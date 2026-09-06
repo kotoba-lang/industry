@@ -1,0 +1,94 @@
+[{:db/id -1
+  :adr/id "adr-2609062900-closing-p2p-video-slice1-disk-and-git-cleanup"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/title "closing — P2P 動画配信 slice #1 の着地、ディスク 8.6 GB → 95 GB の回収、git cleanup の結果と resume point"
+  :adr/status "accepted-closed"
+  :adr/date "2026-09-06"
+  :adr/last_verified "2026-09-06"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "session-closing"
+  :adr/related ["90-docs/adr/2609062800-kotobase-p2p-location-aware-video-delivery.edn"
+                "90-docs/adr/2608171256-kotobase-ipfs-protocol-maturity-and-remaining-gaps.edn"
+                "90-docs/adr/2608124400-shallow-root-and-worktree-depth-fetch.edn"
+                "90-docs/adr/2607051410-net-kotobase-distributed-storage-mesh-design.edn"]
+  :adr/body "# closing 2026-09-06: P2P 動画配信 slice #1 / ディスク回収 / git cleanup
+
+## 1. 着地したもの（default branch に在ることを確認済み）
+
+| repo | 何 | commit / PR | pin |
+|---|---|---|---|
+| com-junkawasaki/root | ADR-2609062800（kotobase.net は public provider になる。動画は CID-addressed segment + client 側 provider ranking） | PR #2958 → `a7bff315` | — |
+| com-junkawasaki/root | ADR-2608171256 G7 を successor へ向けた | 同上 | — |
+| network-awai/app-aozora-engine | slice D5 #1: segment → UnixFS DAG → CARv2 pack、playlist に `/ipfs/<cid>`、`GET|HEAD /ipfs/<cid>`、build 閉包修復、`:live-test` | PR #14 → `366ca9c6` | `63f7352d` |
+| com-junkawasaki/root | ADR-2609062800 の現在地・実測・deploy blocker | PR #2959 → `09a39c93` | — |
+| com-junkawasaki/root | cleanup-land で merge した 9 repo の pin 前進 | `cd70e193`（7 件）/ `14c63120`（control-plane）/ `799a9c01`（net-kotobase-engine） | — |
+
+**検証**: app-aozora-engine `npx shadow-cljs compile live-test && node out/live-tests.js` →
+15 tests / 78 assertions / 0 failures（改竄 pack の負例つき）。`shadow-cljs release live` →
+`live/out/worker.js` 507 KB。`wrangler deploy --dry-run` 通過。1 MiB segment の hash
+コストはこの host（load 約 130）で build+pack 2.7 s / verify+read 1.2 s —— workerd では未測定。
+
+## 2. 未着地・blocked（優先順）
+
+1. **live.aozora.app への deploy。** wrangler OAuth session が失効、Keychain `gftd.cf` は
+   Workers scope 無し、kagi `CLOUDFLARE_GLOBAL_API_KEY` は `no such item`。
+   **再開**: 対話端末で `npx wrangler login` → 下記 §5 の command。
+2. **live probe と round trip の実測**（deploy 後）。ADR-2609062800 D4 の成功指標。
+3. **kotoba-lang/amu PR #824**（cleanup-land が拾った untracked 127 file）。required check
+   `test (ubuntu-latest)` が failing で merge できない。amu の branch protection が
+   GitHub Actions を要求している —— ADR-2607300900（Actions を使わない）と食い違う。
+4. **kotoba-lang/torihiki** の untracked 1,207 file は `cleanup-land` の commit が失敗
+   （API 経由の tree 作成。ローカル無傷、archive 済み）。手で branch に載せる必要がある。
+5. **m365-archive の 137 GB**（§3）。
+
+## 3. ディスク（8.6 GB 空き → 95 GB 空き）
+
+worktree は原因ではなかった。root の worktree は 13 本で計 1.5 GB。本体は annex と pack。
+
+| 場所 | 容量 | 処置 |
+|---|---|---|
+| `orgs/gftdcojp/m365-archive/.git/annex` | 137 GB | **未回収**。`datalad drop` が 10,235 件を `cannot drop modified content, save first` で拒否。working tree に 102,663 件の未コミット変更（HEAD `8945517c` 2026-08-26、`agent/multi-mailbox-ingest` branch あり）。`git annex unused` は 142 key のみ。**`datalad save` するかはオーナー判断** —— save すると新 content が annex に入り、B2 へ `annex copy` してから drop になる |
+| `orgs/cloud-itonami/cloud-itonami-dns-resolver/.git/annex` | 76 GB | **未回収**。2,886 key 全部 B2 に在るので `nbb manifest/west_annex.cljs annex-drop` で回収できるが、`scripts/dns-resolver-resident.cljs --source commoncrawl` が使用中 |
+| `~/.gftd/fleet-ci-cache` | 37.6 GB | `nbb scripts/fleet-ci/prune-cache.cljs --max-age-days 3 --apply` で **28.8 GB 回収**（pin 済み sha は保持。miss の代償は `git archive` 1 回） |
+| `orgs/com-junkawasaki/ghosthacker/.git/objects/pack/tmp_pack_*` | 7.7 GB | 中断 fetch の残骸を削除（60 分より古いもの）。pack 本体 27 GB は本物 |
+| `/private/tmp` の他セッション clone | 4.9 GB | HEAD が GitHub に在り・clean・6h 以上放置の 88 個（2.0 GB）を削除。dirty な 61 個は残した |
+| `~/.gftd/worktrees` / `~/.gftd/dns-resolver-lake` / `~/github/wt/dllm-qwen38/models` | 29 / 16 / 11 GB | resident bot と model weights。触っていない |
+| root `.git/stash-archive-{2026-07-02,20260821,20260822}` | 11.5 GB | 過去 branch の bundle。runbook の可逆性のため保持 |
+
+差分の残り約 45 GB は私の操作の外で空いた（並行セッション）。**測っていない数値は書かない**。
+
+## 4. git cleanup（`git-cleanup-conflict` runbook）
+
+- root: merged 済み local branch 9 本 + codex worktree 2 本（中の子 clone 4 つは GitHub と
+  west に在り）を `.git/stash-archive-2026-09-06/` に archive してから削除。
+  branch 17 → 7、worktree 14 → 12（残りは launchd bot のもの）。
+- stash 3 本（今日 rule-kaizen loop が退避した他 bot の dirty file。west.yml の退行を含む）は
+  active な loop の在庫なので触らず patch を archive。私が FF のために作った 1 本は
+  origin/main と byte 一致だったので archive 後 drop。
+- `cleanup-land.cljs --apply`: merge 済み PR = public-malak #2 / yuubin #2 / app-telecom #4 /
+  tsukuru #3 / aiueos #289 / app-kotoba-cloud #23 / giemon #2 / control-plane #630 / engine #4。
+  draft（merge しない）= tsukuru #4 / aiueos #290 / amu #825 / giemon #3 / grammar #22 / kotoba #585。
+  zap-proxy と torihiki は commit 失敗（ローカル無傷）。
+- 共有 root checkout は origin/main に FF 済み。他 bot の dirty file（`90-docs/adr/2607181900…`、
+  funnel-pulses、observatory datoms、`orgs/kotoba-lang/.env`、agent.log、skills 3 件）はそのまま。
+  `90-docs/business/kotoba-wave-quality-checkpoints.edn` は他セッションの壊れた untracked EDN で、
+  root の commit/push guard を発火させる。触っていない。
+
+## 5. 次の agent の最初の command
+
+```bash
+# 1. deploy（オーナーが対話端末で `npx wrangler login` した後）
+git -C orgs/network-awai/app-aozora-engine fetch network-awai
+git worktree add -b agent/live-deploy orgs/network-awai/app-aozora-engine-wt-deploy network-awai/main  # 兄弟 path: ../../kotoba-lang が解決する
+ln -s $PWD/orgs/network-awai/app-aozora-engine/node_modules orgs/network-awai/app-aozora-engine-wt-deploy/node_modules
+cd orgs/network-awai/app-aozora-engine-wt-deploy && node ../../../scripts/resource-guard.mjs run build -- npx shadow-cljs release live && cd live && npx wrangler deploy
+# 2. probe: startBroadcast → synthetic segment PUT → playlist PUT → playlist に /ipfs/ → GET /ipfs/<cid> が PUT bytes と一致 → 未知 CID 404 / 不正 CID 400
+# 3. round trip 数を ADR-2609062800 に記録
+```
+
+## 改訂履歴
+
+2026-09-06: closing。
+"}]
