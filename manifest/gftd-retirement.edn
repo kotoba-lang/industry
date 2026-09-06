@@ -1,0 +1,139 @@
+;; manifest/gftd-retirement.edn — retiring the `gftd` name, per plane.
+;;
+;; Owner instruction 2026-09-06: "gftd が deprecated なので repo wide に名前を
+;; 適切に変えて欲しい", with two choices made when asked: names are decided
+;; PER PLANE rather than by one blanket substitution, and the scope reaches
+;; the live surfaces (org, domains, keys, jobs).
+;;
+;; ## Why this file exists before any rename happens
+;;
+;; The footprint is 86 west projects, 1,816 files in the root tree, 45
+;; running launchd jobs, 187 entries under ~/.gftd (signing keys and boot
+;; seeds among them), and a large set of *.gftd.ai hosts. A rename that size
+;; is not a command, it is a table -- and the table has to be reviewable
+;; before anything irreversible runs. What follows is that table, the two
+;; things that BLOCK parts of it, and the decisions only the owner can make.
+;;
+;; ## The standing rules this deliberately overrides
+;;
+;; CLAUDE.md says twice that this should not be done:
+;;
+;;   "ドメイン移転で改名しない（登録時点で pin）。名前は discovery alias で
+;;    あって identity ではない" -- with IPFS as the example, where io-ipfs and
+;;    tech-ipfs-* coexist and BOTH ARE CORRECT.
+;;   "一括改名はしない（規則が縛るのは新規登録）" -- for the 77 misplaced
+;;    origin-plane repos.
+;;
+;; The owner was told this and reaffirmed. Recording it here so the next
+;; reader finds the conflict resolved rather than unnoticed: the rules stand
+;; for ordinary origin drift, and this is an owner decision that a deprecated
+;; company identity should not keep naming live infrastructure. CLAUDE.md's
+;; two clauses need the exception written into them when the first wave lands.
+{:plan/id :gftd-retirement
+ :plan/date "2026-09-06"
+ :plan/status :proposed
+
+ :measured
+ {:as-of "2026-09-06"
+  :west-projects 4337
+  :gftd-touching-projects 86
+  :name-carries-gftd 32
+  :org-gftdcojp-repos 73
+  :org-cloud-itonami-repos 13
+  :root-tree-files 1816
+  :launchd-jobs 45
+  :dot-gftd-entries 187
+  :method "manifest/west.yml parsed line-wise (the 4-line regex undercounts: it found 71 of 86, because entries carrying `groups:` break its shape); `git grep -lI` over the root tree; `launchctl list`; `ls ~/.gftd`."}
+
+ ;; ── what stops parts of this, measured rather than assumed ──────────────
+ :blockers
+ [{:id :org-login-rename
+   :what "gftdcojp -> <successor>"
+   :measured "2026-09-06: this token's X-OAuth-Scopes are admin:public_key, delete_repo, gist, read:org, repo, write:packages. No admin:org. The account IS an org admin (user/memberships/orgs/gftdcojp -> role admin, state active), but the token is not, and an organization's login is changed in the Settings UI rather than through the API in any case."
+   :consequence "Cannot be done from here. Owner-in-browser. Everything downstream of it -- 73 repository URLs, every west pin naming them, every deps.edn :git/url, every CI reference -- waits on that one action."
+   :status :owner-action-required}
+  {:id :dot-gftd-directory
+   :what "~/.gftd -> ~/.<successor>"
+   :measured "187 entries, including fleet-ci-signer-tip.pem, fleet-ci-signer.pem, aiueos boot seeds (ipns, ml-dsa-65), node DIDs and a murakumo service token. 45 launchd jobs are loaded against it, and GFTD_STATE_DIR / GFTD_ROOT name it."
+   :consequence "Moving it is not a rename, it is a cutover: every job reads it while running. Stage it -- create the new path, make the old one a symlink, move jobs one at a time, remove the symlink when the last job is off it. A `mv` breaks the fleet-ci signer and the aiueos boot seeds at once."
+   :status :staged-cutover-required}]
+
+ ;; ── the table ───────────────────────────────────────────────────────────
+ ;;
+ ;; :plane is the one that applies, in ADR-2608040100's order (origin, role,
+ ;; family, subject). :why says what the name was carrying that the org path
+ ;; already says -- because in every case here, `<org>/<name>` restates the
+ ;; org, which CLAUDE.md calls redundant-but-not-wrong. The owner decision is
+ ;; that a DEPRECATED origin restated is different from a live one restated.
+ :renames
+ [;; cloud-itonami: the org already carries the identity, and `gftd` is a
+  ;; third restatement on top of it. Role plane throughout -- these are
+  ;; governed actors, and `cloud-itonami-*-actor` is the established form.
+  {:from "cloud-itonami/cloud-itonami-gftd-audio-actor"  :to "cloud-itonami-audio-actor"  :plane :role}
+  {:from "cloud-itonami/cloud-itonami-gftd-avatar-actor" :to "cloud-itonami-avatar-actor" :plane :role}
+  {:from "cloud-itonami/cloud-itonami-gftd-illust-actor" :to "cloud-itonami-illust-actor" :plane :role}
+  {:from "cloud-itonami/cloud-itonami-gftd-motion-actor" :to "cloud-itonami-motion-actor" :plane :role}
+  {:from "cloud-itonami/cloud-itonami-gftd-rig-actor"    :to "cloud-itonami-rig-actor"    :plane :role}
+  {:from "cloud-itonami/cloud-itonami-gftd-sculpt-actor" :to "cloud-itonami-sculpt-actor" :plane :role}
+  {:from "cloud-itonami/cloud-itonami-gftd-voice-actor"  :to "cloud-itonami-voice-actor"  :plane :role}
+  {:from "cloud-itonami/cloud-itonami-ai-gftd-dougaka-actor" :to "cloud-itonami-dougaka-actor" :plane :role}
+  {:from "cloud-itonami/cloud-itonami-ai-gftd-kaisya"    :to "cloud-itonami-kaisya"       :plane :role}
+  ;; Four repos sharing a subject that this workspace owns: that is the
+  ;; family plane, and `dougaka-` is its prefix. `ai-` is not a prefix the
+  ;; taxonomy has -- it says what built the thing, not what the thing is.
+  {:from "cloud-itonami/ai-gftd-dougaka"        :to "dougaka"        :plane :family}
+  {:from "cloud-itonami/ai-gftd-dougaka-kagaku" :to "dougaka-kagaku" :plane :family}
+  {:from "cloud-itonami/ai-gftd-dougaka-kodomo" :to "dougaka-kodomo" :plane :family}
+  {:from "cloud-itonami/ai-gftd-dougaka-vector" :to "dougaka-vector" :plane :family}
+
+  ;; gftdcojp: names that restate the org. These are correct to rename even
+  ;; if the org login never changes, because the redundancy is the whole of
+  ;; what `gftd` contributes here.
+  {:from "gftdcojp/ai-gftd-content-protection" :to "app-content-protection" :plane :role}
+  {:from "gftdcojp/ai-gftd-cyber-drill"        :to "app-cyber-drill"        :plane :role}
+  {:from "gftdcojp/ai-gftd-cybersecurity"      :to "app-cybersecurity"      :plane :role}
+  {:from "gftdcojp/ai-gftd-isekai"             :to "app-isekai"             :plane :role}
+  {:from "gftdcojp/ai-gftd-kotoba"             :to "app-kotoba"             :plane :role}
+  {:from "gftdcojp/ai-gftd-kotobase"           :to "app-kotobase"           :plane :role}
+  {:from "gftdcojp/ai-gftd-shinshi"            :to "app-shinshi"            :plane :role}
+  {:from "gftdcojp/gftdcojp-app-chat-shell"    :to "app-chat-shell"         :plane :role}
+  ;; `business-` is an existing family here (business-edge, business-manager,
+  ;; business-person): the family form wins over further elision.
+  {:from "gftdcojp/gftdcojp-business-manager"  :to "business-manager"       :plane :family}
+  {:from "gftdcojp/gftdcojp-business-person"   :to "business-person"        :plane :family}
+  {:from "gftdcojp/gftdcojp-engi"              :to "engi"                   :plane :subject}
+  {:from "gftdcojp/gftdcojp-omise"             :to "omise"                  :plane :subject}
+  {:from "gftdcojp/gftdcojp-ontology"          :to "ontology"               :plane :subject}
+  {:from "gftdcojp/gftd-llm-dataset"           :to "llm-dataset"            :plane :subject
+   :note "DataLad dataset (git-annex -> B2). Renaming the repo does not move the annex remote; check .datalad/config and the B2 bucket name before landing."}]
+
+ ;; ── what only the owner can decide ──────────────────────────────────────
+ :open
+ [{:id :org-login
+   :question "gftdcojp becomes what?"
+   :context ":org-domain records gftdcojp -> gftd.co.jp -> jp-co-gftd (compressed form). If the company is retired, the successor org login has to be the successor's reverse-DNS, and nothing in this workspace says which identity that is. 73 repositories, every west pin naming them, and every deps.edn :git/url move with it."}
+  {:id :gftd-cli
+   :question "gftdcojp/gftd becomes what?"
+   :context "It is the `gftd` CLI -- README: \"AI-Agent-Driven Development Platform with Autonomous Cybersecurity\". The binary name, GFTD_* env vars and 70-tools/bmc/bin/gftd.cljs all follow whatever this becomes. Role plane, but the taxonomy has no `cli-` prefix, so this is a naming decision rather than a lookup."}
+  {:id :apps-gftdcojp
+   :question "gftdcojp/apps-gftdcojp becomes what?"
+   :context "Not one subject: the checkout holds _working, 00-contracts, 50-infra. A monorepo of the org's apps. Elision alone gives `apps`, which names nothing."}
+  {:id :ai-gftd-dogaka
+   :question "gftdcojp/ai-gftd-dogaka -- is this a misspelling of dougaka, or a separate thing?"
+   :context "cloud-itonami has ai-gftd-dougaka and three siblings. If it is the same subject it should be retired into that family rather than renamed alongside it."}
+  {:id :dated-case-repos
+   :question "250305-jp-gftd-le-case-kaonavi -- does the dated-name convention keep the origin label?"
+   :context "Here `jp-gftd` reads as origin plane rather than as the org restated. Dated case repos may be records of what was true on that date, in which case renaming them falsifies the record."}
+  {:id :gftd-ai-zone
+   :question "*.gftd.ai hosts move to which zone?"
+   :context "auth, authn, analytics, atproto, arms, animeka, manga and more are live. Each is a Cloudflare route plus DNS. The successor zone is not derivable from anything in the tree."}]
+
+ ;; ── order, so that the reversible parts happen first ────────────────────
+ :waves
+ [{:wave 1 :what "This file, plus the CLAUDE.md exception recording that the two no-mass-rename clauses do not bind this program." :reversible? true}
+  {:wave 2 :what "The 13 cloud-itonami renames. GitHub keeps redirects, and west entries + deps.edn pins follow in the same commit. No org, no domain, no key, no job." :reversible? true}
+  {:wave 3 :what "The 14 gftdcojp name renames. Same mechanics; independent of the org login, which is why they can land before it." :reversible? true}
+  {:wave 4 :what "Tree text: the 1,816 files. Mechanical after waves 2-3, and the ADR/history under 90-docs is the part to be careful with -- a record of what was called what on a date should not be rewritten to say otherwise." :reversible? true}
+  {:wave 5 :what "GFTD_* env vars and the launchd job names, one job at a time, each verified running before the next." :reversible? :with-care}
+  {:wave 6 :what "~/.gftd staged cutover (new path, old path as symlink, jobs moved individually, symlink removed last)." :reversible? :with-care}
+  {:wave 7 :what "Org login and the gftd.ai zone. Owner-in-browser; everything above must already be landed, because these break URLs that the earlier waves rewrite." :reversible? false}]}

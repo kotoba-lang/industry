@@ -68,6 +68,30 @@
   - **`CLOUDFLARE_API_TOKEN_AI_GFTD_CDN`** — bucket `ai-gftd-cdn` 用の API token。
   - **`CLOUDFLARE_R2_ACCESS_KEY`** — JSON（`access-key-id` / `secret-access-key` /
     `endpoint` / `bucket`）。S3 互換の R2 アクセス。
+
+    ⚠ **2026-09-06 実測、3 点。この節の記述と実態がまた食い違っている。**
+
+    1. **item は kagi に「在る」**（上の 2026-08-25 の「不在」は解消済み）。JSON の
+       4 キーとも読める。**が `secret-access-key` は通らない** —— `--region auto` を
+       明示しても `SignatureDoesNotMatch`（ListBuckets で再現、クライアント差ではない）。
+       一方 **`access-key-id` は有効**で、temp credential の `parentAccessKeyId` として
+       受理される。**鍵ペアの片側だけが古い。**
+    2. **⚠⚠ `--region auto` を明示しないと、正しい鍵でも `SignatureDoesNotMatch` になる。**
+       この機械の aws config は `ap-northeast-1` を入れており、SigV4 は region を
+       署名スコープに含むので、**R2 は正しい鍵を失効しているように見せる**。
+       実際 2026-09-06 に、これで一度「鍵が古い」と誤診しかけた（temp credential でも
+       同じエラーが出て、region を明示した瞬間に両方の切り分けがついた）。
+       `aws ... --region auto --endpoint-url <r2 endpoint>` を常に付ける。
+    3. **動く経路は temp credential。** Keychain `gftd.cf` / `API_TOKEN` で
+       `POST /accounts/<acct>/r2/temp-access-credentials`
+       （`{bucket, parentAccessKeyId, permission:"object-read-write", ttlSeconds}`、
+       最大 604800 = 7 日）を叩くと accessKeyId / secretAccessKey / sessionToken が返り、
+       **S3 API がそのまま通る**（実測: 20 万バイトと 15.8 MB の PUT→GET がバイト一致）。
+       **バケット 1 つ・オブジェクト読み書きのみに絞れるので、長期の口座鍵より安全。**
+       同じ token で bucket 作成も通る（`etzhayyim-rasen-genome` を APAC に作成）。
+    4. **`GET /user/tokens/verify` はこの token に `Invalid API Token` を返すが、
+       R2 の呼び出しは通る。** account-scoped token に user 面の verify を当てても
+       答えにならない —— **verify の失敗を「token が死んでいる」と読まない。**
   - **`CLOUDFLARE_R2_ACCOUNT_TOKEN`** — R2 Account Token。**2026-08-25 時点で不在**（上記）。
   - **`CLOUDFLARE_R2_DATA_CATALOG_TOKEN`** — R2 Data Catalog (Iceberg) 用。
     **2026-08-25 に発行して kagi に保管済み**（compartment `personal`）。同時に

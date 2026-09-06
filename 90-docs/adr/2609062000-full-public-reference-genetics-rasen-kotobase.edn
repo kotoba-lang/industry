@@ -218,13 +218,59 @@ representable that is ~450M variants and billions of frequency edges — orders 
 beyond ClinVar's ~81M datoms, and not a run this host can hold under any arrangement. It needs
 the storage decision first, and probably a different machine.
 
+## R2 — the storage blocker is gone, and the run is under way (rasen main 079e89ca)
+
+`rasen.methods.shard-archive`. A sealed shard is immutable, so it lives in an object store and
+comes back when something reads it. `archive!` reads every upload BACK and sha256-compares it
+before removing the local file: a PUT returning 200 for a body that was never stored, a partial
+write, a bucket that drops it — each would otherwise end with the canonical bytes gone and the
+ledger discovering it at the next verify, with nothing to restore from. Only sealed shards are
+touched; the last one is still open for appends, and uploading it would store a prefix and call
+it the shard.
+
+**Demonstrated end to end on real R2, not on a mock.** With shard 0 freed locally, `verify!`
+refuses with :shard-missing rather than verifying the shorter chain; restoring it from R2
+returns {:ok true :tx-count 18 :shards 2}. The object is 15,821,265 bytes and the manifest
+carries its sha256.
+
+The source streams from HTTP now, for a measured reason: landing the 442 MB release first
+failed with ENOSPC mid-download. Free space on this host moved between 125 MB and 11 GB during
+the work, driven by other processes. Completeness for a stream rests on gzip's trailer — CRC32
+and uncompressed length, validated at end of stream — which is a stronger check than a byte
+count, not a weaker one. Passing :expect-bytes with a URL is refused rather than ignored.
+
+Steady-state local footprint is one open shard: ~10-30 MB, against ~6.2 GB if nothing were
+offloaded. **The full ClinVar run is streaming as of 2026-09-06**, resumable from its
+checkpoint, at ~252 rows/s.
+
+## Cloudflare R2 — how the credential actually works
+
+Three things the secrets map did not say, all measured 2026-09-06 and written back into it.
+
+`--region auto` must be passed explicitly. This host's aws config sets ap-northeast-1, SigV4
+puts the region in the signing scope, and R2 answers SignatureDoesNotMatch — **a correct key
+looks revoked**. That misdiagnosis was made once here before the region was pinned.
+
+The working path is a temp credential: keychain gftd.cf/API_TOKEN against
+POST /accounts/<acct>/r2/temp-access-credentials, scoped to one bucket, object-read-write, up
+to 7 days. Better than a long-lived account key, not worse. The kagi
+`CLOUDFLARE_R2_ACCESS_KEY` is present again (the map said absent) but only half-valid: its
+secret fails even with the region pinned, while its access-key-id is accepted as the temp
+credential's parent.
+
+`GET /user/tokens/verify` returns \"Invalid API Token\" for this account-scoped token while its
+R2 calls succeed. A failed verify there is not evidence the token is dead.
+
 ## Not done, and blocking
 
-1. **Storage.** 2.3 GB free; ClinVar alone needs ~6.2 GB and gnomAD is far larger. Nothing
-   further runs until the ledger has somewhere to live (B2 + DataLad per the large-binary rule).
-2. **A credential for kotobase.net.** Owner action; see above.
-3. **Migrating the live single-file ledger** onto shards, together with pointing
-   `publish.cljc` / `datom-emit` at them.
+1. **A credential for kotobase.net.** Owner action — the datom plane is Biscuit-required and
+   the operator seed is a write-only Cloudflare secret by design; the archive token reads
+   `no such item` today. This is the only thing still blocking the projection half.
+2. **gnomAD at scale.** The extractor is verified on real records, but v4.1 genomes is on the
+   order of 760M variants, ~58.8% of them representable, and that is a different order of
+   magnitude from ClinVar. It needs its own run plan on top of the R2 offload.
+3. **Migrating the live single-file ledger** onto shards, with `publish.cljc` / `datom-emit`
+   pointed at them.
 
 ## Notes for whoever continues
 
