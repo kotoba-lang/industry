@@ -108,6 +108,33 @@
   ["ai-kaisya still carries `ai-`, which the taxonomy does not have. The obvious target `kaisya` is a DIFFERENT repository (id 1305773355 vs 1284883752), so this is a naming decision rather than an elision."
    "fleet-db.edn (genpon) still records the old names with :repo-path. `kagami reconcile` absorbs west.yml into it, and its input must be origin/main's west.yml -- not run here."]}
 
+ ;; ── owner answers, 2026-09-06 ───────────────────────────────────────────
+ :decisions
+ {:org-login "gftdcojp STAYS. No org rename. Repos that belong to itonami (or elsewhere) MOVE; repos that are business records STAY and are archived where they are. This retires the blocker that needed admin:org -- there is nothing to do in Settings."
+  :gftd-cli "gftdcojp/gftd -- 除去してよい. NOT deleted here: 43 files in the root tree reference it, including two live skills (build-actor, secrets-location-map) and a set of ADRs. Deletion is irreversible and unregistering plus archiving achieves the same removal from use, so that is what a later wave does; say the word and it is one API call."
+  :apps-gftdcojp "業務用 archive. Stays in gftdcojp."
+  :kaonavi "250305-jp-gftd-le-case-kaonavi -- 記録用 archive. Stays. A dated case repo is a record of what was filed on that date; renaming it would falsify the record, which is what the plan suspected."
+  :dogaka "ai-gftd-dogaka -> unify into dougaka. Measured: it already redirects to cloud-itonami/dogaka, a 3 KB repo distinct from cloud-itonami/dougaka (1284882156). Unifying means retiring dogaka, not renaming it -- the name it would take is occupied by the live one."
+  :gftd-ai "All *.gftd.ai resources move to itonami.cloud."}
+
+ ;; ── wave 3: the same finding as wave 2, at four times the size ──────────
+ :wave-3-result
+ {:landed "west.yml commit f808f3cb51cedc871679c2aaaad4817f4b3ec861, 37 entries"
+  :measured "The gftdcojp org holds 37 repositories. west.yml had 73 entries under orgs/gftdcojp/. Resolving each one's actual owner: 38 already live in cloud-itonami, 34 still in gftdcojp, 1 in com-junkawasaki. The move the owner asked for had already happened for 38 of them, upstream, and every entry still worked through a GitHub redirect."
+  :what-changed "37 entries now name where their repositories actually are -- name, remote AND path. The script gained org moves, which is the same event the manifest sees as a stale name: a transferred repository keeps answering on its old owner."
+  :refused
+  [{:entry "ai-gftd-kotobase" :target "cloud-itonami/kotobase"
+    :why "west project names are unique across the manifest and `kotobase` is taken by kotoba-lang/kotobase -- a different repository. It needs a west name that differs from its repo path (cloud-itonami-kotobase with repo-path kotobase), which is a shape the script does not write yet."}]
+  :verified-after "4,337 projects (unchanged), 0 duplicate names, 0 duplicate paths, orgs/gftdcojp entries 73 -> 36, entries naming gftd 32 -> 13."
+  :remaining-13
+  {:cloud-itonami-duplicates ["ai-gftd-dougaka" "ai-gftd-dougaka-vector" "cloud-itonami-ai-gftd-dougaka-actor"]
+   :needs-a-distinct-west-name ["ai-gftd-kotobase"]
+   :still-in-gftdcojp-and-to-classify
+   ["250305-jp-gftd-le-case-kaonavi (archive, decided)" "apps-gftdcojp (archive, decided)"
+    "gftd (remove, decided)" "gftd-llm-dataset" "gftdcojp-ontology"
+    "ai-gftd-cyber-drill" "ai-gftd-cybersecurity" "ai-gftd-kotoba" "ai-gftd-local"]}
+  :next "Classify the 34 repositories still in gftdcojp as 移動 or archive. The ones already decided are marked above; the rest need a look at what each is."}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
