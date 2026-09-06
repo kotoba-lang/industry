@@ -2314,6 +2314,34 @@
                    "test/nbb/fixtures/lazy-sequence.kotoba"]
    :ship-git-deps true :cd false}
 
+  ;; The package lock, produced and consumed, with java/clojure/clj/javac
+  ;; trapped on PATH. ADR-kotoba-package-cid-lock carried M5 -- some CLI
+  ;; consumes the lock -- as outstanding from 2026-06-30 to 2026-09-06; the
+  ;; consumer now exists and binds a materialised tree to the lock with five
+  ;; checks. This gate is what keeps five from quietly becoming four.
+  ;;
+  ;; :cap :node is load-bearing rather than a placement hint. Two of those
+  ;; checks (signature verification, manifest integrity) were :clj-only until
+  ;; 2026-09-06, and the JVM suite was green the whole time they were
+  ;; unreachable from Node -- a gate that tolerated a JDK on PATH could pass
+  ;; while the property it names was false.
+  ;;
+  ;; Discrimination measured 2026-09-06 before landing, against a local copy
+  ;; (this machine's npx mangles `--classpath`; the nodes' does not):
+  ;;   tree-cid check replaced by nil        exit 1  "suite failed: 2 case(s)"
+  ;;   kotoba-core-contracts out of deps.edn exit 91 lock did not resolve
+  ;;   test/nbb/package_lock.cljs removed    exit 90 required input is missing
+  ;;   unmodified                            exit 0  15 cases, 9 refusals
+  {:name "amu" :id "amu-package-lock" :gate :nbb-script :cap :node
+   :script "gates/amu-package-lock-check.cljs"
+   :include-ext [".cljs" ".cljc" ".edn" ".json"] :min-files 120
+   :require-paths ["test/nbb/package_lock.cljs"
+                   "src/kotoba/compiler/nbb/package_lock.cljs"
+                   "src/kotoba/compiler/nbb/package_authoring.cljs"
+                   "src/kotoba/compiler/nbb/project_source.cljs"
+                   "deps.edn" "deps-lock.edn"]
+   :ship-git-deps true :cd false}
+
   {:name "amu" :id "amu-portable-surface" :gate :nbb-script :cap :node
    :script "gates/amu-portable-surface-check.cljs"
    :include-ext [".cljc" ".cljs" ".edn"] :min-files 120
