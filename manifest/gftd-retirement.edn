@@ -135,6 +135,36 @@
     "ai-gftd-cyber-drill" "ai-gftd-cybersecurity" "ai-gftd-kotoba" "ai-gftd-local"]}
   :next "Classify the 34 repositories still in gftdcojp as 移動 or archive. The ones already decided are marked above; the rest need a look at what each is."}
 
+ ;; ── wave 4: the last of the gftd-named repositories ─────────────────────
+ ;;
+ ;; Owner 2026-09-06: 衝突していたら itonami 側を優先, and for the seven that
+ ;; were left, 削除または移動 — gftd からはいずれにしても delete.
+ :wave-4-result
+ {:duplicates-removed
+  {:landed "west.yml d3468855"
+   :entries ["ai-gftd-dougaka" "ai-gftd-dougaka-vector" "cloud-itonami-ai-gftd-dougaka-actor"]
+   :why "cloud-itonami already registered the same repositories at the same pins under dougaka, dougaka-vector and dougaka-actor. itonami side kept, per the owner's rule."}
+  :moved-to-cloud-itonami
+  {:landed "GitHub transfers + renames, west.yml b2259263"
+   :entries [["gftd-llm-dataset" "llm-dataset" "DataLad dataset; the git-annex content lives in B2 and does not move with the repository. Deleting it would have orphaned the annex, which is why this one is a move rather than a delete."]
+             ["ontology" "ontology" "DoDAF 2.0 ontology, 688 KB, pushed the day before this. Name carried no gftd; only the org did."]
+             ["ai-gftd-cybersecurity" "cybersecurity" "5.6 MB. NIST CSF 2.0 / CIS v8.1 / SP 800-53 normalised into capabilities — a reusable subject, not an actor, so the subject plane rather than app-."]
+             ["ai-gftd-local" "app-local-ai" "Local-first AI harness. Role plane: cloud-itonami already has an app- family. Bare `local` would have named nothing."]]}
+  :deleted
+  {:landed "west.yml 81721237"
+   :entries [["ai-gftd-cyber-drill" "83 KB, archived, last pushed 2026-07-29"]
+             ["ai-gftd-kotoba" "1 KB, archived, last pushed 2026-06-30"]]
+   :preserved "Mirror bundles under ~/repo-archive/, one per repository, each verified with `git bundle verify` before anything was deleted. All six repositories touched in this wave were bundled first, not only the two that were deleted, because a transfer is only reversible while you still know what was in it."}
+  :still-blocked
+  {:entry "ai-gftd-kotobase"
+   :repository "already cloud-itonami/kotobase — only the west entry name is stale"
+   :why "It wants the west name `kotobase`, which belongs to kotoba-lang/kotobase: 731 KB, pushed daily, 'Datom database of the Kotoba stack', gated at scripts/fleet-ci/gates.edn and named in four repo-bots entries. The itonami side is 10 KB with no description. The owner's 'itonami 側を優先' was answering about gftd-era collisions; this one is an unrelated repository that happens to share a word, and applying the rule here would rename the core database's entry and break its gate. Proposed instead: cloud-itonami-kotobase with repo-path kotobase, the same shape 1,451 other entries already use."}
+  :remaining-gftd-named
+  ["250305-jp-gftd-le-case-kaonavi (archive, decided — stays)"
+   "apps-gftdcojp (archive, decided — stays)"
+   "ai-gftd-kotobase (blocked, above)"]
+  :measured-after "4,333 projects, 0 duplicate names, orgs/gftdcojp entries 36 -> 29. The three moved checkouts were re-placed by west and verified at their pinned commits."}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
