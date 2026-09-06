@@ -66,7 +66,7 @@ multicodec table を実測して選んだ（2026-09-06）:
 |---|---|---|
 | **S1** | wire の名前 + surface の実装 | **2026-09-06 landed** |
 | **S2** | deploy —— Worker shell に載せ、本番 block 面の実 CID に対して smoke | **2026-09-06 landed**（下記） |
-| S3 | advertise —— 広告 chain の metadata に IPQ を並記し、cid.contact が返すことを実測。`verify-ipni-publisher-record` に metadata の assertion を足す | protocol ID が静かに落ちたら赤くなること |
+| **S3** | advertise —— 広告 chain の metadata に IPQ を並記 | **2026-09-06 landed**（gate は赤のまま。下記） |
 | S4 | consume —— `ayatori.discovery` が IPQ provider を優先し、`ayatori.remote` が per-block GET の代わりに selection を使う | round trip 数で測る（bytes でも wall clock でもない） |
 | S5 | IPQ/2 —— authenticated index boundaries | 未着手・未スケジュール |
 
@@ -162,6 +162,75 @@ datom 面に載せる経路で、selector engine が読む先として誤り。A
 受理する移行期間を置く（`ipq-selection-http-registration-request` を
 定数として隣に置いてあるのはそのため）。
 
+## S3 で landed したもの（2026-09-06）—— そして仕様の散文が外れていた
+
+**gate を先に書いて赤くしてから publisher を直した。** 現在:
+
+    ok   advertisement-metadata-is-well-formed  —  1 protocol(s): transport-ipfs-gateway-http
+    FAIL advertisement-announces-ipq            —  not announced: not-ipq (found 2336)
+
+`not-ipq` であって `undecodable` ではない —— field は読めて、IPQ が本当に無い。
+この 2 つは別の文で、片方は provider について、もう片方は reader についての話である。
+
+### 仕様の散文と参照実装が食い違い、参照実装が勝った
+
+IPNI.md は metadata を「uvarint の protocol 識別子 + protocol 固有バイト、追加の
+protocol について繰り返す」と書き、gateway-http には「no following metadata」と
+書いている。**それは wire format ではない。** go-libipni v0.8.2（indexer が実際に
+動かす実装）に対して 2026-09-06 に測った:
+
+    a012                 REJECTED  expected 3 readable bytes but read 2
+    a01200               accepted
+    a01200c092c00101     REJECTED  EOF
+    a01200c092c0010101   accepted  [gateway-http Code(3148096)]、remarshal がバイト一致
+
+真の framing は uvarint(protocol) ++ uvarint(payload長) ++ payload で、
+「no following metadata」は**長さ 0 の payload** であって長さの不在ではない。
+
+**この測定は、同じ日に landed させた 2 つを反転させた:**
+
+- 本番広告の末尾 00 を「仕様に無い自作の 1 バイト」と書いたが、**それは長さ 0 の
+  接頭辞で正しい。** 誤っていたのは 2 バイトを出していた gateway-http-bytes の方で、
+  無害だったのは publish するのが cljs ではなく ipni-drain だったからにすぎない。
+- landed させた ipq-selection-http-bytes は長さ接頭辞を欠いており、**wire では
+  EOF で拒否される。** go-libipni は未登録 code を Unknown として読み、Unknown は
+  code → 長さ → payload の順に読む。
+
+**bitswap だけは参照実装の中でも例外**で、長さ接頭辞を持たない裸の識別子なので後ろに
+何も連結できない（801200a01200 は拒否される）。encode-sequence はそれを出すことを拒否する。
+
+### 守り
+
+**参照実装に対する conformance を committed test にした**（net-kotobase/ipfs の
+ipni-drain/test/go-compat/metadata_test.go、npm test に接続）。両方向の control 付き
+—— 2 バイト gateway が拒否されること、長さ無し IPQ が拒否されることを assert しないと、
+受理側の assert は何も証明しない。**1 つの wire format について独立した 2 つの言明**が
+あることが要点で、それが 1 日ずれていたのがこの訂正である。
+
+### 検査を書く途中で 3 回間違えた
+
+どれも「測れなかった」が「測って問題なかった」と同じ顔をする形:
+
+1. 広告 block を publisher-host から取っていた。ipni.kotobase.net は publisher 面で
+   全 path に surface descriptor を返すので、/ipfs/<cid> は JSON を返し、抽出器は
+   Metadata を見つけられない —— **Metadata を持たない広告と見分けが付かない。**
+   取得元は、直前の check が「serve できる」と証明した retrieval host にした。
+2. resolve が nil を返すのは「namespace が古い」ときも「無い」ときも同じで、その nil を
+   呼ぶと run 全体が途中で死ぬ。両方の fn を揃って要求するようにした。
+3. **nbb の require は top-level form の間でしか await されない。** def の中に畳んだら、
+   checkout が在って正しいのに全 resolve が nil になり、:unmeasured を返し続けた。
+
+### まだ言えないこと
+
+**広告はまだ出ていない。** drain は outbox event（= 次の pin）で publish する Queue
+consumer なので、IPQ を載せた最初の広告はその時点で出る。それまで
+advertisement-announces-ipq は赤のままで、**それが正しい状態である。** 緑になったら、
+それは「広告が出た」ことの観測であって、誰かが手で報告した事実ではない。
+
+着地: io-ipni-specs 082c9916 / net-kotobase/ipfs 2ffdffc6（drain version
+175f6148-6cdd-4bf4-acd3-8b7dda04bdf0）/ root 554d898e /
+kotobase-protocol-core b7ddcd48。
+
 ## 現在地と再開点（2026-09-06 closing）
 
 **landed**: S1（wire の名前 + 純関数の surface）と S2（deploy + 本番 smoke）。
@@ -182,11 +251,9 @@ S3 の最初の 1 手は publisher を直すことではなく、**検査を先�
     # 3. cid.contact に反映されたことを実測する
     curl -sS https://cid.contact/cid/<advertised-cid>
 
-⚠ **S3 は「metadata を 2 つ持てるか」を先に確かめる必要がある。** IPNI の
-advertisement は Metadata を 1 フィールドしか持たない（実測した本番広告 block
-bafyreiaupk64… の Metadata は A0 12 00 = gateway-http + 1 byte）。
-2 つの transport を名乗るのが 1 広告の複数 metadata なのか、context-id の違う
-2 本の広告なのかは **IPNI 仕様に当たって決める**こと。ここを推測で決めない。
+✅ **その問いは答えが出た**（上の S3 節）。1 広告・1 Metadata フィールドの中に
+uvarint(protocol) ++ uvarint(長さ) ++ payload を昇順に連結する。context-id を分ける
+必要はない。A0 12 00 の末尾 00 は長さ 0 であって余分ではなかった。
 
 S4（consume）と S5（IPQ/2）は未着手のまま。S4 の測り方は round trip 数であって
 bytes でも wall clock でもない。
