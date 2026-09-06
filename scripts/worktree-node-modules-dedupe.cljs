@@ -23,7 +23,7 @@
 ;; Never touches a worktree that is busy (process cwd inside it, or named on
 ;; a command line), locked, or whose repo cannot be found. Dry-run by default.
 ;;
-;;   nbb scripts/worktree-node-modules-dedupe.cljs [--root <dir>] [--repo orgs/<org>/<repo>] [--limit N] [--apply]
+;;   nbb scripts/worktree-node-modules-dedupe.cljs [--root <dir>] [--repo orgs/<org>/<repo>] [--limit N] [--apply] [--force]
 ;;   exit 0 = answered, 1 = a step failed, 2 = could not answer (lsof / pnpm missing, nothing scanned)
 (require '[clojure.string :as str])
 
@@ -55,8 +55,10 @@
 (defn ls-dirs [p]
   (try (->> (.readdirSync fs p #js {:withFileTypes true}) (filter #(.isDirectory %)) (map #(.-name %)) vec)
        (catch :default _ [])))
-(defn free-kb [] (js/parseInt (last (re-seq #"\S+" (last (str/split-lines (str/trim (:out (sh "df -k /"))))))) 10))
-(defn df-free [] (let [l (last (str/split-lines (str/trim (:out (sh "df -k /")))))] (js/parseInt (nth (str/split l #"\s+") 3) 10)))
+(defn df-free
+  "Free KB on the volume that holds p. `df /` on macOS answers for the sealed
+  system snapshot, not the Data volume the worktrees live on — ask for the path."
+  [p] (let [l (last (str/split-lines (str/trim (:out (sh (str "df -k " (q p)))))))] (js/parseInt (nth (str/split l #"\s+") 3) 10)))
 
 (defn repos []
   (for [org (ls-dirs (.join path root "orgs")) r (ls-dirs (.join path root "orgs" org))
@@ -92,19 +94,25 @@
 (defn bins [wt] (set (try (vec (.readdirSync fs (.join path wt "node_modules" ".bin"))) (catch :default _ []))))
 
 (defn dedupe! [repo wt]
-  (let [before-bins (bins wt) f0 (df-free)
+  (let [before-bins (bins wt) f0 (df-free wt)
         imp (if (exists? (.join path wt "pnpm-lock.yaml")) {:exit 0 :out "(pnpm-lock.yaml present)"} (sh "pnpm import" wt))]
     (if (not= 0 (:exit imp))
       {:ok false :step "pnpm import" :err (str/trim (or (:err imp) (:out imp)))}
       (do (when-not (exists? (.join path wt ".npmrc")) (.writeFileSync fs (.join path wt ".npmrc") "node-linker=hoisted\n"))
           (exclude! repo)
           (.rmSync fs (.join path wt "node_modules") #js {:recursive true :force true})
-          (let [ins (sh "pnpm install --frozen-lockfile --prefer-offline" wt)
-                after-bins (bins wt) f1 (df-free)
+          (let [f-rm (df-free wt)
+                ins (sh "pnpm install --frozen-lockfile --prefer-offline" wt)
+                after-bins (bins wt) f1 (df-free wt)
                 lost (remove after-bins before-bins)]
+            ;; two deltas, reported separately: what rm gave back and what the
+            ;; install took. On a busy disk the sum is noisy; the second number
+            ;; is the one that says whether the store is being shared.
             (cond (not= 0 (:exit ins)) {:ok false :step "pnpm install" :err (str/trim (or (:err ins) (:out ins)))}
                   (seq lost) {:ok false :step "floor: .bin entries lost" :err (str/join "," lost)}
-                  :else {:ok true :df-delta-mb (js/Math.round (/ (- f1 f0) 1024)) :bins (count after-bins)}))))))
+                  :else {:ok true :rm-freed-mb (js/Math.round (/ (- f-rm f0) 1024))
+                         :install-took-mb (js/Math.round (/ (- f-rm f1) 1024))
+                         :bins (count after-bins)}))))))
 
 (defn log! [m] (try (.mkdirSync fs (.dirname path receipt) #js {:recursive true})
                     (.appendFileSync fs receipt (str (js/JSON.stringify (clj->js m)) "\n")) (catch :default _ nil)))
@@ -120,14 +128,16 @@
             :while (< (:done @c) limit)]
       (swap! c update :scanned inc)
       (cond
+        (and (exists? (.join path p "node_modules" ".modules.yaml")) (not (flag? "--force")))
+        (do (swap! c update :skipped inc) (println (str "skip  " (:rel repo) "  " p "  (already pnpm-managed; --force to redo)")))
         (:locked wt) (do (swap! c update :skipped inc) (println (str "skip  " (:rel repo) "  " p "  (locked)")))
         (and idx (busy? idx p)) (do (swap! c update :skipped inc) (println (str "skip  " (:rel repo) "  " p "  (busy)")))
         (not apply?) (do (swap! c update :done inc)
                          (println (str "WOULD " (:rel repo) "  " p "  node_modules=" (str/trim (first (str/split (:out (sh (str "du -sk " (q (.join path p "node_modules"))))) #"\t"))) "KB(du)")))
-        :else (let [r (dedupe! repo wt)]
+        :else (let [r (dedupe! repo p)]
                 (log! (merge {:at (.toISOString (js/Date.)) :repo (:rel repo) :path p} r))
                 (if (:ok r)
-                  (do (swap! c update :done inc) (println (str "DONE  " (:rel repo) "  " p "  df " (if (pos? (:df-delta-mb r)) "+" "") (:df-delta-mb r) "MB  .bin=" (:bins r))))
+                  (do (swap! c update :done inc) (println (str "DONE  " (:rel repo) "  " p "  rm freed " (:rm-freed-mb r) "MB, install took " (:install-took-mb r) "MB  .bin=" (:bins r))))
                   (do (swap! c update :failed inc) (println (str "FAIL  " (:rel repo) "  " p "  " (:step r) ": " (:err r))))))))
     (let [{:keys [scanned done skipped failed]} @c]
       (println (str "SCANNED " scanned " done " done " skipped " skipped " failed " failed))
