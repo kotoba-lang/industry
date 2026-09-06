@@ -22,11 +22,13 @@
 ;;   contracts/lib/      vendored な第三者サイト。我々が書いていない
 ;;   m365-archive/       OneDrive 履歴の DataLad dataset。live なコードではない
 ;;   :max-files 超       1 repo に多数ある repo はこの波の対象外（上記の理由）
+;;   archived            push を受け付けない。**着地できない**（下）
 ;;
 ;; ## exit code
 ;;
 ;;   0  測れた（候補 0 本でも 0。これは gate ではなく測定器）
-;;   2  **測れなかった** —— orgs/ が無い、find が失敗した、走査 0 件。
+;;   2  **測れなかった** —— orgs/ が無い、find が失敗した、走査 0 件、
+;;      west.yml から archived 印を読めなかった。
 ;;      0 と区別されることが要点（ADR-2608136000）。
 
 (ns svelte-cljs-wave-tick
@@ -109,6 +111,87 @@
           (let [i (str/index-of r "/svelte/")]
             (when i (subs r 0 (+ i 7)))))
         rels))
+
+(defn- manifest-facts
+  "west.yml から 2 つの集合を読む。
+   `{:paths #{登録済み path} :archived #{archived と印の付いた path}}`。
+   **読めなかった / 1 件も path を拾えなかった場合は nil**（= 測れなかった）。
+
+   ## :archived —— 「まだ着地していない」ではなく「着地できない」
+
+   実測 2026-09-07: この tick は archived な repo を候補に出していた。
+   `open-banking` に agent を 1 本投げ、11 分 194k token を使ったあとに
+   `This repository was archived so it is read-only.` で push が拒否された ——
+   **着地できない仕事と、まだ着地していない仕事が、同じ顔で候補に並んでいた。**
+   west.yml は最初からそれを知っていて（`groups: [archived]` /
+   `userdata: {archived: true}`）、tick が訊いていなかっただけ。
+   同じ形の repo は測った時点で pool に 9 件在る。
+
+   ⚠ **これは GitHub の状態の写しであって GitHub ではない。** manifest が
+   遅れている可能性は消えないので、最終候補には `archived-on-github` で
+   直接訊く（下）。ここは全候補に当てられる安い一次フィルタ。
+
+   ## :paths —— 改名前の古い checkout を候補にしない
+
+   実測 2026-09-07: 候補に出た `orgs/cloud-itonami/open-cofog` は west.yml にも
+   fleet-db にも無かった。GitHub 側で **`org-un-cofog` に改名済み**で、この path は
+   改名前の残骸だったため（`gh api repos/cloud-itonami/open-cofog` は
+   `cloud-itonami/org-un-cofog` を返す）。
+
+   残骸が厄介なのは、**誰もそれを更新しないので永久に候補であり続ける**こと。
+   pin が無いので `west update` が触らず、`svelte/` が消えないまま毎周
+   候補に並び、毎周 agent が『移行』して no-op を着地させる。実際この周は
+   `open-cofog`（残骸）と `org-un-cofog`（本体）が**同じ 1 個の GitHub repo に
+   対して 2 つの候補として並んだ**。
+
+   撤去は git-cleanup-conflict の仕事なので、ここでは候補にしないだけにする。
+   **名前を出して報告する**（黙って除くと移行が進んだように見える）。"
+  []
+  (try
+    (let [txt   (str (.readFileSync fs (path.join root "manifest" "west.yml") "utf8"))
+          state (reduce
+                 (fn [{:keys [cur] :as st} l]
+                   (cond
+                     (re-find #"^\s*- name:\s*\S" l)
+                     (assoc st :cur nil)
+
+                     (re-find #"^\s*path:\s*\S" l)
+                     (let [p (second (re-find #"^\s*path:\s*(\S+)" l))]
+                       (-> st (assoc :cur p) (update :paths conj p)))
+
+                     (and cur (re-find #"^\s*groups:.*\barchived\b" l))
+                     (update st :acc conj cur)
+
+                     (and cur (re-find #"^\s*archived:\s*true\s*$" l))
+                     (update st :acc conj cur)
+
+                     :else st))
+                 {:cur nil :acc #{} :paths #{}}
+                 (str/split-lines txt))]
+      ;; evidence floor —— path を 1 件も拾えていないなら parse が壊れている。
+      ;; 空集合を「archived は無い」「登録が無い」として返さない（ADR-2608136000）。
+      (when (seq (:paths state))
+        {:paths (:paths state) :archived (:acc state)}))
+    (catch :default _ nil)))
+
+(defn- archived-on-github
+  "GitHub 本体に訊く。true / false / :unmeasured。
+
+   manifest の印は写しなので、**agent に渡す直前の候補だけ**はここで直接訊く。
+   訊けなかったことを false に畳まない —— それをやると、この関数が在ることで
+   かえって「確かめた」という誤った安心が付く。"
+  [{:keys [org name]}]
+  (try
+    (let [r (.spawnSync cp "gh"
+                        (clj->js ["api" (str "repos/" org "/" name) "--jq" ".archived"])
+                        #js {:encoding "utf8" :timeout 30000})]
+      (if (not= 0 (aget r "status"))
+        :unmeasured
+        (case (str/trim (str (aget r "stdout")))
+          "true"  true
+          "false" false
+          :unmeasured)))
+    (catch :default _ :unmeasured)))
 
 (defn- custody-gated?
   "その repo が **machine-enforced な custody 契約**を持っていれば true。触らない。
@@ -243,7 +326,14 @@
       (println "SCANNED\t0")
       (js/process.exit 2))
 
+    (when (nil? (manifest-facts))
+      (println "REFUSING\tmanifest/west.yml を読めなかった —— archived / 登録の判定ができない")
+      (println (str "SCANNED\t" (count rels)))
+      (js/process.exit 2))
+
     (let [by-repo (reduce (fn [m r] (update m (repo-of r) (fnil conj []) r)) {} rels)
+          {:keys [paths archived]} (manifest-facts)
+          arch    archived
           pool    (count by-repo)
           cands   (->> by-repo
                        (keep (fn [[repo fl]]
@@ -261,7 +351,18 @@
           ;; in-flight 判定は 1 repo 1 network round trip なので、順位上位だけに当てる。
           ;; custody 判定はローカル（安い）ので全候補に当てる。
           custody (atom [])
+          ;; archived は「まだ着地していない」ではなく「着地できない」。
+          ;; ローカルで判る（west.yml の写し）ので全候補に当てる。
+          archived (atom [])
+          ;; 改名前の残骸は誰も更新しないので、除かないと毎周候補に出続ける。
+          unregistered (atom [])
           open    (->> cands
+                       (remove (fn [c]
+                                 (when-not (contains? paths (:repo c))
+                                   (swap! unregistered conj (:repo c)) true)))
+                       (remove (fn [c]
+                                 (when (contains? arch (:repo c))
+                                   (swap! archived conj (:repo c)) true)))
                        (remove (fn [c]
                                  (when (custody-gated? c)
                                    (swap! custody conj (:repo c)) true)))
@@ -276,6 +377,12 @@
                                    nil         false
                                    :unmeasured (do (swap! unmeasured conj (:repo c)) true)
                                    (do (swap! skipped conj (:repo c)) true))))
+                       ;; manifest は写しなので、渡す直前の候補だけ GitHub に直接訊く。
+                       (remove (fn [c]
+                                 (case (archived-on-github c)
+                                   false       false
+                                   :unmeasured (do (swap! unmeasured conj (:repo c)) true)
+                                   (do (swap! archived conj (:repo c)) true))))
                        (take limit)
                        vec)
           rec {:at (.toISOString (js/Date.))
@@ -283,6 +390,8 @@
                :files (count rels)
                :eligible (count (filter #(<= (count (second %)) max-files) by-repo))
                :limit limit
+               :unregistered-skipped @unregistered
+               :archived-skipped @archived
                :custody-skipped @custody
                :in-flight-skipped @skipped
                :unmeasured-skipped @unmeasured
@@ -292,6 +401,11 @@
       (println (str "SCANNED\t" (count rels)))
       (println (str "POOL\t" pool "\trepos still carrying .svelte"))
       (println (str "ELIGIBLE\t" (:eligible rec) "\t(<=" max-files " files/repo)"))
+      ;; 「着地できない」を「まだ着地していない」に畳まない。
+      (println (str "UNREGISTERED-SKIPPED\t" (count @unregistered)
+                    (when (seq @unregistered) (str "\t" (str/join " " @unregistered)))))
+      (println (str "ARCHIVED-SKIPPED\t" (count @archived)
+                    (when (seq @archived) (str "\t" (str/join " " @archived)))))
       (println (str "CUSTODY-SKIPPED\t" (count @custody)
                     (when (seq @custody) (str "\t" (str/join " " @custody)))))
       (println (str "IN-FLIGHT-SKIPPED\t" (count @skipped)
