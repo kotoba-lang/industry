@@ -1,0 +1,129 @@
+;; The SUBSTRATE lens. A second rubric over the same method as
+;; manifest/architecture-fit-rubric.edn, asking a different question.
+;;
+;; The first rubric measured fit with the Kotoba guest language surface as it
+;; ships -- what the compiler admits today. It has one blind spot, and it is a
+;; large one: it does not look at the substrate the language was built to sit
+;; on. Definition CIDs (Unison), IPLD values, IPNI provider records, IPFS
+;; retrieval, CARv2 packs and biscuit attenuation are not seven implementation
+;; details underneath an application; they decide what shape an application
+;; should have. An architecture can pass every language check and still be
+;; wrong for a system where identity is a hash and authority is a token.
+;;
+;; So this file scores from the substrate down, and deliberately does NOT ask:
+;;   - does an implementation of this exist in this workspace
+;;   - does a capability kit cover it
+;;   - what did the other rubric say
+;; Those are adoption questions. This one is a design question.
+;;
+;; Same rules as the other lens: no score is authored in the dataset, the
+;; scorer derives every number, and a disagreement is expressed by editing a
+;; level here and recomputing.
+{:kotoba.substrate-fit.rubric/version 1
+ :as-of "2026-09-06"
+ :kotoba.substrate-fit.rubric/adr "adr-2609061800-kotoba-web-architecture-fit"
+ :kotoba.substrate-fit.rubric/authority
+ "The substrate this scores against is named by its own repos and ADRs, not by this file:
+  Unison-style definition identity (kotoba-kir definition CID), IPLD (kotoba-lang/io-ipld),
+  CARv2 packs (io-ipld-car, ADR-2608160100), IPNI (io-ipni-specs), IPFS retrieval
+  (io-libp2p bitswap, tech-ipfs-specs-*), biscuit (org-biscuitsec), and the five canonical
+  IRs of ADR-2608160200."
+
+ :entry-contract {:group-key :arch/layer :require [:arch/evidence :arch/note]}
+ :scale {:min 0 :max 10 :axes 8 :total-max 80}
+
+ :rule
+ {:derived-not-authored "No entity in the dataset carries a score."
+  :one-level-per-axis "Each architecture names exactly one level per axis; an unknown level is a validation failure."
+  :not-adoption "This ranks design fit with a content-addressed substrate. It says nothing about whether an implementation exists, and a high score is not a recommendation to build it this week."
+  :layers-not-rivals "Entries carry :arch/layer. The top of the table is not one winner; it is one answer per layer, and they compose."}
+
+ :axes
+ [{:axis :cid-identity
+   :label "同一性 — 単位はそれ自身のハッシュで名指せるか"
+   :substrate "Unison definition CID + IPLD value CID"
+   :what "If the unit of the architecture is named by where it is rather than by what it is, then caching, sharing, verification and replay each need a separate mechanism invented on top. If it is named by its hash, all four come from the same fact."
+   :levels {:definition-and-value {:score 10 :means "code and data are both content-addressed; a run names both"}
+            :value-cid           {:score  9 :means "the values are content-addressed"}
+            :merkle-state        {:score  8 :means "state is a merkle structure, addressed at the root"}
+            :immutable-value     {:score  6 :means "values are immutable but nothing hashes them"}
+            :versioned-record    {:score  4 :means "identity is a key plus a revision number"}
+            :mutable-cell        {:score  2 :means "identity is a location that is written to"}
+            :host-object         {:score  1 :means "identity belongs to a host object the guest cannot name"}}}
+
+  {:axis :structural-sharing
+   :label "共有 — 差分はデータの性質か、計算するアルゴリズムか"
+   :substrate "IPLD merkle links"
+   :what "Two states that differ in one field share every other block, and comparing two roots tells you where they differ without walking either. An architecture that computes a diff is paying for something the substrate gives away; one that mutates in place has thrown the question out."
+   :levels {:merkle-diff-free    {:score 10 :means "the difference between two states is read off their CIDs"}
+            :persistent-structural {:score 8 :means "persistent structures share, but nothing addresses the sharing"}
+            :normalized-graph    {:score  7 :means "normalized so a part can be replaced without the whole"}
+            :diff-algorithm      {:score  4 :means "a diff is computed over two whole trees"}
+            :full-recompute      {:score  3 :means "the representation is rebuilt each time"}
+            :in-place-mutation   {:score  1 :means "written in place; there is no before to compare to"}}}
+
+  {:axis :fetch-locality
+   :label "局在 — 1 遷移が要する往復は有界か、メモリを超えても成立するか"
+   :substrate "CARv2 write-locality packs + range reads (ADR-2608160100)"
+   :what "One commit, one pack: what a transition touches should arrive in one range read. The measured hazard is the other direction -- a cons chain is width 1 and cannot be prefetched, and a query that materializes the whole database costs O(database) rather than O(result). An in-memory model makes zero round trips and is bounded by memory instead."
+   :levels {:one-pack-per-transition {:score 10 :means "everything one transition touches is written and read as one pack"}
+            :bounded-frontier    {:score  8 :means "each step reads a frontier whose size is stated"}
+            :index-then-leaf     {:score  7 :means "one index read, then the leaves the question covers"}
+            :in-memory-only      {:score  5 :means "no round trips at all, and nothing larger than memory"}
+            :pointer-chase       {:score  3 :means "a chain followed one node at a time, width one"}
+            :whole-corpus        {:score  2 :means "cost is set by the size of the store, not the answer"}
+            :unbounded-walk      {:score  1 :means "traversal depth and breadth are not bounded"}}}
+
+  {:axis :discoverability
+   :label "発見 — 出自のサーバ無しに第三者が取得し検証できるか"
+   :substrate "IPNI provider records + IPFS retrieval"
+   :what "If the answer to `who has this` is `the machine that made it`, the architecture has a single point of both failure and authority no matter how the code is written. A CID plus an indexer makes the origin one provider among others."
+   :levels {:cid-plus-indexer {:score 10 :means "addressed by CID and announced, so any holder can serve it"}
+            :cid-only         {:score  8 :means "addressed by CID; who holds it is arranged separately"}
+            :named-ref        {:score  6 :means "a name resolves to content that is then verified"}
+            :origin-server    {:score  3 :means "the origin answers, and only the origin"}
+            :session-bound    {:score  1 :means "it lives in a session or a process and cannot be fetched at all"}}}
+
+  {:axis :attenuation
+   :label "権限 — 要求とともに流れ、内側へ行くほど狭くなり、offline で検証できるか"
+   :substrate "biscuit (org-biscuitsec) + the capability invariant"
+   :what "Authority that is looked up on arrival needs a table, and the table is a second source of truth about who may do what. Authority that travels with the request and can only be narrowed needs neither, and can be checked by a party that cannot reach the issuer."
+   :levels {:offline-attenuable-token {:score 10 :means "a token that verifies offline and can only be narrowed as it is delegated"}
+            :capability-value  {:score  9 :means "an unforgeable value is passed; narrowing is possible by construction"}
+            :declared-import   {:score  8 :means "declared imports intersected with a policy at admission"}
+            :scoped-context    {:score  5 :means "a context object carries rights by convention"}
+            :acl-lookup        {:score  3 :means "the receiver looks the caller up in a table"}
+            :ambient-session   {:score  1 :means "a session or a global user decides"}}}
+
+  {:axis :effect-row
+   :label "効果 — 型や row に現れ、grant・計量・replay できるか"
+   :substrate "Unison abilities / Kotoba effect rows / the Effect IR of ADR-2608160200"
+   :what "An effect that does not appear anywhere cannot be granted, metered, refused or replayed. Whether it appears in a row, in a type, or as a value the caller returns is a smaller difference than whether it appears at all."
+   :levels {:typed-ability-row {:score 10 :means "effects are a row on the type and a handler supplies them"}
+            :effect-as-value   {:score  9 :means "the unit returns a description; something else performs it"}
+            :typed-requirement {:score  8 :means "the requirement set appears in the type"}
+            :declared-list     {:score  7 :means "declared, but the type does not carry it"}
+            :injected-untyped  {:score  5 :means "dependencies arrive from outside, untyped"}
+            :ambient           {:score  2 :means "anything in scope may be called"}}}
+
+  {:axis :replay
+   :label "再演 — 同じ入力で同じ出力になり、結果を CID で memo できるか"
+   :substrate "the Execution IR: {program, input, state, runtime, policy, effects} -> CID"
+   :what "An Execution CID is a memo key only when the effect set is empty or the effect log is complete; otherwise it is a receipt. An architecture that cannot be replayed cannot be audited either, and the two are the same property."
+   :levels {:execution-cid        {:score 10 :means "a run is identified by a CID over program, input, state, policy and effects"}
+            :pure-fold            {:score  9 :means "a pure fold: the same log yields the same state"}
+            :deterministic-with-log {:score 8 :means "replayable as long as the effect log is complete"}
+            :idempotent-only      {:score  5 :means "safe to repeat, but a repeat is not the same value"}
+            :time-dependent       {:score  3 :means "depends on wall clock, randomness or arrival order"}
+            :nondeterministic     {:score  1 :means "interleaving decides the result"}}}
+
+  {:axis :pure-surface
+   :label "純粋表現 — Kotoba の pure surface でそのまま書けるか"
+   :substrate "guest-grammar: no macros, closed dispatch, [:result T E], bounded admission"
+   :what "Included because the substrate is only reachable through the language. A shape that needs a macro, a runtime lookup or a cell that outlives its function has to be redesigned before it can touch any of the other seven axes."
+   :levels {:pure-total-functions {:score 10 :means "pure total functions over sealed variants"}
+            :pure-with-result     {:score  9 :means "pure functions returning [:result T E]"}
+            :closed-protocol      {:score  8 :means "dispatch over a closed set of declared types"}
+            :needs-local-cell     {:score  6 :means "needs mutation, but only inside one function body"}
+            :needs-escaping-cell  {:score  3 :means "needs a cell that outlives the function that made it"}
+            :needs-macro-or-dynamic {:score 1 :means "needs a macro or resolution by name at run time"}}}]}

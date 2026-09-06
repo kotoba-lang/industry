@@ -16,6 +16,8 @@
                            "kotoba-lang/amu resources/kotoba/lang/application-language.edn"]
   :adr/dataset "90-docs/architecture-fit/architecture-fit.datoms.edn"
   :adr/rubric "manifest/architecture-fit-rubric.edn"
+  :adr/rubric-substrate "manifest/substrate-fit-rubric.edn"
+  :adr/dataset-substrate "90-docs/architecture-fit/substrate-fit.datoms.edn"
   :adr/detector "scripts/architecture-fit-score.cljs"
   :adr/body
   "# Which web architectures fit Kotoba, and how that was decided
@@ -240,4 +242,98 @@ Dioxus, Seaside, Ur/Web, Opa and Wasp. Their absence is absence of measurement.
 
 Do not quote the numbers in this document as current. The ceilings they are
 measured against live in `lang/guest-grammar.edn` under `:admission-limits` and
-in each kit's `:qualification`, and those move. Rerun the detector."}]
+in each kit's `:qualification`, and those move. Rerun the detector.
+
+## Amendment 2026-09-06 -- a second lens, because the first had a blind spot
+
+The owner asked why Elm beat re-frame and Reagent, then asked for the question
+to be recomputed from the substrate -- Kotoba's pure syntax, Unison properties,
+IPLD, IPNI, IPFS, CARv2, biscuit -- rather than from what already exists.
+
+The first part has a short answer and it is in the numbers, not in taste.
+re-frame loses four axes to Elm: state 5 against 10 (one atom the whole program
+holds), dispatch 4 against 10 (handlers registered into a mutable table at load
+time), errors 4 against 10 (no failure contract), identity 5 against 9 (macros
+are how it is used). Reagent loses on state 3 and authority 3 for one reason: a
+ratom is a cell held outside the function that reads it, and the reader is
+discovered by dereferencing during render. Elm did not win for being pure. It
+won because the state is a value, the message set is sealed, and failure is a
+value.
+
+The second part exposed a real defect in the first rubric. Its seven axes
+measure fit with the guest language surface as it ships. Not one of them looks
+at content addressing, IPLD, IPNI, CARv2 or biscuit -- so it can rank an
+architecture that merely compiles above one the substrate was built for, and it
+did. A second rubric now scores the same question from the substrate down, and
+deliberately does not ask whether an implementation or a kit exists.
+
+scripts/architecture-fit-score.cljs takes --rubric and --dataset, so both lenses
+run through one scorer and one validator. What a dataset entry must carry is now
+declared by its rubric (:entry-contract), because the two lenses group by
+different things and cite different kinds of source. The v1 lens is unchanged
+and still totals mean 43.9 -- checked, because a refactor that moves the numbers
+is a different change.
+
+### The eight substrate axes
+
+cid-identity (Unison definition CID + IPLD value CID), structural-sharing (IPLD
+merkle links), fetch-locality (CARv2 write-locality packs and range reads),
+discoverability (IPNI provider records and IPFS retrieval), attenuation
+(biscuit), effect-row (abilities, effect rows, the Effect IR), replay (the
+Execution IR), pure-surface (the guest grammar, included because the substrate
+is only reachable through the language).
+
+### What changed, and what did not
+
+19 entries, mean 50.2, range 14 to 76, median 58.
+
+**The front-end answer changes.** Merkle document UI scores 74; TEA with its
+state in memory scores 52. The shape is the same and survives -- state plus
+event to next state, view a pure function of state. The representation is what
+the substrate replaces: state and view are IPLD values, so the rendered document
+has a CID, and two renders are compared by walking down while their CIDs differ.
+Neither the full-tree commit ui-v1 does today nor a virtual-DOM differ: the
+update set is a property of the data. TEA loses exactly four axes and they are
+the four the first lens had no column for -- the model is a value nobody can
+name, the view is rebuilt then diffed, everything is bounded by one tab's
+memory, and no third party can fetch any of it.
+
+re-frame at 40 is worth reading rather than dismissing: two of its three central
+ideas -- effects returned as data, a pure reducer from event to next state --
+are exactly right here and score 9 each. The third, one atom the whole program
+holds, is what costs it. Replace the cell with a CID and most of re-frame
+survives the translation. Reagent at 23 and React at 22 do not, for the same
+reason in both cases: the shape of the computation is not a value anywhere.
+
+**The stack that falls out is one answer per layer, and it is coherent rather
+than assembled**: event sourcing where one event is one CAR pack (76) for the
+durable plane, Merkle-CRDT local-first (75) for convergence, merkle document UI
+(74) for the interface, extension by DefCID (74), IPLD selector query (72),
+abilities or program-as-value (70) for effects, biscuit attenuation (67) for
+authority. They are one system said seven ways: the application is a fold over a
+content-addressed log, every intermediate is a CID, the UI is the newest state's
+document, authority is a token that only narrows, and discovery is an indexer.
+
+**Discoverability is the axis that separates the field** (mean 5.1, widest
+spread at 3.8). Every in-process architecture scores 1 on it, and that single
+fact is what reorders the table relative to the first lens.
+
+Datomic-shape is the instructive near-miss: seven axes right, and fetch-locality
+2, because the query surface takes a materialised database so cost is
+O(database) rather than O(result). That number was measured, not reasoned about.
+The IPLD selector reaches 8 on the same axis by making the question name the
+subgraph.
+
+### What this does not say
+
+Nothing here is an adoption recommendation. The substrate lens deliberately does
+not ask whether an implementation exists, and on that question the first lens is
+still the one to read: ui-v1 is what ships, and it commits a 32-node flat tree
+against a base revision. A merkle document UI is what to build toward, not what
+can be imported this week. The gap between the two lenses for the same
+architecture is the size of the work, and saying so is the point of having both.
+
+The break tests were run the same way as for the first lens: an unknown level
+reports `merkle-document-ui unknown-level axis=replay`, a removed evidence URL
+reports `biscuit-attenuated-request missing-required-field`, and an empty
+dataset REFUSES with exit 2 rather than passing."}]

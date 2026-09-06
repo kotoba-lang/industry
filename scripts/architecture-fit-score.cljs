@@ -18,12 +18,20 @@
             [clojure.string :as str]
             ["fs" :as fs]))
 
-(def rubric-path "manifest/architecture-fit-rubric.edn")
-(def dataset-path "90-docs/architecture-fit/architecture-fit.datoms.edn")
-
 (def argv (vec (drop 2 (js->clj js/process.argv))))
 (def findings? (some #{"--findings"} argv))
 (def csv? (some #{"--csv"} argv))
+
+(defn flag [name fallback]
+  (let [i (.indexOf (into-array argv) name)]
+    (if (and (>= i 0) (> (count argv) (inc i))) (nth argv (inc i)) fallback)))
+
+;; Two lenses over the same method. The default measures fit with the guest
+;; language surface as it ships; --rubric/--dataset swaps in the substrate lens
+;; (content addressing, IPLD, IPNI, CARv2, biscuit), which asks a different
+;; question of the same architectures and does not rank them the same way.
+(def rubric-path  (flag "--rubric"  "manifest/architecture-fit-rubric.edn"))
+(def dataset-path (flag "--dataset" "90-docs/architecture-fit/architecture-fit.datoms.edn"))
 
 (defn refuse! [msg]
   (println (str "REFUSED: " msg))
@@ -56,6 +64,13 @@
 ;; ------------------------------------------------------------------ validate
 (defn axis-fact-key [axis] (keyword "arch" (name axis)))
 
+;; What a dataset entry must carry is the rubric's business, not this script's:
+;; the two lenses group by different things and cite different kinds of source.
+(def entry-contract
+  (merge {:group-key :arch/family :require [:arch/evidence :arch/note]}
+         (:entry-contract rubric)))
+(def group-key (:group-key entry-contract))
+
 (defn problems-for [e]
   (let [id (:arch/id e)]
     (concat
@@ -68,13 +83,15 @@
        {:entry id :problem (if (nil? v) :missing-axis :unknown-level)
         :axis axis :value v
         :admitted (when (some? v) (vec (sort (map name (keys levels)))))})
-     (when (str/blank? (str (:arch/evidence e)))
-       [{:entry id :problem :no-evidence}])
-     (when-not (str/starts-with? (str (:arch/evidence e)) "http")
+     (for [k (:require entry-contract)
+           :when (str/blank? (str (get e k)))]
+       {:entry id :problem :missing-required-field :value k})
+     (when (and (some #{:arch/evidence} (:require entry-contract))
+                (not (str/blank? (str (:arch/evidence e))))
+                (not (str/starts-with? (str (:arch/evidence e)) "http")))
        [{:entry id :problem :evidence-is-not-a-url :value (:arch/evidence e)}])
-     (when (str/blank? (str (:arch/note e)))
-       [{:entry id :problem :no-note}])
-     (when (nil? (:arch/family e)) [{:entry id :problem :no-family}]))))
+     (when (nil? (get e group-key))
+       [{:entry id :problem :missing-group-key :value group-key}]))))
 
 (def dup-ids
   (->> entries (map :arch/id) frequencies (filter #(> (val %) 1)) (map key) sort vec))
@@ -125,10 +142,10 @@
   (println)
   (println (str "Kotoba web architecture fit -- " (count scored) " entries, "
                 (count axes) " axes, max " (:total-max scale)))
-  (println (str "rubric " rubric-path " as-of " (:kotoba.architecture-fit.rubric/as-of rubric)
+  (println (str "rubric " rubric-path " as-of " (or (:kotoba.architecture-fit.rubric/as-of rubric) (:as-of rubric))
                 "; measured against kotoba-lang "
-                (get-in rubric [:measured-against :kotoba-lang])
-                " / amu " (get-in rubric [:measured-against :amu])))
+                (or (get-in rubric [:measured-against :kotoba-lang]) "-")
+                " / amu " (or (get-in rubric [:measured-against :amu]) "-")))
   (println)
   (println (str (pad "#" 4) (pad "architecture" 46)
                 (apply str (map #(lpad (subs (name %) 0 (min 4 (count (name %)))) 6) axis-keys))
@@ -147,7 +164,7 @@
   (println)
   (println "== axis analysis -- which constraint actually separates the field")
   (println (str (pad "axis" 14) (lpad "mean" 7) (lpad "sd" 7) (lpad "min" 5) (lpad "max" 5)
-                "  " (pad "binds-most-often" 18) "invariant"))
+                "  " (pad "binds-most-often" 18) "measures"))
   (println (apply str (repeat 108 "-")))
   (let [binding-counts (frequencies (map (fn [e] (key (apply min-key val (:scores e)))) scored))]
     (doseq [a (sort-by (fn [a] (- (stdev (map #(get-in % [:scores a]) scored)))) axis-keys)]
@@ -156,7 +173,9 @@
                       (lpad (r1 (mean xs)) 7) (lpad (r1 (stdev xs)) 7)
                       (lpad (apply min xs) 5) (lpad (apply max xs) 5)
                       "  " (pad (str (get binding-counts a 0) " / " (count scored)) 18)
-                      (name (:invariant (by-axis a)))))))
+                      ;; the two lenses name the thing an axis measures differently
+                      (let [g (get (by-axis a) :invariant (:substrate (by-axis a)))]
+                        (if (keyword? g) (name g) (str g)))))))
     (println)
     (println (str "The axis with the largest spread is the one worth arguing about; the axis that "
                   "binds most often is the one that decides ports."))
@@ -164,15 +183,18 @@
                   (name (apply min-key (fn [a] (mean (map #(get-in % [:scores a]) scored))) axis-keys))
                   " -- the field as a whole is furthest from the language here.")))
   (println)
-  (println "== by family (mean total)")
-  (doseq [[fam es] (->> scored (group-by :arch/family) (sort-by (fn [[_ es]] (- (mean (map :total es))))))]
+  (println (str "== by " (name group-key) " (mean total)"))
+  (doseq [[fam es] (->> scored (group-by group-key) (sort-by (fn [[_ es]] (- (mean (map :total es))))))]
     (println (str (pad (name fam) 22) (lpad (r1 (mean (map :total es))) 7)
                   "   n=" (count es)
                   "   " (str/join ", " (map :arch/id (take 3 (sort-by (comp - :total) es)))))))
-  (println)
-  (println "== by kind (mean total)")
-  (doseq [[k es] (->> scored (group-by :arch/kind) (sort-by (fn [[_ es]] (- (mean (map :total es))))))]
-    (println (str (pad (name k) 22) (lpad (r1 (mean (map :total es))) 7) "   n=" (count es))))
+  ;; :arch/kind is a v1-lens field; the substrate lens groups only by layer.
+  (when (some :arch/kind scored)
+    (println)
+    (println "== by kind (mean total)")
+    (doseq [[k es] (->> scored (filter :arch/kind) (group-by :arch/kind)
+                        (sort-by (fn [[_ es]] (- (mean (map :total es))))))]
+      (println (str (pad (name k) 22) (lpad (r1 (mean (map :total es))) 7) "   n=" (count es)))))
   (println)
   (let [tot (map :total scored)
         m (mean tot)]
@@ -185,7 +207,7 @@
                                  (map name axis-keys) ["total" "binding_axis"])))
   (doseq [[i e] (map-indexed vector scored)]
     (println (str/join "," (concat [(inc i) (:arch/id e) (str "\"" (:arch/name e) "\"")
-                                    (name (:arch/kind e)) (name (:arch/family e))
+                                    (name (:arch/kind e)) (name (get e group-key))
                                     (str "\"" (:arch/language e) "\"")]
                                    (map #(get-in e [:scores %]) axis-keys)
                                    [(:total e) (name (key (apply min-key val (:scores e))))])))))
