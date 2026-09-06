@@ -5,8 +5,8 @@
   :adr/date "2026-09-06"
   :adr/repo "cloud-itonami/cloud-itonami-isic-6820"
   :adr/tags ["cloud-itonami" "isic-6820" "actor" "governor" "kanri-kumiai" "shuzen-tsumitatekin" "kubunshoyu-ho" "chouki-shuzen-keikaku"]
-  :adr/landed-commit "ec16bacd7879cbc66f6ed6dc6e86b1f3cd97803a"
-  :adr/west-pin-commit "90fa82ba4c820dd3165ab98ae624aff316d53698"
+  :adr/landed-commit "7c9605223294c79062a0b8f1ce22a6d9d0d6bec2"
+  :adr/west-pin-commit "dff787d462fb6aab0a57aa69c8a19c1753fea9de"
   :adr/landed-commits ["547c86e65483da40cec577b9742dc4cd1a7c571a — 管理組合 actor (JPN)"
                        "577b277616590c04d89486328b3682157e053dce — DEU / ESP / FRA の法定決議要件"
                        "2f0b0b13e48efc5014da5f579b17c05370dfa489 — SGP の法定決議要件"
@@ -462,6 +462,60 @@ origin/main より **26 behind / 14 ahead**（`surface-status.edn` だけで 162
 `defprotocol` の `requires unique bounded (method [this ...]) signatures` も
 `fn value requires unique arities ...` も書式の指摘で、型注釈を外したら通った。
 1 回目の拒否で止めていたら、また実装状態を要件として書いていた。
+
+### 2 本目の slice で :blocked の理由を実証した（2026-09-06）
+
+前節の訂正「blocking なのは記法ではなく effect」を、**書けることで**示した。
+`kotoba/kumiai/works_core.kotoba` は発注ステップを
+**`state + event -> next state + inert effect`** として持つ —— 判断核ではなく
+product semantics で、governor が発注を止める 4 つの根拠を同じ順で決め、
+**一切書き込まない**。outcome が effect の名前（`:effect/draft-works-order`）と
+値と「pending を消すか」を運び、実行は host がする。
+
+記法が blocking なら、これは書けなかった。書けた。**残るのは effect だけ**である。
+
+### そして native の静かな誤答を見つけた（kotoba-lang/amu#835）
+
+このモジュールは `aarch64-macos` に**コンパイルでき、実行でき、答えが違う** ——
+**その backend では keyword の `=` が常に false** だから。
+
+| | 期待 | wasm32-browser | aarch64-macos |
+|---|---|---|---|
+| `(if (= :passed :passed) 1 0)` | 1 | 1 | **0** |
+| `(if (= :passed :failed) 1 0)` | 0 | 0 | 0 |
+| `(if (= 7 7) 1 0)` | 1 | 1 | 1 |
+
+同じビルドで i64 の `=` は正しいので、`if` の lowering でも loader でもない。
+このモジュールは全分岐が keyword で回るので native では**全部が誤った枝**へ行き、
+`main` は 11 中 10 失敗を返した。**その個数だけが、出荷せずに気づけた理由**である。
+
+したがって slice は **wasm32-browser で qualified、native は blocked**。
+**status を i64 に作り替えて回避しない** —— Q9 は未対応 target を fallback では
+なく block と定め、backend の欠陥に合わせてドメインを整形するのは欠陥を隠す
+ことだから。**撤去条件は記憶ではなく機械化した**: acceptance script が
+「欠陥がまだ再現すること」を assert し、amu が直した日に**赤くなって**
+unblock を促す。
+
+### 自分の検査にも穴があり、同じやり方で見つかった
+
+予算上限の比較を `>` から `>=` に反転しても**自己検査は緑のままだった** ——
+「発注額 == 決議予算」のケースが表に無く、2 つの演算子を区別できていなかった。
+そのケース（**可決されるべき**。規則は「超過」だから）を足すと反転で赤くなる。
+**境界を持たない表は、演算子を見られない。**
+
+### acceptance は「ビルドできた」で終わらせない
+
+同じモジュールを native はビルドでき、誤答した。だから script は wasm を
+**実行して** self-check の失敗数を assert する。
+
+```
+NATIVE  aarch64-macos  self-check-failures  0     (resolution_core)
+PARITY  CASES 20       DISAGREEMENTS 0
+WASM    wasm32-browser works-core-self-check-failures 0
+NATIVE-KEYWORD-EQUALITY 0  (1 = correct, 0 = amu#835 の欠陥)
+JVM-INVOCATIONS 0
+PASS
+```
 
 ## 再開点 (会話履歴なしで続けられる粒度)
 
