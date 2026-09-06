@@ -77,7 +77,7 @@ scope 文字列**を渡していたので `(:grant/scopes \"…\")` が nil に�
 **bot 自身による attenuation。** `token/append` は前 block が名指した秘密鍵を
 要求するが、**どの bot も持っていない（設計）** —— `bot-identity` は名前を与えて
 署名鍵を与えない。fleet が発行し誰でも検証できるが、bot が自分より狭い slice を
-他へ渡すことはまだできない。**それは次の決定であって、漏れではない。**
+他へ渡すことはまだできない。**それは次の決定であって、漏れではない。**\n\n**2026-09-06 に測ってまだ真**（ADR-2800010700 D6b）。kotoba.cloud が Stable\nPrincipal から各プレーンへより狭い credential を渡す設計を検討した際、必要な\n当のものがこの段落だった。同時に murakumo 側で確認: operator route は\n`Bearer|Biscuit mro_…` を受け、`operator-refusal` が `:cacao` に対して\n`a CACAO does not authorize this route` を返す —— この ADR の『authority は\nbiscuit』は wire として実際に効いている。
 
 seed の rotation は全 bot を改名する。それが「90 個ではなく 1 個の秘密」の代償で、
 だから seed は一度書いたら読み取りの副作用で再生成しない（テストで bytes 不変を主張）。
