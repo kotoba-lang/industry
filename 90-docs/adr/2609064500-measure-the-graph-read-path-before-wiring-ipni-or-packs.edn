@@ -83,6 +83,74 @@ per-request の block-fetch 内訳（L1 / L2 / pack / B2 / miss）を観察専�
 ADR-2608160100 が既に前例を作っている —— 最初の動機が誤っていたのは、測定が 100 block を
 1 回で書いて答えを仮定していたからだった。
 
+## 最初の一手は landed し、deploy もした —— まだ測ってはいない（2026-09-06）
+
+per-request の block-fetch 内訳（L1 / L2 / B2 / miss / distinct / epoch）が
+`x-kotobase-kv-stats` response header として `net-kotobase/control-plane` の
+`kotobase-graph-database` に入り（919b302f）、本番に deploy した
+（version 0cec5a07-78df-4b20-bae1-1667e345efaf）。suite は 444/1482 → 448/1501。
+
+**port した側で 2 つ意図的に engine と違えている。** ①distinct 集合に上限（4096）を
+置いた —— write path も同じ関数を通って reset されないので、engine の無制限な集合は
+isolate の寿命ぶん育つ。128MB の中で観測がメモリ圧になるのは挙動の変更である。
+②attach 点を 1 つにした。engine は json-resp を 2 箇所包んで cache-hit 経路を素通しに
+しており、そこでは「何も fetch しなかった」と「古い build」が区別できない。
+
+**pack カウンタは port しなかった。** control-plane に pack tier が無いので、
+`pack=0` は「pack hit が無い」ではなく「pack tier が無い」を意味する。
+**取りうる値が 1 つしかないカウンタは測定ではない。**
+
+### まだ測っていない
+
+**本番で header を観測していない。** deploy は成功したが、この header が付くのは
+実際に block を取りに行く read 経路で、そこは認証が要る。無認証の probe は
+401 / 405 を返し、header は付かない —— それは正しい挙動であって観測ではない。
+
+**したがって「deploy した」は「測った」ではない。** この ADR が S4 を再定義した理由が
+まさにそれで、同じ線をここでも引く。次は認証付き read を 1 本通して
+`l1= l2= b2= miss= distinct=` を読むこと。それが本番で読まれるまで、
+pack tier も catalog も IPNI 依存も作らない。
+
+## deploy 経路そのものについての発見
+
+`.github/workflows/graph-database.yml` の deploy job は **SLSA attested** である ——
+tarball を作り、provenance と SBOM を cosign の keyless 署名（この workflow ファイルの
+OIDC identity に固定）で署名し、**deploy 側は両方を verify してから展開する**。
+設計として正しい。
+
+**そして走らない。** `GET /repos/net-kotobase/control-plane/actions/permissions` は
+`{enabled: false}` を返す（ADR-2607300900 のとおり Actions は repo 単位で無効化してある）。
+
+**にもかかわらず Worker は今日 07:56 UTC に deploy されていた** —— author は
+オーナーのアカウント、`Source: Unknown (deployment)`、`Tag` は git sha
+（workflow の `--tag \"$GITHUB_SHA\"` を手で真似た形）。つまり **attestation の鎖は
+既に使われておらず、手 deploy がこの Worker の現行の実践である。**
+
+今回の deploy もその実践に沿って行った（live は main の 4 commit 手前で、差分は
+この計測だけだった）。**ただしそれは、この状態が良いという意味ではない。**
+署名経路が在って動かず、動く経路が署名しないなら、attestation が主張しているのは
+「この artifact は検証された workflow から来た」であって、実際に配られたものについては
+何も言っていない。**どちらかに寄せる決定が要る** —— fleet CI（murakumo）へ port するか、
+attested 経路を明示的に retire するか。放置は「署名しているつもり」を続けることになる。
+
+## nil の所在（確認済み、未修正）
+
+ADR-2608170300 の silent partial read の被疑箇所は `store.cljs:207-212` に**在る**。
+`fetch-block-cached` の `(if bytes …)` の else が `(record-block-fetch! :miss cid)` と
+`nil` を返し、その nil が `block-fetcher` 経由で `:async-get-fn` として
+`xrpc.cljs:379` と `:1382` に入る。受け手は「保存されていない」と「まだ見えない」を
+区別できず、retry ではなく skip する —— 25 行中 9〜14 行を HTTP 200 で返す形。
+
+**今回のカウンタはこれを可視化するが、有罪判決はしない。** `miss=` がその分岐で
+非ゼロになるので、短い結果に `miss>0` が付けば機構を名指しできる。ただし
+①同期 trampoline 経路では nil は正当な制御フロー（block-miss → retry）なので
+`miss>0` 単体は証拠にならない ②両方の consumer が同じ関数を通るので、
+**どちらが nil を見たかはカウンタからは分からない。**
+
+そして **ADR-2608170300 の再現条件（pack writes ON）はこの copy では作れない** ——
+`KOTOBASE_PACK_WRITES` と pack tier は engine 側にしか無い。**被疑者はここに居て、
+それを浮かせた設定はここに無い。**
+
 ## 未決（governance であってコードではない）
 
 - **`net-kotobase/engine` と `control-plane` のどちらが正本か。** どちらも書いていない。
