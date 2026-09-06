@@ -1,0 +1,31 @@
+{
+ "model": "/home/gad/dllm-phase0/SDAR-1.7B-Chat",
+ "results": [
+  {
+   "tokens": 77,
+   "forwards": 23,
+   "tok_per_forward": 3.348,
+   "wall_s": 1.44,
+   "tok_per_s_contended": 53.52,
+   "text": "def merge_intervals(intervals):\n    if not intervals:\n        return []\n    merged = [intervals[0]]\n    for i in intervals[1:]:\n        if i[0] <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], i[0])\n        else:\n            merged.append(i)\n    return merged\n",
+   "distinct_ratio": 0.558,
+   "longest_immediate_repeat": 1,
+   "prompt": "code",
+   "block": 8,
+   "threshold": 0.5
+  },
+  {
+   "tokens": 96,
+   "forwards": 51,
+   "tok_per_forward": 1.882,
+   "wall_s": 3.28,
+   "tok_per_s_contended": 29.28,
+   "text": "自己回帰言語モデルは、前回の出力を入力として出力するため、前回の出力が前回の入力に影響を受ける。一方、拡散言語モデルは、前回の入力と前回の出力を入力として出力するため、前回の入力と前回の入力に影響を受ける。そのため、自己回帰言語モデルは前",
+   "distinct_ratio": 0.302,
+   "longest_immediate_repeat": 1,
+   "prompt": "ja",
+   "block": 8,
+   "threshold": 0.5
+  }
+ ]
+}

@@ -1,0 +1,149 @@
+{
+ "model": "/home/gad/dllm-phase0/SDAR-1.7B-Chat",
+ "rows": [
+  {
+   "block": 1,
+   "threshold": 0.9,
+   "pass": 4,
+   "of": 5,
+   "tok_per_forward": 1.0,
+   "tokens": 355,
+   "forwards": 355,
+   "detail": [
+    "merge_intervals=PASS",
+    "two_sum=PASS",
+    "is_balanced=PASS",
+    "run_length=fail:IndexError: string index out of range",
+    "flatten=PASS"
+   ]
+  },
+  {
+   "block": 4,
+   "threshold": 0.5,
+   "pass": 2,
+   "of": 5,
+   "tok_per_forward": 2.992,
+   "tokens": 362,
+   "forwards": 121,
+   "detail": [
+    "merge_intervals=fail:IndentationError: unindent does not match any outer indentation level",
+    "two_sum=PASS",
+    "is_balanced=fail:IndentationError: unindent does not match any outer indentation level",
+    "run_length=fail:IndexError: string index out of range",
+    "flatten=PASS"
+   ]
+  },
+  {
+   "block": 4,
+   "threshold": 0.7,
+   "pass": 3,
+   "of": 5,
+   "tok_per_forward": 2.613,
+   "tokens": 358,
+   "forwards": 137,
+   "detail": [
+    "merge_intervals=PASS",
+    "two_sum=PASS",
+    "is_balanced=fail:AssertionError",
+    "run_length=fail:IndexError: string index out of range",
+    "flatten=PASS"
+   ]
+  },
+  {
+   "block": 4,
+   "threshold": 0.9,
+   "pass": 4,
+   "of": 5,
+   "tok_per_forward": 2.106,
+   "tokens": 358,
+   "forwards": 170,
+   "detail": [
+    "merge_intervals=PASS",
+    "two_sum=PASS",
+    "is_balanced=PASS",
+    "run_length=fail:IndexError: string index out of range",
+    "flatten=PASS"
+   ]
+  },
+  {
+   "block": 4,
+   "threshold": 0.99,
+   "pass": 4,
+   "of": 5,
+   "tok_per_forward": 1.584,
+   "tokens": 358,
+   "forwards": 226,
+   "detail": [
+    "merge_intervals=PASS",
+    "two_sum=PASS",
+    "is_balanced=PASS",
+    "run_length=fail:IndexError: string index out of range",
+    "flatten=PASS"
+   ]
+  },
+  {
+   "block": 8,
+   "threshold": 0.5,
+   "pass": 0,
+   "of": 5,
+   "tok_per_forward": 3.129,
+   "tokens": 388,
+   "forwards": 124,
+   "detail": [
+    "merge_intervals=fail:SyntaxError: unmatched ']'",
+    "two_sum=fail:TypeError: argument of type 'builtin_function_or_method' is not iterable",
+    "is_balanced=fail:SyntaxError: unmatched ')'",
+    "run_length=fail:SyntaxError: invalid syntax",
+    "flatten=fail:SyntaxError: unmatched ')'"
+   ]
+  },
+  {
+   "block": 8,
+   "threshold": 0.7,
+   "pass": 1,
+   "of": 5,
+   "tok_per_forward": 2.6,
+   "tokens": 351,
+   "forwards": 135,
+   "detail": [
+    "merge_intervals=PASS",
+    "two_sum=fail:SyntaxError: '(' was never closed",
+    "is_balanced=fail:SyntaxError: invalid syntax",
+    "run_length=fail:SyntaxError: invalid syntax",
+    "flatten=fail:IndentationError: expected an indented block after 'for' statement on line 3"
+   ]
+  },
+  {
+   "block": 8,
+   "threshold": 0.9,
+   "pass": 3,
+   "of": 5,
+   "tok_per_forward": 2.259,
+   "tokens": 357,
+   "forwards": 158,
+   "detail": [
+    "merge_intervals=PASS",
+    "two_sum=fail:TypeError: 'int' object is not iterable",
+    "is_balanced=PASS",
+    "run_length=fail:IndexError: string index out of range",
+    "flatten=PASS"
+   ]
+  },
+  {
+   "block": 8,
+   "threshold": 0.99,
+   "pass": 3,
+   "of": 5,
+   "tok_per_forward": 1.564,
+   "tokens": 355,
+   "forwards": 227,
+   "detail": [
+    "merge_intervals=PASS",
+    "two_sum=PASS",
+    "is_balanced=PASS",
+    "run_length=fail:IndexError: string index out of range",
+    "flatten=fail:SyntaxError: '(' was never closed"
+   ]
+  }
+ ]
+}

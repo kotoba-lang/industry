@@ -1,0 +1,31 @@
+{
+ "model": "/home/gad/dllm-phase0/SDAR-1.7B-Chat",
+ "results": [
+  {
+   "tokens": 86,
+   "forwards": 66,
+   "tok_per_forward": 1.303,
+   "wall_s": 4.17,
+   "tok_per_s_contended": 20.62,
+   "text": "def merge_intervals(intervals):\n    if not intervals:\n        return []\n    intervals.sort(key=lambda x: x[0])\n    merged = [intervals[0]]\n    for interval in intervals[1:]:\n        if interval[1] <= merged[-1][1]:\n            merged[-1][1] = max(interval[1], merged[-1][1])\n        else:\n            merged.append(interval)\n    return merged",
+   "distinct_ratio": 0.523,
+   "longest_immediate_repeat": 1,
+   "prompt": "code",
+   "block": 8,
+   "threshold": 0.99
+  },
+  {
+   "tokens": 32,
+   "forwards": 30,
+   "tok_per_forward": 1.067,
+   "wall_s": 1.84,
+   "tok_per_s_contended": 17.42,
+   "text": "拡散言語モデルは、自己回帰モデルよりも高速に学習できるため、自己回帰モデルより速くなりうるのです。",
+   "distinct_ratio": 0.812,
+   "longest_immediate_repeat": 1,
+   "prompt": "ja",
+   "block": 8,
+   "threshold": 0.99
+  }
+ ]
+}
