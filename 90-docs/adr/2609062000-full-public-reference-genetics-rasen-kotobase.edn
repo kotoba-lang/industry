@@ -344,4 +344,41 @@ not.
 The worktree at `scratchpad/rasen-live` (branch `agent/live-run`) is NOT cleaned up: the
 ingest process is running out of it. Removing it would stop the only thing making progress.
 Its branch carries no commits of its own — it tracks main — so nothing is unlanded there.
-Whoever finishes the run should remove both."}]
+Whoever finishes the run should remove both.
+
+## Closing delta (2026-09-06, second close)
+
+**Rules updated from what this work actually stepped in** (superproject `47c26506`). Four
+edits to CLAUDE.md, all as *how to check* rather than as measured values, because this file
+warns repeatedly that a dated number gets quoted with the date stripped:
+
+1. A seventh question — **is that green from work done, or from work skipped?** The section
+   already warned about breaking something the wrong way and reading the red as a
+   demonstration; the mirror was missing. A correctly working skip / cache / gate returns the
+   same success value as a run that did the work.
+2. The heredoc hazard generalised beyond EDN: a backtick inside an unquoted heredoc is
+   executed and its word disappears; a bulk regex reaches into docstrings and closes a string
+   early. Both transformations succeed and only the meaning changes.
+3. **An index hit is not evidence that something works.** An accepted ADR can have no reader,
+   and a same-named thing on a different plane can make a mechanism look implemented.
+4. zsh word-splitting moved out of the west section — the trap is in the shell, not in west.
+   With it: a bulk operation is not judged by the absence of errors, and a zero result is
+   separated from an unreadable one by a control.
+
+**The corpus keeps building through interruptions.** Six cut connections so far; every one
+was classified and left its progress. Measured at this close: **1,300,267 rows read,
+521,290 kept, 761 transactions, 15,230,453 datoms, 76 shards in R2, 2.1 MB on local disk.**
+
+⚠ **The ledger's counts carry a one-time offset and should not be read as exact.**
+`rows/read` exceeds `kept + skipped` by exactly the checkpoint value at the moment the ledger
+was relocated to its durable path. The one-basis fix landed in `96d7d172`; the runs before it
+counted kept per-run, so the prefix those runs skipped was never folded into kept or skipped.
+**The split of that prefix cannot be recovered from the ledger** — deriving it would be
+inventing a measurement — so it is recorded here rather than corrected. Runs entirely on
+`96d7d172` and later satisfy `read = kept + skipped`; this ledger straddles the change.
+
+**What a supervisor would do, and why there isn't one yet.** Each interruption needs a
+restart, and the resume is a single command. The hermes profile's cron prompt already says to
+do exactly that when `ingest-process` goes yes→no with a checkpoint that is not `:complete`.
+It cannot run until the fleet's model plane has credit and capacity, so until then the
+restarts are manual."}]
