@@ -267,6 +267,43 @@ bot 検出の回避はこのワークスペースの安全床が禁じている�
 - west pin 前進 = a25de73b -> 0783d41f -> 5c8e3fb5
 - clojure -M:dev:test -> 188 tests / 755 assertions / 0 failures
 
+## 再開点 (会話履歴なしで続けられる粒度)
+
+**現在地の確認**（これが通れば手を入れる前の状態は健全）:
+
+```bash
+cd orgs/cloud-itonami/cloud-itonami-isic-6820
+clojure -M:dev:test        # 188 tests / 755 assertions / 0 failures
+clojure -M:lint            # 0 errors / 0 warnings
+clojure -M:dev:run-kumiai  # 5法域の決議要件 + 感度表 + HARD hold 11種
+```
+
+**次の一手は ITA / CHN の条文本体に届く URL を見つけること。** どちらも
+サイトは 200 を返すが本文でないので、取得経路の問題であって権限の問題では
+ない。SGP がまさにこの形で、公式索引を辿ったら解決した (`BMSMA2004` ->
+`BSMA2004`)。同じ手順を当てる:
+
+```bash
+# ITA: normattiva は caricaArticolo で条文を返す。codiceRedazionale と
+#      idArticolo の組を、目次フレームの HTML から拾って当てる
+curl -sSL 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262' | grep -oE 'caricaArticolo[^<]+' | head
+# CHN: flk.npc.gov.cn は SPA。内部 API (POST /api/detail) の id を
+#      /api/ の一覧レスポンスから取る
+```
+
+**加える先は `realty.kumiai.facts/catalog` の 1 entry**（`:legal-basis-unverified`
+を `:legal-basis` に変え、`:resolutions` を足し、`:verified-on` を入れ、
+`:source-attempt` を消す）と、`test/realty/kumiai/jurisdictions_test.clj`
+の両方向 fixture。**AUS-NSW は動かさない** —— bot チャレンジの回避は
+しないと決めた (`:source-behind-bot-challenge`)。公式 API か別配布が
+現れたときだけ動く。
+
+**モデル側に追加が要るかは、条文を読んでから決める。** これまでの4回の
+拡張はすべて「分数を足す」ではなく「形を足す」だった (母数3種・軸ごとの
+分数と母数・法定の再決議・分母を持たない比較・定義の一部としての通知期間)。
+ITA 第1136条は定足数と可決要件が回次で変わる形なので、ESP の
+first-call / second-call と同型で足りる見込みだが、**読む前に決めない**。
+
 ## 残っている gap (正直に)
 
 - 検証済みの決議要件テーブルは **JPN / DEU / ESP / FRA / SGP の 5 法域**。
