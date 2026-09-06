@@ -3357,4 +3357,42 @@
               reason. The ayatori finding is what that costs and what it buys: the fix is said
               to exist and is not in the checkout, so the defect is really there for anyone
               running this code. Check the repository's main before acting on a finding."}
+  {:id       :verify-pages-freshness
+   :title    "公開ページが、その repo の default branch より何 commit 前に建てられたものか"
+   :why      "2026-09-08、kotoba-lang/kami-app-suji の公開ページは HTTP 200 を返して
+              普通に開けたが、中身は 2 日前の build で、その間に着地した波 —— 可視量
+              50 → 86、結合解の報告、動員されていない 11 筋が『軽く負荷』と塗られていた
+              欠陥の修正 —— は 1 つも live に無かった。**古いページも 200 を返す。**
+              CLAUDE.md の single-page app 規則は『見られることは規則の半分』と書いて
+              いて、これはその裏面 —— document は出ているが中身が古い。ソースからは
+              見えず、開いても見えない。
+              同じ日、その publish を行うスクリプトの docstring と過去の publish commit
+              すべてが『Actions が repo 全体で無効だから前回の artifact は失敗せずに
+              古くなった』と書いていたが、GitHub に訊くと {\"enabled\":true} だった ——
+              **理由の側が偽になっていた**ので、理由を読まずに時刻と commit を数える。
+              初回の実測（kotoba-lang の 8 件）で 2 件が HTTP 404 を返し、うち
+              kototama は build 記録が status: building のまま 2026-08-05 から動かず、
+              その後 main に 51 commit が着地していた。"
+   :argv ["nbb" "{{repo}}/scripts/verify-pages-freshness.cljs" "--findings"]
+   :cwd :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 2700000
+   :interval-ms 86400000
+   :measured "GitHub の credential を要するのでノードでは引けない —— fleet gate に
+              できない理由は orgs/ を読むことではなく、鍵を持たないことのほう
+              （不変条件3）。1 repo につき /pages・pages/builds/latest・commits?since の
+              3 リクエストと、**URL への実 GET 1 本**。API だけでは足りないことは実測で
+              決まった: build_type が workflow の repo は /pages の status が null で
+              build 記録が 404 を返すが URL は 200 を配っており（kotoba, svgraph）、
+              API の沈黙を『建っていない』と読むと嘘になる。
+              数えているのは『build より後に着地した commit の本数』だけで、これは
+              サイトが間違っているという主張ではない —— README だけを直した commit なら
+              site は正しいまま。だから severity は warn、閾値は無い（> 0 だけが導出
+              できる境界で、それ以外は発明した定数になる）。commits の件数は 1 ページ
+              ぶんしか引かないので 100 で頭打ちになり、そのときは `100+` と印字する。
+              両方向を見た: org を引けなければ REFUSED で exit 2（実測、実在しない org
+              名で確認）。serving? を常に真にすると ① が空になり、commits-since を 0 に
+              固定すると ② が空になる —— どちらも復元は sha256 一致。"}
 ]}
