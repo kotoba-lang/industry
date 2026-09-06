@@ -1,0 +1,128 @@
+[{:db/id -1
+ :adr/id "adr-2609063000-what-the-ipld-stack-integrates-and-what-only-compiles"
+ :adr/title "IPLD/IPNI/CARv2 は library に landed していて、本番の請求経路にはまだ載っていない —— 面を分けずに統合済みとも未統合とも言わない"
+ :adr/status "accepted"
+ :adr/date "2026-09-06"
+ :adr/related ["adr-2809040800-kotobase-join-reach-is-composition-not-ref-count"
+               "2609060000-ipld-adl-selector-car-boundaries"
+               "2608160100-kotobase-physical-plane-ipld-carv2-pack"
+               "2608039980"
+               "2608040100"]
+ :adr/body "## 問い
+
+オーナーの問い（2026-09-06）: kotobase.net に single ref と書かれているが、
+最新の kotobase / ayatori の IPLD・IPFS・UnixFS・ADL・IPNS・CARv2・index を
+最大限活用した query 設計は統合されているか。IPFS ベースの CAS と query の
+成熟度は。これらを ip** と名付けるなら何か。
+
+## 前提の訂正 — single ref は kotobase.net に無い
+
+EN/JA 全ページと llms.txt / llms-full.txt を取得して走査した。single ref /
+one ref / 単一 ref はゼロ件。出所は社内の ADR-260726-kotobase-query-plane-is-one-ref
+（join 到達範囲はちょうど ref 1 本、これは実装の都合ではなくデータモデルそのもの）で、
+2026-09-04 に ADR-2809040800 が実測で反証し supersede している。
+
+問題は supersede されたことではなく、**superseded な規則が 4 箇所で現役として
+引用され続けていた**ことである。壊れた規則は音がするが、古い規則に従っている
+間は何の音もしない。
+
+## 実測 1 — 統合の現在地は層で分かれる
+
+本番 worker が実際に require している namespace を数えた（deps.edn の推移閉包
+99 repo ではなく、require を数える —— 閉包に在ることと請求経路に載っていることは
+別の主張である）。
+
+- graph query 経路（net-kotobase/control-plane）: ipld.core と arrangement.core、
+  protocols-worker は加えて ayatori.query。**ayatori.remote（IPNI）と
+  ayatori.pack（CARv2）は require されていない。**
+- retrieval 経路（net-kotobase/ipfs = ipfs.kotobase.net）: **こちらは別**で、
+  UnixFS（kotobase-ipfs.unixfs + ipld.dag-pb）・CARv2・IPNS を持つ。
+- kotobase-shard-index は消費者ゼロ（deps.edn / shadow-cljs 全走査）。README 自身が
+  Why it is not the deployed path と書いている。
+- ADL / OrderedMap / FBL は kotobase ADR-2609060000 の remaining rollout。
+
+したがって面を分けずに UnixFS を使っていない とも 統合済み とも言えない。
+
+## 実測 2 — CAS 面は実運用、query 面は選択までで完全性は未達
+
+cid.contact 経由の公開経路は生きている。kotobase は 2 つの context ID
+（kotobase-appviews-v1 / ayatori-public-arrangement-v1）で indexed され、
+provider は /dns4/kotobase.net/tcp/443/https、Metadata は 0x0920 =
+transport-ipfs-gateway-http。/ipld/:cid は 10/10 で 200 を返し、中身は
+prev / index-roots / ocp / pos を持つ arrangement snapshot ブロックだった。
+scripts/verify-ipni-publisher-record.cljs は 12 検査 clean（追加と削除の両方向を
+実証している）。
+
+query 面の天井は ADR-2609060000 が自分で書いている: CID 検証はバイトを証明し、
+replay は構造走査を証明するが、**どちらも database range や Datalog 解の完全性を
+証明しない**。それには authenticated index boundaries が要る。
+
+## 実測 3 — ipfs.kotobase.net は自分が広告したブロックを配れなかった
+
+bafkreia2cc444k5yrw57uhszfrvbri7wee3ljbpb5wfcorykk72kgxhjaq は cid.contact に
+広告され、kotobase.net が 0.94 秒で配る。同じ CID を ipfs.kotobase.net に
+求めると 28.4 秒かけて 502 archive gateway unavailable を返した（5/5）。
+R2 も B2 も外し、唯一の fallback が ipfs.io だったからである。IPNI 広告で
+HTTP provider として公開されているブロックは DHT に居ないので、公開 gateway は
+原理的に見つけられない。**自分の deployment が持っているものを世界に訊いていた。**
+
+llms.txt は Retrieve any pinned CID at https://ipfs.kotobase.net/ipfs/<cid> と
+書いているので、この 502 は文書と実装のどちらかが嘘という状態だった。
+
+## 決定
+
+1. superseded 規則の引用 4 箇所を、後継 ADR-2809040800 の言い方に直す
+   （到達範囲は ref の本数ではなく合成の有無）。分割それ自体は代償ではなく、
+   合成しないことが代償である、という形に書き換える。
+2. ayatori に 2 本の入口を与える。README 冒頭の名乗りと
+   manifest/concept-vocabulary.edn への :ipld-retrieval 登録。metaphor 名を
+   許す条件（repository-rules.edn :opaque-name-requires）は両方であって片方ではない。
+3. net-kotobase/ipfs に origin rung を足す。KOTOBASE_IPFS_ORIGIN_URL を
+   公開 gateway より先に引き、空振りは refusal ではなく fall through とする。
+   併せて upstream 読みを KOTOBASE_IPFS_GATEWAY_TIMEOUT_MS で有界にし、
+   完了しなかった読みは 504 を返す —— 502 は upstream が答えて何も無かった意味に限る。
+
+## ip** 命名について
+
+**この workspace の repo 名には付けない。** repository-rules.edn の :plane-order は
+origin 面を最優先にし、origin prefix は自分が所有しないドメインから機械的に導出される。
+origin-domains.edn の実測どおり ipfs.tech → tech-ipfs- / ipni.io → io-ipni /
+ipfs.io → io-ipfs であり、IP は既に他者の authority から導出された prefix として
+使用中である。ここで ipq のような名を自作すると、workspace 初の
+InterPlanetary 名前空間を自分のものとして名乗る repo になる。正しい名前は既に在る
+（ayatori、subject/metaphor 面）。直すべきは名前ではなく入口だった。
+
+**エコシステムに対して名乗るなら、新しい四文字語ではなく既存 2 つの拡張が正解。**
+生きている広告の Metadata は transport-ipfs-gateway-http であり、kotobase は
+IPNI に対して 私は HTTP gateway です としか名乗っていない。実際に持っているのは
+範囲を指定した検証可能な選択に答えられる という別の能力で、それを言う protocol ID が
+存在しない。したがって (a) IPNI Metadata に transport protocol ID を 1 つ、
+(b) trustless gateway 仕様に対する IPIP（?selector= で CARv2 を返す口。
+ADR-2609060000 が自分で これは custom protocol であって standard gateway ではない
+と書いている穴）。一語のラベルが要るなら IPQ を推すが、**今日名乗るのは早い** ——
+Query は完全性を含意し、それは未達である。名乗れるのは Selection まで。
+
+## 着地
+
+- kotoba-lang/kotobase 59523d80c088ec8817a911f3941cc7ce1951ba3d
+- kotoba-lang/arrangement 9d816f01e3cb9d3629c307aa14c8df3e51a47f3e
+- kotoba-lang/ws-valueflo-vocabulary d65315106896771986cb7d4cf0931ba8b006960c
+- kotoba-lang/importer 1c47e96e0b56bf1822fe62072bc2db39d8c146c5
+- kotoba-lang/ayatori 739ffc2d24f8f6be6035c7f4d6b43a3b8e39c150
+- net-kotobase/ipfs e5380ff3eeebbd8c7c1e0936f4d4bf0c048787c3
+
+net-kotobase/ipfs は 127 tests / 540 assertions green。control として origin rung を
+外すと、origin 3 assertion と timeout-outranks-refusal が名指しの理由で赤くなる
+（ours vs theirs、訊くべきでない gateway を訊いた、504 のところが 502）。
+**deploy はこの ADR の主張に含まれない。** merged library は running Worker ではない。
+
+## 測り直し方
+
+値をここから引かない。
+
+    grep -rhoE '\\[(ipld[^ ]*|ayatori[^ ]*|arrangement[^ ]*)' orgs/net-kotobase/control-plane/*/src
+    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-ipni-publisher-record.cljs
+    curl -sS https://cid.contact/cid/<cid>
+    nbb scripts/concept-lookup.cljs ayatori
+"
+}]
