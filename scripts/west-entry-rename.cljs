@@ -23,7 +23,12 @@
 ;; Plus one blob-SHA precondition for the whole write, so a concurrent writer
 ;; gets a 409 and this retries from a fresh read rather than forcing.
 ;;
-;;   RENAMES=renames.tsv  # lines of: <old-entry-name>\t<new-entry-name>\t<org>
+;; It also moves an entry between orgs, because that is the same event seen
+;; from the manifest: a repository transferred to another organisation keeps
+;; answering on its old owner through the same redirect, so an entry can be
+;; behind on `remote:` exactly the way it is behind on `name:`.
+;;
+;;   RENAMES=renames.tsv  # lines of: <old-entry-name>\t<new-entry-name>\t<new-org>
 ;;   RENAMES=… [DRY=1] nbb --classpath ".:scripts/nbb_compat" scripts/west-entry-rename.cljs
 (require '[clojure.string :as str])
 
@@ -70,26 +75,30 @@
           (recur (inc i)))))))
 
 (defn rewrite-block
-  "name: -> new, path: last segment -> new, and repo-path: dropped when it
-  becomes redundant (name and repo path agree after the rename)."
-  [block old new]
+  "name: -> new, remote: -> new org, path: -> orgs/<new org>/<new>, and
+  repo-path: dropped because name and repo path agree after the rename.
+
+  The path is rebuilt from the org and the name rather than edited in place:
+  an entry that is behind on both is behind on the path in two segments, and
+  patching one of them leaves a path that names neither the old repository
+  nor the new one."
+  [block old new org]
   (->> block
        (keep (fn [l]
                (let [t (str/trim l)
                      indent (subs l 0 (- (count l) (count t)))]
                  (cond
                    (= t (str "- name: " old)) (str indent "- name: " new)
+                   (str/starts-with? t "remote: ") (str indent "remote: " org)
                    (str/starts-with? t "repo-path: ") nil
-                   (str/starts-with? t "path: ")
-                   (let [segs (str/split (subs t 6) #"/")]
-                     (str indent "path: " (str/join "/" (conj (vec (butlast segs)) new))))
+                   (str/starts-with? t "path: ") (str indent "path: orgs/" org "/" new)
                    :else l))))
        vec))
 
 (defn revision-of [block]
   (some #(let [t (str/trim %)] (when (str/starts-with? t "revision: ") (subs t 10))) block))
 
-(defn verify! [{:keys [old new org rev names]}]
+(defn verify! [{:keys [old new org rev names paths]}]
   (let [full (str/trim (:out (sh (str "gh api repos/" org "/" new " --jq .full_name 2>/dev/null"))))]
     (cond
       (not= full (str org "/" new))
@@ -97,6 +106,9 @@
 
       (contains? (disj names old) new)
       (str "an entry named " new " already exists — refusing to collapse two projects into one name")
+
+      (contains? paths (str "orgs/" org "/" new))
+      (str "orgs/" org "/" new " is already some entry's checkout path — two projects sharing one working tree is how a rename loses one of them")
 
       (not= 0 (:exit (sh (str "gh api repos/" org "/" new "/commits/" rev " --jq .sha >/dev/null 2>&1"))))
       (str "pinned revision " (subs rev 0 8) " is not in " org "/" new)
@@ -107,17 +119,21 @@
       lines (vec (str/split-lines text))
       names (set (keep #(let [t (str/trim %)]
                           (when (str/starts-with? t "- name: ") (subs t 8))) lines))
+      paths (set (keep #(let [t (str/trim %)]
+                          (when (str/starts-with? t "path: ") (subs t 6))) lines))
       results
       (reduce
        (fn [{:keys [lines applied dropped]} [old new org]]
          (if-let [[s e] (entry-span lines old)]
            (let [block (subvec lines s e)
                  rev (revision-of block)]
-             (if-let [err (verify! {:old old :new new :org org :rev rev :names names})]
+             (if-let [err (verify! {:old old :new new :org org :rev rev :names names
+                                    :paths (disj paths (some #(let [t (str/trim %)]
+                                                                (when (str/starts-with? t "path: ") (subs t 6))) block))})]
                (do (println "  drop" old "->" new ":" err)
                    {:lines lines :applied applied :dropped (conj dropped old)})
                (do (println "  ok  " old "->" new "  (" (subs rev 0 8) ")")
-                   {:lines (vec (concat (subvec lines 0 s) (rewrite-block block old new) (subvec lines e)))
+                   {:lines (vec (concat (subvec lines 0 s) (rewrite-block block old new org) (subvec lines e)))
                     :applied (conj applied [old new]) :dropped dropped})))
            (do (println "  drop" old ": no project entry with that name")
                {:lines lines :applied applied :dropped (conj dropped old)})))
