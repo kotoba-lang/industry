@@ -31,7 +31,13 @@
   (if-not (.existsSync fs views-path)
     (do (js/console.error
          (str "plane-view: no materialised views at " views-path "\n"
-              "  build them: nbb --classpath \".:scripts/nbb_compat\" "
+              ;; classpath は 4 項目。`.` と `scripts/nbb_compat` だけを渡すと
+              ;; `Could not find namespace: datalog.core` で落ちる —— datalog
+              ;; backend は west 管理の orgs/kotoba-lang/datalog に在り、それが
+              ;; datom.source を require する。正本は edn-query.cljs の
+              ;; `classpath` var（実測 2026-09-06、ここは 2 項目を印字していた）。
+              "  build them: nbb --classpath \".:scripts/nbb_compat"
+              ":orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src\" "
               "manifest/edn-query.cljs refresh"))
         (.exit js/process 4))
     (let [{:keys [views built-at]} (edn/read-string (.readFileSync fs views-path "utf8"))
