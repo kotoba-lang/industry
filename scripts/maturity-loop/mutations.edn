@@ -774,7 +774,19 @@
      :file "src/appkit/core.cljc"
      :find "(ui/list-view rows (merge default-list-view-opts opts))"
      :replace "(ui/list-view rows (merge default-list-view-opts {:class \"undeclared\"} opts))"
-     :must-fail ["published-default-maps-are-complete-test"]}]}
+     :must-fail ["published-default-maps-are-complete-test"]}
+    {:id :appkit/panel-drops-class
+     :why "**panel が転送する opt は :id と :class の 2 つ**で、既存の検査は :id しか見ていなかった。:class を落としても 14 test は緑のまま —— 複数ペインを並べる desktop layout が pane を位置づける唯一の opt が、appkit が仕える層そのものなのに無防備だった（実測 2026-09-07、exit 0）。既存の panel-opts-filtered は :id ごと落とすので :id 側の検査に噛む。これはその 1 key 分だけ狭い形"
+     :file "src/appkit/core.cljc"
+     :find "(merge default-panel-opts opts)"
+     :replace "(merge default-panel-opts (dissoc opts :class))"
+     :must-fail ["every-forwarded-opt-survives-the-wrap-test"]}
+    {:id :appkit/list-view-uses-panel-defaults
+     :why "list-view が **panel の** published map を適用する形。liquid-glass の list-view は :elevation を読まないので **描画は 1 バイトも変わらず**、render を見る検査は原理的に捕まえられない（実測 2026-09-07、14 test 緑・exit 0）。published な var は『自分の wrapper が実際に適用する map』でなければ、その上に opts を積むという文書化された使い方が黙って嘘になる。上の行の copy-paste そのものなので、この repo の特徴的な失敗（panel は直り list-view が漏れる）の再来"
+     :file "src/appkit/core.cljc"
+     :find "(ui/list-view rows (merge default-list-view-opts opts))"
+     :replace "(ui/list-view rows (merge default-panel-opts opts))"
+     :must-fail ["each-wrapper-applies-its-own-published-map-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
