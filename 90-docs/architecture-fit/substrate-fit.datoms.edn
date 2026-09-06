@@ -1,0 +1,235 @@
+;; Facts about architectures under the SUBSTRATE lens, in the closed vocabulary
+;; of manifest/substrate-fit-rubric.edn. NO SCORES LIVE HERE.
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/architecture-fit-score.cljs \
+;;     --rubric manifest/substrate-fit-rubric.edn \
+;;     --dataset 90-docs/architecture-fit/substrate-fit.datoms.edn
+;;
+;; :arch/layer says which question an entry answers. The top of the table is not
+;; one winner -- it is one answer per layer, and they compose into one system.
+[{:db/id -1
+  :source/dataset "substrate-fit"
+  :arch/coverage true
+  :arch/as-of "2026-09-06"
+  :arch/entries 19
+  :arch/rubric "manifest/substrate-fit-rubric.edn"
+  :arch/adr "adr-2609061800-kotoba-web-architecture-fit"
+  :arch/caveat "The substrate properties are checkable against the cited specs. The LEVEL assigned to each architecture is judgement, and so is the rubric. No gate produced these totals."
+  :arch/why-a-second-lens "The first rubric measured what the compiler admits. It scored zero axes on content addressing, IPLD, IPNI, CARv2 or biscuit, so it could not distinguish an architecture that merely compiles from one the substrate was built for. On this lens the front-end answer changes."}
+
+ ;; ---------------------------------------------------------------- durable
+ {:db/id -10 :source/dataset "substrate-fit"
+  :arch/id "event-sourced-car-pack" :arch/layer :durable
+  :arch/evidence "https://ipld.io/specs/transport/car/carv2/"
+  :arch/name "Event sourcing where one event is one CAR pack"
+  :arch/name-ja "イベントソーシング（1 event = 1 CAR pack）"
+  :arch/cid-identity :definition-and-value :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :one-pack-per-transition :arch/discoverability :cid-plus-indexer
+  :arch/attenuation :declared-import :arch/effect-row :effect-as-value
+  :arch/replay :execution-cid :arch/pure-surface :pure-with-result
+  :arch/note "The substrate's own shape, written out. An event is a value so it has a CID; the reducer is a definition so it has one too; a run of the two is an Execution CID. Write locality is not a tuning decision here, it is the transaction boundary: what one event touched is what goes in the pack."}
+
+ {:db/id -11 :source/dataset "substrate-fit"
+  :arch/id "merkle-crdt-local-first" :arch/layer :convergence
+  :arch/evidence "https://research.protocol.ai/publications/merkle-crdts-merkle-dags-meet-crdts/"
+  :arch/name "Merkle-CRDT / local-first replication"
+  :arch/name-ja "Merkle-CRDT / local-first レプリケーション"
+  :arch/cid-identity :definition-and-value :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :bounded-frontier :arch/discoverability :cid-plus-indexer
+  :arch/attenuation :offline-attenuable-token :arch/effect-row :effect-as-value
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "The only entry that scores full marks on attenuation, and the reason is structural rather than a choice: a replica that is offline cannot ask an issuer whether the writer was allowed, so the authority has to have travelled with the write. That is what a biscuit is. Merge is a join, which is a pure fold."}
+
+ ;; ---------------------------------------------------------------- interface
+ {:db/id -12 :source/dataset "substrate-fit"
+  :arch/id "merkle-document-ui" :arch/layer :interface
+  :arch/evidence "https://ipld.io/docs/data-model/"
+  :arch/name "Merkle document UI (the diff is two CIDs, not an algorithm)"
+  :arch/name-ja "Merkle ドキュメント UI（差分は 2 つの CID の比較）"
+  :arch/cid-identity :definition-and-value :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :one-pack-per-transition :arch/discoverability :cid-only
+  :arch/attenuation :declared-import :arch/effect-row :typed-ability-row
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "TEA's shape with TEA's representation replaced: state and view are IPLD values, so the rendered document has a CID and two renders are compared by walking down while their CIDs differ. Neither a full-tree commit nor a virtual-DOM differ -- the update set is a property of the data. This is the front-end answer the first lens could not see, because the first lens had no axis for it."}
+
+ {:db/id -13 :source/dataset "substrate-fit"
+  :arch/id "tea-in-memory" :arch/layer :interface
+  :arch/evidence "https://guide.elm-lang.org/architecture/"
+  :arch/name "The Elm Architecture, state in memory"
+  :arch/name-ja "TEA（状態はメモリ上の値）"
+  :arch/cid-identity :immutable-value :arch/structural-sharing :diff-algorithm
+  :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
+  :arch/attenuation :declared-import :arch/effect-row :effect-as-value
+  :arch/replay :pure-fold :arch/pure-surface :pure-total-functions
+  :arch/note "Wins the language lens and loses this one, at the same four places: the model is a value nobody can name, the view is rebuilt and then diffed, the whole thing is bounded by one tab's memory, and no third party can fetch any of it. The SHAPE is right and survives; the representation is what the substrate replaces."}
+
+ {:db/id -14 :source/dataset "substrate-fit"
+  :arch/id "re-frame" :arch/layer :interface
+  :arch/evidence "https://day8.github.io/re-frame/re-frame/"
+  :arch/name "re-frame (event to fx over one store)"
+  :arch/name-ja "re-frame（1 つのストアへの event → fx）"
+  :arch/cid-identity :mutable-cell :arch/structural-sharing :persistent-structural
+  :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
+  :arch/attenuation :acl-lookup :arch/effect-row :effect-as-value
+  :arch/replay :pure-fold :arch/pure-surface :needs-escaping-cell
+  :arch/note "Two of its three best ideas are exactly right for this substrate -- effects returned as data, and a pure reducer from event to next state. The third, one atom that the whole program holds, is what costs it: app-db is a cell nobody can address, nobody else can fetch, and nothing can name a version of. Replace the cell with a CID and most of re-frame survives."}
+
+ {:db/id -15 :source/dataset "substrate-fit"
+  :arch/id "reagent" :arch/layer :interface
+  :arch/evidence "https://reagent-project.github.io/"
+  :arch/name "Reagent (ratom + deref tracking)"
+  :arch/name-ja "Reagent（ratom + deref 追跡）"
+  :arch/cid-identity :mutable-cell :arch/structural-sharing :diff-algorithm
+  :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
+  :arch/attenuation :ambient-session :arch/effect-row :ambient
+  :arch/replay :idempotent-only :arch/pure-surface :needs-escaping-cell
+  :arch/note "The dependency graph is discovered by observing which cells were read during a render. That is the one thing a static effect row cannot express and a CID cannot name: the shape of the computation is not a value anywhere. Nothing here is content-addressable, so seven of the eight axes have nothing to score."}
+
+ {:db/id -16 :source/dataset "substrate-fit"
+  :arch/id "react-vdom" :arch/layer :interface
+  :arch/evidence "https://react.dev/learn/preserving-and-resetting-state"
+  :arch/name "React (component-local state + reconciler)"
+  :arch/name-ja "React（component 局所状態 + reconciler）"
+  :arch/cid-identity :host-object :arch/structural-sharing :diff-algorithm
+  :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
+  :arch/attenuation :ambient-session :arch/effect-row :ambient
+  :arch/replay :idempotent-only :arch/pure-surface :needs-escaping-cell
+  :arch/note "The reconciler is an algorithm for recovering information the substrate never loses. Under content addressing the diff is free; under React it is the framework's central cost and its identity model is the host object, which the UI kit refuses to expose in the first place."}
+
+ {:db/id -17 :source/dataset "substrate-fit"
+  :arch/id "hypermedia-htmx" :arch/layer :interface
+  :arch/evidence "https://htmx.org/essays/hypermedia-driven-applications/"
+  :arch/name "Hypermedia (HTMX / Hotwire)"
+  :arch/name-ja "ハイパーメディア（HTMX / Hotwire）"
+  :arch/cid-identity :versioned-record :arch/structural-sharing :diff-algorithm
+  :arch/fetch-locality :index-then-leaf :arch/discoverability :origin-server
+  :arch/attenuation :acl-lookup :arch/effect-row :declared-list
+  :arch/replay :idempotent-only :arch/pure-surface :pure-with-result
+  :arch/note "Scored highest among client architectures on the language lens by declining to be one. Here that same move costs it: pushing all state to the origin makes the origin the only place the state can be got from, which is the discoverability axis at its floor. The granularity of an update is authored per fragment rather than derived."}
+
+ ;; ---------------------------------------------------------------- effects
+ {:db/id -18 :source/dataset "substrate-fit"
+  :arch/id "unison-abilities" :arch/layer :effects
+  :arch/evidence "https://www.unison-lang.org/docs/fundamentals/abilities/"
+  :arch/name "Unison (abilities + content-addressed definitions)"
+  :arch/name-ja "Unison（ability + content-addressed 定義）"
+  :arch/cid-identity :definition-and-value :arch/structural-sharing :persistent-structural
+  :arch/fetch-locality :index-then-leaf :arch/discoverability :cid-only
+  :arch/attenuation :capability-value :arch/effect-row :typed-ability-row
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "The half of the substrate that is about code rather than data, and the only entry whose identity axis is satisfied by the language itself rather than by a convention on top of it. A handler is where authority narrows, which is why attenuation scores where it does without a token format."}
+
+ {:db/id -19 :source/dataset "substrate-fit"
+  :arch/id "free-monad-interpreter" :arch/layer :effects
+  :arch/evidence "https://okmij.org/ftp/tagless-final/"
+  :arch/name "Program-as-value + interpreter"
+  :arch/name-ja "プログラムを値にして解釈器で回す"
+  :arch/cid-identity :value-cid :arch/structural-sharing :persistent-structural
+  :arch/fetch-locality :bounded-frontier :arch/discoverability :cid-only
+  :arch/attenuation :capability-value :arch/effect-row :effect-as-value
+  :arch/replay :execution-cid :arch/pure-surface :pure-with-result
+  :arch/note "A program that is a value has a CID, which makes the pair (program, input) a memo key and the interpreter the only thing holding authority. It reaches the same place as abilities from the other direction and needs no type system to do it."}
+
+ ;; ---------------------------------------------------------------- authority
+ {:db/id -20 :source/dataset "substrate-fit"
+  :arch/id "biscuit-attenuated-request" :arch/layer :authority
+  :arch/evidence "https://www.biscuitsec.org/docs/reference/specifications/"
+  :arch/name "Biscuit-attenuated request (no session, no user lookup)"
+  :arch/name-ja "biscuit で減衰する要求（session も user 表も引かない）"
+  :arch/cid-identity :value-cid :arch/structural-sharing :persistent-structural
+  :arch/fetch-locality :index-then-leaf :arch/discoverability :cid-only
+  :arch/attenuation :offline-attenuable-token :arch/effect-row :declared-list
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "Attenuation is append-only: each delegation adds a block that can only narrow, so the token shares structure with its own parent and verifies without reaching the issuer. The datalog check is deterministic, which is why an authority decision is replayable rather than merely logged."}
+
+ ;; ---------------------------------------------------------------- query
+ {:db/id -21 :source/dataset "substrate-fit"
+  :arch/id "graphsync-selector-query" :arch/layer :query
+  :arch/evidence "https://ipld.io/specs/selectors/"
+  :arch/name "IPLD selector query (the question names the subgraph)"
+  :arch/name-ja "IPLD selector クエリ（問いが部分グラフを名指す）"
+  :arch/cid-identity :value-cid :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :bounded-frontier :arch/discoverability :cid-plus-indexer
+  :arch/attenuation :declared-import :arch/effect-row :effect-as-value
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "A selector is a value that says exactly which links to follow, so the cost of a query is set by the answer rather than by the store. That is the axis on which materialising query engines lose, and it is measurable rather than aesthetic."}
+
+ {:db/id -22 :source/dataset "substrate-fit"
+  :arch/id "datomic-db-as-value" :arch/layer :query
+  :arch/evidence "https://docs.datomic.com/whatis/data-model.html"
+  :arch/name "Database as a value + pure query (Datomic shape)"
+  :arch/name-ja "データベースを値にして純粋クエリ（Datomic 形）"
+  :arch/cid-identity :merkle-state :arch/structural-sharing :persistent-structural
+  :arch/fetch-locality :whole-corpus :arch/discoverability :cid-only
+  :arch/attenuation :declared-import :arch/effect-row :effect-as-value
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "Everything about it fits except the one axis that was measured rather than reasoned about: the query surface takes a materialised database, so cost is O(database) and not O(result), and over IPLD every block read is a round trip. The shape is right and the evaluation strategy is what the substrate refuses."}
+
+ ;; ---------------------------------------------------------------- extension
+ {:db/id -23 :source/dataset "substrate-fit"
+  :arch/id "plugin-by-defcid" :arch/layer :extension
+  :arch/evidence "https://github.com/kotoba-lang/kotoba-lang/blob/main/lang/typed-eval.edn"
+  :arch/name "Extension by DefCID (typed eval, no source text)"
+  :arch/name-ja "DefCID による拡張（typed eval、ソーステキスト無し）"
+  :arch/cid-identity :definition-and-value :arch/structural-sharing :persistent-structural
+  :arch/fetch-locality :index-then-leaf :arch/discoverability :cid-plus-indexer
+  :arch/attenuation :offline-attenuable-token :arch/effect-row :typed-ability-row
+  :arch/replay :execution-cid :arch/pure-surface :pure-with-result
+  :arch/note "An extension point that names content rather than source is the only one this substrate can express, and it turns out to be the better one: the thing being admitted carries its own interface, effect row, fuel and depth, so admitting it is a decision that can be made offline and recorded as a CID."}
+
+ {:db/id -24 :source/dataset "substrate-fit"
+  :arch/id "plugin-runtime-registry" :arch/layer :extension
+  :arch/evidence "https://docs.osgi.org/specification/"
+  :arch/name "Plugin registry resolved by name at run time"
+  :arch/name-ja "実行時に名前で解決するプラグインレジストリ"
+  :arch/cid-identity :host-object :arch/structural-sharing :in-place-mutation
+  :arch/fetch-locality :in-memory-only :arch/discoverability :origin-server
+  :arch/attenuation :ambient-session :arch/effect-row :ambient
+  :arch/replay :nondeterministic :arch/pure-surface :needs-macro-or-dynamic
+  :arch/note "Kept as the floor of the extension layer. What a name resolves to depends on what was loaded and in which order, so two runs of the same program are not the same program -- which is the negation of the identity axis rather than a low score on it."}
+
+ ;; ---------------------------------------------------------------- coordination
+ {:db/id -25 :source/dataset "substrate-fit"
+  :arch/id "syndicate-dataspace" :arch/layer :coordination
+  :arch/evidence "https://docs.racket-lang.org/syndicate/index.html"
+  :arch/name "Syndicate dataspace + facet"
+  :arch/name-ja "Syndicate データスペース + facet"
+  :arch/cid-identity :value-cid :arch/structural-sharing :normalized-graph
+  :arch/fetch-locality :bounded-frontier :arch/discoverability :session-bound
+  :arch/attenuation :capability-value :arch/effect-row :typed-ability-row
+  :arch/replay :idempotent-only :arch/pure-surface :pure-with-result
+  :arch/note "Top of the coordination layer and it drops two axes to get there, both for the same reason: the dataspace is per-instance and in-process, so an assertion cannot be fetched by a third party and the order in which notices arrive is the host's. Right for coordinating a running system, wrong as the place durable state lives."}
+
+ {:db/id -26 :source/dataset "substrate-fit"
+  :arch/id "actor-otp" :arch/layer :coordination
+  :arch/evidence "https://www.erlang.org/doc/design_principles/des_princ.html"
+  :arch/name "Actors with per-process state (OTP shape)"
+  :arch/name-ja "プロセスごとに状態を持つアクター（OTP 形）"
+  :arch/cid-identity :mutable-cell :arch/structural-sharing :full-recompute
+  :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
+  :arch/attenuation :capability-value :arch/effect-row :ambient
+  :arch/replay :nondeterministic :arch/pure-surface :needs-escaping-cell
+  :arch/note "A pid is genuinely an unforgeable reference, which is the one axis it scores well on. Everything else is decided by the same fact: state that only a live process can see is state no CID can name, no peer can fetch and no log can replay."}
+
+ ;; ---------------------------------------------------------------- baselines
+ {:db/id -27 :source/dataset "substrate-fit"
+  :arch/id "mvc-orm-server" :arch/layer :baseline
+  :arch/evidence "https://guides.rubyonrails.org/active_record_basics.html"
+  :arch/name "Server MVC over a mutable relational store"
+  :arch/name-ja "可変リレーショナルストア上のサーバ MVC"
+  :arch/cid-identity :mutable-cell :arch/structural-sharing :in-place-mutation
+  :arch/fetch-locality :pointer-chase :arch/discoverability :origin-server
+  :arch/attenuation :ambient-session :arch/effect-row :ambient
+  :arch/replay :nondeterministic :arch/pure-surface :needs-macro-or-dynamic
+  :arch/note "The floor, and useful as one: it is the exact negation of the substrate on all eight axes at once, which is why every individual improvement to it tends to pull in the same direction."}
+
+ {:db/id -28 :source/dataset "substrate-fit"
+  :arch/id "di-container" :arch/layer :baseline
+  :arch/evidence "https://github.com/weavejester/integrant"
+  :arch/name "Dependency injection container"
+  :arch/name-ja "DI コンテナ"
+  :arch/cid-identity :host-object :arch/structural-sharing :in-place-mutation
+  :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
+  :arch/attenuation :acl-lookup :arch/effect-row :injected-untyped
+  :arch/replay :idempotent-only :arch/pure-surface :needs-macro-or-dynamic
+  :arch/note "Included because it is the thing most often reached for when someone wants what this substrate already gives. A container assembles a graph of live objects at startup; content addressing assembles a graph of values that were already assembled by whoever hashed them."}]
