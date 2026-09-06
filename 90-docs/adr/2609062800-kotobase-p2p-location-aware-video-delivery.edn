@@ -9,7 +9,7 @@
   :adr/last_verified "2026-09-06"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotobase-p2p-delivery"
-  :adr/deployment-status "not-started; 設計方針の確定であって実装ゼロ。vertical slice の最初の commit はまだ無い"
+  :adr/deployment-status "slice D5 #1 landed on network-awai/app-aozora-engine main (366ca9c6, PR #14, west pin 63f7352d) and release-built; NOT deployed — wrangler OAuth session on the workstation is expired and the Keychain gftd.cf token has no Workers scope, so `wrangler login` (interactive) is the blocker; live probe and round-trip measurement not yet run"
   :adr/repos ["orgs/net-kotobase/ipfs"
               "orgs/kotoba-lang/io-libp2p"
               "orgs/kotoba-lang/io-ipni-specs"
@@ -164,7 +164,7 @@ aozora live segment (R2)
 
 | # | 何を | どこで | 前提 |
 |---|---|---|---|
-| 1 | segment → UnixFS DAG → CARv2 pack、playlist に CID | `app-aozora-engine/live` + `tech-ipfs-specs-unixfs` + `io-ipld-car` | 無し。最初に着手 |
+| 1 | segment → UnixFS DAG → CARv2 pack、playlist に CID | `app-aozora-engine/live` + `tech-ipfs-specs-unixfs` + `io-ipld-car` | **着地済み 2026-09-06**（main `366ca9c6`、PR #14、pin `63f7352d`）。**未 deploy**（下記「現在地」） |
 | 2 | gateway が pack を `:range-read` で serve、広告の multiaddr を実際に取れる先に | `net-kotobase/ipfs` + `ipni-drain` | 1 |
 | 3 | fleet node 1 台に block-server role（anonymous slot）+ Tunnel ingress | `murakumo`（placement）+ `net-kotobase/ipfs`（同じ gateway logic） | 2 |
 | 4 | player に provider ranking + hedge | `kotoba-lang/hls`（reducer）+ `ayatori.discovery`（lookup） | 2, 3 |
@@ -183,6 +183,51 @@ ADR-2606271700 は「Read 面は HTTP が常に正解」と言っている。測
 5. **Kubo / Rust / 新規 `.sh` / GitHub Actions を持ち込まない。** script host は nbb。
 6. **鍵を持つノードは block を serve しない。** `:slot/attested` と `:slot/anonymous` を混ぜない。
 7. **成功指標は round trip 数。** bytes / wall-clock を成功として引用しない。
+
+## 現在地（2026-09-06、slice #1）
+
+**着地したもの**（`network-awai/app-aozora-engine` main `366ca9c6`、PR #14、root の
+west pin `63f7352d`）:
+
+- `aozora.live.segment`（pure cljc）: segment bytes → UnixFS DAG（`unixfs.file/build`）→
+  1 CARv2 pack（`ipld.car.v2/pack`）。pack → 全 block 検証つき bytes（`unixfs.file/read-file`）。
+  playlist の segment URI と `#EXT-X-MAP` の URI を `/ipfs/<cid>` に書き換え、map に無い
+  名前は元のまま残して `:missing` に列挙する（部分的に addressed な playlist を完全なものと
+  読ませない）。
+- router: segment PUT は従来の `live/<id>/<name>` に加えて `ipld/<cid>.car` を書き、
+  `live/<id>/cids.json` に name → cid を記録する。playlist PUT は書き換えて保存する。
+  `GET|HEAD /ipfs/<cid>` は pack から検証して返す。改竄された pack は **502 BlockMismatch**
+  （404 とは別 reason、短い 200 は返さない）。`?format=car` / Accept `vnd.ipld.car` で
+  pack そのものを返す（`application/vnd.ipld.car; version=2`）。`/s/<id>/<name>` は無変更。
+- build 閉包の修復: 無改変 main の `:live` release build は `kotoba.kir` 不在
+  （`shitsuke.kotoba-oracle` 経由）、次に `byoubu-ui.core`（`kotoba-ui.theme` 経由）で
+  落ちていた。`gftdcojp/tia` が同じ閉包に持つ 6 path を足した。scoped な `:live-test`
+  build と `pnpm test:live` を足した（`:kotobase-test` はコンパイルできないため）。
+
+**測ったもの**: `npx shadow-cljs compile live-test && node out/live-tests.js` →
+15 tests / 78 assertions / 0 failures。両方向あり: round-trip する pack の payload を
+1 byte 反転すると refuse される。`npx shadow-cljs release live` → `live/out/worker.js`
+（507 KB）、`wrangler deploy --dry-run` 通過（binding は R2 `SEGMENTS` のみ）。
+**hash のコスト**（この host、load 約 130、compiled）: 1 MiB の synthetic segment で
+build+pack 2.7 s、verify+read 1.2 s。hashing は `sha2.core` の pure-cljs sha256 で、
+これは呼び出し側ではなく codec 層の定数倍（ADR-2609051700 の形）。**workerd の中で
+測り直すまで、この値を Worker の CPU コストとして引用しない。** serve 経路は
+`read-all`（frame ごと）と `read-file`（block ごと）で **2 回**検証している —— 減らす
+なら codec 側で。
+
+**deploy していない理由**: この workstation の wrangler OAuth session が失効しており
+非対話では refresh できない。Keychain `gftd.cf` の account token は wrangler に認証は
+通るが Workers scope を持たない（`deployments list` が 10000 Authentication error）。
+kagi の `CLOUDFLARE_GLOBAL_API_KEY` は `no such item`。**再開手順**: 対話端末で
+`npx wrangler login` → `orgs/network-awai/app-aozora-engine-wt-cid/live` で
+`npx wrangler deploy`（built artifact はそこに在る。共有 checkout は他 bot の
+未コミット変更を抱えているので使わない）→ live probe（startBroadcast → synthetic
+segment PUT → playlist PUT → playlist に `/ipfs/` が現れる → `GET /ipfs/<cid>` が
+PUT した bytes と一致 → 未知 CID は 404、不正 CID は 400）→ round trip 数を記録。
+
+**次の slice（D5 #2）**: `net-kotobase/ipfs` が同じ pack を `:range-read` で serve し、
+IPNI 広告の multiaddr を実際に取れる先に向ける。その前提として ingest 側の pack を
+kotobase.net の bucket にも置く経路（または drain）が要る。
 
 ## 置かないもの
 
@@ -217,4 +262,6 @@ grep -n \"seg_\" orgs/network-awai/app-aozora-engine/live/src/aozora/live/*.cljc
 
 2026-09-06: accepted。4 面の実測（gateway / libp2p / fleet / video）を Context に固定。
 実装は未着手。ADR-2608171256 G7 の successor として同 ADR の G7 節を本 ADR へ向けた。
+2026-09-06（同日、後）: slice D5 #1 が `app-aozora-engine` main に着地（PR #14、pin 前進）。
+「現在地」節を追加。deploy は wrangler OAuth 失効で未実施。
 "}]
