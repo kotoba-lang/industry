@@ -7887,4 +7887,125 @@
      :replace "   :send-confirmation\n   {:requires-slot?  false\n    :external-send?  false"
      :must-fail ["catalog-drives-escalation"
                  "escalates-confirmation-send"
-                 "interrupts-then-sends-confirmation-on-human-approval"]}]}]}
+                 "interrupts-then-sends-confirmation-on-human-approval"]}]}
+
+  {:repo "orgs/kotoba-lang/face-match"
+   :label "face-match —— 何も判定しない repo が、判定しないままであること"
+   ;; この repo は embedding model も比較アルゴリズムも持たない。README と
+   ;; MATURITY.md が述べているのは計算の正しさではなく **自分では絶対に判定
+   ;; しない**ことで、それを実際に支えているのは `core/match` の merge の
+   ;; **引数の順**である —— 計算した map を呼び手の opts の *上に* 重ねるので、
+   ;; opts は結果を先に決められない。逆順（他のほとんどの merge がそうである
+   ;; ように既定を先に書く形）にすると、呼び手が {:status :verified} を渡す
+   ;; だけで auto-approval が返る。2026-09-06 まで、その順序を守るテストは
+   ;; 1 本も無かった。appkit の :appkit/merge-order-reversed と同じ形が、
+   ;; そちらでは既定の上書き、ここでは自動承認として出る。
+   ;;
+   ;; もう半分は面と面の **あいだ** にある。bounded profile (.kotoba)・
+   ;; `scripts/verify-kotoba.mjs`・`.cljc` の 3 つが同じ no-matcher outcome を
+   ;; **手で 3 回** 書いており、突き合わせていたのは .mjs だけ。その .mjs を
+   ;; 走らせる `.github/workflows/ci.yml` は org 単位で無効化済み
+   ;; (ADR-2607300900) なので、**誰も走らせていない検査**だった。
+   ;;
+   ;; ⚠ ここに書けない mutation が 1 つある: **profile のソースごと消す**。
+   ;; find/replace では表せないが、2026-09-06 に手で確認済み ——
+   ;; `the-profile-source-is-readable-from-the-suites-working-directory` が
+   ;; 名指しで赤くなる（入力が読めないとき pass を返さない、の実演）。
+   :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   ;; 13 件とも 2026-09-06 に赤くなるところを見た。
+   [{:id :face-match/merge-order-flipped
+     :why "**この repo の存在理由の側の赤**。既定を先に merge すると、呼び手の opts が計算結果に勝ち、{:status :verified} を渡すだけで auto-approval になる"
+     :file "src/face_match/core.cljc"
+     :find "(merge opts {:status :review\n                                         :confidence nil\n                                         :reason (if matcher :matcher-returned-nil :not-implemented)})"
+     :replace "(merge {:status :review\n                                     :confidence nil\n                                     :reason (if matcher :matcher-returned-nil :not-implemented)}\n                                    opts)"
+     :must-fail ["no-opts-map-can-adjudicate-a-check-that-has-no-matcher"
+                 "no-opts-map-can-adjudicate-a-check-whose-matcher-declined"]}
+
+    {:id :face-match/non-adjudicating-made-configurable
+     :why ":face-match/non-adjudicating が呼び手に開かれると、結果に『これは判定である』と書かせられる"
+     :file "src/face_match/model.cljc"
+     :find ":face-match/non-adjudicating true}"
+     :replace ":face-match/non-adjudicating (:non-adjudicating opts true)}"
+     :must-fail ["no-opts-map-can-adjudicate-a-check-that-has-no-matcher"]}
+
+    {:id :face-match/adjudicating-when-a-matcher-answered
+     :why "「review だけが非判定」という、もっともらしい読み替え。matcher が答えた経路で false になる"
+     :file "src/face_match/model.cljc"
+     :find ":face-match/non-adjudicating true}"
+     :replace ":face-match/non-adjudicating (= :review (:status opts :review))}"
+     :must-fail ["every-reachable-outcome-is-marked-non-adjudicating"]}
+
+    {:id :face-match/verdict-defaults-to-verified
+     :why "fail-safe の向きが反転する —— 判定を言わなかった matcher の答えが :verified になる"
+     :file "src/face_match/core.cljc"
+     :find "(if (:match? outcome) :verified :flagged)"
+     :replace "(if (false? (:match? outcome)) :flagged :verified)"
+     :must-fail ["an-outcome-that-does-not-say-it-matched-is-flagged-never-verified"]}
+
+    {:id :face-match/undeclared-status-produced
+     :why "model/statuses が実際に到達できる status の集合であること（宣言だけが残るのを防ぐ）"
+     :file "src/face_match/core.cljc"
+     :find "(if (:match? outcome) :verified :flagged)"
+     :replace "(if (:match? outcome) :approved :flagged)"
+     :must-fail ["the-declared-status-set-is-exactly-what-match-can-produce"]}
+
+    {:id :face-match/undeclared-reason-produced
+     :why "model/reasons についても同じ —— 宣言と到達可能集合が離れたら赤"
+     :file "src/face_match/core.cljc"
+     :find ":reason (if matcher :matcher-returned-nil :not-implemented)"
+     :replace ":reason (if matcher :matcher-declined :not-implemented)"
+     :must-fail ["the-declared-reason-set-is-exactly-what-match-can-produce"]}
+
+    {:id :face-match/opts-leak-into-the-result
+     :why "結果 map が閉じていること —— 呼び手が入れた鍵が結果に生き残ると、下流が『監査済み』のような自称を読める"
+     :file "src/face_match/model.cljc"
+     :find "  {:face-match/status (:status opts :review)\n   :face-match/confidence (:confidence opts)\n   :face-match/reason (:reason opts :not-implemented)\n   :face-match/non-adjudicating true})"
+     :replace "  (merge opts\n         {:face-match/status (:status opts :review)\n          :face-match/confidence (:confidence opts)\n          :face-match/reason (:reason opts :not-implemented)\n          :face-match/non-adjudicating true}))"
+     :must-fail ["the-result-map-carries-nothing-the-caller-put-into-opts"]}
+
+    {:id :face-match/profile-record-drifts
+     :why "bounded profile が .cljc と違う outcome を作る —— README が『判定しない保証』と呼んでいるものが、そう言わなくなる"
+     :file "src/face_match/bounded_no_matcher.kotoba"
+     :find "(record compare-result-type :review false :not-implemented true)"
+     :replace "(record compare-result-type :verified false :not-implemented true)"
+     :must-fail ["the-profile-builds-the-record-the-cljc-oracle-returns"]}
+
+    {:id :face-match/profile-record-type-reordered
+     :why "record が位置指定なので、型の側のフィールド順が動くと literal の意味が黙って変わる"
+     :file "src/face_match/bounded_no_matcher.kotoba"
+     :find "[[:status :keyword] [:confidence-present :bool]\n    [:reason :keyword] [:non-adjudicating :bool]]"
+     :replace "[[:reason :keyword] [:confidence-present :bool]\n    [:status :keyword] [:non-adjudicating :bool]]"
+     :must-fail ["the-profile-builds-the-record-the-cljc-oracle-returns"]}
+
+    {:id :face-match/conformance-marker-drifts
+     :why "conformance script が profile の返さない marker を要求する（GitHub Actions が inert なので、誰も気づかない）"
+     :file "scripts/verify-kotoba.mjs"
+     :find "if (wasm.instance.exports.main() !== 42n)"
+     :replace "if (wasm.instance.exports.main() !== 43n)"
+     :must-fail ["the-conformance-marker-is-the-one-that-record-reaches"]}
+
+    {:id :face-match/profile-marker-drifts
+     :why "逆向き —— profile 側の成功 marker が動く"
+     :file "src/face_match/bounded_no_matcher.kotoba"
+     :find "(if (record-get compare-result-type r :confidence-present) 1 42)"
+     :replace "(if (record-get compare-result-type r :confidence-present) 1 7)"
+     :must-fail ["the-conformance-marker-is-the-one-that-record-reaches"]}
+
+    {:id :face-match/conformance-stops-checking-the-wasm-graph
+     :why "conformance が 2 面のうち 1 面を見なくなる —— 検査を外しても .mjs は今までどおり成功を印字する"
+     :file "scripts/verify-kotoba.mjs"
+     :find "if (wasm.instance.exports.main() !== 42n) throw new Error(\"face-match Wasm main mismatch\");"
+     :replace "void wasm;"
+     :must-fail ["the-conformance-script-is-readable-and-still-checks-a-marker"]}
+
+    ;; ── 答えられなくなる側 ──
+    ;; profile の `main` が読み手の知らない形になったとき、marker を **推測して
+    ;; 通さない**。読めなかったことを赤として言う（CLAUDE.md の 6 問の 2）。
+    {:id :face-match/profile-main-shape-unreadable
+     :why "`record-get` でない guard が現れたら、marker を推測せず拒否する"
+     :file "src/face_match/bounded_no_matcher.kotoba"
+     :find "(if (= (record-get compare-result-type r :status) :review)"
+     :replace "(if (= (field-get compare-result-type r :status) :review)"
+     :must-fail ["the-conformance-marker-is-the-one-that-record-reaches"]}]}]}
