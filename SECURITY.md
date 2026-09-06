@@ -29,12 +29,25 @@ delay.
 
 ## Human Authentication Invariants
 
-- Human authentication must use a phishing-resistant cryptographic ceremony:
-  WebAuthn with exact RP ID and Origin binding, server-issued single-use
-  challenge, replay protection, and user verification.
-- Passkey-rooted organization quorum or smart-account control may authorize
-  organization governance, but must not become a weaker alternative human
-  login.
+- Web3 first is the current policy (ADR-2609070400): verified SIWE wallet
+  authentication is a first-class, preferred login path. Approved methods are
+  SIWE with ERC-191 EOA signatures, SIWE with ERC-1271 contract signatures,
+  and WebAuthn Passkeys. A product may retain a Passkey-only surface; record
+  its actual methods in the inventory. Policy adoption is not implementation proof.
+- Wallet connection, an address, a DID, or a client hint is not authentication.
+  Verify the server-issued single-use nonce, exact domain/origin/URI, admitted
+  chain, expiry, and signature on the server; consume the nonce atomically.
+  ERC-1271 verification must bind the RPC to the declared chain and recheck
+  current contract authorization when accepting a contract-wallet session.
+  Verification errors must fail closed. Sessions must be bounded and revocable.
+- WebAuthn requires exact RP ID and Origin binding, a server-issued single-use
+  challenge, replay protection, and user verification. Wallet signatures do not
+  inherit WebAuthn's phishing resistance merely by including a domain string.
+- Authentication does not authorize transfers, delegated signing, or governance.
+  Preserve operation-specific authority checks. Wallet and Passkey principals
+  must not be silently merged. Adding a credential to an existing identity
+  requires that identity's verified owner authority; a new wallet login cannot
+  recover another identity.
 - Email links, Email OTPs, Email addresses, passwords, SMS/voice OTPs,
   telephone ownership, OIDC/OAuth/SAML/social/enterprise SSO, security
   questions, device fingerprints, support judgments, operator resets, and
@@ -55,7 +68,8 @@ delay.
 - Recovery must replace a credential; it must not directly create a session.
 - Recovery requires an independently generated, high-entropy, one-time offline
   secret, a durable server-enforced delay, and registration of a fresh approved
-  authenticator.
+  authenticator. The delay must be at least 48 hours. External wallet recovery
+  is outside this service and cannot bypass its identity replacement controls.
 - Store only a verifier or digest of the recovery secret. Plaintext is shown
   once.
 - Recovery possession must not reveal whether an account exists.
@@ -107,11 +121,16 @@ reset would become the weakest route and lower the security of every account.
 
 ## Known Migration Gaps
 
-`auth.itonami.cloud` currently implements the required Passkey-only boundary.
-Cloud Itonami still contains legacy Email and initial-password authentication
-code. Until those routes, consumers, generated artifacts, and live surfaces
-are closed and negatively verified, the workspace must not claim that every
-Itonami authentication surface is Passkey-only.
+ADR-2608302125 previously required Passkey-only authentication. Its exclusivity
+is superseded by ADR-2609070400; its prohibition of Email/password/SMS/SSO
+and operator recovery remains in force.
+
+The inventory retains earlier evidence for the Passkey surface at
+`auth.itonami.cloud`; this policy change does not reverify its live behavior.
+Cloud Itonami PR #610 merged wallet and Passkey browser sessions, but full build,
+migration, and live verification remain pending. Legacy closure gaps are not
+resolved by allowing wallet authentication. Do not claim workspace conformance
+while a declared surface is a migration gap or unverified.
 
 Other first-party human-authentication surfaces remain subject to inventory and
 verification. Unverified means unverified, not conformant.

@@ -1,10 +1,23 @@
-{:policy/id "human-authentication-no-downgrade/v1"
- :policy/adr "2608302125"
+{:policy/id "human-authentication-web3-first/v2"
+ :policy/adr "2609070400"
+ :policy/supersedes "human-authentication-no-downgrade/v1"
  :policy/security-document "SECURITY.md"
  :policy/scope :first-party-human-authentication-surfaces
- :policy/last-reviewed "2026-08-30"
+ :policy/last-reviewed "2026-09-07"
 
- :human-auth/approved-active-methods #{:webauthn-passkey}
+ :human-auth/approved-active-methods #{:webauthn-passkey :siwe-erc191 :siwe-erc1271}
+ :human-auth/preferred-family :web3-wallet
+ :wallet/server-issued-single-use-nonce? true
+ :wallet/exact-domain-origin-uri-binding? true
+ :wallet/admitted-chain-binding? true
+ :wallet/expiry-required? true
+ :wallet/server-side-signature-verification? true
+ :wallet/atomic-nonce-consumption? true
+ :wallet/contract-current-authorization-required? true
+ :wallet/verification-fails-closed? true
+ :wallet/connection-is-authentication? false
+ :wallet/login-authorizes-transactions? false
+ :identity/implicit-principal-linking? false
  :human-auth/prohibited-authority
  #{:email-link
    :email-otp
@@ -38,7 +51,7 @@
  :legacy/plausible-secret-fixture-required? true
 
  :inventory/allowed-statuses #{:conformant :migration-gap :unverified}
- :inventory/workspace-passkey-only-claim? false
+ :inventory/workspace-conformance-claim? false
  :inventory/exclusions
  #{:external-specification-mirror
    :protocol-library
@@ -58,11 +71,13 @@
   {:project "cloud-itonami"
    :path "orgs/network-awai/cloud-itonami"
    :role :combined-authority-and-service
-   :active-methods #{:webauthn-passkey}
+   :active-methods #{:webauthn-passkey :siwe-erc191 :siwe-erc1271}
+   :verification-status :source-only
+   :source-commit "87e4aa5d61bc82b9332aa27c843a5c25b41bdeda"
    :legacy-code #{:email-link :password}
    :status :migration-gap
    :security-policy "SECURITY.md"
-   :evidence "legacy Email and initial-password code remains pending closure and negative verification"}
+   :evidence "PR #610 merged wallet and Passkey browser sessions; full build, migrations and live verification pending; earlier legacy closure gap remains unverified"}
 
   {:project "cloud-itonami-app"
    :path "orgs/cloud-itonami/cloud-itonami-app"

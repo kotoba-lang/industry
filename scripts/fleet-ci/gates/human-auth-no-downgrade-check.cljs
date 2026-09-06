@@ -13,7 +13,7 @@
    "AGENTS.md"
    "manifest/west.yml"
    "manifest/human-authentication-policy.edn"
-   "90-docs/adr/2608302125-human-authentication-is-passkey-only-and-never-downgrades.edn"])
+   "90-docs/adr/2609070400-human-authentication-is-web3-first.edn"])
 
 (def required-prohibited
   #{:email-link :email-otp :password :sms-otp :voice-otp :oauth :oidc :saml
@@ -22,6 +22,9 @@
 
 (def required-security-phrases
   ["Human Authentication Invariants"
+   "Web3 first"
+   "ERC-191"
+   "ERC-1271"
    "Recovery must replace a credential"
    "server-enforced delay"
    "Closed legacy routes must return 404 or 410"
@@ -65,12 +68,12 @@
         west (read-text root "manifest/west.yml")
         policy (reader/read-string (read-text root "manifest/human-authentication-policy.edn"))
         adr (reader/read-string
-             (read-text root "90-docs/adr/2608302125-human-authentication-is-passkey-only-and-never-downgrades.edn"))
+             (read-text root "90-docs/adr/2609070400-human-authentication-is-web3-first.edn"))
         surfaces (:inventory/surfaces policy)
         statuses (:inventory/allowed-statuses policy)
         approved (:human-auth/approved-active-methods policy)
         prohibited (:human-auth/prohibited-authority policy)
-        claim? (:inventory/workspace-passkey-only-claim? policy)
+        claim? (:inventory/workspace-conformance-claim? policy)
         all-conformant? (and (seq surfaces) (every? #(= :conformant (:status %)) surfaces))
         projects (map :project surfaces)
         errors
@@ -78,16 +81,34 @@
          (concat
           (for [phrase required-security-phrases :when (not (str/includes? security phrase))]
             (str "SECURITY.md is missing invariant: " phrase))
-          (when-not (str/includes? agents "ADR-2608302125")
-            ["AGENTS.md does not declare ADR-2608302125 mandatory"])
-          (when-not (= "human-authentication-no-downgrade/v1" (:policy/id policy))
+          (when-not (str/includes? agents "ADR-2609070400")
+            ["AGENTS.md does not declare ADR-2609070400 mandatory"])
+          (when-not (= "human-authentication-web3-first/v2" (:policy/id policy))
             ["unexpected policy id"])
-          (when-not (= "2608302125" (:policy/adr policy))
-            ["machine policy does not point at ADR-2608302125"])
-          (when-not (= "2608302125" (:adr/id (first adr)))
-            ["ADR file does not contain ADR-2608302125"])
-          (when-not (= #{:webauthn-passkey} approved)
-            [(str "approved active methods must be exactly #{:webauthn-passkey}, got " (pr-str approved))])
+          (when-not (= "2609070400" (:policy/adr policy))
+            ["machine policy does not point at ADR-2609070400"])
+          (when-not (= "2609070400" (:adr/id (first adr)))
+            ["ADR file does not contain ADR-2609070400"])
+          (when-not (= #{:webauthn-passkey :siwe-erc191 :siwe-erc1271} approved)
+            [(str "approved active methods must be exactly #{:webauthn-passkey :siwe-erc191 :siwe-erc1271}, got " (pr-str approved))])
+          (when-not (= :web3-wallet (:human-auth/preferred-family policy))
+            ["Web3 wallet must be the preferred authentication family"])
+          (for [k [:wallet/server-issued-single-use-nonce?
+                   :wallet/exact-domain-origin-uri-binding?
+                   :wallet/admitted-chain-binding? :wallet/expiry-required?
+                   :wallet/server-side-signature-verification?
+                   :wallet/atomic-nonce-consumption?
+                   :wallet/contract-current-authorization-required?
+                   :wallet/verification-fails-closed?]
+                :when (not (true? (get policy k)))]
+            (str "wallet safeguard must be true: " k))
+          (for [k [:wallet/connection-is-authentication?
+                   :wallet/login-authorizes-transactions?
+                   :identity/implicit-principal-linking?]
+                :when (not (false? (get policy k)))]
+            (str "wallet authority boundary must be false: " k))
+          (when-not (boolean? claim?)
+            ["workspace conformance claim must be explicitly boolean"])
           (when-not (set/subset? required-prohibited prohibited)
             [(str "prohibited authority set is missing "
                   (pr-str (set/difference required-prohibited prohibited)))])
@@ -95,8 +116,8 @@
             ["approved and prohibited authority sets overlap"])
           (when-not (= #{:conformant :migration-gap :unverified} statuses)
             ["allowed inventory statuses changed without a policy version change"])
-          (when-not (= claim? all-conformant?)
-            [(str "workspace Passkey-only claim is inconsistent: claim=" claim?
+          (when (and claim? (not all-conformant?))
+            [(str "workspace conformance claim is inconsistent: claim=" claim?
                   " all-conformant=" all-conformant?)])
           (when-not (:recovery/replaces-credential-not-session? policy)
             ["recovery must replace a credential, not create a session"])
