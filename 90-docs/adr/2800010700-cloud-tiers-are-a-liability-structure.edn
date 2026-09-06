@@ -1,179 +1,215 @@
 [{:db/id -1
   :adr/id "adr-2800010700-cloud-tiers-are-a-liability-structure"
-  :adr/title "kotoba.cloud の Secure / Community は性能の層ではなく当事者性の層 —— Secure の実体は在るが名乗れず、Community は 0、両方を塞いでいるのは metering"
+  :adr/title "Secure / Community は当事者性の層である —— そしてそれは murakumo に既に live で在った。欠けているのは kotoba.cloud がそれを知らないことだけ"
   :adr/status "accepted"
   :adr/date "2026-09-06"
-  :adr/body "## Context
+  :adr/body "## この ADR は同日中に大幅に訂正された
 
-オーナーの問い（2026-09-06）は 2 段だった。最初は『kotoba.cloud を kotoba cli で
-deploy したり、llm・推論・kototama host・storage・ipfs pin を secure に提供する
-基盤にしたい。そのようになっている?』で、次に形を『runpod secure, community の
-ようなイメージ』と補足された。
+初版（2026-09-06、commit 9875d21b1fc）は『層はこれから作る、metering から
+始めよ』と決めた。**その中心的な主張は誤りだった。** 層も metering も
+credits も payout も **murakumo に既に live で在る。**
 
-前提として『kotoba.cloud が提供するのは kotobalabs 社が管理するリソースで動く』
-と述べられている。**この前提は現状の記述ではなく、これから決める設計判断である。**
+| 初版の主張 | 判定 |
+|---|---|
+| ノードに tier / trust / provider フィールドが無い | **誤り。`/nodes` を見て `/infer/nodes` を見ていなかった** |
+| metering は 35 actor 中 1 つしか形を持たない | **母集団が違う。cloud-itonami の actor の話で、compute plane の話ではない** |
+| 順序は metering → ノード属性 → 層の宣言 → Community | **撤回。最初の 3 つは既に在る** |
+| Community 層は 0 から作る必要がある | **誤り。live で 8 ノードが community として enroll 済み** |
 
-## 測定（2026-09-06、すべて live または実行）
+生き残ったのは当事者性の分析と、**kotobalabs が当事者として登録されていない**
+という発見だけである。以下は訂正後の内容。
 
-### 5 つの要求のうち control plane に載っているのは 2 つ
+## 何を間違えたか —— 隣の endpoint を見て『無い』と言った
 
-`https://kotoba.cloud/.well-known/kotoba-cloud.json` は 200。role は 7 本
+`GET /nodes` の 11 ノードに tier フィールドが無いことを確認し、**そこで止めた。**
+`/nodes` は heartbeat のテレメトリ面であって enrollment 面ではない。
+enrollment は `GET /infer/nodes` で、そちらは 65 件を `trust-tier` /
+`provider` / `admission` 付きで返す。
+
+同じ形で 2 度目も間違えた。`manifest/` と `90-docs/` を `secure cloud` /
+`community cloud` で grep して 1 ファイルずつしか当たらないのを見て
+『語彙が無い』と読んだ。**子リポの source を見ていなかった。**
+`orgs/network-awai/cloud-murakumo-api` には `tier` が 157 箇所ある。
+
+CLAUDE.md は『無いと結論する前に索引を引く』と繰り返している。索引は引いた。
+**引く先が足りなかった** —— live API の隣の path と、子リポの src。
+2026-08-03 の『kuro / kobo は無い』と同型で、あのときも grep は当たっていた。
+
+## 実測（2026-09-06、すべて live）
+
+### Secure / Community はノードの信頼層として live である
+
+`GET https://api.murakumo.cloud/infer/nodes` は 65 件:
+
+```
+trust-tier : awai-secure 10 / community 8 / (legacy 未設定) 47
+admission  : accepted    10 / pending   8 / (未設定)        47
+live?      : true 3 / false 62
+provider   : did:web:awai.network 10 / 各ホスト自身の did:key 8 / 未設定 47
+```
+
+### 当事者性はデータに符号化されている
+
+`control_plane.cljc` の `normalize-enrollment`:
+
+- **Community** —— `:node/provider` はそのホスト自身の `did:key`。
+  `:node/admission :pending`。公開 enrollment の既定
+- **Secure** —— `:node/provider` は `did:web:awai.network`。
+  `:node/admission :accepted`。**operator 認証がなければ 401**
+  （`:secure-enrollment-unauthorized`）。既存の secure enrollment を
+  更新できるのも operator だけ
+
+docstring がそのまま言っている ——
+`Public enrollment is Community by default. AWAI Secure must be explicit and
+is admitted only by the operator-authenticated Worker boundary.`
+
+**これは RunPod の `only the venue ... not a party` と同じ構造を、規約の文言では
+なく provider DID として持っている。** Community ノードの provider が
+ホスト自身の DID である以上、そのノードの提供者は AWAI ではない。
+規約で降りるより強い —— データがそう言っている。
+
+### metering は形だけでなく走っている
+
+| 面 | 実測 |
+|---|---|
+| `GET /infer/credits` | 200。口座残高（run ledger の純粋な fold） |
+| `GET /infer/cost` | 200。**200 runs 実測、prompt 1,124,603 tok、cache hit 0.777**、spot 40.55 円/Mtok に対し fleet 52.84 円/Mtok |
+| `GET /itonami/plans` | 200。**4 プランが価格付きで data として在る** |
+
+プランはそのまま Secure / Community の商品面になっている:
+
+- **free** —— 0 USD。`contribute-to-earn` / `browser/wasm 参加` /
+  `公開 fleet の余力`。support は `community`
+- **payg** —— credits を都度購入（USDC、10 USD = 950cr）
+- **pro** —— 20 USD / 月 3000cr / 優先キュー / 署名領収書
+- **enterprise** —— 自社ハードで走る主権推論 + 監査台帳 + 部門チャージバック
+
+`plan_admission.cljc` は『plan の窓を使い切った口座が API credits を持っていても
+credits を黙って引かない。429 を返す』という規律を明文で持つ。
+run ledger は `:run/shares {node credits}` を持ち、**貢献ノードへの分配が
+台帳の形で在る**。
+
+### kotoba.cloud はこのどれも知らない
+
+`https://kotoba.cloud/.well-known/kotoba-cloud.json` の role は 7 本
 （identity / control / boot / storage / compute / agentWork / language）。
 
-| 要求 | 実測 |
-|---|---|
-| deploy | 半分。`kotoba deploy` は実在（local receipt / `--target murakumo` で署名付き Kekkai desired-state を IPNS 経由で配りノードが pull）。ただし control plane 自身が `deploy.hostedApply: false` と申告 |
-| storage | 載っている。`roles.storage` = kotobase.net |
-| LLM / 推論 | role なし。Worker source に `infer` **0 件** |
-| kototama host | role なし。source に `kototama` **0 件**。runtime は実在するが kotoba.cloud は前に立っていない |
-| IPFS pin | role なし。**ただし下は live** —— `kotobase.net/pins`（PSA）が 401 `NOT_AUTHORIZED / valid Bearer token or CACAO required` を返す |
+- `roles.compute` は `api.murakumo.cloud` を 1 本指すだけで、**層も価格も
+  credits も言わない**
+- `llm` / `inference` の role が無い。Worker source に `infer` **0 件**
+- `kototama` の role が無い。source に **0 件**
+- IPFS pin の role が無い。**`kotobase.net/pins` は live**（401
+  `valid Bearer token or CACAO required`）だが control plane は名乗らない。
+  control plane 内の `pin` はすべて PQ 鍵の pinning
+- `deploy.hostedApply: false`
 
-control plane 内の `pin` という語は**すべて PQ 鍵の pinning** であって IPFS pin
-ではない。
+### 認証が層をまたいで流れない
 
-### 認証が層をまたいで流れていない
-
-`POST https://api.murakumo.cloud/v1/messages` は 401 を返し、本文が
+`POST https://api.murakumo.cloud/v1/messages` は 401 で
 `issue one with nbb scripts/run-task.cljs token issue --scope chat in
-kotoba-lang/murakumo` と案内する。**murakumo は murakumo 自身の API キー平面で
-認証しており、kotoba.cloud の Stable Principal からは発行されない。**
-pin も CACAO を要求するが、それを kotoba.cloud が仲介する経路は control plane に無い。
+kotoba-lang/murakumo` と案内する。**murakumo は自分の API キー平面で認証し、
+kotoba.cloud の Stable Principal からは発行されない。** pin も CACAO を
+要求するが、それを kotoba.cloud が仲介する経路は無い。
 
-**kotoba.cloud が一本化できているのは library publication だけ**である
-（Passkey + Principal 固定 ML-DSA-65 の二重承認）。
+**kotoba.cloud が一本化できているのは library publication だけ**である。
 
-### 前提の訂正 —— kotobalabs 社はどのリソースの管理者としても登録されていない
+### kotobalabs は当事者として登録されていない（初版から変わらない）
 
-- `kotobalabs.com` は **302 → www.kotoba-lang.org** の転送のみ。workspace 内で
-  このドメインを serve する Worker は **0 件**
+- `kotobalabs.com` は **302 → www.kotoba-lang.org**。serve する Worker **0 件**
 - `app-kotoba-cloud` の著作権表示は `Kotoba contributors` —— 法人名ではない
-- **compute plane（murakumo.cloud）の運営者は AWAI Network, L.L.C.**
-  （Delaware file no. 10704996）、infrastructure vendor が Gftd Japan 株式会社
+- **Secure 層の provider は `did:web:awai.network`**（AWAI Network, L.L.C.、
+  Delaware file no. 10704996）。10 ノードが実際にその DID を持っている
 - 法人として実在が確認できるのは npm org `com-kotobalabs` のみ
-  （PyPI org・GitHub org は未作成。ADR-2609010500）
 
-⚠ **ADR-2608231500 D4 の DNS 記述は陳腐化していた。** 同 ADR は 2026-08-23 に
-『kotobalabs.com は A レコード無し』と書いたが、2026-09-06 に測ると
-A / AAAA とも在り 302 を返す。**ただし D4 の核心（どの法人が保有し何を serve
-するのか未決）は今も真である** —— worker 0 件は変わっていない。
-
-### ノードに層の識別子が無い
-
-`GET https://api.murakumo.cloud/nodes` は 200 で 11 ノード（9 到達）。
-**11 台すべてに owner / tier / trust / attest のいずれのフィールドも無い。**
-どれが Secure かを機械が答えられない。
-
-### metering がほぼ無い
-
-`scripts/verify-actor-metering.cljs` を実行（exit 1）:
-
-```
-SCANNED 35 actors
-  meter-shaped   1     ← 3要素（期間 / 重複排除キー / 集計）が揃う
-  no-meter-ns   34     ← 計器の名前空間自体が無い
-```
-
-唯一の該当は `cloud-itonami/actor-hanmoto` の `hanmoto/usage.cljc`。
-**検出器自身が『形が在ることを計測済みとして数えない』と申告している**ので、
-実際に回っている証拠ではない。
-
-### 第三者ホストの受け入れ機構が無い
-
-`node attestation` = 0 件、`remote attestation` = 0 件、`host onboarding` = 0 件。
-決済レールだけは両方向に在る —— `kotoba-lang/x402-sdk`（払う）と
-`network-awai/nexus-x402`（自前 facilitator = 受け取る）。
-
-## RunPod の 2 層は性能ではなく責任構造である
-
-ADR-2800005600 が RunPod の ToS を一次情報で読んでいる。そこが本 ADR の起点になる:
-
-- **Community Cloud** —— RunPod は `only the venue ... not a party`。取引の
-  当事者から契約上おりる。`does not make any specific uptime warranties`
-- **Secure Cloud** —— RunPod が当事者。ただし **ToS には uptime SLA も service
-  credit も条項として無い**（`AS-IS AND AS-AVAILABLE`）。レビューサイトが書く
-  『99.5% コミット』は二次情報で、条項ではない
-
-したがって 2 層を分けているのは価格でも性能でもなく、**誰が当事者になるか**である。
+⚠ ADR-2608231500 D4 の DNS 記述は陳腐化していた（2026-08-23 は A レコード無し、
+今日は A / AAAA とも在り 302）。**ただし D4 の核心（どの法人が保有し何を serve
+するのか未決）は今も真**である。
 
 ## Decision
 
-### D1. 層は『価格と保証の組』として定義し、当事者性を先に決める
+### D1. 層は『価格と保証の組』である。そして既に在る
 
-Secure / Community を UX のラベルとして導入しない。各層は
-(a) 誰が当事者か (b) 何を保証するか (c) いくらか の 3 点を同時に持つ。
-(a) が未決のまま (b)(c) を公開しない。
+Secure / Community を新しく設計しない。**`/infer/nodes` の `trust-tier` と
+`/itonami/plans` が既にその定義であり、両方 live である。**
+新しい層の語彙・新しい credits・新しい payout を作らない。
 
 ### D2. kotobalabs が Secure 層の当事者になるかは、この ADR では決めない
 
-compute を運営しているのは AWAI Network, L.L.C. である。kotobalabs が
-再販者になるのか役務調達するのかで、規約・請求・責任の書き方が変わる。
-**これは法人の決定であってエンジニアリングの決定ではない。**
-ADR-2608231500 D4 が名指しで待っている決定と同一で、SOC 2 のスコープも
-ここで決まる。
+**初版から変わらない唯一の決定。** ただし根拠は強くなった ——
+Secure ノード 10 台が `did:web:awai.network` を provider として**実際に持っている**。
+kotobalabs が当事者になるとは、この DID を書き換えることを意味する。
+規約の文言の問題ではなく、enrollment データの問題である。
 
-**それまで kotoba.cloud の公開面で『kotobalabs が管理するリソース』と
-名乗らない。** 今そう名乗ると、実際には他社が運営している計算資源を
-自社管理と表示することになる。
+**それまで kotoba.cloud の公開面で『kotobalabs が管理するリソース』と名乗らない。**
+今そう名乗ると、provider DID が AWAI を指しているまま別法人の管理と表示する
+ことになる。これは ADR-2608231500 D4 が待っている決定と同一で、SOC 2 の
+スコープもここで決まる。
 
-### D3. 順序は metering → ノード属性 → 層の宣言 → Community
+### D3. 順序は『作る』ではなく『繋ぐ』—— 初版の D3 を撤回する
 
-1. **metering**（34/35 が未装備）。層の定義そのものが価格に依存するので先頭。
-   参照実装は `authn.usage` の 3 要素
-2. **ノードに owner / tier を持たせる**。今は 11 台とも無記名。
-   `murakumo.fleet.inventory` に属性を足し `roles.compute` から引けるようにする
-3. **control plane に層を宣言する**。現在の `roles.compute` は origin 1 本のみ
-4. **Community**（attestation + payout + ホスト identity の公開）は最後
+初版は metering → ノード属性 → 層の宣言 → Community と決めた。
+最初の 3 つは既に在るので撤回する。残っているのは:
 
-**metering が最優先なのは難易度ではなく不可逆性による** ——
-`authn.usage` 自身が書くとおり『計測されなかった月は後から計測できない』。
-他の 3 つは遅れても取り返せる。
+1. **kotoba.cloud の control plane に、実在する面を role として足す** ——
+   `llm`（`api.murakumo.cloud`）/ `pinning`（`kotobase.net/pins`）/
+   層と価格（`/infer/nodes`・`/itonami/plans` を指す）
+2. **Stable Principal から各平面の credential を発行する** ——
+   murakumo の API キーと kotobase の CACAO を、kotoba.cloud の Passkey
+   セッションから短命 grant として出す。README が自ら
+   `short-lived Passkey-scoped storage grants は follow-up` と書いている箇所
+3. **`deploy.hostedApply` を false のままにするか決める** —— 層を宣言しても
+   hosted apply が無ければ層を選べない
+4. **legacy 47 ノードの trust-tier 未設定を埋める** —— 65 中 47 が未設定で、
+   『どちらでもない』は Secure でも Community でもない第三の状態になっている
 
-### D4. Community 層を作るなら、ホストの identity とスコアを顧客に見せる
+### D4. Community 層はホスト identity を既に見せている。隠す方向へ後退させない
 
-ADR-2800005600 D7 は買う側の立場で『aggregator が採点するのは
-`api.murakumo.cloud` の成功率であり、借りた host が落ちればそれはこちらの
-5xx になる』と記録している。**売る側では、これがそのまま Community 層の
-設計制約になる。**
+`/infer/nodes` は provider DID を公開している。RunPod Community が成立するのは
+顧客がホストを名指しで選べるからで、**この面は既にそうなっている。**
+将来 kotoba.cloud の裏に隠して 1 本の API にまとめる設計を採るなら、
+その時点で community の障害は kotoba.cloud の障害として計上される
+（ADR-2800005600 D7 の裏返し）。**隠すなら Community と呼ばない。**
 
-RunPod Community が成立するのは、顧客が特定のホストを名指しで借り、その
-reliability スコアを見て選ぶからである。community ノードを 1 本の API の裏に
-隠すと、community の障害は kotoba.cloud の障害として計上される。選択肢は 2 つで、
-中間は無い:
+### D5. 『無い』と言う前に、隣の endpoint と子リポの src を見る
 
-- ホストの identity とスコアを顧客に見せる（marketplace の形）
-- 隠して吸収する（それは Community ではなく、ただの安い Secure）
-
-### D5. 実在するのに control plane が名乗っていない面を、先に宣言する
-
-推論（murakumo `/v1/messages`）と pin（`kotobase.net/pins`）は**どちらも live で
-認証も掛かっている**。無いのは宣言と、kotoba.cloud からの認証の流れである。
-role を足すのは新規構築ではなく、既にある実体の記述。
+この ADR は 1 セッションで同じ誤りを 2 度犯した。索引は引いたが、
+引く先が足りなかった。**live API について結論する前に、その API の route 一覧
+（`routes.cljc` の docstring）を読む。** 1 つの path の応答は 1 つの面しか
+答えない。
 
 ## Consequences
 
-(+) 『kotobalabs が管理する』という前提が、記述ではなく未決の決定であることが
-    明文化された。公開面で誤って名乗る前に止まれる。
+(+) 『これから作る』が『既に在る、繋がっていないだけ』に変わった。
+    作業量が桁で違う。
 
-(+) metering が最優先である理由が、難易度ではなく不可逆性として記録された。
+(+) 当事者性がデータ（provider DID）として符号化されていることが記録された。
+    kotobalabs の決定が何を書き換えることになるかが具体的になった。
 
-(+) ADR-2800005600 が買う側で測った RunPod の責任構造が、売る側の設計制約に
-    反転して再利用された。同 ADR の D7 は今後どちらの向きでも引ける。
+(+) metering は形ではなく実測値を持っている（200 runs、112 万 tok、
+    cache hit 0.777）。ADR の D3 が『計測されなかった月は後から計測できない』
+    を理由に metering を最優先にしていたが、**その心配は既に解消済みだった**。
 
-(-) ADR-2608231500 D4 の DNS 記述が陳腐化していたことを、この ADR で訂正する
-    形になった。同 ADR 本体は書き換えていない（核心は真のままのため）。
+(-) 初版を accepted のまま main に着地させ、同日中に本文を全面的に書き換えた。
+    parse / strict-keys / id 一意の gate はすべて緑だったが、
+    **それらは主張の正しさを見ない。** ADR-2800005600 と同じ形で、
+    同じ週に 2 回目である。
 
-(?) `roles.compute` に層を足したとき、既存の `deploy.mode`
-    `local-admission-remote-compute` と `hostedApply: false` をどう整合させるかは
-    未決。hosted apply が無いまま層だけ宣言すると、層が選べない。
+(?) 65 ノード中 live? が 3 しかない。層の設計とは別に、稼働率そのものが
+    未調査。ADR-2800005600 D7（単一の借り物では 95% を安定して超えられない）が
+    ここに当たるかは未測定。
+
+(?) community 8 ノードはすべて `admission :pending` で、accepted に上がる
+    経路と条件を読んでいない。pending のまま dispatch 対象になるのかも未確認。
 
 (?) itonami.cloud（agentWork）と boot.kotoba.cloud が層の対象になるかは未検討。
-    本 ADR は compute / storage / pin の 3 面のみを見ている。
 
 ## Related
 
-- ADR-2800005600（GPU 供給元をライツで測り直した —— RunPod ToS の一次情報、D7 の
-  『借り物を可用性の床にしない』、D8 の『打ち切られる一覧を並び順ひとつで読まない』）
-- ADR-2608039800（murakumo の backend 決定。Vast.ai を需要トリガー付きで待つ）
+- ADR-2800005600（GPU 供給元。RunPod ToS の一次情報 —— Community は
+  `only the venue ... not a party`、Secure にも uptime SLA 条項は無い。
+  D7 の『借り物を可用性の床にしない』、D8 の『打ち切られる一覧を並び順ひとつで
+  読まない』。本 ADR の誤りは D8 と同型で、見る場所ひとつで結論が変わった）
+- ADR-2608039800（murakumo の backend 決定）
 - ADR-2608231500（認証スコープは制御環境が決める。D4 が本 ADR の D2 と同じ決定を待つ）
 - ADR-2609010500 / 2609010600（x402 SDK と com-kotobalabs の org 実在状況）
 "}]
