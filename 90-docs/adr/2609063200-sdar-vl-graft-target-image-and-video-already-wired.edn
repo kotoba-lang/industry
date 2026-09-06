@@ -1,0 +1,132 @@
+[{:db/id -1
+  :adr/id "adr-2609063200-sdar-vl-graft-target-image-and-video-already-wired"
+  :adr/title "統一モデルの graft 先は SDAR-VL-Think-8B —— 画像も動画も（時間順序も）既に配線され、実測で動く。書く必要があるのは音声 projector 1 本だけ"
+  :adr/status "accepted"
+  :adr/date "2026-09-06"
+  :adr/last_verified "2026-09-06"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "dllm-latent-unified-model-graft"
+  :source/dataset "adr"
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/authoritative_for
+  ["統一モデル（coding / 音声 / 動画 / world）の graft 先 trunk の選定と、その根拠となる 6 つの probe"
+   "SDAR-VL-Think-8B の画像・動画経路が実際に動くこと、および時間順序を読めること"
+   "音声だけが未実装であること、およびその接続仕様（encoder 出力 → 4096 への 2 層 MLP + placeholder token 1 個）"
+   "『差が出ない』を能力の限界と読む前に刺激の顕著性を疑う、という測定規律"]
+  :adr/related
+  ["adr-2609063000-dllm-phase0-block-diffusion-measured-on-murakumo-gad（decode 側の実測。8B で代償ゼロ）"
+   "adr-2609040130（AR→並列生成変換の実測）"]
+
+  :adr/body
+  "# ADR-2609063200: 統一モデルの graft 先は SDAR-VL-Think-8B
+
+**Status**: accepted / 2026-09-06 / オーナー指示「dllm, latent のアプローチで coding も
+音声も、動画, world も扱えるモデル」+「32gb memory 内でやれる model で進めていきたい」
+
+## 一行で
+
+**画像と動画は既に配線されていて、実測で動く。時間順序も読める。**
+統一モデルのために書く必要があるのは **音声の projector 1 本と placeholder token 1 個**
+だけで、trunk・語彙本体・拡散 mask はいずれも無改造。
+
+## 6 つの probe（すべて gad で実測、2026-09-06）
+
+| # | 問い | 手法 | 結果 |
+|---|---|---|---|
+| 1 | 画像は trunk に届くか | 赤い円 / 青い四角で mask 位置の logits を比較 | **PASS** delta 8.7969 |
+| 2 | 画像を正しく読めるか | 各画像を block decode で記述 | **PASS** 正しく、互いに異なる |
+| 3 | 動画は trunk に届くか | 円クリップ / 四角クリップ | **PASS** delta 8.2188 |
+| 4 | 時間順序は trunk に届くか | 同一フレームの順方向 / 逆方向 | **PASS** delta 2.1250 |
+| 5 | 動きの向きを読めるか | 点が右へ / 左へ動くクリップ | **FAIL** 両方に同じ答え |
+| 6 | 順序を読めるか（刺激を強化） | 数字 1..8 / 8..1、最終フレームを問う | **PASS** 8 と 1 を正答 |
+
+**すべての probe に「届いていなくても流暢な答えが出る」という失敗モードへの対抗が
+組んである。** probe 1/3/4 は logits の一致を FAIL とし、probe 2/5/6 は
+**2 条件が異なる答えを出すこと**を要求する。同じ答えを 2 回返したら、それは
+事前分布からの暗唱であって観測ではない。
+
+## probe 5 と 6 —— 「差が出ない」を能力の限界と読む前に
+
+probe 5 は失敗した。両方の推論トレースが円を `centered horizontally / 中央にある` と
+描写し、**静止画を 1 枚見ているような答え**だった。ここで
+`このモデルは動きを読めない` と結論することはできた。**しなかった理由は測定側の疑い**である:
+
+LLaVA-OneVision は動画フレームを強く pool する。実測で 8 フレームが 1598 tokens
+≈ 196 tokens/frame = 14×14 格子。半径 48px の点は格子上で **1.75 セル**ほどしか
+占めず、pool 後に位置差が潰れうる。つまり probe 5 の赤は
+**`モデルの限界` と `刺激が弱すぎた` を区別できていなかった。**
+
+probe 6 はその曖昧さを構造的に消す —— **完全に同じ 8 枚**を逆順にし、最終フレームの
+数字を問う。順序を捨てるモデルは**原理的に別々の答えを出せない**。数字は VLM にとって
+最も顕著な刺激なので、失敗したら刺激のせいにはできない。
+
+**結果は PASS（8 と 1）。** 順序は読める。probe 5 の赤は刺激の顕著性の問題だった。
+
+**教訓は `テストを強くしろ` ではない。** 弱い刺激で出た赤を能力の限界として記録して
+いたら、`world はこの trunk に載らない` という誤った制約が設計に入り、しかも
+**それに従っている間は何の音もしなかった**。CLAUDE.md の
+`規則を制約として持ち出す前に、それが性質か実装状態かを判定する` の測定版である。
+
+## 3 面の現在地
+
+| modality | placeholder | 入力経路 | 状態 |
+|---|---|---|---|
+| 画像 | `<\\|image_pad\\|>` 151655 | SigLIP(1152) → projector → 4096 | **実測で動作** |
+| 動画 | `<\\|video_pad\\|>` 151656 | 同じ塔をフレームに適用、`video_preprocessor_config.json` 同梱 | **実測で動作（順序含む）** |
+| 音声 | **無し** | — | **唯一の実装対象** |
+
+**動画は `予約されている` のではなく `配線されている`。** config が
+`video_token_index` を持ち、preprocessor が同梱され、そして実際に
+`pixel_values_videos (1, 8, 3, 384, 384)` が trunk に届いている。
+
+## 接続仕様（実測した次元）
+
+```
+画像  SigLIP  1152 ─┐
+動画  SigLIP  1152 ─┼─► projector(2 層 MLP, gelu) ─► placeholder 位置 ─► SDAR trunk 4096
+音声  MiMo    1280 ─┘        ↑ 学習対象はここだけ                          ↑ 無改造（拡散）
+```
+
+- trunk hidden **4096**、vision hidden **1152**（SigLIP）、arch は
+  `LlavaOnevisionForConditionalGeneration` + text は `sdar`
+- 音声候補 `XiaomiMiMo/MiMo-Audio-Tokenizer` は `d_model` **1280**、24 kHz。
+  **SigLIP の 1152 とほぼ同幅**なので、音声 projector は既存の視覚用と構造が同一で
+  幅だけ違う
+- 注入は LLaVA 式の**連続 embedding の散布**（`multi_modal_projector` →
+  `pack_image_features` → placeholder 位置）。**語彙拡張ではない**ので、
+  拡散 mask も block-causal decode もそのまま効く
+
+## Decision
+
+1. **graft 先の trunk は `JetLM/SDAR-VL-Think-8B`**（8.63B、bf16 **16.07 GiB**）。
+   ≤32 GB 制約の中にあり、ADR-2609063000 が 8B で実測した
+   `代償ゼロで 2.362 分の 1` の decode がそのまま乗る。
+2. **視覚側は実装しない。** 既存の経路が動くことを実測した。
+3. **書くのは音声の入力経路のみ** —— projector（1280 → 4096）と placeholder token 1 個。
+4. **MMaDA / Lumina-DiMOO は採らない。** 同じ 8.08B の any-to-any だが vendor の
+   code repo が別途必要で、こちらは Phase 0 で書いた mask 契約・decode ループ・
+   採点 harness が**そのまま使える**。
+
+## Consequences / 未達
+
+- **これは入力側（理解）だけである。** 音声や動画を**生成**するには語彙拡張と
+  modality ごとの decoder が要る。そこは未着手。
+- **8B の日本語は未測定**（1.7B で著しく弱かった。ADR-2609063000）。
+- probe 6 は 1 問である。順序を読めることの証明としては十分だが、
+  **どの程度読めるかは測っていない**。
+- SigLIP の塔は eager attention でメモリを食う（8 フレームで OOM した）。
+  **視覚塔だけ SDPA に落とす**必要がある —— trunk は独自 attention なので
+  eager のままでよく、mask 契約に影響しない。
+
+## 再現
+
+```bash
+ssh gad && cd /home/gad/dllm-phase0
+./venv/bin/python vl_probe.py          # probe 1,2（画像）
+./venv/bin/python vl_video_probe.py    # probe 3,4（動画・順序が届くか）
+PYTORCH_ALLOC_CONF=expandable_segments:True ./venv/bin/python vl_order_digits.py  # probe 6
+```
+"}]

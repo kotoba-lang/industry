@@ -1,0 +1,21 @@
+The text_config of this model contains `auto_map` in its configuration. This might result in errors when using `from_pretrained` to load the model. Please make sure that the `auto_map` is correct.
+🚨 `prompt_mask` is part of LlavaOnevisionModel.forward's signature, but not documented. Make sure to add it to the docstring of the function in /home/gad/.cache/huggingface/modules/transformers_modules/SDAR-VL-Think-8B/modeling_llava_onevision.py.
+🚨 `store_kv` is part of SDARModel.forward's signature, but not documented. Make sure to add it to the docstring of the function in /home/gad/.cache/huggingface/modules/transformers_modules/SDAR-VL-Think-8B/modeling_sdar.py.
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:00<00:00, 19.28it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:00<00:00, 28.78it/s]
+loaded LlavaOnevisionForConditionalGeneration
+
+--- A: does video input reach the trunk at all? ---
+Unused or unrecognized kwargs: return_tensors.
+Unused or unrecognized kwargs: return_tensors.
+  input_ids: 1598 tokens, keys=['attention_mask', 'input_ids', 'pixel_values_videos']
+MIOpen(HIP): Warning [ParseAndLoadDb] File is unreadable: "/home/gad/ComfyUI/venv-rocm7/lib/python3.12/site-packages/_rocm_sdk_libraries_gfx1151/share/miopen/db/gfx1151_20.HIP.fdb.txt"
+/home/gad/.cache/huggingface/modules/transformers_modules/SDAR-VL-Think-8B/modeling_sdar.py:330: UserWarning: Mem Efficient attention on Current AMD GPU is still experimental. Enable it with TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1. (Triggered internally at /__w/TheRock/TheRock/external-builds/pytorch/pytorch/aten/src/ATen/native/transformers/hip/sdp_utils.cpp:377.)
+  attn_output_chunk = F.scaled_dot_product_attention(
+  max|logit delta| content A vs B = 8.2188
+  PASS: video content reaches the trunk.
+
+--- B: does temporal ORDER reach the trunk? ---
+Unused or unrecognized kwargs: return_tensors.
+Unused or unrecognized kwargs: return_tensors.
+  max|logit delta| forward vs reversed motion = 2.1250
+  PASS: frame order changes the distribution -- motion is representable.
