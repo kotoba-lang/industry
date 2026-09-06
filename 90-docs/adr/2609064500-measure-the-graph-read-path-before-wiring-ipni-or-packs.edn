@@ -80,6 +80,7 @@ per-request の block-fetch 内訳（L1 / L2 / pack / B2 / miss）を観察専�
    pack が平らにできるのは正確にそこだけである。低ければ pack は測定上作る価値が無い。
 
 **この header が本番に在って読まれるまで、pack tier も catalog も IPNI 依存も作らない。**
+（2026-09-06 に読まれた。末尾「測った」節が答えを持つ。答えは「作らない」だった。）
 ADR-2608160100 が既に前例を作っている —— 最初の動機が誤っていたのは、測定が 100 block を
 1 回で書いて答えを仮定していたからだった。
 
@@ -171,5 +172,74 @@ duck-typing 版（`satisfies?` を `(not (map? target))` に）を実際に当�
 
 さらに `-atproto` と `-pinning` の deps.edn に**同じ偽の申告**が残っている。
 これは検出器の仕事であって、手で 1 件ずつ直す仕事ではない。
+
+## 測った（2026-09-06、本番 kotobase.net）—— gate は閉じた
+
+`x-kotobase-kv-stats` は本番で読めた。**この節より前の「本番に在って読まれるまで
+作らない」という条件は、これで満たされている。**
+
+観測は新しい probe を書かずに済んだ ——
+`orgs/net-kotobase/control-plane/authn/scripts/bench48_deploy_probe.mjs` が既に
+その形（SIWE(ephemeral EOA) → tenant provision → Biscuit 発行 → 認証付き transact →
+認証付き `datomic.q` → 応答 header を読む）を持っている。外部 secret を要さない。
+
+    l1=5;l2=0;b2=0;miss=0;distinct=3;epoch=1        1 datom の graph、cold read
+
+続けて 600 entity（100 entity × 6 tx）へ広げ、同じ経路を同じ credential で測った:
+
+    query #1 (cold)     l1=20;l2=0;b2=0;miss=0;distinct=8;epoch=1
+    query #2 (repeat)   l1=0 ;l2=0;b2=0;miss=0;distinct=0;epoch=2
+    query #3 (repeat)   l1=0 ;l2=0;b2=0;miss=0;distinct=0;epoch=3
+
+**読み: この経路は object store に一度も触っていない。** 600 entity に対する cold read
+が触れた distinct block は 8、B2 0、miss 0。繰り返しの query は block を 1 つも取らない
+（`distinct=0`）—— block 層より上の materialize memo が答えている。
+
+**したがって pack tier は、この workload に対して節約するものを持たない。** S4 の
+premise は「round trip を pack に畳む」だったが、round trip が 0 の経路に対しては
+空である。gate の答えは「作らない」側だった。
+
+### 測っていないこと
+
+上の graph はどれも同じセッションが直前に書いたもので、worker isolate は温まっている。
+**`b2=0` は「暖かい graph で測って 0」であって「cold で 0」ではない。** `epoch` が
+request ごとに増え `l1` がリセットされることから、query #2/#3 を答えた memo は
+isolate ローカルだと分かる —— 別 colo・別 isolate からの読みは同じ数字にならない。
+**pack の判断を覆すとしたら、その測定である。** 次に測るのは「誰も最近書いていない
+graph を、別経路から 1 本読む」こと。それまで `b2=0` を定常状態として引用しない。
+
+### deploy と source が食い違っている（観測、未修正）
+
+本番が返す summary は `l1;l2;b2;miss;distinct;epoch` で、checkout の
+`orgs/net-kotobase/engine/src/kotobase/graph_database/xrpc.cljs` が組む
+`l1;l2;pack;b2;miss;distinct` と**フィールドが違う**（`pack` が無く `epoch` が在る）。
+**本番に載っているのはこの checkout の bundle ではない。** 上の「engine と
+control-plane のどちらが正本か」が未決のまま deploy されている、という同じ問題の
+別の顔であり、header を読んだからこそ見えた。
+
+## edge の 401 と upstream の 401 が区別できない（2026-09-06 実測、別途修正中）
+
+この計測に到達するまでに 3 本の probe を潰した。原因は認証ではなく**報告**だった。
+
+`kotobase.net` に対し、**壊れた** CACAO は 104 byte の
+
+    {\"ok\":false,\"error\":\"Unauthorized\",\"presented\":\"cacao\",\"details\":\"the presented CACAO was not accepted\"}
+
+を返すのに、**edge が受理する本物の** CACAO は 35 byte の
+
+    {\"ok\":false,\"error\":\"Unauthorized\"}
+
+を返す。後者の credential は同じ瞬間に `GET /v1/audit` と
+`POST /xrpc/…datomic.listDatabases` から **200** を得ており（応答本文が正しい
+tenant DID を名乗る）、edge では受理されている。35 byte のほうは upstream の 401 を
+`proxy.cljc` の `upstream-error-name` が素の `\"Unauthorized\"` に畳んだ結果である。
+
+つまり **verifier に実際に届く唯一の credential 形が、拒否理由を失う唯一の形**であり、
+`credential-refusal-details` の docstring が「二度とやらない」と書いた形
+（ADR-2608291700 §2）がそこで再生している。repo 自身の live acceptance probe
+`kotobase-graph-database/test/contention-live-via-proxy.mjs` が今日 production に対して
+赤いのも同じ理由で、`seed failed: 401 {\"ok\":false,\"error\":\"Unauthorized\"}` としか
+言わない。**修正は別 agent が着地させ、deploy はしない**（この ADR の
+「deploy した ≠ 測った」をここでも守る）。
 "
 }]
