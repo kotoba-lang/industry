@@ -1,0 +1,139 @@
+;; How an architecture is scored for fit with the Kotoba language surface.
+;;
+;; This file holds the JUDGEMENT. `architecture-fit.datoms.edn` holds the FACTS.
+;; Neither holds a score: `scripts/architecture-fit-score.cljs` derives every
+;; number from the two, so a disagreement is expressed by editing this rubric
+;; and recomputing, not by arguing with a hand-typed total.
+;;
+;; Each axis names the Kotoba invariant it is measuring against, and where that
+;; invariant is written down. Read the authority before quoting a score: the
+;; ceilings move, and a number copied out of here goes stale silently.
+{:kotoba.architecture-fit.rubric/version 1
+ :kotoba.architecture-fit.rubric/authority "kotoba-lang/kotoba-lang lang/*.edn (read at origin/main, not at the west pin)"
+ :kotoba.architecture-fit.rubric/as-of "2026-09-06"
+ :kotoba.architecture-fit.rubric/adr "adr-2609061800-kotoba-web-architecture-fit"
+
+ :measured-against
+ {:kotoba-lang "232182d" :amu "1e5b7b8f" :kotoba-kir "af2275d"
+  :how "git fetch origin main in each repo; local == origin/main confirmed before reading"
+  :files ["lang/surface-status.edn" "lang/guest-grammar.edn" "lang/capability-semantics.edn"
+          "lang/local-state.edn" "lang/component-role-model.edn" "lang/pure-product-profile.edn"
+          "amu resources/kotoba/lang/application-language.edn"
+          "amu resources/kotoba/lang/capability-kits/*.edn"]}
+
+ :scale {:min 0 :max 10 :axes 7 :total-max 70}
+
+ :rule
+ {:derived-not-authored "No entity in the dataset carries a score. Scores exist only as the output of applying this rubric to the facts."
+  :one-level-per-axis "Each architecture names exactly one level per axis. A level that is not in this rubric is a validation failure, not a zero."
+  :disagreement "Change a level here, or change a fact there, and recompute. Do not edit a printed total."
+  :not-a-gate "This ranks fit with a language surface. It does not rank the architectures as architectures, and a low score is not a defect in the thing scored."}
+
+ :axes
+ [{:axis :authority
+   :label "権限 — ambient authority を要求しないか"
+   :invariant :no-ambient-authority
+   :invariant-disposition :intentional-security-constraint
+   :shielding-axis :code-identity
+   :authority-file "lang/surface-status.edn :invariants, lang/component-role-model.edn :capability-invariant"
+   :what "A component may exercise an external effect iff source declares it, the compiler emits the import, policy grants a scope, kototama links it, and the provider revalidates. An architecture that lets a module reach the world on its own has to be rewritten, not ported."
+   :levels {:capability-typed  {:score 10 :means "external effects are declared, typed imports carrying a granted scope"}
+            :effect-typed      {:score  9 :means "effects appear in the type or effect row; handlers supply them"}
+            :message-only      {:score  8 :means "the unit reaches the world only by sending messages; no shared reach"}
+            :effect-as-data    {:score  8 :means "the unit returns a description of the effect; something else performs it"}
+            :injected-untyped  {:score  6 :means "dependencies arrive from outside, but nothing in the type says which effects follow"}
+            :context-passed    {:score  5 :means "a request/env value is threaded explicitly, by convention rather than by refusal"}
+            :ambient-opt-in    {:score  3 :means "any effect is reachable by importing it; discipline is the only limit"}
+            :ambient-pervasive {:score  1 :means "global reach is the default idiom (a model class that finds its own rows)"}}}
+
+  {:axis :state
+   :label "状態 — 可変状態が局所か host か"
+   :invariant :no-ambient-mutation
+   :invariant-disposition :intentional-security-constraint
+   :shielding-axis :authority
+   :authority-file "lang/local-state.edn (slice 1), amu capability-kits/state-v1.edn"
+   :what "atom/swap!/reset!/deref exist, but a cell may appear ONLY as the first argument of those, in the body that binds it. Passing, returning, storing, capturing in a fn, or reading inside loop/doseq/dotimes is refused by name. A cell that outlives one call is host kit + grant."
+   :levels {:value-threaded       {:score 10 :means "state is a value the step function returns; no cell exists"}
+            :host-owned           {:score  9 :means "state lives in the host, a process or a dataspace; the unit never holds it"}
+            :immutable-db         {:score  8 :means "state is an immutable store plus transaction functions"}
+            :local-cell           {:score  7 :means "mutation is confined to one function body and cannot escape it"}
+            :single-store         {:score  5 :means "one shared mutable store for the whole application"}
+            :component-cell       {:score  3 :means "a mutable cell per component, captured by closures and read reactively"}
+            :mutable-object-graph {:score  1 :means "a graph of mutable objects is the model"}}}
+
+  {:axis :dispatch
+   :label "分岐 — 閉世界の静的 dispatch に落ちるか"
+   :invariant :closed-world-static-dispatch
+   :invariant-disposition :implemented-partial
+   :shielding-axis :dispatch-bypass
+   :authority-file "lang/surface-status.edn :protocol-and-record-dispatch, lang/guest-grammar.edn :forbidden-heads"
+   :what "defrecord/defprotocol/extend-protocol are landed, with :dynamic-fallback false and an unknown receiver rejected statically. defmulti desugars to a closed case with no hierarchy, no preferences and no runtime extension. resolve, ns-resolve, var, require, load, load-file, load-string, read-string and binding are forbidden heads."
+   :levels {:sealed-static         {:score 10 :means "a sealed variant matched by case; the implementation set is closed at compile time"}
+            :typeclass-static      {:score  9 :means "typeclass/trait resolution decided by the compiler"}
+            :closed-protocol       {:score  9 :means "a protocol over a declared, closed set of record types"}
+            :explicit-value-table  {:score  8 :means "the table of handlers is a literal value in the source"}
+            :compile-time-registry {:score  7 :means "implementations are collected by the build, not at run time"}
+            :reactive-graph        {:score  5 :means "a dependency graph discovered at run time by tracking reads"}
+            :runtime-registry      {:score  4 :means "implementations register themselves into a mutable table at load time"}
+            :reflective            {:score  2 :means "implementations are found by reflection, annotation scanning or autoload"}
+            :open-rewrite          {:score  1 :means "definitions are added or replaced at run time (monkey patch, hot code load)"}}}
+
+  {:axis :bounds
+   :label "有界 — admission limit と fuel に収まるか"
+   :invariant :bounded-admission
+   :invariant-disposition :intentional-security-constraint
+   :shielding-axis :resource-bounds
+   :authority-file "lang/guest-grammar.edn :admission-limits, :first-class-closure-values :bounds, capability kit :limits"
+   :what "max-parameters 5, closure parameters 4 with capture+parameter 5, apply runtime arguments 4, set items 16, list items 128, expression nodes 50000. Kits add their own: ui-v1 32 nodes, http-ingress-v1 queue 8 with 1 pending accept, state-v1 256 entries, dataspace-v1 256 assertions. Read them; they move."
+   :levels {:statically-bounded {:score 10 :means "the design assumes a statically bounded shape and says what the bound is"}
+            :small-fixed-shape  {:score  9 :means "a small fixed shape (one model, one message variant) is the idiom"}
+            :bounded-by-schema  {:score  8 :means "a schema states the limits and rejects what exceeds them"}
+            :modest-open        {:score  6 :means "no stated bound, but the shapes stay small in practice"}
+            :unbounded-tree     {:score  4 :means "a tree or graph is expected to grow without a stated limit"}
+            :unbounded-runtime  {:score  2 :means "the population of units grows at run time without a stated limit"}}}
+
+  {:axis :errors
+   :label "制御 — 例外に依存せず [:result T E] か"
+   :invariant :explicit-errors
+   :invariant-disposition :intentional-security-constraint
+   :shielding-axis :control-effect-tracking
+   :authority-file "lang/abort-ability.edn, lang/surface-status.edn :invariants :explicit-errors"
+   :what "throw/try are admitted as of abort slice 2, but an aborting function CANNOT BE EXPORTED, and throw is refused inside loop/doseq/dotimes bodies, lazy thunks and fn literals, and in any function whose effect row has a :dataspace/* operation. At every boundary the value is [:result T E]."
+   :levels {:typed-abort-ability   {:score 10 :means "a typed abort/exception ability that appears in the effect row"}
+            :typed-result          {:score 10 :means "Result/Either is the idiom for anything that can fail"}
+            :tagged-tuple          {:score  9 :means "{:ok v} / {:error e} tuples are the idiom"}
+            :option-and-result     {:score  9 :means "optional and fallible results are values, though not one named type"}
+            :checked-exception     {:score  6 :means "exceptions, but they appear in the signature"}
+            :exception-idiomatic   {:score  4 :means "exceptions are the normal way to signal failure"}
+            :exception-control-flow{:score  2 :means "exceptions carry ordinary control flow, not only failure"}}}
+
+  {:axis :concurrency
+   :label "並行 — 並行を host に委ねるか"
+   :invariant :no-unbounded-concurrency
+   :invariant-disposition :intentional-security-constraint
+   :shielding-axis :resource-bounds
+   :authority-file "lang/surface-status.edn :invariants, lang/guest-grammar.edn :forbidden-heads"
+   :what "This invariant has NO widening path recorded. future, agent, send, send-off, pmap, locking, dosync and ref are forbidden heads. http-ingress-v1 is host-injects/guest-polls with one pending accept. A guest does not create concurrency; it is scheduled."
+   :levels {:host-scheduled       {:score 10 :means "the unit creates no concurrency; the host schedules it"}
+            :effect-declared      {:score  9 :means "concurrency appears as a declared effect"}
+            :single-threaded-loop {:score  9 :means "one loop processes a queue; anything parallel is outside"}
+            :structured           {:score  7 :means "structured concurrency scoped to a lexical region"}
+            :host-reentrant       {:score  5 :means "the host may re-enter the unit, but the unit does not spawn"}
+            :thread-per-request   {:score  4 :means "the host allocates a thread or process per request, invisibly"}
+            :unbounded-spawn      {:score  2 :means "spawning is the model and the count is not bounded"}
+            :shared-memory-locks  {:score  1 :means "shared mutable memory guarded by locks"}}}
+
+  {:axis :identity
+   :label "同一性 — CID と module-lock を壊さないか"
+   :invariant :no-guest-macros
+   :invariant-disposition :intentional-security-constraint
+   :shielding-axis :code-identity
+   :authority-file "lang/guest-grammar.edn :forbidden-heads, lang/surface-status.edn :typed-eval, adr-2608301500"
+   :what "defmacro, load-string, read-string, load-file and raw eval are forbidden permanently: definition CID and static checkability require it. defdesugar is the one bounded substitute. typed eval exists and is :implemented, but it names a DefCID and carries :no-source-text, so an extension point is content-addressed or it is not an extension point."
+   :levels {:content-addressed  {:score 10 :means "definitions are identified by content hash"}
+            :no-metaprogramming {:score  9 :means "no macros and no run-time code construction"}
+            :compile-time-only  {:score  8 :means "code generation happens in the build and is gone by run time"}
+            :bounded-desugar    {:score  8 :means "only a bounded, non-recursive template expansion"}
+            :macro-idiomatic    {:score  5 :means "macros are a normal part of how the framework is used"}
+            :runtime-codegen    {:score  3 :means "methods or classes are built at run time"}
+            :source-eval        {:score  1 :means "source text is read and evaluated at run time"}}}]}

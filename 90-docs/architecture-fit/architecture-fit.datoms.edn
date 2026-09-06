@@ -1,0 +1,599 @@
+;; Facts about web architectures, in the closed vocabulary of
+;; manifest/architecture-fit-rubric.edn. NO SCORES LIVE HERE.
+;;
+;; Load: manifest/edn-query.cljs (:source/dataset "architecture-fit")
+;; Score: nbb --classpath ".:scripts/nbb_compat" scripts/architecture-fit-score.cljs
+;;
+;; :arch/note names the ONE fact that sets the entry's lowest axis. It is the
+;; part a reader should check first, because it is where the entry could be
+;; wrong in a way that changes the ranking.
+[{:db/id -1
+  :source/dataset "architecture-fit"
+  :arch/coverage true
+  :arch/as-of "2026-09-06"
+  :arch/entries 57
+  :arch/rubric "manifest/architecture-fit-rubric.edn"
+  :arch/adr "adr-2609061800-kotoba-web-architecture-fit"
+  :arch/caveat "The facts are checkable against the cited first-party documents. The LEVELS assigned to them are judgement, and the rubric that turns a level into a number is judgement. No gate produced these numbers."
+  :arch/not-covered "Ember, Nuxt, Remix, Sinatra, Flask, Gin, Rocket, Vapor, Play, Micronaut, Quarkus, Deno Fresh, Astro, Nitro, Leptos, Dioxus, Seaside, Ur/Web, Opa, Wasp. Absence here is absence of measurement, not a judgement that they do not matter."}
+
+ ;; ---------------------------------------------------------------- kits exist
+ {:db/id -10 :source/dataset "architecture-fit"
+  :arch/id "syndicate-dataspace" :arch/name "Syndicate dataspace + facet"
+  :arch/name-ja "Syndicate データスペース + facet" :arch/kind :pattern
+  :arch/language "Racket" :arch/family :coordination
+  :arch/authority :capability-typed :arch/state :host-owned :arch/dispatch :explicit-value-table
+  :arch/bounds :bounded-by-schema :arch/errors :typed-result :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://docs.racket-lang.org/syndicate/index.html"
+  :arch/kotoba-kit "dataspace-v1 (reference, wasm-aot, native-aot, jit implemented; wasm32-kotoba-v1 pending)"
+  :arch/note "A facet closes the scope of authority and the lifetime of state in one construct: facet exit retracts the assertions it owned and drops its observations. This is the only entry that satisfies the state axis and the concurrency axis with the same mechanism."}
+
+ {:db/id -11 :source/dataset "architecture-fit"
+  :arch/id "elm-tea" :arch/name "Elm / The Elm Architecture"
+  :arch/name-ja "Elm / TEA (init-view-update)" :arch/kind :language
+  :arch/language "Elm" :arch/family :managed-effect-ui
+  :arch/authority :capability-typed :arch/state :value-threaded :arch/dispatch :sealed-static
+  :arch/bounds :small-fixed-shape :arch/errors :typed-result :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://guide.elm-lang.org/architecture/"
+  :arch/kotoba-kit "ui-v1 (reference, wasm-aot, native-aot, jit implemented; wasm32-kotoba-v1 pending)"
+  :arch/note "Elm is the only mainstream language that already refuses all four of macros, exceptions, ambient effects and runtime dispatch. Its ceiling here is the bounds axis: ui-v1 commits a 32-node flat tree against a base revision, which is a smaller view than Elm programs assume."}
+
+ {:db/id -12 :source/dataset "architecture-fit"
+  :arch/id "wasi-http-component" :arch/name "WASI 0.3 HTTP component (WIT world)"
+  :arch/name-ja "WASI 0.3 HTTP コンポーネント" :arch/kind :platform
+  :arch/language "any" :arch/family :component-model
+  :arch/authority :capability-typed :arch/state :host-owned :arch/dispatch :sealed-static
+  :arch/bounds :bounded-by-schema :arch/errors :typed-result :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://github.com/WebAssembly/wasi-http"
+  :arch/kotoba-kit "amu application-language.edn :component-model :target wasm-component-kotoba-v1, :wasi-baseline 0.3.0, :undeclared-imports :reject"
+  :arch/note "This is not an analogy: it is the compile target the language names. The one place it does not line up is :recursive-schema :reject-v1 in the WIT mapping, so a recursive value that the wasm and cljs backends accept cannot cross a v1 component boundary."}
+
+ ;; ------------------------------------------------------- effects as values
+ {:db/id -13 :source/dataset "architecture-fit"
+  :arch/id "free-monad-interpreter" :arch/name "Free monad / program-as-value + interpreter"
+  :arch/name-ja "Free モナド / プログラムを値にして解釈器で回す" :arch/kind :pattern
+  :arch/language "Haskell, Scala, Clojure" :arch/family :effect-description
+  :arch/authority :effect-as-data :arch/state :value-threaded :arch/dispatch :sealed-static
+  :arch/bounds :bounded-by-schema :arch/errors :typed-result :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://okmij.org/ftp/tagless-final/"
+  :arch/note "The guest builds a description and something with authority interprets it. That sentence is also the capability invariant in component-role-model.edn, which is why this pattern scores where it does without ever having been designed for Kotoba."}
+
+ {:db/id -14 :source/dataset "architecture-fit"
+  :arch/id "cqrs-event-sourcing" :arch/name "CQRS + event sourcing"
+  :arch/name-ja "CQRS + イベントソーシング" :arch/kind :pattern
+  :arch/language "any" :arch/family :effect-description
+  :arch/authority :effect-as-data :arch/state :immutable-db :arch/dispatch :sealed-static
+  :arch/bounds :bounded-by-schema :arch/errors :typed-result :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://martinfowler.com/eaaDev/EventSourcing.html"
+  :arch/note "Commands and events are sealed variants, the decide function is pure, and the log is append-only. The weak point is that projections usually assume an unbounded working set, which the admission limits do not give."}
+
+ {:db/id -15 :source/dataset "architecture-fit"
+  :arch/id "unison-abilities" :arch/name "Unison (abilities + content-addressed definitions)"
+  :arch/name-ja "Unison (ability + content-addressed 定義)" :arch/kind :language
+  :arch/language "Unison" :arch/family :effect-typed
+  :arch/authority :effect-typed :arch/state :host-owned :arch/dispatch :typeclass-static
+  :arch/bounds :modest-open :arch/errors :typed-abort-ability :arch/concurrency :effect-declared
+  :arch/identity :content-addressed
+  :arch/evidence "https://www.unison-lang.org/docs/fundamentals/abilities/"
+  :arch/note "The only entry that scores full marks on the identity axis, and the widening path for :explicit-errors names Unison's Exception ability by name. Its gap is bounds: Unison has no notion of an admission limit, so nothing in it prepares a program for max-parameters 5."}
+
+ {:db/id -16 :source/dataset "architecture-fit"
+  :arch/id "tagless-final" :arch/name "Tagless final / typeclass-encoded effects"
+  :arch/name-ja "Tagless final (型クラスで効果を抽象化)" :arch/kind :pattern
+  :arch/language "Scala, Haskell" :arch/family :effect-typed
+  :arch/authority :effect-typed :arch/state :immutable-db :arch/dispatch :typeclass-static
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :compile-time-only
+  :arch/evidence "https://okmij.org/ftp/tagless-final/"
+  :arch/note "Effects are a constraint on the type, resolved at compile time, which is the same shape as a declared import. It loses nothing to Kotoba except that its abstraction lives in a typeclass Kotoba does not have; the closed protocol is the substitute."}
+
+ {:db/id -17 :source/dataset "architecture-fit"
+  :arch/id "elmish-fable" :arch/name "Elmish (Fable / F#)"
+  :arch/name-ja "Elmish (Fable / F#)" :arch/kind :framework
+  :arch/language "F#" :arch/family :managed-effect-ui
+  :arch/authority :effect-typed :arch/state :value-threaded :arch/dispatch :sealed-static
+  :arch/bounds :small-fixed-shape :arch/errors :typed-result :arch/concurrency :host-scheduled
+  :arch/identity :compile-time-only
+  :arch/evidence "https://elmish.github.io/elmish/"
+  :arch/note "TEA on a language with discriminated unions and no exceptions in the idiom. Scores just under Elm because F# leaves an escape hatch to .NET that Elm does not have."}
+
+ {:db/id -18 :source/dataset "architecture-fit"
+  :arch/id "halogen-purescript" :arch/name "Halogen (PureScript)"
+  :arch/name-ja "Halogen (PureScript)" :arch/kind :framework
+  :arch/language "PureScript" :arch/family :managed-effect-ui
+  :arch/authority :effect-typed :arch/state :value-threaded :arch/dispatch :sealed-static
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :effect-declared
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://purescript-halogen.github.io/purescript-halogen/"
+  :arch/note "Component state is threaded through a state monad rather than held in a cell, and queries and actions are sealed variants. Nothing here has to be unlearned; the component tree is simply larger than 32 nodes."}
+
+ {:db/id -19 :source/dataset "architecture-fit"
+  :arch/id "htmx-hypermedia" :arch/name "HTMX / Hotwire (hypermedia-driven)"
+  :arch/name-ja "HTMX / Hotwire (ハイパーメディア駆動)" :arch/kind :pattern
+  :arch/language "any" :arch/family :hypermedia
+  :arch/authority :message-only :arch/state :host-owned :arch/dispatch :explicit-value-table
+  :arch/bounds :modest-open :arch/errors :option-and-result :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://htmx.org/essays/hypermedia-driven-applications/"
+  :arch/note "The client holds no application state, creates no concurrency and reaches nothing but the origin it came from. It is the highest-scoring CLIENT architecture here, and the reason is that it declines to be one."}
+
+ {:db/id -20 :source/dataset "architecture-fit"
+  :arch/id "datomic-style" :arch/name "Immutable database + pure query (Datomic shape)"
+  :arch/name-ja "不変DB + 純粋クエリ (Datomic 形)" :arch/kind :pattern
+  :arch/language "Clojure" :arch/family :effect-description
+  :arch/authority :effect-as-data :arch/state :immutable-db :arch/dispatch :explicit-value-table
+  :arch/bounds :modest-open :arch/errors :option-and-result :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://docs.datomic.com/transactions/transaction-processing.html"
+  :arch/note "Transaction data is a value, the query is a value, and reads need no coordination. This is the shape the workspace already uses for its own datom plane, so a framework built this way inherits an existing query surface rather than adding one."}
+
+ ;; ------------------------------------------------------------ typed servers
+ {:db/id -21 :source/dataset "architecture-fit"
+  :arch/id "http4s-tagless" :arch/name "http4s + cats-effect"
+  :arch/name-ja "http4s + cats-effect" :arch/kind :framework
+  :arch/language "Scala" :arch/family :effect-typed
+  :arch/authority :effect-typed :arch/state :immutable-db :arch/dispatch :typeclass-static
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :compile-time-only
+  :arch/evidence "https://http4s.org/v0.23/docs/service.html"
+  :arch/note "A service is a function from Request to F[Response] and the effect is in the type. Its fibers are structured but unbounded in count, which the no-unbounded-concurrency invariant does not admit."}
+
+ {:db/id -22 :source/dataset "architecture-fit"
+  :arch/id "zio-http" :arch/name "ZIO HTTP"
+  :arch/name-ja "ZIO HTTP" :arch/kind :framework
+  :arch/language "Scala" :arch/family :effect-typed
+  :arch/authority :effect-typed :arch/state :local-cell :arch/dispatch :typeclass-static
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :compile-time-only
+  :arch/evidence "https://zio.dev/zio-http/"
+  :arch/note "ZIO's R channel is a typed requirement set, which is the closest thing in a mainstream runtime to a declared import list. Ref gives it a mutable cell that Kotoba would push into a host kit."}
+
+ {:db/id -23 :source/dataset "architecture-fit"
+  :arch/id "rust-axum" :arch/name "Axum (Rust)"
+  :arch/name-ja "Axum (Rust)" :arch/kind :framework
+  :arch/language "Rust" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :local-cell :arch/dispatch :typeclass-static
+  :arch/bounds :bounded-by-schema :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :compile-time-only
+  :arch/evidence "https://docs.rs/axum/latest/axum/"
+  :arch/note "Extractors are trait resolution, so the handler set is closed by the compiler, and Result is the return type rather than a convention. What it does not have is any statement that effects are declared: a handler may call anything in scope."}
+
+ {:db/id -24 :source/dataset "architecture-fit"
+  :arch/id "rust-actix" :arch/name "Actix Web (Rust)"
+  :arch/name-ja "Actix Web (Rust)" :arch/kind :framework
+  :arch/language "Rust" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :local-cell :arch/dispatch :typeclass-static
+  :arch/bounds :bounded-by-schema :arch/errors :typed-result :arch/concurrency :host-reentrant
+  :arch/identity :compile-time-only
+  :arch/evidence "https://actix.rs/docs/"
+  :arch/note "Same typed extractor story as Axum; the actor heritage costs it on concurrency because an actor address is a handle a component may hold and message at will."}
+
+ {:db/id -25 :source/dataset "architecture-fit"
+  :arch/id "servant-haskell" :arch/name "Servant (Haskell)"
+  :arch/name-ja "Servant (Haskell)" :arch/kind :framework
+  :arch/language "Haskell" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :immutable-db :arch/dispatch :typeclass-static
+  :arch/bounds :bounded-by-schema :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :compile-time-only
+  :arch/evidence "https://docs.servant.dev/en/stable/"
+  :arch/note "The API is a type, so the route table is closed before the program runs. Handlers still live in an IO-shaped monad, which is exactly the ambient reach the authority axis is measuring."}
+
+ {:db/id -26 :source/dataset "architecture-fit"
+  :arch/id "yesod-haskell" :arch/name "Yesod (Haskell)"
+  :arch/name-ja "Yesod (Haskell)" :arch/kind :framework
+  :arch/language "Haskell" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :immutable-db :arch/dispatch :compile-time-registry
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :compile-time-only
+  :arch/evidence "https://www.yesodweb.com/book/routing-and-handlers"
+  :arch/note "Routes are generated by Template Haskell at compile time, so nothing is resolved by name at run time. The generation itself is the part with no Kotoba equivalent: defdesugar is bounded and non-recursive, and cannot build a routing table."}
+
+ {:db/id -27 :source/dataset "architecture-fit"
+  :arch/id "dream-ocaml" :arch/name "Dream (OCaml)"
+  :arch/name-ja "Dream (OCaml)" :arch/kind :framework
+  :arch/language "OCaml" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :immutable-db :arch/dispatch :explicit-value-table
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://aantron.github.io/dream/"
+  :arch/note "The router is a literal list of routes and middleware is a function, so the whole dispatch structure is a value in the source. That is the shape a Kotoba web framework has to take, in a language with no macros to hide it."}
+
+ {:db/id -28 :source/dataset "architecture-fit"
+  :arch/id "go-nethttp-chi" :arch/name "Go net/http + chi"
+  :arch/name-ja "Go net/http + chi" :arch/kind :framework
+  :arch/language "Go" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :local-cell :arch/dispatch :explicit-value-table
+  :arch/bounds :modest-open :arch/errors :tagged-tuple :arch/concurrency :unbounded-spawn
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://pkg.go.dev/net/http"
+  :arch/note "Errors are return values, there is no metaprogramming, and the router is explicit. It is undone by one keyword: go, which makes unbounded spawning the ordinary way to express anything concurrent."}
+
+ {:db/id -29 :source/dataset "architecture-fit"
+  :arch/id "ktor" :arch/name "Ktor (Kotlin)"
+  :arch/name-ja "Ktor (Kotlin)" :arch/kind :framework
+  :arch/language "Kotlin" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :local-cell :arch/dispatch :compile-time-registry
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :structured
+  :arch/identity :compile-time-only
+  :arch/evidence "https://ktor.io/docs/server-routing.html"
+  :arch/note "Structured concurrency scoped to a CoroutineScope is the closest mainstream analogue to fuel-bounded execution. Exceptions remain the failure idiom, which is the axis Kotoba refuses at the export boundary."}
+
+ {:db/id -30 :source/dataset "architecture-fit"
+  :arch/id "hono-workers" :arch/name "Hono on Cloudflare Workers (isolate model)"
+  :arch/name-ja "Hono / Cloudflare Workers (isolate モデル)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :typed-server
+  :arch/authority :context-passed :arch/state :host-owned :arch/dispatch :runtime-registry
+  :arch/bounds :bounded-by-schema :arch/errors :exception-idiomatic :arch/concurrency :host-scheduled
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://developers.cloudflare.com/workers/reference/how-workers-works/"
+  :arch/note "Bindings arrive on the context rather than being imported, mutable global state across requests is not available, and the isolate does not let the guest spawn. Three of the seven invariants are already enforced by the platform, which is why the deployed surfaces in this workspace sit here."}
+
+ ;; ------------------------------------------------------------- Erlang / BEAM
+ {:db/id -31 :source/dataset "architecture-fit"
+  :arch/id "otp-genserver" :arch/name "OTP GenServer + supervision"
+  :arch/name-ja "OTP GenServer + supervision" :arch/kind :pattern
+  :arch/language "Erlang, Elixir" :arch/family :actor
+  :arch/authority :message-only :arch/state :host-owned :arch/dispatch :sealed-static
+  :arch/bounds :unbounded-runtime :arch/errors :tagged-tuple :arch/concurrency :unbounded-spawn
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://www.erlang.org/doc/design_principles/gen_server_concepts.html"
+  :arch/note "State that nothing outside the process can name is the same invariant local-state.edn states for a cell, one scale up. The whole model then fails the two resource-bounds axes at once, and no-unbounded-concurrency is recorded with no widening path."}
+
+ {:db/id -32 :source/dataset "architecture-fit"
+  :arch/id "erlang-cowboy" :arch/name "Cowboy (Erlang)"
+  :arch/name-ja "Cowboy (Erlang)" :arch/kind :framework
+  :arch/language "Erlang" :arch/family :actor
+  :arch/authority :message-only :arch/state :host-owned :arch/dispatch :sealed-static
+  :arch/bounds :unbounded-runtime :arch/errors :tagged-tuple :arch/concurrency :unbounded-spawn
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://ninenines.eu/docs/en/cowboy/2.12/guide/"
+  :arch/note "Same shape as GenServer without Elixir's macro layer, which is worth a point on identity. A process per connection is what the http-ingress-v1 kit replaces with one pending accept."}
+
+ {:db/id -33 :source/dataset "architecture-fit"
+  :arch/id "phoenix-liveview" :arch/name "Phoenix LiveView (Elixir)"
+  :arch/name-ja "Phoenix LiveView (Elixir)" :arch/kind :framework
+  :arch/language "Elixir" :arch/family :actor
+  :arch/authority :ambient-opt-in :arch/state :host-owned :arch/dispatch :sealed-static
+  :arch/bounds :modest-open :arch/errors :tagged-tuple :arch/concurrency :unbounded-spawn
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html"
+  :arch/note "handle_event pattern matching on a sealed message set, with all view state in a process and only a diff on the wire, is very close to ui-v1's pull-and-commit. Ecto's Repo is a module reachable from anywhere, which is what costs it the authority axis."}
+
+ {:db/id -34 :source/dataset "architecture-fit"
+  :arch/id "actor-akka" :arch/name "Akka Typed actors"
+  :arch/name-ja "Akka Typed アクター" :arch/kind :pattern
+  :arch/language "Scala, Java" :arch/family :actor
+  :arch/authority :message-only :arch/state :host-owned :arch/dispatch :sealed-static
+  :arch/bounds :unbounded-runtime :arch/errors :tagged-tuple :arch/concurrency :unbounded-spawn
+  :arch/identity :compile-time-only
+  :arch/evidence "https://doc.akka.io/libraries/akka-core/current/typed/actors.html"
+  :arch/note "Typed behaviours make the message set sealed, which the dispatch axis rewards. Spawning children is the model, which the concurrency axis cannot admit at all."}
+
+ ;; ----------------------------------------------------------------- Clojure
+ {:db/id -35 :source/dataset "architecture-fit"
+  :arch/id "clojure-data-oriented" :arch/name "Clojure data-oriented (pure fns + EDN + protocols)"
+  :arch/name-ja "Clojure データ指向 (純関数 + EDN + protocol)" :arch/kind :language
+  :arch/language "Clojure" :arch/family :clojure
+  :arch/authority :ambient-opt-in :arch/state :local-cell :arch/dispatch :closed-protocol
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :thread-per-request
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://clojure.org/reference/protocols"
+  :arch/note "This is the source shape Kotoba is written in, so the surface transfers and the semantics do not. atom now works inside one let, protocols and records are landed closed-world, and everything else on this row is what the migration has to give up."}
+
+ {:db/id -36 :source/dataset "architecture-fit"
+  :arch/id "ring-reitit" :arch/name "Ring + reitit (Clojure)"
+  :arch/name-ja "Ring + reitit (Clojure)" :arch/kind :framework
+  :arch/language "Clojure" :arch/family :clojure
+  :arch/authority :ambient-opt-in :arch/state :single-store :arch/dispatch :explicit-value-table
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :thread-per-request
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://github.com/metosin/reitit"
+  :arch/note "reitit route data is a literal vector, which is the one thing about Ring that ports unchanged. A handler is a function of one map, and the map is where max-parameters 5 does not bite but record fields 32 will."}
+
+ {:db/id -37 :source/dataset "architecture-fit"
+  :arch/id "pedestal-interceptors" :arch/name "Pedestal interceptor chain"
+  :arch/name-ja "Pedestal インターセプタ連鎖" :arch/kind :framework
+  :arch/language "Clojure" :arch/family :clojure
+  :arch/authority :effect-as-data :arch/state :single-store :arch/dispatch :explicit-value-table
+  :arch/bounds :modest-open :arch/errors :tagged-tuple :arch/concurrency :thread-per-request
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://pedestal.io/pedestal/0.7/guides/what-is-an-interceptor.html"
+  :arch/note "An interceptor is a map of functions and the chain is a value that can be inspected and rewritten, so the pipeline is data rather than a call stack. It outscores Ring for exactly that reason, and errors travel on the context instead of unwinding."}
+
+ {:db/id -38 :source/dataset "architecture-fit"
+  :arch/id "re-frame" :arch/name "re-frame (event to fx / cofx)"
+  :arch/name-ja "re-frame (event から fx / cofx)" :arch/kind :framework
+  :arch/language "ClojureScript" :arch/family :clojure
+  :arch/authority :effect-as-data :arch/state :single-store :arch/dispatch :runtime-registry
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :single-threaded-loop
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://day8.github.io/re-frame/re-frame/"
+  :arch/note "Returning a map of effects instead of performing them is the same move the capability model makes, and the event queue is a single loop. It is held back by app-db, one atom the whole program holds, which local-state.edn refuses by name as an escaping cell."}
+
+ {:db/id -39 :source/dataset "architecture-fit"
+  :arch/id "fulcro" :arch/name "Fulcro (normalized client DB + EQL)"
+  :arch/name-ja "Fulcro (正規化クライアントDB + EQL)" :arch/kind :framework
+  :arch/language "ClojureScript" :arch/family :clojure
+  :arch/authority :effect-as-data :arch/state :single-store :arch/dispatch :runtime-registry
+  :arch/bounds :modest-open :arch/errors :tagged-tuple :arch/concurrency :single-threaded-loop
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://fulcro.fulcrologic.com/"
+  :arch/note "Mutations are data submitted for interpretation and the client database is normalized, so the query surface does not fragment. defmutation registers into a multimethod at load time, which the closed-multimethod desugar admits no runtime extension of."}
+
+ {:db/id -40 :source/dataset "architecture-fit"
+  :arch/id "reagent" :arch/name "Reagent (ratom + re-render)"
+  :arch/name-ja "Reagent (ratom + 再レンダ)" :arch/kind :framework
+  :arch/language "ClojureScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :component-cell :arch/dispatch :reactive-graph
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :single-threaded-loop
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://reagent-project.github.io/"
+  :arch/note "A ratom is a cell held outside the function that reads it, and the reader is tracked by dereferencing during render. Both halves are refused: local-state.edn lists captured-by-a-fn-literal and stored-in-a-collection among the escapes."}
+
+ ;; ------------------------------------------------------------- JS front end
+ {:db/id -41 :source/dataset "architecture-fit"
+  :arch/id "react-hooks" :arch/name "React (hooks + reconciler)"
+  :arch/name-ja "React (hooks + reconciler)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :component-cell :arch/dispatch :runtime-registry
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :host-reentrant
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://react.dev/reference/rules/rules-of-hooks"
+  :arch/note "The rules of hooks are a run-time calling-order convention that no type states and no compiler checks, which is the dispatch-bypass shielding axis in miniature. React earns full marks for having no metaprogramming at all."}
+
+ {:db/id -42 :source/dataset "architecture-fit"
+  :arch/id "react-server-components" :arch/name "React Server Components (Next.js App Router)"
+  :arch/name-ja "React Server Components (Next.js App Router)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-pervasive :arch/state :component-cell :arch/dispatch :runtime-registry
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :host-reentrant
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://react.dev/reference/rsc/server-components"
+  :arch/note "Co-locating data access inside the component is the stated benefit, and it is the exact shape the authority axis measures as worst: a leaf reaches the database on its own. It is the lowest-scoring entry that is not a 2000s MVC framework."}
+
+ {:db/id -43 :source/dataset "architecture-fit"
+  :arch/id "solidjs" :arch/name "SolidJS (fine-grained signals)"
+  :arch/name-ja "SolidJS (きめ細かいシグナル)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :component-cell :arch/dispatch :reactive-graph
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :single-threaded-loop
+  :arch/identity :compile-time-only
+  :arch/evidence "https://docs.solidjs.com/concepts/intro-to-reactivity"
+  :arch/note "The dependency graph is built by observing reads at run time, which is precisely what a static effect row cannot express. Compiling the JSX away earns the identity point that MobX loses."}
+
+ {:db/id -44 :source/dataset "architecture-fit"
+  :arch/id "svelte5-runes" :arch/name "Svelte 5 (runes)"
+  :arch/name-ja "Svelte 5 (runes)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :component-cell :arch/dispatch :reactive-graph
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :single-threaded-loop
+  :arch/identity :compile-time-only
+  :arch/evidence "https://svelte.dev/docs/svelte/what-are-runes"
+  :arch/note "Reactivity is compiled rather than observed, so nothing is generated at run time. Assignment is still the way state changes, which is the ambient mutation the authority shielding axis is built around, and the workspace has separately decided to retire Svelte as an authoring surface."}
+
+ {:db/id -45 :source/dataset "architecture-fit"
+  :arch/id "vue3-composition" :arch/name "Vue 3 (composition API)"
+  :arch/name-ja "Vue 3 (composition API)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :component-cell :arch/dispatch :reactive-graph
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :single-threaded-loop
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://vuejs.org/guide/extras/reactivity-in-depth.html"
+  :arch/note "Reactivity is implemented with Proxy, so the object a component holds is not the object it was given. A value whose identity changes under observation has no representation in a language whose values are content-addressed."}
+
+ {:db/id -46 :source/dataset "architecture-fit"
+  :arch/id "qwik-resumable" :arch/name "Qwik (resumability)"
+  :arch/name-ja "Qwik (resumability)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :host-owned :arch/dispatch :compile-time-registry
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :host-scheduled
+  :arch/identity :compile-time-only
+  :arch/evidence "https://qwik.dev/docs/concepts/resumable/"
+  :arch/note "Serializing the whole application state into the document and resuming from it is the same idea as a revisioned commit that carries no host object identity. The optimizer splitting code into lazy chunks is a build-time step, not a run-time one."}
+
+ {:db/id -47 :source/dataset "architecture-fit"
+  :arch/id "angular-di" :arch/name "Angular (injector + RxJS)"
+  :arch/name-ja "Angular (injector + RxJS)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :di
+  :arch/authority :injected-untyped :arch/state :component-cell :arch/dispatch :reflective
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :host-reentrant
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://angular.dev/guide/di"
+  :arch/note "Dependencies really are injected, which the authority axis credits. They are resolved through an injector keyed by tokens at run time, which is a service locator wearing constructor-injection clothes, and resolve is a forbidden head for that reason."}
+
+ {:db/id -48 :source/dataset "architecture-fit"
+  :arch/id "redux" :arch/name "Redux (actions + reducers)"
+  :arch/name-ja "Redux (action + reducer)" :arch/kind :pattern
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :effect-as-data :arch/state :single-store :arch/dispatch :explicit-value-table
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :single-threaded-loop
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://redux.js.org/understanding/thinking-in-redux/three-principles"
+  :arch/note "An action is a plain value, a reducer is a pure function, and the store is the only mutable thing. It is TEA with one cell bolted on, and removing that cell is the whole of the port."}
+
+ {:db/id -49 :source/dataset "architecture-fit"
+  :arch/id "mobx" :arch/name "MobX (observable object graph)"
+  :arch/name-ja "MobX (observable なオブジェクトグラフ)" :arch/kind :pattern
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :mutable-object-graph :arch/dispatch :reactive-graph
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :single-threaded-loop
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://mobx.js.org/the-gist-of-mobx.html"
+  :arch/note "A mutable object graph observed through proxies is the opposite of every one of the seven axes except concurrency. Nothing about it survives translation, which makes it the useful lower bound for the reactive family."}
+
+ {:db/id -50 :source/dataset "architecture-fit"
+  :arch/id "effect-ts" :arch/name "Effect (TypeScript)"
+  :arch/name-ja "Effect (TypeScript)" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :effect-typed
+  :arch/authority :effect-typed :arch/state :local-cell :arch/dispatch :compile-time-registry
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :structured
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://effect.website/docs/getting-started/the-effect-type/"
+  :arch/note "Effect carries requirements and errors in the type and supplies them with Layers, which is a declared import list checked by the compiler. It is the highest-scoring thing in this table that a TypeScript team can adopt without changing language."}
+
+ {:db/id -51 :source/dataset "architecture-fit"
+  :arch/id "lit-web-components" :arch/name "Lit / Web Components"
+  :arch/name-ja "Lit / Web Components" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :ambient-opt-in :arch/state :component-cell :arch/dispatch :runtime-registry
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :host-reentrant
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://lit.dev/docs/components/reactive-properties/"
+  :arch/note "customElements.define is a run-time registry keyed by a string, and the element instance is a mutable host object. ui-v1 states host-object-access false, so the element identity a Lit component depends on does not cross the boundary."}
+
+ {:db/id -52 :source/dataset "architecture-fit"
+  :arch/id "blazor-wasm" :arch/name "Blazor WebAssembly"
+  :arch/name-ja "Blazor WebAssembly" :arch/kind :framework
+  :arch/language "C#" :arch/family :di
+  :arch/authority :injected-untyped :arch/state :component-cell :arch/dispatch :reflective
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :host-reentrant
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://learn.microsoft.com/aspnet/core/blazor/"
+  :arch/note "Compiling to WebAssembly is not the same as fitting the component model: the guest ships a reflective runtime and resolves services by type at run time. Being on the same target as Kotoba changes nothing about the seven axes."}
+
+ ;; --------------------------------------------------------------- server MVC
+ {:db/id -53 :source/dataset "architecture-fit"
+  :arch/id "rails" :arch/name "Ruby on Rails (MVC + ActiveRecord)"
+  :arch/name-ja "Ruby on Rails (MVC + ActiveRecord)" :arch/kind :framework
+  :arch/language "Ruby" :arch/family :mvc-orm
+  :arch/authority :ambient-pervasive :arch/state :mutable-object-graph :arch/dispatch :open-rewrite
+  :arch/bounds :unbounded-runtime :arch/errors :exception-control-flow :arch/concurrency :thread-per-request
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://guides.rubyonrails.org/active_record_basics.html"
+  :arch/note "A model class finds its own rows, associations are defined by methods generated at load time, and rescue_from carries ordinary control flow. It scores lowest not because it is bad but because every one of its conveniences is the thing one of the seven invariants exists to refuse."}
+
+ {:db/id -54 :source/dataset "architecture-fit"
+  :arch/id "django" :arch/name "Django (MVT + ORM)"
+  :arch/name-ja "Django (MVT + ORM)" :arch/kind :framework
+  :arch/language "Python" :arch/family :mvc-orm
+  :arch/authority :ambient-pervasive :arch/state :mutable-object-graph :arch/dispatch :reflective
+  :arch/bounds :unbounded-runtime :arch/errors :exception-idiomatic :arch/concurrency :thread-per-request
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://docs.djangoproject.com/en/stable/topics/db/models/"
+  :arch/note "Model metaclasses build fields at import time and settings are a module-level global that anything may read. The apps registry is autoloaded, which is exactly what forbidding require, load and resolve removes."}
+
+ {:db/id -55 :source/dataset "architecture-fit"
+  :arch/id "laravel" :arch/name "Laravel (Eloquent + facades)"
+  :arch/name-ja "Laravel (Eloquent + ファサード)" :arch/kind :framework
+  :arch/language "PHP" :arch/family :mvc-orm
+  :arch/authority :ambient-pervasive :arch/state :mutable-object-graph :arch/dispatch :reflective
+  :arch/bounds :unbounded-runtime :arch/errors :exception-idiomatic :arch/concurrency :thread-per-request
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://laravel.com/docs/eloquent"
+  :arch/note "A facade is a static proxy that resolves a service out of a global container, and __call builds the rest. This is the service locator the dispatch axis scores at its floor, promoted to the framework's headline feature."}
+
+ {:db/id -56 :source/dataset "architecture-fit"
+  :arch/id "spring-boot" :arch/name "Spring Boot (container DI + annotations)"
+  :arch/name-ja "Spring Boot (コンテナDI + アノテーション)" :arch/kind :framework
+  :arch/language "Java" :arch/family :di
+  :arch/authority :injected-untyped :arch/state :mutable-object-graph :arch/dispatch :reflective
+  :arch/bounds :unbounded-runtime :arch/errors :checked-exception :arch/concurrency :thread-per-request
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html"
+  :arch/note "Constructor injection is genuinely the right idea and the authority axis credits it. Everything underneath it is classpath scanning, proxies and reflection, so the wiring exists only after the program starts and cannot be a module lock."}
+
+ {:db/id -57 :source/dataset "architecture-fit"
+  :arch/id "aspnet-core" :arch/name "ASP.NET Core (built-in DI)"
+  :arch/name-ja "ASP.NET Core (組み込みDI)" :arch/kind :framework
+  :arch/language "C#" :arch/family :di
+  :arch/authority :injected-untyped :arch/state :mutable-object-graph :arch/dispatch :reflective
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :structured
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://learn.microsoft.com/aspnet/core/fundamentals/dependency-injection"
+  :arch/note "Services are registered explicitly rather than scanned, which is a real improvement on Spring for this rubric, and async/await gives it structured concurrency. Resolution is still by type at run time."}
+
+ {:db/id -58 :source/dataset "architecture-fit"
+  :arch/id "express" :arch/name "Express (middleware chain)"
+  :arch/name-ja "Express (ミドルウェア連鎖)" :arch/kind :framework
+  :arch/language "JavaScript" :arch/family :mvc-orm
+  :arch/authority :ambient-opt-in :arch/state :single-store :arch/dispatch :runtime-registry
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :host-reentrant
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://expressjs.com/en/guide/routing.html"
+  :arch/note "app.get mutates a router at load time and next() is a callback that mutates the request object as it travels. Nothing is generated, though, which keeps the identity axis clean."}
+
+ {:db/id -59 :source/dataset "architecture-fit"
+  :arch/id "fastapi" :arch/name "FastAPI (Depends + Pydantic)"
+  :arch/name-ja "FastAPI (Depends + Pydantic)" :arch/kind :framework
+  :arch/language "Python" :arch/family :di
+  :arch/authority :injected-untyped :arch/state :single-store :arch/dispatch :reflective
+  :arch/bounds :bounded-by-schema :arch/errors :exception-idiomatic :arch/concurrency :structured
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://fastapi.tiangolo.com/tutorial/dependencies/"
+  :arch/note "Pydantic states the shape of every request and refuses what exceeds it, which is the same move the capability kits make with their limits. The dependency graph is read out of type hints by introspection, which is reflection with better ergonomics."}
+
+ ;; ------------------------------------------------------------------ patterns
+ {:db/id -60 :source/dataset "architecture-fit"
+  :arch/id "hexagonal-ports-adapters" :arch/name "Hexagonal / ports and adapters"
+  :arch/name-ja "ヘキサゴナル / ポートとアダプタ" :arch/kind :pattern
+  :arch/language "any" :arch/family :di
+  :arch/authority :injected-untyped :arch/state :immutable-db :arch/dispatch :closed-protocol
+  :arch/bounds :modest-open :arch/errors :typed-result :arch/concurrency :thread-per-request
+  :arch/identity :no-metaprogramming
+  :arch/evidence "https://alistair.cockburn.us/hexagonal-architecture/"
+  :arch/note "A port is an interface and the adapter set is known where the application is assembled, which is what closed-world protocol dispatch requires. It is the highest-scoring member of the DI family, and the difference from the others is that nothing is resolved by name."}
+
+ {:db/id -61 :source/dataset "architecture-fit"
+  :arch/id "di-constructor-injection" :arch/name "DI injection (Component / Integrant / container)"
+  :arch/name-ja "DI 注入 (Component / Integrant / コンテナ)" :arch/kind :pattern
+  :arch/language "Clojure, Java, C#" :arch/family :di
+  :arch/authority :injected-untyped :arch/state :single-store :arch/dispatch :runtime-registry
+  :arch/bounds :modest-open :arch/errors :exception-idiomatic :arch/concurrency :thread-per-request
+  :arch/identity :runtime-codegen
+  :arch/evidence "https://github.com/weavejester/integrant"
+  :arch/note "One measured fact decides this row: a capability handle is not a value in the source surface. cap-acquire and has-capability? are listed in the grammar's admitted builtins, but the frontend answers that the operation has no admitted type signature and no admitted lowering, so a system map of live dependencies has nothing to hold."}
+
+ {:db/id -62 :source/dataset "architecture-fit"
+  :arch/id "plugin-runtime-registry" :arch/name "Plugin only (runtime registry / dynamic load)"
+  :arch/name-ja "Plugin only (実行時レジストリ / 動的ロード)" :arch/kind :pattern
+  :arch/language "any" :arch/family :plugin
+  :arch/authority :ambient-opt-in :arch/state :single-store :arch/dispatch :open-rewrite
+  :arch/bounds :unbounded-runtime :arch/errors :exception-idiomatic :arch/concurrency :host-reentrant
+  :arch/identity :source-eval
+  :arch/evidence "https://docs.osgi.org/specification/"
+  :arch/note "require, resolve, ns-resolve, var, load, load-file, load-string and read-string are all forbidden heads, so a registry that discovers implementations by name has no mechanism left. The replacement is not a workaround: typed eval is :implemented and names a DefCID, with :no-source-text in its safety list."}
+
+ {:db/id -63 :source/dataset "architecture-fit"
+  :arch/id "racket-continuation-web" :arch/name "Racket web-server (continuation-based)"
+  :arch/name-ja "Racket web-server (継続ベース)" :arch/kind :framework
+  :arch/language "Racket" :arch/family :continuation
+  :arch/authority :ambient-opt-in :arch/state :value-threaded :arch/dispatch :explicit-value-table
+  :arch/bounds :unbounded-tree :arch/errors :exception-idiomatic :arch/concurrency :thread-per-request
+  :arch/identity :macro-idiomatic
+  :arch/evidence "https://docs.racket-lang.org/web-server/"
+  :arch/note "send/suspend captures the rest of the interaction as a value, so the conversation state is never stored anywhere. The captured continuation is exactly the unbounded, non-inspectable object that bounded admission cannot admit, which is why the same language appears at both ends of this table."}
+
+ {:db/id -64 :source/dataset "architecture-fit"
+  :arch/id "common-lisp-hunchentoot" :arch/name "Common Lisp / Hunchentoot"
+  :arch/name-ja "Common Lisp / Hunchentoot" :arch/kind :framework
+  :arch/language "Common Lisp" :arch/family :mvc-orm
+  :arch/authority :ambient-pervasive :arch/state :mutable-object-graph :arch/dispatch :open-rewrite
+  :arch/bounds :unbounded-runtime :arch/errors :exception-idiomatic :arch/concurrency :thread-per-request
+  :arch/identity :source-eval
+  :arch/evidence "https://edicl.github.io/hunchentoot/"
+  :arch/note "A live image where any definition can be replaced and eval is always available is the maximal opposite of a content-addressed module lock. Included as the ceiling of what the identity axis is refusing, since it is a genuinely productive way to work."}
+
+ {:db/id -65 :source/dataset "architecture-fit"
+  :arch/id "sveltekit-filerouting" :arch/name "SvelteKit / file-based routing + loaders"
+  :arch/name-ja "SvelteKit / ファイル配置ルーティング + loader" :arch/kind :framework
+  :arch/language "TypeScript" :arch/family :reactive-ui
+  :arch/authority :context-passed :arch/state :component-cell :arch/dispatch :compile-time-registry
+  :arch/bounds :unbounded-tree :arch/errors :option-and-result :arch/concurrency :host-scheduled
+  :arch/identity :compile-time-only
+  :arch/evidence "https://svelte.dev/docs/kit/routing"
+  :arch/note "The route table is built from the file tree by the build, so nothing is registered at run time, and a load function receives its dependencies on an event object instead of importing them. The component layer underneath is still cell-based."}
+
+ {:db/id -66 :source/dataset "architecture-fit"
+  :arch/id "kotoba-init-view-step" :arch/name "Kotoba init / view / step on ui-v1 (reference)"
+  :arch/name-ja "Kotoba init / view / step (ui-v1、基準行)" :arch/kind :reference
+  :arch/language "Kotoba" :arch/family :managed-effect-ui
+  :arch/authority :capability-typed :arch/state :value-threaded :arch/dispatch :sealed-static
+  :arch/bounds :statically-bounded :arch/errors :typed-result :arch/concurrency :host-scheduled
+  :arch/identity :content-addressed
+  :arch/evidence "https://github.com/kotoba-lang/amu/blob/main/examples/todo-app.kotoba"
+  :arch/note "The reference row: what the language already ships as a worked example. It is here to give the scale a top, not to claim that everything should be written this way. Any entry scoring near it needs less translation, not more virtue."}]
