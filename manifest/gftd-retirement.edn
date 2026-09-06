@@ -226,6 +226,25 @@
    ["apps-gftdcojp" "m365-archive" "manimani-operations"]
    :still-ambiguous ["fashion" "itad"]}}
 
+ ;; ── wave 7 ──────────────────────────────────────────────────────────────
+ :wave-7-result
+ {:deleted ["manimani-operations"]
+  :moved-to-cloud-itonami ["fashion" "itad"]
+  :note "fashion and itad were the two the plan called genuinely ambiguous -- live business services of the retiring company. Owner ruled: both move. fashion.gftd.ai is one of the hostnames that goes to itonami.cloud, so the repository and its host now point the same way."
+  :backups "Bundled from fresh --mirror clones and verified complete AND tip-matching before anything was deleted or moved."}
+
+ ;; ── what apps-gftdcojp actually holds (asked 2026-09-06) ────────────────
+ :apps-gftdcojp-survey
+ {:headline "5.6 GB on GitHub, 8.7 GB locally -- but the WORKING TREE is only about 285 MB across 12,806 files. The rest is history: one 7.4 GB packfile."
+  :current-tree
+  [["50-infra" "126 MB" "Cloudflare Workers (the atproto lexicon alone is 13 MB of bundled TS and 12 MB of generated registry) and vultr/geth-private, whose Solidity contracts vendor four submodules: forge-std, solady, coinbase/smart-wallet, openzeppelin-contracts-v4."]
+   ["_working" "106 MB" "keiei, malak, murakumo, transform-drafts."]
+   ["00-contracts" "35 MB"] ["90-docs" "9.7 MB"] ["80-data" "5.5 MB"] ["70-tools" "2.6 MB"]]
+  :shape "The top level is a predecessor of this superproject: 00-contracts / 50-infra / 70-tools / 80-data / 90-docs, a CLAUDE.md, deps.edn, schema.edn. .git also carries 341 MB of submodules, 58 MB of Git LFS, and four stash-archive directories dated 2026-07-30, 08-01, 08-08 and 09-05."
+  :sensitive
+  "⚠ `_working/malak/line-exports/evidence-hiro-victim-20260512/` holds what reads as fraud-case evidence about a named victim: two Android APKs (21 MB and 5 MB) and 振込みに関する資料.pdf (15 MB). Personal and financial material about a third party, in a private repository, inside the largest thing left in gftdcojp. Whatever is decided about the repository, that directory is a retention question of its own -- archiving a repository does not delete anything, and moving it does not either."
+  :not-yet-measured "Which historical objects account for the 7.4 GB pack. A verify-pack walk was still running when this was written; the working tree does not explain the size, so something large was committed and later removed."}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
