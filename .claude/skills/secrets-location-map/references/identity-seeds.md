@@ -369,3 +369,27 @@
   その role は新 seed を別 host で作り直し、残り 3 + 新 1 で witness param を
   restate する version を出す。
 
+## EVM deployer（Base）
+
+- **`kotoba-cloud-registry-deployer-base-sepolia`（kagi vault、compartment
+  `personal`、category `:password`）** — `DelegationRootRegistry`
+  （ADR-2800011000）を Base Sepolia へ deploy する秘密鍵。
+  - **address `0x1210bdA52642223b3AC58e50f0D2723506ecB22A`**（公開値。
+    残高と nonce はここから引ける）
+  - 使い方: `npm run deploy:registry -- --kagi
+    kotoba-cloud-registry-deployer-base-sepolia`。script が `kagi get` を
+    pipe で受けるので、値は argv にもシェル履歴にも載らない。
+  - 生成 2026-09-06。`cast wallet new` → stdin で `kagi add`、往復確認
+    （`kagi get` → `cast wallet address`）で address 一致を実測済み。
+  - ⚠ **mainnet 用ではない。** Base mainnet へ出すなら別 item を作る ——
+    testnet の鍵を本番に流用すると、faucet 経由で誰の手にも渡りうる
+    生成履歴を持つ鍵が本番の controller になる。
+  - **未 funding**（2026-09-06 時点で残高 0）。deploy には Base Sepolia の
+    faucet が要る。
+
+- **Basescan / Etherscan の API 鍵は未登録**（`BASESCAN_API_KEY` /
+  `ETHERSCAN_API_KEY` とも unset、2026-09-06 実測）。
+  `app_kotoba_cloud.chain-facts` はこれが無いと provenance
+  （初出・資金源）を取得できず、guardian は仕様どおり全件 veto する。
+  **鍵が無いことは「安全」ではなく「recovery が完了できない」を意味する。**
+
