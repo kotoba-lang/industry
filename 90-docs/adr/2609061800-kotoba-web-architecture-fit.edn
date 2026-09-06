@@ -1,0 +1,243 @@
+[{:db/id -1
+  :adr/id "adr-2609061800-kotoba-web-architecture-fit"
+  :adr/title "Which web architectures fit the Kotoba language surface, scored from facts rather than asserted"
+  :adr/status "accepted"
+  :adr/date "2026-09-06"
+  :adr/authority "kotoba-lang/kotoba-lang lang/*.edn at origin/main"
+  :adr/related ["adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+                "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"
+                "ADR-2608136000"
+                "ADR-2608136800"
+                "2608080100"]
+  :adr/upstream-authority ["kotoba-lang/kotoba-lang docs/adr/ADR-kotoba-language-surface-status.md"
+                           "kotoba-lang/kotoba-lang adr-2608301500-guest-syntax-restrictions-classified-by-shielding-mechanism"
+                           "kotoba-lang/kotoba-lang lang/abort-ability.edn"
+                           "kotoba-lang/kotoba-lang lang/local-state.edn"
+                           "kotoba-lang/amu resources/kotoba/lang/application-language.edn"]
+  :adr/dataset "90-docs/architecture-fit/architecture-fit.datoms.edn"
+  :adr/rubric "manifest/architecture-fit-rubric.edn"
+  :adr/detector "scripts/architecture-fit-score.cljs"
+  :adr/body
+  "# Which web architectures fit Kotoba, and how that was decided
+
+## Context
+
+The question asked was which architectures suit building a web framework or
+library on today's Kotoba language surface. Answering it from memory would have
+reproduced a failure this workspace has recorded repeatedly: quoting an
+implementation ceiling as though it were a property of the language.
+
+The root CLAUDE.md was itself behind. Read at origin/main on 2026-09-06:
+
+- `kotoba-lang/kotoba-lang` 232182d
+- `kotoba-lang/amu` 1e5b7b8f
+- `kotoba-lang/kotoba-kir` af2275d
+
+Each was fetched and confirmed equal to origin/main before being read, because a
+west checkout is not the repository's main (ADR-2608136800).
+
+Five things are landed that the prose in CLAUDE.md still described as absent or
+as blockers:
+
+1. `defrecord` / `defprotocol` / `extend-type` / `extend-protocol` are
+   implemented, with profile `bounded-closed-world-static-dispatch`,
+   `dynamic-fallback false`, and an unknown receiver rejected statically.
+2. First-class closures are implemented: `fn`, `invoke`, `apply`, `fn-ref`,
+   arity 0 to 4, capture plus parameter limit 5, with public `[:fn ...]`
+   contracts crossing project-module boundaries.
+3. `typed-eval` is `:implemented`. `(eval request)` takes a bounded document
+   naming a checked DefCID, admitted on typed interface, effect row, allowed
+   effects, fuel and max depth, with `:no-source-text` in its safety list.
+4. `throw` and `try` exist (abort slice 2). An aborting function still cannot
+   be exported, and throw is refused inside loop, doseq, dotimes, lazy thunks
+   and fn literals, and in any function whose effect row carries a
+   `:dataspace/*` operation.
+5. `atom` / `swap!` / `reset!` / `deref` exist (local-state slice 1, decided
+   2026-09-02). The cell may appear only as the first argument of those forms,
+   in the body that binds it. Passing, returning, storing, capturing in a fn or
+   reading inside an iteration form is refused by name.
+
+Also read: the capability kits. `ui-v1` is a declarative flat tree of at most 32
+nodes committed against a base revision with bounded pull for events;
+`http-ingress-v1` is host-injects and guest-polls with one pending accept and a
+queue of 8; `state-v1` is a host-owned key-value store of 256 entries whose
+values are strings; `dataspace-v1` is assert, retract, observe and facets. Four
+of the fourteen kits are qualified on `wasm-aot`, which is the browser target.
+
+## Decision
+
+### 1. Score against named invariants, not against taste
+
+Seven axes, each bound to an invariant that is written down in the authority
+files, with its disposition and shielding axis carried alongside:
+
+| axis | invariant | disposition |
+|---|---|---|
+| authority | no-ambient-authority | intentional-security-constraint, code-identity |
+| state | no-ambient-mutation | intentional-security-constraint, authority |
+| dispatch | closed-world-static-dispatch | implemented-partial, dispatch-bypass |
+| bounds | bounded-admission | intentional-security-constraint, resource-bounds |
+| errors | explicit-errors | intentional-security-constraint, control-effect-tracking |
+| concurrency | no-unbounded-concurrency | intentional-security-constraint, resource-bounds |
+| identity | no-guest-macros | intentional-security-constraint, code-identity |
+
+Recording the disposition matters more than recording the score. Three of these
+have a widening path on file and four do not, so an architecture that fails on a
+widening axis is waiting, while one that fails on a permanent axis has to be
+rewritten.
+
+### 2. Separate the facts from the judgement, and derive the number
+
+Three artifacts, and no score is authored in any of them:
+
+- `90-docs/architecture-fit/architecture-fit.datoms.edn` holds FACTS. Each
+  architecture names one level per axis from a closed vocabulary, plus a
+  first-party evidence URL and a note identifying the single fact that sets its
+  lowest axis. `:source/dataset` is `architecture-fit`, so it joins the datom
+  plane that `manifest/edn-query.cljs` already loads.
+- `manifest/architecture-fit-rubric.edn` holds the JUDGEMENT: the level to score
+  mapping, one table, applied uniformly.
+- `scripts/architecture-fit-score.cljs` is the only place a total exists.
+
+A disagreement is expressed by editing a level and recomputing. It cannot be
+expressed by arguing with a printed number, because there is no printed number
+to argue with that was not derived a moment ago.
+
+### 3. The detector answers in three values, not two
+
+Exit 0 clean, exit 1 the dataset disagrees with the rubric, exit 2 REFUSED. An
+empty dataset returns 2, not 0: a scan of nothing is not a clean scan
+(ADR-2608136000). Measured on 2026-09-06, all three fire:
+
+- unmodified: exit 0, `SCANNED 57 entries`, clean
+- one level changed to a keyword the rubric does not carry: exit 1, reported as
+  `react-hooks unknown-level axis=state value=:totally-made-up`
+- the exact string `:arch/errors :exception-control-flow ` deleted, which occurs
+  once in the file: exit 1, reported as `rails missing-axis axis=errors`
+- dataset replaced with `[]`: exit 2, REFUSED
+
+The break and the report were compared each time. A first attempt at the second
+case used a regex that spanned entities and produced seven findings with blank
+entry names; that was a broken break rather than a successful demonstration, and
+it was redone.
+
+The check has already caught a real error: `:arch/entries` was hand-typed as 50
+and the dataset holds 57. The first run refused to print a table.
+
+## Findings
+
+57 entries, mean 43.9, standard deviation 14.8, range 14 to 70, median 45.
+
+### The binding constraint is bounds, not the security invariants
+
+`bounds` has the lowest mean of any axis at 5.4, and is the lowest-scoring axis
+for 12 of 57 entries, more than any other. The axes that get discussed --
+ambient authority and ambient mutation -- bind 10 each.
+
+This is the result worth carrying forward. Teams port an architecture expecting
+to fight the capability model, and what actually stops them is max-parameters 5,
+closure arity 4, ui-v1's 32 nodes, http-ingress-v1's single pending accept.
+Those are numbers in files that move; the security invariants are not.
+
+`dispatch` has the largest spread (sd 3.0), so it is the axis where the field
+genuinely disagrees and therefore the one where the rubric is most worth
+challenging.
+
+### Family order, by mean total
+
+managed-effect-ui 66.8 (n=4), component-model 66, coordination 64,
+effect-description 62 (n=3), hypermedia 59, effect-typed 57.4 (n=5),
+typed-server 50.5 (n=8), actor 46.5 (n=4), clojure 41 (n=5), continuation 38,
+reactive-ui 35.7 (n=11), di 32.3 (n=7), plugin 21, mvc-orm 19.6 (n=5).
+
+Two of these are worth naming.
+
+**The client-side reactive family scores below the typed-server family and below
+the actor family.** React, Reagent, Solid, Svelte, Vue, MobX and Lit average
+35.7. The cause is the same in every case and it is not the rendering model: it
+is a mutable cell held outside the function that reads it. `local-state.edn`
+lists `captured-by-a-fn-literal` and `stored-in-a-collection-or-record` among
+the refused escapes, which is a ratom and a `useState` cell described exactly.
+
+**Dependency injection is the second-worst family.** This is the surprise, since
+DI is normally the thing one adopts to get away from ambient authority, and the
+authority axis does credit it. It is undone on dispatch and identity, because a
+container resolves by name at run time. One measured fact settles it: a
+capability handle is not a value in the source surface. `cap-acquire` and
+`has-capability?` appear in the grammar's admitted builtins, but the frontend
+answers that the operation has no admitted type signature and no admitted
+lowering. There is nothing for a system map to hold.
+
+Hexagonal ports-and-adapters at 52 is the exception inside that family, and the
+difference is precisely that nothing is resolved by name.
+
+### The top of the table is not a coincidence
+
+Elm 68, Elmish 66, WASI 0.3 HTTP component 66, free monad interpreter 65,
+Syndicate dataspace 64, CQRS event sourcing 63, Halogen 63, Unison 62.
+
+Three of the top eight already exist as shipped capability kits or as the
+compile target: `ui-v1` is TEA, `dataspace-v1` is Syndicate, and
+`wasm-component-kotoba-v1` with WASI 0.3.0 is the component model. Two more --
+free monad and CQRS -- describe the same move the capability invariant
+describes: the unit produces a description and something with authority
+interprets it.
+
+HTMX at 59 is the highest-scoring client architecture in the table, and it
+scores there by declining to be one. For a UI kit whose whole surface is
+commit-a-tree and pull-events, hypermedia over the wire fits better than any
+client-side reactive framework measured here.
+
+Racket appears at both ends: Syndicate at 64 and the continuation-based
+web-server at 38. A captured continuation is the unbounded non-inspectable
+object that bounded admission cannot admit. The language is not the unit of fit.
+
+## Consequences -- what a Kotoba web framework is
+
+1. A handler, not a server. `http-ingress-v1` is synchronous accept-then-reply
+   with one pending accept. Routing, concurrency and connection management are
+   the host's.
+2. Routes and middleware are literal values. `require`, `resolve`, `ns-resolve`,
+   `var`, `load`, `load-file`, `load-string`, `read-string` and `binding` are
+   forbidden heads, so a table assembled by scanning namespaces has no
+   mechanism. reitit route data and a Pedestal interceptor chain are the two
+   existing shapes that port unchanged.
+3. The request is a record, not an argument list. max-parameters is 5 and
+   `pure-product-profile.edn` states the policy outright as keep-5-use-records,
+   with a preference order of record, option, hetero-vector, flat arity at most
+   five. Record fields go to 32.
+4. Handler abstraction is `defprotocol` plus `extend-protocol` over a closed set
+   of records, resolved statically, with an unknown receiver refused at compile
+   time.
+5. The extension point is a DefCID. Typed eval is the only admitted way to run
+   something not present at link time, and it names content rather than source.
+   A plugin system that loads source text is not a thing to be worked around; it
+   is a thing to be replaced with content addressing.
+6. Boundaries return `[:result T E]`. throw exists but an aborting function
+   cannot be exported.
+7. The view is a 32-node flat tree committed against a base revision. That is
+   optimistic concurrency over the whole tree, not a diff protocol, so there is
+   nothing for a virtual-DOM differ to do.
+8. State has three places, and which one is a counting question before it is a
+   design question: a `let`-local cell that cannot escape, `state-v1` at 256
+   entries with string values, or `dataspace-v1` at 256 assertions with facets.
+   One global store holding everything fits none of them.
+
+## What this does not claim
+
+The facts are checkable against the cited first-party documents. The level
+assigned to each fact is judgement, and the rubric turning a level into a number
+is judgement. No gate produced these totals and none of them is a measurement.
+
+The ranking is fit with one language surface. It is not a ranking of these
+architectures as architectures, and a low score is not a defect in the thing
+scored -- Rails at 14 is at the bottom because every convenience it is admired
+for is the thing one of these seven invariants exists to refuse.
+
+Twenty named frameworks were not covered: Ember, Nuxt, Remix, Sinatra, Flask,
+Gin, Rocket, Vapor, Play, Micronaut, Quarkus, Deno Fresh, Astro, Nitro, Leptos,
+Dioxus, Seaside, Ur/Web, Opa and Wasp. Their absence is absence of measurement.
+
+Do not quote the numbers in this document as current. The ceilings they are
+measured against live in `lang/guest-grammar.edn` under `:admission-limits` and
+in each kit's `:qualification`, and those move. Rerun the detector."}]
