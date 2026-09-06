@@ -1,0 +1,66 @@
+[{:db/id -1
+  :adr/id "adr-2609081200-suji-neck-coverage-against-the-table-it-cites"
+  :adr/title "suji の頸部を、それが引いている表に対して数えた —— 出典が在る 7 筋は例外なく ×2.00、緩いのは引かなかった 3 筋だけ"
+  :adr/status "accepted"
+  :adr/date "2026-09-08"
+  :adr/related ["adr-2609062600-kami-app-suji-browser-posture-load" "adr-2609072000-suji-and-biomech-are-the-same-subject-at-two-resolutions"]
+  :adr/body "## 何を測ったか
+
+**`cloud-itonami/suji` の頸部が、その repo が出典として引いている表に対してどれだけ
+覆えているか**を、目視ではなくデータから数えた（2026-09-08、suji `3d494ba`）。
+出典は Kamibayashi & Richmond 1998 Table 3-3（Vasavada, Rothman-Simeone The Spine
+ch.3 が転載したものを `pdftotext -layout` で抽出）。表は **PCSA 平均を持つ筋を 15 行**
+持つ。
+
+`muscle/specs`（f-max が計算される唯一の表。もう 1 つの `attachment/muscles` 側の
+`:pcsa-cm2` は計算に使われない —— suji 373afc3 で測定済み）の 32 entry と突き合わせた。
+
+| K&R の行（片側 cm²） | model | 比 | 判定 |
+|---|---|---|---|
+| sternocleidomastoideus 3.72 | 7.44 | **×2.00** | 両側和。出典どおり |
+| semispinalis capitis 5.40 | 10.80 | **×2.00** | 同 |
+| splenius 4.26 | 8.52 | **×2.00** | 同（表の行は capitis + cervicis 合算。repo が自分でそう書いている） |
+| rectus capitis posterior major 0.93 | 1.86 | **×2.00** | 同 |
+| rectus capitis posterior minor 0.50 | 1.00 | **×2.00** | 同 |
+| obliquus capitis superior 1.03 | 2.06 | **×2.00** | 同 |
+| longus capitis 0.92 | 1.84 | **×2.00** | 同 |
+| scalenus anterior 1.45 + medius 2.00 + posterior 1.55 | scalenes 5.00（片側） | **×1.00** | 3 筋を 1 群に畳んだ和が、測定値の和と厳密に一致 |
+| clavotrapezius 1.96 | upper_trapezius 9.00（片側） | **×4.59** | representative |
+| levator scapulae 2.18 | levator_scapulae 5.00（片側） | **×2.29** | representative |
+| acromiotrapezius 10.77 | middle_trapezius 8.00（片側） | **×0.74** | representative |
+| rhomboideus 5.84 | girdle の rhomboids 12.0 | ×2.05 | 別 module。**%MVC を報告しない**（3 筋の配分の重みとしてのみ使われる、と自分で書いている） |
+| obliquus capitis inferior 1.29 | —— | —— | **無い**。両端が upper_cervical に乗るので環軸関節が要る |
+
+## 読み取れること
+
+**出典が在る 7 筋は、例外なく片側平均のちょうど 2 倍**である。中線群が両側和を持つ
+という規約が、7 件すべてで機械的に守られている —— つまり**この repo の出典付けは
+守られているところでは厳密**で、緩いのは「出典を引かなかった 3 筋」だけである。
+
+**その 3 筋は、同じ表が測っている。** clavotrapezius と levator scapulae と
+acromiotrapezius は K&R Table 3-3 の行そのものなのに、model は representative を
+持っている。しかも 2026-09-07 に結合解が入って以降、**upper_trapezius と
+levator_scapulae は C7 のモーメントを担う** ようになったので、この 2 つは
+もはや飾りではない（laptop-on-lap で −0.161 / −0.028 N·m）。
+
+**ただし置換は 1 行では済まない。** model の `upper_trapezius` が K&R の
+clavotrapezius なのかは自明でない —— K&R は僧帽筋を clavo / acromio に分けており、
+model の `upper_trapezius` は「後頭骨・項線 → 外側鎖骨」と書いているので
+clavotrapezius に対応しそうに見えるが、これは**出典を読み直してから**でなければ
+決められない。ここで決めない。
+
+## 隣接する測定
+
+- **`attachment/muscles` 側の `:pcsa-cm2` は計算に使われない**（suji 373afc3）。
+  上の 32 件は今日は両表で一致しており、乖離を大きな音にするテストが入っている。
+- **表の行数を 3 箇所が fourteen と書いていた**（実際は 15）。列挙の側は最初から
+  15 筋を並べていた。数に依存する結論（集中定数が代表する 4 筋の不在、
+  rectus capitis anterior の不在）は**数ではなく抽出テキストで再確認**したので動かない。
+
+## この ADR がしないこと
+
+数値の置換も、girdle の重みの出典付けも、環軸関節の追加もしない。**測って、
+次に触る者が同じ調査を繰り返さずに済むようにする**のがここの役目である。
+suji には同時に 2 つの作業が走っており、片方が腰椎の参照姿勢を扱っている ——
+同じ repo に同じ時刻に 2 人を入れない、という運用規則のほうが、この表を
+今日中に反映することより優先する。"}]
