@@ -195,7 +195,7 @@ duck-typing 版（`satisfies?` を `(not (map? target))` に）を実際に当�
 が触れた distinct block は 8、B2 0、miss 0。繰り返しの query は block を 1 つも取らない
 （`distinct=0`）—— block 層より上の materialize memo が答えている。
 
-**したがって pack tier は、この workload に対して節約するものを持たない。** S4 の
+**したがって pack tier は、この workload に対して節約するものを持たない。**（⚠ この一文は同日 cold で測り直して撤回した。末尾の訂正節を読むこと。）S4 の
 premise は「round trip を pack に畳む」だったが、round trip が 0 の経路に対しては
 空である。gate の答えは「作らない」側だった。
 
@@ -241,5 +241,64 @@ tenant DID を名乗る）、edge では受理されている。35 byte のほ�
 赤いのも同じ理由で、`seed failed: 401 {\"ok\":false,\"error\":\"Unauthorized\"}` としか
 言わない。**修正は別 agent が着地させ、deploy はしない**（この ADR の
 「deploy した ≠ 測った」をここでも守る）。
+
+## ⚠ 上の「測った」節の結論は誤りだった —— cold で測ると object store に届く（2026-09-06、同日中に訂正）
+
+**上の節は「pack tier はこの workload に対して節約するものを持たない」と書いた。偽である。**
+そう見えたのは、**測った read が全部、直前にその graph を書いた isolate に当たっていた**
+から。上の節は自分でその限界を「暖かい graph で測って 0 であって cold で 0 ではない」と
+書いておきながら、結論の側はその但し書きを踏み越えていた。
+
+**cold で測り直した。2 本の独立した graph、どちらも `b2 > 0`:**
+
+    graph 1（600 entity）
+      warm   同一 session、書いた直後      l1=32; l2=0 ; b2=0 ; miss=0; distinct=12; epoch=9
+      COLD   別 isolate、4 分後            l1=20; l2=0 ; b2=12; miss=0; distinct=12; epoch=1
+      then   同 isolate 2 回目             l1=0 ; l2=0 ; b2=0 ; miss=0; distinct=0 ; epoch=2
+
+    graph 2（600 entity、別 tenant）
+      warm   同一 session                  l1=25; l2=0 ; b2=6 ; miss=0; distinct=17; epoch=5
+      COLD   別 isolate、53 秒後           l1=14; l2=14; b2=3 ; miss=0; distinct=17; epoch=1
+      then   同 isolate 2 回目             l1=0 ; l2=0 ; b2=0 ; miss=0; distinct=0 ; epoch=3
+
+**判別子は壁時計ではなく `epoch=1`** —— epoch は request ごとに増え、`l1` は isolate 内の
+memo なので、`epoch=1` は「この isolate はこの graph を見たことがない」を意味する。
+上の節の全観測は epoch が既に進んだ isolate、すなわち**構造的に B2 に届きようがない
+条件**で採られていた。
+
+### 読み
+
+- **cold read は object store に届く。** backend は `:block-per-object` なので、
+  届いた分は **block 1 個 = object fetch 1 回**である。graph 1 では distinct 12 に対し
+  b2 が 12 —— 全部が個別の round trip。
+- **量を決めるのは L2 の残存**である。53 秒後は 17 中 14 が L2 から出て B2 は 3、
+  4 分後は L2 が 0 で B2 が 12。**L2 が答えている間は pack の利得も小さい。**
+- **したがって ADR-2608160100 の pack（1 commit = 1 pack、Range GET 1 回）が畳む対象は
+  実在する。** S4 の premise は「refuted」ではなく、**未測定に戻った**。
+
+### それでも「作れ」ではない
+
+**この 2 観測が言うのは「節約するものが在る」までで、「pack が引き合う」ではない。**
+次に測るのは 2 つ:
+
+1. **L2 の残存時間と容量。** 53 秒と 4 分で挙動が割れているので、実運用の read が
+   どちらの側に落ちるかで pack の効き目が桁で変わる。L2 が広く効いているなら、
+   pack より先に L2 の寿命を延ばす方が安い。
+2. **round trip 数ではなく、その round trip の実コスト。** ADR-2608160100 は成功指標を
+   round trip 数と定めているが、b2=12 が実際に何 ms を占めるかはまだ測っていない。
+
+### 方法についての記録（同じ形を今日 2 回踏んだ）
+
+**仕事をしなかった経路が、仕事をして問題が無かった経路と同じ値を返した** ——
+CLAUDE.md「7 問」の 7 問目そのもので、同じ日に 2 回出た:
+
+- **warm な isolate は block を 0 個取る。** それは「取る必要が無かった」であって
+  「取るものが無い」ではない。`b2=0` を「object store に依存していない」と読んだ。
+- **`.shadow-cljs` を持つ `shadow-cljs release` は `0 compiled` で成功し、
+  `out/worker.js` を書く。** その hash 一致を「bundle は変わっていない」と読んだ
+  （cold で 2 回ビルドすると byte 一致で再現するので、**cold hash なら比較できる。
+  incremental hash は何とも比較できない**）。
+
+どちらも**但し書きは先に書いてあった**。読み飛ばしたのは結論を書いた側である。
 "
 }]
