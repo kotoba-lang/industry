@@ -408,7 +408,45 @@
               (= "QmRFjHhG3SkR1RnjwXZ7zz1zS5NpDsv6JCn5V4EkEzP8dv"
                  (cid->multihash-b58 witness))
               (str "base32 CIDv1 → base58btc multihash: "
-                   (str (cid->multihash-b58 witness)))))))
+                   (str (cid->multihash-b58 witness)))))
+
+    ;; ── the metadata checks, in BOTH directions ──────────────────────────
+    ;; Against the wire they can only be red today, because nothing has
+    ;; announced IPQ yet. A check that has only ever been red says as little as
+    ;; one that has only ever been green: neither has been shown to depend on
+    ;; what it claims to measure. These are real DAG-CBOR advertisement blocks
+    ;; built with io-ipld and pinned as bytes, differing in exactly one field --
+    ;; nine Metadata bytes against three.
+    (let [with-ipq (js/Buffer.from
+                    (str "a5644973526df4684d6574616461746149a01200c092c001010168"
+                     "50726f7669646572782c313244334b6f6f57466978747572655072"
+                     "6f7669646572506565724964466f7253656c66746573744f6e6c79"
+                     "694164647265737365738178252f646e73342f697066732e6b6f74"
+                     "6f626173652e6e65742f7463702f3434332f687474707369436f6e"
+                     "7465787449444401020304")
+                    "hex")
+          gateway-only (js/Buffer.from
+                        (str "a5644973526df4684d6574616461746143a012006850726f766964"
+                         "6572782c313244334b6f6f574669787475726550726f7669646572"
+                         "506565724964466f7253656c66746573744f6e6c79694164647265"
+                         "737365738178252f646e73342f697066732e6b6f746f626173652e"
+                         "6e65742f7463702f3434332f687474707369436f6e746578744944"
+                         "4401020304")
+                        "hex")]
+      (check! :fixture-with-ipq-reads-as-announced
+              (if (nil? ipni-metadata) :unmeasured
+                  (boolean (:ok? ((:read-ipq ipni-metadata)
+                                  (advertisement-metadata with-ipq)))))
+              (if (nil? ipni-metadata)
+                "ipni.metadata is not on the classpath"
+                "an advertisement whose Metadata carries IPQ reads as announced"))
+      (check! :fixture-without-ipq-reads-as-absent
+              (if (nil? ipni-metadata) :unmeasured
+                  (= :not-ipq (:reason ((:read-ipq ipni-metadata)
+                                        (advertisement-metadata gateway-only)))))
+              (if (nil? ipni-metadata)
+                "ipni.metadata is not on the classpath"
+                "and one whose Metadata does not is :not-ipq, not :undecodable")))))
 
 (defn -main [& args]
   (reset! findings? (boolean (some #{"--findings"} args)))
