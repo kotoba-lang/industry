@@ -2434,9 +2434,18 @@ target に落ちたときだけで、**それは amu の経路ではない**。
    移す前に、item 2 のコマンドで `http-ingress-v1` / `stream-ingress-v1` の行を実際に
    見る（ADR-2606290000 と整合）。2026-08-08 訂正: 旧文は「どちらの面にも無い」と
    書いていた。
-4. **fs/process/exec capability も Kotoba script host（`kbb`）も無い** — build スクリプトは
-   nbb 据え置き。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
-   ではない（名前で誤解しないこと）。
+4. **`kbb`（Kotoba script host）は無い** — build スクリプトは nbb 据え置き。
+   `kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner ではない
+   （名前で誤解しないこと）。
+   ⚠ **2026-09-06 訂正: 旧文はここに「fs/process/exec capability も無い」と書いていたが偽だった。**
+   `amu/resources/kotoba/lang/capability-catalog.edn` の `:capabilities` は `:fs/transact`
+   `:fs/browse` `:fs/app-data` `:process/spawn` `:env/read` `:git/run` `:secret/get`
+   `:screen/act` `:code/eval` 等を、**wire id を持つ admitted な source 操作**として持っている
+   （`:source-status :friendly-qualified`）。無いのは *kit ファイル* の方で、typed
+   request/result schema と backend qualification 行がまだ書かれていない。
+   **したがって「その capability は在るか」と「その backend で動くか」は別々に引く** ——
+   前者は `capability-catalog.edn`、後者は `capability-kits/*.edn` の `:qualification`。
+   どちらの件数もここに書かない（動くので）。
 
 ## `.kotoba` で「書けない」は 2 種類ある — 恒久と一時を混ぜない（repo-wide mandatory、2026-08-08、ADR-2608650000）
 
@@ -2462,27 +2471,65 @@ target に落ちたときだけで、**それは amu の経路ではない**。
 
 | 制約 | 出典 |
 |---|---|
-| **untracked control effect の禁止** — ambient `throw` / `try` / `catch` を使わず `[:result T E]` を返す。**native の話ではなく wasm/cljs でも拒否**。typed abort/exception ability（effect row に現れ checked unwind を伴う、Unison の Exception と同型）は前提条件 landed 後に ADR 経由で widening 可 | `:invariants :explicit-errors`。改訂は ADR-2608650000 + adr-2608301500 |
+| **untracked control effect の禁止** — 境界で返すのは `[:result T E]`。**恒久なのは「追跡されない制御効果」の禁止であって、`throw` という語の禁止ではない**（2026-09-06 訂正、下記） | `:invariants :explicit-errors`。改訂は ADR-2608650000 + adr-2608301500 |
 | bool は数ではなく型 | `:invariants :bool-is-a-type-not-a-number` = `:intentional-semantic-simplification` |
 
 `ex-info` → Result は後戻りしない設計変更なので、移行の副産物にせず正面からやる。
+
+⚠ **`throw` / `try` は既に admitted である**（2026-09-06 実測）。旧文はこの表で「ambient
+`throw` / `try` / `catch` を使わず」「wasm/cljs でも拒否」と書き、typed abort ability を
+「前提条件 landed 後に widening 可」と将来形で述べていたが、**widening は部分的に landed
+している**。`lang/guest-grammar.edn` の `:sugar` に `:throw` / `:try` が在り、契約は
+`lang/abort-ability.edn`。
+
+効くのは拒否の側で、そこは強い —— **abort する関数は export できない**、`throw` は
+loop / doseq / dotimes の body・lazy thunk・fn literal の中で拒否、effect row に
+`:dataspace/*` を持つ関数でも拒否。**書き方の既定は変わらない: 境界は `[:result T E]`。**
+
+**現在地は `lang/surface-status.edn` の `:invariants :explicit-errors :widening` を引く** ——
+slice 番号も、どの precondition が `:met` でどれが残っているかも、そこが持つ。ここに書き写さない。
 
 **記法制限には shielding axis が付いた（adr-2608301500、2026-08-30 オーナー指示）。**
 禁止が守る性質を 5 軸（`:code-identity` / `:dispatch-bypass` / `:authority` /
 `:control-effect-tracking` / `:resource-bounds`）で名指しし、**definition CID
 （Unison 的 identity）と grant 交差 dispatch（biscuit 的 authority）で防げる害には
-記法禁止を恒久としない**。`:authority` 軸（atom / swap! / reset! / volatile! / ref /
-dosync）は `:state` ability への desugar という widening path を持つ — ただし前提条件
-（backend qualification・cap handle 格納の schema 拒否・conformance vectors）が
-landed するまでは fail-closed に拒否のまま。eval / interop / defmacro は CID と
-静的検査可能性そのものが要求するので恒久（機構が成熟しても解禁されない）。
+記法禁止を恒久としない**。`:authority` 軸は `:state` ability への desugar という widening
+path を持ち、**その一部は既に landed している**（2026-09-06 訂正。旧文はこの軸をまるごと
+「fail-closed に拒否のまま」と書いていた）:
+
+- **`atom` / `swap!` / `reset!` / `deref` は書ける** —— local-state slice 1、オーナー判断
+  2026-09-02「build it, fail-closed, in slices」。ただし cell は**それを束縛した関数本体から
+  逃げられない**: 引数として渡す・返す・コレクションやレコードに入れる・fn literal に捕捉
+  する・loop / doseq / dotimes の中で読む、はいずれも名指しで拒否される。**逃げる cell、
+  関数を跨ぐ cell、1 回の呼び出しより長生きする cell は今も host kit + grant。** escape 規則
+  の全列挙と拒否メッセージは `lang/local-state.edn`（`:escape-rule` / `:refusals`）。
+  これは「1 つの `let` の中の可変」であって、`app-db` や ratom がここに入るわけではない。
+- **`volatile!` / `ref` / `dosync` / `binding` / `var` / `set!` は今も forbidden head**
+  （`lang/guest-grammar.edn` の `:forbidden-heads`）。`:state` kit の desugar 自体も
+  fail-closed のまま。
+
+eval / interop / defmacro は CID と静的検査可能性そのものが要求するので恒久（機構が成熟しても
+解禁されない）—— **ただしここで言う eval は生の `eval` であって、typed eval は別物**
+（2026-09-06 追記）。`(eval request)` は DefCID を名指しする有界な document を取り、安全性に
+`:no-source-text` を持ち、typed interface / effect row / allowed effects / fuel / max-depth で
+受理される（`lang/surface-status.edn` の `:other-gaps :typed-eval`、`:disposition :implemented`）。
+⚠ **この repo では実行できない**（同項の `:execution-in-this-repo :blocked` —— provider が
+未実装）。拡張点を設計するときは「**ソースを渡す plugin は恒久に不可、CID を名指しする拡張は
+仕様済み・ただし provider 待ち**」と読む。
 正本は `kotoba-lang/kotoba-lang` `lang/surface-status.edn` の `:shielding-axis`。
 
 ### それ以外は native 追随を前提とした一時制約として書く
 
 map / set / 永続コレクション・closure / HOF・異種ベクタ・再帰値はすべて
 `:implemented-partial` で `#{:compiler :kotoba-wasm :kotoba-cljs}` に実装済み。
-native に無いだけ。bare `:bool` パラメータは compiler ADR 0219 が自ら
+native に無いだけ。**`defrecord` / `defprotocol` / `extend-type` / `extend-protocol` も同様に
+landed**（`:protocol-and-record-dispatch`。profile は `bounded-closed-world-static-dispatch`、
+`:dynamic-fallback false`、未知または未実装の receiver はコンパイル時に拒否）。`defmulti` /
+`defmethod` も `:closed-multimethod` として desugar される（hierarchy・preference・実行時拡張は
+持たない）。first-class closure（`fn` / `invoke` / `apply` / `fn-ref`）も landed で、設計に
+効くのは実装の有無ではなく **arity の上限**の方（`:first-class-closure-values :bounds`）。
+**これらを「無い」と仮定して判断核だけを切り出す設計にしない。**
+bare `:bool` パラメータは compiler ADR 0219 が自ら
 *a real gap … in the INTERPRETER, not in either backend* と書いており解消途中。
 **正規表現は `:forbidden-heads` に無い**（`value-codec.edn` の `:rejected-closed :regex` は
 「正規表現を値として転送できない」という正準エンコーディングの話で、演算の禁止ではない）。
