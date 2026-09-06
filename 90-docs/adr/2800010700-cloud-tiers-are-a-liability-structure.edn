@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2800010700-cloud-tiers-are-a-liability-structure"
-  :adr/title "Secure / Community は当事者性の層である —— そしてそれは murakumo に既に live で在った。欠けているのは kotoba.cloud がそれを知らないことだけ"
+  :adr/title "Secure / Community は当事者性の層である —— そしてそれは murakumo に既に live で在った。欠けているのは kotoba.cloud がそれを知らないことと、holder-side attenuation"
   :adr/status "accepted"
   :adr/date "2026-09-06"
   :adr/body "## この ADR は同日中に大幅に訂正された
@@ -14,7 +14,7 @@ credits も payout も **murakumo に既に live で在る。**
 | ノードに tier / trust / provider フィールドが無い | **誤り。`/nodes` を見て `/infer/nodes` を見ていなかった** |
 | metering は 35 actor 中 1 つしか形を持たない | **母集団が違う。cloud-itonami の actor の話で、compute plane の話ではない** |
 | 順序は metering → ノード属性 → 層の宣言 → Community | **撤回。最初の 3 つは既に在る** |
-| Community 層は 0 から作る必要がある | **誤り。live で 8 ノードが community として enroll 済み** |
+| Community 層は 0 から作る必要がある | **誤り。live で 8 ノードが community として enroll 済み** |\n| （D3 item 2）Principal は各面へ CACAO を出す | **誤り。authority は Biscuit。CACAO は推移的依存で、operator route では通らない** |
 
 生き残ったのは当事者性の分析と、**kotobalabs が当事者として登録されていない**
 という発見だけである。以下は訂正後の内容。
@@ -148,21 +148,7 @@ kotobalabs が当事者になるとは、この DID を書き換えることを�
 ### D3. 順序は『作る』ではなく『繋ぐ』—— 初版の D3 を撤回する
 
 初版は metering → ノード属性 → 層の宣言 → Community と決めた。
-最初の 3 つは既に在るので撤回する。残っているのは:
-
-1. **kotoba.cloud の control plane に、実在する面を role として足す** ——
-   `llm`（`api.murakumo.cloud`）/ `pinning`（`kotobase.net/pins`）/
-   層と価格（`/infer/nodes`・`/itonami/plans` を指す）
-2. **Stable Principal から各平面の credential を発行する** ——
-   murakumo の API キーと kotobase の CACAO を、kotoba.cloud の Passkey
-   セッションから短命 grant として出す。README が自ら
-   `short-lived Passkey-scoped storage grants は follow-up` と書いている箇所
-3. **`deploy.hostedApply` を false のままにするか決める** —— 層を宣言しても
-   hosted apply が無ければ層を選べない
-4. **legacy 47 ノードの trust-tier 未設定を埋める** —— 65 中 47 が未設定で、
-   『どちらでもない』は Secure でも Community でもない第三の状態になっている
-
-### D4. Community 層はホスト identity を既に見せている。隠す方向へ後退させない
+最初の 3 つは既に在るので撤回する。残っているのは:\n\n1. ~~control plane に実在する面を role として足す~~ **着地済み**（2026-09-06、\n   `kotoba-lang/app-kotoba-cloud` 4c087db）。ただし **role ではなく capability**\n   として足した —— 既存テストが role ごとに origin は相異なると主張しており、\n   推論は compute の origin、pin は storage の origin が出している。role を足すと\n   1 つの origin に 2 つの名前が付き、境界が実際より細かく見える。\n2. **Principal から credential を発行する** —— 下記 D6。**初版のこの項目は\n   CACAO と書いていたが、それは誤りだった。**\n3. **`deploy.hostedApply` を false のままにするか決める** —— 層を宣言しても\n   hosted apply が無ければ層を選べない\n4. ~~legacy 47 ノードの trust-tier 未設定を埋める~~ **着地済み**（2026-09-06、\n   `network-awai/cloud-murakumo-api` 66ef92e）。埋め方は backfill ではなく\n   報告側の解決にした —— 下記 D7。\n\n### D4. Community 層はホスト identity を既に見せている。隠す方向へ後退させない
 
 `/infer/nodes` は provider DID を公開している。RunPod Community が成立するのは
 顧客がホストを名指しで選べるからで、**この面は既にそうなっている。**
@@ -177,7 +163,7 @@ kotobalabs が当事者になるとは、この DID を書き換えることを�
 （`routes.cljc` の docstring）を読む。** 1 つの path の応答は 1 つの面しか
 答えない。
 
-## Consequences
+### D6. Principal が発行するのは Biscuit であって CACAO ではない\n\n**この項目の初版は誤っていた。** 『murakumo の API キーと kotobase の CACAO を\n短命 grant として出す』と書いたが、CACAO を数えて共通言語だと読んだだけだった\n（murakumo src に 108 箇所）。\n\n**向きは 2026-08-20 のオーナー判断で既に決まっていた** —— ADR-2608200400、\n『bot に did を与え、権限を biscuit で運ぶ』。identity は `did:key`、authority は\nBiscuit。macaroon ではなく Biscuit を選んだ理由がそのまま、ここで効く:\n**検証に要るのは root の did:key だけ**で、macaroon なら検証するすべての場所に\nroot 秘密を配ることになる。だから Principal が credential を出しても、\nkotoba.cloud は各プレーンへ秘密を配らずに済む。\n\n同じ ADR が Ed25519 の出所を『**cacao 経由で既に** classpath にある』と書いている。\n**CACAO は推移的依存であって設計の向きではない。** 私はその grep 数を共通言語と\n読み違えた。\n\n実測 2026-09-06、murakumo の `operator-refusal` は明示的にこう返す:\n\n```\n:cacao  a CACAO does not authorize this route\n```\n\noperator route が受けるのは `Bearer|Biscuit mro_…`（passkey-rooted operator\nBiscuit）と service bearer で、**CACAO では通らない。**\n\n### D6a. 単一の credential は存在しない —— shape は apex ごと\n\nADR-2608319900 のタイトルがそのまま結論である（`credential shape is per-apex,\nso a probe that presents one shape reports a false negative`）。\n\n| 面 | 受理 |\n|---|---|\n| murakumo operator route | Biscuit（`mro_`）/ service bearer。CACAO 不可 |\n| kotobase `/pins` | Bearer または CACAO（live 401 の本文） |\n| murakumo の paying identity | `#{:passkey-session :murakumo-biscuit :cacao :mk1 :shared-token}` |\n\nしたがって control plane が `principalIssuedCredentials` を面ごとに持つのは\n正しい形である。**1 つ真にすれば全部が真になる、という書き方をしない。**\n\n### D6b. 本当に足りないのは holder-side attenuation で、それは既に名前が付いている\n\nADR-2608200400 の『まだ無いもの』が、必要な当のものを名指ししている:\n\n> **bot 自身による attenuation。** `token/append` は前 block が名指した秘密鍵を\n> 要求するが、**どの bot も持っていない（設計）** —— `bot-identity` は名前を\n> 与えて署名鍵を与えない。fleet が発行し誰でも検証できるが、bot が自分より\n> 狭い slice を他へ渡すことはまだできない。**それは次の決定であって、漏れではない。**\n\nkotoba.cloud が呼び出し側へより狭い credential を渡すことは、まさにこの\nattenuation である。**新しい credential 形式を作る話ではなく、既に名前の付いた\n次の決定を実行する話。**\n\n決めるべきは 1 点、**誰が attenuation 用の署名鍵を持つか**。上記 ADR は\n『bot に署名鍵を与えない』を意図的な設計としているので、Principal に与えるのは\nその判断の再検討になる（Principal は bot ではないので別判断として成立しうるが、\n成立させるなら理由を書く）。**この ADR では決めない。**\n\n### D6c. smart contract はこの経路の認証に入っていない\n\n`ERC-8004` は live の `api.murakumo.cloud`（`network-awai/cloud-murakumo-api`）に\n**0 件**。この文字列は `gftdcojp/apps-gftdcojp` の古いゲートウェイの説明文\n（`ERC-8004 registered, MurakumoRegistry staked`）に在り、そちらは live の面では\nない。**説明文に書かれた登録を、稼働中の認証経路と読まない。**\n\n### D7. 第三状態は backfill ではなく報告側で解いた\n\nlegacy 47 件（すべて `tab-*` のブラウザ寄与、`liveness :never`）は、\n`trust/normalize` が nil を **`awai-secure`** に解決するため、tier を一度も\n宣言していないブラウザタブが secure プールの一員として読まれていた。\nその既定は *workload* にとっては安全側（何も指定しない呼び出し元に community\nハードを渡さない）だが、*node* に当てると向きが逆になる。\n\n`node-trust-tier` を足して報告時だけこの既定を使わないようにし、\n`node-trust-tier-source` が `:enrolled` / `:legacy-unset` を言う。\n**認可側は変えていない** —— あちらは未設定を secure のまま扱うことで legacy\nレコードを operator 専用に保つ。**正直に報告することが、上書きを容易にしては\nいけない。** この非対称性自体にテストがある。\n\n## Consequences
 
 (+) 『これから作る』が『既に在る、繋がっていないだけ』に変わった。
     作業量が桁で違う。
@@ -211,5 +197,5 @@ kotobalabs が当事者になるとは、この DID を書き換えることを�
   読まない』。本 ADR の誤りは D8 と同型で、見る場所ひとつで結論が変わった）
 - ADR-2608039800（murakumo の backend 決定）
 - ADR-2608231500（認証スコープは制御環境が決める。D4 が本 ADR の D2 と同じ決定を待つ）
-- ADR-2609010500 / 2609010600（x402 SDK と com-kotobalabs の org 実在状況）
+- ADR-2609010500 / 2609010600（x402 SDK と com-kotobalabs の org 実在状況）\n- ADR-2608200400（bot に did を与え権限を biscuit で運ぶ —— D6 の正本。\n  『まだ無いもの』が D6b の attenuation を名指ししている）\n- ADR-2608319900（credential shape は apex ごと —— D6a の正本）\n- ADR-2608200400（kotoba / kotobase の primitive identity は did:key のまま）
 "}]
