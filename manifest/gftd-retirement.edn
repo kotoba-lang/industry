@@ -245,6 +245,32 @@
   "⚠ `_working/malak/line-exports/evidence-hiro-victim-20260512/` holds what reads as fraud-case evidence about a named victim: two Android APKs (21 MB and 5 MB) and 振込みに関する資料.pdf (15 MB). Personal and financial material about a third party, in a private repository, inside the largest thing left in gftdcojp. Whatever is decided about the repository, that directory is a retention question of its own -- archiving a repository does not delete anything, and moving it does not either."
   :not-yet-measured "Which historical objects account for the 7.4 GB pack. A verify-pack walk was still running when this was written; the working tree does not explain the size, so something large was committed and later removed."}
 
+ ;; ── apps-gftdcojp: extract or archive, judged per unit ──────────────────
+ :apps-gftdcojp-judgement
+ {:asked "2026-09-06 — 中身も repo として取り出すか, archive か判断"
+  :method "Measured each top level unit for size, recency and whether an equivalent already exists elsewhere in the workspace. Original work that exists nowhere else is worth extracting; everything else is a record."
+  :extract
+  [{:unit "00-contracts/lexicons" :size "34 MB, 8,722 files"
+    :why "8,377 of them are ai.gftd.* — the organisation's OWN AT Protocol NSIDs. kotoba-lang/org-bluesky-atproto carries one json file, so this exists nowhere else. It is the single largest piece of original work in the repository, and 34 of the 35 MB of 00-contracts."
+    :warning "⚠ The namespace is under the retiring domain. If gftd.ai moving to itonami.cloud is followed through, ai.gftd.* becomes cloud.itonami.* — and AT Protocol NSIDs are WIRE identifiers, not names: renaming them breaks every record already written under them. Extract the repository now; treat the namespace as a separate protocol decision with its own migration."}
+   {:unit "arxiv" :size "116 KB"
+    :why "A complete LaTeX paper — main.tex, main-ja.tex, references.bib, three figure sources, a Makefile — titled 'ai-gftd-organism: Realizing an Information Life Form'. Distinct from com-junkawasaki/moex, which is a different paper (MoEx / WebGPU) and is the established shape for a paper repository here."}]
+  :archive
+  [{:unit "50-infra" :size "126 MB"
+    :why "95 MB of it is vultr/geth-private, whose bulk is four VENDORED submodules (forge-std, solady, coinbase/smart-wallet, openzeppelin-contracts-v4) rather than original work. The live infrastructure now lives per-repo plus the fleet."}
+   {:unit "_working" :size "106 MB"
+    :why "106 of the 106 MB is malak — the evidence directory. That is a retention question, not an extraction candidate. keiei, murakumo and transform-drafts are drafts under 1 MB between them."}
+   {:unit "90-docs" :size "9.7 MB" :why "2604xx design documents. A record by definition."}
+   {:unit "00-contracts minus lexicons" :size "~1 MB" :why "bpmn, dmn, datomic, forms, policies, catalogs."}
+   {:unit "infra" :size "364 KB" :why "Superseded by 50-infra in the same repository."}]
+  :unverified
+  [{:unit "80-data" :size "5.5 MB"
+    :what "unspsc_v26_ucalypt.csv is 2.9 MB. The obvious supersession is an org-unspsc mirror — but kotoba-lang/org-unspsc returns 404, so THAT CLAIM IS NOT MEASURED. It appears in the session spec-mirror list, so it exists under some org; one lookup settles it. Not discarded on an assumption."}
+   {:unit "70-tools" :size "2.6 MB"
+    :what "NOT the same as this superproject's 70-tools. That one holds bmc, spotwork, kotobase-client-query, aiueos-aarch64-spike; this one holds config, cost-analysis, templates, torrent. Assuming supersession from a matching directory name would have been wrong."}]
+  :on-the-repository-itself
+  "Extracting does not shrink it. The 7.4 GB is deleted history — training checkpoints (.npz, *_adapters.safetensors) and compiled binaries (murakumo-kubelet, runpod-kubelet, crossplane-cli) committed and later removed, under projects/ai-gftd-project-*. Shrinking needs history rewriting, which CLAUDE.md requires confirmation for. Extract what is original, then archive the repository as the record it is."}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
