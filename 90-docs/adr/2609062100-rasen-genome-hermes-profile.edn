@@ -91,4 +91,70 @@ profile を起こしている最中に、走らせていた ClinVar 全量実行
 - profile は**記述であって授権ではない**という線を、`.itonami/profile.edn` の
   設計（ADR-2609061200 の closed key 3 集合）と同じ形で引いた
 - **cron が未登録なので、profile は自分からは動かない。** 動かすには
-  `hermes` CLI か、jobs の定義経路を先に特定する必要がある"}]
+  `hermes` CLI か、jobs の定義経路を先に特定する必要がある
+
+## 回した —— そして「登録は稼働ではない」が 4 回出た（2026-09-06 追記）
+
+profile を起こしただけでは回らない。手で tick して初めて見えたものが 4 つあり、
+**どれも registration からは見えなかった**。
+
+1. **`--script` は profile 自身の `scripts/` に解決する。** ヘルプは
+   「`~/.hermes/scripts/` 配下」と書くが、非 default profile では
+   `~/.hermes/profiles/<p>/scripts/` を見る。global に置いた監視スクリプトは
+   `Script not found` で落ち続けた —— **手で tick しなければ 4 時間ごとに静かに
+   失敗していた**。
+2. **per-profile gateway は要らなかった。** `cron status` は
+   「Gateway is not running — cron jobs will NOT fire」と言うが、これは
+   **multiplexer を知らない偽陰性**。default gateway が
+   `gateway.multiplex_profiles: true` で全 profile を serve しており、
+   per-profile gateway の install は「already serves profile 'rasen-genome'」として
+   正しく拒否された（入れた LaunchAgent は外した）。
+3. **監視ゲートは効いている。** 初回は \"Monitor Baseline (first run)\"、2 回目は
+   `no_change (agent run suppressed)`。⚠ **その `succeeded` を「モデル呼び出しが
+   通った」と読みかけた** —— 抑制された実行は LLM を呼んでいないので、
+   設定変更の検証にはならない。baseline を消して呼ばせ直して初めて測れた。
+4. **cron job は `cron/jobs.json`。** `jobs.db` は空で、そこを見て
+   「ジョブ定義が無い」と誤読しかけた。
+
+## fleet の所見 —— 129 profile の fallback が死んでいる
+
+この profile が動かない原因を 1 変数ずつ潰した結果、profile 固有ではなかった。
+
+```
+Auxiliary: marking openrouter unhealthy for 60s (payment / credit error).
+resolve_provider_client: openrouter requested but OpenRouter credential pool
+  has no usable entries (credentials may be exhausted)
+```
+
+**有料 OpenRouter プールは枯渇している。** default profile が生きているのは
+fallback が **無料モデル → fleet 自身の推論（`murakumo-main`）** と 2 段あるから
+（gateway ログ: 「Billing or credits exhausted — switching to fallback provider」）。
+
+実測 2026-09-06: **config.yaml を持つ 182 profile のうち 129 が fallback を
+`http://127.0.0.1:9180` に向けている。そこには何も listen していない**
+（`lsof` で listener 無し、curl 000。control として他の listening port は
+`lsof` で検出できている。ollama は動いているが別ポート）。53 だけが
+`openrouter-free` を持ち、8 は fallback を持たない。
+
+つまり**有料与信が切れたいま、129 profile は落ちる構成になっている**。
+この profile には default と同じ 2 段の鎖を入れた。入れた後のエラーは
+`HTTP 429: murakumo-main is at capacity` と `[Errno 32] Broken pipe` に変わり、
+**設定の誤りではなく容量**になった（後者は active profile のジョブも同時刻に
+出している）。
+
+⚠ **129 という数は「壊れている profile 数」ではない。** 測ったのは
+「fallback が死んだアドレスを指している profile 数」であって、各 profile が
+実際に落ちるかは、その profile が primary で成功するかに依る。**一括の書き換えは
+していない** —— 縛るのはこれから作る profile であり、既存の 129 は所見として
+記録する。
+
+## いまの状態
+
+- profile `rasen-genome` は起きており、multiplexer が serve し、cron job
+  `13554accbbb3` が 4 時間ごとに due（監視ゲート付き、`state: scheduled`）
+- **agent 実行はモデル面の容量が戻るまで通らない。** これはオーナー面の問題
+  （有料プールの与信）であって、profile の設定ではない
+- ClinVar 取り込みは走行中。台帳は session scratchpad から
+  **`~/.gftd/rasen-genome/ledger`（durable）へ移した** —— 常駐 bot が
+  セッションと共に消える場所の state を持つことはできない。移動後の resume は
+  実測で前進を確認（rows/read 234,848 → 245,584）"}]
