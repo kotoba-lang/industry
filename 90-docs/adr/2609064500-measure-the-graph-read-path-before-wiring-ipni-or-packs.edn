@@ -1,1 +1,245 @@
-[{:db/id -1, :adr/id "adr-2609064500-measure-the-graph-read-path-before-wiring-ipni-or-packs", :adr/title "S4 の前提は自分の測定に否定されている —— pack は 97% の逐次項に効かず、IPNI は round trip を足す。先にその経路を観測可能にする", :adr/status "accepted", :adr/date "2026-09-06", :adr/related ["adr-2609063500-ipq-is-the-name-of-the-selection-layer" "2608160100-kotobase-physical-plane-ipld-carv2-pack" "2608021000-namidb-comparison-and-the-read-path-trampoline" "2608170300" "adr-2609063000-what-the-ipld-stack-integrates-and-what-only-compiles"], :adr/body "## 問い\n\nIPQ の段取り（ADR-2609063500）の S4 は「本番 graph query 経路が IPNI discovery と\nCARv2 pack を使う」だった。それに着手する前に、**何が買えるのかを repo の中の\n既存の測定から調べた**。結果、S4 の前提はこの workspace 自身の測定に否定されている。\n\n## 否定された前提\n\n**pack は hydration の逐次項 97% には効かない。** ADR-2608160100 は自分で訂正を\n書いている —— 100 link を 1 commit ずつ書いた場合、block-per-object も packed も\n**どちらも 100 request**。100→1 になるのは 1 回の呼び出しで 100 block を書いたときだけで、\nそれは production の書き込み形ではない。packing の write-locality（1 commit = 1 pack）\nの下では、novelty の cons chain は commit を跨ぐので pack が跨がない。\n\n残る主張は狭い: **pack が買うのは commit-local な読み**（1 commit が書いた ~12 block が\n1 request になる）。それが全体のどれだけかは**誰も測っていない**。\n\n**IPNI discovery は round trip を足す。** block ごとに lookup が 1 回増える —\n`:block-source` か pack catalog が先に答えない限り。ayatori の bench が示した\n「discoveries 6→0」は、**今この worker が払っていないコストに対する節約**である。\n\n## 実測で分かった構造（引用は agent 調査、file:line 付きで原本にある）\n\n**1. 読み経路は 2 本あり、名前空間が違う。**\nlegacy `/xrpc/*` は `blocks/<graph>/<cid>`、canonical `/v2/query` は `ipld/<cid>`。\n**IPNI が広告しているのは後者の名前空間だけ**で、しかも広告されているのは pin であって\ngraph chain block ではない（live な context は kotobase-appviews-v1 と\nayatori-public-arrangement-v1 の 2 つ）。legacy 経路の block はどこにも広告されていない。\n\n**2. 同期/非同期の境界が seam を決める。** `:get-fn` は trampoline の同期 getter で、\nblock が無いと throw する —— await できない。`ayatori.remote/open-snapshot` は\n同期で、しかも async crypto を明示的に拒否する。入れるとすれば\n`open-snapshot-async` を `:async-get-fn` の側に、であって `:get-fn` ではない。\n\n**3. pack tier は deploy されない repo の中に在る。** `net-kotobase/engine` に\npack_writes / pack_reader / pack_tip / pack_catalog_bootstrap が揃っているが、\nこの repo には `.github/` が無く deploy 経路が無い。`wrangler.jsonc` の script 名は\ncontrol-plane と **同じ** `kotobase-cf-wasm-staging` で route だけ違う。\nそして `store.cljs` のコメントが既にこの罠を名指ししている ——\n「以前の修正は別の worker に着地して 3 日誰も気づかなかった。同じことがその修正自身にも\n起き、7 日続いた」。\n\n**4. packed 経路には未修正の silent partial read が在る。** ADR-2608170300、\n2026-08-24 の testnet 実測: pack 書き込み ON で query が 25 行中 9〜14 行を返し、\n**HTTP 200**。疑わしい箇所も名指しされている —— `block-fetcher` が不在 block に対して\nnil を返し、async 読みがそれを miss-and-retry ではなく absent-and-skip として扱う。\n\n**5. 誰もこの経路を測っていない。** repo の中の数字はどれも suite か、synthetic な\nin-memory server か、別の worker のものである。ADR-2608170300 が自分でそう書いている ——\n「本物の測定はまだ無い。ここまでの数字は全部 suite のもの」。\n\n## 決定\n\n**S4 を「ayatori を graph worker に配線する」と定義するのをやめる。** 先に\n**その経路を観測可能にする**。\n\n最初の一手は既に書かれている —— `net-kotobase/engine` の commit c3c508fe（2026-09-05）が\nper-request の block-fetch 内訳（L1 / L2 / pack / B2 / miss）を観察専用カウンタと\n`x-kotobase-kv-stats` response header として持っている。fetch path の構造は変えない。\n**それが deploy されない側の copy に在る。** deploy する側へ port する。\n\nそれが答えるのは、今どの assertion も答えられない 3 問:\n\n1. 実クエリが触る block のうち L1 / L2 / R2 の内訳は。L1+L2 が大半なら、\n   ayatori の 2 機能はコストでない場所を最適化していることになる。\n2. request あたりの distinct block 数は、512 の予算に対していくつか。\n   ADR-2608021000 の 97% は unfolded 64 tx が上界なので、production が積極的に fold\n   していれば逐次項は既に小さいかもしれない。\n3. そのうち**同じ commit が書いた**割合は。ADR-2608160100 の訂正どおり、\n   pack が平らにできるのは正確にそこだけである。低ければ pack は測定上作る価値が無い。\n\n**この header が本番に在って読まれるまで、pack tier も catalog も IPNI 依存も作らない。**\n（2026-09-06 に読まれた。末尾「測った」節が答えを持つ。答えは「作らない」だった。）\nADR-2608160100 が既に前例を作っている —— 最初の動機が誤っていたのは、測定が 100 block を\n1 回で書いて答えを仮定していたからだった。\n\n## 最初の一手は landed し、deploy もした —— まだ測ってはいない（2026-09-06）\n\nper-request の block-fetch 内訳（L1 / L2 / B2 / miss / distinct / epoch）が\n`x-kotobase-kv-stats` response header として `net-kotobase/control-plane` の\n`kotobase-graph-database` に入り（919b302f）、本番に deploy した\n（version 0cec5a07-78df-4b20-bae1-1667e345efaf）。suite は 444/1482 → 448/1501。\n\n**port した側で 2 つ意図的に engine と違えている。** ①distinct 集合に上限（4096）を\n置いた —— write path も同じ関数を通って reset されないので、engine の無制限な集合は\nisolate の寿命ぶん育つ。128MB の中で観測がメモリ圧になるのは挙動の変更である。\n②attach 点を 1 つにした。engine は json-resp を 2 箇所包んで cache-hit 経路を素通しに\nしており、そこでは「何も fetch しなかった」と「古い build」が区別できない。\n\n**pack カウンタは port しなかった。** control-plane に pack tier が無いので、\n`pack=0` は「pack hit が無い」ではなく「pack tier が無い」を意味する。\n**取りうる値が 1 つしかないカウンタは測定ではない。**\n\n### まだ測っていない\n\n**本番で header を観測していない。** deploy は成功したが、この header が付くのは\n実際に block を取りに行く read 経路で、そこは認証が要る。無認証の probe は\n401 / 405 を返し、header は付かない —— それは正しい挙動であって観測ではない。\n\n**したがって「deploy した」は「測った」ではない。** この ADR が S4 を再定義した理由が\nまさにそれで、同じ線をここでも引く。次は認証付き read を 1 本通して\n`l1= l2= b2= miss= distinct=` を読むこと。それが本番で読まれるまで、\npack tier も catalog も IPNI 依存も作らない。\n\n## deploy 経路そのものについての発見\n\n`.github/workflows/graph-database.yml` の deploy job は **SLSA attested** である ——\ntarball を作り、provenance と SBOM を cosign の keyless 署名（この workflow ファイルの\nOIDC identity に固定）で署名し、**deploy 側は両方を verify してから展開する**。\n設計として正しい。\n\n**そして走らない。** `GET /repos/net-kotobase/control-plane/actions/permissions` は\n`{enabled: false}` を返す（ADR-2607300900 のとおり Actions は repo 単位で無効化してある）。\n\n**にもかかわらず Worker は今日 07:56 UTC に deploy されていた** —— author は\nオーナーのアカウント、`Source: Unknown (deployment)`、`Tag` は git sha\n（workflow の `--tag \"$GITHUB_SHA\"` を手で真似た形）。つまり **attestation の鎖は\n既に使われておらず、手 deploy がこの Worker の現行の実践である。**\n\n今回の deploy もその実践に沿って行った（live は main の 4 commit 手前で、差分は\nこの計測だけだった）。**ただしそれは、この状態が良いという意味ではない。**\n署名経路が在って動かず、動く経路が署名しないなら、attestation が主張しているのは\n「この artifact は検証された workflow から来た」であって、実際に配られたものについては\n何も言っていない。**どちらかに寄せる決定が要る** —— fleet CI（murakumo）へ port するか、\nattested 経路を明示的に retire するか。放置は「署名しているつもり」を続けることになる。\n\n## nil の所在（確認済み、未修正）\n\nADR-2608170300 の silent partial read の被疑箇所は `store.cljs:207-212` に**在る**。\n`fetch-block-cached` の `(if bytes …)` の else が `(record-block-fetch! :miss cid)` と\n`nil` を返し、その nil が `block-fetcher` 経由で `:async-get-fn` として\n`xrpc.cljs:379` と `:1382` に入る。受け手は「保存されていない」と「まだ見えない」を\n区別できず、retry ではなく skip する —— 25 行中 9〜14 行を HTTP 200 で返す形。\n\n**今回のカウンタはこれを可視化するが、有罪判決はしない。** `miss=` がその分岐で\n非ゼロになるので、短い結果に `miss>0` が付けば機構を名指しできる。ただし\n①同期 trampoline 経路では nil は正当な制御フロー（block-miss → retry）なので\n`miss>0` 単体は証拠にならない ②両方の consumer が同じ関数を通るので、\n**どちらが nil を見たかはカウンタからは分からない。**\n\nそして **ADR-2608170300 の再現条件（pack writes ON）はこの copy では作れない** ——\n`KOTOBASE_PACK_WRITES` と pack tier は engine 側にしか無い。**被疑者はここに居て、\nそれを浮かせた設定はここに無い。**\n\n## 未決（governance であってコードではない）\n\n- **`net-kotobase/engine` と `control-plane` のどちらが正本か。** どちらも書いていない。\n  script 名が同じなので、engine から手で `wrangler deploy` すれば production を\n  上書きする。そうなった証拠も、そうならない保証も見つからなかった。\n- ADR-2608170300 の silent partial read が直ったかどうか。診断と被疑箇所は在るが、\n  修正 commit も再実行の receipt も見つからない。nil を返す形は deploy 側にも残っている。\n\n## 同日の別件 —— 同じ形が protocol-core にも在った\n\n`kotobase-protocol-core` の `deps.edn` が「src has no dependencies at all」と言い続けて\nいた件（ADR-2609063500 §S2 実装中に発見）を調べた結果、**依存は除去できない**と分かり、\nその証拠がテストとして着地した（ca3874d2）。重要なのは経緯のほうである ——\nduck-typing 版（`satisfies?` を `(not (map? target))` に）を実際に当てると\n**既存 24 テストは両ランタイムとも緑のまま通った**。suite の fixture が全部 deftype で、\n代用述語がたまたま一致するからである。record 形の store は本番経路で静かに壊れていた。\n**control を先に書かなければ、緑のまま出荷されていた。**\n\nさらに `-atproto` と `-pinning` の deps.edn に**同じ偽の申告**が残っている。\nこれは検出器の仕事であって、手で 1 件ずつ直す仕事ではない。\n\n## 測った（2026-09-06、本番 kotobase.net）—— gate は閉じた\n\n`x-kotobase-kv-stats` は本番で読めた。**この節より前の「本番に在って読まれるまで\n作らない」という条件は、これで満たされている。**\n\n観測は新しい probe を書かずに済んだ ——\n`orgs/net-kotobase/control-plane/authn/scripts/bench48_deploy_probe.mjs` が既に\nその形（SIWE(ephemeral EOA) → tenant provision → Biscuit 発行 → 認証付き transact →\n認証付き `datomic.q` → 応答 header を読む）を持っている。外部 secret を要さない。\n\n    l1=5;l2=0;b2=0;miss=0;distinct=3;epoch=1        1 datom の graph、cold read\n\n続けて 600 entity（100 entity × 6 tx）へ広げ、同じ経路を同じ credential で測った:\n\n    query #1 (cold)     l1=20;l2=0;b2=0;miss=0;distinct=8;epoch=1\n    query #2 (repeat)   l1=0 ;l2=0;b2=0;miss=0;distinct=0;epoch=2\n    query #3 (repeat)   l1=0 ;l2=0;b2=0;miss=0;distinct=0;epoch=3\n\n**読み: この経路は object store に一度も触っていない。** 600 entity に対する cold read\nが触れた distinct block は 8、B2 0、miss 0。繰り返しの query は block を 1 つも取らない\n（`distinct=0`）—— block 層より上の materialize memo が答えている。\n\n**したがって pack tier は、この workload に対して節約するものを持たない。** S4 の\npremise は「round trip を pack に畳む」だったが、round trip が 0 の経路に対しては\n空である。gate の答えは「作らない」側だった。\n\n### 測っていないこと\n\n上の graph はどれも同じセッションが直前に書いたもので、worker isolate は温まっている。\n**`b2=0` は「暖かい graph で測って 0」であって「cold で 0」ではない。** `epoch` が\nrequest ごとに増え `l1` がリセットされることから、query #2/#3 を答えた memo は\nisolate ローカルだと分かる —— 別 colo・別 isolate からの読みは同じ数字にならない。\n**pack の判断を覆すとしたら、その測定である。** 次に測るのは「誰も最近書いていない\ngraph を、別経路から 1 本読む」こと。それまで `b2=0` を定常状態として引用しない。\n\n### deploy と source が食い違っている（観測、未修正）\n\n本番が返す summary は `l1;l2;b2;miss;distinct;epoch` で、checkout の\n`orgs/net-kotobase/engine/src/kotobase/graph_database/xrpc.cljs` が組む\n`l1;l2;pack;b2;miss;distinct` と**フィールドが違う**（`pack` が無く `epoch` が在る）。\n**本番に載っているのはこの checkout の bundle ではない。** 上の「engine と\ncontrol-plane のどちらが正本か」が未決のまま deploy されている、という同じ問題の\n別の顔であり、header を読んだからこそ見えた。\n\n## edge の 401 と upstream の 401 が区別できない（2026-09-06 実測、別途修正中）\n\nこの計測に到達するまでに 3 本の probe を潰した。原因は認証ではなく**報告**だった。\n\n`kotobase.net` に対し、**壊れた** CACAO は 104 byte の\n\n    {\"ok\":false,\"error\":\"Unauthorized\",\"presented\":\"cacao\",\"details\":\"the presented CACAO was not accepted\"}\n\nを返すのに、**edge が受理する本物の** CACAO は 35 byte の\n\n    {\"ok\":false,\"error\":\"Unauthorized\"}\n\nを返す。後者の credential は同じ瞬間に `GET /v1/audit` と\n`POST /xrpc/…datomic.listDatabases` から **200** を得ており（応答本文が正しい\ntenant DID を名乗る）、edge では受理されている。35 byte のほうは upstream の 401 を\n`proxy.cljc` の `upstream-error-name` が素の `\"Unauthorized\"` に畳んだ結果である。\n\nつまり **verifier に実際に届く唯一の credential 形が、拒否理由を失う唯一の形**であり、\n`credential-refusal-details` の docstring が「二度とやらない」と書いた形\n（ADR-2608291700 §2）がそこで再生している。repo 自身の live acceptance probe\n`kotobase-graph-database/test/contention-live-via-proxy.mjs` が今日 production に対して\n赤いのも同じ理由で、`seed failed: 401 {\"ok\":false,\"error\":\"Unauthorized\"}` としか\n言わない。**修正は別 agent が着地させ、deploy はしない**（この ADR の\n「deploy した ≠ 測った」をここでも守る）。\n"}]
+[{:db/id -1
+ :adr/id "adr-2609064500-measure-the-graph-read-path-before-wiring-ipni-or-packs"
+ :adr/title "S4 の前提は自分の測定に否定されている —— pack は 97% の逐次項に効かず、IPNI は round trip を足す。先にその経路を観測可能にする"
+ :adr/status "accepted"
+ :adr/date "2026-09-06"
+ :adr/related ["adr-2609063500-ipq-is-the-name-of-the-selection-layer"
+               "2608160100-kotobase-physical-plane-ipld-carv2-pack"
+               "2608021000-namidb-comparison-and-the-read-path-trampoline"
+               "2608170300"
+               "adr-2609063000-what-the-ipld-stack-integrates-and-what-only-compiles"]
+ :adr/body "## 問い
+
+IPQ の段取り（ADR-2609063500）の S4 は「本番 graph query 経路が IPNI discovery と
+CARv2 pack を使う」だった。それに着手する前に、**何が買えるのかを repo の中の
+既存の測定から調べた**。結果、S4 の前提はこの workspace 自身の測定に否定されている。
+
+## 否定された前提
+
+**pack は hydration の逐次項 97% には効かない。** ADR-2608160100 は自分で訂正を
+書いている —— 100 link を 1 commit ずつ書いた場合、block-per-object も packed も
+**どちらも 100 request**。100→1 になるのは 1 回の呼び出しで 100 block を書いたときだけで、
+それは production の書き込み形ではない。packing の write-locality（1 commit = 1 pack）
+の下では、novelty の cons chain は commit を跨ぐので pack が跨がない。
+
+残る主張は狭い: **pack が買うのは commit-local な読み**（1 commit が書いた ~12 block が
+1 request になる）。それが全体のどれだけかは**誰も測っていない**。
+
+**IPNI discovery は round trip を足す。** block ごとに lookup が 1 回増える —
+`:block-source` か pack catalog が先に答えない限り。ayatori の bench が示した
+「discoveries 6→0」は、**今この worker が払っていないコストに対する節約**である。
+
+## 実測で分かった構造（引用は agent 調査、file:line 付きで原本にある）
+
+**1. 読み経路は 2 本あり、名前空間が違う。**
+legacy `/xrpc/*` は `blocks/<graph>/<cid>`、canonical `/v2/query` は `ipld/<cid>`。
+**IPNI が広告しているのは後者の名前空間だけ**で、しかも広告されているのは pin であって
+graph chain block ではない（live な context は kotobase-appviews-v1 と
+ayatori-public-arrangement-v1 の 2 つ）。legacy 経路の block はどこにも広告されていない。
+
+**2. 同期/非同期の境界が seam を決める。** `:get-fn` は trampoline の同期 getter で、
+block が無いと throw する —— await できない。`ayatori.remote/open-snapshot` は
+同期で、しかも async crypto を明示的に拒否する。入れるとすれば
+`open-snapshot-async` を `:async-get-fn` の側に、であって `:get-fn` ではない。
+
+**3. pack tier は deploy されない repo の中に在る。** `net-kotobase/engine` に
+pack_writes / pack_reader / pack_tip / pack_catalog_bootstrap が揃っているが、
+この repo には `.github/` が無く deploy 経路が無い。`wrangler.jsonc` の script 名は
+control-plane と **同じ** `kotobase-cf-wasm-staging` で route だけ違う。
+そして `store.cljs` のコメントが既にこの罠を名指ししている ——
+「以前の修正は別の worker に着地して 3 日誰も気づかなかった。同じことがその修正自身にも
+起き、7 日続いた」。
+
+**4. packed 経路には未修正の silent partial read が在る。** ADR-2608170300、
+2026-08-24 の testnet 実測: pack 書き込み ON で query が 25 行中 9〜14 行を返し、
+**HTTP 200**。疑わしい箇所も名指しされている —— `block-fetcher` が不在 block に対して
+nil を返し、async 読みがそれを miss-and-retry ではなく absent-and-skip として扱う。
+
+**5. 誰もこの経路を測っていない。** repo の中の数字はどれも suite か、synthetic な
+in-memory server か、別の worker のものである。ADR-2608170300 が自分でそう書いている ——
+「本物の測定はまだ無い。ここまでの数字は全部 suite のもの」。
+
+## 決定
+
+**S4 を「ayatori を graph worker に配線する」と定義するのをやめる。** 先に
+**その経路を観測可能にする**。
+
+最初の一手は既に書かれている —— `net-kotobase/engine` の commit c3c508fe（2026-09-05）が
+per-request の block-fetch 内訳（L1 / L2 / pack / B2 / miss）を観察専用カウンタと
+`x-kotobase-kv-stats` response header として持っている。fetch path の構造は変えない。
+**それが deploy されない側の copy に在る。** deploy する側へ port する。
+
+それが答えるのは、今どの assertion も答えられない 3 問:
+
+1. 実クエリが触る block のうち L1 / L2 / R2 の内訳は。L1+L2 が大半なら、
+   ayatori の 2 機能はコストでない場所を最適化していることになる。
+2. request あたりの distinct block 数は、512 の予算に対していくつか。
+   ADR-2608021000 の 97% は unfolded 64 tx が上界なので、production が積極的に fold
+   していれば逐次項は既に小さいかもしれない。
+3. そのうち**同じ commit が書いた**割合は。ADR-2608160100 の訂正どおり、
+   pack が平らにできるのは正確にそこだけである。低ければ pack は測定上作る価値が無い。
+
+**この header が本番に在って読まれるまで、pack tier も catalog も IPNI 依存も作らない。**
+（2026-09-06 に読まれた。末尾「測った」節が答えを持つ。答えは「作らない」だった。）
+ADR-2608160100 が既に前例を作っている —— 最初の動機が誤っていたのは、測定が 100 block を
+1 回で書いて答えを仮定していたからだった。
+
+## 最初の一手は landed し、deploy もした —— まだ測ってはいない（2026-09-06）
+
+per-request の block-fetch 内訳（L1 / L2 / B2 / miss / distinct / epoch）が
+`x-kotobase-kv-stats` response header として `net-kotobase/control-plane` の
+`kotobase-graph-database` に入り（919b302f）、本番に deploy した
+（version 0cec5a07-78df-4b20-bae1-1667e345efaf）。suite は 444/1482 → 448/1501。
+
+**port した側で 2 つ意図的に engine と違えている。** ①distinct 集合に上限（4096）を
+置いた —— write path も同じ関数を通って reset されないので、engine の無制限な集合は
+isolate の寿命ぶん育つ。128MB の中で観測がメモリ圧になるのは挙動の変更である。
+②attach 点を 1 つにした。engine は json-resp を 2 箇所包んで cache-hit 経路を素通しに
+しており、そこでは「何も fetch しなかった」と「古い build」が区別できない。
+
+**pack カウンタは port しなかった。** control-plane に pack tier が無いので、
+`pack=0` は「pack hit が無い」ではなく「pack tier が無い」を意味する。
+**取りうる値が 1 つしかないカウンタは測定ではない。**
+
+### まだ測っていない
+
+**本番で header を観測していない。** deploy は成功したが、この header が付くのは
+実際に block を取りに行く read 経路で、そこは認証が要る。無認証の probe は
+401 / 405 を返し、header は付かない —— それは正しい挙動であって観測ではない。
+
+**したがって「deploy した」は「測った」ではない。** この ADR が S4 を再定義した理由が
+まさにそれで、同じ線をここでも引く。次は認証付き read を 1 本通して
+`l1= l2= b2= miss= distinct=` を読むこと。それが本番で読まれるまで、
+pack tier も catalog も IPNI 依存も作らない。
+
+## deploy 経路そのものについての発見
+
+`.github/workflows/graph-database.yml` の deploy job は **SLSA attested** である ——
+tarball を作り、provenance と SBOM を cosign の keyless 署名（この workflow ファイルの
+OIDC identity に固定）で署名し、**deploy 側は両方を verify してから展開する**。
+設計として正しい。
+
+**そして走らない。** `GET /repos/net-kotobase/control-plane/actions/permissions` は
+`{enabled: false}` を返す（ADR-2607300900 のとおり Actions は repo 単位で無効化してある）。
+
+**にもかかわらず Worker は今日 07:56 UTC に deploy されていた** —— author は
+オーナーのアカウント、`Source: Unknown (deployment)`、`Tag` は git sha
+（workflow の `--tag \"$GITHUB_SHA\"` を手で真似た形）。つまり **attestation の鎖は
+既に使われておらず、手 deploy がこの Worker の現行の実践である。**
+
+今回の deploy もその実践に沿って行った（live は main の 4 commit 手前で、差分は
+この計測だけだった）。**ただしそれは、この状態が良いという意味ではない。**
+署名経路が在って動かず、動く経路が署名しないなら、attestation が主張しているのは
+「この artifact は検証された workflow から来た」であって、実際に配られたものについては
+何も言っていない。**どちらかに寄せる決定が要る** —— fleet CI（murakumo）へ port するか、
+attested 経路を明示的に retire するか。放置は「署名しているつもり」を続けることになる。
+
+## nil の所在（確認済み、未修正）
+
+ADR-2608170300 の silent partial read の被疑箇所は `store.cljs:207-212` に**在る**。
+`fetch-block-cached` の `(if bytes …)` の else が `(record-block-fetch! :miss cid)` と
+`nil` を返し、その nil が `block-fetcher` 経由で `:async-get-fn` として
+`xrpc.cljs:379` と `:1382` に入る。受け手は「保存されていない」と「まだ見えない」を
+区別できず、retry ではなく skip する —— 25 行中 9〜14 行を HTTP 200 で返す形。
+
+**今回のカウンタはこれを可視化するが、有罪判決はしない。** `miss=` がその分岐で
+非ゼロになるので、短い結果に `miss>0` が付けば機構を名指しできる。ただし
+①同期 trampoline 経路では nil は正当な制御フロー（block-miss → retry）なので
+`miss>0` 単体は証拠にならない ②両方の consumer が同じ関数を通るので、
+**どちらが nil を見たかはカウンタからは分からない。**
+
+そして **ADR-2608170300 の再現条件（pack writes ON）はこの copy では作れない** ——
+`KOTOBASE_PACK_WRITES` と pack tier は engine 側にしか無い。**被疑者はここに居て、
+それを浮かせた設定はここに無い。**
+
+## 未決（governance であってコードではない）
+
+- **`net-kotobase/engine` と `control-plane` のどちらが正本か。** どちらも書いていない。
+  script 名が同じなので、engine から手で `wrangler deploy` すれば production を
+  上書きする。そうなった証拠も、そうならない保証も見つからなかった。
+- ADR-2608170300 の silent partial read が直ったかどうか。診断と被疑箇所は在るが、
+  修正 commit も再実行の receipt も見つからない。nil を返す形は deploy 側にも残っている。
+
+## 同日の別件 —— 同じ形が protocol-core にも在った
+
+`kotobase-protocol-core` の `deps.edn` が「src has no dependencies at all」と言い続けて
+いた件（ADR-2609063500 §S2 実装中に発見）を調べた結果、**依存は除去できない**と分かり、
+その証拠がテストとして着地した（ca3874d2）。重要なのは経緯のほうである ——
+duck-typing 版（`satisfies?` を `(not (map? target))` に）を実際に当てると
+**既存 24 テストは両ランタイムとも緑のまま通った**。suite の fixture が全部 deftype で、
+代用述語がたまたま一致するからである。record 形の store は本番経路で静かに壊れていた。
+**control を先に書かなければ、緑のまま出荷されていた。**
+
+さらに `-atproto` と `-pinning` の deps.edn に**同じ偽の申告**が残っている。
+これは検出器の仕事であって、手で 1 件ずつ直す仕事ではない。
+
+## 測った（2026-09-06、本番 kotobase.net）—— gate は閉じた
+
+`x-kotobase-kv-stats` は本番で読めた。**この節より前の「本番に在って読まれるまで
+作らない」という条件は、これで満たされている。**
+
+観測は新しい probe を書かずに済んだ ——
+`orgs/net-kotobase/control-plane/authn/scripts/bench48_deploy_probe.mjs` が既に
+その形（SIWE(ephemeral EOA) → tenant provision → Biscuit 発行 → 認証付き transact →
+認証付き `datomic.q` → 応答 header を読む）を持っている。外部 secret を要さない。
+
+    l1=5;l2=0;b2=0;miss=0;distinct=3;epoch=1        1 datom の graph、cold read
+
+続けて 600 entity（100 entity × 6 tx）へ広げ、同じ経路を同じ credential で測った:
+
+    query #1 (cold)     l1=20;l2=0;b2=0;miss=0;distinct=8;epoch=1
+    query #2 (repeat)   l1=0 ;l2=0;b2=0;miss=0;distinct=0;epoch=2
+    query #3 (repeat)   l1=0 ;l2=0;b2=0;miss=0;distinct=0;epoch=3
+
+**読み: この経路は object store に一度も触っていない。** 600 entity に対する cold read
+が触れた distinct block は 8、B2 0、miss 0。繰り返しの query は block を 1 つも取らない
+（`distinct=0`）—— block 層より上の materialize memo が答えている。
+
+**したがって pack tier は、この workload に対して節約するものを持たない。** S4 の
+premise は「round trip を pack に畳む」だったが、round trip が 0 の経路に対しては
+空である。gate の答えは「作らない」側だった。
+
+### 測っていないこと
+
+上の graph はどれも同じセッションが直前に書いたもので、worker isolate は温まっている。
+**`b2=0` は「暖かい graph で測って 0」であって「cold で 0」ではない。** `epoch` が
+request ごとに増え `l1` がリセットされることから、query #2/#3 を答えた memo は
+isolate ローカルだと分かる —— 別 colo・別 isolate からの読みは同じ数字にならない。
+**pack の判断を覆すとしたら、その測定である。** 次に測るのは「誰も最近書いていない
+graph を、別経路から 1 本読む」こと。それまで `b2=0` を定常状態として引用しない。
+
+### deploy と source が食い違っている（観測、未修正）
+
+本番が返す summary は `l1;l2;b2;miss;distinct;epoch` で、checkout の
+`orgs/net-kotobase/engine/src/kotobase/graph_database/xrpc.cljs` が組む
+`l1;l2;pack;b2;miss;distinct` と**フィールドが違う**（`pack` が無く `epoch` が在る）。
+**本番に載っているのはこの checkout の bundle ではない。** 上の「engine と
+control-plane のどちらが正本か」が未決のまま deploy されている、という同じ問題の
+別の顔であり、header を読んだからこそ見えた。
+
+## edge の 401 と upstream の 401 が区別できない（2026-09-06 実測、別途修正中）
+
+この計測に到達するまでに 3 本の probe を潰した。原因は認証ではなく**報告**だった。
+
+`kotobase.net` に対し、**壊れた** CACAO は 104 byte の
+
+    {\"ok\":false,\"error\":\"Unauthorized\",\"presented\":\"cacao\",\"details\":\"the presented CACAO was not accepted\"}
+
+を返すのに、**edge が受理する本物の** CACAO は 35 byte の
+
+    {\"ok\":false,\"error\":\"Unauthorized\"}
+
+を返す。後者の credential は同じ瞬間に `GET /v1/audit` と
+`POST /xrpc/…datomic.listDatabases` から **200** を得ており（応答本文が正しい
+tenant DID を名乗る）、edge では受理されている。35 byte のほうは upstream の 401 を
+`proxy.cljc` の `upstream-error-name` が素の `\"Unauthorized\"` に畳んだ結果である。
+
+つまり **verifier に実際に届く唯一の credential 形が、拒否理由を失う唯一の形**であり、
+`credential-refusal-details` の docstring が「二度とやらない」と書いた形
+（ADR-2608291700 §2）がそこで再生している。repo 自身の live acceptance probe
+`kotobase-graph-database/test/contention-live-via-proxy.mjs` が今日 production に対して
+赤いのも同じ理由で、`seed failed: 401 {\"ok\":false,\"error\":\"Unauthorized\"}` としか
+言わない。**修正は別 agent が着地させ、deploy はしない**（この ADR の
+「deploy した ≠ 測った」をここでも守る）。
+"
+}]
