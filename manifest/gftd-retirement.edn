@@ -305,6 +305,62 @@
   :the-jsonl-is-different "unspsc_v26_ucalypt.jsonl is the same rows projected into AT Protocol records under at://did:web:unispsc.gftd.ai/ai.gftd.app… -- derived, and tied to the retiring domain exactly as the lexicons are."
   :flag "⚠ UNSPSC is a licensed standard (GS1/UNDP). Where a full code set may be redistributed is a licensing question, not a naming one, and it is not answered here."}
 
+ ;; ── closing 2026-09-06: where this stands and how to resume ─────────────
+ :closing
+ {:landed
+  {:west "orgs/gftdcojp entries 73 -> 6. Everything gftd-named is renamed, moved or gone except two the owner marked as archives (250305-jp-gftd-le-case-kaonavi, apps-gftdcojp)."
+   :deleted-with-verified-bundles
+   ["gftd (the CLI, 96 MB)" "ai-gftd-cyber-drill" "ai-gftd-kotoba" "manimani-operations"
+    "apex" "chat-shell" "hume" "magatama-host-sdk" "router"]
+   :moved
+   {:to-cloud-itonami ["llm-dataset" "ontology" "cybersecurity" "app-local-ai" "tia" "wami-actor" "fashion" "itad"
+                       "37 entries that had already moved upstream and whose manifest entries were stale"]
+    :to-com-junkawasaki-private ["cloud-murakumo-mlx" "effect-actor" "bpmn-engine-ts" "bpmn-sdk-rs"
+                                 "ghosthacker-shiropico-assets" "rs-jsonnet" "shigarami" "sparql-ts"
+                                 "weight-kototama" "weight-modal-emotion" "weight-modal-world" "weight-oka"]
+    :to-net-kotobase ["control-plane-retired (was cloud-itonami/kotobase, a MOVED tombstone)"]}
+   :extracted ["cloud-itonami/chain-contracts — 15 Solidity contracts for chain 260425"
+               "cloud-itonami/malak-case-files — PRIVATE, 1,790 files, the criminal case file"
+               "cloud-itonami/keiei docs/from-apps-gftdcojp — the CXO ledger's working half"
+               "kotoba-lang/murakumo docs/bench-from-apps-gftdcojp — one fleet benchmark"
+               "kotoba-lang/lexicons-bundle drafts/from-apps-gftdcojp — 137 draft lexicons"]
+   :archived-in-place ["240301-olsp-dbguide-web" "250130-riken-suggest-edit"
+                       "250305-jp-gftd-le-case-kaonavi" "lf-case-lingling"]
+   :tools ["scripts/west-entry-add.cljs" "scripts/west-entry-rename.cljs" "scripts/west-entry-remove.cljs"]}
+
+  :not-landed
+  {:apps-gftdcojp-history-rewrite
+   "RUNNING, NOT PUSHED. gftdcojp/apps-gftdcojp on GitHub is untouched at 201b41cf, 5.6 GB. The filtered mirror is /tmp/apps3.git (a temp path — treat it as gone). To resume: re-run the gated script (restore from bundle, verify refs>=1600 / HEAD=201b41cf / commits=27989, then filter with --strip-blobs-bigger-than 25M --paths-from-file <24 entries> --invert-paths --prune-empty=never). Backup: ~/repo-archive/gftdcojp-apps-gftdcojp-20260906.bundle, 5.6 GB, sha256 12dc7221d82df062b3e76b4fad703a8faf68d7037beb94bb685469794e9f4934, verified complete and tip-matching. NOTHING may be force-pushed before the six checks pass: refs 1610, commits 27989, HEAD tree equals before minus the 444 removed paths, _working/malak untouched, zero blobs over 25 MB, measured pack size."
+   :working-still-in-place "All four _working subdirectories were COPIED to their destinations, not moved. They are still in apps-gftdcojp. Removing them is a decision now that the destinations have landed."
+   :unspsc "80-data holds the full UNSPSC v26 hierarchy (18,345 rows) that exists nowhere else — judged EXTRACT and not yet extracted. UNSPSC is a licensed standard; that question is open."
+   :lexicons "00-contracts/lexicons — 8,377 own ai.gftd.* NSIDs, judged EXTRACT, not yet extracted. Their namespace is under the retiring domain and NSIDs are wire identifiers, so renaming them is a protocol migration, not a rename."
+   :arxiv "The ai-gftd-organism paper, judged EXTRACT, not yet extracted."}
+
+  :the-gates-were-observed-and-two-are-red
+  {:green ["test-org-signal-511e4b4-murakumo-joseph — 34 tests / 102 assertions, exit 0"]
+   :red
+   [{:gate "test-envelope-nbb-53073a1-murakumo-zebulun"
+     :detail "NPM-DEPS 0/3 present — @noble/curves, @noble/hashes, @noble/post-quantum absent after npm install."
+     :cause "NOT the devDependencies problem this session fixed; the fix was necessary and is in place at 53073a1. zebulun has no npm egress — CLAUDE.md measured registry.npmjs.org returning 000 there on 2026-08-13 while eight other nodes returned 200. npm exits 0 while installing nothing, which is why the gate looks for the packages rather than at the status."}
+    {:gate "test-envelope-53073a1-murakumo-joseph"
+     :detail "Failed to connect to github.com port 443 — could not clone org-signal into ~/.gitlibs."
+     :cause "Also egress, on a different node and a different protocol. The same node passed the org-signal gate minutes earlier, so this is intermittent rather than a property of joseph."}]
+   :what-this-means "Both red gates are the fleet, not the repository, and the entry registering them predicted this failure mode in writing ('exit 95 is npm install on the node (egress -- measure it, the fleet is not uniform)'). It does not make them acceptable: a gate that cannot run is not a gate. The fix is a capability requirement so these land on nodes with egress, or vendored node_modules. Until then envelope has two red gates and one repository, org-signal, whose gate is green."}
+
+  :incidents
+  [{:what "west.yml was invalid YAML on main for a few minutes"
+    :cause "An insertion anchored on the last `path:` line, which belongs to the `self:` block, so the entry landed outside `projects:`. west then failed for every project with a parser error naming a line number and not the entry."
+    :fixed "Repaired, and scripts/west-entry-add.cljs now anchors on the last project's `groups:` line and parses the result before writing it."}
+   {:what "A working mirror was destroyed by running filter-repo on a half-restored clone"
+    :cause "I read `du` reporting 5.6 GB as completion. Size is not a completion signal; the restore had not written refs, and filter-repo --force on a repo with no refs cleans it to 104 KB. The waiter task I had started for exactly this reported completion AFTER I had already run the filter."
+    :cost "None beyond time. GitHub was untouched and the bundle verified intact. The sequencing is now inside one script that gates on refs, HEAD and commit count."}
+   {:what "A backup bundle was a commit short"
+    :cause "Taken from a stale local checkout whose remote still pointed at the old org. `git bundle verify` said 'complete history' because it was complete with respect to what that clone had."
+    :fixed "Every bundle since is taken from a fresh --mirror and checked by sha against the live GitHub tip. 19/19 on the batch."}]
+
+  :resume-here
+  "1. Finish the apps-gftdcojp rewrite: re-run the gated script, pass the six checks, force-push 1,610 refs. 2. Extract the three remaining originals (lexicons, UNSPSC, the paper). 3. Decide whether _working comes out of apps-gftdcojp now that all four destinations have landed. 4. Give envelope's two gates nodes with egress. 5. The tree text (1,816 files), 45 launchd jobs, ~/.gftd (187 entries incl. signing keys, staged cutover only) and *.gftd.ai -> itonami.cloud remain untouched."}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
