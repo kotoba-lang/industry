@@ -3212,6 +3212,22 @@
    :script-args ["--buckets" "1024,4096,16384,32768,65536,131072,262144"
                  "--max-overhead" "25"]
    :include-ext [".cljc"] :min-files 20 :cd false}
+  ;; kotobase-peer had ONE gate, and it checks block-size padding overhead.
+  ;; That is a real check and it is not a test suite: measured 2026-09-06, this
+  ;; repo's 251 tests / 760 assertions had no fleet gate at all, while its
+  ;; siblings kotobase-block-codec and kotobase-projection both carry
+  ;; `:jvm-test`. The asymmetry matters because peer is the one that DEPLOYS --
+  ;; it is the engine behind `kotobase-graph-database`, so it was the least
+  ;; covered and the most shipped.
+  ;;
+  ;; Found while looking for a receipt to gate a deploy on. The receipt existed
+  ;; and said nothing about the change being deployed, which is the same shape
+  ;; as a passing check that measured nothing.
+  ;;
+  ;; `:cd false` on purpose: this adds the missing signal and does not also
+  ;; turn on pin advancement for a deployed engine. That is a separate decision
+  ;; and should be made as one.
+  {:name "kotobase-peer" :id "kotobase-peer-jvm-test" :gate :jvm-test :cd false}
 
   ;; ------------------------------------------------- datalake format libraries
   ;; ADR-2608054000 P4 が開いたまま 6 日間、この 6 repo には CI が無かった。
