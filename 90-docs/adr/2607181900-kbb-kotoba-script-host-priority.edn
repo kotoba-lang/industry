@@ -147,6 +147,13 @@ readiness gate への進捗 (全て実測付きで landed / in-flight):
   実 getenv binding は未接続) ③ kbb 自体の JVM-free host 化 (v1 は
   bootstrap JVM host) ④ tasks.edn facade 検査の kbb 版 (EDN reader 依存)。
 
+- **js leg (2026-09-06、ADR-2609062200)**: `kotoba-script` を `.cljc` 化し
+  `amu compile --target js --jvm-free` を nbb で host（amu ADR 0340、PR #827）。
+  kotoba に `bin/kbb_js.cljs`（Node host、provider 35/33/34/20、receipt は v1 同形）と
+  script library `lib/kbb/{fs,env,browse,proc}.kotoba`（`--source-path lib`）を追加。
+  demo_kbb_fs_read_native は js でも 84（native と同値）、cold start 1.7 s。
+  js は配布成果物ではなく oracle（ADR-2609051100 の決定は変わらない）。
+
 gate 条件②③が満たされるまで nbb が script host の正本のまま変わらない
 のは Decision 6 のとおり。
 

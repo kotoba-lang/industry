@@ -1,0 +1,59 @@
+[{:db/id -1
+  :adr/id "adr-2609062200-kbb-js-backend-and-lib"
+  :adr/topic "kbb-js-backend"
+  :adr/status "accepted"
+  :adr/title "ADR-2609062200: kotoba compile の js target を JVM-free にし、kbb に js backend と script library を足す（nbb → kbb の js 側の脚）"
+  :adr/authoritative true
+  :adr/repo "com-junkawasaki/root"
+  :adr/related ["adr-2607181900-kbb-kotoba-script-host-priority" "2609051100" "adr-2607198300"]
+  :adr/body "# ADR-2609062200: kotoba compile の js target を JVM-free にし、kbb に js backend と script library を足す
+
+**Status**: accepted (2026-09-06)
+**Deciders**: Jun Kawasaki（オーナー指示「nbb を kbb に refactor, kotoba compile で js も対応, lib も 設計実装」）
+**Landed**: kotoba-lang/kotoba-script `b1900f5b` + `8a55311b`、kotoba-lang/amu PR #827（`agent/js-target-nbb`、main 保護のため CI 13 check 待ち）、kotoba-lang/kotoba `agent/kbb-js-backend`（本 ADR の着地時点の状態は末尾）
+
+## Context
+
+ADR-2607181900 は script host の優先順位を kbb → nbb と決め、ADR-2609051100 は kbb の JVM-free 化を **amu native KEXE + kexe_loader** で進めると決めた（slice 1〜4 着地、shim は並行セッションが `bin/kbb_shim.cljs` で作業中）。同 ADR の却下案 4「kbb を nbb で書き直すだけ」は、JS エンジン経由の guest が配布成果物の要件（ADR-2607198300、Node/browser host 非依存）を満たさないことが理由で、**JS backend を oracle として持つことは否定していない**。Q9 は全 public surface を nbb/CLJS・native・Wasm で照合することを求めている。
+
+一方 `amu compile --target js` は 2026-09-06 まで `clojure -M` を起こしていた。理由は emitter（`kotoba-lang/kotoba-script`）が `.clj` 1 本だったことで、コード生成に JVM は要らなかった。CLAUDE.md の表は js を「JVM / 新規で選ばない」と書いていた。
+
+## Decision
+
+1. **kotoba-script を `.cljc` にする。** JVM 固有だったのは 3 箇所だけ: identifier mangling（`Character/isLetterOrDigit` + `format %04x`）、f64 literal の `Double.toString`、Closure Compiler による出力検証。cljs 側は `java-double-string`（JDK 19+ の shortest-digit 形を `toExponential` から再構成、`MIN_VALUE` の `4.9E-324` も）と `node --check` + 文字列リテラル外の token scan（`:verifier :token-scan` と名乗る）。parity は測る: `npm run test-nbb` が JVM の golden と byte 一致（57,409 byte module、Double.toString 29 例）。
+2. **amu は js / js-browser を nbb で host する**（`kotoba.compiler.nbb.js-cli`、amu ADR 0340）。`bin/amu` の `nbbJsTargets` が `js_cli.cljs` へ送る。`cljs-browser` だけ JVM に残る。parity gate `test/nbb/js_parity.cljs`: `clojure`/`java` を PATH から隠して、JVM 経路が書いた `runtime/http/route-decide.mjs` とバイト一致（60,283 byte）、manifest / provenance は EDN 値として一致、capability 例が grant 経由で走り grant 無しで拒否、`cljs-browser --jvm-free` は拒否。
+3. **kbb に js backend を足す**（`kotoba-lang/kotoba` `bin/kbb_js.cljs`、nbb）。kbb v1 と同じ policy 形を受け、`amu compile --target js --jvm-free` で compile し、Node の `instantiateKotoba(grants)` に wire id 鍵の provider を渡す: 35 `:fs/app-data`（realpath scope 内の 1 ファイル read、O_NOFOLLOW、64 KiB 上限）/ 33 `:env/read`（scope 内の名前、未設定は `\"\"` = loader と同じ）/ 34 `:fs/browse`（scope 内 1 directory、名前を sort して `\\n` 結合）/ 20 `:proc/exec`（policy の invocation 表を index で、exit status）。**wire id を持たない `:data/json` `:data/edn` `:http/fetch` は名指しで拒否**し interpreter backend を案内する（silent fallback 禁止、ADR-2609051100）。receipt は kbb v1 と同形、拒否も `:outcome :denied` の receipt になる。
+4. **script library `lib/kbb/{fs,env,browse,proc}.kotoba`。** `typed-cap-call` と wire id を library に 1 回だけ書き、script は `(fs/read-file path)` と書く。`--source-path lib` の project route で js / native の両方に compile できる。fs は read-only（native の wire-35 provider が read-only なので、片方にしか無い API を library に置かない）。
+5. **js backend は配布成果物ではなく oracle。** 配布形は `--backend native` のまま。`bin/kbb` の差し替え（shim）は並行 slice が持ち、そこから `--backend js` を委譲してよい。
+
+## 実測（2026-09-06）
+
+| 主張 | 測り方 | 値 |
+|---|---|---|
+| emitter の JVM / nbb parity | kotoba-script `npm run test-nbb` | 57,409 byte 一致、f64 29 例一致、JVM 66 tests 0 fail |
+| amu js 経路の parity | amu `npm run test-nbb-js`（PATH から JVM を隠す） | route-decide 60,283 byte 一致、SCANNED 6 failed 0 |
+| kbb js × native | kotoba `kotoba.kbb-js-test`（nbb をプロセスとして駆動） | demo_kbb_fs_read_native = **84**（native の kbb_native_test と同値）、3 tests 20 assertions 0 fail |
+| library | 同上 | fs_report = 84、env_browse_proc = 2100（entries 2 ×1000 + HOME 100 + echo exit 0） |
+| cold start | `time nbb bin/kbb_js.cljs …` | 1.7 s（JVM kbb は ADR-2609051100 の実測で 10.11 s） |
+
+library を書いたことで emitter の欠陥が 2 つ見つかり、上流で直した（kotoba-script `8a55311b`）: `string-index-of` が i64 byte offset の契約に対して JS Number の code point 数を返していた（guest の `(+ i 1)` が `Cannot mix BigInt` で落ちる）、`string-split-count` が grammar には在るのに emitter に無かった。**library は backend の parity 検査器でもある。**
+
+## 現在地と残り
+
+- wire id が在るのは 4 capability だけ（catalog: 33 / 34 / 35 / 20）。kbb v1 の 7 capability のうち残り 3 つは interpreter-only。
+- native loader の provider は 33 と 35 だけ実装（34 / 20 は identity stub、ADR-2609051100 task 5）。`kbb.browse` / `kbb.proc` は今日 js でしか走らない —— library のヘッダにそう書いてある。
+- readiness gate 条件②（nbb スクリプト代表サブセットの移植）は本 ADR では進めていない。js backend と library はその移植の**書き先**を用意した。
+- 記録先: ADR-2607181900 現在地に js leg を追記、CLAUDE.md の js target 表と kbb 項を訂正。
+
+## 再測定
+
+```bash
+# emitter parity（kotoba-script）
+npm run test-nbb ; clojure -M:test
+# amu js 経路（PATH から JVM を隠して）
+npm run test-nbb-js
+# kbb js × native
+AMU_HOME=<amu checkout with node_modules> clojure -M:test   # kotoba; SKIPPED 行が出たら測れていない
+nbb bin/kbb_js.cljs src/demo_kbb_fs_read_native.kotoba --policy src/demo_kbb_fs_read_native_policy.edn
+```
+"}]
