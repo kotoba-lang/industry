@@ -1,0 +1,26 @@
+audio placeholder <|audio_pad|> -> id 151670 (claimed an existing free row)
+The text_config of this model contains `auto_map` in its configuration. This might result in errors when using `from_pretrained` to load the model. Please make sure that the `auto_map` is correct.
+🚨 `prompt_mask` is part of LlavaOnevisionModel.forward's signature, but not documented. Make sure to add it to the docstring of the function in /home/gad/.cache/huggingface/modules/transformers_modules/SDAR-VL-Think-8B/modeling_llava_onevision.py.
+🚨 `store_kv` is part of SDARModel.forward's signature, but not documented. Make sure to add it to the docstring of the function in /home/gad/.cache/huggingface/modules/transformers_modules/SDAR-VL-Think-8B/modeling_sdar.py.
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:00,  7.95it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:00<00:00, 18.33it/s]
+trunk embedding rows: 151936 (placeholder id 151670 is within the existing matrix -- no resize needed)
+whisper encoder loaded: d_model 1280
+projector 1280 -> 4096 (22.0M params, randomly initialised)
+MIOpen(HIP): Warning [ParseAndLoadDb] File is unreadable: "/home/gad/ComfyUI/venv-rocm7/lib/python3.12/site-packages/_rocm_sdk_libraries_gfx1151/share/miopen/db/gfx1151_20.HIP.fdb.txt"
+/home/gad/dllm-phase0/venv/lib/python3.12/site-packages/transformers/models/whisper/modeling_whisper.py:542: UserWarning: Flash Efficient attention on Current AMD GPU is still experimental. Enable it with TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1. (Triggered internally at /__w/TheRock/TheRock/external-builds/pytorch/pytorch/aten/src/ATen/native/transformers/hip/sdp_utils.cpp:320.)
+  attn_output = torch.nn.functional.scaled_dot_product_attention(
+/home/gad/dllm-phase0/venv/lib/python3.12/site-packages/transformers/models/whisper/modeling_whisper.py:542: UserWarning: Mem Efficient attention on Current AMD GPU is still experimental. Enable it with TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1. (Triggered internally at /__w/TheRock/TheRock/external-builds/pytorch/pytorch/aten/src/ATen/native/transformers/hip/sdp_utils.cpp:377.)
+  attn_output = torch.nn.functional.scaled_dot_product_attention(
+encoded: (64, 1280) per clip
+
+--- check 1+2: count, and does the trunk depend on the audio? ---
+  count check PASSED: 64 audio vectors == 64 placeholder positions (prompt 78 tokens)
+  max|logit delta| tone440 vs noise = 2.0625
+  PASS: audio reaches the trunk.
+
+--- check 3 (negative control): zero the projector output ---
+  max|logit delta| with a silenced projector = 0.000000
+  PASS: with the projector silenced the two clips are indistinguishable, so the delta above came from the audio and nothing else.
+
+summary: count ok, live delta 2.0625, silenced delta 0.000000
+NOTE: the projector is untrained. This shows the path CARRIES audio, not that the model understands it. Understanding needs paired audio-text training of these 21M parameters.
