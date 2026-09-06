@@ -155,7 +155,15 @@
    :entries [["ai-gftd-cyber-drill" "83 KB, archived, last pushed 2026-07-29"]
              ["ai-gftd-kotoba" "1 KB, archived, last pushed 2026-06-30"]]
    :preserved "Mirror bundles under ~/repo-archive/, one per repository, each verified with `git bundle verify` before anything was deleted. All six repositories touched in this wave were bundled first, not only the two that were deleted, because a transfer is only reversible while you still know what was in it."}
-  :still-blocked
+  :kotobase-resolved
+  {:landed "GitHub transfer + rename, west.yml a9ea7fac, pin 62320779"
+   :what "cloud-itonami/kotobase -> net-kotobase/control-plane-retired. Owner chose 移動 over 削除."
+   :why-that-name "Reading it settled the question. It is a TOMBSTONE: seven files, of which MOVED.md.edn says '[MOVED] kotobase -> net-kotobase ... This leftover CF Worker (superseded control plane) has been extracted to net-kotobase (worker/)'. Its successor is net-kotobase/control-plane, 49.9 MB, so the remnant is control-plane-retired and it belongs beside what replaced it. The net-kotobase org names everything bare (control-plane, ipfs, sdk, docs, engine, authn) because the org carries the identity; this follows that."
+   :collision-gone "The west name kotobase stays with kotoba-lang/kotobase, whose gate and repo-bots entries are untouched."
+   :note "Its own MOVED.md.edn calls physical removal the final runbook step, once consumers re-point and net-kotobase is CI-green. net-kotobase/control-plane exists and kotobase.net is live, so that condition looks met -- the repository is kept anyway, because 移動 was the instruction and a tombstone that names its successor is worth more than a gap."
+   :backup "~/repo-archive/cloud-itonami-kotobase-20260906.bundle, sha256 d1d50b87…. The FIRST attempt at this bundle was incomplete and was thrown away: it was taken from the stale local checkout, whose remote still pointed at gftdcojp, and it stopped at 2cdee437 while GitHub was at b8322d1d. Re-taken from a fresh --mirror clone and verified to contain the tip. A backup that silently misses the newest commit is the shape of a backup nobody checks."}
+
+  :superseded-still-blocked
   {:entry "ai-gftd-kotobase"
    :repository "already cloud-itonami/kotobase — only the west entry name is stale"
    :why "It wants the west name `kotobase`, which belongs to kotoba-lang/kotobase: 731 KB, pushed daily, 'Datom database of the Kotoba stack', gated at scripts/fleet-ci/gates.edn and named in four repo-bots entries. The itonami side is 10 KB with no description. The owner's 'itonami 側を優先' was answering about gftd-era collisions; this one is an unrelated repository that happens to share a word, and applying the rule here would rename the core database's entry and break its gate. Proposed instead: cloud-itonami-kotobase with repo-path kotobase, the same shape 1,451 other entries already use."}
