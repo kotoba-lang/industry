@@ -526,4 +526,17 @@ register は組織の register である（CLAUDE.md repo-wide mandatory）。�
 同じ線を守り、caller（払った鍵から導出した did:pkh）を月・顧客ごとの salt で
 hash してから記録する。"}
 
+
+ :warrant
+ {:label "フォーク/無効イベントの署名済み証拠（warrant envelope / 逮捕状）"
+  :spellings ["warrant" "warrants" "fork evidence" "double-history evidence" "detected fork"
+              "signed evidence" "無効イベント" "二重履歴" "フォーク証拠"]
+  :note "**フォーク検出の永続化・帰属の形式**。署名済み Syrup envelope で、peer が検出した
+  double-history / invalid event を inert evidence として記録する —— possession/relay は
+  authority を一切与えず、adjudication（被疑 peer の処罰）は範囲外。正本の設計は
+  ADR-2809060410（fork-evidence-warrant-seam）で、成り立ちは redesign 前の
+  nekko（旧 kotoba-rad）の docs ADR の warrant 表から来る。実装は nekko 側の
+  envelope + sign/verify round-trip テストが通過するまで land しない（draft 段階）。
+  **『warrant』で引ける入口を足すのが本 entry の理由** —— 名前が機能を示さない repo の
+  概念索引（2026-08-03 規則）と同じく、語で辿れなければ在っても見つからない。"}
 }
