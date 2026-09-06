@@ -525,6 +525,49 @@
     (die (str sha " is not reachable in " org-repo " after fetch")))
   dir)
 
+(defn- head-already-in-default?
+  "Is `sha` already reachable from `org-repo`'s default branch?
+
+  An open pull request whose head the default branch already contains has
+  nothing left to verify — the tip gate covers exactly those commits. A
+  CLOSED-and-merged one has the same shape, and that is the case this
+  predicate is for.
+
+  `open-prs` below infers openness from `refs/pull/N/merge`, on the stated
+  ground that GitHub deletes that ref when a PR closes. **Measured
+  2026-09-06, it does not always**: net-kotobase/search-origin had 1 merge
+  ref and 0 open PRs (`gh pr list --state open` → `[]`), and
+  net-kotobase/control-plane 17 against 16. A phantom like that is not a
+  one-off red — it is permanent, and it reads as a defect in the repo:
+  search-origin's stale head predates the test entry its new gate needs, so
+  the gate reported `test entry missing after extract` forever.
+
+  **This fixes one of the two shapes, and the other is left standing rather
+  than assumed away.** A phantom from a MERGED pull request has its head on
+  the default branch, and that is what this drops — search-origin's #2,
+  measured. A phantom from a pull request CLOSED WITHOUT MERGING does not:
+  control-plane's 17 merge refs against 16 open PRs, and **none** of the 17
+  heads is an ancestor of main. Deciding that case needs the PR's state,
+  which is the API this runner deliberately does not use (owner policy:
+  github token は使わない). So control-plane keeps its phantom, and this
+  docstring is where someone will find out why.
+
+  The mirror only fetches `refs/heads/*`, so a genuinely open PR's head is
+  not in it at all and `cat-file` fails — which is the fail-open branch.
+  **Ancestry that cannot be decided KEEPS the PR.** The cost of an extra
+  verification is one run; the cost of dropping one silently is an unverified
+  PR that looks verified, and this file should not be in the business of
+  making that trade quietly."
+  [org-repo sha]
+  (try
+    (let [d (mirror! org-repo)
+          default (str/trim (str (:out (git d ["symbolic-ref" "--short" "HEAD"]))))]
+      (boolean
+       (and (seq default)
+            (zero? (:exit (git d ["cat-file" "-e" (str sha "^{commit}")])))
+            (zero? (:exit (git d ["merge-base" "--is-ancestor" sha default]))))))
+    (catch :default _ false)))
+
 (defn open-prs
   "org/repo の **open な** PR を [{:number :head}] で返す。API も token も使わない。
 
@@ -555,9 +598,20 @@
                                    (when-let [n (second (re-find #"^refs/pull/(\d+)/head$" ref))]
                                      [n sha]))
                                  rows))]
-        (vec (sort-by :number
-                      (for [n merge-nums :when (get heads n)]
-                        {:number (js/parseInt n 10) :head (get heads n)})))))))
+        (let [candidates (sort-by :number
+                                  (for [n merge-nums :when (get heads n)]
+                                    {:number (js/parseInt n 10) :head (get heads n)}))
+              [keep- dropped] [(remove #(head-already-in-default? org-repo (:head %)) candidates)
+                               (filter #(head-already-in-default? org-repo (:head %)) candidates)]]
+          ;; Report the drop rather than performing it silently: "0 PRs" and
+          ;; "1 PR whose head is already on main" are different facts, and the
+          ;; second one is how a stale merge ref shows itself.
+          (when (seq dropped)
+            (log "PR skip:" org-repo (pr-str (mapv :number dropped))
+                 "— head already reachable from the default branch"
+                 "(merged, or a merge ref GitHub did not delete);"
+                 "the tip gate covers those commits"))
+          (vec keep-))))))
 
 (defn ensure-tree!
   "org/repo の sha の tree を展開して dir を返す（キャッシュ済みなら再展開しない）。
