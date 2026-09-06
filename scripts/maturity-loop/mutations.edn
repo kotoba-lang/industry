@@ -8070,4 +8070,92 @@
      :file "src/switchboard/ledger.cljc"
      :find "(when (seq vs)"
      :replace "(when false"
-     :must-fail ["append-is-fail-closed"]}]}]}
+     :must-fail ["append-is-fail-closed"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-4221"
+   :label "isco-4221 operations catalog —— 提供していない op と、供給されなかった operand"
+   ;; この actor の governor は 2026-09-07 まで、op ごとの検査を
+   ;; `(= :approve-booking op)` / `(= :approve-refund op)` と直に書き出して
+   ;; いた。**どの分岐にも当たらなかった op は、違反を 1 件も集めずに
+   ;; `:ok? true` で出てくる。** 実測で 3 つ逃げていた:
+   ;;
+   ;;   1. 提供していない op（`:wire-deposit-to-me`）。敵対的な advisor は
+   ;;      要らない —— `travel.advisor/infer` は request の `:op` をそのまま
+   ;;      写し、既定の `:low` stake が confidence 0.95 を作るので escalation
+   ;;      floor 0.6 を越える。`parse-proposal` が壊れた LLM 応答に対して自ら
+   ;;      吐く `{:op :unknown}` も同じ経路に乗る。
+   ;;   2. `:approve-group-booking` —— この actor 自身が「危険な方」と名乗って
+   ;;      いる op が、`:approve-booking` ではないので **在庫と 1 度も突き合わ
+   ;;      されない**。在庫 20 に対する 500 units も、幽霊 inventory も、別
+   ;;      client の inventory も `:violations []` で escalate し、
+   ;;      `travel.actor/approve!` は escalate をそのまま `:commit` へ再開する。
+   ;;      **署名した人間は空の違反リストを見せられていた。**
+   ;;   3. 算術が `(number? units)` で守られていたので、`:units` を単に省いた
+   ;;      予約は検査を飛ばして通った。返金の `:days-before-departure` も同じ。
+   ;;
+   ;; どれも「測れなかった検査が、測って問題が無かった検査と同じ値を返す」形
+   ;; （CLAUDE.md の 7 問 1・2）。`travel.operations` が catalog を持ち、
+   ;; governor はそこから全部を導出する。ここに在るのは、その拒否が今も落ちる
+   ;; かを繰り返し問うためのもの。**7 件とも 2026-09-07 に赤くなるところを見た**
+   ;; （無改変では 36 tests / 83 assertions が緑）。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   ;; ── 欠陥そのものへの回帰（landing 前の挙動に戻す）──
+   [{:id :isco-4221/unoffered-op-rule-never-fires
+     :why "提供していない op を素通しする = 2026-09-07 以前の挙動。advisor が request の :op を写すだけで到達でき、confidence 0.95 なので escalate すらしない"
+     :file "src/travel/governor.cljc"
+     :find "      (not offered?)\n      (conj {:rule :unoffered-op"
+     :replace "      false\n      (conj {:rule :unoffered-op"
+     :must-fail ["hard-on-unoffered-op"
+                 "hard-on-unoffered-op-minted-by-the-advisor-itself"
+                 "hard-on-unparseable-llm-proposal"
+                 "holds-an-unoffered-op"]}
+
+    {:id :isco-4221/escalating-ops-skip-operand-checks
+     :why "escalate する op の算術を飛ばす = group booking が「検査の代わりに escalate」に戻る。人間は空の違反リストに署名させられる"
+     :file "src/travel/governor.cljc"
+     :find "      (and offered? inv)\n      (into (operand-violations"
+     :replace "      (and offered? inv (not (ops/always-escalates? op)))\n      (into (operand-violations"
+     :must-fail ["hard-on-group-booking-over-inventory"
+                 "holds-an-over-inventory-group-booking-instead-of-asking-a-human"]}
+
+    {:id :isco-4221/group-booking-loses-inventory-basis
+     :why "catalog 側で団体予約が inventory を要らないことにする。幽霊 inventory と他 client の inventory が通る"
+     :file "src/travel/operations.cljc"
+     :find "   {:label \"団体予約承認\"\n    :inventory-basis? true"
+     :replace "   {:label \"団体予約承認\"\n    :inventory-basis? false"
+     :must-fail ["group-booking-carries-inventory-arithmetic-not-just-escalation"
+                 "hard-on-group-booking-citing-no-inventory"
+                 "hard-on-group-booking-on-foreign-inventory"]}
+
+    {:id :isco-4221/absent-operand-skipped
+     :why "供給されなかった operand を検査済みとして扱う = 旧 (number? units) guard そのもの。:units を省いた予約が通る（さらに (<= nil 20) で落ちる経路も生む）"
+     :file "src/travel/operations.cljc"
+     :find "    :positive-number     (and (number? v) (pos? v))"
+     :replace "    :positive-number     (or (nil? v) (and (number? v) (pos? v)))"
+     :must-fail ["an-absent-operand-is-not-ok"
+                 "hard-on-booking-with-no-units"
+                 "holds-a-booking-that-supplied-no-units"]}
+
+    ;; ── fail-closed をやめる形（catalog の打ち間違いが素通しになる）──
+    {:id :isco-4221/unknown-operand-kind-fails-open
+     :why "catalog に無い :kind を書いたとき、拒否ではなく合格を返す。打ち間違いが検査を無効化する"
+     :file "src/travel/operations.cljc"
+     :find "    :non-negative-number (and (number? v) (not (neg? v)))\n    false"
+     :replace "    :non-negative-number (and (number? v) (not (neg? v)))\n    true"
+     :must-fail ["an-unknown-operand-kind-refuses"]}
+
+    {:id :isco-4221/unknown-comparison-fails-open
+     :why "catalog に無い :compare を書いたとき、比較せずに合格を返す。同上"
+     :file "src/travel/operations.cljc"
+     :find "    :at-least (>= v figure)\n    false"
+     :replace "    :at-least (>= v figure)\n    true"
+     :must-fail ["an-unknown-comparison-refuses"]}
+
+    {:id :isco-4221/missing-registered-figure-skipped
+     :why "比較相手の登録値を持たない inventory line を拒否ではなく素通しにする。測れなかった検査が合格として積み上がる"
+     :file "src/travel/governor.cljc"
+     :find "         (not (number? figure))\n         (conj acc {:rule :inventory-incomplete"
+     :replace "         (and false (not (number? figure)))\n         (conj acc {:rule :inventory-incomplete"
+     :must-fail ["hard-when-the-inventory-line-lacks-the-registered-figure"]}]}]}
