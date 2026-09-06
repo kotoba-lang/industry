@@ -539,4 +539,53 @@ hash してから記録する。"}
   envelope + sign/verify round-trip テストが通過するまで land しない（draft 段階）。
   **『warrant』で引ける入口を足すのが本 entry の理由** —— 名前が機能を示さない repo の
   概念索引（2026-08-03 規則）と同じく、語で辿れなければ在っても見つからない。"}
+
+ :posture-load-biomechanics
+ {:label "姿勢がつくる身体の負荷を、力学として計算する（筋・関節モーメント・脊椎圧縮）"
+  :spellings ["suji" "筋" "biomechanics" "生体力学" "バイオメカニクス" "musculoskeletal"
+              "筋骨格" "posture load" "姿勢負荷" "モーメントアーム" "%MVC"
+              "筋張力" "spinal compression" "脊椎圧縮" "椎間板"
+              "inverse dynamics" "逆動力学" "RNEA" "Crowninshield" "静的最適化"
+              "屈曲弛緩" "flexion-relaxation" "強張り" "Rohmert"]
+  :query-spellings ["MVC" "moment arm" "muscle force" "intervertebral" "ergonomics"
+                    "人間工学" "肩こり" "tech neck" "forward head posture" "前方頭位"
+                    "緊張" "endurance" "持久" "姿勢" "posture"]
+  :note "**計算は cloud-itonami/suji（筋）**、ブラウザで見せるのは kotoba-lang/kami-app-suji
+  （https://kotoba-lang.github.io/kami-app-suji/、WebGPU / WebGL 2.0 フォールバック）。
+  名前が機能を示さない repo の規則（2026-08-03）に該当する —— 筋 は muscle/sinew であり
+  同時に line-of-force でもあって、どちらの意味も名前からは読めない。
+
+  ⚠ **kotoba-lang/biomech と同じ概念に当たる。境界は解像度**（2026-09-07 実測。
+  この entry を足して索引を回した結果として見つけた —— それまで suji 側は biomech を
+  一度も名指していない）。biomech は**組織スケールの連続体・集中定数**（tissue の
+  Young 率、Euler–Bernoulli 梁、FEM、softbody、血行）で、solver backend として
+  fea / kami-vehicle / kami-engine-cfd を束ねる。suji は**全身スケールの静的逆動力学**
+  （姿勢 → 関節モーメント → 筋張力の分配 → レベル別の椎間板圧縮）で、要素は 1 本の
+  作用線と幾何モーメントアームに潰れている。**Hill の力‐長さ関係は両方が独立に
+  持っており、突き合わせは未実施**（2026-09-07 時点。biomech 側は活性化動特性と
+  遠心性増強と直列弾性腱まで持ち、suji 側は静的な力‐長さと受動張力だけ）。
+
+  **L4 Care Tier の 4 段のうち 2 段目**: kizashi（兆、etzhayyim/actor-kizashi）が
+  senses → **suji が力学を計算し** → mitate（見立て、cloud-itonami/mitate）が診断・
+  経路づけ → iyashi（癒、cloud-itonami/iyashi）が治療。隣接: kokoro（心、精神保健）、
+  suimin（睡眠、睡眠障害のエビデンス合成）。
+
+  **suji は診断しない**（医師法 §17 / G1）—— 返すのは N・N·m・%MVC・MPa・分だけで、
+  所見・病名・治療の推奨を保持できるフィールドが 1 つも無く、足せば charter 違反として
+  テストが落ちる。計測ハードウェアも持たない（薬機法 / G2）: 入力は姿勢の角度である。
+
+  ⚠ **検証は 1 本だけで、残り 2 本は食い違いを報告する。** 頸椎圧縮荷重は Hansraj 2014
+  を再現する（検証済み）。腰椎レベル別は Wilke 1999 の in vivo 椎間板内圧に対して
+  **基準の幅の外**（モデルが低い）、持久ドーズは Frey Law & Avin 2010 の関節別曲線と
+  食い違い、しかも符号が筋で逆。**比が 1 に近づくことは検証ではない** —— この repo では
+  無関係な欠陥を直した結果として 2 回そうなっている。
+
+  **無いもの**: 環軸関節（下頭斜筋が表現できない）、C2/C3 で解かれる筋（出典が無い）、
+  複数制約の同時解（2 関節筋の他関節モーメントは計算して報告するだけ）、そして
+  腰椎 5 レベルと下位頸椎 5 レベルはそれぞれ 1 つの向きを共有する。
+
+  **`:query-spellings` に落とした語がある理由**（同じく実測）: `endurance` だけを綴りと
+  して索引したら kami-engine-multirotor（飛行持続時間）が、`肩こり` だけで kizashi
+  （徴候を感知する側であって力学は解かない）が当たった。**問いとして良い語と、索引の
+  鍵として良い語は別**という、このファイルが既に持っている非対称のとおり。"}
 }
