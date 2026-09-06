@@ -269,6 +269,63 @@
   ;; dependency the classpath names.
   {:name "io-ipld-car" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs"
    :ship-git-deps true :cd true}
+  ;; ── the recipient-bound disclosure chain (root ADR-2609061400) ──────────
+  ;;
+  ;; envelope holds the hybrid X25519 + ML-KEM-768 wrap that kotobase's
+  ;; disclosure grants carry and ayatori's :open! port unwraps, and it holds
+  ;; the qualification that lets kotoba.security.crypto-policy call the ML-KEM
+  ;; provider qualified at all. Until now NOTHING RAN ANY OF IT: measured
+  ;; 2026-09-06, envelope and org-signal had zero gates between them, so the
+  ;; whole suite existed only as a number somebody typed into a commit
+  ;; message. ayatori was already covered by nbb-cross-runtime-query, which
+  ;; picks these up transitively as deps -- but a dependency's suite is not
+  ;; its dependant's suite.
+  ;;
+  ;; :nbb-script rather than :nbb-test because the classpath has to come from
+  ;; deps.edn: envelope names org-signal in :deps and kotoba-lang/security in
+  ;; its :test alias, and a literal classpath string would pin shas that rot
+  ;; the moment either moves.
+  ;;
+  ;; Measured before landing, with the real gate script against a west-shaped
+  ;; layout AND against a tree filtered to exactly this :include-ext set (25
+  ;; files -- the whole repo, as it happens): NPM-DEPS 3/3 present, 78 tests /
+  ;; 203 assertions, 0 failures. Shown red too, by moving the npm deps back to
+  ;; devDependencies: `NPM-DEPS 0/0 present, 3 devDependencies omitted by
+  ;; --omit=dev` and then a refusal to report a pass. That is the failure this
+  ;; entry would have had on its first tick if envelope had not been fixed
+  ;; first, and it would have read as a broken suite rather than a misfiled
+  ;; dependency.
+  ;;
+  ;; If it goes red: exit 95 is `npm install` on the node (egress -- measure
+  ;; it, the fleet's is not uniform), 93/94 mean no summary or zero tests, and
+  ;; `Could not find namespace` means ship-git-deps! did not place a dep the
+  ;; classpath names. A `NPM-DEPS <n>/<m>` line with n < m is the trap above.
+  ;;
+  ;; NOT yet observed green on a node. That is what these entries are for, and
+  ;; the honest reading of a first red is "the node could not run it".
+  {:name "envelope" :id "envelope-nbb" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs"
+   :script-args ["--entry" "scripts/run-tests.cljs"]
+   :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 20 :cd true}
+  ;; The JVM half, which the nbb runner excludes BY NAME: envelope.seal-jvm is
+  ;; the same wire format through JCA instead of Web Crypto, and until this
+  ;; entry the two implementations had one of them tested. 13 tests / 49
+  ;; assertions, 0 failures, measured 2026-09-06.
+  {:name "envelope" :gate :jvm-test :cd true}
+  ;; envelope's only src dependency: X25519 and HKDF. 34 tests / 102
+  ;; assertions, 0 failures, measured 2026-09-06.
+  {:name "org-signal" :gate :jvm-test :cd true}
+  ;; kotoba-lang/security is deliberately NOT here yet, and the reason is a
+  ;; measurement rather than an oversight. `clojure -M:test` is 230 tests /
+  ;; 1128 assertions with ONE failure -- `release-ready-holds-in-a-real-workspace`
+  ;; in release_supply_chain_test.clj, where five products report
+  ;; :supply-chain/dependency-digest -- and it exits 1, so this gate would be
+  ;; red from its first tick and stay red. A gate that never goes green is as
+  ;; uninformative as one that never goes red: nobody can act on either.
+  ;; Register it after that test passes or is retired with a reason. It
+  ;; matters: that repo owns evaluate-pq-provider and the hybrid KEM vectors
+  ;; the disclosure provider is qualified against.
   ;; ayatori（旧 kotobase-query）は既に 2 つ gate を持つ（下の :jvm-test と、:id 付きの
   ;; nbb-cross-runtime-query）。ADR-2608189300 の `kotobase.query.agent` を
   ;; gate する 3 つ目をここに足しかけたが撤去した:
