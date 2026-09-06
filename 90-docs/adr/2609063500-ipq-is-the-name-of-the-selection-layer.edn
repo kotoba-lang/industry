@@ -1,0 +1,130 @@
+[{:db/id -1
+ :adr/id "adr-2609063500-ipq-is-the-name-of-the-selection-layer"
+ :adr/title "IPQ —— 有界で検証可能な選択の層に名前を付ける。wire は multicodec private use area、repo 名の origin 面には付けない"
+ :adr/status "accepted"
+ :adr/date "2026-09-06"
+ :adr/related ["adr-2609063000-what-the-ipld-stack-integrates-and-what-only-compiles"
+               "2609060000-ipld-adl-selector-car-boundaries"
+               "2608051000"
+               "adr-2608039970"
+               "2608040100"]
+ :adr/body "## 決定
+
+**content-addressed なデータに対する「有界で検証可能な選択」の層を IPQ と名付ける。**
+オーナー指示（2026-09-06）「ipq で計画には含めつつ、進めて」。
+
+名前が付く先は 3 つあり、付かない先が 1 つある。
+
+| 付く | 何に |
+|---|---|
+| 計画 | この層をこれから何段で作るか、という話をするときの語 |
+| wire | IPNI advertisement の metadata protocol identifier |
+| surface | HTTP の path prefix `/ipq/v1/` |
+
+**付かないのは repo 名の origin 面である。** ADR-2609063000 のとおり
+`repository-rules.edn` の `:plane-order` は origin 面を最優先にし、
+`ip*` prefix は ipfs.tech / ipni.io / ipfs.io から機械的に導出された他者の
+authority である。今日作った `kotobase-protocol-ipq` は矛盾しない ——
+これは `kotobase-` family + capability 名であって、`kotobase-protocol-ipfs`
+と同じ形。IPFS の mirror は `io-ipfs` という別の repo が担っている。
+**family prefix が付いている限り、末尾の語は capability であって出所ではない。**
+
+## IPQ/1 が主張すること、しないこと
+
+profile 番号が正直さの置き場である。
+
+- **IPQ/1 が証明するのは**: 名指しされた traversal が、CID に hash する
+  block の上で実際に走ったこと。producer が触ったと言う block だけで、
+  verifier が同じ matches に到達できること（`replay-selection`）。
+- **証明しないのは**: database range や Datalog 解の完全性。それには
+  authenticated index boundaries が要る（kotobase ADR-2609060000）。
+
+だから今日名乗れるのは Selection までであり、`Query` を名乗る層に
+`/1` を付けて出す。完全性を運ぶ profile があるとすればそれは別の番号であって、
+同じ番号の「静かに良くなった版」ではない。
+
+## wire 上の番号は private use area から採る
+
+multicodec table を実測して選んだ（2026-09-06）:
+
+- README の Reserved Code Ranges / Private Use Area が `0x300000-0x3FFFFF` を
+  「reserved for internal use by applications and will never be assigned any
+  meaning as part of the Multicodec specification」と定める
+- table.csv にこの範囲の entry は **0 件**、`0x0940` も未割当
+- 登録済み transport family は `0x10` 刻み（0x0900 bitswap / 0x0910
+  graphsync-filecoinv1 / 0x0920 ipfs-gateway-http / 0x0930 filecoin-piece-http）
+
+よって `transport-ipq-selection-http = 0x300940` = private-use base +
+登録が要求するはずの slot。**未登録の番号を private 範囲の外で名乗るのは、
+所有していない registry への squatting である。** 範囲の中で名乗るのは
+その範囲の用途そのもので、しかも自己記述的 —— この番号を知らない reader は
+「application-private だ」と学ぶのであって「壊れている」とは読まない。
+
+## 段取り
+
+| 段 | 中身 | gate |
+|---|---|---|
+| **S1** | wire の名前 + surface の実装 | **2026-09-06 landed** |
+| S2 | deploy —— Worker shell に載せ、本番 block 面の実 CID に対して smoke | dependency closure・artifact・Worker version・smoke を記録するまで landed としない |
+| S3 | advertise —— 広告 chain の metadata に IPQ を並記し、cid.contact が返すことを実測。`verify-ipni-publisher-record` に metadata の assertion を足す | protocol ID が静かに落ちたら赤くなること |
+| S4 | consume —— `ayatori.discovery` が IPQ provider を優先し、`ayatori.remote` が per-block GET の代わりに selection を使う | round trip 数で測る（bytes でも wall clock でもない） |
+| S5 | IPQ/2 —— authenticated index boundaries | 未着手・未スケジュール |
+
+**S3 の gate が要点である。** metadata を足したつもりで落ちても、広告は
+成功し、indexer は 200 を返し、provider は今までどおり見つかる ——
+つまり **足し忘れと足した結果が出力で区別できない**。検査を先に書く。
+
+## S1 で landed したもの
+
+- `kotoba-lang/io-ipni-specs` `7b69b9ef` —— `ipni.metadata` に
+  `ipq-selection-http` / `ipq-selection-profile` / `ipq-selection-http-bytes` /
+  `read-ipq`。**`ipq?` という述語は意図的に作っていない** —— boolean は
+  `:not-ipq`（他所へ回せ）と `:profile-unsupported`（相手は IPQ provider で、
+  遅れているのはこちら）を同じ値にする。この 2 つは反対の指示である。
+  nbb 34 tests / 113 assertions、JVM 41 / 138。control: 番号を
+  private 範囲外の `0x0940` に動かすと、範囲 assertion と pin した wire bytes
+  が名指しの理由で赤くなる。
+- `kotoba-lang/kotobase-protocol-ipq`（新規）—— `GET /ipq/v1` が profile と
+  budget を公開し、`GET|HEAD /ipq/v1/selection/{root}?selector=<base64url dag-cbor>`
+  が CARv1 を返す。pure cljc handler、injected block port の上。
+  ADR-2608051000（1 repo = 1 capability）に従って `kotobase-protocol-ipfs` に
+  同居させていない —— この surface は selector engine と CAR codec を要求し、
+  それを low-privilege gateway repo に引き込むのが、あの規則が防いでいるもの。
+
+## 実装中に測って分かったこと 2 件
+
+**1. bytes が正しくても container が違えば黙って 0 件になる。**
+`dag-json/base64-decode` は Clojure の vector を返す。下流の CBOR reader は
+入力長を `.length` で測るので、vector では `undefined` になり、decoder は
+**0 バイトを見て `cbor: unexpected end of input` と言う**。厄介なのは
+round-trip 検査が緑になることで、実際に `(vec decoded)` と元を比べる debug は
+`:eq true` を出しながら、handler 経由の全 request が落ちていた。
+`ipld.car.bytes/as-bytes` はこのために在る。control: `as-bytes` を外すと
+selector を渡す test が全部赤くなる。
+
+**2. `kotobase-protocol-core` の deps.edn の申告が古い。**
+「src has no dependencies at all — verified by grep at the 2026-08-05 split」と
+書いてあるが、後から入った `kotobase/protocols/blocks.cljc` が
+`kotobase.store` を require している。今日 IPQ の handler がそれを踏んで
+`Could not find namespace: kotobase.store` で落ちた。IPQ 側は block port を
+直接取ることで回避した（IStore fallback は block の bytes を document 値として
+datom 面に載せる経路で、selector engine が読む先として誤り。ADR-2608039970）が、
+**protocol-core の申告自体は直っていない。** 別件として残す。
+
+## 登録の道
+
+- multicodec に `0x0940` / `transport-ipq-selection-http` を要求する PR
+- trustless gateway 仕様に対する IPIP（`?selector=` で CAR を返す口）
+
+**どちらも未着手で、どちらもこの計画を塞がない** —— private-use 番号で
+動くことがその設計意図だからである。登録が通れば、その時点で両方の番号を
+受理する移行期間を置く（`ipq-selection-http-registration-request` を
+定数として隣に置いてあるのはそのため）。
+
+## 主張しないこと
+
+- 本番の graph query 経路が IPQ を使っている、とは言わない（S2/S4 が未了）
+- 広告に IPQ が載っている、とは言わない（S3 が未了）
+- IPQ が完全性を証明する、とは言わない（S5 が未了）
+"
+}]
