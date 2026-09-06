@@ -2,7 +2,15 @@
 ;; Does manifest/ipni-publisher.edn describe the publisher that is actually
 ;; publishing?
 ;;
-;;   nbb scripts/verify-ipni-publisher-record.cljs [--selftest]
+;;   nbb --classpath orgs/kotoba-lang/io-ipni-specs/src \
+;;       scripts/verify-ipni-publisher-record.cljs [--selftest]
+;;
+;; The classpath is for `ipni.metadata`, which reads the advertisement's
+;; Metadata field. Required rather than reimplemented here on purpose: this
+;; repository has already paid for two implementations of that one wire field.
+;; `ipni-drain` hardcodes the gateway metadata as three bytes, the library
+;; emits two, IPNI.md says two, and the wire carries three -- which is exactly
+;; what the last two checks below exist to see.
 ;;
 ;; Measured 2026-08-31 (ADR-2608311800): it did not. The file named the
 ;; 2026-08-27 key while the live head had been signed by another since
@@ -25,6 +33,37 @@
             ["fs" :as fs]
             ["child_process" :as cp]
             ["crypto" :as crypto]))
+
+(def ^:private ipni-metadata-src
+  "The one file the Metadata checks need, so their absence can be measured.
+
+  `require` in nbb cannot be caught -- a missing namespace kills the process
+  before a `try` sees it -- so the gate is the file, not the exception. Without
+  it two checks are :unmeasured and the other twelve still run."
+  "orgs/kotoba-lang/io-ipni-specs/src/ipni/metadata.cljc")
+
+;; Its own top-level form, not folded into the `def` below. nbb's `require`
+;; resolves asynchronously and is only awaited between top-level forms, so a
+;; `require` inside the `def` returns before the namespace is loaded and every
+;; `resolve` after it is nil -- which is indistinguishable from a missing
+;; checkout. Measured: with the checkout present and correct, the checks still
+;; reported :unmeasured.
+(when (fs/existsSync ipni-metadata-src)
+  (require '[ipni.metadata]))
+
+(def ipni-metadata
+  "The two fns, or nil when either is absent.
+
+  `resolve` returns nil for a symbol a loaded namespace does not define, so a
+  checkout that is merely OLD looks exactly like one that is present -- and
+  then calling nil crashes the whole script. Measured: the west pin was two
+  commits behind `decode-sequence` and the run died mid-way with `Cannot read
+  properties of null`, which is a worse answer than either :unmeasured or a
+  finding. Both symbols are required together; a partial answer is no answer."
+  (let [read-ipq (resolve 'ipni.metadata/read-ipq)
+        decode-sequence (resolve 'ipni.metadata/decode-sequence)]
+    (when (and read-ipq decode-sequence)
+      {:read-ipq read-ipq :decode-sequence decode-sequence})))
 
 (def manifest-path
   ;; Overridable so the negative direction can be shown on a doctored copy
@@ -215,6 +254,35 @@
                    (str "b" (base32 (subvec b i (+ i 36)))))))
          distinct vec)))
 
+(defn advertisement-metadata
+  "The `Metadata` byte string out of a DAG-CBOR advertisement block, or nil.
+
+  A targeted read rather than a CBOR decoder: find the map key -- CBOR text of
+  length 8, `0x68` then \"Metadata\" -- and take the byte string after it. Only
+  the immediate (`0x40`-`0x57`) and one-byte-length (`0x58`) forms are read,
+  because a Metadata field longer than 255 bytes would mean something this
+  reader has not been shown, and guessing would be worse than saying so.
+
+  nil is :unmeasured all the way up. It is never \"no metadata\", which IPNI.md
+  gives its own meaning: an advertisement with no Metadata is an address update."
+  [^js buf]
+  (let [b (vec buf)
+        k (into [0x68] (map #(.charCodeAt % 0)) "Metadata")
+        kn (count k)
+        n (count b)]
+    (loop [i 0]
+      (cond
+        (> (+ i kn 1) n) nil
+        (= k (subvec b i (+ i kn)))
+        (let [h (nth b (+ i kn))]
+          (cond
+            (<= 0x40 h 0x57) (let [len (- h 0x40) st (+ i kn 1)]
+                               (when (<= (+ st len) n) (subvec b st (+ st len))))
+            (= h 0x58) (let [len (nth b (+ i kn 1)) st (+ i kn 2)]
+                         (when (<= (+ st len) n) (subvec b st (+ st len))))
+            :else nil))
+        :else (recur (inc i))))))
+
 (defn serves-verifiably?
   "Does `host` return bytes that re-hash to `cid`? :unmeasured when no answer."
   [host cid]
@@ -240,6 +308,66 @@
               ;; check id so a reworded message does not become a new finding.
               (when @findings?
                 (println (str "FINDING\thigh\t" (name id) "\t" detail))))))
+
+(defn check-advertised-protocols!
+  "What the live advertisement says this provider speaks.
+
+  IPNI.md, Metadata: the field is a uvarint protocol identifier and
+  protocol-specific bytes, `repeated for additional supported protocols`, in
+  increasing order. So announcing a second transport is ONE advertisement with
+  a longer Metadata -- not a second advertisement and not a second context id.
+
+  These two checks were written before the publisher was changed, and were red
+  when written. That is the point: adding the IPQ metadata and forgetting to
+  add it produce the same successful publish, the same indexer 200 and the same
+  provider lookup, so nothing outside the bytes can tell them apart."
+  [head-cid retrieval-host]
+  ;; `retrieval-host`, not `publisher-host`. Measured while writing this:
+  ;; ipni.kotobase.net is classified as the publisher plane and answers every
+  ;; path with its surface descriptor, so `/ipfs/<cid>` there returns JSON and
+  ;; the extractor finds no Metadata field -- which is indistinguishable from an
+  ;; advertisement that has none. The host to read the block from is the one the
+  ;; check above has just proven serves it.
+  (let [ad-bytes (when (and head-cid retrieval-host)
+                   (curl (str "https://" retrieval-host "/ipfs/" head-cid "?format=raw")
+                         :binary? true))
+        md (some-> ad-bytes advertisement-metadata)
+        decoded (when (and md ipni-metadata) ((:decode-sequence ipni-metadata) md))
+        ipq (when (and md ipni-metadata) ((:read-ipq ipni-metadata) md))]
+    (check! :advertisement-metadata-is-well-formed
+            (cond (nil? ipni-metadata) :unmeasured
+                  (nil? retrieval-host) :unmeasured
+                  (nil? md) :unmeasured
+                  :else (boolean (:ok? decoded)))
+            (cond
+              (nil? ipni-metadata)
+              (str ipni-metadata-src " is missing, too old to carry decode-sequence, "
+                   "or not on the classpath (--classpath orgs/kotoba-lang/io-ipni-specs/src)")
+              (nil? retrieval-host) "no :ready retrieval candidate to read the block from"
+              (nil? md) "the advertisement's Metadata field could not be read"
+              (:ok? decoded)
+              (str (count (:entries decoded)) " protocol(s): "
+                   (str/join ", " (map #(or (:name %) (str (:protocol %)))
+                                       (:entries decoded))))
+              :else (str "Metadata does not parse as a protocol sequence: "
+                         (name (:reason decoded))
+                         (if (:protocol decoded)
+                           (str " at protocol " (:protocol decoded))
+                           ""))))
+    (check! :advertisement-announces-ipq
+            (cond (nil? ipni-metadata) :unmeasured
+                  (nil? retrieval-host) :unmeasured
+                  (nil? md) :unmeasured
+                  :else (boolean (:ok? ipq)))
+            (cond
+              (nil? ipni-metadata) "ipni.metadata is not on the classpath"
+              (nil? retrieval-host) "no :ready retrieval candidate"
+              (nil? md) "the advertisement's Metadata field could not be read"
+              (:ok? ipq) (str "IPQ/" (:profile ipq) " is announced")
+              :else (str "not announced: " (name (:reason ipq))
+                         (if (:protocols ipq)
+                           (str " (found " (str/join ", " (:protocols ipq)) ")")
+                           ""))))))
 
 (defn selftest
   "The derivation must reproduce a pair the file already records. A derivation
@@ -353,7 +481,10 @@
                       (str (:host c) (if (true? r)
                                        " returned bytes that re-hash to "
                                        " did NOT return bytes matching ")
-                           head-cid))))))
+                           head-cid)))))
+        (check-advertised-protocols!
+         head-cid
+         (:host (first (filter #(= :ready (:status %)) candidates)))))
 
       ;; ── the lifecycle proof ────────────────────────────────────────────
       ;; ADR-2608160300's success criterion ends with the advertisement going
