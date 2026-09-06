@@ -1,0 +1,103 @@
+[{:db/id -1
+  :adr/id "adr-2609062600-kami-app-suji-browser-posture-load"
+  :adr/title "姿勢負荷をブラウザで解いて 3D で見せる — kami-app-suji と、それを可能にした suji の可搬化"
+  :adr/status "accepted"
+  :adr/date "2026-09-06"
+  :adr/body "## 決定
+
+姿勢が人体に作る負荷を、**ブラウザ内で解いて 3D で見せる** single-page app を建てる
+(`kotoba-lang/kami-app-suji`、https://kotoba-lang.github.io/kami-app-suji/)。物理の正本は
+`cloud-itonami/suji`、描画の正本は `kotoba-lang/webgpu` + `webgl`、デザインは
+`jp-go-digital-design-system`。app は UI と orchestration だけを持ち、三角形を 1 つも
+生成せず、関節角から座標を 1 つも導かない(repo-wide 3D 規約)。
+
+その前提として `suji` の 3 つの欠陥を直した。3 つとも既存スイートが緑を返していたものである。
+
+## 直した欠陥
+
+### 1. `.cljc` を名乗って ClojureScript で 1 行も動かなかった
+
+`load` / `muscle` / `strain` が `Math/toRadians` / `Double/POSITIVE_INFINITY` /
+`Double/isInfinite` を reader conditional 無しで呼び、テストは `clojure.test` を直参照して
+いた。`suji.methods.load` を cljs で require すると最初の `radians` で落ちる。
+
+**JVM だけのスイートはこれを discriminate できない** —— 可搬な `.cljc` と可搬を名乗る
+だけの `.cljc` に同じ緑を返す。CLAUDE.md「検査を書く前・緑を信じる前の 6 問」の 2 問目
+(そもそも実行できないとき何を返すか)そのもの。
+
+`suji.methods.math` を数値の床にし、他の `.cljc` は host interop を呼ばない規則にした。
+`scripts/nbb_test.cljs` が可搬な側を cljs で走らせ、**落ちるために存在する**。evidence
+floor 付きで、スイートに到達できないときは exit **2**(0 でも 1 でもない)を返す —— 実測で
+確認済み。I/O をする 3 つのテスト namespace は `.clj` に改名した(実際に JVM 専用なので)。
+
+`round-to` の集約で 4 つ目の欠陥が出た。**4 コピーは同じ関数を計算していなかった**:
+cljs 側は `(/ (Math/round (* v 10^n)) 10^n)` で丸める前に掛けるので、`(round-to 2.675 2)`
+が JS で 2.68、JVM で 2.67。`datoms` は Python `repr` とバイト一致を主張している。
+`.toFixed` は double の厳密値を丸めるので両ホストが一致する。`math-test` が不一致集合を
+空に固定する。
+
+### 2. 幾何が関節ごとに再導出されていた
+
+モーメント式の中に `length × com-frac × sin(flexion)` の手書きてこ算が散っていた。
+`suji.methods.pose` が矢状面の連鎖を world space に **1 度だけ**置き、モーメントは
+Σ weight × (x_com − x_joint) —— 定義そのものになった。描画と物理が同じデータを読むので
+絵と数値が食い違えない。
+
+### 3. 前腕の配置が両端で反転していた
+
+`shoulder-moment` は前腕と手を鉛直から `(90° − 肘屈曲)` に置いていた。**伸ばした腕が水平**
+になり、**タイピングの 90° 肘が鉛直**になる。実測: 真下にぶら下げた腕(質量が関節の真下に
+あり、てこが無いので厳密に 0)が **5.15 N·m** を報告し、laptop-on-lap の肩モーメントは
+130% 過小(3.84 → 8.82 N·m)だった。腕を支える 2 姿勢は不変(そこでは上腕しか肩帯に載らない)。
+**Hansraj 2014 で検証済みの頸椎の脚は一切触っていない**。
+
+## app を建てて見つけた、絵が正しく見えるまま壊れる 2 つ
+
+- **`mesh/render-scene!` は「複数メッシュ」と書いてあるが、1 upload を共有すると最後の 1 つ
+  しか描かれない。** per-draw の uniform を upload のバッファに書くので、pass 内の全 draw が
+  エンコードされてから実行される以上、共有した N draw は最後の uniform を読む。6 本の骨が
+  1 本の棒として描かれ、エラーは出なかった。app 側はオブジェクトごとにバッファを持つ。
+- **React 18 の `createRoot().render()` は非同期コミット。** mount 直後の
+  `requestAnimationFrame` 1 回では canvas がまだ無く、`when-let` は静かに何もしない。
+  再試行が無いので viewport は一生初期化されず、canvas は既定の 300×150 のまま、
+  エラーはどこにも出ない。毎 render 後に `ensure-canvas!` を呼ぶ。
+
+## 検証(両方向)
+
+| 対象 | 手段 | 結果 |
+|---|---|---|
+| suji / JVM | `clojure -M:test` | 79 tests / 1177 assertions |
+| suji / cljs | `nbb --classpath src:test scripts/nbb_test.cljs` | 63 tests / 225 assertions |
+| suji / lint | `clojure -M:lint` | 0 errors(baseline は 7) |
+| app | `clojure -M:test` | 10 tests / 86 assertions |
+| app / lint | `clojure -M:lint` | 0 errors / 0 warnings |
+| app / 実ブラウザ | `scripts/verify-browser.cljs` | 8 checks(ローカルと**公開 URL の両方**) |
+
+break/unbreak を 2 件実施:
+- `(90 − 肘)` の配置を戻すと `pose-test` が名指しの理由で落ちる —— 前腕てこが肘屈曲に対し
+  0.107 → 0.0 と**減り**、ぶら下げ腕が 5.154 N·m を報告する。
+- カメラを寄せると `camera-frames-the-whole-body` が \"top is cut off\" で落ちる。
+
+ブラウザ側 8 つは、コンパイラにもテストにも見えないものだけを見る: GPU backend を実際に
+取れたか(`webgpu` と報告)、画素が描かれたか(単色でないこと)、**物理がブラウザで走るか**
+(スライダで数値が変わる —— 2026-09-06 より前のどの commit でも通らなかった assertion)、
+**view を跨ぐときに document を読み込まないか**(`window` に置いた値が残ること)。
+
+## 意図的にやっていないこと
+
+- **冗長筋の静的最適化(Crowninshield–Brand)と角度依存モーメントアーム。** 前者は現在の
+  1 関節 1 筋の構造では観測可能な差を生まず、意味を持たせるには筋群の分割が要る。後者は
+  出所を確認できる値を今日は用意できなかった。**代表値を出所なしに増やさない**(G7)。
+- **`route.cljc` の抽出。** これがワークスペースで 3 つ目の同型コピーで、`kotoba-uiux`
+  skill が言う抽出 trigger は既に引かれている。抽出は既存 2 app の移行まで済ませないと
+  共有にならないので、別変更として残す。
+- **3D 全身筋骨格・解剖メッシュ・前額面。** モデルは矢状面 2 次元のままである。
+
+## 着地
+
+- `cloud-itonami/suji` main `5a3da89a`、west pin 前進済み(`35906fa2`)
+- `kotoba-lang/kami-app-suji` main `e3a35394`、west 登録済み(west.yml `42a592a2` /
+  repos.edn `d0633405`)
+- 公開 https://kotoba-lang.github.io/kami-app-suji/ (gh-pages `fbbf378b`、Actions 不使用)
+"
+  :adr/related ["ADR-2606061900" "ADR-2608080100" "ADR-2607102200" "ADR-2607173000"]}]
