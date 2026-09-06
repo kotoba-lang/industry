@@ -1,0 +1,107 @@
+[{:db/id -1
+ :adr/id "adr-2609064500-measure-the-graph-read-path-before-wiring-ipni-or-packs"
+ :adr/title "S4 の前提は自分の測定に否定されている —— pack は 97% の逐次項に効かず、IPNI は round trip を足す。先にその経路を観測可能にする"
+ :adr/status "accepted"
+ :adr/date "2026-09-06"
+ :adr/related ["adr-2609063500-ipq-is-the-name-of-the-selection-layer"
+               "2608160100-kotobase-physical-plane-ipld-carv2-pack"
+               "2608021000-namidb-comparison-and-the-read-path-trampoline"
+               "2608170300"
+               "adr-2609063000-what-the-ipld-stack-integrates-and-what-only-compiles"]
+ :adr/body "## 問い
+
+IPQ の段取り（ADR-2609063500）の S4 は「本番 graph query 経路が IPNI discovery と
+CARv2 pack を使う」だった。それに着手する前に、**何が買えるのかを repo の中の
+既存の測定から調べた**。結果、S4 の前提はこの workspace 自身の測定に否定されている。
+
+## 否定された前提
+
+**pack は hydration の逐次項 97% には効かない。** ADR-2608160100 は自分で訂正を
+書いている —— 100 link を 1 commit ずつ書いた場合、block-per-object も packed も
+**どちらも 100 request**。100→1 になるのは 1 回の呼び出しで 100 block を書いたときだけで、
+それは production の書き込み形ではない。packing の write-locality（1 commit = 1 pack）
+の下では、novelty の cons chain は commit を跨ぐので pack が跨がない。
+
+残る主張は狭い: **pack が買うのは commit-local な読み**（1 commit が書いた ~12 block が
+1 request になる）。それが全体のどれだけかは**誰も測っていない**。
+
+**IPNI discovery は round trip を足す。** block ごとに lookup が 1 回増える —
+`:block-source` か pack catalog が先に答えない限り。ayatori の bench が示した
+「discoveries 6→0」は、**今この worker が払っていないコストに対する節約**である。
+
+## 実測で分かった構造（引用は agent 調査、file:line 付きで原本にある）
+
+**1. 読み経路は 2 本あり、名前空間が違う。**
+legacy `/xrpc/*` は `blocks/<graph>/<cid>`、canonical `/v2/query` は `ipld/<cid>`。
+**IPNI が広告しているのは後者の名前空間だけ**で、しかも広告されているのは pin であって
+graph chain block ではない（live な context は kotobase-appviews-v1 と
+ayatori-public-arrangement-v1 の 2 つ）。legacy 経路の block はどこにも広告されていない。
+
+**2. 同期/非同期の境界が seam を決める。** `:get-fn` は trampoline の同期 getter で、
+block が無いと throw する —— await できない。`ayatori.remote/open-snapshot` は
+同期で、しかも async crypto を明示的に拒否する。入れるとすれば
+`open-snapshot-async` を `:async-get-fn` の側に、であって `:get-fn` ではない。
+
+**3. pack tier は deploy されない repo の中に在る。** `net-kotobase/engine` に
+pack_writes / pack_reader / pack_tip / pack_catalog_bootstrap が揃っているが、
+この repo には `.github/` が無く deploy 経路が無い。`wrangler.jsonc` の script 名は
+control-plane と **同じ** `kotobase-cf-wasm-staging` で route だけ違う。
+そして `store.cljs` のコメントが既にこの罠を名指ししている ——
+「以前の修正は別の worker に着地して 3 日誰も気づかなかった。同じことがその修正自身にも
+起き、7 日続いた」。
+
+**4. packed 経路には未修正の silent partial read が在る。** ADR-2608170300、
+2026-08-24 の testnet 実測: pack 書き込み ON で query が 25 行中 9〜14 行を返し、
+**HTTP 200**。疑わしい箇所も名指しされている —— `block-fetcher` が不在 block に対して
+nil を返し、async 読みがそれを miss-and-retry ではなく absent-and-skip として扱う。
+
+**5. 誰もこの経路を測っていない。** repo の中の数字はどれも suite か、synthetic な
+in-memory server か、別の worker のものである。ADR-2608170300 が自分でそう書いている ——
+「本物の測定はまだ無い。ここまでの数字は全部 suite のもの」。
+
+## 決定
+
+**S4 を「ayatori を graph worker に配線する」と定義するのをやめる。** 先に
+**その経路を観測可能にする**。
+
+最初の一手は既に書かれている —— `net-kotobase/engine` の commit c3c508fe（2026-09-05）が
+per-request の block-fetch 内訳（L1 / L2 / pack / B2 / miss）を観察専用カウンタと
+`x-kotobase-kv-stats` response header として持っている。fetch path の構造は変えない。
+**それが deploy されない側の copy に在る。** deploy する側へ port する。
+
+それが答えるのは、今どの assertion も答えられない 3 問:
+
+1. 実クエリが触る block のうち L1 / L2 / R2 の内訳は。L1+L2 が大半なら、
+   ayatori の 2 機能はコストでない場所を最適化していることになる。
+2. request あたりの distinct block 数は、512 の予算に対していくつか。
+   ADR-2608021000 の 97% は unfolded 64 tx が上界なので、production が積極的に fold
+   していれば逐次項は既に小さいかもしれない。
+3. そのうち**同じ commit が書いた**割合は。ADR-2608160100 の訂正どおり、
+   pack が平らにできるのは正確にそこだけである。低ければ pack は測定上作る価値が無い。
+
+**この header が本番に在って読まれるまで、pack tier も catalog も IPNI 依存も作らない。**
+ADR-2608160100 が既に前例を作っている —— 最初の動機が誤っていたのは、測定が 100 block を
+1 回で書いて答えを仮定していたからだった。
+
+## 未決（governance であってコードではない）
+
+- **`net-kotobase/engine` と `control-plane` のどちらが正本か。** どちらも書いていない。
+  script 名が同じなので、engine から手で `wrangler deploy` すれば production を
+  上書きする。そうなった証拠も、そうならない保証も見つからなかった。
+- ADR-2608170300 の silent partial read が直ったかどうか。診断と被疑箇所は在るが、
+  修正 commit も再実行の receipt も見つからない。nil を返す形は deploy 側にも残っている。
+
+## 同日の別件 —— 同じ形が protocol-core にも在った
+
+`kotobase-protocol-core` の `deps.edn` が「src has no dependencies at all」と言い続けて
+いた件（ADR-2609063500 §S2 実装中に発見）を調べた結果、**依存は除去できない**と分かり、
+その証拠がテストとして着地した（ca3874d2）。重要なのは経緯のほうである ——
+duck-typing 版（`satisfies?` を `(not (map? target))` に）を実際に当てると
+**既存 24 テストは両ランタイムとも緑のまま通った**。suite の fixture が全部 deftype で、
+代用述語がたまたま一致するからである。record 形の store は本番経路で静かに壊れていた。
+**control を先に書かなければ、緑のまま出荷されていた。**
+
+さらに `-atproto` と `-pinning` の deps.edn に**同じ偽の申告**が残っている。
+これは検出器の仕事であって、手で 1 件ずつ直す仕事ではない。
+"
+}]
