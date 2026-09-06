@@ -134,15 +134,97 @@ The actual migration of the live ledger is deliberately NOT done here. It
 belongs with the streaming runner — migrating with nothing to append is churn,
 and `publish.cljc` / `datom-emit` still read the single file.
 
+## Streaming runner — landed (rasen main ceeb9e87)
+
+`rasen.methods.clinvar-run`. Acquisition is separate from normalisation: a full release takes
+long enough that holding one HTTP connection across it is its own failure mode. The declared
+size is passed in by the caller rather than read from a response header, because babashka —
+which runs this repository — does not permit the HttpURLConnection header methods, and a size
+check that silently does nothing on the runtime we actually use is worse than none. Resume is
+keyed on the sha256 of the downloaded release, not Last-Modified: row offsets are only
+meaningful against the exact bytes they were counted in.
+
+:complete is returned only when the stream can be shown to have ended where the source said —
+gzip's own trailer validating, and a declared size matching. Otherwise :truncated. A bounded
+run returns :limited and can never claim the whole corpus.
+
+Measured against the live release (442,495,433 bytes, sha256:186ad283…04c9): fetch verified in
+21s; 40,414 rows read / 19,999 kept / 20,415 skipped in 180s = 224 rows/s; 560,445 datoms in
+28 txs across 3 shards; chain verifying.
+
+**The full run has not been done, and not for a reason in the code.** Extrapolated it is ~5.8M
+rows, ~7.2 hours, ~81M datoms, ~6.2 GB of ledger. This machine has 2.3 GB free of 927 GB
+(measured 2026-09-06, disk at 100%). Starting it would fill the disk and take every other
+session on this host down with it. The run needs either space here or the ledger on B2/DataLad
+per the superproject's large-binary rule — a storage decision, taken before the run, not
+during it.
+
+## kotobase projection — seam landed, transport blocked (rasen main 480f3656)
+
+`rasen.methods.kotobase-publish` carries no transport and no credential; writes go through an
+injected (fn [tx-edn] -> result). `kotoba-lang/kotobase-client` is the canonical client and is
+what a host wires this to — rasen runs under bb and that client is ClojureScript, and the seam
+exists so rasen does not grow a second one.
+
+The watermark is the part worth engineering. Publish a batch, advance, repeat — and a
+transport returning nil, or a 202 never applied, advances it exactly as far as a real
+acknowledgement does; the next run starts after datoms that were never stored and no later run
+goes back for them. So `acknowledged?` recognises success rather than assuming it, the run
+stops at the first unrecognised reply, and the resumed run re-sends that transaction rather
+than the one after it. The ledger is verified before anything is sent: projecting a ledger that
+does not verify would put datoms on the target that no shard accounts for, ending the
+rebuildability that makes it a projection at all.
+
+**Both faces of kotobase.net are currently unreachable, measured 2026-09-06.** POST
+/api/transact without credentials returns 401. The datom plane went Biscuit-required
+(net-kotobase ADR-2608280230) and CACAO no longer authenticates ordinary tenant reads or
+writes. The operator seed KOTOBA_SEED is a write-only Cloudflare Worker secret with no readable
+copy anywhere — by design, and changing it would change the operator DID and therefore the
+graph namespace. The archive plane's KOTOBASE_ARCHIVE_TOKEN returns `no such item` from the
+kagi vault today, the third swing for that one item; the secrets map has been corrected. Minting
+or guessing a credential is not something an agent does (safety floor 1), so this is owner
+action: issue a Biscuit for a rasen tenant, or restore the archive token.
+
+Entity identity is the target's property. Ledger ids are content-stable strings; whether a
+target upserts on one or mints a fresh entity per transaction cannot be checked without a live
+endpoint, so `publish!` does not claim idempotence and `:entity-fn` is where a host supplies
+what its target needs.
+
+## gnomAD frequencies — landed, and G1 caps the coverage (rasen main 480f3656)
+
+`rasen.methods.gnomad` emits population nodes and :allele-frequency 縁 and nothing else.
+
+Two constraints here are constitutional rather than technical, and both came from reading real
+gnomAD rather than the spec.
+
+A VCF record identifies a variant by CHROM/POS/REF/ALT. The only G1-safe identity it carries is
+its dbSNP rsID, and gnomAD leaves that empty for a large share of records — measured on a real
+v4.1 chr21 genomes prefix, 24,189 of 41,172 (58.8%). Those records are not representable at
+all. So `extract` partitions every record into :with-rsid and :without-rsid and `coverage`
+returns nil rather than a number when nothing was read: **full gnomAD coverage is false by
+construction**, and the counts exist so it cannot be claimed by accident.
+
+gnomAD publishes AF_XX and AF_XY — sex-stratified — beside the super-population keys, plus
+AF_fin / AF_asj / AF_ami / AF_mid / AF_remaining, all finer than :population/code admits. The
+mapping is an explicit allow-list, not a prefix match; a prefix match would sweep them in and
+the resulting edges would be indistinguishable from legitimate ones.
+
+Measured on the real prefix: 41,172 records → 21,573 distinct variants, 144,544 frequency edges
+across exactly six populations, 0 G1 violations, 5.4s (~7,600 records/s).
+
+**Scale, so nobody plans against the wrong number.** That 25 MB prefix is 0.32% of chr21
+genomes alone (7.76 GB). gnomAD v4.1 genomes is on the order of 760M variants; at 58.8%
+representable that is ~450M variants and billions of frequency edges — orders of magnitude
+beyond ClinVar's ~81M datoms, and not a run this host can hold under any arrangement. It needs
+the storage decision first, and probably a different machine.
+
 ## Not done, and blocking
 
-1. **The G7 streaming runner.** Nothing yet streams the 442 MB gzip; the
-   normaliser is pure and takes parsed lines.
-2. **The kotobase.net publisher.** `kotoba-lang/kotobase-client` is the canonical
-   CACAO-authed client and `net-kotobase/commoncrawler` is the existing precedent
-   for bulk EAVT into kotobase.net through the `kotobase.store/IStore` seam.
-   Neither is wired to rasen yet. Do not write a third client.
-3. **gnomAD AF extraction.** Per-variant super-population frequencies only.
+1. **Storage.** 2.3 GB free; ClinVar alone needs ~6.2 GB and gnomAD is far larger. Nothing
+   further runs until the ledger has somewhere to live (B2 + DataLad per the large-binary rule).
+2. **A credential for kotobase.net.** Owner action; see above.
+3. **Migrating the live single-file ledger** onto shards, together with pointing
+   `publish.cljc` / `datom-emit` at them.
 
 ## Notes for whoever continues
 
