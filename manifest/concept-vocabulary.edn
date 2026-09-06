@@ -141,7 +141,10 @@
               "car file" "unixfs" "adl" "selector" "cid" "content addressed"
               "content-addressed" "block store" "provider discovery"
               "delegated routing" "trustless gateway" "pinning"
-              "取得面" "ブロック取得" "コンテンツアドレス" "内容アドレス"]
+              "ipq" "transport-ipq-selection-http" "verifiable selection"
+              "selection car" "replay" "bounded traversal"
+              "取得面" "ブロック取得" "コンテンツアドレス" "内容アドレス"
+              "検証可能な選択" "選択の証明"]
   :note "**ayatori（綾取り）は metaphor 名**なのでここに載せる —— 名前は
 『IPLD graph の query 面』を一文字も示さない（kuro / kobo と同じ形。ADR-2608039980）。
 
@@ -164,6 +167,16 @@ hash する証拠でなく、どれも query が評価された証拠ではな�
 一方 **retrieval 面（net-kotobase/ipfs = ipfs.kotobase.net）は別**で、
 UnixFS(`kotobase-ipfs.unixfs` + `ipld.dag-pb`)・CARv2・IPNS を持つ。
 **「kotobase は UnixFS を使っていない」と面を分けずに言わない。**
+
+**IPQ はこの面の HTTP surface の名前**（ADR-2609063500）。`kotobase-protocol-ipq` が
+純関数 handler（`GET /ipq/v1/selection/{root}?selector=…` → CARv1）、
+`net-kotobase/ipfs` の `kotobase-ipfs.ipq` が R2 に繋ぐ非同期 shell、
+`io-ipni-specs` の `ipni.metadata` が広告に載せる protocol identifier
+（`transport-ipq-selection-http` = 0x300940、multicodec の private use area）。
+**IPQ/1 が証明するのは traversal であって完全性ではない** —— profile 番号が
+その線を wire に載せている。⚠ **`ipq` は名前であって出所ではない**: repo 名の
+origin 面に `ip*` を自作しない（ADR-2609063000 / ADR-2608040100）。ここに在るのは
+`kotobase-` family + capability という形で、IPFS の mirror は `io-ipfs` が担う。
 
 契約は kotobase `docs/adr/2609060000-ipld-adl-selector-car-boundaries.md` と
 ayatori `docs/ipld-retrieval-contract.md`。FBL / Arrow buffer / ADL signalling は
