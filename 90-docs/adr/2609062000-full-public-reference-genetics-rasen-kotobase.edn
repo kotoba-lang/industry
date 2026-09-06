@@ -283,4 +283,65 @@ While landing this, a superproject EDN document written by another loop
 found broken by four raw quotes inside a body string, which closed it early and
 left the remainder to be read as symbols. Escaping restored it; content
 unchanged. This is the failure mode the superproject CLAUDE.md already records,
-and it recurred in a document written the same day."}]
+and it recurred in a document written the same day.
+
+## Closing state (2026-09-06)
+
+**Landed.** `etzhayyim/actor-rasen` main `96d7d172`; the west pin and the shared checkout
+both sit on it, so checkout / pin / main are one thing. Suite: **148 tests, 905 assertions,
+0 failures**. Every refusal path added in this ADR's work was broken on purpose and only its
+own test failed.
+
+**The corpus is being built, and it is resumable.** Ledger at `~/.gftd/rasen-genome/ledger`
+— durable, not a session scratchpad, because a resident bot cannot own state that disappears
+with whoever started it. Sealed shards live in R2 `etzhayyim-rasen-genome` under
+`rasen-genome/`. Measured at close: **723,378 rows read, 238,439 kept, 459 transactions,
+9,187,054 datoms, 45 shards in R2, 14 MB on local disk** against the ~6.2 GB the corpus would
+be if nothing were offloaded.
+
+**The interruption handling was proven by the failure it was written for.** The live stream
+was cut twice. The first time predated the fix and died as an unclassified
+`SocketException`. The second time it produced
+`run!: the source connection was interrupted — refusing to report a corpus`, wrote
+`:run/status :interrupted`, and kept `rows/read 717069` — so the resumed run picked up where
+it stopped instead of re-reading a third of the release.
+
+### Resume point
+
+```bash
+# credentials: bucket-scoped, object-read-write, 7 days from 2026-09-06
+#   security find-generic-password -s gftd.cf -a API_TOKEN -w
+#   -> POST /accounts/<acct>/r2/temp-access-credentials
+#   ALWAYS pass --region auto; without it SigV4 signs for the config's region and R2
+#   answers SignatureDoesNotMatch, which makes a correct key look revoked.
+cd <a worktree of etzhayyim/actor-rasen at main>
+. /tmp/r2env.sh                      # or mint fresh credentials as above
+LEDGER_ROOT=$HOME/.gftd/rasen-genome/ledger \\
+CV_FP=clinvar-2026-08-31-sha186ad283 \\
+  bb <r2run.clj>                     # streams the release, resumes from the checkpoint
+```
+
+The run script is not in the repository — it is 20 lines of host glue that wires
+`clinvar-run/run!` to `aws s3api` through `shard-archive`'s injected `store-fn`. Rewriting it
+is a five-minute job and it deliberately carries the credential handling that the repo does
+not.
+
+### What blocks each remaining piece
+
+1. **ClinVar completion** — nothing but time and connection stability. The run is streaming
+   and resumes on its own.
+2. **kotobase.net projection** — owner action. The datom plane is Biscuit-required, the
+   operator seed is a write-only Cloudflare secret by design, and the archive token reads
+   `no such item`. An agent does not mint or guess a credential.
+3. **gnomAD** — needs its own run plan. The extractor is verified on real records; the corpus
+   is on the order of 760M variants with 58.8% representable, which is a different order of
+   magnitude from ClinVar's ~81M datoms.
+4. **The ledger migration** of the old single-file ledger, with `publish.cljc` / `datom-emit`
+   repointed at the shards.
+
+### Retained on purpose
+
+The worktree at `scratchpad/rasen-live` (branch `agent/live-run`) is NOT cleaned up: the
+ingest process is running out of it. Removing it would stop the only thing making progress.
+Its branch carries no commits of its own — it tracks main — so nothing is unlanded there.
+Whoever finishes the run should remove both."}]
