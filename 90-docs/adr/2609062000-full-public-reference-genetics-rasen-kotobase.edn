@@ -91,23 +91,64 @@ have been invisible in both. MONDO values carry their own prefix.
 Skipped rows return nil rather than an empty graph, and the accumulator reports
 rows and skips, so coverage cannot be silently overstated.
 
+## Sharding — landed (rasen main a979d183)
+
+`rasen.methods.ledger-shards`. Sharding does not touch the chain: a tx cid is
+sha256 over (datoms, prev-cid) and nothing else, so splitting the same linear
+sequence across files preserves every cid. `migrate!` asserts that instead of
+assuming it; on the real on-disk ledger (1 tx, 583 datoms) the head comes
+through byte-identical as b17a2fa1…d99990.
+
+The failure worth engineering against is not splitting but INCOMPLETENESS. Once
+the log is many files, walking the shards you can find yields a shorter chain
+that verifies perfectly — \"could not read shard 7\" returns the same ok as \"read
+every shard and all linked\". The index is therefore the evidence floor:
+`verify!` reports ok only after seeing exactly as many txs as the index says
+exist, and it separates :no-index, :index-invalid, :shard-missing,
+:chain-broken and :count-mismatch instead of collapsing them into false.
+`index-violations` throws for a non-index rather than reporting no violations.
+`reindex!` refuses to synthesise an index for an empty directory. `append-txs!`
+refuses a run that does not continue the head.
+
+Both refusal paths were broken deliberately and only their own tests failed:
+skipping unreadable shards failed the missing-shard tests, and removing the
+count floor failed the truncation test alone.
+
+**A defect in the existing ledger, found by trying to migrate it.**
+`kotoba/verify-chain` returned `{:ok true :length 0}` for a path that does not
+exist. `read-log` returning [] for a missing file is correct — `autorun` starts
+a fresh chain from genesis on a machine with no ledger — but folding that []
+into verification made \"there is no ledger here\" indistinguishable from \"I
+walked the whole ledger and every link holds\". It now refuses with :no-log.
+This is the same class the superproject CLAUDE.md records, sitting in the
+ledger's own verifier.
+
+Two writing hazards worth carrying forward. `pr-str` cannot write the index: it
+collapses same-namespace maps to `#:index{…}`, which the minimal reader in
+`kotoba.cljc` parses to the string \"#:index\" — silently, yielding an index that
+is not a map. And `data/persisted/` is gitignored by design (machine-local,
+regenerable from the committed seed), so a worktree has no ledger at all; that
+absence is exactly what surfaced the verifier defect.
+
+The actual migration of the live ledger is deliberately NOT done here. It
+belongs with the streaming runner — migrating with nothing to append is churn,
+and `publish.cljc` / `datom-emit` still read the single file.
+
 ## Not done, and blocking
 
-1. **Sharded ledger.** Required before any full run. Single-file EDN cannot hold
-   the corpus.
-2. **The G7 streaming runner.** Nothing yet streams the 442 MB gzip; the
+1. **The G7 streaming runner.** Nothing yet streams the 442 MB gzip; the
    normaliser is pure and takes parsed lines.
-3. **The kotobase.net publisher.** `kotoba-lang/kotobase-client` is the canonical
+2. **The kotobase.net publisher.** `kotoba-lang/kotobase-client` is the canonical
    CACAO-authed client and `net-kotobase/commoncrawler` is the existing precedent
    for bulk EAVT into kotobase.net through the `kotobase.store/IStore` seam.
    Neither is wired to rasen yet. Do not write a third client.
-4. **gnomAD AF extraction.** Per-variant super-population frequencies only.
+3. **gnomAD AF extraction.** Per-variant super-population frequencies only.
 
 ## Notes for whoever continues
 
 The ADR number in the source docstrings of `clinvar.cljc` and
-`test_clinvar.cljc` says 2609061800, which belongs to a different ADR
-(kotoba-web-architecture-fit). It should read 2609062000. Corrected separately.
+`test_clinvar.cljc` briefly said 2609061800, which belongs to a different ADR
+(kotoba-web-architecture-fit). Corrected in rasen main 16d55c50.
 
 While landing this, a superproject EDN document written by another loop
 (`90-docs/business/revenue-agent-loop/runs/0037-kotobase-stab-001.edn`) was
