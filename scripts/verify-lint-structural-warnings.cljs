@@ -369,10 +369,15 @@
   (let [present (filterv #(dir? (p/join repo-dir %)) lint-dirs)]
     (cond
       (not (dir? repo-dir))
-      (unmeasured! (str "no-checkout:" rel)
-                   (str "registered in manifest/west.yml and not checked out under the scan "
-                        "root — whether its src carries either id is unknown, and unknown is "
-                        "not clean"))
+      ;; Only for a path the MANIFEST named. A path the caller named is
+      ;; already reported by `sweep!` as `no-such-repo:`, and saying it a
+      ;; second time as `registered in manifest/west.yml` would assert
+      ;; something about it that nobody checked -- one refusal, one reason.
+      (when-not asserted?
+        (unmeasured! (str "no-checkout:" rel)
+                     (str "registered in manifest/west.yml and not checked out under the scan "
+                          "root — whether its src carries either id is unknown, and unknown is "
+                          "not clean")))
 
       (empty? present)
       (if asserted?
@@ -499,14 +504,20 @@
   (fs/writeFileSync f content))
 
 (defn- fixture-run
-  "Lint a synthetic tree and return [findings unmeasured]."
-  [root scope]
-  (reset! scan-root* root)
-  (reset! findings [])
-  (reset! unmeasured [])
-  (reset! counters {})
-  (doseq [rel scope] (check-repo! rel (p/join root rel) {:asserted? true}))
-  [(distinct-by-key @findings) (distinct-by-key @unmeasured)])
+  "Lint a synthetic tree and return [findings unmeasured].
+
+  `asserted?` is a parameter because the two refusals it selects between are
+  different claims: a path the MANIFEST named that is not checked out, and a
+  path the CALLER named that does not exist. Fixing them to one value would
+  leave one of the two untested."
+  ([root scope] (fixture-run root scope true))
+  ([root scope asserted?]
+   (reset! scan-root* root)
+   (reset! findings [])
+   (reset! unmeasured [])
+   (reset! counters {})
+   (doseq [rel scope] (check-repo! rel (p/join root rel) {:asserted? asserted?}))
+   [(distinct-by-key @findings) (distinct-by-key @unmeasured)]))
 
 (defn selftest
   "The derivation must report each id on a tree that has it, clear on the same
@@ -604,11 +615,18 @@
                " — an unreadable file does not blind the repository")))
     (fs/rmSync (p/join root r "src/fx/broken.clj"))
 
-    ;; 8. a checkout that is not there
-    (let [[_ u] (fixture-run root ["orgs/kotoba-lang/absent"])]
+    ;; 8. a checkout that is not there. Reported ONCE, and as the right thing:
+    ;;    from the manifest it is `no-checkout`, and a path the caller named
+    ;;    is left to `sweep!` to report as `no-such-repo` rather than being
+    ;;    described here as registered when nobody checked whether it is.
+    (let [[_ u] (fixture-run root ["orgs/kotoba-lang/absent"] false)]
       (t! :a-missing-checkout-is-unmeasured
           (and (= 1 (count u)) (str/starts-with? (:key (first u)) "no-checkout:"))
           (str "a registered path with no checkout → " (str/join ", " (map :key u)))))
+    (let [[_ u] (fixture-run root ["orgs/kotoba-lang/absent"] true)]
+      (t! :an-asserted-missing-path-is-not-called-registered
+          (empty? u)
+          "a path named on the command line is not also reported as registered in west.yml"))
 
     ;; 9. a checkout with nothing to lint, named on the command line
     (fs/mkdirSync (p/join root "orgs/kotoba-lang/docsonly") #js {:recursive true})
