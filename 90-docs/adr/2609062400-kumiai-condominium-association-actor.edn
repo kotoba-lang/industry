@@ -5,10 +5,11 @@
   :adr/date "2026-09-06"
   :adr/repo "cloud-itonami/cloud-itonami-isic-6820"
   :adr/tags ["cloud-itonami" "isic-6820" "actor" "governor" "kanri-kumiai" "shuzen-tsumitatekin" "kubunshoyu-ho" "chouki-shuzen-keikaku"]
-  :adr/landed-commit "577b277616590c04d89486328b3682157e053dce"
-  :adr/west-pin-commit "0783d41f7508ec0fd0e1b1b885988454f00b4843"
+  :adr/landed-commit "2f0b0b13e48efc5014da5f579b17c05370dfa489"
+  :adr/west-pin-commit "5c8e3fb5e5734845dab9893e442ec3ce1bdd7105"
   :adr/landed-commits ["547c86e65483da40cec577b9742dc4cd1a7c571a — 管理組合 actor (JPN)"
-                       "577b277616590c04d89486328b3682157e053dce — DEU / ESP / FRA の法定決議要件"]
+                       "577b277616590c04d89486328b3682157e053dce — DEU / ESP / FRA の法定決議要件"
+                       "2f0b0b13e48efc5014da5f579b17c05370dfa489 — SGP の法定決議要件"]
   :adr/body "cloud-itonami-isic-6820 は ISIC Rev.5 6820 (Real estate activities on a
 fee or contract basis) の open business blueprint として、**管理会社が
 所有者の代理で報酬を受け取り契約を実行する**面を実装していた。同じ ISIC
@@ -222,20 +223,58 @@ travaux に単価表は無い。したがって `reserve-guideline` は日本以
 「同じ票が法域ごとに割れる」fixture で落ちた —— 古いコードのまま
 緑になるのではなく。**両方向の fixture を組む理由がこれである。**
 
+### SGP を追加した (2026-09-06、同日追記)
+
+**Singapore は「読めなかった」列に居たが、そこに居た理由がこの repo の
+規則そのものだった。** `sso.agc.gov.sg/Act/BMSMA2004` は何度引いても
+**HTTP 200 を返し、中身は Page Not Found** だった。記憶していた法律名も
+識別子も古かった —— 現行の題名は **Building (Strata Management) Act
+2004**、SSO の識別子は `BSMA2004`。公式の索引 (`/Browse/Act/Current/B/0`)
+を辿って見つけた。**規則を緩めずに、entry が未検証から検証済みへ動いた。**
+この失敗そのものを SGP entry の `:notes` に記録してある ——
+「200 は読めたことを意味しない」を、この actor 自身が踏んだ実例として。
+
+**モデルに無かった形が 2 つ来た。**
+
+- **普通決議に分母が無い。** s 2(2)(b) は**有効票の賛成と反対を直接
+  比べる** —— 挙手なら頭数、poll を採ると lot の share value。棄権は
+  どちらの側にも現れず、**同数は否決**。これを分数で書くには分母を
+  発明するしかなく、発明した分母は誰かが棄権した瞬間に条文と食い違う:
+  有効票40のうち賛成21・反対19 は**可決**だが、同じ21を出席60に対して
+  測ると**否決**になる。テストはこの対を両方 assert する。
+- **通知期間が定義の一部である。** 「(a) 通知から15日目以降に適法に
+  招集された総会で可決され、**かつ** (b) 票が…」という構造なので、
+  14日目に通ったものは「僅差で否決された普通決議」ではなく、
+  **普通決議ではない**。よって `:notice-days` は `tally` で検査し
+  `:passed?` に入る —— evidence checklist ではない。
+
+### AUS-NSW は「読めなかった」ではなく「読まない」
+
+`legislation.nsw.gov.au` は HTML も PDF も自前の検索 API も 403 を返し、
+本文は **Cloudflare の bot チャレンジ**だった。**これを回避しない** ——
+bot 検出の回避はこのワークスペースの安全床が禁じている。したがって
+`:unverified-reason` を `:source-behind-bot-challenge` という**別の値**に
+分けた。ITA / CHN の `:source-unreachable` (取得経路の問題、URL が
+見つかれば解消する) と混ぜると、「誰も試していない」か「試しても無駄」の
+どちらかを偽って主張することになる。**理由の keyword が、gap と decision
+のどちらであるかを言う。**
+
 ## 着地
 
-- cloud-itonami/cloud-itonami-isic-6820 main = 577b2776
-  (2 回のサーバ側 merge commit。547c86e6 が JPN、577b2776 が DEU/ESP/FRA)
-- west pin 前進 = a25de73b -> 0783d41f (scripts/west-pin-put.cljs)
-- clojure -M:dev:test -> 179 tests / 723 assertions / 0 failures
+- cloud-itonami/cloud-itonami-isic-6820 main = 2f0b0b13
+  (3 回のサーバ側 merge commit。547c86e6=JPN / 577b2776=DEU・ESP・FRA /
+  2f0b0b13=SGP)
+- west pin 前進 = a25de73b -> 0783d41f -> 5c8e3fb5
+- clojure -M:dev:test -> 188 tests / 755 assertions / 0 failures
 
 ## 残っている gap (正直に)
 
-- 検証済みの決議要件テーブルは **JPN / DEU / ESP / FRA の 4 法域**。
-  SGP・AUS-NSW・ITA・CHN は法定要件が在るのに一次資料を取得できておらず、
-  **未測定として記録**している (推測で表を置かない)。403 は別経路
-  (公式 API・オフラインの官報等) が要る。200 を返した 2 件は取得経路の
-  問題なので、条文本体に届く URL を見つければ解消する
+- 検証済みの決議要件テーブルは **JPN / DEU / ESP / FRA / SGP の 5 法域**。
+  残りは 3 通りの理由で未検証: **ITA / CHN** は取得経路の問題 (200 を
+  返すが本文でない) で、条文本体に届く URL を見つければ解消する。
+  **AUS-NSW** は bot チャレンジの背後にあり、公式 API か別配布が現れる
+  まで動かない (回避はしない)。**USA-NY / GBR** はそもそも全国一律の
+  法定表が存在しない
 - **管理計画認定制度 (マンション管理適正化法第5条の4) とマンション
   長寿命化促進税制**は catalog に名前だけあり、判定は実装していない。
   引上げ基準は「幅の下限値を下回る額から上回る額へ引き上げたこと」で、
