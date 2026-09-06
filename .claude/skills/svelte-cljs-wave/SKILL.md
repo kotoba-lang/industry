@@ -300,6 +300,31 @@ gh api "repos/<org>/<repo>/git/trees/main?recursive=1" \
 第 1 波では 6/6 が本当に 0 だったが、**確かめたから言える**のであって
 報告がそう言ったからではない。
 
+## archived / 未登録の repo も候補から外れる（tick が自動で除外する、2026-09-07）
+
+**tick は `ARCHIVED-SKIPPED` と `UNREGISTERED-SKIPPED` を名前付きで出す。**
+どちらも「まだ着地していない」ではなく **「着地できない / させても意味がない」**。
+
+- **archived** —— push が `This repository was archived so it is read-only.`
+  で拒否される。実測 2026-09-07、`open-banking` に投げた agent が**完璧な移行を
+  終えてから** push で弾かれた（11 分 / 194k token）。west.yml は最初から
+  `groups: [archived]` と書いていて、tick が訊いていなかっただけ。
+  eligible pool に同じものが 7 件在った。
+- **未登録** —— west.yml にも fleet-db にも無い path。ほぼ**改名前の残骸**で、
+  実測 2026-09-07 の `orgs/cloud-itonami/open-cofog` は GitHub 側が
+  `org-un-cofog` に改名済みだった（`gh api repos/cloud-itonami/open-cofog` が
+  改名後の名前を返す）。**残骸は誰も更新しないので `svelte/` が消えず、毎周
+  候補に出続ける。** 同型が 10 件（`orgs/gftdcojp/app-6ir` 等、どれも
+  cloud-itonami へ redirect）。
+
+⚠ **agent が「push できない」と報告してきたら、それは失敗ではなく正しい停止。**
+その worktree を消さない —— 着地先が無いだけで、中身は完成している。
+
+⚠ **改名された repo に投げると、push は redirect 先に着地する。** つまり
+**west entry 名は候補の path と違う**（`open-cofog` の成果は `org-un-cofog` の
+main に載った）。pin を進めるときは *GitHub が返した full_name* から entry を
+引き直す —— 候補の path から引くと entry が見つからない。
+
 ## custody 契約を持つ repo は候補から外れる（tick が自動で除外する）
 
 実測 2026-08-26、投げた agent が **4 回正しく拒否した**。それらの repo は
