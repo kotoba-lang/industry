@@ -56,3 +56,10 @@ cp scripts/hermes-kumiai-sources/SOUL.md                 $P/SOUL.md
 
 cron job の定義は `scripts/hermes-cron-jobs/hermes-cron-jobs.json`
 （`export_cron.py` が生成）に台帳化される。
+
+**新規 profile は `providers:` と `secrets.command` を持たないので、最初の
+agent job は `blocked_config` で落ちる。** 直し方と、登録後に必ず
+`hermes cron run <id>` で発火まで確かめる理由は
+`scripts/hermes-cron-jobs/README.md` に書いた。実測 2026-09-06 の
+`kumiai-sources` はこれを踏んでいる —— script job は成功し、agent job だけが
+落ちたので、片方の成功を設定の十分性と読むと見逃す。
