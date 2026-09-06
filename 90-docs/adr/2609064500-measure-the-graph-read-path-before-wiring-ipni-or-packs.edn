@@ -134,7 +134,7 @@ OIDC identity に固定）で署名し、**deploy 側は両方を verify して�
 何も言っていない。**どちらかに寄せる決定が要る** —— fleet CI（murakumo）へ port するか、
 attested 経路を明示的に retire するか。放置は「署名しているつもり」を続けることになる。
 
-## nil の所在（両 copy とも修正済み、deploy はしていない。2026-09-07）
+## nil の所在（両 copy とも修正済み。2026-09-07 に control-plane 側を deploy 済み —— 末尾の節を読むこと）
 
 被疑箇所は**在った**。`fetch-block-cached` の `(if bytes …)` の else が
 `(record-block-fetch! :miss cid)` と `nil` を返し、その nil が `block-fetcher`
@@ -371,5 +371,78 @@ CLAUDE.md「7 問」の 7 問目そのもので、同じ日に 2 回出た:
   incremental hash は何とも比較できない**）。
 
 どちらも**但し書きは先に書いてあった**。読み飛ばしたのは結論を書いた側である。
+
+## nil 修正は deploy した。そしてその過程で、この repo の deploy 経路が**通れない**ことが判った（2026-09-07）
+
+**上の「deploy はしていない」はもう現在地ではない。** `kotobase-cf-wasm-staging`
+（= 本番の graph Worker、ADR-2609065000 で control-plane が正本と実測済み）を
+version **`6b99c4ff-fb43-4c5b-b56d-726e7aa68ab7`** として deploy し、repo 自身の
+検証手順と同じ readback で確かめた:
+
+    workers/tag : 8759844539a7faedfdb9d08473ffbc61e74ec2fb
+    expected    : 8759844539a7faedfdb9d08473ffbc61e74ec2fb   MATCH: true
+
+deploy 前に自分で測ったもの（agent の報告を鵜呑みにせず）:
+
+- `npm run test:cljs` → **453 tests / 1,512 assertions、0 failures**
+- `test/e2e-block-unavailable.mjs` を **committed bundle に対して**実行 → 8/8 ok。
+  incomplete read が `503 BlockUnavailable` / `retryable:true` / `block_cid` を返し、
+  datoms 配列を**一切持たない**ことを確認（`rows=null`）
+- `test/e2e-b2-smoke.mjs` は赤い —— **修正前の bundle でも同じ 66 ok の後に同じ
+  `Merkle-LSM reconciliation left unresolved graphs` で落ちる**ことを、
+  `KOTOBASE_GRAPH_BUNDLE` に修正前 commit の bundle を渡して実測。既存であって回帰ではない。
+- deploy 後の本番 smoke: transact / datoms / basisT / q すべて 200。
+
+### 本題 —— `scripts/deploy-versioned.mjs` は構造的に成功できない
+
+正規の deploy 経路を使おうとして拒否された:
+
+    Error: refusing to deploy inputs not represented by HEAD:
+     M kotobase-graph-database/js/kotobase-graph-database-worker.js
+
+script は `npm run build`（`shadow-cljs release`）を走らせてから、tracked な bundle が
+dirty なら拒否する。**意図は正しい**（committed 生成物が HEAD の source と対応することの
+検査）。**しかしこの build は非決定的なので、この検査は決して満たされない。**
+
+同一 source・同一 worktree・`.shadow-cljs` を消してからの cold build を 2 回:
+
+    committed  : 219125e51632446cfc02b8b546da50c6d4640a3dfed8ebee7d80fc1bfdd7eb03
+    cold A     : 03a4d09ed8d57d691b60d1c377fafa5523ee82a7621a127e7f8635bb7236e2fb
+    cold B     : ee380da9556d24a3a9668de2e44a5ed5f51af8c53dac0a4b86aa80f84fd92735
+
+**3 つとも違う。** 最初の差分バイトは gensym である:
+
+    committed : …,b$=new I(null,\"avg\",\"avg\",…
+    built     : …,b$=new cd(null,\"p1__34441#\",\"p1__34441#\",1743753989,null),…
+
+長さは同一（1,375,223 byte）で、差は 16,476 byte —— gensym 名の変化と、それに追随した
+minifier の変数割り当てのずれ。**つまり「build して byte 一致を要求する」という形は、
+この build に対しては表現できない不変条件である。**
+
+⚠ **ここは ipfs repo とは逆だった。** 同日 `net-kotobase/ipfs` では cold build 2 回が
+**byte 一致**した（そちらの節に記録済み）ので、「cold なら比較できる」を一般則として
+持ち出すと誤る。**repo ごとに測ること。**
+
+### これが ADR-2609065000 の観測を説明する
+
+同 ADR は「本番の version はどれも `source: wrangler` の手 deploy で、attested な
+workflow の最終成功は 2026-08-28」と記録した。**理由はこれである** ——
+正規経路には通れない guard が在るので、deploy はその周りを回る。
+「attested だが inert」は運用の怠慢ではなく、**検査の設計が build の性質と噛み合って
+いない**ことの帰結だった。
+
+**したがって直すべきは deploy の習慣ではなく、この検査の表現である。** 選択肢は
+オーナー判断（この ADR では決めない）:
+
+- 生成物を commit するのをやめ、deploy 時に build する（`--no-bundle` を捨てる）
+- byte 一致ではなく**正規化した比較**（gensym と minifier の割り当てを畳む）にする
+- 生成物と source の対応を、hash ではなく**振る舞いの検査**（`e2e-block-unavailable`
+  のような committed bundle に対する e2e）で担保する
+
+**今日の deploy が ship したのは committed bundle である**（`--no-bundle` はそれを
+上げる）。script の build 段は upload 対象を作る段ではなく検査段であり、
+壊れているのは検査段だけなので、committed bundle の振る舞いを直接確かめた上で
+同じ argv（`wrangler deploy --no-bundle --env= --tag <sha>`）で上げ、
+同じ readback で tag を確認した。
 "
 }]
