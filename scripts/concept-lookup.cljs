@@ -65,6 +65,39 @@
 (defn coverage []
   (first (filter :concept/coverage index)))
 
+(defn indexed-vocabulary
+  "索引が生成された時点の語彙（概念名の集合）。**記録が無ければ nil** ——
+   `:unknown` と `#{}` は別物で、後者は「その版の語彙は空だった」と言って
+   しまう。"
+  []
+  (some-> (coverage) :concept/vocabulary-terms read-edn-str seq set))
+
+(defn zero-rows-verdict
+  "0 件が何を意味するか。**『実装が無い』と『まだ測っていない』は、行数では
+   区別できない。**
+
+   語彙に概念を足した直後は、索引がまだその語で走査されていないので必ず 0 件に
+   なる —— 実測 2026-09-07、`:posture-load-biomechanics` を足した直後の
+   `concept-lookup 筋` が `(0 repo)` と印字し、実際には 3 repo が当たった。
+   索引が自分の語彙を記録するようになったので、ここで分けられる。"
+  [c]
+  (let [v (indexed-vocabulary)]
+    (cond
+      (nil? v)
+      (str "  ⚠ **0 件は未測定です。** この索引は生成時の語彙を記録していない"
+           "（この検査より前の生成物）ので、\n"
+           "     『実装が無い』のか『この概念でまだ走査していない』のか分けられません。\n"
+           "     再生成: nbb scripts/gen-concept-index.cljs")
+
+      (not (contains? v (name c)))
+      (str "  ⚠ **0 件は未測定です。** この概念は索引を生成した時点の語彙に"
+           "在りませんでした。\n"
+           "     再生成すると当たります: nbb scripts/gen-concept-index.cljs")
+
+      :else
+      (str "  この概念は索引の走査対象でしたが、当たった repo はありません"
+           "（README のある repo の範囲で）。"))))
+
 (defn- print-rows [rows limit]
   (doseq [r (take limit rows)]
     (println (str "  " (:concept/name r)
@@ -107,12 +140,18 @@
               (println (str "\n■ " (name c) " — " label
                             "  (" (count rows) " repo)"))
               (when note (println (str "  » " note)))
+              (when (empty? rows) (println (zero-rows-verdict c)))
               (print-rows rows (if all? 10000 8)))))
         (when-let [cv (coverage)]
           (println (str "\n⚠ 索引の対象は README のある repo だけ（"
                         (:concept/repos-indexable cv) "/" (:concept/repos-total cv)
                         "、README 無し " (:concept/repos-without-readme cv)
                         " 件は未索引）。"
+                        (when-let [u (:concept/registered-unscanned cv)]
+                          (str "\n  さらに **west 登録済みの " u
+                               " repo は索引した tree に README が無かった**"
+                               "（checkout されていない / README を持たない）——"
+                               "\n  索引できなかったのではなく、そこに無かった。"))
                         "\n  **索引に無いことは存在しないことの証拠になりません。**")))))))
 
 (apply -main *command-line-args*)
