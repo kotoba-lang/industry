@@ -300,6 +300,32 @@ gh api "repos/<org>/<repo>/git/trees/main?recursive=1" \
 第 1 波では 6/6 が本当に 0 だったが、**確かめたから言える**のであって
 報告がそう言ったからではない。
 
+## 上流で着地済みの repo も候補から外れる（tick が自動で除外する、2026-09-07）
+
+**tick が走査しているのは `orgs/` の作業ツリーであって、repo の `main` ではない。**
+west は pin で checkout を止めるので、**上流で移行が着地しても、pin が手前にある
+限り `.svelte` はディスクに残る。**
+
+実測 2026-09-07、候補 4 件のうち **3 件が既に main で移行済み**だった
+（`open-jpn-gov` / `outreach` / `port`。どれも 2026-09-05 の PR #1 で着地）。
+投げた 3 agent はそれぞれ「もう終わっている」と気づくところから始めることになり、
+1 体あたり 200k token を再監査に使った。**checkout・west pin・repo の main は
+3 つの別物**という ADR-2608136800 の形そのもので、tick は 3 番目を一度も
+見ていなかった。
+
+`landed-on-github` が候補に渡す直前に GitHub の default branch を直接引き、
+0 件なら `ALREADY-LANDED-SKIPPED` に名前付きで落とす。**同じ周に `robot` も
+これで捕まった** —— 次の波で配られるはずだった 4 件目。
+
+⚠ **trees API の `truncated: true` を 0 件に畳まない。** 巨大な tree では
+`.tree` が途中までしか入らず、件数だけ見ると「着地済み」と同じ顔になる。
+truncated なら `:unmeasured` を返す（測れなかった検査が、測って問題が
+無かった検査と同じ値を返してはいけない）。
+
+⚠ **これは「pin を進めれば済む」話でもある** —— 3 件とも west pin が
+古いままだった。波の最後の pin 前進はこの再発を減らすが、pin は他の理由でも
+遅れるので、tick 側が main を訊く必要は消えない。
+
 ## archived / 未登録の repo も候補から外れる（tick が自動で除外する、2026-09-07）
 
 **tick は `ARCHIVED-SKIPPED` と `UNREGISTERED-SKIPPED` を名前付きで出す。**

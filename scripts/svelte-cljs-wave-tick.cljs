@@ -193,6 +193,44 @@
           :unmeasured)))
     (catch :default _ :unmeasured)))
 
+(defn- landed-on-github
+  "その repo の **default branch** に `.svelte` がまだ在るか。
+   true = もう無い（着地済み）/ false = まだ在る / :unmeasured。
+
+   ## なぜ要るか —— 走査しているのは checkout であって main ではない
+
+   `scan!` は `orgs/` の**作業ツリー**を歩く。west は pin で checkout を止めるので、
+   **上流で移行が着地しても、pin が手前にある限り `.svelte` はディスクに残る。**
+   その repo は毎周候補として出続け、投げられた agent は「もう終わっている」と
+   気づくところから始めることになる。
+
+   実測 2026-09-07: 候補 4 件のうち **3 件が既に main で移行済み**だった
+   （open-jpn-gov / outreach / port）。3 agent 分の仕事が、着地済みの repo の
+   再監査に費やされた。checkout・west pin・repo の main は 3 つの別物という
+   ADR-2608136800 の形そのもので、**この tick は 3 番目を一度も見ていなかった。**
+
+   ## truncated を 0 件に畳まない
+
+   trees API は巨大な tree で `truncated: true` を返し、その時 `.tree` は
+   **途中まで**しか入っていない。件数だけ見ると 0 件＝着地済みに見えるので、
+   truncated なら :unmeasured を返す。測れなかった検査が、測って問題が無かった
+   検査と同じ値を返してはいけない（ADR-2608136000）。"
+  [{:keys [org name]}]
+  (try
+    (let [r (.spawnSync cp "gh"
+                        (clj->js ["api" (str "repos/" org "/" name "/git/trees/HEAD?recursive=1")
+                                  "--jq" "[(.truncated|tostring), ([.tree[].path|select(test(\"\\\\.svelte$\"))]|length|tostring)]|join(\"\\t\")"])
+                        #js {:encoding "utf8" :timeout 60000})]
+      (if (not= 0 (aget r "status"))
+        :unmeasured
+        (let [[trunc n] (str/split (str/trim (str (aget r "stdout"))) #"\t")]
+          (cond (= "true" trunc)   :unmeasured
+                (not= "false" trunc) :unmeasured
+                (nil? n)           :unmeasured
+                (= "0" n)          true
+                :else              false))))
+    (catch :default _ :unmeasured)))
+
 (defn- custody-gated?
   "その repo が **machine-enforced な custody 契約**を持っていれば true。触らない。
 
@@ -356,6 +394,9 @@
           archived (atom [])
           ;; 改名前の残骸は誰も更新しないので、除かないと毎周候補に出続ける。
           unregistered (atom [])
+          ;; 上流で着地済みなのに pin が手前で止まっている repo。
+          ;; 走査しているのは checkout なので、main を訊かないと毎周出続ける。
+          landed (atom [])
           open    (->> cands
                        (remove (fn [c]
                                  (when-not (contains? paths (:repo c))
@@ -383,6 +424,13 @@
                                    false       false
                                    :unmeasured (do (swap! unmeasured conj (:repo c)) true)
                                    (do (swap! archived conj (:repo c)) true))))
+                       ;; ディスクの .svelte は checkout の話。main を訊くまで
+                       ;; 「まだ移行していない」は未測定（ADR-2608136800）。
+                       (remove (fn [c]
+                                 (case (landed-on-github c)
+                                   false       false
+                                   :unmeasured (do (swap! unmeasured conj (:repo c)) true)
+                                   (do (swap! landed conj (:repo c)) true))))
                        (take limit)
                        vec)
           rec {:at (.toISOString (js/Date.))
@@ -392,6 +440,7 @@
                :limit limit
                :unregistered-skipped @unregistered
                :archived-skipped @archived
+               :already-landed-skipped @landed
                :custody-skipped @custody
                :in-flight-skipped @skipped
                :unmeasured-skipped @unmeasured
@@ -406,6 +455,9 @@
                     (when (seq @unregistered) (str "\t" (str/join " " @unregistered)))))
       (println (str "ARCHIVED-SKIPPED\t" (count @archived)
                     (when (seq @archived) (str "\t" (str/join " " @archived)))))
+      ;; 「checkout に残っている」を「まだ移行していない」に畳まない。
+      (println (str "ALREADY-LANDED-SKIPPED\t" (count @landed)
+                    (when (seq @landed) (str "\t" (str/join " " @landed)))))
       (println (str "CUSTODY-SKIPPED\t" (count @custody)
                     (when (seq @custody) (str "\t" (str/join " " @custody)))))
       (println (str "IN-FLIGHT-SKIPPED\t" (count @skipped)
