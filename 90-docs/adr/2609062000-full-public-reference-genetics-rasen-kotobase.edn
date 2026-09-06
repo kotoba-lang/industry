@@ -1,0 +1,117 @@
+[{:db/id -1
+  :adr/id "adr-2609062000-full-public-reference-genetics-rasen-kotobase"
+  :adr/title "Full public-reference genetics into rasen; ledger canonical, kotobase.net as projection"
+  :adr/status "accepted"
+  :adr/date "2026-09-06"
+  :adr/related ["adr-2606101000" "adr-2607279200" "adr-2608039000" "adr-2608039700"]
+  :adr/body "# Full public-reference genetics into rasen, with kotobase.net as the query face
+
+## The question that started it
+
+\"Is all the human DNA data in kotobase.net?\" No, and three separate layers were
+in the way. Measuring each of them, rather than answering from the shape of the
+repo, is what produced this decision.
+
+**Layer 1 — rasen does not write to kotobase.net at all.** `grep -rn kotobase`
+over `src/`, `tools/` and the EDN roots of `etzhayyim/actor-rasen` returns zero
+hits. The file named `kotoba.cljc` is a local append-only ledger writer that
+states \"performs NO network I/O\"; publication goes to IPFS pin + IPNS. The
+kotobase.net tenant plane was never wired as a destination.
+
+**Layer 2 — the corpus itself was 53 nodes.** Measured in
+`data/seed-genome-graph.kotoba.edn`: 16 gene, 14 phenotype, 12 variant, 6
+population, 5 pathway; the persisted ledger carries `:tx/count 583`.
+
+**Layer 3 — the path that would grow it does not run.** `ingest.cljc` refuses
+live ingest (\"REFUSED: live gene ingest (MyGene.info / MyVariant.info) is
+G7-gated network + not ported\"); only `--offline` re-addressing works. The
+Python original it was ported from is not in the repository. Upstream is fine:
+mygene.info and myvariant.info both answer 200. What is missing is one unported
+path, not egress and not the sources.
+
+## Decision
+
+Ingest the **full public reference corpus** — ClinVar in its entirety, gnomAD
+population-aggregate allele frequencies — and keep **individual genotypes out**,
+which is not a scope cut but the actor's constitution (G1: no individual
+genotype registry, no identifiable personal sequence, no sample- or family-level
+data; population frequencies at super-population scale only; location as COARSE
+cytoband only).
+
+Destination is **both faces, with an explicit direction**: the append-only
+content-addressed ledger stays canonical, and kotobase.net carries the same
+datoms as a **projection** — deletable and rebuildable from the ledger, per the
+superproject's projection rule. kotobase.net is where Datalog reaches the graph;
+it is never where the graph lives.
+
+## What the scale actually is (measured, not estimated from reputation)
+
+| source | measured |
+|---|---|
+| ClinVar `variant_summary.txt.gz` | 442,495,433 bytes (2026-08-31) |
+| ClinVar GRCh38 VCF | 193,427,450 bytes |
+| gnomAD v4.1 genomes, **chr21 alone** | 7,758,981,978 bytes |
+| gnomAD v4.1 exomes, **chr21 alone** | 2,250,319,809 bytes |
+
+chr21 is among the smallest chromosomes. The full gnomAD sites release is
+hundreds of gigabytes. That settles a design question rather than describing
+one: **the raw VCFs are not ingested.** Only per-variant super-population
+allele frequencies are extracted, which is also all G1 permits. Any raw bulk
+that must be retained goes to B2 + DataLad, never into git.
+
+Normalising 5,282 real ClinVar lines through the new code: 2,619 GRCh38 rows
+kept, 2,663 skipped, 4,365 nodes and 9,076 edges, 0 G1 violations. Kept plus
+skipped equals rows read. Extrapolated to the full release that is roughly 5.8M
+lines, about 2.9M GRCh38 rows, on the order of 10M edges and tens of millions of
+datoms.
+
+**Consequence the measurement forces:** the ledger is one EDN file holding 583
+datoms today. It cannot hold that. Sharding of the ledger is a prerequisite for
+the full run, not an optimisation of it.
+
+## Landed in this step
+
+`rasen.methods.clinvar` (etzhayyim/actor-rasen main a261f970) — the full-corpus
+normaliser, emitting the same node and edge shapes as the bounded producer so
+the two are interchangeable downstream.
+
+G1 is enforced as a check rather than described in a comment. `variant_summary`
+carries Chromosome / Start / Stop / PositionVCF; the ontology permits coarse
+cytoband only. `g1-violations` refuses any node carrying a coordinate attr,
+`row->graph` runs it over everything it emits, and it throws rather than
+reporting clean when handed a non-map, so an unreadable node is UNVERIFIED and
+not silently clean. The negative test pins the refusal reason, so an unrelated
+failure cannot be counted as a successful discrimination.
+
+The suite caught one real defect: MONDO ids were built with a doubled prefix
+(`ph.mondo-mondo-0011450`), which would have split every MONDO condition into
+two node ids — one from this producer, one from `ingest` — and the split would
+have been invisible in both. MONDO values carry their own prefix.
+
+Skipped rows return nil rather than an empty graph, and the accumulator reports
+rows and skips, so coverage cannot be silently overstated.
+
+## Not done, and blocking
+
+1. **Sharded ledger.** Required before any full run. Single-file EDN cannot hold
+   the corpus.
+2. **The G7 streaming runner.** Nothing yet streams the 442 MB gzip; the
+   normaliser is pure and takes parsed lines.
+3. **The kotobase.net publisher.** `kotoba-lang/kotobase-client` is the canonical
+   CACAO-authed client and `net-kotobase/commoncrawler` is the existing precedent
+   for bulk EAVT into kotobase.net through the `kotobase.store/IStore` seam.
+   Neither is wired to rasen yet. Do not write a third client.
+4. **gnomAD AF extraction.** Per-variant super-population frequencies only.
+
+## Notes for whoever continues
+
+The ADR number in the source docstrings of `clinvar.cljc` and
+`test_clinvar.cljc` says 2609061800, which belongs to a different ADR
+(kotoba-web-architecture-fit). It should read 2609062000. Corrected separately.
+
+While landing this, a superproject EDN document written by another loop
+(`90-docs/business/revenue-agent-loop/runs/0037-kotobase-stab-001.edn`) was
+found broken by four raw quotes inside a body string, which closed it early and
+left the remainder to be read as symbols. Escaping restored it; content
+unchanged. This is the failure mode the superproject CLAUDE.md already records,
+and it recurred in a document written the same day."}]
