@@ -23,13 +23,19 @@
 ;; downgrades the check. Nothing is written if no entry survives.
 ;;
 ;;   PINS=pins.tsv  # lines of: <west-entry-name>\t<40-hex sha>\t<repo slug>
-;;   PINS=… [DRY=1] nbb --classpath ".:scripts/nbb_compat" west-pin-put-batch.cljs
+;;   PINS=… [DRY=1] [MSG="west: …"] nbb --classpath ".:scripts/nbb_compat" west-pin-put-batch.cljs
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))
 (def cp (js/require "node:child_process"))
 (def pins-file (.-PINS js/process.env))
 (def dry? (= "1" (.-DRY js/process.env)))
+;; The commit message. Was hard-coded to one tranche's headline ("portable suite
+;; now runs on nbb"), which every later batch then carried onto main whatever it
+;; had actually advanced -- `git log manifest/west.yml` read as one campaign
+;; repeating. MSG overrides it; absent MSG the old wording is kept so nothing
+;; that calls this today changes behaviour.
+(def msg (let [m (.-MSG js/process.env)] (when-not (or (nil? m) (= "" m)) (str m))))
 (def repo "com-junkawasaki/root")
 (def path "manifest/west.yml")
 
@@ -133,8 +139,9 @@
             changed (count (remove true? (map = lines updated)))]
         (if (not= changed (count good))
           (println (str "REFUSING: planned " (count good) " edits but " changed " lines differ"))
-          (let [payload {:message (str "west: advance " (count good)
-                                       " pin(s) — portable suite now runs on nbb")
+          (let [payload {:message (or msg
+                                      (str "west: advance " (count good)
+                                           " pin(s) — portable suite now runs on nbb"))
                          :content (.toString (js/Buffer.from out "utf8") "base64")
                          :sha blob :branch "main"}
                 pf "/tmp/west-pin-batch-payload.json"]
