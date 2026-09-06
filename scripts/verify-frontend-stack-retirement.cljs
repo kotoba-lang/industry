@@ -67,7 +67,12 @@
    ;; m365-archive は OneDrive の履歴アーカイブ（DataLad dataset）であって live な
    ;; コードではない。2026-08-26 の実測で next.config.* 15 件のうち 8 件がここだった。
    ;; 過去の成果物を「移行されていない Next.js app」として数えない。
-   "orgs/gftdcojp/m365-archive/"])
+   "orgs/gftdcojp/m365-archive/"
+   ;; llama.cpp の vendored checkout。2026-09-07 の実測で .svelte/.tsx/.jsx が
+   ;; 323 件出るが **git は 1 件も追跡していない**（repo の tracked は 406 件で、
+   ;; そのどれでもない）。上流 llama.cpp のツール UI であって我々が書いた面ではない。
+   ;; ADR-2608260900 が縛るのは我々が著述する面なので、ここは移行対象ではない。
+   "orgs/kotoba-lang/com-github-big-moe-on-edge/third_party/"])
 
 (defn vendored? [rel] (some #(str/starts-with? rel %) vendored-prefixes))
 
