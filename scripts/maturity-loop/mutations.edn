@@ -8288,4 +8288,89 @@
      :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/app.ts"
      :find "\t\trequireApproval(DecisionClass.B, 1, \"high\"),"
      :replace "\t\trequireApproval(DecisionClass.C, 1, \"low\"),"
-     :must-fail ["app-high-pii-commands-keep-their-approval-class"]}]}]}
+     :must-fail ["app-high-pii-commands-keep-their-approval-class"]}]}
+
+  {:repo "orgs/cloud-itonami/emotional-analytics"
+   :label "emotional-analytics wire contract —— proto の tag 表と README の約束が、実行されて固定されていること"
+   ;; この repo は proto 1 本が製品面の全部で（README「API contract — See: proto/…」）、
+   ;; 名指しされた consumer（communicator）が依存するのは field 名ではなく wire tag。
+   ;; 2026-09-07 までテストは 0 本で、tag の付け替え・tenant scope の脱落・README と
+   ;; proto の食い違いは全部緑で着地できた。`test/contract_test.cljs` が proto を text で
+   ;; 読んで golden の tag 表と突き合わせ、buf / protoc が PATH に在れば descriptor 側
+   ;; とも突き合わせる（無ければ SKIPPED と印字し、pass には数えない）。
+   ;;
+   ;; 面は 3 つ。①wire contract（tag / 型 / repeated / rpc 署名）②README の約束
+   ;; （Signal model の 6 語 = EmotionVector の field 順、request は tenant+conversation、
+   ;; response は model_name/version + Timestamp）③oracle parity。
+   ;;
+   ;; 測れないときは exit 2（proto / README 不在、subset 外の文、message 0 件）。
+   ;; 3 経路とも 2026-09-07 に手で踏んで 2 が返るのを見た。
+   :cmd ["nbb" "test/contract_test.cljs"]
+   :green-marker "emotional-analytics contract: all green"
+   ;; 9 件とも 2026-09-07 に実際に赤くなるところを見た（着地前に copy で dry-run）。
+   ;; buf / protoc の parity テストは must-fail に**載せない** —— 無い機械では SKIPPED に
+   ;; なるので、載せると「噛まない」が環境の話になる。
+   :mutations
+   [{:id :emotional-analytics/field-renumbered
+     :why "tag の付け替え。名前も型も同じなので README 側の検査は全部緑のまま、wire だけが黙って壊れる —— この suite の本題"
+     :file "proto/v1/emotional_analytics.proto"
+     :find "  float urgency = 4;"
+     :replace "  float urgency = 7;"
+     :must-fail ["emotion-vector-wire-tags-are-pinned"]}
+
+    {:id :emotional-analytics/tag-collision
+     :why "2 field が同じ tag を持つ。protoc は拒否するが、text で読む consumer / 手書きの codec は後勝ちで黙って通す。uniqueness の検査と golden の両方が捕まえること"
+     :file "proto/v1/emotional_analytics.proto"
+     :find "  string model_version = 3;"
+     :replace "  string model_version = 2;"
+     :must-fail ["response-wire-tags-are-pinned" "no-message-reuses-a-tag-or-a-field-name"]}
+
+    {:id :emotional-analytics/reserved-tag
+     :why "予約範囲 19000–19999 の先頭ちょうど。境界の 1 個手前（18999）は通る値なので、境界ちょうどの入力が無ければ範囲検査は劇場"
+     :file "proto/v1/emotional_analytics.proto"
+     :find "  int32 window_size = 4;"
+     :replace "  int32 window_size = 19000;"
+     :must-fail ["no-message-reuses-a-tag-or-a-field-name" "message-sample-and-request-wire-tags-are-pinned"]}
+
+    {:id :emotional-analytics/tenant-dropped-from-thread-request
+     :why "README integration note 1（communicator は tenant と conversation の文脈を渡す）の受け皿が片方の request から消える。message 単位の検査だけでは AnalyzeMessageRequest が緑で、thread 側の脱落が見えない"
+     :file "proto/v1/emotional_analytics.proto"
+     :find "  string tenant_id = 1;\n  string conversation_id = 2;\n  repeated MessageSample messages = 3;"
+     :replace "  string conversation_id = 2;\n  repeated MessageSample messages = 3;"
+     :must-fail ["every-request-carries-tenant-and-conversation-scope" "message-sample-and-request-wire-tags-are-pinned"]}
+
+    {:id :emotional-analytics/timestamp-becomes-string
+     :why "README integration note 2（timestamp と一緒に永続化する）の timestamp が string になる。field 名も tag も同じなので、型を見ない検査は緑のまま"
+     :file "proto/v1/emotional_analytics.proto"
+     :find "  google.protobuf.Timestamp analyzed_at = 4;"
+     :replace "  string analyzed_at = 4;"
+     :must-fail ["every-response-carries-model-name-version-and-analyzed-at" "response-wire-tags-are-pinned"]}
+
+    {:id :emotional-analytics/rpc-removed
+     :why "service から AnalyzeThread が消える。message は全部残るので message 側の検査は全部緑"
+     :file "proto/v1/emotional_analytics.proto"
+     :find "  rpc AnalyzeThread(AnalyzeThreadRequest) returns (AnalyzeThreadResponse);\n"
+     :replace ""
+     :must-fail ["service-exposes-exactly-analyze-message-and-analyze-thread"]}
+
+    {:id :emotional-analytics/timestamp-import-removed
+     :why "import が消えて Timestamp が未解決になる。protoc は落ちるが、text で読む側は型名を文字列として持つだけなので、import と使用の対応を別に見ないと通る"
+     :file "proto/v1/emotional_analytics.proto"
+     :find "import \"google/protobuf/timestamp.proto\";\n"
+     :replace ""
+     :must-fail ["timestamp-import-matches-its-use"]}
+
+    ;; ── README の側。proto が完璧でも、README が別のことを言えば consumer はそちらを読む ──
+    {:id :emotional-analytics/readme-signal-drift
+     :why "Signal model の 3 語目が proto に無い名前になる。proto 側の検査は全部緑のまま、文書だけが嘘になる"
+     :file "README.md"
+     :find "3. `dominance`: passive to dominant stance"
+     :replace "3. `stance`: passive to dominant stance"
+     :must-fail ["readme-signal-model-lists-the-emotion-vector-fields-in-tag-order"]}
+
+    {:id :emotional-analytics/readme-points-at-a-proto-that-does-not-exist
+     :why "API contract の参照先が v2 に進むが、v2 は無い。テストが読んだ file と README が指す file が別物になる"
+     :file "README.md"
+     :find "See: `proto/v1/emotional_analytics.proto`"
+     :replace "See: `proto/v2/emotional_analytics.proto`"
+     :must-fail ["readme-points-at-the-proto-file-that-was-parsed"]}]}]}
