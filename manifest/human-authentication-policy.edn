@@ -90,15 +90,20 @@
   {:project "authn"
    :path "orgs/net-kotobase/authn"
    :role :authority
-   :active-methods #{:webauthn-passkey}
+   :active-methods #{:webauthn-passkey :siwe-erc191 :siwe-erc1271}
+   :default-method :siwe-erc1271
+   :agent-registration "POST /v1/agents/register (net-kotobase/control-plane authn, ADR-2609071000)"
    :status :unverified
+   :verification-status :live-partial
+   :source-commit "net-kotobase/control-plane main, kotobase-authn Worker 890da019-8e98-49af-9ca7-e2500867bdea (2026-09-07)"
    :security-policy "SECURITY.md"
-   :evidence "auth.kotobase.net requires current source, artifact, and live negative verification"}
+   :evidence "2026-09-07 live e2e on auth.kotoba.cloud: wallet_connect EOA SIWE, passkey-owned Base Account (ERC-6492 on Base mainnet), agent registration as a key-owned Base Account and as an EOA, recovery phrase — 20/20, 12/12, 21/21. The Base Account SDK is the first way in on the page. Legacy-route closure (410) and the passkey negative suite were not re-run today; source is net-kotobase/control-plane, not this stub repository"}
 
   {:project "app-kotoba-cloud"
    :path "orgs/kotoba-lang/app-kotoba-cloud"
    :role :client-and-public-surface
-   :active-methods #{:webauthn-passkey}
+   :active-methods #{:webauthn-passkey :siwe-erc191 :siwe-erc1271}
+   :default-method :siwe-erc1271
    :status :unverified
    :security-policy "SECURITY.md"
-   :evidence "auth.kotoba.cloud requires current source, artifact, and live negative verification"}]}
+   :evidence "kotoba.cloud's primary action is 'Start with a Base Account' since 2026-09-07 and hands off to auth.kotoba.cloud/sign-in, whose methods are the authority's above; the apex issues no session itself and reads /v1/session credential-free. Live negative verification of the apex routes not re-run today"}]}
