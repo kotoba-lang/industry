@@ -4,6 +4,7 @@
   :adr/status "accepted"
   :adr/date "2026-09-06"
   :adr/repo "cloud-itonami/cloud-itonami-isic-6820"
+  :adr/related ["adr-2609072000-what-the-kotoba-refactor-taught"]
   :adr/tags ["cloud-itonami" "isic-6820" "actor" "governor" "kanri-kumiai" "shuzen-tsumitatekin" "kubunshoyu-ho" "chouki-shuzen-keikaku"]
   :adr/landed-commit "7c9605223294c79062a0b8f1ce22a6d9d0d6bec2"
   :adr/west-pin-commit "dff787d462fb6aab0a57aa69c8a19c1753fea9de"
@@ -516,6 +517,16 @@ NATIVE-KEYWORD-EQUALITY 0  (1 = correct, 0 = amu#835 の欠陥)
 JVM-INVOCATIONS 0
 PASS
 ```
+
+## 一般化した学びは別 ADR に出した
+
+この repo に依らない部分 —— 受理して誤答する backend、境界を持たない表、
+拒否して記録する gate、blocking が記法か effect かは書けば分かる、規則を
+根拠に使う前に性質か実装状態かを判定する —— は
+**ADR-2609072000（adr-2609072000-what-the-kotoba-refactor-taught）**に
+まとめ、CLAUDE.md の 8 問目・5 問目の但し書き・直し方リストと、
+skill `kotoba-clj-to-kotoba` の手順 6 / 6b に反映した。
+**ここに書いたままにすると、次に同じ罠を踏む人が読む場所に無い。**
 
 ## 再開点 (会話履歴なしで続けられる粒度)
 
