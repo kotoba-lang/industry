@@ -15,3 +15,13 @@
 (:qc/at "2026-09-06T14:30:00Z" :qc/amendment-of :whole-component-requalify-feasibility
  :qc/upstream-issue "https://github.com/kotoba-lang/kotoba/issues/590"
  :qc/note "compiler surface gap (str/assoc/filterv/contains? not admitted) filed upstream with measured probes; whole-component requalify unblocks when the issue lands")
+(:qc/at "2026-09-07T11:00:00Z" :qc/audit :bb-nbb-residue-survey
+ :qc/trigger "owner 指示 2026-09-07: まだ bb, nbb が残っていないか調査 + kbb-first ルール反映"
+ :qc/rule-landed "CLAUDE.md + AGENTS.md: 新規運用 tooling は kbb-first、nbb は既存資産のみ (commit e80865c5 via server merge)。skill nbb-to-kbb-migration 作成"
+ :qc/bb-residue {:bb-edn 217 :bb-shebang-files 309 :bb-files 138
+                 :distribution {"cloud-itonami" 111 "kotoba-lang" 86 "etzhayyim" 72 "gftdcojp" 20 "network-awai" 18}
+                 :status "退役 host (ADR-2607173000) — Wave 1-4 削除が宣言されていたが大量残存"}
+ :qc/nbb-residue {:workspace-cljs 6919 :root-scripts-cljs 403 :launchd-plists-nbb 45
+                  :recent-new-nbb (last-7-days new .cljs in scripts/, incl. kotoba-wave-verify-tick from this session)}
+ :qc/measured-blocker "kbb.proc は allowlist-by-grant-index (argv=policy literal) — 動的 spawn を要る tick 系スクリプトの移行は :blocked (kotoba-wave-verify-tick 実測: 20 repo × 5 command = 100+ policy rows)"
+ :qc/migration-candidates-first-wave "単純スクリプト (op が fs read + str + edn parse のみ) から順に。動的 spawn を要るものは kbb.proc model 進化待ち")
