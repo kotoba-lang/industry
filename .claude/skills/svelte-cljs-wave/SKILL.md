@@ -72,6 +72,11 @@ printf '%s\n' <name1> <name2> ... | xargs west update --fetch smart
 project 名になり、`printf ... | west update` は**引数ゼロ = 4,200 project 全部**を歩く。
 ⚠ **west.yml が新しいことを先に確かめる。** 古い west.yml に対して update すると
 checkout が**古い pin に戻る**（実測 2026-08-26 に 1 度やった）。
+⚠ **非対話 shell では `west` が PATH に無い**（実測 2026-09-07、第 8 波）。`xargs west`
+は `xargs: west: No such file or directory`（exit 127）で**何も更新せずに終わる**。
+実体は `~/.local/bin/west`（pipx）。`W=$HOME/.local/bin/west` にしてから `xargs $W update`。
+exit 127 は「pin に合わせた」と同じ静けさで返るので、update の後は必ず
+`git -C orgs/<org>/<repo> rev-parse HEAD` で新しい pin に居ることを見る。
 
 ## 4. 測り直して baseline を締める
 
@@ -83,6 +88,26 @@ nbb --classpath ".:scripts/nbb_compat" scripts/verify-frontend-stack-retirement.
 **baseline の締め直しは省かない。** 締めないと、移行済み repo が `.svelte` を
 取り戻しても検出できない（entry が 1 のままだと 0→1 は「増えた」にならない）。
 commit して main に載せる。
+
+**載せ方（実測 2026-09-07、第 8 波）。** superproject 本体は閲覧専用なので、commit は
+sparse な root worktree から出す:
+
+```bash
+nbb scripts/root-worktree.cljs create svelte-wave-baseline-<date> --profile minimal --include manifest --path /tmp/root-svelte-wave-baseline
+# --write-baseline は cwd（FLEET_ROOT）の orgs/ を走査して cwd の manifest/ に書く。
+# worktree には orgs/ が無いので、本体で書いて worktree へ copy し、本体側は checkout で戻す
+cp manifest/frontend-stack-baseline.edn /tmp/root-svelte-wave-baseline/manifest/
+git checkout -- manifest/frontend-stack-baseline.edn
+```
+
+⚠ **push / `gh api …/merges` を含む Bash 呼び出しは、その中で先に `git merge --ff-only`
+しても通らない。** PreToolUse hook `west-pin-verify-guard` は**コマンド文字列**に push /
+merges を見つけた時点で、worktree に**今ある** west.yml を main と比べる。worktree を切って
+から main の pin が 1 つでも動いていれば（第 8 波では `amu` が動いた）、この branch が
+west.yml を触っていなくても「pin 退行」として**呼び出し全体が拒否され、ff も commit も
+走らない**。**ff を別の Bash 呼び出しで先に済ませ、west.yml が main と一致してから**
+commit + push + merges を呼ぶ。`WEST_PIN_VERIFY_SKIP=1` は使わない（退行ではないが、
+skip は本物の退行も通す）。
 
 ## agent プロンプトに必ず入れるもの（全部、実測で必要と分かったもの）
 
@@ -102,6 +127,8 @@ commit して main に載せる。
 | **build が通らなければ merge しない** | 壊れた移行は未移行より悪い |
 | **rebase 禁止・force-push 禁止** | CLAUDE.md |
 | **`manifest/west.yml` を触らない** | pin は中央で 1 commit にまとめる |
+| **`wrangler.jsonc` のコメントを Bash heredoc で書かない（Write / Edit ツールで書く）** | PreToolUse hook `wrangler-deploy-main-sync-guard` は**コマンド文字列**を見る。「deploy / dev は走らせていない」と説明する UNVERIFIED コメントに `wrangler deploy` の字面が入るので、heredoc 経由だと**実行していない deploy として拒否される**。第 8 波（2026-09-07）で 1 agent が踏み、Write ツールに切り替えて通った |
+| **`+server.ts` を別 dir へ `git mv` してから `git rm -r svelte/`** | 第 8 波の 4 repo は全部 `svelte/src/routes/xrpc/[...path]/+server.ts` を持っていた（上記「バックエンドである」節）。4 agent とも `src/xrpc-proxy.ts` に marker 付きで保存し、`src/app.ts` には触っていない（`gh api compare` で確認） |
 
 ## ⚠ `svelte/src/routes/**/+server.ts` は**バックエンド**である（実測 230 repo）
 
