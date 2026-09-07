@@ -3522,4 +3522,47 @@
               FINDINGS 0, amu SCANNED 3 FINDINGS 0, empty directory exit 2. One
               true red, two false reds removed, one false green caught -- all
               three shapes seen before this text was written."}
+  {:id       :verify-status-sink
+   :title    "a `(* 0 <call>)` in .kotoba that multiplies a status away, classified by what it sinks"
+   :why      "2026-09-07 (aiueos K16 Co-Scientist, silence-h1 elo 1560 / silence-h2):
+              Kotoba kernel and driver sources force evaluation order with
+              `(+ v (* 0 status))`, which evaluates the status and discards it. For a
+              store return that is sequencing; for a `kernel-load-*` read-back or a
+              `kernel-pause` / `*-drain` poll result it is a check nobody performs,
+              and in source every `(* 0 x)` looks the same. The detector resolves a
+              plain local through the enclosing top-level form's let/loop bindings,
+              names the producer head and classifies the site (load-result /
+              poll-result / store-return / other; token heuristic, not truth), prints
+              one SINK line per site with file:line and class, and one FINDING per
+              checkout with the class histogram. Severity warn only when a load or
+              poll result is sunk. Cannot be a fleet gate: the population that
+              matters is aiueos + kototama under orgs/."
+   :argv     ["nbb" "{{repo}}/scripts/verify-status-sink.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  600000
+   :writes   :none
+   :accepted {"status-sink:kotoba-lang/aiueos"
+              {:since "2026-09-07"
+               :why "aiueos E8 removed 129 tautological compares and sequences stores with
+                     `(* 0 status)` on purpose (branch k16-stream-20260906, commit `129 -> 0`).
+                     The count on aiueos is a dated, accepted BASELINE that this detector makes
+                     visible and countable -- it is not a defect list. The per-site class is
+                     the actionable part: sites whose class is load-result or poll-result
+                     (SINK lines) are the ones a read-back check would change."
+               :clears-when "the aiueos checkout under orgs/ reports 0 sinks (stores sequenced
+                             by a form that keeps the status, or a compiler-level sequencing
+                             form replaces the idiom), or the owner decides the idiom is a
+                             defect and this acceptance is removed so the count stands as NEW"}}
+   :measured "2026-09-07 12:xx: aiueos K16 tip 851bae9 (read-only worktree) SCANNED 132
+              FORMS 476 (literal 1, unresolved-local 12, unparsed 0) SINKS 463 in 22 files
+              -- load-result 18, poll-result 7, store-return 229, other 255 (exit 1);
+              aiueos pinned checkout in orgs/ (29b4c34) SCANNED 133 SINKS 448 in 23 files
+              -- load-result 20, poll-result 3, store-return 216, other 245 (exit 1);
+              kototama SCANNED 14 FORMS 0 CLEAN (exit 0); empty directory exit 2. Both
+              directions and the refusal seen. Self-check: 5 class-bearing fixtures +
+              literal + parameter-only + comment + string, 9/9. SCANNED is over
+              checkouts, not a workspace total (orgs/ is west-managed)."}
 ]}
