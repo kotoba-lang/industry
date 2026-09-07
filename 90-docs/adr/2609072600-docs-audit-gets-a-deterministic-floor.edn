@@ -32,10 +32,10 @@ unpinned だったため、Hermes が意図しない課金を防ぐために発�
 **これは安全側の失敗**（推論呼び出しは 1 回も行われていない）だが、`cron list`
 上は `[active]` のままなので、実行履歴を見るまで分からない。
 
-実測（2026-09-07、189 cron job）: `drift_skip` 9 件 / `failure_streak > 0` 85 件 /
+実測（2026-09-07、**`~/.hermes/profiles/*/cron/jobs.json` の `jobs` 配列を数えた** 189 job）: `drift_skip` 9 件 / `failure_streak > 0` 85 件 /
 clean 95 件。9 件の drift_skip は同じ移行に由来する（design-audit / docs-audit /
 isekai-x402 / jv-migration / kinyu / murakumo-tok / seiri / tsuushin / zeta）。
-**この ADR が直すのは docs-audit の 1 件だけ**で、残りは名指しして残す。
+**この ADR が直すのは docs-audit の 1 件だけ**で、残りは名指しして残す。\n\n⚠ **この分母を「cron job の総数」として引用しない。** 同日 `export_cron.py` は 137 profile / **255 job** と報告し、同じ `jobs` 配列を数え直すと 196 だった （間に自分で 1 本足し、他セッションが数本足している）。**数え方が違えば分母が違い、稼働状態は端末ローカルで刻々動く。** 上の 3 つの比は「同じ 1 回の走査の中の比」としてだけ意味を持つ。今日の値が要るなら数え直す。
 
 ## Decision
 
