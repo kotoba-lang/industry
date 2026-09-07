@@ -65,6 +65,13 @@
               "weave" "project link" "プロジェクトリンク"]
   :note "kotoba-lang/amu is the compiler orchestrator (formerly kotoba-lang/compiler). 編む = 言葉を一つの反物にする。プロジェクト閉グラフ（複数 .kotoba を一台の機にかける）もここ。実行時に import を provider へ結ぶのは kototama（ADR-2608139980）。:compiler roles, kotoba.compiler namespaces, kotoba-compiler/1 artifact compatibility, and the bin/kotoba-compiler shim remain compatible."}
 
+ :osaho-kir
+ {:label "osaho / KIR（筬）"
+  :spellings ["osaho" "kir" "kotoba-kir" "筬" "osa" "reed"
+              "intermediate representation" "中間表現" "checked ir"
+              "defcid" "definition cid" "definition identity" "定義同一性"]
+  :note "kotoba-lang/osaho is the checked intermediate representation every backend shares, and the owner of the canonical DAG-CBOR definition identity (DefCID). Renamed from kotoba-lang/kotoba-kir on 2026-09-07 (owner decision); GitHub redirects the old name, so io.github.kotoba-lang/kotoba-kir git coordinates still resolve and the kotoba.kir.* namespaces are UNCHANGED -- the same compatibility shape amu kept after its own rename from `compiler`. **No DefCID moved**: names are not in the hash on either side of a call, which is this repository's own guarantee. 筬 = the reed of a loom: every warp thread passes through one dent of it and it holds them all in position; it makes nothing and decides nothing, it is what everything passing through must fit. The name is COINED, not a traditional weaving term (osaba 筬羽 / osauchi 筬打ち / osatōshi 筬通し are). Registered here because a name that does not announce its function needs a second entrance. Reads as: kotoba 言葉 -> amu 編む -> osaho 筬 -> 綾 (kotoba-wasm / -native / -script / -component) -> kototama 言霊. Does NOT parse source, emit code, or decide policy. ⚠ Its value model is not `kotoba.value.v1`: all 10 frozen vectors disagree, so adopting the io-ipld value model is payload v3 (ADR adr-2609076000, differential test in this repo)."}
+
  :kototama-runtime
  {:label "Kototama / 言霊（実行と実行時 link）"
   :spellings ["kototama" "言霊" "runtime" "host" "execution" "tender"
