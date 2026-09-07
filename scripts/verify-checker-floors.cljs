@@ -74,6 +74,19 @@
         (= 2 exit) :refuses
         :else      :fails))
 
+;; Second rule (2026-09-07). The first rule fed a MISSING input and the known
+;; floorless checkers crashed (exit 1) rather than print PASS, so it never went
+;; red on a real tree -- a detector written to the hypothesis, not to a measured
+;; red. The hazard silence-h9 names is a verdict with no evidence count: run the
+;; checker against its OWN repo and refuse a PASS/OK/CLEAN line that carries no
+;; number -- `PASS` alone cannot distinguish 40 components from 0.
+(def verdict-re #"\b(PASS|OK|CLEAN|SUCCESS)\b|✅")   ; anywhere -- `Q9 JVM-FREE PASS:` carries it mid-line
+(def count-re   #"(?i)(SCANNED\t\d+|\b\d+\s*(files?|components?|documents?|checks?|entries|verified|scanned|checked|items?|repos?|modules?)\b|\b(files?|components?|documents?|checks?|verified|scanned|checked)\D{0,12}\d+)")
+(defn pass-without-count?
+  "exit 0 + a verdict word + no evidence count anywhere in the output."
+  [{:keys [exit out]}]
+  (and (= 0 exit) (re-find verdict-re (str out)) (not (re-find count-re (str out)))))
+
 ;; ── 実行 ─────────────────────────────────────────────────────────────────
 
 (defn- mkdtemp [prefix] (fs/mkdtempSync (path/join (os/tmpdir) prefix)))
@@ -138,8 +151,22 @@
       (vec (for [n names]
              (let [_ (try (fs/unlinkSync log) (catch :default _ nil))
                    r (run-checker {:script (path/join t "scripts" n) :cwd work :classpath classpath
-                                   :path-prefix dir :stub-log log :timeout-ms timeout-ms})]
-               (assoc r :script (path/join scripts-dir n) :class (classify r)))))
+                                   :path-prefix dir :stub-log log :timeout-ms timeout-ms})
+                   c (classify r)
+                   ;; rule 2 only where rule 1 did not already fire: the checker on
+                   ;; its own tree, same stubs (JVM/gh still refused there).
+                   _ (try (fs/unlinkSync log) (catch :default _ nil))
+                   ;; the ORIGINAL script, not the copy: checkers locate their
+                   ;; inputs relative to their own file, and the copy in t/ has no
+                   ;; ../qualification or ../lang beside it (that crash read as
+                   ;; `fails` and hid every real PASS-without-count).
+                   real (when-not (= c :pass-on-empty)
+                          (run-checker {:script (path/join scripts-dir n) :cwd repo
+                                        :classpath (str/join ":" (filter fs/existsSync [repo (path/join repo "scripts") (path/join repo "src") (path/join repo "scripts" "nbb_compat")]))
+                                        :path-prefix dir :stub-log log :timeout-ms timeout-ms}))
+                   c2 (if (and real (pass-without-count? real)) :pass-without-count c)]
+               (assoc r :script (path/join scripts-dir n) :class c2
+                      :real-last (when real (last-line (:out real)))))))
       (finally
         (fs/rmSync t #js {:recursive true :force true})))))
 
@@ -235,7 +262,7 @@
       (when (str/includes? root "orgs")
         (println "NOTE\tcheckouts only; unchecked-out west projects are not scanned"))
       (println (str "CHECKERS\t" total "\tpass-on-empty=" (n :pass-on-empty) "\trefuses=" (n :refuses)
-                    "\tfails=" (n :fails) "\tunmeasured=" (n :unmeasured)))
+                    "\tpass-without-count=" (n :pass-without-count) "\tfails=" (n :fails) "\tunmeasured=" (n :unmeasured)))
       (when (pos? (n :unmeasured)) (println (str "UNMEASURED\t" (n :unmeasured))))
       (let [stubbed (filter #(pos? (:stubbed %)) results)]
         (when (seq stubbed) (println (str "STUBBED\t" (count stubbed) "\tcheckers reached clojure/clj/java/gh and were refused there"))))
@@ -250,6 +277,7 @@
 
         :else
         (let [bad (concat (by-class :pass-on-empty)
+                          (by-class :pass-without-count)
                           (by-class :unmeasured)
                           (when strict? (by-class :fails)))]
           (doseq [{:keys [script class exit out stubbed ms spawn-error]} (sort-by :script results)]
@@ -263,6 +291,10 @@
                       (finding! "warn" (str "pass-on-empty:" script)
                                 (str script " exits 0 against an empty input dir and prints `" (last-line out)
                                      "` -- zero evidence and a clean scan return the same value; add a floor (SCANNED n, n=0 -> exit 2)"))
+                      :pass-without-count
+                      (finding! "warn" (str "pass-without-count:" script)
+                                (str script " exits 0 on its own tree and prints `" (or (:real-last (first (filter #(= script (:script %)) results))) (last-line out))
+                                     "` with no evidence count -- a verdict that cannot tell N from 0; print SCANNED n and exit 2 when n=0"))
                       :unmeasured
                       (finding! "info" (str "unmeasured:" script)
                                 (str script " did not finish within " timeout-ms " ms against an empty input; not clean, not failing, unmeasured"))
