@@ -1,0 +1,82 @@
+[{:db/id -1
+  :adr/id "adr-2809071200-kotoba-lang-org-site-storytelling-and-evidence-surface"
+  :adr/title "kotoba-lang.org: chart the evidence, lead with the one qualified speed claim, and give the page a readable shape"
+  :adr/status :accepted
+  :adr/date "2026-09-07"
+  :adr/deciders ["owner" "agent"]
+  :adr/supersedes []
+  :adr/related ["adr-2607132300-design-quality-score"
+                "adr-2608080100-single-page-app"
+                "adr-2608040100-repo-name-planes"]
+  :adr/context
+  "kotoba-lang.org published five benchmark reports as four wide tables of milliseconds, had no dark mode, listed none of its 2,215 public repositories, and ran its twenty sections in an order that put the mechanism and the evidence after the sponsorship page. The header carried ten flat controls: three rows and 202px on a 390px screen. Owner asked, over one session, for: the benchmark speed difference made legible with charts and motion; `Fastest` conveyed on the first screen; dark mode; a filterable library list whose tags correspond to GitHub topics; the harness repositories linked; the runtime benchmark charted too; a Lisp cue in the header; a light/dark switch built from the Lisp logo; an animation showing code becoming a hash; sample code in the hero; the page reorganised for mobile and storytelling WITHOUT changing the information; and GitHub visible in the header."
+
+  :adr/decision
+  "Ship all of it, deriving every published number from the repository's own machine authorities, and keep the page's existing discipline that a claim may not exceed what its report qualifies.
+
+## What landed (all on kotoba-lang/kotoba-lang main, all deployed)
+
+1. Charts. `site/src/kotoba/site/chart.cljc`, pure hiccup, no third-party runtime. `ranked-bars` (compiler startup; six workload-domain small multiples; six native-runtime panels in absolute ms), `diverging-cell` (all 30 runtime pairs), `log-lines` (build time vs source size, both axes log). Bars carry TIME, so the fastest lane is the shortest bar and every chart says so. Row layout answers to the width of the CHART (`container-type: inline-size`), not the window.
+
+2. The `Fastest` claim. `cold-start` derives it once from bench/public-build-scaling. Four of five reports record a FAILED quiet-host gate and rank nothing; build-scaling is the exception because its lanes are interleaved on one host and every ordering clears perfgate at its unrelaxed default policy. At K=1 the released CLI passes against all four comparators (2.5x Clang, 3.3x rustc->Wasm, 4.8x rustc->native, 14.6x javac). `:qualified?` is read from the report, so a rerun that loses one ordering demotes the chip, the heading and the sentence together. lang/product-defaults.edn still forbids :universal-speed-rank; none is claimed.
+
+3. Dark mode, from one knob (`:dark? true`) on all eight documents. Application CSS defines no palette.
+
+4. Repository catalogue at /libraries/#catalog: 2,215 public repos, filterable by text and tag, server-rendered. `site/library-taxonomy.edn` names the GitHub topic each tag corresponds to; 1,960 repositories had those topics WRITTEN to GitHub, verified from GitHub's own side.
+
+5. Benchmark provenance table: harness, method and report for all five benchmarks, in-repo paths checked at build time.
+
+6. Lisp identity: `( KOTOBA )` around the wordmark, nested parens in the page margins, and a light/dark switch drawn as a lambda yin-yang that rotates 180 degrees between states.
+
+7. The hero opens with a real Kotoba program (double-21.kotoba) that dissolves into its own identities — source bytes, checked KIR, artifact identity — read from the checked-in provenance receipt.
+
+8. Information architecture: five chapters in narrative order, a generated contents strip, one grouped `<details>` menu, GitHub as a bar control from 23rem up.
+
+## One upstream fix
+
+`jp-go-digital-design-system` `.dds-ext-grid` used `minmax(<min>,1fr)`, whose track cannot go narrower than the declared minimum, so a grid overflowed its container and the whole page scrolled sideways at 320px. Fixed there with `min(<declared>,100%)` rather than re-derived in app CSS."
+
+  :adr/consequences
+  "The page now leads with speed and can be read on a phone, and every number on it still names the gate it passed or failed. The catalogue and the org's GitHub topics are one vocabulary, so a tag added in one place is visible in the other.
+
+Costs accepted: the libraries page is 844 KB raw (100 KB gzipped) because the catalogue is server-rendered rather than hydrated from JSON — chosen so the complete list is the page with JavaScript off. 255 repositories are published as UNTAGGED rather than given a nearest-guess label."
+
+  :adr/evidence
+  "Landed merges on kotoba-lang/kotoba-lang main:
+   2f49d4dc charts + qualified Fastest + dark mode + catalogue
+   ec01924d harness links + runtime charted in ms + Lisp header
+   2d5d6282 Lisp-mark theme switch + hero code/hash morph
+   db7ec932 five chapters + grouped menu + phone-sized header
+   58dfe912 program opens the page + menu anchored to the header row
+   1e7f913a header controls at the right edge, no wrap
+   1d4ac963 GitHub is a header control
+  Landed on kotoba-lang/jp-go-digital-design-system main:
+   a4a99b5e ext-grid min guard (117 tests / 2514 assertions pass)
+  west pins advanced: kotoba-lang -> 1d4ac963 (root 40f24601);
+   jp-go-digital-design-system -> a4a99b5e (root bd0c7879), now 5b17a0a1 by a later session, my fix included.
+  Deployed: kotoba-lang-org version 5b997290; all eight live pages verified byte-identical to origin/main after deploy.
+  design-quality: 100.00 on all eight pages, unchanged from before the session.
+  Reveal animation discriminates in three states (off-screen 0px -> 36px on scroll; reduced motion never arms; no JavaScript renders complete).
+  Morph discriminates in four states (idle source / scatter hex / hash overlay with its own label / exact restore).
+  Theme switch discriminates in both directions and across a navigation, and is hidden with JavaScript off.
+  Catalogue filtering verified by RENDERED GEOMETRY, not by the hidden property: unfiltered 2,215 rows / 166,164px tall; #tag=simulation 31 rows / 8,144px.
+  Header measured at 320/360/375/390/414/430/480/600/768/1024/1440: 68px at every width, theme switch flush with the header content box, wordmark never clipped, no horizontal page scroll, GitHub in the bar from 375 up.
+  Information preservation measured, not asserted: across the IA change the section ids (18), h2 headings (21) and external links (46) are the same sets as before."
+
+  :adr/gaps
+  "1. The 320px class does not show GitHub in the header bar; it is reachable in the menu. Accepted: the bar cannot hold a fourth control there without clipping the wordmark.
+   2. The `no-document` blind spot of verify-single-page-app is unchanged; this site is a multi-document marketing surface under the ADR-2606290000 exception and was already so.
+   3. `site/library-catalog.edn` is a snapshot with no scheduled refresh. The refresh procedure is documented as a `gh api graphql` invocation in site/README.md rather than a script, because new operations tooling is kbb-first (owner 2026-09-07) and that migration was out of scope. A tag vocabulary change therefore does not reach GitHub topics until someone re-runs the sweep.
+   4. 255 of 2,215 repositories match no domain rule and are shown untagged. 1,160 carry no GitHub description at all, which is the ceiling on what name-and-description matching can do.
+   5. The wordmark link is a 27-34px tap target (an image link), below 44px. Pre-existing; the design-quality gate does not flag it.
+   6. kotoba-lang main carries a stray COMMIT_MSG.txt from another session. Not touched."
+
+  :adr/resume
+  "Nothing is in flight. To re-verify the live surface:
+     curl -sS -L https://kotoba-lang.org/ | shasum -a 256
+   against `git -C orgs/kotoba-lang/kotoba-lang show origin/main:site/dist/index.html | shasum -a 256`.
+   To rebuild the site (grammar pin must match site/dependencies.edn):
+     JP_GO_DDS_ROOT=../jp-go-digital-design-system KOTOBA_GRAMMAR_ROOT=../grammar \\
+     nbb --classpath \"site/src:../grammar/src:../jp-go-digital-design-system/src:../css/src:../html/src\" site/generate.cljs
+   To refresh the repository catalogue and push topics, follow site/README.md 'Refresh the snapshot'.
+   The next honest improvement is gap 3: a kbb ops script that refreshes site/library-catalog.edn and reconciles GitHub topics, so the tag vocabulary and the org cannot drift."}]
