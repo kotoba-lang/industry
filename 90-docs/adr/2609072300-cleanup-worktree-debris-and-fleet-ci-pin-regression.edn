@@ -1,0 +1,69 @@
+[{:db/id -1
+  :adr/id "adr-2609072300-cleanup-worktree-debris-and-fleet-ci-pin-regression"
+  :adr/title "cleanup 2026-09-07: superproject 直下の worktree 残骸 232 本の処分、fleet-ci が pin 前進を静かに巻き戻していた経路、open-jpn-gov の 4 階層 :local/root"
+  :adr/status "accepted"
+  :adr/date "2026-09-07"
+  :adr/body "## 決定と発見（cleanup セッションの正本、skill git-cleanup-conflict）
+
+### 発見 1 — fleet-ci の put-file! は ref の楽観ロックだけで content の base を守っていなかった（root #2979、e042539 で修正）
+
+01:47Z に `west-pin-put` が open-jpn-gov の pin を 7a48a7f0 → 31ae7491 に進めた（root dd41613b）。fleet-ci の tick はそれより前に west.yml を読み、`verify-west-pins`（最長 300 秒）を挟んで 01:57Z に ayatori の pin を書いた（5d652130、`2 insertions(+), 2 deletions(-)`）—— ayatori を進めると同時に open-jpn-gov を 7a48a7f0 へ**戻していた**。`put-file!` は自分で fetch した tip の上に worktree を作るので push は fast-forward で通るが、書く content は呼び側が *それより前に* 読んだ base から作られている。`advance-pin!` は成功を返し、ログには何も出なかった。`append-receipt!` も同じ形（並行 tick の receipt 行が落ちうる）。
+
+修正: `put-file!` に `:base`（呼び側が content を導出した元の file 内容）を渡し、tip から materialize した実ファイルと違えば commit せず `push rejected (base moved …)` を返す（`base-moved-detail`）。この文言は `advance-pin!` の再試行述語が見るもので、次の試行は west.yml を読み直す。両呼び側が `:base` を渡す。unit suite 32 tests / 75 assertions 緑、両方向を実演済み（advance-pin-once! の `:base` だけ外すとその test 1 件だけ赤、append-receipt! も同様）。
+
+**規則**: 『ref の更新が楽観ロックだから安全』は content の base については何も言っていない。読んだ時点と書く時点の間に同じ file が動いたかは、別に測る。
+
+### 発見 2 — cleanup-land が clj-kondo の lint cache を :additive（PR → merge）に載せていた（同 PR で修正）
+
+fleet dry-run の `:additive` 4 repo のうち 2 repo（kami-app-modeler 12 件 / langgraph 8 件）は `.clj-kondo/.cache/v1/**/*.transit.json` だけだった。`junk-re` に `\\.clj-kondo/\\.cache` を追加（`.clj-kondo/config.edn` は正当に track される設定なので `.cache` 配下だけ）。修正後の実パイプラインで `additive=0 repo`。
+
+### 発見 3 — open-jpn-gov の deps.edn は appkit を 4 階層上（superproject の外）で指していた（唯一の blocking 辺）
+
+svelte→cljs 移行（cloud-itonami/open-jpn-gov #1、2026-09-06）が `_wt-*` worktree で検証した際の `../../../../kotoba-lang/appkit` をそのまま commit しており、コメント自身が『shared checkout から解決するなら直せ』と書いていた。west path `orgs/cloud-itonami/open-jpn-gov` からは `../../kotoba-lang/appkit`。`agent/fix-appkit-local-root` → server-side merge 31ae7491 → pin 前進（fleet-ci に 1 度巻き戻され、84118a33 で再適用）→ `west-orphan-audit --blocking` exit 0。
+
+### 発見 4 — superproject 直下に linked worktree 262 本、そのうち 106 本は親 repo の org 移転で metadata が消えた『宙吊り』だった
+
+`orgs/cloud-itonami/.wave5-*` / `.wave6-*` / `.w5-*` / `_wt*-*`（industry-stack-wave）、`orgs/kotoba-lang/.tamaki-*` / `.toshokan-*`（tamaki）等。ADR-2607011345 が禁じる配置（superproject の内側）。分類は 3 軸で測った: (a) HEAD が remote default の祖先か (b) dirty content の追加行が現 main に在るか (c) main がその後同じ file を動かしたか（= stale、`:close-stale-revert-risk`）。
+
+| 母集団 | 処分 | 件数 |
+|---|---|---|
+| landed + dirty + main が同 file を後で更新（stale-superseded） | archive → `worktree remove --force` → 祖先なら local branch 削除 | 90 |
+| landed + dirty content が全行 main に在る（content-landed） | 同上 | 9 |
+| landed + clean（7 日未満で retire ツールが保留していたもの） | remove | 6 |
+| `worktree-retire.cljs --apply`（landed・clean・7 日超・idle） | ツールが retire（.git symlink 1 件と read-only test-data 3 件は手で完了） | 57 + prune 264 |
+| 未 merge branch だが追加行が全て main に在る（keyboard / sanctions / 5630 / 0144 / isic-873 / 5090-stability） | archive → remove → local + remote branch 削除 | 6 |
+| `.git` が消えた metadata を指す dangling dir（親: tamaki → etzhayyim/tamaki、nexus-x402 / aozora-engine / network-isekai → network-awai、dougaka） | 親 ODB に無い blob だけ copy（252 件）→ rm | 99 |
+| nogit の tamaki 写し（2026-08-03 の 1 日分） | 同上（60 件 copy）→ rm | 24 |
+
+archive は全て親 repo の `.git/stash-archive-2026-09-07/{worktrees,branches,dangling,nogit-scratch}/<name>/`（patch + status + untracked/ignored の copy + index.txt）。**最大の 1 件**: `cloud-itonami-app/.git/stash-archive-2026-09-07/worktrees/.cloud-itonami-app-adopt/`（feat/repository-runtime-adoption の未 commit 5,174 行、tracked-modifications.patch 468 KB + untracked 10 件）。main が同じ file を後で更新しているので `:close-stale-revert-risk`。rescue branch への push は `jvm-new-surface-guard`（新規 production .clj 禁止）が拒否したため archive のみ。
+
+retire 対象の branch のうち remote に残っていた merged branch 21 本を削除（69 本は既に無し、未 merge 0）。
+
+### 着地させたもの
+
+- kotoba-lang/torihiki: 共有 checkout の untracked 489 件（source 25 / md 137 / test evidence 322）を cleanup-land が #14 で、credential 名パターンに当たった 2 件（seeded fuzz harness、秘密無し）を手で bc7ff869 で着地。pin 前進 → checkout clean。
+- root: `agent/maturity-4221-mutations`（main の祖先）を archive → 削除。
+
+### 保留（報告のみ。archive は無し = 手を付けていない）
+
+- **genuine な未着地 worktree 24 本**（landed だが dirty content が main に無く、main も同 file を更新していない）: cloud-itonami 10 本（_wt10-1072 sugarops governor 等、1〜3 file の実編集）、`.toshokan-tamaki--*` 12 本（未着地の maturity module の変種 ×12、58〜62 commit 遅れ）、`.kakeibo-tamaki--*` 3 本。archive 済み（worktrees/）だが worktree はそのまま。
+- **draft PR 4 本**（`:branches`: push 済み・PR 無し・content が main に無い）: kotoba-lang/kotoba-lang#594（security-hardening、12/252 行）、cloud-itonami-isic-4652#3（680/2956 行）、cloud-itonami-isic-2822#5（770/3023 行）、kotoba-lang/toshokan#18（detached HEAD に 9 commit 未 push → `rescue/toshokan-harvest-codex-0-20260907`）。body に何を測れば決まるかを書いた。
+- `.ai-gftd-apex-tamaki--*` 7 本: 親 gftdcojp/ai-gftd-apex が GitHub 404（redirect 無し）で判定不能。
+- shadow checkout（renamed-upstream 60 / registered-elsewhere 35 / path-override 9）: `shadow-checkout-disposition.cljs` / `shadow-ignored-content-survey.cljs` は 2026-08-13 の固定 249 件を見ており 204 件が cannot-assess（exit 2）。道具を現在の母集団に合わせるまで触らない。
+- `~/.cloud-itonami/awai-worktrees/awai/nexus-x402-{sales,supporter}-<epoch>` 213 本（2 日で ~100/日、bot が run ごとに worktree を作り消していない）: bot 所有、報告のみ。作り手側の修正が要る。
+- `docs/design/tamaki-ui-concepts/`（PNG 5 件、8/3 から root 直下に untracked）、`orgs/personal/*` 37 件、true-orphan-nongit 10: 前回（ADR-2608301430）と同じく据え置き。
+- root PR #2977（別セッションの draft、作成 16 分後に本人が #2978 で着地）には触っていない。
+
+### 検証
+
+`west-orphan-audit`: blocking 0 / true-orphan-git 0 / UNVERIFIED 0（exit 0）。superproject untracked entries 419 → 159、worktree/scratch 53 → 14、worktree-of-registered 28 → 6。root: main == origin/main、stash 0、自分の worktree/branch は撤去済み。
+
+### 次の一手
+
+1. 上の 24 本の genuine WIP worktree —— 所有 loop（industry-stack-wave / tamaki）が拾うか、owner が 1 本ずつ merge / close。
+2. `worktree-retire.cljs` に `:git` が symlink の worktree の正規化（gitdir file へ戻す）と、read-only な `target/test-data` の chmod を足す —— 今日の FAILED 4 件はどちらも手作業で完了させた。
+3. `shadow-checkout-disposition.cljs` の母集団を固定 249 件から `west-orphan-audit` の分類に置き換える。"
+  :adr/related ["adr-2608301430-cleanup-ledger-seq-collision-and-symlink-worktrees"
+                "adr-2608230300"
+                "ADR-2607011345"
+                "adr-2608136000"]}]
