@@ -487,5 +487,220 @@ bundle に対して**通る**。manifest はその bundle が「どの入力か�
 
 再構築した bundle での検証: `manifest:check` exit 0、suite **562 tests / 2,732
 assertions 0 failures**、`predeploy:check` 6 項目すべて ok。
+
+## L2 の残存と容量を測った —— 前節の問いは、そのままでは成立していなかった（2026-09-07、本番 kotobase.net）
+
+前節「それでも『作れ』ではない」が次に測ると書いた 2 点のうち、1 点目（L2 の残存時間と
+容量）と、2 点目（round trip の実コスト）を測った。**採用 16 標本、棄却 34 標本。**
+
+結論を 3 行で:
+
+- **L2 は経過時間では失効しなかった。** population から **114 分**まで、採用標本は
+  全件 `b2=0`。答えなくなる点は**見つかっていない**（上界は未測定）。
+- **前節の 2 点が割れていたのは経過時間ではない。** graph 1 の `l2=0; b2=12` は
+  「4 分で L2 が切れた」のではなく、**その block が一度も L2 に入っていなかった**。
+- **read が触る distinct block は commit 1 本あたり約 1.1 個。** commit-local pack が
+  畳めるのはその 1 個で、28 request が 24 になるだけ。**同じ 28 を L2 は 0 にしている。**
+
+### まず機構 —— L2 に block を入れるのは read であって write ではない
+
+`store.cljs` を読むと、block の `l2-put` は `fetch-block-cached` の **B2 分岐にしか無い**。
+`flush!` は自分の docstring どおり **L1 だけ**を seed し、`block-store/put-immutable!` は
+object store にしか書かない。この Worker が `caches.default` を触る箇所は 4 つ
+（block・manifest・rows・owner）で、**write path はそのどれも通らない**。
+
+したがって **「write から何分で L2 が答えなくなるか」という問いには答えが無い。**
+write は L2 を答え*始めさせ*ない。時計が動き出すのは、L1 を持たない isolate が読んで
+**B2 に落ちた瞬間**である。
+
+実測も同じことを言う。**first ever の durable read を観測できた 43 graph のうち 40 件が
+その read で `l2=0`**（M=6 commit は `b2=8`、S=1 commit は `b2=3`、L=24 commit は `b2=28`）。
+残る 3 件は例外ではない —— どれも**手前に 504 した read が在り**、gateway が諦めた後も
+その read が L2 を部分的に埋めていた（`l2=4;b2=4` / `l2=23;b2=5` / `l2=25;b2=5`）。
+**504 は「読めなかった」であって「触らなかった」ではない。**
+
+これで前節の 2 点はそのまま説明が付く:
+
+| | その graph の warm read | COLD read | 前節の読み | 実際 |
+|---|---|---|---|---|
+| graph 1 | `b2=0` | 4 分後 `l2=0; b2=12` | 4 分で L2 が切れた | **一度も L2 に入っていない** |
+| graph 2 | `b2=6` | 53 秒後 `l2=14; b2=3` | 53 秒なら生きている | warm read が B2 に落ちたので入っていた |
+
+**割れていたのは経過時間ではなく、L2 に入れる read が先に在ったかどうかである。**
+前節は 2 点を residency 曲線の 2 点として読んだが、**そもそも同じ曲線の上に無かった。**
+
+### 対照実験 —— 同じ graph が population の前後で反転する
+
+cell H は 6 commit（8 block）で書いたあと **1 度も読まずに** 84 分置いた。write から
+graph 2 の 53 秒より遥かに古いが、L2 は 1 block も答えない:
+
+    H rep0  write から 84 分  l1=12; l2=0; b2=8; miss=0; distinct=8; epoch=10   4436 ms
+    H rep1  write から 84 分  l1=12; l2=0; b2=8; miss=0; distinct=8; epoch=2    4770 ms
+    H rep2  write から 84 分  l1=12; l2=0; b2=8; miss=0; distinct=8; epoch=6    7194 ms
+
+同じ数分の間に、**population 済み**の cell B（44 分前に population、同じ 6 commit /
+8 block）は 4 件全部が `l2=8; b2=0`。そして上の 3 read 自身が population なので、
+**72 分後に同じ graph を読み直すと反転する**:
+
+    H rep1  population から 72 分  l1=12; l2=8; b2=0; miss=0; distinct=8; epoch=5   5158 ms
+
+**同一 graph・同一 query・write からはむしろ古い。変わったのは population だけ。**
+（H rep0 / rep2 はこのとき colo 共有の rows-cache に短絡して `distinct=0` を返した。後述）
+
+### 標本の採り方
+
+- **1 graph = 1 発。** isolate ローカルの read-cache（`xrpc.cljs` の `read-cache`、
+  chain-cid + method + body で keyed）と hydrated-db cache があるので、**同じ isolate
+  では同じ graph を 2 度測れない**（2 発目は `distinct=0`）。したがって条件ごとに
+  graph を分け、1 graph につき probe は 1 回だけにした。
+- **fresh isolate は fresh TCP connection で買う。** これが最初に躓いた点で、
+  keep-alive pool を使うと **10 連続 read が全部同じ isolate に着き epoch は 2→11 と
+  単調に増えた**。`https.Agent({keepAlive:false})` + `connection: close` にすると
+  epoch=1 が出るようになる。
+- **group 内の probe 間隔は 40 秒。** 2.5 秒間隔では colo が温かい isolate に回し続け、
+  epoch=1 の採れ高が 1/7 まで落ちた。
+- **`epoch=1` 以外は棄却。** `epoch` は isolate 内で read path が走った回数、`l1` は
+  その isolate の memo なので、`epoch>1` の `l2=0` は「L2 に無い」ではなく
+  「L1 が先に答えた」でありうる。
+- 変えたのは **1 度に 1 つ** —— 遅延軸は 6 commit 固定、サイズ軸は遅延 43〜45 分固定。
+
+### 採用標本（`epoch=1` かつ HTTP 200）—— 16 件すべて
+
+    cell          commit blocks  age(min)     ms   l1  l2  b2 miss dist rows
+    S2_M_short         6      8      16.1   2332   12   8   0    0    8  180
+    A_M_d2             6      8      23.1   2515   12   8   0    0    8  180
+    F_S_d10            1      3      43.5   1549    2   3   0    0    3   30
+    G_L_d10           24     28      43.6   9691   42  28   0    0   28  720
+    B_M_d10            6      8      44.6   2803   12   8   0    0    8  180
+    X_M_extra          6      8      59.0   4388   12   8   0    0    8  180
+    X_M_extra          6      8      60.4   5342   12   8   0    0    8  180
+    X_M_extra          6      8      61.0   3302   12   8   0    0    8  180
+    C_M_d25            6      8      68.0   3311   12   8   0    0    8  180
+    C_M_d25            6      8      68.6   3681   12   8   0    0    8  180
+    C_M_d25            6      8      68.7   3460   12   8   0    0    8  180
+    X_M_extra          6      8      91.6   3154   12   8   0    0    8  180
+    X_M_extra          6      8      92.9   2799   12   8   0    0    8  180
+    D_M_d45            6      8      98.9   3207   12   8   0    0    8  180
+    E_M_d70            6      8     111.7   3493   12   8   0    0    8  180
+    E_M_d70            6      8     113.7   3623   12   8   0    0    8  180
+
+`age` は **write からではなく population から**の経過。`rows` は期待値と一致
+（6 commit = 180 行、1 commit = 30 行、24 commit = 720 行）で、**短い 200 ではない**
+ことを毎回確かめている。
+
+### 棄却した 34 件（内訳）
+
+| 理由 | 件数 | 備考 |
+|---|---|---|
+| `epoch>1` | 25 | epoch 2 が 9、3 が 6、4 が 3、5 が 2、6/10/11/12/13 が各 1 |
+| HTTP 401 | 4 | Biscuit の TTL を 1 時間だと思って組んだ最初の schedule。**実測 900 秒**（`expiresIn`）。401 は read path の手前で落ちる（60 ms、`x-kotobase-kv-stats` 無し）ので、**その graph の L2 状態は無傷**。組み直して測り直した |
+| HTTP 504 | 2 | 8 block の graph に対して 38.6 秒 / 59.3 秒。同じ cell の他 2 件は 3.1 / 3.2 秒 |
+| epoch を記録していない | 3 | 上の H 再読 control。生の header は残っており epoch は 14 / 5 / 7、いずれも >1 |
+
+棄却のうち `l2>0` を示したものは、**L2 が生きていたことの証拠としては有効**である ——
+`fetch-block-cached` は L1 を先に見るので、L2 が答えたのなら L1 には無かった。
+逆向きには使えない（`epoch>1` の `l2=0` は L1 が先に答えただけかもしれない）。
+この非対称性のため、**下の「L2 は生きていた」側の主張だけは棄却標本でも補強できる**が、
+「L2 が死んでいた」を言うときは採用標本しか使っていない。
+実際、棄却標本 25 件の `epoch>1` のうち `l2>0` は 21 件で、すべて上の表と同じ形だった。
+
+### 読み
+
+**1. 残存時間 —— 切れる点は見つからなかった。** population から 16 / 23 / 43 / 44 /
+59 / 60 / 61 / 68 / 92 / 99 / 112 / 114 分、**全部 `b2=0`**。block entry の
+`cache-control` は `max-age=31536000, immutable` なので、これは TTL ではなく
+Cloudflare 側の eviction が決める。**測れたのは下界（114 分以上）だけで、上界は無い。**
+
+**2. 容量 —— distinct block 数への依存は見えなかった。** 遅延 43〜45 分でサイズを振ると:
+
+    1 commit /  3 block   l2=3 / 3    (100%)   1549 ms
+    6 commit /  8 block   l2=8 / 8    (100%)   2803 ms
+   24 commit / 28 block   l2=28 / 28  (100%)   9691 ms
+
+**28 block まで、L2 の hit 率はサイズに依らず 100%。** これ以上のサイズは測っていない。
+
+**3. round trip の実コスト（前節の 2 点目）。** 同じ block 数で tier だけが違う read の
+中央値:
+
+    8 block   B2 が答えた  4600 ms (n=17)   L2 が答えた  3154 ms (n=31)   差 1.4 秒
+   28 block   B2 が答えた 20697 ms (n=1)    L2 が答えた  8399 ms (n=2)    差 12.3 秒
+
+**block あたり 180〜440 ms。** 28 block の graph では B2 経路が **20.7 秒**かかり、
+population 中に **504 を 2 回**出した。これがこの read path の実際の病理である。
+
+**4. そして pack が畳める量は、ここで測れる。** commit 数を振ると distinct block は:
+
+    1 commit -> 3 block      6 commit -> 8 block      24 commit -> 28 block
+
+限界比は (28-8)/(24-6) = **commit 1 本あたり 1.11 block**。commit-local pack
+（ADR-2608160100 の 1 commit = 1 pack）が 1 回の Range GET に畳めるのは
+**同じ commit が書いた複数の block**だが、read が触るのは commit あたり約 1 個なので、
+**24 commit の graph で 28 request が 24 request になるだけ（約 14%）**である。
+
+**同じ 28 request を、既に deploy 済みの L2 は 0 にしている。**
+
+### 測れなかったこと（正直に）
+
+- **L2 residency の上界。** 切れる点を見ていないので、「114 分は持つ」以上のことは
+  言えない。**「L2 は失効しない」と引用しない。**
+- **manifest の TTL の効き目。** block entry は `immutable` だが
+  `manifest-l2-max-age` は **3600 秒**で、これが切れると cold isolate は warm wave を
+  張れず trampoline が 1 block ずつ discover する。68〜114 分の標本は 60 分を跨いで
+  いるが、8 block では wave の利得が小さく、latency 差は雑音に埋もれた
+  （44 分 2803 ms vs 68 分 3311/3460/3681 ms）。**分離できていない。**
+- **colo は 1 つ（NRT）だけ。** L2 は colo ごとなので、**別 colo の読み手は自分の
+  first read を自分で払う**。読み手が地理的に散っていれば「L2 が覆う」は
+  colo ごとに成り立つのであって、全体に対してではない。**これは pack 側に有利な
+  未測定要因である。**
+- **本番の read 分布。** 「ある graph が、どれだけの頻度で、いくつの colo から
+  読み直されるか」を測っていない。**この measurement が置き換えられないのはここで**、
+  もし実運用の read の大半が「その colo で初めて読む graph」なら、L2 は定義により
+  1 度も助けない。
+- **28 block より大きい graph。** budget は 512 なので、まだ 1 桁以上上がある。
+- 504 が 4 回（population 2 / probe 2）出た。自分の負荷が原因かどうかは分けていない。
+
+### 勧告（**決定ではない。オーナー判断を要する**）
+
+**pack tier を作らないこと**を勧める。理由は 3 つとも上の測定に載っている ——
+①畳める量が commit あたり約 1 block しかない ②同じ round trip を L2 が既に 0 に
+している ③L2 は少なくとも 114 分持ち、28 block まで一様に効く。
+
+**ただし「L2 の寿命を延ばす」も勧めない —— 延ばす対象が無かった。**
+問題は L2 が短いことではなく、**L2 に入るのが遅いこと**である。`flush!` は L1 だけを
+seed するので、**どの graph も最初の 1 read は必ず全 block を B2 から取る**
+（43 graph 中 40 件で観測、残り 3 件は手前の 504 が代わりに払っていた）。
+28 block の graph ではそれが 20.7 秒と 504 になる。
+
+したがって次に検討すべきは、pack でも residency でもなく:
+
+- **`flush!` が書いた block を、書いた時に L2 にも置く**（`l2-put` は既に在る）。
+  first read の B2 往復が構造的に消える。**ただし colo をまたがない** ——
+  書いた colo の L2 にしか入らないので、上の未測定要因は残る。
+- **manifest を書き込み時に publish する。** 現状は read が learn した後に
+  publish されるので、first read だけが `warm!` の並列 wave を張れない
+  （28 block で 20 秒かかる主因はここの疑いが濃いが、**分離していない**）。
+
+どちらも数行で、pack tier / catalog / IPNI 依存のどれも要らない。
+**ただし『flush! で L2 に置けば速くなる』は、まだ仮説である** —— 上の 504 の原因も
+20 秒の内訳も分離していない。**この節が測ったのは L2 の残存と容量であって、
+その修正の効果ではない。** 実装する前に、この節と同じ形（`epoch=1` 標本、
+1 graph 1 発、条件ごとに複数標本）で first-read の前後を測ること。
+
+### 方法についての記録
+
+**この計測は 2 度組み直した。どちらも「測れなかった実行」が「測った実行」と同じ顔を
+していた**（CLAUDE.md の 7 問、2 問目と 7 問目）:
+
+- **401 が read path の手前で落ちることに気付くまで、`kv` が nil の probe を
+  『header が付かない route』と読みかけた。** 実際は Biscuit の TTL が 900 秒で、
+  1 時間だと仮定した再発行 threshold（35 分）が一度も発火していなかった。
+  **仮定した定数は、失敗するまで正しく見える。**
+- **keep-alive の pool が isolate を固定していることに気付くまで、`epoch` が
+  2→11 と増えるのを『production に read traffic が在る』と読みかけた。**
+  増やしていたのは自分の 10 連続 request だった。
+- **`rows` を chunk 連結で組み立てていて、multibyte が chunk 境界で割れると
+  JSON.parse が落ち、`rows=null` になっていた。** 「短い 200 を検出する」ために
+  置いた計器が、自分のバグで全件 null を返していた —— `Buffer.concat` に直すまで
+  **その計器は何も検出していなかった**。
 "
 }]
