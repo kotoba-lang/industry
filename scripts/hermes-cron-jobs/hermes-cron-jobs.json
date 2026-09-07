@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T01:30:50Z",
+  "generated_at": "2026-09-07T01:49:07Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -1570,7 +1570,7 @@
         "id": "fefcae7b9f6b",
         "name": "docs-reality-tick",
         "no_agent": false,
-        "prompt": "docs-audit daily drift tick (ADR-2609072600)。決定論の monitor が測った結果だけがあなたの知るすべて。捏造ゼロ、unknown は unknown。\n\nまず monitor 出力の SYNC 行を読む。\n- ff-exit が 0 でない、または behind-after が 0 でない場合: checkout は origin/main と一致していない。その事実を最初に報告し、drift findings を権威として扱わない（古い tree を測った可能性がある）。同期は自分で強制しない（他セッションの WIP を壊す）。\n- DOC-REALITY exit=2 の場合: 測れていない。findings 0 と読まない。\n\nDOC-REALITY findings が 1 件以上なら、**1 件だけ**直す（1 反復 = 1 finding。2 件まとめない）。\n- cited-superseded: CLAUDE.md はこの workspace の agent 指示の正本。該当行が旧 ADR を「現行の根拠」として引いているなら、後継 ADR を指すか、経緯であることが 1 行で分かる形に直す。決定そのものを変えない。歴史を消さない。\n- dead-path: 参照先が本当に撤去済みなら文書側をそう直す。撤去されていないなら path を直す。どちらか分からないなら「起票のみ」で報告して直さない。\n- agents-md-stale: `nbb scripts/gen-agents-md.cljs` を回す。AGENTS.md を手で編集しない（生成物）。\n\n**CLAUDE.md を直したら AGENTS.md も再生成する**（ADR-2609062600。AGENTS.md は生成物で、正本は CLAUDE.md）。\n\n着地の規律:\n- 共有 checkout に直接 commit しない。`nbb scripts/root-worktree.cljs create <task> --profile docs` で worktree を切り、そこで作業する。\n- 検証は `nbb scripts/verify-doc-reality.cljs . --findings` が該当 finding を出さなくなること、および `nbb --classpath \".:scripts/nbb_compat\" scripts/fleet-ci/gates/docs-edn-check.cljs . --sub 90-docs/adr --strict-keys` が 0 で通ること。\n- push が west pin guard に阻まれたら、branch が pin を変えていないことを確認した上で GitHub API のサーバ側 commit で着地させる（CLAUDE.md「Git operations」）。\n\nfindings が 0 なら「findings 0 / adr-inventory backlog N 件」を 1〜2 行で報告して終える。何も作らない。\n\nADR-INVENTORY の件数は backlog の指標として報告するだけ。あれを直すのは skill `adr-inventory` の担当なので、この tick では触らない。",
+        "prompt": "docs-audit daily drift tick (ADR-2609072600)。1 反復 = 1 finding。\n\n## 手順 1: 測定（これを飛ばして判断しない）\n\n最初の行動として、次を **そのまま** 実行する:\n\n    nbb scripts/docs-reality-tick.cljs --root /Users/junkawasaki/github/com-junkawasaki\n\nその stdout だけがあなたの測定である。node/python のインライン計算で代替しない。\n**報告には必ず `SYNC` / `DOC-REALITY` / `findings=` / `AGENTS-MD` の 4 行をそのまま引用する。**\n引用できないなら測定していないので、その旨を報告して終える（推測で埋めない）。\n\n⚠ hermes の cron は shebang を honour せず `.sh`/`.bash` 以外を Python で実行するため、\nこの monitor は `--script` では注入できない（注入すると Python が `.cljs` を読んで\nSyntaxError になり、しかも job は completed と記録される）。だから自分で nbb を呼ぶ。\n\n## 手順 2: 測定を読む\n\n- `SYNC` の ff-exit が 0 でない / behind-after が 0 でない → checkout は origin/main と\n  一致していない。その事実を最初に報告し、drift findings を権威として扱わない。\n  同期を自分で強制しない（他セッションの WIP を壊す）。\n- `DOC-REALITY exit=2` → 測れていない。findings 0 と読まない。\n\n## 手順 3: findings が 1 件以上なら 1 件だけ扱う（報告専任。CLAUDE.md は直さない）\n\n⚠ **この profile は報告専任**（SOUL.md「修正はしない (報告専任)」）。かつ\n`CLAUDE.md` / `AGENTS.md` は protected file guard に守られており、この bot の\n権限では編集できない（2026-09-07 実測: guard が block した。**別経路で回避しない** ——\nguard に阻まれたらそう報告して終える）。\n\nしたがって扱い方は finding の種類で分かれる:\n\n- **cited-superseded / dead-path（CLAUDE.md / AGENTS.md 内）→ 報告のみ。**\n  「何が・どの行が・後継 ADR は何か・どう直すべきか」の 4 点を書く。自分で直さない。\n- **agents-md-stale → これだけは実行してよい。** `nbb scripts/gen-agents-md.cljs` は\n  生成器であり、AGENTS.md は生成物（ADR-2609062600）。手編集ではないので guard の対象外。\n  それでも block されたら報告して終える。\n\n旧版のこの節は「1 件だけ直す」と指示していたが、profile の charter と guard の\n両方に反していた（実測 2026-09-07、guard が正しく止めた）。\n\n- cited-superseded: CLAUDE.md は agent 指示の正本。該当行が旧 ADR を「現行の根拠」として\n  引いているなら、後継 ADR を指すか、経緯だと 1 行で分かる形に直す。決定は変えない。歴史も消さない。\n- dead-path: 本当に撤去済みなら文書側を直す。撤去されていないなら path を直す。\n  どちらか分からないなら「起票のみ」で報告して直さない。\n- agents-md-stale: `nbb scripts/gen-agents-md.cljs` を回す。AGENTS.md を手で編集しない（生成物）。\n\n**CLAUDE.md を直したら AGENTS.md も再生成する**（ADR-2609062600）。\n\n## 着地\n\n- 共有 checkout に直接 commit しない。`nbb scripts/root-worktree.cljs create <task> --profile docs`\n  で worktree を切る。\n- 検証: `nbb scripts/verify-doc-reality.cljs . --findings` が該当 finding を出さなくなること、\n  および `nbb --classpath \".:scripts/nbb_compat\" scripts/fleet-ci/gates/docs-edn-check.cljs . --sub 90-docs/adr --strict-keys` が 0。\n- push が west pin guard に阻まれたら、branch が pin を変えていないことを確認の上、\n  GitHub API のサーバ側 commit で着地させる（CLAUDE.md「Git operations」）。\n\nfindings 0 なら「findings 0 / adr-inventory backlog N 件」を 1〜2 行で報告して終える。何も作らない。\nADR-INVENTORY の件数は backlog 指標として報告するだけ。直すのは skill `adr-inventory` の担当。",
         "repeat": {
           "times": null
         },
@@ -1579,7 +1579,7 @@
           "expr": "37 8 * * *",
           "kind": "cron"
         },
-        "script": "docs-reality-tick-launcher.py",
+        "script": null,
         "workdir": "/Users/junkawasaki/github/com-junkawasaki"
       }
     ],

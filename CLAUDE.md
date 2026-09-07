@@ -832,8 +832,10 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   fleet 活動中など `origin/main` が逐次前進して `git push main` が race する時は、変更を
   feature branch に push し（push 同期ガードは非-main を許可）、`gh api repos/<org>/<repo>/merges
   -f base=main -f head=<branch> -f commit_message=...` で **サーバ側マージ commit** を作る。
-  push race に触れず、409(conflict/race) で再試行。実績: ADR-2606302300 の
-  doc commit をこの経路で main 化（rebase も force-push も使わず）。
+  push race に触れず、409(conflict/race) で再試行。実績: ADR-2606302300（org 分類
+  そのものは**その後 superseded**。ここで引いているのは当時この経路で着地させたという
+  記録であって、現行の org 分類の根拠ではない）の doc commit をこの経路で main 化
+  （rebase も force-push も使わず）。
 
 - **force-push は禁止（`git push --force` / `--force-with-lease` / `+refs` を使わない）。**
   共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
@@ -1572,9 +1574,10 @@ CertGovernor）。
 
 ### 実例（2026-09-04、この規則が生まれた経緯）
 
-ADR-260726 は「kotobase の Datalog join の到達範囲はちょうど ref 1 本で、別 ref に
-分けたものは**二度と join できない**。**これは実装の都合ではなく、kotobase の
-データモデルそのものである**」と書いていた。私はこれを制約として引用し、IPLD 越しの
+ADR-260726（**superseded** —— ADR-2809040800 が実測で反転させた）は「kotobase の
+Datalog join の到達範囲はちょうど ref 1 本で、別 ref に分けたものは**二度と join
+できない**。**これは実装の都合ではなく、kotobase のデータモデルそのものである**」と
+書いていた。私はこれを制約として引用し、IPLD 越しの
 query 設計をこの前提の上に組み立てた。
 
 **測ると偽だった。** `datom-source` の `merged` に、答えがどちらの partition 単独にも
