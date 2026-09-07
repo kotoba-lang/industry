@@ -693,4 +693,26 @@
  :coverage/verified-at "2026-09-06"
  :coverage/note "Housing and community amenities n.e.c. (COFOG 06.6) in the United Kingdom is owned by the Ministry of Housing, Communities and Local Government, whose gov.uk hub publishes housing and community policy the residual housing-functions actor answers to. Gate-fetched 2026-09-06: HTTP 200 / 142631 bytes. Division 06 already had 061-065 named (japan-side); 066 is the residual group. Also tried this run: 047 METI (meti.go.jp answered 200 to curl but 403 to the gate's fetch, so REFUSED, not landed), 023 DSCA and 02.5/025 defense.gov (403), and ISIC 4775-4779/3291-3299 were confirmed Rev.5-codes-in-Rev.4-table renumbering artefacts against the mirror's own class files and skipped."
 }
-]
+
+{:db/id -8
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "036"
+ :coverage/name "Public order and safety n.e.c."
+ :coverage/division "03"
+ :coverage/division-name "Public order and safety"
+ :coverage/authority-url "https://www.fdma.go.jp/"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-09-08"
+ :coverage/note "Public order and safety n.e.c. (COFOG 03.6) in Japan is owned by the Fire and Disaster Management Agency (消防庁, FDMA), the MIC agency that runs fire services, emergency medical rescue, and disaster-response policy outside the police (031) and corrections (034) functions. Gate-fetched 2026-09-08: HTTP 200 / 34192 bytes. Division 03 already had 031/033/034/035 named; 036 adds the residual public-safety function."}
+{:db/id -9
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "047"
+ :coverage/name "Other industries"
+ :coverage/division "04"
+ :coverage/division-name "Economic affairs"
+ :coverage/authority-url "https://www.mlit.go.jp/kankocho/"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-09-08"
+ :coverage/note "Other industries (COFOG 04.7) in Japan is owned by the Japan Tourism Agency (観光庁) under MLIT, the bureau that promotes and regulates tourism — the flagship 'other industry' outside the primary (042) and energy (043) sectors. Chosen over METI (meti.go.jp answers 403 to the gate) because MLIT's domain fetches cleanly. Gate-fetched 2026-09-08: HTTP 200 / 53302 bytes. Division 04 already had 041-046 and 048 named; 047 adds the residual-industries function."}]
