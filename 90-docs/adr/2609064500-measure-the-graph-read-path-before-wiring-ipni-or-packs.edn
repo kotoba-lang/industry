@@ -444,5 +444,48 @@ workflow の最終成功は 2026-08-28」と記録した。**理由はこれで�
 壊れているのは検査段だけなので、committed bundle の振る舞いを直接確かめた上で
 同じ argv（`wrangler deploy --no-bundle --env= --tag <sha>`）で上げ、
 同じ readback で tag を確認した。
+
+## edge の 401 と upstream の 401 は本番で区別できるようになった（2026-09-07、出荷済み）
+
+**上の節が「修正は別 agent が着地させ、live にはしない」と書いた分は live にした。**
+`net-kotobase`（= kotobase.net の gateway）version **`e45d9e5f-7e4d-45b6-a4f4-a4f69c708487`**。
+
+前後を同じ 2 リクエストで測った（`POST /xrpc/…datomic.basisT`）:
+
+    BEFORE  壊れた CACAO     {\"ok\":false,\"error\":\"Unauthorized\",\"presented\":\"cacao\",\"details\":\"the presented CACAO was not accepted\"}
+    BEFORE  受理される CACAO  {\"ok\":false,\"error\":\"Unauthorized\"}                                   ← 素の 35 byte
+
+    AFTER   壊れた CACAO     {\"ok\":false,\"error\":\"Unauthorized\",\"error_origin\":\"edge\",\"presented\":\"cacao\",\"details\":…}
+    AFTER   受理される CACAO  {\"ok\":false,\"error\":\"Unauthorized\",\"error_origin\":\"upstream\"}
+    AFTER   同じ credential で GET /v1/audit → 200                                  ← edge は確かに受理している
+
+**2 つの 401 が、決定がどこで下されたかという 1 点で分かれるようになった。**
+
+### 出荷の前に見つかったこと —— 着地した source が bundle に入っていなかった
+
+`164fca3a` は `kotobase-api-gateway-cljs/src/kotobase/proxy.cljc` を直したが、
+**committed bundle を再生成していなかった**。実測: `error_origin` は source に 16 回、
+`kotobase-api-gateway/js/kotobase-worker.js` に **0 回**。
+wrangler が上げるのは bundle なので、**あのまま出荷しても旧挙動が出て、しかも全ファイルが
+「修正は着地済み」と言っている状態**だった。
+
+tree が壊れていたわけではなく、古かっただけである —— `manifest:check` は修正前の
+bundle に対して**通る**。manifest はその bundle が「どの入力から作られたか」を記録する
+ものだから。**この形が正しい**（build → bundle-sha と inputs-sha を記録 → 両方 commit）。
+
+### 対比: 同じ repo の 2 つの worker が逆の設計を持っている
+
+| | 生成物 | 検査 | 通るか |
+|---|---|---|---|
+| gateway（`net-kotobase`） | commit する | manifest が bundle-sha + inputs-sha を記録し `manifest:check` が照合 | **通る**（今日 exit 0 / 130 inputs） |
+| graph worker（`kotobase-cf-wasm-staging`） | commit する | `deploy-versioned.mjs` が build して **byte 一致**を要求 | **構造的に通らない**（build が非決定的） |
+
+**同じ「生成物を commit する」設計で、検査の書き方だけが違う。** gateway 側は
+「何から作ったか」を記録して照合し、graph worker 側は「もう一度作って一致するか」を
+要求する。後者は build が決定的でなければ表現できない不変条件で、実際できていない。
+**graph worker の検査を直すなら、答えは同じ repo の中にある** —— gateway の manifest 方式。
+
+再構築した bundle での検証: `manifest:check` exit 0、suite **562 tests / 2,732
+assertions 0 failures**、`predeploy:check` 6 項目すべて ok。
 "
 }]
