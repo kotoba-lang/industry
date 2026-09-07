@@ -1,0 +1,110 @@
+[{:db/id -1
+  :adr/id "adr-2609062600-agent-instructions-generated-from-one-source"
+  :adr/title "agent 指示は 1 本の正本から生成する — CLAUDE.md が正本、AGENTS.md は生成物"
+  :adr/status "accepted"
+  :adr/date "2026-09-06"
+  :adr/supersedes []
+  :adr/related ["adr-2809040800-kotobase-join-reach-is-composition-not-ref-count"
+                "2608302125-human-authentication-is-passkey-only-and-never-downgrades"
+                "2608291248-west-sparse-worktree-standard"]
+  :adr/body "## Status
+
+accepted
+
+## Context
+
+この workspace の agent 指示は 2 ファイルある —— `CLAUDE.md`（Claude Code 向け）と
+`AGENTS.md`（Codex 向け）。両方が「repo-wide mandatory」を名乗る規則を載せており、
+両方が手で維持されていた。
+
+2026-09-06 に実測した乖離:
+
+- **見出し集合**: CLAUDE.md 36 節 / AGENTS.md 35 節。片側にしか無い節が 13。
+- **共有節の本文**: 29 の共有見出しのうち **17 が本文で食い違う**（最大 213 行差）。
+- **commit の流れ**: 直近 30 日で CLAUDE.md だけを触った commit が **52**。
+  直近 60 日で AGENTS.md だけを触った commit が **9**。
+- **agent 固有語**: 全 2,900 行のうち置換対象になりうる token は **24 個**だけ。
+  つまり 99% 超が同一内容の二重管理だった。
+
+その結果として実際に起きていたこと:
+
+1. **反証済みの規則が生き残っていた。** AGENTS.md は
+   `## kotobase の Datalog join は ref 1本までしか届かない（repo-wide mandatory）`
+   を見出しとして保持していた。この規則は 2026-09-04 に ADR-2809040800 が実測で
+   反転させ（partition A 単独 #{} / B 単独 #{} / merged #{\"alice\"}）、CLAUDE.md
+   からは撤去済み。ADR 側の supersede pointer も正しく打たれていた。
+   **正本も後継も正しく、古い写しだけが残っていた。**
+
+2. **強制されている規則が片方に無かった。** AGENTS.md だけが持つ 4 つの
+   repo-wide mandatory 規則 —— Passkey-only 人間認証（ADR-2608302125）、
+   `kotobase.net` 永続化境界（ADR-2608159100）、direct-first 調達、
+   `scripts/root-worktree.cljs`（ADR-2608291248）—— が CLAUDE.md に無かった。
+   **うち 2 つは fleet gate（`root-human-auth-no-downgrade` /
+   `root-kotobase-persistence-policy`）で強制されている。** Claude 側は
+   落ちる理由を知らないまま gate に当たる状態だった。
+
+3. **過去の一括置換が path を壊していた。** 素の `Claude`→`Codex` 置換が
+   一度当てられており、AGENTS.md の **10 個の path が `.Codex/` という実在しない
+   directory を指していた**（`.claude/hooks/` にある 4 つの guard は実在する）。
+   CLAUDE.md 自身が「一括正規表現の書き換えが当たってはいけない場所まで当たる。
+   書き換えたファイルは書き換えた直後に読み返す」と警告している形そのもの。
+
+**乖離が音を立てないのが問題の核。** どちらのファイルも単体では完全に読め、
+矛盾は 2 つを並べて初めて見える。`rule-kaizen` は両方を走査対象にしているが
+1 反復 = 1 finding なので、52 commit/月 の流入には構造的に追いつかない。
+
+## Decision
+
+**`CLAUDE.md` を agent 指示の唯一の正本とし、`AGENTS.md` はそこからの生成物にする。**
+`manifest/west.yml` と同じ「生成物・手書き禁止」の規律に載せる。
+
+- 生成器は `scripts/gen-agents-md.cljs`、検査は `--check`。
+- fleet gate は `root-agents-md-generated`
+  （`scripts/fleet-ci/gates/agents-md-generated-check.cljs`）。検証ロジックは
+  gate に複製せず、正本の `--check` に委譲して exit code を伝播する。
+- **置換表は最小で fail-closed。** 対象は「この文書自身への自己参照」と
+  「agent の名前」の 9 エントリだけ。各エントリは期待出現回数を持ち、
+  1 つでも食い違えば **exit 2 で拒否する**（黙って違う置換をしない）。
+- **実在するものは置換しない。** `.claude/hooks/*`・`.claude/settings.json`・
+  `.claude/skills/`・`.claude/workflows/`・`.claude/worktrees/`・`claude.ai` の
+  routine / design 面は実在する path と service であって agent の別名ではない。
+  生成器はさらに、置換が `.Codex/` を **持ち込んで** いないことを確かめる
+  （source に既に在る出現は数えない —— この文書は事故自体を記述しており、
+  文字列としての `.Codex/` は正当に登場する）。
+
+同時に、この機会に正本側の以下を是正した:
+
+- AGENTS.md だけが持っていた 3 節（direct-first 調達 / Passkey-only /
+  `kotobase.net` 永続化境界）を CLAUDE.md へ移植。
+- `scripts/root-worktree.cljs` を worktree の既定入口として CLAUDE.md へ移植
+  （それまで CLAUDE.md は素の `git worktree add` を案内していた）。
+- **stale な事実 2 件**:
+  (a) 「west には `compiler` と `amu` の 2 entry が残っていて別々の checkout を
+  持つ」—— 実測で west.yml 0 件 / fleet-db.edn 0 件 / checkout 無し。撤去済み。
+  (b) west project 数が **同一ファイル内に 4,100 / 4,124 / 4,200 / 4,000 / 4,050
+  という 5 つの違う定数**として載っていた（実測 4,338）。値を消し、数え方
+  （`grep -c '^    - name: ' manifest/west.yml`）に置き換えた —— CLAUDE.md 自身の
+  「ここに残してよいのは測り方であって測った値ではない」に従う。
+
+## Consequences
+
+- 規則を足す/直すときは `CLAUDE.md` を編集して生成器を回す。`AGENTS.md` への
+  直接編集は gate が落とす。
+- Codex 固有の記述を自由に足せなくなる。足したい場合は置換表にエントリを
+  追加する（= 意図的な差分が 1 箇所に集まる）。
+- **gate の red/green は landing 前に実測した**（CLAUDE.md「落ちる gate である
+  ことを確かめる」）: 無改変 exit 0 / AGENTS.md 手編集 exit 1 / CLAUDE.md が
+  置換表から外れる exit 2 / 生成器が shipped tree に届かない exit 2。
+- この ADR は ADR-2809040800 と ADR-2608136000（測れなかった検査が測って問題が
+  無かった検査と同じ値を返す）を supersede しない —— どちらも生きており、
+  本 ADR はその失敗クラスが **agent 指示そのもの**に現れた事例への対処。
+
+## 残る未処理（この ADR の範囲外）
+
+`scripts/adr-inventory.cljs` の実測（2026-09-06、readable 2,755 / findings 235）:
+`successor-unmarked` 112 / `ledger-ops-instruction` 45 / `status-body-mismatch` 36 /
+`id-collision` 23 / `unresolved-supersede-ref` 15 / `cited-superseded` 4。
+これらは skill `adr-inventory`（1 反復 = 1 finding、判断が要る）の領分であって、
+一括では処理しない。`cited-superseded` 4 件のうち 3 件は経緯としての正当な引用
+（CLAUDE.md が「この節は反転した」と書いた上で旧 ADR を指している）で、
+本 ADR が撤去したのは AGENTS.md 見出しの 1 件。"}]

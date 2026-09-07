@@ -515,6 +515,21 @@
    :min-files 400
    :require-paths ["scripts/verify-no-github-workflows.cljs" "manifest/west.yml"]
    :cd false}
+  ;; AGENTS.md は CLAUDE.md からの生成物（ADR-2609062600）。2 つの agent 指示を
+  ;; 手で二重管理していた間、30 日で片側 52 commit / 60 日で逆側 9 commit が相手に
+  ;; 渡っておらず、AGENTS.md は ADR-2809040800 が実測で反転させた規則を repo-wide
+  ;; mandatory の見出しとして保持し続けていた。乖離は単体では読めてしまうので
+  ;; prose では守れない。
+  ;;
+  ;; Red/green は 2026-09-06 に実測: 無改変 exit 0 / AGENTS.md を手編集 exit 1 /
+  ;; CLAUDE.md が置換表から外れる exit 2 / 生成器が tree に届かない exit 2。
+  {:name "root" :id "root-agents-md-generated" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/agents-md-generated-check.cljs"
+   :include-ext [".md" ".cljs"]
+   :min-files 1200
+   :require-paths ["CLAUDE.md" "AGENTS.md" "scripts/gen-agents-md.cljs"]
+   :cd false}
   ;; Human authentication policy is authority-scoped, not a repository-wide
   ;; keyword ban. External OAuth/OIDC/SAML/Email/SMS mirrors and protocol
   ;; libraries may exist; only declared first-party session / credential /
