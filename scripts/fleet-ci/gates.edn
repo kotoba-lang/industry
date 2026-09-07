@@ -3799,6 +3799,19 @@
   {:name "com-acquia" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "com-adobe" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "com-aftership" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  ;; Q9 wave-1 tranche-2 soak (2026-09-06): same shape as the tranche-1 entries above.
+  ;; Each repo gained run-tests.cljs (portable-half nbb runner) with the paginate
+  ;; slice landing; :cd false — the Q9 soak gate remains the explicit authority boundary.
+  {:name "com-8th-wall" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-abb-800xa" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-ads-b-aviation" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-adyen" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-agleader" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-agones" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-agora" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-airbus-analytx" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-airbyte" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-airtable" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "datom-source" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "credits" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "inference" :gate :nbb-test :classpath "cljc/src:cljc/test:resources" :entry "run-tests.cljs" :ship-git-deps true :cd false}
