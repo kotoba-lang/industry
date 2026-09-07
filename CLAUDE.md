@@ -20,7 +20,7 @@
 # 初回
 west init -l manifest
 # 取得/同期（full history がデフォルト。shallow は使わない — ADR-2607211600）
-# ⚠ 引数なしの `west update` は 4,100 project 全部を歩く。既定にしない（下記）
+# ⚠ 引数なしの `west update` は west.yml の全 project を歩く。既定にしない（下記）
 west update --fetch smart <name> [<name> ...]
 # DataLad の実体だけ別途（B2 creds は環境変数）
 west update --group-filter +datalad m365-archive && nbb manifest/west_annex.cljs annex-get
@@ -36,9 +36,12 @@ west を動かす worktree の作り方は、Skill ツールで `west-pin-advanc
 
 ここで守るべき規則だけ再掲する（skill を読まなくても効く）:
 
-- **引数なしの `west update` を既定にしない。** 4,124 project を歩き、pin と
-  一致している checkout でも git を起動する。全体を回すのは初回 clone と、
-  pin が大量に動いた後だけ。**複数 project を渡すときは `xargs` が必須**
+- **引数なしの `west update` を既定にしない。** west.yml の全 project を歩き、pin と
+  一致している checkout でも git を起動する。**何 project かは数えてから言う**
+  —— `grep -c '^    - name: ' manifest/west.yml`。この数は毎週動くので、ここに
+  書いた値は書いた翌週には嘘になる（この節は 2026-09-06 まで 4,100 / 4,124 /
+  4,200 / 4,000 / 4,050 という 5 つの違う定数を同時に載せていた）。
+  全体を回すのは初回 clone と、pin が大量に動いた後だけ。**複数 project を渡すときは `xargs` が必須**
   （zsh は単語分割しないので `west update $NAMES` は 1 個の project 名になり、
   `printf ... | west update` は**引数ゼロ = 全 project 更新**になる）。
 - **`west update` は pin 鮮度を答えない。** west.yml に既に書かれた pin へ
@@ -53,6 +56,38 @@ west を動かす worktree の作り方は、Skill ツールで `west-pin-advanc
   作ると west が本体の `.west/` を見つけて topdir を誤認し、**本体の `orgs/` を
   書き換える**（`WEST_TOPDIR` でも直らない）。
 
+
+## agent 指示は 1 本の正本から生成する — `AGENTS.md` を手で書かない（repo-wide mandatory、2026-09-06、ADR-2609062600）
+
+**`CLAUDE.md` が agent 指示の正本で、`AGENTS.md`（Codex 向け）はそこからの生成物。**
+生成は `nbb scripts/gen-agents-md.cljs`、検査は `--check`（fleet gate
+`root-agents-md-generated`）。west.yml と同じ「生成物・手書き禁止」の規律に載せる。
+
+- **規則を足す・直すときは `CLAUDE.md` を編集して生成器を回す。** `AGENTS.md` への
+  直接編集は gate が落とす。
+- **置換表は最小で、fail-closed。** 置換対象は「この文書自身への自己参照」と
+  「agent の名前」だけ。期待した文字列が期待した回数見つからなければ生成器は
+  **exit 2 で拒否する**（黙って違う置換をしない）。
+- **実在するものは置換しない。** `.claude/hooks/*`・`.claude/settings.json`・
+  `.claude/skills/`・`claude.ai` の routine / design 面は**実在する path と service**
+  であって agent の別名ではない。ここを置換すると、存在しない場所を指す指示になる。
+
+**なぜこの規則が要るか（2026-09-06 の実測）。** それまで 2 ファイルは手で二重管理
+されており、**30 日で片側 52 commit、60 日で逆側 9 commit** が相手に渡っていなかった。
+結果:
+
+- `AGENTS.md` は **ADR-260726 の「join は ref 1 本まで」を repo-wide mandatory の
+  見出しとして保持し続けていた** —— その規則は 2026-09-04 に ADR-2809040800 が
+  実測で反転させ、`CLAUDE.md` からは撤去済み。ADR 側の supersede も正しく打たれて
+  いた。**古い規則だけがそこに残り、しかも誰にも音を立てなかった。**
+- 逆向きには、`AGENTS.md` だけが持っていた 4 つの repo-wide mandatory 規則
+  （Passkey-only 人間認証・`kotobase.net` 永続化境界・direct-first 調達・
+  `root-worktree.cljs`）が `CLAUDE.md` に無く、**うち 2 つは fleet gate で強制されて
+  いた** —— Claude 側は落ちる理由を知らないまま gate に当たる状態だった。
+- 過去に一度、素の `Claude`→`Codex` 一括置換が当てられており、`AGENTS.md` の
+  **10 個の path が `.Codex/` という実在しない directory を指していた**（`.claude/hooks/`
+  の 4 つの guard は実在する）。**この CLAUDE.md 自身が「一括正規表現の書き換えが
+  当たってはいけない場所まで当たる」と警告している形**の実例。
 
 ## Repo naming — no `-clj` suffix (2026-07-10)
 
@@ -134,6 +169,26 @@ login 変更はこの workspace の token ではできない**（`admin:org` sco
 あるが token が違う。かつ org login は Settings UI の操作）。`~/.gftd/` も `mv` ではなく
 段階移行 —— fleet-ci 署名鍵と aiueos boot seed が入っていて、稼働中 45 job が読んでいる。
 
+## 調達経路は direct-first（repo-wide mandatory、2026-08-25）
+
+**メーカー、運営主体、公式販売主体との直接取引を既定とし、検証済みの
+付加価値がある場合だけ中間者を使う。** 詳細な機械可読正本は
+`90-docs/business/direct-procurement-rule.edn`。
+
+- 比較単位は `調達経路 × 製品構成 × 数量 × 時点`。表示単価ではなく、税、送料、
+  通関、検品、不良/RMA、停止損失、管理費を含むリスク込み総調達原価で比べる。
+- `仲介プレミアム = 中間経路の総原価 - 直接経路の総原価`。そこから、国内交換在庫、
+  法令適合証跡、SLA、与信、物流、保証等の**実測または契約化された**付加価値を引き、
+  残りを説明のない仲介レントとして扱う。
+- 付加価値が不明、未確認、又は価格差を下回るなら中間経路を選ばない。直接経路が
+  不可能、法令ゲートを通らない、必要数を供給できない、または検証済み付加価値が
+  プレミアムを上回る場合だけ、根拠付きで例外にできる。
+- 言語で直接性を推測しない。送信先endpoint、担当者の決裁権、契約・請求主体、
+  依頼種別で直接性を確認する。直接調達のために仕向地、再販売目的、法令上の責任を
+  隠したり、販売・地域制限を回避したりしない。
+- 見積、価格観測、契約主体、調達経路、付加価値、例外理由、判断時点を記録する。
+  仲介者の存在や見積取得だけで、付加価値が実証されたと扱わない。
+
 ## 標準作業の常時許可（standing authorization）
 
 新規 project の scaffold → 登録フロー（ADR 起票 → 子リポ scaffold → GitHub repo
@@ -178,6 +233,42 @@ skill `new-project-scaffold` を参照。
     公開リポ化（visibility 変更）・他者ブランチへの push**）は、この恒久承認の対象外 —
     従来どおり必ず**事前確認**する（force-push / 履歴書き換えの詳細は下記 Git operations
     節。公開リポ化と他者ブランチへの push はここが正本の禁止列挙）。
+
+## 人間認証は Web3 first（repo-wide mandatory、2026-09-07、ADR-2609070400）
+
+first-party の human session、identity bootstrap、credential registration/replacement、
+account recovery には root `SECURITY.md` と `manifest/human-authentication-policy.edn` を適用する。
+旧 ADR-2608302125 の「Passkey のみ」は当時の決定であり、現在の許可規則としては不適切。
+オーナーの Web3 first 方針により、検証済みウォレット署名を正規の認証手段とする。
+
+- Web3 first: SIWE + ERC-191 (EOA) / ERC-1271 (contract wallet) による署名認証を
+  第一の選択肢とし、WebAuthn Passkey も正規の手段として維持する。各 product が提供する
+  手段は inventory に明記する。方針変更だけで全 product の wallet 対応済みとはしない。
+- wallet 接続、address、DID、client hint だけでは認証しない。server-issued single-use nonce、
+  domain/origin/URI、chain、expiry、署名、atomic nonce consumption を server 側で検証する。
+  ERC-1271 は指定 chain と現在の contract authority を確認し、検証不能なら fail closed。
+- Passkey は exact RP ID / Origin、single-use challenge、replay protection、user verification を必須とする。
+  SIWE の domain 検証を WebAuthn と同じ phishing resistance と呼ばない。
+- Email、password、SMS/voice、OAuth/OIDC/SAML/social/enterprise SSO、support/operator/admin
+  override を login、bootstrap、step-up、credential registration、recovery の authority にしない。
+  approved authenticator が無い時は fail closed。設定・secret・incident から禁止経路を復活させない。
+- login は送金・署名代行・governance の承認ではない。操作別の権限検査を維持する。
+  wallet DID と Passkey DID を暗黙に統合せず、既存 identity への credential 追加は既存 owner の
+  検証済み権限を要する。wallet login だけで別 identity の復旧はできない。
+- recovery は session を直接発行せず、one-time offline secret + 48 時間以上の server-enforced
+  delay + fresh approved authenticator による credential replacement とする。
+  operator は freeze できるが identity を grant できず、delay を短縮できない。
+  wallet 自体の外部 recovery は本サービスの identity recovery を代行・迂回しない。
+- closed legacy route は 404/410 で ceremony・redirect・session/token/credential issuance を始めない。
+  source / built artifact / live route の negative test に plausible legacy secret を含める。
+- 新しい human-auth surface は deploy 前に inventory へ登録する。`:migration-gap` / `:unverified`
+  を `:conformant` と読まず、方針採用・merge だけで全体の適合や本番稼働を claim しない。
+- 外部仕様 mirror、protocol library、test fixture、認証後の notification/connectivity は
+  human session / credential / recovery を発行しない限りこの authority 境界の対象外。
+
+nested `SECURITY.md` はこの方針を強化・具体化できる。Passkey 専用 product も許すが、
+wallet 認証を workspace 全体で禁止する根拠にはしない。federation product は別 hostname・
+trust boundary・session namespace・threat model・ADR を持ち、既存 authority の fallback にしない。
 
 ## CI/CD は murakumo fleet。GitHub Actions を使わない（repo-wide mandatory、2026-08-05、ADR-2607300900）
 
@@ -688,7 +779,7 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   commit message にそう書く。**黙って遅れているのと、理由があって留めているのは、
   出力から区別できなければならない。**
 - ⚠ **これは「引数なしの `west update` を回せ」という意味ではない**（上記の罠 2 の
-  とおり 4,200 project を歩く）。進めるのは**遅れている pin だけ**で、その集合は
+  とおり全 project を歩く）。進めるのは**遅れている pin だけ**で、その集合は
   `gh api repos/<org>/<repo>/compare/<pin>...<default>` の `ahead_by` で決まる。
 
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
@@ -912,8 +1003,8 @@ DAG-CBOR のリンクは全部 CID なので `ipld/decode` が canonical 再エ�
 ## 「無い」と結論する前に検索する（repo-wide mandatory、2026-08-04）
 
 **「この workspace には X が無い」「X を作る必要がある」と結論する前に、必ず
-`nbb scripts/repo-search.cljs <語> [語...]` を引く。** west.yml は 4,000 repo を
-管理しており、**checkout されていない repo は `ls` にも `find` にも `grep -r` にも
+`nbb scripts/repo-search.cljs <語> [語...]` を引く。** west.yml は 4,000 を超える repo を
+管理しており（正確な数は上記のとおり数える）、**checkout されていない repo は `ls` にも `find` にも `grep -r` にも
 映らない**。手元に無いことは存在しないことではない。
 
 実測（2026-08-04、この規則が生まれたセッション）: agent が 1 セッションで
@@ -1107,10 +1198,12 @@ push 直前まで行われなかった。**警告を読むことと同期する�
   `west update` / 読み取りだけ。本体に未コミット編集が転がっていると、並行セッションの
   main 同期のたびに「他人の WIP を stash 温存」が発火して stash が堆積する。
 - **作業は 1 task = 1 branch = 1 worktree（superproject の外、sibling path）。**
-  `git worktree add -b <branch> /tmp/root-<name> origin/main`。superproject の
-  full checkout は重い（2分超）ので、触るパスが少ない作業は `--no-checkout` +
-  `git sparse-checkout set --no-cone <paths>` で部分 checkout にする。worktree 内で
-  west を使う場合は前節のとおり `west init -l manifest` で topdir を固定する。
+  既定入口は `nbb scripts/root-worktree.cljs create <task>`（ADR-2608291248）。
+  `origin/main` fetch → `--no-checkout` → cone sparse checkout + sparse-index を行い、
+  root 23万件を毎回展開しない。ADR/政策は `--profile docs|policy`、追加 directory は
+  `--include <path>`。west child が必要なら `--west <name>` を明示し、対象だけを
+  `west update --fetch smart` する。full root は `--profile full` を**明示した場合だけ**。
+  worktree 内の `west init -l manifest` と superproject 外配置で topdir を固定する。
 - **WIP の退避は stash でなく session branch への commit。** commit は名前・履歴・
   所有者が付き branch 単位で棚卸しできるが、stash は無名の共有スタックで誰のものか
   追えなくなる。stash を使ってよいのは「共有 checkout で見つけた他人の未コミット WIP を
@@ -1227,7 +1320,7 @@ disk/帯域を抑えたい大容量バイナリは shallow ではなく B2 + Dat
 ## 「無い」と言う前に索引を引く（repo-wide mandatory、2026-08-03）
 
 **この workspace に何かが「無い」と結論する前、および新しく何かを作り始める前に、
-2 つの索引を引く。** grep で代替しない —— 4,050 repo に対する全文検索は必ず数百行を
+2 つの索引を引く。** grep で代替しない —— 全 repo に対する全文検索は必ず数百行を
 出し、必ず切られ、**切られたことに気付く手段が無い**。
 
 ```bash
@@ -1499,8 +1592,11 @@ query 設計をこの前提の上に組み立てた。
 2. **1 コマンドで反証できるなら、まず反証を試す。** 上の例は `merged` に join を
    1 本通すだけで済んだ。規則を信じて設計をやり直すより安い。
 3. 反証できたら、**その場で規則を直す** —— `:adr/status` を `superseded`、後継を
-   `:adr/superseded-by`、CLAUDE.md の該当節も**同じ commit で**。次に読む人は
-   ADR ではなく CLAUDE.md を見るので、片方だけ直すと誤りが残る。
+   `:adr/superseded-by`、**`CLAUDE.md`（agent 指示の正本）の該当節も同じ commit で**。
+   次に読む人は ADR ではなく agent 指示を見るので、片方だけ直すと誤りが残る。
+   **`AGENTS.md` は `CLAUDE.md` からの生成物なので直接編集しない** —— `CLAUDE.md` を
+   直して `nbb scripts/gen-agents-md.cljs` を回す（下記「agent 指示は 1 本の正本から
+   生成する」節）。
 4. 反証できなかったら、**確かめた事実を規則の隣に足す**（「2026-09-04 に測って
    まだ真」）。次の人が同じ検証を繰り返さずに済む。
 5. どちらの場合も、**測った内容は数値ではなく再現手順として残す**（この CLAUDE.md が
@@ -1520,6 +1616,48 @@ query 設計をこの前提の上に組み立てた。
 - `:kotoba.graph/cid` は identity。`:kotoba.graph/head` は naming（IPNS）。session kgraph の datoms は公開 resource ではない。
 - lock の `:kotoba.*` に archive 専用の raw CID を載せない。Location は protocol 外の記録（例 `:graph {:raw-cid …}`）。
 - document が raw なら identity と Location の文字列は一致してよい。dag-cbor commit では一致しない。それをバグにしない。
+
+## live service の永続化境界は `kotobase.net`（repo-wide mandatory、2026-08-15、ADR-2608159100）
+
+**live service が生成・収集する proof、actor、wiki、graph、event、index の durable source は
+Kotobase とする。authority と既定 API origin は `https://kotobase.net`。protocol 固有の
+wire contract は capability subdomain を使える。** provider の実装（R2 / B2 / IPFS）を
+application の前提にしない。
+
+- immutable bytes は `PUT/GET https://kotobase.net/ipld/:cid`。書く前と読む時の両方で
+  CID を検証する。application 自身の R2 binding を production path に直書きしない。
+- stable な capability origin は `datomic.kotobase.net`、`sparql.kotobase.net`、
+  `cypher.kotobase.net`、`gremlin.kotobase.net`、`graphql.kotobase.net`、
+  `s3.kotobase.net`、`git.kotobase.net`、`atproto.kotobase.net`、
+  `pinning.kotobase.net`、`search.kotobase.net`。apex path facade と同じ
+  authority/policy に属する。`search.kotobase.net` は Datalog dialect ではなく
+  inverted-postings serving plane（ADR-2608170600）。query-dialects に足さない。
+- edge 内部の datom/CID execution capability は `datoms.kotobase.net`。
+  `graph-database.kotobase.net` / `backend.kotobase.net` / `graphdb.kotobase.net` は
+  2026-08-15 に Custom Domain と DNS から除去済みの retired hostname。rollback alias を含め
+  production config / SDK / docs に再導入しない。
+- RDF4J は別 database product ではなく `sparql.kotobase.net/repositories/default` の path
+  compatibility。GraphQL は `graphql.kotobase.net/graphql` の独立した read-only document
+  query protocol で、RDF4J/SPARQL の別名ではない。SQL は独立 origin ではなく query dialect。
+  implementation/product 名を capability 名として増やさない。
+- logical metadata、provenance、actor、proof 評価、CID index は
+  `https://kotobase.net/api/*` の datom 面に置く。bytes 本体を datom に埋めない。
+- Durable Object / D1 / KV は alarm、lease、single-writer、cursor、session、cache、projection
+  にだけ使える。消しても Kotobase の block + datom から durable state を復元できなければ違反。
+- write は fresh nonce の CACAO capability を route ごとに使う。credential は既知の識別子を
+  credential 専用ツールから1件だけ取得し、repo・ログ・datom・block に保存しない。
+- 8 MiB を超える object は datom や `/ipld` に押し込まず、`kotobase.net` から取得した
+  presigned transfer capability を使う。入口の authority は同じく `kotobase.net`。
+- localhost / mock / testnet は明示した環境でのみ可。production の接続失敗時に direct R2、
+  provider host、DO SQL へ黙って fallback しない。
+- Git 管理の policy / source / artifact は引き続き Git + EDN + DataLad が正本
+  （ADR-2608039700）。この規則が対象にするのは **live service の runtime durable plane**。
+
+機械可読な正本は `manifest/repository-rules.edn` の
+`:workspace-policies :live-service-durable-data`。検査は
+`nbb scripts/verify-kotobase-persistence-policy.cljs`、CI/CD は murakumo fleet の
+`root-kotobase-persistence-policy` gate。新しい service は README / ADR / config で
+Kotobase の database/ref と block codec を宣言する。
 
 ## kotobase の join 到達範囲は ref の本数ではなく合成の有無で決まる（repo-wide mandatory、2026-09-04 訂正、ADR-2809040800）
 
@@ -2385,8 +2523,10 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 この取り違えをやった）。
 
 ⚠ **compiler repo は `kotoba-lang/compiler` から `kotoba-lang/amu`（編む）に改名済み。**
-旧名は GitHub リダイレクトで生きており、**west には `compiler` と `amu` の 2 entry が
-残っていて別々の checkout を持つ**（`orgs/kotoba-lang/compiler` は古い pin で止まる）。
+旧名は GitHub リダイレクトで生きているが、**west の `compiler` entry は撤去済み**
+（実測 2026-09-06: `manifest/west.yml` に `name: compiler` は 0 件、`manifest/fleet-db.edn`
+にも 0 件、`orgs/kotoba-lang/compiler` の checkout も無い）。2026-08 の改名直後は
+2 entry が並存し古い pin の checkout を読む事故があったが、その状態はもう無い。
 読むのも走らせるのも `orgs/kotoba-lang/amu` 側にする。CLI の front は `bin/amu`
 （`bin/kotoba` / `bin/kotoba-compiler` は互換 shim）。native backend は
 `kotoba-lang/kotoba-native`、KIR は `kotoba-lang/kotoba-kir`、restricted-ESM emitter は
