@@ -2422,6 +2422,11 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   ADR-2607181900 の readiness gate（nbb スクリプト代表サブセットの移植 = 条件②）を
   通過するまでは以下の nbb-only ルールがそのまま正本のまま変わらない。
   運用スクリプトを kbb 前提で書かない。**
+  ⚠ **例外（owner 指示 2026-09-07）: 新規に書く運用 tooling は kbb-first。**
+  nbb は既存資産の実行環境として残るが、新規 script host としては禁止。
+  手順は skill `nbb-to-kbb-migration`。kbb に無い op は guest を縮めず
+  kbb 側に足す（capability extension）。既存 nbb スクリプトは
+  migration candidate として列挙し、readiness が追いついたところから順に移行。
   **kbb 用の `.kotoba` script を書くときの実測済み規則**（2026-09-07、ADR-2609062200）:
   ①capability は `lib/kbb/{fs,env,browse,proc,str}.kotoba` 経由で呼び、script に
   `typed-cap-call` や wire id を書かない（`--source-path lib`）。②policy は kbb v1 と
@@ -2440,6 +2445,9 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   `scripts/nbb_compat` の `babashka.*` **名前空間**は Node 互換シムであり、
   `bb` 実行を意味しない。app runtime としての `bb` 降格（JVM と並ぶ最下位）
   は従来どおり維持。
+- **新規の運用 tooling を nbb で書かない — kbb-first（owner 指示 2026-09-07）。**
+  新規に書く運用スクリプトは kbb（`.kotoba` / `.cljk` + kbb runtime）で書く。
+  手順は skill `nbb-to-kbb-migration`。既存 nbb スクリプトは migration candidate。
 - **Node 側の検証/テストハーネス（Playwright driver、静的サーバ、E2E
   スクリプト等）も新規に書く場合は nbb（`.cljs`）で書く — 生 JS の
   `.mjs`/`.cjs` を新規に書かない。** シェルスクリプト（`.sh`）も同様に
