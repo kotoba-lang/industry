@@ -185,6 +185,60 @@
         :else (str/replace lib #"^io\.github\." ""))
       str/lower-case))
 
+;; ---------------------------------------------------------------------------
+;; A rename changes the URL, so the string above sees one repository as two.
+;;
+;; `repo-of` is a string comparison, which is right for the group-shaped case
+;; (`kotoba-lang/css` beside `io.github.kotoba-lang/css` -- same URL, two
+;; symbols). It is WRONG for the rename-shaped case once the URL follows the
+;; rename: `kotoba-kir.git` and `osaho.git` are different strings and the same
+;; repository. Measured 2026-09-07 on a synthetic half-migrated tree: this
+;; check reported it CLEAN -- the one case a rename most needs it for.
+;;
+;; The old names this check already lists (compiler, ed25519, mcp, svg) are
+;; found only because those entries still carry the OLD url. The moment a
+;; consumer updates the url alongside the coordinate, the pair goes invisible.
+;;
+;; So `canonical-repo` asks GitHub for the repository's current full name and
+;; groups by that. Results are cached; a repository that cannot be resolved is
+;; reported and makes the run UNANSWERED, because "could not resolve" and
+;; "no alias" must not print the same value.
+(def ^:private canon-cache (atom nil))
+(def ^:private canon-cache-file (p/join root ".dep-coordinate-canon.json"))
+(def ^:private canon-unresolved (atom #{}))
+
+(defn- load-canon! []
+  (when (nil? @canon-cache)
+    (reset! canon-cache
+            (or (try (js->clj (js/JSON.parse (fs/readFileSync canon-cache-file "utf8")))
+                     (catch :default _ nil))
+                {}))))
+
+(defn- save-canon! []
+  (try (fs/writeFileSync canon-cache-file (js/JSON.stringify (clj->js @canon-cache)))
+       (catch :default _ nil)))
+
+(defn canonical-repo
+  "REPO (`owner/name`) under its current GitHub name, or nil when unresolvable.
+   Offline? uses only the cache and counts every miss as unresolved."
+  [repo offline?]
+  (load-canon!)
+  (cond
+    (not (re-matches #"[^/]+/[^/]+" repo)) repo
+    (contains? @canon-cache repo) (get @canon-cache repo)
+    offline? (do (swap! canon-unresolved conj repo) nil)
+    :else
+    (let [cp (js/require "node:child_process")
+          out (try (-> (.execFileSync cp "gh"
+                                      #js ["api" (str "repos/" repo) "--jq" ".full_name"]
+                                      #js {:encoding "utf8" :timeout 20000
+                                           :stdio #js ["ignore" "pipe" "ignore"]})
+                       str/trim str/lower-case)
+                   (catch :default _ nil))]
+      (if (seq (str out))
+        (do (swap! canon-cache assoc repo out) (save-canon!) out)
+        (do (swap! canon-unresolved conj repo) nil)))))
+
 (defn -main []
   (let [dirs (vec (checkouts))
         _ (when (zero? (count dirs)) (die-unanswered (str "0 checkouts under " root "/orgs")))
@@ -199,7 +253,15 @@
         broken (filterv :error parsed)
         rows (->> parsed (remove :error) (mapcat :deps)
                   (filter #(in-house (first (str/split (repo-of %) #"/")))))
-        by-repo (group-by repo-of rows)
+        ;; Group by the CURRENT GitHub name, not the url string: a rename
+        ;; makes one repository look like two. `--no-canon` keeps the old
+        ;; string grouping for a fast offline run and says so in the output.
+        canon? (not (some #{"--no-canon"} argv))
+        offline? (some #{"--offline"} argv)
+        group-key (if canon?
+                    (fn [r] (or (canonical-repo (repo-of r) offline?) (repo-of r)))
+                    repo-of)
+        by-repo (group-by group-key rows)
         multi (->> by-repo
                    (filter (fn [[_ rs]] (> (count (set (map :lib rs))) 1)))
                    (sort-by (fn [[_ rs]] (- (count rs)))))]

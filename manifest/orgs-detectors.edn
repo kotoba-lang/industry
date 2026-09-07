@@ -1807,7 +1807,18 @@
               Two shapes, both reported: rename-shaped, where the old repository name
               survives as a coordinate (compiler for amu, ed25519, mcp, svg), and
               group-shaped, where the group segment differs (kotoba-lang/css beside
-              io.github.kotoba-lang/css, org.kotoba-lang/io-multiformats). The second works,
+              io.github.kotoba-lang/css, org.kotoba-lang/io-multiformats).
+              2026-09-07: the rename-shaped half was only ever half-measured. Grouping
+              was by the `:git/url` STRING, so it found an old name only while the entry
+              still carried the OLD url -- the moment a consumer updates the url beside
+              the coordinate, the pair goes invisible. Measured on a synthetic
+              half-migrated tree (kotoba-kir beside osaho, each with its own url): this
+              detector reported it CLEAN, which is the one case a rename most needs it
+              for. It now groups by the repository's CURRENT GitHub name, resolved once
+              per repository and cached; `--no-canon` keeps the old string grouping and
+              still misses that tree, which is how both directions were shown. A
+              repository that cannot be resolved makes the run UNANSWERED rather than
+              clean. The second works,
               because a bare group forces an explicit :git/url, and is still a second
               identity for one library."
    :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
