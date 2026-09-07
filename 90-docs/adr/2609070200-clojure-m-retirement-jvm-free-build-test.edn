@@ -135,6 +135,18 @@ deps.edn と不一致 / `--fuel` を native で受け付けて無視）。
    `:fs/browse`(34) は is-directory が無く再帰走査ができない / `:http/fetch` は最後。
    ⚠ 未確認の divergence 報告あり: **native loader は書き込みを wire 35（読み取り
    capability）に実装している可能性**（wire 19 ではなく）。着手時に検証する。
+   **（2026-09-08 実測で確定 — これは設計であり事故ではない）**: 書き込みは js host
+   （`bin/kbb_js.cljs`）と native loader（`amu tools/kexe_loader.c
+   fs_app_data_write_provider` = commit 6cca3852、main 済み）の両方が wire 35 /
+   `:fs/app-data` の WRITE_SEP 形式に実装しており、`lib/kbb/fs.kotoba` の header と一致。
+   帰結を明記: **`:fs/app-data` を付与した script は scope 内書き込みも得る**（read/write
+   は分離しない設計）。proc / git / browse / edn の kit と js host provider はこの ADR
+   着地後に全て着地済み（`:data/edn` は `lib/kbb/edn.kotoba` の capability 不要 pure
+   reader が完了、native / js 両 backend で実行可; `:git/run` と `:proc/exec` は
+   `<exit>\n<stdout>` を返す）。`:fs/transact`(19) は引き続き未束縛（kit / provider 無し）。
+   **item 1 で実際に残る唯一の gap は `:fs/browse`(34) の is-directory 欠落**（entry 名
+   しか返さず再帰走査ができない — wire 契約を型情報入りに広げる両 host の変更が要る）。
+   `:http/fetch` は未着手（設計どおり最後）。
 2. **native loader** — wire 20/33/34 の provider、fuel が compile-time 定数である問題。
 3. **clj-kondo の JVM 撤去** — 検出器いわく最も安い出口。findings を比べること
    （件数が減ったら変換ではなく無効化）。native `clj-kondo` は現在 PATH に無い。
