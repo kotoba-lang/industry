@@ -19,6 +19,19 @@ import re
 import sys
 
 HERMES_ROOT = os.path.expanduser("~/.hermes/profiles")
+# The "default" profile (the one every `hermes cron create` lands on when no
+# --profile/HERMES_HOME is given -- which is where kotoba-migration-scout,
+# kotoba-cli-build-scout/-verifier, and clojure-stdlib-migration-scout all
+# actually live) does NOT keep its jobs.json under HERMES_ROOT/<name>/cron/
+# like every other named profile. It keeps them one level up, at
+# ~/.hermes/cron/jobs.json. The glob below only ever matched the named-profile
+# shape, so the default profile's jobs were silently invisible to this ledger
+# -- measured 2026-09-07 building the clojure-stdlib bot: 0 of those 4 jobs
+# were in hermes-cron-jobs.json even though `hermes cron list` showed all of
+# them [active]. Same failure shape this file's own _now() docstring already
+# warns about one level up (a ledger that can't say what it missed reads
+# identical to one that missed nothing).
+DEFAULT_PROFILE_JOBS_FILE = os.path.expanduser("~/.hermes/cron/jobs.json")
 
 
 def _now():
@@ -78,8 +91,15 @@ def main():
               "generated_at": _now(),
               "profiles": {}}
 
-    for jobs_file in sorted(glob.glob(os.path.join(HERMES_ROOT, "*", "cron", "jobs.json"))):
-        profile = os.path.basename(os.path.dirname(os.path.dirname(jobs_file)))
+    jobs_files = sorted(glob.glob(os.path.join(HERMES_ROOT, "*", "cron", "jobs.json")))
+    if os.path.isfile(DEFAULT_PROFILE_JOBS_FILE):
+        jobs_files.append(DEFAULT_PROFILE_JOBS_FILE)
+
+    for jobs_file in jobs_files:
+        if jobs_file == DEFAULT_PROFILE_JOBS_FILE:
+            profile = "default"
+        else:
+            profile = os.path.basename(os.path.dirname(os.path.dirname(jobs_file)))
         try:
             with open(jobs_file) as f:
                 d = json.load(f)
