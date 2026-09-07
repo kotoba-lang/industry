@@ -8373,4 +8373,111 @@
      :file "README.md"
      :find "See: `proto/v1/emotional_analytics.proto`"
      :replace "See: `proto/v2/emotional_analytics.proto`"
-     :must-fail ["readme-points-at-the-proto-file-that-was-parsed"]}]}]}
+     :must-fail ["readme-points-at-the-proto-file-that-was-parsed"]}]}
+
+  {:repo "orgs/cloud-itonami/loop-x402-qr-growth"
+   :label "loop-x402-qr-growth —— profile は記述であって授権ではない: tool 要求 0 / 市場は自動昇格しない / outreach は有効化されない / 観測記録は script・README・自身の digest と整合する"
+   ;; x402.nexus の QR 決済 pilot を育てる Cloud Itonami Bot profile。この repo の
+   ;; 仕事は「何も授権しないこと」で、それが docs/operating-contract.md の
+   ;; 「Metrics and authority」節に書かれている —— が、2026-09-07 まで test は
+   ;; schema / id / brief 長 / key 集合 / markets 全部 :hypothesis / context-refs 実在
+   ;; の 6 assert だけで、`:bot/tools-requested []` も `:external-outreach-enabled? false`
+   ;; も観測記録の digest も誰も固定していなかった。
+   ;;
+   ;; 面は 4 つ。profile が権限を要求しないこと（validator repo_profile.cljc の
+   ;; 上限 name 60 / brief 2000 / id 120 を境界つきで写す）、data/markets.edn が
+   ;; 運用契約の「hypothesis → … → live-qualified に自動昇格しない」「EEA/LATAM は
+   ;; 国ではなく research bucket」を守ること、data/runtime.edn が outreach を有効化
+   ;; しないこと、reports/latest-observation.edn が scripts/observe.cljs の URL と
+   ;; README の discovery URL と自身の sha256 に一致し「Unmeasured is not zero」の
+   ;; 2 key を落とさないこと。
+   ;;
+   ;; 測れないときは exit 2（6 入力のどれかが読めない）。2026-09-07 に
+   ;; .itonami/profile.edn を外して 2 が返るのを手で見た。
+   :cmd ["nbb" "test/profile_test.cljs"]
+   :green-marker "x402 profile contract: all green"
+   ;; 12 件とも 2026-09-07 に着地前の worktree で実際に赤くなるところを見た。
+   :mutations
+   [{:id :x402-qr-growth/profile-requests-a-tool
+     :why "profile が tool を 1 つ要求すると、destination Bot 側で admit されれば「記述」が「授権要求」に変わる。README も runtime.edn も『grants nothing』と言ったまま嘘になる"
+     :file ".itonami/profile.edn"
+     :find ":bot/tools-requested []"
+     :replace ":bot/tools-requested [:http/fetch]"
+     :must-fail ["profile-requests-no-tools"]}
+
+    {:id :x402-qr-growth/profile-gains-an-authority-key
+     :why "`:bot/tools` は validator が名指しで refuse する key。ここで通れば admit で落ちるまで誰も気づかず、落ちた理由は destination のログにしか出ない"
+     :file ".itonami/profile.edn"
+     :find ":bot/tools-requested []}"
+     :replace ":bot/tools-requested []\n :bot/tools [:http/fetch]}"
+     :must-fail ["profile-keys-are-only-the-six-description-keys"]}
+
+    {:id :x402-qr-growth/bot-name-exceeds-validator-limit
+     :why "validator の max-name は 60。61 文字の name は destination で refuse されるので、ここで先に落とす。境界は within? の self-check（3 通る / 4 落ちる）が別途固定している"
+     :file ".itonami/profile.edn"
+     :find ":bot/name \"x402 QR Global Growth\""
+     :replace ":bot/name \"x402 QR Global Growth — merchant-presented QR pilots for Base USDC\""
+     :must-fail ["profile-name-within-validator-limit"]}
+
+    {:id :x402-qr-growth/context-ref-added-before-the-file
+     :why "context-refs は destination が読みに行くファイル。存在しない path を先に足すと、Bot の文脈から 1 本が静かに欠ける"
+     :file ".itonami/profile.edn"
+     :find ":bot/context-refs [\"README.md\" \"docs/operating-contract.md\" \"data/markets.edn\"]"
+     :replace ":bot/context-refs [\"README.md\" \"docs/operating-contract.md\" \"data/markets.edn\" \"docs/pilot-playbook.md\"]"
+     :must-fail ["profile-context-refs-exist"]}
+
+    {:id :x402-qr-growth/brief-drops-the-funds-prohibition
+     :why "brief は destination に渡る唯一の指示文。『No funds …』の一句が消えると、残りは完全に妥当な文章のまま資金操作の禁止だけが無くなる"
+     :file ".itonami/profile.edn"
+     :find "No funds, refunds, credentials,"
+     :replace "Refunds, credentials,"
+     :must-fail ["brief-forbids-funds-and-unauthorized-contact"]}
+
+    {:id :x402-qr-growth/market-admitted-without-review
+     :why "operating-contract は hypothesis → researched → operator-reviewed → pilot-authorized → live-qualified で、後段 2 つに自動昇格は無い。data だけ書き換えれば昇格したことになる形"
+     :file "data/markets.edn"
+     :find "{:id \"JP\" :language \"ja\" :status :hypothesis"
+     :replace "{:id \"JP\" :language \"ja\" :status :live-qualified"
+     :must-fail ["markets-are-all-hypotheses"]}
+
+    {:id :x402-qr-growth/eea-treated-as-a-country
+     :why "EEA は research bucket で、必ず個別 jurisdiction に解かれる。flag を落とすと EEA が 1 つの市場として pilot proposal の宛先になる"
+     :file "data/markets.edn"
+     :find "{:id \"EEA\" :language \"en\" :status :hypothesis :requires-country-selection true :evidence []}"
+     :replace "{:id \"EEA\" :language \"en\" :status :hypothesis :evidence []}"
+     :must-fail ["non-country-buckets-require-country-selection"]}
+
+    {:id :x402-qr-growth/outreach-flag-flipped
+     :why "runtime.edn は『この repository からは autonomous outreach を有効化しない』の機械可読な写し。true にしても他に何も変わらないので、テストが無ければ誰も気づかない"
+     :file "data/runtime.edn"
+     :find ":external-outreach-enabled? false"
+     :replace ":external-outreach-enabled? true"
+     :must-fail ["runtime-never-enables-external-outreach"]}
+
+    {:id :x402-qr-growth/observation-body-edited-without-redigest
+     :why "観測記録の body を手で直すと sha256 と食い違う。digest を検査しなければ、手編集された『観測』が本物と同じ顔で残る"
+     :file "reports/latest-observation.edn"
+     :find "\\\"asset\\\":\\\"USDC\\\""
+     :replace "\\\"asset\\\":\\\"USDT\\\""
+     :must-fail ["observation-digest-matches-recorded-body"]}
+
+    {:id :x402-qr-growth/observe-drops-unmeasured-fields
+     :why "『Unmeasured is not zero.』script から 2 key を外すと、次の観測から physical-issuance / external-demand が記録に現れなくなり、不在が 0 として読まれる。既存の記録はまだ持っているので、記録側の検査だけでは緑のまま"
+     :file "scripts/observe.cljs"
+     :find "              :physical-issuance :unmeasured :external-demand :unmeasured})"
+     :replace "              })"
+     :must-fail ["observe-script-records-unmeasured-not-zero"]}
+
+    {:id :x402-qr-growth/observe-points-elsewhere
+     :why "observe の URL を動かすと、記録の :url と README の『Public discovery』が別の endpoint を指す。3 箇所が同じ文字列であることは、どれか 1 つを読んでも分からない"
+     :file "scripts/observe.cljs"
+     :find "(def url \"https://x402.nexus/qr/capabilities\")"
+     :replace "(def url \"https://x402.nexus/qr/v2/capabilities\")"
+     :must-fail ["observation-url-matches-observe-script" "readme-discovery-url-matches-observe-target"]}
+
+    {:id :x402-qr-growth/readme-names-a-script-that-does-not-exist
+     :why "README の Run 節は operator が実際に打つ行。script を改名して README を直し忘れると、手順の 1 行目で止まる"
+     :file "README.md"
+     :find "`nbb scripts/observe.cljs`"
+     :replace "`nbb scripts/observe_live.cljs`"
+     :must-fail ["readme-commands-name-files-that-exist"]}]}]}
