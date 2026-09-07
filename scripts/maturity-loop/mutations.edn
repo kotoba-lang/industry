@@ -8480,4 +8480,131 @@
      :file "README.md"
      :find "`nbb scripts/observe.cljs`"
      :replace "`nbb scripts/observe_live.cljs`"
-     :must-fail ["readme-commands-name-files-that-exist"]}]}]}
+     :must-fail ["readme-commands-name-files-that-exist"]}]}
+
+  {:repo "orgs/cloud-itonami/hrse"
+   :label "hrse public job-board catalog —— 閉じた enum / FK / uint 文字列 / applicant PII 不在 / page 上限 / coverage 境界を、kotoba/src/*.ts をそのまま実行して固定する"
+   ;; サイバーセキュリティ特化フリーランス求人板の public 面。`kotoba/src/registry.ts` が
+   ;; AT PDS に書く company / jobPosting の catalog で、types.ts の冒頭が
+   ;; 「posting は public listing data だけを運び、applicant / freelancer の欄を
+   ;; 決して持たない」「comp は decimal JPY string で float は無い」と定めている。
+   ;; 2026-09-07 まで、この repo で数えられる test は 0 本だった —— 在ったのは
+   ;; vitest の 1 ファイル（`kotoba/test/hrse.test.ts`）で、git 依存の
+   ;; `@etzhayyim/sdk-mock` が要り、scan の `test/` にも入っていない。
+   ;;
+   ;; `test/hrse_test.cljs` は Node の type stripping で **その .ts を直接 import**
+   ;; する（mehikari と同じ形。`./types.js` → `types.ts` は resolve hook が写す）。
+   ;; SDK client は test 内の in-memory stand-in で、**書かれた record と要求された
+   ;; page limit を記録する** —— 返り値だけでは「何が永続化されたか」が見えない。
+   ;;
+   ;; 測れないときは exit 2（kotoba/src/*.ts 不在 / import 失敗 / 実行本数 < 20）。
+   ;; 不在の経路は 2026-09-07 に HRSE_ROOT を存在しないパスにして 2 が返るのを見た。
+   :cmd ["nbb" "test/hrse_test.cljs"]
+   :green-marker "hrse kotoba: all green"
+   ;; 15 件とも 2026-09-07 に実際に赤くなるところを見た（着地前に copy で dry-run）。
+   :mutations
+   [{:id :hrse/barrel-drops-coverage
+     :why "index.ts の export から 1 操作が落ちる。registry.ts は無傷なので unit test は全部緑のまま、package の公開面だけが 5 操作になる"
+     :file "kotoba/src/index.ts"
+     :find "  coverage,\n} from \"./registry.js\";"
+     :replace "} from \"./registry.js\";"
+     :must-fail ["barrel-exports-the-six-operations"]}
+
+    {:id :hrse/category-whitelist-grows
+     :why "SECURITY_CATEGORIES に 1 語足すだけで、Lexicon に無い category の posting が PDS に書かれる。既存 9 語の入力は全部そのまま通るので、正例だけの検査では見えない"
+     :file "kotoba/src/types.ts"
+     :find "  \"threat-intel\",\n  \"other\",\n]);"
+     :replace "  \"threat-intel\",\n  \"other\",\n  \"quantum\",\n]);"
+     :must-fail ["security-categories-are-exactly-the-nine" "posting-with-unknown-category-is-rejected"]}
+
+    {:id :hrse/rkey-stops-lowercasing
+     :why "companyRkey が大小を区別すると `C-1` と `c-1` が別 record になり、同じ会社が 2 回登録できる（DID 側だけ小文字のままなので DID は衝突する）"
+     :file "kotoba/src/types.ts"
+     :find "  return `co-${id.toLowerCase()}`;"
+     :replace "  return `co-${id}`;"
+     :must-fail ["company-did-and-rkey-are-lowercased-with-role-prefix" "company-id-is-case-insensitive"
+                 "company-record-carries-only-public-fields" "get-company-distinguishes-invalid-and-missing"]}
+
+    {:id :hrse/uint-regex-accepts-empty
+     :why "`\\d+` → `\\d*`。空文字が uint として通り、comp band に \"\" が書かれる。\"5.5\" も \"-1\" も引き続き拒否されるので、境界ちょうど（空）の入力が無ければ緑のまま"
+     :file "kotoba/src/types.ts"
+     :find "  return /^\\d+$/.test(s);"
+     :replace "  return /^\\d*$/.test(s);"
+     :must-fail ["uint-string-accepts-only-ascii-digits" "posting-with-empty-comp-string-is-rejected"]}
+
+    {:id :hrse/company-duplicate-check-removed
+     :why "既存 record の検査を外すと、同じ companyId で何度でも `registered` が返り、PDS に上書き write が走る（alreadyExists が二度と出ない）"
+     :file "kotoba/src/registry.ts"
+     :find "  if (existing.records[0]?.value) {\n    return { status: \"alreadyExists\", companyUri:"
+     :replace "  if (false) {\n    return { status: \"alreadyExists\", companyUri:"
+     :must-fail ["registering-the-same-company-twice-is-idempotent" "company-id-is-case-insensitive"]}
+
+    {:id :hrse/company-record-spreads-input
+     :why "record 構築を `{ ...input, did, ... }` の便利な形に戻すと、input に紛れた contactEmail / ownerPhone がそのまま public record に永続化される。宣言済みの欄は全部正しいので、返り値だけ見る検査では見えない"
+     :file "kotoba/src/registry.ts"
+     :find "  const record: CompanyRecord = {\n    did,"
+     :replace "  const record: CompanyRecord = {\n    ...(input as unknown as CompanyRecord),\n    did,"
+     :must-fail ["company-record-carries-only-public-fields"]}
+
+    {:id :hrse/seniority-check-removed
+     :why "3 つの enum 検査のうち 1 行が消える。category と engagementType は引き続き拒否されるので、seniority の負例が無ければ緑のまま"
+     :file "kotoba/src/registry.ts"
+     :find "  if (!SENIORITIES.has(input.seniority)) return { status: \"rejected\", error: \"invalidSeniority\" };\n"
+     :replace ""
+     :must-fail ["posting-with-unknown-seniority-is-rejected"]}
+
+    {:id :hrse/comp-check-skips-empty-string
+     :why "`!= null` → truthiness。\"\" が検査を素通りして compMinJpy に空文字が書かれる。undefined / \"5.5\" / \"0\" の挙動は変わらない"
+     :file "kotoba/src/registry.ts"
+     :find "  if (input.compMinJpy != null && !isUintString(input.compMinJpy))"
+     :replace "  if (input.compMinJpy && !isUintString(input.compMinJpy))"
+     :must-fail ["posting-with-empty-comp-string-is-rejected"]}
+
+    {:id :hrse/fk-check-removed
+     :why "**この suite の本題の 1 つ。** company の存在検査を外すと、登録の無い会社名で posting が書け、catalog の FK が孤児を持つ"
+     :file "kotoba/src/registry.ts"
+     :find "  if (!(await exists(e, COMPANY_COLLECTION, companyRkey(input.companyId)))) {"
+     :replace "  if (false) {"
+     :must-fail ["posting-for-unknown-company-is-refused"]}
+
+    {:id :hrse/posting-record-spreads-input
+     :why "**この suite の本題。** types.ts が『applicant / freelancer の欄を決して運ばない』と定める posting record に、input の spread で applicantEmail / resumeUrl が乗る。宣言済みの欄は全部正しく、返り値も `added` のまま"
+     :file "kotoba/src/registry.ts"
+     :find "  const record: JobPostingRecord = {\n    did,"
+     :replace "  const record: JobPostingRecord = {\n    ...(input as unknown as JobPostingRecord),\n    did,"
+     :must-fail ["posting-record-carries-no-applicant-fields"]}
+
+    {:id :hrse/remote-filter-treats-false-as-unset
+     :why "`!= null` → truthiness。`remote: false` が『指定なし』に化け、オンサイト限定の検索に remote 案件が混ざる。`remote: true` は変わらないので境界（false）が無ければ緑のまま"
+     :file "kotoba/src/registry.ts"
+     :find "      if (input.remote != null && v.remote !== input.remote) return false;"
+     :replace "      if (input.remote && v.remote !== input.remote) return false;"
+     :must-fail ["remote-false-filters-to-onsite-postings"]}
+
+    {:id :hrse/search-ignores-skills
+     :why "q の検索対象が title だけに縮む。types.ts が『App-layer substring search over title + required skills』と宣言している面の半分が消える"
+     :file "kotoba/src/registry.ts"
+     :find "        const hay = [v.title, ...(v.requiredSkills ?? [])].join(\" \").toLowerCase();"
+     :replace "        const hay = v.title.toLowerCase();"
+     :must-fail ["q-search-matches-required-skills"]}
+
+    {:id :hrse/posting-page-limit-uncapped
+     :why "PDS へ渡す limit が呼び出し側の値そのままになる。返る件数は fake でも実 PDS でも変わらないので、**要求した limit を記録する**検査でしか見えない"
+     :file "kotoba/src/registry.ts"
+     :find "  const resp = await e.read<JobPostingRecord>({ collection: JOB_POSTING_COLLECTION, cursor: input.cursor, limit });"
+     :replace "  const resp = await e.read<JobPostingRecord>({ collection: JOB_POSTING_COLLECTION, cursor: input.cursor, limit: input.limit ?? 50 });"
+     :must-fail ["list-postings-caps-page-limit-at-200"]}
+
+    {:id :hrse/truncated-becomes-exclusive
+     :why "`>=` → `>`。ちょうど maxScan 件のとき truncated が false になり、『まだ在るかもしれない』が『これで全部』と読まれる。maxScan±1 は正しく判定されるので、境界ちょうどの入力が無ければ緑のまま"
+     :file "kotoba/src/registry.ts"
+     :find "    truncated: companyCount >= maxScan || jobPostingCount >= maxScan,"
+     :replace "    truncated: companyCount > maxScan || jobPostingCount > maxScan,"
+     :must-fail ["coverage-truncated-flag-is-inclusive-at-max-scan" "coverage-never-scans-past-the-default-ceiling"]}
+
+    {:id :hrse/scan-ceiling-removed
+     :why "DEFAULT_MAX_SCAN の天井が消え、呼び出し側が maxScan を大きく渡すだけで PDS を無制限に歩く。通常の入力（既定 / 小さい maxScan）では何も変わらない"
+     :file "kotoba/src/registry.ts"
+     :find "  const maxScan = Math.min(input.maxScan ?? DEFAULT_MAX_SCAN, DEFAULT_MAX_SCAN);"
+     :replace "  const maxScan = input.maxScan ?? DEFAULT_MAX_SCAN;"
+     :must-fail ["coverage-never-scans-past-the-default-ceiling"]}]}]}
