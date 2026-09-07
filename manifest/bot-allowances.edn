@@ -86,4 +86,13 @@
   {:credits/per-call 1 :credits/per-day 30 :runs-as/hermes "itonami-ingest-scout"}
 
   "itonami-coverage-scout"
-  {:credits/per-call 1 :credits/per-day 30 :runs-as/hermes "itonami-coverage-scout"}}}
+  {:credits/per-call 1 :credits/per-day 30 :runs-as/hermes "itonami-coverage-scout"}
+
+  ;; amu の速度主張チェーン。measurement placement を直して host gate を開け、
+  ;; qualified な bounded claim を着地させる（ADR 0341）。plan は
+  ;; .hermes/plans/2026-09-07_092400-amu-claim-chain.md、hermes job 52c20791b602。
+  ;; per-day が 20min cron の 72 回より小さいのは意図的 —— 測れない tick は
+  ;; 何も呼ばずに "not measured" で終わるのが正しい挙動なので、上限は
+  ;; 「実際に測れた回数」の想定に合わせてある。
+  "amu-claim-chain"
+  {:credits/per-call 1 :credits/per-day 40 :runs-as/hermes "amu-claim-chain"}}}
