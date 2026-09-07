@@ -1,0 +1,101 @@
+[{:db/id -1
+  :adr/id "adr-2609072000-what-the-kotoba-refactor-taught"
+  :adr/title "kotoba への refactor が教えたこと —— 受理して誤答する backend、境界を持たない表、拒否して記録する gate"
+  :adr/status "accepted"
+  :adr/date "2026-09-07"
+  :adr/tags ["kotoba" "amu" "refactor" "testing" "rule-kaizen" "jvm-free"]
+  :adr/related ["adr-2609062400-kumiai-condominium-association-actor"
+                "adr-2608136000"
+                "adr-2809041200"
+                "kotoba-lang/amu#835"]
+  :adr/body "この session の refactor（cloud-itonami-isic-6820 の管理組合 actor を JVM から
+kotoba compile + amu native へ移す）で出た学びのうち、**この repo に依らないもの**を
+1 箇所にまとめる。repo 固有の経緯は ADR-2609062400 が持つ。
+
+## 1. 規則を根拠に使う前に、性質か実装状態かを判定する（ADR-2809041200 の実例）
+
+CLAUDE.md は「map / set / closure / HOF ... native に無いだけ」と書いていた。
+**2026-09-06 に測って偽。** `atom` / `swap!` / `deref`、`defrecord` + アクセサ、
+`defprotocol` + `extend-type`、`fn` を値として渡す高階関数 —— 4 つとも
+`aarch64-macos` に通り、kexe loader で**実行して正しい値**を返した（12 / 74 / 15 / 7）。
+
+**この一句は 1 日で実害を出した。** 同じ段落の末尾は
+「これらを『無い』と仮定して判断核だけを切り出す設計にしない」と正しく警告して
+いたのに、その**直前の断定**が「native では無い」と言っていたため、native を
+target にした slice が判断核だけになった。**警告文は、その手前の断定に負ける。**
+
+派生する 3 つ:
+
+- **`:implementation` のような集合自体が遅れうる。** surface-status は HOF を
+  `#{:compiler :kotoba-wasm :kotoba-cljs}` とだけ書いていたが native で動いた。
+- **拒否メッセージを「その機能が無い」と読まない。**
+  `defprotocol requires unique bounded (method [this ...]) signatures` も
+  `fn value requires unique arities ...` も**書式の指摘**で、注釈を外したら通った。
+  1 回目の拒否で止めると、自分のタイプミスを言語の天井として記録する。
+- **stale な checkout を正本にしない。** 最初に読んだ kotoba-lang は origin/main より
+  26 behind / 14 ahead、`surface-status.edn` だけで 162 行差だった。
+
+## 2. 受理して誤答する backend は、拒否する backend より悪い
+
+kotoba-lang/amu#835: あるモジュールは `aarch64-macos` に**コンパイルでき、実行でき、
+答えが違った** —— その backend では keyword の `=` が常に false で、同じビルドで
+i64 の `=` は正しい。診断は一切出ない。
+
+**拒否は設計判断を 1 つ生むが、誤答は何も生まない。**
+
+気づけた理由は 1 つだけ: モジュールが自分で self-check を持ち、**失敗の「個数」を
+返していた**（11 中 10 失敗）。boolean なら「何かが失敗した」しか言えず、1 件の退行と
+壊れたビルドを区別できない。
+
+したがって:
+
+- **成果物を出す検査は、その成果物を実行して値を確かめるまで pass にしない。**
+  `:ok true` は「ビルドできた」であって「正しい」ではない。
+- **self-check は個数を返す。**
+
+## 3. backend の欠陥は block であって作り直しではない
+
+回避のために表現を変えない（keyword を i64 にする等）。Q9 は未対応 target を
+fallback ではなく `:blocked` と定めており、**ドメインを backend の欠陥に合わせて
+整形するのは欠陥を隠すこと**である。status が keyword なのは、それが status だから。
+
+**撤去条件は記憶ではなく機械化する。** 「その欠陥がまだ再現すること」を assert する
+probe を acceptance に置けば、上流が直した日に probe が**赤くなって** unblock を促す。
+誰かが覚えている必要が無くなる。
+
+## 4. 境界を持たない表は、演算子を見られない
+
+上限比較を `>` から `>=` に反転しても self-check は**緑のまま**だった。通る例も
+落ちる例も在ったが、**線上のケース（発注額 == 決議予算）が無かった**。その 1 件
+（規則が「超過」なので**可決されるべき**）を足すと反転で赤くなる。
+
+**両方向を出すことと、境界を持つことは別の要件である。** CLAUDE.md の 5 問目に
+この但し書きを足した。
+
+## 5. 禁じたい経路は「無い」ではなく「拒否して記録する」
+
+JVM-free を主張するなら、JDK が**無い**環境で測るのではなく、
+`java` / `javac` / `clojure` / `clj` の stub を PATH 先頭に置き、呼ばれたら log に
+追記して非ゼロで終わらせ、**log が空であることを assert する**。
+
+**そしてその log が空でないことを 1 度は見せる。** 実測: amu のサブコマンドで
+trace を踏むのは `amu test` だけ（`clojure -M:run` に落ちる）。それが
+「trace が何かを検出できる」ことの証拠になった。**踏まれたことのない trace は、
+常に空な trace と区別できない。**
+
+## 6. blocking なのが記法か effect かは、書いてみれば分かる
+
+「この component は atom と protocol に乗っているから移せない」は測っていない主張
+だった。**実際に書けた** —— 発注ステップを `state + event -> next state + inert
+effect` として、一切書き込まずに。残ったのは effect（台帳書き込み・sequence 更新）
+だけで、それは実装状態ではなく**性質**（ambient authority の排除）なので広がらない。
+
+**移行できない理由を並べる前に、1 slice 書いてみる。** 書けたなら理由が違っていた。
+
+## 反映先
+
+- CLAUDE.md 8 問目（生成物を実行したか）、5 問目の但し書き（境界）、
+  直し方リスト（個数を返す / 拒否して記録する）
+- skill `kotoba-clj-to-kotoba` 手順 6・6b と両方向の但し書き
+- ADR-2609062400（repo 固有の経緯・現在地・再開点）
+- `cloud-itonami/cloud-itonami-isic-6820` README（gate の 1 コマンド・native block）"}]
