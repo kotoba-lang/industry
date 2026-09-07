@@ -3448,4 +3448,78 @@
               classify directly on capability-llm-infer returns the understated and
               inconsistent pair by hand. Do not quote a finding count here: orgs/ is
               west-managed, so SCANNED is over checkouts and not a workspace total."}
+  {:id       :verify-catch-swallow
+   :title    "a catch that returns an empty literal and drops the exception body, outside a teardown"
+   :why      "2026-09-06 (ADR-0156, aiueos): the PXE server's netlog thread died with an
+              exception whose traceback went to an uncaptured stderr; the process
+              kept serving DHCP/TFTP, so three kernel boots were recorded as 'the
+              board transmits nothing' while it sent 3.7 million frames per boot.
+              The same shape in code: `(catch T _ nil|false|0|-1|[]|{}|#{})` turns a
+              DNS failure, a bad signature and an I/O error into one value a caller
+              cannot tell from a legitimate result (kototama transport_provider.clj
+              :240, aiueos phone_bind.cljc:370, k16-pxe-server.py:643
+              `except Exception: pass`). Teardown catches around .close/.destroy/
+              .kill are excluded. Reports a SHAPE; the fix is a tagged value or a
+              host-side reason ring, never removing the catch."
+   :argv     ["nbb" "{{repo}}/scripts/verify-catch-swallow.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  600000
+   :writes   :none
+   :measured "2026-09-07 10:3x: aiueos worktree SCANNED 184 FINDINGS 18 (exit 1);
+              kototama SCANNED 107 FINDINGS 28 (exit 1); empty directory exit 2
+              (REFUSED). Self-check fixture pair lives inside the script. SCANNED is
+              over checkouts, not a workspace total (orgs/ is west-managed)."}
+  {:id       :verify-fuel-literal-vs-policy
+   :title    "a fuel budget written as a literal beside a *fuel-policy*.edn that nothing reads"
+   :why      "2026-09-06 (ADR-0156): the aiueos kernel's fuel budget 1048576 was
+              written in five places -- two --fuel flags, the sealed-context check,
+              the receipt, the OK line -- while scripts/native-kernel-fuel-policy.edn
+              carried the same number and was read by none of them. Raising the
+              budget failed on a check that named the old value; the receipt
+              restated the environment, not the bytes. A literal that AGREES with the
+              policy today is the dangerous case, so the finding prints
+              POLICY=n LITERAL=n so agreement-by-coincidence is visible. A tree with
+              no policy file is REFUSED (exit 2): no authority to compare against."
+   :argv     ["nbb" "{{repo}}/scripts/verify-fuel-literal-vs-policy.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  600000
+   :writes   :none
+   :measured "2026-09-07 10:3x: aiueos worktree SCANNED 285 FINDINGS 12 (exit 1,
+              policy 1048576); kototama SCANNED 122 REFUSED no *fuel-policy*.edn
+              (exit 2); empty directory exit 2."}
+  {:id       :verify-checker-floors
+   :title    "a repo-local check-*/verify-* script that passes on zero evidence"
+   :why      "2026-09-06/07 (ADR-0156, Co-Scientist rank-01): kototama
+              scripts/check-q9-migration-policy.cljs prints PASS with no count;
+              kotoba-lang check-grammar-authority.cljs prints `:forbidden 0` and
+              passes when the authority file is missing; amu check-browser-evidence
+              and check-github-governance print `verified N` with no floor. Each
+              answers 'nothing wrong' when it could not look. This meta-detector runs
+              every scripts/check-*.cljs and verify-*.cljs it finds against an empty
+              input and REQUIRES exit 2; a 0 is a finding."
+   :argv     ["nbb" "{{repo}}/scripts/verify-checker-floors.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  900000
+   :writes   :none
+   :measured "2026-09-07 11:1x: rule 1 (missing input) never went red on a real
+              tree -- the floorless checkers CRASH on a missing input, which is
+              not a pass. Rule 2 runs each checker on its own tree and refuses a
+              PASS/OK/CLEAN verdict with no count. First regex (a noun list) gave
+              3 reds of which 2 were the regex (`OK 9 boundaries`, `{:forbidden
+              26 ...}` are counts); the loosened form let `Q9` count and the one
+              true red went green. With whitespace required between word and
+              number: kototama SCANNED 1 FINDINGS 1 (check-q9-migration-policy:
+              `Q9 JVM-FREE PASS: ...`, nothing numeric), kotoba-lang SCANNED 4
+              FINDINGS 0, amu SCANNED 3 FINDINGS 0, empty directory exit 2. One
+              true red, two false reds removed, one false green caught -- all
+              three shapes seen before this text was written."}
 ]}
