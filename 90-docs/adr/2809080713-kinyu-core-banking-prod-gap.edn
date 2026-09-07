@@ -1,0 +1,35 @@
+[{:db/id -1
+  :adr/id "adr-2809080713-kinyu-core-banking-prod-gap"
+  :adr/title "kinyu finding 1: datom plane healthy at health level, so the ranked gap is core-banking productionization; open-banking needs a prod-readiness datom register before it can be produced"
+  :adr/status :proposed
+  :adr/date "2026-09-08"
+  :adr/deciders ["owner"]
+  :adr/supersedes []
+  :adr/related []
+  :adr/context
+  "kinyu agent (cloud-itonami banking/settlement alternative) first observed tick ran 2026-09-08 07:13 JST via the profile evidence script (nbb ~/.hermes/profiles/kinyu/scripts/evidence.cljs, exit 0; output JSON at ~/.hermes/profiles/kinyu/workspace/findings/kinyu-evidence-2026-09-07.json). Measured state:
+- 9 corpora checked out, all clean: kotoba-lang/banking b8750ad17d16, kotoba-lang/kessai 50d8af95aa3b, cloud-itonami/kouza 6538fe581ff7 (owner advanced 09-07 from e86ead76b6fd: cljs/reagent/re-frame DDS shell, Svelte retired), cloud-itonami/open-banking ad4a571df095, cloud-itonami/app-open-swift 52dc2642324a, kotoba-lang/aml 91b29a756677, kotoba-lang/ekyc cada3f511f03, cloud-itonami/cloud-itonami-pi 7591931a6399, cloud-itonami/cloud-itonami-emi 8ab0d4fc6028.
+- kotobase probes: https://kotobase.net/health 200, https://auth.kotobase.net/health 200; datom-plane-ok? = true at health level. Transact-plane 401/502 was measured 2026-09-05 (the evidence script notes transact is a separate plane; re-measurement is owner-requested or explicit-capability only), so the datom-plane-repair priority is NOT actionable by this bot right now.
+- Ledger findings.edn at seq 1 (bootstrap only); zero open kinyu PRs; kessai :redirect invariant untouched.
+So the ranked priority list (datom-plane-repair, core-banking-prod, bank-adapter, kyc-aml-actor, settlement-netting) points at core-banking-prod as the achievable next gap. cloud-itonami/open-banking is the Core-Banking MVP corpus at scaffold stage (forms, dodaf, bpmn, xrpc-adapter, kotoba src + test, dmn, worker) and carries no production-readiness datoms at all, which is the same failure shape this workspace keeps finding: a scaffold that cannot say what it is missing reads exactly like a production one."
+  :adr/decision
+  "1. This iteration's single ranked move: start core-banking-prod at the gap register, not at code. Before any productionization edit on open-banking, it must be possible to query what still blocks production.
+2. The register is proposed as datoms: a prod-readiness gate set on open-banking with one measured gate per entry - deploy surface (worker/wrangler.jsonc 404-check vs origin), D1 schema/migrations presence, xrpc-adapter routing coverage, form -> banking.ts wiring, Open Banking contract test (kotoba/test/banking.test.ts), and a transact-plane probe flag recording the owner-only measurement date. Each gate carries :prod/status open|closed|pending-owner with :prod/measure date and :prod/evidence source string, DataScript-queryable.
+3. This ADR only registers the gap and the datom shape (propose-only). The register file lands in a following iteration only if owner accepts; the bot does not touch open-banking source yet, does not deploy, does not enter credentials, and does not modify kessai :redirect."
+  :adr/consequences
+  "Future kinyu ticks compare diffs against the register: each open gate is a ranked candidate and each tick proposes exactly one gate implementation PR, measured. The bot stays propose-only and never actuates payments: transfer/card execution, publishing and governor-bypass remain out of scope. Owner review of this ADR accepts or rejects the register shape before any repository edit takes place."
+  :adr/gaps
+  "1. Transact plane (401/502 on 2026-09-05) is owner-only to re-measure; health-200 is not a transact proof.
+2. open-banking has no 90-docs dir yet. Register datoms are proposed for the corpus root, mirroring the workspace convention (90-docs/adr, DataScript queries).
+3. app-open-swift relay DNS and NSID 6 legs remain design-only (unverified); ranked below this gap.
+4. No production datoms exist on any of the 9 corpora; this ADR is the first."
+  :adr/evidence
+  "Measured 2026-09-08 07:13 JST (UTC 2026-09-07T22:13Z, evidence script at 2026-09-07T22:13:01.343Z). NBB_EXIT=0.
+- output file: ~/.hermes/profiles/kinyu/workspace/findings/kinyu-evidence-2026-09-07.json (kind kinyu-evidence)
+- repo heads and cleanliness as listed in :adr/context (all dirty? = false)
+- kotobase.net/health -> 200, auth.kotobase.net/health -> 200 (curl -sS -o /dev/null -w %{http_code}, -m 10, run by the evidence script itself)
+- datom-plane-ok? -> true, with the script's standing note about the transact plane (2026-09-05 measured 401/502; owner-only re-measure)
+- gh auth status: com-junkawasaki, token scopes gist, read:org, repo; gh pr list open across all 9 corpora: empty (no prior kinyu PRs)
+- Ledger ~/.hermes/profiles/kinyu/workspace/ledger/findings.edn: seq = 1 (bootstrap) before this tick"
+  :adr/resume
+  "Proposed; no source edits made to any corpus. Next tick: if owner accepts this shape, seed the register file (prod-readiness datoms) on the corpus root and mark gates one measured at a time; if rejected, keep the ranked priority list and move to the next gap. To re-verify the observed state: re-run nbb ~/.hermes/profiles/kinyu/scripts/evidence.cljs and diff the 9 heads plus the two /health probes against this ADR's :adr/evidence."}]
