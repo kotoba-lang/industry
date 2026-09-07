@@ -1,0 +1,64 @@
+[{:db/id -1
+  :adr/id "adr-2609076200-register-cloud-itonami-apex"
+  :adr/title "cloud-itonami-apex is registered; the coupled Worker is the one that owns no hostname"
+  :adr/status "accepted"
+  :adr/date "2026-09-07"
+  :adr/related "adr-2609075800-register-cloud-itonami-cli"
+  :adr/body "## What was asked
+
+itonami.cloud の repo を cloud-itonami-app / -cli / -api / -apex（+ -auth）に
+整理（オーナー、2026-09-07）。Second registration, after
+adr-2609075800-register-cloud-itonami-cli.
+
+## The line was measured, not chosen
+
+\"Which Workers are edge?\" reads as a taste question. It was answered the way
+the CLI seam was, by counting references into the app tree with comments
+excluded:
+
+    agent-edge  0 · itonami-cloud-webhooks  0 · itonami-fleet-dispatch  0
+    mcp-edge    0 · app-edge                4
+
+Four moved to `cloud-itonami-apex` at pin `5e7ab156`. `app-edge` stayed, for
+two measured reasons rather than a preference:
+
+1. Its dependency is in the **shipped Worker**, not only in a test —
+   `worker.cljs` requires `cloud.itonami.app.fleet-core` and `.kotoba-oracle`.
+   The CLI case turned on a consumer with no launcher; this one ships.
+2. `kotoba-oracle` is **shared foundation**: six other app namespaces require it
+   (`did-web`, `session-handoff`, `oauth-resource`, `policy.kotoba`,
+   `health-core.kotoba`, `fleet-core.kotoba`).
+
+`fleet-core` additionally has a `.kotoba` twin under an active parity test, and
+splitting a namespace in the middle of a Kotoba migration would fork it.
+
+## The boundary was already drawn by the hostnames
+
+The four that moved own `agent.` / `hooks.` / `app.` / `mcp.` itonami.cloud.
+`app-edge` owns none — its wrangler config says, in its own comment, that it
+deploys to workers.dev only so that a slice in progress cannot take a live host
+with it.
+
+**The coupled Worker is exactly the one with nothing live to lose.** The split
+did not have to impose a boundary; it had to find the one that was there.
+
+## Verified by building
+
+Each Worker was built from the new tree with `wrangler deploy --dry-run` before
+the repository existed — all four exit 0. The check was then shown to
+discriminate: invalid JavaScript appended to `agent-edge/src/index.js` gives
+exit 1 and `Build failed`, restoring gives 0. A build check that cannot fail is
+not evidence that a move worked.
+
+## Cutover has not happened, and it is per-Worker
+
+Nothing is deleted from `cloud-itonami-app`, and **moving source does not move a
+Worker** — the live deployments still run whatever was last deployed to
+Cloudflare. Cutting over means deploying each Worker from the new repository and
+confirming its host still answers, one at a time, so rollback stays per-Worker.
+
+## Remaining
+
+`-auth` needs a decision about what the app asks it FOR before code moves;
+`-api` needs `server.clj` split into routes and handlers first, which is a
+refactor inside the current repo. Both as recorded in adr-2609075400."}]
