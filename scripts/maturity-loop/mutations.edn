@@ -1610,7 +1610,35 @@
      :file "src/langchain/json.cljc"
      :find "(def default-json-read  decode)"
      :replace "(def default-json-read  identity)"
-     :must-fail ["the-host-injected-defaults-are-these-functions"]}]}
+     :must-fail ["the-host-injected-defaults-are-these-functions"]}
+
+    ;; ── langchain.db ────────────────────────────────────────────────────
+    ;; 2026-09-07 追加。`src/langchain/db.cljc` は 25KB あってこの repo で最も
+    ;; 大きい source で、`langchain-store` とその先の 316 consumer が全員ここを
+    ;; 通る —— **その file に mutation が 1 件も無かった**。下の 3 件はどれも
+    ;; 追加前の suite（153 tests / 535 assertions）を **完全に緑のまま通過した**
+    ;; ことを 1 件ずつ確認してから書いている。既に捕まっている mutation を足すのは
+    ;; 穴を塞いだことにならないので、その確認込みで 1 組。
+    {:id :langchain/entity-map-loses-unique-first-ordering
+     :why "`expand-entity-map` が unique attr を先に emit すること。tempid を束縛するのは**最初の op** で、既存 entity に解決できるのは unique attr だけ。sort を外すと map が先に出した attr が tempid を束縛し、それが unique でなければ新しい eid が割り当てられ、`:db.unique/identity` の値が **2 つ目の entity** に書かれる。例外は出ず、両方とも well-formed で、この store は datom 面で一意性を強制しない（ns docstring がそう書いている）。既存の upsert テストが見られないのは `{:person/id ... :person/age ...}` と unique を先に書いているから —— sort に仕事が無い。逆順が例外的なのではなく、`langchain-store/map->tx` は `reduce-kv` で spec 順に組むので、identity 属性は spec 著者が書いた場所に出る"
+     :file "src/langchain/db.cljc"
+     :find "(->> (dissoc m :db/id)\n                 (sort-by (fn [[a _]] (if (unique-attr? db a) 0 1))))"
+     :replace "(->> (dissoc m :db/id) (into []))"
+     :must-fail ["upsert-resolves-through-the-unique-attr-wherever-it-sits-in-the-map"]}
+
+    {:id :langchain/tx-data-drops-the-retraction
+     :why "cardinality-one の値を上書きしたとき、retraction が `:datoms` だけでなく `:tx-data` にも入ること。`:tx-data` は診断ではなく **`as-of` が replay する対象**で、`as-of` は tx-data をそのまま `:datoms` へ畳む（`apply-add` を通らないので、書かれなかった retraction を再導出できない）。落とすと live process は正しいまま、置換を**跨いで** replay した `as-of` が cardinality-one 属性に 2 値を持つ db を返す。⚠ **PERSIST 経路はこの mutation では赤くならない** —— `create-conn` の replay は `with` を通り `apply-add` が retraction を再計算するため。テスト側の persist assertion は passenger であることを docstring に明記済み。`as-of-test` が見られないのは、置換した**手前**の tx を読んでいるから"
+     :file "src/langchain/db.cljc"
+     :find "        (update :tx-data into (concat (map (fn [[e a v]] [:db/retract e a v]) retracts)\n                                      [[:db/add e a v]])))))"
+     :replace "        (update :tx-data into [[:db/add e a v]]))))"
+     :must-fail ["replacing-a-value-retracts-the-old-one-in-tx-data"]}
+
+    {:id :langchain/tempid-upserts-on-any-attribute
+     :why "tempid が既存 entity へ解決されるのは、それを束縛する attr が `:db/unique` のときだけ、ということ。`entid` はどんな `[a v]` 対でも一致するので任意の attr へ広げるのは魅力的に見えるが、そうすると **unique attr を 1 つも持たない entity が、先頭 attr の値を共有する既存 entity へ黙って merge する**。chat memory がまさにその形で、`memory/append!` は `{:msg/thread <e> :msg/index n ...}` を書く —— unique attr は無く、同じ thread の message は全部同じ `:msg/thread` 値で始まる。広げた規則の下では 2 通目が 1 通目に解決し、会話は最新ターンだけを持つ 1 entity へ潰れる。transaction は成功し、履歴が短くなるだけ"
+     :file "src/langchain/db.cljc"
+     :find "(let [upsert-e (when (and a (unique-attr? db a))\n                     (entid db [a v]))"
+     :replace "(let [upsert-e (when a\n                     (entid db [a v]))"
+     :must-fail ["an-entity-with-no-unique-attribute-gets-a-fresh-identity"]}]}
 
   {:repo "orgs/kotoba-lang/langchain-store"
    :label "langchain-store —— 316 consumer が黙って依存している store seam の不変条件"
