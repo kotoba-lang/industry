@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T10:10:57Z",
+  "generated_at": "2026-09-07T00:52:00Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -91,6 +91,27 @@
           "kind": "cron"
         },
         "script": "amu_cowork_state.sh",
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/amu"
+      }
+    ],
+    "amu-claim": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "52c20791b602",
+        "name": "amu-claim-chain",
+        "no_agent": false,
+        "prompt": "Continue the amu speed-claim chain. One tick = one task, in order, from the plan at\n/Users/junkawasaki/github/com-junkawasaki/.hermes/plans/2026-09-07_092400-amu-claim-chain.md\n\nREAD THAT PLAN FIRST, every tick. It carries the measured current state, the six tasks in\ndependency order, and ten non-optional workspace rules. Do not re-derive what it already\nmeasured; do not skip ahead past Task 1, because Tasks 2 and 3 cannot produce a qualified\nnumber until Task 1 opens the host gate.\n\nAuthoritative context, already landed: ADR 0341 in kotoba-lang/amu (PR #851) and the sealed\nclaim at bench/runtime-comparison/jb-imod-control-claim-20260906.edn. The live co-scientist\nladder is docs/codegen-coSCientist.md (iteration 122c) — note that docs/codegen-cosientist.md,\none letter different, is a STALE duplicate that already caused one wrong decision. Task 6\nretires it.\n\nThe three rules that matter most, because each one has already been violated once and cost\nreal work:\n\n1. Measure on a fleet node, never on this workstation. On 2026-09-06, 8 of 10 fleet nodes\n   passed the quiet gate on the first probe while the workstation read load1 32-64. The 174\n   rank ticks recorded as \"no measured verdicts\" were a placement error, not a scarcity of\n   quiet machines. Reachable nodes: levi, asher, dan, joseph, judah, benjamin (naphtali and\n   issachar were unreachable; simeon and zebulun answered once then timed out).\n2. Gate on busy-CPU fraction, not loadavg: 1 - dIdle/dTotal from os.cpus() over 1-second\n   windows, <= 0.10 for three consecutive samples. load1 on these machines has a floor above\n   1.0 with every CPU idle (ADR 0281), and it is also too permissive — it passed a host that\n   had a full core occupied by another agent's benchmark.\n3. Before taking a node, check whether someone else is measuring on it\n   (ps -axo pcpu,etime,command | sort -rn | head). Two agents collided on judah on 2026-09-06\n   and corrupted each other's runs. Never kill another user's process; take a different node\n   or wait, and say which you did.\n\nNever fabricate a measurement. If the host is not quiet, or a tool is missing, or a check\ncould not run, report \"not measured\" and stop for this tick — that is a legitimate result\nhere, and it is what the existing tick log does. A number you did not observe is the worst\npossible output.\n\nkotoba-lang/amu main is a protected branch: gh api .../merges returns 409, so PRs are the\nonly landing path. No rebase, no force-push, no new .github/workflows, no new .sh or .mjs\nfiles (nbb .cljs only), no bb.\n\nEnd each tick by reporting: which task you advanced, what you measured with the host and the\nbusy fraction beside it, what you landed (PR URL), and what the next tick should do first.",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "3-59/20 * * * *",
+          "expr": "3-59/20 * * * *",
+          "kind": "cron"
+        },
+        "script": null,
         "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/amu"
       }
     ],
@@ -192,6 +213,27 @@
         },
         "script": "amu_cowork_state.sh",
         "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/amu"
+      }
+    ],
+    "browser-maturity": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "dc3aa37b51f9",
+        "name": "browser-maturity-tick",
+        "no_agent": false,
+        "prompt": "browser-maturity tick (kotoba-lang/browser ecosystem, pure-Kotoba 成熟度)。\nSOUL.md の「1 回の実行の仕事」に従い、scripts/browser_state.sh の出力に基づいて 1 finding を\n着地させる。正本は amu check --jvm-free（JVM/cljs は測らない・成功と報告しない）。\namu gate FAIL 最優先 → R2 conformance gap（src 実装あり test 0）→ .cljc→.kotoba migrate 1 歩。\n修正は branch bot/browser-<日時> から PR、main 直 push 禁止、merge はしない、west.yml 手編集禁止。\namu test の wasm 実行 FAIL は UNMEASURED（環境要因）と報告し赤扱いしない。\n報告: 対象 repo / amu gate 合否(N/M PASS jvm-free) / .kotoba 数 / R2 項目 test カバレッジ /\n出した PR・issue / 次の 1 finding。誇張なし。",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "10,40 * * * *",
+          "expr": "10,40 * * * *",
+          "kind": "cron"
+        },
+        "script": "browser_state.sh",
+        "workdir": null
       }
     ],
     "codinator": [
@@ -1214,6 +1256,27 @@
         "workdir": null
       }
     ],
+    "itonami-coverage-gap": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "4d0c36994c3d",
+        "name": "coverage-gap-scout",
+        "no_agent": false,
+        "prompt": "Read SOUL.md section 正本 and 測る3面, run the evidence script (single command), then report 1 finding. 1 iteration = 1 gap finding; propose at most 1. Never publish directly.",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "8 6 * * *",
+          "expr": "8 6 * * *",
+          "kind": "cron"
+        },
+        "script": "coverage_gap_evidence.py",
+        "workdir": null
+      }
+    ],
     "itonami-maint": [
       {
         "context_from": null,
@@ -1376,6 +1439,27 @@
         },
         "script": null,
         "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/kotoba-lang"
+      }
+    ],
+    "jvm-retire": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "cefcbc840801",
+        "name": "jvm-retire: JVM を出荷物から外す。1 反復 1 件",
+        "no_agent": false,
+        "prompt": "SOUL.md を読み、90-docs/adr の ADR-2609070200 を読む。SOUL.md の優先順に従って未着手の作業を 1 件だけ選び、着地させる。JVM-free は exit-127 stub と control で証明する。テスト件数を新旧で比べる。赤くなることを実演する。変換できないものは理由付きで正直に報告し、偽の変換をしない。1 件直したら即 merge する。",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 60m",
+          "kind": "interval",
+          "minutes": 60
+        },
+        "script": null,
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki"
       }
     ],
     "kinyu": [
@@ -1646,6 +1730,46 @@
         "schedule": {
           "display": "0 */3 * * *",
           "expr": "0 */3 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
+      }
+    ],
+    "kumiai-kotoba": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "7ad256f0f787",
+        "name": "kumiai-kotoba-gate",
+        "no_agent": true,
+        "prompt": "measure the Kotoba migration frontier: the JVM-free gate, amu#835, and slice qualification (propose-only; silent when nothing changed)",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "0 */12 * * *",
+          "expr": "0 */12 * * *",
+          "kind": "cron"
+        },
+        "script": "kotoba_migration_tick.py",
+        "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "09e06ff5d9d1",
+        "name": "kumiai-kotoba-report",
+        "no_agent": false,
+        "prompt": "You are the kumiai-kotoba bot. Read SOUL.md in this profile first — it holds what each measured line means, the priority order, and the things you may not do. Follow it.\n\nEach tick:\n1. Read the last two lines of workspace/kotoba-migration-ledger.jsonl (the gate job writes one line per run; do NOT run the gate yourself).\n2. Compare them. Report the single most important change, in the format SOUL.md specifies, priority UNBLOCK > GATE FAILED > SLICE > CHANGED.\n3. If they are identical, say exactly: 変化なし\n4. If the newest line has gate_exit 2, say the gate COULD NOT MEASURE and stop — that is not a pass.\n\nRules you may not break: never treat gate_exit 2 as 変化なし. Never call a green gate \"correct\" — it is correct as far as it measured, and a module once compiled AND RAN on native and still answered wrongly (kotoba-lang/amu#835). native_keyword_equality=1 is not merely good news: it means the native block on works_core.kotoba can now be removed, and your report must say what to edit. You are propose-only: you never advance the migration.",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "15 10 * * *",
+          "expr": "15 10 * * *",
           "kind": "cron"
         },
         "script": null,
@@ -1997,6 +2121,27 @@
         "workdir": null
       }
     ],
+    "maturity-fleet": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "c80f3d0d005a",
+        "name": "maturity-fleet-tick",
+        "no_agent": false,
+        "prompt": "maturity-fleet tick。SOUL.md の「1 回の実行（cron tick）の仕事」に従う。\n\n1. evidence script を 1 回実行: `cd $HOME/.hermes/profiles/maturity-fleet && nbb scripts/maturity_evidence.cljs`\n2. script の SMOKE-OK を確認。出なければ「測定失敗」と報告して終了（再計算・再検証しない）。\n3. script が名指す最低スコア repo（現状 cloud-itonami-isic-855）を対象に、その産業/職種に固有の 1 finding を提案。\n4. 具体可能なら branch bot/maturity-fleet-<date> + PR を作る。merge・main 直 push はしない。\n5. 報告書式: 対象 corpus / 最低 repo (score) / 提案 1 件 / 台帳 seq / 異常。\n\npropose only。publish・merge はオーナーの do it を待つ。",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "7 * * * *",
+          "expr": "7 * * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
+      }
+    ],
     "model-scout": [
       {
         "context_from": null,
@@ -2138,6 +2283,29 @@
         },
         "script": "murakumo_i18n_merge_evidence.py",
         "workdir": "/Users/junkawasaki/.hermes/profiles/murakumo-i18n-merge"
+      }
+    ],
+    "murakumo-infer-maturity": [
+      {
+        "context_from": [
+          "self"
+        ],
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "9ea532317c62",
+        "name": "murakumo inference maturity",
+        "no_agent": false,
+        "prompt": "One iteration = one landed increment. Do not attempt the whole backlog in a run.\n\nPick the highest-value item still open, do it end to end, land it, and report what you could not verify.\n\nThe backlog, in priority order:\n\n1. api.murakumo.cloud publishes a capacity number that folds three separate\n   facts together. `capacity-measured-aggregate-tok-s` is\n   sum(completion_tokens)/wall_clock and the wall clock includes prefill, so it\n   is dominated by prompt length and prompt-cache state rather than by serving\n   capacity, and it is not comparable between two measurements. Separately, the\n   b70 unit runs `--parallel 1` (one slot) while the published `max_concurrency`\n   is 2. Re-cut the declaration in\n   `orgs/network-awai/cloud-murakumo-api/src/local_murakumo/provider_catalog.cljc`\n   so decode rate, prefill rate and real slot count are published as distinct\n   values, with a `capacity-method` that says where each was taken (server-side\n   llama-server timings answer a different question from end-to-end through the\n   public boundary; both are legitimate, publishing one under the other's name\n   is not). Measure gad (tailnet 100.82.98.110) and xavier (100.87.226.80) the\n   same way b70 was measured before you pick the pool numbers; an unreachable\n   host is UNVERIFIED, never zero capacity. Tests: `nbb scripts/run-cljs-tests.cljs`.\n   Then deploy and verify the live `/v1/models`.\n\n2. `orgs/kotoba-lang/capability-llm-infer/capability.edn` still declares\n   `:capability/provider-status :contract-only`. That is now the stale side of a\n   real disagreement: the provider landed on this workspace's JVM/Chicory host\n   in `kotoba-lang/kotoba` (`op->kind` 'llm-infer, `wasm-exec/real-op-effects`,\n   injected `:llm-client`, six tests running a real Chicory guest), with\n   `:host/llm-infer` registered in `kotoba-lang`'s `effect-for-kind`. Update the\n   declaration to what is measured, and say in the commit which hosts it covers\n   and which it does not.\n\n3. `orgs/kotoba-lang/mesh` compiles and dispatches guests through Chicory but\n   passes only `kgraph-host-functions`. Wire the llm-infer provider through so a\n   mesh guest can actually call it, gated by the same fail-closed per-call\n   capability guard, with the client injected by the node rather than ambient.\n   That is the change that lets `kotoba-lang/murakumo`'s itonami-agent move its\n   Bot turns onto the mesh; `murakumo.app.edn` says so around line 90, and that\n   comment should be updated only once the move is demonstrated, not when it\n   becomes possible.\n\n4. Drain findings from\n   `nbb --classpath \".:scripts/nbb_compat\" scripts/verify-capability-provider-status.cljs /Users/junkawasaki/github/com-junkawasaki --findings`\n   one at a time. The largest group is `inconsistent` between\n   `kototama/src/kototama/browser.cljc` and `kotoba-lang/lang/host-parity.edn`\n   about the same host/op pair. For each one, work out which table is right by\n   reading the implementation, fix the wrong table, and say how you decided.\n\n5. b70's `/slots` reports `n_prompt_tokens_cache: 0` on a 13.5k-token prompt,\n   so the resident bot's transcript is re-evaluated from scratch every turn. The\n   router's own `demote-busy-endpoints` docstring in\n   `orgs/network-awai/cloud-murakumo-api/src/local_murakumo/readiness.cljc` says\n   this costs ~83 s cold against 7-13 s cached. Diagnose: is the prompt prefix\n   changing between turns, are requests alternating across pool members and\n   splitting the cache, is a llama.cpp flag such as `--cache-reuse` missing, or\n   something else? Diagnose and report; do not change fleet unit files without\n   reporting the intended change and the measurement that would confirm it.\n\nRead `/Users/junkawasaki/github/com-junkawasaki/CLAUDE.md` before acting. If an\nitem turns out to be already done, say so with the evidence and move to the next\none rather than redoing it.",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 240m",
+          "kind": "interval",
+          "minutes": 240
+        },
+        "script": null,
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki"
       }
     ],
     "murakumo-po": [
@@ -2915,6 +3083,27 @@
         "workdir": null
       }
     ],
+    "suji-anatomy": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "9c22ebc66af0",
+        "name": "suji-anatomy-tick",
+        "no_agent": false,
+        "prompt": "suji-anatomy tick。SOUL.md の「1 回の実行（cron tick）の仕事」に従う。\n\n1. evidence script を 1 回だけ実行: `cd $HOME/.hermes/profiles/suji-anatomy && nbb scripts/anatomy_evidence.cljs`\n2. 末尾の SMOKE-OK を確認。出なければ「測定失敗」とだけ報告して終了（再計算・再検証しない）。MEASUREMENT-FAILED は exit 2 で、これは clean ではない。\n3. script が並べたギャップ（suji README が自分で「できない / 得られなかった」と書いている節）から 1 件を選ぶ。前回と同じ節でよいが、前回と同じ提案は繰り返さない。\n4. その 1 件について、抽象化していない finding を 1 つ提案する。数値には出典か :representative / :parameter-not-in-source と誤差の向きを付ける。可能なら fresh clone で patch を作り branch bot/suji-anatomy-<日時> に載せて PR を作る。merge・main 直 push・west pin 前進はしない。\n5. 報告書式: 対象 repo / ギャップ名 / 提案 1 件 / pin lag 3 本 / 公開面 / 台帳 seq / 異常。\n\n絶対規則（SOUL.md より): propose only。1 tick = 1 finding。測れなかった測定を成功として報告しない。1 repo に 2 人の書き手を入れない（他の agent が作業中の repo は対象にしない）。比が 1 に近づくことは検証ではない —— 文献に向けて数値を調整しない。導出できない定数は発明した定数である。Hansraj の 5 値と Wilke 座位 348.86176709999995 N を動かさない。",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "23 */2 * * *",
+          "expr": "23 */2 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
+      }
+    ],
     "svelte-to-cljs": [
       {
         "context_from": [
@@ -3377,6 +3566,48 @@
         },
         "script": "scripts/isic_evidence.py",
         "workdir": "/Users/junkawasaki/.gftd/worktrees/wiki-isic-crawl"
+      }
+    ],
+    "wiki-kaonavi-crawl": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "c8f2117951c9",
+        "name": "wiki-kaonavi-crawl-scout",
+        "no_agent": false,
+        "prompt": "You are the wiki-kaonavi-crawl bot for wiki.kotobase.net (repo: network-awai/app-hyakka).\n\nEverything above the procedure is a measurement taken seconds ago. If it begins with REFUSED, say so plainly and stop - do not propose anything.\n\n## Your one job this run\nGrow and verify Kaonavi (Q27017035) first-party coverage. Propose at most TWO new ingest sources, and land only what the gate accepts. Follow your SOUL.md exactly.\n\n## Procedure\n1. cd to the worktree (see workdir).\n2. Read the measurement block (configured-kaonavi-sources, live-plane, growth-evidence) - this is the current state.\n3. If Kaonavi is absent on the live plane, note it and prefer to verify ingestion over proposing new sources.\n4. Choose candidates among Kaonavi's own pages (www.kaonavi.jp / corp.kaonavi.jp) not yet configured, fetch each URL yourself this run, discard anything not HTTP 200 with a body.\n5. Write /tmp/hyakka-source-proposal.edn (:proposal/rationale + :sources with :id/:kind/:url/:title/:publisher/:license/:source-classes/:access/:interval-seconds/:llm?).\n6. Run the gate from the worktree: nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn (exit 0 accepted, 1 rejected, 2 REFUSED - stop).\n7. Only on exit 0: git checkout -b bot/kaonavi-crawl-20260906-2109, commit the source entry, push, open ONE PR against network-awai/app-hyakka.\n\nOpening no PR is correct when nothing new passed the gate.\n\n## Commands the cron runtime refuses\nDo not use -e/-c script flags, heredocs feeding interpreters, or rm -rf. A denied command returns exit_code -1 with BLOCKED; the run still finishes completed, so these waste the run silently.\n\n## Scope\nKaonavi (Q27017035) only - do not propose other companies. First-party only; :third-party-wiki-prose and :user-generated are inadmissible. Public sources must carry :license.",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "25 6 * * *",
+          "expr": "25 6 * * *",
+          "kind": "cron"
+        },
+        "script": "kaonavi_evidence.py",
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/wiki-kaonavi-crawl"
+      }
+    ],
+    "wiki-listed-crawl": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "3929f34e3c90",
+        "name": "wiki-listed-crawl-scout",
+        "no_agent": false,
+        "prompt": "You are the wiki-listed-crawl bot for wiki.kotobase.net (repo: network-awai/app-hyakka).\n\nEverything above the procedure is a measurement taken seconds ago. If it begins with REFUSED, say so plainly and stop - do not propose anything.\n\n## Your one job this run\nAdvance the worldwide listed-company frontier by proposing at most TWO companies' first-party sources, and land only what the gate accepts. Follow your SOUL.md exactly.\n\n## Procedure\n1. cd to the worktree (see workdir).\n2. Read the measurement block (worklist-total, already-covered, queued-uncovered, pending, next-batch). The next-batch is your company list this run.\n3. For each next-batch company: resolve its real LEI (GLEIF API) and/or Wikidata QID (EntityData) from the LIVE plane - never a recalled or hand-seeded identifier. Fetch the company's own first-party URLs (site / IR / ToS / official registry), discard anything not HTTP 200 with a body. Never propose a URL you have not fetched yourself in this run.\n4. Write /tmp/hyakka-source-proposal.edn (:proposal/rationale + :sources, max 2 sources across at most 2 companies, with :id/:kind/:url/:title/:publisher/:license/:source-classes/:access/:interval-seconds/:llm?).\n5. Run the gate from the worktree: nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn (exit 0 accepted, 1 rejected, 2 REFUSED - stop).\n6. Only on exit 0: git checkout -b bot/listed-crawl-20260906-2130, commit the source entries, push, open ONE PR against network-awai/app-hyakka. AFTER the PR is opened, append the proposed companies to workspace/listed-processed.jsonl (one JSON line each, append-only). Do NOT write the ledger if the PR was not opened.\n\nOpening no PR is correct when nothing new passed the gate.\n\n## Commands the cron runtime refuses\nDo not use -e/-c script flags, heredocs feeding interpreters, or rm -rf. A denied command returns exit_code -1 with BLOCKED; the run still finishes completed, so these waste the run silently.\n\n## Scope\nListed companies worldwide. First-party only; :third-party-wiki-prose and :user-generated are inadmissible. Public sources must carry :license. Never recall or hand-seed LEI/QID - resolve from the live plane.",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "45 5,17 * * *",
+          "expr": "45 5,17 * * *",
+          "kind": "cron"
+        },
+        "script": "listed_evidence.py",
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/wiki-listed-crawl"
       }
     ],
     "wiki-market-cn": [
