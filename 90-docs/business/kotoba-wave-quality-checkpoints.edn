@@ -12,3 +12,6 @@
  :qc/measured-not-admitted ["str" "assoc" "filterv" "contains? on map" "atoms" "java/js interop (clock/uuid)"]
  :qc/conclusion ":whole-public-surface gate CANNOT pass today — the CRUD surface requires string/map-mutation lowerings that the compiler subset does not admit. Wave-1 stays in pilot state (:consumer-cutover false); whole-component requalify is BLOCKED on compiler surface growth, not on process."
  :qc/no-forced-migration "per :scope :whole-component-build-required true — shrinking the component to fit the subset would violate the contract; recorded as measured gap instead")
+(:qc/at "2026-09-06T14:30:00Z" :qc/amendment-of :whole-component-requalify-feasibility
+ :qc/upstream-issue "https://github.com/kotoba-lang/kotoba/issues/590"
+ :qc/note "compiler surface gap (str/assoc/filterv/contains? not admitted) filed upstream with measured probes; whole-component requalify unblocks when the issue lands")
