@@ -3565,4 +3565,44 @@
               directions and the refusal seen. Self-check: 5 class-bearing fixtures +
               literal + parameter-only + comment + string, 9/9. SCANNED is over
               checkouts, not a workspace total (orgs/ is west-managed)."}
+  {:id       :verify-grammar-authority-floor
+   :title    "a checker that reads lang/guest-grammar.edn to decide what is forbidden and passes when it is missing or forbids nothing"
+   :why      "2026-09-07 (aiueos K16 Co-Scientist, silence-h10 elo 1600): checkers read
+              the source-surface authority with `(:forbidden-heads grammar #{})` or
+              `(if-not (exists? p) [] ...)`, so an authority that cannot be read is
+              the same value as an authority that forbids nothing, and `every
+              forbidden head is classified` is vacuously true over an empty set.
+              verify-checker-floors cannot see this: its count regex accepts
+              `{:forbidden 0 ...}` as evidence, and a MISSING file makes these
+              checkers crash (exit 1), never pass. This detector copies each
+              grammar-reading checkout three times (unmodified / every
+              guest-grammar.edn deleted / every one rewritten with
+              `:forbidden-heads #{}`), runs each scripts/*.cljs that reads
+              `guest-grammar` in CODE (a comment-only mention is not a read --
+              check-vendored-copies-fleet was a false red before that filter), with
+              clojure/clj/java/gh stubbed to exit 64, and reports exit 0 on a
+              mutated copy. Cannot be a fleet gate: the checkers live in
+              kotoba-lang checkouts under orgs/."
+   :argv     ["nbb" "{{repo}}/scripts/verify-grammar-authority-floor.cljs" "--findings" "{{root}}/orgs/kotoba-lang"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  900000
+   :writes   :none
+   :measured "2026-09-07 12:xx: orgs/kotoba-lang SCANNED 4 (2 checkouts: kotoba-lang and
+              its linked worktree lang-pure-wt; 2 .bb scripts counted unrunnable, bb
+              is retired) FINDINGS 1 (exit 1): kotoba-lang/scripts/check-grammar-authority.cljs
+              exits 0 with `:forbidden-heads #{}` and prints `stats {:forbidden 0 ...}`
+              then `W0 PASS` -- the hypothesis, red on a real checker. On a DELETED
+              grammar the same checker crashes (exit 1, fails, not a finding).
+              check-docs is baseline-red on its own tree (generated-doc drift, same
+              on the real checkout), so its columns are not evidence either way.
+              Empty directory and a tree whose scripts/ never reads the grammar
+              (aiueos worktree) both exit 2. Self-check 6/6: floorless fixture red
+              on both variants, floored fixture clean, version-only fixture red on
+              missing only, text mutation removes the fixture heads, baseline green,
+              comment-only mention filtered. Each run copies ~11 MB x 3 per checkout
+              into os.tmpdir() and removes it. SCANNED is over checkouts, not a
+              workspace total."}
 ]}
