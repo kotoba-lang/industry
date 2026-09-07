@@ -62,6 +62,11 @@ delay.
 - Agent and service authentication is a separate boundary. It must use
   short-lived, audience- and resource-scoped cryptographic authority such as
   CACAO, Biscuit, mTLS, or signatures, and must never double as human recovery.
+  An agent may register its own account with a signature by a key it holds
+  (auth.kotoba.cloud `POST /v1/agents/register`, ADR-2609071200): the account
+  is created as kind `agent`, the request's cookie is ignored so it can never
+  link into or step up a human account, and the durable API credential it
+  then obtains is a scoped Biscuit, not the session.
 
 ## Recovery Invariants
 
