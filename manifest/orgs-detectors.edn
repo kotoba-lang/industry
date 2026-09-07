@@ -3406,4 +3406,46 @@
               両方向を見た: org を引けなければ REFUSED で exit 2（実測、実在しない org
               名で確認）。serving? を常に真にすると ① が空になり、commits-since を 0 に
               固定すると ② が空になる —— どちらも復元は sha256 一致。"}
+  {:id       :verify-capability-provider-status
+   :title    "capability packages whose declared :capability/provider-status disagrees with what the host tables implement"
+   :why      "2026-09-06: capability-llm-infer declared :contract-only, and
+              kotoba-lang/murakumo's murakumo.app.edn cited exactly that status as
+              the reason every LLM turn of the itonami agent stays OFF the mesh on a
+              JVM resident. Measured, the status was half stale and half true, and
+              nothing in the tree could tell the halves apart: kototama.tender
+              implements the host fn, kototama.browser records :browser :yes,
+              kotoba-lang's host-parity.edn records :browser :no for the same import,
+              kotoba's own Chicory host had no entry at all, and kotoba-lang's
+              effect-for-kind had no llm kind -- five sources, four answers, one
+              declaration. A declared status is a claim; only the host tables are
+              evidence. This CANNOT be a fleet gate: it reads orgs/, which a gate
+              never ships, since the fleet sends one repository's tree to a node.
+              It reports that two sources DISAGREE, never that a repo is wrong."
+   :argv     ["nbb" "{{repo}}/scripts/verify-capability-provider-status.cljs" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- host tables and capability
+                                         ; declarations both move on the order of
+                                         ; days, and the sweep is cheap
+   :timeout-ms  600000
+   :writes   :none
+   :measured "How to measure, not what was measured: run the argv above. The run
+              prints SELFCHECK (five classifier arms exercised against fixtures
+              before anything is scanned), SOURCES n/7, SCANNED read/listed over the
+              capability-* projects west NAMES, CHECKED-OUT, UNVERIFIED, then KIND
+              lines and the findings. Exit is three-valued: 0 clean, 1 findings, 2
+              REFUSED -- and REFUSED is used whenever a host table could not be read,
+              west.yml is unreadable, no capability-* checkout exists, or any
+              checked-out package could not be measured, because every verdict
+              depends on all seven sources and a partial read is a lower bound, not
+              an answer. Both directions were seen on 2026-09-07: the detector's own
+              first version read the loaded package as (:cap %) where
+              load-capability returns it under :data, so classify received nil for
+              all 61 packages, produced zero findings, and printed a clean run --
+              the exact defect this detector exists to find, in the detector. With
+              the read corrected the same invocation reports findings; calling
+              classify directly on capability-llm-infer returns the understated and
+              inconsistent pair by hand. Do not quote a finding count here: orgs/ is
+              west-managed, so SCANNED is over checkouts and not a workspace total."}
 ]}
