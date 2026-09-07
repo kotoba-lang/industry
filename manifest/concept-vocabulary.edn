@@ -590,4 +590,16 @@ hash してから記録する。"}
   して索引したら kami-engine-multirotor（飛行持続時間）が、`肩こり` だけで kizashi
   （徴候を感知する側であって力学は解かない）が当たった。**問いとして良い語と、索引の
   鍵として良い語は別**という、このファイルが既に持っている非対称のとおり。"}
+
+ :edge-execution-surface
+ {:label "エッジ実行面 / 公開ホスト名を持つ Cloudflare Worker"
+  ;; :spellings は索引の鍵。ここは狭くする —— 最初に "serverless" "workers"
+  ;; "apex" "公開面" "hostname" を鍵に入れたら 124 repo が当たり、当の
+  ;; cloud-itonami-apex が埋まった（KIP entry が記録している bare "proposal" と
+  ;; 同じ失敗。索引が防ぐはずの「多すぎて読めない」を索引自身が作っていた）。
+  :spellings ["cloudflare worker" "cloudflare workers" "wrangler"
+              "workers.dev" "route pattern" "edge runtime" "edge worker"]
+  :query-spellings ["エッジ" "apex" "workers" "serverless" "CDN edge"
+                    "公開面" "公開ホスト" "hostname" "ホスト名"]
+  :note "**itonami の公開エッジは cloud-itonami/cloud-itonami-apex**（2026-09-07、adr-2609076000）—— `agent.` `hooks.` `app.` `mcp.` itonami.cloud の 4 Worker が、それぞれ自分の wrangler config と依存を持ち、独立に rollback する。境界は好みで引いたのではなく、アプリツリーへの参照数を数えて出た: 4 つとも 0、`app-edge` だけ 4（`worker.cljs` が `cloud.itonami.app.fleet-core` と `.kotoba-oracle` を require）。**結合していた 1 つが、ちょうど公開ホスト名を持たない方**で、その wrangler config は「進行中の slice が live なホストを道連れにできないよう workers.dev のみ」と自分で書いている。だから `app-edge` は cloud-itonami-app に残る。⚠ **ソースを移しても Worker は移らない** —— live な 4 ホストは Cloudflare にある最後のデプロイを配信し続けるので、cutover は 1 Worker ずつ deploy して host が答えることを確かめる別作業。⚠ この概念は「エッジで動く実行面」であって、事業者の公開サイト（`:web-presence` の暖簾）とは別。"}
 }

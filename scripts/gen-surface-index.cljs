@@ -22,13 +22,21 @@
 ;; 引ける datom 形）。`:surface/repo` が `repo-taxonomy` の `:repo/path` と
 ;; 同じ形なので join できる。
 ;;
-;;   nbb scripts/gen-surface-index.cljs            # 生成
-;;   nbb scripts/gen-surface-index.cljs --check    # 差分があれば非ゼロ終了
+;;   nbb --classpath "orgs/kotoba-lang/org-toml/src" \\
+;;     scripts/gen-surface-index.cljs            # 生成
+;;   nbb --classpath "orgs/kotoba-lang/org-toml/src" \\
+;;     scripts/gen-surface-index.cljs --check    # 差分があれば非ゼロ終了
 
 (ns gen-surface-index
   (:require ["fs" :as fs]
             ["path" :as path]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            ;; TOML is read by kotoba-lang/org-toml (portable .cljc, TOML v1.0.0).
+            ;; Requires --classpath orgs/kotoba-lang/org-toml/src. If that
+            ;; checkout is absent this file fails to load, LOUDLY, which is the
+            ;; point: an index that silently drops a whole config format is the
+            ;; failure this generator's own docstring warns about.
+            [toml.reader :as toml]))
 
 (def root (.cwd js/process))
 (def out-file (path/join root "90-docs" "surface" "surface.datoms.edn"))
@@ -145,7 +153,7 @@
                 (mapcat (fn [e]
                           (let [n (.-name e) p (path/join d n)]
                             (cond
-                              (and (.isFile e) (#{"wrangler.jsonc" "wrangler.json"} n)) [p]
+                              (and (.isFile e) (#{"wrangler.jsonc" "wrangler.json" "wrangler.toml"} n)) [p]
                               (and (.isDirectory e)
                                    (not (str/starts-with? n "."))
                                    (not (#{"node_modules" "dist" "target" "public" "test"} n)))
@@ -153,6 +161,30 @@
                               :else nil)))
                         ents))))]
     (vec (walk repo-root 0))))
+
+;; Configs that could not be parsed are COUNTED, not silently dropped. A
+;; generator that skips what it cannot read reports the same empty result for
+;; "this repo serves nothing" and "this repo's config defeated the parser", and
+;; the second is then quoted as the first.
+(defonce unparsed (atom []))
+
+(defn- parse-config
+  "wrangler config -> map, dispatched on extension.
+
+   ⚠ Until 2026-09-07 this only read `.jsonc`/`.json`, so EVERY Worker
+   configured in TOML was invisible to the index — measured that day: 43
+   wrangler.toml under orgs/, 22 of them declaring routes, including
+   `agent.itonami.cloud` and `mcp.itonami.cloud`, two live public hosts. The
+   index that exists to answer \"which host serves what\" answered nothing for
+   them, and nothing reads the same as does-not-exist."
+  [file raw]
+  (let [r (if (str/ends-with? file ".toml")
+            (let [{:keys [status value]} (toml/read raw)]
+              (when (= :ok status) value))
+            (try (js->clj (js/JSON.parse (drop-trailing-commas (strip-jsonc raw))))
+                 (catch :default _ nil)))]
+    (when-not r (swap! unparsed conj file))
+    r))
 
 (defn scan []
   (let [orgs-dir (path/join root "orgs")
@@ -163,8 +195,7 @@
           cfg-file (wrangler-files rp)
           :let [raw (read-safe cfg-file)]
           :when raw
-          :let [cfg (try (js->clj (js/JSON.parse (drop-trailing-commas (strip-jsonc raw))))
-                         (catch :default _ nil))]
+          :let [cfg (parse-config cfg-file raw)]
           :when cfg
           :let [hs (hosts-of cfg)
                 ps (paths-of (path/join (path/dirname cfg-file) "src"))]
@@ -198,7 +229,7 @@
   (let [rows (vec (scan))
         datoms (->datoms rows)
         header (str ";; 稼働面の索引 —— **生成物。手で編集しない**\n"
-                    ";; 再生成: nbb scripts/gen-surface-index.cljs\n;;\n"
+                    ";; 再生成: nbb --classpath \"orgs/kotoba-lang/org-toml/src\" scripts/gen-surface-index.cljs\n;;\n"
                     ";; 2026-08-03 の重複（murakumo に /signup を手書きしたが\n"
                     ";; authn.kotobase.net/sign-in が既に稼働していた）を防ぐために作った。\n"
                     ";; CLAUDE.md の『作る前に確認する』が効かなかったのは意思ではなく\n"
@@ -207,13 +238,19 @@
                     ";;   （(= seg [\"v1\" \"gen\"])）は拾えない。拾えた分だけを記録する。\n;;\n"
                     ";; host=" (count (distinct (map :host rows)))
                     " repo=" (count (distinct (map :repo rows)))
-                    " surface=" (count rows) "\n\n")
+                    " surface=" (count rows)
+                    ;; Evidence floor: configs the parser could not read are
+                    ;; counted here rather than dropped in silence, so a future
+                    ;; reader can tell "serves nothing" from "was not read".
+                    " unparsed-configs=" (count @unparsed) "\n\n")
         body (str header (pr-str datoms) "\n")]
     (if (some #{"--check"} args)
       (let [cur (read-safe out-file)]
         (if (= cur body)
           (println "surface index: 最新")
-          (do (js/console.error "surface index が古い。再生成せよ: nbb scripts/gen-surface-index.cljs")
+          (do (js/console.error (str "surface index が古い。再生成せよ: "
+                                 "nbb --classpath \"orgs/kotoba-lang/org-toml/src\" "
+                                 "scripts/gen-surface-index.cljs"))
               (set! (.-exitCode js/process) 1))))
       (do (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
           (fs/writeFileSync out-file body)
