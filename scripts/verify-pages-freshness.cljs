@@ -162,11 +162,23 @@
   [full branch src-path]
   (let [dir (str/replace (or src-path "/") #"^/" "")
         api (str "repos/" full "/contents/" dir "?ref=" branch)]
-    (when-let [out (gh api "--jq" "[.[] | select(.type==\"file\") | .path] as $f | (($f | map(select(endswith(\".html\"))) | sort | .[0]) // ($f | sort | .[0]) // empty)")]
-      (let [rel (str/trim out)]
-        (when-not (str/blank? rel)
-          ;; source が /docs なら docs/ を剥がす。/ ならそのまま。
-          (if (str/blank? dir) rel (str/replace rel (re-pattern (str "^" dir "/")) "")))))))
+    (letfn [(pick [listing-api]
+              (when-let [out (gh listing-api "--jq"
+                                "[.[] | select(.type==\"file\") | .path] as $f | (($f | map(select(endswith(\".html\"))) | sort | .[0]) // ($f | sort | .[0]) // empty)")]
+                (let [rel (str/trim out)] (when-not (str/blank? rel) rel))))
+            (subdir [listing-api]
+              (when-let [out (gh listing-api "--jq"
+                                "[.[] | select(.type==\"dir\") | .path] | sort | .[0] // empty")]
+                (let [d (str/trim out)] (when-not (str/blank? d) d))))]
+      ;; **1 段だけ降りる。** 実測 2026-09-08: 44 の isco repo は source が /docs で
+      ;; `docs/` の中身が `samples` ディレクトリ 1 つだけ。file が 0 なので浅い
+      ;; probe は「対象なし」を返し、**配信している site を「何も配信していない」と
+      ;; 報告した**（`/samples/operator-console.html` は 200 を返す）。
+      ;; 無界に降りない —— 1 段で足りることを測ったので 1 段にする。
+      (when-let [rel (or (pick api)
+                         (when-let [d (subdir api)]
+                           (pick (str "repos/" full "/contents/" d "?ref=" branch))))]
+        (if (str/blank? dir) rel (str/replace rel (re-pattern (str "^" dir "/")) ""))))))
 
 (defn- latest-build [full]
   (when-let [out (gh (str "repos/" full "/pages/builds/latest")
