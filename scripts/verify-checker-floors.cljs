@@ -81,7 +81,15 @@
 ;; checker against its OWN repo and refuse a PASS/OK/CLEAN line that carries no
 ;; number -- `PASS` alone cannot distinguish 40 components from 0.
 (def verdict-re #"\b(PASS|OK|CLEAN|SUCCESS)\b|✅")   ; anywhere -- `Q9 JVM-FREE PASS:` carries it mid-line
-(def count-re   #"(?i)(SCANNED\t\d+|\b\d+\s*(files?|components?|documents?|checks?|entries|verified|scanned|checked|items?|repos?|modules?)\b|\b(files?|components?|documents?|checks?|verified|scanned|checked)\D{0,12}\d+)")
+;; "a count" = a number touching a word on either side (`OK 9 boundaries`,
+;; `:classified 190`, `SCANNED\t4`). The first version was a noun list (files /
+;; components / checks ...) and it flagged `OK 9 boundaries` and
+;; `{:forbidden 26, :admitted 119 ...}` as count-less -- 2 of the 3 reds on
+;; 2026-09-07 were the regex, not the checker. A bare `Q9` / `W0` label is not a
+;; count (whitespace is required between word and number), so `Q9 JVM-FREE
+;; PASS:` stays red. Measured 2026-09-07: the \s* form let `Q9` count and the
+;; only true red went green -- 0 findings is the value a broken regex returns too.
+(def count-re   #"(?:[A-Za-z_\-:]\s+\d+\b)|(?:\b\d+\s+[A-Za-z])")   ; \s+ -- `Q9` must not count
 (defn pass-without-count?
   "exit 0 + a verdict word + no evidence count anywhere in the output."
   [{:keys [exit out]}]

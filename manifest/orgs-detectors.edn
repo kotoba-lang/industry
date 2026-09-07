@@ -3510,13 +3510,16 @@
    :interval-ms 86400000
    :timeout-ms  900000
    :writes   :none
-   :measured "2026-09-07 10:43: rule 1 (missing input) never went red on a real
+   :measured "2026-09-07 11:1x: rule 1 (missing input) never went red on a real
               tree -- the floorless checkers CRASH on a missing input, which is
               not a pass. Rule 2 runs each checker on its own tree and refuses a
-              PASS/OK/CLEAN verdict carrying no count: kototama SCANNED 1
-              FINDINGS 1 (check-q9-migration-policy: `Q9 JVM-FREE PASS: ...`, no
-              number), kotoba-lang SCANNED 4 FINDINGS 2 (check-grammar-authority,
-              verify-cryptographic-boundaries); empty directory exit 2. Both
-              directions shown; the first version of this entry said 'not yet seen
-              red' and that was the honest state for an hour."}
+              PASS/OK/CLEAN verdict with no count. First regex (a noun list) gave
+              3 reds of which 2 were the regex (`OK 9 boundaries`, `{:forbidden
+              26 ...}` are counts); the loosened form let `Q9` count and the one
+              true red went green. With whitespace required between word and
+              number: kototama SCANNED 1 FINDINGS 1 (check-q9-migration-policy:
+              `Q9 JVM-FREE PASS: ...`, nothing numeric), kotoba-lang SCANNED 4
+              FINDINGS 0, amu SCANNED 3 FINDINGS 0, empty directory exit 2. One
+              true red, two false reds removed, one false green caught -- all
+              three shapes seen before this text was written."}
 ]}
