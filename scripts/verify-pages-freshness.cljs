@@ -130,9 +130,9 @@
   "`/pages` —— html_url / build_type / status。引けなければ nil。"
   [full]
   (when-let [out (gh (str "repos/" full "/pages")
-                     "--jq" "[.html_url, .build_type, (.status // \"null\")] | @tsv")]
-    (let [[url kind status] (str/split (str/trim out) #"\t")]
-      {:url url :build-type kind :status status})))
+                     "--jq" "[.html_url, .build_type, (.status // \"null\"), (.source.path // \"/\")] | @tsv")]
+    (let [[url kind status path] (str/split (str/trim out) #"\t")]
+      {:url url :build-type kind :status status :path path})))
 
 (defn- http-status
   "その URL を実際に引く。引けなければ nil（`000` と区別する）。"
@@ -142,6 +142,31 @@
                                       "--max-time" "20" url]
                           #js {:encoding "utf8" :timeout 30000})]
       (when (zero? (.-status r)) (str/trim (.-stdout r))))))
+
+(defn- first-servable-path
+  "Pages の source ディレクトリの中に実在するファイルを 1 つ選び、**配信 URL 上の
+   パス**に直して返す。無ければ nil。
+
+   ここが要る理由（2026-09-08 実測）: この検出器の最初の版は **root だけ**を引いて
+   404 なら『人が開けない』と報告した。52 件が当たったが、そのうち少なくとも
+   48 件は **site そのものは配信していて root に index が無いだけ**だった ——
+   `cloud-itonami/cargo` は `/` が 404 で `/.well-known/did.json` が 200、
+   `cloud-itonami-isco-1111` は `/` が 404 で `/samples/operator-console.html`
+   が 200。root 1 本では『死んでいる』と『入口が無い』を区別できない。
+
+   選び方は**導出**であって発明ではない: source ディレクトリを listing し、
+   **ブラウザが描くもの（`.html`）を優先して**名前順で 1 つ取り、無ければ任意の
+   ファイルを 1 つ取る。source が `/docs` なら配信 root は `docs/` なので、
+   そのぶんを剥がしたパスが URL になる。`.nojekyll` が 200 を返すことも
+   『配信している』の証拠ではあるが、証人としては弱い。"
+  [full branch src-path]
+  (let [dir (str/replace (or src-path "/") #"^/" "")
+        api (str "repos/" full "/contents/" dir "?ref=" branch)]
+    (when-let [out (gh api "--jq" "[.[] | select(.type==\"file\") | .path] as $f | (($f | map(select(endswith(\".html\"))) | sort | .[0]) // ($f | sort | .[0]) // empty)")]
+      (let [rel (str/trim out)]
+        (when-not (str/blank? rel)
+          ;; source が /docs なら docs/ を剥がす。/ ならそのまま。
+          (if (str/blank? dir) rel (str/replace rel (re-pattern (str "^" dir "/")) "")))))))
 
 (defn- latest-build [full]
   (when-let [out (gh (str "repos/" full "/pages/builds/latest")
@@ -179,30 +204,54 @@
         (let [rows (vec (for [[full branch] repos
                               :let [cfg  (pages-config full)
                                     code (http-status (:url cfg))
+                                    ;; root が 404 のときだけ、site 自体が配信して
+                                    ;; いるかを 1 本だけ確かめる。**root の 404 は
+                                    ;; 死んでいることの証拠ではない。**
+                                    probe (when (not= "200" code)
+                                            (when-let [rel (first-servable-path
+                                                            full branch (:path cfg))]
+                                              {:rel rel
+                                               :http (http-status
+                                                      (str (str/replace (:url cfg) #"/$" "")
+                                                           "/" rel))}))
                                     b    (latest-build full)
                                     n    (when b (commits-since full branch (:created b)))]]
-                          {:repo full :branch branch :cfg cfg :http code
+                          {:repo full :branch branch :cfg cfg :http code :probe probe
                            :build b :behind n :capped? (= n 100)}))
               serving?   (fn [r] (= "200" (:http r)))
-              not-serving (remove serving? rows)
+              ;; root が 404 でも、site の中の実ファイルが 200 なら **配信はしている**。
+              site-serves? (fn [r] (or (serving? r) (= "200" (:http (:probe r)))))
+              nothing-serves (remove site-serves? rows)
+              no-entrance    (filter #(and (not (serving? %)) (= "200" (:http (:probe %)))) rows)
               built       (filter :build rows)
               stale       (filter #(and (:behind %) (pos? (:behind %))) built)
               ;; **完了しなかった build** は、遅れているのとは別の欠陥。
               unfinished  (filter #(and (:build %) (not= "built" (:status (:build %)))) rows)
               plain-stale (remove (set unfinished) stale)
               no-record   (remove :build rows)]
-          (println (str "SERVING\t" (count (filter serving? rows)) "\tURL が 200 を返した"))
+          (println (str "SERVING\t" (count (filter site-serves? rows))
+                        "\tsite が配信している（root 200 " (count (filter serving? rows))
+                        " + root 404 だが中は 200 " (count no-entrance) "）"))
           (println (str "BUILD-RECORD\t" (count built) "\tbuild 記録が引けた（残り "
                         (count no-record) " 件は build_type が workflow 等で記録が無い）"))
           (when (every? nil? (map :http rows))
             (refuse! "1 件も URL を引けなかった（curl が使えないか、外向きが塞がっている）"))
           (println)
-          (println "① 人が開けない（URL が 200 を返さない）:")
-          (if (seq not-serving)
-            (doseq [r (sort-by :repo not-serving)]
-              (println (str "  " (.padEnd (:repo r) 42) "HTTP " (or (:http r) "引けず")
+          (println "① site そのものが何も配信していない:")
+          (if (seq nothing-serves)
+            (doseq [r (sort-by :repo nothing-serves)]
+              (println (str "  " (.padEnd (:repo r) 42) "root " (or (:http r) "引けず")
+                            "  probe " (or (:rel (:probe r)) "対象なし") " → "
+                            (or (:http (:probe r)) "-")
                             "\tbuild " (or (:created (:build r)) "記録なし")
                             " (" (or (:status (:build r)) (:status (:cfg r))) ")")))
+            (println "  （無し）"))
+          (println)
+          (println "①' 配信はしているが root に入口が無い（root 404 / 中のファイルは 200）:")
+          (if (seq no-entrance)
+            (doseq [r (sort-by :repo no-entrance)]
+              (println (str "  " (.padEnd (:repo r) 42) "root " (:http r)
+                            "  " (:rel (:probe r)) " → 200")))
             (println "  （無し）"))
           (println)
           (println "② build より後に default branch へ commit が着地している:")
@@ -222,11 +271,18 @@
           (when findings?
             (println)
             ;; ① 人が開けない。これは欠陥なので 1 件ずつ出す。
-            (doseq [r (sort-by :repo not-serving)]
-              (println (str "FINDING\twarn\tpages-url-not-serving\t" (:repo r)
+            (doseq [r (sort-by :repo nothing-serves)]
+              (println (str "FINDING\twarn\tpages-serves-nothing\t" (:repo r)
                             "\t" (:url (:cfg r)) " returned " (or (:http r) "no answer")
+                            " and so did " (or (:rel (:probe r)) "(no file to probe)")
                             "; build record " (or (:created (:build r)) "absent")
                             " (" (or (:status (:build r)) (:status (:cfg r))) ")")))
+            (when (seq no-entrance)
+              (println (str "FINDING\tinfo\tpages-root-has-no-index\t" (count no-entrance)
+                            " repos\ttheir root 404s while files inside serve 200"
+                            " (e.g. " (:repo (first no-entrance)) " "
+                            (:rel (:probe (first no-entrance))) ")"
+                            " — an entrance is missing, the site is not dead")))
             ;; ② build が完了していない。これも 1 件ずつ。
             (doseq [r (sort-by :repo unfinished)]
               (println (str "FINDING\twarn\tpages-build-never-completed\t" (:repo r)
@@ -244,6 +300,6 @@
                               (when (:capped? worst) "+")
                               ". Listed in full in this run's output, not as findings:"
                               " a commit that touched only a README leaves the site correct.")))))
-          (.exit js/process (if (or (seq not-serving) (seq stale)) 1 0)))))))
+          (.exit js/process (if (or (seq nothing-serves) (seq unfinished)) 1 0)))))))
 
 (-main)
