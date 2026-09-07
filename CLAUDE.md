@@ -2419,6 +2419,17 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   ADR-2607181900 の readiness gate（nbb スクリプト代表サブセットの移植 = 条件②）を
   通過するまでは以下の nbb-only ルールがそのまま正本のまま変わらない。
   運用スクリプトを kbb 前提で書かない。**
+  **kbb 用の `.kotoba` script を書くときの実測済み規則**（2026-09-07、ADR-2609062200）:
+  ①capability は `lib/kbb/{fs,env,browse,proc,str}.kotoba` 経由で呼び、script に
+  `typed-cap-call` や wire id を書かない（`--source-path lib`）。②policy は kbb v1 と
+  同形（`:kotoba.policy/forbid-wildcard true` 必須、resource scope 必須）。③**effect の
+  無い i64 `main` は compile 時に KIR oracle でも実行される**ので、その fuel には
+  `--fuel` が届かない —— probe は capability を 1 回は呼ぶ形にする。④fs write は
+  `kbb.fs/write-file`（request `<path>WRITE_SEP<content>`、native loader と同じ契約）で、
+  path + 9 + content が 65536 byte を超えると provider の前に `string-too-large` で止まる。
+  ⑤backend は `bin/kbb … --backend js|native|interpreter`。js は oracle、配布形は
+  native。同じ script・policy で両方を走らせて同じ値になることが parity の証拠
+  （kotoba `test/kotoba/kbb_js_test.clj` の形）。
   `scripts/*.cljs`・`.claude/hooks/*.cljs`・west 拡張・child repo の
   task/test オーケストレーションは **`bb` バイナリを使わない**。新規に
   `bb.edn` / `#!/usr/bin/env bb` を置かない。残存は Wave 1–4 で削除中
