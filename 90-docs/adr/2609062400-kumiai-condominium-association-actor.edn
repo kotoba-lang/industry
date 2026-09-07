@@ -528,6 +528,39 @@ PASS
 skill `kotoba-clj-to-kotoba` の手順 6 / 6b に反映した。
 **ここに書いたままにすると、次に同じ罠を踏む人が読む場所に無い。**
 
+## 続きは常駐 bot が持つ（2026-09-07、オーナー指示「続きは hermes agent bot に profile, cron を作って」）
+
+正本は `scripts/hermes-kumiai-kotoba/`、稼働は Hermes profile **`kumiai-kotoba`**
+（cron 2 本: `0 */12 * * *` の gate と `15 10 * * *` の report）。
+
+**測るのは 3 つ**:
+
+| | 意味 |
+|---|---|
+| gate exit | `kotoba_native_acceptance.cljs` の判定（0 pass / 1 fail / **2 測定不能**） |
+| `native_keyword_equality` | 0 = amu#835 がまだ再現（**正常**）、1 = **直った → native block を外せる** |
+| slices | module header から読む qualification（`works_core:wasm-only` 等） |
+
+**amu#835 が直った日は、gate が赤くなって知らせる。** gate 自身が「欠陥がまだ
+再現すること」を assert しているので、上流の修正が**赤い gate + 何を外すかを書いた
+メッセージ**として届く。誰も覚えている必要が無い。
+
+**evidence floor**: gate が自分の測定行を 1 つも印字しなかったら、exit code が
+何であれ「走っていない」として **exit 2**。
+
+**両方向を実演してから landed とした**（ADR-2609072000 の規律）:
+
+| 入力 | 結果 |
+|---|---|
+| 前 tick と同一 | **沈黙**、exit 0 |
+| 測定値・qualification が変化 | `CHANGED parity_cases: 19 -> 20` / `SLICE works_core.kotoba: native+wasm -> wasm-only`、exit 0 |
+| checkout 不在 | `COULD-NOT-MEASURE`、**exit 2** |
+
+**そして「登録した」で終わらせなかった** —— 2 job とも `hermes cron run` で実際に
+発火させ、`hermes cron runs` に `completed` が 2 件残ることまで確認した
+（gate=baseline 記録、report=`変化なし`）。`[active]` は動くことではない
+（`scripts/hermes-cron-jobs/README.md` の runbook）。
+
 ## 再開点 (会話履歴なしで続けられる粒度)
 
 **現在地の確認**:
@@ -542,6 +575,11 @@ clojure -M:lint            # 0 errors / 0 warnings
 clojure -M:dev:run-kumiai  # 6法域の決議要件 + 感度表 + HARD hold 11種
 python3 ../../../scripts/hermes-kumiai-sources/probe_kumiai_sources.py  # 出典の現況
 ```
+
+**次の一手は 2 つの bot が持ってくる。** `kumiai-kotoba` が 12 時間ごとに
+migration frontier を測り（amu#835 が直れば赤くなって unblock を促す）、
+`kumiai-sources` が 6 時間ごとに ITA / CHN の出典を測る。**どちらも
+propose-only** なので、報告を受けて動くのは人間か指示を受けた agent。
 
 **次の一手は自分で来る。** `kumiai-sources` bot が 6 時間ごとに 8 法域の
 出典を測り、ITA / CHN の候補 URL のどれかが本文を返した tick に
