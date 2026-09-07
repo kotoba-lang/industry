@@ -56,7 +56,25 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
    `:decode` / `input could not be read`** になる。
    `orgs/kotoba-lang/amu/bin/kotoba` が動く実体。
 
-6. **parity。** 既存関数と突き合わせる。CLI は binary が無ければ skip し、
+6. **成果物を実行する。ビルドは受け入れではない。** target が受理しても
+   **誤った答えを返す**ことがある —— 拒否より悪い（拒否は設計判断を 1 つ生むが、
+   誤答は何も生まない）。実測 2026-09-06、kotoba-lang/amu#835:
+   `(= :passed :passed)` は `aarch64-macos` で **常に false**、同じビルドで
+   i64 の `=` は正しい。全分岐が keyword で回るモジュールは全部が誤った枝へ行き、
+   **self-check が失敗の「個数」を返していたこと**だけが気づけた理由だった
+   （boolean だと 1 件の退行と壊れたビルドを区別できない）。
+   だから `main` を置き、`amu extract-native --symbol main` + `tools/kexe_loader.c`
+   で **native を走らせ**、wasm は `runtime/browser-host.mjs` で **走らせる**。
+   `:ok true` は「ビルドできた」であって「正しい」ではない。
+
+6b. **backend の欠陥は block であって作り直しではない。** 回避のために表現を
+   変えない（keyword を i64 にする等）—— Q9 は未対応 target を fallback ではなく
+   `:blocked` と定め、ドメインを backend の欠陥に合わせて整形するのは欠陥を隠す。
+   **撤去条件は機械化する**: 「その欠陥がまだ再現すること」を assert する probe を
+   acceptance に置く。上流が直した日に probe が**赤くなり**、unblock を促す。
+   誰かが覚えている必要が無くなる。
+
+7. **parity。** 既存関数と突き合わせる。CLI は binary が無ければ skip し、
    skip と pass を同じ顔にしない。意味を 1 枝だけひっくり返して赤になることを
    見る。reader を壊した赤は数えない。`ex-info` はこの機会に Result へ移す。
 
@@ -65,7 +83,17 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
    2 行の shim で、`which` は通り実行が 126 で落ち、skip されるはずの
    3 test が **16 assertion の赤**になっていた（org-ietf-smtp）。
    `(zero? (:exit (shell/sh bin "--help")))` なら両方向が出る。
-7. **着地。** feature branch を push し `gh api .../merges` で main へ。
+
+   ⚠ **比較を持つ検査には境界ちょうどの入力を 1 つ置く。** 実測 2026-09-06、
+   上限比較を `>` から `>=` に反転しても self-check は緑のままだった —— 通る例も
+   落ちる例も在ったが線上のケースが無く、2 つの演算子が区別できていなかった。
+
+   ⚠ **JVM-free を主張するなら、無いのではなく拒否して記録する。**
+   `java`/`javac`/`clojure`/`clj` の stub を PATH 先頭に置き、呼ばれたら log に
+   追記して非ゼロで終わらせ、log が空であることを assert する。**そして その log が
+   空でないことを 1 度は見せる**（実測: `amu test` だけが `clojure -M:run` に落ちて
+   踏む）—— 踏まれたことのない trace は、常に空な trace と区別できない。
+8. **着地。** feature branch を push し `gh api .../merges` で main へ。
    west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`。
 
 先例: amu `examples/todo-app.kotoba`（application）、

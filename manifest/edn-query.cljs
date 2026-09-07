@@ -17,22 +17,39 @@
 ;; 文字列化する（"was keyword" という型情報は失われる — MVP の既知の制約。
 ;; 必要になったら別属性に :value/type "keyword" のようなマーカーを足す）。
 ;;
-;; 使い方:
-;;   nbb manifest/edn-query.cljs count
-;;   nbb manifest/edn-query.cljs q '[:find ?id ?status :where
+;; 使い方（classpath は下の `classpath` var と同じ 4 項目。`.` と
+;; `scripts/nbb_compat` だけでは `datalog.core` が見つからない）:
+;;
+;;   CP=".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src"
+;;   NODE_OPTIONS=--max-old-space-size=8192 \
+;;     nbb --classpath "$CP" manifest/edn-query.cljs refresh   # 面を組んで shard に書く
+;;
+;; **面を丸ごと materialise する操作は heap を上げる。** 組むときだけの話ではない
+;; —— 実測 2026-09-06、既定 heap では build も cache からのロードも OOM した
+;; （前者 4.07GB/86 秒、後者 79 秒）。面そのものが既定の old-space に入らないので、
+;; どう保存しても変わらない。対象は `refresh` と `count` と、entity 変数が
+;; dataset に縛られていない `q`（= `shardable` が :full と言う query）。
+;;
+;; 逆に **dataset を名指した query は既定 heap のまま数秒で返る** —— shard を
+;; 名指した分だけ読むので面を組まない（実測: market-intel 1 枚で 4.6 秒）。
+;; 常用するなら、この形に寄せるのが一番効く。
+;;   nbb --classpath "$CP" manifest/edn-query.cljs count
+;;   nbb --classpath "$CP" manifest/edn-query.cljs q '[:find ?id ?status :where
 ;;                                   [?e "adr/id" ?id] [?e "adr/status" ?status]]'
-;;   nbb manifest/edn-query.cljs q* '<q1>' '<q2>' ...
+;;   nbb --classpath "$CP" manifest/edn-query.cljs q* '<q1>' '<q2>' ...
 ;;                                       # 面を 1 回だけ組んで N 本流す。結果は
 ;;                                       # 同じ順のベクタ 1 行。所要時間はロードが
 ;;                                       # 支配するので、N 本を別プロセスで叩くと
 ;;                                       # そのまま N 倍かかる
-;;   nbb manifest/edn-query.cljs mcp     # 常駐 MCP server（stdio, JSON-RPC）
+;;   nbb --classpath "$CP" manifest/edn-query.cljs mcp   # 常駐 MCP server（stdio, JSON-RPC）
 ;;
 ;; MCP client の設定（この面を datalog を知らなくても聞けるようにする）:
 ;;
 ;;   {"mcpServers": {"kotoba-query-plane": {
 ;;      "command": "nbb",
-;;      "args": ["--classpath", ".:scripts/nbb_compat", "manifest/edn-query.cljs", "mcp"],
+;;      "args": ["--classpath",
+;;               ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src",
+;;               "manifest/edn-query.cljs", "mcp"],
 ;;      "cwd": "<superproject root>"}}}
 ;;
 ;; tools: plane_query（生 datalog）/ company_profile（LEI 結合済みの企業像）/
@@ -2500,6 +2517,34 @@
 
 (def ^:private budget-ms 30000)
 
+;; この面をロードするのに要る classpath。**`.` と `scripts/nbb_compat` だけでは
+;; 足りない** —— datalog backend（`datalog.core`）は west 管理の
+;; `orgs/kotoba-lang/datalog` に在り、それ自身が `datom.source`
+;; （`orgs/kotoba-lang/datom-source`）を require する。
+;;
+;; 1 箇所に置いているのは、**このツールが印字する指示は実行できなければならない**
+;; から。実測 2026-09-06: 下の refuse-cold! は 2 項目だけの classpath を印字して
+;; いて、言われたとおり貼り付けると `Could not find namespace: datalog.core` で
+;; exit 1 —— 元のエラーが別のエラーに変わるだけで、そこから先の道が無かった。
+;; 印字する側とロードする側が同じ値を読んでいれば、この形の食い違いは起きない。
+(def ^:private classpath
+  ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src")
+
+;; refresh を実際に通す 1 行。**heap の指定はこのコマンドの一部であって、回避策では
+;; ない。** 面を組む途中の working set が node の既定 old-space を超えるからで、
+;; 実測 2026-09-06、既定 heap の refresh は 86 秒・4.07 GB で OOM した —— shard を
+;; 1 枚も書く前、まだ build-conn の中である（.projection-cache は空のままだった）。
+;;
+;; これは shard 化が直した欠陥とは別のものである。両方を測って区別してある:
+;; heap を上げても一枚岩は書けず（`Invalid string length` に変わるだけ）、
+;; 一枚岩をやめても面は既定 heap に収まらない。片方だけ直しても refresh は通らない。
+;;
+;; 8192 は「面が組めた」ことを実測した値であって、面の大きさの上界ではない。
+;; いつか足りなくなるが、そのとき出るのは上の OOM なので、読めば分かる。
+(def ^:private refresh-command
+  (str "NODE_OPTIONS=--max-old-space-size=8192 nbb --classpath \"" classpath
+       "\" manifest/edn-query.cljs refresh"))
+
 (def ^:private cache-dir (io/file root ".projection-cache"))
 (def ^:private cache-edn (io/file cache-dir "edn-query-plane.edn"))
 (def ^:private cache-meta (io/file cache-dir "edn-query-plane.meta.edn"))
@@ -2550,30 +2595,83 @@
   (try (when (.exists cache-meta) (slurp-edn cache-meta))
        (catch :default _ nil)))
 
-(defn- cache-state
-  "[:fresh|:stale|:absent meta]。**読めなかったことを fresh と区別する** ——
-   meta が壊れていれば :absent であって :fresh ではない。"
-  []
-  (let [m (read-meta)]
-    (cond
-      (or (nil? m) (not (.exists cache-edn))) [:absent nil]
-      (= (:digest m) (current-digest m)) [:fresh m]
-      :else [:stale m])))
-
 (def ^:private shards-dir (io/file cache-dir "shards"))
 (def ^:private shards-index (io/file cache-dir "edn-query-shards.edn"))
 
+(def ^:private no-dataset-shard
+  "`source/dataset` を持たない entity を入れる shard の名前。
+
+   dataset で切るだけでは面の一部しか書けない。ADR entity が持つのは
+   `:adr/*` と `:source/file` だけで、`:source/dataset` は付かない
+   （`adr-entities-from-file` を見ればわかる）—— docs / manifest / foreign-adr も
+   同じ。**`entity->dataset` が nil を返すこれらを keep が黙って落としていた**
+   ので、shard は今日まで面の写しではなく面の一部だった。
+
+   `_` で始めているのは `source/dataset` の実値と衝突しないため。`shardable` は
+   query に literal で書かれた dataset 名しか要求しないので、この shard が
+   dataset 指定の速い経路に混ざることはない。"
+  "_no-dataset")
+
+(defn- cache-state
+  "[:fresh|:stale|:absent meta]。**読めなかったことを fresh と区別する** ——
+   meta が壊れていれば :absent であって :fresh ではない。
+
+   面の実体は shard 群なので、在るかどうかを訊く先は shard の索引。"
+  []
+  (let [m (read-meta)]
+    (cond
+      (or (nil? m) (not (.exists shards-index))) [:absent nil]
+      (= (:digest m) (current-digest m)) [:fresh m]
+      :else [:stale m])))
+
+(defn- serialize-shard
+  "shard 1 枚を文字列にする。V8 の 1 文字列の上限に当たったら、**どの shard で
+   当たったか**を名指して落ちる。
+
+   一枚岩をやめてもこの上限は消えていない。消えたのは「今の面が 1 枚に収まらない」
+   という事実だけで、上限そのものは据え置きである。いつか 1 つの dataset が単独で
+   届く日が来るので、そのとき欲しいのは次に割る単位を名指した 1 行であって、
+   どこで何が起きたか書いていない RangeError のスタックではない。"
+  [dsname sdb]
+  (try
+    (dlq/serialize-db sdb)
+    (catch :default e
+      (throw (ex-info
+              (str "edn-query: shard \"" dsname "\" does not fit in one JavaScript "
+                   "string (" (.-message e) "). Split this dataset into parts -- "
+                   "raising the heap will not help, the limit is per string, "
+                   "not per process.")
+              {:shard dsname})))))
+
 (defn- write-shards!
+  "面を dataset ごとの shard に分けて書く。**これがキャッシュの本体**である。
+
+   一枚岩をやめた理由は速さではなく、**書けなかったから**である。実測 2026-09-06、
+   `write-cache!` の `pr-str` が `RangeError: Invalid string length` で落ちた。
+   V8 の 1 文字列の上限（64bit で約 5.4 億文字）は heap の設定ではないので、
+   `--max-old-space-size` を上げても**落ち方が変わるだけ**だった。同じ日に測った
+   最大の shard は `_no-dataset` の 204,562,760 バイトで、上限の 4 割弱に収まる。
+
+   これは heap が足りない話とは**別**である（`refresh-command` の注記を見よ）。
+   混ぜると、heap を上げて直ったつもりになるか、割ったから heap が要らなくなった
+   つもりになる —— どちらでも refresh は通らない。
+
+   割り方が dataset なのは、`shardable` / `load-shards!` が既にこの単位で
+   読んでいるから —— 新しい機構を足さずに、既にある機構を全体にも使う。"
   [db]
   (when-not (.exists shards-dir)
     (node-fs/mkdirSync (.getPath shards-dir) (clj->js {:recursive true})))
-  (let [datasets (into #{}
-                       (keep (fn [eid] (dlq/entity->dataset db eid))
-                             (keys (:eavt db))))
+  ;; どの entity がどの shard かは 1 度だけ決める。dataset ごとに面を走査し直すと
+  ;; 102 shard × 480,253 entity になり、shard を書く時間が読む時間から離れていく。
+  (let [by-shard (reduce (fn [m eid]
+                           (let [k (or (dlq/entity->dataset db eid) no-dataset-shard)]
+                             (assoc m k (conj (get m k []) eid))))
+                         {}
+                         (keys (:eavt db)))
         idx (doall
-             (for [dsname (sort datasets)
-                   :let [sdb (dlq/subset-db db #{dsname})
-                         content (dlq/serialize-db sdb)
+             (for [dsname (sort (keys by-shard))
+                   :let [sdb (dlq/subset-db-eids db (get by-shard dsname))
+                         content (serialize-shard dsname sdb)
                          f (io/file shards-dir
                                     (str (str/replace (str dsname) #"[^A-Za-z0-9_.-]" "_")
                                          ".edn"))]]
@@ -2582,10 +2680,37 @@
                  [(str dsname) {:file (.getName f)
                                 :datoms (dlq/datom-count sdb)
                                 :bytes (count content)}])))]
+    ;; ファイル名は dataset 名の英数字以外を `_` に潰して作るので、`a/b` と `a_b` は
+    ;; 同じファイルになる。索引は 2 エントリのまま同じファイルを指し、後に書いた方が
+    ;; 前を上書きするので、**片方の dataset は索引に載ったまま中身だけ消える** ——
+    ;; 数え直しても shard の枚数は合う。数が合う消え方なので、ここで名指しして止める。
+    (when-not (= (count idx) (count (into #{} (map (fn [[_ v]] (:file v)) idx))))
+      (throw (ex-info (str "edn-query: two datasets sanitise to the same shard file "
+                           "-- refusing to write a cache that would silently drop one.")
+                      {:files (map (fn [[k v]] [k (:file v)]) idx)})))
+    ;; 組んだ datom が全部どれかの shard に入ったことを、書いた直後に数えて確かめる。
+    ;;
+    ;; **この 1 行が無かったせいで、shard は面の一部のまま気づかれずに居た。**
+    ;; `source/dataset` を持たない entity（ADR 全部）を `keep` が落としていて、
+    ;; それでも shard は書けて索引も揃い、枚数も dataset の数と一致していた ——
+    ;; 足りないことを言うものが、どこにも無かった。数が合う欠け方だったので、
+    ;; 出力を読んでも分からない。数える側を置く以外に見つけようが無い。
+    ;;
+    ;; 実測 2026-09-06、落とす側の実装にこの検査を当てると
+    ;; `built 6930504 datoms but wrote 6086157 across 101 shards` で止まる ——
+    ;; 面の 12.2% が、索引の揃った「完成した」キャッシュから消えていた。
+    (let [built (dlq/datom-count db)
+          written (reduce + 0 (map (fn [[_ v]] (:datoms v)) idx))]
+      (when-not (= built written)
+        (throw (ex-info (str "edn-query: built " built " datoms but wrote " written
+                             " across " (count idx) " shards -- refusing to publish a "
+                             "cache that is not the plane.")
+                        {:built built :written written}))))
     (node-fs/writeFileSync (.getPath shards-index)
                            (pr-str {:built-at (.toISOString (js/Date.))
                                     :shards (into {} idx)}))
     {:shards (count idx)
+     :datoms (reduce + 0 (map (fn [[_ v]] (:datoms v)) idx))
      :bytes (reduce + 0 (map (fn [[_ v]] (:bytes v)) idx))}))
 
 (defn- shardable
@@ -2639,22 +2764,49 @@
                 (node-fs/readFileSync (.getPath (io/file shards-dir file)) "utf8")))
              files)))))
 
-(defn- write-cache! [db counts]
+(defn- write-cache!
+  "鮮度の指紋と counts を書く。**面そのものはもうここには無い** —— shard が
+   持っている（write-shards!）ので、ここが書くのは meta だけ。
+
+   meta を最後に書くのは、これが「面が揃った」ことの印だからである。shard の
+   途中で落ちた refresh が meta を残すと、cache-state は揃っていない面を fresh と
+   答える —— 半分の面に対する query は、少ない行数を正しい答えの顔で返す。"
+  [counts sharded]
   (when-not (.exists cache-dir)
     (node-fs/mkdirSync (.getPath cache-dir) (clj->js {:recursive true})))
-  (let [snap (inputs-snapshot)
-        edn (dlq/serialize-db db)]
-    (node-fs/writeFileSync (.getPath cache-edn) edn)
+  ;; 旧レイアウトの一枚岩が残っていたら捨てる。もう誰も読まないので、置いたままに
+  ;; すると数百 MB の死んだファイルが黙って残り続けるだけになる。
+  (when (.exists cache-edn)
+    (node-fs/unlinkSync (.getPath cache-edn)))
+  (let [snap (inputs-snapshot)]
     (node-fs/writeFileSync (.getPath cache-meta)
                            (pr-str (assoc snap
                                           :digest (snapshot-digest snap)
                                           :built-at (.toISOString (js/Date.))
                                           :counts counts
-                                          :bytes (count edn))))
-    {:bytes (count edn) :files (count (:files snap)) :dirs (count (:dirs snap))}))
+                                          :shards (:shards sharded)
+                                          :bytes (:bytes sharded))))
+    {:bytes (:bytes sharded) :files (count (:files snap)) :dirs (count (:dirs snap))}))
 
-(defn- load-cached-db []
-  (dlq/deserialize-db (node-fs/readFileSync (.getPath cache-edn) "utf8")))
+(defn- load-cached-db
+  "面全体を shard から組み直す。
+
+   1 つずつ読んで足すのは、`(mapv deserialize ...)` だと全 shard の db が同時に
+   生きたまま merge 先も作ることになり、面を 2 つ分抱えるから。ここでは生きて
+   いるのは累積器と読んでいる 1 枚だけで、読み終えた shard はその場でゴミになる。
+
+   3 索引のうち載せ直す側が読むのは `:eavt` だけ（`dlq/db-quads`）。残る
+   `:aevt` / `:avet` は同じ datom の並べ替えなので、merge が assert し直して作る。"
+  []
+  (let [idx (:shards (slurp-edn shards-index))]
+    (dlq/merge-finish
+     (reduce (fn [acc [_ {:keys [file]}]]
+               (dlq/merge-add!
+                acc
+                (dlq/deserialize-db
+                 (node-fs/readFileSync (.getPath (io/file shards-dir file)) "utf8"))))
+             (dlq/merge-start)
+             (sort-by key idx)))))
 
 (defn- allow-cold? []
   (= "1" (.-EDN_QUERY_ALLOW_COLD (.-env js/process))))
@@ -2664,9 +2816,12 @@
    (str "edn-query: the plane is " (name state) " -- refusing to answer.\n"
         "  Building it inline takes ~5 minutes, 10x this tool's 30s budget, and the\n"
         "  query is not what is slow (a join measures ~0.3s once the plane is warm).\n"
-        "  Refresh the cache first:\n"
-        "    nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs refresh\n"
-        "  Or set EDN_QUERY_ALLOW_COLD=1 to build inline anyway."))
+        "  Refresh the cache first (the heap flag is part of the command --\n"
+        "  building the plane does not fit in node's default old-space):\n"
+        "    " refresh-command "\n"
+        ;; ここも「貼れば動く」でなければならない。inline build も同じ面を組むので
+        ;; 同じ heap が要る —— 書き忘れると、拒否を回避した人が今度は OOM に当たる。
+        "  Or set EDN_QUERY_ALLOW_COLD=1 (with the same heap flag) to build inline."))
   (scripts.nbb-compat/exit 4))
 
 (defn- plane-db! []
@@ -2702,8 +2857,10 @@
         db (:db built)
         t-build (- (js/Date.now) t0)
         counts (dissoc built :db)
-        written (write-cache! db counts)
+        ;; shard を先に、meta を最後に。順が逆だと、shard の途中で落ちた refresh が
+        ;; 「揃っている」と名乗る meta を残す（write-cache! の docstring）。
         sharded (write-shards! db)
+        written (write-cache! counts sharded)
         views (when (.exists views-spec)
                 (into {} (map (fn [[k qs]]
                                 (let [t (js/Date.now)
@@ -2716,10 +2873,10 @@
       (node-fs/writeFileSync (.getPath views-file)
                              (pr-str {:built-at (.toISOString (js/Date.)) :views views})))
     (println (str "REFRESHED\tbuild_ms=" t-build
-                  " cache_bytes=" (:bytes written)
                   " inputs_files=" (:files written)
                   " inputs_dirs=" (:dirs written)
                   " shards=" (:shards sharded)
+                  " datoms=" (:datoms sharded)
                   " shard_bytes=" (:bytes sharded)
                   " views=" (count (or views {}))))))
 
@@ -2761,7 +2918,7 @@
           (do (js/console.error
                (str "edn-query/mcp: cache is " (name state)
                     " — building the plane (first query only, minutes). "
-                    "Run `edn-query.cljs refresh` to make this 8s."))
+                    "To make this seconds, run: " refresh-command))
               (let [built (build-conn)]
                 (js/console.error (str "edn-query/mcp: plane ready in "
                                        (quot (- (js/Date.now) t0) 1000) "s"))
@@ -2952,7 +3109,7 @@
         "q" (println (pr-str (timed-q db (first queries))))
         "q*" (println (pr-str (mapv (fn [x] (timed-q db x)) queries)))))
 
-    (do (println (str "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs "
+    (do (println (str "usage: nbb --classpath \"" classpath "\" manifest/edn-query.cljs "
                       "[refresh | count | q '<datalog-query>' | q* '<q1>' '<q2>' ... "
                       "| view <name> | mcp]"))
         (scripts.nbb-compat/exit 1))))

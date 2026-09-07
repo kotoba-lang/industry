@@ -1,0 +1,331 @@
+[{:db/id -1
+ :adr/id "adr-2609065000-the-graph-worker-is-control-plane-and-the-checkout-was-four-commits-behind"
+ :adr/title "kotobase.net の graph 読み経路を配っているのは control-plane@919b302f。engine は一度も着地していない —— 「どちらの tree とも一致しない」は 4 commit 遅れた checkout に当てた grep だった"
+ :adr/status "accepted"
+ :adr/date "2026-09-06"
+ :adr/related ["adr-2609064500-measure-the-graph-read-path-before-wiring-ipni-or-packs"
+               "adr-2609063500-ipq-is-the-name-of-the-selection-layer"
+               "2607300900"
+               "2608051000"
+               "2608170300"]
+ :adr/body "## 問い
+
+kotobase.net の graph 読み経路を実際に配っているのはどの Worker script で、
+それを作っているのはどの source tree か。ADR-2609064500 は「未決（governance で
+あってコードではない）」としてこう書いた —— net-kotobase/engine と
+net-kotobase/control-plane のどちらが正本か、どちらも書いていない。script 名が
+同じなので engine から手で wrangler deploy すれば production を上書きする。
+
+さらに同 ADR が本番で読んだ response header
+
+    x-kotobase-kv-stats: l1=5;l2=0;b2=0;miss=0;distinct=3;epoch=1
+
+は、engine の committed bundle が組み立てる field 集合（l1;l2;pack;b2;miss;distinct）と
+一致しない —— pack が在り epoch が無い。ここから「本番の artifact はどちらの
+checkout とも一致しない」という読みが出た。**その読みは誤りで、誤り方に名前が付く。**
+
+## 答え（測定）
+
+**live script は kotobase-cf-wasm-staging。**
+**live version は 0cec5a07-78df-4b20-bae1-1667e345efaf。**
+**それを作っているのは net-kotobase/control-plane の kotobase-graph-database、
+commit 919b302fdacac2a9550e481197394da219fb5de8。**
+
+### 1. どの script がどの host に応えているか
+
+GET /accounts/4da88288dc30d9ee257f319d3c33ecf0/workers/domains（keychain gftd.cf /
+API_TOKEN、account cloud-kotoba）:
+
+    datoms.kotobase.net   -> kotobase-cf-wasm-staging
+    kotobase.net          -> net-kotobase
+    www.kotobase.net      -> net-kotobase
+    datomic.kotobase.net  -> net-kotobase
+
+**ADR-2609064500 が header を読んだ kotobase.net は graph worker ではない。**
+そこに居るのは script net-kotobase（control-plane/kotobase-api-gateway、
+wrangler.jsonc:2）で、その config は service binding
+
+    { binding: KOTOBASE_GRAPH_DATABASE_SERVICE, service: kotobase-cf-wasm-staging }
+
+を持つ（同 wrangler.jsonc:293-294）。**header は gateway が発行したのではなく、
+service binding 越しに graph worker から返ってきたものである。** gateway 自身の
+最終 deploy は 2026-09-05T15:16:41Z で、kv-stats が graph worker に入った
+2026-09-06 より前 —— gateway を deploy し直さずに header が現れたことが、
+これが pass-through であることを裏から支えている。
+
+### 2. live artifact はどの commit か（3 本の独立した指紋）
+
+**指紋 A —— version annotation。**
+GET /accounts/{acct}/workers/scripts/kotobase-cf-wasm-staging/deployments の先頭:
+
+    deployment 5f9d9c6e-e6de-4a9b-b424-42b8df9ac347  2026-09-06T13:36:35.084974Z
+      versions: [0cec5a07-78df-4b20-bae1-1667e345efaf]
+      source: wrangler   author: 04.feasts_minded@icloud.com
+      annotations: {workers/triggered_by: deployment}
+
+version 側の annotation:
+
+    workers/tag = 919b302fdacac2a9550e481197394da219fb5de8
+    workers/triggered_by = version_upload
+    metadata.source = wrangler
+
+⚠ **tag は deploy した側が付ける申告であって測定ではない。** 単独では証拠にしない。
+
+**指紋 B —— compiled bundle の string literal。**
+control-plane@919b302f の js/kotobase-graph-database-worker.js（blob
+edef4710384bdb9fd3d6e657ccfdd10b11484f56、1,374,083 バイト）を取得して
+x-kotobase-kv-stats の代入部を読むと:
+
+    [l1\\x3d, ..., ;l2\\x3d, ..., ;b2\\x3d, ..., ;miss\\x3d, ...,
+     ;distinct\\x3d, ..., (+ if truncated), ;epoch\\x3d, ...].join()
+
+engine の committed bundle（1,140,788 バイト、engine main と同一）は:
+
+    [l1\\x3d, ..., ;l2\\x3d, ..., ;pack\\x3d, ..., ;b2\\x3d, ...,
+     ;miss\\x3d, ..., ;distinct\\x3d, ...].join()
+
+**本番 header は epoch を持ち pack を持たない。** つまり field 集合は
+control-plane@919b302f と厳密に一致し、engine とは一致しない。
+
+**指紋 C —— live version の binding 集合。**
+GET .../versions/0cec5a07-... の resources.bindings は 29 件。名前集合を両 tree の
+production（top-level）wrangler.jsonc と突き合わせると:
+
+    control-plane@919b302f の top-level 名 - live = 空集合
+    live の名 ∩ control-plane = 25/29（残り 4 は wrangler secret put で入るもの:
+      KOTOBA_INTERNAL_SECRET / KOTOBA_SEED / KOTOBASE_B2_APP_KEY / KOTOBASE_B2_KEY_ID）
+    live の名 ∩ engine       = 14/29
+    engine にしか無い名（= live に無い）: KOTOBASE_B2_BUCKET / KOTOBASE_B2_ENDPOINT
+                                          / KOTOBASE_B2_PREFIX
+
+live にある ratelimit binding READ_AUDIT_RELAY_RATE_LIMITER（namespace 2608281）と
+KOTOBASE_READ_AUDIT_RELAY_MODE / KOTOBASE_TIMING / KOTOBASE_R2 /
+KOTOBASE_PUBLIC_READ_GRAPHS 等 11 個は **control-plane の config にしか無い**。
+
+3 本とも同じ方向を指す。
+
+### 3. なぜ「どちらの checkout とも一致しない」と見えたのか
+
+**この workspace の control-plane checkout が west pin で 4 commit 手前に居る。**
+
+    orgs/net-kotobase/control-plane  HEAD = a2520f826434ca3fb0b1696e2b01e007994353a9 (detached)
+    compare a2520f82...main -> {status: ahead, ahead_by: 4, behind_by: 0}
+    control-plane main tip  = 164fca3a53bc6af16147874b40840bfa01807501 (2026-09-06T14:34:13Z)
+    compare 919b302f...main -> {status: ahead, ahead_by: 2}   ← deploy 元は main に在る
+
+その checkout の src と committed bundle には x-kotobase-kv-stats が **0 件**。
+一方 main には在る。**遅れた checkout に対する grep は、コードが存在しない場合と
+同じ答えを返す。**
+
+これは CLAUDE.md が既に名指ししている形（測れなかった検査が、測って問題が
+無かった検査と同じ値を返す）の checkout 版である。sparse cone・未 checkout の
+west project・stale pin —— **3 つとも ls に映らないという同じ顔をする。**
+今回の判定を出せたのは、ローカルの tree ではなく GitHub と Cloudflare の両方に
+訊いたからで、手元だけを見ていれば「どちらでもない」で止まっていた。
+
+engine 側は逆に最新である —— ローカル HEAD a89aadc063148c2149cda8aa91daff421ec922f2 は
+engine main と identical（ahead 0 / behind 0）。**最新なのに live ではない。**
+
+### 4. engine が本番に着地したことは一度も無い
+
+engine が名乗る host は 3 つあり、どれも存在しない:
+
+    wrangler.jsonc top-level route   backend.kotobase.net        -> NXDOMAIN
+    README / repo description        engine.kotobase.net         -> NXDOMAIN
+    （旧名 clone の wrangler）        graph-database.kotobase.net -> NXDOMAIN
+
+3 つとも account の workers/domains 一覧にも無い。engine の production config で
+wrangler deploy が通っていれば custom domain が作られるので、**engine の
+production block は一度も適用されていない。**
+
+## 第 3 の tree は在るか —— 7 tree、しかし upstream repo は 2 つ
+
+surface 索引（90-docs/surface/surface.datoms.edn、:surface/worker で引く）は
+script 名 kotobase-cf-wasm-staging を主張する tree を **7 つ**返す。git で素性を
+測ると:
+
+    orgs/net-kotobase/control-plane/kotobase-graph-database
+        west project / repo net-kotobase/control-plane / detached a2520f82   ← LIVE の出所
+    orgs/net-kotobase/engine
+        west project / repo net-kotobase/engine / a89aadc（main と同一）
+    orgs/net-kotobase/control-plane-legal-candidate/kotobase-graph-database
+        west 未登録。net-kotobase/control-plane の **別 clone**、しかも shallow、
+        branch main @ be57723
+    orgs/net-kotobase/control-plane-siwe-wallet/kotobase-graph-database
+        上の linked worktree（branch codex/eip4361-wallet-login @ 8db5cfc）
+    orgs/net-kotobase/biscuit-auth-query-bench/kotobase-graph-database
+        **git repo ですらない**（.git 無しの裸のディレクトリ複製）
+    orgs/network-awai/net-kotobase/kotobase-graph-database
+        west 未登録。remote は network-awai/net-kotobase だが
+        GET /repos/network-awai/net-kotobase は full_name = net-kotobase/control-plane を
+        返す —— **改名リダイレクト。同じ repo の旧名 clone。** 930 commit 遅れ
+    orgs/network-awai/net-kotobase-enterprise-wave2/kotobase-cf-wasm
+        上の linked worktree @ c3f6e9e0
+
+**したがって upstream は 2 つだけで、残り 5 つは control-plane の複製である。**
+5 つのうち kv-stats を持つものは 0 件（committed bundle を実際に読んだ）。
+control-plane-retired は kotobase-graph-database を持たない。
+
+**未 checkout の repo に隠れていないことを、両側の control で確かめた。**
+net-kotobase org の 13 repo すべてに対して
+GET /repos/{r}/git/trees/{default_branch}?recursive=1 を引き、
+graph_database|graph-database に当たる path を数えた:
+
+    engine 61 / control-plane 290 / 残り 11 repo は 0
+
+11 repo とも tree_entries は非ゼロ（5〜209）で返っている —— **読めなかった repo は
+1 つも無い。** 0 件が「空」なのか「読めなかった」のかは、この列で区別できる。
+
+## deploy 経路 —— attestation は在って走らず、走る経路は署名しない（確認）
+
+ADR-2609064500 の記述を GitHub API で確認した。**確認された。**
+
+    GET /repos/net-kotobase/control-plane/actions/permissions
+      -> {\"enabled\":false,\"sha_pinning_required\":false}
+
+    GET /repos/net-kotobase/engine/actions/permissions
+      -> {\"enabled\":true,\"allowed_actions\":\"all\",\"sha_pinning_required\":false}
+
+control-plane には registered workflow が 20 本在り、そのうち
+.github/workflows/graph-database.yml は state active。その deploy job は
+cosign attest-blob --type slsaprovenance と --type cyclonedx で
+tarball に provenance と SBOM を keyless 署名し、deploy 側は
+cosign verify-blob-attestation で **両方を verify してから展開する**
+（workflow の 245-300 行）。設計として正しい。
+
+**そして走らない。** graph-database.yml の run は総数 218、success 28、
+最後の success は 2026-08-28T05:02:46Z（head e1e00b67）、最後の run 自体は
+2026-08-29T00:01:26Z で conclusion failure。以後 repo 単位で Actions が
+無効化されている。今日 live に載った 2 つの version（5640de96 @07:56、
+0cec5a07 @13:36）はどちらも source: wrangler・author はオーナーのアカウント。
+
+**つまり attestation の鎖は、実際に配られている artifact について何も言っていない。**
+
+⚠ **engine 側の permissions は逆向きの危険を持つ。** engine は
+registered workflow が 0 本で .github も main に無い（GET /contents/.github は 404）。
+だが **Actions は enabled のまま**である。CLAUDE.md が名指ししている形そのもの ——
+有効なまま放置された repo は、workflow ファイルが 1 つ載った瞬間に走り出す。
+そして engine の wrangler.jsonc の top-level は **production の script 名を名乗っている。**
+
+## 測っていないこと（正直に）
+
+- **deploy された bundle の bytes を落としていない。** API token では
+  GET /workers/scripts/{n}/content が
+  {\"success\":false,\"errors\":[{\"code\":10405,\"message\":\"Method not allowed for this authentication scheme\"}]}
+  を返し、wrangler init --from-dash はこの機械の npm で EALLOWSCRIPTS に落ちる。
+  **したがって artifact と committed bundle の byte 一致は証明していない。**
+  同定は上の 3 指紋（tag / bundle literal / binding 集合）に依っており、hash には依らない。
+- **認証付き read を自分で 1 本通していない。** 引用した l1=5;l2=0;b2=0;miss=0;distinct=3;epoch=1 は
+  ADR-2609064500 が記録した値である。probe（bench48_deploy_probe.mjs）は tenant provision と
+  transact を伴う **本番への書き込み**なので、測定目的のためだけには走らせなかった。
+- **build lock を 1 度も取っていない。** どちらの tree も rebuild していない。
+  この判定に rebuild は要らなかった —— 必要だったのは deploy 済み commit の
+  committed bundle を GitHub から読むことだけだった。
+- **silent partial read（ADR-2608170300）が直ったかは、今回も測っていない。**
+
+## 決定
+
+**この ADR が決めるのは事実の記録だけである。** live は control-plane@919b302f で
+あり、engine は本番に着地したことが無い —— これは測定であって選択ではない。
+
+**どちらを正本とするかは決めていない。** 下の節は推奨であって、私が下した決定ではない。
+正本を宣言する権限はオーナーにあり、宣言する場所は ADR ではなく
+両 tree の README（読む側が最初に開く場所）である。
+
+## 推奨（RECOMMENDATION —— 決定ではない）
+
+**1. 正本は net-kotobase/control-plane の kotobase-graph-database にする。**
+理由は好みではなく 3 つの構造的事実: ①それが配られている ②それを service binding で
+呼ぶ api-gateway が同じ repo に在る ③attested deploy workflow も同じ repo に在る。
+engine を正本にするには、この 3 つを移すことになる。
+
+**2. engine を消さない。** engine は control-plane が持たないものを持つ ——
+pack tier（pack_writes / pack_reader / pack_tip / pack_catalog_bootstrap）、
+KOTOBASE_PACK_WRITES、merkle-LSM promotion gate（PROMOTION.md）。
+ADR-2608051000 の「1 repo = 1 capability」の分割先でもある。**候補系として残す。**
+
+**3. ただし engine が production の script 名を名乗れないようにする（最優先）。**
+今日の状態では engine から wrangler deploy を 1 回叩けば、live script が engine の
+bundle に置き換わり、custom domain が backend.kotobase.net へ動こうとする。
+これは governance の答えを待つ必要が無い —— engine の top-level の
+name を候補用の別名（例 kotobase-engine-candidate）にするか、top-level の
+production block を落として env 側だけにすれば、**危険は正本論争と独立に消える。**
+store.cljs のコメントが既に名指ししている事故（別の worker に着地して 3 日、
+次に 7 日）と同じ形が、まだ構造として残っている。
+
+**4. engine の Actions を無効化する。** PUT /repos/net-kotobase/engine/actions/permissions
+は repo scope で通る（org 単位の PUT は admin:org が要るので不可）。
+workflow が 0 本の今こそ安い。3 と合わせて、事故経路が 2 本とも閉じる。
+
+**5. attestation をどちらかに寄せる。** graph-database.yml の cosign 経路は
+2026-08-29 以降走っておらず、Actions が無効なので走れない。
+ADR-2607300900 のとおり murakumo fleet（scripts/fleet-ci/gates.edn）へ port するか、
+明示的に retire するか。**放置は「署名しているつもり」を続けること**であり、
+今日の 2 deploy がそれを実演している。
+
+**6. west pin を前進させる。** net-kotobase/control-plane の pin は main より
+4 commit 遅れており、それがこの調査の入口の誤読を生んだ。
+2026-08-20 の standing rule（pin の既定状態は upstream default branch の tip）が
+既にこれを要求している。
+
+**7. 複製 5 本を棚卸しする。** control-plane-legal-candidate（shallow な別 clone）、
+control-plane-siwe-wallet（その worktree）、biscuit-auth-query-bench（git ですらない）、
+network-awai/net-kotobase（旧名 clone、930 commit 遅れ）、
+network-awai/net-kotobase-enterprise-wave2（その worktree）—— どれも west 未登録で、
+どれも production の script 名を持つ wrangler.jsonc を抱えている。
+処理は git-cleanup-conflict の領分であって、この ADR では触っていない。
+
+## この件が残す一般則
+
+**stale な checkout に対する検査は、コードが存在しない場合と同じ答えを返す。**
+「本番の artifact はどちらの tree とも一致しない」という今回の入口の読みは、
+1 本の grep が 4 commit 遅れた working tree に当たった結果であって、
+grep も deploy も間違っていない。**間違えたのは、手元の tree を repo の
+現在地として読んだことである。**
+
+live artifact の出所を判定するときに手元の checkout を根拠にしない。
+GitHub（その commit が default branch から到達するか）と、
+配布側（version の annotation / binding 集合 / artifact の literal）の
+**両方に訊く**。片方だけなら、遅れた checkout と存在しないコードが同じ顔をする。
+
+## 追記（2026-09-06、この ADR の勧告 3・4 を実行し、7 を測った）
+
+**勧告 3（engine が本番 script を名指せる状態を止める）は実行済み。**
+`net-kotobase/engine` の `wrangler.jsonc` 冒頭の `name` を
+`kotobase-cf-wasm-staging` → **`kotobase-engine-candidate`** に変更し、なぜかを
+その場に書いた（merge `1e40778aef5dea4e9243e1e46d985e87e95625dc`、west pin
+`9a01d4769cd7`）。**どちらの tree が正本かは決めていない** —— 決まるまでの間、
+engine から出る deploy が本番を上書きできないようにしただけである。
+`test/architecture-boundary-gate.mjs --self-test` は変更の前後とも exit 1
+（control-plane 側のディレクトリ配置にある
+`contracts/architecture/capability-boundaries.json` が engine には無い）。
+既存の状態であって、この変更のせいではない。
+
+**勧告 4（engine の Actions 無効化）も実行済み。両方向を実測した:**
+
+    before: {\"enabled\":true,\"allowed_actions\":\"all\",\"sha_pinning_required\":false}
+    after:  {\"enabled\":false,\"sha_pinning_required\":false}
+    registered workflows: 0
+
+**勧告 7（重複 tree）は測った。消していない。**（2026-09-06 実測）
+
+| tree | git | 未コミット | 本番 script 名を持つ config |
+|---|---|---|---|
+| `net-kotobase/control-plane-legal-candidate` | be57723 | **3 件** | 2 |
+| `net-kotobase/control-plane-siwe-wallet` | 8db5cfc | 0 | 2 |
+| `net-kotobase/biscuit-auth-query-bench` | **git repo ですらない** | — | 2 |
+| `network-awai/net-kotobase` | f2d38219 | **5 件** | 1 |
+| `net-kotobase/control-plane-retired` | b8322d1 | 0 | 0 |
+
+**2 つが他者の未コミット作業を抱えている**ので、移動も削除もしていない
+（CLAUDE.md「他者の dirty/untracked を移動・削除しない」）。整理は
+`git-cleanup-conflict` の仕事であって、この ADR の仕事ではない。
+
+⚠ **この 4 つに対して deploy guard は効かない。** `wrangler-deploy-main-sync-guard`
+は `origin/main` との遅れで判定するが、west checkout の remote は org 名なので
+`origin/main` が解決できず **fail-open** する（CLAUDE.md「6 問」の 2 問目が
+名指ししている形で、実測で 4,406 中 2,824 が無検査）。つまりここから出る deploy は
+**930 commit 遅れの artifact を本番へ出荷できて、しかも何も言わない。**
+engine を改名して塞いだのは 5 本のうち 1 本だけである。
+"
+}]

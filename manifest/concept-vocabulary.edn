@@ -141,7 +141,10 @@
               "car file" "unixfs" "adl" "selector" "cid" "content addressed"
               "content-addressed" "block store" "provider discovery"
               "delegated routing" "trustless gateway" "pinning"
-              "取得面" "ブロック取得" "コンテンツアドレス" "内容アドレス"]
+              "ipq" "transport-ipq-selection-http" "verifiable selection"
+              "selection car" "replay" "bounded traversal"
+              "取得面" "ブロック取得" "コンテンツアドレス" "内容アドレス"
+              "検証可能な選択" "選択の証明"]
   :note "**ayatori（綾取り）は metaphor 名**なのでここに載せる —— 名前は
 『IPLD graph の query 面』を一文字も示さない（kuro / kobo と同じ形。ADR-2608039980）。
 
@@ -164,6 +167,16 @@ hash する証拠でなく、どれも query が評価された証拠ではな�
 一方 **retrieval 面（net-kotobase/ipfs = ipfs.kotobase.net）は別**で、
 UnixFS(`kotobase-ipfs.unixfs` + `ipld.dag-pb`)・CARv2・IPNS を持つ。
 **「kotobase は UnixFS を使っていない」と面を分けずに言わない。**
+
+**IPQ はこの面の HTTP surface の名前**（ADR-2609063500）。`kotobase-protocol-ipq` が
+純関数 handler（`GET /ipq/v1/selection/{root}?selector=…` → CARv1）、
+`net-kotobase/ipfs` の `kotobase-ipfs.ipq` が R2 に繋ぐ非同期 shell、
+`io-ipni-specs` の `ipni.metadata` が広告に載せる protocol identifier
+（`transport-ipq-selection-http` = 0x300940、multicodec の private use area）。
+**IPQ/1 が証明するのは traversal であって完全性ではない** —— profile 番号が
+その線を wire に載せている。⚠ **`ipq` は名前であって出所ではない**: repo 名の
+origin 面に `ip*` を自作しない（ADR-2609063000 / ADR-2608040100）。ここに在るのは
+`kotobase-` family + capability という形で、IPFS の mirror は `io-ipfs` が担う。
 
 契約は kotobase `docs/adr/2609060000-ipld-adl-selector-car-boundaries.md` と
 ayatori `docs/ipld-retrieval-contract.md`。FBL / Arrow buffer / ADL signalling は
@@ -513,4 +526,68 @@ register は組織の register である（CLAUDE.md repo-wide mandatory）。�
 同じ線を守り、caller（払った鍵から導出した did:pkh）を月・顧客ごとの salt で
 hash してから記録する。"}
 
+
+ :warrant
+ {:label "フォーク/無効イベントの署名済み証拠（warrant envelope / 逮捕状）"
+  :spellings ["warrant" "warrants" "fork evidence" "double-history evidence" "detected fork"
+              "signed evidence" "無効イベント" "二重履歴" "フォーク証拠"]
+  :note "**フォーク検出の永続化・帰属の形式**。署名済み Syrup envelope で、peer が検出した
+  double-history / invalid event を inert evidence として記録する —— possession/relay は
+  authority を一切与えず、adjudication（被疑 peer の処罰）は範囲外。正本の設計は
+  ADR-2809060410（fork-evidence-warrant-seam）で、成り立ちは redesign 前の
+  nekko（旧 kotoba-rad）の docs ADR の warrant 表から来る。実装は nekko 側の
+  envelope + sign/verify round-trip テストが通過するまで land しない（draft 段階）。
+  **『warrant』で引ける入口を足すのが本 entry の理由** —— 名前が機能を示さない repo の
+  概念索引（2026-08-03 規則）と同じく、語で辿れなければ在っても見つからない。"}
+
+ :posture-load-biomechanics
+ {:label "姿勢がつくる身体の負荷を、力学として計算する（筋・関節モーメント・脊椎圧縮）"
+  :spellings ["suji" "筋" "biomechanics" "生体力学" "バイオメカニクス" "musculoskeletal"
+              "筋骨格" "posture load" "姿勢負荷" "モーメントアーム" "%MVC"
+              "筋張力" "spinal compression" "脊椎圧縮" "椎間板"
+              "inverse dynamics" "逆動力学" "RNEA" "Crowninshield" "静的最適化"
+              "屈曲弛緩" "flexion-relaxation" "強張り" "Rohmert"]
+  :query-spellings ["MVC" "moment arm" "muscle force" "intervertebral" "ergonomics"
+                    "人間工学" "肩こり" "tech neck" "forward head posture" "前方頭位"
+                    "緊張" "endurance" "持久" "姿勢" "posture"]
+  :note "**計算は cloud-itonami/suji（筋）**、ブラウザで見せるのは kotoba-lang/kami-app-suji
+  （https://kotoba-lang.github.io/kami-app-suji/、WebGPU / WebGL 2.0 フォールバック）。
+  名前が機能を示さない repo の規則（2026-08-03）に該当する —— 筋 は muscle/sinew であり
+  同時に line-of-force でもあって、どちらの意味も名前からは読めない。
+
+  ⚠ **kotoba-lang/biomech と同じ概念に当たる。境界は解像度**（2026-09-07 実測。
+  この entry を足して索引を回した結果として見つけた —— それまで suji 側は biomech を
+  一度も名指していない）。biomech は**組織スケールの連続体・集中定数**（tissue の
+  Young 率、Euler–Bernoulli 梁、FEM、softbody、血行）で、solver backend として
+  fea / kami-vehicle / kami-engine-cfd を束ねる。suji は**全身スケールの静的逆動力学**
+  （姿勢 → 関節モーメント → 筋張力の分配 → レベル別の椎間板圧縮）で、要素は 1 本の
+  作用線と幾何モーメントアームに潰れている。**Hill の力‐長さは 2026-09-07 に突き合わせた**:
+  能動は同じ閉形式（17 点で最悪差 6.7e-16）、**受動は別モデルで最大 121 倍・
+  至適長より短い側では符号が違う**（biomech は双方向の線形ばね、suji は張力専用の
+  指数）。力‐速度・活性化動特性・直列弾性腱は biomech だけが持ち、静的逆動力学の
+  suji には対応物が無い。ADR-2609072000。
+
+  **L4 Care Tier の 4 段のうち 2 段目**: kizashi（兆、etzhayyim/actor-kizashi）が
+  senses → **suji が力学を計算し** → mitate（見立て、cloud-itonami/mitate）が診断・
+  経路づけ → iyashi（癒、cloud-itonami/iyashi）が治療。隣接: kokoro（心、精神保健）、
+  suimin（睡眠、睡眠障害のエビデンス合成）。
+
+  **suji は診断しない**（医師法 §17 / G1）—— 返すのは N・N·m・%MVC・MPa・分だけで、
+  所見・病名・治療の推奨を保持できるフィールドが 1 つも無く、足せば charter 違反として
+  テストが落ちる。計測ハードウェアも持たない（薬機法 / G2）: 入力は姿勢の角度である。
+
+  ⚠ **検証は 1 本だけで、残り 2 本は食い違いを報告する。** 頸椎圧縮荷重は Hansraj 2014
+  を再現する（検証済み）。腰椎レベル別は Wilke 1999 の in vivo 椎間板内圧に対して
+  **基準の幅の外**（モデルが低い）、持久ドーズは Frey Law & Avin 2010 の関節別曲線と
+  食い違い、しかも符号が筋で逆。**比が 1 に近づくことは検証ではない** —— この repo では
+  無関係な欠陥を直した結果として 2 回そうなっている。
+
+  **無いもの**: 環軸関節（下頭斜筋が表現できない）、C2/C3 で解かれる筋（出典が無い）、
+  複数制約の同時解（2 関節筋の他関節モーメントは計算して報告するだけ）、そして
+  腰椎 5 レベルと下位頸椎 5 レベルはそれぞれ 1 つの向きを共有する。
+
+  **`:query-spellings` に落とした語がある理由**（同じく実測）: `endurance` だけを綴りと
+  して索引したら kami-engine-multirotor（飛行持続時間）が、`肩こり` だけで kizashi
+  （徴候を感知する側であって力学は解かない）が当たった。**問いとして良い語と、索引の
+  鍵として良い語は別**という、このファイルが既に持っている非対称のとおり。"}
 }

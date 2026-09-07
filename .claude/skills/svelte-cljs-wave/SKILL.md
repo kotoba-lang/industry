@@ -95,7 +95,7 @@ commit して main に載せる。
 | **`package.json` に `"type": "module"` を書かない** | shadow-cljs の `:node-test` 出力は CommonJS（`__dirname`）。ESM 指定で `ReferenceError` になる。3 agent が踏んだ |
 | **build の sentinel / log を worktree の外に置かない** | 第 2 波で 3 agent が揃って `/private/tmp/claude-501/build-app.exit` という**共有パス**を使った。1 つの exit code を別の agent が自分の結果として読みうる。scratch は worktree の下か session 固有パスに置く |
 | **`:asset-path` は相対** | これらのページは path prefix の下に出る。絶対だと mount 先で壊れる |
-| **build は前景の retry loop で回す。background 監視に入らせない** | 下記。第 1・2 波で計 6 agent がこれで停止した |
+| **build は前景の retry loop で回す。background 監視に入らせない。かつ Bash 呼び出しに `timeout: 600000` を渡させる** | 下記。第 1・2 波で計 6 agent、第 7 波でさらに 1 agent がこれで停止した。timeout を落とすと harness が**勝手に** background へ移す |
 | **backend の `.ts` を書き換えない** | `src/app.ts` / `src/engine.ts` は Cloudflare Worker の本番ロジック。第 1 波で 2 agent が正しく拒否した。**svelte/ ディレクトリだけ**が対象 |
 | **README / operator-quickstart / `kotodama.jsonld` の `staticDir` も直す** | 消した svelte build を説明したまま残すと、文書が能動的に嘘になる |
 | **`wrangler.jsonc` / `wrangler.toml` が消したパスを指していたら直す**（下記の 1 通りに揃える） | 第 6 波で 3 agent が同じ問題に**3 通り**の答えを出した。scope を「frontend だけ」と書いた私の穴 |
@@ -219,11 +219,24 @@ tick が 2 件と出したが対象 appview には 1 件で、もう 1 件は**�
    移行が終わった瞬間に single-page 規則を破った app ができる**。画面の移動は
    state の変更であって location の変更ではない（ADR-2608080100）。
    view は表（data）で持ち、nav をそこから生成し、addressability は fragment
-   で与える。着地後の確認 —— exit 0 でなければ波は着地していない:
+   で与える。着地後の確認:
 
    ```bash
    nbb scripts/verify-single-page-app.cljs --root . --findings
    ```
+
+   ⚠ **exit 0 を合格条件にしない。この検出器は fleet 全体を見る**ので、
+   波と無関係な repo の finding で恒常的に exit 1 を返す（実測 2026-09-07:
+   `multi-document=11 no-document=21`、どれも今回の 4 repo と無関係）。
+   **exit 0 を要求すると、どの波も永久に着地できない。** 見るのは
+   **その波が触った repo が finding に出ていないこと**:
+
+   ```bash
+   grep -e <repo1> -e <repo2> ... /tmp/spa.log || echo "wave clean"
+   ```
+
+   波が新しい finding を*足していない*ことが条件であって、fleet が
+   clean であることではない（後者は別の仕事）。
 
 
 ⚠ **なぜ 1 通りに固定するか。** 第 6 波で 3 agent が同じ状況に別々に答えた ——
@@ -245,6 +258,14 @@ assets を向け直し（正しい・unverified と明記）、`app-society6` �
 
 **background 監視・Monitor・sentinel ファイルを使わせない。** 次の 1 行が実測で
 毎回通った形（私が第 2 波の 3 repo を全部これで着地させた）:
+
+⚠ **agent には `timeout: 600000` を Bash 呼び出しに渡させる。これを落とすと、
+自分から background にしなくても harness が background に**する**。** 下の loop は
+`sleep 45` × 9 回で既定の 2 分を超えるので、timeout を指定しなければ harness が
+勝手に background へ移し、agent は来ない通知を待って idle する —— **「自分から
+background 監視に入るな」だけでは防げない**。実測 2026-09-07（第 7 波、app-tia）:
+この 1 点で 1 agent が 212k token 使って停止し、resume が要った。作業自体は
+無傷で、build も落ちていなかった（lock が兄弟 agent に握られていただけ）。
 
 ```bash
 for i in $(seq 1 9); do
@@ -278,6 +299,57 @@ gh api "repos/<org>/<repo>/git/trees/main?recursive=1" \
 
 第 1 波では 6/6 が本当に 0 だったが、**確かめたから言える**のであって
 報告がそう言ったからではない。
+
+## 上流で着地済みの repo も候補から外れる（tick が自動で除外する、2026-09-07）
+
+**tick が走査しているのは `orgs/` の作業ツリーであって、repo の `main` ではない。**
+west は pin で checkout を止めるので、**上流で移行が着地しても、pin が手前にある
+限り `.svelte` はディスクに残る。**
+
+実測 2026-09-07、候補 4 件のうち **3 件が既に main で移行済み**だった
+（`open-jpn-gov` / `outreach` / `port`。どれも 2026-09-05 の PR #1 で着地）。
+投げた 3 agent はそれぞれ「もう終わっている」と気づくところから始めることになり、
+1 体あたり 200k token を再監査に使った。**checkout・west pin・repo の main は
+3 つの別物**という ADR-2608136800 の形そのもので、tick は 3 番目を一度も
+見ていなかった。
+
+`landed-on-github` が候補に渡す直前に GitHub の default branch を直接引き、
+0 件なら `ALREADY-LANDED-SKIPPED` に名前付きで落とす。**同じ周に `robot` も
+これで捕まった** —— 次の波で配られるはずだった 4 件目。
+
+⚠ **trees API の `truncated: true` を 0 件に畳まない。** 巨大な tree では
+`.tree` が途中までしか入らず、件数だけ見ると「着地済み」と同じ顔になる。
+truncated なら `:unmeasured` を返す（測れなかった検査が、測って問題が
+無かった検査と同じ値を返してはいけない）。
+
+⚠ **これは「pin を進めれば済む」話でもある** —— 3 件とも west pin が
+古いままだった。波の最後の pin 前進はこの再発を減らすが、pin は他の理由でも
+遅れるので、tick 側が main を訊く必要は消えない。
+
+## archived / 未登録の repo も候補から外れる（tick が自動で除外する、2026-09-07）
+
+**tick は `ARCHIVED-SKIPPED` と `UNREGISTERED-SKIPPED` を名前付きで出す。**
+どちらも「まだ着地していない」ではなく **「着地できない / させても意味がない」**。
+
+- **archived** —— push が `This repository was archived so it is read-only.`
+  で拒否される。実測 2026-09-07、`open-banking` に投げた agent が**完璧な移行を
+  終えてから** push で弾かれた（11 分 / 194k token）。west.yml は最初から
+  `groups: [archived]` と書いていて、tick が訊いていなかっただけ。
+  eligible pool に同じものが 7 件在った。
+- **未登録** —— west.yml にも fleet-db にも無い path。ほぼ**改名前の残骸**で、
+  実測 2026-09-07 の `orgs/cloud-itonami/open-cofog` は GitHub 側が
+  `org-un-cofog` に改名済みだった（`gh api repos/cloud-itonami/open-cofog` が
+  改名後の名前を返す）。**残骸は誰も更新しないので `svelte/` が消えず、毎周
+  候補に出続ける。** 同型が 10 件（`orgs/gftdcojp/app-6ir` 等、どれも
+  cloud-itonami へ redirect）。
+
+⚠ **agent が「push できない」と報告してきたら、それは失敗ではなく正しい停止。**
+その worktree を消さない —— 着地先が無いだけで、中身は完成している。
+
+⚠ **改名された repo に投げると、push は redirect 先に着地する。** つまり
+**west entry 名は候補の path と違う**（`open-cofog` の成果は `org-un-cofog` の
+main に載った）。pin を進めるときは *GitHub が返した full_name* から entry を
+引き直す —— 候補の path から引くと entry が見つからない。
 
 ## custody 契約を持つ repo は候補から外れる（tick が自動で除外する）
 

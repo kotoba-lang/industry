@@ -130,34 +130,80 @@
        (mapcat (fn [[p os]] (map (fn [o] {:s eid :p p :o o}) os)) pm)))
    eids))
 
+(defn subset-db-eids
+  "A db holding only `eids`.
+
+  Takes the entity ids rather than a dataset predicate so that a caller writing
+  every shard can decide which entity belongs where in one pass. `subset-db`
+  answers that question by scanning the whole db, which is the right shape for
+  one subset and the wrong shape for a hundred: shard writing was scanning all
+  480,253 entities once per dataset (measured 2026-09-06)."
+  [db eids]
+  (if (empty? eids)
+    (index/empty-db)
+    (index/assert-quads (index/empty-db)
+                        (vec (quads-for-entities db eids))
+                        (constantly false))))
+
 (defn subset-db
   "Keep only entities whose `source/dataset` is in `datasets` (set of strings)."
   [db datasets]
-  (let [eids (into #{}
-                   (filter #(contains? datasets (entity->dataset db %))
-                           (keys (:eavt db))))]
-    (if (empty? eids)
-      (index/empty-db)
-      (let [quads (vec (quads-for-entities db eids))]
-        (index/assert-quads (index/empty-db) quads (constantly false))))))
+  (subset-db-eids db (into #{}
+                           (filter #(contains? datasets (entity->dataset db %))
+                                   (keys (:eavt db))))))
+
+(defn db-quads
+  "Every quad in `db`.
+
+  Reads `:eavt` and nothing else, because the other three indices hold the same
+  datoms in a different order and whoever receives these quads asserts them back
+  into all four. That is also why a shard file's `:aevt` and `:avet` were only
+  ever written, parsed and dropped."
+  [db]
+  (mapcat (fn [[s pm]]
+            (mapcat (fn [[p os]] (map (fn [o] {:s s :p p :o o}) os)) pm))
+          (:eavt db)))
+
+;; Merging is an accumulator, not a fold over a materialised list of dbs, so
+;; that a caller reading many shards can deserialise one, add it, and let it
+;; become garbage before opening the next -- rather than holding every shard and
+;; the union at the same time.
+;;
+;; The accumulator is also what keeps the cost linear. `assert-quads` walks the
+;; existing outer keys once per call to make their inner maps transient, so a
+;; fold that calls it once per db pays that walk once per db -- quadratic in the
+;; number of shards. `index/mutable-db` exists precisely to pay it once; its own
+;; docstring records an LDBC load that never finished in the looped form.
+
+(defn merge-start
+  "A mutable accumulator for `merge-add!`. NOT a db -- finish it with
+  `merge-finish` before querying or serialising it."
+  []
+  (index/mutable-db (index/empty-db)))
+
+(defn merge-add!
+  "Add every datom of `db` to the accumulator, returning it."
+  [macc db]
+  (index/assert-quads! macc (db-quads db) (constantly false)))
+
+(defn merge-finish
+  "Finish an accumulator, returning a db with all four indices built."
+  [macc]
+  (index/persist-db macc))
 
 (defn merge-dbs
   "Union of several datalog dbs (disjoint entity sets assumed)."
   [dbs]
-  (reduce
-   (fn [acc db]
-     (let [quads (mapcat (fn [[s pm]]
-                           (mapcat (fn [[p os]]
-                                     (map (fn [o] {:s s :p p :o o}) os))
-                                   pm))
-                         (:eavt db))]
-       (index/assert-quads acc quads (constantly false))))
-   (index/empty-db)
-   dbs))
+  (merge-finish (reduce merge-add! (merge-start) dbs)))
 
 (defn datom-count [db]
+  ;; The inner step used to read `(fn [m _p os] (+ m (count os)) 0)` -- two body
+  ;; forms, so it returned the literal `0` and threw the sum away. Every db
+  ;; therefore counted zero datoms, and the shard index has been recording
+  ;; `:datoms 0` for every shard it ever wrote. A count that cannot come out
+  ;; anything but zero is not a count.
   (reduce-kv
    (fn [n _s pm]
-     (+ n (reduce-kv (fn [m _p os] (+ m (count os)) 0) 0 pm)))
+     (+ n (reduce-kv (fn [m _p os] (+ m (count os))) 0 pm)))
    0
    (:eavt db)))

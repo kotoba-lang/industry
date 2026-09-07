@@ -66,12 +66,39 @@
   quote ends its string early and the reader carries on parsing the sentence as
   structure. Measured across the same 2,347 documents, exactly one has symbol
   keys — `commit-dag` and `|quad-store`, a table cell that bled into the
-  document — so the rule costs one true positive and no false ones."
+  document — so the rule costs one true positive and no false ones.
+
+  ⚠ IT DOES NOT CATCH AN INTEGER KEY, and one got past it on 2026-09-07. An ADR
+  body contained a backticked example whose content was a quoted number; the
+  quote ended the docstring, the number after it was read as a KEY, and the rest
+  of the sentence closed the map. The document parsed, the entity had a key of
+  `10`, and this check — symbols only — said nothing. `adr-bad-keys` below is the
+  narrow answer: integer keys are legitimate in this corpus generally, and not in
+  an ADR."
   [v]
   (cond
     (map? v) (concat (filter symbol? (keys v)) (mapcat bad-keys (vals v)))
     (sequential? v) (mapcat bad-keys v)
     :else nil))
+
+(defn- adr-bad-keys
+  "Non-keyword TOP-LEVEL keys on an ADR entity. Empty is clean.
+
+  Narrower than `bad-keys` in what it looks at and wider in what it rejects, and
+  both narrowings were measured. An ADR is `[{:db/id … :adr/id … :adr/body …}]`,
+  so every top-level key is a keyword by construction — checked across all 2,769
+  ADRs in `90-docs/adr` on 2026-09-07: not one has a top-level key that is not a
+  keyword. So rejecting anything else there costs no false positives, while the
+  corpus-wide rule cannot reject integer or string keys because seven documents
+  use them on purpose.
+
+  It looks only at the top level for the same reason: an ADR's nested structure
+  is a `pr-str` blob inside a string, so anything deeper is not the ADR's own
+  shape."
+  [v]
+  (->> (if (sequential? v) v [v])
+       (filter map?)
+       (mapcat (fn [e] (remove keyword? (keys e))))))
 
 (def skip-dirs #{"node_modules" ".git" "archive" "dist" "target" ".shadow-cljs"
                  ;; Session scratch: git worktrees other agents cut under the
@@ -133,7 +160,17 @@
                      [f (str "parses, but " (count odd) " symbol key(s) — "
                              (str/join ", " (map pr-str (take 4 odd)))
                              " — a quote inside a string ended it early and what "
-                             "followed was read as structure")])))))
+                             "followed was read as structure")])))
+          ;; the ADR-only rule, which catches what the symbol test cannot
+          (when (str/includes? f "90-docs/adr/")
+            (let [odd (distinct (adr-bad-keys (first v)))]
+              (when (seq odd)
+                (swap! bad conj
+                       [f (str "parses, but the ADR entity has " (count odd)
+                               " top-level key(s) that are not keywords — "
+                               (str/join ", " (map pr-str (take 4 odd)))
+                               " — a quote inside the body ended it early and what "
+                               "followed was read as structure")]))))))
       (catch :default e
         (swap! bad conj [f (ex-message e)]))))
   (println "edn files:" (count files) "unparsable:" (count @bad))

@@ -463,7 +463,7 @@ landing 前の break/unbreak は手元か stub に対して行われており、
 「落ちない gate は劇場」の対偶も同じく成り立つ —— **一度も緑にならない gate も、
 誰も行動できないという意味で同じだけ無内容**。
 
-### 検査を書く前・緑を信じる前の 7 問（repo-wide mandatory、2026-08-13 / 6 問目 2026-08-22 / 7 問目 2026-09-06、ADR-2608136000）
+### 検査を書く前・緑を信じる前の 8 問（repo-wide mandatory、2026-08-13 / 6 問目 2026-08-22 / 7 問目・8 問目 2026-09-06、ADR-2608136000）
 
 **測れなかった検査が、測って問題が無かった検査と同じ値を返す** —— この 1 つの形が
 2026-08-13 の 1 日で **14 箇所**見つかった（gate・PreToolUse hook 4 本・launchd job 2 本・
@@ -479,6 +479,11 @@ landing 前の break/unbreak は手元か stub に対して行われており、
    応答の中に書いてあっても読まない（HTTP 400 を 20 回、本文を捨てて status だけ記録）。
 4. **「飛ばした」と「合格した」が出力で区別できるか。**
 5. **その検査は両方向を出したことがあるか。**
+   ⚠ **両方向を出しても、境界が無ければ演算子は見えない。** 実測 2026-09-06、
+   発注額の上限比較を `>` から `>=` に反転しても自己検査は**緑のまま**だった ——
+   通る例も落ちる例も在ったが、「発注額 == 決議予算」の**線上のケースが無かった**。
+   その 1 件（規則が「超過」なので**可決されるべき**）を足すと反転で赤くなる。
+   **比較を持つ検査には、必ず境界ちょうどの入力を 1 つ置く。**
 6. **その検査は、自分が名乗っている理由で拒否したことがあるか。** 結果だけを
    assert する負テストは、**別の原因で落ちた実行を「discriminate した」として数える**。
    2026-08-22 の 1 日で、別々の repo の 4 つの agent がこの形を踏んだ:
@@ -508,11 +513,31 @@ landing 前の break/unbreak は手元か stub に対して行われており、
    の側を読んで「接続の修正が効いた」と結論しかけた —— **道具は正直で、読み手が
    誤った。** 直後に gate を外して走らせ直すと、同じ失敗がそのまま出た。
 
+8. **その検査は生成物を実行したか、ビルドできたことで満足したか。** 7 問目は
+   「変更した経路が走ったか」を問うが、**その手前に「作ったものを動かしたか」がある**。
+   コンパイラ・生成器・トランスパイラを相手にすると、**受理して誤った答えを出す**
+   backend が在りうる —— 拒否する backend より悪い。拒否は設計判断を 1 つ生むが、
+   誤答は何も生まない。
+   実測 2026-09-06（kotoba-lang/amu#835）: あるモジュールは `aarch64-macos` に
+   **コンパイルでき、実行でき、答えが違った** —— その backend では keyword の `=` が
+   常に false で、同じビルドで i64 の `=` は正しい。全分岐が keyword で回るので
+   全部が誤った枝へ行った。**気づけた理由は、モジュールが自分で self-check を持ち、
+   失敗の「個数」を返していたことだけ**である（boolean なら「何かが失敗した」しか
+   言えず、1 件の退行と壊れたビルドを区別できない）。
+   したがって: **成果物を出す検査は、その成果物を実行して値を確かめるまで
+   pass にしない。** `:ok true` は「ビルドできた」であって「正しい」ではない。
+
 直し方で効いたもの: **evidence floor**（`SCANNED<TAB>n`、n=0 を clean にしない）/
 **実行本数の床** / **「答えられなかった」専用の exit code**（0 でも 1 でもない値）/
 **答えを拒否する**（`git archive` に `.git` が無いと分かった gate は
 `Refusing to report a pass` と言って終わる —— 恒久的に赤い gate を landing させるより良い）/
-**signal を落とさない** / **測ったときの load を値の隣に書く**。
+**signal を落とさない** / **測ったときの load を値の隣に書く** /
+**self-check は個数を返す**（boolean は 1 件の退行と壊れたビルドを区別できない）/
+**禁じたい経路は「無い」ではなく「拒否して記録する」**（PATH の先頭に stub を置き、
+呼ばれたら log に追記して非ゼロで終わる。そして**その log が空でないことを 1 度は
+見せる** —— 実測 2026-09-06、JVM-free 経路の検証で `amu test` だけが
+`clojure -M:run` に落ちて trace を踏み、それが「trace が何かを検出できる」ことの
+証拠になった。踏まれたことのない trace は、常に空な trace と区別できない）。
 
 ⚠ **この class を最も安く作れるのは shell である。`$?` は pipe の「最後の」
 コマンドの終了値**なので、次の 1 行は**検査の結果を一度も見ていない**:
@@ -1425,9 +1450,11 @@ CertGovernor）。
   |---|---|---|
   | **unquoted heredoc の中のバッククォート** | shell が**コマンド置換として実行**し、その語がファイルから消える。残りは完全に妥当なコードで、テストは緑のまま | heredoc は必ず `<<'EOF'` と**引用符で閉じる**。変数展開が要るときだけ開き、その塊にバッククォートを入れない |
   | **一括正規表現の書き換えが docstring / コメントまで当たる** | 文字列の中にキーを差し込んで**その文字列を早期に閉じ**、以降がコードとして読まれる。壊れ方は当たった場所依存なので、動く例を見ても安心できない | 置換後に**必ず読み直す**（compile / reader / `bb test`）。`grep` で件数だけ数えて済ませない |
+  | **データファイルに Clojure の *ソース* イディオムを書く**（2026-09-08） | `.edn` の値として `(str "…" "…")` と書くと、**`edn/read-string` は throw せず**その項目を `PersistentList` として返す。ファイルは読め、件数も合い、目視でも普通に見える —— **文字列を期待している下流だけが静かに壊れる**。EDN に評価は無い、が理由 | reader を通すだけでは足りない。**読んだ値の「型」を assert する**（`string?` / `number?`）。実測: 13 tissue の出典欄がこの形で、`edn/read-string` は 13 件すべてを clean に返していた |
 
-  どちらも「書けた」と「意図どおり書けた」が出力で区別できない。**書き換えたファイルは、
-  書き換えた直後に読み返す。**
+  3 つとも「書けた」と「意図どおり書けた」が出力で区別できない。**書き換えたファイルは、
+  書き換えた直後に読み返す** —— そして **reader が返した値の型まで見る**。
+  「壊れていれば reader が throw する」は真ではない。
 
   「全キーが keyword」ではない —— それは 8 件を赤くし、うち 7 件は正当だった
   （`"p50"` `".cljs"` `"stripe.com"` `0 1 2 3`。EDN の map は文字列キーも整数キーも取る）。
@@ -1442,8 +1469,8 @@ CertGovernor）。
   fleet gate は `root-adr-identity`。**既知の衝突 23 件は据え置きで、表を増やさない**
   —— 新しい衝突は fail させる。
 - **横断 query**:
-  `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs count`
-  `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
+  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljs count`
+  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
   属性は datascript.js 向けに **裸文字列**（`"adr/id"`、コロン無し）。
 - **この面は 90-docs だけではない（2026-07-25 拡張、ADR-2607252000）。** 企業データと
   fleet 状態も同じ面に載っており、`:company/lei` を結合キーに **repo を跨いで join
@@ -1467,7 +1494,8 @@ CertGovernor）。
   `:observed`（PDS をアカウント側から数えたもの）は同じ列に見えて出所が違う。
   ```bash
   # 財務 × 法人実体 × ToS を 1 クエリで
-  nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+  nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" \
+    manifest/edn-query.cljs q \
     '[:find ?legal ?juris ?rev ?url :where
       [?a "company/lei" ?lei] [?a "source/dataset" "market-intel"] [?a "company/revenue-usd" ?rev]
       [?b "company/lei" ?lei] [?b "company/legal-name" ?legal] [?b "company/jurisdiction" ?juris]

@@ -22,11 +22,13 @@
 ;;   contracts/lib/      vendored な第三者サイト。我々が書いていない
 ;;   m365-archive/       OneDrive 履歴の DataLad dataset。live なコードではない
 ;;   :max-files 超       1 repo に多数ある repo はこの波の対象外（上記の理由）
+;;   archived            push を受け付けない。**着地できない**（下）
 ;;
 ;; ## exit code
 ;;
 ;;   0  測れた（候補 0 本でも 0。これは gate ではなく測定器）
-;;   2  **測れなかった** —— orgs/ が無い、find が失敗した、走査 0 件。
+;;   2  **測れなかった** —— orgs/ が無い、find が失敗した、走査 0 件、
+;;      west.yml から archived 印を読めなかった。
 ;;      0 と区別されることが要点（ADR-2608136000）。
 
 (ns svelte-cljs-wave-tick
@@ -110,6 +112,125 @@
             (when i (subs r 0 (+ i 7)))))
         rels))
 
+(defn- manifest-facts
+  "west.yml から 2 つの集合を読む。
+   `{:paths #{登録済み path} :archived #{archived と印の付いた path}}`。
+   **読めなかった / 1 件も path を拾えなかった場合は nil**（= 測れなかった）。
+
+   ## :archived —— 「まだ着地していない」ではなく「着地できない」
+
+   実測 2026-09-07: この tick は archived な repo を候補に出していた。
+   `open-banking` に agent を 1 本投げ、11 分 194k token を使ったあとに
+   `This repository was archived so it is read-only.` で push が拒否された ——
+   **着地できない仕事と、まだ着地していない仕事が、同じ顔で候補に並んでいた。**
+   west.yml は最初からそれを知っていて（`groups: [archived]` /
+   `userdata: {archived: true}`）、tick が訊いていなかっただけ。
+   同じ形の repo は測った時点で pool に 9 件在る。
+
+   ⚠ **これは GitHub の状態の写しであって GitHub ではない。** manifest が
+   遅れている可能性は消えないので、最終候補には `archived-on-github` で
+   直接訊く（下）。ここは全候補に当てられる安い一次フィルタ。
+
+   ## :paths —— 改名前の古い checkout を候補にしない
+
+   実測 2026-09-07: 候補に出た `orgs/cloud-itonami/open-cofog` は west.yml にも
+   fleet-db にも無かった。GitHub 側で **`org-un-cofog` に改名済み**で、この path は
+   改名前の残骸だったため（`gh api repos/cloud-itonami/open-cofog` は
+   `cloud-itonami/org-un-cofog` を返す）。
+
+   残骸が厄介なのは、**誰もそれを更新しないので永久に候補であり続ける**こと。
+   pin が無いので `west update` が触らず、`svelte/` が消えないまま毎周
+   候補に並び、毎周 agent が『移行』して no-op を着地させる。実際この周は
+   `open-cofog`（残骸）と `org-un-cofog`（本体）が**同じ 1 個の GitHub repo に
+   対して 2 つの候補として並んだ**。
+
+   撤去は git-cleanup-conflict の仕事なので、ここでは候補にしないだけにする。
+   **名前を出して報告する**（黙って除くと移行が進んだように見える）。"
+  []
+  (try
+    (let [txt   (str (.readFileSync fs (path.join root "manifest" "west.yml") "utf8"))
+          state (reduce
+                 (fn [{:keys [cur] :as st} l]
+                   (cond
+                     (re-find #"^\s*- name:\s*\S" l)
+                     (assoc st :cur nil)
+
+                     (re-find #"^\s*path:\s*\S" l)
+                     (let [p (second (re-find #"^\s*path:\s*(\S+)" l))]
+                       (-> st (assoc :cur p) (update :paths conj p)))
+
+                     (and cur (re-find #"^\s*groups:.*\barchived\b" l))
+                     (update st :acc conj cur)
+
+                     (and cur (re-find #"^\s*archived:\s*true\s*$" l))
+                     (update st :acc conj cur)
+
+                     :else st))
+                 {:cur nil :acc #{} :paths #{}}
+                 (str/split-lines txt))]
+      ;; evidence floor —— path を 1 件も拾えていないなら parse が壊れている。
+      ;; 空集合を「archived は無い」「登録が無い」として返さない（ADR-2608136000）。
+      (when (seq (:paths state))
+        {:paths (:paths state) :archived (:acc state)}))
+    (catch :default _ nil)))
+
+(defn- archived-on-github
+  "GitHub 本体に訊く。true / false / :unmeasured。
+
+   manifest の印は写しなので、**agent に渡す直前の候補だけ**はここで直接訊く。
+   訊けなかったことを false に畳まない —— それをやると、この関数が在ることで
+   かえって「確かめた」という誤った安心が付く。"
+  [{:keys [org name]}]
+  (try
+    (let [r (.spawnSync cp "gh"
+                        (clj->js ["api" (str "repos/" org "/" name) "--jq" ".archived"])
+                        #js {:encoding "utf8" :timeout 30000})]
+      (if (not= 0 (aget r "status"))
+        :unmeasured
+        (case (str/trim (str (aget r "stdout")))
+          "true"  true
+          "false" false
+          :unmeasured)))
+    (catch :default _ :unmeasured)))
+
+(defn- landed-on-github
+  "その repo の **default branch** に `.svelte` がまだ在るか。
+   true = もう無い（着地済み）/ false = まだ在る / :unmeasured。
+
+   ## なぜ要るか —— 走査しているのは checkout であって main ではない
+
+   `scan!` は `orgs/` の**作業ツリー**を歩く。west は pin で checkout を止めるので、
+   **上流で移行が着地しても、pin が手前にある限り `.svelte` はディスクに残る。**
+   その repo は毎周候補として出続け、投げられた agent は「もう終わっている」と
+   気づくところから始めることになる。
+
+   実測 2026-09-07: 候補 4 件のうち **3 件が既に main で移行済み**だった
+   （open-jpn-gov / outreach / port）。3 agent 分の仕事が、着地済みの repo の
+   再監査に費やされた。checkout・west pin・repo の main は 3 つの別物という
+   ADR-2608136800 の形そのもので、**この tick は 3 番目を一度も見ていなかった。**
+
+   ## truncated を 0 件に畳まない
+
+   trees API は巨大な tree で `truncated: true` を返し、その時 `.tree` は
+   **途中まで**しか入っていない。件数だけ見ると 0 件＝着地済みに見えるので、
+   truncated なら :unmeasured を返す。測れなかった検査が、測って問題が無かった
+   検査と同じ値を返してはいけない（ADR-2608136000）。"
+  [{:keys [org name]}]
+  (try
+    (let [r (.spawnSync cp "gh"
+                        (clj->js ["api" (str "repos/" org "/" name "/git/trees/HEAD?recursive=1")
+                                  "--jq" "[(.truncated|tostring), ([.tree[].path|select(test(\"\\\\.svelte$\"))]|length|tostring)]|join(\"\\t\")"])
+                        #js {:encoding "utf8" :timeout 60000})]
+      (if (not= 0 (aget r "status"))
+        :unmeasured
+        (let [[trunc n] (str/split (str/trim (str (aget r "stdout"))) #"\t")]
+          (cond (= "true" trunc)   :unmeasured
+                (not= "false" trunc) :unmeasured
+                (nil? n)           :unmeasured
+                (= "0" n)          true
+                :else              false))))
+    (catch :default _ :unmeasured)))
+
 (defn- custody-gated?
   "その repo が **machine-enforced な custody 契約**を持っていれば true。触らない。
 
@@ -157,7 +278,18 @@
    を使ったので git は衝突せず、**2 つの agent が同じ repo を二重に移行しかけた**。
 
    agent は作業開始時に必ず linked worktree を作るので、**push より早く立つ印**が
-   これ。branch 名や path を決め打ちせず、linked worktree が 1 つでも在れば触らない。"
+   これ。branch 名や path を決め打ちせず、linked worktree が 1 つでも在れば触らない。
+
+   ⚠ **ただし「在る」のは実体であって台帳の行ではない。** `git worktree list` は
+   **実体が消えた worktree も 1 行として出し続ける**（`prunable <理由>` 付き）。
+   それは「誰かが作業中」ではなく**残骸**である。
+
+   実測 2026-09-07: IN-FLIGHT 15 件のうち **8 件が prunable のみ**で、
+   その 8 repo の branch はどれも main から **0 ahead**（中身は既に着地済み、
+   ディレクトリは OS の /tmp 掃除で消えていた）。残骸を live と数えていたので、
+   候補が 4 本出るはずの周に **1 本しか出ず**、しかも出力は正常に見えた ——
+   `git worktree prune` で 8 件消したら候補は 1 → 4 に戻った。
+   **走っている波と、走った跡が、同じ顔で数えられていた**（ADR-2608136000）。"
   [{:keys [repo]}]
   (try
     (let [r (.spawnSync cp "git"
@@ -165,7 +297,14 @@
                         #js {:encoding "utf8" :timeout 30000})]
       (if (not= 0 (aget r "status"))
         true                                     ; 訊けなければ触らない側に倒す
-        (> (count (re-seq #"(?m)^worktree " (str (aget r "stdout")))) 1)))
+        ;; porcelain は空行区切りのレコード列で、先頭が本体。実体が消えたものには
+        ;; `prunable` 行が付く。locked な worktree は git が prune しないので
+        ;; prunable にならず、ここでも live 側に残る（正しい）。
+        (let [linked (->> (str/split (str (aget r "stdout")) #"\n\s*\n")
+                          (map str/trim)
+                          (remove str/blank?)
+                          rest)]
+          (boolean (some #(not (re-find #"(?m)^prunable(\s|$)" %)) linked)))))
     (catch :default _ true)))
 
 (defn- remote-name
@@ -225,7 +364,14 @@
       (println "SCANNED\t0")
       (js/process.exit 2))
 
+    (when (nil? (manifest-facts))
+      (println "REFUSING\tmanifest/west.yml を読めなかった —— archived / 登録の判定ができない")
+      (println (str "SCANNED\t" (count rels)))
+      (js/process.exit 2))
+
     (let [by-repo (reduce (fn [m r] (update m (repo-of r) (fnil conj []) r)) {} rels)
+          {:keys [paths archived]} (manifest-facts)
+          arch    archived
           pool    (count by-repo)
           cands   (->> by-repo
                        (keep (fn [[repo fl]]
@@ -243,7 +389,21 @@
           ;; in-flight 判定は 1 repo 1 network round trip なので、順位上位だけに当てる。
           ;; custody 判定はローカル（安い）ので全候補に当てる。
           custody (atom [])
+          ;; archived は「まだ着地していない」ではなく「着地できない」。
+          ;; ローカルで判る（west.yml の写し）ので全候補に当てる。
+          archived (atom [])
+          ;; 改名前の残骸は誰も更新しないので、除かないと毎周候補に出続ける。
+          unregistered (atom [])
+          ;; 上流で着地済みなのに pin が手前で止まっている repo。
+          ;; 走査しているのは checkout なので、main を訊かないと毎周出続ける。
+          landed (atom [])
           open    (->> cands
+                       (remove (fn [c]
+                                 (when-not (contains? paths (:repo c))
+                                   (swap! unregistered conj (:repo c)) true)))
+                       (remove (fn [c]
+                                 (when (contains? arch (:repo c))
+                                   (swap! archived conj (:repo c)) true)))
                        (remove (fn [c]
                                  (when (custody-gated? c)
                                    (swap! custody conj (:repo c)) true)))
@@ -258,6 +418,19 @@
                                    nil         false
                                    :unmeasured (do (swap! unmeasured conj (:repo c)) true)
                                    (do (swap! skipped conj (:repo c)) true))))
+                       ;; manifest は写しなので、渡す直前の候補だけ GitHub に直接訊く。
+                       (remove (fn [c]
+                                 (case (archived-on-github c)
+                                   false       false
+                                   :unmeasured (do (swap! unmeasured conj (:repo c)) true)
+                                   (do (swap! archived conj (:repo c)) true))))
+                       ;; ディスクの .svelte は checkout の話。main を訊くまで
+                       ;; 「まだ移行していない」は未測定（ADR-2608136800）。
+                       (remove (fn [c]
+                                 (case (landed-on-github c)
+                                   false       false
+                                   :unmeasured (do (swap! unmeasured conj (:repo c)) true)
+                                   (do (swap! landed conj (:repo c)) true))))
                        (take limit)
                        vec)
           rec {:at (.toISOString (js/Date.))
@@ -265,6 +438,9 @@
                :files (count rels)
                :eligible (count (filter #(<= (count (second %)) max-files) by-repo))
                :limit limit
+               :unregistered-skipped @unregistered
+               :archived-skipped @archived
+               :already-landed-skipped @landed
                :custody-skipped @custody
                :in-flight-skipped @skipped
                :unmeasured-skipped @unmeasured
@@ -274,6 +450,14 @@
       (println (str "SCANNED\t" (count rels)))
       (println (str "POOL\t" pool "\trepos still carrying .svelte"))
       (println (str "ELIGIBLE\t" (:eligible rec) "\t(<=" max-files " files/repo)"))
+      ;; 「着地できない」を「まだ着地していない」に畳まない。
+      (println (str "UNREGISTERED-SKIPPED\t" (count @unregistered)
+                    (when (seq @unregistered) (str "\t" (str/join " " @unregistered)))))
+      (println (str "ARCHIVED-SKIPPED\t" (count @archived)
+                    (when (seq @archived) (str "\t" (str/join " " @archived)))))
+      ;; 「checkout に残っている」を「まだ移行していない」に畳まない。
+      (println (str "ALREADY-LANDED-SKIPPED\t" (count @landed)
+                    (when (seq @landed) (str "\t" (str/join " " @landed)))))
       (println (str "CUSTODY-SKIPPED\t" (count @custody)
                     (when (seq @custody) (str "\t" (str/join " " @custody)))))
       (println (str "IN-FLIGHT-SKIPPED\t" (count @skipped)

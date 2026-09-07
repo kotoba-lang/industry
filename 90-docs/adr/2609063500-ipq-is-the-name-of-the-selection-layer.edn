@@ -67,7 +67,7 @@ multicodec table を実測して選んだ（2026-09-06）:
 | **S1** | wire の名前 + surface の実装 | **2026-09-06 landed** |
 | **S2** | deploy —— Worker shell に載せ、本番 block 面の実 CID に対して smoke | **2026-09-06 landed**（下記） |
 | **S3** | advertise —— 広告 chain の metadata に IPQ を並記 | **2026-09-06 landed**（gate は赤のまま。下記） |
-| S4 | consume —— `ayatori.discovery` が IPQ provider を優先し、`ayatori.remote` が per-block GET の代わりに selection を使う | round trip 数で測る（bytes でも wall clock でもない） |
+| S4 | consume —— **再定義された**。配線の前にまず graph read 経路を観測可能にする | ADR-2609064500。pack が 97% の逐次項に効くという前提は、この workspace 自身の測定に否定されている |
 | S5 | IPQ/2 —— authenticated index boundaries | 未着手・未スケジュール |
 
 **S3 の gate が要点である。** metadata を足したつもりで落ちても、広告は
@@ -265,5 +265,113 @@ bytes でも wall clock でもない。
   何も変わっていない（S4 が未了）
 - 広告に IPQ が載っている、とは言わない（S3 が未了）
 - IPQ が完全性を証明する、とは言わない（S5 が未了）
+
+## 残っている 1 件 —— IPQ は live だが、まだ announce されていない（2026-09-06 実測）
+
+検査は `scripts/verify-ipni-publisher-record.cljs --findings`（`--classpath` に
+`orgs/kotoba-lang/io-ipni-specs/src` を足す）。今日の実行は 13 検査中 12 が ok で、
+1 件だけ赤い:
+
+    ok   advertisement-metadata-is-well-formed  —  1 protocol(s): transport-ipfs-gateway-http
+    FAIL advertisement-announces-ipq           —  not announced: not-ipq (found 2336)
+
+`2336` = `0x920` = `transport-ipfs-gateway-http`。つまり **live の advertisement は
+gateway だけを名乗っており、IPQ を名乗っていない。**
+
+**コードの問題ではない。** `ipni-drain/src/index.ts` の `KOTOBASE_METADATA` は既に
+両方を運ぶ形（`a0 12 00` ++ `c0 92 c0 01 01 01`）で main に在り、drain Worker は
+今日 12:47 UTC に deploy 済み。赤いのは **advertisement chain の head が
+その前に発行されたものだから**である（head は
+`bafyreiaupk64m6ghvgwslukgq2rz2m5fwxut7qwlpojkj4apczbg34ie5e` のまま）。
+
+**そして head を進める経路は、内容を作らずには存在しない。** advertisement を
+発行するのは `kotobase-api-gateway-cljs` の `git_private_snapshot.cljc` だけで、
+`advertise?` は private git snapshot の append に付くフラグである
+（`publish-advertisement` は `append-candidate` の中からしか呼ばれない）。
+再 announce だけをする admin 経路は無い（探した）。**metadata の 1 field を
+直すために private git plane へ中身を捏造しない。**
+
+したがってこの finding は次の条件で閉じる: **次に `advertise` 付きの private git
+snapshot が 1 本 append されたとき。** それまでは「live だが未 announce」であり、
+IPNI 経由で provider を探す client は IPQ endpoint に辿り着けない。
+**待ちであって、未実装ではない。** 検査は赤のままにしておく —— 緑にする方法は
+発行することであって、検査を弱めることではない。
+
+## wire format は CARv1（2026-09-06 実測、記録の訂正ではなく口頭の訂正）
+
+descriptor は `\"response\": {\"content-type\": \"application/vnd.ipld.car\", \"car-version\": 1}`
+と言う。**実測もそのとおり** —— live の selection 応答の先頭は
+
+    3a a2 65 72 6f 6f 74 73 81 d8 2a 58 25 …
+    ^^ varint(58)  ^^ dag-cbor map  ^^^^^^^^^^^^^^^^^ \"roots\"
+
+で、**CARv2 の pragma（`0a a1 67 76 65 72 73 69 6f 6e 02`）では始まらない**。
+ADR-2609060000 が既に「HTTP streaming may use CARv1」と書いているとおりで、
+文書は正しい。CARv2 は pack（L0b）の形式であって、この応答の形式ではない。
+この 2 つを口頭で混ぜると、replay する側が index を探しにいく。
+
+## IPQ/2（range selection）の可否は測った —— 正直に名乗れる claim と、名乗れない claim（2026-09-06）
+
+**「key-range の IPLD selector が無いので IPQ/2 は着手できない」は、もう現在地ではない。**
+`kotoba-lang/prolly-tree` に `verify-range` が着地した（merge `20a94b27a48e`、west pin
+`c5e420e93638`）。JVM 76 tests / 3,053 assertions、cljs 84 / 3,068、どちらも 0 failures。
+
+### 名乗れる claim（C1、成立）
+
+**「この結果は、この root に対する `scan-range` と等しい」** は、証明として正直に運べる。
+控えは全部 refuse し、しかも**名指しの理由で** refuse する:
+
+| 壊し方 | 拒否 |
+|---|---|
+| 残すべき block を 1 個落とす（5 block の証明の全位置で） | `:prolly-tree/block-missing` |
+| 同じ tree の別の**本物の** leaf を境界 leaf とすり替える | `:prolly-tree/block-missing` |
+| すり替えでなく**追加**する（欠落側が撃てない形にする） | `:prolly-tree/unexpected-block` |
+| bytes を改竄する（全位置） | `:prolly-tree/block-missing` |
+| root を差し替える | `:prolly-tree/block-missing` |
+| leaf が親の主張する span の外に出る | `:prolly-tree/entry-outside-span` |
+
+すり替えが「CID 不一致」でなく「欠落」として落ちるのは、archive を**再 hash して**
+索引しているから —— 呼び手は CID を 1 つも渡さないので、すり替えは
+「欠落 + 余剰」に分解される。
+
+### 名乗れない claim（C2、実測で反証）
+
+**完全性は運べない。** root の max-key を過少申告した doctored root に対し、
+window `[key-0001, m0)` で prover は `[]` を返し、**verifier は `[]` を受理する**。
+同じ root を素の scan で開くと **4,000 行**在る。別形（最後の child の主張を信じる形）
+では scan+verify が **0 行**で一致する一方、同じ root に `diff/range-diff` を当てると
+**313 行**出る。
+
+**したがって IPQ の descriptor が言っている
+`doesNotProve: \"that a database range or Datalog answer is complete\"` は、
+用心ではなく実測された境界である。** 完全性を運びたいなら別の commitment が要る ——
+**prover が選べない何かに由来する、あるいはそれで署名された max-key**。
+この構造に対して schema-version の作業を積んでも出てこない。
+
+### コスト
+
+**余分なバイトはゼロ。** 4,000 key・120 window（擬似乱数と境界ちょうどの両方）で、
+scan と proof が同じ block 数・同じバイト数を読む（JVM 873 / 2,547,074 で一致、
+cljs 852 / 2,458,423 で一致 —— 2 runtime の差は共有 `lcg` が 2^53 を超えることに
+由来し、実測して記録済み）。**独立な 2 標本でどちらも 0。**
+⚠ これは *block* のバイトであって、CARv1 の framing（header・block ごとの varint と
+binary CID）は container のコストであり proof のコストではない。
+
+### 副産物の finding（未修正）
+
+`core/range-children` と `diff/span-intersects?` は**最後の child について既に食い違って
+いる**（主張された max-key vs `+infinity`）。**保守側に寄せることは C2 の未採用の修正では
+ない** —— verifier がその規則を借りると、prover が読んでいない block を要求することに
+なり、正直な証明を全部 refuse する。
+
+### 方法（記録に値する 2 件）
+
+- **最初の mutation は何も赤くしなかった。** `diff` の `+infinity` を借りれば C2 の
+  テストが壊れると予測したが、壊れなかった —— `upper` と主張 max-key は**最後の child
+  以外**では同じ値で、fixture が過少申告していたのは*最初*だった。
+  **答えを変えない mutation は、何も検査していない。**
+- **mutation D は殺すしかなかった。** `demand` を throw でなく fallback にすると、
+  既に通過した node に walk が再入して無限再帰する。**refuse は答えを正直に保つだけで
+  なく、walk を停止させているもの**でもある。
 "
 }]

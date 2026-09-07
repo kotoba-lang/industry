@@ -536,7 +536,7 @@
   ;; recovery issuers are constrained. The gate refuses a verdict when its
   ;; policy, ADR, SECURITY.md, AGENTS.md, or west inventory was filtered out.
   ;;
-  ;; Red/green discrimination is recorded in ADR-2608302125: unchanged tree
+  ;; Red/green discrimination is recorded in ADR-2609070400: unchanged tree
   ;; exits 0; adding :password to one active-methods set exits 1; removing the
   ;; machine policy from the shipped tree exits 2.
   {:name "root" :id "root-human-auth-no-downgrade" :org "com-junkawasaki"
@@ -548,7 +548,7 @@
                    "AGENTS.md"
                    "manifest/west.yml"
                    "manifest/human-authentication-policy.edn"
-                   "90-docs/adr/2608302125-human-authentication-is-passkey-only-and-never-downgrades.edn"]
+                   "90-docs/adr/2609070400-human-authentication-is-web3-first.edn"]
    :cd false}
   {:name "governor" :gate :jvm-test :cd true}
   {:name "taxlaw" :gate :jvm-test :cd true}

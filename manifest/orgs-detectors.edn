@@ -3168,4 +3168,235 @@
                                          ; what changes the answer, and both are
                                          ; day-scale events
    :timeout-ms  120000}                  ; 2m -- measured 1.4s wall, three legs
+
+  {:id       :verify-declared-dependencies
+   :title    "src requires namespaces its own deps.edn does not account for"
+   :why      "A require is resolved by the classpath, and in this workspace the classpath is
+              assembled four ways -- `clojure -M:test`, a hand-written --classpath in
+              bin/run_tests.cljs, shadow-cljs reading :deps, and a sibling checkout that
+              happens to sit next door under orgs/. Three of the four put a dependency on the
+              classpath whether or not deps.edn names it, so an undeclared require resolves
+              for everyone who already has the dependency and for nobody else. The first
+              person it does not resolve for is always a new consumer, part-way through its
+              first run.
+              Measured twice on 2026-09-06 in one session. (1) kotobase-protocol-core's
+              deps.edn said `src has no dependencies at all ... verified by grep at the
+              2026-08-05 split`; src/kotobase/protocols/blocks.cljc arrived AFTER that split
+              and requires kotobase.store, so three surface repos needed the whole kotobase
+              repository on the classpath with nothing declaring it and a fourth found out as
+              `Could not find namespace: kotobase.store`. (2) net-kotobase/ipfs pinned io-ipld
+              twelve commits behind the namespace a new file needed -- the same shape one
+              layer down, where the coordinate is declared and the revision it names does not
+              carry the namespace.
+              Neither was carelessness. A comment recording a grep is only as true as the day
+              it was run, and nothing in this workspace re-ran it.
+              The two directions are reported apart, deliberately: `used but undeclared` says
+              add a coordinate (severity fail) and `declared but unused` says remove it or say
+              why it is there (severity warn, and it distinguishes a deliberate version FLOOR
+              from dead weight). Fusing them into one mismatch count is the failure this
+              detector exists to stop.
+              CANNOT be a fleet gate: resolving what a dependency PROVIDES means reading that
+              repository's checkout under orgs/, and a gate ships only the target repo's own
+              tree."
+   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+              "{{repo}}/scripts/verify-declared-dependencies.cljs" "--findings"
+              "--scan-root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :writes   :none
+   :interval-ms 86400000                 ; 24h -- deps.edn and src ns forms move in days
+   :timeout-ms  300000                   ; 5m -- 80x the slower measured run
+   :measured "2026-09-06 on this machine, four runs: 3.64s and 3.27s at load average 30.2, then
+              11.81s and 9.85s at load 52.8. Byte-identical output all four times. The load is
+              recorded beside the number because this workstation runs many concurrent agent
+              sessions and the wall time is mostly theirs; the timeout below is sized against
+              the SLOWER pair. SCANNED 64 external requires from 65 source files across the
+              14 repos the default scope matches; 50 checkouts read in total once the
+              dependency closures are followed. Exit 2, 18 fail findings, 5 warns, 4 unmeasured.
+              Both directions were watched before landing, on the real repository rather than
+              on a fixture. A copy of kotobase-protocol-core carrying its PRE-FIX deps.edn
+              (`git show HEAD~1:deps.edn`, the `:deps {}` with the grep comment) exits 1 with
+              exactly `undeclared-require:...:kotobase.store`; the same tree with the shipped
+              deps.edn, nothing else changed, exits 0 clean. `--selftest` builds its own trees
+              and shows all three questions changing colour, including the pin question over
+              two real commits of a git repository it creates -- pinned one commit back it
+              reports the namespace that revision does not carry and not the one it does,
+              pinned forward it goes clean, and pinned to a sha no object store holds it says
+              unmeasured rather than behind.
+              The 18 fail findings are one defect repeated: six kotobase-protocol-* surface
+              repos (atproto, git, ipfs, issues, pinning, s3) carry `:deps {}` under a comment
+              saying `src depends only on kotobase-protocol-core`, and require
+              kotobase.protocols.{blocks,hash,http,json} and kotobase.store from src.
+              kotobase-protocol-core itself is clean -- its fix landed the same day.
+              The 4 unmeasured are one coordinate: `io.github.kotoba-lang/dag-cbor`, which
+              names a repository RENAMED to org-ietf-cbor. GitHub's redirect still resolves it
+              for tools.deps, which is why nothing had noticed, but there is no
+              orgs/kotoba-lang/dag-cbor to read -- so what it provides is unmeasured, and this
+              refuses to report agreement rather than assume. It is first reached from
+              kotoba-lang/security/deps.edn; tech-ipfs-specs-ipns already fixed its own copy
+              of the same coordinate and left a comment saying why. This is a standing gap in
+              the tree, not detector noise: the detector reads :inconclusive until a
+              coordinate is corrected or the checkout appears.
+              NOT `accepted`: an acceptance would have to name the finding key, and the honest
+              answer here is that the run genuinely did not measure that dependency. Recording
+              it as understood-and-deferred would put an exit-2 reason inside the class the
+              registry reserves for findings.
+              It reads WORKING TREES, like verify-dep-coordinate-identity and for the same
+              reason -- so a finding describes the deps.edn that is CHECKED OUT, which in this
+              workspace is regularly not the one upstream has. Check the dependency's main
+              before acting on one."}
+  {:id       :verify-lint-structural-warnings
+   :title    "clj-kondo structural warnings: an if with no else, a when with no body"
+   :why      "Every registered repository here carries the same lint alias -- clj-kondo
+              2024.11.14, `--lint src test --fail-level error`. Measured 2026-09-06: 3,122 of
+              the 4,331 paths manifest/west.yml pins declare it. NOTHING RUNS IT. GitHub
+              Actions was retired fleet-wide (ADR-2607300900) and the 301 entries in
+              scripts/fleet-ci/gates.edn contain no clj-kondo gate -- the one entry NAMED
+              `lint` is nbb-cross-runtime-lint, which exercises the `lint` library on a second
+              runtime and never invokes a linter.
+              ADR-2607091500 (accepted, 2026-07-09) fixed that alias shape AND declared lint
+              `CI の必須ジョブ` -- a required CI job. The later ADR retired the thing that ran
+              it, and the enforcement clause was never re-homed. The alias has been inert ever
+              since: present in three thousand deps.edn files, run in none.
+              `--fail-level error` is the second half of the defect. Both ids below are
+              :warning by default, so even on the day the alias last ran, every one of these
+              exited 0. Only a mechanism that treats them as FINDINGS sees them.
+              missing-else-branch, 9 sites in 6 files. Two had already been diagnosed by hand,
+              at cost: network-awai/local-murakumo src/local_murakumo/worker.cljs:1546 lost its
+              else, cljs compiled it as a `when`, and every non-streaming /v1/messages resolved
+              to nil -- which the live Worker answered as 500 RangeError (fixed by hand
+              2026-09-01 in d7225b7, while clj-kondo had been able to print `Missing else
+              branch.` at it the whole time; it is absent from the sweep, which is the fix
+              showing up). kotoba-lang/ayatori src/ayatori/remote.cljc:457 cost TWO
+              discoveries and two fetches where none costs one, and killed the Node process on a
+              rejecting source. RESOLVED 2026-09-06. The defect was real -- the if-not opened at
+              457:37 and CLOSED at 469:89 with one child form, so the (try ...) on line 470 was
+              its sibling, not its else -- but the repository's main had ALREADY been fixed
+              (b539060, merged baceead7) and the west pin was ALREADY at that merge. Only the
+              shared CHECKOUT lagged, at 408938c, and this detector reads the checkout; the
+              fetch the first sweep recorded as refused in fact succeeds. `west update --fetch
+              smart ayatori` cleared it and the site went with it.
+              So checkout, west pin and main being three different things (ADR-2608136800) cuts
+              BOTH ways here: a stale checkout makes this detector report a site that no longer
+              exists in anything that ships -- a FALSE POSITIVE, the mirror of the silence the
+              rest of this entry is about. A finding means `the tree on disk carries it`; check
+              `git -C <path> rev-parse HEAD` against the pin before acting on one.
+              The other four -- cloud-itonami-isic-3520, cloud-itonami-isic-853,
+              network-awai/cloud-itonami and kototama-component -- had never been named anywhere
+              before this ran, and neither had the sixth file the count includes without the
+              prose naming it, kotoba-lang/ooyake
+              src/ooyake/cells/world_model/state_machine.cljc:65.
+              missing-body-in-when, 1 site, and it earns its place on evidence not symmetry:
+              kotoba-lang/kotoba-lang test/kotoba/cli_test.cljc:116 is
+              `(when (pos? ...) #?(:clj (System/exit 1)))`, and under :cljs the reader
+              conditional yields nothing, so A FAILING SUITE DOES NOT EXIT NON-ZERO.
+              SCOPED NARROWLY ON PURPOSE, and the price is visible in the run's own output: the
+              sweep saw 20,325 clj-kondo findings of every kind and reported 10. unused-binding
+              alone is 2,992 sites across 1,611 repos; unused-referred-var, unused-namespace,
+              redundant-do, misplaced-docstring and single-logical-operand are this codebase's
+              idiom or are cosmetic. A gate that lands red against thousands of sites is not a
+              gate, and the 10 would be inside it.
+              THIS DOES NOT RE-HOME ADR-2607091500's CLAUSE. It covers two ids of it. Every
+              repository whose own --fail-level error alias would already be red if anything
+              ran it is still unaddressed by this or by anything else; the error-level share of
+              those 20,325 was not separated out, and stating it would be a number this entry
+              did not measure.
+              Unlike most entries here it COULD be a fleet gate for the per-repo half --
+              clj-kondo needs only the target repository's tree. It is here because the
+              question is fleet-wide (9 sites across 4,331 paths, four of them in repositories
+              nobody would have thought to add a gate to), and because no node declares
+              clj-kondo while the alias's own `clojure -M:lint` needs :jvm, which 2 of the 8
+              nodes have."
+   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+              "{{repo}}/scripts/verify-lint-structural-warnings.cljs" "--findings"
+              "--scan-root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :writes   :none
+   :interval-ms 86400000                 ; 24h -- source moves in days and the sweep is long
+   :timeout-ms  3600000                  ; 60m -- 3.5x the measured run, on a loaded machine
+   :measured "2026-09-06 on this machine. Full sweep: 1020s wall, load average 17.4 rising to
+              26.4 across the run -- the load is recorded beside the number because this
+              workstation runs many concurrent agent sessions and most of that wall time is
+              theirs. SCANNED 33,269 source files across the 3,766 repos that have a src/ or
+              test/, of 4,331 registered paths; 539 had neither and are out of scope; 9 files
+              did not parse. Exit 2: 7 findings (10 sites) and 35 things that could not be
+              linted -- 26 registered paths with no checkout and 9 unparseable files. Exit 2
+              rather than 1 is the honest state: until those 35 can be read, `neither id occurs
+              anywhere` is not a claim this detector is entitled to make.
+              NOT `accepted`: an acceptance names a finding key, and every unmeasured row here
+              is a thing the run genuinely did not measure, not a finding understood and
+              deferred. Recording them as accepted would put an exit-2 reason inside the class
+              the registry reserves for findings.
+              Both directions were watched on the real tree before landing, not asserted.
+              FINDS IT: --repo kototama-component --repo ooyake exits 1 with exactly the two
+              sites, at 528:3 and 65:9. GOES CLEAN: --repo prolly-tree exits 0 having linted 12
+              files with 0 clj-kondo findings of any kind. REFUSES: --repo property exits 2 on
+              src/kotoba/property/query.clj, which clj-kondo cannot parse, while still linting
+              the other 78 files in that repository -- an unreadable file does not blind the
+              repo around it.
+              `--selftest` builds its own trees and shows eleven things change colour,
+              including three that are easy to get silently wrong: a repository whose own
+              .clj-kondo/config.edn sets both ids to :level :off is STILL reported (without the
+              forced --config, clj-kondo prints `:findings []` there and this would report
+              clean having measured nothing); linting leaves no .clj-kondo/.cache behind, which
+              is what `--cache false` buys and what makes :writes :none true -- 24 registered
+              repositories already have a .clj-kondo directory, and clj-kondo writes a cache
+              into exactly those; and the excluded ids stay quiet on a file deliberately full
+              of them.
+              The clj-kondo BINARY on PATH is used, not `clojure -M:lint`: same pinned version
+              (checked at startup, and a mismatch or an absent binary is exit 2 before any
+              sweep), ~10ms startup against the JVM's seconds, and no contention for the build
+              lock. Skipping the classpath cache cannot change these two answers -- a populated
+              cache moves unresolved-namespace and unresolved-symbol counts, which need to know
+              what another namespace defines, while missing-else-branch and missing-body-in-when
+              are decided from the arity of one form and see nothing outside the file.
+              It reads WORKING TREES, like verify-declared-dependencies and for the same
+              reason. The ayatori finding is what that costs and what it buys: the fix is said
+              to exist and is not in the checkout, so the defect is really there for anyone
+              running this code. Check the repository's main before acting on a finding."}
+  {:id       :verify-pages-freshness
+   :title    "公開ページが、その repo の default branch より何 commit 前に建てられたものか"
+   :why      "2026-09-08、kotoba-lang/kami-app-suji の公開ページは HTTP 200 を返して
+              普通に開けたが、中身は 2 日前の build で、その間に着地した波 —— 可視量
+              50 → 86、結合解の報告、動員されていない 11 筋が『軽く負荷』と塗られていた
+              欠陥の修正 —— は 1 つも live に無かった。**古いページも 200 を返す。**
+              CLAUDE.md の single-page app 規則は『見られることは規則の半分』と書いて
+              いて、これはその裏面 —— document は出ているが中身が古い。ソースからは
+              見えず、開いても見えない。
+              同じ日、その publish を行うスクリプトの docstring と過去の publish commit
+              すべてが『Actions が repo 全体で無効だから前回の artifact は失敗せずに
+              古くなった』と書いていたが、GitHub に訊くと {\"enabled\":true} だった ——
+              **理由の側が偽になっていた**ので、理由を読まずに時刻と commit を数える。
+              全件（8 org / Pages 有効 524 repo）で測ると: **URL が 200 を返さない 52**、
+              build 記録あり 496、build より後に commit が在る 444（うち status が
+              built でないもの 6 —— building 5 / errored 1）、遅れの中央値 5・最大 51。
+              444 を 1 件ずつ finding にすると使われなくなるので、**個別 finding は
+              境界が導出できる 2 つ**（開けない / build が完了していない）に限り、
+              残りは母数と最悪値を持つ 1 行の集計 finding にした。列挙しないことと
+              数えていないことは別である。"
+   :argv ["nbb" "{{repo}}/scripts/verify-pages-freshness.cljs" "--findings"]
+   :cwd :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 2700000
+   :interval-ms 86400000
+   :measured "GitHub の credential を要するのでノードでは引けない —— fleet gate に
+              できない理由は orgs/ を読むことではなく、鍵を持たないことのほう
+              （不変条件3）。1 repo につき /pages・pages/builds/latest・commits?since の
+              3 リクエストと、**URL への実 GET 1 本**。API だけでは足りないことは実測で
+              決まった: build_type が workflow の repo は /pages の status が null で
+              build 記録が 404 を返すが URL は 200 を配っており（kotoba, svgraph）、
+              API の沈黙を『建っていない』と読むと嘘になる。
+              数えているのは『build より後に着地した commit の本数』だけで、これは
+              サイトが間違っているという主張ではない —— README だけを直した commit なら
+              site は正しいまま。だから severity は warn、閾値は無い（> 0 だけが導出
+              できる境界で、それ以外は発明した定数になる）。commits の件数は 1 ページ
+              ぶんしか引かないので 100 で頭打ちになり、そのときは `100+` と印字する。
+              両方向を見た: org を引けなければ REFUSED で exit 2（実測、実在しない org
+              名で確認）。serving? を常に真にすると ① が空になり、commits-since を 0 に
+              固定すると ② が空になる —— どちらも復元は sha256 一致。"}
 ]}
