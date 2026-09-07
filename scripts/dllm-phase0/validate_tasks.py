@@ -166,6 +166,113 @@ def matrix_diagonal(m):
 def group_by_parity(xs):
     return {'even': [x for x in xs if x % 2 == 0], 'odd': [x for x in xs if x % 2 != 0]}
 """,
+
+"lru_cache_class": """
+from collections import OrderedDict
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity; self.d = OrderedDict()
+    def get(self, key):
+        if key not in self.d: return -1
+        self.d.move_to_end(key); return self.d[key]
+    def put(self, key, value):
+        if key in self.d: self.d.move_to_end(key)
+        self.d[key] = value
+        if len(self.d) > self.cap: self.d.popitem(last=False)
+""",
+"topo_sort": """
+def topo_sort(n, edges):
+    adj = {i: [] for i in range(n)}; indeg = {i: 0 for i in range(n)}
+    for u, v in edges:
+        adj[u].append(v); indeg[v] += 1
+    q = [i for i in range(n) if indeg[i] == 0]; out = []
+    while q:
+        u = q.pop(0); out.append(u)
+        for v in adj[u]:
+            indeg[v] -= 1
+            if indeg[v] == 0: q.append(v)
+    return out if len(out) == n else None
+""",
+"edit_distance": """
+def edit_distance(a, b):
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+""",
+"parse_ini": """
+def parse_ini(text):
+    out = {}; sec = ''
+    for line in text.splitlines():
+        t = line.strip()
+        if not t or t[0] in ';#': continue
+        if t.startswith('[') and t.endswith(']'):
+            sec = t[1:-1]; out.setdefault(sec, {})
+        elif '=' in t:
+            k, v = t.split('=', 1)
+            out.setdefault(sec, {})[k.strip()] = v.strip()
+    return out
+""",
+"interval_intersection": """
+def interval_intersection(a, b):
+    i = j = 0; out = []
+    while i < len(a) and j < len(b):
+        lo = max(a[i][0], b[j][0]); hi = min(a[i][1], b[j][1])
+        if lo <= hi: out.append([lo, hi])
+        if a[i][1] < b[j][1]: i += 1
+        else: j += 1
+    return out
+""",
+"base62_roundtrip": """
+A = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+def to_base62(n):
+    if n == 0: return '0'
+    s = ''
+    while n: n, r = divmod(n, 62); s = A[r] + s
+    return s
+def from_base62(s):
+    n = 0
+    for c in s: n = n * 62 + A.index(c)
+    return n
+""",
+"group_anagrams": """
+def group_anagrams(words):
+    d = {}
+    for w in words: d.setdefault(''.join(sorted(w)), []).append(w)
+    return sorted([sorted(g) for g in d.values()], key=lambda g: g[0])
+""",
+"validate_brackets_depth": """
+def max_depth(s):
+    d = best = 0
+    for c in s:
+        if c == '(': d += 1; best = max(best, d)
+        elif c == ')':
+            d -= 1
+            if d < 0: return -1
+    return best if d == 0 else -1
+""",
+"merge_sorted_k": """
+def merge_k(lists):
+    out = []
+    for l in lists: out.extend(l)
+    return sorted(out)
+""",
+"spiral_matrix": """
+def spiral(m):
+    if not m: return []
+    m = [list(r) for r in m]; out = []
+    while m:
+        out += m.pop(0)
+        if m and m[0]:
+            for r in m: out.append(r.pop())
+        if m: out += m.pop()[::-1]
+        if m and m[0]:
+            for r in m[::-1]: out.append(r.pop(0))
+    return out
+""",
 }
 
 
