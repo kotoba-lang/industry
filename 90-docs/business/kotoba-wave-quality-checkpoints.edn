@@ -5,3 +5,10 @@
 (:qc/at "2026-09-06T13:20:00Z" :qc/checkpoint :#3 :qc/retrofit-complete true
  :qc/summary "test-page-limit export retro-fitted into page_limit.kotoba of all 20 wave-1 tranche repos; kotoba -M test 3/3 passed on :jvm-kir :js :wasm for every file (operator-measured). 19 pin advances landed in one batch commit (ce8dab0, west-pin-put-batch 19/19 verified). Remediation item from checkpoint #2 amendment is closed."
  :qc/verification "final gate re-run: page_limit test gate 20 pass / 0 fail")
+(:qc/at "2026-09-06T14:10:00Z" :qc/probe :whole-component-requalify-feasibility
+ :qc/target "com-aave main.cljc full public surface (27 defn, CRUD + pagination + validation)"
+ :qc/method "kotoba -M check probes against measured subset boundaries"
+ :qc/measured-admitted ["get on canonical typed map" "int decision kernels (as-int/clamp-limit/has-more?)" "arithmetic/comparisons/cond/if"]
+ :qc/measured-not-admitted ["str" "assoc" "filterv" "contains? on map" "atoms" "java/js interop (clock/uuid)"]
+ :qc/conclusion ":whole-public-surface gate CANNOT pass today — the CRUD surface requires string/map-mutation lowerings that the compiler subset does not admit. Wave-1 stays in pilot state (:consumer-cutover false); whole-component requalify is BLOCKED on compiler surface growth, not on process."
+ :qc/no-forced-migration "per :scope :whole-component-build-required true — shrinking the component to fit the subset would violate the contract; recorded as measured gap instead")
