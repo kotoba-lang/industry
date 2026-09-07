@@ -45,6 +45,24 @@ library を書いたことで emitter の欠陥が 2 つ見つかり、上流で
 - readiness gate 条件②（nbb スクリプト代表サブセットの移植）は本 ADR では進めていない。js backend と library はその移植の**書き先**を用意した。
 - 記録先: ADR-2607181900 現在地に js leg を追記、CLAUDE.md の js target 表と kbb 項を訂正。
 
+## 2026-09-07 — 並列 slice で進めた成熟度と coverage（すべて着地・実測）
+
+オーナー指示「subagent も使ってガンガン進めたい」で、独立 slice を fresh agent に振り、各 agent が worktree → 検証 → API merge まで行った。数値は各 agent の test 出力から転記。
+
+| slice | repo / commit | 実測 |
+|---|---|---|
+| kbb js provider 境界 test | kotoba `c5393d04` | 4 tests / 97 assertions / 0 fail。host の欠陥 6 件を修正（directory・64 KiB 超・非 directory の拒否が receipt 無しで throw、拒否メッセージの namespace 落ち、proc の `:elapsed-ms`）。proc timeout は provider 側 1015 ms |
+| kbb js CLI（`--fuel` / `--json` / 引数拒否 / 複数 `--source-path`） | kotoba `d3251c1d` | 4 tests / 54 assertions / 0 fail。host の欠陥なし。**effect の無い i64 `main` は compile 時に KIR oracle でも実行され、その fuel に `--fuel` は届かない**（countdown 200 は compile 時に fuel-exhausted） |
+| `kbb.str` + gate 移植 3 本目 `env_scan` | kotoba `a96dae55` | 3 tests / 22 assertions / 0 fail。`amu check` `:ok`。dirty 3 / clean 0 / unset は browse 拒否 |
+| kbb js fs **write**（loader `WRITE_SEP` 契約を写す） | kotoba `78458db1` | 3 ns で 12 tests / 213 assertions / 0 fail。結果は書いた content そのもの（loader と同じ）。65536 byte 超は provider の前に artifact の `string-too-large` で止まる（receipt 無し、実測どおり pin） |
+| kotoba-script parity golden 1 → 61 | kotoba-script `79d13e78` | nbb `SCANNED 99 failed 0`、3,588,034 byte、JVM 66 tests / 229 assertions。cljs で `-0` が i64 に化ける seam を修正（誤った直し方は 17 golden が赤にした） |
+| amu js 経路 golden +3 | amu PR #850 `aabc6758` | todo-app 70,312 / `--source-path` project 59,206 / `--fuel 4096` 57,887 byte、byte 一致 + manifest/provenance EDN 一致 |
+| kotoba-kir interpreter `string-index-of` | kotoba-kir `f1259101` | cljs で JS number を返していた（`(= (string-index-of …) 7)` が 0 に畳まれる silent wrong answer）→ BigInt。nbb 130 tests 563 passed / JVM 335 tests 2243 assertions。amu の kir pin `b021a0d` が原因の「pure な main で unknown-function」は amu 側の pin 前進で解消する（進行中） |
+
+- `bin/kbb --backend js` は shim から `bin/kbb_js.cljs` に委譲（kotoba `39aab807`）。3 backend が 1 入口。
+- gate ② の移植は `no_bb_scan`（3）/ `shebang_scan`（122 = [1 2 2]）/ `env_scan` の 3 本。interpreter twin と同じ test で突き合わせている。
+- 並列で走らせて分かった運用上の事実: session の rate limit で agent が途中で殺される（2 回）。worktree と branch は残るので、同じ agent を resume すれば続きから着地できた。resource-guard の build lock は agent 間で正しく直列化された（exit 2 → retry）。
+
 ## 再測定
 
 ```bash
