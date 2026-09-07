@@ -4529,3 +4529,12 @@ hyakka-wiki-index.key
 /orgs/kotoba-lang/skill-guest-authoring/
 /orgs/kotoba-lang/x402-sdk/
 /orgs/kotoba-lang/zap-proxy/
+
+# Credential files. `.env` at the superproject root held a fleet host's sudo
+# password in plain text, untracked but NOT ignored -- one `git add -A` away
+# from being committed (measured 2026-09-07). Ignoring it does not make the
+# storage right; it removes the accident. Secrets belong in kagi
+# (`.claude/skills/secrets-location-map`), not in a file the repo can stage.
+.env
+.env.*
+!.env.example
