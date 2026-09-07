@@ -1431,6 +1431,32 @@
              :detail (str "landing worktree preparation failed at "
                           (str/join " " args) ": " (str/trim (:out r)))}))))))
 
+(defn base-moved-detail
+  "`put-file!` の base 検査。呼び側が `content` を導出した元 (`base`) と、書き込み
+  直前に tip から materialize した実ファイル (`actual`) が違えば、その理由を
+  \"push rejected …\" の形で返す（nil = 一致、または base 未指定で検査なし）。
+
+  **ref の楽観ロックは content の base を守らない。** `put-file!` は自分で fetch
+  した tip の上に worktree を作るので push は fast-forward で通るが、書く content は
+  呼び側が *それより前に* 読んだ base から作られている。その間に誰かが同じ file を
+  動かしていれば、その変更は content に無く、**fast-forward のまま静かに巻き戻る**。
+
+  実測 2026-09-07（この関数ができた日）: 01:47Z に `west-pin-put` が open-jpn-gov の
+  pin を 7a48a7f0 → 31ae7491 に進めた（root `dd41613b`）。fleet-ci の tick は
+  それより前に west.yml を読んでおり、`verify-west-pins`（最長 300 s）を挟んで
+  01:57Z に ayatori の pin を書いた（`5d652130`、`2 insertions(+), 2 deletions(-)`）——
+  ayatori を進めると同時に open-jpn-gov を 7a48a7f0 へ**戻していた**。push は
+  拒否されず、`advance-pin!` は成功を返し、ログには何も出なかった。
+  `append-receipt!` も同じ形なので、並行する tick の receipt 行が落ちうる。
+
+  返す文言に \"push rejected\" を含めるのは意図的で、`advance-pin!` の再試行述語が
+  それを見る。再試行は `advance-pin-once!` を呼び直す = west.yml を読み直すので、
+  次の試行は新しい base から content を作り直す。"
+  [path branch base actual]
+  (when (and (some? base) (not= base actual))
+    (str "push rejected (base moved: " path " on " branch
+         " changed between read and write — retry from a fresh read)")))
+
 (defn put-file!
   "landing repo の path を content に置き換えて push する。
 
@@ -1439,8 +1465,14 @@
   non-fast-forward push が拒否されるのが 409 に相当する — 呼び側は「読み直して
   作り直して再試行」すればよく、意味論は変わらない。
 
+  ⚠ ただし ref のロックが守るのは **ref** であって content の base ではない。
+  `:base`（呼び側が `content` を導出した元の file 内容）を渡すと、書き込み直前に
+  tip から materialize した実ファイルと突き合わせ、違っていれば commit せずに
+  \"push rejected (base moved …)\" を返す（`base-moved-detail`）。渡さなければ従来
+  どおり無検査 —— 新しい呼び側は必ず渡すこと。
+
   作業は使い捨ての worktree で行う（superproject の working tree には触らない）。"
-  [{:keys [repo branch path content message]}]
+  [{:keys [repo branch path content message base]}]
   (let [d (mirror! repo)
         wt (fs/mkdtempSync (path/join (os/tmpdir) "fleet-ci-put-"))]
     (try
@@ -1448,9 +1480,14 @@
                           (str "+refs/heads/" branch ":refs/remotes/origin/" branch)])]
         (if-not (zero? (:exit fetch))
           {:ok false :detail (str "fetch failed: " (str/trim (:out fetch)))}
-          (let [prepared (prepare-landing-worktree! d wt (str "origin/" branch) path)]
-            (if-not (:ok prepared)
-              prepared
+          (let [prepared (prepare-landing-worktree! d wt (str "origin/" branch) path)
+                actual (when (and (:ok prepared) (fs/existsSync (path/join wt path)))
+                         (fs/readFileSync (path/join wt path) "utf8"))
+                moved (when (:ok prepared) (base-moved-detail path branch base actual))]
+            (cond
+              (not (:ok prepared)) prepared
+              moved {:ok false :detail moved}
+              :else
               (do
                 (fs/mkdirSync (path/join wt (path/dirname path)) #js {:recursive true})
                 (fs/writeFileSync (path/join wt path) content)
@@ -1480,7 +1517,9 @@
     (let [path receipts
           cur (gh-raw repo branch path)
           content (str (if (str/ends-with? cur "\n") cur (str cur "\n")) line "\n")
-          r (put-file! {:repo repo :branch branch :path path :content content
+          ;; :base cur — 並行 tick が同じ ledger に追記していたら、その行を落とした
+          ;; content を fast-forward で載せてしまう。base が動いていれば読み直す。
+          r (put-file! {:repo repo :branch branch :path path :content content :base cur
                         :message "fleet-ci: tip-driven murakumo tick receipt"})]
       (cond
         (:ok r) {:ok true}
@@ -1641,6 +1680,9 @@
             (if-not (zero? exit)
               {:ok false :detail (str "pin verification refused: " (str/trim out))}
               (let [r (put-file! {:repo repo :branch branch :path west :content cand
+                                  ;; cand は cur から作った。書く直前に tip の west.yml が
+                                  ;; cur と違えば書かない（base-moved-detail）。
+                                  :base cur
                                   :message (str "west: advance " nm " pin to " (sha12 new-sha)
                                                 " (fleet-ci green on murakumo)")})]
                 (if (:ok r) {:ok true :detail (str old " -> " new-sha)} r)))))

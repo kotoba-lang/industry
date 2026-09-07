@@ -238,6 +238,64 @@
       (is (= 1 puts)))))
 
 ;; ---------------------------------------------------------------------------
+;; CD: the ref lock does not protect the content's base
+;; ---------------------------------------------------------------------------
+;;
+;; Measured 2026-09-07: `west-pin-put` advanced open-jpn-gov at 01:47Z (root
+;; dd41613b). The tick had read west.yml BEFORE that, spent up to 300 s in
+;; verify-west-pins, then at 01:57Z pushed ayatori's advance on top of the NEW tip
+;; with content derived from the OLD read (5d652130: "2 insertions, 2 deletions").
+;; The push was a fast-forward, advance-pin! reported success, nothing was logged,
+;; and open-jpn-gov's pin was silently back at 7a48a7f0. append-receipt! has the
+;; same shape, so a concurrent tick's receipt line can be dropped the same way.
+
+(deftest base-moved-detail-is-nil-when-the-base-is-unchanged
+  (is (nil? (tick/base-moved-detail "manifest/west.yml" "main" "west" "west"))))
+
+(deftest base-moved-detail-names-the-race-when-the-base-moved
+  (let [d (tick/base-moved-detail "manifest/west.yml" "main" "west" "west+someone-else")]
+    (is (string? d))
+    (is (str/includes? d "push rejected")
+        "advance-pin!'s retry predicate keys on this phrase — a moved base is a
+         race to retry from a fresh read, not a refusal to report")
+    (is (str/includes? d "manifest/west.yml"))))
+
+(deftest base-moved-detail-skips-callers-that-pass-no-base
+  ;; nil base = not measured. It must read neither as "unchanged" nor as "moved"
+  ;; (ADR-2608136000: a question that was not asked is not a clean answer).
+  (is (nil? (tick/base-moved-detail "p" "main" nil "anything"))))
+
+(deftest pin-advance-hands-put-file-the-base-it-derived-the-candidate-from
+  (let [seen (atom nil)]
+    (with-redefs [tick/gh-raw (fn [& _] "west-as-read")
+                  tick/parse-west (fn [_] {:projects {"r" {:revision "old"}}})
+                  tick/replace-revision (fn [& _] "cand")
+                  tick/sh (fn [& _] {:exit 0 :out ""})
+                  tick/put-file! (fn [m] (reset! seen m) {:ok true :detail "old -> new"})
+                  tick/log (fn [& _])]
+      (tick/advance-pin! pin-landing "r" "new")
+      (is (= "west-as-read" (:base @seen))
+          "without :base, put-file! cannot tell that the tip moved between read and write")
+      (is (= "cand" (:content @seen))))))
+
+(deftest pin-advance-retries-a-moved-base-like-a-lost-push
+  (with-pin-stubs [{:ok false :detail (tick/base-moved-detail "manifest/west.yml" "main" "a" "b")}
+                   {:ok true :detail "old -> new"}]
+    (fn [r puts reads]
+      (is (:ok r))
+      (is (= 2 puts))
+      (is (= 2 reads) "the second attempt must re-read west.yml"))))
+
+(deftest receipt-append-hands-put-file-the-ledger-it-appended-to
+  (let [seen (atom nil)]
+    (with-redefs [tick/gh-raw (fn [& _] "line1\n")
+                  tick/put-file! (fn [m] (reset! seen m) {:ok true})
+                  tick/log (fn [& _])]
+      (tick/append-receipt! {:repo "r" :branch "main" :receipts "manifest/fleet-ci.edn"} "line2")
+      (is (= "line1\n" (:base @seen)))
+      (is (= "line1\nline2\n" (:content @seen))))))
+
+;; ---------------------------------------------------------------------------
 ;; A west project's name is not always its GitHub repo name.
 ;;
 ;; west allows `repo-path:` to differ from `name:`, and `path:` is then

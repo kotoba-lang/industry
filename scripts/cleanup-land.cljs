@@ -200,8 +200,17 @@
   日、同じ scratch worktree 由来で `etzhayyim/tamaki` の test と
   `kotoba-lang/kakeibo` の accounting 実装（src+test）が正しく着地している。
   効く信号は**取り込み元のディレクトリ**ではなく**着地する path そのもの**で、
-  取り込み元で弾いていれば本物 3 件を巻き添えにしていた。"
-  #"(^|/)(node_modules|\.cpcache|\.shadow-cljs|cljs-runtime|\.fleet-run|\.wrangler|target|dist|build|out|scratch|\.probe|tmp|\.DS_Store|.*\.log|.*-cache\.json)(/|$)")
+  取り込み元で弾いていれば本物 3 件を巻き添えにしていた。
+
+  `\\.clj-kondo/\\.cache` は 2026-09-07 に追加。clj-kondo の lint cache
+  （`.clj-kondo/.cache/v1/**/*.transit.json` と `lock`）はエディタ/LSP が走るたびに
+  書き換わる生成物で、repo が `.gitignore` に持っていなければ `??` に上がる。実測:
+  fleet の dry-run が `:additive`（= PR を作って **merge する**クラス）として計上した
+  4 repo のうち **2 repo（kotoba-lang/kami-app-modeler 12 件 / langgraph 8 件）は
+  この cache だけ**で、そのまま apply していれば lint cache を main に commit していた。
+  `.clj-kondo` 全体を落とさないのは、`.clj-kondo/config.edn` が正当に track される
+  設定ファイルだから —— 落とすのは `.cache` 配下だけ。"
+  #"(^|/)(node_modules|\.cpcache|\.shadow-cljs|cljs-runtime|\.fleet-run|\.wrangler|target|dist|build|out|scratch|\.probe|tmp|\.DS_Store|\.clj-kondo/\.cache|.*\.log|.*-cache\.json)(/|$)")
 
 (def max-bytes (* 2 1024 1024))
 
