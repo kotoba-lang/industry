@@ -105,9 +105,9 @@ loop. Matching that shape is the closer for the 1.24×.
   AArch64 LLVM+ ranking of the published narrow harness, including the
   loop-in-artifact refutation.
 
-## 改訂履歴
+## 現在地 2026-09-07（測って書く。数値は amu ledger 148–150 が正本）\n\n判定器は `kotoba-lang/perfgate` default-v1（30 ペア: 6 domain × rust / clang / zig /\ngo / swift、5% 以上かつ summed-stdev 分離）。公開値は quiet-gate と mid-run\n`hostLoadQualified` の両方を通った 5 run の中央値。\n\n- **公開スコア 19/30**（run 19 19 19 20 20、床 19。前回 19、run 19 19 17 17 19、床 16）。\n  kotoba-lang.org / `bench/public-runtime-comparison/latest.json`（kotoba-lang #612）。\n- **到達不能を証明済みのペア**: narrow-arithmetic × clang / rust（同一の 61 命令。\n  swift も同じ）。loop-call × rust / clang は call 律速のタイ（amu の loop 本体 10 命令\n  vs clang 20 で差 ±1%）。**この fixture 集合の現実的な天井は 22–24/30** であり、\n  30/30 は codegen では到達しない。\n- **call 境界は命令単位で解剖済み**（ledger 148）: amu の余分 8 命令/呼び出しのうち\n  4 は fuel 契約、4 はアロケータが引数まわりに吐く copy。後者は kotoba-native #154\n  （post-allocation coalescing）で除去。#151 hoist + #152 cross-call hoist + #154 を\n  amu #857 が搬入した結果、call-preservation × rust は −5.9% → −0.8%、× clang は\n  −6.4% → −0.7%、branch-call × clang は −11.4% → −6.1%。**qualified は 1 つも増えて\n  いない**（判定は「5%」であって「近づいた」ではない）。残る差は fuel 契約そのもの。\n- **deep-spill × rust / zig は +4.1% / +4.8%** —— 5% 線の直下。動かせるのはここと、\n  ノイズで落ちる wide × rust / clang、deep × clang。\n- **測定床がコンパイラより支配的になった。** judah は fleet gate と同居しており\n  （2 時間で 50 gate 配置）、A/B 12 run 中 4 run が run 途中で汚染された。projector は\n  `hostLoadQualified false` を拒否するようにした（#612）。それでも床は ±1.5% で、\n  残りのペアの差はそれ以下。\n\n**再開点**: (1) ベンチ実行中の judah を gate rotation から外すか lease するか\n（`scripts/fleet-ci/probe.cljs` `operator-hosts`。placement authority は murakumo、\nオーナー判断）。(2) その上で deep-spill の残り ~1%（sum 木の線形化は fixture では\n+3.17%、hoist が −2.66% を回収済み、差分は未測定）。(3) ledger は\n`orgs/kotoba-lang/amu/docs/codegen-coscientist.md` の 148–150 から続ける。\n\n## 改訂履歴
 
 - 2026-08-18: accepted. Owner override of ADR-2608179400 decision 2.
   Coalescing landed in kotoba-native (`5dbe0d2`). Loop-in-artifact
   measured and refuted on this lowering (71.27 vs 12.79 ns). Numbered 05
-  so it does not clobber iteration 04."}]
+  so it does not clobber iteration 04.\n- 2026-09-07: 現在地節を追加。公開 19/30 据え置き（床 16→19）、call 境界の解剖と\n  coalescing（kotoba-native #154）、到達不能ペアと天井 22–24/30、測定床の所見。"}]
