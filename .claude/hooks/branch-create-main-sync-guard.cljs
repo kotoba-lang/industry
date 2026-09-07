@@ -129,6 +129,22 @@
         ;; base は正しい。推奨形なのでブロックしない。
         (when (str/includes? cmd ref) (allow!))
 
+        ;; 同じ理由で、<remote>/<branch> を明示していて、その remote-tracking ref が
+        ;; この repo に実在するなら、それも remote の状態であってローカルの遅れでは
+        ;; ない（PR が main 以外の統合 branch を base にする形: k16-stream-* 等）。
+        ;; 実測 2026-09-07: 2 つの agent が `origin/k16-stream-20260906` を明示して
+        ;; ここで deny され、script file 経由で回避した。default 以外は stderr に
+        ;; 名指しで残す —— 通したことと検査しなかったことを同じ無言にしない。
+        (let [[remote _] (str/split ref #"/" 2)
+              named (->> (re-seq (re-pattern (str "(?:^|\\s)(" remote "/[A-Za-z0-9._/-]+)")) cmd)
+                         (map second) (remove #(= % ref)) distinct)
+              live (filter #(not (str/blank? (git top "rev-parse" "--verify" "--quiet" (str "refs/remotes/" %)))) named)]
+          (when (seq live)
+            (js/console.error
+             (str "branch-create-main-sync-guard: base is the remote branch " (first live)
+                  " (not " ref "); allowed because a remote-tracking ref is remote state, not local lag."))
+            (allow!)))
+
         (let [[remote branch] (str/split ref #"/" 2)]
           (git top "fetch" "-q" remote branch)
           (let [raw    (git top "rev-list" "--count" (str "HEAD.." ref))
