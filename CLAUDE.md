@@ -234,33 +234,41 @@ skill `new-project-scaffold` を参照。
     従来どおり必ず**事前確認**する（force-push / 履歴書き換えの詳細は下記 Git operations
     節。公開リポ化と他者ブランチへの push はここが正本の禁止列挙）。
 
-## 人間認証は Passkey-only、弱い経路へ戻さない（repo-wide mandatory、2026-08-30、ADR-2608302125）
+## 人間認証は Web3 first（repo-wide mandatory、2026-09-07、ADR-2609070400）
 
-first-party project が human session、identity bootstrap、credential registration /
-replacement、account recovery のいずれかを発行する場合、root `SECURITY.md` と
-`manifest/human-authentication-policy.edn` を必ず適用する。
+first-party の human session、identity bootstrap、credential registration/replacement、
+account recovery には root `SECURITY.md` と `manifest/human-authentication-policy.edn` を適用する。
+旧 ADR-2608302125 の「Passkey のみ」は当時の決定であり、現在の許可規則としては不適切。
+オーナーの Web3 first 方針により、検証済みウォレット署名を正規の認証手段とする。
 
-- active な人間認証は WebAuthn Passkey のみ。Email、password、SMS/voice、OAuth /
-  OIDC / SAML / social / enterprise SSO、support/operator/admin override を login、
-  bootstrap、step-up、credential registration、recovery の authority にしない。
-- approved authenticator が無い時は fail closed。feature flag、tenant setting、provider
-  secret、legacy record、incident 対応から弱い fallback を復活させない。
-- recovery は session を直接発行せず、one-time offline secret + 48 時間以上の
-  server-enforced delay + fresh Passkey による credential replacement とする。
+- Web3 first: SIWE + ERC-191 (EOA) / ERC-1271 (contract wallet) による署名認証を
+  第一の選択肢とし、WebAuthn Passkey も正規の手段として維持する。各 product が提供する
+  手段は inventory に明記する。方針変更だけで全 product の wallet 対応済みとはしない。
+- wallet 接続、address、DID、client hint だけでは認証しない。server-issued single-use nonce、
+  domain/origin/URI、chain、expiry、署名、atomic nonce consumption を server 側で検証する。
+  ERC-1271 は指定 chain と現在の contract authority を確認し、検証不能なら fail closed。
+- Passkey は exact RP ID / Origin、single-use challenge、replay protection、user verification を必須とする。
+  SIWE の domain 検証を WebAuthn と同じ phishing resistance と呼ばない。
+- Email、password、SMS/voice、OAuth/OIDC/SAML/social/enterprise SSO、support/operator/admin
+  override を login、bootstrap、step-up、credential registration、recovery の authority にしない。
+  approved authenticator が無い時は fail closed。設定・secret・incident から禁止経路を復活させない。
+- login は送金・署名代行・governance の承認ではない。操作別の権限検査を維持する。
+  wallet DID と Passkey DID を暗黙に統合せず、既存 identity への credential 追加は既存 owner の
+  検証済み権限を要する。wallet login だけで別 identity の復旧はできない。
+- recovery は session を直接発行せず、one-time offline secret + 48 時間以上の server-enforced
+  delay + fresh approved authenticator による credential replacement とする。
   operator は freeze できるが identity を grant できず、delay を短縮できない。
-- closed legacy route は 404/410 で ceremony・redirect・token/session/credential issuance
-  を始めない。source / built artifact / live route の negative test に plausible legacy
-  secret を含める。
-- 新しい human-auth surface は deploy 前に machine inventory へ登録する。
-  `:migration-gap` / `:unverified` を `:conformant` と読まず、1 件でも残る間は
-  workspace-wide Passkey-only を claim しない。
-- 外部仕様 mirror、protocol library、test fixture、強認証後の notification/connectivity
-  は、それだけで human authentication authority ではない。文字列の存在ではなく、
-  human session / credential / recovery を発行する authority を境界にする。
+  wallet 自体の外部 recovery は本サービスの identity recovery を代行・迂回しない。
+- closed legacy route は 404/410 で ceremony・redirect・session/token/credential issuance を始めない。
+  source / built artifact / live route の negative test に plausible legacy secret を含める。
+- 新しい human-auth surface は deploy 前に inventory へ登録する。`:migration-gap` / `:unverified`
+  を `:conformant` と読まず、方針採用・merge だけで全体の適合や本番稼働を claim しない。
+- 外部仕様 mirror、protocol library、test fixture、認証後の notification/connectivity は
+  human session / credential / recovery を発行しない限りこの authority 境界の対象外。
 
-project の nested `SECURITY.md` は root policy を強化・具体化できるが、弱めてはならない。
-競合は security finding として扱い、便利さを理由に局所例外を作らない。federation が必要なら
-別 hostname・RP/trust boundary・session namespace・threat model・ADR を持つ別 product にする。
+nested `SECURITY.md` はこの方針を強化・具体化できる。Passkey 専用 product も許すが、
+wallet 認証を workspace 全体で禁止する根拠にはしない。federation product は別 hostname・
+trust boundary・session namespace・threat model・ADR を持ち、既存 authority の fallback にしない。
 
 ## CI/CD は murakumo fleet。GitHub Actions を使わない（repo-wide mandatory、2026-08-05、ADR-2607300900）
 
