@@ -521,6 +521,37 @@ break/unbreak は各波で実施。`mirror` の巻き付き符号反転を外す
 着地していない理由は「難しいから」ではなく、まだやっていないからである ——
 この節を読む者が、報告の沈黙をカバレッジと読まないように書いておく。
 
+## 引き継ぎ（2026-09-08 closing）
+
+**常駐化した。** `~/.hermes/profiles/suji-anatomy/`（SOUL.md + `scripts/anatomy_evidence.cljs`
++ `cron/jobs.json`、`23 */2 * * *`、propose only）。定義は
+`scripts/hermes-cron-jobs/hermes-cron-jobs.json` に export 済みなので、端末を
+建て直しても復元できる。evidence script が毎 tick 測るもの: 3 repo の west pin と
+upstream tip の差 / **suji README が自分で『できない・得られなかった』と書いている節**
+（固定見出しに縛らない —— 初版は消えた見出しを探して 0 件を返した）/ 公開ページが
+実際に配信しているか / ledger 追記。**SMOKE-OK が出なければ測定失敗**で exit 2。
+
+**この日に landed した波（すべて west pin 前進済み）**
+
+| repo | tip | 何が入ったか |
+|---|---|---|
+| `cloud-itonami/suji` | `d089ecf` | 複数制約の同時解 / 骨盤傾斜と T12/L1 分割 / 出典つき前弯 / 支持依存の根 / **腰椎 5 レベルが各自の向きを持つ** |
+| `kotoba-lang/kami-app-suji` | `d438bf4` | 可視量 50 → 98、cljs runner 新設、骨盤傾斜と 2 分割の描画、**1 度の view 遷移で viewport が死んでいた**欠陥の修正、公開ページ再 publish |
+| `kotoba-lang/biomech` | `b3be7f0` | suji との境界記述、Thelen 2003 の受動、椎間板 2 組織の出典、等方性に載らない組織の拒否 |
+
+**最後の測定が最後の一致を壊した。** 5 レベルに各自の向きを与えた結果、
+立位−座位は +1.568 → **−10.859 N**（Wilke は +48）、`:same-direction?` が **false**。
+原因は名指しされ、大きさも出ている —— 15.29° では L4/L5 上の重量の 0.965 しか
+その軸に乗らず（−12.34 N）、同じ傾きが作る **91.98 N のせん断を担うものがこの
+モデルには無い**（facet も、せん断駆動の動員も無い）。2026-09-08 に名指しされた
+限界が、その日は 0.32 N で、いまは支配項である。**次の 1 手はここ。**
+
+**未着地で残したもの（branch は push 済み、merge していない）**
+- `kotoba-lang/biomech` `agent/tissue-provenance`（`3270475`）—— 13 組織のうち
+  出典が無い 10 件への出典付け。皮質骨・海綿骨・動脈壁まで進み、**README の
+  再カウントが未了**のまま session rate limit で切れた。**検証していない**ので
+  テストは未実行として扱う。closing が WIP を commit して push しただけである。
+
 ## 第 9 波（2026-09-07）—— 等式制約が 1 本しか取れなかった
 
 **閉形式の Crowninshield–Brand は等式制約を 1 本しか取らない。** 2 関節筋が
