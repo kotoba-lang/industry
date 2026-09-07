@@ -138,6 +138,17 @@
                        :total (count results)
                        :results results})
       (println (str "VERIFIED\t" n-green "/" (count results) "\tgreen (sample of " (count repos) ")"))
-      (js/process.exit (if (= n-green (count results)) 0 1)))))
+            ;; ── kotoba main emit-manifest guard (issue #594) ──
+      ;; kotoba repo が origin/main と同期しているなら、reproducible-emit gate の
+      ;; :unlisted-source 検査もここで回す（bin/check-emit-manifest は 69cff566 で着地）。
+      (let [krepo (str root "/orgs/kotoba-lang/kotoba")
+            _ (sh ["git" "-C" krepo "fetch" "origin" "-q"] {})
+            _ (sh ["git" "-C" krepo "merge" "--ff-only" "origin/main" "-q"] {})
+            {:keys [code out]} (sh [(str krepo "/bin/check-emit-manifest")] {:timeout 240000})
+            line (str/trim (or out ""))]
+        (println (str "EMIT-MANIFEST\t" (if (= 0 code) "OK" "RED") "\t" (subs line 0 (min 80 (count line)))))
+        (when-not (= 0 code)
+          (append-ledger! {:at (.toISOString (js/Date.)) :kind :emit-manifest-red :detail line})))
+(js/process.exit (if (= n-green (count results)) 0 1)))))
 
 (-main)
