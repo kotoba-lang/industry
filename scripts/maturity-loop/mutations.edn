@@ -8198,4 +8198,94 @@
      :file "src/travel/governor.cljc"
      :find "         (not (number? figure))\n         (conj acc {:rule :inventory-incomplete"
      :replace "         (and false (not (number? figure)))\n         (conj acc {:rule :inventory-incomplete"
-     :must-fail ["hard-when-the-inventory-line-lacks-the-registered-figure"]}]}]}
+     :must-fail ["hard-when-the-inventory-line-lacks-the-registered-figure"]}]}
+  {:repo "orgs/cloud-itonami/mehikari"
+   :label "mehikari edge dispatcher —— 令状 / opt-in / 二段承認 / JST 営業時間の 4 つの拒否と、app.ts がそれを本当に呼んでいること"
+   ;; 警察向け監視カメラ検索 Worker。この Worker の仕事は「dispatch する前に拒否する」
+   ;; ことで、それが repo の CLAUDE.md の CRITICAL 節 3 つに書かれている —— が、
+   ;; 2026-09-07 までテストは 0 本で、拒否は app.ts の中に inline だった。
+   ;; gate を `src/gates.ts`（pure、SDK import 無し）へ出し、nbb の test が
+   ;; Node の type stripping で **その .ts をそのまま実行する**。
+   ;;
+   ;; 面は 2 つ。gates.ts が正しく拒否すること（境界つき: 09:00 は開いていて
+   ;; 17:00 は閉じている、JST の土曜 00:30 は UTC ではまだ金曜）と、
+   ;; **app.ts がそれを呼んでいること**。後者が無いと、完璧な gates.ts を
+   ;; app.ts が呼ぶのをやめても緑のまま —— だから app.ts を text として読んで、
+   ;; gated command ごとに「gate 呼び出しが dispatchToBpmn より手前に在る」を pin する。
+   ;;
+   ;; 測れないときは exit 2（app.ts 不在 / 登録 0 件 / gates.ts が load できない）。
+   ;; 3 経路とも 2026-09-07 に手で踏んで 2 が返るのを見た。
+   :cmd ["nbb" "test/gates_test.cljs"]
+   :green-marker "mehikari gates: all green"
+   ;; 10 件とも 2026-09-07 に実際に赤くなるところを見た（着地前に copy で dry-run）。
+   :mutations
+   [{:id :mehikari/warrant-gate-accepts-empty-reference
+     :why "`nonEmptyString` が空文字を通すと、`legalBasis: {warrantRef: \"\"}` で queryPerson が令状ありと同じ経路へ進む。同じ helper を 4 gate が共有しているので、緩めれば camera / approval / opt-in の空値検査も一緒に消える"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/gates.ts"
+     :find "\treturn typeof x === \"string\" && x.trim().length > 0;"
+     :replace "\treturn typeof x === \"string\";"
+     :must-fail ["person-query-without-legal-basis-is-denied" "person-query-with-whitespace-only-reference-is-denied"]}
+
+    {:id :mehikari/opt-in-whitelist-grows
+     :why "whitelist に 1 語足すだけで、特電法の opt-in 根拠が無い名簿からの送信が可能になる。既存 4 語の入力は全部そのまま通るので、正例だけの検査では見えない"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/gates.ts"
+     :find "\t\"inbound\",\n]);"
+     :replace "\t\"inbound\",\n\t\"cold_list\",\n]);"
+     :must-fail ["prospect-outside-opt-in-whitelist-is-rejected" "prospect-whitelist-is-exactly-the-four-sources"]}
+
+    {:id :mehikari/close-becomes-inclusive
+     :why "`<` と `<=` の取り違え。17:00〜17:59 JST が営業時間になる。16:59 も 18:00 も正しく判定されるので、境界ちょうどの入力が無ければ緑のまま"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/gates.ts"
+     :find "hour < BUSINESS_HOURS_JST.close;"
+     :replace "hour <= BUSINESS_HOURS_JST.close;"
+     :must-fail ["business-hours-close-at-17-jst-exclusive"]}
+
+    {:id :mehikari/clock-drifts-to-utc
+     :why "timeZone が UTC になると『09:00-17:00 JST』が『18:00-02:00 JST』に化ける。Worker は UTC で動くので、`new Date()` の getHours に書き換える種類の退行がまさにこれ"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/gates.ts"
+     :find "\t\ttimeZone: \"Asia/Tokyo\","
+     :replace "\t\ttimeZone: \"UTC\","
+     :must-fail ["business-hours-are-judged-in-jst-not-utc"]}
+
+    {:id :mehikari/same-approver-counts-twice
+     :why "二段承認は『2 人』であって『2 欄』ではない。同一 DID を両欄に入れて通るなら、1 人で証拠パケットを出せる"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/gates.ts"
+     :find "\tif (input.supervisorDid.trim() === input.sectionChiefDid.trim()) {"
+     :replace "\tif (false && input.supervisorDid.trim() === input.sectionChiefDid.trim()) {"
+     :must-fail ["two-stage-approval-needs-two-different-approvers"]}
+
+    {:id :mehikari/any-schedule-hint-bypasses-the-clock
+     :why "queue 用の literal `nextBusinessHour` だけが時計を迂回できる。『何か hint が在れば』に緩むと、`scheduleHint: \"now\"` で深夜送信が通る"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/gates.ts"
+     :find "\tif (input.scheduleHint !== \"nextBusinessHour\" && !withinBusinessHours(now)) {"
+     :replace "\tif (typeof input.scheduleHint !== \"string\" && !withinBusinessHours(now)) {"
+     :must-fail ["sales-email-outside-hours-is-rejected-unless-queued"]}
+
+    ;; ── app.ts の側。gates.ts が完璧でも、呼ばれなければ何も守らない ──
+    {:id :mehikari/app-stops-consulting-the-warrant-gate
+     :why "**この suite の本題。** gate 呼び出しの 2 行を消すと queryPerson は無条件で dispatch する。gates.ts の unit test は全部緑のまま"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/app.ts"
+     :find "\t\t\tconst gate = personQueryDecision(input as { legalBasis?: { warrantRef?: unknown; enquiryRef?: unknown } });\n\t\t\tif (!gate.ok) return JSON.stringify(gate.body);\n"
+     :replace ""
+     :must-fail ["app-gated-commands-consult-the-gate-before-dispatch"]}
+
+    {:id :mehikari/app-reimplements-a-gate-locally
+     :why "gate を app.ts 内の inline 判定に戻す形。status 語が app.ts に現れた時点で、gates.ts とは別の経路が生えている"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/app.ts"
+     :find "\t\t\tconst gate = prospectRegistrationDecision(input as { optInSource?: unknown; optInAt?: unknown });"
+     :replace "\t\t\tconst gate = (input as { optInAt?: unknown }).optInAt ? { ok: true as const } : { ok: false as const, body: { status: \"rejectedOptInSource\", error: \"optInAt required\" } };"
+     :must-fail ["app-does-not-reimplement-gates-locally" "app-gated-commands-consult-the-gate-before-dispatch"]}
+
+    {:id :mehikari/app-drops-an-operation
+     :why "Lexicon SSoT の 15 操作（12 command + 3 query）が 14 になる。CLAUDE.md の表は散文なので、消えても音がしない"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/app.ts"
+     :find "\tsdk.app.query(nsid(\"com.etzhayyim.apps.mehikari.listOutreach\"), async (_ctx, body) => {\n\t\tconst input = parseLexiconInput(\"com.etzhayyim.apps.mehikari.listOutreach\", body);\n\t\tconst result = await dispatchToBpmn(sdk.env, \"com.etzhayyim.apps.mehikari.listOutreach\", input);\n\t\treturn JSON.stringify(result);\n\t});\n"
+     :replace ""
+     :must-fail ["app-registers-all-fifteen-operations"]}
+
+    {:id :mehikari/app-downgrades-person-query-approval
+     :why "queryPerson の requireApproval が Class B/high から Class C/low へ。gate は残るので gate の検査は緑のまま、人の承認だけが軽くなる"
+     :file "appview/etzhayyim-wasm-mehikari-mhk7r2vq/src/app.ts"
+     :find "\t\trequireApproval(DecisionClass.B, 1, \"high\"),"
+     :replace "\t\trequireApproval(DecisionClass.C, 1, \"low\"),"
+     :must-fail ["app-high-pii-commands-keep-their-approval-class"]}]}]}
