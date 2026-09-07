@@ -8607,4 +8607,187 @@
      :file "kotoba/src/registry.ts"
      :find "  const maxScan = Math.min(input.maxScan ?? DEFAULT_MAX_SCAN, DEFAULT_MAX_SCAN);"
      :replace "  const maxScan = input.maxScan ?? DEFAULT_MAX_SCAN;"
+     :must-fail ["coverage-never-scans-past-the-default-ceiling"]}]}
+
+  {:repo "orgs/cloud-itonami/app-tia"
+   :label "app-tia kotoba-E2E split —— 平文 catalog / 封印される PII と検知 / 整数パーセント / http(s) URL / page 上限 / coverage 境界を、kotoba/src/*.ts をそのまま実行して固定する"
+   ;; なりすまし検知（Internet Account Protection）の kotoba front。types.ts の冒頭が
+   ;; 「platform catalog は平文の公開参照データ、account の PII と detectionResult は
+   ;; kotoba E2E で封印し substrate は平文を見ない」「similarityScore は 0-100 の整数で
+   ;; legacy の 0.0-1.0 double ではない」と定めている。2026-09-07 まで、この repo で
+   ;; 数えられる test は 0 本だった —— 在ったのは vitest の 1 ファイル
+   ;; （`kotoba/test/tia.test.ts`）で、git 依存の `@etzhayyim/sdk-mock` が要り、
+   ;; scan の `test/` にも入っていない。
+   ;;
+   ;; `test/tia_test.cljs` は Node の type stripping で **その .ts を直接 import** する
+   ;; （hrse / mehikari と同じ形。`./types.js` → `types.ts` は resolve hook が写す）。
+   ;; SDK client は test 内の in-memory stand-in で、**平文 write と encryptedWrite を
+   ;; 別々に記録する** —— 返り値は両経路で同じ形（uri）なので、「PII がどちらの経路を
+   ;; 通ったか」は記録でしか見えない。この suite の本題はそこ。
+   ;;
+   ;; 測れないときは exit 2（kotoba/src/*.ts 不在 / import 失敗 / 実行本数 < 20）。
+   ;; 不在の経路は 2026-09-07 に TIA_ROOT を存在しないパスにして 2 が返るのを見た。
+   :cmd ["nbb" "test/tia_test.cljs"]
+   :green-marker "tia kotoba: all green"
+   ;; 22 件とも 2026-09-07 に実際に赤くなるところを見た（着地前に copy で dry-run）。
+   :mutations
+   [{:id :tia/barrel-drops-coverage
+     :why "index.ts の export から 1 操作が落ちる。registry.ts は無傷なので unit test は全部緑のまま、package の公開面だけが 8 操作になる"
+     :file "kotoba/src/index.ts"
+     :find "  listDetections,\n  coverage,\n} from \"./registry.js\";"
+     :replace "  listDetections,\n} from \"./registry.js\";"
+     :must-fail ["barrel-exports-the-nine-operations"]}
+
+    {:id :tia/pct-upper-bound-dropped
+     :why "`n <= 100` が消える。0..100 は全部そのまま通るので、101 という境界の外の入力が無ければ緑のまま。似た値 (0-1000 の permille) に広げた改修がまさにこの形"
+     :file "kotoba/src/types.ts"
+     :find "  return typeof n === \"number\" && Number.isInteger(n) && n >= 0 && n <= 100;"
+     :replace "  return typeof n === \"number\" && Number.isInteger(n) && n >= 0;"
+     :must-fail ["pct-is-an-integer-from-0-to-100" "detection-with-out-of-range-score-is-rejected"]}
+
+    {:id :tia/pct-accepts-the-legacy-double
+     :why "**この suite の本題の 1 つ。** `Number.isInteger` が消えて legacy の 0.0-1.0 double が整数パーセント欄を通る。整数入力は全部そのまま通るので、0.92 という入力が無ければ緑のまま"
+     :file "kotoba/src/types.ts"
+     :find "  return typeof n === \"number\" && Number.isInteger(n) && n >= 0 && n <= 100;"
+     :replace "  return typeof n === \"number\" && n >= 0 && n <= 100;"
+     :must-fail ["pct-is-an-integer-from-0-to-100" "detection-with-fractional-score-is-rejected"]}
+
+    {:id :tia/http-url-accepts-any-scheme
+     :why "`https?://` が「何かの scheme」に広がる。seekUrl / accountUrl に javascript: や ftp: が書ける。https の入力は全部通るので正例だけでは見えない"
+     :file "kotoba/src/types.ts"
+     :find "  return typeof s === \"string\" && /^https?:\\/\\//.test(s);"
+     :replace "  return typeof s === \"string\" && /^[a-z][a-z0-9+.-]*:/.test(s);"
+     :must-fail ["http-url-accepts-only-http-and-https" "platform-with-non-http-seek-url-is-rejected" "account-with-non-http-url-is-rejected"]}
+
+    {:id :tia/slug-stops-lowercasing
+     :why "slug が大小を保つと `X` と `x` が別 rkey になり、同じ platform が 2 回登録できる（DID 側だけ小文字のままなので DID は衝突する）。acct- / det- の rkey も同じ関数を通るので一緒に動く"
+     :file "kotoba/src/types.ts"
+     :find "  return id.toLowerCase().replace(/[^a-z0-9]+/g, \"-\");"
+     :replace "  return id.replace(/[^A-Za-z0-9]+/g, \"-\");"
+     :must-fail ["rkeys-are-lowercased-slugs-with-role-prefix" "platform-type-is-case-insensitive"
+                 "account-is-sealed-not-written-in-plaintext" "detection-is-sealed-not-written-in-plaintext"]}
+
+    {:id :tia/seek-url-check-removed
+     :why "seekUrl の検査 1 行が消える。displayName / platformType の検査は残るので、正例と missingRequiredFields の負例だけでは見えない"
+     :file "kotoba/src/registry.ts"
+     :find "  if (!isHttpUrl(input.seekUrl)) return { status: \"rejected\", error: \"invalidSeekUrl\" };\n"
+     :replace ""
+     :must-fail ["platform-with-non-http-seek-url-is-rejected"]}
+
+    {:id :tia/platform-duplicate-check-removed
+     :why "既存 record の検査を外すと、同じ platformType で何度でも `registered` が返り、PDS に上書き write が走る（alreadyExists が二度と出ない）"
+     :file "kotoba/src/registry.ts"
+     :find "  if (existing.records[0]?.value) {\n    return { status: \"alreadyExists\", platformUri:"
+     :replace "  if (false) {\n    return { status: \"alreadyExists\", platformUri:"
+     :must-fail ["registering-the-same-platform-twice-is-idempotent" "platform-type-is-case-insensitive"]}
+
+    {:id :tia/platform-record-spreads-input
+     :why "record 構築を `{ ...input, did, ... }` の便利な形に戻すと、input に紛れた apiToken / ownerEmail がそのまま **平文の公開 catalog** に永続化される。宣言済みの欄は全部正しいので、返り値だけ見る検査では見えない"
+     :file "kotoba/src/registry.ts"
+     :find "  const record: ProtectedPlatformRecord = {\n    did,"
+     :replace "  const record: ProtectedPlatformRecord = {\n    ...(input as unknown as ProtectedPlatformRecord),\n    did,"
+     :must-fail ["platform-record-carries-only-catalog-fields"]}
+
+    {:id :tia/platform-page-limit-uncapped
+     :why "PDS へ渡す limit が呼び出し側の値そのままになる。返る件数は fake でも実 PDS でも変わらないので、**要求した limit を記録する**検査でしか見えない"
+     :file "kotoba/src/registry.ts"
+     :find "  const resp = await e.read<ProtectedPlatformRecord>({ collection: PLATFORM_COLLECTION, cursor: input.cursor, limit });"
+     :replace "  const resp = await e.read<ProtectedPlatformRecord>({ collection: PLATFORM_COLLECTION, cursor: input.cursor, limit: input.limit ?? 50 });"
+     :must-fail ["list-platforms-caps-page-limit-at-200"]}
+
+    {:id :tia/account-url-check-removed
+     :why "accountUrl の検査 1 行が消え、javascript: が PII 本文に封印される。5 つの必須欄の検査は残る"
+     :file "kotoba/src/registry.ts"
+     :find "  if (input.accountUrl !== undefined && !isHttpUrl(input.accountUrl)) return { status: \"rejected\", error: \"invalidAccountUrl\" };\n"
+     :replace ""
+     :must-fail ["account-with-non-http-url-is-rejected"]}
+
+    {:id :tia/account-written-in-plaintext
+     :why "**この suite の本題。** encryptedWrite が平文の write に「簡略化」される。uri は同じ形で返るので、SDK の返り値を見る検査は緑のまま —— substrate が PII を平文で持つようになったことは、**どちらの経路が呼ばれたか**を記録する検査でしか見えない"
+     :file "kotoba/src/registry.ts"
+     :find "  const receipt = await e.encryptedWrite<Record<string, unknown>>({\n    innerType: ACCOUNT_INNER_TYPE,"
+     :replace "  const receipt = await e.write({\n    collection: ACCOUNT_INNER_TYPE,"
+     :must-fail ["account-is-sealed-not-written-in-plaintext" "account-with-non-http-url-is-rejected"
+                 "account-body-carries-only-declared-fields" "account-read-cap-includes-explicit-recipients"
+                 "registered-account-round-trips-through-encrypted-read"]}
+
+    {:id :tia/account-body-spreads-input
+     :why "封印される本文が `{ ...input, accountId, ... }` になり、input に紛れた password / recoveryEmail と、write option であるはずの recipients が envelope の中身に乗る。宣言済みの欄は全部正しい"
+     :file "kotoba/src/registry.ts"
+     :find "  const body: ProtectedAccountBody = {\n    accountId: input.accountId,"
+     :replace "  const body: ProtectedAccountBody = {\n    ...(input as unknown as ProtectedAccountBody),\n    accountId: input.accountId,"
+     :must-fail ["account-body-carries-only-declared-fields"]}
+
+    {:id :tia/account-recipients-dropped
+     :why "呼び出し側の recipients が envelope に届かず、read-cap が常に owner だけになる。owner 自身の round-trip は全部通るので、**envelope に渡された recipients を記録する**検査でしか見えない"
+     :file "kotoba/src/registry.ts"
+     :find "    recipients: input.recipients ?? [],\n    rkey: accountRkey(input.accountId),"
+     :replace "    recipients: [],\n    rkey: accountRkey(input.accountId),"
+     :must-fail ["account-read-cap-includes-explicit-recipients"]}
+
+    {:id :tia/accounts-read-under-the-wrong-inner-type
+     :why "account の走査が detectionResult の innerType を引く（copy-paste 事故の形）。書く側は無傷なので register は `registered` のまま、読み返しだけが空になる"
+     :file "kotoba/src/registry.ts"
+     :find "    const page = await e.encryptedRead<ProtectedAccountBody>({ innerType: ACCOUNT_INNER_TYPE, cursor, limit: PAGE_LIMIT });"
+     :replace "    const page = await e.encryptedRead<ProtectedAccountBody>({ innerType: DETECTION_INNER_TYPE, cursor, limit: PAGE_LIMIT });"
+     :must-fail ["registered-account-round-trips-through-encrypted-read" "list-accounts-filters-by-platform"
+                 "list-accounts-caps-page-size-at-200" "coverage-rolls-up-platforms-accounts-and-detections"
+                 "coverage-truncated-flag-is-inclusive-at-max-scan" "coverage-never-scans-past-the-default-ceiling"]}
+
+    {:id :tia/account-page-size-uncapped
+     :why "listAccounts の 200 上限が消え、呼び出し側が limit を大きく渡すだけで items が全件になる。既定 (50) と小さい limit では何も変わらない"
+     :file "kotoba/src/registry.ts"
+     :find "  const limit = Math.min(input.limit ?? 50, 200);\n  const all = await scanAccounts(e, DEFAULT_MAX_SCAN);"
+     :replace "  const limit = input.limit ?? 50;\n  const all = await scanAccounts(e, DEFAULT_MAX_SCAN);"
+     :must-fail ["list-accounts-caps-page-size-at-200"]}
+
+    {:id :tia/score-check-removed
+     :why "similarityScore の検査 1 行が消え、101 も 0.92 も封印される。必須欄と suspectUrl の検査は残る"
+     :file "kotoba/src/registry.ts"
+     :find "  if (!isPct(input.similarityScore)) return { status: \"rejected\", error: \"invalidSimilarityScore\" };\n"
+     :replace ""
+     :must-fail ["detection-with-out-of-range-score-is-rejected" "detection-with-fractional-score-is-rejected"]}
+
+    {:id :tia/detection-written-in-plaintext
+     :why "**この suite の本題（検知側）。** 検知結果 —— 誰のどのアカウントに何 % 似た偽物が居るか —— が平文の write で substrate に置かれる。account 側と同じく返り値では見えない"
+     :file "kotoba/src/registry.ts"
+     :find "  const receipt = await e.encryptedWrite<Record<string, unknown>>({\n    innerType: DETECTION_INNER_TYPE,"
+     :replace "  const receipt = await e.write({\n    collection: DETECTION_INNER_TYPE,"
+     :must-fail ["detection-is-sealed-not-written-in-plaintext" "detection-with-out-of-range-score-is-rejected"
+                 "detection-with-non-http-suspect-url-is-rejected" "detection-body-carries-only-declared-fields"
+                 "detection-read-cap-includes-explicit-recipients"]}
+
+    {:id :tia/detection-body-spreads-input
+     :why "封印される検知本文に input の spread で evidenceBlob / reporterEmail / recipients が乗る。宣言済みの欄は全部正しく、返り値も `recorded` のまま"
+     :file "kotoba/src/registry.ts"
+     :find "  const body: DetectionResultBody = {\n    detectionId: input.detectionId,"
+     :replace "  const body: DetectionResultBody = {\n    ...(input as unknown as DetectionResultBody),\n    detectionId: input.detectionId,"
+     :must-fail ["detection-body-carries-only-declared-fields"]}
+
+    {:id :tia/detection-fk-filter-removed
+     :why "internetAccountId の絞り込みが消え、ある人の検知一覧に他人の検知が混ざる。フィルタ無しの一覧は正しいまま"
+     :file "kotoba/src/registry.ts"
+     :find "  const filtered = all.filter((d) => !input.internetAccountId || d.internetAccountId === input.internetAccountId);"
+     :replace "  const filtered = all;"
+     :must-fail ["list-detections-filters-by-account-fk"]}
+
+    {:id :tia/coverage-stops-following-the-platform-cursor
+     :why "platform の走査が最初の 1 page で止まる。100 件以下の catalog では正しい値が出るので、100 を超える seed が無ければ緑のまま"
+     :file "kotoba/src/registry.ts"
+     :find "    if (!page.cursor || page.records.length < PAGE_LIMIT) break;\n    cursor = page.cursor;"
+     :replace "    break;"
+     :must-fail ["coverage-pagination-follows-cursor" "coverage-never-scans-past-the-default-ceiling"]}
+
+    {:id :tia/truncated-becomes-exclusive
+     :why "`>=` → `>`。ちょうど maxScan 件のとき truncated が false になり、『まだ在るかもしれない』が『これで全部』と読まれる。maxScan±1 は正しく判定されるので、境界ちょうどの入力が無ければ緑のまま"
+     :file "kotoba/src/registry.ts"
+     :find "      protectedPlatformCount >= maxScan || accounts.length >= maxScan || detectionResultCount >= maxScan,"
+     :replace "      protectedPlatformCount > maxScan || accounts.length > maxScan || detectionResultCount > maxScan,"
+     :must-fail ["coverage-truncated-flag-is-inclusive-at-max-scan" "coverage-never-scans-past-the-default-ceiling"]}
+
+    {:id :tia/scan-ceiling-removed
+     :why "DEFAULT_MAX_SCAN の天井が消え、呼び出し側が maxScan を大きく渡すだけで PDS を無制限に歩く（3 面とも）。通常の入力（既定 / 小さい maxScan）では何も変わらない"
+     :file "kotoba/src/registry.ts"
+     :find "  const maxScan = Math.min(input.maxScan ?? DEFAULT_MAX_SCAN, DEFAULT_MAX_SCAN);"
+     :replace "  const maxScan = input.maxScan ?? DEFAULT_MAX_SCAN;"
      :must-fail ["coverage-never-scans-past-the-default-ceiling"]}]}]}
