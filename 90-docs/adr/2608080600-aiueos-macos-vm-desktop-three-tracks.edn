@@ -16,7 +16,7 @@
   :adr/related ["2607241100" "2607198300" "2607022400" "2607211600" "2608012050" "2608051200" "2608052200"]
   :adr/repos ["com-junkawasaki/root" "kotoba-lang/aiueos" "kotoba-lang/compiler"]
   :adr/evidence ["90-docs/evidence/260808-aiueos-aarch64-uefi-boot-v1.edn"
-                 "70-tools/aiueos-aarch64-spike/"]
+                 "orgs/kotoba-lang/aiueos/os/aiueos/aarch64/"]
   :adr/aiueos_pin "fd371d71c2ab593c2191727eef1031d0bc00f182"
   :adr/body
   "## 問い
@@ -56,7 +56,7 @@ compositor+browser shell の三つ全部）を追う指示を受けた。本 ADR
 ## 実測（2026-08-08、この ADR を書いたセッション）
 
 証拠の正本は `90-docs/evidence/260808-aiueos-aarch64-uefi-boot-v1.edn`、
-harness は `70-tools/aiueos-aarch64-spike/smoke-qemu-aarch64-uefi.cljs`（nbb、
+harness は `orgs/kotoba-lang/aiueos/os/aiueos/aarch64/smoke-qemu-aarch64-uefi.cljs`（nbb、
 2026-07-14 の owner rule に従い `.sh` ではない）。**gate は落ちることを確認してから
 記録した** —— `--expect-fail` は loader を置かない ESP で起動し、6 個の marker が
 全て不在であることを要求する。
@@ -225,8 +225,9 @@ ADR-0014 が避けた「測定前の commit」を繰り返すため。
 ## 依存順
 
 1. **a1 — aarch64 UEFI loader** ✅ **landed**（ELF load + bounded admission +
-   boot-info handoff まで込み。証拠あり）→ `kotoba-lang/aiueos` の
-   `os/aiueos/aarch64/` へ移設する
+   boot-info handoff まで込み。証拠あり）→ 2026-09-07 に `kotoba-lang/aiueos` の
+   `os/aiueos/aarch64/` へ byte-identical で移設済み（aiueos PR #312）。`scripts/tasks.edn`
+   に `:aarch64-boot-smoke` として登録。
 2. **a2 — aarch64 kernel: entry / vectors / MMU(TTBR0_EL1) / W^X / physical page
    allocator** ✅ **landed**（negative control 3 本つき。table は allocator の page
    から作る）。**残り**: runtime の map/unmap（dynamic paging 本体）、GIC、
@@ -263,10 +264,12 @@ ADR-0014 が避けた「測定前の commit」を繰り返すため。
   Apple Silicon の virtio-gpu 挙動は全て未測定。
 - **実機でも測っていない。** `ramfb` の aperture も 800x600 も QEMU の産物で、
   Apple Silicon は ramfb も この GOP 形状も持たない。
-- **spike の置き場所が暫定。** 本来の home は `kotoba-lang/aiueos` だが、本セッションは
-  cross-tier の `add_repo` ができず（`kotoba-lang` tier に到達できない）、
-  `70-tools/aiueos-aarch64-spike/` に staged してある。kotoba-lang に触れる
-  セッションが a1 として移設し、この directory を消す。
+- **spike の置き場所は解消済み。** 本 ADR の当初、`70-tools/aiueos-aarch64-spike/` に
+  staged していた（cross-tier `add_repo` ができず `kotoba-lang` tier に到達できないため）。
+  2026-09-07 に `kotoba-lang/aiueos` の `os/aiueos/aarch64/` へ byte-identical で移設し、
+  staging directory は削除した（aiueos PR #312）。gate 自体の実行は AAVMF firmware +
+  aarch64 lld + vfat ツールが要るため移設時のホストでは未実行（byte-identical な
+  既-landed 証拠の移動であり、新規コードではない）。
 
 ## 次の一手
 
