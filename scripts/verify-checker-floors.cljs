@@ -164,8 +164,15 @@
                           (run-checker {:script (path/join scripts-dir n) :cwd repo
                                         :classpath (str/join ":" (filter fs/existsSync [repo (path/join repo "scripts") (path/join repo "src") (path/join repo "scripts" "nbb_compat")]))
                                         :path-prefix dir :stub-log log :timeout-ms timeout-ms}))
-                   c2 (if (and real (pass-without-count? real)) :pass-without-count c)]
-               (assoc r :script (path/join scripts-dir n) :class c2
+                   c2 (if (and real (pass-without-count? real)) :pass-without-count c)
+                   ;; the table row must describe the run that produced the verdict:
+                   ;; for :pass-without-count that is the own-tree run (exit 0), not
+                   ;; the empty-input run (which crashed, exit 1) -- printing the
+                   ;; crash beside the verdict read as a red for the wrong reason.
+                   base (if (= c2 :pass-without-count)
+                          (assoc real :empty-exit (:exit r) :stubbed (:stubbed r))
+                          r)]
+               (assoc base :script (path/join scripts-dir n) :class c2
                       :real-last (when real (last-line (:out real)))))))
       (finally
         (fs/rmSync t #js {:recursive true :force true})))))
@@ -280,8 +287,9 @@
                           (by-class :pass-without-count)
                           (by-class :unmeasured)
                           (when strict? (by-class :fails)))]
-          (doseq [{:keys [script class exit out stubbed ms spawn-error]} (sort-by :script results)]
+          (doseq [{:keys [script class exit out stubbed ms spawn-error empty-exit]} (sort-by :script results)]
             (println (str (name class) "\t" script "\texit=" (or exit "timeout")
+                          (when (= class :pass-without-count) (str "\town-tree(empty-input exit=" (or empty-exit "timeout") ")"))
                           (when (pos? stubbed) "\tstubbed") "\t" ms "ms\t" (or spawn-error (last-line out)))))
           (if (seq bad)
             (do (when findings?
