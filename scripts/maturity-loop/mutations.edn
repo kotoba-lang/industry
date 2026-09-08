@@ -9651,4 +9651,83 @@
      :find "if (!did) return c.json({ error: \"NotFound\", message: \"actor DID unset\" }, 404);"
      :replace "if (!did) return c.json({ error: \"NotFound\", message: \"actor DID unset\" }, 200);"
      :must-fail ["FAIL the-did-document-is-404-when-the-actor-did-is-unset"]}
-    ]}]}
+    ]}
+
+  {:repo "orgs/cloud-itonami/app-swe"
+   :label "app-swe repo contract —— 宣言ファイルが parse でき、型が合い、木と identity が一致するか"
+   ;; この repo は既に `docs/verify-docs-claims.cljs` を持っており、18 claim・18/18
+   ;; discriminate の mutation harness まで自前で回している。**それでも足りない層が
+   ;; 1 つ下に在った** —— あちらは README.md と quickstart の *散文* を現物に当てる
+   ;; 検査で、そのために宣言ファイルを **正規表現で** 読む。だから
+   ;;
+   ;;   - PROJECT.jsonld が JSON として壊れても、`"path": "..."` という部分文字列が
+   ;;     残っていれば 18 claim は全部緑
+   ;;   - README.edn は `exists?` しか見られていないので、中身が何であっても緑
+   ;;   - nanoid がディレクトリ名と食い違っても、2 体の nanoid が「相異なる」限り緑
+   ;;
+   ;; となる。下の 8 mutation は 2026-09-09 に 1 つずつ実際に当てて測った:
+   ;; **8 つとも test/repo_contract_test.cljs を赤くし、8 つとも
+   ;; docs/verify-docs-claims.cljs を緑のまま通した。** 2 本は同じものを見ていない、
+   ;; というのがこの suite が在る理由そのものである。
+   ;;
+   ;; ⚠ `must-fail` は `FAIL in (<test 名>)` の literal を pin する。結果だけを見る
+   ;; （exit が非 0 になった）判定にすると、別の理由で落ちた実行を「噛んだ」と
+   ;; 数える —— CLAUDE.md 6 問目の形。
+   :cmd ["nbb" "test/repo_contract_test.cljs"]
+   :green-marker "app-swe repo contract: all green"
+   :mutations
+   [{:id :app-swe/readme-edn-schema-becomes-an-unevaluated-form
+     :why "**この suite で一番静かな壊れ方。** EDN に評価は無いので `(str \"a\" \"b\")` は throw せず PersistentList として読める。reader を通しただけの検査は「読めた」と報告し、文字列を期待している下流だけが壊れる（superproject CLAUDE.md が 2026-09-08 に 13 件の実例で警告している形）。だから型まで見る"
+     :file "README.edn"
+     :find ":schema \"etzhayyim.repository/v1\""
+     :replace ":schema (str \"etzhayyim.repository/\" \"v1\")"
+     :must-fail ["FAIL in (readme-edn-is-typed-repository-metadata)"]}
+
+    {:id :app-swe/project-jsonld-stops-being-json
+     :why "配列に余分なコンマを 1 つ入れる。JSON.parse は落ちるが、`verify-docs-claims` の正規表現は全部当たり続けるので 18 claim は緑のまま —— 「宣言が読める」と「宣言が正規表現に引っかかる」の差がここで出る"
+     :file "PROJECT.jsonld"
+     :find "\"programmingLanguage\": ["
+     :replace "\"programmingLanguage\": [,"
+     :must-fail ["FAIL in (every-declaration-file-parses-as-the-format-it-names)"]}
+
+    {:id :app-swe/readme-edn-name-goes-stale
+     :why "canonical metadata が名乗る repo 名だけが古くなる形。README.edn は `exists?` しか見られていないので、中身が remote と食い違っても誰も言わない。`migration.edn` の :destination が実際に同じ形でずれており（README 表 #7）、そちらは記録済みでこちらは未検査だった"
+     :file "README.edn"
+     :find ":name \"app-swe\""
+     :replace ":name \"app-swe-appview\""
+     :must-fail ["FAIL in (readme-edn-name-agrees-with-the-remote-that-carries-it)"]}
+
+    {:id :app-swe/project-name-and-urn-diverge
+     :why "`@id` の urn 末尾と `name` が別の project を指す形。片方だけ改名するとこうなる。JSON としては完全に妥当で、参照する側は 2 つの識別子のどちらを信じるかで挙動が分かれる"
+     :file "PROJECT.jsonld"
+     :find "\"name\": \"etzhayyim-project-swe\","
+     :replace "\"name\": \"etzhayyim-project-swe-appview\","
+     :must-fail ["FAIL in (project-jsonld-urn-suffix-equals-its-name)"]}
+
+    {:id :app-swe/nanoid-no-longer-names-its-directory
+     :why "performer ディレクトリは template から複製される。この repo では既に **2 体が同じ DID を名乗る**写し間違いが起きている（README 表 #5）ので、nanoid でも同じことが起きうる。⚠ 3 つ目の相異なる値にするのが要点 —— 既存の did-collision claim は nanoid が「2 種あること」しか見ないので、そちらは緑のまま通る"
+     :file "appview/etzhayyim-wasm-git-gt1v2w3x/kotodama.jsonld"
+     :find "\"nanoid\": \"gt1v2w3x\""
+     :replace "\"nanoid\": \"g1tag3nt\""
+     :must-fail ["FAIL in (each-performer-nanoid-matches-the-directory-that-carries-it)"]}
+
+    {:id :app-swe/sidecar-and-kotodama-disagree
+     :why "同じ performer ディレクトリの 2 つの宣言が別の名前を名乗る形。どちらのファイルも単独では完全に妥当なので、片方だけを読む consumer は一生気づかない"
+     :file "appview/etzhayyim-wasm-swe-sw3ng1n3/etzhayyim.json"
+     :find "\"name\": \"swe\","
+     :replace "\"name\": \"swe-ui\","
+     :must-fail ["FAIL in (sidecar-declarations-in-a-performer-directory-agree)"]}
+
+    {:id :app-swe/ignore-rules-swallow-the-tracked-document
+     :why "ignore 規則を 1 行広げると、追跡済みの `public/index.html` が次の clone から消える。`git check-ignore` は **既定で index を見る**ので追跡ファイルを報告せず、この壊れ方を隠す —— 検査は `--no-index` で規則だけを当てる。既存の `artifacts-ignored` claim は「欲しい 5 行が在るか」しか見ないので、行を*足す*方向には反応しない"
+     :file "appview/etzhayyim-wasm-swe-sw3ng1n3/cljs/.gitignore"
+     :find ".cpcache/"
+     :replace ".cpcache/\n*.html"
+     :must-fail ["FAIL in (the-ignore-rules-do-not-match-a-tracked-file)"]}
+
+    {:id :app-swe/migration-promises-a-file-that-is-not-there
+     :why "`NOTICE` は `CHARTER-RIDER.md` を「see」と指しているが、その file は repo に無い。その宙ぶらりんを migration.edn 側の宣言に足して「直した」ように見せる形 —— 宣言を足すことは file を作ることではない"
+     :file "migration.edn"
+     :find ":allowed-additions [\"README.edn\" \"migration.edn\"]"
+     :replace ":allowed-additions [\"README.edn\" \"migration.edn\" \"CHARTER-RIDER.md\"]"
+     :must-fail ["FAIL in (migration-edn-is-typed-and-its-allowed-additions-exist)"]}]}]}
