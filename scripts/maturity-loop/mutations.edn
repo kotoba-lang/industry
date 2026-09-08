@@ -10405,4 +10405,149 @@
      :file "edn-datomize.cljs"
      :find "          (js/process.exit 1)"
      :replace "          (js/process.exit 0)"
-     :must-fail ["FAIL in (a-malformed-invocation-fails-loudly)"]}]}]}
+     :must-fail ["FAIL in (a-malformed-invocation-fails-loudly)"]}]},
+
+  {:repo "orgs/cloud-itonami/app-mamoru"
+   :label "app-mamoru dispatcher —— secret scanner の edge が、検証していない入力を pod へ流さないか"
+   ;; この repo は GitHub の commit から漏れた credential を探す secret scanner の
+   ;; edge dispatcher で、守っている床は 1 つ ——
+   ;; **検証されていない入力を pod へ転送しない**。
+   ;;
+   ;; それまで検査は docs/verify-docs-claims.cljs の 8 claim だけで、あれは
+   ;; src/app.ts を **文字列として** 読む。routing・認証・HMAC・ECDSA がどう
+   ;; 壊れても 8 claim は緑のまま通る（ADR-2608136000 の 8 問目「その検査は
+   ;; 生成物を実行したか」）。README の「ローカル実行 ✅」も、人が wrangler dev を
+   ;; 1 回叩いた 2026-09-06 の記録でしかなかった。
+   ;;
+   ;; test/dispatcher_test.cljs は Worker を import して本物の Request を通す
+   ;; （Node 26 が TypeScript を型剥がしで実行するので nbb から app.fetch が呼べる。
+   ;; HMAC も ECDSA P-256 も WebCrypto で実際に走る）。**status code だけを見ない** ——
+   ;; globalThis.fetch を差し替えて、拒否の test は「pod へ 0 本」まで assert する。
+   ;; 401 を返しつつ転送していても status では緑になるからである。
+   ;;
+   ;; 17 件とも 2026-09-08 に、当てて赤くなるところを実際に見てから登録した。
+   ;; 無改変では 17/17 が緑で exit 0。
+   :cmd ["nbb" "test/dispatcher_test.cljs"]
+   :green-marker "mamoru dispatcher: OK"
+   ;; Worker が hono を import するので依存が要る。package.json は repo ルートに在る。
+   :npm-install true
+   :mutations
+   [
+    {:id :auth/procedure-auth-guard-dropped
+     :why "認証が取れなくても匿名で通す形。**この repo の床そのもの** —— 検証されていない入力が pod へ届く"
+     :file "src/app.ts"
+     :find "  const auth = await resolveAuth(c.req.raw, c.env);\n  if (!auth) return c.json({ error: \"AuthRequired\" }, 401);\n\n  const body = await c.req.json<unknown>();"
+     :replace "  const auth = (await resolveAuth(c.req.raw, c.env)) ?? { did: \"anon\", orgDid: \"anon\" };\n\n  const body = await c.req.json<unknown>();"
+     :must-fail ["FAIL  xrpc-procedure-without-auth-is-401-and-dispatches-nothing" "FAIL  bearer-scheme-and-a-non-empty-token-are-both-required"]},
+
+    {:id :auth/query-auth-guard-dropped
+     :why "同じ緩和を query 側だけに当てる。procedure 側の test では見えないので、口ごとに測っていることの確認でもある"
+     :file "src/app.ts"
+     :find "  const auth = await resolveAuth(c.req.raw, c.env);\n  if (!auth) return c.json({ error: \"AuthRequired\" }, 401);\n\n  const params = Object.fromEntries(c.req.query());"
+     :replace "  const auth = (await resolveAuth(c.req.raw, c.env)) ?? { did: \"anon\", orgDid: \"anon\" };\n\n  const params = Object.fromEntries(c.req.query());"
+     :must-fail ["FAIL  xrpc-query-without-auth-is-401-and-dispatches-nothing"]},
+
+    {:id :auth/bearer-scheme-made-optional
+     :why "「寛容に受け取る」形の退行。Bearer を名乗らない Authorization 値がそのままトークンとして通る"
+     :file "src/app.ts"
+     :find "  if (!h.startsWith(\"Bearer \")) return null;\n  const token = h.slice(7).trim();"
+     :replace "  const token = (h.startsWith(\"Bearer \") ? h.slice(7) : h).trim();"
+     :must-fail ["FAIL  bearer-scheme-and-a-non-empty-token-are-both-required"]},
+
+    {:id :route/post-accepts-query-names
+     :why "POST が query 名も受けるようになる形。メソッド種別の分離が消え、GET 前提の口が本文つきで叩ける"
+     :file "src/app.ts"
+     :find "  if (!methodName || !PROCEDURES.has(methodName)) {"
+     :replace "  if (!methodName || !(PROCEDURES.has(methodName) || QUERIES.has(methodName))) {"
+     :must-fail ["FAIL  procedures-and-queries-do-not-cross-verbs"]},
+
+    {:id :route/nsid-prefix-optional
+     :why "接頭辞が無い名前を素通しする形。他人の namespace の method 名がそのまま通る"
+     :file "src/app.ts"
+     :find "    : null;\n\n  if (!methodName || !PROCEDURES.has(methodName)) {"
+     :replace "    : fullNsid;\n\n  if (!methodName || !PROCEDURES.has(methodName)) {"
+     :must-fail ["FAIL  nsid-prefix-is-required"]},
+
+    {:id :hmac/github-webhook-verification-ignored
+     :why "HMAC の判定結果を使わなくなる形。署名は計算されるが誰も見ない"
+     :file "src/app.ts"
+     :find "    if (!await verifyGitHubHmac(bodyBuf, sig, secret)) {"
+     :replace "    if (false && !await verifyGitHubHmac(bodyBuf, sig, secret)) {"
+     :must-fail ["FAIL  github-webhook-rejects-a-forged-hmac"]},
+
+    {:id :hmac/sha256-prefix-check-dropped
+     :why "`sha256=` 接頭辞を任意にする形。実装は依然として比較するが、接頭辞なしの生 hex がそのまま通る"
+     :file "src/app.ts"
+     :find "  if (!sigHeader.startsWith(\"sha256=\")) return false;\n  const expected = sigHeader.slice(7);"
+     :replace "  const expected = sigHeader.startsWith(\"sha256=\") ? sigHeader.slice(7) : sigHeader;"
+     :must-fail ["FAIL  github-webhook-rejects-a-forged-hmac"]},
+
+    {:id :trust/internal-hmac-replaced-by-dev
+     :why "内部信頼ヘッダが dev 固定になる形。pod 側から見て呼び手が検証できなくなる"
+     :file "src/app.ts"
+     :find "  const hmacHeader = internalSecret ? await computeHmac(bodyStr, internalSecret) : \"dev\";"
+     :replace "  const hmacHeader = \"dev\";"
+     :must-fail ["FAIL  an-authenticated-procedure-reaches-the-dispatcher-with-internal-trust"]},
+
+    {:id :ss/either-missing-header-becomes-both
+     :why "`||` を `&&` に変える形。**両方欠けた入力しか無い test はこれを緑で通す** —— 片方だけ欠けた入力を置いている理由がここ"
+     :file "src/app.ts"
+     :find "  if (!keyId || !sig) {"
+     :replace "  if (!keyId && !sig) {"
+     :must-fail ["FAIL  secret-scanning-refuses-when-either-signature-header-is-missing"]},
+
+    {:id :ss/signature-result-ignored
+     :why "ECDSA の判定結果を使わなくなる形。GitHub を名乗る誰でも alert を投げ込める"
+     :file "src/app.ts"
+     :find "  if (!valid) {\n    return c.json({ error: \"InvalidSignature\" }, 401);"
+     :replace "  if (false) {\n    return c.json({ error: \"InvalidSignature\" }, 401);"
+     :must-fail ["FAIL  secret-scanning-refuses-a-forged-signature" "FAIL  secret-scanning-refuses-an-unknown-key-identifier"]},
+
+    {:id :ss/raw-token-used-as-its-own-hash
+     :why "raw token をそのまま tokenHash として転送する形。この repo は secret scanner なので、これは漏れた credential を自分でもう一度運ぶことになる"
+     :file "src/app.ts"
+     :find "      tokenHash: await sha256hex(a.token),"
+     :replace "      tokenHash: a.token,"
+     :must-fail ["FAIL  secret-scanning-accepts-a-genuine-signature-and-forwards-a-token-hash"]},
+
+    {:id :push/author-email-forwarded-raw
+     :why "commit author の生アドレスを転送する形。hash してから渡すという privacy の床が消える"
+     :file "src/app.ts"
+     :find "    ? await sha256hex(authorEmail)\n    : undefined;"
+     :replace "    ? authorEmail\n    : undefined;"
+     :must-fail ["FAIL  push-forwards-a-hash-of-the-author-email-not-the-address"]},
+
+    {:id :push/branch-delete-guard-narrowed
+     :why "全ゼロ sha のガードを落とす形。branch 削除のたびに pod が起きる"
+     :file "src/app.ts"
+     :find "  if (!commitSha || commitSha === \"0000000000000000000000000000000000000000\") {"
+     :replace "  if (!commitSha) {"
+     :must-fail ["FAIL  branch-delete-push-dispatches-nothing"]},
+
+    {:id :meta/advertises-a-method-that-is-not-wired
+     :why "申告だけ足して配線を忘れる形。/_app/meta を読んだ client は 404 に当たる"
+     :file "src/app.ts"
+     :find "      \"/xrpc/com.etzhayyim.apps.mamoru.getIncident\","
+     :replace "      \"/xrpc/com.etzhayyim.apps.mamoru.deleteIncident\","
+     :must-fail ["FAIL  meta-advertises-only-routable-methods"]},
+
+    {:id :meta/backend-falls-back-instead-of-vanishing
+     :why "README §5 の改善案 1 そのもの。**直すのは正しいが、そのとき README §3.2 の実測記述も一緒に動かす必要がある** —— この mutation はその対を保つために在る"
+     :file "src/app.ts"
+     :find "    backend: c.env.BPMN_DISPATCHER_URL,"
+     :replace "    backend: c.env.BPMN_DISPATCHER_URL ?? \"https://dispatcher.etzhayyim.com\","
+     :must-fail ["FAIL  meta-drops-the-backend-key-when-the-var-is-unset"]},
+
+    {:id :probe/health-app-name-renamed
+     :why "probe の app 名を変える形。名前で照合している監視が黙って外れる"
+     :file "src/app.ts"
+     :find "  c.json({ ok: true, app: \"mamoru\", ts: new Date().toISOString() }),\n);\n\napp.get(\"/_worker/health\""
+     :replace "  c.json({ ok: true, app: \"app-mamoru\", ts: new Date().toISOString() }),\n);\n\napp.get(\"/_worker/health\""
+     :must-fail ["FAIL  health-probe-needs-no-auth-and-calls-nothing"]},
+
+    {:id :push/dispatch-target-mistaken-for-scanrepo
+     :why "転送先を隣の handler からの写し間違いで scanRepo にする形。push が commit 単位の走査に届かなくなる"
+     :file "src/app.ts"
+     :find "  const target = `${dispatcherUrl}/xrpc/${NSID_PREFIX}.scanCommit`;"
+     :replace "  const target = `${dispatcherUrl}/xrpc/${NSID_PREFIX}.scanRepo`;"
+     :must-fail ["FAIL  github-webhook-accepts-a-genuine-hmac-and-dispatches-scancommit"]}]}]}
