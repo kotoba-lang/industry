@@ -1,0 +1,153 @@
+;; data-licensing —— データソース事業 bot のための再販ライセンス台帳（手書き・新規正本）。
+;; 各 corpus の「出所」・「ライセンス」・「再販可否」・「x402 SKU 状況」を記録する。
+;; これは infra worker の asset 台帳（90-docs/compliance/scope.datoms.edn、生成物）とは別の、
+;; データそのものの出所・再販権を扱う手書き正本（ADR 補助・追加するなら ADR を起こす）。
+;; 最新状態のみを表す（履歴は git）。ローダ互換のため :db/id は負値、属性名は datom 面規約。
+;;
+;; 判定原則（AGENTS.md 再販ライセンス適用）:
+;;   - 「公開 repo に置いてある」「収集できた」は再販可否の根拠にならない（ADR-2608039700）。
+;;   - 再販可は「出所のライセンスが再配布を明示的に許す」か「自社所有」の場合のみ。
+;;   - :resale/status は :sellable / :not-sellable / :unverified（=判定保留）の 3 値。
+;;     :unverified は :sellable でも :not-sellable でもない — 未測定は clean と同形にしない。
+;;   - private-offer 商用データ（D&B / FactSet / Equifax 等）は本 workspace に実体・ライセンスが
+;;     無く、そもそも corpus として登録しない（再販対象外）。
+
+[{:db/id -1
+  :licensing/corpus "market-intel"
+  :licensing/repo "orgs/network-awai/cloud-murakumo-market-intel"
+  :licensing/dataset "market-intel"
+  :licensing/source "SEC EDGAR (U.S. Securities and Exchange Commission)"
+  :licensing/authority "US SEC"
+  :licensing/licence "U.S. federal government public domain (17 U.S.C. §105); EDN normalization = 自社派生"
+  :licensing/redistribution true
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "SEC EDGAR の company facts を EDN 正規化した自社派生。生地データは public domain、正規化・crosswalk は自社著作物。再販可（出所帰属つき）。x402 SKU は第一弾では未登録（propose のみ）。"
+  :resale/status :sellable
+  :datom/verified true}
+
+ {:db/id -2
+  :licensing/corpus "gleif-lei"
+  :licensing/repo "orgs/com-junkawasaki/org-gleif-projections"
+  :licensing/dataset "gleif-lei"
+  :licensing/source "GLEIF (Global Legal Entity Identifier Foundation) — LEI Golden Copy"
+  :licensing/authority "GLOBAL/GLEIF"
+  :licensing/licence "GLEIF open data (LEI 基準データ登録無償・出所帰属付き再頒布可); projection は自社派生"
+  :licensing/redistribution true
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "GLEIF LEI 基準データ（closing 面）に自社 projection を加えたもの。出所帰属つき再販可。Relationship closure 面も併せて sellable。x402 SKU は第一弾では未登録。"
+  :resale/status :sellable
+  :datom/verified true}
+
+ {:db/id -3
+  :licensing/corpus "gleif-relationship"
+  :licensing/repo "orgs/com-junkawasaki/org-gleif-projections"
+  :licensing/dataset "gleif-relationship"
+  :licensing/source "GLEIF LEI Relationship (ownership) Golden Copy"
+  :licensing/authority "GLOBAL/GLEIF"
+  :licensing/licence "GLEIF open data (出所帰属付き再頒布可); projection は自社派生"
+  :licensing/redistribution true
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "GLEIF Relationship 面。LEI と同条件で sellable。"
+  :resale/status :sellable
+  :datom/verified true}
+
+ {:db/id -4
+  :licensing/corpus "hyakka-knowledge"
+  :licensing/repo "orgs/network-awai/app-hyakka"
+  :licensing/dataset "hyakka"
+  :licensing/source "自社 (wiki.kotobase.net 知識コーパス)"
+  :licensing/authority "自社"
+  :licensing/licence "自社所有コンテンツ (code: Apache-2.0; 収集コンテンツは出所毎のライセンス次第)"
+  :licensing/redistribution true
+  :licensing/attribution-required false
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "自社コーパス本体は再販可。ただし wiki に取り込んだ外部出所 (Wikidata 等) の各項目は元ライセンスを尊重し、表示時出所を保つ。x402 SKU 検討対象。"
+  :resale/status :sellable
+  :datom/verified true}
+
+ {:db/id -5
+  :licensing/corpus "hayari"
+  :licensing/repo "orgs/cloud-itonami/hayari + orgs/cloud-itonami/hayari-data"
+  :licensing/dataset "hayari"
+  :licensing/source "Wikimedia Analytics pageview statistics (CC0) + 自社分類"
+  :licensing/authority "Wikimedia / 自社"
+  :licensing/licence "CC0 (Wikimedia pageview stats); into-country/kinds/domains 分類は自社派生"
+  :licensing/redistribution true
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "Wikimedia pageview 統計は CC0 で再配布可（出所帰属つき）。分類層は自社著作。x402 SKU 検討対象。"
+  :resale/status :sellable
+  :datom/verified true}
+
+ {:db/id -6
+  :licensing/corpus "threat-intelligence"
+  :licensing/repo "orgs/cloud-itonami/threat-intelligence"
+  :licensing/dataset "threat-intelligence"
+  :licensing/source "公開 IOC feed (urlhaus / drop / openphish 等 12 feed) + 自社ソース"
+  :licensing/authority "feed 毎に異なる"
+  :licensing/licence "feed 毎の再頒布条項に依存（未確定分は不明）"
+  :licensing/redistribution false
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "IOC feed は feed 毎のライセンス条項を確認するまで再販しない。自社由来 IOC のみ再販可。:resale/status は feed 別に精査するまで :not-sellable 扱い。"
+  :resale/status :not-sellable
+  :datom/verified false}
+
+ {:db/id -7
+  :licensing/corpus "repo-taxonomy"
+  :licensing/repo "manifest/repo-taxonomy.edn (superproject 手書き join key 面)"
+  :licensing/dataset "repo-taxonomy"
+  :licensing/source "自社導出メタデータ"
+  :licensing/authority "自社"
+  :licensing/licence "自社"
+  :licensing/redistribution true
+  :licensing/attribution-required false
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "自社の repo 3 面分類。公共性が高く、再販より社内・公開での提供が適切。x402 SKU は低優先。"
+  :resale/status :sellable
+  :datom/verified true}
+
+ {:db/id -8
+  :licensing/corpus "tadori-threat-intel"
+  :licensing/repo "orgs/cloud-itonami/(tadori 系)"
+  :licensing/dataset "tadori-threat-intel"
+  :licensing/source "外部 threat/PII 系"
+  :licensing/authority "未確認"
+  :licensing/licence "公開ライセンス未確認"
+  :licensing/redistribution false
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "公開ライセンス未確認のため再販しない（:unverified に近いが、PII/threat 系は安全側で :not-sellable）。"
+  :resale/status :not-sellable
+  :datom/verified false}
+
+ {:db/id -9
+  :licensing/corpus "yabai-passive-dns"
+  :licensing/repo "orgs/cloud-itonami/(yabai 系)"
+  :licensing/dataset "yabai-passive-dns"
+  :licensing/source "passive DNS 観測"
+  :licensing/authority "未確認"
+  :licensing/licence "公開ライセンス未確認"
+  :licensing/redistribution false
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "passive DNS の再販条項未確認。:not-sellable。"
+  :resale/status :not-sellable
+  :datom/verified false}
+
+ {:db/id -10
+  :licensing/corpus "internet-accounts"
+  :licensing/repo "orgs/kotoba-lang/global-accounts-datoms"
+  :licensing/dataset "internet-accounts"
+  :licensing/source "公開アカウント・ディレクトリ"
+  :licensing/authority "未確認"
+  :licensing/licence "公開ライセンス未確認"
+  :licensing/redistribution false
+  :licensing/attribution-required true
+  :licensing/observed-at "2026-09-08"
+  :licensing/notes "個人識別子を含むため再販しない。service 面 (catalog/coverage) は別。"
+  :resale/status :not-sellable
+  :datom/verified false}]

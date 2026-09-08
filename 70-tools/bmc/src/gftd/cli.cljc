@@ -45,7 +45,7 @@
             [gftd.kotobase :as kbase]))
 
 (def registry
-  {:itonami  {:products [:cloud-itonami]                :desc "business operator (L3)"}
+  {:itonami  {:products [:cloud-itonami :cloud-itonami-data-products]                :desc "business operator (L3) + データソース事業 (公開ライセンス研究データの x402 販売)"}
    :manimani {:products [:cloud-manimani]               :desc "personal wellbecoming OS (L5)"}
    :murakumo {:products [:cloud-murakumo]               :desc "LLM 推論 infra (L1)"}
    :kotoba   {:products [:net-kotobase]                 :desc "storage hosting / graph BaaS (L2)"}
