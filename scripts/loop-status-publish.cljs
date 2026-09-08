@@ -175,35 +175,75 @@
 (def hermes-home
   (or (aget (.-env js/process) "HERMES_HOME") (str home "/.hermes")))
 
-(defn- read-hermes-jobs
-  "<home>/cron/jobs.json → {:jobs [job…]} か {:why \"…\"}。
+(defn- read-one-jobs
+  "<dir>/cron/jobs.json → {:jobs [job…]} か {:why \\\"…\\\"}。
+  読めなかった理由を名前で返す（read-hermes-jobs が全体を束ねる）。"
+  [f]
+  (if (not (exists? f))
+    {:why "jobs-file-absent"}
+    (let [txt (read-file f)]
+      (if (nil? txt)
+        {:why "jobs-file-unreadable"}
+        (let [parsed (try (js/JSON.parse txt) (catch :default _ ::bad))]
+          (cond
+            (= ::bad parsed) {:why "jobs-file-invalid-json"}
+            (nil? parsed) {:why "jobs-file-invalid-json"}
+            :else
+            (let [arr (aget parsed "jobs")]
+              (if-not (array? arr)
+                {:why "jobs-file-shape-unexpected"}
+                {:jobs (vec arr)}))))))))
 
-  **読めなかった理由を捨てない。** 5 つの失敗はどれも「常駐が 0 体」と
-  同じ形で返せてしまうので、それぞれ別の名前で返す。値は Hermes が持つ
-  JS object のまま扱う（`get` は生の JS object に nil を返す —— この
-  workspace が verify-hermes-agent-health で一度踏んだ形）。
+
+(defn- read-hermes-jobs
+  "All of <home>/cron/jobs.json AND <home>/profiles/*/cron/jobs.json →
+  {:jobs [job…] :scanned n} か {:why \\\"…\\\"}。
+
+  ADR-0053 puts the Hermes cron residents in the bots plane, and that
+  population is spread across *every* Hermes profile, not just the root:
+  `~/.hermes/cron/jobs.json` holds the default profile's jobs, while
+  per-profile bots (e.g. itonami-isco-1-scout, wiki-kaonavi-crawl) live in
+  `~/.hermes/profiles/<name>/cron/jobs.json`. A reader that only looks at
+  the root file silently misses the per-profile majority — which is the
+  exact 'unmeasured reports as zero' shape this function exists to prevent.
+  Real population measured 2026-09-08: 59 default jobs, plus ~30 per-profile
+  occupation bots invisible to the old single-file reader.
+
+  **読めなかった理由を捨てない。** Each jobs file can fail in the same
+  5 ways as before, and each is still named. A broken root file with healthy
+  profiles still yields the profiles' jobs, so a single broken file cannot
+  blank the whole population; only a total failure (no home, or no readable
+  jobs anywhere) yields a bare why with no jobs.
 
   home を引数に取るのは self-test がこの関数**そのもの**を回すため。
   分類器を写して回すテストは、分類器が壊れても緑のままになる。"
   ([] (read-hermes-jobs hermes-home))
   ([hermes-home]
-   (let [f (str hermes-home "/cron/jobs.json")]
-    (cond
-      (not (exists? hermes-home)) {:why "hermes-home-absent"}
-      (not (exists? f)) {:why "jobs-file-absent"}
-      :else
-      (let [txt (read-file f)]
-        (if (nil? txt)
-          {:why "jobs-file-unreadable"}
-          (let [parsed (try (js/JSON.parse txt) (catch :default _ ::bad))]
-            (cond
-              (= ::bad parsed) {:why "jobs-file-invalid-json"}
-              (nil? parsed) {:why "jobs-file-invalid-json"}
-              :else
-              (let [arr (aget parsed "jobs")]
-                (if-not (array? arr)
-                  {:why "jobs-file-shape-unexpected"}
-                  {:jobs (vec arr)}))))))))))
+   (if-not (exists? hermes-home)
+     {:why "hermes-home-absent"}
+     (let [profiles-dir (str hermes-home "/profiles")
+           root (read-one-jobs (str hermes-home "/cron/jobs.json"))
+           pdirs (when (exists? profiles-dir)
+                   (let [es (try (vec (.readdirSync fs profiles-dir))
+                                 (catch :default _ []))]
+                     (remove #(or (.startsWith % ".") (.endsWith % ".bak"))
+                             (mapv str es))))
+           files (cond
+                   (string? pdirs) [(str hermes-home "/cron/jobs.json")]
+                   (nil? pdirs) [(str hermes-home "/cron/jobs.json")]
+                   :else (cons (str hermes-home "/cron/jobs.json")
+                               (map #(str profiles-dir "/" % "/cron/jobs.json")
+                                    pdirs)))
+           results (map read-one-jobs files)
+           good (filter :jobs results)
+           jobs (vec (apply concat (map :jobs good)))
+           errs (keep :why results)]
+       (if (seq jobs)
+         {:jobs jobs :scanned (count results)}
+         ;; a total failure carries a reason and NO jobs key — the page must
+         ;; render `unmeasured`, never "no residents" (ADR-0053).
+         {:why (or (first errs) "jobs-file-absent")})))))
+
 
 (defn- resident-row
   "1 job → 発行する facts だけ。**workdir と prompt は写さない。**"
