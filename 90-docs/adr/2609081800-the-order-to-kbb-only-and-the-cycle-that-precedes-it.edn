@@ -140,6 +140,54 @@ nbb --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.clj
 nbb <kotoba>/scripts/verify-kbb-ports.cljs
 ```
 
+## 引き継ぎ（2026-09-08 の closing）
+
+### 着地したもの
+
+| repo | PR | main | west pin |
+|---|---|---|---|
+| `kotoba-script` | #96 境界を判定する / #97 自己末尾呼び出しをループに / #98 検査を JVM から退避 | `112713c9` | 同一 |
+| `amu` | #890 kotoba-script pin / #892 TCO pin（+ lock 再生成） | `3f36eb51` | 同一 |
+| `kotoba` | #605 空 capability / #606 env NAME は scope / #609 gate case / #610 amu pin | `730f8e1b` | 同一 |
+| `root` | adr-2609081600（+ 訂正）/ adr-2609081800 / adr-2609070200 に欠陥 6 件目 | — | — |
+
+3 repo とも **pin が main の tip と一致**している（`gh api repos/<r>/compare/<pin>...main` が identical）。
+
+### 他 agent が進めていて、この順序に直接当たるもの（2026-09-08 時点、実測）
+
+- **amu #852** —— `capability-kits/fs-transact-v1.edn` と `git-run-v1.edn` を足す。
+  **これは 1d そのもの**（`:fs/transact` は wire id だけ在って中身が無い、と上に書いた
+  状態を変える）。状態は BLOCKED。**1d を「未着手」と読まないこと。**
+- **kotoba #598** —— `fs/browse-dir` provider（`lib/kbb/browse.kotoba` と js host、
+  および JVM host provider）。1b の近傍だが、1b が名指しているのは
+  `string-index-of` の native lowering であって同じではない。状態は DIRTY（衝突）。
+- **amu #893** —— f32 リテラルが JVM-free 経路で通るようにする（0d の片側、
+  ADR-2609081700）。
+- **amu #891** —— native の vector arena を per-run 予算にする。
+
+### 次の 1 手（オーナー決定を待たずに進められるもの）
+
+**1a: native loader に wire 20 / 22 の provider を足す。** 今の状態はこれで出る:
+
+```
+grep -oE 'wire id [0-9]+ = :[a-z/-]+' <amu>/tools/kexe_loader.c | sort -u
+#   33 / 34 / 35 しか出ない
+```
+
+amu #852 が kit 契約の側を持ってくるので、provider を足せば `kbb.proc` と `kbb.git`
+を使う script が js 専用でなくなる。0a / 0b / 0c のどれも待たない。
+
+### 触っていない、または壊れたまま残っているもの
+
+- **`git_status_report/js` の gate が赤い**（`verify-kbb-ports.cljs`、CHECKED 17 中 1 件）。
+  packed の答えに `git ls-files` の**作業ツリーの行数**が入っているので、untracked が
+  1 つ増えると動く。origin/main でも同じく落ちる。**期待値ではなく case の設計の問題。**
+- **`orgs/kotoba-lang/amu` の checkout が pin に追随していない** —— 別セッションの
+  bot commit が 167 本と未追跡ファイルが載っており、west が正しく拒否した。破棄していない。
+- 別 agent の未追跡ファイル 1 件（`revenue-agent-loop/runs/0037-…-tooling.edn`）の
+  70 行目で、生の `\"` を 1 文字だけエスケープした（EDN guard が commit を止めていた。
+  開きが `„` で閉じが ASCII だったため文字列が早く閉じていた）。内容は変えていない。
+
 ## 位置づけ
 
 ADR-2607198300（実行成果物が JVM/Node/Rust を経由しない）の下に、**順序**を足す。
