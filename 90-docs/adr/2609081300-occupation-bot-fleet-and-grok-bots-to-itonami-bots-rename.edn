@@ -1,0 +1,64 @@
+[{:db/id -1
+  :adr/id "adr-2609081300-occupation-bot-fleet-and-grok-bots-to-itonami-bots-rename"
+  :adr/title "ISIC/ISCO 職種 bot fleet 30 体を立て、grok-bots を itonami-bots にまるごと rename（closing / resume point）"
+  :adr/status "accepted"
+  :adr/date "2026-09-08"
+  :adr/related ["adr-2609081000-status-and-resume-point"
+                "adr-2608318000-hermes-residents-join-the-bots-plane"
+                "adr-2609051100-kbb-refactor-and-adr-2609051100"]
+  :adr/body "## 何をやったか（2026-09-08、実測・live 検証済み）
+
+itorami.cloud（cloud-itonami）の per-code blueprint アクター（ISIC 457 + ISCO 340 =
+797 個）を**大分類（ISCO major 10 + ISIC section 21）ごとに 30 体の Hermes bot profile +
+cron** として立てた。各 bot は「その分類のアクターを JVM(.clj*)→ kotoba-native(.kotoba)
+へ移行し、`amu check <f>.kotoba --jvm-free` を :ok true にする移行ドライバー」。オーナー
+指示「jvm only をやめて kotoba only にしていきます」(2026-09-08)。
+
+さらに「grok-bots の名前を内部 wire からも外す」オーナー指示を、ADR-0055 Phase 3 として
+実装・deploy した。
+
+## 着地（全部 merged + live deploy + 実測検証）
+
+| repo | PR | 内容 |
+|---|---|---|
+| com-junkawasaki/root | #2997 | loop-status-publish.cljs を per-profile 対応に（residents を全 Hermes profile から読む。dry-run residents 290 / 30 occupation bot 確認） |
+| network-awai/cloud-itonami | #640 #641 #642 #643 #646 #647 #648 #649 | Pages `/api/v1/grok-bots/*`→308 redirect to itonami-bots、worker route `/v1/itonami-bots` へ canonical 化、DO class `GrokBotRuntime`→`ItonamiBotsRuntime`（`state: renamed` migration で data 保持 deploy、tick 351→354 継続）、canonicalPath の bug fix、redirect module export fix（Pages build 修復）、body cap 64KB→256KB、src .cljc 政策 ns rename、caller MURAKUMO_AUTH_URL を itonami-bots へ |
+| network-awai/cloud-murakumo-api | #234 #235 | murakumo worker の grok→itonami rename（routing accept-both + legacy 308 + auth 両対応）、governed release artifact 再生成（sourceDigest 更新、package-release ok:true）→ **本番 deploy（api.murakumo.cloud Version 9cdae161）** |
+
+## （c）token 再プロビジョン
+
+BOTS_STATUS_TOKEN は 2026-09-03 に失効し publish が停止していた。新 bearer token を生成
+→ Cloudflare Pages secret 更新 + `~/.gftd/bots-status-token`（mode 600）へ。live 検証:
+`PUT https://itonami.cloud/api/bots-status` → 204、フィードに **30 体の職種 bot 全部**
+（295 residents）。
+
+## live 検証（捏造ゼロ）
+
+- workers: `bots.itonami.cloud/v1/itonami-bots/runtime` 200（tick 継続）、`/api/v1/itonami-bots/runtime` 200
+- murakumo: `/internal/itonami-bots/authorize` 401（route 実装、bad token 拒否）、`/internal/grok-bots/authorize` 308→new、`/v1/itonami-bots` 200、`/v1/grok-bots` 308→new
+- publish: `/api/bots-status` residents 295 で 30 occupation bot 表示
+
+## 残存 gap（次のセッションの起動点）
+
+1. **28 体の職種 bot は未実行 cron**（isco-3/5-9, isic-*）— 24h 前の初回 tick 前で
+   `last_status: None`（正しく unmeasured として表示）。isco-1/2/4 のみ ok。cron は各
+   04:xx に順次 fire。
+2. **murakumo の response `object :grok_bot.*` 型識別子 + biscuit scope コメント** —
+   既存クライアント互換のため歴史的 wire identifier として温存（routing/auth には無関係）。
+   `GrokBotRuntime` の stale_tombstone（`state: renamed` の残骸）は「no effect」警告が出て
+   おり、全 worker が ItonamiBotsRuntime に振り直し済みなら exports から除去可能。
+3. **30 体の .kotoba 移行は出発点**（各 bot の frontier slice が durable
+   `workspace/slices/<code>/` に置かれる。isco-1 は 1120、isco-4 は 4110 を実装済み・
+   `amu check --jvm-free` :ok true 確認済み）。
+4. **継続 deploy の guard**: cloud-murakumo-api は governed release artifact
+   （`release/cljs/manifest.json` sourceDigest）が厳格。src/deps/shadow を変えたら
+   `scripts/refresh-bots-release-artifact.py`（今回作成）で artifact 再生成が必要。
+
+## 次 agent の最初の一手
+
+- 残り 28 体を実際に動かし .kotoba 移行を進める（各 profile の cron fire を確認、
+  `hermes cron run <job-id> --profile itonami-<...>` で手動 fire 可能）
+- murakumo の stale_tombstone 整理（全て ItonamiBotsRuntime 参照なら exports から
+  `GrokBotRuntime` 行を除去）・`object :grok_bot.*` の互換戦略を決める
+- 30 体の frontier slice を PR 化・merge・の各 repo へ着地
+"}]
