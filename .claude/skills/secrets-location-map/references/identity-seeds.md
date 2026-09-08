@@ -393,3 +393,28 @@
   （初出・資金源）を取得できず、guardian は仕様どおり全件 veto する。
   **鍵が無いことは「安全」ではなく「recovery が完了できない」を意味する。**
 
+
+- **`hyakka-index-ipns` — kagi、compartment `net-kotobase`**（2026-09-08 発行）。
+  wiki.kotobase.net の content-addressed index root を名指す IPNS 鍵。
+  - **IPNS name `k51qzi5uqu5djz8wrylvnm0u2mqwsvpdlqrh6jisb5ll3nsc189ul4zg1ukfld`**
+    （公開値。`GET https://ipfs.kotobase.net/ipns/{name}` が署名済み record を返す）
+  - 使い方: `nbb scripts/publish-ipns.cljs --cid <root> --kagi hyakka-index-ipns
+    --kagi-compartment net-kotobase --sequence <n> --put`
+    （net-kotobase/ipfs。`--kagi` は 2026-09-08 に足した。値は argv にも
+    シェル履歴にもファイルにも載らない）
+  - 生成: `node -e 'randomBytes(32)'` を **stdin で `kagi add` に直結**。
+    seed は端末にも変数にも出していない。往復確認は「kagi get → 公開鍵導出 →
+    k51 名が record の署名と一致」を live の `GET /ipns/{name}` が 200 で
+    返すことで実測（gateway は検証を通した record しか返さない）。
+  - ⚠ **IPNI publisher の鍵とは別物**。ADR-2608160300 の
+    `:one-key-for-the-workspace` は *advertise する identity* の話で、
+    **名前は名指す対象ごとに要る** —— 1 つの鍵で 2 つの root は名指せない。
+    加えて publisher 鍵の custody は 3 記録が食い違ったまま
+    (`manifest/ipni-publisher.edn` の `:custody-remeasured`) で、
+    その状態の鍵に新しい役割を足すのは筋が悪い。
+  - ⚠ **IPNS は canonical truth ではない**（ADR-2609060000 の責務表:
+    *optional mutable publication hint*）。正本は CID。この名前は
+    「最新の index はどれか」への近道であって、identity ではない。
+  - **sequence を必ず上げる。** record は sequence で順序が決まるので、
+    同じ番号で 2 つ出すと「どちらが新しいか」が答えられなくなる。
+    現在 1（2026-09-08、root `bafyreichqlk7po…`）。有効期限 2027-08-14。

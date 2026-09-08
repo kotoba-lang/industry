@@ -396,6 +396,43 @@
                cost this names: every rebuild needs a fresh advertisement, and a
                name is what would stop that."]}]
 
+ ;; ── the naming key, which is NOT this publisher's key ────────────────────────
+ ;;
+ ;; Issued 2026-09-08 to close the second :not-done above. Recorded here because
+ ;; a reader who arrives at this file asking "which keys does this workspace
+ ;; have for the IPFS plane" should not have to already know there are two.
+ ;;
+ ;; `:one-key-for-the-workspace` above is about the identity that ADVERTISES.
+ ;; A NAME is per named thing: one key cannot name two different roots, because
+ ;; the name IS the public key. So this is a second key by construction, not by
+ ;; sprawl. It also keeps a role away from a key whose custody has three
+ ;; records that disagree (see :ipni.publisher/custody-remeasured).
+ ;;
+ ;; ADR-2609060000 places IPNS as an "optional mutable publication hint, never
+ ;; canonical truth". The CID stays the identity; this is a shortcut to the
+ ;; newest one.
+ :ipni.publisher/naming-key
+ {:role :names-the-hyakka-index-root
+  :ipns-name "k51qzi5uqu5djz8wrylvnm0u2mqwsvpdlqrh6jisb5ll3nsc189ul4zg1ukfld"
+  :seed-kagi-item "hyakka-index-ipns"
+  :seed-kagi-compartment "net-kotobase"
+  :issued "2026-09-08"
+  :custody :single-location
+  :custody-note "kagi only. The IPNI publisher key is recorded in two places and the two disagreed; one location that is known to hold it beats two that are not compared. A second copy is worth making only alongside something that compares them."
+  :how-issued "32 random bytes piped from node straight into `kagi add` -- the hex reached no shell variable, no file and no terminal. Only the derived k51 name was printed."
+  :published {:record-bytes 331
+              :sequence 1
+              :points-at "/ipfs/bafyreichqlk7pojif7i4xtaowgm6zwen3u2jdvmdwaehx76elf4auc7aai"
+              :valid-until "2027-08-14T00:00:00.000000000Z"
+              :stored "R2 kotobase-graph-database-production, key ipns/{name}"
+              :verified "GET https://ipfs.kotobase.net/ipns/{name} -> 200 application/vnd.ipfs.ipns-record. The gateway validates signature and TTL before serving, so a 200 there is a checked record and not merely a stored one."}
+  :rule "sequence must increase. Records are ordered by it, so two records at one number make `which is newer` unanswerable."
+  :tool "net-kotobase/ipfs scripts/publish-ipns.cljs --kagi (added 2026-09-08)"
+  :not-done ["No DHT publication. This name resolves through kotobase's gateway
+              and nowhere else, which is the same boundary the advertisement
+              section records: this operator runs no libp2p peer."
+             "No rotation record and no second custody location yet."]}
+
  ;; Which cid.contact surface answers freshly. This is not trivia: the first
  ;; three minutes of watching the provide advertisement land were spent
  ;; reading a CloudFront response cached BEFORE the announce, which reports
