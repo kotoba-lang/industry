@@ -17,7 +17,7 @@
 
 (ns gen-industry-docs
   (:require [clojure.edn :as edn]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             ["node:fs" :as fs]
             ["node:path" :as path]))
 
