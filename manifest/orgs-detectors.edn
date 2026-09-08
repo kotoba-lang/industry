@@ -1358,6 +1358,41 @@
    ;; anything). Those four are ~8,300 repo-class pairs, none of which names a defect.
    }
 
+  {:id       :verify-portable-source-tested-on-one-host
+   :title    "portable .cljc source whose only tests are .clj -- verified on the host being removed"
+   :why      "Measured 2026-09-08 in kotoba-lang/kotoba-sema: `(defn main [] :f32 1.5)`
+              compiled on the JVM and was REFUSED on nbb with `expected f32, got f64`, and
+              so was `(f32-add 1.5 2.5)`. No f32 expression with a number in it could be
+              written on the runtime this workspace is migrating TO, and `bin/amu`'s default
+              target runs there. One branch in a `.cljc` file was guarded on a HOST double,
+              which a decimal literal only ever is on the JVM.
+              The reason nobody knew is what this detector measures: the only test of the
+              feature was `f32_literal_test.clj`, so the suite that exercised it ran on the
+              one host where it worked.
+              THE TWO SIBLING DETECTORS WERE BOTH CORRECTLY GREEN ON THAT FILE, which is why
+              this is a third script and not a flag on one of them. verify-cljs-runner-
+              completeness compares `.cljc` TEST namespaces against a runner's list, and a
+              `.clj` test is never a candidate. verify-cljc-runtime-parity asks whether a
+              repo has ANY ClojureScript path, and kotoba-sema has one -- `run-tests.cljs`,
+              green at 356 tests. Neither asks whether a portable SOURCE namespace is reached
+              only by tests that cannot run on the second host.
+              First sweep, 4,270 checkouts and 16,098 `.cljc` sources: 5,445 namespaces
+              tested only on the JVM, 7,812 reached by a portable test, 2,840 with no test at
+              all. The last group is counted and NOT a finding -- honestly untested misleads
+              nobody, while `looks tested, is tested on one host` is the whole point. In the
+              migration core: kotoba-lang 23 of 28, kotoba-native 9, kotoba 8, amu 7,
+              kototama 5, osaho 4, and kotoba-sema 0 after its repair the same day.
+              It refuses rather than passing when it cannot read: `--repo` pointed at a path
+              not on disk answered 0 -- the same output as a clean repo -- until that was
+              made an exit-2 REFUSED. Its `--self-test` caught two real defects in it on the
+              first run, both of which produce MISSING findings against a count."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-portable-source-tested-on-one-host.cljs"
+              "--findings" "--max-findings" "0"]
+   :cwd      :root
+   :findings :protocol
+   :adr      "adr-2609081700-a-clj-test-of-a-cljc-compiler-tests-one-host"}
+
   {:id       :verify-cljs-runner-completeness
    :title    "ClojureScript test runners that run less than the suite they sit in"
    :why      "ADR-2608170200 moves :jvm-test fleet gates to :nbb-test, and the :nbb-test
