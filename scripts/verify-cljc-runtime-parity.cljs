@@ -79,7 +79,9 @@
 
   ## What this cannot answer
 
-  This walks only `src/`, `test/`, `tests/`, `scripts/`, `script/` under
+  This walks the repository root non-recursively (which is where
+  `run-tests.cljs` lives in kotoba-sema and kotoba-native), plus
+  `src/`, `test/`, `tests/`, `scripts/`, `script/` under
   each checked-out repo (plus root-level `package.json`/`nbb.edn`/
   `shadow-cljs.edn`) -- not the whole tree -- to keep a ~4300-repo sparse
   checkout tractable. A verification runner living somewhere else (repo
@@ -143,11 +145,35 @@
                         :else (conj a f)))))
                 acc entries)))))
 
+(defn root-level-files
+  "Files sitting directly in the repository root, without descending.
+
+  The subdirectory walk below misses these, and one of them is a runner this
+  workspace actually uses: `kotoba-sema` and `kotoba-native` both keep their
+  ClojureScript suite at `<repo>/run-tests.cljs`, and the sibling detector
+  `verify-cljs-runner-completeness.cljs` reads it as the runner it is. Before
+  this, those two repos were reported as having NO ClojureScript verification
+  path while their nbb suites were green -- kotoba-sema 356 tests / 1371
+  assertions, kotoba-native 24 / 37, both measured 2026-09-08.
+
+  A false `error` on the two repos furthest along the migration is worse than
+  a missed finding elsewhere: this detector's whole job is to say where the
+  ClojureScript half has never been run, and it was saying it about halves
+  that run.
+
+  No recursion, so a repo whose root holds a large generated tree costs one
+  `ls` here, not a walk."
+  [abs]
+  (let [entries (ls abs)]
+    (if (= entries ::error)
+      []
+      (into [] (comp (map #(p/join abs %)) (remove dir?)) entries))))
+
 (defn repo-files [abs]
   (reduce (fn [acc sub]
             (let [d (p/join abs sub)]
               (if (dir? d) (walk d 0 acc) acc)))
-          [] target-subdirs))
+          (root-level-files abs) target-subdirs))
 
 ;; --- Signal A: cljs verification path -----------------------------------
 
