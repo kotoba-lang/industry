@@ -8999,4 +8999,64 @@
      :find "export function validateElementAgainstMetaModel("
      :replace "export function validateElement("
      :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/cloud-itonami/engi"
+   :label "engi kernel parity —— 同じ承認判定が 3 回書かれていて、どれも自分の面しか歩かない"
+   ;; この repo の承認不変条件は 3 つの実装を持つ: Worker の `src/contract.mjs`、
+   ;; portable な `engi.contract`、`kotoba/engi_settlement.kotoba` から出た WASM。
+   ;; README は「三通りで exercise している」と言うが、**三つが一致することは
+   ;; 誰も見ていなかった** —— `main()` は 7 入力の真理値表 128 点のうち 8 点、
+   ;; portable 側の既存 test は同じ 8 点、Worker suite は入力 3 つ。
+   ;; 7 つの拒否理由のうち **5 つはどの assertion にも現れておらず**、2 つの門が
+   ;; 語を交換しても suite は緑だった（下の :engi/reasons-swapped が実際にそれを
+   ;; 示す —— 既存 suite だけを回すと 0 failures で通る）。
+   ;;
+   ;; 5 件とも 2026-09-08 に、当てて赤くなるところを実際に見てから登録した。
+   ;; ⚠ WASM 側の差は textual mutation では作れないので登録していない。代わりに
+   ;; 同日、7 引数のうち 6 つしか AND しない module を手で組んで置き換え、
+   ;; parity test が `{:bits [1 1 1 1 1 1 0], :wasm 1, :portable 0}` ——
+   ;; replay を通す binary —— を名指しするところを見た。
+   :cmd ["nbb" "--classpath" "src-cljs:test" "test/run_portable.cljs"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :engi/replay-gate-dropped
+     :why "replay-free を論理積から外す。**既存 test も新 test も落ちる**（8 点の側にも現れる退行なので）"
+     :file "src-cljs/engi/contract.cljc"
+     :find "   (and2 (and2 (flag metering-role-valid) (flag metering-signature-valid))\n         (flag replay-free))"
+     :replace "   (and2 (flag metering-role-valid) (flag metering-signature-valid))"
+     :must-fail ["wasm-and-portable-kernels-agree-on-every-point"]
+     :also ["fail-closed-context"]}
+
+    ;; ── この suite が在る理由。既存 test はこれを見ない ──────────────
+    {:id :engi/reasons-swapped
+     :why "invalid-amount と invalid-pay-to が入れ替わる。判定は 1bit も変わらないので
+           8 点を歩く test は全部緑のまま —— **operator が読む語だけが嘘になる**。
+           実測 2026-09-08: 既存の engi.contract-test だけを回すと 0 failures"
+     :file "src-cljs/engi/contract.cljc"
+     :find "    (not (:amount-valid m)) (conj :invalid-amount)\n    (not (:pay-to-valid m)) (conj :invalid-pay-to)"
+     :replace "    (not (:amount-valid m)) (conj :invalid-pay-to)\n    (not (:pay-to-valid m)) (conj :invalid-amount)"
+     :must-fail ["every-gate-refuses-under-its-own-name"
+                 "worker-and-portable-kernels-refuse-in-the-same-words"]}
+
+    {:id :engi/worker-renames-a-reason
+     :why "Worker 側だけが拒否の語を変える。同じ拒否が経路によって別の語で返る。
+           実測 2026-09-08: `npm test` は 6/6 緑のまま通る"
+     :file "src/contract.mjs"
+     :find "errors.push(\"invalid-pay-to\")"
+     :replace "errors.push(\"bad-pay-to\")"
+     :must-fail ["worker-and-portable-kernels-refuse-in-the-same-words"]}
+
+    {:id :engi/amount-floor-admits-zero
+     :why "金額の下限が 0 を通す。既存の境界 test がまだ噛んでいることの確認"
+     :file "src-cljs/engi/contract.cljc"
+     :find "(and (integer? amount) (pos? amount) (<= amount 4294967295))"
+     :replace "(and (integer? amount) (not (neg? amount)) (<= amount 4294967295))"
+     :must-fail ["amount-boundary"]}
+
+    {:id :engi/one-refusal-clause-deleted
+     :why "門は閉じるのに理由を名乗らなくなる。拒否は起きるので判定側の test は緑"
+     :file "src-cljs/engi/contract.cljc"
+     :find "    (not (:metering-role-valid m)) (conj :untrusted-metering-role)\n"
+     :replace ""
+     :must-fail ["every-gate-refuses-under-its-own-name"]}]}
 ]}
