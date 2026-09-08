@@ -142,8 +142,70 @@
   (when (string? content)
     (some-> (re-find ns-form-re content) second)))
 
+(defn- balanced-form-at
+  "The text of the parenthesised form beginning at index START, or nil.
+
+  Tracks string and character literals so a `\\(` or a paren inside a
+  docstring cannot unbalance the scan."
+  [content start]
+  (let [n (count content)]
+    (loop [i start depth 0 in-str? false esc? false]
+      (if (>= i n)
+        nil
+        (let [c (nth content i)]
+          (cond
+            esc?    (recur (inc i) depth in-str? false)
+            (and in-str? (= c \\)) (recur (inc i) depth true true)
+            (= c \") (recur (inc i) depth (not in-str?) false)
+            in-str? (recur (inc i) depth true false)
+            (= c \() (recur (inc i) (inc depth) false false)
+            (= c \)) (if (= depth 1)
+                       (subs content start (inc i))
+                       (recur (inc i) (dec depth) false false))
+            :else   (recur (inc i) depth false false)))))))
+
+(defn dependency-text
+  "The part of CONTENT in which a namespace dependency can legitimately appear:
+  the `(:require ...)`, `(:require-macros ...)` and `(:use ...)` CLAUSES, plus
+  any top-level `(require ...)` calls.
+
+  ## Two false positives, and why the obvious narrowing was not enough
+
+  It started as the whole file. A whole-file scan cannot tell a require vector
+  from a DESTRUCTURING BIND -- `(:require [demo])` and `{:keys [demo]}` are
+  both `[demo]` to a regex, delimited identically on both sides. Measured
+  2026-09-08 in `kotoba-lang/kotoba`: `src/demo.cljc` was reported as reached
+  by fourteen `.clj` tests, and no test required it at all; every hit was
+  `(doseq [{:keys [demo]} ...])`.
+
+  Narrowing to the `(ns ...)` form did not fix it, which is the part worth
+  remembering. `kotoba.actor-host-test`'s ns DOCSTRING contains the sentence
+  \"each demo below is a real, capability-gated `.kotoba` -> Wasm compile\" --
+  the bare word, in prose, inside the form. Still a match.
+
+  So it is the require CLAUSES or nothing. Prose cannot appear there, and
+  neither can a destructuring bind."
+  [content]
+  (when (string? content)
+    (let [clause (fn [needle]
+                   (loop [from 0 acc []]
+                     (let [i (.indexOf content needle from)]
+                       (if (neg? i)
+                         acc
+                         (recur (inc i)
+                                (if-let [f (balanced-form-at content i)]
+                                  (conj acc f)
+                                  acc))))))]
+      (str/join "\n" (concat (clause "(:require")
+                             (clause "(:require-macros")
+                             (clause "(:use")
+                             (clause "(require "))))))
+
 (defn references?
-  "Does TEST-CONTENT name NS in a position that reads as a dependency?
+  "Does DEP-TEXT name NS in a position that reads as a dependency?
+
+  DEP-TEXT is the output of `dependency-text`, not a whole file -- see there
+  for why the whole file is the wrong input.
 
   Deliberately not a bare substring test: `kotoba.sema` appears inside
   `kotoba.sema.internal` and inside prose. The symbol must be delimited on both
@@ -178,18 +240,22 @@
                        test-files)
         ;; read once; a file read twice is a file that can disagree with itself
         read-one (fn [f] (let [c (slurp* f)] {:path f :content c}))
+        ;; Narrow each TEST file to the region where a dependency can appear
+        ;; before matching. Sources keep their full content -- the ns name is
+        ;; read from their own `(ns ...)` form.
+        narrow (fn [m] (assoc m :deps (dependency-text (:content m))))
         src-read (mapv read-one cljc-src)
         test-read (mapv read-one tests)
         unreadable (+ (count (filter #(= ::unreadable (:content %)) src-read))
                       (count (filter #(= ::unreadable (:content %)) test-read)))
-        jvm-tests (filterv #(str/ends-with? (:path %) ".clj") test-read)
-        portable-tests (filterv #(not (str/ends-with? (:path %) ".clj")) test-read)
+        jvm-tests (mapv narrow (filterv #(str/ends-with? (:path %) ".clj") test-read))
+        portable-tests (mapv narrow (filterv #(not (str/ends-with? (:path %) ".clj")) test-read))
         results
         (for [{:keys [path content]} src-read
               :let [ns (file-ns content)]
               :when ns
-              :let [jvm (filterv #(references? (:content %) ns) jvm-tests)
-                    portable (filterv #(references? (:content %) ns) portable-tests)]]
+              :let [jvm (filterv #(references? (:deps %) ns) jvm-tests)
+                    portable (filterv #(references? (:deps %) ns) portable-tests)]]
           {:ns ns
            :path (subs path (inc (count abs)))
            :jvm (mapv #(subs (:path %) (inc (count abs))) jvm)
@@ -230,9 +296,33 @@
            false (references? "(ns t (:require [kotoba.sema.internal :as i]))" "kotoba.sema"))
     (check "an unrelated namespace does not match"
            false (references? "(ns t (:require [other.thing]))" "kotoba.sema"))
+    ;; The false positive that motivated `dependency-text`. Both strings
+    ;; contain `[demo]`, delimited identically; only the FORM differs.
+    (check "a destructuring bind is not a dependency"
+           false (references? (dependency-text
+                               "(ns t (:require [clojure.test]))\n(deftest a (doseq [{:keys [demo]} xs] demo))")
+                              "demo"))
+    (check "a real require IS a dependency"
+           true (references? (dependency-text "(ns t (:require [demo]))") "demo"))
+    (check "a top-level (require ...) counts too"
+           true (references? (dependency-text "(require '[demo :as d])\n(println 1)") "demo"))
+    (check "a paren inside a docstring does not unbalance the clause scan"
+           true (references? (dependency-text
+                              "(ns t \"doc with ( unbalanced\" (:require [demo]))")
+                             "demo"))
+    ;; The SECOND false positive: the bare word in ns-docstring prose. Narrowing
+    ;; to the `(ns ...)` form does not exclude this; narrowing to the clauses does.
+    (check "a bare word in the ns docstring is not a dependency"
+           false (references? (dependency-text
+                               "(ns t \"each demo below is a real compile\" (:require [clojure.test]))")
+                              "demo"))
+    (check "and the require in that same ns still counts"
+           true (references? (dependency-text
+                              "(ns t \"each demo below is a real compile\" (:require [clojure.test]))")
+                             "clojure.test"))
     ;; The real file that motivated this script, in both directions.
     (check "the f32 case: a .clj test does reach kotoba.sema"
-           true (references? "(ns kotoba.compiler.f32-literal-test\n  (:require [clojure.test :refer [deftest is testing]]\n            [kotoba.sema :as sema]))"
+           true (references? (dependency-text "(ns kotoba.compiler.f32-literal-test\n  (:require [clojure.test :refer [deftest is testing]]\n            [kotoba.sema :as sema]))")
                              "kotoba.sema"))
     (println (str "SELFTEST\t" @ok " passed, " @bad " failed"))
     (.exit js/process (if (pos? @bad) 1 0))))
