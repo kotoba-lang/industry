@@ -1,0 +1,170 @@
+[{:db/id -1
+  :adr/id "adr-2809081400-hyakka-i18n-cid-on-kotobase-ipld"
+  :adr/title "hyakka の i18n（UI 文言・言語別ラベル・procured 翻訳）を git/DataLad から移し、IPLD/IPNI/IPFS ベースの kotobase に CID で pin・CARv2 pack し、kotobase-lake 経由で query 可能にする（accepted、前提は s3 でなく IPFS pin）"
+  :adr/status :accepted
+  :adr/date "2026-09-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/related ["ADR-2809031900" "ADR-2608152330" "ADR-2607289100"
+                "ADR-2607289200" "ADR-2607051210" "ADR-2608610000"
+                "ADR-2608148200" "ADR-2608159100"]
+  :adr/context
+  "オーナー指示（2026-09-08、2 回）: ① i18n の翻訳も git 上というより ipld, ipni, ipfs ベースの
+   kotobase で cid で、ちゃんと pin ベースで pack して、query 可能なデータにしてほしい。
+   ② do it。また s3 じゃなくて ipfs pin を前提にしてほしい。
+
+   ②が決定的な前提変更である: 配信・保持は s3.kotobase.net に置かず、**IPFS pin
+   （kotobase-protocol-pinning の PSA surface + net-kotobase/ipfs の IPFS/IPNS retrieval
+   Worker + ipfs.kotobase.net の subdomain 形）** を正とする。
+
+   これは既存の決定・資産を、いずれも壊さずに 1 本に統合する作業である。
+
+   ## 守る既存決定（上書きしない）
+
+   - ADR-2809031900（accepted）: hyakka の多言語は UI 層のみ。claim 本文は翻訳しない。
+     翻訳を流すと「出典まで辿れる主張」の検証可能性が壊れる。UI 文言の辞書化と
+     言語別ラベルだけが翻訳対象。
+   - ADR-2608152330（accepted）: corpus は既に content-addressed の CID 索引に載っている。
+     root block は corpus の純関数（wall-clock を hash に入れない）。lookup は root 1 回 +
+     二分探索で leaf 1 個 = コーパス規模に依らず有界な 2 fetch。CID が与えるのは fetch で
+     query ではない、が設計の前提。
+   - ADR-2607289100 / 2607289200（accepted）: 翻訳は procured service。正本は
+     cloud-itonami/cloud-itonami-translation（TranslationAdvisor ⊣ TranslationGovernor）。
+     外部翻訳ベンダの API 契約に直結せず、x402 で推論を調達・検品する。
+     使い捨て翻訳スクリプトを新規に書かない。
+   - ADR-2608610000（accepted）: 既定スタック = datom 面 + Prolly index + commit DAG +
+     条件付き ref 1 本。object store backend は hop 数を最適化。ブロック粒度は定義単位。
+     per-tenant 鍵 + ciphertext-addressed。
+   - ADR-2608148200（accepted）: identity は hasher の付けた CID。raw CIDv1 と dag-cbor
+     commit の CID 文字列は分かれうる - それはバグにしない。
+   - ADR-2608159100（accepted）: live service の永続化境界は kotobase.net。immutable bytes
+     は PUT/GET https://kotobase.net/ipld/:cid。provider 実装は application の前提にしない。
+   - ADR-2608051000（accepted）: 1 repo = 1 capability で分離。pinning は
+     kotobase-protocol-pinning に、retrieval は net-kotobase/ipfs に分かれた。
+
+   ## 現状（前提として確認した実体）
+
+   - hyakka の言語別ラベルは prop/label（en）+ prop/label-ja の 2 フィールド。corpus は
+     network-awai/hyakka-data（git + DataLad / s3.kotobase.net）。**i18n 層はこれに乗せない。
+     配信・保持は IPFS pin を正とする。**
+   - kotoba-lang/i18n-cid が既に存在: catalog-&gt;block（DAG-CBOR ブロック）/
+     locale-index-&gt;block / lake-claim / lake-claim-index（kotobase-lake へ admit）。
+     誠実さ境界: encode/address はするが pin(IPFS)・announce(IPNI)・write 認可(Biscuit)
+     はしない。テスト green。
+   - kotoba-lang/kotobase-protocol-pinning が既に存在: IPFS Pinning Service API surface
+     （`/pins` PSA）。ADRD-2608051000 で kotobase-protocols から分離、pure cljc handler。
+   - orgs/net-kotobase/ipfs が既に存在: `GET /ipfs/<cid>` と `GET /ipns/<name>` の
+     低権限 retrieval Worker。B2 から CAR/raw を配信、read-only。ipfs.kotobase.net
+     subdomain 形（https://CID.ipfs.kotobase.net/）を返す。
+   - kotoba-lang/kotobase-lake が既に存在: 任意のファイルを datom 面のカタログに。
+     admit すれば Datalog / SQL / SPARQL / Cypher / GraphQL / Gremlin で query 可能。
+   - kotoba-lang/i18n（.cljc）が既に存在: register! / set-locale! / t /
+     messages/defmessages（コンパイル時キー検査）。
+   - kotoba-lang/io-ipld-car が既に存在: CARv2 の pack / locate / range-header を提供。
+   - UI 層は worker.cljs が resolve-lang で ja/en を既定、UI 文言は言語別 map。
+   - 翻訳の生成・検品側は cloud-itonami/cloud-itonami-translation（ADR-2607289100 のとおり）。"
+
+  :adr/decision
+  "## 統合方針：翻訳というデータを、既存 hyakka CID 索引と同じ土台（IPLD ブロック + 純関数 root
+  CID + 有界 2 fetch）に載せ、**IPFS pin で保持・配信**し、kotobase-lake で datom 面 query
+  可能にする。
+
+   claim 本文は翻訳しない（ADR-2809031900 維持）。対象は UI 文言カタログ・言語別ラベル・
+   procured 翻訳の成果物の 3 種。それぞれを i18n-cid の形（DAG-CBOR i18n-catalog/1 ブロック）
+   + プロジェクト索引（locale-index-&gt;block）にし、IPLD ブロックとして **IPFS に CID で
+   pin（kotobase-protocol-pinning `/pins` PSA）** し、CARv2 pack で配信し、kotobase-lake に
+   admit して datom 面から query 可能にする。
+
+   ### D1. 3 種類の i18n 資産を 1 つのカタログ形状に正規化し、それぞれ block + root を持つ
+
+   対象: (1) UI 文言（resolve-lang の辞書）(2) 言語別ラベル（prop/label + prop/label-ja）
+   (3) procured 翻訳（cloud-itonami-translation の検品済み成果物）。いずれも
+   i18n-catalog/1 形式の DAG-CBOR ブロックにし、locale-index（ja/en ごとの CID 索引）を持つ。
+   ブロックは corpus の純関数（wall-clock なし）にする - 同一カタログは同一 root CID。
+
+   ### D2. 保持・配信は IPFS pin を正とする。s3.kotobase.net は使わない（オーナー指示②）
+
+   - 各 i18n ブロック（DAG-CBOR）を `PUT https://kotobase.net/ipld/:cid`（ADR-2608159100 の
+     immutable bytes 境界）。identity は raw CIDv1。
+   - **IPFS pin**: ブロックを **kotobase-protocol-pinning** の `/pins` PSA surface に
+     add してピン留めする（i18n-cid が現在「しない」と明言している pin を、この統合で
+     既存 pinning repo が担う）。翻訳成果物を CID に publish し、locale 名 → CID の解決を
+     IPNS 相当（`/ipns/<locale>`）で net-kotobase/ipfs Worker が配信する。
+   - **CARv2 pack**（kotoba-lang/io-ipld-car）で翻訳ブロック群を束ね round-trip を減らす。
+     複数 locale のカタログを 1 pack にすれば hydration が 1 回の Range GET。
+   - 配信は net-kotobase/ipfs の subdomain 形（https://CID.ipfs.kotobase.net/）を使う。
+     s3.kotobase.net への直接配信・保持はこの i18n 層では行わない。
+
+   ### D3. query 面は kotobase-lake admit 経由（新しい index を作らない）
+
+   i18n-cid の lake-claim / lake-claim-index が既に datom 面 admit を提供している。これを使い
+   「どの locale のカタログが在るか・何 version か・誰が publish したか」を datom plane に載せ、
+   既存の Datalog / SQL / SPARQL / Cypher が翻訳を第二 index なく問い合わせられるようにする。
+   ADR-2608610000 D6 の「graph も同じ datom 面に載せる」の拡張。
+
+   ### D4. ランタイム seam は i18n-cid.seam を使う（新規機構を書かない）
+
+   - build-time: write-catalog-resource! で i18n/messages/LOCALE.edn を出し defmessages が読む（既存、JVM-only）。
+   - runtime: register-from-block! で kotobase as-of / IPFS / local からフェッチし i18n.core に
+     merge。UI 層は既存 resolve-lang の配下で呼ぶ。
+   - hyakka の prop/label-ja は item ページ表示の補助データとして維持し、翻訳の正本にはしない
+     （正本は procured 翻訳カタログ）。label-ja は「収集時に Wikidata が持っていた言語別ラベル」の記録。
+
+   ### D5. 翻訳の生成・検品は procured service のまま（使い捨て翻訳 script を書かない）
+
+   cloud-itonami-translation（TranslationAdvisor ⊣ TranslationGovernor）が CID カタログの
+   「生成・検品側」。翻訳成果物を i18n-cid のブロック形式で publish する。hyakka 自体は
+   外部翻訳 API への直接呼び出しを持たない。ADR-2607289100 の単一不変条件を維持。
+
+   ### D6. 達成条件（本 ADR が「完了」になるため）
+
+   1. i18n-cid が pin(IPFS, kotobase-protocol-pinning PSA) を利用でき、translator
+      （cloud-itonami-translation）の成果を CID に publish できる。
+   2. CARv2 pack（io-ipld-car）で翻訳ブロック群を束ね net-kotobase/ipfs（ipfs.kotobase.net）
+      から配信される。
+   3. kotobase-lake admit で、既存 query surface が「この project のこの locale の翻訳
+      カタログ」を 2 fetch で返す。
+   4. hyakka UI が resolve-lang の下で register-from-block! を呼び、言語別ラベル / UI 文言を
+      CID カタログから解決できる。
+
+   ### D7. 誠実さの境界（実装しない / 測っていないことを書く）
+
+   - i18n-cid は現在 pin を持たない。IPFS pin は既存 kotobase-protocol-pinning の
+     `/pins` PSA が担う。本 ADR は接続形状を決めた。pinning 自体の実装可否（ネットワーク /
+     PSA の実配備状態）は本 ADR のスコープ外で、着地時に実測する。
+   - 翻訳の品質は cloud-itonami-translation の governor が検品する。本 ADR は「CID で運ぶ」
+     ことだけを決め、翻訳の品質を決めない。
+   - 2 fetch 有界は index の性質。翻訳カタログが corpus と同規模になるまで index を分けない
+     が、なる場合は ADR-2608610000 D1 の shard 規則を先に適用する。
+   - s3.kotobase.net は既存 hyakka corpus（ADR-2608152330）の保持・配信として**残る**。
+     本 ADR が禁じるのは i18n 層を s3 に新規に載せることであって、既存 corpus の移行ではない。
+
+   ### D8. 実装単位（本 ADR accepted により着手可）
+
+   実装は i18n-cid への pin 接続と、cloud-itonami-translation → i18n-cid の publish bridge
+   を 1 本目の slice とする。search-replace:
+   (a) i18n-cid に kotobase-protocol-pinning `/pins` PSA 接続を足す（pin seam を埋める）、
+   (b) CARv2 pack（io-ipld-car）+ net-kotobase/ipfs 配信のパイプライン、
+   (c) kotobase-lake admit の UI 文言 / ラベル登録（app-hyakka）、
+   (d) cloud-itonami-translation から i18n-cid への publish bridge。"
+
+  :adr/consequences
+  "## 効果
+
+  - 翻訳・言語別ラベル・UI 文言という「翻訳」の資産が、git(/DataLad) だけでなく
+    IPLD/IPNI/IPFS ベースの kotobase に CID で pin（IPFS PSA）され、CARv2 pack され、
+    net-kotobase/ipfs（ipfs.kotobase.net）から配信され、datom 面から query 可能になる
+    （オーナー要求①の達成）。**配信・保持は s3 でなく IPFS pin が正（オーナー要求②）。**
+  - 既存の accepted ADR と競合しない。claim 翻訳（ADR-2809031900）、procured service
+    （ADR-2607289100）、CID 索引土台（ADR-2608152330）、既定スタック（ADR-2608610000）、
+    1 repo = 1 capability（ADR-2608051000）をすべて維持したまま、それらが共有する土台に
+    i18n を載せる。
+  - 翻訳の provenance（誰がいつどの locale を publish したか）が datom 面に載り、
+    第二 index なしに監査できる。
+  - cost: i18n-cid に pin(IPFS) seam を足し、kotobase-protocol-pinning の `/pins` PSA へ
+    接続する実装分。現状 i18n-cid は encode/address のみで、pin・announce・write 認可の
+    3 つが未実装。この内 pin + pack が今回の新規実装要件。
+  - cost: 既存 prop/label-ja（Wikidata 由来言語別ラベル）と procured 翻訳カタログの
+    二重ソースがしばらく共存する。label-ja は「収集時ラベルの記録」、翻訳カタログは
+    「プロジェクトの翻訳」と役割を分けて明示する（混ぜない）。
+  実装は本 ADR の accepted（所有者 do it、2026-09-08）を受けて着手する。"}
+]
