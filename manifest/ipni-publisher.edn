@@ -339,7 +339,62 @@
               "No IPNS name points at this index root. Comparing two CIDs still
                answers `is the index current?`, but there is no name to follow
                to the newest one -- and assigning one needs a key decision,
-               given :ipni.publisher/custody-remeasured."]}]
+               given :ipni.publisher/custody-remeasured."]}
+  ;; Same corpus, same context, re-advertised because the root CID moved: the
+  ;; root now carries a `schema` link and the ledger gained items. Nothing was
+  ;; retracted -- the previous root is still served and still advertised, which
+  ;; is what a content-addressed store means.
+  ;;
+  ;; The index is now SELF-DESCRIBING. Before this the links were real and what
+  ;; they pointed AT was private knowledge, held by `hyakka.corpus-index` as
+  ;; positions 0..3 in a vector. Verified from outside with io-ipld and no
+  ;; app-hyakka code: fetch the root by CID (re-hashes), read `schema`, fetch
+  ;; that (re-hashes), unify the root against it -- 227 nodes, valid.
+  ;;
+  ;; The schema block is advertised too, not merely reachable through the root,
+  ;; so a client handed a schema CID alone can find a provider for it.
+  {:advertisement "baguqeeravxle7japrcfikchltoxmipg262gbwxe7jx56ziiousziy4rnvxsa"
+   :entries "baguqeerags5trzroqrso4mnyunaasro24zv3lmfkgthby3vlir63upnqdqcq"
+   :cids 38 :at "2026-09-08" :announce-status 204
+   :previous "baguqeerakrqvy2exht5q4wgq67t7zt73anbqbnphlc56df4pluuk436a73kq"
+   :provider "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
+   :context "hyakka-wiki-index-v1"
+   :is-rm false
+   :detached-head true
+   :subject {:surface "wiki.kotobase.net"
+             :repo "network-awai/app-hyakka"
+             :pr "network-awai/app-hyakka#890"
+             :index-root "bafyreichqlk7pojif7i4xtaowgm6zwen3u2jdvmdwaehx76elf4auc7aai"
+             :schema "bafyreif3gla42qbwgahwr7ixefnnvisyv6k64jwdvlxntg3eqaefvhcg6e"
+             :schema-bytes 559
+             :root-codec "dag-cbor (0x71)"
+             :leaves 36
+             :leaf-codec "raw (0x55)"}
+   :ingestion {:index "https://cid.contact"
+               :indexed true
+               :surface "https://cid.contact/multihash/{base58btc-multihash}"
+               :x-cache "Miss from cloudfront, no age header"
+               :sampled-on :the-schema-block
+               :sample-multihash "QmawPqbynnnwx4fjibaNG4Ho1D8L7ziHwZkYQ23N5UJEPA"
+               :multihashes 38}
+   ;; The selector surface this corpus made usable, measured the same day.
+   ;; `ipfs.kotobase.net` answered 500 for ANY selector that crossed a Link
+   ;; into a raw block until io-ipld#35. The fault was two layers under the
+   ;; gateway, in `ipld/get-verified-block`, which re-addressed every block as
+   ;; dag-cbor -- so `ipld.graph`, the traversal core under both IPQ and the
+   ;; GraphSync adapter, could only cross links inside an all-dag-cbor DAG.
+   :selector {:surface "https://ipfs.kotobase.net/ipq/v1/selection/{cid}?selector={dag-cbor base64url}"
+              :before "HTTP 500 (error code 1101) for a selector reaching a Link; 200 for the same selector aimed at a string or an int one position away in the same vector"
+              :after {:one-leaf {:blocks 2 :fetches 2 :bytes 389774}
+                      :schema-link {:blocks 2 :fetches 2 :bytes 5579}
+                      :whole-dag-car {:blocks 37 :bytes 13496172}}
+              :fixed-by ["kotoba-lang/io-ipld#35"
+                         "kotoba-lang/kotobase-protocol-ipq 37a7a062 -- floor plus three regression tests"
+                         "net-kotobase/ipfs 4e6671e3 -- both pins advanced together, because tools.deps picks the newest sha it is shown"]}
+   :not-done ["Still no removal, so this advertisement's lifecycle is half-proven."
+              "Still no IPNS name. The root CID moved again today, which is the
+               cost this names: every rebuild needs a fresh advertisement, and a
+               name is what would stop that."]}]
 
  ;; Which cid.contact surface answers freshly. This is not trivia: the first
  ;; three minutes of watching the provide advertisement land were spent
