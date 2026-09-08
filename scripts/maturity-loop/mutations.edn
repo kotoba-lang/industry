@@ -8790,4 +8790,88 @@
      :file "kotoba/src/registry.ts"
      :find "  const maxScan = Math.min(input.maxScan ?? DEFAULT_MAX_SCAN, DEFAULT_MAX_SCAN);"
      :replace "  const maxScan = input.maxScan ?? DEFAULT_MAX_SCAN;"
-     :must-fail ["coverage-never-scans-past-the-default-ceiling"]}]}]}
+     :must-fail ["coverage-never-scans-past-the-default-ceiling"]}]}
+
+  {:repo "orgs/cloud-itonami/action-paid-outreach"
+   :label "action-paid-outreach G1–G9 —— 宣言された gate と、それを実現している surface の一致"
+   ;; この repo の README は「監視型 ad-tech の害は feature として無効化するのでは
+   ;; なく、データモデルと gate から**構造的に不可能にする**」と約束している。
+   ;; 既存の `contracts_test.clj` は各 lexicon の**形**を見るが、約束されているのは
+   ;; 形ではなく**閉じていること**なので、検査対象は面と面の**あいだ**にある ——
+   ;; どの 1 ファイルにも属さない。
+   ;;
+   ;; 実測 2026-09-08、下の 10 個の退行は**すべて既存の 35 assertion を緑のまま
+   ;; 通過した**（10 件それぞれについて `./run_tests.sh` の bb 側だけを回して確認）。
+   ;; 10 個は `gates_test.cljs` の 10 個のテスト名に 1:1 で対応し、無改変では緑。
+   :cmd ["nbb" "test/gates_test.cljs"]
+   :green-marker "gates: OK"
+   :mutations
+   [{:id :apo/individual-surface-in-another-lexicon
+     :why "個人識別の禁止が audience 1 本でしか見られていなかった。performanceReport に個人 id を足しても、既存 35 assertion は全部緑（G2）"
+     :file "lex/performanceReport.edn"
+     :find "    {:cohort      {:type \"string\" :description \"→ audience/cohort-id (G2 — no finer grain exists)\"}"
+     :replace "    {:cohort      {:type \"string\" :description \"→ audience/cohort-id (G2 — no finer grain exists)\"}\n     :personId    {:type \"string\" :description \"per-person journey id\"}"
+     :must-fail ["g2-no-individual-surface-in-any-lexicon"]}
+
+    {:id :apo/prohibited-source-admitted-on-one-side
+     :why "lexicon の :source 許可列と manifest の :actor/allowed-enrichment / :actor/prohibited-sources が突き合わされていなかった。片側にだけ linkedin を足せる（G3）"
+     :file "lex/audience.edn"
+     :find "self-optin|orcid|github-public|public-credential-registry ONLY (G3)"
+     :replace "self-optin|orcid|github-public|public-credential-registry|linkedin ONLY (G3)"
+     :must-fail ["g3-audience-source-allowlist-matches-manifest"]}
+
+    {:id :apo/human-disposition-becomes-optional
+     :why "proposal から人間の :disposition が必須でなくなる。governor の判定だけで先へ進める（G1）"
+     :file "lex/proposal.edn"
+     :find ":required [\"id\" \"campaign\" \"kind\" \"payload\" \"governorVerdict\" \"disposition\"]"
+     :replace ":required [\"id\" \"campaign\" \"kind\" \"payload\" \"governorVerdict\"]"
+     :must-fail ["g1-human-approval-chain-is-complete"]}
+
+    {:id :apo/spend-loses-its-monotonic-order
+     :why "単調な :tx が必須でなくなる。署名は残るので既存テストは緑のまま、append-only の主張だけが根拠を失う（G4）"
+     :file "lex/spendRecord.edn"
+     :find ":required [\"tx\" \"campaign\" \"amount\" \"signedBy\"]"
+     :replace ":required [\"campaign\" \"amount\" \"signedBy\"]"
+     :must-fail ["g4-spend-is-append-only-and-finance-signed"]}
+
+    {:id :apo/creative-publishes-without-review
+     :why "審査判定を持たない creative が構成できる（G5）"
+     :file "lex/creative.edn"
+     :find ":required [\"id\" \"contentHash\" \"reviewVerdict\"]"
+     :replace ":required [\"id\" \"contentHash\"]"
+     :must-fail ["g5-creative-review-gate-precedes-publish"]}
+
+    {:id :apo/exact-amount-becomes-public
+     :why "akashi へ開示されるのが範囲だけでなく金額そのものになる（G7）"
+     :file "lex/spendRecord.edn"
+     :find ":amount     {:type \"integer\" :description \"currency minor units; cumulative ≤ budgetCap (G4)\"}"
+     :replace ":amount     {:type \"integer\" :description \"currency minor units; disclosed to akashi (G4/G7)\"}"
+     :must-fail ["g7-public-disclosure-is-a-range-not-an-amount"]}
+
+    {:id :apo/prose-cites-a-gate-that-does-not-exist
+     :why "散文が存在しない gate を引用する。README も lexicon も正しいことを言っているように読めるまま、指している先が無い"
+     :file "lex/campaign.edn"
+     :find "(G2 — cohort target only; no individual)"
+     :replace "(G12 — cohort target only; no individual)"
+     :must-fail ["gate-registry-is-complete-and-closed"]}
+
+    {:id :apo/gate-declared-and-cited-by-nothing
+     :why "登記簿にだけ残り、どの surface からも引用されない gate。名前だけの gate は劇場である。⚠ この検査は最初の版では**恒真**だった —— 参照元に :actor/gates 自身を含めていたので、各 gate は自分の登記行によって引用されていた"
+     :file "manifest.edn"
+     :find "vendor / external LLM narration (G6)"
+     :replace "vendor / external LLM narration"
+     :must-fail ["every-declared-gate-is-actually-referenced-somewhere"]}
+
+    {:id :apo/k-anonymity-drops-to-one
+     :why "k=1 の cohort は個人である。境界ちょうど（k=2）は通ることを述語の単体テストが別に固定している"
+     :file "manifest.edn"
+     :find "k-anonymity 5"
+     :replace "k-anonymity 1"
+     :must-fail ["g2-cohort-declares-k-anonymity"]}
+
+    {:id :apo/pr-str-blob-stops-being-a-string
+     :why "manifest の入れ子は pr-str した string blob（ADR-2607171600）。要素を keyword に「正規化」しても edn/read-string は throw せず、string を期待する下流だけが静かに壊れる（CLAUDE.md 2026-09-08「読んだ値の型を assert する」）"
+     :file "manifest.edn"
+     :find ":actor/prohibited-sources [\"linkedin\""
+     :replace ":actor/prohibited-sources [:linkedin"
+     :must-fail ["manifest-nested-values-stay-pr-str-blobs"]}]}]}
