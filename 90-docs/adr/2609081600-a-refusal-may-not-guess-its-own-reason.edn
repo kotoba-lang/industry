@@ -75,22 +75,34 @@ loader は wire 33 の provider を最初から持っていた（`kexe_loader.c`
   surplus・mismatch・unterminated は**行番号まで一致**する。
 - そのうち 10 件は raw loader ではなく **`bin/kbb` の front door 経由**でも一致し、
   10 件とも `:auto` が native に routing した。
+- **js backend も同じ答えを返す**（TCO 着地後に測り直した）: 変異 59 件すべて一致、
+  実文書 300 件のうち 294 件一致・0 件不一致・5 件は上記の 65,536 バイト境界で拒否。
+- 移植の置き場所は `kotoba-lang/kotoba` の `examples/kbb/edn_balance_scan.kotoba`
+  に決まった（兄弟の `edn_depth_scan` と同じ場所。policy の相対パスが KBB_HOME 基準で
+  解決する）。`scripts/verify-kbb-ports.cljs` に native 2 件 + js 1 件の case として
+  載っている。順序と残りの blocker は adr-2609081800。
 
 **宣言済みの狭まり**: `unclosed` について原本は opener の行を答えるが、guest は
 種別だけを答える。行を運ぶには opener ごとの行スタックが要り、guest には
 数値→文字列の builtin が無い。撤去条件はモジュールのヘッダに書いた。
 
-## 残る天井（どちらも一時制約であって設計ではない）
+## 残る天井（一時制約であって設計ではない）
 
-1. **js backend に TCO が無い。** 走査する guest は約 1,600 段で死ぬ。native は
-   末尾自己再帰を最適化するので同じ guest が完走する。したがって
-   **文書を歩く kbb script は native に回す**（`:auto` がそうする）。
-2. **native の string pool は 65,536 バイト。** 文書全体がそこに収まる必要がある。
-   実測: 65,398 バイトは走り、65,998 バイトは SIGILL。90-docs の EDN
+1. ~~**js backend に TCO が無い**~~ —— **同日中に解消した**（kotoba-script #97、
+   amu #892、kotoba #610）。`let` / `if` / `do` が IIFE になり自己呼び出しが本物の
+   JS 呼び出しになっていたので、走査 guest は約 1,600 段で死んでいた。自己末尾
+   呼び出しをループに落とすようにして、20 万段が通り、同じ 15,532 バイトの文書を
+   js backend が完走する。**`charge()` はループの中に残した** —— 予算は安全性の
+   性質なので、外に出すと有界な再帰が無限ループになる。
+2. **guest の文字列値の上限が 65,536 バイト。** 文書全体がそこに収まる必要がある。
+   ⚠ **これは native 固有の pool ではない。両 backend 共通の宣言された値境界で、
+   報告の質だけが違う** —— js は `string-too-large` と名指して拒否し、native は
+   SIGILL で落ちる。実測 2026-09-08: 65,398 バイトは走り 65,998 バイトは拒否、
+   実文書 300 件の走査で js と native が拒否したのは**同じ 5 件**。90-docs の EDN
    3,442 件のうち 77 件（2.2%）がこれを超える。
    ⚠ guest 側の書き方でも効く —— スタックの先頭を `string-substring` で読むと
-   **文字ごとに 1 文字列を確保**し、15 KB の文書で pool を使い切って SIGILL に
-   なった。`string-code-point-at` で読めば確保は push / pop のときだけになる。
+   **文字ごとに 1 文字列を確保**し、15 KB の文書で使い切って SIGILL になった。
+   `string-code-point-at` で読めば確保は push / pop のときだけになる。
 
 ## 届かせるには pin を 3 つ動かす必要があった
 
