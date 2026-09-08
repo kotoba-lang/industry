@@ -1,79 +1,9 @@
 [{:db/id -1
-  :doc/id "business-openrouter-awai-murakumo-provider-application"
-  :doc/title "OpenRouter provider application — awai.network / murakumo.cloud"
-  :doc/as-of "2026-09-01"
-  :doc/status :draft
-  :doc/owner "Jun Kawasaki"
-  :doc/related ["adr-2609011842-awai-japanese-models-openrouter-provider-application"]
-  :source/dataset "business"
-  :doc/body
-  "# OpenRouter provider application — awai.network / murakumo.cloud
-
-**Status:** draft only; not submitted
-
-**Hard hold:** fine-tuned artifacts, production inference backends, data policy, pricing, capacity, and reliability measurements are incomplete.
-
-## Application summary
-
-murakumo.cloud is applying to become an OpenRouter inference provider for Japanese-first models developed by awai.network. We fine-tune upstream open-weight models on a proprietary, rights-reviewed Japanese dataset. murakumo.cloud owns the public API boundary, authentication, routing, metering, reliability, and data policy. Baseten is the initial hosting primary; Together is a later fallback after access and identical-artifact verification.
-
-The requested models are:
-
-| Model ID | Display name | Planned base | Modality | Current state |
-|---|---|---|---|---|
-| `awai-network/basho` | Basho | `Qwen/Qwen3.8-Flash-Next` | streaming chat | artifact not trained; public route live but fail-closed |
-| `awai-network/hokusai` | Hokusai | `MiniMaxAI/MiniMax-H3` | asynchronous audiovisual video | artifact not trained; public route live but fail-closed |
-
-We will not describe a renamed upstream checkpoint as an original model. The prior Baseten deployment `basho-fp8-test` used `RedHatAI/Qwen3.5-9B-FP8-dynamic` only for infrastructure smoke testing and is not Basho.
-
-## Organization
-
-| Field | Answer |
-|---|---|
-| Model developer / publisher | awai.network |
-| Inference provider | murakumo.cloud |
-| Infrastructure vendors | Baseten primary; Together gated fallback |
-| Provider website | https://murakumo.cloud |
-| Developer website | https://awai.network |
-| Contact and legal entity | OWNER-FILL before submission |
-| Terms, privacy, acceptable use | OWNER-FILL public URLs before submission |
-
-## Public API contract
-
-- Basho: OpenAI-compatible `POST /v1/chat/completions`, streaming and non-streaming, with prompt/completion token usage.
-- Hokusai: `POST /api/v1/videos`, job polling, optional signed webhook, and content download. Advertised duration, resolution, aspect ratio, references, and `generate_audio` are limited to verified capabilities.
-- `/v1/models` advertises only ready models.
-- Any missing endpoint, credential, health, capacity, price, or exact artifact-revision evidence fails closed.
-- Vendor URLs and credentials remain private behind murakumo.cloud.
-
-## Hosting decision
-
-Baseten is the validation primary because this account supports custom deployments and `min_replica=0` scale-to-zero. Together's normal custom-model list does not currently cover the planned bases, while arbitrary Dedicated Container Inference requires sales enablement. Together remains a fallback candidate only after it serves the same immutable artifact and passes the same capability, health, capacity, and accounting checks. Primary order is remeasured before general availability.
-
-Scale-to-zero is acceptable for review only if the cold-start path, timeout budget, capacity, and representative availability are demonstrated. An always-warm GPU is not claimed or required by this draft.
-
-## Current production evidence
-
-- Basho gateway: cloud-murakumo-api PR #194 merged at `3e91b9f507006493c71135d50be3ffcc4c52391e`; Cloudflare version `a9066a0a-c55a-4ebb-a690-d9de1eda7dde` is live on api.murakumo.cloud. A live unready request returns HTTP 503 `self_model_backend_unavailable`, and Basho is excluded from `/v1/models`.
-- Hokusai adapter: cloud-murakumo PR #159 merged at `683cb6ed6eded3114be0b797eb259316e6f77e6b`; generated artifact PR #160 merged at `af0b6cb1d489e4babfe3a158af3e176f18c6136f`. After explicit owner approval, lease-free bootstrap deployed Cloudflare version `1b398be7-53e0-4683-9d75-009394080ed6`. The model page is live, and unauthenticated submit/poll requests return HTTP 401. The fine-tuned backend remains unconfigured and Hokusai remains pending.
-- awai.network: network-awai-apex PR #1 merged at `174492d8186d62ae728c0f4f630a4af94fcf2310`; Cloudflare version `45d9a3bb-bff4-4a72-b06f-08b9aa629564` is live. Health and a real `murakumo-main` chat generation passed. Basho/Hokusai cutover variables are intentionally unset until readiness passes.
-- OpenRouter BYOK tests against the existing catalog model `z-ai/glm-5.3-flash` succeeded for Baseten and Together, but BYOK did not register `awai-network/basho`. Calling that unregistered OpenRouter model ID returned HTTP 400 `invalid model ID`.
-
-## Pricing, capacity, and data policy
-
-All commercial and performance values remain **未測定**. Before submission, provide Basho input/output USD per 1M tokens, context length, TTFT, tokens/s, TPM, errors and uptime; provide Hokusai USD per output second/variant, queue wait, generation time, concurrent jobs, success rate, artifact retention and uptime.
-
-OWNER-FILL prompt/output logging, retention, deletion, training reuse, ZDR, processing regions, vendor subprocessors, and abuse/legal disclosure policy. Do not state `no training` or ZDR unless operational controls prove it.
-
-## Submission gate
-
-- [ ] Produce immutable Basho and Hokusai fine-tuned checkpoints and private artifact readback.
-- [ ] Review upstream licenses and proprietary-dataset rights.
-- [ ] Publish model cards, Japanese evals, safety evals, and supported-capability matrices.
-- [ ] Deploy Baseten backends and pass direct positive/negative inference tests.
-- [ ] Obtain Together access and validate the identical artifacts, or keep Together unadvertised.
-- [ ] Pass murakumo.cloud streaming usage and video submit/poll/content/webhook tests.
-- [ ] Publish prices, capacity, data policy, and representative uptime evidence.
-- [ ] Fill owner/legal/policy fields and obtain owner review immediately before submission.
-
-Do not claim either model is trained, generating, OpenRouter-listed, or generally available until those states are separately verified."}]
+ :doc/id "business-openrouter-awai-murakumo-provider-application"
+ :doc/title "OpenRouter provider application — Murakumo fixed-model qualification"
+ :doc/as-of "2026-09-08"
+ :doc/status :draft
+ :doc/owner "Jun Kawasaki"
+ :doc/related ["adr-2609081430-murakumo-openrouter-fixed-model-qualification"]
+ :source/dataset "business"
+ :doc/body "# OpenRouter provider application — Murakumo\n\nStatus: DRAFT / NOT SUBMITTED. This replaces the September 1 application narrative, not the independent Basho/Hokusai product roadmap. Do not send until the gates below are evidenced.\n\n## Proposed offering\nMurakumo proposes a self-hosted upstream text model, qwen3.8-27b-throughput-b70, served through https://api.murakumo.cloud/v1/chat/completions. It is not an original model or a proprietary fine-tune. The advertised alias murakumo-main is unsuitable for this application because its response can identify a different backend. Basho's current upstream relay and the untrained Hokusai artifact are not part of this proposal.\n\nCandidate catalog: https://api.murakumo.cloud/v1/openrouter/models. This separate projection uses the official ModelDocumentV2 schema version 2.4 and deliberately reports is_ready=false. It makes no ZDR, certified-compliance, dedicated-capacity or proprietary-training claim. The existing /v1/models remains the product discovery surface, not the application catalog.\n\n## Evidence as of 2026-09-08\nTwo initial public requests to the fixed candidate returned HTTP 200, the requested model ID, correct changing marker text, stop, and consistent positive prompt/completion usage. The streaming request also supplied [DONE]. These are low-volume protocol checks, not a model-weight attestation, uptime history or a load test.\nThe candidate catalog is checked against a vendored official schema, including negative cases. The smoke host rejects wrong models, missing usage, incomplete streams and oversized responses. It writes timestamps, model identity, timing, token counts and pass/fail, not customer prompts or generated content.\n\n## Qualification plan\nRun scripts/api-smoke.cljs --provider-sample every 15 minutes, making one non-streaming and one streaming request sequentially, with a 45-second timeout. Append results to ~/.murakumo/openrouter-b70-samples.jsonl. Report with --provider-report.\nOur internal low-volume observation gate is seven days, at least 1,000 non-429 requests (at least 500 in each mode), at least 99.5% correctness success excluding HTTP 429, no observation gap over 45 minutes, successful-request p95 completion <=10 seconds and streaming TTFT <=5 seconds. HTTP 429 is reported separately, never erased. These are internal targets, not OpenRouter's published acceptance criteria. A rolling window permits recovery from old failures; sleep or a stopped scheduler creates a coverage gap.\nEven when this observation gate passes, production-ready remains false. A small repeated prompt cannot establish long-context quality, parallel-load capacity, billing correctness or outage recovery.\n\n## Remaining submission gates\n1. Pin the exact upstream repository, revision and weight hashes, quantization and commercial serving license. The returned model ID alone is insufficient evidence. Proposed context/output limits require a boundary test against that artifact.\n2. Exercise long prompts, concurrent requests, cancellation, queue overflow, 429/Retry-After and backend restart recovery. Reserve capacity so existing workloads cannot consume the promised offer. Establish supported request parameters with measured results.\n3. Establish the OpenRouter credential, authorization and per-provider accounting boundary. Current anonymous public smoke success does not prove authenticated partner isolation or billable metering.\n4. Publish approved, final privacy/retention and terms pages covering edge, inference origin, asynchronous storage and operational logs. Current public legal pages are marked DRAFT; no whole-service ZDR claim is justified. Public URLs: https://murakumo.cloud/legal-privacy and https://murakumo.cloud/legal-terms.\n5. Confirm the contracting entity, billing contact, monthly invoice and reconciliation procedure. Do not infer legal or invoice readiness from a company name on a website.\n6. Finish seven-day observation and attach the raw ledger hash, UTC interval, request counts, 429 count, failure causes, throughput and latency percentiles. Cross-check public catalog against actual deployment.\n7. Rewrite the final submission from verified evidence, then submit and retain an external receipt. A draft, merged PR, deployed endpoint or scheduler is not an application receipt.\n\n## Sources\nhttps://openrouter.ai/providers/apply\nhttps://openrouter.ai/docs/assets/provider-monitor-schema-v2.openapi.json\nPrevious original-model plan: adr-2609011842-awai-japanese-models-openrouter-provider-application.\n"}]
