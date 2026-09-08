@@ -69,7 +69,7 @@ CP=$(clojure -Spath -M:test); nbb --classpath \"src:test:$CP\" run-tests.cljs   
 **discriminate する**: frontend の分岐だけを戻すと nbb は 7 failures + 9 errors に
 なり、その全部が移植した f32 テストの中に出て、外には 1 件も出ない。
 
-## 一緒に測って、着地させなかったもの
+## reader の統一（同日中に着地した。下の記述は経緯として残す）
 
 **reader の統一は今日はできない。** `read-forms` を両ホストとも `kotoba-reader` に
 向けると、コンパイルは通り、そのあと kotoba-sema の JVM suite で **28 assertion が
@@ -81,8 +81,39 @@ JVM 経路と bit-for-bit で一致すると書いている。**十進につい�
 2 つの reader は、その grammar に対するあらゆる問いに 2 つの答えを持つということで、
 そのうち片方しか走っていない —— それが上の欠陥の構造的な原因である。
 
-したがって「両ホストで 1 つの reader」は正しい終点であり、**証拠の付いた別の作業**
-である。その作業の入口は上の 51 件で、その 51 件は今日測った実在の差である。
+**追記（同日）: 着地した。** kotoba-sema PR #75、`9d87c113`。
+`clojure -Spath | grep -c tools.reader` は **1 → 0**。
+JVM 476/2237/0 → **480/2244/0**、nbb 356/1371/0 → **360/1377/0**。
+
+**51 という数は誤りだった。正しくは 35 である。** 51 は f32 修正の *前* の tree
+（`a2ee65a`）で測ったので、まだ `.clj` だった f32 テストの失敗が上乗せされていた。
+自分の log で数え直すと、51 件のうち **16 件が f32 由来**で、51 − 16 = 35 が
+reader 由来。**この訂正の仕方が要点である** —— 数を測り直したのではなく、
+*測った条件*が違っていた。同じコマンドが違う tree に対して違う数を返したのであって、
+どちらの測定も間違ってはいない。**測定値を引用するときは tree も一緒に引用する。**
+
+35 件の内訳は 2 つだけで、どちらも `kotoba-reader` 側の欠落だった:
+
+- **整数の host 型（18 件）**。`parse-int-token` が `:clj` で無条件に
+  `(bigint token)` を呼んでいたので、JVM で `5` が `clojure.lang.BigInt` になった
+  （`clojure.tools.reader` は i64 に収まる限り `java.lang.Long`）。
+  **`(= 5 (bigint 5))` が真なので、値を間違えたプログラムは 1 つも無い。**
+  壊れたのは印字した AST とその sha256 を比べる assertion だけ ——
+  `5` と `5N` は違う文字列だから。だから新しいテストは**値ではなく型**を assert する
+  （値の assertion はどちらでも通るので劇場になる）。
+- **`@`（deref）が存在しなかった（17 件）**。dispatch に case が無く、`@` は
+  delimiter でもないので `@a` は 1 個の *symbol* として読まれ、frontend が
+  「未束縛の変数」として拒否していた。**入力が既に間違っていたのに、拒否の文面は
+  正しかった** —— 著者は在りもしない束縛を探しに行く。
+
+quote / syntax-quote / unquote / var-quote / `^meta` も同様に無い。`.kotoba` の
+corpus がそれらを一度も使っていないので、**それらの不在は未測定であって
+known-good ではない**。沈黙が網羅に読まれないよう、そう言うテストを置いた。
+
+**docstring の「bit-for-bit 一致」の主張の後始末**: 計算された i64 の *値* に
+ついては真だった（Clojure の異種数値 `=` が差を吸収していた）。しかし
+**「2 つの reader が整数リテラルとは何かについて一致する」と読むなら偽**で、
+上の 18 件がその差である。
 
 ## JVM 依存の現在地（kotoba core、2026-09-08 実測）
 
@@ -95,7 +126,7 @@ JVM 経路と bit-for-bit で一致すると書いている。**十進につい�
 | `kototama` | 28 `.clj` src / Chicory（凍結 inventory 内） |
 | `kotoba-lang` | 13 `.clj` src |
 | `kotoba-native` | 1 `.clj` src |
-| `kotoba-sema` | `org.clojure/tools.reader`（frontend の `:clj` 分岐） |
+| `kotoba-sema` | **無し**（2026-09-08 に tools.reader を撤去、PR #75） |
 | `kotoba-script` | `closure-compiler-unshaded` |
 
 **`amu` の top-level `:deps` にあった `org.clojure/tools.reader` は、amu 自身の
@@ -103,8 +134,10 @@ JVM 経路と bit-for-bit で一致すると書いている。**十進につい�
 **それを `:test` alias へ移しても production classpath からは消えない** ——
 `kotoba-sema` が transitively 引くからである（`clojure -Stree` で実測、移動の前後
 とも 1 件）。**この 1 件を「JVM 依存を除去した」と報告しない。** 宣言が正しくなった
-だけで、closure は変わっていない。closure が縮むのは kotoba-sema が 1 つの reader に
-なったときで、それが上の 51 件の作業である。
+だけで、closure は変わっていない。**closure が縮むのは kotoba-sema が 1 つの reader に
+なったときで、それは同日中に着地した**（上記）。amu 側は kotoba-sema pin を
+`9d87c113` に進めた時点で `clojure -Spath` の tools.reader が 0 になるはずで、
+**それを実測するまで「消えた」とは書かない**。
 
 さらに、テストのホスト分布そのものが同じ欠陥の面積を示している（`test/` の
 `.clj` / `.cljc`）:
