@@ -364,6 +364,62 @@
               protocols-worker DANGLING (真 -- fixed in control-plane 2a959b76),
               kotobase-worker-shell source-path and unpinned."}
 
+  {:id       :verify-kotoba-stdlib-self-hosted
+   :title    "kotoba stdlib repos that have gone back to a clojure.* namespace"
+   :why      "2026-09-08: over three days the kotoba stdlib stopped delegating --
+              clojure.string, clojure.set, clojure.walk and clojure.edn were
+              replaced by kotoba.lang.text / .coll / .edn, the last of those a
+              READER rather than a wrapper (ADR-2609040930 routing table). The
+              value is not that names changed. It is that clojure.string and
+              clojure.edn DO NOT MEAN THE SAME THING ON THEIR TWO HOSTS, and a
+              delegating wrapper inherits every divergence silently. Measured,
+              with the migration corpus as evidence: trim's whitespace class
+              (the JVM excludes U+00A0/2007/202F and includes U+001C-001F,
+              goog.string is the reverse); split with a capturing group
+              (JVM drops the captures, JS String.split interleaves them, so the
+              same .cljc file splits differently on the two runtimes); replace's
+              $0 and \\$; 1N / 1.5M / 1/2 / 9e18; and :eof on the empty string.
+              One reintroduced require puts a repo back on that footing and
+              nothing says so.
+
+              Three deliberate choices, each of which was wrong in a first
+              version and is why this is not a grep. (1) The population is
+              DERIVED from the tree -- a repo is in scope when its own src
+              declares a kotoba.lang.* namespace -- because a hand-kept list
+              goes stale silently. (2) It reads the default-branch remote ref
+              and RESOLVES it rather than assuming origin/main: a west checkout
+              names its remote after the ORG, and assuming origin/main hid FIVE
+              still-unmigrated repos (checkpointer, mst-projector, pqh, process,
+              witness-quorum) behind an honest-looking UNRESOLVED. CLAUDE.md
+              records the same assumption breaking a deploy guard across 2,824
+              of 4,406 checkouts, where it silently ALLOWED. (3) A repo whose
+              ref cannot be resolved is UNRESOLVED, never clean -- that is how
+              base-l2, whose checkout had no remote-tracking refs at all, was
+              kept out of the migrated count until it really was migrated.
+
+              clojure.java.io is reported at :info, not as a defect. Classpath
+              lookup has no portable meaning -- there is no classpath on
+              ClojureScript -- so it is a host mechanism, and ADR-2609040930's
+              rule is to record such a dependency rather than invent a
+              destination for it (its migration is adr-2809070100, still
+              proposed)."
+   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+          "{{repo}}/scripts/verify-kotoba-stdlib-self-hosted.cljs" "--findings" "--root" "{{root}}"]
+   :cwd :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 180000
+   :interval-ms 86400000
+   :measured "Run 2026-09-08 from the orgs-bearing checkout: 39 repos in the
+              derived population, exit 0, four :info findings and no defects.
+              Wall time 23s, so the timeout is roughly 8x. Daily, because a repo
+              gains or loses a require on the scale of a landed PR, not a
+              commit. The first version of this entry ran with an assumed
+              origin/main and reported SCANNED 33 with six repos UNRESOLVED;
+              the numbers above are from the version that resolves the remote,
+              which is why the population is 39 and not 33."}
+
   {:id       :verify-credential-consumers
    :title    "a credential class that is minted, verifiable, and accepted by nobody"
    :why      "2026-08-31, ADR-2608311600: ADR-2608291200 minted a per-caller operator
