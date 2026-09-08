@@ -1,0 +1,22 @@
+{:adr/id "2609081115"
+ :title "Public SEO, social previews and connected agent onboarding"
+ :status :implemented-and-live-verified
+ :date "2026-09-08"
+ :sites [{:origin "https://kotoba.cloud" :source "7677a1084cf3bcdf776306075aef67281251e112" :worker "c16c3ce9-05b4-4110-9d59-dbf1a62ffd79"}
+         {:origin "https://kotobase.net" :source "291e491f3b5f0ed357057a3972e6613d705b8234" :worker "779a3f43-0d8f-4186-a808-6b607f50b999"}
+         {:origin "https://kotoba-lang.org" :source "127b41e4cdf5c6f4375a31f68f356a2fa462dad8" :worker "13a3a865-54dc-46c1-af5b-7be4727bf332"}]
+ :delivery ["Canonical/locale metadata, OG/Twitter previews and WebSite JSON-LD"
+            "robots.txt and sitemap.xml; short public agent-quickstart.md and connected llms.txt entries"
+            "CLI installation, executable language validation, scoped graph authentication and MCP configuration"]
+ :verification ["All three live homepages contain metadata and parseable JSON-LD; OG images return PNG bytes"
+                "Agent quickstart, llms.txt, robots.txt and sitemap.xml are byte-identical to deployed artifacts"
+                "Anonymous OAI-SearchBot, GPTBot, Twitterbot and Facebook user-agent probes return successfully; this is not search-index ingestion proof"
+                "All three deterministic design audits 100/100"
+                "Kotoba seed check passes; zero-authority Wasm compile and execution returns 42"
+                "Fresh isolated Kotobase CLI installation, health and MCP config pass; anonymous POST /pins remains 401"
+                "Kotobase public-page tests 46/492; Cloud tests 51/492 plus boot-manifest tamper and Worker smoke pass"
+                "Language required remote checks passed before merge; all three pins passed remote reachability and fast-forward verification"]
+ :limits ["Cloud hosted apply remains unavailable"
+          "Native CLI reference-package add returned runtime/internal-error / IllegalArgumentException; Cloud onboarding records the gap and routes first execution through verified zero-authority Wasm"
+          "Existing unrelated Kotobase full-release/admin/DID gaps remain recorded in the prior release ADR"
+          "Search indexing and individual LLM provider URL policies are external and not measured"]}
