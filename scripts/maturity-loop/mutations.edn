@@ -9350,4 +9350,150 @@
      :file "scripts/verify-record.cljs"
      :find "(try (.isDirectory (fs/statSync root)) (catch :default _ false))"
      :replace "(try (fs/existsSync root) (catch :default _ false))"
-     :must-fail ["a-path-that-is-not-a-directory-refuses"]}]}]}
+     :must-fail ["a-path-that-is-not-a-directory-refuses"]}]}
+
+   {:repo "orgs/cloud-itonami/app-news"
+    :label "app-news corpus-registry —— 21,882 件の JSON-LD と台帳 2 本の跨ぎ不変条件"
+    :cmd ["nbb" "test/corpus_registry_test.cljs"]
+    :green-marker "corpus-registry-test: OK"
+    :mutations
+    [{:id :cr/language-check-disabled
+      :note "言語ディレクトリと inLanguage の突き合わせを外す。10 言語のサイトで
+             これが外れると、別の言語の文書がそのまま配られる"
+      :file "scripts/corpus_registry.cljs"
+      :find "(when (and article? (not= (get doc \"inLanguage\") lang))"
+      :replace "(when (and false (not= (get doc \"inLanguage\") lang))"
+      :must-fail ["FAIL rejects-a-document-whose-language-contradicts-its-directory"]}
+
+     {:id :cr/ceiling-comparison-inverted
+      :note "上限の比較を > から >= へ。**境界ちょうど**でしか見えない反転で、
+             実データは 5 家族すべてが上限ちょうどに居るので実データ側も落ちる"
+      :file "scripts/corpus_registry.cljs"
+      :find ":when (> obs ceil)]"
+      :replace ":when (>= obs ceil)]"
+      :must-fail ["FAIL accepts-a-known-deviation-family-at-exactly-its-ceiling"
+                  "FAIL the-real-corpus-satisfies-every-invariant"]}
+
+     {:id :cr/positions-check-made-vacuous
+      :note "position の集合を 1..n ではなく自分自身と比べる。常に真なので
+             歯抜けも重複も通る（『測っているつもり』の最短形）"
+      :file "scripts/corpus_registry.cljs"
+      :find "(when (not= (set positions) (set (range 1 (inc (count elements)))))"
+      :replace "(when (not= (set positions) (set positions))"
+      :must-fail ["FAIL rejects-an-index-position-one-past-the-end"]}
+
+     {:id :cr/evidence-floor-removed
+      :note "床を外す。0 件の走査が clean を名乗るようになる"
+      :file "scripts/corpus_registry.cljs"
+      :find "(when (< n min-docs)"
+      :replace "(when false"
+      :must-fail ["FAIL refuses-rather-than-passing-when-the-corpus-is-empty"
+                  "FAIL the-default-evidence-floor-refuses-a-corpus-that-is-too-small-to-judge"]}
+
+     {:id :cr/unreadable-ledger-no-longer-refuses
+      :note "台帳が読めなくても止まらなくする。『読めなかった』が『問題が無かった』に化ける"
+      :file "scripts/corpus_registry.cljs"
+      :find "(when (= :error wk) (refuse! (str \"writers.jsonld: \" wv)))"
+      :replace "(when false (refuse! (str \"writers.jsonld: \" wv)))"
+      :must-fail ["FAIL refuses-rather-than-passing-when-a-ledger-cannot-be-read"]}
+
+     {:id :cr/unknown-author-accepted
+      :note "台帳にも組織名表にも無い著者を通す。著者ページの無い記事が黙って増える"
+      :file "scripts/corpus_registry.cljs"
+      :find "(when (and article? (= :author/other (author-family doc writer-ids)))"
+      :replace "(when (and false (= :author/other (author-family doc writer-ids)))"
+      :must-fail ["FAIL rejects-an-author-who-is-neither-a-registered-writer-nor-a-declared-organisation"]}
+
+     {:id :cr/source-position-check-dropped
+      :note "出典ファイルの sourcePosition と index の position の突き合わせを外す"
+      :file "scripts/corpus_registry.cljs"
+      :find "(when (not= (get doc \"sourcePosition\") (get el \"position\"))"
+      :replace "(when false"
+      :must-fail ["FAIL rejects-a-source-whose-position-contradicts-the-index"]}
+
+     {:id :cr/index-checked-in-only-one-direction
+      :note "『index に在るがファイルが無い』だけを見て、逆向き（ファイルが在るが
+             index に無い）を落とす。片方向の検査は、どの一覧にも出てこない出典を
+             静かに残す"
+      :file "scripts/corpus_registry.cljs"
+      :find "(for [id (sort (remove in-index on-disk))]"
+      :replace "(for [id (sort (remove on-disk on-disk))]"
+      :must-fail ["FAIL rejects-a-source-file-that-the-index-does-not-list"]}
+
+     {:id :cr/authority-vocabulary-widened
+      :note "語彙に実データに無い値を足す。語彙を広げるのは 1 行なので、
+             広げても誰も止めないことを確かめる"
+      :file "scripts/corpus_registry.cljs"
+      :find "(def source-authority-types #{\"association\" \"platform\" \"regulator\"})"
+      :replace "(def source-authority-types #{\"association\" \"platform\" \"regulator\" \"oracle\"})"
+      :must-fail ["FAIL rejects-an-authority-type-outside-the-pinned-vocabulary"]}
+
+     {:id :cr/url-language-segment-check-dropped
+      :note "URL の言語セグメントと置き場所の突き合わせを外す。ja の記事が
+             /en/articles/ を名乗っても通る"
+      :file "scripts/corpus_registry.cljs"
+      :find "            (not= (second m) lang)"
+      :replace "            (and false (not= (second m) lang))"
+      :must-fail ["FAIL rejects-a-url-whose-language-segment-contradicts-its-directory"]}
+
+     {:id :cr/urn-shape-check-made-permissive
+      :note "知らない @id の形を canonical として飲み込む。形の検査は = 0 でなければ
+             意味が無い（上限は既知の家族にしか付けない）"
+      :file "scripts/corpus_registry.cljs"
+      :find "          :else :urn/other)))))"
+      :replace "          :else :urn/canonical)))))"
+      :must-fail ["FAIL rejects-an-unrecognised-urn-shape"]}
+
+     {:id :cr/identifier-shape-check-made-permissive
+      :note "知らない identifier の形を『ファイル名と一致』として飲み込む"
+      :file "scripts/corpus_registry.cljs"
+      :find "      :else                        :identifier/other)))"
+      :replace "      :else                        :identifier/filename)))"
+      :must-fail ["FAIL rejects-an-identifier-that-is-neither-the-filename-nor-the-language-prefixed-filename"]}
+
+     {:id :cr/document-type-vocabulary-widened
+      :note "@type の語彙を広げる。ItemList だけが記事面の検査を免除されている
+             ことの裏返しで、ここが緩むと検査を受けない @type を足せてしまう"
+      :file "scripts/corpus_registry.cljs"
+      :find "(def declared-types (into content-types #{\"ItemList\"}))"
+      :replace "(def declared-types (into content-types #{\"ItemList\" \"BlogPosting\"}))"
+      :must-fail ["FAIL rejects-an-undeclared-document-type"]}
+
+     ;; ── ここから下は **実データ**を壊す。fixture だけを守る検査になっていないか ──
+     {:id :data/source-position-drifts
+      :note "出典 1 件の sourcePosition を index と食い違わせる。台帳の片側だけを
+             編集したときに実際に起きる形"
+      :file "resources/entries/source/4gamer.jsonld"
+      :find "\"sourcePosition\": 4"
+      :replace "\"sourcePosition\": 9"
+      :must-fail ["FAIL the-real-corpus-satisfies-every-invariant"]}
+
+     {:id :data/an-article-declares-the-wrong-language
+      :note "ja の記事 1 件が en を名乗る。翻訳パイプラインが実際に起こした形
+             （@id の :ja 接尾辞・publisher.url の ja 記事 URL と同じ事故の顔）"
+      :file "resources/content/ja/anime/86-eighty-six/analysis/anime-86-eighty-six-series-primer-2026.jsonld"
+      :find "\"inLanguage\": \"ja\""
+      :replace "\"inLanguage\": \"en\""
+      :must-fail ["FAIL the-real-corpus-satisfies-every-invariant"]}
+
+     {:id :data/writers-ledger-count-drifts
+      :note "writers.jsonld の numberOfItems だけ増やす（人を足さずに数を足す）"
+      :file "resources/writers.jsonld"
+      :find "\"numberOfItems\": 5"
+      :replace "\"numberOfItems\": 6"
+      :must-fail ["FAIL the-real-corpus-satisfies-every-invariant"]}
+
+     {:id :data/source-index-count-drifts
+      :note "source-index.jsonld の numberOfItems だけ減らす"
+      :file "resources/entries/source-index.jsonld"
+      :find "\"numberOfItems\": 28"
+      :replace "\"numberOfItems\": 27"
+      :must-fail ["FAIL the-real-corpus-satisfies-every-invariant"]}
+
+     {:id :data/a-new-publisher-url-deviation-appears
+      :note "publisher.url を記事 URL にする 64 件目。**既知の 63 件は通り、
+             64 件目で落ちる** —— 上限が <= であることの実データ側の境界"
+      :file "resources/content/en/anime/86-eighty-six/analysis/anime-86-eighty-six-series-primer-2026.jsonld"
+      :find "\"url\": \"https://news.etzhayyim.com\""
+      :replace "\"url\": \"https://news.etzhayyim.com/ja/articles/anime-86-eighty-six-series-primer-2026\""
+      :must-fail ["FAIL the-real-corpus-satisfies-every-invariant"]}]}]}
