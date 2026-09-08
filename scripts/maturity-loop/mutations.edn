@@ -9863,4 +9863,177 @@
      :file "appview/oshiete-mcp-component/cljs/.gitignore"
      :find "public/js/"
      :replace "public/js/\n*.html"
-     :must-fail ["FAIL in (the-ignore-rules-do-not-match-a-tracked-file)"]}]}]}
+     :must-fail ["FAIL in (the-ignore-rules-do-not-match-a-tracked-file)"]}]}
+
+  {:repo "orgs/cloud-itonami/app-chat-shell"
+   :label "app-chat-shell repo contract —— ビルドできない facade で、宣言どうしの一致と、文書と現実の一致だけが残っているところ"
+   ;; この repo は **ビルドできない edge facade** である（README.md、2026-09-06 実測）。
+   ;; コードを実行して確かめられる不変条件が無いので、残っているのは
+   ;; **宣言と宣言の一致**、そして **文書と現実の一致** だけ。そのどちらも、この
+   ;; suite が入るまで何にも守られていなかった。
+   ;;
+   ;; この repo が持っていた実行可能な検査は `npm run typecheck` 1 本だけで、
+   ;; root tsconfig の `include` が `src/**/*.ts` なので見ているのは
+   ;; `src/app.ts`（README が superseded と記録している Hono worker）1 ファイル ——
+   ;; **出荷されるコードを 1 行も読まない**。`lg/tests/*.cljc` は LangGraph
+   ;; グラフのテストで、宣言にも wrangler 設定にも触れない。
+   ;;
+   ;; identity は 5 箇所に散っている（package.json / wrangler.jsonc / magatama.jsonld /
+   ;; migration.edn / README.edn）ので、**1 箇所だけ書き換え忘れる**のが最も自然な
+   ;; 壊し方であり、どのファイルも単独では完全に妥当なまま。backend URL も
+   ;; 「wrangler の vars」と「2 本の +server.ts がハードコードした既定値」の
+   ;; 2 系統があり、var の側だけ repoint すると var が配られない実行で fallback が
+   ;; 黙って古い origin を向く。
+   ;;
+   ;; 末尾 3 件は **双条件** を守る mutation —— 「壊れていること」ではなく
+   ;; 「文書と現実が一致していること」を assert しているので、ビルドが直っても
+   ;; 同じ commit で文書を直せば緑のまま、片方だけ動かしたときにだけ赤くなる。
+   ;;
+   ;; 20 件とも 2026-09-09 に 1 つずつ当てて、名指しの test が赤くなり、
+   ;; 無改変で緑（15 tests / 93 assertions）に戻るところを実測してから登録した。
+   ;;
+   ;; ⚠ `must-fail` は `FAIL in (<test 名>)` の literal を pin する。結果だけを見る
+   ;; （exit が非 0 になった）判定にすると、別の理由で落ちた実行を「噛んだ」と
+   ;; 数える —— CLAUDE.md 6 問目の形。
+   :cmd ["nbb" "test/repo_contract_test.cljs"]
+   :green-marker "app-chat-shell repo contract: all green"
+   :mutations
+   [{:id :app-chat-shell/worker-name-drifts-in-wrangler
+     :why "5 箇所に散ったデプロイ単位の名前のうち、**デプロイ先を実際に決める方**だけが動く形。既存の Worker を置き換えず 2 つ目が生える"
+     :file "wrangler.jsonc"
+     :find "\"name\": \"ai-gftd-chat-shell\""
+     :replace "\"name\": \"ai-gftd-chat\""
+     :must-fail ["FAIL in (the-worker-name-agrees-across-every-file-that-repeats-it)"]}
+
+    {:id :app-chat-shell/magatama-name-left-behind
+     :why "宣言側だけ改名する逆向きの形。JSON としては完全に妥当なので、magatama を読む索引と wrangler を読む deploy が別の名前を答える"
+     :file "magatama.jsonld"
+     :find "\"name\": \"ai-gftd-chat-shell\""
+     :replace "\"name\": \"ai-gftd-chat-shell-v2\""
+     :must-fail ["FAIL in (the-worker-name-agrees-across-every-file-that-repeats-it)"]}
+
+    {:id :app-chat-shell/did-web-host-loses-its-route
+     :why "`did:web:gftd.ai` は **そのホストが .well-known を配ること**に依存して解決する。route から外れた瞬間 DID は宣言の中だけに存在して解決しなくなるが、宣言は妥当なままなので読む側からは正常に見える"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"gftd.ai/*\""
+     :replace "\"pattern\": \"chat-ui.gftd.ai/*\""
+     :must-fail ["FAIL in (the-did-web-host-is-actually-a-route-this-worker-serves)"]}
+
+    {:id :app-chat-shell/did-drifts-between-declaration-and-env
+     :why "宣言だけ更新して deploy すると、宣言と実際に配られる env が静かに分かれる。actor が名乗る DID と、解決先のホストが別物になる"
+     :file "wrangler.jsonc"
+     :find "\"CHAT_ACTOR_DID\": \"did:web:gftd.ai\""
+     :replace "\"CHAT_ACTOR_DID\": \"did:web:chat.gftd.ai\""
+     :must-fail ["FAIL in (the-did-web-host-is-actually-a-route-this-worker-serves)"]}
+
+    {:id :app-chat-shell/adapter-swapped-for-auto
+     :why "**この suite で一番静かな壊れ方。** adapter を差し替えても `pnpm build` は通る —— 出力先が変わって `main` が何も指さなくなるだけで、型検査もテストも何も言わない。ADR-2608136000 の 8 問目（「ビルドできた」は「正しい」ではない）そのもの"
+     :file "svelte/svelte.config.js"
+     :find "@sveltejs/adapter-cloudflare"
+     :replace "@sveltejs/adapter-auto"
+     :must-fail ["FAIL in (the-deploy-target-is-the-adapter-output-that-this-build-emits)"]}
+
+    {:id :app-chat-shell/main-points-at-the-superseded-hono-worker
+     :why "壊れたビルドを「コンパイルが通る方を指せばよい」と直す形。`src/app.ts` は README が superseded と記録している Hono worker で、しかも **追跡ファイル**（ビルド成果物ではない）"
+     :file "wrangler.jsonc"
+     :find "\"main\": \"svelte/.svelte-kit/cloudflare/_worker.js\""
+     :replace "\"main\": \"src/app.ts\""
+     :must-fail ["FAIL in (the-deploy-target-is-the-adapter-output-that-this-build-emits)"]}
+
+    {:id :app-chat-shell/assets-come-from-a-different-build
+     :why "`main` と `assets.directory` が別のビルドの出力を指す形。worker は新しく、静的資産は古い —— どちらも存在するので deploy は成功する"
+     :file "wrangler.jsonc"
+     :find "\"directory\": \"./svelte/.svelte-kit/cloudflare/client\""
+     :replace "\"directory\": \"./svelte/build/client\""
+     :must-fail ["FAIL in (the-deploy-target-is-the-adapter-output-that-this-build-emits)"]}
+
+    {:id :app-chat-shell/one-fallback-left-behind
+     :why "2 本ある fallback の **片方だけ**が古いまま残る形。var が配られない実行（`wrangler dev` / preview / `--env` 隔離）でだけ、片方の route が黙って別の origin を向く"
+     :file "svelte/src/routes/api/chat/+server.ts"
+     :find "const DEFAULT_CHAT_AGENT_URL = 'https://chat-agent.gftd.ai';"
+     :replace "const DEFAULT_CHAT_AGENT_URL = 'https://chat-agent-v2.gftd.ai';"
+     :must-fail ["FAIL in (every-hardcoded-backend-fallback-agrees-with-the-configured-var)"]}
+
+    {:id :app-chat-shell/an-undeclared-backend-is-handed-to-the-worker
+     :why "宣言に無い backend を env だけで足す形。退役表にも依存表にも載らないまま本番が外部を叩く"
+     :file "wrangler.jsonc"
+     :find "\"AUTHN_URL\": \"https://authn.gftd.ai\""
+     :replace "\"AUTHN_URL\": \"https://authn-v2.gftd.ai\""
+     :must-fail ["FAIL in (every-host-in-the-worker-vars-is-declared-in-magatama)"]}
+
+    {:id :app-chat-shell/a-retired-backend-is-also-listed-as-live
+     :why "退役させたのに live 表から消し忘れる形。どちらの表も単独では妥当なので、片方しか読まない consumer は退役済みの origin を live として扱う"
+     :file "magatama.jsonld"
+     :find "\"comfyui\": \"https://comfyui.gftd.ai\""
+     :replace "\"comfyui\": \"https://comfyui.gftd.ai\",\n    \"chatAgent\": \"https://chat-agent.gftd.ai\""
+     :must-fail ["FAIL in (a-backend-is-not-both-live-and-retired)"]}
+
+    {:id :app-chat-shell/a-retirement-loses-its-status
+     :why "退役の記録から理由が落ちる形。key は残るので「退役済み」とは読めるが、**いつ何を測ってそう決めたか**が消える —— 測り直せない記録は記録ではない"
+     :file "magatama.jsonld"
+     :find "\"status\": \"Worker ai-gftd-pds-2603241700"
+     :replace "\"statusNote\": \"Worker ai-gftd-pds-2603241700"
+     :must-fail ["FAIL in (a-backend-is-not-both-live-and-retired)"]}
+
+    {:id :app-chat-shell/readme-edn-schema-becomes-an-unevaluated-form
+     :why "EDN に評価は無いので `(str \\\"a\\\" \\\"b\\\")` は throw せず PersistentList として読める。reader を通しただけの検査は「読めた」と報告し、文字列を期待している下流だけが壊れる（CLAUDE.md が 2026-09-08 に 13 件の実例で警告している形）。だから型まで見る"
+     :file "README.edn"
+     :find ":schema \"etzhayyim.repository/readme-v1\""
+     :replace ":schema (str \"etzhayyim.repository/\" \"readme-v1\")"
+     :must-fail ["FAIL in (readme-edn-is-typed-repository-metadata)"]}
+
+    {:id :app-chat-shell/readme-edn-name-drifts-from-the-remote
+     :why "名乗りが remote とずれる形。west / 索引 / 監査はこの repo を別名で数える。remote 名は git に訊いているので、改名すれば検査も一緒に動く"
+     :file "README.edn"
+     :find ":name \"app-chat-shell\""
+     :replace ":name \"chat-shell\""
+     :must-fail ["FAIL in (readme-edn-name-agrees-with-the-remote-that-carries-it)"]}
+
+    {:id :app-chat-shell/migration-promises-a-file-that-is-not-there
+     :why "`:canonical-files` に宣言を足して「足した」ように見せる形 —— 宣言を足すことはファイルを作ることではない"
+     :file "migration.edn"
+     :find ":canonical-files [\"README.edn\" \"migration.edn\"]"
+     :replace ":canonical-files [\"README.edn\" \"migration.edn\" \"CHARTER-RIDER.md\"]"
+     :must-fail ["FAIL in (migration-edn-is-typed-provenance-and-its-files-exist)"]}
+
+    {:id :app-chat-shell/the-frozen-lockfile-flag-is-dropped-silently
+     :why "**この mutation がこの test に assertion を 1 本足させた。** 最初の版は `--frozen-lockfile` の有無で分岐しており、フラグを外すと分岐ごと空振りして **何も見ずに緑**を返した —— 「測れなかった検査が、測って問題が無かった検査と同じ値を返す」形。文書が build を literal で引用しているので、現実から組み立てて突き合わせる床を足した"
+     :file "package.json"
+     :find "cd svelte && pnpm install --frozen-lockfile && pnpm build"
+     :replace "cd svelte && pnpm install && pnpm build"
+     :must-fail ["FAIL in (the-frozen-lockfile-flag-and-the-lockfile-agree-or-the-docs-say-they-do-not)"]}
+
+    {:id :app-chat-shell/the-workspace-dependency-is-renamed-and-the-docs-are-not
+     :why "解決できない `workspace:` 依存が改名され、文書がその名前を挙げたまま置いていかれる形。README は `@gftd/signal` が npm にも workspace にも無いことを 4 経路で測って記録しているが、名前が変われば測定ごと嘘になる"
+     :file "svelte/package.json"
+     :find "\"@gftd/signal\": \"workspace:*\""
+     :replace "\"@gftd/crypto\": \"workspace:*\""
+     :must-fail ["FAIL in (every-workspace-protocol-dependency-has-a-workspace-root-or-the-docs-say-it-does-not)"]}
+
+    {:id :app-chat-shell/the-typecheck-scope-widens-and-the-docs-do-not
+     :why "**良い変更が文書を嘘にする形。** root の typecheck が出荷されるコードまで見るようになるのは望ましいが、README と quickstart は「`src/app.ts` しか見ていない」を literal 引用で主張している。直した人に、同じ commit で直す場所を教える"
+     :file "tsconfig.json"
+     :find "\"include\": [\"src/**/*.ts\"]"
+     :replace "\"include\": [\"src/**/*.ts\", \"svelte/src/**/*.ts\"]"
+     :must-fail ["FAIL in (the-docs-quote-the-typecheck-scope-that-tsconfig-actually-declares)"]}
+
+    {:id :app-chat-shell/a-documented-script-is-removed
+     :why "文書が名指ししている npm script が消える形。ビルドできない repo では手順書が唯一の入口なので、踏めない手順は入口が無いのと同じ"
+     :file "package.json"
+     :find "    \"deploy\": \"pnpm build && wrangler deploy\",\n"
+     :replace ""
+     :must-fail ["FAIL in (the-docs-only-name-npm-scripts-that-exist)"]}
+
+    {:id :app-chat-shell/an-ignore-rule-swallows-the-svelte-sources
+     :why "`git check-ignore` は **既定で index を見る**ので追跡ファイルを報告せず、この壊れ方を隠す。検査は `--no-index` で規則だけを当てる。1 行広がると svelte/src が次の clone から消え、ビルド以前に source が無くなる"
+     :file ".gitignore"
+     :find "build/"
+     :replace "svelte/src/lib/"
+     :must-fail ["FAIL in (the-ignore-rules-do-not-match-a-tracked-file)"]}
+
+    {:id :app-chat-shell/magatama-stops-being-json
+     :why "配列に余分なコンマを 1 つ入れる。`JSON.parse` は落ちるが、宣言を正規表現で読む検査は部分文字列が残る限り緑のまま —— 「宣言が読める」と「宣言が grep に引っかかる」の差がここで出る"
+     :file "magatama.jsonld"
+     :find "\"routes\": ["
+     :replace "\"routes\": [,"
+     :must-fail ["FAIL in (every-declaration-file-parses-as-the-format-it-names)"]}]}]}
