@@ -117,6 +117,7 @@ skip は本物の退行も通す）。
 | **detached HEAD である** | west は SHA で pin するので branch 名が無い。`<org>/main` を明示させる |
 | **`reagent`/`re-frame` は `:cljs` alias に置く** | PreToolUse hook `jvm-new-surface-guard`（ADR-2608201300）が top-level の新規 JVM 依存を**拒否**する。第 1 波の 6 agent 全員が踏んだ |
 | **`package.json` に `react` と `react-dom` を入れる** | **reagent は npm の `react` / `react-dom` を解決する。** shadow-cljs だけ宣言すると app build が `The required namespace "react-dom" is not available, it was required by "reagent/dom.cljs"` で落ちる。第 2 波で `app-har` がこれで落ち、agent は**正直に失敗として報告した**（merge しなかった）。`devDependencies` に `^18.2.0` で足りる |
+| **最初の build の前に `cljs/` で `npm install` を回させる** | **宣言と解決は別の動作。** `package.json` に `react` / `react-dom` を書いても `node_modules` は空のままなので、1 本目の build が上の行と**同じ** `The required namespace "react-dom" is not available` で落ちる。第 9 波（2026-09-08）で `gmail` と `meet` の agent が独立に踏み、2 人とも自力で `npm install` に気づいて回復した —— つまり**止まりはしないが、毎回 1 回ぶんの失敗を払っている**。前の行だけでは足りない |
 | **`package.json` に `"type": "module"` を書かない** | shadow-cljs の `:node-test` 出力は CommonJS（`__dirname`）。ESM 指定で `ReferenceError` になる。3 agent が踏んだ |
 | **build の sentinel / log を worktree の外に置かない** | 第 2 波で 3 agent が揃って `/private/tmp/claude-501/build-app.exit` という**共有パス**を使った。1 つの exit code を別の agent が自分の結果として読みうる。scratch は worktree の下か session 固有パスに置く |
 | **`:asset-path` は相対** | これらのページは path prefix の下に出る。絶対だと mount 先で壊れる |
