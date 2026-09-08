@@ -4,11 +4,6 @@ manifest:
   version: "1.0"
 
   remotes:
-    - name: cloud-itonami-api
-      remote: cloud-itonami
-      revision: 7baad582e05714bc6a9f33854601745e1a069c47
-      path: orgs/cloud-itonami/cloud-itonami-api
-      groups: [cloud-itonami]
     - name: cloud-itonami
       url-base: git@github.com:cloud-itonami
     - name: com-junkawasaki
@@ -36,6 +31,11 @@ manifest:
       remote: cloud-itonami
       revision: a3c578507b9a40ae3e3919021c18189d22db8ca4
       path: orgs/cloud-itonami/cloud-itonami-apex
+      groups: [cloud-itonami]
+    - name: cloud-itonami-api
+      remote: cloud-itonami
+      revision: 7baad582e05714bc6a9f33854601745e1a069c47
+      path: orgs/cloud-itonami/cloud-itonami-api
       groups: [cloud-itonami]
     - name: cloud-itonami-cli
       remote: cloud-itonami
