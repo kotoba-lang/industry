@@ -3775,4 +3775,55 @@
               into os.tmpdir() and removes it. SCANNED is over checkouts, not a
               workspace total."}
 
+  {:id       :verify-git-dep-pin-reachability
+   :title    "every :git/sha in a deps.edn, asked of the library it actually names"
+   :why      "CLAUDE.md says it outright: west pins have a gate (verify-west-pins) and deps.edn
+              pins have none. Two things hide in that gap. A pin can name a commit on a branch
+              that was never merged -- which CLAUDE.md forbids by name and nothing was checking
+              -- and a pin can be a real ancestor that is simply old, so a fix the library
+              landed cannot reach the repo, because tools.deps takes the newest sha it is SHOWN.
+              What justifies running it is a measurement, not a fear. 2026-09-09: 98 repos
+              pinned io.github.kotoba-lang/json before d5137c7, the commit that restored
+              read-str's trailing kwargs; 23 of them actually called it that way and every such
+              call threw ArityException. The fix had been on json's main for a day. It was
+              merged and it was not deployed, and nothing in the tree could tell those apart.
+              The same run found two pins on unmerged branches, one of them in cloud-itonami-app,
+              a live deploy repo: kotoba-lang/authentication at 188eb0e6, three commits ahead of
+              and twenty-six behind that library's main. If that branch is deleted the build
+              stops resolving, and nothing would have said so first.
+              Adjacent: verify-source-path-pins asks whether a shadow-cljs :source-path checkout
+              sits at the revision west.yml pins. This asks a different question of a different
+              file -- whether a deps.edn's own :git/sha is reachable from the library's main at
+              all. A repo can pass that one and fail this one."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-git-dep-pin-reachability.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- it costs one GitHub call per suspect
+   :timeout-ms  900000                   ; 15m -- 7.6x the measured runtime, sized against load
+   :writes   :none
+   :measured "2026-09-09, load 35.8: 118s wall. SCANNED 3876 deps.edn files, 6883 git
+              coordinates, 463 distinct libraries. 4 findings (2 distinct facts -- one
+              coordinate appears in a repo plus two copies of it), 2910 stale, 3596 unresolved,
+              237 current, 32 cleared by asking GitHub.
+              That last number is the reason this detector has two stages. Judged from local
+              remote-tracking refs alone it reported 33 unreachable pins and THIRTY-ONE of them
+              were false: the local ref was simply behind the library's real main, which
+              CLAUDE.md warns about in as many words. A local suspicion is therefore re-asked
+              of GitHub and only reported if the server agrees.
+              Self-check, both directions. Red: with a `gh` stub on PATH returning the secondary
+              rate limit's 403, all 36 suspects land in :unverified, the finding list empties,
+              and the detector REFUSES with exit 2 rather than exiting 0 -- because a run that
+              could not ask must not return the value of a run that found nothing. Green: with
+              the real gh, exit 1 and the same 4 findings.
+              One measured false-positive class is closed in the code: the coordinate NAME is
+              not the repo address. kami-app-cad names io.github.kotoba-lang/cad and points its
+              :git/url at kotoba-lang/kami-engine-cad, where the pinned commit exists and is
+              healthy; resolving by name reported it as a commit that does not exist. When a
+              :git/url is declared it is the address.
+              A library with no local checkout is UNRESOLVED (3596 coordinates), which is
+              reported at :info and is not clean. A shallow checkout answers ancestry wrongly
+              and with authority, so it is refused rather than believed."}
+
 ]}
