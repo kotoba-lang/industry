@@ -8874,4 +8874,57 @@
      :file "manifest.edn"
      :find ":actor/prohibited-sources [\"linkedin\""
      :replace ":actor/prohibited-sources [:linkedin"
-     :must-fail ["manifest-nested-values-stay-pr-str-blobs"]}]}]}
+     :must-fail ["manifest-nested-values-stay-pr-str-blobs"]}]}
+  {:repo "orgs/cloud-itonami/ontology"
+   :label "DoDAF meta-model index —— 11 のモジュール表の順序つき合併と、その順序が決める勝者"
+   ;; この repo の索引は 11 の `*-metamodel.ts` を `{...A, ...B}` で畳んだもので、
+   ;; **14 の element キーが 2 つのモジュールに定義されている**（Capability は
+   ;; operational と organizational、Information / Representation は data と service）。
+   ;; どちらが勝つかは spread の順序だけが決めており、その順序を述べた文は
+   ;; tree のどこにも無かった —— 2 行を入れ替えても型は通り、build も通る。
+   ;;
+   ;; test は出荷される .ts をそのまま import して走らせる（Node が型を剥がす）。
+   ;; Clojure で書き直した鏡は .ts が動いても緑のままなので、鏡は置いていない。
+   :cmd ["nbb" "test/ontology_test.cljs"]
+   :green-marker "ontology metamodel: all green"
+   :mutations
+   ;; ── 5 件とも 2026-09-08 に赤くなるところを実際に見た ──
+   [{:id :ontology/module-dropped-from-the-index
+     :why "索引が 1 モジュールぶん静かに痩せる。security の 12 クラスは export されたまま、索引からだけ消える —— 型は Partial<Record<…>> なので tsc は何も言わない"
+     :file "src/ontology/dodaf-metamodel.ts"
+     :find "\n  ...SECURITY_METAMODEL,"
+     :replace ""
+     :must-fail ["index-is-the-ordered-union-of-the-eleven-modules"]}
+
+    {:id :ontology/colliding-keys-change-owner
+     :why "data と service の spread を入れ替える。**キー集合は 1 つも動かない**ので索引の同一性検査（上）は緑のまま通り、Information / Representation がどちらのモジュールのクラスとして解決されるかだけが変わる。境界そのものを狙った変異"
+     :file "src/ontology/dodaf-metamodel.ts"
+     :find "  ...DATA_METAMODEL,\n  ...SERVICE_METAMODEL,\n"
+     :replace "  ...SERVICE_METAMODEL,\n  ...DATA_METAMODEL,\n"
+     :must-fail ["colliding-keys-resolve-to-the-module-spread-last"]}
+
+    {:id :ontology/validator-stops-at-the-first-missing-property
+     :why "必須プロパティが 3 つ欠けている element に対して、報告が 1 件しか返らない。valid=false は変わらないので呼び出し側の分岐は同じ形をしており、**欠けているものの一覧だけが静かに短くなる**"
+     :file "src/ontology/dodaf-metamodel.ts"
+     :find "is missing for element type '${element.type}'`);\n"
+     :replace "is missing for element type '${element.type}'`);\n      break;\n"
+     :must-fail ["validator-reports-every-missing-required-property"]}
+
+    {:id :ontology/standard-views-leave-dodaf-order
+     :why "AV と OV が入れ替わる。5 つとも在るので数を数える検査は通り、DoDAF が定めた並びだけが壊れる"
+     :file "src/ontology/dodaf-views.ts"
+     :find "    type: 'AV',\n    name: 'All Views',\n    description: 'Integrated Architecture View',\n    purpose: 'Provide overarching architecture information'\n  },\n  {\n    type: 'OV',\n    name: 'Operational View',\n    description: 'Operational View',\n    purpose: 'Describe operational aspects of the architecture'\n"
+     :replace "    type: 'OV',\n    name: 'Operational View',\n    description: 'Operational View',\n    purpose: 'Describe operational aspects of the architecture'\n  },\n  {\n    type: 'AV',\n    name: 'All Views',\n    description: 'Integrated Architecture View',\n    purpose: 'Provide overarching architecture information'\n"
+     :must-fail ["five-standard-views-in-dodaf-order"]}
+
+    ;; ── 測れなくなる側（exit 2）。CLAUDE.md の 8 問の 2 ──
+    ;;
+    ;; 検査対象の export が消えたとき、**pass と同じ値を返してはならない**。
+    ;; この 1 件は 0 でも 1 でもない 2 が返ることを確かめる。
+    {:id :ontology/validator-export-renamed
+     :why "索引が validateElementAgainstMetaModel を export しなくなる。test は検査対象を掴めないので、**答えを出さずに拒否する** —— 「壊れていない」と「読めなかった」が同じ緑にならないこと"
+     :file "src/ontology/dodaf-metamodel.ts"
+     :find "export function validateElementAgainstMetaModel("
+     :replace "export function validateElement("
+     :must-fail ["REFUSED"]}]}
+]}
