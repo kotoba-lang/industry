@@ -129,6 +129,25 @@
   (boolean (or (re-find #"\[clojure\.string[\s\]]" src)
                (re-find #"(?s)\(:require[^)]*[\s\[]clojure\.string[\s\)\]]" src))))
 
+(def ^:private inserted-libspec
+  "What is inserted into an ns form that CALLS clojure.string without requiring
+  it. Written as one exact string so the inverse can remove it by equality
+  rather than by pattern -- the substitution-only invariant has to be able to
+  undo an insertion as precisely as it undoes a rename."
+  "(:require [kotoba.lang.text]")
+
+(defn- ns-require-index
+  "Index of the ns form's own `(:require`, or nil.
+
+  Anchored on the `(ns ` form, not on the first `(:require` in the file: a
+  nested `(require ...)` in a comment or a body would otherwise be treated as
+  the ns's, and the libspec would land somewhere that is not a require at all."
+  [src]
+  (let [ns-at (.indexOf src "(ns ")]
+    (when (>= ns-at 0)
+      (let [at (.indexOf src "(:require" ns-at)]
+        (when (>= at 0) at)))))
+
 (defn- rewrite
   "With an alias, the namespace in the require is renamed and the alias is kept.
   Without one, the NAMESPACE TOKEN itself is renamed everywhere -- which is the
@@ -136,10 +155,21 @@
   bare `clojure.string` symbol in the require."
   [alias src]
   (if-not alias
-    (-> src
-        (str/replace #"\bclojure\.string/lower-case" "kotoba.lang.text/lower")
-        (str/replace #"\bclojure\.string/upper-case" "kotoba.lang.text/upper")
-        (str/replace #"\bclojure\.string\b" "kotoba.lang.text"))
+    (let [renamed (-> src
+                      (str/replace #"\bclojure\.string/lower-case" "kotoba.lang.text/lower")
+                      (str/replace #"\bclojure\.string/upper-case" "kotoba.lang.text/upper")
+                      (str/replace #"\bclojure\.string\b" "kotoba.lang.text"))]
+      ;; If the file only CALLED clojure.string and never required it, renaming
+      ;; the calls is not enough: it worked because something else on the
+      ;; classpath had loaded the namespace, and kotoba.lang.text may not be
+      ;; loaded by anything. Insert the libspec.
+      (if (or (str/includes? src "[clojure.string")
+              (re-find #"(?s)\(:require[^)]*[\s\[]clojure\.string[\s\)\]]" src))
+        renamed
+        (if-let [i (ns-require-index renamed)]
+          (str (subs renamed 0 i) inserted-libspec
+               (subs renamed (+ i (count "(:require"))))
+          renamed)))
     (-> src
       (str/replace (re-pattern (str "\\[clojure\\.string :as " alias "\\]"))
                    (str "[kotoba.lang.text :as " alias "]"))
@@ -154,6 +184,7 @@
   [alias src]
   (if-not alias
     (-> src
+        (str/replace inserted-libspec "(:require")
         (str/replace #"\bkotoba\.lang\.text/lower\b" "clojure.string/lower-case")
         (str/replace #"\bkotoba\.lang\.text/upper\b" "clojure.string/upper-case")
         (str/replace #"\bkotoba\.lang\.text\b" "clojure.string"))
@@ -238,7 +269,8 @@
         no-alias (filterv (fn [[_ s]] (and (str/includes? s "clojure.string")
                                            (nil? (alias-of s))
                                            (not (requires-clojure-string? s))
-                                           (re-find #"\bclojure\.string/" s)))
+                                           (re-find #"\bclojure\.string/" s)
+                                           (nil? (ns-require-index s))))
                           targets)]
     (println (str "SCANNED\t" (count files) "\t.clj/.cljc files under " repo))
     (println (str "TARGETS\t" (count targets) "\tfiles mention clojure.string"))
@@ -255,9 +287,10 @@
       (seq no-alias)
       (do (doseq [[p _] no-alias] (println (str "NO-ALIAS\t" p)))
           (refuse! (str (count no-alias) " file(s) CALL clojure.string without"
-                        " requiring it at all; renaming the calls would break them."
-                        " They need a require inserted, which is ns-form surgery"
-                        " and a different edit from a rename")))
+                        " requiring it and have no `(:require` in their ns form"
+                        " to insert one into -- 41 have no :require and 9 have no"
+                        " ns form at all, measured 2026-09-09. Adding one is a"
+                        " different edit again and is not attempted here")))
 
       :else
       (let [changed (for [[p s] targets
