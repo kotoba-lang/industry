@@ -166,5 +166,37 @@
   - cost: 既存 prop/label-ja（Wikidata 由来言語別ラベル）と procured 翻訳カタログの
     二重ソースがしばらく共存する。label-ja は「収集時ラベルの記録」、翻訳カタログは
     「プロジェクトの翻訳」と役割を分けて明示する（混ぜない）。
-  実装は本 ADR の accepted（所有者 do it、2026-09-08）を受けて着手する。"}
+  実装は本 ADR の accepted（所有者 do it、2026-09-08）を受けて着手する。
+
+  ## 実施状況（2026-09-08 closing 時点、全て merge 済み）
+
+  slice a/b/c/d はすべて実装・merge・main 着地済み。検証は operator が各 repo で再実行した。
+
+  | slice | repo / PR | 内容 | 検証 |
+  |---|---|---|---|
+  | a + b | kotoba-lang/i18n-cid PR#1 | `i18n-cid.pin`（IPFS PSA `/pins`）+ `i18n-cid.pack`（CARv2） | clojure -M:test 13/45 |
+  | c | network-awai/app-hyakka PR#860 | `hyakka.i18n` + `hyakka.i18n.admit`（UI 文言・ラベル → lake admit） | nbb 8/44（実 snapshot round-trip） |
+  | d | cloud-itonami/cloud-itonami-translation PR#2 | `translation.publish`（governor 検品 → i18n-cid block → IPFS pin → lake） | clojure -M:test 36/110 |
+
+  **etzhayyim 参照はこの統合の成果物（ADR・コード）からすべて除去**し、翻訳生成・検品側を
+  cloud-itonami-translation（itonami 配下、既存）に一本化した。外部翻訳ベンダ API に直結せず
+  x402 調達 + governor 検品（ADR-2607289100 維持）。grep 0 件を確認。
+
+  **west pin 前進済み**: i18n-cid f7cda3d→b20895c / app-hyakka 6a91dd6→1ff4720 /
+  cloud-itonami-translation eaf7b49→cc6f3dd（いずれも upstream tip）。verify-west-pins OK。
+
+  ## 残る検証（未完了、正直に記録）
+
+  - **app-hyakka の shadow-cljs フルビルド（`shadow-cljs release worker`）のみ未検証**。
+    この統合の実装環境（/tmp worktree）では `.kotoba`（hyakka.article 等）の amu/kbb 事前
+    コンパイル + deps.edn の west 相対パス（`../../kotoba-lang/*`）が解決できず落ちる。
+    これは slice c と無関係の環境制約（slice c が無い main でも同じ）。
+    ただし Worker の require graph に入る新規 namespace は `hyakka.i18n`（依存ゼロの pure
+    .cljc）のみで、`hyakka.i18n.admit`（重い ipld/lake）は Worker が require しない。
+    `hyakka.i18n` は nbb（cljs エンジン）テスト 8/44 で compile + 実行実証済み。
+    → **次の本番 deploy（`npm run deploy`、共有 checkout の正常 build 環境）時に最終検証が
+    走る**。merge + pin 前進は完了済み。
+  - D6.4（hyakka UI が register-from-block! で解決）は slice c の範囲外で未実装（encode/admit
+    まで）。これは次段の作業。
+  - D7 の pinning 実配備（ネットワーク / PSA の実到達性）は未実測。本統合は接続形状のみ。"}
 ]
