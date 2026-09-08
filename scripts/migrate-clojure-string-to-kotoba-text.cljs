@@ -376,7 +376,17 @@
                                   a     (alias-of (get orig p))
                                   fail  (cond
                                           (str/blank? back) "empty after write"
-                                          (str/includes? back "clojure.string") "still names clojure.string"
+                                          ;; A MENTION is not a dependency. kagi/b64.cljc
+                                          ;; explains in a comment why the require sits
+                                          ;; inside a reader conditional, and the word
+                                          ;; `clojure.string` in that sentence made the
+                                          ;; readback refuse a correct rewrite -- 9 repos
+                                          ;; in one wave. Only a libspec or a qualified
+                                          ;; call counts.
+                                          (or (str/includes? back "[clojure.string")
+                                              (str/includes? back "clojure.string/")
+                                              (re-find #"(?s)\(:require[^)]*[\s]clojure\.string[\s\)]" back))
+                                          "still requires or calls clojure.string"
                                           (not (substitution-only? a (get orig p) back))
                                           "changed something other than the substitutions"
                                           (not (insertion-landed-inside-ns? back))
