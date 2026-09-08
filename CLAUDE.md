@@ -1,5 +1,24 @@
 # CLAUDE.md
 
+**この文書は「常に効く不変条件」だけを持つ。手順・実測・罠は skill に委譲してある**
+（2026-09-08、ADR-2609081000。それまで 15 万字を超えて常時読み込みの上限に当たっており、
+上限そのものより「読まれない規則は無い規則と同じ」の方が問題だった）。委譲先:
+
+| 主題 | skill | CLAUDE.md 側に残したもの |
+|---|---|---|
+| git（shallow / ancestry / force-push / 同期 / worktree） | `git-operations` | 禁止と手順 |
+| west pin の前進・登録・三点ずれ | `west-pin-advance` | pin の既定状態と正経路 |
+| stash / branch / PR / conflict の棚卸し | `git-cleanup-conflict` | 破棄しない規則 |
+| fleet gate（murakumo CI/CD） | `fleet-ci-gates` | Actions を使わない・8 問 |
+| `.kotoba` / runtime / native / 移行 | `kotoba-authoring` | 優先順位と恒久/一時の分類 |
+| UI・design system・品質計測 | `kotoba-uiux` | jp-go-dds・SPA・Svelte/React 禁止 |
+| 大容量バイナリ | `large-binary-datalad` | 方針 |
+| secrets の在り処 | `secrets-location-map` | 参照のみ |
+
+**規則を足す・直すときはここを編集して `nbb scripts/gen-agents-md.cljs` を回す。**
+**手順や実測を足すときは skill 側に書く** —— ここに測定値を書けば、それは翌週には
+定数として引用される（この文書が繰り返し警告している形）。
+
 ## リポジトリ構成（west manifest が正）
 
 このリポジトリは superproject だが、**子リポ群は git submodule ではなく
@@ -276,202 +295,36 @@ trust boundary・session namespace・threat model・ADR を持ち、既存 autho
 このワークスペースの CI/CD の正本は **`scripts/fleet-ci/`（murakumo mac-mini fleet）**であり、
 GitHub Actions ではない。
 
+**gate の書き方・種別・罠・placement・job 配分・Actions の状態と課金の測り方は、
+Skill ツールで `fleet-ci-gates` を呼ぶ。** ここに残すのは skill を読まなくても効く規則だけ。
+
 - **新しい `.github/workflows/*.yml` を書かない。** 検査を足したいなら
   `scripts/fleet-ci/gates.edn` に 1 行足す（gate 本体は `scripts/fleet-ci/gates/*.cljs`）。
-  「Actions が今は動いているから」は理由にならない — **止まったのは org 単位**で、
-  動いている org も同じ理由で止まりうる。
-- **Actions は repo 単位で無効化「した」——それは掃除の記録であって、今の状態ではない**
-  （`scripts/github-actions-disable-sweep.cljs`）。無効化された repo では workflow ファイル
-  自体は残るが inert。
-  ⚠ **2026-09-06 訂正: 旧文は現在形で「無効化してある」と書いており、それが偽になる repo が
-  ある。** 実測: `kotoba-lang/amu` は `GET /repos/kotoba-lang/amu/actions/permissions` が
-  `{"enabled":true}` を返し、PR に 13 job のマトリクスが実走し（`test` × 3 platform /
-  `browser-matrix` × 2 / `safari` / `windows-arm64` / `android-ndk` /
-  `provider-qualification` × 3 / `server-kind` / `downstream-murakumo`）、**main は保護ブランチで
-  PR + 2 status check を要求する**。サーバ側 `gh api .../merges` は 409 で拒否され、PR 経路が
-  唯一の着地経路だった。
-  **したがって「この workspace では Actions は動いていない」を前提に手順を選ばない** ——
-  下記の節が自分で書いているとおり、状態は GitHub に訊くまで未測定である。訊いてから決める。**ファイルの削除には GitHub の `workflow` OAuth scope が
-  要り、このワークスペースの token は持っていない**（push も Contents API も通らず、後者は
-  403 でなく **404** を返すので「repo が無い」と誤読しやすい）。一方 **Actions の無効化は
-  `repo` scope で通る** — 詰まっているのは「workflow ファイルを編集する」経路だけ。
-  ⚠ **ただしこの制約は remote の protocol 次第で、repo ごとに違う**（実測 2026-08-19）。
-  OAuth scope が効くのは **HTTPS remote への push** だけで、**SSH remote には効かない**。
-  同じ日に `kotoba-lang/amu`（remote が `git@github.com:`）へは workflow 変更が普通に
-  push でき、`kotoba-lang/kotoba`（`https://github.com/`）は
-  `refusing to allow an OAuth App to create or update workflow ... without workflow scope`
-  で弾かれた。後者は push 先に SSH URL を明示すれば通る（共有 checkout の remote 設定は
-  書き換えないこと）。**「この workspace では workflow を触れない」と一般化しない** ——
-  触れるかどうかは対象 repo の remote を見て決まる。
-  org 単位の一括無効化（`PUT /orgs/{org}/actions/permissions`）は `admin:org` が要り、
-  これも持っていない（実測 2026-08-05）。
-- **なぜ「動いていない CI」より「無い CI」の方がよいか。** 2026-07-30、com-junkawasaki と
-  gftdcojp の Actions は課金停止で **job が起動しなくなった**。落ちるのではなく走らないので、
-  **repo は green に見えたまま何も検査されていなかった**。無効化すればチェックマーク自体が
-  出ないので、誤読しようがない。
-
-### 「Actions を止めた」は、GitHub 側に訊くまで未測定（2026-08-22、ADR-2608221300）
-
-**workflow ファイルの有無から Actions の状態を推測しない。** `.github/` を 1 ファイルも
-持たない repo が registered workflow を持つことがある（Dependabot の `dynamic/*` と、
-削除済みファイルの stale entry）。それらは `ls` にも `git ls-files` にも映らないので、
-**ファイル走査は見えないものを「無い」と報告する。**
-
-- 状態を訊くのは `GET /repos/{o}/{r}/actions/permissions`。**読めなかった応答を
-  「無効」と読まない** —— 403 も 404 も network error も、無効と同じ形で返ってくる。
-  読めなかったなら `UNVERIFIED` であって `disabled` ではない（実測 2026-08-22、
-  掃除機がまさにこれを `:already-disabled` として state に書き込んでいた）。
-- **workflow が 0 本であることは無効化を省く理由にならない。** 有効なまま放置された
-  repo は、workflow ファイルが 1 つ載った瞬間に走り出す。
-- **課金を言うときは `/actions/runs/{id}/timing` の `billable` を引く。**
-  壁時計は課金ではない（実測: 30〜45 分回る run の `billable.total_ms` が 0）。
-  引いていないなら「未測定」と書く。
-- 道具の分担: 現在地を測るのは `scripts/github-actions-billable-audit.cljs`
-  （対象は `--repo` / `--owner` で明示。引数なしで全アカウントを歩かない）、
-  止めるのは `scripts/github-actions-disable-sweep.cljs`。tree の側は fleet gate
-  `root-no-github-workflows` が保つ —— ただし**その緑が言うのは「この tree は
-  GitHub に workflow を渡していない」だけ**で、GitHub 側の設定は credential を
-  要するのでノードでは引けない。
-
-### fleet gate の書き方（実測した制約つき）
-
-| gate | 要件 | 落とし穴 |
-|---|---|---|
-| `:jvm-test` | `deps.edn` に `:test` alias、出力に `Ran N tests` | 依存はノード側で解決する |
-| `:nbb-test` | nbb のテストエントリ | 同上 |
-| `:nbb-script` | `gates/*.cljs` を配って実行 | 1 ファイルで完結させる（nbb に `load-file` は無い） |
-
-- **ノードの外向き HTTPS の有無は「実測して」使う。定数で持たない。**
-  fleet-ci の README と `tick.cljs` のコメントは「ノードは tailnet だけに繋がっていて
-  外向きの HTTPS が無い」と書いているが、これは **2026-07-26 に zebulun 1 台で測った値**で、
-  全ノードの恒久的な性質ではない。この誤った前提のせいで、gate 種別の判断を誤り
-  （maven 依存があるから `:jvm-test` は無理、と結論した）、workflow 実行では 167 本を
-  不当に拒否していた。
-  必要なら `curl -sS -o /dev/null -w '%{http_code}' https://repo1.maven.org/maven2/` を
-  その場で叩く（`gates/github_workflow_run.cljs` の `egress?` が実例）。
-
-  **⚠ この節自身が定数を持ってしまっていた。** 2026-08-05 の実測「到達可能な 10 ノード
-  全部で 200」をここに書いた結果、それが新しい定数として引用され続けた（今日だけで
-  複数の agent 指示に転記した）。**2026-08-13 に測り直すと `registry.npmjs.org` は
-  8 ノードが 200、zebulun が 000。** egress は**一様ではない**。
-
-  zebulun が今日それで問題を起こしていないのは、`:caps #{}` を持っていて cap filter に
-  弾かれているからで、**設計ではなく偶然**である。cap を 1 つ足した瞬間に、egress を
-  前提にした gate がそのノードで落ちる。
-
-  **「実測して定数で持つな」と書いた節に実測値を書けば、それは定数になる。**
-  日付付きで書いても同じ —— 引用する側は日付を落とす。ここに残してよいのは
-  *測り方*であって、*測った値*ではない。
-- **`ship-git-deps!` が運ぶのは git 依存だけ**（maven/npm は運ばない）。egress があれば
-  ノードが自力で取りに行けるので普通は問題にならないが、**egress を切った運用に戻すなら
-  そこが効いてくる**。
-- **`:include-ext` で送る tree を絞る**（`max-ship-mb` 200）。`:min-files` は絞り込みが壊れて
-  空 tree を「違反 0 件 = 合格」にしないための床。
-- **署名鍵**は kagi の `fleet-agent-murakumo-ci-tip-25mbair`（compartment `personal`）と
-  `~/.gftd/fleet-ci-signer-tip.pem` の両方にある（2026-08-05 に kagi 側を PEM から復元）。
-  手動実行で `no such item` が出たら `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem`
-  を付ける。常駐 plist は env を渡している。
+  「Actions が今は動いているから」は理由にならない —— **止まったのは org 単位**で、
+  動いている org も同じ理由で止まりうる。tree の側は fleet gate
+  `root-no-github-workflows` が保つ。
+- **「この workspace では Actions は動いていない」を前提に手順を選ばない。**
+  状態は `GET /repos/{o}/{r}/actions/permissions` に訊くまで **UNVERIFIED** であって
+  `disabled` ではない（403 も 404 も network error も、無効と同じ形で返ってくる）。
+  workflow ファイルの有無からも推測しない —— `.github/` を 1 ファイルも持たない repo が
+  registered workflow を持つことがある。実測 2026-09-06、`kotoba-lang/amu` は
+  `{"enabled":true}` を返し、13 job が実走し、main は PR + 2 status check を要求していた。
+- **なぜ「動いていない CI」より「無い CI」の方がよいか。** 2026-07-30、課金停止で
+  **job が起動しなくなった** —— 落ちるのではなく走らないので、**repo は green に見えたまま
+  何も検査されていなかった。**
 - **gate は「落ちること」を確かめてから landed とする。** 対象を 1 箇所壊したコピーで
-  exit 1 になり、無改変で exit 0 になることを実際に見る。落ちない gate は劇場。
+  exit 1 になり、無改変で exit 0 になることを実際に見る。**落ちない gate は劇場。**
+  対偶も成り立つ —— **一度も緑にならない gate も、誰も行動できないという意味で同じだけ無内容**
+  なので、**「fleet で 1 度緑になる」までは landed としない**（手元で discriminate することと、
+  ノードの配られた tree で discriminate することは別の主張）。
+- **直したら pin も前進させる。** 子リポの main を直しても、west pin が手前にあると
+  gate は古い tip を見続ける。修正 → `advance-pins.cljs` → `verify-west-pins.cljs` までが 1 組。
+- **`manifest/fleet-ci.edn` の fail を見て、いきなり直しにいかない**（ADR-2608102000）。
+  receipt は `test-<gate>-<sha7>-murakumo-<node>` で**その sha 時点の判定**でしかない。
+  現 tip と比べ、ローカル実行の引数順（`<dir>` は**先頭**）と `:include-ext` の絞り込みを
+  当ててから診断する。**「ローカルで赤」は「fleet で赤」ではないし、その逆も成り立たない。**
 
-### placement を決めるのは murakumo。fleet-ci は「何を検査するか」だけを持つ（2026-08-11、ADR-2608111721）
-
-**オーナー判断（2026-08-11）: placement authority は `murakumo.task.plan` に1本化する。**
-新しい配置ロジック・ノード在庫・入場判定を `scripts/fleet-ci/` に書き足さない。
-
-| 誰が | 何を所有するか |
-|---|---|
-| **murakumo**（`murakumo.task.plan` / `murakumo.fleet.inventory`、`:task-plan` / `:fleet-inventory` KIR 裏付け） | placement・在庫・入場（`admit`）・不能タスクの説明（`why-unschedulable`）・常駐の枠 |
-| **scripts/fleet-ci** | `gates.edn`（何を検査するか）・gate script・署名 receipt・commit status・west pin 前進 |
-
-fleet-ci が持ち続けるものは**全部 credential を要する operator 側の仕事**なので、
-不変条件3（ノードに credential を置かない）のとおりノードへ移さない。移るのは
-placement だけ。ADR-2607300900 の「CI/CD の正本は murakumo fleet であって GitHub
-Actions ではない」は変わらない —— 変わるのは**どう配るかを誰が決めるか**。
-
-**常駐スロットは 2 種で、混ぜない。**
-
-- `:slot/anonymous` — 鍵を持たない。10 ノードどこでも置く（gate・推論・ffmpeg・WASM guest）
-- `:slot/attested` — 書き込み鍵を持つ。**常時稼働の1台に固定し、台数を増やさない。
-  そのホストは `probe.cljs` の `operator-hosts` で gate rotation から外す** ——
-  さもないと repo から送られてきた gate コードを実行するマシンが publish 鍵を持つ
-
-鍵を発行するのは cloud-itonami（actor DID / CACAO / scope を絞った鍵）、**枠を割り当てて
-生存を見るのは murakumo**。常駐の機構は murakumo、常駐する権利は cloud-itonami、
-保管は kotobase —— 判定は 3 問（今夜この機械が眠って何が止まるか / 書き込み鍵を持つか /
-誰の名前で世に出るか）。
-
-**移行期の現在地（2026-08-11）**: 切り替えは未実施。両実装に同じ batch を通して
-assignments が一致することを実測してから切り替える。それまで下記の LPT が正本として
-動き続ける。cost EMA は捨てず、**placement の決定器から入力の順序付け器へ降りる**
-（`plan/assign` は与えられた順に greedy least-filled で置くので、LPT は「tasks を
-cost 降順に並べ替える」という host 側の 1 手に還元でき、Kotoba object を足す必要が無い）。
-
-### job の配分は自動計算する（round-robin に戻さない）
-
-**⚠ この節は移行期の暫定実装を記述している。新しい配置ロジックの置き場は上記のとおり
-murakumo 側であって、ここではない。**
-
-`tick.cljs` の `assign` は **LPT（重い順に、投入後の完了時刻が最小の slot へ）**で、
-ノードの速度を `cores` / `free-gb` / **live の load1**（`sysctl -n vm.loadavg` を実測）から、
-gate の重さを過去実測の EMA（`~/.gftd/fleet-ci-cost.edn`）から出す。
-
-以前は `(mod i (count slots))` の round-robin で、**空きも重さも見ていなかった**。
-fleet のノードは CI 専用ではなく推論やマイニングと同居しているので、張り付いている
-ノードに暇なノードと同じ本数が飛び、batch は全 slot の完走を待つため遅い 1 台が
-全体の完了時刻を決めていた。**新しいノードを足したり用途を変えたときに手で配分を
-書き換える必要は無い** — 測った値から毎 tick 計算し直す。
-
-記録するコストは **batch 単位の上界**（batch 内の gate は並列に走るので、所要時間は
-最も遅い 1 本で決まる）。LPT は相対的な重さしか使わないのでこれで足りるが、
-**絶対値として引用しない**こと。
-
-### 生成物を検査する gate は sha256 を見る（Actions では構造的に不可能だった）
-
-committed な生成物（投影・シャード・索引）を持つ repo では、**manifest に記録された
-sha256 と実ファイルを突き合わせる**。Actions 経路は committed 済みの値を読むだけで
-再生成が走らないので `git diff --exit-code` が無反応になり、**内部整合を保ったまま
-手編集されたファイル**を検出できなかった。fleet gate ならこれを捕まえられる。
-
-### 赤い gate を直す前に 3 つ確かめる（repo-wide mandatory、2026-08-10、ADR-2608102000）
-
-**`manifest/fleet-ci.edn` の fail を見て、いきなり直しにいかない。** 実測 2026-08-10、
-赤い 8 種のうち **2 種は既に上流で直っており**、**2 種は私の手元の環境が原因**で、
-本当に直す必要があったのは残りだけだった。順に:
-
-1. **receipt の sha を現 tip と比べる。** gate 名は
-   `test-<gate>-<sha7>-murakumo-<node>` で、**その sha 時点の判定**でしかない。
-   実測: `test-amu-jdk-free-2644eb9` は赤だったが、現 tip `3b45ae11` では
-   `LOCK-FRESH`。`net-kotobase` も現 tip では gate 全体が OK
-   （別セッションが `93d176d` で直していた）。**古い赤を『いま壊れている』と読まない。**
-2. **ローカルで gate を回すときは `<dir>` を引数の**先頭**に置く。** 多くの gate が
-   `(first (remove #(str/starts-with? % "--") argv))` で tree を決めるので、
-   `gate.cljs --min 10 .` と書くと **`"10"` が tree のパスになる**。
-   fleet は `<dir>` を先に渡すので production では起きない。実測 2026-08-10、
-   この順序ミスで 3 つの gate を「壊れている」と誤診しかけた。
-3. **`npx --yes <pkg> --flag` はこのマシンでは壊れているが、ノードでは動く。**
-   実測 2026-08-10: 手元 npm 11.12.1 では npx が `--classpath` を自分のフラグと
-   誤解してヘルプを吐く。judah（npm 11.17.0）と simeon（10.9.8）では正常。
-   **「ローカルで赤」は「fleet で赤」ではない。** 切り分けは `nbb` を直接呼ぶか、
-   `ssh <node> 'npx --yes nbb …'` で実ノードに当てる。
-4. **逆向きも起きる —— 「ローカルで緑」は「fleet で緑」ではない。** fleet が配るのは
-   repo の tree そのままではなく、**`:include-ext` で拡張子を絞った tree** である。
-   実測 2026-08-13: `gh-workflow-assoc-gapki` は手元の完全な tree で緑、fleet で赤。
-   `:include-ext` が `.yml .edn .clj .cljc` だったのに対し、その repo の production
-   source は `src/association_facts.kotoba` **1 本きり**で、ノードに配られた 11 ファイル
-   に `src/` が無かった（`clojure -M:test` が `association_facts.kotoba (No such file or
-   directory)`）。**再現するのは tree ではなく、絞り込みの結果である。**
-   ローカルで gate を回すときは `:include-ext` を当ててから回す。
-
-**gate は「fleet で 1 度緑になる」まで landed としない。** 実測 2026-08-13、赤い
-8 gate のうち**両方向を見せたことがあるのは 2 つだけ**で、残る 6 つは landing 以来
-一度も緑になっていない（`root-permit-index` 300 回、`root-itonami-org-id` 286 回）。
-landing 前の break/unbreak は手元か stub に対して行われており、**手元で discriminate
-することと、ノードの配られた tree で discriminate することは別の主張**である。
-「落ちない gate は劇場」の対偶も同じく成り立つ —— **一度も緑にならない gate も、
-誰も行動できないという意味で同じだけ無内容**。
-
-### 検査を書く前・緑を信じる前の 8 問（repo-wide mandatory、2026-08-13 / 6 問目 2026-08-22 / 7 問目・8 問目 2026-09-06、ADR-2608136000）
+## 検査を書く前・緑を信じる前の 8 問（repo-wide mandatory、2026-08-13 / 6 問目 2026-08-22 / 7 問目・8 問目 2026-09-06、ADR-2608136000）
 
 **測れなかった検査が、測って問題が無かった検査と同じ値を返す** —— この 1 つの形が
 2026-08-13 の 1 日で **14 箇所**見つかった（gate・PreToolUse hook 4 本・launchd job 2 本・
@@ -594,17 +447,6 @@ store によっては `length(...)` が空を返し、**エラーと区別が付
 gate は古い tip を見続ける（実測: `amu` / `cloud-itonami` とも修正 commit の手前で
 pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-pins.cljs` までが 1 組。
 
-### gate が要求する入力が repo に無いことがある
-
-**その gate が読む正本が、配られる tree に入っているかを確かめる。** fleet が配るのは
-**その repo の tree だけ**で、`orgs/` 配下の子リポは入らない。実測 2026-08-10:
-`root-permit-index` の生成器 `gen-permit-index.cljs` は `<root>/orgs/cloud-itonami` を
-読むが、`git ls-files orgs/cloud-itonami` は **0 件**（west 管理で repo 外）。
-つまりこの gate は **root repo をどう直しても fleet 上では緑にならない**。
-射影を検査したいなら `manifest/projection-verify.cljs` の contract（入力 hash を
-固定する）に寄せるか、`orgs/` が実在する場所で回す。**入力が無い gate は、
-落ちているのではなく問いを立てられていない。**
-
 ## genpon（原本）— pin 登録簿 / west 後継 VCS プレーン（ADR-2607160005、2026-07-16）
 
 - **話される名前は原本 (genpon)。** on-disk は `manifest/fleet-db.edn`
@@ -654,318 +496,119 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
 
 ## Git operations
 
+**理由・実測・罠は Skill ツールで `git-operations` を呼ぶ。** pin 前進の操作面は
+`west-pin-advance`、stash / branch / PR の棚卸しは `git-cleanup-conflict`。
+ここに残すのは skill を読まなくても効く禁止と手順だけ。
+
+### 履歴と ancestry
+
 - **shallow（`--depth 1`）は使わない。full 履歴がデフォルト**（2026-07-21、
-  ADR-2607211600。ADR-2606241600/2606302100 の shallow 既定を reverse）。
-  west が `clone-depth` を fetch のたびに再適用し、触るたびに新しい shallow
-  graft（親情報を持たない境界コミット）を作り続けていたことが、下記の
-  「forced update」偽陽性・pin 到達失敗を繰り返し引き起こす根本原因だった
-  （実測: superproject `.git` が 226 shallow boundary / 18GB に肥大していたのに
-  reachable commit はわずか2件）。
-
-  ```bash
-  git fetch origin
-  git pull --ff-only
-  west update --fetch smart        # 各 project を full 履歴で取得
-  ```
-
-  大容量バイナリを含む heavy project（旧 `manifest/repos.edn` `:heavy`）も
-  含め、2026-07-21 にオーナー判断で全 unshallow する決定をした。disk/帯域コストより
-  ancestry の正しさを優先する。恒久的な disk 対策は shallow ではなく
-  B2 + DataLad への移行（skill `large-binary-datalad`）。
-
-  **ただしその unshallow は完了していない**（ADR-2608124400。この節は
-  2026-08-12 まで「全 unshallow 済み」と完了形で書いていたが、事実ではなかった）。
-  shallow のまま残っている子リポがあり、**superproject root 自身も retirement の
-  後に ad-hoc な `--depth` fetch で shallow 化されていた**（実行者は特定できて
-  いない。west ではないことは実測済み）。**shallow clone の ancestry 回答は
-  間違っていて、しかも権威があるように見える** — 実測では「その commit は stale な
-  side branch からしか到達できない」と答えたが、実際は `main` の 643 commit 手前に
-  在った。したがって下記「マージ / ancestry 判定」がローカル解決を勧めるのは
-  **full 履歴が実在する repo でだけ**正しい。判定を出す前に確かめる:
+  ADR-2607211600）。`west update --fetch smart` で各 project を full 履歴で取得する。
+  恒久的な disk 対策は shallow ではなく B2 + DataLad（skill `large-binary-datalad`）。
+- **その unshallow は完了していない**（ADR-2608124400）。**shallow clone の ancestry
+  回答は間違っていて、しかも権威があるように見える。** 判定を出す前に確かめる:
 
   ```bash
   git rev-parse --is-shallow-repository   # true なら、その repo の ancestry 判定を信用しない
   git fetch --unshallow                   # 直す
   ```
 
-  ⚠ **`git fetch` の `--dry-run` は preview ではない** — ref 更新を飛ばすだけで
-  fetch 自体は実行される（`--dry-run --unshallow` が実際に unshallow を完了させた）。
+  ⚠ **`git fetch` の `--dry-run` は preview ではない** —— ref 更新を飛ばすだけで
+  fetch 自体は実行される。
+- **full 履歴なら `merge-base` / `--is-ancestor` はローカルでそのまま正しい。**
+  外部由来の shallow clone と比べる必要があるときだけ GitHub に計算させる
+  （`gh api repos/<org>/<repo>/compare/...`）。
+- **`(forced update)` 表示や `unrelated histories` エラーは、それ単独では本物の
+  force-push と断定しない。** 確度の高い実サインは `upload-pack: not our ref` に
+  よるチェックアウト失敗。迷ったら `gh api .../compare/<old>...<new>` の
+  `status` / `behind_by` / `merge_base_commit` で判定する。
 
-- **マージ / ancestry 判定（full 履歴なら通常は素直に解決する）。**
-  `merge-base` / `--is-ancestor` / `rev-list --count` はローカルでそのまま
-  正しく解決する（旧 shallow 既定では graft 境界の外に共通祖先があると
-  誤判定した）。外部から持ち込まれた一時的な shallow clone と比較する必要が
-  生じた時だけ、その場で GitHub 側に計算させる:
+### 禁止
 
-  ```bash
-  BASE=$(gh api repos/<org>/<repo>/compare/main...<branch> --jq .merge_base_commit.sha)
-  git fetch origin "$BASE"      # full 履歴なのでそのまま繋がる
+- **force-push は禁止**（`--force` / `--force-with-lease` / `+refs`）。共有リポの
+  いかなるブランチにも、履歴を書き換えて上流を上書きする push をしない。乖離は
+  fast-forward できる clean branch / clean commit で解消し、それが不可能なら
+  **勝手に強制せず必ずユーザーに報告する。**
+- **rebase は基本禁止**（`git rebase` / rebase 付き pull）。FF できない stale branch は、
+  最新 `origin/main` から clean branch / 一時 worktree を作り、必要な小差分だけを
+  `cherry-pick` または patch で載せ直す。競合したら `git rebase --abort` し、
+  marker 手編集で続行しない。
+- **`manifest/west.yml` は生成物。行指向 pin の textual 3-way merge はアンチパターンで、
+  conflict marker の手編集は pin を静かに壊す。** 登録 / rename / pin 前進は GitHub API の
+  サーバ側 **single-entry commit**（`--entry <name>`）を唯一の正経路とし、
+  **wholesale 再生成 commit は禁止**（未 push HEAD 由来の壊れた pin を 44 件 main に
+  流した事故 `90852b86` の再発防止）。
+- **pin に許されるのは「上流 repo の default branch から到達可能な commit」だけ**
+  （`scripts/verify-west-pins.cljs`、ADR-2607022900）。①存在 ②default branch 到達性
+  ③旧 pin からの前進。判定は GitHub API で行い、**ローカルの ancestry 判定だけに
+  頼らない。** 強制するのは PreToolUse hook `.claude/hooks/west-pin-verify-guard.cljs` と
+  fleet gate `root-west-pin-policy`。
+- **未 merge branch 上の commit を pin にしない** —— `deps.edn` の `:git/sha`、lock、
+  `resources/*.edn` に焼いた sha も同じ規則。**west pin には gate があるが、
+  `deps.edn` の pin には無い。**
+
+### 同期（最優先）
+
+- **常に `main` と同期し、乖離を作らない。** 何らかの git 操作の前に、上流 `main` に
+  更新があれば必ず先に取り込む。ローカルが遅れた状態で新しい作業を積み上げない。
+
+  ```
+  git fetch origin
+  git merge --ff-only origin/main    # FF 不可なら停止。rebase しない
+  west update --fetch smart          # project 群を pin に合わせて同期
   ```
 
-  さらに、**manifest の pin 前進のような単純更新は、ローカルでマージを戦うより
-  GitHub API でサーバ側にクリーン commit を起こす方が確実かつ安い**（optimistic
-  lock で conflict が構造的に発生しない）。実例: PR #61 / #62 / #86 は main の
-  tree をベースにクリーン commit を API で作成してマージした（#86 は 31 リポの
-  west 移行を regression なしで取り込み）。
-
-- **`git fetch` の `(forced update)` 表示や `git merge` の
-  `fatal: refusing to merge unrelated histories` は、それ単独では本物の
-  force-push と断定しない。** 旧 shallow 既定では `--depth 1` フェッチのたびに
-  新しい shallow graft ができ、upstream が**純粋な fast-forward で前進しただけ**
-  でも同じ症状（`(forced update)` 表示・`unrelated histories` エラー）が出て
-  いた（実測 2026-07-01、`root` superproject: 6 commit 遅れの純前進で両症状が
-  発生。これが ADR-2607211600 で shallow 既定を撤回した主因）。full 履歴の今は
-  この graft 由来の偽陽性は構造的に起きないが、判定に迷ったら GitHub API で
-  比較する:
-
-  ```bash
-  gh api repos/<org>/<repo>/compare/<old-local-tip>...<new-origin-tip> \
-    --jq '{status, ahead_by, behind_by, merge_base_commit: .merge_base_commit.sha}'
-  # status:"ahead" かつ behind_by:0 かつ merge_base_commit == old-local-tip なら
-  # 純粋な fast-forward。diverged や merge_base が別物なら本物の force-push。
-  ```
-
-  本物の force-push と判明した場合は、下記「force-push は禁止」節の対応
-  （ユーザーへの報告）に進む。
-
-- **`manifest/west.yml` への変更（登録 / rename / pin 前進）は GitHub API の
-  サーバ側 single-entry commit を「唯一の正経路」にする。** west.yml は生成物
-  （手書き禁止）なので、行指向 pin の textual 3-way merge はアンチパターンで、
-  conflict marker の手編集は **pin を静かに壊す**。**登録・rename・pin 前進は
-  `--entry <name>` で当該 entry のみの最小 diff を生成する — wholesale 再生成
-  commit は禁止**（1 件の登録のつもりが未 push HEAD 由来の壊れた pin を 44 件
-  main に流した実事故 `90852b86` の再発防止）。
-
-- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す**（`scripts/verify-west-pins.cljs`、
-  ADR-2607022900）。pin に許されるのは「上流 repo の default branch から到達可能な
-  commit」だけ — ①存在（未 push のローカル HEAD の pin 化は禁止）②default branch
-  到達性 ③旧 pin からの前進（behind = 静かな pin 退行）。判定は GitHub API で行い、
-  **ローカルの ancestry 判定だけに頼らない**。強制するのは PreToolUse hook
-  `.claude/hooks/west-pin-verify-guard.cljs` と murakumo fleet の
-  `root-west-pin-policy` gate。
-
-- **`git push` / `git pull` / `west update` の前に、manifest の pin が upstream
-  GitHub の最新から取り残されていないか（pin 鮮度）を必ず確認する。** `west update`
-  は pin へ checkout を合わせるだけで、GitHub 側の新しいコミットを pin に反映する
-  コマンドではない。
-
-  **上記 3 点の手順・コマンド・実測済みの罠は skill `west-pin-advance`。**
-
-### pin の既定状態は「upstream default branch の tip」（repo-wide mandatory、2026-08-20）
-
-**オーナー指示（2026-08-20）「west pull, remote pull また基本的に pin を最新に進める
-運用となるように」。** pin が upstream の default branch より遅れているのは、放置して
-よい平常状態ではなく**是正対象**である。
-
-- **`git pull` / `west update` /「pull して」の類を指示されたら、checkout を pin に
-  合わせるだけで終わらせない。** pin 鮮度まで見て、遅れているものは前進させる。
-  「pull」は 3 つの別物を含む: (1) superproject を origin/main に合わせる
+  SessionStart hook `.claude/hooks/session-start-branch-sync-check.cljs` が毎セッション
+  ahead/behind を可視化する。**警告を読むことと同期することは別の動作**で、
+  前者は後者を保証しない。
+- **push の前に `origin/main` との遅れを解消する**（`git merge --ff-only origin/main`。
+  FF 不可なら停止、rebase しない）。PreToolUse hook `git-push-main-sync-guard.cljs` が強制する。
+- **push / PR 作成・更新の前に、superproject と west の両方を最新化する。** 逐次・省略せず
+  `git fetch origin` → `git merge --ff-only origin/main` → `west update --fetch smart` →
+  `nbb scripts/gen-west-manifest.cljs --check` を実行してから push / PR する。
+- **pin の既定状態は「upstream default branch の tip」**（オーナー指示 2026-08-20）。
+  「pull して」は 3 つの別物を含む —— (1) superproject を origin/main に合わせる
   (2) pin を各 repo の default branch tip に進める (3) checkout を pin に合わせる。
-  (2) を落とすと、(1) と (3) をいくら回しても workspace は古いまま止まる。
-- **前進の経路は変わらない** —— `scripts/west-pin-put.cljs <entry> HEAD`（1 件）か
-  `scripts/west-pin-put-batch.cljs`（多件、1 commit に束ねる）。どちらも
-  (1) default branch 到達性 (2) 旧 pin からの前進 (3) blob SHA precondition を
-  **entry ごとに**検査する。速いから検査を省く、はしない。
-- **repo の中の pin も同じ規則に従う。** `deps.edn` の `:git/sha`、lock ファイル、
-  `resources/*.edn` に焼いた sha —— どれも「upstream の default branch から到達
-  可能」でなければならない。**west pin には `verify-west-pins` という gate があるが、
-  `deps.edn` の pin には無い。** 実測 2026-08-20: `kotoba-native` の deps.edn は
-  `kotoba-codegen` を `c85088b` に固定していたが、その commit は codegen の main に
-  無く、未 merge branch `agent/aarch64-madd-mc` にしかなかった（main はそこから
-  5 commit 遅れ）。branch が消えるか force-update された時点で production の依存が
-  壊れる。**未 merge branch 上の commit を pin にしない。**
-- **例外は「進めない理由を書いた」ときだけ。** 上流の tip が壊れている、API が
-  互換性を壊した、意図的に古い挙動に留めている —— どれも正当だが、pin の隣か
-  commit message にそう書く。**黙って遅れているのと、理由があって留めているのは、
-  出力から区別できなければならない。**
-- ⚠ **これは「引数なしの `west update` を回せ」という意味ではない**（上記の罠 2 の
-  とおり全 project を歩く）。進めるのは**遅れている pin だけ**で、その集合は
-  `gh api repos/<org>/<repo>/compare/<pin>...<default>` の `ahead_by` で決まる。
+  **(2) を落とすと、(1) と (3) をいくら回しても workspace は古いまま止まる。**
+  前進の経路は `scripts/west-pin-put.cljs` / `west-pin-put-batch.cljs`。
+  進めない理由があるなら pin の隣か commit message に書く ——
+  **黙って遅れているのと、理由があって留めているのは、出力から区別できなければならない。**
+  ⚠ これは「引数なしの `west update` を回せ」という意味ではない。
+- **本番デプロイは `origin/main` を包含した checkout からのみ行う。** デプロイは push と
+  違って fast-forward 検査を持たない —— **最後に実行した人が勝つ**（2026-07-25、
+  kotobase.net の signup funnel が 11 分後に古い checkout からの deploy で 404 に戻った）。
+  PreToolUse hook `wrangler-deploy-main-sync-guard.cljs` が強制する
+  （`--env <name>` の隔離環境と `--dry-run` はブロックしない）。
+- **ユーザーが「pull して」とだけ指示した場合も、main 同期 + `west update` + pin 鮮度まで
+  含めて実行する**（取り込みだけで終わらせない）。
 
-- **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
-  （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
-  に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
-  （`git rev-list --left-right --count origin/main...HEAD` の左側が非ゼロ）で
-  新しい作業を積み上げない。fast-forward 可能なら `--ff-only` で取り込む:
+### 破棄しない
 
-  ```bash
-  git fetch origin
-  git pull --ff-only                                 # 乖離していなければ FF で取り込む
-  west update --fetch smart                          # project 群を pin に合わせて同期
-  ```
+- **`main` への同期が未コミット/未追跡のローカル変更でブロックされたら、勝手に破棄しない。**
+  ①incoming とバイト同一なら（`shasum` で確認して）削除 ②本物のローカル編集は
+  `git stash push -- <paths>` で退避し、**stash は drop せず温存** ③pop で衝突したら
+  upstream 側を採用し、ローカル差分は stash と未追跡実体として残す。
+- **west project の checkout がローカル変更で失敗しても `west update --force` で破棄しない**
+  （west は既定で破壊的更新をしない）。`upload-pack: not our ref` で失敗した場合は
+  上流 force-push の可能性が高いのでユーザーに報告する。
+- **「cleanup」と言われたら、また自分から `git stash drop` / `git branch -D` をしようと
+  しているときは、Skill ツールで `git-cleanup-conflict` を呼ぶ。** drop / 削除の前は
+  「もう landed だと確信していても」必ず `.git/stash-archive-<date>/` へ退避する。
 
-  **これは prose instruction だけに頼らず、SessionStart hook
-  （`.claude/hooks/session-start-branch-sync-check.cljs`、`.claude/settings.json`
-  に登録済み）で毎セッション開始時に自動チェックする。** 実測インシデント
-  （2026-07-20）: `agent/pin-docs-edn-only` ブランチが誰も気づかないまま
-  `origin/main` から 848 commits ahead / 1607 commits behind まで積み上がった
-  （592 ファイル・56万行超の diff）。agent が都度思い出して確認する運用は
-  機能しなかったため、hook で ahead/behind を強制的に可視化する
-  （閾値超過時は `systemMessage` + `additionalContext` で警告、閾値内でも
-  非ゼロなら軽量に表示、失敗時は fail-open でセッション開始をブロックしない）。
-  乖離を見つけたら rebase せず、この節の手順か `git-cleanup-conflict` skill
-  （848 commits 級の乖離は content-containment 判定 → 新しい clean branch を
-  origin/main から切って必要な差分だけ移植、が正解）で解消する。この実インシデントの
-  詳細（`projects/` 旧 submodule クローン削除・各リポの actor 外部化検証・
-  848 commits 乖離の解消経緯）は `90-docs/adr/2607206700-west-multirepo-monorepo-era-cleanup-audit.edn`
-  に記録している。
+### worktree
 
-- **`git push` の前に必ず `origin/main` との遅れを解消する。** push しようとする
-  リポ（superproject / 各 project とも）が `origin/main`（既定ブランチ）より遅れて
-  いる場合は、先に同期してから push する:
-
-  ```bash
-  git fetch origin
-  git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
-  ```
-
-  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.cljs`（nbb）で強制される
-  （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
-  破壊的な自動マージはしない（判定と指示のみ、fail-open）。
-
-- **rebase は基本禁止。** `git rebase` / `git pull --rebase` / rebase での乖離解消を
-  標準手順にしない。FF できない stale branch は、最新 `origin/main` から clean branch /
-  一時 worktree を作り、必要な小差分だけを `cherry-pick` または patch として載せ直す。
-  `manifest/west.yml` の pin 前進は、ローカル rebase で解かず GitHub API single-entry
-  commit（または最新 main ベースの clean worktree で当該 entry のみ commit）にする。
-  既に rebase を開始して競合した場合は `git rebase --abort` し、marker 手編集で続行しない。
-  fleet 活動中など `origin/main` が逐次前進して `git push main` が race する時は、変更を
-  feature branch に push し（push 同期ガードは非-main を許可）、`gh api repos/<org>/<repo>/merges
-  -f base=main -f head=<branch> -f commit_message=...` で **サーバ側マージ commit** を作る。
-  push race に触れず、409(conflict/race) で再試行。実績: ADR-2606302300（org 分類
-  そのものは**その後 superseded**。ここで引いているのは当時この経路で着地させたという
-  記録であって、現行の org 分類の根拠ではない）の doc commit をこの経路で main 化
-  （rebase も force-push も使わず）。
-
-- **force-push は禁止（`git push --force` / `--force-with-lease` / `+refs` を使わない）。**
-  共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
-  上流を上書きする push をしてはならない。force-push は他の clone・west pin・
-  ancestry 判定を静かに壊し、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。
-  **逆に `(forced update)` 表示や `unrelated histories` エラーだけでは本物の force-push と
-  断定できない**（判別法は上述「マージ / ancestry 判定」節）。
-  確度の高い実サインは `upload-pack: not our ref` によるチェックアウト失敗。乖離は
-  **force-push ではなく fast-forward できる clean branch / clean commit** で解消し、
-  それが不可能な場合（既に push 済みの履歴を変えたい等）は**勝手に強制せず必ずユーザーに報告**する。
-  履歴書き換えが本当に必要なときも**行わない**。upstream を進めたいだけの単純更新は、ローカルで
-  戦うより GitHub API でサーバ側にクリーン commit を起こす（PR #61/#62/#86 の実績）。
-
-- **`main` への同期が未コミット/未追跡のローカル変更でブロックされた場合**、
-  勝手に破棄しない。次の順で安全に同期する:
-  1. ブロック原因の未追跡ファイルが **incoming とバイト同一** なら（origin に
-     既に存在する掃き出しファイル）削除して安全。`shasum` で確認してから消す。
-  2. 本物のローカル編集（incoming に未含有）は `git stash push -- <paths>` で
-     退避してから pull する。**stash は drop せず温存**して owner が後で
-     reconcile できるようにする。
-  3. stash pop で衝突したら、本リポジトリの方針として **upstream(`main`) 側を
-     採用**して解決し（`git checkout --ours -- <file>`）、ローカル差分は stash
-     と未追跡実体として残す。乖離より main 同期を優先する。
-
-- ユーザーが「git pull」とだけ指示した場合も、上記の main 同期 + `west update`
-  まで含めて実行する（プルだけで終わらせない）。
-
-- **本番デプロイは `origin/main` を包含した checkout からのみ行う。** デプロイは
-  push と違って fast-forward 検査を持たない——**最後に実行した人が勝つ**ので、
-  main より古い checkout から出荷すると、その間に他セッションが入れた変更を
-  黙って巻き戻す。実インシデント（2026-07-25）: kotobase.net の signup funnel が
-  404 だったのを直して 07:01 に deploy した11分後、別セッションが**その変更を
-  含まない古い checkout** から同じ Worker を deploy し、funnel が 404 に戻った
-  （誰も気付かなかった）。デプロイ前に:
-
-  ```bash
-  git fetch origin && git merge --ff-only origin/main   # FF 不可なら乖離。rebase しない
-  ```
-
-  これは PreToolUse フック `.claude/hooks/wrangler-deploy-main-sync-guard.cljs`
-  （nbb、`.claude/settings.json` に登録済み）で強制される。`wrangler deploy` /
-  `wrangler versions deploy` / `npm|pnpm|yarn run deploy` を対象に、checkout が
-  `origin/main` より遅れていれば deny する。**隔離環境（`--env <name>`：
-  staging / testnet / b2 等）と `--dry-run` はブロックしない**——feature branch を
-  隔離環境で検証するのは正常な作業であり、そこを塞ぐと検証自体ができなくなる。
-  フックは破壊的な自動同期をしない（判定と指示のみ、fail-open）。
-
-- **`git push` / PR 作成・更新の前に、superproject と west の両方を最新化してから
-  行う。** push や PR（`gh pr create`/`gh pr ready`/PR への追加 commit 等）の直前に、
-  逐次・省略せず、以下を必ず実行してから push/PR する:
-
-  ```bash
-  git fetch origin                                 # origin/main 他を取得
-  git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら停止。rebase しない）
-  west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
-  nbb scripts/gen-west-manifest.cljs --check          # west.yml が canonical か（生成器と一致か）確認
-  ```
-
-  これらを飛ばして push/PR すると、main 乖離・west.yml の pin 退行・子リポの
-  checkout 不一致が他者 clone や CI に伝播する。`west.yml` は生成物（手書き禁止）
-  なので、`--check` が STALE なら **ローカル pin 退行の罠**（`gen-west-manifest.cljs`
-  はローカル working HEAD で pin する＝子が遅れていると黙ってロールバック）に注意しつつ
-  再生成し、`--check` が通ってから push/PR する。子リポ単位の push/PR も同様に、
-  その子リポの `origin/<default-branch>` との遅れを解消してから行う。
-
-- ユーザーが「cleanup」とだけ指示した場合、または PR/merge/stash/merge conflict の
-  整理を依頼した場合、あるいは自分から `git stash drop` / `git branch -D` をしようと
-  している場合は、**Skill ツールで `git-cleanup-conflict` を呼ぶ**
-  （`.claude/skills/git-cleanup-conflict/SKILL.md`。Codex 側の同名 skill
-  `$git-cleanup-conflict` と同じ runbook を共有）。手順の正本は
-  `manifest/cleanup-workflow.edn`（readable 版が `manifest/cleanup-workflow.md`）—
-  **trigger した節だけでなく edn 全体（`:retirement`/`:stash-pop`/`:west-conflict`
-  含む）を読む**。superproject と `orgs/` 配下などの子リポを含め、WIP を破棄せず、
-  `cleanup` メッセージで PR を作り、merge 可なら main へ merge し、残った stash/
-  未追跡 repo を報告する。**stash/branch を drop/削除する前は「もう landed だと
-  確信していても」必ず `.git/stash-archive-<date>/` へ退避してから**（実際に
-  2026-07-04、確信を理由に archive を省略して drop した事例あり — 幸い
-  `git fsck --unreachable` で拾えたが、運に頼らない）。
-
-- **west project の checkout が「ローカルの未コミット変更」で失敗（衝突）した場合**、
-  勝手に `west update --force` 等で破棄しないこと。`west` は既定で破壊的更新を
-  しない（衝突時は当該 project を skip）。ユーザーに確認するか、まず差分を提示する。
-  ローカル作業が残る project は manifest の pin を進める前に reconcile（commit &
-  push）する。
-
-- **project の checkout が「リモートに存在しない ref」（`upload-pack: not our ref`）**
-  で失敗した場合は、上流で force-push された可能性が高い。`manifest/west.yml` の
-  当該 pin（= repos.edn 経由）の見直しが必要なので、ユーザーに報告する。
-
-- **複数セッション/エージェントが並行作業する可能性がある時は、共有の west checkout
-  （`orgs/<org>/<repo>`）を直接編集せず、セッションごとに `git worktree` を切る。**
-  west が管理するパスは1つの共有 working tree なので、別セッションがそこで
-  `git checkout`（ブランチ切替）すると、自分がまだコミットしていない編集が
-  working tree 上で**黙って巻き戻される**（実例: 2026-07-01、`orgs/kotoba-lang/
-  kami-engine` で `sip.render`/`sip.world` への未コミット編集が、並行していた
-  別セッションの `kami-isaac-sim-wasm` 作業のブランチ切替で失われかけた）。
-  作業前に一時 worktree を切って、そこで完結させる:
-
-  ```bash
-  git worktree add -B <session-branch> <path> origin/main   # 独立 working tree
-  # ... <path> で編集 / commit / test ...
-  git push origin <session-branch>
-  gh api repos/<org>/<repo>/merges -f base=main -f head=<session-branch> \
-    -f commit_message="..."                                 # サーバ側マージ（ローカル merge/rebase を戦わない）
-  git worktree remove <path>                                 # 使い終わったら片付ける
-  ```
-
-  **`<path>` は superproject ルートの外（例: scratchpad / `/tmp` 配下）にする。**
-  `.claude/worktrees/` 等 superproject 内側に worktree を作ると、west は `.west/`
-  を親ディレクトリへ辿って発見するため topdir が superproject ルートのままになり、
-  worktree 内で `west update` しても実際には共有の `orgs/` を操作してしまう
-  （false isolation。`WEST_TOPDIR` 環境変数でも直らない）。west コマンドを worktree
-  内で使う必要がある場合は、外側に作った上でさらに `west init -l manifest` を
-  worktree 内で実行し、worktree ローカルな `.west/` を作って topdir を固定する。
-  詳細は ADR-2607011345。plain git（commit/push、west 不使用）だけなら
-  superproject 内側の worktree でも問題ない。
-
-  **worktree が隔離するのは working tree であって object store ではない。**
-  linked worktree は `$GIT_COMMON_DIR` を元リポジトリと共有するので、
-  **`/tmp` に作った「使い捨て」worktree の中で `--depth` 付き fetch をすると、
-  superproject 本体が shallow になる**（`.git/shallow` は共有される）。
-  実測 2026-08-12: root が shallow になっていた最有力経路がこれで、
-  痕跡はどのログにも残っていなかった（**ref を動かさない depth fetch は
-  reflog に entry を書かない**ため）。**worktree は `.git` に書くものに対する
-  sandbox ではない。** 詳細は ADR-2608124400。
-
-  共有 checkout（west 管理パス）には直接 commit/push しない。worktree 経由で
-  main に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum`
-  で確認した上での）重複ファイルの削除だけで追従させる。
-
+- **並行作業の可能性があるときは、共有 west checkout（`orgs/<org>/<repo>`）を直接編集せず
+  worktree を切る。** 別セッションのブランチ切替で未コミット編集が黙って巻き戻る。
+- **`<path>` は superproject ルートの *外*にする。** 内側に作ると west が親の `.west/` を
+  見つけて topdir を誤認し、**本体の `orgs/` を書き換える**（`WEST_TOPDIR` でも直らない。
+  ADR-2607011345）。west を worktree 内で使うなら、そこで `west init -l manifest` を
+  やり直して topdir を固定する。
+- ⚠ **worktree が隔離するのは working tree であって object store ではない。**
+  `/tmp` の使い捨て worktree で `--depth` 付き fetch をすると、**superproject 本体が
+  shallow になる**（`.git/shallow` は共有。ref を動かさない depth fetch は reflog にも
+  残らない）。**worktree は `.git` に書くものに対する sandbox ではない。**
+- 着地は共有 checkout へ直接 push せず、branch を push して
+  `gh api repos/<org>/<repo>/merges` でサーバ側マージする。
 ## 基盤ライブラリの定数倍は、呼び出し側の profile に現れない（repo-wide mandatory、2026-09-05、ADR-2609051700）
 
 **「遅い」と分かった場所と、遅い理由が在る場所は、たいてい 2 層以上離れている。**
@@ -1002,136 +645,160 @@ DAG-CBOR のリンクは全部 CID なので `ipld/decode` が canonical 再エ�
 ⚠ **ここに測定値を書き足さない。** 上の数字は「何が起きたか」の記録であって、
 今日の値ではない。今日の値は上のコマンドとその repo の bench が持つ。
 
-## 「無い」と結論する前に検索する（repo-wide mandatory、2026-08-04）
+## 「無い」と結論する前に、索引を引き、検索する（repo-wide mandatory、2026-08-03 / 2026-08-04）
 
-**「この workspace には X が無い」「X を作る必要がある」と結論する前に、必ず
-`nbb scripts/repo-search.cljs <語> [語...]` を引く。** west.yml は 4,000 を超える repo を
-管理しており（正確な数は上記のとおり数える）、**checkout されていない repo は `ls` にも `find` にも `grep -r` にも
+**「この workspace には X が無い」「X を作る必要がある」と結論する前、および新しく何かを
+作り始める前に、必ず索引と検索を引く。** west.yml は 4,000 を超える repo を管理しており
+（正確な数は数える）、**checkout されていない repo は `ls` にも `find` にも `grep -r` にも
 映らない**。手元に無いことは存在しないことではない。
 
-実測（2026-08-04、この規則が生まれたセッション）: agent が 1 セッションで
-「無い」と 3 回結論し、**3 回とも間違っていた**。
+```bash
+nbb scripts/repo-search.cljs bitswap libp2p   # 名前 + checkout 済み README 冒頭
+nbb scripts/concept-lookup.cljs terminal      # 概念 → repo（順位付き・有界）
+nbb scripts/concept-lookup.cljs 端末           # 日本語でも引ける
+nbb scripts/concept-lookup.cljs               # 語彙一覧
+```
 
-### 同じ誤りは repo の *中* でも起きる —— sparse cone（2026-08-13 追記）
+**`repo-search` は名前と、checkout 済み repo の README 冒頭の両方に当たる** ——
+能力名が repo 名に出ないことがあるため（multistream と Yamux は
+`io-libp2p-specs-transport` にあり、どちらの語も名前に無い）。接頭辞を持たない
+library（`noise`、`codebase`、`identify`、`mesh`、`p2p` 等）はこれが拾う。
 
-**この superproject は cone-mode sparse checkout である。** cone の外のファイルは
-`ls` にも `find` にも映らず、`git ls-files -v` では **`S`（skip-worktree）** が付く。
+**grep で代替しない** —— 全 repo に対する全文検索は必ず数百行を出し、必ず切られ、
+**切られたことに気付く手段が無い**（2026-08-03、`kuro`/`kobo` は grep に当たっていたのに
+`head -40` で切って当の行を見ていなかった）。
+
+| 索引 | 何を答えるか | 生成 |
+|---|---|---|
+| `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `nbb scripts/gen-concept-index.cljs` |
+| `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `nbb scripts/gen-surface-index.cljs` |
+| `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `nbb scripts/gen-compliance-scope.cljs` |
+| `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `nbb scripts/gen-dependency-inventory.cljs` |
+
+4 つとも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き。
+いずれも `manifest/edn-query.cljs` の datom 面に載っており、`:concept/repo` /
+`:surface/repo` / `:scope/repo` / `:dependency/repo` は `repo-taxonomy` の `:repo/path` と
+join できる。**セッション開始時に外部仕様ミラー repo の一覧**（`io-`/`org-`/`tech-`/`dev-`/
+`capability-` 接頭辞）が SessionStart hook `session-start-spec-inventory.cljs` で自動提示
+される —— この接頭辞群は命名規則上「どの外部仕様が実装済みか」の答えそのもの。
+
+**実測（2026-08-04、この規則が生まれたセッション）: agent が 1 セッションで「無い」と
+3 回結論し、3 回とも間違っていた**（semantic-code / DHT announce / transport の 3 件は
+`codebase`・`io-libp2p-specs-kad-dht`・`io-libp2p-specs-transport` に既に在り、3 回とも
+1 コマンドで見つかった）。失敗したのは検索能力ではなく**「結論する前に検索する」という
+手順**で、prose の指示（CLAUDE.md には既に「既存を確認せよ」が複数ある）だけでは
+守られなかった。しかも 3 回目は 2 回目の訂正を受けた直後に起きている ——
+**一度直した種類の誤りが、次の話題で再発する。**
+
+**既存を見つけたら使う。** 「見つけたが自分で書き直す」は、既存が accepted ADR で
+否定されている場合を除き、選択肢に入らない。
+
+### 索引が当たったことは、動くものが在ることの証拠ではない（2026-09-06）
+
+**見つけた機構の上に何かを載せる前に、それを *読む側* が実在するかを確かめる。**
+
+| 見つかったもの | 確かめること |
+|---|---|
+| **accepted な ADR が機構を定義している** | その形を**読むコードが在るか**。`grep` して 0 hit なら、書いても誰も読まない |
+| **その名前のコードが在る** | **同じ名前の別物ではないか**（面も schema も別、ということが起きる） |
+
+実測 2026-09-06、索引が 3 つ返して**2 つが行き止まりだった**（1 つは accepted だが読む
+実装が無く、1 つは同名の検査器が別 schema を見ていたので**実装済みに見えた**）。
+確かめ方: 読む側を `grep` する / 使っている**実例が 1 つ以上在るか**を見る / それでも
+決まらないなら**最小の 1 個を置いて、拾われるかを観測する**。拾われないものを
+「登録した」と報告しない。
+
+**索引に無いことも、存在しないことの証拠にならない**（concept 索引は README のある repo
+だけを見る。未索引数は `:concept/coverage` が申告する）。「索引を引いたが無かった」を
+不在の証明に使わない。
+
+### 同じ誤りは repo の *中* でも起きる —— sparse cone
+
+**この superproject は cone-mode sparse checkout である。** cone の外のファイルは `ls` にも
+`find` にも映らず、`git ls-files -v` では **`S`（skip-worktree）** が付く。
 **`origin/main` には在る。手元に無いだけである。**
 
-実測 2026-08-13、同じバグが**両方向に 1 回ずつ**出た:
+**手元に無いファイルについて何かを結論する前に、`git ls-files -v` と
+`git cat-file -e origin/main:<path>` を引く。** cone 外・stale checkout・未 checkout の
+west project —— **3 つとも「`ls` に映らない」で同じ顔をする。**
 
-- `manifest/docs-edn-only.cljs` の baseline が sparse な worktree から生成され、
-  cone 外の `.md` **6 件が「新規」として 1 週間報告され**、baseline に追記された。
-- その 1 週間後、**私はその 6 件を「もう存在しないから baseline から削れ」と指示した。**
-  6 件は `origin/main` に無傷で在り、**指示どおり削っていれば ratchet から本物の
-  6 エントリが消えていた。**
+実測 2026-08-13、同じバグが**両方向に 1 回ずつ**出た: `docs-edn-only.cljs` の baseline が
+sparse な worktree から生成されて cone 外の 6 件を「新規」として 1 週間報告し、その 1 週間後
+私はその 6 件を「もう存在しないから削れ」と指示した（**6 件は `origin/main` に無傷で在り、
+指示どおり削っていれば ratchet から本物の 6 エントリが消えていた**）。1 回目の対策は
+docstring への注意書きで、**効かなかった —— 誤った答えを出す実行は docstring を読まない。**
+現在は `git ls-files --cached --others --exclude-standard` で git に訊き、読めない分が
+在れば `edn=<scanned>/<listed>` を出して **exit 2**（0 でも 1 でもない = 「答えられなかった」）
+で終わる。
 
-1 回目の対策は docstring への注意書き（「full checkout から再生成せよ」）だった。
-**効かない —— 誤った答えを出す実行は docstring を読まない。** 現在は
-`git ls-files --cached --others --exclude-standard` で git に訊く。
-
-**`.edn` 側の穴の方が大きかった**: `parse-errors=0` が **2,505 中 2,340 ファイル**に
-対して印字されていた（残り 165 は cone 外で読めていない）。**読めなかったものを
-0 件として数えていた。** 今は `edn=<scanned>/<listed>` を出し、読めない分が在れば
-**exit 2**（0 でも 1 でもない = 「答えられなかった」）で終わる。
-
-**規則: 手元に無いファイルについて何かを結論する前に、`git ls-files -v` と
-`git cat-file -e origin/main:<path>` を引く。** cone 外・stale checkout・
-未 checkout の west project —— **3 つとも「`ls` に映らない」で同じ顔をする。**
-
-⚠ **その `<rev>:<path>` を shell 変数で組み立てない。zsh が食う。** 実測
-2026-08-19（zsh 5.9）、`$ref:$path` の `:` 以降は history modifier として
-解釈される —— **この workspace で最も多い 2 つの top-level dir がどちらも当たる**:
+⚠ **その `<rev>:<path>` を shell 変数で組み立てない。zsh が食う。** 実測 2026-08-19
+（zsh 5.9）、`$r:$path` の `:` 以降は history modifier として解釈される ——
+**この workspace で最も多い 2 つの top-level dir がどちらも当たる**:
 
 ```
 $r:scripts/x.cljs   → pr/547           # :s = 置換。以降を静かに飲み込む
 $r:tools/x.c        → 547ools/x.c      # :t = tail。静かに別物になる
-$r:manifest/x.yml   → pr/547:manifest/x.yml   # :m は modifier でないので無傷
 ${r}:scripts/x.cljs → pr/547:scripts/x.cljs   # ← 常にこう書く
 ```
 
-**壊れ方が path 依存なので、動く例を見て安心できない。** しかも `2>/dev/null`
-を付けると `fatal: Not a valid object name` が消え、**存在するファイルが
-「MISSING」として報告される** —— 「無い」と結論しないための道具が、
-「無い」と嘘をつく。2026-08-19 に実際にそれで 1 度誤った結論を出しかけた
-（`ls-tree` で測り直して気付いた）。
+**壊れ方が path 依存なので、動く例を見て安心できない。** しかも `2>/dev/null` を付けると
+`fatal: Not a valid object name` が消え、**存在するファイルが「MISSING」として報告される**
+—— 「無い」と結論しないための道具が、「無い」と嘘をつく。確実な形は `${r}:...` と波括弧で
+閉じるか、`git ls-tree -r --name-only <rev> -- <path>`（`--` の後は expansion されず、
+件数で答えが出る）。
 
-**確実な形は 2 つ**: `${r}:...` と波括弧で閉じるか、`git ls-tree -r --name-only
-<rev> -- <path>` を使う（`--` の後は expansion の対象にならず、件数で答えが出る）。
-
-| 結論した内容 | 実際 |
-|---|---|
-| 「semantic-code は kotoba repo にある」 | #429 で `kotoba-lang/codebase` に切り出し済み |
-| 「DHT に announce するには libp2p ノードが要るが無い」 | `io-libp2p-specs-kad-dht`（multi-router quorum 付き delegated routing）と `tech-ipfs-specs-ipns`（実 IPNS record）があり、実ネットワークに publish できた |
-| 「transport が無い」 | multistream/Yamux=`io-libp2p-specs-transport`、Noise XX=`noise`、multiaddr=`io-multiformats`、protobuf=`dev-protobuf` が全部あった |
-
-3 回とも 1 コマンドで見つかった。失敗したのは検索能力ではなく**「結論する前に
-検索する」という手順**で、prose の指示（CLAUDE.md には既に「既存を確認せよ」が
-複数ある）だけでは守られなかった。しかも 3 回目は、2 回目の訂正を受けた直後に
-起きている —— **一度直した種類の誤りが、次の話題で再発する**。
-
-- 検索は**名前と、checkout 済み repo の README 冒頭**の両方に当たる。能力名が
-  repo 名に出ないことがあるため（multistream と Yamux は `io-libp2p-specs-transport`
-  にあり、どちらの語も名前に無い）。
-- **セッション開始時に外部仕様ミラー repo の一覧**（`io-`/`org-`/`tech-`/`dev-`/
-  `capability-` 接頭辞、約 195 件）が SessionStart hook
-  `.claude/hooks/session-start-spec-inventory.cljs` で自動提示される。この接頭辞群は
-  命名規則上「どの外部仕様が実装済みか」の答えそのもので、上記 3 件のうち 2 件は
-  この一覧だけで防げた。
-- **一覧に出ない接頭辞なしの library**（`noise`、`codebase`、`identify`、`mesh`、
-  `p2p` 等）は `repo-search` が拾う。
-- 既存を見つけたら**それを使う**。「見つけたが自分で書き直す」は、既存が accepted
-  ADR で否定されている場合を除き、選択肢に入らない。
-
-### 索引が当たったことは、動くものが在ることの証拠ではない（2026-09-06 追記）
-
-**見つけた機構の上に何かを載せる前に、それを *読む側* が実在するかを確かめる。**
-索引・ADR・設計文書は「設計された」ことしか言わない。この 2 つは別物である:
-
-| 見つかったもの | 確かめること |
-|---|---|
-| **accepted な ADR が機構を定義している** | その形を**読むコードが在るか**。`grep` して 0 hit なら、書いても誰も読まない —— 決定は生きているが実装はまだ無い |
-| **その名前のコードが在る** | **同じ名前の別物ではないか。** 一致するのは名前だけで、面（plane）も schema も別ということが起きる |
-
-実測 2026-09-06、bot profile を作る前に索引を引いたら 3 つ出て、**2 つが行き止まり
-だった** —— 1 つは accepted だが読む実装が無く、もう 1 つは同名の検査器が別の
-profile 種別（別 schema）を見ていたので、**実装済みに見えた**。動いていたのは 3 つ目
-だけで、それは live なプロセスが実際にファイルを拾うことで確かめられた。
-
-**確かめ方**: 読む側を `grep` する / その機構を使っている**実例が 1 つ以上在るか**を見る /
-それでも決まらないなら**最小の 1 個を置いて、拾われるかを観測する**。
-拾われないものを「登録した」と報告しない。
-
-### IPFS/content-addressed storage で Kubo に安易に手を伸ばさない（repo-wide mandatory、2026-08-28）
+### IPFS / content-addressed storage で Kubo に安易に手を伸ばさない（repo-wide mandatory、2026-08-28）
 
 **IPFS の block 取得・bitswap 相当の P2P 配布が要る時、Kubo（go-ipfs）のような外部ネイティブ
-バイナリ daemon を既定の選択肢にしない。** Kubo は別プロセスの Go バイナリで、fleet ノードごとに
-プラットフォーム別ダウンロード・インストール・ライフサイクル管理が要り、上記「`.cljc`/
-`.kotoba` ランタイム優先順位」節が繰り返し禁じている「新規に外部ネイティブバイナリへ依存する」
-パターンそのものである。
+バイナリ daemon を既定の選択肢にしない。** プラットフォーム別バイナリ配布と別プロセス
+daemon は、「新規に外部ネイティブバイナリへ依存する」パターンそのもの。
 
-**`kotoba-lang/io-libp2p`（実体 repo 名 `kotoba-net`）に、pure Clojure/EDN (`.cljc`) による
-完全な libp2p 実装が既にある。** `src/kotoba/net/bitswap.cljc` に実際の bitswap 実装があり
-（`test/kotoba/net/bitswap_test.clj` でテスト済み）、TCP + multistream + Noise XX handshake +
-Yamux mux + Kademlia DHT + GossipSub + IPNS 周りも揃っている（`kotoba.net.node`/`dial`/
-`connection`/`mux`/`socket`/`serve`/`store`/`validate` 等の namespace）。**2026-08-04 に
-実際の public IPFS ピア（kubo/0.32.1、go-libp2p reference peer）とローカル Kubo 0.41 ノードに
-対して相互接続検証済み**（TCP+Noise+Yamux+identity、`/ipfs/kad/1.0.0` FIND_NODE、
-`/meshsub/1.1.0` GossipSub、全て実測）。pure `.cljc` なので nbb/JVM 上で in-process に動き、
-別プロセスの daemon もプラットフォーム別バイナリ配布も要らない。関連: `kotoba-lang/p2p`
-（別名 `kotoba-lang/net` としても参照される、同一系統）が同じ基盤の上に GraphSync
-（`/ipfs/graphsync/2.0.0`）を構築している。
+**`kotoba-lang/io-libp2p`（実体 repo 名 `kotoba-net`）に、pure `.cljc` の完全な libp2p 実装が
+既にある** —— `src/kotoba/net/bitswap.cljc` に実際の bitswap があり、TCP + multistream +
+Noise XX + Yamux + Kademlia DHT + GossipSub + IPNS が揃い、**2026-08-04 に実 public IPFS ピア
+と相互接続検証済み**。pure `.cljc` なので nbb/JVM 上で in-process に動く。関連:
+`kotoba-lang/p2p` が同じ基盤の上に GraphSync を構築している。
 
-実測（2026-08-28）: kotobase の IPFS block provider を実装する際、複数の agent が
-「Kubo バイナリを fleet ノードへ curl 取得して一時実行する」経路や「npm の Helia
-（外部パッケージ）を検討する」経路にいきなり向かい、**この既存 native 実装の存在を
-見落としていた**。`nbb scripts/repo-search.cljs bitswap libp2p` で一発で見つかる
-——「無い」と結論する前に索引を引く節と同じ失敗の、IPFS 版。
+実測 2026-08-28: 複数の agent が「Kubo を fleet ノードへ curl 取得」「npm の Helia」へ
+いきなり向かい、**この既存実装を見落とした**（`nbb scripts/repo-search.cljs bitswap libp2p`
+で一発で見つかる）。既に Kubo が動いている環境との相互運用として残すのはよいが、
+**新規設計の第一候補は `io-libp2p` の native 実装。**
 
-Kubo 自身（`kotobase.storage.ipfs-kubo` client）は Kubo が既に動いている環境との
-相互運用・比較対象として残してよいが、**新規に「fleet ノードで IPFS を動かす」経路を
-設計する時の第一候補は `io-libp2p` の native 実装**であり、Kubo バイナリの配布・
-インストールを前提にしない。
+### compliance の 2 索引が答えるもの（2026-08-23）
+
+surface 索引は「どのホストがどのパスを出すか」までで、**そのワーカがどのデータストアに
+触るかを持っていなかった**。監査（SOC 2 CC3.2/CC6.1、ISO/IEC 27001 A.5.9）で問われるのは
+そこ。**どちらも fleet gate にできない**（west 管理の `orgs/` を読む）ので
+`manifest/orgs-detectors.edn` に `:compliance-scope-boundary` / `:dependency-vulnerabilities`
+として登録してある。
+
+⚠ **実測値をこの節に書かない。** 数は ADR と索引の中に在るので、必要なら引く
+（この CLAUDE.md 自身が fleet-ci の節でそう警告している形）。この 2 つを引かずに次の 3 つを
+結論しないこと:
+
+- **「この面は他と切り離せる」** —— 1 ワーカが複数の登録可能ドメインに応答している例が
+  実在する。**境界はドメインではなく共有された制御環境の単位でしか切れない。**
+- **「脆弱性は無い」** —— version が範囲（`^1.2.3`）の依存を advisory DB に投げると
+  「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。範囲のままの依存は
+  **未測定であって clean ではない。**
+- **「この脆弱性は緊急だ」** —— `:dependency/dev?` を見ずに数えない（2026-08-23 に
+  `undici` の勧告を「本番」と誤報告した実例。deploy された Worker は workerd で走り
+  undici を載せない）。⚠ **`:dev?` は 3 値**（pnpm の lockfile は dev/prod を言わないので
+  `nil` = 判らなかった）。`not` で畳むと、判らなかったものが本番として並ぶ。
+
+**統制の写像と SBOM の生成器**: SOC 2 TSC / ISO 27001 Annex A ↔ 手元の証拠の写像は
+`kotoba-lang/security` の `policy/control-crosswalk.edn` +
+`src/kotoba/security/crosswalk.cljc`（現在地は
+`nbb --classpath src scripts/check-crosswalk.cljs`。**設計の証拠は運用の証拠に
+ならない**という不変条件を計算器が持つ ——「写像を埋めても Type II を主張できない」）。SBOM の生成器は
+`cloud-itonami/cloud-itonami-isic-7120-cyberassurance` の `cyberassurance.sbom` ——
+⚠ **新しく作らない**（domain は `app-sbom`、リリース成果物の仕様は `security` の
+`docs/sbom-slsa.md`、署名への束ね方は `amu` が既に持っている）。**認証が取れるかへの答えは
+評価からは出ない** —— 発行するのは CPA firm / 認定審査機関 / 登録監査機関で、
+**評価の完全性は発行権限ではない**（ADR-2608231800）。
+
+**名前が機能を示さない repo を作ったら、README の冒頭で名乗る。** 短い名前を選ぶのは
+正しいが、説明可能性は別の場所で補う必要がある（`manifest/concept-vocabulary.edn` 登録も要る）。
 
 ## 並行エージェント運用（worktree-per-agent / stash を積まない）
 
@@ -1318,99 +985,6 @@ unshallow は未完了で、重い repo が shallow のまま残っている**�
 上記「Git operations」節の確認手順を参照）。
 disk/帯域を抑えたい大容量バイナリは shallow ではなく B2 + DataLad へ移行する
 （`m365-archive` が先行例）。
-
-## 「無い」と言う前に索引を引く（repo-wide mandatory、2026-08-03）
-
-**この workspace に何かが「無い」と結論する前、および新しく何かを作り始める前に、
-2 つの索引を引く。** grep で代替しない —— 全 repo に対する全文検索は必ず数百行を
-出し、必ず切られ、**切られたことに気付く手段が無い**。
-
-```bash
-nbb scripts/concept-lookup.cljs terminal      # 概念 → repo（順位付き・有界）
-nbb scripts/concept-lookup.cljs 端末           # 日本語でも引ける
-nbb scripts/concept-lookup.cljs               # 語彙一覧
-```
-
-| 索引 | 何を答えるか | 生成 | ADR |
-|---|---|---|---|
-| `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `nbb scripts/gen-concept-index.cljs` | ADR-2608039980 |
-| `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `nbb scripts/gen-surface-index.cljs` | — |
-| `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `nbb scripts/gen-compliance-scope.cljs` | ADR-2608231500 |
-| `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `nbb scripts/gen-dependency-inventory.cljs` | ADR-2608231600 |
-
-4 つとも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き
-（「端末 と terminal と TTY は同じ」は repo の中身から導出できないため）。いずれも
-`manifest/edn-query.cljs` の datom 面に載っており（`:source/dataset "concept"` /
-`"surface"` / `"compliance-scope"` / `"compliance-dependencies"`）、`:concept/repo` /
-`:surface/repo` / `:scope/repo` / `:dependency/repo` は `repo-taxonomy` の
-`:repo/path` と join できる。
-
-**なぜ要るか。** 2026-08-03、「kotoba-lang に terminal, console は設計実装されている?」に
-**「無い」と誤答した**。`kotoba-lang/kuro`（terminal model）と `kotoba-lang/kobo`
-（workbench）と ADR-2606301000 は 34 日前から在った。grep は `kuro/README.md:3` に
-**当たっていた**が、出力を `head -40` で切って当の行を見ていない。加えて **`kuro`(黒) も
-`kobo`(工房) も機能を一文字も示さない**ので、名前からの経路も無かった。同じ日に
-`/signup` を 4 件重複させた事故（surface 索引の動機）と同じクラス —— 意思ではなく
-**見る場所が無い**。
-
-### compliance の 2 索引が答えるもの（2026-08-23 追加）
-
-surface 索引は「どのホストがどのパスを出すか」までで、**そのワーカがどのデータストアに
-触るかを持っていなかった**。監査（SOC 2 CC3.2/CC6.1、ISO/IEC 27001:2022 A.5.9）で
-問われるのはそこなので、compliance scope 索引が足す。`:scope/host` は
-`:surface/host` と、`:scope/repo` / `:dependency/repo` は `repo-taxonomy` の
-`:repo/path` と join できる。
-
-**どちらも fleet gate にできない**（west 管理の `orgs/` を読む。`root-permit-index` が
-それで落ち続けた形）。`manifest/orgs-detectors.edn` に `:compliance-scope-boundary` /
-`:dependency-vulnerabilities` として登録済み。
-
-⚠ **実測値をこの節に書かない。** 下記 3 つはどれも数で表せるが、書けばそれが定数として
-引用される（この CLAUDE.md 自身が fleet-ci の節でそう警告している）。数は ADR と索引の
-中に在るので、必要なら引く。ここに残すのは**引き方と、間違いの形**だけ。
-
-この 2 つを引かずに次の 3 つを結論しないこと:
-
-- **「この面は他と切り離せる」** —— 1 ワーカが複数の登録可能ドメインに応答している例が
-  実在する（1 config・1 binding 群・1 deploy credential）。**境界はドメインではなく
-  共有された制御環境の単位でしか切れない。** 現在数は
-  `grep 'cross-boundary=' 90-docs/compliance/scope.datoms.edn`（ADR-2608231500）。
-- **「脆弱性は無い」** —— version が範囲（`^1.2.3`）の依存を advisory DB に投げると
-  「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。範囲のままの依存は
-  **未測定であって clean ではない**。現在数は同索引の `:dependency/coverage` entity。
-- **「この脆弱性は緊急だ」** —— `:dependency/dev?` を見ずに数えない。2026-08-23 に
-  `undici@7.28.0` の 5 勧告を「本番 N repo」と誤報告した実例がある。deploy された
-  Worker は workerd で走り undici を載せないので、あれは miniflare 経由の開発時
-  依存だった。npm の lockfile はその答えを持っていたのに棚卸しが捨てていた
-  （ADR-2608231700）。⚠ **`:dev?` は 3 値である** —— pnpm の lockfile は dev/prod を
-  言わないので `nil`（判らなかった）を返す。`not` で畳むと、判らなかったものが本番
-  として並ぶ（ADR-2608232100）。
-
-### 統制の写像と SBOM の生成器はどこにあるか
-
-- **SOC 2 TSC / ISO 27001 Annex A ↔ 手元の証拠** の写像は
-  `kotoba-lang/security` の `policy/control-crosswalk.edn` +
-  `src/kotoba/security/crosswalk.cljc`。`nbb --classpath src scripts/check-crosswalk.cljs`
-  が現在地を出す。**設計の証拠は運用の証拠にならない**という不変条件を計算器が持つ
-  （`type-ii-readiness` は運用 register を直接読むので、写像を埋めても Type II を
-  主張できない）。規格本文は複製していない —— 条項番号と自前の記述子と provenance URL
-  だけなので、`:control/descriptor` を規格の要求事項として引用しない。
-- **SBOM の生成器**は `cloud-itonami/cloud-itonami-isic-7120-cyberassurance` の
-  `cyberassurance.sbom`（CycloneDX 1.5、純関数）。⚠ **新しく作らない** ——
-  `kotoba-lang/app-sbom` が domain を、`kotoba-lang/security` の `docs/sbom-slsa.md` が
-  リリース成果物の仕様を、`kotoba-lang/amu` が SBOM を hash して署名に束ねる処理を
-  既に持っている。3 つとも「SBOM は在る」前提で、生成器だけが無かった。
-- **認証は取れるか**への答えは評価からは出ない。SOC 2 は CPA firm、ISO/IEC 27001 は
-  認定審査機関、ISMAP は登録監査機関が発行する。**評価の完全性は発行権限ではない**
-  （ADR-2608231800）。
-
-**索引に無いことは、存在しないことの証拠にならない。** concept 索引は README のある
-repo だけを見る（未索引の repo 数を `:concept/coverage` entity で申告し、
-`concept-lookup` が毎回表示する）。「索引を引いたが無かった」を不在の証明に使わない。
-
-**名前が機能を示さない repo を作ったら、README の冒頭で名乗る。** 短い名前を選ぶのは
-正しい（ADR-2606301000 は 7 案から `kuro`/`kobo` を選んだ）が、説明可能性は別の場所で
-補う必要がある。
 
 ## 秘密情報の保管場所マップ
 
@@ -2079,245 +1653,77 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
 
 ## UI/UX 標準 — 基本 design system は `jp-go-dds`（repo-wide mandatory、2026-08-05）
 
-**このリポジトリ群で web / local app の UI を書く時は、コードを書き始める前に Skill
-ツールで `kotoba-uiux` を呼ぶ。** そして**新規 UI の基盤は
-`kotoba-lang/jp-go-digital-design-system`（デジタル庁デザインシステム = DADS）で
-あって liquid-glass ではない**（オーナー判断 2026-08-05）。
+**web / local app の UI を書き始める前に、Skill ツールで `kotoba-uiux` を呼ぶ。**
+実測・トークン表・component の過不足・legacy スタックの規約・品質計測
+（design-quality-score / co-scientist kaizen loop）はそこが正本。ここに残すのは
+skill を読まなくても効く不変条件だけ。
 
-判断時の実測: **DADS 依存 170 repo / kotoba-ui 依存 12 repo**。DADS は既にこの
-ワークスペースの共通言語で、この決定はそれを追認し、新しい仕事が少数派スタックに
-着地するのを止めるもの。
-
-```clojure
-(require '[jp-go-dds.core :as dds]       ; button / select / table / chip-label / …
-         '[jp-go-dds.page :as page]      ; ->page
-         '[jp-go-dds.tokens :as tokens])  ; bridge-css — --hig-* 契約を DADS の上に
-```
-
-- **`--hig-*` トークン契約はそのまま生きる。** `tokens/bridge-css` が全 `--hig-*`
-  を DADS primitive の上に再定義するので、契約で書かれた view / SVG / CSS は**無改造で**
-  DADS に追従する。実際 kami-genko / kami-app-daw / kami-app-nle は app CSS を 1 行も
-  変えずに基盤を移した。`dads-*` コンポーネント自体を触る時以外は、DADS primitive
-  ではなく `var(--hig-spacing-4)` を書き続けること。
-- **DADS を基盤にした app の下には `shitsuke.hig` が居ない。** 橋渡しに無いトークンは
-  **何にも解決しない**（`padding: var(--hig-spacing-4)` が黙って消える）。足りなければ
-  上流の `hig->dads` に足す —— app CSS で再導出しない（bridge 自身の docstring:
-  「2つ目のアプリが再導出した瞬間に契約は壊れる」）。
-  **再実測（2026-08-08）: bridge は 71 個を運ぶ —— `--hig-color-*`(18) /
-  `--hig-text-*`(22) / `--hig-spacing-*`(11) / `--hig-palette-*`(9) /
-  `--hig-radius-*`(7) / `--hig-font-*`(3) / `--hig-hairline`。**
-  2026-08-05 版のこの節は「27 個で spacing / text-size / radius は 1 つも無い」と
-  書いていたが、その後 upstream の `e671277`「bridge the rest of the `--hig-*`
-  contract」が入って解消している。**したがって `padding: var(--hig-spacing-4)` も
-  `font-size: var(--hig-text-footnote-font-size)` も `--hig-radius-xs` も、
-  DADS 基盤でそのまま書いてよい** —— 旧記述に従って `em` 相対や DADS primitive を
-  直接書くと、いま在る契約から不要に外れる。
-  **残っている本物の穴は `--hig-palette-*` の 6 色**（teal / mint / indigo / brown /
-  gray2-6）。DADS に対応する色相が無いので意図的に載せていない。bridge の docstring は
-  「載せなければ `shitsuke.hig` の既定値が効く」と書いているが、**DADS 基盤の app の
-  下に `shitsuke.hig` は居ない**（`jp-go-dds.page` は bridge も HIG も自動では入れず、
-  app が `:app-css` で `tokens/bridge-css` を渡す）ので、そこでは**何にも解決しない**。
-  カテゴリ色にこの 6 つを使っている view は移行前に確認する。
-  確認コマンド（`grep` は行内 1 件しか数えないので使わない）:
-  `clojure -M -e "(require '[jp-go-dds.tokens :as t]) (println (count t/hig->dads))"`。
-- **DADS は light。** `page` の `:dark? true` はこのライブラリ独自の反転層（上流には
-  dark palette が無い）。暗い環境で色を見る editor 向けで、kami-app-daw / -nle が使う。
-- **DADS に無いもの**: app-shell / editor frame、segmented control、trailing slot 付き
-  list、**app が選べる accent**。前 3 つは token 契約で書く app CSS（実例 kami-genko）、
-  4 つ目は「無い」のが仕様 —— DADS はデジタル庁ブルーを配り、app は自分の色を選ばない。
-- `dds-ext-*`（container / section / grid / stack / row / card）は上流に無い layout 補助。
-  app CSS で layout を再導出せず、ここを上流拡張する。
-
-### UI は single-page app で建てる（repo-wide mandatory、2026-08-08、ADR-2608080100）
-
-**オーナー指示（2026-08-08）「daw, nle どちらも single page app となるようにして、
-これは kotoba-lang の repo wide に single page app を前提にした デザインルールに」。**
-kotoba-lang の web / local app UI は **1 文書・1 バンドル・1 mount** を既定とする。
-画面の移動は state の変更であって location の変更ではない。
-
-- **2 つ目の HTML を作りたくなったら、それは view であって document ではない。**
-  実測（ADR-2608080100）: kami-app-nle / kami-app-daw は「エディタ」と「ユーザテスト
-  集計」で 2 文書 2 バンドルを持ち、**React・cljs core・design system を 2 回
-  コンパイルして 2 回配っていた**（3.6 MB → 1 文書にして 2.1 MB）。差は機能ではない。
-  さらに app shell が 2 箇所にあったので、**片方だけが DADS 移行に追従して、もう
-  片方は削除済みの `liquid-glass.css` を link したまま無スタイルで配信されていた。**
-- **view は data として持ち、nav をそこから生成する。** dispatch に足して nav に
-  足し忘れた view は「live に見える dead code」になる。表から生成すれば構造的に
-  起きない。nav は `dds/button` に `:href`（= 実際のリンクでありながら DADS の
-  control）。**この規則のために app CSS を足さない。**
-- **addressability は fragment（hash）で与える。pushState を既定にしない** ——
-  静的ホスト（Pages / cloud-itonami sites plane）では `/user-test` は **reload
-  されるまで動く URL** で、reload した瞬間に 404 になる。server rewrite を持つ
-  経路（Worker の `not_found_handling: single-page-application`）では pushState を
-  選んでよいが、**その rewrite が実在することを確かめてから**。
-- **静的ホストには `404.html` を置く。ただし未知のパス全部を `./` へ rewrite
-  しない** —— `/x/y` は `/x/` へ飛び、そこも無いので **fallback が自分自身へ
-  無限にリダイレクトする**。移動した実アドレスだけを対応 view へ送る。
-  redirect 先は相対 `./`（同じ artifact が任意の mount point で正しくなる）。
-- **「document を読み込んでいない」ことは機械で確かめる。ソースからは観測
-  できない** —— nav が router link でも素の href でもコードは同じに読める。
-  `window` に値を置き、view をまたぎ、まだそこにあることを確認する。
-  待つ対象は**その view にしか無い要素**にする（両 view にある `main h1` を待つと
-  crossing の描画前に返る。実測で踏んだ）。app 固有 state が crossing を越える
-  ことも確かめる（これが無いと single page にした利益が無い）。
-- **「見られる」ことは規則の半分である**（2026-08-26、オーナー指示「uiux は
-  singlepage app として見れるようにしてね」）。UI は**コンパイルが通った時点では
-  終わっていない** —— 人が開ける address が 1 つあって、そこに見えて、初めて
-  終わりである。bundle を作って document を 1 枚も出さない app は開くものが無く、
-  2 枚出す app は 1 page であることをやめている。**同じ失敗の裏表**で、どちらも
-  ソースからは見えない（nav が router link でも素の href でもコードは同じに読める）。
-- **これは prose だけの規則ではなくなった。** superproject root で:
+- **新規 UI の基盤は `kotoba-lang/jp-go-digital-design-system`（DADS）であって
+  liquid-glass ではない**（オーナー判断 2026-08-05）。`jp-go-dds.core` /
+  `jp-go-dds.page` / `jp-go-dds.tokens` を使う。
+- **`--hig-*` トークン契約はそのまま生きる**（`tokens/bridge-css` が DADS primitive の
+  上に再定義する）。**契約で書かれた view / CSS は無改造で追従するので、`dads-*` を
+  触る時以外は DADS primitive ではなく `var(--hig-*)` を書き続ける。**
+  ⚠ **DADS 基盤の app の下に `shitsuke.hig` は居ない** —— bridge に無いトークンは
+  **何にも解決しない**（黙って消える）。足りなければ上流の `hig->dads` に足す。
+  **app CSS で再導出しない**（2 つ目の app が再導出した瞬間に契約は壊れる）。
+  **bridge が今いくつ運ぶかをこの文書に書かない** —— reader で数える（コマンドは skill）。
+- **UI は single-page app で建てる**（repo-wide mandatory、2026-08-08、ADR-2608080100）。
+  **1 文書・1 バンドル・1 mount。** 画面の移動は state の変更であって location の変更
+  ではない。**view は data として持ち、nav をそこから生成する**（dispatch に足して nav に
+  足し忘れた view は「live に見える dead code」になる）。addressability は fragment
+  （hash）が既定で、pushState は server rewrite が実在することを確かめてから。静的
+  ホストには `404.html` を置くが、未知のパス全部を `./` へ rewrite しない（無限
+  リダイレクト）。**「document を読み込んでいない」ことは機械で確かめる** ——
+  ソースからは観測できない。検査は superproject root で:
 
   ```bash
   nbb scripts/verify-single-page-app.cljs --root . --findings   # 0=clean 1=findings 2=REFUSED
   ```
 
-  `multi-document`（script を読む document が 2 枚以上）と `no-document`
-  （shadow-cljs `:target :browser` なのに document が 0 枚）を報告する。
-  **`404.html` は違反ではない** —— 静的ホストでは規則が要求するものなので、
-  報告すれば規則を守った側を罰することになる。registry は
-  `manifest/orgs-detectors.edn` の `:verify-single-page-app` で、SSR/OG の
-  marketing surface は `:accepted`（日付・理由・解除条件つき）で持つ。
-  **既知の盲点**: `no-document` は `:target :browser` を要求するので、
-  **`:esm` の app が最後の document を失っても捕まえない**（`:esm` は library
-  全部の target でもあり、絞らずに測ると 285 中 232 が出て、その大半は設計どおり
-  正しい）。`multi-document` は `:esm` も見る。
-- **例外は SSR/OG が必要な公開ページ**（ADR-2606290000）。app と marketing
-  surface を同じ規則で縛らない。分けるなら理由を書く。
-- **もう 1 つの例外は「生きた credential の隣にある local 面」**（ADR-2608231200、
-  2026-08-23）。`kagi ui` は **bundle を 1 本も出さず**、server-rendered な 1 文書 +
-  `default-src 'none'` で建っている —— vault を開いた session の隣のページに対して
-  「この script に何ができるか」への一番安い正しい答えは *script が無いこと*だから。
-  失うのは mount だけ（1 操作 = 1 描き直し。loopback で数ミリ秒）で、この規則が守ろうと
-  している不変条件——1 文書・1 shell・1 stylesheet・views をデータから生成——は全部残る。
-  **これを「SPA 化し忘れ」として直さない。** 公開 app には従来どおり SPA 規則が効く。
-  ⚠ 同 ADR の実測: **`Referrer-Policy: no-referrer` を付けたページは、自分自身への
-  same-origin form POST に `Origin: null` を送る。** Origin を検査する POST 面を持つ
-  ページでこれを付けると全 action が拒否され、しかも HTTP client は test が渡した
-  Origin を送るので**テストは緑のまま**。`same-origin` にする。
-- **router はまだ共有ライブラリに無い。** 2 app が同型の `route.cljc`（約 60 行、
-  view 表 + `fragment->view` + `nav` を pure に持ち、listener だけ `#?(:cljs)`）を
-  各自持っている。**抽出の trigger は 3 つ目の app** —— routing は markup でも CSS
-  でもないので `jp-go-dds` には置かない。3 つ目を書くときは先にここを見ること。
-
-**legacy（kotoba-ui / liquid-glass）** は未移行の約 12 repo（`kotoba-lang/app-*`、
-`cloud-itonami/kaisya`・`lawfirm`、`gftdcojp/apex`）でのみ引き続き正。**新規 UI を
-これで始めない。** 旧スタックの規約（`kotoba-ui.core` 単一 require、raw hex 禁止、
-`@layer kotoba.hig, kotoba.glass` の外で app CSS が勝つ、layout は `kotoba-ui.shell`
-から）は該当 repo ではそのまま有効。詳細は ADR-2607122200 と
-`orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md`。
-
-### Svelte / React で UI を著述しない。既定は cljs + reagent + re-frame + jp-go-dds（repo-wide mandatory、2026-08-26、ADR-2608260900）
-
-**オーナー指示（2026-08-26）「svelte, react は全て cljs, reframe などに refactor」
-「jp-go-dds をデフォルトの デザインシステムに」。**
-
-- **新しい `.svelte` / `.tsx` / `.jsx` を書かない。** UI は `.cljc` / `.cljs` で書き、
+  例外は SSR/OG が要る公開ページ（ADR-2606290000）と、生きた credential の隣にある
+  local 面（ADR-2608231200。`kagi ui` は bundle を 1 本も出さない —— **これを
+  「SPA 化し忘れ」として直さない**）。
+- **「見られる」ことは規則の半分**（オーナー指示 2026-08-26）。UI はコンパイルが
+  通った時点では終わっていない —— 人が開ける address が 1 つあって、そこに見えて、
+  初めて終わり。document を 1 枚も出さない app と 2 枚出す app は同じ失敗の裏表。
+- **Svelte / React で UI を著述しない**（repo-wide mandatory、2026-08-26、ADR-2608260900。
+  オーナー指示）。新しい `.svelte` / `.tsx` / `.jsx` を書かない。UI は `.cljc` / `.cljs`、
   状態は **reagent + re-frame**（`shitsuke.re-frame.core` / `shitsuke.reagent.core` の
-  host seam が既に在る。新しく作らない）、見た目は **`jp-go-dds`** に載せる。
-  既存の 1,379 ファイル（実測 2026-08-26）は移行対象で、順序と期限は未決定。
-- ⚠ **これは `react` / `react-dom` を package.json から剥がす指示ではない。**
-  reagent / re-frame は React を描画バックエンドに使うので、shadow-cljs の app が
-  `react` に依存しているのは**正常**であり移行後も残る。退役するのは
-  **著述面（ソースファイルの拡張子）**であって依存ではない。実測 2026-08-26:
-  `react` 依存 48 package のうち `manimani-experience-ui` と `kami-genko` は
-  `.tsx`/`.jsx` を 1 本も持たず、**既に適合済み**。依存だけを見て「React repo」と
-  数えない。
-- **数える時は `node_modules` と `.claude/worktrees/` の両方を除外する。** 除外前は
-  React が 754 件に見えたが、うち 386 件は使い捨て worktree 2 本に同じ 193 件が
-  複製されていたもの。除外を間違えた計測は、移行が進んだように見せる。
-- **設計言語は既に一致している。** `svelte-design-system`（55 component）は
-  `@digital-go-jp/design-tokens` に依存しており、DADS の token で描かれた Svelte 実装。
-  移行で変わるのは実装言語であって design language ではない。ただし
-  **`jp-go-dds` は 20 component**（実測 2026-08-26）で BottomSheet / Carousel /
-  DatePicker / Dialog / Drawer / Toast / Fab 等は対応が無い —— **「DADS で足りる」と
-  丸めない**。足りない分は jp-go-dds への上流拡張か `shitsuke.components` で組む。
-- **`/design-sync`（claude.ai/design 同期）はこの workspace で実行しない。** あの skill は
-  *React design systems* 専用で（`non-storybook/SKILL.md` の Scope 節）、ここには React の
-  design system が存在せず、**今後も作らないと決めた**。Svelte DS を custom element 経由で
-  bridge しても、design agent が吐く React はこの workspace が出荷する cljc に写らない。
-  **退役させると決めたスタックを、bridge を書いて固定化しない。**
+  host seam が既に在る）、見た目は **`jp-go-dds`**。
+  ⚠ **これは `react` / `react-dom` を package.json から剥がす指示ではない** ——
+  reagent / re-frame は React を描画バックエンドに使う。退役するのは**著述面
+  （ソースファイルの拡張子）**であって依存ではない。**依存だけを見て「React repo」と
+  数えない。**
+- **`/design-sync`（claude.ai/design 同期）はこの workspace で実行しない** ——
+  あれは React design system 専用で、ここには React の design system が無く、今後も
+  作らないと決めた。**退役させると決めたスタックを、bridge を書いて固定化しない。**
+- **legacy（kotoba-ui / liquid-glass）は未移行 repo でのみ正。新規 UI をこれで始めない。**
 
-## UI/UX 品質の数値化 — design-quality-score（2026-07-13、ADR-2607132300）
+## repo-wide resource governor（mandatory）
 
-**`uikit`/`appkit`/`kotoba-ui`/`liquid-glass-ui` の UI/UX 品質を数値で把握・比較したい
-ときは、新しい仕組みをゼロから作る前に `90-docs/design-quality/` の既存 EDN を必ず
-確認する。** 正本は `90-docs/design-quality/design-quality.datoms.edn`（schema +
-`:lib/*`/`:axis/*`/`:sample/*` catalog、DataScript/Datomic にそのまま transact/query
-可能）+ `90-docs/design-quality/design-quality-ledger.edn`（append-only スコアイベント、
-BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記のみ）。両ファイルは
-既定の sparse-checkout から除外されている可能性がある —
-`git sparse-checkout add 90-docs/design-quality` で明示的に取得してから触る。
+`orgs/` / `projects/` を含む workspace 全体で、高負荷 build は同時 1 本に制限する。
+`shadow-cljs release` / `vite build` / `next build` / `cargo build` / `wash build` 等を
+直接起動せず、必ず次を使う（deploy は scope `deploy`）:
 
-- **3層スコアリング**: (1) `:lint` 層（0–1、grepベース決定論的 — token-compliance /
-  dark-mode-coverage / single-entry-discipline）(2) `:llm-judge` 層（1–5、Apple HIG
-  由来 clarity/deference/depth + consistency + token-discipline、**3体の独立judgeの
-  平均+標準偏差**を記録 — 単一judgeは合意の弱い箇所を隠す、実際 liquid-glass-ui の
-  deference 軸で judge 間 stdev 0.50 の disagreement が実測された）(3)
-  `:sample-visual` 層（1–5、`90-docs/design-quality/samples/` の実レンダリング済み
-  サンプルページをスクリーンショットして視認採点。初回は3-judge panelでなく
-  オーケストレータ単発1パス・hero/nav部分のみ視認という限界あり、ledger note に
-  明記済み — 数値を見るときはこの層の note を必ず読み、library score 層と同等の
-  厳密さがあるかのように扱わない）。
-- **再実行**: `Workflow({name: 'design-quality-score'})`（`.claude/workflows/
-  design-quality-score.js` に保存済み、lib score 層のみ再実行し ledger に追記する。
-  sample-visual 層は現状ワークフロー化されておらず手動パス — 3-judge visual panel
-  化は follow-up、ADR-2607132300 Alternatives 参照）。
-- **サンプルページの再生成**: `nbb --classpath "orgs/kotoba-lang/shitsuke/src:
-  orgs/kotoba-lang/css/src:orgs/kotoba-lang/liquid-glass-ui/src:orgs/kotoba-lang/
-  kotoba-ui/src:orgs/kotoba-lang/uikit/src:orgs/kotoba-lang/appkit/src"
-  90-docs/design-quality/samples/generate-samples.cljs`（`kototama/web/generate.cljs`
-  と同型の nbb multi-dir `--classpath` パターン。ライブラリの `.cljc` を編集も破壊も
-  しない、読み取り専用の消費者として使う）。
-- **この macOS 環境でブラウザを操作するときの既知ハザード**: 多数の並行 Claude Code
-  セッションが同一マシン上でフォーカスを奪い合う（`computer-use` skill既知）。
-  Chrome は既定で「Apple Events からの JavaScript の実行」が無効なので
-  `execute javascript` 経由のスクロールは失敗する — キー入力に頼らず
-  `set URL of active tab of front window` / `target_app` screenshot の
-  app-scripting 経路のみで完結させる。
-- **repo-wide resource governor（mandatory）**: `orgs/` / `projects/` を含むworkspace全体で
-  高負荷buildは同時1本に制限する。`shadow-cljs release` / `vite build` / `next build` /
-  `cargo build` / `wash build` 等を直接起動せず、必ず
-  `node /Users/junkawasaki/github/com-junkawasaki/scripts/resource-guard.mjs run build -- <command>`
-  を使う。deployはscope `deploy`を使う。lockはPID・cwd・開始時刻を保持し、live ownerが
-  いる二本目をexit 2で拒否し、dead ownerのstale lockだけを回収する。browser probeは
-  `finally`でcloseし、残留掃除はrootの`npm run browser:cleanup`（60分超の
-  `agent-browser-chrome-*`限定）を使う。superproject rootで無制限な`find .` / `du`を
-  実行しない。
+```bash
+node /Users/junkawasaki/github/com-junkawasaki/scripts/resource-guard.mjs run build -- <command>
+```
 
-  ⚠ **`browser:cleanup` が回収するのは disk であって CPU ではない。** 実装
-  （`resource-guard.mjs` の `cleanupBrowser`）は `os.tmpdir()` 直下の
-  `agent-browser-*` **ディレクトリを `fs.rmSync` するだけ**で、**プロセスは 1 つも
-  殺さない**。上の「`finally` で close し、残留掃除は cleanup を使う」という並びは
-  これを process reaper のように読ませるが、そうではない —— **close し損ねた
-  browser は、cleanup を何度回しても回り続ける。**
+lock は PID・cwd・開始時刻を保持し、live owner がいる二本目を exit 2 で拒否し、
+dead owner の stale lock だけを回収する。**superproject root で無制限な `find .` / `du` を
+実行しない。**
 
-  実測 2026-08-13: Chrome for Testing の GPU helper が **2 日 15 時間、それぞれ
-  CPU 105%** で回っており（load average 109 の主因）、一方 `os.tmpdir()` 配下の
-  `agent-browser-*` は **0 件**だった —— このマシンの probe browser は
-  `~/.agent-browser/browsers/` に profile を持つので、cleanup は**何も見つけずに
-  成功する**。「cleanup を回したから残留は無い」と読めるが、実際には測っていない。
+⚠ **`npm run browser:cleanup` が回収するのは disk であって CPU ではない。** 実装
+（`resource-guard.mjs` の `cleanupBrowser`）は `os.tmpdir()` 直下の `agent-browser-*`
+**ディレクトリを `fs.rmSync` するだけ**で、**プロセスは 1 つも殺さない**。
+**close し損ねた browser は、cleanup を何度回しても回り続ける**（実測 2026-08-13:
+このマシンの probe browser は `~/.agent-browser/browsers/` に profile を持つので、
+cleanup は**何も見つけずに成功する**）。CPU を食っている probe は `ps` で実測してから
+扱い、親が生きているものは勝手に kill せずオーナーに報告する。
 
-  **CPU を食っている probe を止める必要があるときは、`ps` で実測してから扱う。**
-  親が生きている browser は別セッションが使っている可能性があるので、勝手に
-  kill せずオーナーに報告する（孤児かどうかは `ps -o ppid=` で親を辿れば分かる）。
-- **Co-Scientist kaizen loop（2026-07-13追記）**: `:llm-judge` 層（主観採点、単一judge
-  やLLM panelは「計測されないメトリクス＝劇場」になりうる — 実測: liquid-glass-ui等の
-  4ライブラリを3-judge panelが clarity/deference/depth等で軒並み4.0–5.0/5と採点した裏で、
-  tap-target min-height欠如・dvhフォールバック欠如・safe-area片側未対応・theme-color
-  meta欠如という4つの具体的ギャップを3体とも一つも指摘していなかった）を補う
-  **決定論的 fitness function** が `90-docs/design-quality/audit.cljc`（LLM/browser不要、
-  regexベース、`orgs/gftdcojp/network-isekai` の `isekai.ux.audit`／ADR-0007 からの移植）
-  として存在する。Co-Scientist loop 本体（Generate→Reflect→Rank(Elo)→Evolve→Meta）は
-  `90-docs/design-quality/coscientist.cljc`（同 `isekai.ux.coscientist` 移植、
-  langchain-clj依存なしのoffline/heuristic版）で、`nbb` から `kaizen-cycle` を呼ぶと
-  `90-docs/design-quality/coscientist/iteration-NN.edn` を生成する。この co-scientist
-  パターン自体の原典は `90-docs/adr/2606141500-keiei-arbor-coscientist-engine.edn`。
-  **UI/UXに限らず「品質を測って改善ループを回したい」タスクでは、まず
-  `orgs/gftdcojp/network-isekai` の `90-docs/coscientist/` と `ADR-0007` 系（同type の
-  ADRが `ai-gftd-shinshi`/`ai-gftd-yukkuri`/`ai-gftd-apps-gftdcojp` 等にも複数存在、
-  `grep -rl coscientist 90-docs/adr` で一覧できる）を確認し、ゼロから設計しない。**
-
+⚠ **この macOS では多数の並行セッションが OS フォーカスを奪い合う。** ブラウザ / GUI を
+操作する前に skill `computer-use` を読む。
 ## 3D はすべて kami-engine を使う（repo-wide mandatory rule、2026-07-10）
 
 - **この workspace 内の 3D は、用途（modeling / animation / CAD / BIM / sculpt /
@@ -2357,736 +1763,114 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   ある場合だけ許す。temporary fallback は UI 上とコード上の両方で
   `non-authoritative` と明示し、恒久実装へ昇格させない。
 
-## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-10 改訂。2026-07-07 改訂・初版は2026-07-06）
+## `.cljc` / `.kotoba` ランタイム優先順位（repo-wide mandatory）
 
-### Kotoba は safe application language とする（repo-wide mandatory rule、2026-07-20）
+**詳細・実測・現在地の読み方は Skill ツールで `kotoba-authoring` を呼ぶ。**
+`.kotoba` / `.cljk` を書く前、その天井を判定する前、移行する前に読む。
+ここに残すのは skill を読まなくても効く不変条件だけ。
 
-- **`.kotoba` を純粋な narrow-slice decision function だけに限定しない。**
-  ADR-2607201300 に従い、`kotoba/pure`、`kotoba/cell`、`kotoba/app`、
-  `kotoba/host` の4 profile を区別する。新規アプリの product logic、workflow、
-  UI view/event reducer、LLM/tool loop、明示的 state machine、actor behavior、
-  supervision policy は、必要な capability が実装済みなら `kotoba/app` を
-  第一候補にする。ADR-2607141900 は削除済みであり、ADR-2607150000/
-  2607151500 内の narrow-slice/general-application exclusion も superseded である。
-  これらを active policy や application-scope ceiling として引用してはならない。
-- **安全性の境界は purity ではなく ambient authority の排除である。** 外部から
-  観測可能な effect は、型付き capability value、静的 effect set、package lock、
-  deny-by-default policy、quota/fuel/memory、audit を必ず通す。`atom`/`ref`、process
-  global、任意 `require`、`eval`、reflection、Java/JS interop、直接 DOM/SDK/socket/
-  credential access を application code に追加して穴を埋めない。
-- **状態は `state + event -> next-state + effects` として記述する。** 永続化、
-  transaction、queue、timer、actor placement/recovery、DOM/WebGPU/native mutation、
-  LLM provider transport は `kotoba/host` provider が担当し、結果を typed event として
-  app に戻す。host が機構を所有しても product semantics は `.kotoba` が正本である。
-- **UI/LLM/state/actor/lifecycle capability は descriptor、effect inference、compiler
-  admission、policy-gated provider、positive/deny fixtures、quota/audit、2 runtime parity
-  が揃うまで「実装済み」と扱わない。** unrestricted interop や doc だけで readiness
-  を宣言しない。最初の vertical proving slice は shiropico の
-  state → LLM/ComfyUI effect → result event → governor → UI → checkpoint とする。
-- 言語側の詳細規則は `orgs/kotoba-lang/kotoba/docs/lang/application-profile.md` を参照。
+- **第一の runtime の順序は `kotoba wasm runtime` > `clojurewasm` > `ClojureScript` >
+  `nbb`。`JVM` と `bb` はその下（どちらも最後の手段。2026-07-10 オーナー指示）。**
+  reader-conditional・依存選定・テストの正本もこの順に合わせる。上位で動くものを
+  JVM / bb 前提で書かない。JVM / bb にしか無い経路は「互換 (compat) 層」として
+  隔離し、設計の前提にしない。
+- **Rust を新規に書かない**（2026-07-10 オーナー指示）。既存 Rust エンジンが露出済みの
+  WASM/JS 境界を呼ぶのはよいが、描画要件を満たすために新しい crate を起こさない。
+  満たせないならスコープを絞るか、ADR 化してオーナー判断を仰ぐ。
+- **`.sh` を新規に書かない**（2026-07-14 オーナー指示）。**生 JS の `.mjs`/`.cjs` も
+  新規に書かない** —— Node 側の検証/テストハーネスも nbb（`.cljs`）で書く。
+- **新規の運用 tooling は kbb-first**（owner 指示 2026-09-07）。手順は skill
+  `nbb-to-kbb-migration`。nbb は既存資産の実行環境として残るが、新規 script host
+  としては使わない。**`bb` は script host としても退役**（ADR-2607173000）——
+  新規に `bb.edn` / `#!/usr/bin/env bb` を置かない。
+- **`#?(:kototama ...)` / `#?(:clojurewasm ...)` は存在しない reader-conditional。**
+  書くと黙って dead branch になる。
+- **Kotoba は safe application language**（ADR-2607201300）。`kotoba/pure` /
+  `cell` / `app` / `host` の 4 profile を区別し、新規アプリの product logic・
+  workflow・UI reducer・state machine・actor behavior は capability が実装済みなら
+  `kotoba/app` を第一候補にする。**安全性の境界は purity ではなく ambient authority の
+  排除。** narrow-slice / general-application exclusion（ADR-2607141900 ほか）は
+  superseded であり、active policy として引用しない。
 
-- **repo wide のルール: app の互換性と「第一の runtime」の順序は
-  `kotoba wasm runtime` > `clojurewasm` > `ClojureScript` > `nbb` とし、
-  `JVM` と `bb`（babashka）はその下に降格する（どちらも最後の手段。
-  2026-07-10 オーナー指示）。** 新しく書く app / library / `.cljc` /
-  `.kotoba` は、この順で「どの runtime を第一級に据えるか」を決め、
-  reader-conditional 分岐・依存選定・テストの正本もこの順序に合わせる。
-  上位 runtime で動くものを JVM / bb 前提で書かない。JVM / bb にしか無い
-  経路（Chicory テストハーネス、既存 JVM 専用 lib への互換層など）は
-  「互換 (compat) 層」として明示的に隔離し、設計の前提にしない。
-  実例（この規則の模範実装）: `kotoba.kami-host`（ADR-2607100030
-  addendum 2）— ECS core を portable `.cljc` に置き、第一の実行経路は
-  ClojureScript（browser ESM / nbb ネイティブ WebAssembly）、`:clj`/
-  Chicory 層は互換スイート専用と docstring に明記。
-- **Rust（`kami-render`/`kami-app` 等の既存エンジン）を、個別 app/game の
-  描画要件を満たすために新規 crate として書き足さない（2026-07-10 追記、
-  オーナー指示: 「rust は使わないで、これはちゃんと rule に」）。** 上記の
-  runtime 優先順位はいずれも「app/game 側」コードの選び方であり、Rust
-  エンジン本体は所与のインフラとして**消費するだけ**の対象——個別アプリの
-  描画ニーズのために新しい Rust crate（`#[wasm_bindgen]` エントリポイント
-  + カスタムレンダーパイプライン等）を書き起こす選択肢は、この優先順位
-  チェーンに含まれない。実例: `kami-app-animeka-timeline`
-  （`orgs/etzhayyim/root/40-engine/kami-apps/`）は Rust crate を新規に
-  書いた先行実装だが、これは本規則の明文化前のパターンであり、以後の
-  新規タスクでこれを模倣しない。描画が要る app/game は、既存 Rust エンジン
-  が既に露出済みの WASM/JS 境界があればそれをそのまま呼ぶだけに留め、
-  無ければ上記 kotoba wasm → clojurewasm → ClojureScript → nbb の範囲内で
-  実現方法を探す——それでも描画ニーズを満たせない場合、**「Rust を新規に
-  書く」ことで穴を埋めない**。スコープを絞る（例: 当面は DOM/CSS の視覚
-  表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を仰ぐ。
-- **運用 tooling の script host は nbb のみ（ADR-2607173000、2026-07-17）— ただし将来
-  優先順位は `kbb`（Kotoba script host）→ `nbb` →（退役: `bb`）（ADR-2607181900、
-  2026-07-18 roadmap 決定）。`kbb` は **実在する**（`kotoba-lang/kotoba` の `bin/kbb`。
-  backend は interpreter = JVM bootstrap / `--backend native` = amu KEXE + kexe_loader /
-  `bin/kbb_js.cljs` = amu `--target js` + Node host、ADR-2609051100・ADR-2609062200）が、
-  ADR-2607181900 の readiness gate（nbb スクリプト代表サブセットの移植 = 条件②）を
-  通過するまでは以下の nbb-only ルールがそのまま正本のまま変わらない。
-  運用スクリプトを kbb 前提で書かない。**
-  ⚠ **例外（owner 指示 2026-09-07）: 新規に書く運用 tooling は kbb-first。**
-  nbb は既存資産の実行環境として残るが、新規 script host としては禁止。
-  手順は skill `nbb-to-kbb-migration`。kbb に無い op は guest を縮めず
-  kbb 側に足す（capability extension）。既存 nbb スクリプトは
-  migration candidate として列挙し、readiness が追いついたところから順に移行。
-  **kbb 用の `.kotoba` script を書くときの実測済み規則**（2026-09-07、ADR-2609062200）:
-  ①capability は `lib/kbb/{fs,env,browse,proc,str}.kotoba` 経由で呼び、script に
-  `typed-cap-call` や wire id を書かない（`--source-path lib`）。②policy は kbb v1 と
-  同形（`:kotoba.policy/forbid-wildcard true` 必須、resource scope 必須）。③**effect の
-  無い i64 `main` は compile 時に KIR oracle でも実行される**ので、その fuel には
-  `--fuel` が届かない —— probe は capability を 1 回は呼ぶ形にする。④fs write は
-  `kbb.fs/write-file`（request `<path>WRITE_SEP<content>`、native loader と同じ契約）で、
-  path + 9 + content が 65536 byte を超えると provider の前に `string-too-large` で止まる。
-  ⑤backend は `bin/kbb … --backend js|native|interpreter`。js は oracle、配布形は
-  native。同じ script・policy で両方を走らせて同じ値になることが parity の証拠
-  （kotoba `test/kotoba/kbb_js_test.clj` の形）。
-  `scripts/*.cljs`・`.claude/hooks/*.cljs`・west 拡張・child repo の
-  task/test オーケストレーションは **`bb` バイナリを使わない**。新規に
-  `bb.edn` / `#!/usr/bin/env bb` を置かない。残存は Wave 1–4 で削除中
-  （共有 `.bb` 族 → scaffold `bb.edn` → 大型 `bb.edn` → ゲート）。
-  `scripts/nbb_compat` の `babashka.*` **名前空間**は Node 互換シムであり、
-  `bb` 実行を意味しない。app runtime としての `bb` 降格（JVM と並ぶ最下位）
-  は従来どおり維持。
-- **新規の運用 tooling を nbb で書かない — kbb-first（owner 指示 2026-09-07）。**
-  新規に書く運用スクリプトは kbb（`.kotoba` / `.cljk` + kbb runtime）で書く。
-  手順は skill `nbb-to-kbb-migration`。既存 nbb スクリプトは migration candidate。
-- **Node 側の検証/テストハーネス（Playwright driver、静的サーバ、E2E
-  スクリプト等）も新規に書く場合は nbb（`.cljs`）で書く — 生 JS の
-  `.mjs`/`.cjs` を新規に書かない。** シェルスクリプト（`.sh`）も同様に
-  **新規作成禁止 — nbb で書く**（2026-07-14 オーナー指示「sh は prohibit, nbb にして」。
-  既存の実例移行: itad `tools/subset_font.cljs`、jp-go-dds `scripts/vendor.cljs`）。 既存 repo に `.mjs` の先行実装
-  （例: `wasm-webcomponent/test/render/lib/webgpu-harness.mjs`）があっ
-  ても、それは「対象を決めて ADR 化してから移行する既存資産」（既存の
-  JVM 専用ライブラリを書き直さない原則と同型）であって、新規タスクで
-  それをコピー/踏襲してよい前例にはならない — 中身のロジック（技術的
-  knowledge: full Chromium 実行パス解決・静的サーバ・`navigator.gpu`
-  可用性チェック等）は参照してよいが、新規に書く実装は必ず nbb に翻訳
-  する（実例: ADR-2607100100 M2、2026-07-10 owner 指摘で `.mjs` harness
-  を nbb 版に置き換え）。
-- **`kotoba wasm`** — `.kotoba` 拡張子（legacy emitter の基礎サブセット —
-  `def`/`defn`/`ns`/`if`/`when`/`let`/`do`/算術/比較/`and`/`or`/`not`/
-  文字列基本操作 + 再帰のみ、Java/JS interop 一切なし、サードパーティ lib
-  不可。Application Profile の effect は閉じた capability import として段階追加）を
-  `kotoba wasm emit` で WASM にコンパイルし、`kototama` の
-  `actor:host` ABI（`kototama.contract`/`kototama.tender`, ADR-2607062330/
-  2607062400）でホストする経路。**2026-07-06 版と異なり、これは今や実在し
-  E2E で動作確認済み**（ADR-2607062330 addendum 5、2026-07-06〜07）:
-  `kotoba-core-contracts` の閉じたホストインポート表に `.kotoba` から呼べる
-  capability を登録し、`kotoba wasm emit` が実際に出力した（手書き WAT では
-  ない）`.wasm` が `kototama.tender`（JVM/Chicory）にリンクして正しく実行
-  することを確認済み（`kotoba-lang/kototama` の `test/kototama/fixtures/`
-  に実バイナリとして checked in）。ホストは JVM/Chicory 経路
-  （`kototama.tender`）と ブラウザネイティブ経路
-  （`wasm-webcomponent` の `actor-host.js`、ADR-2607062400）の両方が実在。
-- **`clojurewasm`** — `.kotoba` の極小サブセットではなく**フルの Clojure**
-  を書きたい場合の次点。外部プロジェクト
-  [`clojurewasm/ClojureWasm`](https://github.com/clojurewasm/ClojureWasm)
-  （通称 `cljw`）: Zig で書かれた JVM フリーの Clojure ランタイムで、
-  WebAssembly を FFI として呼べる（`(wasm/load "mod.wasm")` /
-  `(:require ["comp.wasm" :as c])` で WASM component を名前空間のように
-  require できる）。2026-02 発足、2026-07 時点で v1.0.0 安定版・実働デモ
-  （cw-playground, cw-serverless-demo, cw-arcade）あり、157 stars、直近まで
-  push されている活発なプロジェクト（確認日 2026-07-07）。**ただし
-  Issues/PR は現在受け付けていない**（小規模チームのため。EPL-2.0）ので、
-  このリポジトリへの直接貢献はできず「利用する」側の依存としてのみ扱う。
-  **2026-07-10 時点でもこのモノレポ内に `clojurewasm`/`cljw` の利用例・
-  ビルド・統合は無い**（既存 `.cljc` を勝手に `cljw` 前提に書き換えない —
-  導入する場合は対象を決めてから着手する）。2026-07-10 に実適用を検討した
-  実測: cljw v1.0.1 の FFI は `wasm/load`+`wasm/call`（import-free module
-  専用）で、**Clojure 製 host import の提供は upstream 自身が「Phase-16 の
-  fuller FFI surface」として将来に明示**（`docs/examples/wasm/README.md`）。
-  host import を要する guest（例: kami-survivors の 12 imports）は現状
-  ホストできないため ClojureScript に落ちる（ADR-2607100030 addendum 2）。
-  Phase-16 が landed したら再評価する。
-- **`ClojureScript`（cljs）** — ブラウザ/Node 向け。次点。
-- **`nbb`** — ClojureScript-on-Node の高速スクリプティング。静的サイト生成
-  など軽量タスク向け（実例: `kototama/web/generate.cljs`）。
-- **JVM 単体と bb は最後の手段（app runtime として）。** 既存の JVM(`:clj`)
-  専用ライブラリは、実装当時「唯一動く経路が JVM だった」という正しい判断の
-  結果なので、上位の選択肢が実在するようになった今もリトロアクティブに
-  書き直さない（移行する場合は対象を決めて ADR 化してから着手する）。
-  ⚠ **ただしこの一覧を「今どれが JVM 専用か」の答えとして引かない。**
-  ここは長く `kotoba-lang/ed25519`（現 `org-ietf-ed25519`）を例として挙げて
-  いたが、**2026-08-27 の実測でそれは誤りだった** —— `edwards.cljc` と
-  `scalar.cljc` は reader conditional が **0 個**、`sign.cljc` の 2 個は hex
-  整形だけで、`test/nbb_smoke.cljs` は cljs の署名が JVM と**バイト一致**する
-  ことを assert している。移行はとうに済んでいて、**それを書いた文だけが
-  古かった**。この誤った記述を根拠に「この workspace に portable な署名は
-  無い」と結論し、ADR に書き、次の作業の前提にしかけた（ADR-2608271200）。
-  **JVM 専用かどうかは repo の `#?(:clj` を数えて決める。ここを引かない。****script host としての bb は ADR-2607173000 で退役** —
-  app を bb 前提で新規に書かないのはもちろん、運用スクリプトも nbb に寄せる。
-- `#?(:kototama ...)` / `#?(:clojurewasm ...)` という reader-conditional は
-  **コードベース全体を検索してゼロ**——Clojure 標準は `:clj`/`:cljs`/
-  `:cljr`/`:default` しか認識せず、これらを feature として認識させるカスタム
-  reader/ビルドステップは存在しない。**存在しないものとしてこれらの
-  reader-conditional を書かない**（無言でどちらの分岐も評価されない dead
-  branch になる）。
-- 新しい `.cljc`/`.kotoba` を書く／既存の `:clj`/`:cljs` 分岐を拡張する判断に
-  迷ったら、上記の順序（kotoba wasm → clojurewasm → cljs → nbb →（降格:
-  jvm / bb））で「今実際に動く経路はどれか」を確認してから選ぶ——ただし
-  目の前のタスクを止めてまで存在しない統合（例: `clojurewasm` の新規導入）を
-  今から作ることはしない（別スコープの ADR とプロジェクトとして切り出す）。
+## `.kotoba` を書くときは `compile` 経路（amu）を使う（repo-wide mandatory、2026-07-27）
 
-## `.kotoba` を書くときは `compile` 経路を使う — legacy emitter は使わない（repo-wide mandatory、2026-07-27）
+**方向の正本は ADR-2607279200 と `orgs/kotoba-lang/kotoba-lang/docs/kotoba-centered-migration-plan.md`。
+source-surface の唯一の authority は `orgs/kotoba-lang/kotoba-lang/lang/guest-grammar.edn`**
+（`compiler/frontend.cljc` が受理することと authority が認めることは別物）。
 
-> **方向の正本は ADR-2607279200（accepted）と
-> `orgs/kotoba-lang/kotoba-lang/docs/kotoba-centered-migration-plan.md`。**
-> 本節と ADR-2607270100 が記すのは *2026-07-27 時点で実測した現在地* であって到達目標ではない。
-> 現在地の制約（再帰値・explicit capability 等）を恒久的な設計前提として引用しないこと —
-> 計画側で解消予定のものが含まれる。両者が食い違ったら ADR-2607279200 が勝つ。
->
-> **source-surface の唯一の authority は `orgs/kotoba-lang/kotoba-lang/lang/guest-grammar.edn`**
-> （ADR-2607279200 Delivery #1）。`compiler/frontend.cljc` が受理することと authority が
-> 認めることは**別物**で、両者の drift は機械検査で潰す対象。文法面を触るときは
-> frontend ではなく authority を先に見る。
-
-**kotoba には独立した2つのコンパイラ面があり、新規の `.kotoba` は必ず後者
-（`amu compile` → `kotoba-lang/amu`）で書く。** legacy emitter
-（`kotoba wasm emit` / `kotoba cljs emit`）は単一ファイル・貧弱な型・127 バイト文字列上限を
-持つ旧経路であり、その制約を「Kotoba 言語の限界」と誤認しない（実際に 2026-07-27 の spike が
-この取り違えをやった）。
-
-⚠ **compiler repo は `kotoba-lang/compiler` から `kotoba-lang/amu`（編む）に改名済み。**
-旧名は GitHub リダイレクトで生きているが、**west の `compiler` entry は撤去済み**
-（実測 2026-09-06: `manifest/west.yml` に `name: compiler` は 0 件、`manifest/fleet-db.edn`
-にも 0 件、`orgs/kotoba-lang/compiler` の checkout も無い）。2026-08 の改名直後は
-2 entry が並存し古い pin の checkout を読む事故があったが、その状態はもう無い。
-読むのも走らせるのも `orgs/kotoba-lang/amu` 側にする。CLI の front は `bin/amu`
-（`bin/kotoba` / `bin/kotoba-compiler` は互換 shim）。native backend は
-`kotoba-lang/kotoba-native`、KIR は `kotoba-lang/kotoba-kir`、restricted-ESM emitter は
-`kotoba-lang/kotoba-script`、実行/runtime linking は `kotoba-lang/kototama` に分かれている
-（ADR-2608139980 の 綾 分割）—— **amu に無いからといって「無い」と結論しない。**
-
-| | legacy（`wasm emit` / `cljs emit`） | **`compile`（使うのはこちら）** |
-|---|---|---|
-| モジュール | 単一ファイルのみ | 複数ファイル閉グラフ `(:require [m :as a])` + `(:export [...])` |
-| ターゲット | wasm32 / cljs テキスト | wasm32 + `:js-kotoba-v1` restricted ESM |
-| 型 | i32/i64/f32 と生メモリ | `[:map K V]` `[:set T]` `[:record ...]` `[:variant ...]` `[:option T]` `[:result T E]` 異種 `[:vector ...]` `:document` `:string-index` |
-| 数値 | cljs 側は 2^53 で throw | BigInt i64 + `assertI64` |
-| 文字列 | **127 UTF-8 バイト上限** | EDN 1 MiB / string leaf 64 KiB（実測: 4,920 バイトの HTML 断片を構築可） |
-| capability | host-import 表（id 201+） | capability-registry（id 1–12）+ 型付き kit |
-
-- **型注釈はインライン構文で、いま必要なものだけ書く**（2026-09-01 改訂）:
-  `(defn f [p :string n] body)`。legacy の `^:i64` メタデータ形式ではない。
-  - **注釈は per-parameter**。1 つ書いたら全部書く規則は無くなった（kotoba-sema
-    `14b5536`）。
-  - **未注釈パラメータは body が要求する型を取る**（同 `0b0b31e`）。制約は型検査器
-    自身の拒否から読むので、operand 型の第 2 の表は存在しない。
-  - **結果型も省ける**（`infer-absent-results`）。
-  - 書く必要が残るのは、**body が要求しない**型だけ。実例: `or` of two `=` は i64 を
-    返すので、`(if (and has-x ...) ...)` の `has-x` は `:bool` と書かないと `if` の
-    分岐型が食い違う。
-  - ⚠ **書かれた注釈は決して推論で上書きされない。** 用途が食い違うパラメータは
-    `:i64` に戻り、以前と同じ場所で同じメッセージで落ちる。
-  - 実測 2026-09-01: `org-ietf-smtp` の 3 modules から 85 個中 **81 個**を外して、
-    生成 wasm32 は**バイト単位で同一**。残った 3 個は上の `:bool` 3 つ。
-- **`defdesugar` は使える**（2026-08-31、kotoba-sema `dae81ee`）。
-  `(defdesugar clamp [x lo hi] (if (< x lo) lo (if (> x hi) hi x)))` を書いて
-  `(clamp n 0 6)` と呼ぶ。**macro ではない** —— registered な head だけが展開され、
-  body は**それより前に宣言された** template に対してだけ展開されるので再帰は
-  構造的に不可能、引数は 1 度だけ synthesized name に束縛される（= 複数評価も
-  capture も起きない）。個数・arity・body node 数・総展開数はすべて有界。
-  ⚠ **`defmacro` の代わりに使えるのはこれだけ。** ADR-2608301500 が defmacro 恒久禁止の
-  根拠に据えているのがこの機構であり、2026-08-31 まで**実装が存在しなかった**。
-  なお同 ADR の fixture が使う `match` は今も未実装。
-- capability は今のところ `(ns x (:capabilities #{:ui/commit}))` + `(cap-call :ui/commit v)`、
-  policy は `{:allow #{[:cap/call 9]}}` と書ける（宣言したのに使わないとコンパイルエラー）。
-  **ただしこれを「effect の書き方」として広めない。** ADR-2607279200 §2 は
-  「通常の source は capability ID / WIT import / provider callback を記述しない」、
-  Consequences は「`cap-call`・wire ID は compiler/host 内部へ押し下げられる」と定める。
-  **effect は推論が既定**で、明示宣言が正当なのは公開 API・package 境界・security ceiling、
-  および scope/quota/deadline を attenuate して委譲する場合だけ。数値 ID は wire ABI であって
-  source 語彙ではない（正本は `lang/capability-semantics.edn` の
-  `:cap/kind`/`:cap/resource`/`:cap/holder` という名前付き scoped モデル）。
-- **`:js-kotoba-v1` の成果物は `kotoba-js-artifact/v1`**: `instantiateKotoba(grants)` を
-  export し、grant が `requiredCapabilities` と厳密一致しなければ
-  `capability-grant-mismatch` で instantiate 自体が落ちる（実行時も fail closed）。
-
-### 再帰的な値型は landed（W4）— flat/handle 設計を恒久前提にしない
-
-**この節は 2026-08-08 に書き換えた。** 旧文は「今日は hiccup のような任意深度の入れ子を
-Kotoba の値として表現できない」と書いていたが、W4 は 2026-07-27 に 6 スライスまで landed
-している（migration plan の W4 節が各スライスを記録）。第 5 スライス
-（`recursive_tree_value_test`、compiler#343 + kotoba-kir#10 + kotoba-script#71）が
-**sealed schema-checked tree としての recursive logical value** を、第 1〜4 スライスが
-`:document` 値（構築・walk・digest・`document-sha256`・DOM reconcile）を入れている。
-**backend は `#{:compiler :kotoba-wasm :kotoba-cljs}`。native には無い**（下記の新しい規則の
-とおり、これは backend 未達であって言語の天井ではない）。
-
-migration plan は **「Implementations may use arenas and handles, but *handles are not the
-application programming model*」** と明記している。したがって:
-
-- **flat node 集合 / parent ポインタ / handle を「Kotoba ではこう書くもの」として文書化しない。**
-  それは実装戦略であって application の書き方ではない、と計画側が名指しで否定している。
-- **native 向けに word 型へ閉じて書く場合も同じ** — その制限は「native がまだ持っていない
-  から」であって様式ではない。モジュールのヘッダにそう書く。
-- 形 A（component を `:string` を返す純関数にし `string-concat` で合成）は、capability 不要で
-  native にも載る書き方として引き続き有効。ただし**string-only SSR を最終 API にしない**
-  （ADR-2607279200 Delivery #6）。
-
-### ブラウザ / Worker で動かす口は 3 つあり、既定は wasm32-browser（2026-08-30 改訂）
-
-**amu は native compiler であって JVM に依存しない**（オーナー指摘 2026-08-30）。
-`.kotoba` をブラウザや Worker で動かすときの既定は **`--target wasm32-browser`** で、
-`bin/amu` はこれを **nbb で実行する —— JVM を起こさない**。
-
-⚠ **この節は 2026-08-30 まで逆を書いていた。** 「既定は `--target js` の restricted ESM」
-と指名した上で、同じ節の下の方で「コンパイルは js / cljs とも JVM 経路」と自分で書いて
-いた —— **JVM を起こす経路を既定に指名していた**。JVM が現れるのは native/wasm 以外の
-target に落ちたときだけで、**それは amu の経路ではない**。
-
-実測 2026-08-30、`bin/amu` @ `kotoba-lang/main` `0df9d99` —— **nbb（JVM なし）で走るのは**
-`check` / `extract-native` / `verify-output-set` / `sign-output-set` と、
-`worker` | `compile` の `--target` ∈ {未指定, `wasm32`, `wasm32-browser`, `wasm32-wasi`,
-`x86_64*`, `aarch64*`}。**それ以外は `spawn("clojure", …)` に落ちる。**
-（読むのは `orgs/kotoba-lang/amu` の checkout ではなく `kotoba-lang/main` —— 2026-08-30
-時点で checkout は pin のまま **139 commit 遅れ**ており、その古い tree を読んで
-「amu も部分的に JVM」と誤読した。）
-
-| target | 出力 | host | 実行 | 使いどころ |
-|---|---|---|---|---|
-| `wasm32-browser` | `.wasm` | `amu/runtime/browser-host.mjs`（`kotoba:typed/cap-call`） | **nbb（JVM なし）** | **既定。** ブラウザ / Worker |
-| `js` / `js-browser` | restricted ESM `.mjs` | `amu/runtime/dom-driver.mjs` + `browser-host.mjs` | **nbb（JVM なし）**（2026-09-06、amu ADR 0340） | 既存資産の互換と、`kbb --backend js` の oracle。既定は上の wasm32-browser のまま |
-| `cljs-browser-kotoba-v1` | `.cljs` **ソーステキスト** | 無い（自分で require して `main` を呼ぶ） | **clojure（JVM）** | cljs toolchain に載せる必要があるときだけ |
-
-- **JVM を起こさないことは好みではなく容量の問題である。** 実測 2026-08-30、この 1 台
-  （10 コア）で **load average 513**、java 14 本 / node 99 本 / Claude セッション 8 本。
-  走っていた java を親プロセスで辿ると **`scripts/resource-guard.mjs` の下に居たのは 1 本だけ**で、
-  残りは `clojure -M` / `-A:test` / `-Sdeps` / launchd 常駐だった。guard が壊れているのではなく、
-  **guard の対象が「build コマンド名の列挙」（shadow-cljs / vite / next / cargo / wash）なので、
-  実際に CPU を食っている JVM の test / gate / loop が全部その列挙の外にある**。
-  列挙を足すより、**JVM を起こさない経路を既定にする方が効く。**
-
-- **UI は `init` / `view` / `step` の 3 つの純関数 export**（`state + event -> next-state`）。
-  参照実装は `amu/examples/todo-app.kotoba`、host は `amu/runtime/dom-driver.mjs`。
-  **capability は要らない** —— guest は DOM 名も host object も callback も受け取らず、
-  往復するのは `data-k` 由来の文字列だけ。`requiredCapabilities` は空で mount する。
-- **cljs backend は「できている」が JS 面の主役ではない。** 出るのは `.cljs` ソースなので
-  nbb / shadow-cljs が要り、**ブラウザ用の host runtime が無い**。capability kit ファイルに
-  cljs の qualification 行は 1 件も無く（`:jit` は kotoba-script の `:js-kotoba-v1` のこと）、
-  `surface-status.edn` の `:backend-parity` も「同じプログラムを `:kotoba-wasm` と
-  `:kotoba-cljs` で走らせて突き合わせる harness はまだ無い」と自分で書いている。
-  **「cljs があるから browser は済んでいる」と読まない。**
-- **先に当たる天井は fuel ではなく値の大きさ。** `:document` は 256 ノードで、
-  `todo-app.kotoba` 程度のレイアウトだと数行で `doc-node-limit` に届く（その天井は
-  ファイル冒頭のコメントが自分で申告しているので、そこを読む）。fuel 512 は instance
-  生涯で使い切りなので dom-driver は **1 インタラクション = 1 新規 instance** にしている
-  —— 共有すると描画途中で `fuel-exhausted` になる。**整数→文字列の builtin が無い**
-  （todo-app が ID を 26 文字のアルファベットから取っているのはそのため）。
-- **`cljs` target を選ぶと `clojure` が起きる。** それが JVM の入口であって、
-  amu 自体の性質ではない。1 ファイルで分単位かかるので、どうしても使う場合でも
-  loop や hook に組み込む前に測る。**新規はこの target を選ばない。**
-  ⚠ 2026-09-06 まで `js` もここに並んでいた。emitter（`kotoba-lang/kotoba-script`）が
-  `.cljc` になり、`amu compile --target js --jvm-free` は nbb で走る（amu ADR 0340。
-  parity は `test/nbb/js_parity.cljs` —— JVM 経路が書いた `runtime/http/route-decide.mjs`
-  とバイト一致）。**JVM に残るのは `cljs-browser` だけ。**
-- 実ブラウザでの確認は `amu/tests/browser/`（`app.html` + `browser.spec.mjs`、Playwright で
-  trusted event を送る）。Node の mock DOM で足りるなら `createMockDom` が
-  `browser-host.mjs` に在る。
-
-### 今日の既知ブロッカー（回避策を知らずに時間を溶かさないこと）
-
-1. ~~project linker が `:capabilities` を拒否~~ / ~~CLI が policy を `{}` 固定で渡す~~ —
-   **どちらも 2026-07-27 に解消**（compiler#332 / kotoba#432 + pin 前進 #433）。
-   多ファイル project で `:capabilities` を宣言でき、`--policy` に compiler の
-   `{:allow #{[:cap/call <id>]}}` を渡せば CLI からそのままコンパイルできる。
-   `--policy` 無しは空 policy（deny-by-default は不変）。`:schemas` は project mode では
-   引き続き拒否（同名 schema の衝突規則が未決定）。
-2. **`guest-grammar.edn` の `:admitted-builtins` を「呼べる操作の一覧」として引かない**
-   （2026-09-06 追記）。実測: `document-sha256` はそこに**無い**のに guest source から呼べる。
-   `document-*` は 36 個あり（`document-canonical-bytes` / `document-equal?` /
-   `document-assoc` / `document-merge` / `document-print` ↔ `document-read` を含む）、
-   正本は `:sugar :document` と amu の W4 スライス群のほう。**ある操作が無いことを、
-   あの一覧に無いことから結論しない。** 今日それで一度誤診した。
-3. **capability kit の qualification をここに書き写さない — kit ファイルが正本。**
-   `orgs/kotoba-lang/amu/resources/kotoba/lang/capability-kits/*.edn` の
-   `:qualification` を引く。key の意味は `:reference`（KIR インタプリタ）/
-   `:wasm-aot`（`wasm32-browser-kotoba-v1` + `kotoba:typed/cap-call`）/
-   `:wasm32-kotoba-v1`（clock の i64 `kotoba:cap/call` 面 —— **その target に
-   コンパイルできることと、その host 面で動くことは別の主張**なので別 key）/
-   `:native-aot` / `:jit`（kotoba-script `:js-kotoba-v1` を V8 で実行）。
-   **値は kit ごとに違う**ので「N kit とも同じ」という形の要約を作らない。
-
-   ```bash
-   nbb --classpath ".:scripts/nbb_compat" -e '
-   (ns x (:require [clojure.edn :as edn] ["fs" :as fs] ["path" :as p]))
-   (def dir "orgs/kotoba-lang/amu/resources/kotoba/lang/capability-kits")
-   (doseq [f (sort (fs/readdirSync dir))]
-     (println (.padEnd (subs f 0 (- (count f) 4)) 20)
-              (pr-str (:qualification (edn/read-string (fs/readFileSync (p/join dir f) "utf8"))))))'
-   ```
-
-   **grep で代替しない。** `grep -A6 … | cut` で試したところ、行の折り返しのせいで
-   ちょうど `:jit` が 5 kit 分だけ末尾で切れ、**切れたことが出力から分からなかった**
-   （「測れなかった検査が、測って問題が無かった検査と同じ顔をする」の小型版）。
-   key の集合も kit ごとに違う（`stream-object-v1` だけ `:frontend` / `:wit-03` /
-   `:restricted-esm` という別語彙）ので、reader で読んで map ごと出す。
-
-   kit ファイルは pending の理由まで書いている（例: ui-v1 の `:native-aot` は
-   「未着手」ではなく `[:set [:record …]]` が one-word 値でないという**測定された
-   拒否**で、同じ native に dataspace は qualified 済み）。**pending を「誰も試して
-   いない」と読まない。**
-
-   ⚠ **この項目自身が 3 週間ずれていた。** 旧文は「全 8 kit が `:wasm-aot` /
-   `:native-aot` / `:jit` とも pending」という **2026-07-27 の測定値**を定数として
-   持ち、2026-08-18 に引用された時点で実態と食い違っていた（kit ファイル側は
-   `Measured 2026-08-18` と日付を書いて更新し続けている）。**「今日の既知ブロッカー」
-   という見出しの節に値を書けば、その値は明日も「今日」として読まれる。**
-   ここに残してよいのは*引き方*であって*引いた結果*ではない。
-4. **ingress capability は在る**（`capability-kits/http-ingress-v1.edn`、host-injects /
-   guest-polls の accept-then-reply、queue 深さ 8、body 64 KiB）。**ただし ingress 系の
-   qualification は他 kit と揃って進まない** —— Cloudflare Worker のエントリを Kotoba に
-   移す前に、item 3 のコマンドで `http-ingress-v1` / `stream-ingress-v1` の行を実際に
-   見る（ADR-2606290000 と整合）。2026-08-08 訂正: 旧文は「どちらの面にも無い」と
-   書いていた。
-5. **`kbb`（Kotoba script host）は在るが、まだ script host の正本ではない** — build
-   スクリプトは nbb 据え置き（上の nbb-only 節）。⚠ **2026-09-06 訂正: 旧文は「kbb は無い」
-   と書いていたが偽だった。** `kotoba-lang/kotoba` に `bin/kbb`（JVM bootstrap）、
-   `--backend native`（ADR-2609051100）、`bin/kbb_js.cljs`（ADR-2609062200）が在り、
-   同じ policy で同じ script が native と js で同じ値を返す（demo_kbb_fs_read_native = 84）。
-   script が書く相手は `lib/kbb/*.kotoba`（`--source-path lib`）で、wire id を script に
-   書かない。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
-   ではない（名前で誤解しないこと）。
-   ⚠ **2026-09-06 訂正: 旧文はここに「fs/process/exec capability も無い」と書いていたが偽だった。**
-   `amu/resources/kotoba/lang/capability-catalog.edn` の `:capabilities` は `:fs/transact`
-   `:fs/browse` `:fs/app-data` `:process/spawn` `:env/read` `:git/run` `:secret/get`
-   `:screen/act` `:code/eval` 等を、**wire id を持つ admitted な source 操作**として持っている
-   （`:source-status :friendly-qualified`）。無いのは *kit ファイル* の方で、typed
-   request/result schema と backend qualification 行がまだ書かれていない。
-   **したがって「その capability は在るか」と「その backend で動くか」は別々に引く** ——
-   前者は `capability-catalog.edn`、後者は `capability-kits/*.edn` の `:qualification`。
-   どちらの件数もここに書かない（動くので）。
+- **新規の `.kotoba` は `amu compile` 経路で書く。legacy emitter（`kotoba wasm emit` /
+  `kotoba cljs emit`）を使わない。** legacy の制約（単一ファイル・127 バイト文字列
+  上限・貧弱な型）を「Kotoba 言語の限界」と誤認しない。
+- ⚠ **compiler repo は `kotoba-lang/compiler` から `kotoba-lang/amu` に改名済み**
+  （west entry は撤去済み）。読むのも走らせるのも `orgs/kotoba-lang/amu`。CLI の front は
+  `bin/amu`。native backend は `kotoba-native`、KIR は `kotoba-kir`、restricted-ESM
+  emitter は `kotoba-script`、実行/runtime linking は `kototama` に分かれている
+  （ADR-2608139980 の 綾 分割）—— **amu に無いからといって「無い」と結論しない。**
+- **ブラウザ / Worker の既定 target は `wasm32-browser`**（`bin/amu` はこれを nbb で
+  走らせる = JVM を起こさない）。JVM が現れるのは `cljs-browser` に落ちたときだけ。
+- **capability kit の qualification・admission gate の型集合・stdlib の中身・ADR 番号を
+  この文書に書き写さない。** 正本は
+  `amu/resources/kotoba/lang/capability-kits/*.edn` の `:qualification`、
+  `amu/resources/kotoba/lang/capability-catalog.edn`、`kotoba-kir` の
+  `only-native-word-typed-features?`、`kotoba-lang/lang/stdlib/core.kotoba`。
+  **その場で読む**（読み方は skill）。grep は行の折り返しで静かに切れるので使わない。
+- **「その capability は在るか」と「その backend で動くか」は別々に引く** ——
+  前者は capability-catalog、後者は kit の `:qualification`。
 
 ## `.kotoba` で「書けない」は 2 種類ある — 恒久と一時を混ぜない（repo-wide mandatory、2026-08-08、ADR-2608650000）
 
-**`.kotoba` で何かが書けないと結論する前に、それが「恒久の安全設計」なのか
-「backend がまだ追いついていない」だけなのかを、必ず分類してから書く。** 両者は
-どちらも「使えない」として同じ形で現れるので、分類を書かなければ読み手は全部を恒久だと
-読み、**backend が追いついた後もその自己制限を守り続ける**。
+**「`.kotoba` でこれは書けない」と結論する前に、それが恒久の安全設計なのか、
+backend がまだ追いついていないだけなのかを必ず分類してから書く。** 分類を書かなければ
+読み手は全部を恒久だと読み、**backend が追いついた後もその自己制限を守り続ける。**
 
 分類は推測しない。言語側が仕様として持っている:
+`kotoba-lang/kotoba-lang` の `lang/surface-status.edn` の **`:disposition`**
+（`:intentional-security-constraint` / `:intentional-semantic-simplification` /
+`:implemented-partial` / `:not-yet-implemented`）と、`amu` の
+`resources/kotoba/lang/application-language.edn` の **`:backend-qualification :rule`**
+—— *An unavailable backend is an implementation gap, not a reason to remove a specified
+safe language feature.*
 
-- **`kotoba-lang/kotoba-lang` の `lang/surface-status.edn` の `:disposition`** —
-  `:intentional-security-constraint`（安全不変条件。広げるには ADR と fail-closed 強制）/
-  `:intentional-semantic-simplification`（決定性・可搬性のため意図的に狭い）/
-  `:implemented-partial`（1 つ以上の backend で使える）/ `:not-yet-implemented`
-  （**安全上の禁止ではない**）。
-- **`kotoba-lang/amu` の `resources/kotoba/lang/application-language.edn` の
-  `:backend-qualification :rule`** — *An unavailable backend is an implementation gap,
-  not a reason to remove a specified safe language feature.*
+- **恒久として引き受けるのは 2 つだけ**: ①**untracked control effect の禁止**
+  （境界で返すのは `[:result T E]`。恒久なのは「追跡されない制御効果」の禁止であって
+  `throw` という語の禁止ではない —— `throw` / `try` は既に admitted で、契約は
+  `lang/abort-ability.edn`）②**bool は数ではなく型**。
+- **eval / interop / defmacro は恒久**（definition CID と静的検査可能性そのものが
+  要求する）。ただし **typed eval は別物** —— CID を名指しする有界な拡張は仕様済み。
+  記法禁止には shielding axis が付いており（adr-2608301500）、**definition CID と
+  grant 交差 dispatch で防げる害には記法禁止を恒久としない。**
+- **それ以外は一時制約として書く。** map / set / closure / HOF / 異種ベクタ /
+  再帰値 / `defrecord` / `defprotocol` / `defmulti` / local `atom` は landed。
+  **「native に無い」は、それ自体では言語の設計判断の証拠にならない** ——
+  backend ごとの現在地は skill のコマンドで**その場で測る**（2026-09-06 に、ここの
+  古い一句「native では無い」が実害を出した。ADR-2609062400）。
+- **一時制約に沿って書いたコードは、その旨と撤去条件をモジュールのヘッダに書く。**
+  書かなければ、後から読む者はそれを恒久の様式として模倣する。
+- **移行の単位は `kotoba/app` の vertical slice**（1 判断表ではない）。ADR-2608261100 /
+  ADR-2607279200 決定 5。**Q9 は decision-core fallback を移行単位として認めない** ——
+  backend が component 全体を admit できない場合、その移行は `:blocked` である。
+  機械正本は `kotoba-lang/lang/q9-migration.edn`。
 
-**したがって「native に無い」は、それ自体では言語の設計判断の証拠にならない。**
+## design system 5 repo は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
 
-### 恒久として引き受けるのは 2 つだけ（2026-08-30 精密化: 恒久は性質であって記法ではない）
-
-| 制約 | 出典 |
-|---|---|
-| **untracked control effect の禁止** — 境界で返すのは `[:result T E]`。**恒久なのは「追跡されない制御効果」の禁止であって、`throw` という語の禁止ではない**（2026-09-06 訂正、下記） | `:invariants :explicit-errors`。改訂は ADR-2608650000 + adr-2608301500 |
-| bool は数ではなく型 | `:invariants :bool-is-a-type-not-a-number` = `:intentional-semantic-simplification` |
-
-`ex-info` → Result は後戻りしない設計変更なので、移行の副産物にせず正面からやる。
-
-⚠ **`throw` / `try` は既に admitted である**（2026-09-06 実測）。旧文はこの表で「ambient
-`throw` / `try` / `catch` を使わず」「wasm/cljs でも拒否」と書き、typed abort ability を
-「前提条件 landed 後に widening 可」と将来形で述べていたが、**widening は部分的に landed
-している**。`lang/guest-grammar.edn` の `:sugar` に `:throw` / `:try` が在り、契約は
-`lang/abort-ability.edn`。
-
-効くのは拒否の側で、そこは強い —— **abort する関数は export できない**、`throw` は
-loop / doseq / dotimes の body・lazy thunk・fn literal の中で拒否、effect row に
-`:dataspace/*` を持つ関数でも拒否。**書き方の既定は変わらない: 境界は `[:result T E]`。**
-
-**現在地は `lang/surface-status.edn` の `:invariants :explicit-errors :widening` を引く** ——
-slice 番号も、どの precondition が `:met` でどれが残っているかも、そこが持つ。ここに書き写さない。
-
-**記法制限には shielding axis が付いた（adr-2608301500、2026-08-30 オーナー指示）。**
-禁止が守る性質を 5 軸（`:code-identity` / `:dispatch-bypass` / `:authority` /
-`:control-effect-tracking` / `:resource-bounds`）で名指しし、**definition CID
-（Unison 的 identity）と grant 交差 dispatch（biscuit 的 authority）で防げる害には
-記法禁止を恒久としない**。`:authority` 軸は `:state` ability への desugar という widening
-path を持ち、**その一部は既に landed している**（2026-09-06 訂正。旧文はこの軸をまるごと
-「fail-closed に拒否のまま」と書いていた）:
-
-- **`atom` / `swap!` / `reset!` / `deref` は書ける** —— local-state slice 1、オーナー判断
-  2026-09-02「build it, fail-closed, in slices」。ただし cell は**それを束縛した関数本体から
-  逃げられない**: 引数として渡す・返す・コレクションやレコードに入れる・fn literal に捕捉
-  する・loop / doseq / dotimes の中で読む、はいずれも名指しで拒否される。**逃げる cell、
-  関数を跨ぐ cell、1 回の呼び出しより長生きする cell は今も host kit + grant。** escape 規則
-  の全列挙と拒否メッセージは `lang/local-state.edn`（`:escape-rule` / `:refusals`）。
-  これは「1 つの `let` の中の可変」であって、`app-db` や ratom がここに入るわけではない。
-- **`volatile!` / `ref` / `dosync` / `binding` / `var` / `set!` は今も forbidden head**
-  （`lang/guest-grammar.edn` の `:forbidden-heads`）。`:state` kit の desugar 自体も
-  fail-closed のまま。
-
-eval / interop / defmacro は CID と静的検査可能性そのものが要求するので恒久（機構が成熟しても
-解禁されない）—— **ただしここで言う eval は生の `eval` であって、typed eval は別物**
-（2026-09-06 追記）。`(eval request)` は DefCID を名指しする有界な document を取り、安全性に
-`:no-source-text` を持ち、typed interface / effect row / allowed effects / fuel / max-depth で
-受理される（`lang/surface-status.edn` の `:other-gaps :typed-eval`、`:disposition :implemented`）。
-⚠ **この repo では実行できない**（同項の `:execution-in-this-repo :blocked` —— provider が
-未実装）。拡張点を設計するときは「**ソースを渡す plugin は恒久に不可、CID を名指しする拡張は
-仕様済み・ただし provider 待ち**」と読む。
-正本は `kotoba-lang/kotoba-lang` `lang/surface-status.edn` の `:shielding-axis`。
-
-### それ以外は native 追随を前提とした一時制約として書く
-
-map / set / 永続コレクション・closure / HOF・異種ベクタ・再帰値はすべて
-`:implemented-partial` で landed している。
-
-⚠ **旧文はここに「native に無いだけ」と続けていた。2026-09-06 に実測して偽。**
-`amu compile --jvm-free --target aarch64-macos` で `atom`/`swap!`/`deref`、
-`defrecord`+アクセサ、`defprotocol`+`extend-type`、`fn` を値として渡す高階関数の
-4 つとも通り、**kexe loader で実行して正しい値を返した**（12 / 74 / 15 / 7）。
-コンパイルが通ることと動くことを分けて確かめている。
-
-この一句は 1 日で実害を出した。**同じ段落の末尾が「これらを『無い』と仮定して
-判断核だけを切り出す設計にしない」と警告しているのに、その直前の一句が
-「native では無い」と言っていたため、native を target にした slice が
-判断核だけになった**（cloud-itonami-isic-6820 の kumiai actor、ADR-2609062400）。
-警告文は、その手前の断定に負ける。
-
-**backend ごとの現在地はここで読まない。1 コマンドで測る**（`:implementation`
-集合は surface-status 側でも更新が遅れうる —— 実測時、そこは HOF を
-`#{:compiler :kotoba-wasm :kotoba-cljs}` とだけ書いていたが native で動いた）:
-
-```bash
-A=orgs/kotoba-lang/amu/bin/amu
-printf '(ns t (:export [main]))\n(defn main [] :i64 (let [c (atom 0)] (swap! c + 5) (deref c)))\n' > /tmp/t.kotoba
-$A compile /tmp/t.kotoba --jvm-free --target aarch64-macos --output /tmp/t.kexe
-$A extract-native /tmp/t.kexe --symbol main --output /tmp/m.bin   # :offset を控える
-cc -O2 -o /tmp/loader orgs/kotoba-lang/amu/tools/kexe_loader.c
-/tmp/loader /tmp/m.bin <offset> 0 aarch64 -                        # 値が返る
-```
-
-⚠ **拒否メッセージを「その機能が無い」と読まない。** 実測 2026-09-06、
-`defprotocol` の `requires unique bounded (method [this ...]) signatures` と
-`fn value requires unique arities with zero to four unique parameters` は
-どちらも**書式の指摘**で、シグネチャの型注釈と `fn` リテラルの戻り値注釈を
-外したら両方 native まで通った。1 回目の拒否で止めると、実装状態どころか
-自分のタイプミスを言語の天井として記録することになる。**`defrecord` / `defprotocol` / `extend-type` / `extend-protocol` も同様に
-landed**（`:protocol-and-record-dispatch`。profile は `bounded-closed-world-static-dispatch`、
-`:dynamic-fallback false`、未知または未実装の receiver はコンパイル時に拒否）。`defmulti` /
-`defmethod` も `:closed-multimethod` として desugar される（hierarchy・preference・実行時拡張は
-持たない）。first-class closure（`fn` / `invoke` / `apply` / `fn-ref`）も landed で、設計に
-効くのは実装の有無ではなく **arity の上限**の方（`:first-class-closure-values :bounds`）。
-**これらを「無い」と仮定して判断核だけを切り出す設計にしない。**
-bare `:bool` パラメータは compiler ADR 0219 が自ら
-*a real gap … in the INTERPRETER, not in either backend* と書いており解消途中。
-**正規表現は `:forbidden-heads` に無い**（`value-codec.edn` の `:rejected-closed :regex` は
-「正規表現を値として転送できない」という正準エンコーディングの話で、演算の禁止ではない）。
-
-**一時制約に沿って書いたコードは、その旨と撤去条件をモジュールのヘッダに書く。**
-書かなければ、後から読む者はそれを恒久の様式として模倣する。
-
-### 移行の単位は kotoba/app の vertical slice である（ADR-2608261100）
-
-Kotoba は safe application language である（ADR-2607201300）。source は
-Clojure-shaped のまま、`kotoba/app` が第一候補。切り方は guest と host
-（ambient authority）であって、判断と残りではない。narrow-slice-only は
-2607201300 が削除済み。判断核を既定にすると、ADR-2607141900 と同じ誤りになる。
-
-既定の移行は ADR-2607279200 決定 5 の 4 分類である。portable な product
-semantics を普通の Kotoba 値（map / 文字列 / record / document / `cond`）として
-移し、ソケット・credential・DOM 破壊は host に残す。vertical slice は
-capability が conformance を通った一本の製品経路（state → effect → event →
-governor → UI → checkpoint）。1 判断表ではない。1 commit を有界にするのは
-正しい。有界はスカラーを意味しない。参照は amu の `examples/todo-app.kotoba`
-（`init` / `view` / `step`）。kit の現状は
-`amu/resources/kotoba/lang/application-language.edn` をその場で読め。
-
-**2026-08-30 の Q9 whole-component 決定は、決定核 fallback を移行単位として
-認めない。** backend が component 全体を admit できない場合、その移行は
-`:blocked` である。predicate、decision core、caller が前計算した scalar shadow は
-compiler research / historical fixture にはできるが、移行進捗、consumer cutover、
-旧 source 削除の証拠にはならない。
-
-文字列禁止ではない（ADR-2608261000）。`.cljc` oracle は slice の gate が揃うまで
-残し、`.kotoba` を require しない。oracle は照合用の写しであり、意味の正本ではない。
-コマンド文字列はゲストの product semantics である。『コマンド文字列は `.cljc`』は
-不適切（ある日の SMTP fallback を言語にした読み）。mirror を作らない。正規表現走査は
-移す前に宣言データへ直す。依存が `.cljc` のままの面は移行しない。
-
-Q9 の移行単位は namespace / deployable component の全 public surface と transitive
-source closure。機構だけを capability provider import に残す。各 target は verified
-native `kotoba check` / `kotoba compile` / `kotoba rad build` と、
-`amu check --jvm-free` / `amu compile --jvm-free` の両方を通す。acceptance では
-`java` / `javac` / `clojure` / `clj` を deny/trace し、未対応 target、lock failure、
-JVM-free project linker 未達は fallback せず block する。
-
-oracle parity は nbb/CLJS、native、Wasm、または content-addressed golden vector で
-全 public surface を照合する。JVM oracle は historical/non-gating。両 build の
-payload CID、definition CID、exports/imports、effects、resource bounds が一致するまで
-consumer cutover しない。機械正本は
-`orgs/kotoba-lang/kotoba-lang/lang/q9-migration.edn`、Kototama 採用記録は
-`orgs/kotoba-lang/kototama/qualification/q9-whole-component-build.edn`。既存の
-JVM/Chicory tender と Clojure compiler path は compat/diagnostic であり、Q9 を
-green にできない。
-
-### native の現在地の読み方
-
-**`amu/docs/native-aot-baseline.md` を引用しない** — ADR 0063 で更新が止まっており、
-*there is still no native provider/capability mechanism at all* と書いていて native を
-実際より低く見せる。現在地は次の 3 つから**その場で読む**:
-
-1. **admission gate** `kotoba-lang/kotoba-kir` の `src/kotoba/kir.cljc` の
-   `only-native-word-typed-features?` と `native-word-value-type?` — 名前のとおり
-   1 ワードで表せる値しか通さない。**通る型の集合はその場で読む** — 後から足された
-   型がある（`:document` は string と同じ pair(offset,length) として入った）。
-   `typed-cap-call` は固定の型対に加えて `native-provider-contract?` が認めた
-   provider 契約も通るので、**「N 組のみ」と要約しない**。
-2. **kit の `:qualification` 行** — 読み方は上記「今日の既知ブロッカー」item 2 の
-   reader スニペット。**値をここに書き写さない**（kit ごとに key の集合も値も違い、
-   grep は行の折り返しで静かに切れる）。
-3. **ADR 系列** `orgs/kotoba-lang/amu/docs/adr/` を `ls | tail` で末尾から読む。
-   **番号の上限をここに書かない** — 書いた瞬間に天井として引用される。
-
-⚠ **この 3 つは 2026-08-19 時点で 3 つとも実測値がずれていた**（kit 数・native-aot の
-可否・admission gate の型集合・ADR 番号）。読む先が `compiler/` になっていたのも一因で、
-正しくは `amu/`（改名済み。west に残る `compiler` entry は古い pin の別 checkout）。
-**この節に測定値を書き足さないこと** —— 直近 3 回の陳腐化はすべて「日付付きで値を書いた」
-ことが原因で、引用する側は日付を落とす。
-
-可搬 stdlib は `kotoba-lang/lang/stdlib/core.kotoba`。`select-keys` `merge` `update`
-`group-by` `every?` `some` `concat` `comp2` `partial1` 等は**在る**。無いのは `get-in`
-`sort-by` `juxt` `mapv` `keep` `remove` `for` と `str/*` 全般、そして**バイト走査**
-（`skip-spaces` / `digit?` / 大小無視比較のような、行指向プロトコルが必ず要るもの）。
-**「stdlib に無い」と言う前にこのファイルを引く**（索引を引いてから「無い」と言う規則が、
-repo だけでなく言語の stdlib にも当たる）。
-
-⚠ **`compile --prelude` で取り込めると書いてあったのは誤り**（2026-08-30 に訂正）。
-`--prelude` を読むのは **CLJS backend だけ**で、`kotoba.compiler.nbb.*` の entry point は
-どれもパースしない。実測（amu `2cb7d3f`、JDK 無し）: stdlib 専用の名前（`comp2` /
-`stdlib-binary-closure-anchor`）を単一ファイルで呼ぶと `:subset-reject`、**`--prelude` を
-付けても一字一句同じ拒否**。`grep -c prelude` は wasm_cli / x86_64_cli / aarch64_cli とも 0。
-つまり**フラグは黙って無視され、他の経路では緑を返していた**。amu#709 で exit 64 に
-fail-closed 化した。
-
-**したがって単一ファイルの guest は stdlib を引けない。** 共有する経路は project route
-（`--source-path` / `--module-lock`）である。
-
-⚠ **この節は 2026-08-30 に「project route は CLI では JVM 経由になる」と書いていた。
-2026-09-01 に project mode は全部 Node へ移り、`bin/amu` の `jvmOnlyProjectMode` は
-関数ごと消えた。** `--source-path` は 2026-08-31（amu#717、`kotoba.compiler.nbb.project-files`）、
-`--module-lock` は 2026-09-01（amu#728、`kotoba.compiler.nbb.module-lock`、ADR 0289）。
-どちらも同じ portable な `project/link-source` に渡す:
-
-```bash
-amu compile main.cljk --source-path <dir> --target wasm32 --jvm-free            # exit 0
-amu module-lock main.cljk --source-path <dir> --blocks <dir> --jvm-free         # exit 0
-amu compile --module-lock lock.edn --blocks <dir> --target wasm32 --jvm-free    # exit 0
-```
-
-実測（`clojure` と `java` を PATH から外し `JAVA_HOME=/nonexistent`）: 2 module の
-project が通り、生成 wasm が `run(5) = 11` を返す（= もう一方の module のコードが
-走っている）。
-
-- **再現可能な build も、もう JVM を通らない。** lock を**作る**側（`amu module-lock`）も
-  同じ日に移した —— 消費だけ移すと JDK が全 pinned build の 1 段上流に移るだけで、
-  Q9 の反論は答えたことにならない。lock の全 refusal（未 pin の依存 / CID に hash
-  しない block / block store の不在 …）は message ごと保存されており、path fallback は
-  無い。実測: JVM 経路と突き合わせて **lock.edn・block CID・`.wasm` はバイト一致**。
-  **provenance だけは 1 フィールド（`:build-metadata-sha256`）違う** —— これは
-  `--source-path` でも同じに出る path-resolver 移植由来の既存差で、route を跨いで
-  provenance を照合する consumer は 2 つを同一視できない。
-- したがって「JVM-free を保つには単一ファイルにするしかない」はもう成り立たない。
-  実測 2026-08-30 に見つかった重複 —— `org-ietf-smtp` / `org-ietf-pop3` /
-  `org-ietf-imap` の 3 repo が同じバイト走査（空白送り・数字判定・大小無視比較）を
-  **別々の名前で 3 回**書いている —— は、いま共有できる。
-- **共有先の実例**: `kotoba-lang/kotoba-lang` の `lang/compat/clojure/string.kotoba`。
-  `.cljc` の `(:require [clojure.string :as str])` がそのまま解決する
-  （`--source-path <kotoba-lang>/lang/compat`）。**ただし置いてあるのは
-  `clojure.string` と厳密同値な 3 つ（`starts-with?` `ends-with?` `includes?`）だけ**
-  で、`index-of` `blank?` `trim` `lower-case` 等が**無い理由は 1 件ずつ
-  `lang/compat.edn` に書いてある** —— Kotoba の文字列面は UTF-8 バイトで addressing
-  されるので、それらは近似にしかならない。**近似を本名で置かない。**
-
-## design system（css / html / shitsuke / liquid-glass-ui / kotoba-ui）は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
-
-**この 5 リポジトリを「`.cljc` のまま維持する層」と扱わない。** `.kotoba` へ移行する方針が
-決まっている。これらは本質的に「データ → 文字列」の純関数群（token map → CSS 変数、
-hiccup → HTML、opts → component）で `->page` は文字列を返すため、**capability は一切不要で
-`kotoba/pure` に収まる**。
-
-**ただし string-only SSR を最終 API にしない（ADR-2607279200 Delivery #6 /
-migration plan L201）**: *"Do not make string-only SSR the final abstraction. Start cutover
-when the shared logical value and both required renderers for that tranche are qualified."*
-つまり本格的な切り替えは **W4（recursive logical values）と両 renderer の qualification 後**に
-始める。それ以前に書くものは oracle 付きの先行実験として扱い、最終 API として固定しない。
-
-**進捗**: `css` は形 A で移植済み（2026-07-27、kotoba-lang/css#2）——ただし上記のとおり
-**W4 に先行した oracle 付き実験**であって「5 段階の 1 段目完了」ではない。`kotoba/css_core.kotoba` +
-byte 一致 parity gate（KIR インタプリタを同一 JVM で回す / compiler は test-only 依存）。
-`css.core` 自体は無変更で、facade の裏に置く方針を踏襲。後続で効く実測知見:
-**数値→文字列の組み込みが無い**（桁を literal から `string-substring` で引く）・**正規表現が無い**
-（`string-contains?` で代替）・**`or` は bool でなく i64 を返す**（`if` の入れ子で畳む）・
-例外の代わりに `[:result T E]` を返す。なお原典 `css.core/declarations` は**宣言 8 件超で
-順序が未規定**（Clojure map が hash-map に切り替わるため。実測済み）で、移植版は
-`typed-map-entry-at` のキー昇順で決定的。
-
-### `document-bool` に i64 を渡すと、`amu check` は通り**実行時に**落ちる（2026-08-31 実測）
-
-上の「`or` は bool でなく i64」は css 移植の知見だが、**`document-bool` 経由で表面化すると
-症状が変わる**。実測（`org-ietf-ers` の chain slice、amu 88ae83e）:
-
-- `and` / `or` に型注釈が無いと i64 になる。**keyword 同士の `=` も同じ**。
-- それを `(document-bool …)` に渡しても `amu check` は **`:ok true` を返す**。
-- 落ちるのは **export を実行した瞬間**で、`value is not a boolean`（`:phase :value`、
-  `kotoba.kir.value/bounded-typed-value!`）。
-
-**型の誤りが check を素通りして、値の構築時に初めて出る。** `cond` や `if` の*テスト位置*
-では強制されるので、そこだけ見ていると気付かない。**document 構築に到達する bool は
-全部 `if` に畳む**（`(if (= t :no) true false)` まで含めて）。
-
-同日のもう 1 つの実測: **`new` は local 名にできない**。`:forbidden-heads`（interop）に
-在るので `(let [new …] …)` は shadowing 警告ではなく `invalid local binding` になる。
-
-**移行順序は依存順に厳守する**: `css` → `html` → `shitsuke` → `liquid-glass-ui` → `kotoba-ui`。
-逆順・同時並行は依存を壊す。移行が完了するまでは skill `kotoba-uiux` の既存ルール
-（app は `kotoba-ui.core` のみ require、raw hex 禁止、layout は shell から）がそのまま有効で、
-**移行途中のリポジトリを app から直接 require しない**。
+`css` / `html` / `shitsuke` / `liquid-glass-ui` / `kotoba-ui` を「`.cljc` のまま維持する層」と
+扱わない。**移行順序は依存順に厳守**（`css` → `html` → `shitsuke` → `liquid-glass-ui` →
+`kotoba-ui`）。逆順・同時並行は依存を壊す。**移行途中のリポジトリを app から直接
+require しない**（skill `kotoba-uiux` の既存ルールが移行完了までそのまま有効）。
+**string-only SSR を最終 API にしない**（ADR-2607279200 Delivery #6）。
 
 ## kotoba の実行は最終的に JVM/Node/Rust を経由しない（ADR-2607198300、2026-07-19）
 
-**kotoba-lang における「実行時に JVM/Node/Rust を迂回しない」とは、kotoba 自身の
-コンパイラ（cljc）が AOT コンパイルを、独立して直接実行可能なネイティブ artifact
-まで最後まで面倒を見ることを意味する。** 配布される実行成果物が JVM/Chicory ホスト・
-JS エンジン（Node/browser）ホスト・新規 Rust 実行エンジンのいずれにも依存しては
-ならない。さらに **Q9 source migration は build/acceptance も JVM-free** である。
-verified native Kotoba CLI と Amu `--jvm-free` を使い、compiler、test、oracle の
-どこにも JVM を必須化しない。ADR-2607198300 の「compiler tool の JVM は問わない」は
-一般的な historical build の記述としてのみ残り、Q9 には適用しない。
+配布される実行成果物が JVM/Chicory ホスト・JS エンジンホスト・新規 Rust 実行エンジンの
+いずれにも依存してはならない。**Q9 source migration は build/acceptance も JVM-free**
+（verified native Kotoba CLI と `amu --jvm-free`。`java` / `javac` / `clojure` / `clj` を
+deny/trace し、未対応 target は fallback せず block する）。
 
-- **kototama 自身の maturity ladder（`orgs/kotoba-lang/kototama/docs/maturity.md`）
-  には JVM/JS 以外の層が無いことを直接確認済み**: R0 contract → **R1 JVM/Chicory
-  (stable)** → **R2 browser-native (advanced-partial)** → R3 fleet-on-R1。
-  R2 は「browser-*native*」であって machine-native ではない——JVM でも Node でも
-  ないことを理由に R2（`wasm-webcomponent`/`kgraph.js`）で妥協しない。
-- **Rust は書かない（新規の実行エンジンとして）。** `90-docs/adr/2607072000` が
-  kotoba-lang 全体に「Rust が必要な実装は全て cljc」を明文化済み
-  （kotoba-lang/kotoba 自身の旧 ~38万行 Rust crate 群を撤去した実績が根拠）。
-  wasmtime 埋め込みホスト等を新規 Rust で書くのはこの accepted ADR に反する。
-- **許容される非 cljc コードは「判断を含まない機構 (mechanism) 層」だけ**
-  （ADR-2607241100 D6 / aiueos ADR-0015 で従来の「crt0 相当シムのみ」表現を
-  実態に合わせて再定義、2026-07-24）。実測: `kotoba-lang/aiueos` の
-  `os/aiueos/kernel` は C/asm 約5,000行超（pci.c 1178 / main.c 690 /
-  scheduler.c 570 等）を持つが、**C はレジスタ/MMIO/GDT/IDT/ページング等の
-  機構のみを所有し、判断（SHA-256/RSA-2048 検証・ELF/catalog/journal
-  admission・capability 発行/委譲/世代付き失効・dispatch 計画）はすべて
-  compiler-emit の `.kotoba` オブジェクト**。レビュー可能な性質は
-  「decision-free C mechanism」であり、新しい admission/validation 経路は
-  必ず Kotoba object として書く（C に判断ロジックを足さない）。汎用ランタイム
-  や Rust 代替としての C 導入は引き続きこの例外に含まれない。
-- **`kotoba-lang/kotoba-native` に、まさにこれを実現するネイティブ AOT バックエンドが
-  既に実在する**: `src/kotoba/native/x86_64.cljc` / `src/kotoba/native/aarch64.cljc`
-  ——生の機械語オペコードを直接 cljc で手書き emit（SysV/AAPCS64 ABI、fuel計測、
-  末尾自己再帰最適化、`pair`ヒープアリーナ）。実ネイティブプロセス実行の証明
-  （`result 42`・trap/signal検知・ヒープアリーナ動作）は amu 側の
-  `test/kotoba/compiler/native_executor_test.clj`、ホスト側の非 cljc コードは
-  amu の `tools/kexe_loader.c`（+ `_windows.c`、SHA256ピン留め・レビュー済み）。
-  **新しいネイティブ実行経路を探す前に、まずこのバックエンドを確認する
-  （ゼロから設計しない）。**
-- ~~現状のギャップ: この native backend は `kgraph-assert!`/`kgraph-query` を
-  まだサポートしない~~ **→ 解消済み（2026-07-24 実測、adr-ledger seq 41 で
-  ADR-2607198300 に amend 済み）**: x86_64/aarch64 backend は
-  `kgraph-assert!`/`kgraph-get`/`kgraph-count`/`kgraph-entity-at` を実装済みで、
-  `native_executor_test.clj` の kgraph-native-customer-pilot が実 kexe loader
-  実行で証明している。この capability gap を理由に native 経路を避けない。
-  詳細・調査経緯は ADR-2607198300 / ADR-2607198200 / ADR-2607241100 を参照。
+- **Rust は書かない**（ADR-2607072000: kotoba-lang 全体で「Rust が必要な実装は全て cljc」）。
+- **許容される非 cljc は「判断を含まない機構 (mechanism) 層」だけ**（ADR-2607241100 D6）。
+  実例 `aiueos`: C はレジスタ / MMIO / GDT / ページング等の機構のみを所有し、判断
+  （署名検証・admission・capability 発行/失効・dispatch 計画）は compiler-emit の
+  `.kotoba` object。**新しい admission / validation 経路を C に足さない。**
+- **ネイティブ AOT backend は既に実在する**（`kotoba-native` の `x86_64.cljc` /
+  `aarch64.cljc`、ホストは amu の `tools/kexe_loader.c`）。**新しいネイティブ実行経路を
+  探す前にこれを確認する（ゼロから設計しない）。**
