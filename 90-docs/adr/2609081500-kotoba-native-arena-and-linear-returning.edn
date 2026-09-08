@@ -1,0 +1,165 @@
+[{:db/id -1
+  :adr/id "adr-2609081500-kotoba-native-arena-and-linear-returning"
+  :adr/title "A Kotoba guest runs natively: exact artifact reads, a caller's oracle budget, named vector arenas, and an accumulator that may be handed back"
+  :adr/status "accepted"
+  :adr/date "2026-09-08"
+  :adr/body "A Kotoba guest could not be a native binary for two reasons at once, and
+neither was where the search started. This session found both by RUNNING
+things rather than reading them, and closed both.
+
+## 1. The compiler could not read its own artifacts exactly
+
+`amu extract-native` read the sealed `.kexe` with `cljs.reader/read-string`,
+which returns a `js/Number` for every integer token. A Number cannot hold an
+i64. Measured on SHA-512 compiled to aarch64-macos: 347 integer literals, 106
+past 2^53, the first round constant coming back 4794697086780616226 ->
+4794697086780617000. The seal is over the exact values, so the command
+refused its own compiler's output as \"artifact integrity mismatch\".
+
+Nothing here could see it. Every fixture that reached the command had
+constants under 2^53, where a Number is exact.
+
+Reading exactly then exposed three more, each of which had been invisible for
+the same reason -- nothing JVM-free had ever executed the path:
+
+  - osaho: the native admission gate did not name the i64 shift family, so
+    SHA-512 (rotations over a :vector-i64) was refused for aarch64 with a
+    message about typed values that named no shift
+  - kotoba-verifier: seven gates in the .cljs branch of verify-artifact! read
+    the JVM's representation. The seventh was not a refusal but a host
+    TypeError -- a param index out of an artifact is a bigint and nth will
+    not take one -- reported as :kotoba/internal-error, which sends the reader
+    to look at the compiler
+  - kotoba-mir: aarch64-fuse-zero-equality-branches tested its constant with
+    zero?, false for a bigint, so the fusion never fired for a literal that
+    came from the READER -- every literal in real source. (if (= a 0) a a) was
+    24 bytes on the JVM-free front and 12 through the JVM, FOR THE SAME
+    PROGRAM. Emission had stopped being a function of the KIR value, which is
+    what makes an artifact verifiable at all
+
+## 2. lower's constant oracle ran on a budget no caller could name
+
+`kotoba.kir/lower` seals a pure entry's value by EXECUTING it, on a private
+100,000. `--fuel` reached the artifact's :limits and the verifier's
+re-execution and stopped there, so a program costing more was refused as
+`fuel-exhausted` whatever its author declared. Measured on the X25519
+Montgomery ladder: identical refusals at --fuel 60000000 and at
+--fuel 9007199254740991, the largest budget KIR admits.
+
+## 3. The loader's vector arenas were compile-time constants with no name
+
+kexe_loader.c bounded vector allocation twice over -- a table of handles and
+an arena of items -- and its own comment recorded that raising either \"is a
+separate decision with its own fail-closed argument, and it has not been
+made\".
+
+The decision made here is NOT a bigger constant. Both numbers stay where they
+were and become DEFAULTS of a per-run budget (KEXE_VECTOR_CAPACITY /
+KEXE_VECTOR_ITEM_CAPACITY), parsed the way KEXE_FUEL was, capped so the two
+arenas together cannot exceed 1 GiB. A guest that ran before runs
+identically; one that did not still refuses unless its caller asks.
+
+The half worth more than the raise: exhaustion had no NAME. All ten arena
+sites raised SIGILL and the report described the PAIR heap, untouched by
+vector work, so a guest that outgrew an arena looked like a miscompilation.
+Both loaders now name which arena filled and carry both in every report.
+
+## 4. Why 32 million items, and the language change that answered it
+
+X25519 took 1,165,132 handles and 31,933,313 items -- 274 MiB. Not a large
+working set; one small working set copied several hundred thousand times.
+
+The mechanism, measured with four probes: A LINEAR VECTOR MAY NOT BE
+RETURNED. position-ok? treats a bare target as an escape, correctly, so a
+function that builds a vector and hands it back can never write in place. The
+identical fused read-modify-write loop is refused when its base case returns
+the handle and admitted when the base case consumes it.
+
+kotoba-sema a2ee65ac answers it over the MODULE: module-linear-returning is a
+greatest fixpoint -- assume every parameter qualifies, drop those whose body
+or whose call sites refuse them, repeat. Sound by induction on call depth.
+TWO obligations, neither sound alone, each tested alone: the callee lets the
+handle escape nowhere but its return, and every caller gives it up at the
+call.
+
+Result, same programs and same answers, on aarch64 under kexe_loader:
+
+    field self-check   2,012 handles / 46,176 items -> 1,244 / 23,648
+    X25519 ladder  1,165,132 / 31,933,313          -> 300,908 / 6,366,337
+
+274 MiB down to about 54.
+
+## What is executed, and where
+
+  - SHA-512 (org-nist-sha2) in the Kotoba guest subset: compiles to
+    aarch64-macos, extracts, and the loader answers 0 -- and 1 with one
+    expected word perturbed
+  - x25519.field: 0 on the KIR oracle, 0 on wasm32, 0 as a native aarch64
+    binary; 1 with one expected byte perturbed
+  - x25519.core (the ladder): 0 on the KIR oracle and 0 as a native aarch64
+    binary against RFC 7748 section 5.2 vector 1, under a raised arena; 1
+    with one expected byte perturbed
+
+## Two defects found in work landed EARLIER TODAY by this same session
+
+Both are recorded because the pattern matters more than either.
+
+  - kotoba-sema deccd54 put a bare (catch :default ...) in a .cljc. Clojure
+    reads :default as a class name and refuses to compile the file, so the
+    repository's whole JVM suite stopped running -- and it went in green
+    because the run that reported green never compiled that namespace on the
+    JVM. Fixed in 92010a51: the guard is :cljs only, because a Clojure set
+    hashes a BigInt without complaint and a JVM catch there could only
+    swallow a real error
+  - the kotoba/x25519 guest, landed the previous day, had FIVE defects and no
+    entry to run. pack returned thirty-two zeros for every input; mul dropped
+    limbs 16..30 of every product; carry never stripped limb 15; the ladder
+    took its bits from the u-coordinate field element rather than the clamped
+    scalar; final-x inverted the unswapped lane. It compiled, and compiling
+    was read as working
+
+## Known hole, left open deliberately and asserted as such
+
+A function whose vector PARAMETER is linear in its own body earns
+vector-assoc! whatever its callers do, and has since the gate existed. It is
+observable: a bump helper called from a main that then reads its own handle
+answers 2 as an aarch64 binary and should answer 1 -- a reader saw a store it
+never asked for, and main writes no bang so the gate never looks at it.
+
+module-linear-returning is the machinery that would close it. REQUIRING it
+refuses two shapes that work today: a public helper whose callers are in
+another module (torihiki.book's slab/add!, which ADR-2609010500 exists for)
+and any function this module does not see called. Whole-program linking
+answers the first. That is a decision about the language, so the widening
+landed and the hole is asserted as an admission in kotoba-sema's sema_test,
+named so that closing it is visible, with a note to invert the assertion.
+
+## Landed
+
+  osaho 73243145      i64 shift family admitted beside a typed value
+  osaho c24c92a1      lower takes :oracle-fuel; default unchanged
+  kotoba-verifier ea50d8f2   seventh representation gate; fixture rebuilt
+  kotoba-mir ac690136 selection depends on the value, not the host's spelling
+  kotoba-native a5711bdc     that, pinned
+  artifact 678c0095 / a0b36af3 / e827c9ef   reviewed loader identities
+  kototama-native f6adc42f   the report carries the two arenas
+  kotoba-sema 92010a51       the JVM suite runs again
+  kotoba-sema a2ee65ac       linear-returning
+  kotoba-lang 49988eb7 / fc25c7ee / bb072c76   the decision and its evidence
+  org-ietf-x25519 8bee1104 / 85555d48   the guest, corrected and in place
+  amu 473e84ab (#888)  extract-native reads i64 exactly
+  amu 6e1c81db (#889)  the oracle runs on the declared budget
+
+## Resume point
+
+  1. amu PR 891 (agent/native-vector-arena) -- the loader arenas. Green when
+     last measured; merge it
+  2. carry is the remaining arena cost in x25519.field, and the reason is
+     precise: it reads limb i, computes a carry from it, and writes limbs i
+     and i+1. Hoisting the read into a let makes it a second use. Admitting a
+     let-bound read of v at k whose only other mention is a write at k in the
+     let's body is the same soundness argument with the binding in between
+  3. Ed25519 needs the Edwards layer and pow2523 on top of the corrected
+     field. Verify is two scalar multiplications, so budget roughly twice the
+     ladder: about 600k handles and 13M items after the in-place work
+  4. The known hole above, if the language decides for whole-program linking"}]
