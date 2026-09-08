@@ -9213,4 +9213,141 @@
      :find "\n[meta]\ntarget_model"
      :replace "\n[meta\ntarget_model"
      :must-fail ["REFUSED"]}]}
-]}
+
+  {:repo "orgs/cloud-itonami/hubspot"
+   :label "hubspot verify-record —— 実装 0 の repo で、唯一の実行物の拒否が今も拒否か"
+   ;; この repo は HubSpot 連携を 1 行も持たない。中身は retirement record が
+   ;; tx-data で書かれているだけで、**唯一の実行物**が scripts/verify-record.cljs
+   ;; である。その仕事は全部が拒否 —— parse 形状、schema との両方向の照合、
+   ;; heredoc が作る「途中で終わった文字列」、そして retired と宣言した 2 つの
+   ;; Wrangler surface の不在。
+   ;;
+   ;; landing まで、その拒否は **一度も起きたところを見られていなかった**。
+   ;; 無改変の record に対して verifier は OK を出すが、それは
+   ;; 「検査して問題が無かった」と「検査が噛まなくなった」で同じ値である。
+   ;;
+   ;; test は fixture を自分で作る。**実データでは拒否側を 1 つも discriminate
+   ;; できない** —— 3 文書はどれも健全なので、検査を全部消しても出力は変わらない。
+   ;;
+   ;; 拒否は exit と **理由の literal 両方**で pin してある。exit だけを見る probe は
+   ;; SyntaxError を門として数える（:vr/directory-refusal-stops-naming-its-reason が
+   ;; ちょうどその形を突く —— exit 2 は変わらないまま理由だけが消える）。
+   ;;
+   ;; 13 件とも pin 25714931 で landing 前に実際に赤くなるところを見た。
+   ;; **13 件すべてが、名指しした test だけを赤くし、巻き添えは 1 件も無かった** ——
+   ;; 各 test が 1 つのことだけを discriminate している証拠。
+   :cmd ["nbb" "test/verify_record_test.cljs"]
+   :green-marker "verify-record: OK"
+   :mutations
+   [{:id :vr/form-count-comparison-widened
+     :why "top-level form の個数比較 `not= 1` が `< 1` になる。**0 個（空ファイル）が
+           通るようになる** —— 切れた文書と完全な文書が同じ値を返す。
+           境界ちょうどの入力が無ければ、この反転は誰にも見えない"
+     :file "scripts/verify-record.cljs"
+     :find "(not= 1 (count forms))"
+     :replace "(< 1 (count forms))"
+     :must-fail ["exactly-one-top-level-form-is-the-boundary"]}
+
+    {:id :vr/bare-symbol-keys-looks-for-strings
+     :why "heredoc 破損の検出が symbol でなく string を探すようになる。
+           EDN の map は文字列キーも取るので**この述語は正当に見える**が、
+           破損が作るのは裸の symbol。エスケープされた引用符で早期終了した
+           文字列が黙って通る —— reader は throw しないので他に受け皿が無い"
+     :file "scripts/verify-record.cljs"
+     :find "(map? form) (into (into #{} (filter symbol?) (keys form))"
+     :replace "(map? form) (into (into #{} (filter string?) (keys form))"
+     :must-fail ["a-string-that-ends-early-is-caught"]}
+
+    {:id :vr/evidence-floor-removed
+     :why "tx-data が 0 件のときの拒否床が外れる。**この repo は自分の record が
+           全てなので、空の scan は clean ではない**。SCANNED n=0 を pass にしない、
+           という CLAUDE.md の evidence floor そのもの"
+     :file "scripts/verify-record.cljs"
+     :find "_ (when (empty? tx-files)"
+     :replace "_ (when (and false (empty? tx-files))"
+     :must-fail ["an-empty-directory-refuses-instead-of-passing"]}
+
+    {:id :vr/unused-answered-from-a-broken-read
+     :why "1 ファイルが parse 失敗したのに unused 検査が答えてしまう。
+           読めなかったファイルは属性を供給しないので、**そのファイルが宣言して
+           いた属性が全部『未使用』として並ぶ** —— 1 件の破損が偽の findings を
+           量産する。答えられない検査が答えたふりをする形"
+     :file "scripts/verify-record.cljs"
+     :find "can-answer-unused? (empty? bad-parse)"
+     :replace "can-answer-unused? true"
+     :must-fail ["one-broken-file-does-not-manufacture-unused-findings"]}
+
+    {:id :vr/skipped-checks-stop-being-counted
+     :why "飛ばした検査の数え上げが消える。違反 0 件なら exit 0 になる ——
+           **『飛ばした』と『合格した』が出力で区別できなくなる**（8 問の 4 問目）"
+     :file "scripts/verify-record.cljs"
+     :find "skipped (+ (if check-retired? 0 1) (if can-answer-unused? 0 1))"
+     :replace "skipped 0"
+     :must-fail ["a-skipped-check-is-never-reported-as-a-pass"]}
+
+    {:id :vr/retirement-guard-widened-to-every-status
+     :why "status に関係なく retired-surface 検査を走らせる。:retired でない record に
+           対して『検査した』と言うようになる —— 適用範囲外の検査を実施済みとして数える"
+     :file "scripts/verify-record.cljs"
+     :find "check-retired? (= :retired status)"
+     :replace "check-retired? true"
+     :must-fail ["a-skipped-check-is-never-reported-as-a-pass"]}
+
+    {:id :vr/retired-surface-path-not-joined-to-root
+     :why "retired surface の存在確認が root を結合し忘れ、cwd 相対で見るようになる。
+           **無改変の repo では緑のまま** —— 2 つの path は cwd からも見えないので。
+           復活した surface だけが見逃される。この repo の reactivation gate のうち、
+           機械が強制できる唯一の 1 条が静かに死ぬ"
+     :file "scripts/verify-record.cljs"
+     :find "(vec (filter #(fs/existsSync (path/join root %)) retired))"
+     :replace "(vec (filter #(fs/existsSync %) retired))"
+     :must-fail ["a-retired-surface-that-came-back-is-caught"]}
+
+    {:id :vr/attribute-comparison-arguments-swapped
+     :why "used と declared を取り違える。2 つの集合差を取る隣り合った式なので
+           実際に起こりうる。tx-data が使っているのに未宣言の属性が報告されなくなる"
+     :file "scripts/verify-record.cljs"
+     :find "undeclared (sort (remove declared used))"
+     :replace "undeclared (sort (remove used declared))"
+     :must-fail ["an-attribute-missing-from-the-schema-is-reported"]}
+
+    {:id :vr/undeclared-attribute-check-neutered
+     :why "未宣言属性の検査を外す。schema が現実から離れても音がしなくなる"
+     :file "scripts/verify-record.cljs"
+     :find "undeclared (sort (remove declared used))\n"
+     :replace "undeclared (sort (remove (constantly true) used))\n"
+     :must-fail ["an-attribute-missing-from-the-schema-is-reported"]}
+
+    {:id :vr/unused-attribute-check-neutered
+     :why "逆向き（宣言されたが誰も使っていない）の検査を外す。片方向だけの照合は
+           schema が肥大していくのを止められない"
+     :file "scripts/verify-record.cljs"
+     :find "unused (if can-answer-unused? (sort (remove used declared)) [])"
+     :replace "unused (if can-answer-unused? (sort (remove (constantly true) declared)) [])"
+     :must-fail ["an-attribute-no-document-uses-is-reported"]}
+
+    {:id :vr/schema-evidence-floor-removed
+     :why "schema が :db/ident を 1 つも宣言していないときの拒否床が外れる。
+           **宣言側が読めていないだけなのに、使用側が全部 FAIL として並ぶ** ——
+           1 件の設定ミスが n 件の偽の findings になる"
+     :file "scripts/verify-record.cljs"
+     :find "_ (when (empty? declared)"
+     :replace "_ (when (and false (empty? declared))"
+     :must-fail ["a-schema-declaring-nothing-refuses-instead-of-failing-everything"]}
+
+    {:id :vr/tx-data-shape-check-accepts-any-collection
+     :why "top-level が vector であることの検査が coll? に緩む。map が tx-data として
+           通り、以降の検査が全部別の意味で走る。落ちはするが**理由が別物になる**"
+     :file "scripts/verify-record.cljs"
+     :find "(not (vector? (first forms)))"
+     :replace "(not (coll? (first forms)))"
+     :must-fail ["a-top-level-map-is-not-tx-data"]}
+
+    {:id :vr/directory-refusal-stops-naming-its-reason
+     :why "ディレクトリ判定が存在判定に緩む。**exit 2 は変わらない**（次の readdir が
+           落ちて別の REFUSED になる）ので、結果だけを assert する probe は緑のまま
+           通す。理由の literal を pin していなければ検出できない"
+     :file "scripts/verify-record.cljs"
+     :find "(try (.isDirectory (fs/statSync root)) (catch :default _ false))"
+     :replace "(try (fs/existsSync root) (catch :default _ false))"
+     :must-fail ["a-path-that-is-not-a-directory-refuses"]}]}]}
