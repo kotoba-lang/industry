@@ -6,6 +6,23 @@
   越しの API トークンではなく、ローカルの wrangler セッションで完結）。
   `CLOUDFLARE_API_TOKEN`（Zone Analytics Read 等の狭いスコープ）は用途別に
   `wrangler secret put` で個別プロジェクトへ投入するもので、これとは別物。
+  - ⛔ **2026-09-08 実測: keychain `gftd.cf` / `API_TOKEN` は失効している。**
+    R2 だけでなく `GET /accounts` でも `9109 Invalid access token` を返す。
+    上の 2026-08-14 / 2026-08-25 の記述（DNS 26 レコード作成、R2 Data Catalog
+    の 2 権限を持つ）は**当時は真だったが現在は通らない**。旧記述は復旧時の
+    参照として残す。**この鍵を前提に計画を立てない。**
+  - ✅ **2026-09-08 に動いた経路: `CLOUDFLARE_GLOBAL_API_KEY`（kagi、JSON の
+    `email` / `global-api-key`）を `X-Auth-Email` + `X-Auth-Key` で送り、
+    `POST /accounts/<acct>/r2/temp-access-credentials` で一時鍵を発行する。**
+    `parentAccessKeyId` は kagi の `CLOUDFLARE_R2_ACCESS_KEY` の `access-key-id`
+    （この item の `secret-access-key` 自体は依然 `SignatureDoesNotMatch`）。
+    発行される鍵は **bucket 1 個・object 読み書きのみ・TTL 付き**なので、
+    global key を直接使うより露出が小さい。実測: 19,193 object / 4.4 GB を
+    `kotobase-graph-database-production` へ投入（ADR-2809081900）。
+  - ⚠ **`rclone` はこの一時鍵で無言でハングする**（session token 経路、
+    exit 124 = timeout）。**0 バイトかつ stderr 空**なので認証エラーに見えるが
+    違う。**`aws` CLI を使う** —— `--region auto --endpoint-url <r2 endpoint>`
+    を必ず付ける（region 未指定は `SignatureDoesNotMatch` になる、既出）。
   - ✅ **DNS を読み書きできる資格情報は keychain `gftd.cf` / `API_TOKEN`**
     （2026-08-14 実測。この鍵で 26 レコードを 6 ゾーンに作成、ADR-2608145000）。
     ```bash
