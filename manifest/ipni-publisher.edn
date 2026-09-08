@@ -113,6 +113,44 @@
   :current-key-location "cloudflare worker secret IPNI_ED25519_SEED_B64URL on net-kotobase-private-ipni-drain (write-only)"
   :consequence "an operator can publish only as the held identity; the corpus chain can be extended only by the drain worker"}
 
+ ;; Re-measured 2026-09-08, by the advertise tool itself rather than by hand:
+ ;; it derives the public identity from whatever the vault returns and prints
+ ;; it before writing anything. The answer had moved AGAIN, and not to the
+ ;; identity recorded directly above:
+ ;;
+ ;;   kagi kotobase-ipni-publisher (net-kotobase) -> 12D3KooWDscME2qEggsQ…ay2of
+ ;;   :current-custody :held-identity says         -> 12D3KooWGmq2x23J59Lm…Usz3
+ ;;   the key signing GET /ipni/v1/head            -> 12D3KooWGxKwrwhqzVDK…Bt7X
+ ;;
+ ;; Three identities, three records, one vault. The derived key is the FIRST
+ ;; entry in :identity-history -- the one this file marks
+ ;; `:custody :unrecoverable`, which is now false of it and was true of
+ ;; nothing measurable at the time it was written.
+ ;;
+ ;; What this is NOT: a claim that someone rotated the vault. Nobody measured
+ ;; between 2026-09-01 and today, so the window is a week wide and the cause is
+ ;; unknown. Recording it as unknown, because a guess here becomes the next
+ ;; person's premise -- which is exactly how :custody :unrecoverable got
+ ;; written about a key that opens.
+ ;;
+ ;; Why it did not block publishing: the tool refuses to publish under an
+ ;; identity this manifest does not record, and this one is recorded. What it
+ ;; DID block was the first attempt, which passed the Usz3 chain tip as
+ ;; --previous. PreviousID is per-publisher; chaining DscME2q's advertisement
+ ;; onto Usz3's would have orphaned it. The tip was read off the wire instead:
+ ;;   GET https://cid.contact/providers/12D3KooWDscME2qEggsQ… -> LastAdvertisement
+ :ipni.publisher/custody-remeasured
+ {:at "2026-09-08"
+  :status :moved-again
+  :derived-identity "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
+  :previously-recorded-as-held "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+  :head-signing-identity "12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X"
+  :how "scripts/ipni-advertise.cljs took the item once by its known identifier, derived the Ed25519 public key, built the identity multihash and base58btc peer-id, and printed it. The seed was never displayed."
+  :contradicts [:ipni.publisher/current-custody
+                "the :custody :unrecoverable on the first :identity-history entry"]
+  :cause :unknown
+  :consequence "the two custody records in this file disagree with each other and with the wire. Neither may be cited without re-deriving."}
+
  ;; Decision 1 of ADR-2608160300: ONE key for the workspace, not one per
  ;; surface. Twelve keys is a key set managed by enumeration whether anyone
  ;; admits it or not, and the safety floor is explicit that credentials are
@@ -252,7 +290,56 @@
    :detached-head true
    :ingestion {:index "https://cid.contact"
                :synced true
-               :synced-at "2026-09-01T05:45:13Z"}}]
+               :synced-at "2026-09-01T05:45:13Z"}}
+  ;; wiki.kotobase.net's corpus index -- the first advertisement of a corpus
+  ;; that is a DAG rather than a bag. 1 DAG-CBOR root + 36 raw leaves, and the
+  ;; root's links are tag-42 IPLD links, so a client that resolves the root can
+  ;; reach every leaf without holding the index schema.
+  ;;
+  ;; All 37 CIDs are advertised, not just the root. A root-only advertisement
+  ;; would make the entry point discoverable and every block it names not, which
+  ;; is the half-answer this context exists to avoid: following a link would
+  ;; land on a CID the index has never heard of.
+  ;;
+  ;; Chained onto DscME2q's OWN tip, read off the wire
+  ;; (GET /providers/{peer-id} -> LastAdvertisement), not off this file.
+  {:advertisement "baguqeerakrqvy2exht5q4wgq67t7zt73anbqbnphlc56df4pluuk436a73kq"
+   :entries "baguqeerap7tvdssu6daq4q7cow7nce66eh2qn5yl7t4iivf42xzyu74bnt6a"
+   :cids 37 :at "2026-09-08" :announce-status 204
+   :previous "baguqeeraa7fpey2eucubpel6wddilnoxbyydcyn7jefxibcfkvmh46vob37q"
+   :provider "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
+   :context "hyakka-wiki-index-v1"
+   :is-rm false
+   :detached-head true
+   :subject {:surface "wiki.kotobase.net"
+             :repo "network-awai/app-hyakka"
+             :index-root "bafyreigfryzgzkcon3ouroargtziqdsu236vow3jyqz76i2naodzcmtoxa"
+             :root-codec "dag-cbor (0x71)"
+             :leaves 36
+             :leaf-codec "raw (0x55)"}
+   :ingestion {:index "https://cid.contact"
+               :indexed true
+               :surface "https://cid.contact/multihash/{base58btc-multihash}"
+               :x-cache "Miss from cloudfront, no age header -- not a cached answer"
+               :multihashes 37}
+   ;; The round trip ADR-2608160300 asks for, run on a LEAF rather than on the
+   ;; root. A root that resolves proves the entry point is findable; a leaf that
+   ;; resolves proves the graph is.
+   :round-trip {:cid "bafkreia67xfdsjfpznembgygnvteanpd5ccgawruwd3ni25uxc5vxkuo24"
+                :multihash "QmQRdPnEu9X4Q3PqoQv4xtjHzh1sBozXomKJ1FSTVjTTJe"
+                :asked "https://cid.contact/multihash/{multihash} -- no kotobase URL in the question"
+                :index-answered "/dns4/ipfs.kotobase.net/tcp/443/https"
+                :fetched 384843
+                :re-hashed :matches-the-cid-that-was-asked-for
+                :at "2026-09-08"}
+   ;; What was NOT done, so the entry above is not read as more than it says.
+   :not-done ["No removal was published, so this advertisement's lifecycle is
+               half-proven. ADR-2608160300 wants both halves; the 2026-09-01
+               entry has them for a different CID."
+              "No IPNS name points at this index root. Comparing two CIDs still
+               answers `is the index current?`, but there is no name to follow
+               to the newest one -- and assigning one needs a key decision,
+               given :ipni.publisher/custody-remeasured."]}]
 
  ;; Which cid.contact surface answers freshly. This is not trivia: the first
  ;; three minutes of watching the provide advertisement land were spent
