@@ -69,7 +69,8 @@
                       (let [p (.join path-mod d (.-name e))]
                         (cond
                           (.isDirectory e)
-                          (if (#{"node_modules" ".git" "target" "out" "dist" ".cpcache"} (.-name e))
+                          (if (#{"node_modules" ".git" "target" "out" "dist" ".cpcache"
+                                 ".shadow-cljs" ".clj-kondo" "vendor" ".calva"} (.-name e))
                             acc (go p acc))
                           (re-find #"\.cljc?$" (.-name e)) (conj acc p)
                           :else acc)))
@@ -114,24 +115,53 @@
 (defn- alias-of [src]
   (second (re-find #"\[clojure\.string :as ([a-zA-Z0-9*+!?<>=_-]+)\]" src)))
 
-(defn- rewrite [alias src]
-  (-> src
+(defn- requires-clojure-string?
+  "True when the file's ns form actually REQUIRES clojure.string, in any of the
+  three shapes that appear here: `[clojure.string :as x]`, `[clojure.string]`,
+  or a bare `clojure.string` symbol inside `(:require ...)`.
+
+  A file that calls `clojure.string/f` WITHOUT requiring it -- 337 of the 485
+  no-alias files, measured 2026-09-08 -- works only because something else on
+  the classpath loaded the namespace first. Renaming its calls would break it,
+  so those are still refused: they need a require inserted, which is ns-form
+  surgery and a different edit from a rename."
+  [src]
+  (boolean (or (re-find #"\[clojure\.string[\s\]]" src)
+               (re-find #"(?s)\(:require[^)]*[\s\[]clojure\.string[\s\)\]]" src))))
+
+(defn- rewrite
+  "With an alias, the namespace in the require is renamed and the alias is kept.
+  Without one, the NAMESPACE TOKEN itself is renamed everywhere -- which is the
+  same edit, spelled without a nickname, and covers `[clojure.string]` and a
+  bare `clojure.string` symbol in the require."
+  [alias src]
+  (if-not alias
+    (-> src
+        (str/replace #"\bclojure\.string/lower-case" "kotoba.lang.text/lower")
+        (str/replace #"\bclojure\.string/upper-case" "kotoba.lang.text/upper")
+        (str/replace #"\bclojure\.string\b" "kotoba.lang.text"))
+    (-> src
       (str/replace (re-pattern (str "\\[clojure\\.string :as " alias "\\]"))
                    (str "[kotoba.lang.text :as " alias "]"))
       (str/replace (re-pattern (str "\\b" alias "/lower-case")) (str alias "/lower"))
       (str/replace (re-pattern (str "\\b" alias "/upper-case")) (str alias "/upper"))
       (str/replace #"\bclojure\.string/lower-case" (str alias "/lower"))
       (str/replace #"\bclojure\.string/upper-case" (str alias "/upper"))
-      (str/replace #"\bclojure\.string/" (str alias "/"))))
+      (str/replace #"\bclojure\.string/" (str alias "/")))))
 
 (defn- unrewrite
   "The inverse of `rewrite`, as far as the substitution set goes."
   [alias src]
-  (-> src
+  (if-not alias
+    (-> src
+        (str/replace #"\bkotoba\.lang\.text/lower\b" "clojure.string/lower-case")
+        (str/replace #"\bkotoba\.lang\.text/upper\b" "clojure.string/upper-case")
+        (str/replace #"\bkotoba\.lang\.text\b" "clojure.string"))
+    (-> src
       (str/replace (re-pattern (str "\\[kotoba\\.lang\\.text :as " alias "\\]"))
                    (str "[clojure.string :as " alias "]"))
       (str/replace (re-pattern (str "\\b" alias "/lower\\b")) (str alias "/lower-case"))
-      (str/replace (re-pattern (str "\\b" alias "/upper\\b")) (str alias "/upper-case"))))
+      (str/replace (re-pattern (str "\\b" alias "/upper\\b")) (str alias "/upper-case")))))
 
 (defn- substitution-only?
   "Proof that the rewrite moved NOTHING but the substitutions.
@@ -147,11 +177,13 @@
   too many somewhere in 13,000 files would show up here and nowhere else until
   something broke in production."
   [alias before after]
-  (let [collapse (fn [s] (-> s
+  (if-not alias
+    (= before (unrewrite alias after))
+    (let [collapse (fn [s] (-> s
                              (str/replace #"\bclojure\.string/lower-case" (str alias "/lower-case"))
                              (str/replace #"\bclojure\.string/upper-case" (str alias "/upper-case"))
                              (str/replace #"\bclojure\.string/" (str alias "/"))))]
-    (= (collapse before) (unrewrite alias after))))
+      (= (collapse before) (unrewrite alias after)))))
 
 (def dep-note
   ["        ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:"
@@ -190,19 +222,24 @@
   (when-not (try (.isDirectory (.statSync fs repo)) (catch :default _ false))
     (refuse! (str "not a directory: " repo)))
 
-  (let [files    (walk-files (.join path-mod repo "src"))
-        files    (into files (walk-files (.join path-mod repo "test")))
+  ;; The whole repo, not just src/ and test/. Measured 2026-09-08: app-animeka
+  ;; keeps its .cljc under lg/, and an earlier version that walked only src and
+  ;; test reported "nothing was measured" for it -- a repo with code the tool
+  ;; could not see reads exactly like a repo with nothing to do.
+  (let [files    (walk-files repo)
         _        (when (empty? files)
-                   (refuse! (str "no .clj/.cljc under " repo "/src or /test; nothing was measured")))
+                   (refuse! (str "no .clj/.cljc anywhere under " repo "; nothing was measured")))
         loaded   (for [p files] [p (.readFileSync fs p "utf8")])
         targets  (filterv (fn [[_ s]] (str/includes? s "clojure.string")) loaded)
         haz      (for [[p s] targets
                        :let [a (alias-of s)]
-                       :when a
-                       h (hazards-in a s)]
+                       h (hazards-in (or a "kotoba\\.lang\\.text") s)]
                    [p h])
         no-alias (filterv (fn [[_ s]] (and (str/includes? s "clojure.string")
-                                           (nil? (alias-of s)))) targets)]
+                                           (nil? (alias-of s))
+                                           (not (requires-clojure-string? s))
+                                           (re-find #"\bclojure\.string/" s)))
+                          targets)]
     (println (str "SCANNED\t" (count files) "\t.clj/.cljc files under " repo))
     (println (str "TARGETS\t" (count targets) "\tfiles mention clojure.string"))
     (cond
@@ -217,8 +254,10 @@
 
       (seq no-alias)
       (do (doseq [[p _] no-alias] (println (str "NO-ALIAS\t" p)))
-          (refuse! (str (count no-alias) " file(s) name clojure.string without an"
-                        " `:as` alias; the rewrite has no name to route through")))
+          (refuse! (str (count no-alias) " file(s) CALL clojure.string without"
+                        " requiring it at all; renaming the calls would break them."
+                        " They need a require inserted, which is ns-form surgery"
+                        " and a different edit from a rename")))
 
       :else
       (let [changed (for [[p s] targets
