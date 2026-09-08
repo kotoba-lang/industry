@@ -10036,4 +10036,218 @@
      :file "magatama.jsonld"
      :find "\"routes\": ["
      :replace "\"routes\": [,"
-     :must-fail ["FAIL in (every-declaration-file-parses-as-the-format-it-names)"]}]}]}
+     :must-fail ["FAIL in (every-declaration-file-parses-as-the-format-it-names)"]}]}
+
+  {:repo "orgs/cloud-itonami/app-business-person"
+   :label "app-business-person repo contract —— 実装は在るが、それを実行する手段が無い repo で、文書の約束とコードの現実が一致していること"
+   ;; この repo は実装を持っている（`kotoba/src/registry.ts` の 7 操作）。持って
+   ;; いないのは **それを実行する手段** である。実測 2026-09-08、`kotoba/package.json`
+   ;; の git+https 依存（`@etzhayyim/sdk` / `@etzhayyim/sdk-mock`）は prepare script を
+   ;; 走らせる必要があり、**npm も pnpm も明示の allowlist を要求して拒否する**:
+   ;;
+   ;;   npm  -> EALLOWSCRIPTS  --allow-scripts is not allowed in project-scoped installs
+   ;;   pnpm -> ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED  needs to execute build scripts
+   ;;
+   ;; この repo は `allowScripts` も `onlyBuiltDependencies` も lockfile も持たない。
+   ;; `typescript` も同じ devDependencies に居るので **`npm run typecheck` も走らない**。
+   ;; つまり振る舞いを本当に検査している `kotoba/test/business-person.test.ts` も、
+   ;; 型検査も、**この checkout では 1 度も実行できない**。赤いのではなく走らない。
+   ;;
+   ;; だから残っているのは 3 種類の不変条件で、そのどれも suite が入るまで
+   ;; 何にも守られていなかった:
+   ;;
+   ;;   1. **語彙の重複** —— 11 個の primaryRole が types.ts の union（コンパイラが
+   ;;      見る）・ROLES の Set（実行時が見る）・README.md・CLAUDE.md の 4 箇所に在る。
+   ;;      union と Set がずれると型と実行時が別のことを言うが、tsc は 2 つが同じ
+   ;;      語彙を表すつもりであることを知らない。
+   ;;   2. **コンパイラの代役** —— registry.ts が返す status と types.ts が宣言する
+   ;;      union は別の場所に書かれており、片方だけ直せば型エラーになる（tsc が
+   ;;      走れば）。走らないので suite が見る。**tsc が動くようになったら冗長に
+   ;;      なる。それでよい** —— 冗長な検査は無い検査より安い。
+   ;;   3. **散文に凍結された測定値** —— README.md と MIGRATION-TODO.md は
+   ;;      「Stripe / RisingWave / Kysely / Prisma / Drizzle / GA4 / Meta Pixel /
+   ;;      直接の @atproto/api / 直接の viem は検出されなかった」と書いている
+   ;;      （2026-05-21 の走査）。それを再走査するものが無い。
+   ;;
+   ;; そして境界が 1 つ在る。`coverage` の `truncated` は `personCount >= maxScan`
+   ;; で、`countAll` が `while (scanned < maxScan)` なので **`>` にすると永久に
+   ;; false になる** —— 打ち切られた集計が完全な集計として、エラーも出さずに返る。
+   ;; CLAUDE.md 5 問目「比較を持つ検査には境界ちょうどの入力を 1 つ置く」の実例。
+   ;;
+   ;; 23 件とも 2026-09-08 に 1 つずつ当てて、`:find` がちょうど 1 回現れること・
+   ;; 名指しの test が赤くなること・REFUSED ではなく exit 1 であること・無改変で
+   ;; 緑（14 tests / 62 assertions）に戻ることを実測してから登録した。
+   ;;
+   ;; ⚠ `must-fail` は `FAIL in (<test 名>)` の literal を pin する。結果だけを見る
+   ;; （exit が非 0 になった）判定にすると、別の理由で落ちた実行を「噛んだ」と
+   ;; 数える —— CLAUDE.md 6 問目の形。この suite は答えられないとき exit 3 で
+   ;; REFUSED と言うので、1 と 3 の区別がそのまま効く。
+   ;;
+   ;; ⚠ **ネットワークを叩く mutation は入れていない。** `@etzhayyim/sdk` の URL が
+   ;; 指す `etzhayyim/com-etzhayyim-sdk` は `kotoba-lang/sdk` へ改名済みで、GitHub
+   ;; リダイレクトで解決する（実測 2026-09-08）。そこを赤くすると「リダイレクトが
+   ;; 効いている正常な状態」を欠陥として報告することになり、かつ DNS / 認証 /
+   ;; 実際の不在が同じ顔で失敗して落ちた理由を区別できない。
+   :cmd ["nbb" "test/repo_contract_test.cljs"]
+   :green-marker "app-business-person repo contract: all green"
+   :mutations
+   [{:id :app-business-person/role-union-loses-a-member
+         :why "11 個の役職語彙は 4 箇所に重複しており、これは **コンパイラが見る側** だけが縮む形。tsc は union と ROLES の Set が同じ語彙を表すつもりであることを知らないので、型が拒否する役職を実行時が受理する側へずれる"
+         :file "kotoba/src/types.ts"
+         :find "  | \"treasurer\";"
+         :replace "  ;"
+         :must-fail ["FAIL in (the-role-vocabulary-is-the-same-in-the-type-the-runtime-set-and-both-documents)"]},
+    
+    {:id :app-business-person/runtime-role-set-loses-a-member
+         :why "逆向き —— **実行時が見る側**だけが縮む。型は `treasurer` を通し、`registerPerson` は `invalidPrimaryRole` で拒否する。呼び手から見れば「型が正しいのに拒否される」"
+         :file "kotoba/src/types.ts"
+         :find "\"secretary\", \"treasurer\","
+         :replace "\"secretary\","
+         :must-fail ["FAIL in (the-role-vocabulary-is-the-same-in-the-type-the-runtime-set-and-both-documents)"]},
+    
+    {:id :app-business-person/readme-role-list-drifts
+         :why "文書側だけが動く形。README は公開 API の説明なので、消費者は存在しない役職名を実装する"
+         :file "README.md"
+         :find "`vice-president` `director`"
+         :replace "`vp` `director`"
+         :must-fail ["FAIL in (the-role-vocabulary-is-the-same-in-the-type-the-runtime-set-and-both-documents)"]},
+    
+    {:id :app-business-person/claude-md-role-list-drifts
+         :why "同じ語彙が CLAUDE.md にも 3 つ目の写しとして在る。agent はこちらを読むので、ここだけずれると **agent が間違った役職名でコードを書く**"
+         :file "CLAUDE.md"
+         :find "vice-president / director"
+         :replace "vp / director"
+         :must-fail ["FAIL in (the-role-vocabulary-is-the-same-in-the-type-the-runtime-set-and-both-documents)"]},
+    
+    {:id :app-business-person/a-tier-3-field-is-added-to-the-public-record
+         :why "**この repo が存在する理由（ADR-0014 の PII 境界）を壊す最短の形。** `email` を 1 行足すと Tier-3 の私的情報が公開レコードに入るが、型は通り、テストは（そもそも install できないので）緑のまま"
+         :file "kotoba/src/types.ts"
+         :find "  sourceUrl?: string;\n  createdAt: string;\n}"
+         :replace "  sourceUrl?: string;\n  email?: string;\n  createdAt: string;\n}"
+         :must-fail ["FAIL in (no-tier-3-personal-data-field-appears-in-the-public-record-types)"]},
+    
+    {:id :app-business-person/the-tier-3-delegation-link-is-removed
+         :why "逆向き —— 委譲の**受け皿**が消える形。境界違反はまだ無いが、次に PII が要求されたとき置き場所がここしか無くなる。README の「リンクであって写しではない」という説明が成立しなくなる"
+         :file "kotoba/src/types.ts"
+         :find "  /** Link to the Tier-3 PII custodian (natural-person), optional. */\n  naturalPersonDid?: string;\n"
+         :replace ""
+         :must-fail ["FAIL in (no-tier-3-personal-data-field-appears-in-the-public-record-types)"]},
+    
+    {:id :app-business-person/a-forbidden-payment-dependency-is-added
+         :why "README が「2026-05-21 の走査で検出されなかった」と散文に凍結している基層違反のひとつ。**それ以降そのスキャンを再実行するものは何も無かった**ので、依存を 1 つ足した日にこの文は測り直されないまま嘘になる"
+         :file "kotoba/package.json"
+         :find "\"dependencies\": { \"@etzhayyim/sdk\""
+         :replace "\"dependencies\": { \"stripe\": \"^18.0.0\", \"@etzhayyim/sdk\""
+         :must-fail ["FAIL in (the-substrate-boundary-imports-the-readme-says-are-absent-are-actually-absent)"]},
+    
+    {:id :app-business-person/a-forbidden-direct-atproto-import-is-added
+         :why "MIGRATION-TODO が名指しで禁じている形（「@atproto/api を @etzhayyim/sdk に置き換えよ」）。型 import なので実行時に何も変わらず、tsc も（走らないので）何も言わない"
+         :file "kotoba/src/registry.ts"
+         :find "import type { Etzhayyim } from \"@etzhayyim/sdk\";"
+         :replace "import type { Etzhayyim } from \"@etzhayyim/sdk\";\nimport type { AtpAgent } from \"@atproto/api\";"
+         :must-fail ["FAIL in (the-substrate-boundary-imports-the-readme-says-are-absent-are-actually-absent)"]},
+    
+    {:id :app-business-person/an-operation-is-renamed-in-the-readme-only
+         :why "操作名が文書側だけ動く形。⚠ この mutation は **2 つの** test を赤くする（集合の不一致と、表が名指しした識別子の不在）。どちらも正当な検出なので `must-fail` は両方を挙げる"
+         :file "README.md"
+         :find "| `getPerson` |"
+         :replace "| `fetchPerson` |"
+         :must-fail ["FAIL in (the-seven-operations-are-the-same-in-the-barrel-and-in-the-readme-table)" "FAIL in (every-identifier-the-readme-table-quotes-exists-in-the-code)"]},
+    
+    {:id :app-business-person/the-coverage-bound-is-raised-past-what-the-readme-documents
+         :why "文書が「default 10,000」と書いている定数だけが動く形。1 リクエストが歩く行数が 10 倍になるが、返る値の形は同じ"
+         :file "kotoba/src/registry.ts"
+         :find "const DEFAULT_MAX_SCAN = 10_000;"
+         :replace "const DEFAULT_MAX_SCAN = 100_000;"
+         :must-fail ["FAIL in (the-coverage-scan-bound-is-the-one-the-readme-documents-and-cannot-be-raised-by-a-caller)"]},
+    
+    {:id :app-business-person/the-caller-can-raise-the-scan-bound
+         :why "**clamp を外す形。** `Math.min` を落とすと `coverage(e, {maxScan: 1e9})` が通り、1 リクエストが PDS を丸ごと歩く。既定値は変わらないので、既定で呼ぶ全ての呼び出しは今までどおり動く —— 悪用される経路だけが開く"
+         :file "kotoba/src/registry.ts"
+         :find "Math.min(input.maxScan ?? DEFAULT_MAX_SCAN, DEFAULT_MAX_SCAN)"
+         :replace "(input.maxScan ?? DEFAULT_MAX_SCAN)"
+         :must-fail ["FAIL in (the-coverage-scan-bound-is-the-one-the-readme-documents-and-cannot-be-raised-by-a-caller)"]},
+    
+    {:id :app-business-person/truncated-becomes-unreachable
+         :why "**この suite の境界ケース（CLAUDE.md 5 問目）。** `countAll` は `while (scanned < maxScan)` で maxScan を超えないので、`>` にすると `truncated` は**永久に false** になる。打ち切られた集計が完全な集計として返り、エラーも出ず件数も「正しく」見える。1 文字"
+         :file "kotoba/src/registry.ts"
+         :find "truncated: personCount >= maxScan"
+         :replace "truncated: personCount > maxScan"
+         :must-fail ["FAIL in (truncated-is-reported-on-the-boundary-not-past-it)"]},
+    
+    {:id :app-business-person/the-scan-walks-one-row-past-the-bound
+         :why "上限で止める側を 1 行ずらす形。`scanned` が maxScan を超えられるようになり、`>=` の側と辻褄が合わなくなる。境界の両側を別々に固定しているのはこのため"
+         :file "kotoba/src/registry.ts"
+         :find "while (scanned < maxScan)"
+         :replace "while (scanned <= maxScan)"
+         :must-fail ["FAIL in (truncated-is-reported-on-the-boundary-not-past-it)"]},
+    
+    {:id :app-business-person/the-foreign-key-check-is-dropped
+         :why "AT PDS は参照整合性を持たないので、**この 3 行が唯一の防波堤**である。消しても書き込みは成功し、存在しない人物への appointment が静かに増える。README は「the FK is enforced here, not by the store」と明記している"
+         :file "kotoba/src/registry.ts"
+         :find "  if (!(await exists(e, PERSON_COLLECTION, personRkey(personSlug)))) {\n    return { status: \"personNotFound\", error: `personNotFound:${personSlug}` };\n  }\n"
+         :replace ""
+         :must-fail ["FAIL in (the-foreign-key-to-person-is-enforced-in-this-layer-before-the-write)"]},
+    
+    {:id :app-business-person/a-status-is-returned-that-the-output-union-does-not-declare
+         :why "**本来 tsc が捕まえるもの。** この repo は devDependencies を用意できないので tsc が走らない（`kotoba/package.json` の git 依存が prepare script を要求し、npm は EALLOWSCRIPTS、pnpm は ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED で拒否する）。宣言側だけ改名すると、返している status が宣言に無い状態になる"
+         :file "kotoba/src/types.ts"
+         :find "status: \"added\" | \"alreadyExists\" | \"rejected\" | \"personNotFound\";"
+         :replace "status: \"added\" | \"alreadyExists\" | \"rejected\" | \"personAbsent\";"
+         :must-fail ["FAIL in (every-status-literal-returned-is-declared-in-that-operations-output-union)"]},
+    
+    {:id :app-business-person/the-readme-table-names-a-status-that-does-not-exist
+         :why "文書が実装に無い状態名を名指しする形。検査は名前を手で並べず **README から引き抜く**ので、文書側が動いたときにも赤くなる"
+         :file "README.md"
+         :find "(`personNotFound` — the FK is enforced here"
+         :replace "(`personMissing` — the FK is enforced here"
+         :must-fail ["FAIL in (every-identifier-the-readme-table-quotes-exists-in-the-code)"]},
+    
+    {:id :app-business-person/the-vitest-include-stops-matching-the-tests
+         :why "**この suite で一番静かな壊れ方。** include とテストの置き場所がずれると vitest は「0 tests」で **exit 0** を返す —— CLAUDE.md 1 問目そのもの。install が直った日に、走っていない suite が緑として数えられる"
+         :file "kotoba/vitest.config.ts"
+         :find "include: [\"test/**/*.test.ts\"]"
+         :replace "include: [\"tests/**/*.test.ts\"]"
+         :must-fail ["FAIL in (the-vitest-include-glob-matches-the-test-file-that-exists)"]},
+    
+    {:id :app-business-person/a-git-dependency-floats-to-a-branch
+         :why "pin が branch へ緩む形。lockfile が無いので、同じ install が日によって違うコードを引く。CLAUDE.md は「west pin には gate があるが deps の pin には無い」と書いている"
+         :file "kotoba/package.json"
+         :find "#12314a0cc5ac2feb49dd9789d5c002398acb6988"
+         :replace "#main"
+         :must-fail ["FAIL in (the-git-dependencies-are-pinned-to-a-commit-not-a-branch)"]},
+    
+    {:id :app-business-person/the-two-provenance-records-disagree-on-the-source-path
+         :why "2 つの来歴記録のうち片方だけが動く形。どちらのファイルも単独では完全に妥当なので、片方しか読まない監査は違う抽出元を答える"
+         :file "migration.edn"
+         :find ":path \"60-apps/etzhayyim-project-business-person\""
+         :replace ":path \"60-apps/etzhayyim-project-business-persons\""
+         :must-fail ["FAIL in (the-two-provenance-records-agree-on-where-this-repo-came-from)"]},
+    
+    {:id :app-business-person/readme-edn-schema-becomes-an-unevaluated-form
+         :why "EDN に評価は無いので `(str \"a\" \"b\")` は throw せず PersistentList として読める。reader を通しただけの検査は「読めた」と報告し、文字列を期待している下流だけが壊れる（CLAUDE.md が 2026-09-08 に 13 件の実例で警告している形）。だから型まで見る"
+         :file "README.edn"
+         :find ":schema \"etzhayyim.repository/v1\""
+         :replace ":schema (str \"etzhayyim.repository/\" \"v1\")"
+         :must-fail ["FAIL in (the-two-provenance-records-agree-on-where-this-repo-came-from)"]},
+    
+    {:id :app-business-person/the-pre-extraction-seed-is-wired-into-the-barrel
+         :why "`seed.ts` は PDS へ直接書き込む（`fetch` + Bearer token）。kotoba/ から引かれた瞬間、**client を渡される決定論的なライブラリ**という README の説明が成立しなくなり、barrel を import しただけで env var を要求して throw する"
+         :file "kotoba/src/index.ts"
+         :find "export * from \"./types.js\";"
+         :replace "export * from \"./types.js\";\nexport * from \"../../seed.js\";"
+         :must-fail ["FAIL in (the-pre-extraction-seed-is-not-wired-into-the-kotoba-package)"]},
+    
+    {:id :app-business-person/the-did-prefix-drifts-from-the-documents
+         :why "identity は保存されず**導出される**ので、接頭辞が動くと過去に書いた全レコードの DID が引けなくなる。しかもコードは動き続け、新しいレコードは新しい DID で正常に書ける"
+         :file "kotoba/src/types.ts"
+         :find "export const BP_DID_PREFIX = \"did:web:business-person.etzhayyim.com:\""
+         :replace "export const BP_DID_PREFIX = \"did:web:business-person.itonami.cloud:\""
+         :must-fail ["FAIL in (every-did-and-rkey-shape-agrees-with-both-documents)"]},
+    
+    {:id :app-business-person/the-person-rkey-prefix-is-dropped
+         :why "rkey は AT PDS の record key。接頭辞が消えると既存レコードが引けなくなり、`getPerson` は `notFound` を返す —— **エラーではなく「その人は居ません」**として返るので、消えたことに気づけない"
+         :file "kotoba/src/types.ts"
+         :find "return `person-${slug.toLowerCase()}`;"
+         :replace "return `${slug.toLowerCase()}`;"
+         :must-fail ["FAIL in (every-did-and-rkey-shape-agrees-with-both-documents)"]}]}]}
