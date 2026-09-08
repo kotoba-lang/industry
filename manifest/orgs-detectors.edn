@@ -1391,7 +1391,23 @@
               "--findings" "--max-findings" "0"]
    :cwd      :root
    :findings :protocol
-   :adr      "adr-2609081700-a-clj-test-of-a-cljc-compiler-tests-one-host"}
+   :adr      "adr-2609081700-a-clj-test-of-a-cljc-compiler-tests-one-host"
+   ;; Added 2026-09-08 without the four fields this file's own header calls
+   ;; mandatory. The tick's admission is fail-closed and refuses EVERY detector
+   ;; when any one entry is incomplete, so the whole home went dark the moment
+   ;; this landed -- no detector ran, and nothing said so except an exit 2
+   ;; nobody was reading. That is the failure this registry exists to prevent,
+   ;; committed by an entry added to it.
+   ;;
+   ;; The values are read off the script, not guessed: it prints SCANNED<TAB>n,
+   ;; it has explicit REFUSED paths for an unreadable tree, and it writes
+   ;; nothing (no writeFileSync/spit/appendFileSync in its 331 lines). The
+   ;; timeout is generous because the entry's own :why records a sweep of 4,270
+   ;; checkouts and 16,098 sources; the interval is daily for the same reason.
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :writes   :none
+   :interval-ms 86400000
+   :timeout-ms  2700000}
 
   {:id       :verify-cljs-runner-completeness
    :title    "ClojureScript test runners that run less than the suite they sit in"
@@ -3651,4 +3667,5 @@
               comment-only mention filtered. Each run copies ~11 MB x 3 per checkout
               into os.tmpdir() and removes it. SCANNED is over checkouts, not a
               workspace total."}
+
 ]}
