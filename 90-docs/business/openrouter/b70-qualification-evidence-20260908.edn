@@ -1,0 +1,37 @@
+[{:db/id -1
+ :doc/id "business-openrouter-b70-qualification-evidence-20260908"
+ :doc/title "B70 artifact provenance and public context/concurrency qualification"
+ :doc/as-of "2026-09-08"
+ :doc/status :partial
+ :source/dataset "business"
+ :doc/body "# B70 provider qualification evidence — 2026-09-08
+
+Scope: fixed qwen3.8-27b-throughput-b70 through the public API; this is a bounded qualification slice, not a reserved-capacity or seven-day reliability certificate. No serving configuration changed.
+
+## Artifact identity
+The live process PID 29578 on ubuntu-server uses /home/jun/models/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf. Read the effective process arguments and localhost /props and /v1/models, rather than inferring the running configuration from a unit file.
+A complete low-priority SHA-256 read of the 16,810,714,336-byte file returned e00082f779fa385cee8c68a3ec8833a75778cc87272240b942f74e0b8243e520. The public Hugging Face LFS metadata for lmstudio-community/Qwen3.8-27B-GGUF at 5a7da681f60570ab5b439a587e912d2e5eddb582 returns the identical size and hash. Thus the serving artifact is byte-for-byte identified, not merely similarly named.
+The pinned quantizer model card declares base_model Qwen/Qwen3.8-27B and license apache-2.0. The official source LICENSE at the source revision recorded by ADR-2608159600 (1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0) is Apache 2.0; downloaded LICENSE SHA-256 bbedc3fda3305820b977265f01b8619d87570a6739de3a5582c3464840f1e57a. This establishes the published artifact and license declarations. We have not reproduced the conversion or independently proven which exact source commit the quantizer used.
+GGUF metadata: version 3, 866 tensors, architecture qwen35, general.name Qwen_Qwen3.8 27B, file_type 15. A runtime architecture label is not a different public model identity.
+
+## Live serving settings
+Q4_K - Medium; 27,320,697,856 parameters; llama.cpp b10630-d222767c7; --ctx-size 32768 and --parallel 2, hence 16,384 tokens per slot. --reasoning off, --spec-type draft-mtp, --spec-draft-n-max 3. Process is supervised and NRestarts was 0 at inspection. That is a point-in-time observation, not restart-recovery evidence. Two slots were idle immediately before the bounded parallel test.
+
+## Public boundary tests
+- Exact context budget: the serving tokenizer counted 16,336 prompt tokens; max_tokens 48 gives 16,384. HTTP 200, returned model and served-head b70 match, 12 completion tokens, stop, and exact retrieval of the random key placed before the long filler. Public wall time 22,478 ms; server prefill 18,609.282 ms; generation 455.055 ms. This is a synthetic retrieval check, not broad long-context quality evaluation.
+- One token beyond the prompt limit: 16,385 prompt tokens returned HTTP 400 in 461 ms with type exceed_context_size_error, n_prompt_tokens 16385 and n_ctx 16384. The negative result names the intended boundary, not a different failure.
+- Two simultaneous short requests: both HTTP 200, exact markers, matching model/head, stop and internally consistent usage. Completion times 6,323 and 8,445 ms, total wall time 8,482 ms. Server prefill+generation were about 1,514 and 1,539 ms. This single pair proves two requests completed under overlap; it does not establish sustained throughput, reserved capacity, overload behavior or capacity exclusive of other workloads.
+- A separate short request completed in 4,147 ms, with server prefill 524.265 ms and generation 299.114 ms. The unaccounted interval is 3,323.621 ms. It includes admission, queueing, network and edge processing and must not be labelled GPU decode time.
+
+## Latency diagnosis status
+The public non-streaming handler awaits model-readiness storage, run-history storage and credit settlement before returning. Streaming does not use that same response path. This is a plausible contributor to the observed latency difference, not an established root cause: per-phase edge timings are still needed. Do not remove or defer billable accounting merely to improve wall-clock latency. The earlier 16-21-second observations remain in the seven-day ledger and are not replaced by these better short-run results.
+One attempted Python HTTP client request received 403 before a body was retained. It is an unclassified client-access failure, not a successful inference sample. The standard Node fetch client used by the ongoing qualification was used for all public tests above. No credential or WAF policy was changed.
+
+## Still open
+Seven-day qualification and short-request latency target; sustained load and overflow/429 policy; cancellation and restart recovery; exclusive capacity; OpenRouter partner authorization and reconcilable metering; final privacy/retention and terms; monthly invoicing. is_ready remains false. No application was submitted.
+
+## Immutable source references
+https://huggingface.co/lmstudio-community/Qwen3.8-27B-GGUF/blob/5a7da681f60570ab5b439a587e912d2e5eddb582/Qwen3.8-27B-Q4_K_M.gguf
+https://huggingface.co/lmstudio-community/Qwen3.8-27B-GGUF/blob/5a7da681f60570ab5b439a587e912d2e5eddb582/README.md
+https://huggingface.co/Qwen/Qwen3.8-27B/blob/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/LICENSE
+"}]
