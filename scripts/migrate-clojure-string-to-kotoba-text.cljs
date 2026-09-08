@@ -136,6 +136,40 @@
   undo an insertion as precisely as it undoes a rename."
   "(:require [kotoba.lang.text]")
 
+(defn- ns-close-index
+  "Index of the `)` that closes the `(ns ...)` form, or nil.
+
+  Balanced-paren scan, skipping parens inside strings, character literals and
+  `;` comments -- a docstring containing a paren is the ordinary case here, not
+  an exotic one, and counting it would close the ns form in the wrong place."
+  [src]
+  (let [start (.indexOf src "(ns ")]
+    (when (>= start 0)
+      (let [n (count src)]
+        (loop [i (inc start), depth 1, in-str? false, esc? false, in-cmt? false]
+          (cond
+            (>= i n) nil
+            :else
+            (let [c (nth src i)]
+              (cond
+                in-cmt?  (recur (inc i) depth false false (not= c \newline))
+                esc?     (recur (inc i) depth in-str? false false)
+                (and in-str? (= c \\)) (recur (inc i) depth true true false)
+                in-str?  (recur (inc i) depth (not= c \") false false)
+                (= c \") (recur (inc i) depth true false false)
+                (= c \;) (recur (inc i) depth false false true)
+                ;; a character literal: the next char is data, whatever it is
+                (= c \\) (recur (+ i 2) depth false false false)
+                (= c \() (recur (inc i) (inc depth) false false false)
+                (= c \)) (if (= depth 1) i (recur (inc i) (dec depth) false false false))
+                :else (recur (inc i) depth false false false)))))))))
+
+(def ^:private created-require
+  "What is added to an ns form that has no `:require` at all. One exact
+  literal, for the same reason `inserted-libspec` is: the inverse removes it by
+  equality."
+  "\n  (:require [kotoba.lang.text])")
+
 (defn- ns-require-index
   "Index of the ns form's own `(:require`, or nil.
 
@@ -169,7 +203,11 @@
         (if-let [i (ns-require-index renamed)]
           (str (subs renamed 0 i) inserted-libspec
                (subs renamed (+ i (count "(:require"))))
-          renamed)))
+          ;; No `:require` in the ns form at all -- create one just inside its
+          ;; closing paren. 41 files, measured 2026-09-09.
+          (if-let [close (ns-close-index renamed)]
+            (str (subs renamed 0 close) created-require (subs renamed close))
+            renamed))))
     (-> src
       (str/replace (re-pattern (str "\\[clojure\\.string :as " alias "\\]"))
                    (str "[kotoba.lang.text :as " alias "]"))
@@ -184,6 +222,7 @@
   [alias src]
   (if-not alias
     (-> src
+        (str/replace created-require "")
         (str/replace inserted-libspec "(:require")
         (str/replace #"\bkotoba\.lang\.text/lower\b" "clojure.string/lower-case")
         (str/replace #"\bkotoba\.lang\.text/upper\b" "clojure.string/upper-case")
@@ -193,6 +232,29 @@
                    (str "[clojure.string :as " alias "]"))
       (str/replace (re-pattern (str "\\b" alias "/lower\\b")) (str alias "/lower-case"))
       (str/replace (re-pattern (str "\\b" alias "/upper\\b")) (str alias "/upper-case")))))
+
+(defn- insertion-landed-inside-ns?
+  "Where an insertion went, which `substitution-only?` cannot see.
+
+  The inverse removes `created-require`/`inserted-libspec` by equality wherever
+  they are, so a libspec inserted into the WRONG place -- past the end of the
+  ns form, say, because a docstring paren was miscounted -- undoes cleanly and
+  the substitution invariant passes. It would still be broken code. So the
+  marker's position is checked against the ns form's own closing paren in the
+  WRITTEN text."
+  [after]
+  (let [marker (cond (str/includes? after created-require)  created-require
+                     (str/includes? after inserted-libspec) inserted-libspec
+                     :else nil)]
+    (if-not marker
+      true
+      ;; BOTH ends. An earlier version checked only `at < close`, and an
+      ;; insertion at index 0 -- before the ns form entirely -- passed it: the
+      ;; marker was indeed before the closing paren, just not inside anything.
+      (let [start (.indexOf after "(ns ")
+            at    (.indexOf after marker)
+            close (ns-close-index after)]
+        (boolean (and (>= start 0) close (< start at) (< at close)))))))
 
 (defn- substitution-only?
   "Proof that the rewrite moved NOTHING but the substitutions.
@@ -270,7 +332,8 @@
                                            (nil? (alias-of s))
                                            (not (requires-clojure-string? s))
                                            (re-find #"\bclojure\.string/" s)
-                                           (nil? (ns-require-index s))))
+                                           (nil? (ns-require-index s))
+                                           (nil? (ns-close-index s))))
                           targets)]
     (println (str "SCANNED\t" (count files) "\t.clj/.cljc files under " repo))
     (println (str "TARGETS\t" (count targets) "\tfiles mention clojure.string"))
@@ -288,9 +351,11 @@
       (do (doseq [[p _] no-alias] (println (str "NO-ALIAS\t" p)))
           (refuse! (str (count no-alias) " file(s) CALL clojure.string without"
                         " requiring it and have no `(:require` in their ns form"
-                        " to insert one into -- 41 have no :require and 9 have no"
-                        " ns form at all, measured 2026-09-09. Adding one is a"
-                        " different edit again and is not attempted here")))
+                        " and have no ns form to add one to -- 9 such files,"
+                        " measured 2026-09-09, all scripts. A top-level"
+                        " `(require ...)` would have to go somewhere specific"
+                        " relative to first use, which is a judgement this tool"
+                        " does not make")))
 
       :else
       (let [changed (for [[p s] targets
@@ -314,6 +379,8 @@
                                           (str/includes? back "clojure.string") "still names clojure.string"
                                           (not (substitution-only? a (get orig p) back))
                                           "changed something other than the substitutions"
+                                          (not (insertion-landed-inside-ns? back))
+                                          "the inserted require landed outside the ns form"
                                           :else nil)]
                             :when fail]
                         [p fail])]
