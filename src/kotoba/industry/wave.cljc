@@ -17,7 +17,7 @@
   (section letter, 2-digit division, 3-digit group or 4-digit class).
   `kotoba.industry/execution-plan`, `maturity-roadmap` and
   `wave-maturity-summary` attach :wave from here."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def waves
   "Wave metadata, ordered by reverse-topological depth (root first)."
@@ -115,7 +115,7 @@
   "Wave number (0-4) for an ISIC code: section letter, 2-digit
   division, 3-digit group or 4-digit class. nil for unknown codes."
   [isic]
-  (let [s (str/upper-case (str isic))]
+  (let [s (str/upper (str isic))]
     (or (get code-overrides s)
         (get section-wave s)
         (when (>= (count s) 2)
