@@ -10250,4 +10250,159 @@
          :file "kotoba/src/types.ts"
          :find "return `person-${slug.toLowerCase()}`;"
          :replace "return `${slug.toLowerCase()}`;"
-         :must-fail ["FAIL in (every-did-and-rkey-shape-agrees-with-both-documents)"]}]}]}
+         :must-fail ["FAIL in (every-did-and-rkey-shape-agrees-with-both-documents)"]}]}
+
+  {:repo "orgs/cloud-itonami/stripe"
+   :label "stripe edn-datomize —— 退役記録の中で唯一実際に走る道具を、読むのではなく走らせる"
+   ;; この repo は「記録」であって実装を持たない（`docs/verify-docs-claims.cljs` の
+   ;; `no-implementation-files` がそれを守っている）。だが `edn-datomize.cljs` だけは
+   ;; 実際に走るプログラムで、しかも **書き込む** —— 対象ファイルを in-place で
+   ;; 上書きし、`schema.edn` を作り直す。2026-09-09 まで、その振る舞いを検査する
+   ;; ものは 1 つも無かった。
+   ;;
+   ;; 既存の主張が 1 つだけこの道具に触れているが
+   ;; （`schema-format-is-not-what-the-in-repo-tool-emits`）、それは道具の **ソースに
+   ;; `(pr-str merged)` という文字列が在ること** で判定している。道具を読んでいる
+   ;; だけで、走らせていない —— CLAUDE.md 8 問目「その検査は生成物を実行したか、
+   ;; ビルドできたことで満足したか」がそのままこの形。この suite は判定を
+   ;; **すべて実行から採り**、道具のロジックを test 側に写し取らない（写せば、
+   ;; 道具ではなく写しを検査することになる。ADR-0073 が記録した欠陥）。
+   ;;
+   ;; 誰にも守られていなかった不変条件が 2 つ在った:
+   ;;
+   ;;   1. **committed `schema.edn` の型と cardinality の列。** 既存の
+   ;;      `schema-covers-exactly-the-tx-data-attrs` は **ident の集合**しか見て
+   ;;      いないので、`:db.type/keyword` を `:db.type/string` に手で書き換えても
+   ;;      何も落ちなかった。記録側の値が型を変えたときも同じ。
+   ;;   2. **整形の主張そのもの。** 「再生成すれば整形が失われる」は、道具を
+   ;;      走らせて出てきた成果物で確かめるまで、ソースの読み方の話でしかない。
+   ;;
+   ;; そして境界が 1 つ在る（CLAUDE.md 5 問目）。**JS には整数型が無い**ので
+   ;; `classify` の `(integer? v)` が `(double? v)` より先に当たり、`1.0` は
+   ;; `:db.type/long` と宣言され、書き戻された値は `1` になる —— `.0` が黙って
+   ;; 消える。`1.5` は double。線のちょうど両側に 1 つずつ置いてある。
+   ;;
+   ;; 15 件とも 2026-09-09 に 1 つずつ使い捨てコピーへ当て、`:find` がちょうど
+   ;; 1 回現れること・名指しの test が `FAIL in (...)` として現れること・exit が
+   ;; 1 であって REFUSED (3) ではないこと・無改変で exit 0 に戻ることを実測して
+   ;; から登録した。9 tests のどれもが少なくとも 1 件で赤くなる。
+   ;;
+   ;; ⚠ 最初の測定は **control が赤**で、15 件全部が「噛まなかった」に見えた。
+   ;; 原因は suite ではなく私の driver で、sandbox を `git ls-files` から組んで
+   ;; いたため **まだ untracked だった test file がコピーされていなかった**。
+   ;; 壊し方を間違えた赤は実演ではないが、**壊し方を間違えた「MISS」も同じだけ
+   ;; 無意味**である。control を先に見る理由がこれ。
+   ;;
+   ;; ⚠ ネットワークを叩く mutation は入れていない。木の中の唯一の URL は
+   ;; manifest の `@context` で、README はそれが 200 を返しながら
+   ;; `content-type: text/html` であることを既に記録している —— そこを赤くすると
+   ;; DNS / 到達性 / 実際の変化が同じ顔で落ち、理由を区別できない。
+   :cmd ["nbb" "test/edn_datomize_test.cljs"]
+   :green-marker "stripe edn-datomize: all green"
+   :mutations
+   [{:id :stripe/classify-double-before-integer
+     :why "**境界そのものを動かす。** `double?` を `integer?` より先に置くと `1.0` は double と宣言され、`.0` も保たれる —— つまり現状の「long に落ちて桁が消える」振る舞いが消える。境界のどちら側に線が在るかを、この 1 件だけが固定している"
+     :file "edn-datomize.cljs"
+     :find "    (integer? v) {:type :db.type/long    :card :db.cardinality/one}\n    (double? v)  {:type :db.type/double  :card :db.cardinality/one}"
+     :replace "    (double? v)  {:type :db.type/double  :card :db.cardinality/one}\n    (integer? v) {:type :db.type/long    :card :db.cardinality/one}"
+     :must-fail ["FAIL in (a-whole-number-double-is-recorded-as-a-long-and-loses-its-point-zero)"
+                 "FAIL in (classify-assigns-a-value-type-and-cardinality-to-every-branch)"]},
+
+    {:id :stripe/classify-nil-becomes-keyword
+     :why "`nil` は「型が分からなかった」ではなく string と宣言される。そこを keyword に変えると、記録に nil が 1 つ入った瞬間 schema が別のことを言い始める"
+     :file "edn-datomize.cljs"
+     :find "    (nil? v)     {:type :db.type/string  :card :db.cardinality/one}"
+     :replace "    (nil? v)     {:type :db.type/keyword :card :db.cardinality/one}"
+     :must-fail ["FAIL in (classify-assigns-a-value-type-and-cardinality-to-every-branch)"]},
+
+    {:id :stripe/classify-empty-coll-becomes-cardinality-one
+     :why "空 coll は要素を見られないので string/**many** に落ちる。one にすると、空だった属性が後で値を持ったとき cardinality が食い違う"
+     :file "edn-datomize.cljs"
+     :find "    {:type :db.type/string :card :db.cardinality/many}\n    (and (coll? v) (every? string? v))"
+     :replace "    {:type :db.type/string :card :db.cardinality/one}\n    (and (coll? v) (every? string? v))"
+     :must-fail ["FAIL in (classify-assigns-a-value-type-and-cardinality-to-every-branch)"]},
+
+    {:id :stripe/classify-keyword-vector-becomes-string
+     :why "keyword の vector が string/many と宣言されると、読み手は文字列を期待して keyword を受け取る。値は壊れないので実行時まで気づかない"
+     :file "edn-datomize.cljs"
+     :find "    (and (coll? v) (every? keyword? v)) {:type :db.type/keyword :card :db.cardinality/many}"
+     :replace "    (and (coll? v) (every? keyword? v)) {:type :db.type/string  :card :db.cardinality/many}"
+     :must-fail ["FAIL in (classify-assigns-a-value-type-and-cardinality-to-every-branch)"]},
+
+    {:id :stripe/attr-value-stops-serialising-blobs
+     :why "scalar に収まらない値は `pr-str` して string にしてから書く。生のまま書くと tx-data の中に入れ子 map が残り、schema は string/one と言い続ける —— 宣言と中身が食い違ったまま書き込まれる"
+     :file "edn-datomize.cljs"
+     :find "    (if blob (pr-str v) v)"
+     :replace "    v"
+     :must-fail ["FAIL in (values-that-do-not-fit-a-scalar-are-stored-as-readable-strings)"]},
+
+    {:id :stripe/entity-from-map-drops-db-id
+     :why "`:db/id` が付かないと、書いた結果を自分の冪等ガードが tx-data と認識できない。**2 度目の実行が記録を二重に包む** —— この道具は in-place で書くので、それは記録の破壊にあたる"
+     :file "edn-datomize.cljs"
+     :find "  (into {:db/id -1}"
+     :replace "  (into {}"
+     :must-fail ["FAIL in (wrapping-an-already-wrapped-record-changes-nothing)"
+                 "FAIL in (the-idempotency-guard-boundary-is-a-non-empty-vector-of-maps-carrying-db-id)"]},
+
+    {:id :stripe/guard-stops-requiring-db-id
+     :why "ガードの 4 条件のうち `:db/id` を持つことだけを外す形。`[{:a 1}]` が「もう変換済み」と誤認され、**変換されないまま skip と報告されて成功する** —— 何も起きなかったのに成功に見える"
+     :file "edn-datomize.cljs"
+     :find " (contains? (first content) :db/id)"
+     :replace " true"
+     :must-fail ["FAIL in (the-idempotency-guard-boundary-is-a-non-empty-vector-of-maps-carrying-db-id)"]},
+
+    {:id :stripe/merge-schema-overwrites-existing
+     :why "`merge-schema!` は既存の ident 定義に触らない（手で直した型が残るように）。上書きするようにすると、記録を 1 本変換し直すたびに他の属性の定義が推定値へ戻る"
+     :file "edn-datomize.cljs"
+     :find "                                   (if (contains? acc ident) acc (assoc acc ident attr)))"
+     :replace "                                   (assoc acc ident attr))"
+     :must-fail ["FAIL in (merge-schema-keeps-the-definition-that-was-already-there)"]},
+
+    {:id :stripe/merge-schema-stops-sorting
+     :why "並びが ident 順でなくなると、記録を 1 本変換するたびに schema.edn の diff が全行になる。⚠ この 1 件は **suite の欠陥を 1 つ見つけた** —— 最初の版は並びを sorted-map 経由で見ており、ソートを外しても緑のままだった。ファイル上の生の並びを読むよう直して初めて噛んだ"
+     :file "edn-datomize.cljs"
+     :find "        merged (vec (sort-by (comp str :db/ident) (vals merged-by-ident)))"
+     :replace "        merged (vec (reverse (sort-by (comp str :db/ident) (vals merged-by-ident))))"
+     :must-fail ["FAIL in (merge-schema-keeps-the-definition-that-was-already-there)"]},
+
+    {:id :stripe/tool-starts-pretty-printing-the-schema
+     :why "**README の主張を真正面から反転させる形。** 道具が属性 1 行ずつ書くようになると、committed の schema.edn は「この道具からは出てこない形」ではなくなる。ソースを grep する既存の主張はこの変更を **見ない**（`(pr-str merged)` の文字列が消えるので偶然赤くなるが、それは整形を見たからではない）。ここは成果物を実行して数える"
+     :file "edn-datomize.cljs"
+     :find "                              (pr-str merged)"
+     :replace "                              (str \"[\" (str/join \"\\n \" (map pr-str merged)) \"]\")"
+     :must-fail ["FAIL in (the-tool-when-actually-run-emits-its-body-on-one-line)"]},
+
+    {:id :stripe/committed-schema-value-type-hand-edited
+     :why "schema.edn は「手編集禁止」と名乗る。型を 1 つ手で書き換える形 —— **これが今まで何にも守られていなかった。** ident の集合は変わらないので既存の主張は緑のまま通る"
+     :file "schema.edn"
+     :find "#:db{:ident :readme/status, :valueType :db.type/keyword"
+     :replace "#:db{:ident :readme/status, :valueType :db.type/string"
+     :must-fail ["FAIL in (the-committed-schema-matches-what-the-tool-infers-from-the-committed-records)"]},
+
+    {:id :stripe/committed-schema-cardinality-hand-edited
+     :why "同じ穴の cardinality 側。one を many に変えると、読み手は 1 つの文字列ではなく集合を期待する"
+     :file "schema.edn"
+     :find "#:db{:ident :readme/note, :valueType :db.type/string, :cardinality :db.cardinality/one}"
+     :replace "#:db{:ident :readme/note, :valueType :db.type/string, :cardinality :db.cardinality/many}"
+     :must-fail ["FAIL in (the-committed-schema-matches-what-the-tool-infers-from-the-committed-records)"]},
+
+    {:id :stripe/committed-schema-loses-an-ident
+     :why "属性が 1 つ schema から消える形。記録側には在るので、datom 面へ載せたとき型の無い属性になる"
+     :file "schema.edn"
+     :find " #:db{:ident :readme/source, :valueType :db.type/string, :cardinality :db.cardinality/one}\n"
+     :replace ""
+     :must-fail ["FAIL in (the-committed-schema-matches-what-the-tool-infers-from-the-committed-records)"]},
+
+    {:id :stripe/a-record-value-changes-type
+     :why "逆向き —— **記録側**が動く形。`:retired` という keyword が文字列になると、schema は keyword と言い続ける。記録と schema のどちらが動いても同じ 1 つの検査が捕まえる"
+     :file "README.md.edn"
+     :find "  :readme/status :retired"
+     :replace "  :readme/status \"retired\""
+     :must-fail ["FAIL in (the-committed-schema-matches-what-the-tool-infers-from-the-committed-records)"]},
+
+    {:id :stripe/usage-error-starts-exiting-zero
+     :why "引数を間違えた実行が exit 0 を返すようになる形。**実行できなかった呼び出しが、実行して問題が無かった呼び出しと同じ値を返す** —— CLAUDE.md 2 問目そのもの。呼び出し側の script はこれを成功として次へ進む"
+     :file "edn-datomize.cljs"
+     :find "          (js/process.exit 1)"
+     :replace "          (js/process.exit 0)"
+     :must-fail ["FAIL in (a-malformed-invocation-fails-loudly)"]}]}]}
