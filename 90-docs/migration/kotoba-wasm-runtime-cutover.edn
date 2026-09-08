@@ -64,6 +64,74 @@
    :owns [:compiler-clojure-bootstrap]}
   {:id :t4-jvm-removal :status :blocked
    :blocked-by [:t1-runtime-port :t2-launcher-cutover :t3-independent-compiler]}]
+ :cutover/measured
+ ;; What was actually run on 2026-09-08, as opposed to what the tranche
+ ;; statuses above assert. A `:status :open` cannot distinguish "nothing has
+ ;; happened" from "most of it works and here is the remainder", and T3 had
+ ;; become the second while still reading as the first.
+ ;;
+ ;; Recorded as measurements with the command that produced them, not as status
+ ;; flips: none of the four tranche statuses changed, because none was wrong.
+ {:date "2026-09-08"
+  :chicory-sweep
+  {:command "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
+   :registered-checkouts 4270
+   :files-scanned 38341
+   :files-naming-chicory 24
+   :outside-frozen-inventory 18
+   :note
+   "Until this date the verifier scanned FOUR hardcoded deps.edn paths -- the
+    same four the inventory freezes -- so :new-chicory-call-sites :forbidden
+    could not be violated in a way it could see, and problems=0 meant
+    did-not-look. The sweep over registered checkouts is new."
+   :post-freeze-violations
+   ["orgs/kotoba-lang/provider-postgres/src/provider/postgres/pool.clj"
+    "orgs/kotoba-lang/provider-transport/src/provider/transport.clj"]
+   :violation-note
+   "Both import com.dylibso.chicory.wasm.types directly and both landed AFTER
+    the 2026-07-18 freeze. Whether the inventory absorbs them or they are
+    removed is an owner decision and is NOT made here. The remaining 16 are
+    kototama providers, kototama/clj's second Chicory pin, mesh as a new
+    consumer, and the kotoba launcher with its tests."}
+  :jvm-free-compiler
+  {:verified-by
+   "a PATH with no clojure and no java, plus a poison clojure script that logs
+    every invocation -- so it-did-not-need-a-JVM is measured by the trace being
+    empty, not by the command exiting 0"
+   :jvm-free ["amu compile (wasm32 and all native ISA targets)"
+              "amu check"
+              "amu extract-native"
+              "amu module-lock and multi-file compile --module-lock"]
+   :still-jvm ["keygen" "sign" "measure-runtime" "trust-runtime" "run"
+               "receipt" "verify-receipt" "sbom" "attest-release" "coverage"
+               "inspect" "test" "package-aiueos-boot"
+               "the aiueos kernel/UEFI packaging targets"]
+   :ran "compiled native output executed under a from-source tools/kexe_loader.c: add(40,2) and a two-module double(21) both printed 42, with no JVM, no Node and no Wasm runtime"
+   :honesty-gap
+   "bin/amu refuses out loud for the JVM-only commands. bin/kotoba SILENTLY
+    spawns clojure instead, so a caller cannot tell a JVM-free run from a
+    fallback. Fix the launcher before quoting any bin/kotoba result as
+    JVM-free."}
+  :tools-reader-exit
+  {:note
+   "org.clojure/tools.reader left amu's production classpath on this date
+    (clojure -Spath | grep -c tools.reader, 1 -> 0). It was there only
+    transitively via kotoba-sema, whose frontend read source with tools.reader
+    on :clj and its own kotoba-reader on :cljs. kotoba-sema now uses one reader
+    on both hosts.
+    Collapsing that fork surfaced three defects that were live on the JVM-free
+    runtime and invisible on the JVM: f32 decimal literals refused, 0x hex
+    literals read as SYMBOLS (79 .kotoba files use them), and (def k 1.5)
+    refused as not-closed. A fourth divergence was silent rather than a
+    refusal: 0377 read as decimal 377 here and octal 255 under tools.reader."
+   :adr "adr-2609081700-a-clj-test-of-a-cljc-compiler-tests-one-host"}
+  :launcher-exit-evidence-is-stale
+  "The :kotoba-chicory-launcher entry's exit-evidence says the kotoba CLI
+   delegates compile/run without a JVM classpath. kotoba/deps.edn pins
+   com.dylibso.chicory/{wasm,runtime} 1.7.5 directly AND pulls kototama, which
+   pins it again, into the same JVM process. The evidence describes an end
+   state, not the current one; T2 remains :open, correctly."}
+
  :cutover/verification
  {:inventory "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
   :adr-inventory "nbb --classpath '.:scripts/nbb_compat' scripts/verify-adr-freshness.cljs"
