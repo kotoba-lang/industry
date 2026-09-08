@@ -92,8 +92,48 @@
 - live 検証済み（2026-08-01、CLI 発行・MCP 発行のどちらも本番 `/v1/messages` で 200、
   scope 不足は 401）。
 
+## K16 murakumo ノード鍵 — did:key で自分に署名する (aiueos ADR-0202/0203、2026-09-08)
+
+- **`AIUEOS_K16_MURAKUMO_NODE_KEY`（kagi vault、compartment `network-awai`、
+  `KAGI_HOME=$HOME/.kagi`）** — GMKtec K16 の murakumo ノード identity、
+  Ed25519 秘密鍵（PKCS8 PEM）。公開側の did:key は `did:key:z6Mkpqczt…`
+  （`~/.gftd/k16-murakumo-node.did`。公開値なので秘密ではない）。
+  常駐プロセス（`k16-pxe-server.py`）は kagi を引けないので
+  **`~/.gftd/k16-murakumo-node.pem`（mode 600）** から読む —— このファイル冒頭の
+  「launchd 下では kagi が使えない」と同じ理由。**kagi と `~/.gftd` の 2 箇所**に
+  あり、vault から読み戻して同じ did:key が導出できることを確認済み。
+- **これは下の service token の代用であって、劣化版ではない。** 実測 2026-09-08、
+  live の `api.murakumo.cloud` は relay が使う全ルート
+  （`POST /infer/nodes` `/infer/queue` `/infer/queue/:id/claim`
+  `/infer/queue/:id/result` `/infer/nodes/:name/heartbeat`）で
+  **`Authorization: CACAO <base64>`** を受理する —— 条件は CACAO の `:iss` が
+  body の `:did` / `:who` と一致すること（`write_gate/cacao-authorized?`）。
+  ノードはその鍵を持っているので、**共有 operator secret は要らない。**
+  発行は `os/aiueos/tools/k16-cacao-mint.cljs`（`cacao.edge.mint` を呼ぶだけ。
+  Python 側で再実装しない —— SIWE 平文は mint と verify が byte 単位で一致して
+  いなければならず、その一致は既に存在する）。
+- ⚠ **`node/trust-tier` は `community` まで。** `awai-secure` は
+  `control_plane/normalize-enrollment` が operator 認可を要求するので CACAO では
+  通らない（401 "AWAI Secure Cloud enrollment requires operator authorization"）。
+  K16 は AWAI の設備ではないので community が正しい tier で、`node/provider` は
+  自分の did:key になる。
+- ⚠ **node 名 `gmktec-k16` は operator が別 DID で登録済み**（stale）。同じ名前に
+  別 DID を載せると 409 "an existing node name cannot be replaced by a different
+  DID" —— 正しい拒否。自前 identity は **`gmktec-k16-lan2`** で登録した。
+- 鍵の作り方は ADR-2607320000 の形（multicodec `0xed01` + Ed25519 公開鍵 32 byte の
+  base58btc、**切り詰めない**）。生成器は 4 つ検査する: round trip / shape /
+  **独立した 2 実装の base58btc が一致すること** / **DID 文字列から復元した公開鍵で
+  署名が検証できること**。最後の 1 つだけが、あの ADR が記録した「それらしく見えて
+  署名できない識別子」を捕まえられる。
+
 ## api.murakumo.cloud ノード面 service token (ADR-2608031000、2026-08-03)
 
+- ⚠ **2026-09-08 再実測: まだ存在しない**（`no such item:
+  LOCAL_MURAKUMO_SERVICE_TOKEN`、exit 1、stdout 0 byte）。**ただしノードを立てるのに
+  もう要らない** —— 上の「K16 murakumo ノード鍵」節のとおり node 面の全ルートが
+  CACAO を受理する。この token を探しに来た人がまず読むべきはそちら。残る用途は
+  operator 面（`awai-secure` の enrollment、model/plan の PUT、`/infer/runs`
+  `/infer/spend` `/v1/slow/*`）。
 - ⚠ **2026-08-15 実測: この item は kagi に存在しない。**
   `KAGI_HOME=$HOME/.kagi … kagi get LOCAL_MURAKUMO_SERVICE_TOKEN` は
   **`no such item: LOCAL_MURAKUMO_SERVICE_TOKEN`** を返す（この索引冒頭が警告して
