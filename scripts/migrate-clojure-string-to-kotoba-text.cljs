@@ -58,6 +58,21 @@
 (def repo (opt "--repo"))
 (def text-sha (opt "--text-sha"))
 (def apply? (some #{"--apply"} argv))
+(def include-cljs?
+  "Whether to rewrite `.cljs` too.
+
+  Off by default, and it stayed off for the whole .clj/.cljc migration, because
+  kotoba.lang.text adopts the JVM's whitespace class for `trim` and a .cljs
+  file's answer would move from goog.string's. That is a decision about DATA --
+  whether the strings being trimmed contain U+00A0, U+2007, U+202F (which JS
+  trims and Java does not) or U+001C-001F (the reverse) -- and it is not
+  decidable from source.
+
+  What settles it is that the .cljc migration ALREADY made that change on the
+  ClojureScript half of 10,115 lines. Leaving .cljs behind does not avoid the
+  decision; it applies it inconsistently. The remaining 4,882 lines get the
+  same answer the rest of the workspace already has."
+  (some #{"--include-cljs"} argv))
 
 (defn- refuse! [msg]
   (println (str "REFUSED: " msg))
@@ -72,7 +87,10 @@
                           (if (#{"node_modules" ".git" "target" "out" "dist" ".cpcache"
                                  ".shadow-cljs" ".clj-kondo" "vendor" ".calva"} (.-name e))
                             acc (go p acc))
-                          (re-find #"\.cljc?$" (.-name e)) (conj acc p)
+                          (if include-cljs?
+                            (re-find #"\.cljs?c?$" (.-name e))
+                            (re-find #"\.cljc?$" (.-name e)))
+                          (conj acc p)
                           :else acc)))
                     acc
                     (try (.readdirSync fs d #js {:withFileTypes true}) (catch :default _ []))))]
@@ -296,7 +314,7 @@
    "        ;; tools.deps takes the NEWEST sha it is shown, so without a floor here"
    "        ;; this repo silently rides whatever a sibling happens to name."])
 
-(defn- top-level-deps-open
+(defn- top-level-key-open
   "Index just past the `{` of the OUTER map's `:deps`, or nil.
 
   Not `(.indexOf s \":deps {\")`. That finds the first such text anywhere,
@@ -313,7 +331,8 @@
 
   So: scan with a depth counter and take the `:deps` that sits at depth 1,
   then the `{` that follows it."
-  [s]
+  ([s] (top-level-key-open s ":deps" \{))
+  ([s kee open]
   (let [n (count s)]
     (loop [i 0, depth 0, in-str? false, esc? false, in-cmt? false]
       (cond
@@ -329,15 +348,15 @@
             (= c \;) (recur (inc i) depth false false true)
             (or (= c \{) (= c \[) (= c \()) (recur (inc i) (inc depth) false false false)
             (or (= c \}) (= c \]) (= c \))) (recur (inc i) (dec depth) false false false)
-            (and (= depth 1) (= c \:) (= ":deps" (subs s i (min n (+ i 5)))))
-            ;; found it -- now the opening brace of its value
-            (loop [j (+ i 5)]
+            (and (= depth 1) (= c \:) (= kee (subs s i (min n (+ i (count kee))))))
+            ;; found it -- now the opening delimiter of its value
+            (loop [j (+ i (count kee))]
               (cond (>= j n) nil
-                    (= (nth s j) \{) (inc j)
+                    (= (nth s j) open) (inc j)
                     (or (= (nth s j) \space) (= (nth s j) \newline)
                         (= (nth s j) \tab) (= (nth s j) \return)) (recur (inc j))
                     :else nil))
-            :else (recur (inc i) depth false false false)))))))
+            :else (recur (inc i) depth false false false))))))))
 
 (defn- add-dep [deps-path]
   (let [s (.readFileSync fs deps-path "utf8")]
@@ -350,16 +369,21 @@
       ;; leaving the namespace unresolvable, which is what the first version
       ;; did: it reported `no-deps-key` and carried on.
       (not (str/includes? s ":deps"))
-      (let [m (re-find #"\{:paths \[[^\]]*\]" s)]
-        (if-not m
-          [:refused s]
-          (let [i (+ (.indexOf s m) (count m))
-                entry (str "\n :deps {\n" (str/join "\n" dep-note)
-                           "\n        io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}}")]
-            [:inserted (str (subs s 0 i) entry (subs s i))])))
+      ;; Find `:paths` the same way, by depth. The old `#"\{:paths \["` required
+      ;; it to be the very first key with no comment before it -- and a bb.edn
+      ;; that opens with a two-line comment then `:paths` was reported as having
+      ;; neither key, which held 218 files in etzhayyim/root.
+      (if-let [po (top-level-key-open s ":paths" \[)]
+        (let [close (loop [j po] (cond (>= j (count s)) nil
+                                       (= (nth s j) \]) (inc j)
+                                       :else (recur (inc j))))
+              entry (str "\n :deps {\n" (str/join "\n" dep-note)
+                         "\n        io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}}")]
+          (if close [:inserted (str (subs s 0 close) entry (subs s close))] [:refused s]))
+        [:refused s])
 
       :else
-      (if-let [i (top-level-deps-open s)]
+      (if-let [i (top-level-key-open s)]
         (let [entry (str "\n" (str/join "\n" dep-note)
                          "\n        io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}\n       ")]
           [:added (str (subs s 0 i) entry (str/triml (subs s i)))])
@@ -460,23 +484,30 @@
             ;; 146 files were rewritten there and nothing declared the
             ;; dependency, because the only file the tool looked for did not
             ;; exist and its absence was indistinguishable from "already done".
-            (let [nearest (fn [file]
+            ;; `bb.edn` counts. Babashka's project file carries `:deps` with the
+            ;; same shape as deps.edn, and two of the repos that had "no deps.edn
+            ;; to declare in" have only a bb.edn -- refusing them was the tool
+            ;; being narrow, not the repo being unusual.
+            (let [project-file (fn [d]
+                                 (some (fn [n]
+                                         (let [c (.join path-mod d n)]
+                                           (when (try (.isFile (.statSync fs c))
+                                                      (catch :default _ false)) c)))
+                                       ["deps.edn" "bb.edn"]))
+                  nearest (fn [file]
                             (loop [d (.dirname path-mod file)]
-                              (let [c (.join path-mod d "deps.edn")]
-                                (cond
-                                  (try (.isFile (.statSync fs c)) (catch :default _ false)) c
-                                  (or (= d repo) (= d (.dirname path-mod d))) nil
-                                  :else (recur (.dirname path-mod d))))))
+                              (or (project-file d)
+                                  (when-not (or (= d repo) (= d (.dirname path-mod d)))
+                                    (recur (.dirname path-mod d))))))
                   targets-deps (distinct (keep (fn [[f _]] (nearest f)) changed))
                   targets-deps (if (seq targets-deps)
                                  targets-deps
-                                 (let [dp (.join path-mod repo "deps.edn")]
-                                   (when (try (.isFile (.statSync fs dp)) (catch :default _ false)) [dp])))]
+                                 (when-let [dp (project-file repo)] [dp]))]
               (when (empty? targets-deps)
                 (println "DEPS\tnone-found")
                 (refuse! (str "rewrote " (count changed) " file(s) but found no deps.edn"
-                              " to declare kotoba.lang.text in -- the namespace would"
-                              " not resolve")))
+                              " or bb.edn above any of them to declare kotoba.lang.text"
+                              " in -- the namespace would not resolve")))
               (doseq [dp targets-deps]
                 (let [[status s'] (add-dep dp)]
                   (when (#{:added :inserted} status) (.writeFileSync fs dp s' "utf8"))
