@@ -447,7 +447,97 @@
                 (println (str "wrote " (rel p) " — " (:shard/bytes s) " bytes, key "
                               (:shard/annex-key s)))))))))))
 
+;; Explicit AWAI seed export uses this existing corpus host. It never scans or
+;; exports the workspace document corpus, and never promotes research to serving.
+(defn- awai-errors [seed]
+  (let [models (:models seed)
+        rows (mapcat (fn [[model spec]]
+                       (mapcat (fn [split]
+                                 (map #(assoc % :model model :split split)
+                                      (get spec split []))) [:train :eval])) models)
+        duplicates (fn [f] (->> rows (map f) frequencies (filter #(> (val %) 1)) seq))
+        norm #(str/replace (str/lower-case (str/trim (or % ""))) #"\s+" " ")]
+    (vec
+     (concat
+      (when-not (= #{:basho :hokusai} (set (keys models))) [:model-set])
+      (when-not (= :research-only (:training-purpose seed)) [:research-purpose])
+      (when-not (= :new-synthetic (get-in seed [:authorship :kind])) [:source-kind])
+      (when (str/blank? (get-in seed [:authorship :source])) [:source-missing])
+      (when-not (seq (get-in models [:basho :train])) [:empty-training])
+      (when (some #(empty? (:eval (val %))) models) [:empty-evaluation])
+      (when (duplicates :id) [:duplicate-id])
+      (when (duplicates #(norm (:prompt %))) [:duplicate-prompt])
+      (when (some (fn [[_ rs]] (> (count (set (map :split rs))) 1))
+                  (group-by (juxt :model :family) rows)) [:family-split-leakage])
+      (when (some #(or (str/blank? (:id %)) (str/blank? (:family %))
+                      (str/blank? (:prompt %))) rows) [:invalid-row])
+      (when (some #(and (= :train (:split %)) (str/blank? (:answer %))) rows)
+        [:missing-answer])
+      (when (some #(and (= :eval (:split %))
+                       (or (not (seq (:rubric %))) (some str/blank? (:rubric %)))) rows)
+        [:missing-rubric])
+      (when (seq (get-in models [:hokusai :train])) [:video-text-not-training-clips])))))
+
+(defn- awai-self-test! []
+  (let [seed (read-edn (path/join root "manifest/awai-model-seed.edn"))
+        cases [[seed []]
+               [(assoc-in seed [:models :basho :train] []) [:empty-training]]
+               [(assoc seed :training-purpose :commercial) [:research-purpose]]
+               [(assoc-in seed [:authorship :source] "") [:source-missing]]
+               [(assoc-in seed [:models :basho :train 0 :answer] "") [:missing-answer]]
+               [(assoc-in seed [:models :basho :eval 0 :family] "delivery-register")
+                [:family-split-leakage]]
+               [(assoc-in seed [:models :basho :eval 0 :prompt]
+                          (str "  " (get-in seed [:models :basho :train 0 :prompt]) "  "))
+                [:duplicate-prompt]]
+               [(assoc-in seed [:models :hokusai :eval] []) [:empty-evaluation]]]]
+    (doseq [[input expected] cases]
+      (let [actual (awai-errors input)]
+        (when-not (= expected actual)
+          (throw (ex-info "AWAI control failed" {:expected expected :actual actual})))))
+    (println "AWAI seed: 8 controls passed, including exact rejection reasons")))
+
+(defn- awai-export! []
+  (let [argv (vec *command-line-args*)
+        idx (.indexOf argv "--awai-research-export")
+        dest (get argv (inc idx))
+        input (path/join root "manifest/awai-model-seed.edn")
+        seed (read-edn input)
+        errors (awai-errors seed)]
+    (when (seq errors) (throw (ex-info "AWAI seed rejected" {:reasons errors})))
+    (when (or (str/blank? dest) (str/starts-with? dest "--"))
+      (throw (ex-info "Provide a new output directory" {})))
+    ;; Refuse overwrite: evaluated/trained artifacts must remain tied to bytes.
+    (fs/mkdirSync dest)
+    (let [files
+          (mapv
+           (fn [[file rows]]
+             (let [body (str (str/join "\n" (map #(js/JSON.stringify (clj->js %)) rows)) "\n")]
+               (fs/writeFileSync (path/join dest file) body #js {:flag "wx"})
+               {:file file :rows (count rows) :sha256 (sha256 body)}))
+           [["basho-train.jsonl"
+             (mapv (fn [r] {:messages [{:role "user" :content (:prompt r)}
+                                       {:role "assistant" :content (:answer r)}]})
+                   (get-in seed [:models :basho :train]))]
+            ["basho-eval.jsonl" (get-in seed [:models :basho :eval])]
+            ["hokusai-eval.jsonl" (get-in seed [:models :hokusai :eval])]])
+          receipt {:purpose :research-only :commercial-ready false :trained-model false
+                   :source "manifest/awai-model-seed.edn"
+                   :source-sha256 (sha256 (fs/readFileSync input))
+                   :authorship (:authorship seed) :files files
+                   :limits ["Seed only, not a production corpus or independent benchmark"
+                            "Exact prompt and family checks do not detect semantic leakage"
+                            "No video training clips or trained artifacts exported"
+                            "Training and evaluation quality have not been measured"]}]
+      (fs/writeFileSync (path/join dest "receipt.edn") (str (pr-str receipt) "\n")
+                        #js {:flag "wx"})
+      (println (pr-str receipt)))))
+
 (defn -main []
-  (if verify-index? (verify-index!) (main-generate!)))
+  (cond
+    (contains? args "--awai-self-test") (awai-self-test!)
+    (contains? args "--awai-research-export") (awai-export!)
+    verify-index? (verify-index!)
+    :else (main-generate!)))
 
 (-main)
