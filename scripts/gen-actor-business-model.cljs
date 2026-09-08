@@ -17,7 +17,7 @@
 ;; (matched by the blueprint's :itonami.blueprint/isic-rev5).
 (ns gen-actor-business-model
   (:require [clojure.edn :as edn]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             ["node:fs" :as fs]
             ["node:path" :as path]))
 
