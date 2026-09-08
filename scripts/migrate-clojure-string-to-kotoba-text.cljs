@@ -218,12 +218,22 @@
       (str/replace #"\bclojure\.string/" (str alias "/")))))
 
 (defn- unrewrite
-  "The inverse of `rewrite`, as far as the substitution set goes."
-  [alias src]
+  "The inverse of `rewrite`, as far as the substitution set goes.
+
+  `inserted?` matters. `inserted-libspec` is the literal
+  `(:require [kotoba.lang.text]` -- which is ALSO exactly what renaming a file
+  whose ns already said `(:require [clojure.string]` produces. Stripping it
+  unconditionally turned that legitimate rename back into a bare `(:require`,
+  the round trip did not match, and the read-back refused a correct rewrite:
+  control-plane, 146 files, all of them held back by one. So the inverse only
+  undoes an insertion when there was one."
+  [alias inserted? src]
   (if-not alias
-    (-> src
-        (str/replace created-require "")
-        (str/replace inserted-libspec "(:require")
+    (-> (if inserted?
+          (-> src
+              (str/replace created-require "")
+              (str/replace inserted-libspec "(:require"))
+          src)
         (str/replace #"\bkotoba\.lang\.text/lower\b" "clojure.string/lower-case")
         (str/replace #"\bkotoba\.lang\.text/upper\b" "clojure.string/upper-case")
         (str/replace #"\bkotoba\.lang\.text\b" "clojure.string"))
@@ -271,12 +281,15 @@
   something broke in production."
   [alias before after]
   (if-not alias
-    (= before (unrewrite alias after))
+    ;; an insertion happened exactly when the original did not require it
+    (let [inserted? (not (or (str/includes? before "[clojure.string")
+                             (re-find #"(?s)\(:require[^)]*[\s]clojure\.string[\s\)\]]" before)))]
+      (= before (unrewrite alias inserted? after)))
     (let [collapse (fn [s] (-> s
                              (str/replace #"\bclojure\.string/lower-case" (str alias "/lower-case"))
                              (str/replace #"\bclojure\.string/upper-case" (str alias "/upper-case"))
                              (str/replace #"\bclojure\.string/" (str alias "/"))))]
-      (= (collapse before) (unrewrite alias after)))))
+      (= (collapse before) (unrewrite alias false after)))))
 
 (def dep-note
   ["        ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:"
@@ -441,15 +454,37 @@
               (when (seq bad)
                 (doseq [[p why] bad] (println (str "READBACK-FAILED\t" p "\t" why)))
                 (refuse! "a rewritten file did not survive the read-back invariant")))
-            (let [dp (.join path-mod repo "deps.edn")]
-              (when (try (.isFile (.statSync fs dp)) (catch :default _ false))
+            ;; The deps.edn to update is the NEAREST ANCESTOR of each rewritten
+            ;; file, not `<repo>/deps.edn`. net-kotobase/control-plane is a
+            ;; monorepo with a deps.edn per sub-project and none at the root:
+            ;; 146 files were rewritten there and nothing declared the
+            ;; dependency, because the only file the tool looked for did not
+            ;; exist and its absence was indistinguishable from "already done".
+            (let [nearest (fn [file]
+                            (loop [d (.dirname path-mod file)]
+                              (let [c (.join path-mod d "deps.edn")]
+                                (cond
+                                  (try (.isFile (.statSync fs c)) (catch :default _ false)) c
+                                  (or (= d repo) (= d (.dirname path-mod d))) nil
+                                  :else (recur (.dirname path-mod d))))))
+                  targets-deps (distinct (keep (fn [[f _]] (nearest f)) changed))
+                  targets-deps (if (seq targets-deps)
+                                 targets-deps
+                                 (let [dp (.join path-mod repo "deps.edn")]
+                                   (when (try (.isFile (.statSync fs dp)) (catch :default _ false)) [dp])))]
+              (when (empty? targets-deps)
+                (println "DEPS\tnone-found")
+                (refuse! (str "rewrote " (count changed) " file(s) but found no deps.edn"
+                              " to declare kotoba.lang.text in -- the namespace would"
+                              " not resolve")))
+              (doseq [dp targets-deps]
                 (let [[status s'] (add-dep dp)]
                   (when (#{:added :inserted} status) (.writeFileSync fs dp s' "utf8"))
-                  (println (str "DEPS\t" (name status)))
+                  (println (str "DEPS\t" (name status) "\t" dp))
                   (when (= :refused status)
-                    (refuse! (str dp " has neither a :deps key nor a :paths vector to"
-                                  " insert one after; the rewritten source would not"
-                                  " resolve kotoba.lang.text"))))))
+                    (refuse! (str dp " has neither a locatable top-level :deps nor a"
+                                  " :paths vector to insert one after; the rewritten"
+                                  " source would not resolve kotoba.lang.text"))))))
             (doseq [[p _] changed] (println (str "REWROTE\t" p)))
             (println (str "REWROTE\t" (count changed) "\tfiles -- NOT verified;"
                           " run this repo's tests and say so separately"))
