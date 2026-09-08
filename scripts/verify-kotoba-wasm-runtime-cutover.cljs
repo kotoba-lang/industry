@@ -1,7 +1,14 @@
 #!/usr/bin/env nbb
 ;; verify-kotoba-wasm-runtime-cutover — the frozen legacy inventory in
-;; 90-docs/migration/kotoba-wasm-runtime-cutover.edn against the four deps.edn
-;; files it freezes.
+;; 90-docs/migration/kotoba-wasm-runtime-cutover.edn against the deps.edn files
+;; it freezes, AND a sweep of every registered checkout for Chicory sites the
+;; inventory does not name.
+;;
+;; The sweep is the half that was missing until 2026-09-08. The contract says
+;; `:new-chicory-call-sites :forbidden`, and the only enforcement was a scan of
+;; the same four files the inventory already froze -- so a new site in a fifth
+;; repository was invisible by construction, and `problems=0` meant "did not
+;; look".
 ;;
 ;; It reads `orgs/kotoba-lang/*/deps.edn`, so it cannot be a murakumo fleet
 ;; gate: a gate ships only the target repo's own tree and would find an empty
@@ -90,7 +97,94 @@
                     (str/includes? text "org.clojure/clojure"))]
     (when-not (contains? allowed p)
       (fail! (str "jvm-dep-not-frozen:" p)
-             "JVM/runtime dependency is not in the frozen legacy inventory" {:path p}))))
+             "JVM/runtime dependency is not in the frozen legacy inventory" {:path p})))
+
+  ;; --- the rule says FORBIDDEN; until now nothing looked outside four files --
+  ;;
+  ;; `:cutover/rules :new-chicory-call-sites :forbidden` was enforced by
+  ;; scanning exactly the four `dependency-files` above, which are the four the
+  ;; inventory already freezes. A new Chicory site in a FIFTH repository could
+  ;; not be seen by construction, and `problems=0` therefore meant "did not
+  ;; look" rather than "looked and found nothing" -- the failure this
+  ;; workspace's own 8 questions put first.
+  ;;
+  ;; Measured 2026-09-08, when this sweep was added, it immediately found what
+  ;; the four-file scan could not: `provider-postgres` and `provider-transport`
+  ;; each import `com.dylibso.chicory.wasm.types` directly, both landed AFTER
+  ;; the 2026-07-18 freeze; `kototama/clj/deps.edn` carries a second, separate
+  ;; Chicory pin; and `mesh` is a new production consumer of the frozen path.
+  ;;
+  ;; The sweep is over registered checkouts, not the whole disk, and reports
+  ;; how many it opened -- a run that walked nothing must not read as clean.
+  (let [orgs-dir (full "orgs")
+        skip-dir #"/(node_modules|\.git|target|out|dist|build|\.cpcache|\.gitlibs)(/|$)"
+        interesting? (fn [f] (or (str/ends-with? f "deps.edn")
+                                 (str/ends-with? f ".clj")
+                                 (str/ends-with? f ".cljc")))
+        ;; A directory holding its own `.git` is a DIFFERENT repository -- a
+        ;; nested clone or a worktree someone left inside a checkout. Its files
+        ;; are not the registered repo's files and must not be attributed to
+        ;; it. Without this the sweep walked
+        ;; `orgs/kotoba-lang/kotoba/kotoba/kotoba/kotoba/...` and reported each
+        ;; nesting level as its own unfrozen Chicory site.
+        nested-repo? (fn [d root?]
+                       (and (not root?)
+                            (try (.existsSync fs (.join path d ".git"))
+                                 (catch :default _ false))))
+        walk (fn walk [d depth acc]
+               (if (or (> depth 6) (re-find skip-dir (str d "/"))
+                       (nested-repo? d (zero? depth))
+                       (>= (count acc) 40000))
+                 acc
+                 (let [entries (try (vec (.readdirSync fs d)) (catch :default _ nil))]
+                   (if (nil? entries)
+                     acc
+                     (reduce (fn [a e]
+                               (let [f (.join path d e)]
+                                 (if (try (.isDirectory (.statSync fs f)) (catch :default _ false))
+                                   (walk f (inc depth) a)
+                                   (if (interesting? f) (conj a f) a))))
+                             acc entries)))))
+        ;; REGISTERED checkouts only, from manifest/west.yml -- not everything
+        ;; under orgs/. The first version walked orgs/ wholesale and reported
+        ;; 22 "unfrozen Chicory sites" that were all one stray worktree someone
+        ;; had left INSIDE the superproject
+        ;; (orgs/kotoba-lang/wt-kbb-docstring/kotoba/kotoba/kotoba/...), which
+        ;; CLAUDE.md already forbids and which is not a registered repository
+        ;; at all. A contract verifier that reports a violation for a directory
+        ;; the contract does not govern trains its reader to ignore it.
+        registered (->> (str/split-lines (read-text "manifest/west.yml"))
+                        (keep #(second (re-find #"^\s*path:\s*(orgs/\S+)" %)))
+                        distinct
+                        (filter #(try (.isDirectory (.statSync fs (full %)))
+                                      (catch :default _ false))))
+        files (vec (mapcat #(walk (full %) 0 []) registered))
+        rel (fn [f] (subs f (inc (count root))))
+        ;; A file is EXCUSED when the inventory already names it, either as the
+        ;; dependency-file or as the implementation of a frozen entry.
+        frozen (into (set (map :dependency-file (:cutover/legacy-inventory contract)))
+                     (keep :implementation (:cutover/legacy-inventory contract)))
+        hits (for [f files
+                   :let [text (try (.readFileSync fs f "utf8") (catch :default _ nil))]
+                   :when (and text (str/includes? text "com.dylibso.chicory"))]
+               (rel f))]
+    ;; A sweep that walked nothing is not a clean sweep. The floor is stated
+    ;; rather than implied: this workspace registers thousands of repos, so a
+    ;; handful means the manifest or the disk is not what this run assumed.
+    (when (< (count registered) 100)
+      (fail! "chicory-sweep-unmeasured"
+             "too few registered checkouts were readable, so the forbidden-new-site rule went unmeasured"
+             {:registered (count registered)}))
+    (swap! inspected into registered)
+    (doseq [h (sort hits)
+            :when (not (contains? frozen h))]
+      (fail! (str "chicory-site-not-frozen:" h)
+             "names com.dylibso.chicory and is not in the frozen legacy inventory"
+             {:path h}))
+    (println (str "  chicory sweep: " (count registered) " registered checkout(s), "
+                  (count files) " file(s), "
+                  (count hits) " naming com.dylibso.chicory, "
+                  (count (remove #(contains? frozen %) hits)) " outside the frozen inventory"))))
 
 (let [ids (set (map :id (:cutover/legacy-inventory contract)))]
   (doseq [{:keys [id owns blocked-by]} (:cutover/tranches contract)
