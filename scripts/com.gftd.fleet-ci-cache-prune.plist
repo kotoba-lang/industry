@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.fleet-ci-cache-prune</string>
+  <!-- scripts/fleet-ci/prune-cache.cljs existed and worked, but nothing ever
+       ran it: measured 2026-09-08 the cache had reached 41 GB on a volume with
+       669 MB free. The script keeps every sha west.yml pins, and a wrong
+       delete costs one `git archive` — so the failure mode of running it too
+       often is slow, not incorrect. 3d rather than the script's 7d default
+       because at 7d the retained set alone measured 24.4 GB. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/nbb</string>
+    <string>scripts/fleet-ci/prune-cache.cljs</string>
+    <string>--max-age-days</string>
+    <string>3</string>
+    <string>--apply</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/junkawasaki/github/com-junkawasaki</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>86400</integer>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/junkawasaki/.itonami/fleet-ci-cache-prune.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/junkawasaki/.itonami/fleet-ci-cache-prune.log</string>
+</dict>
+</plist>
