@@ -420,6 +420,57 @@
               the numbers above are from the version that resolves the remote,
               which is why the population is 39 and not 33."}
 
+  {:id       :verify-string-migration-hazards
+   :title    "call sites where clojure.string -> kotoba.lang.text would change the ANSWER"
+   :why      "2026-09-08: kotoba.lang.text stopped delegating to clojure.string and had
+              to DECIDE three things clojure.string does not decide, because its two host
+              implementations disagree and a delegating wrapper inherited the
+              disagreement invisibly. kotoba.lang.text adopts the JVM's answer in all
+              three and pins it.
+
+              The workspace has ~3,900 repos and ~30,000 clojure.string call sites. The
+              question a bulk migration has to answer first is not `how many` but `which
+              ones would come out different`, and the honest answer turned out to be far
+              smaller than the fear -- 3,002 split calls with a regex separator and 1,918
+              replace calls with a regex match and a string replacement, of which:
+
+                1 split has a capturing group, and it is .clj, so nothing changes
+                8 replace use `$&`   (the whole match in JS; ordinary text on the JVM)
+                6 replace use `\\$N` (an escaped dollar on the JVM; backslash + group in JS)
+
+              Fifteen files. Nothing in the .cljc corpus is affected. Without this the
+              migration either stops on a fear it cannot size, or proceeds and breaks
+              fourteen regex-escaping helpers silently -- they would still run, and emit
+              a literal `$&`.
+
+              Two things it does deliberately. (1) The regex must be the SECOND ARGUMENT
+              of split/replace, not merely somewhere on the line: matching the line
+              reported 13 capturing-group splits where there is 1, because a `re-find`
+              pattern elsewhere on the same line counted. (2) A paren inside a character
+              class is LITERAL -- without that, `#\"\\s+[-|(]\\s*\" was reported as a capture.
+              Both are discriminated by breaking them.
+
+              trim's whitespace class is the fourth divergence and is NOT decidable from
+              source -- it depends on whether the DATA contains U+00A0/2007/202F or
+              U+001C-001F. 10,115 .cljc and 4,882 .cljs lines are in that population.
+              Reported at :info rather than omitted, so the number is not mistaken for
+              zero by anyone reading a clean run."
+   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+          "{{repo}}/scripts/verify-string-migration-hazards.cljs" "--findings" "--root" "{{root}}"]
+   :cwd :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 180000
+   :interval-ms 86400000
+   :measured "Run 2026-09-08 from the orgs-bearing checkout: 14.3s wall, exit 1,
+              SCANNED 17,915 call-site lines, 15 warn findings (1 .clj capturing-group
+              + 14 .cljs template) and 1 info. The timeout is ~12x the wall. Daily,
+              because a new hazardous call site arrives on the scale of a landed PR.
+              Discriminated twice: dropping the character-class exclusion takes the
+              capturing-group count from 1 to 2 (the known false positive returns), and
+              disabling the `$&` test takes those findings from 8 to 0."}
+
   {:id       :verify-credential-consumers
    :title    "a credential class that is minted, verifiable, and accepted by nobody"
    :why      "2026-08-31, ADR-2608311600: ADR-2608291200 minted a per-caller operator
