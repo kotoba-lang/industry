@@ -9496,4 +9496,84 @@
       :file "resources/content/en/anime/86-eighty-six/analysis/anime-86-eighty-six-series-primer-2026.jsonld"
       :find "\"url\": \"https://news.etzhayyim.com\""
       :replace "\"url\": \"https://news.etzhayyim.com/ja/articles/anime-86-eighty-six-series-primer-2026\""
-      :must-fail ["FAIL the-real-corpus-satisfies-every-invariant"]}]}]}
+      :must-fail ["FAIL the-real-corpus-satisfies-every-invariant"]}]}
+
+   {:repo "orgs/cloud-itonami/face-tracker"
+    :label "face-tracker read-document —— 9 文書を読む唯一の口の振る舞い"
+    :cmd ["nbb" "test/read_document_test.cljs"]
+    :green-marker "read-document-test: OK"
+    :mutations
+    [{:id :rd/shape-check-removed
+      :note "tx-data の形の検査を丸ごと外す。EDN として読めれば通るので、
+             `edn/read-string` が先頭 1 form しか読まないことがそのまま効く ——
+             LICENSE は symbol、MIGRATION.edn は map で返り、後続の for が seq を
+             要求して **uncaught exception** になる。これが 2026-09-09 に実在した
+             状態で、tracked 20 件のうち 6 件が stack trace で終わっていた"
+      :file "docs/read-document.cljs"
+      :find "(not (and (sequential? v) (seq v) (every? map? v))) [:not-tx-data]"
+      :replace "false [:not-tx-data]"
+      :must-fail ["FAIL refuses-an-edn-file-that-is-not-tx-data"
+                  "FAIL refuses-a-file-that-is-not-edn-at-all"
+                  "FAIL no-tracked-file-makes-the-reader-crash"]}
+
+     {:id :rd/shape-check-broadened-to-coll
+      :note "`sequential?`/`map?` を `coll?`/`coll?` に緩める。**外すのではなく
+             緩める**ので symbol は今までどおり弾かれ、`MIGRATION.edn` のような
+             正当な map だけが通って落ちる —— 上の mutation とは別の 1 件でしか
+             区別が付かない。緩め方の違いが出力に出ることを見るための対"
+      :file "docs/read-document.cljs"
+      :find "(not (and (sequential? v) (seq v) (every? map? v))) [:not-tx-data]"
+      :replace "(not (and (coll? v) (seq v) (every? coll? v))) [:not-tx-data]"
+      :must-fail ["FAIL refuses-an-edn-file-that-is-not-tx-data"
+                  "FAIL no-tracked-file-makes-the-reader-crash"]}
+
+     {:id :rd/label-boundary-inverted
+      :note "属性名を付けるかどうかの比較を `>` から `>=` へ。**境界ちょうどの
+             入力（240 字）が 1 件無ければ、この反転は緑のまま通る** ——
+             CLAUDE.md 8 問の 5 問目が名指ししている形。実データ側の文書は
+             どれも境界から遠いので、fixture が 1 件だけこれを見ている"
+      :file "docs/read-document.cljs"
+      :find "(> (count s) 240)"
+      :replace "(>= (count s) 240)"
+      :must-fail ["FAIL the-label-boundary-is-exactly-240-characters"]}
+
+     {:id :rd/sort-order-reversed
+      :note "長さ降順を昇順に戻す。docstring が約束している『本文が先頭に来る』が
+             破れるが、**本文は今までどおり全部出る**ので、出力の有無だけを見る
+             probe は緑のまま通す"
+      :file "docs/read-document.cljs"
+      :find "(sort-by (fn [[_ s]] (- (count s))))"
+      :replace "(sort-by (fn [[_ s]] (count s)))"
+      :must-fail ["FAIL orders-attributes-longest-first"]}
+
+     {:id :rd/listing-refusal-removed
+      :note "文書が 1 件も無いときの REFUSED を外す。`読める文書 0 件` を exit 0 で
+             印字するようになる —— 『測れなかった』が『測って問題が無かった』と
+             同じ値で返る、この repo の規則が名指しする最短形"
+      :file "docs/read-document.cljs"
+      :find "(when (empty? docs)"
+      :replace "(when false"
+      :must-fail ["FAIL refuses-with-exit-3-when-no-document-is-tracked"]}
+
+     {:id :rd/not-found-reason-collapsed
+      :note "『ファイルが無い』を『EDN として読めない』に畳む。**exit は 1 のまま
+             で、拒否もしている**ので、結果だけを assert する負テストは噛んだと
+             数えてしまう。理由の literal を pin していなければ検出できない
+             （CLAUDE.md 8 問の 6 問目）"
+      :file "docs/read-document.cljs"
+      :find ":not-found   \"ファイルが無い（または読めない）\""
+      :replace ":not-found   \"EDN として読めない\""
+      :must-fail ["FAIL refuses-a-path-that-does-not-exist"]}
+
+     {:id :rd/string-attributes-no-longer-collected
+      :note "本文の抽出条件を `string?` から `number?` へ。9 文書すべてが
+             『文字列の属性が 1 つも無い』で exit 1 になる —— 道具が全面的に
+             使えなくなる退行で、これを 1 件も捕まえないなら suite は無内容"
+      :file "docs/read-document.cljs"
+      :find "(string? s)"
+      :replace "(number? s)"
+      :must-fail ["FAIL every-tracked-document-opens"
+                  "FAIL prints-a-long-body-verbatim"
+                  "FAIL labels-short-attributes-with-their-attribute-name"
+                  "FAIL orders-attributes-longest-first"
+                  "FAIL the-label-boundary-is-exactly-240-characters"]}]}]}

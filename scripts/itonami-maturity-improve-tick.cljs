@@ -64,6 +64,35 @@
 ;; ゼロにすると t=24 で 13.8% 失い、10% を超えると過投資（17 repo は飽和済み）。
 (def substrate-share-floor 0.02)
 
+;; ── どこまで深く出すか（CLI） ──────────────────────────────────────────────
+;;
+;; **既定の 5 本は、5 本とも別セッションが握っていることがある。** 実測
+;; 2026-09-08/09: 2 周連続で上位 5 本（appkit / app-6ir / app-ge / app-ka /
+;; cloud-itonami-apex）が全て live な worktree に握られており、tick の最後の 1 行は
+;; 「上位に clean な候補が無い。順位を下へ辿るか」で終わった。**辿る手段が無い。**
+;; 前周はこの tick を丸ごと写して深さと本数だけ書き換えた copy を回している ——
+;; つまり順位付け・archived 除外・movement probe・contention 判定が二重化し、
+;; その copy はこの本体が直っても直らない。
+;;
+;; だから本体に引数を足す。**既定値は変えない**（引数なしの出力はこれまでと同一）。
+(defn- cli-int
+  "`--flag N` を読む。無ければ `default`。**壊れた値は既定に落とさず終える** ——
+  `--take abc` を静かに 5 と読むと、5 本しか出ていないのに 40 本見たつもりで
+  『clean な候補が無い』と結論する。読めなかったことと読んで既定だったことは
+  出力で区別できなければならない。"
+  [flag default]
+  (let [args (vec (or *command-line-args* []))
+        i (.indexOf args flag)]
+    (if (neg? i)
+      default
+      (let [v (get args (inc i))
+            n (when (string? v) (js/parseInt v 10))]
+        (if (and (number? n) (not (js/isNaN n)) (pos? n))
+          n
+          (do (println (str "✗ " flag " に正の整数が要る（受け取った: "
+                            (pr-str v) "）"))
+              (js/process.exit 2)))))))
+
 (defn log! [& xs] (println (str/join " " (map str xs))))
 (defn- slurp* [p] (try (str (.readFileSync fs p "utf8")) (catch :default _ nil)))
 
@@ -498,8 +527,17 @@
 (def ^:private movement-probe-depth
   "How far down the gain-sorted candidates to ask git. Not the whole lane -- that
   is 1,782 repositories every tick. Deep enough that dropping the moved ones
-  still leaves five to rank."
-  24)
+  still leaves five to rank.
+
+  `--probe-depth N` raises it, and `--take N` raises it implicitly: asking for 40
+  ranked rows while probing 24 candidates would silently return at most 24, and a
+  short list would read as `nothing further down` rather than `we stopped looking`."
+  (max (cli-int "--probe-depth" 24)
+       (* 3 (cli-int "--take" 5))))
+
+(def ^:private rank-take
+  "How many ranked rows to print and record. `--take N`."
+  (cli-int "--take" 5))
 
 (defn- head-commit-ms
   "Epoch ms of `path`'s current HEAD commit, or nil when git cannot answer.
@@ -680,7 +718,7 @@
         movement (fresh/classify-movement
                   (with-commit-identity (vec (take movement-probe-depth by-gain))))
         moved (:moved movement)
-        ranked (vec (take 5 (:kept movement)))
+        ranked (vec (take rank-take (:kept movement)))
         ;; `freshness` は probe より前に走るので、:blind-to-own-work は
         ;; 「どの候補が落ちるか」を知らずに決まっている。probe が名指しされた着地を
         ;; **全部** 落としたなら、間違っている行はもう候補に居ない —— 残りの順位は
@@ -705,6 +743,10 @@
                :datoms-unseen-landings (mapv #(select-keys % [:at :target :axis :merged])
                                              unseen)
                :lane lane
+               ;; **何本見て「clean な候補が無い」と言ったのかを残す。** 既定の
+               ;; 5 本で見つからなかったのと、40 本見て見つからなかったのは別の記録。
+               :rank-take rank-take
+               :movement-probe-depth movement-probe-depth
                :observed-substrate-share observed-substrate-share
                :iterations iterations
                :fleet {:mean-own (:summary/mean-own summary)
@@ -859,7 +901,8 @@
       (when-let [t (:taken r)]
         (log! (str "      ⛔ " t))))
     (when flat?
-      (log! "⚠ この lane の leverage は平坦（上位 5 本の差 < 0.5）。順位は弱い信号なので、"
+      (log! (str "⚠ この lane の leverage は平坦（上位 " rank-take
+                 " 本の差 < 0.5）。順位は弱い信号なので、")
             "順位より『弱い軸を 1 つ確実に埋める』を優先する"))
 
     (try (.appendFileSync fs ledger-file (str (pr-str (assoc entry :outcome :measured)) "\n"))
