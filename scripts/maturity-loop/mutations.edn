@@ -9576,4 +9576,79 @@
                   "FAIL prints-a-long-body-verbatim"
                   "FAIL labels-short-attributes-with-their-attribute-name"
                   "FAIL orders-attributes-longest-first"
-                  "FAIL the-label-boundary-is-exactly-240-characters"]}]}]}
+                  "FAIL the-label-boundary-is-exactly-240-characters"]}]}
+  {:repo "orgs/cloud-itonami/shirabe"
+   :label "shirabe worker contract —— 内部信頼ゲートと Selective-Persist を、実装を読まずに呼んで確かめる"
+   ;; この repo の実装は `src/app.ts` 1 ファイルで、冒頭 14 行が 2 つの不変条件を
+   ;; **散文で**宣言している（全 XRPC は共有秘密を要する / 保存に到達するのは
+   ;; saveListings と persistTorrent だけ）。それまで repo が持っていた検査は
+   ;; `tsc --noEmit` だけで、**gate の 1 行を消しても緑で通る** —— 型は正しい。
+   ;;
+   ;; test は source を grep せず、`src/app.ts` を **hono だけ test double に
+   ;; 差し替えて import し、登録された handler をそのまま呼ぶ**（Node 26 が .ts の
+   ;; 型注釈を剥がすので実装は無改変）。global fetch を差し替えて、どの daemon
+   ;; path へ転送したかを観測する。ネットワークも pnpm install も要らないので、
+   ;; 使い捨て worktree でそのまま走る。
+   ;;
+   ;; 7 件とも 2026-09-09 に、当てて**名指しした検査が赤くなる**ところを実際に
+   ;; 見てから登録した。
+   :cmd ["nbb" "test/worker_contract_test.cljs"]
+   :green-marker "worker-contract: OK"
+   :mutations
+   [
+    {:id :shirabe/fail-open-when-unconfigured
+     :note "gate を fail-open に反転させる。**1 文字の編集で、型検査は緑のまま通る** ——\n            CLAUDE.md 8 問の 2 問目「そもそも実行できないとき何を返すか」に対して\n            この repo が出している答えそのものを壊す。"
+     :file "src/app.ts"
+     :find "if (!expected) return false; // fail-closed when unconfigured"
+     :replace "if (!expected) return true; // fail-closed when unconfigured"
+     :must-fail ["FAIL every-xrpc-route-refuses-when-the-internal-secret-is-unset"]}
+
+    {:id :shirabe/length-only-comparison
+     :note "秘密の比較を**長さだけ**にする。実装は `got.length === expected.length && got === expected`\n            で、長さ検査は本来冗長 —— だから「1 文字短い」だけを見る test は\n            **この変異を素通しする**。同じ長さで 1 文字違う境界の入力だけが捕まえる。"
+     :file "src/app.ts"
+     :find "return got.length === expected.length && got === expected;"
+     :replace "return got.length === expected.length;"
+     :must-fail ["FAIL a-same-length-trust-header-that-differs-is-refused"]}
+
+    {:id :shirabe/gate-dropped-from-one-route
+     :note "1 route から `if (!authorized(c)) return unauthorized(c);` を落とす。**これが\n            この suite が在る理由**: 新しい route を足してこの 1 行を書き忘れる形と\n            同じで、`tsc --noEmit` は緑で通す。内部専用 actor に無認証の口が開く。"
+     :file "src/app.ts"
+     :find ".search`, async (c) => {\n  if (!authorized(c)) return unauthorized(c);\n  return callDaemon(c.env, \"GET\", \"/torznab/search\""
+     :replace ".search`, async (c) => {\n  return callDaemon(c.env, \"GET\", \"/torznab/search\""
+     :must-fail ["FAIL every-xrpc-route-refuses-a-request-without-the-trust-header"]
+     ;; 正しい巻き込み。弱い方の test に寄せて消さず、ここに宣言する
+     :also ["FAIL every-xrpc-route-refuses-when-the-internal-secret-is-unset"
+            "FAIL a-trust-header-one-character-short-is-refused"
+            "FAIL a-same-length-trust-header-that-differs-is-refused"]}
+
+    {:id :shirabe/analysis-route-routed-to-persist
+     :note "`analyzeTorrent` の転送先を `/analyze` から `/persist` に変える。README が\n            不変条件 2 として書いている Selective-Persist（貯めるものを選ぶ）を、\n            **解析しただけで保存する**形に壊す。散文はこれに気づかない。"
+     :file "src/app.ts"
+     :find "return callDaemon(c.env, \"POST\", \"/analyze\", {"
+     :replace "return callDaemon(c.env, \"POST\", \"/persist\", {"
+     :must-fail ["FAIL analysis-and-ephemeral-routes-never-reach-a-persisting-daemon-path"]
+     ;; 正しい巻き込み。弱い方の test に寄せて消さず、ここに宣言する
+     :also ["FAIL every-xrpc-route-reaches-the-daemon-with-the-correct-secret"
+            "FAIL persist-torrent-is-the-only-route-that-reaches-persist"]}
+
+    {:id :shirabe/empty-query-forwarded
+     :note "空文字の query を daemon へ転送する。`indexer=` のような空の絞り込みが\n            daemon 側で「空文字の indexer 名」として効き、検索が黙って 0 件になる。"
+     :file "src/app.ts"
+     :find "if (v !== undefined && v !== \"\") url.searchParams.set(k, String(v));"
+     :replace "if (v !== undefined) url.searchParams.set(k, String(v));"
+     :must-fail ["FAIL empty-query-parameters-are-not-forwarded-to-the-daemon"]}
+
+    {:id :shirabe/trailing-slash-kept
+     :note "daemon origin の末尾スラッシュを剥がさない。`http://d/` + `/torznab/search`\n            で `//torznab/search` になる。operator が末尾 `/` 付きで\n            `SHIRABE_DAEMON_URL` を渡した時だけ壊れるので、設定依存で再現しにくい。"
+     :file "src/app.ts"
+     :find "const base = (env.SHIRABE_DAEMON_URL ?? \"http://127.0.0.1:8765\").replace(/\\/$/, \"\");"
+     :replace "const base = (env.SHIRABE_DAEMON_URL ?? \"http://127.0.0.1:8765\");"
+     :must-fail ["FAIL a-trailing-slash-on-the-daemon-url-is-not-doubled"]}
+
+    {:id :shirabe/unset-actor-did-answers-200
+     :note "DID 未設定でも 200 で did document を返す。`id` が undefined の DID 文書を\n            名乗ることになる（README 不変条件 4）。"
+     :file "src/app.ts"
+     :find "if (!did) return c.json({ error: \"NotFound\", message: \"actor DID unset\" }, 404);"
+     :replace "if (!did) return c.json({ error: \"NotFound\", message: \"actor DID unset\" }, 200);"
+     :must-fail ["FAIL the-did-document-is-404-when-the-actor-did-is-unset"]}
+    ]}]}
