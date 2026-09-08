@@ -4,7 +4,7 @@ Intended recipient: Modal sales/support, through the workspace's established con
 
 Subject: Contract scope for a Modal-backed inference API distributed through OpenRouter
 
-We are preparing Murakumo, an authenticated inference API, and considering offering a fixed GLM-5.3-Flash endpoint through OpenRouter using our Modal workspace. Users would receive Murakumo credentials only; Modal credentials would remain private. We are comparing Modal Shared Endpoints with a dedicated deployment.
+We operate Murakumo with our own inference fleet as the primary backend. We are considering Modal only as backup capacity during fleet outages or saturation, returning new requests to our fleet after recovery. Users would receive Murakumo credentials only; Modal credentials would remain private. Any backup must serve the same declared model and capabilities. Please distinguish the terms for Shared Endpoints and our own dedicated Modal deployment.
 
 Please confirm whether this use, including selling inference through OpenRouter, is permitted under our applicable agreement given section 1.3(c) of the standard terms. If an additional Service Order or reseller arrangement is required, please identify the terms and required contracting information.
 
