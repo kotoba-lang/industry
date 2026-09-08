@@ -9730,4 +9730,137 @@
      :file "migration.edn"
      :find ":allowed-additions [\"README.edn\" \"migration.edn\"]"
      :replace ":allowed-additions [\"README.edn\" \"migration.edn\" \"CHARTER-RIDER.md\"]"
-     :must-fail ["FAIL in (migration-edn-is-typed-and-its-allowed-additions-exist)"]}]}]}
+     :must-fail ["FAIL in (migration-edn-is-typed-and-its-allowed-additions-exist)"]}]}
+  {:repo "orgs/cloud-itonami/app-oshiete"
+   :label "app-oshiete repo contract —— 宣言が parse でき、型が合い、4 箇所に散った identity が一致し、SPA の結び目が繋がっているか"
+   ;; この repo の identity は **1 箇所に無い**。nanoid `sg65kxvf` だけでも
+   ;; kotodama.jsonld / wrangler.jsonc の `name` / `vars.APP_NANOID` /
+   ;; `routes[].pattern` の 4 箇所に書かれており、performer ディレクトリは
+   ;; template から複製されるので **1 箇所だけ書き換え忘れる**のが最も自然な
+   ;; 壊し方である。どのファイルも単独では完全に妥当な JSON のままなので、
+   ;; 片方しか読まない consumer は一生気づかない。
+   ;;
+   ;; この repo が持っていた実行可能な検査は 2 本あったが、どちらもこの層を
+   ;; 見ていない —— `appview/…/test/oshiete.test.ts` は
+   ;; `expect(true).toBe(true)` の 1 件で **ファイルを 1 つも開かず**、
+   ;; `cljs/test/oshiete/app_test.cljs` が読むのは `oshiete.app` の re-frame db
+   ;; だけ（下の 15 mutation はどれも `src/oshiete/app.cljs` を書き換えない）。
+   ;;
+   ;; SPA の 3 点（shadow module → `public/js/<module>.js` → index.html の
+   ;; `<script>` → `main` の mount 点）は名前で結ばれているだけで、**どれか 1 つを
+   ;; 改名してもビルドは通る** —— 出るのは真っ白なページで、型検査もテストも
+   ;; 何も言わない。ADR-2608136000 の 8 問目そのもの。
+   ;;
+   ;; 15 件とも 2026-09-09 に 1 つずつ当てて、名指しの test が赤くなり、
+   ;; 無改変で緑に戻るところを実測してから登録した。
+   ;;
+   ;; ⚠ `must-fail` は `FAIL in (<test 名>)` の literal を pin する。結果だけを見る
+   ;; （exit が非 0 になった）判定にすると、別の理由で落ちた実行を「噛んだ」と
+   ;; 数える —— CLAUDE.md 6 問目の形。
+   :cmd ["nbb" "test/repo_contract_test.cljs"]
+   :green-marker "app-oshiete repo contract: all green"
+   :mutations
+   [{:id :app-oshiete/nanoid-drifts-in-the-worker-env
+     :why "4 箇所に散った nanoid のうち **Worker に実際に配られる方**だけが古くなる形。宣言は正しいまま、実行環境だけが別の identity を名乗る"
+     :file "appview/oshiete-mcp-component/wrangler.jsonc"
+     :find "\"APP_NANOID\": \"sg65kxvf\""
+     :replace "\"APP_NANOID\": \"sg65kxvg\""
+     :must-fail ["FAIL in (the-nanoid-agrees-across-every-file-that-repeats-it)"]}
+
+    {:id :app-oshiete/worker-name-no-longer-carries-the-nanoid
+     :why "Worker 名の規約 `kotodama-<nanoid>` が崩れる形。デプロイ先の名前が変わるので、既存の Worker を置き換えず **2 つ目が生える**"
+     :file "appview/oshiete-mcp-component/wrangler.jsonc"
+     :find "\"name\": \"kotodama-sg65kxvf\""
+     :replace "\"name\": \"kotodama-oshiete\""
+     :must-fail ["FAIL in (the-nanoid-agrees-across-every-file-that-repeats-it)"]}
+
+    {:id :app-oshiete/did-web-host-loses-its-route
+     :why "`did:web:oshiete.etzhayyim.com` は **そのホストが .well-known を配ること**に依存して解決する。route から外れた瞬間 DID は宣言の中だけに存在して解決しなくなるが、宣言は完全に妥当なままなので読む側からは正常に見える"
+     :file "appview/oshiete-mcp-component/wrangler.jsonc"
+     :find "\"pattern\": \"oshiete.etzhayyim.com/*\""
+     :replace "\"pattern\": \"oshiete-qa.etzhayyim.com/*\""
+     :must-fail ["FAIL in (the-did-web-host-is-actually-a-route-this-worker-serves)"]}
+
+    {:id :app-oshiete/capabilities-drift-between-declaration-and-env
+     :why "宣言（kotodama profile）だけ更新して deploy すると、宣言と実際に配られる env が静かに分かれる。capability が 1 つ減っても JSON としては妥当"
+     :file "appview/oshiete-mcp-component/wrangler.jsonc"
+     :find "\\\"submitQuestion\\\",\\\"listQuestions\\\""
+     :replace "\\\"listQuestions\\\""
+     :must-fail ["FAIL in (the-worker-env-mirrors-the-declaration-it-was-copied-from)"]}
+
+    {:id :app-oshiete/capabilities-stop-being-a-json-string
+     :why "**この suite で一番静かな壊れ方。** `APP_CAPABILITIES` は JSON の中に JSON 文字列として入っている。配列を表す文字列を素の文字列に取り違えても `JSON.parse` は外側で何も言わない —— 読む側が `JSON.parse` した先で初めて壊れる"
+     :file "appview/oshiete-mcp-component/wrangler.jsonc"
+     :find "\"APP_CAPABILITIES\": \"[\\\"submitQuestion\\\""
+     :replace "\"APP_CAPABILITIES\": \"submitQuestion\", \"APP_CAPABILITIES_OLD\": \"[\\\"submitQuestion\\\""
+     :must-fail ["FAIL in (the-worker-env-mirrors-the-declaration-it-was-copied-from)"]}
+
+    {:id :app-oshiete/readme-edn-schema-becomes-an-unevaluated-form
+     :why "EDN に評価は無いので `(str \"a\" \"b\")` は throw せず PersistentList として読める。reader を通しただけの検査は「読めた」と報告し、文字列を期待している下流だけが壊れる（superproject CLAUDE.md が 2026-09-08 に 13 件の実例で警告している形）。だから型まで見る"
+     :file "README.edn"
+     :find ":schema \"etzhayyim.repository/v1\""
+     :replace ":schema (str \"etzhayyim.repository/\" \"v1\")"
+     :must-fail ["FAIL in (readme-edn-is-typed-repository-metadata)"]}
+
+    {:id :app-oshiete/project-jsonld-stops-being-json
+     :why "配列に余分なコンマを 1 つ入れる。`JSON.parse` は落ちるが、宣言を正規表現で読む検査は部分文字列が残る限り緑のまま —— 「宣言が読める」と「宣言が grep に引っかかる」の差がここで出る"
+     :file "PROJECT.jsonld"
+     :find "\"documents\": ["
+     :replace "\"documents\": [,"
+     :must-fail ["FAIL in (every-declaration-file-parses-as-the-format-it-names)"]}
+
+    {:id :app-oshiete/project-id-and-url-diverge
+     :why "`@id` と `url` が別の origin を指す形。片方だけ改名するとこうなる。JSON としては完全に妥当で、参照する側は 2 つの識別子のどちらを信じるかで挙動が分かれる"
+     :file "PROJECT.jsonld"
+     :find "\"url\": \"https://oshiete.etzhayyim.com\","
+     :replace "\"url\": \"https://oshiete-qa.etzhayyim.com\","
+     :must-fail ["FAIL in (project-jsonld-id-and-url-name-the-same-origin)"]}
+
+    {:id :app-oshiete/inlined-rdf-document-loses-its-context
+     :why "top-level の *.jsonld を PROJECT.jsonld に畳み込んだもの。畳んだ **中身**が JSON-LD を名乗れなくなっても、外側の PROJECT.jsonld は妥当な JSON のままなので parse 検査では捕まらない"
+     :file "PROJECT.jsonld"
+     :find "\"@context\": ["
+     :replace "\"@ctx\": ["
+     :must-fail ["FAIL in (project-jsonld-inlined-rdf-documents-are-well-formed)"]}
+
+    {:id :app-oshiete/migration-promises-a-file-that-is-not-there
+     :why "`:allowed-additions` に宣言を足して「足した」ように見せる形 —— 宣言を足すことは file を作ることではない"
+     :file "migration.edn"
+     :find ":allowed-additions [\"README.edn\" \"migration.edn\"]"
+     :replace ":allowed-additions [\"README.edn\" \"migration.edn\" \"CHARTER-RIDER.md\"]"
+     :must-fail ["FAIL in (migration-edn-is-typed-and-its-allowed-additions-exist)"]}
+
+    {:id :app-oshiete/bundle-name-and-script-tag-diverge
+     :why "shadow の module 名を変えると出力は `public/js/main.js` になるが、index.html は `js/app.js` を読み続ける。**ビルドは通り、テストも通り、出るのは真っ白なページ**（CLAUDE.md「見られる ことは規則の半分」）"
+     :file "appview/oshiete-mcp-component/cljs/shadow-cljs.edn"
+     :find ":modules {:app {:init-fn oshiete.app/main}}"
+     :replace ":modules {:main {:init-fn oshiete.app/main}}"
+     :must-fail ["FAIL in (the-single-page-bundle-is-actually-wired-to-the-document)"]}
+
+    {:id :app-oshiete/mount-point-renamed-in-the-document-only
+     :why "同じ結び目の逆側。`main` は `getElementById \"app\"` を呼び続けるので `null` に描こうとする。document 側だけの 1 語の変更で、ビルドは何も言わない"
+     :file "appview/oshiete-mcp-component/cljs/public/index.html"
+     :find "<div id=\"app\">"
+     :replace "<div id=\"root\">"
+     :must-fail ["FAIL in (the-single-page-bundle-is-actually-wired-to-the-document)"]}
+
+    {:id :app-oshiete/test-ns-regexp-stops-matching
+     :why "**この repo で最も静かな壊れ方。** shadow の `:node-test` は正規表現に当たる ns が 1 つも無くても **ビルドに成功し、0 件走って exit 0** で終わる。「実行できなかった検査」と「実行して問題が無かった検査」が同じ値を返す形（CLAUDE.md 1 問目・2 問目）そのもの"
+     :file "appview/oshiete-mcp-component/cljs/shadow-cljs.edn"
+     :find ":ns-regexp \"-test$\""
+     :replace ":ns-regexp \"-spec$\""
+     :must-fail ["FAIL in (the-test-build-regexp-actually-matches-the-test-namespaces)"]}
+
+    {:id :app-oshiete/shadow-asks-for-an-alias-deps-does-not-have
+     :why "alias が消えると reagent / re-frame がクラスパスから落ちる。ビルドは「その ns が無い」で落ちるが、落ちる場所が宣言から 2 段離れているので原因が読めない"
+     :file "appview/oshiete-mcp-component/cljs/shadow-cljs.edn"
+     :find ":aliases [:cljs :test]"
+     :replace ":aliases [:cljs :test :bench]"
+     :must-fail ["FAIL in (the-cljs-build-aliases-that-shadow-asks-for-exist)"]}
+
+    {:id :app-oshiete/ignore-rules-swallow-the-served-document
+     :why "frontend は `public/` の静的資産として配られる。ignore が 1 行広がると index.html が次の clone から消える —— 200 すら返らない。`git check-ignore` は **既定で index を見る**ので追跡ファイルを報告せず、この壊れ方を隠す。検査は `--no-index` で規則だけを当てる"
+     :file "appview/oshiete-mcp-component/cljs/.gitignore"
+     :find "public/js/"
+     :replace "public/js/\n*.html"
+     :must-fail ["FAIL in (the-ignore-rules-do-not-match-a-tracked-file)"]}]}]}
