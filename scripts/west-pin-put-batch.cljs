@@ -51,10 +51,45 @@
        (map #(str/split % #"\t"))
        (filter #(and (= 3 (count %)) (re-matches #"[0-9a-f]{40}" (second %))))))
 
-(defn tip []
+(defn tip
+  "west.yml at the tip, or a REFUSAL.
+
+  The guard below is not defensive padding. Measured 2026-09-09: sustained API
+  traffic from three concurrent migration waves tripped GitHub's SECONDARY rate
+  limit, which `gh api rate_limit` does not report (that endpoint is exempt and
+  answers for the core bucket -- it said 5000 remaining while every other call
+  was being refused). The raw-content GET then returned a JSON error body
+  INSTEAD OF west.yml, `revision-line-index` found no revision line in it, and
+  the batch reported
+
+      drop <entry>: no revision line at tip     x 723
+
+  and exited 0 with `nothing to write`. Every one of those 723 entries was
+  present at tip with a revision line. The verdict read as a fact about
+  west.yml; it was a fact about a read that failed.
+
+  So the text is checked for being west.yml at all -- a `manifest:` key and a
+  plausible size -- before any entry is looked up in it. A tip that cannot be
+  read is exit 2, never a page of drops."
+  []
   (let [blob (str/trim (:out (sh (str "gh api repos/" repo "/contents/manifest --jq '.[] | select(.name==\"west.yml\") | .sha'"))))
         text (:out (sh (str "gh api repos/" repo "/contents/" path
                             " -H 'Accept: application/vnd.github.raw'")))]
+    (when (or (str/blank? text)
+              (< (count text) 1000)
+              (not (str/includes? text "manifest:"))
+              (str/includes? (subs text 0 (min 400 (count text))) "\"message\":"))
+      (println "REFUSED: could not read manifest/west.yml at tip.")
+      (println (str "  got " (count text) " bytes; first 200: "
+                    (str/replace (subs text 0 (min 200 (count text))) #"\s+" " ")))
+      (println "  Not writing, and not reporting the entries as missing -- they")
+      (println "  were never looked at. A secondary rate limit answers here with")
+      (println "  a JSON error body and `gh api rate_limit` will still say the")
+      (println "  core bucket is full.")
+      (js/process.exit 2))
+    (when (str/blank? blob)
+      (println "REFUSED: could not read the west.yml blob sha at tip.")
+      (js/process.exit 2))
     {:blob blob :text text}))
 
 (defn revision-line-index
