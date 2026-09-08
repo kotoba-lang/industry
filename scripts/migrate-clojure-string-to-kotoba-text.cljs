@@ -283,6 +283,49 @@
    "        ;; tools.deps takes the NEWEST sha it is shown, so without a floor here"
    "        ;; this repo silently rides whatever a sibling happens to name."])
 
+(defn- top-level-deps-open
+  "Index just past the `{` of the OUTER map's `:deps`, or nil.
+
+  Not `(.indexOf s \":deps {\")`. That finds the first such text anywhere,
+  which in a deps.edn whose top-level `:deps` is written as
+
+      :deps
+      {org.clojure/clojure ...}
+
+  is the one inside `:aliases {:build {:deps {...}}}`. Measured 2026-09-09 on
+  cloud-itonami-app: the text dependency landed in the BUILD alias, the
+  namespace was unresolvable at runtime, and the only symptom was a
+  FileNotFoundException for kotoba/lang/text much later. 83 repos write
+  `:deps` on its own line.
+
+  So: scan with a depth counter and take the `:deps` that sits at depth 1,
+  then the `{` that follows it."
+  [s]
+  (let [n (count s)]
+    (loop [i 0, depth 0, in-str? false, esc? false, in-cmt? false]
+      (cond
+        (>= i n) nil
+        in-cmt? (recur (inc i) depth false false (not= (nth s i) \newline))
+        esc?    (recur (inc i) depth in-str? false false)
+        :else
+        (let [c (nth s i)]
+          (cond
+            (and in-str? (= c \\)) (recur (inc i) depth true true false)
+            in-str? (recur (inc i) depth (not= c \") false false)
+            (= c \") (recur (inc i) depth true false false)
+            (= c \;) (recur (inc i) depth false false true)
+            (or (= c \{) (= c \[) (= c \()) (recur (inc i) (inc depth) false false false)
+            (or (= c \}) (= c \]) (= c \))) (recur (inc i) (dec depth) false false false)
+            (and (= depth 1) (= c \:) (= ":deps" (subs s i (min n (+ i 5)))))
+            ;; found it -- now the opening brace of its value
+            (loop [j (+ i 5)]
+              (cond (>= j n) nil
+                    (= (nth s j) \{) (inc j)
+                    (or (= (nth s j) \space) (= (nth s j) \newline)
+                        (= (nth s j) \tab) (= (nth s j) \return)) (recur (inc j))
+                    :else nil))
+            :else (recur (inc i) depth false false false)))))))
+
 (defn- add-dep [deps-path]
   (let [s (.readFileSync fs deps-path "utf8")]
     (cond
@@ -303,10 +346,11 @@
             [:inserted (str (subs s 0 i) entry (subs s i))])))
 
       :else
-      (let [i (+ (.indexOf s ":deps {") (count ":deps {"))
-            entry (str "\n" (str/join "\n" dep-note)
-                       "\n        io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}\n       ")]
-        [:added (str (subs s 0 i) entry (str/triml (subs s i)))]))))
+      (if-let [i (top-level-deps-open s)]
+        (let [entry (str "\n" (str/join "\n" dep-note)
+                         "\n        io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}\n       ")]
+          [:added (str (subs s 0 i) entry (str/triml (subs s i)))])
+        [:refused s]))))
 
 (defn -main []
   (when-not repo (refuse! "--repo is required"))
