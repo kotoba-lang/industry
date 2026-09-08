@@ -37,9 +37,14 @@
 
   ## What it does NOT claim
 
-  It re-reads every file it wrote and reports a parse failure, but it does not
-  run the repo's tests. `--apply` prints REWROTE, never PASSED. Running the
-  suite is the caller's job and the caller must say so separately.
+  It re-reads every file it wrote and proves, by applying the inverse
+  substitution and comparing, that NOTHING BUT THE SUBSTITUTIONS MOVED. That is
+  what stands in for running 3,245 test suites: it does not show the code is
+  correct, it shows this tool did not touch anything else, which is the failure
+  a bulk rewrite actually has.
+
+  It does not run the repo's tests. `--apply` prints REWROTE, never PASSED.
+  Running the suite is the caller's job and the caller must say so separately.
 
     nbb --classpath \".:scripts/nbb_compat\" scripts/migrate-clojure-string-to-kotoba-text.cljs \\
         --repo <dir> --text-sha <40-hex> [--apply]"
@@ -119,6 +124,35 @@
       (str/replace #"\bclojure\.string/upper-case" (str alias "/upper"))
       (str/replace #"\bclojure\.string/" (str alias "/"))))
 
+(defn- unrewrite
+  "The inverse of `rewrite`, as far as the substitution set goes."
+  [alias src]
+  (-> src
+      (str/replace (re-pattern (str "\\[kotoba\\.lang\\.text :as " alias "\\]"))
+                   (str "[clojure.string :as " alias "]"))
+      (str/replace (re-pattern (str "\\b" alias "/lower\\b")) (str alias "/lower-case"))
+      (str/replace (re-pattern (str "\\b" alias "/upper\\b")) (str alias "/upper-case"))))
+
+(defn- substitution-only?
+  "Proof that the rewrite moved NOTHING but the substitutions.
+
+  Applying the inverse to the result has to give back the original, modulo the
+  fully-qualified `clojure.string/f` -> `alias/f` routing, which has no inverse
+  (both spellings map to one). So the comparison is made after collapsing that
+  form on the ORIGINAL side too.
+
+  This is what stands in for running 3,245 test suites. It does not prove the
+  code is correct -- it proves this tool did not touch anything else, which is
+  the failure a bulk rewrite actually has. A regex that matched one character
+  too many somewhere in 13,000 files would show up here and nowhere else until
+  something broke in production."
+  [alias before after]
+  (let [collapse (fn [s] (-> s
+                             (str/replace #"\bclojure\.string/lower-case" (str alias "/lower-case"))
+                             (str/replace #"\bclojure\.string/upper-case" (str alias "/upper-case"))
+                             (str/replace #"\bclojure\.string/" (str alias "/"))))]
+    (= (collapse before) (unrewrite alias after))))
+
 (def dep-note
   ["        ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:"
    "        ;; tools.deps takes the NEWEST sha it is shown, so without a floor here"
@@ -130,8 +164,18 @@
       (str/includes? s "io.github.kotoba-lang/text ")
       [:already s]
 
+      ;; No :deps key at all -- common in these repos, which declare only
+      ;; :paths and :aliases. Insert one rather than rewriting the source and
+      ;; leaving the namespace unresolvable, which is what the first version
+      ;; did: it reported `no-deps-key` and carried on.
       (not (str/includes? s ":deps"))
-      [:no-deps-key s]
+      (let [m (re-find #"\{:paths \[[^\]]*\]" s)]
+        (if-not m
+          [:refused s]
+          (let [i (+ (.indexOf s m) (count m))
+                entry (str "\n :deps {\n" (str/join "\n" dep-note)
+                           "\n        io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}}")]
+            [:inserted (str (subs s 0 i) entry (subs s i))])))
 
       :else
       (let [i (+ (.indexOf s ":deps {") (count ":deps {"))
@@ -189,19 +233,30 @@
             (doseq [[p s'] changed] (.writeFileSync fs p s' "utf8"))
             ;; read back what was written; a rewrite that cannot be re-read is
             ;; the failure mode this whole workspace keeps rediscovering
-            (let [bad (for [[p _] changed
-                            :let [back (.readFileSync fs p "utf8")]
-                            :when (or (str/includes? back "clojure.string")
-                                      (str/blank? back))]
-                        p)]
+            (let [orig (into {} loaded)
+                  bad (for [[p _] changed
+                            :let [back  (.readFileSync fs p "utf8")
+                                  a     (alias-of (get orig p))
+                                  fail  (cond
+                                          (str/blank? back) "empty after write"
+                                          (str/includes? back "clojure.string") "still names clojure.string"
+                                          (not (substitution-only? a (get orig p) back))
+                                          "changed something other than the substitutions"
+                                          :else nil)]
+                            :when fail]
+                        [p fail])]
               (when (seq bad)
-                (doseq [p bad] (println (str "READBACK-FAILED\t" p)))
-                (refuse! "a rewritten file still names clojure.string or is empty")))
+                (doseq [[p why] bad] (println (str "READBACK-FAILED\t" p "\t" why)))
+                (refuse! "a rewritten file did not survive the read-back invariant")))
             (let [dp (.join path-mod repo "deps.edn")]
               (when (try (.isFile (.statSync fs dp)) (catch :default _ false))
                 (let [[status s'] (add-dep dp)]
-                  (when (= :added status) (.writeFileSync fs dp s' "utf8"))
-                  (println (str "DEPS\t" (name status))))))
+                  (when (#{:added :inserted} status) (.writeFileSync fs dp s' "utf8"))
+                  (println (str "DEPS\t" (name status)))
+                  (when (= :refused status)
+                    (refuse! (str dp " has neither a :deps key nor a :paths vector to"
+                                  " insert one after; the rewritten source would not"
+                                  " resolve kotoba.lang.text"))))))
             (doseq [[p _] changed] (println (str "REWROTE\t" p)))
             (println (str "REWROTE\t" (count changed) "\tfiles -- NOT verified;"
                           " run this repo's tests and say so separately"))
