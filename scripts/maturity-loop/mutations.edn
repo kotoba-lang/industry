@@ -9059,4 +9059,158 @@
      :find "    (not (:metering-role-valid m)) (conj :untrusted-metering-role)\n"
      :replace ""
      :must-fail ["every-gate-refuses-under-its-own-name"]}]}
+
+  {:repo "orgs/cloud-itonami/llm-dataset"
+   :label "llm-dataset corpus licence gate —— 拒否が今も拒否か、manifest が pipeline を今も述べているか"
+   ;; この repo の実行物は Python の corpus pipeline 1 本きりで、その仕事は
+   ;; **拒否**である。corpus/manifest.toml が source ごとに商用可否を記録し、
+   ;; それに従うコードは 2 箇所 —— `_manifest.assert_ingest_allowed` と
+   ;; `build_kototama_mix.py --commercial-only`。どちらも landing まで散文でしか
+   ;; 主張されていなかった。**拒否についての散文は、拒否が起きなくなっても
+   ;; 同じ文面のまま残る。** MELD と dair_emotion は非商用条項を持ち
+   ;; marble_world は ToS gate。門が静かに落ちれば 3 件とも promotable な mix に
+   ;; 入り、何も音を立てない。
+   ;;
+   ;; test は repo 自身の Python を subprocess で走らせて出力を読む。manifest を
+   ;; 読むのは pipeline と同じ tomllib であって、ここで書いた第二の reader では
+   ;; ない —— 自分の対象を再実装した検査は、出荷されるコードと食い違ったまま
+   ;; 自分自身とは一致できる。
+   ;;
+   ;; 境界が 1 つ在ることを test 自身が要求する: marble_world は
+   ;; commercial_ok=false / research_ok=true で、**同じ入力に 2 つの purpose が
+   ;; 違う答えを返す唯一の点**。ここに source が無ければ、research 側を
+   ;; commercial_ok を見るように反転させても上のどの結果も変わらない。
+   ;;
+   ;; 拒否は exit 2 **と理由の literal 両方**で pin してある。「落ちた」だけを
+   ;; assert する probe は SyntaxError を門として数える。
+   ;;
+   ;; 15 件とも pin 5d7b970c で landing 前に実際に赤くなるところを見た
+   ;; （無改変で exit 0、anchor はすべて一意、噛んだ invariant は名前まで一致）。
+   ;; **そのうち 2 件は test 自身の欠陥を見つけた**:
+   ;;   ① `commercial_build = not a.commercial_only` で suite が緑のままだった ——
+   ;;      corpus/mix.*.json は gitignore された生成物なので前回実行の写しが
+   ;;      disk に残っており、「書かなかった」が「古い正しい答え」として読まれて
+   ;;      いた。build! が実行前に unlink するようにして直した。
+   ;;   ② refuse! が、それ以前に集めた failure を捨てて exit していた。
+   ;; どちらも「測れなかった」と「測って問題が無かった」が同じ値を返す形。
+   :cmd ["nbb" "test/corpus_manifest_test.cljs"]
+   :green-marker "corpus-manifest-check: OK"
+   :mutations
+   [{:id :llm-dataset/commercial-filter-neutered
+     :why "商用 build が uncleared を落とさなくなる。非商用条項つきの 3 source が promotable な mix に入る。この repo の存在理由そのもの"
+     :file "scripts/corpus/build_kototama_mix.py"
+     :find "if commercial_build and not s.get(\"commercial_ok\", False):"
+     :replace "if False and not s.get(\"commercial_ok\", False):"
+     :must-fail ["commercial-build-drops-exactly-the-uncleared-sources"]}
+
+    {:id :llm-dataset/drop-moves-to-the-research-build
+     :why "back-compat の別 flag と取り違える形。research/commercial が入れ替わる。
+           **この変異が test の欠陥を 1 つ見つけた** —— 前回実行の mix.*.json が
+           残っていると『書かなかった』が緑として通っていた"
+     :file "scripts/corpus/build_kototama_mix.py"
+     :find "commercial_build = a.commercial_only"
+     :replace "commercial_build = not a.commercial_only"
+     :must-fail ["the-builder-writes-the-mix-it-was-asked-for" "REFUSED"]}
+
+    {:id :llm-dataset/purpose-branches-swapped
+     :why "research purpose が商用 gate に落ちる。全 source の ingest が拒否される"
+     :file "scripts/corpus/_manifest.py"
+     :find "    if purpose() == \"research\":"
+     :replace "    if purpose() == \"commercial\":"
+     :must-fail ["ingest-permits-an-uncleared-source-under-research-purpose"]}
+
+    {:id :llm-dataset/research-refusal-disabled
+     :why "research_ok=false の拒否が起きなくなる。commit された source は 1 件も
+           この枝を通らないので、landing まで一度も実行されたことが無かった枝"
+     :file "scripts/corpus/_manifest.py"
+     :find "if source.get(\"research_ok\", True) is False:"
+     :replace "if source.get(\"research_ok\", True) is None:"
+     :must-fail ["ingest-refuses-a-research-forbidden-source-under-research-purpose"]}
+
+    {:id :llm-dataset/refusal-stops-naming-its-reason
+     :why "門は閉じるが commercial_ok を名乗らなくなる。exit 2 は変わらないので
+           結果だけを assert する probe は緑のまま通す"
+     :file "scripts/corpus/_manifest.py"
+     :find "f\"REFUSED: source '{source['id']}' has commercial_ok=false \""
+     :replace "f\"REFUSED: source '{source['id']}' is not cleared \""
+     :must-fail ["ingest-refuses-an-uncleared-source-under-commercial-purpose"]}
+
+    {:id :llm-dataset/refusal-exits-1-not-2
+     :why "拒否と一般の失敗が同じ exit になる。呼び手は門と例外を区別できない"
+     :file "scripts/corpus/_manifest.py"
+     :find "        raise SystemExit(2)\n\n\n# back-compat alias"
+     :replace "        raise SystemExit(1)\n\n\n# back-compat alias"
+     :must-fail ["ingest-refuses-an-uncleared-source-under-commercial-purpose"]}
+
+    {:id :llm-dataset/vocabulary-forgets-the-world-lane
+     :why "実際に起きた drift の再現。world expert が lane=\"world\" を持ち込んだとき
+           語彙表は追随せず、数ヶ月そのままだった"
+     :file "corpus/manifest.toml"
+     :find "lane = [\"hf\", \"commoncrawl\", \"internal\", \"hume\", \"local\", \"world\"]"
+     :replace "lane = [\"hf\", \"commoncrawl\", \"internal\", \"hume\", \"local\"]"
+     :must-fail ["manifest-declares-every-lane-it-uses"]}
+
+    {:id :llm-dataset/vocabulary-forgets-the-world-modality
+     :why "同じ drift の modality 側。out_dir は corpus/{modality}/{id} を作るので、
+           未宣言の modality は未宣言の directory を静かに生やす"
+     :file "corpus/manifest.toml"
+     :find "modality = [\"text\", \"vision\", \"audio\", \"geo\", \"emotion\", \"world\"]"
+     :replace "modality = [\"text\", \"vision\", \"audio\", \"geo\", \"emotion\"]"
+     :must-fail ["manifest-declares-every-modality-it-uses"]}
+
+    {:id :llm-dataset/distillation-input-promoted
+     :why "ADR-2605260002 の前提が崩れる形。teacher に食わせる生テキストの
+           **自前ラベル**で学習することになる"
+     :file "corpus/manifest.toml"
+     :find "id = \"go_emotions\"\nlane = \"hf\"\nrole = \"distillation_input\""
+     :replace "id = \"go_emotions\"\nlane = \"hf\"\nrole = \"training_label\""
+     :must-fail ["the-emotion-expert-trains-only-on-hume-distilled-labels"]}
+
+    {:id :llm-dataset/world-source-loses-its-teacher
+     :why "world expert の supervision は teacher の出力なので、その ToS が唯一の
+           licence。teacher 名が消えると何の許諾で学習しているか誰も言えない"
+     :file "corpus/manifest.toml"
+     :find "teacher = \"marble\""
+     :replace "teacher = \"\""
+     :must-fail ["the-world-expert-names-its-teacher"]}
+
+    {:id :llm-dataset/ingest-writes-outside-the-modality-dir
+     :why "out_dir（書く場所）と mix の path（読む場所）は別々に同じ道を計算して
+           いる。一致させているものが無かった"
+     :file "scripts/corpus/_manifest.py"
+     :find "d = DATASET_ROOT / \"corpus\" / source[\"modality\"] / source[\"id\"]"
+     :replace "d = DATASET_ROOT / \"corpus\" / source[\"id\"]"
+     :must-fail ["the-mix-path-agrees-with-the-ingest-output-directory"]}
+
+    {:id :llm-dataset/mix-hardcodes-the-role
+     :why "manifest では distillation_input のままなのに、学習が読む mix では
+           training_label になる。前提が manifest について真で training について偽になる"
+     :file "scripts/corpus/build_kototama_mix.py"
+     :find "\"role\": s.get(\"role\", \"training_label\"),"
+     :replace "\"role\": \"training_label\","
+     :must-fail ["the-mix-carries-each-source-role-unchanged"]}
+
+    {:id :llm-dataset/source-omits-its-licence-flag
+     :why "両 gate の既定は False なので安全側には倒れるが、それは宣言ではなく
+           偶然。licence は誰かが主張したものでなければならない"
+     :file "corpus/manifest.toml"
+     :find "license = \"Apache-2.0\"\ncommercial_ok = true\nnote = \"Reddit comments"
+     :replace "license = \"Apache-2.0\"\nnote = \"Reddit comments"
+     :must-fail ["every-source-carries-the-required-keys"]}
+
+    {:id :llm-dataset/purpose-default-flips
+     :why "他の probe が代入している purpose() 自身を pin する。既定が commercial に
+           倒れると、何が ingest できるかが全部変わる"
+     :file "scripts/corpus/_manifest.py"
+     :find "return load().get(\"meta\", {}).get(\"purpose\", \"research\")"
+     :replace "return load().get(\"meta\", {}).get(\"purposes\", \"commercial\")"
+     :must-fail ["manifest-purpose-is-research"]}
+
+    {:id :llm-dataset/manifest-unreadable
+     :why "拒否床。入力が読めないときに exit 2 を返すこと —— 0 でも 1 でもない値で
+           なければ『測れなかった』が『測って問題が無かった』と同じ顔をする"
+     :file "corpus/manifest.toml"
+     :find "\n[meta]\ntarget_model"
+     :replace "\n[meta\ntarget_model"
+     :must-fail ["REFUSED"]}]}
 ]}
