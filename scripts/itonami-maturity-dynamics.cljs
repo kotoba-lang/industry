@@ -698,6 +698,28 @@
                         :uncounted/test-bytes (:uncounted/test-bytes e 0)
                         :uncounted/readme-file-count (:uncounted/readme-file-count e 0)
                         :uncounted/url-count (:uncounted/url-count e 0)
+                        ;; ── walk が repo を最後まで見られたか（scan の walk-files が
+                        ;; 立てる 2 つの旗）。**スコアには一切入らない** —— :uncounted/*
+                        ;; と同じ扱いで、運ぶ理由も同じ「tick は datoms しか読まない」。
+                        ;;
+                        ;; :uncounted/* との違いは、これが軸ではなく **行全体** に
+                        ;; かかることである。max-entries に当たった walk は任意の位置で
+                        ;; 止まるので、そこから先の src/ test/ data/ docs/ は 1 つも
+                        ;; files に入らない —— その repo の 0bp は「無い」ではなく
+                        ;; 「見ていない」であり、:uncounted/* にすら現れない
+                        ;; （:uncounted/* も同じ files から作られるので）。
+                        ;;
+                        ;; 実測 2026-09-09: cloud-itonami/app-news は 21,978 ファイルの
+                        ;; corpus repo で、walk は resources/ の中で 6000 件に当たって
+                        ;; 止まり、トップレベルの test/corpus_registry_test.cljs
+                        ;; (20,576 B, 30 invariants) と scripts/corpus_registry.cljs
+                        ;; (25,457 B) に一度も到達していなかった。:test/bytes は 0 で、
+                        ;; test を 1 行も持たない repo と同じ値である。maturity loop は
+                        ;; その 0 を伸びしろと読んで 2026-09-08 に axis-test の仕事を
+                        ;; 着地させ（18 mutation が全て赤くなることまで確認した本物の
+                        ;; test）、**軸は 1bp も動かなかった。**
+                        :repo/files-truncated? (boolean (:repo/files-truncated? e))
+                        :repo/files-depth-pruned? (boolean (:repo/files-depth-pruned? e))
                         :dep/direct-count (count (nth dep-idx i))
                         :dep/transitive-dependents tdeps
                         :leverage/fleet-gain gain

@@ -383,6 +383,26 @@
 
       :else nil)))
 
+(defn- scan-truncated?
+  "Did the scan's file walk stop before it had seen the whole repository?
+
+   `scan` walks with `walk-files root 6 6000` and reports two ways of giving up.
+   They are not the same failure and must not be collapsed:
+
+   - `:repo/files-truncated?` -- the walk hit max-entries and **stopped where it
+     happened to be**. Everything after that point is invisible, including
+     top-level `src/` `test/` `data/` `docs/` if the cap was reached before the
+     walk reached them. The whole evidence row is unreliable, not one axis of it.
+   - `:repo/files-depth-pruned?` -- only directories deeper than max-depth were
+     skipped. Top-level `src/` and `test/` sit at depth 1 and **were** seen, so
+     the row is usable; the pruning is worth saying but not worth refusing.
+
+   Only truncation returns true here. The distinction is measured, not assumed:
+   2026-09-09 across 2,013 scored repos, 1 was truncated and 26 were depth-pruned,
+   and the 26 include `kotoba-lang/transit` with 249 counted test files."
+  [e]
+  (boolean (:repo/files-truncated? e)))
+
 (defn- unseen-content
   "Content this repository has that the axis it is about to be sent to cannot see.
 
@@ -392,27 +412,46 @@
    is looking in the wrong place -- and sending an agent to the second is asking it
    to add what is already there.
 
+   There is a **third** cause, and until 2026-09-09 this function did not know it
+   existed: the walk never reached the directory at all. When that happens the two
+   messages below are not merely incomplete, they are **wrong** -- they name
+   `nested src/` or `outside top-level test/` for a repository whose `test/` is at
+   the top level and is exactly what the axis wants. Say the real cause first, and
+   drop the guesses that are only valid when the walk finished.
+
    Returns a seq of one-line strings, or nil when there is nothing to say."
   [e]
-  (seq
-   (keep identity
-         [(when (and (zero? (or (:maturity/axis-test e) 0))
-                     (pos? (or (:uncounted/test-file-count e) 0)))
-            (str "axis-test は 0bp だが test が " (:uncounted/test-file-count e)
-                 " ファイル・" (:uncounted/test-bytes e 0) " バイト在る"
-                 "（トップレベル test/ の外なので数えられていない）"))
-          (when (and (zero? (or (:maturity/axis-substrate e) 0))
-                     (pos? (or (:uncounted/src-file-count e) 0)))
-            (str "axis-substrate は 0bp だが src が " (:uncounted/src-file-count e)
-                 " ファイル・" (:uncounted/src-bytes e 0) " バイト在る"
-                 "（入れ子の src/ なので数えられていない）"))
-          (when (and (zero? (or (:maturity/axis-ingest e) 0))
-                     (>= (or (:uncounted/url-count e) 0) 5))
-            (str "axis-ingest は 0bp だが計数外のファイルに URL が "
-                 (:uncounted/url-count e) " 件在る"))
-          (when (pos? (or (:uncounted/readme-file-count e) 0))
-            (str "README が .md ではないので docs の README 成分は 0"
-                 "（README.edn 等が " (:uncounted/readme-file-count e) " 件）"))
+  (let [truncated? (scan-truncated? e)]
+    (seq
+     (keep identity
+           [(when truncated?
+              (str "⚠ scan の walk が " (:repo/file-count e "?")
+                   " ファイルで打ち切られている（max-entries）——"
+                   " その先に在る src/ test/ data/ docs/ は 1 つも見ていない。"
+                   "**この行の 0bp は「無い」ではなく「見ていない」**"))
+            (when (and (not truncated?) (:repo/files-depth-pruned? e))
+              (str "scan の walk が max-depth で枝刈りしている"
+                   "（深い階層は見ていない。トップレベルの src/ test/ は見えている）"))
+            (when (and (not truncated?)
+                       (zero? (or (:maturity/axis-test e) 0))
+                       (pos? (or (:uncounted/test-file-count e) 0)))
+              (str "axis-test は 0bp だが test が " (:uncounted/test-file-count e)
+                   " ファイル・" (:uncounted/test-bytes e 0) " バイト在る"
+                   "（トップレベル test/ の外なので数えられていない）"))
+            (when (and (not truncated?)
+                       (zero? (or (:maturity/axis-substrate e) 0))
+                       (pos? (or (:uncounted/src-file-count e) 0)))
+              (str "axis-substrate は 0bp だが src が " (:uncounted/src-file-count e)
+                   " ファイル・" (:uncounted/src-bytes e 0) " バイト在る"
+                   "（入れ子の src/ なので数えられていない）"))
+            (when (and (not truncated?)
+                       (zero? (or (:maturity/axis-ingest e) 0))
+                       (>= (or (:uncounted/url-count e) 0) 5))
+              (str "axis-ingest は 0bp だが計数外のファイルに URL が "
+                   (:uncounted/url-count e) " 件在る"))
+            (when (pos? (or (:uncounted/readme-file-count e) 0))
+              (str "README が .md ではないので docs の README 成分は 0"
+                   "（README.edn 等が " (:uncounted/readme-file-count e) " 件）"))
           ;; manifest/repo-taxonomy.edn の冒頭は「判定できないものは
           ;; \"unclassified\"。デフォルト値で埋めない」と書いている。そして
           ;; unclassified は実際に 125 件付いている。だから kind が**無い** 145 件は
@@ -422,10 +461,10 @@
           ;; 当てて採点する。**推測した profile で付いた点が、判明している
           ;; profile で付いた点と同じ顔で並ぶ。** 出力に何も出ていなかったので
           ;; ここで言う(実測 2026-08-16: 1,934 中 145 = 7.5%)。
-          (when (nil? (:repo/kind e))
-            (str "taxonomy に :repo/kind の行が無い → :default の重みで採点されている"
-                 "（unclassified とは別。この own は kind が判明している repo と"
-                 "同じ尺度では比べられない）"))])))
+            (when (nil? (:repo/kind e))
+              (str "taxonomy に :repo/kind の行が無い → :default の重みで採点されている"
+                   "（unclassified とは別。この own は kind が判明している repo と"
+                   "同じ尺度では比べられない）"))]))))
 
 (defn- row [e]
   {:repo (:repo/path e)
@@ -437,6 +476,13 @@
    :band (:leverage/band e)
    :unseen (unseen-content e)
    :taken (taken-by-someone-else (:repo/path e))
+   ;; 「この行は測れていない」。候補から落とすのに使う（下の unmeasured）。
+   ;; :taken と同じく repo そのものの性質ではなく **この周の可否** である。
+   :truncated? (scan-truncated? e)
+   ;; datoms がこの旗を運んでいるか。運んでいない datoms（この項が入る前に
+   ;; 生成されたもの）で `:truncated? false` が並ぶと、**検査を掛けなかった周が
+   ;; 検査して問題が無かった周と同じ顔になる**（CLAUDE.md 8 問の 1 問目）。
+   :scan-flags-carried? (contains? e :repo/files-truncated?)
    :weakest (weakest-axes e)})
 
 ;; ── lane（substrate か breadth か）───────────────────────────────────────────
@@ -699,7 +745,25 @@
         ;; archived を候補から落とす。**落としたことを黙らない** —— 掃き出しが
         ;; 無い/古いときに、この tick が黙って旧挙動へ戻ると、誰も気付かない。
         dropped (filterv #(archived-paths (:repo %)) in-lane*)
-        in-lane (filterv #(not (archived-paths (:repo %))) in-lane*)
+        after-archived (filterv #(not (archived-paths (:repo %))) in-lane*)
+        ;; **測れていない repo を候補にしない。** archived（push できない）や
+        ;; moved（行が現状を describe していない）と同じ family の除外で、理由は
+        ;; 「この行の 0bp は伸びしろではない」——  walk が途中で止まった repo は、
+        ;; そこに何を landing させても軸が動かない。
+        ;;
+        ;; 実測 2026-09-09、この除外が生まれた周: tick は
+        ;; cloud-itonami/app-news を clean な 1 位として名指しし、axis-test を
+        ;; 0bp → +2000bp の伸びしろとして提示していた。その repo には既に
+        ;; トップレベル test/ に 20,576 B・30 invariant の test が在り、
+        ;; **前々周のこの loop 自身が landing させたもの**だった（18 mutation が
+        ;; 全て赤くなることまで確認済み）。scan の walk は 21,978 ファイル中
+        ;; 6,000 件目で resources/ の中に止まっており、test/ を一度も見ていない。
+        ;; 除外しなければ、loop は同じ repo の同じ軸へ 3 度目を送るところだった。
+        unmeasured (filterv :truncated? after-archived)
+        in-lane (filterv #(not (:truncated? %)) after-archived)
+        ;; 旗そのものが datoms に無いなら、`unmeasured` が空でも
+        ;; 「truncate された repo が無い」ではなく「訊いていない」である。
+        scan-flags-carried? (boolean (some :scan-flags-carried? in-lane*))
         ;; substrate 層は 17 本しかなく leverage に 10〜20 倍の段差がある。
         ;; cohort は 1,700 本超で ratio ≈ 1.0 の平坦地 —— **同じ順位付けでも
         ;; 意味の強さが違う**ので、それを出力に明記する。
@@ -746,6 +810,11 @@
                ;; **何本見て「clean な候補が無い」と言ったのかを残す。** 既定の
                ;; 5 本で見つからなかったのと、40 本見て見つからなかったのは別の記録。
                :rank-take rank-take
+               ;; 測れていない repo を何本落としたか。**旗が運ばれていない周は
+               ;; :not-carried と書く** —— 0 と区別が付かなくならないように。
+               :unmeasured-dropped (if scan-flags-carried?
+                                     (mapv :repo unmeasured)
+                                     :scan-flags-not-carried)
                :movement-probe-depth movement-probe-depth
                :observed-substrate-share observed-substrate-share
                :iterations iterations
@@ -854,6 +923,20 @@
                  "**その区別がこの行からは付かない、というのがこの警告の内容**）")))
     ;; 計測より後に動いた repo。**archived と同じく、落としたことを黙らない。**
     ;; これを黙ると、順位から repo が消えた理由が ledger だけでは再構成できない。
+    ;; **測れていない repo を落としたことも黙らない。** 落とした側が黙ると、
+    ;; 次周は「なぜこの repo が出てこないのか」を ledger だけでは再構成できない。
+    (when (seq unmeasured)
+      (log! (str "scan が最後まで見られていないので候補から除外: " (count unmeasured) " 本"
+                 "（walk が max-entries で打ち切られた repo）"))
+      (doseq [m (take 5 unmeasured)]
+        (log! (str "    ↳ " (:repo m) " own=" (some-> (:own m) (.toFixed 3))
+                   " — walk が途中で止まっており、0bp の軸は「無い」ではなく"
+                   "「見ていない」。ここへ landing させても軸は動かない"))))
+    ;; 旗が運ばれていないなら、上の 0 本は測定結果ではない。
+    (when-not scan-flags-carried?
+      (log! (str "⚠ datoms が :repo/files-truncated? を運んでいない —— "
+                 "『打ち切られた repo は 0 本』は測っていない。dynamics を"
+                 " 掛け直すまで、この除外は効いていない")))
     (when (seq moved)
       (log! (str "計測が読んだ tree がもう無いので候補から除外: " (count moved) " 本"
                  "（上位 " (:checked movement) " 本を git と evidence に確認）"))
