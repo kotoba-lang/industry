@@ -1,0 +1,113 @@
+[{:db/id -1
+  :adr/id "adr-2609082000-three-names-one-library-kotoba-string-text-alias"
+  :adr/title "名前は 3 つ、ライブラリは 1 つ — kotoba.string / kotoba.text を alias にする"
+  :adr/status "accepted"
+  :adr/date "2026-09-08"
+  :adr/deciders "Jun Kawasaki"
+  :adr/related ["adr-2609040930-kotoba-stdlib-replacement-router"
+                "adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"]
+  :source/dataset "adr"
+  :adr/body "# ADR-2609082000: 名前は 3 つ、ライブラリは 1 つ —— `kotoba.string` / `kotoba.text` を alias にする
+
+**Status**: accepted
+**Date**: 2026-09-08
+**Deciders**: Jun Kawasaki（オーナー判断）
+
+# Context
+
+`clojure.string` を `.kotoba` guest 向けに置き換える作業の途中で、**同じものを指す名前が
+3 つ在り、そのうち 1 つしか解決しない**ことが実測で判った。
+
+| 名前 | 何がそこを指していたか | 実在したか |
+|---|---|---|
+| `kotoba.lang.text` | 実装（`kotoba-lang/text` の `src/kotoba/lang/text.cljc`） | **する** |
+| `kotoba.text` | ADR-2609040930 の置換先表が `clojure.string` の宛先として名指し | **しない**（workspace のどこにも無い） |
+| `kotoba.string` | guest `.kotoba` 面（`kotoba-lang/kotoba-lang` の `lang/compat/kotoba/string.kotoba`）。オーナーが正本と指定 | する（3 export のみ） |
+
+**表は宛先を決めたが、その名前が実在するかを一度も確かめていなかった。** 4 日間、
+移行 bot はどこにも解決しない namespace を指す表を正本として読める状態だった。
+
+同時に `clojure.string` の扱いが問題になった。**`.kotoba` の 68 ファイルが
+`[clojure.string` を require している**（実測 2026-09-08、ほぼ `network-awai/app-hyakka`）
+ので、単純な削除も一括改名も選べない。
+
+# Decision
+
+**3 つの名前のうち 2 つを退役させるのではなく、alias にする**（オーナー判断 2026-09-08)。
+
+## 1. `.cljc` 面（`kotoba-lang/text`）
+
+- **正本は `kotoba.lang.text`。** 変更しない。
+- **`kotoba.text` と `kotoba.string` はその alias。** `(def split text/split)` の形で、
+  **alias の var は正本の var そのもの**（コピーではない）。実装は 1 つしか無いので、
+  **振る舞いが分岐しうる経路が存在しない。**
+- alias は docstring と arglist を運ばない（`def` は値を写して metadata を写さない）。
+  両 namespace の docstring と README に書く。
+
+## 2. guest `.kotoba` 面（`kotoba-lang/kotoba-lang`）
+
+- **正本は `kotoba.string`**（オーナー指定）。`clojure.string` の関数群をここへ移す。
+- **`kotoba.text` はその alias。**
+- **`clojure.string` は期限付きの compat shim として残す。** 68 の呼び出し側を
+  無関係な変更に相乗りさせて一括書き換えしない。撤去条件と実測した呼び出し件数を
+  ヘッダと `lang/compat.edn` に書く。
+- `kotoba.string.case` は既に別 namespace で、そのまま。
+
+## 3. ADR-2609040930 の表を訂正した
+
+`| clojure.string | kotoba.text |` の行は、書かれた時点で**存在しない宛先**を指していた。
+alias が実在させたので現在は真。同 ADR の Consequences に改訂を追記した。
+
+## 4. surface の drift は「気をつける」ではなく検査する
+
+手書きの alias 一覧は**静かに陳腐化する** —— 正本に関数が足され、alias に足し忘れられ、
+alias は部分集合になり、**それでも誰が走らせるテストも全部通る**。
+
+`kotoba.lang.text-alias-test` が JVM で `ns-publics` に**実際に何が入っているか**を訊き、
+alias の公開 surface が正本と**ちょうど一致**すること、各 var が正本の var と
+`identical?` であることを要求する。ClojureScript には実行時の var reflection が無いので、
+portable 側は同じ名前を 3 つの namespace 経由で呼んで**3 つの答えが一致すること**を
+要求する（弱いが、解決に失敗した alias は捕まえる —— それを捕まえないと、
+最初に気づくのは消費側になる）。
+
+反射テストには **evidence floor** を置いた: `ns-publics` が何も返さなければ、
+その下の比較は全部 vacuously true になる。だから先に「surface が空でない」ことと
+「既知の名前が在る」ことを assert する。
+
+# Consequences
+
+- **両方の assertion が、名乗った理由で赤くなることを確認済み**（2026-09-08）:
+  `(def truncate text/truncate)` を 1 行消すと `kotoba.text is missing (truncate)`、
+  alias を `(def upper (fn [s] (text/upper s)))` という**surface は同一のコピー**に
+  差し替えると `kotoba.string/upper is a COPY of kotoba.lang.text/upper`。
+  どちらも byte 単位で復元した。
+- **同名別物の hazard が 1 つ増える**: guest 面の `kotoba.string` と `.cljc` 面の
+  `kotoba.string` は surface が違う（guest 側が部分集合）。**guest surface が
+  真に部分集合であること**と、共有する名前が共有する入力で一致することを保つ。
+  guest 側が意図的に分岐する箇所は `lang/compat.edn` の `:hazards` の形で名指しする。
+  これは既に `clojure.string` という名前が guest 面で使われているのと同じ構図で、
+  解決は source-path（面）による。
+- **一括改名はしない。** この ADR が縛るのは名前の解決であって、既存の呼び出し側では
+  ない。68 の `clojure.string` 呼び出し側の移行は別の決定で、別の根拠が要る。
+- ADR-2609040930 の置換先表は現在真になった。**表に宛先を書くときは、その namespace を
+  検索して 1 件は当たることを確かめる**（CLAUDE.md「索引が当たったことは、動くものが
+  在ることの証拠ではない」の同型 —— そこでは「読む側が実在するか」を問い、ここでは
+  「書かれた宛先が実在するか」を問う）。
+
+# 実測（2026-09-08）
+
+- `kotoba.text` は workspace のどこにも存在しなかった（`kotoba-lang/text` の全 ns は
+  `kotoba.lang.text` / `kotoba.lang.bounded-text` / `kotoba.lang.bounded-regex`）。
+- `clojure.string` を require する `.kotoba`: 68 ファイル。
+- 正本の公開関数: 43。
+- 着地後の suite: JVM 34 tests / 302 assertions、nbb 30 / 171、いずれも 0 failures。
+  lint errors 0（warning 5 はすべて既存で、新規ファイル由来はゼロ）。
+
+# Related
+
+- ADR-2609040930（置換先表。本 ADR が `kotoba.text` 行を訂正）
+- ADR-2608650000（`.kotoba` で「書けない」の恒久/一時の分類。`clojure.string` を
+  guest に持ってくる作業そのものがこの分類の適用先）
+- `kotoba-lang/text` PR #7（`.cljc` 面の alias）
+- `kotoba-lang/kotoba-lang`（guest 面。別 PR）
+"}]
