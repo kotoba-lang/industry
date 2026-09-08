@@ -41,7 +41,79 @@
  :isolation :worktree
 
  :suites
- [{:repo "orgs/cloud-itonami/app-bpmn"
+ [{:repo "orgs/cloud-itonami/smishing"
+   :label "smishing read-document —— 実装 0 の repo で、唯一の実行物が本当に動くか"
+   ;; この repo は実装を 1 行も持たない。残っているのは記述と宣言だけで、その
+   ;; 文書は `*.md.edn`（tx-data）なので **GitHub でも editor でも本文が読めない**。
+   ;; docs/read-document.cljs が唯一の読み口で、壊れると
+   ;; NOT-MIGRATED-CHARTER-VIOLATION の本文 —— **この repo が存在する理由** ——
+   ;; が誰にも読めなくなる。
+   ;;
+   ;; それまで docs/verify-docs-claims.cljs は `:read-document-tool-present`
+   ;; （ファイルが在る）しか測っておらず、tool が出力を丸ごと間違えても 25 claim
+   ;; すべてが緑で通った。ADR-2608136000 の 8 問目そのものなので、test は
+   ;; **tool を子プロセスで走らせ、exit と出力の両方**を見る。
+   ;;
+   ;; 6 件とも 2026-09-08 に、当てて赤くなるところを実際に見てから登録した。
+   :cmd ["nbb" "test/read_document_test.cljs"]
+   :green-marker "read-document: OK"
+   :mutations
+   [{:id :rd/threshold-raised-to-240
+     :note "face-tracker から本文判定の閾値を写して戻す（実際に一度起きた退行の形）。
+            この repo の本文は 218 字しかないので、240 にすると本文が metadata に落ちる"
+     :file "docs/read-document.cljs"
+     :find "(>= (count s) 120)"
+     :replace "(>= (count s) 240)"
+     :must-fail ["body-threshold-is-exactly-120-characters"
+                 "list-mode-separates-body-from-metadata"
+                 "body-is-printed-without-its-attribute-name"]}
+
+    ;; ── ここが、この suite が fixture を持つ理由 ──────────────────
+    {:id :rd/newline-clause-dropped
+     :note "本文判定を長さだけにする。**この repo の実データでは 1 件も分類が動かない**
+            —— 本文は 218 字/複数行、metadata の最長は 87 字/1 行なので 87 < 120。
+            実データだけで書いた test はこの節を永久に測らず緑を出す。
+            test が自分で作る 200 字/1 行の fixture だけがこれを見る"
+     :file "docs/read-document.cljs"
+     :find "(and (str/includes? s \"\\n\") (>= (count s) 120))"
+     :replace "(>= (count s) 120)"
+     :must-fail ["body-requires-a-newline-not-only-length"]}
+
+    {:id :rd/attribute-name-dropped
+     :note "metadata を属性名なしで出す。どの attr の値かが読めなくなる。
+            **境界 test 2 件も巻き込む** —— 本文と metadata を見分ける観測点は
+            この接頭辞しか無いので、接頭辞を消すと両者が原理的に区別できなくなる。
+            正しい巻き込みなので弱い方の test に寄せて消さず、:also に宣言する"
+     :file "docs/read-document.cljs"
+     :find "(println (str k \": \" s))"
+     :replace "(println s)"
+     :must-fail ["metadata-is-printed-with-its-attribute-name"]
+     :also ["body-threshold-is-exactly-120-characters"
+            "body-requires-a-newline-not-only-length"]}
+
+    {:id :rd/sort-reversed
+     :note "短い順にする。本文が先頭に来なくなる"
+     :file "docs/read-document.cljs"
+     :find "(sort-by (fn [[_ s]] (- (count s))))"
+     :replace "(sort-by (fn [[_ s]] (count s)))"
+     :must-fail ["longest-attribute-is-printed-first"]}
+
+    ;; ── 「測れなかった」が「測って問題が無かった」と同じ値になる側 ──
+    {:id :rd/unreadable-argument-exits-0
+     :note "読めない引数を成功として返す。失敗が成功と同じ exit になる"
+     :file "docs/read-document.cljs"
+     :find "一覧は引数なしで実行する。\"))\n              (.exit js/process 1))"
+     :replace "一覧は引数なしで実行する。\"))\n              (.exit js/process 0))"
+     :must-fail ["unreadable-argument-exits-1"]}
+
+    {:id :rd/refusal-exits-0
+     :note "repo 外の REFUSED を 0 で返す。**測れなかった実行が緑になる**"
+     :file "docs/read-document.cljs"
+     :find "REFUSED: git ls-files が実行できない（この repo の中で実行しているか）\")\n  (.exit js/process 3))"
+     :replace "REFUSED: git ls-files が実行できない（この repo の中で実行しているか）\")\n  (.exit js/process 0))"
+     :must-fail ["outside-a-repository-it-refuses-with-3"]}]}
+
+  {:repo "orgs/cloud-itonami/app-bpmn"
    :label "app-bpmn cross-plane —— README が散文で述べている食い違いを、散文の外で保つ"
    ;; この repo の README は冒頭で「三つの面は互いに一致していない」と言い、
    ;; その一致していなさを 1 つずつ散文で述べている。散文は自分が真でなくなった
