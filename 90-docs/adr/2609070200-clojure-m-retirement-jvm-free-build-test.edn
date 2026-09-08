@@ -126,6 +126,22 @@ deps.edn と不一致 / `--fuel` を native で受け付けて無視）。
    移行と言うが SOUL.md は amu-falsify（compiler co-scientist / perfgate 反証）の charter。
    索引が当たったことは動くものが在る証拠ではない、の実例。
 
+6. **capability を 1 つも要らない script が、native backend で 1 度も動いたことが
+   なかった**（2026-09-08 実測、kotoba PR #605、main `96c888e1`）。`bin/kbb_shim.cljs`
+   は loader の allow 引数を `(str/join \",\" wire-ids)` で組んでいた。空 policy では
+   これは**空文字列**になるが、`kexe_loader.c` の `parse_allow` が受けるのは wire id の
+   CSV か番兵 `-` の 2 つだけで、空文字列はどちらでもない —— 桁ループが 1 度も回らずに
+   `-1` を返し、`main` は**何も印字せずに** exit 2 する。結果、いちばん最初に書く形
+   （純計算・capability 無し）が `:kbb-shim/loader-failed {:status 2}` で落ちていた。
+   `:auto` も同じで、空集合は `every? native-auto` を満たすので native に行く。
+   **js backend は最初から 42 を返していた** —— native が動かないときに `--backend js`
+   に手を伸ばすと、この破損は別の何かに見える。
+   検査が無かった理由は 8 問目の 1 番と同じ形: `kbb-shim-test` の native ケースは
+   **全て `:fs/app-data` を grant する**ので `wire-ids` が空になったことが 1 度も無く、
+   loader は「何も grant しない」ときにシムが実際に送る引数を見たことがなかった。
+   番兵だけを戻すと新テストは 5 assertion 赤（全て `:kbb-shim/loader-failed` を名指し）、
+   js の assertion は緑のまま。`demo_kbb_fs_read_native` は native で 84 のまま。
+
 ## 残作業（bot に引き継ぎ）
 
 1. **kbb capability** — `:data/edn`（**pure-Kotoba reader は capability を要さない**。
