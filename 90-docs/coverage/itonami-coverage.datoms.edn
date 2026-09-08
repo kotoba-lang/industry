@@ -747,4 +747,23 @@
  :coverage/jurisdiction "gbr"
  :coverage/verified-at "2026-09-08"
  :coverage/note "Foreign military aid (COFOG 02.3) in the United Kingdom is owned by the Foreign, Commonwealth & Development Office (FCDO), the body that oversees UK security and defence assistance delivered abroad — defence diplomacy, military-assistance grants and training to partner governments — whose gov.uk hub publishes the security-assistance programmes any foreign-military-aid actor answers to. The US State Department PM Bureau (the dedicated FMF/FMS authority) was tried first and answered 403 to the gate's fetch, so the UK body on gov.uk is cited instead. Gate-fetched 2026-09-08: HTTP 200 / 154714 bytes. Division 02 already had 021 (UK MoD), 022 (civil defence), 024 (DARPA), 025 (BMVg) named; 023 adds the foreign-assistance group, closing the only remaining gap in the division."}
+
+{:db/id -13
+ :source/dataset "itonami-coverage"
+ :coverage/kind :isic-class
+ :coverage/code "2520"
+ :coverage/name "Manufacture of weapons and ammunition"
+ :coverage/authority-url "https://www.atf.gov/"
+ :coverage/jurisdiction "usa"
+ :coverage/verified-at "2026-09-08"
+ :coverage/note "Manufacture of weapons and ammunition (ISIC 2520) in the United States is regulated by the Bureau of Alcohol, Tobacco, Firearms and Explosives (ATF), the licensing and enforcement authority any commercial firearms or ammunition manufacturer must answer to. Gate-fetched 2026-09-08: HTTP 200 / 74430 bytes. The 14 other ISIC gaps on the run list (1395/1396/3291/3292/3299/4313/4664/4665/4775-4779/8410) are NACE-only codes absent from ISIC Rev.4 per the mirror's own PROVENANCE, so they were skipped as renumbering artefacts rather than recorded."}
+{:db/id -14
+ :source/dataset "itonami-coverage"
+ :coverage/kind :isic-class
+ :coverage/code "3040"
+ :coverage/name "Manufacture of military fighting vehicles"
+ :coverage/authority-url "https://www.gov.uk/government/organisations/ministry-of-defence"
+ :coverage/jurisdiction "gbr"
+ :coverage/verified-at "2026-09-08"
+ :coverage/note "Manufacture of military fighting vehicles (ISIC 3040) in the United Kingdom is owned by the Ministry of Defence, the sovereign buyer and sponsor of armoured-vehicle programmes whose procurement (DE&S) and standards any fighting-vehicle manufacturer answers to. Gate-fetched 2026-09-08: HTTP 200 / 162581 bytes. Chosen because the 14 other ISIC gaps on the run list are NACE-only codes absent from ISIC Rev.4 (renumbering artefacts, per the mirror's PROVENANCE :codes-only-in-mirror)."}
 ]
