@@ -598,6 +598,12 @@ hash してから記録する。"}
   （徴候を感知する側であって力学は解かない）が当たった。**問いとして良い語と、索引の
   鍵として良い語は別**という、このファイルが既に持っている非対称のとおり。"}
 
+ :kyosai-mutual-aid
+ {:label "共済 / mutual aid（risk-priced insurance ではなく均一掛金の団体）"
+  :spellings ["kyosai" "共済" "mutual aid" "mutual-aid" "互助" "掛金" "掛け金"
+              "JA共済" " JA共済" "cooperative insurance" "friendly society"]
+  :note "**実装は cloud-itonami/kyosai**（2026-09-08 設計実装）—— 均一 schedule 掛金（solidarity, NOT risk pricing。過払いも不足も拒否）、pool は導出残高で口座ではない（構造的に負にならない）、payout は draft のみで裁定は member council（ratify-payout は無条件 throw、council attestation 無しの記録は入らない）、deny-by-default boundary は sonae/marine-insurance idiom（5 cell x 7 gate）。**insurance（kotoba-lang/insurance = risk-priced library）/ marine-insurance（descriptor snapshot）と対になる共済面。** 共済団体自体の corpus は 90-docs/community-coverage/community-orgs-mutual-aid.edn。"}
+
  :edge-execution-surface
  {:label "エッジ実行面 / 公開ホスト名を持つ Cloudflare Worker"
   ;; :spellings は索引の鍵。ここは狭くする —— 最初に "serverless" "workers"
