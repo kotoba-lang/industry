@@ -47,7 +47,7 @@ YC bench 成熟度 = design 6 次元（YCBench 基準）50% + traction 3 次元 
 主観入力は `90-docs/business/maturity-facts.edn`、`hyp pass|fail` で検証が
 進むと validation → スコアが自動で動く。
 
-repo root 以外から動かすときは `GFTD_ROOT=<superproject root>`。
+repo root 以外から動かすときは `COM_JUNKAWASAKI_ROOT=<superproject root>`（`GFTD_ROOT` も当面読むが、`gftd` は退役済み）。
 
 ## 進化成長 ReAct loop（CLAUDE.md Actors パターン準拠）
 

@@ -24,7 +24,9 @@
             ["node:os" :as os]
             ["node:path" :as path]))
 
-(def root (or (aget (.-env js/process) "GFTD_ROOT") "."))
+(def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
+              ;; legacy; `gftd` is retired (manifest/gftd-retirement.edn)
+              (aget (.-env js/process) "GFTD_ROOT") "."))
 (def amu-bin (or (aget (.-env js/process) "AMU_BIN")
                  (path/join root "orgs/kotoba-lang/amu/bin/amu")))
 

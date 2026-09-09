@@ -1743,7 +1743,7 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
   follow-up）— CCR agent が実行時に自己修復して動いてしまうため気付きにくい。routine の
   prompt を編集する機会があれば直す。
 - **既存 canvas/仮説の有無は `gftd products` / `gftd canvas show --product <p>` /
-  `90-docs/business/maturity-scores.edn` で確認できる**（`GFTD_ROOT=<superproject root>
+  `90-docs/business/maturity-scores.edn` で確認できる**（`COM_JUNKAWASAKI_ROOT=<superproject root>
   nbb 70-tools/bmc/bin/gftd.cljs products` 等）。登録済みなのに daily routine の
   `--product` ループに載っていないだけ、というギャップが起点になりやすい —
   その場合は新規登録でなく routine の対象リスト追加で足りる。

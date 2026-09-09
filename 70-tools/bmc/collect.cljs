@@ -17,7 +17,10 @@
          '[clojure.string :as str]
          '[gftd.traffic :as traffic])
 
-(def root (or (scripts.nbb-compat/getenv "GFTD_ROOT") "."))
+(def root (or (scripts.nbb-compat/getenv "COM_JUNKAWASAKI_ROOT")
+              ;; legacy; `gftd` is retired (manifest/gftd-retirement.edn)
+              (scripts.nbb-compat/getenv "GFTD_ROOT")
+              "."))
 (def out-dir (str root "/90-docs/business/metrics"))
 (def account "4da88288dc30d9ee257f319d3c33ecf0") ; ai-gftd-cloud
 

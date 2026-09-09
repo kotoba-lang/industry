@@ -10,7 +10,9 @@ import os
 import subprocess
 import sys
 
-ROOT = os.environ.get("GFTD_ROOT", os.path.expanduser("~/github/com-junkawasaki"))
+ROOT = os.environ.get("COM_JUNKAWASAKI_ROOT") or os.environ.get(
+    # legacy; `gftd` is retired (manifest/gftd-retirement.edn)
+    "GFTD_ROOT", os.path.expanduser("~/github/com-junkawasaki"))
 K = os.path.join(ROOT, "orgs", "kotoba-lang")
 CLASSPATH = ":".join([
     os.path.join(ROOT, "scripts", "hermes-bots-aozora"),
