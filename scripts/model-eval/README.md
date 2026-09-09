@@ -1,5 +1,50 @@
 # scripts/model-eval — fleet に載せる候補モデルを実測で比べる
 
+## 6公開サイトの言語別翻訳モデル
+
+`manifest/public-site-locales.edn` の17言語には `manifest/public-language-models.edn`
+の選択順を使う。既存の本ツールに公開文の翻訳経路を追加した。サイトの閲覧時や
+Bot全体のモデル設定を変更するものではない。出力はレビューする翻訳案であり、
+生成だけで翻訳品質の認定・法務承認・公開は成立しない。
+
+```bash
+# superproject rootで実行。表示だけなら認証情報は不要。
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-plan ja 100000
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-plan ja 1000000
+
+# 入力は文字列値だけのJSON。公開原文を20キー・1500 UTF-8バイト以下に分割する。
+# OPENROUTER_API_KEYは既存の認証環境から渡す。値をログやファイルに書かない。
+BENCH_OUT=/tmp/public-translation-receipts nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs translate ja public-source.json 1000000 --public-input
+
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-self-test
+```
+
+月間出力100万token未満は通常量、それ以上は大量生成という**運用上の初期値**。
+実際のサイト流量を測った閾値ではない。通常は固定語検査に通った候補の実測応答時間、
+大量生成は同じ原文に対する実請求額で順を決める。単発サンプルのため、普遍的な
+品質・速度ランキングとは扱わない。更新時はモデル全体の公開利用量と、言語別の
+検査・実費を別々に記録し、欠測を0にしない。母語・地域語の確認は別工程。
+
+JSON形、符号・数値・通貨・URL・placeholderの個数、最低限の文字種を検査する。
+失敗/打切り/HTTPエラーは次の明示候補へ進むが、不正出力は採用しない。
+全候補が失敗すれば非0で終了する。英語原文は生成せずそのまま返す。
+`translation-attempts.edn` にモデル・provider・generation ID・token・実費・失敗を、
+`translations.edn` に採用した案を追記する。URLには空白区切りを要求する。
+
+価格はproviderの `max_price` でも制限し、1回4096出力tokenまで。
+1バッチの入場予算は$0.05の**推定値**で、アカウント全体のハード上限ではない。
+請求不明の失敗は保守的な推定で計上し、実費超過が判明したら記録して停止する。
+初期証拠は2026-10-09で失効し、更新するまで推論を止める。
+
+再検査例（HTTP成功・stop・構造/固定語すべてを要求する）:
+
+```bash
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-check 90-docs/reports/language-models-20260909/evaluations-v2.json 90-docs/reports/language-models-20260909/sample.json
+```
+
+調査正本: `90-docs/reports/260909-language-model-cost-usage.edn`。
+元のOllama用 `speed/tasks/needle/ctx` の動作は維持している。
+
 **「速い」「賢い」を人の印象や LLM-judge で決めない。** 出力を実際に走らせて
 PASS/FAIL を取り、速度と文脈上限は ollama が返す実測値だけを使う。
 初出は ADR-2608140200（laguna-xs-2.1 vs qwen3.6-35b-a3b、16GB M4 mac mini）。

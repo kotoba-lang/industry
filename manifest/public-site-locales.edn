@@ -29,6 +29,9 @@
            :choice-explicit true :preserve-equivalent-view true
            :no-ip-based-redirect true :unknown-locale :english}
  :translation {:source :english :machine-translation-allowed true
+               :model-policy "manifest/public-language-models.edn"
+               :model-policy-scope :public-static-copy-drafts
+               :generation-entry "scripts/model-eval/bench.cljs translate"
                :native-speaker-review :unverified-unless-recorded
                :unchanged-tokens [:brand :url :code :identifier :amount :currency :unit :version :evidence-status]
                :missing-key :visible-english-fallback
