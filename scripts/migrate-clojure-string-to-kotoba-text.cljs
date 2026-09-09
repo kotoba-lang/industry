@@ -488,7 +488,25 @@
                    (refuse! (str "no .clj/.cljc anywhere under " repo "; nothing was measured")))
         loaded   (for [p files] [p (.readFileSync fs p "utf8")])
         targets  (filterv (fn [[_ s]] (str/includes? s "clojure.string")) loaded)
+        ;; A HAZARD IS A HOST DISAGREEMENT, AND A .clj FILE HAS ONE HOST.
+        ;; All three hazards -- split with a capturing group, `$&`, and `\$` --
+        ;; are places where clojure.string's two implementations answer
+        ;; differently. kotoba.lang.text adopts the JVM's answer in all three,
+        ;; so in a file that only ever runs on the JVM the rewrite cannot change
+        ;; the answer. The hazard detector says exactly this in its own output
+        ;; ("`.clj` is unaffected") and this tool refused anyway, which held
+        ;; cloud-itonami-isco-4313 and its 54 files on one line of a test file.
+        ;;
+        ;; Measured on the JVM before this exemption was written, using that
+        ;; file's own pattern: 180 cases across four patterns, nine inputs and
+        ;; five limits -- including #"/(ipfs|refs)/" -- gave zero disagreements
+        ;; between clojure.string/split and kotoba.lang.text/split. The harness
+        ;; was controlled: it prints a difference when given two calls that do
+        ;; differ, so agreement is a result and not a silent comparator.
+        ;;
+        ;; .cljc keeps the check. Its two halves are exactly the disagreement.
         haz      (for [[p s] targets
+                       :when (not (str/ends-with? p ".clj"))
                        :let [a (alias-of s)]
                        h (hazards-in (or a "kotoba\\.lang\\.text") s)]
                    [p h])
