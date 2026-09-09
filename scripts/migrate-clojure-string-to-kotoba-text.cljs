@@ -399,16 +399,24 @@
             :else (recur (inc i) depth false false false))))))))
 
 (defn- project-file
-  "The deps.edn or bb.edn directly in this directory, or nil.
+  "The deps.edn, bb.edn or nbb.edn directly in this directory, or nil.
 
   bb.edn takes the same shape as deps.edn, and two of the repos reported as
   having \"no deps.edn to declare in\" have only a bb.edn -- refusing them was
-  the tool being narrow, not the repo being unusual."
+  the tool being narrow, not the repo being unusual.
+
+  nbb.edn is the same story, found when .cljs joined the migration: nbb reads
+  :deps from it in the tools.deps shape, git coordinates included. Measured
+  2026-09-09 rather than assumed -- an nbb.edn naming kotoba-lang/text by
+  :git/url and :git/sha resolves, and `nbb --classpath src -e \"(require ...)\"`
+  against it answers from kotoba.lang.text. Twenty-four of the repositories
+  refused in the .cljs pass run their tests as `nbb --classpath src:test
+  run_tests.cljs`, which is where nbb.edn belongs."
   [d]
   (some (fn [n]
           (let [c (.join path-mod d n)]
             (when (try (.isFile (.statSync fs c)) (catch :default _ false)) c)))
-        ["deps.edn" "bb.edn"]))
+        ["deps.edn" "bb.edn" "nbb.edn"]))
 
 (defn- declaration-landed?
   "Whether the ONLY semantic change to the project file is one added dependency.
