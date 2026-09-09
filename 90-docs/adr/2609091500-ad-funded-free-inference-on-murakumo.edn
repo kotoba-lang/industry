@@ -66,7 +66,11 @@ THE BOTS RUN. Measured 2026-09-09, by giving 閲覧 its standing objective and w
 - it wrote, unprompted, 'absence of flow is not proof the pipes are sound'
 - and it found a defect in this wiring: metrics/free-tier-findings/ did not exist and it holds no directory-creation tool. It wrote to metrics/ instead and DISCLOSED the deviation rather than failing quietly. The tick now creates that directory on every pass.
 
+MERGING IS NOT DEPLOYING, for a launchd script. The directory fix merged to main and the tick still did not create the directory: the launchd job runs `scripts/free-tier-tick.cljs` out of the SHARED west checkout, which was two merges behind. Caught only by deleting the directory and kickstarting the job -- the log line was identical before and after, because the tick's real work (fetch, write state, exit 1) succeeded either way. Reporting the fix as working off the merge alone would have been wrong, and nothing in the output would have said so. A local script's deploy step is `git merge --ff-only origin/main` in the checkout the plist names, and that step has no gate.
+
 That last one is this session's second instance of one shape -- an instruction naming something the actor cannot reach -- and the first instance is what the tick was built to fix. Writing the lesson down once did not stop the second.
+
+All three Bots now carry a last-run-id and run on their own 15-minute cadence with the rewritten objectives (workforce-run-e40beb90 / 3c917e28 / 32aef2c4, 2026-09-09T08:13-08:16Z). That is the difference between provisioned and running, and it is what the earlier state was not.
 
 Provisioning alone proved nothing: the three Bots sat at last-run NONE for twenty minutes past their scheduled 15-minute cadence, because the resident lane runs at max-active 2 across 147 Bots. A roster row and a Bot that has produced work look identical until something asks it to work.
 
