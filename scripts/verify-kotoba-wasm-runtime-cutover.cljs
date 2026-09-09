@@ -164,10 +164,35 @@
         ;; dependency-file or as the implementation of a frozen entry.
         frozen (into (set (map :dependency-file (:cutover/legacy-inventory contract)))
                      (keep :implementation (:cutover/legacy-inventory contract)))
-        hits (for [f files
-                   :let [text (try (.readFileSync fs f "utf8") (catch :default _ nil))]
-                   :when (and text (str/includes? text "com.dylibso.chicory"))]
-               (rel f))]
+        ;; Does the file USE Chicory, or only name it? The contract forbids
+        ;; `:new-chicory-call-sites`, and a docstring is not a call site.
+        ;; Measured 2026-09-09: of the nine hits then classified
+        ;; `frozen-repo-other`, TWO were prose --
+        ;; `kotoba/src/kotoba/launcher.clj` says "EXECUTE the module via
+        ;; kotoba.wasm-exec (com.dylibso.chicory)" in a docstring while
+        ;; importing nothing (it requires `kotoba.wasm-exec`, which IS the
+        ;; frozen entry), and `aiueos/src/aiueos/tcb.clj` spells the
+        ;; coordinate out to explain a maven path layout,
+        ;; `com.dylibso.chicory/wasm 1.4.0 ->
+        ;; com/dylibso/chicory/wasm/1.4.0/wasm-1.4.0.jar`. A substring sweep
+        ;; counts an explanation of Chicory as a use of it.
+        ;;
+        ;; `uses?` is deliberately crude and deliberately OVER-inclusive: an
+        ;; `import` form anywhere, or a dependency coordinate
+        ;; `com.dylibso.chicory/<artifact>`. It cannot be fooled into missing a
+        ;; real site by formatting, and when it is wrong it is wrong toward
+        ;; reporting, which is the only direction a forbidden-site check may
+        ;; err.
+        uses? (fn [text]
+                (boolean (or (re-find #"com\.dylibso\.chicory/[A-Za-z0-9.-]" text)
+                             (some (fn [m] (str/includes? m "com.dylibso.chicory"))
+                                   (re-seq #"\(:?import[^)]*(?:\([^)]*\)[^)]*)*\)" text)))))
+        scanned (for [f files
+                      :let [text (try (.readFileSync fs f "utf8") (catch :default _ nil))]
+                      :when (and text (str/includes? text "com.dylibso.chicory"))]
+                  [(rel f) (uses? text)])
+        hits (map first scanned)
+        mention-only (set (map first (remove second scanned)))]
     ;; A sweep that walked nothing is not a clean sweep. The floor is stated
     ;; rather than implied: this workspace registers thousands of repos, so a
     ;; handful means the manifest or the disk is not what this run assumed.
@@ -204,7 +229,8 @@
                             (when (>= (count ps) 3) (str/join "/" (take 3 ps)))))
           frozen-repos (set (keep repo-of frozen))
           unfrozen (remove #(contains? frozen %) (sort hits))
-          {tests true other false} (group-by (comp boolean test-path?) unfrozen)
+          {mentions true named false} (group-by #(contains? mention-only %) unfrozen)
+          {tests true other false} (group-by (comp boolean test-path?) (or named []))
           {in-frozen-repo true outside false}
           (group-by #(contains? frozen-repos (repo-of %)) (or other []))]
       (doseq [h (or in-frozen-repo [])]
@@ -222,10 +248,17 @@
       ;; Every hit lands in exactly one bucket and the buckets are printed with
       ;; their sum, so a future reclassification cannot quietly lose one.
       (println (str "  chicory buckets: frozen " (- (count hits) (count unfrozen))
+                    " + mention-only " (count (or mentions []))
                     " + test-oracle " (count (or tests []))
                     " + frozen-repo-other " (count (or in-frozen-repo []))
                     " + outside-inventory " (count (or outside []))
                     " = " (count hits)))
+      (when (seq mentions)
+        ;; Named, like the test bucket, because a file that only explains
+        ;; Chicory today can acquire an import tomorrow and would then leave
+        ;; this bucket on its own.
+        (println (str "  mention-only (names it, does not import it): "
+                      (str/join " " (sort mentions)))))
       (when (seq tests)
         ;; Counted and NAMED, never silent: `:allowed-as-oracle-until-replaced`
         ;; is a clock, not an exemption, and a bucket nobody can see never runs
