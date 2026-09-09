@@ -113,6 +113,131 @@
      :replace "REFUSED: git ls-files が実行できない（この repo の中で実行しているか）\")\n  (.exit js/process 0))"
      :must-fail ["outside-a-repository-it-refuses-with-3"]}]}
 
+  {:repo "orgs/cloud-itonami/app-contracts"
+   :label "app-contracts corpus validation —— 実装 0 の JSON-LD corpus で、宣言が instance に届いているか"
+   :cmd ["nbb" "test/contracts/validate_test.cljs"]
+   :green-marker "contracts-validate: OK"
+   :mutations
+   [{:id :cv/id-path-check-disabled
+     :note "@id と file path の照合をやめる。**この repo で実際に landed していた欠陥**
+            —— example-procurement.jsonld の @id は末尾 -001 で、publication 面が
+            serve する https://etzhayyim.com/data/{type}/{id}.jsonld からは届かなかった"
+     :file "src/contracts/validate.cljc"
+     :find "(when (not= want got)"
+     :replace "(when (and false (not= want got))"
+     :must-fail ["an-id-whose-slug-is-not-the-filename-is-reported"
+                 "an-id-in-the-wrong-directory-is-reported"]}
+
+    {:id :cv/class-identity-compared-as-strings
+     :note "展開せずに compact IRI を文字列比較する。**同じ名前空間を別の prefix で
+            書いた 2 つが『割れている』と報告される** —— 偽陽性のほうの失敗様式"
+     :file "src/contracts/validate.cljc"
+     :find "(not= (expand-iri context from-ctx) (expand-iri context declared))\n                   (finding :class/identity-split"
+     :replace "(not= from-ctx declared)\n                   (finding :class/identity-split"
+     :must-fail ["the-same-namespace-under-a-different-prefix-is-not-a-split"]}
+
+    {:id :cv/class-identity-check-disabled
+     :note "class の同一性を見ない。**この repo で実際に landed していた欠陥** ——
+            @context は Organization/Person を schema: に展開し、class 定義は
+            etzhayyim: を名乗っていた。required を持つ class の instance が 0 件になる"
+     :file "src/contracts/validate.cljc"
+     :find "                   (not= (expand-iri context from-ctx) (expand-iri context declared))"
+     :replace "                   (and false (not= (expand-iri context from-ctx) (expand-iri context declared)))"
+     :must-fail ["a-class-the-context-expands-elsewhere-is-reported"]}
+
+    {:id :cv/evidence-floor-removed
+     :note "何も見ていない実行を pass にする。**corpus を全部消した tree が、
+            健全な tree と同じ値を返す** —— この class を最も安く作れる形"
+     :file "src/contracts/validate.cljc"
+     :find "(when (< n floor) [k n])"
+     :replace "(when (and false (< n floor)) [k n])"
+     :must-fail ["an-empty-corpus-is-refused-not-passed"
+                 "a-corpus-that-lost-every-cross-reference-is-refused"]}
+
+    {:id :cv/date-order-rejects-the-boundary
+     :note "採択と施行が同じ日を違反にする。**通る側の境界を 1 つも持たない test は
+            この反転を緑のまま通す**（CLAUDE.md 8 問の 5 問目）。
+            実測: この境界は合成 fixture だけでなく **実 corpus にも在る** ——
+            7 record すべてが dateCollected == lastVerified なので、
+            the-real-corpus-on-disk-passes-every-check も同時に赤くなる"
+     :file "src/contracts/validate.cljc"
+     :find "(pos? (compare x y))"
+     :replace "(not (neg? (compare x y)))"
+     :must-fail ["adoption-and-entry-into-force-on-the-same-day-is-allowed"]}
+
+    {:id :cv/date-order-compares-malformed-values
+     :note "形の壊れた値も順序比較する。1 つの欠陥が 2 つの rule を出し、
+            **順序の検査が自分の名乗っていない理由で拒否したことになる**"
+     :file "src/contracts/validate.cljc"
+     :find "(when (and (comparable-temporal-pair? x y)"
+     :replace "(when (and (string? x) (string? y)"
+     :must-fail ["a-malformed-date-is-not-also-reported-as-out-of-order"]}
+
+    {:id :cv/confidence-upper-bound-opened
+     :note "confidence の上端を排他にする。実測: 実 corpus の 6 record が
+            confidence = 1 ちょうどなので **実データ側も赤くなる** ——
+            境界が実データ上に在る珍しい例。fixture 側と二重に効く"
+     :file "src/contracts/validate.cljc"
+     :find "(and (number? v) (<= 0 v) (<= v 1))"
+     :replace "(and (number? v) (<= 0 v) (< v 1))"
+     :must-fail ["confidence-accepts-both-ends-of-its-range"]}
+
+    {:id :cv/confidence-type-check-dropped
+     :note "number? を落とす。文字列の \"1\" が数と比べられ、範囲内として通る"
+     :file "src/contracts/validate.cljc"
+     :find "(and (number? v) (<= 0 v) (<= v 1))"
+     :replace "(and (<= 0 v) (<= v 1))"
+     :must-fail ["confidence-outside-zero-to-one-is-reported"]}
+
+    {:id :cv/leap-century-clause-dropped
+     :note "100 で割り切れる年の除外を落とす。2100-02-29 が実在する日になる"
+     :file "src/contracts/validate.cljc"
+     :find "(or (not (zero? (mod y 100))) (zero? (mod y 400)))"
+     :replace "true"
+     :must-fail ["the-leap-year-rule-is-the-gregorian-one-not-just-divisible-by-four"]}
+
+    {:id :cv/leap-quadricentennial-clause-dropped
+     :note "400 の例外を落とす。2000-02-29 が『実在しない』になる。
+            上の mutation と **同じ test の別の assertion** を撃つ"
+     :file "src/contracts/validate.cljc"
+     :find "(or (not (zero? (mod y 100))) (zero? (mod y 400)))"
+     :replace "(not (zero? (mod y 100)))"
+     :must-fail ["the-leap-year-rule-is-the-gregorian-one-not-just-divisible-by-four"]}
+
+    {:id :cv/lei-checked-by-length-only
+     :note "mod-97-10 で英字を 2 桁に展開する節を 1 桁にする。**長さの検査は
+            無傷のまま、検査数字だけが別の値を計算する** —— LEI は他所の台帳への
+            外部キーなので、通った打ち間違いは黙って別の法人を指すか、誰も指さない。
+            実測: apple-inc の実 LEI も落ちるので実 corpus 側でも赤くなる"
+     :file "src/contracts/validate.cljc"
+     :find "(mod (+ (* r 100) v) 97)"
+     :replace "(mod (+ (* r 10) v) 97)"
+     :must-fail ["a-lei-is-checked-by-its-check-digits-not-only-its-length"]}
+
+    {:id :cv/references-only-read-vectors
+     :note "参照が裸の文字列で書かれていると飛ばす。**飛ばした参照は
+            解決した参照と同じ形で緑になる**"
+     :file "src/contracts/validate.cljc"
+     :find "                                     (cond (vector? v) v\n                                           (string? v) [v]"
+     :replace "                                     (cond (vector? v) v\n                                           (string? v) []"
+     :must-fail ["a-reference-written-as-a-bare-string-is-still-checked"]}
+
+    {:id :cv/unexpressible-required-property-ignored
+     :note "class が必須と宣言した IRI を書く term が context に無いとき黙る。
+            **その時点で required 検査はどの record も落とせなくなっている**"
+     :file "src/contracts/validate.cljc"
+     :find "                               (cond\n                                 (empty? terms)"
+     :replace "                               (cond\n                                 (and false (empty? terms))"
+     :must-fail ["a-required-property-no-term-can-express-is-reported"]}
+
+    {:id :cv/parse-errors-dropped
+     :note "読めなかったファイルを黙って除く。**壊れた JSON が『問題が無かった』と
+            同じ形になる**（CLAUDE.md 8 問の 1 問目）"
+     :file "src/contracts/validate.cljc"
+     :find "        (:parse-errors corpus)))"
+     :replace "        (take 0 (:parse-errors corpus))))"
+     :must-fail ["a-file-that-did-not-parse-is-reported-not-dropped"]}]}
+
   {:repo "orgs/cloud-itonami/cloud-itonami-isco-3522"
    :label "isco-3522 governed refusals —— governor が名指しで縛っていた 1 op の外側"
    ;; この actor の governor は `(= :approve-test op)` で分岐していた。つまり
