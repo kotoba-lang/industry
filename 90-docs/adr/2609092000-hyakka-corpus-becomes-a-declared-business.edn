@@ -1,0 +1,130 @@
+[{:db/id -1
+  :adr/id "adr-2609092000-hyakka-corpus-becomes-a-declared-business"
+  :adr/title "百科のコーパスは業務として宣言され、resident lane が 7 日ぶりに registry を読んだ"
+  :adr/status "accepted"
+  :adr/date "2026-09-09"
+  :adr/tags ["hyakka" "wiki" "workforce" "loop-yakuwari" "cloud-itonami" "provisioning"]
+  :adr/related ["adr-2608300900-hyakka-ontology-backbone-and-the-gaps-that-stayed"
+                "adr-2608271450-hermes-hyakka-growth-bots"
+                "adr-2607311100-hyakka-knowledge-wiki-on-kotobase"]
+  :adr/body "# 百科のコーパスは業務として宣言され、resident lane が 7 日ぶりに registry を読んだ
+
+**Status**: accepted / **Date**: 2026-09-09
+
+## 決めたこと
+
+**wiki.kotobase.net のコーパス事業を `loop-yakuwari` に business `:hyakka` として宣言し、
+役は `:corpus-analyst` 1 つだけにする。** 取り込みの実行（upstream バイトの取得、digest の
+再計算、suite の実行、PR）は hermes の gated pipeline に残し、itonami cloud の workforce
+lane は analysis の半分だけを持つ。
+
+**役が 1 つなのは規模の判断ではなく、道具立ての帰結である。** workforce Bot の workspace は
+git root ちょうど 1 つ（`workspace_tools/admit-root`）で、道具は workspace の読み書きと
+local `git_commit` だけ。fetch も shell も push も PR も無い（cloud-itonami-app の
+`data/config.edn` が明示的にそう書いている）。したがって:
+
+- `:engineer` を置くと「提案はするが着地できない役」になる
+- `:qa` を置くと、falsify の主要な道具 `test.run` を走らせる shell が無いので、
+  **測れなかったことと問題が無かったことを同じ値で返す**役になる
+
+この 2 つは `:roles-absent` に理由付きで書いた。欠落は宣言されて初めて反論できる。
+
+cadence は 15 ではなく **720**。実測 2026-09-09、この lane は `max-active 1` /
+`max-starts-per-tick 1` で、store 上の 94 job に対して提出は 1〜4 件/日だった
+（74 job は最終提出が 09-02〜03）。15 を名乗っても次の 1 回は早くならない。
+
+## 見つけた欠陥 — provisioning は 16 時間、9 語しか言わずに壊れていた
+
+登録を通そうとして `workforce_provision` を叩いたら
+`{:error \"workforce projection failed\" :type \"command-failed\"}` が返った。**私の変更の前の
+tip でも同じだった。**
+
+原因は 2 層離れていた。loop-yakuwari の workspace 横断の `clojure.string` 撤去（e3f6024、
+09-08 23:51）が `kotoba.lang.text` を `src/awai/*.cljc` と `bin/awai.cljs` に入れた。
+cloud-itonami-app 側は projection の classpath を**手書きのリスト**で組んでおり、3 本目を
+学ばなかった。以後すべての provision が `Could not find namespace: kotoba.lang.text` で死んだ。
+
+**そして理由は wire に出ていなかった。** `load-catalog` は subprocess の出力 2000 字を
+`:detail` に入れていたのに、`/api/agent-bots` の error body は `:type` と `:message` だけを
+送っていた。CLI も MCP も browser も「workforce projection failed」の 9 語しか見られず、
+診断は subprocess を手で再実行して初めて取れた。CLAUDE.md の 8 問の 3 問目
+（受け取ったエラー本文を捨てていないか）の実例。
+
+直した形:
+
+- `registry-dependencies` が registry 自身の `nbb.edn` の `:local/root` を読み、floor と
+  **union する**。「宣言があればそれだけ」ではない —— 今日の `nbb.edn` は 2 本しか宣言して
+  いないのに sources は 3 本必要で、**present but incomplete な宣言が floor を静かに
+  置き換える**と同じ壊れ方が残る
+- checkout されていない依存は subprocess の前に `:workforce/unavailable` + `:missing` で
+  **名指しで拒否**する
+- error body が `:detail` / `:missing` を運ぶ（それ以外の ex-data は運ばない）
+- loop-yakuwari の `nbb.edn` が text を宣言する。この repo が README で勧めている
+  `nbb bin/awai.cljs check` が素の checkout で**起動すらできなかった**
+
+検査は `workforce_classpath_test`（12 assertion）。**通ることではなく判別することを確認した**:
+union を「宣言優先」に戻すと 3 件赤（不完全宣言のケースを含む）、nbb.edn を読まなくすると
+1 件赤、戻すと 0。
+
+## resident app は削除済みファイルから走っていた
+
+`cloud.itonami.app.local` の plist が指す `~/.gftd/bin/itonami-app-resident.cljs` は、
+同日のホームディレクトリ移行で**消えていた**。走っているプロセスは削除済みの inode を
+掴んだまま生きており、`KeepAlive` は true。つまり **app はクラッシュ 1 回で戻らない状態**で、
+外からは「起動している app」と「再起動できる app」が同じ顔をしていた。
+
+launcher を書き直し、秘密は plist に書かず起動時に取りに行く形にした（plist は誰でも
+読める）。`MURAKUMO_API_KEY` は 0600 ファイル、`OPENROUTER_API_KEY` は Keychain の
+`gftd.openrouter` を**名前で 1 件だけ**。どちらも欠落は fatal にしない —— exit すると
+`KeepAlive` に respawn ループを渡すことになるので、**名指しで WARNING を出して起動する**。
+これは飾りではない: `policy.kotoba/provider-allowed?` は egress provider に
+`authenticated`（変数が実際に立っていること）を要求するので、鍵の無い再起動は全 turn を
+turn 開始前に denied にする。
+
+消えていた murakumo の鍵ファイルは、走っていたプロセスの環境から 1 変数だけ復元して
+0600 で書き戻した（値は表示せず、sha256 前 8 桁で同一性を確認）。
+
+## 実測（2026-09-09）
+
+再起動と provision の前後:
+
+| | before | after |
+|---|---|---|
+| catalog-businesses | 14 | 26 |
+| businesses | 13 | 25 |
+| bots | 94 | 144 |
+| provisioned-at | 2026-09-02T00:41Z | 2026-09-09T06:58:18Z |
+
+**止まっていたのは hyakka だけではなかった。** 新規に provision された 50 体は 13 business に
+またがる: sumai / chuko-sha / inshoku / shigoto / biyo / tabi / manabi / kekkon が各 4、
+cloud-itonami-numbering 8、kbb-migration 3、kotobascript 3、cloud-itonami 3、hyakka 1。
+退役 0。投影は 09-02 から古く、09-08 からは直すことも不可能だった。
+
+resident tick は再起動後に再び動いている。**13 分で 11 run**（ほぼ毎分 1 本、すべて
+`goal? true`）—— 再起動前は 94 job に対して 1〜4 件/日だった。内訳は checkpointed 2
+（tool を 8 回 / 4 回使って 579s・459s 走り、slot を譲った）、completed 1、running 6、
+failed 2。failed の 2 件はどちらも今回の変更とは無関係で、しかも理由を名乗っている ——
+`yadori/invalid-input: account-id is required`（Domain Steward の既存の設定欠落）と
+`agent/context-overflow`（指示だけで model の context window を超える役が 1 つある）。
+
+`hyakka · Corpus Analyst`: `workforce-key hyakka/corpus-analyst` /
+`resident-job {enabled? true, cadence-minutes 720, next-run-at 2026-09-09T10:47:18Z}` /
+workspace は app-hyakka の checkout / capability 8 件。
+
+## まだ測っていないこと
+
+**この bot の resident run は 1 回も完走していない。** 動作確認に投げた interactive の
+`bot_task` は `:agent/multiple-tool-calls` で落ちた。これは `bots.clj:4777` が
+`:goal? false` の run にだけ適用するガードで、goal run（resident job はこちら）では
+違反バッチを model に差し戻すか並列 read を実行する —— **が、これはコードを読んだ結果で
+あって測定ではない。** resident 経路を強制起動する route は無いので、最初の実測は
+予定された 10:47Z の run になる。
+
+## 隣接する状態（記録として）
+
+bot の workspace である app-hyakka の共有 checkout は、別の bot の branch
+`bot/gp-source-…`（origin/main から 3 commit 遅れ）に置かれたままだった。未 push の
+commit は無く、その内容は PR #977 で main に入っていたので、west pin を upstream tip
+（49824de9）へ進めて checkout をそこに合わせた。**遅れた checkout を正本として読む**のは
+この workspace が繰り返し踏んでいる形なので、bot に読ませる前に直した。
+"}]
