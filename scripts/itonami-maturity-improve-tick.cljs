@@ -48,7 +48,7 @@
 (def datoms-file (str root "/90-docs/system-dynamics/itonami-maturity.datoms.edn"))
 (def evidence-file (str root "/manifest/itonami-maturity-evidence.edn"))
 (def archived-file (str root "/manifest/archived-repos.edn"))
-(def ledger-file (str home "/.gftd/itonami-maturity-improve.ledger.edn"))
+(def ledger-file (str home "/.itonami/itonami-maturity-improve.ledger.edn"))
 
 ;; 計測値がこれより古ければ、次の 1 手は「作業」ではなく「測り直し」。
 ;; 古い順位に従って働くのは、測っていないものを測ったことにするのと同じ。

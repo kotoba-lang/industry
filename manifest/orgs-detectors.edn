@@ -74,7 +74,7 @@
 ;;      quietly. See the tick's header for what that env var does and does not
 ;;      cover, stated honestly.
 ;;   2. It writes NOTHING into any git checkout, including the superproject.
-;;      State lives under `~/.gftd/orgs-detector-tick/`. A tick that dirtied the
+;;      State lives under `~/.itonami/orgs-detector-tick/`. A tick that dirtied the
 ;;      shared checkout would trip the stash-churn failure CLAUDE.md documents.
 ;;   3. It is a monitor, not a gate: exit 0 even with findings. The gate is the
 ;;      individual detector, run by a human or by a hook.
@@ -141,7 +141,7 @@
    :why "2026-08-20: amu's contract (kotoba-component's component-model-v1.edn,
               [:spec-baseline :wasi :toolchain]) pins {:wasm-tools \"1.243.0\"
               :wac-cli \"0.10.1\"} and refuses any other version before running.
-              The fleet satisfies that from ~/.gftd/wasm-pin/bin, and the
+              The fleet satisfies that from ~/.itonami/wasm-pin/bin, and the
               amu-jvm-test gate depends on it. When the contract moves, those
               binaries stay put and the gate goes red saying `wasm-tools version
               is not pinned` -- which reads as a repo failure and is not one. It

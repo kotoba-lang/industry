@@ -8,7 +8,7 @@
 ;;
 ;; **なぜ要るか。** amu は `component-model-v1.edn` の
 ;; `[:spec-baseline :wasi :toolchain]` で toolchain を pin し、他の version を
-;; 実行前に拒否する。fleet 側は `~/.gftd/wasm-pin/bin` に置いた binary で
+;; 実行前に拒否する。fleet 側は `~/.itonami/wasm-pin/bin` に置いた binary で
 ;; その pin を満たしており、`amu-jvm-test` gate はそれに依存する。
 ;;
 ;; amu が pin を上げると、prefix の binary は古いまま残る。そのとき gate は

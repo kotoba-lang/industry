@@ -42,7 +42,7 @@
 
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT") (.cwd js/process)))
-(def ledger-file (str home "/.gftd/docs-edn-repair-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/docs-edn-repair-tick.ledger.edn"))
 
 (defn- arg [flag default]
   (let [a (vec *command-line-args*)

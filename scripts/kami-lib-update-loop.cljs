@@ -32,9 +32,9 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-dir (str home "/.gftd/kami-lib-update"))
+(def ledger-dir (str home "/.itonami/kami-lib-update"))
 (def ledger-file (str ledger-dir "/ledger.edn"))
-(def lock-file (str home "/.gftd/kami-lib-update.lock"))
+(def lock-file (str home "/.itonami/kami-lib-update.lock"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]

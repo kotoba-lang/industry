@@ -60,7 +60,7 @@
                   (get argv (inc i) d) d))
 (def root (opt "--root" (js/process.cwd)))
 (def home (opt "--home" (.join path (or (.-HOME js/process.env) "/tmp")
-                               ".gftd" "endpoint-health")))
+                               ".itonami" "endpoint-health")))
 (def window-hours (js/parseFloat (opt "--window-hours" "24")))
 (def cheap-only? (some #{"--cheap-only"} argv))
 (def ledger-path (.join path home "observations.ledger.edn"))

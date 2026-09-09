@@ -17,7 +17,7 @@
 ;; ## 有界であること
 ;;
 ;; 1 tick で見るのは最大 30 repo。どこまで見たかは
-;; `~/.gftd/kami-lib-update/cursor.edn` の round-robin cursor が持ち、
+;; `~/.itonami/kami-lib-update/cursor.edn` の round-robin cursor が持ち、
 ;; 次の tick は続きから見る（全 100+ repo を毎周歩かない）。
 ;;
 ;; ## :not-measured を :fresh に畳まない
@@ -56,7 +56,7 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def state-dir (str home "/.gftd/kami-lib-update"))
+(def state-dir (str home "/.itonami/kami-lib-update"))
 (def cursor-file (str state-dir "/cursor.edn"))
 (def batch-limit (max 1 (js/parseInt (or (opt "--limit") "30") 10)))
 

@@ -33,7 +33,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljs
 - **exit 2 が返ったら何もしない。** 構成 repo の checkout が 0 本という意味なので、
   次の 1 手は `west update` であって事業を進めることではない。tick が名指しする。
 - `NEXT` 行の床が今回の対象。**それ以外の床に手を出さない。**
-- `~/.gftd/ma-business-tick.ledger.edn` の末尾数行も読む（前周との差分が現在地）。
+- `~/.itonami/ma-business-tick.ledger.edn` の末尾数行も読む（前周との差分が現在地）。
 - **`:unmeasured` は対象にしない。** 測れていないものを直しに行くと、直したつもりで
   別のものを壊す。測れないこと自体が報告対象で、作業対象ではない。
 

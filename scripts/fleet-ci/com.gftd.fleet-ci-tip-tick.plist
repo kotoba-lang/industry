@@ -16,7 +16,7 @@
   * 前の tick が走っている間は tick.cljs 側の lock で skip する（重複起動しない）。
   * RunAtLoad false: bootstrap 直後に走らせない（意図しない一斉 gate を避ける）。
   * StandardOut/Err は **構造化ログとは別ファイル**（ADR-2607178000 addendum の
-    二重書き込み事故の回避）。正本のログは ~/.gftd/fleet-ci-tick.log。
+    二重書き込み事故の回避）。正本のログは ~/.itonami/fleet-ci-tick.log。
   * 署名鍵は kagi（compartment personal）から読む → ユーザーの GUI session で
     動かす必要があるため LaunchDaemon ではなく LaunchAgent（gui/<uid>）。
 -->
@@ -44,21 +44,21 @@
          — ADR-2607178000 §3 が同じ場所・同じ理由で認めている経路。鍵は grant
          fleet-ci/* のみで pin 前進も governance quorum も持たない。 -->
     <key>FLEET_CI_SIGNER_PEM</key>
-    <string>/Users/junkawasaki/.gftd/fleet-ci-signer-tip.pem</string>
+    <string>/Users/junkawasaki/.itonami/fleet-ci-signer-tip.pem</string>
     <!-- gh の token も keyring から読めないので owner ごとの fine-grained PAT を
          mode 600 ファイルから読む（dir は 700）。ファイルが無い owner は preflight /
          WARN で明示される。必要な権限は scripts/fleet-ci/README.md 参照。 -->
     <key>FLEET_CI_GH_TOKEN_DIR</key>
-    <string>/Users/junkawasaki/.gftd/fleet-ci-gh-tokens</string>
+    <string>/Users/junkawasaki/.itonami/fleet-ci-gh-tokens</string>
   </dict>
   <key>StartInterval</key>
   <integer>300</integer>
   <key>RunAtLoad</key>
   <false/>
   <key>StandardOutPath</key>
-  <string>/Users/junkawasaki/.gftd/fleet-ci-tip-tick.stdout.log</string>
+  <string>/Users/junkawasaki/.itonami/fleet-ci-tip-tick.stdout.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/junkawasaki/.gftd/fleet-ci-tip-tick.stdout.log</string>
+  <string>/Users/junkawasaki/.itonami/fleet-ci-tip-tick.stdout.log</string>
   <!-- ProcessType は Standard。**Background にしてはいけない**: 実測(2026-07-25)、
        ProcessType=Background + Nice=5 で bootstrap した job は、他セッションの JVM が
        CPU を占めている状況で 15 分間 CPU 0.09 秒しか進まず（macOS の background

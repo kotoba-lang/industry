@@ -110,8 +110,8 @@ GitHub Actions ではない。
 - **`:include-ext` で送る tree を絞る**（`max-ship-mb` 200）。`:min-files` は絞り込みが壊れて
   空 tree を「違反 0 件 = 合格」にしないための床。
 - **署名鍵**は kagi の `fleet-agent-murakumo-ci-tip-25mbair`（compartment `personal`）と
-  `~/.gftd/fleet-ci-signer-tip.pem` の両方にある（2026-08-05 に kagi 側を PEM から復元）。
-  手動実行で `no such item` が出たら `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem`
+  `~/.itonami/fleet-ci-signer-tip.pem` の両方にある（2026-08-05 に kagi 側を PEM から復元）。
+  手動実行で `no such item` が出たら `FLEET_CI_SIGNER_PEM=$HOME/.itonami/fleet-ci-signer-tip.pem`
   を付ける。常駐 plist は env を渡している。
 - **gate は「落ちること」を確かめてから landed とする。** 対象を 1 箇所壊したコピーで
   exit 1 になり、無改変で exit 0 になることを実際に見る。落ちない gate は劇場。
@@ -156,7 +156,7 @@ murakumo 側であって、ここではない。**
 
 `tick.cljs` の `assign` は **LPT（重い順に、投入後の完了時刻が最小の slot へ）**で、
 ノードの速度を `cores` / `free-gb` / **live の load1**（`sysctl -n vm.loadavg` を実測）から、
-gate の重さを過去実測の EMA（`~/.gftd/fleet-ci-cost.edn`）から出す。
+gate の重さを過去実測の EMA（`~/.itonami/fleet-ci-cost.edn`）から出す。
 
 以前は `(mod i (count slots))` の round-robin で、**空きも重さも見ていなかった**。
 fleet のノードは CI 専用ではなく推論やマイニングと同居しているので、張り付いている

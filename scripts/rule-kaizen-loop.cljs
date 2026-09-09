@@ -30,8 +30,8 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/rule-kaizen.ledger.edn"))
-(def tick-ledger (str home "/.gftd/rule-kaizen-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/rule-kaizen.ledger.edn"))
+(def tick-ledger (str home "/.itonami/rule-kaizen-tick.ledger.edn"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]

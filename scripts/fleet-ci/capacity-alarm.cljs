@@ -51,7 +51,7 @@
 (def volume (flag "--volume" "/System/Volumes/Data"))
 (def notify? (not= "false" (flag "--notify" "true")))
 (def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp")
-                                        ".gftd" "capacity-alarm-state.edn")))
+                                        ".itonami" "capacity-alarm-state.edn")))
 
 (defn measure
   "`df -k` の 1 行を読む。**取れなかったときは nil を返す** —— 測れなかったことを

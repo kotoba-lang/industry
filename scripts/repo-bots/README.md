@@ -1,7 +1,7 @@
 # repo-bots — repo 1 本につき常駐 bot 1 体
 
 west に登録された repo それぞれに、自分の現在地を測る常駐 bot を 1 体置く。
-名簿は生成物 `manifest/repo-bots.edn`、稼働は `~/.gftd/repo-bots/state.edn`。
+名簿は生成物 `manifest/repo-bots.edn`、稼働は `~/.itonami/repo-bots/state.edn`。
 
 ```bash
 nbb scripts/repo-bots/gen-registry.cljs          # 名簿を起こす（生成物）
@@ -29,7 +29,7 @@ residents）が「テーマごとに Durable Object の *インスタンス* を
 
 - 安定した id（`<org>/<name>`）
 - 自分の charter（class 由来の床）
-- 自分の state 行と履歴（`~/.gftd/repo-bots/observations.ledger.edn`）
+- 自分の state 行と履歴（`~/.itonami/repo-bots/observations.ledger.edn`）
 
 にある。2 本目の pipeline を生やさない。
 
@@ -81,7 +81,7 @@ UNMEASURED 測れなかったもの。件数と理由の内訳
 
 ## 共有 checkout を書かない
 
-書くのは `~/.gftd/repo-bots/` の下だけ。4,000 本の checkout は**読むだけ**で、git の
+書くのは `~/.itonami/repo-bots/` の下だけ。4,000 本の checkout は**読むだけ**で、git の
 書き込みコマンドは 1 つも呼ばない。並行 agent が走っているマシンなので、ここを
 緩めるとこの tick が他人の working tree を壊す側になる。
 

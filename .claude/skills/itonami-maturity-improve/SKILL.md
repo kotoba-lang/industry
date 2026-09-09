@@ -46,7 +46,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.clj
 ```
 
 tick が出すもの: `lane`（substrate / breadth）・対象 repo・**目標にしてよい軸**と
-その伸びしろ（bp）・計測値の鮮度。`~/.gftd/itonami-maturity-improve.ledger.edn`
+その伸びしろ（bp）・計測値の鮮度。`~/.itonami/itonami-maturity-improve.ledger.edn`
 の末尾も読む（前周が何を狙い、`:own-before` がいくつだったか）。
 
 **`:datoms-stale?` が true なら、この反復の仕事は「測り直し」**であって軸上げ
@@ -200,7 +200,7 @@ superproject 側で pin を進めるなら **当該 entry だけ**
 
 ### 7. ledger に 1 行足す
 
-`~/.gftd/itonami-maturity-improve.ledger.edn`（追記のみ、1 行 1 EDN）:
+`~/.itonami/itonami-maturity-improve.ledger.edn`（追記のみ、1 行 1 EDN）:
 
 ```clojure
 {:at "..." :outcome :landed :lane :substrate :target "orgs/kotoba-lang/langgraph"

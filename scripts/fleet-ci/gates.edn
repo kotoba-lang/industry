@@ -48,7 +48,7 @@
  ;; そこで **このマシン専用の identity を新規 enroll した**（README の
  ;; 「machine ごとに別 identity」に従う）。既存 `-tip` の鍵を推測で作り直すと
  ;; enroll 済み公開鍵と一致せず receipt の検証が壊れるので、名前を分ける。
- ;; 秘密鍵は kagi と ~/.gftd/fleet-ci-signer-tip.pem（mode 600、plist が期待
+ ;; 秘密鍵は kagi と ~/.itonami/fleet-ci-signer-tip.pem（mode 600、plist が期待
  ;; する路 = ADR-2607178000 §3 が認めた launchd 経路）の両方に置いた。
  :signer-kagi "fleet-agent-murakumo-ci-tip-25mbair"
  :landing {:repo "com-junkawasaki/root"
@@ -2732,7 +2732,7 @@
   ;; .clj`, through `kotoba.wasm.tools/run-command!`. That is a bare
   ;; `ProcessBuilder.start`, so an absent binary is an IOException and a red
   ;; gate, not a skip -- and `assert-version!` pins the version exactly, which
-  ;; is why the cap is :wasm-tools (the tick puts ~/.gftd/wasm-pin/bin ahead of
+  ;; is why the cap is :wasm-tools (the tick puts ~/.itonami/wasm-pin/bin ahead of
   ;; Homebrew for precisely this) and not :jvm. Giving these :jvm would put
   ;; them on nodes where they cannot pass. kotoba-script shells out to nothing
   ;; and takes :jvm, so it reaches the wider set.

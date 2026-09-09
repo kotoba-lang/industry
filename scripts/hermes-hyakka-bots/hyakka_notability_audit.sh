@@ -5,7 +5,7 @@
 # run nbb with the kotoba stdlib on the classpath (kotoba.lang.http for the
 # request model + parse-url, kotoba.lang.json for body decoding).
 set -u
-WORKTREE="${HYAKKA_BOT_WORKTREE:-$HOME/.gftd/worktrees/hyakka-wikidata-class-bot}"
+WORKTREE="${HYAKKA_BOT_WORKTREE:-$HOME/.itonami/worktrees/hyakka-wikidata-class-bot}"
 NBB="${HYAKKA_NBB:-/opt/homebrew/bin/nbb}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Derived, not hardcoded: this file lives at <root>/scripts/hermes-hyakka-bots/,

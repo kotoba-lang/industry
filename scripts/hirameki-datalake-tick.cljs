@@ -45,7 +45,7 @@
 ;; to test a change is to land it first, which is the wrong order.
 (def root (or (flag "--root") "/Users/junkawasaki/github/com-junkawasaki"))
 (def repo (or (flag "--repo") (str root "/orgs/cloud-itonami/hirameki-patents")))
-(def out-dir (or (flag "--out-dir") (str (.homedir os) "/.gftd/hirameki-lake")))
+(def out-dir (or (flag "--out-dir") (str (.homedir os) "/.itonami/hirameki-lake")))
 (def state-path (path/join out-dir "state.json"))
 (def corpus-dir (path/join repo "corpus"))
 

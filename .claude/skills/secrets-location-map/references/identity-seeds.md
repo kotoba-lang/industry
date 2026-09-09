@@ -81,7 +81,7 @@
     `did:key:z6MkeaQ3TzXk8H7ZyEcrQyTM1iNEkJ2gmq1BdXsauaPGBTC1` を返し、
     `unlock-status` は os-keychain wrap が 1 本ある状態を返す —— **vault は開いている**。
     総当たり列挙はしていない（安全床⑦、`kagi ls` は叩いていない）。
-  - `~/.gftd/` にも seed ファイルは無い（あるのは `hyakka-archive/` だけ）。
+  - `~/.itonami/` にも seed ファイルは無い（あるのは `hyakka-archive/` だけ）。
   - **実害**: `npm run publish`（ledger → kotobase `hyakka` ref の projection）が
     起動できない。2026-08-27 に landed した kaiyaku corpus の 104 claim / 13 source は
     **Git と Worker catalog には在るが、datom 面には入っていない**。
@@ -96,12 +96,12 @@
     復元した seed からこの DID が derive されることを
     `scripts/verify_identity.cljs` で確認してから publish を再開する。
   - **projection がいつから止まっているかも測った**: この端末で publish 管理簿は
-    `~/.gftd/worktrees/app-hyakka-resident/.resident/published.edn` の 1 本だけで、
+    `~/.itonami/worktrees/app-hyakka-resident/.resident/published.edn` の 1 本だけで、
     **最終更新 2026-08-15 12:00 / 収録 100 file**（最後に publish された ledger は
     2026-08-15T02:41）。main の ledger は 2026-08-27 時点で **362 file** なので、
     **datom 面は 12 日分・262 file 遅れている**。
     さらに、下の 2026-08-24 の記録が「退避済み」と書いている
-    `~/.gftd/hyakka-publish-published-v2.edn` は**この端末に存在しない** ——
+    `~/.itonami/hyakka-publish-published-v2.edn` は**この端末に存在しない** ——
     290/291 file の re-publish が実際に完了したかどうかは、ここからは
     **UNVERIFIED**（別端末で行われた可能性は残る）。
   - 消失の原因は未特定。**2 度目である以上、次も起きるとみなす** —— seed を
@@ -122,7 +122,7 @@
   fold.cljs は退役 D1 で 410。可視化の unblock は engine main の silent-partial read
   退行の修正 → production deploy → bounded fold。ADR-2608170300 参照）。
   情報損失はゼロ、失ったのは旧 graph の identity 継続性のみ。
-  publish 済み管理簿は `~/.gftd/hyakka-publish-published-v2.edn` に退避済み。
+  publish 済み管理簿は `~/.itonami/hyakka-publish-published-v2.edn` に退避済み。
 - **旧 DID `did:key:z6MkuEj8M1GKrAqW8ZsenbickiLvpfzJFLpNpxgyggcm1DKv` の graph は
   orphan**（append-only のまま残る。誰も書けない・resident の published.edn 追跡外）。
 - ⚠ **resident（別ホストで稼働中）はこの端末の kagi を読めない** — vault は 7/25 から
@@ -346,16 +346,16 @@
   | role | 置き場所 |
   |---|---|
   | security / legal | この端末の login Keychain `webvh-witness-<domain>-<role>`（account `authn`）+ kagi の同名 item（compartment `personal`） |
-  | operations | fleet node **judah** `~/.gftd/webvh-witness/<domain>-operations.b64`（0600、FileVault） |
-  | auditor | fleet node **simeon** `~/.gftd/webvh-witness/<domain>-auditor.b64` |
-  | recovery | fleet node **levi** `~/.gftd/webvh-witness/<domain>-recovery.b64` |
+  | operations | fleet node **judah** `~/.itonami/webvh-witness/<domain>-operations.b64`（0600、FileVault） |
+  | auditor | fleet node **simeon** `~/.itonami/webvh-witness/<domain>-auditor.b64` |
+  | recovery | fleet node **levi** `~/.itonami/webvh-witness/<domain>-recovery.b64` |
 
   `<domain>` は `auth.kotoba.cloud` / `kotobase.net` / `kotoba.cloud` の 3 つ、
   計 15 seed。ノードの seed は**ノード上で生成し、ノードから出さない**（ssh で
   渡るのは enrollment 時の did:key と version ごとの proof だけ）。ノードの
   login keychain は ssh 越しに書けない（`Write permissions error`、実測）ので
   file 置き。署名はノード上の `authn/scripts/webvh_witness.cljs`（nbb、lib は
-  `~/.gftd/webvh-witness/lib/` に rsync 済み。levi は `npx --yes nbb`）。
+  `~/.itonami/webvh-witness/lib/` に rsync 済み。levi は `npx --yes nbb`）。
   **auditor の seed は witness proof だけでなく whois の第三者証明にも署名する**
   （2026-09-02、ADR-2609021700）。simeon 上の `webvh_attest.cljs` が log を
   公開 URL から取得・検証し、`DidLogAttestationCredential` をこの鍵で発行して

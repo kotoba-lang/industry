@@ -62,7 +62,7 @@ def _work_root() -> str:
         os.environ.get("HYAKKA_COVERAGE_READ_ROOT", "~/github/com-junkawasaki")))
     if os.path.exists(os.path.join(cwd, ".git")) and cwd != read_root:
         return cwd
-    return os.path.expanduser("~/.gftd/worktrees/hyakka-coverage-bot")
+    return os.path.expanduser("~/.itonami/worktrees/hyakka-coverage-bot")
 
 
 WORK_ROOT = _work_root()

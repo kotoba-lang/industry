@@ -19,7 +19,7 @@
 
 (def root (path/resolve (arg "--root" ".")))
 (def config-path (path/join root "config" "knowledge-ingest.edn"))
-(def lake-dir (arg "--lake-dir" (path/join (aget js/process.env "HOME") ".gftd" "hyakka-lake")))
+(def lake-dir (arg "--lake-dir" (path/join (aget js/process.env "HOME") ".itonami" "hyakka-lake")))
 
 (defn refuse! [why]
   (println "REFUSED — no evidence was gathered this run.")
@@ -67,7 +67,7 @@
   (do (println (str "windows-seen-in-local-lake\t" (:windows-seen cw)))
       (println (str "avg-total-results-per-window\t" (:avg-total-results cw)))
       (println (str "avg-ingested-per-window\t" (:avg-ingested cw))))
-  (println "coverage-window-facts\tUNAVAILABLE (no local ~/.gftd/hyakka-lake export — run `npm run datalake` first, or judge from the ledger yourself)"))
+  (println "coverage-window-facts\tUNAVAILABLE (no local ~/.itonami/hyakka-lake export — run `npm run datalake` first, or judge from the ledger yourself)"))
 (println (str "note\tnvd.cljc's own comment: \"the knob to turn after watching the "
               "projection cost is :max-cves, not the ledger format.\" avg-total-results "
               "much bigger than avg-ingested and current-max-cves means real headroom, "

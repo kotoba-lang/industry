@@ -74,7 +74,7 @@
 
 ;; ── the root key ─────────────────────────────────────────────────────────
 
-(defn gftd-dir [] (path/join (os/homedir) ".gftd"))
+(defn gftd-dir [] (path/join (os/homedir) ".itonami"))
 (defn root-seed-file [] (path/join (gftd-dir) "bot-spend-authority.seed"))
 (defn pass-dir [] (path/join (gftd-dir) "x402-bot-pass"))
 (defn pass-file [bot-id] (path/join (pass-dir) (str bot-id ".token")))

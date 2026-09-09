@@ -42,7 +42,7 @@
 (def series (or (flag "--series") ""))
 
 (def ledger-dir (or (.-SHINSHI_VIDEO_HOME js/process.env)
-                    (.join path (.homedir os) ".gftd" "shinshi-catalog-video")))
+                    (.join path (.homedir os) ".itonami" "shinshi-catalog-video")))
 (def work-dir (.join path ledger-dir "work"))
 (def ledger-path (.join path ledger-dir "loop.ledger.edn"))
 (def root (or (.-COM_JUNKAWASAKI_ROOT js/process.env) (.cwd process)))

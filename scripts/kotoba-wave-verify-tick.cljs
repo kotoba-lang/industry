@@ -30,7 +30,7 @@
 
 (def home (or (aget (.-env js/process) "HOME") "/Users/junkawasaki"))
 (def root (str home "/github/com-junkawasaki"))
-(def ledger-file (str home "/.gftd/kotoba-wave-verify.ledger.edn"))
+(def ledger-file (str home "/.itonami/kotoba-wave-verify.ledger.edn"))
 (def amu-bin (str root "/orgs/kotoba-lang/amu/bin/amu"))
 (def kotoba-bin (str root "/orgs/kotoba-lang/amu/bin/kotoba"))
 (def authority-repo "orgs/kotoba-lang/kotoba-lang")

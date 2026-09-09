@@ -36,9 +36,9 @@
 ;; 不在は見えなければならない（省略は「動いている」と同じ顔をする）。
 ;;
 ;; ledger の置き場は歴代 loop で 3 形あるので、name ごとに順に引く:
-;;   1. ~/.gftd/<name>/ledger.edn          （isekai-game-dev / kami-lib-update 形）
-;;   2. ~/.gftd/<name>.ledger.edn          （fleet-refactor-wave / svelte-cljs-wave 形）
-;;   3. repo-bot-drain だけ ~/.gftd/repo-bots/drain.ledger.edn
+;;   1. ~/.itonami/<name>/ledger.edn          （isekai-game-dev / kami-lib-update 形）
+;;   2. ~/.itonami/<name>.ledger.edn          （fleet-refactor-wave / svelte-cljs-wave 形）
+;;   3. repo-bot-drain だけ ~/.itonami/repo-bots/drain.ledger.edn
 ;;
 ;; ledger の最終行が EDN として読めなければ outcome null / why "ledger-unreadable"
 ;; —— **読めなかったものを ok に畳まない**（ADR-2608136000）。
@@ -46,7 +46,7 @@
 ;; ## 発行先
 ;;
 ;; PUT https://itonami.cloud/api/bots-status（KV-backed、対の公開 page は
-;; itonami.cloud/bots/）。bearer token は ~/.gftd/bots-status-token（mode 600、
+;; itonami.cloud/bots/）。bearer token は ~/.itonami/bots-status-token（mode 600、
 ;; 値をログにも argv にも出さない — header はファイル経由で curl に渡す）。
 ;;
 ;; ## 出力と exit

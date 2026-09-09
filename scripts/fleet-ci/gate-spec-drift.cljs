@@ -103,7 +103,7 @@
 (defn -main []
   (let [cfg (read-edn-file (path/join here "gates.edn") nil)
         _ (when-not cfg (println "gates.edn missing") (js/process.exit 1))
-        state (read-edn-file (path/join (os/homedir) ".gftd" "fleet-ci-state.edn") {:repos {}})
+        state (read-edn-file (path/join (os/homedir) ".itonami" "fleet-ci-state.edn") {:repos {}})
         decl-at (last-decl-change)
         script-at (last-script-change)
         rows

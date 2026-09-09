@@ -6,7 +6,7 @@ description: isekai.network のゲームを 1 増分だけ制作して着地さ�
 # isekai のゲームを 1 増分だけ作る
 
 **この skill は会話履歴を一切持たない fresh context から読める**ように書いてある。
-前の反復が何をしたかは会話ではなく **tick の出力・`~/.gftd/isekai-game-dev/ledger.edn`・
+前の反復が何をしたかは会話ではなく **tick の出力・`~/.itonami/isekai-game-dev/ledger.edn`・
 git log** から読む。
 
 対象リポジトリ: `orgs/network-awai/network-isekai`（isekai.network）

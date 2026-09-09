@@ -26,7 +26,7 @@
 
 (def root    (flag "--root" (path/join (or js/process.env.HOME "/tmp") "github" "com-junkawasaki")))
 (def notify? (not= "false" (flag "--notify" "true")))
-(def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp") ".gftd" "hayari-alarm-state.edn")))
+(def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp") ".itonami" "hayari-alarm-state.edn")))
 
 (def gate   (path/join root "scripts" "fleet-ci" "gates" "hayari-tick-alive.cljs"))
 (def target (path/join root "orgs" "cloud-itonami" "hayari"))

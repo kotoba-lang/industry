@@ -12,7 +12,7 @@
 ;; mistake afterwards; this one is so the mistake is not made.
 ;;
 ;; THE SECRET NEVER TOUCHES THE REPOSITORY. It is written to
-;; ~/.gftd/actor-keys/<handle>.ed25519 with mode 0600 and printed nowhere, and
+;; ~/.itonami/actor-keys/<handle>.ed25519 with mode 0600 and printed nowhere, and
 ;; the command to move it into kagi is printed instead. A private key committed
 ;; once is a private key forever, whatever the next commit says.
 ;;
@@ -126,7 +126,7 @@
                     multibase (subs did-key (count "did:key:"))
                     vm-id (str did-id "#node-key-0")
                     updated (document doc did-id vm-id multibase did-key)
-                    key-dir (path/join (os/homedir) ".gftd/actor-keys")
+                    key-dir (path/join (os/homedir) ".itonami/actor-keys")
                     key-path (path/join key-dir (str handle ".ed25519"))]
                 (println (str "actor:      " handle))
                 (println (str "did:        " did-id))

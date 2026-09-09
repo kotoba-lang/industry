@@ -3,9 +3,9 @@
 ;; `cursor-agent -p` CLI, so agents that speak chat/completions (hermes' `custom`
 ;; provider, aider, cline, …) run against the Cursor SUBSCRIPTION.
 ;;
-;;   nbb ~/.gftd/cursor-bridge.cljs            # listens on 127.0.0.1:9181
+;;   nbb ~/.itonami/cursor-bridge.cljs            # listens on 127.0.0.1:9181
 ;;
-;; Sibling of ~/.gftd/claude-bridge.cljs (port 9180). Same request/response
+;; Sibling of ~/.itonami/claude-bridge.cljs (port 9180). Same request/response
 ;; shaping, different backend, different subscription. Two bridges rather than
 ;; one because 23 hermes profiles were sharing a single `claude` process capped
 ;; at 2 concurrent — and because the Cursor plan was measured 2026-08-19 as
@@ -55,7 +55,7 @@
 (def max-inflight  (env-int "CURSOR_BRIDGE_CONCURRENCY" 2))
 (def child-timeout (* 1000 (env-int "CURSOR_BRIDGE_TIMEOUT" 600)))
 (def cursor-bin    (or (aget env "CURSOR_BRIDGE_BIN") "cursor-agent"))
-(def workdir       (path/join (os/homedir) ".gftd" "cursor-bridge-cwd"))
+(def workdir       (path/join (os/homedir) ".itonami" "cursor-bridge-cwd"))
 
 ;; ids `cursor-agent models` reported for the account this bridge was started
 ;; with. Grok 4.6 leads because it is what this bridge was asked to serve, and
@@ -107,7 +107,7 @@
 ;; through, and no way to put an image into the request at all. The prompt is
 ;; text.
 ;;
-;; So unlike ~/.gftd/claude-bridge.cljs, which gained both on 2026-08-19, this
+;; So unlike ~/.itonami/claude-bridge.cljs, which gained both on 2026-08-19, this
 ;; one genuinely cannot. What it must NOT do is drop them silently: a caller
 ;; that attached a screenshot and got a confident answer has been told the
 ;; model looked at something it never received. Count them, log them, and tell

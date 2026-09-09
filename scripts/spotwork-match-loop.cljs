@@ -36,9 +36,9 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-dir (str home "/.gftd/spotwork-match"))
+(def ledger-dir (str home "/.itonami/spotwork-match"))
 (def ledger-file (str ledger-dir "/ledger.edn"))
-(def lock-file (str home "/.gftd/spotwork-match.lock"))
+(def lock-file (str home "/.itonami/spotwork-match.lock"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]

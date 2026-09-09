@@ -77,7 +77,7 @@
 (def here (if (str/ends-with? script-path ".cljs") (path/dirname script-path) "."))
 (def policy-path (arg "--policy" (path/join here "free-model-policy.edn")))
 (def config-path (arg "--config" (path/join (os/homedir) ".hermes" "config.yaml")))
-(def receipt-path (arg "--receipt" (path/join (os/homedir) ".gftd" "hermes-free-model" "receipt.edn")))
+(def receipt-path (arg "--receipt" (path/join (os/homedir) ".itonami" "hermes-free-model" "receipt.edn")))
 (def hermes-bin (arg "--hermes" (path/join (os/homedir) ".hermes" "hermes-agent" "venv" "bin" "hermes")))
 (def write? (flag? "--write"))
 (def dry-list? (flag? "--list"))
@@ -617,7 +617,7 @@
        "#\n"
        "# The model below was chosen by measurement, not by name — see\n"
        "# free-model-policy.edn and the receipt at\n"
-       "# ~/.gftd/hermes-free-model/receipt.edn for what it beat and how.\n"
+       "# ~/.itonami/hermes-free-model/receipt.edn for what it beat and how.\n"
        "\n"
        "# The key stays in the login Keychain. This helper hands it to Hermes\n"
        "# once per process as a KEY=VALUE line, so nothing writes it to disk\n"

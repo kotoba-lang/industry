@@ -185,7 +185,7 @@ ipfs.tech → tech-ipfs (tech-ipfs-specs-*)  boj.or.jp → jp-or-boj
 広げたければ同じように名指しの指示と、退役の根拠と、面ごとの改名表が要る。表・測定値・
 実行順・オーナーにしか決められない 6 件は retirement plan が持つ。⚠ **`gftdcojp` org の
 login 変更はこの workspace の token ではできない**（`admin:org` scope 無し。org admin では
-あるが token が違う。かつ org login は Settings UI の操作）。`~/.gftd/` も `mv` ではなく
+あるが token が違う。かつ org login は Settings UI の操作）。`~/.itonami/` も `mv` ではなく
 段階移行 —— fleet-ci 署名鍵と aiueos boot seed が入っていて、稼働中 45 job が読んでいる。
 
 ## 調達経路は direct-first（repo-wide mandatory、2026-08-25）
@@ -1586,7 +1586,7 @@ diff → verify/query → commit → review/merge → handoff/restart` という
 - 2026-07-17 現在の main: qwen3.6-35b-a3b（**gemma4-26b は deprecated** — オーナー指示。
   `gemma-gad.gftd.ai` / `gemma-fleet.gftd.ai` は legacy hostname alias として main モデルを配信）。
   実装例: `70-tools/bmc` の `GFTD_LLM_*`（ADR-2607172700/2800）、
-  `~/.gftd/run-itonami-qwen36-tick.cljs`（ADR-2607172900、alias 解決 + endpoint-only fallback）。
+  `~/.itonami/run-itonami-qwen36-tick.cljs`（ADR-2607172900、alias 解決 + endpoint-only fallback）。
 
 ## System dynamics loop 分析 — 全 entity 対象・kotoba-lang/dynamics（repo-wide mandatory rule、2026-07-20、ADR-2607203000）
 

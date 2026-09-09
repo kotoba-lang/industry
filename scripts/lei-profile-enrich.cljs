@@ -727,7 +727,7 @@
                       "| reg=" (or (:registration (:org r)) "-")
                       "| persons=" (:persons r)
                       ;; Names are NEVER printed -- only the count. This output
-                      ;; goes to ~/.gftd/lei-profile-tick.stdout.log, and a log
+                      ;; goes to ~/.itonami/lei-profile-tick.stdout.log, and a log
                       ;; file is exactly the plaintext side channel the
                       ;; encrypted dataset exists to avoid.
                       (cond (zero? (:persons r)) ""

@@ -43,8 +43,8 @@
 
 (def home (.homedir os))
 (def root (str home "/github/com-junkawasaki"))
-(def log-file (str home "/.gftd/tsukuru-maturity-tick.log"))
-(def ledger-file (str home "/.gftd/tsukuru-maturity-tick.ledger.edn"))
+(def log-file (str home "/.itonami/tsukuru-maturity-tick.log"))
+(def ledger-file (str home "/.itonami/tsukuru-maturity-tick.ledger.edn"))
 (def dataset (str root "/orgs/cloud-itonami/tsukuru-manufacturing-artifacts"))
 (def actor (str root "/orgs/cloud-itonami/tsukuru-actor"))
 (def skip-slow? (boolean (some #{"--skip-slow"} *command-line-args*)))

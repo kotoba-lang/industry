@@ -46,7 +46,7 @@ import sys
 READ_ROOT = os.environ.get("KOTOBA_MIGRATION_READ_ROOT",
                            os.path.expanduser("~/github/com-junkawasaki"))
 RUN_PARENT = os.environ.get("KOTOBA_MIGRATION_RUN_PARENT",
-                            os.path.expanduser("~/.gftd/worktrees/kotoba-migration-bot"))
+                            os.path.expanduser("~/.itonami/worktrees/kotoba-migration-bot"))
 NBB = os.environ.get("KOTOBA_MIGRATION_NBB", "/opt/homebrew/bin/nbb")
 GATE = os.environ.get(
     "KOTOBA_MIGRATION_GATE",

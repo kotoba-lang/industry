@@ -59,7 +59,7 @@ def _work_root() -> str:
     if os.path.exists(os.path.join(cwd, ".git")) and cwd != os.path.abspath(
             os.path.expanduser("~/github/com-junkawasaki")):
         return cwd
-    return os.path.expanduser("~/.gftd/worktrees/hyakka-growth-bot")
+    return os.path.expanduser("~/.itonami/worktrees/hyakka-growth-bot")
 
 WORKTREE = _work_root()
 NBB = os.environ.get("HYAKKA_NBB", "/opt/homebrew/bin/nbb")

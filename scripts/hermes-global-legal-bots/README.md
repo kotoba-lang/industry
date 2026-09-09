@@ -14,7 +14,7 @@ Five scheduled Hermes bots expand Hyakka's worldwide public legal knowledge in b
 
 ## Evidence and isolation
 
-Each bot has its own detached Hyakka worktree under `~/.gftd/worktrees/`. The evidence wrapper refuses a dirty worktree, fetches `origin`, synchronizes to `origin/main`, measures only tracked source/config/test text (excluding generated catalog data), and injects the scope hash and missing/present tokens. It never chooses a source or schema design.
+Each bot has its own detached Hyakka worktree under `~/.itonami/worktrees/`. The evidence wrapper refuses a dirty worktree, fetches `origin`, synchronizes to `origin/main`, measures only tracked source/config/test text (excluding generated catalog data), and injects the scope hash and missing/present tokens. It never chooses a source or schema design.
 
 The shared `~/github/com-junkawasaki/orgs/**` checkout is read-only. Bots create topic branches, run focused tests, and may open one PR. They may not push main, force-push, merge, deploy, publish, hand-edit knowledge ledgers, contact people, or give legal advice.
 

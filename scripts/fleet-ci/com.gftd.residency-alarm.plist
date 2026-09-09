@@ -21,7 +21,7 @@
        launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.residency-alarm.plist
        launchctl kickstart -p gui/$(id -u)/com.gftd.residency-alarm   # 1 回だけ手動起動
 
-     ログ: ~/.gftd/residency-alarm.log / state: ~/.gftd/residency-alarm-state.edn -->
+     ログ: ~/.itonami/residency-alarm.log / state: ~/.itonami/residency-alarm-state.edn -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.gftd.residency-alarm</string>
@@ -33,8 +33,8 @@
   </array>
   <key>StartInterval</key><integer>21600</integer>
   <key>RunAtLoad</key><true/>
-  <key>StandardOutPath</key><string>/Users/junkawasaki/.gftd/residency-alarm.log</string>
-  <key>StandardErrorPath</key><string>/Users/junkawasaki/.gftd/residency-alarm.log</string>
+  <key>StandardOutPath</key><string>/Users/junkawasaki/.itonami/residency-alarm.log</string>
+  <key>StandardErrorPath</key><string>/Users/junkawasaki/.itonami/residency-alarm.log</string>
   <key>ProcessType</key><string>Background</string>
 </dict>
 </plist>

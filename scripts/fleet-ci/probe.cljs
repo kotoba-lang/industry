@@ -93,7 +93,7 @@
     ;; expected to be empty. That is the point: the gap becomes a field in
     ;; nodes.edn instead of folklore in a comment, and the day somebody
     ;; `brew install`s them it appears without anyone editing this file.
-    ;; `~/.gftd/wasm-pin/bin` comes FIRST, and that ordering is the whole
+    ;; `~/.itonami/wasm-pin/bin` comes FIRST, and that ordering is the whole
     ;; mechanism rather than a convenience.
     ;;
     ;; amu pins its Wasm toolchain (`component-model-v1.edn`,
@@ -111,9 +111,9 @@
     ;; benjamin in 74s, 1,099 tests, 8,302 assertions, **0 failures 0 errors**,
     ;; exit 0. Gates that want this cap must put the prefix on PATH the same
     ;; way; the version recorded below is the one this prefix answers with.
-    "echo wasmpin=$HOME/.gftd/wasm-pin/bin"
-    "echo wasmtools=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH command -v wasm-tools)"
-    "echo wasmtoolsv=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH wasm-tools --version 2>/dev/null | awk '{print $2}')"
+    "echo wasmpin=$HOME/.itonami/wasm-pin/bin"
+    "echo wasmtools=$(PATH=$HOME/.itonami/wasm-pin/bin:$PATH command -v wasm-tools)"
+    "echo wasmtoolsv=$(PATH=$HOME/.itonami/wasm-pin/bin:$PATH wasm-tools --version 2>/dev/null | awk '{print $2}')"
     ;; **npm egress, measured rather than assumed.** Root CLAUDE.md records
     ;; this workspace writing the same value down twice as a constant and
     ;; being wrong both times: "到達可能な 10 ノード全部で 200" was measured
@@ -175,8 +175,8 @@
     ;; defect this cap exists to prevent, reached for the third time from a new
     ;; direction.
     "echo rosetta=$(arch -x86_64 /usr/bin/true 2>/dev/null && echo yes || echo no)"
-    "echo wac=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH command -v wac)"
-    "echo wacv=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH wac --version 2>/dev/null | awk '{print $2}')"
+    "echo wac=$(PATH=$HOME/.itonami/wasm-pin/bin:$PATH command -v wac)"
+    "echo wacv=$(PATH=$HOME/.itonami/wasm-pin/bin:$PATH wac --version 2>/dev/null | awk '{print $2}')"
     "echo curl=$(command -v curl)"
     "echo tar=$(command -v tar)"
     "echo git=$(command -v git)"]))

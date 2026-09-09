@@ -22,7 +22,7 @@ whatever number a proposal claims — so proposing one only wastes the run.
 
 ## Procedure — do all of it, in order
 
-1. `cd ~/.gftd/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main`
+1. `cd ~/.itonami/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main`
 2. If the ontology signal is `none 0`, stop here and report that the corpus has
    not pushed against its own edges since the last run. That is the whole
    report. It is not a failure.

@@ -42,7 +42,7 @@
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
 (def app (str root "/orgs/network-awai/cloud-itonami"))
-(def ledger-file (str home "/.gftd/itonami-os-maturity-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/itonami-os-maturity-tick.ledger.edn"))
 (def offline? (boolean (some #{"--offline"} *command-line-args*)))
 
 (defn log! [& xs] (println (str/join " " (map str xs))))

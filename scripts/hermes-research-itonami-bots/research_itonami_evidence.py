@@ -11,13 +11,13 @@ SCOPE_FILE = VERSIONED if VERSIONED.is_file() else HERE / "research-scope.edn"
 HYAKKA = READ_ROOT / "orgs/network-awai/app-hyakka"
 ROOT_REMOTE = READ_ROOT
 CONFIG = {
- "schema": (HYAKKA, Path("~/.gftd/worktrees/research-world-schema-bot").expanduser()),
- "research": (HYAKKA, Path("~/.gftd/worktrees/research-source-bot").expanduser()),
- "events": (HYAKKA, Path("~/.gftd/worktrees/research-events-bot").expanduser()),
- "funding": (HYAKKA, Path("~/.gftd/worktrees/research-funding-bot").expanduser()),
- "impact": (HYAKKA, Path("~/.gftd/worktrees/research-impact-bot").expanduser()),
- "itonami-collector": (ROOT_REMOTE, Path("~/.gftd/worktrees/itonami-research-collector-bot").expanduser()),
- "itonami-impact": (ROOT_REMOTE, Path("~/.gftd/worktrees/itonami-research-impact-bot").expanduser()),
+ "schema": (HYAKKA, Path("~/.itonami/worktrees/research-world-schema-bot").expanduser()),
+ "research": (HYAKKA, Path("~/.itonami/worktrees/research-source-bot").expanduser()),
+ "events": (HYAKKA, Path("~/.itonami/worktrees/research-events-bot").expanduser()),
+ "funding": (HYAKKA, Path("~/.itonami/worktrees/research-funding-bot").expanduser()),
+ "impact": (HYAKKA, Path("~/.itonami/worktrees/research-impact-bot").expanduser()),
+ "itonami-collector": (ROOT_REMOTE, Path("~/.itonami/worktrees/itonami-research-collector-bot").expanduser()),
+ "itonami-impact": (ROOT_REMOTE, Path("~/.itonami/worktrees/itonami-research-impact-bot").expanduser()),
 }
 TOKENS = {
  "schema": ["research-work", "research-project", "scholarly-society", "event-edition", "funding-award", "impact-observation"],

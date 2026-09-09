@@ -32,7 +32,7 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/repo-bots/drain.ledger.edn"))
+(def ledger-file (str home "/.itonami/repo-bots/drain.ledger.edn"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]
@@ -46,7 +46,7 @@
     (catch :default e {:code nil :out "" :err (str e)})))
 
 (defn- append-ledger! [m]
-  (try (.mkdirSync fs (str home "/.gftd/repo-bots") #js {:recursive true})
+  (try (.mkdirSync fs (str home "/.itonami/repo-bots") #js {:recursive true})
        (.appendFileSync fs ledger-file (str (pr-str m) "\n"))
        (catch :default e (log! "ledger 追記に失敗:" (str e)))))
 

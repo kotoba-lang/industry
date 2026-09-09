@@ -42,7 +42,7 @@
 (def limit (js/parseInt (opt "--limit" "100000") 10))
 (def only-path (opt "--only" nil))
 (def apply? (flag? "--apply"))
-(def receipt (.join path (.homedir os) ".gftd" "worktree-node-modules-dedupe.log"))
+(def receipt (.join path (.homedir os) ".itonami" "worktree-node-modules-dedupe.log"))
 
 (defn sh
   ([cmd] (sh cmd nil))

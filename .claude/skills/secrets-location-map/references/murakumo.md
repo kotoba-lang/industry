@@ -97,9 +97,9 @@
 - **`AIUEOS_K16_MURAKUMO_NODE_KEY`（kagi vault、compartment `network-awai`、
   `KAGI_HOME=$HOME/.kagi`）** — GMKtec K16 の murakumo ノード identity、
   Ed25519 秘密鍵（PKCS8 PEM）。公開側の did:key は `did:key:z6Mkpqczt…`
-  （`~/.gftd/k16-murakumo-node.did`。公開値なので秘密ではない）。
+  （`~/.itonami/k16-murakumo-node.did`。公開値なので秘密ではない）。
   常駐プロセス（`k16-pxe-server.py`）は kagi を引けないので
-  **`~/.gftd/k16-murakumo-node.pem`（mode 600）** から読む —— このファイル冒頭の
+  **`~/.itonami/k16-murakumo-node.pem`（mode 600）** から読む —— このファイル冒頭の
   「launchd 下では kagi が使えない」と同じ理由。**kagi と `~/.gftd` の 2 箇所**に
   あり、vault から読み戻して同じ did:key が導出できることを確認済み。
 - **これは下の service token の代用であって、劣化版ではない。** 実測 2026-09-08、
@@ -253,7 +253,7 @@
   に設定済み（primary の `ANTHROPIC_PROXY_TOKEN`＝1Password `gftd.murakumo/
   ANTHROPIC_PROXY_TOKEN` はローテーションせず据え置き。primary は op interactive
   auth timeout で非対話取得不可、こちらは kagi から取得可能なのが要点）。
-  playtest co-scientist の standing runner（`~/.gftd/run-playtest-coscientist.cljs`
+  playtest co-scientist の standing runner（`~/.itonami/run-playtest-coscientist.cljs`
   ＋ LaunchAgent `com.gftd.playtest-coscientist`）が `MURAKUMO_CLAUDE_TOKEN` として
   これを読む。新しい `/v1/messages` consumer も同じ secondary スロットで rotation
   なしにオンボードできる。
@@ -273,7 +273,7 @@
     への bearer）。未設定時は単にヘッダを付けない実装なので今回の追加で挙動は
     変わらないが、**将来この値を rotate するときは ingest と ledger POST の両方に
     効く**ことを忘れないこと。
-  - **launchd 経路は kagi ではなくファイル**: `~/.gftd/murakumo-service-token`
+  - **launchd 経路は kagi ではなくファイル**: `~/.itonami/murakumo-service-token`
     （mode 600）。**launchd 下では kagi が Keychain unlock prompt を出せずに
     timeout する**ため（fleet-ci が先に踏んだ壁、ADR-2607178000 §3 と同じ答え）。
     LaunchAgent plist は world-readable なので plist 本体には絶対に書かない。

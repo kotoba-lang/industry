@@ -13,7 +13,7 @@
     launchctl bootout gui/$(id -u)/com.gftd.spotwork-match
 
   Interval: 21600s (6h)。1 反復 = tick（決定論・数秒）+ 候補がある周だけ
-  claude -p /spotwork-match（最長 1h）。lock file（~/.gftd/spotwork-match.lock）が
+  claude -p /spotwork-match（最長 1h）。lock file（~/.itonami/spotwork-match.lock）が
   重なりを防ぐ。候補が無い周・測れなかった周（:not-measured は :no-candidates とは
   別の事実）はモデルを起こさない（loop 側で判定）。**床（オペレータ維持データの
   未供給など）でもモデルを起こさない** —— bot に直せないものに予算を使わない。
@@ -55,9 +55,9 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardErrorPath</key>
-	<string>/Users/junkawasaki/.gftd/spotwork-match.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/spotwork-match.stdout.log</string>
 	<key>StandardOutPath</key>
-	<string>/Users/junkawasaki/.gftd/spotwork-match.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/spotwork-match.stdout.log</string>
 	<key>StartInterval</key>
 	<integer>21600</integer>
 	<key>WorkingDirectory</key>

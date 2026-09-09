@@ -21,7 +21,7 @@ import subprocess
 import sys
 
 WORKTREE = os.environ.get("HYAKKA_TETTAI_BOT_WORKTREE",
-                          os.path.expanduser("~/.gftd/worktrees/hyakka-tettai-bot"))
+                          os.path.expanduser("~/.itonami/worktrees/hyakka-tettai-bot"))
 NBB = os.environ.get("HYAKKA_NBB", "/opt/homebrew/bin/nbb")
 DAYS = os.environ.get("HYAKKA_EVIDENCE_DAYS", "14")
 

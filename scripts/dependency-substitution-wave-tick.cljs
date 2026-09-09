@@ -20,7 +20,7 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/dependency-substitution-wave-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/dependency-substitution-wave-tick.ledger.edn"))
 (def agent-branch "agent/dependency-substitution")
 
 (def args (vec *command-line-args*))

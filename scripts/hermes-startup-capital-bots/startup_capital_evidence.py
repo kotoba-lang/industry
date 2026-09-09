@@ -10,13 +10,13 @@ VERSIONED = READ_ROOT / "scripts/hermes-startup-capital-bots/capital-scope.edn"
 SCOPE_FILE = VERSIONED if VERSIONED.is_file() else HERE / "capital-scope.edn"
 HYAKKA = READ_ROOT / "orgs/network-awai/app-hyakka"
 CONFIG = {
- "schema": (HYAKKA, Path("~/.gftd/worktrees/startup-capital-ontology-bot").expanduser()),
- "company": (HYAKKA, Path("~/.gftd/worktrees/startup-company-source-bot").expanduser()),
- "fund": (HYAKKA, Path("~/.gftd/worktrees/venture-fund-source-bot").expanduser()),
- "lp": (HYAKKA, Path("~/.gftd/worktrees/venture-lp-source-bot").expanduser()),
- "manager": (HYAKKA, Path("~/.gftd/worktrees/venture-manager-source-bot").expanduser()),
- "round": (HYAKKA, Path("~/.gftd/worktrees/venture-round-source-bot").expanduser()),
- "analysis": (READ_ROOT, Path("~/.gftd/worktrees/itonami-capital-analysis-bot").expanduser()),
+ "schema": (HYAKKA, Path("~/.itonami/worktrees/startup-capital-ontology-bot").expanduser()),
+ "company": (HYAKKA, Path("~/.itonami/worktrees/startup-company-source-bot").expanduser()),
+ "fund": (HYAKKA, Path("~/.itonami/worktrees/venture-fund-source-bot").expanduser()),
+ "lp": (HYAKKA, Path("~/.itonami/worktrees/venture-lp-source-bot").expanduser()),
+ "manager": (HYAKKA, Path("~/.itonami/worktrees/venture-manager-source-bot").expanduser()),
+ "round": (HYAKKA, Path("~/.itonami/worktrees/venture-round-source-bot").expanduser()),
+ "analysis": (READ_ROOT, Path("~/.itonami/worktrees/itonami-capital-analysis-bot").expanduser()),
 }
 TOKENS = {
  "schema": ["startup", "venture-firm", "investment-fund", "limited-partner", "financing-round"],

@@ -82,7 +82,7 @@
 
 (def root (path/resolve (arg "--root" ".")))
 (def top-n (js/parseInt (arg "--top" "1") 10))
-(def seen-path (arg "--seen" (path/join (os/homedir) ".gftd" "hermes-clojure-stdlib-migration-bot" "seen.edn")))
+(def seen-path (arg "--seen" (path/join (os/homedir) ".itonami" "hermes-clojure-stdlib-migration-bot" "seen.edn")))
 (def seen-ttl-days (js/parseInt (arg "--seen-ttl-days" "14") 10))
 (def pool-size (js/parseInt (arg "--pool" "60") 10))
 

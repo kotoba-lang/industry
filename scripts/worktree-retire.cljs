@@ -15,7 +15,7 @@
 ;;   old      newest of (dir mtime, .git/worktrees/<n>/HEAD mtime) >= --min-age-days
 ;;   idle     no process has its cwd inside it (lsof), no command line names it (ps)
 ;;   unlocked no `locked` file for it
-;;   not bot  not under ~/.gftd/worktrees (resident bots own theirs; --include-bots to widen)
+;;   not bot  not under ~/.itonami/worktrees (resident bots own theirs; --include-bots to widen)
 ;;
 ;; Everything else is reported with the reason it was kept. Dirty worktrees
 ;; are never touched — that is git-cleanup-conflict's job, and it archives
@@ -49,8 +49,8 @@
 (def min-age-days (js/parseInt (opt "--min-age-days" "7") 10))
 (def apply? (flag? "--apply"))
 (def include-bots? (flag? "--include-bots"))
-(def bot-dir (.join path (.homedir os) ".gftd" "worktrees"))
-(def receipt (.join path (.homedir os) ".gftd" "worktree-retire.log"))
+(def bot-dir (.join path (.homedir os) ".itonami" "worktrees"))
+(def receipt (.join path (.homedir os) ".itonami" "worktree-retire.log"))
 
 (defn sh
   "Run cmd; return {:out :exit}. Never throws; a timeout is exit 124 like coreutils."

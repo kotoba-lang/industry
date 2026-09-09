@@ -356,7 +356,7 @@
   or :built. The cache probe is stubbed miss so the check under test is reached."
   [tree opts]
   ;; `log` is stubbed, not merely tolerated. `filtered-tarball!` logs a
-  ;; `pathspec-filter` line, and `tick/log` appends to ~/.gftd/fleet-ci-tick.log
+  ;; `pathspec-filter` line, and `tick/log` appends to ~/.itonami/fleet-ci-tick.log
   ;; -- the file the operator reads to see what the fleet did. Running these
   ;; tests wrote four lines naming a repo that was never filtered at a sha that
   ;; does not exist (`999999999999`), interleaved with real ones. A test that

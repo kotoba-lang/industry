@@ -41,7 +41,7 @@
 ;; scripts it calls have landed in the shared checkout.
 (def root (or (flag "--root") "/Users/junkawasaki/github/com-junkawasaki"))
 (def repo (or (flag "--repo") (str root "/orgs/cloud-itonami/sukashi")))
-(def out-dir (or (flag "--out-dir") (str (.homedir os) "/.gftd/sukashi-lake")))
+(def out-dir (or (flag "--out-dir") (str (.homedir os) "/.itonami/sukashi-lake")))
 (def state-path (path/join out-dir "state.json"))
 (def log-path (path/join repo "data" "sukashi.datoms.kotoba.edn"))
 

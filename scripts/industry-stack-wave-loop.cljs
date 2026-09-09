@@ -36,9 +36,9 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/industry-stack-wave.ledger.edn"))
-(def tick-ledger (str home "/.gftd/industry-stack-wave-tick.ledger.edn"))
-(def lock-file (str home "/.gftd/industry-stack-wave.lock"))
+(def ledger-file (str home "/.itonami/industry-stack-wave.ledger.edn"))
+(def tick-ledger (str home "/.itonami/industry-stack-wave-tick.ledger.edn"))
+(def lock-file (str home "/.itonami/industry-stack-wave.lock"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]

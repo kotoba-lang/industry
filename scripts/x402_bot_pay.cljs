@@ -82,7 +82,7 @@
   answer `spent`/`policy` questions about what WOULD be granted."
   "manifest/bot-allowances.edn")
 
-(defn gftd-dir [] (path/join (os/homedir) ".gftd"))
+(defn gftd-dir [] (path/join (os/homedir) ".itonami"))
 (defn seed-file [] (path/join (gftd-dir) "itonami-bot-payer.seed"))
 (defn spend-ledger-file [] (path/join (gftd-dir) "x402-bot-spend.ledger.edn"))
 

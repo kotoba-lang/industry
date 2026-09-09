@@ -34,9 +34,9 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/svelte-cljs-wave.ledger.edn"))
-(def tick-ledger (str home "/.gftd/svelte-cljs-wave-tick.ledger.edn"))
-(def lock-file (str home "/.gftd/svelte-cljs-wave.lock"))
+(def ledger-file (str home "/.itonami/svelte-cljs-wave.ledger.edn"))
+(def tick-ledger (str home "/.itonami/svelte-cljs-wave-tick.ledger.edn"))
+(def lock-file (str home "/.itonami/svelte-cljs-wave.lock"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 ;; 並列度は build lock に合わせる。実測 2026-08-26: resource-guard の build lock は

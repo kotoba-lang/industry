@@ -40,7 +40,7 @@
     <string>/bin/sh</string>
     <string>-c</string>
     <!-- token はファイルから読んで env に入れる。argv には載せない（ps 露出）。 -->
-    <string>export MURAKUMO_ACTIONS_RUNNER_TOKEN="$(cat $HOME/.gftd/murakumo-actions-runner-token)"; export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; exec node /Users/junkawasaki/github/com-junkawasaki/orgs/network-awai/cloud-murakumo/scripts/actions-runner.mjs</string>
+    <string>export MURAKUMO_ACTIONS_RUNNER_TOKEN="$(cat $HOME/.itonami/murakumo-actions-runner-token)"; export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; exec node /Users/junkawasaki/github/com-junkawasaki/orgs/network-awai/cloud-murakumo/scripts/actions-runner.mjs</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/Users/junkawasaki/github/com-junkawasaki/orgs/network-awai/cloud-murakumo</string>
@@ -51,7 +51,7 @@
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/Users/junkawasaki/.gftd/murakumo-actions-runner.log</string>
-  <key>StandardErrorPath</key><string>/Users/junkawasaki/.gftd/murakumo-actions-runner.log</string>
+  <key>StandardOutPath</key><string>/Users/junkawasaki/.itonami/murakumo-actions-runner.log</string>
+  <key>StandardErrorPath</key><string>/Users/junkawasaki/.itonami/murakumo-actions-runner.log</string>
 </dict>
 </plist>

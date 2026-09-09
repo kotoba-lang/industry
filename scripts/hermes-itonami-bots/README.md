@@ -66,7 +66,7 @@ weakening the suite drops it below the floor.
 | | |
 |---|---|
 | `~/github/com-junkawasaki` | **read only.** The only checkout where `orgs/` is populated, so the ISIC and COFOG mirrors live here. Other sessions work in it, and CLAUDE.md forbids writing to it. |
-| `~/.gftd/worktrees/itonami-growth-bot` | the bot may branch and commit here. Re-synced to `origin/main`, detached, every run. |
+| `~/.itonami/worktrees/itonami-growth-bot` | the bot may branch and commit here. Re-synced to `origin/main`, detached, every run. |
 
 Child-repo work happens in a **clone**, not in `orgs/<org>/<repo>` — that path is
 a shared working tree, and another session switching branches in it silently
@@ -117,10 +117,10 @@ cp scripts/hermes-itonami-bots/ingest-scout.prompt.md    ~/.hermes/scripts/itona
 cp scripts/hermes-itonami-bots/coverage-scout.prompt.md  ~/.hermes/scripts/itonami-coverage-scout.prompt.md
 
 git -C ~/github/com-junkawasaki worktree add --detach \
-  ~/.gftd/worktrees/itonami-growth-bot origin/main
+  ~/.itonami/worktrees/itonami-growth-bot origin/main
 
 H=~/.hermes/hermes-agent/venv/bin/hermes
-W=~/.gftd/worktrees/itonami-growth-bot
+W=~/.itonami/worktrees/itonami-growth-bot
 $H cron create "40 11 * * *" "$(cat ~/.hermes/scripts/itonami-ingest-scout.prompt.md)" \
    --name itonami-ingest-scout   --script itonami_evidence.py --workdir "$W" \
    --model murakumo-main --provider custom --deliver local

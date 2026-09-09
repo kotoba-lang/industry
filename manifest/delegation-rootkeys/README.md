@@ -42,7 +42,7 @@ current, because tokens minted under the first are still live.
 
 Private keys are in `kagi` (compartment `personal`):
 `biscuit-root-kotobase-delegation-genesis`, `-next-1` (now the second
-current key) and the pre-rotation `-next-2`, with 0600 copies under `~/.gftd/`
+current key) and the pre-rotation `-next-2`, with 0600 copies under `~/.itonami/`
 for non-interactive use. **No secret is in this directory.**
 
 ## Rotating

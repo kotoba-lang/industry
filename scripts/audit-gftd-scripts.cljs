@@ -1,12 +1,12 @@
 #!/usr/bin/env nbb
-;; ~/.gftd/ のスケジュール実行スクリプトが、この repo の accepted な規約に
+;; ~/.itonami/ のスケジュール実行スクリプトが、この repo の accepted な規約に
 ;; 違反していないかを報告する（読み取り専用。修正はしない）。
 ;;
 ;; なぜ必要か — ADR-2608019100
 ;;
 ;;   これらのスクリプトは repo の外にあり、workspace の repo を書き換える。
 ;;   hook も lint も grep も repo の外は見ないので、規約は物理的に届いていない。
-;;   実測: `~/.gftd/` で git を fetch するスクリプトは2件あり、**2件とも**
+;;   実測: `~/.itonami/` で git を fetch するスクリプトは2件あり、**2件とも**
 ;;   ADR-2607211600（shallow 禁止）に違反していた。母数2で違反2 である。
 ;;   片方は superproject を6時間ごとに shallow へ戻し、もう片方は west 管理下の
 ;;   子リポを到達可能 commit 1 件まで潰していた。どちらも例外を出さず、
@@ -14,7 +14,7 @@
 ;;
 ;; 安全のための制限（意図的で、緩めない）
 ;;
-;;   1. 読むのは `.cljs` と `.sh` だけ。`~/.gftd/` には `.pem`（秘密鍵）や
+;;   1. 読むのは `.cljs` と `.sh` だけ。`~/.itonami/` には `.pem`（秘密鍵）や
 ;;      `.json` / `.edn` の資格情報が同居しているので、拡張子の allowlist で
 ;;      弾く。「全部読んで grep する」を絶対にしない。
 ;;   2. **一致した行の中身を出力しない。** 報告するのは path・行番号・規則 id
@@ -32,7 +32,7 @@
             ["path" :as path]
             [clojure.string :as str]))
 
-(def gftd-dir (path/join (os/homedir) ".gftd"))
+(def gftd-dir (path/join (os/homedir) ".itonami"))
 (def launch-agents (path/join (os/homedir) "Library" "LaunchAgents"))
 
 (def readable-extensions
@@ -47,7 +47,7 @@
     :adr "ADR-2607211600 / ADR-2608019100"
     :why "shallow は fetch のたびに graft を積み、ancestry を壊す。`unrelated histories` や pin 退行として現れる"
     ;; git と同じ行にあることを要求する。`innen record tick --depth N` のような
-    ;; 非 git の --depth を拾わないため（実際に ~/.gftd/ に存在する）。
+    ;; 非 git の --depth を拾わないため（実際に ~/.itonami/ に存在する）。
     :match? (fn [line]
               (and (str/includes? line "git")
                    (or (str/includes? line "--depth")
@@ -164,7 +164,7 @@
           plists)))
 
 (def sensitive-extensions
-  "**開いたら事故になる拡張子**（`~/.gftd/` に実在する）。allowlist に入っていない
+  "**開いたら事故になる拡張子**（`~/.itonami/` に実在する）。allowlist に入っていない
    ことを起動時に毎回確かめるためだけに存在する —— 検査の allowlist が将来
    広げられたとき、これが無ければ誰も気づかない。"
   #{".pem" ".json" ".edn" ".log" ".tgz" ".plist" ".key" ".p12"})
@@ -173,7 +173,7 @@
   "**この script の安全性は allowlist 1つに乗っている。** 実際のディレクトリに
    対して、走査対象に危険な拡張子が1つも入らないことを毎回確かめる。
 
-   定数どうしの比較ではなく実ディレクトリで確かめるのは、`~/.gftd/` に新しい
+   定数どうしの比較ではなく実ディレクトリで確かめるのは、`~/.itonami/` に新しい
    種類の秘密が置かれた場合も捕まえるため。"
   [entries scanned]
   (let [bad (filter #(contains? sensitive-extensions (path/extname %)) scanned)]
@@ -192,7 +192,7 @@
 (defn -main []
   (run-self-tests!)
   (if-not (fs/existsSync gftd-dir)
-    (do (println (str "~/.gftd/ が無い。監査対象なし: " gftd-dir))
+    (do (println (str "~/.itonami/ が無い。監査対象なし: " gftd-dir))
         (js/process.exit 0))
     (let [entries (fs/readdirSync gftd-dir)
           files (->> entries

@@ -55,7 +55,7 @@ and measures only tracked text and Hyakka schema tokens (including the layered
 vocabulary `claim/layer`, `model-inference`, `secondary-reported`,
 `inference/basis`). It never chooses a source, schema design, or analysis
 content. Bots work in the dedicated Hyakka bot worktree
-(`~/.gftd/worktrees/hyakka-growth-bot`), never the shared `orgs/**` checkout;
+(`~/.itonami/worktrees/hyakka-growth-bot`), never the shared `orgs/**` checkout;
 one topic branch and at most one PR per run; never push main, force-push,
 merge, deploy, contact anyone, or make financial commitments.
 
@@ -72,7 +72,7 @@ python3 scripts/hermes-geopol-power-bots/gp_wiki_evidence.py
 Copy this directory's Python and prompt files plus `geopol-power-scope.edn`
 to the hyakka profile's `scripts/`. Reuse the Hyakka worktree, then create the
 two jobs with `z-ai/glm-5.3-flash`, provider `openrouter`, reasoning `low`,
-local delivery, workdir `~/.gftd/worktrees/hyakka-growth-bot`, and the
+local delivery, workdir `~/.itonami/worktrees/hyakka-growth-bot`, and the
 corresponding evidence wrapper and prompt. The dashboard is
 `http://127.0.0.1:9119/cron`.
 

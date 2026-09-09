@@ -29,7 +29,7 @@ git merge-base --is-ancestor HEAD origin/main
 nbb --classpath ".:scripts/nbb_compat" scripts/industry-stack-wave-tick.cljs --limit 20
 ```
 
-tick の ledger 最終行 `~/.gftd/industry-stack-wave-tick.ledger.edn` の
+tick の ledger 最終行 `~/.itonami/industry-stack-wave-tick.ledger.edn` の
 `:candidates` が対象。候補 0 なら**何もせず終える**。
 
 **`--limit` は 20 にする。harness の同時 subagent 上限が 20 で、21 本目以降は
@@ -158,7 +158,7 @@ superproject で pin + ledger を branch に載せ、server-side merge で main 
 
 ### 3. done 集合と ledger
 
-merge した repo 名を `~/.gftd/industry-stack-wave-done.edn` に conj（次周 tick が再ピックしない）:
+merge した repo 名を `~/.itonami/industry-stack-wave-done.edn` に conj（次周 tick が再ピックしない）:
 
 ```bash
 # 例: 既存 set に追加して書き戻す
@@ -167,7 +167,7 @@ nbb -e '(require (quote [clojure.edn :as edn])) ...'
 
 または EDN set を手で更新。**忘れても skill が origin/main で skip するが、slot が無駄になる。**
 
-`~/.gftd/industry-stack-wave.ledger.edn` と
+`~/.itonami/industry-stack-wave.ledger.edn` と
 `90-docs/business/industry-stack-ledger.edn` に 1 行:
 
 ```clojure

@@ -115,15 +115,15 @@ cp scripts/hermes-realestate-bots/realestate-scope.edn         ~/.hermes/scripts
 
 for b in realestate-ontology realestate-registry-source realestate-transaction-source \
          realestate-investment-source realestate-procedure-source; do
-  git -C orgs/network-awai/app-hyakka worktree add --detach ~/.gftd/worktrees/$b-bot origin/main
-  ( cd ~/.gftd/worktrees/$b-bot && npm install )
+  git -C orgs/network-awai/app-hyakka worktree add --detach ~/.itonami/worktrees/$b-bot origin/main
+  ( cd ~/.itonami/worktrees/$b-bot && npm install )
 done
-git worktree add --detach ~/.gftd/worktrees/itonami-realestate-analysis-bot origin/main
+git worktree add --detach ~/.itonami/worktrees/itonami-realestate-analysis-bot origin/main
 ```
 
-The hyakka worktrees must sit under `~/.gftd/worktrees/`, not in `/tmp`:
+The hyakka worktrees must sit under `~/.itonami/worktrees/`, not in `/tmp`:
 app-hyakka's `deps.edn` carries the source path
-`../../kotoba-lang/kotobase-client/src`, and `~/.gftd/kotoba-lang` is what makes
+`../../kotoba-lang/kotobase-client/src`, and `~/.itonami/kotoba-lang` is what makes
 that resolve. In a flat `/tmp` worktree the build fails with *the required
 namespace "kotobase.client" is not available* — which is exactly the failure a
 caller reads as *the tests ran*.
