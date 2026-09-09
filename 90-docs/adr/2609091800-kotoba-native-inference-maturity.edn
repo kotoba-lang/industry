@@ -330,4 +330,95 @@
   だから**この二本の arm は、署名済み artifact からはこのホスト上で到達
   できない**。上の測定が repo の外で行われたのはそのためであり、それは
   「実行した」を弱めるものではないが（バイトは同一）、「provider が
-  これで推論できる」ことは意味しない。P0 の設計は改訂 2 のまま有効。"}]
+  これで推論できる」ことは意味しない。P0 の設計は改訂 2 のまま有効。
+  ## 改訂 4 (2026-09-09 夜) — P0 は測ると 1 本の gate で、その半分が着地した
+
+  改訂 2 は P0 を『region capability を dataspace-v1 のように新設する』と設計した。
+  **測ると、その設計は要らなかった。** 必要な安全性は既存の pass が既に持って
+  いる。
+
+  ### 実測した gate は 2 本、うち本当に効いていたのは 1 本
+
+  aarch64 target に対して、host が渡した region を読むプログラムを実際に
+  コンパイルして測った:
+
+  | # | gate | どこ | 何だったか |
+  |---|---|---|---|
+  | 1 | `:kotoba.error/slice-export-boundary` | kotoba-sema | export の ABI が引数 1 個 = 1 word だから、という**実装状態** |
+  | 2 | `bounded kernel memory operation requires the aiueos kernel target` | kotoba-verifier | 唯一の実質的な gate |
+
+  gate 1 は**回避できる**。region を `[:slice :u8]` として export の引数にせず、
+  `base :i64 length :i64` として受けて中で `slice-of-u8` を組めばよい。だから
+  **kotoba-sema の変更は 1 行も要らなかった。** 残るのは gate 2 だけ。
+
+  ⚠ gate 1 の docstring は「*there is no ABI in which they could spell two*」と
+  書いている。これは**実装状態を性質として書いた文**で、CLAUDE.md が名指しで
+  警告している形。KEXE の export ABI は既に 5 machine word を運ぶ。
+
+  ### 安全性は新設ではなく、既にある provenance pass が持っていた
+
+  `kotoba.compiler.frontend` の region-provenance pass は、全ての base が
+  literal / `kernel-boot-info` / parameter から**無改変で**流れることを要求し、
+  算術・load・call 結果を拒否する。そして `kernel-region-report` の docstring が
+  この状況を既に名指ししている ——
+
+      A tainted param on a function with no internal caller is the ABI boundary
+      where the C kernel supplies the region: unverifiable from here, so it is
+      admitted and REPORTED rather than silently trusted.
+
+  hosted target では供給者が C kernel ではなく export を呼んだ host になる、
+  というだけで、**問いは同じ**。
+
+  ### 着地したもの
+
+  | repo | commit | 何 |
+  |---|---|---|
+  | `kotoba-lang/kotoba-verifier` | `33b3d067` | slice subfamily + `kernel-subregion` を hosted target に admit。条件は**この file 自身が再導出する** |
+  | `kotoba-lang/amu` | PR #908 | pin 前進 + fixture + 3 つの拒否の対比 |
+
+  admit の条件は 2 つで、別々に検査して別々に報告する: 全ての base がその関数の
+  parameter であること、そして内部 callee の tainted parameter 位置に流れ込む
+  引数も parameter であること。後者が無いと、**base が parameter である callee は
+  単独では clean に見える**ので、caller が穴になる。
+
+  拒否しないものを 2 つ、区別して書いた:
+
+  - **literal base は hosted で拒否する。** frontend は admit する（aiueos では
+    MMIO を名指すのが仕事）。だから verifier が自分で拒否する。
+  - **byte-window family（`kernel-load-u8` 等 16 個）は aiueos 専用のまま。**
+    これは**性質ではなく surface の大きさの判断**で、そう書いた —— parameter
+    base の window は slice と同じだけ安全である。
+
+  ### 実行して確かめた
+
+  repo の外で、arm64-apple-macos 上:
+  `amu compile --target aarch64` → `amu extract-native --symbol sum-bytes` →
+  `.byte` を label 下に置いて `clang -c` → C から 5 引数 + context で呼ぶ
+  （emit されたコードは `[x7+8]` の fuel カウンタを読んで尽きたら trap するので、
+  8 番目の引数レジスタが context）。
+
+  - 64 byte → 2080 / granted length 10（region は 64 byte）→ 55 /
+    空 region → 0 / `0xFF` 4 個 → **1020**（符号拡張なら負になる）
+
+  **これは provider CLI の `generate!` が `:kotodama/blocked-on
+  :kotoba/bytes-access` で refuse している、まさにその primitive である。**
+
+  ### 残り: 最後の 1 マイル
+
+  署名済み artifact から `amu run` 経由でこれに到達するには、loader が region を
+  渡せる必要がある。現状 kexe の境界は raw base を渡せない —— `:string` 引数は
+  pair handle、vector は arena handle として届く。要るのは
+  `tools/kexe_loader.c` の region pool と、1 つの host 値が 2 machine word
+  （base と length、どちらも loader が計算するので host は嘘をつけない）に
+  展開される `marshal-entry-arguments` の対応。これは**未着手**。
+
+  ### 副産物 —— 走らないスイートは、走ったスイートに見えない
+
+  kotoba-verifier の `clojure -M:test` は **1 日ゼロテストを報告していた**。
+  `verifier_f64_boundary_test` が repo 境界越しに `kotoba.kir/native-float-
+  boundary-types` を読む（2 つの admission set が黙って乖離しないよう意図的に）
+  のに、osaho の pin がその var の 1 commit 手前で止まっていた。namespace が
+  コンパイルできず、runner は最初の file で止まり、**失敗ではなくゼロ件**を
+  報告した。pin を進めると即座に 2 つ目の帰結が出た ——
+  `verifier_test` が `[:f64]` は boundary で**拒否される**と assert したままで、
+  それはこの repo 自身に着地した決定の逆だった。両方直した。"}]
