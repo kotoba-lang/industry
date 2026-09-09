@@ -187,7 +187,7 @@
 
     Where the bytes are load-bearing, measured rather than assumed:
 
-    - 29 files across 8 of the 27 repos hold a JSON write and a digest in the
+    - 29 files across 9 of the 27 repos hold a JSON write and a digest in the
       same file. That is a list of places to look, not a list of defects.
     - Two of the strongest-looking candidates are NOT data paths:
       `network-awai/cloud-itonami` `net_kotobase.clj` and
@@ -220,9 +220,30 @@
     and, for the same reason, the byte change reaches every consumer of that
     seam at once. Change it where it is injected, not where it is called.
 
+    First rewire landed 2026-09-10 (cloud-itonami/za-actor, the whole repo's only
+    JVM runtime dep). Two things it taught, both cheaper to read here than to
+    rediscover:
+
+    **A repo with `:local/root \"../../kotoba-lang/...\"` cannot be built from a
+    worktree outside the superproject** -- `clojure` fails resolving the
+    classpath before it reaches your change. 8 of the 9 remaining clean repos
+    are in this class. Give the worktree the same relative shape
+    (`<tmp>/orgs/<org>/<repo>`) and symlink `<tmp>/orgs/kotoba-lang` at the real
+    one.
+
+    **Check that the suite loaded the file you changed.** za-actor's
+    `clojure -M:test` returned 42 tests / 86 assertions / 0 failures and never
+    required `za-actor.deploy`, the only file the commit touched. Forcing the
+    namespace to load fails -- on unmodified main too: it requires
+    `kotoba.net.jvm-host` and the repo declares nothing providing it. So that
+    coordinate was being carried for a namespace that does not load, and the
+    green was evidence of nothing. Per-namespace
+    `(require (quote <ns>))` after the edit, and `git stash` to tell a
+    pre-existing failure from your own.
+
     Order of work: land the 20 repos with no digest and no JSON-literal test
     first, let the 7 literal-test repos go red and fix the fixtures, and treat
-    the 8 digest-adjacent repos as a read-before-swap list of 29 files."}
+    the 9 digest-adjacent repos as a read-before-swap list of 29 files."}
   {:coordinate "metosin/jsonista" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json" :kind :implementation}
   {:coordinate "cheshire/cheshire" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json" :kind :implementation}
   {:coordinate "zod" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/spec" :kind :implementation}
