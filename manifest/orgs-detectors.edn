@@ -3935,4 +3935,49 @@
               the library. Often fine (transitive, or :local/root on a sibling), so it is a
               number to watch rather than a defect."}
 
+  {:id       :verify-build-input-addressing
+   :title    "every build input in this workspace, and whether it is addressed by content"
+   :why      "ADR-2609092000, owner directive. A build is only as trustworthy as the identity
+              of what it pulls in, and this workspace owns the machinery for content addressing
+              -- IPLD, CIDs, kotoba.storage.verify/verifying-block-store, ADR-2607289500's
+              ruling that identity is a semantic definition CID -- while the build uses none of
+              it. Measured 2026-09-09 over 4,336 project files and 20,097 build inputs: 6,954
+              are 40-hex :git/sha and addressed; 3,675 are a seven-hex PREFIX, 2^28 and
+              grindable with a mutable :git/tag beside it, of which 3,673 are one value copied
+              into nearly every deps.edn; 6,317 are :mvn/version, a name with no integrity
+              field anywhere in the coordinate; 3,128 are a cross-repo :local/root, a path into
+              whatever happens to be checked out. Roughly two thirds of this workspace's build
+              inputs are named rather than addressed.
+              Unison has no package at all -- a definition is the hash of its typed AST, so
+              there is nothing to substitute. Nix declares outputHash before fetching, which is
+              why its caches need no trust. Deno's lock carries a SHA-256 per fetched URL. Go
+              adds a transparency log so a server cannot serve different bytes to different
+              people. All four address the bytes.
+              Adjacent: verify-git-dep-pin-reachability asks whether a pin a deps.edn NAMES is
+              reachable from its library's main. This asks whether the coordinate is an address
+              at all."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-build-input-addressing.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\\t[1-9][0-9]*\\t"
+   :interval-ms 86400000                 ; 24h
+   :timeout-ms  900000                   ; 15m
+   :writes   :none
+   :measured "2026-09-09: 4,336 project files, 20,097 build inputs, ~50s. Exit 1 on the prefix
+              class, with maven and cross-repo :local/root reported as standing counts at :info
+              so each number moves visibly when its step lands.
+              DISCRIMINATED THREE WAYS ON FIXTURE TREES BEFORE REGISTRATION: one prefix among
+              601 inputs exits 1 and names it; the same tree with every sha written in full
+              exits 0; a tree below the evidence floor exits 2 saying it could not measure.
+              Fixing the fixtures exposed a real defect in the detector first -- it passed
+              orgs, scripts and 70-tools to ripgrep unconditionally, and naming a directory
+              that does not exist makes rg exit 2, which the detector correctly read as 'could
+              not measure' and which therefore made every fixture unrunnable. It now passes
+              only the directories that exist, and refuses if none do.
+              ⚠ It measures the CHECKOUT, not the repos' mains. This workspace's checkouts are
+              routinely behind, so a wave expanding prefixes on every main will not move this
+              number until west brings the checkouts along. A count that has not moved is not
+              evidence that nothing landed."}
+
 ]}
