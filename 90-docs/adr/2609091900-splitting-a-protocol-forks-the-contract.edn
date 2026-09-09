@@ -1,0 +1,66 @@
+[{:db/id -1
+ :adr/id "adr-2609091900-splitting-a-protocol-forks-the-contract"
+ :adr/title "Splitting a protocol forks the contract"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/related "adr-2609091200-a-definition-is-the-unit-of-a-library"
+ :adr/body "Measured 2026-09-09, while splitting kotoba.lang.process under ADR-2609091200.
+
+A definition can be moved to its own repo. A PROTOCOL cannot, not without
+deciding who owns the contract, because a protocol's identity is what reify and
+extend-type dispatch on. Two namespaces that each declare IFilesystem declare
+TWO protocols, and an object implementing one does not satisfy the other.
+
+## How it surfaced
+
+kotoba.lang.process-host reifies kotoba.lang.process/IProcess. Running the
+process family's own suite against the split gave
+
+  No implementation of method: :spawn! of protocol:
+  #'kotoba.process.iprocess/IProcess found for class:
+  kotoba.lang.process_host$os_spawn$reify__2388
+
+which is the split working exactly as written and being wrong anyway.
+
+## What is already published in this state
+
+Counted across orgs/, mentions of each protocol outside the namespace it was
+split from:
+
+  fs/IFilesystem        21 files -- kotoba-lang/store, amu, lint, and more
+  http/IHttp            79 files
+  process/IProcess       8 files -- process-host, kotoba/git_adapter, launcher
+  io/IReader, IWriter    0 files outside the split's own repos
+
+fs and http were published before this was measured. NOTHING EXISTING BREAKS:
+kotoba.lang.fs and kotoba.lang.http keep their protocols and their implementers,
+and the splits are additive. What is broken is ADOPTION -- code that starts
+using kotoba.fs cannot hand a kotoba.lang.fs-host implementation to it, and
+finds out at runtime rather than at compile time.
+
+io is unaffected: its two protocols have no implementer outside the split.
+
+## The three ways out, and why none is a small edit
+
+1. The split's protocol repo re-exports the ORIGINAL protocol instead of
+   declaring one. One contract, everything satisfies it -- and the split now
+   depends on the namespace it was supposed to replace.
+
+2. The definition repo OWNS the protocol and the old namespace re-exports it.
+   Also one contract, and the right end state, but it edits namespaces with 21
+   and 79 consumers.
+
+3. Two protocols, and implementers migrate with the callers. Coherent, and it
+   makes the facade something other than a drop-in.
+
+This is an owner-level choice about migration order, not a mechanical one, so
+no further protocol-bearing family is published until it is made. Families
+without protocols -- string, coll, edn, spec -- are unaffected and complete.
+
+## What this does not change
+
+The eight families already split still match their unsplit suites exactly, and
+that measurement stands: the split does not change an answer WITHIN a family.
+This is about what happens at the boundary between the split and code that was
+written against the original."
+}]
