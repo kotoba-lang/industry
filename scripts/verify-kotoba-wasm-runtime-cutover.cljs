@@ -176,15 +176,62 @@
              "too few registered checkouts were readable, so the forbidden-new-site rule went unmeasured"
              {:registered (count registered)}))
     (swap! inspected into registered)
-    (doseq [h (sort hits)
-            :when (not (contains? frozen h))]
-      (fail! (str "chicory-site-not-frozen:" h)
-             "names com.dylibso.chicory and is not in the frozen legacy inventory"
-             {:path h}))
-    (println (str "  chicory sweep: " (count registered) " registered checkout(s), "
-                  (count files) " file(s), "
-                  (count hits) " naming com.dylibso.chicory, "
-                  (count (remove #(contains? frozen %) hits)) " outside the frozen inventory"))))
+    ;; Classify instead of lumping. Until 2026-09-09 every non-frozen hit was
+    ;; the same `fail!` with the same sentence, which put a historical `.clj`
+    ;; test and a production provider's `import` in one undifferentiated pile
+    ;; of 19 -- and this contract's own `:cutover/rules` already separate them:
+    ;; `:historical-clj-tests :allowed-as-oracle-until-replaced` next to
+    ;; `:new-chicory-call-sites :forbidden`. A verifier that reports an
+    ;; explicitly allowed file as a violation is not stricter than its
+    ;; contract, it is less readable than it: the owner decision this record
+    ;; defers -- absorb the post-freeze providers or remove them -- cannot be
+    ;; put to anyone while the two providers sit in a list of 19 that is mostly
+    ;; test fixtures.
+    ;;
+    ;; The three buckets, and only the last two fail:
+    ;;
+    ;;   test-oracle          a test path, allowed by :historical-clj-tests
+    ;;   frozen-repo-other    a repo the inventory freezes, a file it does not
+    ;;   outside-inventory    a repo the inventory does not name at all
+    ;;
+    ;; `frozen-repo-other` is separate because the inventory freezes
+    ;; IMPLEMENTATION PATHS, not repositories -- `kototama/src/linker.clj` sits
+    ;; beside a frozen entry and is not that entry -- and because reading it as
+    ;; a brand-new call site would overstate what was measured.
+    (let [test-path? (fn [h] (or (re-find #"(^|/)test/" h)
+                                 (re-find #"_test\.cljc?$" h)))
+          repo-of (fn [h] (let [ps (str/split h #"/")]
+                            (when (>= (count ps) 3) (str/join "/" (take 3 ps)))))
+          frozen-repos (set (keep repo-of frozen))
+          unfrozen (remove #(contains? frozen %) (sort hits))
+          {tests true other false} (group-by (comp boolean test-path?) unfrozen)
+          {in-frozen-repo true outside false}
+          (group-by #(contains? frozen-repos (repo-of %)) (or other []))]
+      (doseq [h (or in-frozen-repo [])]
+        (fail! (str "chicory-site-in-frozen-repo:" h)
+               "names com.dylibso.chicory in a repo the inventory freezes, at a path it does not"
+               {:path h :repo (repo-of h)}))
+      (doseq [h (or outside [])]
+        (fail! (str "chicory-site-not-frozen:" h)
+               "names com.dylibso.chicory and is outside the frozen legacy inventory entirely"
+               {:path h :repo (repo-of h)}))
+      (println (str "  chicory sweep: " (count registered) " registered checkout(s), "
+                    (count files) " file(s), "
+                    (count hits) " naming com.dylibso.chicory, "
+                    (count unfrozen) " outside the frozen inventory"))
+      ;; Every hit lands in exactly one bucket and the buckets are printed with
+      ;; their sum, so a future reclassification cannot quietly lose one.
+      (println (str "  chicory buckets: frozen " (- (count hits) (count unfrozen))
+                    " + test-oracle " (count (or tests []))
+                    " + frozen-repo-other " (count (or in-frozen-repo []))
+                    " + outside-inventory " (count (or outside []))
+                    " = " (count hits)))
+      (when (seq tests)
+        ;; Counted and NAMED, never silent: `:allowed-as-oracle-until-replaced`
+        ;; is a clock, not an exemption, and a bucket nobody can see never runs
+        ;; down.
+        (println (str "  test-oracle (allowed until replaced): "
+                      (str/join " " (sort (distinct (keep repo-of tests))))))))))
 
 (let [ids (set (map :id (:cutover/legacy-inventory contract)))]
   (doseq [{:keys [id owns blocked-by]} (:cutover/tranches contract)
