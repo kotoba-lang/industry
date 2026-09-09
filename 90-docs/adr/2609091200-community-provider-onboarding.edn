@@ -150,6 +150,43 @@
   - the handlers were rewritten as named functions, so the route table branches
     are one line each. The mistake is still possible; it is no longer invisible.
 
+  ## The runtime the CLI serves through (owner correction, same day)
+
+  The first version of the CLI probed for `ollama / lm studio / vllm` and
+  called that the local runtime. The owner corrected it: the inference stack
+  here is **murakumo plus `kotoba-lang/inference`, `num` and `torch`**. That is
+  not a naming quibble, it inverts what the CLI is. `inference` owns the
+  portable contract `kotodama.inference.ports/IModelRuntime`, `torch` holds the
+  model graph as EDN, `num` does tensor compute behind an injected backend, and
+  murakumo is the fleet plane that plans and launches the serving processes.
+  Ollama is one **host** of that contract, and the repo says exactly that in
+  its own adapter docstring.
+
+  The correction had a landing place already waiting. Both JVM adapters in
+  `inference` end their `:cljs` branch with the same throw — *mlx-runtime is a
+  host adapter; provide a CLJS fetch-backed IModelRuntime instead*. The CLI's
+  `murakumo_cli/runtime.cljs` is that implementation, over the vendored
+  contract. Probe order now follows what the fleet runs: murakumo's own
+  llama.cpp head on `:infer/api-port` 8090, then mlx-lm / mlx-moe on 8080
+  (which `murakumo.infer.moe` launches), then vLLM, then Ollama last.
+  `forward!` stays unimplemented and says why — an HTTP chat endpoint has no
+  raw tensors, and a stub behind a protocol method `num`-level callers trust is
+  worse than a refusal.
+
+  ### And the correction found an error the FLOPs table had already shipped
+
+  `provider-flops/model-parameters` carries `murakumo-edge`, and its docstring
+  says rows are added only for models whose parameter count is published,
+  because a guess there is indistinguishable from a measurement everywhere
+  downstream. The row said **27B**. `kotodama.inference.edge/ornith-1-5-9b`
+  pins `murakumo-edge` to Ornith-1.5-9B — **9B** — by name, upstream, artifact
+  repo and revision. Nothing had to be estimated; the estimate was made anyway.
+
+  On a FLOPs-priced payout rail that is a threefold overpayment on the fleet's
+  most-served model. Corrected, with a test that fails if it drifts back or if
+  the two ids stop agreeing. Measured after the fix deployed: the same
+  qualification workload reports **1.12 TFLOP/s** against `murakumo-edge`.
+
   ## Evidence
 
   - `cloud-murakumo-api` tests 333 → 372, assertions 1911 → 2069, `npm test` green.
