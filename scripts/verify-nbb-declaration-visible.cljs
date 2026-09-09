@@ -36,7 +36,7 @@
 ;; one repository's tree.
 ;;
 ;; Usage: nbb verify-nbb-declaration-visible.cljs [--findings] <orgs-dir>
-(require '[clojure.string :as s])
+(require '[clojure.string :as s] '[cljs.reader :as reader])
 
 (def fs (js/require "node:fs"))
 (def path-mod (js/require "node:path"))
@@ -51,6 +51,7 @@
                                  :maxBuffer 67108864}))
        (catch :default _ nil)))
 
+(defn- file? [p] (try (.isFile (.statSync fs p)) (catch :default _ false)))
 (defn- slurp* [p] (try (str (.readFileSync fs p "utf8")) (catch :default _ nil)))
 
 (when-not (try (.isDirectory (.statSync fs orgs)) (catch :default _ false))
@@ -162,7 +163,27 @@
       (swap! scanned inc)
       (doseq [f (entry-points p)]
         (when-let [src (slurp* f)]
-          (let [needs (keep coordinate-for (external-requires src))
+          (let [;; A NAMESPACE THE REPOSITORY PROVIDES ITSELF NEEDS NO COORDINATE.
+                ;; kotoba-lang/kotoba-core-contracts has
+                ;; src/kotoba/lang/package_contract.cljc, and this detector
+                ;; mapped kotoba.lang.package-contract to a coordinate
+                ;; io.github.kotoba-lang/package-contract and reported the repo
+                ;; for not depending on itself -- 2 findings that no declaration
+                ;; could ever satisfy.
+                owned? (fn [ns]
+                         (let [rel (s/replace (s/replace ns "." "/") "-" "_")
+                               dp (some (fn [n] (let [c (.join path-mod p n)]
+                                                  (when (file? c) c)))
+                                        ["deps.edn" "bb.edn" "nbb.edn"])
+                               ps (when dp (:paths (try (reader/read-string (slurp* dp))
+                                                        (catch :default _ nil))))]
+                           (some (fn [pp]
+                                   (some #(file? (.join path-mod p pp (str rel %)))
+                                         [".cljc" ".cljs" ".clj"]))
+                                 (or ps []))))
+                needs (->> (external-requires src)
+                           (remove owned?)
+                           (keep coordinate-for))
                 np    (nbb-above p f)
                 have  (if np (declared-in np) #{})
                 miss  (remove have needs)]
