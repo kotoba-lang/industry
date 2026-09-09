@@ -118,10 +118,27 @@ reader can tell which kind it is without measuring.
 ## Where the ceiling actually is now
 
 Not the document budget. Measured after the change: the todo app fills to its
-OWN caps -- at most 26 todos, and a counter that stops at \"9+\" -- and
-adr-2608690000 already names both as holes in Kotoba rather than choices,
-because there is no integer->string builtin.
+OWN caps -- at most 26 todos, and a counter that stops at \"9+\".
 
-**So the next thing between here and reagent/re-frame parity is that builtin,
-not a bigger budget.** Raising the budget again would move nothing. That is a
-smaller and more concrete piece of work than the arc that found it."}]
+⚠ CORRECTED 2026-09-10, within the hour, by measurement. This section first
+said those caps exist \"because there is no integer->string builtin\", which is
+what `examples/todo-app.kotoba` says (\"Kotoba has no integer-to-string builtin
+... A wider app wants that builtin, not a workaround\") and what
+adr-2608690000 repeated.
+
+**It is false.** `string-from-i64` exists and takes arbitrary i64: measured
+that day through the emitted ESM, 12345 -> \"12345\", -42 -> \"-42\", 0 -> \"0\",
+and 9007199254740991 -> \"9007199254740991\". This very session had been calling
+it all evening in `pattern-vm`, for single digits, without noticing that the
+guard around it was about hex letters rather than the builtin's range.
+
+So the caps are not waiting on a language feature. They are a workaround that
+outlived its reason, in an example whose header states the reason as fact, in
+an ADR that repeated it, and in the first draft of THIS ADR -- which is the
+sixth time in one session that an implementation state written as a fact was
+found still steering work, and the first where I propagated it myself rather
+than found it.
+
+**The next step is to remove those caps in the example, using the builtin that
+is already there.** That is smaller than the arc that found it, and it is what
+demonstrates the raised budget rather than asserting it."}]
