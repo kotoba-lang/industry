@@ -806,11 +806,29 @@ ${r}:scripts/x.cljs → pr/547:scripts/x.cljs   # ← 常にこう書く
 バイナリ daemon を既定の選択肢にしない。** プラットフォーム別バイナリ配布と別プロセス
 daemon は、「新規に外部ネイティブバイナリへ依存する」パターンそのもの。
 
-**`kotoba-lang/io-libp2p`（実体 repo 名 `kotoba-net`）に、pure `.cljc` の完全な libp2p 実装が
-既にある** —— `src/kotoba/net/bitswap.cljc` に実際の bitswap があり、TCP + multistream +
-Noise XX + Yamux + Kademlia DHT + GossipSub + IPNS が揃い、**2026-08-04 に実 public IPFS ピア
-と相互接続検証済み**。pure `.cljc` なので nbb/JVM 上で in-process に動く。関連:
-`kotoba-lang/p2p` が同じ基盤の上に GraphSync を構築している。
+**`kotoba-lang/io-libp2p`（実体 repo 名 `kotoba-net`）に libp2p 実装が既にある** ——
+TCP + multistream + Noise XX + Yamux + Kademlia DHT + GossipSub + IPNS が揃い、
+**2026-08-04 に実 public IPFS ピアと相互接続検証済み**。関連: `kotoba-lang/p2p` が
+同じ基盤の上に GraphSync を構築している。
+
+⚠ **ただし「pure `.cljc` だからどこでも動く」ではない。ここは 2026-09-09 に訂正した。**
+それまでこの節は「pure `.cljc` の完全な実装」「nbb/JVM 上で in-process に動く」と書き、
+**`src/kotoba/net/bitswap.cljc` に実際の bitswap がある**と名指していた。3 点とも測ると違う:
+
+| 主張 | 実測 2026-09-09 |
+|---|---|
+| `net/bitswap.cljc` が bitswap | **違う。** その docstring 自身が `No block transfer over any wire` と書いている（want-list の集合演算だけ、protobuf の require すら無い）。wire は **`net/libp2p/bitswap.cljc`** —— `/ipfs/bitswap/1.2.0` を go-bitswap の `message.proto` の field 番号で持つ |
+| pure `.cljc` | **違う。** `libp2p/` は 22 ファイル中 **14 が `.clj`**。`.cljc` なのは schema 側（bitswap / handshake / identify / gossipsub / connection …）で、**dial・socket・transport・mux・keys・node は全部 `.clj`** |
+| nbb でも動く | **動かない。** 上のとおり接続経路が JVM 専用。もう 1 本の transport `net/transport/tcp.cljs` は `node:net` なので **workerd では動かない** |
+
+**つまり protobuf は在り、足りないのは transport である。** bitswap の wire schema は
+書けているので、Worker から使いたいなら要るのは protobuf ではなく **workerd の
+`cloudflare:sockets` 上の transport**（と、request-scoped isolate ではなく session を
+持てる Durable Object）。**「bitswap が在る」と「その runtime から届く」を混同しない。**
+
+この誤りが実害を持つ形: この節は「Kubo に手を伸ばすな、io-libp2p を使え」と指示している。
+Worker 上の agent がそれに従って名指しの path を開くと、**集合演算だけのファイルに当たる**。
+そこで「無い」と結論しても「全部在る」と結論しても、どちらも誤る。
 
 実測 2026-08-28: 複数の agent が「Kubo を fleet ノードへ curl 取得」「npm の Helia」へ
 いきなり向かい、**この既存実装を見落とした**（`nbb scripts/repo-search.cljs bitswap libp2p`
