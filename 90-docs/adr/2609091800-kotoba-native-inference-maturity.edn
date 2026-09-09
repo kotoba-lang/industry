@@ -496,4 +496,74 @@
     unroll されており、移植ではない）。IQ 4 形式は read-only table が機械に
     届くまで両 backend とも arm を持てない。
   - **CLI**: `provider-kernel.wasm` は wasm32 で走っている。native kexe の方が
-    Mac の provider には正しい形なので、runtime を native に寄せる判断が要る。"}]
+    Mac の provider には正しい形なので、runtime を native に寄せる判断が要る。
+  ## 改訂 6 (2026-09-09 深夜) — Ollama 依存を外し、native path に初めて gate を付けた
+
+  オーナー指示「ollama 依存を外して」。**まず「依存」と「面」を分けて測った** ——
+  自分が直前に「走っている 4 つの `ollama-*` gate はオーナーが外せと言った面」と
+  書いたのが誤りで、あれらは `ollama-server-test`、つまり**こちらが提供する
+  Ollama 互換サーバ**のテストだった。
+
+  | | 判定 | 措置 |
+  |---|---|---|
+  | `ollama.cljc` / `mlx.cljc` | 依存（第三者のトークンを自分の答えとして報告する `IModelRuntime`） | 削除 |
+  | `gemma4_e4b_ollama.clj` + `:gemma4-e4b-live` | 依存（Ollama を通して生成） | 削除 |
+  | `host/jvm.clj` の `ollama-gguf-path` + verifier 4 本 | 依存（出荷 host が `ollama show` でモデルを探す） | `KOTODAMA_GGUF_PATH`、fallback せず fail-closed |
+  | `native_gemma4_parity` の live 比較 | 依存（第三者が参照） | 記録済み oracle と直接比較 |
+  | `relay_worker.clj` の `:engine ollama`（文字列） | 誤申告（実際は任意の OpenAI 互換 URL） | `MURAKUMO_INFER_ENGINE`、既定 `openai-compatible` |
+  | `host/ollama_server.clj` + `kotoba/ollama_*_core.kotoba` | 面（policy は Kotoba、host は transport のみ） | 残す |
+  | `vllm_infer_core.kotoba` + `cli/vllm.clj` | 自前（`build-native-vllm-cli.sh` は `amu compile` で自前 core をネイティブ化） | 残す |
+
+  ### locator が一番小さい依存だった
+
+  GGUF を読むことは依存ではない —— この host は Q4_K / Q6_K / BF16 / F32 を
+  自分でデコードする。**どこにあるかを Ollama に訊く**ことが、計算に一切必要
+  ない Ollama を必須にしていた。**小さすぎて見落とされる服を着た依存**である。
+
+  ### 置き換わっていないものを、置き換わったと書かない
+
+  `:gemma4-e4b-live` は `:imodelruntime-live-generate` を証明していた ——
+  つまり**第三者サーバがトークンを生成すること**の証明だった。**live
+  real-model generation の gate は今は無い。** `required-gates` から gate が
+  消えたのはこれが初めてで、その理由と「何が置き換わっていないか」を集合の
+  隣にそのまま書いた。
+
+  ### fleet の launcher は残っている（外す順序の問題）
+
+  `murakumo.infer.engine` / `infer.moe` は今も第三者プロセスを起動する。これを
+  外すのは rename ではなく、**native Kotoba path がトークンを生成できるように
+  なるのを待つ** —— まだできない。今外せば fleet は止まる。
+
+  ### そして gate を 1 つ足した —— この ledger で初めて方向を測るもの
+
+  **`:kotoba-native-executed`**（inference `bb6fa45a`）: `npm run conformance`
+  を `../amu` で回し、Kotoba を amu でコンパイルし、kexe loader を建て、
+  **W^X の下で artifact を実行する**。407 秒、実測で緑。
+
+  それまで ledger の gate は全部、portable な CLJC contract か、こちらが提供する
+  Ollama 互換面のどちらかだった —— **面はランタイムではない。**
+
+  最初 `:kotoba-native-cross-isa` と名付けたが、ホスト ISA でしか走らないので
+  改名した。**やっていないことを名前にするのは、ledger が嘘をつき始める形。**
+  cross-ISA の bit 一致は amu 自身の `isa_execution_test` にあり、そこからは
+  到達していないと `:does-not-prove` に書いてある。
+
+  ### この改訂で見つかった、自分の前セッションの欠陥
+
+  成熟度 loop を**正しい木**で回したら 2 件赤くなった —— `scheduler_core.kir.edn`
+  を生成・commit・parity 検査までしておきながら **`oracle/catalog` に登録して
+  いなかった**。`load-all!` は一度も読まず、テストは正確に **a core with no
+  catalog entry is shipped but unreachable** と言っていた。1 日誰も見なかったのは、
+  loop が回る west checkout が **origin/main より 4 commit 遅れ**ていて、その木には
+  artifact が存在しなかったから。**緑の gate が、報告している木とは別の木を
+  測っていた。** 出荷することと登録することは別である。
+
+  ### 2 層下の欠陥も 2 件（loop が見つけた）
+
+  - torch の checkpoint 往復で GradScaler が `32.0` → `32`。原因は
+    `json.core/numstr` が小数部ゼロの Double を整数として書くこと（JS の
+    一種類しかない数値型に合わせる**意図的**設計）。torch `43eb3c84` で
+    schema を知る層が型を復元するようにした。
+  - 同じ値が **compact `32` / pretty `32.0`** に分かれていた（pretty 分岐が
+    `numstr` を迂回）。json `ceeec4b1` で統一し、「Double は JSON 往復を
+    生き延びない」を**事実として pin** した（reader は lossy な側ではない、も）。"}]
