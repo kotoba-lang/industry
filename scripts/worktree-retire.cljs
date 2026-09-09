@@ -10,7 +10,9 @@
 ;; when the session that made the worktree is gone.
 ;;
 ;; A worktree is retired only when ALL of these hold:
-;;   landed   its HEAD is an ancestor of origin/<default branch>
+;;   landed   its HEAD is an ancestor of SOME remote's default branch (any remote:
+;;            west fetches into the manifest remote, and a leftover `origin` is often
+;;            stale — judging against one guessed remote is what made this lie)
 ;;   clean    `git status --porcelain` is empty (untracked files count as dirty)
 ;;   old      newest of (dir mtime, .git/worktrees/<n>/HEAD mtime) >= --min-age-days
 ;;   idle     no process has its cwd inside it (lsof), no command line names it (ps)
@@ -98,30 +100,41 @@
       (str/includes? (:cmds idx) wt)))
 
 ;; ---- per-repo ----
-(defn primary-remote
-  "west names remotes after the manifest remote (kotoba-lang / network-awai / …), not
-  `origin` — measured 2026-08-08, 197 of 273 sampled `orgs/` repos have no `origin` at all.
-  Hardcoding it makes `merge-base --is-ancestor` fatal, and a fatal ancestry test falls
-  silently to the `unlanded` side (manifest/cleanup-workflow.md; the same defect
-  scripts/cleanup.cljs fixed by porting this helper)."
-  [repo]
-  (let [rs (->> (str/split-lines (:out (sh "git remote" repo)))
-                (map str/trim) (remove str/blank?))]
-    (or (some #{"origin"} rs) (first rs))))
+(defn remotes [repo]
+  (->> (str/split-lines (:out (sh "git remote" repo)))
+       (map str/trim) (remove str/blank?)))
 
-(defn default-ref
-  "The remote's default branch, or nil when it cannot be resolved. nil is not `origin/main`:
-  an unresolvable ref must reach classify as `could not measure`, never as `unlanded`
-  (ADR-2608136000)."
+(defn remote-default-ref
+  "This one remote's default branch, or nil if it cannot be resolved."
+  [repo rem]
+  (let [r (sh (str "git symbolic-ref -q --short refs/remotes/" rem "/HEAD") repo)]
+    (if (and (= 0 (:exit r)) (not (str/blank? (:out r))))
+      (str/trim (:out r))
+      (some (fn [b]
+              (let [c (str rem "/" b)]
+                (when (= 0 (:exit (sh (str "git rev-parse --verify -q " c "^{commit}") repo))) c)))
+            ["main" "master"]))))
+
+(defn default-refs
+  "Every remote's default branch. Empty when none resolves — and empty is not
+  `origin/main`: an unresolvable ref must reach classify as `could not measure`,
+  never as `unlanded` (ADR-2608136000).
+
+  All of them, not one, because picking one is what kept getting this wrong.
+  west names a remote after the manifest remote (kotoba-lang / gftdcojp / …) and
+  measured 2026-08-08, 197 of 273 sampled `orgs/` repos have no `origin` at all —
+  so hardcoding `origin` made the ancestry test fatal and every worktree read
+  `unlanded`. But preferring `origin` when it *is* present fails the other way:
+  measured 2026-09-09, 294 repos carry both, and in `network-awai/net-kotobase`
+  both point at the same GitHub repo while `origin/main` sits 56 commits behind
+  the `gftdcojp/main` that west actually fetches. Judging against the stale one
+  called 127 landed worktrees `unlanded`.
+
+  A worktree is retired only when its commits already exist upstream, so the
+  honest question is whether HEAD is on *a* published default branch — not on
+  whichever remote we guessed."
   [repo]
-  (when-let [rem (primary-remote repo)]
-    (let [r (sh (str "git symbolic-ref -q --short refs/remotes/" rem "/HEAD") repo)]
-      (if (and (= 0 (:exit r)) (not (str/blank? (:out r))))
-        (str/trim (:out r))
-        (some (fn [b]
-                (let [c (str rem "/" b)]
-                  (when (= 0 (:exit (sh (str "git rev-parse --verify -q " c "^{commit}") repo))) c)))
-              ["main" "master"])))))
+  (->> (remotes repo) (keep #(remote-default-ref repo %)) distinct vec))
 
 (defn worktrees [repo]
   (let [{:keys [out]} (sh "git worktree list --porcelain" repo)
@@ -144,7 +157,7 @@
       (let [s (str/trim (str (.readFileSync fs gd "utf8")))]
         (when (str/starts-with? s "gitdir: ") (subs s 8))))))
 
-(defn classify [repo def-ref idx shallow? wt]
+(defn classify [repo def-refs idx shallow? wt]
   (let [p (:path wt)]
     (cond
       (:prunable wt) {:verdict :prune :why "directory gone"}
@@ -152,11 +165,12 @@
       (:locked wt) {:verdict :keep :why "locked"}
       (and (not include-bots?) (str/starts-with? p (str bot-dir "/"))) {:verdict :keep :why "resident bot"}
       shallow? {:verdict :unverified :why "repo is shallow; ancestry answer untrusted"}
-      (nil? def-ref) {:verdict :unverified :why "no resolvable default ref; ancestry unanswerable"}
+      (empty? def-refs) {:verdict :unverified :why "no resolvable default ref; ancestry unanswerable"}
       (nil? idx) {:verdict :unverified :why "lsof unavailable"}
       (busy? idx p) {:verdict :keep :why "busy (process cwd / argv)"}
       :else
-      (let [landed (= 0 (:exit (sh (str "git merge-base --is-ancestor " (:sha wt) " " def-ref) repo)))
+      (let [landed (boolean (some #(= 0 (:exit (sh (str "git merge-base --is-ancestor " (:sha wt) " " %) repo)))
+                                  def-refs))
             st (sh "git status --porcelain" p)
             clean (and (= 0 (:exit st)) (str/blank? (:out st)))
             ad (admin-dir repo p)
@@ -200,7 +214,7 @@
     (doseq [repo rs]
       (let [rel (if (= repo root) "root" (subs repo (inc (count root))))
             shallow? (= "true" (str/trim (:out (sh "git rev-parse --is-shallow-repository" repo))))
-            def-ref (default-ref repo)
+            def-refs (default-refs repo)
             wts (cond->> (worktrees repo)
                   only-prefix (filter #(let [p (:path %)]
                                          (and p (or (= p only-prefix)
@@ -208,7 +222,7 @@
         (when (seq wts)
           (doseq [wt wts]
             (swap! counts update :scanned inc)
-            (let [{:keys [verdict why]} (classify repo def-ref idx shallow? wt)]
+            (let [{:keys [verdict why]} (classify repo def-refs idx shallow? wt)]
               (case verdict
                 :prune (do (swap! counts update :pruned inc)
                            (println (str "PRUNE   " rel "  " (:path wt) "  (" why ")"))
