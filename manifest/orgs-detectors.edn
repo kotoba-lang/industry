@@ -3885,4 +3885,54 @@
                      an absent pin is deliberately not a finding. exit 2 was confirmed
                      against a root with no orgs/ rather than assumed."}}
 
+  {:id       :verify-kotoba-require-declarable
+   :title    "files that require a kotoba.lang.* namespace with nowhere to declare it"
+   :why      "clojure.string resolves for free: it ships with Clojure, with ClojureScript and
+              with babashka. kotoba.lang.text does not. The two are therefore NOT
+              interchangeable in one way no source-level diff shows -- a file with no project
+              file above it runs on clojure.string and cannot run at all on kotoba.lang.text.
+              Measured 2026-09-09, and the reason this exists: the clojure.string migration
+              rewrote 281 files across 53 repos into exactly that state, including
+              `#!/usr/bin/env bb` scripts invoked directly in repos with no deps.edn anywhere.
+              One of them, m365-archive's bin/gpg-unlock.cljc, is what lets git-annex push that
+              archive non-interactively. All of them have been put back and the migration tool
+              now asks the question per file, but the property outlives that one tool and
+              nothing in the tree was checking it.
+              ⚠ The first version of this detector reported the entire workspace CLEAN, because
+              its walk did not stop at the repo boundary and found THIS superproject's own
+              deps.edn above every file under orgs/. It was caught by planting a file that
+              could not possibly resolve and watching the detector not report it. A second
+              audit written in shell had the mirror-image bug: it tested directory membership
+              with `printf '%s\\n' \"$decl\" | grep -qx \"$d\"`, and when a repo has NO project
+              file at all $decl is empty, printf emits one empty line, and grep -qx '' matches
+              it -- so the repos most certain to be broken were the ones reported clean.
+              Adjacent: verify-git-dep-pin-reachability asks whether a pin a deps.edn NAMES is
+              reachable. This asks whether there is a deps.edn to name it in at all."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-kotoba-require-declarable.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\\t[1-9][0-9]*\\t"
+   :interval-ms 86400000                 ; 24h
+   :timeout-ms  900000                   ; 15m
+   :writes   :none
+   :measured "2026-09-09: 12,671 file/library uses of kotoba.lang.* under orgs/, 305 of which
+              looked unresolvable in the checkout and were re-asked of each repo's main.
+              Exit 0, zero findings -- AFTER the 281 repairs landed and the affected repos were
+              re-fetched. Before them the same command reported 307, then 275; the green is a
+              result, not a blind check.
+              TWO STAGES, for the reason this workspace keeps rediscovering: the checkout is
+              not the repo. 301 of the 305 suspects were cleared by asking main, every one of
+              them a local checkout sitting behind a revert that had already landed. 4 could
+              not be asked at all and are reported :unverified, which is neither clean nor a
+              finding.
+              A keyword is not a require: `:kotoba.lang.surface-status/as-of` is a map key, and
+              matching it reported plugin-hermes as unable to resolve a namespace it never asks
+              for. Excluded in the pattern.
+              A file inside the library it requires is exempt -- kotoba-lang/text's own tests
+              require kotoba.lang.text and need no declaration to do it.
+              The 742 :info 'undeclared' uses have a project file above them that does not name
+              the library. Often fine (transitive, or :local/root on a sibling), so it is a
+              number to watch rather than a defect."}
+
 ]}
