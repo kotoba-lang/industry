@@ -137,6 +137,42 @@
 
  :detectors
  [
+  {:id       :verify-source-has-a-project
+   :title    "Clojure source in a west project with nothing that declares a project"
+   :why      "2026-09-09: the clojure.string -> kotoba.lang.text migration refused 67
+              repositories with 'every one of the N file(s) to rewrite has no project file
+              above it; nothing was written'. clojure.string ships with Clojure and
+              resolves for free; kotoba.lang.text is a dependency and does not, so the
+              migration cannot touch those files until something declares what the
+              repository depends on -- a decision per repository, not a rewrite. Sweeping
+              the whole workspace rather than the refusal list found 43 such projects
+              holding 228 files that no build reads. Deliberately not a fleet gate: it
+              walks every west project under orgs/, and a gate ships one repository's
+              tree."
+   :argv     ["nbb" "{{repo}}/scripts/verify-source-has-a-project.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  900000
+   :writes   :none
+   :measured "Landed 2026-09-09 with both directions shown on one project rather than
+              asserted: orgs/cloud-itonami/igata without a project file gives one FINDING
+              naming it and 27 files; the same project with a deps.edn gives NO-PROJECT 0.
+              kotoba.app.edn counts as a project descriptor and is reported separately
+              (4 projects) rather than as a defect -- it is what `kotoba app deploy`
+              reads. manifest.edn does NOT: seventeen of these repositories have one and
+              it is actor datoms (:actor/glyph, :actor/gates, :actor/cells), so counting
+              it would have turned 43 findings into 26 with the difference invisible.
+              Registered checkouts that are absent are reported as ABSENT (14) and not
+              folded into clean. The first version ran two find calls PER PROJECT --
+              9,588 subprocess spawns -- and produced no output at all, which is
+              indistinguishable from a clean tree; it now runs two finds total and
+              buckets by path. --only <project> runs the same code path in seconds,
+              which exists because two attempts at a control on the full sweep were
+              killed mid-flight and left a planted file in a shared checkout."}
+
   {:id       :verify-definition-repo-reachability
    :title    "a definition repository that nothing names, and why"
    :why      "2026-09-09: twenty-four kotoba.lang namespaces became one repository per
