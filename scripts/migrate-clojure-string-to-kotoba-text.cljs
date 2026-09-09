@@ -742,7 +742,21 @@
                        ";;\n"
                        ";; :paths is COPIED from " (.basename path-mod dp)
                        ", not chosen here.\n"
-                       "{:paths " (pr-str ps) "\n"
+                       ;; "." IS ADDED, NOT COPIED. nbb puts the working
+                       ;; directory on the classpath when there is no nbb.edn;
+                       ;; declaring :paths REPLACES that rather than adding to
+                       ;; it. Writing this file with deps.edn's :paths alone
+                       ;; therefore takes the repository root OFF the classpath,
+                       ;; and a bare `nbb <file>` stops resolving namespaces
+                       ;; that used to come from there. Measured 2026-09-10 on
+                       ;; 150 repositories this tool had already written, and in
+                       ;; the wild on kotoba-lang/amu, whose browser-matrix
+                       ;; check passes on main and failed on the wave's branch
+                       ;; with `Could not find namespace: scripts.lib`.
+                       ;;
+                       ;; It goes LAST so the copied paths still win a
+                       ;; collision.
+                       "{:paths " (pr-str (conj (vec (remove #{"."} ps)) ".")) "\n"
                        " :deps {io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}}}\n")
                   "utf8")
                 (println (str "DEPS\tcreated\t" np))))
