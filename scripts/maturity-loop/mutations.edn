@@ -113,6 +113,150 @@
      :replace "REFUSED: git ls-files が実行できない（この repo の中で実行しているか）\")\n  (.exit js/process 0))"
      :must-fail ["outside-a-repository-it-refuses-with-3"]}]}
 
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-3522"
+   :label "isco-3522 governed refusals —— governor が名指しで縛っていた 1 op の外側"
+   ;; この actor の governor は `(= :approve-test op)` で分岐していた。つまり
+   ;; **allowlist ではなく denylist** で、名指しした 1 op の外は全部素通りだった。
+   ;; 実測 2026-09-10、登録済み client と登録済み link（上限 3.5dB / 校正期限 day 100）
+   ;; に対して:
+   ;;
+   ;;   {:op :cut-over-production-fiber :measured-attenuation-db 99.0 :as-of-day 500}
+   ;;   => {:ok? true :violations []}
+   ;;
+   ;; さらに悪いのは `:approve-service-restoral`（既に故障した link を本番搬送へ戻す）
+   ;; で、これは **escalate するので governed に見えた** —— 実際には上限・校正窓・
+   ;; 登録 link 基底の 3 つ全部から免除されており、人間に `:violations []` で届いた。
+   ;; **「止まった」ことと「理由を示した」ことは別**で、出力からは区別できなかった。
+   ;;
+   ;; 14 件とも 2026-09-10 に、当てて赤くなるところを実際に見てから登録した。
+   ;; うち 1 件（:bounds-removed）は最初 `(== x x)` の NaN guard を壊す形で書いたが
+   ;; **何も赤くならなかった** —— bounds が既に NaN を落としており、その節は死んで
+   ;; いた（NaN との比較は全て false なので `(> ##NaN -1e15)` が false）。docstring は
+   ;; その死んだ節を「NaN を落としている節」として説明していた。節を消し、
+   ;; **実際に効く方**（bounds そのもの）を壊す mutation に差し替えてある。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :tt/restoral-not-a-link-op
+     :note "中心の修正を戻す。:approve-service-restoral が link に束縛されなくなり、
+            上限・校正窓・登録 link 基底の 3 つから同時に外れる"
+     :file "src/telecomtech/operation.cljc"
+     :find "   :approve-service-restoral\n   {:escalates? true\n    :link-op? true"
+     :replace "   :approve-service-restoral\n   {:escalates? true\n    :link-op? false"
+     :must-fail ["hard-on-restoral-without-evidence"
+                 "hard-on-restoral-over-ceiling"
+                 "hard-on-restoral-with-expired-calibration"
+                 "hard-on-restoral-of-unregistered-link"
+                 "hard-on-restoral-of-foreign-link"
+                 "restoral-binds-to-a-link"
+                 "link-binding-applies-to-the-restoral-too"
+                 "the-graph-holds-a-restoral-that-breaches-the-ceiling"
+                 "the-scenario-table-passes"]}
+
+    {:id :tt/vocabulary-reopened
+     :note "supported? を全許可に戻す = governor が denylist だった頃の形"
+     :file "src/telecomtech/operation.cljc"
+     :find "(defn supported? [op] (contains? supported op))"
+     :replace "(defn supported? [op] (or (some? op) (contains? supported op)))"
+     :must-fail ["hard-on-undeclared-operation"
+                 "undeclared-ops-answer-false-everywhere"]}
+
+    {:id :tt/negative-attenuation-admitted
+     :note "非負の節を落とす。受動 link は増幅できないので -50dB は計器異常だが、
+            どんな上限も下回るため『良い測定値』として通る"
+     :file "src/telecomtech/facts.cljc"
+     :find "  (and (usable-number? x) (not (neg? x))))"
+     :replace "  (usable-number? x))"
+     :must-fail ["hard-on-negative-measurement"
+                 "usable-attenuation-rejects-what-cannot-be-compared"]}
+
+    {:id :tt/bounds-removed
+     :note "有限性検査を number? に『単純化』する。NaN と ±Inf が戻る。
+            NaN は**どの不等式も false にする**ので、上限を超えることが原理的に無い"
+     :file "src/telecomtech/facts.cljc"
+     :find "  (and (number? x)\n       (> x -1e15)\n       (< x 1e15)))"
+     :replace "  (number? x))"
+     :must-fail ["hard-on-nan-measurement"
+                 "usable-attenuation-rejects-what-cannot-be-compared"]}
+
+    {:id :tt/day-requirement-dropped
+     :note ":as-of-day を必須でなくす。校正窓が自分自身を切る形に戻る"
+     :file "src/telecomtech/facts.cljc"
+     :find "        (not (usable-day? (:as-of-day proposal)))\n        (conj {:rule :as-of-day-unusable"
+     :replace "        (and false (not (usable-day? (:as-of-day proposal))))\n        (conj {:rule :as-of-day-unusable"
+     :must-fail ["hard-on-missing-day" "hard-on-non-integer-day"
+                 "link-binding-reports-each-absence-separately"]}
+
+    {:id :tt/measurement-requirement-dropped
+     :note "測定を必須でなくす。`(number? x)` の off-switch が戻る"
+     :file "src/telecomtech/facts.cljc"
+     :find "        (not (usable-attenuation? (:measured-attenuation-db proposal)))\n        (conj {:rule :attenuation-unusable"
+     :replace "        (and false (not (usable-attenuation? (:measured-attenuation-db proposal))))\n        (conj {:rule :attenuation-unusable"
+     :must-fail ["hard-on-missing-measurement" "hard-on-non-numeric-measurement"
+                 "link-binding-reports-each-absence-separately"]}
+
+    {:id :tt/provenance-back-to-nil-check
+     :note "『store が何かを返したか』だけを問う形に戻す。空 map を登録すると
+            キー nil の下に入り、:client-id を持たない request がそれに解決する"
+     :file "src/telecomtech/facts.cljc"
+     :find "    (blank? (:client-id client-record))\n    [{:rule :client-record-unidentified"
+     :replace "    (and false (blank? (:client-id client-record)))\n    [{:rule :client-record-unidentified"
+     :must-fail ["hard-on-client-record-that-identifies-nobody"
+                 "provenance-separates-existence-from-identity"]}
+
+    {:id :tt/registered-record-trusted-blindly
+     :note "登録済み record を無検査で信じる。:clj では throw、:cljs では**通す** ——
+            同じ tree で host により逆の結果になる"
+     :file "src/telecomtech/facts.cljc"
+     :find "  (if-not (and (op/link-op? op-kw) (some? l))\n    []"
+     :replace "  (if-not (and false (op/link-op? op-kw) (some? l))\n    []"
+     :must-fail ["hard-on-link-registered-without-comparable-facts"
+                 "registered-record-must-itself-be-comparable"]}
+
+    {:id :tt/confidence-unconstrained
+     :note ":confidence 99.0 が escalation を買い戻せるようにする"
+     :file "src/telecomtech/facts.cljc"
+     :find "    (if (or (nil? c) (usable-confidence? c))"
+     :replace "    (if (or true (nil? c) (usable-confidence? c))"
+     :must-fail ["hard-on-unusable-confidence" "confidence-absence-is-not-a-violation"]}
+
+    {:id :tt/phase-order-swapped
+     :note "escalate を hold より先に見る。誰も yes と言えない提案を人間に出す"
+     :file "src/telecomtech/phase.cljc"
+     :find "  (cond\n    (:hard? verdict)     :hold\n    (:escalate? verdict) :request-approval\n    :else                :commit))"
+     :replace "  (cond\n    (:escalate? verdict) :request-approval\n    (:hard? verdict)     :hold\n    :else                :commit))"
+     :must-fail ["hard-outranks-escalate"]}
+
+    {:id :tt/ledger-unchained
+     :note "素の map を append する形に戻す。任意の prefix と順列が『無傷』と読める"
+     :file "src/telecomtech/actor.cljc"
+     :find "  (let [e (ledger/entry (vec (store/ledger store)) m)]\n    (store/append-ledger! store e)\n    e))"
+     :replace "  (let [e m]\n    (store/append-ledger! store e)\n    e))"
+     :must-fail ["the-ledger-the-graph-leaves-behind-is-chained-and-verifies"]}
+
+    {:id :tt/approval-provenance-erased
+     :note "全ての書き込みを :actor として記録する。人間が承認した restoral と
+            自動承認の test が区別できなくなる（interrupt が存在する理由そのもの）"
+     :file "src/telecomtech/actor.cljc"
+     :find "                           approved-by (if (phase/approved-commit? disposition)\n                                         :human\n                                         :actor)"
+     :replace "                           approved-by :actor"
+     :must-fail ["a-commit-records-who-approved-it"]}
+
+    {:id :tt/verify-stops-checking-the-hash
+     :note "改竄が検出できなくなるが verify は :ok? true を返し続ける ——
+            『測れなかった検査が、測って問題が無かった検査と同じ値を返す』の形"
+     :file "src/telecomtech/ledger.cljc"
+     :find "          (not= (:ledger/hash e)\n                (chain-hash prev (dissoc e :ledger/hash)))"
+     :replace "          (and false (not= (:ledger/hash e)\n                (chain-hash prev (dissoc e :ledger/hash))))"
+     :must-fail ["a-tampered-entry-breaks-the-chain"]}
+
+    {:id :tt/sim-reports-pass-with-no-refusals
+     :note "harness 自身の失敗様式。何も実演していないのに緑を出す"
+     :file "src/telecomtech/sim.cljc"
+     :find "     (zero? refusals)\n     \"  REFUSING TO REPORT A PASS: the scenario table demonstrated no refusal.\\n\""
+     :replace "     (zero? refusals)\n     \"  PASS\\n\""
+     :must-fail ["report-refuses-to-report-a-pass-with-no-refusals"]}]}
+
   {:repo "orgs/cloud-itonami/app-bpmn"
    :label "app-bpmn cross-plane —— README が散文で述べている食い違いを、散文の外で保つ"
    ;; この repo の README は冒頭で「三つの面は互いに一致していない」と言い、
