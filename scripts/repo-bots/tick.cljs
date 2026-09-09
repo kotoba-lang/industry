@@ -660,7 +660,9 @@
             (binding [*print-fn* *print-err-fn*]
               (println (str "NOTE\t名簿の pin が書き換わってもう割れていない :pinned finding を "
                             stale-pin " 件外した —— state が古いだけで、直す仕事は無い。"
-                            " 消す: nbb scripts/repo-bots/tick.cljs --wave 200"))))
+                            " state から消えるのはその bot が次に測られた時。"
+                            " 今すぐなら --only <id>；波は :last-tick の古い順に選ぶので"
+                            " 未測定の bot を測り終えるまでここへは来ない"))))
           (js/process.exit 0))
 
         (flag "--report")
