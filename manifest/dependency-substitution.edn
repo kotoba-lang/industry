@@ -172,7 +172,41 @@
   {:coordinate "zod" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/spec" :kind :implementation}
   {:coordinate "metosin/malli" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/spec" :kind :implementation}
   {:coordinate "org.clojure/tools.reader" :ecosystem :maven :disposition :first-party-exists
-   :target "kotoba-lang/reader" :kind :implementation :note "kotoba-lang/edn covers the bounded-EDN half."}
+   :target "kotoba-lang/reader" :kind :implementation :note "kotoba-lang/edn covers the bounded-EDN half."
+   :qualification
+   "TRUE for `.kotoba` source, and that is how the substitution has actually
+    landed: amu's production classpath went from one tools.reader jar to zero
+    on 2026-09-08 once kotoba-sema read with one reader on both hosts.
+
+    NOT a drop-in for `kotoba/src/kotoba/runtime.clj`, which is the last
+    declaration of this coordinate in orgs/kotoba-lang. Measured 2026-09-10.
+    That call site reads `.cljc` for a CHOSEN HOST:
+
+      (reader/read {:read-cond :allow :features #{reader-target} :eof ::eof} rdr)
+
+    and `kotoba-lang/reader` declines host-feature selection on purpose -- its
+    README says reader conditionals select `:kotoba` or `:default`, NEVER a
+    host feature, so a `.kotoba` source cannot read differently depending on
+    where it is read. Probed directly against the target:
+
+      #?(:kotoba 1 :default 2)  ->  1
+      #?(:clj    1 :default 2)  ->  2      (not the :clj branch)
+      #?(:cljs   1 :default 2)  ->  2
+
+    The two readers are doing different jobs, and the target's refusal is a
+    property it was built to have. Swapping it in here would silently read the
+    `:default` branch of every `#?(:clj ...)` in a `.cljc` file.
+
+    One half of the swap IS available and is strictly better: `runtime.clj`
+    binds `*read-eval* false` so a crafted source cannot execute JVM code at
+    read time. `kotoba-lang/reader` has no eval at all -- `#=(+ 1 2)` answers
+    `unsupported reader dispatch` -- so the property is structural there rather
+    than a binding someone can forget.
+
+    The exit for this call site is therefore a decision about `runtime.clj`,
+    not a library swap: either it stops reading `.cljc` for a chosen host, or
+    the target grows host features and loses the property it was built for.
+    Not decided here."}
   {:coordinate "datascript/datascript" :ecosystem :maven :disposition :first-party-exists
    :target "kotoba-lang/datalog" :kind :implementation :note "With kotoba-lang/datom for the value layer; kotobase when durability is wanted."}
   {:coordinate "datascript" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/datalog" :kind :implementation}
