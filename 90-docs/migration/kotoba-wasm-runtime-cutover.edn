@@ -78,8 +78,24 @@
    :registered-checkouts 4780
    :files-scanned 39794
    :files-naming-chicory 25
-   :buckets {:frozen 6 :test-oracle 8 :frozen-repo-other 9 :outside-inventory 2}
-   :problems 11
+   :buckets {:frozen 6 :mention-only 7 :test-oracle 3 :frozen-repo-other 7
+             :outside-inventory 2}
+   :problems 9
+   :mention-only "A docstring is not a call site, and the rule is
+    :new-chicory-call-sites :forbidden. Seven files name Chicory and import
+    nothing: kotoba/src/kotoba/launcher.clj says `EXECUTE the module via
+    kotoba.wasm-exec (com.dylibso.chicory)` in a docstring while requiring
+    kotoba.wasm-exec, which IS the frozen entry; kototama's
+    runtime_conformance.clj and five kotoba/mesh tests are the rest. Control,
+    three ways, buckets summing to 25 each time: predicate live -> 7 / 3 / 7 /
+    2 and problems 9; forced true -> mention-only 0 and problems 11, the
+    previous number exactly; forced false -> mention-only 19 and problems 0,
+    which is why the predicate is written to err toward REPORTING. A rule that
+    can absorb every hit is one bad regex away from silencing the check.
+    Known over-report: aiueos/src/aiueos/tcb.clj is prose too -- it spells the
+    coordinate out to explain a maven path layout -- but the coordinate form
+    is what the predicate looks for, so it stays in frozen-repo-other. Wrong
+    toward reporting, deliberately."
    :note "The sweep used to report every non-frozen hit with one sentence, so a
     historical .clj test and a production provider's import sat in one
     undifferentiated pile of 19 -- while :cutover/rules already separates them
@@ -93,7 +109,20 @@
     frozen-repo-other 14, outside-inventory 5 and problems 19 -- the old
     number, redistributed rather than suppressed; restored, 8 and 11 again.
     Buckets sum to 25 in all three."
-   :frozen-repo-other "Nine files sit in a repo the inventory freezes at a path it
+   :frozen-repo-other-reachability
+   "Measured 2026-09-09 by reading the (ns ...) form of every file in each
+    repository rather than grepping the text -- a text search reported five
+    requirers that turned out to be comments. NONE of the seven is on a
+    production path. kototama's three providers are required only by
+    src/kototama/host_parity_live.clj, whose own docstring says it `actually
+    links and calls selected imports on the JVM tender (Chicory)` and whose
+    only requirer is its own test; linker.clj, runtime_conformance.clj and
+    clj/src/.../prior_shortcut_kotoba.clj are each required by one test and
+    nothing else. So the whole kototama cluster is transitively test-only,
+    which is the same disposition :historical-clj-tests already grants -- it
+    simply does not live under test/. Whether that rule is about the path or
+    about the reach is the owner's call and is not made here."
+   :frozen-repo-other "Files that sit in a repo the inventory freezes at a path it
     does not: kototama/src/{linker,transport_provider,runtime_conformance,
     postgresql_pool_provider,postgresql_wire_provider}.clj, kototama/clj's own
     deps.edn and one source under it, aiueos/src/aiueos/tcb.clj, and
