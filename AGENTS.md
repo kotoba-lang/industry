@@ -192,15 +192,25 @@ ipfs.tech → tech-ipfs (tech-ipfs-specs-*)  boj.or.jp → jp-or-boj
 広げたければ同じように名指しの指示と、退役の根拠と、面ごとの改名表が要る。表・測定値・
 実行順・オーナーにしか決められない 6 件は retirement plan が持つ。⚠ **`gftdcojp` org の
 login 変更はこの workspace の token ではできない**（`admin:org` scope 無し。org admin では
-あるが token が違う。かつ org login は Settings UI の操作）。**home ディレクトリ面は段階移行の途中である**（2026-09-09 実測）: 実体は
-**`~/.itonami`**（194 entry、fleet-ci 署名鍵と aiueos boot seed を含む）で、`~/.gftd` は
-そこへの互換 symlink。version 管理された参照 178 ファイルは `~/.itonami` へ切り替え済み。
-**まだ `~/.gftd` 経由で読んでいるものが残っている**: launchd plist 58 本（114 箇所、
-46 job が loaded）と `~/.itonami` 内の 493 ファイル。symlink を消すのはその後。
-⚠ `scripts/fleet-ci/nodes.edn` の `/Users/{benjamin,joseph,judah,levi,simeon}/.gftd/` は
-**他の mac-mini のホーム**で、この機械の symlink とは無関係 —— 一緒に書き換えない。
-⚠ `ai.gftd.*` は atproto の NSID で、live サーバが今も serve している（実測 2026-09-09:
-`ai.gftd.apps.shinshi.coverage` は 200、`ai.itonami.*` は 404）。lexicon と同時にしか動かせない。
+あるが token が違う。かつ org login は Settings UI の操作）。**home ディレクトリ面の移行は完了した**（2026-09-09）。**`~/.gftd` はもう存在しない。**
+実体は **`~/.itonami`**（194 entry、fleet-ci 署名鍵と aiueos boot seed を含む）。互換
+symlink は `~/.gftd.retired-20260909` へ改名して残してあり、戻すなら `mv` 1 回。
+
+切り替えたもの: version 管理下 178 ファイル / launchd plist 43 本（102 本すべて
+`plutil -lint` clean）/ `~/.itonami` 内の運用ファイル 25 本。**46 job すべてを
+bootout→bootstrap で再読み込みした**（launchd は load 時の定義をキャッシュするので、
+plist を書いただけでは効かない）。実測: job セットは前後で同一、**last-exit が変わった
+5 本はすべて改善**（2→0 / -15→0 / 1→0 / 78→0 / 1→0）、非ゼロは 12→7 で 0 から非ゼロに
+なったものは無い。symlink を外した後に job を実走させ、`~/.itonami/…` に書いて exit 0 に
+なることまで確認した。backup は `~/repo-archive/gftd-symlink-cutover-20260909/`。
+
+⚠ **書き換えなかったものが 3 種ある。**（1）`scripts/fleet-ci/nodes.edn` の
+`/Users/{benjamin,joseph,judah,levi,simeon}/.gftd/` は**他の mac-mini のホーム**で、
+この機械の移行とは無関係 —— 一緒に動かすと 5 台同時に Wasm toolchain pin が外れる。
+（2）`ai.gftd.*` は atproto の NSID で live サーバが今も serve している（実測: POST
+`ai.gftd.apps.shinshi.coverage` は 200、`ai.itonami.*` は 404、存在しないメソッドの
+control も 404）。lexicon の移行と同じ 1 手でしか動かせない。（3）ADR・ledger・receipt
+の中のパスは**その日に何が真だったかの記録**なので書き換えない。
 
 ## 調達経路は direct-first（repo-wide mandatory、2026-08-25）
 
