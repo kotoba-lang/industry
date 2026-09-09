@@ -60,6 +60,29 @@
    ;; A name with a dot cannot be one DNS label, so it cannot be an entry
    ;; host; such a site stays on a path plane. Measured constraint, not style.
    :policy/entry-name-constraint :single-dns-label
+   ;; A :document is ONE self-contained file. A page that fetches its runtime
+   ;; by relative path is right for a directory served over HTTP and wrong for
+   ;; a content address -- an address that cannot be fetched and run on its own
+   ;; is an address for half an application.
+   :policy/document-shape :single-self-contained-file
+   :policy/document-builder "orgs/network-awai/cloud-itonami/scripts/gen-selfcontained-doc.cljs"
+   :policy/document-verifier "orgs/network-awai/cloud-itonami/scripts/verify-selfcontained-doc.cljs"
+   ;; A remote script means the CID does not cover what the app runs. The one
+   ;; way past substitutes a local file ONLY when its sha256 matches the digest
+   ;; named at the call site -- evidence that someone compared the two.
+   :policy/remote-script :refused-unless-digest-verified
+   ;; Publishing writes B2; the origin plane reads R2 `ipld/{cid}`. Until one of
+   ;; the two permanent fixes is chosen, a new :document needs both.
+   :policy/byte-stores {:archive :b2 :origin-plane :r2
+                        :origin-plane-key "ipld/{cid}"
+                        :publish-writes :archive-only
+                        :consequence :document-200-on-bytes-plane-502-on-web-plane}
+   ;; The key signing the live advertisement chain exists only as a write-only
+   ;; Worker secret. Measured 2026-09-01, manifest/ipni-publisher.edn.
+   :policy/public-announce {:route "POST /announce"
+                            :worker "net-kotobase-private-ipni-drain"
+                            :why-not-a-separate-worker :signing-key-is-write-only-there
+                            :reads-private-bucket false}
    :policy/agent-work-plane "https://itonami.cloud"
    :policy/verifier "scripts/verify-app-content-address.cljs"
    :policy/verifier-states #{:addressed :exempt :document-not-addressed :located :unreadable}
@@ -77,9 +100,11 @@
    :policy/measured
    {:at "2026-09-09"
     :note "Numbers move. Re-measure; do not cite these."
-    :scanned 517 :addressed 435 :located 82 :unreadable 0
+    :scanned 518 :addressed 436 :located 82 :unreadable 0
+    :entry-hosts-live ["genko" "daw" "nle" "rirekisho" "tsukuru" "inkan" "shirohan"]
     :bytes-host-probe {"https://{cid}.ipfs.kotobase.net" 200
-                       "https://{cid}.ipfs.itonami.cloud" 502}}}
+                       "https://{cid}.ipfs.itonami.cloud" 200}
+    :correction "The initial record called {cid}.ipfs.itonami.cloud broken. The host was fine; the block was in B2 and that plane reads R2."}}
 
   :live-service-durable-data
   {:policy/authority "90-docs/adr/2608159100-kotobase-net-default-durable-boundary.edn"

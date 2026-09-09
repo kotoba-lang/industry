@@ -1289,6 +1289,56 @@ query 設計をこの前提の上に組み立てた。
 - lock の `:kotoba.*` に archive 専用の raw CID を載せない。Location は protocol 外の記録（例 `:graph {:raw-cid …}`）。
 - document が raw なら identity と Location の文字列は一致してよい。dag-cbor commit では一致しない。それをバグにしない。
 
+## app の面は 4 つで、混ぜない —— identity / naming / location / kind（repo-wide mandatory、2026-09-09、ADR-2609092600）
+
+**正本は ADR-2609092600、機械可読は `manifest/repository-rules.edn` の
+`:workspace-policies :app-plane`、検査は `scripts/verify-app-content-address.cljs`。**
+ここに残すのは、それらを読まなくても効く不変条件だけ。
+
+    identity  ipfs://{cid}                      不変。app が記録する唯一のアドレス
+    naming    ipns://{k51} または DNSLink        可変な版
+    bytes     https://{cid}.ipfs.kotobase.net   Location — 1 面
+    entry     https://{name}.itonami.app/       Location — 1 hostname、DNSLink で解決
+
+- **上 3 行が protocol、`:published` だけが protocol の外。** だから bytes host を
+  差し替えても manifest は 1 文字も動かない。**Location は設計ではなく設定である。**
+- **`:kotoba.app/kind` は 3 値で、既定を持たない** —— `:document`（content address 必須）/
+  `:service`（動的 Worker、宣言で免除）/ `:placement`（actor の配置、宣言で免除）。
+  **宣言の無い manifest は finding のまま残る。** 既定を `:service` にすれば 82 件が
+  一晩で緑になり、1 本も publish されない。免除は書かれた判断であって書き忘れではない。
+  legacy 表記 `"appview"`（文字列）は `:document` として正規化する（一括改名はしない）。
+- **entry は path ではなく hostname にする。** DNSLink は hostname 単位なので
+  `itonami.app/{name}/` では per-app の naming が原理的に解決せず、解決させるには
+  path→IPNS の router が要る —— それは location-addressed な hop を naming plane の
+  真ん中に戻すことである。下の層（`{cid}.ipfs.*` / `{k51}.ipns.*`）が既に subdomain
+  gateway であることと、app ごとに origin が閉じる（localStorage / SW scope / CSP /
+  cookie）ことも同じ側に効く。⚠ entry 名は **1 つの DNS ラベル**でなければならない。
+- **`:document` は自己完結の 1 ファイルである。** 相対パスで runtime を取りに行く
+  ページは HTTP で配るディレクトリとしては正しく、content address としては誤り ——
+  **単体で取得して動かないアドレスは、アプリの半分のアドレスでしかない。**
+  組むのは `cloud-itonami` の `scripts/gen-selfcontained-doc.cljs`、動くことの確認は
+  `scripts/verify-selfcontained-doc.cljs`（実 Chrome、`file://`）。
+- **CDN から取りに行く document に CID を付けない。** 自己完結ではないので、その CID は
+  app が何を実行するかを覆っていない。逃げ道は `--vendor <url>=<path>=<sha256>` 1 つだけで、
+  **digest が一致したときにだけ**ローカルの同一バイト列に差し替える。
+- **publish しただけでは web plane から見えない。** `PUT /ipfs/{cid}` が書くのは **B2**、
+  app を配る origin plane が読むのは **R2 の `ipld/{cid}`**。片方だけに置いた document は
+  bytes plane で 200、web plane で 502 になる。**どちらに寄せるかを決めるまで、
+  新しい `:document` は publish のあとに R2 へも置く。**
+- **公開 announce（IPNI）は drain worker からしか行えない。** chain を署名している鍵は
+  `net-kotobase-private-ipni-drain` の write-only secret にしか存在せず、kagi にも
+  keychain にも無い（`manifest/ipni-publisher.edn` の実測）。**別 worker を立てて
+  署名しようとしない。**
+
+⚠ **「ビルドできた」を「正しい」と読まない。** この面で 2026-09-09 に 2 件、
+**ビルドが成功して出力が間違っている**欠陥が出た: ①`str/replace` の置換文字列で
+JavaScript が `$&` / `$1` / `$'` を解釈し、minified bundle が 4 分の 1 に化けた
+②`js->clj` が match の `.index` を落とし、元のタグを残したまま body を末尾に足した。
+①は browser check が、②は byte 同一性の self-check が捕まえた —— **片方だけでは
+両方は捕まらない**（①のとき browser check は 6 本中 4 本を通していた）。
+**成果物を出す検査は、成果物を実行し、かつ入力が verbatim で入ったことを確かめるまで
+pass にしない。**
+
 ## live service の永続化境界は `kotobase.net`（repo-wide mandatory、2026-08-15、ADR-2608159100）
 
 **live service が生成・収集する proof、actor、wiki、graph、event、index の durable source は
