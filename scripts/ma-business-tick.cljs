@@ -12,7 +12,7 @@
 ;; ## 不変条件（姉妹 tick と同一 — itonami-os-maturity-tick / repo-bots/tick）
 ;;
 ;;   - **何も書かない・deploy しない・git を書き換えない。** 測って言うだけ。
-;;     書くのは `~/.gftd/ma-business-tick.ledger.edn` だけ（追記のみ）。
+;;     書くのは `~/.itonami/ma-business-tick.ledger.edn` だけ（追記のみ）。
 ;;   - 捏造ゼロ。読めなかったら :unmeasured。:ok にも :broken にも丸めない。
 ;;   - **測れなかったことを「問題なし」と同じ形で返さない**（ADR-2608136000）。
 ;;     構成 repo を 1 本も測れなかった周は exit 2 で「答えられなかった」と言う。
@@ -59,7 +59,7 @@
 (def registry-file (str root "/manifest/ma-business.edn"))
 (def itonami-dir (str root "/orgs/cloud-itonami"))
 (def os-app (str root "/orgs/network-awai/cloud-itonami"))
-(def ledger-file (str home "/.gftd/ma-business-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/ma-business-tick.ledger.edn"))
 (def argv (vec *command-line-args*))
 (def no-ledger? (boolean (some #{"--no-ledger"} argv)))
 

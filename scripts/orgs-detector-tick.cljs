@@ -90,7 +90,7 @@
 ;; and CLAUDE.md's own shallow-check hook warns that a guard which false-positives
 ;; gets ignored, and a guard that is ignored protects nothing.
 ;;
-;; The tick itself writes only under `~/.gftd/orgs-detector-tick/`. It never
+;; The tick itself writes only under `~/.itonami/orgs-detector-tick/`. It never
 ;; writes into any checkout, including the superproject -- a tick that dirtied
 ;; the shared checkout would feed the stash-churn failure CLAUDE.md documents.
 ;;
@@ -122,7 +122,7 @@
                                             (nth argv (inc i)))))
 
 (def home (.homedir os))
-(def state-dir (str home "/.gftd/orgs-detector-tick"))
+(def state-dir (str home "/.itonami/orgs-detector-tick"))
 (def state-file (or (opt "--state") (str state-dir "/state.edn")))
 (def log-file (str state-dir "/tick.log"))
 ;; The lock is per state file, not global: a fixture run under --state must not

@@ -32,7 +32,7 @@
 
 (def root (flag "--root" (path/join (or js/process.env.HOME "/tmp") "github" "com-junkawasaki")))
 (def notify? (not= "false" (flag "--notify" "true")))
-(def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp") ".gftd" "residency-alarm-state.edn")))
+(def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp") ".itonami" "residency-alarm-state.edn")))
 
 (defn check []
   (let [r (cp/spawnSync "nbb" #js["scripts/residency-collect.cljs" root "--check"]

@@ -23,14 +23,14 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/industry-stack-wave-tick.ledger.edn"))
-(def wave-ledger (str home "/.gftd/industry-stack-wave.ledger.edn"))
+(def ledger-file (str home "/.itonami/industry-stack-wave-tick.ledger.edn"))
+(def wave-ledger (str home "/.itonami/industry-stack-wave.ledger.edn"))
 (def project-ledger (str root "/90-docs/business/industry-stack-ledger.edn"))
 (def cloud-root (.join path root "orgs" "cloud-itonami"))
 
 (def need-files ["operation.cljc" "governor.cljc" "store.cljc" "phase.cljc"])
 
-(def done-file (str home "/.gftd/industry-stack-wave-done.edn"))
+(def done-file (str home "/.itonami/industry-stack-wave-done.edn"))
 
 (defn- done-from-project-ledger
   "project ledger の構造化行だけから着地 repo を拾う。
@@ -74,7 +74,7 @@
 (defn- done-repos
   "既 wave で着地した repo 名集合。local checkout が pin より遅れていても
   再ピックしないための床（skill 側は origin/main を見るが、slot を浪費しない）。
-  正本は ~/.gftd/industry-stack-wave-done.edn（wave 着地時に skill が conj）。
+  正本は ~/.itonami/industry-stack-wave-done.edn（wave 着地時に skill が conj）。
   保険は project ledger の :event/merged / :event/pins だけ — loop/tick
   ledger の free-text や dry-run 候補は見ない。"
   []

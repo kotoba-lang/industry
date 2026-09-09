@@ -35,8 +35,8 @@
                                             (nth argv (inc i)))))
 
 (def home (.homedir os))
-(def state-file (or (opt "--state") (str home "/.gftd/repo-bots/state.edn")))
-(def ledger-file (str home "/.gftd/repo-bots/observations.ledger.edn"))
+(def state-file (or (opt "--state") (str home "/.itonami/repo-bots/state.edn")))
+(def ledger-file (str home "/.itonami/repo-bots/observations.ledger.edn"))
 (def plist (str home "/Library/LaunchAgents/com.gftd.repo-bots-tick.plist"))
 (def registry-file (str (or (not-empty (str (or js/process.env.CLAUDE_PROJECT_DIR ""))) ".")
                         "/manifest/repo-bots.edn"))

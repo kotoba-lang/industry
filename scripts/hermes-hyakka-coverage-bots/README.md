@@ -33,7 +33,7 @@ looks like.
 | | |
 |---|---|
 | `~/github/com-junkawasaki` | **read only.** |
-| `~/.gftd/worktrees/hyakka-coverage-bot` | this family's own worktree — NOT shared with `hyakka-source-scout`/`hyakka-ontology-scout`'s `hyakka-growth-bot` worktree, and NOT shared with `itonami-*-bots`' worktree either. |
+| `~/.itonami/worktrees/hyakka-coverage-bot` | this family's own worktree — NOT shared with `hyakka-source-scout`/`hyakka-ontology-scout`'s `hyakka-growth-bot` worktree, and NOT shared with `itonami-*-bots`' worktree either. |
 
 Sharing a worktree across bot families is exactly the failure mode that blocked
 `hyakka-source-scout` for ~11 hours (2026-08-28): an interrupted run's uncommitted
@@ -63,10 +63,10 @@ cp scripts/hermes-hyakka-coverage-bots/vuln-coverage-scout.prompt.md ~/.hermes/s
 cp scripts/hermes-hyakka-coverage-bots/osm-coverage-scout.prompt.md ~/.hermes/scripts/
 
 git -C orgs/network-awai/app-hyakka worktree add --detach \
-  ~/.gftd/worktrees/hyakka-coverage-bot origin/main
+  ~/.itonami/worktrees/hyakka-coverage-bot origin/main
 
 H=~/.hermes/hermes-agent/venv/bin/hermes
-W=~/.gftd/worktrees/hyakka-coverage-bot
+W=~/.itonami/worktrees/hyakka-coverage-bot
 $H cron create "30 4 * * *" "$(cat ~/.hermes/scripts/vuln-coverage-scout.prompt.md)" \
    --name vuln-coverage-scout --script hyakka_coverage_evidence.py \
    --deliver local

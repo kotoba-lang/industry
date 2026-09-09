@@ -37,7 +37,7 @@
    {:tick-interval-min {:v 5 :measured "LaunchAgent com.gftd.fleet-ci-tip-tick (loaded, PID 確認)"}
     :gates {:v 23 :measured "gates.edn :repos の件数"}
     :receipts {:v 230 :measured "manifest/fleet-ci.edn の署名済み receipt 行数"}
-    :historical-passes {:v 2957 :measured "~/.gftd/fleet-ci-tick.log の 'pass test-' 出現数"}
+    :historical-passes {:v 2957 :measured "~/.itonami/fleet-ci-tick.log の 'pass test-' 出現数"}
     :commit-statuses {:v 0 :measured "root と net-kotobase の直近 5 commit を GitHub API で確認、contexts 空"}
     :enforced? {:v false :measured "required status checks 未設定（status が無いので設定すると全 merge が固まる）"}}
    :murakumo-actions

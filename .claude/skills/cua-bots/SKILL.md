@@ -6,8 +6,8 @@ description: 画面操作の常駐 bot（CUA bot、selectable-backend）を 1 �
 # CUA bot を 1 体回す
 
 **この skill は会話履歴を持たない fresh context から読める**ように書いてある。
-状態は会話ではなく **receipt（`~/.gftd/cua-bots/receipts/<bot-id>/`）と
-ledger（`~/.gftd/cua-bots/ledger.edn`）** から読む。
+状態は会話ではなく **receipt（`~/.itonami/cua-bots/receipts/<bot-id>/`）と
+ledger（`~/.itonami/cua-bots/ledger.edn`）** から読む。
 
 正本 ADR: `adr-2608291900-cua-bots-selectable-backend-residents`。
 
@@ -19,8 +19,8 @@ ledger（`~/.gftd/cua-bots/ledger.edn`）** から読む。
 | **実行機構**（backend registry + session） | `orgs/kotoba-lang/computer-use` の `bin/cua_bot_run.cljs` | kotoba-lang/computer-use |
 | due 判定 | `scripts/cua-bots-tick.cljs`（決定論） | superproject |
 | 常駐 | `scripts/cua-bots-loop.cljs` + `com.gftd.cua-bots.plist`（1h） | superproject |
-| receipt | `~/.gftd/cua-bots/receipts/<bot-id>/` | lib の session |
-| ledger | `~/.gftd/cua-bots/ledger.edn`（追記のみ） | loop |
+| receipt | `~/.itonami/cua-bots/receipts/<bot-id>/` | lib の session |
+| ledger | `~/.itonami/cua-bots/ledger.edn`（追記のみ） | loop |
 
 ## backend の選び方（この system の中心）
 
@@ -42,7 +42,7 @@ cd orgs/kotoba-lang/computer-use
 nbb bin/cua_bot_run.cljs \
   --roster "$COM_JUNKAWASAKI_ROOT/manifest/cua-bots.edn" \
   --bot <bot-id> \
-  --receipts-dir ~/.gftd/cua-bots/receipts/<bot-id> \
+  --receipts-dir ~/.itonami/cua-bots/receipts/<bot-id> \
   [--dry-run]        # validate + backend probe だけ。行動しない
 ```
 

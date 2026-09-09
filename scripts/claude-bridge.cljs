@@ -4,7 +4,7 @@
 ;; provider, aider, cline, …) run against the Claude Code SUBSCRIPTION
 ;; instead of the metered api.anthropic.com path.
 ;;
-;;   nbb ~/.gftd/claude-bridge.cljs            # listens on 127.0.0.1:9180
+;;   nbb ~/.itonami/claude-bridge.cljs            # listens on 127.0.0.1:9180
 ;;
 ;; Env: CLAUDE_BRIDGE_PORT (9180) CLAUDE_BRIDGE_CONCURRENCY (2)
 ;;      CLAUDE_BRIDGE_TIMEOUT (600s) CLAUDE_BRIDGE_BIN (claude)
@@ -107,7 +107,7 @@
 (def max-inflight  (env-int "CLAUDE_BRIDGE_CONCURRENCY" 2))
 (def child-timeout (* 1000 (env-int "CLAUDE_BRIDGE_TIMEOUT" 600)))
 (def claude-bin    (or (aget env "CLAUDE_BRIDGE_BIN") "claude"))
-(def workdir       (path/join (os/homedir) ".gftd" "claude-bridge-cwd"))
+(def workdir       (path/join (os/homedir) ".itonami" "claude-bridge-cwd"))
 
 (def served-models
   ["claude-opus-5" "claude-sonnet-5" "claude-haiku-4-5" "opus" "sonnet" "haiku"])

@@ -2,7 +2,7 @@
 (ns prune-cache
   "Reclaim the fleet-ci ship cache.
 
-  `~/.gftd/fleet-ci-cache` holds one tarball per (repo, sha, :include-ext).
+  `~/.itonami/fleet-ci-cache` holds one tarball per (repo, sha, :include-ext).
   The key pins an immutable sha, and `tick.cljs` looks entries up with nothing
   but `existsSync`, so an entry stops being reachable the moment that repo's
   tip moves — and nothing has ever deleted one. Measured 2026-08-27: 17,370
@@ -31,7 +31,7 @@
 (defn flag? [f] (some? (some #{f} argv)))
 (defn arg [f d] (let [i (.indexOf argv f)] (if (neg? i) d (get argv (inc i) d))))
 
-(def cache-dir (arg "--cache" (path/join (os/homedir) ".gftd" "fleet-ci-cache")))
+(def cache-dir (arg "--cache" (path/join (os/homedir) ".itonami" "fleet-ci-cache")))
 ;; Resolved from the working directory, not from this file: nbb's ESM loader
 ;; gives no `__dirname`, and a wrong guess here silently becomes "no pins",
 ;; which the refusal below turns into a stop rather than a sweep.

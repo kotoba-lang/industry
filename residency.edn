@@ -137,7 +137,7 @@
    :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/capacity-alarm.cljs"]
    :plist "scripts/fleet-ci/com.gftd.capacity-alarm.plist"
    :credentials []
-   :health {:kind :state-file :path "~/.gftd/capacity-alarm-state.edn"}
+   :health {:kind :state-file :path "~/.itonami/capacity-alarm-state.edn"}
    :adr "adr-2608160300-disk-full-halted-writes"
    :note "この機械の空き容量と inode を見る。ADR-2608160300 の再発防止 —— ディスクが 0 になったとき、症状は checkout 失敗・テスト失敗・receipt が書けないという無関係な場所に出て、容量そのものを見ているものが何も無かった。fleet gate にできないのは residency-alarm と同じ理由で、対象が *この機械* だから（gate はノードへ tree を配る）。床 20GiB は「最後の警告」ではなく「気づいてから片付ける余地」。df が答えないことと閾値が数値でないことは、どちらも healthy として報告しない。"}
 
@@ -149,7 +149,7 @@
    :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/residency-alarm.cljs"]
    :plist "scripts/fleet-ci/com.gftd.residency-alarm.plist"
    :credentials []
-   :health {:kind :state-file :path "~/.gftd/residency-alarm-state.edn"}
+   :health {:kind :state-file :path "~/.itonami/residency-alarm-state.edn"}
    :adr "adr-2608111721-placement-authority-is-murakumo-fleet-ci-is-a-gate-consumer"
    :note "この登録簿そのものの drift を見る側。判定は residency-collect --check にあり、ここは exit code を見て遷移時に 1 回だけ鳴らす。fleet gate にできないのは、drift の片側が『この機械で実際に何が動いているか』(launchctl) だから。"}
 
@@ -170,7 +170,7 @@
  ;;
  ;; **記録を残す理由**: 消したことが分からないと、次に同じ label を見た人が
  ;; 「なぜ動いていないのか」を最初から調べ直す。plist は
- ;; `~/.gftd/launchd-archive-2026-08-11/` に退避してある（stash-archive と同じ作法）。
+ ;; `~/.itonami/launchd-archive-2026-08-11/` に退避してある（stash-archive と同じ作法）。
  :retired
  [{:label "ai.gftd.agent-daemon" :exit 78 :reason :subject-removed-upstream
    :detail "gftdcojp/ai-gftd-apps-gftdcojp の 20-actors/magatama が上流で撤去済み（numbered-layer 撤去、#1544/#1555 系）。.venv も無い。"}
@@ -189,7 +189,7 @@
   {:label "ai.gftd.keiei" :exit 127 :reason :subject-deleted-as-dead
    :detail "50-infra/vultr/keiei-llm-pool は commit cf392a3d62b『prune confirmed-dead Vultr VKE chart dirs』で意図的に削除されている。後継の cloud-itonami/keiei は別物（kotoba/lg/migration.edn）で、常駐エントリを持たない。"}
   {:label "ai.gftd.litellm.jacob" :exit 127 :reason :runtime-absent
-   :detail "~/.gftd/litellm-start.sh は在るが、それが exec する ~/litellm-venv/bin/litellm と ~/litellm.yaml がどちらも無い。"}]
+   :detail "~/.itonami/litellm-start.sh は在るが、それが exec する ~/litellm-venv/bin/litellm と ~/litellm.yaml がどちらも無い。"}]
 
  ;; 直したもの（retire ではない）
  :repaired

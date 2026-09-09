@@ -45,7 +45,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory-tick.cljs
 `:outcome :insufficient-scan` が出たら **何もせず終わる**。sparse checkout から
 「もう無い」を言うと嘘になる。
 
-先頭 1 件 (`next`) を取る。`~/.gftd/adr-inventory-tick.ledger.edn` の末尾も読む。
+先頭 1 件 (`next`) を取る。`~/.itonami/adr-inventory-tick.ledger.edn` の末尾も読む。
 
 ### 1. worktree を切る（共有 checkout を触らない）
 
@@ -152,5 +152,5 @@ worktree を撤去し、merge 済み branch を消す。
 ## 成否
 
 この反復が自分で green と言ってはいけない。次周の tick が測る。
-`~/.gftd/adr-inventory-tick.ledger.edn` の `remaining` が減っていること、
+`~/.itonami/adr-inventory-tick.ledger.edn` の `remaining` が減っていること、
 かつ同じ `:path` + `:kind` が `next` に出ていないこと。

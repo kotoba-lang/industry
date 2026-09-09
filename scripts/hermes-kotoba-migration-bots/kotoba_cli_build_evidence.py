@@ -19,10 +19,10 @@ READ_ROOT = Path(os.environ.get(
     "KOTOBA_CLI_BUILD_READ_ROOT", "~/github/com-junkawasaki")).expanduser()
 RUN_PARENT = Path(os.environ.get(
     "KOTOBA_CLI_BUILD_RUN_PARENT",
-    "~/.gftd/worktrees/kotoba-cli-build-bot")).expanduser()
+    "~/.itonami/worktrees/kotoba-cli-build-bot")).expanduser()
 STATE_PATH = Path(os.environ.get(
     "KOTOBA_CLI_BUILD_STATE",
-    "~/.gftd/hermes-kotoba-cli-build-bot/seen.json")).expanduser()
+    "~/.itonami/hermes-kotoba-cli-build-bot/seen.json")).expanduser()
 NBB = os.environ.get("KOTOBA_CLI_BUILD_NBB", "/opt/homebrew/bin/nbb")
 TTL_SECONDS = 14 * 24 * 60 * 60
 DRY_RUN = os.environ.get("KOTOBA_CLI_BUILD_DRY_RUN") == "1"

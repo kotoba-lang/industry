@@ -39,7 +39,7 @@ import sys
 READ_ROOT = os.environ.get("CLOJURE_STDLIB_READ_ROOT",
                            os.path.expanduser("~/github/com-junkawasaki"))
 RUN_PARENT = os.environ.get("CLOJURE_STDLIB_RUN_PARENT",
-                            os.path.expanduser("~/.gftd/worktrees/clojure-stdlib-migration-bot"))
+                            os.path.expanduser("~/.itonami/worktrees/clojure-stdlib-migration-bot"))
 NBB = os.environ.get("CLOJURE_STDLIB_NBB", "/opt/homebrew/bin/nbb")
 GATE = os.environ.get(
     "CLOJURE_STDLIB_GATE",

@@ -55,7 +55,7 @@
                                             (nth argv (inc i)))))
 
 (def state-file (or (opt "--state")
-                    (str (.homedir os) "/.gftd/orgs-detector-tick/state.edn")))
+                    (str (.homedir os) "/.itonami/orgs-detector-tick/state.edn")))
 (def registry-file (str (or (not-empty (str (or js/process.env.CLAUDE_PROJECT_DIR "")))
                             ".")
                         "/manifest/orgs-detectors.edn"))

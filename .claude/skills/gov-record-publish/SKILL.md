@@ -145,8 +145,8 @@ MISS が出たら evidence を実際のテキストに合わせて直す（PDF �
 ### 5. Dry-run → 実行
 
 ```bash
-HYAKKA_ARCHIVE_DIR=~/.gftd/hyakka-archive nbb --classpath src scripts/seed_<corpus>.cljs --dry-run
-HYAKKA_ARCHIVE_DIR=~/.gftd/hyakka-archive nbb --classpath src scripts/seed_<corpus>.cljs
+HYAKKA_ARCHIVE_DIR=~/.itonami/hyakka-archive nbb --classpath src scripts/seed_<corpus>.cljs --dry-run
+HYAKKA_ARCHIVE_DIR=~/.itonami/hyakka-archive nbb --classpath src scripts/seed_<corpus>.cljs
 ```
 
 dry-run が `admitted` を返してから実行する。evidence が 1 件でも一致しなければ

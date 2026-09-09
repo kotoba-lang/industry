@@ -64,7 +64,7 @@ compile success alone.
 | | |
 |---|---|
 | `~/github/com-junkawasaki` | **read only.** `orgs/kotoba-lang/` is fully checked out here (1,983 repos measured 2026-08-28 — unusually complete for a west sparse checkout). `candidates.cljs` scans it. Never edit inside it. |
-| `~/.gftd/worktrees/kotoba-migration-bot/run-<timestamp>/<repo>` | **a fresh clone, every run, of whatever repo this run's candidate lives in.** |
+| `~/.itonami/worktrees/kotoba-migration-bot/run-<timestamp>/<repo>` | **a fresh clone, every run, of whatever repo this run's candidate lives in.** |
 
 The other two bots keep one persistent worktree of one fixed target repo and `git fetch
 + checkout --detach origin/main` it each run. This bot's candidates come from ~2,000
@@ -106,7 +106,7 @@ Every rule about what counts as a candidate lives here, not in the bot's prompt:
   fails (rate limit, network), the candidate is still handed to the bot with an explicit
   `⚠ … UNKNOWN` line — not silently treated as clear, per the same discipline
   `itonami_evidence.py` uses for `UNKNOWN` vs `none`.
-- **recently proposed** (`~/.gftd/hermes-kotoba-migration-bot/seen.edn`, 14-day TTL) — a
+- **recently proposed** (`~/.itonami/hermes-kotoba-migration-bot/seen.edn`, 14-day TTL) — a
   candidate this bot already picked recently isn't picked again while its PR (if any)
   is still fresh, even if `gh` couldn't confirm an open PR for it.
 
@@ -164,7 +164,7 @@ cp scripts/hermes-kotoba-migration-bots/kotoba_cli_build_verifier_evidence.py \
 cp scripts/hermes-kotoba-migration-bots/kotoba-cli-build-verifier.prompt.md \
    ~/.hermes/scripts/
 
-mkdir -p ~/.gftd/worktrees/kotoba-migration-bot
+mkdir -p ~/.itonami/worktrees/kotoba-migration-bot
 
 H=~/.hermes/hermes-agent/venv/bin/hermes
 $H cron create "15 5 * * *" "$(cat ~/.hermes/scripts/kotoba-migration-scout.prompt.md)" \

@@ -7,7 +7,7 @@ description: スキマバイト（単発シフト）の求人を 1 件だけ gov
 
 **この skill は会話履歴を一切持たない fresh context から読める**ように書いてある。
 前の反復が何をしたかは会話ではなく **tick の出力・`80-data/spotwork/proposals.ledger.edn`・
-`~/.gftd/spotwork-match/ledger.edn`・git log** から読む。
+`~/.itonami/spotwork-match/ledger.edn`・git log** から読む。
 
 - 実装: `70-tools/spotwork/`（pure `.cljc`）
 - policy: `manifest/spotwork.edn`

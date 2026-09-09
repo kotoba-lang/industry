@@ -18,7 +18,7 @@
 
 (def home (.homedir os))
 (def ledger-dir (or (.-OEM_RFQ_HOME js/process.env)
-                    (.join path home ".gftd" "murakumo-oem-rfq")))
+                    (.join path home ".itonami" "murakumo-oem-rfq")))
 (def root (or (.-COM_JUNKAWASAKI_ROOT js/process.env)
               (.cwd process)))
 (def this-dir

@@ -61,7 +61,7 @@
 (def alias-model "murakumo-main")
 (def registry-url "https://api.murakumo.cloud/infer/models/murakumo-main")
 (def chat-url "https://api.murakumo.cloud/v1/chat/completions")
-(def key-path (str (.-HOME js/process.env) "/.gftd/murakumo-api-key"))
+(def key-path (str (.-HOME js/process.env) "/.itonami/murakumo-api-key"))
 (def resident-config (str (.-HOME js/process.env) "/.cloud-itonami/data/config.edn"))
 (def shipped-defaults
   "orgs/cloud-itonami/cloud-itonami-app/resources/cloud-itonami-app.defaults.edn")

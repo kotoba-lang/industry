@@ -182,11 +182,11 @@ cp scripts/hermes-hyakka-bots/hyakka_evidence.py    ~/.hermes/scripts/
 cp scripts/hermes-hyakka-bots/*.prompt.md           ~/.hermes/scripts/
 
 git -C orgs/network-awai/app-hyakka worktree add --detach \
-  ~/.gftd/worktrees/hyakka-growth-bot origin/main
-( cd ~/.gftd/worktrees/hyakka-growth-bot && npm install )
+  ~/.itonami/worktrees/hyakka-growth-bot origin/main
+( cd ~/.itonami/worktrees/hyakka-growth-bot && npm install )
 
 H=~/.hermes/hermes-agent/venv/bin/hermes
-W=~/.gftd/worktrees/hyakka-growth-bot
+W=~/.itonami/worktrees/hyakka-growth-bot
 $H cron create "20 9 * * *"  "$(cat ~/.hermes/scripts/source-scout.prompt.md)" \
    --name hyakka-source-scout   --script hyakka_evidence.py --workdir "$W" \
    --model murakumo-main --provider custom --deliver local
@@ -233,9 +233,9 @@ itself, so the pair travels together. As with the prompts, this directory is
 the reviewable original and the installed copies can drift; re-copy after
 editing.
 
-The worktree must sit under `~/.gftd/worktrees/`, not in `/tmp`: app-hyakka's
+The worktree must sit under `~/.itonami/worktrees/`, not in `/tmp`: app-hyakka's
 `deps.edn` carries the source path `../../kotoba-lang/kotobase-client/src`, and
-`~/.gftd/kotoba-lang` is what makes that resolve. In a flat `/tmp` worktree the
+`~/.itonami/kotoba-lang` is what makes that resolve. In a flat `/tmp` worktree the
 test build fails with `The required namespace "kotobase.client" is not
 available` — which is exactly the failure a caller reads as *the tests ran*.
 

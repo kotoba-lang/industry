@@ -45,7 +45,7 @@
 ;;
 ;; ## 共有 checkout を書かない
 ;;
-;; 書くのは `~/.gftd/repo-bots/` の下だけ。4,000 本の checkout は**読むだけ**で、
+;; 書くのは `~/.itonami/repo-bots/` の下だけ。4,000 本の checkout は**読むだけ**で、
 ;; git の書き込みコマンドは 1 つも呼ばない。並行 agent が走っているマシンなので、
 ;; ここを緩めるとこの tick が他人の working tree を壊す側になる。
 ;;
@@ -69,7 +69,7 @@
 
 (def top (or (.-CLAUDE_PROJECT_DIR (.-env js/process)) (.cwd js/process)))
 (def home (.homedir os))
-(def state-dir (str home "/.gftd/repo-bots"))
+(def state-dir (str home "/.itonami/repo-bots"))
 (def state-file (or (opt "--state") (str state-dir "/state.edn")))
 (def ledger-file (or (opt "--ledger") (str state-dir "/observations.ledger.edn")))
 (def log-file (str state-dir "/tick.log"))

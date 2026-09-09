@@ -80,7 +80,7 @@
                                   (= % only-id) (= % edn-out)) argv))
               (js/process.cwd)))
 (def state-path (.join path (or (.-HOME js/process.env) "/tmp")
-                       ".gftd" "endpoint-health.state.edn"))
+                       ".itonami" "endpoint-health.state.edn"))
 
 (defn die! [code & msg]
   (apply println msg)

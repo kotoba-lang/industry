@@ -77,7 +77,7 @@ def main() -> None:
                 os.path.join(p, ".git")):
             refuse(f"{p} is not a git checkout")
 
-    print("worktree\t~/.gftd/worktrees/hyakka-growth-bot (app-hyakka)")
+    print("worktree\t~/.itonami/worktrees/hyakka-growth-bot (app-hyakka)")
     print(f"superproject\t{SUPER}")
     print()
     print("# BPMN corpus evidence — mirrors measured, nothing decided")
@@ -133,7 +133,7 @@ def main() -> None:
     print()
 
     # ── the ISIC precedent, in the worktree ──
-    wt = os.path.expanduser("~/.gftd/worktrees/hyakka-growth-bot")
+    wt = os.path.expanduser("~/.itonami/worktrees/hyakka-growth-bot")
     for rel in ("src/hyakka/corpus/isic.cljc", "scripts/seed_isic.cljs",
                 "test/hyakka/isic_test.cljs",
                 "scripts/verify_source_proposal.cljs"):

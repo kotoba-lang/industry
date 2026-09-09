@@ -7,7 +7,7 @@
 ;;   1. 名簿の形。読めない / 形が違う / id 重複 → **:not-measured（exit 2）**。
 ;;      壊れた名簿を「候補 0 件」と読ませない —— 測れなかった検査が、測って
 ;;      問題が無かった検査と同じ値を返してはならない（ADR-2608136000）。
-;;   2. bot ごとの due?。~/.gftd/cua-bots/receipts/<bot-id>/ の最新 receipt が
+;;   2. bot ごとの due?。~/.itonami/cua-bots/receipts/<bot-id>/ の最新 receipt が
 ;;      :bot/interval-s より古い、または receipt が 1 つも無い → due。
 ;;
 ;; backend keyword の**実在**はここでは検査しない —— backend registry の正本は
@@ -39,7 +39,7 @@
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
 (def roster-file (or (opt "--roster") (str root "/manifest/cua-bots.edn")))
-(def receipts-root (str home "/.gftd/cua-bots/receipts"))
+(def receipts-root (str home "/.itonami/cua-bots/receipts"))
 
 (defn- exists? [p] (try (.existsSync fs p) (catch :default _ false)))
 

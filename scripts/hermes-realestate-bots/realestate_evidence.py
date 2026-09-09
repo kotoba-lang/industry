@@ -26,12 +26,12 @@ CANDIDATES = ["orgs/cloud-itonami/real-estate",
               "orgs/cloud-itonami/cloud-itonami-isic-6820",
               "orgs/cloud-itonami/cloud-itonami-isco-3334"]
 CONFIG = {
- "schema":      (HYAKKA, Path("~/.gftd/worktrees/realestate-ontology-bot").expanduser()),
- "registry":    (HYAKKA, Path("~/.gftd/worktrees/realestate-registry-source-bot").expanduser()),
- "transaction": (HYAKKA, Path("~/.gftd/worktrees/realestate-transaction-source-bot").expanduser()),
- "investment":  (HYAKKA, Path("~/.gftd/worktrees/realestate-investment-source-bot").expanduser()),
- "procedure":   (HYAKKA, Path("~/.gftd/worktrees/realestate-procedure-source-bot").expanduser()),
- "analysis":    (READ_ROOT, Path("~/.gftd/worktrees/itonami-realestate-analysis-bot").expanduser()),
+ "schema":      (HYAKKA, Path("~/.itonami/worktrees/realestate-ontology-bot").expanduser()),
+ "registry":    (HYAKKA, Path("~/.itonami/worktrees/realestate-registry-source-bot").expanduser()),
+ "transaction": (HYAKKA, Path("~/.itonami/worktrees/realestate-transaction-source-bot").expanduser()),
+ "investment":  (HYAKKA, Path("~/.itonami/worktrees/realestate-investment-source-bot").expanduser()),
+ "procedure":   (HYAKKA, Path("~/.itonami/worktrees/realestate-procedure-source-bot").expanduser()),
+ "analysis":    (READ_ROOT, Path("~/.itonami/worktrees/itonami-realestate-analysis-bot").expanduser()),
 }
 TOKENS = {
  "schema":      ["parcel", "land-right", "title-record", "recorded-transaction", "official-valuation"],

@@ -12,7 +12,7 @@ hyakka_evidence.py — the bot must run and be told it is blind, not skip).
 import json, os, subprocess, sys, datetime
 
 ROOT = os.environ.get("QA_ROOT", "/Users/junkawasaki/github/com-junkawasaki")
-STATEMENT = os.path.expanduser("~/.gftd/endpoint-health/statement.edn")
+STATEMENT = os.path.expanduser("~/.itonami/endpoint-health/statement.edn")
 
 def run(cmd, timeout=240):
     try:

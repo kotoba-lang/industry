@@ -27,7 +27,7 @@
 ;;   - Only the shared root checkout's OWN pull is written by step 3. Child
 ;;     checkouts are only moved by west update when every guard above passes.
 ;;   - No rebase, no force anything, no stash. Divergence = detect + stop.
-;;   - Every run appends exactly one EDN map to ~/.gftd/west-pull-bot/ledger.edn
+;;   - Every run appends exactly one EDN map to ~/.itonami/west-pull-bot/ledger.edn
 ;;     (append-only event column; failures are events too).
 ;;   - exit 0 always when it ran (monitoring, not a gate); 2 = could not run.
 ;;
@@ -46,7 +46,7 @@
 (def home (.homedir os))
 (def root (or (.-COM_JUNKAWASAKI_ROOT js/process.env)
               (str home "/github/com-junkawasaki")))
-(def out-dir (path/join home ".gftd" "west-pull-bot"))
+(def out-dir (path/join home ".itonami" "west-pull-bot"))
 (def ledger (path/join out-dir "ledger.edn"))
 (def dry-run? (boolean (some #{"--dry-run"} js/process.argv)))
 (def max-children 40)                       ; bounded wave per tick

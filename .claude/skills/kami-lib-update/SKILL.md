@@ -6,8 +6,8 @@ description: kami-engine family + core render/game lib（webgpu / webgl / host /
 # kami family の pin を tip へ進める
 
 **この skill は会話履歴を一切持たない fresh context から読める**ように書いてある。
-前の反復が何をしたかは会話ではなく **tick の出力・`~/.gftd/kami-lib-update/ledger.edn`・
-cursor（`~/.gftd/kami-lib-update/cursor.edn`）** から読む。
+前の反復が何をしたかは会話ではなく **tick の出力・`~/.itonami/kami-lib-update/ledger.edn`・
+cursor（`~/.itonami/kami-lib-update/cursor.edn`）** から読む。
 
 根拠: CLAUDE.md 2026-08-20 オーナー規則「**pin の既定状態は upstream default branch の
 tip**」。pin が遅れているのは平常ではなく是正対象なので、**batch で前進させてよい**
@@ -41,7 +41,7 @@ PINS=<tsv> nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.clj
 `HEAD` は「上流 default branch の先端」の意味で、script がサーバ側で解決する。
 
 - **REJECTED をねじ込まない。** サーバ側検証（到達不能 / 退行 / diverged / 409）に
-  弾かれた entry は、**理由を ledger（`~/.gftd/kami-lib-update/ledger.edn` に追記）に
+  弾かれた entry は、**理由を ledger（`~/.itonami/kami-lib-update/ledger.edn` に追記）に
   書いて置いていく**。force しない、検証を飛ばす別経路を作らない。
   未 merge branch 上の commit を pin にしない（CLAUDE.md、実測事例あり）。
 - 終わったら検証: `nbb scripts/verify-west-pins.cljs`
@@ -56,7 +56,7 @@ printf '%s\n' <entry1> <entry2> ... | xargs west update --fetch smart
 
 ### 4.（第二の任務・最大 1 件）kami family の床割れを 1 つ塞ぐ
 
-pin が全部進んだ後に余力があれば、`~/.gftd/repo-bots/state.edn` を読み、
+pin が全部進んだ後に余力があれば、`~/.itonami/repo-bots/state.edn` を読み、
 kami family の repo で `:readme` または `:test-signal` が `:broken` のものを
 **1 件だけ**直す。直し方・着地のさせ方は skill `repo-bot-drain` の該当節と同じ:
 

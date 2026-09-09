@@ -14,7 +14,7 @@
 ;;
 ;; Resend key（どれか 1 つ、総当たりしない）:
 ;;   env RESEND_API_KEY
-;;   file $HOME/.gftd/resend-api-key  (mode 600, launchd 用)
+;;   file $HOME/.itonami/resend-api-key  (mode 600, launchd 用)
 ;;   keychain service=gftd.resend account=API_KEY
 
 (require '[clojure.string :as str])
@@ -34,7 +34,7 @@
 
 (def home (.homedir os))
 (def ledger-dir (or (.-OEM_RFQ_HOME js/process.env)
-                    (.join path home ".gftd" "murakumo-oem-rfq")))
+                    (.join path home ".itonami" "murakumo-oem-rfq")))
 (def scan-path (.join path ledger-dir "scans.edn"))
 (def json? (some #{"--json"} (js->clj (.-argv process))))
 
@@ -71,7 +71,7 @@
 (defn- read-key []
   (or (let [e (.-RESEND_API_KEY js/process.env)]
         (when (and (string? e) (pos? (count e))) e))
-      (let [p (.join path home ".gftd" "resend-api-key")]
+      (let [p (.join path home ".itonami" "resend-api-key")]
         (when (.existsSync fs p)
           (str/trim (.readFileSync fs p "utf8"))))
       (try

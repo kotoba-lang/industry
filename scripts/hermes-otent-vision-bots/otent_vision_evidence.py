@@ -16,12 +16,12 @@ GATE_REPO={"schema":"network-awai/app-hyakka","earth-ingest":"cloud-itonami/oten
  "earth-vision":"cloud-itonami/otent","street-ingest":"cloud-itonami/otent",
  "street-vision":"cloud-itonami/otent","publish":"network-awai/app-hyakka"}
 CONFIG={
- "schema":(HYAKKA,Path("~/.gftd/worktrees/otent-geo-ontology-bot").expanduser()),
- "earth-ingest":(OTENT,Path("~/.gftd/worktrees/otent-earth-imagery-bot").expanduser()),
- "earth-vision":(OTENT,Path("~/.gftd/worktrees/otent-earth-vision-bot").expanduser()),
- "street-ingest":(OTENT,Path("~/.gftd/worktrees/otent-street-imagery-bot").expanduser()),
- "street-vision":(OTENT,Path("~/.gftd/worktrees/otent-street-vision-bot").expanduser()),
- "publish":(HYAKKA,Path("~/.gftd/worktrees/otent-hyakka-publish-bot").expanduser()),
+ "schema":(HYAKKA,Path("~/.itonami/worktrees/otent-geo-ontology-bot").expanduser()),
+ "earth-ingest":(OTENT,Path("~/.itonami/worktrees/otent-earth-imagery-bot").expanduser()),
+ "earth-vision":(OTENT,Path("~/.itonami/worktrees/otent-earth-vision-bot").expanduser()),
+ "street-ingest":(OTENT,Path("~/.itonami/worktrees/otent-street-imagery-bot").expanduser()),
+ "street-vision":(OTENT,Path("~/.itonami/worktrees/otent-street-vision-bot").expanduser()),
+ "publish":(HYAKKA,Path("~/.itonami/worktrees/otent-hyakka-publish-bot").expanduser()),
 }
 TOKENS={
  "schema":["imagery-asset","model-run","image-detection","spatial-uncertainty","derived-from"],

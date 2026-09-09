@@ -19,11 +19,11 @@ SCOPE_FILE = (SCOPE_ROOT / "world-legal-scope.edn"
               else INSTALLED_ROOT / "world-legal-scope.edn")
 HYAKKA = READ_ROOT / "orgs/network-awai/app-hyakka"
 WORKTREES = {
-    "schema": Path("~/.gftd/worktrees/legal-world-schema-bot").expanduser(),
-    "legislation": Path("~/.gftd/worktrees/legal-legislation-source-bot").expanduser(),
-    "cases": Path("~/.gftd/worktrees/legal-cases-source-bot").expanduser(),
-    "profession": Path("~/.gftd/worktrees/legal-profession-source-bot").expanduser(),
-    "news": Path("~/.gftd/worktrees/legal-news-source-bot").expanduser(),
+    "schema": Path("~/.itonami/worktrees/legal-world-schema-bot").expanduser(),
+    "legislation": Path("~/.itonami/worktrees/legal-legislation-source-bot").expanduser(),
+    "cases": Path("~/.itonami/worktrees/legal-cases-source-bot").expanduser(),
+    "profession": Path("~/.itonami/worktrees/legal-profession-source-bot").expanduser(),
+    "news": Path("~/.itonami/worktrees/legal-news-source-bot").expanduser(),
 }
 
 TOKENS = {

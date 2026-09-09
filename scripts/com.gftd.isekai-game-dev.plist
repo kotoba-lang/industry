@@ -13,7 +13,7 @@
     launchctl bootout gui/$(id -u)/com.gftd.isekai-game-dev
 
   Interval: 21600s (6h). 1 反復 = tick（決定論・数秒〜数十秒）+ 候補がある周だけ
-  claude -p /isekai-game-dev（最長 1h）。lock file（~/.gftd/isekai-game-dev.lock）が
+  claude -p /isekai-game-dev（最長 1h）。lock file（~/.itonami/isekai-game-dev.lock）が
   重なりを防ぐ。候補が無い周・測れなかった周（:not-measured は :no-candidates とは
   別の事実）はモデルを起こさない（loop 側で判定）。
 
@@ -53,9 +53,9 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardErrorPath</key>
-	<string>/Users/junkawasaki/.gftd/isekai-game-dev.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/isekai-game-dev.stdout.log</string>
 	<key>StandardOutPath</key>
-	<string>/Users/junkawasaki/.gftd/isekai-game-dev.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/isekai-game-dev.stdout.log</string>
 	<key>StartInterval</key>
 	<integer>21600</integer>
 	<key>WorkingDirectory</key>

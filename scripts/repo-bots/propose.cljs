@@ -53,7 +53,7 @@
 
 (def top (or (.-CLAUDE_PROJECT_DIR (.-env js/process)) (.cwd js/process)))
 (def home (.homedir os))
-(def state-dir (str home "/.gftd/repo-bots"))
+(def state-dir (str home "/.itonami/repo-bots"))
 (def state-file (or (opt "--state") (str state-dir "/state.edn")))
 (def proposal-dir (or (opt "--out") (str state-dir "/proposals")))
 (def receipt-ledger (str state-dir "/proposals.ledger.edn"))

@@ -363,7 +363,7 @@
 
 (def reader-roots
   ["manifest" "scripts" ".claude" "70-tools"
-   (path/join (os/homedir) ".gftd")
+   (path/join (os/homedir) ".itonami")
    (path/join (os/homedir) "Library/LaunchAgents")])
 
 ;; `.claude/worktrees` holds dozens of whole copies of this superproject; left

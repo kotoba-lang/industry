@@ -13,7 +13,7 @@
 ;; MATURITY.md も、それらが動くと書いてあった。
 ;;
 ;; だから名簿には **charter（何を守る役か）しか書かない**。動いたかどうかは
-;; 名簿ではなく tick の state が答える（`~/.gftd/repo-bots/state.edn`）。
+;; 名簿ではなく tick の state が答える（`~/.itonami/repo-bots/state.edn`）。
 ;; **名簿に載っていることを「動いている」と読ませない。** これが 4,000 体
 ;; 規模で最初に壊れるところなので、構造で分けておく。
 ;;
@@ -169,7 +169,7 @@
        ";;\n"
        ";; west に登録された repo 1 本につき常駐 bot 1 体の名簿。\n"
        ";; **ここに載っていることは「動いている」ことを意味しない** —— 動いたかは\n"
-       ";; ~/.gftd/repo-bots/state.edn（tick の state）だけが答える。名簿と稼働を\n"
+       ";; ~/.itonami/repo-bots/state.edn（tick の state）だけが答える。名簿と稼働を\n"
        ";; 分けているのは manifest/observatories.edn が記録した失敗（22 actor 中 8 本が\n"
        ";; 「壊れていたのではなく、誰も一度も走らせていなかった」）を構造で防ぐため。\n"
        ";;\n"

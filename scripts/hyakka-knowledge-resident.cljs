@@ -15,11 +15,11 @@
 (def os (js/require "node:os"))
 
 (def root "/Users/junkawasaki/github/com-junkawasaki")
-(def default-worktree (str (.homedir os) "/.gftd/worktrees/app-hyakka-resident"))
+(def default-worktree (str (.homedir os) "/.itonami/worktrees/app-hyakka-resident"))
 (def worktree (or (aget js/process.env "HYAKKA_WORKTREE") default-worktree))
 (def archive-dir (or (aget js/process.env "HYAKKA_ARCHIVE_DIR")
-                     (str (.homedir os) "/.gftd/hyakka-archive")))
-(def lock-dir (str (.homedir os) "/.gftd/locks/hyakka-knowledge-ingest.lock"))
+                     (str (.homedir os) "/.itonami/hyakka-archive")))
+(def lock-dir (str (.homedir os) "/.itonami/locks/hyakka-knowledge-ingest.lock"))
 ;; The graph these ledgers belong to. `:apex` requires graph scope == issuer
 ;; DID, so a seed that derives anything else does not fail — it writes to a
 ;; DIFFERENT ref, silently forking the corpus.

@@ -32,9 +32,9 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/fleet-refactor-wave.ledger.edn"))
-(def tick-ledger (str home "/.gftd/fleet-refactor-wave-tick.ledger.edn"))
-(def lock-file (str home "/.gftd/fleet-refactor-wave.lock"))
+(def ledger-file (str home "/.itonami/fleet-refactor-wave.ledger.edn"))
+(def tick-ledger (str home "/.itonami/fleet-refactor-wave-tick.ledger.edn"))
+(def lock-file (str home "/.itonami/fleet-refactor-wave.lock"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 ;; svelte-cljs-wave の実測（resource-guard build lock は二本目を exit 2 で拒否）

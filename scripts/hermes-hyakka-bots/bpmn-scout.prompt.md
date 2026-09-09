@@ -15,7 +15,7 @@ The ladder, in order — do the FIRST step not yet done, then stop:
 
 ## Rules
 
-- cd ~/.gftd/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main first.
+- cd ~/.itonami/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main first.
 - Run npm test from the worktree before pushing. It must report 0 failures. A suite that does not run is not a pass.
 - Never edit knowledge/ledger/ or knowledge/receipts/ (append-only history). Never push to main, never force-push, never edit a gate.
 - Branch bot/apqc-scout-$(date +%Y%m%d-%H%M), commit, push, gh pr create against main with the gate/test output in the body.

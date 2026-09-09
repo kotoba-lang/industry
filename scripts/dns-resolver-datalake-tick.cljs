@@ -21,12 +21,12 @@
 
 (def root "/Users/junkawasaki/github/com-junkawasaki")
 (def worktree (or (aget js/process.env "DNS_RESOLVER_WORKTREE")
-                  (str (os/homedir) "/.gftd/worktrees/dns-resolver-resident")))
+                  (str (os/homedir) "/.itonami/worktrees/dns-resolver-resident")))
 (def out-dir (or (aget js/process.env "DNS_RESOLVER_LAKE_DIR")
-                 (str (os/homedir) "/.gftd/dns-resolver-lake")))
+                 (str (os/homedir) "/.itonami/dns-resolver-lake")))
 (def state-path (path/join out-dir "state.json"))
 (def ledger-dir (path/join worktree "data" "ledger"))
-(def lock-path (str (os/homedir) "/.gftd/locks/dns-resolver-datalake.lock"))
+(def lock-path (str (os/homedir) "/.itonami/locks/dns-resolver-datalake.lock"))
 
 (defn die! [code msg] (js/console.error msg) (.exit js/process code))
 

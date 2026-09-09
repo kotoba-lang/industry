@@ -52,7 +52,7 @@
 ;; ---------------------------------------------------------------------------
 ;; gate の重さ（EMA）
 
-(def cost-path (path/join (os/homedir) ".gftd" "fleet-ci-cost.edn"))
+(def cost-path (path/join (os/homedir) ".itonami" "fleet-ci-cost.edn"))
 
 (def default-cost-s
   ;; 実測が無い gate の初期値。桁が合っていればよい（LPT は順序しか使わない）。
@@ -76,7 +76,7 @@
                                      :n (inc n)
                                      :bound :batch-upper})))
                     costs gate-ids)]
-    (try (.mkdirSync fs (path/join (os/homedir) ".gftd") #js {:recursive true})
+    (try (.mkdirSync fs (path/join (os/homedir) ".itonami") #js {:recursive true})
          (.writeFileSync fs cost-path (str (pr-str upd) "\n"))
          (catch :default _ nil))))
 
@@ -186,7 +186,7 @@
 (def ^:private murakumo-rel "orgs/kotoba-lang/murakumo")
 
 (def ^:private cp-cache-path
-  (path/join (os/homedir) ".gftd" "murakumo-classpath.edn"))
+  (path/join (os/homedir) ".itonami" "murakumo-classpath.edn"))
 
 (defn absolutize-classpath
   "`clojure -Spath` が返す相対 entry を、その command を実行した checkout 基準の
@@ -232,7 +232,7 @@
                  (last (remove str/blank? (str/split-lines (str out)))))]
         (when cp
           (let [abs (absolutize-classpath murakumo-root cp)]
-            (try (.mkdirSync fs (path/join (os/homedir) ".gftd") #js {:recursive true})
+            (try (.mkdirSync fs (path/join (os/homedir) ".itonami") #js {:recursive true})
                  (.writeFileSync fs cp-cache-path (pr-str {:key key* :cp abs}))
                  (catch :default _ nil))
             abs))))))

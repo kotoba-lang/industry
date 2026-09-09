@@ -20,7 +20,7 @@ installing means copying it into `~/.hermes/scripts/` and creating the job.
 | moves | product semantics, `.clj`/`.cljc` → **new** `.kotoba`/`.cljk` file | an *existing* `.clj`/`.cljc` file's `(:require ...)`, one external namespace → its `kotoba-lang.*` replacement |
 | file count change | adds a file | edits a file (and `deps.edn`) in place |
 | gate's core question | does the compiled artifact do what the Clojure it replaces did | is the old namespace actually gone, the new one actually present, actually declared as a real dependency, and does the repo's own suite still pass |
-| seen-ledger | `~/.gftd/hermes-kotoba-migration-bot/seen.edn` | `~/.gftd/hermes-clojure-stdlib-migration-bot/seen.edn` |
+| seen-ledger | `~/.itonami/hermes-kotoba-migration-bot/seen.edn` | `~/.itonami/hermes-clojure-stdlib-migration-bot/seen.edn` |
 
 Same shape (decision-free scanner ranks → LLM classifies and does the work → an
 independent adversarial gate decides → PR), deliberately copied from that family
@@ -174,7 +174,7 @@ cp scripts/hermes-clojure-stdlib-migration-bots/verify-clojure-stdlib-migration.
 # original AND the one that actually runs; editing a copy elsewhere would not do
 # anything.
 
-mkdir -p ~/.gftd/worktrees/clojure-stdlib-migration-bot
+mkdir -p ~/.itonami/worktrees/clojure-stdlib-migration-bot
 
 H=~/.hermes/hermes-agent/venv/bin/hermes
 $H cron create "27 6 * * *" "$(cat ~/.hermes/scripts/clojure-stdlib-migration-scout.prompt.md)" \
@@ -192,7 +192,7 @@ clones into a fresh subdirectory of it.
 `kotoba-migration-scout`, `kotoba-cli-build-scout`, and `kotoba-cli-build-verifier` are
 already registered (confirmed live via `hermes cron list` before choosing) — same owner,
 same kind of operation (reads this same superproject checkout, clones into
-`~/.gftd/worktrees/...`, needs the same `openrouter-free` credential already configured
+`~/.itonami/worktrees/...`, needs the same `openrouter-free` credential already configured
 there), so there is no reason to create a new profile and split state that belongs
 together. A new profile would also hit the documented `config.yaml` gotcha (a freshly
 created profile's `providers:`/`secrets:` blocks are empty, so its first agent-mode job

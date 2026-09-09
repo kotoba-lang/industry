@@ -188,7 +188,7 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/fleet-refactor-wave-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/fleet-refactor-wave-tick.ledger.edn"))
 (def fleet-dir "orgs/cloud-itonami")
 
 (def args (vec *command-line-args*))

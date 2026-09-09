@@ -26,7 +26,7 @@ then sourced claims, then items people can query.
 
 ## Procedure — do all of it, in order
 
-1. `cd ~/.gftd/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main`
+1. `cd ~/.itonami/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main`
 2. Read `config/knowledge-ingest.edn` (the `:sources` already configured, and
    `:allowed-properties`) and `src/hyakka/corpus/registry.cljc` (which corpora
    exist, and `connector-source-classes` — which classes each connector kind

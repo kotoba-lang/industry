@@ -42,8 +42,8 @@
 
 (def root "/Users/junkawasaki/github/com-junkawasaki")
 (def worktree (or (flag "--worktree")
-                  (str (.homedir os) "/.gftd/worktrees/app-hyakka-resident")))
-(def out-dir (or (flag "--out-dir") (str (.homedir os) "/.gftd/hyakka-lake")))
+                  (str (.homedir os) "/.itonami/worktrees/app-hyakka-resident")))
+(def out-dir (or (flag "--out-dir") (str (.homedir os) "/.itonami/hyakka-lake")))
 (def state-path (path/join out-dir "state.json"))
 (def ledger-dir (path/join worktree "knowledge" "ledger"))
 

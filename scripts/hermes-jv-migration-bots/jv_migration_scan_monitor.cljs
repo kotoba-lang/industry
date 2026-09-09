@@ -15,7 +15,7 @@
 ;;
 ;; Measured 2026-09-04: four of the fleet's seven monitor-driven jobs had no
 ;; working monitor. Three of them (the canvas-watch trio) share a thin .py
-;; launcher that delegates to `~/.gftd/canvas-signal.cljs`, which does not
+;; launcher that delegates to `~/.itonami/canvas-signal.cljs`, which does not
 ;; exist and has no trace in any repo — it lived outside version control and
 ;; vanished, taking three monitors with it. None of them failed loudly: the
 ;; job runs, the monitor never signals, and the prompt's own instruction for

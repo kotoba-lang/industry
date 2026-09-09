@@ -14,7 +14,7 @@
 
   Interval: 21600s (6h). 1 反復 = tick（有界 30 repo の pin 鮮度測定、round-robin
   cursor）+ 遅れた pin がある周だけ claude -p /kami-lib-update（最長 1h）。
-  lock file（~/.gftd/kami-lib-update.lock）が重なりを防ぐ。遅れ 0 件の周・
+  lock file（~/.itonami/kami-lib-update.lock）が重なりを防ぐ。遅れ 0 件の周・
   測れなかった周（rate limit = :not-measured、:no-candidates とは別の事実）は
   モデルを起こさない（loop 側で判定）。
 
@@ -54,9 +54,9 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardErrorPath</key>
-	<string>/Users/junkawasaki/.gftd/kami-lib-update.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/kami-lib-update.stdout.log</string>
 	<key>StandardOutPath</key>
-	<string>/Users/junkawasaki/.gftd/kami-lib-update.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/kami-lib-update.stdout.log</string>
 	<key>StartInterval</key>
 	<integer>21600</integer>
 	<key>WorkingDirectory</key>

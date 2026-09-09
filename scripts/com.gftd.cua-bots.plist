@@ -17,7 +17,7 @@
   **この loop は `claude -p` を呼ばない**（モデルの解釈は lib の session 内、
   予算は名簿の :bot/budget-tokens）。skip-permissions フラグは存在しない。
   lib が未着地の周は :not-measured として ledger に残る（failed でも done でもない）。
-  lock: ~/.gftd/cua-bots.lock / ledger: ~/.gftd/cua-bots/ledger.edn。
+  lock: ~/.itonami/cua-bots.lock / ledger: ~/.itonami/cua-bots/ledger.edn。
 
   env block は姉妹 plist と同型の標準（nbb / git / gh を launchd の最小 env でも
   同じ条件で動かすため）。
@@ -51,9 +51,9 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardErrorPath</key>
-	<string>/Users/junkawasaki/.gftd/cua-bots.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/cua-bots.stdout.log</string>
 	<key>StandardOutPath</key>
-	<string>/Users/junkawasaki/.gftd/cua-bots.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/cua-bots.stdout.log</string>
 	<key>StartInterval</key>
 	<integer>3600</integer>
 	<key>WorkingDirectory</key>

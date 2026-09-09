@@ -123,7 +123,7 @@ printf 'FREE\t%s\n' \"$(df -g / | awk 'NR==2{print $4}')\"
 (def delete-sh "
 set -u
 C=$HOME/.cache/huggingface
-MAN=$HOME/.gftd/hf-cache-pruned.tsv
+MAN=$HOME/.itonami/hf-cache-pruned.tsv
 mkdir -p \"$HOME/.gftd\"
 while IFS='\t' read -r m age b; do
   [ -n \"${b:-}\" ] || continue

@@ -39,8 +39,8 @@ Like the other Hermes bot families, failures print `REFUSED` into the prompt ins
 Copy this directory's Python and prompt files plus `system-scope.edn` to `~/.hermes/scripts/`. Create or reuse these worktrees:
 
 ```bash
-git -C ~/github/com-junkawasaki worktree add --detach ~/.gftd/worktrees/magnesium-systems-bot origin/main
-git -C ~/github/com-junkawasaki/orgs/network-awai/app-hyakka worktree add --detach ~/.gftd/worktrees/hyakka-growth-bot origin/main
+git -C ~/github/com-junkawasaki worktree add --detach ~/.itonami/worktrees/magnesium-systems-bot origin/main
+git -C ~/github/com-junkawasaki/orgs/network-awai/app-hyakka worktree add --detach ~/.itonami/worktrees/hyakka-growth-bot origin/main
 ```
 
 Create the four cron jobs with Hermes from `~/.hermes/hermes-agent/venv/bin/hermes`, using `z-ai/glm-5.3-flash`, provider `openrouter-free`, local delivery, the appropriate evidence script and prompt, and the workdirs above. The model/provider pin is deliberate for this fleet and is expected to be rotated with the OpenRouter credential.

@@ -19,7 +19,7 @@
 
 (def home (.homedir os))
 (def ledger-dir (or (.-SHINSHI_VIDEO_HOME js/process.env)
-                    (.join path home ".gftd" "shinshi-catalog-video")))
+                    (.join path home ".itonami" "shinshi-catalog-video")))
 (def root (or (.-COM_JUNKAWASAKI_ROOT js/process.env) (.cwd process)))
 (def this-dir
   (.dirname path (or (second (js->clj (.-argv process)))

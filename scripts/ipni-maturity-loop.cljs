@@ -49,7 +49,7 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/ipni-maturity.ledger.edn"))
+(def ledger-file (str home "/.itonami/ipni-maturity.ledger.edn"))
 (def argv (vec *command-line-args*))
 (def dry-run? (boolean (some #{"--dry-run"} argv)))
 (def probe-override
@@ -99,7 +99,7 @@
   (if probe-override
     (try (edn/read-string (str (.readFileSync fs probe-override "utf8")))
          (catch :default e (log! "could not read" probe-override (str e)) nil))
-    (let [tmp (str home "/.gftd/ipni-probe-latest.edn")
+    (let [tmp (str home "/.itonami/ipni-probe-latest.edn")
           {:keys [code err]} (sh "nbb" ["--classpath" "90-docs"
                                         "90-docs/ipni_maturity/probe.cljs"
                                         "--out" tmp]

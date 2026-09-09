@@ -15,7 +15,7 @@
 ;; on 2026-07-30 (ADR-2607300900); (2) under launchd this process cannot count on the
 ;; credentials a push needs — the sibling fleet-ci tick's own plist documents that
 ;; kagi cannot show a Keychain prompt there, and its GH-token directory
-;; (~/.gftd/fleet-ci-gh-tokens) does not exist on this machine, which is why its log
+;; (~/.itonami/fleet-ci-gh-tokens) does not exist on this machine, which is why its log
 ;; tail is a string of rejected pushes. A detector that silently degrades is worse
 ;; than no detector, so this one fails loudly and records the failure as an event.
 ;;
@@ -24,7 +24,7 @@
 ;;   nbb scripts/fleet-sync-tick.cljs probe     ;; full fleet sync probe (slow, ~5 min)
 ;;   nbb scripts/fleet-sync-tick.cljs both
 ;;
-;; Every run appends exactly one EDN map to ~/.gftd/fleet-sync/ledger.edn — including
+;; Every run appends exactly one EDN map to ~/.itonami/fleet-sync/ledger.edn — including
 ;; runs that fail. That file is a time series: it is what lets the next reading say
 ;; "the stock moved" instead of "here is a number".
 
@@ -36,7 +36,7 @@
             [clojure.string :as str]))
 
 (def root (or (.-FLEET_ROOT js/process.env) "/Users/junkawasaki/github/com-junkawasaki"))
-(def out-dir (path/join (os/homedir) ".gftd" "fleet-sync"))
+(def out-dir (path/join (os/homedir) ".itonami" "fleet-sync"))
 (def ledger (path/join out-dir "ledger.edn"))
 (def kagami (path/join root "orgs" "kotoba-lang" "kagami"))
 

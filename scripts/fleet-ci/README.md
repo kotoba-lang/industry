@@ -55,7 +55,7 @@ receipt を組み立てる `kagami` 側の仕事であってここではない�
 | `sweep.cljs` | ノードのディスクを回収する（既定 dry-run、`--apply` で実行） |
 | `com.gftd.fleet-ci-sweep.plist` | 日次 04:17 の sweep LaunchAgent |
 
-状態・ログはリポジトリ外（`~/.gftd/`）:
+状態・ログはリポジトリ外（`~/.itonami/`）:
 `fleet-ci-state.edn`（repo → 最後に検証した sha）/ `fleet-ci-tick.log`（正本ログ）/
 `fleet-ci-tick.lock` / `fleet-ci-cache/`（tarball と kagami tree のキャッシュ）。
 
@@ -165,7 +165,7 @@ LaunchAgent（`gui/<uid>`）から起動すると macOS Keychain に触る 2 経
 
 ### 必要な fine-grained PAT（2 本 — PAT は resource owner 1 つにしか紐付かない）
 
-`~/.gftd/fleet-ci-gh-tokens/`（dir 700）に **owner 名のファイル**（mode 600）として置く。
+`~/.itonami/fleet-ci-gh-tokens/`（dir 700）に **owner 名のファイル**（mode 600）として置く。
 tick は endpoint の owner を見て token を選び、**子プロセスの env にだけ**載せる
 （argv に出さないので `ps` に見えない）。
 
@@ -176,12 +176,12 @@ tick は endpoint の owner を見て token を選び、**子プロセスの env
 | `kotoba-lang` | 対象 12 repo（kagami, nekko, bonsai, langgraph, kagitaba, org-ietf-ed25519, org-ietf-cbor, io-multiformats, io-ipld, chain, org-chainagnostic-cacao, tech-ipfs-specs-ipns） | Contents: Read（tarball）+ **Commit statuses: Read and write** |
 
 ```bash
-mkdir -p -m 700 ~/.gftd/fleet-ci-gh-tokens
+mkdir -p -m 700 ~/.itonami/fleet-ci-gh-tokens
 # GitHub の Fine-grained token 画面でコピーしたあと（shell 履歴に残さないため pbpaste 経由）
-pbpaste > ~/.gftd/fleet-ci-gh-tokens/com-junkawasaki && chmod 600 ~/.gftd/fleet-ci-gh-tokens/com-junkawasaki
-pbpaste > ~/.gftd/fleet-ci-gh-tokens/kotoba-lang     && chmod 600 ~/.gftd/fleet-ci-gh-tokens/kotoba-lang
+pbpaste > ~/.itonami/fleet-ci-gh-tokens/com-junkawasaki && chmod 600 ~/.itonami/fleet-ci-gh-tokens/com-junkawasaki
+pbpaste > ~/.itonami/fleet-ci-gh-tokens/kotoba-lang     && chmod 600 ~/.itonami/fleet-ci-gh-tokens/kotoba-lang
 # 効いているか（launchd と同じ経路を対話セッションで確認）
-FLEET_CI_GH_TOKEN_DIR=~/.gftd/fleet-ci-gh-tokens nbb scripts/fleet-ci/tick.cljs --plan
+FLEET_CI_GH_TOKEN_DIR=~/.itonami/fleet-ci-gh-tokens nbb scripts/fleet-ci/tick.cljs --plan
 ```
 
 pin を進められるのは **root の Contents: write** だけで、子 repo 側は status 以外書けない

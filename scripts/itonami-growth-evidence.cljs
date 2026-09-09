@@ -101,7 +101,7 @@
 ;; the drift would be invisible -- both would print a repo name.
 ;; ---------------------------------------------------------------------------
 
-(def ledger-path (str (.-HOME js/process.env) "/.gftd/itonami-maturity-improve.ledger.edn"))
+(def ledger-path (str (.-HOME js/process.env) "/.itonami/itonami-maturity-improve.ledger.edn"))
 
 (defn- ledger-entries []
   (let [t (slurp* ledger-path)]

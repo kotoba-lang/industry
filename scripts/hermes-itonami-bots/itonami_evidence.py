@@ -60,7 +60,7 @@ def _work_root() -> str:
     if os.path.exists(os.path.join(cwd, ".git")) and cwd != os.path.abspath(
             os.path.expanduser("~/github/com-junkawasaki")):
         return cwd
-    return os.path.expanduser("~/.gftd/worktrees/itonami-growth-bot")
+    return os.path.expanduser("~/.itonami/worktrees/itonami-growth-bot")
 
 WORK_ROOT = _work_root()
 NBB = os.environ.get("ITONAMI_NBB", "/opt/homebrew/bin/nbb")

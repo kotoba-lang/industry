@@ -35,7 +35,7 @@
             ["node:os" :as os]
             ["node:path" :as path]))
 
-(def gftd (path/join (os/homedir) ".gftd"))
+(def gftd (path/join (os/homedir) ".itonami"))
 (def state-file (path/join gftd "fleet-ci-state.edn"))
 (def log-file (path/join gftd "fleet-ci-tick.log"))
 (def lock-file (path/join gftd "fleet-ci-tick.lock"))

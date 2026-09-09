@@ -31,7 +31,7 @@ def main() -> None:
     print(f"SCANNED\t{len(prs)} open [bot][kotoba-cli-build] PRs")
     print(f"CHOSEN\t{repo}\t{chosen.get('url', '')}")
     print(f"TITLE\t{chosen.get('title', '')}")
-    print("run-parent\t~/.gftd/worktrees/kotoba-cli-build-verifier\t(use a fresh clone)")
+    print("run-parent\t~/.itonami/worktrees/kotoba-cli-build-verifier\t(use a fresh clone)")
     print("kotoba-cli\t/opt/homebrew/opt/kotoba/bin/kotoba")
     print("amu-bin\t~/github/com-junkawasaki/orgs/kotoba-lang/amu/bin/amu")
 

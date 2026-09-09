@@ -69,8 +69,8 @@ gh api repos/<org>/<name>/compare/<pin>...<head> --jq '{status, ahead_by, behind
 **まず、murakumo が書いた草稿が在るか見る。**
 
 ```bash
-ls ~/.gftd/repo-bots/proposals/<org>__<name>.md          # 受理された草稿
-cat ~/.gftd/repo-bots/proposals/<org>__<name>.receipt.edn # 何が書いたか・token 数
+ls ~/.itonami/repo-bots/proposals/<org>__<name>.md          # 受理された草稿
+cat ~/.itonami/repo-bots/proposals/<org>__<name>.receipt.edn # 何が書いたか・token 数
 ```
 
 草稿は `scripts/repo-bots/propose.cljs` が **決定論的に集めた証拠だけ**を渡して

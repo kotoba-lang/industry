@@ -22,7 +22,7 @@
 
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT") (.cwd js/process)))
-(def ledger-file (str home "/.gftd/rule-kaizen-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/rule-kaizen-tick.ledger.edn"))
 
 (defn- sh [cmd args]
   (try

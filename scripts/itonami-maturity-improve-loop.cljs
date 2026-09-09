@@ -39,7 +39,7 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/itonami-maturity-improve.ledger.edn"))
+(def ledger-file (str home "/.itonami/itonami-maturity-improve.ledger.edn"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]

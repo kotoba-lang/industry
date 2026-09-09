@@ -18,7 +18,7 @@
          '["node:os" :as os])
 
 (def worktree (or (aget js/process.env "DNS_RESOLVER_WORKTREE")
-                  (str (os/homedir) "/.gftd/worktrees/dns-resolver-resident")))
+                  (str (os/homedir) "/.itonami/worktrees/dns-resolver-resident")))
 
 (defn lock-path-for
   "One lock PER SOURCE, not one lock for the whole script — tranco (hourly)
@@ -27,7 +27,7 @@
   for literally the same lock file and the more frequent one (commoncrawl)
   lost every time to the slower one (tranco) still mid-fetch."
   [source]
-  (str (os/homedir) "/.gftd/locks/dns-resolver-" (or source "tick") ".lock"))
+  (str (os/homedir) "/.itonami/locks/dns-resolver-" (or source "tick") ".lock"))
 
 (defn source-arg
   "Pull --source's value out of argv (defaults to \"tranco\", matching

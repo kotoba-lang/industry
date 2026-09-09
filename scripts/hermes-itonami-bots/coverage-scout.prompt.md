@@ -115,7 +115,7 @@ of them have no project.
    land nothing, and report why. A refusal is not a rejection.
 
 5. Only on exit 0: in the bot worktree
-   (`~/.gftd/worktrees/itonami-growth-bot`), branch
+   (`~/.itonami/worktrees/itonami-growth-bot`), branch
    `bot/coverage-scout-$(date +%Y%m%d-%H%M)`, append the accepted entries to
    `90-docs/coverage/itonami-coverage.datoms.edn` keeping its shape and comment
    style, add `:coverage/verified-at` with today's date and

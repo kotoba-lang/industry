@@ -23,7 +23,7 @@
 ;;   nbb scripts/github-actions-disable-sweep.cljs --apply    # 実際に無効化
 ;;   nbb scripts/github-actions-disable-sweep.cljs --apply --owner kotoba-lang
 ;;
-;; 再開可能: 走査済み repo は ~/.gftd/gh-actions-sweep-state.edn に記録され、
+;; 再開可能: 走査済み repo は ~/.itonami/gh-actions-sweep-state.edn に記録され、
 ;; 再実行では skip する（rate limit で途中終了しても続きから回せる）。
 ;; --recheck で state を無視して全件見直す。
 (ns github-actions-disable-sweep
@@ -59,7 +59,7 @@
    {:name "jk-luxury" :kind :org}
    {:name "com-junkawasaki" :kind :user}])
 
-(def state-path (str (.homedir os) "/.gftd/gh-actions-sweep-state.edn"))
+(def state-path (str (.homedir os) "/.itonami/gh-actions-sweep-state.edn"))
 
 (defn log [& xs]
   (println (str "[" (.toISOString (js/Date.)) "] " (str/join " " (map str xs)))))

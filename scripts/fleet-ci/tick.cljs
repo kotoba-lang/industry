@@ -68,7 +68,7 @@
 (def opts (parse-args *command-line-args*))
 (def here (path/dirname *file*))   ;; nbb: js/__filename は nil。*file* が正
 (def root (path/resolve here ".." ".."))          ;; superproject checkout
-(def gftd (path/join (os/homedir) ".gftd"))
+(def gftd (path/join (os/homedir) ".itonami"))
 (def state-file (or (:state opts) (path/join gftd "fleet-ci-state.edn")))
 (def log-file (or (:log opts) (path/join gftd "fleet-ci-tick.log")))
 (def lock-file (path/join gftd "fleet-ci-tick.lock"))
@@ -500,7 +500,7 @@
 ;; ---------------------------------------------------------------------------
 ;; kagami（fleet CLI）— **tip の kagami を使う**。ローカル checkout は west pin に
 ;; 縛られていて --subject-extra を持たない可能性がある（自己ホスト: CI ツール自身も
-;; 常に最新 main で動かす）。sha ごとに ~/.gftd/fleet-ci-cache に展開して再利用。
+;; 常に最新 main で動かす）。sha ごとに ~/.itonami/fleet-ci-cache に展開して再利用。
 
 (def max-ship-mb 200)
 
@@ -948,7 +948,7 @@
          ;; pinned pair lives in a prefix of its own. probe.cljs reads the same
          ;; path and grants :wasm-tools only when all three tools are there, so
          ;; the two must stay in step. A no-op on nodes without the prefix.
-         "export PATH=$HOME/.gftd/wasm-pin/bin:$JAVA_HOME/bin:$PATH"
+         "export PATH=$HOME/.itonami/wasm-pin/bin:$JAVA_HOME/bin:$PATH"
          "java -version 2>&1 | head -1"
          (str "for i in $(seq 1 900); do mkdir " dep-lock " 2>/dev/null && break;"
               " [ -n \"$(find " dep-lock " -maxdepth 0 -mmin +20 2>/dev/null)\" ]"

@@ -42,7 +42,7 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-file (str home "/.gftd/svelte-cljs-wave-tick.ledger.edn"))
+(def ledger-file (str home "/.itonami/svelte-cljs-wave-tick.ledger.edn"))
 
 (def args (vec *command-line-args*))
 (defn- arg [flag default]

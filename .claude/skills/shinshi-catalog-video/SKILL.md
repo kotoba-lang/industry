@@ -6,7 +6,7 @@ description: club-shinshi の original-series キャラを 1 体だけ i2v し�
 # shinshi catalog video — 1 体生成し、測ってから載せる
 
 **会話履歴を持たない fresh context から読める**こと。前の周は
-`~/.gftd/shinshi-catalog-video/scans.edn` と `loop.ledger.edn` と run 0029 から読む。
+`~/.itonami/shinshi-catalog-video/scans.edn` と `loop.ledger.edn` と run 0029 から読む。
 
 対象: `shinshi.club` original-series 12 名（Cafe Corner ほか）。IP（Genshin / Fate / …）は
 `--allow-ip` 無しでは候補にしない。
@@ -23,7 +23,7 @@ description: club-shinshi の original-series キャラを 1 体だけ i2v し�
 ### 0. 測る（推測しない）
 
 ```bash
-nbb ~/.gftd/shinshi-catalog-video/tick.cljs --json
+nbb ~/.itonami/shinshi-catalog-video/tick.cljs --json
 # または repo 側
 nbb scripts/shinshi-catalog-video-tick.cljs --json
 ```

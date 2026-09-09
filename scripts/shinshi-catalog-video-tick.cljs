@@ -22,7 +22,7 @@
 
 (def home (.homedir os))
 (def ledger-dir (or (.-SHINSHI_VIDEO_HOME js/process.env)
-                    (.join path home ".gftd" "shinshi-catalog-video")))
+                    (.join path home ".itonami" "shinshi-catalog-video")))
 (def scan-path (.join path ledger-dir "scans.edn"))
 (def json? (boolean (some #{"--json"} (js->clj (.-argv process)))))
 

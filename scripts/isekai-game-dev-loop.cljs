@@ -34,9 +34,9 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def ledger-dir (str home "/.gftd/isekai-game-dev"))
+(def ledger-dir (str home "/.itonami/isekai-game-dev"))
 (def ledger-file (str ledger-dir "/ledger.edn"))
-(def lock-file (str home "/.gftd/isekai-game-dev.lock"))
+(def lock-file (str home "/.itonami/isekai-game-dev.lock"))
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]

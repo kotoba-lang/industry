@@ -14,7 +14,7 @@
     launchctl bootout gui/$(id -u)/com.gftd.loop-status-publish
 
   Interval: 1800s (30min)。**この loop はモデルを一切呼ばない**（純粋な publisher。
-  skill 無し、claude 起動無し）。bearer token は ~/.gftd/bots-status-token
+  skill 無し、claude 起動無し）。bearer token は ~/.itonami/bots-status-token
   （値はどこにも書かない — パス参照のみ）。token が無い周は exit 2
   （:not-measured）で、発行成功とは別の顔をする。
 
@@ -50,9 +50,9 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardErrorPath</key>
-	<string>/Users/junkawasaki/.gftd/loop-status-publish.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/loop-status-publish.stdout.log</string>
 	<key>StandardOutPath</key>
-	<string>/Users/junkawasaki/.gftd/loop-status-publish.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/loop-status-publish.stdout.log</string>
 	<key>StartInterval</key>
 	<integer>1800</integer>
 	<key>WorkingDirectory</key>

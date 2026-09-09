@@ -6,7 +6,7 @@ description: Mouse / Sycom への murakumo OEM RFQ の業者返信を 1 通だ�
 # murakumo OEM RFQ — 業者返信を 1 通だけ扱う
 
 **会話履歴を持たない fresh context から読める**こと。前の周が何をしたかは
-`~/.gftd/murakumo-oem-rfq/scans.edn` と `loop.ledger.edn` と run 0027 / 0028 から読む。
+`~/.itonami/murakumo-oem-rfq/scans.edn` と `loop.ledger.edn` と run 0027 / 0028 から読む。
 
 送信済み RFQ（2026-08-13、inquiry only、PO ではない）:
 
@@ -28,12 +28,12 @@ description: Mouse / Sycom への murakumo OEM RFQ の業者返信を 1 通だ�
 ### 0. 測る（推測しない）
 
 ```bash
-nbb ~/.gftd/murakumo-oem-rfq/tick.cljs --json
+nbb ~/.itonami/murakumo-oem-rfq/tick.cljs --json
 # または repo 側
 nbb scripts/murakumo-oem-rfq-tick.cljs --json
 ```
 
-- `UNANSWERED=true` / `reason=resend-key-missing` → **返信 0 と書かない。** 鍵が無い。Cursor なら Resend MCP `list-received-emails` と Gmail `search_threads` で測る。launchd は `~/.gftd/resend-api-key`（mode 600）か keychain `gftd.resend`/`API_KEY` が要る。
+- `UNANSWERED=true` / `reason=resend-key-missing` → **返信 0 と書かない。** 鍵が無い。Cursor なら Resend MCP `list-received-emails` と Gmail `search_threads` で測る。launchd は `~/.itonami/resend-api-key`（mode 600）か keychain `gftd.resend`/`API_KEY` が要る。
 - `SCANNED=n MATCHES=0` で unanswered でない → 測った空。それが証拠。スコアは上げない。
 - 候補の先頭 1 件だけ取る。ledger に同じ `:id` の `:woke` があれば次へ行かず終わる。
 

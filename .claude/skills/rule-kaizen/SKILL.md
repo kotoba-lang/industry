@@ -44,7 +44,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen-tick.cljs
 `:outcome :insufficient-scan` が出たら **何もせず終わる**。sparse checkout から
 「もう無い」を言うと嘘になる。
 
-先頭 1 件 (`next`) を取る。`~/.gftd/rule-kaizen-tick.ledger.edn` の末尾も読む。
+先頭 1 件 (`next`) を取る。`~/.itonami/rule-kaizen-tick.ledger.edn` の末尾も読む。
 対象ファイルと、`:superseded-by` が指す後継 ADR を **両方読む**。
 
 ### 1. worktree を切る（共有 checkout を触らない）

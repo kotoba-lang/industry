@@ -64,7 +64,7 @@
                   (when (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)))))
 
 (def worktree (or (flag "--worktree")
-                  (str (.homedir os) "/.gftd/worktrees/app-hyakka-resident")))
+                  (str (.homedir os) "/.itonami/worktrees/app-hyakka-resident")))
 (def out-dir (or (flag "--out-dir") "/tmp"))
 (def ledger-dir (path/join worktree "knowledge" "ledger"))
 
