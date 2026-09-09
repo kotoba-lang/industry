@@ -118,4 +118,55 @@ kbb の policy に書いた**相対パスの grant は呼び出し元の cwd か
 （KBB_HOME 基準）。実測: superproject の root から `\"90-docs\"` を grant すると
 `:kbb-shim/no-scope` で正しく拒否される。したがって root 側に kbb script を置くには
 policy が絶対パスを書くことになる。基準を動かすのは security 面の変更なので、
-この ADR では変えない。移植した走査器の設置場所はこの決定を待つ。"}]
+この ADR では変えない。移植した走査器の設置場所はこの決定を待つ。
+
+## 双対 —— 判定できた理由を、判定しなかった拒否（2026-09-09 実測、amu PR #906）
+
+この ADR の本体は「拒否が自分の理由を**推測した**」形である。同じ日の翌日、同じ
+workspace でその**裏返し**を踏んだ ——「拒否が、判定できる理由を持っていながら
+判定しなかった」。
+
+`amu extract-native` は `compile --output` が書く EDN artifact を読む。usage 行は
+`<file>` としか言わないので、最も間違えやすい入力は**その artifact を作った
+`.kotoba` ソースそのもの**である。それを渡すと、値は誰にも判定されずに流れ、
+
+    No protocol method IAssociative.-assoc defined for type object: (ns m ...)
+
+で死ぬ。この error は `:phase` を持たない。CLI は phase の無い error を
+`:internal` に写すので、答えは `internal compiler error` の exit 70 ——
+**コンパイラが壊れたときのために予約されたコード**が、ファイル名を間違えた
+呼び出し側に対して使われ、上の 1 行は途中で捨てられた。
+
+**代償**: 私は同じ誤りを 3 つの入力（自作の component、amu 自身の
+`examples/todo-app.kotoba`、最小の `(defn main [] :i64 42)`）で 3 回犯し、
+**3 回の読みを 1 つの結論のための 3 つの証拠として数えた** ——「component 固有では
+ない、ゆえにコンパイラの欠陥」。その結論を Q9 の finding に書き、**9 repo の
+tranche の blocker として commit した**。artifact を渡せば同じコマンドは
+`:ok true` を返し、取り出したコードは `tools/kexe_loader.c` で走り、Clojure oracle と
+同じ値を返す。
+
+**この誤りを即座に捕まえたはずの測定は、skill が既に要求しているもの**である ——
+**成果物を実行する**。私は一度も走らせていないビルドを「blocked」と報告した。
+8 問の 8 番目（ビルドできたことで満足したか）は「実行せよ」と言うが、この 1 件は
+その手前を示す —— **実行しようとして失敗したときも、失敗の理由を確かめるまでは
+何も測っていない。**
+
+**直したもの**（amu PR #906）: `source-path/admit-native-artifact!` が、この入力を
+読む唯一の場所で判定する。2 つとも推測ではなく判定である ——(1) 拡張子は
+`source-kind`、すなわちその namespace が既に所有する閉じた契約なので、
+「ソースファイルである」は引数についての事実であって意図についての推測ではない
+(2) 形は `extract-native` がこれから読むキそのもので照合するので、**拒否が
+守っている当のコードより長生きできない**。`:phase :decode` → exit 65。
+
+    before  {:error :internal, :message \"internal compiler error\"}   70
+    after   {:error :decode,
+             :message \"extract-native reads a compiled artifact, not a source file\"}  65
+
+test は portable `.cljc`（両ホストの runner が載せている）。**message ではなく
+phase を assert し、4 つの誤入力を拒否するだけでなく本物の artifact を admit する**
+—— 最後の 1 件が無ければ「全部拒否する関数」でも緑になる。拡張子側だけを戻すと
+0 failures が 6 failures になる。
+
+**規則として**: 推測した理由と、判定しなかった理由は、読み手にとって同じ害を持つ。
+どちらも**答えとして読まれる**。判定できる条件はその場で判定し、判定していない
+失敗には、判定した失敗の名前を付けない —— **`internal` もひとつの名前である。**"}]
