@@ -1,0 +1,34 @@
+;; The checkouts a session reads THROUGH before it reads anything else.
+;;
+;; Why this file exists (2026-09-09, ADR-2609092500): the pure S-expression
+;; core was refused by the `kotoba` CLI for days. Nothing was wrong with the
+;; language and nothing was wrong with the west pin -- the shared `amu`
+;; CHECKOUT was 200 commits behind that pin, and the sema it pinned was 71
+;; behind main. `checkout / west pin / repo main` are three different things
+;; and the stale one was the third, which no session-start check measured:
+;; `session-start-checkout-staleness` compares a checkout with its own
+;; last-fetched default branch, weighted by how many things READ it, and a
+;; toolchain repo that nobody `:local/root`s does not rank.
+;;
+;; These are not "important repos". They are the ones whose code RUNS when any
+;; other repo is compiled, so a session that reads them stale reads everything
+;; else through a compiler it did not choose.
+{:session-sync/version 1
+
+ :repos ["amu"            ; the CLI itself (bin/kotoba)
+         "kotoba-sema"    ; the frontend and the grammar authority
+         "kotoba-kir"     ; the IR the evaluator runs
+         "kotoba-hir"
+         "kotoba-script"  ; the restricted-ESM emitter
+         "kotoba-wasm"
+         "kotoba-native"
+         "kotoba-object"
+         "osaho"          ; the KIR interpreter and the value bounds
+         "text"           ; kotoba.lang.text, under everything
+         "kotoba-lang"]   ; the language spec and lang/*.edn authorities
+
+ ;; A session-start hook must be fast and offline. These bound it; when the
+ ;; budget runs out the hook says how many it measured rather than implying it
+ ;; measured all of them.
+ :max-repos 12
+ :budget-ms 12000}

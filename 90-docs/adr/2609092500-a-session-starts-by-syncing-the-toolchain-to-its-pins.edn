@@ -1,0 +1,81 @@
+[{:db/id -1
+ :adr/id "adr-2609092500-a-session-starts-by-syncing-the-toolchain-to-its-pins"
+ :adr/title "A session starts by syncing the toolchain to its pins"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/authority "owner instruction, 2026-09-09"
+ :adr/repos "com-junkawasaki/root"
+ :adr/related "adr-2609092400-the-checkout-was-the-stale-plane-and-a-program-outgrows-a-document, adr-2608136800-checkout-staleness, manifest/session-sync.edn"
+ :adr/body "Owner instruction, 2026-09-09: make it a rule that west pins and the like are
+synced to latest BEFORE a session.
+
+## What went wrong first
+
+The pure S-expression core was refused by the `kotoba` CLI for days with
+\"operation has no admitted lowering\". The language had it. The west pin had it.
+The SHARED `amu` CHECKOUT was 200 commits behind that pin, and the kotoba-sema
+it pinned was 71 commits behind main.
+
+CLAUDE.md already says `checkout / west pin / repo main` are three different
+things. The stale one was the FIRST, and nothing measured it:
+`session-start-checkout-staleness` compares a checkout with its own
+last-fetched default branch, ranked by how many things READ it -- and a
+toolchain repo that nobody `:local/root`s does not rank. The compiler everyone
+runs was 200 commits stale and no session-start check printed a line about it.
+
+## The rule
+
+Before a session does anything else, the toolchain checkouts are brought to
+their west pins.
+
+  roster     manifest/session-sync.edn
+  mechanism  .claude/hooks/session-start-toolchain-pin-sync.cljs (SessionStart)
+  manual     nbb .claude/hooks/session-start-toolchain-pin-sync.cljs \"$PWD\" [--dry-run]
+
+It SYNCS rather than warns. This workspace has written down twice that reading
+a warning and syncing are different actions, and this session was the proof:
+the staleness hook ran, printed its line, and the 200-commit gap stayed. So a
+clean checkout is moved to its pin silently -- detached, exactly what west
+does -- and only three states are left alone, each with a reason printed:
+
+  * tracked changes            -- someone's WIP is not discarded (CLAUDE.md)
+  * unpushed commits on a branch -- a bot's work is not moved out from under it
+  * the pinned commit is absent and the fetch did not finish in budget
+
+Untracked files do not block a checkout and are ignored; amu carries 588.
+
+The PIN's own freshness is reported, not acted on: if a pin is behind the
+last-fetched origin/main the hook prints the count and
+`nbb scripts/west-pin-put.cljs <name> HEAD`. Advancing a pin is a write with a
+reachability proof behind it and is not something a session-start hook should
+do from a shared checkout.
+
+## Measured on the day it landed
+
+First real run, against the live workspace:
+
+  synced   kotoba-sema, kotoba-native      (behind their pins)
+  left     amu           tracked changes
+  left     kotoba-lang   commits on bot/migrate-ledger-tick68-20260909
+  reported kotoba-script pin 1 behind, osaho pin 2 behind
+
+So both directions were observed on the first run: it moved two checkouts that
+were wrong, and it refused two that it had no business touching.
+
+The roster is not \"important repos\" -- it is the ones whose code RUNS when any
+other repo is compiled (amu, kotoba-sema, kotoba-kir, kotoba-hir,
+kotoba-script, kotoba-wasm, kotoba-native, kotoba-object, osaho, text,
+kotoba-lang). A session that reads those stale reads everything else through a
+compiler it did not choose.
+
+## Two design points that are easy to get wrong
+
+The pins are read from `origin/main`'s west.yml, not the working tree's. A
+stale local manifest as the authority would nail down the very drift this
+exists to remove; when origin/main is unreadable the hook falls back and SAYS
+it fell back.
+
+A missing roster file, an unreadable manifest, or a budget overrun each print a
+line. A silent exit would be indistinguishable from a healthy session, which is
+the defect this workspace has now counted fifteen times.
+"}]
