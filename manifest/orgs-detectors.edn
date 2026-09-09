@@ -145,8 +145,12 @@
               resolves for free; kotoba.lang.text is a dependency and does not, so the
               migration cannot touch those files until something declares what the
               repository depends on -- a decision per repository, not a rewrite. Sweeping
-              the whole workspace rather than the refusal list found 43 such projects
-              holding 228 files that no build reads. Deliberately not a fleet gate: it
+              the whole workspace rather than the refusal list found 43. Nine of those are a
+              PATTERN rather than an oversight -- their run_tests.cljs is invoked as
+              `nbb --classpath src:test run_tests.cljs`, so the classpath is declared at
+              the invocation site and the repository has nowhere for a dependency because
+              it was never meant to have one -- and they are reported separately. That
+              leaves 34 projects holding 204 files that no build reads. Deliberately not a fleet gate: it
               walks every west project under orgs/, and a gate ships one repository's
               tree."
    :argv     ["nbb" "{{repo}}/scripts/verify-source-has-a-project.cljs"
@@ -171,7 +175,10 @@
               indistinguishable from a clean tree; it now runs two finds total and
               buckets by path. --only <project> runs the same code path in seconds,
               which exists because two attempts at a control on the full sweep were
-              killed mid-flight and left a planted file in a shared checkout."}
+              killed mid-flight and left a planted file in a shared checkout. The
+              invocation-site split was checked the same way: orgs/cloud-itonami/airshed,
+              which has run_tests.cljs, reports CLASSPATH-AT-INVOCATION and no finding;
+              orgs/cloud-itonami/igata, which has no runner, still reports one."}
 
   {:id       :verify-definition-repo-reachability
    :title    "a definition repository that nothing names, and why"

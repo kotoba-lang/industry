@@ -111,6 +111,7 @@
 (def absent (atom 0))
 (def rows (atom []))
 (def has-app-edn (atom []))
+(def runner-declared (atom []))
 
 (doseq [p (if only (filter #(= % only) west) west)]
   (if-not (.existsSync fs p)
@@ -121,16 +122,32 @@
             proj (get proj-counts p 0)
             app? (.existsSync fs (str p "/kotoba.app.edn"))]
         (when (and (pos? src) (zero? proj))
-          (if app?
+          (cond
+            app?
             (swap! has-app-edn conj (str "KOTOBA-APP-ONLY\t" p "\t" src))
+
+            ;; A repository whose runner states its own classpath is not an
+            ;; oversight, it is a pattern: run_tests.cljs is invoked as
+            ;; `nbb --classpath src:test run_tests.cljs`, so the classpath is
+            ;; declared at the INVOCATION SITE and the repository has nowhere
+            ;; for a dependency because it was never meant to have one. Nine of
+            ;; the 43 are this. Saying only "no project file" invites the wrong
+            ;; repair; these need a decision about where their classpath lives,
+            ;; not a file dropped in.
+            (.existsSync fs (str p "/run_tests.cljs"))
+            (swap! runner-declared conj (str "CLASSPATH-AT-INVOCATION\t" p "\t" src))
+
+            :else
             (swap! rows conj (str "NO-PROJECT\t" p "\t" src))))))))
 
 (doseq [x (sort @has-app-edn)] (println x))
+(doseq [x (sort @runner-declared)] (println x))
 (doseq [x (sort @rows)] (println x))
 (println (str "SCANNED\t" @scanned "\twest projects present on disk"))
 (when (pos? @absent)
   (println (str "ABSENT\t" @absent "\tregistered but not checked out -- not measured, not clean")))
 (println (str "KOTOBA-APP-ONLY\t" (count @has-app-edn)))
+(println (str "CLASSPATH-AT-INVOCATION\t" (count @runner-declared)))
 (println (str "NO-PROJECT\t" (count @rows) "\tprojects, "
               (reduce + 0 (map #(js/parseInt (nth (s/split % #"\t") 2)) @rows)) " files"))
 (when findings?
