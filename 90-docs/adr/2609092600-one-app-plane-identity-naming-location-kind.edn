@@ -218,15 +218,34 @@ unavailable が返る。
 genko の block を `wrangler r2 object put kotobase-graph-database-production/ipld/{cid}`
 で置くと、**同じ CID が `{cid}.ipfs.itonami.cloud` でも 200 になった**（それまで 502）。
 
-**恒久の直し方は 2 つあり、まだ決めていない**（どちらもこの ADR の範囲外の別決定）:
+**決めた（オーナー判断 2026-09-09、「今のところは R2」）: publish が 2 面に書く。**
+origin plane に archive への fallback を足す案は採らない —— retrieval 経路に触るし、
+2 面のどちらが正かを曖昧にする。
 
-1. **publish が両方に書く** —— `content-address publish` が B2（identity/archive）と
-   R2（web plane）の両方へ置く。単純だが、2 つの store に同じバイト列を持つ。
-2. **origin plane が B2 へ fallback する** —— `serve-from-r2` の `:root-missing` で、
-   公開 gateway より先に archive を見る。2 面が「何が存在するか」で食い違わなくなるが、
-   retrieval 経路に触る。
+**archive を落とすことはできない。** IPNI の広告が retrieval address として
+`/dns4/ipfs.kotobase.net/tcp/443/https` を名指しており、その面は B2 を読む。
+つまり **archive は indexer に対する約束**で、**R2 は app が配られる場所**である。
+非対称なのは「無いときに何が起きるか」で、R2 が無ければ web plane が 502 になる。
 
-**どちらを採るまで、新しい `:document` は publish のあとに R2 へも置く必要がある。**
+実行は `scripts/publish-document.cljs` 1 本:
+
+    nbb --classpath <the same classpath the other checks use>
+      scripts/publish-document.cljs <file> --manifest <path> [--id <id>] [--dry-run]
+
+（この本文は EDN 文字列なので、引用符もバックスラッシュも置かない —— 置いて文字列を
+早期に閉じ、型 assert に捕まった。3 度目。正確な起動行は script の docstring が持つ。）
+
+archive の段は既存 CLI を**呼ぶ**（PUT → GET → バイト比較を二重実装しない）。その後
+R2 へ置き、**最後に `{cid}.ipfs.itonami.cloud` から取り直してバイト比較する** ——
+この読み戻しだけが「決定が実際に効いた」ことを示す段である。
+
+両方向で確認（2026-09-09）: 存在しない文書 → **exit 2** / `--dry-run` は origin の書き込みと
+読み戻しを飛ばす / 実行すると **web plane が 502 から 200 に変わり**バイト一致した
+（R2 の段が効いたことの判別。この CID は事前に 502 だった）。
+
+⚠ `PUT /ipld/{cid}` は **canonical な byte route** だが **Biscuit 認証**で、
+`KOTOBASE_ARCHIVE_TOKEN` では 401 になる（実測: CBOR decode error）。R2 への書き込みは
+当面 wrangler 経由。credential が揃えばこの script の 1 段を差し替えるだけで済む。
 
 ## 適用 1 件目 —— genko（2026-09-09）
 
