@@ -10887,4 +10887,128 @@
      :file "kotoba/test/invariants.test.ts"
      :find "const WITH_REMAINDER = [1n, 7n, 9n, 999n, 1001n, 12_345n, 123_456_789n, 20_000_001n];"
      :replace "const WITH_REMAINDER: bigint[] = [];"
-     :must-fail ["the remainder and exact fixtures are both non-empty and disjoint"]}]}]}
+     :must-fail ["the remainder and exact fixtures are both non-empty and disjoint"]}]}
+  {:repo "orgs/cloud-itonami/app-inducer"
+   :label "app-inducer repo-consistency —— README が「直さないと決めた」drift を、両側に噛む形で固定する"
+   ;; app-inducer は backend も API も持たない v0.app 生成の Next.js 画面 2 枚である。
+   ;; 実行時に判定をする場所が無いので、壊れるとしたら **別のファイルに書かれた宣言との
+   ;; 食い違い** で、この repo の道具はどれもそこを見ない:
+   ;;
+   ;;   - `next build` は `typescript.ignoreBuildErrors: true` を立てている。型の赤は届かない。
+   ;;   - `tsc --noEmit` は **すでに赤**（2026-09-07 実測で 9 件 / 2 ファイル）。10 件目は
+   ;;     既存の 9 件と見分けが付かない。
+   ;;   - `pnpm run lint` は `eslint: command not found` でそもそも動かない。
+   ;;   - build は誰も import しないファイルを bundle しないので、`theme-provider.tsx` の
+   ;;     未宣言 `next-themes` import を踏まない。
+   ;;
+   ;; **この suite の特徴は、検査が両側に噛むこと。** README の「知っている drift」節は
+   ;; 2026-09-07 に *直さないと決めて* 書かれたので、検査の仕事は drift を消すことではなく
+   ;; 今の姿のまま固定することである。違反集合が既知集合と **ちょうど一致** することを見る:
+   ;; 新しい違反が増えても落ちるし、**既知の違反が黙って直っても落ちる**（allowlist が古い、
+   ;; という意味の赤）。片側だけ（部分集合）の検査は allowlist を足せば何でも通るので、
+   ;; それは検査ではなく言い訳の置き場になる。下の 11 件は 5 件が「増えた」側、
+   ;; 4 件が「直った（stale）」側、2 件が両方向を 1 つの変異で撃つ。
+   ;;
+   ;; `:must-fail` を **`実データ: <検査名>` の形**で書いているのは、この suite が検査名を
+   ;; 緑のときにも印字する（`  ok   <名前>`）ためである。名前だけを照合すると、
+   ;; **その検査が通っていても must-fail が満たされる** —— 別の理由で赤くなった実行を
+   ;; 「噛んだ」と読む、この道具で一番ありがちな嘘そのものになる。`実データ: ` の接頭辞は
+   ;; その検査が実データで落ちたときにしか出ない。
+   ;;
+   ;; 11 件とも 2026-09-09 に、当てて赤くなるところを実際に見てから登録した。
+   :cmd ["nbb" "--classpath" "test" "test/repo_consistency_test.cljs"]
+   :green-marker "repo-consistency: OK"
+   :mutations
+   [{:id :inducer/panel-value-typo
+     :why "tab の panel 側の value を 1 文字落とす。`value` はただの文字列なので tsc は見ず、
+           `next build` は静的に生成して成功する —— クリックできて何も出ない tab が残る"
+     :file "app/contacts/[id]/page.tsx"
+     :find "<TabsContent value=\"graph\">"
+     :replace "<TabsContent value=\"grahp\">"
+     :must-fail ["実データ: every-tab-trigger-has-a-panel"]}
+
+    {:id :inducer/trigger-value-typo
+     :why "上の対照で、trigger 側を落とす。**1 つの変異で両方向が立つ** ——
+           `profil` は panel の無い trigger、`profile` は trigger の無い panel になる。
+           片方向しか見ていない検査はここで半分しか言えない"
+     :file "app/contacts/[id]/page.tsx"
+     :find "<TabsTrigger value=\"profile\">"
+     :replace "<TabsTrigger value=\"profil\">"
+     :must-fail ["実データ: every-tab-trigger-has-a-panel"]}
+
+    {:id :inducer/link-path-typo
+     :why "手書きの内部 path を 1 文字落とす。`next build` は文字列の href を辿らないので
+           静的に生成でき、404 になるのは人がクリックした時だけである"
+     :file "app/page.tsx"
+     :find "href={`/contacts/${prospect.id}`}"
+     :replace "href={`/contact/${prospect.id}`}"
+     :must-fail ["実データ: every-internal-link-resolves-to-a-route"]}
+
+    {:id :inducer/undeclared-import-in-a-live-file
+     :why "**生きている**ファイルに依存に無い package を import する。既知の `next-themes` は
+           誰も import しないファイルに在るので build に見えないが、これは見えるはず ——
+           それでも package.json だけが知らない状態は build を止めない"
+     :file "app/page.tsx"
+     :find "import Link from \"next/link\""
+     :replace "import Link from \"next/link\"\nimport { create } from \"zustand\""
+     :must-fail ["実データ: every-imported-package-is-declared"]}
+
+    {:id :inducer/known-undeclared-import-quietly-fixed
+     :why "**stale 側。** `next-themes` を宣言して既知の違反を消す。片側（部分集合）の検査なら
+           これは緑になり、allowlist は古いまま残る。ここが赤くなることが、この suite が
+           『言い訳の置き場』でないことの証拠"
+     :file "package.json"
+     :find "\"next\": \"16.3.4\","
+     :replace "\"next\": \"16.3.4\",\n    \"next-themes\": \"^0.4.4\","
+     :must-fail ["実データ: every-imported-package-is-declared"]}
+
+    {:id :inducer/dead-duplicate-quietly-diverged
+     :why "**stale 側。** 未参照の `styles/globals.css` を 1 行だけ変えて複製でなくす。
+           「生きている css の複製」という条件が外れるので既知の違反が消える ——
+           ファイルは相変わらず誰も読まないのに、記録だけが黙って正しくなくなる形"
+     :file "styles/globals.css"
+     :find "@import 'tw-animate-css';"
+     :replace "@import 'tw-animate-css';\n/* diverged */"
+     :must-fail ["実データ: no-unreachable-duplicate-of-an-imported-stylesheet"]}
+
+    {:id :inducer/shadcn-points-at-the-css-nobody-imports
+     :why "`components.json` だけを別の css に向ける。components.json は TS の program に
+           入らないので tsc も build も見ず、`shadcn add` の出力が誰も読まないファイルへ落ちる"
+     :file "components.json"
+     :find "\"css\": \"app/globals.css\""
+     :replace "\"css\": \"styles/globals.css\""
+     :must-fail ["実データ: the-stylesheet-shadcn-writes-to-is-the-one-the-app-imports"]}
+
+    {:id :inducer/new-script-with-no-binary
+     :why "依存に無い binary を呼ぶ script をもう 1 本足す。**在る script は動く根拠に読まれる**
+           ので、動かない script は無い script より悪い"
+     :file "package.json"
+     :find "\"lint\": \"eslint .\","
+     :replace "\"lint\": \"eslint .\",\n    \"format\": \"prettier --write .\","
+     :must-fail ["実データ: every-declared-script-can-run"]}
+
+    {:id :inducer/broken-script-quietly-fixed
+     :why "**stale 側。** `lint` を宣言済みの `next` に差し替えて既知の違反を消す。
+           README の drift 節は `eslint` のまま残るので、記録と実態がずれる"
+     :file "package.json"
+     :find "\"lint\": \"eslint .\""
+     :replace "\"lint\": \"next build\""
+     :must-fail ["実データ: every-declared-script-can-run"]}
+
+    {:id :inducer/fonts-quietly-applied
+     :why "**stale 側。** 落としてくるだけだった Geist を body に当てる。直したこと自体は
+           正しいが、README と allowlist を直さないままだと『当たっていない』という記録が
+           残り続ける。**直した側も報告させる**のがこの検査の設計"
+     :file "app/layout.tsx"
+     :find "<body className={`font-sans antialiased`}>"
+     :replace "<body className={`${_geist.className} ${_geistMono.className} font-sans antialiased`}>"
+     :must-fail ["実データ: every-font-loaded-is-applied"]}
+
+    {:id :inducer/readme-drops-a-drift-item
+     :why "README の drift 節から font の 1 行だけを消す。**コード側は 1 バイトも変わらない**
+           ので他の 7 検査は緑のまま —— 読み物だけが嘘になる形を、この 1 件が捕まえる。
+           `_geist` / `_geistMono` は README でこの 1 行にしか出てこない"
+     :file "README.md"
+     :find "返り値 `_geist` / `_geistMono` を className に使っていない。"
+     :replace "返り値を className に使っていない。"
+     :must-fail ["実データ: readme-declares-every-known-drift"]}]}]}
