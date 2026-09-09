@@ -190,7 +190,55 @@
  ;; id is still on OpenRouter's model list, and exits 1 saying so when it is
  ;; not. That is the one guard ADR-2608271450 asked for — a pinned id that
  ;; has stopped existing must not present as a healthy tick.
- :primary {:model "z-ai/glm-5.3-flash"
-           :billed true
-           :measured-at "2026-08-30"
-           :evidence "~/.hermes/cron/usage_audit.jsonl"}}
+ ;; ---- owner override: the primary is THE FLEET (2026-09-09) -------------
+ ;; Superseding the 2026-08-30 billed override above, which stays in place as
+ ;; the record of why the free tier was left. Owner instruction: run the bots
+ ;; on murakumo.cloud's Qwen 27B.
+ ;;
+ ;; The 2026-08-27 note further up says the fleet is "ours and unbilled, NOT
+ ;; always up", and installs it last for that reason. What changed is not the
+ ;; argument, it is the measurement. `api.murakumo.cloud` was answering all
+ ;; day on 2026-09-09, and murakumo-main scored 3/3 on the SAME three probes
+ ;; this file measures the free tier with:
+ ;;
+ ;;   tools  PASS  one record_source call, exact url and license
+ ;;   exact  PASS  replied HYAKKA-OK and nothing else
+ ;;   edn    PASS  {:id "a" :ctx 7}
+ ;;
+ ;; A `:base-url` here means the primary is NOT an OpenRouter id, so the
+ ;; resolver's usual guard — is the id still on OpenRouter's list — cannot
+ ;; run and would pass vacuously if it did. It probes this endpoint with the
+ ;; three tasks instead. That substitution is the whole reason a fleet primary
+ ;; is safe to pin: the guard still measures something, and it measures the
+ ;; thing that would actually break.
+ ;;
+ ;; The free chain does not go away. It moves under this one, walked when the
+ ;; fleet rate-limits or goes down — which is the arrangement the 2026-08-27
+ ;; note asked for, with the two ends swapped.
+ ;; What the fleet displaced. It stays in the chain as the first fallback,
+ ;; because a primary with an empty chain under it is worse than the
+ ;; arrangement it replaced: the free tier answers 429 all afternoon but it
+ ;; answers, and on the first run of this change the probe found no free model
+ ;; that scored 3/3, so `fallback_providers` came out EMPTY. The claim in the
+ ;; note below -- that the free chain moves under the fleet -- has to be
+ ;; something the renderer does, not something the comment says.
+ :displaced-primary {:provider "openrouter-free"
+                     :model "z-ai/glm-5.3-flash"
+                     :measured-at "2026-08-30"}
+
+ ;; `:context-length` is not optional for a non-OpenRouter primary. Hermes
+ ;; resolves a model's window from the provider's model list, gets nothing for
+ ;; this endpoint, and falls through to a value that made the first live run
+ ;; die with `Context length exceeded (32 tokens). Cannot compress further.` --
+ ;; on a 32-token prompt. Every one of the 58 cron jobs would have failed that
+ ;; way. 262,144 is what api.murakumo.cloud publishes for murakumo-main in
+ ;; `/v1/models`; the pool's b70 member has a smaller per-slot window and the
+ ;; gateway routes around it, which is the gateway's contract to keep, not the
+ ;; bots'.
+ :primary {:provider "murakumo"
+           :model "murakumo-main"
+           :base-url "https://api.murakumo.cloud/v1"
+           :context-length 262144
+           :billed false
+           :measured-at "2026-09-09"
+           :evidence "3/3 on the same probe the free tier is measured with"}}
