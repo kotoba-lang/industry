@@ -125,7 +125,25 @@
   "Bare `nbb <file>` entry points per repo: shebang files plus package.json
   scripts with no --classpath."
   (fn [repo]
-    (let [shebangs (get @shebang-index repo [])
+    (let [;; A SHEBANG IS NOT PROOF THAT A FILE IS RUN BARE. Two repositories
+          ;; carry `#!/usr/bin/env nbb` on a script whose own README says to run
+          ;; it as `nbb --classpath <dir> <file>`, and it works that way:
+          ;; kotoba-lang/global-accounts-datoms answers "policy ok: 57
+          ;; attributes allowed, 0 violations" with `--classpath bin`, and
+          ;; kotoba-lang/org-iso-h264 reaches its own argument check with
+          ;; `--classpath scripts`. Reported as findings they are noise -- they
+          ;; are the invocation-site category this detector says it excludes.
+          ;;
+          ;; So: if any documentation or package script in the repository spells
+          ;; out a --classpath invocation naming the file, the file is not a bare
+          ;; entry point.
+          documented (let [txt (apply str (keep (fn [f] (slurp* (.join path-mod repo f)))
+                                                ["README.md" "README.edn" "package.json"
+                                                 "docs/operator-quickstart.md"]))]
+                       (set (map second (re-seq #"--classpath\s+\S+\s+(\S+\.cljs)" txt))))
+          documented? (fn [f] (let [rel (s/replace f (re-pattern (str "^" repo "/")) "")]
+                                (contains? documented rel)))
+          shebangs (remove documented? (get @shebang-index repo []))
           pkg      (slurp* (.join path-mod repo "package.json"))
           scripted (when pkg
                      (->> (re-seq #"\"nbb ((?!--classpath)[^\"]*?\.cljs)" pkg)
