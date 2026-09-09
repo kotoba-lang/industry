@@ -1,0 +1,127 @@
+[{:db/id -1
+ :adr/id "adr-2609092500-edge-fleet-ten-enrolled-three-live"
+ :adr/title "mac mini に slot が無いのではない — 10 本中 7 本が黙って死んでいる"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/related ["adr-2609092400-donated-inference-commons-reserved-floor" "adr-2607173100"]
+ :adr/body "オーナーの問い ——「mac mini 11 台、gad、ubuntu-server、xavier があるのに
+slot が無いの?」—— を実測で答えた記録。**答えは「slot はある。ただし別のモデルに
+付いていて、10 本中 7 本が黙って死んでいる」。**
+
+## 1. slot は 2 本ではなく 2 系統ある
+
+`/v1/models` の `max_concurrency: 2` は **murakumo-main の pool のみ**の数で、
+mac は 1 台も入っていない。
+
+| 系統 | 構成 | slot | 実測 decode |
+|---|---|---|---|
+| `murakumo-main` | b70 / gad / xavier（**全て自前**。b70 は Owned Intel Arc Pro B70。借り物ではない） | 2（全 request が使える数） | 16.83 tok/s |
+| `murakumo-edge` | mac mini（Ornith-1.5-9B Q4、ctx 65,536） | 登録 10・**live 3** | **17.5 tok/s / 台** |
+
+**mac は murakumo-main を 1 request も処理していない。** 別モデル・別経路である。
+
+## 2. edge の経路は pull 型で、正しく設計されている
+
+`murakumo/src/murakumo/infer/edge.clj` が launchd plan を配る。各 mac の
+`com.murakumo.edge-join` が `api.murakumo.cloud` を 1 秒間隔で polling し、
+ジョブを claim して `http://127.0.0.1:8092/v1` のローカル llama-server で実行して
+返す。**だから llama-server が 127.0.0.1 に bind されているのは正しい** ——
+Worker 側から NAT 内へ入る必要がない。
+
+実測 2026-09-09: 公開 API に `model: murakumo-edge` を投げると **HTTP 200 /
+18.02 tok/s / `worker_did` 付き**で返り、judah の join.log に対応する
+`job ... -> ok (result status 201)` が出る。**この経路は今日動いている。**
+
+## 3. では何が壊れているか —— 3 つ、全部沈黙している
+
+### (a) 10 本中 3 本しか live でない
+
+`GET /infer/nodes` 実測: murakumo-edge に登録された mac は 10 台
+(asher / benjamin / dan / issachar / joseph / judah / levi / naphtali / simeon /
+zebulun)、**`live?: true` は dan / judah / levi の 3 台だけ**。
+
+- **4 台は機械ごと offline**（asher / naphtali / zebulun / issachar、tailscale が
+  最終 2〜14 日前）。
+- **3 台は ephemeral port 枯渇**（benjamin / simeon / joseph）。
+
+### (b) port 枯渇は自己維持ループになっている
+
+benjamin 実測: TCP 50,313 本中 **TIME_WAIT 48,298 本**。内訳は
+**443 番宛が 31,758 本**（宛先は 172.67.222.17 / 104.21.25.30 = Cloudflare =
+api.murakumo.cloud）、8092 番宛 8,865、8077 番宛 2,509。
+join worker が **poll ごとに新しい TLS 接続を張る**ため、失敗すると再試行が
+さらに port を食い、`EADDRNOTAVAIL` で失敗し続ける。log は
+`heartbeat error (local-exhaustion EADDRNOTAVAIL, failure 1558, next in 300s)`
+—— 300s backoff × 1558 回 ≒ **5.4 日**、プロセス自体は **7 日 4 時間**動きっぱなし。
+
+joseph は形が違う: ローカル 8092/8077 宛が主で、しかも
+`net.inet.ip.portrange.first = 49152` のため **使える port が 16,384 本しかない**
+（benjamin/simeon は 16384 開始で約 49,000 本）。
+
+⚠ **TIME_WAIT が抜けない。** msl は 15,000ms（= TIME_WAIT 30s）なのに、join を
+止めて 45 秒後も **48,298 のまま 1 本も減らなかった**。churn を止めても回復しない
+ので、この 3 台は再起動しないと戻らない。
+
+### (c) fleet 全体が「再起動したら消える」プロセスの上に載っている
+
+live な 3 台を含め、**全ノードで GUI ログインセッションが存在しない**
+（`who` が空、`/dev/console` の所有者が root）。それでも join worker は
+**10 日 21 時間**動いている —— つまり **既に終了したセッションから生き残っている
+孤児プロセス**である。`~/Library/LaunchAgents` は GUI セッションが無いと load
+されないので:
+
+- SSH から `launchctl kickstart` / `bootstrap` は `125: Domain does not support
+  specified action` で届かない（実測）。
+- **どのノードも、再起動したら join worker は戻ってこない。**
+
+**「動いている」と「再起動に耐える」は別の事実で、外からは同じに見える。**
+
+### (d) trust tier が 1 台だけ違う
+
+issachar だけ `trust-tier: community`、他 9 台は `awai-secure`。edge.clj の
+コメントが名指しで警告している事故と同型 ——「ten resident Ornith minis enrolled
+Community, workloads asked for Secure, placement requires an exact tier match
+with no fallback, and murakumo-edge answered 503 with every node live, ready
+and idle」。**tier がずれたノードは live でも配られない。**
+
+## 4. 発見が沈黙していた理由
+
+`/v1/models` は `murakumo-edge` を **`is_ready: false` / `capacity-unmeasured`**
+として公開している。つまり **動いている 3 台の存在が、公開面のどこにも出ていない。**
+これは donate した推論そのものが「無料なのに宣言されていなかった」
+(adr-2609092400) のと**同じ形が、容量の側で再発している**。
+
+## 5. itonami bots は edge を使えない（黙って main に落ちる）
+
+実測: `POST /v1/itonami-bots/responses` に `model: murakumo-edge` を渡すと
+**HTTP 200 で返るが応答の `model` は `murakumo-main`**。
+`itonami-bots-responses-route` は `resolve-endpoint` を直接呼ぶだけで、
+`/v1/chat/completions` が持つ edge queue 分岐を持たない。**却下ではなく
+無言の置換**なので、呼び出し側からは成功と区別が付かない。
+
+## この調査で私が変えたもの（1 件）
+
+benjamin の join worker を kill した（launchd が拾い直すと期待したが、上記 (c) の
+とおり domain が無く、戻らなかった）。手動起動も試したが、port 枯渇のため
+**起動直後に `Error: fetch failed` で即終了する**。処理したジョブ数は前後とも 0 で
+変わらないが、**プロセスが在る状態から無い状態にしたのは私である**。再起動すれば
+（GUI セッションの問題を解けば）戻る。
+
+## 次の一手（順序に意味がある）
+
+1. **3 台（benjamin / simeon / joseph）を再起動**して port を解放する。ただし
+   (c) を先に解かないと、再起動でむしろ全滅する。
+2. **join worker を LaunchDaemon（system domain）へ移す**か auto-login を設定する。
+   現状の LaunchAgent は GUI セッション前提で、この fleet には GUI セッションが無い。
+3. **join worker が接続を使い回すようにする**（keep-alive / agent pool）。1 秒ごとに
+   新しい TLS 接続を張る設計が (b) の根本原因。あわせて poll 失敗時の即時再試行を
+   抑える。
+4. **issachar の trust tier を awai-secure に直す。**
+5. **`murakumo-edge` の capacity を測って公開する**（`is_ready` を真にする）。
+   測っていないものは、無いのと外から区別が付かない。
+6. **itonami bots の responses 経路に edge 分岐を足す**（無言の置換をやめる）。
+7. offline 4 台（asher / naphtali / zebulun / issachar）は物理確認が要る。
+
+⚠ 1〜3 と 6 は `cloud-murakumo-api` の deploy を伴い、その deploy は
+`release/cljs` の artifact refresh に閉じ込められている（adr-2609092400 参照）。
+**artifact refresh がこの fleet の容量問題全体のボトルネックになっている。**"}]
