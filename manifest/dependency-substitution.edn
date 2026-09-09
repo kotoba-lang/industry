@@ -166,7 +166,63 @@
 
   ;; ------------------------------------------------ first-party exists: rewire
   {:coordinate "org.clojure/data.json" :ecosystem :maven :disposition :first-party-exists
-   :target "kotoba-lang/json" :kind :implementation :note "Layer 1 of the foundational stdlib. encode/decode, deterministic key order."}
+   :target "kotoba-lang/json" :kind :implementation :note "Layer 1 of the foundational stdlib. encode/decode, deterministic key order."
+   :qualification
+   "The note names `deterministic key order` as a property of the target. It is
+    also a DIFFERENCE from the source, and that is the half a rewire has to
+    plan for. Measured 2026-09-10.
+
+      (array-map \"zebra\" 1 \"apple\" 2 \"mango\" 3)
+      json.core/encode           -> {\"apple\":2,\"mango\":3,\"zebra\":1}
+      clojure.data.json/write-str -> {\"zebra\":1,\"apple\":2,\"mango\":3}
+
+    `json.data-json` is API-complete for the surface these 27 repos use --
+    `read-str` / `write-str` / `read`, trailing kwargs or an options map,
+    `:key-fn` applied recursively -- and its docstring is right that the swap
+    is `a require-line change rather than hundreds of call-site edits`. That is
+    a statement about arities. **It is not a statement about bytes.**
+
+    No round-trip test can see the difference: decode(encode(x)) = x under
+    both. So the usual evidence for a codec swap does not discriminate here.
+
+    Where the bytes are load-bearing, measured rather than assumed:
+
+    - 29 files across 8 of the 27 repos hold a JSON write and a digest in the
+      same file. That is a list of places to look, not a list of defects.
+    - Two of the strongest-looking candidates are NOT data paths:
+      `network-awai/cloud-itonami` `net_kotobase.clj` and
+      `cloud-itonami-isic-5820` `crm/kotobase.clj` both hash a NAME STRING
+      (`kotobase/db/<did>/<db>`) to build a graph CID. Co-location of a JSON
+      writer and a digest in one file proves nothing.
+    - One confirmed JSON-to-digest path:
+      `cloud-itonami/cloud-itonami-app` `.../app/acme.clj`, the RFC 7638 JWK
+      thumbprint (`b64u(sha256(utf8(write-str (jwk key))))`). **There the swap
+      is safe and strengthening.** RFC 7638 requires lexicographic member
+      order, and today that is held by a hand-written `array-map` whose own
+      docstring says `in the order RFC 7638 requires ... and it is not an
+      accident here`. Sorting makes structural what is currently remembered.
+      Nothing tests that array-map's order; under a sorting encoder nothing
+      needs to.
+    - The JWS uses in the same file are not in this class: `protected` and
+      `payload` are transmitted as the exact bytes that were signed, so member
+      order cannot invalidate them.
+    - 7 of the 27 repos assert on JSON string literals in tests. Those go RED
+      at swap time. That is the good failure -- visible, at the moment of the
+      change, in the repo making it.
+
+    The hazard that remains is the one nothing here covers: a receiver
+    comparing bytes produced elsewhere in insertion order. Nothing in these 27
+    was found doing that, and `not found` is weaker than `absent`.
+
+    One thing makes the rewire cheaper than the file count suggests: several of
+    these repos already INJECT the writer (`:json-write clojure.data.json/write-str`
+    passed in as a parameter), so the swap is one line at the injection site --
+    and, for the same reason, the byte change reaches every consumer of that
+    seam at once. Change it where it is injected, not where it is called.
+
+    Order of work: land the 20 repos with no digest and no JSON-literal test
+    first, let the 7 literal-test repos go red and fix the fixtures, and treat
+    the 8 digest-adjacent repos as a read-before-swap list of 29 files."}
   {:coordinate "metosin/jsonista" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json" :kind :implementation}
   {:coordinate "cheshire/cheshire" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json" :kind :implementation}
   {:coordinate "zod" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/spec" :kind :implementation}
