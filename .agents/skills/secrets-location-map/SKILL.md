@@ -77,5 +77,5 @@ B2 Master Key を確認する。
   「1Password には未登録」なのは方針であると同時に、この環境で `op` の CLI 統合が
   オフで非対話に書けないため。オーナーが有効化したら登録して該当行を更新する。
 - **launchd 下では kagi が使えない**（Keychain unlock prompt を出せず timeout する）。
-  常駐プロセスに渡す値は `~/.gftd/<name>`（mode 600）のファイル経路にする。
+  常駐プロセスに渡す値は `~/.itonami/<name>`（mode 600）のファイル経路にする。
   **LaunchAgent plist は world-readable なので plist 本体に値を書かない。**

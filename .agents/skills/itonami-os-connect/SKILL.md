@@ -38,7 +38,7 @@ os.edn` と出ていたら **その候補は信用できない**（共有 checko
 留まり他セッターの WIP で dirty なので、main で既に接続済みの vertical を
 「未宣言」と判定する。実測 2026-08-07 / 08 の 2 回、1 位の 4630 が両方とも既に
 接続済みで、loop 自身が『次の反復も同じ罠を踏む』と ledger に書いて終わった）。
-`~/.gftd/itonami-os-maturity-tick.ledger.edn` の末尾数行も読む。
+`~/.itonami/itonami-os-maturity-tick.ledger.edn` の末尾数行も読む。
 
 **tick が `:ops-drift` を出していたら、接続より先にそれを直す。** 宣言と actor の
 op がズレている面は嘘をついているので、その上に 1 本足しても嘘が増えるだけ。
@@ -179,7 +179,7 @@ diverged なら触らない** —— pin の clean な worktree を作り、兄�
 
 ### 6. ledger に 1 行足す
 
-`~/.gftd/itonami-os-connect.ledger.edn`（追記のみ、1 行 1 EDN）:
+`~/.itonami/itonami-os-connect.ledger.edn`（追記のみ、1 行 1 EDN）:
 
 ```clojure
 {:at "..." :repo "cloud-itonami-isic-NNNN" :ns "..." :ops N
