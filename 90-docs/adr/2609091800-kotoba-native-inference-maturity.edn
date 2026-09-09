@@ -93,7 +93,7 @@
   | # | capability | what exists here today |
   |---|---|---|
   | P0 | **general-target memory** | aiueos `kernel-*` ops, kernel target only |
-  | P1 | quantized matvec (Q4_K/Q6_K/Q8_0) | `qwen35-dequant-row`/`-matvec` in Kotoba; `ggml_kdot.clj` is a bit-exact ggml oracle; `native/kotodama_kdot.c` is the C mechanism |
+  | P1 | quantized matvec (Q4_K/Q6_K/Q8_0) | **emitted on x86-64** as `kernel-dequant-dot-{q8-0,q4-k,q6-k}`; **absent on aarch64**; IQ formats declared and refused. See the amendment |
   | P2 | attention, RoPE, RMSNorm, SwiGLU | `qwen35-attention`, `-norm`, `-activation`, `-recurrent-step`; `kernel_math_core` for the pure half |
   | P3 | KV cache, paged attention | **decisions landed** in Kotoba (`scheduler_core.kotoba`); block table itself blocked on P0 |
   | P4 | continuous batching, chunked prefill | **decisions landed**; the sequence list is the host's |
@@ -169,6 +169,85 @@
   gate died before running; and that gate's own `--write` was unreachable
   because the guard tested only the LAST argv, so the half CI runs hid the
   half a person runs.
+
+  ## Amendment 2026-09-09 (second): P0 and P1 measured properly, and P1 was understated
+
+  Reading the backends rather than the docstrings changed two of the rows
+  above. Both corrections make this ADR's own earlier text wrong, and the
+  earlier text is the kind that sends someone to build what exists.
+
+  ### P1 is emitted on x86-64 and absent on aarch64
+
+  The fused dequantize-and-dot family is not \"mostly written and blocked\". It
+  is a set of Kotoba OPERATIONS with machine arms:
+
+  | operation | block bytes / elements | x86-64 | aarch64 |
+  |---|---|---|---|
+  | `kernel-dequant-dot-q8-0` | 34 / 32 | emitted | — |
+  | `kernel-dequant-dot-q4-k` | 144 / 256 | emitted | — |
+  | `kernel-dequant-dot-q6-k` | 210 / 256 | emitted | — |
+  | `kernel-dequant-dot-iq4-xs` | 136 / 256 | declared, refused | — |
+  | `kernel-dequant-dot-iq2-s` | 82 / 256 | declared, refused | — |
+  | `kernel-dequant-dot-iq3-xxs` | 98 / 256 | declared, refused | — |
+  | `kernel-dot-f32` | — | emitted | — |
+
+  The strides are ggml's. The IQ rows carry their own reason
+  (`:emitted? false`, a code in those formats is an index into a 256/512/1024
+  entry table that has to reach the machine as read-only data first), which is
+  a refusal with a route rather than an absence.
+
+  **aarch64 has none of them**, and the fleet is ten Mac minis. The one
+  machine that can run these kernels today is the x86-64 AIUEOS device — which
+  is exactly the node class `local-murakumo.device-p256` was built around.
+  That is not a coincidence to note in passing: it means the native quantized
+  path already runs somewhere, and porting it to the fleet's own ISA is a
+  named, bounded piece of work rather than a research question.
+
+  ### P0's shape is a granted region, not a lifted gate
+
+  `[:slice T]` for `T ∈ {:u8 :u16 :u32 :u64}` already exists (kotoba-sema
+  ADR 0022): a source type erased into `base` and `len` machine words before
+  HIR, with `slice-get`/`slice-set!`/`slice-sub`/`slice-length`, bounds
+  checks, and a 2^40 element ceiling. `[:slice :f32]` is declared and refused
+  because no `slice-load-f32` exists on either ISA — the u32 load plus
+  `f32-from-bits` reaches the same value.
+
+  Measured on aarch64, in order, each rejection naming the next gate:
+
+      dot over two slices, 5 params      -> \"function parameters exceed
+                                            ABI-supported arity after slice
+                                            erasure: 7 machine words for 5\"
+      restructured to 4 machine words    -> \"a slice parameter cannot cross an
+                                            export boundary\"
+      base+length in, slices built inside-> \"bounded kernel memory operation
+                                            requires the aiueos kernel target\"
+
+  So the memory family is reachable from ordinary Kotoba, and the last gate is
+  the target. **It should not simply be opened.** On aiueos the program IS the
+  kernel and a base address is memory it owns; on a general target a base
+  handed in from outside is authority over the whole address space, and the
+  bounds check validates the index against the declared length, never the base
+  against anything. Opening it would put ambient authority into a language
+  whose capability kits all declare `:ambient-access false`.
+
+  P0 is therefore: **a region capability**. The host grants a bounded region
+  the way `dataspace-v1` grants a dataspace — lexical/argument possession,
+  no ambient access — and slice loads are admitted on general targets only
+  through a granted region. The `:request`/`:result`/`:limits` shape those
+  kits already use is the template, and the KEXE export copy ABI (which
+  already carries vector RESULTS out of an export) is the marshalling half.
+
+  ### What this does to the ordering
+
+  Unchanged in shape, sharper in content:
+
+  1. **P0 region capability** — the one gate, and now with a known design.
+  2. **P1 on aarch64** — port the three emitted dequant arms to the fleet's
+     ISA. The oracle for them already exists (`ggml_kdot.clj`, bit-exact
+     against ggml's Q4_K/Q6_K x Q8_K reduction), so this is portable work with
+     a pass/fail signal, not exploration.
+  3. P3–P5 decisions are landed (previous amendment); their structures still
+     wait on P0.
 
   ## What is honestly not claimed
 
