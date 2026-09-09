@@ -716,6 +716,58 @@
               RAISES the mean. Deleting the sample must not be a quiet way to score
               higher."}
 
+  {:id       :verify-ns-form-loadable
+   :title    "ns forms that cannot macroexpand, in files no test loads"
+   :why      "2026-09-10 (ADR-2609101200): found by accident. A JSON-library swap
+              checked each rewire with one line per edited namespace,
+              `clojure -M -e '(require (quote <ns>))'`, on the rule that a suite
+              which never loads the edited file returns the same green as one that
+              does. Five repos were loaded that way and five failed -- none because
+              of the change. Two failed at the `ns` form itself: the `(:import ...)`
+              keyword is missing, so the import vectors dangle as ns references,
+              `clojure.core/ns` throws while macroexpanding, and the file never
+              loads. Nothing said so, because no test requires these namespaces --
+              the suites are green and substantial and simply never touch them. The
+              failure mode is not a red build, it is no build at all for that file,
+              indefinitely. There is a second cost for dependency work: a repo
+              declaring a JVM dependency for a namespace that cannot load is
+              carrying it for dead code, and every count of remaining JVM surface
+              includes it."
+   :argv     ["nbb" "{{repo}}/scripts/verify-ns-form-loadable.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- ns forms change rarely, and the
+                                         ; defect arrives by template copy, not drift
+   :timeout-ms  900000                   ; 15m -- ~6x the measured 2.5m runtime
+   :writes   :none
+   :scope    "A SHAPE check on the `ns` form. It runs nothing, so it cannot see the
+              other two failure modes ADR-2609101200 records -- a required namespace
+              no coordinate provides, and a Java class used with no :import. A clean
+              run means `no ns form is malformed in the way we can see without a
+              classpath`, which is a smaller claim than `these namespaces load`, and
+              the detector prints that on every run rather than leaving it implied."
+   :measured "2026-09-10: 39,389 Clojure sources under orgs/, 4 findings, all four in
+              the same copied `aozora.clj` template (kouhou, shinshi-growth-actor,
+              tashikame, wt-kouhou). All four were then actually loaded and all four
+              throw `Syntax error macroexpanding clojure.core/ns` -- no false
+              positives survive. Both directions shown: it exits 1 on those files and
+              0 on za-actor/deploy.clj, which is a file that DOES fail to load but
+              whose ns form is well-formed -- the detector correctly stays silent
+              rather than claiming a defect it cannot see. Exit 2 for an empty scan, a
+              missing directory, an unreadable file, or a failed self-check, so a run
+              that could not answer never returns the value a clean run returns.
+              Every run first proves the check still discriminates, and reports a
+              COUNT of control failures rather than a boolean: a boolean cannot tell
+              one regression from a wholly broken scanner. The controls are not
+              hypothetical -- an earlier build of this detector reported 2 false
+              positives because deciding whether a quote closes a string needs the
+              PARITY of the backslash run before it, and a two-character lookback
+              read `\\\\\\\"` (one literal backslash then an escaped quote) as
+              closing the docstring 80 lines early, after which prose parens counted
+              as structure. That exact shape is now a control fixture; reverting the
+              fix makes the detector REFUSE rather than report."}
+
   {:id       :verify-codec-seq-expansion
    :title    "base codecs that expand a byte into a seq per bit, whose constant factor never appears in the caller's own profile"
    :why      "2026-09-05 (ADR-2609051700): multiformats.base32/encode expanded every

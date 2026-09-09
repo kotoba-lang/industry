@@ -38,8 +38,19 @@ import vectors dangle as bare `ns` references:
                [java.time Instant]
              [java.util UUID]))
 
-Across the workspace there are **22 `aozora.clj` files and 4 carry this**
-(kouhou, tashikame, wt-kouhou, network-awai/cloud-itonami media/aozora).
+Measured by detector, 2026-09-10, over **39,389 Clojure sources**: **4 files**
+carry this, all four the same copied template -- **kouhou, shinshi-growth-actor,
+tashikame, wt-kouhou**. All four were then loaded and all four throw
+`Syntax error macroexpanding clojure.core/ns`.
+
+That set is a correction. This ADR first named `network-awai/cloud-itonami`
+`media/aozora.clj` (which is fine -- it has a correct `(:import ...)`) and
+missed `shinshi-growth-actor`, because the first count came from an ad-hoc
+`grep` that was wrong in both directions: `grep` on this machine is **ugrep**,
+which reads `(:import` as an unterminated regex group and so never matched,
+and `head -25` stopped before the `ns` form in docstring-heavy files. Two
+errors that cancelled, giving a count that looked right with the wrong members
+in it. The detector is `scripts/verify-ns-form-loadable.cljs`.
 
 **Java classes used with no `:import`.** `animekaza.engine` names `HttpClient`,
 `HttpRequest` and `HttpResponse$BodyHandlers` while its sibling namespaces in
@@ -98,12 +109,28 @@ Two rules follow.
 
 ## What is not decided here
 
-**No detector exists yet**, and this ADR does not claim one. The natural shape
-is per-repo: enumerate `src/**/*.clj` namespaces, subtract those any test
-requires, and load the remainder -- reporting the count of namespaces that no
-test loads *and* that fail to load, with a `SCANNED` floor so an empty run is
-distinguishable from a clean one. It belongs in `manifest/orgs-detectors.edn`
-rather than a fleet gate, since it reads west-managed `orgs/`.
+**One of the three defects is now detected; two are not.**
+`scripts/verify-ns-form-loadable.cljs` (registered in
+`manifest/orgs-detectors.edn` as `:verify-ns-form-loadable`, not a fleet gate,
+since it reads west-managed `orgs/`) is a SHAPE check on the `ns` form. It runs
+nothing, so it cannot see a required namespace no coordinate provides, or a
+Java class used with no `:import`. It prints that limit on every run rather
+than leaving it implied, because **a clean run here means only `no ns form is
+malformed in the way we can see without a classpath`**.
+
+Detecting the other two needs a resolved classpath per repo, which is a
+different and much more expensive instrument. It is not built.
+
+A note on building the one that exists, because it argues for the discipline
+above rather than against it: its first version reported **2 false positives**.
+Deciding whether a quote closes a string needs the PARITY of the backslash run
+before it, and a two-character lookback read `\\\"` -- one literal backslash
+then an escaped quote -- as closing a docstring 80 lines early, after which
+every paren of prose counted as structure. It named a well-formed file as
+broken. **That is worse than silence: it sends someone to a file that is
+fine.** Caught only because its count disagreed with the earlier grep and the
+disputed file was actually loaded. The shape is now a control fixture, and
+reverting the fix makes the detector refuse rather than report.
 
 The 4 malformed `ns` forms, the missing `:import`, and the 14 undeclared
 requires are **left in place**
