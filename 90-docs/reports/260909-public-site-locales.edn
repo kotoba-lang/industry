@@ -1,0 +1,66 @@
+{:report/id :public-site-locales-20260909
+ :decision "ADR-2609091700"
+ :date "2026-09-09"
+ :required-locales ["en" "zh-Hans" "hi" "es" "ar" "fr" "bn" "pt" "id" "ur" "ru" "de" "ja" "ko" "pcm" "arz" "mr"]
+ :translation-review :machine-with-targeted-edits-native-speaker-unverified
+ :manifest-verification {:candidate "c43b0abb6a03c297f315d82b134690b28c83d426"
+                         :baseline "8b113df01c430b7168358c23d1ed529832e99712"
+                         :entries ["kotoba-lang" "cloud-murakumo" "cloud-murakumo-app" "app-kotoba-cloud" "nexus-x402" "cloud-itonami"]
+                         :result :all-six-fast-forward-and-reachable
+                         :scope "Only these six entries were checked; unrelated root pin changes are outside this report."}
+ :sites
+ [{:domain "kotoba.cloud" :status :verified-live
+   :repo "kotoba-lang/app-kotoba-cloud"
+   :pr "https://github.com/kotoba-lang/app-kotoba-cloud/pull/33"
+   :commit "928f95868cbe383af30fbe3b472b4fd9bc7c41e2"
+   :cloudflare-version "d5336518-dc71-4674-8c8c-5f94027f6840"
+   :verified [:all-17-public-routes :zh-alias :html-lang :rtl :browser-egyptian-arabic]
+   :tests {:tests 52 :assertions 2112 :failures 0}
+   :scope "Public entry/navigation and substantive static prose. Dynamic account messages and linked legal/reference documents retain their source language; coverage inventory discloses fallback."}
+  {:domain "murakumo.cloud" :status :verified-live
+   :repo "network-awai/cloud-murakumo"
+   :commit "75f62a449c3ab8c04eb97f31049abe675c40b09f"
+   :app-commit "a90d9e790646cf1054bb0c20ecb45bbbf3a792f2"
+   :cloudflare-version "becc8c4d-9376-4616-b369-1627c4c749f8"
+   :verified [:all-17-public-routes :zh-alias :html-lang :rtl :mobile-390 :same-page-language-switch :live-catalog-and-js-bytes]
+   :scope "Public landing (35 messages) and existing app catalog (145 keys). Egyptian Arabic catalog refreshed separately from standard Arabic. Separate long-form and legal pages retain their source language."}
+  {:domain "kotoba-lang.org" :status :verified-live
+   :commit "eb492e251b2e1d7d070bb7f1b3cca9bcc9914d6b"
+   :cloudflare-version "feef93fb-db41-4bed-994c-68fd1de0e356"
+   :production-exact-page-matches 85
+   :repo "kotoba-lang/kotoba-lang"
+   :pr "https://github.com/kotoba-lang/kotoba-lang/pull/668"
+   :scope "Home, blog, library introduction, operator/legal and sponsorship: 85 equivalent pages, 976 source-hashed messages per translated catalog. Upstream library records, external specifications and executable examples retain source identity. Tamil/Ukrainian starters retained."
+   :verified [:catalog-completeness :runtime-placeholders :all-85-canonicals :reciprocal-alternates :unchanged-executable-blocks :mobile-390-rtl :keyboard-equivalent-page-switch :browser-play-42]
+   :tests {:locale-tests 4 :locale-assertions 17358 :documentation-tests 10 :documentation-assertions 89 :failures 0}
+   :design-audit {:score 100 :axes 10 :contrast :not-measured}}
+  {:domain "x402.nexus" :status :verified-live
+   :repo "network-awai/nexus-x402"
+   :pr "https://github.com/network-awai/nexus-x402/pull/47"
+   :commit "e05482a9287c83ba1aa5567afedefd0eb67b09c1"
+   :cloudflare-version "4dbd0ee2-57c5-456e-af5f-80bfdc1505b1"
+   :scope "199 catalog segments cover the concurrently merged integration-documentation redesign. Existing cohort/apply/checkout pages and future publisher descriptions retain their source language."
+   :verified [:all-17-public-routes :zh-alias :root-json :mobile-390 :same-page-language-switch :rtl-code-and-price-isolation :localized-copy-button]
+   :compiled-worker-verified [:unknown-404]
+   :tests {:tests 32 :assertions 486 :failures 0}}
+  {:domain "itonami.cloud" :status :verified-live
+   :repo "network-awai/cloud-itonami"
+   :prs ["https://github.com/network-awai/cloud-itonami/pull/664" "https://github.com/network-awai/cloud-itonami/pull/665"]
+   :commit "db37e00c4b3b7e469305d29631c4f98dbb2261b1"
+   :cloudflare-deployment "https://b2e281b6.cloud-itonami.pages.dev"
+   :production-exact-page-matches 180
+   :scope "688 messages per catalog, ordered 17 languages and legacy zh. Root-only legal/trust/partners/reference documents, private app and publisher-authored descriptions are not fully translated."
+   :verified [:all-180-public-pages :html-lang :rtl :locale-preserving-app-redirects :browser-egyptian-arabic :chinese-plans-prices]
+   :tests {:tests 18 :assertions 11225 :router-regressions 2 :wallet-tests 3 :failures 0 :ui-build-warnings 0}}
+  {:domain "kotobase.net" :status :partial
+   :repo "net-kotobase/control-plane"
+   :pr "https://github.com/net-kotobase/control-plane/pull/651"
+   :commit "70dc2047f43ca1bf8989f4354415ea0192445e5d"
+   :deployed false
+   :scope "170 public marketing page/language combinations rendered. Core entry and substantive static prose translated; unchanged technical labels and English fallback are individually inventoried. Legal/reference and authenticated surfaces retain their source language."
+   :preview-verified [:all-170-rendered-pages :locale-routes :rtl :authority-boundary :browser-arabic-pricing :worker-build :bundle-manifest :deployment-dry-run]
+   :tests {:focused-tests 8 :assertions 362 :failures 0}
+   :release-blockers ["Existing DATA-HANDLING.md and PLANS.md differ from counsel-reviewed document digests. No approval records changed and no publication guard bypassed."
+                      "Live B2 staging /_app/meta still exposes the older archive_cids contract and lacks required p2p_egress. The default public smoke suite remains failed; no weakened assertion or unreviewed staging deployment is claimed."]}]
+ :notes ["Policy acceptance, translation, merge, deployment and observed production are distinct. This report records each site separately."
+         "Native-speaker review is not claimed. Original-language technical/reference and legal surfaces are not counted as fully translated."]}
