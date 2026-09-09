@@ -1,0 +1,185 @@
+[{:db/id -1
+  :adr/id "adr-2609091200-community-provider-onboarding"
+  :adr/title "Community providers: one command from stranger to paid, and the four gaps that were in the way"
+  :adr/status "accepted"
+  :adr/date "2026-09-09"
+  :adr/deciders "owner (two decisions, recorded below), Claude Opus 5"
+  :adr/supersedes-clause "ADR-2607995000's no-fiat-payout clause, for EARNED credits only"
+  :adr/related "adr-2607995000-kotoba-three-sphere-economy adr-2607300100-x402-credits-acceptance-session adr-2608136000-eight-questions"
+  :adr/body
+  "## The question that started this
+
+  『murakumo cli を install したら、その pc が推論 provider として murakumo に
+  登録されて、推論に参加し、報酬を受け取れるようにできているか』
+
+  Measured on 2026-09-09 the answer was no, in four separate places, and the
+  fourth one is the interesting one.
+
+  ## What was actually there (measured, not read off the docs)
+
+  - **No CLI.** `cloud-murakumo-cli` did not exist. `join.cljc` declares the
+    native tier's `:install :curl-sh`, which is a tier descriptor and not an
+    installer; no published install path existed on npm, brew or anywhere else.
+  - **Enrollment worked.** `POST /infer/nodes` is public and live: 66 nodes
+    enrolled, 56 of them Community.
+  - **Admission was decorative.** Every Community node was `:pending`. The only
+    writer of `:node/admission` in the entire codebase was enrollment itself,
+    and it can only write `:accepted` for an operator-authenticated Secure
+    node. **No route existed that could move a Community node to admitted.**
+    The Secure/Community ADR's sentence — `registration alone is not capacity`
+    — was true in the opposite sense to the one intended.
+  - **And the gate was not a gate.** The queue never read `:node/admission`.
+    Any `did:key` with a self-signed CACAO could claim `host-large-model` work
+    and be credited for whatever it returned; 22 accounts already had. All 612
+    `native-relay` runs in the ledger record `:run/proof :verified` with
+    nothing having verified any of them — `relay_worker.clj` says so in its own
+    header.
+  - **Reward existed but did not leave.** `murakumo.infer.credits` settles
+    `:run/shares` correctly, and its own docstring forbids adding a fiat payout
+    path without revisiting ADR-2607995000 first.
+
+  So the open enrollment endpoint was a form for a queue nobody served, and the
+  admission field was a lock with no key and no door.
+
+  ## The two decisions that were the owner's
+
+  **Reward form: credits by default, with a credits→USDC payout rail behind an
+  owner approval.** ADR-2607995000's membrane moves in exactly one direction
+  for exactly one class of holder: a Community provider may withdraw credits it
+  EARNED by serving inference. Nothing else about the membrane changes.
+
+  **Admission: automatic qualification.** A node that answers a
+  server-issued challenge correctly and in time is admitted without an operator
+  in the loop. The alternative — measure, then wait for a human — leaves the
+  Community pool empty for as long as nobody is pushing the button, which is
+  the state this ADR exists to end.
+
+  The owner also asked that FLOPS be part of the accounting.
+
+  ## What FLOPs are for, and why not memory×time
+
+  `murakumo.infer.credits` prices the OWNED fleet by memory×time, because what
+  is scarce on ten Mac minis is resident memory: a node holding 11 GB of a
+  shard cannot host anything else with it. That is the right unit for a shard
+  ring the operator placed and the wrong one for a stranger's PC that dials in,
+  serves a whole request end to end and leaves — there is no shard, no
+  placement, and no memory the operator reserved. What that machine contributed
+  is arithmetic, so `local-murakumo.provider-flops` counts arithmetic: two FLOPs
+  per active parameter per token, prompt and generated tokens alike, which
+  understates a long-context request and is therefore the safe direction for a
+  payout. An unknown model measures `nil`, never `0`, and every consumer has to
+  keep those apart.
+
+  ## What lands
+
+  | piece | where | what it decides |
+  |---|---|---|
+  | qualification | `local-murakumo.provider-qualification` | a nonce-derived challenge; correct and in-window ⇒ `:accepted` |
+  | the claim gate | `local-murakumo.edge-queue/claim-decision` | native-tier work requires an admitted node |
+  | delivered FLOPs | `local-murakumo.provider-flops` | arithmetic recorded beside the price |
+  | payout | `local-murakumo.payout` | earned credits → USDC on Base, owner-approved |
+  | the CLI | `network-awai/cloud-murakumo-cli` | enroll → qualify → serve, in one command |
+
+  ### The qualification is honest about its own reach
+
+  It proves that, inside one bounded window, an endpoint controlled by this
+  `did:key` answered a challenge that did not exist before it was issued. It
+  does NOT prove the answers came from local hardware, from the model the node
+  named, or from a model at all. Saying so in the namespace docstring is the
+  point: the mechanisms that bound that fraud are delivered-FLOPs accounting,
+  canary re-execution of sampled jobs (not built), and a human in front of
+  every payout. A qualification is an admission gate, not an attestation —
+  `local-murakumo.device-p256` is the attestation and is a narrower, different
+  thing.
+
+  ### The claim gate is tier-shaped, not blanket
+
+  A blanket gate would have deleted the browser swarm, whose workers are
+  unenrolled `did:key:pending-*` placeholders by design. `join/tiers` already
+  says a browser can take media-postproc, small shards, prompt eval and
+  embarrassingly parallel work and cannot host a large model — so browser-tier
+  kinds stay open to unenrolled dids, which is what those tiers ARE, and the
+  four native-only kinds require an admitted node. Operator-authenticated
+  claims bypass the gate entirely: the owned fleet is trusted by custody, and
+  requiring it to qualify would have made this change an outage for ten Mac
+  minis.
+
+  ### The payout rail's three separations
+
+  1. **Only earned credits are payable.** `:run/shares` are; grants and topups
+     are not. Without this, buy-credits-then-withdraw is a laundering path and
+     would be the first thing anyone tried.
+  2. **A request debits; a settlement does not.** Credits leave the account
+     when the provider asks. Debiting at settlement leaves a window in which
+     the same credits are payable twice, exactly as long as a human approval
+     takes.
+  3. **Nothing in the codebase moves money.** `settle` records a transaction
+     hash the owner produced from the treasury Safe. No key is reachable from
+     this path, by construction rather than by convention.
+
+  The starting rate is 125 credits per USD against a published buy side of 95,
+  a ~24% spread covering the treasury cut, gas and the refund reserve. It is
+  derived from the buy price, not measured, and lives in `payout/default-policy`
+  as data so it can be tuned without touching the decisions.
+
+  ## The deploy that broke production, and what it changed
+
+  The first deploy of this work 500'd **every route on api.murakumo.cloud**,
+  including `/health`, for about four minutes before rollback:
+
+      500 {\"error\":\"Error: No item 2 in vector of length 1\"}
+
+  Cause: `worker.cljs` was written as five nested promise chains inline in the
+  route table, and one of them was a single closing paren short. The parens
+  still balanced across the file, so the `cond` simply closed early — every
+  branch after it became an unconditional expression, and `(seg 2)` ran for
+  every request. It compiled, bundled, packaged, digest-verified and deployed.
+
+  Nothing between the edit and production had an opinion, and the reason is
+  structural rather than careless: `local-murakumo.routes` is the pure,
+  portable half and has 372 tests; `local-murakumo.worker` is the half that
+  deploys and had **none**, because it needs a Worker runtime the nbb suite
+  does not have. The suite was green throughout.
+
+  Two things landed because of it:
+
+  - `scripts/verify-worker-bundle.cljs` loads `dist/worker.js` and probes six
+    paths whose answers need no storage, failing on any 500. Confirmed to fail
+    on the broken bundle (5 of 6 FAIL) before it was confirmed to pass on the
+    fixed one — the gate was seen red first.
+  - the handlers were rewritten as named functions, so the route table branches
+    are one line each. The mistake is still possible; it is no longer invisible.
+
+  ## Evidence
+
+  - `cloud-murakumo-api` tests 333 → 372, assertions 1911 → 2069, `npm test` green.
+  - Both new gates mutation-tested: admitting every node fails 9 tests; making
+    bought credits withdrawable fails 4.
+  - `routes_test` asserts the refusal AND the admission for the same job, and
+    the double-claim test uses a second admitted node so it cannot pass at 403
+    without ever reaching the 409 path.
+  - The CLI's CACAO round-trips through `cacao.edge.verify` — the same verifier
+    the Worker runs — and the round-trip test caught a real first-run bug:
+    `generate!` returned no private key, so the very first `murakumo join` on a
+    fresh machine would have crashed, and every subsequent run would have
+    worked.
+  - `nbb.edn` had two dead classpath entries (`kotoba-kir`, renamed to `osaho`;
+    `kotoba.lang.text`, never added when `clojure.string` was retired). The
+    repo's whole nbb suite could not run at all until they were fixed.
+
+  ## What is NOT done
+
+  - **Output verification.** Nothing re-executes a sampled job on a Secure node
+    and compares. `:run/proof` now says `:self-reported` where that is the
+    truth, which is a prerequisite for building it, not a substitute.
+  - **The CLI repo is private.** A stranger cannot install it until the owner
+    makes `network-awai/cloud-murakumo-cli` public; publishing a repo is
+    outside the standing authorization and is deliberately left as the owner's
+    action.
+  - **No npm registry publish.** `npm i -g github:network-awai/...` works
+    without a registry token; a real `@murakumo/cli` name needs one.
+  - **The payout rail has never settled.** The routes, the accounting and the
+    refusals are tested; no USDC has moved, because moving it is the owner's
+    action and no code here can take it.
+  - **Community pool depth is 1.** This machine. A pool of one is a working
+    mechanism and not yet a market."}]
