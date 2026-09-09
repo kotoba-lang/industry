@@ -1,0 +1,119 @@
+[{:db/id -1
+ :adr/id "adr-2609093400-dot-was-wrong-and-the-suite-was-told-to-look-away"
+ :adr/title "`.` was wrong, and the suite had been told to look away"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/authority "owner instruction, 2026-09-09"
+ :adr/repos "kotoba-lang/pattern, kotoba-lang/cssom"
+ :adr/related "adr-2609093300-captures-and-the-end-of-the-regex-blocker, adr-2809041200, adr-2609092600-a-program-outgrew-the-document-and-the-corpus-hid-a-bug, kotoba-lang/pattern#3"
+ :adr/body "Continuing 2026-09-09, after captures. The next step was cssom's three named
+gaps. Measuring the first one found something else first.
+
+## The bug
+
+`.` matched a line terminator in both matchers. JavaScript's does not.
+Measured that day: `a.b` against \"a\\nb\" answered TRUE here and false there,
+and so did `.` against \"\\n\" and `a.*b` against \"a\\nxb\".
+
+## Why it survived
+
+`vm_parity` was 270/270 and `pattern_parity` 252/252, both green for days,
+and NEITHER COULD HAVE CAUGHT IT. Both headers listed this among \"two
+differences that are deliberate and asserted rather than hidden\", and both
+then stated that patterns containing `.` are \"compared only on inputs with no
+newline\". `pattern_core`'s own docstring said `.` takes a newline \"which
+differs from Clojure default and is asserted in the parity test rather than
+left to be discovered\".
+
+One of those two differences is real. This is a Pike VM: leftmost-longest,
+where JavaScript backtracks. That is a property, it has a derivation, and the
+suites are right to pin it.
+
+The other was a line of code. Op 2 answered `true`. Nothing about a Pike VM
+requires `.` to take a newline; it is simply what that line did. Written up as
+a decision, it then DID WORK: it justified leaving newline inputs out of the
+corpus, so the suite was blind by design and the blindness had a rationale
+sitting next to it.
+
+This is ADR-2809041200 exactly -- an implementation state promoted to a
+property -- with the additional turn that the promotion was enforced by a test
+corpus. The rule that ADR gives (\"その一文は、書き手が実装状態を性質に昇格させた
+瞬間の痕跡である\") has a corollary worth stating: when a difference is written
+up as deliberate, check what the write-up is being used to justify NOT
+testing.
+
+It is also the second time this corpus failed to reach a construct. The first
+was patterns ending in `$` (adr-2609092600). Both times the suite was green,
+both times the missing thing was an input rather than a check.
+
+## What changed
+
+`.` excludes LF, CR and the two Unicode separators, in `pattern-vm` and in
+`pattern-core`. A negated class still matches them -- `[^x]` is not `.` -- in
+both engines, and that is asserted.
+
+`(?s)` turns it back on, and `(?m)` came with it. The header did not have to
+widen: the nibble after \"K\" was a fold BIT and is now a bitfield (0 fold,
+1 dotall, 2 multiline), so \"K0\" and \"K1\" still mean what they meant and every
+program literal already compiled and committed still reads correctly. The same
+reasoning as the capture slot count -- a format is a public surface even
+inside one repo.
+
+The emitter reads the flag LETTERS rather than matching \"(?i)\" as a
+four-character string, so `(?is)`, `(?smi)` and the rest work in any order.
+Leading only: a mid-pattern flag group is still refused, because modes live in
+the header and would silently apply to the whole pattern. That refusal is an
+implementation limit, not a design decision, and it is labelled as one.
+
+`pattern-core` gets the `.` fix but not the flags: its program is a document
+with a single `:fold` and no room for a mode field. That is a reason to use
+`pattern-vm`, not a reason to leave the two matchers answering different
+questions.
+
+## Measured
+
+  pattern-vm selfcheck    16/16
+  pattern-emit selfcheck  17/17
+  vm parity              320/320   was 270 -- the corpus now reaches `.`
+  pattern parity         284/284   was 252 -- same
+  emit parity            168/168   + 5 ahead of the .cljc oracle
+  compile parity         157/157
+  capture parity        1277/1277
+  expressible            168/184   the inline-flags entry LEFT the ratchet
+
+Against JavaScript directly: 11/11 on dot and dotall, 10/10 on the multiline
+anchors including `(?m)^$` against \"a\\n\\nb\".
+
+Discrimination: reverting the dot fix in both matchers now costs 17 failures
+in `vm_parity` and 11 in `pattern_parity`. The identical code was invisible to
+both suites that morning, and that contrast is the result -- not the fix.
+Separately, making the multiline `^` ask about `pos` instead of `pos - 1`
+reddens only `test-multiline-anchors`, the off-by-one its own comment names.
+
+## A decision the emitter forced
+
+The Kotoba emitter now compiles five leading-flag patterns that the `.cljc`
+oracle still refuses, so `emit_parity` had a choice. Folded into \"both
+refused\" they vanish. Failed, they are wrong -- there is nothing to disagree
+with. They are counted under their own name, \"ahead of the oracle\", and
+ratcheted at 5, so the category cannot become the place disagreements hide.
+Teaching the oracle inline flags lowers it.
+
+The `expressible` ratchet lost its `:group/inline-flags` entry the same day it
+was written, by the OTHER direction of the ratchet: a gap that closes must
+leave the table rather than sit there granting room nothing uses. Both
+directions have now fired on real work.
+
+## Where the goal stands
+
+htmldom remains fully expressible. cssom's remaining gaps are two, not three:
+non-greedy quantifiers (3 patterns) and lookaround (2).
+
+⚠ Non-greedy is not obviously reachable, and this is the honest reading rather
+than a plan. Under leftmost-longest, `*?` and `*` CANNOT differ -- POSIX has
+no greediness, because the overall match is the longest regardless of any
+operator. Supporting it means either giving the VM priority semantics
+(leftmost-first, which changes every answer the parity suites currently pin)
+or refusing it permanently and rewriting the three consumer patterns. That is
+a decision, not an implementation task, and it should be taken deliberately
+rather than discovered halfway through."}]
