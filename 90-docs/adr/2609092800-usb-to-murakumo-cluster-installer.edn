@@ -16,7 +16,8 @@
               "kotoba-lang/kekkai"
               "kotoba-lang/kekkai-node"
               "network-awai/cloud-murakumo"
-              "net-kotobase/control-plane"]
+              "net-kotobase/control-plane"
+              "kotoba-lang/org-wi-fi-easy-connect"]
 
   :adr/authoritative_for
   ["USB から murakumo cluster 参加までを 1 本の onboarding-chain として閉じる product contract"
@@ -210,20 +211,81 @@ ADR-2608153600 と ADR-2800004900 の決定を、この installer に束縛す�
 **live な authority は既に両方を出しているのに、component contract がそれを
 言っていない。** 実装順 1 はこの drift を閉じること。
 
-### D6. network は 2 経路。R0 は有線。Wi-Fi を critical path に置かない
+### D6. 「入力させない」は 3 つの問題。R1 は USB tethering、R2 は DPP、SoftAP は採らない
 
-- **R0 = wired DHCP。** K16 では RTL8125 driver が 6 個の Kotoba object として
-  実在し、`dhcp-reply-valid-v1.edn` / `dhcp-option-u32-v1.edn` の契約もある。
-  **6600HS の NIC は未 probe** —— PCI identity を probe で得るまで driver 対応を
-  green にしない（ADR-2608251418 が既にこう決めている）。
-- **Wi-Fi は authenticated phone browser から封緘して配る。**
-  suite は `:x25519-hkdf-sha256-aes-256-gcm-v1`、
-  `:authority-sees-plaintext? false`、device 側は encrypted envelope として保存。
-  required-proof は authority-opaque-envelope / device-decryption /
-  physical-association / reboot-recovery の 4 つ。
-- native application は `:pending-wifi-driver`。したがって
-  **「USB を挿すだけで network 設定ができる」の R0 は有線である**と製品文言に書く。
-  Wi-Fi は R1。ここを曖昧にすると「挿すだけ」が嘘になる。
+**「keyboard 入力をさせずにスマホから Wi-Fi 情報を渡す」は 1 語で 3 つを言っている。**
+
+| | 何を | 2026-09-09 の状態 |
+|---|---|---|
+| **取得** | スマホから SSID+passphrase を出す | プラットフォーム依存（下記） |
+| **受け渡し** | 箱へ届ける | **実装済み** —— `phone_bind.cljc` の X25519+HKDF+AES-GCM 封筒（AAD `aiueos-wifi-profile-v1`、SSID 1–32 / passphrase 8–63 を検証、`:authority-sees-plaintext? false`） |
+| **適用** | STA で繋ぐ | `:apply-state :pending-native-wifi-driver` |
+
+**受け渡しには bootstrap の鶏卵がある（コードで確認した）。** `decrypt-network-envelope`
+の封筒は `device-auth-poll`（`auth.kotoba.cloud`）から**箱が polling して**受け取る。
+つまり**箱が先に online でないと Wi-Fi 設定を受け取れない**。現実装は 2 本目以降の
+Wi-Fi は配れるが、**最初の 1 本にはなれない。**
+
+制約の核心はこれである:
+
+> **QR は「箱 → スマホ」の一方向にしか流れない。箱にカメラが無いからである。**
+> したがって「スマホ → 箱」は、電波か・線か・authority 経由のどれかしかない。
+
+**取得側の実際**: Android 10+ は 設定 → Wi-Fi → 共有 で `WIFI:` QR を出す（打鍵ゼロ。
+⚠ その QR は **passphrase を平文で持つ**ので写真に残ると漏れる）。iOS は
+`WIFI:` QR を**生成できない**が、iOS 16+ は Face ID 越しにパスワードを表示・コピー
+できる（貼り付け 1 回、打鍵ゼロ）。両方とも `WIFI:` QR を**読んで**参加はできる。
+
+**鶏卵の出口は 4 つあり、2 つを採り 1 つを名指しで捨てる。**
+
+| | 打鍵 | hosted 今日 | bare-metal に要るもの | 平文 passphrase を見る者 | 判断 |
+|---|---|---|---|---|---|
+| A 有線 bootstrap | 0 | ✅ | 済（6600HS は未 probe） | —— | R0、据え置き |
+| **B USB tethering** | 0（iPhone は Trust タップ 1 回） | ✅ `cdc_ncm`/`rndis`/`ipheth` | USB host stack + CDC-NCM | —— | **R1** |
+| C SoftAP + captive portal | 0 | ❌ | AP mode + DHCP + HTTP server | **我々のページ** | **採らない** |
+| **D DPP / Wi-Fi Easy Connect** | 0 | ❌ | Wi-Fi driver + action frame + DPP 状態機械 | **誰も見ない** | **R2** |
+
+- **B が「スマホから提供する」の最も直接的な形**である —— 情報ではなく回線そのものを
+  渡す。Wi-Fi driver を 1 行も要さず、hosted profile では今日閉じられる。B で online に
+  なれば既存の封筒経路がそのまま箱自身の Wi-Fi profile を配れる（適用は driver 待ちの
+  まま先に配れる）。
+- **D だけが D4「QR は秘密を運ばない」と完全に一致する。** 箱が出す DPP QR は箱の
+  公開鍵であって秘密ではなく、passphrase は人も我々のコードも一度も見ない。
+- **C を採らない理由は好みではない。** AP mode + DHCP + HTTP を足して、**D より弱い
+  性質**しか得られない —— 平文 passphrase が我々のページを通るので D4 に正面から反する。
+
+**B の決定核は着地済み**（`aiueos` `96f288bf`、`network-bootstrap-v1.edn` +
+`src/aiueos/network_bootstrap.cljc`、6 tests / 43 assertions）。設計の要点は
+**1 つの `:ok?` を 2 つに割ったこと**である:
+
+    bootstrap-decision   この link は first boot を運んでよいか
+    durable?             この link を「この機械の network」として記録してよいか
+
+**tether は前者に yes、後者に no を返す。** 潰すと、箱が電話越しに立ち上がり、電話が
+去り、なぜ到達不能になったかが記録のどこにも無い。ephemeral な bootstrap の receipt は
+`:owed` と `:must-not` を持つ。refusal は個別に名前を持ち、その 1 つが
+**`:link-local-only-is-not-a-network`** —— 169.254 のアドレスは `ip addr` に出て何も
+route しない、この workspace が繰り返し会う「測れなかった検査が、測って問題が無かった
+検査と同じ値を返す」形である。selection は install target disk と違い**曖昧さを refuse
+せず rank する**（disk は不可逆、link は選び直せる）。
+
+**D の URI codec も着地済み** —— **`kotoba-lang/org-wi-fi-easy-connect`**（新規 repo、
+west 登録済み）。DPP bootstrapping URI の parse / admit / generate を pure `.cljc` で
+持ち、`org-ietf-ssh` と同じ切り方で **URI だけを持ち protocol は持たない**。
+`parse` は構造だけ、`admit` が決定で、**未知の tag も、admitted curve 上の EC SPKI で
+ない鍵も fail-closed で refuse する**。35 checks、うち 18 が理由 literal を pin する
+refusal、変異 2 種で discriminate 確認済み。
+
+- **R0 の「network 設定」は有線のままである。** Wi-Fi の native application は
+  `:pending-wifi-driver` で、これを製品文言で曖昧にすると「挿すだけ」が嘘になる。
+- **6600HS の NIC は未 probe。** PCI identity を probe で得るまで driver 対応を green に
+  しない（ADR-2608251418 が既にこう決めている）。K16 では RTL8125 が 6 個の Kotoba
+  object として実在し DHCP 契約もあるが、**その測定を 6600HS の測定として引用しない。**
+
+⚠ **DPP の iOS 対応は未測定である。** Android 10+ は configurator をネイティブに持つ
+（設定 → Wi-Fi → デバイスを追加）。**iOS が一般の configurator UI を公開しているかは
+測っていない。** ここを仮定すると iOS ユーザーだけ経路が無い設計になるので、D に進む
+1 手目は実機での測定であって実装ではない。
 
 ### D7. machine profile は probe が作る。spec sheet を receipt の代わりにしない
 
@@ -282,6 +344,10 @@ install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で�
 | O3 human approval | passkey / Base Account でスマホから承認 | authority は **live**。installer 面の結線は red |
 | O4 murakumo join | device-owned CACAO で authenticated heartbeat + 実 job 結果 + reboot 回復 | **red**（`:native-device-cacao :not-wired-to-kernel`）。relay 経由は contract-only |
 | O5 kekkai join | 署名済み netmap 検証 + Noise IK handshake + reconnect | **red**（`:pending-native-adapter`） |
+| N0 bootstrap 決定 | first boot を運べる link と、機械の network にしてよい link が別々の答えになる | green（`aiueos` `96f288bf`、6 tests / 43 assertions、変異 2 種で discriminate） |
+| N1 USB tether 実測 | hosted で実際に電話を挿して first boot が DHCP を取り、receipt が ephemeral と記録する | **red**（未実測）。bare-metal は USB host stack が `:absent` |
+| N2 DPP URI | bootstrapping URI を parse / admit / generate し、不正を名前付きで拒否する | green（`org-wi-fi-easy-connect`、35 checks、変異 2 種で discriminate） |
+| N3 DPP interop | 実 configurator がこの URI を読んで credential を渡す | **red**。Android 10+ はネイティブ、**iOS は未測定** —— ここを仮定しない |
 | C0 confidentiality | —— | **恒久的に空。名乗らない**（D3）。gate を置かないことが決定であり、未達ではない |
 
 ## 実装順（依存が決めている）
@@ -314,6 +380,12 @@ install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で�
   （`:factory` → `:claimed` → `:released`）・canonical QR encoding・9 個の deny 理由・
   `:attested` / `:tofu` の 2 段階 trust を既に持つ。
 - **新しい netmap / overlay。** kekkai の 4 repo。
+- **SoftAP + captive portal（経路 C）。** AP mode + DHCP + HTTP server を足して、
+  DPP より弱い性質しか得られない —— 平文 passphrase が我々のページを通る。
+- **`WIFI:` URI の parser。** 経路 C を採らないので要らず、取得側でも使えない
+  （自分の画面の QR は自分でスキャンできない）。`org-wi-fi-easy-connect` は
+  `DPP:` だけを持つ —— `WIFI:` は Wi-Fi Alliance の仕様ではないので、
+  そこに同居させると origin 面の名前が嘘になる。
 - **TEE の名乗り。**
 
 ## Consequences
@@ -362,5 +434,8 @@ install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で�
     {:gap :kekkai-native-adapter :state :pending :note \"device-onboarding-v1 の :kekkai :initial-state :pending-native-adapter\"}
     {:gap :device-owned-cacao :state :blocked :note \"native-device-cacao :not-wired-to-kernel。persistent device key / secure entropy / ed25519-sign / trusted-https を要する\"}
     {:gap :wifi-driver :state :pending :note \"network-profile-sync の :native-k16-application :pending-wifi-driver。R0 は有線 DHCP\"}
+    {:gap :wifi-profile-bootstrap-paradox :state :addressed :note \"封筒は auth.kotoba.cloud から箱が polling して受け取るので、箱が先に online でないと最初の 1 本にはなれない。D6 の経路 B（USB tethering）がこれを閉じる。決定核は着地、live 実測は未\"}
+    {:gap :usb-tether-live :state :not-started :note \"hosted で実際に電話を挿した first boot が未実測。bare-metal は USB host stack が absent\"}
+    {:gap :dpp-interop :state :unverified :note \"URI codec は着地（org-wi-fi-easy-connect、35 checks）。実 configurator との往復は未測定で、iOS が configurator になれるかは特に未測定 —— 仮定すると iOS だけ経路が無い設計になる\"}
     {:gap :physical-boot :state :red :note \"K16 は physical-qualification-usb-v11 / code 416。6600HS は未測定。1〜7 の実装を塞がない\"}
     {:gap :confidentiality :state :out-of-scope :note \"D3 により恒久的に空。未達ではなく、名乗らないという決定\"}]"}]
