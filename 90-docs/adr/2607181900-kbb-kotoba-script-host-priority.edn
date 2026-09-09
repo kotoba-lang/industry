@@ -167,6 +167,50 @@ readiness gate への進捗 (全て実測付きで landed / in-flight):
   demo_kbb_fs_read_native は js でも 84（native と同値）、cold start 1.7 s。
   js は配布成果物ではなく oracle（ADR-2609051100 の決定は変わらない）。
 
+## 記録 (2026-09-05、native backend slice — slice 4 の手前)
+
+**着地 (kotoba agent/kbb-native-slice)**: `kbb --backend native` が
+既存 native AOT backend 経由で `.kotoba` スクリプトを実行する。設計は
+「compile to native + 許可された invocation は policy 側で前実行」の
+narrow 形:
+
+- guest の `(proc-exec \"<index>\")` を desugar 前の forms で機械的に
+  書き換え、policy 側で guard-call (v1 interpreter と同一の receipt
+  journal 付き) により前実行し、その exit status word (exit 0 → 1
+  truthy / それ以外 → 0) をリテラルに置換する。guest はコマンドバイトを
+  持たない契約は slice 2 から不変。
+- 書き換え後の guest は capability 呼び出しを 0 個含むので、native
+  artifact は **空の allow bitmap** で admission され、`kotoba.verifier`
+  署名 → `kototama.native.executor` (measure-runtime で reviewed
+  kexe_loader.c を 2 回ビルドして identity 測定 → verify → loader
+  プロセス実行) で実行される。amu tools/ は classpath resource
+  (`kotoba/lang/capability-catalog.edn` の URL) から解決する。
+- 実測 (macOS arm64): demo_kbb_proc_exec.kotoba が native 経路で
+  `:result 0` (interpreter slice と同一)、receipt 1 件
+  (`:host/proc-exec` / `\"echo\"` / `:ok`)。スカラー `typed-cap-call`
+  (wire id 33, i64→i64) は loader の deterministic provider で
+  7→8 round-trip 実測。loader プロセス単体 cold start ~11ms (warm)、
+  JVM orchestrator 込み execute 150-190ms / session invoke 12ms。
+- **cold start 実測 (正直な数字)**: `clojure -M -m kotoba.kbb ...`
+  (v1 interpreter) median **17.9s** (5 回, min 13.9)。`--backend
+  native` は JVM CLI 起動が残るため median 18.1s と JVM 起動税が
+  同額 — native 化は実行エンジン部分 (~interpreter steps) を短縮する
+  が CLI 起動税は別課題。**真の JVM-free 経路は実在する**:
+  `bin/amu --jvm-free compile` (nbb, ~2.2s) → kexe_loader 実行
+  (~11ms) ≈ **2.2s** だが、これは sealed artifact の sign/verify host
+  層 (kototama-native/executor.clj が JVM-only) を経ない省略経路で、
+  kbb 統合は未達。
+- **未達 (次スライス)**: ① verifier/executor host 層の nbb 移植
+  (sign/verify + measure-runtime orchestration — ed25519 検証の CLJS
+  実装が要) ② string/option/result typed capability の loader 側実
+  provider (env-read/getenv は identity stub のまま) ③ proc-exec 以外
+  の capability (env-read/fs-browse/fs-read) の native 経路での扱い
+  (同様の pre-exec 書き換えで拡張可能だが未実装) ④ kbb CLI 自体の
+  GraalVM native-image 化または nbb 移植 (CLI 起動税の解消)。
+
+gate 条件③ (kbb JVM-free host 化) は **in progress**: native 実行
+経路の接続は実証済み、JVM-free CLI host 層が残る。
+
 gate 条件②③が満たされるまで nbb が script host の正本のまま変わらない
 のは Decision 6 のとおり。
 

@@ -75,7 +75,8 @@ query($q:String!,$after:String){
       (cond
         (nil? s) acc
         :else
-        (let [acc' (into acc (:nodes s))
+        (let [nodes (remove #(contains? #{"gftdcojp/241001-lifescience-web" "kotoba-lang/kotoba-v2025"} (get-in % [:repository :nameWithOwner])) (:nodes s))
+              acc' (into acc nodes)
               pi   (:pageInfo s)]
           (if (and (:hasNextPage pi) (< guard 20))
             (recur (:endCursor pi) acc' (inc guard))
