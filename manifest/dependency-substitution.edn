@@ -208,7 +208,37 @@
     the target grows host features and loses the property it was built for.
     Not decided here."}
   {:coordinate "datascript/datascript" :ecosystem :maven :disposition :first-party-exists
-   :target "kotoba-lang/datalog" :kind :implementation :note "With kotoba-lang/datom for the value layer; kotobase when durability is wanted."}
+   :target "kotoba-lang/datalog" :kind :implementation :note "With kotoba-lang/datom for the value layer; kotobase when durability is wanted."
+   :qualification
+   "The note names two repositories that cannot do the job and omits the one
+    that can. Measured 2026-09-10 against the only kotoba-lang call site,
+    `shell/apps/tamaki-observer-web/src/tamaki/observer/app.cljs`, which uses
+    five datascript names: `create-conn`, `empty-db`, `reset-conn!`,
+    `transact!` and `q`.
+
+      kotoba-lang/datalog     q, normalize, canonicalize -- storage-FREE by
+                              design, and its own README says so: extracted
+                              from arrangement, `whose arrangement.core
+                              interleaved this query half with a persistence
+                              half`.
+      kotoba-lang/datom       representation only. No conn, no transact.
+      kotoba-lang/kotobase    open / transact! / q / pull, on the DURABLE
+                              CID-addressed plane. This call site explicitly
+                              does not want durability -- it calls
+                              `(d/reset-conn! db (d/empty-db schema))` on
+                              refresh.
+      kotoba-lang/arrangement mutable-db, empty-db, assert-quads!,
+                              retract-quad, q, materialized, merge-dbs.
+                              THIS is the in-memory conn, and the note does
+                              not mention it.
+
+    So the composition is `datalog` (or arrangement's own `q`) for the query
+    and `arrangement/mutable-db` for the connection, with `kotobase` only when
+    the caller wants the commit chain. Feasible, and not a rewire: the query
+    dialects differ (datascript's `:find`/`:where` over an entity schema
+    against arrangement's quad model), and this particular consumer is a
+    2,188-line reagent SPA with three `d/q` call sites and a datascript schema
+    map. Sizeable, clear, and not started here."}
   {:coordinate "datascript" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/datalog" :kind :implementation}
   {:coordinate "datalevin/datalevin" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/kotobase" :kind :partial :partial-because "the query and datom planes are real; storage backends are pluggable by design"}
   {:coordinate "com.datomic/peer" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/kotobase" :kind :partial :partial-because "the query and datom planes are real; storage backends are pluggable by design"}
