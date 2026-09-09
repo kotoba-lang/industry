@@ -479,7 +479,19 @@
       ;; :paths and :aliases. Insert one rather than rewriting the source and
       ;; leaving the namespace unresolvable, which is what the first version
       ;; did: it reported `no-deps-key` and carried on.
-      (not (str/includes? s ":deps"))
+      ;;
+      ;; Asked of `top-level-key-open`, not of the text. `(str/includes? s
+      ;; ":deps")` matches a COMMENT, and the nbb.edn that
+      ;; bb_edn_to_nbb_tasks.cljs generates opens with
+      ;;
+      ;;     ;; Note: nbb does not resolve :deps from bb.edn; use sibling :paths
+      ;;     {:paths ["src" "test"]}
+      ;;
+      ;; so the text check said "this file has a :deps", the depth-aware scan
+      ;; correctly found none, and the file was REFUSED for having "neither a
+      ;; locatable top-level :deps nor a :paths vector" while its :paths vector
+      ;; was on the next line. Measured 2026-09-10 on three repos in one wave.
+      (nil? (top-level-key-open s))
       ;; Find `:paths` the same way, by depth. The old `#"\{:paths \["` required
       ;; it to be the very first key with no comment before it -- and a bb.edn
       ;; that opens with a two-line comment then `:paths` was reported as having
