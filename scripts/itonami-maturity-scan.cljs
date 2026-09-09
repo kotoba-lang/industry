@@ -205,7 +205,21 @@
 
 ;; ---------------------------------------------------------------- evidence
 
+;; 計数対象の言語。**この集合の外で書かれた実装は、7 軸のどれにも現れない。**
 (def src-ext #{"cljc" "cljs" "clj" "kotoba"})
+
+;; プログラムのソースだと言い切れる拡張子（データ・文書・設定は入れない）。
+;; **スコアには一切入らない。** これは「この instrument はこの repo を読めて
+;; いない」と言うためだけの語彙で、:maturity/* はどれもこの集合を見ない。
+(def foreign-code-ext
+  #{"sol" "ts" "tsx" "js" "mjs" "cjs" "jsx" "py" "go" "rs" "rb" "java" "kt"
+    "swift" "c" "h" "cpp" "hpp" "cc" "cs" "php" "ex" "exs" "erl" "scala" "hs"
+    "lua" "zig"})
+
+;; test だと名乗っている path。`uncounted-test` が使ってきた規約に、Foundry の
+;; `Foo.t.sol`（test/ の外に置ける）を足したもの。
+(def foreign-test-re
+  #"(?i)(^|/)tests?/|_test\.|\.test\.|\.spec\.|\.t\.|(^|/)test_|(^|/)spec/")
 
 (defn- ext-of [f] (let [i (.lastIndexOf f ".")] (when (pos? i) (subs f (inc i)))))
 (defn- base-of [f] (last (str/split f #"/")))
@@ -282,6 +296,34 @@
                                      files)
             ;; README.md 以外の README（.edn / .rst / 拡張子なし）
             uncounted-readme (filterv #(re-find #"(?i)^readme\.(edn|rst|txt|org)$" %) files)
+            ;; ── 計数外の言語で書かれた実装（報告のみ）───────────────────────
+            ;;
+            ;; 上の uncounted-src / uncounted-test は **src-ext を要求する**。
+            ;; だから Clojure を 1 行も持たない repo は「計数外の src も 0」と
+            ;; 報告する —— 実装が空の repo と、この instrument が読めない言語で
+            ;; 書かれた repo が、**counted も uncounted も全部 0** という同じ顔で
+            ;; 並ぶ。CLAUDE.md 8 問の 1 問目そのもの（測れなかった検査が、測って
+            ;; 問題が無かった検査と同じ値を返す）。
+            ;;
+            ;; 実測 2026-09-09: counted と uncounted の src/test が 4 つとも 0 で
+            ;; ファイルが 10 件以上ある repo は 95 本あり、そのうち **74 本が実際に
+            ;; 非 Clojure の実装を持ち、53 本は test まで持っていた**。tick は
+            ;; その 53 本へ「axis-test 0bp → +2000bp の伸びしろ」と言い続けていた。
+            ;;
+            ;; **vendored な依存は数えない。** Foundry は `lib/` に、Go は
+            ;; `vendor/` に依存を置く。`vendor` は walk が既に飛ばすが `lib` は
+            ;; 飛ばさない —— そして `lib/` を名前で一律に飛ばすと Elixir と Ruby の
+            ;; **一次ソース**が消える。だから名前ではなく `.gitmodules` が
+            ;; submodule として宣言した path だけを外す。
+            submodule-paths (let [t (slurp* (str root "/.gitmodules"))]
+                              (if t
+                                (vec (keep (fn [[_ p]] (when (seq p) (str (str/trim p) "/")))
+                                           (re-seq #"(?m)^\s*path\s*=\s*(.+)$" t)))
+                                []))
+            vendored?   (fn [f] (boolean (some #(str/starts-with? f %) submodule-paths)))
+            foreign-all (filterv #(and (foreign-code-ext (ext-of %)) (not (vendored? %))) files)
+            foreign-test (filterv #(re-find foreign-test-re %) foreign-all)
+            foreign-src  (filterv #(not (re-find foreign-test-re %)) foreign-all)
             ;; 計数対象外の宣言ファイル。URL は distinct で数える —— 同じ URL が
             ;; 20 回出てくるのは 20 の出典ではない。上限は既存の計数と同じ発想で
             ;; 25 ファイル（scan は 1,936 repo を歩くので、ここは安くなければならない）
@@ -320,6 +362,14 @@
          :uncounted/test-file-count (count uncounted-test)
          :uncounted/test-bytes (reduce + 0 (map #(file-size (str root "/" %)) uncounted-test))
          :uncounted/readme-file-count (count uncounted-readme)
+         ;; 計数外の言語で書かれた実装。**報告のみ。どの :maturity/* も読まない。**
+         ;; counted も uncounted も 0 の repo が「空」なのか「読めなかった」のかは、
+         ;; この 2 つを見るまで区別が付かない。
+         :uncounted/foreign-src-file-count (count foreign-src)
+         :uncounted/foreign-src-bytes (reduce + 0 (map #(file-size (str root "/" %)) foreign-src))
+         :uncounted/foreign-test-file-count (count foreign-test)
+         :uncounted/foreign-test-bytes (reduce + 0 (map #(file-size (str root "/" %)) foreign-test))
+         :uncounted/foreign-langs (into (sorted-map) (frequencies (keep ext-of foreign-all)))
          :uncounted/url-count uncounted-urls
          :ingest/fact-file-count (count fact-files)
          :ingest/data-file-count (count data-files)
