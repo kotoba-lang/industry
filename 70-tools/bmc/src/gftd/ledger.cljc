@@ -84,11 +84,19 @@
 
   Deliberately NOT beside the ledger and not inside the repository: the whole
   point is to survive `git checkout` reverting the ledger, and anything tracked
-  or ignorable inside the tree can be reverted or cleaned with it. `~/.gftd` is
-  where this workspace already keeps machine-local loop state."
+  or ignorable inside the tree can be reverted or cleaned with it. `~/.itonami`
+  is where this workspace keeps machine-local loop state.
+
+  The directory was `~/.gftd` until 2026-09-09. `gftd` is retired
+  (manifest/gftd-retirement.edn), and a hardcoded path under a retired name is
+  not inert: a missing parent is created rather than reported, so this line
+  silently resurrected `~/.gftd` after the home-directory cutover had removed
+  it. The high-water mark migrates with the directory -- moving the path without
+  carrying the value forward would let seq numbers roll back, which is the exact
+  collision this floor exists to prevent."
   ([home ledger-path] (hwm-file home nil ledger-path))
   ([home git-root ledger-path]
-   (str home "/.gftd/ledger-hwm/"
+   (str home "/.itonami/ledger-hwm/"
         (-> (ledger-key git-root ledger-path)
             (str/replace #"[^A-Za-z0-9._-]" "_"))
         ".seq")))

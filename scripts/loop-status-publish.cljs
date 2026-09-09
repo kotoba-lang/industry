@@ -75,9 +75,15 @@
 (def home (.homedir os))
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
-(def gftd (str home "/.gftd"))
+(def state-dir
+  ;; The loops write their ledgers here. It was `~/.gftd` until the 2026-09-09
+  ;; home-directory cutover (manifest/gftd-retirement.edn); this line did not move
+  ;; with them, and the failure was silent in the worst direction -- the directory
+  ;; still existed, so every lookup below simply found nothing and this published an
+  ;; empty loop list. Measured 2026-09-09: 0 ledgers under ~/.gftd, 19 under ~/.itonami.
+  (str home "/.itonami"))
 (def agents-dir (str home "/Library/LaunchAgents"))
-(def token-file (str gftd "/bots-status-token"))
+(def token-file (str state-dir "/bots-status-token"))
 (def endpoint "https://itonami.cloud/api/bots-status")
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 (def self-test? (boolean (some #{"--self-test"} *command-line-args*)))
@@ -101,21 +107,21 @@
   [name]
   (cond
     (= name "repo-bot-drain")
-    (let [p (str gftd "/repo-bots/drain.ledger.edn")] (when (exists? p) p))
+    (let [p (str state-dir "/repo-bots/drain.ledger.edn")] (when (exists? p) p))
     :else
-    (or (let [p (str gftd "/" name "/ledger.edn")] (when (exists? p) p))
-        (let [p (str gftd "/" name ".ledger.edn")] (when (exists? p) p)))))
+    (or (let [p (str state-dir "/" name "/ledger.edn")] (when (exists? p) p))
+        (let [p (str state-dir "/" name ".ledger.edn")] (when (exists? p) p)))))
 
 (defn- ledger-names
   "ledger を持ち、loop script も在る name の集合。"
   []
-  (let [dir-form (for [d (list-names gftd)
-                       :when (exists? (str gftd "/" d "/ledger.edn"))]
+  (let [dir-form (for [d (list-names state-dir)
+                       :when (exists? (str state-dir "/" d "/ledger.edn"))]
                    d)
-        flat-form (for [f (list-names gftd)
+        flat-form (for [f (list-names state-dir)
                         :when (str/ends-with? f ".ledger.edn")]
                     (subs f 0 (- (count f) (count ".ledger.edn"))))
-        drain (when (exists? (str gftd "/repo-bots/drain.ledger.edn"))
+        drain (when (exists? (str state-dir "/repo-bots/drain.ledger.edn"))
                 ["repo-bot-drain"])]
     (->> (concat dir-form flat-form drain)
          (filter loop-script?)
@@ -292,7 +298,7 @@
   "curl で PUT。token は argv に出さず header ファイル（mode 600）経由で渡す。
   返り値 {:status int|nil :body str}。"
   [token json]
-  (let [hdr (str gftd "/.bots-status-hdr")]
+  (let [hdr (str state-dir "/.bots-status-hdr")]
     (try
       (.writeFileSync fs hdr (str "Authorization: Bearer " token "\n") #js {:mode 0600})
       (let [r (.spawnSync cp "curl"
@@ -320,7 +326,7 @@
 ;; broken read, which is the one answer this whole block exists to prevent.
 
 (defn- self-test! []
-  (let [tmp (str gftd "/.loop-status-self-test")
+  (let [tmp (str state-dir "/.loop-status-self-test")
         write! (fn [body]
                  (.mkdirSync fs (str tmp "/cron") #js {:recursive true})
                  (.writeFileSync fs (str tmp "/cron/jobs.json") body))]
@@ -332,7 +338,7 @@
                                  :next_run_at "2026-08-31T03:00:00Z"
                                  :last_status "ok" :failure_streak 0
                                  :model "m" :provider "p" :script "e.py"
-                                 :workdir "/Users/someone/.gftd/worktrees/x"
+                                 :workdir "/Users/someone/.itonami/worktrees/x"
                                  :last_error "Script exited with code 1\nstdout: boom"
                                  :prompt "SECRET INSTRUCTIONS"}]})))
       (let [good (read-hermes-jobs tmp)

@@ -163,7 +163,7 @@
 
 (defn- argv-test! []
   ;; 実測した壊れ方: deploy 名 quality.cljs で file-arg が script 自身になった。
-  (doseq [script ["/Users/x/.gftd/shinshi-catalog-video/quality.cljs"
+  (doseq [script ["/Users/x/.itonami/shinshi-catalog-video/quality.cljs"
                   "/repo/scripts/shinshi-catalog-video-quality.cljs"]]
     (let [got (parse-args ["node" "/opt/homebrew/bin/nbb" script "/tmp/a.mp4" "--json"])]
       (when-not (= ["/tmp/a.mp4" "--json"] got)

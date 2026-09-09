@@ -88,7 +88,7 @@
     (is (= 42 (ledger/parse-hwm "42\n"))))
   (testing "the mark lives outside the tree, or a checkout could revert it too"
     (let [p (ledger/hwm-file "/home/u" "/repo/90-docs/business/canvas-ledger.edn")]
-      (is (str/starts-with? p "/home/u/.gftd/"))
+      (is (str/starts-with? p "/home/u/.itonami/"))
       (is (not (str/includes? p "/repo/")))))
   (testing "one ledger is one floor, however many checkouts reach it"
     ;; Measured 2026-08-31, hours after the floor landed: TWO marks existed for
