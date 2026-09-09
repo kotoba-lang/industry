@@ -197,12 +197,41 @@ login 変更はこの workspace の token ではできない**（`admin:org` sco
 symlink は `~/.gftd.retired-20260909` へ改名して残してあり、戻すなら `mv` 1 回。
 
 切り替えたもの: version 管理下 178 ファイル / launchd plist 43 本（102 本すべて
-`plutil -lint` clean）/ `~/.itonami` 内の運用ファイル 25 本。**46 job すべてを
-bootout→bootstrap で再読み込みした**（launchd は load 時の定義をキャッシュするので、
-plist を書いただけでは効かない）。実測: job セットは前後で同一、**last-exit が変わった
-5 本はすべて改善**（2→0 / -15→0 / 1→0 / 78→0 / 1→0）、非ゼロは 12→7 で 0 から非ゼロに
-なったものは無い。symlink を外した後に job を実走させ、`~/.itonami/…` に書いて exit 0 に
-なることまで確認した。backup は `~/repo-archive/gftd-symlink-cutover-20260909/`。
+`plutil -lint` clean）/ `~/.itonami` 内の運用ファイル 25 本 / launchd job 57 本の再読み込み
+（launchd は load 時の定義をキャッシュするので、plist を書いただけでは効かない）。
+backup は `~/repo-archive/gftd-symlink-cutover-20260909/`。
+
+⚠ **「消えた」は 6 分しかもたなかった。** symlink を外した直後、`~/.gftd` は
+**実ディレクトリとして再生成された** —— `murakumo-status/` と `awai-yakuwari-tick.log` を
+抱えて。**ハードコードされたパスは、親が無いときエラーにならない。親を作る。**
+だから削除は成功したように見え、次の tick まで誰にも音を立てなかった。
+
+**resolver は 5 つの面に居て、網を広げるたびに新しいものが出た**（この順で見つかった）:
+
+| 面 | 見落とした理由 |
+|---|---|
+| superproject の repo tree | —— 最初に直した |
+| launchd plist | —— 直したが、**再読み込みしないと効かない**ことに気づくのが遅れた |
+| `~/.itonami` 内の運用ファイル | —— 直した |
+| **west 子リポ** | `git grep -- 'orgs/*'` は**子リポを見られない**（superproject 上は untracked） |
+| **ラベルが `com.gftd*` でない job** | 11 本を再読み込みしていなかった（`network.awai.*` / `com.kotoba-lang.*` / `cloud.itonami.*` / `dev.*`） |
+| **`~/Library/Application Support/`** | 走査対象のどのディレクトリにも入っていなかった（AIUEOS K16 の PXE script が node DID と service token をそこから読む） |
+
+**効いた検査は 2 つだけ**:
+
+1. **launchd が実際に起動するプログラムを列挙して、そのファイル自身を grep する**
+   （全 plist の `ProgramArguments` から採る）。「どのディレクトリを探すか」を人が
+   決めている限り、決めた範囲の外は見えない。
+2. **`launchctl print gui/$UID/<label>` の `stdout path` を plist と突き合わせる。**
+   ⚠ **`bootstrap` の後に一覧へ戻ったことは、新しい定義を読んだ証拠ではない。**
+   実測 2026-09-09: 57 job を bootout→bootstrap し、全部「一覧に戻った」ことを確認して
+   完了と報告した後、`~/.gftd` が 40 秒で再生成された。1 本だけ **plist は `.itonami`、
+   ロード済み定義は `.gftd`** のままで、`launchctl list` からはその差が見えない。
+   `launchctl print` で測ると stale はちょうど 1 本、直して 0 になった。
+
+**この 1 件で 2 回「完了」と誤報告した。** 1 回目は resolver の面を数え落とし、
+2 回目は reload の検査が弱かった。どちらも**削除は成功したように見えていた** ——
+ハードコードされたパスは親を作るので、次の tick まで音を立てない。
 
 ⚠ **書き換えなかったものが 3 種ある。**（1）`scripts/fleet-ci/nodes.edn` の
 `/Users/{benjamin,joseph,judah,levi,simeon}/.gftd/` は**他の mac-mini のホーム**で、
