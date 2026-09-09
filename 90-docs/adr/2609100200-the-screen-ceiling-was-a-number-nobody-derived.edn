@@ -141,4 +141,52 @@ than found it.
 
 **The next step is to remove those caps in the example, using the builtin that
 is already there.** That is smaller than the arc that found it, and it is what
-demonstrates the raised budget rather than asserting it."}]
+demonstrates the raised budget rather than asserting it.
+
+## Done, and the ceiling moved twice more (amu#919)
+
+Removing them uncovered a THIRD cap behind the first: `add-todo` refused past
+26 items, sized to the alphabet rather than to anything. It was found by
+measurement rather than by reading the diff -- after the key fix the counter
+read 26, which is the only reason the second 26 surfaced. The removal had
+already been claimed by then.
+
+The full history for that example, every step measured, each uncovering the
+next:
+
+  256-node budget      7 rows      the ceiling this ADR is about
+  4096-node budget     26          the alphabet cap
+  integer item keys    27          FUEL, at the default budget of 512
+  fuel >= ~100k        32          document-container-item-limit
+
+Four ceilings, three removed. The third move is the qualitative one: the first
+two were constants compiled into the language, and fuel is a budget the CALLER
+chooses -- it arrives as policy `{:budgets {:fuel n}}`, and past about 100,000
+it stops binding at all. \"How much can one Kotoba screen show\" stopped being a
+number someone has to change.
+
+**The fourth is the first with a derivation, and should NOT be raised.** Unlike
+the node budget, 32-items-per-container is not a flat cap on data: with
+`document-depth-limit` 8, nesting gives 32^8. A list app that wants a thousand
+items wants two levels, not a bigger container. The node budget was worth
+raising because a SCREEN is naturally flat; a MODEL is not. That asymmetry is
+the reason one of these four numbers deserved changing and another does not.
+
+## What the last two ticks cost, and why
+
+Two failures that a local suite structurally could not see, both landed by CI:
+
+  * `deps-lock.edn` carries a hash of `deps.edn` and only the JVM-FREE path
+    reads it. `clojure -M:test` resolves the closure directly, so local green
+    and CI green were different claims about different routes.
+  * `tests/browser/browser.spec.mjs` drives the example through a real browser
+    with the same letter-key fixtures the unit test used. Only CI runs it,
+    which is why the unit suite was 1372/10381 green while `browser-matrix`
+    was red.
+
+And one misattribution worth keeping: `browser-matrix` had been red on main
+since an earlier merge, and the timeline said that merge caused it. The LOG
+said `Failed to fetch chrome-stable ... Hash Sum mismatch -- Failed to install
+chrome`. Two reds adjacent in a history are not the same red; reading the
+timeline instead of the log produced a confident, wrong claim of
+responsibility."}]
