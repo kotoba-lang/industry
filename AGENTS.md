@@ -192,8 +192,15 @@ ipfs.tech → tech-ipfs (tech-ipfs-specs-*)  boj.or.jp → jp-or-boj
 広げたければ同じように名指しの指示と、退役の根拠と、面ごとの改名表が要る。表・測定値・
 実行順・オーナーにしか決められない 6 件は retirement plan が持つ。⚠ **`gftdcojp` org の
 login 変更はこの workspace の token ではできない**（`admin:org` scope 無し。org admin では
-あるが token が違う。かつ org login は Settings UI の操作）。`~/.itonami/` も `mv` ではなく
-段階移行 —— fleet-ci 署名鍵と aiueos boot seed が入っていて、稼働中 45 job が読んでいる。
+あるが token が違う。かつ org login は Settings UI の操作）。**home ディレクトリ面は段階移行の途中である**（2026-09-09 実測）: 実体は
+**`~/.itonami`**（194 entry、fleet-ci 署名鍵と aiueos boot seed を含む）で、`~/.gftd` は
+そこへの互換 symlink。version 管理された参照 178 ファイルは `~/.itonami` へ切り替え済み。
+**まだ `~/.gftd` 経由で読んでいるものが残っている**: launchd plist 58 本（114 箇所、
+46 job が loaded）と `~/.itonami` 内の 493 ファイル。symlink を消すのはその後。
+⚠ `scripts/fleet-ci/nodes.edn` の `/Users/{benjamin,joseph,judah,levi,simeon}/.gftd/` は
+**他の mac-mini のホーム**で、この機械の symlink とは無関係 —— 一緒に書き換えない。
+⚠ `ai.gftd.*` は atproto の NSID で、live サーバが今も serve している（実測 2026-09-09:
+`ai.gftd.apps.shinshi.coverage` は 200、`ai.itonami.*` は 404）。lexicon と同時にしか動かせない。
 
 ## 調達経路は direct-first（repo-wide mandatory、2026-08-25）
 
