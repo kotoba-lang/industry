@@ -65,11 +65,27 @@
   {:service   "a dynamic worker — it answers requests, it does not serve one document"
    :placement "an actor placement manifest — it declares where code runs, not what is served"})
 
+(def ^:private legacy-kind
+  "Spellings that predate the keyword value space (ADR-2609092600).
+
+  Measured 2026-09-09: all 435 addressed manifests carry
+  `:kotoba.app/kind \"appview\"` — a string — and all 82 unaddressed ones
+  carry no kind at all. An appview repo ships one `docs/index.html`, so
+  \"appview\" says exactly what `:document` says.
+
+  They are normalised here rather than rewritten in 435 files, because
+  rewriting them would move no coverage (CLAUDE.md: 一括改名はしない). It
+  matters for the failing direction: without this, an appview that lost its
+  address would fall through to LOCATED — the weaker finding — instead of
+  UNPUBLISHED, which is what it would actually be."
+  {"appview" :document})
+
 (defn- declared-kind
   "The `:kotoba.app/kind` this file declares, or nil. Read from whichever
   entity carries it, because a manifest may be a map or a vector of maps."
   [parsed]
-  (some :kotoba.app/kind (ca/entities parsed)))
+  (let [raw (some :kotoba.app/kind (ca/entities parsed))]
+    (if (string? raw) (get legacy-kind raw) raw)))
 
 (defn- classify [p]
   (let [m (try (edn/read-string (.readFileSync fs p "utf8"))

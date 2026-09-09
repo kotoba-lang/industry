@@ -197,12 +197,49 @@ control:
   kotobase の retired hostname と同じ道を行く。sites.edn の `:org \"app\"` を付け替える
   ところまでを 1 組の作業とする。
 
+## 適用 1 件目 —— genko（2026-09-09）
+
+`kotoba-lang/kami-genko` を `:kind :document` で通した（kami-genko#13、merged）。
+
+`public/index.html` は bundle を相対パスで参照していた。path で配るサイトには正しいが
+content address としては誤りで、**単体で取得して動かないアドレスはアプリの半分の
+アドレスでしかない**。`scripts/gen-selfcontained.cljs` が bundle を inline して
+`dist/genko.html` を 1 ファイルにする。決定論（同じ入力 → 同じバイト列 → 同じ CID、
+2 回実行して sha256 一致）。
+
+    cid    bafkreiffmgvpdzs6aoidrznnvyn2yxts2smhr7ghryj2yurozdjqlv4qve
+    size   633,269 bytes
+    PUT 201 -> GET 200 -> 送ったバイト列と返ったバイト列が一致
+    外部から取り直して sha256 一致（{cid}.ipfs.kotobase.net、200）
+
+**公開前に成果物を実行した**（8 問の 8 問目）。`dist/genko.html` を `file://` から実 Chrome で
+駆動し **18/18 PASS** —— WebGL2 コンテキスト live、delegated click が dispatch に届く、
+undo、ページ遷移、**console error なし**。ビルドできたことは正しいことではない。
+
+naming も張った: `_dnslink.genko.itonami.app TXT dnslink=/ipfs/{cid}`。**Cloudflare API が
+受理したことは解決の証拠ではない**ので公開 DNS から引き直し、1.1.1.1 と 8.8.8.8 の
+2 resolver で一致を確認した。
+
+**まだ通っていない 2 点を、通ったことと区別して書く:**
+
+- **公開 gateway からは取れない。** `https://ipfs.io/ipns/genko.itonami.app/` は **504**。
+  名前は解決するが、block を公開ネットワークへ announce していないので取得できない。
+  今日 genko が取れるのは `{cid}.ipfs.kotobase.net`（実測 200、バイト一致）だけである。
+- **`genko.itonami.app` は HTTP を答えない。** `net-kotobase/ipfs` の worker は
+  `origin_hosts` に 4 つの wildcard（`*.ipfs|ipns.itonami.cloud` / `.kotobase.net`）しか
+  持たず、**任意ホストの DNSLink 解決を実装していない**。entry 面を立てるには worker 側の
+  変更（Host から DNSLink を引く）と custom domain の追加が要る。
+
+`itonami.app` zone は実測でレコード 0 件だった（zone は在るが何も載っていない）。
+いま載っているのはこの TXT 1 本だけである。
+
 ## 未了 / 次の一手（現在地は毎回測る。ここの数値を引用しない）
 
 1. `{cid}.ipfs.itonami.cloud` の 502 —— 直すか、kotobase.net に寄せて退役させるか。
-2. genko を `:kind :document` で 1 本通す（manifest → publish → GET が送った bytes を返す
-   → catalog の 436 番目 → `genko.itonami.app` の DNSLink）。**catalog が 200 を返すことを
-   成功条件にしない** —— それが今日 genko で起きていることそのもの。
+2. ~~genko を `:kind :document` で 1 本通す~~ —— 済（上記）。残るのは
+   **entry 面**（worker に Host→DNSLink 解決を足し `genko.itonami.app` を custom domain に
+   する）と、**公開ネットワークへの announce**（今は公開 gateway が 504）。
+   catalog（`manifest/appview-catalog.edn`、435 → 436）への登録もまだ。
 3. 82 件の `:kind` 宣言。1 件ずつ、repo ごとの判断で。
 4. mangaka studio / ongakuka / dougaka を genko と同じ形に載せる。
 5. sites.edn の `:org \"app\"` の `:host` を `itonami.app` に付け替え、site host を
