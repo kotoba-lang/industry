@@ -1,0 +1,127 @@
+[{:db/id -1
+ :adr/id "adr-2609100200-the-screen-ceiling-was-a-number-nobody-derived"
+ :adr/title "The screen ceiling was a number nobody derived, stated twice"
+ :adr/status "accepted"
+ :adr/date "2026-09-10"
+ :adr/authority "owner instruction, 2026-09-10"
+ :adr/repos "kotoba-lang/osaho, kotoba-lang/kotoba-script, kotoba-lang/amu"
+ :adr/related "adr-2608690000-kotoba-web-app-loop-events-reach-the-guest, adr-2608100300-jp-go-dds-bridge-kotoba-decision-core, adr-2809041200, adr-2609100100-lookahead-lands-and-lookbehind-is-blocked-upstream, kotoba-lang/amu#917, kotoba-lang/amu#918, kotoba-lang/osaho#88, kotoba-lang/kotoba-script#101"
+ :adr/body "Continuing 2026-09-10. The regex work was downstream tooling; this went after
+the thing actually blocking the stated goal, and found that the answer had
+been written down twice already and acted on neither time.
+
+## The finding
+
+`document-node-limit` was 256, and that is the ceiling on a Kotoba screen.
+adr-2608690000 measured the todo layout filling at about SEVEN ROWS and said
+outright: 「これは cljs 相当を名乗るには小さい」-- too small to claim cljs
+equivalence. adr-2608100300 said of the same class of constraint 「どちらも
+恒久の設計ではない」-- neither is a permanent design.
+
+So the workspace had measured the ceiling, recorded that it blocked the goal,
+recorded that it was provisional, and then built on top of it for weeks. The
+goal is reagent/re-frame in Kotoba so the cljs call sites do not change; a
+screen that fills at seven rows is not that.
+
+## Property or number
+
+The BOUND is a property and stays. A document must be structurally bounded,
+and `document-utf8-byte-limit` does not provide it -- that budget charges TEXT
+only, so a document of 65,536 empty nodes passes it. The node limit is the
+only thing bounding the shape.
+
+The NUMBER was never derived. 256 sat beside `canonical-list-total-item-limit`
+16384 and `canonical-indirect-byte-limit` 1048576 in the same file, and beside
+`max-xml-nodes` 2048 in the emitter's copy -- one to two orders of magnitude
+looser, with nothing saying why documents were the tight one.
+
+Measured 2026-09-10 with a four-column table: 7 rows at 256, 30 at 1024, 123
+at 4096, 399 at 16384. The 7 reproduces the ADR figure from a different
+layout, which is the cross-check that the model is right.
+
+4096: the smallest power of two that clears a realistic screen with headroom,
+4x below the file own aggregate structural bound, and cheap -- validating
+33,825 nodes costs 8.5 ms and 11.7 MB, so 4096 is about 1.5 ms and 1.5 MB.
+
+## The part that was not the constant
+
+The number is stated TWICE, independently, under different names, in
+different repositories:
+
+  osaho          `kotoba.kir.value/document-node-limit`   compile-time
+  kotoba-script  `kotoba.script/max-document-nodes`       written into every
+                                                          emitted ESM prelude
+                                                          as a literal
+
+The emitter restates rather than reads because an emitted module has no
+classpath and cannot resolve a var. Nothing compared them. Raising osaho alone
+let a 1057-node document COMPILE CLEAN and then trap at runtime with
+`doc-node-limit`: the build succeeded and the artifact was wrong, which is
+worse than a refusal -- a refusal produces a design decision, a wrong answer
+produces nothing.
+
+amu already had the answer for a different constant. `fuel64_ceiling_test`
+compares the four statements of the fuel ceiling and says why: 「a restatement
+nobody compares is a copy, and a copy drifts」, citing `elf64_twin_parity_test`
+where one table in two files of one repo drifted in both directions and
+shipped. The value-bounds table had the same shape and no such comparison.
+
+So the deliverable changed shape: kotoba-lang/amu#917 compares nine pairs from
+the one classpath that holds both, and landed BEFORE the constant moved.
+
+## Three of my own claims were wrong, and the corrections are the content
+
+**「one validation constant with no structural dependents」** -- wrong. I had
+grepped for the SYMBOL `document-node-limit`; the second statement is called
+`max-document-nodes`, in another repo, and the emitter writes the NUMBER into
+generated JavaScript. Grepping a name misses a number.
+
+**「400 rows, hitting neither ceiling」** -- wrong. I read a LOOP COUNT as a
+row count. The loop ran 400 times; the render was 423 characters. The
+controlled comparison, same probe either side: at 256, five adds then
+`doc-node-limit`, \"7 left\", 175 chars; at 4096, 400 adds, no trap, \"9+ left\",
+423 chars.
+
+**「the local suite is green」** -- true and not sufficient. CI failed three
+`test-jdk-free-native` jobs because `deps-lock.edn` carries a hash of
+`deps.edn` and only the JVM-FREE path reads it. `clojure -M:test` resolves the
+closure directly and never consults the lock, so local green and CI green were
+different claims about different routes.
+
+## What the evidence is and is not
+
+osaho suite: 355 tests / 2325 assertions, 1 pre-existing failure, identical
+before and after. That is WEAK evidence by construction: every existing test
+document is under 256 nodes, so a LARGER ceiling admits all of them unchanged.
+What makes the check non-vacuous is the other direction -- lowering the limit
+to 4 produces 7 errors. The suite sees this constant; it simply cannot see it
+going up.
+
+The evidence that counts is end-to-end: a 1057-node document COMPILES AND RUNS
+through the pinned toolchain returning correct answers, where the old
+toolchain refused it at compile time. The earlier attempt compiled clean and
+produced an artifact that trapped, so \"it builds\" was evidence of nothing.
+
+## The fifth ceiling-as-assertion this session
+
+`dom_app_driver_test` asserted the app died of `doc-node-limit` between 3 and
+20 rows, under a comment reading 「the screen budget, not fuel, is what a
+growing app meets first: a :document holds 256 nodes」. True when written, and
+the same shape as the four others retired this week: `(?m)` refused, `.`
+matching a newline, `(?=` refused, and the emit parity `both refused` bucket.
+
+The pattern is worth naming. An assertion that something is REFUSED, or that a
+budget is MET, is a claim about the implementation rather than the language,
+unless the refusal has a derivation. Write the reason beside it so the next
+reader can tell which kind it is without measuring.
+
+## Where the ceiling actually is now
+
+Not the document budget. Measured after the change: the todo app fills to its
+OWN caps -- at most 26 todos, and a counter that stops at \"9+\" -- and
+adr-2608690000 already names both as holes in Kotoba rather than choices,
+because there is no integer->string builtin.
+
+**So the next thing between here and reagent/re-frame parity is that builtin,
+not a bigger budget.** Raising the budget again would move nothing. That is a
+smaller and more concrete piece of work than the arc that found it."}]
