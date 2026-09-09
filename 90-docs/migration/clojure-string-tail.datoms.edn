@@ -1,42 +1,34 @@
 [{:db/id -1
- :record/id "clojure-string-migration-tail-20260909"
+ :record/id "clojure-string-migration-tail-20260909b"
  :record/kind "migration-tail"
  :source/dataset "clojure-string-migration"
  :record/measured-at "2026-09-09"
- :record/total-repos 31
- :record/total-files 679
- :record/by-reason {:deps/nowhere-to-declare 11 :hazard/host-divergent-call-site 1 :merge/failed 1 :push/denied 7 :require/absent-and-no-ns-require 5 :rewrite/invariant-refused 1 :unclassified 4 :worktree/blocked 1}
+ :record/measured-against "each repo's default branch on GitHub, fetched first -- NOT the local checkouts. An earlier version of this record was built from checkouts and overstated the tail by two orders of magnitude: 3,547 repos and 15,832 files, against a real answer of 17 repos and 399 files. A checkout that is behind its main looks exactly like a repo that was never migrated."
+ :record/clj-cljc-repos 17
+ :record/clj-cljc-files 399
+ :record/by-reason {:branch/protected 1 :hazard/host-divergent-call-site 1 :intentional/parity-test 1 :project-file/absent 8 :project-file/not-tools-deps 3 :project-file/npm-only 2 :push/denied 1}
  :record/entries
  [
-  {:repo "cloud-itonami/ai-gftd-dougaka-vector" :files 5 :reason :unclassified :detail "REFUSED ai-gftd-dougaka-vector :: /Users/junkawasaki/github/wt-true/ai-gftd-dougaka-vector"}
-  {:repo "cloud-itonami/ai-gftd-kaisya" :files 2 :reason :push/denied :detail "SKIP push-failed ai-gftd-kaisya"}
-  {:repo "cloud-itonami/app-animeka" :files 17 :reason :deps/nowhere-to-declare :detail "REFUSED app-animeka :: rewrote 17 file(s) but found no deps.edn to declare kotoba.lang.tex"}
-  {:repo "cloud-itonami/cloud-itonami-dns-resolver" :files 1 :reason :deps/nowhere-to-declare :detail "REFUSED cloud-itonami-dns-resolver :: rewrote 1 file(s) but found no deps.edn to declare k"}
-  {:repo "cloud-itonami/cloud-itonami-isco-4313" :files 54 :reason :hazard/host-divergent-call-site :detail "REFUSED cloud-itonami-isco-4313 :: 1 hazardous call site(s); this repo is not safe to rewr"}
-  {:repo "cloud-itonami/dougaka-vector" :files 5 :reason :unclassified :detail "REFUSED ai-gftd-dougaka-vector :: /Users/junkawasaki/github/wt-true/ai-gftd-dougaka-vector"}
-  {:repo "cloud-itonami/funamori" :files 3 :reason :deps/nowhere-to-declare :detail "REFUSED funamori :: rewrote 3 file(s) but found no deps.edn to declare kotoba.lang.text in"}
-  {:repo "cloud-itonami/hakoniwa" :files 13 :reason :unclassified :detail "REFUSED hakoniwa :: /Users/junkawasaki/github/wt-true/hakoniwa/deps.edn has neither a loca"}
-  {:repo "cloud-itonami/narou" :files 8 :reason :require/absent-and-no-ns-require :detail "REFUSED narou :: 1 file(s) CALL clojure.string without requiring it and have no `(:require"}
-  {:repo "cloud-itonami/open-patent" :files 6 :reason :deps/nowhere-to-declare :detail "REFUSED open-patent :: rewrote 6 file(s) but found no deps.edn to declare kotoba.lang.text"}
-  {:repo "cloud-itonami/patent" :files 5 :reason :deps/nowhere-to-declare :detail "REFUSED open-patent :: rewrote 6 file(s) but found no deps.edn to declare kotoba.lang.text"}
-  {:repo "etzhayyim/actor-niyaku" :files 17 :reason :deps/nowhere-to-declare :detail "REFUSED actor-niyaku :: rewrote 17 file(s) but found no deps.edn to declare kotoba.lang.te"}
-  {:repo "etzhayyim/com-etzhayyim-kotoba-datom" :files 1 :reason :push/denied :detail "SKIP push-failed com-etzhayyim-kotoba-datom"}
-  {:repo "etzhayyim/com-etzhayyim-kuni_umi" :files 9 :reason :deps/nowhere-to-declare :detail "REFUSED com-etzhayyim-kuni_umi :: rewrote 9 file(s) but found no deps.edn to declare kotob"}
-  {:repo "etzhayyim/com-etzhayyim-media-gamers" :files 1 :reason :deps/nowhere-to-declare :detail "REFUSED com-etzhayyim-media-gamers :: rewrote 1 file(s) but found no deps.edn to declare k"}
-  {:repo "etzhayyim/com-etzhayyim-niyaku" :files 17 :reason :deps/nowhere-to-declare :detail "REFUSED com-etzhayyim-niyaku :: rewrote 17 file(s) but found no deps.edn to declare kotoba"}
-  {:repo "etzhayyim/root" :files 218 :reason :deps/nowhere-to-declare :detail "REFUSED root :: /Users/junkawasaki/github/wt-true/root/deps.edn has neither a locatable to"}
-  {:repo "gftdcojp/apps-gftdcojp" :files 3 :reason :unclassified :detail "REFUSED apps-gftdcojp :: /Users/junkawasaki/github/wt-true/apps-gftdcojp/70-tools/deps.edn"}
-  {:repo "gftdcojp/hume" :files 2 :reason :push/denied :detail "SKIP push-failed hume"}
-  {:repo "gftdcojp/router" :files 2 :reason :push/denied :detail "SKIP push-failed router"}
-  {:repo "kotoba-cli-verify-120601/repo" :files 67 :reason :push/denied :detail "SKIP push-failed repo"}
-  {:repo "kotoba-lang/amu" :files 56 :reason :merge/failed :detail "SKIP merge-failed amu"}
-  {:repo "kotoba-lang/engine" :files 1 :reason :push/denied :detail "SKIP push-failed engine"}
-  {:repo "kotoba-lang/karakuri" :files 13 :reason :deps/nowhere-to-declare :detail "REFUSED karakuri :: rewrote 13 file(s) but found no deps.edn to declare kotoba.lang.text i"}
-  {:repo "kotoba-lang/newsfeed" :files 7 :reason :worktree/blocked :detail "SKIP worktree-failed newsfeed"}
-  {:repo "kotoba-lang/org-chainagnostic-cacao" :files 9 :reason :require/absent-and-no-ns-require :detail "REFUSED org-chainagnostic-cacao :: 1 file(s) CALL clojure.string without requiring it and"}
-  {:repo "kotoba-lang/text" :files 3 :reason :rewrite/invariant-refused :detail "REFUSED text :: a rewritten file did not survive the read-back invariant"}
-  {:repo "network-awai/app-aozora-appview" :files 36 :reason :require/absent-and-no-ns-require :detail "REFUSED app-aozora-appview :: 2 file(s) CALL clojure.string without requiring it and have"}
-  {:repo "network-awai/manimani" :files 3 :reason :push/denied :detail "SKIP push-failed manimani"}
-  {:repo "network-awai/network-isekai" :files 70 :reason :require/absent-and-no-ns-require :detail "REFUSED network-isekai :: 1 file(s) CALL clojure.string without requiring it and have no `"}
-  {:repo "network-awai/nexus-x402" :files 25 :reason :require/absent-and-no-ns-require :detail "REFUSED nexus-x402 :: 1 file(s) CALL clojure.string without requiring it and have no `(:re"}
- ]}]
+  {:repo "etzhayyim/root" :files 214 :reason :project-file/not-tools-deps :detail "Its deps.edn is a 1.5 MB platform manifest keyed :experiments :modules :adrs :platform. Inserting :deps would corrupt a document other tooling reads."}
+  {:repo "cloud-itonami/cloud-itonami-isco-4313" :files 54 :reason :hazard/host-divergent-call-site :detail "One call site uses a form whose answer differs between the two clojure.string hosts. Refused by design; the template or the pattern has to be fixed first."}
+  {:repo "kotoba-lang/amu" :files 52 :reason :branch/protected :detail "main requires a pull request and two status checks, so a server-side merge is refused. Same wall as the json pin, waiting in kotoba-lang/amu#903."}
+  {:repo "network-awai/app-aozora-appview" :files 29 :reason :project-file/absent :detail "No deps.edn, bb.edn, package.json, shadow-cljs.edn or project.clj. Nothing builds it and no project file in this workspace names it."}
+  {:repo "cloud-itonami/hakoniwa" :files 11 :reason :project-file/not-tools-deps :detail "Its deps.edn is a project descriptor keyed :project :dependencies :substrate :gates :cells."}
+  {:repo "etzhayyim/com-etzhayyim-kuni_umi" :files 7 :reason :project-file/npm-only :detail "A package.json, no tools.deps file and no --classpath entry to extend."}
+  {:repo "cloud-itonami/narou" :files 7 :reason :project-file/absent :detail "No project file of any kind."}
+  {:repo "cloud-itonami/open-patent" :files 5 :reason :project-file/absent :detail "No project file of any kind."}
+  {:repo "cloud-itonami/patent" :files 4 :reason :project-file/absent :detail "No project file of any kind."}
+  {:repo "network-awai/manimani" :files 3 :reason :project-file/absent :detail "No project file of any kind."}
+  {:repo "gftdcojp/apps-gftdcojp" :files 3 :reason :project-file/not-tools-deps :detail "70-tools/deps.edn is a component manifest keyed :name :layer :subdirs :files."}
+  {:repo "cloud-itonami/funamori" :files 3 :reason :project-file/absent :detail "No project file of any kind."}
+  {:repo "kotoba-lang/text" :files 2 :reason :intentional/parity-test :detail "test/kotoba/lang/text_parity_test.cljc requires clojure.string ON PURPOSE, to compare kotoba.lang.text against it. Migrating this would delete the comparison."}
+  {:repo "cloud-itonami/ai-gftd-kaisya" :files 2 :reason :project-file/absent :detail "No project file of any kind."}
+  {:repo "etzhayyim/com-etzhayyim-media-gamers" :files 1 :reason :project-file/absent :detail "No project file of any kind."}
+  {:repo "etzhayyim/com-etzhayyim-kotoba-datom" :files 1 :reason :push/denied :detail "git push is refused for this account; an owner access decision, not a code one."}
+  {:repo "cloud-itonami/cloud-itonami-dns-resolver" :files 1 :reason :project-file/npm-only :detail "A package.json, no tools.deps file."}
+ ]
+ :record/cljs-tail "249 repos and 567 files whose only residual is .cljs. 225 have no project file of any kind, and the 224 distinct names among those are NAMED BY NOBODY: measured across all four ways this workspace wires a dependency -- a git coordinate in a deps.edn or bb.edn (619 names), a :local/root (375 names), a cross-repo :source-paths entry in a shadow-cljs.edn (122 path segments), and an npm script's --classpath (47 names). Zero matches on each. The measurement carries its own controls: kotoba-lang/text and kotoba-lang/json are both present in the consumed set and an invented name is absent. So this is source that nothing compiles and nothing depends on; migrating it would change no behaviour anywhere, and there is nowhere to declare the dependency."
+ :record/repairs "Four deps.edn files were still split in half on main by the migration tool's pre-2026-09-08 insertion arithmetic -- cloud-itonami/ainori, kotoba-lang/capability-http-fetch, capability-llm-infer, capability-mmio-map. All four failed clojure -Stree with exit 1 and now exit 0. A fifth, network-awai/app-tabi-mikake, was broken BEFORE the migration by an unclosed vector in its :lint alias; checked at the pre-migration commit before being repaired, because the migration had also edited that file and the obvious guess was wrong. The earlier claim that all 29 corrupted files had been repaired was the number found, not the number that existed: that pass read local checkouts, which are routinely behind."
+ :record/tool-changes "Two, both on com-junkawasaki/root main. (1) A file's require list can live outside an ns form: nine files keep a top-level (require ...) and were refused as having nowhere to declare the dependency, which held three repos and 104 files. (2) The tool now checks the project file it writes, not only the source it rewrites: read both sides and require that everything outside :deps is identical and that :deps differs by exactly one entry. A first version checking only that the result PARSED was discriminated as insufficient -- reintroducing the bug at a different offset produced an even number of forms, a clean parse, and :deps bound to a symbol."
+ :record/unresolved "17 of the 348 never-merged repos could not be measured at all -- 12 have no local checkout, 5 have no remote matching their path. UNRESOLVED, which is not clean."
+}]
