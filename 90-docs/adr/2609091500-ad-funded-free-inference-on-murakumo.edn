@@ -42,7 +42,15 @@ What was genuinely missing was one layer: the rule converting an ad impression i
 
 7. BOOTSTRAP (owner choice 2026-09-09): with no advertisers, the tier runs on a DECLARED house sponsorship rather than being switched off, bounded by a FLEET-WIDE daily budget queried from the ledger. GET /api/v1/free/status reports fundingSource 'house-sponsorship' and advertiserFunded 0, and funding-mix keeps sponsored micros out of the advertiser-revenue column -- reporting :advertiser-share as nil with no records rather than 0%, because an unmeasured mix and an all-sponsored one are different states.
 
-8. THREE BOTS, in network-awai/loop-yakuwari (yakuwari/cloud-murakumo.edn): :ad-placement (出稿, advertiser desk), :ad-serving (配信, delivery), :ad-audience (閲覧, audience integrity). Three because 出稿 wants more spend and 閲覧 is the role that reports the spend did not materialise; one Bot holding both would audit its own work. :campaign.register is :approval-required for 出稿 and :blocked for the other two. :funds.move and :pricing.change are :blocked for all three."
+8b. THE BOTS READ A FILE, NOT THE ENDPOINTS. Added 2026-09-09 after measuring what the roles could actually do. A cloud-itonami workforce Bot's admitted tools are workspace_*, git_*, browser_*, commerce_* and messaging; there is NO http_get among them (the http_get in cloud-itonami's grok-bot runtime belongs to a different lane). The objectives as first written said 'read GET /api/v1/free/status', naming an instrument the Bot does not have -- an objective a Bot cannot execute is not an objective, it is a sentence that makes a roster look staffed.
+
+   `scripts/free-tier-tick.cljs` (launchd `com.gftd.murakumo-free-tier-tick`, every 15 minutes) does the HTTP and writes `metrics/free-tier-state.edn`, which the Bots read with workspace_read. Every finding names the role that owns it, so 出稿 owns 'no advertiser is funding this' and 閲覧 owns 'the share is below one' -- the separation between the three roles, made operational rather than merely written down. State is written on EVERY pass including the one that reached nothing; exit is three-valued (0 clean, 1 finding, 2 COULD NOT MEASURE). The tick also creates metrics/free-tier-findings/, because the Bots have workspace_write_file and no directory-creation tool.
+
+8c. GET /api/v1/free/funding, because the advertiser-funded share -- the number 閲覧 exists to report -- was readable from nowhere. `/status` counts eligible CAMPAIGNS, a different question: a campaign can be registered and never serve. The route is public and AGGREGATE-ONLY: the SQL is a GROUP BY with no identity in its result set, because the ledger behind it holds a viewer DID against what that viewer watched, and a route incapable of returning a row is worth more than one careful not to. `advertiserShare` is null when nothing was counted and 0.0 when everything was sponsored -- different answers, and a test pins the endpoint against adnet.entitlement/funding-mix so the two implementations of that contract cannot drift.
+
+8d. NO PROFILE IS ASSIGNED, and that is a measurement rather than an omission. `profiles.edn` says a role's model choice belongs to whoever pays. Measured 2026-09-09 on this lane's actual workload (read the state EDN, write the whole findings file in one answer): `murakumo-main` answered in 19.2s and `qwen3.8-27b-fastmtp-aggressive` in 20.0s, both finish_reason stop, both correct on the nil-vs-0% distinction -- and BOTH were served by the same backend, `qwen3.8-27b-throughput-b70`. Assigning the second id today would be a no-op wearing the appearance of a choice, which is the exact failure `profiles.edn` was written to end.
+
+9. THREE BOTS, in network-awai/loop-yakuwari (yakuwari/cloud-murakumo.edn): :ad-placement (出稿, advertiser desk), :ad-serving (配信, delivery), :ad-audience (閲覧, audience integrity). Three because 出稿 wants more spend and 閲覧 is the role that reports the spend did not materialise; one Bot holding both would audit its own work. :campaign.register is :approval-required for 出稿 and :blocked for the other two. :funds.move and :pricing.change are :blocked for all three."
   :adr/consequences
   "LIVE and measured 2026-09-09 after deploy (version 9ebd5df7-e240-450e-8876-641d328f4244):
 - GET /api/v1/free/status -> available true, fundingSource 'house-sponsorship', advertiserFunded 0, storeReady true, dailyUnitCap 5, unitPriceMicros 10000.
@@ -50,6 +58,17 @@ What was genuinely missing was one layer: the rule converting an ad impression i
 - /api/v1/ads/placement?placement=go-sidebar&locale=en -> byte-identical to before the auction rewire.
 - The free-tier slot exists and answers; the paid /api/v1/messages lane still 401s.
 - D1: free_receipts, free_ledger, free_balances present on the remote database.
+
+THE BOTS RUN. Measured 2026-09-09, by giving 閲覧 its standing objective and watching what came back rather than reading `status: idle` off a roster:
+
+- it read metrics/free-tier-state.edn, branched on :free-tier/measured? before quoting anything, and reported that nil :advertiserShare means 'a share of nothing is not 0%' while all-sponsored would be 0.0
+- it took ONLY the finding naming :ad-audience and explicitly declined the :ad-placement one, citing its own blocked campaign.register -- the separation of duties held without anyone enforcing it in that turn
+- it wrote, unprompted, 'absence of flow is not proof the pipes are sound'
+- and it found a defect in this wiring: metrics/free-tier-findings/ did not exist and it holds no directory-creation tool. It wrote to metrics/ instead and DISCLOSED the deviation rather than failing quietly. The tick now creates that directory on every pass.
+
+That last one is this session's second instance of one shape -- an instruction naming something the actor cannot reach -- and the first instance is what the tick was built to fix. Writing the lesson down once did not stop the second.
+
+Provisioning alone proved nothing: the three Bots sat at last-run NONE for twenty minutes past their scheduled 15-minute cadence, because the resident lane runs at max-active 2 across 147 Bots. A roster row and a Bot that has produced work look identical until something asks it to work.
 
 NOT verified: the authenticated flow past sign-in was exercised only against the built Worker bundle (12 e2e groups over real SQLite running the migration), not against the live deployment, because minting a session token needs MURAKUMO_TOKEN_SECRET and it is NOT in kagi under MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2, the name scripts/deploy-model-hosting-locked.mjs documents. That absence also forced the deploy to run with --bootstrap (main-inclusion assertion kept, concurrency lease skipped). Storing that secret under the documented name is the next concrete step; until then this gap is UNMEASURED, not passing.
 
@@ -73,7 +92,10 @@ network-awai/loop-yakuwari fe5f5a687b8be8d4ddfe45818f9ecdfb30a0296d (three roles
 west pins advanced in 37477fe9dce9066501cd2f37565ddb6c6c77d95f
 D1 migration 0005_free_tier.sql applied to murakumo-actions (8 commands)
 Worker version 9ebd5df7-e240-450e-8876-641d328f4244
-Reproduce: npm run test:free-tier (in orgs/network-awai/cloud-murakumo); clojure -M:test (in orgs/kotoba-lang/adnet); npx nbb bin/awai.cljs check (in orgs/network-awai/loop-yakuwari); curl -sS https://murakumo.cloud/api/v1/free/status"
+network-awai/cloud-murakumo (wiring): GET /api/v1/free/funding, scripts/free-tier-tick.cljs, com.gftd.murakumo-free-tier-tick, objectives repointed in loop-yakuwari
+Worker version 088adf46-b7e8-4f3a-bb32-b2f7cf92047c (funding endpoint live)
+Bot run: run-97fb754e-a317-4755-b313-21e2b0cae2f7 (閲覧, 2026-09-09T07:55-08:01Z)
+Reproduce: npm run test:free-tier-tick; nbb scripts/free-tier-tick.cljs; npm run test:free-tier (in orgs/network-awai/cloud-murakumo); clojure -M:test (in orgs/kotoba-lang/adnet); npx nbb bin/awai.cljs check (in orgs/network-awai/loop-yakuwari); curl -sS https://murakumo.cloud/api/v1/free/status"
   :adr/body
   "See :adr/context, :adr/decision, :adr/consequences and :adr/evidence. Operational documentation is orgs/network-awai/cloud-murakumo/docs/free-tier.md; the entitlement rules are documented in kotoba-lang/adnet's README and in adnet.entitlement's namespace docstring.
 
