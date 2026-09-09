@@ -7,6 +7,16 @@ firebase-debug.log
 firebase-debug.*.log
 node_modules/
 
+# nbb dependency cache. A build artifact: nbb writes .nbb/.cache/<sha>/ with
+# the resolved dependency and its jar the first time a script requires one.
+#
+# Ignored here because it was NOT ignored, and this superproject holds 12 such
+# files right now that `git status` does not show -- the cone-mode sparse
+# checkout hides them, and a full checkout would not. That is the same trap
+# that put the cache into 198 child repositories on 2026-09-09: a wave wrote
+# nbb.edn, ran nbb to prove the namespace resolved, and then `git add -A`.
+.nbb/
+
 # Python
 __pycache__/
 *.pyc
