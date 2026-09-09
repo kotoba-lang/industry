@@ -170,6 +170,33 @@ window の幅の出所は ADR-2608021000 の default-fold-threshold（64）。
 - **上限は 2x。** per-object は 1 block あたり 2（discover + fetch）、packed は 1 +
   window ごとの固定 3 なので 2W/(W+3) は 2 に漸近する。**N/P = 64 は N/P の話であって
   速度の話ではない。**
+- ⚠ **そして上の表の chain は深さ 64 の合成 chain で、本番の novelty chain は 4 本である**
+  （2026-09-09 実測、kotobase-peer `novelty_chain_depth_test`。iteration 07）。
+  `novelty-segment-size` は 16 なので **depth = ceil(unfolded-tx / 16)**、fold 閾値
+  64 で **4**。この ADR 自身が Implementation state で `hops = ceil(unfolded-tx / 16)`
+  を実測しており、ADR-2608021000 の「depth = unfolded-tx」は segment 化前の形。
+  **深さが 16 倍違うので、この節の比ではなく round trip の実数で判断する** ——
+  packed 側の window あたり固定 3 は 64 本では薄まり 4 本では薄まらない:
+
+  | unfolded | link | per-object | commit 単位 pack | window pack |
+  |---|---|---|---|---|
+  | 16 | 1 | 2 | 4 | 4（2 trip 損） |
+  | 32 | 2 | 4 | 8 | 5（1 trip 損） |
+  | 64（fold 閾値） | 4 | 8 | 16 | **7（1 trip 得）** |
+  | 128 | 8 | 16 | 32 | 11（5 trip 得） |
+  | 1024（fold 遅延） | 64 | 128 | 256 | 67（61 trip 得） |
+
+  crossover は 3 link で、これは iteration 02 の N/P > 3 を「link 数」という単位で
+  言い直したもの（window grouping では link 数 = N/P）。
+- **したがって window sealer は作らない。** 本番深さでの取り分が 1 round trip である一方、
+  sealer は isolate を跨いだ buffer を要し、window が閉じるまで封じられず、その未封 tail は
+  既に 0.12–0.19x を食い返すと測れている。**この ADR の fold-first 結論はむしろ補強された**
+  —— 決定 4 の下で compaction を書かないと決めた論拠（fold は分子を消す）が、grouping にも
+  そのまま当たる。chain を 4 本に保っているのは fold であり、4 本では grouping は
+  1 桁の round trip しか動かさない。**lever は fold 閾値。**
+- **write 側は無条件の勝ち**（144 puts → 16、9x、byte overhead は pack が育つほど縮む）。
+  window を要さず、いま在る grouping で得られる。**cutover の取引は比ではなく整数 2 つ**:
+  PUT が 9 分の 1、fold 閾値での cold chain read が +8 round trip。
 - **代償（measured、仮定ではない）**: commit ごとの pack は commit が着地した瞬間に
   封じられるが、window は**閉じてから**しか封じられない。最新 W-1 commit は pack を
   持たず、live head の読みは**そこを最初に**歩く。W = 8 で 1.45x（window が閉じている）

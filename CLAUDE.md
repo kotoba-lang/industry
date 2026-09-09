@@ -1461,14 +1461,34 @@ L0c  object   S3 / R2 / B2 / IPFS   transport = object key + HTTP Range
   ADR-2608160100 / ayatori iteration 05・06）。chain の link は**構成上 commit を跨ぐ**
   ので、commit ごとに封じると 1 pack につき link がちょうど 1 本 = **N/P 1.00**、
   iteration 02 の crossover（cold で N/P > 3）を下回り **0.50x = 2 倍の損**になる。
-  window ごとに封じると N/P = W で、64 commit の chain walk が **1.91x** に反転する
-  （0.50x → 1.91x、grouping だけを変えて 3.8 倍の振れ）。
+  window ごとに封じると N/P = W になり、深さ 64 の合成 chain では **0.50x → 1.91x**。
   **上限は 2x** —— per-object が 1 block あたり 2（discover + fetch）払い packed が 1 なので
   `2W/(W+3) → 2`。「N/P が crossover の 1 桁上」は N/P の話で速度の話ではない。
-  W の出所は ADR-2608021000 の default-fold-threshold（64）。
   **代償も measured**: window は**閉じてから**しか封じられないので、最新 W-1 commit は
   pack を持たず、live head の読みはそこを per-object で歩く（W=8 で 1.45x → 1.26–1.33x）。
-  薄まるが反転はしない。再現は ayatori の `bench/novelty_window.cljs`。
+
+  ⚠ **ただし、その chain は本番では 64 本ではなく 4 本である**（2026-09-09 実測、
+  kotobase-peer `novelty_chain_depth_test`）。`novelty-segment-size` は **16** なので
+  **depth = ceil(unfolded-tx / 16)**、fold 閾値 64 なら **4**。ADR-2608021000 の
+  「depth = unfolded-tx」は**この repo が既に離れた形**（segment 化前）の記述で、
+  segment 化はまさにその実測に対する修正として入った。**この深さの違いは 16 倍あるので、
+  比ではなく round trip の実数で判断する** —— packed 側は window ごとに固定 3
+  （open 2 + catalog 1）を払い、これは 64 本では薄まり 4 本では薄まらない:
+
+  | unfolded | link | per-object | commit 単位 pack | window pack |
+  |---|---|---|---|---|
+  | 16 | 1 | 2 | 4 | 4（**2 trip 損**） |
+  | 64（fold 閾値） | 4 | 8 | 16 | 7（**1 trip 得**） |
+  | 1024（fold 遅延） | 64 | 128 | 256 | 67（61 trip 得） |
+
+  したがって **novelty window sealer は作らない**（ayatori iteration 07）。本番深さでの
+  取り分は 1 round trip で、isolate を跨いだ buffer と「window が閉じるまで封じられない」
+  代償に見合わない。**効く lever は grouping ではなく fold 閾値**であり、これは
+  ADR-2608160100 が compaction を書かないと決めた論拠（fold は分母を割るのではなく
+  分子を消す）と同じ。**write 側の 9x（144 puts → 16）は無条件で、window を要さない。**
+  cutover の取引は比ではなく整数 2 つ: **PUT が 9 分の 1 になり、fold 閾値での cold
+  chain read が +8 round trip**。再現は ayatori の `bench/novelty_window.cljs`
+  （section G は深さ 64、**section K が本番深さの絶対値**）。
 - **成功の指標は round trip 数**。bytes でも wall-clock でもない（この workstation は
   load 100 超で並行 agent が走る。count を測る）。
 - **pack は封じたら不変。in-place で追記しない** —— offset が動き、catalog と
