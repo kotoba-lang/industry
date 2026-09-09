@@ -72,7 +72,43 @@
  ;;
  ;; Recorded as measurements with the command that produced them, not as status
  ;; flips: none of the four tranche statuses changed, because none was wrong.
- {:date "2026-09-08"
+ {:date "2026-09-09"
+  :chicory-sweep-2026-09-09
+  {:command "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
+   :registered-checkouts 4780
+   :files-scanned 39794
+   :files-naming-chicory 25
+   :buckets {:frozen 6 :test-oracle 8 :frozen-repo-other 9 :outside-inventory 2}
+   :problems 11
+   :note "The sweep used to report every non-frozen hit with one sentence, so a
+    historical .clj test and a production provider's import sat in one
+    undifferentiated pile of 19 -- while :cutover/rules already separates them
+    (:historical-clj-tests :allowed-as-oracle-until-replaced beside
+    :new-chicory-call-sites :forbidden). The verifier now classifies, the
+    buckets are printed with their sum so a reclassification cannot lose a
+    hit, and the test bucket is NAMED rather than merely excused: allowed
+    UNTIL REPLACED is a clock, and a bucket nobody can see never runs down.
+    Control, three ways: with the test predicate live, test-oracle 8 and
+    problems 11; with both of its alternatives disabled, test-oracle 0,
+    frozen-repo-other 14, outside-inventory 5 and problems 19 -- the old
+    number, redistributed rather than suppressed; restored, 8 and 11 again.
+    Buckets sum to 25 in all three."
+   :frozen-repo-other "Nine files sit in a repo the inventory freezes at a path it
+    does not: kototama/src/{linker,transport_provider,runtime_conformance,
+    postgresql_pool_provider,postgresql_wire_provider}.clj, kototama/clj's own
+    deps.edn and one source under it, aiueos/src/aiueos/tcb.clj, and
+    kotoba/src/kotoba/launcher.clj. The inventory freezes IMPLEMENTATION
+    PATHS, not repositories, so calling these brand-new call sites would
+    overstate what was measured; they are reported under their own key."
+   :outside-inventory "Two, unchanged since 2026-09-08 and now isolated from the
+    other seventeen: provider-postgres/src/provider/postgres/pool.clj and
+    provider-transport/src/provider/transport.clj. Both import
+    com.dylibso.chicory.wasm.types directly and both landed after the
+    2026-07-18 freeze. Whether the inventory absorbs them or they are removed
+    remains the owner's decision and is still NOT made here. What changed is
+    that the decision can now be put to someone, which it could not be while
+    those two were lines in a list of nineteen."}
+
   :chicory-sweep
   {:command "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
    :registered-checkouts 4270
@@ -108,10 +144,25 @@
                "the aiueos kernel/UEFI packaging targets"]
    :ran "compiled native output executed under a from-source tools/kexe_loader.c: add(40,2) and a two-module double(21) both printed 42, with no JVM, no Node and no Wasm runtime"
    :honesty-gap
-   "bin/amu refuses out loud for the JVM-only commands. bin/kotoba SILENTLY
-    spawns clojure instead, so a caller cannot tell a JVM-free run from a
-    fallback. Fix the launcher before quoting any bin/kotoba result as
-    JVM-free."}
+   "CLOSED, and it was never quite what this said. Re-measured 2026-09-09
+    against amu 353a0677 with java/javac/clojure/clj stubbed to a deny-and-log
+    script at the head of PATH, so the route is read off an empty trace rather
+    than off an exit code:
+
+      bin/amu    test|sbom|inspect              jvm=1   spawns, as asked
+      bin/kotoba -M test|sbom|inspect           jvm=1   identical
+      bin/amu    test|sbom --jvm-free           jvm=0   refuses, names why
+      bin/kotoba -M test --jvm-free             jvm=0   refuses, names why
+      bin/amu    check --jvm-free               jvm=0
+      bin/kotoba -M check --jvm-free            jvm=0
+
+    Neither half of the old sentence reproduces. bin/amu does NOT refuse a
+    JVM-only command on its own: without --jvm-free it spawns, which is
+    correct, because the caller did not ask. And bin/kotoba does not silently
+    differ from it -- the two launchers behave the same, and both refuse out
+    loud when --jvm-free is passed, each naming the command it will not run.
+    So `fix the launcher before quoting any bin/kotoba result as JVM-free` no
+    longer blocks T2: pass --jvm-free, and the empty trace is the evidence."}
   :tools-reader-exit
   {:note
    "org.clojure/tools.reader left amu's production classpath on this date
