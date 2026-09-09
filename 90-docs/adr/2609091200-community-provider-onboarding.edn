@@ -187,6 +187,62 @@
   the two ids stop agreeing. Measured after the fix deployed: the same
   qualification workload reports **1.12 TFLOP/s** against `murakumo-edge`.
 
+  ## Second owner correction: Kotoba only, and what that costs today
+
+  『vllm ollama, mlx, llama にも依存せずに, kotoba cli, amu native binary での
+  推論だけで整えて』 — so the third-party runtimes came out entirely. The
+  provider's inference is now `kernel/provider_kernel.kotoba` plus
+  `kotoba-lang/inference`'s own `kernel_math_core.kotoba`, compiled by `amu
+  compile --target wasm32` into a `wasm32-kotoba-v1` module with amu's
+  provenance beside it, instantiated through amu's Kotoba host, and exposed as
+  a `kotodama.inference.ports/IModelRuntime`.
+
+  Measured on this machine rather than assumed:
+
+  - `dot([0.5 1.5 -2.25 3.0], [2.0 4.0 8.0 0.5])` returns **-9.5**, equal to
+    the same expression in JavaScript, and `silu(1.0)` returns
+    **0.7310585786300049**, bit-identical to `1/(1+e^-1)`.
+  - `scripts/verify-kernel.cljs` re-runs those against the committed artifact
+    and reports a COUNT of failures. Perturbing one expected value fails
+    exactly one check.
+
+  ### The cost, stated rather than absorbed
+
+  **The provider cannot serve `host-large-model` work today.** The Kotoba
+  language has no byte access — amu's `bytes-operations` table is exactly
+  `{bytes-empty 0}` — so no GGUF block can be dequantised, no KV cache held
+  and no decode loop run. `kernel_math_core.kotoba` says this itself and calls
+  it `:not-yet-implemented`, **not** a safety constraint.
+
+  `join`, `qualify` and `serve` therefore refuse and name the missing
+  primitive; `generate!` returns that sentence and
+  `:kotodama/blocked-on :kotoba/bytes-access` rather than an empty string,
+  which a grader would score as a wrong answer and blame on the provider's
+  model. Nothing falls back. That is the decision: **a provider that reports
+  another runtime's compute as its own is worse than one that says it cannot
+  help yet**, and the earlier probing CLI was doing exactly that.
+
+  ### The shortest path out, already measured
+
+  - the general native targets reject the float kernel: `amu compile --target
+    aarch64` answers *typed values currently require the kotoba-script web
+    target, typed Wasm target, or qualified native string/scalar-record/
+    option-i64/result-i64 features*. `wasm32` and `wasm32-browser` accept it.
+  - **`kotoba-lang/aiueos` already has the byte half in Kotoba** — GGUF header
+    validation, KV scan, tensor-table bind, vocab index build, dequant-row,
+    dot-f32, matvec, norm, activation, attention, recurrent-step, tokenize,
+    detokenize — each compiled to a `.o` with provenance against the
+    `kernel/qwen35_infer.c` oracle. They compile only for
+    `x86_64-aiueos-kernel-v1`: elsewhere amu answers *bounded kernel memory
+    operation requires the aiueos kernel target*.
+
+  So the primitive is not missing from the language, it is unreachable from a
+  general host. Making the aiueos byte operations available on `wasm32` (or
+  qualifying f64 for the native walk, which amu ADR 0241 already pins through
+  machine IR) is what turns this provider from an arithmetic kernel into a
+  generating one. Both are upstream language work, and neither is a rewrite of
+  anything in this ADR.
+
   ## Evidence
 
   - `cloud-murakumo-api` tests 333 → 372, assertions 1911 → 2069, `npm test` green.
