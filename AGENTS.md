@@ -1321,10 +1321,12 @@ query 設計をこの前提の上に組み立てた。
 - **CDN から取りに行く document に CID を付けない。** 自己完結ではないので、その CID は
   app が何を実行するかを覆っていない。逃げ道は `--vendor <url>=<path>=<sha256>` 1 つだけで、
   **digest が一致したときにだけ**ローカルの同一バイト列に差し替える。
-- **publish しただけでは web plane から見えない。** `PUT /ipfs/{cid}` が書くのは **B2**、
+- **publish は 2 面に書く。`scripts/publish-document.cljs` を使う。**
+  `PUT /ipfs/{cid}` が書くのは **B2**（IPNI の広告が retrieval address として名指す面）、
   app を配る origin plane が読むのは **R2 の `ipld/{cid}`**。片方だけに置いた document は
-  bytes plane で 200、web plane で 502 になる。**どちらに寄せるかを決めるまで、
-  新しい `:document` は publish のあとに R2 へも置く。**
+  bytes plane で 200、web plane で 502 になる。**`content-address publish` を単体で
+  使わない** —— それは archive にしか書かない。origin plane に archive への fallback を
+  足す案は採らないと決めた（2026-09-09）。
 - **公開 announce（IPNI）は drain worker からしか行えない。** chain を署名している鍵は
   `net-kotobase-private-ipni-drain` の write-only secret にしか存在せず、kagi にも
   keychain にも無い（`manifest/ipni-publisher.edn` の実測）。**別 worker を立てて

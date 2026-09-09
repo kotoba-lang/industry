@@ -71,12 +71,23 @@
    ;; way past substitutes a local file ONLY when its sha256 matches the digest
    ;; named at the call site -- evidence that someone compared the two.
    :policy/remote-script :refused-unless-digest-verified
-   ;; Publishing writes B2; the origin plane reads R2 `ipld/{cid}`. Until one of
-   ;; the two permanent fixes is chosen, a new :document needs both.
-   :policy/byte-stores {:archive :b2 :origin-plane :r2
-                        :origin-plane-key "ipld/{cid}"
-                        :publish-writes :archive-only
-                        :consequence :document-200-on-bytes-plane-502-on-web-plane}
+   ;; Two stores, not interchangeable. The archive is what every IPNI
+   ;; advertisement names as its retrieval address, so it cannot be dropped;
+   ;; R2 is what the web plane reads, so its absence is a bug rather than a
+   ;; slower path. Decided 2026-09-09 (「今のところは R2」): publishing writes
+   ;; BOTH, through one script that verifies both, and the origin plane is not
+   ;; taught to fall back to the archive.
+   :policy/byte-stores {:archive {:store :b2
+                                  :written-by "PUT https://kotobase.net/ipfs/{cid}"
+                                  :read-at "{cid}.ipfs.kotobase.net"
+                                  :named-by :ipni-advertisement-retrieval-address}
+                        :origin-plane {:store :r2
+                                       :bucket "kotobase-graph-database-production"
+                                       :key "ipld/{cid}"
+                                       :read-at ["{cid}.ipfs.itonami.cloud" "{name}.itonami.app"]}
+                        :publish-writes :both
+                        :publisher "scripts/publish-document.cljs"
+                        :origin-plane-fallback :not-implemented-by-decision}
    ;; The key signing the live advertisement chain exists only as a write-only
    ;; Worker secret. Measured 2026-09-01, manifest/ipni-publisher.edn.
    :policy/public-announce {:route "POST /announce"
