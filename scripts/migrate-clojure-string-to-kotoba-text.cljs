@@ -142,6 +142,41 @@
 (defn- alias-of [src]
   (second (re-find #"\[clojure\.string :as ([a-zA-Z0-9*+!?<>=_-]+)\]" src)))
 
+(defn- code-only
+  "`src` with every `;` comment and every string literal blanked out, so a
+  predicate can ask whether the CODE mentions something.
+
+  Measured 2026-09-10 on kotoba-lang/kotobase-peer: run-nbb-tests.cljs names
+  `clojure.string` twice and both are prose --
+
+      ;; before discovering a single test -- and `clojure.string` would have failed
+      ;; regex replaces the FIRST match only, unlike clojure.string/replace, so the
+
+  -- and the second one matches `\\bclojure\\.string/`, so the file was selected
+  as a target, the namespace token was renamed inside the comments, a require
+  was inserted for a namespace the file never uses, and the whole repository
+  was then REFUSED because that insertion is not a substitution. Three of the
+  facts in that sentence are wrong for the same reason: a text search was
+  asked a question about code. Same shape as the `:deps` guard fixed in
+  3cb7e99.
+
+  This also removes work rather than adding it: a file whose only mention is
+  prose needs no edit at all."
+  [src]
+  (let [n (count src)]
+    (loop [i 0, out [], in-str? false, esc? false, in-cmt? false]
+      (if (>= i n)
+        (apply str out)
+        (let [c (nth src i)]
+          (cond
+            in-cmt? (recur (inc i) (conj out (if (= c \newline) c \space)) false false (not= c \newline))
+            esc?    (recur (inc i) (conj out \space) in-str? false false)
+            (and in-str? (= c \\)) (recur (inc i) (conj out \space) true true false)
+            in-str? (recur (inc i) (conj out (if (= c \") c \space)) (not= c \") false false)
+            (= c \") (recur (inc i) (conj out c) true false false)
+            (= c \;) (recur (inc i) (conj out \space) false false true)
+            :else (recur (inc i) (conj out c) false false false)))))))
+
 (defn- requires-clojure-string?
   "True when the file's ns form actually REQUIRES clojure.string, in any of the
   three shapes that appear here: `[clojure.string :as x]`, `[clojure.string]`,
@@ -550,9 +585,12 @@
         ;; definition a call site. Measured 2026-09-09: five such files exist in
         ;; the workspace, four in kotoba-lang/text and one in kuro.
         self?    (fn [s] (re-find #"(?m)^\(ns\s+kotoba\.lang\.text\b" s))
-        targets  (filterv (fn [[_ s]] (and (not (self? s))
-                                           (or (requires-clojure-string? s)
-                                               (re-find #"\bclojure\.string/" s))))
+        targets  (filterv (fn [[_ s]] (let [code (code-only s)]
+                                        (and (not (self? s))
+                                             ;; asked of the CODE, not of the file:
+                                             ;; a mention in prose is not a use.
+                                             (or (requires-clojure-string? code)
+                                                 (re-find #"\bclojure\.string/" code)))))
                           loaded)
         ;; A HAZARD IS A HOST DISAGREEMENT, AND A .clj FILE HAS ONE HOST.
         ;; All three hazards -- split with a capturing group, `$&`, and `\$` --
