@@ -120,6 +120,41 @@ workspace は app-hyakka の checkout / capability 8 件。
 あって測定ではない。** resident 経路を強制起動する route は無いので、最初の実測は
 予定された 10:47Z の run になる。
 
+## Resume point
+
+**この bot の resident run が実際に何を出すかは、まだ誰も見ていない。** 次にこの話を
+拾う者が最初にやること:
+
+```
+# 1. 予定されていた run が走ったか、何を出したか
+#    （resident job を強制起動する route は無い。cadence 720 分で回る）
+mcp cloud-itonami-app workforce_status
+mcp cloud-itonami-app bot_messages bot-workforce-a4663798-6596-33cd-9f08-2a9429d9a6bf
+
+# 2. 走ったなら、その run が共有 checkout に何か書いたか
+git -C orgs/network-awai/app-hyakka status --porcelain
+git -C orgs/network-awai/app-hyakka log --oneline -3
+```
+
+判断の分かれ目は 1 つ: **run が objective どおり「次の 1 段と足りない証拠」を出したか、
+それとも lane の失敗（context-overflow / provider）で終わったか。** 前者なら hermes 側の
+`hyakka-bpmn-scout` と役割が重複していないかを見て、後者ならこの lane に analysis を
+置く判断そのものを疑う。どちらでも、**hermes を止めるのは cloud 側が 1 回緑になってから。**
+
+## 残した gap
+
+- **resident run 未測定**（上記）。ADR はこれを「動いている」と書いていない。
+- **`invalid-input` と `context-overflow` は他の役の既存欠陥**。Domain Steward の
+  `account-id is required` と、指示だけで context window を超える役が 1 つ。今回の
+  変更とは無関係だが、lane の完走率をこれが押し下げている。
+- **`clojure -M:test` が cloud-itonami-app で起動しない**（`storj_test.clj:113` の
+  `storj/build-request` が存在しない）。今回の新しい検査は runner を通さず直接走らせた。
+- **launcher と plist は version 管理に入れたが、live の plist はまだ home の path を
+  指している**（`~/.gftd/bin/itonami-app-resident.cljs` は repo の
+  `scripts/itonami-app-resident.cljs` への symlink）。plist を repo の path に向け直すには
+  もう一度 bootout/bootstrap が要る。`scripts/cloud.itonami.app.local.plist` がその
+  向き直した版で、再インストール時はこれを使う。
+
 ## 隣接する状態（記録として）
 
 bot の workspace である app-hyakka の共有 checkout は、別の bot の branch
