@@ -255,4 +255,79 @@
   not claim that P0 makes one likely. It claims that P0 is the first thing
   that is both blocking and buildable, that P1–P2 are mostly written behind
   it, and that P3–P5 are absent and are the largest single gap between this
-  stack and the serving systems named in the instruction."}]
+  stack and the serving systems named in the instruction.
+  ## 改訂 3 (2026-09-09 夕) — P1 の半分が aarch64 に着地し、実行して確かめた
+
+  P1 は「三本の dequant arm を fleet の ISA に移す」だったが、その前に
+  `kernel-dot-f32` 自体が x86 専用だった。両方動いた。
+
+  | 何 | repo | commit |
+  |---|---|---|
+  | `kernel-dot-f32` の aarch64 arm | `kotoba-lang/kotoba-native` | `f8eaee6e` |
+  | 同 target selection | `kotoba-lang/kotoba-mir` | `55d78851` |
+  | Q8_0 fused dequant の aarch64 arm | `kotoba-lang/kotoba-native` | `7cbed512` |
+  | 同 target selection | `kotoba-lang/kotoba-mir` | `b70a567a` |
+
+  ### 決定: NEON ではなく scalar
+
+  オーナー判断（改訂 2 に記録済み、KEEP THE TREE）に従い、**両 arm とも
+  scalar**。理由は速度ではなく、この演算の契約が「内積」ではなく**加算の順序**
+  だからである。NEON の安い縮約 (`faddp`) は別の木を計算し、この木を計算する
+  高い NEON 縮約は scalar が払わない lane 抽出を払う。AArch64 の scalar
+  FMUL/FADD は SSE の `mulss`/`addss` と同じ被演算子上の IEEE-754
+  round-to-nearest-even なので、**一致は測定ではなく構成による**。
+
+  fp16 の scale は AArch64 自身の `FCVT S,H` ではなく **x86 の式**を写した。
+  FCVT は 1 命令で、有限な half すべてに対して厳密で、それでも誤りである ——
+  二本の arm は exponent 31 の場合（x86 側は手書き）と NaN payload でも一致
+  しなければならず、式を写せばそれも写るが、意図を写しても写らない。
+
+  ### 実行して確かめた（8 問目）
+
+  kotoba-native の deps.edn が自分で書いているとおり **この repo は
+  コンパイル済みプログラムを実行しない**。だから測定は repo の外で行った:
+  emit → `.byte` 列を label 下に置く → `clang -c -target arm64-apple-macos`
+  → 5 引数の C 関数として呼ぶ（被演算子は x0..x4、答えは x0 で、これは
+  AAPCS64 の引数順そのものなので shim が要らない）。
+
+  - `kernel-dot-f32`: `dot-f32-probe.kotoba` の fixture
+    (`[2^24, 1 x 11]` × ones) に対し **0x4B800004**。左から右の和なら
+    0x4B800000。
+  - Q8_0: 7 fixture すべて緑 —— tree (0x4B80000C)、負の code、fp16 の
+    normal / **subnormal (2^-24)** / infinity / negative、2 block。
+
+  制御も回した。木を壊すと `tree` だけが 0x4B800000 で赤くなり、LDRSB を
+  LDRB にすると `negative codes` だけが **8160 = 255 × 32** で赤くなり、
+  exponent 31 の比較を 0x7c00 から外すと `fp16 infinity` だけが **2^21 =
+  32 × 2^16** で赤くなる —— 最後の数は `x86-dequant-magic` の docstring が
+  その誤りに対して予告している値そのもの。
+
+  ⚠ **同じ壊れたビルドで「普通の内積」fixture は 142.5 のまま通った。**
+  もっともらしい内積は誤った木と一致する。fixture がこの形である理由がこれ。
+
+  ### 途中で当たった二つの天井（どちらも塞いだ）
+
+  - `encode-selected` の `case` が **JVM の 64 KiB メソッド上限**を超えた
+    （arm を 1 本足しただけで `Method code too large!` で namespace が
+    コンパイルできなくなる）。ISA で 2 関数に分割した。x86 側が今は大きい方
+    なので、また当たる。
+  - `encode-layout-branch` に **`:aarch64/b-eq-imm19` が無かった**。
+    `kotoba.mir` は前から admit しており legacy emitter も持っていたが、この
+    表が要らなかった —— 本番 MIR で**等値**分岐が要るものが fp16 decode まで
+    存在しなかったため。
+
+  ### P1 の残り、および P0 は動いていない
+
+  残るのは Q4_K と Q6_K の aarch64 arm。これは移植ではない —— Q4_K は
+  (scale, min) 対と nibble half が別周期で変わり、Q6_K は scale index が
+  16 要素ごと・2bit field の shift が 32 要素ごとに変わるので、x86 側でも
+  32 group が per-group geometry で unroll されている。IQ 4 形式は read-only
+  table が機械に届くまで両 backend とも arm を持てない。
+
+  **P0 は 1 mm も動いていない。** そして今回それを正面から測った: kexe の
+  境界は guest に raw base を渡せない —— `:string` 引数は pair handle として、
+  vector は arena handle として届き、`kernel-*` は生アドレスを要求する。
+  だから**この二本の arm は、署名済み artifact からはこのホスト上で到達
+  できない**。上の測定が repo の外で行われたのはそのためであり、それは
+  「実行した」を弱めるものではないが（バイトは同一）、「provider が
+  これで推論できる」ことは意味しない。P0 の設計は改訂 2 のまま有効。"}]
