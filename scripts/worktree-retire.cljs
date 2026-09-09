@@ -153,9 +153,16 @@
   ;; .git/worktrees/<name> — name is the basename unless git had to disambiguate;
   ;; resolve it through the gitdir file instead of guessing.
   (let [gd (.join path wt ".git")]
+    ;; A .git this process cannot READ is not a .git that is absent. Measured
+    ;; 2026-09-09: a worktree under ~/Documents/Codex threw
+    ;; "EPERM: operation not permitted" here and killed the whole sweep, so no
+    ;; worktree anywhere got classified. statSync was already guarded and
+    ;; readFileSync was not -- the two calls needed the same treatment, and the
+    ;; one that was missed is the one that reads.
     (when (try (.isFile (.statSync fs gd)) (catch :default _ false))
-      (let [s (str/trim (str (.readFileSync fs gd "utf8")))]
-        (when (str/starts-with? s "gitdir: ") (subs s 8))))))
+      (let [s (try (str/trim (str (.readFileSync fs gd "utf8")))
+                   (catch :default _ nil))]
+        (when (and s (str/starts-with? s "gitdir: ")) (subs s 8))))))
 
 (defn classify [repo def-refs idx shallow? wt]
   (let [p (:path wt)]
