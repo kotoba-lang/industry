@@ -202,14 +202,47 @@ ADR-2608153600 と ADR-2800004900 の決定を、この installer に束縛す�
 - **オーナーの言う「smart contract passkey」の実体はこれ**であり、新規に作らない。
 - installer が local な account 系を発明しない（2 つ目の identity を持たない）。
 
-⚠ **contract と live に drift がある（この ADR が見つけた 1 件）。**
-`device-onboarding-v1.edn` の `:authentication :methods` は `:passkey` と
-`:phone-scan` しか持たず、repo-wide mandatory な
-`manifest/human-authentication-policy.edn` が
-`:human-auth/preferred-family :web3-wallet` として preferred に置く
-`:siwe-erc191` / `:siwe-erc1271` を名乗っていない。
-**live な authority は既に両方を出しているのに、component contract がそれを
-言っていない。** 実装順 1 はこの drift を閉じること。
+**この ADR が見つけた drift は、文書の穴ではなく欠陥だった（2026-09-09 に閉じた）。**
+
+最初の診断は「`device-onboarding-v1.edn` の `:authentication :methods` が
+`:siwe-erc191` / `:siwe-erc1271` を名乗っていない」だった。コードを読むと
+もっと悪かった: `aiueos.device-auth/supported-methods` 自体が
+`#{:passkey :phone-scan}` で、`verified-authority-result?` は
+**authority が要求した method を echo し返すことを要求する**。つまり
+**credential が Base Account の account は、device claim を一切完了できなかった。**
+authority の既定 method であり、そのページの最初の入口である方式が、である。
+
+⚠ **そして「語彙に 2 つ足す」は、もっと悪い直し方だった。** `proof-problem` の
+admission は全部 passkey の形（user-present / user-verified / rp-id / origin /
+sign-count）で、SIWE assertion はそのどれも持たない。**足すだけなら wallet は
+全部 refuse され、通るように緩めれば何も証明していない wallet が通る。**
+
+したがって直し方は **method ごとの要件表**にした（`aiueos` `c11e63c5`）:
+
+- SIWE = server-issued single-use nonce / atomic consumption / domain・URI・chain
+  binding / expiry / server-side signature、ERC-1271 は加えて contract の現在権限
+  （**検証不能なら fail closed**）
+- **語彙に在って要件が宣言されていない method は refuse する**
+  （`:method/requirements-undeclared`）—— 語彙を広げる変更が既定で fail-closed になる
+- `:siwe/domain` は rp-id と同じ文字列に縛るが、**reason 名を分けてある** ——
+  policy が「SIWE の domain 検証を WebAuthn と同じ phishing resistance と呼ぶな」
+  と定めているため
+- **接続は認証ではない**（`:wallet/connection-is-authentication? false`）——
+  address と chain id は何も証明しないので、署名を要求することで表現している
+
+**drift の住処は 4 つの literal だった。** chassis QR・setup.json・plan 文書が
+method 一覧を手で書き写しており、語彙と別々に古びた。今は
+`device-auth/supported-methods` から導出し、**phone の camera が読む文字列そのもの**
+を test が pin する（`passkey,phone-scan,siwe-erc1271,siwe-erc191` —— 数値順ではなく
+辞書順。だから計算し直さず literal で pin してある）。
+
+**aiueos を `manifest/human-authentication-policy.edn` の inventory に登録した。**
+policy は「新しい human-auth surface は deploy 前に inventory へ登録する」と定めて
+いるのに、aiueos は 7 surface のどこにも居なかった。
+
+⚠ **live な wallet claim は 1 件も完了していない。** 検査したのは verified assertion の
+**形**の admission（passkey 経路と同じ seam）であって、**authority 側の 2026-09-07 の
+緑はその代わりにならない。**
 
 ### D6. 「入力させない」は 3 つの問題。R1 は USB tethering、R2 は DPP、SoftAP は採らない
 
@@ -338,7 +371,8 @@ install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で�
 | I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | green |
 | I6 physical probe | 対象機の NIC/NVMe/GPU/UEFI/CPUID を read-only receipt に | **red（6600HS 未 probe）**。K16 は amber |
 | I7 physical install | 明示 target へ write/readback、USB 無し SSD boot、LAN SSH | **red**。K16 は `physical-qualification-usb-v11` / code 416 で停止（final CR3 の下で最初の C 呼び出しに入る所）。6600HS は未測定 |
-| O0 onboarding contract | 本 ADR と `device-onboarding-v1` が同じ matrix を言う | **red**（D5 の wallet method drift） |
+| O0 onboarding contract | 本 ADR と `device-onboarding-v1` が同じ matrix を言う | green（wallet method drift は 2026-09-09 に閉じた。`aiueos` `c11e63c5`、20 tests / 118 assertions、変異 3 種で discriminate） |
+| O0b wallet claim live | wallet account が実際に device claim を完了する | **red**（未実測。authority 側の緑は代わりにならない） |
 | O1 label + parse | 2 encoding / 1 parser、秘密を運ばない | green（実装済み・unit tested） |
 | O2 possession proof | server nonce → device 署名 → 検証 | green（決定核は実装済み・unit tested）。**device 側 agent が未着地**なので live は `awaiting-proof` で time out する |
 | O3 human approval | passkey / Base Account でスマホから承認 | authority は **live**。installer 面の結線は red |
@@ -352,9 +386,10 @@ install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で�
 
 ## 実装順（依存が決めている）
 
-1. **D5 の drift を閉じる** —— `device-onboarding-v1.edn` の
-   `:authentication :methods` に `:siwe-erc191` / `:siwe-erc1271` を入れ、
-   O0 と `human-authentication-policy.edn` を一致させる。**依存無し、今日。**
+1. ~~**D5 の drift を閉じる**~~（済 2026-09-09、`aiueos` `c11e63c5`）—— 語彙に足すのではなく
+   **method ごとの要件表**にし、要件が宣言されていない method は refuse する形にした。
+   4 つの literal を語彙から導出させ、aiueos を policy inventory に登録した。
+   残るのは **live な wallet claim を 1 件通すこと**（O0b）。
 2. **6600HS を read-only probe し、machine profile を receipt から作る**（I6）。
    CPUID `0x8000001F` の 3 bit を含める。**依存無し、今日。**
 3. device 側 agent（`/challenge` → 署名 → `/attest`）を aiueos に置く（O2 を閉じる）。
