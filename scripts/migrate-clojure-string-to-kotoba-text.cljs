@@ -512,8 +512,19 @@
         ;; is the invariant working -- but the repo was club-shinshi-app and the
         ;; cost was 61 other files. So the target set is narrowed to what it
         ;; always meant: a file that REQUIRES clojure.string, or CALLS it.
-        targets  (filterv (fn [[_ s]] (or (requires-clojure-string? s)
-                                          (re-find #"\bclojure\.string/" s)))
+        ;; A COPY OF THE TARGET NAMESPACE IS NOT A CONSUMER OF IT.
+        ;; kuro vendors kotoba.lang.text under test/cljs-shims/, and
+        ;; kotoba-lang/text is the namespace itself plus three test files that
+        ;; declare it. Rewriting those turns (:require [clojure.string ...])
+        ;; into a namespace requiring ITSELF. The read-back invariant caught it
+        ;; and refused both repositories, which is the invariant working -- but
+        ;; the fix is not to loosen the invariant, it is to stop calling the
+        ;; definition a call site. Measured 2026-09-09: five such files exist in
+        ;; the workspace, four in kotoba-lang/text and one in kuro.
+        self?    (fn [s] (re-find #"(?m)^\(ns\s+kotoba\.lang\.text\b" s))
+        targets  (filterv (fn [[_ s]] (and (not (self? s))
+                                           (or (requires-clojure-string? s)
+                                               (re-find #"\bclojure\.string/" s))))
                           loaded)
         ;; A HAZARD IS A HOST DISAGREEMENT, AND A .clj FILE HAS ONE HOST.
         ;; All three hazards -- split with a capturing group, `$&`, and `\$` --
