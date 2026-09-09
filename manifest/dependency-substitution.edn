@@ -244,7 +244,80 @@
     Order of work: land the 20 repos with no digest and no JSON-literal test
     first, let the 7 literal-test repos go red and fix the fixtures, and treat
     the 9 digest-adjacent repos as a read-before-swap list of 29 files."}
-  {:coordinate "metosin/jsonista" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json" :kind :implementation}
+  {:coordinate "metosin/jsonista" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/json" :kind :implementation
+   :qualification
+   "This entry had no note, sitting next to `org.clojure/data.json` whose note
+    ends `deterministic key order`. Read together they imply the same story.
+    They are not the same story. Measured 2026-09-10.
+
+    **There is no jsonista-shaped shim.** `kotoba-lang/json` ships two migration
+    surfaces and neither fits: `json.compat` is cheshire-shaped
+    (`parse-string` / `generate-string`) and `json.data-json` is data.json-shaped
+    (`read-str` / `write-str`). jsonista's surface is `read-value` /
+    `write-value-as-string` / `object-mapper`. So unlike data.json, this is not
+    a require-line change today -- it is a shim that does not exist, or ~200
+    call-site edits.
+
+    Surface actually in use, counted across the consumers:
+
+      read-value                  71
+      write-value-as-string       57
+      object-mapper               36
+      keyword-keys-object-mapper  34
+
+    The configuration surface is closed and small, which is the good news --
+    every `object-mapper` call in the workspace is one of these:
+
+      (object-mapper)                                          34
+      (object-mapper {:decode-key-fn keyword})                 17
+      (object-mapper {:decode-key-fn keyword :encode-key-fn name})  13
+      (object-mapper {:encode-key-fn name})                     3
+      (object-mapper {:decode-key-fn true})                     3
+
+    Two options, four shapes. A faithful shim is small.
+
+    **The difference that matters is NOT key order.** Ran both encoders side by
+    side on a real classpath:
+
+      value            jsonista default   jsonista :encode-key-fn name   json.core
+      {:ns/k 1}        {\"ns/k\":1}         {\"k\":1}                       {\"k\":1}
+      {:b 1 :a 2}      {\"b\":1,\"a\":2}     {\"b\":1,\"a\":2}               {\"a\":2,\"b\":1}
+
+    Key order sorts, as with data.json. But **jsonista's DEFAULT mapper keeps
+    the namespace on a namespaced keyword key and `json.core` drops it.**
+    `json.core` matches jsonista's `:encode-key-fn name`, not its default. That
+    is a change to key NAMES, not to their order: a consumer reading `ns/k`
+    finds nothing at all, and no amount of order-insensitivity saves it. 40 of
+    the requires call `write-value-as-string` with no mapper, so they are on the
+    default.
+
+    Consequences for whoever builds the shim:
+
+    1. **The default mapper cannot delegate to `json.core/encode`.** It has to
+       walk the value and stringify keyword keys WITH their namespace
+       (`(subs (str k) 1)`) before encoding, or it silently renames keys.
+       `:encode-key-fn name` is the case that may delegate.
+    2. **Refuse mapper options the shim cannot honour; do not ignore them.**
+       `json.data-json` silently ignores every option but `:key-fn`. That has
+       been harmless so far only by luck -- the option in the wild was
+       `:escape-slash false`, and `json.core` never escapes `/`, so it was a
+       no-op under both. Luck is not a contract. A jsonista shim that quietly
+       drops an option it does not implement will rename or reshape keys and
+       stay green.
+    3. `read-value` in jsonista also accepts InputStream / File / URL. The shim
+       should take a string and refuse the rest by name rather than throw
+       something opaque.
+
+    One measurement correction worth keeping, because it nearly became the
+    plan: a first pass reported that only **2 of 21** consumers actually require
+    jsonista, which would have made this an easy `remove an unused declaration`
+    wave. That was a false negative -- it searched only `src/` and `test/`. The
+    real number is **20 of 21** (only `com-junkawasaki/ghosthacker-shiropico`
+    has no source reference). Several declare jsonista in a NESTED deps.edn
+    rather than the repo root (`yukkuri/clj/deps.edn`,
+    `yukkuri/renderer-mac/clj/deps.edn`), which is the same nested-declaration
+    shape this ledger meets elsewhere."}
   {:coordinate "cheshire/cheshire" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json" :kind :implementation}
   {:coordinate "zod" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/spec" :kind :implementation}
   {:coordinate "metosin/malli" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/spec" :kind :implementation}
