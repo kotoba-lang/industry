@@ -511,12 +511,30 @@
                         (str/join " " (take 4 (sort runtime-third-party)))
                         ;; Silent when the project's own deps.edn declares it,
                         ;; which is the common case and needs no annotation.
+                        ;;
+                        ;; The path, and NOT a verdict about it. The first cut
+                        ;; of this line ended `, not this repository's own
+                        ;; deps.edn`, which reads as `so it is not really this
+                        ;; repository's dependency` -- and for 21 of the 25
+                        ;; rows it annotates, that is false. Measured
+                        ;; 2026-09-10: twelve cloud-itonami apps and four
+                        ;; others declare in `clj/deps.edn`, which is the JVM
+                        ;; half of a repository that also has `cljs/` or
+                        ;; `appview/`. That IS the runtime dependency of a
+                        ;; shipped sub-project. Only the three kami trees and
+                        ;; a couple of others are authoring or test projects
+                        ;; (`games/puzzle/deps.edn`, whose own first line says
+                        ;; `Authoring deps`; `visual-test/deps.edn`).
+                        ;;
+                        ;; A reader can tell those apart from the path in one
+                        ;; glance, which is the whole value here. The detector
+                        ;; cannot, so it does not try.
                         (when-not (contains? third-party-roots "deps.edn")
                           (str " [declared in "
                                (str/join " " (take 2 third-party-roots))
                                (when (> (count third-party-roots) 2)
                                  (str " +" (- (count third-party-roots) 2) " more"))
-                               ", not this repository's own deps.edn]")))})
+                               "]")))})
     (and (seq runtime) (empty? runtime-third-party))
     (conj {:sev "warn" :kind :jvm-runtime-clojure-only :repo repo
            :detail (str "org.clojure/clojure in top-level :deps with "
