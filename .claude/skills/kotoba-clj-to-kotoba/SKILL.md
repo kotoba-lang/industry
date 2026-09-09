@@ -92,9 +92,34 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
    `java`/`javac`/`clojure`/`clj` の stub を PATH 先頭に置き、呼ばれたら log に
    追記して非ゼロで終わらせ、log が空であることを assert する。**そして その log が
    空でないことを 1 度は見せる**（実測: `amu test` だけが `clojure -M:run` に落ちて
-   踏む）—— 踏まれたことのない trace は、常に空な trace と区別できない。
+   踏まれていた）—— 踏まれたことのない trace は、常に空な trace と区別できない。
+
+6c. **`kotoba -M test` の契約（実測 2026-09-06、wave-1 20 repo で確立）。**
+   - `test-*` 定義が **`(:export [...])` に明記されていなければ**、export されていても
+     「no exported test-* definitions」で拒否される —— `tests-in` は `:exports` を
+     見る。slice を足したら export ベクタにも書く。
+   - `test-*` は **真偽値を返す**。`(and (= a b) (= c d))` の形。if で bool と i64 を
+     混ぜる枝は「if branches must have the same value type」で落ちる。
+   - entryless library（`main` 無し）は wasm target を拒否される —— `main` を置く。
+   - 3 target（`:jvm-kir :js :wasm`）全部で同じテストが走る。1 つでも FAIL なら
+     全体が FAIL。
+   - **gate 判定は「N/N passed」の文字列一致で行う** — rc70 等の失敗文字列を
+     truthy 評価すると緑偽装になる（実測: qc スクリプトの truthy バグで
+     checkpoint #2 を一時過大記録、amendment で訂正）。
+
+8b. **着地後の pin は batch で**。複数 repo を動かしたら
+   `PINS=pins.tsv nbb scripts/west-pin-put-batch.cljs`（tsv: `name\tsha\tslug`）。
+   19 pin が 1 commit にまとまった実績（2026-09-06）。SHA は **GitHub API から**
+   採る（shared checkout の origin/main ref は並行作業で stale になる —
+   checkout 側 rev-parse で作った pins.tsv が全件「already at that pin」で
+   drop された実測がある）。
+
+8c. **着地後の常時監視**。tranche 全 repo は
+   `scripts/kotoba-wave-verify-tick.cljs`（launchd `com.kotoba.wave-verify-tick`、1h、
+   rotating sample）が kotoba -M check/test/compile + amu check の 4 gate で巡回する。
+   REGRESSION が出たら着地済み slice の退行。
 8. **着地。** feature branch を push し `gh api .../merges` で main へ。
-   west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`。
+   west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`（複数 repo なら 8b の batch）。
 
 先例: amu `examples/todo-app.kotoba`（application）、
 `kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_commands`（コマンド文字列）と
