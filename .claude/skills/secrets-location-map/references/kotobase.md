@@ -25,11 +25,43 @@ becoming net-kotobase-engine」と書いているのはこの制約のこと。
 content-addressed graph の名前空間ごと変わる — 障害ではなく**データ面の同一性の変更**。
 「動かなくなったら再発行すればいい」で済む種類のものではない。
 
-**解除するには（agent 単独ではできない、安全床①）**:
-1. オーナーが 3 値を供給して kagi（compartment `net-kotobase`）に保管する、または
-2. B2 → **R2 binding** 移行を先に完了させる（binding は資格情報を要さないので B2 の
-   2 件が消える。`env.testnet` は既に `KOTOBASE_R2` binding を持っている）。`KOTOBA_SEED`
-   は残るので、これだけでは足りない。
+**⚠ 2026-09-09 実測: 上の表の 3 件を「供給すればよい」と読まない。選択肢 2 は
+本番では既に完了しており、B2 の 2 件は本番が捨てたものである。**
+
+    GET https://datoms.kotobase.net/_health
+      200  {ok true, missing [], keyring {ok true},
+            object_store {mode "r2", ...}}
+
+`control-plane/kotobase-graph-database`（= `kotobase-cf-wasm-staging`、
+`datoms.kotobase.net` を配信）の production env は **`KOTOBASE_R2` →
+`kotobase-graph-database-production` binding** を持ち、B2 vars は
+`KOTOBASE_B2_RETIRED` 一本に退役済み。その `readiness` も R2 を知っている ——
+storage mode が `:r2` で `KOTOBASE_B2_RETIRED=1`（または B2 credential が
+一つも設定されていない）なら **B2 の 2 件を要求しない**。だから healthy。
+
+一方 **`net-kotobase/engine`（= `kotobase-engine-candidate`、`backend.kotobase.net`）は
+R2 移行前の fork**: 全 env が R2 binding を持たず B2 vars のままで、`readiness` は
+B2 2 件を無条件に要求する。だから 503 で 3 件を欠落として挙げる。
+
+**この 503 に 3 値を供給するのは誤った修正である。** 同じ operator DID /
+content-addressed 名前空間に対して、incumbent が R2（`kotobase-graph-database-production`）
+に、candidate が B2（`kotobase-cf-wasm-production`）に書く **split brain** を作る。
+
+**candidate を healthy にする正しい順序**:
+1. engine を incumbent の storage 移行に追いつかせる —— `KOTOBASE_R2` binding と、
+   R2 を知る `readiness`（control-plane の `object-store/mode` + `KOTOBASE_B2_RETIRED`
+   分岐）を移植する。**これで B2 の 2 件は構造的に消える**（binding は資格情報を要さない）。
+2. 残るのは `KOTOBA_SEED` **1 件だけ**。しかも incumbent と**同一の値**でなければならない
+   —— 別 seed は別 operator DID = 別グラフで、既存の head チェーンから切れる（下記）。
+   incumbent の script secret は write-only なので、値はオーナーの手元にしか無い。
+3. そもそも 2 つの木（engine と control-plane/kotobase-graph-database）が同じ worker の
+   複製で、storage 移行と readiness の両方で乖離している。片方に追いつかせるより
+   「どちらが正本か」を決める方が安い可能性がある —— これはオーナー判断。
+
+**2026-09-09 に kagi を実測した結果**（識別子を狙い撃ち、列挙なし）:
+`KOTOBASE_B2_KEY_ID` / `KOTOBASE_B2_APP_KEY` / `KOTOBA_SEED` は 3 件とも
+`no such item`（exit 1）。B2 Master Key（`260421-BACKBLAZE_MASTER_KEY_ID` /
+`_KEY`）も kagi には無く、1Password item のフィールドとして記録されている。
 
 **agent は seed を推測・再生成して代替しないこと。** 新しい seed は別 DID = 別グラフで、
 既存の head チェーンから切り離される。
