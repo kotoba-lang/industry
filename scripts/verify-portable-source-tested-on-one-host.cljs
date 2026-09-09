@@ -70,6 +70,7 @@
 
 (def fs (js/require "node:fs"))
 (def node-path (js/require "node:path"))
+(def child (js/require "node:child_process"))
 (def argv (vec (drop 2 js/process.argv)))
 (defn flag? [f] (some #{f} argv))
 (defn opt [f] (second (drop-while #(not= f %) argv)))
@@ -91,6 +92,83 @@
 (def root (.cwd js/process))
 (defn full [p] (.join node-path root p))
 (def min-repos 500)
+
+;; ---------------------------------------------------------------------------
+;; Which tree did this actually read.
+;;
+;; Every namespace below is read off `orgs/<org>/<repo>` as it sits on this
+;; disk, and a checkout is a third thing beside the west pin and the repo's own
+;; main (ADR-2608136800). A finding from a drifted working copy and a finding
+;; about the project are the same line until something says otherwise.
+;;
+;; This is not hypothetical for THIS detector. Measured 2026-09-09: it reported
+;; SEVEN one-host namespaces in `kotoba-lang/amu`. The shared checkout was on a
+;; local cron-tick commit at the time. Once it was synced to the pin the same
+;; command reported TWO -- five of the seven already had a `.cljc` sibling test
+;; upstream (`fuel_estimate_portable_test.cljc` and friends), and one of them
+;; carries a docstring saying so. The detector was right about the tree it read
+;; and wrong about the repo, and nothing in its output distinguished those.
+;;
+;; `verify-jvm-dependency-surface.cljs` grew the same check the same day for
+;; the same reason. It is duplicated rather than shared because every detector
+;; here is deliberately standalone; if a third one needs it, factor it out then.
+
+(def manifest-source
+  "Which west.yml the pins below were read from, and it is `origin/main`'s
+  whenever git can produce it.
+
+  The working copy is not the right answer here. This superproject checkout is
+  integration-and-reading only by policy, pin advances land through the GitHub
+  API, and so the file on disk is routinely BEHIND the pins that actually
+  shipped. Measured while writing this: the disk said amu was pinned at
+  `24516340` and origin/main said `6ffc1d71`, so comparing against the disk
+  marked a repo that was sitting exactly on its landed pin.
+
+  This does not make the answer authoritative -- `origin/main` here is only as
+  fresh as the last fetch, and nothing in this detector fetches. It makes the
+  answer name its own source, which is the part that was missing."
+  (let [r (.spawnSync child "git" (clj->js ["show" "origin/main:manifest/west.yml"])
+                      #js {:encoding "utf8" :cwd root :maxBuffer 268435456})]
+    (if (and (zero? (.-status r)) (seq (or (.-stdout r) "")))
+      {:label "origin/main:manifest/west.yml" :text (.-stdout r)}
+      {:label "manifest/west.yml (working copy -- origin/main unreadable)"
+       :text (try (.readFileSync fs (full "manifest/west.yml") "utf8")
+                  (catch :default _ ""))})))
+
+(def pins
+  "path -> the commit west.yml pins that project at. `revision:` is emitted
+  immediately before `path:` for each entry, so the pin for a path is the last
+  revision seen above it."
+  (loop [lines (str/split-lines (:text manifest-source))
+         rev nil
+         acc {}]
+    (if-let [line (first lines)]
+      (if-let [r (second (re-find #"^\s+revision:\s*([0-9a-f]{7,40})\s*$" line))]
+        (recur (rest lines) r acc)
+        (if-let [pth (second (re-find #"^\s+path:\s*(\S+)\s*$" line))]
+          (recur (rest lines) nil (if rev (assoc acc pth rev) acc))
+          (recur (rest lines) rev acc)))
+      acc)))
+
+(defn- head-of [repo]
+  (let [r (.spawnSync child "git" (clj->js ["-C" (full repo) "rev-parse" "HEAD"])
+                      #js {:encoding "utf8"})]
+    (when (and (zero? (.-status r)) (.-stdout r))
+      (str/trim (.-stdout r)))))
+
+(defn off-pin
+  "`nil` if the checkout is at its pin, else a sentence naming what it is at
+  instead. The two unknowns are marked rather than passed over: a tree that
+  could not be measured must not print as a tree measured at its pin."
+  [repo]
+  (let [pin (get pins repo)
+        head (head-of repo)]
+    (cond
+      (nil? pin)   "pin unknown: no revision: line parsed for this path"
+      (nil? head)  "tree state unknown: git could not answer rev-parse HEAD"
+      (= pin head) nil
+      :else (str "tree off pin: HEAD " (subs head 0 (min 9 (count head)))
+                 " != pin " (subs pin 0 (min 9 (count pin)))))))
 
 (def prune-dirs
   #{"node_modules" ".git" ".shadow-cljs" ".cache" "target" "dist" "build"
@@ -400,6 +478,10 @@
 (when findings?
   (println (str "SCANNED\t" (count in-scope) "\tregistered repo(s) present on disk"))
   (let [ordered (sort-by (juxt :repo :ns) findings)
+        ;; One `git rev-parse` per REPO that has something to report -- not per
+        ;; finding, not per registered checkout. The question only matters where
+        ;; a number is about to be printed.
+        drift (into {} (map (juxt identity off-pin)) (distinct (map :repo ordered)))
         ;; 0 means no cap. The registered detector run uses 0 deliberately: a
         ;; truncated finding SET makes the NEW/RESOLVED diff between runs lie,
         ;; because entries enter and leave the window as the sort shifts under
@@ -411,7 +493,14 @@
       (println (str "FINDING\tfail\tonly-jvm-tested:" (:repo f) ":" (:ns f)
                     "\t" (:path f) " is .cljc; the only tests reaching it are "
                     (str/join ", " (:jvm f))
-                    " -- portable source verified on one host")))
+                    " -- portable source verified on one host"
+                    (when-let [d (drift (:repo f))] (str " [" d "]")))))
+    (let [marked (filter #(drift (:repo %)) ordered)]
+      (println (str "MANIFEST\t" (count pins) "\tpins read from "
+                    (:label manifest-source)))
+      (println (str "OFF-PIN\t" (count (distinct (map :repo marked))) "\tof "
+                    (count drift) " reporting repo(s) are not at their west pin; "
+                    (count marked) " finding(s) describe a tree nobody ships")))
     (when (pos? hidden)
       ;; Announced, never silent. `--max-findings 0` prints every one.
       (println (str "TRUNCATED\t" hidden "\tfurther finding(s) not printed"

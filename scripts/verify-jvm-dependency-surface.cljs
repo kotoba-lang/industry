@@ -99,6 +99,30 @@
        (keep #(second (re-find #"^\s+path:\s*(\S+)\s*$" %)))
        (into (sorted-set))))
 
+(def manifest-source
+  "Which west.yml the pins below were read from, and it is `origin/main`'s
+  whenever git can produce it.
+
+  Corrects this check on the day it was added. It first read the working copy,
+  and the working copy is the wrong file: this superproject checkout is
+  integration-and-reading only by policy and pin advances land through the
+  GitHub API, so the file on disk is routinely BEHIND the pins that shipped.
+  Measured within the hour: on disk amu was pinned at `24516340`, on
+  origin/main at `6ffc1d71`, and a repo sitting exactly on its landed pin was
+  marked as drifted. A check for reading the wrong tree that read the wrong
+  tree.
+
+  Still not authoritative -- `origin/main` here is only as fresh as the last
+  fetch and nothing here fetches. It names its own source, which is the part
+  that was missing."
+  (let [r (.spawnSync child "git" (clj->js ["show" "origin/main:manifest/west.yml"])
+                      #js {:encoding "utf8" :cwd root :maxBuffer 268435456})]
+    (if (and (zero? (.-status r)) (seq (or (.-stdout r) "")))
+      {:label "origin/main:manifest/west.yml" :text (.-stdout r)}
+      {:label "manifest/west.yml (working copy -- origin/main unreadable)"
+       :text (try (.readFileSync fs (full "manifest/west.yml") "utf8")
+                  (catch :default _ ""))})))
+
 (def pins
   "path -> the commit west.yml pins that project at.
 
@@ -107,7 +131,7 @@
   `registered` is parsed, and for the same stated reason: adding a YAML
   dependency to this detector to read four lines is worse than reading four
   lines."
-  (loop [lines (str/split-lines (.readFileSync fs (full "manifest/west.yml") "utf8"))
+  (loop [lines (str/split-lines (:text manifest-source))
          rev nil
          acc {}]
     (if-let [line (first lines)]
@@ -548,6 +572,8 @@
         drift (into {} (map (juxt identity off-pin)) (distinct (map :repo emitted)))
         marked (filter #(drift (:repo %)) emitted)]
     (println (str "SCANNED\t" (:present @stats) "\tregistered repo(s) present on disk"))
+    (println (str "MANIFEST\t" (count pins) "\tpins read from "
+                  (:label manifest-source)))
     (println (str "OFF-PIN\t" (count (distinct (map :repo marked))) "\tof "
                   (count drift) " reporting repo(s) are not at their west pin; "
                   (count marked) " finding(s) below describe a tree nobody ships"))
