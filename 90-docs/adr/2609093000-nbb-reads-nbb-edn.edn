@@ -1,0 +1,72 @@
+[{:db/id -1
+ :adr/id "adr-2609093000-nbb-reads-nbb-edn"
+ :adr/title "nbb reads nbb.edn, so that is where the .cljs declaration goes"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/body "## 決定
+
+**`.cljs` の依存宣言は `nbb.edn` に置く。`deps.edn` と `bb.edn` は nbb から見えない。**
+
+nbb は `nbb.edn` を読む。`deps.edn` も `bb.edn` も読まない。したがって `.cljs` を
+`kotoba.lang.text` に移行し、その coordinate を `deps.edn` に書いた repo は
+**移行できていない —— 壊れていて、しかも全ての道具が成功を報告する。**
+
+## なぜ気づかなかったか
+
+実測 2026-09-09、kotoba-lang/grammar:
+
+    DEPS added   orgs/kotoba-lang/grammar/deps.edn
+    REWROTE 6    files
+    clojure -M:test    16 tests / 502 assertions, 0 failures
+    nbb tools/gen-tmlanguage.cljs
+        Error: Could not find namespace: kotoba.lang.text
+
+JVM suite が緑なのは `deps.edn` を読み、`.cljs` を一度も load しないから。
+同じ形が cloud-itonami/cybersecurity と kotoba-lang/kotoba-fleet でも出た。
+
+## 何を数えるか
+
+**報告するのは entry point だけ** —— shebang を持つ `.cljs`、または package.json の
+script が `nbb <file>` と `--classpath` なしで名指しているもの。
+`nbb --classpath src:test <file>` で起動されるファイルは invocation 側で classpath を
+宣言しているので finding ではない。それを数えると「壊れているものの一覧」が
+「珍しいものの一覧」に化ける（1,114 ファイル 対 その中の 442 entry point）。
+
+初回全走査: SCANNED 4,786 / ABSENT 61（登録されているが checkout されていない ——
+未測定であって clean ではない）/ UNRESOLVABLE 442 entry point・206 repo。
+nbb.edn が無い 336、在るが coordinate を名指していない 106。
+coordinate 別: kotoba-lang/text 428、kotoba-lang/edn 12、
+kotoba-lang/package-contract 2、kotoba-lang/fmt 1。
+
+## 直し方
+
+`nbb.edn` を書く。**sha も :paths も、隣の project file から複写する。**
+project file が coordinate を名指していなければ、sha を選ばずに拒否する。
+`:paths` を推測した宣言は、正しく見えて何も解決しない宣言そのもの。
+
+- 移行スクリプト `scripts/migrate-clojure-string-to-kotoba-text.cljs` は、
+  書き換える `.cljs` の上に nbb.edn が無ければ **何かを書く前に**拒否する。
+  `--create-nbb-edn` で project file の隣に 1 本作る（`:paths` は複写）。
+- 既着地分の検出は `scripts/verify-nbb-declaration-visible.cljs`
+  （`manifest/orgs-detectors.edn` の `:verify-nbb-declaration-visible`）。
+
+## 検査の oracle は nbb 自身
+
+detector の control は assertion ではなく nbb の実行にした。nbb.edn が coordinate を
+名指すかだけが違う合成 project 2 本に対し、detector はちょうど一方を報告し、
+`nbb run.cljs` は報告された側で失敗し、もう一方では答えを印字する。
+実 sweep から無作為に引いた 3 件も nbb で実行し、3 件とも namespace を解決できなかった。
+
+repo を直す driver も同じ oracle を持つ: **何かを書く前に**
+`nbb -e \"(require '[kotoba.lang.text])\"` が失敗することを確かめ、書いた後に
+成功することを確かめる。既に解決する repo は finding が古いだけなので SKIP する。
+
+## この件で踏んだ、同じ形の自分の誤り
+
+1. 最初の guard を宣言フェーズに置き、「何も書いていない」と言いながら
+   1 ファイル既に書いていた。書き込みの前へ移した。
+2. 検証を `.sh` の `cd \"$wt\" && nbb ...` で書き、worktree を消した後にその
+   `cd` が失敗し、**grep が何も見つけないので `OK` を印字した** ——
+   「実行できなかった検査が、実行して問題が無かった検査と同じ値を返す」の最短形。
+   driver をプロセスの終了値を見る nbb 実装に置き換えた。
+"}]
