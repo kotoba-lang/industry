@@ -45,10 +45,21 @@
     :placement {:content-address :not-applicable
                 :why "an actor placement manifest declares where code runs, not what is served"}}
    :policy/kind-default nil
+   ;; `:entry` is a HOSTNAME, not a path. DNSLink is per-hostname
+   ;; (`_dnslink.<host> TXT dnslink=/ipns/<k51>`), so a path apex can carry
+   ;; exactly one dnslink and per-app naming does not resolve without a
+   ;; router -- which would put a location-addressed hop back in the middle
+   ;; of the naming plane. The layers below are already subdomain gateways
+   ;; (`{cid}.ipfs.*`, `{k51}.ipns.*`, certificates measured), and one origin
+   ;; per app is what keeps one app out of another's localStorage.
    :policy/location
    {:bytes "https://{cid}.ipfs.kotobase.net"
-    :entry "https://itonami.app/{name}/"
-    :naming-resolution :dnslink}
+    :entry "https://{name}.itonami.app/"
+    :naming-resolution :dnslink
+    :dnslink-record "_dnslink.{name}.itonami.app"}
+   ;; A name with a dot cannot be one DNS label, so it cannot be an entry
+   ;; host; such a site stays on a path plane. Measured constraint, not style.
+   :policy/entry-name-constraint :single-dns-label
    :policy/agent-work-plane "https://itonami.cloud"
    :policy/verifier "scripts/verify-app-content-address.cljs"
    :policy/verifier-states #{:addressed :exempt :document-not-addressed :located :unreadable}
@@ -61,6 +72,7 @@
                      :path-as-identity
                      :second-bytes-plane
                      :entry-apex-as-alias-of-another
+                     :entry-path-instead-of-hostname
                      :bulk-exemption}
    :policy/measured
    {:at "2026-09-09"
