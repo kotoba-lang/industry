@@ -127,19 +127,56 @@
          (filter loop-script?)
          set)))
 
+(def bot-label-prefixes
+  "launchd label prefixes a resident bot may be installed under, preferred first.
+
+  `com.gftd.` is retired (manifest/gftd-retirement.edn wave 5) and the jobs move to
+  `cloud.itonami.bot.` one at a time, each verified running before the next. Discovery
+  must accept both for as long as that takes: a renamed job whose prefix this does not
+  know does not report as renamed, it simply stops appearing -- and a bot that vanished
+  from the page is indistinguishable from one that was never installed.
+
+  `bot.` is a segment rather than the bare `cloud.itonami.`, because that namespace
+  already carries things that are not bots (agent-tunnel, controller-tunnel,
+  hanmoto-register, noren.resident). Qualifying by `loop-script?` instead was measured
+  and rejected: only 11 of the 34 jobs have one, so it would have dropped 23 ticks,
+  bridges and probes from the report -- a behaviour change wearing a rename's clothes."
+  ["cloud.itonami.bot." "com.gftd."])
+
+(defn- name-from-plist
+  "`<prefix><name>.plist` -> name, for any known prefix. nil otherwise."
+  [filename]
+  (some (fn [pre]
+          (when (and (str/starts-with? filename pre)
+                     (str/ends-with? filename ".plist"))
+            (let [n (subs filename (count pre) (- (count filename) (count ".plist")))]
+              (when-not (str/blank? n) n))))
+        bot-label-prefixes))
+
+(defn- plist-file
+  "The installed plist for `name`, whichever prefix it carries. nil if none."
+  [name]
+  (some (fn [pre] (let [f (str agents-dir "/" pre name ".plist")] (when (exists? f) f)))
+        bot-label-prefixes))
+
+(defn- label-for
+  "The label `name` is actually installed under; the preferred prefix if it is not."
+  [name]
+  (or (some (fn [pre] (when (exists? (str agents-dir "/" pre name ".plist")) (str pre name)))
+            bot-label-prefixes)
+      (str (first bot-label-prefixes) name)))
+
 (defn- plist-names
-  "installed な com.gftd.<name>.plist の name 集合。"
+  "installed な <prefix><name>.plist の name 集合。"
   []
-  (->> (list-names agents-dir)
-       (keep #(second (re-matches #"com\.gftd\.(.+)\.plist" %)))
-       set))
+  (->> (list-names agents-dir) (keep name-from-plist) set))
 
 ;; ---------------------------------------------------------------- per-loop row
 
 (defn- interval-s
   "plist の StartInterval。無い / 読めない → nil。"
   [name]
-  (when-let [txt (read-file (str agents-dir "/com.gftd." name ".plist"))]
+  (when-let [txt (some-> (plist-file name) read-file)]
     (when-let [m (re-find #"<key>StartInterval</key>\s*<integer>(\d+)</integer>" txt)]
       (js/parseInt (second m) 10))))
 
@@ -161,7 +198,7 @@
         led (when lp (last-ledger-entry lp))
         entry (:entry led)]
     {:name name
-     :label (str "com.gftd." name)
+     :label (label-for name)
      :installed (contains? installed name)
      :interval_s (interval-s name)
      :last_run (when entry (:at entry))
