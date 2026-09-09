@@ -200,6 +200,29 @@
       (let [at (.indexOf src "(:require" ns-at)]
         (when (>= at 0) at)))))
 
+(def ^:private inserted-toplevel
+  "What is inserted into a file that has NO `(ns ...)` form but does open with a
+  top-level `(require ...)`. Nine files in the workspace are shaped that way --
+  scripts and a `clojure -i` test file -- and the tool refused all three of
+  their repos wholesale because it looked only inside an ns form and concluded
+  there was nowhere to put a require. There was: the same place the file
+  already keeps its requires."
+  "(require '[kotoba.lang.text]")
+
+(defn- toplevel-require-index
+  "Index of a top-level `(require ...)`, or nil.
+
+  Anchored on column zero. A top-level form in these files begins there, and
+  requiring that is what keeps a `(require` inside a string, a comment or a
+  function body from being mistaken for the file's own require list -- the same
+  reason `ns-require-index` anchors on the `(ns ` form rather than on the first
+  `(:require` it can find."
+  [src]
+  (let [m (re-find #"(?m)^\(require\b" src)]
+    (when m
+      (let [i (.indexOf src m)]
+        (when (>= i 0) i)))))
+
 (defn- rewrite
   "With an alias, the namespace in the require is renamed and the alias is kept.
   Without one, the NAMESPACE TOKEN itself is renamed everywhere -- which is the
@@ -225,7 +248,13 @@
           ;; closing paren. 41 files, measured 2026-09-09.
           (if-let [close (ns-close-index renamed)]
             (str (subs renamed 0 close) created-require (subs renamed close))
-            renamed))))
+            ;; No ns form either. If the file keeps its requires in a top-level
+            ;; `(require ...)`, that is its require list and the libspec goes
+            ;; there. 9 files, measured 2026-09-09.
+            (if-let [t (toplevel-require-index renamed)]
+              (str (subs renamed 0 t) inserted-toplevel
+                   (subs renamed (+ t (count "(require"))))
+              renamed)))))
     (-> src
       (str/replace (re-pattern (str "\\[clojure\\.string :as " alias "\\]"))
                    (str "[kotoba.lang.text :as " alias "]"))
@@ -250,7 +279,8 @@
     (-> (if inserted?
           (-> src
               (str/replace created-require "")
-              (str/replace inserted-libspec "(:require"))
+              (str/replace inserted-libspec "(:require")
+              (str/replace inserted-toplevel "(require"))
           src)
         (str/replace #"\bkotoba\.lang\.text/lower\b" "clojure.string/lower-case")
         (str/replace #"\bkotoba\.lang\.text/upper\b" "clojure.string/upper-case")
@@ -273,7 +303,16 @@
   [after]
   (let [marker (cond (str/includes? after created-require)  created-require
                      (str/includes? after inserted-libspec) inserted-libspec
+                     (str/includes? after inserted-toplevel) inserted-toplevel
                      :else nil)]
+    (if (= marker inserted-toplevel)
+      ;; A top-level insertion has no ns form to be inside of, so what has to
+      ;; hold is different: there must be no ns form at all (otherwise the
+      ;; libspec belonged in it), and the marker must sit exactly where the
+      ;; file's own top-level require began.
+      (boolean (and (neg? (.indexOf after "(ns "))
+                    (= (.indexOf after inserted-toplevel)
+                       (toplevel-require-index after))))
     (if-not marker
       true
       ;; BOTH ends. An earlier version checked only `at < close`, and an
@@ -282,7 +321,7 @@
       (let [start (.indexOf after "(ns ")
             at    (.indexOf after marker)
             close (ns-close-index after)]
-        (boolean (and (>= start 0) close (< start at) (< at close)))))))
+        (boolean (and (>= start 0) close (< start at) (< at close))))))))
 
 (defn- substitution-only?
   "Proof that the rewrite moved NOTHING but the substitutions.
@@ -414,7 +453,8 @@
                                            (not (requires-clojure-string? s))
                                            (re-find #"\bclojure\.string/" s)
                                            (nil? (ns-require-index s))
-                                           (nil? (ns-close-index s))))
+                                           (nil? (ns-close-index s))
+                                           (nil? (toplevel-require-index s))))
                           targets)]
     (println (str "SCANNED\t" (count files) "\t.clj/.cljc files under " repo))
     (println (str "TARGETS\t" (count targets) "\tfiles mention clojure.string"))
@@ -431,12 +471,14 @@
       (seq no-alias)
       (do (doseq [[p _] no-alias] (println (str "NO-ALIAS\t" p)))
           (refuse! (str (count no-alias) " file(s) CALL clojure.string without"
-                        " requiring it and have no `(:require` in their ns form"
-                        " and have no ns form to add one to -- 9 such files,"
-                        " measured 2026-09-09, all scripts. A top-level"
-                        " `(require ...)` would have to go somewhere specific"
-                        " relative to first use, which is a judgement this tool"
-                        " does not make")))
+                        " requiring it, and have nowhere to declare it: no"
+                        " `(:require` in their ns form, no ns form to add one"
+                        " to, and no top-level `(require ...)` either --"
+                        " measured 2026-09-09, all scripts. Where a file DOES"
+                        " keep a top-level `(require ...)`, the libspec now goes"
+                        " there; these are the ones that keep no require list at"
+                        " all, so a new one would have to be placed relative to"
+                        " first use -- a judgement this tool does not make")))
 
       :else
       (let [changed (for [[p s] targets
