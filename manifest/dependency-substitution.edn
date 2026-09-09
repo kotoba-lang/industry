@@ -333,7 +333,69 @@
     suite is not sufficient evidence for replacing a cryptographic primitive.
     A wrong swap here is a security defect that compiles."}
   {:coordinate "org.bouncycastle/bcpkix-jdk18on" :ecosystem :maven :disposition :first-party-exists
-   :target "kotoba-lang/org-ietf-cms" :kind :implementation}
+   :target "kotoba-lang/org-ietf-cms" :kind :implementation
+   :qualification
+   "One consumer, one file, one function -- and the target does a different
+    job. Measured 2026-09-10.
+
+    murakumo `src/murakumo/overlay/cert.clj` is the whole surface. All three
+    bcpkix classes sit in `issue-self-signed!` and `pem-string`:
+    `JcaX509v3CertificateBuilder` + `JcaX509CertificateConverter` assemble a
+    90-day self-signed X.509 for local QUIC, `JcaContentSignerBuilder`
+    (`SHA256withRSA`) signs it, `JcaPEMWriter` writes it out. This is
+    certificate ISSUANCE. `org-ietf-cms` is RFC 5652 SignedData -- parse,
+    verify, and `build-signed-data`, a signed MESSAGE container. Nothing here
+    signs a CMS message, so the target fits no call site, the same defect the
+    bcprov entry has with `org-ietf-x509`.
+
+    Both bouncycastle coordinates land in this one file: bcprov supplies its
+    `asn1.x500` / `asn1.x509` / `jce.provider` half. They are one substitution,
+    not two.
+
+    A first-party issuer DOES exist, and this ledger names neither half of it.
+    `kotoba-lang/io-storj-node` carries, in portable `.cljc` with no
+    bouncycastle:
+
+      storj.node.certificate  -- `ca-tbs`, `leaf-tbs`, `certificate`,
+                                 `key-usage`, serials, extensions. TBS
+                                 assembly and signature wrapping.
+      storj.node.pem          -- RFC 7468 encode/decode with its own base64,
+                                 checked against RFC 4648's vectors and
+                                 against a PEM file Go wrote.
+
+    The two are not equally reusable, and the distinction is the point.
+
+    `storj.node.pem` is general. Its docstring says why it was written there:
+    `Nothing in this workspace's byte libraries has it` -- io-multiformats
+    carries base58 and base32 because multihash and CID need those. It
+    replaces `JcaPEMWriter` directly.
+
+    `storj.node.certificate` is deliberately Storj-shaped and says so:
+    subject and issuer are both `O=Storj` on CA and leaf, validity is Go's
+    zero time twice (year 1 -- Storj node certificates do not expire, so the
+    namespace needs no clock), and the identity version rides in extension
+    `2.999.2.1` as a raw byte. murakumo needs a 90-day cert with subjectAltName
+    for a host or IP. So this is NOT a drop-in. What it is, is proof that
+    building a certificate is expressible in portable `.cljc` here -- which is
+    a different and weaker claim than `a target exists`, and the ledger should
+    say the weaker one.
+
+    Signing and key generation stay a host boundary in both. storj reaches
+    them through `IKeyMaterial` (`(p/-sign key-material private :ecdsa-sha256
+    tbs)`); murakumo reaches them through JCA `SHA256withRSA`. A seam, not a
+    gap.
+
+    The same floor as bcprov applies, for the same reason: a green test suite
+    is not sufficient evidence for replacing a cryptographic primitive. A
+    certificate that parses is not a certificate that is correct -- QUIC will
+    present whatever it is handed.
+
+    Method note. A grep for `TBSCertificate` and `tbs-certificate` across
+    kotoba-lang returned zero, and `storj.node.certificate` names its functions
+    `ca-tbs` and `leaf-tbs`. Concluding absence from that grep would have been
+    wrong; the builder surfaced only because `storj.node.mint`'s docstring
+    describes what it calls. Searching for a name one guessed is not
+    searching."}
   {:coordinate "@noble/hashes" :ecosystem :npm :disposition :first-party-exists
    :target "kotoba-lang/org-nist-sha2" :kind :host-provider
    :host-because "SHA-2/HMAC/BLAKE2 exist in portable .cljc and pass vectors, but hot paths (noise handshakes, relay loops) need native-speed hash injection — same pattern as @noble/ciphers. Substitution is kotoba oracle + explicit provider selection, not deleting package.json lines."
