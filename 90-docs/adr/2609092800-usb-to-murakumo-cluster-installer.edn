@@ -186,6 +186,26 @@ ADR-2608153600 と ADR-2800004900 の決定を、この installer に束縛す�
 - **所持証明は 3 者で行い、鍵はスマホに載せない。**
   phone が claim 要求 → server が 1 回限りの nonce → device が外に出したことの
   無い鍵で署名 → server が検証して初めて `aiueos.enroll/claim` が走る。
+- **device が署名するのは nonce ではなく、束縛されたメッセージである**
+  （2026-09-09 に確定。`grant.device-attest`）。
+
+      aiueos-device-attest-v1\\n<did>\\n<endpoint>\\n<nonce>\\n
+
+  ⚠ **両側が別のものに署名していた。** Worker の verifier は **nonce の生バイト**を
+  検証し、`aiueos.provider.device` は canonical document に署名していた ——
+  そして後者の docstring が既に「bare nonce では endpoint と purpose を縛れない」と
+  書いていた。`docs/devices.md` は両者が噛み合う前提で書かれていたが、噛み合って
+  いなかった。**一度も attest されたことが無かったので、誰にも音を立てていなかった。**
+  決める前に測った: `/attest` に POST するコードはワークスペースにゼロ、
+  `sign-challenge` の呼び出しも自分のテストだけ。**クライアント 0 なので今直すのは
+  無料で、device 出荷後は移行になる。**
+  `grant.key-lifecycle` の document 形を採らなかったのは、あれが JVM 専用で
+  `pr-str` の map 順序に依存するため —— 8 キー以下なら挿入順で印字されるという保証に
+  署名検査を載せることになり、この workspace は既にその形が静かに壊れると記録している。
+  **規則は `grant` に 1 本だけ置き、device も Worker も import する**
+  （`grant` は既に両側の classpath に在り、`grant → aiueos` の逆依存が無い）。
+  field は改行終端なので、**改行を含む field は escape せず refuse する** ——
+  さもないと 2 つの異なる三つ組が同じバイト列を作れる。
 - **grant も deny も `device_claims` に追記する。** refusal を記録しない表は、
   label が photograph されたこと（1 分に 20 回の refusal）を映せない。
 - `BarcodeDetector` を持たない platform（現在の iOS Safari は全て持たない）向けに
@@ -374,7 +394,8 @@ install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で�
 | O0 onboarding contract | 本 ADR と `device-onboarding-v1` が同じ matrix を言う | green（wallet method drift は 2026-09-09 に閉じた。`aiueos` `c11e63c5`、20 tests / 118 assertions、変異 3 種で discriminate） |
 | O0b wallet claim live | wallet account が実際に device claim を完了する | **red**（未実測。authority 側の緑は代わりにならない） |
 | O1 label + parse | 2 encoding / 1 parser、秘密を運ばない | green（実装済み・unit tested） |
-| O2 possession proof | server nonce → device 署名 → 検証 | green（決定核は実装済み・unit tested）。**device 側 agent が未着地**なので live は `awaiting-proof` で time out する |
+| O2 possession proof | server nonce → device 署名 → 検証 | green（`aiueos` `ff99eb9a` の agent + `grant` `a6edc9f` の wire 規則。ループ全体を実サーバ相手に子プロセスで両方向実測: 正しい鍵で exit 0 `proved`、違う鍵で exit 1 `rejected`） |
+| O2b live claim | murakumo.cloud に対して実際に 1 件 claim が通る | **red**。Worker 側の新しい verifier は**未 deploy**（agent と同時に出す） |
 | O3 human approval | passkey / Base Account でスマホから承認 | authority は **live**。installer 面の結線は red |
 | O4 murakumo join | device-owned CACAO で authenticated heartbeat + 実 job 結果 + reboot 回復 | **red**（`:native-device-cacao :not-wired-to-kernel`）。relay 経由は contract-only |
 | O5 kekkai join | 署名済み netmap 検証 + Noise IK handshake + reconnect | **red**（`:pending-native-adapter`） |
@@ -465,7 +486,9 @@ install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で�
   :adr/gaps
   "[{:gap :physical-6600hs-probe :state :not-started :note \"対象機 Ryzen 5 6600HS はこの workspace に記録が無い。NIC / NVMe / firmware / CPUID 0x8000001F は全て UNVERIFIED。K16 の測定値を代用しない\"}
     {:gap :onboarding-contract-wallet-drift :state :open :note \"device-onboarding-v1 の :authentication :methods が :siwe-erc191 / :siwe-erc1271 を名乗っていない。live な auth.kotoba.cloud は既に両方を出している\"}
-    {:gap :device-agent :state :not-started :note \"/challenge を polling して attestation を返す device 側 agent が無いので、claim は awaiting-proof で time out する（ADR-2800004900 の次の一手 1）\"}
+    {:gap :device-agent :state :resolved :note \"aiueos ff99eb9a で着地。grant.device-attest の wire 規則を device と Worker が import し、ループ全体を実サーバ相手に両方向実測（正しい鍵 exit 0 proved / 違う鍵 exit 1 rejected）\"}
+    {:gap :attest-wire-mismatch :state :resolved :note \"Worker は bare nonce を、aiueos.provider.device は canonical document を検証しており噛み合っていなかった。クライアント 0 を測ってから束縛メッセージへ寄せ、規則を grant に 1 本だけ置いた\"}
+    {:gap :attest-live :state :not-started :note \"murakumo.cloud に対する実 claim が 1 件も通っていない。Worker の新 verifier は未 deploy — agent と同時に出す\"}
     {:gap :kekkai-native-adapter :state :pending :note \"device-onboarding-v1 の :kekkai :initial-state :pending-native-adapter\"}
     {:gap :device-owned-cacao :state :blocked :note \"native-device-cacao :not-wired-to-kernel。persistent device key / secure entropy / ed25519-sign / trusted-https を要する\"}
     {:gap :wifi-driver :state :pending :note \"network-profile-sync の :native-k16-application :pending-wifi-driver。R0 は有線 DHCP\"}
