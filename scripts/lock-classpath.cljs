@@ -19,6 +19,11 @@
 ;;   closure with nothing in it -- each says which, and exits 2. A lock that
 ;;   silently omits an input is worse than no lock, because it looks like one.
 ;;
+;;   IT DECLARES ITS OWN COMPLETENESS. A :local/root resolves to a plain path,
+;;   which is neither a git sha nor a jar hash. Those are recorded under
+;;   :lock/unaddressed and :lock/complete? is false, so a lock that cannot cover
+;;   everything cannot be mistaken for one that does.
+;;
 ;; ADR-2609092000. Run it whenever deps.edn changes: :lock/deps-digest binds the
 ;; two, so a consumer that checks it fails closed until this is regenerated.
 ;;
@@ -90,6 +95,18 @@
         libs-prefix (str (.join np (gitlibs-root) "libs") (.-sep np))
         m2-prefix   (str (.join np (.homedir os) ".m2" "repository") (.-sep np))
         entries (str/split (str/trim (.-stdout r)) (re-pattern (str "\\" (.-delimiter np))))
+        ;; ANYTHING THAT IS NEITHER. A :local/root resolves to a plain path --
+        ;; not ~/.gitlibs, not ~/.m2 -- and the first version of this script
+        ;; dropped those silently. Found by running it on cloud-itonami/junbi,
+        ;; whose deps.edn names three cross-repo :local/root and whose lock
+        ;; recorded none of them: exactly the failure this script's own header
+        ;; calls worse than no lock. They are recorded, and the lock says of
+        ;; itself that it is not complete.
+        unaddressed (->> entries
+                         (remove #(or (str/starts-with? % libs-prefix)
+                                      (str/starts-with? % m2-prefix)
+                                      (not (str/starts-with? % "/"))))
+                         distinct sort vec)
         gits (->> entries (keep #(git-entry libs-prefix %))
                   (group-by (juxt :coordinate :git-sha)) (sort-by first)
                   (mapv (fn [[[c sha] g]] {:coordinate c :git-url (origin-url c sha)
@@ -123,7 +140,19 @@
                  (println "  {:coordinate" (pr-str (:coordinate e)))
                  (println "   :mvn-version" (pr-str (:mvn-version e)))
                  (println "   :sha256" (pr-str (:sha256 e)) "}"))
-               (println " ]}"))))
-      (println (str "LOCKED\t" out "\t" (count gits) " git, " (count mvns) " maven")))))
+               (println " ]")
+               (println " :lock/unaddressed")
+               (println " [")
+               (doseq [p unaddressed] (println "  " (pr-str p)))
+               (println " ]")
+               (println " :lock/complete?" (empty? unaddressed) "}"))))
+      (println (str "LOCKED\t" out "\t" (count gits) " git, " (count mvns) " maven, "
+                    (count unaddressed) " unaddressed"))
+      (when (seq unaddressed)
+        (println (str "INCOMPLETE\t" (count unaddressed)
+                      " classpath entr(ies) are plain paths -- a :local/root or"
+                      " similar -- and cannot be addressed by content. The lock"
+                      " records them and declares :lock/complete? false; it must"
+                      " not be read as a complete one."))))))
 
 (apply -main *command-line-args*)
