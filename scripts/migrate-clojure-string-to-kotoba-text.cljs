@@ -398,6 +398,18 @@
                     :else nil))
             :else (recur (inc i) depth false false false))))))))
 
+(defn- project-file
+  "The deps.edn or bb.edn directly in this directory, or nil.
+
+  bb.edn takes the same shape as deps.edn, and two of the repos reported as
+  having \"no deps.edn to declare in\" have only a bb.edn -- refusing them was
+  the tool being narrow, not the repo being unusual."
+  [d]
+  (some (fn [n]
+          (let [c (.join path-mod d n)]
+            (when (try (.isFile (.statSync fs c)) (catch :default _ false)) c)))
+        ["deps.edn" "bb.edn"]))
+
 (defn- declaration-landed?
   "Whether the ONLY semantic change to the project file is one added dependency.
 
@@ -487,7 +499,22 @@
         _        (when (empty? files)
                    (refuse! (str "no .clj/.cljc anywhere under " repo "; nothing was measured")))
         loaded   (for [p files] [p (.readFileSync fs p "utf8")])
-        targets  (filterv (fn [[_ s]] (str/includes? s "clojure.string")) loaded)
+        ;; A FILE THAT ONLY MENTIONS clojure.string IN PROSE IS NOT A TARGET.
+        ;; The filter used to be a bare substring test, so a file that had
+        ;; ALREADY been migrated -- requiring kotoba.lang.text, calling nothing
+        ;; from clojure.string -- was picked up because a comment above its ns
+        ;; form said "dependency-free (only clojure.string)". The no-alias path
+        ;; then found no `[clojure.string :as x]` to rename, concluded the file
+        ;; called the namespace without requiring it, and inserted a second
+        ;; libspec: `(:require [kotoba.lang.text] [kotoba.lang.text :as str])`.
+        ;;
+        ;; The read-back invariant caught it and refused the whole repo, which
+        ;; is the invariant working -- but the repo was club-shinshi-app and the
+        ;; cost was 61 other files. So the target set is narrowed to what it
+        ;; always meant: a file that REQUIRES clojure.string, or CALLS it.
+        targets  (filterv (fn [[_ s]] (or (requires-clojure-string? s)
+                                          (re-find #"\bclojure\.string/" s)))
+                          loaded)
         ;; A HAZARD IS A HOST DISAGREEMENT, AND A .clj FILE HAS ONE HOST.
         ;; All three hazards -- split with a capturing group, `$&`, and `\$` --
         ;; are places where clojure.string's two implementations answer
@@ -543,10 +570,39 @@
                         " first use -- a judgement this tool does not make")))
 
       :else
-      (let [changed (for [[p s] targets
-                          :let [a (alias-of s), s' (rewrite a s)]
-                          :when (not= s s')]
-                      [p s'])]
+      (let [project-above (fn [file]
+                            (loop [d (.dirname path-mod file)]
+                              (or (project-file d)
+                                  (when-not (or (= d repo) (= d (.dirname path-mod d)))
+                                    (recur (.dirname path-mod d))))))
+            all-changed (for [[p s] targets
+                              :let [a (alias-of s), s' (rewrite a s)]
+                              :when (not= s s')]
+                          [p s'])
+            ;; A FILE WITH NO PROJECT FILE ABOVE IT IS NOT REWRITTEN.
+            ;; The refusal for "nowhere to declare kotoba.lang.text" used to be
+            ;; global: it fired only when NO changed file had a project file
+            ;; above it. So in a repo where most files do and a few do not, the
+            ;; few were rewritten into a namespace nothing would resolve, and
+            ;; nothing said so. Measured on club-shinshi-app: 59 files under a
+            ;; deps.edn and three standalone `#!/usr/bin/env nbb` scripts under
+            ;; scripts/, which have no project file anywhere above them and
+            ;; would have stopped working.
+            ;;
+            ;; They are skipped and named, rather than the whole repo refused --
+            ;; a file that can be migrated correctly should be, and a file that
+            ;; cannot should be reported, not quietly broken.
+            orphan  (filterv (fn [[p _]] (nil? (project-above p))) all-changed)
+            changed (filterv (fn [[p _]] (some? (project-above p))) all-changed)]
+        (doseq [[p _] orphan]
+          (println (str "SKIPPED-NO-DECLARATION\t" p)))
+        (when (seq orphan)
+          (println (str "SKIPPED\t" (count orphan) "\tfile(s) have no deps.edn or"
+                        " bb.edn above them; rewriting them would leave"
+                        " kotoba.lang.text unresolvable")))
+        (when (empty? changed)
+          (refuse! (str "every one of the " (count all-changed) " file(s) to rewrite"
+                        " has no project file above it; nothing was written")))
         (if-not apply?
           (do (doseq [[p _] changed] (println (str "WOULD-REWRITE\t" p)))
               (println (str "PLAN\t" (count changed) "\tfiles (dry run; pass --apply)"))
@@ -592,18 +648,7 @@
             ;; same shape as deps.edn, and two of the repos that had "no deps.edn
             ;; to declare in" have only a bb.edn -- refusing them was the tool
             ;; being narrow, not the repo being unusual.
-            (let [project-file (fn [d]
-                                 (some (fn [n]
-                                         (let [c (.join path-mod d n)]
-                                           (when (try (.isFile (.statSync fs c))
-                                                      (catch :default _ false)) c)))
-                                       ["deps.edn" "bb.edn"]))
-                  nearest (fn [file]
-                            (loop [d (.dirname path-mod file)]
-                              (or (project-file d)
-                                  (when-not (or (= d repo) (= d (.dirname path-mod d)))
-                                    (recur (.dirname path-mod d))))))
-                  targets-deps (distinct (keep (fn [[f _]] (nearest f)) changed))
+            (let [targets-deps (distinct (keep (fn [[f _]] (project-above f)) changed))
                   targets-deps (if (seq targets-deps)
                                  targets-deps
                                  (when-let [dp (project-file repo)] [dp]))]
