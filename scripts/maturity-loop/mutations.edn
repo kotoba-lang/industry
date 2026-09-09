@@ -11166,4 +11166,126 @@
      :file "src/transit/core.cljc"
      :find "    (symbol? k) (str k)"
      :replace "    (symbol? k) (name k)"
-     :must-fail ["map-keys-that-are-not-keywords-still-write"]}]}]}
+     :must-fail ["map-keys-that-are-not-keywords-still-write"]}]}
+
+  {:repo "orgs/kotoba-lang/com-apple-fileprovider"
+   :label "com-apple-fileprovider policy —— 拒否する側の半分を、拒否が止んでも気づけるように"
+   ;; この repo の `src/fileprovider/model.cljc` は、Finder が何を materialise し
+   ;; 何を evict してよいかを決める。Apple 側は placeholder と実バイトしか持たない
+   ;; ので、**データを失わせない判断はすべてこの 1 ファイルに在る**。
+   ;;
+   ;; 2026-09-09 まで test は 4 本で、どれも各モードの happy path を歩いていた。
+   ;; 「聞かれた通りに動くか」は測っていたが、**この model の仕事は「いつ拒否するか」**
+   ;; であって、そちらは 1 本も held されていなかった。拒否が静かに止んでも、
+   ;; 動いている拒否とまったく同じ緑を返す。
+   ;;
+   ;; 下の 11 件は **4 本の suite に当てて、10 件が緑のまま生き残ることを実測**して
+   ;; から登録した（2026-09-09）。捕まえられていたのは `badge-dirty-reads-available`
+   ;; だけ。8 本足して 11 件すべてが噛むところを見ている。
+   ;;
+   ;; ⚠ **JVM を起こさない経路で走らせる。** `deps.edn` の `clojure -M:test` も
+   ;; 同じ namespace を読むが、この gate が使うのは `test/run_tests.cljs`
+   ;; （nbb entry。失敗数を exit status にする）。
+   :cmd ["nbb" "--classpath" "src:test" "test/run_tests.cljs"]
+   :green-marker "fileprovider model: OK"
+   :mutations
+   ;; ── バイトを失う側 ────────────────────────────────────────────────
+   [{:id :fp/evict-any-bytes
+     :why "「placeholder でなければ捨てられる」に読み替える。`can-evict?` が
+           :materialized との等値を要求している理由がここ —— :uploading /
+           :conflict / :error はバイトを持つが、捨てるとローカルの編集か、
+           何が起きたかの唯一の記録が消える。境界ちょうどの入力でしか
+           2 つの読みは区別できない"
+     :file "src/fileprovider/model.cljc"
+     :find "(= :materialized local-state)"
+     :replace "(not= :placeholder local-state)"
+     :must-fail ["eviction-requires-exactly-materialized"]}
+
+    {:id :fp/upload-keeps-pending
+     :why "upload 成功で pending-local? を下ろし忘れる。他に下ろす経路が無いので
+           その item は**二度と evict できず**、badge も pending-upload のまま
+           固まる。サーバが既に持っているファイルでディスクが埋まる"
+     :file "src/fileprovider/model.cljc"
+     :find ":sync/pending-local? false\n                             :sync/remote-verified? true)"
+     :replace ":sync/remote-verified? true)"
+     :must-fail ["upload-success-clears-the-pending-flag"]}
+
+    ;; ── paused が守られなくなる側 ─────────────────────────────────────
+    {:id :fp/open-ignores-paused
+     :why "paused なのに open が download する。paused は両方向を止める約束"
+     :file "src/fileprovider/model.cljc"
+     :find "            (= :paused (:sync/schedule item)) [:fail-paused]\n"
+     :replace ""
+     :must-fail ["paused-refuses-both-directions"]}
+
+    {:id :fp/materialize-ignores-paused
+     :why "should-materialize? から paused の番人を外す。pin した folder を
+           pause しても download し続ける"
+     :file "src/fileprovider/model.cljc"
+     :find "  (and (not= :paused (:sync/schedule item))\n       (or (= :pinned"
+     :replace "  (and true\n       (or (= :pinned"
+     :must-fail ["paused-refuses-both-directions"]}
+
+    ;; ── residency が効かなくなる側 ────────────────────────────────────
+    {:id :fp/pinned-not-proactive
+     :why "residency を見るつもりで schedule を見る（key の写し間違い）。
+           :pinned が**先回りして materialise する**という性質だけが消え、
+           他は全部正しく動くので happy path では見えない"
+     :file "src/fileprovider/model.cljc"
+     :find "(or (= :pinned (:sync/residency item))"
+     :replace "(or (= :pinned (:sync/schedule item))"
+     :must-fail ["residency-decides-what-materialises-unasked"]}
+
+    {:id :fp/unpin-keeps-residency
+     :why "unpin の判定を「これから移る residency」ではなく「今の residency」で
+           行う。item はまだ :pinned なので can-evict? は必ず false ——
+           unpin が何も解放しなくなる"
+     :file "src/fileprovider/model.cljc"
+     :find "(can-evict? (assoc item :sync/residency :automatic))"
+     :replace "(can-evict? item)"
+     :must-fail ["pin-and-unpin-move-only-what-must-move"]}
+
+    {:id :fp/pin-always-downloads
+     :why "pin が常に download を出す。既に手元に在るバイトを取り直す"
+     :file "src/fileprovider/model.cljc"
+     :find ":pin (if (= :placeholder (:sync/local-state item)) [:download] [])"
+     :replace ":pin [:download]"
+     :must-fail ["pin-and-unpin-move-only-what-must-move"]}
+
+    ;; ── 検査が片方向しか出さなくなる側 ────────────────────────────────
+    {:id :fp/validity-skips-residency
+     :why "valid? から residency の語彙検査を外す。**正のテストしか無いと
+           絶対に見えない** —— 正しい item は検査を外しても正しいまま"
+     :file "src/fileprovider/model.cljc"
+     :find "       (contains? residencies residency)\n"
+     :replace ""
+     :must-fail ["validity-is-checked-field-by-field"]}
+
+    ;; ── 人に見える嘘になる側 ──────────────────────────────────────────
+    {:id :fp/badge-pinned-outranks-trouble
+     :why "cond の先頭に residency を上げる。conflict / error の pinned file が
+           :available-offline —— 「ディスクに在って安全」—— として表示される"
+     :file "src/fileprovider/model.cljc"
+     :find "  (cond\n    (= :conflict local-state) :conflict"
+     :replace "  (cond\n    (= :pinned residency) :available-offline\n    (= :conflict local-state) :conflict"
+     :must-fail ["every-local-state-has-its-own-badge"]}
+
+    {:id :fp/badge-dirty-reads-available
+     :why "dirty の枝を落とすと既定へ落ち、未アップロードの編集が同期済みに見える。
+           **11 件のうち唯一、4 本時代の suite も捕まえていた**もの。
+           :also に既存テストを宣言して、弱い方に寄せて消さない"
+     :file "src/fileprovider/model.cljc"
+     :find "    (= :dirty local-state) :pending-upload\n"
+     :replace ""
+     :must-fail ["every-local-state-has-its-own-badge"]
+     :also ["badges-expose-real-state"]}
+
+    ;; ── 知らない入力を黙って状態にする側 ──────────────────────────────
+    {:id :fp/unknown-event-is-failure
+     :why "知らない event を :error として畳む（防御的コーディングの顔をした退行）。
+           transport 側は model がまだ知らない event を報告してよい ——
+           それで state を書き換える方が、無視するより悪い"
+     :file "src/fileprovider/model.cljc"
+     :find "    :failed (assoc item :sync/local-state :error)\n    item))"
+     :replace "    :failed (assoc item :sync/local-state :error)\n    (assoc item :sync/local-state :error)))"
+     :must-fail ["unknown-events-change-nothing"]}]}]}
