@@ -143,8 +143,14 @@
       "carrying an owned block too would emit the key twice and YAML would
        take the LAST one — the rewrite would silently lose its own answer"]
      ["what install writes still contains the rendered model"
-      (boolean (re-find #"(?m)^  default: example/model:free$"
-                        (str (r/render-config "example/model:free" [] false) carried)))
+      ;; Asserted against whatever the renderer actually emitted, not against
+      ;; the argument. Since 2026-09-09 a fleet `:primary` overrides the
+      ;; passed model-id, and pinning the literal here would make this
+      ;; composition check fail for a reason that has nothing to do with
+      ;; composition — the exact confusion it exists to rule out.
+      (let [body (r/render-config "example/model:free" [] false)
+            line (re-find #"(?m)^  default: .*$" body)]
+        (boolean (and line (.includes (str body carried) line))))
       "composition check: the tail must not truncate the rendered body"]]))
 
 

@@ -95,6 +95,7 @@
 ;; the rewrite verbatim. This used to be a refusal; see `carry-forward` for
 ;; why a refusal was the wrong remedy for a hazard it named correctly.
 (def managed-config-keys #{"model" "fallback_providers" "providers" "secrets" "auxiliary"
+                           "custom_providers"
                             "openrouter"})
 
 (defn die!
@@ -183,6 +184,7 @@
 ;; to check that the id is real every run, and to say so out loud when it
 ;; stops being real instead of letting every tick 401 and exit 0.
 (def primary (:primary policy))
+(def displaced-primary (:displaced-primary policy))
 
 (defn check-policy! []
   (when-let [e @policy-error] (refuse! e))
@@ -271,14 +273,18 @@
   for a reason the probe does not name. Hermes normalises this at runtime;
   the probe has to ask for the same shape or it is not measuring what Hermes
   will see."
-  [key body]
-  (fetch-json (str or-base "/chat/completions")
-              {:method "POST"
-               :headers {"Authorization" (str "Bearer " key)
-                         "Content-Type" "application/json"
-                         "HTTP-Referer" "https://wiki.kotobase.net"
-                         "X-Title" "hyakka-growth-bots"}
-               :body (js/JSON.stringify (clj->js (assoc body :reasoning {:exclude true})))}))
+  ([key body] (chat key body or-base))
+  ([key body base]
+   ;; No Authorization header when there is no key. The fleet admits an
+   ;; unauthenticated caller; sending `Bearer null` would be admitted too, on
+   ;; the same anonymous path, and would only make a failure harder to read.
+   (fetch-json (str base "/chat/completions")
+               {:method "POST"
+                :headers (cond-> {"Content-Type" "application/json"
+                                  "HTTP-Referer" "https://wiki.kotobase.net"
+                                  "X-Title" "hyakka-growth-bots"}
+                           key (assoc "Authorization" (str "Bearer " key)))
+                :body (js/JSON.stringify (clj->js (assoc body :reasoning {:exclude true})))})))
 
 (defn body-error
   "OpenRouter returns upstream failures INSIDE a 200 — `{\"error\": {...}}`
@@ -321,9 +327,10 @@
 
 (defn probe-tools
   "1/3 — a well-formed tool call with the exact arguments asked for."
-  [key id]
-  (p/let [resp (chat key
-                {:model id :max_tokens 400 :temperature 0
+  ([key id] (probe-tools key id or-base))
+  ([key id base]
+   (p/let [resp (chat key
+                 {:model id :max_tokens 400 :temperature 0
                  :tool_choice "required"
                  :tools [{:type "function"
                           :function {:name "record_source"
@@ -335,7 +342,8 @@
                  :messages [{:role "user"
                              :content (str "Call record_source exactly once, with url "
                                            "https://example.org/a and license CC0-1.0. "
-                                           "Do not call it more than once.")}]})]
+                                           "Do not call it more than once.")}]}
+                 base)]
     (if-let [msg (message-of resp)]
       (let [calls (:tool_calls msg)
             c (first calls)
@@ -352,16 +360,18 @@
           :else {:task :tools :pass true}))
       (if (unavailable? resp)
         {:task :tools :pass false :unavailable true :why (http-why resp)}
-        {:task :tools :pass false :why (http-why resp)}))))
+        {:task :tools :pass false :why (http-why resp)})))))
 
 (defn probe-exact
   "2/3 — obeys an exact-output instruction. The bot prompts say `stop`,
   `land nothing`, `report and stop`; a model that decorates its replies
   will decorate those too."
-  [key id]
-  (p/let [resp (chat key {:model id :max_tokens 200 :temperature 0
-                          :messages [{:role "user"
-                                      :content "Reply with exactly the token HYAKKA-OK and nothing else."}]})]
+  ([key id] (probe-exact key id or-base))
+  ([key id base]
+   (p/let [resp (chat key {:model id :max_tokens 200 :temperature 0
+                           :messages [{:role "user"
+                                       :content "Reply with exactly the token HYAKKA-OK and nothing else."}]}
+                          base)]
     (if-let [msg (message-of resp)]
       (let [c (str/trim (str (:content msg)))]
         (if (= "HYAKKA-OK" c)
@@ -369,7 +379,7 @@
           {:task :exact :pass false :why (str "replied " (pr-str (subs c 0 (min 80 (count c)))))}))
       (if (unavailable? resp)
         {:task :exact :pass false :unavailable true :why (http-why resp)}
-        {:task :exact :pass false :why (http-why resp)}))))
+        {:task :exact :pass false :why (http-why resp)})))))
 
 (defn strip-fence [s]
   (let [t (str/trim (str s))]
@@ -380,12 +390,14 @@
 (defn probe-edn
   "3/3 — writes parseable EDN. The proposal file the gate reads is EDN, and
   a stray sentence in front of it makes the whole run unreadable."
-  [key id]
-  (p/let [resp (chat key {:model id :max_tokens 300 :temperature 0
+  ([key id] (probe-edn key id or-base))
+  ([key id base]
+   (p/let [resp (chat key {:model id :max_tokens 300 :temperature 0
                           :messages [{:role "user"
                                       :content (str "Output only a Clojure EDN map with exactly two keys: "
                                                     ":id whose value is the string \"a\", and :ctx whose value "
-                                                    "is the integer 7. No prose, no code fence, no explanation.")}]})]
+                                                    "is the integer 7. No prose, no code fence, no explanation.")}]}
+                          base)]
     (if-let [msg (message-of resp)]
       (let [raw (strip-fence (:content msg))
             v (try (edn/read-string raw) (catch :default _ ::unreadable))]
@@ -395,7 +407,7 @@
           :else {:task :edn :pass true}))
       (if (unavailable? resp)
         {:task :edn :pass false :unavailable true :why (http-why resp)}
-        {:task :edn :pass false :why (http-why resp)}))))
+        {:task :edn :pass false :why (http-why resp)})))))
 
 (defn verdict
   "A score is only a verdict when every task got an answer. If the provider
@@ -408,6 +420,69 @@
      :score (when-not unavail (count (filter :pass tasks)))
      :unavailable (boolean unavail)
      :tasks (vec tasks)}))
+
+(def fleet-primary?
+  "Is the pinned primary somewhere other than OpenRouter?
+
+  `:base-url` is the tell. Its presence changes which guard is honest: the
+  resolver's usual one asks whether the id is still on OpenRouter's model
+  list, and for `murakumo-main` the answer is permanently no. Left in place it
+  would `die! 1` every run; removed and not replaced, the primary would have
+  no guard at all -- which is the shape ADR-2608271450 is about, one level up."
+  (boolean (and primary (:base-url primary))))
+
+(defn probe-context-floor
+  "4/4 for a fleet primary — does the endpoint actually SERVE the context the
+  policy requires?
+
+  The other three probes send prompts under a hundred tokens, and on
+  2026-09-09 all three passed against murakumo-main while the endpoint could
+  not accept a Hermes turn at all. `/v1/models` advertises
+  `context_window: 262144`; measured by bisection the same hour, ~3,016 prompt
+  tokens were accepted and ~4,000 answered
+
+    {\"error\": {\"type\": \"invalid_request_error\",
+                \"message\": \"Input reserve exceeds this model's serving context window.\"}}
+
+  Hermes reads that as a context signal, adopts it, compresses, and collapses
+  to `Context length exceeded (32 tokens)` on a 32-token prompt. Every one of
+  the 58 cron jobs would have failed that way, and the three capability probes
+  would have gone on passing.
+
+  So this asks for `:min-context` worth of input, which is the floor the rest
+  of this policy is written against. An endpoint that advertises a window it
+  will not serve fails here, and the primary is refused."
+  [floor-tokens]
+  ;; ~1 token per short word is close enough: the question is two orders of
+  ;; magnitude, not a boundary.
+  (let [filler (str/join " " (repeat floor-tokens "word"))]
+    (p/let [resp (chat nil {:model (:model primary) :max_tokens 8 :temperature 0
+                            :messages [{:role "user"
+                                        :content (str filler " Reply with OK.")}]}
+                       (:base-url primary))]
+      (if (message-of resp)
+        {:task :context :pass true}
+        {:task :context :pass false
+         :why (str "asked for " floor-tokens " input tokens: " (http-why resp))}))))
+
+(defn probe-primary-endpoint
+  "Run the three bot tasks against a non-OpenRouter primary.
+
+  The same probes, against a different base URL and with no key: the fleet
+  admits an unauthenticated caller, and sending a placeholder would not make
+  it more authenticated -- it would only make the failure harder to read.
+
+  This is a REPLACEMENT guard, not an addition. It answers the question the
+  OpenRouter-list check answers for a listed model: is the thing the bots are
+  about to be pointed at still able to do their work."
+  []
+  (p/let [r1 (probe-tools nil (:model primary) (:base-url primary))]
+    (if-not (:pass r1)
+      [r1]
+      (p/let [r2 (probe-exact nil (:model primary) (:base-url primary))
+              r3 (probe-edn nil (:model primary) (:base-url primary))
+              r4 (probe-context-floor min-context)]
+        [r1 r2 r3 r4]))))
 
 (defn probe-fallback
   "Ask the floor whether it is there. `:fallback` is described in the policy
@@ -660,10 +735,26 @@
               "    # sources on the main client, and it survives a credential\n"
               "    # swap (`apply_custom_provider_extra_headers_to_client_kwargs`).\n"
               h))
+       ;; A fleet primary needs a provider block of its own: the `model:` block
+       ;; below names a provider, and a name that is not in `providers:` is not
+       ;; a route. The fallback entry further down carries its base_url inline,
+       ;; which is enough for a fallback and not enough for a primary.
+       (when fleet-primary?
+         (str "  " (:provider primary) ":\n"
+              "    base_url: " (:base-url primary) "\n"
+              "    api_mode: chat_completions\n"
+              "    # No key_env. api.murakumo.cloud admits an unauthenticated\n"
+              "    # caller, and a placeholder would be admitted on the same\n"
+              "    # anonymous path while making a failure harder to read.\n"))
        "\n"
        "model:\n"
-       "  provider: " provider-name "\n"
-       "  default: " model-id "\n"
+       "  provider: " (if fleet-primary? (:provider primary) provider-name) "\n"
+       "  default: " (if fleet-primary? (:model primary) model-id) "\n"
+       ;; Explicit, because Hermes cannot look it up for this endpoint and the
+       ;; value it falls back to is unusable -- measured 2026-09-09, a 32-token
+       ;; prompt died with `Context length exceeded (32 tokens)`.
+       (when (and fleet-primary? (:context-length primary))
+         (str "  context_length: " (:context-length primary) "\n"))
        (when-let [h (render-headers "  ")]
          (str "  # The same headers again, one level up, because the block above\n"
               "  # does not reach every client Hermes builds. Auxiliary calls —\n"
@@ -712,22 +803,60 @@
               "  response_cache: " (if (:enabled response-cache) "true" "false") "\n"
               "  response_cache_ttl: " (:ttl-seconds response-cache) "\n"
               "\n"))
+       ;; `model.context_length` alone did not reach the agent: measured
+       ;; 2026-09-09, with it set, `hermes -z "hi"` still died with
+       ;; `Context length exceeded (19 tokens)` -- the number tracking the
+       ;; prompt, which is what a limit of zero looks like. The supported
+       ;; per-model override is this route-matched block
+       ;; (hermes_cli/config_providers.py, get_custom_provider_context_length),
+       ;; and it is checked before any probe.
+       ;;
+       ;; The endpoint is not at fault: /v1/models publishes
+       ;; `context_window: 262144` for murakumo-main. Hermes reads
+       ;; `context_length`, OpenRouter's field name, and finds nothing.
+       (when (and fleet-primary? (:context-length primary))
+         (str "custom_providers:\n"
+              "  - name: " (:provider primary) "\n"
+              "    base_url: " (:base-url primary) "\n"
+              "    models:\n"
+              "      " (:model primary) ":\n"
+              "        context_length: " (:context-length primary) "\n"
+              "\n"))
        "# Walked in order when the model above rate-limits or goes away.\n"
-       "# Most of the free tier answers 429 on any given afternoon, so the\n"
-       "# entries above the fleet are the OTHER models that scored 3/3 — each a\n"
-       "# different provider, not a second lane into the same pool.\n"
+       "# Most of the free tier answers 429 on any given afternoon, so these\n"
+       "# are models that each scored 3/3 on different providers, not a\n"
+       "# second lane into the same pool.\n"
        "#\n"
-       "# The fleet is last and is not assumed up. Measured at install time:\n"
-       "# " (if fallback-reachable "REACHABLE." "UNREACHABLE — see the receipt.") "\n"
+       (if fleet-primary?
+         (str "# The fleet is the PRIMARY above, not an entry here. It was probed\n"
+              "# with the same three tasks this run, and the free chain below is\n"
+              "# what the bots walk when it rate-limits or goes down.\n")
+         (str "# The fleet is last and is not assumed up. Measured at install time:\n"
+              "# " (if fallback-reachable "REACHABLE." "UNREACHABLE — see the receipt.") "\n"))
        "fallback_providers:\n"
+       ;; The displaced primary first: it is the one entry here with a
+       ;; multi-day failure record rather than a single probe, and on a run
+       ;; where the free tier yields nothing it is the difference between a
+       ;; chain and an empty list.
+       (when (and fleet-primary? displaced-primary)
+         (str "  - provider: " (:provider displaced-primary) "\n"
+              "    model: " (:model displaced-primary) "\n"
+              "    base_url: " or-base "\n"))
+       (when (and fleet-primary? (empty? runners-up) (nil? displaced-primary))
+         "  # no free model scored 3/3 this run and no displaced primary is\n  # recorded: the fleet has NOTHING under it. See free-model-policy.edn.\n")
        (apply str
          (for [m runners-up]
            (str "  - provider: " provider-name "\n"
                 "    model: " m "\n"
                 "    base_url: " or-base "\n")))
-       "  - provider: " (:provider fallback) "\n"
-       "    model: " (:model fallback) "\n"
-       "    base_url: " (:base-url fallback) "\n"))
+       ;; Not when it is already the primary: an entry that repeats the
+       ;; primary is not a fallback, it is the same endpoint tried twice, and
+       ;; it turns one outage into two identical failures before the chain
+       ;; reaches a provider that could have answered.
+       (when-not fleet-primary?
+         (str "  - provider: " (:provider fallback) "\n"
+              "    model: " (:model fallback) "\n"
+              "    base_url: " (:base-url fallback) "\n"))))
 
 (defn install-config! [model-id runners-up fallback-reachable]
   (let [prior   (when (fs/existsSync config-path) (fs/readFileSync config-path "utf8"))
@@ -754,13 +883,18 @@
   "The cron jobs carry their own model/provider, which override config.yaml.
   Changing only the config would look like a change and alter nothing."
   [model-id]
-  (vec (for [id job-ids]
+  ;; The provider has to travel with the model. Writing `--provider
+  ;; openrouter-free` beside `--model murakumo-main` names a route that does
+  ;; not exist, and the job would fail on every tick while the config file
+  ;; sitting next to it said the swap had happened.
+  (let [prov (if fleet-primary? (:provider primary) provider-name)]
+   (vec (for [id job-ids]
          (let [r (cp/spawnSync hermes-bin
-                               #js ["cron" "edit" id "--model" model-id "--provider" provider-name]
+                               #js ["cron" "edit" id "--model" model-id "--provider" prov]
                                #js {:encoding "utf8" :timeout 120000})]
            {:job id
             :ok (zero? (or (.-status r) 1))
-            :out (str/trim (str (or (.-stdout r) "") (or (.-stderr r) "")))}))))
+            :out (str/trim (str (or (.-stdout r) "") (or (.-stderr r) "")))})))))
 
 ;; ---------------------------------------------------------------- receipt
 
@@ -845,7 +979,39 @@
       ;; `all`, not `cands`: `candidate?` requires zero-priced, so a billed
       ;; primary is never in `cands` and looking for it there would report
       ;; every healthy day as a disappearance.
-      (when primary
+      ;; A fleet primary takes the replacement guard: the three bot tasks
+      ;; against its own endpoint. The OpenRouter-list check below cannot run
+      ;; for it -- `murakumo-main` will never be on that list -- and leaving
+      ;; it in would die! 1 on every healthy run, while removing it without a
+      ;; substitute would leave the pinned primary with no guard at all. That
+      ;; second shape is the one ADR-2608271450 is about.
+      (when (and primary fleet-primary?)
+        (p/let [rs (probe-primary-endpoint)]
+          (let [failed (remove :pass rs)]
+            (when (seq failed)
+              (die! 1 (str "The pinned primary " (:model primary) " at " (:base-url primary)
+                           " did not pass the bots' own probe:\n"
+                           (str/join "\n" (for [f failed]
+                                             (str "  " (name (:task f)) "\t" (:why f))))
+                           "\n\nNothing was changed. The four tasks are the four things a bot does\n"
+                           "on every turn: call a tool, obey an exact-output instruction, write\n"
+                           "parseable EDN, and fit its prompt. Failing any one of them is a bot\n"
+                           "that fails on its first turn, every tick, while exiting 0.\n\n"
+                           "Either fix the endpoint, or drop :primary in "
+                           (str policy-path) " to hand the choice back to the probe.")))
+            (let [jobs (when write? (install-jobs! (:model primary)))
+                  wrong (remove :ok jobs)
+                  cfg-written (when write? (install-config! (:model primary) (free-runners-up) true))]
+              (println (str "primary\t" (:model primary) "\t" (:base-url primary)
+                            "\tprobed " (count rs) "/4 pass"))
+              (when cfg-written (println (str "config\t" cfg-written)))
+              (doseq [j jobs]
+                (println (str "job\t" (:job j) "\t" (if (:ok j) "ok" (str "FAILED " (:out j))))))
+              (when-not write?
+                (println "dry-run\tpass --write to install"))
+              (.exit js/process (if (seq wrong) 1 0))))))
+
+      (when (and primary (not fleet-primary?))
         (let [pid (:model primary)
               m (some #(when (= pid (:id %)) %) all)]
           (when-not m
