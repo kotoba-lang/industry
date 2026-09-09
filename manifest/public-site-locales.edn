@@ -1,0 +1,48 @@
+{:format :public-site-locales/v1
+ :decision "ADR-2609091700"
+ :status :accepted
+ :decided-at "2026-09-09"
+ :source-language "en"
+ :default-language "en"
+ :scope ["kotobase.net" "murakumo.cloud" "kotoba-lang.org" "kotoba.cloud" "x402.nexus" "itonami.cloud"]
+ :required-locales [
+  {:tag "en" :name "English" :native-name "English" :dir "ltr"}
+  {:tag "zh-Hans" :name "Chinese (Simplified)" :native-name "简体中文" :dir "ltr"}
+  {:tag "hi" :name "Hindi" :native-name "हिन्दी" :dir "ltr"}
+  {:tag "es" :name "Spanish" :native-name "Español" :dir "ltr"}
+  {:tag "ar" :name "Modern Standard Arabic" :native-name "العربية الفصحى" :dir "rtl"}
+  {:tag "fr" :name "French" :native-name "Français" :dir "ltr"}
+  {:tag "bn" :name "Bengali" :native-name "বাংলা" :dir "ltr"}
+  {:tag "pt" :name "Portuguese" :native-name "Português" :dir "ltr"}
+  {:tag "id" :name "Indonesian" :native-name "Bahasa Indonesia" :dir "ltr"}
+  {:tag "ur" :name "Urdu" :native-name "اردو" :dir "rtl"}
+  {:tag "ru" :name "Russian" :native-name "Русский" :dir "ltr"}
+  {:tag "de" :name "German" :native-name "Deutsch" :dir "ltr"}
+  {:tag "ja" :name "Japanese" :native-name "日本語" :dir "ltr"}
+  {:tag "ko" :name "Korean" :native-name "한국어" :dir "ltr"}
+  {:tag "pcm" :name "Nigerian Pidgin" :native-name "Naijá" :dir "ltr"}
+  {:tag "arz" :name "Egyptian Arabic" :native-name "العربية المصرية" :dir "rtl"}
+  {:tag "mr" :name "Marathi" :native-name "मराठी" :dir "ltr"} ]
+ :aliases {"zh" "zh-Hans"}
+ :retain-existing-locales true
+ :routing {:english-unprefixed true :preserve-existing-routes true
+           :choice-explicit true :preserve-equivalent-view true
+           :no-ip-based-redirect true :unknown-locale :english}
+ :translation {:source :english :machine-translation-allowed true
+               :native-speaker-review :unverified-unless-recorded
+               :unchanged-tokens [:brand :url :code :identifier :amount :currency :unit :version :evidence-status]
+               :missing-key :visible-english-fallback
+               :english-fallback-is-translated false
+               :arabic-registers {"ar" :modern-standard "arz" :egyptian}
+               :portuguese :region-neutral}
+ :html {:lang :actual-content-language :dir :locale-direction
+        :ltr-islands [:code :command :url :identifier]
+        :canonical :per-route :hreflang :reciprocal-equivalent-content-only
+        :x-default :english-equivalent}
+ :verification [:source-catalog-keys :nonempty-translations :placeholder-parity
+                :route-response :selected-language :rtl-ltr-isolation
+                :mobile-overflow :keyboard-language-selector :public-deployment]
+ :completion {:policy-is-deployment false :menu-entry-is-translation false
+              :record-per-site-and-surface true
+              :states [:not-started :partial :translated :verified-live]
+              :long-form-reference-and-legal-gaps :explicit}}
