@@ -1452,10 +1452,23 @@ L0c  object   S3 / R2 / B2 / IPFS   transport = object key + HTTP Range
   `:packed-blocks` は object 面の **`:range-read` を併せて宣言しないと拒否**する。
   Range の無い store で packed を名乗ると、pack 全体を GET して 1 block を取り出す
   実装が動き、**round trip は減るが転送量が爆発する**（成功に見える失敗）。
-- **packing policy は write-locality。1 commit = 1 pack を既定にする。** 効くのは
-  ここだけ —— hydration の逐次項の 97% は novelty の cons chain で、幅 1・prefetch
-  不能（ADR-2608021000）。**同じ pack に入っていれば 1 回の Range GET で全部取れる**
-  ので、chain は論理的に逐次のまま network の逐次性が消える。
+- **packing policy は「read-locality を write 側で作る」。既定は 1 commit 1 pack ではなく
+  novelty window（幅 W）1 pack。** 効かせたい場所は変わらない —— hydration の逐次項の
+  97% は novelty の cons chain で、幅 1・prefetch 不能（ADR-2608021000）。
+  **同じ pack に入っていれば 1 回の Range GET で全部取れる**ので、chain は論理的に
+  逐次のまま network の逐次性が消える。
+  ⚠ **その「同じ pack」を 1 commit 1 pack は作れない**（2026-09-09 実測で反転。
+  ADR-2608160100 / ayatori iteration 05・06）。chain の link は**構成上 commit を跨ぐ**
+  ので、commit ごとに封じると 1 pack につき link がちょうど 1 本 = **N/P 1.00**、
+  iteration 02 の crossover（cold で N/P > 3）を下回り **0.50x = 2 倍の損**になる。
+  window ごとに封じると N/P = W で、64 commit の chain walk が **1.91x** に反転する
+  （0.50x → 1.91x、grouping だけを変えて 3.8 倍の振れ）。
+  **上限は 2x** —— per-object が 1 block あたり 2（discover + fetch）払い packed が 1 なので
+  `2W/(W+3) → 2`。「N/P が crossover の 1 桁上」は N/P の話で速度の話ではない。
+  W の出所は ADR-2608021000 の default-fold-threshold（64）。
+  **代償も measured**: window は**閉じてから**しか封じられないので、最新 W-1 commit は
+  pack を持たず、live head の読みはそこを per-object で歩く（W=8 で 1.45x → 1.26–1.33x）。
+  薄まるが反転はしない。再現は ayatori の `bench/novelty_window.cljs`。
 - **成功の指標は round trip 数**。bytes でも wall-clock でもない（この workstation は
   load 100 超で並行 agent が走る。count を測る）。
 - **pack は封じたら不変。in-place で追記しない** —— offset が動き、catalog と

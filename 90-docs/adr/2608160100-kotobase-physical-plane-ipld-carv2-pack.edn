@@ -129,13 +129,53 @@ embedded index を残すのは **generic tooling が pack を単体で読める�
 再構築できる —— ADR-2608039000 の削除・再構築テストにそのまま通る。通らない
 設計（catalog にしか無い情報を作る）にしてはならない。
 
-### 4. packing policy は write-locality。1 commit = 1 pack を既定にする
+### 4. packing policy は write 側で read-locality を作る。既定は novelty window 1 pack
 
-**一緒に書かれたものを一緒に置く。** 具体的には 1 transaction の commit が生む
-block 群（tx block、novelty、更新された prolly-tree page、index root）を 1 pack に
-封じる。これが cons chain に効く唯一の形である —— chain は論理的には逐次のまま
-だが、**同じ pack に入っていれば 1 回の Range GET でまとめて取れる**ので、
-network の逐次性が消える。
+⚠ **この既定は 2026-09-09 に「1 commit = 1 pack」から反転した。** 反転させたのは
+実測であって設計判断ではない。理由は 1 行で言える —— **cons chain の link は構成上
+commit を跨ぐので、commit ごとに封じると同じ pack に入らない。** 反転前の文
+（1 transaction の commit が生む block 群を 1 pack に封じる、これが cons chain に
+効く唯一の形である）は、後半が偽だった。
+
+**一緒に読まれるものを一緒に置く。** 1 pack に封じるのは、fold 閾値までの novelty
+window が生む block 群（その window の各 tx block、novelty cell、更新された
+prolly-tree page、index root）である。chain は論理的には逐次のままだが、**同じ pack に
+入っていれば 1 回の Range GET でまとめて取れる**ので、network の逐次性が消える。
+window の幅の出所は ADR-2608021000 の default-fold-threshold（64）。
+
+#### 実測（2026-09-09、kotoba-lang/ayatori の bench/novelty_window.cljs）
+
+64 commit の chain walk、round trip 数。W = 1 つの window に入る commit 数。
+**W = 1 は反転前の既定そのものなので、この表は自分の control を含んでいる。**
+
+| W | packs | per-object | packed | N/P | vs |
+|---|---|---|---|---|---|
+| 1 | 64 | 128 | 256 | 3.00 | **0.50x** |
+| 2 | 32 | 128 | 160 | 4.00 | 0.80x |
+| 3 | 22 | 128 | 130 | 4.91 | 0.98x |
+| 4 | 16 | 128 | 112 | 6.00 | 1.14x |
+| 8 | 8 | 128 | 88 | 10.00 | 1.45x |
+| 16 | 4 | 128 | 76 | 18.00 | 1.68x |
+| 64 | 1 | 128 | 67 | 66.00 | **1.91x** |
+
+- **W = 1 は 2 倍の損**。1 pack につき chain link がちょうど 1 本（N/P = 1.00、
+  ありうる最悪）で、link ごとに 2（open）+ 1（block）+ 1（catalog）= 4 を払う。
+  per-object は 2。
+- **W = 64 で 1.91x**。grouping だけを変えて 3.8 倍の振れ。mechanism も codec も
+  catalog も walk も変えていない。
+- **境界は W = 3 で、iteration 02 の crossover 規則（cold で N/P > 3）が予告した
+  ところに出た。** 0.98x は tie であり、予測 1.00x との 0.02 は誤差ではない ——
+  64 を 3 で割ると最後の window に commit が 1 本だけ残り、その window は 1 block の
+  ために W + 3 を払う。閉じた式は full window を仮定していた。
+- **上限は 2x。** per-object は 1 block あたり 2（discover + fetch）、packed は 1 +
+  window ごとの固定 3 なので 2W/(W+3) は 2 に漸近する。**N/P = 64 は N/P の話であって
+  速度の話ではない。**
+- **代償（measured、仮定ではない）**: commit ごとの pack は commit が着地した瞬間に
+  封じられるが、window は**閉じてから**しか封じられない。最新 W-1 commit は pack を
+  持たず、live head の読みは**そこを最初に**歩く。W = 8 で 1.45x（window が閉じている）
+  → 1.26–1.33x（4 commit 未封）。**薄まるが反転はしない。**
+- **未着地**: window を見て fold 閾値で封じる sealer は無い。下の未着地表の
+  「write-locality で pack を封じる commit 経路」は、この grouping で書く。
 
 - pack は封じたら不変。**in-place で追記しない**（追記は offset を動かし、
   catalog と embedded index の両方を静かに嘘にする）。
