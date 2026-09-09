@@ -1,0 +1,112 @@
+[{:db/id -1
+ :adr/id "adr-2609101200-a-namespace-nothing-loads"
+ :adr/title "A namespace nothing loads is invisible, and a dependency it declares is fiction"
+ :adr/status "accepted"
+ :adr/date "2026-09-10"
+ :adr/body "A dependency campaign kept turning up the same thing by accident: namespaces
+that no test requires, and that do not load at all.
+
+## What was measured (2026-09-10)
+
+Removing `org.clojure/data.json` from repos where it was the only JVM runtime
+dependency, each rewire was checked with one line per edited namespace,
+`clojure -M -e '(require (quote <ns>))'`, because a suite that never loads the
+edited file returns the same green as one that does.
+
+Five repos were loaded that way. **Five failed**, and none of the failures were
+caused by the change -- each fails identically on unmodified main:
+
+    za-actor        src/za_actor/deploy.clj    Could not locate kotoba/net/jvm_host
+    dougaka-actor   src/dougaka/aozora.clj     Could not locate kotoba/net/jvm_host
+    tashikame       src/tashikame/aozora.clj   Syntax error macroexpanding clojure.core/ns
+    kouhou          src/kouhou/aozora.clj      Syntax error macroexpanding clojure.core/ns
+    animeka-actor   src/animekaza/engine.clj   HttpClient etc. used with no (:import ...)
+
+The fifth is the sharpest case. **animeka-actor's `clojure -M:test` runs ZERO
+tests**, before and after any change, because `animekaza.produce` reaches
+`animekaza.deploy` which requires the undeclared `kotoba.net.jvm-host`. A suite
+that executes nothing is not red in any way anybody watches -- it reports
+nothing, and had been doing so unnoticed.
+
+Three distinct defects, all in files copied between repos:
+
+**A malformed `ns` form.** The `(:import ...)` keyword is missing, so the
+import vectors dangle as bare `ns` references:
+
+    (:require [kotoba.net.jvm-host :as jvm-host]
+              [tashikame.publisher :as publisher])
+               [java.time Instant]
+             [java.util UUID]))
+
+Across the workspace there are **22 `aozora.clj` files and 4 carry this**
+(kouhou, tashikame, wt-kouhou, network-awai/cloud-itonami media/aozora).
+
+**Java classes used with no `:import`.** `animekaza.engine` names `HttpClient`,
+`HttpRequest` and `HttpResponse$BodyHandlers` while its sibling namespaces in
+the same repo import them correctly -- the file was written against something
+that resolved them and committed without ever being loaded.
+
+**A required namespace nothing declares.** `kotoba.net.jvm-host` lives in
+`kotoba-lang/kotoba-net`. **21 repos require it; 18 do not name the coordinate
+directly**, and of the aozora-shaped files specifically, **14** require it with
+no declaration. tools.deps resolves transitively, so an undeclared require is
+not automatically broken -- which is why the number that matters is the five
+that were actually loaded, not the eighteen.
+
+## Why none of this was visible
+
+Each of these namespaces is required by no test. The suites are green and
+substantial -- za-actor runs 42 tests / 86 assertions -- and they never touch
+these files. The failure mode is not a red build; it is **no build at all for
+that file**, indefinitely.
+
+This is the workspace's 7th question (\"was it green because it did the work or
+because it skipped the work?\") in its least visible form. The existing rule
+tells you to check that the path you *changed* ran. The gap here is code nobody
+is changing: it has never run, and nothing says so.
+
+There is a second cost, specific to dependency work. A repo declaring a JVM
+dependency for a namespace that cannot load is **carrying that dependency for
+dead code**, and every count of \"how much JVM surface is left\" includes it.
+Two of the six repos rewired in this campaign were in exactly that state:
+za-actor's data.json served a namespace that does not load, and
+actor-mikurabe declared data.json while requiring it nowhere at all -- its
+three mentions were docstring text.
+
+## Decision
+
+**A namespace that no test loads must still be proven to load.** Neither half
+is optional: \"no test covers it\" is a coverage gap, \"it does not load\" is a
+defect, and the two together are silent.
+
+The check is one line and needs no test to be written:
+
+    clojure -M -e '(require (quote <ns>))'
+
+Two rules follow.
+
+1. **When a commit edits a namespace, load that namespace.** A green suite is
+   evidence only for the namespaces the suite requires. This is already
+   practice for the changed path; it is written here because the failures it
+   surfaces are usually not the change's fault, and reporting a pre-existing
+   failure as your own breakage is its own error. Distinguish them with
+   `git stash`.
+
+2. **Do not fix an unrelated load failure inside a dependency commit.** All
+   five above were reported, not repaired. A commit whose message says it
+   swaps a JSON library should not also be silently repairing `ns` forms.
+
+## What is not decided here
+
+**No detector exists yet**, and this ADR does not claim one. The natural shape
+is per-repo: enumerate `src/**/*.clj` namespaces, subtract those any test
+requires, and load the remainder -- reporting the count of namespaces that no
+test loads *and* that fail to load, with a `SCANNED` floor so an empty run is
+distinguishable from a clean one. It belongs in `manifest/orgs-detectors.edn`
+rather than a fleet gate, since it reads west-managed `orgs/`.
+
+The 4 malformed `ns` forms, the missing `:import`, and the 14 undeclared
+requires are **left in place**
+and recorded here rather than fixed, because fixing them is a separate change
+with its own verification, and because a repair landed without a detector
+leaves nothing to stop the next copy of the template."}]
