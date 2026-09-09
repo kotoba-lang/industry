@@ -1,0 +1,179 @@
+[{:db/id -1
+  :adr/id "adr-2609091800-kotoba-native-inference-maturity"
+  :adr/title "Kotoba-native inference: what was measured, what it costs to reach llama.cpp-class maturity, and the one primitive in the way"
+  :adr/status "accepted"
+  :adr/date "2026-09-09"
+  :adr/deciders "owner (b + everything needed for llama.cpp/vLLM/SGLang-class maturity), Claude Opus 5"
+  :adr/related "adr-2609091200-community-provider-onboarding adr-2608030300 adr-2607198300"
+  :adr/body
+  "## The instruction
+
+  『b + amu native binary で llama.cpp, vllm, sglang なみの成熟度を実現するために
+  必要なことを全て行う』 — option (b) was *qualify f64 for the native word-typed
+  walk*, and then everything needed for maturity.
+
+  Two answers, and the first one changes the second.
+
+  ## (b) turned out to be already half-true, and the other half landed
+
+  The rule said `only-native-word-typed-features?` rejects f64 expressions
+  (`kernel_math_core.kotoba`'s own docstring). Measured: **false**.
+  `native-f64-arithmetic-operations` has admitted `f64-add/sub/mul/div/min/max/
+  abs/neg/sqrt` and the bit conversions since ADR-2608030300, and
+
+      (defn add2 [a :i64 b :i64] :i64
+        (f64-to-bits (f64-add (f64-from-bits a) (f64-from-bits b))))
+
+  compiled to aarch64 before anything changed. What was refused was the
+  **signature**: `(defn add2 [x :f64 y :f64] :f64 (f64-add x y))` answered
+  *typed values currently require the kotoba-script web target …*. Float values
+  were always allowed through the machine; only saying so was not. That is why
+  every float kernel here is written in the bit-word idiom, `kotoba-lang/
+  aiueos`'s qwen35 kernels included.
+
+  So (b) was: admit `:f64` at the native function boundary. Landed in both
+  halves, because either alone is a wrong answer — `kotoba.kir` alone is a
+  green `amu check` and a red `amu compile`:
+
+  | repo | commit |
+  |---|---|
+  | `kotoba-lang/osaho` (`kotoba.kir`) | `74426bad` |
+  | `kotoba-lang/kotoba-verifier` | `39db2f3f` |
+  | `kotoba-lang/amu` (pin advance) | PR #905 |
+
+  Verified through `bin/amu` after the pin advance, not through a patched
+  classpath — `(defn scale [x :f64] :f64 (f64-mul x 2.5))` extracts to
+
+      d2e80081   MOVZ X1, #0x4004, LSL #48     ; 2.5
+      9e670000   FMOV D0, X0
+      9e670021   FMOV D1, X1
+      1e610800   FMUL D0, D0, D1
+      9e660002   FMOV X2, D0
+      d65f03c0   RET
+
+  A record FIELD stays refused, and both repositories keep a test for that:
+  `native-word-field-types`'s own reason — a field \"would have to say which
+  width its one word carries, and no field's declared type is read at runtime\"
+  — does not reach a signature, where the width IS the declaration. `:f32` is
+  not admitted: both widths are one word and the argument covers both, but only
+  `:f64` was measured end to end, and an admission is a claim about what a
+  backend lowers rather than about what an argument covers.
+
+  ## What (b) does NOT unlock, and this is the whole roadmap
+
+  A dot product needs more than one value. On a general native target there is
+  no way to give it one:
+
+  - `:vector-f64` is a **private handle**: `native-private-handle-type?`
+    admits it at an INTERNAL call boundary and `native-function-boundary-type?`
+    refuses it for an export. \"Parameters still cannot be handles.\"
+  - bytes do not exist: amu's `bytes-operations` table is exactly
+    `{bytes-empty 0}` — a constructor for the empty one and nothing else.
+  - `kotoba-lang/aiueos` HAS the byte half in Kotoba, and it is not a sketch:
+    `qwen35-gguf-header-valid`, `-kv-scan`, `-tensor-table-bind`,
+    `-vocab-index-build`, `-dequant-row`, `-dot-f32`, `-matvec`, `-norm`,
+    `-activation`, `-attention`, `-recurrent-step`, `-tokenize`, `-detokenize`,
+    each compiled to a `.o` with provenance against the `kernel/qwen35_infer.c`
+    oracle. They compile for `x86_64-aiueos-kernel-v1` only: elsewhere amu
+    answers *bounded kernel memory operation requires the aiueos kernel
+    target*.
+
+  **The primitive exists. It is unreachable from a general host.** That single
+  sentence is the difference between an arithmetic kernel and an inference
+  engine, and every item below is ordered behind it.
+
+  ## What llama.cpp / vLLM / SGLang maturity actually consists of
+
+  Stated plainly because the instruction was `全て`: this is not a sprint.
+  llama.cpp is years of kernel work by a large contributor base; vLLM and
+  SGLang are serving layers over PyTorch/CUDA whose value is scheduling, not
+  arithmetic. What follows is the ordered list of what would have to exist,
+  with what this workspace already has against each.
+
+  | # | capability | what exists here today |
+  |---|---|---|
+  | P0 | **general-target memory** | aiueos `kernel-*` ops, kernel target only |
+  | P1 | quantized matvec (Q4_K/Q6_K/Q8_0) | `qwen35-dequant-row`/`-matvec` in Kotoba; `ggml_kdot.clj` is a bit-exact ggml oracle; `native/kotodama_kdot.c` is the C mechanism |
+  | P2 | attention, RoPE, RMSNorm, SwiGLU | `qwen35-attention`, `-norm`, `-activation`, `-recurrent-step`; `kernel_math_core` for the pure half |
+  | P3 | KV cache, paged attention | **decisions landed** in Kotoba (`scheduler_core.kotoba`); block table itself blocked on P0 |
+  | P4 | continuous batching, chunked prefill | **decisions landed**; the sequence list is the host's |
+  | P5 | prefix/radix caching, speculative decoding, MTP | **decisions landed**; the radix trie is blocked on P0. `kotodama.inference.mtp` contract |
+  | P6 | sampling, grammar-constrained decoding | `kotodama.inference.sample` |
+  | P7 | GGUF/safetensors loading, mmap | `kotodama.inference.gguf` (`.cljc`, host-side) |
+  | P8 | SIMD / Metal / CUDA | `num` has CPU/WGSL/WebGPU backends; native SIMD absent |
+  | P9 | logit-level parity harness | `kernel_math_parity_test`, `ollama_kotoba_parity_test`, `inference`'s own maturity ledger |
+  | P10 | tok/s benchmark against llama.cpp on the same box | murakumo's fleet benches measure the llama.cpp head, not a Kotoba one |
+
+  P3–P5 are where vLLM and SGLang actually live, and **their decision half now
+  exists in Kotoba** — see the amendment below. What is still absent there is
+  the bookkeeping, which is P0 again. P1–P2 are largely WRITTEN and blocked on P0. P7–P9 exist in `.cljc`
+  on the host side and were proven end to end once already:
+  `cloud-murakumo-studio` generated real text from a real GGUF through
+  `kotodama.inference.host.jvm` (\"The largest planet in our solar system is\"
+  → \" Jupiter. Jupiter is a gas\", first token identical to Ollama).
+
+  ## The decision
+
+  1. **P0 is the only thing worth starting.** Two candidate shapes, both
+     measured as reachable: (i) admit the aiueos bounded memory operations on
+     a general native target, or (ii) admit `:vector-f64`/bytes at the export
+     boundary with a copy ABI — `native-export-copy-result-type?` already
+     admits vector RESULTS for exports, so half of (ii) exists.
+  2. **Nothing below P0 gets built first.** A kernel that cannot be handed
+     data is not a step toward an engine, and the workspace's own migration
+     rule says a component the compiler cannot express is `:blocked`, not
+     reduced to a smaller predicate to make a gate green.
+  3. **The provider tells the truth in the meantime.** `cloud-murakumo-cli`
+     refuses to enrol as capacity it does not have and names the missing
+     primitive. It does not fall back to vLLM, Ollama, MLX or llama.cpp; those
+     were removed on the owner's instruction, and the ADR for that decision
+     records what it cost.
+  4. **Parity before performance.** `ggml_kdot.clj` is already a bit-exact
+     port of ggml's Q4_K/Q6_K×Q8_K reduction; any Kotoba matvec is checked
+     against it before anyone measures tok/s. A fast kernel that disagrees
+     with the oracle is not progress.
+
+  ## Amendment 2026-09-09: P3–P5's decision half landed
+
+  `kotoba-lang/inference` `e68ec8d` adds `kotoba/scheduler_core.kotoba`: 17
+  exported decisions covering paged KV (`kv-blocks-needed`,
+  `kv-blocks-to-append`, `kv-can-allocate` with vLLM's watermark,
+  `kv-slot-index`, `kv-append-offset`, `kv-free-after-alloc`), continuous
+  batching and chunked prefill (`batch-prefill-chunk`, `batch-budget-after`,
+  `batch-admit`, `batch-decode-slots`, `preempt-rank`), and prefix caching and
+  speculation (`prefix-cached-blocks`, `prefix-tokens-to-compute`,
+  `cache-hit-bp`, `spec-accept-count`, `spec-emitted-tokens`,
+  `spec-worth-it`). `amu test` runs 17 `test-*` exports across
+  `[:jvm-kir :js :wasm]` — 51/51 — and it compiles to `aarch64-kotoba-v1`.
+
+  **This is the half that is policy, and it is the half that was worth moving
+  first.** vLLM's and SGLang's kernels are cuBLAS and FlashAttention; what
+  those systems own is which sequence runs, how many of its tokens run this
+  step, and which blocks it may hold. That is arithmetic over small integers,
+  and it fits the subset every Kotoba backend already admits.
+
+  The signatures are scalars because P0 has not moved: a native export cannot
+  take a handle, and `:document` crosses the boundary but cannot be READ on
+  native (only `document-edn-read`/`-print` are admitted; a `document-get`
+  program is refused). So the host keeps the block table, the sequence list
+  and the radix trie, and asks the core the questions those structures exist
+  to answer — the same split `kernel_math_core.kotoba` makes for bytes.
+
+  So P3–P5 are no longer `nothing`, and they are not `done` either. What
+  landed is every decision; what is still behind P0 is every structure those
+  decisions are made about. The ordering in this ADR is unchanged: P0 remains
+  the only blocking, buildable thing.
+
+  Two tools were repaired to land it, both broken beforehand on `main`:
+  `inference`'s `nbb.edn` did not name `kotoba-lang/text`, so its KIR parity
+  gate died before running; and that gate's own `--write` was unreachable
+  because the guard tested only the LAST argv, so the half CI runs hid the
+  half a person runs.
+
+  ## What is honestly not claimed
+
+  This ADR does not claim a path to llama.cpp parity on a timeline, and does
+  not claim that P0 makes one likely. It claims that P0 is the first thing
+  that is both blocking and buildable, that P1–P2 are mostly written behind
+  it, and that P3–P5 are absent and are the largest single gap between this
+  stack and the serving systems named in the instruction."}]
