@@ -121,4 +121,15 @@
    :default-method :siwe-erc1271
    :status :unverified
    :security-policy "SECURITY.md"
-   :evidence "kotoba.cloud's primary action is 'Start with a Base Account' since 2026-09-07 and hands off to auth.kotoba.cloud/sign-in, whose methods are the authority's above; the apex issues no session itself and reads /v1/session credential-free. Live negative verification of the apex routes not re-run today"}]}
+   :evidence "kotoba.cloud's primary action is 'Start with a Base Account' since 2026-09-07 and hands off to auth.kotoba.cloud/sign-in, whose methods are the authority's above; the apex issues no session itself and reads /v1/session credential-free. Live negative verification of the apex routes not re-run today"}
+
+  {:project "aiueos"
+   :path "orgs/kotoba-lang/aiueos"
+   :role :client
+   :active-methods #{:webauthn-passkey :siwe-erc191 :siwe-erc1271}
+   :status :unverified
+   :verification-status :built-partial
+   :source-commit "kotoba-lang/aiueos c11e63c5 (2026-09-09)"
+   :security-policy "SECURITY.md"
+   :known-divergence "aiueos/device_auth.cljc admits the wallet family, but handle-device-auth-challenge still falls back to :passkey when the caller names no method, while the authority's default is :siwe-erc1271. Recorded rather than changed: the default is a product decision, not a policy conformance one"
+   :evidence "2026-09-09: the device-claim ceremony was passkey-only until c11e63c5 -- the vocabulary was #{:passkey :phone-scan} and the authority is required to echo the requested method back, so a Base Account could not claim a device at all. Now admitted on per-method requirements (SIWE: server-issued single-use nonce, atomic consumption, domain/URI/chain binding, expiry, server-side signature; ERC-1271 additionally the contract's current authority, fail-closed when unverifiable). A method in the vocabulary with no declared requirements is refused (:method/requirements-undeclared). 20 tests / 118 assertions, mutation-checked. NOT verified: no live claim has been completed by a wallet account against auth.kotoba.cloud -- what is tested is the admission of a verified assertion's shape, and the authority's own 2026-09-07 green does not stand in for it"}]}
