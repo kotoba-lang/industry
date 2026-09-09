@@ -3,30 +3,30 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.repo-bots-tick</string>
+  <string>cloud.itonami.bot.repo-bot-drain</string>
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/nbb</string>
-    <string>scripts/repo-bots/tick.cljs</string>
-    <string>--wave</string>
-    <string>200</string>
+    <string>scripts/repo-bots/drain-loop.cljs</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/Users/junkawasaki/github/com-junkawasaki</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>/Users/junkawasaki/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>COM_JUNKAWASAKI_ROOT</key>
+    <string>/Users/junkawasaki/github/com-junkawasaki</string>
   </dict>
   <key>StartInterval</key>
-  <integer>3600</integer>
+  <integer>14400</integer>
   <key>RunAtLoad</key>
   <false/>
   <key>Nice</key>
   <integer>10</integer>
   <key>StandardOutPath</key>
-  <string>/Users/junkawasaki/.itonami/repo-bots/tick.stdout.log</string>
+  <string>/Users/junkawasaki/.itonami/repo-bots/drain.stdout.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/junkawasaki/.itonami/repo-bots/tick.stdout.log</string>
+  <string>/Users/junkawasaki/.itonami/repo-bots/drain.stdout.log</string>
 </dict>
 </plist>

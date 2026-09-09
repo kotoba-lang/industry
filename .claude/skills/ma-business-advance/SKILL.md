@@ -1,6 +1,6 @@
 ---
 name: ma-business-advance
-description: M&A マッチング事業（cloud-itonami/ma + 構成 5 repo）の割れた床を 1 つだけ塞いで着地させる。1 反復 = 床 1 つ。ローカル Claude loop（com.gftd.ma-business-advance）が毎日これを呼ぶが、手で `/ma-business-advance` と打ってもよい。「M&A 事業を進める」「マッチング事業」「ma business」「M&A クラウドのような」で発火。
+description: M&A マッチング事業（cloud-itonami/ma + 構成 5 repo）の割れた床を 1 つだけ塞いで着地させる。1 反復 = 床 1 つ。ローカル Claude loop（cloud.itonami.bot.ma-business-advance）が毎日これを呼ぶが、手で `/ma-business-advance` と打ってもよい。「M&A 事業を進める」「マッチング事業」「ma business」「M&A クラウドのような」で発火。
 ---
 
 # M&A マッチング事業を 1 床ぶん進める

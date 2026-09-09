@@ -1,6 +1,6 @@
 ---
 name: isekai-game-dev
-description: isekai.network のゲームを 1 増分だけ制作して着地させる（登録漏れ 1 件を塞ぐ、または planned なゲームを 1 増分進める）。1 反復 = 1 production step。ローカル Claude loop（com.gftd.isekai-game-dev）が候補のある周だけこれを呼ぶが、手で `/isekai-game-dev` と打ってもよい。「ゲーム制作」「新しいゲームを作る」「isekai game dev」「game production loop」で発火。
+description: isekai.network のゲームを 1 増分だけ制作して着地させる（登録漏れ 1 件を塞ぐ、または planned なゲームを 1 増分進める）。1 反復 = 1 production step。ローカル Claude loop（cloud.itonami.bot.isekai-game-dev）が候補のある周だけこれを呼ぶが、手で `/isekai-game-dev` と打ってもよい。「ゲーム制作」「新しいゲームを作る」「isekai game dev」「game production loop」で発火。
 ---
 
 # isekai のゲームを 1 増分だけ作る

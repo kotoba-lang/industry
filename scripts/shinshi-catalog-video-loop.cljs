@@ -2,7 +2,7 @@
 ;; scripts/shinshi-catalog-video-loop.cljs — 1 体だけ i2v して品質を測り、
 ;; pass のときだけ shinshi.club に載せる。モデルは居ない（yellow/想定外 fail だけ起こす）。
 ;;
-;; launchd: scripts/com.gftd.shinshi-catalog-video.plist (30m)
+;; launchd: scripts/cloud.itonami.bot.shinshi-catalog-video.plist (30m)
 ;;
 ;; 禁ずる: murakumo generation 課金、IP 自動公開、黒/未測定 clip の公開、
 ;; H3 を止めたまま放置、D1 不通を「埋めるものが無い」と書くこと。

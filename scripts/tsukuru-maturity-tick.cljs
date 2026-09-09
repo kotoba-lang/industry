@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/tsukuru-maturity-tick.cljs — ADR-2800003200 の残 gap を継続測定する
-;; ローカル loop。LaunchAgent com.gftd.tsukuru-maturity-tick が起動する。
+;; ローカル loop。LaunchAgent cloud.itonami.bot.tsukuru-maturity-tick が起動する。
 ;;
 ;; ## この loop が答える問い
 ;;
@@ -13,7 +13,7 @@
 ;;
 ;; ## この loop は observe-only
 ;;
-;; 姉妹の com.gftd.itonami-maturity-tick (ADR-2607254000) は Tier 1 の決定論的
+;; 姉妹の cloud.itonami.bot.itonami-maturity-tick (ADR-2607254000) は Tier 1 の決定論的
 ;; 修正を**無人で着地させる**。こちらは違う: **何も書かない・deploy しない・
 ;; git を触らない**。ここで残っている gap は決定論的な欠陥ではなく、
 ;; (a) 外部サービスの authorization、(b) 人間の判断（NDA・鍵の再発行）、

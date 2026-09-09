@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.tsukuru-maturity-tick</string>
+  <string>cloud.itonami.bot.tsukuru-maturity-tick</string>
 
-  <!-- Wrapped in `tamaki exec`, like com.gftd.itonami-maturity-tick: every
+  <!-- Wrapped in `tamaki exec`, like cloud.itonami.bot.itonami-maturity-tick: every
        firing gets an AgentRun identity and a durable append-only lifecycle
        alongside the real argv and exit code. `exec` (not `local`) is correct
        because this tick is deterministic with no model in the loop —
@@ -36,7 +36,7 @@
     <string>/Users/junkawasaki/.kagi</string>
   </dict>
 
-  <!-- 6h, matching com.gftd.itonami-maturity-tick. What this watches changes on
+  <!-- 6h, matching cloud.itonami.bot.itonami-maturity-tick. What this watches changes on
        human timescales (a seed restored, an NDA read, an upstream authorization
        fixed), so a shorter interval would only add idle probes.
 

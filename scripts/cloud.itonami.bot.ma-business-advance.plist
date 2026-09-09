@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.ma-business-advance</string>
+  <string>cloud.itonami.bot.ma-business-advance</string>
 
   <!-- ローカル Claude loop（superproject ADR-2608291400）。姉妹の
-       com.gftd.itonami-os-connect と同じ 2 段構え:
+       cloud.itonami.bot.itonami-os-connect と同じ 2 段構え:
          1) scripts/ma-business-tick.cljs が割れた床を測る（決定論）
          2) 割れた床が在るときだけ claude -p "/ma-business-advance" を起こす
 
@@ -18,7 +18,7 @@
        複数回の反復を要する。日次で足りるので 86400。
 
        止め方:
-         launchctl bootout gui/$(id -u)/com.gftd.ma-business-advance
+         launchctl bootout gui/$(id -u)/cloud.itonami.bot.ma-business-advance
        次の 1 手だけ見る（モデルを起こさない）:
          nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-loop.cljs --dry-run -->
 

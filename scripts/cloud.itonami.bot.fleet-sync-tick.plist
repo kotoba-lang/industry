@@ -9,12 +9,12 @@
   setting.
 
   install:
-    cp scripts/com.gftd.fleet-sync-tick.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.fleet-sync-tick.plist
+    cp scripts/cloud.itonami.bot.fleet-sync-tick.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.fleet-sync-tick.plist
   uninstall:
-    launchctl bootout gui/$(id -u)/com.gftd.fleet-sync-tick
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.fleet-sync-tick
   run once now:
-    launchctl kickstart -p gui/$(id -u)/com.gftd.fleet-sync-tick
+    launchctl kickstart -p gui/$(id -u)/cloud.itonami.bot.fleet-sync-tick
 
   * `check` only (fleet-db <-> west.yml drift, read against MAIN not the local
     checkout). The full fleet probe is a separate, much slower job -- see
@@ -31,7 +31,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.fleet-sync-tick</string>
+  <string>cloud.itonami.bot.fleet-sync-tick</string>
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/nbb</string>

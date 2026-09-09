@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/docs-edn-repair-loop.cljs — **ローカル Claude loop** の入口。
-;; LaunchAgent `com.gftd.docs-edn-repair` が一定間隔でこれを起こす。
+;; LaunchAgent `cloud.itonami.bot.docs-edn-repair` が一定間隔でこれを起こす。
 ;;
 ;; ## 2 段構え（姉妹 loop と同じ）
 ;;

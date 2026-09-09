@@ -1,6 +1,6 @@
 ---
 name: dependency-substitution-wave
-description: kotoba-lang の外部依存を manifest/dependency-substitution.edn の先に rewire する波を 1 本進める。1 反復 = 1 coordinate × 最大 4 repo + west pin 前進 + verify 再測定。常駐 loop com.gftd.dependency-substitution-wave が呼ぶが、手で `/dependency-substitution-wave` でもよい。「dependency substitution」「noble 置換」「data.json 移行」「verify-dependency-substitution」で発火。
+description: kotoba-lang の外部依存を manifest/dependency-substitution.edn の先に rewire する波を 1 本進める。1 反復 = 1 coordinate × 最大 4 repo + west pin 前進 + verify 再測定。常駐 loop cloud.itonami.bot.dependency-substitution-wave が呼ぶが、手で `/dependency-substitution-wave` でもよい。「dependency substitution」「noble 置換」「data.json 移行」「verify-dependency-substitution」で発火。
 ---
 
 # dependency-substitution-wave — 外部依存 substitution を 1 波

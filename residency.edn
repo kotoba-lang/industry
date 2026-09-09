@@ -34,24 +34,24 @@
 
  :jobs
  [{:id "fleet-ci-tip-tick"
-   :label "com.gftd.fleet-ci-tip-tick"
+   :label "cloud.itonami.bot.fleet-ci-tip-tick"
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 300}
    :run ["nbb" "scripts/fleet-ci/tick.cljs"]
-   :plist "scripts/fleet-ci/com.gftd.fleet-ci-tip-tick.plist"
+   :plist "scripts/fleet-ci/cloud.itonami.bot.fleet-ci-tip-tick.plist"
    :credentials [:github-token :fleet-ci-signer :fleet-ssh]
    :health {:kind :ledger :path "manifest/fleet-ci.edn"}
    :adr "adr-2607300900-ci-cd-murakumo-fleet"
    :note "CI/CD の本体。receipt 署名・commit status・pin 前進を行うので credential を持つ。ADR-2608111721 の決定 5 のとおり、この仕事は operator 側に留まる。"}
 
   {:id "fleet-ci-sweep"
-   :label "com.gftd.fleet-ci-sweep"
+   :label "cloud.itonami.bot.fleet-ci-sweep"
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 86400}
    :run ["nbb" "scripts/fleet-ci/sweep.cljs" "--apply"]
-   :plist "scripts/fleet-ci/com.gftd.fleet-ci-sweep.plist"
+   :plist "scripts/fleet-ci/cloud.itonami.bot.fleet-ci-sweep.plist"
    :credentials [:fleet-ssh]
    :health nil
    :adr "adr-2607300900-ci-cd-murakumo-fleet"
@@ -104,12 +104,12 @@
    :adr "adr-2608081200-domain-observatory-runner"}
 
   {:id "newsfeed-ingest"
-   :label "com.gftd.newsfeed-ingest"
+   :label "cloud.itonami.bot.newsfeed-ingest"
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 3600}
    :run ["nbb" "scripts/newsfeed-ingest.cljs"]
-   :plist "scripts/fleet-ci/com.gftd.newsfeed-ingest.plist"
+   :plist "scripts/fleet-ci/cloud.itonami.bot.newsfeed-ingest.plist"
    :credentials [:github-token :b2]
    :health nil
    :adr "adr-2608031900-newsfeed-ledger-datalad-b2"
@@ -130,12 +130,12 @@
    :note "Hourly fail-closed publication loop: collect, archive raw bytes to B2, merge the ledger and catalogue, project through Kotobase, test/build/deploy wiki.kotobase.net, then verify the live catalogue CID. The credential-bearing runner stays on the operator host; cloud-itonami's edge is not given Git/B2/signing custody."}
 
   {:id "capacity-alarm"
-   :label "com.gftd.capacity-alarm"
+   :label "cloud.itonami.bot.capacity-alarm"
    :slot :anonymous
    :host :operator
    :cadence {:interval-seconds 3600}
    :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/capacity-alarm.cljs"]
-   :plist "scripts/fleet-ci/com.gftd.capacity-alarm.plist"
+   :plist "scripts/fleet-ci/cloud.itonami.bot.capacity-alarm.plist"
    :credentials []
    :health {:kind :state-file :path "~/.itonami/capacity-alarm-state.edn"}
    :adr "adr-2608160300-disk-full-halted-writes"

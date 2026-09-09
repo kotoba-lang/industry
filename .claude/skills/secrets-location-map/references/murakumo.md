@@ -277,7 +277,7 @@
     （mode 600）。**launchd 下では kagi が Keychain unlock prompt を出せずに
     timeout する**ため（fleet-ci が先に踏んだ壁、ADR-2607178000 §3 と同じ答え）。
     LaunchAgent plist は world-readable なので plist 本体には絶対に書かない。
-    常駐: `com.gftd.murakumo-x402-ingest`（60秒間隔）。
+    常駐: `cloud.itonami.bot.murakumo-x402-ingest`（60秒間隔）。
   - 消費側: `orgs/network-awai/cloud-murakumo/scripts/x402-ingest.cljs`
     （env → `MURAKUMO_SERVICE_TOKEN_FILE` の順で解決。argv には載せない）。
 

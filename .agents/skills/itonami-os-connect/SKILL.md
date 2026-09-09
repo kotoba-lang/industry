@@ -1,6 +1,6 @@
 ---
 name: itonami-os-connect
-description: 営み OS（network-awai/cloud-itonami）に、まだ繋がっていない産業の governed actor を 1 本だけ接続して着地させる。1 反復 = 1 vertical。ローカル Codex loop（com.gftd.itonami-os-connect）が毎周これを呼ぶが、手で `/itonami-os-connect` と打ってもよい。「営み OS に産業を繋ぐ」「次の vertical を接続」「itonami os loop」で発火。
+description: 営み OS（network-awai/cloud-itonami）に、まだ繋がっていない産業の governed actor を 1 本だけ接続して着地させる。1 反復 = 1 vertical。ローカル Codex loop（cloud.itonami.bot.itonami-os-connect）が毎周これを呼ぶが、手で `/itonami-os-connect` と打ってもよい。「営み OS に産業を繋ぐ」「次の vertical を接続」「itonami os loop」で発火。
 ---
 
 # 営み OS に産業を 1 本繋ぐ

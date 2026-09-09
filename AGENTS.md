@@ -954,7 +954,7 @@ push 直前まで行われなかった。**警告を読むことと同期する�
   状態を作らない。
 - **worktree モデルはディスクを理由に捨てない。捨てる理由になるのは「同時書き手が 1 人」だけ**
   （オーナー判断 2026-09-06、ADR-2609061800）。「この端末だけで開発する」に変わっても、
-  この端末では Claude セッション・codex・launchd の `com.gftd.*` bot が同時に書いている
+  この端末では Claude セッション・codex・launchd の `cloud.itonami.bot.*` bot が同時に書いている
   （数え方: `ps -axo command | grep -c '^claude'`、`launchctl list | grep -c com.gftd`）。
   worktree の作成は sub-second・object store は共有・working tree は再生成物を除けば
   ディスクの 1% 台で、**本当のコストは「着地したのに残る worktree」と「worktree ごとに
@@ -963,7 +963,9 @@ push 直前まで行われなかった。**警告を読むことと同期する�
     7 日超・idle（lsof の cwd / ps の argv に無い）・unlocked・非 bot の worktree だけを
     `git worktree remove`（`--force` 無し）+ `git branch -d` で撤去し、stale entry を
     prune する。dirty は触らない（git-cleanup-conflict の領分）。lsof が引けなければ
-    `REFUSED`（exit 2）。launchd `com.gftd.worktree-retire` が日次で `--apply`。
+    `REFUSED`（exit 2）。launchd `cloud.itonami.bot.worktree-retire` が日次で `--apply`。
+    ⚠ **2026-09-09 実測: この job は install も load もされていない。** 名簿にあることと
+    走っていることは別で、この節が書いている日次実行は起きていなかった。
   - **node_modules は pnpm store 経由で入れる**: `nbb scripts/worktree-node-modules-dedupe.cljs
     --root . [--apply]` が npm lockfile の worktree を `pnpm import` + `.npmrc`
     `node-linker=hoisted` + `pnpm install --frozen-lockfile` に置き換える。pnpm は APFS で

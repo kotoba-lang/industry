@@ -1,23 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  com.gftd.isekai-game-dev — isekai.network ゲーム制作 bot の loop
-  (ADR-2608291600)
+  cloud.itonami.bot.kami-lib-update — kami family + core render/game lib の
+  ライブラリ更新 bot（pin 前進）の loop (ADR-2608291600)
 
   Install:
-    cp scripts/com.gftd.isekai-game-dev.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.isekai-game-dev.plist
-    launchctl kickstart -k gui/$(id -u)/com.gftd.isekai-game-dev
+    cp scripts/cloud.itonami.bot.kami-lib-update.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.kami-lib-update.plist
+    launchctl kickstart -k gui/$(id -u)/cloud.itonami.bot.kami-lib-update
 
   Unload:
-    launchctl bootout gui/$(id -u)/com.gftd.isekai-game-dev
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.kami-lib-update
 
-  Interval: 21600s (6h). 1 反復 = tick（決定論・数秒〜数十秒）+ 候補がある周だけ
-  claude -p /isekai-game-dev（最長 1h）。lock file（~/.itonami/isekai-game-dev.lock）が
-  重なりを防ぐ。候補が無い周・測れなかった周（:not-measured は :no-candidates とは
-  別の事実）はモデルを起こさない（loop 側で判定）。
+  Interval: 21600s (6h). 1 反復 = tick（有界 30 repo の pin 鮮度測定、round-robin
+  cursor）+ 遅れた pin がある周だけ claude -p /kami-lib-update（最長 1h）。
+  lock file（~/.itonami/kami-lib-update.lock）が重なりを防ぐ。遅れ 0 件の周・
+  測れなかった周（rate limit = :not-measured、:no-candidates とは別の事実）は
+  モデルを起こさない（loop 側で判定）。
 
-  姉妹 loop com.gftd.kami-lib-update と同間隔だが、両方とも各自の lock で保護されて
+  姉妹 loop cloud.itonami.bot.isekai-game-dev と同間隔だが、両方とも各自の lock で保護されて
   いるので同時発火しても互いを壊さない（launchd の StartInterval にオフセット指定は
   無い）。
 
@@ -42,20 +43,20 @@
 		<string>junkawasaki</string>
 	</dict>
 	<key>Label</key>
-	<string>com.gftd.isekai-game-dev</string>
+	<string>cloud.itonami.bot.kami-lib-update</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/nbb</string>
 		<string>--classpath</string>
 		<string>.:scripts/nbb_compat</string>
-		<string>scripts/isekai-game-dev-loop.cljs</string>
+		<string>scripts/kami-lib-update-loop.cljs</string>
 	</array>
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardErrorPath</key>
-	<string>/Users/junkawasaki/.itonami/isekai-game-dev.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/kami-lib-update.stdout.log</string>
 	<key>StandardOutPath</key>
-	<string>/Users/junkawasaki/.itonami/isekai-game-dev.stdout.log</string>
+	<string>/Users/junkawasaki/.itonami/kami-lib-update.stdout.log</string>
 	<key>StartInterval</key>
 	<integer>21600</integer>
 	<key>WorkingDirectory</key>

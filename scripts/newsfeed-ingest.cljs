@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; newsfeed-ingest.cljs — newsfeed の日次 ingest を回して台帳を B2 へ載せる
-;; （ADR-2608031900）。launchd の com.gftd.newsfeed-ingest から呼ばれる。
+;; （ADR-2608031900）。launchd の cloud.itonami.bot.newsfeed-ingest から呼ばれる。
 ;;
 ;; ## なぜ superproject 側にこれがあるか
 ;;

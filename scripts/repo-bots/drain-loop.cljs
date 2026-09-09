@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; scripts/repo-bots/drain-loop.cljs — repo 常駐 bot の findings を 1 件ずつ
 ;; 塞ぎにいくローカル Claude loop の入口。
-;; LaunchAgent `com.gftd.repo-bot-drain` が一定間隔でこれを起こす。
+;; LaunchAgent `cloud.itonami.bot.repo-bot-drain` が一定間隔でこれを起こす。
 ;;
 ;; 2 段構え（姉妹 loop `adr-inventory-loop` と同じ）:
 ;;   1. `scripts/repo-bots/tick.cljs` が波を測る（決定論。モデルは居ない）

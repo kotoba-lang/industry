@@ -1,6 +1,6 @@
 ---
 name: repo-bot-drain
-description: repo ごとの常駐 bot（scripts/repo-bots/）が見つけた床割れを 1 件だけ直して着地させる。1 反復 = 1 finding。ローカル Claude loop（com.gftd.repo-bot-drain）が呼ぶが、手で `/repo-bot-drain` と打ってもよい。「repo bot の指摘を直す」「未着地の作業を拾う」「床を塞ぐ」で発火。
+description: repo ごとの常駐 bot（scripts/repo-bots/）が見つけた床割れを 1 件だけ直して着地させる。1 反復 = 1 finding。ローカル Claude loop（cloud.itonami.bot.repo-bot-drain）が呼ぶが、手で `/repo-bot-drain` と打ってもよい。「repo bot の指摘を直す」「未着地の作業を拾う」「床を塞ぐ」で発火。
 ---
 
 # repo bot が見つけた床割れを 1 件塞ぐ
@@ -15,7 +15,7 @@ description: repo ごとの常駐 bot（scripts/repo-bots/）が見つけた床�
 nbb scripts/repo-bots/tick.cljs --next     # 直す 1 件が EDN で出る
 ```
 
-**無人の loop（`com.gftd.repo-bot-drain`）は `--next-unattended` を使い、`:landed` を
+**無人の loop（`cloud.itonami.bot.repo-bot-drain`）は `--next-unattended` を使い、`:landed` を
 渡さない。** 他人の未 commit の作業は、失われうる唯一の床であると同時に、**誰も見て
 いないときに触ってよい対象ではない**（このマシンは並行 agent が走っている）。
 あなたが手で `/repo-bot-drain` を打ったなら人が見ているので、`--next` の答え

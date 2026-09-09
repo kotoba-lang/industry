@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  cloud.itonami.bot.fleet-refactor-wave — cloud-itonami fleet refactor 波の loop
+  (ADR-2608290100)
+
+  Install:
+    cp scripts/cloud.itonami.bot.fleet-refactor-wave.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.fleet-refactor-wave.plist
+    launchctl kickstart -k gui/$(id -u)/cloud.itonami.bot.fleet-refactor-wave
+
+  Unload:
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.fleet-refactor-wave
+
+  Interval: 3600s (1h), same as the sibling cloud.itonami.bot.svelte-cljs-wave.plist
+  this is modeled on. 1 波 = 4 repo 並列（Mission A / B 混在可）+ pin 前進 +
+  再測定で 30〜60 分。lock file が重なりを防ぐ。候補が無い周・測れなかった周は
+  モデルを起こさない（loop 側で判定）。
+-->
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>COM_JUNKAWASAKI_ROOT</key>
+		<string>/Users/junkawasaki/github/com-junkawasaki</string>
+		<key>HOME</key>
+		<string>/Users/junkawasaki</string>
+		<key>LOGNAME</key>
+		<string>junkawasaki</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>SHELL</key>
+		<string>/bin/zsh</string>
+		<key>USER</key>
+		<string>junkawasaki</string>
+	</dict>
+	<key>Label</key>
+	<string>cloud.itonami.bot.fleet-refactor-wave</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/nbb</string>
+		<string>--classpath</string>
+		<string>.:scripts/nbb_compat</string>
+		<string>scripts/fleet-refactor-wave-loop.cljs</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/junkawasaki/.itonami/fleet-refactor-wave.stdout.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/junkawasaki/.itonami/fleet-refactor-wave.stdout.log</string>
+	<key>StartInterval</key>
+	<integer>3600</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/junkawasaki/github/com-junkawasaki</string>
+</dict>
+</plist>

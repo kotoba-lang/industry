@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; scripts/itonami-maturity-improve-loop.cljs — 成熟度を**上げる**ローカル Claude
 ;; loop の入口（superproject ADR-2608080000）。LaunchAgent
-;; com.gftd.itonami-maturity-improve が起こす。
+;; cloud.itonami.bot.itonami-maturity-improve が起こす。
 ;;
 ;; 兄弟 `itonami-os-connect-loop.cljs` と同じ 2 段構え:
 ;;   1. `itonami-maturity-improve-tick.cljs` が対象と軸を**測る**（決定論）

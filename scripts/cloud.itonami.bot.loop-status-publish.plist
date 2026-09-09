@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  com.gftd.loop-status-publish — com.gftd.* loop 群の現在地を itonami.cloud の
+  cloud.itonami.bot.loop-status-publish — com.gftd.* loop 群の現在地を itonami.cloud の
   公開 status page（itonami.cloud/bots/、API /api/bots-status）へ発行する
   (ADR-2608291600 改訂履歴)
 
   Install:
-    cp scripts/com.gftd.loop-status-publish.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.loop-status-publish.plist
-    launchctl kickstart -k gui/$(id -u)/com.gftd.loop-status-publish
+    cp scripts/cloud.itonami.bot.loop-status-publish.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.loop-status-publish.plist
+    launchctl kickstart -k gui/$(id -u)/cloud.itonami.bot.loop-status-publish
 
   Unload:
-    launchctl bootout gui/$(id -u)/com.gftd.loop-status-publish
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.loop-status-publish
 
   Interval: 1800s (30min)。**この loop はモデルを一切呼ばない**（純粋な publisher。
   skill 無し、claude 起動無し）。bearer token は ~/.itonami/bots-status-token
@@ -39,7 +39,7 @@
 		<string>junkawasaki</string>
 	</dict>
 	<key>Label</key>
-	<string>com.gftd.loop-status-publish</string>
+	<string>cloud.itonami.bot.loop-status-publish</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/nbb</string>

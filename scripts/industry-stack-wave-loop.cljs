@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; scripts/industry-stack-wave-loop.cljs — industry-stack flagship wave の
 ;; **ローカル Claude loop** 入口（ADR-2608090800）。
-;; LaunchAgent com.gftd.industry-stack-wave が一定間隔で起こす。
+;; LaunchAgent cloud.itonami.bot.industry-stack-wave が一定間隔で起こす。
 ;;
 ;; 2 段構え（姉妹 itonami-os-connect / itonami-maturity-improve と同型）:
 ;;   1. industry-stack-wave-tick.cljs が候補を**測る**（決定論）

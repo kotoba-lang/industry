@@ -4,12 +4,12 @@
   fleet-ci tip-driven tick（scripts/fleet-ci/tick.cljs）の standing runner。
 
   install:
-    cp scripts/fleet-ci/com.gftd.fleet-ci-tip-tick.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.fleet-ci-tip-tick.plist
+    cp scripts/fleet-ci/cloud.itonami.bot.fleet-ci-tip-tick.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.fleet-ci-tip-tick.plist
   uninstall:
-    launchctl bootout gui/$(id -u)/com.gftd.fleet-ci-tip-tick
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.fleet-ci-tip-tick
   1回だけ手で走らせる:
-    launchctl kickstart -p gui/$(id -u)/com.gftd.fleet-ci-tip-tick
+    launchctl kickstart -p gui/$(id -u)/cloud.itonami.bot.fleet-ci-tip-tick
 
   * StartInterval 300s = 5 分ごとに tip を見る。変化が無い repo は gate を回さない
     （なので通常の tick は GitHub API 15 回程度で終わる）。
@@ -23,7 +23,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.fleet-ci-tip-tick</string>
+  <string>cloud.itonami.bot.fleet-ci-tip-tick</string>
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/nbb</string>

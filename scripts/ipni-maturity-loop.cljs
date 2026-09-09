@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/ipni-maturity-loop.cljs — the IPNI maturity growth loop.
-;; LaunchAgent com.gftd.ipni-maturity wakes it. Sibling of
+;; LaunchAgent cloud.itonami.bot.ipni-maturity wakes it. Sibling of
 ;; itonami-maturity-improve-loop.cljs and built to the same two-stage shape:
 ;; MEASURE deterministically, and wake the model only when there is something
 ;; it could honestly move.

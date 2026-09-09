@@ -1,6 +1,6 @@
 ---
 name: svelte-cljs-wave
-description: Svelte を cljs + reagent + re-frame + hiccup + jp-go-dds に移す波を 1 本進める。1 反復 = 1 波（4 repo 並列）+ west pin 前進 + 再測定。ローカル Claude loop（com.gftd.svelte-cljs-wave）が毎周これを呼ぶが、手で `/svelte-cljs-wave` と打ってもよい。「svelte 移行」「cljs に移す」「svelte を消す」「migration wave」で発火。
+description: Svelte を cljs + reagent + re-frame + hiccup + jp-go-dds に移す波を 1 本進める。1 反復 = 1 波（4 repo 並列）+ west pin 前進 + 再測定。ローカル Claude loop（cloud.itonami.bot.svelte-cljs-wave）が毎周これを呼ぶが、手で `/svelte-cljs-wave` と打ってもよい。「svelte 移行」「cljs に移す」「svelte を消す」「migration wave」で発火。
 ---
 
 # svelte-cljs-wave — Svelte を cljs に移す波を 1 本

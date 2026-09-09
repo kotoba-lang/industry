@@ -1,6 +1,6 @@
 ---
 name: spotwork-match
-description: スキマバイト（単発シフト）の求人を 1 件だけ governed に審査して提案台帳へ着地させる。規則側に欠陥が見つかった周はそれを 1 件直す。1 反復 = 1 件。ローカル Claude loop（com.gftd.spotwork-match）が候補のある周だけこれを呼ぶが、手で `/spotwork-match` と打ってもよい。「スキマバイト」「単発シフト」「タイミー」「求人を審査」「spotwork」で発火。
+description: スキマバイト（単発シフト）の求人を 1 件だけ governed に審査して提案台帳へ着地させる。規則側に欠陥が見つかった周はそれを 1 件直す。1 反復 = 1 件。ローカル Claude loop（cloud.itonami.bot.spotwork-match）が候補のある周だけこれを呼ぶが、手で `/spotwork-match` と打ってもよい。「スキマバイト」「単発シフト」「タイミー」「求人を審査」「spotwork」で発火。
 ---
 
 # 単発シフトを 1 件だけ審査して着地させる

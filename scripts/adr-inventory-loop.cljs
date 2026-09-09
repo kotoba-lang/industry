@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/adr-inventory-loop.cljs — ローカル Claude loop の入口。
-;; LaunchAgent `com.gftd.adr-inventory` が一定間隔でこれを起こす。
+;; LaunchAgent `cloud.itonami.bot.adr-inventory` が一定間隔でこれを起こす。
 ;;
 ;; 2 段構え（姉妹 loop と同じ）:
 ;;   1. `scripts/adr-inventory-tick.cljs` が棚卸し候補を測る（決定論）

@@ -12,7 +12,7 @@
   フラグ名を書く必要があるときは、下の ProgramArguments 行を参照させること。
 
   なぜ launchd か: この workspace の定期実行は既に launchd に寄っている
-  （com.gftd.fleet-ci-tip-tick / com.gftd.fleet-ci-sweep / com.gftd.newsfeed-ingest）。
+  （cloud.itonami.bot.fleet-ci-tip-tick / cloud.itonami.bot.fleet-ci-sweep / cloud.itonami.bot.newsfeed-ingest）。
   別の scheduler を持ち込むと「どこで何が回っているか」が 2 箇所に割れる。
 
   なぜ operator マシンで回すか（fleet ノードでなく）: newsfeed-ingest と同じ理由。

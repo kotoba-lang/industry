@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; scripts/fleet-refactor-wave-loop.cljs — cloud-itonami fleet refactor 波の
 ;; **ローカル Claude loop** 入口（ADR-2608290100）。LaunchAgent
-;; com.gftd.fleet-refactor-wave が一定間隔で起こす。
+;; cloud.itonami.bot.fleet-refactor-wave が一定間隔で起こす。
 ;;
 ;; 2 段構え（姉妹 svelte-cljs-wave-loop.cljs と同型）:
 ;;   1. fleet-refactor-wave-tick.cljs が候補を**測る**（決定論・ネットワークは

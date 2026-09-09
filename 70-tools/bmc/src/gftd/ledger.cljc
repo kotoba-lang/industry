@@ -60,7 +60,7 @@
     …com-junkawasaki_90-docs_business_canvas-ledger.edn.seq          13968
     …T_itonami-qwen36-1788174887288_90-docs_business_canvas…seq      13966
 
-  The second is `com.gftd.itonami-qwen36-tick`, which by design builds a
+  The second is `cloud.itonami.bot.itonami-qwen36-tick`, which by design builds a
   sibling worktree per run (`(str (.tmpdir os) \"/itonami-qwen36-\" ts)`) so it
   never touches the shared checkout, and deletes it afterwards. Every tick
   therefore got a NEW absolute path, a NEW key, and a floor of zero -- the

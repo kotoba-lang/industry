@@ -1,6 +1,6 @@
 ---
 name: docs-edn-repair
-description: 90-docs の中で reader を通らない EDN 文書を 1 件だけ復元して着地させる。1 反復 = 1 文書。ローカル Claude loop（com.gftd.docs-edn-repair）が毎周これを呼ぶが、手で `/docs-edn-repair` と打ってもよい。「読めない edn を直す」「docs 修復 loop」「parse error の文書」で発火。
+description: 90-docs の中で reader を通らない EDN 文書を 1 件だけ復元して着地させる。1 反復 = 1 文書。ローカル Claude loop（cloud.itonami.bot.docs-edn-repair）が毎周これを呼ぶが、手で `/docs-edn-repair` と打ってもよい。「読めない edn を直す」「docs 修復 loop」「parse error の文書」で発火。
 ---
 
 # 読めない 90-docs 文書を 1 件だけ復元する

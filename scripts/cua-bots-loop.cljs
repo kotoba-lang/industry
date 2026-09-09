@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/cua-bots-loop.cljs — CUA bot（画面操作の常駐 bot）の loop 入口
-;; （ADR-2608291900）。LaunchAgent com.gftd.cua-bots が 1 時間ごとに起こす。
+;; （ADR-2608291900）。LaunchAgent cloud.itonami.bot.cua-bots が 1 時間ごとに起こす。
 ;;
 ;; 2 段構え。ただし姉妹 loop（isekai-game-dev 等）と 1 点違う:
 ;; **この loop は `claude -p` を呼ばない。** モデルの解釈は

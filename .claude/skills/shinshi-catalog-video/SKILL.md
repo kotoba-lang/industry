@@ -1,6 +1,6 @@
 ---
 name: shinshi-catalog-video
-description: club-shinshi の original-series キャラを 1 体だけ i2v し、決定論的品質を測って pass のときだけ shinshi.club に載せる。ローカル Claude loop（com.gftd.shinshi-catalog-video）が 30 分ごとに tick し、yellow / 想定外 fail の周だけこれを呼ぶ。手で `/shinshi-catalog-video` と打ってもよい。「catalog 動画」「character ごとに動画」「shinshi video loop」で発火。
+description: club-shinshi の original-series キャラを 1 体だけ i2v し、決定論的品質を測って pass のときだけ shinshi.club に載せる。ローカル Claude loop（cloud.itonami.bot.shinshi-catalog-video）が 30 分ごとに tick し、yellow / 想定外 fail の周だけこれを呼ぶ。手で `/shinshi-catalog-video` と打ってもよい。「catalog 動画」「character ごとに動画」「shinshi video loop」で発火。
 ---
 
 # shinshi catalog video — 1 体生成し、測ってから載せる
@@ -69,7 +69,7 @@ nbb scripts/shinshi-catalog-video-quality.cljs --self-test
 
 ### 2. この skill が起きるとき
 
-launchd `com.gftd.shinshi-catalog-video` は **pass ならモデルを呼ばない**。呼ばれるのは:
+launchd `cloud.itonami.bot.shinshi-catalog-video` は **pass ならモデルを呼ばない**。呼ばれるのは:
 
 - quality unanswered
 - quality fail のうち black 以外

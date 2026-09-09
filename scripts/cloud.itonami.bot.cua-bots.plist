@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  com.gftd.cua-bots — CUA bot（selectable-backend 画面操作の常駐 bot）の loop
+  cloud.itonami.bot.cua-bots — CUA bot（selectable-backend 画面操作の常駐 bot）の loop
   (ADR-2608291900)
 
   Install:
-    cp scripts/com.gftd.cua-bots.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.cua-bots.plist
-    launchctl kickstart -k gui/$(id -u)/com.gftd.cua-bots
+    cp scripts/cloud.itonami.bot.cua-bots.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.cua-bots.plist
+    launchctl kickstart -k gui/$(id -u)/cloud.itonami.bot.cua-bots
 
   Unload:
-    launchctl bootout gui/$(id -u)/com.gftd.cua-bots
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.cua-bots
 
   Interval: 3600s (1h)。tick が名簿（manifest/cua-bots.edn）の due を測り、
   due な bot だけ kotoba-lang/computer-use の bin/cua_bot_run.cljs を回す。
@@ -40,7 +40,7 @@
 		<string>junkawasaki</string>
 	</dict>
 	<key>Label</key>
-	<string>com.gftd.cua-bots</string>
+	<string>cloud.itonami.bot.cua-bots</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/nbb</string>

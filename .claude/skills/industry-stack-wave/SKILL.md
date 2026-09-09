@@ -1,6 +1,6 @@
 ---
 name: industry-stack-wave
-description: cloud-itonami flagship item2（REAL actor build-time demo）を missing-render isic に対して最大 20 本並列で進める。1 反復 = 1 wave。ローカル Claude loop（com.gftd.industry-stack-wave）が毎周これを呼ぶが、手で `/industry-stack-wave` と打ってもよい。「flagship wave」「industry stack wave」「render_html を並列で」で発火。
+description: cloud-itonami flagship item2（REAL actor build-time demo）を missing-render isic に対して最大 20 本並列で進める。1 反復 = 1 wave。ローカル Claude loop（cloud.itonami.bot.industry-stack-wave）が毎周これを呼ぶが、手で `/industry-stack-wave` と打ってもよい。「flagship wave」「industry stack wave」「render_html を並列で」で発火。
 ---
 
 # industry-stack wave — flagship demos を並列で進める

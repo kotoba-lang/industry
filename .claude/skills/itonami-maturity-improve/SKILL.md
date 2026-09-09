@@ -1,6 +1,6 @@
 ---
 name: itonami-maturity-improve
-description: cloud-itonami fleet の成熟度スコア（ADR-2608052000 の 7 軸）を、leverage の高い repo から 1 反復 1 軸ずつ実際に上げる。水増しを構造的に禁じる gate つき。ローカル Claude loop（com.gftd.itonami-maturity-improve）が毎周呼ぶが、手で `/itonami-maturity-improve` と打ってもよい。「成熟度を上げる」「maturity loop」「leverage の高い repo を伸ばす」で発火。
+description: cloud-itonami fleet の成熟度スコア（ADR-2608052000 の 7 軸）を、leverage の高い repo から 1 反復 1 軸ずつ実際に上げる。水増しを構造的に禁じる gate つき。ローカル Claude loop（cloud.itonami.bot.itonami-maturity-improve）が毎周呼ぶが、手で `/itonami-maturity-improve` と打ってもよい。「成熟度を上げる」「maturity loop」「leverage の高い repo を伸ばす」で発火。
 ---
 
 # 成熟度を 1 段だけ上げる
