@@ -1,0 +1,81 @@
+[{:db/id -1
+ :adr/id "adr-2609092600-a-program-outgrew-the-document-and-the-corpus-hid-a-bug"
+ :adr/title "A program outgrew the document, and the corpus was hiding a bug"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/authority "owner instruction, 2026-09-09"
+ :adr/repos "kotoba-lang/pattern"
+ :adr/related "adr-2609092400-the-checkout-was-the-stale-plane-and-a-program-outgrows-a-document, adr-2609092300-a-bounded-pattern-matcher-whose-program-is-data"
+ :adr/body "Continuing 2026-09-09: the named next step from ADR-2609092400 was to carry a
+program as a `:string`, because a `:document` holds 32 items per container and
+43 of the 200 regex literals in kotoba-lang's browser stack compile to more
+than that.
+
+## The string form, and the ceiling behind the ceiling
+
+`kotoba-lang/pattern` gains `kotoba/pattern_vm.kotoba`: the same Pike VM over
+a program carried as a string.
+
+    header  \"K\" fold(1) nc(6 hex) nr(6 hex)      14 chars
+    code    nc x [ op(1) a(6) b(6) c(1) ]        14 chars each
+    ranges  nr x [ lo(6) hi(6) ]                 12 chars each
+
+65536 / 14 is about 4,680 instructions against 32. There was nowhere else to
+go: every guest container is bounded near 32 (typed map 31, typed set 32,
+record 32 fields, heterogeneous vector 32), `[:vector T]` is a bounded TUPLE
+type, and no backend has a sequence parameter type.
+
+Measured on the real corpus: the IPv4 (88 instructions), the CSS length (82)
+and the 64-hex id (65) now run. As documents they could not be handed to the
+matcher at all.
+
+LIFTING ONE CEILING LEFT THE NEXT ONE STANDING BEHIND IT. The thread list was
+a document too, and 32 simultaneously-live threads is real: the
+257-instruction email pattern from `kiyaku` answered `doc-vector-too-large` on
+\"a@b.co\". The thread set is now one string as well -- a bitset of visited
+program counters followed by the live list.
+
+The bitset is not a matter of taste. With membership as a linear scan the same
+pattern took 20.4 SECONDS for one `match?` -- correct, but the dedup that
+keeps a Pike VM linear was itself quadratic in FUNCTION ENTRIES, and fuel is
+charged per entry. With the bit test it is 3.5s, and the 88- and
+65-instruction patterns are unchanged at 80 and 127 ms.
+
+## The bug the corpus was hiding
+
+`^(px|em)$` answered FALSE for \"px\". So did `^[-+]?[0-9]+$` for \"12\". `^a$`
+for \"a\" was right, which is exactly why it survived: the anchor is reached
+before any step happens.
+
+The `eol` flag handed to a step was the one for the position the threads LEFT
+rather than the one they land on, so every thread that stepped onto a `$` was
+dropped. Both machines had it -- the document one had shipped with it.
+
+216 parity checks agreed with JavaScript's own RegExp without touching it,
+because THE CORPUS CONTAINED NO PATTERN ENDING IN `$`. This is the workspace's
+own rule (\"that check has to have produced both answers\") failing in the one
+way prose cannot catch: the corpus was the thing that was incomplete, not the
+assertion. Four such patterns are in it now, and both suites are green at 252
+(document) and 270 (string) checks.
+
+## Three backend facts the string form cost
+
+  * `bit-and` and `bit-or` are REFUSED by the JS backend -- \"unsupported KIR
+    operation\" at the :kotoba-script phase -- while `string-from-i64` compiles
+    there. The bit test is arithmetic instead: for a hex digit d and a bit
+    value v, the bit is set exactly when (quot d v) is odd.
+  * `i64-shift-left` takes a LITERAL count in [0,63], so a computed shift is a
+    four-way branch.
+  * `mod` is not a builtin here.
+
+## What is not done
+
+The COMPILER still builds its AST and program as documents, so it still cannot
+emit the 43. The string emitter is the next slice, and it needs the AST to go
+too -- the way out is to fuse parse and emit and re-emit an atom's source span
+for a quantifier, rather than building a tree at all.
+
+`compile_parity` now finds its corpus from a worktree as well; it had REFUSED
+with \"0 patterns\", which is the guard working, but the path assumption was
+wrong.
+"}]
