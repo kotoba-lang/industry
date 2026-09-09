@@ -421,4 +421,79 @@
   コンパイルできず、runner は最初の file で止まり、**失敗ではなくゼロ件**を
   報告した。pin を進めると即座に 2 つ目の帰結が出た ——
   `verifier_test` が `[:f64]` は boundary で**拒否される**と assert したままで、
-  それはこの repo 自身に着地した決定の逆だった。両方直した。"}]
+  それはこの repo 自身に着地した決定の逆だった。両方直した。
+  ## 改訂 5 (2026-09-09 深夜) — 最後の 1 マイルも着地。P0 は閉じた
+
+  改訂 4 が『未着手』と名指しした loader の region grant が着地した。
+  **署名済み artifact が `amu run` 経由で、host が渡した region を読む。**
+
+  | repo | commit | 何 |
+  |---|---|---|
+  | `kotoba-lang/artifact` | `43330d87` | loader identity を 2 回前進（region 形 + report tail） |
+  | `kotoba-lang/kototama-native` | `9e53ea35` | host 側の `{:region [...]}` / `{:region-length n}` |
+  | `kotoba-lang/amu` | PR #910 | loader C（region pool + 2 つの引数形 + report tail） |
+
+  ### 対にした理由
+
+  `g:<hex>` が region を鋳造して **base address** を答え、`gl:<n>` が
+  **loader が記録した length** を答える。**2 つとも loader の数**であること
+  が全て —— caller は region を渡せるが、**その region に属さない length と
+  base の組を渡すことはできない**。これが「granted な region が granted で
+  なくなる」唯一の道だった。guest 自身の bounds check は、自分が選んでいない
+  length に対して index を比べることになる。
+
+  fail closed: 前方参照（2 つ目の `g:` より前の `gl:1`）/ 未鋳造の length /
+  奇数桁の hex / 9 個目の region / 64 KiB pool 超過 —— すべて**答えずに拒否**。
+
+  host 側も 1 対 1 に保った。**1 つの host 値が黙って 2 つの parameter を
+  埋める形にはしなかった** —— entry は本当に 2 machine word を取り、
+  `(:arity export)` は `(count param-types)` と別に assert されているので、
+  暗黙の展開はその 2 つの数を別物にしてしまう。caller は entry が取るものを
+  そのまま書く。
+
+  ### 両 ISA で、実プロセスとして実行した
+
+  `isa_execution_test` に `a-granted-region-is-read-on-every-available-isa` を
+  足した。出力は `available: [aarch64 x86_64] / missing (SKIPPED): []`。
+
+  | grant | 結果 |
+  |---|---|
+  | 64 byte | 2080 |
+  | 10 byte、同じプログラム | 55（bound は `slice-length` なので grant のもの） |
+  | 空 | 0 |
+  | `0xFF` × 4 | 1020（負ではない） |
+  | 前方参照 | result を一切出さない |
+
+  署名経路全体でも測った: compile → measure-runtime → keygen → sign → trust →
+  `amu run --entry sum-bytes --input {:args [{:region [1..64]} {:region-length 0}]}`
+  → **`:result 2080`**、receipt 付き。制御では、pool 超過は executor が
+  caller 自身の引数を名指しして拒否し、**base の位置に生の整数を渡すと
+  読まずに trap する** —— host は信頼されているが、間違いは封じ込められる。
+
+  ### 途中で出てきた既存のずれ（これも直した）
+
+  `kototama.native.executor` の `valid-supervisor-report?` は 2026-09-08 から
+  全 report に `:vectors` と `:vector-items` を要求していた（2 つの vector
+  arena は別々に枯渇し、report が触れない唯一の bounded resource で、枯渇は
+  **PAIR arena の `:heap` 行の隣に裸の SIGILL として**現れていた）。
+  **loader はその片割れを一度も持っていなかった** —— 10 箇所の report site
+  すべてで。amu が古い kototama-native を pin していたので見えず、region
+  marshalling に届かせるため pin を進めた瞬間に
+  `malformed native supervisor evidence (exit=0, report-status=:ok)` として
+  出た —— **頼まれたことを正確にやった実行が、そう言う文の形で拒否された。**
+  report tail は 10 個の複製から 1 個の macro になった。
+
+  ### P0 の現在地
+
+  **閉じた。** provider が推論するのに要る「host memory を読む」は、言語・
+  verifier・loader・executor・署名経路のすべてで通っている。残るのは能力の
+  拡張であって gate ではない:
+
+  - **transport**: region は argv 越しの hex なので実質 64 KiB が上限。
+    モデル重みには**ファイル経路**が要る（`g:` の隣に `gf:<path>` を置く形）。
+    これは bound ではなく gap。
+  - **P1 の残り**: Q4_K / Q6_K の aarch64 arm（x86 側も per-group geometry で
+    unroll されており、移植ではない）。IQ 4 形式は read-only table が機械に
+    届くまで両 backend とも arm を持てない。
+  - **CLI**: `provider-kernel.wasm` は wasm32 で走っている。native kexe の方が
+    Mac の provider には正しい形なので、runtime を native に寄せる判断が要る。"}]
