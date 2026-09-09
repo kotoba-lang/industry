@@ -1,6 +1,6 @@
 ---
 name: kaiyu-kaizen
-description: 回遊（アクセス解析）の計測から出た「答えるべき問い」を 1 件だけ、cloud-itonami の承認キューに提案として着地させる。ローカル Claude loop（com.gftd.kaiyu-kaizen）が候補のある周だけこれを呼ぶが、手で `/kaiyu-kaizen` と打ってもよい。「回遊から kaizen」「アクセス解析の issue」「kaiyu kaizen loop」で発火。
+description: 回遊（アクセス解析）の計測から出た「答えるべき問い」を 1 件だけ、cloud-itonami の承認キューに提案として着地させる。ローカル Claude loop（cloud.itonami.bot.kaiyu-kaizen）が候補のある周だけこれを呼ぶが、手で `/kaiyu-kaizen` と打ってもよい。「回遊から kaizen」「アクセス解析の issue」「kaiyu kaizen loop」で発火。
 ---
 
 # kaiyu-kaizen — 測ったことから、答えるべき問いを 1 件

@@ -1149,7 +1149,7 @@
               plane query made it skip all three checks and exit 0, the same shape as the five
               retired security-gate-* scripts, inside the verifier itself (ADR-2608130600).
               Its only scheduled caller is scripts/tsukuru-maturity-tick.cljs, driven by
-              com.gftd.tsukuru-maturity-tick -- one of the five plists ADR-2608124800 found
+              cloud.itonami.bot.tsukuru-maturity-tick -- one of the five plists ADR-2608124800 found
               was never installed. Registering it here gives it a home WITHOUT installing
               that plist, which also launches an autonomous model loop that commits and
               pushes; the ADR is explicit that those are different decisions."

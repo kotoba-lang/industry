@@ -1,6 +1,6 @@
 ---
 name: murakumo-oem-rfq
-description: Mouse / Sycom への murakumo OEM RFQ の業者返信を 1 通だけ読んで対応する。ローカル Claude loop（com.gftd.murakumo-oem-rfq）が 4 時間ごとに tick し、未処理の業者返信がある周だけこれを呼ぶ。手で `/murakumo-oem-rfq` と打ってもよい。「OEM 返信」「Mouse から返事」「Sycom 対応」で発火。
+description: Mouse / Sycom への murakumo OEM RFQ の業者返信を 1 通だけ読んで対応する。ローカル Claude loop（cloud.itonami.bot.murakumo-oem-rfq）が 4 時間ごとに tick し、未処理の業者返信がある周だけこれを呼ぶ。手で `/murakumo-oem-rfq` と打ってもよい。「OEM 返信」「Mouse から返事」「Sycom 対応」で発火。
 ---
 
 # murakumo OEM RFQ — 業者返信を 1 通だけ扱う

@@ -34,7 +34,7 @@
 
 (def evidence
   {:fleet-ci
-   {:tick-interval-min {:v 5 :measured "LaunchAgent com.gftd.fleet-ci-tip-tick (loaded, PID 確認)"}
+   {:tick-interval-min {:v 5 :measured "LaunchAgent cloud.itonami.bot.fleet-ci-tip-tick (loaded, PID 確認)"}
     :gates {:v 23 :measured "gates.edn :repos の件数"}
     :receipts {:v 230 :measured "manifest/fleet-ci.edn の署名済み receipt 行数"}
     :historical-passes {:v 2957 :measured "~/.itonami/fleet-ci-tick.log の 'pass test-' 出現数"}

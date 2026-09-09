@@ -88,7 +88,7 @@
 
   So the hook checks. A missing scheduler is louder than a stale detector,
   because every detector's age is a consequence of it (ADR-2608196000)."
-  (str (.homedir os) "/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist"))
+  (str (.homedir os) "/Library/LaunchAgents/cloud.itonami.bot.orgs-detector-tick.plist"))
 
 (defn scheduler-installed? []
   (try (.existsSync fs scheduler-plist) (catch :default _ false)))
@@ -214,7 +214,7 @@
            ""
            "手で 1 回走らせる:"
            "  nbb --classpath \".:scripts/nbb_compat\" scripts/orgs-detector-tick.cljs --force"
-           "常駐させる (owner 判断): scripts/com.gftd.orgs-detector-tick.plist の"
+           "常駐させる (owner 判断): scripts/cloud.itonami.bot.orgs-detector-tick.plist の"
            "ヘッダに何がいつ走り何に触るかが書いてあります。"]))
 
       :else
@@ -238,11 +238,11 @@
               ;; those ages is a consequence of this (ADR-2608196000).
               (when-not (scheduler-installed?)
                 [(str "  ⚠⚠ この tick に scheduler がありません —— "
-                      "~/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist が無い。"
+                      "~/Library/LaunchAgents/cloud.itonami.bot.orgs-detector-tick.plist が無い。"
                       "下の「最終測定」は「変化が無い」ではなく「誰も走らせていない」です。"
-                      "install: cp scripts/com.gftd.orgs-detector-tick.plist "
+                      "install: cp scripts/cloud.itonami.bot.orgs-detector-tick.plist "
                       "~/Library/LaunchAgents/ && launchctl load "
-                      "~/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist")])
+                      "~/Library/LaunchAgents/cloud.itonami.bot.orgs-detector-tick.plist")])
               (when (seq unrun)
                 [(str "  ⚠ 未実行のまま登録されている: " (str/join ", " (map name unrun)))])
               (mapcat :lines reports)))))))

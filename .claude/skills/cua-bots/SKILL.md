@@ -1,6 +1,6 @@
 ---
 name: cua-bots
-description: 画面操作の常駐 bot（CUA bot、selectable-backend）を 1 体だけ手で回す。名簿は manifest/cua-bots.edn、実行機構は kotoba-lang/computer-use の bin/cua_bot_run.cljs（backend 10 種から bot ごとに 1 keyword で選ぶ）。ローカル loop（com.gftd.cua-bots）が毎時 due を測って回すが、手で `/cua-bots <bot-id>` と打ってもよい。「cua bot」「画面操作 bot」「bots page を目視確認」「touch QA を回す」で発火。
+description: 画面操作の常駐 bot（CUA bot、selectable-backend）を 1 体だけ手で回す。名簿は manifest/cua-bots.edn、実行機構は kotoba-lang/computer-use の bin/cua_bot_run.cljs（backend 10 種から bot ごとに 1 keyword で選ぶ）。ローカル loop（cloud.itonami.bot.cua-bots）が毎時 due を測って回すが、手で `/cua-bots <bot-id>` と打ってもよい。「cua bot」「画面操作 bot」「bots page を目視確認」「touch QA を回す」で発火。
 ---
 
 # CUA bot を 1 体回す
@@ -18,7 +18,7 @@ ledger（`~/.itonami/cua-bots/ledger.edn`）** から読む。
 | **名簿**（どの bot が・何を・どの backend で） | `manifest/cua-bots.edn` | 人（policy、手書き） |
 | **実行機構**（backend registry + session） | `orgs/kotoba-lang/computer-use` の `bin/cua_bot_run.cljs` | kotoba-lang/computer-use |
 | due 判定 | `scripts/cua-bots-tick.cljs`（決定論） | superproject |
-| 常駐 | `scripts/cua-bots-loop.cljs` + `com.gftd.cua-bots.plist`（1h） | superproject |
+| 常駐 | `scripts/cua-bots-loop.cljs` + `cloud.itonami.bot.cua-bots.plist`（1h） | superproject |
 | receipt | `~/.itonami/cua-bots/receipts/<bot-id>/` | lib の session |
 | ledger | `~/.itonami/cua-bots/ledger.edn`（追記のみ） | loop |
 

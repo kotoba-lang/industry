@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  com.gftd.svelte-cljs-wave — Svelte → cljs 移行波の loop (ADR-2608260900)
+  cloud.itonami.bot.svelte-cljs-wave — Svelte → cljs 移行波の loop (ADR-2608260900)
 
   Install:
-    cp scripts/com.gftd.svelte-cljs-wave.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.svelte-cljs-wave.plist
-    launchctl kickstart -k gui/$(id -u)/com.gftd.svelte-cljs-wave
+    cp scripts/cloud.itonami.bot.svelte-cljs-wave.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.svelte-cljs-wave.plist
+    launchctl kickstart -k gui/$(id -u)/cloud.itonami.bot.svelte-cljs-wave
 
   Unload:
-    launchctl bootout gui/$(id -u)/com.gftd.svelte-cljs-wave
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.svelte-cljs-wave
 
   Interval: 3600s (1h). 1 波 = 4 repo 並列 + pin 前進 + 再測定で 30〜60 分。
   lock file が重なりを防ぐ。候補が無い周・測れなかった周はモデルを起こさない
@@ -35,7 +35,7 @@
 		<string>junkawasaki</string>
 	</dict>
 	<key>Label</key>
-	<string>com.gftd.svelte-cljs-wave</string>
+	<string>cloud.itonami.bot.svelte-cljs-wave</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/nbb</string>

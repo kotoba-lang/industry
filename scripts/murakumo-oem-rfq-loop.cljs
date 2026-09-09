@@ -5,7 +5,7 @@
 ;; usage:
 ;;   nbb scripts/murakumo-oem-rfq-loop.cljs
 ;;
-;; launchd: scripts/com.gftd.murakumo-oem-rfq.plist (4h)
+;; launchd: scripts/cloud.itonami.bot.murakumo-oem-rfq.plist (4h)
 
 (require '[clojure.edn :as edn]
          '[clojure.string :as str])

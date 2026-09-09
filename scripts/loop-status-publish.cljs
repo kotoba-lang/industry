@@ -1,15 +1,15 @@
 #!/usr/bin/env nbb
-;; scripts/loop-status-publish.cljs — この workstation の com.gftd.* loop 群の
+;; scripts/loop-status-publish.cljs — この workstation の常駐 bot 群（`cloud.itonami.bot.*`、
 ;; 現在地を itonami.cloud の公開 status page へ発行する。**決定論。モデルは
 ;; 一切呼ばない**（claude 起動も skip-permissions フラグも無い、純粋な publisher）。
-;; LaunchAgent com.gftd.loop-status-publish が 30 分ごとに起こす。
+;; LaunchAgent cloud.itonami.bot.loop-status-publish が 30 分ごとに起こす。
 ;;
 ;; ## 何を発行するか
 ;;
 ;; 2 つの population を **1 通の document** に載せる（ADR-2608318000 /
 ;; cloud-itonami ADR-0053）:
 ;;
-;;   `loops`      launchd の com.gftd.* Claude loop（従来どおり）
+;;   `loops`      launchd の常駐 bot（`bot-label-prefixes` の接頭辞を持つもの）
 ;;   `residents`  Hermes の cron 常駐（~/.hermes/cron/jobs.json）
 ;;
 ;; **1 通なのは KV の key が 1 つだからである。** `/api/bots-status` は
@@ -30,7 +30,7 @@
 ;; loop の列挙は **union**（片方に居ないものを黙って落とさない）:
 ;;   (a) ledger を持つ loop — 対応する scripts/<name>-loop.cljs
 ;;       （repo-bot-drain は scripts/repo-bots/drain-loop.cljs）が存在するもの
-;;   (b) ~/Library/LaunchAgents/com.gftd.<name>.plist が installed なもの
+;;   (b) ~/Library/LaunchAgents/<prefix><name>.plist が installed なもの
 ;;
 ;; plist は在るのに ledger がまだ無い loop も **last_run null で載せる** ——
 ;; 不在は見えなければならない（省略は「動いている」と同じ顔をする）。

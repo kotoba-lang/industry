@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  com.gftd.spotwork-match — スキマバイト（単発シフト）突合 bot の loop
+  cloud.itonami.bot.spotwork-match — スキマバイト（単発シフト）突合 bot の loop
   (ADR-2608292100)
 
   Install:
-    cp scripts/com.gftd.spotwork-match.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.spotwork-match.plist
-    launchctl kickstart -k gui/$(id -u)/com.gftd.spotwork-match
+    cp scripts/cloud.itonami.bot.spotwork-match.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.spotwork-match.plist
+    launchctl kickstart -k gui/$(id -u)/cloud.itonami.bot.spotwork-match
 
   Unload:
-    launchctl bootout gui/$(id -u)/com.gftd.spotwork-match
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.spotwork-match
 
   Interval: 21600s (6h)。1 反復 = tick（決定論・数秒）+ 候補がある周だけ
   claude -p /spotwork-match（最長 1h）。lock file（~/.itonami/spotwork-match.lock）が
@@ -46,7 +46,7 @@
 		<string>junkawasaki</string>
 	</dict>
 	<key>Label</key>
-	<string>com.gftd.spotwork-match</string>
+	<string>cloud.itonami.bot.spotwork-match</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/nbb</string>

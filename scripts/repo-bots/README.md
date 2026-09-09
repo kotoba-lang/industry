@@ -154,8 +154,8 @@ alias `murakumo-main` だけを送る（ADR-2607173100）。receipt には呼ん
 
 | plist | 間隔 | 何をするか |
 |---|---|---|
-| `com.gftd.repo-bots-tick` | 1h | 200 体を測る。全 4,186 体の一周におよそ 21 時間 |
-| `com.gftd.repo-bot-propose` | 1h | 8 本まで草稿を作る（滞留 40 本で自動停止） |
-| `com.gftd.repo-bot-drain` | 4h | 草稿を 1 件だけ着地させる（候補が無ければモデルを起こさない） |
+| `cloud.itonami.bot.repo-bots-tick` | 1h | 200 体を測る。全 4,186 体の一周におよそ 21 時間 |
+| `cloud.itonami.bot.repo-bot-propose` | 1h | 8 本まで草稿を作る（滞留 40 本で自動停止） |
+| `cloud.itonami.bot.repo-bot-drain` | 4h | 草稿を 1 件だけ着地させる（候補が無ければモデルを起こさない） |
 
 止めるときは `launchctl unload`。測る側だけ残して直す側を止める、もできる。

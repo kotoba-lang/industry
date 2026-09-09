@@ -73,4 +73,4 @@ Monero マイニングフリートの「売上(収益)」を確認して日本�
 
   戻すのは `sudo launchctl enable system/com.mining.xmrig`(plist は削除しないこと)。
 - **マシン自体は落とさない。** 同じ 10 台が murakumo の CI と推論を動かしている
-  (`com.gftd.fleet-ci-*`)。止めてよいのは `com.mining.xmrig` だけ。
+  (`cloud.itonami.bot.fleet-ci-*`)。止めてよいのは `com.mining.xmrig` だけ。

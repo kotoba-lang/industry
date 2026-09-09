@@ -37,7 +37,7 @@
 (def home (.homedir os))
 (def state-file (or (opt "--state") (str home "/.itonami/repo-bots/state.edn")))
 (def ledger-file (str home "/.itonami/repo-bots/observations.ledger.edn"))
-(def plist (str home "/Library/LaunchAgents/com.gftd.repo-bots-tick.plist"))
+(def plist (str home "/Library/LaunchAgents/cloud.itonami.bot.repo-bots-tick.plist"))
 (def registry-file (str (or (not-empty (str (or js/process.env.CLAUDE_PROJECT_DIR ""))) ".")
                         "/manifest/repo-bots.edn"))
 
@@ -82,7 +82,7 @@
                ""
                "**報告の無い tick と、動いていない tick は外から見て同じです。**"
                "1 回走らせる: nbb scripts/repo-bots/tick.cljs --wave 200"
-               (str "常駐させる: cp scripts/com.gftd.repo-bots-tick.plist ~/Library/LaunchAgents/ && "
+               (str "常駐させる: cp scripts/cloud.itonami.bot.repo-bots-tick.plist ~/Library/LaunchAgents/ && "
                     "launchctl load " plist)]))
 
       :else
@@ -114,7 +114,7 @@
            (when-not (exists? plist)
              [(str "  ⚠⚠ scheduler がありません —— " plist " が無い。"
                    "上の「最終測定」は「変化が無い」ではなく「誰も走らせていない」です。"
-                   "install: cp scripts/com.gftd.repo-bots-tick.plist ~/Library/LaunchAgents/ "
+                   "install: cp scripts/cloud.itonami.bot.repo-bots-tick.plist ~/Library/LaunchAgents/ "
                    "&& launchctl load " plist)])
            [(str "  床を割っている: " total-broken " 件"
                  (when (seq standing)

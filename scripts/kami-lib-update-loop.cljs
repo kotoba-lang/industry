@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; scripts/kami-lib-update-loop.cljs — kami family + core render/game lib の
 ;; **ライブラリ更新 bot（pin 前進）** のローカル Claude loop 入口
-;; （ADR-2608291600）。LaunchAgent com.gftd.kami-lib-update が 6 時間ごとに起こす。
+;; （ADR-2608291600）。LaunchAgent cloud.itonami.bot.kami-lib-update が 6 時間ごとに起こす。
 ;;
 ;; 2 段構え（姉妹 isekai-game-dev-loop.cljs / fleet-refactor-wave-loop.cljs と同型）:
 ;;   1. scripts/kami-lib-update-tick.cljs が pin 鮮度を**測る**（決定論・有界 30 repo）

@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.adr-inventory</string>
+  <string>cloud.itonami.bot.adr-inventory</string>
 
   <!-- ローカル Claude loop（superproject ADR-2608161700）。姉妹の
-       com.gftd.docs-edn-repair と同じ 2 段構え:
+       cloud.itonami.bot.docs-edn-repair と同じ 2 段構え:
          1) scripts/adr-inventory-tick.cljs が棚卸し候補を測る（決定論）
          2) 候補があるときだけ claude -p "/adr-inventory" を起こす
 
@@ -15,7 +15,7 @@
        docs-edn-repair と同じ 8h にはしない。1 日 1 件。
 
        止め方:
-         launchctl bootout gui/$(id -u)/com.gftd.adr-inventory
+         launchctl bootout gui/$(id -u)/cloud.itonami.bot.adr-inventory
        候補だけ見る（モデルを起こさない）:
          nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory-loop.cljs --dry-run -->
 

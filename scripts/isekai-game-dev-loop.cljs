@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; scripts/isekai-game-dev-loop.cljs — isekai.network ゲーム制作 bot の
 ;; **ローカル Claude loop** 入口（ADR-2608291600）。LaunchAgent
-;; com.gftd.isekai-game-dev が 6 時間ごとに起こす。
+;; cloud.itonami.bot.isekai-game-dev が 6 時間ごとに起こす。
 ;;
 ;; 2 段構え（姉妹 fleet-refactor-wave-loop.cljs / repo-bots/drain-loop.cljs と同型）:
 ;;   1. scripts/isekai-game-dev-tick.cljs が候補を**測る**（決定論）

@@ -1,6 +1,6 @@
 ---
 name: adr-inventory
-description: 90-docs/adr の古い・不適切な ADR を 1 件だけ棚卸しして着地させる。1 反復 = 1 finding。ローカル Claude loop（com.gftd.adr-inventory）が毎日これを呼ぶが、手で `/adr-inventory` と打ってもよい。「古い adr」「adr 棚卸し」「supersede 漏れ」で発火。
+description: 90-docs/adr の古い・不適切な ADR を 1 件だけ棚卸しして着地させる。1 反復 = 1 finding。ローカル Claude loop（cloud.itonami.bot.adr-inventory）が毎日これを呼ぶが、手で `/adr-inventory` と打ってもよい。「古い adr」「adr 棚卸し」「supersede 漏れ」で発火。
 ---
 
 # 古い / 不適切な ADR を 1 件棚卸しする

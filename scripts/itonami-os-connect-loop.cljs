@@ -1,11 +1,11 @@
 #!/usr/bin/env nbb
 ;; scripts/itonami-os-connect-loop.cljs — **ローカル Claude loop** の入口
-;; （superproject ADR-2608070000）。LaunchAgent com.gftd.itonami-os-connect が
+;; （superproject ADR-2608070000）。LaunchAgent cloud.itonami.bot.itonami-os-connect が
 ;; 一定間隔でこれを起こす。
 ;;
 ;; ## 姉妹 loop との違い: ここにはモデルが居る
 ;;
-;; `com.gftd.itonami-maturity-tick` / `com.gftd.tsukuru-maturity-tick` は
+;; `cloud.itonami.bot.itonami-maturity-tick` / `cloud.itonami.bot.tsukuru-maturity-tick` は
 ;; 決定論的で、モデルを 1 度も呼ばない。この loop は違う —— **測るのは決定論、
 ;; 判断と実装は Claude Code**、という 2 段構えになっている:
 ;;

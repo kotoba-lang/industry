@@ -1,6 +1,6 @@
 ---
 name: rule-kaizen
-description: standing な ADR / md / rule が、ある日の実装天井を『こう書くもの』として残していないかを 1 件だけ疑って着地させる。1 反復 = 1 finding。ローカル Codex loop（com.gftd.rule-kaizen）が毎日これを呼ぶが、手で `/rule-kaizen` と打ってもよい。「規則を疑う」「スナップショットが言語になっている」「rule kaizen」で発火。
+description: standing な ADR / md / rule が、ある日の実装天井を『こう書くもの』として残していないかを 1 件だけ疑って着地させる。1 反復 = 1 finding。ローカル Codex loop（cloud.itonami.bot.rule-kaizen）が毎日これを呼ぶが、手で `/rule-kaizen` と打ってもよい。「規則を疑う」「スナップショットが言語になっている」「rule kaizen」で発火。
 ---
 
 # 実装スナップショットを言語にしない（1 finding）

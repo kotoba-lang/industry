@@ -1,6 +1,6 @@
 ---
 name: kami-lib-update
-description: kami-engine family + core render/game lib（webgpu / webgl / host / scene2d / sprite2d / render / game / dance / bonsai）の west pin を upstream default branch tip へ前進させ、遅れた checkout を同期する。1 反復 = tick が見つけた遅れ pin の前進（batch 可）+ 床割れ修正は最大 1 件。ローカル Claude loop（com.gftd.kami-lib-update）が遅れのある周だけこれを呼ぶが、手で `/kami-lib-update` と打ってもよい。「kami の pin を進める」「lib 更新 bot」「kami lib update」「ライブラリ更新 loop」で発火。
+description: kami-engine family + core render/game lib（webgpu / webgl / host / scene2d / sprite2d / render / game / dance / bonsai）の west pin を upstream default branch tip へ前進させ、遅れた checkout を同期する。1 反復 = tick が見つけた遅れ pin の前進（batch 可）+ 床割れ修正は最大 1 件。ローカル Claude loop（cloud.itonami.bot.kami-lib-update）が遅れのある周だけこれを呼ぶが、手で `/kami-lib-update` と打ってもよい。「kami の pin を進める」「lib 更新 bot」「kami lib update」「ライブラリ更新 loop」で発火。
 ---
 
 # kami family の pin を tip へ進める

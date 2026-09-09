@@ -3,11 +3,13 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.orgs-detector-tick</string>
+  <string>cloud.itonami.bot.repo-bot-propose</string>
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/nbb</string>
-    <string>scripts/orgs-detector-tick.cljs</string>
+    <string>scripts/repo-bots/propose.cljs</string>
+    <string>--batch</string>
+    <string>8</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/Users/junkawasaki/github/com-junkawasaki</string>
@@ -17,12 +19,14 @@
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>
   <key>StartInterval</key>
-  <integer>21600</integer>
+  <integer>3600</integer>
   <key>RunAtLoad</key>
   <false/>
+  <key>Nice</key>
+  <integer>10</integer>
   <key>StandardOutPath</key>
-  <string>/Users/junkawasaki/.itonami/orgs-detector-tick.stdout.log</string>
+  <string>/Users/junkawasaki/.itonami/repo-bots/propose.stdout.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/junkawasaki/.itonami/orgs-detector-tick.stdout.log</string>
+  <string>/Users/junkawasaki/.itonami/repo-bots/propose.stdout.log</string>
 </dict>
 </plist>

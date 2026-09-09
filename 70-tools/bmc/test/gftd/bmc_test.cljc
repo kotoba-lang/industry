@@ -92,7 +92,7 @@
       (is (not (str/includes? p "/repo/")))))
   (testing "one ledger is one floor, however many checkouts reach it"
     ;; Measured 2026-08-31, hours after the floor landed: TWO marks existed for
-    ;; the canvas ledger, because com.gftd.itonami-qwen36-tick builds a fresh
+    ;; the canvas ledger, because cloud.itonami.bot.itonami-qwen36-tick builds a fresh
     ;; sibling worktree per run and deletes it. Keyed on the absolute path,
     ;; every tick got a new key and therefore a floor of zero -- the writer the
     ;; floor most needed to constrain was the one it did not.

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  com.gftd.newsfeed-ingest.plist — newsfeed の日次 ingest（ADR-2608031900）。
+  cloud.itonami.bot.newsfeed-ingest.plist — newsfeed の日次 ingest（ADR-2608031900）。
 
   なぜ launchd か: この workspace の定期実行は既に launchd に寄っている
-  （com.gftd.fleet-ci-tip-tick / com.gftd.fleet-ci-sweep）。別の scheduler を
+  （cloud.itonami.bot.fleet-ci-tip-tick / cloud.itonami.bot.fleet-ci-sweep）。別の scheduler を
   持ち込むと「どこで何が回っているか」が 2 箇所に割れる。
 
   なぜ operator マシンで回すか（fleet ノードでなく）:
@@ -20,16 +20,16 @@
   ずらしてある — 同時刻に走らせるとどちらの負荷か切り分けられない。
 
   導入:
-    cp scripts/fleet-ci/com.gftd.newsfeed-ingest.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.newsfeed-ingest.plist
-    launchctl kickstart -p gui/$(id -u)/com.gftd.newsfeed-ingest   ; 1 回だけ試す
+    cp scripts/fleet-ci/cloud.itonami.bot.newsfeed-ingest.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.newsfeed-ingest.plist
+    launchctl kickstart -p gui/$(id -u)/cloud.itonami.bot.newsfeed-ingest   ; 1 回だけ試す
   停止:
-    launchctl bootout gui/$(id -u)/com.gftd.newsfeed-ingest
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.newsfeed-ingest
 -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.newsfeed-ingest</string>
+  <string>cloud.itonami.bot.newsfeed-ingest</string>
 
   <key>ProgramArguments</key>
   <array>

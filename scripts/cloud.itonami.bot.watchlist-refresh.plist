@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  com.gftd.watchlist-refresh — 制裁リスト snapshot を週 1 回取り直し、着地させ、
+  cloud.itonami.bot.watchlist-refresh — 制裁リスト snapshot を週 1 回取り直し、着地させ、
   3 つの投影（git / R2 objects / Iceberg）を揃える。
 
   なぜ常駐させるか: snapshot は 2026-07-19 から 2026-08-26 まで 38 日古いまま
@@ -13,11 +13,11 @@
   気づかない。週 1 回なので、gate が赤くなるまでに 2 回失敗する猶予がある。
 
   install:
-    cp scripts/com.gftd.watchlist-refresh.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.watchlist-refresh.plist
+    cp scripts/cloud.itonami.bot.watchlist-refresh.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.watchlist-refresh.plist
 
   uninstall:
-    launchctl bootout gui/$(id -u)/com.gftd.watchlist-refresh
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.watchlist-refresh
 
   手で 1 回:
     nbb scripts/watchlist-refresh-cycle.cljs --dry-run    # 取得・ratchet・両 suite まで
@@ -40,7 +40,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.watchlist-refresh</string>
+  <string>cloud.itonami.bot.watchlist-refresh</string>
 
   <key>ProgramArguments</key>
   <array>

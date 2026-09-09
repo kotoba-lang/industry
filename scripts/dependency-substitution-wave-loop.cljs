@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; scripts/dependency-substitution-wave-loop.cljs — kotoba-lang 外部依存
 ;; substitution 波の **ローカル Claude loop** 入口。LaunchAgent
-;; com.gftd.dependency-substitution-wave が 6h ごとに起こす。
+;; cloud.itonami.bot.dependency-substitution-wave が 6h ごとに起こす。
 ;;
 ;; 手順の正本は skill `dependency-substitution-wave`。**ここには書かない。**
 ;;

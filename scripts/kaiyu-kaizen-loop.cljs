@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/kaiyu-kaizen-loop.cljs — **ローカル Claude loop** の入口。
-;; LaunchAgent `com.gftd.kaiyu-kaizen` が一定間隔でこれを起こす。
+;; LaunchAgent `cloud.itonami.bot.kaiyu-kaizen` が一定間隔でこれを起こす。
 ;;
 ;; ## 2 段構え（姉妹 loop と同じ）
 ;;

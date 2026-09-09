@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/spotwork-match-loop.cljs — スキマバイト突合 bot の **ローカル Claude
-;; loop** 入口（ADR-2608292100）。LaunchAgent com.gftd.spotwork-match が
+;; loop** 入口（ADR-2608292100）。LaunchAgent cloud.itonami.bot.spotwork-match が
 ;; 6 時間ごとに起こす想定。
 ;;
 ;; 2 段構え（姉妹 isekai-game-dev-loop.cljs / repo-bots/drain-loop.cljs と同型）:

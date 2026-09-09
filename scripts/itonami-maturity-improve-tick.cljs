@@ -4,11 +4,11 @@
 ;;
 ;; ## 姉妹との住み分け
 ;;
-;;   com.gftd.itonami-maturity-tick   決定論的欠陥クラス（Tier 1）を無人で直す。
+;;   cloud.itonami.bot.itonami-maturity-tick   決定論的欠陥クラス（Tier 1）を無人で直す。
 ;;                                    モデルは居ない。**2026-08-05 時点で枯れており**
 ;;                                    1,398 repo を 6h ごとに走査して findings 0。
-;;   com.gftd.itonami-os-connect      まだ繋がっていない産業を OS に 1 本繋ぐ（横）。
-;;   com.gftd.itonami-maturity-improve  ← これ。**軸そのものを上げる**（縦）。
+;;   cloud.itonami.bot.itonami-os-connect      まだ繋がっていない産業を OS に 1 本繋ぐ（横）。
+;;   cloud.itonami.bot.itonami-maturity-improve  ← これ。**軸そのものを上げる**（縦）。
 ;;
 ;; ADR-2608052000 は「どこに工数を積むと fleet 合計が最大に伸びるか」を
 ;; 計算したが、**それを定期的に実行するものが無かった**。この tick はその

@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/rule-kaizen-loop.cljs — ローカル Claude loop の入口。
-;; LaunchAgent `com.gftd.rule-kaizen` が一定間隔でこれを起こす（未配置）。
+;; LaunchAgent `cloud.itonami.bot.rule-kaizen` が一定間隔でこれを起こす（未配置）。
 ;;
 ;; 2 段構え（姉妹 loop と同じ）:
 ;;   1. `scripts/rule-kaizen-tick.cljs` が候補を測る（決定論）

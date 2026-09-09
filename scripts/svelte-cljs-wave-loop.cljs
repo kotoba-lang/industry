@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
 ;; scripts/svelte-cljs-wave-loop.cljs — Svelte → cljs 移行波の **ローカル
-;; Claude loop** 入口（ADR-2608260900）。LaunchAgent com.gftd.svelte-cljs-wave
+;; Claude loop** 入口（ADR-2608260900）。LaunchAgent cloud.itonami.bot.svelte-cljs-wave
 ;; が一定間隔で起こす。
 ;;
 ;; 2 段構え（姉妹 industry-stack-wave / itonami-os-connect と同型）:

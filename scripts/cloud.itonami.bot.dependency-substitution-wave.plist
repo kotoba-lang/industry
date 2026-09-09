@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  com.gftd.dependency-substitution-wave — kotoba-lang 外部依存 substitution 波
+  cloud.itonami.bot.dependency-substitution-wave — kotoba-lang 外部依存 substitution 波
   (ADR-2608301000)
 
   Install:
-    cp scripts/com.gftd.dependency-substitution-wave.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.dependency-substitution-wave.plist
-    launchctl kickstart -k gui/$(id -u)/com.gftd.dependency-substitution-wave
+    cp scripts/cloud.itonami.bot.dependency-substitution-wave.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.dependency-substitution-wave.plist
+    launchctl kickstart -k gui/$(id -u)/cloud.itonami.bot.dependency-substitution-wave
 
   Unload:
-    launchctl bootout gui/$(id -u)/com.gftd.dependency-substitution-wave
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.dependency-substitution-wave
 
   Interval: 21600s (6h). 1 波 = 1 coordinate × 最大 4 repo + pin 前進 + 再測定。
   lock file が重なりを防ぐ。候補 0 / 測れなかった周はモデルを起こさない。
@@ -33,7 +33,7 @@
 		<string>junkawasaki</string>
 	</dict>
 	<key>Label</key>
-	<string>com.gftd.dependency-substitution-wave</string>
+	<string>cloud.itonami.bot.dependency-substitution-wave</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/nbb</string>

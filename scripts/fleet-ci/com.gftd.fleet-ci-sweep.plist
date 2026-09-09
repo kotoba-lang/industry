@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  com.gftd.fleet-ci-sweep — fleet ノードのディスク回収を 1 日 1 回走らせる。
+  cloud.itonami.bot.fleet-ci-sweep — fleet ノードのディスク回収を 1 日 1 回走らせる。
 
   なぜ常駐させるか: 満杯のノードは gate を **走らせる前に** 殺す。tar が
   "No space left on device" で落ちるので、CI は赤にすらならず何の signal も出ない。
@@ -8,12 +8,12 @@
   数百 MiB まで詰まっていた。手で気づけるものではないので定期実行にする。
 
   install:
-    cp scripts/fleet-ci/com.gftd.fleet-ci-sweep.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.fleet-ci-sweep.plist
-    launchctl kickstart -p gui/$(id -u)/com.gftd.fleet-ci-sweep     # 1 回手動起動
+    cp scripts/fleet-ci/cloud.itonami.bot.fleet-ci-sweep.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.fleet-ci-sweep.plist
+    launchctl kickstart -p gui/$(id -u)/cloud.itonami.bot.fleet-ci-sweep     # 1 回手動起動
 
   uninstall:
-    launchctl bootout gui/$(id -u)/com.gftd.fleet-ci-sweep
+    launchctl bootout gui/$(id -u)/cloud.itonami.bot.fleet-ci-sweep
 
   credential: 不要。ノードへの ssh 鍵だけで、kagi も GitHub token も使わない
   （sweep は receipt を作らないので署名しない）。launchd 下で Keychain が
@@ -27,7 +27,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.gftd.fleet-ci-sweep</string>
+  <string>cloud.itonami.bot.fleet-ci-sweep</string>
 
   <key>ProgramArguments</key>
   <array>

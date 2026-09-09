@@ -50,10 +50,10 @@ receipt を組み立てる `kagami` 側の仕事であってここではない�
 | `tick.cljs` | 本体（tip 検出 → gate 実行 → receipt → status → pin 前進） |
 | `tick-unit-test.cljs` | batch 内 git dependency dedupe と一時 worktree cleanup の回帰テスト |
 | `gates/docs-edn-check.cljs` | EDN-only ドキュメント repo 用の gate（ノードへ配って実行） |
-| `com.gftd.fleet-ci-tip-tick.plist` | 5 分間隔の LaunchAgent（install 手順はファイル冒頭のコメント） |
+| `cloud.itonami.bot.fleet-ci-tip-tick.plist` | 5 分間隔の LaunchAgent（install 手順はファイル冒頭のコメント） |
 | `sweep.edn` | **ディスク回収ポリシー（allowlist）**。1 行足せば対象が増える |
 | `sweep.cljs` | ノードのディスクを回収する（既定 dry-run、`--apply` で実行） |
-| `com.gftd.fleet-ci-sweep.plist` | 日次 04:17 の sweep LaunchAgent |
+| `cloud.itonami.bot.fleet-ci-sweep.plist` | 日次 04:17 の sweep LaunchAgent |
 
 状態・ログはリポジトリ外（`~/.itonami/`）:
 `fleet-ci-state.edn`（repo → 最後に検証した sha）/ `fleet-ci-tick.log`（正本ログ）/
@@ -79,9 +79,9 @@ nbb scripts/fleet-ci/provision.cljs --from-nodes --need jvm
 nbb scripts/fleet-ci/probe.cljs
 
 # 常駐（5 分間隔）
-cp scripts/fleet-ci/com.gftd.fleet-ci-tip-tick.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.fleet-ci-tip-tick.plist
-launchctl kickstart -p gui/$(id -u)/com.gftd.fleet-ci-tip-tick   # 1 回だけ手動起動
+cp scripts/fleet-ci/cloud.itonami.bot.fleet-ci-tip-tick.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.fleet-ci-tip-tick.plist
+launchctl kickstart -p gui/$(id -u)/cloud.itonami.bot.fleet-ci-tip-tick   # 1 回だけ手動起動
 ```
 
 Receipt landing uses a no-checkout sparse worktree containing only
