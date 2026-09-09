@@ -96,11 +96,10 @@ ADR-2608157000 の「未了」3 項目は、どれも「まだやっていない
 
 - **bytes は kotobase.net に寄せる。** ADR-2608159100 が既に「live service の durable
   source は Kotobase、authority と既定 API origin は `https://kotobase.net`」と決めている。
-  第二の bytes plane を持つ理由が無く、実測でも itonami.cloud 側は壊れている（**失敗の形は
-  一定しない** —— 11:0x に 502 / 27 bytes、11:26 に 25 秒 timeout で 0 bytes。親host の
-  `ipfs.itonami.cloud/health` は 200 なので Worker は生きており、wildcard subdomain 経路
-  だけが落ちている。TLS ではない —— 証明書の SAN に `*.ipfs.itonami.cloud` が在る）。
-  kotobase.net 側は 200。`{cid}.ipfs.itonami.cloud` は直すか退役させるかを別途決める —— **どちらでも
+  第二の bytes plane を持つ理由が無い。
+  ⚠ **この節は初版で `{cid}.ipfs.itonami.cloud` を「壊れている」と書いた。誤診だった**
+  （2026-09-09 に原因を特定して訂正）。ホストも TLS も Worker も正常で、原因は
+  **web plane と bytes plane が別の store を読むこと**である —— 下の「2 つの store」節。`{cid}.ipfs.itonami.cloud` は直すか退役させるかを別途決める —— **どちらでも
   identity は動かない。それがこの表が設定であって設計でないということ。**
 - **entry は `{name}.itonami.app`。path ではなく hostname である。** これは美観ではなく
   3 つの測れる理由による（2026-09-09 オーナー指摘で訂正。初版は `itonami.app/{name}/` と
@@ -197,6 +196,38 @@ control:
   kotobase の retired hostname と同じ道を行く。sites.edn の `:org \"app\"` を付け替える
   ところまでを 1 組の作業とする。
 
+## bytes plane と web plane は別の store を読む（2026-09-09、初版の誤診を訂正）
+
+**`PUT /ipfs/{cid}` が書くのは B2 で、app を配る web/origin plane が読むのは R2 である。**
+
+| 面 | 実装 | 読む先 |
+|---|---|---|
+| bytes `{cid}.ipfs.kotobase.net` | `gateway/serve-archive-target` | **B2**（無ければ公開 gateway へ proxy） |
+| web `{cid}.ipfs.itonami.cloud` / `{name}.itonami.app` | `origin/serve-from-r2` | **R2 `ipld/{cid}`**（`KOTOBASE_BLOCKS`） |
+
+だから `content-address publish` で archive した document は bytes plane からは 200 で
+取れ、**web plane からは取れない** —— R2 に無いので `:root-missing` になり、fallback の
+`KOTOBASE_IPFS_GATEWAY_URL`（`https://ipfs.io`）にも無いので 502 archive gateway
+unavailable が返る。
+
+**この 1 つの事実が、この ADR が初版で「壊れている」と書いた 502 のすべてである。**
+ホストは正常で、証明書も正常で、Worker も生きていた。**測った症状は正しく、原因の帰属が
+誤っていた** —— 「どの URL が落ちているか」だけを見て「そのホストが壊れている」と書き、
+その URL が読む store を確かめていなかった。
+
+genko の block を `wrangler r2 object put kotobase-graph-database-production/ipld/{cid}`
+で置くと、**同じ CID が `{cid}.ipfs.itonami.cloud` でも 200 になった**（それまで 502）。
+
+**恒久の直し方は 2 つあり、まだ決めていない**（どちらもこの ADR の範囲外の別決定）:
+
+1. **publish が両方に書く** —— `content-address publish` が B2（identity/archive）と
+   R2（web plane）の両方へ置く。単純だが、2 つの store に同じバイト列を持つ。
+2. **origin plane が B2 へ fallback する** —— `serve-from-r2` の `:root-missing` で、
+   公開 gateway より先に archive を見る。2 面が「何が存在するか」で食い違わなくなるが、
+   retrieval 経路に触る。
+
+**どちらを採るまで、新しい `:document` は publish のあとに R2 へも置く必要がある。**
+
 ## 適用 1 件目 —— genko（2026-09-09）
 
 `kotoba-lang/kami-genko` を `:kind :document` で通した（kami-genko#13、merged）。
@@ -220,15 +251,45 @@ naming も張った: `_dnslink.genko.itonami.app TXT dnslink=/ipfs/{cid}`。**Cl
 受理したことは解決の証拠ではない**ので公開 DNS から引き直し、1.1.1.1 と 8.8.8.8 の
 2 resolver で一致を確認した。
 
-**まだ通っていない 2 点を、通ったことと区別して書く:**
+### entry 面も通した（同日、net-kotobase/ipfs#62）
+
+worker に `:dnslink-origin` を足した。`{name}.itonami.app` が
+`_dnslink.{name}.itonami.app` を DoH で引き、その CID を **既存の origin 経路と同じ関数**
+で配る（retrieval も CID 検証も header も第二実装を作らない）。route は wildcard
+`*.itonami.app/*`、DNS は `AAAA *.itonami.app → 100::` proxied（`*.ipfs.itonami.cloud` と
+同じ形）。**app を公開するのは wrangler.jsonc の行ではなく `_dnslink` レコードである** ——
+レコードの無い名前は 404 `dnslink/absent` を返す。apex は suffix の外なので配信しない。
+
+実測（両方向）:
+
+    https://genko.itonami.app/       200 / 633,269 bytes / text/html  バイト一致
+    https://nosuchapp.itonami.app/   404 dnslink/absent
+    {cid}.ipfs.itonami.cloud/        200（R2 に置く前は 502）
+    {cid}.ipfs.kotobase.net/         200
+
+**live plane で成果物を実行した**: `{cid}.ipfs.itonami.cloud` に対して kami-genko の
+verify-browser を走らせ **18/18 PASS**（console error なし）。file:// のときと同じ結果で、
+worker 経由でも壊れていない。
+
+テストが本物のバグを 1 つ捕まえた: `kotoba.lang.text/split` は **regex を取る**
+（`clojure.string/split` と違い文字列セパレータを受けない）。文字列を渡すと
+`match-spans` に届いて undefined.includes を投げる。10 errors、全部 `txt-value` を
+名指ししており、欠陥はそこに在った。
+
+**まだ通っていない 1 点:**
 
 - **公開 gateway からは取れない。** `https://ipfs.io/ipns/genko.itonami.app/` は **504**。
-  名前は解決するが、block を公開ネットワークへ announce していないので取得できない。
-  今日 genko が取れるのは `{cid}.ipfs.kotobase.net`（実測 200、バイト一致）だけである。
-- **`genko.itonami.app` は HTTP を答えない。** `net-kotobase/ipfs` の worker は
-  `origin_hosts` に 4 つの wildcard（`*.ipfs|ipns.itonami.cloud` / `.kotobase.net`）しか
-  持たず、**任意ホストの DNSLink 解決を実装していない**。entry 面を立てるには worker 側の
-  変更（Host から DNSLink を引く）と custom domain の追加が要る。
+  名前は解決するが、block を公開ネットワークへ announce していない。
+  ⚠ **announce の扉は private-git のものである** —— `ipni-drain` の `drainIpni` は
+  `kotobase-private-git-production` の `ipni-staging/{outbox_id}/{cid}` に staging された
+  バイト列を要求し、その sha256 が宣言 CID と一致することを検査する。公開バケットに在る
+  公開文書を通す口ではない。**公開 announce 経路は未実装**で、それを足すことは
+  「staging を読める唯一のコンポーネント」に公開バケットへの新しい書き込み口を足すことに
+  なるので、設計判断としてオーナーに出す。
+  なお publisher 自体は live で crawl されている: cid.contact の provider 一覧に
+  `12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of`
+  （`/dns4/ipfs.kotobase.net/tcp/443/https`、LastAdvertisementTime 2026-09-08）が在り、
+  genko の CID を引くと 404 —— 機構は動いていて、genko が chain に載っていないだけである。
 
 `itonami.app` zone は実測でレコード 0 件だった（zone は在るが何も載っていない）。
 いま載っているのはこの TXT 1 本だけである。
