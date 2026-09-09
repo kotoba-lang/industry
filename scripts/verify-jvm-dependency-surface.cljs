@@ -74,6 +74,7 @@
 
 (def fs (js/require "node:fs"))
 (def node-path (js/require "node:path"))
+(def child (js/require "node:child_process"))
 (def argv (vec (drop 2 js/process.argv)))
 (defn flag? [f] (some #{f} argv))
 (defn opt [f] (second (drop-while #(not= f %) argv)))
@@ -97,6 +98,68 @@
   (->> (str/split-lines (.readFileSync fs (full "manifest/west.yml") "utf8"))
        (keep #(second (re-find #"^\s+path:\s*(\S+)\s*$" %)))
        (into (sorted-set))))
+
+(def pins
+  "path -> the commit west.yml pins that project at.
+
+  west.yml emits `revision:` immediately before `path:` for each entry, so the
+  pin for a path is the last revision seen above it. Parsed the same way
+  `registered` is parsed, and for the same stated reason: adding a YAML
+  dependency to this detector to read four lines is worse than reading four
+  lines."
+  (loop [lines (str/split-lines (.readFileSync fs (full "manifest/west.yml") "utf8"))
+         rev nil
+         acc {}]
+    (if-let [line (first lines)]
+      (if-let [r (second (re-find #"^\s+revision:\s*([0-9a-f]{7,40})\s*$" line))]
+        (recur (rest lines) r acc)
+        (if-let [pth (second (re-find #"^\s+path:\s*(\S+)\s*$" line))]
+          (recur (rest lines) nil (if rev (assoc acc pth rev) acc))
+          (recur (rest lines) rev acc)))
+      acc)))
+
+(defn head-of
+  "The checkout's HEAD, or nil if git could not answer."
+  [repo]
+  (let [r (.spawnSync child "git" (clj->js ["-C" (full repo) "rev-parse" "HEAD"])
+                      #js {:encoding "utf8"})]
+    (when (and (zero? (.-status r)) (.-stdout r))
+      (str/trim (.-stdout r)))))
+
+(defn off-pin
+  "`nil` if the checkout is at its pin, else a sentence saying what it is at
+  instead.
+
+  Why this exists. Every count below is read off `orgs/<org>/<repo>` as it sits
+  on this disk, and a checkout is a third thing beside the pin and the repo's
+  own main (ADR-2608136800). A finding from a tree that is not at its pin is not
+  a fact about the project -- it is a fact about somebody's working copy, and
+  the two are indistinguishable in the output until something says so.
+
+  Measured 2026-09-09, and this is why the check is here rather than in a note:
+  this detector reported `jvm-runtime-deps:orgs/kotoba-lang/amu -- org.clojure/
+  tools.reader`. At amu's pin that dependency is not in the top-level `:deps`;
+  it was moved out on 2026-09-08 and `clojure -Spath | grep -c tools.reader`
+  goes 1 -> 0 across that advance. The shared checkout was sitting on a local
+  commit from a cron tick with 584 uncommitted files, and the detector reported
+  its `deps.edn` as the project's.
+
+  The finding is NOT suppressed -- suppressing would under-report real debt on
+  the strength of a guess about which direction the tree drifted. It is marked,
+  and the marked ones are counted, so a reader can tell a measurement from a
+  measurement of the wrong tree."
+  [repo]
+  (let [pin (get pins repo)
+        head (head-of repo)]
+    (cond
+      ;; Not `nil`. A pin this parser could not read is the same class of
+      ;; unknown as a checkout git could not answer for, and answering `nil`
+      ;; here would print it as `measured at its pin`.
+      (nil? pin)  "pin unknown: no revision: line parsed for this path"
+      (nil? head) "tree state unknown: git could not answer rev-parse HEAD"
+      (= pin head) nil
+      :else (str "tree off pin: HEAD " (subs head 0 (min 9 (count head)))
+                 " != pin " (subs pin 0 (min 9 (count pin)))))))
 
 (when (empty? registered)
   (println "SCANNED\t0\tregistered repo(s) -- west.yml yielded no path: entries")
@@ -478,11 +541,20 @@
   (println "  wrote" edn-out))
 
 (when findings?
-  (println (str "SCANNED\t" (:present @stats) "\tregistered repo(s) present on disk"))
-  (doseq [f (sort-by (juxt :kind :repo) all-findings)
-          :when (emitted-kinds (:kind f))]
-    (println (str "FINDING\t" (:sev f) "\t" (name (:kind f)) ":" (:repo f)
-                  "\t" (:detail f)))))
+  (let [emitted (filter #(emitted-kinds (:kind %)) all-findings)
+        ;; One `git rev-parse` per REPO that has something to report, not per
+        ;; finding and not per registered checkout -- the question only matters
+        ;; where a number is about to be printed.
+        drift (into {} (map (juxt identity off-pin)) (distinct (map :repo emitted)))
+        marked (filter #(drift (:repo %)) emitted)]
+    (println (str "SCANNED\t" (:present @stats) "\tregistered repo(s) present on disk"))
+    (println (str "OFF-PIN\t" (count (distinct (map :repo marked))) "\tof "
+                  (count drift) " reporting repo(s) are not at their west pin; "
+                  (count marked) " finding(s) below describe a tree nobody ships"))
+    (doseq [f (sort-by (juxt :kind :repo) emitted)]
+      (println (str "FINDING\t" (:sev f) "\t" (name (:kind f)) ":" (:repo f)
+                    "\t" (:detail f)
+                    (when-let [d (drift (:repo f))] (str " [" d "]")))))))
 
 (when (and strict? (some #(= "fail" (:sev %)) all-findings))
   (.exit js/process 1))
