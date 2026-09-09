@@ -67,6 +67,71 @@
  :dependency-substitution/measured "2026-08-26"
  :dependency-substitution/scope "orgs/kotoba-lang"
 
+ :dependency-substitution/coverage-2026-09-09
+ ;; What this ledger does NOT cover, measured rather than inferred from its
+ ;; own scope line. `:dependency-substitution/scope "orgs/kotoba-lang"` is
+ ;; true and reads as completeness; the detector that counts the same debt
+ ;; workspace-wide is `scripts/verify-jvm-dependency-surface.cljs`, and its
+ ;; `jvm-runtime-deps` class disagrees with this file in two ways.
+ {:measured-by "nbb --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.cljs --findings orgs"
+  :reporting-repos 75
+  :in-this-ledgers-scope 18
+  :outside-it 57
+  :outside-by-org {:cloud-itonami 35 :network-awai 16 :com-junkawasaki 3
+                   :etzhayyim 2 :gftdcojp 1}
+
+  :the-scope-gap
+  "The five largest coordinates have ZERO occurrences in orgs/kotoba-lang:
+   org.clojure/data.json 27, metosin/jsonista 21, http-kit/http-kit 19,
+   ring/ring-core 12, metosin/reitit-ring 9 -- 88 declarations, none of them
+   in scope. They are one shape (JSON codec + HTTP server + ring + routing)
+   and they sit in one application family. Three of the five already have a
+   :first-party-exists disposition below, so for those the substitute exists
+   and the SCOPE is what excludes the repositories that would use it.
+   Widening the scope is a decision this ledger's owner makes; naming the gap
+   is not."
+
+  :the-coverage-gap
+  "Six coordinates carry no entry at all -- 36 declarations. Candidate targets
+   below were found with `nbb scripts/repo-search.cljs` and read out of each
+   repository's README; they are CANDIDATES, not dispositions, and are
+   recorded that way deliberately. A disposition asserts that a substitution
+   is the right move, which is a judgement; this is only the measurement that
+   a plausible first-party target exists and can be checked in one command."
+  :unlisted-coordinates
+  {"ring/ring-core"
+   {:declarations 12 :candidate "kotoba-lang/http"
+    :evidence "README: `a request/response data model plus a pure parse-url, with an
+     IHttp protocol the host injects` -- which is what ring-core is. http-kit
+     already points at this repo below."}
+   "metosin/reitit-ring"
+   {:declarations 9 :candidate :none-found
+    :evidence "kotoba-lang/route is FRAGMENT routing for single-page apps in the
+     browser, not server-side request routing. Searched `routing route`; no
+     first-party server router surfaced. An honest gap."}
+   "org.clojure/tools.logging"
+   {:declarations 6 :candidate "kotoba-lang/log"
+    :evidence "README: `Structured logging + telemetry (trace/span) as pure data`."}
+   "org.slf4j/slf4j-simple"
+   {:declarations 5 :candidate "kotoba-lang/log"
+    :evidence "Same target as tools.logging; slf4j-simple is the backend the
+     other one logs through."}
+   "com.fasterxml.jackson.dataformat/jackson-dataformat-cbor"
+   {:declarations 2 :candidate "kotoba-lang/org-ietf-cbor"
+    :evidence "README: `Definite-length CBOR (RFC 8949) encode/decode`."}
+   "org.babashka/cli"
+   {:declarations 2 :candidate :none-found
+    :evidence "bb is retired as a script host (ADR-2607173000) and new tooling is
+     kbb-first, so the answer here is probably the kbb migration rather than a
+     library substitution. Not decided."}}
+
+  :what-this-does-not-say
+  "It does not say the ledger is wrong. Its scope is stated and its 108
+   dispositions are about the repositories in it. It says that a reader who
+   takes the `jvm-runtime-deps` count of 75 to this file will find 18 of those
+   repositories and five of the largest coordinates absent, and will not be
+   told why unless this key is here."}
+
  :dependency-substitution/dispositions
  [;; ------------------------------------------------ structural: the host itself
   {:coordinate "org.clojure/clojure" :ecosystem :maven :disposition :structural
