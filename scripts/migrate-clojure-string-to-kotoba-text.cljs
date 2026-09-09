@@ -48,7 +48,8 @@
 
     nbb --classpath \".:scripts/nbb_compat\" scripts/migrate-clojure-string-to-kotoba-text.cljs \\
         --repo <dir> --text-sha <40-hex> [--apply]"
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [cljs.reader :as reader]))
 
 (def fs (js/require "node:fs"))
 (def path-mod (js/require "node:path"))
@@ -397,6 +398,49 @@
                     :else nil))
             :else (recur (inc i) depth false false false))))))))
 
+(defn- declaration-landed?
+  "Whether the ONLY semantic change to the project file is one added dependency.
+
+  Added 2026-09-09, after thirty deps.edn files were found split in half by an
+  earlier version of the insertion arithmetic. Every one passed the read-back
+  invariant, because that invariant asks whether the SOURCE files round-trip and
+  never looked at the project file this tool also writes.
+
+  The first version of this check only asked whether the result still PARSED,
+  and that was not enough -- discriminated by reintroducing the bug at a
+  different offset, which produced
+
+      {:paths [\"src\"] :deps io.github.kotoba-lang/text {...} {com.example/a ...}}
+
+  an even number of forms, a clean parse, and `:deps` bound to a symbol. A check
+  that a corrupted file can satisfy is not a check. So the question asked here
+  is the whole statement instead: read both sides, and require that everything
+  outside `:deps` is untouched and that `:deps` differs by exactly the one entry
+  this tool meant to add.
+
+  Comments are dropped by the reader, which is right for this: what is being
+  compared is what tools.deps will see, not the bytes.
+
+  cljs.reader is stricter than Clojure's about multi-segment keywords, so an
+  unreadable BEFORE is reported as the repo's own defect rather than as damage
+  from this edit -- see the two refusals at the call site."
+  [before after]
+  (let [b (try (reader/read-string before) (catch :default _ nil))
+        a (try (reader/read-string after) (catch :default _ nil))]
+    (boolean
+      (and (map? b) (map? a)
+           (= (dissoc b :deps) (dissoc a :deps))
+           (map? (:deps a))
+           (contains? (:deps a) 'io.github.kotoba-lang/text)
+           (= (dissoc (:deps a) 'io.github.kotoba-lang/text)
+              (or (:deps b) {}))))))
+
+(defn- reads-back?
+  "Whether this text reads back as an EDN map at all. Used only to tell a file
+  that was ALREADY broken from one this tool broke."
+  [text]
+  (try (map? (reader/read-string text)) (catch :default _ false)))
+
 (defn- add-dep [deps-path]
   (let [s (.readFileSync fs deps-path "utf8")]
     (cond
@@ -551,8 +595,29 @@
                               " or bb.edn above any of them to declare kotoba.lang.text"
                               " in -- the namespace would not resolve")))
               (doseq [dp targets-deps]
-                (let [[status s'] (add-dep dp)]
-                  (when (#{:added :inserted} status) (.writeFileSync fs dp s' "utf8"))
+                (let [before (.readFileSync fs dp "utf8")
+                      [status s'] (add-dep dp)]
+                  ;; Parse BEFORE writing. A project file this tool cannot read
+                  ;; back is one it must not edit -- and if it could not read it
+                  ;; beforehand either, that is the repo's defect to report, not
+                  ;; this tool's to paper over.
+                  (when (#{:added :inserted} status)
+                    (cond
+                      (not (reads-back? before))
+                      (refuse! (str dp " does not read back as an EDN map BEFORE this"
+                                    " tool touched it -- broken already, and not by"
+                                    " this edit. The declaration was NOT written; the"
+                                    " source rewrites are on disk, so discard this"
+                                    " working tree. The project file needs a human."))
+                      (not (declaration-landed? before s'))
+                      (refuse! (str "inserting the kotoba.lang.text declaration into "
+                                    dp " did not leave the rest of that file alone:"
+                                    " read back, it is not the same map plus exactly"
+                                    " one dependency. The insertion arithmetic is"
+                                    " wrong for this file's shape. The project file"
+                                    " was NOT written; the source rewrites are on"
+                                    " disk, so discard this working tree."))
+                      :else (.writeFileSync fs dp s' "utf8")))
                   (println (str "DEPS\t" (name status) "\t" dp))
                   (when (= :refused status)
                     (refuse! (str dp " has neither a locatable top-level :deps nor a"
