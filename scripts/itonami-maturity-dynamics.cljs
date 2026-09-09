@@ -698,6 +698,16 @@
                         :uncounted/test-bytes (:uncounted/test-bytes e 0)
                         :uncounted/readme-file-count (:uncounted/readme-file-count e 0)
                         :uncounted/url-count (:uncounted/url-count e 0)
+                        ;; 計数外の**言語**で書かれた実装。上の 2 対は src-ext
+                        ;; （clj/cljs/cljc/kotoba）を要求するので、Clojure を 1 行も
+                        ;; 持たない repo では counted も uncounted も 0 になり、
+                        ;; 実装が空の repo と見分けが付かない。これもスコアには
+                        ;; 一切入らない —— tick が「読めなかった」と言うためだけに運ぶ。
+                        :uncounted/foreign-src-file-count (:uncounted/foreign-src-file-count e 0)
+                        :uncounted/foreign-src-bytes (:uncounted/foreign-src-bytes e 0)
+                        :uncounted/foreign-test-file-count (:uncounted/foreign-test-file-count e 0)
+                        :uncounted/foreign-test-bytes (:uncounted/foreign-test-bytes e 0)
+                        :uncounted/foreign-langs (:uncounted/foreign-langs e {})
                         ;; ── walk が repo を最後まで見られたか（scan の walk-files が
                         ;; 立てる 2 つの旗）。**スコアには一切入らない** —— :uncounted/*
                         ;; と同じ扱いで、運ぶ理由も同じ「tick は datoms しか読まない」。

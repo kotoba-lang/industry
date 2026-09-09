@@ -1,0 +1,51 @@
+[{:db/id -1
+  :adr/id "adr-2609092800-maturity-loop-unreadable-language-exclusion"
+  :adr/doc_type "adr"
+  :adr/topic "maturity-loop-unreadable-language-exclusion"
+  :adr/title "成熟度 loop は「読めない言語で書かれた repo」を候補から外す —— 実装が在る 116 repo が、空の repo と同じ 0bp を返していた"
+  :adr/status :accepted
+  :adr/date "2026-09-09"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/related ["adr-2608052000-itonami-maturity-dependency-system-dynamics"
+                "adr-2608080000-itonami-maturity-improve-loop"]
+  :adr/authoritative_for
+  ["itonami 成熟度 scan が『計数外の言語で書かれた実装』を報告する方法"
+   "improve tick が 0bp を伸びしろとして扱ってよい条件"]
+  :adr/context
+  "scan が数える拡張子は src-ext = #{cljc cljs clj kotoba} だけである。Solidity / TypeScript / Go / Python で書かれた repo は substrate も test も 0bp になる。問題はそこではなく、**その 0 が報告の上で「空の repo」と区別できない**ことにある —— 既存の報告専用フィールド :uncounted/src-* と :uncounted/test-* も条件に src-ext を持つので、Clojure を 1 行も持たない repo は『計数外の src も 0』と答える。counted も uncounted も全部 0 という同じ顔で並ぶ。
+
+CLAUDE.md の 8 問の 1 問目そのもの: 測れなかった検査が、測って問題が無かった検査と同じ値を返す。
+
+実害は仮定ではない。2026-09-09 のこの周、tick の上位 5 本のうち 4 本（chain-contracts / app-6ir / app-ge / app-ka）がこの形で、それぞれに `axis-test 0bp → +2000bp` `axis-substrate 0bp → +2500bp` の伸びしろが提示されていた。chain-contracts は Foundry の repo で、`contracts/test/*.t.sol` に 5 本・40,250 バイトの test が既に在る。この提示に素直に従う agent には 2 つの道しかない —— repo の言語を捨てて Clojure の test を置くか（水増し）、正しく Solidity の test を足して軸が 1bp も動かないのを見るか。前者は skill が禁じ、後者は loop が同じ repo へ次周も送る。
+
+前例がある。archived な repo は push できないのに『伸びしろ最大』と読まれ、loop は 3 周連続で先頭の手を捨てた。walk が max-entries で打ち切られた repo も同じ理由で 2026-09-09 に除外された。今回はその family の 3 例目で、原因だけが違う —— walk は最後まで歩けており、ファイルは見えている。読めないのは言語の方である。"
+  :adr/decision
+  "(1) scan は報告専用フィールドを 5 つ足す: :uncounted/foreign-src-file-count / -bytes、:uncounted/foreign-test-file-count / -bytes、:uncounted/foreign-langs（拡張子→件数）。**どの :maturity/* もこれを読まない。** 測り方（軸・重み）は 1bp も変えない —— それはオーナー判断であって scan の判断ではない（ADR-2608052000）。
+
+(2) vendored な依存は数えない。名前で `lib/` を弾くと Elixir と Ruby の一次ソースが消えるので、`.gitmodules` が submodule として宣言した path だけを外す。
+
+(3) dynamics はこの 5 つを datoms まで運ぶ（tick は datoms しか読まない）。
+
+(4) tick は「counted の substrate と test が両方 0bp」かつ「foreign src が実在する」repo を候補から外す。truncation とは**別のリストで数える** —— 2 つの失敗を 1 つの数に畳むと『walk を直せば済む』と読めてしまう。
+
+(5) 旗が datoms に無い周は :foreign-flags-not-carried と書き、『読めない repo は 0 本』とは書かない。訊かなかった周と、訊いて 0 だった周を同じ顔にしない。
+
+この規則は fail-open である: 実装が空の repo（181 本）も、shell だけの repo も、候補に残る。落とすのは『実装が在ることを確認できた』repo だけ。"
+  :adr/consequences
+  "候補から 116 repo が外れる（lane と archived の絞り込み後で 105）。これらは順位にも fleet 平均にも従来どおり載る —— 変わるのは行き先だけ。
+
+**これは『これらの repo を測れるようにした』ではない。** 隠れている src 1,277 ファイル / test 166 ファイルは依然としてスコアに入らない。この ADR が閉じたのは『測れないものを伸びしろとして提示する』という誤りだけで、『非 Clojure repo をどう採点するか』は開いたままである。採点したいなら src-ext を広げることになり、それは数百 repo の own が一度に動く変更なのでオーナー判断を要する。
+
+次に読む人へ: 116 という数を引用しない。datoms を数え直すこと。"
+  :adr/verification
+  "4 つの gate を通し、**どれも落ちることを先に見た**。
+
+(1) 検出の両方向。chain-contracts: counted src=0/test=0、uncounted src=0/test=0、foreign src=29/test=5、langs {sol 33, mjs 1} —— disk の実測（15 src + 13 script + 5 test = 33 .sol）と一致。app-screener: foreign src=51 / test=0（実装は在るが test は無い、を正しく分けている）。Clojure repo（aburi 等）は foreign-src=0 で旗が立たない。実装が空の 181 repo も 0。
+
+(2) スコアが動かないこと。新しい 5 キーを evidence から dissoc したコピーで dynamics を回し、2,015 repo × 19 の :maturity/* :leverage/* フィールドを比較 → 差分 0。落とすことも見た: :maturity/own-bp を 1bp ずらすと exit 1 で `orgs/cloud-itonami/aburi` を名指しした。
+
+(3) Kotoba カーネルとのパリティ（ADR-2608052000）。PASS 2,015 repo / 45.7s。落とすことも見た: 1bp ずらすと `cljs=3458 kotoba=3457` で exit 1。両方の run で `Could not find namespace` が 0 件であることを確認した —— 起動しなかったときの exit も 1 なので、exit だけでは本物の FAIL と区別できない。
+
+(4) tick の挙動。105 本を理由付きで除外し、chain-contracts / app-6ir / app-ge / app-ka が順位から消え、代わりに実際に測れる repo（com-apple-fileprovider: counted test 1115bp）が候補に出た。fail-closed も実演した: 旧 datoms を読ませた 1 回目は『除外 0 本』ではなく『:uncounted/foreign-src-file-count を運んでいない、この除外は効いていない』と言って止まった。
+
+(5) 誤爆が無いこと。旗が立った 116 本のうち、counted 軸が非ゼロのものは 0 本、foreign src を持たないものは 0 本。\\n\\n(6) この ADR 自身。top-level の key がすべて keyword であること（早く閉じた文字列の署名）と、本文 9 フィールドがすべて string であることを確認した。落とすことも見た: :adr/topic の文字列を途中で閉じて次の語を key 位置に置いたコピーは exit 1 で corrupted-key を名指しし、無改変では exit 0 になる。⚠ repo の docs-edn-check.cljs --strict-keys は、この sparse worktree からはこのファイルを discriminate できない —— cone の外に 802 の EDN が在って全部 ENOENT になり、FAIL 表示の 20 枠を先に埋める（実測: 故意に壊しても私のファイルは名指しされなかった）。この gate は cone の広い checkout で回す必要がある。"}]

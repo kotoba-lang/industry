@@ -403,6 +403,37 @@
   [e]
   (boolean (:repo/files-truncated? e)))
 
+(defn- unreadable-language?
+  "Is this row's 0bp a property of the repository, or of the instrument?
+
+   `scan` counts only src-ext (clj / cljs / cljc / kotoba). A repository written
+   in Solidity, TypeScript, Go or Python therefore scores substrate 0 **and**
+   test 0, and — because `:uncounted/src-*` and `:uncounted/test-*` also require
+   src-ext — it reports nothing uncounted either. Every key reads zero, which is
+   exactly what an empty repository reports.
+
+   That is the 1st of CLAUDE.md's eight questions: the measurement that could not
+   be taken returns the same value as the measurement that was taken and found
+   nothing. It matters here for the same reason truncation does — the ranking
+   reads those zeros as headroom and sends an agent to add what is already there,
+   in a language the agent would have to abandon to make the number move.
+
+   実測 2026-09-09、この除外が生まれた周: 2,015 の scored repo のうち **116 本**が
+   substrate も test も 0bp のまま非 Clojure の実装を持ち、**80 本は test まで
+   持っていた**（隠れていたのは src 1,277 ファイル / test 166 ファイル）。tick は
+   その 80 本へ `axis-test 0bp -> +2000bp` の伸びしろを提示し続けていた。1 位から
+   5 位までのうち 4 本がこれだった。**数はここに焼かずに数え直すこと** ——
+   `:uncounted/foreign-src-file-count` を持つ datoms を数えれば今日の値が出る。
+
+   True only when the counted axes are zero *and* foreign source is present, so a
+   genuinely empty repository is still a candidate. Shell-only repositories are
+   deliberately outside `foreign-code-ext`, so they stay candidates too: this
+   predicate fails toward keeping a repo, never toward silently dropping one."
+  [e]
+  (and (zero? (or (:maturity/axis-substrate e) 0))
+       (zero? (or (:maturity/axis-test e) 0))
+       (pos? (or (:uncounted/foreign-src-file-count e) 0))))
+
 (defn- unseen-content
   "Content this repository has that the axis it is about to be sent to cannot see.
 
@@ -432,6 +463,14 @@
             (when (and (not truncated?) (:repo/files-depth-pruned? e))
               (str "scan の walk が max-depth で枝刈りしている"
                    "（深い階層は見ていない。トップレベルの src/ test/ は見えている）"))
+            (when (and (not truncated?) (unreadable-language? e))
+              (str "⚠ この repo の実装は scan が数えない言語で書かれている（"
+                   (str/join ", " (map (fn [[k v]] (str (name k) "×" v))
+                                       (take 4 (sort-by (comp - val)
+                                                        (:uncounted/foreign-langs e {})))))
+                   "）—— src " (:uncounted/foreign-src-file-count e 0) " ファイル・test "
+                   (:uncounted/foreign-test-file-count e 0) " ファイルが実在する。"
+                   "**substrate と test の 0bp は「無い」ではなく「読めていない」**"))
             (when (and (not truncated?)
                        (zero? (or (:maturity/axis-test e) 0))
                        (pos? (or (:uncounted/test-file-count e) 0)))
@@ -482,10 +521,18 @@
    ;; 「この行は測れていない」。候補から落とすのに使う（下の unmeasured）。
    ;; :taken と同じく repo そのものの性質ではなく **この周の可否** である。
    :truncated? (scan-truncated? e)
+   ;; 「この行の 0bp は instrument の側の 0 である」。truncation と同じ family の
+   ;; 除外だが **原因が違うので混ぜない** —— walk は最後まで歩けており、
+   ;; ファイルは見えている。読めないのは言語の方である。
+   :unreadable-lang? (unreadable-language? e)
    ;; datoms がこの旗を運んでいるか。運んでいない datoms（この項が入る前に
    ;; 生成されたもの）で `:truncated? false` が並ぶと、**検査を掛けなかった周が
    ;; 検査して問題が無かった周と同じ顔になる**（CLAUDE.md 8 問の 1 問目）。
    :scan-flags-carried? (contains? e :repo/files-truncated?)
+   ;; datoms がこの旗を運んでいるか。運んでいない datoms（この項が入る前に
+   ;; 生成されたもの）では `unreadable` が必ず空になり、**訊かなかった周が
+   ;; 「読めない repo は無かった」周と同じ顔になる**（:scan-flags-carried? と同型）。
+   :foreign-flags-carried? (contains? e :uncounted/foreign-src-file-count)
    :weakest (weakest-axes e)})
 
 ;; ── lane（substrate か breadth か）───────────────────────────────────────────
@@ -779,10 +826,19 @@
         ;; 6,000 件目で resources/ の中に止まっており、test/ を一度も見ていない。
         ;; 除外しなければ、loop は同じ repo の同じ軸へ 3 度目を送るところだった。
         unmeasured (filterv :truncated? after-archived)
-        in-lane (filterv #(not (:truncated? %)) after-archived)
+        after-truncation (filterv #(not (:truncated? %)) after-archived)
+        ;; **読めない言語で書かれた repo も候補にしない。** 上の truncation と
+        ;; 同じ理由（0bp が伸びしろではない）で、原因は別 —— walk は最後まで
+        ;; 歩いており、ファイルは見えている。数えられないのは言語の方である。
+        ;; 別のリストに分けて数えるのは、2 つの失敗を 1 つの数に畳むと
+        ;; 「walk を直せば済む」と読めてしまうため（scan-truncated? の docstring
+        ;; が truncated と depth-pruned を分けているのと同じ理由）。
+        unreadable (filterv :unreadable-lang? after-truncation)
+        in-lane (filterv #(not (:unreadable-lang? %)) after-truncation)
         ;; 旗そのものが datoms に無いなら、`unmeasured` が空でも
         ;; 「truncate された repo が無い」ではなく「訊いていない」である。
         scan-flags-carried? (boolean (some :scan-flags-carried? in-lane*))
+        foreign-flags-carried? (boolean (some :foreign-flags-carried? in-lane*))
         ;; substrate 層は 17 本しかなく leverage に 10〜20 倍の段差がある。
         ;; cohort は 1,700 本超で ratio ≈ 1.0 の平坦地 —— **同じ順位付けでも
         ;; 意味の強さが違う**ので、それを出力に明記する。
@@ -837,6 +893,11 @@
                :unmeasured-dropped (if scan-flags-carried?
                                      (mapv :repo unmeasured)
                                      :scan-flags-not-carried)
+               ;; 読めない言語で候補から落とした repo。旗が運ばれていない
+               ;; 周は :not-carried と書く —— 0 件と区別が付かなくならないように。
+               :unreadable-language-dropped (if foreign-flags-carried?
+                                              (mapv :repo unreadable)
+                                              :foreign-flags-not-carried)
                :movement-probe-depth movement-probe-depth
                :observed-substrate-share observed-substrate-share
                :iterations iterations
@@ -958,6 +1019,18 @@
     (when-not scan-flags-carried?
       (log! (str "⚠ datoms が :repo/files-truncated? を運んでいない —— "
                  "『打ち切られた repo は 0 本』は測っていない。dynamics を"
+                 " 掛け直すまで、この除外は効いていない")))
+    (when (seq unreadable)
+      (log! (str "scan が読めない言語なので候補から除外: " (count unreadable) " 本"
+                 "（substrate と test が 0bp だが、非 Clojure の実装が実在する repo）"))
+      (doseq [m (take 5 unreadable)]
+        (log! (str "    ↳ " (:repo m) " own=" (some-> (:own m) (.toFixed 3))
+                   " — 実装は在るが scan が数える拡張子ではない。"
+                   "その 0bp は伸びしろではないので、ここへ landing させても軸は動かない"))))
+    ;; 旗が運ばれていないなら、上の 0 本は測定結果ではない。
+    (when-not foreign-flags-carried?
+      (log! (str "⚠ datoms が :uncounted/foreign-src-file-count を運んでいない —— "
+                 "『読めない言語の repo は 0 本』は測っていない。dynamics を"
                  " 掛け直すまで、この除外は効いていない")))
     (when (seq moved)
       (log! (str "計測が読んだ tree がもう無いので候補から除外: " (count moved) " 本"
