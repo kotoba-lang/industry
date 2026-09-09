@@ -11084,4 +11084,86 @@
      :file "src/kotoba/robotics/export.cljc"
      :find "   (let [gate (fn [a]\n                (let [g (rob/gate a allowed)]"
      :replace "   (let [gate (fn [a]\n                (let [g (rob/gate a #{:none :low :medium :high :safety-critical})]"
-     :must-fail ["exported-rows-carry-each-actions-own-answers"]}]}]}
+     :must-fail ["exported-rows-carry-each-actions-own-answers"]}]}
+  {:repo "orgs/kotoba-lang/transit"
+   :label "transit JSON wire envelope —— 既存 suite が緑のまま通していた 9 つの不変条件"
+   ;; この repo の 8 テストは各関数の happy path をなぞっており、9 つの退行が
+   ;; 一言も言われずに通っていた。一番効くのは **envelope の family 検査** ——
+   ;; office envelope を「似た key を持つ他の JSON」から分ける唯一の手段なのに、
+   ;; 削除しても何も落ちなかった。
+   ;;
+   ;; 閉集合 office-resource-kinds は set 自身を回して守る。docstring が既に
+   ;; kotoba-lang/forms を「1 kind 欠けた代償を払った repo」として名指ししている
+   ;; のに、テストは手で選んだ 2 kind しか触っておらず、3 つ目が消えても緑だった。
+   ;;
+   ;; 9 件とも 2026-09-09 に、当てて赤くなるところを実際に見てから登録した。
+   ;; 手順は毎回 3 段: (1) find が 1 箇所だけかを数える (2) **編集が diff として
+   ;; 載ったことを先に確認する** (3) それから走らせて :must-fail の名前が実際に
+   ;; 失敗集合に居ることを見る。10 件目は捨てた —— 括弧が閉じず
+   ;; `EOF while reading` になり、「ファイルがコンパイルできない」しか
+   ;; 証明していなかった（構文を壊すだけの mutation は劇場）。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :transit/office-envelope-reader-stops-checking-the-family
+     :why "family 検査は office envelope を「似た形の JSON」から分ける唯一の手段。落としても envelope は parse でき、reader は誰も送っていない resource kind で分岐する。削除して何も落ちないなら、その検査は宣言であって門ではない"
+     :file "src/transit/core.cljc"
+     :find "    (when (not= office-family family)\n      (throw (ex-info \"not a Kotoba office JSON envelope\" {:family family})))\n"
+     :replace ""
+     :must-fail ["a-foreign-envelope-is-not-read-as-an-office-envelope"]}
+
+    {:id :transit/a-resource-kind-drops-out-of-the-closed-set
+     :why "office-resource-kinds の docstring 自身が kotoba-lang/forms を「1 つ欠けた代償を払った repo」として名指ししている。手で 2 kind だけ触るテストは 3 つ目が消えたことに気づかない —— set 自身を回して初めて閉集合が守られる"
+     :file "src/transit/core.cljc"
+     :find "    :office/selection\n    :office/presence})"
+     :replace "    :office/selection})"
+     :must-fail ["every-declared-office-resource-kind-can-be-carried"]}
+
+    {:id :transit/content-type-match-becomes-case-sensitive
+     :why "Content-Type は RFC 9110 で case-insensitive。case fold を落とすと、正しい JSON を送ってきた peer が拒否される。大文字で送る host は実在するので、これは起こりうる退行の形"
+     :file "src/transit/core.cljc"
+     :find "             str/trim\n             str/lower)))"
+     :replace "             str/trim)))"
+     :must-fail ["media-type-matching-ignores-case-and-parameters"]}
+
+    {:id :transit/accept-header-stops-splitting-off-parameters
+     :why "Accept は q 値を運ぶ。`;` で切らないと `application/json;q=0.9` が JSON として認識されず、ブラウザが実際に送る形で落ちる"
+     :file "src/transit/core.cljc"
+     :find "             (-> % (str/split #\";\") first str/trim str/lower))"
+     :replace "             (-> % str/trim str/lower))"
+     :must-fail ["media-type-matching-ignores-case-and-parameters"]}
+
+    {:id :transit/accepts-json-treats-an-absent-accept-as-yes
+     :why "「Accept が無い = 何でも受ける」は意味論としては弁護できるので、善意で入りうる退行。この述語は「この request は自分のものか」を決めるので、全部に true を返すのが危険な側で、しかも正のテストしか無い suite には見えない"
+     :file "src/transit/core.cljc"
+     :find "(defn accepts-json? [accept]\n  (boolean\n   (some #(= media-type-json\n             (-> % (str/split #\";\") first str/trim str/lower))\n         (str/split (or accept \"\") #\",\"))))"
+     :replace "(defn accepts-json? [accept]\n  (or (nil? accept)\n      (boolean\n       (some #(= media-type-json\n                 (-> % (str/split #\";\") first str/trim str/lower))\n             (str/split (or accept \"\") #\",\")))))"
+     :must-fail ["non-json-media-types-are-refused"]}
+
+    {:id :transit/sets-lose-their-deterministic-wire-order
+     :why "set の反復順は値の一部ではないので、sort を外すと同じ EDN が 2 通りの JSON body を作る。byte 比較・cache・wire body に取る CID が全部壊れる。既存テストの 2 要素 set は小さすぎて気づけない"
+     :file "src/transit/core.cljc"
+     :find "    (set? x) (mapv write-json (sort-by pr-str x))"
+     :replace "    (set? x) (mapv write-json x)"
+     :must-fail ["sets-serialize-in-a-deterministic-order"]}
+
+    {:id :transit/gzip-is-announced-on-an-uncompressed-body
+     :why "gzip は opt-in。圧縮していない body に gzip を名乗ると host の出力が decode 不能になる。不変条件は「無いこと」で、無いことは suite が assert し忘れる側"
+     :file "src/transit/core.cljc"
+     :find "  (cond-> envelope\n    (:gzip? opts) (assoc :content-encoding gzip-encoding)))"
+     :replace "  (cond-> envelope\n    true (assoc :content-encoding gzip-encoding)))"
+     :must-fail ["envelopes-carry-no-content-encoding-unless-asked"]}
+
+    {:id :transit/optional-reader-fields-become-explicit-nils
+     :why "cond-> は「送られなかった field は現れない」を作る。常に assoc すると `contains?` と `get` が食い違い、送られていない request id を呼び手が読む"
+     :file "src/transit/core.cljc"
+     :find "      (get body \"kotoba.request/id\") (assoc :kotoba.request/id (get body \"kotoba.request/id\"))"
+     :replace "      true (assoc :kotoba.request/id (get body \"kotoba.request/id\"))"
+     :must-fail ["optional-envelope-fields-are-absent-rather-than-nil"]}
+
+    {:id :transit/symbol-keys-lose-their-namespace
+     :why "write-key は key の型ごとに枝を持つが keyword 枝しか通されていなかった。symbol 枝が name に変わると `my.ns/sym` が `sym` になり、namespace が黙って落ちる（keyword 側で同じ退行を既存テストは捕まえている。symbol 側だけ無防備だった）"
+     :file "src/transit/core.cljc"
+     :find "    (symbol? k) (str k)"
+     :replace "    (symbol? k) (name k)"
+     :must-fail ["map-keys-that-are-not-keywords-still-write"]}]}]}
