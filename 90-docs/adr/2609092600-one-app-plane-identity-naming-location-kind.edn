@@ -1,0 +1,176 @@
+[{:db/id -1
+  :adr/id "adr-2609092600-one-app-plane-identity-naming-location-kind"
+  :adr/doc_type "adr"
+  :adr/title "app の面を 1 本にする —— identity / naming / location / kind"
+  :adr/status "accepted"
+  :adr/topic "app-plane-unification"
+  :adr/last_verified "2026-09-09"
+  :adr/authoritative_for ["workspace の app 面の統一形（identity / naming / location / kind の四分）" ":kotoba.app/kind の値域（:document / :service / :placement）と「既定を持たない」規則" "app の bytes Location を kotobase.net 1 面に寄せる決定" "人が開く app の entry apex を itonami.app とし、itonami.cloud を agent-work plane に戻す決定" "verify-app-content-address の 5 状態と、既存 finding key を変えない規則"]
+  :adr/related ["adr-2608157000-app-links-are-content-addressed" "adr-2608159100-live-service-durable-data-boundary-kotobase" "adr-2608136000-eight-questions-before-writing-a-check" "adr-2607301300-itonami-cloud-org-repo-site-publishing-rule"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/body "
+# ADR-2609092600: app の面を 1 本にする —— identity / naming / location / kind
+
+**Status**: accepted
+**Date**: 2026-09-09
+**Deciders**: Jun Kawasaki
+
+オーナーの指示（2026-09-09）:「いろんなパターンがあって、綺麗じゃないので、美しいパターンで
+統一してほしい。基本的には ipld, content addressing web の設計で想定。」
+
+## 統一先は新しい形ではない
+
+**ADR-2608157000（accepted）が既に identity / naming / location の三分を決めており、
+`kotoba-lang/content-address` がその 1 本の道を実装している。** この ADR は新しいパターンを
+足さない —— 足すと 10 個目のパターンになる。足すのは 2 つだけである:
+
+1. **`:kotoba.app/kind`** —— manifest が「自分は何か」を宣言する 1 キー。
+2. **Location 面の統一** —— ADR-2608157000 は「Location は protocol の外」とだけ決め、
+   その外側にホストが何本あってよいかを言っていない。今は 9 本ある。
+
+## 実測（2026-09-09、着手前）
+
+検査（`nbb --classpath \".:orgs/kotoba-lang/content-address/src\" scripts/verify-app-content-address.cljs orgs`）:
+
+    SCANNED 517 / ADDRESSED 435 / LOCATED 82 / UNREADABLE 0   （exit 1）
+
+URL probe:
+
+| URL | 実測 |
+|---|---|
+| `{cid}.ipfs.kotobase.net` | **200 / 823,495 bytes** |
+| `{cid}.ipfs.itonami.cloud` | **502**（CID 2 本で 2 回。上が control） |
+| `ipfs.itonami.cloud/ipni/v1/head` | 200 |
+| `app.itonami.cloud/mangaka/` | 200 / 83 KB（genko editor が入っている） |
+| `app.itonami.cloud/shirohan/` | 404 `{\"error\":\"actor not deployed\"}` |
+| `itonami.cloud/kotoba-lang/kami-genko/` | **200 だが 619 バイトの catalog JSON。`cid` `ipns` `origin` `bytes-url` すべて null** |
+| `kotoba-lang.itonami.cloud/kami-genko/` | 接続不可（sites.edn の `:status \"provisioning\"` どおり） |
+| `itonami.app` | Cloudflare NS 2 本（everton / vivienne）、A/AAAA 無し、HTTP 応答なし |
+
+genko / mangaka / ongakuka / dougaka は **ADDRESSED でも LOCATED でもない** ——
+`kotoba.app.edn` を持たないので 517 の走査に入っていない。
+
+## なぜ `:kotoba.app/kind` が要るか
+
+ADR-2608157000 の「未了」3 項目は、どれも「まだやっていない」ではなく **分類されていない**:
+
+- **44 本** —— deploy pipeline に publish step が要る（= 未適用）
+- **89 本** —— 単一 document を持たない動的 Worker（= 対象外）
+- **82 本**（当時 154） —— actor placement manifest（= 対象外）
+
+検査の出力ではこの 3 つが全部 `LOCATED` の 1 行になる。**「飛ばした」と「合格した」が
+出力で区別できない**（ADR-2608136000 の 4 問目）。しかも 4 つ目の状態 —— manifest を
+持たない app —— は走査に入らないので **0 行として現れる**。ドレインしようとしている検査が、
+ドレインすべき対象を数えられない。
+
+## Decision
+
+### 1. 記録は 1 ファイル形式 `kotoba.app.edn`。契約は 4 行
+
+    {:kotoba.app/name \"genko\"
+     :kotoba.app/kind :document                ; ← この ADR が足す 1 キー
+     :kotoba.app/bundle-cid \"bafkrei…\"         ; identity — protocol
+     :kotoba.app/embed-url  \"ipfs://bafkrei…\"  ; link     — protocol
+     :kotoba.app/latest     \"k51…\"             ; naming   — protocol（今は catalog 1 鍵）
+     :published {…}}                           ; location — protocol の外。差し替え可能
+
+### 2. `:kotoba.app/kind` は 3 値で、既定を持たない
+
+| kind | 意味 | content address |
+|---|---|---|
+| `:document` | 単一 document を配る | **必須** |
+| `:service` | 動的 Worker。要求に答え、document を配らない | 不要（**宣言で**免除） |
+| `:placement` | actor の配置 manifest。どこで走るかを宣言する | 不要（**宣言で**免除） |
+
+**既定値は無い。** 宣言の無い manifest は `LOCATED` のまま finding として残る。免除は
+書かれた判断であって、書き忘れの結果ではない —— 既定を `:service` にすると、この ADR は
+82 件を一晩で緑にして何も直さない。
+
+### 3. Location は 4 行のテーブル。設計ではなく設定である
+
+    identity  ipfs://{cid}                      不変。app が記録する唯一のアドレス
+    naming    ipns://{k51}                      可変な版
+    bytes     https://{cid}.ipfs.kotobase.net   Location — 1 面
+    entry     https://itonami.app/{name}/       Location — 1 apex、DNSLink で naming に解決
+
+- **bytes は kotobase.net に寄せる。** ADR-2608159100 が既に「live service の durable
+  source は Kotobase、authority と既定 API origin は `https://kotobase.net`」と決めている。
+  第二の bytes plane を持つ理由が無く、実測でも itonami.cloud 側は 502、kotobase.net 側は
+  200。`{cid}.ipfs.itonami.cloud` は直すか退役させるかを別途決める —— **どちらでも
+  identity は動かない。それがこの表が設定であって設計でないということ。**
+- **entry は `itonami.app`。** `app.itonami.cloud` は `itonami-fleet-dispatch` の custom
+  domain に取られており（今日も 404）、sites.edn の `:org \"app\"` は「先にそちらを外す」と
+  書いたまま provisioning で止まっている。別 apex はその取り外しを要さない。sites.edn の
+  `:org \"app\"` の `:host` を `itonami.app` に付け替える。
+- **`itonami.cloud` は agent-work plane に戻す**（cloud-itonami-app の README の自称どおり）。
+  app の bytes を配らない。`/{org}/{repo}/` の catalog 面は残すが、**`origin` が null の
+  ときに 200 を返さない** —— 今日 genko で起きているのがそれで、未公開が公開済みと同じ顔を
+  している。
+- `{name}.itonami.cloud` / `{name}.etzhayyim.com` / `{name}.gftd.ai` の Worker custom
+  domain は `:kind :service`。document ではないので content address の対象外だが、
+  **そう宣言する。**
+
+⚠ **`itonami.app` を `app.itonami.cloud` の別名にしない。** kotobase が
+`graph-database.kotobase.net` / `backend.kotobase.net` / `graphdb.kotobase.net` を
+retire したのと同じ失敗になる（ADR-2608159100）。役割で割るか、片方を退役させるかの
+どちらかにする。
+
+### 4. 検査は 5 状態を出し、exit は 3 値のまま
+
+| 出力 | 意味 | finding key |
+|---|---|---|
+| `ADDRESSED` | content address を持つ | —— |
+| `EXEMPT` | `:kind` が `:service` / `:placement` | —— |
+| `UNPUBLISHED` | `:kind :document` と言い、address が無い | `document-not-addressed:` |
+| `LOCATED` | 何も宣言せず、address も無い | `located-only:`（既存キーを維持） |
+| `UNREADABLE` | EDN が読めない / app entity が無い | exit 2 |
+
+**既存の `located-only:` キーは変えない。** 変えると、standing findings が一斉に
+RESOLVED に見え、新しいキーで NEW として再登場する —— 直していないのに 82 件動いたように
+見える。`:kind` を足した manifest だけが正しく RESOLVED になる。
+
+exit は 0 = 全部 addressed か exempt / 1 = LOCATED か UNPUBLISHED が在る /
+2 = 答えられなかった。
+
+## 検証（両方向、2026-09-09）
+
+fixture 4 本を temp root に置いて、**4 状態が 4 通りに分かれ、finding key が 2 種類出る**
+ことを確認した:
+
+    LOCATED     a/  (宣言なし・address なし)      → FINDING located-only
+    EXEMPT      b/  (:kind :placement)            → finding なし
+    UNPUBLISHED c/  (:kind :document・address なし) → FINDING document-not-addressed
+    ADDRESSED   d/  (:kind :document・raw CIDv1)   → finding なし
+    exit 1
+
+control:
+
+- exempt + addressed だけの root → **exit 0**（免除が違反として数えられていないことの証拠）
+- 空の root → **exit 2**（答えられなかった、が 0 とも 1 とも違う値で出る）
+- 実 `orgs` に対して **SCANNED 517 / ADDRESSED 435 / EXEMPT 0 / UNPUBLISHED 0 /
+  LOCATED 82 / UNREADABLE 0、exit 1** —— まだどの manifest も `:kind` を宣言していないので
+  既存の判定は 1 件も動いていない。
+
+## Consequences
+
+- **正**: ADR-2608157000 の 3 つの「未了」が、作業ではなく分類の問題として扱えるようになる。
+  免除を宣言した瞬間に finding が消えるので、82 件の内訳が測れる（今は測れない）。
+- **正**: Location が表になったので、bytes host を差し替えても manifest は 1 文字も動かない。
+  502 の修理と app の publish が独立した作業になる。
+- **負**: `:kind` は 82 件に手で入る値で、一括では入れられない —— 動的 Worker か未公開 document
+  かは repo ごとの判断である。**一括で `:service` を撒かない**（撒けばこの ADR は無意味になる）。
+- **負**: `itonami.app` は 3 つ目の apex である。役割を割り切れなければ別名になり、
+  kotobase の retired hostname と同じ道を行く。sites.edn の `:org \"app\"` を付け替える
+  ところまでを 1 組の作業とする。
+
+## 未了 / 次の一手（現在地は毎回測る。ここの数値を引用しない）
+
+1. `{cid}.ipfs.itonami.cloud` の 502 —— 直すか、kotobase.net に寄せて退役させるか。
+2. genko を `:kind :document` で 1 本通す（manifest → publish → GET が送った bytes を返す
+   → catalog の 436 番目 → `itonami.app/genko/` の DNSLink）。**catalog が 200 を返すことを
+   成功条件にしない** —— それが今日 genko で起きていることそのもの。
+3. 82 件の `:kind` 宣言。1 件ずつ、repo ごとの判断で。
+4. mangaka studio / ongakuka / dougaka を genko と同じ形に載せる。
+5. sites.edn の `:org \"app\"` の `:host` を `itonami.app` に付け替える。
+"}]

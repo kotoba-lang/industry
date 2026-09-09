@@ -53,9 +53,28 @@
          sort
          vec)))
 
+(def ^:private exempt-kinds
+  "Kinds that are outside content addressing, and why.
+
+  A manifest that declares one of these is not unfinished work — it has no
+  single document to address. Before this key existed the three states
+  `not yet published`, `never going to be a document` and `nobody looked`
+  produced the same LOCATED line, so ADR-2608157000's three open items
+  (44 pipelines / 89 dynamic workers / 154 placement manifests) could not be
+  told apart by the detector that was supposed to be draining them."
+  {:service   "a dynamic worker — it answers requests, it does not serve one document"
+   :placement "an actor placement manifest — it declares where code runs, not what is served"})
+
+(defn- declared-kind
+  "The `:kotoba.app/kind` this file declares, or nil. Read from whichever
+  entity carries it, because a manifest may be a map or a vector of maps."
+  [parsed]
+  (some :kotoba.app/kind (ca/entities parsed)))
+
 (defn- classify [p]
   (let [m (try (edn/read-string (.readFileSync fs p "utf8"))
-               (catch :default e {::unreadable (str e)}))]
+               (catch :default e {::unreadable (str e)}))
+        kind (when-not (::unreadable m) (declared-kind m))]
     (cond
       (::unreadable m)
       {:path p :state :unreadable :detail (::unreadable m)}
@@ -63,10 +82,23 @@
       (empty? (ca/entities m))
       {:path p :state :unreadable :detail "no application entity in this EDN"}
 
+      ;; An address answers the question whatever the kind says, so this
+      ;; comes first: a service that also publishes a document is addressed,
+      ;; not exempt.
       (ca/file-addressed? m)
-      {:path p :state :addressed
+      {:path p :state :addressed :kind kind
        :address (ca/file-address-of m)
        :problems (mapcat ca/problems (filter ca/addressed? (ca/entities m)))}
+
+      (contains? exempt-kinds kind)
+      {:path p :state :exempt :kind kind :why (get exempt-kinds kind)}
+
+      ;; `:document` is a claim that there IS one document here. Unaddressed,
+      ;; that is a stronger finding than never having said what this is, and
+      ;; it gets its own reason literal so the two cannot be folded together.
+      (= :document kind)
+      {:path p :state :document-not-addressed :kind kind
+       :problems (ca/problems (first (ca/entities m)))}
 
       :else
       {:path p :state :located
@@ -89,12 +121,16 @@
           by-state (group-by :state rows)
           scanned (count rows)
           addressed (count (:addressed by-state))
+          exempt (count (:exempt by-state))
+          mislabelled (count (:document-not-addressed by-state))
           located (count (:located by-state))
           unreadable (count (:unreadable by-state))]
       (when list?
         (doseq [r rows]
           (println (case (:state r)
                      :addressed "ADDRESSED "
+                     :exempt "EXEMPT    "
+                     :document-not-addressed "UNPUBLISHED"
                      :located "LOCATED   "
                      "UNREADABLE")
                    (:path r)
@@ -114,6 +150,15 @@
       ;; was already careful (three-valued exit, no second copy of the judge, a
       ;; refusal when the library is absent); the gap was only that its output
       ;; was addressed to a reader.
+      ;; A manifest that says `:document` and carries no address is a
+      ;; different failure from one that never said what it is, so it gets
+      ;; its own key. Folding them would make a repo look finished the
+      ;; moment someone typed the kind.
+      (doseq [r (:document-not-addressed by-state)]
+        (println (str "FINDING\twarn\tdocument-not-addressed:" (:path r) "\t"
+                      "declares :kotoba.app/kind :document and carries no content address"
+                      (when (seq (:problems r))
+                        (str " — " (str/join "," (map (comp name :problem) (:problems r))))))))
       (doseq [r (:located by-state)]
         (println (str "FINDING\twarn\tlocated-only:" (:path r) "\t"
                       "identifies its document by location, not by content"
@@ -122,6 +167,8 @@
       (println (str "ROOT\t" (path/resolve root)))
       (println (str "SCANNED\t" scanned))
       (println (str "ADDRESSED\t" addressed))
+      (println (str "EXEMPT\t" exempt))
+      (println (str "UNPUBLISHED\t" mislabelled))
       (println (str "LOCATED\t" located))
       (println (str "UNREADABLE\t" unreadable))
       (cond
@@ -133,7 +180,7 @@
         (do (println "UNANSWERED — an application manifest would not read")
             (set! (.-exitCode js/process) 2))
 
-        (pos? located)
+        (or (pos? located) (pos? mislabelled))
         (set! (.-exitCode js/process) 1)))))
 
 (apply -main (script-args))
