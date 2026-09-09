@@ -447,19 +447,77 @@
 ;; ADR-2608136000 の 2 問目（そもそも実行できないとき何を返すか）。ここが返して
 ;; いたのは pass ではなく**実行できない仕事**で、出力からはそれと分からない。
 ;; 黙って捨てず、何件外したかを一緒に返す（:landed の held-for-a-human と同じ作法）。
-(defn- next-finding [state & {:keys [unattended? roster]}]
-  (let [cands (for [[id row] (:bots state)
-                    [f {:keys [since detail]}] (:broken row)
-                    :when (or (nil? roster) (contains? roster id))
-                    :when (not (and unattended? (unattended-excluded f)))]
-                {:bot id :floor f :since since :detail detail})]
-    (->> cands
-         ;; ⚠ 最初の版は `(.indexOf (clj->js floor-priority) (:floor c))` と書いて
-         ;; いた。JS 配列に cljs keyword を indexOf すると同一性比較になって**常に
-         ;; -1** を返すので、優先順は一度も効かず :since だけで並んでいた。
-         ;; 実測 2026-08-27: :landed が 2 件在るのに :readme を先頭に出していた。
-         (sort-by (fn [c] [(get floor-priority (:floor c) 99) (ms (:since c))]))
-         first)))
+;; state に残った :pinned finding は、**checkout が一バイトも動かなくても**名簿を
+;; 再生成しただけで嘘になる。`floor-pinned` は HEAD を名簿の `:bot/pin` と比べるので、
+;; pin が書き換わった瞬間、前回の測定値は「もう誰も使っていない revision についての答え」になる。
+;;
+;; そしてそれは自然には消えない。`select-wave` は :last-tick の古い順に選ぶので、
+;; **一度でも測られた bot は、未測定の山を測り終えるまで再測定の順番が来ない**。
+;; その間 `--next` は :since の古い順に配るので、ghost がちょうど先頭に居座る。
+;;
+;; 実測 2026-09-09: 名簿再生成（b8e8966）の 28 分前に測った :pinned finding 208 件の
+;; うち **206 件が ghost**（HEAD = 現名簿の pin = west.yml の revision の三点一致）で、
+;; 本物は 2 件だけだった。`--next` を 2 回引いて 2 回とも ghost が出、どちらも
+;; `--only` で測り直すと即 RESOLVED になった —— **直す仕事が無いのに、直す仕事と
+;; 同じ形で配られていた。**
+;;
+;; orphan（名簿から消えた bot）を外す規則と同型で、外す理由も同じ ——
+;; **どう直しても RESOLVED にならない finding を配らない**。ADR-2608136000 の 2 問目。
+(def ^:private stale-pin-verify-cap 500)
+
+(defn- pinned-recheck
+  "この :pinned finding を、**現在の名簿**に対して測り直して `[verdict detail]` を返す。
+
+  ⚠ 測る。state の `:detail`（\"HEAD abc1234 ≠ pin def5678\"）を読み解かない ——
+  あれは人間向けの散文で、書式を変えた日に黙って当たらなくなる（実行できない
+  検査が、実行して問題が無かった検査と同じ値を返す形）。`floor-pinned` をそのまま
+  呼べば、床を測るコードと床を検算するコードが 1 本で済む。"
+  [bot]
+  (floor-pinned (.join path top (:bot/repo bot)) (:bot/pin bot)))
+
+(defn- next-finding
+  "配れる finding を 1 件返す。
+  `{:finding <n or nil> :stale-pin-skipped <count> :verify-capped? <bool>}`。"
+  [state & {:keys [unattended? by-id]}]
+  (let [roster (when by-id (set (keys by-id)))
+        cands (->> (for [[id row] (:bots state)
+                         [f {:keys [since detail]}] (:broken row)
+                         :when (or (nil? roster) (contains? roster id))
+                         :when (not (and unattended? (unattended-excluded f)))]
+                     {:bot id :floor f :since since :detail detail})
+                   ;; ⚠ 最初の版は `(.indexOf (clj->js floor-priority) (:floor c))` と書いて
+                   ;; いた。JS 配列に cljs keyword を indexOf すると同一性比較になって**常に
+                   ;; -1** を返すので、優先順は一度も効かず :since だけで並んでいた。
+                   ;; 実測 2026-08-27: :landed が 2 件在るのに :readme を先頭に出していた。
+                   (sort-by (fn [c] [(get floor-priority (:floor c) 99) (ms (:since c))])))]
+    (loop [cs (seq cands) skipped 0 checked 0]
+      (if-let [c (first cs)]
+        (let [pin-bot (when (= :pinned (:floor c)) (get by-id (:bot c)))
+              [verdict detail] (when (and pin-bot (< checked stale-pin-verify-cap))
+                                 (pinned-recheck pin-bot))]
+          (cond
+            ;; 検算そのものを打ち切ったなら、そう言う。黙って「検算済み」の顔で配らない
+            ;; —— 上限に当たったことは、この 1 件が本物である証拠ではない。
+            (and pin-bot (>= checked stale-pin-verify-cap))
+            {:finding c :stale-pin-skipped skipped :verify-capped? true}
+
+            ;; もう割れていない。配らない。
+            (= verdict :ok)
+            (recur (next cs) (inc skipped) (inc checked))
+
+            ;; 本物。ただし **:detail は前回測ったときの散文**で、pin と HEAD の
+            ;; 両方が動いていることがある（実測 2026-09-09、cloud-itonami-app は
+            ;; "HEAD 98bec5d ≠ pin c792872" と言い続けていたが、その時点の実測は
+            ;; HEAD b56c292 / pin 98bec5d —— 引用された 2 つの sha はどちらも
+            ;; 現在地ではなかった）。測り直せたなら今の値で配る。
+            (= verdict :broken)
+            {:finding (assoc c :detail detail) :stale-pin-skipped skipped}
+
+            ;; 測れなかった（checkout が無い等）。**外さない** —— 実行できなかった
+            ;; 検査を「合格」と読まない。前回の detail のまま人に渡す。
+            :else
+            {:finding c :stale-pin-skipped skipped}))
+        {:finding nil :stale-pin-skipped skipped}))))
 
 ;; ---------------------------------------------------------------- wave
 
@@ -553,8 +611,10 @@
       (cond
         (or (flag "--next") (flag "--next-unattended"))
         (let [unattended? (boolean (flag "--next-unattended"))
-              roster (set (map :bot/id registry))
-              n (next-finding prev :unattended? unattended? :roster roster)
+              by-id (into {} (map (juxt :bot/id identity) registry))
+              roster (set (keys by-id))
+              {n :finding stale-pin :stale-pin-skipped capped? :verify-capped?}
+              (next-finding prev :unattended? unattended? :by-id by-id)
               ;; held も orphan も**名簿の中だけ**で数える。名簿から消えた bot の
               ;; :landed は「人のために取っておいた」のではなく、そもそも配れない。
               held (when unattended?
@@ -575,12 +635,18 @@
                                         (assoc :held-for-a-human held
                                                :note "無人の周回では :landed を渡さない（他人の未 commit の作業）")
                                         (pos? orphaned)
-                                        (assoc :orphan-findings-skipped orphaned))
+                                        (assoc :orphan-findings-skipped orphaned)
+                                        (pos? stale-pin)
+                                        (assoc :stale-pin-findings-skipped stale-pin))
                              :else (cond-> (merge {:outcome :candidate} n)
                                      (and held (pos? held))
                                      (assoc :held-for-a-human held)
                                      (pos? orphaned)
-                                     (assoc :orphan-findings-skipped orphaned)))))
+                                     (assoc :orphan-findings-skipped orphaned)
+                                     (pos? stale-pin)
+                                     (assoc :stale-pin-findings-skipped stale-pin)
+                                     capped?
+                                     (assoc :stale-pin-verify-capped stale-pin-verify-cap)))))
           (when (pos? orphaned)
             ;; 数だけ返して黙らない。放っておくと state に溜まり続けるので、
             ;; 掃除の入口を stderr に出す（stdout は EDN 1 行のままにする）。
@@ -588,6 +654,13 @@
               (println (str "NOTE\t名簿に無い bot の finding を " orphaned
                             " 件外した —— どう直しても RESOLVED にならない。"
                             " 一覧: nbb scripts/repo-bots/tick.cljs --report"))))
+          (when (pos? stale-pin)
+            ;; 数だけ返して黙らない。ghost は state に残ったままなので、
+            ;; 消し方（測り直し）を stderr に出す（stdout は EDN 1 行のまま）。
+            (binding [*print-fn* *print-err-fn*]
+              (println (str "NOTE\t名簿の pin が書き換わってもう割れていない :pinned finding を "
+                            stale-pin " 件外した —— state が古いだけで、直す仕事は無い。"
+                            " 消す: nbb scripts/repo-bots/tick.cljs --wave 200"))))
           (js/process.exit 0))
 
         (flag "--report")
