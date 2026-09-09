@@ -10790,4 +10790,101 @@
      :file "test/site_consistency.cljs"
      :find "(seq unsupported-routes)"
      :replace "(and false (seq unsupported-routes))"
-     :must-fail ["a-route-convention-this-resolver-cannot-model-is-refused"]}]}]}
+     :must-fail ["a-route-convention-this-resolver-cannot-model-is-refused"]}]}
+
+  {:repo "orgs/cloud-itonami/app-omise"
+   :label "omise tithe + identity invariants —— 金額保存則と、did/rkey の正規化が片側だけずれる形"
+   ;; この repo の存在理由は「憲法上の 10% 供託を、端数を漏らさずに割る」ことで、
+   ;; tithe.ts 自身のヘッダが "integer-floored tithe, no rounding leak"
+   ;; (ADR-2605192100) と書いている。ところがそれを見ていた assertion は
+   ;; omise.test.ts の 1 行だけで、**gross = 50_000_000 という余りの出ない値**を
+   ;; 使っていた。50000000*100/1000 はちょうど 5000000 なので、
+   ;;   ・tithe を切り上げる
+   ;;   ・net を gross-tithe ではなく gross*900/1000 と独立に計算する
+   ;; のどちらをやっても**同じ数**が出る。CLAUDE.md の 8 問目 5 番
+   ;; 「比較を持つ検査には、必ず境界ちょうどの入力を 1 つ置く」の、金額版。
+   ;;
+   ;; 実測（2026-09-09）: 下の 8 mutation はすべて **既存 vitest suite を
+   ;; 9 passed (9) のまま通り抜ける**。新しい suite だけが赤くなる。
+   ;;
+   ;; :cmd が vitest でなく node:test なのは、この suite が依存の無い 2 モジュール
+   ;; しか import しないので **何も install せずに走る**から。omise.test.ts は
+   ;; git-hosted な @etzhayyim/* を要り、その install は build script と network を
+   ;; 使うので、**この gate が走る使い捨て worktree では走らない**。
+   ;; 走らない gate は、緑と区別が付かない。
+   :cmd ["node" "--test" "kotoba/test/invariants.test.ts"]
+   :green-marker "fail 0"
+   :mutations
+   [{:id :omise/net-computed-independently
+     :why "net は gross から tithe を引いた残り。独立に 90% を計算すると、端数のある額で 1 micro が
+           どちらにも属さなくなる —— 供託もされず支払われもしない金が出る"
+     :file "kotoba/src/tithe.ts"
+     :find "return { gross: grossMicros, tithe, net: grossMicros - tithe };"
+     :replace "return { gross: grossMicros, tithe, net: (grossMicros * (1000n - TITHE_PERMILLE)) / 1000n };"
+     :must-fail ["tithe + net === gross across a sweep including remainders"
+                 "net is the exact complement, never an independently rounded 90%"]}
+
+    {:id :omise/tithe-rounds-up
+     :why "切り上げは「端数の供託を取りこぼさない修正」として実際に書かれうる形。
+           9 micros の 10% は 0.9 で、切り上げると払い手から 1 多く取る"
+     :file "kotoba/src/tithe.ts"
+     :find "const tithe = (grossMicros * TITHE_PERMILLE) / 1000n;"
+     :replace "const tithe = (grossMicros * TITHE_PERMILLE + 999n) / 1000n;"
+     :must-fail ["tithe is floored, never rounded up"]}
+
+    {:id :omise/negative-gross-admitted
+     :why "guard が無いと splitTithe(-100n) は負の tithe を返し、それが負の on-chain 送金額になる"
+     :file "kotoba/src/tithe.ts"
+     :find "  if (grossMicros < 0n) throw new RangeError(\"[omise/tithe] gross must be non-negative\");\n"
+     :replace ""
+     :must-fail ["refuses a negative gross rather than inventing a negative tithe"]}
+
+    {:id :omise/parse-micros-unanchored
+     :why "拒否しているのは BigInt ではなく **anchor 付きの正規表現**。anchor を落とすと
+           BigInt が受理する \"0x1f\" や、価格としての \"1.5\" \"-5\" が注文合計に届く"
+     :file "kotoba/src/tithe.ts"
+     :find "if (!/^\\d+$/.test(s))"
+     :replace "if (!/\\d+/.test(s))"
+     :must-fail ["rejects each shape that BigInt() alone would have accepted"]}
+
+    {:id :omise/tithe-rate-halved
+     :why "率そのものが動いたことを、額の側から見る"
+     :file "kotoba/src/tithe.ts"
+     :find "export const TITHE_PERMILLE = 100n;"
+     :replace "export const TITHE_PERMILLE = 50n;"
+     :must-fail ["the rate is exactly one part in ten"]}
+
+    {:id :omise/product-rkey-not-normalised
+     :why "did と rkey の**片側だけ**が正規化をやめる形。SKU-1 と sku-1 が
+           1 つの did を 2 つの record key の下に持ち、同じ identity を主張する重複記録になる"
+     :file "kotoba/src/types.ts"
+     :find "return `product-${sku.toLowerCase()}`;"
+     :replace "return `product-${sku}`;"
+     :must-fail ["every spelling of a sku yields one product did and one product rkey"
+                 "did and rkey collapse identically, so neither can drift alone"]}
+
+    {:id :omise/payment-rkey-not-normalised
+     :why "同じ形の order 版。payment rkey だけがずれると、O-1 と o-1 で
+           **同じ注文が二度決済できる**（order 側の paid 判定をすり抜ける）"
+     :file "kotoba/src/types.ts"
+     :find "return `payment-${orderId.toLowerCase()}`;"
+     :replace "return `payment-${orderId}`;"
+     :must-fail ["every spelling of an order id yields one order did, rkey and payment rkey"
+                 "did and rkey collapse identically, so neither can drift alone"]}
+
+    {:id :omise/product-rkey-collapses-everything
+     :why "上の 3 つの対照。**定数を返す実装は「1 綴り → 1 key」を全部通す**ので、
+           「区別が保たれること」を別に言っていないと、正規化の検査は片側しか見ていない"
+     :file "kotoba/src/types.ts"
+     :find "return `product-${sku.toLowerCase()}`;"
+     :replace "return `product-constant`;"
+     :must-fail ["distinct ids stay distinct"]}
+
+    {:id :omise/fixture-emptied
+     :why "この suite の掃きは全部 `for (const g of ARRAY)`。ARRAY が空になると
+           **1 つも assertion を実行せずに緑**になり、全部調べた実行と同じ値を返す。
+           ADR-2608136000 の 1 問目（入力が無いとき何を返すか）に対する床"
+     :file "kotoba/test/invariants.test.ts"
+     :find "const WITH_REMAINDER = [1n, 7n, 9n, 999n, 1001n, 12_345n, 123_456_789n, 20_000_001n];"
+     :replace "const WITH_REMAINDER: bigint[] = [];"
+     :must-fail ["the remainder and exact fixtures are both non-empty and disjoint"]}]}]}
