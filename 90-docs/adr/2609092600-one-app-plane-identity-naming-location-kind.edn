@@ -92,17 +92,50 @@ ADR-2608157000 の「未了」3 項目は、どれも「まだやっていない
     identity  ipfs://{cid}                      不変。app が記録する唯一のアドレス
     naming    ipns://{k51}                      可変な版
     bytes     https://{cid}.ipfs.kotobase.net   Location — 1 面
-    entry     https://itonami.app/{name}/       Location — 1 apex、DNSLink で naming に解決
+    entry     https://{name}.itonami.app/       Location — 1 hostname、DNSLink で naming に解決
 
 - **bytes は kotobase.net に寄せる。** ADR-2608159100 が既に「live service の durable
   source は Kotobase、authority と既定 API origin は `https://kotobase.net`」と決めている。
-  第二の bytes plane を持つ理由が無く、実測でも itonami.cloud 側は 502、kotobase.net 側は
-  200。`{cid}.ipfs.itonami.cloud` は直すか退役させるかを別途決める —— **どちらでも
+  第二の bytes plane を持つ理由が無く、実測でも itonami.cloud 側は壊れている（**失敗の形は
+  一定しない** —— 11:0x に 502 / 27 bytes、11:26 に 25 秒 timeout で 0 bytes。親host の
+  `ipfs.itonami.cloud/health` は 200 なので Worker は生きており、wildcard subdomain 経路
+  だけが落ちている。TLS ではない —— 証明書の SAN に `*.ipfs.itonami.cloud` が在る）。
+  kotobase.net 側は 200。`{cid}.ipfs.itonami.cloud` は直すか退役させるかを別途決める —— **どちらでも
   identity は動かない。それがこの表が設定であって設計でないということ。**
-- **entry は `itonami.app`。** `app.itonami.cloud` は `itonami-fleet-dispatch` の custom
-  domain に取られており（今日も 404）、sites.edn の `:org \"app\"` は「先にそちらを外す」と
-  書いたまま provisioning で止まっている。別 apex はその取り外しを要さない。sites.edn の
-  `:org \"app\"` の `:host` を `itonami.app` に付け替える。
+- **entry は `{name}.itonami.app`。path ではなく hostname である。** これは美観ではなく
+  3 つの測れる理由による（2026-09-09 オーナー指摘で訂正。初版は `itonami.app/{name}/` と
+  書いていた）:
+
+  1. **DNSLink は hostname 単位である。** `_dnslink.<host> TXT dnslink=/ipns/<k51>` ——
+     この workspace 自身の `net-kotobase/ipfs/scripts/announce-dnslink.cljs` が
+     `_dnslink.{k51}.ipns.itonami.cloud` としてその形で書いている。path 形にすると
+     dnslink を張れる場所が apex に 1 つしかなく、**per-app の naming が成り立たない**。
+     成立させるには path→IPNS を引く Worker が要り、それは location-addressed router を
+     naming plane の真ん中に戻すことになる。この表の `:naming-resolution :dnslink` は
+     **subdomain でしか成立しない。**
+  2. **下の層がもう subdomain である。** `{cid}.ipfs.*` / `{k51}.ipns.*` は両ゾーンとも
+     subdomain gateway で、証明書も実測で発行済み（`*.ipfs.itonami.cloud` /
+     `*.ipfs.kotobase.net` が SAN に在る）。IPFS の subdomain gateway 仕様が存在する理由が
+     まさに path gateway の origin 共有問題なので、**entry だけ path にすると層がねじれる。**
+  3. **origin 分離が実利である。** genko は「原稿はブラウザの外に出ない（localStorage）」と
+     自ら名乗っている。path 形では 435 app が 1 origin を共有し、**どの app も他の app の
+     原稿を読める**。hostname 形なら localStorage / service worker scope / CSP / cookie が
+     app ごとに閉じる。bot に操作させる面（ADR: `window.__itonami`）と人の作業データを持つ面が
+     同じ origin にあってはならない、という要求とも一致する。
+
+  費用は測った上で問題にならない: 1 レベルの wildcard `*.itonami.app` は Cloudflare
+  Universal SSL（無料）で足りる。2 レベル（`{cid}.ipfs.itonami.app`）は Advanced
+  Certificate が要るが、**bytes は kotobase.net に寄せると決めたので itonami.app 側には
+  要らない。**
+
+  ⚠ **制約: entry 名は 1 つの DNS ラベルでなければならない**（dot を含められない）。
+  dot を含む名前は path plane に残る —— `announce-dnslink.cljs` が既にそう注記している。
+  `genko` / `mangaka` / `ongakuka` / `dougaka` はいずれもラベルにできる。
+
+  `app.itonami.cloud` は `itonami-fleet-dispatch` の custom domain に取られており（今日も
+  404）、sites.edn の `:org \"app\"` は「先にそちらを外す」と書いたまま provisioning で
+  止まっている。別 zone はその取り外しを要さない。sites.edn の `:org \"app\"` の `:host` を
+  `itonami.app` に付け替え、**site ごとの host は `{repo}.itonami.app`** とする。
 - **`itonami.cloud` は agent-work plane に戻す**（cloud-itonami-app の README の自称どおり）。
   app の bytes を配らない。`/{org}/{repo}/` の catalog 面は残すが、**`origin` が null の
   ときに 200 を返さない** —— 今日 genko で起きているのがそれで、未公開が公開済みと同じ顔を
@@ -168,9 +201,10 @@ control:
 
 1. `{cid}.ipfs.itonami.cloud` の 502 —— 直すか、kotobase.net に寄せて退役させるか。
 2. genko を `:kind :document` で 1 本通す（manifest → publish → GET が送った bytes を返す
-   → catalog の 436 番目 → `itonami.app/genko/` の DNSLink）。**catalog が 200 を返すことを
+   → catalog の 436 番目 → `genko.itonami.app` の DNSLink）。**catalog が 200 を返すことを
    成功条件にしない** —— それが今日 genko で起きていることそのもの。
 3. 82 件の `:kind` 宣言。1 件ずつ、repo ごとの判断で。
 4. mangaka studio / ongakuka / dougaka を genko と同じ形に載せる。
-5. sites.edn の `:org \"app\"` の `:host` を `itonami.app` に付け替える。
+5. sites.edn の `:org \"app\"` の `:host` を `itonami.app` に付け替え、site host を
+   `{repo}.itonami.app` にする（`*.itonami.app` の Universal SSL で足りる）。
 "}]
