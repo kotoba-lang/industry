@@ -67,6 +67,56 @@
  :dependency-substitution/measured "2026-08-26"
  :dependency-substitution/scope "orgs/kotoba-lang"
 
+ :dependency-substitution/jvm-runtime-deps-shape-2026-09-10
+ "What is left is not 64 independent items. Measured 2026-09-10 from
+  verify-jvm-dependency-surface, after this campaign took jvm-runtime-deps from
+  74 to 64 (data.json 27 -> 17, ten repos cleared outright).
+
+  Repos by how many JVM runtime coordinates they still carry:
+
+     1 coordinate   15 repos     <- one substitution each clears the finding
+     2              18
+     3              13
+     4              17
+     5               1
+
+  **Eight of the four-coordinate repos carry an IDENTICAL set** --
+  `http-kit/http-kit + metosin/jsonista + metosin/reitit-ring + ring/ring-core`:
+  animeka, arms, defence, dougaka, gameka, mangaka, syosetsuka, pornhub. That is
+  one Clojure web-appview template copied eight times, not eight problems. 13
+  repos in total hold http-kit together with reitit-ring or ring-core. Whatever
+  answers the web stack answers most of the remaining tail at once, and nothing
+  else will: picking off jsonista alone leaves every one of those eight at three
+  coordinates.
+
+  The 15 one-coordinate repos are NOT 15 available wins. By target:
+
+    org.clojure/data.json  5  kouhou, newscaster, dougaka-actor, cloud-murakumo,
+                              actor-kawaraban -- the hazard set this campaign
+                              deferred: digests, JSON-literal tests, or (kouhou,
+                              dougaka-actor) a namespace that does not load at all
+                              (ADR-2609101200)
+    org.bouncycastle/...   2  pqh, kagi -- qualified :host-boundary. pqh has no
+                              first-party ML-KEM/ML-DSA; kagi's real target is
+                              org-ietf-argon2, a reference-provider move, not a
+                              removal
+    org.xerial/sqlite-jdbc 2  bitcoin-consensus, kotobase-storage-sqlite -- a
+                              driver is a host boundary
+    org.babashka/cli       2  cloud-itonami-souji, cloud-itonami-carrier -- no
+                              first-party target has been found
+    metosin/jsonista       1  weight-kototama -- BLOCKED, see that entry: its
+                              JSON is hashed into a storage path
+    babashka/process       1  actor-iriai -> kotoba-lang/process
+    datascript/datascript  1  cloud-murakumo-market-intel -> kotoba-lang/datalog,
+                              an API rewrite
+    closure-compiler       1  kotoba-script
+
+  So of 15, **two are straightforwardly available** (actor-iriai, and
+  cloud-murakumo-market-intel with an API rewrite), five are deferred hazards,
+  and eight are correctly blocked or unanswered. A plan that reads `15 repos are
+  one coordinate from clean` and schedules 15 rewires is reading the number
+  without the dispositions."
+
  :dependency-substitution/coverage-2026-09-09
  ;; What this ledger does NOT cover, measured rather than inferred from its
  ;; own scope line. `:dependency-substitution/scope "orgs/kotoba-lang"` is
@@ -308,6 +358,36 @@
     3. `read-value` in jsonista also accepts InputStream / File / URL. The shim
        should take a string and refuse the rest by name rather than throw
        something opaque.
+
+    **The shim now exists**: `json.jsonista` in `kotoba-lang/json`
+    (merged 835300ca, pinned 2026-09-10). Default mapper keeps the namespace,
+    `:encode-key-fn name` delegates, unknown options THROW. Verified on both
+    runtimes and shown to go red when the namespace behaviour is broken.
+
+    **And the first repo it unblocked must not be swapped.**
+    `com-junkawasaki/weight-kototama` is the only consumer whose sole JVM
+    runtime coordinate is jsonista -- the obvious first win -- and it is the one
+    repo in the set that is BLOCKED. `clj/src/kototama/snapshot.cljc`:
+
+        canonical    (json/write-value-as-string spec mapper)
+        content-hash (sha256-hex canonical)
+        :b2_prefix   (str \"kototama/snapshots/\" expert \"/\" (subs content-hash 0 16) \"/\")
+
+    The JSON is hashed and the hash IS the storage path. Its mapper is
+    `{:encode-key-fn name}`, which the shim implements exactly, so key NAMES are
+    identical -- and `spec` has exactly 8 keys, so it is a PersistentArrayMap in
+    author order, which jsonista preserves and `json.core` sorts. Measured with
+    both encoders on one classpath:
+
+        jsonista content-hash  93d4dab201aa362e
+        shim     content-hash  daabdbba4353d04e
+
+    Every stored snapshot prefix moves. The tests would not notice: they
+    recompute the hash with the same encoder they wrote it with. This is the
+    shape the crypto floor was written for, in a repo with no crypto in it.
+
+    Swapping it is an owner decision about a one-time re-addressing of stored
+    objects, not a rewire. Left alone.
 
     One measurement correction worth keeping, because it nearly became the
     plan: a first pass reported that only **2 of 21** consumers actually require
