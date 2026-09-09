@@ -11557,4 +11557,110 @@
      :file "src/fileprovider/model.cljc"
      :find "    :failed (assoc item :sync/local-state :error)\n    item))"
      :replace "    :failed (assoc item :sync/local-state :error)\n    (assoc item :sync/local-state :error)))"
-     :must-fail ["unknown-events-change-nothing"]}]}]}
+     :must-fail ["unknown-events-change-nothing"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-4419"
+   :label "clerical-support governor —— 名指しした HARD 不変条件が、欄を空にするだけで外れていた"
+   ;; この repo の README は「裁量ではない」HARD 不変条件を 2 つ名乗る ——
+   ;; 保存期限の床（保存期限より前の廃棄は不可）と、クリアランスの順序尺度
+   ;; （:public < :internal < :confidential）。どちらも **比較** であり、比較には
+   ;; 比較可能な被演算子が 2 つ要る。
+   ;;
+   ;; 2026-09-10 まで、その 2 つの比較はそれぞれ**自分の被演算子の存在検査**で
+   ;; 守られていた（床は `(integer? as-of-day)`、順序は truthy な
+   ;; `requester-clearance-level`）。つまり **被演算子が無いときにちょうど比較が
+   ;; 飛ばされ**、飛ばされた比較は「走って問題が無かった比較」と同じ verdict を
+   ;; 返した。day 400 / :internal で登録された record に対する実測:
+   ;;
+   ;;   {:op :approve-destruction :record-id "R-1"}        => {:ok? true}
+   ;;   {:op :approve-destruction ... :as-of-day "400"}    => {:ok? true}
+   ;;   {:op :approve-access :record-id "R-1"}             => {:ok? true}
+   ;;   {:op :approve-access ... :clearance-level :secret} => NullPointerException
+   ;;
+   ;; **欄を空にすることは advisor にできる最も安い誤り**で、それがその欄の名前を
+   ;; 持つ不変条件からの免除になっていた。尺度外の値はもっと悪く、`(< nil 2)` が
+   ;; `:govern` の中で throw して run が `:decide` の手前で死ぬ —— 承認も hold も
+   ;; されず、**ledger には何も届かない**。台帳の側から見ると、一度も出されなかった
+   ;; 要求と区別が付かない。**crash は refusal ではない。**
+   ;;
+   ;; 7 件とも 2026-09-10 に、当てて赤くなるところを実際に見てから登録した。
+   ;; うち :rank-off-scale-is-bottom は**もっともらしい誤った修正**（尺度外を尺度の
+   ;; 下端として扱う）で、record 側の要求水準が尺度外のとき何でも満たしてしまう。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :cn/retention-comparability-dropped
+     :note "比較可能性の節を落とす = 欄を空にすれば床が外れた頃の形。
+            床そのものは残るので、早すぎる廃棄は今も止まる —— 止まらなくなるのは
+            **いつ廃棄するのか言わなかった**廃棄の方だけ"
+     :file "src/clericalsupport/governor.cljc"
+     :find "      (and destroy? r (or (nil? proposed-day) (nil? floor-day)))"
+     :replace "      (and destroy? r false)"
+     :must-fail ["hard-on-destruction-without-a-day"
+                 "hard-on-destruction-with-an-uncomparable-day"
+                 "hard-on-record-registered-without-an-expiry"
+                 "holds-a-destruction-with-no-day-and-says-why"
+                 "uncomparable-and-breached-are-different-refusals"]}
+
+    {:id :cn/clearance-comparability-dropped
+     :note "順序尺度側の同じ節。requester-clearance-level を書かない access が
+            `:violations []` で人間に届く"
+     :file "src/clericalsupport/governor.cljc"
+     :find "      (and access? r (or (nil? held-rank) (nil? required-rank)))"
+     :replace "      (and access? r false)"
+     :must-fail ["hard-on-access-without-a-clearance"
+                 "hard-on-access-with-an-off-scale-clearance"
+                 "hard-on-record-registered-without-a-required-level"
+                 "holds-an-off-scale-clearance-instead-of-throwing"
+                 "uncomparable-and-breached-are-different-refusals"]}
+
+    {:id :cn/rank-off-scale-is-bottom
+     :note "尺度外を尺度の**下端**として扱う（もっともらしい誤った修正）。
+            要求者側は拒否されるので一見正しく見えるが、**record 側の要求水準が
+            尺度外のとき 0 になり、どんなクリアランスでも満たす**"
+     :file "src/clericalsupport/governor.cljc"
+     :find "  (get clearance-rank x))"
+     :replace "  (get clearance-rank x 0))"
+     :must-fail ["hard-on-access-without-a-clearance"
+                 "hard-on-access-with-an-off-scale-clearance"
+                 "hard-on-record-registered-without-a-required-level"
+                 "holds-an-off-scale-clearance-instead-of-throwing"
+                 "uncomparable-and-breached-are-different-refusals"]}
+
+    {:id :cn/day-accepts-anything
+     :note "day の正規化を外す。文字列の日付が比較可能として通り、`(< \"400\" 400)`
+            が throw する —— 「受理して誤る」ではなく「受理して死ぬ」形"
+     :file "src/clericalsupport/governor.cljc"
+     :find "  (when (integer? x) x))"
+     :replace "  x)"
+     :must-fail ["hard-on-destruction-with-an-uncomparable-day"]}
+
+    {:id :cn/retention-floor-removed
+     :note "床の比較そのものを外す。比較可能性の節は残るので、**日付を書いた**
+            早すぎる廃棄だけが通る"
+     :file "src/clericalsupport/governor.cljc"
+     :find "      (and destroy? proposed-day floor-day (< proposed-day floor-day))"
+     :replace "      (and destroy? proposed-day floor-day false)"
+     :must-fail ["hard-on-early-destruction"
+                 "holds-a-pre-expiry-destruction"
+                 "uncomparable-and-breached-are-different-refusals"]}
+
+    {:id :cn/clearance-floor-flipped
+     :note "順序を反転させる。低いクリアランスが通り、高いクリアランスが落ちる ——
+            **両方向**を持っているテストだけが捕まえる"
+     :file "src/clericalsupport/governor.cljc"
+     :find "      (and access? held-rank required-rank (< held-rank required-rank))"
+     :replace "      (and access? held-rank required-rank (> held-rank required-rank))"
+     :must-fail ["hard-on-clearance-insufficient"
+                 "ok-access-above-required-level"
+                 "uncomparable-and-breached-are-different-refusals"]}
+
+    {:id :cn/retention-boundary-off-by-one
+     :note "`<` を `<=` にする。保存期限**ちょうど**の廃棄が拒否される。
+            CLAUDE.md 8 問の 5 問目 —— 通る例と落ちる例が在っても、**線上の
+            入力**が無ければ演算子は見えない。この 2 本だけが赤くなる"
+     :file "src/clericalsupport/governor.cljc"
+     :find "      (and destroy? proposed-day floor-day (< proposed-day floor-day))"
+     :replace "      (and destroy? proposed-day floor-day (<= proposed-day floor-day))"
+     :must-fail ["ok-destruction-at-exact-expiry"
+                 "comparable-proposals-are-still-admitted"]}]}]}
