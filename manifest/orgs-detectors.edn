@@ -136,7 +136,45 @@
 {:schema 1
 
  :detectors
- [{:id :verify-wasm-toolchain-pin
+ [
+  {:id       :verify-definition-repo-reachability
+   :title    "a definition repository that nothing names, and why"
+   :why      "2026-09-09: twenty-four kotoba.lang namespaces became one repository per
+              definition (adr-2609091200), 452 of them. kotoba.coll spent part of a day
+              exporting 7 of its 27 names because its assembled namespace was generated
+              before the namespace grew and never regenerated -- all 31 definition repos
+              existed the whole time and nothing said the namespace that assembles them
+              was behind. A call site asking for kotoba.coll/postwalk got a symbol that
+              did not resolve, which is silent until called. The useful question is not
+              whether a repo is named but WHY it is not: four kinds of name are
+              deliberately not carried (values, macros, protocols, record types), so
+              without that separation the answer is nine repos and the real finding is
+              one. Deliberately not a fleet gate: it reads every sibling under orgs/ to
+              find out who names whom, and a gate ships one repo's tree."
+   :argv     ["nbb" "{{repo}}/scripts/verify-definition-repo-reachability.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  900000
+   :writes   :none
+   :measured "Landed 2026-09-09 with the finding path shown rather than asserted: a
+              definition repository nothing names, planted under orgs/, produced exactly
+              one FINDING naming it and moved SCANNED from 452 to 453; removing it
+              returned UNREACHABLE 0. The FIRST control was wrong and stayed green --
+              it renamed a function inside a repo the facade still named, which this
+              detector does not measure -- so it proved nothing and was redone. Two
+              defects were found while writing it, both of which reported a clean
+              subset rather than an error: a lazy directory walk blew the stack on
+              orgs/ and exited 0, and a name-escape that emitted two backslashes made
+              the dead-code pattern match nothing, so a private helper nobody calls was
+              reported as a missing public function. Its evidence floor is the
+              namespaces the assembled namespaces REQUIRE, not west's registered
+              checkouts: comparing against west counted 2,520 ordinary repositories
+              that were never split and refused on all of them."}
+
+  {:id :verify-wasm-toolchain-pin
    :title "the Wasm toolchain amu pins, against the versions the nodes actually have"
    :why "2026-08-20: amu's contract (kotoba-component's component-model-v1.edn,
               [:spec-baseline :wasi :toolchain]) pins {:wasm-tools \"1.243.0\"
