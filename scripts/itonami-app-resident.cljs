@@ -9,11 +9,13 @@
 ;; Rewritten 2026-09-09, and put under version control the same day. The
 ;; original lived only in the home directory, so its loss was invisible until
 ;; the next restart — a single point of failure with no history and no
-;; reviewer. `~/.gftd/bin/itonami-app-resident.cljs` is now a symlink to this
+;; reviewer. This file is the only copy; `~/.gftd/bin/` is gone with the rest of
 ;; file; the plist beside it (`scripts/cloud.itonami.app.local.plist`) points
 ;; here directly, and is the copy to reinstall from.
 ;;
-;; What made the rewrite necessary: the original lived at `~/.gftd/bin/` and was
+;; What made the rewrite necessary: the original lived at `~/.gftd/bin/` (the name
+;; is retired -- manifest/gftd-retirement.edn -- but this sentence records where it
+;; actually was) and was
 ;; removed by that day's home-directory migration, while the process it had
 ;; started stayed alive holding a deleted file. The plist still pointed at the missing
 ;; path and `KeepAlive` is true, so the app was one crash away from a respawn
@@ -25,7 +27,7 @@
 ;; A launchd plist is world-readable; a value written into `EnvironmentVariables`
 ;; is a credential in a file anyone can cat. These are fetched at start instead:
 ;;
-;;   MURAKUMO_API_KEY    ~/.gftd/itonami-murakumo-api-key (0600). A file rather
+;;   MURAKUMO_API_KEY    ~/.itonami/itonami-murakumo-api-key (0600). A file rather
 ;;                       than kagi because launchd cannot unlock kagi.
 ;;   OPENROUTER_API_KEY  login Keychain, service `gftd.openrouter`, by exact
 ;;                       name. One known item, never an enumeration.
@@ -43,7 +45,7 @@
 
 (def workspace-root "/Users/junkawasaki/github/com-junkawasaki")
 (def murakumo-key-file
-  (str (or (aget js/process.env "HOME") "") "/.gftd/itonami-murakumo-api-key"))
+  (str (or (aget js/process.env "HOME") "") "/.itonami/itonami-murakumo-api-key"))
 (def openrouter-keychain-service "gftd.openrouter")
 
 (defn- log [& parts]
