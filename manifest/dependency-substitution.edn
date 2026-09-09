@@ -296,7 +296,42 @@
    :target "kotoba-lang/org-postgresql-wire" :kind :implementation :note "provider-postgres is the adapter above it."}
   {:coordinate "org.bouncycastle/bcprov-jdk18on" :ecosystem :maven :disposition :first-party-exists
    :target "kotoba-lang/org-ietf-x509" :kind :implementation
-   :note "Split by use: certificates to org-ietf-x509, DER to org-ietf-asn1, signatures to org-ietf-ed25519 or eth-crypto. Not a single swap."}
+   :note "Split by use: certificates to org-ietf-x509, DER to org-ietf-asn1, signatures to org-ietf-ed25519 or eth-crypto. Not a single swap."
+   :qualification
+   "The note above is already careful -- it splits by use and says `Not a
+    single swap`. What it does not cover is that the three uses it lists are
+    not the three uses that exist. Measured 2026-09-10 from what each consumer
+    actually imports: none of them parses a certificate, none decodes bare
+    DER, and none signs with Ed25519. `:target org-ietf-x509` is the first
+    thing a reader or a wave bot sees, and it fits no call site.
+
+    kagi -- `Argon2BytesGenerator` + `Argon2Parameters`. A password KDF, not
+    X.509 at anything. The right target EXISTS: `kotoba-lang/org-ietf-argon2`,
+    RFC 9106 Argon2d/i/id in portable `.cljc`, whose own README says it was
+    written because pqh's `IKdf` seam had `a real gap -- there was no
+    in-language implementation to serve as the reference a provider is checked
+    against`. kagi already carries the seam to plug it into: `defprotocol
+    Provider`, its own `暗号プリミティブの差し替え境界`.
+
+    Per ADR-2608301100's ladder this is a REFERENCE-PROVIDER move, not a
+    removal: Argon2 is a deliberately slow KDF and a pure `.cljc` one may be
+    far slower again, the way ChaCha seal measured 3.25 ms against @noble's
+    0.0065 ms. Reference first, production hot path measured before it moves.
+
+    pqh -- `pqc.crypto.mlkem`, `pqc.crypto.mldsa`, digests, generators.
+    Post-quantum primitives. Searched before concluding absence: no
+    first-party ML-KEM or ML-DSA exists (`kotoba-lang/kyber` is
+    `com-etzhayyim-app-kyber`, a business app). Genuine `:host-boundary`.
+
+    murakumo -- `cert.jcajce`, `openssl.jcajce`, `operator.jcajce`,
+    `jce.provider`, `asn1.x509`, `asn1.x500`. Certificate ISSUANCE and PEM
+    writing. Parsing is not issuing. Genuine `:host-boundary` until something
+    first-party issues.
+
+    One floor applies to all three and is worth writing down where the
+    substitution is proposed rather than where it is attempted: a green test
+    suite is not sufficient evidence for replacing a cryptographic primitive.
+    A wrong swap here is a security defect that compiles."}
   {:coordinate "org.bouncycastle/bcpkix-jdk18on" :ecosystem :maven :disposition :first-party-exists
    :target "kotoba-lang/org-ietf-cms" :kind :implementation}
   {:coordinate "@noble/hashes" :ecosystem :npm :disposition :first-party-exists
