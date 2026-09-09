@@ -1,6 +1,6 @@
 [{:db/id -1
  :adr/id "adr-2609092600-cluster-stability-cosci-daemons-and-filevault"
- :adr/title "再起動が治療で、再起動を生き延びられないのが supervision だった — cluster 安定化の co-scientist 設計"
+ :adr/title "cluster 安定化の co-scientist 設計 — そして「治療は再起動」は間違いだった"
  :adr/status "accepted"
  :adr/date "2026-09-09"
  :adr/related ["adr-2609021500-fleet-node-outbound-hygiene-contract" "adr-2609092500-edge-fleet-ten-enrolled-three-live" "adr-2609092400-donated-inference-commons-reserved-floor"]
@@ -113,9 +113,47 @@ murakumo-edge が 200 / 18.6 tok/s）。
 は、6 台が孤児プロセスから boot を生き延びる daemon になったこと**で、再起動は
 supervision の側からは安全になった。
 
+## 4.5 訂正（同日、この ADR の見出しの主張を実測が反転させた）
+
+**「dark node の治療は再起動しかない」は強すぎた。** 正しくは:
+
+> 再起動は wedged な TIME_WAIT を**回収**する。**サービスを復旧**するものではない。
+> 固着したエントリは古い ephemeral floor の**上に連続した塊**で居るので、
+> **floor をその塊の下へ動かせば即座に空きができる。**
+
+実測 2026-09-09:
+
+| node | before | after | 結果 |
+|---|---|---|---|
+| benjamin | first=16384 / 48,298 wedged (98%) | first=12000 → 空き 5,238 | 数分で pool 復帰 |
+| simeon | first=16384 / 48,907 wedged (99.5%) | first=12000 → 空き 4,629 | 数分で pool 復帰 |
+| joseph | **baseline daemon 未適用**・macOS 既定 49152 / 16,384 中 15,763 wedged | baseline 適用のみで空き 33,389 | 復帰 |
+
+**murakumo-edge は live 3 → 6（到達可能な全 mini）になった。再起動は 1 台も
+していない。**
+
+効かないと確認したレバーも記録する（同じ午後を誰かが繰り返さないため）:
+**`net.inet.tcp.msl` を 15000 → 1000 に下げても固着は期限切れにならない**
+（45 秒後も 48,298 で同一）。生成源を止めても同じ。kernel はこれらの timer を
+そもそも回していない。
+
+floor を下げてよいのは**そのノード自身の固定 listener の下まで**。この mini 群で
+旧 floor 未満の最上位は ollama の 11434 なので、値は 12000（きりの良い数では
+ない理由がこれ）。
+
+`murakumo edge baseline [<node>|all]` を追加した。ADR-2609021500 はこの daemon を
+benjamin / simeon に手で配り「provision を全 macOS ノードに回す」を follow-up と
+記録したが、実行されておらず、実測で dan / judah / levi / joseph に**存在しなかった**。
+4 台に配備済み。
+
+**FileVault は依然として本当の制約だが、それは緊急事項ではなくなった。**
+wedged なソケットの回収にはやはり再起動が要る（放置すれば空きは再び減る。ただし
+backoff 契約が効いている今、健全ノードは 24 日で TIME_WAIT 1 桁なので、
+5,000 本の空きは実務上は当分もつ）。
+
 ## 5. オーナーにしか決められないこと
 
-**FileVault ノードの解錠方針。** 3 台を戻す道は 2 つしかない:
+**FileVault ノードの解錠方針。** 4.5 のとおり 3 台は再起動なしで戻したので、これは\n緊急ではなくなった。ただし wedged なソケットの回収には依然として再起動が要る。道は 2 つ:
 (a) コンソールで再起動（物理アクセス）、(b) `sudo fdesetup authrestart`
 （1 回だけ解錠を通す。認証情報が要り、**agent は入力しない** —— 安全床①）。
 恒久的な自己復旧を望むなら authrestart 鍵の保管が要り、それは FDE を
