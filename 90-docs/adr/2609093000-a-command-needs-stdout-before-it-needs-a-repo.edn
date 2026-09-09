@@ -1,0 +1,106 @@
+[{:db/id -1
+ :adr/id "adr-2609093000-a-command-needs-stdout-before-it-needs-a-repo"
+ :adr/title "A command needs stdout before it needs a repo, and the scan already knew the offset"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/authority "owner instruction, 2026-09-09"
+ :adr/repos "kotoba-lang/kotoba-native, kotoba-lang/kotoba-verifier, kotoba-lang/osaho, kotoba-lang/amu"
+ :adr/related "kotoba-native ADR 0081, kotoba-native ADR 0002, kotoba-verifier ADR 0051, osaho ADR 0271, adr-2607198300-kotoba-execution-without-jvm-node-rust"
+ :adr/body "Owner instruction, 2026-09-09: build kotoba/amu native binaries that run as fast
+as Rust, one repo per command, in kotoba-lang. This ADR records what was
+MEASURED that day before any repo was created, because the request assumes a
+native command binary is reachable today and three quarters of it is not.
+
+## What runs today (measured 2026-09-09, aarch64-macos, amu --jvm-free)
+
+Reproduction, not values -- the values move:
+
+    A=orgs/kotoba-lang/amu/bin/amu
+    printf '(ns t (:export [main]))\\n(defn main [] :i64 ...)\\n' > /tmp/t.kotoba
+    $A compile /tmp/t.kotoba --jvm-free --target aarch64-macos --output /tmp/t.kexe
+    $A extract-native /tmp/t.kexe --symbol main --output /tmp/m.bin
+    cc -O2 -o /tmp/loader orgs/kotoba-lang/amu/tools/kexe_loader.c
+    /tmp/loader /tmp/m.bin <offset> <arity> aarch64 <allow-csv|->
+
+| face | state |
+|---|---|
+| .kotoba to machine code, executed | works |
+| fs/browse (wire 34), directory listing, executed | works |
+| fs/app-data (wire 35) read / write / ranged read | hosted by the loader |
+| env/read (wire 33) | hosted by the loader |
+| string-substring / string-byte-length / string-contains? | lower to native |
+| string-index-of | REFUSED, see below |
+| stdout, argv, exit status | do not exist as capabilities at all |
+| standalone executable | does not exist |
+
+The last two rows are what stands between this and a command. The loader is a
+HOST: it mmaps the code, answers capability calls, and prints the RETURN VALUE
+as an EDN map. There is no way for a guest to write a byte to stdout, read its
+own argv, or set an exit status, and `kotoba.native.macho` encodes a `.o`
+object, not a linked executable. `capability-catalog.edn` lists 35 capabilities
+and none of them is stdout or argv -- so this is not a qualification gap in a
+kit, it is an absent capability.
+
+## The first blocker, and why it was the right one to take first
+
+`string-index-of` failed as `aggregate ABI rejected: call-abi-not-admitted`.
+Without an offset a guest cannot cut a string at a separator, so it cannot
+split lines -- which removes grep, wc, cut, head, tail, sort and uniq at once,
+and is why `kbb.browse` could not compile for native even though the loader has
+hosted its provider all along.
+
+It turned out to be one line of exposure, not a feature: `kotoba$string-find`,
+the helper kotoba-native ADR 0002 already had, ALREADY answers the first
+matching byte offset. `string-contains?` was folding that offset to 0/1 and
+throwing it away.
+
+Landed as three changes, because there are three gates in front of it and ADR
+0002 measured that opening one alone moves nothing:
+
+  * kotoba-native `lower-index-of` + dispatch on both ISAs (its ADR 0081)
+  * kotoba-verifier `string-operations` gains `string-index-of 2` (its ADR 0051)
+  * osaho: the oracle itself was wrong (its ADR 0271)
+
+## The reference interpreter was the implementation that was wrong
+
+kotoba-native's string-search suite never writes an expected value down: each
+row runs through `kotoba.kir/execute` twice, once as the operation and once as
+the rewrite. Adding an astral row made that suite fail as `(not (= 7 4))` on
+`(string-index-of` G-clef + `ab, ab)`.
+
+`kotoba.kir.value/utf8-index-of!` walked the haystack one UTF-16 unit at a
+time, charged a high surrogate 4 bytes, then stepped onto the LOW surrogate and
+charged 3 more. Every astral code point before a match added 7. The JS emitter,
+the new native lowering and CPython all answer 4.
+
+Nothing had caught it because every multi-byte test row used 2- and 3-byte code
+points, which are one UTF-16 unit each. The existing test even named the wrong
+answer it was guarding against -- a UTF-16 answer of 6 -- and 7 is neither that
+nor the right one. It also reached artifacts, not just runtime: `lower` folds a
+pure i64 entry through this evaluator, so a constant `string-index-of` over an
+astral literal was baked in wrong.
+
+This is the workspace rule about oracles paying for itself. A suite that had
+written 4 down would have been GREEN and the reference would still be wrong.
+
+## Decisions
+
+1. Foundation before repos, each step proved by EXECUTING the artifact rather
+   than by building it. The remaining foundation is: argv, stdout/stderr and
+   exit status as capabilities with loader providers, then a linked executable
+   so `./ls` is a file rather than a blob plus a loader invocation.
+2. Naming is the ORIGIN plane. POSIX utilities are specified by IEEE Std
+   1003.1, so they take `org-ieee-<utility>`, following `org-ieee-tar`, which
+   states that pattern for exactly this reason. Non-POSIX entries in the
+   owner's list route to their own origin instead -- ssh is IETF and
+   `org-ietf-ssh` already exists.
+3. The command set is the 28 the owner listed. `tar` is already
+   `org-ieee-tar` (a format library, not yet a command surface); awk, sed,
+   curl and ssh are each a larger subject than the rest and are sequenced last.
+
+## Not done, and named so it is not mistaken for done
+
+No command repo exists yet, and none can produce a runnable binary until argv,
+stdout and exit status exist. Do not scaffold 28 repos against a runtime that
+cannot print. The next step is the loader's provider table, not a repo.
+"}]
