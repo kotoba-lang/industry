@@ -475,7 +475,10 @@
    :fleet-gain (:leverage/fleet-gain e)
    :band (:leverage/band e)
    :unseen (unseen-content e)
-   :taken (taken-by-someone-else (:repo/path e))
+   ;; `:taken` はここでは付けない —— ranked 行にだけ後付けする（-main を見よ）。
+   ;; 実測 2026-09-07: ここで全 entity に付けると 1 tick で約 4,000 回の git spawn に
+   ;; なり、tick は timeout 300s / 1500s のどちらでも出力 0 バイトのまま SIGTERM で
+   ;; 死んだ（node は flush せず落ちる）。消費者は `ranked` だけなので、順位は 1bp も動かない。
    ;; 「この行は測れていない」。候補から落とすのに使う（下の unmeasured）。
    ;; :taken と同じく repo そのものの性質ではなく **この周の可否** である。
    :truncated? (scan-truncated? e)
@@ -541,16 +544,32 @@
                             (.existsSync fs (str root "/" target "/.git"))))
                      raises)))))
 
+(def ^:private landing-time-window-days
+  "`with-landing-times` が git に訊く行の下限（datoms 生成時刻からこの日数だけ前）。
+  `:at` の誤りは JST を Z と書いた 9 時間（実測 2026-08-09）で、日単位の窓は
+  それを桁で超える。"
+  7)
+
 (defn- with-landing-times
   "軸上げの行に、merge commit から測った実時刻を添える。
 
-  問い合わせるのは `axis-raise?` の行だけ（ledger 全体を git に聞かない）。"
-  [entries]
-  (mapv (fn [e]
-          (if (fresh/axis-raise? e)
-            (if-let [ms (commit-time-ms e)] (assoc e :landed-at-ms ms) e)
-            e))
-        entries))
+  問い合わせるのは `axis-raise?` の行のうち、**`:at` が datoms 生成時刻の
+  `landing-time-window-days` 日前より新しいか、`:at` が読めない行だけ**。
+  それより古い行は `:at` のまま `freshness` に渡す。実測 2026-09-07: axis-raise 行は
+  529 本あり、全部に `git log -1` を訊いていた。ledger と共に単調に増えるので窓で切る。
+  `gen-ms` が数でない（`:unknown`）ときは従来どおり全行に訊く。"
+  [entries gen-ms]
+  (let [floor (when (number? gen-ms)
+                (- gen-ms (* landing-time-window-days 24 60 60 1000)))
+        ask? (fn [{:keys [at]}]
+               (or (nil? floor)
+                   (let [t (js/Date.parse (str at))]
+                     (or (js/isNaN t) (>= t floor)))))]
+    (mapv (fn [e]
+            (if (and (fresh/axis-raise? e) (ask? e))
+              (if-let [ms (commit-time-ms e)] (assoc e :landed-at-ms ms) e)
+              e))
+          entries)))
 
 ;; ── 計測より後に動いた repo は候補から外す ──────────────────────────────────
 ;;
@@ -718,7 +737,7 @@
         freshness (fresh/freshness {:generated-at gen-ms
                                     :now (.now js/Date)
                                     ;; `:at` ではなく merge commit の実時刻で測る
-                                    :entries (with-landing-times entries)
+                                    :entries (with-landing-times entries gen-ms)
                                     :stale-after-days stale-after-days
                                     :root-reads-behind-remote? behind?})
         {:keys [stale? unseen suspect]} freshness
@@ -782,7 +801,10 @@
         movement (fresh/classify-movement
                   (with-commit-identity (vec (take movement-probe-depth by-gain))))
         moved (:moved movement)
-        ranked (vec (take rank-take (:kept movement)))
+        ;; `:taken`（他セッションが作業中か）は順位が決まった後、ranked 行にだけ
+        ;; git を訊く（`row` の注記を見よ）。rank-take 本 × 2 spawn。
+        ranked (mapv #(assoc % :taken (taken-by-someone-else (:repo %)))
+                     (take rank-take (:kept movement)))
         ;; `freshness` は probe より前に走るので、:blind-to-own-work は
         ;; 「どの候補が落ちるか」を知らずに決まっている。probe が名指しされた着地を
         ;; **全部** 落としたなら、間違っている行はもう候補に居ない —— 残りの順位は
