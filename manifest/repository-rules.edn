@@ -19,7 +19,57 @@
 {:schema "kotoba.repository-role-rules.workspace.v1"
 
  :workspace-policies
- {:live-service-durable-data
+ {;; ADR-2609092600. The app plane, as four planes that are never mixed.
+  ;;
+  ;; `:policy/kind-values` has NO default on purpose: a manifest that declares
+  ;; nothing stays a finding. Defaulting to :service would turn every
+  ;; unclassified manifest green without publishing a single document.
+  ;;
+  ;; `:policy/location` is a TABLE, not a design. Swapping the bytes host does
+  ;; not touch one character of any manifest -- that is the whole point of
+  ;; keeping location outside the protocol keys.
+  :app-plane
+  {:policy/authority "90-docs/adr/2609092600-one-app-plane-identity-naming-location-kind.edn"
+   :policy/builds-on "90-docs/adr/2608157000-app-links-are-content-addressed.edn"
+   :policy/scope :application-surface
+   :policy/manifest-name "kotoba.app.edn"
+   :policy/identity-key :kotoba.app/bundle-cid
+   :policy/link-key :kotoba.app/embed-url
+   :policy/naming-key :kotoba.app/latest
+   :policy/kind-key :kotoba.app/kind
+   :policy/kind-values
+   {:document {:content-address :required
+               :why "serves one document"}
+    :service {:content-address :not-applicable
+              :why "a dynamic worker answers requests; it serves no single document"}
+    :placement {:content-address :not-applicable
+                :why "an actor placement manifest declares where code runs, not what is served"}}
+   :policy/kind-default nil
+   :policy/location
+   {:bytes "https://{cid}.ipfs.kotobase.net"
+    :entry "https://itonami.app/{name}/"
+    :naming-resolution :dnslink}
+   :policy/agent-work-plane "https://itonami.cloud"
+   :policy/verifier "scripts/verify-app-content-address.cljs"
+   :policy/verifier-states #{:addressed :exempt :document-not-addressed :located :unreadable}
+   :policy/finding-keys #{"located-only" "document-not-addressed"}
+   :policy/requires #{:content-address-for-documents
+                      :declared-kind
+                      :put-then-get-byte-comparison
+                      :location-outside-protocol-keys}
+   :policy/forbids #{:hostname-in-kotoba-namespaced-key
+                     :path-as-identity
+                     :second-bytes-plane
+                     :entry-apex-as-alias-of-another
+                     :bulk-exemption}
+   :policy/measured
+   {:at "2026-09-09"
+    :note "Numbers move. Re-measure; do not cite these."
+    :scanned 517 :addressed 435 :located 82 :unreadable 0
+    :bytes-host-probe {"https://{cid}.ipfs.kotobase.net" 200
+                       "https://{cid}.ipfs.itonami.cloud" 502}}}
+
+  :live-service-durable-data
   {:policy/authority "90-docs/adr/2608159100-kotobase-net-default-durable-boundary.edn"
    :policy/scope :runtime-durable-plane
    :policy/authority-origin "https://kotobase.net"
