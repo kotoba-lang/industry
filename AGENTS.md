@@ -1853,10 +1853,33 @@ safe language feature.*
   古い一句「native では無い」が実害を出した。ADR-2609062400）。
 - **一時制約に沿って書いたコードは、その旨と撤去条件をモジュールのヘッダに書く。**
   書かなければ、後から読む者はそれを恒久の様式として模倣する。
-- **移行の単位は `kotoba/app` の vertical slice**（1 判断表ではない）。ADR-2608261100 /
-  ADR-2607279200 決定 5。**Q9 は decision-core fallback を移行単位として認めない** ——
-  backend が component 全体を admit できない場合、その移行は `:blocked` である。
-  機械正本は `kotoba-lang/lang/q9-migration.edn`。
+- **移行の単位は component 全体**（2026-08-30、`kotoba-lang/docs/adr/ADR-q9-whole-component-build-migration.md`）。
+  機械正本は `kotoba-lang/lang/q9-migration.edn` **version 3** で、そこに
+  `:migration-unit :whole-component` と **`:decision-only-slices-allowed false`** が
+  書かれている。`.kotoba` / `.cljk` の deploy 可能な entry 1 本が、閉じた推移
+  source 集合と宣言された public surface を持ち、**置き換える component の
+  public export をすべて実装するか、versioned な API 決定で明示的に外す**。
+  - ⚠ **ここは 2026-09-09 に訂正した。** それまで「単位は `kotoba/app` の
+    vertical slice（1 判断表ではない）」と書き、ADR-2608261100 を引いていた。
+    **その ADR は上の ADR が名指しで supersede している** —— 「function-only or
+    decision-only shadow is **compiler research, not a migration**, and cannot
+    authorize consumer cutover」。訂正は kotoba-lang 側の docs と機械正本には
+    2026-08-30 に入っていたが、**root の ADR は `accepted` のまま、この文書は
+    古い単位を引き続き指していた**（10 日間）。この文書自身が繰り返し警告して
+    いる形 —— 古い規則は破られると音がしないので、そのまま設計を縛る。
+  - **機構が host に在ることは、business component を Clojure に残す理由に
+    ならない。** filesystem / socket / clock / randomness / crypto / process /
+    host handle は **宣言された capability import** として渡る
+    (`:native-functionality-crosses :declared-capability-import`、
+    `:ambient-authority-forbidden true`)。HTTP と database のロジックも
+    移行対象（`:http-and-database-logic-may-migrate true`）。
+  - **compiler が表現できないなら、その移行は `:blocked`。** 小さい述語に
+    削って gate を緑にしない —— *the component is not reduced to a smaller
+    predicate to make the gate green*。欠落は language surface plan に足す。
+  - 現在地は機械正本が持つ（`:current-decision`）。2026-08-30 時点で
+    `:whole-component-wave-1-authorized-in-progress` / 次の一手は
+    **wave-1 の pilot を whole-component build として再 qualify すること**。
+    ⚠ **その値をここに書き写さない** —— 毎日動く。
 
 ## design system 5 repo は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
 

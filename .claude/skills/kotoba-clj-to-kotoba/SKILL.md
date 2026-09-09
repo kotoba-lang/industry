@@ -1,13 +1,20 @@
 ---
 name: kotoba-clj-to-kotoba
-description: clj / cljc から .kotoba へ、kotoba/app の vertical slice を 1 本移す。判断核は named backend が値を通せないときの fallback。『clj から kotoba』『cljk』『decision core』『todo-app』『kotoba compile』で発火。
+description: clj / cljs / cljc から .kotoba へ、component を 1 本まるごと移す（2026-08-30 以降 vertical slice / decision-core は移行単位ではない）。機構は宣言された capability import として渡し、compiler が表現できなければ :blocked にする。『clj から kotoba』『cljs を kotoba に』『cljk』『whole component』『todo-app』『kotoba compile』で発火。
 ---
 
-# clj → .kotoba（vertical app slice）
+# clj → .kotoba（whole component）
 
-**正本は ADR-2608261100**（移行単位）。言語は ADR-2607201300 / ADR-2607279200。
+**移行単位の正本は `kotoba-lang/docs/adr/ADR-q9-whole-component-build-migration.md`
+（2026-08-30、Accepted）と機械正本 `kotoba-lang/lang/q9-migration.edn` version 3。**
+単位は **component 全体**で、`:decision-only-slices-allowed false`。
+
+⚠ **この skill は 2026-09-09 まで「1 反復 = vertical slice」と書いていた。**
+その ADR が名指しで supersede している —— *a function-only or decision-only shadow
+is compiler research, not a migration, and cannot authorize consumer cutover*。
+ADR-2608261100 は superseded。言語は ADR-2607201300 / ADR-2607279200。
 分類は ADR-2608650000 と `lang/surface-status.edn` の `:disposition`。
-文字列禁止の否定は ADR-2608261000。この skill は 1 slice の手順書。
+文字列禁止の否定は ADR-2608261000。この skill は 1 component の手順書。
 
 判断核は既定ではない。参照は amu の `examples/todo-app.kotoba`
 （`init` / `view` / `step`。文字列、`:document`、`cond`）。
@@ -16,13 +23,22 @@ description: clj / cljc から .kotoba へ、kotoba/app の vertical slice を 1
 
 | 層 | 例 | 扱い |
 |---|---|---|
-| 恒久の安全 | `throw`、ホスト interop、ソケット | 広げない |
+| 恒久の安全 | `throw`、ambient authority | 広げない |
 | 意味の単純化 | bool は数ではない | 広げない |
-| 部分実装 / 未達 | native の word 型、正規表現演算 | その backend にだけ fallback。言語から削らない |
-| **guest / host** | 線の CRLF 送信、DOM 破壊、credential | 機構は host。product semantics はゲスト |
+| 部分実装 / 未達 | native の word 型、正規表現演算 | **`:blocked`。** 小さくして緑にしない |
+| **機構 / 意味** | socket、DOM 破壊、credential、clock、乱数、crypto | 機構は **宣言された capability import**。orchestration と decision surface は component が持つ |
 
 **文字列は禁止されていない。** 『判断だけ』を『文字列を持たない』と読まない。
-『1 スライス = 1 判断表』にしない。
+
+⚠ **『機構は host に残す』を『business component を Clojure に残す』と読まない。**
+機械正本が `:native-functionality-crosses :declared-capability-import` /
+`:ambient-authority-forbidden true` と書いており、ADR は明示している ——
+filesystem・socket・clock・randomness・crypto・process control・host handle は
+**component を Clojure に残す理由にならない**。HTTP と database のロジックも移行対象
+(`:http-and-database-logic-may-migrate true`)。
+
+⚠ **compiler が表現できないなら `:blocked`。** *the component is not reduced to a
+smaller predicate to make the gate green*。欠落は language surface plan に足す。
 
 ## 手順
 
