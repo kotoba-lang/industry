@@ -58,6 +58,14 @@
 (defn- opt [flag] (second (drop-while #(not= flag %) argv)))
 (def repo (opt "--repo"))
 (def text-sha (opt "--text-sha"))
+;; `.cljs` is run by nbb, and nbb reads nbb.edn -- NOT deps.edn and not bb.edn.
+;; Without this flag a repo whose only project file is a deps.edn gets the
+;; coordinate written somewhere its own .cljs can never see it. Measured
+;; 2026-09-09 on kotoba-lang/grammar: deps.edn named the dependency, the tool
+;; reported DEPS added, and `nbb tools/gen-tmlanguage.cljs` answered "Could not
+;; find namespace: kotoba.lang.text". Creating the file is a change to how the
+;; repo is built, so it is opt-in rather than silent.
+(def create-nbb-edn? (some #{"--create-nbb-edn"} argv))
 (def apply? (some #{"--apply"} argv))
 (def include-cljs?
   "Whether to rewrite `.cljs` too.
@@ -594,6 +602,13 @@
                               (or (project-file d)
                                   (when-not (or (= d repo) (= d (.dirname path-mod d)))
                                     (recur (.dirname path-mod d))))))
+            nbb-above (fn [file]
+                        (loop [d (.dirname path-mod file)]
+                          (let [c (.join path-mod d "nbb.edn")]
+                            (cond
+                              (try (.isFile (.statSync fs c)) (catch :default _ false)) c
+                              (or (= d repo) (= d (.dirname path-mod d))) nil
+                              :else (recur (.dirname path-mod d))))))
             all-changed (for [[p s] targets
                               :let [a (alias-of s), s' (rewrite a s)]
                               :when (not= s s')]
@@ -622,11 +637,65 @@
         (when (empty? changed)
           (refuse! (str "every one of the " (count all-changed) " file(s) to rewrite"
                         " has no project file above it; nothing was written")))
+        ;; nbb.edn IS THE DECLARATION SITE FOR .cljs, AND ONLY nbb.edn IS.
+        ;; deps.edn and bb.edn are both invisible to nbb, so a repo whose .cljs
+        ;; were rewritten and whose coordinate went to deps.edn is not migrated
+        ;; -- it is broken, and it reports success. Measured 2026-09-09 on three
+        ;; repos in one wave (grammar, cybersecurity, kotoba-fleet): each printed
+        ;; DEPS added, and each then answered "Could not find namespace:
+        ;; kotoba.lang.text" when its own entry point was run.
+        ;;
+        ;; This is checked HERE, before any source is written, so the refusal can
+        ;; truthfully say nothing was written. The first version of it sat in the
+        ;; declaration phase and said so while 1 rewritten file was already on
+        ;; disk.
+        (let [without (filterv (fn [[p _]] (and (str/ends-with? p ".cljs")
+                                                (nil? (nbb-above p))))
+                               changed)]
+          (when (seq without)
+            (doseq [[p _] without] (println (str "NO-NBB-EDN\t" p)))
+            (when-not create-nbb-edn?
+              (refuse! (str (count without) " rewritten .cljs file(s) would have no"
+                            " nbb.edn above them. nbb does not read deps.edn or"
+                            " bb.edn, so the declaration this tool writes there is one"
+                            " their own runtime cannot see: they would fail at load"
+                            " with \"Could not find namespace: kotoba.lang.text\"."
+                            " Nothing was written. Pass --create-nbb-edn to have one"
+                            " written beside the project file, mirroring its :paths.")))))
         (if-not apply?
           (do (doseq [[p _] changed] (println (str "WOULD-REWRITE\t" p)))
               (println (str "PLAN\t" (count changed) "\tfiles (dry run; pass --apply)"))
               (js/process.exit 0))
           (do
+            ;; --create-nbb-edn: one nbb.edn beside each project file that has
+            ;; .cljs under it with no nbb.edn of their own. :paths is COPIED
+            ;; from that project file -- the tool does not choose a classpath.
+            (doseq [dp (distinct (keep (fn [[f _]] (when (and (str/ends-with? f ".cljs")
+                                                              (nil? (nbb-above f)))
+                                                     (project-above f)))
+                                       changed))]
+              (let [np   (.join path-mod (.dirname path-mod dp) "nbb.edn")
+                    base (try (reader/read-string (.readFileSync fs dp "utf8"))
+                              (catch :default _ nil))
+                    ps   (:paths base)]
+                (when-not (vector? ps)
+                  (refuse! (str dp " has no :paths vector to mirror, so"
+                                " --create-nbb-edn would have to invent one for " np
+                                " -- and a classpath this tool guessed is exactly the"
+                                " kind of declaration that looks right and resolves"
+                                " nothing. Nothing was written.")))
+                (.writeFileSync
+                  fs np
+                  (str ";; nbb reads this file and does NOT read deps.edn or bb.edn.\n"
+                       ";; The .cljs here are run by nbb, so a coordinate declared only\n"
+                       ";; in " (.basename path-mod dp) " is invisible to them.\n"
+                       ";;\n"
+                       ";; :paths is COPIED from " (.basename path-mod dp)
+                       ", not chosen here.\n"
+                       "{:paths " (pr-str ps) "\n"
+                       " :deps {io.github.kotoba-lang/text {:git/sha \"" text-sha "\"}}}\n")
+                  "utf8")
+                (println (str "DEPS\tcreated\t" np))))
             (doseq [[p s'] changed] (.writeFileSync fs p s' "utf8"))
             ;; read back what was written; a rewrite that cannot be re-read is
             ;; the failure mode this whole workspace keeps rediscovering
@@ -667,7 +736,19 @@
             ;; same shape as deps.edn, and two of the repos that had "no deps.edn
             ;; to declare in" have only a bb.edn -- refusing them was the tool
             ;; being narrow, not the repo being unusual.
-            (let [targets-deps (distinct (keep (fn [[f _]] (project-above f)) changed))
+            (let [targets-deps (distinct (concat
+                                           (keep (fn [[f _]] (project-above f)) changed)
+                                           (keep (fn [[f _]]
+                                                   (when (str/ends-with? f ".cljs")
+                                                     (let [d (.dirname path-mod f)]
+                                                       (loop [d d]
+                                                         (let [c (.join path-mod d "nbb.edn")]
+                                                           (cond
+                                                             (try (.isFile (.statSync fs c))
+                                                                  (catch :default _ false)) c
+                                                             (or (= d repo) (= d (.dirname path-mod d))) nil
+                                                             :else (recur (.dirname path-mod d))))))))
+                                                 changed)))
                   targets-deps (if (seq targets-deps)
                                  targets-deps
                                  (when-let [dp (project-file repo)] [dp]))]

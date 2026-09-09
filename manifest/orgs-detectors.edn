@@ -137,6 +137,45 @@
 
  :detectors
  [
+  {:id       :verify-nbb-declaration-visible
+   :title    ".cljs entry points that require a namespace nbb cannot resolve"
+   :why      "nbb reads nbb.edn. It does NOT read deps.edn and it does NOT read bb.edn --
+              their :deps are invisible to it. So a repository whose .cljs were migrated
+              to kotoba.lang.text, with the coordinate written to deps.edn, is not
+              migrated: it is broken, and every tool in the chain reports success.
+              Measured 2026-09-09 on three repositories in one wave (kotoba-lang/grammar,
+              cloud-itonami/cybersecurity, kotoba-lang/kotoba-fleet): each printed
+              'DEPS added <path>/deps.edn' and each then answered 'Could not find
+              namespace: kotoba.lang.text' the first time its own entry point ran, while
+              `clojure -M:test` stayed green throughout because the JVM suite reads
+              deps.edn and never loads the .cljs. Only ENTRY POINTS are reported -- a
+              shebang file, or a package.json script spelled `nbb <file>` with no
+              --classpath. A file invoked as `nbb --classpath src:test <file>` declares
+              its classpath at the invocation site and is not a finding; counting those
+              would turn a list of broken things into a list of unusual ones (1,114 files
+              rather than the 442 entry points among them). Deliberately not a fleet
+              gate: it walks every west project under orgs/, and a gate ships one
+              repository's tree."
+   :argv     ["nbb" "{{repo}}/scripts/verify-nbb-declaration-visible.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  1800000
+   :writes   :none
+   :measured "Landed 2026-09-09 with nbb itself as the oracle rather than with an
+              assertion. Two synthetic projects differing only in whether nbb.edn names
+              the coordinate: the detector reports exactly the one, and running each with
+              `nbb run.cljs` errors on the reported one and prints its answer on the
+              other. Three findings drawn at random from the real sweep were then run
+              under nbb and all three failed to resolve a namespace. First full sweep:
+              SCANNED 4786, ABSENT 61 (registered but not checked out -- not measured and
+              not clean), UNRESOLVABLE 442 entry points across 206 repositories, of which
+              336 have no nbb.edn at all and 106 have one that does not name the
+              coordinate. By coordinate: kotoba-lang/text 428, kotoba-lang/edn 12,
+              kotoba-lang/package-contract 2, kotoba-lang/fmt 1."}
+
   {:id       :verify-source-has-a-project
    :title    "Clojure source in a west project with nothing that declares a project"
    :why      "2026-09-09: the clojure.string -> kotoba.lang.text migration refused 67
