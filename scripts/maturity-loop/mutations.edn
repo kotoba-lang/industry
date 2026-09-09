@@ -10550,4 +10550,133 @@
      :file "src/app.ts"
      :find "  const target = `${dispatcherUrl}/xrpc/${NSID_PREFIX}.scanCommit`;"
      :replace "  const target = `${dispatcherUrl}/xrpc/${NSID_PREFIX}.scanRepo`;"
-     :must-fail ["FAIL  github-webhook-accepts-a-genuine-hmac-and-dispatches-scancommit"]}]}]}
+     :must-fail ["FAIL  github-webhook-accepts-a-genuine-hmac-and-dispatches-scancommit"]}]}
+
+  ;; ── app-webpage —— 5 つの宣言面に重複して書かれた名前（2026-09-09 に着地）────
+  ;;
+  ;; この repo は 8 つの method 名・1 つの nanoid・1 つの DID ホストを 5 面に
+  ;; 重複して書いている（src/app.ts / kotodama.jsonld / wrangler.jsonc /
+  ;; bpmn/webpage.bpmn / appview の default-db）。README.md はその一致を散文の表で
+  ;; 書いていたが、2026-09-09 まで**それを検査するものは 1 つも無かった** ——
+  ;; 表は人間が読むもので、method を 1 つ足して 1 面だけ更新しても誰も落ちない。
+  ;; 実際に 1 件（<noscript> が隣の app を名乗る）が landed したままだった。
+  ;;
+  ;; もう 1 件は静かで、既存の cljs テストでは構造的に捕まらない: app.cljs の
+  ;; docstring は default-db を ../wrangler.jsonc の写しだと宣言するが、
+  ;; app_test.cljs が pin しているのは**写した先のリテラル**であって写し元との
+  ;; 一致ではない。wrangler に var を 1 つ足すと、appview は嘘を表示したまま、
+  ;; テストは緑のままになる。
+  ;;
+  ;; 下記 14 件は全て 2026-09-09 に実際に赤くなるところを見た。
+  ;; うち 2 件は**規則コード側**を撃っており、それは fixture だけが捕まえる。
+  {:repo "orgs/cloud-itonami/app-webpage"
+   :label "app-webpage repo contract —— 8 method / nanoid / DID が 5 面で一致するか、appview は wrangler の写しか"
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "app-webpage contract: all green"
+   :mutations
+   [
+    {:id :webpage/kotodama-drops-a-capability
+     :why "kotodama.jsonld の profile.capabilities から 1 つ落ちる形。Worker（src/app.ts）は 8 を返し続けるので、actor profile を読んだ側だけが 7 method の app だと思う"
+     :file "appview/webpage-mcp-component/kotodama.jsonld"
+     :find "\"publishPage\", \"listPublished\","
+     :replace "\"listPublished\","
+     :must-fail ["the-committed-repo-has-no-violations" "the-inputs-were-actually-read"]}
+
+    {:id :webpage/wrangler-gains-an-unmirrored-var
+     :why "**既存の app_test.cljs では捕まらない形。** wrangler.jsonc に binding が 1 つ増え、appview の default-db は写し損ねる。あちらは写した先のリテラルを pin しているので緑のまま、画面だけが嘘になる"
+     :file "appview/webpage-mcp-component/wrangler.jsonc"
+     :find "\"APP_NANOID\": \"n9j2qp89\","
+     :replace "\"APP_NANOID\": \"n9j2qp89\",
+    \"APP_NEW_BINDING\": \"x\","
+     :must-fail ["the-appview-mirrors-the-wrangler-config-not-a-frozen-literal" "the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/wrangler-gains-an-unmirrored-route
+     :why "route が 1 本増えて appview が追従しない形。:routes と :route-count の両方が割れる"
+     :file "appview/webpage-mcp-component/wrangler.jsonc"
+     :find "\"pattern\": \"webpage.etzhayyim.com/*\","
+     :replace "\"pattern\": \"pages.etzhayyim.com/*\",
+      \"zone_name\": \"etzhayyim.com\"
+    },
+    {
+      \"pattern\": \"webpage.etzhayyim.com/*\","
+     :must-fail ["the-appview-mirrors-the-wrangler-config-not-a-frozen-literal" "the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/bpmn-task-type-drifts
+     :why "getPageStats の task type を get.page.stats に「整える」形。BPMN としては valid で、zeebe の worker が拾う名前だけが Worker の名乗りとずれる"
+     :file "bpmn/webpage.bpmn"
+     :find "type=\"com.etzhayyim.apps.webpage.get.pageStats\""
+     :replace "type=\"com.etzhayyim.apps.webpage.get.page.stats\""
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/bpmn-process-id-drifts
+     :why "process id だけが単数形になる形。task type は正しいままなので、名簿を目で追っても気づけない"
+     :file "bpmn/webpage.bpmn"
+     :find "<bpmn:process id=\"webpage-search-pages\""
+     :replace "<bpmn:process id=\"webpage-search-page\""
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/app-ts-did-drifts
+     :why "Worker の ACTOR_DID が -actor 付きのホストを名乗る形。intel が 2026-08-03 に踏んだ「隣の actor のシェルと誤ペアリング」と同じ入口"
+     :file "appview/webpage-mcp-component/src/app.ts"
+     :find "const ACTOR_DID = \"did:web:webpage.etzhayyim.com\""
+     :replace "const ACTOR_DID = \"did:web:webpage-actor.etzhayyim.com\""
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/app-ts-nanoid-fallback-drifts
+     :why "APP_NANOID binding が無い環境で Worker が別の自分を名乗り始める形。binding が在る本番では見えず、binding を落とした環境でだけ出る"
+     :file "appview/webpage-mcp-component/src/app.ts"
+     :find "env.APP_NANOID ?? \"n9j2qp89\""
+     :replace "env.APP_NANOID ?? \"n9j2qp90\""
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/wrangler-worker-name-drifts
+     :why "改名半端。Worker 名だけが新しい nanoid になり、route と kotodama は古いまま —— 配備面が別 component を指す"
+     :file "appview/webpage-mcp-component/wrangler.jsonc"
+     :find "\"name\": \"kotodama-n9j2qp89\""
+     :replace "\"name\": \"kotodama-n9j2qp90\""
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/kotodama-ui-type-drifts
+     :why "actor profile 側だけ uiType を変える形。配備された APP_UI_TYPE var は古いままなので、2 つの自己紹介ができる"
+     :file "appview/webpage-mcp-component/kotodama.jsonld"
+     :find "\"uiType\": \"yoro\""
+     :replace "\"uiType\": \"kanso\""
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/appview-route-count-goes-stale
+     :why "Svelte 版が持っていた stale な数値に戻る形（あちらは 0/[]/[] だった）。この port の主眼はそれを wrangler.jsonc から直すことだった"
+     :file "appview/webpage-mcp-component/cljs/src/webpage/app.cljs"
+     :find ":route-count 2"
+     :replace ":route-count 0"
+     :must-fail ["the-appview-mirrors-the-wrangler-config-not-a-frozen-literal" "the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/noscript-names-the-neighbour
+     :why "**実際に landed していた退行の再現。** 2026-09-09 に直すまで <noscript> は隣の app（scheduler-mcp-component）を名乗っており、同じファイルの <title> と <div id=\"app\"> は正しかった。README がそれを記録していたが、記録は再発を止めない"
+     :file "appview/webpage-mcp-component/cljs/public/index.html"
+     :find "<noscript>webpage-mcp-component requires"
+     :replace "<noscript>scheduler-mcp-component requires"
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/readme-name-drifts
+     :why "README.edn の :name だけ変わり、git remote と migration.edn の destination の両方と割れる形。EDN としては valid のまま"
+     :file "README.edn"
+     :find ":name \"app-webpage\""
+     :replace ":name \"app-webpage-legacy\""
+     :must-fail ["the-committed-repo-has-no-violations"]}
+
+    {:id :webpage/the-html-rule-goes-blind
+     :why "**規則コード側を撃つ。** check-index-html の component を nil に潰すと実ファイルは緑のままなので repo_test は何も言わない —— fixture テストだけがこれを捕まえる。データを撃つ 12 件が守るのはファイル面、これが守るのは規則そのもの"
+     :file "src/etzhayyim/webpage/contract.cljc"
+     :find "  [{:keys [index-html component]}]
+  (let [noscript"
+     :replace "  [{:keys [index-html component]}]
+  (let [component nil
+        noscript"
+     :must-fail ["a-noscript-naming-another-component-is-a-violation"]}
+
+    {:id :webpage/the-comment-stripper-goes-naive
+     :why "**JSONC の comment 除去を素朴な版に戻す。** 文字列に入る遷移を落とすと、値の中の https:// が行コメント扱いになり AGENTGATEWAY_MCP_ROUTER_URL が切れる。fixture がこれを名指しで落とす（実ファイル側は JSON.parse ごと落ちるので、何が壊れたかを言えない赤になる）"
+     :file "src/etzhayyim/webpage/contract.cljc"
+     :find "                             (= c \\\")                 (recur (inc i) :string (conj out c))"
+     :replace "                             (= c \\\")                 (recur (inc i) :code (conj out c))"
+     :must-fail ["jsonc-stripper-keeps-urls-inside-strings"]}]}]}
