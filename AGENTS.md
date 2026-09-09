@@ -1965,6 +1965,17 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
   新規に `bb.edn` / `#!/usr/bin/env bb` を置かない。
 - **`#?(:kototama ...)` / `#?(:clojurewasm ...)` は存在しない reader-conditional。**
   書くと黙って dead branch になる。
+- **`.cljs` の依存宣言は `nbb.edn` に置く。nbb は `deps.edn` も `bb.edn` も読まない**
+  （repo-wide mandatory、2026-09-09、ADR-2609093000）。coordinate を `deps.edn` にだけ
+  書いた repo は移行できていない —— **壊れていて、しかも全ての道具が成功を報告する**
+  （実測: `DEPS added deps.edn` → `REWROTE 6 files` → `clojure -M:test` 緑 →
+  `nbb tools/gen-tmlanguage.cljs` が `Could not find namespace`。JVM suite は
+  `deps.edn` を読み `.cljs` を一度も load しないので緑のまま）。
+  **sha も `:paths` も隣の project file から複写する** —— project file が coordinate を
+  名指していなければ sha を選ばずに拒否する。推測した `:paths` は、正しく見えて何も
+  解決しない宣言そのもの。検出は `scripts/verify-nbb-declaration-visible.cljs`
+  （`manifest/orgs-detectors.edn`）で、**数えるのは bare な `nbb <file>` の entry point だけ**
+  （`nbb --classpath …` で起動されるファイルは invocation 側で宣言している）。
 - **Kotoba は safe application language**（ADR-2607201300）。`kotoba/pure` /
   `cell` / `app` / `host` の 4 profile を区別し、新規アプリの product logic・
   workflow・UI reducer・state machine・actor behavior は capability が実装済みなら
