@@ -11011,4 +11011,77 @@
      :file "README.md"
      :find "返り値 `_geist` / `_geistMono` を className に使っていない。"
      :replace "返り値を className に使っていない。"
-     :must-fail ["実データ: readme-declares-every-known-drift"]}]}]}
+     :must-fail ["実データ: readme-declares-every-known-drift"]}]}
+
+  {:repo "orgs/kotoba-lang/robotics"
+   :label "robot-safety の policy contract —— 「動かす前に拒否できること」がこの library の主張そのもの"
+   ;; この library は motor を回さない。governor が unsafe な actuation を hardware に
+   ;; 届く前に拒否するための記録を渡すだけである。だから「拒否が今も落ちるか」は
+   ;; この repo にとって付随的な品質ではなく、存在理由そのものの検査になる。
+   ;;
+   ;; ここに載せる 8 件は **2026-09-09 に実際に赤くなるところを見た**もの。同じ 8 件を
+   ;; **変更前の suite にも当ててあり、7 件が緑のまま通った** —— つまりこの suite が
+   ;; 足したのはバイト数ではなく discrimination である。捕まった 1 件
+   ;; (:robotics/permitted-waves-through-sign-off) は、この repo が実際に一度踏んで
+   ;; 回帰テストを既に持っていた退行だった。
+   ;;
+   ;; 6 件は名指しした test だけを赤くする。残り 2 件が複数本を赤くするのは、
+   ;; どれも同じ 1 つの所見の言い換えだからで、「壊し方を間違えた赤」ではない。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :robotics/new-kind-not-classified-as-hardware
+     :why "**穴そのもの。** vocabulary に kind を足し、それを分類する 2 箇所目を直し忘れる形。`actuates-hardware?` は `action-kinds` から複製した literal set を自分で持っているので、新しい kind は「ハードウェアを動かさない」と報告される —— それが CSV/JSON export が監査記録に書き込む値であり、read-only な :sense とモータを回すものを読み手が見分ける唯一の欄である。例示ベースのテストは新しい kind の名前を一度も書かないので全部緑のまま通る（実測: 変更前の suite は 8 変異中 7 をそのまま通した）"
+     :file "src/kotoba/robotics.cljc"
+     :find "  #{:sense :move :grasp :actuate :emit})"
+     :replace "  #{:sense :move :grasp :actuate :emit :pour})"
+     :must-fail ["hardware-classification-covers-the-whole-kind-vocabulary"]}
+
+    {:id :robotics/sign-off-class-that-cannot-be-constructed
+     :why "safety-class ではない sign-off class を足す。`action` がその class を持つ action を作らないので、**その sign-off 規則は一度も発火できない dead policy になる** —— しかも誰も声を上げない。2 本が赤くなるが、どちらも同じ 1 つの所見の言い換え"
+     :file "src/kotoba/robotics.cljc"
+     :find "  #{:high :safety-critical})"
+     :replace "  #{:high :safety-critical :critical})"
+     :must-fail ["every-sign-off-class-is-a-constructible-safety-class" "a-sign-off-action-is-never-permitted-whatever-its-kind"]}
+
+    {:id :robotics/absent-allowlist-means-unrestricted
+     :why "allowlist が無いことを「制限なし」と読み替える形。**設定されていない governor が開いた governor になる**。この workspace が繰り返し踏んでいる allowlist→denylist の反転そのもので、動いているソフトウェアと見分けが付かない。`#{}` ではなく nil だけをfail-open にしてあるので、既存の `gate-edge-cases` は緑のまま —— 新しい検査だけが噛む"
+     :file "src/kotoba/robotics.cljc"
+     :find "(not (contains? (set allowed-safety-classes) (:action/safety a)))"
+     :replace "(not (contains? (if (nil? allowed-safety-classes) safety-classes (set allowed-safety-classes)) (:action/safety a)))"
+     :must-fail ["an-unconfigured-governor-denies-instead-of-permitting"]}
+
+    {:id :robotics/unconstructible-action-reported-as-denied
+     :why "`action` が拒否して返した nil が :invalid ではなく :deny として報告される形。**どちらも赤だが、operator が読む文が違う** —— :deny は「policy が実在の action を拒否した」と言うので、打ち間違えた kind に対して operator は拒否した policy を探しに行き、そんな policy は無い。isco-2165 の reserved-reported-as-undeclared と同型"
+     :file "src/kotoba/robotics.cljc"
+     :find "    (not (map? a))"
+     :replace "    (and (some? a) (not (map? a)))"
+     :must-fail ["an-unconstructible-action-is-invalid-not-denied"]}
+
+    {:id :robotics/stop-reason-guard-narrowed
+     :why "`safety-stop` の guard が vocabulary から literal set に置き換わり、宣言済みの:operator を落とす形（rename の途中で片側だけ直した形）。その reason のsafety-stop は nil を返すので、**停止は起きるのに ledger に追記するものが無い** —— ロボットは止まり、監査証跡は理由を言えない"
+     :file "src/kotoba/robotics.cljc"
+     :find "  (when (contains? stop-reasons reason)"
+     :replace "  (when (contains? #{:e-stop :governor :boundary} reason)"
+     :must-fail ["every-declared-stop-reason-round-trips"]}
+
+    {:id :robotics/permitted-waves-through-sign-off
+     :why "**この repo が実際に一度持っていた退行**（commit 7057404 が直したもの）を戻す。`action-permitted?` が `gate` への委譲をやめ、sign-off を要する action を既定で permitted として扱う。既存の `action-permitted-test` も赤くなる —— 8 変異中これだけが変更前の suite でも捕まった 1 件で、残り 7 は緑のまま通っていた"
+     :file "src/kotoba/robotics.cljc"
+     :find "  (= :permit (:gate/decision (gate a allowed-safety-classes))))"
+     :replace "  (contains? (set allowed-safety-classes) (:action/safety a)))"
+     :must-fail ["a-sign-off-action-is-never-permitted-whatever-its-kind" "gate-matches-its-specification-for-every-kind-and-class"]}
+
+    {:id :robotics/csv-sign-off-column-from-wrong-predicate
+     :why "CSV の requires_sign_off 欄が `requires-sign-off?` ではなく `actuates-hardware?` から書かれる形。**監査記録の 1 欄だけが静かに別の質問に答える。** 変更前の`(is (re-find #\"yes\" csv))` はどの行のどの欄の \"yes\" でも満たされるので、この変異を一度も見ない"
+     :file "src/kotoba/robotics/export.cljc"
+     :find "                         (if (rob/requires-sign-off? a) \"yes\" \"no\")"
+     :replace "                         (if (rob/actuates-hardware? a) \"yes\" \"no\")"
+     :must-fail ["exported-rows-carry-each-actions-own-answers"]}
+
+    {:id :robotics/csv-gate-column-ignores-the-allowlist
+     :why "CSV の gate 欄が呼び手の allowlist ではなく固定の全許可 set で計算される形。allowlist の外に在る :high の行が deny ではなく require-sign-off として記録される —— **監査記録が、実際には拒否された actuation を『人の承認待ち』と書く。** anchor が 2 行に跨るのは `(rob/gate a allowed)` が JSON 側にも同じ形で在るため（1 行だけでは一意にならず、run.cljs は 2 箇所目を見つけて拒否する）"
+     :file "src/kotoba/robotics/export.cljc"
+     :find "   (let [gate (fn [a]\n                (let [g (rob/gate a allowed)]"
+     :replace "   (let [gate (fn [a]\n                (let [g (rob/gate a #{:none :low :medium :high :safety-critical})]"
+     :must-fail ["exported-rows-carry-each-actions-own-answers"]}]}]}
