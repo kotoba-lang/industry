@@ -25,7 +25,9 @@
                         (str/includes? % "kotobase-dual-write"))
                %)
             argv)
-      (path/join (or (aget (.-env js/process) "GFTD_ROOT") ".")
+      (path/join (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
+          ;; legacy; `gftd` is retired (manifest/gftd-retirement.edn)
+          (aget (.-env js/process) "GFTD_ROOT") ".")
                  "70-tools/bmc/bin/kotobase-dual-write.cljs")))
 
 (def script-path (find-script-path))

@@ -178,7 +178,7 @@
                (.exists (java.io.File. d ^String base-rel)) (.getPath d)
                (or (nil? (.getParentFile d)) (>= n 8))
                (throw (ex-info (str "repo root not found (looked for " base-rel
-                                    "). run from repo root or set GFTD_ROOT.") {}))
+                                    "). run from repo root or set COM_JUNKAWASAKI_ROOT.") {}))
                :else (recur (.getParentFile d) (inc n)))))))
 
      (defn paths
@@ -611,7 +611,7 @@
                (.exists (nc/file d base-rel)) (.getPath d)
                (or (nil? (.getParentFile d)) (>= n 8))
                (throw (ex-info (str "repo root not found (looked for " base-rel
-                                    "). run from repo root or set GFTD_ROOT.") {}))
+                                    "). run from repo root or set COM_JUNKAWASAKI_ROOT.") {}))
                :else (recur (.getParentFile d) (inc n)))))))
 
      (defn paths
@@ -672,8 +672,14 @@
         been failing on a missing `@noble/curves` for an unknown length of time
         while every tick reported success."
        [ps]
-       (str (or (nc/getenv "GFTD_STATE_DIR")
-                (str (nc/getenv "HOME") "/.gftd"))
+       ;; `gftd` is retired (manifest/gftd-retirement.edn). The default moved with the
+       ;; home cutover; the old one did not, and a hardcoded path CREATES its missing
+       ;; parent rather than failing -- so this line kept resurrecting ~/.gftd after it
+       ;; was removed, writing a second copy of the status file that bmc-tick.cljs was
+       ;; already writing under ~/.itonami.
+       (str (or (nc/getenv "ITONAMI_STATE_DIR")
+                (nc/getenv "GFTD_STATE_DIR")
+                (str (nc/getenv "HOME") "/.itonami"))
             "/bmc-dual-write-status.edn"))
 
      (defn record-dual-write-status!

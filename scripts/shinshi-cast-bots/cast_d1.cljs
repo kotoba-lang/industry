@@ -17,7 +17,9 @@
             ["node:path" :as path]))
 
 (def gftd-root
-  (or (aget (.-env js/process) "GFTD_ROOT")
+  (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
+      ;; legacy; `gftd` is retired (manifest/gftd-retirement.edn)
+      (aget (.-env js/process) "GFTD_ROOT")
       (path/join (os/homedir) "github" "com-junkawasaki")))
 
 (def appview-dir

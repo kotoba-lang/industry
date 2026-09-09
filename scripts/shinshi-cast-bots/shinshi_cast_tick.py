@@ -8,7 +8,9 @@ passes through: 0 handled / 1 local failure / 2 refused.
 """
 import os, subprocess, sys
 
-root = os.environ.get("GFTD_ROOT", os.path.expanduser("~/github/com-junkawasaki"))
+root = os.environ.get("COM_JUNKAWASAKI_ROOT") or os.environ.get(
+    # legacy; `gftd` is retired (manifest/gftd-retirement.edn)
+    "GFTD_ROOT", os.path.expanduser("~/github/com-junkawasaki"))
 k = os.path.join(root, "orgs", "kotoba-lang")
 cp = ":".join([
     os.path.join(root, "scripts", "shinshi-cast-bots"),
