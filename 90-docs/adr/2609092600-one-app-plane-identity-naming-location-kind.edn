@@ -359,18 +359,5 @@ self-check が捕まえた。しかも**①のとき browser check は 6 本中 
 したがってこの面の規則: **成果物を出す検査は、成果物を実行し、かつ入力が verbatim で
 入ったことを確かめるまで pass にしない。** どちらか一方では足りない。
 
-## 未了 / 次の一手（現在地は毎回測る。ここの数値を引用しない）
-
-1. `{cid}.ipfs.itonami.cloud` の 502 —— 直すか、kotobase.net に寄せて退役させるか。
-2. ~~genko を `:kind :document` で 1 本通す~~ —— 済（上記）。残るのは
-   **entry 面**（worker に Host→DNSLink 解決を足し `genko.itonami.app` を custom domain に
-   する）と、**公開ネットワークへの announce**（今は公開 gateway が 504）。
-   catalog（`manifest/appview-catalog.edn`、435 → 436）への登録もまだ。
-3. 82 件の `:kind` 宣言。1 件ずつ、repo ごとの判断で。
-4. mangaka studio / ongakuka / dougaka を同じ形に載せる（reader は `:service`）。
-5. B2 と R2 のどちらに寄せるかを決める（上の 2 案）。決まるまで publish 後の
-   R2 書き込みが手作業として残る。
-6. 435 の appview に entry hostname を与えるか決める（今は CID と catalog だけ）。
-5. sites.edn の `:org \"app\"` の `:host` を `itonami.app` に付け替え、site host を
-   `{repo}.itonami.app` にする（`*.itonami.app` の Universal SSL で足りる）。
+## 現在地と再開点（2026-09-09 closing。数値は毎回測り直す）\n\n**live なもの** —— 7 本が `{name}.itonami.app` で 200 / バイト一致:\ngenko / daw / nle / rirekisho / tsukuru / inkan / shirohan。全部 archive と R2 の\n両面に在り、cid.contact が索いている。`nosuchapp.itonami.app` は 404 dnslink/absent\n（負の control）。\n\n**片付いた項目**（初版の未了から）:\n\n- `{cid}.ipfs.itonami.cloud` の 502 —— **ホストの故障ではなかった。** web plane が\n  R2 を読み、publish が B2 にしか書いていなかっただけ。両面に書くようになり解消。\n- entry 面 —— worker の `:dnslink-origin` + wildcard route + wildcard AAAA。\n- 公開 announce —— drain worker の POST /announce。indexer が 7 本を索いている。\n- B2 と R2 のどちらに寄せるか —— **両方に書くと決めた**（オーナー判断、上記）。\n\n**残っているもの**（着手しやすい順）:\n\n1. **catalog が古い。** `manifest/appview-catalog.edn` は 435 のままで今回の 7 本を\n   含まない。更新には kagi の catalog IPNS seed が要る（ADR-2608157000 の再開手順）。\n2. **82 件の `:kind` 宣言。** 1 件ずつ repo ごとの判断で。**一括で service を撒かない。**\n3. **mangaka studio / ongakuka / dougaka** を同じ形に。reader は `:service`。\n4. **sites.edn の app org の `:host`** を itonami.app へ付け替え、site host を\n   `{repo}.itonami.app` にする（1 レベルの wildcard なので Universal SSL で足りる）。\n5. **trustless gateway からの retrieval。** `ipfs.kotobase.net/ipfs/{cid}` に\n   format=raw を付けると 301 を返し、追えば 200 / raw。追わないクライアントは止まる\n   （trustless-gateway.link は providers を 3 件見つけたうえで 504）。原因候補は\n   「301 を追わない」と「metadata が広告する transport の不一致」の 2 つで、\n   **まだどちらか測っていない。**\n6. **canonical byte route の credential。** `PUT /ipld/{cid}` は Biscuit 認証で、\n   archive の bearer では 401。手に入れば R2 の段が wrangler から置き換わる。\n7. **435 の appview に entry hostname を与えるか。** 今は CID と catalog だけ。\n\n**次の 1 コマンド**（この面が今日も真かを測る）:\n\n    nbb --classpath <the content-address classpath> scripts/verify-app-content-address.cljs orgs\n\nclosing 時点で SCANNED 524 / ADDRESSED 442 / EXEMPT 0 / UNPUBLISHED 0 / LOCATED 82 /\nUNREADABLE 0（exit 1 —— LOCATED 82 が残っているため。これは項目 2 そのもの）。
 "}]
