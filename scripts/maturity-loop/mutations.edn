@@ -11663,4 +11663,130 @@
      :find "      (and destroy? proposed-day floor-day (< proposed-day floor-day))"
      :replace "      (and destroy? proposed-day floor-day (<= proposed-day floor-day))"
      :must-fail ["ok-destruction-at-exact-expiry"
-                 "comparable-proposals-are-still-admitted"]}]}]}
+                 "comparable-proposals-are-still-admitted"]}]}
+
+  {:repo "orgs/cloud-itonami/hirameki-patents"
+   :label "hirameki corpus checks —— 5 つの拒否が、一度も拒否したことがなかった"
+   ;; この repo の唯一の test は「公開済み corpus は clean だ」を主張する。
+   ;; 持っている価値は本物だが **positive-only** で、今日の bytes が manifest の
+   ;; 言うとおりに hash することしか報告できない。
+   ;;
+   ;; 実測 2026-09-10（tree 60a6cc5）: CID 比較・raw-block 上限・G1/G2/G6 の
+   ;; governance guard 3 本 —— **5 つの拒否を同時に無効化しても**
+   ;; `0 failures, 0 errors` のままだった。ADR-2608136000 の 6 問目そのもので、
+   ;; clean な入力にしか当てられていない検査は、**効いていても外されていても
+   ;; 同じ verdict を返す**。
+   ;;
+   ;; test/refusal_test.clj は「ちょうど 1 箇所だけ誤った」corpus を temp dir に
+   ;; 組んで、**名乗っている理由で**拒否することを見る（理由の literal を pin
+   ;; する —— 別の原因で落ちた実行を「まだ効いている」と数えないため）。
+   ;; 各拒否には control（正しく記述された fixture が受理される）を対にしてある。
+   ;; fixture が壊れていることと、摂動が捕まったことを区別するためで、
+   ;; CLAUDE.md の「壊したものと報告されたものが一致することを確かめる」に当たる。
+   ;;
+   ;; これを書いている最中に実装の欠陥が 1 件出た。`verify-artifacts` は欠けた
+   ;; shard を検出しておきながら、直後の row-count readback が **全 part を
+   ;; 無条件に slurp** していたので、集めた報告を返す手前で throw していた ——
+   ;; 公開 corpus で最も起こりやすい故障（upload されなかった shard）が、
+   ;; ファイル名を名指す 1 行ではなく FileNotFoundException として出ていた。
+   ;; **crash は refusal ではない**（呼ぶ側からは「検査器自身が壊れている」と
+   ;; 区別が付かない）。:cn/missing-shard-crashes-again がその退行を pin する。
+   ;;
+   ;; 11 件とも 2026-09-10 に、当てて赤くなるところを実際に見てから登録した。
+   ;; 予期しない test が赤くなったものは 1 件も無い。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :cn/cid-compared-to-itself
+     :note "宣言された CID を宣言された CID と比べる。**自己比較は常に通る** ——
+            CLAUDE.md が tls.cert の truthy verdict で名指ししている族"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(not= cid actual-cid)"
+     :replace "(not= cid cid)"
+     :must-fail ["refuses-a-cid-that-does-not-match-the-bytes"]}
+
+    {:id :cn/byte-count-compared-to-itself
+     :note "同じ形を byte 数に当てる。cond なので byte 検査が飛ぶと CID 検査に
+            落ちるが、CID は正しいので**何も報告されない**"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(not= declared-bytes actual-bytes)"
+     :replace "(not= declared-bytes declared-bytes)"
+     :must-fail ["refuses-a-byte-count-that-does-not-match-the-file"]}
+
+    {:id :cn/block-limit-strictly-over
+     :note "`>=` を `>` にする。**上限ちょうど**の shard だけが通るようになる。
+            ADR-2608136000 の 5 問目 —— 線上の入力を持たない比較は未検査の比較。
+            1 byte 下の control は緑のままなので、この 1 本だけが赤くなる"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(>= actual-bytes single-block-limit)"
+     :replace "(> actual-bytes single-block-limit)"
+     :must-fail ["refuses-a-shard-at-exactly-the-block-limit"]}
+
+    {:id :cn/missing-shard-crashes-again
+     :note "readback を「在る shard だけ」から「全 part」に戻す = 修正前の形。
+            欠けた shard は検出されるのに、報告を返す手前で throw する"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(let [present (filter #(.exists (io/file dir (:file %))) parts)\n            read-back (reduce + 0 (map #(count (edn/read-string (slurp (io/file dir (:file %))))) present))]"
+     :replace "(let [read-back (reduce + 0 (map #(count (edn/read-string (slurp (io/file dir (:file %))))) parts))]"
+     :must-fail ["refuses-a-shard-the-manifest-names-but-does-not-exist"]}
+
+    {:id :cn/shard-count-compared-to-itself
+     :note "宣言された shard 数を自分自身と比べる。**CID は shard が無傷である
+            ことしか証明せず、集合が完全であることは証明しない** —— その差を
+            埋めているのがこの 1 行"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(= shards (count parts))"
+     :replace "(= shards shards)"
+     :must-fail ["refuses-a-shard-count-that-disagrees-with-the-parts-listed"]}
+
+    {:id :cn/row-count-compared-to-itself
+     :note "件数の突き合わせを自己比較にする。shard ごとの hash は完璧なまま
+            静かに truncate された corpus が通る。欠けた shard の test も
+            **不足件数**を assert しているので一緒に赤くなる"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(= rows read-back)"
+     :replace "(= rows rows)"
+     :must-fail ["refuses-a-row-count-the-shards-do-not-hold"
+                 "refuses-a-shard-the-manifest-names-but-does-not-exist"]}
+
+    {:id :cn/byte-total-compared-to-itself
+     :note "合計 byte 数の自己比較"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(= bytes declared)"
+     :replace "(= bytes bytes)"
+     :must-fail ["refuses-a-declared-total-that-is-not-the-sum-of-its-parts"]}
+
+    {:id :cn/attrs-read-from-the-wrong-tuple-position
+     :note "`[op e a v]` の 2 番目ではなく 1 番目を属性として読む（destructure の
+            off-by-one）。attrs が entity id の集合になるので **G1/G2/G6 の
+            3 本が同時に沈黙する** —— guard は 3 つとも実行され、3 つとも
+            何も見つけない"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(map #(nth % 2)) raw"
+     :replace "(map #(nth % 1)) raw"
+     :must-fail ["refuses-a-published-verdict-attribute"
+                 "refuses-a-patent-that-imposes-on-something"
+                 "refuses-a-person-level-attribute"]}
+
+    {:id :cn/verdict-guard-narrowed
+     :note "G1/G3 の regex から 2 語落とす。`infringement` は今も捕まるので
+            **guard は生きているように見える** —— fto と equity-signal だけが
+            通る。test が 3 語を回しているのはこのため"
+     :file "src/hirameki_patents/checks.clj"
+     :find "#\"infringement|fto|equity-signal\""
+     :replace "#\"infringement\""
+     :must-fail ["refuses-a-published-verdict-attribute"]}
+
+    {:id :cn/person-guard-narrowed
+     :note "G6 の同じ形。`inventor` は捕まり `person-*` が通る"
+     :file "src/hirameki_patents/checks.clj"
+     :find "#\"inventor|person\""
+     :replace "#\"inventor\""
+     :must-fail ["refuses-a-person-level-attribute"]}
+
+    {:id :cn/imposes-guard-disabled
+     :note "G2 は語が 1 つしかないので、退行の形は guard ごと死ぬこと"
+     :file "src/hirameki_patents/checks.clj"
+     :find "(when (some #(re-find #\"imposes\" (str %)) attrs)"
+     :replace "(when (and false (some #(re-find #\"imposes\" (str %)) attrs))"
+     :must-fail ["refuses-a-patent-that-imposes-on-something"]}]}]}
