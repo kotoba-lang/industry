@@ -52,6 +52,10 @@ for(const l of fs.readFileSync("manifest/west.yml","utf8").split("\n")){
   else if(m=l.match(/^\s*path:\s*(\S+)/)) if(process.argv.slice(1).includes(m[1])) console.log(m[1],n);
 }' orgs/kotoba-lang/<name> ...
 
+# pins.tsv の 1 行 = <west entry 名>\t<40 hex sha>\t<org/repo>
+#   3 列目は説明ではなく GitHub の repo slug。取り違えると全件 drop し、
+#   しかも "not reachable from default branch" という別の問題の顔で報告される。
+#   メタ文字（`->` 等）も入れない — シェル経由で組み立てられる。
 PINS=pins.tsv DRY=1 nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljs
 PINS=pins.tsv     nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljs
 nbb --classpath ".:scripts/nbb_compat" scripts/verify-west-pins.cljs

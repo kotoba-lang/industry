@@ -124,7 +124,15 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
      checkpoint #2 を一時過大記録、amendment で訂正）。
 
 8b. **着地後の pin は batch で**。複数 repo を動かしたら
-   `PINS=pins.tsv nbb scripts/west-pin-put-batch.cljs`（tsv: `name\tsha\tslug`）。
+   `PINS=pins.tsv nbb scripts/west-pin-put-batch.cljs`。
+
+   **tsv の 3 列目は「説明」ではなく GitHub の `<org>/<repo>`。**
+   `<west entry 名>\t<40 hex sha>\t<org/repo>`。ここを取り違えると全件 drop するが、
+   エラーは `not reachable from default branch` と出る —— **到達性の問題に見えて、
+   実際は 3 列目を repo slug として `gh api repos/<3列目>/compare/...` に埋めている**
+   （実測 2026-09-10、5 件が 2 回とも 0/5 で drop）。**3 列目にシェルのメタ文字を
+   入れない** —— スクリプトはこの文字列をシェル経由で組み立てるので、`->` を書くと
+   `/bin/sh: No such file or directory` が「到達性エラー」として報告される。
    19 pin が 1 commit にまとまった実績（2026-09-06）。SHA は **GitHub API から**
    採る（shared checkout の origin/main ref は並行作業で stale になる —
    checkout 側 rev-parse で作った pins.tsv が全件「already at that pin」で
