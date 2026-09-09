@@ -422,6 +422,26 @@
          :deps deps
          :runtime (into #{} (mapcat :runtime deps))
          :runtime-third-party (into #{} (mapcat :runtime-third-party deps))
+         ;; WHICH deps.edn declared it. The walk collects every deps.edn in the
+         ;; repository and unions them, which is right -- a jar pinned three
+         ;; directories down still ends up on somebody's classpath -- but the
+         ;; finding then said `top-level :deps` about a file that is not the
+         ;; project's. Measured 2026-09-10: all three kami repositories were
+         ;; reported for `datalevin/datalevin`, and NONE of them declares it.
+         ;; It is in a per-game authoring deps.edn -- `games/survivors/deps.edn`
+         ;; and eighteen siblings -- each of whose own comment says `Authoring
+         ;; deps -- datalevin is the scene source of truth (ADR-0036)`.
+         ;; kami-engine's own deps.edn names one dependency and it is
+         ;; io.github.kotoba-lang/text.
+         ;;
+         ;; The distinction changes what the finding asks for: a runtime
+         ;; dependency of a library is substitution work, and an authoring
+         ;; tool three directories down is `:tooling`, a class this ledger and
+         ;; this detector already have.
+         :third-party-roots (into (sorted-set)
+                                  (comp (filter #(seq (:runtime-third-party %)))
+                                        (map :file))
+                                  deps)
          :chicory (into #{} (mapcat :chicory deps))
          :lint (into #{} (mapcat :lint deps))
          :test-tool (into #{} (mapcat :test deps))
@@ -473,6 +493,7 @@
   #{:jvm-chicory :jvm-source :jvm-runtime-deps :jvm-build :babashka})
 
 (defn findings-for [{:keys [repo clj-src clj-test runtime runtime-third-party
+                            third-party-roots
                             chicory lint test-tool build bb kotoba
                             clj-mesh clj-script clj-unloadable clj-build-entry]}]
   (cond-> []
@@ -486,8 +507,16 @@
     ;; A third-party jar is the binding; Clojure-only is the declaration.
     (seq runtime-third-party)
     (conj {:sev "fail" :kind :jvm-runtime-deps :repo repo
-           :detail (str "third-party JVM lib(s) in top-level :deps: "
-                        (str/join " " (take 4 (sort runtime-third-party))))})
+           :detail (str "third-party JVM lib(s) in :deps: "
+                        (str/join " " (take 4 (sort runtime-third-party)))
+                        ;; Silent when the project's own deps.edn declares it,
+                        ;; which is the common case and needs no annotation.
+                        (when-not (contains? third-party-roots "deps.edn")
+                          (str " [declared in "
+                               (str/join " " (take 2 third-party-roots))
+                               (when (> (count third-party-roots) 2)
+                                 (str " +" (- (count third-party-roots) 2) " more"))
+                               ", not this repository's own deps.edn]")))})
     (and (seq runtime) (empty? runtime-third-party))
     (conj {:sev "warn" :kind :jvm-runtime-clojure-only :repo repo
            :detail (str "org.clojure/clojure in top-level :deps with "
