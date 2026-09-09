@@ -1,0 +1,210 @@
+{:expires-at "2026-10-09T00:00:00Z",
+ :bulk-output-tokens-per-month 1000000,
+ :observed-at "2026-09-09T09:10:50.529Z",
+ :scope
+ "public static copy drafts across the six sites; not general agent or private-content routing",
+ :models
+ {"inception/mercury-2.5"
+  {:canonical-slug "inception/mercury-2.5-20260908",
+   :input-usd-per-token 4e-8,
+   :output-usd-per-token 1.5e-7,
+   :usage-7d-tokens nil,
+   :usage-scope
+   "OpenRouter public top-50 daily dataset; absent is unknown, not zero",
+   :reasoning {:enabled false}},
+  "google/gemini-3.8-flash"
+  {:canonical-slug "google/gemini-3.8-flash-20260902",
+   :input-usd-per-token 7.5e-7,
+   :output-usd-per-token 0.00000375,
+   :usage-7d-tokens 1909926559760,
+   :usage-scope
+   "OpenRouter public top-50 daily dataset; absent is unknown, not zero",
+   :reasoning {:enabled false}},
+  "qwen/qwen3.8-flash"
+  {:canonical-slug "qwen/qwen3.8-flash-20260826",
+   :input-usd-per-token 1.5e-7,
+   :output-usd-per-token 4.7e-7,
+   :usage-7d-tokens 69938982818,
+   :usage-scope
+   "OpenRouter public top-50 daily dataset; absent is unknown, not zero",
+   :reasoning {:enabled false}},
+  "z-ai/glm-5.3-flash"
+  {:canonical-slug "z-ai/glm-5.3-flash-20260826",
+   :input-usd-per-token 7.5e-8,
+   :output-usd-per-token 2.5e-7,
+   :usage-7d-tokens 12171327216756,
+   :usage-scope
+   "OpenRouter public top-50 daily dataset; absent is unknown, not zero",
+   :reasoning {:effort "low"}},
+  "openai/gpt-5.6-luna"
+  {:canonical-slug "openai/gpt-5.6-luna-20260709",
+   :input-usd-per-token 2e-7,
+   :output-usd-per-token 0.0000012,
+   :usage-7d-tokens 14454071776447,
+   :usage-scope
+   "OpenRouter public top-50 daily dataset; absent is unknown, not zero",
+   :reasoning {:enabled false}},
+  "deepseek/deepseek-v4-flash"
+  {:canonical-slug "deepseek/deepseek-v4-flash-20260423",
+   :input-usd-per-token 8.8606e-8,
+   :output-usd-per-token 1.77212e-7,
+   :usage-7d-tokens 4993215183447,
+   :usage-scope
+   "OpenRouter public top-50 daily dataset; absent is unknown, not zero",
+   :reasoning {:enabled false}},
+  "openai/gpt-4.1-mini"
+  {:canonical-slug "openai/gpt-4.1-mini-2025-04-14",
+   :input-usd-per-token 4e-7,
+   :output-usd-per-token 0.0000016,
+   :usage-7d-tokens nil,
+   :usage-scope
+   "OpenRouter public top-50 daily dataset; absent is unknown, not zero",
+   :reasoning {:enabled false}}},
+ :maximum-run-usd 0.05,
+ :version 1,
+ :languages
+ {"arz"
+  {:name "Egyptian Arabic, not Modern Standard Arabic",
+   :routine ["openai/gpt-5.6-luna"],
+   :bulk ["openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "pt"
+  {:name "Portuguese",
+   :routine
+   ["openai/gpt-5.6-luna"
+    "z-ai/glm-5.3-flash"
+    "deepseek/deepseek-v4-flash"],
+   :bulk
+   ["deepseek/deepseek-v4-flash"
+    "z-ai/glm-5.3-flash"
+    "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "en"
+  {:name "English",
+   :routine [],
+   :bulk [],
+   :evidence "English source identity, no inference needed"},
+  "ur"
+  {:name "Urdu",
+   :routine
+   ["openai/gpt-5.6-luna"
+    "z-ai/glm-5.3-flash"
+    "deepseek/deepseek-v4-flash"],
+   :bulk
+   ["deepseek/deepseek-v4-flash"
+    "z-ai/glm-5.3-flash"
+    "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "pcm"
+  {:name "Nigerian Pidgin, not standard English",
+   :routine
+   ["openai/gpt-5.6-luna"
+    "z-ai/glm-5.3-flash"
+    "deepseek/deepseek-v4-flash"],
+   :bulk
+   ["deepseek/deepseek-v4-flash"
+    "z-ai/glm-5.3-flash"
+    "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "id"
+  {:name "Indonesian",
+   :routine
+   ["openai/gpt-5.6-luna"
+    "z-ai/glm-5.3-flash"
+    "deepseek/deepseek-v4-flash"],
+   :bulk
+   ["deepseek/deepseek-v4-flash"
+    "z-ai/glm-5.3-flash"
+    "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "fr"
+  {:name "French",
+   :routine ["openai/gpt-5.6-luna" "z-ai/glm-5.3-flash"],
+   :bulk ["z-ai/glm-5.3-flash" "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "bn"
+  {:name "Bengali",
+   :routine ["z-ai/glm-5.3-flash"],
+   :bulk ["z-ai/glm-5.3-flash"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "de"
+  {:name "German",
+   :routine ["openai/gpt-5.6-luna" "z-ai/glm-5.3-flash"],
+   :bulk ["z-ai/glm-5.3-flash" "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "hi"
+  {:name "Hindi",
+   :routine
+   ["openai/gpt-5.6-luna"
+    "z-ai/glm-5.3-flash"
+    "deepseek/deepseek-v4-flash"],
+   :bulk
+   ["deepseek/deepseek-v4-flash"
+    "z-ai/glm-5.3-flash"
+    "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "ru"
+  {:name "Russian",
+   :routine
+   ["z-ai/glm-5.3-flash"
+    "deepseek/deepseek-v4-flash"
+    "openai/gpt-5.6-luna"],
+   :bulk
+   ["deepseek/deepseek-v4-flash"
+    "z-ai/glm-5.3-flash"
+    "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "es"
+  {:name "Spanish",
+   :routine ["openai/gpt-5.6-luna" "z-ai/glm-5.3-flash"],
+   :bulk ["z-ai/glm-5.3-flash" "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "ja"
+  {:name "Japanese",
+   :routine ["z-ai/glm-5.3-flash" "deepseek/deepseek-v4-flash"],
+   :bulk ["deepseek/deepseek-v4-flash" "z-ai/glm-5.3-flash"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "mr"
+  {:name "Marathi",
+   :routine
+   ["openai/gpt-5.6-luna"
+    "z-ai/glm-5.3-flash"
+    "deepseek/deepseek-v4-flash"],
+   :bulk
+   ["deepseek/deepseek-v4-flash"
+    "z-ai/glm-5.3-flash"
+    "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "zh-Hans"
+  {:name "Simplified Chinese",
+   :routine ["openai/gpt-5.6-luna" "z-ai/glm-5.3-flash"],
+   :bulk ["z-ai/glm-5.3-flash" "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "ar"
+  {:name "Modern Standard Arabic",
+   :routine ["openai/gpt-5.6-luna" "z-ai/glm-5.3-flash"],
+   :bulk ["z-ai/glm-5.3-flash" "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."},
+  "ko"
+  {:name "Korean",
+   :routine ["openai/gpt-5.6-luna" "z-ai/glm-5.3-flash"],
+   :bulk ["z-ai/glm-5.3-flash" "openai/gpt-5.6-luna"],
+   :evidence
+   "public-web-5-v2-url-boundaries; one request per model, five strings. Exact-token contract only; native semantics unverified."}},
+ :selection
+ "Only current-prompt contract-passing candidates with observed public usage admitted. Routine=min observed wall time; bulk=min reported billed pilot cost. Single-sample provisional choice, not semantic quality or statistical latency ranking. Qwen excluded after repeated HTTP 429. Missing usage is unknown."}
