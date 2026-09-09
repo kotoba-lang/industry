@@ -1,0 +1,180 @@
+[{:db/id -1
+ :adr/id "adr-2609093400-cleanup-three-ledger-events-and-one-revert-risk"
+ :adr/title "Cleanup 2026-09-09: three ledger events rescued, one revert-risk PR stopped"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/authority "owner instruction, 2026-09-09 (git cleanup conflict, then closing)"
+ :adr/repos "com-junkawasaki/root, net-kotobase/control-plane, cloud-itonami/cloud-itonami-isic-5610, kotoba-lang/org-wi-fi-easy-connect, network-awai/app-hyakka"
+ :adr/body "Cleanup session, 2026-09-09, invoked by the owner as `git cleanup conflict`
+then closed with `closing`. Skill: git-cleanup-conflict. Everything below was
+measured; nothing was inferred from a tool's summary line alone.
+
+## What was rescued
+
+Three append-only ledger events existed in no commit and on no remote.
+
+All six superproject stashes were `90-docs/business/canvas-ledger.edn`
+appends. Judged on the semantic key required by `:append-only-ledger-gate`
+(the line with `:event/at` stripped, because `kagami reconcile` re-stamps that
+field on every run and a line-exact test over-reports), nine of twelve distinct
+events were already on `origin/main`. Three were not: `:seq` 14416, 14417,
+14418, all stamped 2026-09-08T20:34. Seq 14415 and 14419 are both present on
+main, so this was a real three-event hole rather than a numbering artifact.
+
+The gate forbids appending a missing event at the tail without checking the
+fold, because `gftd.canvas/fold` replays in file order and an old observation
+appended after a newer one can overwrite newer canvas state. That hazard does
+not apply to these three. `70-tools/bmc/src/gftd/canvas.cljc` `apply-event` is
+a `case` over `:event/type` with clauses for `:canvas/add-item`,
+`:canvas/retract-item`, `:canvas/note` and `:hyp/status` only; its default arm
+returns `idx` unchanged, and its own docstring says observation events are
+no-ops. The three events are two `:react/observation` and one
+`:governor/rejected`. All three are fold no-ops, so tail order cannot matter.
+
+Landed one line at a time through `scripts/ledger-land.cljs` (one line at a
+time because that script tests idempotency with `str/includes?`, so a
+multi-line payload double-appends when its first line is already present).
+Verified after landing: main went 10852 to 10855 lines, each of the three
+seqs appears exactly once, and all 10855 lines parse as EDN.
+
+## What was stopped
+
+`net-kotobase/control-plane#653` would have made the default branch factually
+wrong. `cleanup-land` found an untracked `kotobase-head-store/README.md`,
+correctly declined to auto-merge it (it exists on main with different content)
+and opened a draft PR. Three measurements closed it:
+
+- the checkout it came from, `orgs/network-awai/net-kotobase`, is rename
+  residue: its remote `network-awai/net-kotobase` redirects to
+  `net-kotobase/control-plane`, which west already carries at
+  `orgs/net-kotobase/control-plane`;
+- that checkout's HEAD is `f2d38219`, dated 2026-08-10, roughly a month stale;
+- the diff replaces a true statement with a false one. It rewrites `The schema
+  is contracts/architecture/head-store-shards.schema.json.` into `This
+  historical format is not a contract under contracts/architecture.` That file
+  exists on main today, 1251 bytes, checked through the contents API.
+
+Deletions were 3, not 0, so it was never in the auto-merge class to begin with:
+`:preservation-pr-disposition` puts any preservation PR with a deleted line in
+`:needs-review`, and a stale base that reverses a live claim in
+`:close-stale-revert-risk`. Closed with the reasoning in a comment, content
+archived verbatim, and the path added to that checkout's `.git/info/exclude`
+so the next `--apply` does not recreate the same PR. Verified both ways: the
+file is no longer a landing candidate, and the archive holds its bytes.
+
+Two things were deliberately NOT done, both cases where a tool's own output
+pointed the wrong way:
+
+- `cleanup-land` warned that `orgs/network-awai/net-kotobase` landed while
+  west-unregistered and printed a `west-triple-sync` command. That check reads
+  only whether the path appears in `west.yml`; it does not ask whether the repo
+  is registered under its successor name. It is. Re-registering the dead path
+  is exactly what the `:renamed-upstream` row of the west-orphan table forbids.
+- Two worktrees reported mass deletions, one with 229,802 ` D ` entries. Both
+  are cone-mode sparse checkouts and the sampled paths exist on `origin/main`.
+  Applying those deletions would have wiped the tree.
+
+## Landed and retired
+
+- `cloud-itonami/cloud-itonami-isic-5610#3` merged, one 103-byte doc sample,
+  verified present on that repo's main after merge.
+- Stashes 6 to 0. All archived before any drop.
+- Local branches 37 to 21. Fourteen merged branches deleted with `git branch
+  -d`, which refuses unmerged branches; all fourteen succeeded, which is itself
+  the confirmation that the merged verdict was right.
+- `west-orphan-audit --blocking` went exit 1 to exit 0 with
+  `renamed-UNVERIFIED: 0`, so the zero is an answer rather than an unanswerable
+  run. The blocking edge was `kotoba-net`: registered correctly in west, the
+  checkout simply absent, fixed with a targeted `west update --fetch smart
+  kotoba-net`.
+- `kotoba-lang/org-wi-fi-easy-connect` registered in west; it was pushed to
+  GitHub and never registered, the classic GH-only orphan.
+- `scripts/worktree-retire.cljs --apply`: 5 retired, 35 stale entries pruned,
+  0 failed.
+
+## Gaps left open, in priority order
+
+1. **3,590 un-landed fleet-db ledger events.** In the worktree
+   `/private/tmp/itonami-spam-release`, branch `codex/spam-release-20260909`,
+   `manifest/fleet-db.ledger.edn` carries 3,590 uncommitted events (3,287
+   `:pin/reconcile-legacy`, 303 `:repo/added-legacy`) that are the output of an
+   uncommitted `kagami reconcile`. All 3,590 are missing from `origin/main` on
+   the semantic key. NOT landed by cleanup: CLAUDE.md forbids hand-editing that
+   file (append-only, signed VCS plane), `:append-only-ledger-gate` assigns
+   `:pin/reconcile-legacy` to fleet reconcile, and appending risks writing pin
+   regressions if the reconcile input was not `origin/main`'s `west.yml` (the
+   2026-08-05 incident). Archived with provenance. Resume: re-run reconcile with
+   `git show origin/main:manifest/west.yml` as the input and let it land through
+   its own path, or judge the run stale and discard.
+
+2. **A bot committed conflict markers to a pushed branch.** In
+   `orgs/network-awai/app-hyakka`, the tip of `bot/gp-source-20260904g`
+   contains `<<<<<<<`, `=======` and `>>>>>>>` inside
+   `src/hyakka/corpus/world_legal.cljc` at lines 622, 739 and 892. Nothing is
+   at risk right now: that branch is an ancestor of `origin/main` (verified on
+   full history, the repo is not shallow) and main's copy is clean at 889
+   lines. The defect is that the bot which produced it can produce it again.
+   The working-tree edit in that checkout removes 143 lines main still has, so
+   it was archived and left untouched rather than landed.
+
+3. **`codex/maturity-remeasure` is local-only and unpushed.** The only branch
+   in this superproject existing on no remote. Judged superseded rather than
+   un-landed: main implements the same optimisation in generalised form, and
+   main's comment reads `ranked 行にだけ後付けする` where the branch reads
+   `ranked 5 本にだけ後付けする`, so main derived from it. NOT deleted, because
+   discarding the only copy of anything on a judgement call is the owner's to
+   make. Held in worktree `root-maturity-remeasure-mtql61p3`.
+
+4. **88 UNLANDED child repos remain.** `nbb scripts/cleanup.cljs --unlanded`
+   reported 88 of 4416 scanned, and the run completed (its own completion line
+   was present, so it was not killed mid-scan). This session handled only the
+   seven holding untracked content, which is the top of the ladder because
+   untracked work is on no branch and no remote. The rest are `nopr` and
+   `unpushed` rows and several branch farms.
+
+5. **The daily worktree-retire job is still not installed.** CLAUDE.md already
+   records that `cloud.itonami.bot.worktree-retire` is named in the roster but
+   never loaded; that is still true, which is why 35 stale entries and 5
+   eligible worktrees had accumulated for this session to clear by hand.
+
+6. **57 `nexus-x402-supporter-*` worktrees** under
+   `~/.cloud-itonami/awai-worktrees/awai/`, one roughly every 100 minutes, all
+   landed and clean and all younger than the 7-day floor, so `worktree-retire`
+   correctly keeps every one. The floor is not the problem; the creation rate
+   is.
+
+## Validation actually run
+
+- `nbb scripts/west-orphan-audit.cljs --blocking`: exit 0,
+  `local-root-broken 0`, `relative-paths-broken 0`, `true-orphan-git 0`,
+  `renamed-UNVERIFIED 0`.
+- EDN readability of the landed ledger: 10855 lines, 0 parse failures.
+- Conflict-marker search over tracked `manifest/`, `90-docs/`, `scripts/`:
+  none.
+- `worktree-retire --apply`: SCANNED 1516, retired 5, kept 1457, unverified 19,
+  pruned 35, failed 0.
+- Superproject: on `main`, 0 ahead 0 behind `origin/main`, 0 stashes, 0 open
+  PRs.
+
+Not run, and named rather than skipped silently: `gen-west-manifest.cljs
+--check` was not used as a gate, because it compares against a wholesale
+regeneration from local child-repo HEADs and reports STALE as its normal
+reading in any shared checkout; the manifest changes in this session went
+through the single-entry path, which is the shape that check cannot judge.
+
+## Archive
+
+Everything dropped or closed in this session is recoverable from
+`.git/stash-archive-20260909/` in the superproject: 14 stash patches with an
+`index.txt`, 14 branch archives under `branches/`, and the un-landed ledger
+events under `unlanded-ledger-events-20260909/` with a provenance file naming
+the worktree and branch they came from. Per-repo archives were written by
+`cleanup-land` into each child repo's own `.git/stash-archive-20260909/`.
+
+One process note worth carrying forward. While writing that archive this
+session truncated a pre-existing `index.txt` from an earlier session the same
+day; the three lost entries were reconstructed from still-reachable objects and
+all 14 patches were intact, but the correct move is to append to an existing
+archive index rather than recreate it.
+"
+}]
