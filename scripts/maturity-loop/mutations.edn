@@ -10679,4 +10679,115 @@
      :file "src/etzhayyim/webpage/contract.cljc"
      :find "                             (= c \\\")                 (recur (inc i) :string (conj out c))"
      :replace "                             (= c \\\")                 (recur (inc i) :code (conj out c))"
-     :must-fail ["jsonc-stripper-keeps-urls-inside-strings"]}]}]}
+     :must-fail ["jsonc-stripper-keeps-urls-inside-strings"]}]}
+
+  {:repo "orgs/cloud-itonami/app-pre"
+   :label "app-pre site-consistency —— 実行時に判定をする場所が無い repo で、ファイルをまたいだ文字列の食い違いを見る"
+   ;; app-pre は backend も API も form 処理も持たない静的サイト 1 面である。実行時に
+   ;; 判定をする場所が無いので、壊れるとしたら **別のファイルに書かれた文字列との
+   ;; 食い違い** で、この repo の道具はどれもそれを見ない:
+   ;;
+   ;;   - `next build` は文字列の href を辿らない。`/templates/databreach` は静的に
+   ;;     生成でき、404 になるのは人がクリックした時だけである。
+   ;;   - `tsc --noEmit` は **すでに赤**（`components/theme-provider.tsx` が依存に無い
+   ;;     `next-themes` を import している）で、`typescript.ignoreBuildErrors: true` が
+   ;;     build から隠している。増えた 1 件は既存の 1 件と見分けが付かない。
+   ;;   - CTA の form URL は 4 箇所に手で写してある。1 箇所だけ直した変更は build も
+   ;;     型検査も lint も通る。
+   ;;
+   ;; suite の exit は 3 値（0 通った / 1 破れた / 3 REFUSED）。**下 3 件は床を撃つ。**
+   ;; 床は 3 つの別々の理由で拒否するので、空の corpus を 1 つ渡して「拒否した」を
+   ;; 1 回見るやり方では discriminate できない —— 実測 2026-09-09、sources 節を殺しても
+   ;; routes 節が同じ「拒否した」を返して control は緑のままだった。理由ごとに、その
+   ;; 理由だけが立つ corpus を当てている。
+   ;;
+   ;; 11 件とも 2026-09-09 に、当てて赤くなるところを実際に見てから登録した。
+   ;; 各 mutation は名指しの検査だけを赤にし、巻き込みは 0 件だった。
+   :cmd ["nbb" "--classpath" "test" "test/site_consistency_test.cljs"]
+   :green-marker "site-consistency: OK"
+   :mutations
+   [{:id :pre/typo-in-a-hand-written-path
+     :note "文言集カードのリンクを 1 文字落とす。next build は静的に生成し、404 になるのは人がクリックした時だけ"
+     :file "components/templates-section.tsx"
+     :find "href=\"/templates/data-breach\""
+     :replace "href=\"/templates/databreach\""
+     :must-fail ["every-internal-link-resolves-to-a-route-on-disk"]}
+
+    {:id :pre/nav-link-collapsed-to-home
+     :note "header の「文言集」を / に潰す。**リンクは全部解決したまま**で、/templates だけが
+            どこからも辿れない page になる —— live に見える dead page"
+     :file "components/header.tsx"
+     :find "<Link href=\"/templates\" className="
+     :replace "<Link href=\"/\" className="
+     :must-fail ["every-route-on-disk-is-linked-from-somewhere"]}
+
+    {:id :pre/copy-paste-in-navItems
+     :note "サイドナビの手書き配列で 1 行を隣からコピーする。href としては両方とも実在するので
+            リンク解決は緑のまま、data-breach だけがサイドナビから消える"
+     :file "app/templates/layout.tsx"
+     :find "href: \"/templates/data-breach\""
+     :replace "href: \"/templates/bec\""
+     :must-fail ["the-category-sidebar-lists-every-category-route"]}
+
+    {:id :pre/only-one-cta-updated
+     :note "form を差し替えたとき header だけ直して landing-page の 3 箇所を忘れる形。
+            build も tsc も lint も通り、サイトの一部だけが古い form を指す"
+     :file "components/header.tsx"
+     :find "https://share.hsforms.com/1ktcvOuQyQryU6Qy98nvaRwp49om"
+     :replace "https://share.hsforms.com/2ZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+     :must-fail ["the-cta-form-url-is-the-same-in-every-call-to-action"]}
+
+    {:id :pre/template-numbering-duplicated
+     :note "文例3 を文例2 と名乗らせる。3 カテゴリ × 3 本 = 9 本はこの repo の存在理由なので、
+            番号が重複した page は誰も気づかないまま出荷される"
+     :file "app/templates/bec/page.tsx"
+     :find "title=\"文例3："
+     :replace "title=\"文例2："
+     :must-fail ["every-category-page-carries-three-numbered-templates"]}
+
+    {:id :pre/description-dropped
+     :note "TemplateViewer の props を 1 つ空にする。React は落ちず、空の説明文が描画されるだけ"
+     :file "app/templates/bec/page.tsx"
+     :find "description=\"BECにより誤った口座へ送金してしまった取引先への謝罪と、今後の対応を協議するための連絡です。\""
+     :replace "description=\"\""
+     :must-fail ["every-template-declares-a-title-a-description-and-a-body"]}
+
+    {:id :pre/live-url-pasted-into-a-body
+     :note "文例の本文に実 URL を貼る。文例は利用者が書き換えて出す下書きなので、
+            **この repo が書いた宛先が利用者の広報文にそのまま出ていく**"
+     :file "app/templates/ransomware/page.tsx"
+     :find "進捗につきましては、明日[日付]午前[時刻]を目処に、改めて本ウェブサイトにてご報告いたします。"
+     :replace "進捗につきましては、https://status.example.co.jp/ にて随時ご報告いたします。"
+     :must-fail ["no-template-body-embeds-a-url"]}
+
+    {:id :pre/bracket-left-open
+     :note "記入欄の角括弧を閉じ忘れる。描画は普通に成功し、利用者が置換すべき箇所を見落とす"
+     :file "app/templates/ransomware/page.tsx"
+     :find "[復旧日時]"
+     :replace "[復旧日時"
+     :must-fail ["every-placeholder-bracket-in-a-template-body-is-closed"]}
+
+    ;; ── ここから 3 件は床を撃つ（検査対象ではなく検査そのもの）──────────────
+    {:id :pre/floor-sources-clause-cannot-fire
+     :note "「.tsx が 1 つも読めなかった」節を発火しなくする。**残り 2 節が同じ「拒否した」を
+            返すので、空 corpus を 1 つ当てるだけの control では気づけない**"
+     :file "test/site_consistency.cljs"
+     :find "(zero? (count sources))"
+     :replace "(neg? (count sources))"
+     :must-fail ["a-corpus-with-no-sources-is-refused-not-reported-clean"]}
+
+    {:id :pre/floor-routes-clause-cannot-fire
+     :note "「App Router の tree として読めていない」節を発火しなくする"
+     :file "test/site_consistency.cljs"
+     :find "(zero? (count routes))"
+     :replace "(neg? (count routes))"
+     :must-fail ["a-corpus-with-no-routes-is-refused-not-reported-clean"]}
+
+    {:id :pre/floor-stops-refusing-unmodelled-routes
+     :note "dynamic segment / route group を見つけても拒否しなくする。**規約を模せていない
+            resolver が「全リンク解決した」と答える** —— 検査しなかった実行が、検査して
+            問題が無かった実行と同じ値を返す形そのもの"
+     :file "test/site_consistency.cljs"
+     :find "(seq unsupported-routes)"
+     :replace "(and false (seq unsupported-routes))"
+     :must-fail ["a-route-convention-this-resolver-cannot-model-is-refused"]}]}]}
