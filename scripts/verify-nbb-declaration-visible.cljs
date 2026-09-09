@@ -186,7 +186,32 @@
                            (keep coordinate-for))
                 np    (nbb-above p f)
                 have  (if np (declared-in np) #{})
+                ;; DECLARING :paths TAKES "." OFF THE CLASSPATH.
+                ;; nbb puts the working directory there when there is no
+                ;; nbb.edn; :paths replaces that rather than adding to it. So an
+                ;; nbb.edn written to make one namespace resolvable can make
+                ;; another stop resolving, and nothing says so. This tool wrote
+                ;; 150 such files on 2026-09-09; kotoba-lang/amu's browser-matrix
+                ;; check -- which compares against main -- was the only thing in
+                ;; the workspace that noticed.
+                np-paths (when np (:paths (try (reader/read-string (slurp* np))
+                                               (catch :default _ nil))))
+                root-only (when (and np-paths (not (some #{"."} np-paths)))
+                            (seq (for [ns (external-requires src)
+                                       :let [rel (s/replace (s/replace ns "." "/") "-" "_")
+                                             at-root (some #(file? (.join path-mod p (str rel %)))
+                                                           [".cljc" ".cljs" ".clj"])
+                                             under (some (fn [pp]
+                                                           (some #(file? (.join path-mod p pp (str rel %)))
+                                                                 [".cljc" ".cljs" ".clj"]))
+                                                         np-paths)]
+                                       :when (and at-root (not under))]
+                                   ns)))
                 miss  (remove have needs)]
+            (when root-only
+              (swap! rows conj
+                     (str "ROOT-OFF-CLASSPATH\t" f "\t" (s/join "," root-only)
+                          "\tnbb.edn :paths " (pr-str np-paths) " has no \".\"")))
             (when (seq miss)
               (swap! rows conj
                      (str "UNRESOLVABLE\t" f "\t" (s/join "," miss) "\t"
