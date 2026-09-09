@@ -102,12 +102,47 @@
     overstate what was measured; they are reported under their own key."
    :outside-inventory "Two, unchanged since 2026-09-08 and now isolated from the
     other seventeen: provider-postgres/src/provider/postgres/pool.clj and
-    provider-transport/src/provider/transport.clj. Both import
-    com.dylibso.chicory.wasm.types directly and both landed after the
-    2026-07-18 freeze. Whether the inventory absorbs them or they are removed
-    remains the owner's decision and is still NOT made here. What changed is
-    that the decision can now be put to someone, which it could not be while
-    those two were lines in a list of nineteen."}
+    provider-transport/src/provider/transport.clj. Whether the inventory
+    absorbs them or they are removed remains the owner's decision and is still
+    NOT made here. What changed is that the decision can be put to someone,
+    which it could not be while those two were lines in a list of nineteen --
+    and that four facts were measured for it, on 2026-09-09, which change what
+    `post-freeze violation` means for these two."
+   :outside-inventory-measured
+   {:they-are-extractions-of-a-frozen-repos-files
+    "provider-transport/src/provider/transport.clj differs from
+     kototama/src/kototama/transport_provider.clj in 15 lines of 440, and every
+     one is a namespace rename (kototama -> provider, including the keyword
+     namespaces). provider-postgres/src/provider/postgres/pool.clj differs from
+     kototama/src/kototama/postgresql_pool_provider.clj in 46 of 477. These are
+     not newly written Chicory consumers; they are files that were split out of
+     a repository the inventory freezes."
+    :the-split-was-deliberate-and-is-documented-upstream
+    "kototama/deps.edn says it in its own words: `not part of the runtime core.
+     It lives in kotoba-lang/provider-postgres and its interop harness went
+     with it. A deployment that wants it adds that dependency itself; the
+     tender does not ship a database pool.` The extraction NARROWS the runtime
+     core, which is the direction this cutover wants."
+    :neither-declares-chicory
+    "Zero Chicory coordinates in either deps.edn. Both depend on kototama --
+     a frozen inventory entry that pins com.dylibso.chicory/{wasm,runtime} --
+     so what Chicory they resolve, they resolve THROUGH the frozen entry. No
+     new dependency was added by the split; a string moved."
+    :the-transport-split-reduced-the-surface
+    "kototama/src/kototama/transport_provider.clj imports
+     `com.dylibso.chicory.runtime HostFunction` AND
+     `com.dylibso.chicory.wasm.types ValType`. The extracted copy imports only
+     ValType -- a type used to declare a host-function signature, not the
+     runtime engine. The file that left the frozen repo names LESS Chicory than
+     the one that stayed."
+    :what-is-still-true
+    "The sweep is right that the string appears outside the frozen paths, and
+     :new-chicory-call-sites :forbidden is about call sites, not about
+     dependency declarations. Nothing above says the rule was not crossed. It
+     says the crossing is a documented extraction that reduced the runtime core
+     and added no dependency -- which is the difference between `absorb these
+     two into the inventory` and `remove them`, and that is the decision this
+     record has always left to its owner."}}
 
   :chicory-sweep
   {:command "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
