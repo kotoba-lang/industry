@@ -215,7 +215,39 @@
   {:coordinate "com.datomic/local" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/kotobase" :kind :partial :partial-because "the query and datom planes are real; storage backends are pluggable by design"}
   {:coordinate "org.neo4j/neo4j" :ecosystem :maven :disposition :first-party-exists
    :target "kotoba-lang/kotobase" :kind :partial :partial-because "the query and datom planes are real; storage backends are pluggable by design" :note "Cypher itself is org-opencypher-cypher; the store is kotobase."}
-  {:coordinate "babashka/process" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/process" :kind :capability-seam :seam-because "the effect is a capability; a host must supply the implementation"}
+  {:coordinate "babashka/process" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/process" :kind :capability-seam :seam-because "the effect is a capability; a host must supply the implementation"
+   :qualification
+   "The transport EXISTS -- `kotoba.lang.process-host/sh` talks to
+    java.lang.ProcessBuilder on `:clj` and child_process.spawnSync on `:cljs`,
+    with `validate-spawn` in front, so a rejected argv returns `{:exit -1}` and
+    is never launched. `a host must supply the implementation` reads like a
+    blocker and is not one. Measured 2026-09-10 across the two repositories
+    that still declare this coordinate.
+
+    playwright -- ONE call site, and it does not fit:
+
+      (p/sh {:extra-env {\"NODE_PATH\" np}} \"node\" bridge (.getPath f) url)
+
+    `process-host/sh` has no per-call environment at all, and says so in its
+    own docstring under `NOT implemented -- documented, not silently
+    approximated`: `:env` is `a real gap, not silently ignored`. So this one
+    is blocked on a named, already-known missing feature rather than on
+    anything about the call site.
+
+    murakumo -- 43 call sites, and MOST of them fit: 37 plain `p/sh`, which is
+    exactly what `process-host/sh` is a drop-in for. Three tails are not
+    covered: `p/shell` (3, infer.clj), a `.destroy` on a transport handle (1,
+    overlay/transport.clj), and `:env` (2). What matters more than the tails:
+    EIGHT of the 37 are `(p/sh \"sh\" \"-c\" \"...\")`. Those pass
+    `validate-spawn`'s structural checks -- `sh` carries no path separator --
+    while carrying a shell through a library whose stated purpose is that `the
+    cell never sees ambient PATH or a shell`. Rewiring them unchanged would
+    satisfy the dependency and defeat the reason for it.
+
+    So the coordinate's disposition is right and the work is two different
+    jobs: add `:env` to `kotoba-lang/process` (which unblocks playwright and 2
+    of murakumo's), and decide what the 8 shell-string call sites become. Not
+    decided here."}
   {:coordinate "http-kit/http-kit" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/http" :kind :capability-seam :seam-because "the effect is a capability; a host must supply the implementation"}
   {:coordinate "org.babashka/http-client" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/http" :kind :capability-seam :seam-because "the effect is a capability; a host must supply the implementation"}
   {:coordinate "clj-http/clj-http" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/http" :kind :capability-seam :seam-because "the effect is a capability; a host must supply the implementation"}
