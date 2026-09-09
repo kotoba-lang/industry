@@ -17,14 +17,17 @@ merge conflicts in this superproject and its `orgs/` child repos.
 - Keep failed `stash pop` entries. Git keeps the stash on failed pop; inspect it before applying manually.
 - **GitHub push alone is not registration.** Repos under `orgs/` that consumers resolve via `:local/root` (or that are intentional fleet members) must also appear in west (`repos.edn` `:extra-projects` + `gen-west-manifest.cljs --entry`). See skill `new-project-scaffold`.
 
-## west update first — inventory より前に必ず回す
+## inventory の前に fleet 全体の west update を回さない（2026-09-09 改訂）
 
 ```bash
 git fetch origin && git merge --ff-only origin/main   # superproject を先に同期
-west update --fetch smart                             # 子リポを pin に合わせる（dirty は skip、exit 1）
+nbb scripts/checkout-staleness.cljs                   # dirty / behind / untracked の母集団（全 fleet 94 秒、network なし）
+# 判定する repo だけ、その repo で明示的に fetch する（鮮度はここでしか得られない）
 ```
 
-理由は2つあり、どちらも実測（2026-08-04、オーナー指示でこの節を追加）に基づく。
+この節は 2026-08-04 のオーナー指示で「必ず回せ」と定め、理由を 2 つ挙げていた。
+**両方とも、この repo 自身の測定で崩れている。** 以下は両方の記録を残す — 何が
+真だったかと、いつ何によって偽になったかが読めないと、同じ結論に戻るため。
 
 **1. 判定の前提が古いと結論が全部ずれる。** cleanup の中心的判定である content-containment は
 「branch の追加行が現 `origin/main` に存在するか」を見る。子リポの `origin/main` が fetch されて
@@ -46,13 +49,40 @@ west update --fetch smart                             # 子リポを pin に合�
 > | `west update --fetch smart css` 直後 | `6eda5ee` ← **動かない** |
 > | `git fetch kotoba-lang` 直後 | `82aa184` ← 正しい |
 >
-> したがって鮮度は下の手順 **(d) で別途取る**のが唯一の方法であり、(d) は補助ではなく
-> 本体である。west update を先に回す価値は理由 **(2)**（skip 集合 = ローカルにしか無い
-> 作業の母集団）にある。
+> したがって鮮度は「判定する repo だけを明示的に fetch する」で取るのが唯一の方法であり、
+> それは補助ではなく本体である。
+>
+> この訂正が書かれた時点では「west update を先に回す価値は理由 **(2)** にある」と結ばれて
+> いた。その (2) も 2026-09-09 に倒れている（下）。**残った価値は『checkout を pin に揃える』
+> ことだけで、それは cleanup の前提ではない。**
 
-**2. west update の skip 一覧そのものが cleanup の入力である。** west は dirty な project を
-破壊せず skip して exit 1 を返すので、その skip 集合が「ローカルにしか無い作業を持つ repo」の
-正確な母集団になる。実測（4,022 project、full history、約4時間）: **87 project が skip**、内訳は
+**2. west update の skip 一覧そのものが cleanup の入力である。**
+
+> ⚠️ **訂正（2026-09-09）: skip 集合は母集団を取りこぼす。**
+> west が skip するのは *更新がローカル変更と衝突するとき* だけで、衝突しなければ
+> dirty な木の上でも checkout を進める。実測: 中断した run が到達した 1,073 project の
+> うち dirty は 2 件（`cloud-itonami/akashi` の untracked `config/`、
+> `cloud-itonami/business-manager` の `.cpcache/`）で、**どちらも skip されていない** ——
+> akashi は `Previous HEAD position was 1c9ef16` → `HEAD is now at 16ecd85` と HEAD を
+> 動かしている。
+>
+> **そして同じ答えは約 200 倍速くローカルで出る。** 同一の 1,073 project に対して:
+>
+> | 方法 | 時間 | 1 project あたり | 全 4,343 換算 |
+> |---|---|---|---|
+> | `west update --fetch smart` | 1,825 秒 | 1.70 s | **約 2.0 時間** |
+> | `git status --porcelain` 12 並列 | 7.7 秒 | 0.0072 s | 約 32 秒 |
+> | `scripts/checkout-staleness.cljs`（実際に使う道具） | — | — | **94 秒**（4,555 checkout、load 51.6） |
+>
+> 時間は network に消えている（到達した 545 のうち 352 = 65% が実際に fetch を要した）。
+> fleet 全体をローカルで測る道具は既にある: `scripts/checkout-staleness.cljs` は
+> docstring 自身が「**fetch はしない。** 4,415 checkout を fetch するのは論外だし、hook から
+> 呼べなくなる」と書いている。`scripts/cleanup.cljs` も 2026-07-26 に同じ理由で 2 フェーズ化
+> され、phase 1 はネットワーク往復ゼロで全 repo を走査する。**3 つのスクリプトが既にこれを
+> 知っていて、この節だけが取り残されていた。**
+
+**dirty な repo は実在する — 母集団の取り方が変わっただけである。**
+実測（4,022 project、full history、約4時間）: **87 project が skip**、内訳は
 untracked 衝突 83 / tracked のローカル変更 17（13 は両方）。うち **69 project・70 ファイル**は
 incoming と byte-identical な掃き出しファイル（大半が `kotoba-lang/com-*` の
 `schema/<name>.kotoba-schema`）で、`shasum` 一致を確認して削除し再 update すれば解消した。
@@ -61,9 +91,12 @@ incoming と byte-identical な掃き出しファイル（大半が `kotoba-lang
 手順:
 
 1. superproject を `git fetch origin && git merge --ff-only origin/main`
-2. `west update --fetch smart`
-3. skip された project を untracked / localchg に分類。untracked は `git hash-object` と pin 側
-   blob hash の**一致を確認したものだけ**削除して再 update。localchg は触らず温存
+2. `nbb scripts/checkout-staleness.cljs` で dirty / behind / untracked の母集団をローカルに取る
+   （`dirty=N (Xt/Yu)` と tracked / untracked を分けて出す。全 fleet 94 秒、network round trip ゼロ）
+3. untracked は `git hash-object` と pin 側 blob hash の**一致を確認したものだけ**削除。
+   localchg は触らず温存。checkout を pin に揃えたいときだけ
+   `west update --fetch smart <name> …` を**対象を名指しして**回す（引数なしの全体走査は
+   初回 clone と pin が大量に動いた後だけ — CLAUDE.md）
 4. 個別リポを触る前に、**そのリポでも**明示的に fetch して `<remote>/<default>` を最新化して
    から判定する（上の訂正のとおり、**ここが鮮度を得る唯一の手段**）。
    **`git fetch origin` と書いてはならない** — 下記のとおり 72% の repo に `origin` は無い。
@@ -593,7 +626,7 @@ scope の沈黙を「未登録は無い」と読ませないため。
 
 ## Standard Cleanup
 
-1. Inventory each relevant repo (**west update を先に回してから** — 上の「west update first」節):
+1. Inventory each relevant repo (**ローカル走査を先に** — 上の「inventory の前に fleet 全体の west update を回さない」節):
 
    ```bash
    git fetch origin && git merge --ff-only origin/main
