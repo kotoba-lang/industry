@@ -3826,4 +3826,63 @@
               reported at :info and is not clean. A shallow checkout answers ancestry wrongly
               and with authority, so it is refused rather than believed."}
 
+{:id       :verify-itonami-surface-split
+   :title    "the surfaces cloud-itonami-app handed to cli and apex, after it handed them over"
+   :why      "2026-09-09: cloud-itonami-apex owns the four Workers that hold real
+              itonami.cloud hostnames, and cloud-itonami-cli pins four tables the app
+              generates. Neither split removed what it replaced, and nothing was
+              comparing the two sides.
+
+              Measured against both repositories' main: all four Worker copies left in
+              cloud-itonami-app carried the SAME Worker name and the SAME custom_domain
+              as the apex originals -- agent.itonami.cloud, hooks.itonami.cloud,
+              app.itonami.cloud, mcp.itonami.cloud -- so a release run from the app tree
+              would have replaced the live Worker rather than failing. Three copies were
+              byte-identical; itonami-fleet-dispatch had ALREADY DRIFTED, its copy
+              missing `capital` from the API route test, so shipping it would have taken
+              /api/capital off app.itonami.cloud -- the ingress cloud-itonami-api sits
+              behind -- while every check in both repositories stayed green. A release
+              has no fast-forward check: the last tree to ship wins, and nothing was
+              measuring which tree that was.
+
+              This CANNOT be a fleet gate, and the reason is structural rather than
+              incidental: answering needs THREE checkouts at once. A gate ships only the
+              target repo's own tree, so the same check placed there can only report
+              that the other side is missing. cloud-itonami-cli already carries
+              scripts/verify-pinned-surface.cljs, which correctly returns exit 2 REFUSED
+              when it cannot find the app -- and would return it forever on a node. A
+              check that can never answer is worth no more than one that is always green.
+              The superproject is the only checkout holding app, cli and apex together.
+
+              Three families, each discriminated by its own named reason on 2026-09-09
+              rather than by going red for some reason: cli-pin-drift fires when the
+              app's generated table is edited and not the CLI's pin; ingress-pin-drift
+              fires when the pinned agent-edge write table stops matching the Worker
+              apex ships; ingress-pin-shape fires on an entry written as (str \"a\" \"b\"),
+              which edn/read-string returns as a LIST without throwing, so a pin can
+              read cleanly and still hand a non-string to a comparison that then simply
+              never matches. worker-copy fires on the duplication itself and reports
+              whether the two copies still agree, because 'byte-identical today' and
+              'already drifted' are different amounts of trouble and the finding should
+              say which one it found."
+   :argv     ["nbb" "{{repo}}/scripts/verify-itonami-surface-split.cljs"
+              "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000
+   :timeout-ms  60000
+   :measured {:as-of "2026-09-09" :runtime-s 0.26 :load-1m 14.4
+              :comparisons 8 :findings 5
+              :note "0.23/0.24/0.26s over three runs at load 14.4. The timeout is not a
+                     multiple of that warm run: the work is a directory walk plus file
+                     digests, so a cold page cache dominates, and 60s is sized for that
+                     rather than for 12x a warm one. Six-hourly because a surface moves
+                     on the scale of a landed PR, not a commit. The clean run against a
+                     fixed tree makes 9 comparisons -- one more than the workspace made
+                     when this was written, because the ingress pin did not exist yet and
+                     an absent pin is deliberately not a finding. exit 2 was confirmed
+                     against a root with no orgs/ rather than assumed."}}
+
 ]}
