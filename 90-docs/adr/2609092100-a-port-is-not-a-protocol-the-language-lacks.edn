@@ -1,0 +1,87 @@
+[{:db/id -1
+  :adr/id "adr-2609092100-a-port-is-not-a-protocol-the-language-lacks"
+  :adr/title "A port is not a protocol the language lacks: closed-world dispatch runs, open-world dispatch is refused"
+  :adr/status "accepted"
+  :adr/date "2026-09-09"
+  :adr/related "adr-2608650000 q9-migration.edn ADR-q9-whole-component-build-migration"
+  :adr/body
+  "## Decision
+
+`kotoba.card.actuation` and `kotoba.card.ports` are recorded `:blocked` for the
+Kotoba migration. The block is asserted by a probe, not written down as a claim:
+`kotoba-lang/card` `test/kotoba/card/actuation_kotoba_blocked_probe.cljs`.
+
+## What was measured, in both directions (2026-09-09)
+
+Protocols are NOT missing from the language. A `defprotocol` + `extend-protocol`
+whose implementations sit in the same compiled graph COMPILES and RUNS and returns
+the right answer -- the probe instantiates the emitted artifact and checks it
+returns 103, rather than reading `:ok true`, because a backend that accepts and
+answers wrongly is worse than one that refuses (amu#835).
+
+What is refused is the PORT shape: a protocol method called on a value whose record
+the module does not statically know.
+
+  :kotoba.error/protocol-dispatch
+  'protocol method requires a statically known implemented record; got :i64'
+
+`kotoba-lang/lang/surface-status.edn` names the profile:
+`:protocol-and-record-dispatch` is `:bounded-closed-world-static-dispatch`, with
+`:dynamic-fallback false` and `:default :sealed-module-record-specialization`.
+
+## Why these two components are exactly that shape
+
+Their implementers live outside the compiled graph ON PURPOSE, and in other
+repositories. `io.stripe.issuing.core/StripeIssuing` is a JVM record holding a live
+HTTP transport; `cardissuing.http` dispatches on an actuator injected at runtime.
+An open world is the whole point of a port. `kotoba.card.ports` is five protocol
+declarations and nothing else.
+
+## This is backend state, not a permanent design decision
+
+`:disposition` is `:implemented-partial`, which ADR-2608650000 classifies as
+TEMPORARY -- the permanent dispositions are `:intentional-security-constraint` and
+`:intentional-semantic-simplification`, and neither is on this profile. So the
+components are NOT reshaped to fit the backend.
+
+## The trap this ADR exists to disarm
+
+That surface-status entry carries `:missing []` and `:not-yet-implemented #{}`.
+Both are scoped to the closed-world profile. Neither means protocols are complete,
+and neither is a statement that open-world dispatch is refused by design. Read as
+the latter -- which is the natural reading of `:missing []` -- this block looks
+permanent, and a future agent would either stop trying or, worse, redesign a
+component around a gap that is scheduled to close.
+
+## Why not migrate the pure half
+
+`approval-issues`, `authorised?`, `idempotency-issues`, `state-mapping-complete?`,
+`unrepresentable-states`, `refusal` and `precheck` would each move today. Moving
+only those is a decision-only slice, and `q9-migration.edn` v3 sets
+`:decision-only-slices-allowed false` with `:migration-unit :whole-component`.
+
+Replacing the ports with declared capability imports is the other way a port can
+cross (`:native-functionality-crosses :declared-capability-import`), and it is
+rejected here for a reason that is not about the compiler: the library is
+provider-agnostic on purpose, so a capability that issued a card would have to name
+a provider's wire format, which lives in the provider. It would also delete two
+public exports that two other repositories implement -- a versioned API decision,
+not a migration step.
+
+## Removal condition, mechanised
+
+The probe exits 0 blocked / 1 unblocked / 2 REFUSED, and was discriminated in three
+directions before landing: port shape admitted -> 1; reason literal renamed -> 2
+(it refuses to attribute the block to a failure it did not name); control answering
+wrongly -> 2. The day open-world dispatch is admitted, it goes red for BOTH
+namespaces. `kotoba.card.ports` deliberately has no second probe -- two probes
+asserting the same refusal drift apart, and the one nobody runs is the one that
+goes stale.
+
+## Note on the control
+
+The first attempt at the control-broken variant changed nothing, and the probe
+reported a healthy control, which reads exactly like a successful demonstration.
+The mutation is now asserted to have applied before it is trusted. This is the
+'壊し方を間違えた赤は成功した実演に見える' failure in its mirror form: a mutation
+that misses looks like a passing control."}]
