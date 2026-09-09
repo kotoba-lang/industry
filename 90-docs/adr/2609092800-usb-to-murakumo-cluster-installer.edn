@@ -1,0 +1,366 @@
+[{:db/id -1
+  :adr/id "adr-2609092800-usb-to-murakumo-cluster-installer"
+  :adr/title "USB を挿すだけで murakumo cluster に参加する installer —— 5 面のうち 4 面は既に在り、律速は実機 boot 1 点。TEE は名乗らない"
+  :adr/status "accepted"
+  :adr/date "2026-09-09"
+  :adr/last_verified "2026-09-09"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "murakumo-cluster-usb-installer"
+  :source/dataset "adr"
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/aiueos"
+              "kotoba-lang/murakumo"
+              "kotoba-lang/kekkai"
+              "kotoba-lang/kekkai-node"
+              "network-awai/cloud-murakumo"
+              "net-kotobase/control-plane"]
+
+  :adr/authoritative_for
+  ["USB から murakumo cluster 参加までを 1 本の onboarding-chain として閉じる product contract"
+   "この installer が TEE / CVM を名乗らない決定と、その代わりに何を与えるかの正本"
+   "overlay の authority を kekkai に置き Tailscale を移行互換の到達経路に降ろす決定"
+   "対象機 Ryzen 5 6600HS の machine profile を probe receipt からのみ作る規則"
+   "bare-metal と hosted の 2 profile が 1 つの product であることの正本"]
+
+  :adr/related
+  ["adr-2608251418-aiueos-usb-install-and-headless-bootstrap"
+   "2608051200 aiueos as a USB-bootable murakumo.cloud node"
+   "2800004900 murakumo.cloud device console mobile"
+   "ADR-2608153600 device enrollment / live update / publisher trust"
+   "adr-2608300100-fleet-credential-attestation-and-load-split"
+   "adr-2609062600-itonami-bots-in-the-cloud-and-what-murakumo-can-attest"
+   "adr-2609063400-gmktec-k16-fleet-hardware-and-the-32gb-ceiling"
+   "adr-2609031030-aiueos-k16-pure-kotoba-physical-tcp-handoff"
+   "2608111721 slot/attested"
+   "2608039000 blockchain / 分散型経路に D1 を前提にしない"
+   "2609070400 human authentication web3 first"]
+
+  :adr/supersedes []
+
+  :adr/body
+  "# USB を挿すだけで murakumo cluster に参加する installer
+
+**Status**: accepted / 2026-09-09 / オーナー要求 2026-09-09:
+「接続した usb に murakumo cluster を作るために kekkai, murakumo, tailscale などを
+含めた server の installer を設計して, tee, cvm として安全かつ軽量な os として。
+usb をさすだけで network の設定ができ, qr コードで読み取るだけで murakumo.cloud から
+network に登録できるようにしたい, webauth, smart contract passkey で スマホから auth が
+完了、network 情報なども スマホから共有できるように」
+
+## 索引を引いた結果 —— 要求の 5 面のうち 4 面は既に在る
+
+**この ADR は新しい機構をほとんど設計していない。** `repo-search` と
+`concept-lookup` と ADR corpus を引いた結果、要求のほぼ全部が既に設計され、
+一部は live だった。設計として新しいのは 3 つだけ —— chain を 15 段に延ばすこと、
+TEE を名乗らないと決めること、overlay の authority を kekkai に置くこと。
+
+| 面 | 誰が所有しているか | 2026-09-09 実測の状態 |
+|---|---|---|
+| boot / install | `kotoba-lang/aiueos`（`install-v1.edn`） | QEMU で 9 段 chain が green。**実機は red** |
+| identity / QR claim | `aiueos.enroll` + `murakumo.enroll` + `sekisho.didkey` | implemented-and-unit-tested |
+| human auth（passkey / smart account） | `net-kotobase/control-plane` @ `auth.kotoba.cloud` | **live**（2026-09-07 e2e） |
+| network profile をスマホから配る | `device-onboarding-v1.edn` の `network-profile-sync` | implemented-and-unit-tested。native application は driver 待ち |
+| overlay | `kekkai` / `kekkai-node` / `kekkai-cli` / `cloud-itonami/kekkai` | `pending-native-adapter` |
+| compute join | `murakumo.infer.join` + `murakumo-relay-enrollment-v1.edn` | relay 経由は contract、device-owned CACAO は `not-wired-to-kernel` |
+
+したがって **作らないものの一覧（後述）がこの ADR の中心**である。
+
+## 実測が要求と衝突する 1 点 —— TEE / CVM
+
+対象機は **AMD Ryzen 5 6600HS**（Zen3+ Rembrandt 系 APU）。
+
+- **SEV / SEV-ES / SEV-SNP は EPYC の機能**であり、client Ryzen APU には無い。
+  Intel TDX は当然無い（AMD なので）。
+- 近縁機 GMKtec K16（Ryzen 7 7735HS）では aiueos の `os/aiueos/kernel/paging.c` が
+  **CPUID `0x8000001F` を実際に読んでいる**（C-bit 位置を取り、現在の CR3 が
+  それを持つときだけ継承する）。実機 v9 の返り値は **code 260、feature bit ゼロ** ——
+  README はこれを「LA57, SME and CET were absent」と読んでいる。
+  contract 側の記録は `:sme-c-bit :not-active-in-firmware-cr3`。
+- **仮に SME が firmware で有効でも、守るのは物理 DRAM 攻撃であって
+  ホスト運用者ではないし、遠隔 attest もできない。**
+
+**したがって CVM ——「guest の memory がホスト運用者からも守られ、遠隔から
+attest できる」—— はこのハードウェアでは作れない。**
+
+⚠ **ただし 6600HS ではこれは未測定である。** K16 の測定を 6600HS の測定として
+引用しない。実装順 2 の probe が CPUID `0x8000001F` の EAX bit 0（SME）/
+bit 1（SEV）/ bit 4（SEV-SNP）を receipt に記録して初めて答えになる。
+**記録が無い = UNVERIFIED であって「無い」ではない。**
+
+### オーナー判断 2026-09-09 —— ホスト運用者は信頼する
+
+ADR-2608300100 の推奨 (b)「TEE を要らなくする設計」を採る。
+ADR-2609062600 が既に測って書いているとおり、murakumo は host になれるが
+今日 TEE ではない。
+
+### 4 つの性質を名前で分ける
+
+ADR-2609062600 の D5 を、この installer の出力文言に束縛する。
+
+| 性質 | 意味 | この installer は |
+|---|---|---|
+| **attested (custody)** | 書き込み鍵を持つ常駐スロット | **与える** |
+| **isolated (capability)** | 与えられていない authority に手が届かない | **与える** |
+| **integrity** | 走っているコードが何か（CID + release receipt digest chain） | **与える** |
+| **confidential (TEE)** | ホスト運用者からも中身が見えない | **与えない。名乗らない** |
+
+`:slot/attested` を remote attestation と読む誤りを、この installer の文書・UI・
+receipt のどこにも入れない。
+
+### 「TEE を要らなくする」の具体
+
+confidentiality が要るのは node が**秘密を持つ**ときだけである。この設計は
+node に秘密を持たせない:
+
+- node は operator credential を 1 つも持たない（`:slot/attested`、ADR-2608111721 不変条件 3）
+- device 鍵は端末で生成され外に出ない（`:private-key-leaves-device? false`）
+- service token は Mac relay に残り、AIUEOS に送らず EFI 変数にも焼かない
+  （`murakumo-relay-enrollment-v1.edn` の `:safety` が既にこの 3 つを false で持つ）
+
+**TEE が欲しくなったら、まず「なぜこの node は秘密を持っているのか」を問う。**
+
+## 決定
+
+### D1. 完了単位は 15 段の 1 本の chain。9 段目で止めない
+
+`install-v1.edn` の `completion-chain` は 9 段で SSH に終わる。cluster 参加は
+そこから 6 段先にある。**`aiueos.onboarding-chain/v1` = install 9 段 + join 6 段。**
+
+    10  label-scanned-and-authority-issued-single-use-challenge
+    11  device-proved-possession-with-key-that-never-left
+    12  human-approved-from-phone-with-passkey-or-smart-account
+    13  device-self-issued-cacao-and-murakumo-accepted-authenticated-heartbeat
+    14  kekkai-signed-netmap-verified-and-noise-ik-peer-handshake-completed
+    15  all-of-10-through-14-survive-reboot
+
+各段は単独でも報告する。**どの緑も足し算して「cluster ready」と呼ばない** ——
+image build と flash と boot と install を別々の緑として報告し、最後の一続きが
+無いのに install complete と呼ばない、という ADR-2608251418 決定 1 の形を
+join 側にも伸ばす。
+
+### D2. 5 つの gate は独立している
+
+`device-onboarding-v1.edn` の `:safety` が既にこう切っている
+（`account-claim-implies-murakumo-ready?` false、
+`kekkai-reachability-implies-storage-sync?` false)。installer はこれを
+**出力の形**として持つ:
+
+    identity ≠ reachability ≠ workload ≠ replication ≠ confidentiality
+
+「claimed」と「murakumo ready」と「kekkai 到達可能」を 1 つの緑にしない。
+5 番目（confidentiality）は D3 により**恒久的に空**であり、空であることを表示する。
+
+### D3. overlay は kekkai が authority、Tailscale は移行互換の到達経路
+
+オーナー判断 2026-09-09（「両方、kekkai が正、Tailscale は移行互換」）。
+
+- **reachability の唯一の authority は kekkai の署名済み netmap。**
+  `kekkai` が control plane（admission・netmap・route・ACL、coord-LLM ⊣
+  TailnetGovernor）、`kekkai-node` が data plane（Noise IK・NAT 越え・relay・MagicDNS）。
+- **Tailscale は既存到達性の compatibility route。** `kekkai-node` は既に
+  「Tailscale coexistence is retained; this repository performs no uninstall or
+  disable action」と明記しており、この installer もそれに従う。
+- **Tailscale を identity authority にしない**（ADR-2608251418 の非決定、そのまま生きる）。
+- **reusable auth key を release image / USB / EFI 変数に焼かない。**
+  ephemeral な one-off enrollment capability を device intent に束縛し、
+  registration receipt を得たら失効させる。
+- **Tailscale が失敗しても LAN SSH の recovery を保つ**（ADR-2608251418 決定 5）。
+  これにより vendor account・ブラウザ認証・tailnet policy・外向き network が
+  disk install の critical path から外れる。
+
+### D4. QR は秘密を運ばない。運ぶのは「答えられる窓」
+
+ADR-2608153600 と ADR-2800004900 の決定を、この installer に束縛する。
+
+- `:qr-contains [:device-did :model :public-challenge-reference]`
+- `:qr-excludes [:passkey-private-key :account-session :poll-token :device-enrollment-token]`
+- **label は 2 つの encoding を持ち、parser は 1 本。** canonical な
+  `aiueos:1;did=…;model=…` と、`https://murakumo.cloud/#claim?q=<percent-encoded canonical>`。
+  後者は**第 2 の encoding ではなく同じ文字列を運ぶ封筒**である
+  （どの携帯の camera app も custom scheme を browser に渡さないため）。
+  query ではなく **fragment** —— Referer にも server log にも出ない。
+- **所持証明は 3 者で行い、鍵はスマホに載せない。**
+  phone が claim 要求 → server が 1 回限りの nonce → device が外に出したことの
+  無い鍵で署名 → server が検証して初めて `aiueos.enroll/claim` が走る。
+- **grant も deny も `device_claims` に追記する。** refusal を記録しない表は、
+  label が photograph されたこと（1 分に 20 回の refusal）を映せない。
+- `BarcodeDetector` を持たない platform（現在の iOS Safari は全て持たない）向けに
+  **貼り付け欄を常設し、scan button の方を条件付きにする。**
+  WASM decoder を polyfill しない —— 大半の訪問者が開かない導線のために
+  数百 KB を全訪問に課すことになる。
+
+### D5. human auth は live な authority を使う。2 つ目の identity を作らない
+
+- authority は **`auth.kotoba.cloud`**（source は `net-kotobase/control-plane`)。
+  2026-09-07 に live e2e 済み: EOA の SIWE、**passkey-owned Base Account
+  (ERC-6492 on Base mainnet)**、agent registration、recovery phrase ——
+  20/20・12/12・21/21。
+- **オーナーの言う「smart contract passkey」の実体はこれ**であり、新規に作らない。
+- installer が local な account 系を発明しない（2 つ目の identity を持たない）。
+
+⚠ **contract と live に drift がある（この ADR が見つけた 1 件）。**
+`device-onboarding-v1.edn` の `:authentication :methods` は `:passkey` と
+`:phone-scan` しか持たず、repo-wide mandatory な
+`manifest/human-authentication-policy.edn` が
+`:human-auth/preferred-family :web3-wallet` として preferred に置く
+`:siwe-erc191` / `:siwe-erc1271` を名乗っていない。
+**live な authority は既に両方を出しているのに、component contract がそれを
+言っていない。** 実装順 1 はこの drift を閉じること。
+
+### D6. network は 2 経路。R0 は有線。Wi-Fi を critical path に置かない
+
+- **R0 = wired DHCP。** K16 では RTL8125 driver が 6 個の Kotoba object として
+  実在し、`dhcp-reply-valid-v1.edn` / `dhcp-option-u32-v1.edn` の契約もある。
+  **6600HS の NIC は未 probe** —— PCI identity を probe で得るまで driver 対応を
+  green にしない（ADR-2608251418 が既にこう決めている）。
+- **Wi-Fi は authenticated phone browser から封緘して配る。**
+  suite は `:x25519-hkdf-sha256-aes-256-gcm-v1`、
+  `:authority-sees-plaintext? false`、device 側は encrypted envelope として保存。
+  required-proof は authority-opaque-envelope / device-decryption /
+  physical-association / reboot-recovery の 4 つ。
+- native application は `:pending-wifi-driver`。したがって
+  **「USB を挿すだけで network 設定ができる」の R0 は有線である**と製品文言に書く。
+  Wi-Fi は R1。ここを曖昧にすると「挿すだけ」が嘘になる。
+
+### D7. machine profile は probe が作る。spec sheet を receipt の代わりにしない
+
+**6600HS はこの workspace に記録が 1 件も無い。** 記録があるのは K16
+（Ryzen 7 7735HS、ADR-2609063400）だけである。新しい `:machine-profile` の
+field は read-only hw-probe receipt からのみ採る:
+
+- NIC の PCI vendor:device と、既存 driver で対応可能かの判定
+- NVMe の model / capacity / transport / serial-sha256
+  （serial 自体は log に出さず、照合値として扱う）
+- firmware mode、LA57 / CET、**CPUID `0x8000001F` の SME / SEV / SEV-SNP bit**
+- iGPU の識別子
+
+**K16 の測定値を 6600HS の測定値として引用しない。** 両者は近縁（どちらも
+Zen3+ Rembrandt 系 APU + RDNA2 iGPU）だが、近縁であることは probe を省略して
+よい理由にならない —— ADR-2608251418 が既に「spec-sheet の型番を live probe
+receipt の代わりにしない」と決めている。
+
+### D8. 2 profile は 1 つの product。profile は receipt の field である
+
+オーナー判断 2026-09-09（2 profile 同時）。ADR-2608051200 が既に採った形を、
+join 側まで伸ばす。
+
+- **bare-metal aiueos** = boot / install / target admission / identity / 決定の authority。
+  kernel は 524,864 bytes（**「軽量な OS」の根拠はここ**。決定は Kotoba object、
+  C は decision-free）。
+- **hosted（Linux PID-1）** = network / TLS / 推論 workload の authority。
+- **同じ install intent、同じ onboarding-chain、同じ receipt schema を通る。**
+  profile は receipt の 1 field であって別の product ではない。
+- 出荷は 2 profile 同時。QR 登録と cluster 参加は hosted で今日閉じられ、
+  bare-metal は同じ contract のまま後から入れ替わる。
+
+### D9. 成功した USB も、成功した claim も、再破壊しない
+
+install 側の I5 は既に green（fake device と QEMU 全連鎖の両方で実測、
+再挿入は exit 4 existing-install で拒否し disk は byte-identical）。
+**onboarding 側にも同じ形を置く** —— 既に claim 済みの device を、同じ label の
+再 scan が黙って再 claim しない。物理 reset だけが `:factory` へ戻す
+（`aiueos.enroll` の状態機械が既にこうなっている）。
+
+## Exit gate
+
+| Gate | 緑の条件 | 2026-09-09 実測 |
+|---|---|---|
+| I0 contract | 本 ADR と component contract が同じ matrix を言う | green（install-v1 / ssh-v1） |
+| I1 artifact | release image / installer bundle / intent / receipt の digest chain が閉じる | green |
+| I2 destructive guard | partition / removable / system / nonempty / changed identity / wrong intent を全て拒否 | green-offline（18/18 + 18/18） |
+| I3 QEMU install | USB から空 disk へ install し USB 無しで 2 回 boot | green（QEMU、4 boot 一体） |
+| I4 headless SSH | 外部 client が指定鍵で SSH、wrong key 拒否、reboot 後も成立 | green（実 socket 上で kex + host 認証 + aes128-gcm + publickey userauth + session/exec、独立 client で検証） |
+| I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | green |
+| I6 physical probe | 対象機の NIC/NVMe/GPU/UEFI/CPUID を read-only receipt に | **red（6600HS 未 probe）**。K16 は amber |
+| I7 physical install | 明示 target へ write/readback、USB 無し SSD boot、LAN SSH | **red**。K16 は `physical-qualification-usb-v11` / code 416 で停止（final CR3 の下で最初の C 呼び出しに入る所）。6600HS は未測定 |
+| O0 onboarding contract | 本 ADR と `device-onboarding-v1` が同じ matrix を言う | **red**（D5 の wallet method drift） |
+| O1 label + parse | 2 encoding / 1 parser、秘密を運ばない | green（実装済み・unit tested） |
+| O2 possession proof | server nonce → device 署名 → 検証 | green（決定核は実装済み・unit tested）。**device 側 agent が未着地**なので live は `awaiting-proof` で time out する |
+| O3 human approval | passkey / Base Account でスマホから承認 | authority は **live**。installer 面の結線は red |
+| O4 murakumo join | device-owned CACAO で authenticated heartbeat + 実 job 結果 + reboot 回復 | **red**（`:native-device-cacao :not-wired-to-kernel`）。relay 経由は contract-only |
+| O5 kekkai join | 署名済み netmap 検証 + Noise IK handshake + reconnect | **red**（`:pending-native-adapter`） |
+| C0 confidentiality | —— | **恒久的に空。名乗らない**（D3）。gate を置かないことが決定であり、未達ではない |
+
+## 実装順（依存が決めている）
+
+1. **D5 の drift を閉じる** —— `device-onboarding-v1.edn` の
+   `:authentication :methods` に `:siwe-erc191` / `:siwe-erc1271` を入れ、
+   O0 と `human-authentication-policy.edn` を一致させる。**依存無し、今日。**
+2. **6600HS を read-only probe し、machine profile を receipt から作る**（I6）。
+   CPUID `0x8000001F` の 3 bit を含める。**依存無し、今日。**
+3. device 側 agent（`/challenge` → 署名 → `/attest`）を aiueos に置く（O2 を閉じる）。
+4. `onboarding-chain/v1` contract を aiueos に置き、I0 と O0 が同じ matrix を言う状態にする。
+5. hosted profile で 15 段を 1 本通す（QR scan から cluster 参加まで）。
+6. kekkai の native adapter（O5）。
+7. device-owned CACAO を kernel に結線（O4）。
+8. 実機 boot の CR3 境界（I7）。**1〜7 を塞がない。**
+
+**1 と 2 は今日始められて互いに依存しない。** 8 が他を塞がないことが、
+2 profile 同時出荷を選んだ理由そのものである。
+
+## 作らないもの
+
+- **新しい repo。** installer authority は aiueos（ADR-2608251418 決定 3）。
+- **新しい key broker。** `grant` が capability broker（specification を返し handle を
+  返さない）、`kagi` が保管と受け渡し（`kagi device grant` の hybrid 封緘）。両方実装済み。
+- **新しい credential 形式。** Biscuit が委譲の中心（ADR-2608180200）。
+- **新しい did:key 実装 / base58 decode。** `sekisho.didkey` がこの workspace で
+  did:key が妥当かを決める唯一の定義。過去に自作した実装は 34 byte の値を
+  JavaScript の number に積み、**2^53 を超えて静かに壊れていた**（ADR-2800004900）。
+- **新しい QR parser / enroll 状態機械。** `aiueos.enroll` が claim の状態機械
+  （`:factory` → `:claimed` → `:released`）・canonical QR encoding・9 個の deny 理由・
+  `:attested` / `:tofu` の 2 段階 trust を既に持つ。
+- **新しい netmap / overlay。** kekkai の 4 repo。
+- **TEE の名乗り。**
+
+## Consequences
+
+- (+) 「USB を挿すだけ」が **15 段**に分解され、どれが今日できてどれが実機 boot 待ちかが
+  出力から区別できる。
+- (+) TEE を名乗らないと決めたことで、`:slot/attested`（custody）を
+  remote attestation と読む誤りが、この installer の文書・UI・receipt に入らない。
+- (+) Tailscale が critical path から外れ、vendor account とブラウザ認証と外向き
+  network が disk install の成功条件でなくなる。
+- (+) この ADR 自身が contract drift を 1 件見つけた（D5）。索引を引かずに
+  新しく設計していたら、live な authority が既に出している認証手段を
+  installer が知らないまま出荷していた。
+- (−) **R0 の「network 設定」は有線である。** Wi-Fi は driver 待ちで、これを
+  製品文言で曖昧にすると「挿すだけ」が嘘になる。
+- (−) confidentiality を要する事業（他者データの受託処理）には、この fleet では
+  踏み込めない。踏み込むなら外部 CVM を 1 hop 足す判断が別途要り、
+  信頼の根が fleet の外に 1 つ増える。封緘層（`envelope` / `pqh` / `hpke`）は
+  そのまま再利用できるので、設計は捨てずに済む。
+- (−) 6600HS の probe が K16 と違う答えを返したら、NIC driver から作り直しになる面がある。
+  近縁だから同じだろうという推定を receipt の代わりにしていないので、
+  **その事実は probe の日に分かる**。
+
+## Evidence（この ADR の主張の出所）
+
+- `orgs/kotoba-lang/aiueos/os/aiueos/contracts/device-onboarding-v1.edn` ——
+  passkey / phone-scan / device-key-proof / network-profile-sync / node-addition の
+  現行 contract と `:present-evidence` の各状態
+- 同 `install-v1.edn` の `:completion-chain` と `:intent`、`ssh-v1.edn` の profile
+- 同 `physical-qualification-usb-v9.edn` / `-v10` / `-v11` —— 実機 K16 の
+  `:sme-c-bit :not-active-in-firmware-cr3`、code 416
+- 同 `os/aiueos/kernel/paging.c` 148–166 行 —— CPUID `0x8000001F` の C-bit 読み取り
+- 同 `os/aiueos/README.md` 355–360 行 —— 実機 v9 が feature bit ゼロを返した記録
+- 同 `murakumo-relay-enrollment-v1.edn` の `:safety` —— service token を EFI にも
+  wire にも出さない 3 条件
+- `manifest/human-authentication-policy.edn` —— `:human-auth/approved-active-methods`
+  と `auth.kotoba.cloud` の 2026-09-07 live e2e 記録
+- `orgs/kotoba-lang/kekkai-node/README.md` —— Tailscale coexistence の明記
+- root ADR 2608251418 / 2608051200 / 2800004900 / 2608153600 / 2608300100 /
+  2609062600 / 2609063400"
+
+  :adr/gaps
+  "[{:gap :physical-6600hs-probe :state :not-started :note \"対象機 Ryzen 5 6600HS はこの workspace に記録が無い。NIC / NVMe / firmware / CPUID 0x8000001F は全て UNVERIFIED。K16 の測定値を代用しない\"}
+    {:gap :onboarding-contract-wallet-drift :state :open :note \"device-onboarding-v1 の :authentication :methods が :siwe-erc191 / :siwe-erc1271 を名乗っていない。live な auth.kotoba.cloud は既に両方を出している\"}
+    {:gap :device-agent :state :not-started :note \"/challenge を polling して attestation を返す device 側 agent が無いので、claim は awaiting-proof で time out する（ADR-2800004900 の次の一手 1）\"}
+    {:gap :kekkai-native-adapter :state :pending :note \"device-onboarding-v1 の :kekkai :initial-state :pending-native-adapter\"}
+    {:gap :device-owned-cacao :state :blocked :note \"native-device-cacao :not-wired-to-kernel。persistent device key / secure entropy / ed25519-sign / trusted-https を要する\"}
+    {:gap :wifi-driver :state :pending :note \"network-profile-sync の :native-k16-application :pending-wifi-driver。R0 は有線 DHCP\"}
+    {:gap :physical-boot :state :red :note \"K16 は physical-qualification-usb-v11 / code 416。6600HS は未測定。1〜7 の実装を塞がない\"}
+    {:gap :confidentiality :state :out-of-scope :note \"D3 により恒久的に空。未達ではなく、名乗らないという決定\"}]"}]
