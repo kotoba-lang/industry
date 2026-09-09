@@ -27,6 +27,31 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 | **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljs plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
 | **ずれの定期検出** | `nbb scripts/fleet-sync-tick.cljs check`（検出のみ。書かない） |
 
+## セッション前の同期 —— checkout を pin に合わせるのは hook の仕事
+
+**`.claude/hooks/session-start-toolchain-pin-sync.cljs`** が毎セッション冒頭で、
+`manifest/session-sync.edn` に載った toolchain repo の checkout を **west pin に
+合わせる**（clean なものだけ。tracked 変更・未 push commit・pin が手元に無い、の
+3 つは触らず理由を出す）。手で回すなら:
+
+```bash
+nbb .claude/hooks/session-start-toolchain-pin-sync.cljs "$PWD" --dry-run  # 測るだけ
+nbb .claude/hooks/session-start-toolchain-pin-sync.cljs "$PWD"            # 合わせる
+```
+
+**なぜ hook なのか（2026-09-09 の実測、ADR-2609092500）。** 共有 `amu` checkout が
+**自分の west pin より 200 commit 遅れ**ており、その checkout が pin する
+kotoba-sema は main より 71 遅れで、pure S-expression core は数日間「無い」ものとして
+拒否されていた。**pin は正しく、tree だけが腐っていた** —— そして
+`session-start-checkout-staleness` は checkout を *自分の remote の default branch* と
+*読み手の多い順*で比べるので、誰も `:local/root` しない toolchain repo は 1 行も出ない。
+警告を足しても直らない（CLAUDE.md 自身が「警告を読むことと同期することは別の動作」と
+書いている）ので、**この hook は報告ではなく同期する**。
+
+pin 自体が最後に fetch した `origin/main` より遅れていれば、行数と
+`nbb scripts/west-pin-put.cljs <name> HEAD` を出す。**pin の前進は自動でやらない** ——
+到達性検証を伴う書き込みで、共有 checkout からは行わない（下記の正経路を使う）。
+
 ## 罠 1 — `west update` は「pin に合わせる」だけで、GitHub の新しい commit を見ない
 
 **pin と remote の鮮度は別の問い**である。`west update` は west.yml に**既に書かれた**

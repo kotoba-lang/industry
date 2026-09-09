@@ -602,6 +602,28 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
 
 ### 同期（最優先）
 
+- **セッションを始める前に、toolchain の checkout を west pin に合わせる**（repo-wide
+  mandatory、2026-09-09、ADR-2609092500）。名簿は `manifest/session-sync.edn`、実行は
+  SessionStart hook `.claude/hooks/session-start-toolchain-pin-sync.cljs`（`--dry-run`
+  で測るだけ）。**clean な checkout は黙って pin に合わせ、次の 3 つだけ触らずに報告する**
+  —— tracked な変更がある／branch 上に未 push の commit がある／pin の commit が手元に
+  無く fetch が予算内に終わらなかった。untracked は checkout を妨げないので無視する。
+  - **これは警告ではなく同期である。** 既存の `session-start-checkout-staleness` は
+    checkout を「自分の remote の default branch」と**読み手の多い順**で比べるので、
+    誰も `:local/root` しない toolchain repo は順位に入らない。実測 2026-09-09:
+    共有 `amu` checkout が**自分の west pin より 200 commit 遅れ**、その checkout が
+    pin する kotoba-sema は main より 71 遅れで、pure S-expression core が
+    「無い」ものとして数日間拒否され続けた。**pin は正しく、tree だけが腐っていた。**
+    hook 登録初日の実測でも `kotoba-sema` / `kotoba-native` が pin より遅れていた。
+  - **pin 自体の鮮度も同じ hook が出す**（pin が最後に fetch した `origin/main` より
+    遅れていれば行数と `nbb scripts/west-pin-put.cljs <name> HEAD` を示す）。**pin の
+    前進は自動でやらない** —— 到達性検証を伴う書き込みで、共有 checkout からは行わない
+    （上記「pin を動かす・同期する」節）。
+  - **`checkout` / `west pin` / `repo の main` は 3 つの別物**という既存の規則の、
+    3 番目ではなく**1 番目**を機械で閉じるのがこの hook。結論を出す前に origin/main を
+    読む規則（ADR-2608136800）はそのまま生きている。
+
+
 - **常に `main` と同期し、乖離を作らない。** 何らかの git 操作の前に、上流 `main` に
   更新があれば必ず先に取り込む。ローカルが遅れた状態で新しい作業を積み上げない。
 
