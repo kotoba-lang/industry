@@ -294,6 +294,52 @@ worker 経由でも壊れていない。
 `itonami.app` zone は実測でレコード 0 件だった（zone は在るが何も載っていない）。
 いま載っているのはこの TXT 1 本だけである。
 
+## 展開 —— itonami.cloud/{org}/{repo}/ の app 6 本（2026-09-09、cloud-itonami#670）
+
+sites.edn は 67 site を持つが、**app として配置されているのは 7 本**（`app` org の
+inkan / shirohan / rirekisho / tsukuru と、kami の genko / daw / nle）。残る 60 は
+cloud-itonami の産業 actor site で、既に 435 の appview として addressed である。
+
+genko が先に通ったので、残り 6 本を同じ形に載せた。すべて 200 / バイト同一 / announce 204:
+
+    daw.itonami.app        2,166,598   nle.itonami.app        2,230,435
+    rirekisho.itonami.app  1,022,172   tsukuru.itonami.app       23,441
+    inkan.itonami.app      1,010,786   shirohan.itonami.app   1,240,399
+
+道具は `cloud-itonami` に置いた —— `scripts/gen-selfcontained-doc.cljs`（組む）と
+`scripts/verify-selfcontained-doc.cljs`（実 Chrome で `file://` から動かす）。
+manifest は `site-documents/{name}/kotoba.app.edn`。
+
+**CDN 依存は測定で解いた。** inkan / shirohan は scittle を jsdelivr から読んでいた。
+`scittle@0.6.22` を CDN から取り、rirekisho が既に vendor している複製と比べると
+**888,214 バイトで sha256 一致**（9ffcf57c4ba9002dcc90c4f2048f166dda19d3d24dfb43f47befae223fb9fe25）。
+同じバイト列なので inline は「何を実行するか」を変えず、「どこから来るか」だけを変える。
+bundler の `--vendor <url>=<path>=<sha256>` はこの digest が一致したときにだけ差し替える。
+
+## ビルドが成功して出力が間違っている —— 同じ日に 2 件（重要）
+
+**どちらも「測れなかった検査が、測って問題が無かった検査と同じ値を返す」の変種**で、
+片方の検査だけでは捕まらなかった。
+
+1. **`str/replace` の置換文字列を JavaScript が解釈する。** `String.replace` は
+   置換文字列の中の `$&` `$1` `$'` を特別扱いする。daw の minified bundle には
+   `$&` が 77 個、`$<数字>` が 15,672 個あり、2,036,709 文字の script が
+   591,814 文字になって inline された。ページは `Invalid or unexpected token` を投げた。
+   **ビルドは成功と言い、バイト数も「それらしい」値だった。**
+2. **`js->clj` が match の `.index` を落とす。** index 指定の splice に直した際、
+   `js->clj` が RegExpMatchArray を vector に変え `.index` が消えた。nil の index は
+   `subs` を文字列末尾までコピーさせ、**元のタグを残したまま body を末尾に追加**した。
+   document は吸収したはずのファイルを依然 fetch していた。
+
+**捕まえ方が別々だった。** ①は browser check（実 Chrome）が、②は byte 同一性の
+self-check が捕まえた。しかも**①のとき browser check は 6 本中 4 本を通していた** ——
+中身が化けたまま「動いた」ので。self-check も最初の版は弱く、「body が在るか」しか
+見ておらず②を通した（二重に在ったので）。今は**両方向**を見る: body が verbatim で
+入ったこと **かつ** 元の src を指すものが残っていないこと。
+
+したがってこの面の規則: **成果物を出す検査は、成果物を実行し、かつ入力が verbatim で
+入ったことを確かめるまで pass にしない。** どちらか一方では足りない。
+
 ## 未了 / 次の一手（現在地は毎回測る。ここの数値を引用しない）
 
 1. `{cid}.ipfs.itonami.cloud` の 502 —— 直すか、kotobase.net に寄せて退役させるか。
@@ -302,7 +348,10 @@ worker 経由でも壊れていない。
    する）と、**公開ネットワークへの announce**（今は公開 gateway が 504）。
    catalog（`manifest/appview-catalog.edn`、435 → 436）への登録もまだ。
 3. 82 件の `:kind` 宣言。1 件ずつ、repo ごとの判断で。
-4. mangaka studio / ongakuka / dougaka を genko と同じ形に載せる。
+4. mangaka studio / ongakuka / dougaka を同じ形に載せる（reader は `:service`）。
+5. B2 と R2 のどちらに寄せるかを決める（上の 2 案）。決まるまで publish 後の
+   R2 書き込みが手作業として残る。
+6. 435 の appview に entry hostname を与えるか決める（今は CID と catalog だけ）。
 5. sites.edn の `:org \"app\"` の `:host` を `itonami.app` に付け替え、site host を
    `{repo}.itonami.app` にする（`*.itonami.app` の Universal SSL で足りる）。
 "}]
