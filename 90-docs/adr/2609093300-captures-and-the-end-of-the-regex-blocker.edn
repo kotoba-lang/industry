@@ -1,0 +1,121 @@
+[{:db/id -1
+ :adr/id "adr-2609093300-captures-and-the-end-of-the-regex-blocker"
+ :adr/title "Captures, and the end of the regex blocker for htmldom"
+ :adr/status "accepted"
+ :adr/date "2026-09-09"
+ :adr/authority "owner instruction, 2026-09-09"
+ :adr/repos "kotoba-lang/pattern, kotoba-lang/htmldom, kotoba-lang/cssom"
+ :adr/related "adr-2609093100-a-library-with-records-can-be-a-dependency, adr-2609092700-no-tree-no-ceiling-and-the-first-consumer, adr-2609092600-a-program-outgrew-the-document-and-the-corpus-hid-a-bug, kotoba-lang/pattern#1, kotoba-lang/pattern#2"
+ :adr/body "Continuing 2026-09-09, after adr-2609093100 made a library with records
+requirable. This is the step that ends the regex blocker for the browser
+stack, and the measurement that says what is left.
+
+## What was still missing
+
+The matcher could say whether a pattern matched and where, and nothing else.
+That is enough for a predicate and not enough for `re-find`. Of the eleven
+regex literals in `kotoba-lang/htmldom`, FOUR exist to pull text out -- the
+character-entity forms and the attribute scanner -- and a plain `(...)`
+compiled to exactly the same program as `(?:...)`, so the parentheses were
+decoration.
+
+## Captures
+
+Opcode 5 `save` writes the current input position into a slot, so a thread
+carries slots and the thread entry widens from `pc(6)` to `pc(6) + nslots*6`.
+
+The width is a PARAMETER, not a branch. A program with no `save` has nslots 0
+and width 6, which is byte for byte the entry the VM had before. That is the
+claim the unchanged 270-check `vm_parity` and 168-check `emit_parity` stand
+behind: the capture-free path is not a special case, it is nslots = 0.
+
+`save` costs no input, so it lives in the epsilon closure with split, jmp and
+the anchors. `run-from` now answers a string rather than an integer, because a
+match has to carry its slots out and there is one return value.
+
+nslots is scanned from the code rather than added to the header. Widening the
+header would invalidate every program literal already compiled and committed
+-- kiyaku carries six -- and the scan is bounded by the instruction count. A
+format is a public surface even when it lives inside one repo.
+
+In the emitter, a capturing `(` emits `save(2(g-1))` before and
+`save(2(g-1)+1)` after; `(?:` emits neither. The group NUMBER is the source's,
+counted by a scan rather than threaded through the records, because a group
+number does not depend on anything downstream. The scan skips `(` inside a
+character class and after a backslash, and both are asserted.
+
+## The semantics, said out loud rather than assumed
+
+This is a Pike VM: leftmost-LONGEST (POSIX). JavaScript backtracks:
+leftmost-FIRST (Perl). On `(a|ab)` against \"ab\" this takes \"ab\" and JavaScript
+takes \"a\", and both are right for their semantics.
+
+So `test/capture_parity.cljs` counts an extent disagreement as a semantic
+difference and fails only on a GROUP disagreement within an agreed extent --
+and asserts the divergence in the direction it exists. Over the 60 corpus
+patterns that have groups: 1277/1277 agree, and extent differences are ZERO.
+That zero is the interesting number, because preferring the shortest match
+instead makes 86 of the same checks diverge: the corpus is not blind to match
+length, it simply never distinguishes longest from first. The probe covers the
+one case that does.
+
+## What it bought, measured rather than claimed
+
+All eleven of htmldom's regex literals now compile, including the three-group
+entity form and the four-group attribute scanner at 37 instructions -- which
+is past the 32-item document ceiling that the string program was built for in
+the first place. Run against JavaScript on the two capture regexes with real
+HTML fragments: 15/15 identical, including non-participating groups reported
+as -1 by both and a match found at a non-zero offset.
+
+`test/expressible.cljs` makes that a standing measurement rather than a note.
+It reports the goal-level question -- can the browser stack be written in
+Kotoba at all, and if not WHICH FEATURE is missing -- because \"16 refused\" is
+not actionable and this is:
+
+  expressible: 168/184   not a regex (scrape artifact): 6
+    :group/inline-flags 5        (?m) (?s) (?is)   -- cssom
+    :quantifier/non-greedy 3     *? +?             -- cssom, css
+    :refused/lookahead 2         (?=) (?<=)        -- cssom
+
+The useful part is what is NOT in that list. **htmldom is fully expressible.
+The three remaining gaps are cssom's, and they are named.**
+
+The probe ratchets in both directions: a gap that grows is over it, and so is
+a gap the table still claims that no longer occurs -- otherwise the table
+quietly keeps room it does not need, which is how a ratchet stops measuring.
+The six scraped strings that are not regexes at all are reported but not
+ratcheted, because their number tracks the scrape rather than the library.
+
+## Two reds that were rejected
+
+Both breaks tried first were reds for the WRONG reason, and neither was
+accepted as a demonstration. Reading past the verdict crashed instead of
+disagreeing. Flipping the `deeper`/`here` preference does not compile at all:
+`deeper` is eagerly bound, so the compiler refuses a `let` that would recurse
+on the branch guarding against it -- a refusal worth recording, because it
+means that particular mistake cannot be made silently.
+
+The breaks that were accepted: `group-start` reading the end slot (1170/1277,
+group boundaries disagree) and preferring the shortest match (1276/1277, ONLY
+the divergence probe).
+
+## Left standing
+
+`kotoba-lang/amu`'s shared checkout is 14 commits behind its own west pin with
+another process writing into it every few minutes, so the `kotoba` on PATH is
+still pre-#912. The work above ran from a worktree at the merged commit. That
+checkout is not this session's to stash; the commit it carries is preserved as
+`refs/preserved/amu-rank-tick-355` and its working tree is archived under
+`.git/stash-archive-20260909/`.
+
+Also: the `jv/expressible` branch was force-pushed once, to replace a stub
+commit message before the PR existed. The branch was one commit old, unmerged
+and unshared, but the rule is unconditional and the amend should have happened
+before the first push.
+
+## What this does not say
+
+It does not say htmldom is migrated. It says the reason it could not be has
+been removed and measured away, and that the next repo in the dependency order
+needs three named features rather than an unknown number."}]
