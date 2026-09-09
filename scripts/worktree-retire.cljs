@@ -32,6 +32,7 @@
 ;; SCANNED 0 is exit 2, not a clean pass.
 ;;
 ;;   nbb scripts/worktree-retire.cljs [--root <dir>] [--min-age-days 7] [--apply] [--include-bots]
+;;                                    [--only <path-prefix>]
 ;;   exit 0 = answered, 1 = a retire step failed, 2 = could not answer
 (require '[clojure.string :as str])
 
@@ -49,6 +50,10 @@
 (def min-age-days (js/parseInt (opt "--min-age-days" "7") 10))
 (def apply? (flag? "--apply"))
 (def include-bots? (flag? "--include-bots"))
+;; Restrict to worktrees under this path prefix. Per-tick bot farms are throwaway and
+;; tolerate a 1-day floor; a human's parked worktree wants the 7-day default. Without a
+;; scope the two populations can only share one floor, and the safe floor reclaims nothing.
+(def only-prefix (some-> (opt "--only" nil) (#(.resolve path %))))
 (def bot-dir (.join path (.homedir os) ".itonami" "worktrees"))
 (def receipt (.join path (.homedir os) ".itonami" "worktree-retire.log"))
 
@@ -93,9 +98,30 @@
       (str/includes? (:cmds idx) wt)))
 
 ;; ---- per-repo ----
-(defn default-ref [repo]
-  (let [r (sh "git symbolic-ref -q --short refs/remotes/origin/HEAD" repo)]
-    (if (and (= 0 (:exit r)) (not (str/blank? (:out r)))) (str/trim (:out r)) "origin/main")))
+(defn primary-remote
+  "west names remotes after the manifest remote (kotoba-lang / network-awai / …), not
+  `origin` — measured 2026-08-08, 197 of 273 sampled `orgs/` repos have no `origin` at all.
+  Hardcoding it makes `merge-base --is-ancestor` fatal, and a fatal ancestry test falls
+  silently to the `unlanded` side (manifest/cleanup-workflow.md; the same defect
+  scripts/cleanup.cljs fixed by porting this helper)."
+  [repo]
+  (let [rs (->> (str/split-lines (:out (sh "git remote" repo)))
+                (map str/trim) (remove str/blank?))]
+    (or (some #{"origin"} rs) (first rs))))
+
+(defn default-ref
+  "The remote's default branch, or nil when it cannot be resolved. nil is not `origin/main`:
+  an unresolvable ref must reach classify as `could not measure`, never as `unlanded`
+  (ADR-2608136000)."
+  [repo]
+  (when-let [rem (primary-remote repo)]
+    (let [r (sh (str "git symbolic-ref -q --short refs/remotes/" rem "/HEAD") repo)]
+      (if (and (= 0 (:exit r)) (not (str/blank? (:out r))))
+        (str/trim (:out r))
+        (some (fn [b]
+                (let [c (str rem "/" b)]
+                  (when (= 0 (:exit (sh (str "git rev-parse --verify -q " c "^{commit}") repo))) c)))
+              ["main" "master"])))))
 
 (defn worktrees [repo]
   (let [{:keys [out]} (sh "git worktree list --porcelain" repo)
@@ -126,6 +152,7 @@
       (:locked wt) {:verdict :keep :why "locked"}
       (and (not include-bots?) (str/starts-with? p (str bot-dir "/"))) {:verdict :keep :why "resident bot"}
       shallow? {:verdict :unverified :why "repo is shallow; ancestry answer untrusted"}
+      (nil? def-ref) {:verdict :unverified :why "no resolvable default ref; ancestry unanswerable"}
       (nil? idx) {:verdict :unverified :why "lsof unavailable"}
       (busy? idx p) {:verdict :keep :why "busy (process cwd / argv)"}
       :else
@@ -169,12 +196,15 @@
       (println "REFUSED: lsof unavailable — cannot tell idle from busy; not applying.")
       (.exit js/process 2))
     (println (str (if apply? "APPLY" "DRY-RUN") " root=" root " repos-with-worktrees=" (count rs)
-                  " min-age-days=" min-age-days (when include-bots? " include-bots")))
+                  " min-age-days=" min-age-days (when include-bots? " include-bots") (when only-prefix (str " only=" only-prefix))))
     (doseq [repo rs]
       (let [rel (if (= repo root) "root" (subs repo (inc (count root))))
             shallow? (= "true" (str/trim (:out (sh "git rev-parse --is-shallow-repository" repo))))
             def-ref (default-ref repo)
-            wts (worktrees repo)]
+            wts (cond->> (worktrees repo)
+                  only-prefix (filter #(let [p (:path %)]
+                                         (and p (or (= p only-prefix)
+                                                    (str/starts-with? p (str only-prefix "/")))))))]
         (when (seq wts)
           (doseq [wt wts]
             (swap! counts update :scanned inc)
