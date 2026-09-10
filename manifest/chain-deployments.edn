@@ -10,10 +10,20 @@
 ;; 08:03:25Z, and the pacemaker's own view counter (1,496,323, advancing
 ;; 0.69/s while the height advanced 0) divided out to 25.1 days of spinning.
 ;;
-;; Nothing noticed. There was no launchd job, no observatory entry, and the
-;; repo bot for `torihiki-node` measures `checkout / pinned / landed / readme /
-;; test-signal` — five floors, none of which asks whether the chain moves. The
-;; repository was green the whole time.
+;; It was noticed once, and that changed nothing — which is worse than not
+;; being noticed, and is the actual lesson. On 2026-08-31, sixteen days in,
+;; somebody diagnosed it exactly: `inga.replica/sync-ask-from`'s docstring
+;; names THIS chain and THIS height, 5616, and the fix landed on inga's main
+;; the same day. It never reached the deployment, because `torihiki-node`'s
+;; pin did not move. The chain ran halted for ten more days with its own fix
+;; already written.
+;;
+;; Nothing carried that forward. There was no launchd job, no observatory
+;; entry, and the repo bot for `torihiki-node` measures `checkout / pinned /
+;; landed / readme / test-signal` — five floors, none of which asks whether
+;; the chain moves. The repository was green the whole time. A diagnosis in a
+;; docstring is something somebody knew once; a detector is something the
+;; workspace keeps knowing.
 ;;
 ;; That is the shape CLAUDE.md's eight questions describe: a check that could
 ;; not see the failure returns the value of a check that looked and found
