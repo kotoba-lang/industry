@@ -8,6 +8,15 @@
 ;; ノード側で `npx nbb docs-edn-check.cljs <dir>` として実行される
 ;; （tick.cljs が heredoc でノードに配って呼ぶ。JVM を要求しない gate）。
 ;;
+;; exit codes（3 つとも 2026-09-10 に実測、`/tmp` の使い捨て repo で再現できる）:
+;;
+;;   0  木が完全で、壊れた文書は無い            edn files: 3/3
+;;   2  読めなかった文書が在る（壊れてはいない）  edn files: 2/3  CANNOT ANSWER
+;;   1  実際に壊れている文書が在る               edn files: 3/4  FAIL broken.edn
+;;
+;; 1 が 2 に優先する —— 読めた文書は本当に読めているので、読めなかったものが
+;; 何であれ parse 失敗は実在する（manifest/docs-edn-only.cljs と同じ優先順位）。
+;;
 ;; false-pass 対策: 検出ファイル数が --min 未満なら FAIL する。tarball の
 ;; 展開ミス（ADR-2607178000 addendum の --strip-components 事故と同型）で
 ;; 空ディレクトリを検査して「0 件 = 全部有効」と報告する事故を防ぐ。
@@ -141,12 +150,30 @@
 (defn edn-files [dir]
   (or (tracked-edn-files dir) (walked-edn-files dir)))
 
+(defn split-readable
+  "-> [on-disk unreadable]
+
+  `tracked-edn-files` asks git, and git answers about the INDEX. In a cone-mode
+  sparse checkout the index names files this working tree does not contain, so
+  `readFileSync` throws ENOENT on them. Those went into the same `bad` list as a
+  genuinely corrupt document and the gate exited 1 -- reporting a file it could
+  not read as a file that does not parse.
+
+  `manifest/docs-edn-only.cljs` already splits these (`edn=<scanned>/<listed>`,
+  exit 2) and this gate reads the same git listing; it just never made the same
+  distinction. Measured 2026-09-10 on a `--profile policy` worktree: 19 of the
+  FAIL lines were ENOENT for 60-apps/ and 80-data/ paths outside the cone, which
+  in the output are indistinguishable from the one real finding."
+  [files]
+  [(filterv fs/existsSync files) (vec (remove fs/existsSync files))])
+
 (when-not (fs/existsSync root)
   (println "FLEET-CI: root does not exist:" root
            "— extraction or --sub is wrong, refusing to report pass")
   (js/process.exit 90))
 
-(let [files (edn-files root)
+(let [listed (edn-files root)
+      [files unreadable] (split-readable listed)
       bad (atom [])]
   (doseq [f files]
     (try
@@ -173,21 +200,45 @@
                                "followed was read as structure")]))))))
       (catch :default e
         (swap! bad conj [f (ex-message e)]))))
-  (println "edn files:" (count files) "unparsable:" (count @bad))
+  (println (str "edn files: " (count files) "/" (count listed)
+                " unparsable: " (count @bad)))
   (doseq [[f msg] (take 20 @bad)]
     (println "  FAIL" (path/relative root f) "—" msg))
+  (when (seq unreadable)
+    (println (str "=== " (count unreadable)
+                  " .edn ARE IN GIT BUT NOT IN THIS WORKING TREE ==="))
+    (println "  This checkout does not contain them, so their content was not read.")
+    (println "  Fix: run from a full checkout, or sparse-checkout add their directories.")
+    (doseq [f (take 10 unreadable)] (println " " (path/relative root f)))
+    (when (< 10 (count unreadable))
+      (println (str "  … and " (- (count unreadable) 10) " more"))))
   (cond
-    (< (count files) min-files)
-    (do (println "FLEET-CI: only" (count files) "edn files found (<" min-files
+    (< (count listed) min-files)
+    (do (println "FLEET-CI: only" (count listed) "edn files found (<" min-files
                  ") — extraction or path is wrong, refusing to report pass")
         (js/process.exit 90))
+
+    ;; A definite defect outranks an incomplete corpus: every document that WAS
+    ;; read was really read, so a parse failure in it is real no matter what was
+    ;; missing. Same precedence as manifest/docs-edn-only.cljs.
     (seq @bad) (js/process.exit 1)
+
+    ;; Read nothing that is broken, but did not read everything. "All edn files
+    ;; parse" is not something this run is entitled to say, and 0 must not be the
+    ;; answer (ADR-2608136000: a check that could not perform its measurement
+    ;; must not return the value of one that performed it and found nothing).
+    (seq unreadable)
+    (do (println (str "CANNOT ANSWER — " (count unreadable) " of " (count listed)
+                      " edn files are not in this working tree; the "
+                      (count files) " that are all parse"))
+        (js/process.exit 2))
     ;; One string, not two arguments to println. `(when strict-keys ...)` is nil
     ;; when the flag is off, and println prints that nil: the three repos that
     ;; do not pass --strict-keys have been recording
     ;; "OK — all 2347 edn files parse nil" in their fleet receipts since this
     ;; flag landed. Harmless to the verdict and confusing in the one line a
     ;; reader actually sees.
-    :else (println (str "OK — all " (count files) " edn files parse"
+    :else (println (str "OK — all " (count files) " of " (count listed)
+                        " edn files parse"
                         (when strict-keys
                           ", and no symbol appears in key position")))))
