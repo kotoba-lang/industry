@@ -492,6 +492,131 @@
      :replace "The suite is green."
      :must-fail ["REFUSING TO REPORT A PASS: README.md publishes no"]}]}
 
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-3133"
+   :label "isco-3133 chemical-ops —— 一度も走っていなかった suite と、denylist だった governor"
+   ;; 2026-09-11、66aeb11（.kotoba 一括改名 6355ed3 の直後）で測った状態:
+   ;;
+   ;;   clojure -M:test   Ran 0 tests containing 0 assertions.   exit 0
+   ;;   clojure -M:lint   linting took 9ms, errors: 0             exit 0
+   ;;
+   ;; どちらも 1 ファイルも読んでいない。改名前の pin b3fc906 では同じ suite が
+   ;; 10 tests / 31 assertions で緑だった。走らなかった suite は、全部走って
+   ;; 無事だった suite と同じ値を返す（ADR-2608136000 の 2 問目）。
+   ;;
+   ;; actor 自体の欠陥は 3 つで、どれも wired graph を通して測った:
+   ;;
+   ;;   1. governor は 4 つの名前の denylist だった。登録済み・検証済み plant に
+   ;;      対し :override-interlock（README 自身が「authority が無い」と書く
+   ;;      process control interlock）が :commit に到達して record に**書かれた**。
+   ;;   2. escalate された :flag-anomalous-reading は人間を待つ間 ledger が [] だった。
+   ;;      store の docstring は :escalate disposition を約束していたが誰も書いていない。
+   ;;   3. 人間が approve した後の commit entry は自動 commit と同じ形だった。
+   ;;
+   ;; 加えて :confidence 1.5 は admitted、"high" は ClassCastException で
+   ;; governor から throw、ledger は plain vector で欠落・並べ替えを検出できず。
+   ;;
+   ;; green marker は `chemical-ops: OK` —— **`0 failures, 0 errors` を使わない**。
+   ;; あれは 0 件走った run が印字する文字列そのもの。
+   ;;
+   ;; 9 件とも 2026-09-11（UTC）に、当てて赤くなるところを実際に見てから登録した。
+   ;; うち 1 件（:co/canonical-dropped）は最初のテストが**噛まなかった** ——
+   ;; array-map を hash-map の seq 順で組んでいたので印字順が同じで、正規化の
+   ;; 有無を区別できていなかった。逆順で組み直して赤くなるのを見てから登録した。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "chemical-ops: OK"
+   :mutations
+   [{:id :co/vocabulary-reopened
+     :note "allowlist を全許可に戻す = governor が denylist だった頃の形。
+            :vent-to-atmosphere / :bypass-scrubber が再び通り、wired graph で
+            record に書かれる"
+     :file "src/chemical_ops/facts.kotoba"
+     :find "      (and (keyword? o) (not (op/supported? o)))"
+     :replace "      (and false (keyword? o) (not (op/supported? o)))"
+     :must-fail ["hard-on-undeclared-operation"
+                 "an-undeclared-operation-is-held-and-never-written"
+                 "the-scenario-table-runs-clean-and-demonstrates-refusals"
+                 "every-reserved-and-provenance-scenario-refuses"
+                 "vocabulary-names-reserved-and-undeclared-differently"]}
+
+    {:id :co/reserved-shrunk-to-four-names
+     :note "reserved を README が最初から持っていた 4 名に戻す。
+            :interlock-override は allowlist で hold されるが、拒否理由が
+            『undeclared』になり README の述べる理由でなくなる"
+     :file "src/chemical_ops/operation.kotoba"
+     :find "   :interlock-override\n   {:reason \"process control interlocks are exclusively licensed operator authority\"}\n\n"
+     :replace ""
+     :must-fail ["the-readme-boundary-is-reserved"
+                 "hard-on-every-reserved-operation-with-its-reason"
+                 "a-reserved-operation-is-held-for-the-reason-the-readme-states"
+                 "vocabulary-names-reserved-and-undeclared-differently"]}
+
+    {:id :co/confidence-envelope-dropped
+     :note "envelope 検査を外す。1.5 が再び admitted になり、文字列は
+            ClassCastException で governor から throw する（= 拒否ではなく
+            『答えられなかった』）"
+     :file "src/chemical_ops/facts.kotoba"
+     :find "         (not (and (number? (:confidence proposal))\n                   (<= 0 (:confidence proposal) 1))))"
+     :replace "         false)"
+     :must-fail ["confidence-must-be-a-number-in-range"
+                 "hard-on-confidence-out-of-range"
+                 "a-malformed-proposal-is-refused-not-thrown"]}
+
+    {:id :co/canonical-dropped
+     :note "chain hash を印字順に依存させる。9 key の entry（= escalate-entry）が
+            hash-map になり dissoc 後の順序が構築時と変わるので、escalation を
+            含む ledger が全部 verify に落ちる"
+     :file "src/chemical_ops/ledger.kotoba"
+     :find "  (let [s (pr-str (canonical content))"
+     :replace "  (let [s (pr-str content)"
+     :must-fail ["an-entry-with-more-than-eight-keys-verifies"
+                 "chain-hash-is-a-function-of-the-value-not-the-map-type"
+                 "every-ledger-the-graph-leaves-behind-verifies"
+                 "a-human-approved-write-says-so"]}
+
+    {:id :co/escalate-node-bypassed
+     :note ":decide から :request-approval へ直接繋ぐ = 66aeb11 の配線。
+            interrupt-before なので node 本体は resume まで走らず、escalation は
+            ledger に痕跡を残さない"
+     :file "src/chemical_ops/actor.kotoba"
+     :find "           :request-approval :escalate"
+     :replace "           :request-approval :request-approval"
+     :must-fail ["an-escalation-is-in-the-ledger-before-anyone-approves-it"
+                 "the-scenario-table-runs-clean-and-demonstrates-refusals"]}
+
+    {:id :co/approval-provenance-dropped
+     :note "resume を通過しても :approved-by を付けない。人間が approve した
+            commit と自動 commit が再び同じ形になる"
+     :file "src/chemical_ops/actor.kotoba"
+     :find "                   (fn [s] (assoc s :approved-by :human)))"
+     :replace "                   (fn [s] s))"
+     :must-fail ["a-human-approved-write-says-so"
+                 "the-human-approved-scenario-writes-exactly-once-as-human"]}
+
+    {:id :co/report-passes-with-no-refusals
+     :note "refusal 0 件の run に PASS と印字する。拒否を 1 つも実演していない
+            harness が緑に見える"
+     :file "src/chemical_ops/sim.kotoba"
+     :find "     (zero? refusals)\n     \"  REFUSING TO REPORT A PASS: the scenario table demonstrated no refusal.\\n\""
+     :replace "     (zero? refusals)\n     \"  PASS\\n\""
+     :must-fail ["report-refuses-to-report-a-pass-with-no-refusals"]}
+
+    {:id :co/ok-without-refusals
+     :note ":ok? から (pos? refusals) を外す。clean scenario だけの table が
+            :ok? true になる"
+     :file "src/chemical_ops/sim.kotoba"
+     :find "               (pos? refusals))}))"
+     :replace "               true)}))"
+     :must-fail ["a-table-without-refusing-scenarios-is-not-ok"]}
+
+    {:id :co/escalate-outranks-hold
+     :note "phase の判定順を入れ替える。hard かつ escalate な verdict が
+            :hold ではなく人間の承認待ちに並ぶ —— 誰も yes と言えない提案を
+            人間に訊く"
+     :file "src/chemical_ops/phase.kotoba"
+     :find "    (:hard? verdict)     :hold\n    (:escalate? verdict) :request-approval"
+     :replace "    (:escalate? verdict) :request-approval\n    (:hard? verdict)     :hold"
+     :must-fail ["hard-outranks-escalate"]}]}
+
   {:repo "orgs/cloud-itonami/app-bpmn"
    :label "app-bpmn cross-plane —— README が散文で述べている食い違いを、散文の外で保つ"
    ;; この repo の README は冒頭で「三つの面は互いに一致していない」と言い、
