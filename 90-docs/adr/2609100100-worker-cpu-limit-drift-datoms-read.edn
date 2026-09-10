@@ -481,5 +481,61 @@ fold ではなく apply の側を掃引する）。**Worker も本番グラフ�
 **read 側の retract summary はそれとは独立に効く**（`:limit` が novelty walk を
 縛れるようになる）。
 
+## これは CPU の問題ではなくメモリの問題だった（2026-09-10、確定）
+
+**7 回の推論がすべて外れたのは、7 回とも間違った資源を測っていたからである。**
+
+`workersInvocationsAdaptive` の `memoryUsageBytes` 分位数（直近 6 時間）:
+
+    status                 req      memP50    memP90    memP99   memP99.9
+    exceededResources     1317      89.9M    123.3M    138.9M     146.0M
+    clientDisconnected    8653      46.7M     66.9M    122.7M     140.0M
+    success              77612      14.6M     18.8M     20.3M     106.7M
+
+**Worker の isolate 上限は 128 MB。** CPU 上限で殺されるリクエストは中央値
+90 MB、tail で 123〜139 MB —— **天井に張り付いている**。成功するリクエストは
+14.6 MB で、二桁違う。
+
+### これで全観測が余りなく説明できる
+
+| 観測 | メモリ説での説明 |
+|---|---|
+| 27 秒、store 呼び出しゼロ | 取りに行くものが無い。in-memory の churn と GC だけ |
+| 各部品がローカルでミリ秒（apply-quad 0.01ms/quad、encode-rows 11ms、AES-GCM 1,800 件で 92ms〜2.3s） | ローカルには 128 MB の天井も isolate も無い |
+| **`cpu_ms` 300,000 でも終わらない** | **CPU を足してもメモリは増えない** |
+| `encrypts:0` / `blinds:0` | そこまで到達しない |
+| memo を配線しても効かない | memo が減らすのは*繰り返し*の仕事。詰まっているのは*1 回分*の作業集合 |
+| `gets:0` の 24 秒 read | ブロックは全部キャッシュ済みで、なお 24 秒 |
+
+### 直し方が変わる
+
+**「fold を速くする」ではなく「作業集合を小さくする」。**
+
+- CPU 上限を上げる → **無効**（実証済み）
+- memo → **無効**（繰り返しではなく 1 回分が入らない）
+- **rows を materialize せずに流す** → これが効く軸。`hydrate-db-cached` は
+  `cold-datoms-async` の全行を配列で受け、`encode-rows` で文字列にし、`build` で
+  db を作る —— **同時に 3 つ持つ**。tree builder に流し込めば作業集合は落ちる。
+
+⚠ **そして ayatori はここで効く。** iteration 09 は「cursor が置き換える read の
+snapshot 側は既に O(result) だから効かない」と結論したが、それは **CPU の話**
+だった。cursor の性質は *materialize しない* ことであり、**それはメモリの軸で
+効く**。iteration 08 の 9 block / 182 KB は、CPU の主張である以上にメモリの主張
+である。**同じ道具が、別の資源に対して効く。**
+
+### 読み方の誤り 2 つ（次の人が繰り返さないために）
+
+1. **probe が数えているのは「呼び出し」であって「Promise の解決」ではない。**
+   `ms` が固まったまま件数だけ伸びるのはそのため。「5.5 秒で store 呼び出しが
+   終わった」は「5.5 秒で全部解決した」ではない。
+2. **`exceededResources` は「CPU 超過」と読めるが、Cloudflare の同じ status に
+   メモリ由来の終了も入る。** status 名から資源を推定しない。
+
+### 次の一手
+
+`hydrate` の作業集合を測る（rows 配列 / encode 文字列 / db を同時に持つ地点）。
+そして**流し込み型の hydrate**（rows を保持せず builder に渡す）を試す。
+これは engine の変更だが、**今度は測定に基づいている。**
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
