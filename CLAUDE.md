@@ -1334,6 +1334,48 @@ JavaScript が `$&` / `$1` / `$'` を解釈し、minified bundle が 4 分の 1 
 **成果物を出す検査は、成果物を実行し、かつ入力が verbatim で入ったことを確かめるまで
 pass にしない。**
 
+## privacy は 4 つ目の面で、identity / authority / evidence と混ぜない（repo-wide mandatory、2026-09-10、ADR-2609108000）
+
+**正本は ADR-2609108000、機械可読は `manifest/repository-rules.edn` の
+`:workspace-policies :privacy-plane`。** ここに残すのは、それらを読まなくても効く
+不変条件だけ。
+
+    Identity  != Authority                 CID は「この bytes だった」だけを証明する
+    Integrity != Confidentiality           hash で検証できることは秘匿ではない
+    Auditability != Publicity              監査可能であることは公開であることではない
+    Content addressing != Safe disclosure  アドレスが付いたことは出してよいことではない
+
+**この 4 つは新しい機構の要求ではなく、既存の機構をどう読むかの規則である。**
+実装側は既に分けている（`kotobase.execution-contract` / `output-attestation` /
+`disclosure-grant` / `transparency-log`）。分けていなかったのは文書の側で、
+**設計文書が 2 つを同じ段落で語る限り、次に読む agent はそこを 1 つの概念として学ぶ。**
+
+- **resource budget を privacy budget と呼ばない。** `kotobase.query.bridge/default-max-datoms`
+  と `:materialize-over-budget` は実在するが、これは**走査量の上限**であって推論の遮蔽ではない。
+  件数上限をいくら下げても `(count (where ...))` が 0/1 を返す限り存在は漏れる。
+  **同じ語で呼ぶと、走査上限が landed した日に推論防御も landed したと読まれる。**
+- **inference channel は防ぐ前に測る。** differential privacy / 最小結果集合 /
+  threshold aggregation を先に入れない。先にやるのは今の ayatori が何を漏らすかの
+  再現手順（存在照会 0/1、adaptive probing による個体値復元、result identity の変化）。
+  **測っていない防御は、測っていない攻撃に対する劇場。**
+- **agent が触れてよいのは propose まで。** `generate → parse → schema validate →
+  static effects → authority check → risk classify → admission → execute` のうち、
+  agent は左 3 つ。`ayatori.agent/validate` は実在するが、**validate が通ることは
+  authorize ではない。**
+- **消去は CID 削除ではなく crypto erasure**（`disclosure-grant` + `authority-window` +
+  `crypto-policy` の epoch）。**新しく設計しない** —— 実装側は既にこの道を採っている。
+- **監査ログ自体が個人データである。** public に出るのは commitment、principal /
+  purpose / resource / timestamp は selective disclosure。
+
+⚠ **この面に gate は無く、それは決定である**（ADR-2609108000 D8）。上の 4 つは
+「文書が 2 つの概念を混ぜていないか」を問うもので、機械が判定できる述語ではない。
+**落ちることを確かめていない gate は劇場**なので landing させていない。
+
+⚠ **2026-09-10 の実測で、3 つは不在・1 つは未測定と判定した** —— query の推論防御 /
+correlation・fingerprinting の棚卸し / LINDDUN threat model が不在、IPLD traversal の
+上限（max blocks / depth / fanout / decompression ratio）が未測定。**未測定は clean ではない。**
+**この判定を「もう塞がっている」と読まない**（表と現在地は ADR が持つ。ここに書き写さない）。
+
 ## live service の永続化境界は `kotobase.net`（repo-wide mandatory、2026-08-15、ADR-2608159100）
 
 **live service が生成・収集する proof、actor、wiki、graph、event、index の durable source は
