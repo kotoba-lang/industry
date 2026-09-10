@@ -427,6 +427,87 @@
    :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
    :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}
+
+  ;; ADR-2609109700. The query plane, arranged onto the Form layering rather
+  ;; than given a layering of its own.
+  ;;
+  ;; `:policy/doors` is the load-bearing key. An ontology changes answers, so
+  ;; an ontology that reaches an evaluator without passing through one of the
+  ;; two doors produces a VALID receipt for an answer nobody can reproduce.
+  ;; The rule is that there is no third door -- not that a third field is
+  ;; added, which would be execution-contract v2 and would move every digest
+  ;; ever signed.
+  :query-plane
+  {:policy/authority "90-docs/adr/2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles.kotoba"
+   :policy/builds-on ["90-docs/adr/2609109400-kotoba-form-dag-kotoba-and-what-guest-and-host-actually-name.kotoba"
+                      "90-docs/adr/2608039970-the-base-is-the-datom-plane-not-datalog.kotoba"]
+   :policy/evidence "90-docs/query-plane/2026-09-10-query-plane-measurements.edn"
+   :policy/scope :query-and-inference
+   ;; What is shared is L1. Every dialect keeps its own algebra; a
+   ;; dialect-neutral universal IR is refused, and the proposal that asked
+   ;; for this plane asked for the same thing in its own words.
+   :policy/shared-layer :datom-plane
+   :policy/universal-query-ir :refused
+   :policy/agent-first-language :kotobase-dialect
+   :policy/doors
+   {:rules {:carried-in :query-value
+            :addressed-by :query/digest
+            :computed-by "kotobase.execution-identity/value-cid"
+            :emitter "owl.rules (org-w3-owl2) for the RDFS / OWL 2 RL fragment"}
+    :materialized {:carried-in :graph
+                   :addressed-by :data/commit}}
+   :policy/third-door :forbidden
+   :policy/third-door-why "manifest-keys is exact and names no ontology; an ontology arriving any other way is a valid receipt for an unreproducible answer"
+   :policy/reasoner :refused
+   :policy/reasoner-why "the RL/RDFS fragment IS a fixpoint over Horn clauses and is already rules; the rest (someValuesFrom, unionOf, cardinality, disjointWith consistency) is outside Horn and is a different decision, not more rules"
+   ;; Measured 2026-09-10: the two rulesets get opposite verdicts and the
+   ;; refusal names the rule. A gate that read only :where could not say this.
+   :policy/inference-cost-gate "kotobase.server.admission/admit"
+   :policy/inference-cost-measured {:hierarchy-rules :admitted
+                                    :triple-rules [:refused :variable-attribute]}
+   ;; One traversal, two addresses, and only one of them is publishable --
+   ;; the other IPLD implementation on the far side can compute exactly one.
+   :policy/selector-address :data-model-cid
+   :policy/selector-address-computed-by "ipld/cid (ipld.selector/encode s)"
+   :policy/selector-value-cid :local-authoring-address-do-not-publish
+   :policy/selector-address-implemented false
+   :policy/selector-address-implemented-note "measured 2026-09-10: nothing in this workspace computes either address; naming it is this policy, computing it is not"
+   ;; The GraphSync role, filled over HTTP. Not a substitute chosen for
+   ;; convenience: the bitswap wire exists and its transports are JVM- or
+   ;; node:net-only, so the gap was transport, and this is the transport.
+   :policy/transfer-protocol "IPQ/1 (kotobase-protocol-ipq)"
+   :policy/transfer-origin "https://ipfs.kotobase.net/ipq/v1"
+   :policy/transfer-advertised-as {:ipni-protocol 3148096
+                                   :name "transport-ipq-selection-http"}
+   :policy/transfer-proves :traversal-ran-over-verified-bytes
+   :policy/transfer-does-not-prove :completeness
+   :policy/new-graphsync-transport :refused
+   ;; The six network roles, fixed. Adding a seventh means one of these six
+   ;; stopped answering its question.
+   :policy/network-roles
+   {:cid :what-is-this
+    :link :what-does-this-depend-on
+    :ipns :what-is-the-current-root
+    :ipni :who-can-provide-this
+    :selector :which-reachable-objects-are-needed
+    :ipq :transfer-them-and-return-the-proving-blocks}
+   :policy/ipns-scope :root-pointer-only
+   :policy/ipns-scope-why "a mutable edge inside the DAG destroys traversal reproducibility; the only mutable edge is name -> root"
+   ;; Names are outside identity on the code plane and inside it here
+   ;; (ADR-2609107000 D3). Measured again for ontologies: the same entailment
+   ;; under two vocabularies is two addresses.
+   :policy/names-inside-query-identity true
+   :policy/names-inside-query-identity-consequence "a cache keyed on :query/digest misses across variable renames and across ontology vocabularies"
+   :policy/provenance {:per-execution {:exists true
+                                       :via ["kotobase.execution-contract receipt" "IPQ CAR"]}
+                       :per-row {:exists false
+                                 :blocked-on "the fixpoint does not carry rule identity into an answer"}}
+   :policy/detector nil
+   :policy/gate nil
+   :policy/why-no-gate "no predicate enumerates the ways an ontology could reach an evaluator other than the two doors; a gate that has never been shown to fail is theatre, so build the third door first and watch it redden"
+   :policy/measured-on "2026-09-10"
+   :policy/not-measured #{:ipns-resolution :dialect-surfaces-answering-a-query
+                          :per-row-provenance-design :pack-granularity}}
   }
 
  :vocabularies
