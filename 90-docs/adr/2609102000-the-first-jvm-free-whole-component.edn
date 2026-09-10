@@ -203,6 +203,50 @@ answers JVM-free. What is now known is that **shipping it is blocked upstream
 of Kotoba**, on the provenance and availability of an artifact this repository
 does not build.
 
+## Resume point (session close, 2026-09-10)
+
+**Where kotoba-only actually stands.** The owner's definition is both halves:
+written in Kotoba, and starting no JVM process. Against that:
+
+    repositories satisfying BOTH        0   (com-aave proves the build, not the ship)
+    Q9 per-repository gate items done   4 of 12 for com-aave
+    jvm-runtime-deps                    75 -> 63 this session, 11 repos cleared
+    of those 11, actually JVM-free       4   (7 kept jvm-source/jvm-build/babashka)
+
+**The axis correction is the session's main result and should not be lost.**
+`jvm-runtime-deps` removes third-party JVM *libraries*; it does not remove the
+JVM. Only **6** repositories have that class standing alone. The axes that
+actually start a JVM are `jvm-build` (452, of which 400 stand alone),
+`jvm-source` (207, 141 alone) and `babashka` (181, 144 alone). A plan that
+optimises the number this session moved will not reach kotoba-only.
+
+**Next concrete step, in priority order:**
+
+1. **Answer what `built-rust-raw` names.** 1,026 manifests declare an artifact
+   CID; 0 are present. This blocks every consumer cutover, and it is not a
+   Kotoba problem. `verify-declared-artifact-present` now measures it daily.
+2. **com-aave's remaining 8 gate items**, of which `:consumer-cutover` is
+   blocked on (1). `artifact-equivalence`, `capability-denial` and
+   `reproducibility` are not.
+3. **The 4 malformed `ns` forms** (kouhou, shinshi-growth-actor, tashikame,
+   wt-kouhou) — deliberately unfixed until the detector existed. It exists now.
+4. `jvm-build` 452 if the goal is repository count; `jvm-source` 207 if the
+   goal is the language. They are different goals and the owner has said both.
+
+**Do not re-derive these; they are measured and landed:**
+
+    ADR-2609101200   namespaces nothing loads (5 of 5 sampled fail)
+    ADR-2609102000   this document
+    scripts/verify-ns-form-loadable.cljs          39,389 scanned, 4 findings
+    scripts/verify-declared-artifact-present.cljs 1,026 declared, 0 present
+    manifest/dependency-substitution.edn          7 entries now :qualification'd
+    :dependency-substitution/jvm-runtime-deps-shape-2026-09-10
+
+**Owner decisions still open**, none of which an agent should take: what
+`built-rust-raw` names; who consumes `did:web:etzhayyim.com:actor:aave-compat`;
+whether `weight-kototama`'s stored snapshot prefixes may be re-addressed;
+whether wave-1's 20 pilots are re-qualified or retired.
+
 ## Reproduce
 
     # PATH trap first, and prove it fires
