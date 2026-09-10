@@ -20,16 +20,16 @@
   :matrix/linddun ["linking" "identifying" "non-repudiation" "detecting"
                    "data-disclosure" "unawareness" "non-compliance"]
   :matrix/cells-total 78
-  :matrix/cells-recorded 10
+  :matrix/cells-recorded 11
   ;; These five must sum to :cells-recorded, and with :cells-unrecorded to
   ;; :cells-total. A reader can count the entities below and check. A matrix
   ;; whose declared coverage does not equal its counted coverage is the
   ;; failure this file exists to make visible.
-  :matrix/cells-measured 5
+  :matrix/cells-measured 6
   :matrix/cells-measured-residue 1
   :matrix/cells-gap 3
   :matrix/cells-unmeasured-here 1
-  :matrix/cells-unrecorded 68
+  :matrix/cells-unrecorded 67
   :matrix/note "68 unrecorded cells are UNMEASURED, not clean. Absence of a cell is absence of a measurement."}
 
  {:db/id -2 :cell/plane "ayatori" :cell/stride "information-disclosure"
@@ -38,6 +38,13 @@
   :cell/finding "The scan ceiling reports the cardinality it refused at, before visible? is consulted. Under a policy hiding every datom of a collection, a caller recovered the exact datom count (17/17, 12 probes), the existence of one named individual, and her field count (5/5). The built-in ceiling discloses the same quantity to a caller that names no cap."
   :cell/reviewed-threat-applicable false
   :cell/why-not "The reviewed shape (aggregate allowed, rows denied) needs an aggregate-only mode. visible? is per-datom and required; there is no such mode."}
+
+ {:db/id -12 :cell/plane "kotobase" :cell/stride "information-disclosure"
+  :cell/linddun "detecting" :cell/status :measured :source/dataset "privacy-plane"
+  :cell/surface "kotobase-server, deployed"
+  :cell/evidence "orgs/kotoba-lang/kotobase-server scripts/measure_wire_disclosure.cljs"
+  :cell/finding "The deployed refusal carries an exact datom count to the client: over-budget's :detail names n, counted in pattern-source before any visibility decision, and refusal-response puts it in both :details and :refusals. The cap is NOT caller-settable -- the policy is a literal, every call site is the 1-arity, and neither policy key appears elsewhere in the server -- so the caller learns one number for a range already past 200,000 and cannot probe below it. Narrower than the library seam it sits on, which binary-searches an exact total in about a dozen probes."
+  :cell/decision-pending "whether a refusal may say why"}
 
  {:db/id -3 :cell/plane "ayatori" :cell/stride "denial-of-service"
   :cell/linddun "detecting" :cell/status :measured :source/dataset "privacy-plane"
