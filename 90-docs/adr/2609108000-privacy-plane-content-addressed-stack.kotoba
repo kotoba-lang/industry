@@ -202,11 +202,28 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
    `90-docs/security/privacy-threat-matrix.datoms.edn`。**78 セル中 10 セルだけ**が
    記録され、`:matrix/coverage` が declared == counted を読み手に数えさせる形で
    持つ。**68 セルは未測定であって clean ではない。**
-7. dual-compiler / independent rebuild（#7）。**未着手。** attestation は在るので、
-   compromised compiler は**検出されるのではなく attest される**（matrix の
-   `kotoba × tampering` セル）。着手条件は 2 つの backend が
-   **意味的に等価な artifact を出すことを比較する harness** であって、
-   依存の追加ではない。
+7. dual-compiler / independent rebuild（#7）。**harness は在る。PR #927 のまま
+   （2026-09-10、subagent）。amu の west pin は `b57bcdb6981a` で未前進。**
+
+   **そして live な誤答を 1 件見つけた。** `kw-same` が **aarch64-macos で 0、
+   wasm32 と js で 1** を返す —— 3 つとも compile は exit 0、native artifact は
+   署名され、run は `:status :ok`。原因は読んで確認した:
+   `kotoba-native` の `aarch64.cljc` は `=` を **SUBS + CSET（整数レジスタ比較）**に
+   lower し、**型による分岐を持たない**。keyword は `pair(offset,length)` の handle
+   なので、**中身ではなく handle を比較する**。`(= :alpha :alpha)` → 0、
+   `(let [k :alpha] (= k k))` → 1 で予測が当たっている。
+   `x86_64.cljc` も同じ形だが**このホストで実行できないため未測定**。
+
+   ⚠ **この harness が検出するのは lowering の乖離であって frontend の compromise
+   ではない** —— `wasm32` と `js` は frontend / HIR / KIR を共有しており、
+   同じ入力を byte 同一のメッセージで拒否することが測られている。
+   **Ken Thompson の閉包はまだ閉じていない。**
+
+   判別は 2 通り実演済み（①emitter の `valueEqual` を keyword 2 引数で false に
+   すると**予測した probe だけ**が動く ②片側が全部コンパイル不能な corpus では
+   `no probe executed` として**拒否**する）。harness 自身の偽陽性を 2 件見つけて
+   直しており、うち 1 件は **`cljs.reader/read-string` が EDN 整数を float64 にする**
+   ため本物の欠陥と同じ見た目で出ていた。
 
 9. **matrix の弱かった 2 セルは実測に変えた（2026-09-10、subagent）** ——
    `key` 面は `:unmeasured-here` → `:measured-residue`（94 probes / 19 の拒否理由 /

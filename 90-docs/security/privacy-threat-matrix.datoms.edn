@@ -28,7 +28,8 @@
   :matrix/cells-measured 6
   :matrix/cells-implemented 2
   :matrix/cells-measured-residue 2
-  :matrix/cells-gap 3
+  :matrix/cells-gap 2
+  :matrix/cells-measured-defect 1
   :matrix/cells-unmeasured-here 0
   :matrix/cells-unrecorded 65
   :matrix/note "68 unrecorded cells are UNMEASURED, not clean. Absence of a cell is absence of a measurement."}
@@ -102,9 +103,14 @@
   :cell/not-measured "no model was called: whether an LLM in practice writes queries that pass validate and read what it should not is unmeasured; only that nothing would stop it"}
 
  {:db/id -10 :cell/plane "kotoba" :cell/stride "tampering"
-  :cell/linddun "non-compliance" :cell/status :gap :source/dataset "privacy-plane"
-  :cell/evidence "orgs/kotoba-lang/amu src/kotoba/compiler/nbb/output_attestation.cljs"
-  :cell/finding "Ed25519 publisher attestation binds marker, sealed provenance, artifact identity and target, and its own docstring says it does not replace output admission. Dual-compiler agreement and independent rebuild are absent, so a compromised compiler is attested rather than detected."}
+  :cell/linddun "non-compliance" :cell/status :measured-defect :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/amu PR #927 bench harness; defect in kotoba-native aarch64.cljc"
+  :cell/finding "Measured 2026-09-10 with a dual-backend equivalence harness over an 11-program corpus, and it found a live wrong answer on main: kw-same returns 0 on aarch64-macos where wasm32 and js return 1. All three compiles exited 0, the native artifact signed, and its run reported :status :ok. Cause read rather than inferred: aarch64.cljc lowers = to SUBS+CSET, an integer register compare, with no type dispatch, while a keyword is a pair(offset,length) handle -- so = compares handles. Predicted and confirmed: (= :alpha :alpha) is 0 natively, (let [k :alpha] (= k k)) is 1. x86_64.cljc has the same shape and is NOT measured, this host cannot run it. 77 probes seen, 73 run, 71 agreed, 2 disagreed."
+  :cell/status-was :gap
+  :cell/limitation "the harness detects LOWERING divergence, not frontend compromise: wasm32 and js share the frontend/HIR/KIR and were measured to accept and refuse identically with byte-identical messages. The Ken Thompson closure is still open."
+  :cell/discrimination "demonstrated twice: patching the emitter's valueEqual to return false for two keyword operands moved exactly the predicted probes and nothing else; a corpus uncompilable by one side refuses with `no probe executed` rather than reporting clean"
+  :cell/landed false
+  :cell/where "kotoba-lang/amu PR #927, branch dual-compiler-equivalence; amu west pin unchanged at b57bcdb6981a"}
 
  {:db/id -11 :cell/plane "key" :cell/stride "information-disclosure"
   :cell/linddun "data-disclosure" :cell/status :measured-residue :source/dataset "privacy-plane"

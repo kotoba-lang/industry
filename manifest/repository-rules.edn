@@ -388,6 +388,34 @@
                   ;; the baseline had 0.
                   :measured-floor :undeclared-var-warnings
                   :not-measured "security-mode, max-datoms-per-tx and required-purpose are read the same single-decode way and may be unreachable over the wire for the identical reason -- suspected, not measured"}}
+   ;; Step 4 (2026-09-10): the classification is the LANGUAGE's, declared on
+   ;; every capability-catalog entry, and the compiler refuses a grant whose
+   ;; declaration is missing or unrankable. No policy key reaches that check.
+   ;; Measured end to end: a guest whose only effect is granted by policy
+   ;; compiles at the base sha and exits 65 :kotoba/admission-denied on the
+   ;; branch. Two of three repos merged; amu is PR #929.
+   :policy/compile-time-declaration
+   {:key :kotoba.security/classification
+    :declared-on :capability-catalog-entry
+    :refused-by "kotoba.compiler.effect-classification/check! via kotoba.compiler.effect-row/check"
+    :reachable-by-policy false
+    :landed {:kotoba-lang "bf670cf2ef2c" :kotoba-sema "90baa17c0bb5"}
+    :not-landed {:amu "PR 929; west pin still b57bcdb6981a"}
+    ;; Measured, not assumed: arming it unconditionally gives 277 failures and
+    ;; 1186 errors, because abac denies whenever a resource classification is
+    ;; present and the subject's rank is nil -- and no amu policy names a
+    ;; :clearance at all. D5's unconditional half is the DECLARATION, and that
+    ;; is what is enforced with no policy involved.
+    :no-read-up-armed-only-when :policy-names-a-subject-clearance}
+   ;; The third instance in one day of the same shape, and the one that
+   ;; matters most: a fix on main that the classpath never sees. ADR-2607280100
+   ;; recorded D1 as done; osaho pins security at b13c5e12, where
+   ;; abac/classification-rank is STILL its own map and does not even carry
+   ;; :personal. "Implemented" and "implemented on the classpath in use" are
+   ;; different claims.
+   :policy/lattice-duplication-survived-on-the-compiler-classpath
+   {:until "2026-09-10" :pinned-by "osaho" :at-sha "b13c5e12"
+    :fixed-in "amu PR 929 (security b13c5e12 -> d87f3342)"}
    :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
    :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}
