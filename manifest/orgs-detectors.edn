@@ -3525,8 +3525,8 @@
               alias #270 deleted -- in the west checkout under orgs/. That works
               today only because `west update` REFUSED to advance that checkout
               past another session's uncommitted files; the pin already points
-              past it. This is ADR-2609012000's "three pointers to the app, all
-              disagreeing" for the third time, and it keeps recurring because the
+              past it. This is ADR-2609012000's \"three pointers to the app, all
+              disagreeing\" for the third time, and it keeps recurring because the
               only way anyone checks a pointer is by starting it. So this reads
               every configured entry point and resolves each against the tree IT
               names, rather than against one directory.
