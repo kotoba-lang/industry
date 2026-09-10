@@ -1,0 +1,74 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111400-a-repository-that-answers-25-is-worth-more-than-nine-that-answer-30")
+  (:adr/topic "q9-parity-harness-coverage")
+  (:adr/title "A repository that answers 25 is worth more than nine that answer 30")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/com-adyen"))
+  (:adr/related (vector "adr-2609111300-eight-of-twenty-pilots-now-have-a-parity-harness"))
+  (:adr/body
+  "## Context
+
+Second batch of generated parity harnesses, same procedure as the first:
+generate, `amu check`, compile to aarch64-macos, execute through
+`tools/kexe_loader.c`, compare selector by selector, and only then land.
+Coverage moves from eight to eleven of twenty.
+
+`com-acorrd-standards`, `com-acquia` and `com-adyen`. The third was picked
+deliberately.
+
+## Why com-adyen was the one to include
+
+Every parity run so far has reported the same route count: 30. A number that is
+identical everywhere is exactly the kind of agreement that cannot be read --
+it agrees with a correct derivation, and equally with a constant that was
+hard-coded on both sides and never depended on anything.
+
+`com-adyen` declares FIVE entities rather than six, and both sides answer 25.
+
+    com-acorrd-standards   native 30   oracle 30
+    com-acquia             native 30   oracle 30
+    com-adyen              native 25   oracle 25
+
+That single 25 is what makes the nine 30s informative. It shows the count is
+computed from the entity table on the ARTIFACT side too, not just in the
+harness, so the agreements elsewhere are evidence about a derivation rather
+than a coincidence of constants.
+
+The general form is the one this cohort keeps running into from different
+directions: a measurement that only ever produces one value has not
+demonstrated that it can produce another.
+
+## It also separates two generators
+
+The COMPONENT generator refuses `com-adyen`: no spec declares a ref, so no
+expand oracle can be derived (adr-2609111100). The HARNESS generator does not
+care -- it needs `routes`, `as-int`, `as-bool` and `page-limit`, and refs are
+not among them. Confirmed by running it: the harness generated, compiled and
+verified normally.
+
+Worth recording because the two refusals could easily be assumed to travel
+together, and they do not.
+
+## Result
+
+All three: `amu check :ok true`, compiled, executed.
+
+    route count   agrees on both sides (30, 30, 25)
+    as-bool       9 of 9
+    page-limit    8 of 8
+    as-int        5 of 6, the \"12abc\" row differing
+
+The ninth, tenth and eleventh reproductions of the cohort reader-conditional
+divergence, and in each run the only differing row -- so a run in which
+everything matched would be a reason to suspect the harness never reached the
+artifact, not a better result.
+
+## Still not covered
+
+Eleven of twenty is coverage of FOUR layers, not of the components. The store,
+filter, pagination, handler and expand layers need fixtures shaped to each
+repository's entities and are not generated. Nine pilots have no harness at
+all.")))
