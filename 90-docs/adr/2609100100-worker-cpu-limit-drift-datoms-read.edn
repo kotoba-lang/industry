@@ -537,5 +537,45 @@ snapshot 側は既に O(result) だから効かない」と結論したが、そ
 そして**流し込み型の hydrate**（rows を保持せず builder に渡す）を試す。
 これは engine の変更だが、**今度は測定に基づいている。**
 
+## メモリ説が本番で検証された —— 予測 −14 MB、実測 −15.5 MB（2026-09-10）
+
+**今日はじめて、事前の予測と本番の実測が一致した。**
+
+`hydrate-db-cached` の `build` は行ごとに persistent な `assert-quad` を打っていた
+（4 索引ぶんの db を毎行作り直すので、N 行で N-1 個がゴミになる）。arrangement は
+bulk accumulator を既に持っている。ローカル bench（本番と同じ 1,665 行）:
+
+    persistent  23.7 MB heap 増       mutable  9.8 MB heap 増     → 予測 −14 MB
+
+kotobase-peer `9a9e011f` / control-plane `a7164736` を deploy して実測:
+
+    status                memP50    memP90    memP99
+    変更前                 89.9M    123.3M    138.9M
+    変更後                 74.4M    108.7M    135.8M
+                          -15.5M
+
+**予測 −14 MB に対し実測 −15.5 MB。** メモリのモデルが end-to-end で正しいことの
+証拠であり、7 回の推論が外れた後で最初に当たった予測である。
+
+⚠ **ただし fold はまだ通らない。** 74 MB は 128 MB に対してまだ高く、tail は
+届いている。**あと 50 MB 程度落とす必要がある。**
+
+### `assert-quads!` は bang が付いていても in-place ではない
+
+戻り値を捨てて accumulator を persist したら、**vaet 索引だけが空になった** ——
+他の 3 索引は mutate が通り、vaet だけが通らない。結果、suite の失敗は
+Link 値のテスト 3 件だけで、**「戻り値を捨てた」ではなく「Link のバグ」に見えた**。
+名前の `!` を in-place の意味に読まない。
+
+### 次に落とせる 50 MB の候補（未測定）
+
+- **rows・encode 文字列・db を同時に持つ**（`hydrate-db-cached` の cljs 分岐）。
+  builder に流し込めば rows 配列を保持しなくてよい。
+- **db 表現そのものが 1 quad あたり 6〜14 KB**（ローカル bench の heap 増 ÷ 行数）。
+  1,665 行で 10〜24 MB。これは基盤の定数で、ADR-2609051700 と同じ場所に居る。
+- **ayatori の cursor は materialize しない** —— iteration 09 は「CPU では効かない」
+  と正しく結論したが、**メモリでは効く**。iteration 08 の 324 block 中 9 block は
+  CPU の主張である以上にメモリの主張である。
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
