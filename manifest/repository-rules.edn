@@ -174,7 +174,79 @@
                     :alias-lint-test-build-coords
                     :portable-cljc-cljs-kotoba
                     :org.clojure/clojure}
-   :policy/override-env "JVM_NEW_SURFACE_ALLOW"}}
+   :policy/override-env "JVM_NEW_SURFACE_ALLOW"}
+
+  ;; ADR-2609108000. The privacy plane, as the fourth plane. identity (CID),
+  ;; authority (capability/policy/admission) and evidence (receipt/attestation)
+  ;; already have names here; privacy was scattered across all three, and a
+  ;; plane with no name cannot be inventoried.
+  ;;
+  ;; `:policy/invariants` is the whole point. Each one names two things that
+  ;; are routinely read as one; a document that mixes either pair teaches the
+  ;; next reader the wrong concept, whatever the implementation does.
+  :privacy-plane
+  {:policy/authority "90-docs/adr/2609108000-privacy-plane-content-addressed-stack.edn"
+   :policy/builds-on "90-docs/adr/2607280100-clearance-design-integration-kotoba-kotobase.edn"
+   :policy/scope :content-addressed-stack
+   :policy/concerns #{:classification :retention :disclosure
+                      :unlinkability :aggregation :purpose}
+   :policy/invariants
+   {:identity-is-not-authority
+    {:says "a CID proves the bytes were these bytes; it proves nothing about permission to run or read them"
+     :enforced-by ["kotobase.execution-contract" "kotoba.compiler.nbb.output-attestation"]}
+    :integrity-is-not-confidentiality
+    {:says "verifiable by hash and hidden from a reader are different properties"
+     :enforced-by ["kotoba.security.object-encryption-gate" "kotobase.disclosure-grant"]}
+    :auditability-is-not-publicity
+    {:says "an immutable audit trail is evidence, and access history is itself personal data"
+     :enforced-by ["kotobase.transparency-log"]
+     :gap "the public/private boundary of a receipt is not declared anywhere"}
+    :content-addressing-is-not-safe-disclosure
+    {:says "giving something an address does not make releasing it safe; the DAG shape leaks without the bytes"
+     :enforced-by ["ADR-2607051000 ciphertext-over-CID"]
+     :gap "no threat model for graph-shape inference"}}
+   ;; The single most load-bearing distinction in this policy. `max-datoms`
+   ;; is real and correctly named, and it is NOT a privacy budget: lowering a
+   ;; scan cap does not stop `(count (where ...))` from answering 0 or 1.
+   ;; Calling both "budget" makes the day the scan cap landed read as the day
+   ;; inference protection landed.
+   :policy/budget-kinds
+   {:resource {:exists true
+               :implemented-by "kotobase.query.bridge/default-max-datoms"
+               :signals :materialize-over-budget
+               :bounds :work-performed}
+    :privacy {:exists false
+              :bounds :information-disclosed
+              :blocked-on :measure-the-channel-first}}
+   ;; Measure before defending: differential privacy, minimum result sets and
+   ;; threshold aggregation are not to be added until the channel they close
+   ;; has a reproduction. An untested defence against an unmeasured attack is
+   ;; theatre in both directions.
+   :policy/inference-channels-measured false
+   ;; Generate, validate and authorize are three steps, and an agent reaches
+   ;; only the first two. `ayatori.agent/validate` passing is not admission.
+   :policy/agent-output :proposal-only
+   :policy/agent-pipeline [:generate :parse :schema-validate :static-effects
+                           :authority-check :risk-classify :admission :execute]
+   :policy/agent-reaches-through :schema-validate
+   ;; Erasure is key release revoked, never CID deletion. This road is already
+   ;; taken by the implementation; the design documents just never named it.
+   :policy/erasure :cryptographic-only
+   :policy/erasure-implemented-by ["kotobase.disclosure-grant"
+                                   "kotobase.authority-window"
+                                   "kotoba.security.crypto-policy"]
+   ;; No gate, and that is a decision. The invariants above ask whether a
+   ;; document conflates two concepts, which is not a machine-decidable
+   ;; predicate. A gate that cannot fail for its stated reason is theatre.
+   :policy/detector nil
+   :policy/gate nil
+   :policy/why-no-gate "the invariants are read-side rules about documents, not predicates over a tree"
+   :policy/measured-absent #{:query-inference-protection
+                             :correlation-fingerprinting-inventory
+                             :linddun-threat-model}
+   :policy/unmeasured #{:ipld-traversal-bounds}
+   :policy/measured-on "2026-09-10"}
+  }
 
  :vocabularies
  [{:vocabulary/id :stack-tier

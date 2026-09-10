@@ -1,0 +1,110 @@
+[{:db/id -1
+  :adr/id "adr-2609108000-privacy-plane-content-addressed-stack"
+  :adr/title "ADR-2609108000: content-addressed stack の privacy 面を 1 本の組織原理にする — 4 つの不変条件と、既に在るもの/まだ無いものの実測"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "privacy-plane"
+  :adr/date "2026-09-10"
+  :adr/last_verified "2026-09-10"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative_for
+  ["Kotoba / Kotobase / Ayatori / agent / IPLD / key の 6 面にまたがる privacy 設計の組織原理"
+   "4 つの hard invariant（Identity/Authority, Integrity/Confidentiality, Auditability/Publicity, Content-addressing/Disclosure）の記録"
+   "Privacy Plane を identity / authority / evidence とは別の面として名付けた決定の記録"
+   "resource budget と privacy budget を同じ語で呼ばないという決定の記録"
+   "12 のリスク領域それぞれについて、2026-09-10 時点で実在/部分/不在のどれかを測った記録"]
+
+  :adr/problem
+  "外部レビュー（オーナー持ち込み、2026-09-10）が、この stack のリスクの中心は「メモリ破壊」や「SQL injection」ではなく identity・authority・metadata leakage・graph inference・supply-chain・agent-generated code provenance に移る、と指摘した。指摘そのものは正しい。
+
+問題は指摘の内容ではなく、**この workspace がその指摘に対して「もう在る」と答えるべきか「まだ無い」と答えるべきかを、読み手ごとに違う答えで返してしまう**ことである。実測すると、レビューが提案した 12 の対策のうち相当数は既に in-tree に実装があり、いくつかは名前が違うだけで、いくつかは本当に無い。組織原理が 1 本無いので、この区別が誰にも見えていない。
+
+これは CLAUDE.md が別の文脈で繰り返し警告している形と同型である —— 「索引が当たったことは、動くものが在ることの証拠ではない」の裏返しで、**「まだ設計文書に節が無いことは、機構が無いことの証拠ではない」**。両方向とも、確かめずに結論すると設計が嘘になる。
+
+さらに具体的な危険が 1 つある。レビューは「CID = trustworthy と思ってしまうこと」を最大のリスクに挙げているが、この workspace の実装側は既にそこを分けている（admission / attestation / execution contract）。**分けていない可能性が高いのは実装ではなく文書の側**で、設計文書が identity と authority を同じ段落で語っている限り、次に読む agent はそこを 1 つの概念として学ぶ。"
+
+  :adr/decision
+  "**D1. 4 つを hard invariant として採る。** これは新しい機構の要求ではなく、既存の機構をどう読むかの規則である。
+
+    1. Identity != Authority          — CID は「この bytes だった」だけを証明する
+    2. Integrity != Confidentiality   — hash で検証できることは秘匿ではない
+    3. Auditability != Publicity      — 監査可能であることは公開であることではない
+    4. Content addressing != Safe disclosure — アドレスが付いたことは出してよいことではない
+
+**D2. Privacy Plane を 4 つ目の面として名付ける。** 現在この workspace は identity（CID/IPLD）・authority（capability/policy/admission）・evidence（receipt/attestation/transparency log）の 3 面を持ち、privacy はその 3 面に散らばっている。散らばっていること自体が欠陥ではないが、**面として名前が無いものは棚卸しできない**。Privacy Plane が持つのは classification / retention / disclosure / unlinkability / aggregation / purpose の 6 つ。
+
+**D3. resource budget を privacy budget と呼ばない。** ayatori の `kotobase.query.bridge/default-max-datoms` と `:materialize-over-budget` は実在するが、これは**走査量の上限**であって推論の遮蔽ではない。件数上限をいくら下げても `(count (where ...))` が 0/1 を返す限り存在は漏れる。**この 2 つを同じ語で呼ぶと、resource budget が landed した日に privacy budget も landed したと読まれる。**
+
+**D4. inference channel は入れる前に測る。** differential privacy / minimum result set / threshold aggregation を先に入れない。先にやるのは「今の ayatori が何を漏らすか」を 1 本の再現手順にすること —— 存在照会（0/1）、adaptive probing による個体値復元、result identity の変化。**測っていない防御は、測っていない攻撃に対する劇場である。**
+
+**D5. agent 出力は propose であって authorize ではない。** `ayatori.agent/validate` は実在し、LLM が書く入口として正しい。ただし **validate が通ることは authorize ではない**。generate -> parse -> schema validate -> static effects -> authority check -> risk classification -> admission -> execute の並びで、agent が触れてよいのは左 3 つまで。authority object を発行するのは別の evaluator。
+
+**D6. 監査面を public commitment と private detail に分ける。** immutable audit log そのものが個人データになる、というのは正しい指摘で、この workspace の `kotobase.transparency-log` は既に checkpoint + receipt retention の形を持つ。足りないのは「public に出るのは commitment だけで、principal / purpose / resource / timestamp は selective disclosure」という境界の宣言。
+
+**D7. 消去は CID 削除ではなく crypto erasure。** これは既に実装側が採っている道で、`kotobase.disclosure-grant` + `kotobase.authority-window` + `kotoba.security.crypto-policy` が epoch と recipient-bound 鍵解放を持つ。**新しく設計しない。** 設計文書の側がこの道を名指ししていないだけ。
+
+**D8. この ADR は gate を持たない。** 持てない理由を書く：上の 4 不変条件は「文書がこの 2 つを混ぜていないか」を問うもので、機械が判定できる述語になっていない。CLAUDE.md の規則どおり、**落ちることを確かめていない gate は劇場**なので landing させない。gate にするなら測れるのは次の 3 つで、どれも独立した作業である —— (a) ayatori の query 経路が privacy budget を消費した receipt を 1 度でも出したか (b) public に出る receipt に principal / purpose が入っていないか (c) 新しい surface が classification を宣言せずに deploy されていないか。"
+
+  :adr/evidence
+  "2026-09-10 に実際に読んだもの（`orgs/kotoba-lang/` の checkout。west pin ではなく手元の tree を読んだので、pin より遅れている可能性は残る）。
+
+| # | レビューの指摘 | この workspace の現在地 | 判定 |
+|---|---|---|---|
+| 1 | CID = authority と誤認 | `kotobase.execution-contract`（1 実行 = 署名される contract、fail closed・暗黙の既定を足さない）、`kotoba.compiler.nbb.output-attestation`（Ed25519 が marker + provenance + artifact identity + target を束ねる。docstring 自身が「独立した output admission を置き換えない」と書いている） | 実在 |
+| 2 | DAG metadata leakage | ADR-2607051000 ciphertext-over-CID persistence。ciphertext identity で addressing する形は在る | 部分（形は在る。threat model が無い） |
+| 3 | query が oracle になる | `bridge/default-max-datoms` + `:materialize-over-budget` は**走査量**。存在照会・adaptive probing・aggregation 下限は無い | **不在**（D3 の混同点） |
+| 4 | agent-generated form | `ayatori.agent`（validate / ->engine-query / repair-turn / system-prompt。LLM が書く入口として設計されている） | 実在（ただし propose/authorize の分離は文書化されていない） |
+| 5 | capability escalation | `kotoba.security.information-flow`（4 段 lattice + `evaluate-egress`）、`kotoba.security.abac`（no-read-up）、`kotobase-peer.policy`（read 側の 2 値可視性） | 部分（ADR-2607280100 Step 1 のみ landed） |
+| 6 | schema CID が trust root | `kotobase.execution-contract` が protocol adapter に暗黙の既定を禁じている | 部分（migration proof は無い） |
+| 7 | compiler supply-chain | `output-attestation` + amu の output set / provenance | 部分（dual-compiler / independent rebuild は無い） |
+| 8 | revocation / crypto erasure | `kotobase.disclosure-grant`（recipient-bound、docstring が「delivery receipt は人が読んだことでも復号成功でも帯域外コピーの不在でもない」と明記）、`authority-window`、`crypto-policy` | 実在 |
+| 9 | result CID が metadata | `kotobase.transparency-log`（key-epoch-aware checkpoint + receipt retention） | 部分（public/private の境界宣言が無い） |
+| 10 | audit log 自体が個人情報 | 同上 | 部分 |
+| 11 | correlation / fingerprinting | 該当機構を見つけられなかった | **不在** |
+| 12 | DoS（fuel / traversal 上限） | `:materialize-over-budget` は在る。IPLD traversal 側（max blocks / depth / fanout / decompression ratio）は未確認 | 未測定 |
+
+LINDDUN は 90-docs 全体で 0 hit。STRIDE は 6 文書に語として出るが、いずれも threat-model 文書ではない。
+
+**副産物として 1 件の欠陥が出た。** ADR-2607280100（クリアランスの設計統合、accepted）の代替案 A2「クリアランスごとに ref / データベースを分ける」の却下理由は「D4 のとおり join が ref 1 本までしか届かない」である。**この前提は 2026-09-04 に ADR-2809040800 が実測で反転させている**（join の到達範囲は ref の本数ではなく合成の有無で決まる）。A2 の却下理由は現在偽。ただし A1（datom に 5 列目を足す）の却下理由（ブロック形式・CBOR・merkle-LSM・compaction を壊す）は独立に生きているので、**D2「ラベルは属性に付ける」という決定自体は倒れない** —— 倒れたのは却下の 2 番目の理由だけ。ADR-2607280100 に注記を足し、決定は動かさない。"
+
+  :adr/alternatives
+  "**A1. 12 領域それぞれに ADR を起こす。** 却下 —— 12 本の accepted ADR は、1 本の組織原理より読まれない。CLAUDE.md 自身が「読まれない規則は無い規則と同じ」で始まっている。
+
+**A2. まず threat-model matrix（STRIDE x LINDDUN を 6 面に）を作る。** 却下ではなく後回し。matrix は「どの面に何の脅威が在りうるか」を網羅するが、**この workspace の問題は網羅の不足ではなく現在地の不明**だった。現在地を測ってから matrix を敷く方が、埋まっていない格子と埋める必要が無い格子を区別できる。matrix は次の 1 手として `:status_detail` に置く。
+
+**A3. Kotoba Form に privacy label を semantics として入れる（レビュー提案）。** 現時点では採らない —— ADR-2607280100 が既に「クリアランスは effect の型には載せる、値の型には載せない」と決めており、その決定は Step 2〜5 が未着手なだけで生きている。**先に landed していない既存決定を、新しい提案で上書きしない。**
+
+**A4. 何もしない（実装側は既に分けているので文書は要らない）。** 却下 —— 分けているのは実装で、次に読む agent が学ぶのは文書である。"
+
+  :adr/consequences
+  "- 「もう在る」「まだ無い」の答えが 1 箇所に固定される。次に同じレビューが来たとき、12 行の表を更新すればよく、調べ直さなくてよい。
+- **resource budget を privacy budget と呼べなくなる。** 既存コードの名前は変えない（`max-datoms` は正しく resource を名乗っている）が、設計文書で「budget が在る」と書くときは必ずどちらかを名指す。
+- Privacy Plane が面として名前を持つので、新しい surface に「この面で何を宣言したか」を問えるようになる。ただし **問える == 強制される ではない**（D8。gate は無い）。
+- ADR-2607280100 に注記が入るが、決定は動かない。**却下理由が 1 つ古くなったことと、決定が誤りであることは別**。
+- 不在と判定した 3 件（query inference / correlation / IPLD traversal 上限）は、この ADR では塞がらない。塞いだと読まれないよう `:status_detail` に未着手として残す。"
+
+  :adr/status_detail
+  "**この ADR が landed させたのは組織原理と実測だけで、機構は 1 つも足していない。**
+
+未着手（優先順）:
+1. ayatori の inference channel を 1 本の再現手順にする（存在照会 0/1、adaptive probing、result identity の変化）。D4 のとおり、防御より先。
+2. public receipt に principal / purpose が入っていないことを測る（D6）。
+3. IPLD traversal の上限（max blocks / depth / fanout / decompression ratio）が在るかを測る。#12 は未測定であって clean ではない。
+4. correlation / fingerprinting（#11）—— 内部 CID を境界にそのまま出しているかの棚卸し。
+5. ADR-2607280100 の Step 2〜5（ラベルを属性に束縛して伝播させる）。この ADR は Step 1 が landed であることを再確認しただけで、進めていない。
+6. STRIDE x LINDDUN matrix を 6 面（Kotoba / Kotobase / Ayatori / Agent / IPLD / Key）に敷く（A2）。1〜4 の実測が入ってから。
+7. dual-compiler / independent rebuild（#7）。
+
+**gate は無い**（D8）。上の 1〜4 はどれも「測る」であって「直す」ではないので、測った結果が clean なら gate は要らず、汚れていればそこで初めて何を強制すべきかが決まる。"
+
+  :adr/references
+  ["ADR-2607280100 — クリアランスの設計統合（4 段 lattice、ラベルは属性、effect の型にのみ載せる）。Step 1 のみ landed"
+   "ADR-2809040800 — join の到達範囲は ref の本数ではなく合成の有無。ADR-260726 を supersede し、ADR-2607280100 の A2 却下理由を古くした"
+   "ADR-2607051000 — ciphertext-over-CID persistence（ciphertext identity で addressing する形）"
+   "ADR-2608148200 — L2 graph CID と archive Location は同じ bytes でも CID 文字列が分かれうる（identity と location の分離）"
+   "ADR-2609092600 — app の面は 4 つで混ぜない（identity / naming / location / kind）。面を分ける規律の先例"
+   "ADR-2608160200 — 5 つの canonical IR（State / Transaction / Capability / CausalLink / Effect）と Execution CID を memo key にしてよい条件"
+   "ADR-2608301500 — 記法禁止の shielding axis（definition CID と grant 交差 dispatch で防げる害には記法禁止を恒久としない）"
+   "manifest/repository-rules.edn :workspace-policies :privacy-plane — この ADR の機械可読正本"]}]
