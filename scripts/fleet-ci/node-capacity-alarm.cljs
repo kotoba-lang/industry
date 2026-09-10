@@ -75,6 +75,17 @@
 ;; 0.75: 実測 benjamin は 92% で**まだ繋がる**（curl 200）。尽きてから鳴る警報は
 ;; 鳴った時にはもう ssh も入れない。行動できるうちに鳴らす。
 (def port-ceiling (num-flag "--port-ceiling" "0.75" js/parseFloat))
+;; 200: **健全な kernel では到達しない値。** 実測 2026-09-10、11 台すべてが
+;; 0-10 だった —— uptime 4 分の naphtali も、25 日の dan/judah も同じ。macOS は
+;; 2*MSL = 30 秒で回収するので、TIME_WAIT は uptime に依存せず一桁で定常になる。
+;; 回収が止まった kernel は数時間で数千に達する（実測: benjamin 53,000 / 
+;; naphtali 32,000）。**間の値が存在しないので、閾値の位置は鋭敏ではない。**
+;;
+;; ⚠ 一過性のバーストは健全なノードでも数千を作る（npm install 1 回で足りる）。
+;; だから**超えた台だけ 45 秒後に測り直す** —— バーストは 30 秒で引き、
+;; 止まった kernel は引かない。1 回の観測で判定すると、忙しいノードを
+;; 壊れたノードとして報告する。
+(def time-wait-ceiling (num-flag "--time-wait-ceiling" "200" js/parseInt))
 (def notify? (not= "false" (flag "--notify" "true")))
 (def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp")
                                         ".itonami" "node-capacity-alarm-state.edn")))
@@ -150,6 +161,20 @@
     (when (zero? (or (.-status r) 1))
       {:via via :stdout (str (.-stdout r))})))
 
+(def ^:private confirm-script
+  ;; 2*MSL = 30 秒より長く待ってから 1 回だけ数え直す。
+  "sleep 45\nnetstat -an -p tcp 2>/dev/null | grep -c TIME_WAIT || true\n")
+
+(defn- confirm-stuck?
+  "高い TIME_WAIT が**引かない**ことを確かめる。引けば健全なバーストだった。
+  測れなければ nil —— 『確かめられなかった』を『健全』に畳まない。"
+  [args]
+  (let [r (cp/spawnSync "ssh" (clj->js args)
+                        #js {:input confirm-script :encoding "utf8" :timeout 90000})]
+    (when (zero? (or (.-status r) 1))
+      (let [n (js/parseInt (str/trim (str (.-stdout r))))]
+        (when-not (js/isNaN n) (>= n time-wait-ceiling))))))
+
 (defn measure-host
   "1 ノードを測る。tailnet で答えなければ **踏み台経由の LAN でもう一度訊く。**
 
@@ -185,6 +210,9 @@
         (if (js/isNaN freekb)
           {:host host :state :unmeasured :lan lan :detail "df が読めなかった"}
           {:host host :state :measured :via (:via answer) :lan lan
+           :ssh-args (if (= :lan (:via answer))
+                       (concat base ["-J" jump-host (str host "@" lan) "sh" "-s"])
+                       (concat base [host "sh" "-s"]))
            :free-gb (/ freekb 1048576.0)
            :capacity (:capacity kv)
            :time-wait (when-not (js/isNaN (js/parseInt (:timewait kv)))
@@ -208,7 +236,11 @@
         ;; **tailnet を失ったが生きている。** fleet はここへ仕事を配れないので
         ;; 健全ではないが、`:unmeasured` とは行動が違う —— こちらは遠隔で戻せる
         ;; （実測: sysctl で range を広げると egress が戻り、tailscale が再接続した）。
-        off-tailnet (filter #(= :lan (:via %)) measured)]
+        off-tailnet (filter #(= :lan (:via %)) measured)
+        ;; **回収が止まった kernel。** port の充填率より前に出る信号で、
+        ;; 手当ては 1 つ（再起動、実測 20-50 秒）。`:stuck-kernel true` は
+        ;; 確認パスで「引かなかった」ことまで見た結果だけが持つ。
+        stuck (filter :stuck-kernel? measured)]
     (cond
       ;; **evidence floor.** 0 台を clean として報告しない。答えられなかったのだから
       ;; 0 でも 1 でもない値で終わる。
@@ -218,13 +250,14 @@
                  " —— これは『全ノード健全』ではない")}
 
       :else
-      {:healthy? (and (empty? low-disk) (empty? low-port) (empty? off-tailnet))
+      {:healthy? (and (empty? low-disk) (empty? low-port) (empty? off-tailnet)
+                      (empty? stuck))
        :measured (count measured) :unmeasured (count unmeasured)
        :low-disk (mapv :host low-disk) :low-port (mapv :host low-port)
-       :off-tailnet (mapv :host off-tailnet)
+       :off-tailnet (mapv :host off-tailnet) :stuck (mapv :host stuck)
        :persist {:measured (count measured) :unmeasured (count unmeasured)
                  :low-disk (mapv :host low-disk) :low-port (mapv :host low-port)
-                 :off-tailnet (mapv :host off-tailnet)}
+                 :off-tailnet (mapv :host off-tailnet) :stuck (mapv :host stuck)}
        :why (str/join " / "
                       (cond-> []
                         (seq low-disk)
@@ -239,7 +272,12 @@
                                                        low-port))))
                         (seq off-tailnet)
                         (conj (str "tailnet 上は不在だが LAN で生きている（遠隔で戻せる）: "
-                                   (str/join ", " (map :host off-tailnet))))))})))
+                                   (str/join ", " (map :host off-tailnet))))
+                        (seq stuck)
+                        (conj (str "TIME_WAIT が回収されていない（再起動で戻る。"
+                                   "port が尽きる前に手当てできる）: "
+                                   (str/join ", " (map #(str (:host %) " " (:time-wait %))
+                                                       stuck))))))})))
 
 ;; ---------------------------------------------------------------- self-test
 
@@ -280,6 +318,23 @@
          "LAN で 1 台測れていれば REFUSE ではない —— 測れているのだから")
     (chk (= ["offnet"] (:off-tailnet (verdict [(assoc (m "offnet" 40.0 0.10) :via :lan)])))
          "どのノードが tailnet を失ったかを名指しする")
+    ;; 回収が止まった kernel —— port 充填より前に出る信号。
+    (chk (not (:healthy? (verdict [(assoc (m "stuck" 40.0 0.10)
+                                          :via :tailnet :stuck-kernel? true
+                                          :time-wait 32000)])))
+         "回収が止まった kernel は、port にまだ余裕があっても赤")
+    (chk (:healthy? (verdict [(assoc (m "burst" 40.0 0.10)
+                                     :via :tailnet :stuck-kernel? false
+                                     :time-wait 3000)]))
+         "高い TIME_WAIT でも 45 秒後に引いたなら健全なバースト —— 赤にしない")
+    (chk (not (:healthy? (verdict [(assoc (m "unk" 40.0 0.10)
+                                          :via :tailnet :stuck-kernel? :unconfirmed
+                                          :time-wait 3000)])))
+         "確かめられなかったものを健全に畳まない")
+    (chk (= ["stuck"] (:stuck (verdict [(assoc (m "stuck" 40.0 0.10)
+                                               :via :tailnet :stuck-kernel? true
+                                               :time-wait 9)])))
+         "どのノードを再起動すべきかを名指しする")
     (println (str "self-test: " (count @fails) " failed"))
     (doseq [f @fails] (println "  FAIL:" f))
     (count @fails)))
@@ -291,7 +346,27 @@
     (js/process.exit (if (zero? (self-test)) 0 1))
     (let [hosts (roster)
           _ (println (str "node-capacity-alarm: " (count hosts) " 台を測る …"))
-          results (mapv measure-host hosts)
+          first-pass (mapv measure-host hosts)
+          ;; 確認パスは**疑わしい台だけ**。健全な 11 台に 45 秒ずつ払わない。
+          suspects (filter #(and (= :measured (:state %))
+                                 (:time-wait %)
+                                 (>= (:time-wait %) time-wait-ceiling))
+                           first-pass)
+          _ (when (seq suspects)
+              (println (str "  … TIME_WAIT が高い " (count suspects)
+                            " 台を 45 秒後に測り直す（バーストと停止の区別）")))
+          confirmed (into {} (for [r suspects]
+                               [(:host r) (confirm-stuck? (:ssh-args r))]))
+          ;; ⚠ `nil` は「引かなかった」ではなく「確かめられなかった」。
+          ;; false（＝引いた＝健全なバースト）と同じ値に畳むと、確認が失敗した
+          ;; ノードが健全として通る —— この警報が存在する理由そのものの形。
+          results (mapv (fn [r]
+                          (if (contains? confirmed (:host r))
+                            (assoc r :stuck-kernel?
+                                   (let [c (get confirmed (:host r))]
+                                     (if (nil? c) :unconfirmed c)))
+                            r))
+                        first-pass)
           v (verdict results)]
       (doseq [r (sort-by :host results)]
         (println
@@ -302,7 +377,9 @@
                 (if (:port-frac r)
                   (str "  port " (:port-used r) "/" (:port-span r)
                        " (" (int (* 100 (:port-frac r))) "%)"
-                       (when (:time-wait r) (str " TIME_WAIT " (:time-wait r))))
+                       (when (:time-wait r)
+                         (str " TIME_WAIT " (:time-wait r)
+                              (when (:stuck-kernel? r) " ← 回収停止（要再起動）"))))
                   "  port 未測定")))))
       (if (:refused? v)
         (do (println (str "node-capacity-alarm: REFUSED — " (:why v)))
