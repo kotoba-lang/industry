@@ -565,6 +565,62 @@ Three kinds of "no remote", needing different handling: has commits (create + pu
 never touching the local checkout); **exists upstream but local lost `origin`** (reattach,
 do not create — measured: `kotoba-lang/org-threejs` had 10 of 12 files already landed).
 
+## ignore 規則を書く前に、base tree に当てる（2026-09-10）
+
+着地候補を黙らせるために `.gitignore` へ規則を足すときは、その規則が **base tree**
+（`git ls-tree -r <remote>/main`）の何に当たるかを測る。**`git ls-files` に訊かない。**
+
+これは `stale-ignore-gate` と同じ論拠の逆向きである。あの gate が base の `.gitignore` を
+GitHub から取るのは west checkout が数十 commit 遅れるからで、同じ理由で checkout の
+*tracked 集合* も遅れている。`git ls-files` は「この checkout が知っている tracked」で
+あって「この repo が track している」ではない。
+
+実測 2026-09-10、`kotoba-lang/giemon`: checkout に `sim-loop/` が 1 ファイルも無く 351 件が
+全部 untracked に見えたので `/sim-loop/` を「完全に未追跡の bot scratch」として landed した。
+**main はそこに 194 ファイルを track している**（`bench-001..067.md` / `falsify-001..023.md` /
+`probe_*`）。revert 済み。
+
+同じ日、同じ形が逆に働いた例が 2 つある:
+
+- `kotoba-lang/torihiki` は `evidence/*.out` を 232、`*.err` を 121、`*.md` を 156 track して
+  いる。`evidence/*.out` は junk ではなくこの repo の成果物で、`tracked-safety-gate` の
+  「junk パスは base に無いときだけ落とす」と同じ判断がここでも要る。ignore したのは base が
+  1 件も track していない `*.py` / `*.sh` / `*.log` だけ。
+- `net-kotobase/docs` は tracked 238 件が untracked 5,919 件と同じ `_b<N>_*` 命名・同じ拡張子
+  で、同じ corpus の一部だけが commit されている。パターンでは決まらないので規則を書かず、
+  未決として報告した。**決められないことを、決めたふりで黙らせない。**
+
+手順（両方向を出すまで規則を書かない）:
+
+```bash
+d=orgs/<org>/<repo>
+# remote は URL に <org>/<repo> を含むものを選ぶ（origin とは限らない。
+# 実測: net-kotobase/docs の remote 名は bench_fetch）
+rem=$(git -C "$d" remote -v | awk -v p="<org>/<repo>" '$3=="(fetch)" && index($2,p)>0 {print $1; exit}')
+git -C "$d" fetch -q "$rem" main
+git -C "$d" ls-tree -r --name-only "$rem/main" > /tmp/base.files
+
+printf '/sim-loop/\n' > /tmp/rule.excl          # 候補の規則だけ
+git -C "$d" -c core.excludesFile=/tmp/rule.excl check-ignore --no-index --stdin < /tmp/base.files
+#   ^ 1 件でも当たったらその規則は書かない
+git -C "$d" -c core.excludesFile=/tmp/rule.excl check-ignore --no-index --stdin < /tmp/keep.files
+#   ^ 着地させると決めたファイル。ここも 0 件でなければ書かない
+```
+
+仕組み自体にも control を通す — 当たるはずの path が当たり、当たらないはずの path が当たら
+ないことを 1 回ずつ見る（`core.excludesFile` が先頭 `/` 付きの規則を repo root 起点で解釈する
+ことを確かめずに、0 件を「安全」と読まない）。
+
+数えるときは **repo 自身の `.gitignore` と `.git/info/exclude` も `check-ignore` が読む**。
+合算を自分の規則の成績として報告しない（実測: `network-awai/app-hyakka` の 18 件は既存の
+`data/`、`kotoba-lang/amu` の 1 件は `info/exclude` の `.npmrc`）。
+
+**この gate は `cleanup-land.cljs` には無い。** あの script は着地の側を
+`drop-already-landed` の 3-way（base に無い / 在って同内容 / 在って内容違い）で正しく守って
+おり、giemon を通しても事故は起きなかった — 守られている経路の *外* で手で規則を書いたのが
+原因である。ignore 規則を書く行為は cleanup の write path でありながら道具を通らないので、
+当面はこの手順を人が回す。
+
 ## West orphan inventory
 
 `orgs/<org>/<repo>` can exist locally without being in west, or exist on GitHub without local/west. Mixing path-override leftovers with true orphans causes false registrations.
