@@ -1,0 +1,87 @@
+[{:db/id -1
+  :adr/id "adr-2609102200-https-required-and-generate-now"
+  :adr/title "murakumo.cloud requires HTTPS, and an agent can generate from the first page it reads"
+  :adr/status "accepted"
+  :adr/date "2026-09-10"
+  :adr/related ["adr-2609102000-hokusai-is-a-name-the-fleet-owns"]
+  :adr/body
+  "Owner instruction 2026-09-10: make murakumo.cloud a place an LLM can
+generate from immediately, and require HTTPS.
+
+## HTTPS
+
+Measured before changing anything: `http://murakumo.cloud/` answered **200 with
+the page**. HSTS was already set and does not close that -- RFC 6797 says a UA
+records the policy only from an HTTPS response, so the FIRST visit over http is
+unprotected however long the max-age is. The redirect is what makes a first
+visit safe.
+
+A plain-http request now never reaches a handler: the redirect is the first
+thing `fetch-handler` does, because a response that travelled in the clear has
+already travelled. GET and HEAD get 301; everything else gets 308, because 301
+lets a client turn a POST into a GET and drop its body and `/api/v1/generation`
+is a POST route on this host. Behind Cloudflare the client's real scheme is in
+`cf-visitor` -- `request.url` reads as https because TLS terminated at the
+edge -- so both are checked. A check that trusted only the URL would pass
+exactly the requests it exists to catch, and the test that breaks that half
+proves it.
+
+**One path was missed and the sweep caught it.** `/llms.txt` is served by a
+SEPARATE worker on its own routes, so the site worker's redirect never saw it:
+minutes after the first deploy, `http://murakumo.cloud/` redirected and
+`http://murakumo.cloud/llms.txt` still answered 200 in the clear. That is the
+file an agent fetches first. A rule enforced on every path but one is not
+enforced, for whoever reaches that one.
+
+Verified live on all six public entry points, including `/llm.txt` and
+`/.well-known/llms.txt`.
+
+## Generate immediately
+
+The docs said image generation \"remains a separate product surface\" and that
+generation models \"are not listed by api.murakumo.cloud/v1/models\". Both
+became false an hour earlier when `awai-network/hokusai` was published, and
+`llms.txt` still carried the old claim -- because it is a HAND-MAINTAINED file
+beside `docs.cljc`, not generated from it. `clojure -M:site` regenerated
+`/free` and `/docs` and left `llms.txt` untouched, and only a grep of the live
+file showed it.
+
+Now, and verified live:
+
+- `/llms.txt` opens with `## HTTPS is required`, documents hokusai with a
+  complete request, and no longer carries the stale claim
+- `/free` carries the image example beside the text one
+- `/docs` documents the route, the return shape and the size allowlist
+- `GET /v1/models` lists `awai-network/hokusai` with its own `endpoint`,
+  `kind`, `free` and `sizes`, so discovery alone is enough to call it
+
+That last one was its own gap: publishing a model discovery cannot see is half
+a publication. The registry lives in `worker.cljs`, the half that cannot ship,
+so the JS entry augments the catalogue and fails open on every shape it cannot
+parse -- a models list that 500s because it could not be parsed is worse than
+one missing an entry.
+
+## Two things worth carrying forward
+
+**`llms.txt` and `docs.cljc` are hand-synced duplicates.** They drifted within
+an hour of a change and the drift was invisible from the source tree. Either
+generating one from the other, or a check that fails when they disagree, would
+have caught it. Not done.
+
+**The site deploy needs a lease token that cannot be minted here.**
+`scripts/deploy-model-hosting-locked.mjs` mints it with `clojure -M:token
+issue`, which needs `MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2` in kagi
+(compartment network-awai). Measured: `kagi get` answers `no such item`, and
+it is absent from `~/.itonami/` too. The vault was not enumerated to look for
+it. Both deploys therefore used `--bootstrap`, the script's own documented
+last resort, which skips the CONCURRENCY lease only -- it is not a data guard,
+and the change was already merged to main, so any later deploy from main
+includes it. The secret needs to be provisioned or the map corrected.
+
+## Also repaired
+
+`orgs/network-awai/cloud-murakumo-api/node_modules` was found as a symlink to
+itself, which made every `npm run build` there fail with `spawn ELOOP`. It was
+reinstalled with `npm ci`. This session ran several `ln -sfn` commands against
+that path and is the likely cause, but the earlier deploy through the same path
+succeeded, so the moment it broke could not be established."}]
