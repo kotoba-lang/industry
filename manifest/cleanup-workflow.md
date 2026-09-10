@@ -686,7 +686,7 @@ scope の沈黙を「未登録は無い」と読ませないため。
 
    ```bash
    git fetch origin && git merge --ff-only origin/main
-   west update --fetch smart
+   nbb scripts/checkout-staleness.cljs   # 母集団をローカルに（94s・network なし）。fleet 全体の west update は回さない
    git worktree list --porcelain
    git branch --show-current
    git stash list

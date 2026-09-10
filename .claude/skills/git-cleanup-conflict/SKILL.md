@@ -34,34 +34,55 @@ stashes, diff + commit log for branches, per `:retirement :archive` in the edn) 
 landed. The archive step is what makes the decision reversible; skipping it because
 you're confident is exactly the failure mode this note exists to catch.
 
-## Run `west update` first — before any inventory
+## Do NOT run a fleet-wide `west update` before the inventory (revised 2026-09-09)
 
 ```bash
-git fetch origin && git merge --ff-only origin/main   # superproject
-west update --fetch smart                             # children (dirty ones are skipped, exit 1)
+git fetch origin && git merge --ff-only origin/main   # superproject only
+nbb scripts/checkout-staleness.cljs                   # dirty / behind / untracked population: 94s, zero network
+# then fetch ONLY the repos you are about to judge, in that repo (this is the only source of freshness)
 ```
 
-Two reasons, both measured 2026-08-04 (owner directive; SSoT: `:west-update` in the edn):
+This section used to say "run `west update` first", on an owner directive of 2026-08-04,
+and gave two reasons. **This repo measured both of them false.** Both records are kept,
+because a reader who cannot see what was true and when it stopped being true will
+re-derive the old conclusion.
 
-1. **A stale tree gives false verdicts.** Content-containment — the core of every classify
-   decision — asks "do this branch's added lines exist in the child repo's *current*
-   `origin/main`?" Without a fetch, that question cannot be answered. Measured: judged
-   against **pins**, six repos looked ahead (abi +11, bitcoin-node +52, kotoba +19,
-   kotobase +3, kagitaba +1, shell +5). Re-measured against **fetched `origin/main`**,
-   bitcoin-node was 0 ahead (the pin was simply stale) and almost everything else was
-   already landed — only 2 files in `kotoba` were genuinely un-landed. Skipping the
-   update would have meant PR-ing already-landed content and rolling `main` back.
-2. **west's skip set *is* the inventory.** west never destroys a dirty project; it skips
-   it and exits 1. That skip set is the precise population of repos holding local-only
-   work. Measured over 4,022 projects (~4h, full history): **87 skipped** — 83 untracked
-   collisions, 17 tracked-file changes (13 both). Of those, **69 projects / 70 files**
-   were byte-identical spill files (mostly `kotoba-lang/com-*`
-   `schema/<name>.kotoba-schema`) that vanish once you verify the hash and delete;
-   the remaining **18** were real local work.
+1. ~~A stale tree gives false verdicts, so `west update` first.~~ **The premise is right
+   and the remedy is wrong.** Content-containment does need each child's *current*
+   default branch — but `west update --fetch smart` **never updates remote-tracking
+   refs**. It fetches only enough to reach the pin, and the pin itself lags upstream.
+   Controlled test 2026-08-08 (`kotoba-lang/css`): `refs/remotes/kotoba-lang/main` stayed
+   at `6eda5ee` across a `west update --fetch smart css` while GitHub was at `82aa184`;
+   an explicit `git fetch kotoba-lang` moved it. Freshness comes only from fetching the
+   repo you are judging.
+2. ~~west's skip set *is* the inventory.~~ **It misses the population.** west skips only
+   when an update *collides* with local changes; otherwise it moves HEAD on a dirty tree.
+   Measured 2026-09-09: of 1,073 projects reached, the 2 dirty ones were **not** skipped
+   (`cloud-itonami/akashi` moved `1c9ef16` → `16ecd85` with untracked `config/` present).
 
-Then: classify skips into untracked vs localchg; delete **only** untracked files whose
-`git hash-object` matches the pin's blob; leave localchg untouched; and `git fetch origin`
-inside each child repo before judging it.
+And the same answer is ~200x cheaper locally: for those same 1,073 projects,
+`west update --fetch smart` took 1,825s (≈2.0h extrapolated to the full fleet) versus
+**94s** for `scripts/checkout-staleness.cljs` over all 4,555 checkouts — which is the
+tool actually built for this, and whose docstring already said it must not fetch.
+
+Dirty repos are real; only how you enumerate them changed. Measured 2026-08-04 (4,022
+projects, ~4h): 87 dirty — 83 untracked collisions, 17 tracked changes (13 both). Of
+those, 69 projects / 70 files were spill files byte-identical to incoming (mostly
+`kotoba-lang/com-*` `schema/<name>.kotoba-schema`); **18** were real local work.
+
+Then: classify into untracked vs localchg; delete **only** untracked files whose
+`git hash-object` matches the pin's blob; leave localchg untouched; and fetch each child
+repo before judging it — **never write `git fetch origin`**: west names remotes after the
+manifest remote (`kotoba-lang`, `cloud-itonami`, …) and **197 of 273 sampled repos (72%)
+have no `origin` at all**. Hardcoding `origin/` makes the ref fail to resolve and tips the
+verdict silently toward UNLANDED. Use the repo's primary remote:
+
+```bash
+REM=$(git -C "$R" remote | grep -qx origin && echo origin || git -C "$R" remote | head -1)
+git -C "$R" fetch "$REM" --quiet
+```
+
+Use `west update --fetch smart <name> ...` only to align named checkouts to their pins.
 
 **Traps.** west checkouts fetch into `refs/west/*`, so `origin/<branch>` remote-tracking
 refs may not exist — check push state with `gh api repos/<slug>/branches/<branch>`, not
@@ -305,7 +326,7 @@ create`** と印字しており、その文言に従うと**既に在る repo �
 
 ## Minimum workflow
 
-1. Inventory (**after `west update` — see the section above**): `git fetch origin && git merge --ff-only origin/main`, `west update --fetch smart`,
+1. Inventory (**local scan first — see the section above; do NOT run a fleet-wide `west update`**): `git fetch origin && git merge --ff-only origin/main`, `nbb scripts/checkout-staleness.cljs`,
    `git worktree list --porcelain`, `git branch --show-current`,
    `git stash list`, `git status --short --branch`,
    `gh pr list --state open --json number,title,headRefName,baseRefName,url,mergeable,statusCheckRollup`,
