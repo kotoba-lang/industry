@@ -1,0 +1,299 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles")
+  (:adr/topic "query-plane-on-kotoba-form")
+  (:adr/title "Form/ADL の上の query 面 —— ontology は 2 つの扉からしか入らず、dialect は algebra を手放さず、GraphSync の役は既に埋まっている")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/ayatori" "kotoba-lang/kotobase"
+                "kotoba-lang/kotobase-server" "kotoba-lang/datalog" "kotoba-lang/org-w3-owl2"
+                "kotoba-lang/io-ipld" "kotoba-lang/kotobase-protocol-ipq"))
+  (:adr/related (vector "adr-2609109400-kotoba-form-dag-kotoba-and-what-guest-and-host-actually-name"
+                "adr-2609107000-everything-is-a-form-arranged-against-what-runs"
+                "adr-2609101300-kotoba-adl-notation"
+                "adr-2609101837-corpus-cid-plane-and-ontology-admitted-inference"
+                "adr-2609108000-privacy-is-the-fourth-plane"
+                "adr-2609060000-ipld-adl-selector-car-boundaries"
+                "adr-2608039970-the-base-is-the-datom-plane-not-datalog"
+                "adr-2608189300-datalog-kotobase-dialect-and-datomic-are-three-names"
+                "adr-2608319400-oak-the-ontology-as-the-admission-boundary"
+                "adr-2608148200-l2-graph-cid-and-archive-location"
+                "2809040800"))
+  (:adr/validation (map
+    (:measured "4 probes, each with a control that was run in the failing direction")
+    (:route "nbb, no JVM; one live HTTPS surface")
+    (:evidence "90-docs/query-plane/2026-09-10-query-plane-measurements.edn")
+    (:base "org-w3-owl2 b23571a / datalog fef2eb4 / datom-source 6936d20 / io-ipld f2d0487 / kotobase faa5cc0 / kotobase-server 197cd9d / ayatori d6f3431 / kotobase-protocol-ipq 8c5f701")
+    (:read-not-measured (vector "IPNS name resolution" "SPARQL/Cypher/SQL/Gremlin/GraphQL surfaces answering a query"))))
+  (:adr/body "## Context
+
+オーナーが「Kotoba Form / Kotoba ADL の上で ontology・SPARQL・Datomic・SQL を
+query できるようにするには」と、その下半分として「IPLD Link を中心に据え、
+Graphsync・IPNS・IPNI を使えるか」を持ってきた。層の名前は同日 ADR-2609109400 が
+既に決めている（Kotoba / Kotoba ADL / Kotoba Form / Kotoba Schema / DAG-Kotoba /
+DAG-CBOR / CID）。
+
+**測った結果、提案のほぼ全部が既に在る。** この ADR は新しい repo を 1 つも作らず、
+新しい層も 1 つも作らない。やるのは 3 つ —— 既に在るものを層に配り直すこと、
+どこが本当に空いているかを名指すこと、そして**まだ決まっていなかった 3 つの
+境界を決めること**（ontology の入口、Selector の公開 address、名前と identity）。
+
+## 現在地 —— 提案の要素と、その実体
+
+読んだ sha は Reproduce。★ が今日この ADR が測ったもの。
+
+| 提案の要素 | 実体 | 状態 |
+|---|---|---|
+| 1. ontology を Form にする | `org-w3-owl2` の `owl.model`（OWL 2 構造仕様を EDN で。RDF 三つ組ではなく構造オブジェクトモデル） | 在る |
+| 2. 基本関係を datom に寄せる | `datalog.index` の 4 covering index（eavt/aevt/avet/vaet）。共有しているのは datom であって Datalog ではない | 在る（ADR-2608039970） |
+| 3. ontology = RDF に限定しない | 同上。triple に潰さない判断は既に下されている | 在る |
+| 4. Form を datom projection する | `kotobase.query.bridge/materialize` | 在る。コストは O(database) で、その代償も測ってある |
+| 5. 共通 query vocabulary | kotobase 方言（`{:find :where :rules}`）。agent 面の第一言語として既に決定済み | 在る（ADR-2608189300） |
+| 6. SPARQL frontend | `org-w3-sparql-protocol` + `kotoba-lang/sparql` の EDN algebra（`:bgp` `:join` `:filter` `:union` `:optional` `:project` `:distinct` `:order-by` `:slice`） | 在る。**Datalog に翻訳していない** |
+| 7. Datalog frontend | `datalog.core/q` —— 再帰 rule・否定・disjunction・集約・semi-naive fixpoint | 在る |
+| 8. SQL frontend | `org-postgresql-wire` / `datomic-client-shim` / `org-opencypher-cypher` / `org-graphql-http` / `org-apache-tinkerpop-gremlin` | 在る。10 origin が live（下記） |
+| 9. 共有 algebra は小さく | 共有は L1（datom 面）で、L2 は各 dialect が持つ | **既に提案どおり**（ADR-2608039970） |
+| 10-11. Ontology axiom を rule にする | ★ `owl.rules` が RDFS/OWL 2 RL の entailment を `:rules` の形で emit する。`hierarchy-rules` は述語を literal に、`triple-rules` は述語を変数に | 在る。**そして今日はじめて engine に通した** |
+| 12. materialized と virtual を分ける | (a) `:rules` で query 時に導出 (b) derived datom を書き込む。どちらも既存 | 在る。**入口の規則が無かった → D3** |
+| 13. result に proof/provenance | execution 単位は在る（receipt + IPQ の CAR）。**row 単位の derivation は無い** | 半分 → D9 |
+| 14. query / ontology / schema に CID | `:query/digest` = `value-cid(query)`、`:schema/root`。**ontology の欄は無い** → D3 | 部分 |
+| 15. agent は Query Form を直接生成 | `kotobase.query.agent`：`validate` / `->engine-query` / `schema-block` / `system-prompt` / `repair-turn` / `extract-query` | 在る |
+| Link / Selector / CAR | `ipld.link`（tag-42）/ `ipld.selector` / `ipld.graph`（有界 cursor）/ `io-ipld-car` | 在る |
+| Graphsync の役 | ★ **IPQ/1**（`kotobase-protocol-ipq`）—— live | 在る → D6 |
+| IPNI の役 | ★ `io-ipni-specs` + `ipni.kotobase.net` の署名付き head —— live | 在る |
+| IPNS の役 | `tech-ipfs-specs-ipns`、`*.ipns.kotobase.net` | 在る（**この session では測っていない**） |
+
+## 決定
+
+### D1. 層は増やさない —— ADR-2609109400 の段をそのまま query 面へ伸ばす
+
+    Kotoba ADL   人と agent が書く記法（pure S）
+    Kotoba Form  意味を持つオブジェクト
+    Kotoba Schema 型と制約
+    DAG-Kotoba   IPLD Data Model の profile
+    DAG-CBOR     codec
+    CID          identity
+
+query 面の各物は、この段の *インスタンス* であって新しい段ではない:
+
+| 物 | その Form | その address | 実装 |
+|---|---|---|---|
+| query | `{:find :where :rules}` | `value-cid` = `:query/digest` | `kotobase.execution-identity` |
+| ontology 断片 | 同じ query の中の `:rules` | 同じ digest の中 | `owl.rules` |
+| 導出済みの事実 | datom | `:data/commit` | `arrangement` / prolly-tree |
+| traversal | IPLD Selector | Data Model bytes の CID（D5） | `ipld.selector` |
+| 物理 plan | plan | `:query/plan-digest` | `kotobase.execution-contract` |
+| 結果 | rows + 証明 block | `:result/root` + CAR | `kotobase-protocol-ipq` |
+| schema | schema | `:schema/root` | ExecutionManifest |
+
+**`(eval ...)` Form を足さない。** 提案の universal Eval 関係は
+`kotobase.execution-contract` version 1 として既に在り、署名され、versioned で、
+fail-closed である（ADR-2609107000 D2）。2 つ目の「1 回の実行とは何か」を作らない。
+
+### D2. 共有するのは datom 面。dialect は algebra を手放さない
+
+提案自身が §9 で「共有 algebra を小さくしろ、万能 IR は何も最適化できない IR に
+なる」と書いており、**この workspace は既にその側に居る。** SPARQL は自分の
+algebra を持ったまま L1 に束縛され、Datalog に翻訳して戻していない。
+その判断は ADR-2608039970 と ADR-2608039975 が根拠付きで下している。
+
+したがって **Layer 3 の「dialect-neutral な共通 algebra」は作らない。**
+提案がそこに置きたかったもの —— 人と agent が書く 1 つの query 記法 —— は
+**kotobase 方言**であり、それは既に agent 面の第一言語として決まっている
+（ADR-2608189300：EDN 値なので文字列連結の段が無く injection class が構造的に
+消え、redaction seam が `q` 側に required 引数として在る）。
+
+⚠ **「Datalog」と「kotobase 方言」と「Datomic」は 3 つの別の名前である。**
+私たちが書いている `[:find ... :where ...]` は Datalog 標準の記法ではない。
+
+### D3. ontology は 2 つの扉からしか入らない。第 3 の扉は禁止
+
+**これがこの ADR の中心的な決定である。**
+
+    (a) query の中の `:rules`         -> value-cid(query) = :query/digest の中に居る
+    (b) materialize された derived datom -> :data/commit の中に居る
+
+★ 実測 2026-09-10: 同じ entailment を rule 無し / keyword vocabulary /
+IRI vocabulary で書くと `value-cid` は **3 つとも違う**。つまり `:rules` として
+運ばれた ontology は `:query/digest` の中に居り、auditor が再導出できる。
+
+**禁止するのは第 3 の扉 —— engine 側の設定として ontology を持つこと。**
+`kotobase.execution-contract` の `manifest-keys` は exact であり
+（`exact-keys!` が余分な key を `:invalid-keys` で拒否する）、ontology の欄は
+無い。だから第 3 の扉から入った ontology は、**有効な receipt が付いた
+再現できない答え**を作る —— 同じ data・同じ query・同じ policy で、違う結果。
+
+**この規則に version bump は要らない。** 規則は「第 3 の扉が無い」であって
+「4 つ目の field を足す」ではない。もし将来 ontology を manifest に載せたく
+なったら、それは contract v2 であり、既存の digest 全部が動く owner decision に
+なる（ADR-2609107000 D3 が同じ形のコストを記録している）。
+
+### D4. OWL reasoner を作らない。高い側は既に名指しで拒否されている
+
+★ 実測 2026-09-10、deploy 済みの `kotobase.server.admission`:
+
+    hierarchy-rules (述語が literal)  admitted?=true   refusals=[]
+    triple-rules    (述語が変数)      admitted?=false  refusals=[[:variable-attribute [:rules owl-triple]]]
+
+同じ library の 2 つの ruleset が逆の verdict を得て、**拒否は rule の名前を
+名指す。** `:where` だけを読む gate ではこの refusal は出せない —— admission は
+rule body を歩く。fixpoint は clause を毎ラウンド訊き直すので、`:where` の中の
+full scan より rule の中の full scan の方が高い。
+
+つまり提案が §9 で心配していた「LLM が無自覚に書ける unbounded traversal」は、
+**ontology 側では既に閉じている** —— コストの選択が 2 つの ruleset として
+表に出ており、server がその選択を強制する。
+
+DL の残り（`someValuesFrom` / `unionOf` / `maxCardinality` / `disjointWith` の
+整合性判定）は Horn の外なので、**rule を増やす話ではない。** 要るなら別の
+決定であって、この ADR の続きではない。
+
+ontology を *admission* として使う側は `oak` が既に持っている
+（ADR-2608319400、ADR-2609101837 D5）。**model は提案し、ontology が受け入れる。**
+
+### D5. Selector は Form である。公開する address は Data Model 側
+
+★ 実測 2026-09-10、同じ selector が 2 つの address を持ち、**一致しない**:
+
+    ipld/cid (selector/encode s)   canonical Data Model の bytes
+    vc/value-cid s                 authoring 値（Clojure keyword のまま）
+
+control（field 名を 1 つ変えた selector）は両方の addressing で動くので、
+上の不一致は 2 つの値の差ではなく **2 つの addressing の差**である。
+これは ADR-2608148200 が 1 つ下の面で記録している形そのもの ——
+同じ bytes でも codec が違えば CID 文字列は分かれ、**それをバグにしない。**
+
+**決定: SelectorCID := Data Model bytes の CID。** 理由は 1 つで、それは
+「他の IPLD 実装が計算できる唯一の address だから」である。IPQ が
+`?selector=<base64url dag-cbor>` として wire に載せているのもこの bytes である。
+`value-cid` はこのスタックの中だけで意味を持つ authoring 値の address なので、
+**publish しない** —— publish した瞬間 1 つの traversal が 2 つの identity を持つ。
+
+⚠ **この workspace で selector の CID を計算しているコードは 0 件。**
+上の 2 つはこの ADR の probe が初めて計算した。**この ADR は名前を決めるだけで、
+計算する側を作らない** —— 読む側の無い address を先に足さない。
+
+### D6. Graphsync の役は IPQ/1 が埋めている。transport を作らない
+
+★ 実測 2026-09-10、`https://ipfs.kotobase.net/ipq/v1` は live:
+
+    profile      limits: maxBlocks 256 / maxBytes 4 MiB / maxDepth 32 / maxMatches 256
+                 ipni protocol 3148096 (0x300940) transport-ipq-selection-http
+    matcher      200  blocks=1 matches=1 car-bytes=562
+    explore-all  200  blocks=3 matches=8 car-bytes=1148   <- link を跨いだ
+    control      400 selector-not-dag-cbor / 404 root-not-held / 400 selector-required
+
+root は `ipni.kotobase.net/ipni/v1/head` の署名付き head から取っている
+（固定 CID を probe に焼くと、その CID が unpin された日に測定であることを
+やめる）。3 つの control が 3 つの違う名前付き refusal を返すので、上の 200 は
+**名乗った理由で** 200 である。
+
+**新しく GraphSync transport を作らない。** bitswap の wire schema は
+`io-libp2p` に在るが接続経路は JVM 専用で、もう 1 本の transport は `node:net`
+なので workerd では動かない（CLAUDE.md に実測済み）。つまり足りないのは
+protocol ではなく transport であり、**その穴を HTTP で埋めたのが IPQ/1 である。**
+
+⚠ **IPQ の 200 は完全性の証明ではない。** endpoint 自身がそう言う ——
+`proves: that this traversal ran over blocks that hash to their CIDs` /
+`doesNotProve: that a database range or Datalog answer is complete`。
+range や Datalog の答えが「漏れていない」ことの証明には authenticated index
+boundary が要り、それは存在しない（ADR-2609060000）。だから profile 番号が
+wire に載っている —— 完全性証明を運ぶのは IPQ/2 であって、IPQ/1 の
+静かに良くなった版ではない。
+
+### D7. 役割は 6 つで固定する
+
+提案の一覧をそのまま採る。ただし Graphsync の行は IPQ/1 に置き換える。
+
+    CID       これは何か
+    Link      このオブジェクトは何に依存しているか
+    IPNS      今の root はどれか
+    IPNI      これを提供できるのは誰か
+    Selector  到達可能なもののうちどれが要るか
+    IPQ/1     それを転送し、結果を証明する block を返す
+
+    ayatori   どのオブジェクトが意味的な問いを満たすか
+    kotobase  どんな関係・index・時間軸の事実が在るか
+    kotoba    Form はどう評価されるか
+
+**Link は取得命令ではない。** local に在れば local から読み、無いときにだけ
+discovery -> retrieval に進む。この分離が保たれている限り、bytes の置き場所を
+差し替えても query 面は 1 文字も動かない（ADR-2609092600 の
+identity / naming / location の分離が、1 層下で同じことを言っている）。
+
+**IPNS は DAG の中に入れない。** mutable な辺は `name -> RootCID` の 1 本だけに
+し、RootCID から先は全部 immutable にする。DAG の途中に IPNS を混ぜると
+traversal の再現性が壊れる。
+
+### D8. 名前は query 面では identity の *中* に居る —— ontology の vocabulary も同じ
+
+ADR-2609107000 D3 が測ったとおり、code 面では binder の rename は DefCID を
+動かさないが、query 面では `?e` を `?entity` に変えると `:query/digest` が動く。
+
+★ この ADR はそれを ontology にも当てて測った: **同じ entailment を
+keyword vocabulary で書くか IRI vocabulary で書くかで CID が変わる。**
+
+これを defect と呼ばない —— digest は「提出されたとおりの query」を指しており、
+それが auditor の再導出する対象である。しかし**書いていないのは擁護できない**:
+`:query/digest` で keying した cache は、**同じ ontology を別の語彙で書いた
+だけの query で miss する。**
+
+### D9. proof は 2 つの粒度に分かれ、片方だけが在る
+
+- **execution 単位** —— 在る。receipt が `:result/root` と `:query/plan-digest` を
+  名指し、IPQ が traversal の触った block を CAR で返し、caller は archive だけで
+  同じ selector を replay できる。
+- **row 単位の derivation**（提案の `(because (assertion CID) (rule CID))`）—— **無い。**
+  `datalog` の fixpoint は rule identity を答えに運ばない（grep で確認）。
+  作るなら engine の中の話であり、ここでは作らない。
+
+**「証拠が在る」と「どの行がどの規則から出たかが言える」は 2 つの主張である。**
+
+## 作らないもの
+
+新しい repo、dialect-neutral な universal query IR、OWL/DL reasoner、
+GraphSync transport、2 つ目の selector address、`(eval ...)` Form、
+2 つ目の ontology 語彙。どれも既存の決定が名指しで否定しているか、既に在る。
+
+## gate は無い。それは決定である
+
+D3 の「第 3 の扉が無いこと」を機械で検査していない。書けそうに見えるが、
+`:rules` でも derived datom でもない経路で ontology が evaluator に届く形を
+網羅的に述べる述語を私は持っていない。**落ちることを確かめていない gate は劇場**
+なので landing させない。**検査を書くなら、まず第 3 の扉を 1 つ実際に作って
+赤くなることを見せる。**
+
+## 測っていないこと（clean ではなく未測定）
+
+- **IPNS の name -> root CID 解決。** 読んだだけで引いていない。
+- **6 つの dialect surface に query を通していない。** 10 origin が答えることは
+  測った（下記）が、**401 は「動いている」であって「正しく答える」ではない。**
+- **row 単位 provenance の設計と性能。** 無いことを確かめただけ。
+- **pack 粒度と round trip。** ADR-2608160100 の結論をこの面に輸入していない。
+
+live 判定（GET `/`、2026-09-10）:
+
+    datomic 200 / datoms 200 / search 200      sparql 401 / cypher 401 / gremlin 401
+    graphql 401 / s3 401                        git 404 / atproto 404
+    control: graphdb（2026-08-15 に撤去済み）000 / 存在しない host 000
+
+control が 000 を返すので、上の 401 と 404 は生きた worker の応答である。
+
+## Reproduce
+
+evidence は `90-docs/query-plane/2026-09-10-query-plane-measurements.edn`。
+probe は 4 本、superproject root から:
+
+    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/ontology_entailment.cljs
+
+    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/kotobase-server/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/ontology_admission.cljs
+
+    nbb --classpath \"orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/selector_address.cljs
+
+    nbb 90-docs/query-plane/ipq_live.cljs
+
+**4 本とも control を持ち、その control は落ちる向きで走らせてある。**
+`datom-source` を classpath から外すと 1 本目は query の答えではなく
+missing namespace を報告する —— それは依存の欠落であって codec の答えではない。
+")))

@@ -1,0 +1,66 @@
+;; ADR-2609109700 の測定記録。**生成物ではないが、手で数値を書き換えない** ——
+;; 数値は下の 4 本の probe が出したもので、直すときは probe を回し直す。
+;;
+;; 4 本とも「両方向」を持つ: 通る例と落ちる例の両方を出したことがある。
+;; 片方しか出したことのない検査は、discriminate したのか空振りしたのかを
+;; 出力から区別できない（CLAUDE.md 8 問の 5 問目・6 問目）。
+{:measured "2026-09-10"
+ :adr "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
+ :route "nbb, no JVM"
+ :base {:org-w3-owl2 "b23571a" :datalog "fef2eb4" :datom-source "6936d20"
+        :io-ipld "f2d0487" :kotobase "faa5cc0" :kotobase-server "197cd9d"
+        :ayatori "d6f3431" :kotobase-protocol-ipq "8c5f701"}
+
+ :probes
+ [{:probe "90-docs/query-plane/ontology_entailment.cljs"
+   :question "owl.rules の :rules は datalog の fixpoint に届くか。届いた ontology は query の identity の中に居るか"
+   :result {:asserted-only ["Cat"]
+            :with-ontology ["Animal" "Cat" "Mammal"]
+            :control-one-edge-cut ["Cat" "Mammal"]
+            :cid-no-rules "bafyreiaxvc7yvnxvi5h2kvaofp5odmlp7awqpo3hpxrfkgxh6s4otswv74"
+            :cid-keyword-vocabulary "bafyreiduswn75cgdbqcinmxt7mwsxp6xjuge7yk3u6molij3tg2vbrgj7a"
+            :cid-iri-vocabulary "bafyreiecwmqupeik7mhuaidm4hh7z4dx7ms2zo4tgd4skptvsqlcdzzyla"
+            :distinct-addresses 3}
+   :discriminates "rules 無しは 1 件、rules 付きは 3 件、hierarchy edge を 1 本切ると 2 件。全部返す ruleset と何も導出しない ruleset は、この 3 行のうち 1 行だけでは区別できない"}
+
+  {:probe "90-docs/query-plane/ontology_admission.cljs"
+   :question "deploy 済みの admission gate は ontology の高い側を拒否するか"
+   :result {:hierarchy-rules {:admitted? true :refusals []}
+            :triple-rules {:admitted? false
+                           :refusals [[:variable-attribute [:rules "owl-triple"]]]}}
+   :discriminates "同じ library の 2 つの ruleset が逆の verdict を得る。拒否は rule 名を名指す —— :where だけを読む gate ではこの refusal は出せない"}
+
+  {:probe "90-docs/query-plane/selector_address.cljs"
+   :question "Selector を content address すると、どの address になるか"
+   :result {:selector-a {:data-model "{\"f\" {\"f>\" {\"defs\" {\"a\" {\">\" {\".\" {}}}}}}}"
+                         :cid-dag-cbor "bafyreih5dzujzvstg2jlhqmw52zd52q55peid7mm6ralmg7kivczzwltxy"
+                         :value-cid "bafyreiflt6um5yoe6ys3k5ut7jwuoqchxpao2nbxs6slgfv3x74ao6rjiu"}
+            :selector-b-control {:cid-dag-cbor "bafyreihkby6u57z2igp2txuezkysvzjzzeiprmk7aim4omoll7b6vyc3qm"
+                                 :value-cid "bafyreicdqw5kobzxmx35khddmca4qkewkpxl3bdks7kf3ctwahx5rhvpyq"}
+            :addressings-agree? false}
+   :discriminates "control は 1 field 名だけ違い、両方の addressing が動く。だから上の不一致は 2 つの値の差ではなく 2 つの addressing の差"
+   :note "この workspace で selector の CID を計算しているコードは 0 件。上の 2 つはこの probe が初めて計算した"}
+
+  {:probe "90-docs/query-plane/ipq_live.cljs"
+   :question "selector を投げて、結果を証明する block が返る経路は live か"
+   :origin "https://ipfs.kotobase.net/ipq/v1"
+   :result {:profile {:protocol "ipq" :profile 1
+                      :limits {:maxBlocks 256 :maxBytes 4194304
+                               :maxDepth 32 :maxMatches 256}
+                      :ipni {:protocol 3148096 :name "transport-ipq-selection-http"}
+                      :proves "that this traversal ran over blocks that hash to their CIDs"
+                      :does-not-prove "that a database range or Datalog answer is complete"}
+            :root-from "https://ipni.kotobase.net/ipni/v1/head （署名付き head。固定 CID を焼かない）"
+            :root "bafyreid4qinuqf6iugjpvjwcma7iuhbf37vrxgmvyku6rkl3vm3hsnfmda"
+            :matcher {:status 200 :blocks 1 :matches 1 :car-bytes 562}
+            :explore-all {:status 200 :blocks 3 :matches 8 :car-bytes 1148}
+            :control-bad-selector {:status 400 :error "selector-not-dag-cbor"}
+            :control-bad-root {:status 404 :error "root-not-held"}
+            :control-no-selector {:status 400 :error "selector-required"}}
+   :discriminates "3 つの control が 3 つの違う名前付き refusal を返す。200 が『名乗った理由で』200 だと言えるのはこれがあるからで、結果だけを assert する負テストは別の原因で落ちた実行を成功として数える"}]
+
+ :not-measured
+ ["IPNS の name -> root CID 解決（読んだだけ。この session では引いていない）"
+  "SPARQL / Cypher / SQL / Gremlin / GraphQL の各 surface に query を通していない。live 判定は GET / の応答コードだけで、401 は『動いている』であって『正しく答える』ではない"
+  "row 単位の derivation provenance —— datalog engine に無いことを grep で確かめたが、無いことの確認であって性能や設計の測定ではない"
+  "pack 粒度 / round trip 数。ADR-2608160100 の結論をこの面に輸入していない"]}
