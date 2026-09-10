@@ -4261,7 +4261,11 @@
               Two independent measurements agreed on the date: the highest checkpoint every
               witness still holds (5600) was written 2026-08-15 08:03:25Z, and the pacemaker's
               own view counter, advancing 0.69/s while the height advanced 0, divided out to
-              25.1 days of spinning. The repo bot for `torihiki-node` was green throughout --
+              25.1 days of spinning. It had been diagnosed once, on 2026-08-31, sixteen days
+              in: `inga.replica/sync-ask-from`'s docstring names this chain and this height, and
+              the fix landed on inga's main that day. It never reached the deployment, because
+              the pin in `torihiki-node` did not move -- ten more days of halt with the fix
+              already written. The repo bot for `torihiki-node` was green throughout --
               its five floors (checkout, pinned, landed, readme, test-signal) are all questions
               about a git tree, and the chain is not in the tree. Cannot be a fleet gate: a
               gate ships one repo's tree and no network identity, and the question here is
@@ -4297,6 +4301,11 @@
               What a clean run means, exactly: the chain advanced between two samples seconds
               apart and its witnesses agreed on the CIDs in one window above the last common
               commit. It is not a safety proof, it verifies no signatures, and it cannot see a
-              fork already buried under a common checkpoint."}
+              fork already buried under a common checkpoint.
+              BOTH DIRECTIONS, ON THE SAME LIVE DEPLOYMENT AND THE SAME DAY: at 11:16 it reported
+              `halted:` and `fork:` and exited 1; the inga pin was then advanced to d8e5952 and
+              the validator redeployed (code-version 150); the same script, unchanged, exited 0
+              with zero findings, all four witnesses holding one block at 5616. A detector that
+              has only ever been red is not yet evidence of anything."}
 
 ]}
