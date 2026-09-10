@@ -177,6 +177,17 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
    格子は `kotoba-lang/security` から借りた —— D1 が 2 複製を 1 つにした直後に
    3 つ目を作らない。**未知ラベルの丸めは主体と客体で逆**（客体は上、主体は下）。
 
+   **Step 3 も完了（2026-09-10）** —— `authorize-xrpc` が全 method で
+   `classification-decision` を出し、`classification-required?` が未申告を
+   `:kotobase/classification-undeclared` に変える。pin `c722fb166b11`。
+   判定は abac のまま（D6）。**`authorize-xrpc` にはそれまでテストが 1 本も無かった。**
+
+   **Step 5 は未着手で、ブロッカーを測った** —— `kotobase-server` は
+   `kotobase-peer` を古い sha に pin しており、その pin は
+   **2026-08-04 の実測（78/332 green → 16 failures）を根拠に意図的に凍結**されている。
+   Step 5 の実体は「security を足す」ではなく「pin を測定付きで前進させる」。
+   **読む側の無い依存を先に足さない。**
+
    ⚠ **4 段は「宣言できて強制される」が「配れる」ではない** ——
    `read-classified/<label>` capability を発行する経路はまだ無い。
    ⚠ A2 の却下理由が古くなった件（同 ADR の注記）は Step 2 に影響しない ——
@@ -187,7 +198,16 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
    持つ。**68 セルは未測定であって clean ではない。**
 7. dual-compiler / independent rebuild（#7）。**未着手。** attestation は在るので、
    compromised compiler は**検出されるのではなく attest される**（matrix の
-   `kotoba × tampering` セル）。
+   `kotoba × tampering` セル）。着手条件は 2 つの backend が
+   **意味的に等価な artifact を出すことを比較する harness** であって、
+   依存の追加ではない。
+
+9. **matrix の残り 65 セルは埋めない。** 埋めるには 65 回測る必要があり、
+   測らずに埋めることは matrix そのものが防ぐために形を与えられている失敗である
+   （`:matrix/note` が「セルの不在は測定の不在である」と書いている）。
+   **「格子が埋まっている」ことは「脅威が無い」ことの証拠にならない** ——
+   この文書が fleet-ci 節で警告している「緑は仕事をした証拠ではない」の
+   matrix 版。1 セル = 1 測定という単価は変わらない。
 8. ~~3-arity を wire に出している呼び出し側の棚卸し~~ **完了（2026-09-10）**。
    `orgs/kotoba-lang/kotobase-server` の `scripts/measure_wire_disclosure.cljs`、
    pin `197cd9d96046`。**答えは「出ている。ただし遥かに狭い」。**

@@ -50,7 +50,47 @@
   ⚠ **まだ誰も `read-classified/<label>` capability を発行していない。**
   4 段は「宣言できて強制される」が「配れる」はまだ —— CACAO 側の発行経路は別作業。
   既存の `read-protected-capability` は top clearance として不変なので、
-  発行経路が無い間も全ての既存 graph は今日と同じに動く。\n- **Step 3 — `authorize-xrpc` の write 限定解除(問題2): 未着手。** `kotobase.cljc:76` の `write-methods` ガードを外し、write = no-write-down / read = no-read-up に分ける。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 未着手。**\n- **Step 5 — `kotobase-server` への security 依存追加(問題4): 未着手。** 優先度は Step 3 より高い可能性がある(サーバがクライアントを信用しない、という独立した価値があるため)。\n\n**Step 1 は他 repo に波及しない。** 消費者は各自の `security-adoption.edn` で古い sha を pin したままでも adoption verifier を通る(宣言 sha と deps.edn が一致していればよい)ので、各 repo が自分のペースで pin を進められる。"
+  発行経路が無い間も全ての既存 graph は今日と同じに動く。\n- **Step 3 — `authorize-xrpc` の write 限定解除(問題2): 完了(2026-09-10)。** pin `c722fb166b11`。
+  `flow/evaluate-egress` は write 限定のままで**正しい**（egress は write の問い）。
+  足りていなかったのは read 側なので、**全 method が `classification-decision` を出す**ようにした
+  （`:kotobase/read` / `:kotobase/write` のラベル付き）。`:get`/`:list`/`:snapshot` が黙らなくなった。
+
+  **問題3 も半分閉じた。** abac の `required-rank` は resource の申告から来るので、
+  **申告が無いと nil になり、nil は violation を生まない** —— 分類の無い resource は、
+  正しく clearance を持つ resource と**同じ値で許可される**。決定がどちらだったかを記録し、
+  `classification-required?` が前者を `:kotobase/classification-undeclared` に変える。
+
+  - **判定は複製していない。** no-read-up は abac のまま（D6）。この層が足すのは
+    「abac に判定させるだけの申告が在ったか」だけ。**格子が rank できないラベルは
+    申告が無いのと同じ**に数える（abac も同じように読み飛ばすので）。
+  - **未申告の枝は abac の枝より上**に置いた。両方が拒否する場合、
+    「分類を申告していない」が行動可能な答えで、「policy に拒否された」は
+    **到達していない検査の報告**だから。
+
+  ⚠ **`authorize-xrpc` にはそれまでテストが 1 本も無かった。** 9 本追加。
+  **検証: 172 tests / 3078 assertions / 0 failures**（変更前 163 / 3061 / 0）。
+  判別 3 本 ——①write 限定に戻す→ read 系 4 本 ②`allowed?` を常に true →
+  required 系 4 本 ③枝を abac の下へ→**順序テストだけ**。
+
+  ⚠ **option を渡さない呼び出し側は今日と同じ**（`capability-required?` と同じ opt-in）。
+  申告を無条件に必須化するのは Step 4 の compile 時の仕事で、runtime flag の仕事ではない。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 未着手。**\n- **Step 5 — `kotobase-server` への security 依存追加(問題4): 未着手。ブロッカーを測った(2026-09-10)。**
+
+  当初「Step 2 が問題4 を部分的に閉じたのでは」と考えたが、**測ると偽だった** ——
+  `kotobase-server` は `kotobase-peer` を**古い sha (`4926d13`) に pin** しており、
+  `clojure -Stree` に security は現れない。CLAUDE.md が警告している
+  「基盤ライブラリの pin は、fix が main に在っても届かない」形そのもの。
+
+  **その pin は勝手に上げられない。** deps.edn 自身が理由を持っている ——
+  2026-08-04 の実測で、これらの pin を外して surface を取ると
+  **78/332 green が 16 failures になった**（query surface の推移依存が engine の
+  ライブラリを黙って差し替える）。したがって Step 5 の実体は
+  「security を足す」ではなく **「kotobase-peer pin を測定付きで前進させる」**であり、
+  それ自体が独立した作業。
+
+  ⚠ **読む側の無い依存を先に足さない。** 依存だけ足すのは
+  「索引が当たったことは動くものが在る証拠ではない」の裏返しで、
+  security を deps.edn に書いても server の src が 1 行も参照しなければ
+  **問題4 は 1 ミリも動かない**。\n\n**Step 1 は他 repo に波及しない。** 消費者は各自の `security-adoption.edn` で古い sha を pin したままでも adoption verifier を通る(宣言 sha と deps.edn が一致していればよい)ので、各 repo が自分のペースで pin を進められる。"
 
   :adr/alternatives
   "**A1. datom に5列目としてラベルを足す。** 却下 — ブロック形式・CBOR エンコード・merkle-LSM・compaction を全て破壊し、既存 chain との互換性が切れる。属性レベルなら schema datom 1個で済む(D2)。\n\n**A2. クリアランスごとに ref / データベースを分ける。** 却下 — D4 のとおり join が ref 1本までしか届かず、横断クエリが永久に失われる。CLAUDE.md の repo-wide mandatory rule に正面から反する。\n\n⚠ **この却下理由は 2026-09-10 に古くなった**(ADR-2609108000 が発見)。「join が ref 1本までしか届かない」という前提は **ADR-2809040800 が 2026-09-04 に実測で反転させている** —— 到達範囲は ref の本数ではなく、query 時に 1 つの `IPatternSource` へ合成されているかで決まる。したがって A2 の 2 番目の理由(横断クエリが永久に失われる)は現在偽で、CLAUDE.md の該当規則も既に書き換わっている。\n\n**それでも A2 は却下のまま**で、D2(ラベルは属性に付ける)も動かない —— A1 の却下理由(ブロック形式・CBOR・merkle-LSM・compaction を壊す)と、分割した ref を合成し続ける運用コストが独立に生きているため。**倒れたのは却下の理由が 1 つであって、決定ではない。**\n\n**A3. 言語に完全な IFC 型システム(値レベル label + label polymorphism)を入れる。** 却下 — D5 のとおり capability confinement で既に閉じている経路に対する二重投資で、追加保証がほぼゼロ。non-claims が covert / timing channel を非-claim にしている以上、到達点も変わらない。\n\n**A4. クリアランスは言語に一切入れず実行時チェックのみに留める。** 却下 — 問題3(context 欠損の fail-open)が原理的に塞げないまま残る。effect の型に載せることが、この穴を構造的に消す唯一の手段。\n\n**A5. read 側に新しい強制 seam を作る。** 却下 — `kotobase-peer.policy` の `visible-for` が既に全 read producer を通っており、in-graph で chain と一緒に伝播するという正しい性質を持つ。新設は重複を4つ目にするだけ。"

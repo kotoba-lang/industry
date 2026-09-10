@@ -1406,6 +1406,23 @@ pass にしない。**
     共通規則にすると必ず片側で誤る —— **主体側を上へ丸めるのは誤字による権限昇格**。
   - ⚠ **宣言できて強制されることは、配れることではない。**
     `read-classified/<label>` を発行する経路はまだ無い。
+  - **read でも格子を評価する**（Step 3）。egress は write の問いなので write 限定で
+    正しく、足りていなかったのは read 側。`authorize-xrpc` は全 method で
+    `classification-decision` を出す。⚠ **abac は「申告が無い」を violation にしない**
+    （`required-rank` が nil になり nil は何も生まない）ので、**分類の無い resource は
+    正しく clearance を持つ resource と同じ値で許可される** —— `classification-required?`
+    がこれを拒否に変える。**判定は複製しない**（比較は abac のまま。この層が記録するのは
+    「abac に判定させるだけの申告が在ったか」だけ）。
+  - ⚠ **未申告の拒否は policy 拒否より上に置く。** 両方が拒否する場合、
+    行動可能なのは「申告していない」で、「policy に拒否された」は
+    **到達していない検査の報告**である。
+
+⚠ **依存を足すことは、その層が在ることではない。** 実測 2026-09-10:
+`kotobase-server` に security 依存が無いという gap を閉じようとして、
+まず「Step 2 が transitively 届いているのでは」と考えたが**測ると偽**だった ——
+server は `kotobase-peer` を古い sha に pin しており、その pin は**実測を根拠に
+凍結されている**（外すと 78/332 green が 16 failures）。**読む側の無い依存を
+先に足さない** —— deps.edn に書いても src が 1 行も参照しなければ gap は動かない。
 
 ⚠ **この面に gate は無く、それは決定である**（ADR-2609108000 D8）。上の 4 つは
 「文書が 2 つの概念を混ぜていないか」を問うもので、機械が判定できる述語ではない。
