@@ -325,6 +325,27 @@
     :versus-library-seam "materialize takes max-datoms as an argument; there an exact total falls out in about a dozen probes"
     :defence-chosen :none-yet
     :why "a refusal that will not say why is its own defect; which cost to pay is a decision"}
+   ;; The first thing on this plane that is an IMPLEMENTATION rather than a
+   ;; measurement (2026-09-10, ADR-2607280100 Step 2). Read visibility is
+   ;; four-level over the one lattice, and the previous binary rule is the
+   ;; top case of it rather than a branch beside it -- breaking the
+   ;; object-side rounding fails the tests that existed before the change,
+   ;; which is what makes that a claim and not a hope.
+   :policy/clearance
+   {:levels :kotoba.security.information-flow/ranks
+    :lattice-is-borrowed-not-copied true
+    :enforced-in "orgs/kotoba-lang/kotobase-peer src/kotobase_peer/policy.cljc"
+    :pin "ed3ae49d79ec"
+    :policy-key :kotobase.policy/prefix-levels
+    :rule "(>= viewer-rank level-rank)"
+    :prefix-without-level :restricted
+    ;; Both are the fail-closed direction for their own side. One shared
+    ;; rule would have to be wrong on one of them: rounding a SUBJECT up is
+    ;; privilege escalation by typo.
+    :unknown-label-rounding {:object :up :subject :down}
+    :overlapping-prefixes :higher-wins
+    :coercion-observable-as :unknown-levels
+    :gap "nothing mints read-classified/<label> capabilities yet; declarable and enforced, not issuable"}
    :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
    :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}

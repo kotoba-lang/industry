@@ -20,16 +20,17 @@
   :matrix/linddun ["linking" "identifying" "non-repudiation" "detecting"
                    "data-disclosure" "unawareness" "non-compliance"]
   :matrix/cells-total 78
-  :matrix/cells-recorded 11
+  :matrix/cells-recorded 12
   ;; These five must sum to :cells-recorded, and with :cells-unrecorded to
   ;; :cells-total. A reader can count the entities below and check. A matrix
   ;; whose declared coverage does not equal its counted coverage is the
   ;; failure this file exists to make visible.
   :matrix/cells-measured 6
+  :matrix/cells-implemented 1
   :matrix/cells-measured-residue 1
   :matrix/cells-gap 3
   :matrix/cells-unmeasured-here 1
-  :matrix/cells-unrecorded 67
+  :matrix/cells-unrecorded 66
   :matrix/note "68 unrecorded cells are UNMEASURED, not clean. Absence of a cell is absence of a measurement."}
 
  {:db/id -2 :cell/plane "ayatori" :cell/stride "information-disclosure"
@@ -55,6 +56,14 @@
   :cell/linddun "detecting" :cell/status :measured :source/dataset "privacy-plane"
   :cell/evidence "90-docs/security/traversal-bounds-census.edn"
   :cell/finding "ipld.graph/selection-cursor requires four positive limits and refuses a partial set before reading a block; prolly-tree.diff/sync-blocks* requires three and rejects 0. Fail closed, no default. The bound exists; it is the query plane's two doors that skip it."}
+
+ {:db/id -13 :cell/plane "kotobase" :cell/stride "elevation-of-privilege"
+  :cell/linddun "data-disclosure" :cell/status :implemented :source/dataset "privacy-plane"
+  :cell/surface "kotobase-peer read policy"
+  :cell/evidence "orgs/kotoba-lang/kotobase-peer src/kotobase_peer/policy.cljc, pin ed3ae49d79ec"
+  :cell/finding "ADR-2607280100 Step 2 (D3) landed: read visibility is four-level, (>= viewer-rank level-rank), over the one lattice in kotoba-lang/security rather than a local copy. A prefix with no declared level is :restricted, so the previous binary rule is the top case of the new one -- breaking the object-side rounding fails the PRE-EXISTING tests, which is the evidence for that. Unknown labels round UP on the object side and DOWN on the subject side; a shared rule would be wrong on one of them."
+  :cell/first-implementation-in-this-plane true
+  :cell/gap "nothing mints read-classified/<label> capabilities yet -- four levels can be declared and enforced, not handed out"}
 
  {:db/id -5 :cell/plane "kotobase" :cell/stride "information-disclosure"
   :cell/linddun "data-disclosure" :cell/status :measured :source/dataset "privacy-plane"
