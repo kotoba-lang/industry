@@ -1,0 +1,74 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609112100-the-rule-against-inventing-fixtures-does-not-cover-a-whole-oracle")
+  (:adr/topic "q9-harness-store-layer")
+  (:adr/title "The rule against inventing fixtures does not cover a whole oracle, only its rendered half")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang" "kotoba-lang/com-agones"))
+  (:adr/related (vector "adr-2609112000-eighteen-of-twenty-harnesses-carry-the-table-layer-and-two-should-not"
+                "adr-2609111100-a-generator-that-cannot-derive-a-test-should-refuse-not-invent"))
+  (:adr/body
+  "## The decision that had been deferred three times
+
+The generator refused the fixture-shaped layers -- store, filter, pagination,
+handler, expand -- on one argument: a generator that constructs a test input has
+manufactured the very thing whose absence it exists to detect, and its arms
+would go green over behaviour the production path never performs.
+
+That argument is sound. It was applied to whole oracles, and that was the error.
+
+## oracle-store is two things
+
+Eight selectors. FIVE return `arr-count`; three return `str-hash` of a rendered
+store.
+
+The three hashes are exactly what the rule is about: they hash the component's
+own JSON convention, so a disagreement confounds behaviour with layout, and
+reproducing that convention in the Clojure side would be constructing the answer.
+
+The five counts are not. A count has no rendering.
+
+And the seeded row they operate on is DERIVED rather than invented: the
+component's own `seeded-row` is generated from the spec table -- id prefix, one
+non-required field, then the required ones. Mirroring it reads the same source.
+Nothing is constructed for the test to consume; the test reads what the
+component already reads.
+
+**So the rule holds and the layer comes in, partially. The unit it applies to is
+a SELECTOR, not an oracle.**
+
+## What it buys
+
+Every layer before this one reads declarations -- the route table, the entity
+table, a fixed table of strings. This one runs the store, and the selectors are
+chosen for semantics that nothing else reaches:
+
+    retract an id that is not there   the count must not move
+    put an id that is already there   it must replace, not append
+
+Measured on `com-agones`: 5 of 5 agreeing against the component compiled to
+aarch64-macos and executed through `tools/kexe_loader.c`.
+
+## Controls
+
+A count layer whose values are all the same proves nothing, so two:
+
+  **the values discriminate** -- the five selectors produce three distinct
+  values, 3, 2 and 0.
+
+  **mismatched comparisons differ** -- cljc `retract existing` against native
+  `seeded count` (2 vs 3), and cljc `other entity` against native `retract
+  absent` (0 vs 3).
+
+## What is still refused
+
+`oracle-store`'s three hash selectors, and the filter, pagination, handler and
+expand layers, which have not been examined selector by selector yet. The same
+question applies to each of them and the answer may differ per selector rather
+than per layer -- that is the shape this iteration found, and it is the way to
+approach the rest.
+
+`com-agones` is the only repository carrying this layer so far. Rolling it out
+is mechanical; the decision is what was hard.")))
