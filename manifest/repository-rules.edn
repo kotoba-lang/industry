@@ -305,6 +305,26 @@
     :propose-not-authorize-is-unenforced
     {:evidence "orgs/kotoba-lang/ayatori src/ayatori/agent.cljc"
      :says "ayatori.agent/validate is real; nothing checks that passing it is not authorisation"}}
+   ;; Measured 2026-09-10 on the deployed surface, which is a different
+   ;; question from the library seam and got a different answer. The refusal
+   ;; does carry an exact count to the client, and the cap it fires at is a
+   ;; literal that no request can move -- so the deployment is strictly
+   ;; narrower than the library it sits on. Recorded because "it leaks" and
+   ;; "it leaks one number above a fixed threshold" call for different
+   ;; decisions, and only the second one is true here.
+   :policy/wire-exposure
+   {:surface "kotobase.server.admission"
+    :evidence "orgs/kotoba-lang/kotobase-server scripts/measure_wire_disclosure.cljs"
+    :pin "197cd9d96046"
+    :discloses :exact-datom-count-of-the-prefetched-union
+    :counted-before-visibility true
+    :reaches-client-in #{:details :refusals}
+    :cap-caller-settable false
+    :cap 200000
+    :probe-below-cap false
+    :versus-library-seam "materialize takes max-datoms as an argument; there an exact total falls out in about a dozen probes"
+    :defence-chosen :none-yet
+    :why "a refusal that will not say why is its own defect; which cost to pay is a decision"}
    :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
    :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}

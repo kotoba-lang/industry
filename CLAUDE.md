@@ -1369,6 +1369,15 @@ pass にしない。**
   開示経路である。** 再現は `orgs/kotoba-lang/ayatori` の
   `bench/inference_channel.cljs`（記録は `bench/inference-channel-01.edn`）。
   **防御はまだ入れていない** —— 何を選ぶかは決定であって、これはその入力。
+  ⚠ **deploy された面は別に測ってあり、答えが違う**（`kotobase-server` の
+  `scripts/measure_wire_disclosure.cljs`）。refusal は確かに正確な件数を
+  wire に載せる（`:details` と `:refusals` の両方、可視性判断より前に数えた値）。
+  **ただし cap は caller が動かせない** —— policy は source の literal、call site は
+  全て 1-arity、2 つの policy key は server の他のどこにも無い。したがって
+  **library seam は「任意の collection の正確な総数を約 12 probes で」、
+  deploy 面は「cap を超えた range について 1 つの数、cap 未満は探れない」。**
+  **「漏れる」と「固定閾値の上で 1 つ漏れる」は別の決定を要求する。**
+  片方の測定でもう片方を語らない。
 - **agent が触れてよいのは propose まで。** `generate → parse → schema validate →
   static effects → authority check → risk classify → admission → execute` のうち、
   agent は左 3 つ。`ayatori.agent/validate` は実在するが、**validate が通ることは

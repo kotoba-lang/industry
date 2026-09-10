@@ -178,7 +178,27 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
 7. dual-compiler / independent rebuild（#7）。**未着手。** attestation は在るので、
    compromised compiler は**検出されるのではなく attest される**（matrix の
    `kotoba × tampering` セル）。
-8. **3-arity を wire に出している呼び出し側の棚卸し**（前回の測定が残したもの）。未実施。
+8. ~~3-arity を wire に出している呼び出し側の棚卸し~~ **完了（2026-09-10）**。
+   `orgs/kotoba-lang/kotobase-server` の `scripts/measure_wire_disclosure.cljs`、
+   pin `197cd9d96046`。**答えは「出ている。ただし遥かに狭い」。**
+
+   deploy されている surface（`kotobase.server.admission`）は `over-budget` の
+   `:detail` に **n をそのまま書き**、`refusal-response` がそれを `:details` と
+   `:refusals` の両方で wire に載せる。n は `pattern-source` が prefetch した
+   union の件数で、**可視性の判断が存在する前に数えられている**。
+
+   **しかし cap は caller が動かせない。** policy は `admission.cljc` の
+   literal で、call site は全て 1-arity、2 つの policy key は server の他の
+   どこにも現れない（測った）。したがって:
+
+   | | library seam | deployed surface |
+   |---|---|---|
+   | cap | 呼び出し側の引数 | source の literal |
+   | 学べるもの | **任意の collection の正確な総数** | cap を超えた range の正確な件数 |
+   | 費用 | 約 12 probes | 1 request、cap 未満は探れない |
+
+   **deployment は、その下のライブラリより良い。** 直していない ——
+   理由を言わない refusal はそれ自体が欠陥で、どちらの代償を払うかは決定。
 
 **gate は無い**（D8）。上の 1〜4 はどれも「測る」であって「直す」ではないので、測った結果が clean なら gate は要らず、汚れていればそこで初めて何を強制すべきかが決まる。"
 
