@@ -1,0 +1,170 @@
+[
+{:id "lsp-rpc-notification" :repo "lsp-rpc-notification" :src-path "orgs/kotoba-lang/lsp-rpc-notification/src/kotoba/lsp_rpc/notification.cljc"
+ :ns-name "kotoba.lsp-rpc.notification" :fn-name "notification"
+ :inputs [["initialize" nil]] :compare false
+ :source "(ns kotoba.lsp-rpc.notification
+  \"notification -- addressed on its own.
+
+  Split out of kotoba.lang.lsp-rpc on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn notification   [method params]   {:jsonrpc \"2.0\" :method method :params (or params {})})
+"}
+{:id "time-pad4" :repo "time-pad4" :src-path "orgs/kotoba-lang/time-pad4/src/kotoba/time/pad4.cljc"
+ :ns-name "kotoba.time.pad4" :fn-name "pad4"
+ :inputs [[7] [1234] [0] [12345]] :compare true
+ :source "(ns kotoba.time.pad4
+  \"pad4 -- addressed on its own.
+
+  Split out of kotoba.lang.time on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn pad4 [n] (let [s (str n)] (str (apply str (repeat (- 4 (count s)) \\0)) s)))
+"}
+{:id "time-pad2" :repo "time-pad2" :src-path "orgs/kotoba-lang/time-pad2/src/kotoba/time/pad2.cljc"
+ :ns-name "kotoba.time.pad2" :fn-name "pad2"
+ :inputs [[7] [12] [0] [123]] :compare true
+ :source "(ns kotoba.time.pad2
+  \"pad2 -- addressed on its own.
+
+  Split out of kotoba.lang.time on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn pad2 [n] (let [s (str n)] (if (< (count s) 2) (str \"0\" s) s)))
+"}
+{:id "string-pad-left" :repo "string-pad-left" :src-path "orgs/kotoba-lang/string-pad-left/src/kotoba/string/pad_left.cljc"
+ :ns-name "kotoba.string.pad-left" :fn-name "pad-left"
+ :inputs [["ab" 5 "0"] ["abcdef" 3 "0"] ["" 3 "x"]] :compare true
+ :source "(ns kotoba.string.pad-left
+  \"pad-left -- one definition, addressed on its own.
+
+  Split out of kotoba.lang.text on 2026-09-09. The unit here is the
+  DEFINITION, not the library: this repo holds pad-left and names, in its
+  deps.edn, exactly the definitions pad-left reaches. Nothing else.\"
+  (:require [kotoba.string.join :refer [join]]
+            [kotoba.string.pad :refer [pad]]))
+
+(defn pad-left  [s width ch] (let [pad (max 0 (- width (count s)))] (str (join (repeat pad ch)) s)))
+"}
+{:id "json-ws" :repo "json-ws" :src-path "orgs/kotoba-lang/json-ws/src/kotoba/json/ws.cljc"
+ :ns-name "kotoba.json.ws" :fn-name "ws?"
+ :inputs [[\space] [\a]] :compare false
+ :source "(ns kotoba.json.ws
+  \"ws? -- addressed on its own.
+
+  Split out of json.core on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn ws? [ch] (contains? #{\\space \\tab \\newline \\return} ch))
+"}
+{:id "lsp-rpc-response" :repo "lsp-rpc-response" :src-path "orgs/kotoba-lang/lsp-rpc-response/src/kotoba/lsp_rpc/response.cljc"
+ :ns-name "kotoba.lsp-rpc.response" :fn-name "response"
+ :inputs [[1 "ok"]] :compare false
+ :source "(ns kotoba.lsp-rpc.response
+  \"response -- addressed on its own.
+
+  Split out of kotoba.lang.lsp-rpc on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn response       [id result]       {:jsonrpc \"2.0\" :id id :result result})
+"}
+{:id "kotoba-io-len" :repo "kotoba-io-len" :src-path "orgs/kotoba-lang/kotoba-io-len/src/kotoba/io/len.cljc"
+ :ns-name "kotoba.io.len" :fn-name "len"
+ :inputs [] :compare false
+ :source "(ns kotoba.io.len
+  \"len -- addressed on its own.
+
+  Split out of kotoba.lang.io on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn len [buf] (count @buf))
+"}
+{:id "json-starts" :repo "json-starts" :src-path "orgs/kotoba-lang/json-starts/src/kotoba/json/starts.cljc"
+ :ns-name "kotoba.json.starts" :fn-name "starts?"
+ :inputs [["hello" 0 "he"] ["hello" 1 "he"] ["hello" 3 "lo"]] :compare true
+ :source "(ns kotoba.json.starts
+  \"starts? -- addressed on its own.
+
+  Split out of json.core on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn starts? [s i lit] (= lit (subs s i (min (count s) (+ i (count lit))))))
+"}
+{:id "async-closed" :repo "async-closed" :src-path "orgs/kotoba-lang/async-closed/src/kotoba/async/closed.cljc"
+ :ns-name "kotoba.async.closed" :fn-name "closed?"
+ :inputs [[{:closed? true}] [{}]] :compare false
+ :source "(ns kotoba.async.closed
+  \"closed? -- addressed on its own.
+
+  Split out of kotoba.lang.async on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn closed? [ch] (true? (:closed? ch)))
+"}
+{:id "time-instant-millis" :repo "time-instant-millis" :src-path "orgs/kotoba-lang/time-instant-millis/src/kotoba/time/instant_millis.cljc"
+ :ns-name "kotoba.time.instant-millis" :fn-name "instant-millis"
+ :inputs [[{:time/instant 123}]] :compare false
+ :source "(ns kotoba.time.instant-millis
+  \"instant-millis -- addressed on its own.
+
+  Split out of kotoba.lang.time on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn instant-millis [i] (:time/instant i))
+"}
+{:id "string-pad-right" :repo "string-pad-right" :src-path "orgs/kotoba-lang/string-pad-right/src/kotoba/string/pad_right.cljc"
+ :ns-name "kotoba.string.pad-right" :fn-name "pad-right"
+ :inputs [["ab" 5 "0"] ["abcdef" 3 "0"] ["" 3 "x"]] :compare true
+ :source "(ns kotoba.string.pad-right
+  \"pad-right -- one definition, addressed on its own.
+
+  Split out of kotoba.lang.text on 2026-09-09. The unit here is the
+  DEFINITION, not the library: this repo holds pad-right and names, in its
+  deps.edn, exactly the definitions pad-right reaches. Nothing else.\"
+  (:require [kotoba.string.join :refer [join]]
+            [kotoba.string.pad :refer [pad]]))
+
+(defn pad-right [s width ch] (let [pad (max 0 (- width (count s)))] (str s (join (repeat pad ch)))))
+"}
+{:id "netcap-surface-to-cap" :repo "netcap-surface-to-cap" :src-path "orgs/kotoba-lang/netcap-surface-to-cap/src/kotoba/netcap/surface_to_cap.cljc"
+ :ns-name "kotoba.netcap.surface-to-cap" :fn-name "surface->cap"
+ :inputs [[:http]] :compare false
+ :source "(ns kotoba.netcap.surface-to-cap
+  \"surface->cap -- addressed on its own.
+
+  Split out of kotoba.lang.netcap on 2026-09-09 (ADR-2609091200). The unit
+  here is the DEFINITION, and this repo's deps.edn names exactly the
+  definitions it reaches -- nothing else.
+\"
+  )
+
+(defn surface->cap [s] (str \"net:\" (name s)))
+"}
+]
