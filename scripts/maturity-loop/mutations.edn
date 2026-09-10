@@ -11919,4 +11919,82 @@
      :file "src/medsales/phase.cljc"
      :find "(:hard? verdict)     :hold\n    (:escalate? verdict) :request-approval"
      :replace "(:escalate? verdict) :request-approval\n    (:hard? verdict)     :hold"
-     :must-fail ["hard-beats-escalate"]}]}]}
+     :must-fail ["hard-beats-escalate"]}]}
+
+  {:repo "orgs/cloud-itonami/hagukumi"
+   :label "hagukumi record-key identity —— MST の rkey を決める sanitizer と、その 5 分岐の fallback chain"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   ;; `safe-rkey` は :mst/put-record が書かれる rkey を決める = MST 上の
+   ;; **record identity** を決める。それが 1 本もテストを持たないまま、8f33084 で
+   ;; clojure.string -> kotoba.lang.text に書き換えられていた。
+   ;;
+   ;; 下の 6 つは 2026-09-10 に全部当てて赤くなることを確認済みで、そのとき
+   ;; **既存 suite (murakumo-test) は 6 つとも緑のままだった** —— つまりこの
+   ;; suite が測っているのは、既存テストが 1 つも区別できなかった 6 通りの
+   ;; 壊れた実装である。
+   :mutations
+   [{:id :hg/did-strip-unanchored
+     :note "`^` を外して did:web: をどこでも剥がす。**ordinary な入力は 1 つも変わらない** ——
+            \"did:web:x\" は両方 \"x\" になる。分かれるのは prefix でない位置に did:web: が
+            在る入力だけなので、happy path しか持たない test はこの 1 文字を通す"
+     :file "src/hagukumi/murakumo.cljc"
+     :find "#\"^did:web:\""
+     :replace "#\"did:web:\""
+     :must-fail ["safe-rkey-strips-the-did-web-prefix-only-at-the-start"]}
+
+    {:id :hg/charset-widened-by-one-space
+     :note "許可文字集合に space を 1 つ足す。rkey に空白が入ると atproto の record key
+            として不正だが、**alphanumeric な例はすべて通る**。敵対的入力でしか分かれない"
+     :file "src/hagukumi/murakumo.cljc"
+     :find "#\"[^A-Za-z0-9._~-]\""
+     :replace "#\"[^A-Za-z0-9._~ -]\""
+     :must-fail ["safe-rkey-output-charset-is-closed"
+                 "safe-rkey-maps-only-the-empty-input-to-unknown"
+                 "safe-rkey-coerces-non-strings"
+                 "every-branch-of-the-rkey-chain-is-sanitized"
+                 "every-cell-produces-a-nonempty-closed-rkey-under-hostile-input"
+                 "the-effect-and-the-record-it-writes-carry-the-same-rkey"]}
+
+    {:id :hg/blank-check-on-the-original-not-the-cleaned
+     :note "**CLAUDE.md 8 問の 5 問目そのもの。** clean ではなく元の文字列に blank? を当てる。
+            2 つの実装を分けるのは **空白だけの入力ちょうど 1 種** —— 空文字も nil も
+            どちらの実装でも \"unknown\"、他の入力はどちらでも同じ。境界を 1 つ置いて
+            いなければ、この反転は永久に緑のまま通る。実測: 落ちる test は 1 本だけ"
+     :file "src/hagukumi/murakumo.cljc"
+     :find "(if (str/blank? clean) \"unknown\" clean)"
+     :replace "(if (str/blank? (str s)) \"unknown\" clean)"
+     :must-fail ["safe-rkey-maps-only-the-empty-input-to-unknown"]}
+
+    {:id :hg/string-rkey-branch-dropped
+     :note "fallback chain から文字列キー \"rkey\" の分岐を落とす。呼び手が JSON 由来の
+            record を渡すと rkey が静かに :tid か request-id に落ちる —— 例外は出ず、
+            **別の record として書かれる**（識別子が変わるので上書きにも衝突にもならない）"
+     :file "src/hagukumi/murakumo.cljc"
+     :find "(get record* \"rkey\")"
+     :replace "nil"
+     :must-fail ["records-for-resolves-the-rkey-in-declared-precedence-order"
+                 "every-branch-of-the-rkey-chain-is-sanitized"]}
+
+    {:id :hg/sanitizer-bypassed-in-plans
+     :note "plan を組むときに safe-rkey を通さない。**この suite の中で最も重い欠陥**で、
+            呼び手由来の :tid / request-id が未 sanitize のまま MST へ届く。
+            実測 2026-09-10: 新 test は 200 assertion 落ちるのに対し、
+            **既存 suite は 0 件しか落ちない** —— 既存の `(not (str/blank? rkey))` は
+            汚れた rkey も blank ではないので通してしまう"
+     :file "src/hagukumi/murakumo.cljc"
+     :find "rkey (safe-rkey (or (:rkey record*)"
+     :replace "rkey (str (or (:rkey record*)"
+     :must-fail ["every-branch-of-the-rkey-chain-is-sanitized"
+                 "every-cell-produces-a-nonempty-closed-rkey-under-hostile-input"
+                 "the-effect-and-the-record-it-writes-carry-the-same-rkey"]}
+
+    {:id :hg/unreserved-characters-narrowed
+     :note "`.` `_` `~` を許可集合から外す（widen の逆向き）。**両方向を持つための対**で、
+            widen 側だけだと『通る例が 1 つも無い』検査と区別が付かない。
+            実測: DID 由来の rkey \"etzhayyim.com-hagukumi\" も同時に壊れる"
+     :file "src/hagukumi/murakumo.cljc"
+     :find "#\"[^A-Za-z0-9._~-]\""
+     :replace "#\"[^A-Za-z0-9-]\""
+     :must-fail ["safe-rkey-preserves-the-unreserved-characters"
+                 "safe-rkey-strips-the-did-web-prefix-only-at-the-start"]}]}]}
