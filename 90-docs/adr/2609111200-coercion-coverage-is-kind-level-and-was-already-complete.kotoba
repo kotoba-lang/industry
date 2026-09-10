@@ -1,0 +1,85 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111200-coercion-coverage-is-kind-level-and-was-already-complete")
+  (:adr/topic "q9-coercion-coverage")
+  (:adr/title "Coercion coverage is kind-level and was already complete, and my earlier reading of the fixture was wrong")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/com-aave" "kotoba-lang/com-aadhaar"))
+  (:adr/related (vector "adr-2609110900-the-coercion-fixture-omitted-the-coerced-field"
+                "adr-2609111100-a-generator-that-cannot-derive-a-test-should-refuse-not-invent"))
+  (:adr/body
+  "## Context
+
+Two iterations ago the generator was changed so `fixture-data` selector 3
+carries the coercion entity's coerced fields, on the stated grounds that the
+fixture existed to exercise the coercion arm. The open question left behind was
+whether the two hand-written pilots, `com-aave` and `com-aadhaar`, carried the
+same omission. The generator cannot answer it -- it refuses `com-aave`, which
+declares no refs -- so the files had to be read directly.
+
+Reading them answered a different question and corrected the first one.
+
+## First measurement, and why it was the wrong question
+
+Extract each entity's `:coerce` table from `main.cljc`, extract selector 3's
+document from the component, and ask which coerced fields appear:
+
+    com-abb-robotics  Robot          1 coerced, 1 present   COMPLETE
+    com-accela        Permit         0 coerced              n/a
+    com-aave          EModeCategory  7 coerced, 3 present   MISSING 4
+    com-aadhaar       Transaction    1 coerced, 1 present   COMPLETE
+
+Four verdicts from one predicate, so it discriminates. But it is measuring the
+wrong thing. Read the consumer:
+
+    :else (reject-unknown (fixture-data 3) (fields-of \"EModeCategory\"))
+
+Selector 3 feeds `reject-unknown`. Its job is to carry a field the entity does
+NOT declare, so the rejection has something to reject. Whether the entity's
+COERCED fields appear in it is not a property anyone should want.
+
+## Where coercion is actually exercised
+
+`oracle-coerce` calls `coerce-field` directly, once per KIND:
+
+    (coerce-field \"int\" \" 42 \")   (coerce-field \"bool\" \"YES\")
+    (coerce-field \"int\" \"7\")      (coerce-field \"\" \"abc\")
+
+So coverage is kind-level. Measured across the cohort -- the kinds each
+`entity-specs` declares, against the kinds some oracle passes to
+`coerce-field`:
+
+    com-abb-robotics  declares int,float    exercises '',bool,float,int   COMPLETE
+    com-accela        declares none         exercises '',bool,float,int   COMPLETE
+    com-aave          declares bool,int     exercises '',bool,int         COMPLETE
+    com-aadhaar       declares bool,float   exercises '',bool,float,int   COMPLETE
+
+**The control**, because a census where everything passes cannot be told from a
+predicate stuck on true: strip `float` from `com-abb-robotics`' oracle and the
+same check reports `MISSING float`. It can say no.
+
+## The correction
+
+ADR-2609110900 says selector 3 is the fixture that exists to exercise the float
+arm. That is wrong, and it is corrected in place at the head of that document
+rather than left to be read as written.
+
+**The generator change it describes still stands.** Putting a declared field
+into the document makes the reject-unknown fixture fuller and more
+representative, and deriving it beats depending on someone noticing. What was
+wrong was the reason, and a wrong reason is worth correcting on its own: left
+standing, it teaches the next reader that selector 3 is where coercion is
+tested, and sends them to close a coverage gap that does not exist.
+
+## What generalises
+
+I found a real asymmetry between two pilots, described it in the vocabulary of
+the thing I had just been working on, and did not read the consumer until a
+later iteration went looking for the same gap somewhere else. The number was
+right -- aave's selector 3 really does omit four coerced fields -- and the
+conclusion drawn from it was not.
+
+A fixture is defined by what consumes it, not by what it resembles. Before
+calling an absence a gap, read the call site.")))
