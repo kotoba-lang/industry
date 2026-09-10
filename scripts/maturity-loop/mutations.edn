@@ -1214,7 +1214,55 @@
      :file "src/appkit/core.cljc"
      :find "([body opts] (ui/panel body (merge default-panel-opts opts)))"
      :replace "([body opts] (ui/panel (vec (remove vector? body)) (merge default-panel-opts opts)))"
-     :must-fail ["composed-children-arrive-as-markup-test" "composed-children-keep-caller-order-test"]}]}
+     :must-fail ["composed-children-arrive-as-markup-test" "composed-children-keep-caller-order-test"]}
+
+    ;; --- README: 誰も読んでいなかった入口（2026-09-10 追加）------------------
+    ;; 上の 22 件はすべて **コード**を壊す。README は appkit の worked example と
+    ;; 既定 opts 表を持つのに、**1 バイトも読まれていなかった**。19 tests /
+    ;; 41 assertions の suite に対する実測: 表の値をずらす / example が存在しない
+    ;; component を呼ぶ / example が app/* をやめて ui/* を呼ぶ —— **3 つとも
+    ;; exit 0 で通った**。3 つ目が一番効く —— bare な component を呼ぶ example は
+    ;; 「この binding を迂回する方法」を文書化していることになり、**しかも完璧に
+    ;; 描画される**（例外も欠落 markup も無い）。
+    ;; composition 節が example の *形* を既に pin しているが、それは同じ example の
+    ;; 2 つ目の写しを Clojure で書いたものだった。これらは README の写しを読む。
+
+    {:id :appkit/readme-default-opts-table-drifts
+     :why "README の既定 opts 表が publish されている var と一致すること。この 2 つの map は API（consumer は自前 opts をこの上に積む）なので、表を信じた読み手は**コードが作るのと違う pane** を組む。値は test 側の literal が pin していたが、**README 側は誰も見ていなかった**"
+     :file "README.md"
+     :find "`{:surface :thick :elevation :flat}`"
+     :replace "`{:surface :thick :elevation :raised}`"
+     :must-fail ["readme-default-opts-table-is-the-published-contract-test"]}
+
+    {:id :appkit/readme-usage-names-a-missing-component
+     :why "README の usage block が**動くコード**であること。存在しない component を呼ぶ example は、新しい consumer が最初に出会うものが嘘になる形。fresh namespace で eval するので、block 自身の `(require …)` 行も同時に検査される"
+     :file "README.md"
+     :find "(ui/icon-button \"☰\")"
+     :replace "(ui/icon-btn \"☰\")"
+     :must-fail ["readme-usage-example-runs-from-a-clean-namespace-test"
+                 "readme-usage-example-goes-through-appkit-test"]}
+
+    {:id :appkit/readme-usage-drops-its-requires
+     :why "同じ test を**別の壊し方**で —— 呼び出しは正しいまま require だけが消える形。読み手は block を丸ごと貼るので、require が欠けた example は貼った瞬間に落ちる。空の namespace で eval していなければ、この変異は test ns の alias に助けられて**緑のまま通る**"
+     :file "README.md"
+     :find "(require '[kotoba-ui.core :as ui]\n         '[appkit.core :as app])\n\n"
+     :replace ""
+     :must-fail ["readme-usage-example-runs-from-a-clean-namespace-test"
+                 "readme-usage-example-goes-through-appkit-test"]}
+
+    {:id :appkit/readme-usage-bypasses-appkit-panel
+     :why "**この 2 件がこの節の理由**。example が `app/panel` をやめて `ui/panel` を呼ぶと、markup は完全に妥当なまま appkit の寄与（--thick / --flat）だけが消える —— 例外も欠落も無いので、描画を見ても読んでも気づけない。appkit を迂回する方法を README が教えている状態"
+     :file "README.md"
+     :find "(app/panel [(ui/toolbar"
+     :replace "(ui/panel [(ui/toolbar"
+     :must-fail ["readme-usage-example-goes-through-appkit-test"]}
+
+    {:id :appkit/readme-usage-bypasses-appkit-list-view
+     :why "同上を list-view 側で。**この repo が繰り返す非対称**（panel は固く list-view が漏れる）を README でも別々に discriminate する —— 実測 2026-09-10、panel 側を壊すと --thick/--flat の 2 件だけが、list-view 側を壊すと list--thick の 1 件だけが赤くなり、互いに巻き込まない"
+     :file "README.md"
+     :find "(app/list-view [(ui/list-row \"Row 1\")"
+     :replace "(ui/list-view [(ui/list-row \"Row 1\")"
+     :must-fail ["readme-usage-example-goes-through-appkit-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
