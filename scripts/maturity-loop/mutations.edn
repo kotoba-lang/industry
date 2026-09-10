@@ -1182,7 +1182,7 @@
      :file "test/appkit/cljs_runner.cljs"
      :find "            [clojure.string :as str]))"
      :replace "            [kotoba.lang.text :as str]))"
-     :must-fail ["cljs-runner-is-bare-launchable-test"]}
+     :must-fail ["documented-bare-launchers-are-bare-launchable-test"]}
 
     ;; ── 深さを持つ合成 ────────────────────────────────────────────────
     ;; この suite の body/rows 検査はどれも **平らな** body を渡していた
@@ -1262,7 +1262,55 @@
      :file "README.md"
      :find "(app/list-view [(ui/list-row \"Row 1\")"
      :replace "(ui/list-view [(ui/list-row \"Row 1\")"
-     :must-fail ["readme-usage-example-goes-through-appkit-test"]}]}
+     :must-fail ["readme-usage-example-goes-through-appkit-test"]}
+
+    ;; --- quickstart: the second entry point, and nothing had read it（2026-09-11 追加）---
+    ;; 上の README 群が閉じたのは **1 つ目**の入口だった。`docs/operator-quickstart.md`
+    ;; と、その render 段である `docs/quickstart_page.cljs` は **1 バイトも読まれて
+    ;; いなかった** —— 22 tests / 53 assertions の suite に対する実測 2026-09-11:
+    ;; 74ad15c と同一の clojure.string -> kotoba.lang.text 置換を quickstart 側に
+    ;; 当てると `nbb docs/quickstart_page.cljs` は exit 1 で死に、**JVM も cljs も
+    ;; exit 0 のまま**だった。runner を名指しで固めたことが、その双子を無防備に
+    ;; 残していた —— この repo が繰り返す非対称（panel は固く list-view が漏れる）
+    ;; が docs 面に出た形。
+    ;;
+    ;; なので launcher は列挙ではなく**発見**する: 「docs が `nbb <path>` と
+    ;; 素で走らせろと書いている .cljs」。列を書けばそれは覚えていなければならず、
+    ;; 覚えていなかったことこそがこの節の防ぎたいものである。
+    {:id :appkit/quickstart-requires-a-classpath-namespace
+     :why "**実測された壊れ方の、双子の側**。quickstart の render 段も素の `nbb <script>` で起動されるので classpath 上の namespace は require できない。74ad15c と同じ機械置換がここに当たると operator が来た当のものが死ぬのに、suite は両 runtime とも緑のまま"
+     :file "docs/quickstart_page.cljs"
+     :find "            [clojure.string :as str]))"
+     :replace "            [kotoba.lang.text :as str]))"
+     :must-fail ["documented-bare-launchers-are-bare-launchable-test"]}
+
+    {:id :appkit/quickstart-doc-names-a-missing-script
+     :why "docs が名指しする launcher が実在すること。発見が docs 側から行われる以上、docs が存在しない path を指したら誰も検査されないまま全部緑になる —— 「見つからなかった」が「問題なかった」と同じ値を返す形そのもの"
+     :file "docs/operator-quickstart.md"
+     :find "nbb docs/quickstart_page.cljs"
+     :replace "nbb docs/quickstart-page.cljs"
+     :must-fail ["documented-bare-launchers-are-bare-launchable-test"]}
+
+    {:id :appkit/quickstart-render-bypasses-appkit
+     :why "quickstart が render するページが **appkit を通っている**こと。script 自身は 4 性質を厳しく見ているが、**誰もその script を走らせていなかった** —— list-view を素の kotoba-ui に替えると liquid-glass__list--thick が body から消え、script は exit 1 で理由を名乗る。それを聞く者が居て初めて検査になる"
+     :file "docs/quickstart_page.cljs"
+     :find "(app/list-view [(ui/list-row"
+     :replace "(ui/list-view [(ui/list-row"
+     :must-fail ["quickstart-render-step-actually-renders-test"]}
+
+    {:id :appkit/quickstart-worked-verification-drifts
+     :why "quickstart の worked verification（sed|grep が返す 3 つの modifier）が実際のページと一致すること。この 3 つは appkit そのもの（既定 2 つと呼び手の override 1 つ）で、doc は『信じるのではなく markup で見よ』と言っている。示す答えがずれたら、その手順を踏んだ読み手は違うものを見る"
+     :file "docs/operator-quickstart.md"
+     :find "liquid-glass__panel--floating\n"
+     :replace ""
+     :must-fail ["quickstart-worked-verification-holds-test"]}
+
+    {:id :appkit/quickstart-transcript-drifts
+     :why "quickstart が見せる transcript が script の実出力であること。読み手は自分の run をこの行と突き合わせるので、ずれれば意味のない差を見るか、意味のある差を見落とす"
+     :file "docs/operator-quickstart.md"
+     :find "checked: whole document / appkit defaults present / caller opt still overrides / stylesheet inlined"
+     :replace "checked: whole document / appkit defaults present / stylesheet inlined"
+     :must-fail ["quickstart-transcript-is-what-the-script-prints-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
