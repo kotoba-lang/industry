@@ -5174,3 +5174,19 @@ hyakka-wiki-index.key
 # `:ignore-rule-gate`: this rule matches 0 of the 235,196 paths `origin/main` tracks,
 # and a control confirms it does match the cache itself.
 /.dep-coordinate-canon.json
+
+# Three verifier scratch roots at the superproject root: `engine-clone/` (145 files),
+# `kotoba-verify/` (626), `kotoba-cli-build-verifier-runs/` (638) -- 85 MB of throwaway
+# clones written by the kotoba CLI build verifier. Untracked and un-ignored, they were
+# standing `:additive` landing candidates: absent from `main` for the reason scratch is
+# absent, not for the reason new work is (`:residue-gate` / `:stale-ignore-gate`).
+# Gated before writing, per `:ignore-rule-gate` -- measured against the BASE tree
+# (`git ls-tree -r origin/main`), not `git ls-files`, because this checkout's tracked
+# set lags: these rules match 0 of the 235,316 paths `origin/main` tracks (attributed
+# with `check-ignore -v`; the 36,210 raw hits all come from pre-existing `.gitignore`
+# files under `orgs/personal/takeout/`, none from this rule). Controls both ways:
+# the three scratch roots do match, and `refusals/`, `org/`, `.hermes/`, `90-docs/`
+# and `scripts/` do not.
+/engine-clone/
+/kotoba-verify/
+/kotoba-cli-build-verifier-runs/
