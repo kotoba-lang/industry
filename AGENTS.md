@@ -1097,13 +1097,27 @@ kotoba-server（kotobase.net）向けの CACAO 自己発行の実装規約は sk
 CertGovernor）。
 
 
-## docs / ADR は EDN only + DataScript query（2026-07-17、ADR-2607171600）
+## docs / ADR は kotoba only + DataScript query（2026-07-17、ADR-2607171600。形式は 2026-09-10 に edn→kotoba へ訂正）
 
-- **`90-docs/` 配下（特に `90-docs/adr/`）の正本は `.edn` のみ。`.md` は置かない。**
-  各 ADR は `(d/transact conn (edn/read-string (slurp f)))` 可能な
-  `[{:db/id -1 :adr/id ... :adr/title ... :adr/status ... :adr/body ...}]`。
+- **`90-docs/adr/` の正本は `.kotoba` のみ。`.md` も `.edn` も新規に置かない。**
+  各 ADR は S 式の tx-data
+  `(vector (map (:db/id -1) (:adr/id ...) (:adr/title ...) (:adr/status ...) (:adr/body ...)))`。
+  `.kotoba` のデータファイルは S 式なので `cljs.reader` がそのまま読む。
   入れ子 map/vector は `pr-str` した string blob（`manifest/edn-datomize.cljs` と同型）。
-- **EDN 文書を heredoc で書いたら、reader を通してから commit する。`read-string`
+  ⚠ **この節は 2026-07-17 に `.edn` only として書かれ、tree に追い越された。**
+  実測 2026-09-10: ADR 面は **2,884 件すべて `.kotoba`**。⚠ **その数時間後に `.edn` の ADR が 1 件着地した**
+  （`2609101900-q9-rename-reverted-pending-admission.edn`）—— 下の `adr-new.cljs` の
+  欠陥の実例である。**この規則は現状の記述ではなく方向であって、件数で読まない。**
+  ⚠ **`90-docs/` 全体は kotoba only では*ない*。** datom catalog と ledger は `.edn` のまま
+  **617 件**在り（business 165 / lake 77 / community-coverage 46 / maturity 42 / evidence 39 …）、
+  `.md` も 88 件残っている。gate `docs-edn-check` は `.edn` と `.kotoba` の両方を受ける。
+  **「ADR は kotoba」と「90-docs は kotoba」を混同しない** —— 後者を書けば 617 件が
+  一夜で違反になる。
+  ⚠ **`scripts/adr-new.cljs` は `.edn` と bare な数値 id を出す。** どちらもこの節と
+  下の `:adr/id` slug 規則に反するので、使ったら拡張子と id を直してから commit する。
+  ⚠ **`manifest/docs-edn-only.cljs` のヘッダは今も「正本は `*.edn`」と書いている。**
+  移行ツールとしては生きているが、その一文は現在地ではない。
+- **`.kotoba` / `.edn` 文書を heredoc で書いたら、reader を通してから commit する。`read-string`
   が throw しないことは無傷を意味しない。** shell heredoc の中の `\"` はファイル上で
   **バックスラッシュ 2 つ + 引用符**になり、EDN では「エスケープされたバックスラッシュ」+
   「文字列を閉じる引用符」と読まれる。そこで本文が終わり、続く語が**キーとして**読まれ、
@@ -1189,7 +1203,7 @@ CertGovernor）。
 - **検証**: `nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljs verify`。
 - **移行ツール**: `manifest/docs-edn-only.cljs`（`migrate` / `status` / `verify`）。
 - multi-entity catalog（`*.datoms.edn`）は複数 entity のまま、query ローダが全 entity を読む。
-- 新規 ADR は最初から `.edn` tx-data で書く（`.md` を起こしてから変換しない）。
+- 新規 ADR は最初から `.kotoba` の S 式 tx-data で書く（`.md` も `.edn` も起こしてから変換しない）。
 - **文書は「最新状態のみ」を表す。履歴は git に任せる**（オーナー判断 2026-07-25、
   ADR-2607257000）。`status accepted` の ADR であっても、決定が変わったり現在地が
   進んだりしたら **`:adr/body` や `:adr/status` をその場で書き換える**。同じ規則が

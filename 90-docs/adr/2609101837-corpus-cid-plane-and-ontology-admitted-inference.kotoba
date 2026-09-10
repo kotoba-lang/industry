@@ -1,0 +1,142 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609101837-corpus-cid-plane-and-ontology-admitted-inference")
+  (:adr/title "学習コーパスを CID 面に載せ、ontology を score と inference の両方に結線する —— 求められた 4 つのうち 3 つは既に在り、繋がっていないだけである")
+  (:adr/status :accepted)
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/related (vector "ADR-2608056000" "ADR-2809081400" "ADR-2608152330"
+                "ADR-2608159100" "ADR-2608160100" "ADR-2608160200" "ADR-2608148200"
+                "ADR-2608039970" "ADR-2608319400" "ADR-2609108000" "ADR-2809101800"
+                "adr-2609100300-hermes-bots-onto-murakumo-api"
+                "ADR-2607132300"))
+  (:adr/body "## 現在地 —— 求められたものの大半は既に在る（実測 2026-09-10）
+
+この決定は新しい repo を 1 つも作らない。求められた 4 つのうち 3 つは実在し、
+繋がっていないだけである。
+
+### 学習データベースと data score —— 在る
+
+- 手書きの正本は `manifest/corpus-policy.edn`（`training-corpus/v1`）。
+  ここに在るのは repo の中身から導出できないものだけ —— 軸と重み、tier 閾値、
+  hazard パターン、consent scope、bytes 面の宛先。
+- 索引は生成物 `90-docs/corpus/corpus.datoms.edn`（1,683,282 B、`scripts/gen-training-corpus.cljs`）。
+  実測: 2,013 文書。tier は gold 1,121 / silver 768 / bronze 110 / excluded 14。
+  score は min 0.0918 / p50 0.7126 / max 0.9533。kind は adr 1,915 / doc-md 76 / manifest 22。
+- score は 6 軸（evidence, specificity, provenance, structure, currency, self-containment）の
+  重み付き**幾何平均**。算術平均にしないのは弱い軸を他で埋めさせないため。
+- **LLM judge を使わない**という決定が既に測定に基づいて下されている（ADR-2607132300）——
+  3-judge panel が 4 ライブラリを 4.0–5.0/5 と採点した裏で、4 つの具体的欠落を
+  1 つも指摘しなかった。採点が学習データの選別を決める以上、再現しない採点器は
+  劇場ではなく汚染源になる。**この決定を上書きしない。**
+- shard は 2 つ: gold-v1 17,120,082 B / 1,121 文書、silver-v1 10,097,713 B / 768 文書。
+- fleet gate は `training-corpus-check` として既に在る。
+
+### ontology —— 2 つ在って、どちらも繋がっていない
+
+- `kotoba-lang/ontology`: object-type + provenance registry（Foundry 風の object-type 層の
+  正直に絞った類似物、5 src）。
+- `kotoba-lang/oak`: ontology-as-kernel（ADR-2608319400）。agent は graph に作用しない。
+  `oak-call` に型付き値を渡し、schema が「世界が受け入れる種類のものか」を決める。
+  syscall table の admission 規則が ontology である、という形（5 src、Kotoba/amu）。
+- **実測: どちらも `deps.edn` を持たず、`kotoba-lang/inference`（433 src）はどちらも参照しない。**
+
+### IPFS / CID 面 —— ここが本当の空白
+
+- `corpus.datoms.edn` の属性国勢調査で **`:corpus/cid` は 0 件**。文書は
+  `:corpus/sha256` と `:corpus/annex-key`（git-annex SHA256）でしか指されていない。
+  bytes は DataLad + git-annex から Backblaze B2 へ直行しており、**CID 面に載っていない。**
+- kotobase 側は live である（実測: 不正 CID の GET は 400、PUT は 401 `invalid CACAO length`）。
+- 同じ移行は既に 1 度成功している —— ADR-2809081400 が hyakka の i18n を
+  git/DataLad から kotobase の IPLD/IPNI/IPFS 面へ移し、s3 ではなく **IPFS pin** を前提と
+  すること、CARv2 で pack すること、query は kotobase-lake 経由であることを決めている。
+
+## 決定
+
+**D1. 文書には `:corpus/cid` を足す。annex key は消さない。**
+CID は identity、annex key は location の 1 つ、kotobase `/ipld` はもう 1 つの location。
+ADR-2608148200 のとおり identity の CID 文字列と archive の Location の CID 文字列は
+分かれうる。**それをバグにしない。** 生成器 `gen-training-corpus.cljs` の変更 1 本で足り、
+新しい索引を作らない。
+
+**D2. shard は `/ipld` に置かず CARv2 pack として置く。**
+17.1 MB と 10.1 MB は kotobase の 8 MiB 天井を超える。ADR-2608160100 の物理層は
+block → CARv2 pack → object であり、CARv2 の codec 正本は `kotoba-lang/io-ipld-car`。
+**自分で CAR を書かない。** 8 MiB を超える転送は kotobase から取得した presigned
+transfer capability を使う（ADR-2608159100）—— **application の production path から
+B2 や R2 を直接叩かない。** provider の実装を前提にした瞬間、この面は移せなくなる。
+
+**D3. `:shard/custody :unverified` を clean と読まない。**
+実測でこの 2 shard はどちらも `:unverified` である。記録が無いことは適合ではない。
+custody は 2 つの別の検査で、混ぜない ——
+(a) identity 検証（bytes の hash が key と一致するか。`scripts/annex-custody-verify.cljs` が既に在る）
+(b) availability 検証（実際に取り戻せるか）。
+CID 面については **CID を引き戻して byte 同一性を確かめるまで custody を主張しない。**
+0 件が返ったときは「空」なのか「読めなかった」なのかを control で分ける。
+
+**D4. ontology は repo path ではなく object-type で corpus に join する。**
+`:corpus/object-type` を `kotoba-lang/ontology` の registry から与える。これが score を
+型に敏感にする —— ADR と manifest は同じ種類のものではなく、同じ軸の重みを共有する
+理由が無い。⚠ **2 つ目の語彙を作らない。** `manifest/concept-vocabulary.edn` と
+ontology registry は既に在るので、**どちらを出所とするかを宣言してから**足す。
+どちらも出所にしない属性は、次の週には 3 つ目の語彙になる。
+
+**D5. ontology 推論は新しい reasoner ではなく oak の admission として入る。**
+model は提案し、ontology が受け入れる。ADR-2609108000 が既に置いている段
+（`generate → parse → schema validate → static effects → authority check → risk classify
+→ admission → execute`）のうち、**oak が admission を所有する。** agent が触れてよいのは
+propose まで。**validate が通ることは authorize ではない。**
+`kotoba-lang/inference` からは oak と ontology への依存を宣言する —— ただし
+**依存を足すことは、その層が在ることではない**（ADR-2609108000 の実測）。
+src が 1 行も参照しない依存は gap を動かさない。
+
+**D6. OWL / RDF reasoner を作らない。**
+`org-w3-owl2` / `org-w3-rdf` / `org-w3-sparql-protocol` は外部仕様のミラーであって
+実行系ではない。この workspace の推論面は datom 面（L1）であり、共有しているのは
+datom であって Datalog ではない（ADR-2608039970）。したがって ontology 推論は
+L1 の index access path（`entity-attrs` / `by-predicate` / `by-predicate-value` / `refs-to`）に
+束縛する。**surface ごとに独自の物理表現を持たせない。**
+
+**D7. 効率化のレバーは 3 つで、どれもモデルではない。**\n⚠ **入場上限そのものは新発見ではない。** ADR-2609100300 が同日、経験的に同じ帯を\n挟んでいる（15,115 B は 200、15,615 B は 502、0.2 秒、route head 無し）。本 ADR が\n足すのは 3 つ ——(a) その帯の**出所**（`readiness.cljc` の `b70-request-eligible?` =\n`llama-request-eligible? … 15360`）(b) 拒否の**理由**（b70 が受けない要求は gad へ\n回す設計で、その gad が落ちている）(c) **並列度**。
+ADR-2809101800 が測った 2 つはそのまま生きる —— shape pre-filter 2.25x、
+1 コール 3〜4 関数の batching 2.46x。3 つ目をこの ADR が足す:
+
+    gateway の入場規則は  request-bytes + (max_tokens or 512) <= 15360
+    （b70 の per-slot bound、cloud-murakumo-api の readiness.cljc）
+
+超えた要求は **0.1 秒で** 502 `murakumo fleet unreachable: connection_refused` になる。
+timeout ではなく routing 判断で、停止中の gad へ回されている。さらに b70 は
+2 スロットなので、**並列度が 2 を超えた分も同じ死んだ head へ落ちる。**\n実測 2026-09-10: 約 7,700 B の本体を 12 本並列に投げると 6 本が 502。**本体は全て\n予算内だった** —— この場合の弁別子はサイズではなく並列度である。逐次化と有界\nリトライで同じ 13 本が失敗 0 になった。ADR-2609100300 は `pool-available {b70 2}` を\n記録しているが、上限を per-request サイズにだけ帰属させており、この面は分離\nされていない。
+
+## 訂正 —— ADR-2809101800 の refusal の帰属
+
+ADR-2809101800 は同じ 502 を「generation が約 30 秒を超える呼び出しが拒否される」と
+読んでいる。**その ADR 自身のデータがそれを支持しない** —— batch-of-6 は約 30.2 秒で
+2/2 拒否され、12 項目の trivial batch は約 30.2 秒で HTTP 200 だった。同じ所要時間で
+結果が割れているので、時間は弁別子ではない。
+
+実測 2026-09-10（本 ADR）: 本体 14,000 B は 200、15,000 B は 502。padding だけを
+変えた対照で、生成内容は同一。**弁別子は要求サイズと並列度であって生成時間ではない。**
+batch-of-6 の本体が 12 項目の trivial batch より大きかった、というのが観測の説明になる。
+
+この訂正は運用を変える: batching の上限は「秒」ではなく**バイト**で決める。
+
+## ADR-2609100300 の結論を 1 点だけ狭める\n\nあの ADR は「api.murakumo.cloud は Hermes agent を一切 serve できず、config の\nどの設定もそれを変えない」と書く。**設定については正しい** —— 本 ADR の実測でも、\n全 toolset を無効にした床で wire 21,610 B、上限 15,360 B を 6,250 B 超過する。\n狭まるのは「一切」の方である。**agent の形を変えれば serve できる。**\nb70 が縛るのは 1 コールであって仕事の総量ではないので、機械的作業を script に置き、\n判断だけを予算内の窓に切って渡せば通る。実測: 4.56 MB の PDF を 53,191 B に落とし、\n13 窓 × 各 7,000 B、13 コール 95,108 B、全て予算内、失敗 0、OpenRouter へ 0 バイト。\nこれは設定変更ではなく**分解**なので、あの ADR の否定と矛盾しない。\n\n## 測っていないこと（clean ではなく未測定）
+
+- **`:corpus/cid` を足した後の pack 粒度を測っていない。** ADR-2608160100 は
+  novelty window の議論を持つが、2026-09-09 の実測は本番深さでの取り分が
+  1 round trip しかないと結論している。**corpus は chain ではないので、その結論を
+  そのまま輸入しない。** 2,013 文書に対する pack 粒度は別の測定を要する。
+- **object-type の被覆率を測っていない。** `kotoba-lang/ontology` の registry が
+  2,013 文書のうち何件を型付けできるかは未測定。**索引に無いことは存在しないことの
+  証拠にならない**ので、被覆率は申告させる（`:concept/coverage` と同じ形）。
+- **oak が admission として実際に呼ばれた実績を確認していない。** accepted な ADR が
+  機構を定義していることと、その形を読むコードが在ることは別。着地の前に
+  読む側を grep し、使っている実例が 1 つ以上あることを確かめる。
+- **basho-320-18b は依然未測定**（Modal workspace が disabled）。ADR-2809101800 の
+  open half はそのまま open。
+
+## この ADR が作らないもの
+
+新しい repo、2 つ目の artifact store、2 つ目の語彙、OWL reasoner、LLM judge による採点。
+どれも既存の決定が名指しで否定しているか、既に在る。
+")))
