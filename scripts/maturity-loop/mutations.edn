@@ -1453,9 +1453,23 @@
     {:id :social-pub/blank-citations
      :why "空白だけの出典が頭数に入らないこと。「nil だけ落とせば十分」に緩めると出典 1 件の投稿が『出典 2 件』と名乗る —— 数が合っているように見えるぶん、外から気づけない"
      :file "src/etzhayyim/social/publication.cljc"
-     :find "  (let [citations (vec (filter #(seq (str/trim (str %))) (or sources [])))]"
-     :replace "  (let [citations (vec (remove nil? (or sources [])))]"
+     :find "       (filter #(seq (str/trim (str %))))"
+     :replace "       (remove nil?)"
      :must-fail ["blank-citations-are-not-provenance"]}
+
+    {:id :social-pub/duplicate-citations
+     :why "同じ出典を 2 回引いても出所は 1 つであること。重複を頭数に入れると、裏付けが何ひとつ増えていない投稿が ≥ 2 の閾値を数の上でだけ満たし、本文で『出典 2 件』と名乗る —— 空白出典とまったく同じ形の穴で、数が合っているように見えるぶん外から気づけない。2026-09-11 まで実際に素通りしていた（両経路とも）"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "       (reduce (fn [acc s]\n                 (let [k (str/trim (str s))]\n                   (if (contains? (:seen acc) k)\n                     acc\n                     (-> acc (update :seen conj k) (update :out conj s)))))\n               {:seen #{} :out []})\n       :out\n       vec))"
+     :replace "       vec))"
+     :must-fail ["duplicate-citations-are-one-source"]}
+
+    {:id :social-pub/provenance-rule-duplicated
+     :why "provenance 規則の実装が 1 つであること。state machine が自前の門を持つと、片方を直したときもう一方が黙って古いまま残る —— しかも state machine 側だけが緩いと、そこを通った入力が draft-observation-post の中で例外になり、**拒否 cell を返す契約のはずの関数から throw が呼び手へ抜ける**。実測: この変異で the-two-provenance-paths-cannot-drift が ERROR になり、両 runtime とも赤"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "      (< (count (distinct-citations (get next-state \"sources\"))) 2)"
+     :replace "      (< (count (filter #(seq (str/trim (str %)))\n                        (get next-state \"sources\"))) 2)"
+     :must-fail ["the-two-provenance-paths-cannot-drift"]}
 
     {:id :social-pub/wire-shaped-server-key
      :why "wire 形（文字列）で届いた server key も鍵とみなすこと。state はキーが全部文字列なので値も文字列で届く —— 「型をきちんとした」という形の退行で `\"true\"` が素通りする"
