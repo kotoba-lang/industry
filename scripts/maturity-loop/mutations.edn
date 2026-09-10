@@ -1127,7 +1127,37 @@
      :file "src/appkit/core.cljc"
      :find "(ui/list-view rows (merge default-list-view-opts opts))"
      :replace "(ui/list-view rows (merge default-panel-opts opts))"
-     :must-fail ["each-wrapper-applies-its-own-published-map-test"]}]}
+     :must-fail ["each-wrapper-applies-its-own-published-map-test"]}
+    ;; --- cljs: consumer の runtime で同じ suite が走ること（2026-09-07 追加）-----
+    ;; appkit は .cljc で consumer は browser だが、runner は `clojure -M:test` だけ
+    ;; だった。実測 2026-09-07、下の 3 つはどれも JVM の 16 test / 31 assertion を
+    ;; 緑のまま通す —— JVM 側が弱いのではなく、cljs の分岐が JVM から構造的に
+    ;; 見えない（run.cljs が per-mutation :cmd の理由として名指ししている class）。
+    ;; `nbb test/appkit/cljs_runner.cljs` は同じ appkit.core-test を cljs.test で
+    ;; 走らせる（assertion の 2 本目の写しは無い）。:must-fail は test 名ではなく
+    ;; **runner が印字する理由の literal** —— 別の理由で赤くなった実行を「噛んだ」と
+    ;; 数えないため。3 本目だけは load が通るので test 名で pin する。
+    {:id :appkit/panel-jvm-only
+     :why "wrapper が JVM にしか無い形。`#?(:clj …)` を 1 つ巻くだけで、consumer の browser では app/panel が存在しないのに JVM の suite は 16 本とも緑"
+     :file "src/appkit/core.cljc"
+     :find "(defn panel\n  ([body] (panel body {}))\n  ([body opts] (ui/panel body (merge default-panel-opts opts))))"
+     :replace "#?(:clj\n   (defn panel\n     ([body] (panel body {}))\n     ([body opts] (ui/panel body (merge default-panel-opts opts)))))"
+     :cmd ["nbb" "test/appkit/cljs_runner.cljs"]
+     :must-fail ["Unable to resolve symbol: app/panel"]}
+    {:id :appkit/jvm-only-require
+     :why "JVM 専用 namespace の require。誰かが helper を足す形で最も起きやすく、JVM では何も壊れない"
+     :file "src/appkit/core.cljc"
+     :find "(:require [kotoba-ui.core :as ui]))"
+     :replace "(:require [kotoba-ui.core :as ui]\n            [clojure.java.io :as io]))"
+     :cmd ["nbb" "test/appkit/cljs_runner.cljs"]
+     :must-fail ["Could not find namespace: clojure.java.io"]}
+    {:id :appkit/cljs-branch-drifts
+     :why "reader conditional の :cljs 側だけが既定から外れる形。load は通るので上 2 つとは別 class —— 描画の検査そのものが cljs で赤くなること"
+     :file "src/appkit/core.cljc"
+     :find "{:surface :thick :elevation :flat}"
+     :replace "{:surface :thick :elevation #?(:clj :flat :cljs :raised)}"
+     :cmd ["nbb" "test/appkit/cljs_runner.cljs"]
+     :must-fail ["desktop-panel-defaults-test" "default-opts-are-published-contract-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
