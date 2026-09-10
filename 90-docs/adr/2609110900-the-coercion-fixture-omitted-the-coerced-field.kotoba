@@ -1,0 +1,87 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110900-the-coercion-fixture-omitted-the-coerced-field")
+  (:adr/topic "q9-generator-coercion-fixture")
+  (:adr/title "The coercion fixture was built from :required, so it omitted the coerced field")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609110800-a-generator-fallback-produced-a-selector-that-measured-nothing"))
+  (:adr/body
+  "## Context
+
+The plan for this iteration was to regenerate `com-abb-robotics` with the
+ref-arity-aware generator, the way `com-accela` was regenerated the iteration
+before. Diffing the candidate against what ships stopped that, and the reason is
+the finding.
+
+## What the diff showed
+
+    shipped    (= sel 3) \"{\\\"model\\\":\\\"IRB-6700\\\",\\\"status\\\":\\\"idle\\\",\\\"payloadKg\\\":\\\"150.5\\\"}\"
+    generated  (= sel 3) \"{\\\"model\\\":\\\"v\\\",\\\"status\\\":\\\"v\\\"}\"
+
+Selector 3 is the coercion entity's document. It was built from `(:required
+float-ent)`, and Robot coerces `payloadKg` to `:float` while requiring only
+`[model status]`. So the generated fixture omits the one field the arm exists to
+exercise. The hand-written component carried it because a person noticed.
+
+**Regenerating would have been a regression, and the regression would have been
+invisible**: the file compiles, `amu check` answers `:ok true`, and the
+validation oracle that consumes selector 3 keeps returning numbers. Nothing
+downstream says that the float field stopped being present.
+
+## It is the common case, not the rare one
+
+Reproduce by reading each oracle's `entity-specs` and asking which coerced
+fields are absent from `:required`:
+
+    com-aadhaar        none
+    com-aave           ReserveData, EModeCategory, ExecuteBorrowParams
+    com-abb-robotics   Robot:payloadKg
+    com-accela         none (declares no coercion at all)
+    com-adobe          Frame:height
+    com-acquia         Asset, Channel, ContentEntry, Experiment
+
+Four of six sampled pilots declare a coercion on a field they do not require.
+
+## Decision
+
+The fixture is `:required` plus the coerced fields, each given a value of its
+kind -- `7` for int, `1.5` for float, `true` for bool.
+
+## The control
+
+A fix that added a coerced field unconditionally would also make the symptom go
+away, and would put a field in the fixture of a table that has none. So the
+check is the pair:
+
+    com-abb-robotics  gains \"payloadKg\":\"1.5\"
+    com-accela        gains nothing -- it declares no coercion anywhere
+
+Both regenerated components pass `amu check :ok true`, and regenerating
+`com-accela`'s shipped component is byte-identical, so the generator is
+idempotent.
+
+## com-abb-robotics is still not regenerated
+
+Its component is hand-written, its fixture values are domain-specific rather
+than placeholders, and its migration record quotes measured hash values that a
+regeneration would move. With this fix the generated form is structurally
+right, so regeneration is now a reasonable step -- but it is a step that must
+re-measure and rewrite those recorded values, and that deserves its own run
+rather than riding along with a generator change.
+
+## A stale ref cost me a wrong conclusion, in the middle of this
+
+Checking idempotency, I diffed a regenerated `com-accela` against `origin/main`
+and got 39 differing lines, which reads as a generator that is not idempotent.
+It was not. I had fetched `com-abb-robotics` and `kotoba-lang` this iteration
+and not `com-accela`, so the local `origin/main` ref still pointed at the commit
+before last iteration's regeneration. GitHub's `main` was correct throughout.
+
+This is the workspace's own standing warning -- checkout, west pin and the
+repository's `main` are three different things -- reached through the ref rather
+than the working tree. After fetching, the diff is zero. The lesson that
+generalises: a comparison against `origin/main` is only as current as the last
+fetch of THAT repository, and fetching a sibling does not count.")))
