@@ -307,7 +307,7 @@
    :script "gates/nbb-cross-runtime.cljs"
    :script-args ["--entry" "scripts/run-tests.cljs"]
    :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 20 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 20 :cd true}
   ;; The JVM half, which the nbb runner excludes BY NAME: envelope.seal-jvm is
   ;; the same wire format through JCA instead of Web Crypto, and until this
   ;; entry the two implementations had one of them tested. 13 tests / 49
@@ -511,7 +511,7 @@
   {:name "root" :id "root-no-github-workflows" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/github-workflows-absent-check.cljs"
-   :include-ext [".yml" ".yaml" ".cljs"]
+   :include-ext [".kotoba" ".yml" ".yaml" ".cljs"]
    :min-files 400
    :require-paths ["scripts/verify-no-github-workflows.cljs" "manifest/west.yml"]
    :cd false}
@@ -526,7 +526,7 @@
   {:name "root" :id "root-agents-md-generated" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/agents-md-generated-check.cljs"
-   :include-ext [".md" ".cljs"]
+   :include-ext [".kotoba" ".md" ".cljs"]
    :min-files 1200
    :require-paths ["CLAUDE.md" "AGENTS.md" "scripts/gen-agents-md.cljs"]
    :cd false}
@@ -542,7 +542,7 @@
   {:name "root" :id "root-human-auth-no-downgrade" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/human-auth-no-downgrade-check.cljs"
-   :include-ext [".md" ".edn" ".yml" ".cljs"]
+   :include-ext [".kotoba" ".md" ".edn" ".yml" ".cljs"]
    :min-files 1500
    :require-paths ["SECURITY.md"
                    "AGENTS.md"
@@ -817,7 +817,7 @@
   ;; discriminates rather than having been widened into vacuity.
   {:name "prolly-tree" :id "nbb-cross-runtime-prolly" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; arrangement's second gate, once its pins agreed (9b658c8c). It had
   ;; reached io-ipld at two shas -- e08dc3b2 from its own deps.edn and 45917645
@@ -833,7 +833,7 @@
   ;; equality inverted in `arrangement/core.cljc`.
   {:name "arrangement" :id "nbb-cross-runtime-arrangement" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; **`kotobase-projection` gets one now; `kotobase` does not, and the two
   ;; reasons turned out to be different problems.**
@@ -853,7 +853,7 @@
   ;; the same counts `clojure -M:test` reports.
   {:name "kotobase-projection" :id "nbb-cross-runtime-kotobase-projection"
    :gate :nbb-script :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; **`kotobase` was NOT held back by its pins, and this file said it was.**
   ;; Its diamond is real and much deeper -- thirteen libraries, `kotoba-kir`
@@ -925,13 +925,13 @@
   ;; `FAIL: 55 tests, 19 failures`, exit 1.
   {:name "datalog" :id "nbb-cross-runtime-datalog" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "graphql" :id "nbb-cross-runtime-graphql" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotobase-protocols" :id "nbb-cross-runtime-protocols" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; ── round 3: the rest of the Worker's ClojureScript halves ────────────────
   ;;
   ;; Seven more with counts measured identical on both runtimes, and two whose
@@ -993,25 +993,25 @@
   ;; tick.cljs does rather than cloning on the node.
   {:name "chain" :id "nbb-cross-runtime-chain" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "ayatori" :id "nbb-cross-runtime-query" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-apache-tinkerpop-gremlin" :id "nbb-cross-runtime-gremlin" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-graphql-http" :id "nbb-cross-runtime-graphql-http" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-opencypher-cypher" :id "nbb-cross-runtime-cypher" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-w3-sparql-protocol" :id "nbb-cross-runtime-sparql-protocol" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotobase-protocol-core" :id "nbb-cross-runtime-protocol-core" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; **These two carry binary fixtures, and the filter above would drop them.**
   ;; Both ran on the fleet and both failed the same way on every node they
   ;; reached: `FAIL: 35 tests, 0 failures, 19 errors` for arrow and
@@ -1033,16 +1033,16 @@
   ;; fleet, which answers the same question better than the audit could.
   {:name "org-apache-arrow" :id "nbb-cross-runtime-arrow" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".arrow"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json" ".arrow"] :min-files 5 :cd true}
   {:name "org-apache-parquet" :id "nbb-cross-runtime-parquet" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".parquet"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json" ".parquet"] :min-files 5 :cd true}
   {:name "pay" :id "nbb-cross-runtime-pay" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-ietf-zstd" :id "nbb-cross-runtime-zstd" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; **Two of the four are NOT gated, and cannot be as they stand.**
   ;;
@@ -1294,7 +1294,7 @@
   ;; :include-ext は .cljc だけ送る。この repo は動画/画像込みで巨大。
   {:name "club-shinshi-app" :gate :nbb-script
    :script "gates/vendored-kaiyu-parity.cljs" :script-args []
-   :include-ext [".cljc"] :min-files 2 :cd true}
+   :include-ext [".kotoba" ".cljc"] :min-files 2 :cd true}
 
   ;; :video の既定が、spec と「実際に応答しているもの」で一致しているかを見る。
   ;;
@@ -1445,7 +1445,7 @@
   {:id "root-adr-identity"
    :name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/adr-identity-check.cljs" :script-args ["--min" "1400"]
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; itonami-coverage.datoms.edn は `[ {…} {…} ]` という **1 個の** top-level form
   ;; でなければならない。2026-08-30、2 つの scout commit が閉じ括弧 `]` の**後ろ**に
@@ -1465,7 +1465,7 @@
   {:id "root-itonami-coverage"
    :name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/itonami-coverage-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 1 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1 :cd false}
 
   ;; The orgs-detector registry admits, checked HERE instead of six hours later
   ;; on a machine nobody is watching. That tick refuses EVERY detector when one
@@ -1483,7 +1483,7 @@
   {:id "root-orgs-detectors-admission"
    :name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/orgs-detectors-admission-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 100 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 100 :cd false}
 
   ;; superproject の parity 台帳 gate。**:id が必要**（:name は org / tip 解決に使う
   ;; repo 名のままにする必要があるため）。
@@ -1502,7 +1502,7 @@
   {:id "root-parity-probe-policy"
    :name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/parity-probe-check.cljs" :script-args ["--min" "30"]
-   :include-ext [".edn" ".cljs"] :min-files 200 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 200 :cd false}
 
   ;; superproject の 2 本目の gate。**:id が必要**（:name は org / tip 解決に使う
   ;; repo 名のままにしないといけないので、識別子を分ける。無いと state の
@@ -1543,7 +1543,7 @@
   {:name "hayari" :id "hayari-tick-alive" :org "cloud-itonami" :gate :nbb-script
    :script "gates/hayari-tick-alive.cljs"
    :script-args ["--max-age-hours" "36" "--max-failures" "1"]
-   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 2 :cd false}
 
   ;; EDN 文書が「読めるのに中身が切れている」状態。
   ;;
@@ -1567,11 +1567,11 @@
    :script "gates/docs-edn-truncation-check.cljs"
    :script-args ["--min" "1500"
                  "--dir" "90-docs/adr,90-docs/business,90-docs/design-quality,90-docs/task-graphs,90-docs/regulatory,90-docs/observatory,90-docs/concept,90-docs/surface,manifest"]
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   {:name "root" :id "root-repository-roles" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/repository-roles-check.cljs" :script-args ["--min" "20"]
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; cloud-itonami の org id **受付**（`POST /api/onboarding/challenge`）が、
   ;; ADR-2608062100 の逆順規則と一致しているか。
@@ -1596,7 +1596,7 @@
   ;; 別 repo の live surface であって、この tree の内容ではない）。
   {:name "root" :id "root-itonami-org-id" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/itonami-org-id-check.cljs" :script-args ["--min" "7"]
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; 同じ規則の **workspace 内側**。上の gate が受付の drift を見るのに対し、
   ;; こちらは「導出が 1 つであること」自体を押さえる（ADR-2608098000）。
@@ -1676,7 +1676,7 @@
   ;; ".edn" は deps/manifest 読みのため。:min-files は他の root gate と同じ床。
   {:name "root" :id "root-west-pin-policy" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/west-pin-policy-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; 「その gate が落ちたとき、誰に届くのか」を訊く gate。
   ;;
@@ -1719,7 +1719,7 @@
   ;; Measured 2026-08-16: 10 files match, hence the floor of 8.
   {:name "kip" :id "kip-registry" :org "kotoba-lang" :gate :nbb-script
    :script "gates/kip-registry-check.cljs"
-   :include-ext [".edn" ".cljs" ".cljc"] :min-files 8 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs" ".cljc"] :min-files 8 :cd false}
 
   ;; 成熟度向上 loop の鮮度判定（ADR-2608052000 / ADR-2608080000 の loop）。
   ;;
@@ -1738,7 +1738,7 @@
   {:name "jp-go-nta-houjin-bangou" :id "nta-projections" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/nta-projections-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 4 :cd false}
 
   ;; company-web-presence の 3 projection（web-presence / press-wire / domain-facts）は
   ;; ノードの cell が毎日書き換える。人のレビューが挟まらないので、混入・分母欠落・
@@ -1747,21 +1747,21 @@
   {:name "company-web-presence" :id "cwp-projections" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/company-web-presence-projections-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 4 :cd false}
 
   ;; 官報 projection（決算公告 / 落札公示）。90 日窓しか無い記録で、日次 cell が
   ;; 押し込む。個人名の混入・窓の不可視化・名寄せ分母の欠落を artifact 側で見る。
   {:name "jp-go-npb-kanpou" :id "kanpou-projections" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/kanpou-projections-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 3 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 3 :cd false}
 
   ;; jGrants カタログ。3,751 件中 308 件が募集中で、分母が消えると全件が
   ;; 「使える補助金」に読める。締切の時刻精度もここで守る。
   {:name "jp-go-digital-jgrants" :id "jgrants-projections" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/jgrants-projections-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 2 :cd false}
 
   ;; gBizINFO 全件 projection。列挙側（section ごとに manifest）と畳んだ側
   ;; （summary）で形が違い、片方に合わせた検査は他方に黙る。分母 2 つと publish の
@@ -1769,18 +1769,18 @@
   {:name "jp-go-gbiz-info" :id "gbiz-info-projections" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/gbiz-info-projections-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 2 :cd false}
 
   ;; 行政事業レビューの支出先（各府省の原典）。畳んだ側なので分母 4 つと単位を見る。
   {:name "jp-go-gyoukaku-review" :id "gyoukaku-review-projections" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/gyoukaku-review-projections-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 2 :cd false}
 
   {:name "root" :id "root-itonami-maturity-freshness" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/itonami-maturity-freshness-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; cleanup-land の「改名残骸 gate」（manifest/cleanup-workflow.edn :residue-gate）。
   ;;
@@ -1800,7 +1800,7 @@
   {:name "root" :id "root-rename-residue" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/rename-residue-check.cljs"
-   :include-ext [".cljs"] :min-files 300 :cd false}
+   :include-ext [".kotoba" ".cljs"] :min-files 300 :cd false}
 
   ;; 法規制の datom 射影（ADR-2608080000）—— **`root-permit-index` は撤去した**
   ;; （2026-08-13、ADR-2608130800）。ここに entry を戻さないこと。
@@ -1847,7 +1847,7 @@
   {:name "root" :id "root-itonami-game-never-auto" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/itonami-game-never-auto-check.cljs"
-   :include-ext [".cljc"] :min-files 20 :cd false}
+   :include-ext [".kotoba" ".cljc"] :min-files 20 :cd false}
 
   ;; squint-cljs 0.8.147 compiles `(- (+ a b))` to `-(a) + (b)` — it splices the inner
   ;; operands out of a unary negation. It compiles, it runs, and it returns `b - a`.
@@ -1876,7 +1876,7 @@
   {:name "root" :id "root-squint-unary-minus" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/squint-unary-minus-check.cljs"
-   :include-ext [".cljc" ".cljs" ".clj"] :min-files 20 :cd false}
+   :include-ext [".kotoba" ".cljc" ".cljs" ".clj"] :min-files 20 :cd false}
 
   ;; 領域別 observatory の登録簿（ADR-2608081200）。2026-08-08 の実測で、13 actor の
   ;; うち 5 本が起動しなかった —— にもかかわらず README も MATURITY.md も
@@ -1900,7 +1900,7 @@
   ;;    検査を足したらケースも足す。落ちない gate は劇場。
   {:name "root" :id "root-observatory-registry" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/observatory-registry-check.cljs" :script-args ["--min" "10"]
-   :include-ext [".edn" ".yml" ".cljs" ".plist"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".yml" ".cljs" ".plist"] :min-files 1500 :cd false}
 
   ;; クリアランス政策（ADR-2608083000）。**政策が腐る 2 方向を語彙で塞ぐ** ——
   ;; 秘匿の根拠が第三者の危害から組織の都合へ滑ること、位（役職・年功）が級を
@@ -1909,7 +1909,7 @@
   ;; 施行の証拠ではなく、草案が自分の不変条件を破っていないことの検査である。**
   {:name "root" :id "root-clearance-policy" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/clearance-policy-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; Projection contracts are rebuilt from the exact Git-tip snapshot shipped
   ;; by the fleet operator. The archive has no .git directory, so this gate
@@ -1919,7 +1919,7 @@
   {:name "root" :id "root-projection-rebuild" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/projection-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; 学習コーパス面（ADR-2608057000）。**索引に載っている行を再採点して照合する**
   ;; （`--verify-index`）— committed 済みの値を読むだけの検査では、内部整合を保った
@@ -1936,7 +1936,7 @@
   {:name "root" :id "root-training-corpus" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/training-corpus-check.cljs"
-   :include-ext [".edn" ".cljs" ".md"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs" ".md"] :min-files 1500 :cd false}
 
   ;; 資本 pool 面（ADR-2608062300）。`capital-pools.edn` が `budget-supply.edn` の
   ;; `:supply/pools` から**今も**導かれることを再導出して照合する。
@@ -1956,7 +1956,7 @@
   {:name "root" :id "root-capital-pools" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/capital-pools-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; fabric actor（`*-organism.aozora.app`）が外へ出す文字列と終了状態の 2 実装。
   ;; ADR-2608155000。正本は `scripts/kotoba/fabric_actor_core.kotoba`（kotoba/pure、
@@ -2044,7 +2044,7 @@
   {:name "kotobase-shard-index" :id "root-shard-index" :org "kotoba-lang"
    :gate :nbb-script
    :script "gates/shard-index-check.cljs"
-   :include-ext [".edn" ".cljs" ".cljc"] :min-files 10 :cd true}
+   :include-ext [".kotoba" ".edn" ".cljs" ".cljc"] :min-files 10 :cd true}
 
   ;; kotobase-client — the CID-verified block transport (root ADR-2609064000).
   ;; Until now NOTHING RAN IT: measured 2026-09-06, this repo had no entry
@@ -2232,7 +2232,7 @@
   ;; のどれか一つだけが動く drift を root tree 内で落とす。
   {:name "root" :id "root-kotobase-persistence-policy" :org "com-junkawasaki"
    :gate :nbb-script :script "gates/kotobase-persistence-policy-check.cljs"
-   :include-ext [".edn" ".cljs" ".md"] :min-files 1500 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs" ".md"] :min-files 1500 :cd false}
 
   ;; Pinned quiet-host kotoba stack performance evidence (ADR-2608260800).
   ;; Verifies performance.datoms.edn, judah-quiet JSON, host-meta load < 4,
@@ -2240,7 +2240,7 @@
   ;; not shipped); live regression is `scripts/verify-kotoba-stack-performance.cljs --live`.
   {:name "root" :id "root-kotoba-stack-performance" :org "com-junkawasaki"
    :gate :nbb-script :script "gates/kotoba-stack-performance-check.cljs"
-   :include-ext [".edn" ".cljs" ".json" ".md"] :min-files 10 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs" ".json" ".md"] :min-files 10 :cd false}
 
   ;; net-kotobase の commit 済みバンドルが、その commit の source から作られたか
   ;; （ADR-2608110900）。**JDK を要求しない。**
@@ -2414,7 +2414,7 @@
   ;; JVM suite を gate 化したいなら、まず 1 台に 2 本入れて cap が立つのを
   ;; 確認してから `:cap :wasm-tools` の entry を足す。
   ;;
-  ;; :include-ext [".edn" ".cljs"] — resolver 本体・その test・lock・deps.edn。
+  ;; :include-ext [".kotoba" ".edn" ".cljs"] — resolver 本体・その test・lock・deps.edn。
   ;; 実測 84 件なので :min-files 60 を床にする（filter が壊れて空 tree を
   ;; 「合格」にしないため）。
   ;; :require-paths — この gate の wrapper 自身が `required-paths` として持っている
@@ -2424,7 +2424,7 @@
   ;; 配る前に、件数ではなく名前で拒否できる。
   {:name "amu" :id "amu-jdk-free" :gate :nbb-script
    :script "gates/kotoba-compiler-jdk-free-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 60
+   :include-ext [".kotoba" ".edn" ".cljs"] :min-files 60
    :require-paths ["deps.edn" "deps-lock.edn"
                    "src/kotoba/compiler/nbb/classpath.cljs"
                    "test/nbb/classpath.cljs"]
@@ -2514,7 +2514,7 @@
   ;;   unmodified                            exit 0  15 cases, 9 refusals
   {:name "amu" :id "amu-package-lock" :gate :nbb-script :cap :node
    :script "gates/amu-package-lock-check.cljs"
-   :include-ext [".cljs" ".cljc" ".edn" ".json"] :min-files 120
+   :include-ext [".kotoba" ".cljs" ".cljc" ".edn" ".json"] :min-files 120
    :require-paths ["test/nbb/package_lock.cljs"
                    "src/kotoba/compiler/nbb/package_lock.cljs"
                    "src/kotoba/compiler/nbb/package_authoring.cljs"
@@ -2524,7 +2524,7 @@
 
   {:name "amu" :id "amu-portable-surface" :gate :nbb-script :cap :node
    :script "gates/amu-portable-surface-check.cljs"
-   :include-ext [".cljc" ".cljs" ".edn"] :min-files 120
+   :include-ext [".kotoba" ".cljc" ".cljs" ".edn"] :min-files 120
    :require-paths ["run-portable-surface.cljs" "deps.edn" "deps-lock.edn"
                    "src/kotoba/compiler/nbb/classpath.cljs"
                    "src/kotoba/compiler/ios_aot.cljc"
@@ -2675,10 +2675,10 @@
   ;; / 0 failures, and BOTH go red when the fix is neutralised.
   {:name "kotoba-sema" :id "nbb-cross-runtime-kotoba-sema" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotoba-kir" :id "nbb-cross-runtime-kotoba-kir" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotoba-verifier" :id "kotoba-verifier-jvm-test" :gate :jvm-test :cap :jvm :cd false}
 
   ;; The two layers under those three. Added 2026-08-20 after porting code in
@@ -2776,7 +2776,7 @@
   ;; 名前で拒否すれば、直す先が枝であることが最初の行に出る。
   {:name "amu" :id "amu-windows-loader-cross" :gate :nbb-script :cap :zig
    :script "gates/amu-windows-loader-cross-check.cljs"
-   :include-ext [".c" ".cljs"] :min-files 70
+   :include-ext [".kotoba" ".c" ".cljs"] :min-files 70
    :require-paths ["scripts/windows-loader-cross-compile.cljs"
                    "tools/kexe_loader_windows.c"]
    :cd false}
@@ -2870,13 +2870,13 @@
   ;; ハッシュに @noble/hashes が要り、無いと ipld.core の require が load 時に死ぬ）。
   {:name "org-ietf-deflate" :id "nbb-cross-runtime-deflate" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "io-ipld" :id "nbb-cross-runtime-io-ipld" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotobase-block-codec" :id "nbb-cross-runtime-block-codec" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; io-multiformats' SECOND gate (ADR-2608170800). The first is :jvm-test
   ;; above, and it has to stay, because this repo carries one defect per host:
   ;; `core/varint` built its cljs branch on `unsigned-bit-shift-right` (int32
@@ -2892,7 +2892,7 @@
   ;; absent, which is how @noble/hashes resolves there -- hence ".json".
   {:name "io-multiformats" :id "nbb-cross-runtime-multiformats" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; sigv4's SECOND gate. It signs this fleet's outbound S3 requests and
   ;; verifies the inbound ones its Workers accept, and ClojureScript is where
   ;; both happen -- WebCrypto is Promise-based, so the same source takes a
@@ -2909,7 +2909,7 @@
   ;; break `FAIL: 17 tests, 7 failures` exit 1.
   {:name "sigv4" :id "nbb-cross-runtime-sigv4" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; sigv4's THIRD gate: the Kotoba implementation of the percent-encoder held
   ;; to the Clojure one, byte for byte, across 147 inputs.
   ;;
@@ -2955,7 +2955,7 @@
   ;; thing the comment forbids -- `FAIL: 13 tests, 2 failures` exit 1.
   {:name "org-ietf-cbor" :id "nbb-cross-runtime-cbor" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; kotobase-lake's SECOND gate. `:script-args` carries the entry, because
   ;; this repo's nbb runner is `test/run.cljs` rather than the default name.
   ;;
@@ -2973,7 +2973,7 @@
   {:name "kotobase-lake" :id "nbb-cross-runtime-lake" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :script-args ["--entry" "test/run.cljs"]
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
 
   ;; `.kotoba` は **この repo の唯一の production source** なので :include-ext に
   ;; 要る（ADR-2608131200）。この gate は 2026-08-05 から 4 回すべて赤で、一度も
@@ -3059,103 +3059,103 @@
   ;; two direct sightings are the confirmation rather than the other way round.
   {:name "cloud-itonami-isic-0610" :id "itonami-regenerate-0610" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-2620" :id "itonami-regenerate-2620" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-2910" :id "itonami-regenerate-2910" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-3600" :id "itonami-regenerate-3600" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-4210" :id "itonami-regenerate-4210" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-4630" :id "itonami-regenerate-4630" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-5210" :id "itonami-regenerate-5210" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-5320" :id "itonami-regenerate-5320" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6201" :id "itonami-regenerate-6201" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6202" :id "itonami-regenerate-6202" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6311" :id "itonami-regenerate-6311" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6312" :id "itonami-regenerate-6312" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6420" :id "itonami-regenerate-6420" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6512" :id "itonami-regenerate-6512" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6612" :id "itonami-regenerate-6612" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6622" :id "itonami-regenerate-6622" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6810" :id "itonami-regenerate-6810" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6910" :id "itonami-regenerate-6910" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-6920" :id "itonami-regenerate-6920" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-7310" :id "itonami-regenerate-7310" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-7820" :id "itonami-regenerate-7820" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-8299" :id "itonami-regenerate-8299" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-9200" :id "itonami-regenerate-9200" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-9411" :id "itonami-regenerate-9411" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-9522" :id "itonami-regenerate-9522" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
 
   ;; 既存 flagship 9 本のうち **6 本**（ADR-2607122300 / ADR-2607189300 系）。
@@ -3170,27 +3170,27 @@
   ;; publisher 側の murakumo 移行は別の仕組みが要る（実行して commit する経路）。
   {:name "cloud-itonami-isic-851" :id "itonami-regenerate-851" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-852" :id "itonami-regenerate-852" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-853" :id "itonami-regenerate-853" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-854" :id "itonami-regenerate-854" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-4921" :id "itonami-regenerate-4921" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
   {:name "cloud-itonami-isic-5820" :id "itonami-regenerate-5820" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
-   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :include-ext [".kotoba" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
 
   ;; kotoba-lang/shell の in-app provider bridge。scaffold された .ipa/.apk が
@@ -3214,7 +3214,7 @@
   ;; 「0対0で一致」と報告しない）、無改変で exit 0。
   {:name "shell" :id "shell-native-bridge-parity" :gate :nbb-script
    :script "gates/shell-native-bridge-parity.cljs"
-   :include-ext [".clj" ".swift" ".java"] :min-files 5 :cd true}
+   :include-ext [".kotoba" ".clj" ".swift" ".java"] :min-files 5 :cd true}
 
   ;; kotobase-peer の Merkle block size class が、client 封緘の padding bucket に
   ;; 実際に載るかを検査する（ADR-2608070400 D6）。
@@ -3240,7 +3240,7 @@
    :script "gates/block-sizing-pad-alignment-check.cljs"
    :script-args ["--buckets" "1024,4096,16384,32768,65536,131072,262144"
                  "--max-overhead" "25"]
-   :include-ext [".cljc"] :min-files 20 :cd false}
+   :include-ext [".kotoba" ".cljc"] :min-files 20 :cd false}
   ;; kotobase-peer had ONE gate, and it checks block-size padding overhead.
   ;; That is a real check and it is not a test suite: measured 2026-09-06, this
   ;; repo's 251 tests / 760 assertions had no fleet gate at all, while its
@@ -3421,7 +3421,7 @@
    :name "com-cloudflare" :gate :nbb-script :cap :jvm
    :script "gates/kotoba-oracle-cljs.cljs" :ship-git-deps true
    :script-args ["--entry" "test/cloudflare/oracle_cljs_gate.cljs" "--min" "200"]
-   :include-ext [".cljs" ".cljc" ".clj" ".edn"] :min-files 30 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn"] :min-files 30 :cd false}
 
   ;; ── credential 経路の回帰 guard を実際に走らせる ────────────────────────
   ;;
@@ -3578,7 +3578,7 @@
   {:name "kotoba-lang" :id "kotoba-ocapn-endo-live"
    :org "kotoba-lang" :gate :nbb-script
    :script "gates/kotoba-ocapn-endo-check.cljs"
-   :include-ext [".clj" ".cljc" ".cljs" ".edn" ".json"]
+   :include-ext [".kotoba" ".clj" ".cljc" ".cljs" ".edn" ".json"]
    :min-files 12 :cd false}
   ;; kenbun's admission gate (cloud-itonami). The default :test alias resolves
   ;; kotoba-issue as a :git/sha dep, which ship-git-deps! carries, so this needs
@@ -3641,7 +3641,7 @@
   ;;    誤報する —— 実測で確認してからこの行を書いた）。
   {:name "network-isekai" :id "isekai-generated-artifacts" :gate :nbb-script
    :script "gates/isekai-generated-artifacts-current.cljs"
-   :include-ext [".cljs" ".cljc" ".edn" ".mjs" ".png"] :min-files 300 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".edn" ".mjs" ".png"] :min-files 300 :cd false}
 
   ;; 2) テストを定義して一度も実行しないファイル。
   ;;    `clojure -M test/royale_world_streaming_test.clj` は何も出力せず exit 0 で
@@ -3657,7 +3657,7 @@
   {:name "network-isekai" :id "isekai-tests-actually-run" :gate :nbb-script
    :script "gates/test-files-actually-run.cljs"
    :script-args ["--sub" "test" "--min" "20" "--skip" "isekai"]
-   :include-ext [".clj" ".cljc" ".cljs"] :min-files 200 :cd false}
+   :include-ext [".kotoba" ".clj" ".cljc" ".cljs"] :min-files 200 :cd false}
 
   ;; 3) 90-docs の EDN が全部 read できるか（既存の汎用 gate を再利用）。
   ;;    ADR は `.edn` tx-data で書く規約（ADR-2607171600）で、`:adr/body` の中の
@@ -3866,7 +3866,7 @@
   ;; green on a classpath tools.deps would not have built.
   {:name "aiueos" :id "nbb-cross-runtime-aiueos" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
 
   ;; Two stdlib libraries whose suites had NEVER run on a second runtime, and
   ;; which were broken there. Measured 2026-08-20 by giving each an nbb entry
@@ -3895,10 +3895,10 @@
   ;; not need it, but carrying it is harmless and keeps the two entries alike.
   {:name "bytes" :id "nbb-cross-runtime-bytes" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
   {:name "lint" :id "nbb-cross-runtime-lint" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
 
   ;; The remaining eight stdlib libraries that could be run on a second
   ;; runtime. Each was measured green by hand on 2026-08-20 and each now
@@ -3920,28 +3920,28 @@
   ;; threw there instead of reporting. Both passed every JVM run they ever had.
   {:name "json" :id "nbb-cross-runtime-json" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 11 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 11 :cd false}
   {:name "time" :id "nbb-cross-runtime-time" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
   {:name "io" :id "nbb-cross-runtime-io" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
   {:name "fmt" :id "nbb-cross-runtime-fmt" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
   {:name "lsp" :id "nbb-cross-runtime-lsp" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
   {:name "http" :id "nbb-cross-runtime-http" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
   {:name "test" :id "nbb-cross-runtime-test" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
   {:name "scheduler" :id "nbb-cross-runtime-scheduler" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
 
   ;; `store` joins them: one `byte-array` in a test helper was the whole
   ;; reason its suite was JVM-only. `store/put` routes through
@@ -3956,7 +3956,7 @@
   ;; the same JVM on purpose.
   {:name "store" :id "nbb-cross-runtime-store" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+   :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
 
   ;; kotoba-lang.org owns the machine-readable inventory of every managed or
   ;; explicitly external cryptographic boundary. The validator rejects an
@@ -3971,7 +3971,7 @@
   {:name "kotoba-lang" :id "kotoba-crypto-boundary-coverage"
    :org "kotoba-lang" :gate :nbb-script
    :script "gates/kotoba-crypto-boundary-coverage.cljs"
-   :include-ext [".edn" ".cljs" ".md"] :min-files 50 :cd false}
+   :include-ext [".kotoba" ".edn" ".cljs" ".md"] :min-files 50 :cd false}
   ;; ---- the first credential-free step off the workstation ----------------
   ;;
   ;; root ADR-2608300100 decision 1: the hyakka resident's heavy steps are
@@ -4006,7 +4006,7 @@
    :gate :nbb-script
    :script "gates/hyakka-catalog-freshness-check.cljs"
    :script-args ["--min" "400"]
-   :include-ext [".cljs" ".edn" ".cljc"]
+   :include-ext [".kotoba" ".cljs" ".edn" ".cljc"]
    :min-files 900 :cd false}
   ;; yui (結) — the five-domain participation & empowerment bot
   ;; (ADR-2609022000, west child cloud-itonami/yui pin d75520f). This gate
@@ -4023,7 +4023,7 @@
    :gate :nbb-script
    :script "gates/yui-charter-gate-check.cljs"
    :script-args []
-   :include-ext [".cljs" ".edn"]
+   :include-ext [".kotoba" ".cljs" ".edn"]
    :min-files 3 :cd false}
   ;; yui funnel-coverage (yui-h4 publish-funnel-per-domain, measured
   ;; 2026-09-02): counts doors exposing a MACHINE-READABLE funnel surface
@@ -4037,7 +4037,7 @@
    :gate :nbb-script
    :script "gates/yui-funnel-coverage-check.cljs"
    :script-args ["--min" "3"]
-   :include-ext [".cljs" ".edn"]
+   :include-ext [".kotoba" ".cljs" ".edn"]
    :min-files 3 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
