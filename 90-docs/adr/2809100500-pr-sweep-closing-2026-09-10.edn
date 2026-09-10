@@ -1,0 +1,50 @@
+[{:db/id -1
+  :adr/id "adr-2809100500-pr-sweep-closing-2026-09-10"
+  :adr/title "The 2026-09-10 open-PR sweep: what landed, what was superseded, and the four gaps it measured but did not close"
+  :adr/status "accepted"
+  :adr/date "2026-09-10"
+  :adr/related ["ADR-2609062400" "ADR-2608136800" "ADR-2608102000" "ADR-2607300900"]
+  :adr/context
+  "The GitHub dashboard showed 23 drafts and ~25 non-draft open PRs authored by this account, most of them CONFLICTING. This records the disposition of that sweep so a later session does not re-derive it, and -- more usefully -- the four defects it measured and did NOT fix.
+
+  The dominant shape was not disagreement. It was AGE. Eight app-hyakka scout PRs each appended to config/knowledge-ingest.edn from a different base: 464 added lines, ZERO removed across all eight, 72 new :id values, none colliding with each other or with main. Every one was CONFLICTING and none of them disagreed with anything. The same shape appeared in kotoba-lang/amu, where four pin-advance PRs were all behind main by the time they were read.
+
+  A second shape mattered more: a PR whose stated premise had stopped being true. cloud-murakumo-api#190 was blocked on a named operator-identity decision with three options offered. Main had answered it on 2026-08-31 by a fourth route not among them -- the mk1 SCOPE as discriminator rather than an env allowlist of subject names -- and that route's own docstring argues against the allowlist (a name missing from such a list is a silent 402 in production, and revoking an exemption should be revoking a token rather than editing configuration and redeploying). The blocking question was escalated to the owner before this was measured, which is the error: the PR body was read as current state instead of main."
+  :adr/decision
+  "LANDED (all verified on the default branch after merge, and the west pin advanced for each):
+
+  network-awai/app-hyakka 16aa59b7 -- eight scout PRs (#953 #956 #961 #963 #965 #972 #973 #976) as one commit. Splice measured rather than trusted: 8 branches diffed against their OWN merge-base, 464 added / 0 removed, 72 ids with no duplicate among them and none colliding with main. The spliced file was read back through the EDN reader AND type-asserted -- (:sources v) is 2890 maps, every :id a string -- because a file that parses is not a file that says what it should. The one duplicate id in the file (world/company/houjin-2000012100001) pre-exists on main and is not introduced.
+
+  net-kotobase/ipfs bc4a2289 (#64) -- an origin 404 is a definitive miss and returns 404, instead of being collapsed into ::empty-handed and reported as 502 archive gateway unavailable after asking the public gateway.
+
+  kotoba-lang/kotoba-sema f96857f2 + kotoba-lang/kotoba-lang 28e7af24 (#673) -- kotoba-lang main was RED. :sys/cwd (compiler wire 40) was added to the authority catalog at 7483551c; kotoba-sema c8565031 taught its frontend the wire and left its vendored copy at 39 entries; five vendor checks reported :vendor/authority-drift on that one path. Closed at the source (the authority file copied, not hand-edited: both hash b7a4b15e) rather than deferred.
+
+  network-awai/cloud-murakumo-api fa9c79c5 (#250, closes #190) -- relay credit metering, rebuilt on main's scope-aware debit-credits? and threading {:identity :scope} through BOTH the reserve and the settle.
+
+  kotoba-lang/amu 01b5736b (#923, closes #921) -- kotoba-native edbbe987 -> 5f2717c2. capability-bitmap in elf64.cljc did (quot id 8) on a capability id that is a bigint under ClojureScript, so every compile --target x86_64-aiueos-user-v1 of a source containing cap-call exited 70.
+
+  cloud-itonami/cloud-itonami-app e0acb39d (#328, closes #300) -- a text response stopped by the output limit is no longer accepted as a completed turn.
+
+  CLOSED AS SUPERSEDED, each with the measurement in its comment: amu #874 #887 #855 (every proposed pin behind main); kotoba-lang/kotoba#598 and kotoba-lang/kotoba-lang#618 (main answered the recursive-walk need on the EXISTING :fs/browse wire 34 with entry-dir?/subdirs, rather than adding a second capability :fs/browse-dir); cloud-itonami-app#283 (its remaining delta was clojure.string where main has kotoba.lang.text -- merging would revert the migration in four files).
+
+  LEFT OPEN WITH TRIAGE, deliberately: amu#891, wasm-webcomponent#20, cloud-itonami-app#28 and #271, control-plane#645 and #650, app-kotoba-cloud#32. Each carries a comment stating what is already on main, what is genuinely unlanded, and what a port would cost. Thirteen cleanup:/preservation drafts were left untouched -- they exist to hold un-landed WIP and merging them would land months-old branches."
+  :adr/consequences
+  "FOUR GAPS MEASURED AND NOT CLOSED. Each is a resume point.
+
+  1. cloud-itonami-app's JVM test suite does not load on main, before or after any change here: `No such var: storj/build-request`. That var is called only from test/cloud/itonami/app/storj_test.clj and exists NEITHER at the pinned io-storj daa038ba NOR at io-storj main be03b9b4 (14 commits ahead) -- src/storj/core.cljc there defines client, sign, presign, get-object, head-object, put-object, delete-object, list-objects, parse-list-result and nothing named build-request. Advancing the pin will not fix it. It has stayed broken because leftover-jvm-tests.yml is not on the required path (amu-jvm-free-emit is). Verification for #328 was therefore done on the provider-test namespace alone via a manually built classpath.
+
+  2. kotoba-lang/amu#913 was still running its required checks when this session closed. Its own agent had already merged main and reached the identical two pins (kotoba-native 5f2717c2, kotoba-sema 0470c524) independently. Half its stated claim is no longer true and its body should be narrowed: string-index-of compiles and EXECUTES natively on main today -- aarch64-macos, --jvm-free, extract-native + kexe_loader answered 6 -- because 5f2717c2 contains the lower-index-of commit and arrived with #923. The half that still discriminates is printing: (typed-cap-call :io/write :string :i64 ...) under a granting policy is exit 65 `policy names an unregistered capability: :io/write` on main and passes admission on the branch. Auto-merge is disabled on that repository, so it needs a human or a later session to merge it.
+
+  3. This workstation's west checkouts drift behind their own pins, and it is not visible from inside a build. org-chainagnostic-cacao and edn were 4 and 2 commits BEHIND their pins while a governed release artifact was built against them; refresh-release-artifact.cljs recorded the stale HEADs honestly and nothing failed. Caught only by comparing the manifest's recorded dependencies against manifest/west.yml. The rebuild at the pins reproduces byte-for-byte under a clean 131-file recompile, so the artifact on main is correct -- but no gate measures this, and the next build from this machine will have the same exposure.
+
+  4. Two workflows in the repositories touched here still run on GitHub Actions (amu, ipfs, cloud-itonami-app, kotoba-lang), which ADR-2607300900 retired for this workspace in favour of the murakumo fleet. Not addressed; noted because three of this session's merges waited on Actions.
+
+  METHOD NOTES worth keeping, all of them failures first:
+
+  A green verifier is not evidence when there is nothing to verify. scripts/verify-west-pins.cljs answered `変更された pin はありません。OK.` (exit 0) on a worktree at origin/main, because at origin/main there is no pin delta to check. The pins were instead confirmed by two direct server-side conditions per entry -- ahead N / behind 0, and reachable from the upstream default branch -- which is what west-pin-put-batch.cljs itself checks before writing.
+
+  Re-fetch before porting someone else's branch. An hour was spent resolving amu#913's conflicts onto main; its own agent had pushed an equivalent resolution while that work was in progress. The local remote-tracking ref was stale from a fetch taken at the start of the port.
+
+  Porting a stale branch is a review technique, not just a merge chore. #300's guard ran BEFORE the empty-response check; on its own base that was invisible, and on main it reclassified an empty length-terminated turn and turned an-empty-finished-turn-is-not-a-silent-answer red. Measured three ways -- guard absent 4 failures, #300's order 1 failure, guard after 0 -- and only the middle row shows why the PR could not be merged as written.
+
+  Ask the owner AFTER reading main, not after reading the PR body. See :adr/context."}]
