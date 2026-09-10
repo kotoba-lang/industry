@@ -1,0 +1,138 @@
+[{:db/id -1
+ :adr/id "adr-2609102000-the-first-jvm-free-whole-component"
+ :adr/title "com-aave answers JVM-free end to end, and the acceptance found a defect the JVM path could not see"
+ :adr/status "accepted"
+ :adr/date "2026-09-10"
+ :adr/body "The first repository to satisfy both halves of `kotoba only` as the owner
+stated them -- **written in Kotoba, and starting no JVM process** -- measured
+end to end on 2026-09-10. Before this, the count was zero.
+
+## What was actually run
+
+Every step below ran with `java`, `javac`, `clojure` and `clj` replaced by
+refusing stubs on the front of PATH, `JAVA_HOME` unset, each stub appending to
+a trace and exiting 97.
+
+    amu check    whole_component.kotoba --policy p.edn --jvm-free   exit 0
+    amu compile  --target wasm32-browser --jvm-free                 exit 0
+    run the .wasm through runtime/browser-host.mjs                  exit 0
+    run aave.main (the .cljc oracle) under nbb                      exit 0
+
+    java/javac/clojure/clj invocations: 0
+
+**The trace was proven able to fire before it was believed.** Calling
+`java -version` under the same PATH appends a line and returns 97. An empty
+trace is only evidence because a non-empty one was produced first; a trace
+never tripped is indistinguishable from a trace that cannot trip.
+
+## Parity: 89 agree, 2 differ
+
+The comparison drives the artifact from the oracle's own printed selector list
+(`q9-oracle.cljs` prints `label<TAB>value`, and the label carries its
+arguments), so the two sides cannot silently diverge on which case they ran.
+
+    AGREE   89
+    DIFFER   2
+    SKIPPED  6   (labels whose arguments are not numeric, and two with no
+                  matching export -- listed, not folded into agreement)
+
+## The two disagreements, and why one of them is the point
+
+**`as-int 3` -- oracle 12, artifact 0.** Fixture 3 is the string `12abc`, and
+`aave.main/as-int` is a reader conditional:
+
+    #?(:clj  (Long/parseLong (str/trim v))            ; throws -> caught -> 0
+       :cljs (let [n (js/parseInt v 10)] ...))        ; stops at 'a'  -> 12
+
+**The `.cljc` oracle answers differently on the two hosts for the same input.**
+Measured under nbb: `12`. On the JVM `Long/parseLong` throws by specification
+and the catch returns `0`. The `.kotoba` answers `0`, matching the JVM branch.
+
+So this is not the port disagreeing with its oracle. It is a **portability
+defect in the oracle**, and the old JVM-only qualification test was
+structurally incapable of seeing it -- it only ever ran the branch that
+returns 0. Moving the acceptance off the JVM surfaced it on the first run.
+
+**`table 0` -- oracle 590391078, artifact 88433516.** A hash over a rendered
+shape. `q9-oracle.cljs` warns in its own docstring that a hash disagreement is
+either behaviour or rendering and has to be read before it is believed. Not
+yet read. Recorded as open, not as a defect and not as noise.
+
+## Two claims that were implementation states, both moved today
+
+**`run-tests.cljs` says the qualification toolchain is JVM-only.** Measured
+2026-08-20 and true then; false now. `bin/amu` is a node script and
+`--jvm-free` resolves its closure from `deps-lock.edn`. That docstring is why
+the repo still carries `.clj` qualification tests, and it is now stale.
+
+**The wasm traps were fuel, not the backend.** A previous readout recorded
+that the store, filter and handler selectors trap `unreachable` on Wasm while
+answering on native, and that *the browser host exposes no fuel option to
+raise*. Fuel is caller-chosen policy, `{:budgets {:fuel n}}`, defaulting to
+512. Raising it:
+
+    512         5 answer, 16 trap
+    100,000    59 agree, 30 trap
+    50,000,000 89 agree,  0 trap
+
+Every trap was fuel. **No backend defect was involved**, and the intermediate
+run is the reason to say so: at 100,000 the trap count fell rather than
+changing character, which is what a budget does and not what a missing
+instruction does.
+
+## What this does NOT establish
+
+- **The contract is not satisfied for this repository.** The Q9
+  `:per-repository-gate` requires twelve verifications; this covers
+  `amu-check`, `amu-compile`, `jvm-free-process-proof` and `oracle-parity`.
+  `consumer-resolution`, `capability-denial`, `artifact-equivalence`,
+  `reproducibility` and the rest are not done. **`:consumer-cutover` is still
+  false**: `aave.main` is what executes in production, so the Clojure
+  namespace has not stopped running.
+- `src/aave/main.cljc` is still present and still the source of truth. Until
+  consumers resolve the Kotoba entry, this is a proof that the component CAN
+  build and answer JVM-free, not that it does so in anyone's build.
+- Only `wasm32-browser` was exercised here. The contract says
+  `:required-for-every-declared-target true`.
+- The two `.clj` qualification tests were not removed. They cover
+  `page_limit` and `paginate` -- the extracted slices, 19 and 23 lines --
+  which the superseding ADR says are not a migration. Removing them is a
+  separate change, and it should replace them rather than delete them.
+
+## Why the wave-1 record overstates progress
+
+Wave-1 is `:ten-pilots-extracted-awaiting-soak` twice over -- twenty pilots.
+Its `:pilot-contract` reads:
+
+    :source-template  \"src/<dir>/page_limit.kotoba\"
+    :consumer-cutover false
+    :test-template    \"test/<dir>/kotoba_qualification_test.clj\"
+    :fleet-gate       :jvm-test
+    :actual-fleet-receipts 0
+    :soak {:green-fleet-receipts 0 :required-fleet-receipts 3
+           :calendar-days 0 :required-calendar-days 7}
+
+One function per repository, no consumer switched, verified by a JVM test,
+gated by a JVM test, and a soak that has never started. The authority's own
+rule says extracting a decision core while the namespace continues to execute
+in Clojure is not a Q9 migration, and `:next-action` is already
+`:requalify-wave-1-pilots-as-whole-component-builds`. This ADR is the first
+repository measured against the contract that replaced it.
+
+## Reproduce
+
+    # PATH trap first, and prove it fires
+    for b in java javac clojure clj; do ... exit 97 ... done
+    PATH=/tmp/jvm-trap:$PATH java -version     # must append one line
+
+    node <amu>/bin/amu check   src/aave/whole_component.kotoba \\
+      --policy policy.edn --jvm-free
+    node <amu>/bin/amu compile src/aave/whole_component.kotoba \\
+      --target wasm32-browser --policy <policy with :budgets {:fuel 50000000}> \\
+      --jvm-free --output aave.wasm
+    nbb --classpath src q9-oracle.cljs        # the .cljc oracle
+    node <compare artifact against that output>
+
+`amu` must be at its west pin with `node_modules/nbb` present; a fresh worktree
+has none and `--jvm-free` then fails closed with exit 70 rather than falling
+back, which is the contract behaving correctly."}]
