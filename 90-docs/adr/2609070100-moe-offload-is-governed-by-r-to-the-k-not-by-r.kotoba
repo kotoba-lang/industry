@@ -1,0 +1,131 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609070100-moe-offload-is-governed-by-r-to-the-k-not-by-r")
+  (:adr/title "MoE offload の可否は常駐率 r ではなく r^k で決まる —— 74% 常駐でも 91% の層が毎 forward で CPU を触り、gad は 11 時間 GPU 0% で無出力だった")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-07")
+  (:adr/last_verified "2026-09-07")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "dllm-latent-unified-model-phase0")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/authoritative_for
+  (vector "MoE を部分 offload するときの可否判定式（top-k 全員が常駐する確率 r^k）"
+   "gad で SDAR-30B-A3B を bf16 offload したときの実測失敗"
+   "難化した 30 問での SDAR-8B の AR / block=4 実測"
+   "48 GiB を超える dLLM 測定を Modal に出す判断と、その実測 VRAM"))
+  (:adr/related
+  (vector "adr-2609063000-dllm-phase0-block-diffusion-measured-on-murakumo-gad"
+   "adr-2609063400-gmktec-k16-fleet-hardware-and-the-32gb-ceiling"
+   "adr-2609063200-sdar-vl-graft-target-image-and-video-already-wired"))
+
+  (:adr/body
+  "# ADR-2609070100: MoE offload は r ではなく r^k で決まる
+
+**Status**: accepted / 2026-09-07
+
+## 一行で
+
+**expert の 74% を VRAM に置いても、top-8 のうち 8 個すべてが常駐する確率は
+0.74^8 ≒ 9%。つまり層の 91% が毎 forward で host memory を触る。**
+gad はこの構成で **11 時間走って GPU 使用率 0%、swap 32 GiB、出力ゼロ**だった。
+
+## 私が飛ばした計算
+
+ADR-2609063400 で SDAR-30B-A3B の分割を計算したとき、重みの 95% が expert で
+あることまでは正しく出した。そして `A3B なので 1 トークンが触るのは 128 中 8 個。
+大半の forward は VRAM 常駐 expert に当たります` と書いた。
+
+**これを計算していなかった。** 常駐率を r、1 層あたりの活性 expert を k とすると、
+**その層が host を一度も触らない確率は r^k** である。ルーティングは入力依存で
+どの 8 個かは事前に分からないので、平均常駐率 r は使えない。
+
+| r（常駐率） | k=8 で全員常駐 r^8 | 48 層のうち host を触る層 |
+|---|---|---|
+| 0.74 | **9%** | **91%** |
+| 0.90 | 43% | 57% |
+| 0.95 | 66% | 34% |
+| 0.99 | 92% | 8% |
+
+**r=0.74 は「ほぼ載っている」ように見えて、実際には全滅に近い。**
+offload が効くのは r が 1 に十分近いときだけで、その領域は
+「載り切らないから offload する」という前提と両立しない。
+
+## 実測（gad、2026-09-06〜07）
+
+`device_map=auto, max_memory={0: 40GiB, cpu: 16GiB}`、SDAR-30B-A3B bf16（56.9 GiB）。
+
+| 観測 | 値 |
+|---|---|
+| GPU 使用率 | **0%** |
+| VRAM | 25.3 GB のみ使用 |
+| CPU 時間 | 1 秒/秒で増加（＝ CPU で計算していた） |
+| swap | **26 → 32 GiB** |
+| RSS | 2.6 GB ⇄ 1.07 GB を往復（スラッシング） |
+| 経過 / 出力 | **10 時間 58 分 / 結果ファイルなし** |
+
+**遅かったのではなく破綻していた。** `offload_folder` を指定しなかったため
+溢れた分は OS の swap に落ち、本番の ComfyUI と llama-server が同居する機械を
+巻き込んだ。kill 後、disk 12 GB → 69 GB、swap 32 → 10 GiB へ回復させた。
+
+## 結果 1: 難化した 30 問での SDAR-8B
+
+20 問では AR control が 18/20（90%）で、30B を測るには天井が近すぎた。
+状態を持つもの・グラフ・DP・パーサを 10 問足し（LRUCache、topo_sort、
+edit_distance、parse_ini、interval_intersection、base62 往復、group_anagrams、
+max_depth、merge_k、spiral）、**使う前に harness を証明した** ——
+`30/30 reference-passes, 30/30 stub-rejected`。
+
+| cell | 正解 | tok/forward | forwards |
+|---|---|---|---|
+| block=1（AR control） | **24/30**（80%） | 1.000 | 2342 |
+| block=4 | **25/30**（83%） | **2.283** | 985 |
+
+**AR が 6 問落としているので飽和ではない。** そこで差が出なかったのだから、
+20 問で見えた `代償ゼロ` は標本の小ささの産物ではない。
+**+1 を「上回った」とは読まない** —— n=30 で 1 問差は誤差である。
+
+## 結果 2: Modal H200 では素で載る
+
+同じ 30 問・同じ bf16・同じ transformers 4.52.4 pin・**同じ pure-PyTorch
+RMSNorm shim**（RMSNorm が違えば別のモデルを測ることになるので揃えた）で
+H200 に出した。
+
+```
+loaded 30.53B params in 182s, all on GPU; VRAM 63.2/139.8 GiB used
+```
+
+**全パラメータが GPU に載った**（1 つでも外れたら中断する拒否条件を通過）。
+重み 56.9 GiB に対し実測 63.2 GiB は活性と workspace の分。
+
+## Decision
+
+1. **MoE の部分 offload を計画に入れるときは r^k を先に計算する。**
+   r が 0.95 未満なら offload は成立しないと見なす。
+2. **48 GiB を超える dLLM の測定は Modal に出す。** gad の役割は
+   ≤32 GiB クラス（SDAR-8B 15.3 GiB、SDAR-VL-Think-8B 16.1 GiB）に置く。
+3. **量子化で無理に単機へ載せない。** DLLMQuant は AWQ W4A4 で LLaDA に
+   16% の精度低下を測り、誤差が denoising の反復で蓄積すると報告している。
+   曲線が bf16 で引かれている以上、量子化した点を混ぜると
+   「代償が消えた」のか「量子化が足した」のか区別できなくなる。
+
+## Consequences / 未達
+
+- **30B の実行採点はまだ出ていない**（Modal で実行中）。曲線の 4 点目は空欄。
+- **8B を bf16 と int8 で比べる交絡測定は未実施。** 将来 32GB 級の実機へ
+  配備するなら、この測定が量子化を採用してよいかの根拠になる。
+- 32GB の K16 へ expert 分割する案（ADR-2609063400）は、**この ADR の
+  r^k がそのまま当たる。** 4 台で r=1.0（各機が自分の 1/4 を完全に持つ）に
+  なる構成なら成立するが、1 台の中で部分 offload する構成は成立しない。
+  **分割と offload は別物であり、この ADR が否定したのは後者だけである。**
+
+## 再開点
+
+```bash
+# Modal 実行の確認（volume にキャッシュ済みなので再取得は不要）
+cd <scratchpad> && modal run modal_sdar30b.py --tasks tasks-python-30.json --blocks 1,4
+```
+スクリプトは `scripts/dllm-phase0/` に置いた。
+")))

@@ -1,0 +1,178 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607261200-cloud-itonami-crm-marketing-effect-bridge")
+  (:adr/doc_type "adr")
+  (:adr/topic "cloud-itonami-crm-marketing-effect-bridge")
+  (:adr/title "ADR-2607261200: Salesforce/HubSpot 相当（isic-5820 / isic-6201）を cloud-itonami の effect 面にブリッジする — workspace 面と同じ投影層、ただしエスカレーション自動 resume は禁止")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-26")
+  (:adr/last_verified "2026-07-26")
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "cloud-itonami から CRM / marketing-automation vertical を呼ぶ唯一の経路は cloud-itonami.crm の投影層であり、governor / StateGraph / phase を cloud-itonami 側に再実装しない"
+   "vertical actor が escalate したとき、cloud-itonami 側の effect 承認をその sign-off として代用してよいのは :phase-approval だけ。:revenue-mismatch-imminent / :lead-score-mismatch / :low-confidence / :dispute-request は fail closed"
+   "bridge が公開する effect kind の一覧と、各 kind の risk tag（proposer が付けるべき値）"))
+  (:adr/related (vector "adr-2607062000-cloud-itonami-workspace-teian-koyomi-projection"
+                "adr-2607173100-murakumo-main-model-alias"
+                "adr-2607022300-itonami-gftdcojp-private-tenant-kotoba-rad-git-storage"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/repos (vector "gftdcojp/cloud-itonami"
+              "cloud-itonami/cloud-itonami-isic-5820"
+              "cloud-itonami/cloud-itonami-isic-6201"
+              "kotoba-lang/crm"))
+  (:adr/body "# ADR-2607261200: CRM / marketing automation を cloud-itonami の effect 面に載せる
+
+**Status**: accepted
+**Date**: 2026-07-26
+
+## Context
+
+「今の cloud-itonami に Salesforce / HubSpot / Google Workspace 相当はあるか」を
+実測した結果、**3 つのうち workspace 面だけが cloud-itonami に接続されていた**。
+
+- Google Workspace 相当 — `cloud-itonami.workspace`（2,322 行、自称『薄い投影層』）が
+  teian / koyomi / denrei / ichiran / shoko / tayori / goyoukiki / soukai を
+  effect kind に投影済み。`/api/{org}/{repo}/effects/{id}/{action}` として
+  デプロイ済み（`edge/effects_endpoints.cljc` → `cacao-edge-core.js`）。
+- Salesforce 相当 — `cloud-itonami-isic-5820`（RevOps-LLM ⊣ SubscriptionGovernor、
+  4,380 行）。**`cloud-itonami` の deps.edn に存在しない。**
+- HubSpot 相当 — `cloud-itonami-isic-6201`（MarketingOps-LLM ⊣ ConsentGovernor、
+  3,602 行）。**同上。**
+
+つまり CRM / marketing は「独立に fork して売る OSS 事業の blueprint」としては
+実在するが、gftdcojp 自身の運用面（activity / effect / approval 台帳）からは
+**一切呼べなかった**。`gftdcojp/gftdcojp` 本番テナント（ADR-2607022300）も
+live で `claimed: false` のまま。
+
+## Decision
+
+### 1. `cloud-itonami.crm` を workspace 面と同型の投影層として追加する
+
+7 つの effect kind を、2 つの vertical の**自前の**request 語彙へ翻訳するだけ。
+governor / StateGraph / phase を cloud-itonami 側に複製しない。
+
+| effect kind | → vertical op | risk |
+|---|---|---|
+| `:crm/advance-opportunity` | 5820 `:opportunity/transition-stage` | `:financial` |
+| `:crm/qualify-lead` | 5820 `:lead/qualify` | `:read-only` |
+| `:crm/convert-lead` | 5820 `:lead/convert` | `:financial` |
+| `:crm/disclose-account` | 5820 `:disclosure/query` | `:external-send` |
+| `:marketing/send-campaign` | 6201 `:campaign/send-message` | `:external-send` |
+| `:marketing/advance-lead` | 6201 `:lead/advance-stage` | `:read-only` |
+| `:marketing/score-lead` | 6201 `:lead/update-score` | `:read-only` |
+
+`:crm/convert-lead` を `:read-only` でなく `:financial` にしたのは、変換が
+status を動かすだけでなく **Contact と Opportunity を新規に mint する**から
+（crm.phase 自身が phase 3 でも `:lead/convert` を `:auto` に入れていない理由と同じ）。
+
+### 2. エスカレーションの自動 resume を `:phase-approval` に限定する（workspace 面との意図的な差分）
+
+`cloud-itonami.workspace/resume-actor-if-interrupted!` は
+`:request-approval` interrupt を**理由を問わず** approved として resume する。
+teian / koyomi / denrei は自分の phase gate 以外でエスカレートしないので、
+そこでは問題にならない。**CRM ではなる。**
+
+vertical actor は execute 時まで走らないので、cloud-itonami の effect を承認した
+人間は `:revenue-mismatch-imminent`（crm.policy が booked amount を ASC 606 で
+再計算して不一致）や `:lead-score-mismatch`（marketing.policy が engagement
+history からスコアを再計算して不一致）を**構造的に見ていない**。これを自動
+resume するのは「誰も読んでいない指摘を commit に洗浄する」ことに等しい。
+
+したがって `auto-resumable-escalations` は `#{:phase-approval}` のみ。
+`:phase-approval` は「この phase では全 write に人間の sign-off が要る」という
+**この request について何も主張しない**理由であり、cloud-itonami の承認キューが
+既に集めた sign-off がまさにそれなので、代用してよい。
+
+### 3. 完了できない kind は「公開して常に throw」ではなく最初から公開しない
+
+- `:dispute/request` — 全 phase で `:auto` 外、かつ `:correction?` により
+  常に escalate。しかもその escalation は上記の「実質的な指摘」側なので、
+  effect kind にすると execute 時に必ず throw する死んだ kind になる。
+  dispute は 5820 自身のレビュー面（patch を見られる場所）に残す。
+- `:pipeline/dashboard-query` / `:marketing/view-dashboard` — どちらも
+  actor の `llm/infer` に dispatch が無く、`:noop` / confidence 0.0 →
+  `confidence-floor` 未満で永久に escalate する。dashboard は
+  `crm.dashboard` / `marketing.dashboard` の純関数が返す（actor 実行不要）。
+
+### 4. advisor は phase gate 付き、model は注入
+
+`advisor-select/phase-allows-llm?`（phase 0-1 は決定論、2-3 は LLM 可）を
+そのまま再利用し、model 例外時は決定論 advisor へ fallback する。
+chat-model は**呼び出し側が注入**する（`*chat-model*`）。この ns は portable
+`.cljc` のままネットワークを持たず、model の解決は root CLAUDE.md /
+ADR-2607173100 のとおり `murakumo-main` alias 経由で呼び出し側が行う
+（concrete な model id をここに焼かない）。governor は選ばれた advisor の
+下流に居続けるので、実 LLM 化が commit 可能範囲を広げることはない。
+
+## Consequences
+
+- `runtime-handlers/handlers` に `crm/handlers` が merge され、承認済み effect が
+  実際に vertical の actor を駆動するようになった（登録 kind 数 34 → 41）。
+- gftdcojp cockpit（`keiei/ui/gftdcojp.cljc`）に `:crm` / `:marketing` の 2 タブと
+  7 kind の label/icon を追加。**handlers と同時に**追加した — この map の
+  docstring 自身が記録している regression（live な proposer の kind が未登録で、
+  よりによって `:financial` / `:external-send` の行が preview 無しのまま
+  承認されていた）を繰り返さないため。5820 と 6201 を 1 タブに畳まないのは、
+  別 governor の別事業であり、`:financial` な商談進行を承認する仕事と
+  `:external-send` なキャンペーン送信を承認する仕事は別だから。
+- deps.edn に 2 vertical を追加した副作用として、`org-ietf-ed25519` /
+  `org-ietf-cbor` / `langgraph` / `langchain` / `langchain-store` / `crm` を
+  top-level `:local/root` で pin する必要が生じた（mixed coordinate は
+  比較不能で**全 alias の classpath 構築が落ちる**。shitsuke /
+  liquid-glass-ui に対して既に同じ処置が入っているのと同一の理由）。
+
+## 実測 / 検証
+
+`cloud-itonami.crm-test` は governor を stub せず**実 actor を実 governor 越しに**
+駆動する。9 test / 54 assertion 全通過。
+
+- HARD hold が例外として表面化する（rep の割引権限超過 / stage skip / 出典なし /
+  opt-out 済み contact への送信 / phase 未開放 op）。
+- engagement history と食い違う lead score は commit に洗浄されない。
+- clean な phase-1 write は外側の承認を根拠に resume され commit する。
+- **テストが実バグを 1 件検出した**: `crm.policy/licensed-disclosure-violations`
+  は licensed account を **context** から読む（request からではない）ため、
+  bridge が request にしか入れていない間、全 disclosure が
+  「有効な subscription が無い: account=」で HARD hold されていた。
+  2 つの独立した id を持たせると「A の列を出して B の tier で検査する」形に
+  なるので、context の `:account-id` は request と同一値で固定した。
+
+### 副産物: repo を壊していた pre-existing regression の修復
+
+この作業で判明した別件。`kotoba-lang/plm` の `b7d4143`（west pin と一致、
+\"refactor: split Datomic host provider\"）が `fresh-conn` を
+`kotoba.plm.db` から `kotoba.plm.db-host` へ移したが、cloud-itonami 側は
+テスト 1 ns しか追従しておらず、**`cloud-itonami.ops` を読む JVM 経路
+（= `clojure -M:test` 全体）が pin 済みの checkout に対してコンパイル不能**
+だった。4 ファイル 5 箇所を移行。
+
+修復後の全 suite は 1078 test / 7653 assertion で 9 failures / 13 errors。
+いずれも本 ADR の変更とは無関係（`runtime.cljc:554` は空ストア由来の
+`reason-no-activities`、`substance_test` は整数カーネル battery の drift、
+`doctor_test` は UNSPSC カバレッジ、`ops_keys_test` は 2026-07-25 の did
+再 mint との差分、`bb-live-tasks` は ADR-2607173000 で撤去した bb.edn）。
+これらは「新たに壊れた」のではなく、**コンパイルが通らず見えていなかった**もの。
+
+## 未達（正直に）
+
+- **`gftdcojp/gftdcojp` テナントは依然 `claimed: false`。** seed 自体
+  （`cloud-itonami.tenants.gftdcojp/seed!`）は実装済みだが `KOTOBA_URL` /
+  `KOTOBA_GRAPH` + auth env、すなわち kotoba-server 本番デプロイを要する
+  （`docs/launch-blockers.md` の OWNER-ACTION）。本 ADR では seed を実行していない。
+- **承認の lane スコープが存在しない。** `resources/ops-identity.edn` の
+  delegate（sales-head / billing-head / keiei-head）は `:lanes` を持つが、
+  `tenant/permission` の capability モデルに lane 次元が無く、
+  `ops_governor` にも lane 判定が無い（`:lanes` は `ops-keys/delegate-status` の
+  報告用メタデータに留まる）。したがって delegate に `:effect/approve` を
+  与えると `:financial` な商談進行まで無差別に承認できてしまうため、
+  **本 ADR では delegate への approve 付与を行わなかった**。lane scoped
+  approval は別 ADR。
+- **gftdcojp 自身の CRM 実データが無い。** bridge は payload の `:ground` から
+  ground fact を seed する設計なので動作はするが、実際の取引先・商談は
+  まだどこにも入っていない。
+- `*sub-actor-stores*` の edge 側 priming（`edge/sub_actor_store.cljc` は
+  workspace 面のみ対応）は未配線。現状 CRM/marketing の store は
+  handler 呼び出しごとに ephemeral で、耐久性は cloud-itonami 自身の
+  `:runner/executed` 監査証跡が担保する。
+")))

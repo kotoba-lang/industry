@@ -1,0 +1,123 @@
+(vector (map 
+  (:db/id -1)
+  (:adr/id "adr-2609022300-the-execution-contract-gets-callers-and-the-gaps-close")
+  (:adr/title "The execution contract gets callers, and the gaps close")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-02")
+  (:adr/repos "[\"kotoba-lang/kotobase\" \"kotoba-lang/code-graph\"]")
+  (:adr/body "## What this was
+
+A ChatGPT-side session had landed `kotobase.execution-contract` (kotobase PR
+#61): three exact, versioned records for one governed query execution, with
+fail-closed validation. Its own closing report named the largest problem:
+nothing called it. A contract with no caller is a schema, and a schema is not
+a security boundary.
+
+This session closed that and every gap the report listed, across thirteen
+merged pull requests in two repositories.
+
+## What landed
+
+| # | repo | what |
+|---|---|---|
+| 62 | kotobase | `governed-execution` — the contract gets a caller: envelope bound to the query that runs, runtime authority, guarded read, receipt committed and read back before rows |
+| 63 | kotobase | identifiers computed, not accepted; signatures verified before the record is written; `execution-identity` names the canonical codec |
+| 64 | kotobase | `evidence` — lift a plane's records onto a contract under one rule: the supplement must be exactly what the source does not carry |
+| 65 | kotobase | the disclosure read path is deleted; `governed-read` replaces it, keeping the checks the retired path made |
+| 66 | kotobase | `metering` — cost counted at the storage seam instead of asked for |
+| 67 | kotobase | `execution-keys` — which key signed, authorised for this tenant at this epoch |
+| 68 | kotobase | `effect-contract` — a versioned record for authorised effects |
+| 69 | kotobase | `conformance` — the contract's stated purpose checked rather than asserted |
+| 70 | kotobase | `:cache-profile` measured with two meters, since one cannot |
+| 71 | kotobase | `governed-effect` — the effect contract gets a caller |
+| 72 | kotobase | the effect path gets a Worker half; `authority-window` extracted |
+| 73 | kotobase | the last blocker recorded as a measurement rather than a claim |
+| 74 | kotobase | the plane registry opened; the vestigial `code-graph` copy deleted |
+| 1 | code-graph | a query receipt embeds the version 1 receipt it is evidence of |
+
+kotobase main `f78ddd513bbb85c8fad020ecc31cd96171d9d1e7`; code-graph main
+`4afe2389749f60080a705ea26e9138e18489989a`. Both west pins advanced and
+verified (`verify-west-pins` clean); thirteen single-entry pin commits from
+`0033ce17f86` through `bf749dcbecb`.
+
+## Verification
+
+kotobase: JVM 155 tests / 3011 assertions, ClojureScript 50 / 357, clj-kondo
+0 errors and the same 22 pre-existing warnings the session started with — two
+new ones appeared during the work and were fixed rather than accepted. The
+JVM count falls from a peak of 171 because PR #74 deleted tests for a library
+this repository no longer contains; they live in `kotoba-lang/code-graph`
+with deliberately different fixture CIDs, so two suites cannot hide a
+substitution bug by sharing a value.
+
+code-graph: 17 tests / 64 assertions, clj-kondo 0 errors 0 warnings.
+
+The ClojureScript suite grew from 3 tests to 50 because the portable suites
+now run under the real ClojureScript compiler, not only the JVM. That is what
+makes the cross-runtime claim in `execution-identity` a fact produced by
+running rather than by asserting: `conformance-cid` is a CID measured on the
+JVM and written down, and a second runtime reproduces it.
+
+Every new check was mutation-tested — over thirty mutations, each expected to
+fail exactly the test that names it and nothing else.
+
+## What the work found, rather than built
+
+- **A result root is not the identity of an answer.** It is the address of the
+  rows as served, and an address is order sensitive; the query grammar has no
+  ordering clause, so the answer is a multiset and two conformant frontends
+  may serve it in different orders and produce different roots. Neither is
+  wrong. Recorded as an addendum to kotobase's ADR-execution-contract.
+- **A plumbing failure is not a policy denial.** `authorized-query` raises its
+  own reason key on both sides of evaluation; the first version of the deny
+  path wrote both into the durable evidence plane as `:deny`, recording a
+  decision policy never made. Found reviewing the diff, not by a failing test.
+- **The effect side needs two records, and that is not a leftover.** A read's
+  receipt can bind its result because reading is repeatable. An effect's
+  cannot: an outcome does not exist until the effect has run. The audit is the
+  precondition, the receipt is the evidence.
+- **The last plane's blocker was a dependency direction.** `code-graph`
+  depends on `kotobase`, having been extracted from it, so kotobase's
+  byte-identical 668-line copy was what the extraction left behind rather than
+  a vendored dependency. Closing the plane's distance was a change in one
+  place once the copy was gone.
+
+## Own mistakes, recorded
+
+- Two tautological assertions written and caught: one comparing a fixture to
+  itself, one comparing a store to itself with nothing in between.
+- A `testing` block with an empty body.
+- A mutation that appeared to prove a test discriminating while actually
+  breaking something else — the audit was never called rather than its answer
+  ignored — rewritten until the failure matched the property.
+- PR #73 recorded the last gap as unclosable in a claim that had not checked
+  the dependency direction. It was wrong, and the next two pull requests
+  closed it.
+
+## What remains, with reasons
+
+- **A codec that lies is not caught.** `governed-execution` checks that its
+  address function behaves like an address — deterministic, indifferent to map
+  entry order, different for different values — which refuses a constant, a
+  counter, an order-sensitive hash and an absent codec. A function that
+  special-cases the probe and answers freely elsewhere passes. The check is
+  against accident and says so; `execution-identity/conformant?` is the
+  stronger claim and is deliberately not applied to a caller's argument.
+- **`admission` and `code-graph` still write their own records.** Both lift
+  onto a contract with a measured supplement. Retiring either means deleting a
+  path, as PR #65 did for the disclosure plane.
+- **No second query protocol exists in this repository**, so the conformance
+  harness is exercised by two implementations of one surface. That shows the
+  comparison discriminates; it does not claim cross-protocol agreement. A
+  protocol frontend plugs in the same way.
+
+## Resume point
+
+    cd orgs/kotoba-lang/kotobase && clojure -M:test && npm run test:causal-worker
+
+The next piece of work with a clear shape is retiring one of the two effect
+planes the way the disclosure plane was retired: route `admission`'s callers
+through `kotobase.governed-effect`, then delete the audit-only path if
+anything is left of it. `docs/ADR-evidence-plane.md` carries the measurement
+that says how far each plane is from its contract.")
+))

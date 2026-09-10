@@ -1,0 +1,373 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607309950")
+  (:adr/date "2026-07-30")
+  (:adr/status "accepted")
+  (:adr/title "ADR-2607309950: registry 面を実装する — srs (RFC 3915 ライフサイクル) / org-ietf-epp / org-ietf-rdap / org-ietf-dnssec / domain-billing、および org-ietf-dns への EDNS0・AXFR/IXFR 追加")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/body
+  "## Context — 監査で分かった現在地（2026-07-30 実測）
+
+オーナーの問い「今の cloud-itonami, kotoba-lang に godaddy や namecheap のような
+dns registry, host は設計実装されているか。分散型で nameserver, registry として
+機能するものは」に対する実測結果:
+
+**DNS を「運用する」側は揃っていた。**
+
+- `kotoba-lang/org-ietf-dns`（884行、27 tests/54 assertions）— 実際に `dig` できる
+  RFC 1035 権威 DNS サーバー。wire codec（名前圧縮・ポインタループガード）/ store
+  （wildcard・CNAME chase・NXDOMAIN/NODATA）/ resolver chain / UDP+TCP socket。
+  さらに `nameserver.custom-tld` が IPNS 鍵派生名を独自 TLD 下で解決する alt-root。
+- `kotoba-lang/zone`（408行）— RFC 1035 zone file ⇄ EDN、validate、構造 diff。
+- `kotoba-lang/godaddy-dns`（437行）— GoDaddy Domains API クライアント。**registrar の
+  「顧客」であって registrar ではない。**
+- `network-awai/cloud-itonami` の `dns_ops`/`dns_provider`/`domain`/`dns_verify` —
+  DnsGovernor + 承認キュー。gftd.co.jp の実 zone（53 レコード）に配置済み。
+- `kotoba-lang/kekkai-node` の `magicdns.cljc` — overlay 内の netmap 由来 DNS
+  （ポート 5354）。`org-ietf-dns` の `IResolver` として合成される。
+
+**「registry / registrar そのもの」は全く無かった。** grep でゼロ:
+
+- EPP（RFC 5730-5734）— レジストリ⇔レジストラ間プロビジョニング
+- RDAP（RFC 9082/9083）/ WHOIS（RFC 3912）
+- SRS backend — ドメインの割当・更新・移管・redemption grace period
+- DNSSEC 署名（`org-ietf-dns` が明示的に scope 外と宣言）
+- AXFR/IXFR、EDNS0
+- ドメイン販売・課金
+
+`kotoba-lang/com-dns-root-zone` は名前に反して DNS の wire 構造を Datomic 裏の
+CRUD にした L4 compat actor（190行1ファイル）で、root zone でも nameserver でも
+ない。`kotoba-lang/dns` は etzhayyim の TypeScript ATProto appview で DNS 無関係
+（名前衝突）。`2607071717-cloud-itonami-registrar-8530` の「registrar」は ISIC 8530
+の大学教務課であってドメインレジストラではない。
+
+分散型については `tech-ipfs-specs-ipns` の `ipns.core`（k51… 名の導出）+
+`ipns.head`（署名付き可変レコード）が実在し、kotobase.net が **自前の XRPC
+registry** としてそれを解決している——libp2p DHT ではなく単一権威。alt-root の
+中に中央集権点が1つ残っている状態。
+
+## Decision
+
+**kotoba-lang に registry 面を実装する。** 5 リポジトリ新規 + 1 リポジトリ拡張。
+すべて `.cljc`、clock 無し、storage 無し、third-party runtime 依存ゼロ。
+
+| repo | 仕様 | 規模 |
+|---|---|---|
+| `srs` | RFC 3915 RGP + RFC 5731 statuses | 38 tests / 137 assertions |
+| `org-ietf-epp` | RFC 5730/5731/5734 + 3915 | 22 tests / 65 assertions |
+| `org-ietf-rdap` | RFC 9082/9083 + 8056 + 3912 | 28 tests / 83 assertions |
+| `org-ietf-dnssec` | RFC 4034/4035 + 8080 + 8624 | 16 tests / 60 assertions |
+| `domain-billing` | — | 15 tests / 42 assertions |
+| `org-ietf-dns`（拡張） | RFC 6891 + 5936 + 1995 + 3597 | 27→51 tests / 54→150 assertions |
+
+### 命名
+
+`org-<body>-<spec>` は外部仕様を実装する repo の既存規約（`org-ietf-dns`,
+`org-ietf-turn`, `org-w3-did`, `org-khronos-gltf`）。`srs` と `domain-billing`
+は外部仕様ではないので prefix 無しの短い domain name
+（`manifest/repository-rules.edn` の `:name-prefix` vocabulary で prefix 無し =
+`:role :library` / `:execution :none`）。`-clj` suffix は使わない（ADR-2607102200
+addendum 14）。
+
+### EDNS0 / AXFR / IXFR は新規 repo にせず `org-ietf-dns` を拡張した
+
+同じ wire プロトコルであり、codec を別 repo に分割すると OPT pseudo-RR の
+round-trip が2箇所に分かれて必ず drift する。**DNSSEC の前提条件でもある**——
+署名済み応答は 512 オクテットを日常的に超えるので、EDNS0 無しで署名ゾーンを
+出すと全クエリが TCP に落ちる。
+
+## Design decisions
+
+### 1. clock を持たない（`srs`）
+
+すべての関数が `now` を epoch ms 引数で取る。registry の面白い遷移は 30〜45 日
+間隔（redemption 終了・auto-renew grace 終了・transfer の5日自動承認）で、clock を
+読む実装ではそこを sleep か mock でしかテストできない——だから実運用の registry
+では**ドメインを削除するコードが最もテストされていない**。ここでは10年が
+`(lc/advance domain policy (t/plus-years t0 6))` という式1つ。
+
+### 2. grace period は phase ではなく overlay（RFC 3915 §3.1）
+
+RFC の平坦な status 一覧は phase として実装したくなるが、それは相互排他になる。
+実際には `renewPeriod` と `transferPeriod` は同時に立つ。`addPeriod` のドメインは
+「返金可能である以外は普通の active ドメイン」。
+
+### 3. status が自分の禁止を持つ
+
+`srs.status/prohibits` が EPP status → 禁止操作の写像を持ち、`blocked-ops` が
+その知識の唯一の在処。status を不透明な文字列として保存する registry は、
+policy を呼び出し側ごとに書き直すことになり、呼び出し側は drift する。
+
+`client*` と `server*` は同じ禁止・異なる権限。`update` は `server*` への操作を
+拒否する——その非対称性こそが registry lock の実体。`ok` は導出であって保存しない
+（RFC 5731 §2.3）: 保存された `ok` が prohibition と同居すると、`ok` を見る
+クライアントにロック済みドメインをアンロック済みと報告する。
+
+### 4. 暦演算は本物（`srs.time`）
+
+2024-02-29 の1年後は 2025-02-28。1年を365日で近似すると閏日をまたぐ全ドメインで
+満了日が狂い、10年契約では2日ずれる。`java.time` は JVM 専用、`js/Date` は CLJS
+専用かつ既定でローカルタイムゾーン演算なので、Howard Hinnant の
+`days_from_civil`/`civil_from_days` を整数演算で実装した。`floor-div` は
+epoch 以前の instant で `quot` と挙動が違う（truncate-toward-zero では1日ずれる）。
+
+### 5. events を返す、effect を実行しない
+
+create は同時に請求行であり、zone に publish する委任であり、変わった RDAP
+レコードでもある。`srs` がそれらを実行すると billing / DNS / HTTP を知ることに
+なり、どれも他を抜きにテストできなくなる。data として返すことで依存が一方向に
+固定される——`domain-billing` は `srs` を読み、`srs` は何も読まない。
+
+### 6. 返金可否を billing 側で再計算しない
+
+billing 層が最も誘惑され、最もやってはいけないこと。grace period は lifecycle
+policy であり `srs.lifecycle/refundable?` が既に答えていて、答えは
+`:event/refundable?` / `:event/within-grace` として event に載って届く。日付から
+再計算する billing 層は同じ規則の2つ目の実装であり、drift する方向が
+「登録者に金が戻るかどうか」を決める。
+
+### 7. XML namespace の prefix は identity ではない（`org-ietf-epp`）
+
+手書き EPP パーサが最もよく間違える点。`<domain:create>` `<d:create>` 既定
+namespace の `<create>` は同一要素で、prefix は文書著者の自由。リテラル文字列で
+マッチするパーサは1つ目だけ受理して残り2つを黙って落とす——**フレームは正当な
+XML としてパースでき、何にもマッチせず、XML が正しいレジストラに
+「unknown command」を返す**。`epp.xmlns` が scope 内の `xmlns` 宣言（scoped かつ
+shadow 可能なので環境付きの walk）に対して解決してから照合する。
+
+### 8. session が trust boundary（`org-ietf-epp`）
+
+`srs.core/execute` は `:command/registrar` がオブジェクトを sponsor しているかを
+検査するが、**呼び出し側がその registrar である**ことは知りようがない。password を
+見たのは session だけなので、registrar は session から取ってフレームの主張を
+上書きする。フレームの `clID` を信じるサーバーは、認証済みレジストラが他の
+レジストラとして行動することを許す。
+
+### 9. RFC 8056 は仕様として存在するのに registry は自作する（`org-ietf-rdap`）
+
+2つの語彙は似ているので推測が安全に感じられる。合わない箇所こそが推測の誤る箇所:
+`ok` は `active` になる（RDAP に `ok` は無い——`ok` を探すクライアントは
+「status が無い」と結論する）。RGP status は §4 で scope 内であり、
+「まだ取り戻せる名前」と「手遅れの名前」を区別する唯一のもの。未知の status は
+transliterate せず**落とす**——RFC 9083 §10.2 に無い値を捏造するより無い方がまし。
+
+WHOIS を別 repo にせず RDAP と同居させたのは、status を2回計算する registry が
+いずれ片方でロック済み・片方でアンロック済みと表示し、登録者はたまたま引いた方を
+見るから。両者とも `srs.core/info` から描画する。
+
+### 10. 正準形が DNSSEC の全基盤（`org-ietf-dnssec`）
+
+署名はバイト列に対して行われる。validator が signer と1バイトでも違う直列化を
+すると全署名が失敗しゾーンが bogus になる——鍵の問題にも時計の問題にも
+resolver の問題にも見えて、そのどれでもない。
+
+- 名前は小文字化かつ**非圧縮**。`nameserver.wire` の encoder を再利用せず自前を
+  持つのは、あちらが RFC 1035 名前圧縮を行うため——message には正しく、ここでは
+  致命的（圧縮された名前のバイト列は message の他の内容に依存するので、同じ
+  RRset がどのクエリから生じたかで違う署名になる）。
+- **original TTL** を使う。cache されたコピーは TTL が減っており、レコード現在の
+  TTL で署名すると origin では通り他所では全部落ちる——最も再現しにくい DNSSEC 障害。
+- 名前は右から左に整列。`z.a.example.com` は `a.b.example.com` より前
+  （右端のラベルが並び、次に `a` が `b` に勝ち、左端のラベルは発言権を持たない）。
+  文字列順が食い違う全ての箇所で、存在する名前の不在を証明する NSEC chain ができる。
+
+crypto は **injected capability** で import しない。署名実装を import する
+ライブラリは zone-signing key を保持するか少なくとも触ることになる。外に出せば
+鍵は HSM や kagi に置け、このコードは見ない——`cloud-itonami.dns-provider` が
+「actor が secret を読む」を構造的に不可能にしているのと同じ規律。同時に
+**直列化だけを単独でテスト可能**にする（実際に壊れるのはそちら側）。テストの
+「signer」は渡された blob をそのまま返すので、全 assertion が crypto 抜きで
+「どのバイトが署名されたか」を見ている。
+
+### 11. AXFR の ACL は既定値を持たない（`org-ietf-dns`）
+
+`allow?` は必須引数。既定はどちらも間違い——permissive は持っている全ホスト名を
+攻撃者に渡し、restrictive は運用者が設定したつもりの replication を黙って壊す。
+IXFR は履歴が無ければ**完全な AXFR に fallback**する（RFC 1995 §2 が正当な応答と
+定める）——空の diff を返すのが secondary を恒久的に stale にする失敗。
+serial 比較は RFC 1982 sequence space なので `1` は `4294967295` より新しい。
+
+### 12. 金額は整数の minor unit（`domain-billing`）
+
+浮動小数点は `0.1` を表現できないので、ドル建ての price book は合計した瞬間に
+誤差を蓄積し、誰も再構成できない理由で1セントずれた請求書として現れる。
+**JPY には minor unit が無い**——`/100` をハードコードすると ¥3000 が
+`30.00` になる。`:currency` は全ての金額に随伴する（通貨の無い数値は価格ではない）。
+
+ICANN fee は登録年あたりの pass-through で、total とは別に報告する——gross だけ
+報告すると registry 自身のマージンが実際より大きく見え、送金の照合が不可能になる。
+
+## Implementation status（2026-07-30 時点、実測）
+
+すべて GitHub に push 済み、テストは全て通っている。
+
+| repo | commit | tests |
+|---|---|---|
+| `kotoba-lang/srs` | `b239cde` | 38 / 137 |
+| `kotoba-lang/org-ietf-epp` | pushed | 22 / 65 |
+| `kotoba-lang/org-ietf-rdap` | pushed | 28 / 83 |
+| `kotoba-lang/org-ietf-dnssec` | pushed | 16 / 60 |
+| `kotoba-lang/domain-billing` | pushed | 15 / 42 |
+| `kotoba-lang/org-ietf-dns` | `e5f01a1` (merged) | 51 / 150 |
+| `kotoba-lang/xml` | `9d4284c` (merged) | 15 / 66 |
+
+合計 **185 tests / 597 assertions**。
+
+### 副産物: `kotoba-lang/xml` に `compact` emitter を追加した
+
+`xml.core/xml` はインデント整形器で、要素内容が**値**である場合はその
+インデントが値の一部になる: `[:clTRID \"ABC-1\"]` が
+`<clTRID>\\n  ABC-1\\n</clTRID>` になり text content は `\"\\n  ABC-1\\n\"`。
+文書では無害、wire protocol では欠陥——EPP の `clTRID` は応答をコマンドに
+対応付けるもので、送った値と照合するレジストラは不一致を見る。
+`xml.core/compact` を追加（既定付きフラグではなく別関数にしたので、protocol XML を
+出す呼び出し側は明示する必要があり、文書を出す呼び出し側は既存の出力を保つ）。
+
+### 副産物: `nameserver.wire` の RFC 3597 round-trip 修正
+
+`read-rdata` は未知の型を `:zone/raw` にしていたが `write-rdata` は throw して
+いたので、**round-trip が片方向だけ壊れていた**——decode できて re-encode できない。
+それは forwarder・zone transfer・OPT pseudo-RR が知らない型に対して必ず行う操作。
+`rr-type->int`/`rr-class->int` が generic な `TYPEn`/`CLASSn` 綴りと裸の整数を
+受けるようにした（OPT が payload size を置く CLASS フィールドに任意の数値を
+入れる唯一の方法でもある）。
+
+## Non-goals / 明示的に実装しなかったもの
+
+- **host (RFC 5732) / contact (RFC 5733) object mapping** — `srs` は nameserver を
+  ドメイン上の裸の名前として持つ。EPP greeting は `domain-1.0` のみ advertise し、
+  他を求める login は 2307 で拒否する（受理して後で失敗させない）。RDAP の
+  `/nameserver` `/entity` は 404 ではなく **501**——zone に明らかに存在する名前に
+  404 を返すのは嘘だから。
+- **RDAP search（`/domains?name=`）** — RFC 9082 §4 は optional。registry の
+  namespace 全体に対する無制限検索は bulk-extraction endpoint であり、うっかり
+  提供することが登録データが一括で流出する経路。明示的な 501 にした（沈黙の 404 は
+  「該当なし」と読まれる）。
+- **NSEC3（RFC 5155）** — NSEC walk がゾーンを列挙するのを止める hashed denial。
+  名前一覧を秘匿したい registry には必要。**発見させるのではなく無いと書いた。**
+- **署名の検証** — これは signer であって validator ではない。
+- **決済** — カード・ウォレット・ゲートウェイ・保管された credential のいずれも
+  持たない。`domain-billing` は ledger entry と残高を作るだけ。金を取るのは
+  deployment の仕事であり規制対象。この境界のおかげで vault を要するものを
+  何も持たず、public な kotoba-lang ライブラリでいられる。
+- **ICANN accreditation** — これはコードで解決する問題ではない。
+
+## Consequences
+
+**得たもの:** ICANN root 配下で TLD registry を運転するのに必要な protocol 面が
+揃った。既存の `org-ietf-dns`（データ面）+ `zone`（モデル）+ `cloud-itonami`
+（ops governance）と合わせて、`godaddy-dns` が「他人の registrar API を叩く」
+だったところに「自分が registry である」経路ができた。
+
+## 2607-07-31 追記 — 残っていた穴を閉じた
+
+ADR 起票時に Non-goals として記録した項目のうち、以下を実装した。
+
+| 項目 | repo | tests |
+|---|---|---|
+| host object (RFC 5732) | `srs.host` | 38→48 / 137→172 |
+| host object mapping | `org-ietf-epp` | 22→28 / 65→81 |
+| nameserver lookup | `org-ietf-rdap` | 28→33 / 83→98 |
+| NSEC3 (RFC 5155) | `dnssec.nsec3` | 25→38 / 88→141 |
+| crypto provider + 実鍵での検証 | `dnssec.provider` | 16→25 / 60→88 |
+
+### host object — 文字列では答えられない2つの問い
+
+`srs` は nameserver をドメイン上の裸の文字列として持っていた。これで答えられ
+ないのが2つある。
+
+**この nameserver はまだ使われているか。** どのドメインからも参照されている
+host は削除できない（RFC 5732 §3.2.2）。`delete` は **2305**（object
+association prohibits operation、そのコード本来の意味）で拒否し、参照している
+ドメイン名を返す —— registrar が lock ではなく association を探せばよいと分かる。
+association は count ではなく **set**。count だと同じドメインが2回 link された
+後に1回 unlink すると、使われていない host が永久に削除不能になるか、逆に使用中
+の host が削除できてしまう。テストで再現している。
+
+**glue が要るか。** `example.com` を配信する `ns1.example.com` は **in-zone** で
+アドレス必須（それが無いと解決に自分自身の解決が要る、それが glue の存在理由）。
+`ns1.example.net` は **out-of-zone** でアドレス禁止。RFC 5732 §1.1 は両方向を
+書いているが、実装は後者をよく飛ばす —— 権威を持たない名前のアドレスを持つのは
+親切に見えて、他人のデータの second stale copy をレジストリが配ることになる。
+両方向を強制し、`update-addresses` も再検査する（ゾーン名変更で host は側を
+移りうるため）。
+
+`linked` は導出 status で保存しない。保存すると、要約対象の association と
+食い違える。`info` は list ではなく count を返す —— どのドメインがどの
+nameserver を使っているかは公開応答が列挙してよいものではない。
+
+### NSEC3 — iterations はセキュリティのつまみではない
+
+NSEC は前後の名前を平文で渡すので、chain を辿ればゾーン内の**全名前**が読める。
+名簿が商売そのもののレジストリには理論上の話ではない。
+
+実装で最も間違えられる2点:
+
+- **iterations を上げても安全にならない。** 攻撃側は候補名1つにつき1回払うだけ
+  で、ゾーン名は短く辞書由来なのでコストは候補リストに支配される。一方
+  **validator は否定応答のたびに**同じコストを払う。高い値は自分に向けた DoS
+  増幅器。RFC 9276 は iterations 0 / salt 空を推奨しており、それを既定にして
+  大きい値は拒否する。
+- **base32hex であって標準 base32 ではない。** 標準は `A-Z2-7`、base32hex は
+  `0-9A-V` で**全記号が違う**。取り違えると owner name の整列が変わり何にも
+  一致しない —— 正しく見えて何も証明しない chain ができる。RFC 4648 の
+  テストベクタをスイートに入れた。
+
+他に静かに壊れる2点: hash は名前の**正準 wire 形式**に対して取る（テキストに
+対して取ると validator が再現できない chain になる）、salt は**毎回**の
+iteration で付ける（初回だけ、が定番の誤り）。`covers?` は chain 末尾の
+**wrap**（next が自分より小さい区間）を扱う —— 素直な `lo < x < hi` ではその
+区間だけ被覆されず、そこは攻撃者が狙う場所そのもの。
+
+**opt-out は意図的に生成しない。** 未署名委任の NSEC3 を省ける仕組みで大手 TLD
+が採用した理由でもあるが、その委任が存在しないことを証明できなくなる。
+パラメータではなく別のセキュリティモデルなので、既存ゾーンを読むための
+`flags` は残しつつ、こちらからは出さない。
+
+### crypto provider — 署名がバイトシャッフルでないことの証明
+
+`dnssec.sign` は crypto を注入で受けるので、スイートは echo signer で
+**どのバイトが署名されるか**しか証明していなかった。`dnssec.provider` が
+Ed25519（`kotoba-lang/ed25519`）と SHA-2 を配線し、`provider_test` が実鍵で
+署名してから **validator と同じ手順で blob を再構築**して検証する。併せて2つの
+失敗も固定した: RRset の1オクテット変更で壊れること、そして original TTL では
+なくレコード現在の TTL で署名すると壊れること（origin では通り全キャッシュから
+失敗する、あの障害）。
+
+境界は緩めていない —— `canonical`/`sign` は依然 crypto を import せず、それらを
+require しても provider は読み込まれない。
+
+## 更新後の残る穴
+
+1. **libp2p transport**（native DHT node 化）。プロトコル側は
+   `kad.message` + `kad.lookup` で揃っており、Noise XX も実装済み。残りは
+   multiaddr / TCP or QUIC / multistream-select / Yamux / identify / k-buckets。
+2. **contact object（RFC 5733）**。EPP は `contact-1.0` を 2307 で拒否、RDAP の
+   `/entity` は 501。registrant は現状ドメイン上の不透明な handle。
+3. **RDAP の DNSLink プレーン**（`gateway.resolve` の `:dnslink` は routing だけ
+   あって未実装。`org-ietf-dns` の DoH クライアントが使える）。
+4. **RFC 9537 redaction signalling**（redact はしているが、何を伏せたかを述べる
+   `redacted` member をまだ出していない）。
+5. **署名の検証**（本 stack は signer。`dnssec.provider/verify-fn` は自分の出力を
+   検査するためのもので、resolver 側の validator ではない）。
+
+**残る穴（優先順）:**
+
+1. ~~**IPNS の DHT publish/resolve**~~ → **格下げ済み。ADR-2607309970 を参照**
+   (2026-07-30)。着手して分かったのは、より根本的に **publish していたレコードが
+   そもそも IPNS Record ではなかった**こと（`ipns.head` は kotobase 独自 shape で、
+   どの IPFS 実装も検証できない）。`dev-protobuf` + `ipns.record` で本物の形式にし、
+   `io-libp2p-specs-kad-dht` の HTTP delegated routing で複数の独立 router を
+   quorum 付きで引くようにした。**record は相互運用可能になり解決は単一サーバー
+   依存でなくなったが、このプロセスは DHT node ではない** — 残るのは libp2p
+   transport（multiaddr / TCP or QUIC / Noise XX(実装済) / multistream-select /
+   Yamux / identify / k-buckets）。
+2. **DNSSEC の crypto provider** — `sign-fn`/`digest-fn` の JVM 実装がまだ無い。
+   `kotoba-lang/ed25519` が JVM 専用で存在するので接続は小さい仕事。
+3. **NSEC3** — 上記。
+4. **host/contact object** — EPP/RDAP の両方で 501 を返している面。
+5. **`org-ietf-dns` の server.clj に EDNS0/transfer を配線する** — 両方 pure な
+   ライブラリとして存在するが socket 層は既定で使っていない。
+
+**この ADR は registry を運転する決定ではない。** protocol 面を実装した決定で
+あって、TLD を実際に運営するには ICANN との契約・供託・運用監査が要る。")))

@@ -1,0 +1,97 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608315000-murakumo-inference-endpoint-refuses-and-the-workforce-loses-56-percent")
+  (:adr/title "itonami workforce の 56% は murakumo fleet の推論口が connection_refused だから —— cloud-itonami の設定ではない")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-31")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/last-verified "2026-08-31")
+  (:adr/authoritative true)
+  (:adr/topic "murakumo-fleet-availability")
+  (:source/dataset "adr")
+  (:adr/authoritative_for "2026-08-31 の itonami workforce provider 失敗の所在と、その切り分けに使った実測")
+  (:adr/repos (vector "network-awai/local-murakumo" "cloud-itonami/cloud-itonami-app" "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2608314500-hermes-and-itonami-bot-session-close"
+                "adr-2608313500-itonami-and-hermes-on-one-model-order-glm-flash-first"
+                "adr-2608302100-itonami-bots-openrouter-flash-x402-credits"))
+  (:adr/body "## 症状
+
+Cloud Itonami の resident workforce が、**修正後の 50 run 窓で 56% を
+`provider/http-error` で失っている**（正本 `itonami bots workforce`、窓
+06:05:24Z → 07:05:50Z、全件が provider 有効化 05:23Z より後）:
+
+    provider/http-error   28   56%
+    no-op                 12   24%
+    completed              9   18%
+    running                1    2%
+
+エラー本文は 1 種類:
+
+    \\\"model provider request failed — HTTP 502 murakumo fleet unreachable:
+     Error: connection_refused\\\"
+
+## 切り分け —— cloud-itonami の設定ではない
+
+同じ relay・同じ model に、**app と同じ形の payload** で直接当てた:
+
+| 条件 | 結果 |
+|---|---|
+| short prompt / max_tokens 64 | 4/4 通過（3.8–5.7s） |
+| short prompt / max_tokens 16384 | 4/4 通過（3.3–9.0s） |
+| **long prompt 4,620 B / max_tokens 16384** | **5/5 通過（52.8–144.0s、中央値 79.4s）** |
+
+⚠ この行は最初 `3/3（52.8–82.6s）` と書いた。probe が 5 回のうち 3 回まで
+しか出力していない時点の**部分結果を完了として報告した**もの。完走後の値が上で、
+**最大値は 82.6s ではなく 144.0s** だった。結論の向きは変わらないが、
+app 側の request timeout との関係を見るときはこの 144s の方を使うこと。
+
+`/v1/models` は 200 で 8 model を広告し、`bots task` を手で投げれば通る。
+**payload の形では壊れない。**
+
+## 原因 —— fleet 自身がそう言っている
+
+`GET https://api.murakumo.cloud/ready?model=z-ai/glm-5.3-flash` → **HTTP 503**
+（`murakumo-main` は 200）。本文:
+
+    inference   ok=false  available 0 / configured 1
+                endpoint http://127.0.0.1:8090/health
+                error \\\"Error: connection_refused\\\"
+    fleet       online 9 / expected 11   offline [issachar, naphtali]
+    degraded    [fleet-incomplete]
+    ok          false
+    hosted-models
+      qwen3.8-27b-throughput-5090   generation-ok=false   最終成功 4.9 日前
+      qwen3.8-27b-throughput-b70    generation-ok=false   最終成功 0.2 日前
+
+**bot が見ている `connection_refused` と同じ文字列**が、relay 自身の inference
+endpoint（`127.0.0.1:8090`）に対して出ている。`available 0 / configured 1` は
+「推論の口が 1 つ設定されていて、0 個生きている」。
+
+## 面の所在
+
+`network-awai/local-murakumo`（`service: local-murakumo` と名乗る）と
+mac-mini fleet 側。**cloud-itonami-app の config では直らない** —— provider の
+有効化は効いており（無効時は 1 件も走らなかった）、tick も動いている
+（1 分に約 1 run）。落ちているのはその先である。
+
+⚠ **glm-5.3-flash は OpenRouter 経由なのに 503 が返る。** 直接の生成は通るので、
+`/ready` はモデル別ではなくサービス全体の `ok:false` を返している可能性が高い。
+**そこは未測定** —— 「glm が壊れている」と読まないこと。
+
+## この測定で私が踏んだ罠
+
+1. **403 / Cloudflare 1010** を relay の拒否と読みかけた。裸の urllib が browser
+   signature で弾かれただけで、User-Agent を付けたら 8/8 通った
+2. **`nohup &` の子が tool 呼び出し終了で殺され**、条件が 2 度未実行のまま終わった。
+   出力に条件が無いことを「その条件が失敗した」と読めば 3 度目の誤報だった
+3. **部分結果を完了として報告した** —— long prompt の probe を `3/3` と書いたが
+   5 回中 3 回までしか出ていなかった。完走は `5/5`、最大 144.0s
+4. **snapshot だけを読んで journal を無視**し、「07:00Z 以降 0 run」と読みかけた。
+   snapshot は 07:00:23 書込、journal には 07:01–07:04 の run が在る。
+   結局ファイル解析は不要で、**アプリ自身（`bots workforce`）が正本**だった
+
+## 次の一手
+
+`127.0.0.1:8090` の推論プロセスが murakumo host で上がっているかを見る。
+`issachar` / `naphtali` の 2 ノードが offline なのも同じ面。
+")))

@@ -1,0 +1,228 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes")
+  (:adr/title "ADR-2608291700: passkey と smart contract が認証し、Biscuit が権限を持つ — 実測 100.00/100、認証 100 / 権限 100（2026-08-31 に閉じた）")
+  (:adr/status "accepted")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-29")
+  (:adr/last-verified "2026-08-29")
+  (:adr/last_verified "2026-08-29")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotobase-auth-authz-planes")
+  (:adr/repos (vector "orgs/net-kotobase/control-plane"
+              "orgs/kotoba-lang/org-biscuitsec"
+              "orgs/kotoba-lang/authority"
+              "orgs/kotoba-lang/kotobase-client"))
+  (:adr/authoritative-for
+  (vector "認証の基盤は passkey と smart contract (SIWE) の 2 経路であるという決定"
+   "権限 (delegation / authorization) の形式は Biscuit であり、決定器は kotoba-lang/authority 1 本のままであること"
+   "CACAO は session の起点として残り delegation からは降りていること、email OTP と SSO が補助経路として残ること"
+   "2026-08-29 時点の auth / authz 面の実測成熟度と、その測り方 (90-docs/kotobase_auth_maturity)"
+   "ADR-2608241400 と ADR-2608160300 の ipni head not published 記述、および concept-vocabulary の biscuit 未使用記述が実測で古いこと"))
+  (:adr/related
+  (vector "adr-2608180200-biscuit-as-delegation-center"
+   "adr-2608262600-issued-token-at-the-archive-door"
+   "adr-2608281200-kagi-cloud-persistence-blocked-by-biscuit-migration"
+   "adr-2608291500-hermes-bots-aozora-accounts-blocked-by-biscuit-cutover"
+   "adr-2608230100-reasoning-runs-on-the-index-plane-and-the-live-surfaces-do-not"
+   "adr-2608241400-ipni-does-not-buy-query-speed"))
+  (:adr/evidence
+  (vector "90-docs/kotobase_auth_maturity/probe-2026-08-29.edn — overall 58.00, authentication 100.00, authorization 36.36, measured weight 1.00 of 1.00"
+   "selftest.cljs against that probe — 7/7 checks, exit 0"
+   "POST auth.kotobase.net/v1/passkey/login/options -> 200 with challenge and rpId"
+   "POST auth.kotobase.net/v1/siwe/options -> 400 invalid_wallet_request (present)"
+   "POST auth.kotobase.net/v1/biscuit/token -> 403 cross-origin, 400 valid tenantId required same-origin"
+   "POST {sparql,cypher,graphql,gremlin}.kotobase.net -> 401 Bearer, AWS SigV4, or an operator CACAO; byte-identical with an Authorization: Biscuit header"
+   "POST kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.q -> 401 error Unauthorized (reason not named)"
+   "GET ipni.kotobase.net/ipni/v1/head -> 200 signed advertisement; cid.contact ingested 2026-08-27T08:13:07Z"))
+  (:adr/body
+  "# ADR-2608291700: passkey と smart contract が認証し、Biscuit が権限を持つ
+
+**Status**: accepted / **Date**: 2026-08-29
+**Deciders**: Jun Kawasaki（オーナー指示「認証の基盤は passkey, smart contract ベースとして, biscruit を権限関係に」）
+
+## 1. 決定
+
+**認証（誰であるか）の基盤は 2 つ、権限（何をしてよいか）の形式は 1 つ。**
+
+| 面 | 形式 | 役割 |
+|---|---|---|
+| **authentication** | **passkey（WebAuthn）** | 人の第一経路。rpId = auth.kotobase.net |
+| **authentication** | **smart contract / wallet（SIWE）** | EOA・コントラクト所有者の第一経路 |
+| **authorization** | **Biscuit** | principal 間の委譲と減衰。公開鍵で検証、秘密は要らない |
+| session の起点 | CACAO | 人の同意。**delegation からは降りたまま**（ADR-2608180200） |
+| 決定器 | `kotoba-lang/authority` | `covers?` / `meet` の唯一の実装。Biscuit は**その上の wire** |
+
+**この 2 文を分けて読むこと** —— 「Biscuit を権限に」は「authority を置き換える」ではない。
+判定は 1 本のまま、運ぶ形式が Biscuit になる。ADR-2608180200 の再確認であって新決定ではない。
+
+**email OTP / SSO は補助経路として残す。**基盤から降ろすが、消さない —— 消せば
+passkey も wallet も持たない既存 principal が締め出される。基盤とは
+「新しい principal に既定で与えるもの」であって「唯一許すもの」ではない。
+
+## 2. 現在地 —— 実測、2026-08-31（同日 3 回測っている）
+
+```
+2026-08-29  overall 58.00   authentication 100.00   authorization  36.36
+2026-08-31  overall 64.00   authentication 100.00   authorization  45.45   (06:04Z)
+2026-08-31  overall 100.00  authentication 100.00   authorization 100.00   (09:38Z)
+```
+
+**§3 の順序 1〜3 が閉じた。** 最後の 09:38Z の実測は `unknown axes []` /
+`incomplete []` / `measured-weight 1.00` —— 11 軸すべてが live HTTP で測られ、
+**測れなかった軸を pass として数えていない**。
+
+閉じた順に:
+
+- **3（capability 文書）** —— 08-29 と 08-31 06:04Z の間に landed。
+- **2（datom 面が理由を名乗る）** —— `net-kotobase/control-plane` `5e3b2976`。
+- **1（4 面が Biscuit を受理する）** —— 2 段階で閉じた。protocols-worker が
+  `a8c4e158`（16:31 JST）で sparql / graphql / gremlin を配線し、**cypher だけ
+  残った**。cypher.kotobase.net はその Worker の route ではなく、
+  ADR-2608051000 で切り出された `net-kotobase/cypher` で、`kotoba-lang/kotobase-worker-shell`
+  が持つ **同じ namespace の古い写し**の上に建っていた。shell `8cd9edc` +
+  cypher `9720de23` で 4 面目が閉じた。
+
+deploy 後の実測:
+
+```
+sparql   names-biscuit=1  header-changes-answer=YES
+cypher   names-biscuit=1  header-changes-answer=YES
+graphql  names-biscuit=1  header-changes-answer=YES
+gremlin  names-biscuit=1  header-changes-answer=YES
+```
+
+**「1 repo = 1 capability」の分割は、変更の到達範囲も分割する。** protocols-worker
+を直した人は 4 面全部を直したつもりで、3 面しか直っていなかった。差は測って初めて出た。
+
+### この作業で見つかった、この ADR では直していない 2 件
+
+- `kotoba-lang/kotobase-worker-shell` の main は**現在の manifest pin で
+  コンパイルできなかった**（`multiformats/core` が要求する `sha2.core` が
+  source path に無い）。cypher を serve する library が、しばらく誰にも
+  ビルドし直されていなかった。
+- ~~同 repo の `node out/node-tests.js` は完走しない~~ **これは誤りだった。**
+  完走する —— このワークステーションで**約 9 分**かかり、`55 tests / 215
+  assertions` を報告する。900 秒で 3 回切って、その沈黙を hang と読んだ。
+  **プロセスが CPU を焼いているかを一度も見ていなかった。** `node
+  out/node-tests.js` の行を直接サンプルすると CPU 時間は 8s → 28s → 75s → 89s
+  と積み上がっており、deadlock ではなく遅いテストだった。
+
+  誤読は 2 つの測定ミスから来ており、どちらも同じ形 —— **対象ではなくラッパーに
+  当てていた**: `pgrep -f 'node out/node-tests.js'` はその文字列を含む shell 自身に
+  当たるので「まだ走っている」が常に真になり、`ps | grep | head -1` は
+  `timeout 600 node …` を掴んで 0.0% CPU を返した。
+
+  この誤読の上で行動した結果、**スイートを一度も完走させないまま Biscuit の段を
+  merge・deploy し、`an-anonymous-gremlin-websocket-handshake-is-rejected` を
+  赤くしたまま出荷した**（`www-authenticate` が意図どおり `Biscuit, Bearer` に
+  変わったのに、期待値が `Bearer` のままだった）。production は壊れていない ——
+  4 面の live 実測は正しい —— が、それは運であって手順ではない。**完走させて
+  いれば 9 分で判った。** 修正は `fa4f599`、修正後 0 failures / exit 0。
+
+  `:biscuit-test` build は残すが、**全体スイートの代用ではない**。本当に要るのは
+  protocols-worker が自分の重いテストに与えている扱い（多コミット系を既定の
+  `-test$` から別 build へ出す）で、それは未着手。
+
+## 2.1 旧・現在地 —— 実測、2026-08-29
+
+推測ではなく `90-docs/kotobase_auth_maturity/` の probe が live を叩いた値。
+
+```
+overall         58.00 / 100   (measured weight 1.00 of 1.00)
+ authentication 100.00
+ authorization   36.36
+```
+
+**認証の基盤は既に在った。** 起こす仕事ではなく、既定に昇格させる仕事だった:
+
+- `POST /v1/passkey/login/options` → **200**、実 WebAuthn challenge + rpId
+- `POST /v1/passkey/register/options` → 401 `controller_link_required`（存在し、要件を名乗る）
+- `POST /v1/siwe/options` / `/v1/siwe/verify` → 400 `invalid_wallet_request` / `invalid_siwe_response`（存在）
+- `/sign-in` は `passkey.js` と `wallet.js` の両方を配っている
+- `POST /v1/biscuit/token` → cross-origin 403、same-origin 400 `valid tenantId required`（存在・CSRF 防護あり）
+
+**権限の側が 1 ホップ手前で止まっている。**4 つの finding、headroom 順:
+
+| headroom | 何が | 実測 |
+|---|---|---|
+| 0.200 | **4 つの query 面が Biscuit を受理しない** | sparql/cypher/graphql/gremlin とも `Bearer, AWS SigV4, or an operator CACAO` |
+| 0.100 | **その面は header を読んでもいない** | `Authorization: Biscuit …` を付けた応答が**バイト同一** |
+| 0.060 | datom 面の拒否が理由を名乗らない | `{ok:false, error:Unauthorized}` のみ。締め出された CACAO 話者が応答から理由を知れない |
+| 0.060 | capability 文書が受理する credential を書いていない | `/.well-known/kotobase-capabilities` は transport と limit までで、扉の手前で終わる |
+
+3 つ目は実害が出ている: ADR-2608281200 の `kagi push/pull` は、この名乗らない 401 の
+せいで原因特定に 2 つの誤った仮説を経由した。**拒否の理由を名乗るのは親切ではなく、
+運用コストの問題である。**
+
+## 3. 順序（この順でしかやらない）
+
+1. **`shared/kotobase/biscuit_grant.cljc` を 4 面に配線する。**判断は既に 1 箇所に
+   在る（ADR-2608262600 D4）ので、足すのは呼び出しと 401 本文の列挙だけ。
+   **2 つ目の verifier を書かない。**
+2. **datom 面の 401 に理由名を付ける**（`:biscuit-required` / `:expired` /
+   `:bad-signature`）。false だけ返す verifier は読む人を間違った場所へ送る。
+3. **capability 文書に `accepted_credentials` を足す。**匿名で読める discovery 文書は
+   「何を presenting すればよいか」に答えられなければ discovery ではない。
+4. **`/sign-in` の既定順を passkey → wallet → email/SSO にする。**今日は API として
+   完全だが、人に対する提示順が基盤の宣言と一致していない。
+5. **CACAO 話者の移行期限を決める。**datom 面は 2026-08-28 に `required` へ倒れており、
+   移行は既に始まっている —— 期限を決めていないだけ。
+
+**1 と 2 は net-kotobase/control-plane、3 は同 worker、4 は authn、5 はオーナー判断。**
+
+## 4. この ADR が訂正するもの
+
+測ったら、tree の中の 3 箇所が実態より古かった:
+
+- **ADR-2608241400 / ADR-2608160300**: 「`/ipni/v1/head` = ipni head not published」
+  「write 側は 1 行も動いていない」→ **実測 200**、署名付き advertisement chain が在り、
+  cid.contact が 2026-08-27T08:13:07Z に ingest 済み。`manifest/ipni-publisher.edn` が
+  publisher identity・鍵ローテーション・往復検証まで記録している。ADR 側が追随していない。
+- **`manifest/concept-vocabulary.edn` の delegation note**: 「まだどの経路も biscuit を
+  使っていない（live は CACAO 自己発行）」→ **実測で偽**。発行・archive PUT・datom 面の
+  3 経路が Biscuit に載っている。本 ADR と同じ commit で直す。
+
+**どれも誤りとして書かれたのではなく、正しかった記述が追い越されただけである。**
+だからこの ADR は散文を足すのではなく**計器**を足す —— 次に古くなるのは、この ADR の
+§2 の数字であり、それは probe を回せば分かる。
+
+## 5. 計器
+
+```
+npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs
+npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/selftest.cljs 90-docs/kotobase_auth_maturity/probe-2026-08-29.edn
+```
+
+exit は 3 値: **0 = 全軸測れて finding 無し / 1 = 全軸測れて finding あり /
+2 = 測れなかった軸がある（完全なスコアの報告を拒否する）**。
+
+selftest は 7/7 green で、次の 4 つを実演する:
+
+1. 今日の面は空虚に緑ではない（4 finding）
+2. 名指しした入力を直すと **100.00 に到達する**（緑が到達可能）
+3. 読めなかった入力は **nil であって 0 でも 1 でもない**
+   （実測 52.27 —— 0 として数えたなら 46.00 になる）
+4. **入力を 1 つ直すと finding が 1 つだけ消える**（理由特定）
+
+4 番目が本体である。「赤くなった」だけを assert する負テストは、**別の原因で落ちた
+実行を discriminate として数える** —— このワークスペースは 2026-08-22 の 1 日で
+その形を 4 件記録している。
+
+**⚠ この ADR に実測値を書き足さないこと。**§2 の表は 2026-08-29 の値であり、
+引用する側は日付を落とす。現在地は probe を回して得る。
+
+## 6. やっていないこと（正直に）
+
+- **deploy していない。**このセッションは Cloudflare credential を持たない remote
+  container で、`orgs/net-kotobase` も `orgs/kotoba-lang` も checkout されていない。
+  §3 の 1〜4 はコード変更であって、着地は別セッション。
+- **probe は credential を持たない。**測れるのは「拒否がどう名乗るか」までで、
+  正当な Biscuit が実際に通ることは測っていない。それは operator token を持つ側の測定。
+- **fleet gate にしていない。**この probe は外向き HTTPS を要求し、ノードの egress は
+  一様ではない（実測 2026-08-13、8 ノード 200 / zebulun 000）。常駐させるなら
+  operator ホストの 1 台に置く。
+")
+))

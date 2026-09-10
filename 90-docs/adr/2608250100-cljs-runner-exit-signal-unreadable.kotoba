@@ -1,0 +1,119 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608250100-cljs-runner-exit-signal-unreadable")
+  (:adr/title "ClojureScript の test runner が立てていた失敗信号は、呼び手に届いていなかった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-25")
+  (:adr/related (vector "adr-2608136000" "adr-2608730000"))
+  (:adr/body
+  "## 何が起きていたか
+
+`cloud-itonami-isic-6492` の `credit.edge.auth-test` を async に書き直して
+suite に入れる作業の途中で、書き直しが効いたことを確かめるために assertion を
+1 本壊した。runner は `1 failures` を印字し、**exit 0 を返した。**
+
+壊したのが自分の新しいコードだったので最初は書き換えの副作用を疑ったが、
+私の変更を stash して同期テストを壊し直しても同じだった。**この欠陥は
+runner が存在して以来ずっとそこに在った。**
+
+原因は 2 行が噛み合っていないこと。runner は失敗をこう signal している:
+
+    #?(:cljs
+       (defmethod t/report [:cljs.test/default :end-run-tests] [m]
+         (when-not (t/successful? m)
+           (set! (.-exitCode js/process) 1))))
+
+そして起動法をこう書いている:
+
+    clojure -Sdeps '{:paths [\"src\" \"test\"]}' \\
+      -M:dev:cljs -m cljs.main --target node \\
+      -m <the-runner-ns>
+
+`cljs.main ... -m <ns>` は -main を **node の REPL 環境**で評価する。呼び手が
+待つ process は driver であって、テストが何をしても 0 で終わる。
+`js/process.exitCode` はそこに届かない。`js/process.exit` は逃げ道にならない
+—— propagate する代わりに driver を固める（実測、timeout で殺すまで返らない）。
+
+つまり **`$?` を見る呼び手にとって、赤と緑が同じ値**だった。ADR-2608136000 が
+名指しした形——測れなかった検査が、測って問題が無かった検査と同じ値を返す——
+の、最も純粋な例である。
+
+## どれだけ広かったか
+
+detector を書いて測ったところ、**2 系統・30 repo・32 file** が同じ形だった。
+
+- `cloud-itonami/cloud-itonami-isic-*` の `portable_cljs_test_runner.cljc` (22)
+- `kotoba-lang/*` の `cljs_runner.cljc` (7)
+- `network-awai/cloud-itonami` (3)
+
+32 とも exit code を立て、32 とも REPL-eval 形を書いていた。**1 つも
+compile していなかったし、1 つも `*main-cli-fn*` を持っていなかった。**
+
+## 直し方
+
+compile して素の node で走らせる:
+
+    clojure ... -m cljs.main --target node --output-dir target/node-out \\
+      --output-to target/tests.cjs -c <the-runner-ns>
+    echo '{\"type\":\"commonjs\"}' > target/node-out/package.json
+    node target/tests.cjs
+
+加えて runner 側に `#?(:cljs (set! *main-cli-fn* -main))`。
+
+**3 つとも load-bearing で、欠けたときの壊れ方が違う:**
+
+| 欠けるもの | 症状 |
+|---|---|
+| compile 形 | exit code が届かない（元の欠陥） |
+| `*main-cli-fn*` | bundle が全 namespace を読み込み、**テストを 1 本も走らせず 0 で終わる**。出力でも exit code でも clean run と区別できない |
+| package.json marker | node が Closure の `.js` を ESM として読み `require` で死ぬ。これだけは大きな音を立てる |
+
+真ん中が一番危ない —— **直したつもりが、より静かな同じ欠陥になる。**
+だから detector はこれを別 class として持つ。
+
+## 実測（両方向）
+
+    isic-6492  -m 形    assertion 1 本破壊        → `1 failures` / exit 0
+               -m 形    無改変                    → `0 failures` / exit 0
+               compile  同じ破壊（async callback
+                        の中、run-tests 復帰後に
+                        着地するケース）           → `1 failures` / exit 1
+               compile  無改変                    → 63 tests / exit 0
+    isic-6520  compile  無改変 48 tests / exit 0、破壊 → exit 1
+    kura       compile  無改変 54 tests / exit 0、破壊 → exit 1
+
+系統ごとに 1 repo ずつ、別々の deps alias（`-M:dev:cljs` と `-M:cljs`）で
+確かめた。残る 29 file は同一 template なので変換器で当て、**32 file 全部を
+main に着地したあと GitHub から取り直して Clojure reader に通した**
+（parse-failures 0）。
+
+## detector
+
+`scripts/verify-cljs-runner-exit-signal.cljs`（#36、`manifest/orgs-detectors.edn`
+登録済み）。west 管理の checkout を読むので fleet gate にはできない。
+
+**最初の版は 380 件の偽陽性を出した。** exit code を立てているのに起動法を
+書いていない file を全部 finding にしていたが、それらは nbb runner で、
+gate や package.json から `nbb <file>` として起動される —— nbb は script を
+直接実行するので exitCode は普通に届く。**起動法について黙っていることは、
+壊れた失敗信号ではない。** その class を落として 380 → 32 になった。
+
+いま報告するのは 3 つの数で、混ぜない:
+
+    SCANNED        読めた test source
+    CLAIMS-SIGNAL  exitCode を立てている file（407）
+    CHECKABLE      うち起動法も書いている file（33）= file 単体で検査できる分
+    FINDINGS       うち信号が呼び手に届かない file
+
+**CLAIMS-SIGNAL と CHECKABLE の差（374）は UNMEASURED であって clean ではない。**
+
+判別は mutation ではなく**実際の修正**で見せた: 6492 を手で直した時点で
+33 → 32 になり、抜けたのがその repo だった。全部直して 0。
+
+## 残っている問い
+
+この runner 群を**実際に走らせている呼び手が居ない**。superproject の
+`scripts/` にも `fleet-ci/gates.edn` にも、これらを起動する経路は無い。
+つまり今日直したのは「走らせたときに嘘をつかないこと」であって、
+「走っていること」ではない。**後者はまだ真ではない** —— 30 repo 分の
+cljs compile は 1 本 2 分かかるので、fleet の gate に載せるなら
+placement と時間予算の話が先に要る。")))

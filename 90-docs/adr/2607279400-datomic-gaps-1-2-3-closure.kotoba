@@ -1,0 +1,57 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607279400-datomic-gaps-1-2-3-closure")
+  (:adr/doc_type "adr")
+  (:adr/topic "datomic-gaps-closure")
+  (:adr/title "ADR-2607279400: Close residual Datomic gaps — dual-path, SLO/cold-read, Cognitect wire plan")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-27")
+  (:adr/last_verified "2026-07-27")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for (vector "XRPC datomic dual-path prefers D1 when URL configured"
+   "Deprecation headers + Sunset 2026-11-01 for XRPC datomic"
+   "D1 stale-projection auto-reindex-once on cold read"
+   "SLO qualify harness for D1 Client API"
+   "Cognitect wire capture plan + synthetic fixtures only"))
+  (:adr/repos (vector "gftdcojp/net-kotobase" "kotoba-lang/kotobase-storage-d1"))
+  (:adr/related (vector "adr-2607279000-kotobase-datomic-client-api-maturity"
+   "adr-2607279100-client-api-edge-d1-bridge"
+   "adr-2607260940"
+   "adr-2606201800-transit-json-datomic-client-compat"))
+  (:adr/body "## Context
+
+After Client API production deploy, residual gaps were:
+
+1. XRPC vs `/api/*` dual-path (XRPC still hit backend unless STORAGE_MODE=d1)
+2. load/SLO and cold/index-pruned read policy not operationalized
+3. Cognitect client-cloud proprietary wire not captured
+
+## Decision
+
+### 1. Dual-path closure
+
+- `proxy/datomic-prefer-d1?` = STORAGE_MODE=d1 **or** D1 URL configured.
+- Production already sets `KOTOBASE_D1_*` URLs → XRPC datomic q/transact/pull/datoms
+  now bridge to D1 `/api/*` without flipping whole-worker storage mode.
+- XRPC responses carry Deprecation/Sunset(2026-11-01)/Link successor headers.
+- SDK README documents preferred `/api/*` and deprecation.
+
+### 2. Cold read + SLO
+
+- D1 Worker: on `:stale-projection`, **rebuild projection once** then retry fast path;
+  unsupported SQL subset still hydrates without rebuild.
+- `docs/slo.md` + `npm run slo:qualify` gate p50 query + transact + reindex walls.
+
+### 3. Cognitect wire
+
+- Document capture plan (`docs/cognitect-wire-capture.md`).
+- Synthetic Transit fixtures for codec regression only — **not** Cloud golden vectors.
+- No false claim of `com.datomic/client-cloud` wire compatibility.
+
+## Consequences
+
+- New and legacy XRPC datomic traffic share one durable plane (D1) when URLs set.
+- Clients get explicit migration signal toward `/api/*`.
+- SLO harness makes qualification repeatable; not a multi-tenant contractual SLA.
+- Wire parity remains owner-unblocked (needs Cloud capture credentials).
+")))

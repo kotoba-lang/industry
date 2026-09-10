@@ -1,0 +1,132 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607255000-murakumo-cad-rig-enterprise-design-integration")
+  (:adr/doc_type "adr")
+  (:adr/topic "murakumo-cad-rig-enterprise-design-integration")
+  (:adr/title "ADR-2607255000: enterprise 向け 3D/rig/CAD 生成 LLM — 製品面は claude-murakumo、GTM 面は cloud-itonami に分割し、LLM は typed EDN program だけを出して決定論的 kernel が検証する")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-25")
+  (:adr/last_verified "2026-07-25")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative_for
+  (vector "enterprise 向け 3D/rig/CAD 生成 LLM を『claude-murakumo に統合するか cloud-itonami に統合するか』の決定（= 分割する）の正本"
+   "その LLM が何を出力してよいか（typed EDN program のみ、geometry mesh を直接出さない）の境界の正本"
+   "v1 で専用 fine-tune 重みを作らない理由と、代わりに何を作るかの正本"
+   "3D modeling / CAD 事業者への sales で claim してよい成熟度の上限（実測 LOC ベース）の正本"))
+  (:adr/related
+  (vector "adr-2607173100-murakumo-main-alias"
+   "adr-2607051100-kami-gen-procedural"
+   "adr-2607051110-kami-gen-sdf-agent"
+   "adr-2607051120-kami-gen-ml3d"
+   "adr-2607051130-kami-gen-hybrid"
+   "adr-2607084200-org-reverse-domain-spec-repo-naming"
+   "adr-2607010930-clj-wgsl-migration"
+   "adr-2607102200-kami-render-stack-deps-authority-rename"
+   "adr-2607124500-bmc-existing-shared-system-check"
+   "adr-2607173000-nbb-only-script-host"
+   "adr-2607252200-cloud-itonami-measured-readiness-and-isco-tam"
+   "adr-2607072000-kotoba-lang-no-rust"))
+
+  (:adr/decision
+  "1. 『claude-murakumo か cloud-itonami か』は排他選択にしない。**製品面（推論・tool plane・検証・課金）を murakumo 側、GTM 面（買い手接触・governor 付き outbound・受注記録）を cloud-itonami 側**に置き、境界を1本の HTTP 契約（Anthropic Messages 互換 endpoint）にする。理由: claude-murakumo は既に Anthropic Messages 互換 endpoint（`gftdcojp/local-murakumo` の `/v1/messages`、tool_use/tool_result 双方向翻訳・streaming 対応・`ANTHROPIC_PROXY_TOKEN` 認証）を持つ実在の製品面であり、cloud-itonami は既に ISIC 7110（architectural/engineering practice、PracticeOps-LLM ⊣ Design Governor）を含む 458 個の産業別 actor と propose→govern→send の outbound 機構を持つ実在の GTM 面である。どちらか片方に寄せると、無い方の機能を新規に作ることになる。
+
+   2. **v1 では専用の fine-tune 重みを作らない。** 作るのは『専用 endpoint』= (a) 領域固有 system contract、(b) typed EDN tool plane、(c) 決定論的 verifier、(d) SKU/課金 entry の4点で、モデル本体は `murakumo-main` alias が解決する現行 fleet モデルをそのまま使う。理由3つ: ①実測制約 — murakumo の 7 node ring は同時に1モデルしか serve しない（`tools/claude-murakumo/README.md` が明記: 別モデルを指定すると silent fallback せず endpoint 到達失敗になる）。2つ目の重みを常駐させるには ring をもう1本用意するか fleet に multi-model serving を実装する必要があり、どちらも本 ADR のスコープ外。②ADR-2607173100 の alias 規則により concrete model id は焼かない。SKU は KV alias entry（`murakumo-cad`）として作り、将来 fine-tune 重みに差し替える時は alias の PUT 1件で全 consumer が追従する。③顧客検証済みの eval set が無い段階の fine-tune は投機であり、後述の verifier ループが吐く『拒否された program』こそが最初の正しい訓練データになる。
+
+   3. **LLM は geometry を出力しない。** 出力してよいのは typed EDN program だけ — parametric feature tree（CAD）、rig spec（skeleton/skin/blendshape 宣言）、toolpath program（CAM）の3種。mesh 頂点・STEP entity・G-code 文字列を LLM が直接書くことを禁止する。EDN program は決定論的 kernel が compile し、compile と後段 assertion（topology/watertight/単位系/干渉/工具到達性）を通ったものだけが artifact として外に出る。verify 不通過は `tool_result` の error として model に戻り、bounded な再試行ループに入る（`kami-gen-sdf-agent` の propose→compile→render→critique と同型、ただし critique が主観 vision judge ではなく決定論的 assertion）。これが enterprise に対する唯一の実質的な差別化である: 『hallucinate した geometry を構造的に出せない』。モデルの賢さでは競合しない。
+
+   4. **kernel は既存資産を使い、新規に書かない。** CAD topology/STEP = `kotoba-lang/org-iso-10303`（`brep.kernel` の vertex/edge/face/shell/solid、`brep.step` の ISO 10303-21 physical file read/write、`iso-10303/part21`、feature tree、assembly、tessellate、mesh-csg、spline）、曲線/曲面 = `kotoba-lang/kami-engine-cad`（rational Bezier span = NURBS 互換 evaluator）、CAM = `kotoba-lang/org-iso-6983`（G/M-code 語彙、zigzag pocket / peck drill toolpath、工具ライブラリ、stock、材料 preset）、建築 = `kotoba-lang/bim`（IFC 風 spatial hierarchy + Pset_*/Qto_*、DXF/PDF 交換）、CSG/暗黙曲面 = `scad` / `mesher` / `sdf`、図面 = `dxf`、rig = `kotoba-lang/character`（VRM 1.0 humanoid skeleton 35 bone + 52 ARKit blendshape）+ `org-vrmc-vrm` + `org-khronos-gltf` + `org-openusd`、既存 CAD 取り込み = `kotoba-lang/kami-cad-import`（STEP/glTF/OpenSCAD → part graph + CycloneDX SBOM、provenance 無しでは emit を拒否する既存挙動をそのまま enterprise の監査要件に使う）。**Rust を新規に書かない**（ADR-2607072000）。3D の描画・scene 権限は kami-engine stack のまま（ADR-2607102200）。
+
+   5. **成熟度を偽らない。** 実測（2026-07-25、`find src -name '*.clj*' | xargs wc -l`）: org-iso-10303 = 1,599 行、kami-engine-cad = 686 行、org-iso-6983 = 646 行。これは OCCT / Parasolid / ACIS 級の production CAD kernel **ではない**。したがって v1 の適用範囲は『既存 CAD kernel の置換』ではなく『**設計意図 → 検証済み parametric program の起票**と、**DFM/CAM/コード適合の機械チェック**』に限定する。出力は顧客の既存 CAD（SOLIDWORKS/Inventor/Rhino/Revit 等）に STEP AP242 / glTF / DXF / IFC で渡す。sales の claim をこの範囲に厳密に一致させる（下記 gate 参照）。
+
+   6. **rig SKU は既存 GPU backend を使い、有償提供前に実 GPU で通す。** `gftdcojp/cloud-murakumo` の `resources/murakumo.edn` は既に `:model3d`（TRELLIS / Hunyuan3D-2、a100-80、out [:gltf :glb]）、`:autorig`（UniRig、L4、in [:glb :vrm] out [:vrm]）、`:heuristic-autorig`（CPU fallback、`rig:fallback` として degraded を明示する既存契約）、`:motion`、`:vrm-compose` を宣言している。ただし `kami-gen-ml3d` の README が自ら明記するとおり **live TRELLIS/Hunyuan3D-2 GPU backend に対しては未実行**（mock executor に対する E2E のみ）。よって rig SKU は『実 GPU で1本通し、UniRig と heuristic の ensemble 差分を実測する』ことを有償提供の gate にする。
+
+   7. **SKU は3本。** (a) `cad-copilot` — 設計意図/仕様 → parametric feature tree EDN → brep kernel compile → topology/watertight assertion → STEP AP242 / DXF 出力。(b) `rig-copilot` — mesh/photo → `:model3d` → `:autorig` ⊕ heuristic ensemble → VRM 1.0 / glTF skin → `org-vrmc-vrm` round-trip 検証。(c) `mfg-check` — 既存 CAD 取り込み（kami-cad-import、provenance 必須）→ DFM/CAM チェック（org-iso-6983 の toolpath/工具/stock）→ 指摘 + G-code 案 + SBOM。3本とも同じ endpoint・同じ verifier 契約・同じ ledger に乗る。
+
+   8. **serving 側の統合点は既存ファイルであり、新規サービスを立てない。** `orgs/gftdcojp/local-murakumo/src/local_murakumo/`: `catalog.cljc`（SKU を model entry として登録、capability badge / status を正直に `:experimental` から始める）、`anthropic.cljc`（tool plane の注入と tool_use 翻訳）、`worker.cljs`（kernel は zero-dep `.cljc` なので Cloudflare Worker 内の cljs 半身でそのまま実行できる — 別 GPU/JVM サービスを増やさない。重い artifact 生成のみ `generation_proxy.cljc` 経由で cloud-murakumo に出す）、`cost.cljc`（enterprise 課金 unit — token ではなく『検証通過した artifact』を課金単位にする）、`messages_auth.cljc`（tenant 別 token）。alias は murakumo KV に `murakumo-cad` を追加（`murakumo-main` と同じ機構、ADR-2607173100）。
+
+   9. **GTM は cloud-itonami の既存 actor を channel として使い、新しい sales actor を作らない。** 一次 channel = `cloud-itonami-isic-7110`（architectural and engineering activities、既に Design Governor と commission intake/verification/certification の流れを持つ = そのまま買い手側業務の写像）、`cloud-itonami-isic-7120`（technical testing and analysis = 検証を売る相手）。二次 = `isic-2811..2829`（machinery mfg）、`isic-2910/2920/2930`（automotive）、`isic-3011/3020/3030`（船舶/鉄道/航空）、`assoc-4100-usa-agc`（建設）。OEM/embed channel = `isic-5820`（software publishing）/`isic-6201`（受託開発）+ 既存コネクタ repo（`com-autodesk-bim360` / `com-solidworks` / `com-cadence-eda`）。outbound の実行（propose→govern→send）は CLAUDE.md の恒久承認の範囲内で agent 判断で行ってよいが、**gate 未通過の capability を claim する送信は行わない**（安全床⑥の正直報告に直結する）。
+
+   10. **business tracking は `70-tools/bmc` の gftdcojp 11 product 共有システムに勝手に登録しない**（ADR-2607124500: base datoms への新規登録は人間レビュー事項）。standalone パターン（対象 repo 側 `docs/bmc-lean-loop-log.md` に append-only の iteration + superproject 側の開始 ADR = 本 ADR）を使う。")
+
+  (:adr/artifacts
+  (vector "orgs/gftdcojp/local-murakumo/src/local_murakumo/catalog.cljc — SKU の model entry 登録先（:experimental から開始）"
+   "orgs/gftdcojp/local-murakumo/src/local_murakumo/anthropic.cljc — tool plane 注入 / tool_use 翻訳"
+   "orgs/gftdcojp/local-murakumo/src/local_murakumo/worker.cljs — verifier 実行（zero-dep .cljc kernel を Worker 内 cljs で直接実行）"
+   "orgs/gftdcojp/local-murakumo/src/local_murakumo/cost.cljc — 『検証通過 artifact』課金単位"
+   "orgs/gftdcojp/local-murakumo/src/local_murakumo/messages_auth.cljc — tenant 別 token"
+   "orgs/kotoba-lang/murakumo/tools/claude-murakumo/ — enterprise endpoint を叩く既存 CLI wrapper（MURAKUMO_CLAUDE_MODEL に SKU alias を渡すだけ）"
+   "murakumo KV alias 'murakumo-cad' — SKU の解決点（ADR-2607173100 と同じ機構）"
+   "orgs/kotoba-lang/org-iso-10303 (brep.kernel/brep.step/iso-10303.part21, 1599 LOC) — CAD topology + STEP 実体"
+   "orgs/kotoba-lang/kami-engine-cad (kami.cad, 686 LOC) — rational Bezier / NURBS evaluator"
+   "orgs/kotoba-lang/org-iso-6983 (kotoba.cam.*, 646 LOC) — G-code / toolpath / 工具 / stock"
+   "orgs/kotoba-lang/bim, dxf, scad, mesher, sdf, character, kami-cad-import — 建築・図面・CSG・rig・既存CAD取り込み"
+   "orgs/gftdcojp/cloud-murakumo/resources/murakumo.edn — :model3d / :autorig / :heuristic-autorig / :motion / :vrm-compose の既存宣言"
+   "orgs/cloud-itonami/cloud-itonami-isic-7110 — 一次 GTM channel（Design Governor 付き）"
+   "orgs/cloud-itonami/cloud-itonami-isic-7120 / isic-28xx / isic-29xx / isic-30xx / isic-5820 / isic-6201 — 二次・OEM channel"))
+
+  (:adr/body
+  "## 背景
+
+オーナー指示（2026-07-25）:『claude-murakumo に enterprise 向けの 3d, rig, cad 生成の llm を設計統合して 3d modeling, cad 事業者などに sales をしたい, または cloud-itonami で設計統合』。
+
+『claude-murakumo』は `kotoba-lang/murakumo` の `tools/claude-murakumo/` に実在する wrapper で、Claude Code / Anthropic SDK client を `ANTHROPIC_BASE_URL=https://api.murakumo.cloud` に向け、`gftdcojp/local-murakumo` の Cloudflare Worker が実装する Anthropic Messages 互換 `/v1/messages` を通して自前 fleet のモデルに繋ぐ。tool_use/tool_result ⇄ OpenAI tool_calls の双方向翻訳、streaming、reasoning_content → thinking block まで実装済み。つまり『enterprise が自分の client からそのまま叩ける endpoint』は既にある — 足りないのは領域特化の中身と売り方であって、配管ではない。
+
+## なぜ排他選択にしないか
+
+両者は同じ層の代替ではない。
+
+- murakumo 側にあって cloud-itonami 側に無いもの: Anthropic 互換 endpoint、tenant token、モデル catalog、課金 unit、GPU 生成 backend（cloud-murakumo の :model3d/:autorig）、fleet 推論 ring。
+- cloud-itonami 側にあって murakumo 側に無いもの: 買い手の業務そのものを写像した産業別 actor（ISIC 7110 は architectural/engineering practice の commission intake → 規制評価 → design verification → certification delivery を Design Governor 付きで持つ）、独立 governor による外部送信の封じ込め、append-only 監査台帳、458 actor 分の業種 taxonomy。
+
+片方に寄せると無い方を新規実装することになるので、境界を1本の HTTP 契約に置いて分割する。
+
+## なぜ『LLM が geometry を出さない』が製品の本体か
+
+3D/CAD 生成 LLM の競合（大手 foundation model + 各 CAD ベンダの内製 copilot）に対して、モデル品質で勝つ計画は立たない。fleet が serve しているのは汎用 OSS モデルであり、それは変わらない。
+
+一方で enterprise の CAD/3D 事業者が実際に買えない理由は、ほぼ全部が品質ではなく**責任**の問題である: 出力がどの入力から来たか説明できない、寸法が正しい保証が無い、学習データ由来の IP 汚染が怖い、クラウドに図面を出せない、監査に耐える記録が残らない。
+
+この workspace の既存資産は、まさにその4点に構造的に答える形をしている:
+
+1. LLM の出力を typed EDN program に限定し、決定論的 kernel が compile+assert してから artifact を出す ⇒ **寸法・トポロジは kernel が保証し、LLM は保証しない**。verify 落ちは外に出ない。
+2. EDN program はそのまま diff/replay できる ⇒ **なぜその形になったかを説明でき、再現できる**。
+3. `kami-cad-import` は provenance 無しでは emit を拒否し、CycloneDX SBOM を出す ⇒ **部品の出所が記録に残る**。
+4. fleet は自前ハードウェア（Mac mini ring）+ 自前 Worker であり、on-prem/自社 fleet 配布が最初から可能 ⇒ **図面を他社クラウドに出さずに済む**。
+
+したがって売り物は『賢い 3D LLM』ではなく『**検証済みでなければ出力が出ない CAD/rig 生成 endpoint**』である。sales の一次メッセージもこれに揃える。
+
+## v1 が fine-tune ではない理由（実測制約）
+
+`tools/claude-murakumo/README.md` が自ら記録している運用実測: 『Only one model serves at a time across the fleet's shared 7-node ring — MURAKUMO_CLAUDE_MODEL picking a different registered model than what's currently serving will fail to reach an endpoint, not silently fall back.』
+
+つまり専用重みを常駐させると `murakumo-main` を止めることになる。これは fleet の他の全 consumer（Claude Code 経路、itonami tick、bmc routine）を巻き添えにする。v1 の SKU は alias + system contract + tool plane + verifier で構成し、重みは共有のままにする。将来 fine-tune するときは、verifier が拒否した program と受理した program の対（本設計が自動的に生む副産物）を訓練データにする。これは合成データではなく、実際に kernel が判定した ground truth である。
+
+## SKU の verifier 契約（各 SKU が『通った』と言える条件）
+
+- `cad-copilot`: (1) EDN feature tree が `brep.feature` で compile する。(2) 生成 solid が `brep.kernel` の topology 不変条件（Euler 特性 / 閉シェル）を満たす。(3) `brep.step` で ISO 10303-21 に書き出し、読み戻して同一 topology になる（round-trip）。(4) 単位系と公差が入力仕様と一致する。(5) 質量特性が入力の制約範囲内。
+- `rig-copilot`: (1) skeleton が VRM 1.0 humanoid 必須ボーンを満たす。(2) skin weight が正規化され、孤立頂点が無い。(3) `org-vrmc-vrm` で export→parse round-trip する。(4) UniRig 出力と heuristic 出力の骨長/関節位置の差分が閾値内、外れたら `rig:fallback` として degraded を明示（cloud-murakumo の既存契約を流用）。
+- `mfg-check`: (1) 取り込み部品が provenance を持つ（無ければ emit 拒否、既存挙動）。(2) toolpath が stock 内に収まり工具が到達可能。(3) G-code が ISO 6983 語彙のみ。(4) 指摘に必ず該当 feature の ID が付く（『どこが問題か』を指せない指摘を出さない）。
+
+## GTM の順序
+
+1. **OEM/embed が先、直販は後**。ISIC 5820（software publishing）/ 6201 の CAD ISV に対して『あなたの製品の中で動く、検証付き生成レイヤ』として出す方が、7110 の設計事務所に直販するより単価と適合が良い。既存コネクタ repo（com-solidworks / com-autodesk-bim360 / com-cadence-eda）が接点の起点になる。
+2. **7110 / 7120 は verifier の説得力が最も効く相手**。設計検証・第三者試験は『機械が判定した記録が残る』こと自体が商品価値になる。cloud-itonami の Design Governor + 監査台帳がそのまま提案書の中身になる。
+3. **28xx/29xx/30xx（機械・自動車・輸送機器）は mfg-check が入口**。生成より先に『既存 CAD を読んで DFM を指摘する』方が導入障壁が低く、生成 SKU への足がかりになる。
+
+## 正直なギャップ（sales で claim してはならないこと）
+
+- kernel は 1,599 + 686 + 646 行規模であり、production CAD kernel ではない。曲面のトリム/フィレット/ブーリアンの網羅性は未検証。**『既存 CAD の置換』を claim しない。**
+- `scad` の difference/intersection は union として視覚近似する既知の Phase-1 制限がある（`scad` README 自身が記録）。CSG 経路を CAD 精度の主張に使わない。
+- rig SKU の GPU backend は live 実行未確認（`kami-gen-ml3d` README 自認）。実 GPU 1本通し前に rig を有償で売らない。
+- fleet は同時1モデル。enterprise SLA（同時性・可用性）を現状のまま約束しない。
+- 4 approach 比較（ADR-2607051100/1110/1120/1130）の結論どおり、SDF/CSG 経路は有機的形状に弱く prop/構造物向き。character 系の品質を CAD 経路の実績として語らない。
+
+## 実行順序（gate）
+
+- G0: 本 ADR（設計の正本）。
+- G1: `cad-copilot` の EDN program schema + verifier を `.cljc` で書き、既存 kernel に対する assertion テストを通す（LLM 不要、決定論のみ）。ここが通らない限り endpoint を作らない。
+- G2: `local-murakumo` に SKU を `:experimental` として catalog 登録し、tool plane を注入、`murakumo-cad` alias を KV に PUT。既存 `claude-murakumo` wrapper で叩けることを確認。
+- G3: 実 CAD 課題（機構部品1点）で propose→verify→STEP round-trip を1本通し、失敗した program も含めて ledger に記録。
+- G4: rig SKU を実 GPU で1本通す（UniRig ⊕ heuristic の実測差分を取る）。
+- G5: G3/G4 の実測のみを根拠に one-pager を作り、cloud-itonami の 5820/6201 → 7110/7120 の順で propose→govern→send。gate 未達の capability は one-pager に載せない。")))

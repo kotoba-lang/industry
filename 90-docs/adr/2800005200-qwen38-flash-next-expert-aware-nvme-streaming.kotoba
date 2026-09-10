@@ -1,0 +1,23 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800005200-qwen38-flash-next-expert-aware-nvme-streaming")
+  (:adr/title "Qwen3.8-Flash-Next は expert-aware NVMe streaming を num / torch / inference / murakumo の4層で所有し、lossless parity と実測速度を別gateにする")
+  (:adr/date "2026-08-29")
+  (:adr/status "accepted")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/num" "kotoba-lang/torch"
+              "kotoba-lang/inference" "kotoba-lang/murakumo"))
+  (:adr/authoritative_for
+  (vector "Qwen3.8-Flash-Next / Qwen4Exp の Expert-aware NVMe streaming 責任分割"
+   "16 GiB M4 mini での lossless benchmark protocol"
+   "MTP と single-token expert streaming の同時有効化禁止"
+   "macOS buffered I/O と Linux O_DIRECT telemetry の区別"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/related (vector "adr-2800004500-qwen38-2p4t-a95b-self-host-vs-api"))
+  (:adr/body
+  "## 決定\n\nQwen/Qwen3.8-Flash-Next（Qwen4Exp、48層、512 routed experts、top-10）を、routerが選んだexpert sliceだけNVMeから読むlossless経路として実装する。\n\n- `num`: opaque keyのbyte上限付き決定的LRU、hit/miss/eviction accounting、stride付きrouter view。\n- `torch`: positional FileChannel read、direct buffer、bounded resident cache、bounded executor prefetch、same-key concurrency safety。\n- `inference`: 公式config/indexから48 x 512 x top-10、96 packed expert tensors、387 base-decoder Hyper-Connection tensorsをfail-closed admissionする。\n- `murakumo`: 実artifact bytes、空きdisk、node、native revision、cache/lanes、実機evidenceを持つ。\n\n公式BF16では1 expertが9,830,400 bytes、48層top-10のworst-case routed working setは4,718,592,000 bytes/token。この値は量子化GGUFへ流用せずruntime実測を使う。対象UD-IQ3_XXS 3 shardは81,961,823,936 bytes。\n\n## Lossless cell\n\nseed 42、greedy、既定top-10、cold-expert dropなし、prefetchなし、MTPなし。cache 0、2,000 MiB LRU x2、通常mmapを同一promptで比較し、実token ID parityを速度より先にgateする。MTP head存在、MTP decoder実行、expert streamingとの同時高速・正確動作は別gateであり、このsingle-token cellではMTPを有効化しない。\n\n## macOS境界と採用値\n\nAppleにはLinux `O_DIRECT`がなく、pinned BigMoeOnEdgeは`F_NOCACHE`も呼ばないため `page_cache_bypassed=false`。M4/16 GiBでは2,000 MiB user cacheがfile-backed page cacheを圧迫したので、常駐cacheは0 MiBを採用する。Qwen4Exp Hyper-Connectionのfused pre/comb/post実行はnative logで観測した。")
+  (:adr/alternatives
+  "却下: (a) registry rowだけで対応済みとする — 公式tensor admissionとparityが無い。(b) 全512 expertsをOS mmap任せにする — 16 GiBに81.96GBでI/O attributionが無い。(c) top-k削減/cold drop — losslessでない。(d) MTP同時ON — n=1 streaming seamと未qualifiedなMTP parityを混同する。(e) macOS requested o_directを実page-cache bypassと読む — 実装に反する。(f) 2,000 MiB cacheを採用 — 実測でcache 0より11倍以上遅い。")
+  (:adr/verification
+  "2026-08-29: num 92 tests / 462 assertions green; torch 155 / 660 green; inference 92 / 593 green; official HF revision de4b8e4d43b917e7706784d8bb445c9af86a3540 gateは48 layers / 512 experts / top-10 / expert 96 / Hyper-Connection 387 / missing 0。Murakumo 704 tests / 6,959 assertions green（`AIUEOS_ROOT`明示、途中1回だけ既存localhost QUIC timingがflaky red、その後全体再実行green）。dan M4/16 GiB、BigMoeOnEdge 039b8f1、llama.cpp 0e8c83e、native ctest 12/12。32-token decode: cache 0 = 3.615 tok/s、mmap = 1.473 tok/s、cache 2,000 MiB = 0.315 / 0.280 tok/s。cache 0はmmap比2.454x decode、model load + prefill込み0.475645 vs 0.325929 tok/s（1.459x）。8-token actual IDs `[760 12515 7701 6105 1521 33470 303 279]` はcache 0、cache-on x2、mmapで完全一致。MTP=false、page-cache-bypassed=false。")))

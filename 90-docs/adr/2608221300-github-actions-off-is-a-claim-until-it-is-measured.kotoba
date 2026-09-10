@@ -1,0 +1,174 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608221300-github-actions-off-is-a-claim-until-it-is-measured")
+  (:adr/title "GitHub Actions を止めたという主張は、GitHub 側に訊くまで未測定 —— 掃除機が 403 を『無効』と読んでいた")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-22")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags (vector "ci" "murakumo" "fleet-ci" "github-actions" "measurement"))
+  (:adr/context
+  "オーナー指示（2026-08-22）「github actions はお金がかかるので、murakumo cloud の actions で
+行うようにしてね」。方針そのものは新しくない —— ADR-2607300900 が 2026-07-30 に
+CI/CD の正本を murakumo fleet に移し、2026-08-05 の指示で GitHub Actions を repo 単位で
+無効化した。新しいのは問いの側で、**その無効化が今も効いているかを答える道具が無かった。**
+
+com-junkawasaki/root について実測した現在地（2026-08-22）:
+
+- origin/main に `.github/` は 1 ファイルも無い（`git ls-tree -r origin/main -- .github` は 0 件）。
+- それでも Actions API は **registered workflow を 3 本**返し、3 本とも state=active:
+  `.github/workflows/kotoba-shell-gates.yml`（ファイルは既に消えている stale entry）、
+  `dynamic/dependabot/dependabot-updates`、`dynamic/dependabot/update-graph`。
+- 2026-07-30 以降に走った run は 13 本、全部 Dependabot。壁時計で合計 266.7 分。
+- **しかし `/actions/runs/{id}/timing` の `billable.*.total_ms` は 0 だった。**
+  30〜45 分回っていても課金されていない。
+- ファイル由来の workflow の最後の run は 2026-07-30（codeql-analysis / clj-wgsl-parity /
+  west-pin-verify / fleet-projection-verify / tree-collapse-guard、いずれも failure）。以後ゼロ。
+
+つまり root については **課金は止まっている**。ここで報告を終えると気持ちよく終わるが、
+それは 1 repo を見ただけの結論で、しかも「止まっている」と言える根拠を持っていない —
+`actions/permissions` はこのセッションの proxy が 403 で拒否するので、有効か無効かは
+**読めていない**。
+
+そこで既存の掃除機 `scripts/github-actions-disable-sweep.cljs` を読んだところ、
+**答えられなかったことを答えとして記録する経路が 3 本**あった。3 本とも
+CLAUDE.md の『測れなかった検査が、測って問題が無かった検査と同じ値を返す』の形である。
+
+1. `decide-permissions` が `enabled?` を `(and (= 200 status) (.-enabled body))` で作っていた。
+   403 も 404 も network error も **`:already-disabled`** に落ちる。
+2. `handle-repo` は registered workflow が 0 本の repo で `actions/permissions` を
+   **引かずに** 完了していた。0 本は無効の証拠ではない（root がまさに、
+   ファイル 0 で registered 3 本）。逆に本当に 0 本でも有効なままなら、
+   workflow ファイルが 1 つ載った瞬間に走り出す。
+3. repo listing が失敗しても `scanned 0 | errors 0` と印字して **exit 0** で終わっていた。
+   1 件も列挙できなかった run と、掃き切った run の出力が同じになる。
+
+3 番目は実際に踏んだ: このセッションで走らせたら listing が 403 を返し、
+掃除機は clean sweep を報告した。
+
+さらに、無効化を確かめる gate は fleet に 1 本も無かった。方針は prose にあり、
+実行は 1 台のラップトップの `~/.gftd/gh-actions-sweep-state.edn` にあり、
+検査は無い。CLAUDE.md が『落ちない gate は劇場』と書いた対偶で、
+**存在しない gate は劇場ですらない。**")
+
+  (:adr/decision
+  "GitHub Actions を使わないという方針は変えない（ADR-2607300900 のまま）。変えるのは、
+その方針が守られているかを **誰がどう答えるか**。
+
+1. **tree の側は fleet gate が保つ** —— `root-no-github-workflows`
+   （`scripts/fleet-ci/gates.edn`、実体は `scripts/fleet-ci/gates/github-workflows-absent-check.cljs`
+   が `scripts/verify-no-github-workflows.cljs` に委譲）。repo root の
+   `.github/workflows/*.yml` は **GitHub が自分の判断で runner を起こす唯一の入口**で、
+   かつ credential 無しのノードから見える唯一の面。だからここだけを gate にする。
+
+2. **GitHub 側の設定は operator の道具が答える** ——
+   `scripts/github-actions-billable-audit.cljs`。3 つの別々の問いを別々に立てる:
+   Actions は有効か（`actions/permissions`）/ 何が登録されているか（`actions/workflows`、
+   `dynamic/*` を含むのでファイル走査では見えないものが映る）/ 何が走りいくら課金されたか
+   （`actions/runs` + `/timing`）。credential を要するので **ノードには置かない**
+   （fleet の不変条件）。対象は `--repo` / `--owner` で明示させ、引数なしで
+   全アカウントを歩かせない。
+
+3. **掃除機の 3 経路を直す** —— 読めなかった `actions/permissions` は `:unverified`、
+   workflow 0 本でも permissions を必ず引く、listing が失敗したら
+   `Refusing to report a clean sweep` として exit 2。答えられなかった repo は
+   state ファイルに書かない（書くと次回 skip され、非回答が回答として固定される）。
+   単体で分岐を走らせて確かめられるよう `--repo owner/name` を足した。
+
+4. **金額を言うときは `/timing` を引く。** 引いていないなら『未測定』と書く。
+   壁時計から課金を推測しない —— 今日それをやっていれば、課金ゼロの Dependabot を
+   止めに行っていた。
+
+三値の exit code はこの ADR の 3 つの道具すべてに入れる: 0 は測って問題なし、
+1 は違反、2 は **答えられなかった**。0 と 2 が別であることが要点。")
+
+  (:adr/evidence
+  "## gate の両方向（2026-08-22、fleet と同じ形の tree に対して）
+
+fleet は `git archive` した tarball を `:include-ext` で絞って配る（`.git` は入らない）ので、
+同じ形の tree を作って回した。
+
+| 入力 | exit | 出力の要点 |
+|---|---|---|
+| 無改変 | 0 | `ROOT-WORKFLOWS 0` / `OK no workflow at the repo root` |
+| root に `.github/workflows/ci.yml` を 1 本置く | 1 | `VIOLATION .github/workflows/ci.yml` |
+| 錨 `manifest/west.yml` を tree から落とす | 2 | `Refusing to report a verdict ... anchor ... is not in the tree` |
+| verifier を filter から外す | 2 | `Refusing to report a verdict ... not in the shipped tree` |
+
+床を件数ではなく錨にしたのは、この repo が自分で持つ yaml が 5 本しか無いから
+（`deploy/prometheus*.yml`、`lefthook.yml`、`manifest/west*.yml`）。残る 44 本は
+vendored な takeout / comfyui で、件数を床にすると vendored を整理した日に
+**恒久的な exit 2** になる。錨は配送が生きているかだけを問い、tree の中身に連動しない。
+
+歩く深さも直した。最初の版は深さ 12 で打ち切っており、深い takeout を
+数え落としたまま SCANNED を印字していた —— 走れなかった分が無かった分と同じ顔になる。
+今は 40 まで歩き、打ち切ったら `TRUNCATED-AT-DEPTH` を出す。
+
+## 掃除機の before / after（同一入力、com-junkawasaki/root 1 件）
+
+`actions/permissions` がこのセッションの proxy で 403 になる状況をそのまま使った。
+
+- **before**（HEAD の判定ロジック）: `already disabled 1`、**exit 0**、
+  state に `{com-junkawasaki/root {:workflows 3, :already-disabled true}}` を書き込む。
+  以後この repo は skip され、403 が『確かめて無効だった』として固定される。
+- **after**: `UNVERIFIED com-junkawasaki/root permissions 403`、**exit 1**、
+  state は `{}` のまま。次回もう一度訊きに行く。
+
+listing が拒否される経路も同様に、before は `scanned 0 | errors 0` / exit 0、
+after は `Refusing to report a clean sweep: 1 repo listing(s) failed` / exit 2。
+
+## audit の実行（live、com-junkawasaki/root）
+
+    permissions        UNVERIFIED (403 Access to this GitHub Actions path is not permitted through this proxy.)
+    workflows          3 registered  (file-based 1, dynamic 2)  active 3
+    runs since 2026-07-30  13   billable 0.0 min   (timing read 13/13)
+    SUMMARY  repos 1 | actions enabled 0 | with billable minutes 0 | UNVERIFIED 1   -> exit 2
+
+**exit 2 が正しい答え。** 課金は 0 と測れたが、有効か無効かは読めていない。
+0 を返していたら『確かめて無効』と読まれる。")
+
+  (:adr/consequences
+  "- root repo に `.github/workflows/*.yml` が戻ると fleet gate が赤くなる。
+  検査を足したいなら `scripts/fleet-ci/gates.edn` に 1 行足す、という既定の
+  経路がそのまま強制される。
+- gate の緑は **『この tree は GitHub に workflow を渡していない』** しか意味しない。
+  verifier が `NOT-CHECKED` 行で `actions/permissions` / dependency graph /
+  Dependabot を名指しするので、緑を『Actions が無効』と読む余地を出力側で塞いである。
+- 掃除機は今後、答えられなかった repo について exit 0 を返さない。これは
+  **既存の運用が赤くなる**ことを意味する —— 今まで緑だったのは掃き切ったからではなく、
+  答えられなかったものを緑に数えていたから。
+- **この ADR は 1 repo しか測っていない。** com-junkawasaki/root 以外の
+  約 4,000 repo の課金状態は **未測定** であって『0』ではない。
+  このセッションの GitHub access は com-junkawasaki/root に scope されており、
+  org listing も `actions/permissions` も proxy が拒否する。
+- Dependabot の dynamic workflow は課金されていない（`billable.total_ms` = 0）。
+  止める理由は今のところ無い。verifier は root の `.github/dependabot.yml` を
+  見つけても **報告するだけで落とさない** —— 測っていない害を罰しないため。")
+
+  (:adr/resume
+  "実 token（`gh auth token`）を持つ tip host で次を回す。このセッションからは
+proxy が拒否するので回せない。
+
+    # 1. 課金と有効/無効の現在地を、org 単位で測る
+    nbb scripts/github-actions-billable-audit.cljs --owner kotoba-lang --since 2026-07-30
+    nbb scripts/github-actions-billable-audit.cljs --owner cloud-itonami --since 2026-07-30
+    #    ... etzhayyim / gftdcojp / network-awai / jk-luxury / com-junkawasaki
+
+    # 2. exit 1（有効な repo がある / 課金がある）が出たら掃除機を回す。
+    #    直した掃除機は、答えられなかった repo を state に書かないので再実行が効く。
+    nbb scripts/github-actions-disable-sweep.cljs --owner <org> --recheck
+    nbb scripts/github-actions-disable-sweep.cljs --owner <org> --recheck --apply
+
+    # 3. root の gate を fleet で 1 度緑にする（landing 条件）
+    #    手元での両方向確認は済んでいる。ノードの配られた tree で緑を見るまでは
+    #    landed としない —— CLAUDE.md『一度も緑にならない gate も同じだけ無内容』。
+
+未解決として残っているもの:
+
+- `com-junkawasaki/root` の `actions/permissions` が有効か無効かは **未測定**。
+- registered workflow に残る stale entry `.github/workflows/kotoba-shell-gates.yml`
+  （ファイルは既に無い）を GitHub 側から消す経路は確かめていない。
+  ファイルが無いので走りはしないが、`actions/workflows` の件数を読む側には
+  ノイズとして残る。
+- 子リポ側には同じ tree gate が無い。fleet が配るのはその repo 自身の tree だけなので、
+  root の gate は子リポを覆わない。覆っていない範囲をここに書いておくのは、
+  緑を『全部見た』と読ませないため。")))

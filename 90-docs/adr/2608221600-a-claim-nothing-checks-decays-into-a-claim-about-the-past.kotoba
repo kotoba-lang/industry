@@ -1,0 +1,148 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608221600-a-claim-nothing-checks-decays-into-a-claim-about-the-past")
+  (:adr/title "A claim nothing checks decays into a claim about the past — the 因縁 residency, and the three failures under it")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-22")
+  (:adr/repo "kotoba-lang/loop-innen")
+  (:adr/related (vector "adr-2607258500-innen-dependency-record-over-human-history"
+                "adr-2608136000-five-questions-before-writing-a-check"
+                "adr-2608221500-kosatsu-durability-plane-anchor-delegation"))
+  (:adr/body
+  "## Context
+
+`kotoba-lang/loop-innen` grows a sourced dependency record over human history.
+Its corpus and ledger stop on 2026-08-12. Ten days are missing.
+
+`scripts/tick.cljs` said, in its own docstring, that the loop was `registered
+with tamaki and run by launchd`. Measured 2026-08-22, **neither half was true**:
+`tamaki` listed loop-innen only as an example line in its README, and no launchd
+job for it existed on the operator machine while a dozen sibling residencies
+(`com.gftd.observatory-run`, `com.gftd.fleet-ci-tip-tick`, and others) were
+loaded.
+
+The docstring was almost certainly accurate when written. Nothing checked it, so
+it went on asserting a residency that had ceased to exist, and it read as a
+description of the present.
+
+## Decision
+
+### D1 — the residency is registered as a file, not as a sentence
+
+`scripts/com.kotoba.innen-tick.plist` (`com.kotoba.innen-tick`), launchd at
+02:47 / 08:47 / 14:47 / 20:47, running the tick through `tamaki exec` so each
+tick is one `AgentRun` with a real exit code while
+`ledger/loop-innen-ledger.edn` keeps the per-cycle detail.
+
+launchd rather than a new scheduler, for the reason the sibling observatory
+plist gives: this workspace already put its periodic work there, and a second
+scheduler splits the answer to `what is running here` in two.
+
+The plist carries the same warning the observatory plist does — two consecutive
+hyphens are illegal inside an XML comment, and a malformed plist does not fail
+loudly; launchd simply declines to load it, which is the least visible way for a
+residency to be absent.
+
+### D2 — verify a residency by running it, not by installing it
+
+Three real defects were found, each only by ACTUALLY RUNNING the job. None was
+visible to the unit suite, which stayed green throughout.
+
+**(a) A bare double quote inside a docstring stopped every entry point.**
+Introduced while correcting the very sentence D1 is about. The docstring ended
+at the quote, the next word was read as a symbol, and every invocation died with
+`registered is not ISeqable`. The suite exercises `src/` and never opens a
+script, so it reported green while nothing could run.
+
+Counting quotes would NOT have caught it: the broken line carried two of them,
+parity was preserved, and the file held 222 unescaped quotes — an even number, a
+file that looks balanced. This is the trap CLAUDE.md already records for heredoc
+EDN, reappearing in a Clojure docstring.
+
+**(b) Publication was structurally impossible in a west checkout.** The tick ran
+`git push origin main`. west names the remote after the manifest entry
+(`kotoba-lang`) and leaves the tree on a DETACHED HEAD, so both halves were
+false: no such remote, no local ref named `main`. The last successful tick is
+immediately before the commit named `rescue/west-detached-20260812`. Publication
+has been impossible since that rescue while every ingest kept reporting success.
+
+**(c) The git helper discarded stderr.** It read stdout and the exit code and
+threw the error text away, so the residency printed `FAIL publish (exit 1)` for
+a failure git had explained in full. This is why (b) lasted ten days: the cause
+was one line away and nothing could show it. Third of the five questions in
+ADR-2608136000.
+
+### D3 — the gate for (a) is a LOAD, not a lint
+
+Each entry point accepts `--parse-only`, read after the whole file has been read
+and compiled; reaching it proves the file is well formed, and the script exits
+before any work or network I/O. `loop-innen.scripts-load-test` spawns all four.
+
+A lint would have to model the reader. A load IS the reader.
+
+### D4 — publish moved into `src/` so it could be tested at all
+
+`loop-innen.publish` resolves the remote (preferring `origin` when it exists, so
+ordinary clones are unaffected) and the remote's default branch instead of
+assuming them, and pushes `HEAD:<branch>` so a detached checkout can publish.
+The push is not forced and the fast-forward is `--ff-only`: a divergence is
+git's refusal, not something this code decides. `git` returns `{:exit :out :err}`
+always, and a failed step carries `:failed-at` and the text.
+
+### D5 — one parser, because there were four
+
+Each of four scripts carried its own `partition-all 2` argument parser and all
+four had the same defect: a boolean flag consumed the NEXT FLAG'S NAME as its
+value. `--no-push --root /p` parsed as `{:no-push \"--root\"}` and dropped the
+path; `--root` then fell back to `../../..`, which from
+`orgs/kotoba-lang/loop-innen` IS the superproject. So production was correct BY
+POSITION, argument order silently decided what was ingested, and nothing went
+red. Invoked the other way round, the workspace ingest walked a directory that
+does not exist and reported `ok ingest:workspace (exit 0) — 0 nodes / 0 edges`:
+a successful ingest of an empty world.
+
+`loop-innen.cli` is now the only parser. Every valued option goes through
+`string-opt`, so a bare `--root` cannot hand `true` to a filesystem path.
+
+### D6 — regression tests must be able to fail on the code they replace
+
+Every repair here is tested against the OLD behaviour as well as the new one:
+`the-old-parser-is-shown-to-be-wrong` reproduces the shipped parser and asserts
+it differs; `the-old-command-fails-on-the-same-fixture` runs the shipped
+`git push origin main` on the west-shaped fixture and asserts it fails;
+reintroducing the exact docstring reds `every-entry-point-loads`.
+
+A regression test that cannot fail on the code it replaces proves nothing.
+
+## Consequences
+
+- The record grows again without a human. Verified end to end under launchd:
+  `LastExitStatus 0`, all four steps ok, commit `6275b85` pushed by the job
+  itself, ledger at `:event/seq 33`.
+- A resident loop that commits four times a day means the west pin for this
+  repository will lag by design between advances. That is normal for a data
+  repository and is not drift to chase.
+- The failed kickstart runs left an automated commit in the SHARED west checkout
+  (`:event/seq 32`, 459 nodes / 2417 edges — a real measurement). It was
+  preserved through a rescue branch and a server-side merge, not discarded and
+  not rebased.
+- The lesson generalises past this repository: **a claim about the world that
+  nothing checks decays into a claim about the past.** Docstrings that assert
+  deployment state, READMEs that name a schedule, and manifests that describe a
+  gate are all subject to it. The remedy is not more careful prose; it is to
+  make the claim executable, or to date it and expect it to rot.
+
+## Evidence
+
+Measured 2026-08-22 at `kotoba-lang/loop-innen` 6275b85:
+
+- suite 26 tests / 102 assertions, 0 failures (was 10 / 63)
+- publish tested against real temporary git repositories arranged in the failing
+  configuration: a bare remote, a checkout wired under a NON-origin remote name,
+  left on a detached HEAD. Covers publishing from it, no-remote refused with a
+  reason, a non-fast-forward stopping at `ff`, and the helper returning error
+  text.
+- one launchd run end to end: ingest:wikidata 142 nodes / 125 edges,
+  ingest:workspace 317 / 185, cycle ok, publish ok, record 459 nodes /
+  2417 edges. Critical nodes surfaced include `jurisdiction-us-de`
+  (43 dependents), `world-war-i` (23), `paris-peace-conference` (22) and
+  `molotov-ribbentrop-pact` (17).")))

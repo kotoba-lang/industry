@@ -1,0 +1,296 @@
+(vector (map (:db/id -1),
+  (:adr/id "adr-2607301200-firstparty-chatgpt-ads-preflight-kotobase-murakumo"),
+  (:adr/title "ADR-2607301200: kotobase.net / murakumo.cloud の ChatGPT Ads 出稿 — 7310 は判定層として使い、出稿実行は別問題として分離する"),
+  (:adr/status "accepted"),
+  (:adr/doc_type "adr"),
+  (:adr/date "2026-07-30"),
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)")),
+  (:adr/topic "firstparty-chatgpt-ads-preflight"),
+  (:adr/related (vector "adr-2607261200-advertising-7310-media-platform-layer"
+                "adr-2607271400-advertising-7310-multi-platform-catalog"
+                "adr-2607081900-cloud-itonami-advertising-7310-coverage"
+                "adr-2607122300-cloud-murakumo-captive-demand-first-network-participant-growth")),
+  (:adr/supersedes (vector)),
+  (:adr/superseded_by (vector)),
+  (:adr/repos (vector "com-junkawasaki/root" "network-awai/net-kotobase")),
+  (:adr/authoritative true),
+  (:adr/authoritative_for (vector "出稿主体を AWAI Network, L.L.C.(デラウェア LLC / 法域 USA)とする決定"
+                          "自社プロダクト(kotobase.net / murakumo.cloud)を ChatGPT Ads に出稿する際の pre-flight 判定を cloud-itonami-isic-7310 で行うという決定"
+                          "7310 は判定層であって出稿実行層ではないという境界"
+                          "ad-category 未確定を推測で埋めないという規律の first-party 適用")),
+  (:adr/last_verified "2026-07-30"),
+  (:adr/source-format "edn-only (ADR-2607171600)"),
+  (:adr/primary-sources (vector "cloud-itonami/cloud-itonami-isic-7310 @ 4201aee — clojure -M:dev で Campaign Governor を自社2プロダクトに対して実行した出力(2026-07-30)"
+                        "GET https://kotobase.net/api/funnel (2026-07-30 実測) — visitors 1565 / signups 3 / checkouts 0、x402 submissions 3 / rejections 3。BMC の 246 / 0 はこれに置き換わる"
+                        "90-docs/business/cloud-murakumo-business-model.edn — 訪問→実推論 run 転換 1%"
+                        "90-docs/business/budget-supply.edn — :supply/note が自ら placeholder と明記")),
+  (:adr/secondary-sources (vector "ads.openai.com の advertiser 要件(登記9カ国に JPN 含む・配信7カ国・国と通貨は setup 時固定・最低日予算 USD 25・Max CPC・postpay・JCT 非課税)は 2026-07-30 の web 検索由来の二次情報。openai.com / help.openai.com は WebFetch・curl とも 403 (bot wall) で一次確認できていない。")),
+  (:adr/known-gaps (vector "ad-category が未確定。graph-DB BaaS / 推論クラウドが :digital-products-education(4媒体すべて permitted)か :software-download(chatgpt-ads で closed-set により not-permitted)かは openai.com/policies/ad-policies/ の再読が必要で、2026-07-30 時点で 403 により blocked。"
+                   "pixel / Conversions API(OpenAI 固有の実装)は未着手。流入元別 funnel 計器は入ったが、媒体側 pixel は一次情報が読めるまで着手しない(パラメータ名を推測しない)。"
+                   "7310 の west pin (22e3f57) が子リポ main より 7 commit 遅れている。本 ADR の実行は子リポ checkout (4201aee) に対して行った。"
+                   "uikit の west pin が origin/main より 2 commit 遅れている(pin 鮮度の follow-up)。"
+                   "kotoba-ui / shitsuke / liquid-glass-ui の *checkout* が pin より遅れていた(pin 自体は最新)。net-kotobase のサイトは別セッションが DADS(jp-go-dds)ベースへ移行し kotoba-ui 依存自体が外れたため、この skew は net-kotobase の再生成をもう塞いでいない。"
+                   "(解消) signup.html の再生成保留は、別セッションの DADS 移行が私の client 側変更ごと再生成したため消えた。client 側 source 送出・return_to の query 保持とも本番配信中(2026-07-30 実測)。")),
+  (:adr/verification "cloud-itonami-isic-7310 の checkout (4201aee) に対し clojure -M:dev で自社2プロダクト x 2 category の 4 campaign を :campaign/intake -> :media-plan/verify -> :platform/verify -> :risk/screen -> :actuation/place-campaign まで通し、hold rule を実際に発火させて記録した。子リポは無変更(read-only consumer として実行)。net-kotobase 側は clojure -M:test → 73 tests / 405 assertions, 3 failures(いずれも本 diff が触らない既存失敗: uncataloged JS provider sources x2 と worker/js artifact)、kotobase.funnel-test 単独では 13 tests / 87 assertions, 0 failures。本番デプロイは repo-wide build lock が別セッションに保持されていたため未実施。"),
+  (:adr/body
+  "## Context
+
+オーナーの問い: 「今の cloud-itonami に ChatGPT 広告などを出稿する business は
+設計実装されているか。kotobase.net と murakumo.cloud を出稿したい」。
+
+調査結果は **半分ある**。`cloud-itonami-isic-7310`(ISIC Rev.5 7310 = 広告代理業)は
+ADR-2607081900 で actor 化され、ADR-2607261200/2607271400 で 4 媒体
+(chatgpt-ads / google-ads / meta-ads / microsoft-advertising)のポリシーカタログと
+媒体側 HARD check 6 種を持つ。ChatGPT Ads は転記済みの一級市民である。
+
+しかし足りないものが 2 つあった:
+
+1. **出稿の実行層が無い。** 子リポの CLAUDE.md が明記するとおり
+   `No network calls in the actor` で、`:actuation/place-campaign` は監査台帳に
+   placement レコードを起票するだけ。`ads.openai.com` に投げるクライアントは
+   workspace 内に存在しない(`kotoba-lang/com-openai` は推論 API の clean-room 実装、
+   `kotoba-lang/adnet` は自社 ad network = publisher 側で買い付け側ではない)。
+2. **顧客モデルが agency。** `docs/business-model.md` は「顧客は advertiser ではなく
+   agency」と明言しており、自社プロダクトを first-party に出稿するワークフローは
+   モデル化されていなかった。kotobase / murakumo は advertiser としても campaign
+   としても登録が無かった。
+
+## Decision
+
+### D1. 7310 は判定層として使う。出稿実行層をここに足さない
+
+自社プロダクトを 7310 の Campaign Governor に通し、**実出稿の前に何が足りないかを
+機械に列挙させる**。これは 5820 CRM の dogfood(ADR-2607172600)と同じ自己言及
+パターンで、実際に穴が出た: 記憶で「たぶん出せる」と判断していたら見落としていた
+blocker が 5〜6 件、機械的に列挙された。
+
+一方で `ads.openai.com` を叩くクライアントを 7310 に足すことはしない。子リポの
+`No network calls in the actor` は D7(第2の actuation op を作らない)と同じ根拠に
+立っており、実 API 連携は **human-approved order の下流**に属する。判定層に
+ネットワーク I/O を持ち込むと、governor が自分の出稿を承認する構造になる。
+
+その「下流」の置き場所は **`kotoba-lang/com-openai` でもない**。あれは Datomic 裏で
+OpenAI 互換 API を*提供*する clean-room **サーバ**であって、外部への*クライアント*を
+入れると repo の意味が反転する(`com-googleads` も同型なので、ads API の先例として
+引くのは誤り)。今日の消費者は kotobase.net だけ ——**広告を出される当事者が、
+conversion を報告する当事者**でもある —— なので `net-kotobase` 内に置き、
+2 番目の消費者が現れた時点で `kotoba-lang` へ抽出する(投機ではなく second use)。
+
+### D2. dogfood seed は superproject に置く
+
+`90-docs/business/cloud-itonami-7310-firstparty-ads-dogfood-seed.edn`。
+5820 の `cloud-itonami-5820-dogfood-seed.edn` と同じ置き場所・同じ shape。
+自社の advertiser レコードを子リポの `demo-data` に混ぜない —
+`demo-data` は console の byte 同一性を `drivers-test` が固定している
+決定論的デモであり、かつ**売り物の中に自社の営業データを混ぜない**。
+
+### D3. ad-category は推測で埋めない
+
+`chatgpt-ads` は `:closed-category-set? true` なので category の選択が可否を
+そのまま決める。実測:
+
+| candidate | chatgpt-ads | google-ads | meta-ads | microsoft-advertising |
+|---|---|---|---|---|
+| `:digital-products-education` | permitted | permitted | permitted | permitted |
+| `:software-download` | **not-permitted** | permitted | permitted | restricted |
+
+graph-DB BaaS / 推論クラウドがどちらに落ちるかは一次情報の再読が必要で、
+2026-07-30 時点で openai.com は WebFetch・curl とも 403(bot wall)、Chrome 拡張も
+未接続のため確定できない。**通したい方(`:digital-products-education`)を選んで
+先に進めることはしない** — それは ADR-2607261200 D2 が
+google/meta/microsoft を記憶から seed することを拒んだのと同じ失敗である。
+違うのは、ここでは間違えた場合の帰結が gate の hold ではなく**媒体側の広告拒否
+またはアカウント問題**という点で、より重い。
+
+### D4. funnel と計器が先、出稿が後
+
+**BMC に書かれていた「訪問 246 -> signup 0」は陳腐化していた。** 2026-07-30 に
+`GET https://kotobase.net/api/funnel` を実際に叩いた値:
+
+    visitors 1565 / signups 3 / checkouts 0
+    x402: challenges 4 / submissions 3 / settlements 0 / rejections 3
+
+つまり landing -> signup クリックが **0.19%**(目標 3%)、signup -> checkout が
+**0/3 = 0%**。計器そのものは動いている(signups が 0 でなく 3 なので、
+「クリックが記録されない不具合」ではなく本当にクリックされていない)。
+x402 側は submission 3 件が **3 件とも reject** されており、agent 決済経路は
+別の実バグを抱えている(本 ADR の範囲外、別 follow-up)。
+
+転換 0.19% の funnel に有料流入を買うのは CAC を無限にする行為である。
+これは「広告を出さない」決定ではなく**順序の決定**である。
+
+### D4b. 総数だけの funnel では有料出稿を判断できない — 流入元別に割る
+
+出稿の可否を左右するのは総数ではなく「**その媒体から来た訪問のうち何件が
+転換したか**」である。着地前の計器は3つの総数しか持たず、この問いに構造的に
+答えられなかった。実装(net-kotobase main `3fddd36`):
+
+- `utm_source` を**閉じた allowlist に clamp** して stage ごとに JSON 1 個で
+  持つ(`funnel:<stage>:by-source`)。allowlist は飾りではない —
+  `utm_source` は URL バーから誰でも書ける値なので、そのまま鍵にすると
+  keyspace を無制限に膨らませられる。未知の値は捨てずに `\"other\"` に入れる
+  (未知の流入も実在する流入である)。
+- 流入元は「client が送った値 > リクエストの `Referer`」の順で解決する。
+  Referer fallback がこの変更を**今日デプロイ可能にしている**: signup.html は
+  ビルド時生成物で、client 側の変更は次の再生成まで本番に出ないが、
+  `/signup?utm_source=…` からの same-origin POST の Referer は今日すでに
+  campaign tag を運んでいる。
+- `return_to` が query string を落としていたバグを修正。修正前は authn 往復の
+  後の checkout POST が、広告由来の転換を organic として報告していた ——
+  有料出稿がまさに判断される 1 個の数字である。
+- `kotobase.funnel-test` が aggregate runner に**入っていなかった**ので追加した
+  (funnel の unit test は事実上一度も走っていなかった)。
+
+### D4c. 公式 MCP は無いが公式 API はある。第三者 MCP は使わない
+
+`ads.chatgpt.com` は `ads.openai.com` へリダイレクトする同一プロダクト。
+**OpenAI は ads 専用の公式 MCP server を出していない**(2026-07-30 時点)。
+第三者製は複数実在する —— `HYPD-AI/openai-ads-mcp`(OSS・自ホスト・read-only)、
+Markifact / Bluegrass / Trakkr(hosted、Bluegrass は 65 tools の read+write)。
+
+**hosted 系は採らない。** Ads API キーは **1 ad account に 1 対 1 でスコープ**され
+(`Each Ads API key is scoped to one ad account`)、預けた先はその広告アカウントの
+全権を持つ。安全床①(credential を第三者に渡さない)に直接触れる。
+
+より重要な発見: **`developers.openai.com` は bot wall の外にある。**
+403 で塞がれていたのは `openai.com` と `help.openai.com` だけで、Advertiser API と
+Conversions API の仕様は一次情報として読める。したがって第三者の要約に依存する
+理由が無い。
+
+### D4d. 一次情報から転記した API 面(2026-07-30)
+
+- Advertiser API: `https://api.ads.openai.com/v1`、`Authorization: Bearer`、
+  キーは Ads Manager → Settings 発行。**write 可**
+  (`POST /campaigns` `/ad_groups` `/ads` `/upload`)、`GET /ad_account`、
+  insights は 4 スコープ。campaign は `budget.lifetime_spend_limit_micros`
+  (最小 1,000,000)、ad group は `bidding_config.{billing_event_type,max_bid_micros}`。
+- **API に業種カテゴリを申告するフィールドは無い**(`/ads/llms-full.txt` で確認)。
+  ad group の `context_hints` は自由記述キーワードであって taxonomy ではない。
+  カテゴリ可否は **policy 審査**として `review_status`
+  (`in_review` / `rejected` / `approved`)に現れる。よって D3 の
+  「ad-category を推測で埋めない」は依然有効だが、**API が category を要求する**
+  という誤解は解けた —— 間違いの帰結は 400 ではなく広告の却下である。
+- Conversions API: `POST https://bzr.openai.com/v1/events?pid=<PIXEL-ID>`
+  (Advertiser API とは**別ホスト**)。`validate_only` で保存せず検証可、
+  1 batch 1,000 件、`timestamp_ms` は過去 7 日〜未来 10 分、`id`+`type` で重複排除。
+  email / external_id は SHA-256(trim+lowercase、64 桁小文字 hex)必須で、
+  **生値・電話番号ハッシュの送信は禁止**。
+- **click id パラメータ(gclid/oaiq 相当)は文書に無い。** よって `utm_source` +
+  `source_url` による first-party 属性付けが、公式 click-id が現れるまでの正しい形。
+
+### D4e. 実装: 報告するが、既定では送らない
+
+`kotobase.conversions`(純 payload)+ `kotobase.openai-ads`(リクエスト構築と
+制約検証)+ Worker 配線。funnel stage は vendor の標準 event 名へ写す
+(`page_viewed` / `registration_completed` / `checkout_started`)。
+
+**signup を `lead_created` にも `trial_started` にもしない。** 営業リードの
+引き渡しではないし、カード不要の P2P プランでもクリック時点は enrolment ではない
+——どちらも**広告アカウントが最適化する対象を水増しする**。テストで固定した。
+
+**`user` オブジェクトは一切送らない。** vendor は生 email / 生 external_id /
+電話番号ハッシュを禁じ SHA-256 を要求するが、この 3 stage の時点で kotobase は
+検証済み識別子を持たない(identity 引き渡しは報告対象 event の**後**に authn 側で
+起きる)。ハッシュ要件は「持っている識別子への要件」であって「識別子を捏造する
+許可」ではない。`opt_out` も同じ理由で立てない。
+
+安全側の 3 性質: ①設定が無ければ**完全 no-op** ②`validate_only` が**既定 true**
+(conversion データは送り直せないので、誤設定は「リクエストの無駄」で済ませ
+広告アカウントの履歴を汚さない) ③エラーは飲み込み `ctx.waitUntil` に渡す。
+
+### D5. 出稿主体は AWAI Network, L.L.C.(デラウェア LLC)、法域は USA
+
+オーナー判断(2026-07-30)。AWAI Network, L.L.C. は etzhayyim 傘下の営業主体で、
+**既に cloud-itonami の operator** でもあるので、広告出稿主体としても同一線上に
+ある(ADR-2607289700)。ads.openai.com の advertiser account は登記国=US /
+通貨=USD で開設し、`advertising.facts` 側の法域は `\"USA\"`(FTC Act 第5条 /
+FTC Endorsement Guides)を使う。
+
+USA を選ぶと chatgpt-ads では JPN より条件がよい: 当該媒体の
+`:restricted-category-jurisdictions` は `#{\"USA\"}` なので、制限カテゴリ
+(financial-services / healthcare-medical)が広告主承認付きで可能になる法域は
+US だけである。今回の2プロダクトはそこに当たらないが、同じ account が将来
+使える範囲は広い。
+
+**決済情報の入力は agent が行わない。** 本人確認と支払手段登録は owner 実行 ——
+安全床①(認証情報・カード情報を自分でフォーム入力しない)は「標準作業の常時許可」
+でも上書きされない。account の国と通貨は setup 時に固定され後から変更できないので、
+この選択自体が不可逆である点も owner に属する理由になる。
+
+## 実測 — :actuation/place-campaign が挙げた HARD hold
+
+`:digital-products-education` でも 5 件 hold する:
+
+1. `:evidence-incomplete` — 法域の必要書類(ブリーフ/媒体計画/クリエイティブ承認/
+   予算承認)が未整備
+2. `:media-spend-exceeds-authorized-budget` — 提案媒体費 112,500 が承認予算 **0** を超過
+3. `:risk-screen-missing` — 誤認表示リスクスクリーニングの記録が無い
+4. `:platform-check-incomplete` — `:platform/verify` 未実施
+5. `:platform-attestation-missing` — chatgpt-ads の必須表明 3 件が未取得
+   (`:advertiser-identity-verified` / `:distinguishable-from-product-ui` /
+   `:landing-page-consistency`)
+
+`:software-download` ではこれに `:platform-prohibited-category` が加わる。
+
+2 が示しているのは技術的な穴ではなく事実である: **オーナー承認済みの広告予算が
+存在しない**(`budget-supply.edn` は `:supply/note` で自ら placeholder と明記)。
+
+## Alternatives considered
+
+- **7310 に ads.openai.com クライアントを足して端から端まで自動化する**: 却下(D1)。
+  判定層に I/O を入れると governor が自分の出稿を承認する構造になる。実 API 連携は
+  human-approved order の下流に、別 repo として置く。
+- **自社 campaign を子リポの demo-data に足す**: 却下(D2)。console の byte 同一性を
+  壊し、売り物のデモデータに自社営業データが混入する。
+- **`:digital-products-education` と決めて先に進む**: 却下(D3)。403 は「読めなかった」で
+  あって「読んだ」ではない。
+- **funnel を直す前に小額でテスト出稿する**: 却下(D4)。転換 0% の受け皿と計器なしの
+  出稿では、失敗しても原因(creative / category / LP のどれか)が切り分けられない。
+  切り分けられない実験に金を払うことになる。
+
+## Consequences
+
+- 実出稿の TODO が hold リストとして機械可読に固定された。閉じるべき順序も
+  seed doc の表に載っている。
+- 流入元別 funnel 計器が net-kotobase main (`3fddd36`) に着地し、**本番稼働中**
+  (Worker Version ID `80bf9a46-444c-45a1-95d3-2c638b80d97b`、2026-07-30)。
+  ライブ検証(同日):
+
+      GET /api/funnel
+        by-source: {visitors: {openai-ads: 1, organic: 22}, signups: {}, checkouts: {}}
+      POST /api/funnel/event  (referer: /signup?utm_source=openai-ads, event: noop)
+        -> {ok: true, counted: false, source: openai-ads}
+
+  検証は **stage に写らない event 名**で行い、`signups`(=3)を汚していない ——
+  出稿判断に使う数字を検証で動かすのは本末転倒だから。`visitors` は実 GET なので
+  1 件増えており、それは実訪問として正しい。
+- 途中で別セッションが DADS 移行(`signup_page.cljc` 168 行書き換え)と bundle 再ビルドを
+  着地させたが、**私の client 側変更はコメントごと保存されていた**ので、ローカル再ビルドを
+  破棄して上流の artifact に揃えてから出荷した。古い checkout から出して他セッションの
+  変更を巻き戻す事故(CLAUDE.md の wrangler 同期規則)を避けるため、出荷直前に毎回 ff と
+  marker 確認を行った。
+- **advertiser account は開設済み**(owner 実行、2026-07-30)。これで chatgpt-ads の
+  必須表明は 3 件 → **2 件**に減り、残るのはどちらも creative 依存
+  (`:distinguishable-from-product-ui` / `:landing-page-consistency`)で owner 作業ではない。
+  ただし OpenAI 側の本人確認が pending の場合、`:advertiser-identity-verified` の表明は
+  撤回する ——「開設した」と「審査を通った」は別である。
+- Conversions API の配線が本番に載った(Worker Version
+  `22b10be1-0fd3-4296-92a2-047943f2d199`、2026-07-30)。**ただし送信はしていない**
+  —— `OPENAI_ADS_PIXEL_ID` / `OPENAI_ADS_API_KEY` は wrangler.jsonc にも
+  secret list にも存在せず(実測)、設定不在は完全 no-op なので、現時点で外部に
+  出ているイベントは 0 件である。
+- owner 側に残るのは 2 件: **広告予算の実額承認**(`budget-supply.edn` の
+  placeholder 置換)と **Ads Manager → Settings での API キー発行**。キーが入れば
+  agent 側で pixel 作成 → conversion event setting 作成 → `validate_only` で
+  配線検証 → 実送信への切替、まで進む。
+- agent 側に残る作業: (a) 一次情報の再読による ad-category 確定(browser 経路が
+  必要) (b) creative + 3 表明 (c) design-system checkout skew が解けてからの
+  サイト再生成。
+- 副産物として3つの既存欠陥が判明した: `kotobase.funnel-test` が一度も走って
+  いなかった / `return_to` が query string を落としていた /
+  jp-go-digital-design-system の checkout が pin より 8 commit 遅れていて
+  `clojure -M:render-site` が `No such var: dds-tokens/root-css-resource` で
+  落ちていた(checkout を pin に合わせて解消)。
+- 7310 の west pin が子リポ main より 7 commit 遅れ、uikit の pin が 2 commit
+  遅れていることも判明した(いずれも別 follow-up)。
+")))

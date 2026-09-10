@@ -1,0 +1,170 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608130130")
+  (:adr/title "closing — git-cleanup-conflict five passes: 266 remote branches retired, 38 only-local branches rescued, UNLANDED shown to be 94% .cpcache noise")
+  (:adr/status "accepted-closed")
+  (:adr/date "2026-08-13")
+  (:adr/deciders "Jun Kawasaki + Claude")
+  (:adr/supersedes "")
+  (:adr/relates-to "skill git-cleanup-conflict; manifest/cleanup-workflow.edn :append-only-ledger-gate / :preservation-pr-disposition / :retirement / :west-orphan / :west-update; ADR-2608122128 (sibling pass same day); ADR-2607300900 (GitHub Actions retired); ADR-2607211600 (full history); merged: com-junkawasaki/root#2117 #2118, kotoba-lang/kotoba#465, kotoba-lang/arrangement#16, kotoba-lang/loop-innen#4; open: kotoba-wasm#60 kotoba-kir#52 kotoba-verifier#28 kotobase-peer#107 kotobase-server#33 amu#604 kotoba-native#55 newsfeed#1 toshokan#15 yabai-actor#7 cloud-itonami-app#72 kotoba#455")
+  (:adr/body "# closing: git-cleanup-conflict, five passes, 2026-08-12 → 08-13
+
+One `git-cleanup-conflict` session run to exhaustion over `com-junkawasaki/root`
+and its 4,166 west children. Everything below was measured. Where a check could
+not run, that is stated rather than assumed.
+
+Sibling record for a parallel pass the same day: ADR-2608122128.
+
+## The headline finding: the UNLANDED number was 94% noise
+
+`nbb scripts/cleanup.cljs --unlanded` reported **966 UNLANDED child repos of
+4,394 scanned**. Classifying all 768 repos carrying a `dirty=N` marker:
+
+| class | repos | meaning |
+|---|---|---|
+| `.cpcache`-only | **724** | committed Clojure classpath cache, later deleted locally → ` D` entries |
+| deletions-only | 9 | nothing to land |
+| **real content changes** | **31** | the actual backlog |
+
+`.cpcache/` was **committed into hundreds of repos**. Cleanup never applies
+deletions, so those 724 repos hold nothing to land and will report UNLANDED
+forever until untracked.
+
+**Recommended systemic fix, NOT applied** (it rewrites ~724 repos, owner's call):
+`git rm -r --cached .cpcache` + a `.cpcache/` rule in `.gitignore`.
+
+## Landed on default branches (verified present after merge)
+
+| repo | PR | evidence |
+|---|---|---|
+| `kotoba-lang/kotoba` | #465 | memory-safety ADR, +306/−0, EDN parses |
+| `com-junkawasaki/root` | #2118 | live latency probe, +204/−0 |
+| `com-junkawasaki/root` | #2117 | itonami-9601 `--annotate/--pick` (owner merged) |
+| `kotoba-lang/arrangement` | #16 | `estimate-cardinality` delegate, 43 tests / 190 assertions |
+| `kotoba-lang/loop-innen` | #4 | 11 resident-tick commits (owner merged) |
+
+## Open PRs — each needs a disposition, none should be left to rot
+
+Tests were actually run on the first four; passing is evidence, not sign-off.
+
+| repo | PR | verification |
+|---|---|---|
+| `kotoba-lang/kotoba-wasm` | #60 | 109 tests / 497 assertions, 0 failures |
+| `kotoba-lang/kotoba-kir` | #52 | 136 tests / 579 assertions, 0 failures |
+| `kotoba-lang/kotoba-verifier` | #28 | 50 tests / 275 assertions, 0 failures |
+| `kotoba-lang/kotobase-peer` | #107 | 231 tests / 684 assertions, 0 failures |
+| `kotoba-lang/kotobase-server` | #33 | 95 tests / 432 assertions, 0 failures |
+| `kotoba-lang/amu` | #604 | preservation only, 187 behind, do not merge as-is |
+| `kotoba-lang/kotoba-native` | #55 | +53/−2 on a 109-behind base |
+| `kotoba-lang/newsfeed` | #1 | 3 ingest commits, diverged |
+| `kotoba-lang/toshokan` | #15 | 11 harvest commits, diverged |
+| `cloud-itonami/yabai-actor` | #7 | 52 ct-watch commits, diverged |
+| `cloud-itonami/cloud-itonami-app` | #72 | stash rescue, 453 behind |
+| `kotoba-lang/kotoba` | #455 | pre-existing; ~1,400 lines still absent from main |
+
+## Retired
+
+- **266 remote branches** removed from `root` (338 → 65 at close). 240 were 0
+  commits ahead of `main`; 26 more were measured superseded — 12 fully
+  contained, 14 `routine/itonami-*` whose only unique content was a stale
+  snapshot of the **overwrite-style** generated file
+  `90-docs/business/metrics/<product>.edn`.
+- **19 local branches**, **21 worktrees** (~1.9 GB), **2 scratch worktrees**.
+- **6 stashes** (1 superproject + 5 child repos), each archived then classified;
+  2 rescued to pushed branches with tree byte-identity verified before dropping.
+- `kotoba-lang/kotoba-native#10` closed: 409 of its 442 added lines were already
+  on `main`, it deleted 418, and `main` had moved all 5 files it touched.
+
+## Rescued — work that was on no branch and no remote
+
+- **33 branches across 15 repos** pushed. They existed on exactly one disk.
+  Largest: `etzhayyim/root` (9 branches, one +19,003), `dom-gpu` (7),
+  `cloud-itonami-app` (5), `yabai-actor` (76 commits ahead, +80,756).
+- **5 repos where `west update` detached HEAD** and left commits on no branch:
+  `yabai-actor` (52), `toshokan` (11), `loop-innen` (11), `newsfeed` (3).
+  `contentengine` was a false alarm — its tip is the west pin and is on the remote.
+  All verified absent upstream by HTTP 422 before rescue.
+
+## Stale-pin chain (found one link at a time)
+
+Each failure only surfaced after the previous was fixed. Every advance verified
+ancestor→descendant, never backward:
+
+```
+datalog        already on main — provides datalog.query/estimate-cardinality
+  arrangement    datalog pin     9db84106 → 3e9ae67   (8 behind)
+    kotobase-peer  arrangement pin 83b3fe95 → eb7ea6c1 (16 behind)
+                   prolly-tree pin e91eefcd → 05e3bff8 (12 behind)
+```
+
+`arrangement.query/estimate-cardinality` existed on **no branch anywhere** until
+#16 merged during this pass.
+
+## Open gaps, priority order
+
+1. **1,603 append-only ledger event lines** absent from `main`, across 53 remote
+   + 12 local branches (`fleet-db.ledger.edn`, `canvas-ledger.edn`). Archived
+   verbatim with provenance. **Not merge-able mechanically**:
+   `70-tools/bmc/src/gftd/canvas.cljc` `fold` replays in file order, so an event
+   appended after a newer tail overwrites newer state. Needs time-ordered merge.
+2. **`.cpcache` untracking** across ~724 repos (above).
+3. **`kami.webgpu.pick` does not exist.** `main`'s own `isic-9601` requires it
+   from `accept_camera.cljs`, `preview/gl.cljs`, `world3d.cljc`. Verified absent
+   from all 5 local + 95 remote refs of `kotoba-lang/webgpu` and from
+   `git log --all --diff-filter=A`. Blocks `npm run test:annotate`.
+4. **`cloud-itonami/com-etzhayyim-gov_municipality` is archived (read-only)** —
+   push 403s over SSH and HTTPS. Its `agent/maturity-docs` holds 248 un-landed
+   lines. The live successor `cloud-itonami/gov-municipality` is a **different
+   document** (the two READMEs are fully disjoint), so it cannot go there.
+   Requires unarchive → push → re-archive.
+5. **`rescue/resource-guards-shell-gates-20260718`** holds the only tests for
+   `scripts/resource-guard.mjs`, which `main` ships untested. Landing it as-is
+   adds 4 new `.mjs` files (nbb-only rule) and a `.github/workflows/*.yml`
+   (Actions retired, ADR-2607300900). Needs porting to nbb, not merging.
+6. **45 `true-orphan-git`** repos awaiting register-or-retire.
+7. **~191 `nopr` branches** across child repos — pushed, unmerged, no PR.
+
+## Two audit defects found (scripts NOT modified — out of cleanup scope)
+
+- `scripts/west-orphan-audit.cljs` classes **git worktrees as
+  `:true-orphan-git`** when they contain a `.git` file. Measured: 4
+  `net-kotobase-*` paths are worktrees of the registered repo, not clones. The
+  giveaway was their branch lists containing a branch created minutes earlier in
+  a different path.
+- The same script reports `orgs/net-kotobase/kotobase-object-store-b2-s3` as a
+  blocking `:local/root` edge. It is a **sibling package** inside
+  `net-kotobase-codex-lp/` and `net-kotobase-git/`; the relative path is
+  resolved against the wrong base. This is the only remaining \"blocking\" edge
+  and it is a false positive.
+
+## Method notes worth keeping
+
+- **Line containment is meaningless on single-line EDN blobs.** `repos.edn`,
+  `fleet-db.edn` and `west.yml` are one line each, so any byte difference reads
+  as \"1 line missing\". Two branches looked un-landed and were not; both needed
+  semantic checks.
+- **Push state must be measured against every remote.** Repos here carry a
+  DataLad `b2` special remote that sorts before the GitHub one, and west names
+  its remote after the org rather than `origin`. Checking one remote
+  manufactured a false ONLY-LOCAL for a branch pushed an hour earlier.
+- **`west-pin-verify-guard` correctly blocked a push** whose branch was cut from
+  a `main` predating a concurrent pin advance. The fix was to re-cut from
+  current `origin/main`, not to rebase or skip the guard.
+
+## Preserved, untouched
+
+A concurrent session's stash `dd6ce7fc` (\"preserve kaiyu-kaizen ledger rows
+before wave8 sync\", 00:27 JST 2026-08-13) holds 2 rows absent from `main`. It is
+live WIP belonging to another session; archived a copy, left in place.
+
+## Resume point
+
+```bash
+nbb scripts/cleanup.cljs --unlanded          # re-survey; expect ~724 .cpcache false positives
+nbb scripts/west-orphan-audit.cljs --blocking # 1 remaining edge is the false positive above
+```
+
+Everything retired or rescued is under
+`.git/stash-archive-2026-08-12/` (228 MB, 127-line `index.txt`) — stashes,
+branch diffs, worktree diffs, PR diffs, deleted-remote-branch sha→name mapping,
+and the 1,603 ledger events with per-branch provenance.
+")))

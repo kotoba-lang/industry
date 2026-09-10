@@ -1,0 +1,50 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607196100-kami-mix-interpolation-caption-review-audit")
+  (:adr/title "KAMI adds mix interpolation and caption review audit")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607196000-kami-mix-automation-caption-approval"))
+  (:adr/decision
+  (map (:daw (map (:mix-automation-authority :plugin/mix-automation)
+         (:interpolation-authority :plugin/mix-interpolation)
+         (:interpolations (vector :linear :step))
+         (:linear-scheduler :linear-ramp-to-value-at-time)
+         (:step-scheduler :set-value-at-time)
+         (:complement-policy :dry-equals-one-minus-wet)
+         (:render-consumers (vector :realtime-playback :master-wav :normalized-master-wav :track-stems :stem-bundle))))
+   (:nle (map (:review-note-authority :caption/review-notes)
+         (:review-note-fields (vector :review/id :review/author :review/text :review/at))
+         (:status-history-authority :caption/status-history)
+         (:status-history-fields (vector :status/from :status/to :status/actor :status/at))
+         (:append-order :nondecreasing-timestamp)
+         (:duplicate-note-policy :reject)
+         (:translation-clone-audit-policy :empty-new-audit)
+         (:delivery-policy :approved-only)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "third-party plugin SDK/isolation" "bezier curves and live gesture recording" "surround/Atmos"))
+    (:nle (vector "review assignments and threaded discussions" "tamper-evident signatures" "translation memory" "TTML/IMSC" "OCIO/ICC/HDR"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "bcaa76666ed1ff94eeafc1ce5d444437001a1996"))
+   (:nle-commits (vector "defa1eefdec748094b0dade6c1a5828c65ac6f2e"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#18" "kotoba-lang/kami-app-nle#18"))
+   (:evidence
+   (vector "DAW passes 26 tests and 104 assertions; NLE passes 27 tests and 129 assertions after timestamp-order hardening."
+    "Both guarded shadow-cljs production releases completed with zero compiler warnings; NLE was rebuilt after audit-order review."
+    "Instrumented Chrome observed step wet values 0.2 and 0.8 plus complementary dry values 0.8 and 0.2 through setValueAtTime, with no linearRamp call, in realtime and each of three offline stem graphs."
+    "The step-automation stem package contained project.edn, stems.edn and three 882044-byte WAV files."
+    "Chrome persisted reviewer mika, note Timing and wording checked, and draft-to-review-to-approved actor/timestamp transitions in downloaded project EDN."
+    "The reviewed Japanese cue matched preview, WebVTT and production capture."
+    "External ffprobe identified 320x180 VP8 plus 48 kHz two-channel Opus."
+    "Automated Chrome and both local servers were closed after verification."
+    "Both application PRs were reviewed and merged."
+    "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN assertions verify accepted status, supersedes and both current authorities."))))
+  (:adr/consequences
+  (vector "Editors can choose smooth or sample-time step changes without realtime/offline divergence."
+   "Caption approval has human-readable review evidence and ordered status transitions in the project/package."
+   "Malformed, duplicate or time-reversed audit entries are rejected."
+   "Cryptographic audit integrity, assignments and richer curves remain explicit commercial-product gaps."))
+  (:adr/source-format "edn")))

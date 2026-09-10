@@ -1,0 +1,268 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609062800-kotobase-p2p-location-aware-video-delivery")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/title "kotobase.net は public provider になる。動画配信は CID-addressed segment と client 側 provider ranking で位置まで最適化する（ADR-2608171256 G7 の successor）")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/last_verified "2026-09-06")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotobase-p2p-delivery")
+  (:adr/deployment-status "slice D5 #1 landed on network-awai/app-aozora-engine main (366ca9c6, PR #14, west pin 63f7352d) and release-built; NOT deployed — wrangler OAuth session on the workstation is expired and the Keychain gftd.cf token has no Workers scope, so `wrangler login` (interactive) is the blocker; live probe and round-trip measurement not yet run")
+  (:adr/repos (vector "orgs/net-kotobase/ipfs"
+              "orgs/kotoba-lang/io-libp2p"
+              "orgs/kotoba-lang/io-ipni-specs"
+              "orgs/kotoba-lang/ayatori"
+              "orgs/kotoba-lang/tech-ipfs-specs-unixfs"
+              "orgs/kotoba-lang/io-ipld-car"
+              "orgs/kotoba-lang/hls"
+              "orgs/network-awai/app-aozora-engine"
+              "orgs/kotoba-lang/murakumo"
+              "orgs/kotoba-lang/kura"
+              "orgs/cloud-itonami/hakobi"))
+  (:adr/related (vector "90-docs/adr/2608171256-kotobase-ipfs-protocol-maturity-and-remaining-gaps.edn"
+                "90-docs/adr/2606271700-kotoba-transport-planes.edn"
+                "90-docs/adr/2607051410-net-kotobase-distributed-storage-mesh-design.edn"
+                "90-docs/adr/2607023100-murakumo-kotoba-lang-net-p2p-semantics-integration.edn"
+                "90-docs/adr/2608112035-kotobase-kubo-independent-retrieval-closeout.edn"
+                "90-docs/adr/2608160100-kotobase-physical-plane-ipld-carv2-pack.edn"
+                "90-docs/adr/2608560000-libp2p-participation-transport-to-dht-node.edn"
+                "90-docs/adr/2608220300-kubo-free-libp2p-dial-and-the-ipv6-that-does-not-route.edn"
+                "90-docs/adr/2607259500-live-viewer-shared-kotoba-hls.edn"
+                "90-docs/adr/2607167000-kotobase-block-cache-hot-read-followups.edn"
+                "90-docs/adr/2607299200-kura-erasure-coded-storage-network.edn"
+                "90-docs/adr/2609041345-hakobi-useful-delivery-kernel.edn"
+                "90-docs/adr/2809051659-hakobi-integration-planes.edn"
+                "90-docs/adr/2608111721-placement-authority-is-murakumo-fleet-ci-is-a-gate-consumer.edn"))
+  (:adr/body "# ADR-2609062800: kotobase.net は public provider になる。動画配信は位置まで最適化する
+
+**Status**: accepted（設計方針の確定。実装は未着手）
+**Date**: 2026-09-06
+**Deciders**: Jun Kawasaki（問い「今の kotobase.net は配信まで、位置まで最適化した IPFS / CID ネットワーク設計ができているか。動画配信も P2P で最適化したい」→ 調査 → 「do it」）
+
+## Context
+
+### 問いへの答えは「できていない」
+
+ADR-2608171256 G7 は、DHT / Bitswap / libp2p peer 化を**意図的な未実装**とし、
+「public DHT announce や Bitswap provider になる product decision が出た時だけ
+successor ADR を開く」と書いた。本 ADR がその successor である。決定は
+オーナーの 2026-09-06 の指示で出た。
+
+### 実測した現在地（2026-09-06、4 面）
+
+| 面 | live | library / 設計のみ | 無い |
+|---|---|---|---|
+| kotobase.net gateway（`orgs/net-kotobase/ipfs`） | trustless raw / CARv1 / UnixFS Range / IPNS record 検証。IPNI 広告は `ipni-drain` Worker が cid.contact に実 publish（2026-08-30 実測、README 60-66 行） | delegated routing の multi-router quorum（`io-ipni-specs/src/ipni/find.cljc` 132-173 行、`ayatori/src/ayatori/discovery.cljc`）は query plane の classpath にだけ在り、gateway には載っていない | provider 選択。tier は R2 → B2（未 binding）→ `ipfs.io` proxy の固定順（`gateway.cljs` 1-33 行）。miss は全部 ipfs.io |
+| libp2p（`io-libp2p` 系） | GossipSub v1.1 は go-libp2p 実 peer と GRAFT、kad FIND_NODE、Noise XX 実 peer 通過、UnixFS chunker は kubo 0.41 と CID 一致（30,277 chunk まで） | bitswap は wire message と want/have の集合演算のみ。`kotoba/net/libp2p/bitswap.cljc` 27-33 行が「session 戦略は scope 外」と自己申告。`node.clj` に bitswap の配線無し | 常駐 daemon（`~/Library/LaunchAgents` 77 plist 中 0 件）。socket 層は JVM `.clj` |
+| murakumo fleet | 13 ノード、推論と fleet gate | `connect.edn` の `:read` plane（CID-over-HTTP、`:trust :cid`）と `cloud.edn` の relay 2 region（`jp-tyo-1` / `us-sjc-1`）は宣言のみ | 外向き ingress（tailnet 限定、`cloud-murakumo/docs/devices.md` 24-28 行）。block server。`src/murakumo/core.clj` 250 行が「winner は bytes を持つ、no IPFS/bitswap」と設計で除外 |
+| aiueos | QEMU で raw CID の HTTPS GET | `cid-v1-admit` / `unixfs-file-admit` は KERNEL.ELF に未リンク（README 35 行） | 配信側の役割。consumer 専用 |
+| kototama / fleet | guest run の placement（lease / budget / epoch） | — | locality、storage serving（`docs/maturity.md` 243 行が multi-node scheduling を disclaim） |
+| kura | erasure + rendezvous placement。failure-domain に `:region` を取れる | `kura-node` はテストのみ | deployment。「bytes は動かさない」が charter |
+| hakobi | Proof of Useful Delivery kernel、VDT で latency 下界（61 assertion） | 測定経路・SBT・token は後続 ADR | README 自身が「地理は別 primitive」と明記 |
+| video | aozora live は HLS segment を R2 `aozora-live-segments` に置き cache header で配信（playlist 60 s / asset immutable） | isobmff / h264 / av1 の cljc codec、`kotoba-lang/hls` の player state machine | segment の CID 化（名前は `seg_00001.ts`）、fMP4/CMAF segmenter、DASH |
+
+**位置・latency・nearest に関する logic は 0 件。** `ayatori/src`、`io-ipni-specs/src`、
+`kad/src`、`murakumo/src` を `latency|rtt|nearest|locality|geo|region` で grep して
+当たるのは disclaimer だけ（`ayatori/src/ayatori/remote.cljc` 667 行「counters は
+block/byte count であって wall-clock latency ではない」）。唯一の nearest は
+Kademlia の XOR 距離（`kad/key.cljc` 67 行）で、network 距離ではない。fleet ノードの
+`:labels {:tier edge :zone jp}` は 13 台とも**定数**（`fleet.edn` 12-40 行）で、
+placement は label の等値比較のみ（`src/murakumo/task/plan.cljc` 182-187 行）。
+
+### なぜこうなっていたか
+
+ADR-2606271700 の 2 平面論が起点である。Read 面は CID 検証で transport 無信頼だから
+「どの gateway / peer / CDN も等価」とし、Live 面は可用性の最適化層として後回しにした。
+`tech-ipfs-specs-http-gateway` の README はこれを「速いのは user に近いからではなく
+cache key が強いから」と言い切っている。**正しさの議論としては今も真だが、その等価性が
+「誰から取るかを選ばない」設計を固定した。** ADR-2607051410（storage mesh）は accepted
+のまま L0/L1 以外の実装ゼロ、ADR-2607023100（murakumo を gossip/bitswap 上に）は
+proposed のまま。ADR-2607167000 は「per-colo cache の分散代替 = ピア view ブロック複製 =
+IPFS pin 経路」を trigger 待ちとして 2026-07-16 から挙げていた。方向は一致していて、
+product decision だけが無かった。
+
+## Decision
+
+### D1. product decision — kotobase.net は自分が持つ bytes の public provider になる
+
+- `ipfs.kotobase.net` が R2 に持つ block は、IPNI 広告（既に live）の先で**実際に取れる**
+  ことを provider としての契約にする。今は広告の multiaddr が gateway 自身を指しており、
+  miss は ipfs.io へ落ちる。「広告したが持っていない」を作らない。
+- murakumo fleet に **`:slot/anonymous` の block-server role** を足す。鍵を持たない
+  （CLAUDE.md の常駐スロット 2 種のうち anonymous 側）。placement は murakumo
+  `task.plan` が決める（ADR-2608111721）。fleet-ci に配置 logic を足さない。
+- **Kubo は使わない**（ADR-2608112035、CLAUDE.md「Kubo に安易に手を伸ばさない」）。
+  provider の実装は `io-libp2p` native か、同じ `kotobase_ipfs` gateway logic を
+  ノードで動かす HTTP trustless gateway。**両方とも Read 面（CID-over-HTTP）で、
+  ADR-2606271700 の 2 平面は変えない。**
+- G7 が要求した 6 項目（peer identity / transport / routing / abuse-capacity / signer / soak）
+  は、この ADR では**名前と所有者**だけ決め、実測は slice ごとに後続 ADR に書く。
+  HTTP 200 や protocol algebra を libp2p live readiness に読み替えない（G7 の禁止をそのまま継承）。
+
+### D2. 位置最適化の定義 — 選ぶのは client。provider set は index、ranking は実測
+
+「位置まで最適化」を次の 3 段に分解し、**足すのは 3 段目だけ**である:
+
+| 段 | 何が決めるか | 現在地 |
+|---|---|---|
+| anycast / colo | Cloudflare が既にやっている | 変えない |
+| provider set | IPNI（cid.contact + `ipni.kotobase.net`）と kad delegated routing が**集合**を返す | live（広告）+ library（lookup） |
+| **provider ranking** | **client が実測した RTT / throughput で選び、hedged read で tail を切る** | **無い。ここを作る** |
+
+- ranking の入力は**測った値だけ**。`:zone jp` のような定数を入力にしない
+  （CLAUDE.md fleet-ci 節「実測して定数で持つな」と同じ理由）。
+- hedge の形は kura `manifest/range-reads` の `:hedge-group`（直接読みが単一 node
+  依存になる代償を 2 本目で払う）を借りる。新しい抽象を作らない。
+- ranking は **CID を書き換えない**（ADR-2608145500 の不変条件 1 と同型）。どの provider
+  から取っても検証は同じで、provider は信頼されない。
+- 「全 provider が失敗」と「provider が空」は別の reason で返す（`:all-routers-failed`
+  と `[]` の区別を provider 面にも持ち込む）。沈黙を緑にしない。
+
+### D3. 動画の形 — segment は UnixFS block、playlist は CID を指す
+
+- **1 segment = 1 UnixFS balanced DAG**（`tech-ipfs-specs-unixfs/src/unixfs/file.cljc`、
+  256 KiB raw leaves、174 links/node、kubo 一致済み）。新しい chunker を書かない。
+- **1 segment = 1 CARv2 pack**（ADR-2608160100「1 commit = 1 pack」の delivery 版）。
+  segment 内の block は同じ pack に在るので 1 Range GET で取れる。backend は
+  `:packed-blocks` + `:range-read` を宣言する（既定値は無い。宣言しない backend は拒否される）。
+- **playlist の segment URI は `/ipfs/{cid}`**。host は provider ranking が決めるので
+  URI は path だけを持つ。`kotoba-lang/hls` の reducer が「どの provider host を前置するか」
+  を state として持つ（player は既に native HLS 優先 / hls.js fallback を data で決めている。
+  同じ場所に provider 決定を足す）。
+- live の playlist は mutable なので **IPNS 名（naming）か短 TTL の HTTP** で配る。
+  IPNS は naming であって truth ではない（ADR-2608112035）。
+- codec / mux は既存の R2 経路（ffmpeg authored HLS）のまま。cljc codec（h264 は ffmpeg の
+  3〜4 桁遅い、ADR-2800002800）を配信の前提にしない。**配信の CID 化と codec の cljc 化は
+  別の決定**で、本 ADR は前者だけ。DASH は置かない。
+
+### D4. vertical slice（最初の 1 本）
+
+```
+aozora live segment (R2)
+  → UnixFS DAG + CARv2 pack、CID を playlist に書く
+  → IPNI 広告: provider = ipfs.kotobase.net と fleet node 1 台
+  → player: 2 provider に同じ block を probe、RTT で選ぶ、hedge 1 本
+  → 測る: segment あたり round trip 数、provider 選択の分布、fallback 発火数
+```
+
+- **成功指標は round trip 数**（ADR-2608160100）。bytes でも wall-clock でもない
+  （この workstation は load 100 超で並行 agent が走る。count を測る）。
+- **両方向を出す**（ADR-2608136000）: provider 1 台を落として fallback が発火すること、
+  壊れた block を 1 つ混ぜて CID mismatch で拒否されること。片方しか見せない slice は証拠にならない。
+- fleet node の ingress は、この slice では **Cloudflare Tunnel**（`api.murakumo.cloud`
+  と同じ経路）でよい。**これは raw P2P ではない** —— nearest colo から tunnel 越しに
+  ノードへ届くので、kotobase.net とは別 origin として RTT が測れる、という意味でだけ
+  provider になる。`cloud.edn` の relay tier か libp2p WebTransport / WebRTC で
+  browser peer を Live 面に入れるのは **第 2 slice**（`webrtc` / `kaigi` の SFU が既在）。
+- delivery の事実は hakobi の claim として記録する（ADR-2609051659 の projection）。
+  ただし報酬は本 ADR の範囲外。hakobi の「地理は別 primitive」は、この slice が測る
+  RTT を vantage 付きで claim に載せるところまでで、geography primitive の設計は後続。
+
+### D5. 所有者と順序
+
+| # | 何を | どこで | 前提 |
+|---|---|---|---|
+| 1 | segment → UnixFS DAG → CARv2 pack、playlist に CID | `app-aozora-engine/live` + `tech-ipfs-specs-unixfs` + `io-ipld-car` | **着地済み 2026-09-06**（main `366ca9c6`、PR #14、pin `63f7352d`）。**未 deploy**（下記「現在地」） |
+| 2 | gateway が pack を `:range-read` で serve、広告の multiaddr を実際に取れる先に | `net-kotobase/ipfs` + `ipni-drain` | 1 |
+| 3 | fleet node 1 台に block-server role（anonymous slot）+ Tunnel ingress | `murakumo`（placement）+ `net-kotobase/ipfs`（同じ gateway logic） | 2 |
+| 4 | player に provider ranking + hedge | `kotoba-lang/hls`（reducer）+ `ayatori.discovery`（lookup） | 2, 3 |
+| 5 | 測定と両方向の証拠 → 後続 ADR | `90-docs/adr` | 1-4 |
+| 6 | bitswap session の node 配線、browser peer の Live 面 | `io-libp2p` | 5 の実測で round trip が HTTP より減ると示せたときだけ |
+
+**6 を先にやらない。** bitswap が HTTP-by-CID より round trip を減らすかは未測定で、
+ADR-2606271700 は「Read 面は HTTP が常に正解」と言っている。測って覆るまではそれに従う。
+
+### D6. 不変条件
+
+1. **全 provider で CID 検証 fail-closed。** ranking は信頼を作らない。
+2. **ranking は CID を書き換えない。** 書き換えたら `:cid-mismatch`。
+3. **「全 provider 失敗」と「provider が空」は別の reason。** 沈黙を緑にしない。
+4. **入力は測った値だけ。** `:zone` の定数、node 名からの推定を ranking に入れない。
+5. **Kubo / Rust / 新規 `.sh` / GitHub Actions を持ち込まない。** script host は nbb。
+6. **鍵を持つノードは block を serve しない。** `:slot/attested` と `:slot/anonymous` を混ぜない。
+7. **成功指標は round trip 数。** bytes / wall-clock を成功として引用しない。
+
+## 現在地（2026-09-06、slice #1）
+
+**着地したもの**（`network-awai/app-aozora-engine` main `366ca9c6`、PR #14、root の
+west pin `63f7352d`）:
+
+- `aozora.live.segment`（pure cljc）: segment bytes → UnixFS DAG（`unixfs.file/build`）→
+  1 CARv2 pack（`ipld.car.v2/pack`）。pack → 全 block 検証つき bytes（`unixfs.file/read-file`）。
+  playlist の segment URI と `#EXT-X-MAP` の URI を `/ipfs/<cid>` に書き換え、map に無い
+  名前は元のまま残して `:missing` に列挙する（部分的に addressed な playlist を完全なものと
+  読ませない）。
+- router: segment PUT は従来の `live/<id>/<name>` に加えて `ipld/<cid>.car` を書き、
+  `live/<id>/cids.json` に name → cid を記録する。playlist PUT は書き換えて保存する。
+  `GET|HEAD /ipfs/<cid>` は pack から検証して返す。改竄された pack は **502 BlockMismatch**
+  （404 とは別 reason、短い 200 は返さない）。`?format=car` / Accept `vnd.ipld.car` で
+  pack そのものを返す（`application/vnd.ipld.car; version=2`）。`/s/<id>/<name>` は無変更。
+- build 閉包の修復: 無改変 main の `:live` release build は `kotoba.kir` 不在
+  （`shitsuke.kotoba-oracle` 経由）、次に `byoubu-ui.core`（`kotoba-ui.theme` 経由）で
+  落ちていた。`gftdcojp/tia` が同じ閉包に持つ 6 path を足した。scoped な `:live-test`
+  build と `pnpm test:live` を足した（`:kotobase-test` はコンパイルできないため）。
+
+**測ったもの**: `npx shadow-cljs compile live-test && node out/live-tests.js` →
+15 tests / 78 assertions / 0 failures。両方向あり: round-trip する pack の payload を
+1 byte 反転すると refuse される。`npx shadow-cljs release live` → `live/out/worker.js`
+（507 KB）、`wrangler deploy --dry-run` 通過（binding は R2 `SEGMENTS` のみ）。
+**hash のコスト**（この host、load 約 130、compiled）: 1 MiB の synthetic segment で
+build+pack 2.7 s、verify+read 1.2 s。hashing は `sha2.core` の pure-cljs sha256 で、
+これは呼び出し側ではなく codec 層の定数倍（ADR-2609051700 の形）。**workerd の中で
+測り直すまで、この値を Worker の CPU コストとして引用しない。** serve 経路は
+`read-all`（frame ごと）と `read-file`（block ごと）で **2 回**検証している —— 減らす
+なら codec 側で。
+
+**deploy していない理由**: この workstation の wrangler OAuth session が失効しており
+非対話では refresh できない。Keychain `gftd.cf` の account token は wrangler に認証は
+通るが Workers scope を持たない（`deployments list` が 10000 Authentication error）。
+kagi の `CLOUDFLARE_GLOBAL_API_KEY` は `no such item`。**再開手順**: 対話端末で
+`npx wrangler login` → `orgs/network-awai/app-aozora-engine-wt-cid/live` で
+`npx wrangler deploy`（built artifact はそこに在る。共有 checkout は他 bot の
+未コミット変更を抱えているので使わない）→ live probe（startBroadcast → synthetic
+segment PUT → playlist PUT → playlist に `/ipfs/` が現れる → `GET /ipfs/<cid>` が
+PUT した bytes と一致 → 未知 CID は 404、不正 CID は 400）→ round trip 数を記録。
+
+**次の slice（D5 #2）**: `net-kotobase/ipfs` が同じ pack を `:range-read` で serve し、
+IPNI 広告の multiaddr を実際に取れる先に向ける。その前提として ingest 側の pack を
+kotobase.net の bucket にも置く経路（または drain）が要る。
+
+## 置かないもの
+
+- DASH / `.mpd`。HLS 1 本。
+- ノードごとの Kubo daemon。`simeon` の既存 IPFS daemon（`fleet.edn` 18 行、port 衝突として
+  記録されているだけ）を provider に数えない。
+- 独自 bitswap 方言。session が要るなら libp2p の bitswap 1.2 の HAVE / DONT_HAVE のまま。
+- server 側 geo DB / GeoIP による provider 選択。選ぶのは client の実測。
+- 2 つ目の HLS player。`kotoba-lang/hls` に足す（ADR-2607259500 が 2 重実装を潰した経緯）。
+- fleet-ci 側の配置 logic（ADR-2608111721）。
+
+## Consequences
+
+- ADR-2608171256 G7 は本 ADR で **product decision 済み** になる。G7 の 6 項目の実測は
+  slice ごとに後続 ADR。G7 の「HTTP 200 を libp2p readiness に読み替えない」はそのまま効く。
+- ADR-2606271700 の 2 平面は変わらない。変わるのは「Read 面で誰から取るかを client が
+  測って選ぶ」の 1 点。
+- ADR-2607023100（murakumo を gossip/bitswap 上に）は D5 の 6 まで proposed のまま。
+- **2026-09-06 時点の実装はゼロ。** この ADR が accepted であることを、slice が動いた
+  証拠として引用しない。
+
+## 次の最初の command
+
+```bash
+# 1. chunker が video-sized の segment で kubo と一致することを、実 segment で確かめる
+cd orgs/kotoba-lang/tech-ipfs-specs-unixfs && nbb --classpath src -e '(require (quote unixfs.file)) (println :ok)'
+# 2. aozora live の segment 命名箇所（CID 化の入口）
+grep -n \"seg_\" orgs/network-awai/app-aozora-engine/live/src/aozora/live/*.cljc
+```
+
+## 改訂履歴
+
+2026-09-06: accepted。4 面の実測（gateway / libp2p / fleet / video）を Context に固定。
+実装は未着手。ADR-2608171256 G7 の successor として同 ADR の G7 節を本 ADR へ向けた。
+2026-09-06（同日、後）: slice D5 #1 が `app-aozora-engine` main に着地（PR #14、pin 前進）。
+「現在地」節を追加。deploy は wrangler OAuth 失効で未実施。
+2026-09-06（closing）: session の resume point は ADR-2609062900（deploy 手順・ディスク・git cleanup の結果）。
+")))

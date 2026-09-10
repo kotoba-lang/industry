@@ -1,0 +1,169 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2607276000")
+  (:adr/title "AMap 型 map は cloud-itonami-isic-6312（web portal）の地理特化 flagship として立てる")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-27")
+  (:adr/tags (vector "cloud-itonami" "isic-6312" "map" "geo" "poi" "flagship" "kotoba-lang-map" "etzhayyim-maps"))
+  (:adr/supersedes "")
+  (:adr/body
+  "## 現在地（一行）
+
+AMap（高德地図）を参照点にした map は、この workspace に存在しなかった。
+決定 A（`cloud-itonami-isic-6312` の地理特化 flagship）で**実装済み・着地済み**
+（cloud-itonami-isic-6312 `e723bd6`、2026-07-27）。残るのは Managed tier の
+価格決定のみ。
+
+## 背景 — 探索の結果わかったこと
+
+`AMap` / `高德` / `Gaode` / `amap.com` を md・edn・clj(c/s)・ts・js・rs・yml・
+json・html 横断で検索してヒットゼロ。AMap を参考にした設計・実装は無い。
+
+一方、map の substrate は既に 3 層で実在する。
+
+| 層 | repo | 中身 |
+|---|---|---|
+| ライブラリ | `kotoba-lang/map` | `kami-map`（Rust）の pure `.cljc` 移植。MVT PBF デコーダ・球面投影・グローブ mesh・orbital scene・fly-to camera・tile URL |
+| 公益の地図 actor | `etzhayyim/com-etzhayyim-maps` | maps.etzhayyim.com として live。SvelteKit + MapLibre + KAMI engine |
+| 3D | `etzhayyim/com-etzhayyim-app-maps` | gsplat / RunPod endpoint / bulk-ingest |
+
+したがって不足しているのは描画基盤ではなく、**AMap の実際の資産である
+「POI × 業種分類 × 掲載/スポンサー収益」の面**である。
+
+## 決定
+
+**AMap 型 map は `cloud-itonami/cloud-itonami-isic-6312` の地理特化 flagship
+として立てる。新しい ISIC コードの vertical を起こさない。**
+
+根拠は 3 つ。
+
+### 1. AMap の収益構造は 6312 web portal に座標が付いたもの
+
+`cloud-itonami-isic-6312` は既に `:maturity :implemented` で、
+「第三者コンテンツを集約・キュレーションし、スポンサー掲載/リファラルで
+収益化する portal operator」を PortalCurator-LLM ⊣ PortalGovernor で
+封じ込めた実装を持つ。PortalGovernor の 8 checks は POI 掲載と
+スポンサー枠にそのまま効く。
+
+- `source-provenance-gate` → POI の出典（未出典・捏造 POI の掲載拒否）
+- `license-scope-gate`（17 U.S.C. §107 fair-use 抜粋上限、本 actor 固有の HARD check）
+  → 第三者レビュー・写真の転載範囲
+- `disclosure-gate`（16 CFR Part 255 ネイティブ広告開示、2 つめの HARD check）
+  → スポンサー枠と自然検索結果の識別表示
+- `licensed-disclosure` → 広告主の契約ティアを超える開示の防止
+- `sensitive-subject-gate` / `correction-requests-always-escalate`
+  → 施設情報の訂正要求を必ず人間へ
+
+langgraph StateGraph（`portal.operation`）と append-only audit ledger
+（`portal.store/ledger`）、phase 0→3 の段階的自律も既に通っている。
+
+### 2. POI の業種型付けが cloud-itonami の既存面と join key で一致する
+
+cloud-itonami は ISIC / JSIC / ISCO / COFOG / UNSPSC / GTIN / 業界団体 /
+LEI 実体の actor 群を持ち、`:company/lei` を結合キーに market-intel
+（SEC EDGAR 財務）・ToS アーカイブと 1 クエリで join できる。
+「地図上の店舗・施設を業種コードと法人実体で引ける」は AMap に無い
+差別化で、その材料は cloud-itonami 側にしか無い。
+
+### 3. 課金・配信・カタログのレールが既に敷いてある
+
+- Stripe live の Managed Starter（3 flagship で ¥80,000/月 の Price +
+  Payment Link が実在、ADR-2607161745）
+- aozora.app の vertical 別 distribution actor（did:key + CACAO、
+  ADR-2607161930 / 2607161940）＝ B2C 面
+- 公開カタログ `cloud-itonami.github.io`（registry.edn 由来、
+  144 implemented / 646）
+- デモは build 時に actor の StateGraph を実走させて生成（ADR-2607122300）
+
+## 却下した選択肢
+
+- **B: 新しい ISIC vertical を起こす** — 6312 と機能が重複する。
+  「1 blueprint = 1 actor」規約（ADR-2607031400）に対して、同じ収益構造の
+  actor を 2 本持つことになる。
+- **C: `cloud-itonami-isic-7110` に寄せる** — 7110 は字義（測量・地図作成）
+  には合うが、実体は Community Architectural and Engineering Practice として
+  既に実装済みの別 actor。地図ポータルを混ぜると 2 つの business が 1 repo に同居する。
+- **`gftdcojp/ai-gftd-map`（新規商用 repo）** — taxonomy ADR-2606302300 の
+  「commercial product → gftdcojp/ai-gftd-*」だけを見ると素直だが、課金・配信・
+  カタログのレールを一から引き直すことになる。ai-gftd は将来「自社ブランドの
+  消費者向けアプリの皮」として任意に足せる。最初に置く場所ではない。
+
+## 境界 — 何を作らないか
+
+- **描画・投影・MVT デコードを新規に書かない。** `kotoba-lang/map` を
+  消費するだけ。個別 app のために新しい renderer を生やさないのは
+  3D / kami-engine 規則と同型。
+- **公益の地図面を複製しない。** OSM ベースの地図配信は
+  `etzhayyim/com-etzhayyim-maps`（maps.etzhayyim.com、live）が既に持つ。
+  6312 側が所有するのは POI curation・掲載/スポンサーのガバナンス・課金。
+- **AMap の中国固有事情は採らない。** GCJ-02 座標オフセット・測絵資質・
+  ICP 備案は日本で運用する本 actor には不要。参照するのは UX と
+  データモデル構造だけで、座標系は WGS84 のまま。
+
+## 実装（2026-07-27 完了）
+
+着地先: `cloud-itonami-isic-6312` `e723bd6`（repo 内 `docs/adr/0002-map-slice.md`
+が実装側の正本）／`kotoba-lang/industry` `e2e500e`／superproject west pin
+`186c5e1`。
+
+| 項目 | 状態 |
+|---|---|
+| `poi` / `lei-entity` エンティティ（MemStore・DatomicStore 両方、同一 contract） | 完了 |
+| `:poi/publish`（`:geo-editor` ロール）/ `:poi/search`（governed geo 開示） | 完了 |
+| governor 8 checks → 11（HARD 8 / soft 3） | 完了 |
+| `kotoba-lang/map` の消費（`portal.geo` / `portal.map-bridge`、pin `98e87b4`） | 完了 |
+| operator console の地図セクション（build 時 actor 実走、2回実行で byte-identical） | 完了 |
+| registry entry 6312 の name を実態に更新 | 完了 |
+| Managed tier の価格 | **未着手**（下記） |
+
+追加した 3 つの HARD gate:
+
+- **`entity-verification-gate`** — 商用 POI が法人識別子を持たない、LEI が
+  未登録または失効、あるいは claimed ISIC がレジストリ記録と矛盾する場合に
+  拒否（ISO 17442 + FTC Act §5）。捏造・陳腐化した店舗掲載への構造的防御。
+  ISIC 不一致を通すと下流の `:company/lei` join が静かに壊れるため矛盾も HARD。
+- **`residential-privacy-gate`** — 個人名と結び付いた居住地 POI を拒否
+  （個人情報保護法 第2条第1項 / GDPR Art.4(1)）。承認者 override 不可
+  （居住者の同意を運用者が代行できない）。氏名の無い住所は対象外。
+- **`geo-bounds-gate`** — 不正/NaN/欠落座標、運用者の宣言サービス範囲外を拒否。
+  法的でなく構造的な proxy であることを明記。
+
+いずれも advisor が confidence 0.95 で提案しても止まることを test と demo の
+両方で実証。`:poi/publish` は `:listing/publish` より 1 phase 遅れて解禁
+（レジストリ未配線の運用者に pin を publish させない）。`:lei` / `:isic-code`
+は `:tier/analytics`、`:subject-name` は `:tier/audit` のみ。
+
+検証: `clojure -M:dev:test` 71 tests / 316 assertions 0 failures（着手前は
+35/141）、`:market-data` 込みで 73/323、`clojure -M:lint` errors 0 warnings 0、
+`clojure -M:dev:run` の 13 op demo が文書どおりの disposition、
+`clojure -M:dev:render-html` は 2 回連続実行で byte-identical。
+
+**未検証面を隠さない**: POI の ISIC コードは運用者申告であってレジストリ発行
+ではなく、解決済み LEI 記録との「矛盾」チェックにのみ使う
+（`facts/poi-coverage` の note に明記し、note の記載自体をテストで検証）。
+
+## 残作業
+
+- **Managed tier の価格**は pricing-intelligence の実競合調査を経てから決める。
+  既存 3 flagship の ¥80,000/月 を無検証で流用しない。
+- `industry` registry の 6312 `:operating-states` が汎用既定
+  （`[:intake :provision :route :bill :support :audit]`）のままで、本 actor の
+  実際の流れ（intake → advise → govern → decide → commit/hold）と一致していない。
+  isic-6310 は `[:intake :advise :govern :approve :commit :audit]` を持つ。
+  本 ADR のスコープ外として触っていない。
+- `industry` の `maturity-summary counts tiers` テストが 458 を期待するが
+  registry は 459 implemented。**本作業以前から origin/main で失敗**しており、
+  どの vertical の昇格分かの帰属確認が要るため直していない。
+- geo 相当の technology は `kotoba-lang/technology` のレジストリに存在しない。
+  未登録キーワードを industry 側に足すと語彙の負債になるため
+  `:required-technologies` は変更していない。追加するなら technology repo に
+  正式な entry を起こす（同 repo は datoms 形式に移行済み）。
+
+## 参照
+
+- ADR-2607012100（cloud-itonami org、本 ADR と同日に実態へ更新）
+- ADR-2606302300（4-org taxonomy）
+- ADR-2607122300（flagship maturity sprint — デモは build 時 actor 実走）
+- ADR-2607161745（flagship Managed-tier Stripe live 化）
+- ADR-2607161930 / 2607161940（aozora.app distribution actor）
+- ADR-2607031400（one blueprint = one actor 規約）
+")))

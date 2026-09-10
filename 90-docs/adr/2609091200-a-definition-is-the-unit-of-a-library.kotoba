@@ -1,0 +1,139 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609091200-a-definition-is-the-unit-of-a-library")
+ (:adr/title "A definition is the unit of a library: kotoba.string as 59 repos plus a facade")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-09")
+ (:adr/authority "owner directive, 2026-09-09")
+ (:adr/body "Owner directive, 2026-09-09: stop at clojure.string and use kotoba.string --
+and do not bundle it into one lib or one repo. Split it, sub-imports included,
+one repo at a time in the kotoba-lang org, with libraries re-importing each
+other. IPLD- and Unison-shaped library management.
+
+## What changes
+
+The unit of a library becomes the DEFINITION, not the namespace.
+
+kotoba.lang.text was one file, 828 lines, 59 definitions, one repo. It becomes
+59 repos -- one per definition -- plus a facade, kotoba.string, that holds no
+implementation and re-exports them. Each definition repo names, in its own
+deps.edn, exactly the definitions its body reaches. Nothing else.
+
+The name follows clojure.string rather than the layer it used to sit in. That
+also separates two things that were sharing a prefix: kotoba.lang.* keeps the
+LANGUAGE (capability-*, conformance.*, code-identity), and the standard library
+moves out to kotoba.* -- kotoba.string, and on the same argument kotoba.coll,
+kotoba.edn, kotoba.fs, kotoba.io, kotoba.http, kotoba.process, kotoba.spec.
+That is the same cut Clojure makes between clojure.core and clojure.string.
+
+## The dependency graph is measured, not designed
+
+The split follows the edges the code already has. 59 definitions, 55 edges, 26
+leaves, acyclic, topologically ordered 59/59. Examples:
+
+  split          -> match-spans
+  split-lines    -> split
+  trim / triml   -> java-whitespace?
+  capitalize     -> lower, upper
+  rewrite        -> match-spans, replacement-for
+  replace        -> rewrite
+  format         -> fmt-one, re-find, spec-re
+
+match-spans is the single definition that touches the host regex engine, and
+after the split that is visible in the DAG rather than in a comment: every
+regex-shaped function reaches it and nothing else does.
+
+The graph was extracted twice before it was believed. The first attempt matched
+identifiers without skipping strings and comments and reported `split` -- which
+is implemented on top of match-spans -- as a leaf, because every docstring in
+that file names the functions around it. The second checked only a token's
+FIRST occurrence, so `trim` came out a leaf too: the first `java-whitespace?`
+in its form is inside prose. Both were caught by reading the implementations
+that the graph claimed had no edges.
+
+## What was verified before any repo was created
+
+The existing 33-input parity corpus, which compares this implementation against
+clojure.string as an ORACLE, was pointed at the split kotoba.string: 6,530
+assertions, 0 failures. The one error is a test that opens
+src/kotoba/lang/text.cljc by path to assert the namespace no longer requires
+clojure.string -- an assertion about file layout, not about an answer, and that
+file does not exist in this layout.
+
+So the split changes no answer. That was established with a local :local/root
+tree, before a single GitHub repo existed.
+
+## Consequences, stated rather than discovered later
+
+- A private definition stops being private. defn- and ^:private both had to go:
+  another repo has to be able to require what it depends on. 14 of the 59 were
+  private.
+- A facade that re-exports must bind vars, not :refer them. A first version
+  used :refer, which makes the names usable inside kotoba.string and leaves
+  kotoba.string/split unresolvable from outside -- the one thing a facade is
+  for.
+- Every definition that shadows clojure.core needs its own :refer-clojure
+  :exclude. The list is taken from the namespace being split rather than
+  guessed, so the pieces cannot disagree with the whole they came from.
+- Dependencies are pinned by content, in topological order: a repo is pushed
+  only after everything it reaches has been pushed, and it names those at the
+  sha they were pushed at. That is the IPLD half of the directive.
+- kotoba.lang.text stays where it is for now. Nothing is deleted until the call
+  sites move, and the call sites are ~11,900 files.
+
+## Where this got to
+
+Every kotoba.lang namespace with its own repository is split: 23 families, 471
+definition repositories, all registered in west. Each was verified the same way
+-- the family suite run twice against identical assertions, once through the
+source namespace and once through the assembled one, requiring the same numbers,
+and then the facade broken to watch that run go red.
+
+The tools are scripts/split-namespace/ (extract, scc, generate, unfork) and
+their README carries the pipeline, the verification recipe and every refusal.
+They stop rather than produce something that looks right, and each refusal came
+from a failure that was silent at generation, commit and push and showed up only
+at load -- or never. The ones worth naming here:
+
+- A reference scan that only started a token at a letter made ->ymd invisible,
+  so ->iso8601 came out with no edge to it and its repo did not compile.
+- The same scan read through KEYWORDS, so (def levels [:trace :debug ...]) gave
+  levels an edge to each of the six functions of the same name and condensed
+  twelve definitions into one false cycle -- one repo where there should have
+  been twelve.
+- deps.edn was emitted on the count of family-internal dependencies alone while
+  the ns form counted internal-or-external, so a repo whose only dependency was
+  external got the require and not the dependency. kotoba-lang/fs-split could
+  not be loaded from its own main.
+- External pins came from a local checkout tip rather than the sha the source
+  repository declares. kotoba.lang.store's split was handed newer fs and io
+  than it pins and its suite failed ten assertions with nothing wrong in the
+  split.
+- Passing the scc output alone -- no DEF lines -- wrote 19 repos with zero
+  dependencies each and reported success.
+
+## What the assembled namespace does not carry
+
+Four kinds of name, each measured rather than reasoned about, and each named in
+the generated docstring so the omission is not silent:
+
+- VALUE VARS. (def x other/x) copies; for a value that makes with-redefs
+  through the facade a silent no-op. On kotoba.lang.edn three assertions passed
+  against nothing at all.
+- PROTOCOLS. Identity is what extend-type and reify dispatch on; a copy makes an
+  implementation silently extend nothing. See adr-2609091900, which also records
+  how the two-protocol fork was removed.
+- RECORD TYPES. A type is not a var: (:require [ns :refer [RNG]]) fails at load.
+  The constructors ->RNG and map->RNG are functions and cross fine.
+- MACROS. A macro var cannot be copied at all -- (def are other/are) is a
+  compile error, Cant take value of a macro.
+
+kotoba.coll spent part of a day exporting seven of twenty-seven names because
+its facade was generated before the namespace grew and never regenerated. All
+thirty-one definition repositories existed the whole time; only the namespace
+that assembles them was stale, and nothing said so.
+
+## What this still does NOT decide
+
+Whether the source namespaces are eventually deleted. Nothing is deleted until
+the call sites move, and the call sites are ~11,900 files.")
+))

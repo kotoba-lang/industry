@@ -1,0 +1,115 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608271900-murakumo-readiness-reports-a-dead-node-online")
+  (:adr/title "murakumo の /ready が死んだノードを online と答える — 心拍が来なかったことと、来て正常だったことが同じ値になる")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/tags (vector "murakumo" "fleet" "readiness" "fleet-ci" "placement" "measurement"))
+  (:adr/related (vector "adr-2608111721" "adr-2608136000" "adr-2608271450" "adr-2608221300"))
+  (:adr/body "## What was measured
+
+`api.murakumo.cloud/ready` reports the fleet healthy while one of its eleven
+nodes has been dead for a day, and CI has been failing on that node for five.
+
+    /ready        online 11/11,  offline [],  ok true,  fresh true
+    tailscale     100.101.27.85  naphtali  offline, last seen 1d ago, rx 0
+    ping          2 packets transmitted, 0 received, 100.0% packet loss
+    fleet-ci log  ssh timeouts to naphtali on every tick since 2026-08-23
+
+## The mechanism, proven rather than inferred
+
+Two samples of `GET /nodes`, 21 seconds apart:
+
+    naphtali  ts=1787815895132  load1=None  free-gb=None
+    naphtali  ts=1787815916155  load1=None  free-gb=None
+
+**The timestamp advances while the node reports no metrics at all.** In the
+same response, ten of the eleven rows share a `ts` within 20 ms
+(…862131–…862152) while `gad` carries its own — the signature of one collector
+stamping every row with its own clock, not eleven nodes reporting
+independently.
+
+`readiness.cljc/live-node?` then sees a fresh `ts` and a stored
+`:reachable true` and calls the node live. The namespace docstring states the
+invariant this defeats, in its own words:
+
+> A stored descriptor is inventory; only a recent hwmetrics observation may
+> call a node online.
+
+The row **is** inventory. It is wearing an observation's timestamp.
+
+A second path fails differently: `GET /nodes/naphtali` returns
+`ts: None, reachable: None, online: True` — echoing a stored `online` claim
+that `public-node`'s own docstring says never to copy (*they were historically
+static and outlived the processes they described*).
+
+## Why this is expensive, not untidy
+
+ADR-2608111721 gives placement authority to `murakumo.task.plan` over
+`:fleet-inventory`. An inventory that calls a dead node live keeps placing work
+on it. Measured on the tick running at 2026-08-27T07:02Z:
+
+| | |
+|---|---|
+| ssh timeouts to naphtali, this tick alone | 66 |
+| distinct dependencies shipped at a dead host | 33 |
+| timeouts today | 1,490 |
+| tick runtime with no receipt signed | 37+ min |
+
+At ~20s per timeout that is roughly 22 minutes of one tick spent posting
+packages to an address with nobody at it. The tick cannot finish, so it cannot
+sign a receipt — **so nothing about CI can be verified at all while this
+persists.** Five days of it, with the fleet's own health signal reporting
+`ok: true` throughout.
+
+## This is the day's recurring failure, at the top of the stack
+
+2026-08-27 produced the same shape in six unrelated systems: a value that means
+*I could not measure* returned identically to *I measured, and it is fine*.
+
+| where | could-not-measure | looked like |
+|---|---|---|
+| hyakka ingest | 401 from a pinned, unserved model | a growing wiki (ADR-2608271450) |
+| fleet-ci lock | `mkdir` failing on a full disk | `another tick holds the lock` |
+| dashboard build | output written to `hermes_cli/web_dist` | `web/dist` never appearing |
+| `npx --yes npm@11.17.0` | flag misparse | npm 10.2.2 reporting success |
+| `du -ch \\| tail -1` | last xargs batch only | 25 GB instead of 179 GB |
+| `stat -f '%z'` | GNU coreutils `-f` = filesystem status | 86,850 lines summing to 0.0 GB |
+| **this** | **no hwmetric arrived** | **`online: true`** |
+
+The last two were my own tools, mid-investigation, while writing about the
+first four.
+
+## Decision
+
+**Not fixed in this session, deliberately.** The change lands in
+`network-awai/local-murakumo`, a live shared Worker whose output placement
+depends on, and getting it wrong in the other direction — marking live nodes
+dead — idles the fleet. The owner should choose.
+
+Two moves, and they are separable:
+
+1. **Unblock CI now.** Mark naphtali down in whatever the collector reads, so
+   placement stops choosing it. This does not touch semantics and makes (2)
+   unhurried. It still writes to the inventory placement depends on, so it
+   needs an explicit go.
+2. **Fix the semantics.** A row nobody heard from must not be stamped: drop the
+   `(:ts snapshot)` fallback in `observed-at`, stop echoing stored `online` in
+   the single-node route, and let a silent node age out. `:reachable` must come
+   from a measurement rather than from inventory.
+
+## Resume
+
+```bash
+curl -sS https://api.murakumo.cloud/nodes | \\
+  python3 -c 'import json,sys; [print(n[\"name\"], n.get(\"ts\"), n.get(\"load1\")) for n in json.load(sys.stdin)]'
+tailscale status | grep naphtali
+grep -c 100.101.27.85 ~/.gftd/fleet-ci-tick.log
+```
+
+Source: `orgs/network-awai/local-murakumo/src/local_murakumo/readiness.cljc`
+(`observed-at`, `live-node?`, `public-node`, `fleet-summary`) and the
+`/nodes/<id>` route in `routes.cljc`.
+
+**Do not read a green `/ready` as evidence that the fleet can do work until
+this is closed.** It currently answers a different question: whether a row was
+written, not whether a machine answered.")))

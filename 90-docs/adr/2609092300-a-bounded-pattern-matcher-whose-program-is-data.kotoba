@@ -1,0 +1,108 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609092300-a-bounded-pattern-matcher-whose-program-is-data")
+ (:adr/title "A bounded pattern matcher whose program is data")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-09")
+ (:adr/authority "owner instruction, 2026-09-09")
+ (:adr/repos "kotoba-lang/pattern")
+ (:adr/related "adr-2609092200-the-build-is-a-value-and-the-easy-one-is-kiyaku, adr-2609092100-re-frame-and-reagent-in-kotoba, kotoba-lang/app-browser-author")
+ (:adr/body "Owner instruction, 2026-09-09: \"do it\" -- the pattern surface recommended at
+the end of ADR-2609092200, where the browser stack was counted and regex, not
+size, turned out to be what blocks it.
+
+## The decision
+
+`kotoba-lang/pattern` (new repo, registered in west): a bounded pattern
+matcher whose PROGRAM IS DATA.
+
+  kotoba/pattern_core.kotoba   the machine. Empty requiredCapabilities.
+  src/pattern/compile.cljc     regex subset -> program. Host-side, portable.
+
+A program is `{:code [[op a b] ...] :classes [[lo hi ...] ...] :fold bool}` --
+inert EDN. It can be printed into a `.kotoba` module as a literal, shipped in a
+resource, or read at runtime with `document-edn-read`. The machine never
+parses anything, so it cannot be made to reject its input; the compiler is the
+only part that can refuse, and it runs before the guest does.
+
+## A Pike VM, not backtracking
+
+`(a+)+b` against a page of a's is the standard denial of service, and this
+workspace matches input it did not write. The run carries a LIST of live
+threads deduplicated by program counter rather than a stack of choices, so
+each input position is visited once.
+
+That is measurable rather than asserted. At `--fuel 20000`, with the dedup
+removed the machine dies of `doc-vector-too-large` from EIGHT a's; with it,
+twenty-four answer. The parity corpus carries those long inputs on purpose --
+without them it passed either way, which is a test that was not testing.
+
+## What was verified
+
+  216/216 against the host's own RegExp, through the ESM amu emitted, over a
+  corpus drawn from the real literals plus the boundary of each construct.
+
+Both sides run: the oracle is JavaScript's RegExp (the engine the .cljc side
+actually uses), and the port is the artifact driven through programs the
+compiler produced from the same strings. Breaking the dedup turns exactly the
+four long-input checks red with the trap named.
+
+Two differences are deliberate and asserted rather than discovered later:
+`.` matches a newline here, and the machine is leftmost-LONGEST while JS is
+leftmost-first (`a|ab` on \"ab\" answers 2, not 1).
+
+Refused by name rather than by silence, with the count each has in the corpus:
+lookahead and lookbehind (2), back references (0), non-greedy quantifiers (3),
+inline flags other than a leading (?i) (5). A pattern this cannot express must
+not compile to one that means something else.
+
+## Coverage of the thing it was built for
+
+Compiling every unique regex literal in htmldom, cssom, browser, html, css and
+kiyaku: 200 scraped, 183 admitted, 7 of the refusals not patterns at all
+(multi-line scrape artifacts). So 183 of 193 real ones, and what is left names
+itself in frequency order: (?s)/(?m) 5, non-greedy 3, lookahead 2.
+
+## Three things measured along the way
+
+  * THE DEFAULT FUEL BUDGET CANNOT RUN A MATCHER. 512 per instance -- a plain
+    countdown returns at n=510 -- and fuel is charged per function entry, so
+    the default does not finish a six-character search. `--fuel 5000` runs a
+    40-character one. The knob is the host's, which is the point of it.
+
+  * CLOJURESCRIPT HAS NO CHARACTER TYPE. `(vec \"ab\")` yields the STRINGS \"a\"
+    and \"b\" and `(int \"a\")` is 0, so a `.cljc` compiler needs an explicit
+    code-point helper. Without it every literal compiled to code point 0 and
+    the programs still had the right SHAPE -- the kind of wrong a structural
+    test calls correct. The parity test against a real engine is what caught
+    it.
+
+  * AN ENTRY THAT CALLS THE MACHINE IS REFUSED. A `main` that calls
+    `match-end-at` makes the compiler answer `{:error :value, :code
+    :kotoba/internal-error, :message \"value is not a boolean\"}` at the :value
+    phase, where the compile-time evaluator runs the entry. `kotoba -M check`
+    passes, the same module compiles for the JS backend, and the emitted
+    machine answers correctly. Raising --fuel does not change it, and it is
+    deterministic over three runs. It could not be reduced to a small
+    reproducer in six attempts.
+
+    So this repo does NOT use `kotoba -M test` -- the runner evaluates every
+    `test-*` through the same evaluator -- and `main` returns a constant.
+    `test/entry_probe.cljs` rebuilds the failing form FROM the current source
+    and goes RED the day the compiler stops refusing it, so the workaround is
+    removed rather than inherited.
+
+    That probe first reported \"the limitation is gone\" because it read only
+    stdout while the diagnostic went to both streams. A probe that lies in the
+    reassuring direction is worse than no probe; it now reads both and prints
+    what it saw.
+
+## What this is not
+
+Not captures. 102 of the 308 literals use a group and many are grouping rather
+than capturing; opcode 5 (`save`) is reserved and `search` answers where, not
+what.
+
+Not a consumer cutover. No port has been rewritten to use this yet. The
+cheapest first consumer is `kiyaku.account`'s postal validation -- six country
+formats, all admitted by the subset -- and after that htmldom's eleven.
+")))

@@ -1,0 +1,89 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809081900-disk-reclamation-gftd-cutover-ipfs-evacuation")
+  (:adr/title "満杯のディスク（空き 669 MB）を回収し、fleet-ci キャッシュ掃除を機構化し、~/.gftd を ~/.itonami へ段階移行し、local IPFS の pin を ipfs.kotobase.net が読む R2 tier へ退避する（accepted）")
+  (:adr/status :accepted)
+  (:adr/date "2026-09-08")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/related (vector "ADR-2609061800" "ADR-2608136000" "ADR-2607300900"
+                "ADR-2608159100" "ADR-2608039970" "ADR-2607072000"))
+  (:adr/context
+  "2026-09-08、460 GB のボリュームで空きが 669 MB になった（97-100%）。
+測って分かった内訳の主犯は 3 つで、どれも `無い規則は守られない` の実例だった。
+
+1. `~/.gftd/fleet-ci-cache` が 41 GB。`scripts/fleet-ci/prune-cache.cljs` は
+   存在し正しく動くのに、**LaunchAgent から一度も参照されていなかった**。
+   スクリプトの docstring 自身が `nothing has ever deleted one` と書いていた。
+2. awai bot が tick ごとに worktree を作り、1 つも消していない（912 本、22 GB）。
+3. `/private/tmp` に 3 日超の scratch が 2,186 件（7.1 GB）。
+
+加えてオーナーから 2 つの指示が入った ——(a) local IPFS を ipfs.kotobase.net へ
+退避 (b) `.gftd` という名称を `.itonami` へ変更。")
+
+  (:adr/decision
+  "**1. fleet-ci キャッシュ掃除を機構化した。**
+`scripts/com.gftd.fleet-ci-cache-prune.plist` を追加し日次で `--max-age-days 3
+--apply` を回す。保持を script 既定の 7 日でなく 3 日にしたのは、7 日だと残存分
+だけで 24.4 GB を実測したため。prune は west.yml が pin する sha を全て保持し、
+誤削除の代償は `git archive` 1 回 ——**遅いだけで誤りではない**ので、頻度を上げる
+側に倒せる。単発で 25.1 GB を回収し、以後は機構が保つ。
+
+**2. `~/.gftd` を `~/.itonami` へ移した（退役計画の 1-2 段目のみ）。**
+`manifest/gftd-retirement.edn` は `staged cutover only` と `remain untouched`
+を明記しており、**plain mv を禁じている**。実体を `~/.itonami` に置き、
+`~/.gftd` は互換 symlink として残した。job の個別移行と symlink 撤去は未実施。
+
+**3. local IPFS の pin を R2 tier へ退避した。**
+19,193 ブロック / 4.4 GB を `kotobase-graph-database-production` の
+`ipld/<cid>` へ複製した。これは ipfs.kotobase.net の Worker が既に読む鍵空間で、
+ADR-2608159100 の永続化境界に一致する。目録は
+`~/.itonami/ipfs-evacuation-20260908/`。")
+
+  (:adr/consequences
+  "空きは 669 MB から 32 GB になった。`~/.gftd` は 44 GB から 15 GB。
+
+**ipfs.kotobase.net は今まで内容を保持していなかった。** Worker の docstring が
+`this Worker does not create retrievable content` と書いており、B2 archiving は
+off、bucket は空で、全ヒットが swarm への fallback だった。実測 `findprovs` は
+これらの CID の provider を **1 つ（このマシン）** だけ返した ——つまり
+`~/.ipfs` を消せば、gateway が 200 を返していたにもかかわらずデータは
+永久に失われていた。退避後は R2 が実際に配信する。
+
+**未着地の 3 点**（この closing 時点）:
+- `/private/tmp` の 7.1 GB と awai worktree 573 本の削除は、auto mode の分類器が
+  bulk 削除を拒否するためオーナー実行待ち。script は dry-run 既定で用意済み。
+- `~/.ipfs` 4.4 GB の削除は未実施（不可逆、かつ削除すると R2 が唯一の複製になる）。
+- `com.gftd.fleet-ci-cache-prune` は名前が `com.gftd.*` なので、退役時に移行すべき
+  job が 45 から 46 に増えた。")
+
+  (:adr/evidence
+  "**検査は、それが名乗る理由で答えたことを確かめてから pass にした**（ADR-2608136000）。
+
+IPFS 退避の検証は **local daemon を停止した状態**で行った。daemon が動いていれば
+200 は `kotobase が自分のマシンから取ってきた` を意味しうるので証拠にならない:
+- 負のコントロール: swarm に一度も出していない新規ブロックが upload 前 504 /
+  upload 後 200 かつバイト一致
+- raw ブロック 6/6 がバイト一致（daemon 停止中、未取得 CID を選択）
+- 複数ブロックの DAG root 4/4 が 200 で再構成（同条件）
+- S3 head-object のサンプル 60/60 present
+
+**誤結論しかけた 3 点を記録する（どれも `切られた/遅れた出力` が原因）:**
+1. `wrangler r2 bucket list` が 20 件で切れており bucket 不在と判断しかけた。
+   `bucket info` が 909,445 objects / 74.5 GB を返して訂正。
+2. upload 直後の `object_count` が +163 しか増えず sync 失敗と読みかけた。
+   集計の遅延で、head-object では 60/60 存在。
+3. awai worktree を 200 本 sample して `ahead=0` と報告したが、912 本の全数では
+   **84 本が origin/main より先行**していた。sample を全数の代わりにしない。
+
+cutover の検証: 署名鍵・boot seed・credential が両パスで同一サイズ、稼働中の
+`com.gftd.fleet-ci-tip-tick`（PID 41870、rename 前後で同一）が rename 後の
+17:53:38 に実書き込み、旧パス設定の job が新実体へ書けることを実測。")
+
+  (:adr/gaps
+  "**secrets-location-map の記述と実態が乖離していた（同 skill 自身の注意 2 の追加事例）:**
+- Keychain `gftd.cf` / `API_TOKEN` は **失効している** —— R2 だけでなく
+  `/accounts` でも `Invalid access token`。skill は 2026-08-25 実測として
+  R2 権限ありと書いていた。
+- 動いた経路は global key から発行した **bucket 1 個・object 読み書き・TTL 付きの
+  一時鍵**。`rclone` は session token でハングする（exit 124）ので `aws` CLI を使う。
+
+これらは同 commit で `references/cloudflare.md` に反映した。")))

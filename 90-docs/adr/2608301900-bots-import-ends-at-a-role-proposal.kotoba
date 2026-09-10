@@ -1,0 +1,163 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608301900-bots-import-ends-at-a-role-proposal")
+  (:adr/title "hermes / grok からの bots import —— 終点は role 提案であって Bot ではなく、壊れている bot は止まった役として輸入する")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-30")
+  (:adr/tags (vector "cloud-itonami" "bots" "import" "hermes" "grok" "loop-yakuwari" "murakumo"))
+  (:adr/related (vector "adr-2608300200" "adr-2608221700" "adr-2608136000" "adr-2608301700"))
+  (:adr/body "# bots import は Bot を作らない —— 作れるのは名簿だけ
+
+## Context
+
+オーナー指示（2026-08-30）「cloud itonami bots に hermes agent bots, grok bots からの
+bots import 機能をそれぞれつけて」。
+
+このアカウントで実際に bot を持っている外部の面は 2 つある:
+
+| 面 | 実体 | 2026-08-30 の実測 |
+|---|---|---|
+| **hermes** | Nous Research の Hermes Agent。定期 bot は `~/.hermes/cron/jobs.json` の cron job | job 1 件（`mailbox-triage`）。paused、`no_agent: true`、prompt 空、script `mailbox-triage.py`、failure_streak **111**（M365 の login 切れ） |
+| **grok** | AWAI Grok Bots clean-room API（`network-awai/local-murakumo`、ADR-2608300200） | `/api/v1/grok-bots/runtime` は 200 で bot `default` / status `held` / `budget-exhausted`。`/bots` は token 無しで **401** |
+
+## Decision
+
+### 1. import の終点は role 提案であって Bot ではない
+
+Cloud Itonami の Bot は `loop-yakuwari` が役を宣言し、`itonami bots provision` が
+それに合わせることで存在する（provision は「Bot を作ることも grant を広げることも
+できない」）。import が Bot を直接作れると、**governed identity の生まれ方が 2 通りに
+なり、名簿が「誰がここで働いているか」の答えでなくなる。**
+
+したがって `cloud.itonami.app.bot-import` の出力は `:yakuwari/…` の map である。
+着地は loop-yakuwari への git 変更で、Bot は次の provision で現れる —— 手で書いた役と
+同じ経路。
+
+### 2. import できない bot は、理由つきで別の列に出す
+
+`mailbox-triage` は **import できない**。work が Python script で、Cloud Itonami Bot の
+tool set には実行する道具が無い。黙って objective 空の役を作れば、下流の
+`yakuwari.spec` が「目的を述べられない役は reviewable でない」と拒否し、
+**エラーは source bot ではなくこのアプリケーションについて語る**ことになる。
+
+除外理由は 5 つ（role key を作れない / script で objective が無い / objective が空 /
+40 字未満 / **1000 字超**）。最後は `bot/max-responsibility` で、
+ADR-2608221700 の実測どおり **1 役の objective が長いだけで 92 役全部の provision が
+拒否される** —— import の側で先に言う。
+
+### 3. 壊れている bot を「動いている役」として輸入しない
+
+`desired-scale` は enabled かつ failure-streak 0 かつ last-status が
+error/held/paused でないときだけ `:desired 1` を返す。それ以外は
+**`{:min 0 :desired 0 :max 1}`** —— 役は名簿に載って review できるが、走らない。
+failure_streak 111 の job を 15 分 cadence で既に oversubscribed な fleet に乗せるのは、
+import ではなく事故の複製である。
+
+同じ理由で **cadence は 15〜1440 に clamp** する（`workforce.edn` が「cadence は
+天井であって約束ではない」と書いているとおり、1 分と書いても誰も守らない）。
+
+### 4. capability は source から写さない
+
+提案される capability は `:metrics.read` / `:issue.create`（autonomous）、
+`:patch.create`（**approval-required**）、`:spend.commit`（blocked）に固定。
+**その bot が Hermes で何をできたかは、ここで何をしてよいかの証拠にならない。**
+写せば import が grant を広げる経路になる。
+
+### 5. 読めなかった source は「bot 0 体」と同じ顔をしない
+
+hermes home が無い / jobs.json が壊れている / `MURAKUMO_SERVICE_TOKEN` が無い /
+HTTP エラー —— どれも throw する。`:available 0` は **読めた後にだけ**印字される
+（ADR-2608136000）。
+
+### 6. CLI
+
+```
+itonami bots import hermes [--home <hermes-home>] [--business <slug>]
+itonami bots import grok   [--base <url>] [--business <slug>]
+```
+
+`:already-present` は `itonami bots list` の実名と大小文字無視で突き合わせる —— 
+再実行できない import は import ではない。
+
+## Consequences
+
+- **live 実測（2026-08-30）**: `bots import hermes` は `available 1 / importable 0 /
+  not-importable 1`、理由は script。`bots import grok` は token 不在で
+  `:bot-import/credential-required` を投げる。
+- **grok の認証経路は未測定である。** `/bots` は bearer を要し、
+  secrets-location-map が名指しする `LOCAL_MURAKUMO_SERVICE_TOKEN` は
+  その vault に無い（索引自身が `no such item` と書いている）。
+  したがって pin できたのは (a) token 不在の拒否 (b) **公開 `/runtime` の実応答**を
+  fixture にした merge（held / budget-exhausted / interval_ms 3600000 → cadence 60 /
+  desired 0）だけで、認証済み一覧の実呼び出しは**まだ 1 度も走っていない**。
+- **両方向を見せた。** `exclusion` を常に nil にすると、script job・1000 字超・
+  短すぎる objective の分類 assertion が赤くなる。無改変では
+  2107 tests / 12518 assertions / 0 failures。
+- test の grok fixture は今日の実応答であり、hermes fixture は今日の実 job である。
+  健康な bot だけを相手にした converter は正しく見えて、その 2 つを両方
+  15 分 cadence で起こす。
+- **足していない source**: OpenAI の GPTs、Slack bot、claude.ai routine。
+  この 2 つを選んだのは「このアカウントで実際に bot が走っている面」だから。
+  足すときは `read-source` に 1 branch と、その面の実応答 fixture を 1 つ。
+
+
+## 着地（2026-08-30）
+
+`cloud-itonami/cloud-itonami-app` merge `509f557`、west pin `91db6216`。
+suite 2117 tests / 12569 assertions / 1 failure（`every-authority-ships-disabled`。
+#236 由来で `origin/main` 自身が赤く、この変更のものではない）。
+
+resident は release `509f557`（= この merge）で走っており、CLI shim も同じ release を
+指しているので、`itonami bots import hermes` / `... grok` は**そのまま使える**。
+入れ替えで踏んだ罠（`kickstart` が plist を読まない / CLI の headless server が
+port を奪って env を欠く）は ADR-2608301800 の着地節に記録した。
+
+**grok 側の認証済み `/bots` は依然として未測定** —— bearer が無い。
+
+## 再測定（2026-08-31）—— 基盤が 14 倍になり、結論は同じで、理由が変わった
+
+この ADR が根拠にした hermes 側の実測（`available 1 / importable 0 /
+not-importable 1`、理由 script）は**もう現在地ではない**。同日中に hyakka 3 /
+otent 6 / coverage 2 / itonami 2 が作られ、`~/.hermes/cron/jobs.json` は
+**14 job（13 enabled）**になった。
+
+`itonami bots import hermes` を回し直した結果（wall 41.4s、peak RSS 1,341 MB）:
+
+    importable 0 / not-importable 14 / already-present 0
+    次の一手: role になる bot はありません。
+
+**結論は変わらない。変わったのは理由である。**
+
+| 除外理由 | 件数 |
+|---|---|
+| objective が `bot/max-responsibility`(1000) 超過 | **12** |
+| work が script | 2 |
+
+    itonami-coverage-scout   6962 字  (7.0x)
+    itonami-ingest-scout     6572 字  (6.6x)
+    hyakka-source-scout      5096 字  (5.1x)
+    osm-coverage-scout       4191 字  (4.2x)
+    vuln-coverage-scout      4131 字  (4.1x)
+    hyakka-ontology-scout    3356 字  (3.4x)
+    otent-* 6 本             1176–1549 字  (1.2–1.5x)
+
+⚠ **最悪の 2 件は itonami という名前の bot 自身である。** 08-31 に install した
+2 体の scout は、Cloud Itonami の名簿が受け付けられない objective を持つ。
+名前が itonami であることと、この registry に登録できることは無関係。
+
+### これは converter のバグではない
+
+`bot.cljc` は `max-responsibilities 12` × `max-responsibility 1000` を許すので
+容量は 12,000 字あり、`role-proposal` は prompt 全体を **`:yakuwari/objective`
+1 本**に写している。「12 分割すれば通る」と読める —— **が、それは上限が守って
+いるものを壊す。**
+
+hermes の prompt は**どう働くかの運用手順**であり、yakuwari の objective は
+**何のための役かの記述**である。7 KB の手順書を 1000 字で 7 つに切っても、
+「目的を述べられない断片」が 7 つできるだけで、この ADR 自身が引いている
+`yakuwari.spec` の「目的を述べられない役は reviewable でない」に当たる。
+
+**上限は設計どおり働いている。** 2 つの面が持っている「bot の目的」の概念が
+違い、機械的な変換はその差を埋めない。import を通したいなら、変換規則ではなく
+**その役の目的を人が 1000 字で書く**必要がある —— それはまさにこの ADR が
+「着地は loop-yakuwari への git 変更」と定めた経路そのものである。
+")))

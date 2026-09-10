@@ -1,0 +1,160 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608170500-two-tranches-landed-437-repos")
+  (:adr/title "437 repositories left the JVM-only test tier in two tranches; the JVM debt itself is unchanged")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-17")
+  (:source/dataset "adr")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/context
+  "ADR-2608170200 measured the JVM surface across 4,163 registered checkouts.
+ADR-2608170300 built the gate that says whether a ClojureScript runner covers the
+suite it sits in. ADR-2608170400 turned '2,034 repos have portable tests and no
+runner' into a cost model and named the first tranche: 712 CLEAN, of which 322
+needed no classpath beyond their own source.
+
+This records what the tranches actually landed, and — more usefully — what they
+did NOT touch, because the headline number is easy to misread as progress on the
+JVM debt and it is not.")
+
+  (:adr/decision
+  "Two tranches, both verified before landing and both driven by tooling that is
+  landed rather than hand-rolled:
+
+  **Runner tranche** — generate `test/run_portable.cljs` for CLEAN self-contained
+  repos, run it on the DEFAULT-BRANCH tree, land only what passes.
+  `scripts/list-portable-runner-candidates.cljs` ->
+  `scripts/sweep-portable-runners.cljs` -> `scripts/land-portable-runners.cljs`.
+
+  **bb.edn tranche** — convert `:sci-test` bb.edn repos to an nbb test script
+  (ADR-2607173000 retired babashka as the script host), again verified on the
+  default-branch tree. `scripts/measure-bb-to-nbb-yield.cljs` ->
+  `scripts/land-bb-to-nbb.cljs`, which drives the existing
+  `scripts/bb_to_nbb_scaffold.cljs` against a WORKTREE rather than the shared
+  checkout.
+
+  **Pins move in batches.** `scripts/west-pin-put-batch.cljs` amortises the read
+  and the write of a 1 MB west.yml over N entries while keeping the per-entry
+  verification. It is landed because its write path was measured, not because it
+  looked right.")
+
+  (:adr/body
+  "## What landed
+
+| tranche | repos | tests now running under ClojureScript | FAIL |
+|---|---|---|---|
+| runner (`test/run_portable.cljs`) | **260** | 2,522 tests / 19,453 assertions | 0 |
+| bb.edn -> nbb | **177** | 890 tests / 15,159 assertions | 0 |
+| **total** | **437** | **3,412 tests / 34,612 assertions** | **0** |
+
+Plus, by hand earlier the same day: 5 runner repos, `kotoba-lang/nekko` (all 17 of
+its namespaces, 10 on nbb + 3 self-running + 4 compiled), and 2 cloud-itonami
+actors.
+
+Every one of the 437 was verified by running its generated artifact on the
+default-branch tree and requiring 0 failures. 265 of 265 runner PASS rows and 178
+of 178 bb PASS rows were processed; the 5 + 1 SKIPs are the idempotence check
+firing on repos landed by hand earlier.
+
+## Yields, measured rather than projected
+
+    runner tranche   265 PASS of 322 candidates   82%
+    bb.edn tranche   178 PASS of 181 candidates   98%
+
+The bb yield is higher because `:sci-test` is a much stronger precondition: the
+bb.edn had to already be a single `run-tests` scaffold. The 3 that failed name
+their own reason — `System/getProperty` twice and `cljs.core/ExceptionInfo` once,
+all three in the token classes ADR-2608170400 counts.
+
+## The batched pin, and why it needed proving
+
+Per-entry pin advance GETs and PUTs a 1 MB west.yml every time. Measured during
+the runner tranche the landing rate fell from 12s to ~38s per repo as concurrent
+sessions wrote west.yml and 409 retries piled up; ~200 pins that way is two hours
+of round trips.
+
+`west-pin-put-batch.cljs` makes it one round trip and keeps every check:
+
+  - each entry is verified against the server (reachable from the default branch,
+    `ahead` with `behind_by 0`)
+  - ONE blob-SHA precondition for the whole write, so a concurrent writer gets a
+    409 and it retries from a fresh read rather than forcing
+  - one entry failing verification drops that entry, never the check
+  - nothing is written if no entry survives
+
+Measured on the real queue, both directions:
+
+    102 of 102 entr(ies) verified -> committed d37ae9f
+      manifest/west.yml | 102 insertions, 102 deletions
+      added lines that are not `revision:` -- 0
+
+    75 of 177 verified -> committed c669c71
+      the other 102 dropped as already-at-that-pin
+
+So the write moves exactly the revision lines it claims to, and re-running is a
+no-op. The refusal paths were checked separately: already-at-that-pin, a sha not
+reachable from main (404 from compare), and an entry absent from the tip.
+
+## A defect I reported before measuring it
+
+While reading the bb converter's output I noticed it can put `'clojure.test`
+itself in the `run-tests` list, and wrote that it might therefore be in all 178
+landed conversions. It is not: checked across all 177 landed `package.json` files
+on their default branches, **0** contain it. The shape came from `ooyake`, which is
+one of the 3 repos that failed to convert and was never landed. The flag was
+right; the extrapolation was not, and the fix is to measure before saying how far
+something spread.
+
+## What this does NOT change
+
+The original question was where this workspace depends on the JVM. Re-measured
+after both tranches:
+
+| class | repos | change today |
+|---|---|---|
+| `.clj` sources — the JVM is the runtime | **954** | **none** |
+| third-party JVM jar in top-level `:deps` | **149** | **none** |
+| JVM build toolchain | 292 | none |
+| `bb.edn` | **363** in the detector | 177 retired ON MAIN; see below |
+| fleet gates on `:jvm-test` | 66 | 3 flipped by me, 13 added by other sessions |
+
+**Not one of the 954 `.clj` source repos or the 149 third-party-jar repos was
+touched.** What moved is the TEST tier: 437 repos whose portable suites ran only
+on the JVM now also run under ClojureScript, which is where a cljs-half defect in
+a `.cljc` becomes visible. That is a precondition for the JVM exit, not the exit.
+
+Also unchanged: the gate and the detectors read local checkouts, so none of this
+appears in their numbers until `west update` syncs them. The bb.edn row above is
+the honest form of that: the detector still counts 363 because the checkouts still
+hold the file, while on the default branches it is gone — spot-checked on three
+landed repos after fetching, `bb.edn` absent and `nbb.edn` present at the merge
+sha. Reading the same three BEFORE fetching reported `bb.edn` still present, which
+is the third time today a stale remote-tracking ref gave a confident wrong answer.
+Recorded rather than worked around.")
+
+  (:adr/consequences
+  "- 437 repositories gained a ClojureScript test tier, 3,412 tests / 34,612
+  assertions, with zero landing failures and zero forced pins.
+- Six scripts land as the reusable path: three for the runner tranche, two for the
+  bb tranche, and the batched pin. The next tranche starts from tools, not from a
+  transcript.
+- 186 bb.edn files remain, of which the classifier calls 167 `:complex` — those
+  need hand ports, and `emit-batch` should not be pointed at them.
+- The remaining runner work is named: 390 CLEAN-but-not-self-contained repos need a
+  classpath from `clojure -Spath`, 1,134 MIDDLE are unknown until run, 169 FLOOR
+  are definitely not portable, and 14 repos fail under ClojureScript for real
+  (`mst` 262 errors, `glyph` 49, `katex` 37, `arxiv` 14).
+- The JVM debt proper — 954 `.clj`-source repos and 149 third-party jars — is
+  untouched and remains the actual subject of ADR-2608170200.")
+
+  (:adr/evidence
+  (vector "scripts/west-pin-put-batch.cljs"
+   "scripts/land-bb-to-nbb.cljs"
+   "scripts/measure-bb-to-nbb-yield.cljs"
+   "west.yml batched pin commits d37ae9f (102) and c669c71 (75)"
+   "kotoba-lang/nekko 94a7d0d — all 17 namespaces under a ClojureScript host"))
+  (:adr/related
+  (vector "adr-2608170400-portable-tests-are-not-portable"
+   "adr-2608170300-cljs-runner-completeness-gate"
+   "adr-2608170200-jvm-dependency-surface-measured-repowide"
+   "adr-2607173000"))))

@@ -1,0 +1,28 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607183300-kami-media-automation-stems-professional-trim")
+  (:adr/title "KAMI media applications add automation stems and professional trim modes")
+  (:adr/date "2026-07-18")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607183200-kami-media-nondestructive-editing-meter-transition"))
+  (:adr/decision
+  (map (:daw (map (:automation (map (:unit :tick) (:parameter :track/gain) (:interpolation :linear)))
+         (:stems "Each project track can be isolated through the same OfflineAudioContext graph and exported as a named WAV stem.")))
+   (:nle (map (:trim-modes (vector :ripple-trim-out :roll-cut :slip-clip))
+         (:authority "All modes update clip source/timeline fields; render-segments consumes the edited values without a UI-only shadow model.")))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates (map (:daw (vector "recording" "arbitrary automation curves" "bus/send routing" "LUFS/true-peak" "stem bundle"))
+                                (:nle (vector "pointer trim gestures" "overlap compositing" "cross-dissolve" "proxy/cache" "color management"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "894f326" "a8e3d90"))
+   (:nle-commits (vector "e0c25d6" "981bb44" "77629b1"))
+   (:evidence (vector "DAW CLJC tests cover sorted tick automation and isolated track project construction."
+              "DAW Pages green; Chrome imported real audio, changed Synth automation 0.25→1.1 and exported kami-daw-stem-synth.wav (441044 bytes) without page errors."
+              "NLE CLJC tests cover ripple shift, slip source edit and roll boundary edit with exact frame assertions."
+              "NLE Pages green; real browser renders the professional trim controls without page errors."))))
+  (:adr/consequences
+  (vector "Automation and stem export now affect actual audio production instead of remaining project metadata only."
+   "NLE supports professional trim semantics through explicit commands; direct pointer gestures remain a separate ergonomic gate."
+   "Cross-dissolve remains unclaimed until two-source overlap is proven in the rendered master."))
+  (:adr/source-format "edn")))

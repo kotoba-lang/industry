@@ -1,0 +1,104 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608123400")
+  (:adr/title "The VPN LoadBalancer is a path the design already stopped using")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-12")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related (vector "ADR-2608122800"))
+  (:adr/body
+  "## The question
+
+ADR-2608122800 records an authorisation fail-open in the VPN provisioner, and
+notes that `service.yaml` in `gftdcojp/apps-gftdcojp` is `type: LoadBalancer` on
+ports 80/8080 -- **which is what made that defect externally exploitable rather
+than cluster-internal.** Is that exposure intended?
+
+## Answer: no, and it was already replaced
+
+`50-infra/k8s/vpn-provisioner/service.yaml`, namespace `vpn-system`, selector
+matching the Deployment's pod template, ports 80 to 8080 and 8080 to 8080,
+`type: LoadBalancer`. Verified identical across the checkout, the west pin, and
+the child repo's `main` (5 commits ahead, none touching `50-infra/k8s/`).
+
+**The same deploy that added the port-80 mapping also moved the caller off it.**
+The Phase 0c deploy notes in `2605252200-vpn-gftd-design.edn` record, in one
+entry: the LB port mapping, AND a Cloudflare Tunnel route added, a DNS CNAME to
+a `cfargotunnel.com` target, and the Worker secret `VPN_PROVISIONER_URL`
+repointed to that private hostname. `50-infra/prod/main.tf` corroborates it
+independently -- the tunnel ingress resolves
+`vpn-provisioner.vpn-system.svc:8080`, **the Service's in-cluster DNS name, not
+its external IP.**
+
+The intended caller list is exactly one, the portal Worker, and it reaches the
+pod internally. No CLI, no in-cluster consumer, no external health checker
+references the provisioner in either repo; the probes are node-local; and the
+wg-agent relationship runs the other way. **The LoadBalancer is a leftover from
+the iteration before the tunnel.**
+
+## Nothing is reachable today, and that must not be rounded to `it never mattered`
+
+The cluster is gone. `2606120930-...-vultr-winddown.edn` records, with owner
+approval: 2026-06-24, all app namespaces drained to zero replicas with the VPN
+service named in the blast radius; later the same day the SJC VKE cluster
+deleted and **all five LoadBalancers deleted**, the list naming the one backing
+`vpn-system/vpn-provisioner`; 2026-06-25, a decision not to revive on a
+replacement VPS.
+
+**But between 2026-05-26 and 2026-06-24 this Service held a real external IP on
+ports 80 and 8080** -- the June inventory lists it `:live true`. That is the
+window in which the fail-open auth was internet-reachable. ADR-2608122800's
+characterisation is correct for that period.
+
+What is true now is worse than harmless: the exposure is **latent in a manifest
+that is still named as the deployment surface**. `kotoba-lang/vpn`'s CLAUDE.md
+points at `50-infra/k8s/vpn-provisioner/`, and the repo is Phase 0 with
+production deploy gated on counsel. **The next apply reinstates it.**
+
+## The cost of fixing it is one line
+
+Because the tunnel resolves the Service by in-cluster DNS name, `ClusterIP`
+breaks nothing that is in use: the tunnel path is unaffected, probes are
+node-local, and the only thing lost is the abandoned LB-IP path that no
+configured caller uses. Port 80 can go with it -- nothing targets it.
+
+**This is not a trade-off. It is deleting a path the design already stopped
+using**, which is rarer than it sounds and is the main finding.
+
+The alternatives are worse here. A NetworkPolicy constrains who may reach the
+port but still assigns an internet-routable address and a billed LB; and
+`vpn-system` has never had one -- the only NetworkPolicies in the repo are
+scoped to a different namespace. An Ingress restricted to Worker egress is not
+applicable at all: Cloudflare Worker egress is not a stable address set, which
+is why the tunnel exists.
+
+## Two pieces of drift found on the way
+
+- ~~**The Worker source still teaches the abandoned path.**~~ -- **FIXED, merge
+  `f088a870303b3c4d78fe64120d4402a38e908fc2`.** The two places were
+  `appview/etzhayyim-vpn-portal/src/app.ts` and its `wrangler.jsonc`, both in
+  **`kotoba-lang/vpn`** (`gftdcojp/apps-gftdcojp` has no Worker source for this
+  app). Both now give the tunnel-hostname form and say why the LoadBalancer-IP
+  form is not it, citing this ADR and the June winddown. Corrected in the same
+  change that made the Worker refuse to call the provisioner without a
+  credential, because both are read by the same person at the same moment --
+  the one redeploying it.
+- `orgs/gftdcojp/ai-gftd-apps-gftdcojp/` is an untracked, non-west-registered
+  duplicate clone at the same HEAD carrying byte-identical copies of these
+  files. Worth retiring separately.
+
+Also measured: the directory has no `kustomization.yaml` and the repo has no
+Argo or Flux resources. **This is applied by hand.**
+
+## Before applying, check one thing that was deliberately not read
+
+Which URL form the current Worker secret holds. The ADR records the tunnel
+hostname being set under the previous brand; the Worker has since been
+redeployed under a new name and route. **If the secret holds the LB-IP form,
+`ClusterIP` breaks the Worker until it is repointed** -- so check the secret's
+shape before applying, not after. The value itself was not read and should not
+be.
+
+Where the provisioner runs next is undecided in both repos. The
+tunnel-versus-LoadBalancer question belongs to choosing that target, not to a
+retrofit.")))

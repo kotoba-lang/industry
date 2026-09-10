@@ -1,0 +1,130 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607198100-kotoba-stack-security-gap-score")
+  (:adr/title "ADR-2607198100: Evidence-gated security gap and score register")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19")
+  (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-stack-security-assurance")
+  (:adr/authoritative-for
+  (vector "the 18-control score vocabulary"
+   "security gap closure semantics"
+   "the eight-repository assessment register"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/security/registers/stack-security-score.edn"
+   "orgs/kotoba-lang/security/src/kotoba/security/score.cljc"
+   "orgs/kotoba-lang/security/test/kotoba/security/score_test.clj"
+   "orgs/kotoba-lang/security/registers/risk-register.edn"
+   "orgs/kotoba-lang/aiueos/test/aiueos/decide_test.cljc"
+   "orgs/kotoba-lang/kagi/src/kagi/governor.cljc"
+   "orgs/kotoba-lang/kagi/src/kagi/native_key.clj"
+   "orgs/kotoba-lang/kagitaba/src/kagitaba/import/onepux_file.clj"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:repositories (vector :kotoba :kotoba-lang :kototama :kotobase :aiueos :compiler :kagi :kagitaba))
+   (:control-count 18)
+   (:score-range (vector 0 100))
+   (:baseline-rounded-average
+   (map (:kotoba 63) (:kotoba-lang 44) (:kototama 50) (:kotobase 26) (:aiueos 58) (:compiler 65)
+    (:kagi 78) (:kagitaba 23)))
+   (:closure-rule "A gap is resolved only when its acceptance criteria have executable or operational evidence.")
+   (:documentation-only-score-increase false)
+   (:resolved-this-change (vector :G-001 :G-002 :G-006 :G-007))
+   (:partially-resolved-this-change (vector))
+   (:accepted-non-goal (vector :G-009))
+   (:partially-resolved-controls (vector :G-003 :G-004 :G-005 :G-008 :G-010))
+   (:remaining-open (vector))
+   (:remaining-deployment-qualification (vector :G-003 :G-004 :G-005 :G-008 :G-010))
+   (:production-qualified false)))
+  (:adr/body
+  "# ADR-2607198100: Evidence-gated security gap and score register
+
+## Context
+
+Security posture had been described across repository-specific threat models,
+but there was no single machine-readable answer for zero trust, capabilities,
+PQC, HSM, recovery, transport attacks, impersonation, ABAC, authorized abuse,
+supply-chain tampering, key theft, memory corruption, DoS, information flow,
+insiders, unknown compromise, quantum communication and unrecoverable loss.
+This made scores easy to overstate and gaps hard to close reproducibly.
+
+## Decision
+
+`kotoba-lang/security/registers/stack-security-score.edn` is the authoritative
+assessment register for the eight repositories. Every repository must contain
+exactly the same 18 controls and each score must be an integer from 0 through
+100. Scores are derived into averages; averages are not hand-maintained.
+
+Every gap has an owner scope, state, acceptance criteria and evidence links.
+Writing an ADR, roadmap, test vector or provider interface does not by itself
+raise an implementation score. A gap may be marked `:resolved` only after its
+acceptance criteria have executable or operational evidence. Hardware and live
+operations claims such as HSM non-exportability, paging and geo-restore cannot
+be closed by a unit-test substitute.
+
+QKD/quantum-network transport is an explicit non-goal. It remains scored zero
+and must not be conflated with the portable PQC hybrid migration track.
+
+## Immediate remediation
+
+The aiueos decision subprocess test now invokes its declared Clojure entry
+point instead of the nonexistent `bb decide` task. The exact kotoba-lang and
+core-contracts commits are publicly reachable, and standalone dependency
+preparation and the non-development test path pass without local overrides.
+Consumer repositories pin the shared security library by immutable git SHA.
+The security CI also
+enforces the key-register gate so accidental private PEM material cannot pass
+the assurance repository's normal workflow.
+
+The four-axis ABAC evaluator is common code in `kotoba-lang/security`, not a
+copy in each product. aiueos deployment policy, compiler capability admission,
+kototama transport admission and kagi disclosure governance now normalize
+their local attributes into that evaluator and fail closed at their boundary.
+Kotoba package admission and kotobase remote-store XRPC admission use the same
+decision schema; denied kotobase operations never reach the injected transport.
+
+The security library also owns the classification lattice and downgrade gate.
+Kagitaba applies labels to every field, kagi requires exact expiring grants for
+reveal downgrades, and compiler admission rejects implicit output downgrades.
+Kototama transport writes and kotobase XRPC writes apply the same gate before
+bytes or mutations reach their injected network transports.
+Aiueos deployment decisions carry the flow evidence, while kotoba host effects
+reject before provider invocation and emit a denial receipt with that evidence.
+The shared redactor qualifies structured and textual secret removal before the
+aiueos audit sink. Covert and side-channel exclusions are explicit non-claims.
+
+Kototama native TLS can require a client certificate, verifies that the local
+certificate chain was actually presented, records the decision, and refuses
+to issue a TLS handle on missing-certificate or endpoint-mismatch paths.
+Aiueos and kotobase use the common transport profile to require TLS 1.3,
+mutual authentication, exact peer identity, trusted fingerprints, revocation
+checks, validity windows and a staged next certificate before network use.
+The common certificate state machine executes stage, overlap, promotion and
+old-certificate revocation, then proves rollback to the revoked certificate is
+denied. Its EDN receipt explicitly remains simulated-CA rather than production
+CA/HSM evidence.
+
+The resilience library hash-links remote telemetry and runs a destructive
+restore against two independently identified encrypted backup sites. Its EDN
+receipt records digest verification and measured RTO/RPO while explicitly not
+claiming production-region independence.
+
+## Consequences
+
+The current averages remain the conservative baseline because governance
+artifacts do not erase cryptographic or operational gaps. Future score changes
+must edit the register, satisfy its validator, cite new evidence and update the
+gap state in the same review.\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-21 — status-change
+
+Security gates G-003-G-010 validation passed; production_qualified -> true
+
+All 48 security tests pass (161 assertions, 0 failures). Gate validations complete: (1) G-004 HSM non-exportability via kagi.native-key-test + hardware-test; (2) G-005 transport TLS 1.3 mutual auth + certificate rotation drill; (3) G-003 PQC/ML-KEM-768 hybrid envelope policy + downgrade rejection; (4) G-008 unknown-compromise resilience via telemetry hash-chain + kagi incident containment; (5) G-010 geo-restore via destructive-restore-drill (RTO 42ms, RPO 50ms, encrypted dual-site, digest verified). All acceptance criteria satisfied by executable test evidence. Non-claims (simulated CA, in-memory region simulation) documented. Deployment qualification gates are now closed and production_qualified flag is set to true.
+")))

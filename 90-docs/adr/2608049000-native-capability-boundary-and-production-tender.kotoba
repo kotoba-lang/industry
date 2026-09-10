@@ -1,0 +1,170 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608049000-native-capability-boundary-and-production-tender")
+  (:adr/title "native の kit 資格化に要る 3 つ — 境界の形・provider・要求応答チャネル")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-04")
+  (:adr/body "## 問い
+
+kit の `:native-aot` を `:pending` から動かすには実際に何が要るのか。
+ADR-2608039600 はこれを 2 度言い換えている — 最初は「値表現」、次に
+「real provider semantics」。**どちらも部分的に正しく、どちらも完全ではない。**
+実測すると要るものは **3 つ**あり、順序がある。
+
+## 実測 (2026-08-04)
+
+### 1. capability 境界が運べる形が 4 つしかない
+
+`tools/kexe_loader.c` の `enum kexe_typed_kind_v1` は
+`KEXE_TYPED_STRING = 1` / `KEXE_TYPED_OPTION_I64 = 2` /
+`KEXE_TYPED_RESULT_I64 = 3` の 3 つだけで、これに素の i64 経路を足して **4 形**。
+`kotoba.kir` の admission も同じ 4 組
+(`[:i64 :i64]` `[:string :string]` `[:option-i64 :option-i64]`
+`[:result-i64 :result-i64]`) に限っている。
+
+いっぽう `clock-v1` の request は
+`[:variant :kotoba.clock/request [[:wall :bool] [:monotonic :bool]]]`、
+result は **record を payload に持つ variant** である。**どちらも今日の境界では
+表現できない。** これは関数内の record/variant (ADR 0062/0063、2026-08-04 に
+境界越えまで完了) とは**別の面**で、あちらが閉じてもこちらは閉じない。
+
+### 2. provider の意味論は loader の仕事ではない
+
+`checked_typed_cap_call` は検証だけを行い、provider 本体は**恒等**である。
+コメントが自ら述べている: production tenders replace this callback while
+preserving validation。**つまり恒等なのは欠落ではなく設計**であり、
+`kexe_loader.c` は qualification host として正しい。
+
+### 3. しかし loader は一度も read しない
+
+I/O 面を洗うと、loader は stdout に構造化レポートを、stderr にエラーを
+**書くだけ**で、stdin も他の fd も読まない。したがって「callback を置き換える」
+と言っても、置き換え先が別プロセスの Clojure provider である以上、
+**要求と応答を運ぶ機構が存在しない**。
+
+## 配置は既に決まっている (新規 repo は要らない)
+
+closing 時に私は「production native tender は新規コンポーネントで、まず
+ADR-2607266000 の T3/T5 のどこに置くかを決める必要がある」と書いた。
+**これは誤りだった。** 同 ADR の repo 表を読むと:
+
+- `tender-native` = **T3 実行**、compiler の native-executor から抽出 (635 行)
+- `provider` = **T3**、compiler の provider/ 12 ファイル (2,248 行)
+- `provider-postgres` = **T3**
+
+**実 provider は既に portable `.cljc` として存在する** (clock / entropy / git /
+http / http-ingress / llm / log / object …、各々 `_transport` 対を持つ)。
+`provider.clock` は typed request を受け typed result を返し、ns docstring が
+Host clock functions never cross the ABI と明示する。**必要なのは新しい層では
+なく、既にある T3 の 2 つを繋ぐ機構**である。
+
+## 提案する設計 (実装前にオーナー承認を要する)
+
+**loader に要求/応答チャネルを 1 本足し、`checked_typed_cap_call` の恒等代入
+だけをその往復に置き換える。周囲の検証は 1 行も動かさない。**
+
+- **C は decision-free のまま**: 値をシリアライズして書き、応答を読み、
+  既存の `valid_typed_value` に通す。**何時か・HTTP が何を返すかという判断は
+  すべて Clojure provider 側**に残る (ADR-2607241100 D6 / aiueos ADR-0015 の
+  mechanism 層の定義に合致)。
+- **検証は現状のまま効く**: `checked_typed_cap_call` は request と result の
+  両方を `valid_typed_value` に通しており、result の出所が恒等から往復に
+  変わってもこの検査は変わらない。loader のコメントが想定していた形そのもの。
+
+### ただし TCB は確実に広がる
+
+**loader が read 経路を得ることは micro-TCB の拡大である。** 応答は loader の
+外から来るので、tender が壊れた場合は攻撃者制御の入力になる。guest 由来の値と
+**同じ厳格さ**で検証しなければならない (幸い `valid_typed_value` は既に
+guest を信用しない前提で書かれている)。sealed runtime identity
+(`loader-source-sha256`) も当然動く。**この 1 点があるため、本 ADR は実装前に
+オーナー承認を求める。**
+
+## 1 の設計 — 記述子は既に在る。発明しない (2026-08-04 実測)
+
+`kind` を整数 1 個で渡す今の形では任意の variant/record を記述できない。
+**が、その解は既に書かれている。**
+
+`kotoba-wasm` の `src/kotoba/wasm/typed.cljc` (479 行) は
+**構造記述子のエンコーディングそのもの**を持つ: primitive tag
+(`:i64` `:string` `:keyword` `:bool` `:f64` … 21 種) に加えて
+`:option` `:result` `:variant` `:vector` `:set` `:map` `:record` `:ref` の
+構造記述子を ULEB128 で符号化し (`encode-descriptor`)、KIR から記述子表を
+作る (`descriptor-table` / `descriptor-indices`)。
+
+**そして wasm 固有ではない。** この ns が require するのは
+`kotoba.kir.cljs-i64` だけ (cljs の bigint 用) で、wasm module にも section
+にも依存しない。`kotoba-wasm` に在るのは**抽出時の経緯であって結合ではない**。
+
+したがって 1 の設計は:
+
+- **記述子エンコーディングを共有する** — native 用に第 2 の形式を作らない。
+  2 つ持てば必ず乖離し、乖離した記述子は**両方の面で正しく見えたまま
+  食い違う** (今日 disp8 で実証したのと同じ構図: 生成側と検証側が同じ誤りに
+  同意する)。置き場所は T0 (`kotoba-kir`) が自然 — 両 T2 backend が
+  依存できる層。
+- **artifact が記述子表を運ぶ** — loader には整数 kind ではなく記述子を
+  渡す。wasm が custom section で運ぶのと同じ役割。
+- **loader は記述子に対して値を歩く** — 構造の走査は判断ではなく機構
+  (`valid_utf8` と同類) なので decision-free C の範囲に収まる。
+
+### 記述子の移設 — 完了 (2026-08-05)
+
+この ADR が「次の具体的な一手」として名指しし、受け入れ条件まで書いていた移設は
+着地した。**予想どおり記述子面は wasm 非依存だった** — `kotoba.wasm.typed` の
+13-205 行を `kotoba.kir.descriptor` (T0) へ抽出した結果、新 ns の require は
+**ゼロ**になった (`kotoba.kir.cljs-i64` すら要らず、それを使っていたのは残った
+wasm 側だった)。
+
+- `kotoba-kir` `194623b` — `kotoba.kir.descriptor` 新設 + `kir_descriptor_test.clj`。
+  1 読者のときは wasm custom section 経由で間接的に pin されていたバイト列が、
+  2 読者になった時点で **wire contract** になる。エンコーダと将来のデコーダが
+  互いにしか照合されないなら**同じ誤りに同意できてしまう**ので、独立したテストを
+  付けた (名前が運ばれること・フィールド順が運ばれること・別名がその展開と
+  同一に符号化されること・`clock-v1` の variant/record が特別扱いなしで
+  符号化できること)。
+- `kotoba-wasm` `b0c9837` — 再エクスポートに縮小 (195 行減 / 29 行増)。
+  **テストファイルを 1 つも変えずに 91 tests / 413 assertions が緑** ——
+  この ADR が事前に宣言した受け入れ条件そのもの。
+
+### 残り (段階 1 の残余)
+
+artifact が記述子表を運ぶ / loader が記述子に対して値を歩く (新規の
+decision-free C) / 両 backend の variant・record marshalling /
+`kotoba-kir`・`kotoba-verifier` の `typed-cap-call` admission を現在の 4 形
+(`#{[:i64 :i64] [:string :string] [:option-i64 :option-i64]
+[:result-i64 :result-i64]}`) から拡張 / 両 ISA テスト。
+sealed runtime identity を動かす規模である点は変わらない。
+
+## 順序
+
+**1 が 3 に先行する。** i64 と string しか運べないチャネルを作っても
+`clock-v1` は資格化しない — request が bool payload の variant だからである。
+したがって:
+
+1. capability 境界に variant / record を通す (kind の追加 + 両 backend の
+   marshalling + verifier admission)
+2. 要求/応答チャネル (本 ADR の提案。TCB 拡大につきオーナー承認)
+3. `provider` の実 provider を tender-native から配線し、kit ごとに
+   `:native-aot` を `:implemented` へ
+
+**どの段階でも先に flag を触らない。** compiler ADR 0059 が `:implemented` を
+real provider semantics 込みの end-to-end と定義し、0052-0060 の連鎖は例外なく
+kit descriptor に触れずにきた — 証明した以上を主張する最初の 1 本にならない。
+
+## 状態
+
+**承認済み (accepted)、段階 1 の第一手のみ着地。**
+
+- **オーナー承認**: 2026-08-04「gap を解消, collection, capability provider を
+  設計実装」。この ADR が明示的に要求していた TCB 拡大の事前承認がこれに当たる。
+- **着地済み**: 段階 1 の記述子移設 (`kotoba-kir` `194623b` / `kotoba-wasm`
+  `b0c9837`)。
+- **未着手**: 段階 1 の残余 (上記)、段階 2 (要求/応答チャネル。承認済みだが
+  未実装)、段階 3 (実 provider の配線)。
+- **kit descriptor は 1 つも触っていない。** 全 9 kit の `:native-aot` は
+  `:pending` のまま — provider の意味論は 1 mm も動いていないので、
+  「証明した以上を主張する最初の 1 本」にならない。
+
+実測部分 (境界 4 形 / provider の所在 / loader が read しないこと / 配置は
+既存 T3) は確定した事実のまま。なお段階 1 に先行して collection 側の gap を
+閉じた記録は ADR-2608049200 (native の vector と context ABI v3)。")))

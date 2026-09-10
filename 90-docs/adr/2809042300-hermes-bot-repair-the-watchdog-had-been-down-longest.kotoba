@@ -1,0 +1,32 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809042300-hermes-bot-repair-the-watchdog-had-been-down-longest")
+  (:adr/title "hermes bot repair: three config breaks, and the cron watchdog had been down longest")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-04")
+  (:adr/related (vector "adr-2809042000-hermes-profile-fitness-coscientist-iteration-01"
+                "ADR-2608313500" "ADR-2607173100"
+                "adr-2809041200-doubt-rules-not-grounded-in-properties"))
+  (:adr/context
+  "ADR-2809042000 left four standing findings and said they were fleet data rather than tooling, and that repairing them was not a counting question. Repairing them showed that three of the four were single config errors with 11-16 consecutive failures behind them, and that the detector could not see two of the classes involved.
+
+Measured before the work: 19 jobs carried failure_streak > 0. Sorting them by whether a config change could fix them separated 8 structural breaks from 11 environmental ones (interrupted by shutdown, HTTP 429, response truncation, a 660s TERMINAL_CWD lock timeout, and one script that REFUSED deliberately and was working exactly as designed).")
+  (:adr/decision
+  "1. OTENT, SIX JOBS, 11-15 CONSECUTIVE FAILURES. All six reported RuntimeError: Connection error. The profile's own model config was correct throughout -- openrouter, z-ai/glm-5.3-flash. Each JOB overrode it with provider=custom, model=murakumo-main and no base_url, in a profile whose providers map is empty, so custom resolved to nothing. That is precisely the failure ADR-2608313500 documented, still live months later. The override is removed so the jobs inherit the config that already works.
+
+2. FLEET-WATCHDOG, 16 CONSECUTIVE FAILURES -- THE LONGEST IN THE FLEET. Script not found: .../fleet-watchdog/scripts/scripts/fleet_cron_watchdog.py, doubled. The runner already resolves against <workdir>/scripts/ and monitor_script carried its own scripts/ prefix; the file had been there the whole time. The job whose entire purpose is to notice failing cron jobs was the one that had been failing longest, and the detector from ADR-2809042000 could not see it because it checked :script and not :monitor_script.
+
+3. HAKOBI AND THREE LATENT. [blocked_config] Unknown provider 'openrouter-free'. Four profiles name it in model.provider with no providers map and no secrets block -- all exactly 49 lines, from a template that dropped the auth half, while 38 other profiles define it. The definition and its Keychain helper are copied verbatim from a working profile; the helper reads one item by a known service name, which is the targeted form the safety floor requires, and carries no value. Only hakobi had surfaced the defect because its siblings' jobs have never fired.
+
+Each repair was verified by RUNNING the job, not by reading the config back: `hermes cron run` reported 'Ran now: succeeded.' for the otent and hakobi cases.
+
+4. THE DETECTOR LEARNED THE TWO CLASSES IT MISSED, plus a severity correction. New unresolvable-provider (the class that broke otent: a job naming a provider its profile does not define, with no base_url of its own -- plain `openrouter` is built in and is not a finding). New monitor-script-unrunnable: the runner executes .sh via bash and everything else via Python, so a .cljs monitor cannot run even when present; the fleet's own convention, stated in a comment at the top of canvas-signal-itonami.py, is a thin .py launcher calling nbb. :monitor_script is now resolved alongside :script. And missing-workdir is no longer a flat fail: 13 of the 19 reported last_status ok having run that day, so the value is drift and not the cause -- severity is derived from whether any of them is actually unhealthy. Self-test 14 -> 22 assertions, every new axis in both directions.")
+  (:adr/consequences
+  "Standing after the repairs: dangling-script 6 -> 1, unresolvable-provider 6 -> 0, missing-workdir 19 fail -> 13 warn, failure-streak 19 -> 13. The ledger is regenerated at 98 profiles / 156 jobs, 100% coverage. The one remaining dangling script is jv-migration's, which the old detector could not see and which is also the one monitor-script-unrunnable finding.
+
+`hermes cron doctor` corrected two conclusions I had already formed from reading the job JSON: the runner resolves :script against <profile>/scripts/ and does not look in the shared ~/.hermes/scripts/, and the workdir the otent jobs named was otent-vision-bot, not the otent I had read off job[0] and generalised. Running the real tool beat reasoning about the data, and it should be the first move next time rather than the third.
+
+NOT REPAIRED, deliberately. Three otent worktrees are dirty and the script refuses rather than clobbering them -- that refusal is correct and protective. What is in them is real work: new source, tests, fixtures and ledger output, one holding uncommitted changes to the same two files app-hyakka reverted earlier the same day. Whether that WIP lands is a judgement about the work, not about the config.
+
+Four of the fleet's seven monitor-driven jobs have no working monitor logic: jv-migration's script does not exist and carries an extension the runner cannot execute, and the three canvas-watch jobs share a delegate, ~/.gftd/canvas-signal.cljs, which is missing. None of them fails loudly -- the job runs, the monitor never signals, and the prompt's own instruction for the no-change case is to answer [SILENT]. So three disabled jobs and one enabled job are watching nothing, quietly. Writing those monitors means inventing what 'change' means for each, which is not a repair.
+
+The eleven environmental failures are left alone. A 429, a shutdown interrupt and a lock timeout are not config errors, and clearing their streaks would only hide the next one.")))

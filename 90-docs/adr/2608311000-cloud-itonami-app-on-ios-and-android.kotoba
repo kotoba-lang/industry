@@ -1,0 +1,182 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608311000-cloud-itonami-app-on-ios-and-android")
+  (:adr/title "ADR-2608311000: cloud-itonami-app を iOS / Android に載せる —— サーバではなくバンドルを持たせる")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/doc_type "adr")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic (vector "mobile" "kotoba-shell" "cloud-itonami-app" "cloudflare-workers" "cljs"))
+  (:adr/related (vector "adr-2608072000-kotoba-shell-mobile-signing-packaging-in-app-bridge" "adr-2608081500-cloud-itonami-app-server-to-cloudflare-workers-cljs" "adr-2608080100-single-page-app" "adr-2608060000-hig-bridge-tokens"))
+  (:adr/authoritative_for (vector 
+    "cloud-itonami-app のモバイル面は、アプリが持ち運ぶ web バンドルであり、ローカルサーバではない。origin は iOS が kotoba-webbundle://app、Android が https://appassets.androidplatform.net。"
+    "kotoba-shell は欠けていた部品ではなかった（iOS/Android の scaffold・bridge・packaging は 2026-08-07 に実測済み）。欠けていたのはローカルサーバを要さないサーフェス。"
+    "manifest は app.kotoba.edn（デスクトップ）と app.mobile.kotoba.edn（モバイル）の 2 本。運べないのは :window の :web-url 1 行。"
+    "モバイルの bridge policy は deny-all（:allow [] / :deny [\"*\"]）。CORS 回避のために http/fetch を取らない —— あの grant は destination ではなく command を名指す。"
+    "edge の JSON 面は Access-Control-Allow-Origin: * を返す。public / read-only / credential 無しの面に限る。session を読む route が来たら明示 allowlist にする。"
+    "実測 2026-08-31: Android app-debug.apk 1,290,818 bytes をビルド。iOS は scaffold まで（この workstation の Xcode に iOS platform が無い）。実アップロードは未実施。"
+    "view は :applied-query（結果が来た query）で説明する。:query（検索欄）で説明すると、打鍵のたびに古い結果へ新しい問いのラベルが貼られる。"
+   ))
+  (:adr/body "# ADR-2608311000: cloud-itonami-app を iOS / Android に載せる —— サーバではなくバンドルを持たせる
+
+**Status**: accepted / **Date**: 2026-08-31 / **Decider**: Jun Kawasaki
+**決定**: オーナー指示 2026-08-31 —「cloud itonami app を ios, android でも動くようにして,
+kotoba shell がすでにあるので、それを使える?」
+
+## 答え: 使える。そして shell は欠けていた部品ではなかった
+
+`kotoba-lang/shell` の iOS/Android は 2026-08-07 に **scaffold・アプリ内 provider bridge・
+署名/packaging まで実測済み**（ADR-2608072000）。欠けていたのは shell ではなく
+**ローカルサーバを要さないサーフェス**で、その置き場は ADR-2608081500 が既に決めていた。
+
+デスクトップ版は `localhost:1338` の JVM サーバへの窓である。iOS にも Android にも
+そこに答える JVM が無い —— これが `local-manimani` の iOS ビルドが実 UI を描画しながら
+`TypeError: Load failed` を出した理由そのものである。**バンドルは端末に載るが、サーバは載らない。**
+
+したがってモバイルの形は逆になる: **アプリが web バンドルを持ち運び**、自分の origin
+（iOS `kotoba-webbundle://app` / Android `https://appassets.androidplatform.net`）で動き、
+必要なものを HTTPS で edge Worker から読む。
+
+## 決めたこと
+
+1. **manifest は 2 本にする**（`app.kotoba.edn` / `app.mobile.kotoba.edn`）。運べないのは
+   デスクトップ manifest の `:window {:web-url \\\"http://localhost:1338/…\\\"}` という 1 行なので、
+   条件分岐を 1 ファイルに入れるより分けるほうが正しい。
+2. **`mobile/` は独立プロジェクト**（`services/app-edge` と同じ理由）。アプリ本体の
+   100 以上の `.clj` は ClojureScript の classpath に載せない。
+3. **view は `.cljc` で純粋**。reagent がブラウザで、`clojure -M:test` が JVM で同じ hiccup を
+   描く。edge の 4 列テーブルではなく**カードの列**にした —— 390pt で横スクロールが要る表は、
+   運んできたデスクトップのレイアウトであってモバイルのそれではない。データはずれない
+   （両方が同じ `cloud.itonami.app.fleet-core` を 1 本の API 越しに読む）。
+4. **bridge には何も与えない**（`:allow []` / `:deny [\\\"*\\\"]`）。この面は公開カタログを読むだけで
+   何も保存しない。**CORS を回避するために bridge の `http/fetch` を取ることも、意図的にしない**
+   —— あの grant は destination ではなく command を名指すので、任意のホストに届いてしまう。
+5. **JSON 面は `Access-Control-Allow-Origin: *` を返す。** モバイルは構造上 cross-origin の
+   呼び出し側である。public / read-only / credential 無しの面に対する wildcard は
+   `GET /` が既に与えている以上の read を与えない。かつ **WKWebView が custom scheme で
+   どんな `Origin` を送るかを当てずに済む** —— 当て損なうと、実機で packaging 後にしか
+   分からない形で壊れる。**slice 2（session を読む面）が来たら、その route は明示 allowlist にする。**
+
+## 実測（2026-08-31）
+
+| 対象 | 結果 |
+|---|---|
+| view 全 phase（JVM） | 7 tests / 24 assertions。3 つの control がそれぞれ狙った assertion だけを落とす |
+| 実バンドル × headless Chromium 390×844 | 11/11。修正後 6 連続 green（修正前は 5 回中 2 回赤） |
+| `app scaffold --target ios --target android` | 2/2 ready、実バンドル（`:placeholder? false`）、policy asset は deny-all |
+| **Android `app build --execute`** | **`app-debug.apk` 1,290,818 bytes**、`assets/index.html` / `js/main.js` / `dds.css` / deny-all policy を同梱 |
+| edge routes smoke（deploy 済み Worker） | 13/13（CORS の 2 件を含む） |
+| edge parity | 14/14 |
+
+**iOS はコンパイルしていない。** この tree の問題ではなく、この workstation の Xcode 26.6 に
+iOS platform が入っていない（`xcodebuild: error: … iOS 26.5 is not installed`）。
+対処は `xcodebuild -downloadPlatform iOS` の 1 コマンドだが、データボリュームの空きが
+12 GiB しかなく、ダウンロードはほぼ同サイズなので**実行していない**。scaffold 自体は
+`xcodegen` を含めて成功している。
+
+**実アップロードもしていない**（ADR-2608072000 から変わらず）。
+
+## ブラウザだけが見つけた欠陥
+
+画面が、間欠的に、嘘をついていた:
+
+```
+1294 件が一致しました（全 1294 件中）。条件: finance
+```
+
+未フィルタの 1,294 件が出ている状態で `finance` と打っただけで、**検索はまだ 1 度も
+投げられていない**。summary が `:query`（検索欄）を見ていたためで、1 打鍵ごとに古い結果へ
+新しい問いのラベルが貼られていた。`:applied-query`（読み取りが成功したときだけ書く）に
+分け、JVM テストが「適用されていない query で結果を説明しない」ことを assert する。
+
+追いかける過程で **「待てない待ち」が 2 つ**出た。どちらもこのワークスペースが繰り返し
+見つけている形 —— *測れなかった検査が、測って問題が無かった検査と同じ顔をする*:
+
+- **Playwright の `waitForFunction` に文字列を渡すと式として評価される。** arrow function を
+  収めた文字列は truthy なので、**待ちは最初の polling で返る**。2 つの assertion が
+  loading 中の画面を読み「アプリが壊れている」と報告し、その直後のスクリーンショットには
+  正しく動く画面が写っていた。
+- **`waitForSelector` の `text=` は正しく待つが、*どれか* 1 ノードが一致した瞬間に返る**
+  —— 上の欠陥のせいで、それは検索が起きる前だった。待つ対象を「適用された query」にした。
+
+## 他では見つからなかった 2 件（shell 側の性質）
+
+- **`mobile/dist/` に在るものは全部出荷される。** `app scaffold` はディレクトリごと
+  `.ipa` / `.apk` にコピーする。最初の Android ビルドには**検査自身のスクリーンショットが
+  同梱されていた**（scaffold は成功と報告し、アプリも動く）。ブラウザ検査が dist の中身を
+  検査するようにした。
+- **`app scaffold` は出力を掃除しない。** dist から消したファイルは、出力ディレクトリを
+  消すまでアプリの中に残る。
+
+## smoke test の定数を外した
+
+`services/app-edge` の routes smoke は `1215` と `77` を書いていた。今回の deploy が
+再生成済みカタログ（1294 / 79）を載せた瞬間、**何も壊れていないのに 3 件が赤くなった。**
+世界が育つと落ちるテストは、読む人に無視することを教える。Worker が配っているカタログの
+`:count` / `:callable-count` を読むようにした（欲しかったのは「API と生成器が同じカタログに
+ついて一致する」という主張のほうである）。カウントを読めなかった run は**何も検査していない**
+ので、報告ゼロではなく exit 1 にする。
+
+## これで何が変わるか
+
+**モバイル経路が仮説ではなく構造になった。** ADR-2608081500 の slice 2〜5 が edge に着地すれば、
+モバイル側の追加作業なしにそのまま端末に載る。逆に、**今日端末に載っているのは edge が
+配っているものだけ** —— fleet ディレクトリであって、chat / mail / drive / calendar / 書き込み面は
+まだ JVM 側にある。アプリはそれを曖昧にせず、そう表示する。
+
+## 着地
+
+- `cloud-itonami/cloud-itonami-app` PR #245 → main `a70f7ca`（`docs/adr/0087`、`mobile/`、
+  `app.mobile.kotoba.edn`、edge CORS）
+- edge Worker 再 deploy（version `b26cb27a-96db-4df3-8c5f-b8f3dbf6f08a`、workers.dev のみ）
+
+
+## 残っている gap（優先順）
+
+1. **iOS が一度もコンパイルされていない。** この machine の Xcode 26.6 に iOS platform が
+   無い。`xcodebuild -downloadPlatform iOS`(≈10 GiB) を実行できる空きがあるときに、
+   `app build --target ios --execute` を通す。scaffold は既に通っている（xcodegen 込み）。
+2. **実アップロード未実施**（App Store Connect / Play track）。`app package` は署名が
+   構成されていなければ拒否するので、まず `:apple/team-id` と keystore を manifest / 環境に
+   与えるところから。ワークスペース全体では別経路（Capacitor + fastlane）で ASC 到達実績が
+   あるので「不可能」と読まないこと（ADR-2608081200）。
+3. **端末に載っているのは slice 1 だけ。** chat / mail / drive / calendar / 書き込み面は
+   ADR-2608081500 の slice 2〜5。**モバイル側の追加作業は要らない** —— edge に載れば載る。
+4. **Android 実機/エミュレータでの起動確認は未実施**（この machine に AVD も system-image も
+   無い）。bridge 自体は shell 側で実機検証済み（ADR-2608072000）だが、この APK は
+   「ビルドできた」までで「起動して描画した」ではない。
+5. **共有 checkout の追随**: `orgs/cloud-itonami/cloud-itonami-app` は 15f425c のまま
+   （pin は a70f7ca）。superproject の共有 checkout が 97 commit 遅れ・216 ファイル
+   未コミット・index.lock 保持中（別セッション作業中）だったため、west を回していない。
+
+## 次に着手するときの起点
+
+```bash
+# 1. バンドルを建てて検査する（dist/ は build 出力、index.html だけ committed）
+cd orgs/cloud-itonami/cloud-itonami-app/mobile
+npm install && npm run build          # index:check → dds.css → shadow-cljs release
+clojure -M:test                       # 7 tests / 24 assertions
+python3 -m http.server 8099 --bind 127.0.0.1 --directory dist &
+npx nbb scripts/verify-browser.cljs   # 11/11、実ブラウザ 390x844
+
+# 2. edge 側
+cd ../services/app-edge
+npm run test                                     # fleet-core parity 14/14
+npx nbb test/worker_routes_smoke.cljs https://cloud-itonami-app-edge.04-feasts-minded.workers.dev
+
+# 3. native
+cd ../..
+rm -rf target/kotoba-shell/app        # scaffold は出力を掃除しない
+orgs/kotoba-lang/shell/bin/kotoba-shell app scaffold --target ios --target android \\
+  --manifest app.mobile.kotoba.edn --policy mobile/shell-policy.edn \\
+  --output-dir target/kotoba-shell/app
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \\
+  orgs/kotoba-lang/shell/bin/kotoba-shell app build --target android --execute \\
+  --manifest app.mobile.kotoba.edn --policy mobile/shell-policy.edn \\
+  --output-dir target/kotoba-shell/app
+```
+
+⚠ gradle の transform cache が壊れて `aar-metadata.properties (No such file or directory)` で
+落ちることがある。該当 transform ディレクトリを消しただけでは直らず、**`gradle --stop` で
+daemon を落としてから**もう一度回すと通る（実測 2026-08-31）。
+")))

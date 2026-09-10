@@ -1,0 +1,151 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609030900-aiueos-pure-kotoba-native-programme")
+ (:adr/title "AIUEOS pure Kotoba/Amu native: what thirty-one parallel streams measured, and what K16 still runs in C")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-03")
+ (:adr/body "# AIUEOS pure Kotoba/Amu native — the 2026-09-02/03 programme
+
+## What was asked
+
+Make AIUEOS a Kotoba native OS: boot, NIC, HTTPS and Qwen inference all
+compiled from Kotoba by Amu to x86-64, with no runtime delegation to
+external C/C++ or handwritten assembly. Four acceptance conditions were
+set by the owner: PCI/MMIO/DMA emitted directly by Amu; f32/SIMD/AVX2
+fused dequantize+dot kernels rather than a C matvec called from Kotoba;
+boot, network and TLS as Kotoba/Amu artifacts; and a foreign-code
+negative gate that fails the build rather than relying on attention.
+
+The owner also corrected the definition in advance: toolchain-generated
+fixed stubs (interrupt entry, context switch) are admissible when Amu
+emits them reproducibly. The line is delegation, not the presence of
+machine code nobody typed.
+
+## What the programme actually produced
+
+Thirty-one streams ran in parallel across sixteen repositories. The
+substantive results, each with the evidence that carries it:
+
+### Compiler capability, all executed rather than asserted
+
+- f32 scalar arithmetic and every int/float conversion reach native on
+  both ISAs, verified bit-for-bit against the KIR oracle by executing
+  real machine code (81 assertions).
+- kernel-dot-f32 emits an AVX2 arm and a scalar arm that are
+  bit-identical by construction, both executed under QEMU and agreeing
+  with the oracle (4B800004). A Kotoba kernel can now enable XSAVE/YMM
+  itself through kernel-read/write-cr4 and kernel-xsetbv.
+- Fused dequantize+dot lands for Q8_0, Q4_K and Q6_K with both arms
+  executed. The four IQ formats are declared, oracled and refused by
+  name; their codebook grids are expressible because the literal pool
+  reaches the kernel-object route.
+- Memory grew from two widths at two window sizes to 32 operations
+  across four widths and four tiers, plus a slice carrier that lowers to
+  a scaled load with zero context callbacks and can be passed as a
+  function parameter.
+- Fences, rdtsc, general atomics, swapgs, port I/O and MSR access exist;
+  interrupt entry is authored in Kotoba with a toolchain-generated
+  prologue and was executed by taking a real #UD.
+- The fuel budget is 64 bits. 2.2e9 fuel was spent on a CPU past the old
+  2^31 ceiling, with a same-bytes-but-the-budget control stopping where
+  the arithmetic says.
+
+### AIUEOS
+
+- A foreign-code negative gate exists and refuses. On the K16 link list
+  it reports its counts rather than a verdict, and the pure-native
+  profile refuses the loader by name.
+- Every committed Kotoba object is attested to one compiler revision:
+  unattested went from 40 to 0, and the rebuilt image boots with every
+  parity marker.
+- The GGUF admission, the TLS record layer and AES-128-GCM, the RTL8125
+  driver, the Murakumo device-worker canonical form, a streaming
+  SHA-256, the Qwen tokenizer, and the Qwen dequant/dot/matvec/norm/
+  activation/attention/recurrent kernels are Kotoba objects. Several
+  were flipped so the C calls them; the rest are linked and compared.
+- A BOOTX64.EFI compiled from Kotoba boots under OVMF, calls firmware
+  protocol methods with six arguments, allocates pages, writes them,
+  walks the memory map, hashes 176 bytes with SHA-256 inside the image,
+  and jumps to a function whose address it took.
+
+### Six silent defects found, and what they have in common
+
+Each of these returned the same value as a check that ran and found
+nothing wrong. That is the shape this workspace already forbids in
+prose; the programme found six instances of it in one day.
+
+1. A let body with more than one form kept only the first. The rule
+   existed in validate-expr and ran last, so it measured the already
+   truncated form and admitted it.
+2. A bounded store answered with an undefined register on native while
+   the oracle answered with the stored operand.
+3. A register-allocator spill-slot collision froze a loop counter at its
+   entry value, so four committed objects never terminated. One of them
+   was linked.
+4. The --fuel flag was validated and then discarded on two artifact
+   routes; artifacts at 512 and at 1048576 were byte-identical.
+5. A QEMU smoke reported a serial log from a kernel that was not in the
+   tree, because the build failed and the previous artifacts survived.
+6. A dead guest and a known flake were the same observation: after a #UD
+   the firmware halts, QEMU never exits, and the retry loop keyed on the
+   timeout status.
+
+### Measurement lessons worth keeping
+
+- A fixture can state a limit by being one past it, naming no constant a
+  source search can reach. CI found the fifth statement of the fuel
+  ceiling that way.
+- Equal weights see no geometry: a dequant probe whose weights are all
+  equal passes with a wrong nibble, a wrong byte and a wrong scale. Two
+  fixtures had to be rebuilt before a broken emitter could be caught.
+- A golden that counts writes per accumulator passes for an assignment
+  that writes each twice, which is what the wrong lane assignment also
+  does. Pin the sequence, not the histogram.
+- Byte movement is not evidence of a defect. Sixty-nine of seventy-four
+  objects moved for a codegen change that reached four.
+- A check whose search space grows is stronger at the same finding
+  count: self-tail loops went from 301 to 423 while findings went to
+  zero.
+
+## Decision
+
+The definition stands as the owner stated it. Progress against it is
+measured by the K16 pure-native gate, whose foreign count is the number
+that matters and which currently reports the C that remains. Object
+attestation is complete; the compiler capability gap that blocked
+NIC/DMA/f32/SIMD is closed; the loader is proven in parts and not yet
+composed.
+
+## Consequences
+
+- The K16 image still runs its inference and its loader in C. Nothing in
+  this programme changed what K16 boots, and no measurement here was
+  taken on K16 hardware.
+- matvec_range still runs the C every token, so the 0.036 tok/s figure
+  is unchanged and untouched.
+- uefi/main.c is 1,214 lines byte-unchanged, and the pure-native profile
+  refuses it by name.
+- The remaining foreign objects are the C, and are other work.
+
+## Status of the four acceptance conditions
+
+1. PCI/MMIO/DMA emitted by Amu: the primitives exist and the RTL8125
+   driver is six Kotoba objects whose register transcript matches the C
+   under QEMU. Not run on RTL8125 silicon.
+2. f32/SIMD fused kernels: three quantization formats emit with both
+   arms executed; the four dominant IQ formats do not yet. No cycle
+   ratio is claimed from TCG; the defensible number is a static
+   instruction count of roughly 4 to 6 times.
+3. Boot/network/TLS as Kotoba artifacts: the TLS record layer and
+   AES-GCM are flipped and executed; the loader boots and does four of
+   the C loader's jobs; the model read, the embedded-release path and
+   BootNext are untouched.
+4. Foreign-code negative gate: exists, refuses, and is wired to the
+   build.
+
+## What the next session should read first
+
+scratchpad results.md carries every stream's report with its evidence.
+The single most load-bearing correction to any brief is that a minimal
+Kotoba kernel fixture is 110,872 bytes because segment 1 is fixed, which
+inverts the loader stage order: fs must come before PT_LOAD placement,
+or placement must use the 8,560-byte user-image ELF.")))

@@ -1,0 +1,159 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608311800-datom-plane-on-biscuit-ipld-ipni")
+  (:adr/title "ADR-2608311800: kotobase の datom 面は Biscuit / IPLD / IPNI の上に正しく設計されているか — 3 面の判定と 4 つの実測欠陥")
+  (:adr/status "accepted")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-31")
+  (:adr/last-verified "2026-08-31")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "datom-plane-premises")
+  (:adr/repos (vector "orgs/net-kotobase/control-plane"
+              "orgs/kotoba-lang/org-biscuitsec"
+              "orgs/net-kotobase/ipfs"))
+  (:adr/authoritative-for
+  (vector "datom 面が Biscuit / IPLD / IPNI の 3 前提の上でどう設計されているかの判定 (2026-08-31)"
+   "IPNI publisher identity が manifest の記録と一致していないという実測"
+   "auth-plane-integration の axis 名 refusal-distinguishes-credential への改名理由"))
+  (:adr/related
+  (vector "adr-2608311600-one-auth-design-across-six-apexes"
+   "adr-2608261300-biscuit-primary-api-authorization"
+   "adr-2608280230-capability-trust-confidentiality-boundary"
+   "adr-2608160300-ipni-publisher-identity"
+   "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes"))
+  (:adr/evidence
+  (vector "datoms.kotobase.net は全 path で 401 this backend is reachable only through the kotobase.net edge — 直接呼び出しでは Biscuit 検査に到達しない"
+   "kotobase-graph-database wrangler vars: KOTOBASE_BISCUIT_AUTH_MODE=required, ROOT_PUBLIC_KEYS 設定済, PUBLIC_READ_GRAPHS 1 件"
+   "auth.cljs verify-biscuit-action: public root のみ / revocation set / tenant と graph は request context であって token 選択ではない / refusal は bounded category で命名 / token・holder・graph をログしない"
+   "auth.cljs biscuit-scheme? は wire matcher より広い — a rejected credential may never be reinterpreted as an absent credential"
+   "block_store.cljs: 全 write と全 durable/cache read で CID 検証 fail-closed、dag-cbor(0x71)、network-block-key は ipld/<cid> で graph 非依存"
+   "ipni.kotobase.net/ipni/v1/head -> 200 署名付き、publisher peer id 12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X"
+   "cid.contact /providers: ipni.kotobase.net を publisher addr に持つ identity が 4 件 (2026-08-26 / 08-27 x2 / 08-30)。各行とも publisher==provider"
+   "manifest/ipni-publisher.edn は 2 件しか記録しておらず、live head の署名者はそのどちらでもない"
+   "gateway resolve-viewer は Biscuit を 80-8192 base64url で受理し authn へ転送する — 読んでいないのではなく、拒否が区別できなかった"))
+  (:adr/body
+  "# ADR-2608311800: datom 面は Biscuit / IPLD / IPNI の上に正しく設計されているか
+
+**Status**: accepted / **Date**: 2026-08-31
+**Deciders**: Jun Kawasaki（オーナー指示「kotobase の datomic は biscuit, ipld, ipni 前提で
+適切に設計されているか調査」）
+
+## 0. 結論
+
+**3 前提とも設計としては正しい。欠陥は設計ではなく、記録と境界の申告にある。**
+
+| 前提 | 判定 | 根拠 |
+|---|---|---|
+| **Biscuit** | **適切** | graph 側の検証は public root のみ・revocation set・tenant/graph は request context |
+| **IPLD** | **適切、ただし境界が 2 つある** | 全 I/O で CID 検証 fail-closed。ただし `ipld/<cid>` は Biscuit scope の外 |
+| **IPNI** | **設計は適切、記録が現実と食い違う** | 署名付き chain は live。**publisher identity が 4 つあり manifest は 2 つしか知らない** |
+
+## 1. Biscuit — 設計は堅い
+
+`kotobase-graph-database` の `auth.cljs` は 4 つを正しくやっている:
+
+1. **public root のみで検証する。** `KOTOBASE_BISCUIT_ROOT_PUBLIC_KEYS`（32 byte）と
+   `KOTOBASE_BISCUIT_REVOKED_SIGNATURES`（64 byte）。graph は mint できない —
+   これが Biscuit を使う理由そのもので、この Worker には盗む価値のあるものが無い。
+2. **tenant と graph は request context であって token 選択ではない。**
+   `require-tenant-binding? true` + `biscuit-enabled-graphs #{graph}`。token が
+   自分の宛先を選べる設計なら confused deputy になる。**選ばせていない。**
+3. **拒否は bounded category で名乗り、token / holder / tenant / graph をログしない。**
+4. **`biscuit-scheme?` は wire matcher より広い。** docstring がその理由を書いている ——
+   *a rejected credential may never be reinterpreted as an absent credential*。
+   **これが本 ADR で最も重要な一行**である（§4）。
+
+`KOTOBASE_BISCUIT_AUTH_MODE=required` は production / testnet とも設定済み
+（ADR-2608280230 のカットオーバー済み）。`KOTOBASE_PUBLIC_READ_GRAPHS` は 1 graph のみ。
+
+**ただし直接は到達できない。** `datoms.kotobase.net` は全 path で
+`this backend is reachable only through the kotobase.net edge` を返す。つまり
+**Biscuit を検査する層の手前に edge 共有秘密のゲートがある**。これは多層防御として
+正しいが、**「datom 面は Biscuit-required」という記述だけを読むと、直接の呼び手にとっての
+有効な credential が Biscuit だと誤読する。** 実際には edge 経由でしか届かない。
+
+## 2. IPLD — 適切、ただし authorization の境界が 2 つある
+
+`block_store.cljs` の契約は `kotobase.content-addressed-block-store.v1`:
+
+- **全 write と全 durable/cache read で CID を検証し、不一致は fail closed。**
+  「content-addressed と名乗るが検証していない」という最も多い欠陥を踏んでいない。
+- codec は dag-cbor（0x71）、hash は sha2-256、CID は provider I/O の前に parse。
+- **キー空間が 2 つある**:
+  - `blocks/<graph>/<cid>` — graph に属する。Biscuit の `kotoba://graph/…` が縛る
+  - `ipld/<cid>` — **graph 非依存**。docstring は *the CID is the tenant boundary for
+    public bytes; private bytes must already be encrypted* と言う
+
+**後者は Biscuit の scope が縛らない。** これは IPFS 的な block store として正しい形
+（block は content-addressed で公開されうる）だが、**Biscuit の graph scope が
+データ面全部を縛っているという読みは誤り**である。`ipld/` 名前空間の authorization は
+**CID を知っていること**であり、機密は事前暗号化が前提。設計として正当だが、
+**2 つの authorization モデルが同居していることは明示されるべき**で、
+capability 文書はそれを言っていない。
+
+## 3. IPNI — 設計は適切、記録が現実と食い違う
+
+live は健全: `GET /ipni/v1/head` が **署名付き**の head を返し、advertisement は
+`Previous` を持ち chain になっており、cid.contact が crawl している。
+`manifest/ipni-publisher.edn` は公開値のみを持ち、seed は kagi に名前で 1 件だけ置く
+（安全床⑦に沿う）。**IPNI を pinning の機能ではなく publishing discipline と決めた**
+のも正しい（CID を世に出す全ての面が対象）。
+
+**欠陥はここ。**
+
+cid.contact に `ipni.kotobase.net` を publisher address に持つ identity が **4 件**ある:
+
+```
+2026-08-26  12D3KooWDscME2q…   ← manifest の :previous-peer-id
+2026-08-27  12D3KooWHu8JYZpE…  ← manifest に無い
+2026-08-27  12D3KooWGmq2x23J…  ← manifest の :ipni.publisher/peer-id
+2026-08-30  12D3KooWGxKwrwhq…  ← manifest に無い。**live head の署名者はこれ**
+```
+
+**publisher identity を記録するために存在するファイルが、live の署名者を知らない。**
+manifest は 1 回のローテーション（2026-08-27、prior seed unrecoverable）を記録して
+そこで止まっており、その後 2 回起きている。
+
+**4 行とも `publisher == provider`。** ここが実害の在り処である —— ローテーションの
+たびに **provider identity も新しくなっている**。retrieval client は content を
+**provider** へ解決するので、古い 3 つの provider ID の下に publish された
+advertisement は、**manifest 自身が「seed は復元できない」と書いた鍵の持ち主を指し続ける**。
+不変で crawl 可能なまま、custody を誰も証明できない provider を名乗っている。
+
+**是正**（本 ADR では実施していない）: ①manifest を live の署名者に合わせる
+②ローテーションを 1 件ずつではなく**列**として記録する ③provider identity を
+publisher identity から分離できるか判定する（分離できるなら、鍵を替えても
+既存 advertisement の provider は動かない）。
+
+## 4. 判定の副産物 —— 計器の欠陥 2 件
+
+調査中に、**この調査を支えていた計器の方が 2 回間違っていた**。両方とも記録する。
+
+1. **測定用トークンが小さすぎた。** probe は `Biscuit EnwAAA`（6 文字）を送っていたが、
+   gateway も murakumo も `[A-Za-z0-9_-]{80,8192}` を要求する。**考慮される大きさに
+   届かない入力は判別できず、しかも finding に見える向きに壊れる。** 200 文字に直した
+   （直しても datom 面の結果は変わらなかった —— 欠陥は本物だった）。
+2. **axis の名前が、見えない機構について語っていた。** `plane-reads-capability` は
+   「読んでいるか」を測れない —— gateway は最初から読んで authn へ転送していた。
+   測れていたのは**拒否が、提示された credential を提示なしと区別するか**である。
+   `refusal-distinguishes-credential` に改名した。**機構の名前を付けた axis は、
+   その機構についての証拠として引用される。**
+
+§1 の 4 番目（`biscuit-scheme?` が wire matcher より広い）は、graph 側が既にこの規律を
+持っていたことを示す。**edge がそれに同意していなかった**ので、同日 gateway を直した
+（version `19c9271e`）—— 提示なし / 形式不正 / 形式は正しいが拒否、の 3 つが
+区別できるようになった。**なぜ well-formed な credential が落ちたかは言わない**:
+その理由は authn にあり、未認証の呼び手に `expired` と `not yours` を区別して見せる
+のは別種の漏洩である。
+
+## 5. やっていないこと
+
+- **IPNI の是正は 1 つも実施していない。**§3 の 3 項目は未着手。
+- **advertisement chain が identity を跨いで実際に繋がっているかは歩いていない。**
+  head に `Previous` があることまでは見た。`:migration :append-cross-provider-chain`
+  という宣言が実現しているかは未測定。
+- **`ipld/` 名前空間に実際に何が入っているかは見ていない。**「Biscuit が縛らない」は
+  コードの読みであって、そこに機密が入っていないことの測定ではない。
+- **graph 側の Biscuit 検証を正当な token で通したことはない。**§1 の判定は
+  コードと設定の読みで、live の accept path は測っていない。")))

@@ -1,9 +1,0 @@
-[{:db/id -1,
-  :adr/id "adr-2609092350-public-language-model-cost-usage",
-  :adr/title
-  "Cost and observed usage based model selection for 17 public-copy languages",
-  :adr/status "accepted",
-  :adr/date "2026-09-09",
-  :adr/tags ["i18n" "model-routing" "cost" "public-site"],
-  :adr/body
-  "# Decision\n\nAdopt manifest/public-language-models.edn for public-copy drafts across the six sites and 17 locales in ADR-2609091700. English uses source identity. Routine selects observed latency and bulk selects reported cost among current-prompt contract-passing candidates. One million monthly output tokens is a provisional operating threshold, not measured traffic.\n\n# Evidence\n\nThe supplied Reddit post was removed, so the request is interpreted as the preceding 17 natural languages. Record OpenRouter official prices, seven days of global public model usage and actual public-copy API probes. Usage is neither language-specific nor semantic quality evidence. Full research: 90-docs/reports/language-models-20260909/README.md.\n\n# Execution\n\nExtend the existing scripts/model-eval/bench.cljs host and reference it from the shared locale manifest. Require explicit public input, bounded batches, price ceilings, estimated admission budget and evidence expiry. Never treat unknown cost as zero. Preserve fixed-token multisets, JSON keys, minimal script and normal completion; use only admitted fallbacks and fail on exhaustion.\n\n# Limits\n\nA five-string pilot does not certify meaning, dialect or naturalness. Native review is unverified. This does not alter general Bot routing, private-content handling, authentication or website runtime inference. It supplies the shared generation entry point, not automatic migration of every historical generator. No automatic publishing and no release of the Kotobase legal hold. Evidence expires 2026-10-09."}]

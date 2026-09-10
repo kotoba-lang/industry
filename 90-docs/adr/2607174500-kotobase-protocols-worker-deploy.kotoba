@@ -1,0 +1,33 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607174500-kotobase-protocols-worker-deploy")
+  (:adr/doc_type "adr")
+  (:adr/title "ADR-2607174500: kotobase-protocols deploy shell — s3/atproto/git.kotobase.net を Cloudflare Worker で本番投入（R2 single-object state、fail-closed write auth）")
+  (:adr/topic "kotobase-protocols-worker-deploy")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-17")
+  (:adr/last_verified "2026-07-17")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "s3.kotobase.net / atproto.kotobase.net / git.kotobase.net の3 hostname（custom domain route）の所有: kotoba-lang/kotobase-protocols-worker（Cloudflare Worker、R2 bucket kotobase-protocols-state）"
+   "ADR-2607171700 の not-decided ①（deploy shell / route cutover）の解決。ipfs.kotobase.net は引き続き ADR-2607072000（gftdcojp/net-kotobase-ipfs）の所有で本 Worker には routes を張らない"
+   "write 認可の方式: WRITE_TOKEN Bearer 必須・fail-closed（secret 未設定なら全 write 401）。reads は public"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "90-docs/adr/2607171700-kotobase-storage-protocol-layers.edn"
+   "90-docs/adr/2607072000-gftdcojp-net-kotobase-ipfs-gateway-split.edn"
+   "orgs/kotoba-lang/kotobase-protocols-worker"
+   "orgs/kotoba-lang/kotobase-cljc-worker (deploy-shell 先例: shadow-cljs :esm + 相対 source-paths)"
+   ".claude/skills/secrets-location-map (WRITE_TOKEN の保管参照)"))
+  (:adr/problem
+  "ADR-2607171700 は protocol library（kotoba-lang/kotobase-protocols）を確定したが、deploy shell と *.kotobase.net への実 route cutover を not-decided として残した。handler 群は同期・純粋（IStore 直呼び）なので、非同期ストレージ（R2）の上で動かすには persistence モデルの決定が要る。また公開 hostname に無認証 write surface を出してはならない。")
+  (:adr/decision
+  "kotoba-lang/kotobase-protocols-worker（public、shadow-cljs :esm Worker）を新設し deploy 実施。①persistence: IStore 全状態を R2 の単一 object（kotobase-protocols/state.edn、pr-str EDN）に置き、request ごとに hydrate → LocalStore（shell が atom を所有し ->LocalStore に渡す — kotobase.local/snapshot の deftype field access が nbb/SCI で動かないため）→ 純粋 router を同期実行 → write のみ etag 条件付き put（onlyIf etagMatches、楽観ロック、3回 retry 後 503）。:revision 比較で無変更 write の persist を省略。②auth: write（PUT/POST/DELETE）は WRITE_TOKEN Bearer 必須・fail-closed、reads public。③routes: s3./atproto./git.kotobase.net を custom domain で張り、workers.dev では /s3 /xrpc /git /ipfs の single-origin fallback。ipfs.kotobase.net は張らない（ADR-2607072000 所有）。")
+  (:adr/consequences
+  (vector "実測（2026-07-17 デプロイ後 smoke）: 無認証 PUT→401 / Bearer PUT→200 / GET 読み戻し・ListObjectsV2・XRPC putRecord/getRecord round-trip・git 404・ipfs 404 をすべて workers.dev と custom domain 両方で確認。custom domain 3 つは deploy 時に自動プロビジョニング（DNS+cert）"
+   "運用ノート: wrangler secret put 直後は旧 isolate が数秒 401 を返す（伝播遅延、実測）。WRITE_TOKEN の operator copy は macOS Keychain service cf:kotobase-protocols-worker / account WRITE_TOKEN（値は ADR に書かない）"
+   "v0 の明示的スケール上限: 状態は単一 R2 object（メモリに全ロード）・write は実質 1-writer 直列（楽観ロック）。テナント分離・per-collection シャーディング・Durable Objects・real kotobase datom plane 接続は follow-up。CACAO 認可（tenant 単位）も follow-up — 現状は単一 shared token"
+   "not-decided: S3 SigV4 互換 auth（aws cli 互換性）、git surface への実 repo 投入（library fn 経由の seed 運用）、state object の backup/rotation"))
+  (:adr/body
+  "# ADR-2607174500: kotobase-protocols deploy shell\n\n## Status\naccepted — 2026-07-17（デプロイ済み・smoke 検証済み）\n\n## Decision\n- repo: kotoba-lang/kotobase-protocols-worker（shadow-cljs :esm、source-paths ../kotobase-protocols/src ../kotobase/src）\n- persistence: R2 単一 object hydrate/persist + etag 楽観ロック（純粋・同期 handler を async storage に載せる v0 の解）\n- auth: WRITE_TOKEN Bearer fail-closed（未設定 = write 全拒否）\n- routes: s3./atproto./git.kotobase.net custom domains + workers.dev fallback。ipfs.kotobase.net は net-kotobase-ipfs 所有のまま\n\n## Verification（実測 2026-07-17）\n- nbb tests: 5 tests / 16 assertions green\n- shadow-cljs release: 0 warnings（resource-guard 経由）\n- smoke: 401(no token) / 200(Bearer PUT) / GET=body / ListObjectsV2 KeyCount=1 / XRPC put+get round-trip / 3 custom domains とも同一応答\n")))

@@ -1,0 +1,56 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608023200-validator-outbox-batching-clock-still-down")
+  (:adr/title "adr-2608023200: outbox を 1 tick に 1 回だけ flush する — 到着ごとの dispatch は網が自分を食う。時計はまだ動いていない")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "validator-outbox-batching")
+  (:adr/authoritative-for
+  (vector "torihiki-validator の message 送出方式"
+   "deploy 済み validator の現在の稼働状態（自走しない）"))
+  (:adr/related (vector "adr-2608023100-validator-alarm-handler-was-compiled-away"))
+  (:adr/evidence (vector "https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"))
+  (:adr/body
+  "# ADR-2608023200: outbox を 1 tick に 1 回だけ flush する
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Decision: 到着ごとの dispatch をやめる
+
+`ingest` から送ると**増幅する**: 1 通の受信が 3 通の送信を生み、**その各々が受信側でさらに 3 通**を生む。
+
+**1 プロセス内では安く、harness はそれをやっている。** HTTP 上では**ラウンドごとに膨らむ fan-out** で、subrequest の上限に当たる —— そして見える症状は「**12 block ほど走って止まる chain**」で、これは「**網が自分を食っている**」ではなく「**alarm が死んだ**」に読める。
+
+**outbox を queue し、tick が flush する**: 間に何が起きても **replica あたり 1 tick に 3 POST**。有界で、同じ総量を**ラウンド内で倍化させる代わりにラウンドに広げる。**
+
+## 併せて、正しいが十分でなかった 2 つの scheduling 修正
+
+- **alarm handler は決して reject してはならない。** Cloudflare は reject する handler を backoff 付きで再試行し、**やがて落とす** —— **落ちた alarm は永久に止まる chain。**
+- **`rearm` は「pending が無ければ設定」ではなく上書きする。** **落ちた alarm も「pending」に見える**ので、**watchdog は死体を見て「何もする必要は無い」と判断していた。**
+
+## 現在地（正確に）
+
+**まだ自走しない。**
+
+handler は build 済み bundle に**存在する** —— `Ap.prototype.alarm=function(){return this.tickNow()}`、**推測ではなく確認済み**。それでも **queue は 1 通のまま、`last-error` は空** —— つまり **`tickNow` に入っていない。**
+
+**4 validator は deploy されていて、state root で合意していて、`/step` を POST したときだけ進む。**
+
+**次に見るべきは `wrangler tail`。まだ見ていない。**
+
+**ここから見えるものが全部正しく見えるから直った、と言うのは、このファイルが既に 3 回やった間違い。**
+
+## Consequences
+
+- (+) 送出が有界になった（増幅の除去は、時計とは独立に正しい）。
+- (+) 「落ちた alarm も pending に見える」が記録された。
+- (−) **自走しない。** これが唯一かつ最大の残り。
+- (−) 鍵配布は TOFU、transaction 認証は未接続、terminal は単一 sequencer を向いたまま。
+")))

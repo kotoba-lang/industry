@@ -1,0 +1,244 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608031000-murakumo-slow-cheap-inference-tier")
+  (:adr/title "ADR-2608031000: api.murakumo.cloud に低速・低価格ティア(/v1/slow/*)を置く —— 「遅い＝安い」は成立しないので、安さの根拠を価格と一緒に公開する")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "murakumo-slow-tier-streaming-inference-pricing")
+  (:adr/date "2026-08-03")
+  (:adr/last_verified "2026-08-03")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "api.murakumo.cloud の /v1/slow/* 面(非同期ジョブ API)の契約"
+   "低速ティアの価格導出(電力原価・予約 GPU 比較・損益分岐稼働率)"
+   "streaming 推論エンジンの I/O ポリシー(page cache を使わない)と、その機械検査"
+   "低速ティアのノード登録条件(heartbeat preflight)と live 判定"))
+
+  (:adr/context
+  "オーナー指示(2026-08-03): 『https://ai-tldr.dev/releases/sqliteai-waste/ を参考に
+   murakumo.cloud で低速、だが安いモデルを api 提供するようにして』。追指示:
+   『https://news.ycombinator.com/item?id=49123386 を読んで, page cache を使わないのを参考に』。
+
+   参照元の内容:
+   - WASTE(Weight-Aware Streaming Tensor Engine、SQLite AI、Apache-2.0、
+     https://github.com/sqliteai/waste)は、依存なしの C 推論エンジン。dense な trunk
+     だけを RAM に常駐させ、routed expert を 3-bit residual VQ で NVMe から token ごとに
+     streaming することで、2.78T パラメータの Kimi K3 を 29GB RAM(推奨 64GB)+
+     982 GiB NVMe の 1 台で動かす。上流公称 0.49-0.54 tok/s(64GB MacBook Pro)。
+   - HN スレッドの技術的核心は『kernel の page cache に任せるな』。jnwatson
+     『someone that's aware of the actual usage patterns can prefetch and pipeline the
+     right data before it is used』、adrian_b は madvise の非同期発行・swap 無効化・
+     trunk への hugepage を推奨。mappu の『llama.cpp は gguf を mmap すれば RAM に
+     入らなくてもディスクに残る』に対しては、それが成立するのはモデルが概ね RAM に
+     収まる前提だから、という差がある。walrus01 の SSD 書き込み寿命の懸念は mappu が
+     否定(重みは read-only なので write amplification は起きない)。
+   - herf は『NVMe streaming は token あたりの電力が現代の GPU クラスタの 1000-2000 倍』
+     と見積もった。ElectricalUnion は 0.5 tok/s では prefill だけで 30 時間超になりうると
+     指摘。darkoob12 は 4k context ではエージェント用途に足りないと指摘。
+
+   既存の面: api.murakumo.cloud(orgs/network-awai/local-murakumo、Cloudflare Worker、
+   cljs)は /v1/messages(Anthropic 互換)・/v1/chat/completions・/v1/embeddings を
+   fleet head(infer.murakumo.cloud、qwen3.6-35b-a3b、実測 60.48 tok/s)へ中継し、
+   /infer/cost が『fleet ¥/Mtok <= GPU spot ¥/Mtok』の BMC gate を計測している。")
+
+  (:adr/decision
+  "**1. 低速ティアは非同期ジョブ API にする(/v1/slow/*)。同期応答を返さない。**
+   0.5 tok/s では 1000 token の応答に 33 分かかり、Cloudflare Worker の実行時間にも
+   クライアントのタイムアウトにも収まらない。速度が価格を決めるのではなく、
+   **速度が API の形を決める**。submit(202) → poll → result。受付は 200 ではなく
+   202 を返す —— 200 は『応答がある』の意味なのでこの面では嘘になる。
+
+   **2. 『遅い＝安い』は成立しない。これを ADR の中心的所見として記録し、価格の
+   根拠を quote に載せて公開する。**
+   実際に計算すると(local-murakumo.slow/energy-yen-per-mtok、¥30/kWh):
+   - fleet head: 64.1W / 60.48 tok/s → ¥8.83/Mtok
+   - streaming:  35W  / 0.5 tok/s   → ¥583.33/Mtok(約 66 倍)
+   遅いエンジンは 1 token あたりの実時間が長いので、**電力原価はむしろ高い**
+   (HN の herf の指摘と同じ方向)。ではなぜ安く売れるのか —— 安いのは **資本** である。
+   1.043 TB(2.78T × 3-bit)を VRAM に載せるには H200 級(141GB × 実効 0.85)が 9 枚要り、
+   その 9 枚は需要が薄い間もずっと確保していなければならない。streaming は commodity
+   NVMe 1 本 + 29GB RAM の 1 台で同じモデルを提供でき、遊休時間のコストがほぼゼロになる。
+   したがってこのティアの安さは **稼働率の関数** であり、損益分岐稼働率
+   (`break-even-utilization`)を計算して quote に載せる。実測値ベースの参照計算では:
+   - 予約 9×H200 @ $2.99/h・¥157/USD・2000 tok/s、稼働率 100% → ¥586.79/Mtok
+   - 同、稼働率 10% → ¥5,867.9/Mtok
+   - streaming(原価 ¥583.33 × margin 2.0 = ¥1,166.67/Mtok)との分岐点 ≈ 稼働率 0.50
+   つまり **GPU を 50% 以上回せる買い手には予約 GPU のほうが安い**。それを隠さず
+   同じ quote に書く。
+
+   **3. page cache を使わないことを、prose の注意書きではなく機械検査にする。**
+   `:streaming` クラスのエンジンは `:io/page-cache :bypass`・`:io/mmap-for-weights false`・
+   `:io/prefetch :explicit`・`:io/swap :disabled` を宣言しなければ登録できない
+   (`local-murakumo.slow/page-cache-violations` / `engine-admissible?`)。各違反は
+   『何が壊れるか』(`io-failure-modes`)を伴い、理由を持たないルールは足せない。
+   中心的な失敗様態は **常駐 trunk の追い出し** —— expert 読み出しを page cache に
+   通すと、kernel は再利用されない expert ページのために必ず再利用される trunk を捨てる。
+   これは性能チューニングではなく **公称 tok/s の正しさの前提** である。
+   併せて『SSD の書き込み寿命』は理由ではないと明記した(重みは read-only)。
+
+   **4. ノード側も同じ検査を通す。満たさないノードは live にしない。**
+   `POST /v1/slow/workers/heartbeat` は swap 有効・O_DIRECT 非対応・NVMe 不足・RAM 不足を
+   `io-preflight` で判定し、満たさないノードを **412** で拒否する。公称 tok/s を出せない
+   ノードを live として広告することは、価格の根拠ごと嘘になるため。
+
+   **5. live 判定は heartbeat の実在から導く。記述子の :engine/status では決めない。**
+   `:engine/status` は『統合が済んでいるか』であって『今動いているか』ではない。
+   `GET /v1/slow/models` の `:engine/live?` は 5 分以内の heartbeat の有無で決まる。
+
+   **6. 上流バイナリの CLI 契約を捏造しない。**
+   claim 応答が返すのは argv ではなく `io-requirements`(『何を満たすべきか』+
+   『OS レベルの手段』)。フラグ名を決めつけると、実際のオプション名と食い違ったときに
+   『渡したつもりで page cache 経由のまま動いている』という、いちばん検出しにくい
+   壊れ方をする。エンジンプロセスの起動は operator の責任で、ランナーは OpenAI 互換
+   HTTP を話すだけ。
+
+   **7. エンジンは 2 つ。今日 live なのは deferred のほうだけ。**
+   - `:deferred-gguf`(:available)— 既存 GGUF を遅延許容ジョブとして遊休容量で回す。
+     token 速度は速い(60.48 tok/s 実測)。『遅い』のは待ち時間で、安いのは専有容量を
+     予約しないから。**今日から動く。**
+   - `:waste`(:planned)— streaming。tok/s は上流公称であって本 fleet の実測ではなく、
+     `:engine/measured? false` として quote にもそのまま出る。weights も binary も
+     まだどのノードにも無い。")
+
+  (:adr/consequences
+  "**実装(orgs/network-awai/local-murakumo、branch agent/slow-tier):**
+   - `src/local_murakumo/slow.cljc`(新規、純 cljc)— エンジン記述子・I/O ポリシー検査・
+     価格導出・ジョブ状態機械。時計も乱数も I/O も持たない。
+   - `test/local_murakumo/slow_test.cljc`(新規)— 13 test / 105 assertion。
+     価格の期待値は docstring の式から手計算した値で固定してある。
+     **『遅い＝安い』が成り立たないことをテストで固定した** —— 直感に反する性質なので、
+     後から『遅いんだから安いはず』と価格を触ったときに落ちてほしい。
+   - `src/local_murakumo/worker.cljs` — 顧客面(submit/poll/cancel、authorize! scope chat)、
+     ノード面(work/claim/progress/result/heartbeat、write-authorized!)、公開面
+     (models/pricing)。store は `slow.jobs`(document)+ `slow.submitted`(stream)+
+     `slow.workers`(heartbeat document)。清算は既存 `infer.runs` に落とす
+     (murakumo.infer.credits/default-protocol-frac をそのまま使い、新しい台帳を作らない)。
+   - `tools/slow-worker.cljs`(新規、nbb)— `requirements` / `preflight` / `run`。
+
+   **検証(2026-08-03、本番稼働中):**
+   - `clojure -M:test` 全体 137 test / 732 assertion / 0 failure 0 error、
+     clj-kondo errors 0(新規ファイルの warning も 0)。
+   - `shadow-cljs release worker ui` 成功。
+   - **PR #115 / #116 / #117 を main に merge、api.murakumo.cloud へ deploy 済み**
+     (Worker version `ba77d50b`)。
+   - **本番でジョブ 3 件を完走**: submit(202) → heartbeat → work poll → claim(201) →
+     progress → result → 顧客 poll で本文回収(`stop_reason: end_turn`)。
+     `/infer/credits` に清算が乗った(`did:node:slow-tier-proof` ¥0.0028994、
+     treasury 5%)。`GET /v1/slow/models` の `deferred-gguf` は heartbeat により
+     `live? true`、`waste` は `live? false` のまま。
+   - 他人の鍵での job poll は 404、鍵なし submit は 401、service token 未設定時の
+     ノード面は 401(fail-closed)——いずれも本番で確認。
+   - `nbb tools/slow-worker.cljs preflight --engine waste` をこの macOS(32GB RAM、
+     空き 32 GiB)で実行 → 正しく NG(swap 有効・NVMe 982 GiB 不足)を報告した。
+     **このマシンでは WASTE は動かない、と正直に出ることを確認した。**
+
+   **本番係数(KV `infer.cost/coeffs`: ¥40.49/kWh TEPCO 従量電灯B 第3段階、
+   spot $1.80/h RunPod Community H100 下限、¥162.2/USD)での実際の値:**
+   - `waste` ¥1,574.61/Mtok(電力原価 ¥787.31 × margin 2)、
+     予約 GPU 9 枚、**損益分岐稼働率 0.38**
+   - `deferred-gguf` ¥23.84/Mtok(同 ¥11.92)、予約 GPU 1 枚、
+     **損益分岐稼働率 2.83**(＝ 1.0 を超える = どれだけ GPU を回しても deferred の
+     ほうが安い領域)
+
+   **deploy 後の live smoke で見つけて直した実バグ 3 件**(いずれもローカル e2e と
+   本番 smoke が無ければ気付かなかった):
+   1. `work-view` のワイヤキーが `clj->js` の名前空間落ちに依存しており、ランナーが
+      `:job/id` を読んで nil を掴んでいた → ワイヤ契約を非修飾キーで明示。
+   2. reasoning model(qwen3.6)が既定で thinking の途中で打ち切られ、**本文が空の
+      まま返っていた** → 記述子の `:engine/default-request` で既定 off(呼び出し側の
+      明示が勝つ)。待たせた末に空を返すのはこのティアの約束そのものを壊す。
+   3. **`?engine=` が Worker の query 許可リストに無く黙って無視されていた** →
+      pricing が既定エンジンの値を返し、より重い問題として `/v1/slow/work?engine=`
+      が全エンジンのジョブを返していた(deferred のノードが waste のジョブを掴み、
+      実行できないまま lease 切れまで滞留する)。フィルタを `slow/claimable-for` へ
+      移して JVM でテストできるようにした。
+   4. 1 ジョブぶんの金額を 2 桁で丸めていたため、本番係数では実運用サイズのジョブが
+      **全部 ¥0** になっていた(表示だけでなく清算も 0 credits)。1 件の金額のみ 6 桁に。
+
+   **コードレビューで見つけて直した 3 件(2026-08-03、PR #118。1 件は金が二重に
+   払われる実バグ):**
+   1. **result を 2 回 POST すると 2 回清算されていた(再現済み)。** `slow/finish` は
+      終端ガードで no-op を返すが、後続の分岐が `j'` の status を見ていたため、既に
+      `:succeeded` のジョブでも清算だけ走っていた。ローカル再現: 1 ジョブ 1000 token で
+      ワーカーへの支払いが ¥0.0167808 のはずが **¥0.0335616**(`infer.runs` に同一
+      job-id の run が 2 件)。修正後は result POST 3 回でも run 1 件。
+      **金を二重に払う経路を 1 箇所のガードに頼らない**方針で二重化した ——
+      終端ジョブへの result を 409 で返す + `slow-settle!` を `append` から
+      **`append-unique`(冪等鍵 `:run/job-id`)** に変更し、台帳側でも exactly-once に。
+   2. **claim が atomic でなかった。** `slow-get-job!` → `slow/claim` → `put` は
+      read-modify-write で、2 ノードが同時に `:queued` を読めば両方 claim できる
+      (33 分かかるジョブでは計算も清算も二重になる)。`/infer/queue` が同じ理由で
+      `append-unique` を使っているのと同じ手に揃えた。冪等鍵に試行番号を含めるのは
+      lease 切れ後の再 claim を殺さないため。
+   3. **古い queued ジョブが窓から押し出されて餓死していた。**
+      `(take-last 50 submitted)` は末尾しか見ないので、誰も claim しなかったジョブは
+      50 件の新規 submit で二度と配られなくなり、7 日後に黙って expire する ——
+      『待たせる』ことが前提のティアで、待っているジョブが消えるのは最悪の壊れ方。
+      floor カーソルから**前方**に取る FIFO へ変更(`slow/scan-slice` +
+      `slow/next-floor`)。floor は生きているジョブの手前で止まるので、滞留した
+      ジョブは窓の先頭に残り先に配られる。なお最初の実装は残件数を
+      `(- (count all) floor)` で計算していたが **`:seq` は連番ではなくタイム
+      スタンプ**なので負の巨大値になった(実測)—— `:pending-after-floor` に修正。
+
+   レビューで**問題なしと確認したもの**: store は `pr-str` / `edn/read-string` で値を
+   往復するので keyword は keyword のまま戻る。`terminal?` 等の keyword set による
+   終端ガードは正しく効く(JSON 往復で文字列化されて黙って壊れる筋を疑ったが該当せず)。
+
+   **残タスク(次に触る人へ):**
+   - **常駐ワーカーは立てていない。** 本番の完走は `--once` の 1 回きりで、常時
+     ジョブを拾うノードはいない。理由は 2 つあり、どちらも先に潰すべき:
+     (a) ノード面の service token は provisioning 済み(下記)だが、
+     (b) **ランナーに idle 検知が無い。** このティアの安さの根拠は『遊休容量を使う・
+     latency SLO が無い・preemptible』であって、単に常時走らせると単一の fleet head
+     で対話トラフィック(`/v1/messages`)と競合する —— 根拠として述べた性質が実装
+     されていないまま常駐させると、価格の正当化が嘘になる。常駐化の前に idle 検知
+     (head の slot 使用率を見て空いている時だけ claim する)を入れる。
+   - `MURAKUMO_SERVICE_TOKEN`(Worker `local-murakumo` のノード面 write gate)は
+     2026-08-03 に新規発行して投入した。**rotation ではなく追加** —— 発行前は未設定で
+     ノード面が常に 401(fail-closed)だったので、既存 caller はいない。正本は kagi
+     compartment `network-awai` の `LOCAL_MURAKUMO_SERVICE_TOKEN`。
+   - `waste` を live にするには、982 GiB NVMe + 29GB RAM + swap 無効 + O_DIRECT の
+     ノードに上流 WASTE の HTTP サーバを立て、`slow-worker run --engine waste
+     --engine-url <そのURL>` を回す。heartbeat の preflight を通らないノードは
+     412 で弾かれる。通ったら `:engine/measured?` を実測値で true にする。
+
+   **意図的にやっていないこと:**
+   - WASTE の binary も Kimi K3 の weights も、どのノードにも置いていない。
+     `:waste` は heartbeat が来るまで `:engine/live? false` で、submit は受け付けるが
+     『このエンジンを serve しているワーカーが今いない』と正直に返す。
+   - `itonami/unit-prices` の text = 1cr/token は触っていない。$10=950cr 換算だと
+     $10,526/Mtok に相当し、本 ADR が導出した原価と 3 桁以上ずれている(既存の
+     credits 価格表がコストから導かれていない、という別件の所見)。live な価格データの
+     変更はオーナー判断であり、本 ADR のスコープ外。
+   - 4k context の制約(HN darkoob12)は本 fleet の deferred エンジンには当たらない
+     (qwen3.6-35b-a3b は 262144)。WASTE 側の context 上限は、ノードが付いてから実測する。
+
+   **残っている前提の弱さ(placeholder):**
+   - ¥30/kWh は実タリフ未確認(cost.cljc からの継承。KV `infer.cost/coeffs` で上書き可)。
+   - streaming の 35W は placeholder(`:engine/watts-source :placeholder` として quote に出る)。
+   - 予約 GPU 参照($2.99/h、2000 tok/s、141GB、実効 0.85)はすべて仮定。
+     いずれも quote の `:price/basis` / `:price/vs-reserved-gpu` にそのまま載るので、
+     買い手が自分の数字を当てはめて計算し直せる。")
+
+  (:adr/alternatives
+  "- **/v1/messages に低速モデルを足すだけにする** — 却下。0.5 tok/s は同期 HTTP に
+     載らない(33 分/1000 token)。タイムアウトで失敗するだけの面を増やすことになる。
+   - **/infer/queue(既存の native-tier poll relay)をそのまま使う** — 却下。あちらの
+     ジョブは claim → result の 2 状態で途中経過を持たない。分〜時間かかるジョブでは
+     『生きているのか死んでいるのか』が唯一の関心事なので、progress を上書きできる
+     document が要る。ディスパッチの形(poll 型・CACAO/service-token gate)は踏襲した。
+   - **page cache 禁止を docstring の注意書きにする** — 却下。守られたかどうかを
+     誰も検査しない規則は、守られていないときに黙って公称値が嘘になる。
+   - **WASTE 相当を自前で書く** — 却下。CLAUDE.md の『Rust を新規に書かない』
+     『C は判断を含まない機構層のみ』に反するし、上流が Apache-2.0 で存在する。
+     消費する側に回る(llama.cpp と同じ扱い)。
+   - **『遅いから安い』とだけ書いて売る** — 却下。計算すると電力原価は 66 倍高い。
+     稼働率という条件を伏せた安さの主張は、買い手が検算した瞬間に崩れる。")
+
+  (:adr/references
+  (vector "https://ai-tldr.dev/releases/sqliteai-waste/"
+   "https://news.ycombinator.com/item?id=49123386"
+   "https://github.com/sqliteai/waste"
+   "ADR-2607022200 — BMC gate『fleet ¥/tok <= GPU spot ¥/tok』(local-murakumo.cost の由来)"
+   "ADR-2607120000 — push 型 WSS relay の退役と poll 型ディスパッチ"
+   "ADR-2608011400 — mk1 capability token(/v1/slow/* の顧客面認証)"))))

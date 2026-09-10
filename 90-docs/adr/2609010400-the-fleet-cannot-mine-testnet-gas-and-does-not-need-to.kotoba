@@ -1,0 +1,148 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609010400-the-fleet-cannot-mine-testnet-gas-and-does-not-need-to")
+  (:adr/title "The fleet cannot mine testnet gas, and does not need to")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/related (vector "adr-2609010200-a-faucet-gated-by-a-passkey-issues-the-grant-not-only-the-tokens"
+                "adr-2609010100-the-passkey-is-the-root-and-the-first-spend-limit-is-the-balance"
+                "adr-2609010300-a-discovery-surface-is-a-promise-and-nothing-was-checking-it"))
+  (:adr/body "2026-09-01. The fleet cannot mine testnet gas, and it does not need to.
+
+## The question, and what the chains actually say
+
+Asked to mine our own testnet gas so the faucet could fund itself. Measured
+rather than recalled:
+
+  Base Sepolia   difficulty 0x0   miner 0x4200000000000000000000000000000000000011
+  Sepolia L1     difficulty 0x0   nonce 0x0
+  eth_mining     unimplemented on both
+
+0x4200...0011 is the OP-Stack system address. Base Sepolia is a rollup whose
+blocks come from a sequencer; there is no proof-of-work, no block reward, and
+no share of it to win. Sepolia L1 is proof-of-stake with a permissioned
+validator set. This is not a permission problem or a missing tool: no amount
+of fleet CPU produces one wei on either chain, for us or for anyone.
+
+A Monero mining wallet exists on this workstation and no mining process is
+running. Even at full tilt it would not help: XMR is not gas on Base, and
+turning it into gas is a trade, which is not mine to execute.
+
+## The premise was wrong, not the goal
+
+x402's `exact` scheme does not ask the buyer for gas. The buyer signs an
+EIP-3009 `transferWithAuthorization` and the FACILITATOR submits it and pays.
+pay.x402 has validated that authorization since it was written; what was
+missing was never mining, it was the submit seam.
+
+So the economy needs gas in one wallet, once -- not in every agent's. And the
+amount is small: measured at the current Base Sepolia base fee, one settlement
+costs 0.00000144 ETH. A single 0.01 ETH drip covers roughly seven thousand of
+them.
+
+## Everything needed is already here, in .cljc
+
+kotoba-lang/eth-crypto has Keccak-256, EIP-712, secp256k1 sign and recover,
+RLP, and EIP-1559 transaction signing, dependency-free on both platforms.
+org-ethereum-abi encodes the call. base-l2 carries eth_sendRawTransaction over
+an injected transport. No external binary, no node to run, nothing to install.
+
+scripts/x402-gasless-settle-proof.cljs walks the whole path and stops before
+sending: it reads the token's domain off the chain, signs an authorization,
+recovers the signer, encodes the settlement call, signs the EIP-1559
+transaction, prices it against the live base fee, and prints the payer's
+balance. It never submits and never moves funds; keys are generated in memory
+and never printed or written.
+
+## A live defect on that path, found on the way
+
+`extra` is the EIP-712 domain a buyer signs under. Read from the contracts:
+base mainnet 0x833589fC declares `USD Coin`/`2`; base-sepolia 0x036CbD53
+declares `USDC`/`2`. Both requirement builders emitted `USD Coin`
+unconditionally, so all three live base-sepolia listings advertised a domain
+their own token does not use. Every signature would have recovered a different
+address, and been rejected as a bad signature -- blaming the buyer for a value
+the offer supplied.
+
+This is the same defect usdc-by-network was written for, one field over: a
+per-network value left as a constant beside one that had just been fixed. The
+scheme in use today is `transaction`, which does not read `extra` at all, so
+nothing was failing and nothing would have until the first `exact` payment.
+
+Fixed in kotoba-lang/pay and the vendored copy, deployed, and verified live.
+eip712-domain-for throws on an unknown network rather than defaulting, because
+defaulting to the mainnet name is precisely how every testnet offer came to
+carry it.
+
+## Two controls, and what each one caught
+
+The proof's first run printed `SIGNER recovers to the buyer` while every field
+of the domain was nil -- eth-crypto looks fields up by the string name from the
+type definition, and the domain map used keywords. Signing and recovering both
+used the same wrong digest, so it was self-consistent and meaningless. The
+negative control is what noticed: a domain that should have differed produced
+an identical result.
+
+The authoritative check is the counterparty's. USDC exposes DOMAIN_SEPARATOR(),
+and with `USDC` ours equals it byte for byte:
+
+  0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818
+
+With `USD Coin` the same authorization recovers a different address. Agreement
+with the contract is what makes this a proof rather than a self-portrait.
+
+## Asked again: mine the Base Sepolia ETH itself
+
+Base Sepolia still cannot be mined, and the reason has not changed. But the
+question has a real answer one layer down, and the first version of this
+record stopped too early by saying only that gas must come from outside.
+
+Base Sepolia ETH is MINTED BY THE BRIDGE. Deposit ETH into the OptimismPortal
+on Sepolia L1 -- 0x49f53e41452C74589E85cA1677426Ba426459e85, confirmed both by
+Base's own contract documentation and by 2059 bytes of code at that address on
+Sepolia -- and the same address is credited on Base Sepolia. So the question
+becomes where Sepolia L1 ETH comes from.
+
+Sepolia L1 is proof-of-stake with a permissioned validator set, so it cannot
+be mined either. But it can be EARNED BY HASHING. pk910 runs a CryptoNight
+proof-of-work faucet at sepolia-faucet.pk910.de: measured 2026-09-01, powParams
+{\\\"a\\\":\\\"cryptonight\\\"}, difficulty 12, 1000 H/s per session, 12-hour sessions,
+paying 0.05 to 2.5 ETH for work submitted. Its sibling faucets cover ephemery,
+holesky and hoodi. None covers Base Sepolia, which is why the bridge leg
+exists.
+
+That is mining in the sense that matters here: computation in, testnet ETH
+out, and no faucet operator deciding whether we deserve it. The minimum payout
+is 0.05 ETH, which at 0.00000144 ETH per settlement is about thirty-five
+thousand x402 payments.
+
+## The one gesture that is not ours to make
+
+That faucet's captcha module has requiredForStart: true. Solving a CAPTCHA is
+bot-detection bypass and is refused without exception, so a person starts the
+session. It is one gesture, once, and everything after it is machine work the
+faucet is explicitly built to accept -- ADR-2609010200 argued that a CAPTCHA in
+front of an agent measures the wrong party, and this is the same shape seen
+from the other side: the puzzle gates the human who starts, not the machine
+that works.
+
+The fleet does not help. A session is capped at 1000 H/s and a session costs a
+CAPTCHA, so this is a one-machine job; ten mac minis hashing into one capped
+session produce exactly what one does. Nor is a miner worth writing: the
+faucet's own page ships a WASM CryptoNight miner, and duplicating it for one
+capped session would be work with no consumer.
+
+## What exists now
+
+scripts/sepolia-to-base-bridge.cljs reports where the funds are and, once
+Sepolia ETH exists, builds the deposit that carries it across, holding back
+gas for itself. Both branches are exercised: unfunded exits 2 rather than
+reporting a pass it did not measure, and against a funded address it builds
+the transaction and prints it. It does not send, and it does not read a
+signing key.
+
+## What is still missing
+
+One session on the PoW faucet, started by a person solving one CAPTCHA. After
+that the path is: hash, claim to the Sepolia address, run the bridge script,
+and the x402 facilitator has gas. Nothing else in the payment path depends on
+anything outside this workspace.")))

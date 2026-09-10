@@ -1,0 +1,90 @@
+(vector (map 
+  (:db/id -1)
+  (:adr/id "adr-2609010200-affine-homogeneous-vectors-so-a-book-can-be-written")
+  (:adr/title "affine な同種 vector —— 板が書けない理由は「1 要素書くたびに全部コピーする」だった")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/body "## 決定
+
+**同種 i64/f64 vector に affine（線形）な値族を認める。** 更新は handle を消費し、
+backend はコピーではなく store に落としてよい。認めるのは**値族 1 つ**であって、
+`:capability-only-affinity` が意図的に持たないと宣言している
+**一般の ownership/borrow/lifetime 系ではない。**
+
+現在地は正本 `kotoba-lang/kotoba-lang` の `lang/surface-status.edn`
+`:invariants :capability-only-affinity :widening-path`。前提条件は **5 つ中 1 つが met**。
+
+## なぜ意味論の変更ではないか
+
+更新後に死んでいる handle を in-place で書くことと、コピーを作ることは、
+**いかなる観測者にも区別できない。** したがってこの widening はプログラムの
+*意味*を変えず、backend が選んでよい *lowering* だけを変える。だから解析は
+保守的でなければならない —— ここで誤って `true` を返すと、まだ誰かが持っている
+値を黙って書き換える。
+
+## 測った穴（推測ではない）
+
+`amu/tools/kexe_loader.c` の `checked_vector_assoc` は **vector 全体を `memmove` し
+bump 確保する**。C 側のコメントが自分でそう書いている ——
+*every operation that changes an element allocates rather than mutates*。
+
+| | |
+|---|---|
+| 1 要素の書き込み | **O(length)** |
+| vector が生涯に受けられる書き込み回数 | **arena / length** —— `KEXE_VECTOR_ITEM_CAPACITY` 65536 を KIR が認める最長 16384 要素で割ると **生涯 4 回**。arena は bump のみで回収されない |
+
+板は 1 field あたり約 100 万 slot、1 注文ごとに書く（ADR-2608311900）。
+**どちらの数字も桁で足りない。**
+
+## なぜこれが禁止対象ではないか
+
+`surface-status.edn` の `:state` 項が明言している ——
+**「不変条件は AMBIENT であって mutation そのものではない」**。所有が一意な値を
+その場で書くことは ambient authority ではない。値は式が作り、名前が 1 つ持ち、
+更新が消費する。capability も grant も effect row も要らない。
+
+`:capability-only-affinity` の disposition は `:intentional-semantic-simplification`
+（安全不変条件ではない）で、その reason は「*general* な ownership/borrow/lifetime 系は
+意図的に無い」と書いている。値族 1 つはその一般系よりはるかに狭い。
+
+## 着地したもの
+
+**`kotoba.native.affine`**（`kotoba-native`）—— `linear?` と `linear-let-chain?`、
+テスト 12 本。struct-of-arrays が実際に書く形を認める:
+
+    (let [v (vector-i64-new 1024)
+          v (vector-assoc v 0 7)
+          v (vector-assoc v 1 9)]
+      (vector-at v 0))
+
+保守的に拒否するもの: 1 経路での 2 回使用 / 裸の参照（返す・関数に渡す）/
+handle を自分自身の要素に格納 / **`vector-drop` は CONSUMING 扱い**（view の親を
+後で in-place 書き換えると、その view は別物になる —— alias する唯一の操作を
+安全側に倒す）。
+
+壊して両方向を確認済み: `vector-drop` を read 扱いにすると
+`a-view-consumes-its-parent` が赤、1 経路 2 回使用を許すと
+`two-uses-on-one-path-are-not-linear` が赤。
+
+## 着地していないもの（4/5）
+
+- **backend lowering** —— 解析を参照する backend が無い。store に落ちるものは何も無い
+- **host ABI** —— `kexe_context_v3` は `vector_assoc` しか持たない。in-place store は
+  新しい slot と version bump で、ABI drift を守る `_Static_assert` の offset を伴う
+- **arena bounds** —— 4096 handles / 65536 words / 16384 items のまま。in-place 化は
+  「arena が 1 vector の 4 倍必要だった理由」を消すが、上げるのは別の決定
+- **conformance vectors** —— lowering を記述するものなので、lowering の前には書けない
+
+**fail-closed:** 前提が全部揃うまで `vector-assoc` は確保し続ける。
+**解析が存在すること自体は、プログラムから観測できる何も変えない。**
+
+## これで板が書けるようになるか —— まだ
+
+affine vector は**必要条件であって十分条件ではない**。ADR-2608311900 が測った
+もう 1 つの壁が残る: native homogeneous vector は `:implementation
+#{:compiler-native-host}` で **wasm には無い**。torihiki が deploy されるのは
+Worker なので、native だけ広げても届かない。
+
+順序は (1) lowering + ABI（native で証明）(2) arena bounds (3) wasm backend parity。
+それぞれ独立に fail-closed で、どれも安全不変条件には触れない。")
+ ))

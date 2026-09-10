@@ -1,0 +1,31 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607183000-kami-daw-nle-browser-production-io")
+  (:adr/title "KAMI DAW and NLE browser-native production I/O boundaries")
+  (:adr/date "2026-07-18")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607182900-kami-dedicated-daw-nle-app-boundaries"))
+  (:adr/decision
+  (map (:apps (map (:daw "kotoba-lang/kami-app-daw") (:nle "kotoba-lang/kami-app-nle")))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:daw-runtime (map (:playback "AudioContext oscillator sources through gain, BiquadFilter and DelayNode")
+                 (:production-export "OfflineAudioContext full-arrangement render to PCM WAV")))
+   (:nle-runtime (map (:decode "local video Blob URL decoded by HTMLVideoElement")
+                 (:effects "CanvasRenderingContext2D filter applied to every decoded frame")
+                 (:production-export "canvas.captureStream plus source audio track encoded by MediaRecorder to WebM")))
+   (:host-boundary "Browser owns user gesture, device/media decode, realtime scheduling, encoding and file download; EDN project functions remain pure.")
+   (:non-claims (vector "DAW external recording and plugin hosting" "NLE rendered multi-source transitions" "arbitrary codec/container selection"))))
+  (:adr/implementation
+  (map (:daw-files (vector "orgs/kotoba-lang/kami-app-daw/src/main/kami/app_daw/audio.cljs"
+               "orgs/kotoba-lang/kami-app-daw/src/main/kami/app_daw/ui.cljs"))
+   (:nle-file "orgs/kotoba-lang/kami-app-nle/src/main/kami/app_nle/ui.cljs")
+   (:evidence (vector "JVM/CLJC domain tests remain green in both repositories"
+              "GitHub Pages production release compiles both browser apps"
+              "Real Chrome verifies DAW playback graph and WAV download"
+              "Real Chrome imports and decodes a generated video, applies an effect and downloads a non-empty WebM master"))))
+  (:adr/consequences
+  (vector "The applications now own real browser media I/O rather than only editing project data."
+   "Export formats are intentionally WAV and WebM because browsers can produce them without introducing a second JavaScript media engine."
+   "Creative Studio remains outside the canonical DAW/NLE ownership boundary."))
+  (:adr/source-format "edn")))

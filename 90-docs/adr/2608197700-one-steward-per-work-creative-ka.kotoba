@@ -1,0 +1,146 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608197700")
+  (:adr/title "作品ごとに 1 体 — 五つの創作 -ka が bot 登録簿に入る。ただし艦隊は 1 度に 1 体しか動かせない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "bots, loop-yakuwari, cloud-itonami-app, mangaka, animeka, gameka, dougaka, yukkuri, workforce, capacity, murakumo")
+  (:adr/body
+  "## 決定
+
+`mangaka` `animeka` `gameka` `dougaka` `yukkuri` を loop-yakuwari の登録簿に
+事業として足し、**役割ではなく作品で分解する** —— 1 作品 = 1 steward、
+operating role（director/engineer/qa …）は 1 つも持たせない。
+オーナー判断 2026-08-19。
+
+8 事業 70 role → **13 事業 90 role**。新規 20 体。
+
+## なぜ「無かった」のか（測定）
+
+質問は「mangaka, dougaka, yukkuri, shiropico の bots も登録、永続化されて
+いるか」だった。答えは**永続化されていないのではなく、存在しなかった**。
+
+登録簿の 8 事業に 5 つの -ka はどれも入っておらず、74 体を全文検索しても
+1 件もヒットせず、launchd の常駐にも無い。一方で作品は live だった:
+
+| -ka | 実測 2026-08-19 |
+|---|---|
+| mangaka | 5 タイトル / 36 話が `mangaka.itonami.cloud` に live |
+| animeka | 8 作品（放送中 1 / 制作中 1 / 企画 6）が `animeka.gftd.ai` に live |
+| gameka | gameSpec 2 本。**ホストが応答しない**（curl exit 000） |
+| dougaka | 公開作品ゼロ。**ホストが応答しない**（curl exit 000） |
+| yukkuri | 4 チャンネル / 123 series |
+
+**shiropico は独立プロダクトではなく animeka の 1 作品**（シロ & ピコ）だった。
+事業ではなく work steward を与えた。
+
+## なぜ役割ではなく作品で割るか
+
+同じ catalog の 2 タイトルは pipeline を共有するが、読者も刊行ペースも
+存在理由も共有しない。1 体の『mangaka engineer』は無関係な 5 つの編集状態を
+同時に抱えることになり、それは projection が全 bot に配っている
+`Act only inside this business` が防ごうとしているものそのものである。
+
+**単位は継承せず選ぶ:**
+
+- mangaka は**話ではなくタイトル**単位。話ごとにすると bot 数が章数に追随し、
+  誰も決めていないのに増え続ける
+- yukkuri は**series ではなく channel**単位。123 series は 123 体になる。
+  `:channel/topic-scope` と compliance 境界が channel にある
+- dougaka は **1 体だけ**。公開作品がゼロで、repo にあるのは renderer の
+  fixture 5 本。1 本ずつ steward を立てれば、**読者が到達できない 5 作品を
+  この艦隊が「在る」と報告する**ことになる
+
+role kind は**公開 slug の語幹**（`yamainu` → `/work/yamainu-12`）。bot 名から
+URL へ対応表なしで行ける。
+
+## 登録簿のコードは 1 行も変えていない
+
+key は `<business>/<kind>` のまま。`complete-roles` は template の無い kind を
+**生成せずに飛ばす**設計で、`workforce-bots` は authored の `:bot/name` /
+`:bot/cadence-minutes` を template より優先する。だから work steward を
+authored entry として書けばそのまま通る。
+
+## 塞いだ障害
+
+**`cloud-itonami-app` の workforce gate が、自分の所有物でない組織図を
+凍結していた。** `expected-businesses` が 8 事業を集合として固定し、契約が
+`(= 8 (:businesses value))` を主張していた。正本は loop-yakuwari 側なので、
+そちらに事業を足すと **catalog 全体が拒否される** —— 変わっていない 8 事業も
+含めて。実際 2026-08-19 の最初の provision はこれで失敗した。
+
+完全性の検査を**内部整合**に変えた: projection が自己申告する事業数が、
+その role 群が実際に覆う事業数と一致すること。これが本来この gate が捕まえる
+はずの失敗（切り詰められた catalog）を捕まえ、登録簿が育っても捕まえ続ける。
+リテラル 8 が捕まえていたのは『登録簿が変わったこと』だけだった。
+8 事業は**床**として残した（`every? businesses founding-businesses`）—— 静かに
+消えることは count だけでは捕まらない実在の失敗なので。
+
+実際の `load-catalog` で両方向を実証した（隔離 workspace）:
+
+    accept  13 事業 / 90 role
+    reject  role を 1 つも出さない 14 番目の事業 → :businesses 14 に対し 13 が被覆
+    reject  :app-aozora を消し、数は自己整合のまま → :missing-founding #{:app-aozora}
+
+**2 番目の reject は count だけの検査なら通していた。**
+
+もう 1 つ: `dougaka` の objective が 1114 文字で、`bot.cljc` の
+`max-responsibility` は 1000。`awai check` は通り projection も作れたのに、
+provisioning が catalog 全体を拒否した。965 文字に詰め、残り 89 role も
+app 側の全上限（name<=60 / responsibilities<=12 / capability-policy<=40 /
+workspace<=4096）に対して**まとめて**検査した。違反 0。
+
+## 二つの objective は技芸以外を条件にしている（意図的）
+
+- **True Crime ch** は ceiling の `:voice-required` ではなく
+  `:approval-required`。題材が実在の識別可能な人物である
+- **NyaCat Multiverse** は storyboard の前に Nyan Cat の権利を確定し、
+  **答えが『不可』でも報告せよ**と書いてある
+
+`gameka` の 2 体と `dougaka` の 1 体は**ホスト復旧を最初の bounded outcome**
+として持ち、測定した status code を毎回報告するよう指示している ——
+暗いホストに対して『作品が見つかりません』と報告するのは、この workspace が
+silent pass と呼んでいるものだからである。
+
+## 容量 —— 別件として繰り越し（オーナー判断 2026-08-19）
+
+**このワークスペースは「6 スロット」を capacity として引用してきたが、
+それは動いていないループの値である。**
+
+- `fleet.edn` の `:global-wip 6` は loop-yakuwari の `awai dispatch` ループの
+  もので、**そのループは何も dispatch していない**（`journal/runs.edn` は `[]`）
+- 70 体を実際に動かしているのは cloud-itonami-app の常駐で、その上限は
+  `:max-active 1` / `:max-starts-per-tick 1`
+- そして `murakumo-main` の実測が `parallel: 1`（One production slot）。
+  **`max-active 1` は保守的な推測ではなく serving 容量そのもの**で、
+  上げても待ち行列が伸びるだけ
+- `bots.clj` の docstring: `Start a bounded number of due startup jobs
+  for one live human session.` —— **tick は人間のセッションが生きている間だけ動く**
+
+2026-08-19 の実測: **70 体中 66 体が実行超過**（最悪約 19 時間）、
+**直近ターンの 47/72 が失敗**（internal-error 27 / provider/invalid-tool-arguments 19
+/ empty-response 1）。
+
+したがって **20 体を足しても飢餓の原因は変わらない** —— 原因はスロット競合では
+なく、1 度に 1 体でありセッション依存であること。作品 bot の登録を先に着地させ、
+容量は別タスクとした。**この ADR は容量問題を解決していない。**
+
+次の一手（優先順）:
+
+1. 常駐 tick の**セッション依存を外す**（overdue 66 件の直接原因）
+2. `provider/invalid-tool-arguments` 19 件 —— 27B モデルが tool call を
+   正しく出せていない可能性。`max-tool-calls 4` との相互作用を測る
+3. `internal-error` 27 件の切り分け
+4. murakumo の serving slot を増やせるか（増やせない限り max-active は 1 が正しい）
+
+## 証拠
+
+- 登録簿: network-awai/loop-yakuwari `9080408`（`awai check` →
+  businesses 13 | roles 90 | outward 21 | narrowed by ceiling 0）
+- gate: cloud-itonami/cloud-itonami-app `e8634b9`
+- pin: com-junkawasaki/root `8e3e623`（verify-west-pins: すべて fast-forward）
+- provisioned-at 2026-08-19T06:08:46Z → **businesses 13 / bots 90 / enabled 90**
+- 20 体すべてが live Bot として存在し、cadence 1440m、workspace は全て実在
+- 既存 70 体は無傷（8 事業の内訳が変わっていない）
+")))

@@ -1,0 +1,44 @@
+(vector (map (:db/id -1), (:adr-id "ADR-2607154100")
+ (:title "cloud-itonami-isic-931 — Sports Facility & League Administrative Coordination")
+ (:status :accepted)
+ (:date "2026-07-15")
+ (:deciders (vector "Jun Kawasaki"))
+ (:scope (vector "orgs/cloud-itonami/cloud-itonami-isic-931" "orgs/kotoba-lang/industry"))
+ (:isic-code 931)
+ (:isic-description "Sports activities")
+ (:actor-namespace "sportsleagueadminops")
+ (:pattern :cloud-itonami-actor)
+ (:lineage (map (:base :isic-900)
+           (:domain-adaptation "sports facility/league admin from performing-arts venue")))
+ (:hard-checks
+ (map (:facility-unverified "target facility must exist and be :registered?/:verified? in store")
+  (:effect-not-propose "effect must always be :propose")
+  (:scope-exclusion "proposals touching coaching/athlete-selection/competitive-scheduling/disciplinary/pricing/safety-authority are HARD-blocked")))
+ (:allowed-ops
+ (vector :schedule-facility-booking
+  :coordinate-team-roster-logistics-proposal
+  :coordinate-supply-request
+  :coordinate-event-logistics
+  :flag-safety-concern))
+ (:always-escalate-ops (vector :flag-safety-concern))
+ (:scope-excluded-categories
+ (vector :coaching :athlete-selection :competitive-scheduling :disciplinary :pricing :safety-authority))
+ (:phase-rollout (map (:phase-0 "read-only")
+                 (:phase-1 "facility booking + roster logistics (approval-gated)")
+                 (:phase-2 "+ supply + event logistics (approval-gated)")
+                 (:phase-3 "auto-commits high-confidence (safety always escalates)")))
+ (:repo-url "https://github.com/cloud-itonami/cloud-itonami-isic-931")
+ (:repo-private false)
+ (:license "AGPL-3.0-or-later")
+ (:registry-update
+ (map (:registry :kotoba-lang/industry)
+  (:entry-id 931)
+  (:fields (map (:maturity :implemented)
+           (:repo "https://github.com/cloud-itonami/cloud-itonami-isic-931")
+           (:business-id "cloud-itonami-isic-931")
+           (:required-technologies (vector :identity :forms :dmn :bpmn :audit-ledger))))))
+ (:references
+ (vector "ADR-2607121000 (Wave structure and rollout plan)"
+  "ADR-2607152500 (Wave 4 rollout start amendment)"
+  "ADR-2607153800 (cloud-itonami-isic-900 precedent)"
+  "ADR-2607152700 (cloud-itonami-isic-873 precedent)"))))

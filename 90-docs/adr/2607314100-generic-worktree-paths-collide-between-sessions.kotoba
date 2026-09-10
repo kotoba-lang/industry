@@ -1,0 +1,97 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607314100-generic-worktree-paths-collide-between-sessions")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/topic "agent-worktree-path-collision")
+  (:adr/title "ADR-2607314100: agent worktree の path は session 固有にする — 汎用名（/tmp/root-closing）は衝突し、他 session の `git add -A` が自分の編集を吸い込む")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-31")
+  (:adr/last-verified "2026-07-31")
+  (:adr/last_verified "2026-07-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative-for
+  (vector "agent worktree の path に session 固有の suffix を付ける規則（汎用名の禁止）の正本"
+   "共有 path で他 session の編集を巻き込む事故（git add -A が第三者の in-flight 編集を commit する）の記録"
+   "自分の編集が他 session の commit に入って着地した場合の扱い（内容が正しければ再 commit せず handoff に明記する）の正本"))
+  (:adr/related "adr-2607011300-west-topdir-in-agent-worktree, adr-2607011345-worktree-isolation, adr-2607310200-six-workers-called-two-functions-nobody-wrote")
+  (:adr/body "
+# ADR-2607314100: worktree の path は session 固有にする
+
+**Status**: accepted
+**Date**: 2026-07-31
+**Deciders**: Jun Kawasaki（+ Claude。closing 実行中に実際に踏んだ事故の記録）
+
+## Context — 編集が2回消え、3回目は他人の commit に入って着地した
+
+closing の『正本を更新する』段で、既存 ADR 2件（2607309500 / 2607309960）の
+「残る gap」節を最新化しようとして `/tmp/root-closing` に worktree を作った。
+
+起きたこと（実測、2026-07-31）:
+
+1. python heredoc で2ファイルを書き換え、`print('ok')` まで到達。直後の
+   `git status --short` が **clean**。編集が消えた。
+2. 絶対 path で書き直すと今度は `git status` に2件の modified が出た。しかし
+   同じ worktree の `git rev-parse --abbrev-ref HEAD` は
+   **`agent/closing-rdfc-plane`** — 自分が作った `agent/closing-adr-refresh` では
+   なかった。**別 session が同じ path に worktree を作り、branch ごと入れ替わっていた。**
+   見覚えのない untracked ADR（`2607314000-rdfc-cryptosuite-plane-closed.edn`）が
+   同じ tree に現れていたのが手がかりだった。
+3. 自分の編集を scratchpad に退避し、相手の tree を `git checkout --` で戻した直後、
+   **`/private/tmp/root-closing` ごと消滅**（相手が worktree を撤去）。
+4. 新しい path で main を取り直したら、**自分の編集は既に main に載っていた** —
+   相手の commit `3f30b922 docs(adr): record the -rdfc- cryptosuite plane as closed`
+   に、`git add -A` で巻き込まれて着地していた。
+
+## Decision
+
+### D1. worktree の path に session 固有の suffix を付ける
+
+`/tmp/root-closing`・`/tmp/root-fix`・`/tmp/mp-edge` のような**汎用名を使わない**。
+session id の断片・PID・タスク名など、衝突しない要素を必ず入れる:
+
+```bash
+git worktree add -b <branch> /private/tmp/root-<task>-<session-frag> origin/main
+```
+
+CLAUDE.md の worktree-per-agent 規則は「superproject の外に作る」ことは定めていたが
+**path の一意性は定めていなかった**。並行 session が同じ命名規則を持つ以上、
+汎用名は必ず衝突する。実際、この session だけで `/tmp/root-closing` を含む
+generic path を10個以上使っていた（`/tmp/root-funds`・`/tmp/root-mat2` 等）。
+
+### D2. 共有され得る tree で `git add -A` しない
+
+相手の commit に自分の ADR 2件が入ったのは、相手が `git add -A` したから。
+**worktree が自分専用だと確信できないなら、変更した path を明示して add する。**
+これは D1 を守っていれば起きないが、二重の防御として書いておく。
+
+### D3. 他 session の commit に入って着地した場合、内容が正しければ再 commit しない
+
+今回は着地した内容が意図どおり（両 ADR の該当節が期待する文面と byte 一致）だった
+ので、**同じ変更を自分の commit で作り直さない**。履歴に重複を作るだけで、正本の
+内容は既に正しい。**handoff に「どの commit で着地したか」を明記する**ことで
+追跡可能性を確保する。内容が意図と違っていた場合のみ、差分だけを別 commit で直す。
+
+## 検出のしかた（次に踏んだ人向け）
+
+worktree で編集が消えた・見覚えのない untracked file がある ときは、まず:
+
+```bash
+git -C <worktree> rev-parse --abbrev-ref HEAD   # 自分の branch か?
+git worktree list | grep <path>                 # 自分の登録か?
+```
+
+branch 名が自分のものでなければ path が奪われている。**その tree で commit しない**
+（相手の branch に載る）。自分の変更を退避 → 相手の tree を `git checkout --` で戻す
+→ 一意な path で作り直す。
+
+## Alternatives considered
+
+- **worktree を作らず superproject で直接編集する。** CLAUDE.md が禁じている
+  （並行 session の main 同期のたびに他人の WIP が stash される）。
+- **ロックファイルで path を予約する。** resource-guard と同型の仕組みは作れるが、
+  path に一意な文字列を入れるだけで消える問題に機構は要らない。
+- **相手の commit から自分の変更を revert して自分で commit し直す。** 履歴が
+  汚れるだけで正本の内容は変わらない。D3 のとおり、内容が正しければ触らない。
+")))

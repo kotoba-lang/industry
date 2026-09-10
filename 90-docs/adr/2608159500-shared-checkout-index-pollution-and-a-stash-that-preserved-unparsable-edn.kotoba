@@ -1,0 +1,119 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608159500")
+  (:adr/title "共有 checkout の index 汚染と、parse できない EDN を保全した stash（2026-08-15）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-15")
+  (:adr/last-verified "2026-08-15T20:00:00+09:00")
+  (:adr/topic "git-cleanup-conflict")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative-for
+  (vector "2026-08-15 夜の cleanup で index から外した 210 path の範囲と、その根本原因の修正"
+   "kaiyu-kaizen ledger の 2 stash の判定と、着地させた 3 record の出所"
+   "保全機構が壊れた record を作りうるという class と、その検査手順"
+   "この session の archive 位置と resume point"))
+  (:adr/related
+  (vector "90-docs/adr/2608151700-git-cleanup-conflict-superproject-branch-retirement.edn"
+   "90-docs/adr/2608136000-five-questions-before-trusting-green.edn"
+   "manifest/cleanup-workflow.edn"
+   ".claude/skills/git-cleanup-conflict/SKILL.md"))
+  (:adr/supersedes (vector))
+  (:adr/body
+  "# ADR-2608159500: 共有 checkout の index 汚染と、parse できない EDN を保全した stash
+
+ADR-2608151700（同日 17:00）の**後**に起きた別の cleanup。あちらが local stash 0 本と
+記録した時点より後に stash が 2 本積まれ、index には 210 path が staged されていた。
+
+## 見つけた 2 つの欠陥
+
+### 1. 共有 checkout の index に、他 repo の working tree が 210 path 分 staged されていた
+
+commit はされていない。内訳は子 repo の tree 53、子 repo の
+`venv/lib/python3.12/site-packages` 18、他 repo の linked worktree 116、
+`docs/design/` の PNG 5（10.8 MB）。
+
+**原因は `.gitignore` の欠落**である。この superproject は west 管理の子 repo を
+`/orgs/<org>/<repo>/` として 1 件ずつ ignore する規約（4,171 entry）を持つが、
+`gftdcojp` の 14 repo がその列から漏れていた。漏れた path は root で `git add` を
+打った瞬間に**子 repo の working tree ごと index に入る**。tamaki session が作る
+linked worktree `orgs/<org>/.<repo>-tamaki--<session>/` も同じ理由で入っていた。
+
+修正は PR #2261。14 件を既存の規約どおり 1 件ずつ足し、tamaki worktree には
+**org 単位の blanket ではなく**狭い glob を当てた —— blanket は未登録の orphan まで
+隠すので 2026-07-25 に撤去された経緯がこの file 自身に書かれている。west.yml の
+4,170 entry のうち `-tamaki--` を含むもの・dot 始まりの segment を持つものは
+**0 件**なので、この glob が登録済み project を隠すことはない。実測で root の
+untracked entry は 51 → 18 に落ち、**ignore されるようになった tracked file は 0**。
+
+残る 18 件は本物の orphan（venv を抱えた非 git の `maxwell-mac/`、未登録の git repo
+数件、`_intake/` の repo）で、**隠していない**。register か retire かの判断が要る。
+
+### 2. 保全のための stash が、parse できない EDN を保全していた
+
+stash は 2 本とも `90-docs/kaizen/kaiyu-kaizen.ledger.edn` だけを持っていた。
+どちらも **main より後ろの base** から取られており（264 / 285 行 対 main の 298 行）、
+file をそのまま適用すれば ledger が巻き戻る。
+
+record 単位で content containment を取ると、main に無い tick は 3 件だった。
+ここで効いたのが**どちらの stash も単独では正しくない**という事実である:
+
+| record | stash@{0} | stash@{1} |
+|---|---|---|
+| kotobase.net `2026-08-14T16:41:35.864Z` | **corrupt** | 正常 |
+| itonami.cloud `2026-08-14T22:52:34.393Z` | 正常 | 正常（同一） |
+| shinshi.club `2026-08-15T05:17:20.762Z` | 正常 | **存在しない** |
+
+新しい方の stash@{0} が持つ kotobase record は EDN として読めない —— 埋め込まれた
+JSON の escape が EDN 文字列を早く閉じ、map が 21 form（奇数）になる。
+**「新しい stash を採る」という自然な復旧手順は、90-docs に parse error を landing
+させていた。** 実際に採ったのは stash@{1} の kotobase + 共通の itonami +
+stash@{0} にしか無い shinshi で、これは**どちらの stash とも一致しない集合**である。
+
+着地は PR #2259。reader で前後を検証し、32 base + 3 = 35 record / parse error 0 /
+3 insertion・0 deletion を確認してから merge した。
+
+## この class について
+
+ADR-2608136000 は「測れなかった検査が、測って問題が無かった検査と同じ値を返す」を
+14 箇所で見つけた。ここで出たのはその**保全側**の形である:
+
+> **壊れたものを保全した stash は、正しいものを保全した stash と同じ顔をしている。**
+
+`git stash list` は message と日付しか見せない。中身が読めるかは誰も測っていない。
+そして復旧の既定手順（新しい方を採る／`git stash pop`）は、**壊れている方を優先する
+向きに倒れうる**。
+
+したがって **stash から EDN / 構造化文書を復旧するときは、drop の前に record 単位で
+reader を通す。** file 単位の diff・行単位の containment はこれを捕まえない ——
+壊れた record も 1 行の追加として綺麗に見える。
+
+## やらなかったこと（意図的）
+
+- **他 session の worktree と branch に触っていない。** `agent/kotoba-block-ingress-genpon`
+  は tip が測定の 10 分前で**稼働中**。他の 3 本
+  （`agent/cloud-itonami-bot-reply-pin` / `agent/murakumo-distributed-reconcile` /
+  `agent/reconcile-responses-model-loading-v2`）は base が main の 725〜849 commit 手前に
+  あり、いずれも `-v2` 相当の後継が既に着地している。**genpon（`manifest/fleet-db.edn`）を
+  古い west.yml に対して reconcile した commit なので、いま landing させると pin が退行する。**
+  退役はそれぞれの session の判断に委ねる。
+- **`docs/design/` の PNG 5 件（10.8 MB）を commit していない。** index から外しただけで
+  disk には残っている。大容量 binary は git 履歴ではなく B2 + DataLad へ、という方針
+  （skill `large-binary-datalad`）に対する判断が要る。
+- **west update を全 project に対して回していない。** 今回の変更は 90-docs と
+  .gitignore だけで west pin に触れない。
+
+## archive
+
+`.git/stash-archive-20260815/`:
+
+- `staged-index-at-cleanup.txt` — index から外した 210 path（disk からは消していない）
+- `<sha>.patch` / `<sha>.ledger.edn` — stash 2 本の全体
+- `kaiyu-kaizen.ledger.RESCUED.edn` — 着地させた 35 record
+- `index.txt` — 上記の判定
+
+## resume point
+
+1. 残る 18 件の orphan に disposition を付ける（`nbb scripts/west-orphan-audit.cljs --blocking`）。
+   `orgs/com-junkawasaki/maxwell-mac/` は非 git で venv を抱えているので、まずここ。
+2. `docs/design/` の PNG 5 件を B2 + DataLad に載せるか捨てるかを決める。
+3. 上記 3 本の stale な reconcile branch を、各 session が退役させる。
+")))

@@ -1,0 +1,177 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607310200-six-workers-called-two-functions-nobody-wrote")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/topic "marketplace-edge-run-outcome-and-worker-repair")
+  (:adr/title "ADR-2607310200: marketplace actor の Worker 6本が「存在しない関数」を呼んでいた（edge/run・edge/outcome）— 実装・テスト・6本すべての修復と本番 deploy、および短払いの追い請求")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-31")
+  (:adr/last-verified "2026-07-31")
+  (:adr/last_verified "2026-07-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative-for
+  (vector "marketplace.edge/run（advise → govern → phase gate → commit|escalate|hold）と edge/outcome を marketplace.edge に1回だけ実装する決定の正本"
+   "run が escalate 経路でも必ず ledger に :approval-requested fact を書く決定（escalations が読む対象と同じ場所で定義する）の正本"
+   "outcome が disposition と rule を文字列で返し violation の detail を残す決定の正本"
+   "marketplace.edge のテストを .cljs として置き、cljs run のみが host half を検査する決定の正本"
+   "settlement Worker に POST /captures・POST /refunds・GET /acceptances を追加する決定、および /captures が『PSP 署名を検証できない、CACAO が信頼境界』であることを明示する決定の正本"
+   "settleops.store の capture 書き込みを『2件目は top-up、上書きではない』に変更する決定（assoc-in による先行入金の消失は実バグだった）の正本"
+   "marketplace.acceptance/shortfall-minor・top-up-request・apply-top-up による短払いの追い請求の正本"
+   "governor の :duplicate-capture / :top-up-not-derivable 拒否の正本"
+   "marketplace actor 6本すべての pin を marketplace 7ed9642 に前進させ、本番 Worker を再 deploy した記録（6本とも compile 0 warnings・全 suite 緑）の正本"))
+  (:adr/related "adr-2607309960-settlement-refunds-and-cljs-runtime-parity, adr-2607309800-settlement-funds-gate-unpaid-order-could-be-released, adr-2607309500-cloud-itonami-code-payment-acceptance-rail")
+  (:adr/body "
+# ADR-2607310200: 6本の Worker が存在しない関数を呼んでいた
+
+**Status**: accepted
+**Date**: 2026-07-31
+**Deciders**: Jun Kawasaki（+ Claude。ADR-2607309960 の残り gap のうち
+オーナー指示『do it』で着手した『edge/worker が未テスト』『:mpm-static の差額請求』）
+
+## Context — 未テストの半分を実行したら、動いていなかった
+
+B-7（cljs で走らせる）の残りとして `settleops.edge.worker` に手を付けたところ、
+**`marketplace.edge/run` と `marketplace.edge/outcome` がどこにも存在しない**ことが
+判明した。`git log` 上、`edge.cljs` の全4 commit のいずれにも定義が無い。
+
+にもかかわらず、**marketplace actor の Worker 6本すべて**がこの2関数を呼んでいる
+（onboarding / returns / listing / crossborder / fulfillment / settlement）。
+
+ClojureScript は未定義 var の参照を**警告**にする（エラーにしない）ので、これらの
+Worker は**ビルドも deploy も通り、`/health` は 200 を返し、auth を通過した最初の
+リクエストで throw する**。実測（2026-07-31、settlement の本番エンドポイント）:
+
+- `GET /health` → **200**（正常に見える）
+- 未認証 `POST /plans` → **401**（auth が先に効く）
+- `shadow-cljs compile worker` → **`Use of undeclared Var marketplace.edge/run`**
+
+**外から見て健康で、肝心のところが動かない Worker** という最悪の形をしていた。
+
+## Decision
+
+### D1. `run` / `outcome` を marketplace.edge に1回だけ実装する
+
+6つの呼び出し側が同じ契約に合意しているのに、library がそれを提供していなかった。
+`ledger-routes` が『once in marketplace.edge』である理由と同じ — 判断パイプラインの
+コピーが6つあれば drift し、drift した1つは誰も読まない。
+
+`run` = advise → govern → phase gate → commit | escalate | hold。`ops` map が
+actor 側の5関数（`:advise` `:check` `:disposition` `:gate` `:commit!` `:ledger!`
+`:hold-fact`）を供給するので、**generic な側は何も判断しない**。
+
+**ledger は全経路で書く（escalate 含む）。** 書かれない escalation は誰にも見えない
+gate であり、`escalations` が読む `:approval-requested` fact と**同じ場所で定義**する
+ことで、承認キューの両半分が1箇所に揃う。
+
+`outcome` は disposition と rule を**文字列**で返す（JSON を読む client に Clojure の
+keyword 表記を知らせない）。**violation の detail を残す** — `escrow-not-releasable`
+だけでは読み手はソースを見に行かされる。
+
+### D2. host half のテストは `.cljs` に置く
+
+`marketplace.edge` は `.cljs` なので JVM スイートからは永久に見えない。
+`test/marketplace/edge_test.cljs` を置き、**cljs run だけが検査する**。この gap が
+長く残った理由がまさに「cljs を走らせていなかった」ことなので、そこに置くのが正しい。
+8 deftest を injected `ops` map 上で実行（network 無し）。
+
+### D3. settlement Worker に不足していた HTTP surface
+
+`:record-payment-capture` と `:propose-refund` は actor に存在してネットワークから
+**到達できなかった** — つまり資金 gate は拒否しかできなかった（入金を記録する経路が
+無い）。`POST /captures` / `POST /refunds` / `GET /acceptances` を追加。
+
+**`/captures` は自分にできないことを明示する**: この fleet に PSP client は無い
+（ADR-2607309500 D8）ので、**認可されたホストが「PSP がこう言った」と attest した
+内容を記録する**だけで、**信頼境界は webhook ではなくリクエストの CACAO**。
+`:source \"webhook\"` が暗号的証明のように読まれるのを防ぐため明記した。actor が
+それでも検査するのは「その capture を `marketplace.acceptance` が導出するか」
+（買い手提示画面・期限切れ・束縛額不一致は人間に聞く前に拒否）。
+
+`GET /acceptances` は **net の金額**を返す。返金済み注文の隣に gross を出すと
+「運営がまだ持っている金」に読める。
+
+### D4. 2件目の capture は top-up であって上書きではない（実バグの修正）
+
+store は capture を `assoc-in` で書いていたため、**同じ注文の2件目が1件目を消し、
+買い手が既に払った金が資金 gate の読む数字から消えていた**。
+`marketplace.acceptance/apply-top-up` により、2件目は**1件目に加算**される —
+1注文1レコードが合計を持ち、PSP transaction id は両方残る（追い請求の照合には両方要る）。
+top-up でない2件目は `:duplicate-capture` で名指し拒否、library が booking を
+拒む場合は `:top-up-not-derivable`（黙って no-op にしない）。
+
+### D5. 短払いは追える数字にする
+
+`:mpm-static` は金額を code に束縛しないので買い手が打ち間違える。従来は `:short` と
+報告して**そこで終わり**だった。`shortfall-minor` が残額を名指しし、`top-up-request`
+が**その額に束縛された**2つ目の code を作る（既定 `:mpm-dynamic` — 同じ打ち間違いを
+2回招かない）。`:accept/tops-up` に追跡対象の取引 id を持たせ、別 capture への
+誤クレジットを防ぐ。
+
+## 実装・検証・着地
+
+- `kotoba-lang/marketplace` main **`7ed9642`**（`edge/run`・`outcome`・
+  `edge_test.cljs` 8 deftest・kotobase-client が要求する npm dep 宣言）および
+  **`de278cf`**（`shortfall-minor` / `top-up-request` / `apply-top-up`）。
+  JVM **180 tests / 774 assertions**、cljs **183 / 784**（edge_test は cljs のみ）、
+  いずれも 0 failures、lint 0/0。
+- `cloud-itonami/cloud-itonami-marketplace-settlement` main **`5248484`**:
+  Worker の3 route、ops map の `:approved-by` stamp、store の top-up 化、
+  governor の `:duplicate-capture` / `:top-up-not-derivable`。
+  **JVM 126 / 489 と cljs 126 / 489 が一致**、0 failures、lint 0/0。
+  **`shadow-cljs compile worker` が 0 warnings**（修正前は undeclared var 2件）。
+- **本番 deploy 実施**（2026-07-31、standing authorization）:
+  `shadow-cljs release worker` → 0 warnings → `wrangler deploy`。
+  Version `5028f543-730d-4f68-938a-bc142d9304d6`。deploy 後の実測:
+  `/health` 200、`POST /captures` 401、`POST /refunds` 401、
+  `GET /acceptances` 401（いずれも auth が効いている = route が存在する）。
+  **auth を越えた先の検証はしていない**（CACAO を発行して本番 ref に書くことに
+  なるため）。
+- west pin を single-entry commit で前進（**`d5b68bd`**）。
+
+## 6本すべての修復（2026-07-31 完了）
+
+残り5本も同日中に修復・deploy した。各 repo は marketplace `2bdd9b6`（`edge/run` が
+存在しない pin）に留まっていたので、`7ed9642` へ前進させた:
+
+| actor | main | tests | compile | deployed version |
+|---|---|---|---|---|
+| onboarding | `639d360` | 37 / 129 | 0 warnings | `477120e4` |
+| returns | `107cb38` | 21 / 54 | 0 warnings | `705606fc` |
+| listing (buyer) | `0166a88` | 32 / 90 | 0 warnings | `80f82d9e` |
+| crossborder | `fc0da58` | 35 / 132 | 0 warnings | `6fbd5754` |
+| fulfillment | `4b900a7` | 22 / 64 | 0 warnings | `1326026e` |
+
+全 repo で `clojure -M:lint` 0 errors / 0 warnings、deploy 後の `/health` 200。
+**generic な `run` が6 actor すべてに対して正しいことを、pin を上げる前に確認した**:
+`check [request context proposal store]` / `gate [phase request disposition]` /
+`hold-fact [request context verdict]` / `verdict->disposition [verdict]` の
+arglist が6本とも一致している。west pin は5件を single-entry commit で前進
+（**`b3cfb01`**、1回目は 409 で弾かれ tip を読み直して再 PUT）。
+
+**auth を越えた先の動作は6本とも未検証**（本番 ref への書き込みになるため）。
+確認できているのは「compile が undeclared var を出さない」「deploy 後 `/health` が
+200」「未認証 POST が 401 = route が存在する」まで。
+
+## 残る gap
+
+- PSP 署名の検証は依然できない（D3。vendor repo の責務）。
+- 解放後の訂正経路（chargeback）は `resolve-dispute` の人間裁定のみ。
+- 収納代行 / 資金移動業の判断は owner のもの。
+- `kotoba-lang/product-party` の `valid-gtin?` は cljs で `:invalid-arithmetic`
+  警告（JS の型強制で偶然通っている）。別 repo の smell として記録のみ。
+
+## Alternatives considered
+
+- **各 Worker 側で `run` を実装する。** 6コピーは drift する。library に1つ置く。
+- **`run` を Promise ベースにする。** actor は同期であり、`with-store` が Promise の
+  bracket を持つ設計（『the same code path the test suite exercises is the one that
+  runs in production』）を壊す。同期のまま。
+- **escalate 経路では ledger を書かない**（commit だけ記録する）。`escalations` が
+  読むものが無くなり、gate がブラックホールに戻る。
+- **2件目の capture を別レコードにする。** 1注文1レコードの store 契約を壊すか、
+  さもなくば上書きに戻る。加算にした。
+- **`/captures` を PSP からの直接 webhook にする。** 署名検証ができない以上、
+  誰でも POST できる口を開けることになる。認可済みホスト経由に限定した。
+")))

@@ -1,0 +1,402 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607299960-dougaka-murakumo-compute-kotobase-storage")
+  (:adr/title "ADR-2607299960: dougaka の生成計算を murakumo.cloud に、成果物の保管を kotobase.net に置く")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "dougaka-production-plane")
+  (:adr/date "2026-07-29")
+  (:adr/last_verified "2026-07-30")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "dougaka / minidrama 系 creator actor の生成計算はすべて murakumo.cloud の公開 generation API を通ること"
+   "production 中間成果物の保管先が kotobase.net の content-addressed archive (PUT/GET /ipfs/:cid) であること"
+   "degrade が leg 単位で報告され、placeholder が成功として読めないこと"
+   "shot の :speaker 役語彙と VOICEVOX / fleet TTS 話者の対応"))
+  (:adr/related
+  (vector "adr-2607071300-aozora-creator-actors-minidrama"
+   "adr-2607071500-minidrama-mesh-reside-aozora-actor-integration"
+   "adr-2607171800-ai-gftd-dougaka-vector-video-workflow"
+   "adr-2607182130-dougaka-live-action-internal-demo-i2v-handoff"
+   "adr-2607252500-cloud-itonami-media-generate-video"
+   "adr-2607173100-murakumo-main-alias"
+   "adr-2607299800-person-isekai-hajime-game-producer-yakuwari-murakumo-residency"))
+  (:adr/body
+  "# ADR-2607299960: dougaka の生成計算を murakumo.cloud に、保管を kotobase.net に置く
+
+**Status**: accepted
+**Date**: 2026-07-29
+**Deciders**: Jun Kawasaki（指示: 「整えて 計算は murakumo.cloud, storage は kotobase.net」）
+
+## Context — 何が実際に出ていたか
+
+aozora.app には 2026-07-28 から毎日、縦型 60 秒の動画が自動投稿されている。
+実測（2026-07-29、appview `app.bsky.feed.getTimeline` + PDS `getBlob`）:
+
+| 作者 | DID | 投稿 |
+|---|---|---|
+| 【動画家】dougaka-actor | did:key:z6MktbX2… | asaichi-no-koori 07-29 01:32Z / amaoto-no-arcade 07-28 01:31Z |
+| 【ミニドラマ座】minidrama | did:key:z6MkkHZB… | bench-no-tegami 07-29 00:33Z / alarm-ai 07-28 00:31Z |
+
+**シナリオ・音声・投稿は本物だった。** `videos/asaichi-no-koori.edn` は 3 幕 8 ショット、
+各ショットが `:duration` `:speaker` `:prompt`（英語の画像生成プロンプト）`:subtitle` を持つ
+完成した発注書で、Governor gate を通って commit されている。音声も実在し、minidrama の
+公開 mp4 はショット単位の基本周波数実測で `:boy` の 1 ショットだけ 173 Hz に落ちる
+（他は 296–393 Hz）= VOICEVOX の演じ分けが実際に効いていた。
+
+**欠けていたのは絵と、台詞の間だった。**
+
+- `:prompt` は動画モデル向けに書かれていたのに行き先が無く、`dougaka.comfy` は
+  `COMFY_POD_URL` 未設定で placeholder に落ち、`write-keyframe!` が単色板を書いていた。
+  実測: 公開 mp4 は 47 kbps、37 カット、各ショットが別々の**単色**（薄紫/水色/緑）。
+- BGM leg が存在しなかった。`douga.ffmpeg/bgm-mix-cmd` は実装済みなのに
+  `dougaka.pipeline` が一度も呼んでいない。実測: 60 秒中 **38.4 秒が完全な無音**
+  （−45dB/0.6s で 8 箇所）。台詞 2.9 秒 → 無音 4.7 秒の繰り返し。
+- SFX leg は production 経路に 1 行も無い（`bgm|sfx|ongakuka|cues` の grep がゼロ件）。
+  cue モデルがあるのは dougaka-vector だけで、そこも plan を吐くのみ、消費側の
+  `bin/assemble.cljs` は自称 NON-AUTHORITATIVE。
+- `:speaker :narrator` が `speaker-map` に無く（あるのは `:narrator-f`/`:narrator-m`）、
+  実写ミニドキュメンタリーのナレーション 8 本すべてが default = ずんだもん
+  （AI・機械役）に落ちていた。実測でも 8 ショット中 6 つが推定上限に張り付き。
+- production 中間物はラップトップの `target/dougaka/<id>/` にしか無く、翌朝には消える。
+  再カットも再採点も監査もできず、生き残るのは aozora blob の中の最終 mp4 だけだった。
+
+## Decision
+
+### 1. 計算 = murakumo.cloud（`POST /api/v1/generation`）
+
+生成のあらゆる段を fleet に出す。公開 API（`cloud-murakumo.public-generation`）の
+type と、`murakumo.edn` が実際に serve している function の対応:
+
+| production の段 | type | fleet function | 既定モデル |
+|---|---|---|---|
+| shot `:prompt` → 動く絵 | `video` | `:video`(comfy) | ltx-2.3 |
+| shot `:subtitle` → ナレーション | `voice` | `:voice`(tts) | cosyvoice2(ja) |
+| genre+logline → 音楽ベッド | `sound` (`sound_kind=music`) | `:music`(audio) | ace-step |
+| shot `:sfx` → 効果音 | `sound` (`sound_kind=sfx`) | `:sfx`(audio) | stable-audio-open |
+
+**モデル id を焼かない。** `model` を省略すると murakumo が function の `:default` を
+解決するので、fleet 側のモデル入れ替えがこの repo の release なしに届く
+（ADR-2607173100 の murakumo-main 規則を generation 面へ適用）。呼び出し側は
+必要なら明示 pin できる。
+
+実装: `dougaka.murakumo-job`（純粋 — body 構築・応答解析・poll backoff）+
+`dougaka.murakumo`（JVM I/O — submit → poll → artifact download）。この repo の
+`.cljc`/`.clj` 分割規約どおりで、新しい依存は増えていない（JDK HttpClient）。
+
+### 2. 保管 = kotobase.net（`PUT/GET /ipfs/:cid`）
+
+すべての artifact を**自分のバイト列の sha2-256 = raw CIDv1** で置く。
+`kotobase.archive-put` はサーバ側で digest を再計算して不一致を 422 で弾くので、
+CID の付け間違いが誤ったバイト列を保管することは構造的に起きない。同じバイト列は
+同じ名前になるので再保管は冪等 = 再実行が無料。
+
+実装: `dougaka.kotobase`（純粋 — base32/CID）+ `dougaka.archive`（JVM I/O — PUT）。
+これで production は「ラップトップの path 群」ではなく **CID 群**で再現できる。
+
+### 3. degrade は leg 単位で、正直に
+
+fleet clip が無い shot は従来の keyframe 経路（ComfyUI → 単色板）へ、ナレーションは
+murakumo → VOICEVOX → `say` → 無音へ、ベッドと cue は単に不在になる。
+**pipeline は必ず再生可能な動画を返す**（never-throw honesty rule は不変）が、
+`produce!` の返り値に `:legs` を足し、shot ごとに
+`:murakumo`/`:comfy`/`:operator-image`/`:placeholder`、音声は
+`:murakumo`/`:local`/`:silent` を記録する。**placeholder が成功として読めないようにする** —
+呼び出し側は degrade した cut の publish を拒否できる。
+
+### 4. 役語彙を 1 か所に揃える
+
+`speaker-map` に `:narrator`/`:narration` を追加（→ 九州そら 16）。さらに
+`fleet-voice-map` を新設し、同じ役語彙を fleet TTS の話者名へ写す —
+VOICEVOX が無い機械でも演じ分けが失われない。
+
+### 5. douga（craft lib）側に足したもの
+
+- `audio-overlay-mix-cmd` — ループするベッドと時刻付き cue を、組み上がった動画の
+  自前音声の上に混ぜる 1 本の builder。`duration=first` で動画長が正本、
+  `normalize=0` で amix がナレーションを潰さない。映像は stream copy。
+- `video-segment-cmd` に `:audio-path` と `tpad=stop_mode=clone` —
+  生成クリップがナレーションを載せられるように、また計画尺より短いクリップが
+  黒味を残さず最終フレームで持つように。
+
+## Verification
+
+- **douga**: 20 tests / 110 assertions green。実 ffmpeg でも検証 — 20 秒ベッドを
+  ループ + 7.5 秒に cue を、60 秒のナレーション動画へ混ぜて 60.08 秒、
+  無音区間が **8 → 0**。2 秒 768x448 クリップ → 7 秒 720x1280@30（210 frames）。
+- **dougaka**: 31 tests / 126 assertions green（**着地済み douga sha に対して**、
+  local override 無し）。
+- **CID エンコーダは実物で検証**: 現在公開中の asaichi-no-koori.mp4 の sha2-256 から
+  aozora の実 CID `bafkreidaqutrnhk2pa4zsesrmxsfvqpmtyhb77kbf4ks3cwjo5k6czzlcy` を
+  完全一致で再導出。canonical な空オブジェクト CID も一致。
+- **E2E（token 無し）**: 実際の 8 ショット plan で 60.042667s / 720x1280 / h264+aac —
+  現在出荷中のものと同一形状。`:legs` は全 shot `:placeholder`、音声 `:local`、
+  `:bed false` を正直に報告し、skip の理由を 1 行ずつ stderr に出す。**degrade 経路に
+  regression は無い。**
+
+## Live verification（2026-07-29、オーナー承認「kagi は再発行して ok」の下で実行）
+
+### 資格情報 — 再発行した（rotation ではなく追加）
+
+- **kagi vault は 2 つあった。** `bin/kagi` は自身の repo root へ `cd` するので既定では
+  `orgs/kotoba-lang/kagi/.kagi/vault.edn`（2026-07-17 付・56KB の古い方）を読む。
+  実際に使われているのは `~/.kagi/vault.edn`（2.1MB、当日更新）。
+  **ただし live 側にも `MURAKUMO_GENERATION_TOKEN_SECRET` /
+  `MURAKUMO_CHAT_TOKEN_SECRET_2` は無かった**（両方 `no such item`）。
+  ADR-2607161750 / ADR-2607171800 addendum 2 の「kagi 保管を正とする」は実態と乖離。
+- **新しい secret を発行し、`murakumo-generation-proxy` の
+  `MURAKUMO_TOKEN_SECRET_2`（optional な第2検証スロット、未設定だった）へ投入した。**
+  primary は無傷なので `net-babiniku` / `network-isekai` の既存 caller は壊れていない。
+  gate は「どちらかで verify が通れば受理」する実装。
+- **その Worker は 2026-07-15 版が動いており `_2` を読まなかった**（secondary slot 対応は
+  07-16 に landed）。main から rebuild → 再 deploy（version `9a183830`）。
+  ビルドは 0 warnings、`test:generation-proxy`（fail-closed/auth/scope/proxy contract）green。
+- `KOTOBASE_ARCHIVE_TOKEN` は Worker `net-kotobase` に設定済みだったが値がどこにも
+  保管されておらず読み戻せなかった。workspace 全体を grep して consumer ゼロを確認の上で再発行。
+- 保管先は kagi（`MURAKUMO_GENERATION_TOKEN_SECRET` / `MURAKUMO_DOUGAKA_GENERATION_TOKEN`
+  / `KOTOBASE_ARCHIVE_TOKEN`）。secrets-location-map skill を実態に合わせて訂正済み。
+
+### 実 API との差分 — 4 件、すべて実測して直した
+
+設計どおりに書いたコードは live で全滅した。ドキュメントの形と実 API は違った。
+
+1. **ホストが違う。** 既定を `api.murakumo.cloud` にしていたが、generation scope の gate は
+   **`generation.murakumo.cloud`**。同じ token がそこでは 202、`murakumo.cloud` では 401
+   （別 worker・別署名 secret）。ホスト名は互換ではない。
+2. **artifact / status URL は、どのホストで受理されても `murakumo.cloud` を指して返る。**
+   そのまま辿ると毎回 401 になる。`rebase-host` が job-id を含む path だけ残して、
+   認証済みのホストへ差し替える。
+3. **ジオメトリとフレーム数に制約がある。** `params.width must be a multiple of 32 in
+   256..1280` — 縦型ショートの 720 はそのままでは 400。`snap-dimension` は**切り上げる**
+   （720 → 736）ので、フレームより少し大きく生成して縮小する（拡大しない）。
+   `params.frames must be 8n+1 in 9..121` — fleet の 24fps では 1 クリップ約 5 秒が上限で、
+   それより長いショットは最終フレームで持つ（segment builder が既にそうしていた）。
+4. **`params.locale` は `ja` も `ja_JP` も拒否する。** BCP-47 の `ja-JP`。
+
+### cold fleet — placeholder に落とすべきでない失敗
+
+`:video` function は `:scale {:min 0 …}` でゼロからスケールするので、アイドル後の最初の
+ジョブは GPU worker の起動と競合し、生成サービスが ComfyUI に到達できず失敗する
+（実測: `[Errno 111] Connection refused` → 起動中に `[Errno 104] Connection reset by
+peer`）。**どちらの場合も次のジョブは完走して実クリップを出した。** 夜間の 1 本が
+「たまたま fleet を起こす番だった」という理由で単色板に落ちるのはバグなので、この
+signature 群は retry する（2 回 × 45 秒）。逆に本物の拒否（不正 param / VRAM 不足）は
+即座に失敗させ、5 分の空回りにしない。
+
+### integrity — 計算面と保管面で名前が一致する
+
+API は artifact の整合性を `contentHash: \"sha256:<hex>\"` で宣言する。これは
+**kotobase がオブジェクトを名付けるのと同じダイジェスト**なので、fleet の content hash が
+そのまま保管時の CID になる。再ハッシュも第2の命名体系も要らない。download は
+これに対して検証し、不一致は破棄する（切れたバイト列を episode に mux して、
+中身と違う名前で保管することを防ぐ）。
+
+### 実測結果
+
+2 ショットの plan で:
+
+```
+:legs {:video [:placeholder :murakumo] :voice [:murakumo :murakumo]
+       :sfx [0] :bed true :overlays 2}
+```
+
+- ナレーション・音楽ベッド・効果音はすべて fleet 生成。
+- shot 1 のクリップは **prompt どおりの実映像**（736x1280 / 97 frames / 4.04s、
+  自前の音声トラック付き。サンプリングしたフレームに、氷の上に並んだ銀色の魚と、
+  それを並べ直す手袋の手が写っている）。
+- 組み上がった episode は **scene change 45 / 無音区間 0**。
+  現在出荷中のものは **単色カット 37 / 無音区間 8（60 秒中 38.4 秒）**。
+- shot 0 は上記 cold start の取りこぼしで、この修正の対象。
+- 単体でも確認: `wan2.2-ti2v-5b` で 704x1280 / 25 frames / 95,647 bytes の mp4。
+- kotobase.net: `PUT /ipfs/<cid>` 201 → `GET` 200、バイト一致。
+
+37 tests / 160 assertions green（dougaka）、20 tests / 110 assertions green（douga）。
+
+## 共有 lib への切り出し（2026-07-29、オーナー指示「1, 2」）
+
+dougaka がこの API の罠を高い代償で学んだ直後に、**animeka が同型の contract を
+`api.murakumo.cloud` 固定で持っていた**ことが分かった（mangaka / yukkuri も控えている）。
+同じ 400 を 4 回学び直させないため、contract を **`kotoba-lang/murakumo-generation`**
+（public、`.cljc`、依存ゼロ）へ切り出した。
+
+```
+murakumo.generation          request body / 受理レンジ / 応答解析 / retry 分類
+murakumo.generation.digest   sha2-256 hex → raw CIDv1
+murakumo.generation.client   submit → poll → fetch → verify（transport 注入）
+```
+
+`-ka` は JVM 実行器と nbb operator script に分かれているので、JVM 専用 lib にすると
+重複が移動するだけになる。**JSON codec・ファイルダイジェスト・sleep の 4 つだけを
+注入**し、学習コストが高かったもの（ホスト、artifact URL 差し替え、digest 検証、
+cold start、poll schedule）は共有側に置いた。JVM と nbb で同一結果を毎回確認している。
+
+### 移植中に出た 2 つのバグ（どちらも消費者からは見えない）
+
+1. **失敗した submit が status しか出していなかった。** この fleet は 400 の**本文**に
+   制約を全部書く（上記 4 件はすべてそこから分かった）。捨てていたので、1 行の修正が
+   live GPU 相手の当てずっぽうになる。`submit!` は `{:id}｜{:cold}｜{:dead}` を返し、
+   本文込みで log し、`transient-submit?` が status と本文の両方で分類する
+   （400 は既定で非 retry — 同じ body を投げ直しても同じなので）。
+2. その log を入れた**次の実行**が即座に `narration submit 400 params.locale is
+   unsupported` と言った。**分配束縛の `:or` はキーが「無い」時しか発火せず、`nil` で
+   存在する時は発火しない。** `client/narration!` が `{:locale locale}` を nil のまま
+   転送 → default が飛ぶ → prune が落とす → locale 無しで送信 → 400。
+   **ナレーションが 2 回の実行で黙ってローカル TTS に落ちていた。**
+   `(or locale default)` に直し、同型の罠（`sound-body` の `kind` は `(name nil)` で
+   例外、`await-job!` の `timeout-ms` は `(long nil)` で例外、`generate!` の `label`）も
+   すべて掃いた。
+
+### 消費者
+
+- **dougaka**（`9aace5cf`）— 自前 contract を削除。`dougaka.murakumo` はホスト
+  プリミティブ 4 つのみ。`dougaka.kotobase` の base32/CID も共有 digest へ委譲した
+  （同じ artifact が 2 つの base32 実装から別名を得ないように）。24 tests / 85 assertions。
+- **animeka**（`de91ed1d`）— **ホストを修正**（`api.murakumo.cloud` は 401、
+  `generation.murakumo.cloud` は 202 を実測）。**animeka の video 経路は一度も fleet に
+  届いていなかった**。artifact URL 差し替え・digest 検証・geometry snap・cold-start
+  分類を獲得。`default-model \"ltx-2.3\"` を nil にして fleet の `:default` に委ねた
+  （ADR-2607173100。今日の挙動は不変）。ffmpeg 補助関数は別関心なので触っていない。
+  17 tests / 141 assertions。
+
+### 共有 lib での live 検証（2026-07-29）
+
+```
+:legs {:video [:murakumo :murakumo] :voice [:murakumo :murakumo]
+       :sfx [0] :bed true :overlays 2}
+```
+
+全 leg が fleet 生成。**cold-start retry が実地で発火して成功した** —
+`video 1 job …: [Errno 111] Connection refused — fleet is still waking, retrying in 45 s`
+の後、そのショットは `:murakumo` になった。成果物 4 点（mp4 / srt / bgm / sfx）が
+kotobase に載り、episode を CID で取り直してバイト一致
+（`bafkreifwx4vqsve6irxyj6o2f4shbwflabe5qdrtjyvnkdqjxdo5nypnty`、8.05s /
+720x1280 / **scene change 45 / 無音 0**）。lib 20 tests / 107 assertions。
+
+### 手順上の失敗（記録）
+
+`murakumo-generation` の west 登録で、**stale なローカル west.yml から生成した全文を
+PUT し、他セッションが追加していた約 20 entry と複数の pin を一時的に main から
+落とした**（`d905864b`: +13 −145）。ローカル差分は +5 行に見えていた — ベースラインが
+古かったため。現在の main は 3953 → 3954 entry・欠落ゼロで自己修復済み（後続 commit が
+復元）。**`--entry` で生成した全文を PUT するのは「最小 diff」ではない** — CLAUDE.md が
+定める正経路（tip の内容を取得 → 当該行だけ編集 → PUT）に戻し、その後の pin 前進 4 件は
+すべて +1 −1 で着地させた。
+
+## yukkuri と mangaka（2026-07-30、オーナー指示「do it」）
+
+### yukkuri — bb を退役させ、seed を kagi に置いた（`cbf71879`）
+
+`scripts/aozora-publish/` はこの repo に残る**最後の bb エントリポイント**で、独自の
+JVM CACAO 依存を抱え、text 投稿しかできず、seed は `AOZORA_PUBLISHER_SEED` env
+だけから読んでいた——**murakumo secret を失ったのと同じ形**（どこにも durable に
+保管されていない）。
+
+- **seed を kagi へ**（`yukkuri-aozora-publisher-seed`、compartment `net-kotobase`、
+  発行済み）。env は CI override として残す。kagi read は単一 item 狙い撃ち（`ls` は
+  使わない）で、`KAGI_HOME` を live vault に固定する——`bin/kagi` は自身の repo root へ
+  `cd` するので、既定では repo 内の古い vault を読んでしまう。
+- **エピソードが mp4 を `app.aozora.embed.video` として持てる**ようにした。yukkuri の
+  エピソードが dougaka / minidrama と同じ live /videos feed に並ぶ。rkey はエピソード
+  id 由来なので再投稿は複製ではなく置換。
+- 暗号は `kotobase.cacao`（kotobase-client）。`kotoba.cacao` の写しは fleet 内に
+  **既に 5 つ**あった（dougaka-actor / minidrama / dougaka-kodomo / syosetsuka /
+  yukkuri。うち 2 つは 223 行中 24 行しか違わない）ので、6 つ目を作らなかった。
+
+サーバ由来の知見 2 件を、コメントではなく**名前付き・テスト付きの定数**として保全した
+（後の編集で黙って消えないように）:
+
+- `now-iso` は**秒単位切り捨て**。小数秒は createRecord 内部の
+  `Cannot read properties of null (reading 'length')` を踏む。
+- `account-bootstrap-order` は **createSession 先**。既登録 DID に対する createAccount
+  の再呼び出しがアカウント状態をサーバ側で壊し、その後は fresh session でも
+  createRecord が generic InternalError になった記録がある。dougaka-vector の publisher は
+  createAccount を先に呼んで成功しているが、実際に壊れた観測がある方を採る。
+
+**live 検証**: seed を kagi から解決 → self-CACAO → createAccount → createRecord、
+PDS から読み戻し確認（`did:key:z6MkfmLS…`、rkey `1785370350567`）。6 tests /
+27 assertions。動画経路は dry-run まで（手元の mp4 が dougaka のものだけで、
+yukkuri 名義で出すと取り違えになるため未投稿）。
+
+### mangaka — stub ではなく fleet 自身のモデルでパネルを生成する（`1ad8d814`）
+
+`mangaka.video` は `default-model` を **`\"seedance-2.0\"`（hosted fal.ai）に固定**して
+いた。murakumo.edn 自身が「実 API キーでの実行は未実施」と記録しており、
+`backend-token` は何も返さないので、`generate-video!` は**毎回 placeholder SVG を
+返していた**。panel-from-video pipeline は一度もパネルを出していない。
+
+自リポの docstring は「既に cloud-murakumo に in-process 依存しているので HTTP client は
+不要」と論じていた。依存については正しく、**結果については誤り**——in-process の
+どちらの経路にも使える資格情報が無い。`:seedance` は誰も発行していないキーを要求し、
+`:comfy`（executor は実際に駆動できる）は到達可能な ComfyUI endpoint を要求する——
+dougaka が毎晩単色板を出していたのと同じ未設定の `COMFY_POD_URL`。**今日動く経路は
+公開 API だけ**なので、`mangaka.murakumo-http` が共有 client を束ねる（host
+primitive 4 つだけ。API の罠はすべて lib 側）。
+
+`default-model` は nil にして murakumo の `:video :default` に委ねる
+（ADR-2607173100）。`\"seedance-2.0\"` を名指しした時だけ hosted in-process 経路。
+
+**この作業で既存の破損 2 件が表面化した。どちらも一度も実行されていないコード**:
+
+- `clj/deps.edn` が douga を `156667e9`（`ffprobe-duration-cmd` 実装前、6 commits 手前）
+  に pin していたのに `video.cljc` はそれを呼んでいた。**この ns は自分の pin に対して
+  コンパイルできていなかった**。pin を `b957073d` へ前進。
+- `backend-token` を 2 引数で呼んでいた（実際は 1 引数）。**キーが存在した瞬間に
+  ArityException で落ちる**状態で、キーが無い分岐が先に返るので誰も到達していなかった。
+
+**live 検証**: prompt「a lone streetlamp on a rainy night, manga panel composition,
+high contrast ink」で `source \"murakumo-fleet\"`、実 h264 クリップ 306 KB
+（768x448 / 49 frames / 2.04s、cid `bafkreiano34qpe5dbzn5c2m3ojbdwcn2kz6skfqjhvki42cxc5o7kjwmze`）、
+`sample-frames!` がそこから 4 枚のパネル候補を抽出——雨の筋・街灯・建物が
+高コントラストのインク調で、指示どおりの絵。9 tests / 37 assertions。
+
+### 移植状況（-ka 6 本）
+
+| repo | 生成 | 公開 | 状態 |
+|---|---|---|---|
+| dougaka | murakumo（共有 client） | aozora 毎日 | 移植済み・live |
+| animeka | murakumo（共有 client） | 未 | 移植済み（host 修正で初めて到達可能に） |
+| mangaka | murakumo（共有 client） | 未 | 移植済み・live（stub を脱した） |
+| yukkuri | ComfyUI + VOICEVOX | nbb publisher・live | publisher 移植済み。生成側は未移植 |
+| ongakuka | 無（BGM カタログ台帳） | 未 | 生成 pipeline 自体が無い |
+| syosetsuka / gameka | 無（テキスト / specs） | 未 | 同上 |
+
+## 残っていること
+
+- **既存 catalog に `:sfx` を書いた shot が 1 つも無い。** cue は opt-in なので、
+  効果音を入れるには plan 側の追記が要る。
+- **`hunyuanvideo-1.5` は `params.model is unsupported`** で拒否される
+  （murakumo.edn には載っているが gate が受けない）。使えるのは `ltx-2.3`（既定）と
+  `wan2.2-ti2v-5b`。
+- **t2v が画面内に架空の文字を描く。** 実測: 市場のショットに \"BEOTI OPON FAYRLEÇ\" が
+  出た。prompt 側の抑制か negative 指定が要る。
+- **毎晩の投稿を回している runner にはまだ token が渡っていない。** 駆動元は
+  このマシンの launchd に無く（cloud routine と推定）、特定できていない。
+  そこに `MURAKUMO_GENERATION_TOKEN` / `KOTOBASE_ARCHIVE_TOKEN` を通すまで、
+  公開される動画は単色板のまま。**これが最後の 1 マイル。**
+- **yukkuri の生成側（ComfyUI + VOICEVOX）は未移植。** publisher だけが新しい。
+- **`kotoba.cacao` の写しがまだ 4 つ残っている**（dougaka-actor / minidrama /
+  dougaka-kodomo / syosetsuka）。この 2 つは毎日実際に publish している唯一の経路
+  なので、意図的に触っていない——動いているものを共有化するのは別の、慎重な pass。
+- **animeka の ffmpeg 補助関数が `murakumo-video` ns に同居したまま。** 生成の wire とは
+  別関心で、いずれ douga へ。
+- 1 本あたりの制作時間は fleet 往復のぶん延びる（8 ショットで十数分規模）。
+
+## Consequences
+
+- (+) `:prompt` が初めて行き先を持つ。shot list は最初から動画モデル向けに書かれていた。
+- (+) 60 秒中 38 秒の無音が埋まる（ベッド + cue）。実測で 8 箇所 → 0。
+- (+) production が CID で再現・監査できる。中間物が一晩で消えなくなる。
+- (+) degrade が leg 単位で数えられるので、「絵が入らなかった回」を publish 前に落とせる。
+- (+) fleet の contentHash が保管 CID と一致するので、計算面と保管面で名前が割れない。
+- (+) 契約の学習コストが 1 箇所に集約された。**animeka は host 1 つの違いで、mangaka は
+  誰も持っていないキーの既定固定で、どちらも「実装済みに見えて一度も動いていない」
+  状態だった。** 共有化はその 2 件を同時に暴いた。
+- (+) bb がこの fleet の operator host から 1 つ消えた（yukkuri が最後の 1 つ）。
+- (−) fleet を通す分、1 本あたりの制作時間と GPU コストが上がる。
+- (−) cold start の初回は retry で吸収するが、その分だけ最初の 1 本は遅い。
+- (−) SFX は opt-in で、既存 catalog は誰も書いていない。
+- (−) `MURAKUMO_TOKEN_SECRET_2` を使い切ったので、次に generation gate の
+  secret を足したい時は空きスロットが無く、rotation か gate 側の拡張が要る。
+- (−) publisher 実装が fleet 内で 5 つに分かれたまま（yukkuri だけが共有 cljs CACAO を
+  使う）。統一は動いているものを触る pass になるので別途。
+")))

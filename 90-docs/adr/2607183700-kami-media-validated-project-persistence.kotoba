@@ -1,0 +1,31 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607183700-kami-media-validated-project-persistence")
+  (:adr/title "KAMI media applications add validated EDN project persistence")
+  (:adr/date "2026-07-18")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607183600-kami-media-punch-delivery-profiles"))
+  (:adr/decision
+  (map (:daw (map (:project-file (map (:schema "kami.ongaku-project/v1") (:format :edn) (:media :external-by-asset-id)))
+         (:authority "Only schema-valid project maps replace the active project and transport selection.")))
+   (:nle (map (:project-file (map (:schema "kami.eizo-project/v1") (:format :edn) (:media :external-by-source-id)))
+         (:authority "Timeline edits, source references, audio mix, transitions and delivery profile round-trip through validated EDN.")))
+   (:security (map (:reader :cljs-reader) (:code-evaluation false) (:invalid-input :rejected)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates (map (:shared (vector "automatic media relinking" "autosave and recovery" "version migration"))
+                                (:daw (vector "loop and comp recording" "plugin hosting" "LUFS/true-peak"))
+                                (:nle (vector "pointer trim gestures" "proxy/cache" "color management" "additional containers"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "7a014f8"))
+   (:nle-commits (vector "449804f"))
+   (:evidence (vector "DAW and NLE CLJC suites each pass 7 tests and 19 assertions, including accepted valid maps and rejected foreign schemas/non-map EDN values."
+              "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+              "DAW Chrome downloaded a 783-byte EDN, mutated the project name, reopened the file, and restored 夜明けの波形 without console errors."
+              "NLE Chrome downloaded a 983-byte EDN, changed Review to Master, reopened the file, and restored the Review profile without console errors."
+              "Both GitHub Pages workflows completed tests, release compilation and deployment successfully."))))
+  (:adr/consequences
+  (vector "Projects can now cross browser sessions and be version-controlled as EDN rather than existing only in memory or clipboard text."
+   "Media bytes remain deliberately external; stable asset/source IDs preserve relinking authority without serializing browser objects."
+   "Future schema changes require explicit migration rather than accepting arbitrary EDN maps."))
+  (:adr/source-format "edn")))

@@ -1,0 +1,27 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608302125")
+  (:adr/doc_type "adr")
+  (:adr/topic "human-authentication-is-passkey-only-and-never-downgrades")
+  (:adr/title "人間認証は Passkey-only とし、復旧・旧設定・運用介入から弱い経路へ恒久的に downgrade しない")
+  (:adr/status "superseded")
+  (:adr/superseded-by "2609070400")
+  (:adr/supersession-note "2026-09-07: Passkey exclusivity is superseded by Web3 first. Historical decision text is preserved; prohibited legacy authority and recovery safeguards continue in the successor.")
+  (:adr/date "2026-08-30")
+  (:adr/deciders (vector "Jun Kawasaki" "OpenAI Codex"))
+  (:adr/authoritative_for
+  (vector "first-party human authentication authority の repo-wide / project-wide security boundary"
+   "Email・password・SMS・SSO・operator override を人間認証と復旧の authority にしない規則"
+   "使い捨て offline recovery secret と server-enforced delay による credential replacement"
+   "legacy route と dormant configuration が弱い経路を復活させない no-downgrade gate"
+   "外部仕様 mirror と protocol library を human authentication authority から区別する inventory"))
+  (:adr/supersedes (vector "2608084000" "2607262300"))
+  (:adr/related (vector "2607302145" "2608050300" "2608084000" "2608110100" "2608220200"))
+  (:adr/repos
+  (vector "com-junkawasaki/root"
+   "cloud-itonami/app-auth"
+   "network-awai/cloud-itonami"
+   "cloud-itonami/cloud-itonami-app"
+   "net-kotobase/authn"
+   "kotoba-lang/app-kotoba-cloud"))
+  (:adr/body
+  "## Context\n\nPasskey を中心と呼びながら Email link、initial password、SMS、SSO、support reset を残すと、攻撃者は最も弱い入口だけを破ればよい。強い主経路は、同じ session・credential replacement・recovery に到達できる弱い fallback が一つでもあれば、その fallback の強度まで下がる。\n\n一方、この workspace には OAuth、OIDC、SAML、Email、SMS 等の外部仕様 mirror と protocol library がある。文字列や実装の存在を一律に禁止すると仕様実装を human authentication authority と誤認する。対象は、first-party の human session、bootstrap、credential registration/replacement、recovery を発行する surface に限定する。\n\n## Decision\n\n1. 人間認証の active method は WebAuthn Passkey のみ。RP ID / Origin の完全一致、server-issued single-use challenge、replay protection、user verification を必須とする。\n2. Email、password、SMS/voice、OAuth/OIDC/SAML/social/enterprise SSO、security question、device fingerprint、support/operator/admin override は login、bootstrap、step-up、credential registration、recovery の authority として恒久的に禁止する。通知・連絡・data connectivity は、強い認証後に session を mint/upgrade しない用途だけ許す。\n3. approved authenticator が無い場合は fail closed とする。browser、locale、tenant flag、installed provider secret、incident flag、運用都合から fallback を有効化しない。\n4. recovery は session 発行ではなく credential replacement とする。独立生成した高 entropy の one-time offline secret、digest/verifier-only storage、48 時間以上の server-enforced delay、新しい Passkey の登録を必要とする。delay 中は既存の強認証 owner が cancel できる。completion は旧 credential・session・continuation・残 recovery secret を revoke し、partial failure でも旧 credential を usable に戻さない。\n5. operator は freeze できるが identity を grant できない。direct database edit を含め delay を短縮・迂回しない。全 authenticator と recovery secret を失った場合の unrecoverable availability risk を受け入れる。\n6. closed legacy route は 404 または 410 を返し、ceremony、redirect、session/token/credential issuance を開始しない。legacy record と provider secret は inert data とし、runtime flag や tenant setting から復活させない。source、built artifact、live route の negative test に plausible legacy secret を含める。\n7. federation product が必要なら別 hostname、RP/trust boundary、session namespace、threat model、ADR を持つ。既存 authority の fallback として足さない。\n8. `manifest/human-authentication-policy.edn` を machine-readable inventory とする。`:migration-gap` と `:unverified` が一件でもあれば workspace-wide Passkey-only を claim しない。unverified を conformant と読まない。\n\n## Prior decisions\n\nADR-2608084000 が Email link に session または enrollment voucher を発行させた部分と、ADR-2607262300 が initial password を bootstrap authority にした部分は、本 ADR が supersede する。過去の実装・測定記録は消さないが、現在の許可根拠には使わない。Email を Passkey-rooted contact として attach/detach する決定は、session を mint/upgrade しない限り維持する。\n\n## Enforcement\n\nroot `SECURITY.md` が人間向け正本、`manifest/human-authentication-policy.edn` が inventory、`AGENTS.md` が作業規則である。murakumo fleet の `root-human-auth-no-downgrade` gate は三者の存在・整合、west 登録、active method、status/claim、recovery invariant を検査する。各 authority/client project は nested `SECURITY.md` で root boundary を弱めない。\n\ngate は external specification mirror や protocol library のソース文字列を走査しない。inventory に human authentication surface として登録された project の active authority だけを検査する。\n\n## Current gap\n\n`app-auth` の built Worker と `auth.itonami.cloud` は禁止 route の negative proof がある。`network-awai/cloud-itonami` には Email と initial-password code が残るため migration gap である。他の登録 surface は project policy を揃えても source・artifact・live の三面をこの ADR の時点では再検証していないため unverified とする。")))

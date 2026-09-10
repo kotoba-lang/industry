@@ -1,0 +1,169 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608049200-native-vector-collections-and-context-abi-v3")
+  (:adr/title "ADR-2608049200: native の collection gap を閉じる — vector は「新しい値表現」ではなく handle 1 語、context ABI は v3 へ")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-04")
+  (:adr/last-verified "2026-08-04")
+  (:adr/last_verified "2026-08-04")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "native-vector-collections")
+  (:adr/authoritative-for
+  (vector "native backend における vector-i64 / vector-f64 の値表現と lowering"
+   "kexe context ABI version 3 の slot 割り当て (152-192) と 2 つの arena 容量"
+   "vector-conj の in-place append が immutability を壊さない理由"
+   "ADR-2608030300 の f64/vector parity gap のうち vector 部分の完了判定"))
+  (:adr/related
+  (vector "adr-2608030300-kotoba-native-f64-vector-parity"
+   "adr-2608049000-native-capability-boundary-and-production-tender"
+   "adr-2608039600-native-isa-parity-contract-and-verifier-drift"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"
+   "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"))
+  (:adr/evidence-commits
+  (vector "kotoba-lang/kotoba-native 470fd94122b5cbbb05d76040a926af65a079df09"
+   "kotoba-lang/kotoba-verifier aa85109e6016243ee3d87b1e4065a429441b8dbd"
+   "kotoba-lang/kotoba-kir 909528af148ad90d631d02d4f35690d826abf5c6"
+   "kotoba-lang/artifact aacd04f009dba33c927ba726a3c294cf5bc271d7"
+   "com-junkawasaki/root 1e6bfc4f3905862b1d2d9a0a044d35f8152f413e"))
+  (:adr/body
+  "# ADR-2608049200: native の collection gap
+
+**Status**: accepted
+**Date**: 2026-08-04
+
+## Context
+
+ADR-2608030300 (2026-08-03) は、`kotoba-kir` が `vector-*` 7 種・`vector-f64-*`
+7 種を**契約として既に宣言**し `kotoba-wasm` が**既に実装**しているのに
+`kotoba-native` は 1 つも実装していない、と実測して「契約設計の問題ではなく
+backend 実装の穴」と分類した。本 ADR はその穴のうち **vector 部分を閉じた**
+記録である (f64 scalar は 2026-08-04 に別途 landed 済み)。
+
+オーナー指示 (2026-08-04): 「gap を解消, collection, capability provider を設計実装」。
+
+## 実測して分かったこと — 新しい値表現は要らなかった
+
+着手前の見立ては「collection は native の一語スライスに入らないので、
+arena・GC・要素型タグを設計する必要がある」だった。**これは誤りだった。**
+
+native には既に **host context vtable** がある (`pair` 56 / `pair-first` 64 /
+`string-concat` 120 / `string-substring` 136 / `string-code-point-at` 144)。
+string も option も result も keyword も、**すべて `pair(offset,length)` の
+1 語 handle** として既に流通している。vector を同じ形にすれば:
+
+- backend は**新しい register discipline も新しい命令 encoding も要らない** —
+  6 操作すべてが既存の `emit-heap-call` を通る普通の context call
+- **要素型タグが要らない** — native の f64 は既に IEEE-754 bit pattern を載せた
+  i64 語なので (ADR-2608030300)、f64 vector は「その語の vector」。
+  `vector-f64-*` は `vector-*` と**同一の emission** になる
+
+結果、両 backend の変更は `heap-call-offsets` への 6 エントリ追加と
+dispatch 節だけで、機械語の新規手書きは**ゼロ**だった。
+
+## Decision
+
+### 1. vector 値は host vector table への 1 語 handle
+
+`struct kexe_vector_v1 { uint64_t offset; uint64_t length; }` の 1-based index。
+elements は共有 arena `int64_t vector_items[]` の slice。**pair handle と同じ
+規律**であり、guest 側に新しい値表現は生えない。
+
+### 2. context ABI は version 3、slot は 152-192
+
+| offset | 操作 |
+|---|---|
+| 152 | `vector_new_empty` |
+| 160 | `vector_conj` |
+| 168 | `vector_count` |
+| 176 | `vector_at` |
+| 184 | `vector_assoc` |
+| 192 | `vector_drop` |
+
+**version を上げるのは片方向にだけ load-bearing** — v2 host には 152-192 に slot が
+無いので、v3 でコンパイルされたコードがそれを呼ぶと未初期化メモリへ jump する。
+loader の全 `checked_*` は自分の version 以外を拒否する (POSIX / Windows 両方)。
+
+容量は **2 つ**持つ: `vector-capacity 4096` (handle) と
+`vector-item-capacity 65536` (要素語)。**table entry と要素は別々に枯れる** —
+小さい vector が多ければ entry が先に、育つ vector が 1 本なら要素が先に尽きる。
+要素 arena を `vector-item-limit` (16384) ちょうどにしないのは、要素を変える操作が
+すべて allocate する以上、最大長の vector を 1 本作ったら `vector-assoc` 1 回で
+枯れるから。**arena が縛るのは総 live 割り当てであって 1 本の長さではない** —
+string pool が byte で既に持っている区別と同じ。
+
+### 3. `vector-conj` は arena top に接していれば in-place append
+
+source slice が `offset + length == arena_top` を満たすとき、次の語は**どの
+handle も跨いでいない**。全 handle が自分の length を持つので、そこへ書いても
+既存 handle が読む内容は変わらない。したがって copy せず append してよい。
+接していなければ interior slice なので copy する。
+
+**これが load-bearing な理由**: KIR の `vector-new` は可変長だが context ABI は
+可変長でない。だから literal は「空 vector + 要素ごとに 1 conj」に展開される。
+in-place path が無ければ、この展開は O(n²) になり、ADR-2608030300 の動機
+(T5 の実機計測を大きな vector で回す) を最初から潰す。
+`vector-assoc` にはこの case が無く**常に copy**、`vector-drop` は suffix が
+contiguous なので**要素を 1 語も割り当てない view** (string-substring と同型)。
+
+### 4. `vector-get` は trap しない — bounds test で挟む
+
+`vector-at` は範囲外で trap するが `vector-get` は fallback を持つので total。
+両 operand を先に束縛し (参照実装は各 1 回だけ評価する)、fallback は**1 回だけ**
+emit する — nesting で展開が階層ごとに倍化しないため。
+
+## 5 repo の変更 (すべて merged)
+
+| repo | 内容 | SHA |
+|---|---|---|
+| `kotoba-native` | 両 ISA の emit (offsets / alias / vector-new 展開 / vector-get 展開) | `470fd94` |
+| `kotoba-verifier` | 両 family の arity table + variadic literal 上限 + expected context ABI v3 | `aa85109` |
+| `kotoba-kir` | native admission 述語に両 family を追加 | `909528a` |
+| `artifact` | 両 loader の pinned source SHA-256 を v3 へ | `aacd04f` |
+| `compiler` | loader (POSIX/Windows) の host table・context-abi map・conformance 7 件 | (最終 PR) |
+
+## 検証
+
+- **T1.4 native conformance: 15/15 passed** (`aarch64-kotoba-v1`)。うち新規 7 件は
+  vector。**署名付き kexe + 実 loader プロセス実行**であり、arena・bounds check・
+  copy-free append が emit されただけでなく**実行された**唯一の場所。
+- `kotoba-native` 49 tests / 2152 assertions green。host slot・construction が
+  要素ごとに 1 conj であること・**f64 family が i64 family と byte 一致**すること
+  (「両方動く」ではなく「1 つの emission である」) を pin。
+- POSIX loader は `-Wall -Wextra -Werror` で clean compile。
+- immutability は値として検査: `vector_assoc_preserves_source.kotoba` は host が
+  共有 arena を書き抜けたら 97 を返し、正しければ 0 を返す。
+
+## 正直に言う限界
+
+- **Windows loader は compile も実行もしていない** (windows.h が要り、cross
+  compiler が無い)。POSIX と行ごとに対応させ `_Static_assert` で offset を
+  pin したが、**この非対称は string の 2 回の前進より重い** — あちらは既存 shape への
+  bounds check 追加、こちらは slice 簿記の**算術**を足している。
+- **hetero-vector / typed-set / typed-map / document は依然として native に無い。**
+  vector とは違い、これらは要素型タグか再帰値を要求するので同じ trick が効かない。
+- `vector-new` は両 family で唯一 `non-string-typed-ops` に**入っていない**ため
+  cljs gate が admit する。cljs は `vector-count` を拒否するので「作れるが読めない
+  vector」ができる。**不整合だが共有 set の性質**であり、native の変更の中で
+  他 target を黙って narrow しないよう、修理せず test case として pin した。
+- kotoba-kir の admission test は**本変更以前から 4 assertion 落ちていた**
+  (`keyword-from-string` が native admit 済みなのに excluded 一覧に残っていた)。
+  同じ性質の誤りなので同 PR で直した。
+
+## 次 — capability provider (ADR-2608049000 の 3 段)
+
+collection は閉じたが **capability boundary は閉じていない**。ADR-2608049000 の
+順序は変わらない: ①境界に variant/record を通す (記述子共有) → ②要求/応答
+チャネル (TCB 拡大・オーナー承認取得済み) → ③実 provider 配線 → kit ごとに
+`:native-aot` を `:implemented` へ。
+
+**①の前提は実測で確認した** (2026-08-04): `kotoba-wasm/src/kotoba/wasm/typed.cljc`
+の require は `kotoba.kir.cljs-i64` **1 本だけ**で、wasm module にも section にも
+依存しない。ADR-2608049000 の「wasm に在るのは抽出時の経緯であって結合ではない」
+は正しい。したがって①は T0 (`kotoba-kir`) への移設 + `kotoba-wasm` からの
+re-export で始められ、受け入れ条件は既存 wasm test が緑のままであること。
+
+**どの段でも先に flag を触らない** — 全 kit の `:native-aot` は `:pending` のまま。
+本 ADR は言語の値面を広げただけで、provider 面は 1 mm も動かしていない。")))

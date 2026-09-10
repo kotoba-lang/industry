@@ -1,0 +1,127 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608209300-did-webvh-is-the-premise-for-cloud-itonami-class-services")
+  (:adr/title "did:key は root のまま、cloud-itonami 級は did:webvh を前提にする —— そして空の DID document は手落ちではなく決定だった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-20")
+  (:adr/implemented true)
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "did-webvh-premise")
+  (:adr/related (vector "adr-2608200400-did-primitive-identity-reexamination"
+                "adr-2608180200-biscuit-as-delegation-center"
+                "adr-2607285000-cloud-itonami-sealed-blinded-open-planes-threshold-custody"))
+  (:adr/repos (vector "orgs/network-awai/cloud-itonami"
+              "orgs/kotoba-lang/foundation-identity-didwebvh"
+              "orgs/kotoba-lang/org-biscuitsec"
+              "manifest"))
+  (:adr/authoritative-for
+  (vector "cloud-itonami 級のサービスが naming/rotation を did:webvh に置き、did:key を root のまま据え置く決定の正本"
+   "webvh は transport であって biscuit root key の authority ではない（authority は biscuit.rootkey の署名回転ログ）という決定の正本"
+   "delegation(biscuit) と confidentiality(envelope) を混ぜない —— biscuit 単独で sealed data を共有すると custody が :server に落ちる、という規則の正本"))
+  (:adr/body "# 決定
+
+オーナー判断（2026-08-20）「did key を root にして ok, cloud-itonami などでは webvh を前提に」。
+
+- **`did:key` は root のまま。** ADR-2608200400 の理由は動かない —— 識別子が検証材料
+  そのもので、解決に I/O が要らない。`kotoba/pure` に ambient authority が無い以上、
+  コミットメント型の method を primitive に据えると identity の評価が effect になる。
+- **cloud-itonami 級のサービスは `did:webvh` を前提にする。** `did:key` に出来ないのは
+  回転・失効・「誰が変更を承認したか」の記録で、それがこの面。
+- **`did:web` は名前として残す。** 消さない（ADR-2608148200 / ADR-2608039950）。
+
+## 面は 3 つあり、混ぜると壊れる
+
+| 面 | 形式 | 何を答えるか |
+|---|---|---|
+| naming / rotation | **`did:webvh`** | 誰の鍵が今どれか、誰が変更を承認したか |
+| delegation | **biscuit** | 誰が何をしてよいか（減衰・委譲・offline 検証。ADR-2608180200） |
+| confidentiality | **envelope** | 誰が中身を読めるか |
+
+**biscuit だけで sealed data を共有できない。** biscuit が「許可する」と言っても
+バイトは渡らない —— server が復号して配ることになり、custody が `:server` に落ちて
+sealed の主張が消える。共有 = biscuit が fetch を認可し、`envelope/put-recipient` が
+復号能力を渡す。両方要る。
+
+**biscuit の root key 配布に webvh を使わない。** `org-biscuitsec` が実測した表
+（1M verifications/月・四半期回転・1 日 400 cold start）で、`biscuit.rootkey` の
+署名回転ログは 12,000 fetches/月・検証可能な回転つき、`did:webvh` は 16,000 で
+DNS と HTTPS を auth path に戻す（ADR-2608039000 が外した経路）。上流 README の
+結論をそのまま採る: **`did:webvh` can still be the transport — it just is not the
+authority.**
+
+**webvh が rootkey に無いものを 1 つ持つ**: `witness` の m-of-n を **resolver が
+強制する**。ADR-2607285000 D3 が sealed 面の operator 操作に望んだ形そのもので、
+`kotoba-lang/custody` の Shamir threshold と同じ思想の、組織 identity 側の対。
+
+# 前提が 1 つ間違っていた
+
+この作業は「`itonami.cloud/.well-known/did.json` が `verificationMethod` を 1 つも
+持たない = 封の宛先が発見できない穴」という読みから始まった。**誤りで、
+cloud-itonami ADR-0044 がそう決めていた**:
+
+> **`verificationMethod` を書かない。** この識別子は何も署名しない…持っていない鍵を
+> document に書くのは、まさに murakumo.cloud が避けた custody の嘘である。
+
+**webvh を入れてもこの決定は自動的には覆らない。** 変わるのは 1 点 —— webvh の
+`updateKeys` は定義上ホストが保持する鍵である。それでも載せてよいのは実際に
+保持しているものだけで、**テナントの envelope recipient 鍵は org の document では
+なく `app.itonami.cloud` の面**（ADR-0044 が「次に立てるべきはそこ」と名指した面）。
+org に 1 本載せれば、テナントごとに違うはずの宛先が org の鍵にすり替わる。
+
+# 着地したもの
+
+`network-awai/cloud-itonami` `1c305a75`（docs/adr/0046）:
+
+- `src/cloud_itonami/did_webvh.cljc` —— host 半分。上流は「No fetching / No key
+  custody / No JSON I/O」と自分で宣言しているので、その 3 つはここが持つ
+- `bin/didwebvh.cljs` —— `verify` / `genesis`
+- 10 tests / 18 assertions。**3 つの変異でそれぞれちょうど 1 本、狙ったテストだけが
+  赤くなることを確認した**（壊れた行を飛ばす / `keys-published?` が常に true /
+  witness を常に入れる）
+- `public/_headers` に `.well-known/did.jsonl` の content-type
+
+規律として焼いたもの: **update 鍵と公開する鍵を分ける**（ADR-2607285000 D2 の
+`KOTOBA_SEED` 病理）/ **pre-rotation 必須**（省くと現在の鍵を取った者が後継を選べる）/
+**独立した保持者が実在するまで witness を書かない**（`custody/independence` が拒否する
+形と同じ）/ **壊れた行を飛ばさない**（短いが正しく検証される chain は withhold と
+見分けが付かない）。
+
+⚠ **署名は in-process。** 上流は「`didwebvh.signer` は組織 root 鍵には間違った方」と
+書いており、そのとおり。kagi から seed をこのプロセスのメモリに載せて署名する。
+差し替え口は `entry/sign` の契約として開いているので `custody` の threshold を繋ぐのは
+1 箇所の差し替えで済むが、**今はそうなっていない**。「HSM を使っている」と書かない
+ためにここに残す。
+
+# まだ webvh に載っていない
+
+1. **genesis を打っていない。** `did.jsonl` は存在せず、`itonami.cloud` は今も
+   `did:web` だけ。`verify` は exit 3（gap であって検証失敗ではない）。
+2. **update 鍵の item が無い。** `itonami-org-root` は再利用しない（上記 D2）。
+   `scripts/ops-cli.cljs keygen <item>` で kagi の中に封じ、公開 did:key だけを受け取る。
+   **kagi の unlock が要るのでオーナー作業。**
+3. `rotate` 未実装 / witness 空 / この DID を認証経路で検証しているものは無い。
+
+# 途中で踏んだ、別の live incident
+
+**`manifest/west.yml` が `origin/main` から消えていた。** 実測: commit
+`7e077791113`（14:35:05 authored、2 秒後に merge）はメッセージが
+「west: advance org-apqc-pcf pin (axis-ingest catalog)」で、中身は
+**28,538 行の削除 1 件のみ**。親 `6a3c68bfe0e` は 1,052,009 バイトで持っている。
+
+**pin を進めるつもりの commit が manifest を消しても、log と merge 通知では
+pin 前進と同じ顔をする。** 壊れるのは 4,221 project の `west update` で、
+壊れるのは実行した人ではなく次に clone する全員である。
+
+復旧 commit を書いて push したところ 409 で、fetch し直すと**別セッションが既に
+main を復旧させていた**（`410f362754a` 時点で 1,052,009 バイトに戻っている）。
+私の復旧 commit は捨て、cloud-itonami の pin 前進 1 件だけを載せ直した。
+
+**残っている問い（このセッションでは答えていない）**: 何がこの削除を作ったのか。
+GitHub API の single-entry commit 経路が疑わしいが特定していない。同じ形が
+`90852b86`（1 件の登録のつもりが 44 件の壊れた pin を main に流した）以来 2 度目で、
+どちらも **west.yml が生成物であることと、それを書く経路が textual であること**の
+間に在る。次に誰かが `--entry` 経路を触るときは、**書き込み後のバイト数を確かめる**
+検査を足すのが安い（1 MB の manifest が 0 バイトになったことは、行数を数えれば分かる）。
+")))

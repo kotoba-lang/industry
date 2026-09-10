@@ -1,0 +1,101 @@
+(vector (map (:db/id -1),
+  (:adr/id "adr-2607256100-yabai-tadori-cti-corpus-query-plane"),
+  (:adr/title "ADR-2607256100: yabai/tadori の CTI corpus（DNS/IP/passive-DNS/TLS-CT/IOC）を統合クエリ面に接続"),
+  (:adr/status "accepted"),
+  (:adr/doc_type "adr"),
+  (:adr/date "2026-07-25"),
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)")),
+  (:adr/topic "yabai-tadori-cti-corpus-query-plane"),
+  (:adr/related (vector "adr-2607252000-unified-query-plane-cross-repo-company-join"
+                "adr-2605301400-tadori-onchain-tracing-actor-and-kotoba-eavt-migration"
+                "adr-2605171600-docs-edn-only-datascript-query"
+                "adr-2605181100-etzhayyim-encrypted-envelope-pii")),
+  (:adr/supersedes (vector)),
+  (:adr/superseded_by (vector)),
+  (:adr/repos (vector "com-junkawasaki/root" "etzhayyim/com-etzhayyim-yabai" "etzhayyim/com-etzhayyim-tadori")),
+  (:adr/authoritative true),
+  (:adr/authoritative_for (vector "manifest/edn-query.cljs が yabai/tadori の CTI corpus を載せること、およびその loader と join セマンティクスの正本")),
+  (:adr/last_verified "2026-07-25"),
+  (:adr/body "# ADR-2607256100: yabai/tadori CTI corpus を統合クエリ面に接続
+
+**Status**: accepted
+**Date**: 2026-07-25
+
+## Context
+
+ADR-2607252000 が企業データ（market-intel / cloud-itonami-lei / ToS）と fleet 状態を
+統合クエリ面（`manifest/edn-query.cljs`）に載せ、`:company/lei` で repo を跨いだ join
+を可能にした。しかし SecurityTrails 的なネットワーク/セキュリティテレメトリ — すなわち
+passive-DNS 履歴・IP hosting/location 履歴・TLS-CT 証明書観測・IOC indicator・アクセス監査 —
+は yabai（`com-etzhayyim-yabai`）と tadori（`com-etzhayyim-tadori`）が kotoba EAVT の EDN
+として保持しているのに、このクエリ面から引けなかった。
+
+yabai はリスク評価側（fast-flux / hosting 集中 / IOC load / cert-SAN pivot をスコアリング）、
+tadori は case-anchored evidence 側（on-chain tx trace + cross-store attribution）で、
+schema はそれぞれ `00-contracts/schemas/passive-dns-cti-ontology.kotoba.edn` /
+`com-etzhayyim-tadori/kotoba/schema.edn`。責務分離は維持したまま、両者の corpus を同じ
+クエリ面に載せれば「IP/domain を起点にリスクと証拠を横断的に引く」Datalog query が1発で
+書ける。
+
+## Decision
+
+`manifest/edn-query.cljs` に2つの loader を追加する。**既存の generic shape-reader を
+踏襲し、新規発明しない**（ADR-2607252000 の company/fleet loader と同じ方針）。
+
+1. **`yabai-passive-dns-entities`** — `vector-of-maps-entities`（kanjo/kabuto の
+   `*.merged.kotoba.edn` と同型）で `orgs/etzhayyim/com-etzhayyim-yabai/data/
+   passive-dns.merged.kotoba.edn` を読む。`:source/dataset \"yabai-passive-dns\"`。
+2. **`tadori-threat-intel-entities`** — `add-datoms-entities f nil :tadori/entity-id`
+   （hirameki-patents の `[:db/add e a v]` 4-tuple と同型）で
+   `orgs/etzhayyim/com-etzhayyim-tadori/data/persisted/tadori-threat-intel.tx.kotoba.edn`
+   を読む。`:source/dataset \"tadori-threat-intel\"`。
+
+`:source/dataset` で出自を区別し（属性名に出自を埋め込まない — ADR-2607252000 と同じ）、
+`build-conn` の let / all-tx / count map と `-main` の count 表示に組込む。
+
+## 既知のセマンティクス（実装時に障害にならないよう明記）
+
+- **`:db.type/ref` は datascript.js 上で解決されず文字列値として join する**。
+  `:pdns/domain \"domain.cloudflare-com\"` が `:domain/id \"domain.cloudflare-com\"` と
+  文字列一致で結合する（lei-tos の `:company/lei` と同じ）。ref 値（`[:ns/id \"x\"]` のような
+  vector）は JS array として保持され、query での中継は ipaddress graph id 形式を経由する。
+  実測: `pdns/ip`（`ip.v4.104-16-1-1` 形式）と `indicator/value`（生 IP `1.1.1.1`）は形式が
+  違うため直接 join できない — これは仕様（ipaddress graph を中継する設計）であって
+  loader の不具合ではない。
+- **yabai の merged file は生成物**（`cf_sweep/rebuild-merged!`、手編集禁止）。クエリ面は
+  point-in-time snapshot（kanjo/kabuto の merged.kotoba.edn と同じ扱い）。merged が再生成
+  されるまでの間は古い内容が見える。
+- **`:access/*` レコードは安全に load 可能** — payload は envelope CID のみ。PII は
+  `com.etzhayyim.encrypted.*` で暗号化済み（ADR-2605181100）。クエリ面に PII は乗らない。
+- **`warn-skipped!` で握り潰しを報告** — 存在するのに 0 entity のソースは stderr へ
+  WARNING（ADR-2607252000 と同じ規律）。
+
+## 本番 feed 方針（Phase 3 に関連・この ADR で宣言）
+
+yabai の active collection（`methods/ingest.cljc`）は G7 operator-gate で offline-default。
+本番データソースは **public/free 主系**（crt.sh CT logs = key 不要 / Cloudflare scanner =
+既存 CF_API_TOKEN slot）とする。SecurityTrails / DNSDB / Recorded-Future 等の有料
+proprietary feed は schema 上 `:feature-flagged-input` 限定で **system-of-record には
+しない**（tadori G4 起源の ingest 規律）。必要になれば別途 API key を owner が調達し
+（安全床①: agent はフォーム入力しない）、`:feature-flagged-input` タグで ingest bridge に追加する。
+
+## 実測（2026-07-25）
+
+```
+adr=1804 docs=2253 ... yabai=545 tadori=5 total=15660
+```
+
+corpus 内 join: `domain/fqdn → domain/id → pdns/domain → pdns/ip` で
+`[cloudflare.com ip.v4.104-16-1-1] [dns.google ip.v4.8-8-8-8] [one.one.one.one ip.v4.1-1-1-1]`
+が取得可能。IP indicator リスト（`indicator/type \"ip\"` × `indicator/category`）で
+scanner IP（confidence 700-900）や `1.1.1.1 benign 950` / `192.0.2.66 tor-exit 700` が引ける。
+これらは `kotoba-cf-zones` 由来の実データ（2026-07-13→16 の CF GraphQL sweep）。
+
+## Consequences
+
+- SecurityTrails 的な「IP/domain からリスクと証拠を横断引く」query が1面で書ける。
+- yabai/tadori の corpus が他 corpus（company/lei 等）と同じ query 面に乗る。
+- cross-actor の責務分離（yabai=score / tadori=evidence / Council=enforce）は維持。
+- Phase 2（常駐 cron cell）と Phase 3（G7 flip + live 取得）で、この面に載るデータが
+  seed/sample から本番テレメトリに拡大する。
+")))

@@ -1,0 +1,35 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608152300-repo-wide-d1-to-kotobase-and-shared-identity")
+  (:adr/title "Repo-wide D1 retirement through Kotobase API and one DID-rooted account")
+  (:adr/status "closed")
+  (:adr/date "2026-08-15")
+  (:adr/closed "2026-08-15")
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative_for (vector "new Cloudflare D1 binding prohibition"
+                          "D1 to Kotobase migration classification"
+                          "shared account and authentication assurance boundary"
+                          "contextual trust evaluation boundary"))
+  (:adr/artifacts (vector "manifest/d1-kotobase-migration.edn"
+                  "scripts/verify-d1-kotobase-migration.cljs"
+                  "orgs/net-kotobase/control-plane/sdk/kotobase-ts/src/index.ts"
+                  "orgs/cloud-itonami/animeka/viewer/worker.js"
+                  "orgs/cloud-itonami/animeka/viewer/migrate-d1-to-kotobase.mjs"
+                  "orgs/cloud-itonami/yukkuri/appview/ai-gftd-wasm-yukkuri-y5kk5r1x/src/app.ts"
+                  "orgs/cloud-itonami/yukkuri/appview/ai-gftd-wasm-yukkuri-y5kk5r1x/wrangler.worker.jsonc"))
+  (:adr/closure (map (:status :closed)
+                (:closed-on "2026-08-15")
+                (:scope :architecture-inventory-and-pilots)
+                (:initial-active-d1-configs 44)
+                (:active-d1-configs-at-close 42)
+                (:d1-free-pilots (vector "cloud-itonami/animeka viewer"
+                                 "cloud-itonami/yukkuri lean Worker"))
+                (:remaining-work "The 42 registered bindings remain an incremental migration program; closure does not claim that fleet-wide D1 retirement is complete.")
+                (:ucan "No UCAN verifier/account-linking implementation was verified on kotoba main at close; UCAN remains gated on verifier integration.")
+                (:fleet-gate "Not installed: the superproject fleet archive does not contain west child trees, so a root gate would produce false confidence. The workspace-wide verifier is the current executable control.")))
+  (:adr/body "# Decision\n\nNew Cloudflare D1 bindings are forbidden. Existing bindings are a closed migration inventory. Business, protocol, and append-only event records move to the authenticated kotobase.net Datomic/XRPC API through a shared client. SQL table rows become namespaced Datoms; each application receives its own database name and tenant scope. Migration uses dual-write, snapshot/backfill, CID/count comparison, read shadowing, then binding removal. D1 SQL is never exposed through a generic remote-SQL compatibility endpoint.\n\nD1 uses that perform a linearizable claim, lease, unique nonce burn, or work-queue transition do not move into an eventually convergent content-addressed graph by renaming rows as Datoms. They first split domain records from coordination state. Coordination remains an explicit temporary exception until Kotobase exposes and qualifies an equivalent strong-consistency capability. `murakumo-actions` is therefore blocked, not falsely marked migrated.\n\n`auth.kotobase.net` is the common account plane. One human account DID can link multiple proof-of-control identities. The active credential DID remains distinct and authorization continues to evaluate tenant membership and capability. Browser applications reuse the scoped kotobase.net cookie session; Workers use tenant-scoped service accounts or request CACAOs. No application copies passkey, email, OAuth, CACAO, UCAN, or VC secrets into its domain graph.\n\nThe current bounded authentication assurance is usable: passkey is high; TOTP over a low method is substantial; email, OAuth, OIDC, CACAO and legacy sessions are low unless separately stepped up. This measures the current authentication ceremony, not whether the person is honest.\n\nKotoba DID/CACAO and VC surfaces support signed identity, delegation, claims, status and evidence. The attestation query returns claim records and stake, but there is no qualified universal account-reliability score. Trust evaluation must be contextual and explainable: policy selects accepted issuers and claim types, verifies proof/status/time/audience, applies freshness and anti-Sybil constraints, and returns evidence plus a policy version. A scalar score may be a view for one decision domain, never an account-global fact or an authorization substitute. UCAN may be accepted as another capability envelope only after its verifier maps into the same internal principal/capability model; protocol presence alone does not link accounts.\n\nThe workspace verifier fails on an unregistered active Wrangler D1 binding and on stale inventory. It is intentionally closed-world: removing a binding also requires removing its inventory entry, so retirement is visible rather than silently forgotten. This is currently a local west-workspace control, not a murakumo fleet gate: the superproject fleet archive does not contain west child trees, and installing a root gate would therefore be security theatre.\n\n# Implementation outcome and closure\n\nThe repo-wide census began with 44 active Wrangler D1 configurations. The Animeka viewer was migrated from direct D1 SQL to authenticated Kotobase Datomic/XRPC, with an idempotent D1-export backfill tool and tests. The Yukkuri lean Worker already used Kotobase as read/write primary; its best-effort D1 shadow writes and `YUKKURI_DB` binding were removed. Its live SvelteKit deployment remains a distinct read-primary migration and was not falsely included in the pilot result.\n\nAt close, the closed-world verifier passes with 42 active D1 configurations, all registered and classified. Kotobase TypeScript client coverage now includes tenant-scoped Datomic calls, central Authn session/identity access, and a versioned contextual attestation-policy evaluator. Animeka tests and Wrangler dry-run pass without D1; Yukkuri ClojureScript release build and Wrangler dry-run pass with only Kotobase/LLM bindings.\n\nThis ADR closes the architecture, inventory, shared-account/trust boundary, and the two proving pilots. It does not declare the remaining 42 bindings migrated. Those bindings continue under the inventory dispositions; strong-consistency exceptions remain blocked until an equivalent qualified Kotobase capability exists. No live deployment or destructive D1 deletion is part of this closure.")
+  (:adr/consequences (vector "Applications share one principal without collapsing account DID, credential DID, tenant, and capability."
+                     "Authentication assurance is available now; general reputation remains explicitly unqualified."
+                     "Coordination workloads retain correctness while domain data can migrate incrementally."))))

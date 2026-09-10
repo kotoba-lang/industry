@@ -1,0 +1,96 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608039960-flight-shopping-itinerary-and-fare-capability")
+  (:adr/title "ADR-2608039960: kotoba-lang/itinerary と kotoba-lang/fare を新設し、QPX 相当の航空運賃探索を実装 — 「最安である」という主張は、選ばれなかった運賃についての主張なので、再述では検証できない")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "flight-shopping-itinerary-and-fare-capability")
+  (:adr/date "2026-08-03")
+  (:adr/last_verified "2026-08-03")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative_for
+  (vector "kotoba-lang/itinerary(スケジュール leg・接続適法性・旅程構築の capability library)の設計方針の正本"
+   "kotoba-lang/fare(届出運賃・運賃規則・運賃構成・最安運賃探索の capability library)の設計方針の正本"
+   "『最安であるという主張は、選ばれなかった運賃についての主張だから、advisor の答えを再述しても検証できない』という設計原則の正本"
+   "この fleet における QPX 相当機能の現在地(何が実装され、何が意図的に未実装か)の記録"
+   "ATPCO カテゴリのうち実装したもの/しなかったものの列挙と、なぜ近似しなかったかの記録"
+   "cloud-itonami-isic-7911 の shopping op(:search-fares)とその3つの再計算検査・phase 4 ゲーティングの正本"
+   "『価格が違う』と『最安という主張が偽』は別の検査であるべき、という判断の記録"))
+
+  (:adr/problem
+  "オーナーから『今の qpx のような flight 価格検索は cloud-itonami, kotoba-lang で設計実装されているか』という問いがあり、実測した。結論は **No** — QPX(ITA Software の low-fare search engine)相当の中核は存在しなかった。\n\n実測(2026-08-03):\n\n**あった3層**\n\n1. **メタサーチ面** — `cloud-itonami/flight-offer`(west 登録済)。自称 \"Skyscanner-equivalent fare aggregator\"、TypeScript / AT Protocol PDS 上の offer・watch・alert レジストリ + `getCheapestFare` ロールアップ。ただし**このリポジトリ自身には provider を叩く実装が無い** — `registry.ts` は AT PDS の read/write のみで、fetch 系(amadeus / duffel / kiwi-tequila / travelpayouts)は前身の etzhayyim monorepo 側の LangServer BPMN + Python primitive に残っている。`CLAUDE.md` の deployment status は 2026-04-28 時点で CF Worker deploy ❌ / LangServer 起動 ❌ / provider 資格情報 ❌、`MIGRATION-TODO.md` は「🔄 TRANSFORM — codemod pending」。設計はある・移植途中・未稼働。構造上これはメタサーチで、自分では運賃を計算せず provider の返した offer を記録するだけ。\n\n2. **自社在庫・自社運賃の見積** — `kotoba-lang/reservation` + `cloud-itonami-isic-5110`(ADR-2800002200)。実装も試験も揃っている。ただし ADR 自身が範囲を明記している通り「reservation は GDS/PSS/channel manager/PMS と通信しない。運賃の届出も空席の公開もしない」。**1事業者が自社の届出運賃と自社の座席在庫に対して見積を出す**もので、横断探索ではない。\n\n3. **クリーンルーム API 互換 actor 群** — `kotoba-lang/com-{amadeus,sabre,travelport,navitaire,oag-flights,flightstats}-*`、`com-*-gds`、`com-iata-ndc`。名前は GDS/NDC だが中身は**全部同一テンプレートの L4 汎用 CRUD**(Flight / Booking / Segment / Property / Reservation / Fare の6エンティティ)。`com-iata-ndc` ですら AirShopping / OfferPrice ではなく同じ6エンティティ CRUD。棚は立っているが shopping engine ではない。\n\n**無かったもの(QPX の中核そのもの)**\n\n- スケジュールグラフ探索(leg → itinerary 構築、最小接続時間、経由地生成)\n- ATPCO 届出運賃の解釈(fare basis、rule category、routing map)\n- 運賃構成(through fare vs 分割、NUC/ROE 換算、YQ/YR・税)\n- 予約クラス在庫と運賃の突き合わせ\n- low-fare search の組合せ最適化\n\nfleet 全体を `ATPCO|fare-basis|min-connect|routing map|NUC|low fare search` で grep して実ヒット0(唯一の \"routing map\" は無関係な `com-zendesksell/toi/cell.cljc`)。\n\n**なぜこれが実害か。** LLM は運賃を『それらしい数字』として生成できてしまう。ADR-2800002200 は 5110 に対してこれを潰したが、その検証は**1つの料金プランに対する再計算**であって、探索の検証ではない。「これが最安です」という主張は、**選ばれなかった全ての運賃についての主張**なので、advisor の答えを再述しても検証にならない。この fleet には、その検証を成立させる座がどこにも無かった。")
+
+  (:adr/decision
+  "### 1. kotoba-lang/itinerary を新設(capability library、Apache-2.0、zero-dep portable `.cljc`)\n\n旅程側。スケジュール leg、最小接続時間(MCT)テーブル、接続適法性、旅程構築(DFS)。\n\n**時刻は epoch からの整数分で、常に引数**。接続適法性は瞬間に対する算術なので各 leg は `:leg/depart-min` / `:leg/arrive-min` を持つ。ローカル壁時計文字列は表示のために同乗できるが、計算には一切使わない。clock も読まない — governor が1時間後に再計算しても同じ評決に達しなければならない。\n\n**中心は `violations`**(governor seam)。advisor はもっともらしい3レグ旅程を組み立てて「接続します」と主張できるが、2つ目の乗り継ぎで MCT を確認した保証は無く、LLM は成田で20分のインターライン接続を平然と出す。`violations` は同じスケジュールデータに対して算術をやり直すので、**再述ではなく再計算**になる。失敗は最初の1件でなく**全件**返す。\n\n**構築時に自分について嘘をつくものを作らせない**: `leg` は出発前に到着する便・どこにも行かない便・不正なコードに対して nil を返し、`itinerary` は空レグ列に対して nil を返す。\n\n**探索の bound は結果に載せて返す**(`:itin/found` はキャップ前の件数、`:itin/truncated?`)。黙って上位N件だけ返すのは「これが市場だ」と読まれ、切られた旅程に最安運賃が載っていることがある。\n\n**実装中に見つけたバグを1件記録する**: elapsed ceiling(door-to-door 上限)が**直行便に対して一度も適用されていなかった** — 経路延長ステップでしか検査しておらず、直行便はその分岐を通らないため、「2時間以内」を要求した caller に7時間半の便を返していた。emit 時に検査するよう修正し、回帰テストを追加した。\n\n19 tests / 105 assertions、clj-kondo clean。\n\n### 2. kotoba-lang/fare を新設(同上)\n\n価格側。届出運賃、運賃規則(ATPCO カテゴリ部分集合)、運賃構成(旅程を連続する fare component に分割)、NUC/ROE 換算、サーチャージ・税、最安運賃探索。\n\n**整数金額のみ、float なし**。通貨建て運賃は最小単位の整数、NUC 建ては NUC の1/100 の整数、ROE は 10^4 倍の整数、税率は basis point。**IATA の通貨丸めは適用せず truncate する** — 換算運賃は丸めた値以下にしか着地しない。これは意図的で、乗客の請求額を変える丸め規約をライブラリが勝手に選ばない。IATA 丸めが要る事業者は通貨建てで届け出て `:fare/amount` を渡し、換算経路を通らない。\n\n**clock も派生事実も持たない**。advance purchase の日数は**データとして受け取る**(`kotoba.reservation/quote-for` が曜日をデータで受け取るのと同型)。その算術は `kotoba.itinerary/days-between` / `weekday-of` が唯一の実装として持つ — 適格性の不一致が「何曜日だったかの不一致」に化けないようにするため。\n\n**検証できないことは満たされたことではない**。運賃が規則を届け出ていて、それを検査する事実が欠けている場合、その運賃は**適用されない**(`:advance-purchase-unverifiable` 等)。入力が不完全だから遵守を仮定する、というのは誰も権利の無い運賃を返す道である。ADR-2800002200 が 5110 に対して取った立場と同じ。\n\n**部分合計は合計無しより悪い**。`price` はどれか1つの component が価格付け不能なら nil を返す — component を黙って落とした合計は、それでも運賃に見えてしまう。`:pc/amount` も適用不能な運賃に対して nil であって 0 ではない(0 は価格、nil は価格の表明拒否)。\n\n**中心は3つの governor seam**:\n\n- `price-matches-claim?` — 提示合計が届出運賃の算術と一致するか再計算する\n- `fare-applies?` — その運賃がそもそもこの旅程に適格か再計算する\n- **`no-cheaper-than?` / `cheapest-matches-claim?` — 探索そのものを再実行する**\n\n最後の2つがこの fleet に無かったものである。`reservation/quote-matches-claim?` は**1つの**料金プランに対する価格を検証するが、shopping の主張を検証するには**探索を再実行するしかない**。そして両者は**意図的に別の検査**である: 真の最小より**高く**提示した advisor は `no-cheaper-than?` を通り `cheapest-matches-claim?` で落ちる — 自分の提示額より安いものは無かったが、それでも過大請求だからである。すべて fail-closed(空の universe・価格付け不能・非数値の主張は false)。\n\n26 tests / 165 assertions、clj-kondo clean。\n\n### 3. 実装した ATPCO カテゴリと、しなかったものを名指しで列挙する\n\n実装: cat 2(曜日)/ 3(季節)/ 4(便適用)/ 5(事前購入)/ 6・7(最短・最長滞在)/ 11(ブラックアウト)/ 15(販売制限・発券地)/ 16(ペナルティ — **開示のみ、価格に載せない**)。構造的な届出(market 端点・予約クラスの空き・routing・MPM)は `fare-matches-component?`。\n\n**未実装を近似せず名指しする**:\n\n- **cat 10 運賃結合可能性(combinability)** — ここでは component が**独立に**価格付けされ、それが `search` が component ごとに最安運賃を取れる理由である。実際の combinability は component 間を拘束するので、この最適化を無効にする。`cheapest-for-partition` の docstring に「もし実装されたらここで前提が壊れる」と書いた。\n- cat 12(サーチャージ)/ 14 / 17(HIP)/ 23 / 25(fare by rule) — サーチャージは届出から導出せず caller のデータとして受け取る。\n- **routing map をグラフとして扱わない** — `:fare/routing` は許可点の順序付きリストで、component の中間点がその部分列であることを要求する。実際の routing map は分岐を持つ有向グラフなので、この規則は**実際に許可される routing の真部分集合しか受理しない**: 本来適用可能な運賃を却下することはあるが、適用不能な運賃を受理することは無い。\n- 発券・届出・決済 — 何もしない。\n\n### 4. 2つは合成できるが、互いに依存しない\n\n`fare` は leg / itinerary の**形**をデータ契約として消費するだけで `itinerary` に依存しない(両方 `:deps {}`)。これは packaging 要件でもある — `:local/root` は monorepo checkout の中でしか解決しないので `:deps` に入れると git 依存として使えなくなる(`reservation` が `cloud-itonami-isic-7990` から consume された時に実際に踏んだ)。\n\n合成の実測(2026-08-03、両ライブラリを同一 classpath で実行):\n\n```\nitineraries found: 2 truncated: false\n   [NH841]        450min legal: true\n   [NH853 BR225]  620min legal: true      ; TPE 15分接続の CI751 は構築段階で排除\npriced solutions: 2 unpriceable: 0\n   68820 JPY [VLXAP21]        (61000 + YQ 7300 + SW 520)\n   98120 JPY [YOWTPE YOWSGN]  (分割2 component)\ngovernor: 真の最小 68820 を主張      -> true\ngovernor: 54800 を主張(捏造)       -> false\ngovernor: 98000 を提示(過大請求)   -> cheapest-matches-claim? false / no-cheaper-than? true\nadvisor が15分接続を提案            -> [a connection is shorter than the minimum connect time]\n```\n\n### 5. west 登録\n\n`manifest/repos.edn` の `:extra-projects` に2パスを追加し、`gen-west-manifest.cljs --entry itinerary --entry fare` で当該2 entry のみの最小 diff を生成。サーバ側 pin 検証(存在・default branch 到達性)を通過。\n\n### 6. cloud-itonami-isic-7911(旅行業)に shopping op を配線した\n\nライブラリを誰も consume していない状態で置かない。旅行業は**仲介業**であり、自社で保有しない在庫を探して旅客に提示するので、`kotoba.reservation`(1事業者の自社料金プラン × 自社座席)では答えられない — この actor が最初の consumer として正しい。\n\n**追加した op**: `:search-fares`(旅程と運賃を旅客に提示する提案)。\n\n**追加した3つの HARD 再計算検査**。すべて**予約自身の時刻表・届出運賃から**導出し、提案からは読まない:\n\n- `:itinerary-illegal` — `kotoba.itinerary/violations` を当該代理店自身の MCT 表に対して再実行する。デモ時刻表には**台北で15分のインターライン接続**を意図的に入れてある — 時刻表を読んだ advisor が実際に提案してくるのがこれだからである。\n- `:fare-price-mismatch` — `kotoba.fare/search` をその旅程1本に対して再実行し、提示総額が届出運賃の算術と一致するか見る。\n- `:not-the-cheapest-fare` — **提案が `:cheapest? true` と主張したときにのみ**、市場全体に対して探索を再実行する。\n\n**この2つ目と3つ目を分けたことがこの節の実質**である。旅客が直行便を選ぶのは選好であって嘘ではない — 市場最安より高く提示すること自体は許されるが、それを最安だと**言う**ことは許されない。同じ旅程・同じ価格でも `:cheapest? false` なら通る(テストで固定した)。\n\n**提案は leg **id** だけを名乗り、leg データを渡さない。** 自分の出発時刻を渡せる advisor は、適法性検査が検証しようとしているまさにその事実を供給していることになる。時刻表に無い leg id・shopping record の無い予約・適用可能な運賃が無い旅程は `:fare-search-not-recomputable`(HARD)であって pass ではない。\n\n**phase 4 を新設**し、`:search-fares` を back-office op より**上**に置いた(5110 の商用 op と同じ形)。代理店が調整業務だけ運用し、旅客への提示を一切有効化しない選択を取れるようにするため。**どの phase の `:auto` にも入れない** — 金銭も在庫も動かさないが、提示運賃は旅客が依拠する商用コミットメントだからである。\n\n67 tests / 202 assertions(既存 52/150 を保持、15 test 追加)、clj-kondo clean。デモ(`clojure -M:run`)は4つの hold(phase 未有効・捏造価格・非合法接続・偽の最安主張)を実 graph で示す。\n\n**registry 更新**: `kotoba-lang/technology` に `:fare-shopping` capability(`:operational-risk :high` — ここでの誤答は発券できない運賃と乗れない接続を旅客に提示する)、`kotoba-lang/industry` の 7911 entry の required に追加、7911 の `blueprint.edn` にも追加。")
+
+  (:adr/consequences
+  "**得られたもの**: この fleet が初めて『どの便の並びが実際に繋がるか』と『その中でどれが本当に最安か』を、**advisor を信用せずに**答えられるようになった。特に `no-cheaper-than?` / `cheapest-matches-claim?` は、ADR-2800002200 の再計算原則を**探索**に拡張したもので、1つの料金プランに対する検証しか無かった穴を埋める。\n\nこの seam は航空専用ではない — 「候補集合を作り、規則で絞り、最安を選び、その選択が本当に最安だったと主張する」構造は、宿泊(5510/5590)・旅行業(7911)・ツアー(7912)・予約サービス(7990)、さらに調達・入札にも同型である。\n\n**配線の結果、副産物として見つかったもの(2026-08-03)と、その解決**: `:fare-shopping` が `kotoba-lang/industry` の 7911 entry から実際に解決するか確認する過程で、**651 industry のうち 29 が、`kotoba-lang/technology` に entry の無い technology を参照しており、`technology/stack` がそれに対して `unknown technology` を throw するため `execution-plan` が丸ごと落ちる**ことが判明した(欠けている id は **16 個 / 参照 41 件**)。落ちるのは `technology-stack` と `execution-plan` であって、**`readiness` は落ちない** — `readiness` は caller が渡す id 集合に対する純粋な集合演算で、record を解決しないため元から正しく `:missing` を返していた(初出の記述で `readiness` も落ちると書いたのは誤り。id 数を 12 と書いたのも誤りで、正しくは 16。ここで訂正する)。\n\n**16 のうち 2 件は backlog ではなく実際の誤りだったので直した**: `0210`(林業)の `:scheduling` は registry が `:optimization` として提供している capability(`:optimization/scheduling`)の名前違い、`862`(医科・歯科)の `:langgraph-clj` は fleet の全 actor が乗る actor framework であって domain technology ではない(651 件中 1 件だけ)。\n\n**残る 14 は本物の backlog なので消さなかった。**「0311 沖合漁業は漁獲枠管理を必要とする」は真であり有用で、query が throw しなくなるようにこれを消すのは**テストを通すために backlog を破壊する**行為である。代わりに throw そのものを直した: `technology/resolve-stack` が `{:resolved :unknown}` に分割し、`technology-stack` は存在するものを返し、新設の `unprovided-technologies` が存在しないものを名指し、`execution-plan` は `:unprovided-technologies` を載せる。**651 industry すべてが query 可能になり、未着手の capability は例外ではなくデータになった。** 14 件は集合として厳密にアサートしてあるので、1つ作れば落ち(集合を縮める)、新しい未実装参照を足しても落ちる。最大の穴は `:notifications`(建設 6 業種、全て required)。\n\n**残るギャップ(正直な記録)**:\n\n- **スケジュールデータも運賃データも供給しない。** 両ライブラリは算術と契約であって、時刻表・届出運賃・MCT 表・マイレージ表・タイムゾーン DB のいずれも持たない。実運用には `flight-offer` の provider 経路(現在未稼働)か、事業者自身の PSS からの供給が要る。7911 に入っているのは**デモ用の自己完結データ**(HND-SIN 4 leg / 4 運賃)であって、実データ経路ではない。\n- **他の予約系業種への適用は未了**: 5510/5590(宿泊)・7912(ツアー)・7990(予約サービス)は `reservation` は使っているが `fare-shopping` は使っていない。宿泊に「接続適法性」は無いが、「提示した料金が本当に最安か」の再計算は同じ形で効く。\n- **`flight-offer` は依然として未稼働**(CF Worker 未 deploy / provider 資格情報未供給 / codemod pending)。今回それには触っていない。\n- **cat 10 combinability を実装すると `search` の per-component 最小化が無効になる。** 実装するなら探索構造そのものの再設計が要る。\n- クリーンルーム GDS/NDC actor 群(`com-*-gds` / `com-iata-ndc`)は依然として汎用 CRUD のままで、AirShopping / OfferPrice を実装していない。今回それらは変更していない。")
+
+  (:adr/verification
+  "2026-08-03 セッション終了時点。**すべて default branch(main)に着地済み**で、
+   括弧内の SHA でサーバ側 CI が green(GitHub Actions の run を merge 済み SHA
+   に対して個別に確認した — ローカル実行の記憶ではない)。
+
+   | repo | main SHA | tests | CI |
+   |---|---|---|---|
+   | kotoba-lang/itinerary | ede40969df10 | 19 tests / 105 assertions | success |
+   | kotoba-lang/fare | 2d41bfbc5cce | 26 tests / 165 assertions | success |
+   | cloud-itonami/cloud-itonami-isic-7911 | 2a4f730193c1 | 67 tests / 202 assertions(既存 52/150 を保持) | success |
+   | kotoba-lang/technology | 5c3495afa0c3 | 5 tests / 15 assertions | success |
+   | kotoba-lang/industry | 44cfd94fb705 | 46 tests / 1813 assertions(既存 42/1156 から) | success |
+
+   superproject(com-junkawasaki/root)の関連 merge commit: `badb9d0b76aa`
+   (2 ライブラリ登録 + ADR)/ `1c0423d7b7c7`(7911 配線 + pin 3件)/
+   `02acbc1714ff`(registry gap 解消 + pin 2件 + ADR 訂正)。west pin は
+   `--entry` の最小 diff のみで、5 件すべてサーバ側 pin 検証(存在・default
+   branch 到達性・前進)を通過。closing 時点で 5 repo すべて pin == 上流 HEAD。
+
+   **合成の実測**(両ライブラリを同一 classpath で実行、および 7911 の実 graph):
+   HND→SIN の時刻表 4 leg から適法な旅程 2 本を構築(台北 15 分接続の CI751 は
+   構築段階で排除)、届出運賃 4 本で価格付けし 68,820 JPY / 98,120 JPY。governor は
+   真の最小の主張を通し、捏造(54,800)・非合法接続・偽の最安主張(98,120 を
+   cheapest と主張)をすべて HARD hold した。
+
+   **未実行/未検証として明示するもの**: 実データ経路(時刻表・届出運賃の供給)は
+   一度も動かしていない — 7911 に入っているのはデモ用の自己完結データである。
+   `manifest/docs-edn-only.cljs verify` は 90-docs 配下の既存 .md 70 件で FAIL する
+   が、これは origin/main でも同一に FAIL する既存状態で、本 ADR(.edn)は対象外。
+   `gen-west-manifest.cljs --check` は sparse worktree(4056 project 中 2 件のみ
+   checkout)では STALE を返す — これも pristine main で同一に STALE であり、
+   本変更が原因ではない。")
+
+  (:adr/resume
+  "次の agent がこの会話履歴なしで再開するための起点。優先順位順:
+
+   1. **`:notifications` を作る**(最大の穴)。建設 6 業種(4210 4220 4290 4329
+      4330 4390)が **required** として宣言しているが、提供する repo が無い。
+      現状確認: `cd orgs/kotoba-lang/industry && clojure -M -e \"(require '[kotoba.industry :as i]) (println (:unprovided-technologies (i/execution-plan \\\"4210\\\")))\"`
+      → `{:required [:notifications], :optional []}`。作ったら
+      `kotoba-lang/technology` に entry を足し、`industry_test.clj` の
+      `unprovided-technology-ids` から `:notifications` を消す(集合は厳密
+      アサートなので、消し忘れるとテストが落ちて気付く)。
+   2. **`:quota-tracking`**(0311/0312 漁業、required)。同上。
+   3. **残り 11 の optional な未実装 id** は個別に「本当に別 technology か、
+      既に required で持っている `:telemetry` の特殊形か」を判断する必要がある
+      — 実測では `*-monitoring` 系 4 件と `:catch-quality-assurance` /
+      `:byproduct-quality-assurance` はいずれも `:telemetry` を required に
+      持つ業種の optional として宣言されている。**証拠はあるが判断は未了。**
+   4. **fare-shopping を他の予約系業種へ**: 5510/5590(宿泊)・7912(ツアー)・
+      7990(予約サービス)。宿泊に接続適法性は無いが、`cheapest-matches-claim?`
+      による「提示した料金が本当に最安か」の再計算は同じ形で効く。7911 の
+      `travelagency.governor/fare-search-violations` が雛形。
+   5. **実データ経路**: `cloud-itonami/flight-offer` の provider 経路(CF Worker
+      未 deploy / provider 資格情報未供給 / codemod pending)か、事業者 PSS からの
+      供給。ここが繋がるまで両ライブラリは算術のみで、実運賃を扱っていない。
+
+   触っていない既存の別件(このセッションの担当外、報告のみ): superproject の
+   PR #1603(repo-reality weekly claim discovery)、他セッションの worktree
+   4 件(/private/tmp/kotobase-engine-west-wave3 系 3 件と /private/tmp/root-sec)、
+   ローカル branch agent/kotobase-* / agent/projection-*。いずれも当方の作業物では
+   ないので削除も移動もしていない。")
+
+  (:adr/related (vector "ADR-2800002200" "ADR-2628000000" "ADR-2607299000"))
+  (:adr/repos (vector "kotoba-lang/itinerary" "kotoba-lang/fare"
+              "cloud-itonami/cloud-itonami-isic-7911"
+              "kotoba-lang/technology" "kotoba-lang/industry"))))

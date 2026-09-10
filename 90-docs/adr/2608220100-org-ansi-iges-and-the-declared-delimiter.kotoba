@@ -1,0 +1,47 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608220100-org-ansi-iges-and-the-declared-delimiter")
+  (:adr/title "IGES を読み書きする repo を起こす — 区切り子はファイルの中で宣言されている")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-22")
+  (:adr/related (vector "adr-2608200100-threed-maturity-coscientist-and-gtm"))
+  (:adr/body
+  "## 決定
+
+`kotoba-lang/org-ansi-iges` を新設し、IGES 5.3（ANSI/USPRO/IPO-100-1996）の
+読み書きを portable `.cljc` で実装した。3D 成熟度の軸 `:interop/iges` は
+これで `:working`。
+
+## 名前
+
+origin 面（他者の仕様が主題）なので出所ドメインの逆順。IGES は **ISO 10303 ではなく
+ANSI/USPRO の規格**なので `org-iso-10303` の中には置かない —— 軸の catalog は
+2026-08-22 まで repo を `org-iso-10303` と書いており、marker も実在しない綴り
+（`read-iges` / `write-iges`）だった。`ansi.org` を逆順にして `org-ansi-iges`。
+
+## この形式が罰する 2 つのこと
+
+**区切り子はファイルの中で宣言されている。** Global セクションの最初の 2
+フィールドが Hollerith 文字列で、パラメータ区切りとレコード区切りを与える。
+通常は `,` と `;` だが、決め打ちした reader は別の区切り子を選んだ系のファイルを
+**エラーを出さずに**間違った位置で分割する（フィールドは分割されるので、
+形は正しく値だけが違う）。読むには区切り子を知る前に Hollerith を復号する必要が
+あり、長さが `H` の前に来るので解ける。テストは `|` と `#` の fixture を読む ——
+**この library が一度も出さない形**である。
+
+**カードは厳密に 80 桁。** section 文字は 73 桁目、連番は 74-80 桁で、どちらも
+位置で読む。1 文字短いカードは「少し違う行」ではなく、**section が数字で連番が
+ゴミ**の行になる。しかも自分の reader はそれを読めてしまうので、往復ではなく
+桁幅そのものを検査する。
+
+## 対応範囲と、その申告
+
+100 円弧 / 106 copious data / 110 直線 / 116 点 / 124 変換行列。**面（128）・
+トリム面（144）とその上に建つものは復号しない。** `parse` は知らない型を
+`:iges/unsupported` に**番号と件数で報告する** —— 黙って捨てる reader は、
+他人のモデルを自分の部分集合に変えて何も言わない。`write` は書けない型に対して
+throw する（他系が拒否するカードを出すより良い）。
+
+## 検査
+
+6 test / 30 assertion。両方向を確認済み: 区切り子を `,` `;` と決め打ちすると 9 件、
+未対応型を黙って捨てると 1 件、カードを 80 桁に詰めないと 8 failure + 5 error。")))

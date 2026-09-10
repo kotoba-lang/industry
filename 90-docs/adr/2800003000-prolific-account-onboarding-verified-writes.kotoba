@@ -1,0 +1,203 @@
+(vector (map (:db/id -1)
+  (:adr/id "2800003000-prolific-account-onboarding-verified-writes")
+  (:adr/title "ADR-2800003000: Prolific researcher アカウントの HITL 開設と、「成功したという報告」を証拠として扱わない書き込み規律")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "prolific-onboarding-credentials-verified-writes")
+  (:adr/date "2026-08-01")
+  (:adr/last_verified "2026-08-01")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "network-awai/person-awai-ryo の Prolific アカウントの現在地と残タスク"
+   "kotoba-lang/com-prolific-app のブラウザ自動化とサインアップモデル"
+   "kotoba-lang/kagi の CLI 経路(identity-migrate / add --record / copy TTL / fill)"
+   "秘密を欄に入れる際に値を agent の文脈へ通さない方法"))
+
+  (:adr/context
+  "network-awai の代表 actor `ryo@awai.network` として Prolific の researcher
+   アカウントを開設し、ISIC 7320 需要側のリクルート経路を用意する必要があった。
+   要求母集団は英語・ヒンディー語・中国語・スペイン語・アラビア語の5言語。
+
+   開始時点の前提は2つとも誤っていた。(1) `com-prolific-app` は一度もライブ API
+   に接続されたことがなく、README 自身が「filter id を実物で確認せよ」と警告して
+   いた。(2) 開設フローを駆動する手段が無く、デスクトップの合成入力しか使えないと
+   思われていた。")
+
+  (:adr/decision
+  "アカウントは開設され有効化された(workspace 6a6b355df6654bd755bcd495、
+   status :active、メール確認済み、API token 発行済みで `GET /users/me/` が 200)。
+   そこへ至る過程で、この fleet における「書き込みの証拠」の扱いを次のとおり定める。
+
+   ## 1. アクチュエータの戻り値は証拠ではない
+
+   同一セッションで3件の「成功したという嘘」を実測した。
+     type   -> \"Typed\"              4文字が黙って落ちた
+     key    -> \"Pressed tab\"        focus は動かず、次の値が前の欄に連結された
+     resize -> \"after=622,-1049,…\"  渡した bounds をそのまま返し 1px も動かず
+
+   よって書き込みは、対象自身の状態を読み戻して intent と一致したときにのみ完了と
+   する。判定は6つで、それぞれ異なる修復を持つ(`prolific.evidence`):
+   :match / :unchanged(経路を変える。再試行は迷信) / :truncated(全文を書き直す。
+   欠けた末尾を打つのが2度目の破壊を生んだ) / :appended(clear してから書く) /
+   :absent(再 snapshot) / :mismatch(停止)。
+
+   ## 2. 読み戻せない経路は、唯一の選択肢であっても拒否する
+
+   `prolific.channel` はフォームに触る前に経路を決める。keystroke と coordinate は
+   要件を満たしていても拒否する — 読み戻せない以上、証拠を作れないため。fallback は
+   置かない。半分埋まったフォームより、触れずに停止する方が良い。
+
+   ## 3. 検証は「書き込み時」だけでは足りない。落ち着いた後の独立監査を正とする
+
+   per-write の読み戻しでは見えない失敗が2種ある。
+     (a) selector の誤結合: step 先頭で取った ref テーブルは listbox の開閉で
+         振り直され、e6/e7/e8 が隣の欄を指した。同じ古い ref で書いて読めば同じ
+         間違った要素を2回読むだけなので、4欄中2欄が :match を報告しながら他の欄の
+         値を保持していた。
+     (b) 検証後の上書き: Job Role は typeahead で、:match を通した後 blur 時に
+         自前の候補へ置換した。
+   `browser/audit-step` は settle 後に新しい snapshot から全欄を読み直し、そちらを
+   :ok? の根拠とする。書き込みが :match で監査が不一致なら
+   :overwritten-after-write として名指しする。
+
+   ## 4. 同意は field ではなく遷移の属性
+
+   Prolific の email step には規約チェックボックスが存在せず、`Next` ボタン自体が
+   同意である。同意を field 型として表現すると、素朴なランナーは「チェックボックスが
+   無い→同意は無い」と結論して押す。`:step/advance-is-consent` で遷移に印を付け、
+   `may-advance?` が機械の前進可否を答える。`advance!` は既定で拒否し、与える同意の
+   名前と承認者を明示したときだけ通す。拒否が目的ではなく記録が目的である。
+
+   ## 5. 秘密は agent の文脈を通さずに欄へ入れる
+
+   `kagi fill <item> --purpose <p> --selector <css> --cdp <ws>` は
+   vault -> JVM -> CDP フレーム1つ -> input 要素 と直行する。
+   `agent-browser fill <sel> <text>` は使えない — 値が argv になり `ps` で誰でも
+   読める。秘密を JavaScript 式へ補間もしない(`Runtime.evaluate` は focus と長さの
+   読み戻しのみ、値は `Input.insertText` の text パラメータ)。読み戻しは
+   `value.length` で、:absent/:unchanged/:truncated/:match/:unexpected を区別しつつ
+   1文字も開示しない。
+
+   ## 6. 人間が必要な理由を4つに分ける
+
+   :human/credential / :human/captcha / :human/consent は恒久的な境界。
+   :human/unknown-fact は境界ではなく設定漏れ(居住国はオーナーが chat で回答)。
+   混ぜると「永久に手作業」に見えるものが実際は config で閉じる。
+
+   ## 7. vault item の id は、秘密を保存した操作が記録する
+
+   `kagi add --record <file>` が非機微5項目(item/compartment/category/vault-did/
+   時刻)だけを EDN に書く。`kagi ls` による総当たり列挙は安全床⑦違反であり、
+   狙い撃ちには id が要る。別に覚えておく手順は飛ばされる。")
+
+  (:adr/consequences
+  "## 着地したもの(すべて default branch)
+
+   kotoba-lang/com-prolific-app  add3387773  67 tests / 192 assertions、両ホスト
+   kotoba-lang/kagi              d73b1350c7  177 tests / 662 assertions(現 pin
+                                 101724301790 に祖先として含まれる)
+   network-awai/person-awai-ryo  22bdaea410
+   com-junkawasaki/root          pin 122e2a2daa(該当 entry のみの最小 diff)
+
+   ## ライブ API が訂正した前提
+
+   `language-filter` はタイトル/質問文を \"language\"→\"fluent\" でテキスト走査して
+   いた。実アカウントの filter は491個あり、`english-speaking-monolingual`(index
+   303、質問文が「are you fluent only in English?」)が
+   `fluent-languages`(index 388)より先に一致していた。囮の選択肢は言語ではなく
+   単一言語話者かの区分なので、5言語すべてが :unmatched になっていた。fixture は
+   4個しかなく、この失敗には「fluency を語るが言語を提供しない」5個目が必要だった
+   ため、原理的に検出できなかった。
+
+   不変条件は守られた(未一致は報告され破棄されない)ので、誤った母集団を集める
+   study にはならず拒否として現れた。exact filter_id 優先へ変更し、テキスト
+   heuristic には `language-choices?`(選択肢が言語であることを完全一致2件で判定)の
+   門を付けた。ライブ確認: fluent-languages / 選択 id English 19・Hindi 31・
+   Chinese 13・Spanish 60・Arabic 4。
+
+   ## kagi の3件の欠陥(いずれも実 vault で発現)
+
+   (1) `identity-migrate` が実行不能だった。-main が subcommand 分岐の前に
+       identity をロードするため、平文 identity のエラーが指示する対処法が、それ
+       自身に阻まれる。実 vault は private-b64/mldsa-private-b64/kem-secret を
+       world-readable な平文で保持したまま、CLI では回復不能だった。当該1コマンド
+       にのみ例外を通して解消(14971→5419 bytes、秘密3項目 ABSENT、secret-ref あり)。
+   (2) `copy --ttl` の消去が一度も走っていなかった。`future` は daemon スレッドで
+       JVM 終了とともに殺されるため、`{:ok? true :ttl-ms 900000}` を報告して1秒未満で
+       終了し、秘密はクリップボードに残り続けた。既存テストは通っていた — テスト JVM が
+       sleep の間生きているため、呼び出し側の終了を模したものが1つも無かった。
+       :block? と shutdown hook で解消し、実路で `{:cleared? true
+       :clear-mechanism :waited}` と長さ0を確認。
+   (3) `add` が `:item/category` を渡せず、手で作った item が全て無分類だった。
+
+   ## 未了(優先順)
+
+   1. **API token のローテーション(最優先)**。値が会話ログに現れており、researcher
+      token は workspace の財布から支出できる(study 公開・submission 承認)。露出は
+      アクセスだけでなく金銭の問題。
+   2. パスワードのローテーション。同じく会話ログに現れ、かつ16文字小文字のみ。
+   3. mailbox route-in の 409(tenant に verified organization domain が無い)。
+      worker はメールを受理するが mailbox へ入らない。`wrangler tail` は ok を返す
+      — 非 2xx は resolved fetch であるため。今回の検証リンクは別経路で取得できた。
+   4. 1Password への保存。`op` は CLI がサインインできず(`op signin` が exit 0 でも
+      `whoami` は未サインイン)、マスターパスワード入力は agent が踏めないため未了。
+   5. MFA 有効化(Prolific が提示、強制ではない)。
+   6. step 7: 5人パイロットの入金 $17.14。
+   7. kagi の監査台帳が `chain: BROKEN at 0`。migration 前のバックアップでも同位置が
+      壊れており、今回の作業以前から。PQC vault の中核機能なので別件で要調査。
+   8. `KAGI_HOME` を空ディレクトリに向けても repo 内 legacy `./.kagi` が自動移行され、
+      「使い捨て vault」が実物のコピーになる(報告のみ、未修正)。
+
+   ## 再開点
+
+   cd orgs/network-awai/person-awai-ryo
+   export PROLIFIC_TOKEN=$(../../kotoba-lang/kagi/bin/kagi get prolific-api-token)
+   nbb scripts/onboard-prolific.cljs      # step 1-6 は ✓、step 7(入金)で停止する")
+
+  (:adr/body
+  "## セッション中に自分が犯した誤りと、その一般化
+
+   報告の正直さのために列挙する。いずれも修正済み。
+
+   - **probe で「検証済み」と言った**。step 4 が `mail:inbound:*` を読む実装を、
+     自分でその prefix に probe を入れて確認した。あれは読み手が動く証明であって、
+     書き手がそこに書く証明ではない。実際には ingest が数秒で claim して削除しており、
+     45回のポーリングで一度も観測できなかった。**staging key は inbox ではない。**
+   - **fixture で通り本番で落ちた**。WebSocket のテキストメッセージは onText が
+     何度呼ばれるか決まっておらず、`last` フラグを無視して断片を1メッセージとして
+     扱っていた。分割はトラフィックの性質でコードの性質ではないので、小さい fixture
+     では再組立の正しさを示せない。
+   - **`pick-page` が名指しした page に一致しないとき別のタブへ fallback していた** —
+     docstring が防ぐと書いている「他人のフォームにパスワードを打つ」そのもの。
+     テストが捕らえた。
+   - **status 名の前置一致で判定した**。`registered` で始まるかを見ていたため、
+     `:active` にした瞬間「アカウントなし」に戻った。status 名はラベルであって
+     名前空間ではない。
+   - **step 3 が「トークンが無い」を「アカウントが無い」と扱っていた**。アカウントは
+     存在していたのに step 4 が一度も走らず、検証リンクは最初から読めていた。
+   - **自分のテストが3度、実装より先に間違っていた**(境界の数、5言語→5 labels、
+     `:password` を typo 扱い)。いずれも実装が正しく、テストの想定が誤りだった。
+   - **timing に依存するテストを2つ書いた**。20ms タイマーの裏で「まだある」を主張し、
+     約1/3の確率で落ちた。別セッションが同じ flake を独立に発見し窓を広げていたが、
+     並行セッションが常時走る環境では確率が下がるだけである。分割と polling で
+     依存自体を消した。
+   - **KV を約230キー一括で列挙した**。`--prefix` を使うべき場面だった。
+   - **使い捨てのつもりの `KAGI_HOME` が実 vault のコピーになり、`kagi ls` で実 item を
+     3件表示させた**(安全床⑦違反)。即削除。
+   - **`set -e` を忘れ、変更なしの west.yml を PUT して空 commit を作った**。
+   - **登録画面を3度潰した**(fixture を同じブラウザセッションで開いた)。
+
+   一般化: **形だけの規則には構造の文脈が要る。** `verify-accounts.cljs` は3度
+   同じ教訓を要求した — `:password` をキーと値の区別なく拾い、24桁 hex の公開 id を
+   秘密と誤認し、`:credential/item` を1経路しか見なかった。3度とも答えは
+   「パターンを緩める」ではなく「構造を歩く」だった。
+
+   ## 保管場所(値は含まない)
+
+   - パスワード: kagi `prolific-researcher-ryo` / personal / :login / v2
+   - API token: kagi `prolific-api-token` / personal / :api-credential
+   - 参照台帳: person-awai-ryo `identity/credential-refs.edn`(`kagi add --record` が
+     生成)、`identity/accounts.edn`(status/consent/残タスク)
+   - 検査: `nbb scripts/verify-accounts.cljs`(秘密の混入と参照切れを両方見る。
+     正常系 exit 0、異常系 exit 1 を実測)")))

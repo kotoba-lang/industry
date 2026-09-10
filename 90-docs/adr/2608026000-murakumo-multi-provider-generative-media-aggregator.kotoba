@@ -1,0 +1,282 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608026000")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/title "murakumo.cloud を生成メディアのアグリゲータにする — 自己ホストの外に fal / Modal / ModelsLab / Higgsfield を置き、video・3D・music・voice を1つの面で売る")
+  (:adr/status "proposed")
+  (:adr/date "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "murakumo-multi-provider-aggregation")
+  (:adr/repos (vector "orgs/network-awai/cloud-murakumo"
+              "orgs/network-awai/local-murakumo"
+              "orgs/kotoba-lang/murakumo"
+              "orgs/kotoba-lang/murakumo-generation"))
+
+  (:adr/authoritative_for
+  (vector "murakumo.cloud が自己ホスト fleet 以外の推論提供者（fal / Modal / ModelsLab / Higgsfield 等）を第一級の provider として束ね、単一の API・単一の課金面で提供すること"
+   "engine（どの graph/runtime か）と provider（誰の GPU で誰が課金するか）を別の軸として分離すること。現在 :fn/engine がこの2つを兼ねているのは欠陥である"
+   "video / 3D / music / voice の課金単位を modality ごとに正規化し、価格表を持たない model へは dispatch しないこと（無償労働の禁止・fail closed）"
+   "hosted provider の成果物は必ず取得・ハッシュ・kotobase 保管してから返すこと。provider の期限付き URL をそのまま顧客に渡さないこと"
+   "route（どの provider に流すか）は price tier の内側でのみ自由であり、tier を跨ぐ差し替えは禁止であること。provider の決定は台帳に必ず記録する（ADR-2608026100 で改訂: 顧客への開示はしない）"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector))
+
+  (:adr/related
+  (vector "90-docs/adr/2608026100（**本 ADR の §5 価格建てと §6 開示方針を改訂する**。価格は credits 建ての掲示価格になり、provider は顧客に非開示になる）"
+   "90-docs/adr/2607170500（Seedance 2.0 を fal.ai queue 経由で hosted engine として入れた先行実装。本 ADR はこれを一般化する）"
+   "90-docs/adr/2607171330（:video の第一経路は fleet の self-hosted OSS、hosted は候補・fallback に降格）"
+   "90-docs/adr/2607173100（murakumo-main alias — 具体 model id を焼かない。本 ADR は media modality へ拡張する）"
+   "90-docs/adr/2607030030（inference economy GTM — credits $1=100cr / treasury 5%）"
+   "90-docs/adr/2607320000（参加導線 4つの扉。本 ADR は ①使う の中身を厚くする）"
+   "90-docs/adr/2608011400（mk1 capability token を live gateway が受理する。provider scope はこの上に載る）"
+   "90-docs/adr/2607299960（生成計算は murakumo.cloud、保管は kotobase.net）"
+   "orgs/network-awai/cloud-murakumo `src/cloud_murakumo/{gen,engine,dispatch,worker,cost,storefront}.cljc`, `resources/murakumo.edn`"
+   "orgs/kotoba-lang/murakumo-generation README（4つの実測ハザードと cold-start 失敗の記録）"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-02）: 『今の murakumo.cloud を openrouter のように、自己 host 以外の model も openweight や seedance を fal 経由・modal などで hosting し API を提供する設計を、modelslab.com / higgsfield を中心に、動画・3D・音楽・音声を中心にまとめて』。
+
+実測（2026-08-02、live に対して）で分かったのは、**アグリゲータの骨格は既に1本だけ存在していて、それが一般化されていない**ということ。
+
+**既にあるもの:**
+
+| 事実 | 出所 |
+|---|---|
+| hosted provider を1つだけ束ねる経路が既に動いている | `engine.cljc` の `:seedance` = `https://queue.fal.run/bytedance/seedance-2.0/reference-to-video`（ADR-2607170500） |
+| model 単位で実行先を差し替える仕組みがある | `gen.cljc/model-engine` の per-model `:engine` override。`:video` で `seedance-2.0` を選ぶと関数既定の `:comfy` でなく `:seedance` へ行く |
+| 対象 modality は既に宣言されている | `resources/murakumo.edn`: `:image :3d :rig :motion :effect :vrm-compose :music :sfx :voice :video` の 10 modality、`:gen` 関数として |
+| chat 側には alias カタログ面が live で存在する | `GET https://api.murakumo.cloud/infer/models` → 200。`murakumo-main` → `qwen3.6-35b-a3b` / `infer.murakumo.cloud` |
+| 課金面（credits / x402）が live | `/.well-known/x402` → 200、credits mint $1=100cr・treasury 5% |
+| 成果物の同一命名が既に決まっている | `contentHash: sha2-256` = kotobase の archive 名 = CID（murakumo-generation README） |
+
+**足りないもの（実測）:**
+
+| 事実 | 出所 |
+|---|---|
+| **media の catalog 面が無い** | `GET https://generation.murakumo.cloud/v1/models` → **404**、`/models` → 404、`api.murakumo.cloud/v1/models` → **404**。chat は 200 なのに media は 0 |
+| **provider 資格情報が engine 単位のべた書き** | `worker.cljc` の `engine-backend-token-env` = `{:seedance \"SEEDANCE_API_KEY\"}`。provider が 4 つになれば 4 本の特別扱いになる |
+| **media の単価を持つ層が無い** | `cost.cljc` は ¥/1M **token** しか知らない。video の秒・3D のアセット・voice の文字数を見積もる関数が1つも無い |
+| **engine が2つの意味を兼ねている** | `:comfy` は『ComfyUI の graph を組む』、`:seedance` は『fal という会社に課金される』。同じ `engines` 集合に同居している |
+| **Seedance 経路は end-to-end 未検証のまま** | `engine.cljc:22-25` が自ら `Still UNVERIFIED end-to-end (no live API key exercised yet)` と書いている |
+
+つまり不足は『hosted に繋ぐ方法』ではない（それは1本動いている）。不足は **provider を増やしても壊れない軸の分離と、増やした先を売れるようにする課金・カタログ・保管の面**である。")
+
+  (:adr/decision
+  "## 1. engine と provider を分ける（この ADR の中核）
+
+今日 `:fn/engine` は2つの直交する問いに同時に答えている:
+
+- **engine** = どの graph / runtime か（ComfyUI の LTX グラフ、TRELLIS の CLI、CosyVoice2）
+- **provider** = 誰の GPU で走り、誰の請求書に載るか（自 fleet、fal、Modal、ModelsLab、Higgsfield）
+
+この2つを同じ集合に入れたまま provider を4つ足すと、`engines` 集合が組み合わせ爆発する（`:comfy` と `:comfy-on-modal` が別 engine になる）。分離する:
+
+```
+:model     公開 id。<modality>/<vendor>/<name> 例 video/bytedance/seedance-2.0
+:engine    graph/runtime の作り方（既存のまま。:comfy :trellis :audio :tts :unirig …）
+:provider  実行先と課金先。:fleet :fal :modal :modelslab :higgsfield
+:route     model → provider 候補の順序つきベクタ（policy が選ぶ）
+```
+
+**自 fleet も1つの provider にすぎない。** `:fleet` は `:comfy` engine を持つ provider であり、`:modal` **も** `:comfy` engine を持てる — 同じ ComfyUI グラフを、常駐 fleet で走らせるか Modal の serverless GPU で走らせるかの違いだけになる。これが Modal を入れる本当の理由で、Modal は fleet の競合ではなく **同じ engine のオーバーフロー先**である。
+
+provider registry（純データ、`.cljc`）:
+
+```
+{:fal        {:kind :hosted-api  :queue :fal-v1
+              :auth {:header \"Authorization\" :scheme \"Key\"}
+              :credential-ref :fal/api-key
+              :modalities #{:video :music :voice :3d :image}}
+ :modal      {:kind :own-code    :queue :murakumo-v1
+              :auth {:header \"Authorization\" :scheme \"Bearer\"}
+              :credential-ref :modal/token
+              :engines #{:comfy :trellis :audio :tts}}
+ :modelslab  {:kind :hosted-api  :queue :modelslab-v6
+              :auth {:in :body :field \"key\"}
+              :credential-ref :modelslab/api-key
+              :modalities #{:video :3d :music :sfx :voice :image}}
+ :higgsfield {:kind :hosted-api  :queue :higgsfield-v1
+              :auth {:header \"Authorization\" :scheme \"Bearer\"}
+              :credential-ref :higgsfield/api-key
+              :modalities #{:video :image}}
+ :fleet      {:kind :self-hosted :queue :murakumo-v1
+              :engines #{:comfy :trellis :audio :tts :kami-render :unirig …}}}
+```
+
+## 2. なぜ ModelsLab と Higgsfield が中心なのか（役割が違う）
+
+4社は代替品ではなく **別々の役割**を持つ。この差が route policy の根拠になる。
+
+| provider | 役割 | 対象 modality（実測した API 面） | 課金の形 | 弱点 |
+|---|---|---|---|---|
+| **ModelsLab** | **面の広さ + 床** | video `/api/v6/video/{text2video,img2video,video2video,scene_maker}` / 3D `/api/v6/3d/{text_to_3d,image_to_3d}` / 音楽・SFX `/api/v6/voice/{music_gen,sfx}` / 音声 `/api/v6/voice/{text_to_speech,voice_cloning,create_dubbing,voice_cover}` | 月額サブスク（$21–$199、unlimited $199/mo）+ 従量 | サブスクは**ジョブ単位の原価が出ない**。同時実行が枠で決まる（5/10/15） |
+| **Higgsfield** | **video の天井** | `POST /v1/generations` + `GET /v1/generations/{id}`。Sora 2 / Veo 3.1 / Kling 3.0 / Seedance 2.0 / Hailuo 等の**自己ホスト不可能なクローズド最前線**を1本で | credits（$5/100cr 目安、90日失効。1本 15–70cr） | credit 量子化。原価が credit→¥ 換算に依存する |
+| **fal** | **既定の hosted 経路** | 既に結線済み。queue API（submit → status_url → response_url）、動画は**秒課金**（例 $0.05/s 級〜$0.4/s 級）、**成功したものだけ課金**・キュー待ちは無課金 | 従量・単位が modality ごとに明示 | 最前線クローズドモデルは全部は無い |
+| **Modal** | **自分の engine の溢れ先** | murakumo が書いたコードを serverless GPU で走らせる。秒課金・scale-to-zero・H100 $3.95–4.29/h 級、cold start は 7B 級で 15–30s | 秒課金（自分の原価がそのまま出る） | model カタログではない。運用は自分持ち |
+
+**構造的な理由（コストだけではない）:** 現 fleet は Apple Silicon 中心 + gad（Radeon / ROCm）で、CUDA 前提の実装しか無いモデルは**原理的に載らない**。これは値段の話ではないので、値段が下がっても解決しない。hosted / Modal は fleet の贅沢ではなく、**fleet が構造的に到達できない領域への唯一の経路**である。
+
+## 3. 公開 model 名前空間と alias
+
+`ADR-2607173100`（具体 model id を焼かない）を media へ拡張する。
+
+- 公開 id: `<modality>/<vendor>/<name>` — 例 `video/bytedance/seedance-2.0`、`3d/tencent/hunyuan3d-2.1`、`music/ace-step`、`voice/cosyvoice2`
+- provider pin は `@`: `video/bytedance/seedance-2.0@fal`（明示的に fal を指名する時だけ）
+- **modality ごとの alias**: `video-main` / `voice-main` / `music-main` / `3d-main`。consumer はこれを送り、fleet 側の1エントリ更新でモデルが入れ替わる。chat の `murakumo-main` と同じ規約・同じ解決経路
+
+## 4. ジョブの正規化 — 4社の非同期が全部違う
+
+| provider | 投入 | 進捗 | 認証 |
+|---|---|---|---|
+| fal | `POST queue.fal.run/{model}` → `{request_id, status_url, response_url}` | status_url を poll / webhook | `Authorization: Key <k>` |
+| ModelsLab | `POST modelslab.com/api/v6/<family>/<op>` | `POST .../fetch/{id}` | **JSON body の `key` フィールド** |
+| Higgsfield | `POST api.higgsfield.ai/v1/generations` → 202 + id | `GET /v1/generations/{id}`、`DELETE` で cancel | `Authorization: Bearer <k>` |
+| fleet(ComfyUI) | `POST /prompt` | `/history` poll → `/view` download | なし（内部） |
+| Modal | murakumo が定義する（= 上の `:murakumo-v1` にそろえられる唯一の provider） | 同左 | Bearer |
+
+**1つの FSM に正規化する**: `submitted → queued → running → succeeded | failed | canceled | expired`。provider 固有の識別子は不透明な `:job/provider-ref` に押し込み、murakumo の外に漏らさない。
+
+adapter は**純関数の対**として書く（IO は既存どおり注入。新しい境界を発明しない — `worker.cljc` の `:execute` deps が既にこの形）:
+
+```
+(submit-request provider model params creds) -> {:method :url :headers :body}
+(parse-status   provider body)               -> {:state :artifacts [...] :usage {...} :error {...}}
+```
+
+`.cljc` の純データなので JVM worker と Cloudflare Worker の両方から同じ実装が使える（`storefront.cljc` が『UI が表示する価格と Worker が課金する価格は絶対にずれない』ために取った手と同型）。
+
+## 5. 課金単位の正規化 — アグリゲータを proxy でなく経済にするもの
+
+OpenRouter は $/1M token へ正規化すれば済む。**メディアには単一の単位が無い。** modality ごとに単位を定義する:
+
+| modality | 課金単位 | 従属変数 |
+|---|---|---|
+| video | 出力秒 | 解像度クラス・fps・音声有無 |
+| 3D | アセット1件 | ポリゴン/テクスチャ階級 |
+| music / sfx | 音声秒 | — |
+| voice | 1,000 文字（または音声秒） | 話者クローン有無 |
+| image | メガピクセル | — |
+
+**改訂（ADR-2608026100）: 表は2枚に分かれる。**
+
+1. **掲示価格（顧客向け、credits 建て、tier ごと）** ── `{[modality tier] → {:unit :video-second :credits N}}`。provider に依存せず、意図的に固定された数。
+2. **原価表（内部、USD 建て、provider×model ごと）** ── `{[provider model] → {:unit :video-second :usd N :verified-at \"2026-08-02\"}}`。eligibility とマージン gate だけが読む。
+
+**2つの fail closed を入れる:**
+
+1. **掲示価格を持たない tier へは dispatch しない。** 見積もれない仕事を無料でやってしまう経路を作らない（`gen/resolve-model` の『提供外→例外、silent fallback しない』と同じ規律）。既存の `murakumo.infer.credits/job-cost` が既にこの規律を実装済み。
+2. **`:verified-at` が古い『原価』では eligibility を判定しない。** 掲示価格は固定でよいが、原価が上がってもマージン gate が古い数字を見ていれば赤字 provider が eligible のまま残る。staleness gate はこちら側に置く。
+
+**サブスク型（ModelsLab / Higgsfield）は原価が出ない問題**がある。月額を『その月の実行本数』で割った**実効単価**を台帳から後追いで出し、次月の価格表に `:derived-from :subscription-amortized` として入れる。最初の1ヶ月は route policy の `:cheapest` の対象にしない（実効単価が未知のものを最安と主張しない）。
+
+## 6. route policy — 推測しない
+
+CLAUDE.md と `gen.cljc` の両方が silent fallback を禁じている。従って route は**要求されるもの**で、賢く推測されるものではない:
+
+| policy | 意味 |
+|---|---|
+| `:fleet-only` | 既定。fleet に無ければ失敗する（ADR-2607171330 の『第一経路は self-hosted』を既定として保つ） |
+| `:cheapest` | 価格表の実効単価で最小。同値なら台帳の p50 レイテンシ |
+| `:fastest` | 台帳の p50 レイテンシ最小 |
+| `:pinned` | `model@provider` の明示指名 |
+
+**唯一の自動遷移: cold-start spill。** murakumo-generation README が実測記録している『生成関数は scale-to-zero なので、アイドル後の最初のジョブが GPU worker の起動と競合して `[Errno 111] Connection refused` / `[Errno 104] Connection reset` で落ちる。どちらも次のジョブは完走した』——これは hosted provider を持つ**最大の実務的根拠**である。fleet は温まっていれば最安、hosted は cold start に対する答え。
+
+ただし spill は次を満たす時だけ:
+- spill 先が**同じ price tier の eligible provider** である（tier を跨がない）
+- spill 先に原価エントリがあり、掲示価格に対してマージン条件を満たす
+- run 台帳に **spill した事実と理由**が残る
+
+**改訂（ADR-2608026100）: 応答ヘッダ `x-murakumo-provider` による provider 開示は取り下げる。** credits が掲示価格である以上、どの provider で走ったかは顧客の受け取るものを変えない ── 変えてしまう要素（tier / model の同一性、出力ライセンス、失敗の事実）は隠さない、という形に不変条件を移した。台帳への記録は必須のまま（非開示と未記録は別物）。
+
+## 7. 資格情報 — platform key と BYOK
+
+`engine-backend-token-env` の engine 単位べた書きを `provider → :credential-ref` に置き換える。
+
+- **platform key**: murakumo が fal / ModelsLab / Higgsfield の鍵を持ち、顧客は credits で払う（マークアップは murakumo の取り分）。既存 credits / mk1 の面をそのまま使う
+- **BYOK**: 顧客が自分の provider 鍵を持ち込み、murakumo はオーケストレーション手数料だけ取る（OpenRouter の BYOK 5% と同型）。**mk1 の scope に `provider:byok` を足す**（scope 機構は ADR-2608011400 で既に live）
+
+**安全床（CLAUDE.md）を守る**: 鍵は Worker secret / kagi に置き、datom 面には**参照だけ**書く。agent が鍵をフォームに入力しない。BYOK 鍵の保管は『他人の credential を預かる』ことなので、暗号化と失効の設計が済むまで **P4 まで着手しない**。
+
+## 8. 成果物 — アグリゲータではなくアーカイブであること
+
+hosted provider は**期限付きの自社 CDN URL** を返す。murakumo は既に `contentHash: sha2-256` = kotobase の archive 名 = CID という**単一命名**を持っている（murakumo-generation README）。
+
+**従って: hosted の結果は必ず取得し、ハッシュを検証し、kotobase に保管してから返す。** provider の URL をそのまま顧客に転送しない。これで得られるもの:
+
+- **永続性** — 相手の URL は失効する。相手のはキャッシュ、murakumo のがアーカイブになる
+- **単一の名前** — Higgsfield の動画と fleet の動画が同じ種類の identity を持つ。provider を跨いで dedup / 参照 / 再合成できる
+- **検証** — 途中で切れたダウンロードは破棄される（README の既存規律）
+- **provider 撤退耐性** — 会社が消えても顧客の成果物は残る
+
+**これが『fal を直接叩かず murakumo を通す』ことの実際の商品的理由である。** 価格だけなら中間業者は常に負ける。
+
+## 9. カタログ面（今日 404 のところ）
+
+```
+GET /v1/models
+  -> [{:id \"video/bytedance/seedance-2.0\"
+       :modality :video
+       :tier :video/frontier
+       :price {:unit :video-second :credits 50}   ; 掲示価格。provider は出さない
+       :status :serving
+       :p50-seconds 62
+       :alias-of nil}
+      …]
+GET /v1/models/video-main      ; alias 解決（chat の /infer/models/murakumo-main と同じ形）
+POST /v1/quote                 ; params → 課金単位 → 見積もり（dispatch 前）
+POST /v1/generations           ; 投入（正規化 FSM）
+GET  /v1/generations/{id}      ; 進捗
+```
+
+**murakumo.edn + provider registry から生成する**（手書きしない）。カタログが2箇所に存在した瞬間ずれるのは、この repo が `duplicated-truth` 欠陥クラスとして既に何度も踏んでいる（ADR-2607300100）。
+
+x402 の面も更新が要る: 現行 `/.well-known/x402` は **$0.01/req の定額**だが、10秒の video と 2秒の SFX が同じ値段であってよいはずがない。**modality × 単位ごとの offer** にし、quote endpoint と同じ価格表から生成する。
+
+## 10. 段階
+
+| phase | 内容 | 完了条件 |
+|---|---|---|
+| **P0** | provider registry + adapter 対 + 価格表。`:seedance` を engine から provider（fal）へ移す | 既存 Seedance 経路が**振る舞いを1バイトも変えず**通る。加えて engine.cljc が自認している UNVERIFIED を解消する（実鍵で submit→poll→download を1本通す） |
+| **P1** | `/v1/models` + `/v1/quote` + 正規化 FSM | media catalog が 200 を返す。見積もりが価格表と一致し、価格の無い model が fail closed する |
+| **P2** | fal を全 modality へ + Modal を `:comfy` の溢れ先に | 同じ ComfyUI graph が fleet と Modal の両方で同じ成果物を出す（同一 CID または同等性の明示） |
+| **P3** | ModelsLab（面の広さ）+ Higgsfield（video の天井） | 4 modality すべてに hosted 候補がある。サブスクの実効単価が台帳から出ている |
+| **P4** | BYOK + x402 の単位別 offer | BYOK 鍵の保管・失効が設計されている。x402 offer が quote と同じ価格表から生成される |
+
+## 11. 測る（gate）
+
+`cost.cljc` の既存 gate（fleet ¥/1M tok ≤ GPU spot ¥/1M tok）を **modality ごとの単位**へ一般化する: `fleet ¥/unit ≤ 最安 hosted ¥/unit`。
+
+これは抽象的な指標ではなく **GPU を持ち続けるかどうかの判断そのもの**である。hosted が恒常的に安い modality があるなら、その modality のために fleet の GPU を確保する理由は無い（逆もまた然り）。route の決定は provider・単位数・見積もり・実費とともに台帳へ記録し、この比較が実測から出るようにする。")
+
+  (:adr/risks
+  "## 落とし穴（先に名前を付けておく）
+
+1. **価格の陳腐化。** `.cljc` に焼いた価格は UI と課金の間ではずれない（storefront の利点）が、提供者の実価格からは必ずずれる。`:verified-at` の staleness gate で fail closed にする以外に安全な形は無い。『たぶん合っている価格』で quote を返すのが最悪。
+
+2. **ToS。ここが P3 の実ブロッカー。** fal / Modal のような**従量 API は転売を前提に設計されている**が、ModelsLab / Higgsfield の**サブスク型は自社の月額の出力を第三者へ有償 API 提供することを禁じている可能性がある**。P3 着手前に両社の規約を実際に読んで確認する（未確認のまま結線しない）。禁止されていた場合の代替は BYOK（顧客自身の契約で叩き、murakumo は orchestration + 保管だけを売る）で、これは P4 の前倒しになる。
+
+3. **コンテンツ責任の集約。** 4社を束ねるとは、4社のコンテンツ規則を束ねること。murakumo が説明責任の面になる。各 provider の禁止事項の**積集合ではなく和集合**で拒否する必要がある（最も厳しい規則に合わせる）。
+
+4. **カタログの二重正本。** murakumo.edn と provider registry が別々に model を宣言し始めた瞬間に壊れる。生成物として1本化する（`gen-west-manifest` と同じ規律）。
+
+5. **サブスクの原価が最初の1ヶ月は存在しない。** 実効単価が未知の provider を `:cheapest` の候補に入れない。未計測の変換率を掛けて期待値を捏造しないという既存規則（ADR-2607203000 の `:uncomputable-until-measured`）と同じ扱い。
+
+6. **Seedance 経路が未検証のまま一般化される危険。** P0 は『refactor だけ』にせず、既存の唯一の hosted 経路を**実鍵で1本通す**ところまでを完了条件に含める。動いていないものを設計の土台にしない。")
+
+  (:adr/verification
+  "実測（2026-08-02、live に対する読み取りのみ）:
+
+- `GET https://api.murakumo.cloud/infer/models` → 200。`murakumo-main` alias が `qwen3.6-35b-a3b` / `https://infer.murakumo.cloud/v1/chat/completions` を返す（chat の catalog 面は存在する）
+- `GET https://api.murakumo.cloud/v1/models` → 404
+- `GET https://generation.murakumo.cloud/v1/models` → 404、`/models` → 404、`/v1` → 404、`/health` → 404
+- `GET https://generation.murakumo.cloud/` → 200（サイトは配信されている）
+- `GET https://generation.murakumo.cloud/.well-known/x402` → 200
+
+コード実測: `engine.cljc:26-28` に fal queue の hosted engine が1つだけ存在し、同ファイル 22-25 行が自ら end-to-end 未検証と記録。`worker.cljc:43-49` の provider 資格情報は `{:seedance \"SEEDANCE_API_KEY\"}` の engine 単位 map。`cost.cljc` に media の課金単位関数は無い（¥/1M token のみ）。
+
+外部 API 面（公開ドキュメントから、2026-08-02 時点）: ModelsLab は `https://modelslab.com/api/v6/` 配下に video / 3d / voice の各系統と `POST .../fetch/{id}` 方式の polling、認証は JSON body の `key`。Higgsfield は `https://api.higgsfield.ai/v1/generations`（POST 投入 / GET 進捗 / DELETE 取消、Bearer）。fal は queue API（submit → `status_url` → `response_url`、成功分のみ課金）。Modal は秒課金・scale-to-zero の serverless GPU で、model カタログではなく自作コードの実行基盤。**これらの外部数値・エンドポイントは公開ドキュメント由来であり、実鍵での実行確認はまだしていない（P0 の完了条件に含める）。**")))

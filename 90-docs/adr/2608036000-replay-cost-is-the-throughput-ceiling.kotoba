@@ -1,0 +1,6 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608036000")
+  (:adr/title "eviction が throughput の天井 — ただし原因は replay 時間ではない（自己訂正あり）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-03")
+  (:adr/body "## 観測\n\nchain は停止するというより**登るのをやめる**。15秒で 133 block、60秒で 163 block。毎秒9 block から毎秒 0.67 block へ。\n\n```\n  EVICT_MS=1000    60s   162 blocks\n  EVICT_MS=100000  60s   380 blocks\n```\n\n**eviction を退けると 2.3 倍。** これが deploy の 225（139 まで速く、遅くなり、止まった）。\n\n## 訂正: replay は原因ではない\n\n本 ADR は当初「天井は replay コスト、eviction のたびに genesis から chain を再適用している、修正は snapshot」と書いた。**測っていなかった。** `script/replay-cost.cljs` で測ると:\n\n```\n   50 blocks -> 1 ms      100 -> 2 ms\n  200 blocks -> 3.4 ms    400 -> 3.8 ms\n```\n\n線形で無視できる。**400 block で 4 ミリ秒は天井ではない。** コードの*形*（chain 上のループが毎秒走る）から推論し、それを測定結果として書いた。\n\nこのセッションで5回目。**違いは、これは1 commit 後に自分で「主張したもの」を測って捕まえた**こと — その上に積み上げる前に。\n\n## 現在の仮説（未測定と明示する）\n\neviction が実際に破壊するのは**合意状態**: 現 height について集めた全ての票と、まだ子 block に運ばれていない証明書。replay は block と「この replica が投票した height」を戻すが、**他者から受け取った票は戻せず、どの peer も再送しない**。tip に2票持って evict された replica はその2票を再び必要とし、誰も送らない。\n\nこれは仮説である。辻褄は合うが測っていない。**次の読みが snapshot（4ミリ秒しか節約しない）でなくここに向くように、そう明記する。**\n\nengi `e49437c0`、229 tests / 1173 assertions。\n\n## 副次的な訂正\n\n「3回とも寸分違わず 225 なら race でなく limit」も読み過ぎ。**chain は決定的**なので状態依存のバグは必ず同じ height で出る。決定性は数値的上限の証拠にならない。")))

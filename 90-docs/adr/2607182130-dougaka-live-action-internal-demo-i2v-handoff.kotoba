@@ -1,0 +1,88 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607182130")
+  (:adr/title "dougaka 実写化 internal demo — DataLad成果物、2.5D暫定版、Murakumo I2V再開契約")
+  (:adr/topic "dougaka-live-action-internal-demo-i2v-handoff")
+  (:adr/doc_type "adr")
+  (:adr/status :accepted)
+  (:adr/date "2026-07-18")
+  (:adr/last_verified "2026-07-18")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "dougaka の India 向け実写化 internal demo 4作品の現在地と再開手順"
+   "internal demo MP4のDataLad保存先"
+   "静止画ffmpeg/2.5D camera motion と真正image-to-videoを区別する品質表示"
+   "Murakumo LTX-2.3 I2Vを再開する際の認証・入力・出力境界"))
+  (:adr/related (vector "adr-2607171800-ai-gftd-dougaka-vector-video-workflow"))
+  (:adr/source-format "edn")
+  (:adr/decision
+  "{:status :i2v-blocked-on-token-issuance, :completed [:four-original-keyframes :four-shot-plans :2-5d-motion-v2 :datalad-local-save], :next [:issue-dougaka-generation-token :make-keyframes-fetchable-without-public-post :submit-four-ltx-i2v-jobs :persist-job-ids-before-poll :download-to-datalad :score-temporal-motion :assemble], :model :ltx-2.3, :no-secret-in-adr true}")
+  (:adr/body
+  "# ADR-2607182130: dougaka 実写化 internal demo I2V handoff
+
+## Context
+
+ユーザー指示により、ゲーム・アニメ実写化企画の内部検証として、第三者の
+現代映像作品・俳優・ロゴ・固有デザインを使わない4本を作成した。
+
+1. India Ludo風の完全オリジナル『Four Kingdoms: The Last Commute』
+2. 三国志／赤壁前夜
+3. 『史記』／鴻門の会
+4. マハーバーラタ／クルクシェートラ開戦前
+
+imagegenで各作品1枚の9:16実写キーフレームを生成し、`ai-gftd-dougaka`
+offline pipelineへ `:image-path` 入力と `:voice? false` を追加した。最初のMP4は
+静止画holdだったため、ユーザーから『動画が動きがない』との指摘を受け、
+`:motion`（`:push-in` / `:pan-left` / `:pan-right` / `:pull-back`）による
+ffmpeg zoompanの2.5D camera motion v2を実装した。
+
+ただし、これは被写体が動くimage-to-videoではない。真正I2Vへの切替指示を受け、
+現行authorityを確認した結果、第一経路は`api.murakumo.cloud`のself-hosted
+LTX-2.3である。既存`animeka.murakumo-video`契約はPOST generation → jobId即時永続
+→poll/resume→artifact downloadを実証済みで、そのまま再利用できる。
+
+## Decision / current state
+
+- 機械可読の完全な再開状態は
+  `orgs/gftdcojp/ai-gftd-dougaka/clj/examples/internal-demo-i2v-handoff.edn`
+  を正本とする。
+- 2.5D v2 MP4はDataLad dataset
+  `orgs/gftdcojp/gftd-motion-actor/assets/dougaka/internal-demos/`へ保存済み。
+  git-annex local UUID `30a27285-055f-459c-a317-d3d95a65716d`に実体がある。
+  このcheckoutではB2 special remote定義が無く、B2 pushは未実施。
+- 4本とも720x1280/30fps/H.264/AAC/約9.04秒。これはI2V完成物ではなく
+  `:artifact/class :2-5d-camera-motion`として扱う。
+- I2Vは`ltx-2.3`、1 keyframeあたり4秒を第一試行とする。Wan系は品質比較の
+  follow-upであり、初回再開時に同時submitしない。
+- tokenはADR/EDN/logへ絶対に記録しない。既存Worker secretを回転しない。
+  `cloud-murakumo` CLI発行器でsubject=`dougaka-internal-demo`, scope=`generation`
+  のtokenを発行し、環境注入またはvaultへ保存する。
+- 2026-07-18の停止理由: `op signin`/Touch ID authorizationが複数回60秒timeout、
+  Kagiの非対話getもtimeout。Worker secretsはwrite-onlyで読み戻せないため、
+  token発行不能。ユーザーが`closing`を指示したため停止した。外部I2V jobは
+  1件もsubmitしておらず、resume対象jobIdも存在しない。
+
+## Resume procedure
+
+1. 1Password desktop integrationまたはKagi unlockを復旧し、署名secretを値を
+   表示しない形で`MURAKUMO_TOKEN_SECRET`へ注入する。
+2. dirtyな共有`cloud-murakumo` checkoutを編集せず、既存CLIだけを実行:
+   `clojure -M:token issue dougaka-internal-demo generation 7776000`。
+3. tokenを`DOUGAKA_GENERATION_TOKEN`等へ安全に保存し、stdout/logへ残さない。
+4. 各ローカルPNGをgeneration backendがfetch可能な非公開・期限付きURLへ置く。
+   internal demoなのでaozora public postを作成してはならない。
+5. 4 jobを直列submit（GPU重複回避）。submit直後、poll前に本handoff EDNの
+   `:i2v/job-id`相当の別append ledgerへjobIdを永続化する。queued/runningで
+   再submitしない。404/410のみresubmit可。
+6. artifactをDataLad `assets/dougaka/internal-demos/i2v/`へ直接保存し、
+   `datalad save`。B2 remoteが復旧していればpush、無ければlocal-onlyと明記。
+7. ffprobeとtemporal-motion(YDIF)を計測。I2V clipを`dougaka`で縦型に正規化・
+   concatし、2.5D v2とは別名で保存する。
+
+## Safety / scope
+
+- 全成果物は`:distribution :internal-demo-only`のまま。公開には別のrights・文化
+  review gateが必要。
+- マハーバーラタ題材は`:cultural-review-required? true`を維持する。
+- 現代映画・TV・ゲームの映像、俳優likeness、音楽、ロゴをI2V入力へ追加しない。
+- tokenや署名secretをADR、handoff、shell output、git、DataLadへ保存しない。")))

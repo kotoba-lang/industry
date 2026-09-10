@@ -1,0 +1,115 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609072600-docs-audit-gets-a-deterministic-floor")
+  (:adr/title "docs-audit に決定論の床を入れ、cron を pin する — 目視だけの文書監査は 0 findings の意味が無い")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-07")
+  (:adr/related (vector "adr-2609062600-agent-instructions-generated-from-one-source"
+                "2608261200-rule-kaizen-loop-implementation-snapshot-is-not-language"
+                "2609061600-hermes-fleet-deepseek-v4-flash-provider-baidu-qianfan-only"
+                "2608161700-adr-inventory"))
+  (:adr/body "## Status
+
+accepted
+
+## Context
+
+`docs-audit` は「共有ルール・md・ADR が最新に着地した状態と一致しているか」を
+検査する Hermes profile として既に在り、週 1（月 07:00）の cron を持っていた。
+subject は正しい。壊れていたのは 2 点である。
+
+**1. 決定論の床が無かった。** profile に `scripts/` が無く、検査は全部モデルの
+目視だった（`SOUL.md` の「検査対象 (順に)」を LLM が読んで自分で見る）。
+2,773 件の ADR に対してこれをやると、**「0 findings」が「測って問題が無かった」
+なのか「見落とした」なのか出力から区別できない** —— CLAUDE.md が repo-wide の
+失敗クラスとして名指ししている形そのもの。姉妹 bot の `rule-kaizen` は
+`scripts/rule-kaizen.cljs`（決定論・モデル無し）を床に持っており、`docs-audit`
+だけが持っていなかった。
+
+**2. cron が今朝から止まっていた。** 2026-09-07 07:01 の実行が
+`[drift_skip]` で失敗していた —— fleet 全体のモデル移行（ADR-2609061600、
+`z-ai/glm-5.3-flash` → `deepseek/deepseek-v4-flash-0731`）に対して job が
+unpinned だったため、Hermes が意図しない課金を防ぐために発火を拒否した。
+**これは安全側の失敗**（推論呼び出しは 1 回も行われていない）だが、`cron list`
+上は `[active]` のままなので、実行履歴を見るまで分からない。
+
+実測（2026-09-07、**`~/.hermes/profiles/*/cron/jobs.json` の `jobs` 配列を数えた** 189 job）: `drift_skip` 9 件 / `failure_streak > 0` 85 件 /
+clean 95 件。9 件の drift_skip は同じ移行に由来する（design-audit / docs-audit /
+isekai-x402 / jv-migration / kinyu / murakumo-tok / seiri / tsuushin / zeta）。
+**この ADR が直すのは docs-audit の 1 件だけ**で、残りは名指しして残す。\n\n⚠ **この分母を「cron job の総数」として引用しない。** 同日 `export_cron.py` は 137 profile / **255 job** と報告し、同じ `jobs` 配列を数え直すと 196 だった （間に自分で 1 本足し、他セッションが数本足している）。**数え方が違えば分母が違い、稼働状態は端末ローカルで刻々動く。** 上の 3 つの比は「同じ 1 回の走査の中の比」としてだけ意味を持つ。今日の値が要るなら数え直す。
+
+## Decision
+
+**`docs-audit` に決定論の床を入れ、cron を pin する。新しい profile は作らない。**
+
+`90-docs` / `docs-audit` / `rule-kaizen` の 3 profile が既にこの主題の周辺に在り、
+4 つ目を足すのは「同一面の同一主題」（repo 命名規則と同じ判断）になる。
+`docs-audit` が subject の持ち主なので、そこに足す。
+
+### 床（superproject が正本、profile へ re-copy）
+
+- `scripts/verify-doc-reality.cljs` — agent 指示（CLAUDE.md / AGENTS.md）が
+  ADR と tree の実態と食い違っていないかを機械で測る。3 つだけ測る:
+  1. `cited-superseded` / `cited-missing` — 引いている `ADR-<stamp>` が
+     superseded な ADR を指していないか
+  2. `dead-path` — superproject 起点の path 参照が git にも disk にも無い
+  3. `agents-md-stale` — AGENTS.md が CLAUDE.md の生成物として最新か
+     （ADR-2609062600 の `--check` に委譲し、exit 2 は 2 のまま伝播）
+- `scripts/docs-reality-tick.cljs` — monitor。`origin/main` へ FF 同期してから
+  上記と `adr-inventory` を回し、件数付きで印字する。判断はしない。
+
+### 測らないと決めたこと（範囲の申告）
+
+`dead-path` が測るのは **superproject が一意に所有する root** だけ
+（`manifest/` `scripts/fleet-ci/` `.claude/hooks/` `90-docs/adr/`）。
+子リポも `scripts/` や `90-docs/` を持つので、`scripts/vendor.cljs`（jp-go-dds のもの）
+や `90-docs/coscientist/`（network-isekai のもの）は superproject に無いが
+**死んでもいない** —— 同じ文字列が別 repo の path を指しており、区別する手段が
+文書側に無い。**答えられない範囲は測らない**。何を測らなかったかは出力の
+`path-scope` 行が申告する（`path-refs-seen=1010 / measured=114`）。
+
+west project 名を context に含むかで判定する案は**測って捨てた**: 4,338 個の
+project 名には `en` `ci` `ec` `ip` `test` のような短い名前が在り、部分一致で
+どの文脈にも当たる。**常に発火する filter は、発火しない filter より悪い**
+（緑が意味を失う）。
+
+## Consequences
+
+- **demurrer 語彙は弱い語を入れない。** 文書自身が「もう現行ではない」と
+  言っている場合は finding にしないが、`経緯` `歴史` `だった` は現行の ADR を
+  指すときにも普通に使われる。実測 2026-09-07: 最初の語彙に `経緯` を入れた結果、
+  `詳細・調査経緯は ADR-… を参照` という 1 行が**注入した finding 2 件を
+  両方とも抑止した**。抑止しすぎる検査は、抑止しない検査より悪い。
+  現在の語彙は `旧` `当時` `superseded` `supersede(s)` `反転` `撤去` `削除した`
+  `reverse(d)` `誤り` `廃止` `retire`。
+- **red/green は landing 前に実測した。** 注入する場所も測ってから選んだ ——
+  最初の試行は文書末尾に注入し、そこに `経緯` が在ったため 2 件とも抑止され、
+  「検出できていない」ように見えた（**検出器は正しく、テストが誤っていた**）。
+  空行で囲んだ中立な位置で測り直した:
+
+  | 条件 | 結果 |
+  |---|---|
+  | 無改変 | findings 4（実在する 2 件が CLAUDE/AGENTS に鏡像） |
+  | 範囲内に死んだ path を 1 本注入 | `dead-path` +1 |
+  | demurrer 無しで superseded ADR を引用 | `cited-superseded` 4→5 |
+  | 同じ引用に demurrer を添える | 5→4（filter が「否」と言えることの証拠） |
+  | CLAUDE.md / AGENTS.md が tree に無い | exit 2 REFUSED |
+
+- `adr-status` は**文字列と keyword の両形**を読む。実測: 2,229 件が
+  `:adr/status \"accepted\"`、536 件が `:adr/status :accepted`。文字列だけを
+  読んでいた版は **622 件の status を「読めなかった」**として扱っており、
+  それは黙って検査対象から落ちることを意味していた（現在 87、うち真に
+  `:adr/status` を持たないのは 9 件で、いずれも `.datoms.edn` 系の多 entity
+  catalog なので status が無いのが正しい）。
+- 残りの 8 件の `drift_skip` job と 85 件の `failure_streak > 0` は**未処理**。
+  この ADR は docs-audit の 1 件しか直していない。
+
+## 残る未処理
+
+- `adr-inventory` の findings 237（`successor-unmarked` 112 /
+  `ledger-ops-instruction` 45 / `status-body-mismatch` 36 / `id-collision` 23（既知
+  debt、据え置き）/ `unresolved-supersede-ref` 15 / `cited-superseded` 6）。
+  1 件ずつ判断が要るので skill `adr-inventory` の領分。monitor は件数だけ運ぶ。
+- `docs-audit` が現在検出している 2 件の実 finding: `CLAUDE.md:835`
+  （ADR-2606302300 を demurrer 無しで引用）と `CLAUDE.md:1575`
+  （ADR-260726 を引用。節の見出しは反転を説明しているが ±2 行の窓の外）。
+  bot の次の 1 反復が扱う。\n\n## 登録しただけでは動かなかった —— 実測 3 件（2026-09-07）\n\nREADME が「台帳に載っていることも `[active]` であることも、動くことではない」と 書いているとおり、`cron create` の成功から実際に測れるまでに 3 つ躓いた。**3 つとも job の status は緑だった。**\n\n**1. `--script` は shebang を honour しない。** hermes の `cron/scheduler_script.py` が 自分でそう書いている —— *shebang is deliberately NOT honoured (small, auditable surface): `.sh`/`.bash` → bash, else `sys.executable`*。つまり注入 monitor は **`.sh` か Python のどちらか**でなければならない。`.cljs` を渡すと Python が読んで `SyntaxError: invalid character '—' (U+2014)` で死に、**agent には `## Script Error` が注入され、job は `completed` / `Ran now: succeeded.` と記録される**。\n\nこれは 1 件ではない。**`itonami-anatomy-fascia-scout` が同じ形で壊れていた** ——\n`SyntaxError: unmatched ')'`、`failure_streak = 0`、`last_error = None`、`completed` 2 回。\nその job の prompt は測定について「これだけが最終判断材料」と書いているが、\n**注入経路ではそれを受け取っていない**（prompt が agent 自身に nbb を呼ばせているので\n実害は緩和されている）。2026-09-06 以降そうなっていた。\n\n**この workspace の規則と hermes の制約は衝突する。** 新しい `.sh` は禁止\n（2026-07-14 オーナー指示「sh は prohibit, nbb にして」）で、hermes は `.sh` 以外を\nPython で走らせる。したがって **nbb monitor は注入できない**。`.sh` / `.py` の shim を\n作って回避せず、`itonami-anatomy-fascia` が既に採っている形にした ——\n**prompt が agent に `nbb scripts/docs-reality-tick.cljs` を第一行動として呼ばせ、\n報告に `SYNC` / `DOC-REALITY` / `findings=` / `AGENTS-MD` の 4 行をそのまま引用させる**。\n引用が無ければ測定を飛ばしたことが出力から分かる。\n\n**2. 殺した run は永久に `running` のまま残り、以後の発火を全部拒否する。** `timeout 590` で包んで発火させたら 9:50 で殺され（`EXIT=124`）、run 行が `running` の まま孤児になった。`.fire-*.lock` を消しても足りず、`cron run` は `Job is already being fired by the scheduler; not run again.` を返し続けた。\n**つまりこの系では `running` は「生きている」を意味しない。** 生きた gateway の SQLite を 触るより job を作り直す方が安全なので、`ba8e185af144` を撤去して `fefcae7b9f6b` を起こした（孤児は死んだ id に紐付いたまま残る）。\n**cron run を裸で叩かない。`timeout` で包まない。**\n\n**3. `--script` の解決先は profile 配下で、`--help` の記述と違う。** help は *Path to a script under `~/.hermes/scripts/`* と書くが、実際に探すのは `~/.hermes/profiles/<p>/scripts/`。help を信じて shared 側に置き profile 側を消した結果、**最初の発火は monitor 無しで agent が走った**。教えてくれたのは `cron doctor` で、`script not found` と名指しした。**`cron create` の後は必ず `cron doctor` を通す。**\n\n## profile の charter と guard が正しく、prompt が誤っていた\n\n最初の prompt は「findings を 1 件だけ直す」と指示していたが、`docs-audit` の SOUL.md は **「修正はしない (報告専任)」**と定めており、`CLAUDE.md` / `AGENTS.md` は protected file guard に守られている。実測 2026-09-07: bot は fix を試み、guard に block され、**別経路で回避せずそう報告して worktree を片付けた** —— 期待どおりの振る舞い。\nprompt を charter に合わせた（報告専任。ただし `gen-agents-md.cljs` の実行は生成器なので可）。\n**guard に阻まれたときに prompt を書き換えるのではなく、prompt を charter に合わせる。**\n\n## 検証（この ADR が主張してよい範囲）\n\n`fefcae7b9f6b` を発火させ、**注入 prompt に `Script Error` が無いこと**と、**agent の報告が測定 4 行をそのまま引用していること**の両方を state.db の messages から 確認した（`completed` だけでは足りない —— 上の 3 件はどれも `completed` だった）。\nその run が報告した findings は 4 件で、内容はスキャナと一致した。\nbot が直せない 2 件（`CLAUDE.md:835` / `:1575`、どちらも protected file）はこの変更で demurrer を 1 行ずつ添えて解消し、スキャナは **4 → 0** になった。\n**weekly job は pin したが、まだ 1 度も緑になっていない**（次回 2026-09-14 07:00）。pin したことと動くことは別なので、それまで「直った」と書かない。")))

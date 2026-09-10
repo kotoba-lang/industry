@@ -1,0 +1,174 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609030930-advertising-7310-autonomous-bot-organization")
+  (:adr/doc_type "adr")
+  (:adr/topic "advertising-7310-autonomous-bot-organization")
+  (:adr/title "ADR-2609030930: 広告ビジネス(ISIC 7310)を bot で自律運用する bot profile・組織設計")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-03")
+  (:adr/last_verified "2026-09-03")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative_for
+  (vector "ISIC 7310 広告ビジネスを自律運用する bot 編成 (1 resident loop + 3 DO bot + 人の承認面)"
+   "各 bot の役割分割・権限・governor 境界・watch される指標"
+   "measure-first / 捏造ゼロ / 実支出は owner スコープに限定する運用規律"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector))
+  (:adr/related
+  (vector "adr-2608096000-ad-revenue-plan-firstparty-adnet-vertical-media"
+   "adr-2607301200-advertising-7310-media-platform-layer"
+   "adr-2607271400-advertising-7310-multi-platform-catalog"
+   "adr-2607302100-advertising-four-planes"
+   "adr-2607299000-repository-rules-loop-orchestrator"
+   "adr-2608111400-loop-noren-operator-presence"
+   "90-docs/business/cloud-itonami-7310-firstparty-ads-dogfood-seed.edn"))
+  (:adr/evidence
+  (vector "orgs/cloud-itonami/cloud-itonami-isic-7310 (AdOps-LLM ⊣ Campaign Governor, phase 0-3, 2 actuation ops 常時 human-gated)"
+   "orgs/network-awai/cloud-itonami workers/grok-bots (Business Bot DO: http_get/x402_purchase/time_now, hourly, budget+credit cap)"
+   "bots.itonami.cloud live 実測 2026-09-03: business-7310-assignmentisic73 running, first checkpoints reading /api/open-business/7310"
+   "orgs/cloud-itonami/loop-noren (承認キュー ingress 202-proposed パターン, residency.edn 宣言, journal+receipt+annex 永続化)"
+   "orgs/network-awai/cloud-itonami src/cloud_itonami/bots_status.cljc (bot-slo 語彙 ok/stale/held/failed/unmeasured, residents 収集)"
+   "orgs/kotoba-lang/senden + orgs/kotoba-lang/bmc (marketing/campaign 測定と BMC loop の既存正本)"))
+  (:adr/body
+  "# ADR-2609030930: 広告ビジネス(ISIC 7310)を bot で自律運用する bot profile・組織設計
+
+## Context
+
+オーナー指示 (2026-09-03): 「上記のビジネス全体を bot で自律的に進めるための bot profile, 組織設計を立てて」。
+
+対象のビジネスは **ISIC 7310 (Advertising)** — 顧客の campaign を審査し
+(媒体ポリシー準拠・誤認リスク・スポンサー表明)、placement / creator tie-up を
+扱う代理店事業。実装正本は `cloud-itonami-isic-7310`
+(AdOps-LLM ⊣ Campaign Governor, phase 0-3)。
+
+2026-09-03 時点の実測の現在地:
+
+- **最初の Business Bot** (`business-7310-assignmentisic73`) が
+  bots.itonami.cloud で稼働開始。hourly で 7310 契約を読み、governed 1 step。
+- **ads-operations skill の実測**: 外部媒体への実行層 (browser automation) は
+  撤去済み。7310 actor の actuation は台帳起票まで。実支出経路は無い。
+- **収益計画 ADR-2608096000**: 第三者 display では意味のある収益は出ない。
+  正順は「自社 publisher へ adnet 配線 → 在庫 → 広告主」。
+- **dogfood seed (2026-07-30)**: 自社 2 プロダクトの ChatGPT Ads 出稿は
+  5 HARD hold (creative 依存 2 件 + 予算承認 0 + evidence 未整備) で停止中。
+
+ビジネス全体を bot で進めるとは、**営業・審査・測定・出稿判定・自己改善の
+5 つのループを別々の bot に分け、人の承認面を 1 箇所に集約する**こと。
+1 つの bot に全部を持たせない — 権限の混合は governor の検査可能性を壊す。
+
+## Decision
+
+### 組織図 — 4 bot + 1 承認面
+
+```
+                         人 (owner / cockpit 承認キュー)
+                          ▲ 承認だけ。bot は承認鍵を持たない
+ ┌────────────────────────┴─────────────────────────┐
+ │            cloud-itonami 承認面 (cockpit)          │
+ └──▲──────────▲──────────────▲──────────────▲──────┘
+    │          │              │              │
+ [B1]      [B2]           [B3]           [B4]
+ 営業 loop  審査 bot        測定 bot        改善 bot
+ (workstation resident)  (DO resident)  (DO resident)  (workstation resident)
+```
+
+| # | bot | 形態 | すること | 権限 (capability) |
+|---|---|---|---|---|
+| B1 | **shinshi-acquisition** (営業) | workstation resident (loop-noren 型, `residency.edn` 宣言) | 見込み代理店・広告主の発見 → 7310 actor で適格性判定 → 承認キューへ接触案 1 件/tick | HTTP GET (公開面のみ), murakumo-main (抽出→verify 照合), ingest key (`202 proposed` のみ)。**送信はしない** |
+| B2 | **campaign-intake** (審査) | DO resident (Business Bot) | 既存/新規 campaign record の intake 準備: クライアントブリーフ・媒体計画のプレビルド, `:campaign/intake` op を governor に通す | `http_get` (itonami.cloud + 7310 console), `time_now`, x402 (murakumo 推論)。**actuation op は構造的に不可能** (phase が actuation を auto-set から除外) |
+| B3 | **ops-metering** (測定) | DO resident (Business Bot) | funnel / placement の実測値を senden.funnel + BMC datom 面に計上: PV・fill・CPA を senden の語彙で日次集計, `:unmeasured` を捏造しない | `http_get` (metrics endpoints), x402 (kotobase storage)。write は datom 面への measurement に限定 |
+| B4 | **kaizen-analyst** (改善) | workstation resident | 週次で BMC gate 評価 + dogfood seed の hold 清算進捗を追い, 「次の 1 手」を proposal journal に 1 件書く (evaluate 自身はしない) | 読み取り専用 (journal/git)。murakumo-main (要約のみ, 判定は governor/人) |
+| 承認面 | cockpit + owner | — | placement 承認, 予算承認 (`:authorized-budget`), 接触の許可 | **承認鍵を bot は 1 本も持たない** |
+
+### bot 間の契約 (1 周の流れ)
+
+```
+B1 発見 → 承認キュー (proposal) ──人──▶ クライアント化
+B2 intake 準備 → Campaign Governor (HARD 7 checks) → evidence 整備の checklist 化
+   └─ hold の理由が bot から「足りないものの列挙」として出る (dogfood seed パターン)
+B3 実測計上 (senden 語彙) → BMC datoms (:funnel.trials, :zone PV, CPA)
+B4 週次で gate を読む → 次の 1 手を proposal → 人が選ぶ
+```
+
+**キー設計**: B2/B3 は Business Bot DO (既存の itonami-grok-bots runtime) を
+使い、worker 側の作り込みをしない。B1/B4 は DO では不可能な作業
+(長時間の crawl・git/annex) を持つので loop-noren と同じ workstation resident
+(`residency.edn` 宣言 + LaunchAgent) にする。
+
+### 権限とガバナンスの不変条件
+
+1. **actuation は誰も bot から実行しない。** 7310 の `actuation-ops`
+   (`:actuation/place-campaign` / `:actuation/order-creator-tieup`) は phase 構造が
+   auto から除外しており、B2 が触れるのは intake/verify/screen の準備まで。
+   実支出は `clojure -M:buy --live --spend` の owner 実行のみ (ads-operations skill)。
+2. **承認鍵の分離。** B1 は ingress key (`202 proposed`) を持つが approve 鍵を
+   持たない (loop-noren と同じ)。Business Bot の wallet は launch 署名専用で
+   実行権限を持たない (実測どおり `execution_authority: false`)。
+3. **捏造ゼロ。** B3 は測れなかった指標を `:unmeasured` として計上する
+   (bot-slo 語彙)。RPM 仮定からの逆算は ADR-2608096000 の既存計算のみを使う。
+4. **measure-first。** B4 の改善提案は必ず B3 の実測 datom を `:cites` し、
+   未計測の変換率に期待値を掛けない (loop-system-dynamics の
+   `:expected-yield :uncomputable-until-measured` 規律)。
+5. **1 bot 1 権限面。** 営業 (外向き接触) と審査 (governor 実行) と測定 (台帳書込) と
+   改善 (提案) を同一 bot に載せない。governor の検査可能性は権限の分離で保つ。
+6. **watch される指標。** bot 自身の死活は `/bots/` status page の bot-slo 語彙
+   (ok/stale/held/failed/unmeasured) で公開し、fail-closed を保つ
+   (telemetry 無しは緑にしない)。
+
+### bot profile (manifest の形)
+
+各 bot は `manifest.edn` 形で宣言する (kawaraban の actor manifest と同型):
+`:actor/id`, `:actor/display-name`, `:actor/gates`, `:actor/non-goals`,
+`:actor/tier`, `:actor/purpose`。既存の Business Bot (`B2` 相当) は
+assignment `assignment-isic7310-20260903-01` が既に審査側の profile を
+持っており、B3/B4 の追加は **同一 DO runtime の新 bot_id** (`business-7310-*`)
+または **B1/B4 の residency.edn エントリ** として登録する。repo の新規作成はしない
+(役割は loop/residency 宣言で足りる。`loop-*` prefix 規則に従う B1 は
+loop-noren と同型の作業であり新 repo を要しない)。
+
+### 実装の順序 (leverage 順、作らないものを明示)
+
+1. **B2 (既存 bot) の goal を審査ループに一致させる** — 現在の hourly tick は
+   blueprint 読みで止まっている。queue 経由で `:campaign/intake` の
+   evidence checklist 進捗を追う prompt を与える (既存 route で可能)。
+2. **B3 ops-metering を同 DO runtime に追加** — `POST /v1/grok-bots/bots`
+   で新 bot_id, credit は最小 (1000 micro-USDC), `allowed_hosts`
+   は metrics endpoints のみ。
+3. **B1 営業 resident** — loop-noren を雛形に prospects を 7310 適格性で
+   判定する loop。ingress key は既存経路 (`kaizen` ingress と同型)。
+   **実装前に接触対象の法的確認 (特定電子メール法) を loop-noren と同じ形で
+   data/ に宣言する。**
+4. **B4 改善 resident** — 週次 cron。BMC gate 評価器 (`70-tools/bmc`) の
+   既存評価を呼び、diff を proposal journal に書く。
+5. **ステータス統合** — B1/B4 を `cloud.itonami.bots-status.v1` document の
+   residents に加え、`/bots/` page で 4 bot 全員が見えるようにする。
+
+### なぜ「1 bot で全部」ではないか
+
+- **収益面の教訓 (ADR-2608096000)**: 広告収益は在庫と広告主の函数であって、
+  bot 数ではない。bot を増やしても在庫が増えない限り収益は動かない。だから
+  B1 (クライアント獲得) と B3 (在庫・実績の可視化) を分け、B4 がどちらの
+  leverage が高いかを実測で判断する編成にする。
+- **審査の独立性 (7310 CLAUDE.md)**: 「The advisor reports, it does not author」
+  の規律は bot 編成にもそのまま効く。審査をする bot が営業目標を持つと、
+  審査の緩さが営業圧力で決まる。B1 と B2 を分けるのはこのため。
+- **検証可能性**: 権限が分かれていると、`journal` を読むだけで
+  「どの bot が何を propose し、何が hold され、何が承認されたか」を 1 つの
+  承認キューで追える。
+
+## Consequences
+
+- 4 bot のうち B2 だけが今日動いている。B3/B4 は既存 runtime/既存 cron の
+  追加でよく、B1 だけが新しい loop の実装を要する (loop-noren の
+  コピーパターンで判定を 7310 actor に差し替えるだけ)。
+- DO bot の増加は credit line を消費する。trial LP の上限内
+  (0.001-0.05 USDC/bot) に留める。実支出にはならない。
+- B1 は外向き接触の準備をするが送らない。接触の実行は営業判断なので
+  owner が承認キューで行う (恒久承認の「propose→govern→commit」経路でも、
+  特定電子メール法の対象になる recipient への送信は suppression 名簿を
+  通した上で行う)。
+- この ADR は「bot がビジネスを進める」枠組みを決めるものであって、
+  収益が出ることを主張しない。B4 の最初の提案対象は、dogfood seed の
+  hold 清算 (creative 依存 2 件) になる見込みである。")))

@@ -1,0 +1,124 @@
+(vector (map (:db/id -1),
+  (:adr/id "adr-2607252000-unified-query-plane-cross-repo-company-join"),
+  (:adr/title "ADR-2607252000: 統合クエリ面に企業データと fleet 状態を載せ、:company/lei で repo を跨いで join 可能にする"),
+  (:adr/status "accepted"),
+  (:adr/doc_type "adr"),
+  (:adr/date "2026-07-25"),
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)")),
+  (:adr/topic "unified-query-plane-cross-repo-company-join"),
+  (:adr/related (vector "adr-2607171600-docs-edn-only-datascript-query"
+                "adr-2607122000-cloud-murakumo-market-intel"
+                "adr-2607110300-cloud-itonami-lei-corporate-tos-catalog")),
+  (:adr/supersedes (vector)),
+  (:adr/superseded_by (vector)),
+  (:adr/repos (vector "com-junkawasaki/root" "gftdcojp/cloud-murakumo-market-intel" "cloud-itonami/cloud-itonami-lei-*")),
+  (:adr/authoritative true),
+  (:adr/authoritative_for (vector "manifest/edn-query.cljs がどの corpus を載せるか、cross-repo な :company/lei join の正本、および握り潰した source を報告する義務")),
+  (:adr/last_verified "2026-07-25"),
+  (:adr/body "# ADR-2607252000: 統合クエリ面に企業データ・fleet 状態を載せる
+
+**Status**: accepted
+**Date**: 2026-07-25
+
+## Context
+
+「このワークスペースのデータは全て Datomic query できるのか」を実測したところ、
+**3 つの分断された面**に分かれていた。
+
+1. **統合面** — `manifest/edn-query.cljs`（npm `datascript`、属性は裸文字列）。
+   実測 82,660 entity。`90-docs/**` 全体・他リポの ADR 3 ディレクトリ・kotoba-rad・
+   kawasakijun・`manifest/` は **3 ファイルのみ**（repos.edn / kotoba-boundaries.edn /
+   cleanup-workflow.edn）。
+2. **market-intel 面** — `orgs/gftdcojp/cloud-murakumo-market-intel` の
+   `market-intel.store`（`langchain.db` = Datomic API 互換 と DataScript の
+   2 バックエンド）。5,200 社。任意 Datalog が通ることは実行して確認済み。
+   ただし属性は**キーワード**で、統合面の裸文字列とは**同じクエリで引けない**。
+3. **どの面にも載っていないデータ** — `cloud-itonami-lei-*` の blueprint.edn（155）と
+   80-data/public/tos.journal.edn（155、5.3MB）、`manifest/itonami-fleet-audit.edn`
+   （856KB）、`manifest/repo-maturity.edn`（998KB）、`fleet-db.edn`、`fleet-ci.edn`。
+   このうち fleet-audit / repo-maturity は自ら「A vector of DataScript/Datomic-
+   transactable entity-maps」と宣言しているのに、どのローダも読んでいなかった。
+
+決定的だったのは、**2 つの企業データセットが同じ `:company/*` 名前空間で
+`:company/lei` を共有している**ことを実測で見つけた点:
+
+- market-intel: `:company/cik` `:company/lei` `:company/revenue-usd` …（5,200 社、
+  うち LEI 保有 2,640）
+- lei repos: `:company/legal-name` `:company/lei` `:company/jurisdiction`
+  `:company/website` …（155 社）
+
+突合すると **69 社が `:company/lei` で結合可能**。つまり結合キーは既に存在して
+いたのに、**それを結合するローダが無い**だけだった。同 2026-07-25 に LEI
+クロスリンク自体を改善（NBSP による偽陰性の修正、+92 件）した直後だったが、
+その改善が実際の価値を生むには join できる面が要る。
+
+## Decision
+
+**新しい並行ローダを作らず、既存の統合面（`manifest/edn-query.cljs`）に corpus を
+足す。** 変換（keyword → 裸文字列）・schema・CLI をそのまま再利用でき、結果として
+**同一クエリで join できる**ようになる（別ローダを作ると面が 4 つに増えるだけ）。
+
+追加した corpus:
+
+| dataset | 件数 | 内容 |
+|---|---|---|
+| `market-intel` | 5,200 | SEC EDGAR 財務ファンダメンタルズ |
+| `cloud-itonami-lei` | 155 | 法人実体 blueprint |
+| `cloud-itonami-lei-tos` | 148 | ToS アーカイブ（journal を replay） |
+| `itonami-fleet-audit` | 1,223 | fleet 監査状態 |
+| `repo-maturity` | 1,642 | repo 成熟度 |
+
+実測 total: **82,660 → 91,036 entity**。
+
+### 出自の区別は属性名でなく `:source/dataset` で行う
+
+3 つの企業 corpus は `:company/*` を共有する。出自を属性名に埋め込む
+（`:market-intel.company/lei` のように）と**結合キーが壊れる**ので、しない。
+`:source/dataset` の値で区別する。
+
+### ToS journal の entity-id は LEI ではない
+
+journal の entity-id は `\"wabtec-tos-1\"` のような repo ローカル名。ディレクトリ名
+`cloud-itonami-lei-<lei>` 由来の LEI（大文字化して blueprint / GLEIF と揃える）を
+足して初めて join できる。これは捏造ではなく、その repo の識別子そのもの。
+
+### 握り潰した source は必ず報告する（`warn-skipped!`）
+
+このローダ群は shape 不一致を nil で握り潰す設計（1 ファイルの破損で面全体を
+落とさないため）だが、**黙っていると count が「全部載っている」ように読める**。
+存在するのに 0 entity だった source は stderr に WARNING で報告する。`q` の
+stdout は汚さない（パース可能なまま）。
+
+実例: tos.journal.edn 155 件中 **9 件が 0 entity**。原因は source repo 側のデータ
+破損で、スクレイプした ToS 本文中の未エスケープ引用符により文字列が途中終端し、
+ファイル全体が「1 個の巨大タプル」として parse されること（`op` 位置に `:add`
+でなく URL が来るため `replay-journal` が捨てる）。**このローダでは直せない**ので
+報告に留める（該当 9 社: 5493000C01ZX7D35SD85 / 549300IHYHCQP2PIR591 /
+549300SZYINBBLJQU475 / DPRBOZP0K5RM2YE8UU08 / I07WOS4YJ0N7YRFE7309 ほか 4 件）。
+
+## Consequences
+
+- **できるようになったこと**: 財務 × 法人実体 × ToS を 1 クエリで結合できる。
+  実測例（3-way join）: MetLife / Phillips 66 / Valero / CVS Health / Verizon /
+  Salesforce / Workday 等が legal-name + jurisdiction + revenue-usd + tos/source-url
+  を同時に返す。
+- **cloud-itonami-lei-* の repo 追加が、そのまま query 面のカバレッジ拡大になる**
+  （ローダは `cloud-itonami-lei-` prefix でディレクトリを列挙するので、
+  repo を足すだけで載る）。
+- market-intel 側の `market-intel.store` は残る。あちらはキーワード属性で
+  Datomic API 互換の別バックエンドを持つ実装であり、この面は「横断 join 用の
+  読み取り面」。**同じデータが 2 面にあることを許容する**（統合面は生成物寄りで、
+  market-intel の store が持つ pull パターンや契約テストを置き換えない）。
+- **まだ載っていない**: `manifest/fleet-db.edn` / `fleet-ci.edn`、
+  各 `cloud-itonami-*` repo 自身の 80-data（lei 系以外）。これらは follow-up。
+- パフォーマンス: 1,200+ ある `orgs/cloud-itonami/` を `file-seq` で全走査すると
+  重いので、親を `.listFiles` で 1 段だけ見て prefix でフィルタする。
+
+## Alternatives considered
+
+- **market-intel の store を統合面から呼ぶ**: 属性がキーワード vs 裸文字列で
+  クエリ言語が揃わず、結局 2 面のまま。却下。
+- **新しい cross-repo ローダを別スクリプトで作る**: 面が 4 つに増える。却下。
+- **9 件の壊れた tos.journal.edn を修正する**: 9 つの別 repo にまたがる source 側の
+  データ破損で、このタスクのスコープ外。報告に留め follow-up とする。"),
+  (:adr/source-format "edn")))

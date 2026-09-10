@@ -1,0 +1,143 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800010800-root-custody-is-two-problems")
+  (:adr/title "root を安全にすることと安定させることは別の問題で、chain が解けるのは後者だけ —— ただし初版はその『手元』を過大に書き、要らない例外を勧めていた")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/body "## Context
+
+オーナー指示（2026-09-06）「kagi も webauth, passkey smartcontract ベースで
+ルートを安全かつ、安定化させてほしい」。
+
+測ると、3 要素のうち **passkey は既に在り、smart contract は決定済みだが未実装、
+そして『安定していない』原因は passkey の不在ではなかった。**\n\n## この ADR は同日中に訂正された（オーナー指摘 2026-09-06）\n\n初版は D3 で **Secure Enclave のための規約例外**を「正しい形」として提示した。\nオーナー指摘「例外は security 的によくないのでは」を受けて測り直したところ、\n**例外は不要で、しかも初版は露出を過大に書いていた。**\n\n| 初版の主張 | 判定 |\n|---|---|\n| platform crypto に届くには JNI か helper バイナリが要る | **誤り。`kagi/passkey_bridge.clj` が既に非ネイティブで届いている** |\n| 手元の custody の底は file の mode ビット（＝ root がそこに在るように読める） | **過大。VMK は agent に渡らない** |\n| したがって例外を認めるべき | **撤回** |\n\n訂正の中身は D3 に置いた。**初版の誤りの形は、このセッションで 4 回目の同型**\nであることも記録する —— 索引を引かずに『無い』と結論した。今回引くべきだったのは\n**当の repo の ns 一覧**で、`passkey_bridge` はそこに在った。
+
+## 測定（2026-09-06）
+
+### passkey / WebAuthn は既に在る
+
+`kagi.unlock` は VMK の unlock envelope を 2 系統持つ ——
+`kagi/unlock/os-keychain/v1` と **`kagi/unlock/passkey-prf/v1`**
+（rp-id と credential-id に束ねた PRF 派生）。src の出現数は
+passkey 51 / prf 57 / webauthn 7。
+
+### 不安定の原因は custody の底が file の mode ビットであること
+
+ADR-2608281100 が記録したとおり、**launchd 配下では Keychain の prompt を
+出せず timeout する**ので、常駐 agent は `~/.gftd/<name>` の平文を読んでいた。
+その後 `file-0600` は SecretStore の正式な provider になり、mode 600 でなければ
+読まずに拒否し、`:custody :file-0600` として metadata に出るようになった。
+
+**可視化はされた。解消はされていない。** `secret_store.clj` の docstring 自身が
+そう書いている ——「This provider is WEAKER than the Keychain one and exists
+because the Keychain one cannot be used at all in the place that needs it most」。
+
+そして custody の底はそこで終わらない。`kagi.agent-client` の enrollment 契約は
+**`:account-key` と `:secret` を `kagi.secret-store` の ref が指す場所に置け**と
+言う。常駐 agent にとってそれは `file://` の mode 0600 である。
+**つまり agent principal の鍵を守っているのは passkey ではなくファイルの mode で、
+passkey は自動化が生きている場所にだけ届いていない。**\n\n⚠ **ただし、そこに在るのは root ではない**（初版はここを過大に書いた）。\n`agent_service.cljc` の 7 行目は `It has no VMK and cannot get one.` と書く ——\nADR-2608281100 D1 のとおり agent が持つのは自分の KEM 鍵と item ごとの grant だけで、\n**VMK も compartment 鍵も渡らない**。file-0600 に在るのは compartment に限定され、\nitem ごとに grant され、`:agent/not-after` で期限が切れる credential である。\n露出は有界であって、vault の root ではない。
+
+### 非プロンプトのハードウェア鍵は 1 つも無い
+
+`secure-enclave` 0 / `SecKey` 0 / `enclave` 0 / `kSecAccess` 0 /
+`biometry` 0 / `user-presence` 0。`--custody` は operator が file か keychain かを
+選ぶ**要求時のフラグ**であって、ハードウェア裏づけの選択肢は存在しない。\n\n**だが platform の WebAuthn には既に届いている。** `kagi/passkey_bridge.clj` は\n`One-shot loopback-only browser bridge for WebAuthn PRF registration` ——\n`com.sun.net.httpserver` の一回限りの loopback サーバをブラウザに叩かせ、\n`default-src 'none'` の CSP で閉じる。**ネイティブコードは 1 行も無い。**\nこの repo は同じクラスの問題を既にこの形で解いていた。
+
+### smart contract は部品が在り、anchor が無い
+
+- `.sol` 65 本、`erc8004` 167 参照、`MurakumoComputeCredit.sol` 等は実在
+- **`kagi.chain-signer` は既に hardware-wallet 型**: BIP-39 seed は vault item に
+  あってプロセスを出ず、呼び出し側は公開鍵と署名だけを得る。署名ごとに
+  AccessGovernor と append-only 台帳を通り、**意図的にキャッシュしない**
+  （キャッシュは『毎回 governed』を『初回だけ governed』に劣化させる）
+- **anchor の実装は `kotobase-anchor-fevm` の 1 本だけで、それは Filecoin。**
+  ADR-2608057000（2026-08-05）が「Filecoin には anchor しない」と決めた当の対象で、
+  **Bitcoin と Ethereum の anchor は決定済みだが未実装**
+- `eth-crypto` は現在完全に portable（`.cljc`、両ホスト、EIP-1559 署名を viem と
+  突き合わせ済み）。Workers で Ethereum 経路は書ける（同 ADR が訂正済み）
+
+## Decision
+
+### D1. root の要求を 2 つに分ける。混ぜると片方が解けたように見える
+
+| 問い | 答えの層 | 現在地 |
+|---|---|---|
+| **安全** —— 手元に在る鍵が盗まれないか | **露出を減らし寿命を縮める**（D3a）。ハードウェアではない | 有界な agent credential が file-0600。VMK はそこに無い |
+| **安定** —— 1 台のマシンと 1 人の在席に依存せず回せるか | **quorum + anchor** | 決定済み・未実装 |
+
+### D2. smart contract は手元の custody を安全にしない。これは能力の誤配ではなく層の違い
+
+**contract が買えるのは rotation の権限と recovery の quorum であって、
+ラップトップ上で静止している鍵の保護ではない。** chain 上の何も、
+`~/.gftd/<name>` を読める者を止めない。
+
+したがって「passkey smartcontract ベースで root を安全かつ安定化」は、
+1 つの手ではなく 2 つの手になる。**contract だけを入れると、
+台帳と公開検証が増えた分だけ安全になったように見えて、
+底の mode ビットは 1 ビットも動かない。**
+
+### D3. 規約の例外は認めない —— 要らなかったし、例外そのものが代償を持つ\n\n**初版はここで Secure Enclave のための例外を勧めた。撤回する。**\n\n**理由 1 —— 要らない。** platform の WebAuthn には `passkey_bridge` が既に\nネイティブ無しで届いている。初版は「JNI か helper バイナリが要る」と書いたが、\n**その反例は同じ repo の ns 一覧に在った。** 例外を設計する前に、その例外が\n迂回しようとしている制約が本当に効いているかを測っていなかった。\n\n**理由 2 —— 例外は security の側でも負ける。** ネイティブを 1 つ入れると\nTCB にメモリ非安全なコードが入り、署名・配布・検証すべきバイナリが増え、\n**cljc 側の gate と detector から見えないコードができる**。このワークスペースは\nRust 38 万行を撤去してまさにそこから離れた（ADR-2607072000）。\n\n**理由 3 —— 「機構だけ」は precedent になる。** ADR-2607241100 D6 の\nmechanism/judgment の線は aiueos に対しては正しい —— kernel はレジスタと\nMMIO に触る以外の選択肢を持たない。**kagi は userspace の vault で、選択肢を持つ。**\n同じ言葉で入ってくる次の依存を、この ADR は断りにくくする。\n\n### D3a. 正しい方向は「硬くする」ではなく「減らして短くする」\n\n手元に置いてある物を硬くする代わりに、置いてある物を減らし寿命を縮める。\n材料は全部既に在る:\n\n- `passkey_bridge` —— 人間の unlock（ネイティブ無し）\n- `:agent/not-after` —— agent principal は既に期限を持つ\n- `:share/grant` / `:share/revoke` —— item ごとの grant、revoke は再鍵する\n- holder-side attenuation（ADR-2800010700 D6b）—— ひとつ上の層の同じ形\n\n**露出を有界にすることと、有界な露出を硬い金庫に入れることは別の投資で、\n前者の方が安く、例外を要さない。**\n### D4. Bitcoin anchor は quorum の選択に依存しない。先に置ける
+
+ADR-2608057000 の割り当てをそのまま使う:
+
+- **Bitcoin** —— 履歴の不可逆性 / non-equivocation
+- **Ethereum** —— 資産と償還
+
+root 鍵に効くのは前者である。そして今日 landed した
+`app-kotoba-cloud` の root-key log 面（ADR-2800010700 D6b 系列）に直結する ——
+`biscuit.rootkey` の docstring は自らこう書いている:
+
+> An attacker who takes over the publishing location can serve old records or
+> no records — they cannot introduce a key nobody committed to.
+
+**pre-rotation が塞ぐのは鍵の導入だけで、withholding と stale の提供は塞がない。**
+log の head を anchor するのがその残り半分で、**これは rotation 権限を
+contract に置くか inga に置くかと独立している。**
+
+### D5. rotation 権限の置き場は未決のまま残す
+
+- **Ethereum contract** —— 権限がプログラム可能で公開検証でき、外部と共有しやすい。
+  代償はガス、chain 依存、custody が 1 段増えること
+- **inga**（ADR-2608038000、2f+1 の quorum 証明書それ自体が条件付き書き込み）——
+  この workspace が指定した合意層で、ベンダ依存が無い。代償は、外から見た信用が
+  自前のものになること
+
+ADR-2608057000 の観察がここで逆に効く ——「Base も Robinhood も自前で
+チェーンを作らず、**買ったのは技術ではなく settle 先の信用**である」。
+inga を選ぶことは、その信用を自前で用意すると決めることである。
+
+**オーナーの指示は smartcontract ベースだが、ADR-2608039000（分散型経路を
+単一ベンダの primitive に前提させない）と ADR-2608038000（合意層は inga）が
+既に在るので、この ADR では決めない。** 決めるときは 2 つの既存 ADR との
+関係を書く。
+
+## Consequences
+
+(+) 「root を安全かつ安定化」が 2 つの独立した作業に分かれ、片方
+    （contract）を入れても他方（手元の custody）が動かないことが記録された。
+
+(+) Bitcoin anchor が quorum の選択と独立していることが分かったので、
+    未決のまま先に進められる一手が特定できた。
+
+(-) **この ADR は何も実装していない。** 常駐 unlock を file-0600 から外す作業は
+    D3 のとおり規約の例外を要し、Bitcoin anchor は実装が存在しない（OTS 検証も
+    自前 tx も、この workspace に無い）。**着手できる形にはなったが、着手はしていない。**
+
+(?) `kagi agent ls` が custody を見せる、と `secret_store.clj` の docstring は
+    書いているが、**cli 側で custody を出力する経路は確認していない**
+    （`--custody` は request 時のフラグとしては在る）。見せていないなら、
+    「どの principal が盗みやすいか」は今も暗黙のままである。
+
+(?) Secure Enclave の例外を通さない場合、常駐 agent の custody は file-0600 の
+    ままである。その状態で contract を入れると D2 の誤読が起きやすくなるので、
+    入れるなら「これは手元の鍵を守らない」を同時に公開する。
+
+(-) **初版は誤った前提の上に規約例外を勧めた。** 前提は 2 つとも測れば偽で、\n    反例はどちらも当の repo の中に在った（`passkey_bridge` の ns、\n    `agent_service` の 7 行目）。**gate は全部緑だったが、gate は主張の\n    正しさを見ない** —— このセッションで 3 度目の同じ記録である。\n\n(+) 例外を認めなかったことで、mechanism/judgment の線（ADR-2607241100 D6）が\n    kernel に対する判断であって userspace の vault に自動的には及ばない、\n    という区別が記録された。\n\n(?) `--custody file` は今も選べる。D3a の方向を採るなら、resident が\n    どの TTL でどの compartment を持つかを実際に詰める必要があり、\n    それは測っていない。\n\n## Related
+
+- ADR-2608281100（agent が自分の鍵を持つ —— file-0600 を正式 provider にした決定）
+- ADR-2608057000（anchor 先は Bitcoin と Ethereum。Filecoin を外す）
+- ADR-2608038000（inga —— 合意層）
+- ADR-2608039000（分散型経路に単一ベンダの primitive を前提させない）
+- ADR-2800010700（kotoba.cloud の層と delegation。D6b が holder-side attenuation、
+  root-key log 面はこの ADR の D4 が指す対象）
+")))

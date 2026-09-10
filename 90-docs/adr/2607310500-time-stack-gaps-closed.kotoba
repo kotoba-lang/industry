@@ -1,0 +1,233 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607310500-time-stack-gaps-closed")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "時間計測スタックの残 6 ギャップを閉じる（store backend / deployment / 法域 / PSA / WFM / collector）")
+  (:adr/topic "time-stack-gaps-closed")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-31")
+  (:adr/last-verified "2026-07-31")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "kotoba-lang/worklaw の window モデルと :unevaluated/reason 3 分類"
+   "jurisdiction path が地理でなく法令の階層であること（member state は [:eu :xx]）"
+   "kotoba.psa の第4不変条件（rate 無しは換算しない）と revenue recognition の :unknown 規則"
+   "kotoba.shift の availability 宣言主義と propose-roster が gap を埋めない規則"
+   "3 actor の Store backend seam（MemStore ≡ DatomicStore、contract test 必須）"
+   "3 actor の HTTP surface に載せてよい op の決め方（escalate する op は載せない）"
+   "allow-list 不在は 503（open endpoint にしない）という edge の既定"))
+
+  (:adr/related
+  (vector "adr-2607310300-kadou-automatic-work-time-capture"
+   "adr-2607310400-psa-wfm-tehai-kintai"
+   "adr-2607011000-itonami-actor-pattern"
+   "adr-2607141600-langchain-store-shared-seam"
+   "adr-2607268000-cacao-shared-library"
+   "cloud-itonami-isic-6492 (Pages Functions edge の先行実装)"
+   "cloud-itonami-isic-6511 (DatomicStore の reference adopter)"))
+
+  (:adr/artifact
+  (vector "kotoba-lang/worklaw 8681e8e (38 tests / 185 assertions)"
+   "kotoba-lang/psa 741d19a (41 tests / 96 assertions)"
+   "kotoba-lang/shift 7b4c4bd (40 tests / 89 assertions)"
+   "kotoba-lang/activity 0f7ebf2 (33 tests / 89 assertions)"
+   "cloud-itonami/kadou 8beed68 (53 tests / 171 assertions)"
+   "cloud-itonami/tehai 9f1200f (40 tests / 128 assertions)"
+   "cloud-itonami/kintai 6d9a506 (45 tests / 147 assertions)"))
+
+  (:adr/verify
+  (vector "各 repo で clojure -M:test && clojure -M:lint（計 290 tests / 905 assertions）"
+   "nbb --classpath ../../kotoba-lang/activity/src tools/collect-vcs.cljs --worker w-1 --repo <repo> --since '1 day ago'"
+   "nbb --classpath ../../kotoba-lang/activity/src tools/collect-calendar.cljs --worker w-1 --ics <file>"
+   "node scripts/resource-guard.mjs run build -- clojure -M:cljs -m cljs.main --target node -c <actor>.edge.endpoints"))
+
+  (:adr/decision-summary
+  (vector "D1: worklaw に window（:day/:week/:month/:year/:rolling-months）を導入し、期間より長い window の rule は評価せず理由付きで報告する"
+   "D2: :unevaluated/reason を 3 分類する。:window-longer-than-period は本質的（caller に直せない）、:missing-period / :missing-calendar は caller error。consumer は別々に扱う"
+   "D3: jurisdiction path は地理でなく法令の階層。member state は [:eu :fr] であって [:fr] ではない。裸の国コードは :none"
+   "D4: 月以上の window は生時間でなく法定時間外を数える。日次超過を先に、残りの所定時間から週次超過を出す（二重計上しない）"
+   "D5: psa 第4不変条件 — rate 不明の金額は 1:1 換算も破棄もせず、合計から除外して名指しし :total/complete? false を返す。FX rate は方向性を持ち自動反転しない"
+   "D6: revenue recognition は入力が欠ければ :unknown。percent-complete の progress は 1.0 で頭打ち（超過は margin に出る）"
+   "D7: shift の availability は宣言主義。未宣言は「空いている」ではない。swap は双方合意 + 受け手の availability 再検査"
+   "D8: propose-roster は提案であって closure ではない。宣言済み availability から埋まらない gap は gap のまま :still-short に出す。候補順は operator の決定であり library の既定にしない"
+   "D9: 3 actor に DatomicStore を追加し、MemStore ≡ DatomicStore の contract test を必須にする"
+   "D10: HTTP surface に載せてよいのは auto-commit する op だけ。escalate する op は HTTP 表現を持たない（テストで不在を主張する）"
+   "D11: allow-list は DID → subject の map であって set ではない。subject は検証済み DID から来て request body から来ない"
+   "D12: allow-list 不在は 503。open endpoint を既定にしない"))
+
+  (:adr/body "
+# ADR-2607310500: 時間計測スタックの残 6 ギャップを閉じる
+
+**Status**: accepted
+**Date**: 2026-07-31
+
+## Context
+
+ADR-2607310300 / 2607310400 が時間計測 4 区分を埋めたとき、6 つのギャップを
+明記して閉じた。本 ADR はその 6 つすべてを閉じる。
+
+## Decision
+
+### D1–D4: worklaw — window と法令階層
+
+**window を導入した。** rule は `:day`/`:week`/`:month`/`:year`/`:rolling-months`
+を持ち、**check に渡された期間より長い window の rule は評価しない**。7 日を見て
+年間上限について何か言えるわけがなく、言えるふりをしないため。
+
+**理由を 3 分類する**（ここが要点）:
+
+| reason | 意味 | 誰の問題 |
+|---|---|---|
+| `:window-longer-than-period` | 7 日では 36協定の年上限を判定できない | **本質的** — caller には直せない |
+| `:missing-period` | `:period` が渡されていない | caller |
+| `:missing-calendar` | `:week-of` / `:month-of` が無い | caller |
+
+consumer はこれを別々に扱う。kintai は caller error を hard hold にし、本質的な
+方は **escalate** する — ここを hold にすると週次承認が永久に通らなくなる。それは
+compliance ではなく単に使えないということ。
+
+**jurisdiction path は地理でなく法令の階層。** フランスの労働者は `[:eu :fr]` で
+あって `[:fr]` ではない — 指令が床で、Code du travail がその上に載るから。裸の
+`[:fr]` は coverage `:none` になる。裸の国コードを階層に推測で当てはめることに
+なり、このライブラリは推測をしない。
+
+**月以上の window は法定時間外を数える**（生時間ではない）。二重計上しない: 日次
+超過を先に取り、残った所定時間から週次超過を出す。baseline は宣言している最も
+具体的な level から来るので、フランスの週は 35h から、日本の週は 40h から始まる。
+
+実装中に 2 つのバグが出た。`judgeable` が `and` の最後の真値（boolean ではなく
+vector）を返しており `group-by` が黙って別のキーで分類していた。週休判定が末尾の
+休日を見られず月〜金で誤検知していた。後者の修正から規則が 1 つ生まれた —
+**端の gap は規則を「満たす」側にのみ使い、「破る」側には使わない。**
+
+### D5–D6: psa — 第4不変条件
+
+**rate 無しは換算しない。** 目標通貨への FX rate が不明な金額は 1:1 で換算せず、
+黙って捨てもしない。合計から除外して名指しし、`:total/complete? false` を返す。
+換算できない通貨を吸収した合計は未知の係数だけ間違っており、黙って落とした合計は
+既知の係数だけ間違っている。**どちらも「完了」として報告しない。**
+
+FX rate は**方向性を持ち自動反転しない** — buy rate は sell rate ではなく、
+一方から他方を推論すればスプレッドを捏造することになる。
+
+revenue recognition は入力が欠ければ `:unknown`。予算の無い percent-complete は
+パーセンテージを出せず、「だいたい 8 割終わった」は見積もりであってこれは見積もりを
+供給しない。progress は 1.0 で頭打ち — 予算超過のプロジェクトはスコープを納めたので
+あって契約価値の 130% を納めたのではない。超過は margin に出る（そこが出る場所）。
+
+`project-margin` は 3 つの原価源すべてに不変条件 2 を拡張しつつ弱めない —
+労務エントリが 1 件でも原価欠落なら全体が `:unknown` のまま。各源は別々に報告する
+（残りがいくらかだけでなく、金がどこへ行ったかが読めるように）。
+
+### D7–D8: shift — 宣言主義と「提案は closure ではない」
+
+**availability は宣言主義。** 誰も既定では空いていない。未宣言を「空いている」と
+扱う roster generator は、いずれその人を勝手に入れる generator になる。
+
+**swap は双方合意**。片方だけの承諾は `:not-accepted-by-both`。一方が他方に押し
+付けられる swap は swap ではなく、手順の増えた再割当。受け手の availability を
+apply 時に再検査するのが肝で、**そこがまさに人が自分の承認済み休暇の最中に働かされる
+経路**だから。
+
+**`propose-roster` は提案であって closure ではない。** roster を一切 mutate せず、
+この窓に availability を宣言していて空いている人だけを挙げ、尽きたら `:still-short`
+を返す。宣言済み availability から埋まらない gap は gap のまま残る — 一番文句を
+言わなそうな人で埋めない。候補は**渡された順**で取る。意図的に「公平」でも「安い」
+順でもない: シフト割当の順位付けは誰の週末が取られるかを決める判断で、それは責任を
+負える operator のものであって library に埋め込まれた既定のものではない。
+
+### D9: store backend — contract test が 3 件の実バグを出した
+
+3 actor すべてに `DatomicStore`（langchain.db）を足し、**MemStore ≡ DatomicStore の
+contract test** を必須にした。backend は `langchain.db` の `:db-api` を差し替えれば
+実 Datomic / kotoba-server pod を向く。
+
+**この contract test は書いた初回に 3 件の実バグを出した**:
+
+1. **kadou**: `MemStore` の `revoke-consent!` が、grant を持たない worker に対して
+   `{:consent/revoked-at at}` を**捏造していた**（`update-in ... assoc` は作る）。
+   escalation path を持たない hold の近くに置くものとして最悪。
+2. **tehai**: `MemStore` が rate card を `conj` していたので、rate を再登録すると
+   1 つの `[project role]` に**生きた card が 2 枚**残り、`psa/rate-for` は最初の
+   一致を取る — **invoice total が挿入順に黙って依存していた**。
+3. **kintai**: `MemStore` が shift を `conj` していたので、同じ shift id を再発行
+   すると `kotoba.shift/coverage` が同じ人を 2 回数え、**まだ開いている staffing gap
+   を黙って閉じていた**。
+
+いずれも MemStore 側の欠陥で、Datomic 側は正しかった。単一 backend では出ない。
+
+### D10–D12: deployment — 何を HTTP に載せないかで決まる
+
+`manifest/repository-rules.edn` の通り itonami actor は `:on-demand`。Cloudflare
+Pages Functions が形で、`cloud-itonami-isic-6492` が本番で実証済み。
+
+**HTTP に載せてよいのは auto-commit する op だけ。** fleet の不変条件（ある actor が
+別の actor の統治ライフサイクルを自動運転しない）が surface を決める:
+
+| actor | 露出 | 露出しない |
+|---|---|---|
+| kadou | `POST /api/observations` | attribute / submit-timesheet / disclose-report |
+| kintai | `POST /api/punch` | approve-attendance / correct-punch / publish-shift |
+| tehai | `POST /api/invoice/draft` | **issue-invoice** / report-margin / assign-person |
+
+escalate する op は **HTTP 表現を一切持たない**。core fn が存在しないことを test が
+主張する。tehai が最も鋭い: draft は commitment ではない（billed set に入れるのは
+`:issue-invoice` だけ）ので露出して安全だが、**issue には HTTP 表現が無い** —
+invoice が顧客に届くのは人が thread を再開したからで、それを代替する request は無い。
+`:report-margin` は別の理由で伏せた: margin は cost rate を露出し、それは顧客ではなく
+自社の商業的立場で、返す endpoint は credential 1 つで競合のものになる。
+
+**allow-list は DID → subject の map であって set ではない。** subject は検証済み
+DID から来て **request body から来ない**。これが kadou の self-capture 規則と tehai の
+cross-client 遮断を governor より手前に持ってくる。
+
+**allow-list 不在は 503。** open endpoint を既定にしない。既定で開いている capture
+ingest は、労働者の個人データ store への公開書き込み経路。
+
+認証は `cacao.edge.verify`（共有ライブラリ）に依存し**再実装しない**
+（ADR-2607268000 — 手同期のコピーが約 25 repo で実際に乖離した）。
+
+## Consequences
+
+- 時間計測スタックの 4 区分すべてが、library（無依存 `.cljc`）+ governed actor +
+  swappable store + gated HTTP surface を持つ状態になった。
+- **contract test は単一 backend では見えないバグを出す。** 今回 3/3 の actor で
+  MemStore 側の欠陥が出た。新しい actor に backend を足すときは contract test を
+  同時に書く（後回しにしない）。
+- worklaw の window 導入で **JP の週次チェックは `compliant?` を返さなくなった**
+  （36協定 が未評価のため）。これは正しい — 7 日で年上限は判定できない。consumer は
+  `:unevaluated/reason` を見て振り分ける必要がある。
+
+## 検証（2026-07-31、closing 時点）
+
+| | |
+|---|---|
+| test | 7 repo 合計 290 tests / 905 assertions、0 failures 0 errors |
+| lint | 7 repo とも clj-kondo errors 0 warnings 0 |
+| CI | 7 repo とも pin した SHA に対して GitHub Actions `ci=success` |
+| collector | `collect-vcs` を実 repo（138 commits → 2 sessions / 164 分）、`collect-calendar` を実 .ics（3 events、declined 1 件除外、floating-time 警告発火）で実行確認 |
+| edge | 3 actor の `:cljs` 分岐を実 CACAO 依存込みで ClojureScript compile 成功 |
+| west | pin == repo HEAD == remote HEAD（7 件）、サーバ側到達性検証 OK |
+
+**CI は最初 3 actor で赤かった**（`langchain-store` とその依存 `langchain` を CI が
+clone していなかった）。ローカルは workspace 全体があるので通っていた。sibling chain を
+clone するよう workflow を直して green。**`:local/root` sibling を足したら CI の
+clone list も同時に直す。**
+
+## 未実装（次に来るもの）
+
+- **edge の store は per-request `MemStore`**。Pages Function は stateless なので、
+  永続 backend を env から組む配線が要る（Store protocol seam があるので constructor
+  の差し替えで済む）。
+- **`shadow-cljs release edge-api` は未実行**。`:cljs` 分岐が実 CACAO 依存込みで
+  ClojureScript compile を通ることは確認したが、esm bundle の生成と実 deploy は
+  していない。wrangler.jsonc / package.json / shim は配置済み。
+- **worklaw の法域はまだ 6 level**。JP の変形労働時間制・4週4日変形休日制、FR の
+  12 週平均 44h、DE の 6 か月平均、US の他州は未実装（追加要件は `:law/as-of` と
+  全 rule の `:rule/citation`、test が強制）。
+- **kintai は shift の新機能を governed op にしていない** — leave accrual / swap /
+  roster generation は library に在るが actor の op ではない。
+- **PSA**: time-off、resource forecasting、margin を超える project accounting は範囲外。
+")))

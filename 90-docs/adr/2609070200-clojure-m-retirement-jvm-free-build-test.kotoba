@@ -1,0 +1,204 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609070200-clojure-m-retirement-jvm-free-build-test")
+  (:adr/title "clojure -M の退役は kotoba -M への置換ではない — JVM-free な実体は nbb と amu --jvm-free の 2 つだけ")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-07")
+  (:adr/supersedes "")
+  (:adr/related "adr-2607198300 adr-2607181900 adr-2609051100 adr-2609062200 adr-2607300900 adr-2608136000")
+  (:adr/body
+  "## 決定
+
+オーナー指示（2026-09-06）「clojure -M を使っている箇所を全て kotoba -M で build,
+compile, test できるように refactor」に対し、**文字通りの置換は実行しない**。
+代わりに実行サイトを **JVM-free な実体**へ移す。ADR-2607198300 / Q9 と整合。
+
+`90-docs/adr` の記録文（過去に実行した command の実測ログ）は**書き換えない**。
+前を向いた runbook 記述だけを、新 command を実際に動かしてから更新する。
+
+## なぜ文字通りには実行できないか（実測、推測ではない）
+
+`bin/kotoba` は `bin/kotoba-clj` を exec し、それが `exec clojure -M -m kotoba.launcher`
+である。`kotoba.launcher` は `.clj` で `java.nio` / `java.security` / `java.net.http` /
+`gen-class` を持つ JVM 専用 namespace。**`kotoba` に `-M` フラグは無い。**
+つまり `clojure -M` を `kotoba -M` に置換するのは循環であって移行ではない。
+
+`clojure` / `java` / `clj` を exit 127 の stub で隠して実測（control として素の
+`clojure -e` が 127 になることを先に確認 = 両方向に discriminate する）:
+
+| CLI | 結果 |
+|---|---|
+| `kotoba --help` | JVM 起動（stub 発火） |
+| `kbb --help`（2026-09-06 時点） | JVM 起動 |
+| `kbb --backend native`（同） | JVM 起動 — `--backend` はコンパイル先の指定で driver の話ではない |
+| `amu --help` | jvm-free (exit 0) |
+| `nbb -e` | jvm-free (exit 0) |
+
+⚠ **この表は 2026-09-06 の測定値である。** 同日中に並行セッションが `bin/kbb` を
+nbb shim 化した。**現在地は毎回測ること。この表を定数として引用しない。**
+
+## scope の実態 — 生 grep の数は 3 桁膨らんでいた
+
+`clojure -M` / `-X` の生 grep は 1,474 ファイル。うち大半は stray worktree
+（`wt-*` / `_wt-*` / `*-verify*`）の重複だった。除外後 1,138、さらに内訳:
+
+- **1,009 は `90-docs/adr/*.edn` の prose** = 実行された command の記録
+- 大半は docstring / README / コメント / UI 文字列
+- **実際に process を起こすのは約 20 ファイル**
+
+分類器で ADR 2,757 件を全走査（evidence floor: scanned == listed、無言 skip 無し）:
+record 型 2,244 / runbook 型 32 / 計 3,300 hit。**その 32 を実読すると全て偽陽性**
+（`実行する` `再生成` が過去形の検証記述に発火）。**編集した ADR は 0 件。**
+
+workspace 全体の JVM 面は `scripts/verify-jvm-dependency-surface.cljs` が持つ（今回の
+対象外）。分類は「JVM が何のために要るか」で行われている: jvm-source / jvm-runtime-deps /
+jvm-build / jvm-test / jvm-lint / jvm-chicory。**件数はここに書かない**（検出器を回せば出る。
+日付付きで書いた値は日付を落として引用される）。
+
+## 着地したもの
+
+| repo | 変換 | 実測 |
+|---|---|---|
+| `cloud-murakumo-mlx` | `clojure -M:test` → nbb | 4 tests / 14 assertions |
+| `yukkuri/clj` | `clojure -M:test` + npm script → nbb | 35 / 234 |
+| `yukkuri/renderer-mac` | `clojure -M:test` → nbb | 3 / 10 |
+| `net-oppai-gen` | `npm test` + `generate-site` → nbb | 41 / 162、生成 HTML は JVM 版と byte 一致 |
+| `app-hyakka` | `clojure -M scripts/read_check.clj` → nbb | SCANNED 1516 / unreadable 0、JVM oracle と一致 |
+| `engi` | `clojure -M:cljs` → nbb | 2 / 16 |
+| `weight-oka` | `clojure -M:test` → nbb | 4 / 15 |
+| `cybersecurity` | coverage report → nbb | 75 行、byte 一致（diff exit 0） |
+| `nio` | test runner の exit 経路を修正 | 下記 |
+| `kotoba` | `bin/kbb` の JVM-free dispatch | 下記 |
+
+west pin は前進済み（`46c981ec` / `f53976be` / `cb4af34a` / nio 分）。
+
+## kbb の JVM-free dispatch
+
+`bin/kbb_js.cljs` は既に `amu compile --target js --jvm-free` で JVM-free host を
+実装していた（ADR-2607181900 gate 項目 ①③）。front door だけが JVM だった。現在:
+
+    auto → native   caps ⊆ {:fs/app-data}
+    auto → js       caps ⊆ js host の 4 つ（35 fs/app-data, 33 env/read, 34 fs/browse, 20 proc/exec）
+    それ以外        REFUSE, exit 3 (:kbb/no-jvm-free-backend)
+
+**silent fallback 無し**（ADR-2609051100）。`--backend native` を browse surface に
+明示指定しても代替せず拒否し `--backend js` を教える。移植した 3 script は native/js
+両方で nbb 原本と同じ答え。副産物として潜在バグ 4 件を修正（`--source-path` の脱落 /
+interpreter 委譲が policy PATH を parse 済み MAP で shadow / amu pin の hardcode が
+deps.edn と不一致 / `--fuel` を native で受け付けて無視）。
+
+## 変換しなかったもの（実測理由付き。これらは成功した結果である）
+
+- **`defence`** — 7 つの `.cljc` の `deftest` が全て `#?(:clj ...)` 内。JVM 18 tests /
+  1758 assertions、nbb は `Ran 0 tests` + **exit 0**。件数を比べなければ緑に見えた。
+- **`cloud-murakumo-app`** — JVM 48 / 24,125 対 nbb 47 / 1,109。差の 1 namespace が
+  89 個の LLM 生成ロケールカタログを検査していた（docstring 自身が load-bearing と書いている）。
+- **`kakure`** — 26 / 127 対 25 / 120。欠けるのは `java.net.ServerSocket` を使う実 HTTP 統合テスト。
+- **`.mcp.json`** — nbb host は在るが公開 tool が 1 対 27。26 個を殺すことになる。
+- **`scripts/maturity-loop/mutations.edn`** — runner の選択が実験そのもの（同じ mutation が
+  JVM で 0 failures、nbb で 11）。
+- **`cybersecurity` の `prepare`** — nbb の `cljs.pprint` に `*print-right-margin*` が無く、
+  commit 済み catalog が毎ビルド書き換わる（4,490 行 対 4,454 行、diff 7,836 行）。
+- **`test:portability`** — これ自体が JVM↔Node の差分オラクル。
+- **`arms` / `weight-kototama` / `asi_runner` / `animeka-actor`** — `.clj` + Java interop を
+  無条件 import（`java.security.MessageDigest` / jsonista / `java.net.URI`）。JVM が runtime。
+- **shadow-cljs / Chicory tender / clj-kondo** — JVM-free 等価物が存在しない。
+- **`fashion` ci.yml** — 4 step 中 3 つが上記なので 1 つ変えても JVM は消えない。
+
+## 見つけた欠陥
+
+1. **`nio` の nbb CI job が落ちなかった。** 原因は 2 つ。①`cljs.test/set-env!` は
+   `run-all-tests` に届かない（マクロが自前の `(empty-env)` を `:reporter
+   :cljs.test/default` で作る）ためカスタム reporter が一度も dispatch されず失敗
+   カウンタは構造的に常に 0。画面の `FAIL in` は既定 reporter の出力で書式がほぼ同一
+   だったため隠れていた。②`run-all-tests` は `nil` を返し、nbb 自身が既に
+   `exitCode = 1` を設定しているので、明示 exit が**正しい 1 を 0 で潰していた**。
+   修正は `:end-run-tests` フック + fail-closed + evidence floor（assertion 0 件で exit 2）。
+2. **同じ嘘が 17 repo に複製されていた。** `run-tests` から `{:keys [fail error]}` を
+   分配束縛する形。`okugai` で end-to-end 確認（`1 failures` と印字して exit 0）。
+   15 件は着地済み、残り `foundation-identity-didwebvh` は未着地。
+3. **`exit 1` しか呼ばない 33 件は偶然正しいだけ。** nbb 自身の exitCode が生き残るため
+   嘘はついていないが、明示チェックは常に偽の dead code であり、1 回の整理で嘘に変わる。
+4. **`ai-gftd-oshikatsu` の test task は一度も実行されていなかった。** `run-task.cljs` が
+   `shell:false` で spawn するため `[\"clojure -M:test\"]` は存在しないプログラム 1 個を
+   指し、exit 1 / 出力ゼロ。**同じ argv バグをオーナーが 2026-08-13 に既に直していたが
+   着地せず到達不能になっていた**（dangling commit `e16835d`）。
+5. **hermes profile `jvm-dep-migrator` は名前と中身が別物。** cron job 名は JVM 依存 Q9
+   移行と言うが SOUL.md は amu-falsify（compiler co-scientist / perfgate 反証）の charter。
+   索引が当たったことは動くものが在る証拠ではない、の実例。
+
+6. **capability を 1 つも要らない script が、native backend で 1 度も動いたことが
+   なかった**（2026-09-08 実測、kotoba PR #605、main `96c888e1`）。`bin/kbb_shim.cljs`
+   は loader の allow 引数を `(str/join \",\" wire-ids)` で組んでいた。空 policy では
+   これは**空文字列**になるが、`kexe_loader.c` の `parse_allow` が受けるのは wire id の
+   CSV か番兵 `-` の 2 つだけで、空文字列はどちらでもない —— 桁ループが 1 度も回らずに
+   `-1` を返し、`main` は**何も印字せずに** exit 2 する。結果、いちばん最初に書く形
+   （純計算・capability 無し）が `:kbb-shim/loader-failed {:status 2}` で落ちていた。
+   `:auto` も同じで、空集合は `every? native-auto` を満たすので native に行く。
+   **js backend は最初から 42 を返していた** —— native が動かないときに `--backend js`
+   に手を伸ばすと、この破損は別の何かに見える。
+   検査が無かった理由は 8 問目の 1 番と同じ形: `kbb-shim-test` の native ケースは
+   **全て `:fs/app-data` を grant する**ので `wire-ids` が空になったことが 1 度も無く、
+   loader は「何も grant しない」ときにシムが実際に送る引数を見たことがなかった。
+   番兵だけを戻すと新テストは 5 assertion 赤（全て `:kbb-shim/loader-failed` を名指し）、
+   js の assertion は緑のまま。`demo_kbb_fs_read_native` は native で 84 のまま。
+
+## 残作業（bot に引き継ぎ）
+
+1. **kbb capability** — `:data/edn`（**pure-Kotoba reader は capability を要さない**。
+   parse は計算であって authority ではなく、file を読む `:fs/app-data` は既に在る。
+   catalog に足す前にこの経路を検討する）/ `:fs/transact`(19) と `:git/run`(22) は
+   wire id が在るが kit も provider も無い / `:proc/exec`(20) は stdout を返さない /
+   `:fs/browse`(34) は is-directory が無く再帰走査ができない / `:http/fetch` は最後。
+   ⚠ 未確認の divergence 報告あり: **native loader は書き込みを wire 35（読み取り
+   capability）に実装している可能性**（wire 19 ではなく）。着手時に検証する。
+   **（2026-09-08 実測で確定 — これは設計であり事故ではない）**: 書き込みは js host
+   （`bin/kbb_js.cljs`）と native loader（`amu tools/kexe_loader.c
+   fs_app_data_write_provider` = commit 6cca3852、main 済み）の両方が wire 35 /
+   `:fs/app-data` の WRITE_SEP 形式に実装しており、`lib/kbb/fs.kotoba` の header と一致。
+   帰結を明記: **`:fs/app-data` を付与した script は scope 内書き込みも得る**（read/write
+   は分離しない設計）。proc / git / browse / edn の kit と js host provider はこの ADR
+   着地後に全て着地済み（`:data/edn` は `lib/kbb/edn.kotoba` の capability 不要 pure
+   reader が完了、native / js 両 backend で実行可; `:git/run` と `:proc/exec` は
+   `<exit>\n<stdout>` を返す）。`:fs/transact`(19) は引き続き未束縛（kit / provider 無し）。
+   **item 1 で残る gap は `:fs/browse`(34) の is-directory の native 側だけ**（js host + kotoba lib は 2026-09-08、kotoba `b7ab6bee2` で `NAME<TAB>D` へ着地済み）。kotoba `944e250`（jvm-retire 2026-09-08）が shim test で両 host の実測 listing bytes を pin （js=12 / native=6、3 ファイル fixture）: pinned amu の fs_browse_provider（`55e47f90` = amu main）は無いのではなく存在して entry 名しか返さない — native が同じ `NAME<TAB>D` に広げたら native assertion が 12 へ flip し、amu pin 前進と同時に更新する。
+   `:http/fetch` は未着手（設計どおり最後）。
+2. **native loader** — wire 20/33/34 の provider、fuel が compile-time 定数である問題。
+3. **clj-kondo の JVM 撤去** — 検出器いわく最も安い出口。findings を比べること
+   （件数が減ったら変換ではなく無効化）。native `clj-kondo` は現在 PATH に無い。
+4. **jvm-runtime-deps** — 出荷コードが解決する maven 座標。出荷物を JVM に固定している。
+5. **test runner の正直さ** — 残り 1 件 + dead-code 33 件。
+
+## 引き継ぎ先
+
+hermes profile **`jvm-retire`**（`~/.hermes/profiles/jvm-retire`）、cron job
+`cefcbc840801`、schedule `every 60m`、workdir superproject root、deliver local。
+charter は同 profile の `SOUL.md`（この ADR を参照する）。
+
+**実測した落とし穴**: `hermes profile create` が書く config は `model.provider:
+openrouter-free` を書くが `providers:` ブロックを定義しないので最初の agent job は
+必ず落ちる。稼働中 profile（`cron-health`）から `secrets.command` と `providers:` を
+写して修正済み。さらに `hermes` wrapper は `#!/usr/bin/env python3`（system python、
+`openai` 無し）なので**手動 `cron run` は `No module named openai` で落ちる** —
+gateway は `~/.hermes/hermes-agent/venv` を使うので scheduled run は通る。検証は
+venv の python で行う。`croniter` が未インストールのため 5 field cron 式は使えず
+duration 形（`every 1h`）で登録した。
+
+**登録したことも `[active]` であることも、動くことではない。** venv 経由で発火して
+init を越える（`running` に入る）ことまで確認済み。`completed` の記録は未確認。
+
+## 規律（実害で学んだもの）
+
+- JVM-free は exit-127 stub + control で**証明**する。仮定しない。
+- **件数を比べる。** exit status だけを見ない（上記 `defence` / `cloud-murakumo-app`）。
+- 赤くなることを実演してから landed とする。
+- 変換できないものは正直に残す。壊れた build command の方がずっと悪い。
+- `cmd | tail` の `$?` は tail の値。先にファイルへ落として exit を採る。
+- **zsh: `path` を変数名にすると `$PATH` が壊れる**（fetch が黙って no-op になり、
+  stale checkout を正本として読む事故になった）。`${r}:path` は波括弧で閉じる。
+- **1 repo 直すごとに即 merge する。** 2026-09-06 に session limit で 6 agent が同時に
+  死に、まとめて出す予定だった作業を失った（別の 1 体は 15 repo を着地させていたので
+  生き残った）。中断は例外ではなく通常事象として設計する。
+- 削除の前に必ず退避する。`.git/stash-archive-20260906-oshikatsu/`（patch 2 件 +
+  bundle、complete history 検証済み）/ `.git/stash-archive-20260906-orphans/`
+  （`apex` `hume` は GitHub から消滅しており local が唯一の写しの可能性。オーナー判断
+  2026-09-07 により放置）。")))

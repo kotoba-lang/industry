@@ -1,0 +1,26 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608282155-cloud-itonami-regional-classifieds-app")
+  (:adr/title "ADR-2608282155: Cloud Itonami regional classifieds app")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-28")
+  (:adr/last-verified "2026-08-28")
+  (:adr/last_verified "2026-08-28")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "cloud-itonami-regional-classifieds-app")
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/repos (vector "orgs/cloud-itonami/app-classifieds"
+              "orgs/cloud-itonami/fleamarket"
+              "orgs/cloud-itonami/shigotoba"
+              "orgs/cloud-itonami/real-estate"
+              "orgs/cloud-itonami/hc"))
+  (:adr/authoritative-for
+  (vector "app-classifieds is the regional public discovery surface for sale, jobs, housing, and services"
+   "fleamarket, shigotoba, real-estate, and hc retain authority for their domain records and workflows"
+   "localStorage posting is a device-local demonstration until publication, identity, moderation, and reply contracts are connected"))
+  (:adr/body
+  "# ADR-2608282155: Cloud Itonami regional classifieds app\n\n## Context\n\nCloud Itonami already has separate repositories for C2C sale listings (`fleamarket`), jobs (`shigotoba`), housing (`real-estate`), and gig/service listings (`hc`). It did not have one Craigslist-style regional UI that let a person browse those four categories together.\n\n## Decision\n\nCreate `cloud-itonami/app-classifieds` on the role plane. It owns a normalized discovery projection and one public single-page UI. It does not absorb ownership of the four source domains. The first coherent slice provides region/category/text filtering, source-labelled sample projections, SSR-first HTML, and device-local posting with explicit local-only wording. New UI uses `jp-go-digital-design-system` and the shared `--hig-*` token contract.\n\n## Boundaries\n\nNetwork publication, identity, moderation, reporting, replies, applications, contracts, payment, and settlement are not claimed by this slice. They require explicit contracts with the corresponding source repositories. Sample listings are labelled as non-real data.\n\n## Verification\n\nThe child repository passed 8 tests / 44 assertions, deterministic design-quality scoring at 100/100 for both `index.html` and `404.html`, and a headless-browser smoke covering region filter, category filter, text search, dialog opening, device-local posting, and localStorage persistence.\n")))

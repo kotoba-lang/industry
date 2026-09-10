@@ -1,0 +1,157 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607289000-shinshi-84-locales-capability-gated")
+  (:adr/doc_type "adr")
+  (:adr/topic "shinshi-84-locales-capability-gated")
+  (:adr/title "ADR-2607289000: shinshi.club を 17 → 84 言語へ（話者1000万人以上）。ロケールを「モデルが実際に話せること」で門番し、翻訳テーブルをバンドルから外して locale 別遅延取得にする")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-28")
+  (:adr/last_verified "2026-07-28")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "shinshi.club の対応 locale 集合の正本は cljs/src/shinshi/common/lang.cljc。
+    ここに locale を足すことは『そのキャラがその言語で会話する』という約束であり、
+    tools/gate-languages.cljs を通さずに追加してはならない"
+   "UI 翻訳テーブルの配置: cljs/public/i18n/<code>.json（ビルド成果物、
+    tools/gen-i18n-tables.cljs が生成）。コンパイル済みの巨大 map をバンドルに
+    埋め込む方式には戻さない"
+   "新しい静的アセット経路を足したら shinshi.worker.core/asset-request? に必ず
+    登録する。登録漏れは 404 ではなく SPA の HTML を 200 で返すため、呼び出し側が
+    無言で degrade する"))
+  (:adr/context
+  "オーナー指示（2026-07-28）:『もっと人口が多いところ、またマイナー言語にも対応して
+   いってほしい』＋『話者数1000万以上の言語にはどういったのがある?』。
+
+   ## 出発点の歪み
+   対応していたのは ja / en / zh / ko / fr ＋ インド系12言語の計17。つまり
+   **オリヤー語（約3,500万人）は入っていて、スペイン語（5.6億人）が入っていない**。
+   Ethnologue 2026 の上位20言語のうち9つ（スペイン・アラビア・ポルトガル・ロシア・
+   ドイツ・インドネシア・ベトナム・トルコ・タガログ）が未対応だった。
+   1000万人以上の言語は数え方により約90〜100。
+
+   ## 前提: 切替UIに足すこと ≠ 会話できること
+   前日（ADR-2607279500）に直したバグが、まさに『17言語の切替があるのに会話は
+   日本語固定』だった。同じ穴に戻らないために、locale の追加は
+   『モデルが実際にその言語を保持できるか』を実測してから行う必要がある。
+
+   ## 前提: 84 locale はバンドルに載らない
+   翻訳テーブルは shinshi.ui.i18n の巨大な `def` で、16 locale で 66 KB。
+   84 locale では約 350 KB が全訪問者に配信され、各自が使うのは1言語分だけ。")
+  (:adr/decision
+  "## 1. capability gate を作り、通ったものだけ出す（オーナー選択）
+   候補68言語 × 4サンプルを、**本番と同じプロンプト形状**（日本語ペルソナシート＋
+   strict per-turn directive）で実測。合格条件は「空でない・仮名が無い・期待する
+   文字体系である・拒否/メタ発言でない・指示のオウム返しでない・極端に短くない」で、
+   3/4 以上を合格とした。実装は tools/gate-languages.cljs（候補表と endonym/
+   directive メタデータも同ディレクトリに commit）。
+
+   64言語が素で合格。不合格4件のうち**3件はテスト側の欠陥**だった:
+   - **インドネシア語**（2.55億人）と**ジャワ語**（6,900万人）は directive の
+     文言を変えるだけで 4/4 日本語 → 0/4 に反転した。
+   - **セルビア語**はモデルが正しくセルビア語ラテン表記で答えていたのに、
+     判定がキリル文字のみを期待していた（ラテンも正式表記）。
+   本物の不合格は**ヘブライ語のみ**（2日・2文言で 8/8 とも日本語）。除外した。
+   → 67 追加、**合計84 locale**。
+
+   ## 2. 翻訳テーブルをバンドルから出す
+   `public/i18n/<code>.json` に locale 別で分割し、`:locale/set` 時に fetch する
+   （`:i18n-table` として app-db に保持、`(t table key)` は純関数）。
+   `:ja` はテーブル不要（キー自体が日本語）。取得前・取得失敗時は日本語に落ちる。
+   **結果: app.js は 1,285 KB → 1,238 KB と逆に減り**、訪問者が引くのは約 4 KB。
+
+   ## 3. 開幕挨拶を locale に合わせる
+   profile の authored `:greeting` は全1466体とも日本語なので、`:ja` のときだけ
+   使う。他 locale では翻訳済みテンプレート（%s にキャラ名を差し込む）を使う。
+   第一声だけ日本語で以降が選択言語、という不整合を消すため。
+
+   ## 4. 機械的に直せる翻訳の欠陥は、再プロンプトせず機械的に直す
+   - **フラグメントの端の空白**（\" を応援\" はキャラ名の後、\"残り \" は数値の前に
+     連結される）。ko が先頭空白を落として『2B메시지…』になっていた。
+     19 locale・28セルを修復。
+   - **%s プレースホルダ**が `%n` として返った1件を修復。
+   期待値はキー自体から導出するので、テストは列挙した数件ではなく全フラグメントを
+   自動的に覆う。")
+  (:adr/consequences
+  "- **lang.cljc への locale 追加は約束である。** gate を通さずに足すと、
+     『切替はできるが日本語で返る』という前日直したバグが再発する。
+     新しい locale を足す手順は tools/gate-languages.cljs → 合格したら
+     lang.cljc → tools/gen-i18n-tables.cljs（`--keep-dir` で既訳は再利用）。
+   - **directive の文言は load-bearing。** 期待した言語が gate に落ちたら、
+     モデルの限界と結論する前に directive を書き換えて再測する
+     （インドネシア語は文言だけで 4/4 → 0/4 に変わった）。
+   - **静的アセット経路の登録漏れは無言で壊れる。** `/i18n/` を
+     asset-request? に入れ忘れると SPA の HTML が 200 で返り、
+     load-table! が degrade する。core_test でこの不変条件を固定した。
+   - 翻訳はすべて murakumo（murakumo-main）による機械翻訳で、低資源言語ほど
+     品質は落ちる。誤りを見つけたら該当 locale の JSON の1セルを直す
+     （生成器は `--keep-dir` で既存訳を上書きしない）。
+   - **UI 翻訳が入ったのは nav と chat 画面だけ**（76キー）。残り30画面は
+     依然として日本語ベタ書きで、84 locale はその2面にしか効かない。
+     次に効くのは actress 一覧と video 系。
+   - ヘブライ語は roster に無いので `/i18n/he.json` は 404 になる。これは
+     正しい状態（切替に出ないので誰も要求しない）。")
+  (:adr/evidence
+  "実測（2026-07-28、本番 shinshi.club / infer.murakumo.cloud）:
+   - capability gate: 候補68 × 4サンプル → 64 合格。
+     救済後の最終: 67 合格 / 1 除外（he）。
+   - he の除外根拠: 2026-07-27 に3サンプル、07-28 に2文言×4サンプル、
+     いずれも 100% 日本語で返答。
+   - id の救済: directive `Jawab hanya dalam bahasa Indonesia.` → 3-4/4 日本語、
+     `Kamu harus menjawab dalam Bahasa Indonesia saja.` → 0/4。
+   - バンドル: app.js 1,285 KB → 1,238 KB（-47 KB）。
+     翻訳テーブル総量 463 KB / 84 ファイル、1 訪問者あたり約 4 KB。
+   - 本番配信: 84 locale 全てを取得し、83 が 76 キー、ja が空（設計どおり）、
+     失敗 0。※deploy 直後は edge 伝播途中で ar/sw/zh-tw が SPA の HTML を
+     返したが、伝播後は正常（前日と同じ罠 — deploy 直後の計測は取り直す）。
+   - 会話言語: es/pt/ar/ru/de/id/vi/tr/it/th/pl/uk/sw/yue/zh-tw/fa/am/km の
+     18 locale × 2サンプルで日本語混入 0/2。yue は繁体字＋広東語助詞
+     （我係・同・但會）、zh-tw は繁体字で返答。
+   - テスト: 103 tests / 2,434 assertions、0 failures 0 errors。
+   - 話者数の出典: Ethnologue 2026（Wikipedia の集計表経由）。")
+  (:adr/amendment_20260728
+  "**追記（同日、オーナー指摘『kotoba-lang/i18n は活用できている?』）: 活用できていなかった。**
+   ワークスペースに既に `orgs/kotoba-lang/i18n`（portable .cljc、message catalog、
+   CLDR-lite 複数形、言語レジストリ、etzhayyim TM ブリッジ、re-frame/reagent seam）が
+   あるのに確認せず並行実装した。CLAUDE.md が BMC の節で戒めている『新しく作る前に
+   既存の共有システムを確認する』の再発。
+
+   **そして、それが防げたはずのバグを実際に出荷していた。** `rtl?` が
+   `(= :ur ...)` のままで、17言語時代は正しかったが、前日 ar / fa / ps / sd / ks /
+   ug / bal を追加した時点で**7つのアラビア文字系言語が左から右で表示**されていた。
+   `i18n.registry` は最初からこの dir メタデータを持っていた。
+
+   対応（同日）:
+   - `i18n.core` / `i18n.plural` / `i18n.registry` を vendor（zero-dep、
+     treasury/core.cljc と同じ理由と同じヘッダ規約）。
+   - **vendor しないもの**: `i18n.messages`（`defmessages`/`embed-catalog` は
+     カタログを**コンパイル時に埋め込む**ので、84 locale ではまさに本 ADR が
+     避けた ~350 KB 問題になる。`register!` による runtime 登録を使う —
+     ライブラリ側も `set-locale!` の docstring で非同期到着を明示的に許容している）、
+     `i18n.re-frame` / `i18n.reagent`（`shitsuke` に依存。本 app は re-frame /
+     reagent を直接使っており seam は既にある）。
+   - 各 locale が自分の `:dir` を持ち、`lang-test` が registry の知る32 locale
+     について照合する（新しい RTL locale を誤った :dir で足すとビルドが落ちる）。
+   - `i18n.core` の補間が手に入ったので、**連結フラグメントを廃止**した。
+     `\" を応援\"` / `\"残り \"` は「文中に値を差し込む手段が無かった」ためだけに
+     存在し、翻訳者が端の空白を保つことに依存して壊れていた。
+     `\"{name} を応援\"` / `\"残り {n} units\"` に置き換え、バグの分類ごと消した
+     （実測: スペイン語は `Apoyar a {name}`、呉語は `支持侬，{name}` と
+     語順が動く。連結では表現できない）。
+   - `tools/i18n-lint.cljs` を追加。**compile-time key check では捕まらない失敗**
+     ——view に置き去りにされた日本語リテラル（84 locale 全部で日本語のまま出る）
+     ——を検出する。現在値: wrapped 40 / render 位置に未 wrap 707 /
+     top-level def 内 940。
+
+   **残作業（未着手）**: 上記 1,647 リテラルの wrap と翻訳。top-level def 内の
+   940 は「定義側で wrap すると catalog 到着前に評価され日本語で固まる」ため、
+   使用箇所で翻訳する必要がある（top_nav の nav items が既にその形）。")
+  (:adr/refs
+  (vector "orgs/jk-luxury/club-shinshi-app/appview/ai-gftd-wasm-shinshi-sh1n5h1x/cljs/src/shinshi/common/lang.cljc"
+   "orgs/jk-luxury/club-shinshi-app/appview/ai-gftd-wasm-shinshi-sh1n5h1x/cljs/src/shinshi/ui/i18n.cljs"
+   "orgs/jk-luxury/club-shinshi-app/appview/ai-gftd-wasm-shinshi-sh1n5h1x/tools/gate-languages.cljs"
+   "orgs/jk-luxury/club-shinshi-app/appview/ai-gftd-wasm-shinshi-sh1n5h1x/tools/gen-i18n-tables.cljs"
+   "ADR-2607279500（前日: chat の persona / slug parser / 返信言語の修正。本 ADR はその続き）"
+   "ADR-2607173100（murakumo-main alias — concrete model id を焼かない）"
+   "orgs/kotoba-lang/i18n（本 ADR が当初見落としていた既存ライブラリ。pin 277cb404）"
+   "orgs/jk-luxury/club-shinshi-app/.../cljs/src/i18n/（vendor した core/plural/registry）"
+   "orgs/jk-luxury/club-shinshi-app/.../tools/i18n-lint.cljs"))))

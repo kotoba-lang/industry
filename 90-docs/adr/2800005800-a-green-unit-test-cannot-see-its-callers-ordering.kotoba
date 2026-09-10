@@ -1,0 +1,121 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800005800-a-green-unit-test-cannot-see-its-callers-ordering")
+  (:adr/title "全部緑のまま本番で 503 を出した —— 純関数のテストは、呼び出し側の並び順に埋まっている制約を見られない。そして実測を記録した docstring は、引用した一文ではなく段落全体が根拠である")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/repos (vector "com-junkawasaki/root" "network-awai/cloud-murakumo-api"))
+  (:adr/related (vector "adr-2608136000-six-questions-before-trusting-green"
+                "adr-2800005600-gpu-supplier-selection-is-decided-by-rights"
+                "adr-2608319200-murakumo-as-an-openrouter-provider-four-answers-or-no-offer"))
+  (:adr/body
+  "## Context
+
+`api.murakumo.cloud` の router に「測って満杯の head を後ろへ回す」変更を入れ、
+本番に出した。**8 並列のうち 3 本が 503 になった。**
+
+| | 8 並列の最大 | 503 |
+|---|---|---|
+| 変更前 | 31.5 秒 | 0 |
+| **私の変更後** | **51.1 秒** | **3 本** |
+| 修正後 | 3.71 秒 | 0 |
+
+503 は遅い 200 より悪い —— aggregator は provider の失敗として数える
+（adr-2608319200 の uptime）。
+
+## 出す前に緑だったもの
+
+- `demote-busy-endpoints` の 5 ケースを**両方向**で検証（leader 据え置き /
+  満杯だけ後退 / 未測定は据え置き / configured 0 は未測定 / 全部満杯なら原順）
+- **破壊テスト**: 壊すと名指しで FAIL、戻すと byte 一致
+- 283 tests / 1465 assertions、失敗は無改変 main と同じ 1 件のみ
+- clj-kondo errors 0、指摘はベースラインと完全一致
+- release gate ok:true、他 5 段の test すべて exit 0
+
+**adr-2608136000 の 6 問はすべて満たしていた。** それでも落ちた。
+
+## 原因 —— 同じ段落の 3 行上
+
+`weighted-main-pool-order` の docstring:
+
+```
+Rotating leaders also split the llama.cpp prefix cache: a resident bot's
+~18k-token transcript re-evaluated from zero (~83 s on gad) every time the
+leader changed, and hit the cache (7--13 s total) when it did not.
+```
+
+私はこの一文を**引用して**、「だから空き順ソートにはせず、満杯の head だけ
+後ろへ回す」と設計を決めた。**同じ段落の 3 行上にこれがあった:**
+
+```
+Xavier is materially slower than either fast peer (2.6 tok/s and 37-44s
+public latency under the 2026-08-29 concurrency probe). Trying it between
+B70 and gad turned healthy overflow into a latency regression.
+```
+
+私の demote は busy な b70 を xavier の後ろへ回す。**遅い head を速い head の
+前に出す** —— 前任者が実測し、設計で排除した退行そのものである。47〜51 秒は
+xavier の 37-44 秒 + オーバーヘッドで、503 は非ストリーミング timeout の超過。
+
+**実測を記録した docstring は、引用した一文ではなく段落全体が根拠である。**
+片方を設計の根拠として使い、同じ段落のもう片方を同じ変更で破った。
+
+## なぜテストが捕まえられなかったか（本 ADR の中心）
+
+`demote-busy-endpoints` は `(candidates, availability) -> candidates` の純関数
+である。**速度は入力に無い。** したがって
+
+> この関数のどんなテストも「busy な b70 は idle な xavier より良い」を
+> 表現できない。関数がその概念を持っていないから。
+
+欠陥は関数の中ではなく**呼び出し側の並び順**にあった。`main-pool-endpoints`
+が組む列は、末尾が「意図的に遅い最後の手段」である。その列を並べ替える関数は、
+**なぜその順序なのかを知らないまま並べ替えた。**
+
+一般形:
+
+> **純関数を単体で緑にしても、呼び出し側の並び順に埋め込まれた制約は見えない。**
+> 誰かが意図して並べた列を並べ替えるなら、その意図を先に読む。
+
+これは adr-2608136000 の 6 問の**外側**にある。6 問は「その検査は両方向を出した
+か / 入力が無いとき何を返すか」を訊く。今回はどれも通っていた。抜けていたのは
+**検査の対象が正しいか**であって、検査の質ではない。
+
+## Decision
+
+**D1. 意図的に順序付けられた列を並べ替える変更は、その順序の根拠を
+docstring/ADR から読み、テストに写す。** 修正では `main-pool-endpoints` が
+fast peer の中だけで demote し、xavier を末尾に固定する。新 deftest
+`a-busy-fast-head-still-beats-an-idle-slow-one` が「busy な速い head は
+idle な遅い head より前」を固定した（壊すと名指しで FAIL、戻すと byte 一致）。
+
+**D2. 実測を引用するときは段落を読む。** 一文だけを設計の根拠にしない。
+docstring に測定値が並んでいるのは、それぞれが別の制約だからである。
+
+**D3. deploy の後に測る。測るまで成功と呼ばない。** 今回それを見つけたのは
+デプロイ後の 8 並列だけで、緑の CI でも release gate でもなかった。
+adr-2608170300 以降 routine は JVM-free で deploy が軽いので、
+**deploy 後の実測を手順に含める**代償は小さい。
+
+## Consequences
+
+(+) 「全部緑で本番が落ちる」形が 1 つ具体化した。テストの質ではなく
+    **テストの対象**が外れる形として。
+
+(+) 修正後は 8 並列の最大が 3.71 秒（変更前 31.5 秒）。ただし
+    **これは私の変更単独の成果ではない** —— 同時期に別セッションが
+    `messages-route` の else 分岐欠落（非ストリーミングが nil を返していた）と
+    `vpc-fetch` の `.catch` 誤配置を直しており、デプロイした `ac7bca1` は
+    両方を含む。**寄与は分離していない。**
+
+(-) 本番が退行したまま約 1 時間動いた。ビルド枠の競合で修正の出荷に
+    時間がかかった。**戻すのも直すのもビルド 1 周**だったので直す方を選んだが、
+    その判断は「1 周がどれだけかかるか」に依存しており、今回は運が良かった。
+
+(?) **危うく他セッションの修正を巻き戻すところだった。** 修正の artifact を
+    出そうとしたら merge conflict になり、確認すると main は 4 commit 進み、
+    しかも**私の修正を含んだ artifact が既に再生成されていた**。自分の artifact
+    を押し込んでいれば、相手の 2 つの修正が消えていた（CLAUDE.md が記録する
+    kotobase.net の signup funnel 事故と同型）。
+    **conflict は事故ではなく、事故を止めた検査だった。**")))

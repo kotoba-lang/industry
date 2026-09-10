@@ -1,0 +1,241 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608313400-yata-on-x402-must-be-sold-in-bulk")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "yata-on-x402-sku-shape")
+  (:adr/title "ADR-2608313400: YATA を x402 に載せるのに『価格つきの PUT を足す』はできない —— 4 MiB を 5 年保管しても $0.0018 で、read 1 回より安い。売るならまとめてで、書き込みの門は CACAO のまま残す")
+  (:adr/status "superseded")
+  (:adr/superseded_by (vector "adr-2608313700-yata-one-design-account-is-derived-not-issued"))
+  (:adr/superseded_note "まとめ売りの算数はここで出たが、残していた identity の問いが導出で解けたので設計 1 本に畳んだ。本文は git が持つ。")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/network-awai/net-kotobase"))
+
+  (:adr/authoritative_for
+  (vector "ADR-2608291009 実装順 step 3 の形。『kotobase の priced-resources に価格つきの write path を足す』ではないこと"
+   "1 回払いで 1 オブジェクトの保管を売ると取引額が決済コストを下回ること（測定値つき）"
+   "YATA を売るなら **まとめ売り**であること。$8.00 = 1 TB月、$1.00 = 128 GB月"
+   "**書き込みの門は CACAO のまま**であること。x402 の支払いは購入であって、他人のグラフを変える権限ではない"
+   "残っている決定が『どの口座に YATA を入れるか』であり、それが capability の決定として owner に属すること"))
+
+  (:adr/amends
+  (vector "90-docs/adr/2608291009-bot-kumo-yata-three-unit-economy.edn —— 実装順 step 3 を『x402 に載せる』から『まとめ売りの SKU を作る』へ具体化する。D3 の膜（fiat/USDC → YATA 一方向 mint）は不変"
+   "90-docs/adr/2608048000-kotobase-storage-consensus-payment-integration-and-tokenless-chain.edn —— 名指しした穴（保管を買う経路が無い）が per-request では塞げないことを追記する"))
+
+  (:adr/related
+  (vector "90-docs/adr/2608313100-yata-posted-price-resale-basis.edn（掲示 800 credits/TB月 の出所）"
+   "90-docs/adr/2608150100-credits-as-a-second-x402-rail.edn（先に塞ぐべき 2 つの穴。accepted 済み）"))
+
+  (:adr/measured
+  (vector "ADR-2608150100 が『先に塞げ』と言った 2 つの穴（`/infer/transfer` の未認証、CACAO `resources` による to/amount の scope 化 + nonce 単回）は **accepted 済みで塞がっている**。step 3 の前提条件は満たされている"
+   "`kotobase.x402-offer/priced-resources` の docstring が明記: **Reads only, deliberately. Writes stay CACAO-gated.** そして『ここに write path を足すのは pricing ではなく capability の決定』"
+   "`kotobase.archive-put/parse-raw-cid` は CID の digest と body の sha256 の一致を検証する。**したがって PUT は CAS 挿入であって他人のグラフの変更ではない** —— docstring が警告している『誰かのグラフを変える』には当たらない"
+   "掲示 $8.00/TB月 = **$0.0078125/GB月**（ADR-2608313100）"
+   "1 回払いで 1 オブジェクトを売った場合: 4 MiB x 1 か月 = **$0.0000305** / 4 MiB x 12 か月 = **$0.000366** / 4 MiB x 60 か月 = **$0.00183** / 1 MiB x 60 か月 = $0.000458"
+   "比較対象: kotobase の現行 SKU は `/x402/ipfs` **$0.001**・`/x402/xrpc` **$0.002**。Base の 1 トランザクションの gas も $0.001 オーダー"
+   "まとめ売りの粒度: **$0.01 = 1.28 GB月 / $1.00 = 128 GB月 / $8.00 = 1 TB月**"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-31）「do it」—— ADR-2608291009 実装順 step 3、YATA を x402 に載せる。
+掲示価格は ADR-2608313100 で決まり、ADR-2608150100 が先に塞げと言った 2 つの穴も
+accepted 済みなので、前提条件は満たされている。
+
+**素直にやろうとすると 2 つの壁に当たる。どちらも実測で確認した。**")
+
+  (:adr/decision
+  "### D1. 『価格つきの write path を足す』はしない —— ただし理由は 2 つあり、片方は誤解である
+
+`kotobase.x402-offer/priced-resources` の docstring はこう書いている:
+
+> Reads only, deliberately. Writes stay CACAO-gated: payment replaces the tenant
+> credential on the anonymous read plane, but it is not an authorization to
+> mutate someone's graph. **Adding a write path here would be a capability
+> decision, not a pricing one.**
+
+**この警告が守っているのは「他人のグラフを変えられてしまうこと」である。**
+そして `PUT /ipfs/:cid` はそれに当たらない —— `archive-put/parse-raw-cid` が
+**CID の digest と body の sha256 の一致を検証する**ので、内容がアドレスを決める。
+同じ CID に別の内容は置けず、誰かの状態を書き換えることもできない。CAS への
+冪等な挿入であって、mutation ではない。
+
+**したがって「PUT は書き込みだから売れない」は誤解である。**
+売れない本当の理由は D2 の算数の方である。
+
+### D2. 1 回払いで保管を売ると、取引が決済より小さくなる
+
+保管は**時間あたり**、x402 は**要求あたり**。1 回の支払いで何を買うのかを決めないと
+載らない。オブジェクト単位で決めると、こうなる:
+
+| 売るもの | 価格 |
+|---|---|
+| 4 MiB を 1 か月 | **$0.0000305** |
+| 4 MiB を 12 か月 | $0.000366 |
+| **4 MiB を 60 か月（5 年）** | **$0.00183** |
+
+比較:
+
+| | |
+|---|---|
+| `/x402/ipfs` の read 1 回 | $0.001 |
+| `/x402/xrpc` の query 1 回 | $0.002 |
+| Base の 1 tx の gas | $0.001 オーダー |
+
+**4 MiB を 5 年保管する権利が、read 1 回とほぼ同値である。** 決済のコストが
+商品の価格と同じ桁なので、per-object の SKU は経済的に成立しない。
+
+これは掲示価格が安すぎるのではない —— **$8.00/TB月 は B2 の 1.151 倍**であって、
+安いのは価格ではなく**4 MiB という粒度**である。
+
+### D3. 売るならまとめて。$8.00 = 1 TB月
+
+| 支払い | 買えるもの |
+|---|---|
+| $0.01 | 1.28 GB月 |
+| $1.00 | 128 GB月 |
+| **$8.00** | **1 TB月** |
+
+$1〜$8 なら決済コストに対して十分大きい。**したがって step 3 の SKU は
+『まとめて YATA を買う』であって『1 オブジェクトの保管を買う』ではない。**
+
+これは ADR-2608291009 D3 の膜の `fiat/USDC → YATA（一方向 mint）`
+そのものであり、新しい経路ではない —— **膜が最初からそう書いていた**のを、
+今日の算数が追認した。
+
+### D4. 書き込みの門は CACAO のまま
+
+まとめ売りにすると、**支払いと書き込みが分離する**:
+
+```
+支払い（x402、USDC）  →  YATA が口座に入る      ← 購入。誰のグラフも変えない
+書き込み（CACAO）     →  YATA を消費して置く    ← 権限。門は今までどおり
+```
+
+D1 のとおり CAS 挿入は mutation ではないが、**分離しておく方が良い** ——
+`priced-resources` の不変条件（支払いは read plane の tenant credential を
+置き換えるが、mutation の権限にはならない）を 1 バイトも触らずに済む。
+
+### D5. 残っている決定は 1 つ。それは capability の決定なので owner に属する
+
+**買った YATA を、どの口座に入れるのか。**
+
+x402 の read plane は明示的に *no account* である（`priced-resources` の docstring）。
+まとめ売りは残高を持つので、**identity が要る**。素直な候補は支払った EVM アドレスを
+そのまま口座にすることだが、それは
+
+- 匿名の read plane に、初めて**持続する identity** を持ち込む
+- その identity は EVM アドレスであって、台帳の既存の口座（`did:key:…`）と別系統
+
+**これは価格の決定ではなく capability の決定である**（`priced-resources` の
+docstring が引いている線の、まさにそちら側）。agent は決めない。
+
+**したがって本 ADR は step 3 を『設計まで』で止める。** 実装は identity の決定の後。
+決済を受け取る本番エンドポイントを、口座の決め方が未定のまま deploy しない。")
+
+  (:adr/implementation
+  (vector "landed: scripts/yata-cost-model.cljs に SKU 粒度の算数を追記（per-object の価格・現行 SKU との比較・まとめ売りの粒度）"
+   "landed: 本 ADR"
+   "not-done-deliberately: `priced-resources` への entry 追加。D5 の identity 決定が先"
+   "not-done-deliberately: 本番 Worker への deploy。決済を受け取る面を、買ったものがどこに入るか未定のまま公開しない"
+   "not-done-deliberately: YATA を `accepts` の 4 番目のレールにすること（ADR-2608291009 D8-1）。KUMO と違い、保管の単位で read を払う意味が確認できていない —— D8-1 は 4 レールを並べると書いているが、その 4 つ目が何を買う経路なのかは書いていない"))
+
+  (:adr/known-gaps
+  (vector "**identity の決定が未了**（D5）。これが step 3 の唯一の残作業であり、agent の領域ではない"
+   "**YATA を `accepts` に載せる意味を確認していない。** ADR-2608291009 D8-1 は USDC / BOT / KUMO / YATA の 4 レールを並べると書くが、KUMO（演算）で query を払うのは自然な一方、YATA（保管）で read を払うのが何を意味するかは同 ADR に書かれていない。**書いてあるから実装する、はしない**"
+   "**保管の実測をしていない。** kotobase が今いくつの GB月 を実際に保持しているかを測っていないので、まとめ売りの最小単位（$1 = 128 GB月）が現実の需要に対して大きいのか小さいのか分からない"
+   "per-object が成立しないという結論は **4 MiB の上限**に依存する。上限が上がれば粒度も変わる（40 MiB なら 5 年で $0.018）。上限そのものは protocol の制約なので動かしていない"))
+
+  (:adr/open-decisions
+  (vector "買った YATA をどの口座に入れるか（D5）。支払った EVM アドレスを口座にするか、既存の did:key 口座に結びつけるか"
+   "まとめ売りの最小単位（$1 = 128 GB月 か、もっと小さくするか）"
+   "YATA を `accepts` の 4 番目のレールにするか（D8-1 の記述の意味を確定してから）"))
+
+  (:adr/body
+  "# ADR-2608313400: 保管はまとめてしか売れない
+
+## 一行で
+
+**4 MiB を 5 年保管する権利が、read 1 回より安い。** だから per-object では売れない。
+
+## 素直にやろうとして、2 つの壁に当たった
+
+### 1 つ目は誤解だった
+
+`priced-resources` の docstring が『write path を足すのは pricing ではなく
+capability の決定』と警告している。保管を売るのは書き込みだから、ここで止まる —— と
+一度は読んだ。
+
+**が、その警告が守っているのは『他人のグラフを変えられること』である。**
+`PUT /ipfs/:cid` は `archive-put/parse-raw-cid` が **CID の digest と body の
+sha256 の一致を検証する**ので、内容がアドレスを決める。同じ CID に別の内容は置けず、
+誰の状態も書き換えられない。**CAS への冪等な挿入であって mutation ではない。**
+
+読んで確かめずに『書き込みだから危ない』で止まっていたら、正しい理由ではなく
+**もっともらしい理由**で止まっていた。
+
+### 2 つ目が本物
+
+保管は**時間あたり**、x402 は**要求あたり**。1 回の支払いで何を買うのかを決めないと
+載らない。オブジェクト単位で決めると:
+
+```
+4 MiB x  1 か月  $0.0000305
+4 MiB x 12 か月  $0.000366
+4 MiB x 60 か月  $0.00183     ← 5 年
+```
+
+現行の SKU は read が $0.001、query が $0.002。Base の gas も $0.001 オーダー。
+
+**5 年分の保管が、read 1 回とほぼ同じ値段になる。** 決済のコストと商品の価格が
+同じ桁なので、per-object では成立しない。
+
+**価格が安すぎるのではない** —— $8.00/TB月 は B2 の 1.151 倍である。
+安いのは**4 MiB という粒度**の方。
+
+## 答えは膜が最初から書いていた
+
+```
+$0.01 =   1.28 GB月
+$1.00 = 128    GB月
+$8.00 =   1    TB月
+```
+
+まとめて売る。そしてこれは ADR-2608291009 D3 の膜の
+`fiat/USDC → YATA（一方向 mint）` そのもので、**新しい経路ではない**。
+今日の算数がそれを追認しただけである。
+
+まとめ売りにすると支払いと書き込みが自然に分離する:
+
+```
+支払い（x402、USDC） → YATA が口座に入る    購入。誰のグラフも変えない
+書き込み（CACAO）    → YATA を消費して置く  権限。門は今までどおり
+```
+
+D1 のとおり CAS 挿入は mutation ではないが、分離しておけば
+`priced-resources` の不変条件を 1 バイトも触らずに済む。
+
+## 止めた場所と、その理由
+
+残っているのは 1 つだけ —— **買った YATA をどの口座に入れるか**。
+
+x402 の read plane は明示的に *no account* である。まとめ売りは残高を持つので
+identity が要る。素直な候補は支払った EVM アドレスをそのまま口座にすることだが、
+それは匿名の read plane に初めて**持続する identity** を持ち込むことであり、
+しかもその identity は台帳の既存口座（`did:key:…`）と別系統になる。
+
+**これは価格の決定ではなく capability の決定である** —— `priced-resources` の
+docstring が引いている線の、まさにそちら側。
+
+だから設計まででいったん止める。**決済を受け取る本番エンドポイントを、
+買ったものがどこに入るか未定のまま deploy しない。**
+
+## 書いてあるから実装する、はしない
+
+ADR-2608291009 D8-1 は `accepts` に USDC / BOT / KUMO / YATA の 4 レールを
+並べると書いている。KUMO（演算）で query を払うのは自然だが、
+**YATA（保管）で read を払うのが何を意味するのかは同 ADR に書かれていない。**
+
+意味を確認せずに 4 番目を足すと、announce だけがあって誰も使えないレールになる。
+known-gap に置いて、意味が決まってから足す。")))

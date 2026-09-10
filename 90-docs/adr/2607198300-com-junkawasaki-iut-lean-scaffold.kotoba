@@ -1,0 +1,137 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607198300-com-junkawasaki-iut-lean-scaffold")
+  (:adr/title "ADR-2607198300: iut-lean — independent Lean 4 formalization of anabelian geometry / IUT under com-junkawasaki")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "com-junkawasaki-iut-lean-scaffold")
+  (:adr/authoritative-for (vector "placement and purpose of orgs/com-junkawasaki/iut-lean"
+                          "the from-scratch (not-a-fork) relationship of iut-lean to LANA/anabelian.org"
+                          "toolchain-pin-to-mathlib4 approach for this project's lean-toolchain"))
+  (:adr/related (vector "adr-2606302300-org-taxonomy-4-orgs"
+                "orgs/com-junkawasaki/iut-lean"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/body "
+# ADR-2607198300: iut-lean — independent Lean 4 formalization of anabelian geometry / IUT under com-junkawasaki
+
+**Status**: accepted
+**Date**: 2026-07-19
+**Deciders**: Jun Kawasaki
+**Scope**: new repo `com-junkawasaki/iut-lean` (public); depends on the
+ADR-2606302300 taxonomy amendment landed alongside this ADR.
+
+## Context
+
+The owner asked to start an independent, from-scratch Lean 4 formalization
+project targeting anabelian geometry and inter-universal Teichmüller theory
+(IUT) — Shinichi Mochizuki's claimed proof of the ABC conjecture — inspired
+by, but not a fork of, the RIMS \"LANA\" initiative (a project associated
+with Mochizuki, Johan Commelin, and Adam Topaz). Research prior to this ADR
+confirmed LANA's official site, `anabelian.org`, is currently only a stub
+with no public repository or code released, so there is no upstream to fork
+from; this project is necessarily an independent, original effort built on
+`mathlib4`.
+
+Two placement decisions were made by the owner before this ADR was written
+(recorded here, not re-litigated):
+
+1. **Org**: `com-junkawasaki`, **public** visibility.
+2. **Repo name**: `iut-lean` was tried first via `gh repo view` and found
+   free, so it was used (the planned fallbacks, `iut-formalization` and
+   `abc-iut-lean`, were not needed).
+
+Placing this repo in `com-junkawasaki` required first correcting
+ADR-2606302300 (org taxonomy, status `proposed` at the time — directly
+amendable per the CLAUDE.md draft-amendment exception), whose org-taxonomy
+table scoped `com-junkawasaki`'s end-state to \"cloud + data only\" following
+the 2026-06-30 kotoba-lang `-clj` migration decision. That scope did not
+account for Jun Kawasaki's personal/private research projects that are
+neither cloud/data infrastructure nor a `kotoba-lang` library, `etzhayyim`
+public-interest agent, or `gftdcojp` commercial product. The amendment
+(applied as a separate commit immediately before this ADR) widens
+`com-junkawasaki`'s end-state to \"cloud + data + Jun Kawasaki
+personal/private research projects\" and records a dated Amendment section
+in ADR-2606302300 itself, so `iut-lean` has a taxonomy-consistent home.
+
+## Decision
+
+1. **Create `com-junkawasaki/iut-lean`** (public) as a from-scratch Lean 4 +
+   mathlib4 scaffold — no forked code, since LANA has published none.
+2. **Scaffold contents** (original files, not copied from any LANA source):
+   - `lakefile.lean` — package `iut-lean`, `require mathlib from git
+     \"https://github.com/leanprover-community/mathlib4\"`, default target
+     `lean_lib IutLean`.
+   - `lean-toolchain` — pinned to the exact string fetched live from
+     `https://raw.githubusercontent.com/leanprover-community/mathlib4/master/lean-toolchain`
+     at scaffold time (`leanprover/lean4:v4.33.0-rc1`), rather than a
+     guessed version, so the project tracks whatever Lean version mathlib4
+     currently requires. This pin will drift as mathlib4 advances; keeping
+     it in sync is a manual follow-up, not automated by this ADR.
+   - `IutLean/Basic.lean` — a single import-free placeholder file (one
+     `decide`-checked arithmetic example) with no anabelian-geometry or IUT
+     content yet, chosen so it can be type-checked without first resolving
+     the `mathlib4` dependency via `lake update`.
+   - `.gitignore` — Lean/Lake entries (`.lake/`, `build`, `.cache`,
+     `.DS_Store`) sourced from mathlib4's own `.gitignore` rather than
+     guessed.
+   - `README.md` — states the project's purpose and goals, explicitly
+     disclaims affiliation with or forking from LANA, and is honest that
+     `lake update`/`lake build` have not been run or verified in this
+     scaffolding pass.
+3. **Build verification status**: neither `lake` nor `elan` were installed
+   in the environment that created this scaffold (`which lake` / `which
+   elan` both failed), so `lake update && lake build` was **not attempted**.
+   This is recorded honestly rather than claimed as verified; getting a
+   clean build (which requires fetching all of `mathlib4`, a very large
+   repository) is an explicit follow-up.
+4. **Manifest registration**: `orgs/com-junkawasaki/iut-lean` was added to
+   `:manifest.repos/extra-projects` in `manifest/repos.edn`, and
+   `manifest/west.yml` was regenerated for this single entry via
+   `nbb scripts/gen-west-manifest.cljs --entry iut-lean` (minimal
+   single-entry diff, not a wholesale regeneration), pinning to the pushed
+   `main` HEAD of the new repo.
+
+## Consequences
+
+- `com-junkawasaki` now has an accepted taxonomy basis (via the
+  ADR-2606302300 amendment) for personal/private research repos in addition
+  to cloud+data infrastructure, so future similar projects do not need to
+  force-fit into `kotoba-lang`/`etzhayyim`/`gftdcojp`.
+- `iut-lean` currently contains zero mathematical content — this ADR
+  records the decision to start and the scaffold shape, not any progress on
+  anabelian geometry or IUT formalization itself.
+- Follow-up work (not covered by this ADR): running `lake update`/`lake
+  build` to verify the scaffold actually compiles against current mathlib4;
+  choosing a license; beginning actual formalization content; monitoring
+  `anabelian.org` in case LANA publishes code that this project may want to
+  align terminology/scope with (with no obligation to do so, since this
+  project is independent).
+
+## Rejected alternatives
+
+1. **Fork or vendor LANA's code.** Not possible — LANA has no public
+   repository to fork; `anabelian.org` is a stub.
+2. **Place the repo in `kotoba-lang` (library axis) or `gftdcojp`
+   (commercial product axis).** Rejected — this is Jun Kawasaki's personal
+   research project, not a language/infra library and not a commercial
+   product; it fits the newly-amended `com-junkawasaki` personal-research
+   scope instead.
+3. **Guess a Lean toolchain version.** Rejected — mathlib4's required
+   toolchain changes over time; the live-fetched `lean-toolchain` from
+   mathlib4 `master` is authoritative and avoids a stale guess.
+
+## References
+
+- ADR-2606302300 (org taxonomy, 4 orgs) — amended alongside this ADR to
+  widen `com-junkawasaki`'s scope.
+- `orgs/com-junkawasaki/iut-lean` — the new repo (public,
+  `https://github.com/com-junkawasaki/iut-lean`).
+- `https://raw.githubusercontent.com/leanprover-community/mathlib4/master/lean-toolchain`
+  and `.../mathlib4/master/.gitignore` — fetched live at scaffold time for
+  the toolchain pin and `.gitignore` entries respectively.")))

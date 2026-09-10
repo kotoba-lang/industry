@@ -1,0 +1,71 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607196900-kotoba-postgresql-pool-session-reset")
+  (:adr/title "ADR-2607196900: PostgreSQL pool-return session reset")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19")
+  (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for (vector "PostgreSQL connection pool return reset invariant"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/pg_pool_reset_consumer.kotoba"
+   "orgs/kotoba-lang/kototama/src/kototama/linker.clj"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"))
+  (:adr/supersedes (vector "adr-2607196800-kotoba-postgresql-bounded-batch-pipeline"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:operation "pg_session_reset")
+   (:sequence (vector "ROLLBACK" "DISCARD ALL"))
+   (:required-final-state "I")
+   (:clears (vector :open-transaction :portals :prepared-statements :temporary-tables
+            :session-settings :listen-channels :advisory-locks :cached-plans))
+   (:response-additions (vector :bounded-notice-response :bounded-parameter-status))
+   (:failure-policy :do-not-return-channel-to-idle-pool)
+   (:released-server (map (:product :postgresql) (:version "14.19")
+                     (:dirty-setting "application_name")
+                     (:dirty-temp-table "pool_dirty")
+                     (:dirty-statement "dirty_stmt")
+                     (:transaction-rolled-back true) (:reused true)))
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:postgresql-interop")
+     (:result "rollback/discard; settings/temp/statement cleared; reuse; exit 0"))
+    (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:test")
+     (:result "bounded NoticeResponse and ParameterStatus parser coverage; exit 0"))))))
+  (:adr/body
+  "# ADR-2607196900: PostgreSQL pool-return session reset
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+Every reusable PostgreSQL channel must pass `pg_session_reset` before it may be
+returned to an idle pool. The `.kotoba` provider first issues ROLLBACK and
+drains ReadyForQuery, then issues DISCARD ALL and again drains ReadyForQuery.
+Either protocol, SQLSTATE or framing failure makes the channel ineligible for
+reuse and the pool must close it.
+
+The query response parser admits bounded NoticeResponse and ParameterStatus
+messages because ROLLBACK outside a transaction and DISCARD-induced setting
+changes may emit them. Both reuse the existing exact field/status validators;
+they do not broaden accepted arbitrary server messages.
+
+## Evidence
+
+Released PostgreSQL 14.19 qualification dirties application_name, creates a
+temporary table and named prepared statement, opens a transaction and writes a
+row. Reset rolls back and discards the session. The proof requires the setting
+to return to default, the temp relation to disappear, the prepared statement
+to fail with `26000`, a fresh query to succeed and all handles to close.
+
+This establishes the pool-return invariant. The opaque pool lease table,
+credential/certificate rotation, compatibility matrices and soak remain
+open.")))

@@ -1,0 +1,31 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607178000-kotobase-protocols-per-did-storage-isolation")
+  (:adr/doc_type "adr")
+  (:adr/title "ADR-2607178000: atproto surface に per-repo-DID storage isolation — ①（real datom plane）と③（per-DID CACAO 認可）を結合し、DID ごとに物理的に独立した R2 chain へ")
+  (:adr/topic "kotobase-protocols-per-did-storage-isolation")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-17")
+  (:adr/last_verified "2026-07-17")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "atproto surface の4つの repo.*Record NSID（getRecord/putRecord/deleteRecord/listRecords）における graph 選択: request の `repo` フィールド（read は query param、write は body、write は既に CACAO 検証済み signer と一致することが証明されている）から `atproto-repo/<did>` という専用 R2 head/chain を deterministic に導出する。kotobase-protocols-worker.graph が正本実装"
+   "sync.getBlob と s3/git/pinning surface は per-DID scoping の対象外——共有 admin graph（kotobase-protocols-v2）に留まる、という境界線。理由: getBlob は POST /ipfs が書く共有 block space を読むだけで repo の doc space を読まない、s3/git/pinning は DID 形の resource identity 自体を持たない（ADR-2607177000 の既存決定を継承）"
+   "host/path から graph を判定する純粋ロジックの配置場所: kotobase-protocols-worker.graph（cljc、nbb でテスト可能）。worker.cljs 自身は薄い呼び出し元に留める、という本 repo の既存アーキテクチャ規約（core.cljc/sigv4.cljc/cacao.cljs と同型）をこの機能にも適用したことの記録"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "90-docs/adr/2607177000-kotobase-protocols-per-did-cacao-auth.edn"
+   "90-docs/adr/2607177500-kotobase-protocols-real-datom-plane-backend.edn"
+   "orgs/kotoba-lang/kotobase-protocols-worker (pin 4f845f3)"))
+  (:adr/problem
+  "ADR-2607177000（per-DID CACAO 認可）と ADR-2607177500（real datom plane 配線）は、双方とも『not-decided』として『storage を CACAO 認証済み DID でスコープするのが自然な次の一歩』と明記していた。それまでの状態は: atproto の write 認可は per-DID（issuer==repo のチェック）だったが、実際の永続化は依然として全 DID 共有の単一 graph（kotobase-protocols-v2）内の doc-key 名前空間分離に過ぎず、アクセス制御はあってもストレージレベルの物理分離が無かった——bug や将来の実装ミスで他 DID の doc space を誤って読み書きするリスクが構造的には残っていた。")
+  (:adr/decision
+  "kotobase-protocols-worker.graph（新規、純粋 cljc）を追加し、request から『どの R2 head/chain を対象にするか』を決定する処理を worker.cljs から抽出・独立化する。4つの atproto repo.*Record NSID のみ、`repo` フィールド（read: query param、write: body——write 時点で cacao-authorized? により verified issuer と一致することが既に証明されている）から `atproto-repo/<did>` という専用 graph 名を導出。他の全 request（s3/git/pinning、atproto の sync.getBlob 含む）は既存の共有 admin graph に留まる。worker.cljs の run-once は毎リクエストでこの graph 選択を呼び、kotobase-store/hydrate-run-persist! に渡す（ADR-2607177500 の既存サイクルは変更なし、対象 graph が動的になっただけ）。write 認可（CACAO issuer==repo）と storage スコープ（graph=f(repo)）の両方が同じ `repo` フィールドから独立に導出されるため、『署名者が自分の DID 以外の物理 chain に書き込める』という経路は構造的に存在しない。")
+  (:adr/consequences
+  (vector "実測 e2e（2026-07-17、本番 atproto.kotobase.net）: 独立した2つの keypair（別々の did:key）がそれぞれ同一 collection・同一 rkey (\"r1\") で record を書き込み、各々の listRecords が**厳密に自分の1件のみ**を返すことを確認（相互汚染ゼロ）。CACAO write 認可（ADR-2607177000）と組み合わせることで、'自分の DID の graph にしか書けない'という保証が、単なる doc-key 分離ではなく物理的に別の R2 head/chain という強い分離になった"
+   "テスト: 新規 graph_test.cljc（6 scenario: record-op 4NSID の graph 導出、sync.getBlob/未知NSIDが共有graphに留まる、他surfaceが常に共有graph、repo欠如時のfallback、異なるDID間でgraphが異なることの直接比較）が nbb で green（12 tests/43 assertions）、node-test 全体 20 tests/68 assertions green"
+   "アーキテクチャ上の副産物: worker.cljs から atproto-surface?/graph 選択ロジックを切り出したことで、worker.cljs 自体がさらに薄くなり、この repo の既存規約（純粋ロジックは cljc/cljs の独立 testable module に、worker.cljs は呼び出しに徹する）を一貫させた"
+   "not-decided（follow-up）: s3/git/pinning surface への per-resource DID scoping は依然として範囲外（ADR-2607177000 の決定を継承——bucket-per-DID や pin-per-DID の所有権モデルを新規発明しない）。Bearer/SigV4 の admin credential は依然として共有 admin graph 全体に対する full access のまま（per-DID scoping の対象外、CACAO のみ per-DID）。graph 名前空間の rename/migration ツールは無し（新しい graph 名は初回アクセス時に空 graph として自然に始まる、既存 graph からの移行は想定していない）"))
+  (:adr/body
+  "# ADR-2607178000: atproto の per-repo-DID storage isolation\n\n## Status\naccepted — 2026-07-17（実装・デプロイ・e2e 検証済み）\n\n## Decision\nkotobase-protocols-worker.graph（新規 pure cljc module）が、atproto の 4 repo.*Record NSID について `repo` フィールドから `atproto-repo/<did>` という専用 R2 head/chain 名を導出する。write は CACAO issuer==repo が既に保証されているので、署名者は自分の graph にしか到達できない。他の全 surface は共有 admin graph のまま。\n\n## Verification（実測 2026-07-17）\n- 2つの独立 keypair がそれぞれ同一 collection/rkey で write → 各 listRecords が自分の1件のみ返す（相互汚染ゼロ）\n- nbb: graph_test.cljc 6 scenario green（12/43 全体）\n- node-test: 20 tests/68 assertions green\n")))

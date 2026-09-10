@@ -1,0 +1,8 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609081430-murakumo-openrouter-fixed-model-qualification")
+ (:adr/title "Murakumo の OpenRouter 応募を固定モデルの実測で判定する")
+ (:adr/status "accepted")
+ (:adr/doc-type "adr")
+ (:adr/date "2026-09-08")
+ (:adr/repos (vector "orgs/network-awai/cloud-murakumo-api"))
+ (:adr/body "Decision: qualify one existing self-hosted upstream text model before applying to OpenRouter. Keep Basho and Hokusai product work separate; do not call upstream relay traffic proprietary training. Publish a dedicated ModelDocumentV2 projection with is_ready=false and validate it against the independently published schema. Retain the product catalog for existing consumers. Never infer ZDR, capacity or compliance from source-code presence.\n\nThe existing bounded public smoke host performs sequential streaming and non-streaming protocol observations. Its ledger records timing, usage, returned model and pass/fail without response text. Seven-day observation is necessary but insufficient: weight/license provenance, long-context/concurrency/recovery, provider authorization, reserved capacity, data policy and monthly invoicing remain separate gates. No timer or score changes production readiness automatically.\n\nThis decision changes the next application candidate, not the current Basho/Hokusai routing. The original Japanese-model application ADR remains historical context. External submission is still unperformed and must have a recorded receipt before being reported as complete.\n")))

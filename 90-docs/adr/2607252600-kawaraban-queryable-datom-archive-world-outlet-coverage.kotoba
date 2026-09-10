@@ -1,0 +1,143 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607252600-kawaraban-queryable-datom-archive-world-outlet-coverage")
+  (:adr/title "ADR-2607252600: kawaraban — collected articles become queryable EDN datoms; the outlet allowlist becomes measurably worldwide")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-25")
+  (:adr/last-verified "2026-07-25")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "news-collection-archive")
+  (:adr/authoritative true)
+  (:adr/authoritative-for
+  (vector "「全世界の公共放送・メディアの情報を repo に EDN で保存し datomic query できるようにする」という要求に対する実装の正本。収集アクター(kawaraban)・比較アクター(mikurabe)・政府広報 curator(kouhou)という3アクター構成そのものは ADR-2607110200 / ADR-2607197800 が既に決めており、本 ADR はそれを一切変更しない — 変えるのは『収集した記事が PDS にしか無く手元から query できない』『:news.* の schema が存在しない』『allowlist の :verified が実測でなく手書きだった』という3つの実測ギャップだけ。"
+   "kawaraban の outlet allowlist における :verified の意味を『書いた人の自信度』から『その日その URL が実際に parse 可能な RSS/Atom item を返した』という測定値に変える。以後 :verified は手編集せず scripts/verify-feeds.cljs が書く。"))
+  (:adr/related
+  (vector "orgs/etzhayyim/com-etzhayyim-kawaraban"
+   "90-docs/adr/2607110200-kawaraban-r0-r1-cloud-itonami-isco-3521-media-broadcast.edn"
+   "90-docs/adr/2607197800-mikurabe-world-state-media-narrative-comparison-plus-kawaraban-kouhou-world-scope.edn"
+   "90-docs/adr/2607231404-kawaraban-kotoba-wasm-componentization-phase-g-orchestrator.edn"
+   "90-docs/adr/2607231711-kawaraban-kotoba-wasm-phase-h-production-url-golive.edn"
+   "90-docs/adr/2607232009-kawaraban-wasm-orchestrator-reliability-fixes.edn"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/body
+  "
+# ADR-2607252600: kawaraban — collected articles become queryable EDN datoms; the outlet allowlist becomes measurably worldwide
+
+**Status**: accepted
+**Date**: 2026-07-25
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-07-25）: 「今の全世界の公共放送、メディアなどの情報を repo に edn で保存して、datomic query できるように repo は設計実装、また収集の常駐化は設計されているか」。
+
+調査の結果、**設計と収集アクターの実装は既にあった** — kawaraban（瓦版、news mirror、ADR-2607110200 で R0→R1、2026-07-10 live 化）が収集の中核で、ADR-2607197800 が world-scope 拡張と mikurabe（見比べ）新設を accepted にしており、Phase G/H（ADR-2607231404 / 2607231711）で wasm 経由の常駐 orchestrator と本番 PDS go-live まで到達していた。
+
+しかし要求の各点を実測すると、3つのギャップがあった。
+
+### ギャップ1 — 収集した記事が repo に EDN で残っていない
+
+`wasm_orchestrator` は RSS/Atom 取得 → G1/G3/G4/G8 charter gate → per-outlet identity + CACAO 署名 → aozora (AT-Proto PDS) へ createRecord、で完結している。repo に spit されるのは `data/ingest/last-seen*.edn`（outlet 別 high-water mark）と outlet 別 identity seed だけで、**記事本体は PDS にしか存在しない**。手元から datalog で問い合わせる経路が無い。`data/seed.edn` は `:news.article/*` の datom map だが、これは `:sourcing :representative` を明示した説明用の例示であり実収集物ではない。
+
+### ギャップ2 — :news.* の Datomic/DataScript schema が存在しない
+
+`schema/publish.edn` は `:actor/*` 6属性のみ。`data/seed.edn` の `:news.article/outlet` や `:news.section/id` を transact するための属性定義はどこにも無く、superproject の `manifest/edn-query.cljs` は `90-docs/` しか読まないので、この child repo のデータは横断 query 経路にも載っていない。つまり「datom 形で書かれてはいるが、どこにも transact できない」状態だった。
+
+### ギャップ3 — allowlist が「全世界」から遠く、しかも :verified が実測でない
+
+37 entries / 20カ国、`:lang` は en・ja・pt の3つのみ。中南米は BR だけ、アフリカは ZA だけ、インド・北欧・アラブ圏（QA 除く）・SEA の大半・中央アジアが空白。さらに `:verified` は 2026-07-10 に人が書いた値で、2026-07-25 に実測すると **30 が true なのに実際に feed を返したのは 29** だった（NHK World の URL は RSS ではなく HTML ページを返す）。フィールドの意味が「確認した」ではなく「確認したつもり」になっていた。
+
+### 常駐化について（本 ADR のスコープ外）
+
+`scripts/launchd/com.etzhayyim.kawaraban.wasm-orchestrator.plist`（StartInterval 21600 = 6時間）は repo にあるが、`~/Library/LaunchAgents/` に未インストール・`launchctl list` に無し・`~/.kawaraban/logs/` も存在しない。仮に入れても G8 gate（`KAWARABAN_ALLOW_LIVE_INGEST`）が未設定なら `fetch-outlet!` が毎回 `:refused true` を返す no-op。最後の実 ingest は 2026-07-12。**この gate は Council Lv6+ attestation を要求する設計であり、agent 判断で開けるものではない** ので、常駐化の可否は別途オーナー判断とし本 ADR では触らない。
+
+## Decision
+
+### 1. `schema/news.edn` — :news.* を実際に transact できる形にする
+
+`:news.outlet/*` `:news.section/*` `:news.article/*` `:news.mention/*` `:news.wire/*` の属性定義を、`schema/publish.edn` と同じ Datomic 形（`:db/ident` 付き map の vector）で新規に置く。`publish.edn` は「再生成すると上書きされる」生成物なので手を入れず別ファイルにした。
+
+**参照は ref ではなく id 文字列のままにする。** `:news.article/outlet` は `\"outlet.bbc-world\"` という文字列であって `:db.type/ref` ではない。これは lexicon（`data/lex/article.edn` の `outlet {\"type\":\"string\"}`）と 1:1 で対応させるためで、AT-Proto record ↔ datom を往復しても参照が壊れない。join は id 属性経由で書く:
+
+```clojure
+[:find ?headline ?country
+ :where [?a :news.article/headline ?headline]
+        [?a :news.article/outlet ?oid]
+        [?o :news.outlet/id ?oid]
+        [?o :news.outlet/country ?country]]
+```
+
+**G ゲートは「属性が存在しないこと」で表現する。** `:news.article/full-text` `/verdict` `/truth-rating` `/personalized-for` `/speak-as` に相当する属性はこのスキーマに1つも無い。CLAUDE.md の「touch one, touch all three」に対する schema 側の答えは、値を false に固定することではなく属性そのものを不在にすること — 未定義属性を transact すれば Datomic は拒否する。lexicon 側は AT-Proto の型システム上 const false で表現するしかないのでそちらは const false のままで、二重表現ではなくそれぞれの型システムで最も強い形を採る。
+
+`:news.article/id` 等の id 属性には `:db.unique/identity` を付ける。同じ記事を別 tick で再取得しても行が増えないことを DB 側でも保証する。
+
+### 2. `kawaraban.store` — gate を通った記事を日付分割 EDN に追記マージ
+
+`src/kawaraban/store.cljc`（純粋部 + `#?(:clj)` の I/O edge、本 repo の methods/*.cljc と同じ house style）。`data/articles/YYYY-MM-DD.edn` に UTC 発行日ごとに追記マージする。3つの設計判断:
+
+1. **publish 成否と独立。** aozora への publish は `:max-articles-per-outlet` で意図的に絞られている（per-article の wasm/Chicory instantiation コスト）が、EDN の追記にはそのコストが無い。gate を通った記事は publish されなくても、失敗しても、全部残す。**publish 台帳ではなく観測記録**なので、記録できるものを落とす理由がない。
+2. **`:news.article/id` で冪等。** 再取得しても行は増えない（`merge-articles` の dedupe = schema の `:db.unique/identity` と同じ規則）。後から来た方を採る — 媒体が見出しを直したなら、その媒体の現在の公開ページが正しい。
+3. **as-of 不明は捏造しない。** RSS の日付が読めなかった記事（as-of 0）は `unknown-as-of.edn` に隔離する。1970-01-01 に置くのも走った日に置くのも、どちらも「いつの記事か知っている」という嘘になる（G5）。
+
+`wasm_orchestrator`（launchd が回す方）と `run_live_ingest`（旧 JVM 経路）の**両方**から書く。同じ記事を同じ gate で取っている以上、どちらの orchestrator が動いたかで記事がアーカイブされたりされなかったりしてはならない。`KAWARABAN_ARTICLES_DIR=\"\"` で無効化できる。アーカイブ書き込みの失敗（full disk / read-only checkout）は publish 側を巻き添えにせず `:archive-error` として結果マップに載せる。
+
+### 3. `clojure -M:query` — DataScript datalog
+
+`src/kawaraban/query.clj` + `:query` alias（`datascript/datascript`）。`schema/news.edn` を DataScript 形に変換して `data/articles/*.edn` をロードし、`count` / `coverage` / 任意の datalog を実行する。
+
+**既定で `data/seed.edn` を混ぜない。** seed は `:representative` の例示なので、実収集量を数えたいときに混ざると「7件の記事がある」が実測か例示か区別できなくなる。`--seed` で明示的に足したときだけロードし、ロード時にどちらを何件読んだか必ず stderr に出す。
+
+**nbb ではなく JVM を選んだ理由**: npm `datascript` パッケージが公開するのは datascript.js インターフェースで、属性も値も裸の文字列になる（superproject の `manifest/edn-query.cljs` 冒頭コメントが同じ制約を記録している）。それでは `:db.unique/identity` の upsert も `:mirror` / `:verified` という keyword 値も文字列に潰れ、スキーマを書いた意味が消える。この repo は既に `clojure -M:wasm-orchestrator` を launchd から回している JVM repo なので、同じ runtime の alias を1つ足すのが素直（ADR-2607173000 が退役させたのは `bb` であって、この repo 自身の既存 runtime ではない）。
+
+### 4. `:news.article/sourcing` — live 取得は :verified、offline batch は :representative
+
+`ingest/normalize-record` は `:sourcing` を `\":representative\"` に**ハードコード**していた。live fetch した実在の BBC 記事に「例示」と貼るのは G5 source-provenance-honest に正面から反する。入力 record の `\"sourcing\"` を尊重するようにし（既定は `\"representative\"` なので既存の offline 呼び出しは無変更）、`live_fetch/rss-item->record` / `atom-entry->record` が `\"verified\"` を付ける。lexicon enum（`[\"representative\" \"verified\"]`）外の値は素通しせず refuse する。
+
+### 5. `scripts/verify-feeds.cljs` — :verified を実測にする
+
+nbb スクリプト（ADR-2607173000 の script host ルールどおり）。allowlist を読み、各 `:feed-url` を実際に GET し、`live_fetch/parse-feed` と**同じ規則**（`<rss` / `<rdf:RDF` なら `<item>`、`<feed>` なら `<entry>`）で分類して item 数を数える。UA も `jvm-http-get` と同じ名乗りにする（検証と本番で別 UA を使うと、UA で弾く媒体を検証だけ通してしまう）。`--apply` で `:verified` と `:note`（日付つきの機械記録）を書き戻す。
+
+`--discover` は `:feed-url` が無い/落ちた entry について homepage の `<link rel=\"alternate\" type=\"application/rss+xml\">` を読み、無ければよくあるパス（`/rss` `/feed` `/feed/` `/api/` …）を順に試して、実際に item を返した URL を採用する。世界の公共放送は feed URL の規約がばらばらで、記憶や推測で書くと大半が 404 になる — 実測で決めるのが唯一正直な方法だった（実際 discovery が15本の feed URL を発見し、そのうち Yle・LRT・ERT・RRI・STVR・RFI・RFE-RL・VOA・teleSUR・Radio Nacional Argentina・VietnamPlus・APP・Kazinform・UNICEF・ICRC・Radio Prague は当初の推測 URL では全部落ちていた）。
+
+**この検証は ingest ではない。** 記事を1件も作らず、保存せず、publish しない（G8 は関与しない）。やっているのは「この URL は feed か」という到達性確認だけで、allowlist に元々あった `\"live-checked 2026-07-10: …\"` という注記と同じ行為を自動化したもの。
+
+### 6. allowlist を実測ベースで世界規模に
+
+83 の候補媒体（各国 public broadcaster / 国営通信社 / 国際機関 press）を足し、**全 120 件を 2026-07-25 の1回の測定で揃え直した**（元の 37 件も再測定 — そうしないと 2026-07-10 の手書きフラグが混在したままになる）。
+
+| | before (2026-07-19) | after (2026-07-25) |
+|---|---|---|
+| 登録 | 37 | **120** |
+| feed 実測 OK | 29（`:verified true` は 30 と主張） | **77**（主張と実測が一致） |
+| 実測 OK の国・地域 | 18 | **50** |
+| 実測 OK の言語 | 3（en / ja / pt） | **15**（da de el en es fr is it ja nl no pt sk sl sv） |
+| 実測 OK の内訳 | — | public-broadcaster 53 / wire-agency 11 / ngo-press 13 |
+
+新たに実測で入った地域: 北欧全域（FI SE NO DK IS）・バルト三国（EE LV LT）・中欧東欧（AT CZ SK SI RO UA）・ベネルクス（BE NL）・南欧（ES IT PT GR）・アイルランド・スイス（未達）・中南米（AR VE、BR に加えて）・アフリカ（GH KE NG、ZA に加えて）・南アジア（IN PK）・東南アジア（ID VN、SG MY に加えて）・中央アジア（KZ）・ニュージーランド。
+
+**確認できなかった 43 件は削除せず `:verified false` + 正直な note で残す** — orchestrator は `:verified` で filter するので実害はなく、こうすることで「試したが取れなかった」というカバレッジの穴がファイル上で見える。ADR-2607197800 の kouhou registry が採った real-or-honestly-flagged と同じ方針。現時点で working feed が1本も無い国は 22（AE BD BG CH CU DZ ET HR HU IL IR JO KW MA MN MX PH PL RS SA TH TN）。
+
+## Consequences
+
+- 収集した記事が PDS への往復なしに手元で datalog クエリできるようになる。ただし **`data/articles/` は G8 gate を開けた最初の run まで空**（本 ADR は gate を開けない）。配線とテストは完了しており、gate が開いた瞬間から溜まり始める。
+- `:verified` は今後 `verify-feeds.cljs` だけが書く。手編集は「確認したつもり」を再導入するので禁止。
+- feed が Cloudflare 等で bot 遮断されている媒体（IMF・OHCHR・UNHCR・ILO・OECD・IAEA・PIB India・Montsame・Kan・MAP Morocco 等）は現状取得できない。これは「対象外」ではなく「未達」であり、ファイル上に `:verified false` として残る。ADR-2607203000 の repo-wide rule（entity を categorical に除外しない / 未達はカバレッジの問題であって対象外ではない）と同じ姿勢。
+- CBC（CA）は 2026-07-10 に `:verified true` だったが 2026-07-25 の測定では到達せず false に落ちた。同国は Radio-Canada が実測 OK なので CA のカバレッジ自体は維持されている。フラグが実測に追随して上下すること自体が意図した挙動。
+- テスト 81 / assertion 182 / 0 failure、`clojure -M scripts/audit.clj` は ok、lint は変更前と同一（既存 7 error / 39 warning、いずれも本 ADR が触っていないファイル）。
+
+## Alternatives considered
+
+- **`:news.article/outlet` を `:db.type/ref` にする** — datalog は少し短くなるが、lexicon の string 型と乖離し、AT-Proto record からの復元に lookup-ref 解決が要る。id 文字列 join なら往復が壊れない。却下。
+- **nbb + npm datascript で query する** — CLAUDE.md の nbb 優先には沿うが、属性も値も裸文字列に潰れて schema の意味が消える。`verify-feeds.cljs` の方は nbb で書いており、ルールが効く場所（新規の運用スクリプト）ではちゃんと nbb を使っている。
+- **常駐化まで同時にやる** — plist を入れ G8 gate を開ければ今日から記事が溜まるが、gate は Council Lv6+ attestation を要求する設計であり、standing authorization の対象外。別判断に回す。
+- **確認できなかった媒体を allowlist から消す** — ファイルは綺麗になるが、「試したが取れなかった」と「そもそも試していない」が区別できなくなる。却下。
+
+## What this ADR does NOT do
+
+- G1–G11 の charter gate を一切変更しない。`manifest.edn`・`data/lex/*`・cells の state machine は無変更。
+- G8 gate を開けない。launchd plist をインストールしない。
+- mikurabe / kouhou には触れない（mikurabe の実分析と named-party 比較公開は ADR-2607197800 のとおり Council 承認待ちのまま）。
+- `data/seed.edn` を実データで置き換えない（例示は例示として残す方が、実収集物との区別がつく）。
+")))

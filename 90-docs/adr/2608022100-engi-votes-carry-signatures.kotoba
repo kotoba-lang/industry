@@ -1,0 +1,90 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608022100-engi-votes-carry-signatures")
+  (:adr/title "adr-2608022100: 誰も署名していない投票は主張にすぎない — 証明書は署名を運んでいたが、その材料の投票は運んでいなかった")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-votes-carry-signatures")
+  (:adr/authoritative-for
+  (vector "engi の投票認証（wire 表現と replica 側の検証）"
+   "network harness の敵対者（forger）"))
+  (:adr/related
+  (vector "adr-2608022000-engi-replica-nobody-had-ever-run-it"
+   "adr-2608021430-engi-certificates-carry-signatures"
+   "adr-2608021530-engi-real-keys-end-to-end"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi/commit/0366c0466571e002fd335ece7e71e622407e5c3b"))
+  (:adr/body
+  "# ADR-2608022100: 誰も署名していない投票は主張にすぎない
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+**証明書は最初から署名を運んでいた。その材料である投票は運んでいなかった。**
+
+`engi.wire` は投票を witness・block-hash・height・view として encode し、**`:engi.vote/sig` を丸ごと落としていた。** replica は受け取った投票から証明書を組み立てるので、**組み立ての材料は認証されていない主張だった。**
+
+接続した peer が 1 つ `{witness: w2}` `{witness: w3}` `{witness: w4}` を送れば、**鍵を 1 本も持たずに quorum を製造できる。** 証明書の署名は装飾でしかなかった —— **攻撃者が投票を捏造し、正直な replica にその証明書へ署名させる。**
+
+### 直前の commit は、これを「まだ問題ではない」と論じていた
+
+「harness には正直な replica しか居ないので署名を付けても検査を強めない」と書いた。**それは未検証の経路を出荷させる論法**であり、しかも**論そのものが間違っていた**: 弱点は「正直な replica が署名しないこと」ではなく、**socket を開けられる者が誰の名前でも投票できること**だった。
+
+## Decision
+
+### 1. 投票は wire 上で署名を運ぶ
+
+codec 側では署名を **optional** にし、**「署名の無い投票を信じてよいか」は `engi.replica` が決める。** codec の仕事は shape であり、ここに consensus 規則を置くと、既に合意済みの履歴を replay する replica が再署名を強いられる。
+
+### 2. `engi.replica` が注入された `verify-fn` で検証する
+
+**検証に失敗した投票は、返答せずに捨てる** —— 返答は forger に「どの推測が近かったか」を教えることになる。
+
+証明書は検証済み投票から `att/certify` で組み立てるので、**組み立てを見ていない第三者が再検査できる。**
+
+### 3. harness に敵対者を置く
+
+forger が全 replica に dial し、誰も propose していない block について w2・w3・w4 を名乗る投票を送る。**3 つの flavour は 3 つの異なる理由で落ちる**:
+
+1. **無署名** — この commit まで通っていた攻撃
+2. **別の鍵で署名** — 形式は正しい
+3. **別の chain 向けに正しく署名** — domain separation、`chain-id` が payload に入っている理由そのもの
+
+実 Ed25519（`node:crypto`、**同期**署名 —— consensus の seam を async にせずに済んだ理由）。
+
+## 実測
+
+```
+  common committed prefix: 99 blocks
+  all replicas agree     : true
+  every certificate signed: true
+  forged votes accepted  : 0 (of 36 sent)
+  forged certificates    : 0
+
+NETWORK: pass — consensus ran over real sockets, and every forgery was refused
+```
+
+## 穴は「記述」ではなく「assert」した
+
+`without-verification-one-peer-manufactures-a-quorum`: **`verify-fn` を設定しなければ、捏造された 3 票は今でも証明書を作る。**
+
+`verify-fn` が nil は引き続き「何も検査しない」を意味する —— **既に合意済みの履歴を replay する場合には正しく、それ以外では誤り**なので、`replica` は黙って既定にせず明示する。
+
+## Consequences
+
+- (+) 投票の認証が load-bearing になった（検査が実際に攻撃を落とすことを実測）。
+- (+) harness に敵対者が居るので、通ることに意味がある。
+- (−) **equivocation（同一 height で 2 つの異なる block に署名した witness）は検出も slash もしていない。** `engi.stake/detect-equivocation` は存在するが replica は使っていない。
+- (−) forger は validator set の外側。**Byzantine な validator**（正しい鍵を持ち、悪意ある投票をする）はまだ harness に居ない。
+- (−) new-view message は署名されていない —— timeout certificate は依然として認証されていない投票から作られる。**次の対象はここ。**
+- (−) commit された block は何も実行しない（`engi.core` の transfer に未接続）。
+
+179 tests / 1069 assertions。JVM/nbb parity 一致。
+")))

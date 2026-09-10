@@ -1,0 +1,569 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609091800-kotoba-native-inference-maturity")
+  (:adr/title "Kotoba-native inference: what was measured, what it costs to reach llama.cpp-class maturity, and the one primitive in the way")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-09")
+  (:adr/deciders "owner (b + everything needed for llama.cpp/vLLM/SGLang-class maturity), Claude Opus 5")
+  (:adr/related "adr-2609091200-community-provider-onboarding adr-2608030300 adr-2607198300")
+  (:adr/body
+  "## The instruction
+
+  『b + amu native binary で llama.cpp, vllm, sglang なみの成熟度を実現するために
+  必要なことを全て行う』 — option (b) was *qualify f64 for the native word-typed
+  walk*, and then everything needed for maturity.
+
+  Two answers, and the first one changes the second.
+
+  ## (b) turned out to be already half-true, and the other half landed
+
+  The rule said `only-native-word-typed-features?` rejects f64 expressions
+  (`kernel_math_core.kotoba`'s own docstring). Measured: **false**.
+  `native-f64-arithmetic-operations` has admitted `f64-add/sub/mul/div/min/max/
+  abs/neg/sqrt` and the bit conversions since ADR-2608030300, and
+
+      (defn add2 [a :i64 b :i64] :i64
+        (f64-to-bits (f64-add (f64-from-bits a) (f64-from-bits b))))
+
+  compiled to aarch64 before anything changed. What was refused was the
+  **signature**: `(defn add2 [x :f64 y :f64] :f64 (f64-add x y))` answered
+  *typed values currently require the kotoba-script web target …*. Float values
+  were always allowed through the machine; only saying so was not. That is why
+  every float kernel here is written in the bit-word idiom, `kotoba-lang/
+  aiueos`'s qwen35 kernels included.
+
+  So (b) was: admit `:f64` at the native function boundary. Landed in both
+  halves, because either alone is a wrong answer — `kotoba.kir` alone is a
+  green `amu check` and a red `amu compile`:
+
+  | repo | commit |
+  |---|---|
+  | `kotoba-lang/osaho` (`kotoba.kir`) | `74426bad` |
+  | `kotoba-lang/kotoba-verifier` | `39db2f3f` |
+  | `kotoba-lang/amu` (pin advance) | PR #905 |
+
+  Verified through `bin/amu` after the pin advance, not through a patched
+  classpath — `(defn scale [x :f64] :f64 (f64-mul x 2.5))` extracts to
+
+      d2e80081   MOVZ X1, #0x4004, LSL #48     ; 2.5
+      9e670000   FMOV D0, X0
+      9e670021   FMOV D1, X1
+      1e610800   FMUL D0, D0, D1
+      9e660002   FMOV X2, D0
+      d65f03c0   RET
+
+  A record FIELD stays refused, and both repositories keep a test for that:
+  `native-word-field-types`'s own reason — a field \"would have to say which
+  width its one word carries, and no field's declared type is read at runtime\"
+  — does not reach a signature, where the width IS the declaration. `:f32` is
+  not admitted: both widths are one word and the argument covers both, but only
+  `:f64` was measured end to end, and an admission is a claim about what a
+  backend lowers rather than about what an argument covers.
+
+  ## What (b) does NOT unlock, and this is the whole roadmap
+
+  A dot product needs more than one value. On a general native target there is
+  no way to give it one:
+
+  - `:vector-f64` is a **private handle**: `native-private-handle-type?`
+    admits it at an INTERNAL call boundary and `native-function-boundary-type?`
+    refuses it for an export. \"Parameters still cannot be handles.\"
+  - bytes do not exist: amu's `bytes-operations` table is exactly
+    `{bytes-empty 0}` — a constructor for the empty one and nothing else.
+  - `kotoba-lang/aiueos` HAS the byte half in Kotoba, and it is not a sketch:
+    `qwen35-gguf-header-valid`, `-kv-scan`, `-tensor-table-bind`,
+    `-vocab-index-build`, `-dequant-row`, `-dot-f32`, `-matvec`, `-norm`,
+    `-activation`, `-attention`, `-recurrent-step`, `-tokenize`, `-detokenize`,
+    each compiled to a `.o` with provenance against the `kernel/qwen35_infer.c`
+    oracle. They compile for `x86_64-aiueos-kernel-v1` only: elsewhere amu
+    answers *bounded kernel memory operation requires the aiueos kernel
+    target*.
+
+  **The primitive exists. It is unreachable from a general host.** That single
+  sentence is the difference between an arithmetic kernel and an inference
+  engine, and every item below is ordered behind it.
+
+  ## What llama.cpp / vLLM / SGLang maturity actually consists of
+
+  Stated plainly because the instruction was `全て`: this is not a sprint.
+  llama.cpp is years of kernel work by a large contributor base; vLLM and
+  SGLang are serving layers over PyTorch/CUDA whose value is scheduling, not
+  arithmetic. What follows is the ordered list of what would have to exist,
+  with what this workspace already has against each.
+
+  | # | capability | what exists here today |
+  |---|---|---|
+  | P0 | **general-target memory** | aiueos `kernel-*` ops, kernel target only |
+  | P1 | quantized matvec (Q4_K/Q6_K/Q8_0) | **emitted on x86-64** as `kernel-dequant-dot-{q8-0,q4-k,q6-k}`; **absent on aarch64**; IQ formats declared and refused. See the amendment |
+  | P2 | attention, RoPE, RMSNorm, SwiGLU | `qwen35-attention`, `-norm`, `-activation`, `-recurrent-step`; `kernel_math_core` for the pure half |
+  | P3 | KV cache, paged attention | **decisions landed** in Kotoba (`scheduler_core.kotoba`); block table itself blocked on P0 |
+  | P4 | continuous batching, chunked prefill | **decisions landed**; the sequence list is the host's |
+  | P5 | prefix/radix caching, speculative decoding, MTP | **decisions landed**; the radix trie is blocked on P0. `kotodama.inference.mtp` contract |
+  | P6 | sampling, grammar-constrained decoding | `kotodama.inference.sample` |
+  | P7 | GGUF/safetensors loading, mmap | `kotodama.inference.gguf` (`.cljc`, host-side) |
+  | P8 | SIMD / Metal / CUDA | `num` has CPU/WGSL/WebGPU backends; native SIMD absent |
+  | P9 | logit-level parity harness | `kernel_math_parity_test`, `ollama_kotoba_parity_test`, `inference`'s own maturity ledger |
+  | P10 | tok/s benchmark against llama.cpp on the same box | murakumo's fleet benches measure the llama.cpp head, not a Kotoba one |
+
+  P3–P5 are where vLLM and SGLang actually live, and **their decision half now
+  exists in Kotoba** — see the amendment below. What is still absent there is
+  the bookkeeping, which is P0 again. P1–P2 are largely WRITTEN and blocked on P0. P7–P9 exist in `.cljc`
+  on the host side and were proven end to end once already:
+  `cloud-murakumo-studio` generated real text from a real GGUF through
+  `kotodama.inference.host.jvm` (\"The largest planet in our solar system is\"
+  → \" Jupiter. Jupiter is a gas\", first token identical to Ollama).
+
+  ## The decision
+
+  1. **P0 is the only thing worth starting.** Two candidate shapes, both
+     measured as reachable: (i) admit the aiueos bounded memory operations on
+     a general native target, or (ii) admit `:vector-f64`/bytes at the export
+     boundary with a copy ABI — `native-export-copy-result-type?` already
+     admits vector RESULTS for exports, so half of (ii) exists.
+  2. **Nothing below P0 gets built first.** A kernel that cannot be handed
+     data is not a step toward an engine, and the workspace's own migration
+     rule says a component the compiler cannot express is `:blocked`, not
+     reduced to a smaller predicate to make a gate green.
+  3. **The provider tells the truth in the meantime.** `cloud-murakumo-cli`
+     refuses to enrol as capacity it does not have and names the missing
+     primitive. It does not fall back to vLLM, Ollama, MLX or llama.cpp; those
+     were removed on the owner's instruction, and the ADR for that decision
+     records what it cost.
+  4. **Parity before performance.** `ggml_kdot.clj` is already a bit-exact
+     port of ggml's Q4_K/Q6_K×Q8_K reduction; any Kotoba matvec is checked
+     against it before anyone measures tok/s. A fast kernel that disagrees
+     with the oracle is not progress.
+
+  ## Amendment 2026-09-09: P3–P5's decision half landed
+
+  `kotoba-lang/inference` `e68ec8d` adds `kotoba/scheduler_core.kotoba`: 17
+  exported decisions covering paged KV (`kv-blocks-needed`,
+  `kv-blocks-to-append`, `kv-can-allocate` with vLLM's watermark,
+  `kv-slot-index`, `kv-append-offset`, `kv-free-after-alloc`), continuous
+  batching and chunked prefill (`batch-prefill-chunk`, `batch-budget-after`,
+  `batch-admit`, `batch-decode-slots`, `preempt-rank`), and prefix caching and
+  speculation (`prefix-cached-blocks`, `prefix-tokens-to-compute`,
+  `cache-hit-bp`, `spec-accept-count`, `spec-emitted-tokens`,
+  `spec-worth-it`). `amu test` runs 17 `test-*` exports across
+  `[:jvm-kir :js :wasm]` — 51/51 — and it compiles to `aarch64-kotoba-v1`.
+
+  **This is the half that is policy, and it is the half that was worth moving
+  first.** vLLM's and SGLang's kernels are cuBLAS and FlashAttention; what
+  those systems own is which sequence runs, how many of its tokens run this
+  step, and which blocks it may hold. That is arithmetic over small integers,
+  and it fits the subset every Kotoba backend already admits.
+
+  The signatures are scalars because P0 has not moved: a native export cannot
+  take a handle, and `:document` crosses the boundary but cannot be READ on
+  native (only `document-edn-read`/`-print` are admitted; a `document-get`
+  program is refused). So the host keeps the block table, the sequence list
+  and the radix trie, and asks the core the questions those structures exist
+  to answer — the same split `kernel_math_core.kotoba` makes for bytes.
+
+  So P3–P5 are no longer `nothing`, and they are not `done` either. What
+  landed is every decision; what is still behind P0 is every structure those
+  decisions are made about. The ordering in this ADR is unchanged: P0 remains
+  the only blocking, buildable thing.
+
+  Two tools were repaired to land it, both broken beforehand on `main`:
+  `inference`'s `nbb.edn` did not name `kotoba-lang/text`, so its KIR parity
+  gate died before running; and that gate's own `--write` was unreachable
+  because the guard tested only the LAST argv, so the half CI runs hid the
+  half a person runs.
+
+  ## Amendment 2026-09-09 (second): P0 and P1 measured properly, and P1 was understated
+
+  Reading the backends rather than the docstrings changed two of the rows
+  above. Both corrections make this ADR's own earlier text wrong, and the
+  earlier text is the kind that sends someone to build what exists.
+
+  ### P1 is emitted on x86-64 and absent on aarch64
+
+  The fused dequantize-and-dot family is not \"mostly written and blocked\". It
+  is a set of Kotoba OPERATIONS with machine arms:
+
+  | operation | block bytes / elements | x86-64 | aarch64 |
+  |---|---|---|---|
+  | `kernel-dequant-dot-q8-0` | 34 / 32 | emitted | — |
+  | `kernel-dequant-dot-q4-k` | 144 / 256 | emitted | — |
+  | `kernel-dequant-dot-q6-k` | 210 / 256 | emitted | — |
+  | `kernel-dequant-dot-iq4-xs` | 136 / 256 | declared, refused | — |
+  | `kernel-dequant-dot-iq2-s` | 82 / 256 | declared, refused | — |
+  | `kernel-dequant-dot-iq3-xxs` | 98 / 256 | declared, refused | — |
+  | `kernel-dot-f32` | — | emitted | — |
+
+  The strides are ggml's. The IQ rows carry their own reason
+  (`:emitted? false`, a code in those formats is an index into a 256/512/1024
+  entry table that has to reach the machine as read-only data first), which is
+  a refusal with a route rather than an absence.
+
+  **aarch64 has none of them**, and the fleet is ten Mac minis. The one
+  machine that can run these kernels today is the x86-64 AIUEOS device — which
+  is exactly the node class `local-murakumo.device-p256` was built around.
+  That is not a coincidence to note in passing: it means the native quantized
+  path already runs somewhere, and porting it to the fleet's own ISA is a
+  named, bounded piece of work rather than a research question.
+
+  ### P0's shape is a granted region, not a lifted gate
+
+  `[:slice T]` for `T ∈ {:u8 :u16 :u32 :u64}` already exists (kotoba-sema
+  ADR 0022): a source type erased into `base` and `len` machine words before
+  HIR, with `slice-get`/`slice-set!`/`slice-sub`/`slice-length`, bounds
+  checks, and a 2^40 element ceiling. `[:slice :f32]` is declared and refused
+  because no `slice-load-f32` exists on either ISA — the u32 load plus
+  `f32-from-bits` reaches the same value.
+
+  Measured on aarch64, in order, each rejection naming the next gate:
+
+      dot over two slices, 5 params      -> \"function parameters exceed
+                                            ABI-supported arity after slice
+                                            erasure: 7 machine words for 5\"
+      restructured to 4 machine words    -> \"a slice parameter cannot cross an
+                                            export boundary\"
+      base+length in, slices built inside-> \"bounded kernel memory operation
+                                            requires the aiueos kernel target\"
+
+  So the memory family is reachable from ordinary Kotoba, and the last gate is
+  the target. **It should not simply be opened.** On aiueos the program IS the
+  kernel and a base address is memory it owns; on a general target a base
+  handed in from outside is authority over the whole address space, and the
+  bounds check validates the index against the declared length, never the base
+  against anything. Opening it would put ambient authority into a language
+  whose capability kits all declare `:ambient-access false`.
+
+  P0 is therefore: **a region capability**. The host grants a bounded region
+  the way `dataspace-v1` grants a dataspace — lexical/argument possession,
+  no ambient access — and slice loads are admitted on general targets only
+  through a granted region. The `:request`/`:result`/`:limits` shape those
+  kits already use is the template, and the KEXE export copy ABI (which
+  already carries vector RESULTS out of an export) is the marshalling half.
+
+  ### What this does to the ordering
+
+  Unchanged in shape, sharper in content:
+
+  1. **P0 region capability** — the one gate, and now with a known design.
+  2. **P1 on aarch64** — port the three emitted dequant arms to the fleet's
+     ISA. The oracle for them already exists (`ggml_kdot.clj`, bit-exact
+     against ggml's Q4_K/Q6_K x Q8_K reduction), so this is portable work with
+     a pass/fail signal, not exploration.
+  3. P3–P5 decisions are landed (previous amendment); their structures still
+     wait on P0.
+
+  ## What is honestly not claimed
+
+  This ADR does not claim a path to llama.cpp parity on a timeline, and does
+  not claim that P0 makes one likely. It claims that P0 is the first thing
+  that is both blocking and buildable, that P1–P2 are mostly written behind
+  it, and that P3–P5 are absent and are the largest single gap between this
+  stack and the serving systems named in the instruction.
+  ## 改訂 3 (2026-09-09 夕) — P1 の半分が aarch64 に着地し、実行して確かめた
+
+  P1 は「三本の dequant arm を fleet の ISA に移す」だったが、その前に
+  `kernel-dot-f32` 自体が x86 専用だった。両方動いた。
+
+  | 何 | repo | commit |
+  |---|---|---|
+  | `kernel-dot-f32` の aarch64 arm | `kotoba-lang/kotoba-native` | `f8eaee6e` |
+  | 同 target selection | `kotoba-lang/kotoba-mir` | `55d78851` |
+  | Q8_0 fused dequant の aarch64 arm | `kotoba-lang/kotoba-native` | `7cbed512` |
+  | 同 target selection | `kotoba-lang/kotoba-mir` | `b70a567a` |
+
+  ### 決定: NEON ではなく scalar
+
+  オーナー判断（改訂 2 に記録済み、KEEP THE TREE）に従い、**両 arm とも
+  scalar**。理由は速度ではなく、この演算の契約が「内積」ではなく**加算の順序**
+  だからである。NEON の安い縮約 (`faddp`) は別の木を計算し、この木を計算する
+  高い NEON 縮約は scalar が払わない lane 抽出を払う。AArch64 の scalar
+  FMUL/FADD は SSE の `mulss`/`addss` と同じ被演算子上の IEEE-754
+  round-to-nearest-even なので、**一致は測定ではなく構成による**。
+
+  fp16 の scale は AArch64 自身の `FCVT S,H` ではなく **x86 の式**を写した。
+  FCVT は 1 命令で、有限な half すべてに対して厳密で、それでも誤りである ——
+  二本の arm は exponent 31 の場合（x86 側は手書き）と NaN payload でも一致
+  しなければならず、式を写せばそれも写るが、意図を写しても写らない。
+
+  ### 実行して確かめた（8 問目）
+
+  kotoba-native の deps.edn が自分で書いているとおり **この repo は
+  コンパイル済みプログラムを実行しない**。だから測定は repo の外で行った:
+  emit → `.byte` 列を label 下に置く → `clang -c -target arm64-apple-macos`
+  → 5 引数の C 関数として呼ぶ（被演算子は x0..x4、答えは x0 で、これは
+  AAPCS64 の引数順そのものなので shim が要らない）。
+
+  - `kernel-dot-f32`: `dot-f32-probe.kotoba` の fixture
+    (`[2^24, 1 x 11]` × ones) に対し **0x4B800004**。左から右の和なら
+    0x4B800000。
+  - Q8_0: 7 fixture すべて緑 —— tree (0x4B80000C)、負の code、fp16 の
+    normal / **subnormal (2^-24)** / infinity / negative、2 block。
+
+  制御も回した。木を壊すと `tree` だけが 0x4B800000 で赤くなり、LDRSB を
+  LDRB にすると `negative codes` だけが **8160 = 255 × 32** で赤くなり、
+  exponent 31 の比較を 0x7c00 から外すと `fp16 infinity` だけが **2^21 =
+  32 × 2^16** で赤くなる —— 最後の数は `x86-dequant-magic` の docstring が
+  その誤りに対して予告している値そのもの。
+
+  ⚠ **同じ壊れたビルドで「普通の内積」fixture は 142.5 のまま通った。**
+  もっともらしい内積は誤った木と一致する。fixture がこの形である理由がこれ。
+
+  ### 途中で当たった二つの天井（どちらも塞いだ）
+
+  - `encode-selected` の `case` が **JVM の 64 KiB メソッド上限**を超えた
+    （arm を 1 本足しただけで `Method code too large!` で namespace が
+    コンパイルできなくなる）。ISA で 2 関数に分割した。x86 側が今は大きい方
+    なので、また当たる。
+  - `encode-layout-branch` に **`:aarch64/b-eq-imm19` が無かった**。
+    `kotoba.mir` は前から admit しており legacy emitter も持っていたが、この
+    表が要らなかった —— 本番 MIR で**等値**分岐が要るものが fp16 decode まで
+    存在しなかったため。
+
+  ### P1 の残り、および P0 は動いていない
+
+  残るのは Q4_K と Q6_K の aarch64 arm。これは移植ではない —— Q4_K は
+  (scale, min) 対と nibble half が別周期で変わり、Q6_K は scale index が
+  16 要素ごと・2bit field の shift が 32 要素ごとに変わるので、x86 側でも
+  32 group が per-group geometry で unroll されている。IQ 4 形式は read-only
+  table が機械に届くまで両 backend とも arm を持てない。
+
+  **P0 は 1 mm も動いていない。** そして今回それを正面から測った: kexe の
+  境界は guest に raw base を渡せない —— `:string` 引数は pair handle として、
+  vector は arena handle として届き、`kernel-*` は生アドレスを要求する。
+  だから**この二本の arm は、署名済み artifact からはこのホスト上で到達
+  できない**。上の測定が repo の外で行われたのはそのためであり、それは
+  「実行した」を弱めるものではないが（バイトは同一）、「provider が
+  これで推論できる」ことは意味しない。P0 の設計は改訂 2 のまま有効。
+  ## 改訂 4 (2026-09-09 夜) — P0 は測ると 1 本の gate で、その半分が着地した
+
+  改訂 2 は P0 を『region capability を dataspace-v1 のように新設する』と設計した。
+  **測ると、その設計は要らなかった。** 必要な安全性は既存の pass が既に持って
+  いる。
+
+  ### 実測した gate は 2 本、うち本当に効いていたのは 1 本
+
+  aarch64 target に対して、host が渡した region を読むプログラムを実際に
+  コンパイルして測った:
+
+  | # | gate | どこ | 何だったか |
+  |---|---|---|---|
+  | 1 | `:kotoba.error/slice-export-boundary` | kotoba-sema | export の ABI が引数 1 個 = 1 word だから、という**実装状態** |
+  | 2 | `bounded kernel memory operation requires the aiueos kernel target` | kotoba-verifier | 唯一の実質的な gate |
+
+  gate 1 は**回避できる**。region を `[:slice :u8]` として export の引数にせず、
+  `base :i64 length :i64` として受けて中で `slice-of-u8` を組めばよい。だから
+  **kotoba-sema の変更は 1 行も要らなかった。** 残るのは gate 2 だけ。
+
+  ⚠ gate 1 の docstring は「*there is no ABI in which they could spell two*」と
+  書いている。これは**実装状態を性質として書いた文**で、CLAUDE.md が名指しで
+  警告している形。KEXE の export ABI は既に 5 machine word を運ぶ。
+
+  ### 安全性は新設ではなく、既にある provenance pass が持っていた
+
+  `kotoba.compiler.frontend` の region-provenance pass は、全ての base が
+  literal / `kernel-boot-info` / parameter から**無改変で**流れることを要求し、
+  算術・load・call 結果を拒否する。そして `kernel-region-report` の docstring が
+  この状況を既に名指ししている ——
+
+      A tainted param on a function with no internal caller is the ABI boundary
+      where the C kernel supplies the region: unverifiable from here, so it is
+      admitted and REPORTED rather than silently trusted.
+
+  hosted target では供給者が C kernel ではなく export を呼んだ host になる、
+  というだけで、**問いは同じ**。
+
+  ### 着地したもの
+
+  | repo | commit | 何 |
+  |---|---|---|
+  | `kotoba-lang/kotoba-verifier` | `33b3d067` | slice subfamily + `kernel-subregion` を hosted target に admit。条件は**この file 自身が再導出する** |
+  | `kotoba-lang/amu` | PR #908 | pin 前進 + fixture + 3 つの拒否の対比 |
+
+  admit の条件は 2 つで、別々に検査して別々に報告する: 全ての base がその関数の
+  parameter であること、そして内部 callee の tainted parameter 位置に流れ込む
+  引数も parameter であること。後者が無いと、**base が parameter である callee は
+  単独では clean に見える**ので、caller が穴になる。
+
+  拒否しないものを 2 つ、区別して書いた:
+
+  - **literal base は hosted で拒否する。** frontend は admit する（aiueos では
+    MMIO を名指すのが仕事）。だから verifier が自分で拒否する。
+  - **byte-window family（`kernel-load-u8` 等 16 個）は aiueos 専用のまま。**
+    これは**性質ではなく surface の大きさの判断**で、そう書いた —— parameter
+    base の window は slice と同じだけ安全である。
+
+  ### 実行して確かめた
+
+  repo の外で、arm64-apple-macos 上:
+  `amu compile --target aarch64` → `amu extract-native --symbol sum-bytes` →
+  `.byte` を label 下に置いて `clang -c` → C から 5 引数 + context で呼ぶ
+  （emit されたコードは `[x7+8]` の fuel カウンタを読んで尽きたら trap するので、
+  8 番目の引数レジスタが context）。
+
+  - 64 byte → 2080 / granted length 10（region は 64 byte）→ 55 /
+    空 region → 0 / `0xFF` 4 個 → **1020**（符号拡張なら負になる）
+
+  **これは provider CLI の `generate!` が `:kotodama/blocked-on
+  :kotoba/bytes-access` で refuse している、まさにその primitive である。**
+
+  ### 残り: 最後の 1 マイル
+
+  署名済み artifact から `amu run` 経由でこれに到達するには、loader が region を
+  渡せる必要がある。現状 kexe の境界は raw base を渡せない —— `:string` 引数は
+  pair handle、vector は arena handle として届く。要るのは
+  `tools/kexe_loader.c` の region pool と、1 つの host 値が 2 machine word
+  （base と length、どちらも loader が計算するので host は嘘をつけない）に
+  展開される `marshal-entry-arguments` の対応。これは**未着手**。
+
+  ### 副産物 —— 走らないスイートは、走ったスイートに見えない
+
+  kotoba-verifier の `clojure -M:test` は **1 日ゼロテストを報告していた**。
+  `verifier_f64_boundary_test` が repo 境界越しに `kotoba.kir/native-float-
+  boundary-types` を読む（2 つの admission set が黙って乖離しないよう意図的に）
+  のに、osaho の pin がその var の 1 commit 手前で止まっていた。namespace が
+  コンパイルできず、runner は最初の file で止まり、**失敗ではなくゼロ件**を
+  報告した。pin を進めると即座に 2 つ目の帰結が出た ——
+  `verifier_test` が `[:f64]` は boundary で**拒否される**と assert したままで、
+  それはこの repo 自身に着地した決定の逆だった。両方直した。
+  ## 改訂 5 (2026-09-09 深夜) — 最後の 1 マイルも着地。P0 は閉じた
+
+  改訂 4 が『未着手』と名指しした loader の region grant が着地した。
+  **署名済み artifact が `amu run` 経由で、host が渡した region を読む。**
+
+  | repo | commit | 何 |
+  |---|---|---|
+  | `kotoba-lang/artifact` | `43330d87` | loader identity を 2 回前進（region 形 + report tail） |
+  | `kotoba-lang/kototama-native` | `9e53ea35` | host 側の `{:region [...]}` / `{:region-length n}` |
+  | `kotoba-lang/amu` | PR #910 | loader C（region pool + 2 つの引数形 + report tail） |
+
+  ### 対にした理由
+
+  `g:<hex>` が region を鋳造して **base address** を答え、`gl:<n>` が
+  **loader が記録した length** を答える。**2 つとも loader の数**であること
+  が全て —— caller は region を渡せるが、**その region に属さない length と
+  base の組を渡すことはできない**。これが「granted な region が granted で
+  なくなる」唯一の道だった。guest 自身の bounds check は、自分が選んでいない
+  length に対して index を比べることになる。
+
+  fail closed: 前方参照（2 つ目の `g:` より前の `gl:1`）/ 未鋳造の length /
+  奇数桁の hex / 9 個目の region / 64 KiB pool 超過 —— すべて**答えずに拒否**。
+
+  host 側も 1 対 1 に保った。**1 つの host 値が黙って 2 つの parameter を
+  埋める形にはしなかった** —— entry は本当に 2 machine word を取り、
+  `(:arity export)` は `(count param-types)` と別に assert されているので、
+  暗黙の展開はその 2 つの数を別物にしてしまう。caller は entry が取るものを
+  そのまま書く。
+
+  ### 両 ISA で、実プロセスとして実行した
+
+  `isa_execution_test` に `a-granted-region-is-read-on-every-available-isa` を
+  足した。出力は `available: [aarch64 x86_64] / missing (SKIPPED): []`。
+
+  | grant | 結果 |
+  |---|---|
+  | 64 byte | 2080 |
+  | 10 byte、同じプログラム | 55（bound は `slice-length` なので grant のもの） |
+  | 空 | 0 |
+  | `0xFF` × 4 | 1020（負ではない） |
+  | 前方参照 | result を一切出さない |
+
+  署名経路全体でも測った: compile → measure-runtime → keygen → sign → trust →
+  `amu run --entry sum-bytes --input {:args [{:region [1..64]} {:region-length 0}]}`
+  → **`:result 2080`**、receipt 付き。制御では、pool 超過は executor が
+  caller 自身の引数を名指しして拒否し、**base の位置に生の整数を渡すと
+  読まずに trap する** —— host は信頼されているが、間違いは封じ込められる。
+
+  ### 途中で出てきた既存のずれ（これも直した）
+
+  `kototama.native.executor` の `valid-supervisor-report?` は 2026-09-08 から
+  全 report に `:vectors` と `:vector-items` を要求していた（2 つの vector
+  arena は別々に枯渇し、report が触れない唯一の bounded resource で、枯渇は
+  **PAIR arena の `:heap` 行の隣に裸の SIGILL として**現れていた）。
+  **loader はその片割れを一度も持っていなかった** —— 10 箇所の report site
+  すべてで。amu が古い kototama-native を pin していたので見えず、region
+  marshalling に届かせるため pin を進めた瞬間に
+  `malformed native supervisor evidence (exit=0, report-status=:ok)` として
+  出た —— **頼まれたことを正確にやった実行が、そう言う文の形で拒否された。**
+  report tail は 10 個の複製から 1 個の macro になった。
+
+  ### P0 の現在地
+
+  **閉じた。** provider が推論するのに要る「host memory を読む」は、言語・
+  verifier・loader・executor・署名経路のすべてで通っている。残るのは能力の
+  拡張であって gate ではない:
+
+  - **transport**: region は argv 越しの hex なので実質 64 KiB が上限。
+    モデル重みには**ファイル経路**が要る（`g:` の隣に `gf:<path>` を置く形）。
+    これは bound ではなく gap。
+  - **P1 の残り**: Q4_K / Q6_K の aarch64 arm（x86 側も per-group geometry で
+    unroll されており、移植ではない）。IQ 4 形式は read-only table が機械に
+    届くまで両 backend とも arm を持てない。
+  - **CLI**: `provider-kernel.wasm` は wasm32 で走っている。native kexe の方が
+    Mac の provider には正しい形なので、runtime を native に寄せる判断が要る。
+  ## 改訂 6 (2026-09-09 深夜) — Ollama 依存を外し、native path に初めて gate を付けた
+
+  オーナー指示「ollama 依存を外して」。**まず「依存」と「面」を分けて測った** ——
+  自分が直前に「走っている 4 つの `ollama-*` gate はオーナーが外せと言った面」と
+  書いたのが誤りで、あれらは `ollama-server-test`、つまり**こちらが提供する
+  Ollama 互換サーバ**のテストだった。
+
+  | | 判定 | 措置 |
+  |---|---|---|
+  | `ollama.cljc` / `mlx.cljc` | 依存（第三者のトークンを自分の答えとして報告する `IModelRuntime`） | 削除 |
+  | `gemma4_e4b_ollama.clj` + `:gemma4-e4b-live` | 依存（Ollama を通して生成） | 削除 |
+  | `host/jvm.clj` の `ollama-gguf-path` + verifier 4 本 | 依存（出荷 host が `ollama show` でモデルを探す） | `KOTODAMA_GGUF_PATH`、fallback せず fail-closed |
+  | `native_gemma4_parity` の live 比較 | 依存（第三者が参照） | 記録済み oracle と直接比較 |
+  | `relay_worker.clj` の `:engine ollama`（文字列） | 誤申告（実際は任意の OpenAI 互換 URL） | `MURAKUMO_INFER_ENGINE`、既定 `openai-compatible` |
+  | `host/ollama_server.clj` + `kotoba/ollama_*_core.kotoba` | 面（policy は Kotoba、host は transport のみ） | 残す |
+  | `vllm_infer_core.kotoba` + `cli/vllm.clj` | 自前（`build-native-vllm-cli.sh` は `amu compile` で自前 core をネイティブ化） | 残す |
+
+  ### locator が一番小さい依存だった
+
+  GGUF を読むことは依存ではない —— この host は Q4_K / Q6_K / BF16 / F32 を
+  自分でデコードする。**どこにあるかを Ollama に訊く**ことが、計算に一切必要
+  ない Ollama を必須にしていた。**小さすぎて見落とされる服を着た依存**である。
+
+  ### 置き換わっていないものを、置き換わったと書かない
+
+  `:gemma4-e4b-live` は `:imodelruntime-live-generate` を証明していた ——
+  つまり**第三者サーバがトークンを生成すること**の証明だった。**live
+  real-model generation の gate は今は無い。** `required-gates` から gate が
+  消えたのはこれが初めてで、その理由と「何が置き換わっていないか」を集合の
+  隣にそのまま書いた。
+
+  ### fleet の launcher は残っている（外す順序の問題）
+
+  `murakumo.infer.engine` / `infer.moe` は今も第三者プロセスを起動する。これを
+  外すのは rename ではなく、**native Kotoba path がトークンを生成できるように
+  なるのを待つ** —— まだできない。今外せば fleet は止まる。
+
+  ### そして gate を 1 つ足した —— この ledger で初めて方向を測るもの
+
+  **`:kotoba-native-executed`**（inference `bb6fa45a`）: `npm run conformance`
+  を `../amu` で回し、Kotoba を amu でコンパイルし、kexe loader を建て、
+  **W^X の下で artifact を実行する**。407 秒、実測で緑。
+
+  それまで ledger の gate は全部、portable な CLJC contract か、こちらが提供する
+  Ollama 互換面のどちらかだった —— **面はランタイムではない。**
+
+  最初 `:kotoba-native-cross-isa` と名付けたが、ホスト ISA でしか走らないので
+  改名した。**やっていないことを名前にするのは、ledger が嘘をつき始める形。**
+  cross-ISA の bit 一致は amu 自身の `isa_execution_test` にあり、そこからは
+  到達していないと `:does-not-prove` に書いてある。
+
+  ### この改訂で見つかった、自分の前セッションの欠陥
+
+  成熟度 loop を**正しい木**で回したら 2 件赤くなった —— `scheduler_core.kir.edn`
+  を生成・commit・parity 検査までしておきながら **`oracle/catalog` に登録して
+  いなかった**。`load-all!` は一度も読まず、テストは正確に **a core with no
+  catalog entry is shipped but unreachable** と言っていた。1 日誰も見なかったのは、
+  loop が回る west checkout が **origin/main より 4 commit 遅れ**ていて、その木には
+  artifact が存在しなかったから。**緑の gate が、報告している木とは別の木を
+  測っていた。** 出荷することと登録することは別である。
+
+  ### 2 層下の欠陥も 2 件（loop が見つけた）
+
+  - torch の checkpoint 往復で GradScaler が `32.0` → `32`。原因は
+    `json.core/numstr` が小数部ゼロの Double を整数として書くこと（JS の
+    一種類しかない数値型に合わせる**意図的**設計）。torch `43eb3c84` で
+    schema を知る層が型を復元するようにした。
+  - 同じ値が **compact `32` / pretty `32.0`** に分かれていた（pretty 分岐が
+    `numstr` を迂回）。json `ceeec4b1` で統一し、「Double は JSON 往復を
+    生き延びない」を**事実として pin** した（reader は lossy な側ではない、も）。")))

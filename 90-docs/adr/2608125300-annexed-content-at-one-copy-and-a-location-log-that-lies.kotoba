@@ -1,0 +1,128 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608125300")
+  (:adr/title "53 annexed objects at one copy, and a location log that lies")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-13")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related (vector "ADR-2608124200" "ADR-2607252000" "ADR-2608124800"))
+  (:adr/body
+  "## Why this sweep existed
+
+ADR-2608124200 found a repo where `manifest/west.yml` **declared**
+`annex-remote: b2` while **no special remote was ever configured**, so five
+objects existed only in one local clone and the registered checkout's symlinks
+were dangling. **A repo can look complete in git and resolve to nothing.**
+
+This is the sweep for the rest: all 25 manifest-declared candidates, plus a
+bounded disk cross-check.
+
+## Result: 53 objects, 53.4 MB, at ONE copy
+
+| repo | objects at one copy | bytes |
+|---|---|---|
+| `ghosthacker-shiropico-assets` | 42 | 53.6 MB |
+| `kouhou` | 10 | 274,760 |
+| `newsfeed` | 1 | 2.07 MB |
+
+Plus **two whose content could not be located at all** — the exact ADR-2608124200
+shape: declared `annex-remote: b2`, **no `git-annex` branch on the remote**, no
+`remote.log`, and no clone on this machine holding the objects. A fresh clone
+reports *no special remotes are currently known*. With no `remote.log` there is
+**no remote identity to probe**, and a convention-based guess is refused because
+the bucket's uuid belongs to a different remote. **Guessing further would mean
+asserting an answer that was not measured.**
+
+And **seven repos, 49,512 objects, 6.33 GB, where the content is findable and
+the map is not.** Nothing at one copy — B2 was probed and the bytes are there —
+but four never pushed the `git-annex` branch at all, and three published a branch
+whose `uuid.log` names exactly one laptop path with **no `remote.log`**: byte for
+byte the original signature, three more times. **Content and the map to it are
+separate publications, and only the content shipped.**
+
+## The location log lied, and only exhaustive probing exposed it
+
+`kouhou` claimed 48 objects with off-machine copies. Probed key by key against
+the remote: **38 present, 10 absent** — stable across two full runs, the same ten
+keys both times.
+
+**Fixed the part that could be fixed**: all 48 objects were copied into the
+registered checkout, md5-verified 48/48, working tree untouched. The ten are no
+longer dependent on a `/private/tmp` directory macOS purges.
+
+**The part that could not**: `git annex copy --to <remote>` reports **38 ok and
+does not attempt the other ten** — it trusts the same log. `git annex fsck
+--fast` rewrote some of the log and changed nothing about the remote. So
+`whereis` now claims **3 copies for all 48**, and ten of those claims are false.
+
+**This is the sharpest form of a lesson this workspace keeps relearning.** A
+location log is a claim log, not an observation. It is the only thing `whereis`
+reads, the only thing `copy` consults before deciding to skip, and — per below —
+the only thing the custody verifier checks.
+
+## The custody verifier returns OK for the repos that are broken
+
+`scripts/annex-custody-verify.cljs` is well built for what it asks — its
+`untrusted` handling and credential-health check are earned lessons — and on
+this survey it passed `kouhou` (*all with off-machine copies*, while ten were
+absent) and `media-corpus` (branch never pushed). Three blind spots, in cost
+order:
+
+1. **It trusts `whereis`.** Its sampled fsck only checks what the remote
+   *claims*, so a false claim is never contradicted.
+2. **It cannot see the map** — it has no notion of whether the `git-annex`
+   branch is published, so every repo in the findable-content group passes.
+3. **It treats *no annex here* as out of scope** (`:skipped`, not `:fail`), by
+   explicit design. But **a registered checkout with committed pointers, a
+   declared remote, and no annex IS the defect**, not an absence of one. It
+   skipped five of the eight worst cases, including both whose content could not
+   be located.
+
+It also enumerates from `west.yml` `path:` only — **which is precisely where the
+content turned out not to be.**
+
+## The structural cause is one directory, eight times
+
+**8 of the 15 annex stores on disk sit at paths west does not register.** Each
+was confirmed by GitHub repo id to be **the same repository as its registered
+sibling, reached by a rename redirect** — ADR-2608124200's finding, replicated
+eight times.
+
+The registered checkout holds the pointers and **no** `.git/annex`; the
+unregistered one holds the objects **and** the B2 configuration. Because the
+unregistered path is invisible to west, nothing pushes its `git-annex` branch;
+because the registered path sits in the `datalad` group, nothing ever fetches
+into it. **The gap between *declared* and *configured* is literally the gap
+between two directories.**
+
+## What the counts already disagree about
+
+25 declare `datalad: true`, 21 are in the `datalad` group, 24 declare an
+`annex-remote`. The five disagreements are informative rather than noise: four
+declare `datalad` but are **not** in the group, so a default `west update` does
+fetch them; one declares no remote at all and the verifier **silently defaults it
+to b2**; and one declares a different remote — **the only non-B2 in the set, and
+the one that failed.**
+
+## Next steps, in cost order
+
+1. **`ghosthacker-shiropico-assets`** — 42 objects, 53.6 MB, one copy. B2 is
+   configured locally and **no object was ever uploaded**. In the `archived`
+   group, so no routine touches it.
+2. **`newsfeed`** — one append-only ledger object, one copy.
+3. **`kouhou`'s ten** — locally safe now; the remote copy still needs a path that
+   does not consult the log. `git annex copy --force` or a re-init of the
+   remote's key mapping.
+4. **The seven unpublished maps** — cheapest of all: push a branch each, no data
+   movement.
+5. **The two unlocatable** — needs whoever created them to say which prefix was
+   used, or an S3 listing.
+
+## What was not done
+
+Read-only apart from the `kouhou` rescue: no `drop`, `gc`, `prune`, writing
+`fsck` on other repos, commit or push into any checkout. Remotes were touched
+only with existence probes, never a transfer, except the `kouhou` copy. One
+unverified item is recorded rather than assumed: a `/private/tmp` clone of
+another dataset claims all objects on the same remote whose claims proved false
+here — **worth verifying precisely because of that.**")))

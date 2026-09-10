@@ -1,0 +1,224 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609011300-stdlib-core-was-not-reachable-and-the-empty-record-was-not-the-reason")
+  (:adr/title "lang/stdlib/core.kotoba はどの経路からも届かなかった —— 止めていたのは 2 つではなく 5 つで、空 record はそのうち最も無関係だった")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2608311750-cljk-migration-cost-is-not-effects"
+                "adr-2608136000-six-questions-before-trusting-green"
+                "adr-2608650000-two-kinds-of-cannot-write-it-in-kotoba"))
+  (:adr/body "## Context
+
+`kotoba-lang/kotoba-lang` は `lang/stdlib/core.kotoba` に「有界な標準ライブラリ」を
+出荷し、`lang/stdlib.edn` で凍結済み公開名リストと sha256 を宣言し、
+conformance case `:portable-source-stdlib` まで持っている。
+
+2026-09-01 の前任者の実測は「**どの経路でもコンパイルできない**」で、理由を 2 つ
+挙げていた —— ①`(ns ...)` が無いので project route で `project module requires
+exactly one namespace` ②`(defrecord None [])` が
+`:kotoba.error/record-fields` で拒否される。そして case は
+「**もし誰かが走らせたら赤になる。誰も走らせていない**」と記録されていた。
+
+**測り直したら、止めていたのは 2 つではなく 5 つだった。**前の 2 つを外すと
+次が出てくる形で、1 回の測定では最初の 1 つしか見えない。
+
+## 測ったこと（2026-09-01、amu `27d82d8` / kotoba-lang `df17122`、全部 `--jvm-free`）
+
+| | 何が止めていたか | メッセージ | 分類 |
+|---|---|---|---|
+| 1 | namespace 宣言が無い | `project module requires exactly one namespace` | 欠落 |
+| 2 | `(defrecord None [])` | `record fields must be a non-empty unique bounded vector` | **言語の判断** |
+| 3 | 公開名 27 のうち **5 つが予約名** | `reserved function name` | **言語が名前を取った** |
+| 4 | 11 の関数が**書かれたままでは admit しない** | 型不一致 / `operation has no admitted lowering` | 陳腐化 |
+| 5 | 多アリティ関数は **export できない** | `export does not name a declared function` | linker の穴 |
+
+### 3 —— 言語が Option/Result の名前を取っていた
+
+frontend の `reserved-function-names` と凍結リストの積を取ると
+`option-none` `option-some` `option-some?` `option-value` `some` の 5 つ。
+前 4 つは `typed-safe-value-operations`（`result-ok` `result-err` `result-ok?`
+`result-value` `result-error` と同じ表）で、**言語が同じ名前で答える**。
+`some` は `let` `if` `ns` `nil?` `match-option` と同じ予約 head 集合に居る。
+
+つまり stdlib の Option/Result 部分は、**言語がそれを吸収した後も残っていた化石**
+だった。名前が衝突しているのではなく、名前の所有者が移っていた。
+
+### 4 —— 記録には無かった 11 件
+
+1〜3 を外した写しに対して、defn を 1 つずつ足しながら `sema/analyze` を回すと
+27 のうち 11 が落ちる:
+
+```
+FAIL option-some?  expression type mismatch: expected map, got i64
+FAIL option-value  operation has no admitted lowering
+FAIL find          if branches must have the same value type
+FAIL select-keys   operation has no admitted lowering      (contains-key? が無い)
+FAIL group-by      expression type mismatch: expected map, got i64
+FAIL update        expression type mismatch: expected map, got i64
+（ほか option-none? ok? err? unwrap-ok unwrap-err）
+```
+
+## Decision 1 —— 空 record の拒否は**維持する**。stdlib の側を直す
+
+前任者が「これは言語の判断であって自分の call ではない」と書いた点。答えを出す。
+
+**理由は 3 つあり、どれも実測に基づく。**
+
+1. **空 record を通しても何も買えない。** `None` に phantom field を足して
+   拒否を回避した写しを作ると、次に落ちるのは `find` で、
+   `if branches must have the same value type` ——
+   `Some` と `None` は**別の nominal type** なので、どちらかを返す関数は
+   そもそも 1 つの値型を持てない。record ベースの Option は、空 record が
+   通ろうが通るまいが**この言語では表現できない**。
+2. **variant も nullary case を持たない。** `variant cases must be a non-empty
+   unique bounded vector` で、各 case は `[keyword type]` の対。record だけ
+   空を通すと、2 つの nominal type former が食い違う。
+3. **言語が既に Option を持っている。** `:option-i64` は値型で、
+   `option-some` / `option-none` / `option-some?` / `option-value` は builtin。
+   `None` の綴りを議論する理由が無い。
+
+**変えた場合に壊れるもの**（変えないと決めた根拠として、正直に）:
+`validate-value-type!` の record 分岐を緩めるだけでは済まない ——
+`(+ 2 (* 2 (count fields)))` の node 会計、backend の record ABI
+（0 幅の値をどう置くか）、`record-new` / `record-get` の下ろし方、
+そして variant 側との整合。それだけの改造を、**使い道が無い形**のために
+入れることになる。
+
+したがって `Some` / `None` / `Ok` / `Err` は**綴り直さずに撤去**した。
+
+## Decision 2 —— 凍結リストを version 2 で**縮める**
+
+`:frozen` は「拡張には version bump が要る」と書いていた。ここで起きたのは縮小で、
+これも version bump に値する。**凍結リストは「guest が呼べる名前」の約束**なので、
+呼べない名前を載せたまま凍結しておく方が悪い。
+
+27 → 12。撤去した 15 と rename 1 は
+`lang/conformance/stdlib/manifest.edn` の `:withdrawn` に、
+**拒否したメッセージ付きで 1 件ずつ**記録した。
+
+残ったもの: `every?` `first-match` `concat` `reverse-into` `reverse`
+`range-step` `range` `zipmap` `merge` `comp2`
+`stdlib-binary-closure-anchor` `partial1`。
+
+### 凍結リストを縮めたコスト（正直に）
+
+- **`some` → `first-match`**。Clojure の名前が予約なので、この rename は
+  避けられない。呼び出し側の書き換えが要る（実在の呼び出し側は 0 件）。
+- **Option/Result 11 名が消える**。移行先は言語 builtin で、
+  `unwrap-ok` → `result-value`、`ok` → `result-ok` と 1:1 に対応する。
+  対応表は `lang/conformance/stdlib/manifest.edn` の `:withdrawn` と
+  `docs/lang/option-result-guide.md` §3。
+- **`range` が 1/2 引数を失う**。多アリティ export ができないため
+  （下記 5）。`(range 0 n 1)` と書く。
+- **`find` と `update` は admit も実行もできるのに落とした。**
+  wasm32 が拒否するため（`if` の両腕が `option-some`/`option-none` は
+  `unsupported typed Wasm expression`、typed map は internal compiler error、
+  どちらも project 抜きの単一ファイルで再現）。この package は
+  `:kotoba-wasm` を名乗っているので、名乗りの範囲だけを載せた。
+  wasm32 が下ろせるようになったら戻る —— その条件も `:withdrawn` に書いた。
+
+## Decision 3 —— 直さなかったもの
+
+| | 何 | なぜ |
+|---|---|---|
+| `lang/cli.edn` の `:prelude` option | 未修正 | 文書化済み CLI option の削除は、それ自体の conformance surface（`scripts/check-cli-contract.bb`、`lang/cli-adapter-matrix.edn`）を持つ言語判断。stdlib を到達可能にする副作用でやらない |
+| 多アリティ export（amu） | 未修正 | `analyze-module` が module を link **前**に analyze するので、`(:export [twice])` を解決する時点で名前は `twice$arity$1`。直すには interface を arity ごとに持ち、`rewrite-import-calls` が引数個数で選ぶ必要がある。2 module の再現を manifest に置いた |
+| wasm32 の typed option / typed map（amu） | 未修正 | 単一ファイルの再現を 2 つ記録。`find` / `update` が戻る条件 |
+| project link 診断の `:source` | 未修正 | namespace を欠いた module ではなく**entry** を `:source` に出すので、呼び出し側の file が悪いように読める。amu の診断 |
+
+## 結果 —— 到達可能になった
+
+```
+$ amu check lang/conformance/stdlib/basic.kotoba --source-path lang --jvm-free
+{:ok true, :format :kotoba.check/v1, ... :project {:root stdlib.basic,
+ :module-order [stdlib.core stdlib.basic],
+ :paths {stdlib.core <repo>/lang/stdlib/core.kotoba ...}}}          exit 0
+
+$ amu compile lang/conformance/stdlib/basic.kotoba --source-path lang \\
+    --unpinned --target wasm32 --output basic.wasm --jvm-free       exit 0
+$ node -e '<amu runtime/browser-host.mjs>.instantiateKotoba(...)'
+main = 9n
+```
+
+**9 は conformance case の `:expect {:kotoba 9}` そのもの。** file は動かして
+いない —— namespace→path は dots→slashes / hyphens→underscores なので
+`stdlib.core` は `lang/` を root にすれば `lang/stdlib/core.kotoba` に解決する。
+
+conformance case は `:prelude` を捨てて `:source-paths` を持ち、
+`kotoba.lang.stdlib-conformance-test` が実際に走らせて 9 を assert する。
+**ただしこのテストは linker を走らせていない** —— linker は amu に在り、
+kotoba-lang はそれに依存しない。テストは 2 module を join して
+linker と同じ alias 置換（`core/f` → `f`）を行う。project route 自体は
+上記の CLI 実測として `lang/stdlib.edn` の `:artifact-reachability` に
+コマンドと exit code つきで記録した。**「2 module が正しい答えを計算するか」と
+「linker がそれらを解決するか」は別の主張**で、前者がテスト、後者が実測記録。
+
+## この ADR が一般化すること
+
+**凍結した表は、それを実行する経路が無ければ腐る。** T4.1 の freeze は
+2026-07-28 に書かれ、以後 regex と sha256 でだけ検査されていた ——
+「名前が在ること」は検査していたが、「その名前が呼べるか」は一度も訊いていない。
+その間に言語は Option/Result を吸収し、5 つの名前を予約し、型検査を締めた。
+**表は 1 バイトも動いていないのに、表の意味する内容は全部変わっていた。**
+
+これは ADR-2608136000 の 6 問のうち 2 問目（「そもそも実行できないとき何を返すか」）
+の遅効性の形である。検査は走っていた。走っていた検査が、走っていない検査と
+同じ緑を返していた。
+
+## 測っていないこと
+
+- **`:kotoba-cljs` backend では一切測っていない。** `lang/stdlib.edn` の
+  `:backend-evidence` に `:not-measured` と書いた（`#{:compiler :kotoba-wasm
+  :kotoba-cljs}` という宣言はそのまま残してある。落とす根拠を持っていない）。
+- **多アリティ export の修正コストは見積もっていない。** `analyze-module` を
+  読んで「interface を arity ごとに持つ必要がある」ところまで。
+- **`lang/q9-kotoba-candidate-verification.edn`** は古い sha256 と
+  `:status :fail` の proof を持ったままにした。生成物であり、
+  生成器 `scripts/verify_q9_kotoba_candidates.clj` は `:source-paths` を持つ
+  case を skip するので、次に回した時にこの case は対象から外れる。
+  回していない。
+
+## 壊して確かめたこと（CLI 経路、amu `27d82d8`、`--jvm-free`）
+
+`amu check lang/conformance/stdlib/basic.kotoba --source-path lang --jvm-free`
+を、直した 3 点をそれぞれ 1 つだけ壊した写しに対して回した。
+**壊したものと、返ってきたメッセージが一致する**ことを確認している
+（別の理由で赤くなった赤を「実演」と数えないため）。
+
+| 壊した箇所 | exit | メッセージ |
+|---|---|---|
+| （無改変） | **0** | `:ok true` |
+| `(ns stdlib.core ...)` を削除 | 65 | `project module requires exactly one namespace` |
+| `range` を多アリティに戻す | 65 | `export does not name a declared function` |
+| `(defrecord None [])` を足す | 65 | `record fields must be a non-empty unique bounded vector` |
+| （復元） | **0** | `:ok true` |
+
+## suite（`clojure -M:test`、kotoba-lang）
+
+| | tests | assertions | failures | errors |
+|---|---|---|---|---|
+| 無改変 `origin/main` `df17122`（同じ layout） | 273 | 1620 | 5 | 2 |
+| 本変更 | **284** | **1702** | **5** | **2** |
+
+**失敗の一覧は文字列として同一**（`q1-claims-are-auditable` 5 件と
+`q3-consumers-embed-the-canonical-grammar-without-drift` 2 件）。どちらも
+sibling checkout の drift 由来で、本変更とは無関係。新規の赤は 0。
+
+破壊/復元は JVM 側でも回した（対象 2 namespace、15 tests / 110 assertions）:
+
+| 壊した箇所 | 赤くなったテスト |
+|---|---|
+| `(ns stdlib.core ...)` 削除 | `the-module-exports-exactly-the-frozen-public-names` |
+| 凍結リストに `option-value` を戻す | `no-frozen-public-name-is-a-reserved-name` / `version-two-withdrew-the-names-the-language-took` |
+| `range` を多アリティに戻す | `every-export-is-single-arity` |
+| `first-match` が常に先頭を返すようにする | `portable-source-stdlib-computes-its-expected-value` |
+| 復元 | 0 failures |
+
+⚠ **1 回目の break 4 は空振りだった。** `reverse` を恒等関数にしたが、
+conformance entry は `(pair-first (core/reverse (pair 5 0)))` を計算するので
+**答えが変わらない**。sha256 のテストだけが赤くなり、実行結果のテストは緑のまま
+だった。「壊したものと報告されたものが一致することを確かめる」が効いた形なので、
+壊し方を変えて測り直した（上表は測り直した方）。
+")))

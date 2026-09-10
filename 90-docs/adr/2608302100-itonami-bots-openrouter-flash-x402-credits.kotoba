@@ -1,0 +1,73 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608302100-itonami-bots-openrouter-flash-x402-credits")
+  (:adr/title "itonami Bots は murakumo の OpenRouter flash を呼び、x402 USDC と credits で払う。glm-5.3-flash が一次、qwen3.8-flash が次")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-30")
+  (:adr/last-verified "2026-08-30")
+  (:adr/last_verified "2026-08-30")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "itonami-bots-openrouter-reliability")
+  (:adr/repos
+  (vector "orgs/network-awai/cloud-murakumo-api"
+   "orgs/network-awai/cloud-murakumo"
+   "orgs/cloud-itonami/cloud-itonami-app"))
+  (:adr/authoritative-for
+  (vector "api.murakumo.cloud が z-ai/glm-5.3-flash と qwen/qwen3.8-flash を OpenRouter 経由で売ること"
+   "x402 決済後に site worker が prepaid micros を API worker へ運ぶこと"
+   "itonami Bots の既定モデルが murakumo 上の glm flash であること"
+   "identified 顧客は credits、x402 は USDC、operator shared token は OpenRouter 請求そのものであること"))
+  (:adr/related
+  (vector "adr-2608300200-murakumo-is-the-portal-itonami-is-the-agent"
+   "adr-2608301700-hermes-and-itonami-bot-reliability-session"
+   "adr-2608291300"
+   "adr-2608272200-bots-on-the-openrouter-free-plan"
+   "adr-2608150100"))
+  (:adr/evidence
+  (vector "live 2026-08-30: Domain Steward canary が『モデルへの接続に失敗しました (HTTP 503)』。GET /v1/models は hosted 6 件、namespaced 0 件"
+   "ADR-2608300200 は OpenRouter 未設定を 503 external_models_unavailable と決めた。キーも価格も未設定のまま本番に出ていた"
+   "Hermes Agent 2026-08-30: z-ai/glm-5.3-flash が primary（56 ok / 7 fail）。openrouter/free は 24h で死ぬ"
+   "OpenRouter list 2026-08-30: glm-5.3-flash $0.15/$0.50 per Mtok、qwen3.8-flash $0.15/$0.47。GLM promo は 2026-09-09 24:00 UTC+8 で終わるので list を焼く"
+   "x402 $0.01 = 10000 micros。glm list は 20000 output tokens、qwen は 21276。credits peg は 100 credits = $1"))
+  (:adr/body
+  "# itonami Bots は murakumo の OpenRouter flash を呼び、x402 USDC と credits で払う
+
+**Status**: accepted / 2026-08-30 / オーナー指示「itonami cloud bots の app をより grok bots, hermes agent bots を参考に安定させる。api.murakumo.cloud の model 自体を openrouter backed で安定させて glm 5.3 flash, qwen 3.8 flash を call できる様に。決済は x402, usdc。credits 消費」
+
+## Context
+
+画面の 503 は fleet Qwen の過負荷ではなく、ADR-2608300200 が意図した fail-closed である。publisher-namespaced id は OpenRouter key が無いと 503 `external_models_unavailable`。itonami 側は ADR-2608272200 で `openrouter/free` に立ち、Grok Bots は `murakumo-main` alias を dereference して生き残った。
+
+Grok の教訓は alias。Hermes の教訓は **無料 router に立たない** ことと、一次を実測した flash に置くこと。itonami は portal（murakumo）に繋ぎ、model 文字列だけ Hermes と同じにする。
+
+## Decision
+
+1. **Relay する id**（OpenRouter のそのまま）:
+   - `z-ai/glm-5.3-flash` — 一次。list $0.50/Mtok-out → 500000 micros。credits 50/Mtok-out
+   - `qwen/qwen3.8-flash` — 次。list $0.47/Mtok-out → 470000 micros。credits 47/Mtok-out
+   価格は **list**。promo を焼くと期限後に原価割れする。
+
+2. **x402 prepaid hop**（ADR-2608300200 の穴）:
+   site worker が決済後、`x-murakumo-x402-usd-micros` を API worker へ付ける。API は shared token が同時に通ったときだけ `:x402-settled` とし、`prepaid-allowance` で output を切る。ヘッダだけでは支払いにならない。
+
+3. **3 本のレールを混ぜない**:
+   - x402 USDC — 先払い。credits を二重に引かない
+   - passkey / Biscuit / CACAO / mk1 — 完了後に credits。次の空財布は 402
+   - operator `MURAKUMO_API_KEY`（shared token）— OpenRouter 請求そのもの。credits を引かない（Domain Steward が operator 残高 0 で 402 になるのを避ける）
+
+4. **itonami Bots**:
+   provider = murakumo。default / workforce = `z-ai/glm-5.3-flash`。fallback = qwen flash それから `murakumo-main`。OpenRouter は destination として残し、既定にはしない。bots は `MURAKUMO_API_KEY` を持つ。`max-transient-retries` は 2。Grok Bots の alias 契約は動かさない。
+
+5. **広告**:
+   `/v1/models` に載せる namespaced id は、gateway が configured なときだけ。external に `context_window` を付けない（未測定）。bots 側の window は conservative 128000。
+
+## Consequences
+
+- 匿名の namespaced POST は 402。fleet Qwen に差し替えない。
+- 価格表と hop が揃う前に外部 id を advertise しない。両方の Worker を同時に出す。
+- `data/config.edn` の operator overlay が profile より後に勝つ。live がまだ `openrouter/free` なら overlay も直す。
+- reserve-before は未配線。identified 1 本が未払いをすり抜け、次が 402。charge-after のまま。
+")))

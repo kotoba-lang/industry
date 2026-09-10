@@ -1,0 +1,360 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608081800-money-power-reputation-sacred-status-dynamics")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "money-power-reputation-sacred-status-dynamics")
+  (:adr/title "ADR-2608081800: 金は移転でき、評判は移転できず、神聖性は買えない —— この三層をこの workspace がどこまで実装しているかの実測と、14 次元 power vector の stock-flow モデル")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-08")
+  (:adr/last_verified "2026-08-08")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/repos (vector "com-junkawasaki/root" "etzhayyim/root" "gftdcojp/engi"
+              "kotoba-lang/org-oasis-open-xmile" "kotoba-lang/dynamics"))
+
+  (:adr/authoritative_for
+  (vector "三層命題（money 移転可 / reputation 獲得可・移転不可 / sacred status 購入不可）が etzhayyim と engi にどこまで実装されているかの実測結果"
+   "money / power vector / reputation / sacred status の system dynamics モデルの正本は 90-docs/system-dynamics/money-power-sacred.cljs であること"
+   "そのモデルの数値のうち引用してよいのは構造的結論だけで、水準の絶対値は引用してはならないこと（キャリブレーション用の実データが 1 件も無いため）"
+   "4 つの結論のうちどれがパラメータ空間で頑健かの実測（B 100% / D 97.5% / A 90.8% / C 36.8%）"
+   "C（φ 応答の内部最大）は基準パラメータの性質であって構造の性質ではないこと"))
+
+  (:adr/body
+  "## 何を問われたか
+
+『Money は移転可能。Reputation は獲得可能だが移転不可。Sacred status は原則として
+金銭・reputation のどちらからも購入不可』—— この三層が etzhayyim・engi などに
+設計・ルール化されているか。そして、それを system dynamics として実際に走らせられるか。
+
+## 実測 1 —— 三層のうち 2 つは実装され、1 つは実装されていない
+
+### money 移転可 —— gftdcojp/engi がこれ「だけ」をやる
+
+engi は Murakumo の metering と Nexus-x402 の settlement の間に立つ value-accounting /
+countersignature 境界である。Murakumo の Ed25519 receipt を検証し、正準な CIDv1/raw/sha2-256
+の transfer ID を導出し、それを一度だけ記録して replay を封じ、Engi 独立鍵で副署して
+Base USDC の決済文脈へ渡す。reputation も status も一切持たない。移転そのものが唯一の関心事。
+
+### reputation 獲得可・移転不可 —— 要求より強い形で実装されている
+
+etzhayyim は『移転を禁じる』のではなく『数値として鋳造すること自体』を禁じている。
+しかもテストで強制されている:
+
+- 20-actors/ake の G9 —— proposals throttle; they never mint a permanent reputation number。
+  methods/contributor.cljc の docstring が『no permanent ban, no minted reputation number,
+  no ranking of contributors against each other』と書き、methods/test_contributor.cljc:81 が
+  API 表面から rank / leaderboard / compare / score / reputation / best / worst / top を排除する。
+  throttle は回復可能（次の accepted edit で自動解除）なので『獲得可』の側も保たれている。
+- 20-actors/shomei の G8 —— identity-assurance NOT social-credit。
+  methods/test_charter_invariants.cljc:60 / test_aggregate.cljc:50 / test_lexicons.cljc:57 が
+  score / rank / reputation / trustScore / worth / socialCredit フィールドの存在を禁止する。
+
+移転不可は構造的に自明である。claim は subject 自身の DID 鍵で署名され（G1/G7 が
+serverSig / operatorSig を型で拒否）、G2 の own-identity-only により第三者について
+主張する field を持てない。他人に渡せる表現が存在しない。
+
+精度のための但し書き: 禁止は『人』に対してだけである。20-actors/kakaku は
+merchant/reputation-score を持ち、20-actors/credits は HC reputation gate
+（approval_rate < 50% は earn 拒否）を持つ。取引相手の評価は禁じていない。
+
+### sacred status 購入不可 —— 人の地位としては設計されていない
+
+sacred という語の出現は LANDS.md の土地権利型（stewardship / occupancy / use / access /
+cultivation / water / conservation / sacred / easement と並ぶ claim type）と、比喩
+（kamado = 竈 = sacred hearth、asobi = sacred free-play）だけである。金でも評判でも
+買えない『地位』という層は存在しない。
+
+ただし構造的に最も近いものはある。Charter Compliance Rider の Tier-0 priority は
+『The Tier-0 priorities themselves are not amendable by any Council vote (changing them is
+founding a different association -- a chain fork)』と定め、Section 2 の改正ですら
+Council Lv7+ 全会一致 + priority-conformance attestation を要求する。経済面は
+non-profit-only / donation-only inflow / no-equity / ad-exclusion。
+つまり購入不可にしてあるのは『地位』ではなく『優先順位』であり、Charter 自身の言葉では
+『固定するのは掟でなく priority』（ADR-2606062100）。三層命題の第 3 層は、人ではなく
+憲章に対して実装されている。
+
+## 実測 2 —— 14 次元 power vector の stock-flow モデル
+
+power を 1 変数に潰すのは粗すぎるという指摘を受けて組み直した。正本は
+90-docs/system-dynamics/money-power-sacred.cljs。新規実装はゼロで、
+kotoba-lang/org-oasis-open-xmile（XMILE 1.0 の model / expr / validate / execute / xml、
+Euler・RK4 シミュレータ付き）と kotoba-lang/dynamics（Meadows leverage band）だけを使う。
+
+構成: 17 stocks（Money / Attention / Reputation / Network / Institutional / Political /
+Media / Narrative / Cultural / Technological / Data / Coordination / Moral_Authority /
+Legitimacy + Sacred を elite / mass / institutional の 3 チャネルに分割）、34 flows、
+126 aux（うち 87 がパラメータ）、合計 177 変数。XMILE 1.0 として well-formed で、
+Stella / Vensim / Insight Maker にそのまま読める
+（90-docs/system-dynamics/money-power-reputation-sacred.xmile、18,542 bytes）。
+
+Coercive / Reward / Expert / Platform / Gatekeeping / Information / Followers は stock では
+なく Cobb-Douglas の auxiliary にした。『資源そのもの ≠ power』という区別を型で表すため
+である（例: Political_Influence = FinCap^0.4 · Network^0.3 · Rep^0.2 · Inst^0.1）。
+
+半飽和定数 K は当て推量ではない。dX/dt = g·n̄ − δX、n_X = X/(K+X) の閉ループ不動点
+X* = g/δ − K から n* = 1 − Kδ/g なので、K = 0.45·g/δ と置けば全 stock が n*≈0.55 の
+感度帯に入る。初版はここを外していて全 stock が n≈0.05 の不感帯に潰れていた。
+
+## 結果（構造的な結論のみ。水準の絶対値は引用しないこと）
+
+1. 構造不変条件は機械検査に通る。sacred_elite_gain / sacred_mass_gain / sacred_inst_gain の
+   式に Money・Financial_Capacity・Manipulation は一文字も現れない。一方 sacred_*_loss は
+   Scandal・Commercialization・Contradiction を参照する。**金で買う辺は無いが、金で失わせる
+   辺はある**という非対称が構造として出ている。
+
+2. 換金後に『必ず通る関門』は 1 つも無い。|V| 回の到達可能性判定（全単純経路の列挙は
+   組合せ爆発するので使わない）で、Financial_Capacity 以降に単独で切れば分離できる節点は
+   ゼロだった。『1 点を規制すれば金と神聖性を切り離せる』は偽である。最短経路は
+   elite 6 hop（→ political_power_in → Political_Power）、inst 7 hop（→ technological_power_in
+   → Technological_Power → Genuine_Contribution）、mass 9 hop（→ Manipulation → Scandal →
+   reputation_out → Reputation → Recognition）。大衆への最短路が負の経路を通る。
+
+3. **初期資本は到達点を買わない。**t=600 まで回すと、M0 が 1 でも 100000 でも、
+   非-money stock を 0.01 から出発させても 30 から出発させても、Sacred_Total は
+   完全に同一値（差 0.00000）に収束する。単一の大域アトラクタである。
+   ただし過渡は実在する: ∫ΔS dt は M0=1000 で +52.81、M0=1 で −218.13。
+   **初期資本が買うのは速さであって高さ。**
+
+4. 一方で『金の定常的な豊富さ』は到達点を確実に下げる。富の複利の飽和パラメータ
+   money_cap_k を 0（無限に複利）から 0.01（すぐ頭打ち）まで振ると Sacred_Total は
+   9.41 → 12.82 と単調に上がる。どの値でも M0 依存はゼロのまま。金が積み上がるほど
+   Manipulation と Commercialization が増え、mass と institutional のチャネルが削られる。
+
+5. dynamic power multiplier（平衡の +10% ショックに対する ∫ΔS dt。系が単一アトラクタ
+   なので T→∞ で収束する well-defined な impulse response）の順位は
+   Institutional > Political > Coordination > Cultural > Narrative > Network > Legitimacy >
+   Attention > Media > Reputation > Technological > Moral_Authority > **Money** > Data。
+   Money は 14 中 13 位。予想外だったのは Moral_Authority が下から 3 番目であること。
+   Contradiction = n_Moral_Authority × Coercion_Visibility が自分自身の負のフィードバック
+   になるためで、強制が可視な状態では道徳的権威は自分の神聖性を削る。
+   絶対ショック +10 で並べると Reputation が 4 位に跳ね上がるので、絶対ショックの順位は
+   stock ごとの単位スケールに依存する量として扱うこと。
+
+6. policy lever の効きは Meadows の band 順と一致した。psi（商業化の罰、band C）が最強で
+   −41%、theta（power→sacred 防火壁、band E）は −14% にとどまる。phi（money→power 摩擦）は
+   非単調で、しかもチャネルごとに最適点が違う: S_elite は phi=0 で最大、S_mass は phi=0.6 で
+   最大、S_total は phi=0.4 で最大。Sacred を 3 チャネルに割ったから見えた結果である。
+
+## 途中で自分が間違えたこと（同じ誤りを繰り返さないために記録する）
+
+- **t=80 を平衡だと思い込んで M0 依存を報告した。**t=600 まで伸ばすと消えた。
+  収束を確かめずに『平衡値』と呼ばない。今回は cold start と hot start を突き合わせる
+  アトラクタ一意性プローブで初めて気付いた。
+- **xmile.execute/parsed-eqn が評価のたびに式を再パースすると説明した。これは誤り。**
+  execute/run は先頭の desugar-delays で全式を一度だけ木に落とす。実測（メモ化の有無で
+  62.1s 対 63.1s）で効果ゼロと分かった。本当の無駄は定数 aux を RK4 の substep ごとに
+  評価し直すことだった。
+- **スクリプトが節 4b に印字した結論行が間違っていた。**『飽和しない世界でのみ初期資本が
+  到達点を決める』と書いたが、正しくは『飽和しない世界では初期資本の差は消えたまま、
+  到達点そのものが下がる』。上の 4 が正しい読み。
+- **新しいテストの期待値を間違えた。**t=20 は時定数 1 個ぶんで S=200(1−e^−1)=126.424 が
+  正解であり、実装は最初から正しかった。閉形式解に対する各ステップ検証に直した。
+- **90-docs/system-dynamics/ を新規ディレクトリだと思って作ろうとした。**既に
+  business.cljs / leverage.cljs / pricing.cljs / regret.cljs / token-price.cljs /
+  itonami-maturity.datoms.edn がある。自分で書いた『無いと結論する前に索引を引く』規則を
+  踏みかけた。
+
+## 上流に返した変更
+
+kotoba-lang/org-oasis-open-xmile#2（merge commit 9a70300）—— XMILE では全パラメータを
+literal 方程式の aux として宣言するのが普通（Stella / Vensim のスライダーがそれ）なので、
+中規模モデルは大半が定数になる。それを RK4 の substep ごとに評価し直していた。
+run が topo-order を一度だけ分割し、値が run 中変わらない変数を 1 回だけ評価して
+既存の extra-env 経由で流す。public arity は追加のみ。
+
+このモデルで 160 non-stock 変数中 88（55.0%）が定数と判定され、1 run あたりの変数評価が
+480,160 → 216,160（−55.0%）になった。出力は全 stock で小数 12 桁まで一致。
+**速度向上は主張していない。**畳んだ変数はどれも :num 葉で最も安い評価であり、消えるのは
+substep ごとの lookup と assoc であって木の走査ではない。開発機での交互実行は
+before 12.6〜35.2s / after 13.9〜14.4s と before の範囲が after を跨いでおり、壁時計は
+機械負荷に支配されていて何も支持しない。評価回数の削減は決定的で再現するが、壁時計はしない。
+
+TIME/DT が通常の :ref であること（free-vars は結果から除くが評価器は env から解決する）と、
+sec 3.5.4 の PULSE/STEP/RAMP が TIME を引数に取らず env から読むことの 2 点により、
+:ref を持つ木と :call を持つ木は畳めない。どちらもテストで固定した。
+
+## 限界（これを外して引用しないこと）
+
+- **キャリブレーション用の実データは 1 件も無い。**パラメータは全て仮説であり、上の順位も
+  重み付けの仮説に条件付きである。dynamics の『computed always means instantiated against
+  real facts』に照らせば、これは measured ではない。
+- したがって引用してよいのは構造的結論（どの経路が存在するか / 到達点が初期値に依存するか /
+  順位はどうか）だけで、Sacred_Total = 12.58 のような水準の絶対値ではない。
+- XMILE の配列・conveyor・queue は使っていない（org-oasis-open-xmile v1 が未実装）。
+- etzhayyim の実測は checkout 済みのファイルに対するものである。west は必要になるまで
+  取得しないので、未 checkout の repo に別の実装がある可能性は排除していない。
+
+## ロバストネス解析 —— 較正できないなら「値」ではなく「値への依存」を測る（2026-08-08 追記）
+
+較正用の実データはこの workspace に無い。`kotoba-lang/dynamics` の `loop-archetypes` は
+52 件あるが cycle-time の実測は 0 件（ライブラリ自身が推測値を返さず nil を返す設計）、
+`market-intel` や `internet-accounts` は実データだが神聖性に対応する観測量を持たない。
+そこで較正の代わりに、**どの結論がパラメータ値に依存しないか**を測った。
+
+方法: 全パラメータを log-uniform ×[1/1.5, 1.5] で摂動。φ/θ/ψ は独立変数なので摂動しない。
+半飽和定数 K は設計則 K = kfrac·g/δ を摂動後の g,δ から再計算する（kfrac ~ U(0.30,0.60)）
+—— これをしないと大半の draw が不感帯に落ち、『結論が頑健か』ではなく『モデルが退化するか』
+を測ることになる。T=300 / dt=1.0 / seed 固定。退化して除外された draw は 0 件。
+
+| 結論 | 成立率 | 判定 |
+|---|---|---|
+| B Money は power multiplier の下位半分 | **200/200 = 100%** | 完全に構造的 |
+| D ψ（商業化の罰）のほうが θ（防火壁）より効く | **390/400 = 97.5%** | 構造的 |
+| A 到達点は初期資本 M0 に依らない | **363/400 = 90.8%** | ほぼ構造的 |
+| C φ 応答が内部最大を持つ（非単調） | **147/400 = 36.8%** | **構造的ではない** |
+
+Money の順位分布は 11 位:14 / 12 位:42 / 13 位:94 / 14 位:50。400 通りの重み付けで
+**一度も上位半分に入らなかった**。中央値 13 位、最良でも 11 位。
+
+**C の扱いを改める。**φ 応答の非単調性（S_elite は φ=0 で最大、S_mass は φ=0.6 で最大、
+S_total は φ=0.4 で最大）は基準パラメータでは実測どおり成り立つが、±50% 摂動すると
+6 割の draw で消える。したがって『金と力の摩擦には最適点がある』は**この重み付けの性質
+であって、この構造の性質ではない**。本 ADR の結果節 6 と artifact の該当箇所はこの但し書き
+つきで読むこと。
+
+A が落ちる 9.2% も記録しておく。そこでは初期資本が到達点を変えており、最初の議論で
+仮説として出た『ある閾値以上の money で分岐する』現象がパラメータ空間の一部に実在する
+ことを意味する。基準点には無い。
+
+実装は `90-docs/system-dynamics/money-power-sacred-robustness.cljs`、
+生の出力は `90-docs/system-dynamics/robustness-2608081800.log`。
+
+## 解釈から生成へ —— 274 倍（2026-08-08 追記）
+
+上のロバストネス解析は当初 `xmile.execute`（解釈）で回して 35 分で 60 draw しか進まず、
+完走に数時間かかる見込みだった。分解して測った結果:
+
+- マシン負荷の寄与は約 26%（`8.42 real / 6.20 user` = CPU 効率 74%、load average 75–94）。支配的ではない
+- **支配的なのは解釈そのもの**。1 run = 動的な非-stock 変数 72 × 評価 1,501 回 = **108,072 回**
+  の式木評価で、1 回あたり **23.9〜35.2 µs**。変数ごとに `m/lookup`（入れ子 map）→ 式木の
+  再帰走査（`:ref` ごとに約 170 キーの PersistentHashMap へ `contains?` + `get`）→ `assoc` で
+  環境を作り直している
+
+同じ式木から JS を生成し（定数はリテラルに畳み込み、stock は Float64Array の添字に束縛）、
+直線的な浮動小数コードにした:
+
+| | |
+|---|---|
+| 解釈（xmile.execute） | 3,804.3 ms/run — 1 変数評価 35.2 µs |
+| 生成 JS | **13.87 ms/run** — 1 変数評価 0.128 µs |
+| 倍率 | **274×** |
+| 出力の一致 | 全 stock で相対差 0.000000000 |
+| 生成コード | 177 変数で 6,425 bytes |
+
+**速いのは表現であって、ランタイムでも言語でもない。**これは
+`kotoba-lang/org-oasis-open-xmile` の欠陥ではない —— 40 ステップの bathtub では解釈コストは
+見えず、2,000 run × 108k 評価で初めて効く。上流に `xmile.compile`（モデル → クロージャ）を
+任意経路として足すのが自然な follow-up で、大きいモデルを回す誰にでも効く。
+
+## kotoba-native へコンパイルできるか（2026-08-08 追記、実測）
+
+**backend の場所について CLAUDE.md の記述が古い。**「`compiler/src/kotoba/compiler/backend/
+x86_64.cljc`」は存在せず、そこには `cljs.clj` しかない（pin は upstream main と identical
+なので checkout が古いのではない）。native backend は ADR-2607266000 で
+**`kotoba-lang/kotoba-native`** に切り出されている（`kotoba.native.x86-64` /
+`kotoba.native.aarch64` / `kotoba.native.elf64` を所有）。索引（`repo-search`）を引いて判明した。
+
+native の f64 演算表は x86_64 と aarch64 で**完全に一致**する:
+`f64-abs add div eq ge gt le lt max min mul neg sqrt sub unordered`。
+`exp` / `log` / `sin` / `cos` は無い。整数ビット演算も `bit-not` だけ（and/or/shift 無し）
+なので、指数部をビットで抜く常套手段は使えない。f64 は整数レジスタに IEEE-754 の
+ビット列として置かれ、`f64-from-bits` / `f64-to-bits` は何も emit しない。
+
+**それでも backend 変更なしでコンパイルできる。**native が既に emit できる演算だけで
+exp / log / pow を書いて精度を実測した:
+
+| | 最大相対誤差 | 対 libm 速度 |
+|---|---|---|
+| exp（モデルの範囲 x∈[-6,0]） | 2.44e-14 | 5.3× 遅い |
+| log（x∈(0,1]） | 2.37e-15 | 9.2× 遅い |
+| pow（一般指数） | 1.47e-12 | — |
+| `^0.5` → `f64-sqrt` に特殊化 | 厳密 | **0.92×（libm の pow より速い）** |
+
+RK4 の打ち切り誤差は dt=1 で ~1e-4 なので、数値的には 10 桁の余裕がある。
+アルゴリズムは exp = 1/256 に縮小 → 7 項 Horner → 8 回二乗（逆数を定数畳み込みして
+除算を消すと 17.4× → 5.3×）、log = `f64-sqrt` 反復縮小 → atanh 級数、pow = exp∘log。
+
+`vector-f64-*` は両 backend で汎用 vector と同じ表にエイリアスされているので、RK4 の
+state 配列（17 要素）もそのまま通る。再帰的値も `[:set T]` の 32 要素上限も
+このモデルには無関係（当時は「再帰的値は W4 待ち」と書いたが現行ではない。W4 は landed
+しており、待ちが残るなら named backend の未達であって言語計画の未着手ではない）。
+
+手順: ① `f64-math.kotoba`（exp/log/pow、backend 変更なし）② XMILE → `.kotoba` emitter
+（JS 用の式木ウォークを流用。**定数指数の特殊化を入れること** —— 冪 18 箇所のうち 10 箇所が
+`^0.5`＝`f64-sqrt` 一命令、2 箇所が `^3`＝乗算 2 回になり、一般 pow は 6 箇所に減る）
+③ RK4 driver を `[:vector :f64]` 上の末尾自己再帰で ④ 結果は `kgraph-assert` か capability で
+取り出す ⑤ `lang_native_conformance.clj` + `backend_qualification.clj` を通し、
+12 桁一致の JS 版を参照解として突き合わせる。
+
+**ただし native が JS より速いとは限らない。**このモデルは超越関数が重く（derivs 1 回あたり
+一般 pow 6 + exp 1 が残る）、ソフトウェア実装の 5〜9 倍のペナルティと、native 側の利得
+（boxing なし・JIT 無関係・境界検査なし）が正面からぶつかる。どちらが勝つかは測らないと
+分からない。native を明確に勝たせたいなら入れる価値がある backend 変更は 1 つだけ —
+**`f64-exp` と `f64-log`**。上で 1e-14 の精度が出る命令列を実測したので、backend はその列を
+そのまま inline で吐けばよい。
+
+# ══ closing（2026-08-09）—— このプログラムの現在地と再開点 ══
+
+10 反復の自走ループを止めた時点の正本。**会話履歴なしで再開できる粒度で書く。**
+
+## 着地したもの（すべて com-junkawasaki/root の main 上）
+
+| 種別 | 実体 |
+|---|---|
+| ADR 8 件 | 2608081800（本 ADR、基礎モデル）/ 2608082100（金くささ 8 機序分解）/ 2608082300（金利と成長）/ 2608082400（証券・流動性）/ 2608090200（成長要素）/ 2608090400（限界較正）/ 2608090700（実証プロファイル）/ 2608090800-margin-vs-contract（粗利率と契約） |
+| 計算 | `90-docs/system-dynamics/` に 65 ファイル（17 stock / 34 flow / 126 aux = 177 変数の XMILE モデル + 較正・頑健性・走査スクリプトと出力ログ） |
+| 上流貢献 | `kotoba-lang/org-oasis-open-xmile#2`（定数畳み込み。非 stock 変数 160 個中 88 個を畳み、評価回数 480,160 → 216,160 = −55%。62 test / 238 assertion green）。west pin 前進済み |
+
+## 範囲を限定した上で robust な結論（すべての範囲・重み・較正・修復を生き延びた）
+
+1. **囲い込みは唯一「儲かる」機序**（40/40 で範囲不変）。にもかかわらず**害の順位は最下位近く（2.5%）**で、成長にも正統性にも負（90% / 93%）。実証プロファイルで外すと **顧客 −33.69% を払って正統性 +3.38% を買う**取引になる。
+2. **透明性は成長を犠牲にせずに正統性を上げる**（30/30）。独立した 2 モデルで再現。
+3. **学習は正統性で 1 位**（30/30）。成長と正統性の両方を買える唯一の要素。
+
+## 撤回・格下げしたもの（成功譚に整形しない）
+
+- **F2「利益分配のトレードオフ」は撤回**（0/30）—— モデルの不完全さだった
+- φ の内部最大は 36.8%、monitor_cost の交差は 33.3%、distress 加速の非対称は 56.7% —— **いずれも過半に届かず**
+- 機序の害の順位は**実証範囲内では未決定**
+
+## いま明示すべき限界（2026-08-09 に判明、最も広く効く）
+
+**ToS コーパス（187 + 33 + 8 社）はすべて英語版である。** つまり測っていたのは
+**「米国版の契約」**であって、その企業が各地域のユーザーに課している契約ではない。
+Meta を実ブラウザで回収しようとして判明した（`?locale=en_US` を無視して地域で言語が決まる）。
+**ADR-2608082100 以降のすべての測定に掛かる。**間違った答えではなく、答えている問いが
+狭かったという形の欠陥なので、数字はどれも正しいが主語が違う。
+
+## 再開点（優先順）
+
+1. **日本語圏を独立コホートとして測る**（塞がっていない唯一の経路）。日本語検出器の
+   雛形は ADR-2608090800 の末尾にある（自動更新 / 予告なく / ターゲティング広告 /
+   専属的合意管轄 等）。英語コホートとは**接続できない**（較正用の対応ペアが取れない）が、
+   その内部では同じ問いを立てられる。粗利率は EDINET から取る。
+2. **広告型の代表が標本に無い**（Meta が 403 → 地域ロックで英語版取得不能）。
+   米国 exit node があれば解ける。無ければ 1 に倒す。
+3. **a_extern / a_commod / a_ask が未較正**（8 機序中 3 つ）。それぞれ scope-3 と制裁金 /
+   指標が存在しない / 画面占有面積の実測、が要る。
+4. **証券の飽和仮定が未検証** —— turnover と発行コストの対応データが要る。
+
+## 過程についての所見（これ自体が結果である）
+
+**10 反復のうち 9 反復で、自分の先行作業に欠陥が見つかった。** 内訳は
+モデルの不完全さ 1 / 設計の欠陥 1 / 較正の欠如 1 / 実験設計の誤り 1 / モデルの欠落 1 /
+手持ちデータの見落とし 1 / データ品質 1 / 測定対象の取り違え 1、純粋な確認は 1 回だけ。
+
+とくに第 9 反復では、**null 結果（r = −0.067）が取得バグだった** —— `curl` に
+`--compressed` が無く Amazon の応答が 30KB のバイナリごみだったのにサイズ検査を通過して
+いた。修正後 r = +0.180 で**符号が反転した**。以後、取得物には検査（法律定型句 4 語以上 +
+言語判定）を通す。
+
+**したがってこのループが生産していたのは結論ではなく、結論を信じてよい条件である。**
+
+## 既知の未解決（私のものではない）
+
+- **ADR 番号の衝突**: `2608082300` と `2608090800` が別セッションの ADR と数値接頭辞で
+  重複している。ただし `:adr/id` は私が slug 形式（`adr-2608090800-margin-vs-contract`）、
+  別セッションが数値のみ（`2608090800`）なので **datom 面の entity は衝突していない**。
+  ファイル名の可読性の問題であって data の問題ではない。
+- `docs-edn-only verify` は別セッションが `90-docs/business/revenue-agent-loop/runs/` に
+  置いた `.md` 4 件で FAIL する。私の変更ではない。")))

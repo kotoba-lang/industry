@@ -1,0 +1,143 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608252400-the-query-was-never-what-was-slow")
+  (:adr/title "遅かったのは join ではなく面の構築 —— キャッシュ・30 秒予算・dataset shard・事前計算を、実測で順位付けして入れた")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-25")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related (vector "2607171600" "2608039700" "2607132300" "2606141500" "2608189300"))
+  (:adr/body
+  "2026-08-25、オーナーの問い「2 join がこんなに遅いのはなぜ?」から。推測せずに分けて
+測った結果、前提が間違っていた。
+
+## 測定 —— join は全体の 0.09% だった
+
+面を 1 回だけ組んで各段を計る版で測る（load 18〜23）:
+
+    面の構築 (build-conn)   298,795 ms
+    A dataset で数える           100 ms
+    B 稀な属性で数える              7 ms
+    C 7 節の join                267 ms
+    D 同じ join、稀な句を先頭に     68 ms
+
+`manifest/edn-query.cljs` は **1 クエリ 1 プロセス**で、毎回 ADR・docs・manifest・
+journal・corpus をディスクから読み直して 166,311 entity を新しい DataScript に
+transact していた。キャッシュも永続化も無い。
+
+**しかもコードは既にそれを知っていた** —— `q*` モードのコメントが「面のロードが
+所要時間の全て」と書いている。知識は在ったが、既定の経路がそれを使っていなかった。
+
+## 決定 1: 面をキャッシュする。鮮度は測る、仮定しない
+
+`.projection-cache/edn-query-plane.json`（282 MB）+ meta。最初の答えまで **7.6 秒**
+（read 1.4 + JSON.parse 3.4 + from_serializable 2.3 + query 0.15）。
+
+**キャッシュ化を阻んでいた唯一の原因**は 1 行だった: `->ds-value` が map と vector は
+`pr-str` するのに **集合だけ素通し**していて、CLJS の集合オブジェクトのまま JS へ渡り、
+datascript の serializable が `#object[Object #{...}]` と書いて読み戻せない db を作って
+いた。約 100 万 datom 中 **45 件**。
+
+鍵を「宣言した root を walk して hash」にはできない —— 面が読むのは
+`orgs/cloud-itonami` 配下の 185 repo だが、その親には 1,852 repo が居て walk すると
+数百万ファイルを stat することになる。だから **`slurp` が実際に読んだものを記録**する
+（4,781 ファイル）。ファイルだけでは『読んだことのない場所にファイルが増えた』が
+見えないので、親・祖父ディレクトリの**エントリ名 digest**（647 件）も持つ。meta が
+壊れていたら `:fresh` ではなく `:absent`。
+
+**両方向を実演した**（推測していない）: 記録済みディレクトリに新規ファイル → stale/exit 4、
+削除 → fresh/exit 0、記録済みファイルに 1 バイト追記 → stale/exit 4。
+
+そして**本物を捕まえた**: refresh の直後、別セッションの `west update` が 93 の LEI
+checkout を pin へ巻き戻し、その dataset の答えが 4,810 → 1,965 entity に実際に変わった。
+キャッシュは古い答えを返さず stale と言った。
+
+## 決定 2: 冷たい面には答えない（30 秒予算）
+
+`count` / `q` / `q*` は冷たい面を **exit 4・stdout 空**で拒否し、refresh コマンドを
+名指しする。5 分待たされた側は「重いクエリを書いてしまった」と誤解するが、クエリは
+0.3 秒しかかかっていない。**拒否すれば本当のことが出る。**
+
+30 秒を超えたクエリ自体も報告して exit 4 にするが、**これは事前抑止ではなく事後検出**
+（datascript は同期実行で中断できない）。そう書いてある。事前に効いているのは冷たい面を
+拒否する側だけ。
+
+`mcp` は冷たくても組む —— 長命で client が既に接続しており、そこで exit すると
+『答えられない server』になる。**拒否が正しいのは 1 発で終わる CLI の側。**
+
+バッチの呼び出し側 3 本（report-public-money-coverage / verify-tsukuru-factory-plane /
+query-dialect-bench）は `EDN_QUERY_ALLOW_COLD=1` を明示。キャッシュが新しければ自動で
+そちらを使うので**純粋に速くなるだけ**。
+
+## 決定 3: dataset ごとに shard し、静的に証明できるときだけ部分ロードする
+
+refresh が dataset ごとに shard を書く（**75 個・190 MB**）。クエリが shard を使えるのは
+**すべての entity 変数が `source/dataset` のリテラル節で縛られているとき**だけ。1 つでも
+縛られていない変数・`:in`・解析不能があれば全体を読む。
+
+この静的検査が「shard の答え＝全体の答え」を保証する。**『関係ありそうな dataset』を
+推測する heuristic ではない** —— それが、この最適化が最も作りやすい嘘だから。
+
+## 決定 4: よく訊かれる問いは事前に計算する
+
+`manifest/plane-views.edn` に 5 本。refresh が計算して
+`.projection-cache/edn-query-views.edn` に書く。`scripts/plane-view.cljs` はそれを読むだけ
+（面の実装を読み込まない）。
+
+## Co-Scientist で順位を付けた（判定は LLM ではない）
+
+`scripts/plane-coscientist.cljs`。Generate → Reflect → Rank → Evolve → Meta。原典は
+`90-docs/design-quality/coscientist.cljc`（さらに遡って isekai ADR-0007、engine は
+ADR-2606141500）。**判定は実測した壁時計**で、design-quality 版が決定論的 audit を
+判定に据えたのと同じ理由 —— 速さの議論は意見が入りやすいので入れない。
+
+**正しさは順位の先にある門**: baseline と 1 バイトでも違う出力は、速くても順位に載せない。
+
+    問い                  view-min   view    shard   full-cache
+    lei-isin (2 dataset)     474ms   934ms   3867ms    13258ms
+    lei-jurisdiction         354ms   918ms   1248ms     7977ms
+    facts-count                  -       -   1710ms     7502ms
+    adr-status (負の対照)    417ms   838ms   9465ms    11226ms
+
+（trials=3・中央値・load 17.4→12.4。棄却 0 件。）
+
+`adr-status` は負の対照 —— dataset を名指さないので shard に落ちてはいけない。実際に
+落ちず、**落ちないことの費用**が行として出ている（全体より速くない）。最適化が
+助けられない問いに対する正直な結果。
+
+### Evolve
+
+上位 3 つを測ると律速が動いた: view が 589ms なのに nbb の起動だけで 288ms。残り半分は
+**29 KB の EDN を読むために `edn-query.cljs` 3,000 行（datascript と 40 の loader 込み）を
+毎回コンパイルしていた**費用だった。`scripts/plane-view.cljs` は ~310ms、出力は byte 一致。
+
+### harness が自分で自分を詰まらせ、そう申告した
+
+2 反復目は全戦略を棄却して exit 2 で止まった。原因は面ではなく**測定行為**: 1 反復目が
+ledger を `90-docs/` に書き、そこは面の入力なのでキャッシュが stale になり、baseline が
+exit 4 で無出力になり、他の全戦略が「baseline と違う」ことになった。**合格と報告しなかった
+からこそ原因が辿れた。** 今は測る前に baseline が答えられるかを確かめる。
+
+ledger を 90-docs の外へ逃がせば無効化は避けられるが、git から失われるか、『面が読まない
+ディレクトリ』という書かれていない約束に依存する。後者は次に誰かが loader を足した瞬間に
+黙って壊れる。**毎反復 refresh する方が高いが、嘘をつかない。**
+
+## 現在地（実測）
+
+    ISIN join:  cold 299,000ms → 全体 13,258ms → shard 3,867ms → view 934ms → view-min 474ms
+    1 dataset を数える: 464ms の shard ロード + 合計 1,688ms
+
+## 着地
+
+- `com-junkawasaki/root` c175c7b7（キャッシュ・30 秒予算・view）
+- `com-junkawasaki/root` c45694bb（dataset shard・co-scientist harness・iteration-01）
+
+## Meta（次の反復への種、優先順）
+
+1. **律速はプロセス起動に移った。** 残る勝ち筋は常駐（mcp は既に温かい面を保持）か、
+   1 問あたりのプロセス数を減らすことであって、db を速くすることではない。
+2. **shard ごとの鮮度判定。** 現状はどれか 1 ファイルが動くと面全体が stale になる ——
+   ADR を 1 つ触っただけで LEI のクエリまで止まる。shard が『自分を作った入力の digest』を
+   持てば、名指された shard の鮮度だけで判定できる。この workspace は main が絶えず動くので
+   効果が大きい。
+3. AVET 索引は測った上で**見送り**: 値を束縛した節が 100ms、稀な属性が 7ms で差は実在するが、
+   299 秒の隣では誤差。**索引を足しても体感は変わらない。効くのは面を使い回すことだけ。**")))

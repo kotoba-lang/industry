@@ -1,0 +1,166 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608212000-aiueos-consumes-kekkai-admission-not-the-data-plane")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "overlay-membership")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-21")
+  (:adr/last_verified "2026-08-21")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/repos (vector "orgs/kotoba-lang/aiueos"
+              "orgs/kotoba-lang/kekkai"
+              "orgs/kotoba-lang/kekkai-node"
+              "orgs/kotoba-lang/murakumo"))
+  (:adr/authoritative-for
+  (vector "aiueos node が kekkai overlay に参加する形（admission verdict の消費であって data plane 参加ではない）の正本"
+   "どの profile が先に overlay membership を得るか（hosted PID-1 が先、bare metal は後）の正本"
+   "aiueos の enrolment record と kekkai の node identity の束ね方（3 識別子 1 台）の正本"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related (vector "adr-2608212100-where-did-identity-lives-machine-account-service"
+                "adr-2608212300-the-aiueos-cloud-round-trip-authority-pointer"
+                "ADR-2608136000"
+                "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"))
+  (:adr/title "ADR-2608212000: aiueos は kekkai の admission verdict を消費する —— data plane には参加しない")
+  (:adr/body "# 決定
+
+**aiueos node は kekkai の admission verdict を「文書として」消費する。`kekkai-node` を
+走らせない。** 接ぎ目は decision 層であって data plane ではない。
+
+そして **overlay membership は hosted PID-1 profile が先に得る。bare metal は後**。
+
+## 測定（2026-08-21）
+
+各 repo の **origin/main に対して** GitHub code search で測った（手元の checkout は
+古い —— `orgs/kotoba-lang/aiueos` は 58c5d6f で 9 日遅れ、`kekkai-node` は a2d7168 で
+origin の 04c4fa6 より手前だった。ローカルを根拠にすると測定自体が嘘になる）:
+
+| 向き | 件数 |
+|---|---|
+| `kotoba-lang/aiueos` の中の `kekkai` | 0 |
+| `kotoba-lang/kekkai` の中の `aiueos` | 0 |
+| `kotoba-lang/kekkai-node` の中の `aiueos` | 0 |
+| `kotoba-lang/kekkai-cli` の中の `aiueos` | 0 |
+
+**双方向でゼロ。** これは「繋がっていない」の測定であって、繋ぐべきでないことの
+証拠ではない。以下はその 0 を 0 のまま残すか、どこで 1 にするかの決定である。
+
+⚠ この 4 つの数は **その日の tip に対する値**であって性質ではない。引用するときは
+測り直す。値が動いていたら、動いたこと自体がこの ADR を読み直す理由になる。
+
+## 何が既にあるか（3 つの面）
+
+**kekkai（control plane）** は device を admit して署名済み netmap を publish する。
+charter G1 により **packet を 1 つも運ばない**。G2 により machine 承認と exit-node
+承認は**常に人間**。node は `:node/admit` の valid-key 不変条件を通り、そこで提示
+されるのは **`did:key`**（`docs/DESIGN.md` の `:node/admit`、`test/kekkai/tenant_test.clj`
+の `:did \"did:key:zI\"`）。actor 自身は自分の Ed25519 鍵から CACAO を自己発行する。
+
+**kekkai-node（data plane）** は peer pair ごとの相互認証 Noise IK session、NAT
+hole punching + relay fallback、netmap 由来の MagicDNS を持つ。そして
+`kotoba/kekkai/packet_plane.kotoba` に **pure な packet admission** を持っている。
+netmap の中の `:node/key` は **static X25519 公開鍵**である
+（`kekkai/netmap.cljc` の `:node/key (:static-pub node)`、`kekkai.node.netmap/peer-key`
+の docstring が明示）。
+
+**したがって kekkai には node identity が 2 つある。** control plane が admit するのは
+`did:key`、data plane が session を張るのは X25519 static key。これを 1 つとして扱うと
+束ね方を間違える。
+
+**aiueos** 側は `src/aiueos/provider/device.clj` が per-device Ed25519 operational key を
+生成し、秘密鍵は device の外に出ない。possession proof は (public key, nonce, endpoint,
+purpose) の 4 つを束ねる。そしてこの namespace は自分で名前を付けない —— docstring が
+**device が鍵を所有し、fleet が名前を所有する**と宣言し、`did:key` の envelope を持つ
+のは `kotoba-lang/org-w3-did` の仕事だとして、生の公開鍵だけを export する。
+
+**両側が同じ形をしている。** 鍵は機械が持ち、名前は上の面が付ける。接ぎ目は既に在る。
+
+## 先例が 1 つ既に動いている —— murakumo.kekkai
+
+`kotoba-lang/murakumo` は **`murakumo.kekkai`** を持っている。opt-in
+（`kekkai-tailnet.edn` が無ければ全 node が素通り）で、`murakumo.fleet/select` という
+**全コマンドが node 集合を解決する唯一の choke point**を gate する。判定の中核は
+`kotoba/kekkai_gate_core.kotoba` という pure な `.kotoba` object で、parity test
+（`test/murakumo/kekkai_gate_kotoba_parity_test.clj`）付き。kekkai 本体は
+in-process では require せず、**subprocess 境界**で叩く（murakumo が babashka、
+kekkai が JVM/langgraph なので互換リスクを避けるため）。
+
+**これは overlay に参加していない kekkai 消費者である。** admission だけを取り、
+packet は 1 つも運ばない。aiueos が取るべき形はこれと同じで、しかも aiueos の方が
+根拠が強い —— aiueos は `.kotoba` の pure decision と provider mechanism の分離
+（ADR-0015 / ADR-2607241100）を土台にしており、kekkai は既に packet admission を
+`.kotoba` object として publish している。**同じ mechanism / decision 分割が両端に在る。**
+
+## 決定
+
+1. **aiueos は `kekkai` も `kekkai-node` も依存に加えない。** aiueos の
+   dependency-minimal 不変条件（`deps.edn` は共有 security package と Chicory だけ）は
+   ここでも効く。接ぎ目は **library ではなく文書** —— 署名済み netmap / admission
+   envelope である。これは `aiueos.anchors` が anchor set を admit し、`aiueos.cloud` が
+   block を admit するのと**同じ形**であって、新しい種類の境界ではない。
+
+2. **admission は decision、参加は mechanism。** aiueos 側に足すのは
+   `aiueos.overlay`（仮）—— netmap envelope を受け取り、(a) 署名が既知の鍵か
+   (b) netmap version が後退していないか (c) 自分の enrolment record と一致するか
+   を判定する **pure な cljc**。socket を開かない。`aiueos.cloud` が
+   `aiueos.provider.cloud` を持つのと同じ関係で、mechanism は hosted profile の
+   provider に置く。
+
+3. **署名検証鍵は既存の pin set から取る。新しい trust root を作らない。**
+   kekkai の netmap envelope は Ed25519 署名（`kekkai.node.signed-netmap`）。その
+   検証鍵は `:aiueos.cloud/trust-anchors` の anchor set 経由で配る
+   （ADR-0044/0045/0046/0047 の署名・sequence・overlap rotation がそのまま効く）。
+   **overlay membership は trust anchor を 1 本も増やさない。** 増やすなら、それは
+   別の決定として書く。
+
+4. **overlay membership は hosted PID-1 profile が先。** 理由は好みではなく、
+   `kekkai-node` が **data plane** だからである —— UDP socket、NAT hole punch、relay、
+   MagicDNS が要る。bare metal には ADR-0041 の gap ledger step 1〜5（アドレス設定・
+   DNS stub resolver・使える TCP stream・TLS 1.3 client・HTTP/1.1 client）が
+   **1 つも無い**。hosted profile はそれを Linux から得ている。ADR-0019 / ADR-0041 が
+   boot authority と workload authority に引いたのと**同じ線**であって、新しい線ではない。
+
+5. **識別子は 3 つあり、束ねるのは enrolment の 1 回だけ。**
+
+   | 識別子 | 誰が作るか | 何を答えるか |
+   |---|---|---|
+   | aiueos operational Ed25519 公開鍵 | device（`provider/device.clj`、秘密鍵は外に出ない） | この機械は自分が言う機械か |
+   | kekkai `did:key` | fleet が生の公開鍵に名前を付ける | control plane はこの node を admit したか |
+   | netmap `:node/key`（X25519 static） | node の Noise 静的鍵 | peer 間の session を誰と張るか |
+
+   **この 3 つの対応は enrolment 時に 1 回記録する。後から導出し直さない。**
+   導出し直す設計にすると、3 つのうち 1 つが回転したときに他の 2 つが黙って古い
+   ままになる —— そして「対応が取れている」と「対応を確かめていない」は
+   出力から区別できなくなる（ADR-2608136000）。
+
+## 決定しないこと
+
+- **bare metal の overlay 参加。** step 1〜5 が閉じるまで決めない。閉じたとき
+  `packet_plane.kotoba` が aiueos の bare-metal packet adapter になるかは、
+  そのときの別 ADR。**今日それを予約もしない** —— kekkai の packet admission が
+  pure な `.kotoba` であることは魅力的な符合だが、符合は設計判断ではない。
+- **X25519 static key を Ed25519 operational key から導出するか、別に生成するか。**
+  導出には決めるべきことがあり（同じ鍵素材を 2 つの用途に使う是非、回転の連動）、
+  overlay membership の可否とは独立に決まる。
+- **kekkai の G2（machine 承認は常に人間）を aiueos の enrolment 承認が満たすか、
+  人間が 2 回要るか。** aiueos の `enroll.cljc` は `:factory` → `:claimed` の
+  1 回だけ答えられる窓を持ち、kekkai は admission を人間に routing する。
+  **2 つの承認が同じ人間の同じ判断を指しているのか、別の判断なのかを、まだ測って
+  いない。** 測る前に 1 本に畳むと、片方の承認が黙って消える。
+- **murakumo.kekkai と aiueos が同じ kekkai tailnet に入るか。** murakumo は
+  `fleet.edn` の desired inventory を gate しており、aiueos は自分の enrolment
+  record を持つ。同居させる価値はあるが、tailnet 境界（ADR-2608040100 の組織境界）を
+  跨ぐ話なので別に決める。
+
+## 帰結
+
+- **今日の 0 は、hosted profile 側で 1 になる。** bare metal 側は 0 のまま残り、
+  それは gap ではなく決定である。
+- **aiueos の依存グラフは変わらない。** 変わったら、この決定から外れている。
+- **overlay 参加は新しい人間の承認を 1 つ増やす可能性がある**（上の未決定）。
+  増やさないと決めたわけではない。
+- 反証条件: `kekkai-node` の data plane が hosted profile で動かないと分かったら、
+  ここでの「hosted が先」は順序ではなく不能の言い換えになる。そのときは
+  step 1〜5 と同じ扱い —— 測って、gap ledger に書く。
+")))

@@ -1,0 +1,185 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800005900-murakumo-openrouter-session-close")
+  (:adr/title "murakumo を OpenRouter provider にする作業の gap ledger と resume point —— 出荷したもの、測り直したもの、判断待ちで止めたもの")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/repos (vector "com-junkawasaki/root"
+              "network-awai/cloud-murakumo-api"
+              "gftdcojp/cloud-murakumo"))
+  (:adr/related (vector "adr-2800005600-gpu-supplier-selection-is-decided-by-rights"
+                "adr-2800005700-native-http-ingress-is-blocked-by-a-four-entry-allowlist"
+                "adr-2800005800-a-green-unit-test-cannot-see-its-callers-ordering"
+                "adr-2608319200-murakumo-as-an-openrouter-provider-four-answers-or-no-offer"
+                "adr-2608301700-hermes-and-itonami-bot-reliability-session"
+                "adr-2608039800-murakumo-backend-decision-latency-not-cost"))
+  (:adr/body
+  "## この文書は何か
+
+2026-09-01 の 1 セッションの gap ledger と resume point。会話履歴なしで再開できる
+粒度で、**何が default branch に在り、何が本番に出ており、何が判断待ちか**を記録する。
+
+出発点はオーナーの問い「murakumo.cloud を OpenRouter の provider として載せたい」で、
+そこから供給元の選定・推論経路の安定化・常駐 agent の復旧まで広がった。
+
+## 本番に出したもの
+
+| repo | default branch | 本番 |
+|---|---|---|
+| `network-awai/cloud-murakumo-api` | `ac7bca1` | Worker `local-murakumo` version `1aca56e8` |
+| `gftdcojp/cloud-murakumo` | `a0ccd53` | Worker `murakumo-cloud` version `b9b7d6e6` |
+| `com-junkawasaki/root` | ADR 4 本 + 検査 1 本 | —— |
+
+**3 repo とも ahead=0**（このセッションの作業は全部 default branch 上にある）。
+
+### cloud-murakumo-api
+
+- **load shedding** —— 推論経路に入場判定が無く、宣言した並列を超えた要求は
+  拒否されずキューされていた。実測 2026-09-01: 8 並列が全部 200 で最後が 31.5 秒。
+  `owned-slot-admission` / `admission-status`（飽和は 429、未設定は 503）を足した。
+- **router が満杯の head を待たない** —— `fetch-inference` の fall-through は 5xx と
+  fetch 例外だけで「埋まっている」を含まず、唯一の救済が 30 秒の timeout だった。
+  31.5 秒の正体がこれ。`demote-busy-endpoints` で測って満杯の head を後ろへ回す。
+- **probe が pool 全体を測る** —— gad/b70/xavier 決め打ちをやめ、その要求が実際に
+  歩く pool を probe する。借り物の head も demote 対象になる。
+- **alias が relay を guard の外へ持ち出せない** —— `decorate` は `owned_by` が
+  murakumo の model だけを qualify するが、alias は `owned_by murakumo` を名乗り
+  指す先は自由。`:relay-backed` を 5 つ目の withhold 理由として足した。
+
+### cloud-murakumo
+
+- **alias が売れるようになった** —— `MURAKUMO_OPENAI_MODELS` が具体チェックポイント
+  id だけを載せており、`/v1/models` が offer として出す唯一の id `murakumo-main` が
+  compute-market で `no-eligible-supply` だった。ADR-2607173100 が禁じる形が
+  site worker に残っていた（API worker では直っていた）。
+- **quote の request 形を公開** —— capability document は endpoint を公開しながら
+  body の形を載せていなかった。wire は flat camelCase、内部契約は nested
+  kebab-case で、どちらで送っても素の `invalid-max-payment` が返る。公開情報から
+  導いた 4 通りが全部拒否され、形は Worker の adapter を読んで初めて分かった。
+- **常駐 bot `com.gftd.murakumo-offer-drift`** —— 謳っている売り物と実際に買える
+  ものの差を毎時測る。三値 exit、鍵不要（読む面は全部公開）。
+  **デプロイの判定に使った: findings 8 → 6、`chat` が SELLABLE に入った。**
+
+## 常駐 agent の復旧（git の外）
+
+launchd の plist を直接直した。**バックアップは
+`~/Library/LaunchAgents/.wd-fix-backup-20260901/` と `.node-path-fix-20260901/`。**
+
+| 症状 | 台数 | 原因 |
+|---|---|---|
+| WorkingDirectory 不在 | 6 | repo が `orgs/gftdcojp/` から `orgs/network-awai/` へ移り plist が追従していなかった |
+| 起動不能 | 2 | node のパスが argv[0] と argv[1] に**二重**。node が node をモジュールとして読もうとしていた |
+
+**8 台が動くようになった。** `warm-flagship` は 36 日ぶりに完走（`ok+recorded: 12/12`）。
+`model-fleet` / `model-scanner` は「node が上がって壊れた」のではなく**最初から一度も
+起動できていなかった**。
+
+⚠ `launchctl list` は 4 台に `exit=78` を表示していた。78 は EX_CONFIG で「設定を
+直せばよい」に見えるが、実際は何も書かずに即死しており、ログの mtime は最後に
+成功した日（7 月末）のままだった。**「毎回失敗している」と「1 か月動いていない」が
+同じ顔をする。** adr-2608301700 が記録した欠陥の裏返し（あちらは終わらない job が
+前回の exit を持ち続ける、こちらは始まれない job が同じ値を返し続ける）。
+
+## 検証
+
+- cloud-murakumo-api: 285 tests / 1473 assertions。失敗は無改変 main と同じ
+  `crypto-multichain`（dogechain fallback）の 1 件のみ。`test:data-policy` /
+  `test:kotoba` / `test:origin-proxy` / `test:origin-auth` /
+  `test:grok-bot-sand-gateway` すべて exit 0。clj-kondo errors 0。
+- cloud-murakumo: `site_worker_compute_market_test.mjs` exit 0。
+- 新規テストはすべて両方向で確認（壊すと名指しで FAIL、戻すと byte 一致）。
+- governed artifact は 3 回 refresh し、毎回 `ui.js` と `manifest.edn` が
+  **バイト一致**で再生成された（変わったのは `dist/worker.js` だけ）。
+
+## 本番で 1 度退行させた
+
+router の変更を出した直後、8 並列のうち **3 本が 503**（47〜51 秒）になった。
+原因は `weighted-main-pool-order` の docstring の、私が引用した一文の 3 行上 ——
+Xavier は 2.6 tok/s / 37-44 秒で、速い peer の前に出すと退行する、と実測が
+書いてあった。私の demote は busy な b70 をその後ろへ回していた。
+修正（Xavier を末尾固定）と回帰テストを入れて 8 並列は 200×8・最大 3.71 秒に戻った。
+詳細と再発防止は adr-2800005800。
+
+## closing 時点の実測 —— 2 回測って別の答えが出た
+
+同じ面を 20 分あけて 2 回測った。**1 回目だけを見て報告していたら、本番が壊れて
+いると書いていた。**
+
+| | 19:4x | 20:0x |
+|---|---|---|
+| api chat | 200 / **118 秒** | 200 / **3.46 秒** |
+| /ready degraded | fleet-incomplete, **primary-unavailable** | fleet-incomplete のみ |
+| gad の slots | busy 2 / **available 0** | busy 0 / **available 2** |
+| このマシンの load | **113.79** | 111.43（1 分平均。5 分平均は 87.63） |
+
+`fleet-incomplete` は両方で出続けている（fleet の一部が未配線）。消えたのは
+`primary-unavailable` の方で、これは gad の枠が空いたということ。
+
+**118 秒は変更の欠陥ではなくホストの飽和である。** 3.71 秒を測ったときの load は
+約 35 で、このセッションで回した JVM ビルド（shadow-cljs の release を 5 回以上）が
+飽和に寄与している。`/ready` が `primary-unavailable` を出したのは、まさにこの
+状態を報告するために足した機能が働いた結果であって、故障の報告ではない。
+
+**したがって closing 時点の本番は健全である**（chat 3.46 秒、gad に空き 2）。
+ただし `fleet-incomplete` は残っており、それは未解決 2 の modality 欠落と同じ話。
+
+⚠ **引き継ぐ側へ: 負荷 100 超のこのマシンで測った推論の所要時間は、本番の性能では
+ない。** load を値の隣に書かない測定は、この 118 秒と 3.46 秒を区別できない。
+
+その他の面（両回とも同じ）: compute-market は `chat` の quote を返す。
+itonami.cloud は 200、app・auth とも 200。
+
+## 未解決 —— 優先順
+
+1. **`prune` の範囲が未決**（オーナー判断待ち）。`gftd` は launchd 57 台中 45 台の
+   label、**生存ドメイン 4 つ（うち `gftd.co.jp` と `gftd.jp` は M365 の実運用メール、
+   `gftd.group` は課金中の Google Workspace）**、`orgs/gftdcojp/` に 76 repo。
+   A(label 改名) / B(repo 移動) / C(ドメイン廃止) / D(新規に使わない) のどれか。
+   **C は不可逆で外向き**なので単独 ADR にしてから着手する。
+2. **画像・音声・batch 等 6 modality に bid が無い**（offer-drift の残り 6 findings）。
+   画像は 3 経路で 200 と実画像を確認済みなので serve はできる。足りないのは
+   **有料経路** —— `/x402/v1/images/generations` は 404 で、bid を足すと
+   `:execution` が存在しないパスを指す。**先に有料経路を作る。**
+3. **`expiry-alert` が次の壁に当たっている** —— kagi の identity chain が欠落
+   （`itonami-org-root` 不在、full re-mint が必要）。鍵を作る操作なので agent は
+   実行しない（安全床①）。オーナー実行。
+4. **Vast の実測が鍵待ち** —— `vastai` CLI 導入済み、候補選定済み
+   （RTX PRO 6000 Max-Q 96GB / $1.068/h / 信頼度 99.06）、測定スクリプトは
+   `/private/tmp/qwen-verify/`（**セッション後に消える。再作成が要る**）。
+   残りは `vastai set api-key` の 1 コマンドのみ。上限 $5。
+5. **comfy-openai-bridge の keep-alive framing 汚染** —— エラー応答経路が request
+   body を読み捨てないため、同一接続の次のリクエストが壊れる（POST → GET で
+   `{}GET` を実証）。**オーナー指示により Python は触らない**ので、直すなら
+   Python を使わない置き換えになる。
+6. **native HTTP は capability 4 件の許可リストで塞がっている**（adr-2800005700）。
+   upstream の実装課題。
+7. **`kotoba/inference_timeout_core.kotoba` は誰も呼ばない写し**で、既に一度
+   silently diverged している。呼ぶか消すかの判断。
+
+## 次の最初のコマンド
+
+```bash
+# 常駐 agent が起動できる状態か（1=起動不能あり / 2=測れなかった）
+nbb scripts/verify-launchd-agents.cljs --findings
+
+# 売り物の主張と実際の差（6 findings が残っているはず）
+nbb orgs/network-awai/cloud-murakumo/scripts/offer-drift-collect.cljs
+
+# 推論の可用性（ホストの load を一緒に見ること。負荷 100 超では別物を測る）
+sysctl -n vm.loadavg
+```
+
+## このセッションで私がした誤りの型
+
+同じ形を 5 回。**いずれも一次を当たらずに結論した。**
+
+1. grep に出た ADR を題名で読み飛ばし、誤った ADR を main に着地させて訂正した
+2. 二次情報（レビュー記事）で RunPod の規約を報告し、規約本体は逆だった
+3. 打ち切られる API を降順だけで読み、分布を逆に読んだ（57% が最低だった）
+4. docstring の同じ段落の 3 行上を読まず、**本番で 503 を 3 本出した**
+5. カタログを実機の在庫として読み、存在しないモデルで「画像は 502」と誤診した
+
+加えて自作の検査で 2 回、**判定材料を持たない軸で断定**した（`--classpath` を
+script と誤認して 15 中 9 件、stdout の古さで 4 中 4 件の偽陽性）。どちらも
+landing 前に自分で見つけて直したが、**1 度目の教訓を記録した後に 2 度目が起きている。**")))

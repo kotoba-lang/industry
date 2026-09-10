@@ -1,0 +1,90 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608020330-torihiki-node-transport-durable-object-sequencer")
+  (:adr/title "ADR-2608020330: transport — Durable Object を sequencer にした Worker。engine を再実装しないこと、DO は deploy を拾わないこと")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "torihiki-node-transport-durable-object-sequencer")
+  (:adr/authoritative-for
+  (vector "torihiki の transport 構成と単一 writer の獲得方法"
+   "shadow-cljs ESM ビルドによる engine の Worker 実行"
+   "認証済みだが拒否された tx のログ persistence 規則"
+   "Durable Object の deploy 反映に関する運用事実"))
+  (:adr/related
+  (vector "adr-2608020230-torihiki-authentication-is-consensus-state"
+   "adr-2608020130-torihiki-total-block-application-and-api-surface"
+   "adr-2608011600-torihiki-verifiable-sequencer-log-phase2"
+   "adr-260726-kotobase-query-plane-is-one-ref"))
+  (:adr/evidence
+  (vector "https://torihiki-node.04-feasts-minded.workers.dev/head"
+   "https://github.com/kotoba-lang/torihiki-node"))
+  (:adr/body
+  "# ADR-2608020330: transport — DO sequencer
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ギャップ #3 の残り。protocol（ADR-2608020130）と認証（ADR-2608020230）は揃ったが、**注文を出す口が無かった**ので、それまでの層は全部到達不能だった。
+
+前提として、**shadow-cljs の ESM ビルドが成立するかが未検証**だった。検証した: advanced 最適化済みバンドル（195KB）が **JVM と同一の state root** を出す。record フィールドがリネームされる環境なので、`slab/field` マクロの shadow-cljs 分岐も同時に実証された。
+
+## Decision
+
+### 1. Durable Object を sequencer にする
+
+`torihiki.log` は writer がちょうど 1 人であることを要求する。Cloudflare は **DO が id ごとに 1 インスタンス・シングルスレッド**であることを保証するので、「writer は 1 人」を**実装せずに**得られる。write lease や fencing epoch は、設計文書では正しく見えて本番で金を失う類のもの。
+
+`/head` は **consensus が無いことを自分の応答に書く**。黙っているサービスはもう一方だと見なされる。
+
+### 2. engine を再実装しない
+
+`/tx` は `torihiki.state/apply-block` を走らせる——JVM validator が走らせるのと**同じ .cljc**。だから client がこのノードのログを replay して**矛盾を突ける**。ここに手書きの JavaScript 板を置けばそれが不可能になり、永久に一致させ続ける第 2 実装ができる。
+
+### 3. 認証済みだが拒否された tx も**ログに書く**
+
+これは実バグだった。nonce を消費した tx をログから落としていたので、**live 状態では nonce が消費済み、cold start の replay では未消費**——ノードが eviction を挟んで自分と食い違い、**待てば署名が再利用可能になる**。
+
+認証**自体**の失敗だけを捨てる。それは何も変えていないから。
+
+### 4. Ed25519 は WebCrypto、engine には入れない
+
+システム全体で Ed25519 を知っているのはこの 1 箇所だけ。`torihiki.auth` が検証関数を引数に取るのは、engine が crypto の無い場所でも動き続けるため。WebCrypto の verify は非同期で engine の seam は同期なので、**署名はブロック適用の前に検証**し、注入関数はその答えを参照するだけ。engine を async にして platform API に合わせるのは、transport の都合を合意コードに押し込むこと。
+
+### 5. JSON の tx 種別は署名 payload 計算の**前**に正規化する
+
+JSON に keyword は無く `{\"tx\":\"order\"}` は文字列で届くが `api/validate` は `:order` で dispatch する。正規化を**後**にすると client と node が別の payload をハッシュし、**全署名が「暗号のように見えて暗号ではない理由」で落ちる。**
+
+## 実測（live）
+
+実 Ed25519 で: 入金・oracle・maker 両建て・taker 約定がすべて通り、**nonce の再送は `bad-nonce`**、**他人の口座を自分の鍵で署名すると `wrong-key`** で拒否。口座状態に建玉が出る。
+
+## Durable Object は deploy を拾わない（運用事実）
+
+**DO は起動時のコードを evict されるまで実行し続ける。** 状態をメモリに持つ sequencer では、トラフィックがある限りそれは無期限になりうる。つまり **「deploy 済み」と「稼働中」は別の事実**。
+
+このセッションで**2 回**引っかかった: 修正を deploy し、バンドルに含まれていることを確認し、それでも live endpoint が旧ビルドの挙動を返した。1 回目は「バンドルにあるのだから動いているはず」と推論し、2 回目は同じ推論を繰り返した。
+
+`/head` の `code-version` はそのために在る。**deploy を信じる前に `/head` を見る。**
+
+## Consequences
+
+- (+) **注文を出せる。** #3 が閉じた。
+- (+) engine が Worker で動くことが実証され、#4（端末 live 化）の経路も開いた。
+- (+) ログ replay が state そのものなので、第 2 の符号化を保守しなくてよい。
+- (−) **snapshot が無い。** cold start がログ長に比例する。長寿命ノードには必要。
+- (−) **購読（WebSocket）が無い。** client は polling するしかない。
+- (−) devnet 1 市場・単一 DO。マルチ市場もシャーディングも未検証。
+- (−) レート制限も課金も無い。誰でも無制限に tx を投げられる。
+
+## 残りギャップ
+
+1〜3 完了。**4 端末 live 化**（経路は開通済み）、5 ADL 実行・段階証拠金・OI 上限、6 oracle 集約、7 engi 合意層、8 bridge・監査。
+")))

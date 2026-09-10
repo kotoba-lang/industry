@@ -1,0 +1,238 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608273000-a-declared-interval-nothing-reads-back")
+  (:adr/title "A declared interval that nothing reads back")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/repo "cloud-itonami/otent")
+  (:adr/body "# The interval was a control, and the schedule was defeating it
+
+`otent` declares a `:min-interval-ms` per feed. That field has already been
+caught being decorative once in this repository (2026-08-26: it sat in the
+registry and nothing read it). On 2026-08-27 a coverage question was asked
+by hand, and the answer found the second-order version of the same defect:
+the field was being read, honoured to the millisecond, and **defeated one
+layer up**.
+
+## What was measured
+
+Over 173 cycles / 23.4 hours of the timer era, from the tick ledger:
+
+| | declared | measured (median) |
+|---|---|---|
+| cycle (plist `StartInterval`) | 300 s | 447 s |
+| usgs | 300 s | 448 s |
+| opensky | 600 s | 903 s |
+| celestrak | 21,600 s | 22,032 s |
+
+The mechanism: `bin/scheduled.cljs` ran `retain` inline after every tick,
+retention takes ~3.4 minutes, and launchd will not start a job that is
+still running. Every other 300-second fire was therefore dropped, and
+`due?` -- answering honestly about a clock it was handed too rarely --
+turned that into a 1.5x stretch on every feed's real poll rate.
+
+**Nothing was red at any point.** The tick exited as expected, the receipt
+ledger was complete, the tables were growing. The only symptom was a number
+nobody was computing.
+
+## Decisions
+
+1. **`otent coverage`** (`src/otent/coverage.cljc`, pure) reads declared
+   cadence back from the ledger and reports drift past a 1.25x tolerance.
+   Exit 0 clean / 1 finding / 2 could-not-answer. A test asserts the
+   tolerance is below 1.49x -- the drift it was written for -- because a
+   tolerance chosen afterwards to make the current state pass is not a
+   tolerance.
+2. **`--window 3h`**, because the default median is over the whole ledger
+   and a 30-hour median carries the old number for most of a day. An
+   instrument built to measure a schedule that cannot show the schedule
+   being repaired is useless at the one moment it matters. The window is
+   printed in the header: *what is the cadence now* and *which window makes
+   this look fine* are different questions, and the reader must be able to
+   see which was asked.
+3. **Retention leaves the tick's critical path**, running hourly against
+   horizons whose shortest is a day. A skipped run logs `retain NOT-DUE`,
+   never `retain exit 0`.
+4. **The cycle times itself** and warns when it outlasts the timer's
+   period, naming the consequence.
+5. **Every feed declares `:scope`** -- what its request excludes and what
+   could be asked for instead -- checked by a test. See below.
+
+## The generalisable rule
+
+**A declared interval is a claim about the world, and something has to read
+it back.** `due?` checks whether the code MAY poll now; nothing was
+checking how often it DID. Those are different questions, and the gap
+between them is invisible to every green check.
+
+The same shape appeared twice more in the same repository, both closed here:
+
+- **An exemption whose clearing condition is prose will outlive its
+  reason.** `firms` was exempt from being unmeasured because
+  `$FIRMS_MAP_KEY` was not set, `:clears-when` read *the key is entered on
+  this machine*, and so it sat there being true. The key is free; nobody
+  had asked. It is now `the Keychain has firms.nasa/MAP_KEY`, which the
+  cycle evaluates on every run -- a feed whose key it finds is no longer
+  exempt. First commit: 27,833 global fire detections, a whole kind moved
+  from never-observed to measured.
+- **A scope decision can hide in a URL and stop looking like a decision.**
+  The quake feed was `2.5_day.geojson` from day one. Every earthquake below
+  M2.5 was not missing from the table, it was outside what was ever asked
+  for -- and a narrowed request and a quiet world produce identical rows,
+  so no table, receipt, governor or coverage report could tell them apart.
+  Now `all_day.geojson`: 241 events against 29, smallest M-0.4, same
+  parser.
+
+## Closing the second gap rather than leaving it named
+
+The first version of this ADR said cadence was now read back but the shape
+of what a feed is asked for was not, and left that open. It is closed:
+every registry entry declares `:scope` in prose -- what the request
+excludes, and what could be asked for instead -- and a test refuses an
+entry without one.
+
+**This verifies nothing about whether a scope is right.** Nothing can, from
+here. It makes it impossible to narrow coverage without writing down that
+you did. `firms` is the case working as intended: it asks for VIIRS
+NOAA-20 and names `VIIRS_SNPP_NRT`, `VIIRS_NOAA21_NRT` and `MODIS_NRT` as
+available under the same key and not being asked for -- roughly a doubling
+of detections, sitting in the registry as an arguable line rather than in a
+path segment as a fact.
+
+## Coverage as of 2026-08-27
+
+| kind | rows | state |
+|---|---|---|
+| quake | 204 | live, all magnitudes |
+| satellite | 21,085 | live, `GROUP=active`; 799 deep-space cannot be propagated |
+| aircraft | 882,848 | live, bounded by OpenSky's receiver network |
+| fire | 27,833 | live from 2026-08-27 |
+| vessel | -- | **UNMEASURED**: AISStream is a WebSocket subscription and no resident collector exists. Structural, not a missing key. |
+
+## Also measured, not fixed
+
+The `tenkyu` -> `otent` rename copied the basemap and building objects to
+the new prefix and never removed the old ones: **1,470 objects / 27.2 MB**
+duplicated under `tenkyu/`, byte-identical apart from a `_probe.txt`. The
+published manifests still named the retired prefix and were repointed; the
+duplicate objects were left in place, because deleting 1,470 objects is the
+owner's call and nothing reads them.
+
+## What the same day found underneath it
+
+Three more of the same shape, each closed:
+
+**Nothing had a timeout.** The first cycle after the retention change sat
+for eighteen minutes at 0% CPU, holding a dead OpenSky socket in
+`CLOSE_WAIT` and then two established Cloudflare connections. Node's
+`fetch` has no default timeout and nothing here set one. That is not a slow
+poll: launchd will not start a job while the previous one is running, so
+one stalled remote stops ingest entirely, and a cycle that never finishes
+writes no receipt -- so the ledger shows nothing, which is what a quiet
+period looks like. `otent.deadline` now bounds every call (60 s reads,
+180 s writes, including the kotobase publish through `make-client`'s
+`:fetch-fn`), and a call that runs out is UNMEASURED with `[timeout]`
+rather than `[unreachable]`: one says the feed answered nothing, the other
+says we stopped waiting and do not know what it would have said.
+
+**The suite was green over a file that did not parse.** A one-paren edit
+left `bin/otent.cljs` unparseable and `npm test` reported 70 tests, 740
+assertions, 0 failures. That file is required by nothing -- it is the entry
+point, it ends in `(-main)`, and requiring it from a test would run a tick
+against the live feeds. So the one file that touches the network, holds the
+commit logic and is what launchd executes was the one file no test could
+see. Each CLI is now run bare (usage line, exit 2, no socket, but a real
+load). `bin/scheduled.cljs` is still uncovered, and its docstring says so
+rather than letting the floor look complete.
+
+**The warning fired on the incident it was written for.** The new
+cycle-duration warning printed `cycle took 994 s ... launchd will skip
+fires` on that very stall -- in production, not in a test.
+
+## Open: the satellite table is ingested and not servable
+
+`GET /api/objects/satellite` has returned `503 error code: 1102` -- Worker
+CPU exceeded -- on every attempt, ~45-50 s in, and raising `limits.cpu_ms`
+to 120000 did not change it (the config was reverted rather than left in
+place claiming to do something it does not).
+
+Measured: `otent_satellite` is 21,085 rows in **5** Parquet files, 1.84 MB.
+`otent_fire` returns 27,833 rows from **one** 0.93 MB file without
+trouble. So the cost is bytes decoded, not rows returned, and the table has
+been unservable since the catalogue was widened from `GROUP=stations` (21
+objects) to `GROUP=active` on 2026-08-26 -- **ingest coverage went up and
+read coverage silently went to zero**, with a 503 as the only sign. It will
+worsen: the read window is seven days and each poll adds ~4,500 rows.
+
+Narrowing the window does not fix it. Element sets arrive across polls
+(21 + 7,493 + 4,684 + 4,412 + 4,475 to reach 21,085), so a short window
+would hold a fraction of the catalogue rather than a stale copy of it.
+
+The fix is a materialised current-catalogue object -- latest element set
+per object, written by the ingest side where CPU is free, served by the
+Worker without opening Parquet at all. **It is not done here**, because the
+obvious quick version reimplements `app-otent`'s fold in a second language
+in a second repository, and a second implementation of a fold drifts from
+the first silently. Doing it properly means one fold both sides call, and
+that is a design decision rather than an edit.
+
+## Resolved 2026-08-28: one cause under three bug reports
+
+The three symptoms this ADR reported as separate findings were one cause.
+`cp/spawnSync` in the Iceberg writer blocked the Node event loop, and
+`tick` runs its feeds under `js/Promise.all`, so:
+
+- `AbortSignal.timeout` is a wall clock and kept counting while the process
+  sat frozen inside a sibling's `python3`, producing `did not answer within
+  60s` against a server that answered in 2.3 s from the shell;
+- the per-feed elapsed time included being frozen, so it named the feed that
+  finished last rather than the one that cost most;
+- the cycle outran its own 300 s period, launchd declined to start an
+  overlapping job, and every feed's effective interval stretched.
+
+`run-writer!` now spawns and resolves. Measured on the verifying run: a
+NOTHING-NEW feed finished in **1 s while a sibling was 26 s into a commit**,
+and three feeds totalling 82 s of per-feed work completed in **49.6 s of
+wall clock**. On the live timer, cycles went 282 s -> 111 s -> 30 s -> 5 s.
+
+**The accident had been holding an invariant.** `spawnSync` also serialised
+every commit in the process. `otent.lock` restores that deliberately, per
+table, so two feeds sharing a kind cannot each read a `before` count
+containing the other's rows -- and different tables still overlap, which is
+the point. A rejected write does not wedge the chain; without that, one
+refusal turns a table dead and reads from outside as the feed going quiet.
+
+**The refactor shipped a bug the suite could not see.** `(.then p :rows)` is
+correct-looking and wrong: a ClojureScript keyword is a function to Clojure
+and an opaque object to `Promise.prototype.then`, so it returned the whole
+status map, the delta computed `NaN`, and two commits that had ACTUALLY
+LANDED were reported `count-mismatch`. Nothing in the suite exercises
+`commit!` against a live catalog, so only a real tick found it. The failure
+ran in the safe direction and that was luck, not design.
+
+**A second writer now exists on purpose**, so `commit!` records which check
+answered: an exact delta is `:delta`; growth by more than this commit wrote
+means another process appended between the counts and is `:presence-only`
+with a note; growth by less is still a refusal. Refusing the middle case
+would report two successful commits as a fault, and accepting it silently
+would let a weaker check wear the strong one's name.
+
+## What the instrument found after it existed
+
+`otent coverage` was written to read a declared interval back. Over the two
+days after it landed it also found, each time by measurement rather than
+inspection:
+
+- a prefilter matched `\\\"schema\\\": \\\"` with a space where the export emits
+  none -- it would have rejected every line in production while passing a
+  fixture written by `json.dumps`, and an empty index looks exactly like a
+  sanctions list with nobody on it;
+- a deadline blaming the remote for this process's own blocking;
+- a dark-feed refusal that stopped retention for 51 minutes because a
+  DIFFERENT feed could not be read;
+- a `node_modules` symlink committed to main, because `.gitignore`'s
+  `node_modules/` matches a directory and not a symlink.
+
+The recurring shape is the one this ADR opened with: **something that could
+not be measured returning the same value as something measured and found
+fine.** It appeared six more times in two days, in six different places.
+")))

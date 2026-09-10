@@ -1,0 +1,317 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2608291200-aiuefs-v4-hash-addressed-filesystem")
+ (:adr/title "aiuefs-v4: AIUEOS のファイルシステムを kotoba の hash-addressed 面そのものにする")
+ (:adr/status "proposed")
+ (:adr/date "2026-08-29")
+ (:adr/last_verified "2026-08-29")
+ (:adr/deciders (vector "Jun Kawasaki"))
+ (:adr/topic "aiuefs-v4-hash-addressed-filesystem")
+ (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/aiueos" "kotoba-lang/arrangement" "kotoba-lang/kotobase-storage" "kotoba-lang/ayatori" "kotoba-lang/prolly-tree" "kotoba-lang/io-ipld-car"))
+ (:adr/authoritative_for (vector "AIUEOS のファイルシステム命名面を CID 一本にする決定の正本" "kotoba.leaf.v1 シール済み leaf エンベロープの正本" "圧縮を AEAD の前に置く決定と、その実測の正本" "長さ漏洩の測定量（シール後長さ分布の entropy）と padding 方針の正本" "aiuefs-v3 の署名構成を root CID 1 本の ECDSA P-256 署名に畳む決定の正本"))
+ (:adr/supersedes (vector))
+ (:adr/related (vector "adr-2608160100-kotobase-physical-plane-ipld-carv2-pack" "adr-2608160200-five-canonical-irs-and-addressed-execution" "adr-2608161500-unixfs-is-layout-adapter-not-public-http" "adr-2608039000-blockchain-distributed-no-d1-premise" "adr-2608039970-kotobase-base-is-the-datom-plane" "adr-2608153500-aiueos-maturity-roadmap-distributed-computing-premise" "adr-2608251418-aiueos-usb-install-and-headless-bootstrap" "adr-2607132300-design-quality-score" "adr-2607241100-aiueos-decision-free-c-mechanism-boundary" "kotoba-lang/aiueos ADR-0041" "kotoba-lang/aiueos ADR-0105" "kotoba-lang/aiueos ADR-0108"))
+ (:adr/evidence (vector "90-docs/design/aiuefs-v4/aiuefs-v4.edn" "90-docs/design/aiuefs-v4/coscientist/iteration-01.edn" "90-docs/design/aiuefs-v4/conformance-vectors.edn" "90-docs/design/aiuefs-v4/bench/results/2026-08-29-compression-order.edn" "90-docs/design/aiuefs-v4/bench/results/2026-08-29-codec-choice-16k.edn" "90-docs/design/aiuefs-v4/bench/results/2026-08-29-shared-dictionary-16k.edn" "90-docs/design/aiuefs-v4/bench/results/2026-08-29-length-leak-16k.edn" "scripts/aiuefs-codec.cljs" "scripts/aiuefs-coscientist.cljs"))
+ (:adr/body "## 問い
+
+AIUEOS のファイルシステム・ファイルフォーマット・圧縮・復号・通信を、kotoba 全体の
+hash-addressed / IPLD / IPNI / ayatori の設計と**一つの面**として設計しなおすと、
+何になるか。
+
+## 現在地（2026-08-29 実測、kotoba-lang/aiueos c2203a1 = root west pin）
+
+| 面 | 現行 aiuefs-v3 |
+|---|---|
+| 書き込み可能な状態 | **16 バイト**（`struct aiuefs_mutable_object.object[16]`） |
+| app catalog | 最大 4 本 / 1 本 12,288 バイト / RSA-2048 PKCS#1 v1.5 |
+| kernel の真正性 | **無い** — `boot-v1.edn` が `:authenticity false :secure-boot false` と自ら書いている |
+| block I/O | **1 リクエスト = 512 バイト 1 セクタ、outstanding 1**、完了まで `sti; hlt; cli` |
+| 圧縮 | **ゼロ**（repo 全体で zstd/lz4/xz/squashfs/erofs は 0 件） |
+| CID | **無い** — したがって ayatori からも IPNI からも pack からも見えない |
+
+install 経路の gzip は 2 箇所だけで、どちらも Linux live installer 側
+（`initramfs.cpio.gz` と installer bundle の `.tar.gz`、両方とも `mtime=EPOCH` の決定論的
+gzip）。**AIUEOS 本体は非圧縮**であり、それは digest 検証を優先した妥当な選択だった。
+
+一方で、この workspace には既に完成した hash-addressed 面が在る（「無い」と言う前に
+索引を引く規則の通り、全部 west に登録済み）:
+
+- `prolly-tree` — content-defined boundary、IPLD Link（CBOR tag 42）、storage は注入
+- `arrangement` — 4 covering index、**blinded key + AEAD value**、declared range partition
+- `datalog` / `ayatori` — Datalog、IPNI discovery、検証付き block 取得、range pruning
+- `io-ipld-car` — CARv2、`kotobase-storage` — block/ref/object の 3 profile
+- `io-libp2p` — pure `.cljc` の bitswap（go-libp2p と相互接続実測済み）
+
+**aiuefs-v3 だけが、この面と一切繋がっていない。**
+
+## 方法 — Co-Scientist（判定器は決定論的、LLM 討論ではない）
+
+`design-quality.coscientist`（ADR-2607132300、isekai ADR-0007 由来）と同じ規律で
+Generate → Reflect → Rank → Evolve → Meta を回した。実装は
+`scripts/aiuefs-coscientist.cljs`（bench の EDN を読んで順位を計算する。再実行可能）。
+
+判定に使った実測は 4 本、いずれもこの repo のスクリプトがこの repo の corpus に対して
+出したもので、他所からの引用は 1 つも無い:
+
+1. `scripts/aiuefs-compression-bench.cljs` — 圧縮と AEAD の**順序**
+2. `scripts/aiuefs-codec-bench.cljs` — codec と level（ratio **と** 両方向の throughput）
+3. `scripts/aiuefs-dictionary-bench.cljs` — 共有辞書の効き（**hold-out 分割**）
+4. `scripts/aiuefs-leak-bench.cljs` — 長さから漏れる情報量（bits/leaf）
+
+## 実測
+
+### 1. 圧縮は AEAD の**前**でしか効かない（そして後ろでは増える）
+
+| 順序 | 実測 |
+|---|---|
+| encrypt-then-compress | **1.0001〜1.0104** — バイトが**増える** |
+| compress-then-encrypt | **0.098〜0.47** |
+
+前者は ADR-2608160100 の `ratio 1.003` を**再現**した（datom 面 64 KiB brotli で 1.0001、
+document 面で 1.0003）。**あの測定は正しい。** 正しくなかったのは、その一文が
+「ここでは圧縮は効かない」と読めてしまい、その読みが 10 倍外れていたことである。
+2 つの読みの差は AEAD のどちら側に立つかだけで、記録はそれを区別していなかった。
+
+corpus 別（compress-then-encrypt / padmé、今日のシール済みバイトに対する比）:
+
+| plane | 16 KiB | 64 KiB | 128 KiB |
+|---|---|---|---|
+| datom（`*.datoms.edn`） | 0.142 | 0.106 | **0.100** |
+| document（ADR） | 0.403 | 0.380 | 0.379 |
+| code（`.cljc`/`.cljs`） | 0.304 | 0.292 | 0.290 |
+| app（`.wasm`/`.o`） | 0.225 | 0.217 | 0.217 |
+
+### 2. codec は deflate-raw（読み側の速度で決まる）
+
+16 KiB leaf、datom 面 17.7 MB、load1 0.56:
+
+| codec | ratio | 圧縮 MB/s | **展開 MB/s** |
+|---|---|---|---|
+| brotli-11 | 0.1140 | 0.5 | 267.6 |
+| brotli-9 | 0.1257 | 3.2 | 319.8 |
+| brotli-5 | 0.1281 | 51.1 | 288.6 |
+| zstd-19 | 0.1323 | 1.6 | 246.9 |
+| **deflate-9** | 0.1374 | 74.4 | **468.3** |
+| **deflate-6** | 0.1392 | 95.2 | **449.2** |
+| zstd-3 | 0.1462 | 61.3 | 216.7 |
+
+**kernel の読み経路が実装するのは deflate-raw 1 本だけ**にする。brotli-11 は
+ratio 1.7 ポイントのために圧縮を 100 倍遅くする罠。zstd がここで負けるのは codec の
+欠陥ではなく、**16 KiB の独立した leaf に辞書を与えていない**ためで、それが次の実測を
+呼んだ。
+
+### 3. 共有辞書は「面の性質」であって「フォーマットの性質」ではない
+
+**hold-out は「ファイル単位」**（leaf index で割ると、hold-out leaf が同じ文書の訓練
+leaf と隣接してしまう）。辞書は**訓練 leaf 64 本から等分に切り出す**（連結の末尾を取ると、
+1 KiB では 32 leaf 分・64 KiB では 1 leaf の半分になり、leaf サイズと辞書の被覆が同時に
+動いてしまう）。32 KiB 辞書、deflate-6:
+
+| leaf | datom | document | code |
+|---|---|---|---|
+| 1 KiB | 17.34% | **23.75%** | 18.99% |
+| 4 KiB | 10.40% | 19.05% | 14.69% |
+| 16 KiB | 5.88% | 12.74% | 11.40% |
+| 64 KiB | **2.93%** | **10.48%** | 10.95% |
+
+datom 面の減衰は document 面の約 2.5 倍速い（同じ sweep で 5.9 倍減 対 2.3 倍減）。
+大きな datom leaf は次第に**自分自身が辞書**になるが、ADR 同士はどの 1 本にも含まれない
+語彙を共有し続ける。したがって**辞書は面ごとの方針**であり、フォーマットの仕事は
+「どれを使ったか」を名指すことだけ。datom 面の実用 leaf サイズでは既定 null のままでよく、
+document 面の 64 KiB で 10.48% は持つ価値がある。
+
+⚠ **本 ADR の初版はここに `33.80% → 0.56%` と書いていた。両端とも測定の artefact である**
+—— 隣接 hold-out が小 leaf 側をほぼ倍に膨らませ、縮む辞書が大 leaf 側を押し下げていた。
+merge 前の code review で見つかり、上の表が訂正後の値。
+
+### 4. 長さから漏れる情報量 — ここで予想が二重に外れた
+
+シール後の長さ分布の Shannon entropy（bits/leaf）:
+
+| plane | 今日 | 無 padding | **padmé** | 2 冪 |
+|---|---|---|---|---|
+| datom | 0.704 | 9.762 | 5.508 | 1.827 |
+| document | **9.010** | 11.321 | **5.610** | 1.697 |
+
+- **document 面では padmé 圧縮は今日より漏洩が少ない**（5.61 < 9.01）**うえに 2.3 倍
+  小さい**。トレードオフですらなく、単に良い点である。これが見えたのは、今日の baseline を
+  0 と仮定せずに測ったからで、ADR ファイルはサイズがばらつくため末尾 leaf だけで既に
+  9 bits 漏れている。
+- datom 面には本物のトレードがある: padmé は 4.8 bits/leaf を払って 7.2 倍、2 冪は
+  1.1 bits で 4.9 倍。
+- ゆえに **padding scheme は面ごとの方針であり、`p` はフィールドである。**
+
+### 5. 判定器が私に反対した（そして私は重みではなく軸を直した）
+
+最初の rank は leak 軸を「平文ヘッダフィールドの数」で採点し、**h3（padding 無し）が
+勝った** —— h3 はフィールドが最も少なく、漏洩が最も多い。代理指標が量を反転させていた。
+**重みを h4 が勝つまで調整するのは不正**なので、軸を実測の length entropy に置き換えて
+再ランクした。順位は入れ替わった。この経緯は `iteration-01.edn` の
+`:self-inflicted-instances` に残してある。
+
+## 決定
+
+### 1. `kotoba.leaf.v1` — シールされた leaf エンベロープ
+
+DAG-CBOR ブロック。参照実装は `scripts/aiuefs-codec.cljs`、適合ベクタは
+`conformance-vectors.edn`（12 本）。
+
+```
+外側（平文、汎用 IPLD ツールが歩ける）
+  \"v\"  版 / \"p\"  padding scheme / \"d\"  辞書 Link または null
+  \"iv\" 12 バイト / \"ct\" AES-256-GCM（tag 付き）
+AAD = \"ct\" を除いた外側 map の決定論的 CBOR（RFC 8949 4.2.1）
+内側（復号後）
+  u8 codec || u32le 平文長 || 圧縮データ || ゼロ padding
+```
+
+**どのフィールドがどちら側に在るかが設計そのもの:**
+
+- **`d`（辞書 Link）は外側**。秘匿のためではなく**到達性**のため —— DAG の辺として
+  見えない辞書は GC され、それを使った全 leaf が復号不能になり、しかもグラフの中に
+  理由を説明するものが何も残らない。辞書の identity は面ごとの定数で、個々の leaf に
+  ついて何も言わない。
+- **codec と平文長は内側**。平文長が外に在れば、padding が消そうとしている信号を
+  そのまま返してしまう。codec が外に在れば「この leaf は圧縮できたか」を言ってしまう。
+  どちらも復号前には要らない。
+- **`p` は外側**。ciphertext の長さが既に晒している漏洩を*記述する*だけなので隠しても
+  何も得られず、鍵を持たない読み手が開示量を判断できる必要がある。
+
+**ブロックは自分自身のフィールドの決定論的再符号化と 1 バイト違わないこと**（違えば
+`:leaf/non-canonical`）。AAD が縛るのはヘッダの**値**であって符号化ではないので、この検査が
+無いとキーの並べ替え・キーの追加・末尾バイトのいずれも認証を通ってしまい、**同じ平文が
+無数の CID の下で開く** —— content-addressed store が唯一失えない不変条件が壊れる。
+
+**辞書を受け取れる codec は deflate-raw だけ**で、brotli / zstd に渡すのは拒否する
+（`:leaf/dictionary-codec-mismatch`）。黙って捨てると、ヘッダは辞書 Link を縛ったままなので、
+その leaf は**何も得ないうえに、そのブロックを取ってこないと開けない**状態になる。
+
+**平文長は 2 つの穴を 1 つのフィールドで塞ぐ。** シールされているので、これは同時に
+**展開の上界**でもあり、しかも**後から検査するのではなく codec に渡す** —— 後から長さを
+比べる実装は既に展開を確保してしまっており、それが bomb の狙いそのものである。node は
+確保前に `ERR_BUFFER_TOO_LARGE` で拒否する。
+
+**上界を超えた出力は拒否であって、切り詰めではない。** 誤った平文の先頭 N バイトは
+誤ったデータであり、それを返せば検出可能な不一致が静かな破損に化ける。例外は identity
+codec だけで、そこでの後続バイトは認証済みの padding 自身なので切り出しが復号にあたる。
+
+⚠ **本 ADR の初版はこの段落を書いた時点で、実装がそうなっていなかった。**
+`maxOutputLength` を渡しておらず、200 KB を実体化してから先頭 10 バイトを正当な平文として
+返していた。自己テストが「拒否**または**上界への切り詰め」という**選言**を assert して
+いたため、弱い枝が通って緑になっていた。**選言は弱い枝にテストを満たさせる。**
+
+### 2. aiuefs-v4 = CARv2 pack + 署名された 1 本の root CID
+
+```
+LBA 0        aiuefs_superblock_v4  \"AIUEFS4 \" : pack 位置 / root CID(36) / 署名(64) / 辞書 CID
+LBA 1..2     journal      — v3 のまま（2 slot、redo-before-append、readback）
+LBA 3        mutable      — v3 のまま。中身は pack へ移り、ここは head ポインタだけ
+pack extent  CARv2（io-ipld-car）— 1 commit = 1 pack
+```
+
+- **命名面は CID だけ。** ディレクトリは IPLD map ブロック、パスは link 走査の列。
+- **ext4 / erofs / squashfs も UnixFS も採らない** —— どちらも「同じバイトに 2 つ目の
+  名前」を持ち込み、そのうち検証できるのは 1 つだけになる。UnixFS については
+  ADR-2608161500 が既に「layout adapter であって公開面ではない」と決めている。
+- **削除テスト**（ADR-2608039000）: このディスクを消しても、root CID はネットワークで
+  解決できる名前なので再 enroll した機械は戻る。ローカル pack は署名付き head を持つ
+  **cache** であって premise ではない。
+
+### 3. 署名は 1 本に畳む — 副産物として kernel の真正性が閉じる
+
+v3 は catalog に RSA-2048、app に RSA-2048、kernel には**署名の無い SHA-256 digest だけ**
+だった。攻撃者は kernel と埋め込み digest を両方書き換えられる。
+
+v4 では **kernel は pack の中の 1 ブロック**であり、root CID に名指され、root CID が
+署名される。署名は **ECDSA P-256**（kernel は verify も sign も既に持っており boot で
+実測済み —— aiueos ADR-0105 / ADR-0108）。**RSA-2048 は kernel から消える。**
+`boot-v1.edn` の `:authenticity false` は、機能を足したからではなく**命名を変えた帰結
+として**閉じる。
+
+### 4. 通信は ayatori の経路をそのまま使う（新しい transport を足さない）
+
+IPNI discovery（`ayatori.discovery`）→ provider → 全ブロック再ハッシュ付き取得
+（`ayatori.remote`）。transport は trustless gateway HTTP と `io-libp2p` の bitswap
+（pure `.cljc`、go-libp2p と相互接続実測済み）。**Kubo に手を伸ばさない**（CLAUDE.md
+2026-08-28）。AIUEOS 側の上りは kernel 自身の TLS 1.3 + ECDSA P-256（ADR-0114/0115 の
+K16 direct HTTPS、実エンドポイントで実測済み）。
+
+OTA は「ローカル pack が持っていることを証明できないブロックを取りに行く」だけ ——
+prolly-tree は既に欠けている部分木だけの構造的複製を持つので、更新はイメージの
+差し替えではなく **CID の差分**になる。
+
+### 5. IPNI は multihash を索引する（codec ではない）
+
+ayatori の bench が既に、raw ブロックと digest を共有する dag-cbor CID が
+**fail closed しなければならない** ことを pin している。v4 はこれを継承するだけで、
+再決定しない。
+
+## 払う代償（先に書く）
+
+| 項目 | 今日 | 必要 | 種別 |
+|---|---|---|---|
+| block I/O | 1 セクタ/req、depth 1 | 16 KiB leaf は今日**逐次 32 往復** | decision-free C mechanism |
+| CARv2 index 読み | 無い | pack index のオフセット計算 | C。**admission は Kotoba object**（ADR-2607241100） |
+| bounded inflate | 無い | deflate-raw の展開のみ（encoder は不要） | C。上界はシール内の平文長 |
+| AES-256-GCM | aes128-gcm は SSH record 層に在る | 256bit 鍵スケジュール | C |
+
+## Exit gate
+
+| Gate | 状態 |
+|---|---|
+| F0 contract | **green** — 本 ADR と `aiuefs-v4.edn` が同じ matrix を持つ |
+| F1 format | **green** — selftest 22/22。6 つの mutation がそれぞれ自分を名乗る case だけを落とす（AAD 除去 / 長さ上界除去 / 辞書検査除去 / `maxOutputLength` 除去 / canonical 検査除去 / 辞書 codec guard 除去） |
+| F2 圧縮の決定 | **green** — 4 本の bench、4 つの実 corpus、両方の順序を同じ行に併記 |
+| F3 開示量 | **green-measured** — ただし固定 corpus の長さ分布であって、適応的選択平文攻撃者に対する証明ではない |
+| F4 第 2 実装 | **red** — 適合ベクタは在るが、Kotoba 側の実装がまだ再現していない。**1 実装しかない仕様はフォーマットではない** |
+| F5 kernel block I/O | **red** — まだ 1 セクタ/req |
+| F6 往復回数 | **UNMEASURED** — pack 層自身の成功指標。無いことを見えるように書いておく |
+| F7 実機 | **red** — install gate I7 が赤なのは本設計以前の理由であり、v4 はそれに依存しない |
+
+## merge 前の code review が見つけたもの（8 件、すべて修正済み）
+
+本 ADR の初版と参照実装に対する review が 8 件を指摘し、**うち 4 件は本 ADR が
+公表した主張または数値を無効にしていた**。修正内容は上記本文に反映済みで、経緯は
+ここに残す（測定の訂正を静かに上書きしない）。
+
+| # | 何が壊れていたか | 影響 |
+|---|---|---|
+| 1 | `maxOutputLength` を渡さず、上界を展開**後**に検査していた | bomb 対策の中心的主張が実装として偽 |
+| 2 | 上界超過を拒否せず**先頭 N バイトに切り詰めて返して**いた | 検出可能な不一致が静かな破損に化ける |
+| 3 | brotli / zstd に辞書を渡すと**黙って捨てられ**、ヘッダは Link を縛ったまま | 利得ゼロかつ開けない leaf |
+| 4 | 判定器の `evidence` が無防備に除算し、`nil/nil` = NaN が `number?` を通っていた | 「未測定は勝てない」規則が**迂回されていた** |
+| 5 | 辞書が「連結の末尾 32 KiB」で、64 KiB leaf では**1 leaf の半分**だった | leaf サイズと辞書被覆を混同した数値を公表 |
+| 6 | 非 canonical なブロック（キー順・余分キー・末尾バイト）を受理していた | **同じ平文が無数の CID で開く** |
+| 7 | hold-out が leaf index 単位で、同じ文書の訓練 leaf と隣接していた | 辞書利得を過大に公表 |
+| 8 | 全 `:decompress-mbps` が未測定だと `(name nil)` が throw し exit 1 | 「答えられなかった」の予約 exit 2 が出ない |
+
+**#1・#2・#5・#7 は公表済みの主張・数値を無効にしていた。** #1 と #2 が緑のまま残れた
+理由は同じ 1 つで、**自己テストが選言を assert していた**こと —— 弱い枝が通れば緑になる。
+これは CLAUDE.md の「その検査は、自分が名乗っている理由で拒否したことがあるか」が
+名指している形そのものである。
+
+## 非決定
+
+- 鍵階層 / 鍵ローテーション。v4 は `arrangement` の encrypt-fn / blind-fn の seam を
+  そのまま使い、**新しい鍵階層を導入しない**（省略を「後で見つかる穴」にしないため明記）。
+- Secure Boot の production key。
+- pack の compaction 方針（封じた pack は不変。追記しない —— offset が動き catalog と
+  埋め込み index の両方を静かに嘘にする）。
+- v3 → v4 の移行スケジュール。既存の v3 deployment は**そのまま正しい**。
+
+## Consequences
+
+- **ADR-2608160100 の「pack を圧縮しない」は撤回しない。** 本 ADR はその一文の主語を
+  はっきりさせ、AEAD の反対側に別の答えが在ることを測って足す。
+- `kotoba.leaf.v1` は AIUEOS 固有ではない。`arrangement` の leaf であり、
+  したがって kotobase / ayatori / kotobase-storage も同じ envelope を読む。**上流は
+  `kotoba-lang/arrangement` と `kotoba-lang/kotobase-storage`** であり、この session の
+  repo scope は `com-junkawasaki/root` なので、仕様・参照実装・適合ベクタ・判定器を
+  root に着地させ、port は別 session の仕事として明記する。
+- **F4 が red である限り、これは「フォーマット」ではなく「1 実装しかない仕様」**である。
+  次の 1 手は Kotoba 側でベクタ 12 本を再現すること。
+- 次の反復の種は**往復回数**。ADR-2608160100 が pack 層の成功指標として名指しているのは
+  bytes でも wall-clock でもなく round trip であり、本反復はそれを 1 度も測っていない。
+  実験は「実 arrangement snapshot を 1 commit = 1 pack で組み、同じ query の block GET
+  数を co-location 有無で数える」—— ayatori が記録している full score scan の
+  57 blocks / 916,304 bytes が baseline。
+")))

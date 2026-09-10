@@ -1,0 +1,167 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607310100-cloud-itonami-saas-funnel-xmile-model")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/topic "cloud-itonami-saas-funnel-xmile-model")
+  (:adr/title "ADR-2607310100: cloud-itonami の SaaS funnel を実測値だけで XMILE モデル化する — 0/5 の転換は「0」ではなく「95% 上限 0.4507」")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/last-verified "2026-07-30")
+  (:adr/last_verified "2026-07-30")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative-for
+  (vector "`90-docs/business/cloud-itonami-saas-funnel.xmile` — この workspace で最初の実 XMILE モデルの正本。何を主張し、何を主張しないかの定義"
+   "転換が 1 件も観測されていない funnel を数値化する方法の正本 — 点推定でも 0 でもなく、`dynamics.core/upper-bound-rate-from-zero-events` の 95% 上限を使う決定"
+   "事業の経済を模型化するモデルに、価格のような未計測パラメータを入れない決定（revenue を意図的に含めない）の正本"))
+  (:adr/related
+  (vector "adr-2607309600-itonami-business-plane-and-console"
+   "adr-2607072350-kotoba-lang-org-oasis-open-xmile-system-dynamics"
+   "adr-2607203000-system-dynamics-loop-analysis-all-entities"))
+  (:adr/body "
+# ADR-2607310100: cloud-itonami の SaaS funnel を実測値だけで XMILE モデル化する
+
+**Status**: accepted
+**Date**: 2026-07-30
+
+## Context
+
+ADR-2607309600 の Phase 3 で Loops 面（XMILE 実行・Meadows leverage）を出したが、
+**未決の gap を 2 つ記録して閉じた**:
+
+1. 既存の SD ledger が模型化しているのは fleet 自身の repo 登録 backlog であって、
+   事業の経済（売上・顧客・現金）ではない。
+2. workspace に `.xmile` ファイルが **0 件**。エンジン経路は test で証明されて
+   いるが、出荷済みモデルでは証明されていない。
+
+この 2 つは同じ 1 つの穴だった: **事業の経済を模型化した実モデルが存在しない。**
+
+### なぜ今まで書かれていなかったか（そして、なぜ書けるようになったか）
+
+XMILE モデルは全変数に数値を要求する。「未計測」を穴として残せない。だから
+売上・顧客・現金を推測値で埋めたモデルは、**シミュレーションの見た目をした
+捏造**になる — ADR-2607203000 の repo-wide 規則（「『計算済み』と称する数値は必ず
+実データ（日付・出典付き）に基づく」）が禁じているもの。
+
+しかし実測値は在った。日付・出典付きで:
+
+| 値 | 実測 | 出典 |
+|---|---|---|
+| external tenants | 5 | `90-docs/business/metrics/cloud-itonami.edn` `:tenants {:external-total 5}`、`:asOf 2026-07-30T11:11:56.942Z` |
+| paying tenants | 0 | 同ファイル `:tenants {:external-paid 0}` / `:funnel {:paid 0}` / Stripe `:activeSubscriptions 0` |
+| external tenants（10 日前） | 4 | `loop-system-dynamics/resources/entities-seed.edn` `:cloud-itonami-saas-product`、2026-07-20 |
+| weekly human uniques | 147（10 日前 74） | 同上、itonami.cloud Cloudflare zone |
+| agent runs 7d | 2,173（10 日前 34,381） | 同上 |
+
+**日付の付いた 2 点があるので、rate が実測になる**: 4 → 5 tenants / 10 日 =
+0.1 tenants/day。これが推測でない唯一の理由。
+
+### 0/5 は「転換率 0」ではない
+
+転換は 5 件中 0 件。ここで取りうる 2 つの誤答は、
+①「未計測だから数値化できない」②「じゃあ 0」。どちらも間違いで、
+`dynamics.core/upper-bound-rate-from-zero-events`（ADR-2607203000 で導入）が
+正解を持っている: **n=5 で 0 件観測と整合する 95% 上限 = 1-(0.05)^(1/5) =
+0.4507197283469411**。点推定ではない（点推定には成功例が 1 件以上必要）。
+n が実測なので、この上限も実測に動く（n=4 の時点では 0.527129195498412）。
+
+## Decision
+
+### 1. `90-docs/business/cloud-itonami-saas-funnel.xmile` を正本として置く
+
+OASIS XMILE 1.0、Euler、dt=1 日、90 日。構造:
+
+```
+Tenant_Signup ──▶ Non_Paying_Tenants ──Conversion──▶ Paying_Tenants
+   0.1/day            init 5 (実測)                   init 0 (実測)
+```
+
+`Conversion` は **Non_Paying_Tenants の outflow でもある**。転換した tenant は
+2 つの stock の間を移動し、どちらかに湧かない。
+
+### 2. 全変数が自分の provenance を `<doc>` で持つ
+
+`xmile.xml/parse-doc` は `<doc>` を `:xmile/doc` として保持する（実測）。だから
+出典・日付・caveat は sidecar ではなくモデル自身の中に置く。読み手がモデルを
+開けば、どの数値が何の測定かが同じ場所にある。
+
+### 3. revenue は入れない
+
+価格を測っているものがこの workspace に無い。1 つでも推測パラメータを入れれば、
+残り全部が実測でも「実測に基づくモデル」と言えなくなる。funnel は paying tenants
+までで止め、header に「NOT MODELLED: revenue」と明記する。
+
+### 4. 読み方を header に固定する
+
+`Paying_Tenants` は **「これ以上にはならない」** と読む。**「これだけ増える」では
+ない。** 実測転換は 0/5 で、この run はそれと整合する天井。予測ではない。
+
+### 5. agent:human 比の caveat をモデルに載せる
+
+itonami.cloud は agent が実行できる free-tier claim path
+（`/isco-1212/agent.json`）を公開しており、同じ product が **agent runs 2,173 対
+human uniques 147** を報告している。entities-seed はこれを「5 tenant の一部または
+全部が、購入を検討する事業者ではなく product を評価する agent かもしれない」という
+**根拠のある未確定の可能性**として記録している（断定ではない）。この caveat を
+`Non_Paying_Tenants` の `<doc>` に持たせ、tenant を実測として数えながら
+「買い手である」とは主張しない。
+
+## 実行して初めて分かった誤り（記録する）
+
+**最初の版は保存則を持っていなかった。** `Conversion` を `Paying_Tenants` の
+inflow としてだけ宣言し、`Non_Paying_Tenants` の outflow にしていなかった。
+commit 前に実際に走らせたところ:
+
+```
+day 90:  Paying_Tenants 38.3   /   total tenants 14
+```
+
+**顧客より支払い顧客が多い。** モデルが自分の母集団を保存しないと、投影の
+見た目をした算術的無意味が出る — モデルが無いより悪い。outflow を足して修正し、
+`Total_Tenants = Non_Paying_Tenants + Paying_Tenants` を aux として置いて、
+不変条件が renderer 上で見えるようにした（caption の中の主張ではなく、変数として）。
+
+この経験の一般則: **モデルは書いた時点では検証されていない。走らせて、自分が
+分かっている不変条件と照合するまでは草稿である。**
+
+## 検証
+
+実 engine（`xmile.execute/run`、`org-oasis-open-xmile`）で実行:
+
+```
+day  0  non-paying 5.000  paying  0.000  total  5.000  (expected  5.000)
+day 10  non-paying 3.972  paying  2.028  total  6.000  (expected  6.000)
+day 30  non-paying 2.916  paying  5.084  total  8.000  (expected  8.000)
+day 90  non-paying 2.262  paying 11.738  total 14.000  (expected 14.000)
+conservation-holds            true  (全 91 step、1e-9 以内)
+paying-never-exceeds-total    true  (全 91 step)
+```
+
+さらに **`cloud.itonami.app.loops/model` 経由でも end-to-end 確認**（Loops pane が
+実際に読む経路）: `:state :resolved`、stock 2 件の inflow/outflow/units を正しく読み、
+`:trajectory :simulated` 91 step、`Total_Tenants` が全 step で 5 + 0.1t と一致。
+
+## Consequences
+
+- **Loops pane に初めて実モデルが表示できる。** binding は
+  `:business/model \"90-docs/business/cloud-itonami-saas-funnel.xmile\"`
+  （app の store はインストール単位なので、binding 自体は repo に入らない）。
+- ADR-2607309600 の未決 gap 2 件のうち、**「.xmile が 0 件」は解消**。
+  「ledger が事業の経済ではなく fleet backlog を模型化している」は**この
+  モデルとは別の話として残る** — leverage ledger 側は手を付けていない。
+- **モデルは metrics が更新されるたび陳腐化する。** 初期値と rate は
+  2026-07-20 / 2026-07-30 の 2 点に固定されており、自動追従しない。
+  再生成の自動化は行っていない（実測 2 点しか無い rate を自動で引き直すと、
+  観測が 1 点しかない期間に無言で古い rate を使い続ける）。更新は metrics を
+  読んで手で行い、日付を `<doc>` に書き直す。
+
+## やらないこと
+
+- revenue / price / LTV / CAC を推測で入れない。
+- traffic（uniques）を signup に掛けない。traffic→signup の転換率は未計測で、
+  大きな pool に未計測の転換率を掛けるのが `dynamics` の docstring が名指しで
+  「この種の分析が壊れる最も一般的な仕方」と呼ぶもの。
+- 他 11 product に同型モデルを量産しない。各 product の実測 2 点が在るかを
+  確認してから 1 つずつ。
+")))

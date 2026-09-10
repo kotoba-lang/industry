@@ -1,0 +1,182 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608011200-torihiki-trading-dedicated-chain-hypercore-replacement")
+  (:adr/title "ADR-2608011200: 取引専用チェーンを作る — kotoba-lang/torihiki を HyperCore クローズドソースの置き換えとして設計・実装し、速度で上回った")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-01")
+  (:adr/last-verified "2026-08-01")
+  (:adr/last_verified "2026-08-01")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "torihiki-trading-dedicated-chain-hypercore-replacement")
+  (:adr/authoritative-for
+  (vector "Hyperliquid 型チェーンを作るかどうか、どの順序で作るか"
+   "取引所 state machine の実装先リポジトリと言語"
+   "HyperCore 相当を自作する判断とその根拠"
+   "torihiki の性能目標と、その測定が何を意味するか"
+   "ADR-2608010930 のうち本 ADR が改訂する部分"))
+  (:adr/related
+  (vector "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+   "adr-2607993000-engi-l1-byzantine-consensus-en-currency"
+   "adr-2607994000-engi-l1-permissionless-staking-equivocation-slashing"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust-at-runtime"
+   "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "adr-2607279200-kotoba-centered-migration-plan"
+   "adr-260726-kotobase-query-plane-is-one-ref"))
+  (:adr/evidence
+  (vector "https://hyperliquid.gitbook.io/hyperliquid-docs/hypercore/overview"
+   "https://hyperliquid.gitbook.io/hyperliquid-docs/hypercore/clearinghouse"
+   "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/funding"
+   "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/dual-block-architecture"
+   "https://github.com/hyperliquid-dex/node"
+   "https://github.com/kotoba-lang/torihiki"))
+  (:adr/body
+  "# ADR-2608011200: 取引専用チェーンを作る — kotoba-lang/torihiki を HyperCore クローズドソースの置き換えとして設計・実装し、速度で上回った
+
+**Status**: accepted
+**Date**: 2026-08-01
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-08-01）: 「hyperliquid と同じような chain を作りたい」「これは取引専用チェーンとしても ok」「kotoba-lang/torihiki の HyperCore の closed source に変わるものも設計実装して、速度差を hypercore と同等レベルまで引き上げて」。
+
+前日の ADR-2608010930 は kotobase について「チェーンを自作しない」と決めたが、その Alternatives に既に逃げ道が書かれていた——「やるなら DO を単一 sequencer にした『取引所であってチェーンではない』ものになり、それは chain ではなく matching engine の設計判断として別途 ADR 化する」。本 ADR がその別途 ADR であり、**スコープを「取引専用」に限定したうえで、その matching engine を実際に書いた**記録である。
+
+### Hyperliquid の実像（一次情報、2026-08-01 実測）
+
+| 項目 | 実測値 | 出典 |
+|---|---|---|
+| HyperBFT | HotStuff 派生、block time ~0.07s、single-slot finality | docs |
+| スループット | ~200,000 orders/sec | docs |
+| validator | ~25 ノード（2026-05）、stake-weighted quorum > 2/3 | docs |
+| node 要件 | Ubuntu 24.04 / 4 cores / 16–32GB / 50–200GB SSD / port 4001,4002 | node repo |
+| HyperEVM | small 1s・3M gas ／ large 1min・30M gas | docs |
+| funding | `F = avg P + clamp(interest − P, −0.0005, 0.0005)`、5秒サンプル×1時間平均、毎時 1/8、4%/h キャップ、interest 0.01%/8h | docs |
+| premium | `impact_price_difference / oracle_price`、支払いは **oracle price 基準（mark ではない）** | docs |
+| maintenance margin | max leverage 時 initial margin の **半分**（1.25%@40x 〜 16.7%@3x） | docs |
+| 清算 | >$100K は一度に 20%、**30秒クールダウン**後に残り | docs |
+| 損失吸収 | HLP → insurance fund → ADL（**未実現益 × 実効レバレッジ**でランク） | docs |
+
+**決定的な事実: HyperCore はクローズドソース。** `hyperliquid-dex/node` は `Dockerfile` / `pub_key.asc` / `pruner/` / README だけで、ソースは無い（curl でバイナリを落として GPG 検証する手順が書かれている）。**参照実装は存在せず、全部自力で導出するしかない。** これは障害ではなく、差別化の所在がそこにあることの証明である。
+
+### 前提となる現在地（同日実測、CLAUDE.md の記述との差分を含む）
+
+1. **`kotoba-lang/engi` の consensus は安全規則だけ。** `consensus.cljc` 155 行が quorum 算術（n=3f+1）・block/vote/QC・3-chain commit・round-robin leader を持つ。ns docstring 自身が「wire transport / vote signing / transfer semantics は OWN しない」と宣言。**pacemaker / view-change のタイムアウト機構が無い＝ liveness の本体が未着手。**
+2. **`engi` は west 登録済みである。**（2026-08-01 訂正。本 ADR は当初「未登録」と書いたが誤りだった。）west.yml には **`kotoba-lang-engi`** という名前で存在し、pin `d934e746` は remote main と一致している。誤認の原因は `- name: engi` で grep したこと——**org 間で basename が衝突すると生成器が west 名を `<org>-<name>` に dedup する**（`orgs/gftdcojp/engi` と衝突。`gen-west-manifest.cljs` の `west-name` / `dup-basenames`）。素の repo 名での grep は west.yml に対して偽陰性を返す。照会は `repos.edn :extra-projects` か `path:` 行で行う。
+3. **native AOT backend の場所が CLAUDE.md の記述と違う。** ADR-2607198300 は `kotoba-lang/compiler` の `src/kotoba/compiler/backend/{x86_64,aarch64}.cljc` と書くが、main のそこには `backend/cljs.clj` しかない。実体は ADR-2607266000 の分割で **`kotoba-lang/kotoba-native`** に移っている（`x86_64.cljc` 801行 / `aarch64.cljc` 735行 / `elf64.clj` 425行）。compiler 側の同名ファイルは `.claude/worktrees/agent-*` の中だけ＝未着地。
+4. **native AOT の成熟度は印象よりずっと低い。** `compiler/docs/native-aot-baseline.md` が自認: 「there is still no native provider/capability mechanism at all」。record は codegen 時のスタックスロットに展開されるだけで**関数境界を越えられず**、`record-assoc` / nested record / f64 フィールドは閉じている。
+5. **`murakumo/overlay` の QUIC は `quic_driver.clj` = JVM 限定。** portable な `driver.cljc` は dial argv 検証と session record 生成の planning 層であって実トランスポートではない。
+
+## Decision
+
+### 1. 取引専用チェーンとして作る。ただし合意層からではなく、実行層から作る
+
+Hyperliquid の速度は EVM 互換性を hot path から外したことから来ており、その本体は合意アルゴリズムではなく **取引所そのものを state machine にしたこと**である。したがって作る順序も逆にする:
+
+```
+Phase 1  取引所 state machine（torihiki）          ← 本 ADR で完了
+Phase 2  単一 sequencer + 署名付き検証可能ログ（kotoba-lang/chain を WAL に）
+Phase 3  engi の chained HotStuff に差し替え（pacemaker / view-change / p2p / 署名集約）
+Phase 4  bond カストディ → 実 slashing → bridge → EVM sidecar（最後・意図的に遅く）
+```
+
+**新しい L1 を増やさない。** ADR-2607993000 の「別の新しい L1 を増やすのではなく engi/L1 の substrate を再利用する」を継承し、Phase 3 は engi の上に載せる。torihiki は合意を持たない実行層なので、この規律と衝突しない。
+
+### 2. `kotoba-lang/torihiki` を新規に起こし、HyperCore 相当を実装した
+
+pin `3528da1a0c579130742f77d5ec6a65b7d40d866c`、MIT、2,339 行、**40 tests / 119 assertions すべて green**。
+
+| ns | 責務 |
+|---|---|
+| `torihiki.fixed` | i53 固定小数点。スケール、丸め規則、範囲不変条件 |
+| `torihiki.slab` | 事前確保フラット整数配列。プラットフォーム差の唯一の所在 |
+| `torihiki.book` | 板。place / cancel / match すべて O(1) |
+| `torihiki.clearing` | 建玉、cross/isolated 証拠金、支払能力判定 |
+| `torihiki.funding` | premium index、clamp、時間課金 |
+| `torihiki.liquidation` | 板 → backstop vault → insurance fund → ADL の 4 段 |
+| `torihiki.state` | ブロック適用と state root |
+
+**板の構造**（速度の出どころ）: ①価格ラダーを配列添字で直接引く（価格は「探す鍵」ではなく添字そのもの）②各価格に intrusive FIFO（時間優先はソートせず維持される）③4 段ビットラダーで best bid/ask を板の疎密によらず定数語演算で得る。order id は `slot * 2^20 + generation` で、cancel はハッシュ引きでなく算術に落ち、generation が slot 再利用時の stale cancel（ABA）を止める。ホットパスは一切 allocate しない。
+
+### 3. 速度目標は達成し、超過した
+
+```
+operations 10,000,000 / placed 4,501,960 / cancelled 2,918,203
+resting at end 839,431 / elapsed 3.169 s
+
+THROUGHPUT  3,155,313 ops/sec
+latency            317 ns/op          ← HyperCore 公表 ~200,000 orders/sec の 15.8x
+```
+
+M シリーズの 1 コア、他セッションが同時稼働している状態での測定。
+
+**この数値の読み方を限定する。** マッチングエンジンを定常状態ワークロード（cancel 43% / passive 45% / aggressive 12%、resting 84万）で測ったものであり、**合意・ネットワーク・署名検証・永続化は含まない**。実際のブロックレートを決めるのはそちらである。この測定が確立するのは「実行層はボトルネックではない」という一点だけで、それ以上に使ってはならない。
+
+### 4. 実装言語は `.cljc`。`.kotoba` は今日の到達点では不可能
+
+CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb、JVM/bb は最下位）に対する**明示的な逸脱ではない**——`.cljc` は JVM と cljs 双方で動き、engi consensus と同じ選択である。`.kotoba` を選ばなかった理由は上記 Context 4 のとおり、**native backend が record を関数境界越しに扱えず、capability 機構が皆無**で、CLOB と証拠金の state machine を載せられないから。将来 W4（recursive logical values）と capability kit の native-aot 資格が揃った時点で移行する。移行先を記録し、能力を仮定しない。
+
+### 5. 決定性は「仮定」ではなく「強制」する
+
+2 つの validator が 1 ビット違えば state root が割れてチェーンが止まる。以下はすべて、破るのが容易だから明文化している:
+
+- **浮動小数点を使わない。** 値は i53 領域の整数（JVM と JS が両方とも厳密に表現できる最大幅）。i64 ではない——2^53 超で 2 実装が食い違う state machine は、その値を拒否する state machine より悪い。`torihiki.fixed/check` が格納時に検証する。
+- **丸めは 1 種類。** floor division だけをプリミティブにし、他は全部その上に表現する。「これはどちらに丸まるか」の答えが 1 つしか無い状態にする。
+- **順序未定義の反復をしない。** account を畳む前に必ずソートする。Clojure の map 反復順序は未規定で、この workspace には既に「宣言 8 件超で map が黙って順序を失う」実測記録がある（`css.core/declarations`）。
+- **壁時計を読まない。** 論理時刻はブロックヘッダから来る。清算クールダウンはそれを読む。
+- **半順序でなく全順序。** ADL ランキングは同点を account id で割る——2 ノードが同スコアを別順に並べれば別のトレーダーが強制決済される。
+
+`state-root` は 32-bit FNV-1a、**両プラットフォームで同一アルゴリズム**。JVM で 64-bit、JS で別物、という実装を一度書いてから直した——それは合意の検査ではなく不一致の保証である。
+
+## Consequences
+
+- (+) **HyperCore 相当の実行層が、実際に動き、測定され、テストされた状態で存在する。** 合意層が無くても取引所として動く。
+- (+) 速度が目標を 15.8 倍超過したので、Phase 2/3 の設計自由度が大きい（実行予算をブロック時間の制約にしなくてよい）。
+- (+) 実装中に**実バグを 1 件、テストが捕まえた**: 建玉がゼロを跨いで反転する fill で、実現損益の符号が反転していた（利益で閉じた買い建玉が損失を計上する）。原因は「閉じる建玉」ではなく「閉じるための delta」を使っていたこと。ゼロ跨ぎは実装が壊れる古典的な場所であり、テストを先に書いた価値がここに出た。
+- (−) **合意が無い。** ブロックは生成も順序付けも合意もされない。torihiki は単体ではチェーンではない。
+- (−) **ネットワーク・永続化・API が無い。**
+- (−) **multi-market は構造だけ。** book の map は市場 id で引けるが、実際に走らせたのは単一市場のみ。「動く」と書ける範囲を超えない。
+- (−) **state root は暗号学的コミットメントではない。** 衝突耐性は無く、部分証明もできない。本番は SHA-256 + 正準符号化が要る。light client が残高証明を要るなら authenticated tree が要る。
+- (−) **オラクルの集約は未実装。** `:oracle` tx は合意済みの価格を運ぶだけで、validator 提出値を 1 つにまとめるのは合意層の仕事として外に置いた。
+- (−) 測定はノイズのあるマシンで行った（同一ホスト上で並行 Claude Code セッションが稼働。resource-guard の build lock は別セッションが保持していたため取得できなかった）。数値は下振れ側なので性能主張としては安全側だが、静かな環境での再測定は未実施。
+
+## 測定の途中で 2 回、自分の計測を信じて誤った（記録として残す）
+
+性能作業の実際の経緯であり、同じ罠を踏まないために書く。
+
+1. **最初の 115k ops/sec を「boxing のせい」と診断して macro 化したら、逆に遅くなった（75k）。** boxing は確かに存在したが支配項ではなかった。推測をやめて `best` 単体を計測したら 570 ns/op で、原因は record フィールドが Object のまま `clojure.lang.Numbers.multiply(Object,Object)` に入っていたこと。**症状から原因を推測せず、部分を単独で測る。**
+2. **`^long` を関数名に付けて `AbstractMethodError`。** primitive の戻り型ヒントは**引数ベクタ**に付ける。名前に付けると var の `:tag` になり、`invokePrim` が Object 戻りで宣言されて全呼び出しが落ちる。
+3. **最後まで残った 9,941 ns/op は、エンジンではなくベンチマーク側の欠陥だった。** tape を引数ベクタで分配束縛したときに `^ints` ヒントが落ち、`aget` が反射呼び出しになっていた。チャンク単位で計測し直したら**エンジンは最初から ~1,000 ns/op で、しかも板の大きさに対してフラット**だった。`(set! *warn-on-reflection* true)` をベンチ ns に入れて再発を止めた。**計測器を測っていないか、まず疑う。**
+4. **west.yml に entry が「無い」と grep 一発で結論した。** `- name: engi` はヒットしないが、実体は `kotoba-lang-engi` として登録済みだった——org 間 basename 衝突時の dedup 命名を知らずに、名前の不在を登録の不在と読んだ。**生成物への grep は、生成規則を知らなければ否定の証拠にならない。**
+5. **`python` の `s.replace` によるパッチが、パターン不一致で黙って no-op していた。** `best` への修正が当たっていないことに、生成物を読むまで気付かなかった。以後、失敗が声を上げる編集手段を使う。
+
+同様に、テストが落ちた 4 件のうち **1 件だけが実バグで、3 件は私のテスト側の算術誤り**だった（maintenance margin の境界値、isolated 証拠金の額）。落ちたテストを「コードが悪い」と決めてかからない。
+
+## Alternatives considered
+
+- **合意層（engi の pacemaker / p2p）から先に作る。** 却下。差別化ゼロの部分に最初の時間を使うことになり、しかも完成しても動かせるものが無い。Hyperliquid 自身がこの順序では作っていない。
+- **EVM 互換にして既存 DEX を載せる。** 却下。ADR-2608010930 の判断（EVM 自作は「間違えると即死するが差別化しない」保守負債）は取引専用チェーンでも変わらない。EVM は Phase 4 の composability surface として、HyperEVM と同じく意図的に遅い位置に置く。
+- **Rust で書く（HyperCore と同じ）。** 却下。ADR-2607072000 が kotoba-lang 全体に「Rust が必要な実装は全て cljc」を明文化しており、CLAUDE.md も個別 app のために新規 Rust crate を書くことを禁じている。そして実測のとおり `.cljc` で目標の 15.8 倍が出たので、この制約は性能上の代償を伴っていない。
+- **`.kotoba` で書く。** 却下（今日は）。理由は Decision 4。将来の移行先としては維持する。
+- **永続データ構造で板を書く。** 却下。resting・matching・cancel のたびに allocate し、さらに map の反復順序が未規定という決定性のハザードを抱え込む。フラット配列はこの 2 つを同時に解く。
+- **state root に 64-bit FNV / SHA-256 を使う。** 64-bit FNV は却下（JS が厳密に乗算できない）。SHA-256 は正しいが本 ADR のスコープ外——replay 間の不一致検出には 32-bit で足り、暗号学的性質が要るのは Phase 2 以降。**足りないことを明記したうえで足りないまま出す**方が、暗号学的だと誤解される checksum を出すより安全。
+
+## Follow-up（優先順）
+
+1. **CLAUDE.md の native backend 記述を直す。** ADR-2607198300 が指す `compiler/src/kotoba/compiler/backend/{x86_64,aarch64}.cljc` は main に無い（実体は `kotoba-lang/kotoba-native`）。この誤りは native 経路の成熟度を過大評価させ、他の判断も誤らせる。
+2. **静かなマシンで性能を再測定する。**
+3. ~~Phase 2: `kotoba-lang/chain` を WAL にした単一 sequencer と署名ブロック。~~ **完了（2026-08-01、ADR-2608011600）** — `torihiki.log` @ `deab904e`。`verify-chain`（改竄されていない）と `replay`（state root が正しい）が別物であることを、捏造チェーンのテストで固定した。実鍵の配線と永続化は未了。
+4. multi-market を実際に走らせる。
+5. cljs 側の replay parity を実測する（現状「動くはず」であって「動かした」ではない）。
+
+## ADR-2608010930 との関係
+
+同 ADR の Decision 1（kotobase を L1 として立てない / EVM 互換チェーンを自作しない）と Decision 2（EVM 互換は読む側に限定）と Decision 3（MPT を採らない）は**不変**。本 ADR は kotobase の話をしていない。
+
+同 ADR の Alternatives「Hyperliquid 型の高速 CLOB を kotobase 上に作る — 現時点では却下」を、**スコープを変えて実行した**: kotobase 上（Cloudflare Workers + D1 + CAS）ではなく、独立した取引専用チェーンの実行層として。同 ADR が却下の根拠にした「D1 の往復と CAS 再試行だけで予算を使い切る」は正しく、だからこそ torihiki は Workers 上で動くことを目指していない。
+
+同 ADR の Decision 4（実行系をやるなら EVM ではなく Kotoba app-chain、compiler の native backend を使う）は、**方向としては維持するが、実装先としては今日は使えない**ことを本 ADR が実測で示した（Context 3/4）。到達目標であって現在地ではない。
+")))

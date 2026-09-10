@@ -1,0 +1,54 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608025400-twenty-milliseconds-stops-the-chain")
+  (:adr/title "adr-2608025400: 20 ミリ秒で chain は止まる — deploy 済みの停止は latency だった")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-latency-threshold")
+  (:adr/authoritative-for
+  (vector "deploy 済み停止の原因（配送 latency）"
+   "harness の NET_DELAY による再現"))
+  (:adr/related (vector "adr-2608025300-modelling-the-deployment-in-the-harness"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi/commit/33c8a814fd50ee5d4a97e788dab20cf1ff3755aa"))
+  (:adr/body
+  "# ADR-2608025400: 20 ミリ秒で chain は止まる
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 実測
+
+```
+  NET_DELAY=  0   94 committed blocks
+  NET_DELAY=  5   21
+  NET_DELAY= 20    0
+  NET_DELAY= 60    0
+```
+
+**eviction と transport 側署名を先に写し取ったが、どちらも結果を変えなかった。** **batch を 20 ミリ秒保持してから配送すると、chain は完全に止まる** —— **deploy 済みの validator がやっているのは、まさにそれ。**
+
+**Durable Object 間の HTTP 往復は、良くて数十ミリ秒。** つまり **deploy 済み環境は、この実装が生き延びられる範囲に一度も入っていなかった。**
+
+**0 は現実の設定ではない。** それは **この harness がずっと pass してきた設定** —— **1 プロセス内の実 socket、message が「次のことが起きる前に」届く世界。**
+
+## 測り直した
+
+**一度、自分の refactor が壊した harness の上でこれを測り、報告した。** その数字はたまたま正しかったが、**測定はその根拠になっていなかった** —— **遅延を何にも繋いでいない状態の同じ run が、同じ答えを出した。**
+
+**0 で pass する harness の上で測り直した。** **0 と 20 の差に意味を持たせているのは、それ。**
+
+## Consequences
+
+- (+) **deploy 済み停止の原因が特定された。**
+- (+) 6 秒で再現・回帰できる（`NET_DELAY=20`）。
+- (−) **実装は数十ミリ秒の配送遅延に耐えられない。** これは調整ではなく設計の問題 —— 「message は次の tick より前に届く」という仮定がどこかにある。
+- (−) deploy 済み chain は停止のまま。
+
+engi 229 tests / 1173 assertions。
+")))

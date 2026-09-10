@@ -1,0 +1,155 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608261200-jp-mof-sanctions-source-and-its-two-defect-classes")
+  (:adr/title "制裁リストに JP-MOF を足し、表現できない名前と 1 ランタイムだけの検査という 2 つの欠陥クラスを塞いだ")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-26")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related (vector "adr-2608039000-blockchain-decentralised-paths-do-not-presume-d1"
+                "adr-2608039700-agent-loop-source-of-truth-is-git-edn-datalad"
+                "adr-2608252300-lei-catalog-collection-and-the-datalake-projection"
+                "adr-2608260200-ses-mail-private-datalake-routine"))
+  (:adr/landed "kotoba-lang/watchlist-screen 7774a93; com-junkawasaki/root 858a4d0")
+  (:adr/verification "JVM 55 tests / 147 assertions 0 failures; nbb 52 / 141 0 failures; clj-kondo 0/0.
+Iceberg 4 tables committed with matching read-backs (23191 / 62405 / 34056 / 3).
+Pre-existing LEI tables untouched (108368 / 18930 / 54575 / 183).
+Full refresh cycle run for real: 9/9 steps.
+Negative controls observed failing for their own stated reason: empty-name floor
+(18 assertions on the old match.cljc), char-code (8 under nbb, 0 on the JVM),
+freshness gate (stale / missing fetched-at / empty tree), count ratchet (-66.7%
+against a bare remote with inflated counts), publish_r2 read-back (missing key).")
+  (:adr/body "2026-08-26 のセッション記録。発端の問いは「反社、sanction check のためのデータベースは
+repo としてあるか。edn 以外にも r2 datacatalog にも保存できているか」。
+
+## 答えと、その境界
+
+**反社会的勢力（暴力団）のデータベースは無い。** repo 名 4,237 件、および checkout 済み
+`orgs/` と `90-docs/` の全文検索で 反社 / 暴力団 / boryokudan / antisocial は 0 件。
+**日本のどの当局も機械可読な形で公開していない**ので、作れば当てずっぽうになる。
+この repo 群を 反社チェック と説明してはならない —— `watchlist.model/sources` の隣、
+`watchlist.adapters.jp-mof` の冒頭、README、MATURITY の 4 箇所に明記した。
+
+在るのは**制裁・PEP スクリーニング**で、これは別の主題である。
+
+## 決めたこと
+
+### 1. JP-MOF を第 3 の source にした
+
+財務省 資産凍結等対象者一覧（外為法）。2,866 行 → 2,866 entity、skip 0。CSV の解析は
+`kotoba-lang/org-ietf-csv`（RFC 4180、zero-dep）に委譲した —— 引用符の中に区切り文字を
+含む列が実在し、split-on-comma は**エラーにならずに列をずらす**。
+
+**URL が動く。** MOF は publication date をファイル名に埋め（shisantouketsu<YYYYMMDD>.csv）
+安定した alias を持たないので、`latest-csv-link` が index ページから現行の URL を引く。
+リンクが見つからなければ refresh を**失敗させる** —— 覚えている URL に fallback すると、
+凍結された 1 つのファイルに対して成功を報告し続ける。
+
+### 2. 表現できない名前は、何にも一致してはならない
+
+`jaro-winkler` は空文字列 2 つに対して 1.0 を返す。`normalize` は非ラテン文字を全部
+空文字列にしていたので、**表現できない名前どうしが :fuzzy-high 0.92 で一致していた**。
+実測: (score-name 山田太郎 アル・カーイダ) が 0.92 の hit を返した。index に日本語名が
+1 件も無かったので潜在していただけで、MOF リストを入れた瞬間に 2,866 件で発火する。
+
+直し方は両側: script fold（半角カナを濁点ごと・全角 ASCII・ひらがな→カタカナ・CJK 保持・
+U+30FB は区切り）で実在する日本語名を通し、**それでも表現できない名前は score-name の
+floor で候補なしにする**。ハングル・キリル・アラビア文字は今も空になるが、それは
+偽陰性であって自己一致ではない。
+
+### 3. .cljc を 1 ランタイムでしか測っていなかった
+
+上の fold は `(int c)` で code unit を読んでいた。JVM ではそれが code unit で、
+ClojureScript では 1 文字**文字列**を数値化して NaN → 0 になる。**全 codepoint 比較が
+ゼロと比較していた** —— nbb では (normalize ｱﾙ･ｶｰｲﾀﾞ) が濁点を落とし、
+(normalize ＡＬ－ＱＡＩＤＡ) が空を返していた。JVM の suite は緑のままだった。
+`scripts/refresh_lists.cljs` は nbb で走るので実害がある。
+
+`char-code`（reader-conditional）で直し、**nbb 側の suite `test/run.cljs` を足した**。
+JVM 55 tests / 147 assertions、nbb 52 / 141（差は設計上 JVM 専用の edn-index-test）。
+char-code を戻すと nbb で 8 assertion が落ち、JVM は 0 —— runner が discriminate する
+ことを見た上で landed とした。
+
+### 4. 投影は 3 面。正本は git のまま
+
+| 面 | 何を持つか | 書くもの |
+|---|---|---|
+| `resources/watchlist/lists/*.edn` | **正本** | refresh_lists.cljs |
+| R2 objects（bucket watchlist-snapshots） | 内容アドレスの配信コピー | publish_r2.cljs |
+| Iceberg（cloud-itonami-datalake, namespace cloud_itonami） | 分析用 4 表 | watchlist-datalake-export.cljs + datalake-sync.py |
+
+bucket も表も消してよい。`git checkout` + refresh_lists で全バイト再構築できる ——
+それが projection と premise を分ける唯一のテスト（ADR-2608039000 / 2608039700）。
+
+表は watchlist_entity 23,191 / watchlist_name 62,405 / watchlist_attribute 34,056 /
+watchlist_manifest 3。manifest を**表にした**のは、この面に対する query が
+「その答えはどのくらい古いデータに対するものか」を join で答えられるようにするため。
+`normalized_name` は `watchlist.match/normalize` の出力そのもの —— 読む側が畳み込みを
+書き直すと、片方を直した瞬間に screening の答えと datalake の答えが分岐する。
+
+⚠ **R2 objects と R2 Data Catalog は別物。** 前者は素の object、後者は Iceberg REST
+catalog。object PUT を catalog と呼ぶと、利用者が何を query しているかの名前が狂う。
+
+### 5. loader は複製せず、接続だけを共有した
+
+2 本目の consumer が現れたので `lei-datalake-sync.py` を `datalake-sync.py --spec` に
+一般化した。3 本目（`ses-mail-datalake-sync.py`、untracked のまま稼働していた）は
+**明示 pyarrow schema・list 列・record_id upsert・未知フィールド拒否**を持ち、
+1 本に畳むとどちらかが機能を失う。実際に重複していたのは接続の 15 行だけだったので、
+`datalake_catalog.py` に接続だけを出した。
+
+### 6. 古さを赤くする側と、緑に戻す側を対で
+
+snapshot は 2026-07-19 から 38 日古いままだった。screening は毎回正しく
+`:watchlist/stale? true` を返していた —— **誰もその field を読んでいなかった**だけである。
+
+- 赤くする: fleet gate `watchlist-snapshot-freshness`（21 日、credential 不要）
+- 緑に戻す: `com.gftd.watchlist-refresh`（週次 launchd）→ worktree → refresh →
+  **件数 ratchet** → 両ランタイムの suite → commit/merge → west pin → R2 → Iceberg
+
+**ratchet が要となる守り。** 上流が schema を変えると parser は例外を投げずに黙って
+少ない list を返し、それは「制裁対象ではない」という答えを増やす —— fetch 失敗より
+危険である。10% 超の減少で commit の前に中止する。
+
+## 検証（実測値）
+
+| | |
+|---|---|
+| JVM suite | 55 tests / 147 assertions、0 failures |
+| nbb suite | 52 tests / 141 assertions、0 failures |
+| clj-kondo | 0 errors / 0 warnings |
+| refresh | OFAC 19,314 / UN 1,011 / JP-MOF 2,866（skip 0） |
+| Iceberg | 4 表、read-back 行数一致 |
+| 既存 LEI 4 表 | 無傷（108,368 / 18,930 / 54,575 / 183） |
+| 全経路の実行 | 9/9 段成功 |
+
+**両方向を見た検査**: 空 floor（旧 match.cljc で 18 assertion 失敗 / 新で 0）、
+char-code（nbb で 8 失敗 / JVM で 0）、freshness gate（stale・fetched-at 欠落・空 tree の
+3 通りで赤）、count ratchet（件数を偽装した bare remote に対して -66.7% で中止）、
+publish_r2 の read-back（存在しない key で wrangler が exit 1）。
+
+## 着地
+
+kotoba-lang/watchlist-screen main: 7774a93（9225fcd 移植性修正 / 1df3596 README を経由）
+com-junkawasaki/root main: 858a4d0 系（132aa1d datalake、5ab4179 共有と定期実行）
+west pin: 7774a93 に前進。worktree / branch はすべて削除済み。
+
+## 残っている gap（優先順）
+
+1. **fleet gate はノード上でまだ緑になっていない。** ローカルで `git archive` + .edn 絞り込みの
+   tree に対して両方向を確認したが、次の tick が本当の確認である。
+2. **launchd job はまだ 1 度も発火していない**（runs=0、次は日曜 05:23）。Keychain が
+   launchd から読めない既知の問題（ADR-2607178000）に当たると iceberg の段だけが落ちる ——
+   その場合 log にそう出る。token をファイルに書き出して回避しない。
+3. **EU 制裁リストは未実装**（FSD/FSF API に登録トークンが要る。owner 判断）。
+4. **精度の benchmark が無い。** match の論理は自身の仕様に対して検査されているだけで、
+   ラベル付きデータセットに対して検証されていない。この workspace に該当データは無く、
+   捏造もしていない。
+5. **共有 checkout のローカル main branch が古い。** watchlist-screen では f0c028e（7 週前）。
+   west は detached HEAD で動くので実害は無いが、そこから clone すると古い deps.edn を持つ
+   clone ができる（ratchet の対照実験で 2 回踏んだ）。他の子リポも同じはず —— 未測定。
+
+## 次の agent がまず打つもの
+
+    nbb scripts/watchlist-refresh-cycle.cljs --dry-run
+    nbb scripts/fleet-ci/gates/snapshot-freshness-check.cljs orgs/kotoba-lang/watchlist-screen --sub resources/watchlist/lists --max-age-days 21 --min 3
+")))

@@ -1,0 +1,163 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608311100-relay-credit-metering-and-the-operator-identity-that-blocked-it")
+  (:adr/title "OpenRouter キーは 4 箇所で死んでいた。relay の credit rail は作れたが、operator 自身の mk1 identity を 402 で止めたので戻した")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-31")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/last-verified "2026-08-31")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "murakumo-openrouter-relay-credits")
+  (:adr/repos (vector "orgs/network-awai/cloud-murakumo-api"))
+  (:adr/related (vector "adr-2608302100-itonami-bots-openrouter-flash-x402-credits"
+                "adr-2608301700-hermes-and-itonami-bot-reliability-session"
+                "adr-2608272100-hermes-bots-on-free-models"))
+  (:adr/body "## What this session did
+
+Rotated a dead OpenRouter key that lived in three places, found that
+`api.murakumo.cloud`'s relay held a fourth copy of the same dead key, and then
+built the credit rail the relay had been missing — merged it, deployed it,
+measured it against production, found it refused the operator's own bots, and
+rolled both production and `main` back inside the hour.
+
+## The keys — three dead copies, and a fourth in a Worker
+
+`sk-or-v1-d5c…` (live, `is_free_tier: false`) replaced:
+
+| where | old | status |
+|---|---|---|
+| login Keychain `gftd.openrouter` (hermes-hyakka-bots reads this) | `sk-or-v1-baa…` | 401 `User not found` |
+| login Keychain `openrouter` (`~/.zshenv` exports this as `OPENROUTER_API_KEY`) | `sk-or-v1-e78…` | 401 `User not found` |
+| `local-murakumo` Worker secret `MURAKUMO_OPENROUTER_API_KEY` | (a fourth) | 401, passed through as HTTP 400 |
+
+The two Keychain items are DIFFERENT items — `gftd.openrouter` (acct
+`OPENROUTER_API_KEY`) and `openrouter` (acct `$USER`). That is the whole drift:
+`.zshenv` already read from a Keychain, just not the one the workspace policy
+(`scripts/hermes-hyakka-bots/free-model-policy.edn`) names as the rotation point.
+
+`api.murakumo.cloud` was diagnosed by discrimination, not by reading the ADR:
+`murakumo-main` (fleet-local) returned 200 while `z-ai/glm-5.3-flash` and
+`qwen/qwen3.8-flash` (relayed) returned 400 carrying the upstream body
+`{\\\"error\\\":{\\\"message\\\":\\\"User not found.\\\",\\\"code\\\":401}}` — verbatim
+OpenRouter, which is why it read as a murakumo account problem.
+
+## hermes
+
+`~/.hermes/config.yaml`: `model.provider: openrouter`, `model.default:
+qwen/qwen3.8-flash`, a `providers.openrouter` block with
+`stale_timeout_seconds: 600`, and `secrets.command` reading the Keychain so the
+key is never written to disk. `auth.json` `active_provider` `nous` -> `openrouter`.
+Gateway restarted 09:53 JST (config mtime 09:45) so it re-ran the secrets helper.
+
+Measured, not assumed: the first verification returned the right answer while
+being served by `claude-sonnet-5` on a local claude-code bridge. `--usage-file`
+is what showed it. Ten runs, then eight with the fallback chain cleared, isolated
+the cause: `qwen/qwen3.8-flash` has exactly ONE upstream on OpenRouter (Alibaba,
+confirmed via `/endpoints`) on a shared pool that returns 429 intermittently.
+The fallback was rebuilt to leave that pool: `qwen/qwen3.8-flash` ->
+`z-ai/glm-5.3-flash` (Z.ai, 1.31M ctx, cheaper) -> the local bridge, last.
+Re-measured 10 runs: 9 qwen, 1 glm, 0 bridge.
+
+The local bridge was also broken independently — it answered
+`No such tool available` for every tool, which is why it was put last.
+FIXED 2026-08-31 (adr-2608311900): the guest reached for the caller's tools
+even though the empty --tools flag leaves it holding none, and on a bad run
+wrote the CLI's refusal into `content` with `tool_calls` empty — so the caller
+was told its own tools were broken. The bridge now names that error in its
+directive and salvages the rejected attempt into `tool_calls`, with a test
+that fails when the salvage is removed. Ordering it last is still right for
+other reasons (it is the slowest lane), but no longer for this one.
+
+## The credit rail — what landed and what it cost
+
+`5e351da` (merged), reverted by `9101dd1b`, preserved as PR #190 (draft).
+
+1. **Meter.** `upstream-cost-micros` reads OpenRouter's own `usage.cost`.
+   Nothing is estimated. Absent is `nil`, never `0` — `0` would sort among
+   requests that genuinely cost nothing. `relay-meter` rides on
+   `:run/spend-for` rather than becoming a new event kind, because
+   `credits-admission/event-keys` is a whitelist that drops unknown kinds
+   silently.
+2. **Charge.** Job id is the gateway's generation id, not `chat-<wall clock>`
+   (not idempotent, collides between concurrent requests in the same
+   millisecond). `debit-chat-credits!` returned `nil` for success, empty
+   wallet, unpriced model, unmetered response and failed append alike.
+3. **Reserve.** Affordability decided BEFORE the upstream call, from the same
+   price table the settle uses. A **check, not a hold**: `credits/refund` is a
+   free constructor whose own docstring calls an ungoverned caller a mint path,
+   and `refundable` refunds the whole spend once, keyed by job — it cannot
+   express `give back the tokens they did not use`. Concurrent requests can
+   still overdraw by the sum of their ceilings; the next is refused. Bounded,
+   not atomic.
+
+### Why it was reverted
+
+```
+z-ai/glm-5.3-flash + Authorization: MURAKUMO_API_TOKEN
+-> 402 {\\\"code\\\":\\\"external_model_insufficient_credits\\\",
+        \\\"who\\\":\\\"hermes-agent\\\",\\\"cost\\\":0.015,\\\"balance\\\":0}
+```
+
+`MURAKUMO_API_TOKEN` does not authenticate as `:shared-token`. It authenticates
+as an **mk1 identity with subject `hermes-agent`**, and `debit-credits?` counts
+`:mk1` as a billable customer. So the credential ADR-2608302100 named as
+\"the OpenRouter bill itself, credits を引かない\" is, at the wire,
+indistinguishable from a paying stranger.
+
+Before the change that caller was served and silently not charged — the hole the
+change closes. After it, the operator's own bots are refused. Only one of those
+stops live traffic, so production went back to `6ef5790f` and `main` went with it:
+**main must stay deployable by anyone who has not read this thread.**
+
+## The defect in how this was verified
+
+253 tests / 1351 assertions were green, and each of the three new claims was
+broken in turn and went red for the reason broken. **Every one of them is a
+pure-function test.** The reserve wiring was never exercised against a real
+identity, so `chat-identity` returning `:mk1` for the operator's own token was
+first observed in production. This is CLAUDE.md's own 『手元で緑 は fleet で緑
+ではない』, demonstrated by the agent writing about it.
+
+Re-landing must add a test that pins the identity a real `MURAKUMO_API_TOKEN`
+resolves to.
+
+## Blocking decision (one line, not a rewrite)
+
+- (a) exclude operator-owned mk1 subjects from `debit-credits?` via an env
+  allowlist — matches what ADR-2608302100 already decided
+- (b) grant `hermes-agent` credits and treat it as a customer
+- (c) move the bots to the shared-token rail
+
+## Found while verifying, NOT caused by it
+
+The fleet-hosted path is down. `/ready` reports `available: 0` of `configured: 1`;
+`murakumo-main` returns 500 (Cloudflare 1101) 5 times out of 5 on the
+rolled-back version, and the same 1101 is in `~/.hermes/logs/agent.log` from
+07:23 JST — three hours before the deploy. `/infer/models/murakumo-main`
+resolves the alias correctly, so the alias is fine and the backing node is not
+answering.
+
+Also unfixed: the Worker maps upstream 401 and 429 to HTTP **400**, which hermes
+treats as retryable (3 attempts observed), and passes the upstream error body
+through verbatim. Both were reverted along with the rest.
+
+## Resume point
+
+```bash
+# 1. decide (a)/(b)/(c) above, then
+gh pr view 190 --repo network-awai/cloud-murakumo-api
+# 2. the worktree layout that makes the sibling deps and the release build work:
+#    <scratch>/orgs/network-awai/cloud-murakumo-api  with orgs/kotoba-lang symlinked
+#    and cloud-murakumo checked out at the manifest pin, then
+clojure -Sdeps '{:deps {thheller/shadow-cljs {:mvn/version \\\"2.28.20\\\"}}}' \\
+  -M -m shadow.cljs.devtools.cli release worker ui
+# 3. gzip -n -9, update release/cljs/manifest.json digests, confirm
+node scripts/package-release.mjs
+```
+
+Still open, unrelated to the code: restart the Hermes desktop app (orphaned from
+launchd at `ppid 1`, so `launchctl kickstart` exits 0 without restarting it; its
+`serve` child still holds the dead key in its inherited env, and the model picker
+will not show an OPENROUTER group until it restarts). OpenRouter balance is
+$14.06 and is now shared between hermes and the Worker.")))

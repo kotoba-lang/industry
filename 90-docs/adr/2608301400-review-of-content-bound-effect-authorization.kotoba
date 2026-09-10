@@ -1,0 +1,83 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2608301400-review-of-content-bound-effect-authorization")
+ (:adr/title "content-bound effect authorization の review —— 五者 join は成立、compiler leg の義務は無主")
+ (:adr/status "accepted")
+ (:adr/date "2026-08-30")
+ (:adr/related "adr-2608301200-transport-capabilities-and-wave-2-protocol-codecs")
+ (:adr/body "## これは何か
+
+2026-08-30、オーナーが effect / intent / grant / capability / receipt の 5 分離を
+実装した（kotoba-lang 5d76b39 / amu 37fa8ca / org-biscuitsec 6725eba）。
+その review 記録。**3 本とも review 時点で既に各 repo の main に merge 済み**
+（7f0d2f5 / 88ae83e / 8a1fc9f）だったので、merge 作業は無く、記録だけが成果物である。
+
+## 確認できたこと
+
+**token は compiler / policy / runtime の述語を偽装できない。**
+`biscuit/authorizer.cljc` を追った: `:policy-token-facts? false` のとき、
+token の fact も **rule も**、Datalog の saturation 集合に入らない。したがって
+token 内から `amu:requires` / `policy:allows` / `runtime:available` を注入する経路が
+無い。これがこの設計全体の要であり、成立している。
+`verify → checks → policies` の順序も固定で、docstring が理由を書いている ——
+policies を先に走らせると、署名検証に落ちた token が allow と言う rule に届く。
+
+**五者 join は本当に五者で、fail-closed。** `cond` が
+`:missing-static-effect` / `:runtime-unavailable` / `:wrong-holder` /
+`:missing-grant` / `:expired-grant` / `:empty-intersection` と runtime 可用性を
+authorizer に到達する**前**に denial にする。飛ばせる leg が無い。
+
+**provenance の分離が境界で強制されている**（文書だけではない）。
+`compiler-evidence?` は exact-map・format・CID/sha256 の形・fact 数の上限に加えて、
+**全 fact が `\"amu:\"` で始まることを要求する。** compiler evidence が
+`policy:` / `grant:` / `runtime:` の述語を密輸することが構造的にできない。
+
+**amu の manifest は自己検証する** ——
+`manifest-sha256 = sha256(manifest から当該 field を除いたもの)` で、
+`valid-manifest?` がその等式を検査する。
+
+**Biscuit JVM: 81 test / 202 assertion / 0 failure** —— 私が自分で走らせて一致を確認。
+
+## 見つけたこと —— compiler leg の義務に持ち主がいない
+
+biscuit は `manifest-sha256` の**形**（64 hex）だけを検査し、何も再計算しない。
+manifest そのものではなく、導出された fact と hash を受け取る設計だからである。
+
+**両側が同じことを、正しい場所に書いている:**
+
+- amu: `the host must verify the block bytes and compiler attestation before
+  treating this envelope as trusted`
+- biscuit: `a sealed host assertion: this namespace validates its shape but the
+  host must verify the referenced IPLD block and compiler proof before calling`
+
+意図的な委譲であって見落としではない。**しかし誰もそれを履行していない** ——
+`kotoba-logic/authorize` は biscuit 自身の test 以外に caller が無く、
+`authorizer-evidence!` も自分の test からしか呼ばれない（実測）。
+
+つまり今日の join は**構造としては五者、効力としては四者半**である。compiler leg は、
+まだ存在しないホストに帰属する「名前の付いた義務」の上に乗っている。
+
+**何も呼んでいない間は問題にならない。配線した誰かが docstring を読み落とした瞬間に
+本物の穴になる。** このワークスペース自身の知見 ——「誤った答えを出す実行は
+docstring を読まない」—— を当てるなら、**caller が読んでいることに依存せず、
+attestation を持たない envelope を `authorize` 側が拒否する**のが正しい。
+これは提案であって、実装していない。
+
+## 測れなかったこと（正直に）
+
+**amu の 4 test / 16 assertion と kotoba の 9 assertion は独立に確認していない。**
+amu の `test_runner.clj` は namespace 選択（`-n` も `-e` も）を無視して 155 namespace
+全部を走らせる。load 494 で完走できず、そもそも既知の 15 failures / 9 errors を含む。
+**この 2 つはオーナーの実行結果に依っており、私の確認ではない。** 最も重要な
+biscuit だけは自分で確認した。
+
+## `:kinds` の spec と実装の不一致（再掲・未修正）
+
+`capability-semantics.edn` の `:rules` は `:unknown-kind :deny` と書いており、
+`:kinds` が閉じた許可集合に見える。実装は語彙集合として扱い、権威は manifest に
+置く（`kotoba_logic.cljc` が要求 kind を復号用に conj し、コメントで
+`The manifest is the authority for Amu effect names` と明記）。
+
+**私はこれを一度誤読し、「統合が壊れている」と報告しかけた。** ADR-2608301200 にも
+記録済み。`:kinds` の隣に「これは語彙であって authority ではない」と 1 行あれば、
+次に読む者が同じ誤読をしない。
+")))

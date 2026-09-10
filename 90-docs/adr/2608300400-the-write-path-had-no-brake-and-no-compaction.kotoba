@@ -1,0 +1,129 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608300400-the-write-path-had-no-brake-and-no-compaction")
+  (:adr/title "ADR-2608300400: kotobase への書き込みが重い理由は 1 つではなく 5 つで、全部「片方にだけ付いていた安全策」だった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-30")
+  (:adr/related "adr-2608292100-patents-into-the-lake-books-into-the-wiki adr-2608291500-hyakka-public-company-xmile-bots adr-2608170300-pack-writes-testnet-first adr-2608021000-hydration-dominates")
+  (:adr/body "# 書き込み経路には brake も compaction も無かった
+
+**Status**: accepted / **Date**: 2026-08-30
+
+オーナーの問い「同期が重い原因は? もっと効率化できないかな? ipfs, ipni, unixfs,
+ipld, graphsync など活用できている?」から始まり、5 つの欠陥が出た。**5 つとも同じ
+形をしている —— 対になる経路の片方にだけ安全策が付いていて、無い側は「動いている
+ように見える」ので誰も気づいていなかった。**
+
+## 測った現在地
+
+| # | 欠陥 | 対になる経路 | 状態 |
+|---|---|---|---|
+| 1 | publish 側にリクエストタイムアウトが無い | 収集側は `fetch-with-timeout!` 60s | **修正済み** app-hyakka 39d822ab |
+| 2 | バッチがファイル内で止まる | 中央値 9 entity のファイルが 463 個 | **修正済み** 258e78fd（560→192 call） |
+| 3 | CPU 上限 502 を transport に分類 | 400 は既に halve していた | **修正済み** 9d133db |
+| 4 | 天井を毎バッチ再発見 | halving は 1 バッチしか救わない | **修正済み** 1737060 |
+| 5 | publish の失敗が deploy を飛ばす | credential 不在の SKIP は非致命的だった | **修正済み** root 67c3461 |
+
+## 本当の原因は 5 つのどれでもない
+
+`transact` のフェーズは `head-read` → **`engine`** → `flush` → `head-write` で、
+`engine` は `store/run-with-store env g chain-cid …` —— **transaction を適用する前に
+chain から hydrate する。**
+
+`hyakka.fold` の docstring がその帰結を書いている:
+
+> 書き込みは 1 transaction ごとに novelty block を追記し、**あらゆる read がその
+> 全部をマージする**。fold していないグラフの read は、前回の fold 以降に書かれた
+> 量に比例して劣化する。
+
+**1 transact の CPU はバッチの大きさではなく、前回の fold 以降に書かれた量に比例
+する。** 190 transact の publish は run 内で二次、run をまたいで単調。だから突然
+壊れたのではなく、今になって天井を越えた。
+
+## 天井は 30 秒。推測ではなく account API で読んだ
+
+`kotobase-cf-wasm-staging`（`backend.kotobase.net` / `datoms.kotobase.net` を提供
+する本体。`kotobase.net` は gateway）は **`usage_model: standard` / `limits: null`**。
+Cloudflare が 2024-03-01 の移行前の Bundled Worker に自動付与した **50 ms 上限には
+該当しない**。既定の 30 秒である。`limits.cpu_ms` は 300,000 まで上げられるが、
+**増える項を放置したまま崖を動かすだけ**で、しかも CPU 時間は課金対象。
+
+**CPU 時間はネットワーク待ちを含まない**（Cloudflare 公式）。したがって pack /
+GraphSync / IPNI のような往復削減はこの天井に効かない —— pack の README 自身が
+「packing が買うのは commit-local な read」で cross-commit の novelty 鎖は
+平らにしないと明言し、平らにする手段として **novelty の fold** を名指ししている。
+
+## compaction は「動いていない」のではなく「動けない」
+
+`hyakka.fold` は退役済みの `kotobase-storage-d1.aozora.app` に `:transport
+:direct-v1` で、**CACAO で**認証しに行っていた。datom 面は Biscuit 必須化
+（net-kotobase ADR-2608280230）で CACAO を 401 にする。publish はそのとき移行され、
+fold は移行されなかった —— **呼ぶ人がいなかったから。**
+
+さらに測ったこと:
+
+- **索引側の機構は全部作られていて、本番で全部 `0`**（`KOTOBASE_IENGINE_BOOTSTRAP`
+  / `_SHADOW_WRITES` / `KOTOBASE_PHYSICAL_INDEX_BACKFILL` / `_QUALIFICATION` /
+  `KOTOBASE_PROLLY_STANDALONE_SHADOW_WRITES`）。「read が全 novelty をマージする」を
+  構造的に終わらせる道は敷かれていて、1 つも通っていない
+- **定期実行の枠は既にあって、空で回っている。** Worker は `*/5 * * * *` の cron を
+  持ち、handler は `physical-index-reconciler/reconcile-all!` を呼ぶ。その関数は
+  上のフラグが 0 のとき `{:status :disabled}` を返す。**1 日 288 回、何もしない**
+
+## 設計としての評価
+
+**fold は設計の選択ではなく、選択の帰結である。** append-only + read 時マージ
+（compaction の無い LSM）を選んだ時点で compaction は義務。問うべきは「fold が最適
+か」ではなく「**compaction をリクエスト予算の中で走らせるのが最適か**」で、答えは
+no:
+
+- fold は docstring 自身が「server-side で Worker の CPU/wall 予算の中で走る」と
+  書く。**compaction が、compaction で守るはずの資源を奪い合っている。** 必要量が
+  増えるほど収まらなくなるので `--max-novelty` は回避策であって設計ではない
+- 正しい置き場は cron。Cloudflare の CPU 上限は **cron が 1 時間以上間隔なら 15 分**
+  （fetch は 30 秒）。**同じコードを毎時 cron に移すだけで予算が 30 倍**になり、
+  その枠は既に存在して空回りしている
+- 一段先は partition 単位の compaction（benchmarks に `compact-partition.mjs` /
+  `merge-compaction-partitions.mjs` が既にある）
+
+**単一 ref（join 独占）の根拠も弱くなった。** CLAUDE.md の規則は「join したいものは
+同じ ref に置け、代わりに書き込み並列度を捨てろ」で、その代償が今出ている ——
+hyakka は 11 corpus を 1 グラフに置いているので、書籍を 1 冊書くと脆弱性の read が
+高くなる。ただし 2026-08-29 に `hyakka_claim` / `_item` / `_prop` / `_source` が
+R2 Data Catalog に載り、**分析的な横断 join は chain 無しで引けるようになった**
+（ADR-2608292100）。等価ではない —— 毎時の射影なのでラグがあり read-your-writes も
+無い。だが **分析 join は lake、トランザクショナル read は ref** と切れるなら、
+単一 ref が書き込み側に課している費用は再評価に値する。
+
+## この反復で本番に触れたこと
+
+- `KOTOBASE_TIMING: \"1\"` を production に投入。**main からは deploy していない** ——
+  main は live 版 `d633bc86` より **72 commits 先**で、観測フラグ 1 つのために他人の
+  未 release 72 commit を出荷することになる。代わりに **live revision + env var 1 行**
+  の tree（`7fdc2e9e`）を repo 自身の guard 付き経路で deploy（version `d2740725`、
+  tag 照合済み）。同じ行は control-plane main にも入れた（`907b2b3e`）
+- **API で稼働中 Worker の変数だけ差し替える経路は採らなかった** —— settings の PATCH は
+  bindings 配列を丸ごと送る形で、secret 4 本（`KOTOBA_SEED` 等）を取りこぼせば全体が
+  落ちる。deploy 後に 4 本とも無傷であることを確認済み
+- repo が `network-awai/net-kotobase` → **`net-kotobase/control-plane`** に改名済み
+  （GET は redirect、PUT はされない）。west の `orgs/net-kotobase/engine` は
+  **本番の deploy 元ではない stale mirror** で、そこから deploy すると別の tree を
+  出荷する。**mirror の `KOTOBASE_PACK_WRITES` を本番の設定として読まないこと**
+
+## 未了（次の一手）
+
+1. **`agent/fold-can-authenticate` を merge する前に `npm test` と実 fold 1 回。**
+   ブランチは push 済みで、repo の `:fold` ビルドは通っている（67 files / 0 errors）。
+   足りないのは suite と `npm run fold -- --max-novelty 50` の実測。**credential は
+   読めることを確認済み**（kagi の `hyakka-authn-service-token` /
+   `hyakka-authn-tenant-id`、ともに exit 0。ただし load 600 の下で 13 分かかった)。
+   つまり止めているのは権限ではなくこのマシンの負荷
+2. **fold を毎時 cron に移す**（予算 30 倍、枠は既存）
+3. **索引フラグを shadow から段階的に有効化**
+4. `limits.cpu_ms` は最後。増加項を止めてから
+5. **production の write timing はまだ読めていない** —— フラグは live だが、
+   Workers Logs の telemetry query が 0 件を返した。**「timing 行が出ていない」では
+   なく「読めていない」** —— query の形か token の可視範囲が未確認
+
+## 改訂履歴
+
+- 2026-08-30 初版")))

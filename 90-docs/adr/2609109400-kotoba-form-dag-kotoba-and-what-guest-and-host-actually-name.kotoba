@@ -1,0 +1,146 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609109400-kotoba-form-dag-kotoba-and-what-guest-and-host-actually-name")
+  (:adr/topic "kotoba-form-naming-and-the-authority-axis")
+  (:adr/title "Kotoba Form, DAG-Kotoba as a profile rather than a codec, and what guest and host actually name")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang" "kotoba-lang/kototama" "kotoba-lang/amu"))
+  (:adr/related (vector "adr-2609107000-everything-is-a-form-arranged-against-what-runs"
+                "adr-2609106000-the-kir-block-shape-is-an-ipld-schema-and-what-it-cannot-pin"
+                "adr-2609092600-app-plane-identity-naming-location-kind"
+                "adr-2609076000-kir-is-an-ipld-codec-schema-and-adl"))
+  (:adr/body
+  "## Context
+
+Owner decision 2026-09-10, on the naming for the cross-plane object and on
+whether the guest/host split still says the right thing under it.
+
+## Decision 1: the layers, and one name per layer
+
+    Kotoba          the ecosystem and the language philosophy
+    Kotoba ADL      the human- and agent-facing pure S authoring language
+    Kotoba Form     the universal semantic object
+    Kotoba Schema   the type and constraint system over Forms
+    DAG-Kotoba      the canonical IPLD representation profile
+    DAG-CBOR        the canonical binary codec
+    CID             object identity
+
+    foo.kotoba -> parse -> Kotoba ADL -> schema check / desugar
+      -> Kotoba Schema-typed Forms -> canonicalize -> DAG-Kotoba
+      -> DAG-CBOR -> CID
+
+## Decision 2: DAG-Kotoba is a PROFILE, not a codec
+
+In IPLD practice `DAG-*` reads as a codec name -- DAG-CBOR, DAG-JSON, DAG-PB.
+The canonical bytes here ARE DAG-CBOR, so calling the layer above it
+DAG-Kotoba without saying which is which invites a reader to think there are
+two codecs and to ask which one produced a block.
+
+    DAG-Kotoba = an IPLD Data Model profile: Kotoba Forms on the Data Model,
+                 with canonical link and schema semantics
+    DAG-CBOR   = the codec that turns that into bytes
+
+One codec. The profile constrains what may appear; the codec decides the
+bytes. This is the same separation ADR-2609076000 decision 5 draws inside the
+DefCID: the logical form is sealed and the representation is not.
+
+## Decision 3: KDN is not the name
+
+Rejected. `KDN` sits in the series JSON / EDN / KDN and therefore reads as a
+data NOTATION, which boxes the thing at a size it is not. The scope is code,
+query, schema, policy, plan, receipt and patch, and a notation name makes
+every one of those look like a document format.
+
+## Decision 4: `Kotoba Form` collides with two live uses, and the boundary is
+stated rather than assumed
+
+Measured 2026-09-10, both confirmed by reading the repositories:
+
+- `kotoba-lang/forms` is an office product -- *Portable CLJC model for
+  kotoba-lang/forms*, with a Pages editor. Unrelated: it means a form somebody
+  fills in. It keeps its name and its README says which sense it is.
+- `kotoba-sema` describes its pipeline as `source bytes -> forms -> semantic
+  analysis -> checked kotoba-hir`, and its own first line is *reading forms*.
+  This one is NOT a collision, it is the same lineage at an earlier stage: a
+  lowercase `form` is what the reader produces, and a `Kotoba Form` is what
+  one becomes once it is schema-typed and content-addressed. The relation is
+  refinement, and writing it down is what keeps the two from being read as
+  rivals.
+
+Per the workspace rule for a name that does not announce its own function, the
+term is registered in `manifest/concept-vocabulary.edn` and the boundary above
+is what the entry says.
+
+## Decision 5: guest and host name a LOCATION, and the axis that matters is
+AUTHORITY
+
+The redesign the owner asked for. What `guest`/`host` encodes today is the
+WASM embedding metaphor -- the host embeds and answers, the guest is embedded
+and asks -- and that single word is carrying three different things at once:
+
+  1. AUTHORITY   who must declare capability imports, and who answers them
+  2. LOCATION    who is embedded in whom at run time
+  3. TRUST       whose code is checked, and whose is relied on
+
+The layering above exists to keep identity, naming and location apart
+(ADR-2609092600), and location is configuration rather than design. A word
+that binds authority to location is the same mistake one layer up.
+
+**The vocabulary already leaks this, in the authority file itself.**
+`lang/guest-grammar.edn` says, in its own scope key: *the historical key name
+guest-grammar does not make .kotoba guest-only; provider components use the
+same admitted grammar plus declared imports.* A provider is a guest by grammar
+and a host by role. One word cannot carry both, and this note is the record of
+it not doing so.
+
+`kototama` reaches the same place from the other side: *Solo5 called this role
+a tender. That word is a nautical metaphor for the attendant host. It is not
+the product name.*
+
+So:
+
+- **AUTHORITY is the axis.** A Form DECLARES the capabilities it needs; a
+  provider ANSWERS them. Declaring and answering are roles a component takes
+  per capability, not a class it belongs to, and the same component can do
+  both. `:ambient-authority-forbidden` and
+  `:native-functionality-crosses :declared-capability-import` already state
+  the rule; what changes is that the ROLE NAMES follow the rule instead of
+  the embedding.
+- **`host` keeps its narrow, true meaning: the runtime embedding.** Which
+  process loads the artifact is a Location fact, with the same status as
+  which hostname serves a block. It is configuration.
+- **`guest` retires as a SEMANTIC term.** What it actually names is the
+  least-authority profile, which is what `guest-grammar.edn`'s scope key has
+  been saying in prose. New writing says *least-authority profile* or names
+  the capability role directly.
+
+## What is NOT done, deliberately
+
+**No bulk rename.** Measured 2026-09-10 in `kotoba-lang/kotoba-lang/lang`
+alone: `host` 773 occurrences, `guest` 234, `guest-grammar` 82. The workspace
+rule is that a naming decision binds what is written next, not what exists --
+and this file is one where a regular-expression rewrite would land inside
+docstrings and prose that are describing the WASM embedding correctly.
+`guest-grammar.edn` keeps its file name for the same reason `osaho` kept
+`kotoba.kir.*`: names are not identity.
+
+**No gate.** Nothing checks that new writing uses the authority vocabulary,
+and this ADR does not invent one.
+
+**The pipeline in decision 1 is a naming decision, not a claim that it runs.**
+`Kotoba Schema` as a written artifact exists for KIR only, and only as of
+today (`osaho/resources/kotoba/kir/definition-identity.ipldsch`,
+ADR-2609106000). DAG-Kotoba as a named profile has no document yet.
+
+## Reproduce
+
+    git -C orgs/kotoba-lang/kotoba-lang show origin/main:lang/guest-grammar.edn \\
+      | grep -A3 'guest-grammar/scope'
+    git -C orgs/kotoba-lang/kototama show <remote>/main:README.md | head -12
+    git -C orgs/kotoba-lang/forms show <remote>/main:README.md | head -8
+
+The first prints the scope key that says the name is historical. The second
+prints kototama refusing the tender metaphor as a product name. The third
+prints the office product whose `forms` means something else.")))

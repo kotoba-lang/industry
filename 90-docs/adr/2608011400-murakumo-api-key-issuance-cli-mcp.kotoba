@@ -1,0 +1,92 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608011400")
+  (:adr/title "murakumo API key を CLI / MCP から発行し、live gateway が受理する")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-01")
+  (:adr/tags (vector "murakumo" "local-murakumo" "cloud-murakumo" "auth" "mcp" "cli" "mk1"))
+  (:adr/body
+  "## Context
+
+『murakumo の API key を murakumo CLI と MCP から発行できるようにしてほしい』という
+指示を受けて調査したところ、**発行側は既に完成しており、受理側が繋がっていなかった。**
+
+既にあったもの（`kotoba-lang/murakumo`）:
+
+- `murakumo.apikey` —— `mk1` capability token（HMAC-SHA256、`sub`/`scope`/`iat`/`exp`）の
+  単一実装。CLI と MCP が同じ ns を使うので互いにずれない。
+- CLI: `nbb scripts/run-task.cljs token issue --sub … --scope … --ttl …`
+- MCP: `scripts/mcp-server.cljs`（`murakumo.issue_api_key` / `murakumo.verify_api_key`）
+- 境界: 秘密鍵必須・scope 許可リスト（chat|image|all）・TTL 90 日上限
+- `murakumo.apikey-parity-test` が `cloud-murakumo.token` とのバイト一致を保証
+
+繋がっていなかったところ:
+
+- **live の `api.murakumo.cloud` を配信しているのは `cloud-murakumo` ではなく
+  `network-awai/local-murakumo`**（`wrangler.toml` の custom_domain）。
+- その `local-murakumo` の `/v1/messages` / `/v1/embeddings` は
+  `ANTHROPIC_PROXY_TOKEN` / `_2` という**共有の静的シークレットの等価比較**だけを
+  していて、`mk1` を一切知らなかった。つまり CLI / MCP で発行できても、実サービスは
+  受理しない。
+- `cloud-murakumo` の `site_worker.cljs` は `mk1` を検証するが、そのワーカは
+  live のこのホストを配信していない。
+
+実測（2026-08-01）: `POST https://api.murakumo.cloud/v1/messages` は 401、
+`/api/v1/messages` は 404 —— ソースを読んだだけでは分からず、実際に叩いて初めて
+どちらのワーカが live か分かった。
+
+## Decision
+
+**`local-murakumo` が `mk1` capability token を『追加で』受理する。**
+
+### 1. 共有トークンを先に判定する
+
+`authorize!` は共有トークン一致を先に見て、通ればそこで確定し **mk1 の検証を
+やらない**。既存の消費者（shinshi-growth-actor / local-manimani 等）の経路に
+WebCrypto の非同期呼び出しを 1 つも足さないため —— 新しい受理経路を足すことが、
+既に動いているものを遅くしたり壊したりする理由になってはいけない。
+
+### 2. ゲートの ON 判定を『共有トークンの有無』から切り離す
+
+旧 `authorized?` は `(empty? wants)` を『未設定＝素通し』としていた。この判定のまま
+共有トークンを廃止して mk1 だけにすると、**その瞬間に認証が丸ごと無効になる。**
+移行のいちばん危ないところなので、`gate-on?` は『共有トークンか mk1 署名鍵の
+どちらか一方でも設定されていれば ON』にした。
+
+### 3. 判定と crypto を分ける
+
+`local-murakumo.messages-auth` は**判定だけ**を持ち、HMAC は持たない
+（`:mk1-claims` は呼び出し側が検証した結果として渡す契約）。この ns が worker.cljs から
+切り出された元々の理由（JVM のテストランナーで回せる状態を保つ）をそのまま守る。
+
+### 4. トークン形式の実装を 3 つにしない
+
+検証は `cloud-murakumo.token` をそのまま使う。写しを作らない —— 実装が 3 つに
+なった瞬間、どれかがずれても誰も気付かない。取り込みは `:local/root` ではなく
+**sibling path**（`:paths [\"src\" \"../cloud-murakumo/src\"]`）: dep にすると
+cloud-murakumo の依存木ごと引き込み、この repo が既に `:local/root` で上書きして
+いる ed25519 の git 座標と衝突して classpath が組めなくなる（実測）。
+`kotoba-lang/murakumo` の `:test` alias が parity-test のために同じ形で同じ src を
+指しているのと同じ手。
+
+### 5. 401 に『どうすれば直るか』を書く
+
+旧 401 は `bb murakumo token issue` を案内していたが、その command は babashka 退役
+（ADR-2607173000）以来動かない。直し方として成立していない案内を返し続けるくらい
+なら返さない方がまだ良い。新しい 401 は実際に動く CLI と MCP tool 名を出し、
+scope 不足・期限切れ・鍵未設定を**区別して**返す。
+
+## Consequences
+
+- **共有トークンとの違いが運用上の利益になる**: 誰の鍵か分かる（`sub`）／期限がある
+  （`exp`。ステートレス検証で失効リストを持てないので、期限が失効そのもの。だから
+  発行側が 90 日で上限を切っている）／scope がある。共有トークンは 1 本を全消費者が
+  使うので、漏れてもどこから漏れたか分からず、切ると全員止まる。
+- **`MURAKUMO_TOKEN_SECRET` が未設定の間、挙動は今日と 1 バイトも変わらない。**
+  有効化はオペレータが Worker secret に発行時と同じ値を設定した時点。
+- 検証: 86 tests / 453 assertions（うち mk1 判定 10 test を新規追加）、
+  `shadow-cljs release worker` green、**実際に起動した worker への E2E** ——
+  CLI 発行の scope=chat が Bearer / x-api-key の両方で 200（モデルまで到達）、
+  scope=image は理由付きで 401、共有トークンのみの設定では従来どおり 200、
+  鍵未設定時の mk1 は `mk1 tokens are not accepted here` で 401。
+- 残: `cloud-murakumo` 側 `site_worker.cljs` の 401 も同じ死んだ command を案内して
+  いる（live ではないので影響は小さいが、同じ欠陥）。")))

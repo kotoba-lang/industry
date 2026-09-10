@@ -1,0 +1,1229 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608039600-native-isa-parity-contract-and-verifier-drift")
+  (:adr/title "ADR-2608039600: native backend の ISA parity を契約化する — 3 つのギャップと、それを隠していた到達不能な guard")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/last_verified "2026-08-03")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "native-isa-parity")
+  (:adr/authoritative-for
+  (vector "native backend 間の operator parity 契約 (何が portable で何が ISA 固有か)"
+   "kernel-privileged-operations が x86 専用である理由"
+   "producer と verifier の allowlist drift の扱い"
+   "未実装 operator の診断規約 (backend は operation 名を名乗る)"
+   "target-admission 述語は let 束縛値を walk しなければならない"
+   "native の entry/関数 result 型 (:bool box 化は 2026-08-03 に完了、#{:i64 :bool})"
+   "ADR-2608039500 の検証記述の訂正 (override 不発)"))
+  (:adr/related
+  (vector "adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole"
+   "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "kotoba-lang/kotoba-native PR #6"
+   "kotoba-lang/kotoba-verifier PR #5"
+   "kotoba-lang/compiler PR #480"))
+  (:adr/evidence-commits
+  (vector "kotoba-lang/kotoba-native f555a40ff30d31bc70176314cf652305e25243b7"
+   "kotoba-lang/kotoba-verifier 0816622811ca3d1fe7d095b95ea91f5d7ed2bf5f"
+   "kotoba-lang/compiler d1d527fb17ea82ceb67ed74e8b817452f18b882f"
+   "com-junkawasaki/root f19bdc3b021cfac0eda567bd5e15ff3194c6af98"
+   "kotoba-lang/kotoba-native 08bf86dea8fd501914645be0f8c990dfbe3aaf7b"
+   "kotoba-lang/kotoba-verifier a79f5b7c018396b1bedff227b0f0f1522b637e6b"
+   "kotoba-lang/compiler a50331bc36a9fbfbeace6327f296825c9a7db61b"
+   "com-junkawasaki/root e069b3af05e3f9151fe6f7fe55336b88fc9aed7b"
+   "kotoba-lang/kotoba-native 6cea4da1af847335395d2ffcc1daa81ede6dd0ce"
+   "kotoba-lang/compiler cddca6e0982886029679a842f779ba6f98149cbd"
+   "com-junkawasaki/root 26404fec6e13c94ac5549389c56ea1d316636cb1"
+   "kotoba-lang/kotoba-kir 0efe32518a422c2f8ab32de4d9a75720d67780e8"
+   "kotoba-lang/compiler 0d694d02b301d84f985636a7c2bbfdffee6780e7"
+   "com-junkawasaki/root 667b8d987ec469e0364ac97758ed0b20479927e5"
+   "kotoba-lang/kotoba-verifier cc5b4f94fc25fdc31f6e7c9f19158057c6e9a212"
+   "kotoba-lang/compiler e5a8cf1c27a2550294ec12a5d9c99a67461a1f9a"
+   "com-junkawasaki/root 6bc32324bd096368bcdbb10e6a049771a4676370"
+   "kotoba-lang/kotoba-verifier ca7efcb82f58a56de0f60a776019c3044f5b56bb"
+   "com-junkawasaki/root 7f1911977aca19a111d50793b27e04f871561081"
+   "kotoba-lang/kotoba-kir ec7bdb5ea05462757fa10b54f87f7a9177bb9b68"
+   "kotoba-lang/kotoba-verifier e78c37083c2c98e5bdbb3a66c8551691c784f5a3"
+   "kotoba-lang/tender-native f92f390278bc561a098fab65b7430845900aed6f"
+   "kotoba-lang/compiler 3c575e26717afe99b9207519cbdcf183486ea578"
+   "com-junkawasaki/root f9b51ce17bc5a9e67b8c3c1d5385fe55c718621b"
+   "kotoba-lang/kotoba-native ed96dc8aea330dd55f9e5b81ecec7135bf6c59a3"
+   "kotoba-lang/kotoba-kir 95a1ac0f37c3f43e233eee33470c0007593631f7"
+   "kotoba-lang/kotoba-verifier 677eae9267cfef8bd973bf5f602e5d4b31b7bd82"
+   "kotoba-lang/compiler 9c373ed009256cf8fc89b318c98cb8967240ed4e"
+   "com-junkawasaki/root 14505b7f4d878e94bf70bb4a693e820537bf3a87"
+   "kotoba-lang/kotoba-kir a28ea1194fdde96f3a94a7854d1263a1de191746"
+   "kotoba-lang/compiler c3aa42c58021c153353c4706681d44855d56055a"
+   "com-junkawasaki/root 450621ba6cbf3abf4f26ba2d0d9b67394001a6a1"
+   "kotoba-lang/kotoba-native 1b585fcf761d4b3bc85937bdccb25148a6b9c424"
+   "kotoba-lang/kotoba-kir 5d3cb59dae8106ec86c6d2d247e473790699dfbb"
+   "kotoba-lang/kotoba-verifier 34818124819589ef3a2225d07cfc63e1eb555c8a"
+   "kotoba-lang/compiler eaaaeab997d199ca86e7de11fe748d67ac026c4e"
+   "com-junkawasaki/root 62679488b18cb36d76ca6e00919da21ba7a9b2ee"
+   "kotoba-lang/kotoba-native 1c76a0448f51c3d0e6aac18dba227c38abf16a12"
+   "kotoba-lang/kotoba-verifier 50f842dba232e76d541d60507db40bc38ef7a863"
+   "kotoba-lang/compiler 823b376003c3c0f92df5b2eed41c4c52591a680e"
+   "com-junkawasaki/root 62262241a197fba28902569224ac9501e6f8c944"))
+  (:adr/body
+  "# ADR-2608039600: native backend の ISA parity を契約化する
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+ADR-2608039500 の副産物として `bit-xor`/`bit-and`/`bit-or` が AArch64 バックエンドに
+無いことを報告した。追跡した結果、それは単独のギャップではなく、**parity を維持する
+仕組みが存在しなかった**ことの症状だった。
+
+### 症状を隠していたもの — 到達不能な guard
+
+両バックエンドは未知の operator を `emit-call` に落とす。したがって「片方の ISA に
+実装され、もう片方で忘れられた operator」は「存在しない関数の呼び出し」と区別できない。
+これが許容できるのは、失敗が **target を名指しする** 場合だけ。
+
+x86-64 はそうしていた。AArch64 はしていなかった:
+
+```clojure
+(let [absolute (...) target (get offsets (:call token))
+      displacement (- target absolute)]     ; ← target が nil だとここで NPE
+  (when-not target
+    (throw (ex-info \"unknown AArch64 call target\" ...)))   ; ← 到達しない
+```
+
+guard は書かれていたが、同じ `let` の中で `displacement` を先に束縛していたため
+**dead code** だった。未実装 operator は診断可能な `ex-info` ではなく、素の
+NullPointerException として現れていた。
+
+### 沈黙の裏に溜まっていた 3 つのギャップ
+
+1. **AArch64 に `bit-and`/`bit-or`/`bit-xor` が無い** — `kotoba.compiler.frontend`
+   の `arithmetic` が全 native target に対して admit し、x86-64 は常に emit して
+   いた portable な算術。
+2. **x86-64 に `kernel-load-u32`/`kernel-store-u32` が無い** — frontend の
+   `kernel-memory-operations` のうち AArch64 だけが実装していた 2 つ。frontend が
+   `x86_64-aiueos-kernel-v1` 向けに admit したプログラムが、ずっと後の `finalize`
+   で 'unknown call target' として初めて弾かれていた。
+3. **verifier が `bit-or` を拒否していた** — 下記。
+
+### 3 つ目が最も重い — producer と verifier の drift
+
+`kotoba-verifier` の `arithmetic` は `#{+ - * quot bit-xor bit-and}` で、
+**`bit-or` が無かった**。`bit-or` は frontend にも `kotoba.kir` の評価器にも
+x86-64 バックエンド (ADR-2607254600 D2) にも入っていたが、検証器だけ更新されて
+いなかった。検証器は全コンパイル・全実行で走るので、結果として
+**`bit-or` は x86-64 を含むあらゆる native target で使えなかった**。
+
+これは検証器を producer から独立に再導出する設計 (ADR-2607266000 決定 2) の
+**コストであり、同時にその設計が働いた証拠**でもある。drift は安全側に倒れた —
+検証器は未検査のものを admit するのではなく reject した。だからこそ気付かれ
+なかった: 何も壊れず、機能が静かに死んでいただけ。
+
+## Decision
+
+### 1. 3 つのギャップを閉じる
+
+- AArch64 に logical shifted-register 符号化で 3 つの bitwise を追加
+  (Rm=x1 / Rn=x0 / Rd=x0。`mov-reg` 自身の `0xaa0003e0` が Rn=xzr の ORR base
+  なので opcode ビットが独立にクロスチェックされる)。
+- x86-64 に u32 kernel memory ops を追加。検査は u8 形を写すが、**1 点だけ
+  意図的に異なる** — AArch64 自身の `bounds-check-u32` に合わせ、4 バイト
+  アクセスは `index < length` ではなく **`index + 4 <= length`** を要求する
+  (`lea` で widen し unsigned 比較)。バッファ末尾 3 バイトを踏み越えられない。
+- `finalize` の guard を `displacement` の計算より前に移す。
+
+### 2. `kernel-privileged-operations` は x86 専用のままとする
+
+cr2 / cr3 / invlpg / cli / sti / hlt / pause / out はいずれも AArch64 に対応物の
+無い x86 の facility を名指ししている。AArch64 は system register・`tlbi`・
+`msr daifset/daifclr`・memory-mapped I/O を使うので、**これらは翻訳して埋める
+ギャップではない** — AArch64 の privileged surface は別の operator 集合であり、
+別途決める。
+
+### 3. verifier の allowlist を frontend に追随させる
+
+`bit-or` を `arithmetic` と strictly-binary arity 集合の両方に追加。
+**独立再導出は維持する** (producer の集合を import しない)。import すれば
+検証器は producer の決定を追認するだけになり、検証ではなくなる。
+
+### 4. parity を契約として検査する (再発防止の本体)
+
+`kotoba.native.isa-parity-test` が以下を pin する:
+
+- portable operator は両 ISA で emit できる
+- privileged 集合は **設計上 x86 専用**であり、明示列挙される
+- 解決不能な operator は**両 ISA で診断可能**である (NPE ではない)
+- u32 の境界は u8 より 4 バイト広い
+
+初稿の portable 一覧には `not`/`zero?`/`pos?`/`neg?` も入れており、両 ISA で
+対称に失敗した — 正しい答えだが問いが間違っていた。frontend が KIR 以前に
+比較へ lower するので、これらはバックエンドに到達しない。**KIR まで生き残る
+operator だけがこの一覧に属する。**
+
+## Verification
+
+| 対象 | 結果 |
+|---|---|
+| kotoba-native | 25 tests / 1,904 assertions |
+| compiler (pin 前進後、override 無し) | **785 tests / 6,294 assertions、0 failures** — `native-executor-test` / `verifier-profile-test` を含む |
+| `clojure -M:native-conformance` | 5/5 (`aarch64-kotoba-v1`) |
+| 差分ネイティブ実行 | `bit-and`/`bit-or`/`bit-xor` とその合成が実 AArch64 プロセスで正しい値を返す。未修正版は NPE |
+| JVM vs nbb | 3 operator すべて両 ISA でバイト単位一致 |
+
+`(bit-xor 1 2 4 8)` は修正後も `:phase :subset` の 'invalid arithmetic arity' で
+拒否される — bitwise は strictly binary という frontend の意図的な制限で、
+検証器の arity 集合もこれに合わせた。
+
+## ADR-2608039500 の訂正
+
+**ADR-2608039500 に記録した '785 tests / 6290 assertions を patched backend に対して'
+という検証記述は誤りだった。** `-Sdeps '{:override-deps ...}'` をトップレベルに
+渡していたが、`:override-deps` は **alias キー**であり、alias を活性化しない限り
+無視される。`-Spath` で確認したところ classpath には pin 済みの
+`~/.gitlibs/.../502f2921.../src` が入っており、あの実行は patched backend では
+なく **pin 済み backend** に対するものだった。同じ理由で、あの ADR の
+'差分ネイティブ実行 12 本が baseline と一致' も baseline 同士の比較で、何も
+証明していなかった。
+
+正しい指定は `-Sdeps '{:aliases {:ovr {:override-deps {...}}}}' -M:ovr:test`。
+
+**結論自体は現在は正しく、実測で裏付けられている** — peephole は
+`kotoba-native` main に入り、本 ADR の pin 前進で compiler がそれを実際に
+ビルドするようになった上で、上表の 785 tests / 6,294 assertions と
+native-conformance 5/5 が通っている。誤っていたのは当時引用した証拠であって
+結論ではないが、証拠が無効だった以上そう記録する。
+
+## 発見: pin が古すぎて上流の成果が効いていなかった
+
+compiler の `deps.edn` は `kotoba-native` を `502f2921` (8 commit 遅れ)、
+`kotoba-verifier` を `af28d272` (4 commit 遅れ) に固定していた。つまり
+**peephole も f64 算術も本 ADR の修正も、この repo が実際にビルドするものには
+一切効いていなかった。** `bit-or` が全 native target で死んでいた直接の原因も
+これ (frontend は admit するのに、pin された検証器がそれを知らない)。
+PR #480 で両 pin を前進させ、superproject の west pin も 3 件揃えた
+(`f19bdc3`、diff 3 行、全件 server-side で ahead / behind_by 0 /
+merge_base == 旧 pin / default branch と identical を確認)。
+
+**教訓: 上流に merge しただけでは成熟度は上がらない。consumer の pin を
+進めるまでが 1 単位。**
+
+## 続き: `i64-operations` (同日、同じクラスの残りを閉じた)
+
+上記の修正で診断が NPE から `ex-info` になった直後、同じ探索を frontend の
+operator 表全体に広げたところ、**同じクラスがもう 1 家族残っていた**:
+`bit-not` / `i64-shift-left` / `i64-shift-right` / `u64-shift-right`
+(frontend の `i64-operations`)。frontend が全 native target で admit し、
+`kotoba.kir` の評価器も実装済み (つまり compile-time oracle は最初から
+合意していた) なのに、**両バックエンドが emit せず、検証器も admit しない**。
+`emit-call` に落ちて 'unknown call target' — 「存在しない関数を呼んだ」と
+読める誤った診断で報告されていた。
+
+**閉じた**:
+
+- x86-64 は `NOT r/m64` (group 3 `/2`、隣の `neg` `/3` と opcode を共有) と
+  `shl`/`sar`/`shr rax,cl`。AArch64 は `MVN` (= `Rn=xzr` の `ORN`。
+  `mov-reg` が `Rn=xzr` の `ORR` であるのと同型) と `LSLV`/`ASRV`/`LSRV`
+  (同ファイルの SDIV `0x9ac10c00` に対して base と Rm 配置をクロスチェック)。
+- **レンジ検査は両 ISA とも emit しない。** frontend が shift count を
+  **[0,63] の整数リテラルに限定**しているため、`CL` / LSLV の count
+  レジスタが持つ mod-64 切り捨ては到達不能。これが「両 ISA が明示的な
+  マスク無しで一致する」理由であり、同時に**両者が `kotoba.kir` の
+  `checked-shift64` (範囲外は wrap でなく trap) と一致し続ける**理由。
+  count が常にリテラルなので、ADR-2608039500 の `emit-rhs-window` は
+  ここでは必ず定数経路を取り、count を直接 `rcx` / `x1` に載せる。
+- **`i64-shift-right` は算術、`u64-shift-right` は論理** (`kotoba.kir` の
+  `i64-shr` / `u64-shr` に一致)。取り違えると**全ての負のオペランドで
+  封印済み oracle 値と emit されたコードが食い違う**ため、テストは
+  「両方が存在する」ではなく「2 つの符号化が異なる」ことを assert する。
+- 検証器側は `arithmetic` に畳まず**独立の集合**として持つ — shift だけが
+  他の算術に無いオペランド制限 (リテラル [0,63]) を負っており、それが
+  backend のレンジ検査省略を正当化している唯一の根拠だから。非リテラルや
+  範囲外を admit する検証器は、コードと oracle が食い違う artifact を
+  admit することになる。
+
+検証: kotoba-native 27 tests / 1,930 assertions、compiler 786 tests /
+6,300 assertions + native-conformance 5/5、実 AArch64 プロセスでの差分実行
+12 本 (`-1 >> 63` が算術で `-1`・論理で `1` を含む)、JVM/nbb バイト単位一致。
+
+## 完結: 診断の系統的修正 (同日、クラス全体を閉じた)
+
+上記 2 回の修正はいずれも「operator を 1 つずつ塞ぐ」形で、**同じ census を
+毎回やり直す**運用になっていた。根本は診断にある。
+
+**全 31 operator 家族の全数 census** (target `aarch64-kotoba-v1`) を取ったところ、
+`finalize` まで到達して 'unknown call target' になる operator が **13 個**
+残っていた: `xorshift32` / `string-from-i64` / privileged 11 個。残りの家族
+(f64 30・f32 23・document 34・string 20・typed collections・record/variant・
+decimal・xml・compact-graph 等) はすべて `:phase` 付きの clean rejection で、
+ゲートは正しく効いていた。
+
+**当初案 (backend が `supported-operations` を publish し compiler が照合) は
+破棄した。** 宣言と `cond` 実装が drift する — まさに今直している問題を
+再生産する。
+
+**実際に使った不変条件**: 未解決の呼び出し先は **operator 以外ではありえない**。
+`kotoba.compiler.frontend` は未知の名前を KIR 生成前に
+'operation has no admitted lowering' (`:phase :subset`) で弾き (実測確認済み)、
+KIR を敵性データとして扱う `kotoba.verifier` も再emit前に signature 表外の
+operation を弾き、`emit-program` は宣言された全関数を `offsets` に入れる。
+よって `finalize` で解決できない `{:call op}` は、**frontend が admit したのに
+この backend に `emit-expr` の case が無い operation** に限られる。
+
+**両 backend 1 箇所ずつの変更**で 13 個すべてが自分を名乗るようになった
+(`operation not implemented on this backend`、`:operation op`、`:phase` は
+各ファイルの既存 throw と同じ規約)。宣言集合も cross-repo 契約も不要。
+
+**即座に配当があった**: 13 個のうち 2 個は、**source に書いた名前と実際に
+欠けている operator が違った** — `xorshift32` は `u32-wrap` を、
+`string-from-i64` は `string-substring` を報告する (どちらも frontend で
+desugar される)。旧メッセージのままなら、存在しない `xorshift32` を backend に
+探しに行くところだった。privileged 11 個は AArch64 に**設計上**無いもので、
+これも「壊れたプログラム」ではなく意図的な非対称として読めるようになった。
+
+## 続き: admission gate の穴 — `let` 束縛が typed op をロンダリングしていた
+
+診断修正が名指しした 2 件を追ったところ、片方は operator の欠落ではなく
+**ゲート自体のバグ**だった。
+
+`kotoba.kir` の 2 つの target-admission 述語
+(`only-native-word-typed-features?` / `only-cljs-provider-typed-features?`) は
+form の `args` を汎用的に walk していた。`let` の第 1 引数は**束縛ベクタ**で、
+**Clojure のベクタは `seq?` が false** — walk は終端 case (native 側は `true`、
+cljs 側は sealed 型記述子のために書かれた明示的な `(vector? form) true`) に
+落ち、**束縛値が一度も検査されなかった**。
+
+結果、同じ operation が書き方で扱いを変えていた:
+
+```
+(u32-wrap 1)             -> :phase :target で拒否
+(let [a (u32-wrap 1)] a) -> 素通りして backend に到達
+```
+
+f32/f64 だけ免れていたのは `uses-f32?`/`uses-f64?` が別に木全体を走査して
+いたから。**それ以外の typed 家族 — i32・typed map・keyword・document — は
+すべて束縛の裏に隠れられた。**
+
+これが `xorshift32` が backend に到達していた機構でもある: frontend が
+まさにこの形の `let` に展開するため。修正後は他の typed-value 機能と同様
+`:phase :target` で拒否される。
+
+**そしてこの分離が重要**: `string-from-i64` は同じ症状に見えていたが別物で、
+`string-substring` に desugar される — **native gate が設計上 admit する
+string operation**であり、backend が本当に未実装なだけ。ゲート修正前は
+この 2 つが同じ問題に見えていた。
+
+修正は両述語で `let` を明示的に destructure し、束縛値と body を walk する。
+binder が symbol であることとベクタの整形式性は検査するがベクタ自体は walk
+しない — record/variant の case が sealed 型記述子に対して既にそうしている
+のと同じ理由で、blanket vector admit はそのまま正しい。
+
+検証: kotoba-kir 72 tests / 331 assertions (従来 68)、compiler 791 tests /
+6,312 assertions 0 failures、native-conformance 5/5。**既存テストは 1 つも
+この穴に依存していなかった。** 回帰テストは「直書きと `let` 束縛が一致する」
+「入れ子や後続束縛でもロンダリングできない」「backend が実際に実装している
+one-word slice は今も admit される (穴を outage に交換していない)」
+「不正な `let` は walk されずに拒否される (この述語は verifier が敵性として
+扱う KIR にも走る)」を pin する。
+
+## 続き: `:bool` を返す関数が native で書けない — これは**バグではなく制約**だった
+
+drift のクラスを系統的に洗うため、frontend の全 operator を native target で
+コンパイルし `:phase :verify` で拒否されるものを探した (`bit-or` と同じ署名)。
+12 件ヒットしたが、kernel 系 7 件は
+'bounded kernel memory operation requires the aiueos kernel target' という
+**target 認識済みの正しい拒否**で偽陽性。残る比較演算子 5 件が本物だった。
+
+**症状**: `(defn main [] (+ 1 1))` は通るのに `(defn main [] (= 1 1))` が
+'runtime KIR module shape rejected' (data 空) で落ちる。`(if (= 1 1) 7 8)` は
+通る。つまり **比較結果を返す関数が native で書けず、比較は `if` の test 位置
+でしか使えない**。しかも **wasm32 / js / cljs では通る** — portable な言語機能を
+native だけが拒否している。
+
+**原因**: 比較は `:result :bool` を推論し、verifier は entry / 各関数の result を
+`:i64` に限定していた。
+
+**当初「1 行で広げられる」と判断したが、それは誤りだった。** `:bool` は native
+両 backend で 0/1 の語としてビット同一で、`kototama.native.executor` も result が
+integer であることしか要求しないため、受理は無害に見えた。実際に広げたところ、
+**verifier 自身の層構造が 3 つ先の検査で弾いた**。実測:
+
+```
+(defn main [] (= 1 1))   lower :oracle-value = nil (畳み込みを拒否)
+                         execute             = true (1 ではなく真偽値)
+(defn main [] (+ 1 1))   両方とも 2
+```
+
+### 訂正 (同日、later): 上記の「load-bearing」という結論も誤りだった
+
+初版はここで「KIR の値モデルには本物の `:bool` があり native には 0/1 の語しか
+無い。制約は load-bearing。持ち上げるには `execute` が 1/0 を返すか backend が
+本物の bool 表現を持つか」と結論した。**これも誤り**で、しかも
+**3 日前にオーナーが下していた決定と逆向き**だった。
+
+`kotoba-kir` `38d1bd0` (2026-07-31、'box a :bool result at the execute boundary'):
+
+> `:bool` はこのインタプリタの内部でも、wasm module の内部でも、native backend の
+> setcc 列でも **plain な 0/1 の語**である。しかし **target から出る値は host
+> boolean** である: restricted-ESM emitter は boolean を返し、`kotoba.wasm.core` は
+> boolean を box する export wrapper を emit する。参照実装だけが 1/0 を返していた
+> ため、**3 者が同じ値で一致することを唯一の目的とする shared corpora** が
+> predicate について成立しなかった。
+
+`:bool` **引数**は以前から本物の boolean を要求していたので、box 化は新しい規約の
+導入ではなく **両方向を対称にする**もの。
+
+**私は native backend の内部表現から推論し、cross-target の規約を確認しなかった
+ため、進行中の移行を「意図された不変条件」と読み違えた。**
+
+### 実際の現在地
+
+native は**まだその境界を渡っていない target**というだけ。実際に塞いでいるのは
+`kotoba.kir/lower` の oracle 畳み込みガードが `:i64` 限定であること —
+`:bool` entry では何も封印されず、oracle 検査に比較対象が存在しない。
+**したがって verifier の集合だけを広げても何も変わらない。**
+
+完了に必要なのは 3 点、この順序:
+
+1. `kotoba.kir/lower` が `:bool` entry を畳み込む (box 済み boolean を封印し、
+   `:blocks` は 0/1 の語のまま — `38d1bd0` が内部表現は据え置くと明記している)
+2. verifier の `entry-result-types` が `:bool` を得る
+3. `kototama.native.executor` が `:bool` entry に対して integer ではなく
+   boolean を報告する
+
+### 完了 (2026-08-03)
+
+3 点すべてを実施し、**native が最後の target として `:bool` 境界を渡った**。
+
+- `kotoba-kir` `ec7bdb5`: `lower` が pure `:bool` entry を畳み込み、
+  **box 済み boolean** を封印する。`:blocks` は `:const.i64` が運べる 0/1 の語の
+  まま。`:blocks` のガードは truthy ではなく `some?` — `false` が畳み込み可能な
+  値になったので「oracle 無し」と取り違えてはならない (テストで pin)。
+- `kotoba-verifier` `e78c370`: `entry-result-types` が `:bool` を得る。
+  `verify-native-artifact!` の再実行は `execute` 経由で同じく box するので、
+  封印値と直接比較可能。`#{:i64 :bool}` の外は今も `:signature-result` を
+  名指しして拒否される。
+- `tender-native` `f92f390`: `:evidence :result` を box する。**supervisor の
+  report は整数のまま** (`valid-supervisor-report?` の契約は不変、`:report` は
+  verbatim で返る) — box するのは呼び出し側が「プログラムの答え」として読む
+  値だけ。
+- `compiler` `3c575e2`: 3 つの pin を前進。
+
+実プロセスでの実測: `(= 1 1)` → evidence `true` / raw report `1`、
+`(= 1 2)` → `false` / `0`、`(+ 1 1)` は `2` / `2` で不変。
+
+**検証の帰属について**: 共有 compiler checkout が他セッションの未コミット変更
+(`deps.edn` / `core.clj` / `native-pilot-manifest.edn`) を抱えており、最初に
+取った baseline 比較は信頼できなかった (baseline 側の方が失敗が多く、assertion
+数も一致しなかった)。**固定 commit のクリーンな worktree で取り直した結果、
+baseline と patched がともに 799 tests / 6,339 assertions・0 failures で一致**。
+pin 前進後は 800 tests / 6,342 assertions・0 failures、conformance 5/5。
+
+**副産物として直したもの**: `verify-program!` は 12 個の条件を 1 つの `and` で
+検査し `{}` を報告していた。どれが落ちたかを知るにはプログラムを手で二分探索
+するしかなく、最も頻度の高い落ち方 (entry が比較を返す) が malformed module と
+区別できなかった。各条件に名前を付けて報告するようにした (敵性プログラムは
+早い条件の失敗により後の条件が throw しうるので、各検査を guard し throw も
+その条件の失敗として扱う)。**この診断改善が、上記の原因特定を 1 手にした。**
+
+## 副産物: `bool-not` が入力に関わらず常に false を返していた (実バグ)
+
+`typed-safe-value-operations` の native 支持を測る過程で、参照インタプリタの
+**実バグ**を見つけた。
+
+`kotoba.kir` の `bool-not` は `(not value)` だった。比較は**語 0/1** に評価
+されるが、Clojure では **0 が truthy** なので `(not 0)` も `(not 1)` も false —
+**`bool-not` は入力に関わらず定数 false** を返していた。`(bool-not (= a b))`
+という「等しくない」の最も自然な書き方が常に false で、二重否定も元の真偽に
+戻らず定数に潰れていた。
+
+**このインタプリタは他 target を突き合わせる oracle なので、これは参照実装
+だけの取りこぼしではなく言語の定義そのものだった。** 既存テストは 1 件も
+捕まえていない。
+
+`if` は同じ判定を**インラインで正しく**持っていた (boolean なら `not`、語なら
+`zero?` — 38d1bd0 が両方を内部で許容するとしているため両方の復号が要る)。
+`bool-not` はその規約を再導出して誤った。規約を `kotoba-false?` として**1 箇所に
+抽出**し両者から使うようにしたので、3 度目の再導出は起きない。
+
+検証: kotoba-kir 79 tests / 354 assertions (従来 76) — 比較の反転、内部 2 表現
+(比較は語、`option-some?` は host boolean)、involution を pin。compiler は固定
+クリーン checkout で修正前後とも 810 tests / 6,372 assertions、conformance 5/5。
+
+## 訂正: `typed-safe-value` の「4 op ギャップ」は測定の誤りだった
+
+前回「wasm 4/10 対 native 0/10」と報告したが、**probe が entry にその型を
+返させていた**ための交絡だった。entry の result 型規則で弾かれていたのであって、
+op が未支持だったのではない。
+
+i64 を返す関数の**内側**で使うと、`option-some` / `option-none` / `option-some?` /
+`option-value` / `result-ok` / `result-err` / `result-ok?` / `result-value` /
+`result-error` は **すべて既に native でコンパイルできる** (native gate も既に
+これらの case を持っている)。この family の真のギャップは **`bool-not` 1 個だけ**
+であり、それも上記のとおりまず意味論が壊れていた。
+
+## 完了: `bool-not` の native 実装 — typed-safe-value family を閉じた
+
+意味論の修正 (`a28ea11`) の後、backend / gate / verifier を揃えた。**順序が
+本質**で、逆にしていれば壊れた oracle に合わせる実装になっていた。
+
+- `kotoba-native` `1b585fc`: 両 ISA で emit。x86-64 は `test rax,rax` +
+  `sete al` + `movzx`、AArch64 は `subs xzr,x0,#0` + `cset x0,eq` — **どちらも
+  そのファイルの比較が既に出している tail そのもの**なので、`bool-not` と比較が
+  偶然でなく構成上一致する。
+- **bit 0 の反転ではなく零との比較**にした。これにより canonical な 0/1 に
+  限らず**任意の語**に対して `kotoba.kir/kotoba-false?` と同じ復号になる。
+- `kotoba-kir` `5d3cb59`: native gate が admit (共有集合 `non-string-typed-ops`
+  は触らない)。concurrent な f64 gate 変更と同じ `cond` で衝突したため、
+  rebase せず最新 main に当て直した。
+- `kotoba-verifier` `3481812` / `compiler` `eaaaeab`。
+
+検証: 実 AArch64 プロセスで 8 本 — involution、および**インタプリタでは host
+boolean・native では語**になるオペランド (`option-some?`) の混在 — すべて一致。
+compiler は baseline と同じ 810 tests / 6,372 assertions、conformance 5/5。
+
+## 全数計測: native の未実装 operator は **1 個**だけになった
+
+診断修正 (`operation not implemented on this backend`) は**正確なシグナル**に
+なった — frontend が admit し、target gate も通り、backend に case が無い場合
+にだけ出る。これで frontend の全 operator 表を走査して未実装を厳密に列挙できる。
+
+**結果 (2026-08-03、compiler `eaaaeab`、target `aarch64-kotoba-v1`): 12 個。**
+
+- **11 個は `kernel-privileged-operations`** — 設計上 x86 専用 (cr2/cr3/invlpg/
+  cli/sti/hlt/pause/out)。aarch64 で測っているので当然であり、ギャップではない。
+- **残り 1 個が `string-from-i64`**。
+
+それ以外はすべて compile できるか、`:phase :target` / `:subset` で clean に
+gate されている。**この loop の開始時点から見ると、未実装 operator 面はここまで
+狭まった。**
+
+### 訂正 (2026-08-04): その測定は部分的で、穴はもう 1 つ残っていた
+
+上の「ここまで狭まった」は **operator 面を網羅的に測った結果ではなかった**。
+`string-substring` 一般形の landing 後に「operator 面は閉じた」と報告したが、
+それは測っていない部分を含む主張だった。
+
+網羅測定をやり直した (frontend の `string-operations` 表の各 op について最小
+プログラムを `aarch64-kotoba-v1` にコンパイルし、失敗を phase で分類する):
+
+| op | 結果 |
+|---|---|
+| `string-code-point-at` | **`[:aarch64 operation not implemented on this backend]`** — 本物の穴 |
+| `string-contains?` / `string-split-count` / `string-replace-all` / `string-fold-case` / `keyword-name` / `keyword-from-string` | `:target` phase で gate — typed value が web target 限定という設計上の制限であり **native 固有の穴ではない** |
+| `string-length` / `string-from-i64` | OK |
+
+**phase による分類が効いた**: `:aarch64` で落ちるものだけが backend の穴で、
+`:target` で落ちるものは別の設計判断である。両者を混ぜて数えると、閉じられない
+ものを穴として数え続けることになる。
+
+`string-code-point-at` は context offset **144** の callback として landed した。
+これは**文字列を歩く**ための op で、返り値の code point が自身の UTF-8 幅を決める
+ので 1 op で前進できる。oracle は `kotoba.kir.value/utf8-code-point-at!`、境界は
+`[0, byte-length)` の **排他的**上限 (末尾から始まる code point は無いため、
+substring と違う)。**結果はスカラーなので何も確保しない。**
+verifier の string-operation allowlist にも無かったので arity 2 で admit した。
+
+**教訓**: 「閉じた」と言う前に網羅測定を回す。この loop で「閉じた」と報告した
+主張が実測で覆るのは 2 度目 (1 度目は kit 資格化の予測)。
+
+### x86-64 の host call が disp8 で壊れていた — 私が 2 回出荷したバグ (2026-08-04)
+
+**`emit-heap-call` は context offset を `call qword ptr [r9+disp8]` として
+出していた。disp8 は符号付き 1 バイトである。** したがって私が landed した
+`string-substring` (offset **136**) は **-120** として、`string-code-point-at`
+(offset **144**) は **-112** として符号化されており、**どちらも意図した slot
+ではなく context の手前にある何かを呼んでいた**。
+
+**何一つ捕らえなかった。** 理由が 3 つ重なっている:
+
+1. **AArch64 は構造的にこの誤りを起こせない** — `ldr-context` の即値は 8 倍
+   スケールの 12 bit 場で 32760 まで届く。
+2. **この機械には AArch64 しかない。** 実行テストは全部 AArch64 で通り、
+   x86-64 は一度も実行されていない。
+3. **verifier の独立再導出が効かない。** verifier は
+   `x86-64/emit-program` を**呼ぶ**ので、producer と同じ関数で同じ誤った
+   バイトを再導出し、一致してしまう。**独立再導出は emitter を共有する層では
+   独立ではない。**
+
+**そして 3 の穴は塞げた。** 「この機械では x86-64 を実行できない」は思い込みで、
+**macOS/Apple silicon は x86-64 へクロスコンパイルでき (`cc -arch x86_64`)、
+Rosetta 2 でそれを実行できる**。恒久ハーネス
+(`test/kotoba/compiler/x86_64_execution_test.clj`) を入れ、通常のスイートに
+登録した。x86-64 ホストでは skip する (そこでは native_executor_test が既に
+この ISA を実行しているため)。
+
+**このハーネスがバグを捕らえることを実測で示した**: 修正前の backend で同じ
+2 本を emit して実行すると、どちらも **SIGSEGV** で落ちる (`[r9-120]` /
+`[r9-112]` を呼ぶため)。修正後は `:result 3` / `:result 26412` を返す。
+**微妙な誤動作ではなくセグフォだった** — 一度でも x86-64 で実行していれば
+即座に分かった。
+
+**この一件の一般化**: 「テストが全部緑」は「全部のターゲットで緑」ではない。
+ターゲットを増やしたら**そのターゲットを実行する手段**も一緒に作る。無ければ
+そのターゲットのコードは**書かれているだけで一度も動いていない**。
+
+**そして「他にも潜んでいないか」を実測で答えた。** サンプリングでなく、
+native_executor_test が AArch64 で検証している面をそのまま x86-64 で実行した:
+算術・比較・再帰・let・bit-not/bit-or・i64/u32 シフト・i32 wrapping・bool-not・
+pair・string=?/string-concat・record projection・option・result・f64 算術・
+**f64 比較 6 種すべて (NaN 行を含む)**・kgraph・capability call。
+**62 assertions、追加のバグは無し。** disp8 が唯一だったことが分かった
+(仮定ではなく測定)。
+
+この過程で私のテスト構成が 4 回間違えた (`string-byte-length` は keyword を
+取らない / record type id は修飾キーワード / cap-call はコンパイル時 policy が
+要る / qualification host の cap-call provider は +1 を返す)。**いずれも
+「ギャップを見つけた」ではなく「私の probe が間違っていた」** — 報告する前に
+op 名・arity・期待値を実装で確かめる、という同じ規律が効いた。
+
+### 表を 1 つにして両 ISA を回す (2026-08-04)
+
+最初の sweep は**片側だけ**だった: AArch64 は個別 deftest 群、x86-64 は表、
+そして両者が同じプログラムを覆っている保証は無かった。**実際に検査したい性質は
+「1 つのプログラムが両バックエンドで 1 つの値を出す」**なので、表を共有にして
+各行を「ここでビルド・実行できる全 ISA」で回す形にした
+(`test/kotoba/compiler/isa_execution_test.clj`)。
+
+**表を 2 つ持つと、乖離しても両方が緑になりうる。1 つならならない。**
+ビルド・実行できない ISA は**名指しで skip** するので、host しか回らなかった
+実行が「両方回った」ようには読めない。
+
+実測: 両 ISA が実際に走り (skip 無し)、**121 assertions / 0 failures**。
+全体は **885 tests / 6,745 assertions / 0 failures**。
+
+**着地**: compiler `d3ca7b7`、west pin `593ac2c`。
+
+### backend 間の operator パリティを測り、keyword 演算を閉じた (2026-08-04)
+
+**両 backend の dispatch 集合を機械的に diff した。** 差分は**設計上 x86 専用の
+privileged kernel op 11 個だけ**で、それ以外のパリティは完全だった。
+
+(最初の抽出は「AArch64 だけが f64 を持つ」と出したが**私の正規表現の非対称**
+だった — x86 側は opcode をバイト列で、AArch64 側は hex 整数で書くので、片方
+しか一致していなかった。x86 の f64 は実行で確認済みなので即座に疑えた。
+**測定器の非対称を測定結果と読み違えない**。)
+
+**`keyword-name` / `keyword-from-string` を実装した。** `native-word-field-types`
+のコメントが「general substring と concat が runtime handle 上で必要で未実装」と
+していたが、**その substring は同じ日に landed していた**。両 backend で desugar
+する: keyword は印字テキスト (コロン込み) の pair handle なので、name はコロンの
+先の substring、生成はコロン 1 文字との concat。`keyword-name` は subject を先に
+束縛する — オペランドが呼び出しでありうるのに oracle は 1 回しか評価しないため。
+**新しい値表現も ABI 変更も無い。**
+
+古い根拠コメントも同時に直した。**今日 2 度、陳腐化したコメントが次の読者を
+無い障害物へ案内しかけている**のを見つけている (f64 の `:f64` 除外理由、
+keyword 演算のこれ) ので、自分で 3 例目を残さない。
+
+実測: 共有表に 4 行追加し**両 ISA で 137 assertions / 0 failures**
+(長さだけでなく**内容一致**と往復、`:日本` のマルチバイト名を含む)。全体
+**885 tests / 6,761 assertions / 0 failures**、kotoba-native 自身 **43 / 2,052 / 0**。
+
+**着地**: kotoba-native `6ccbc0d` / kotoba-kir `73acba3` / kotoba-verifier
+`ff54fca` / compiler `73bae4b`、west pin 4 件。
+
+## Resume point (2026-08-04 closing)
+
+### 閉じたもの (すべて default branch 着地・west pin 前進済み)
+
+| 面 | 状態 |
+|---|---|
+| 値表現 5 点 + 関数境界越え | 閉 |
+| `string-substring` 一般形 (context offset 136) | 閉 |
+| `string-code-point-at` (offset 144) | 閉 |
+| f64 比較 6 種 (NaN semantics 込み) | 閉 |
+| `keyword-name` / `keyword-from-string` | 閉 |
+| x86-64 の disp8 バグ (**出荷済みバグの修正**) | 閉 |
+| x86-64 実行検証 (Rosetta 2 + `cc -arch x86_64`) | 常設 |
+| 両 ISA を 1 つの表で実行 | 常設 |
+| backend 間 operator パリティ | 測定済み・差分は設計上の x86 専用 kernel op 11 個のみ |
+
+**検証**: compiler `885 tests / 6,761 assertions / 0 failures`、
+kotoba-native `43 / 2,052 / 0`、共有 ISA 表は両 ISA で `137 assertions / 0`。
+再実行は対象 repo で `clojure -M:test`。
+
+### 残っているもの (優先順)
+
+1. **production native tender** — 8 kit の `:native-aot :pending` を正当に解消
+   する唯一の道。**フラグ編集で閉じてはならない**: compiler ADR 0059 が
+   `:implemented` を real provider semantics 込みの end-to-end と定義しており、
+   `kexe_loader.c` の `checked_typed_cap_call` は**意図的に恒等**
+   (コメント: production tenders replace this callback)。**新規コンポーネントの
+   設計**であり、最初の判断は ADR-2607266000 の層 (T3 実行面 / T5 機構) の
+   どこに tender を置くか。
+2. **`:target` gate に残る typed-set / typed-map / typed-vector / document /
+   f32** — keyword 演算と違い**実際に新しい値表現を要する** (可変長コンテナ、
+   32bit 浮動小数)。keyword が閉じられたのは表現が既にあり演算だけ無かったため。
+3. **7 件の parse-error** (`manifest/docs-edn-only.cljs` の baseline) —
+   診断済み・**機械修復不可**。理由と試して撤回した 2 手はその docstring に
+   記録済み。所有 agent による再生成か、オーナーによる退役判断が要る。
+
+### 次の具体的な一手
+
+新しい面に触る前に**必ず網羅 probe を回す**。この loop で「閉じた」という報告が
+実測で 2 度覆っている (kit 資格化の予測、operator 面)。手順:
+
+    # frontend の op 表の各 op を最小プログラムでコンパイルし、phase で分類する
+    # :aarch64 / :x86-64 で落ちる = backend の穴
+    # :target / :subset で落ちる = 設計 gate (穴ではない)
+    # 型エラー = probe 自身の誤り (op 名・arity・期待値を実装で確かめる)
+
+**測定器の非対称を測定結果と読み違えない**、**変更した repo 自身のスイートを
+回す** (下流の統合スイートは上流 repo のテストを含まない) の 2 点が、この loop で
+実際に事故った箇所である。
+
+(なお直前の commit `efa85df` は内容変更を伴わない空 commit である — この節を
+書く際に EDN 文字列を壊す引用符を自分のガードが弾いて本文が書かれないまま
+PUT だけが走った。履歴に残るが中身は無い。)
+
+修正: 127 を超える offset は disp32 形式 (ModRM 0x91) を使う — offset 128 の
+typed-cap-call が既に使っていた形。127 以下はバイト単位で不変。
+
+**回帰テストは call site 1 つではなく offset の TABLE を走査する**ので、次に
+127 を超える offset が足されたとき誰も覚えていなくても捕らえる。修正を戻すと
+実際に落ちることを確認済み。
+
+**同時に判明: kotoba-native 自身のテストは main で赤のままだった。**
+`string-substring` 一般形の landing で「非 ASCII / 非リテラルは unimplemented」
+という意図的な negative を陳腐化させたのに、**compiler のスイートだけで検証した
+ため気づかなかった** (12 failures)。テストを新しい振る舞いに書き換えて緑に戻した。
+**教訓は「変更したリポジトリ自身のスイートを回す」** — 下流の統合スイートは
+上流リポジトリのテストを含まない。
+
+### f64 比較を native に追加 (同日)
+
+網羅 probe の副産物。gate と backend は**同じ集合**を持っており (算術のみ)、
+比較 6 個 (`f64-eq/lt/le/gt/ge/unordered`) はどちらにも無かった。ABI 変更なし、
+命令生成のみ。**NaN が肝**: AArch64 は FCMP が unordered で N=0 Z=0 C=1 V=1 を
+立てるので、そこで**偽になる**条件 (EQ/MI/LS/GT/GE、unordered は VS のみ真) を
+選ぶ。x86-64 は UCOMISD が unordered で ZF=PF=CF=1 を立てるため、`setb`/`setbe`
+は unordered で**真になってしまう** — so lt/le はオペランドを入れ替えて
+seta/setae を使う。等値は PF も見る (unordered も ZF を立てるため)。
+
+実 AArch64 で 19 行 (NaN 行含む) を実行検証。**x86-64 は実行できていない** —
+この機械には無い。上の disp8 バグはまさにその穴から出た。
+
+**着地**: kotoba-native `18dccc5` / kotoba-kir `0725a53` / kotoba-verifier
+`bd9a142` / compiler `6bb2d69`、west pin 4 件。実 pin で **880 tests /
+6,606 assertions / 0 failures**、kotoba-native 自身 **43 / 2,052 / 0**。
+
+**着地**: artifact `ae5f670` / kotoba-native `f4167d7` / kotoba-verifier `b4f5c6e`
+/ compiler `d60cf56`、west pin 4 件。実 pin で **878 tests / 6,583 assertions /
+0 failures**、実 AArch64 実行 3 本 (ASCII / 3 バイト decode / pool 由来)。
+
+### `string-substring` 一般形 — 実装済み (2026-08-04、context offset **136**)
+
+`kotoba.kir` の `string-substring` は**バイト単位だが両端が code-point 境界で
+あることを要求**する。境界検査には文字列領域のバイト読み出しが必要だが、
+**native code は code 領域も string pool も直接アドレスできない** — loader が
+`resolve_string_bytes` で所有している。よって一般実装には新しい context
+callback が要り、`tools/kexe_loader.c` と `kexe_loader_windows.c` の両方、
+`_Static_assert`、そして**封印・計測される runtime identity**
+(`executor/loader-source-sha256`) が変わる。**この loop で唯一 sealed runtime
+identity を動かした変更**である。
+
+**訂正**: この節は以前 offset を **128** と書いていたが誤り。128 は
+`typed_cap_call` が既に占めており、実際の追加位置は **136**
+(`code_base`/`code_length` は data-only で guest 不可視なので後ろにずらせる)。
+書く前に struct を読んで判明した。
+
+**設計上の要点 — 結果は view であって複製ではない。** substring は元文字列の
+連続バイト範囲なので、`string_concat` と違い **string pool を 1 バイトも消費
+しない**。offset 空間は 2 つの半分が**逆向きに走る** (非負は code+literal を
+前進、負は `-offset-1` で pool を指す) ため、`start` バイト進めることは前者では
+加算、後者では**減算**になる。両分岐とも実プロセス実行テストで押さえた。
+
+**oracle との一致。** 判定は共有 oracle `kotoba.kir.value/utf8-substring!` を
+そのまま写した: 境界 `0 <= start <= end <= length`、次に両 index が code-point
+境界であること。**元バイトが canonical UTF-8 であることは仮定せず検査する** —
+不正 UTF-8 の上では「継続バイトでない」は「code-point 境界」を意味せず、guest は
+任意の pair cell を渡せるため。
+
+**context-abi は 4 箇所で独立に再導出されている** (`core.clj`、`nbb/cli.cljs`、
+verifier、`admission_test`)。verifier は完全一致を要求するので最初の実行は
+`execution context ABI is not admitted` で弾かれた — **drift detector が設計
+どおり fail-closed した**のであって回帰ではない。4 箇所すべてを揃えて解消。
+
+**この検査は compiler が作った artifact からは到達しない。** entry は零引数しか
+取れず (`main must take zero arguments`)、compile 時に oracle が entry 全体を
+実行するため、境界違反は必ずコンパイル時に落ちる。実行時 trap を書こうとした
+2 つの試み (再帰で畳み込みを避ける / `:args` で動的 index を渡す) はどちらも
+この 2 つの性質で塞がれた。loader が検査するのは `checked_string_concat` が
+overflow を潰すのと同じ理由 — **guest が pair cell に入れた値を信用しない**、
+かつ artifact がこの compiler 由来とは限らないため。この事実をテストの代わりに
+コメントとして記録した (再試行させないため)。
+
+**検証**: 実 pin (override なし) で **873 tests / 6,575 assertions / 0 failures**。
+実 AArch64 プロセスでの実行 3 本 — pool 由来 (負 offset)、pool 由来の multi-byte
+内容一致、literal 由来 (正 offset) の multi-byte 内容一致。**非対称性を正直に
+記す: POSIX loader はコンパイルして実行したが、Windows loader はしていない** —
+`windows.h` が要り、この環境に cross-compiler が無い。offset は struct を読んで
+確認し、実 Windows ビルドでは `_Static_assert` が捕らえる。
+
+**着地**: artifact `6be99b6` / kotoba-native `02d1a6d` / kotoba-verifier
+`9adda42` / compiler `8ddbec4`、west pin 4 件前進。
+
+### では `:native-aot :pending` は何を意味しているのか
+
+kit descriptor を読むと分かる。`clock-v1` の `:request` は **bool payload の
+variant**、`:result` は **`:i64` / `:keyword` / `:string` フィールドを持つ
+レコードの variant**。つまり kit の native 資格化が要求しているのは
+**「capability 機構」ではなく「値表現」** — string/keyword フィールド付きの
+record/variant が capability 境界を越えること。
+
+`native-aot-baseline.md` 自身がその前提を列挙している
+(「string/keyword フィールド付き record/variant、相互ネスト、native
+provider/capability-linking 機構」)。ただし同ファイルの
+'there is still no native provider/capability mechanism of any kind' という
+表現は、**Component Model 流の provider 合成が無い**ことを指すなら正確だが、
+**capability が native で動かない**と読めてしまう。実際には動く。
+
+### 帰結 — およびこの予測が外れたことの記録 (2026-08-04 訂正)
+
+当初ここには **kit 資格化と「record/variant が関数境界を越えられない」は同じ
+作業であり、native の capability を前進させる道は provider 機構の新設ではなく
+値表現を広げることだ**と書いていた。**この予測は、その後の自分の作業によって
+反証された。**
+
+値表現チェーンは 5 点すべて閉じ、境界越えも `string-substring` 一般形も landed
+した。にもかかわらず **8 つの kit の `:native-aot` はすべて `:pending` のまま
+であり、それが正しい。**
+
+理由は 2 つあり、どちらも測定で確認した:
+
+1. **資格の定義がそもそも違う。** compiler ADR 0059 が明文化している —
+   `:implemented` とは **real provider semantics を含めて end-to-end に使える
+   こと**を意味し、ABI crossing が閉じただけでは足りない。同 ADR は 0052–0060 の
+   連鎖が例外なく kit descriptor に触れずにきたことを述べ、**証明した以上を主張
+   する最初の 1 本にはならない**と明示している。
+2. **native の実行ホストは設計上 qualification host である。**
+   `tools/kexe_loader.c` の `checked_typed_cap_call` は検証だけを行い、provider
+   本体は恒等関数で、コメントが `The qualification host's deterministic typed
+   provider is identity. Production tenders replace this callback while
+   preserving validation.` と述べている。つまり **production provider は loader の
+   仕事ではなく、置き換える側 (production tender) の仕事**であり、それは今存在
+   しない。
+
+**したがって残る `:pending` は「閉じ忘れ」ではなく正直な表示であり、フラグを
+編集して閉じる種類のギャップではない。** 必要なのは production native tender と
+いう**コンポーネント**であって、edit ではない。
+
+**値表現の作業が無駄だったわけではない** — ABI crossing は実際に動くように
+なった。**必要ではあったが十分ではなかった**、というのが正しい総括で、当初の
+「同じ作業」という統合が誤りだった。ADR-2607266000 決定 4 (native は実行面で
+あって Component 契約面ではない) は引き続き有効で、Component 流の provider
+合成を native に持ち込むことが目標ではない点も変わらない。
+
+## 値表現チェーンの現在地 (2026-08-03 実測) — 残るのは 5 点、うち 1 点は backend
+
+「値表現」を残ギャップの唯一の大物と統合したので、compiler ADR 0062/0063 の
+チェーンがどこまで進んでいるかを wasm と突き合わせて実測した。
+
+| 形 | wasm32 | native (aarch64) |
+|---|---|---|
+| record: 直接ネストの `get(new)` (ADR 0062) | OK | **OK** |
+| record: 第 2 フィールド | OK | **OK** |
+| record: 2 つの projection | OK | **OK** |
+| variant: 直接ネストの `match(new)` (ADR 0063) | OK | **OK** |
+| record: ~~`let` 束縛~~ **完了** | OK | **OK** (下記) |
+| record: ~~関数境界を越える~~ **完了** | OK | **OK** (下記) |
+| record: ~~`:string` フィールド~~ **完了** | OK | **OK** (下記) |
+| record: ~~`:keyword` フィールド~~ **完了** | OK | **OK** (下記) |
+| record: ~~入れ子フィールド~~ **完了** | OK | **OK** (下記) |
+
+**5 点の内訳が重要**: 4 点は gate (`:phase :target`) が止めており、
+**`let` 束縛だけが backend の制限** (`record-new is only supported as the direct
+operand of a matching record-get on the native backend`) — つまり gate は既に
+通しているのに emitter が受けられない、この 1 点だけが性質が違う。
+
+### 次の 1 段は `let` 束縛 record
+
+ADR 0062 自身が「`let` 束縛 record を複数の `record-get` が読む形」を残ギャップ
+として挙げている。ただし**安くはない**: 現在の `emit-record-get-of-new` は
+`(record-get T (record-new T ...) f)` を let スロット機構へ書き換えるが、
+`let` は 1 束縛 = 1 スロットを前提にしている。record を束縛するには
+**`emit-let` が「この束縛は N ワード」を知る**必要があり、env の束縛表現
+(`{:let-depth d}`) と両 backend の symbol 解決を変えることになる。
+
+`:string` / `:keyword` フィールドと入れ子は、そこから先の
+**capability kit 資格化が要求する形**そのもの (`clock-v1` の `:result` は
+`:i64`/`:keyword`/`:string` フィールドを持つレコードの variant)。順序としては
+`let` 束縛 → 関数境界 → フィールド型の拡大、が自然。
+
+## 完了: `let` 束縛 record — 5 点のうち backend 側の 1 点を閉じた
+
+ADR 0062 が名指しで残ギャップとしていた形 (「`let` 束縛 record を複数の
+`record-get` が読む」)。**5 点のうち唯一 backend 側にあった項目**で、残り 4 点は
+target gate が止めている。
+
+**第 2 の表現は不要だった。** ADR 0062 は record に独立した実行時表現を与えて
+いない — 直接ネストの `record-get` は、通常の多重束縛 `let` が既に使っている
+slot 機構へ書き換えられ、1 フィールド 1 ワードになる。`let` 束縛 record が要る
+のはまさにそれで、違いは**その場で消費されず body まで届く**ことだけ。よって
+**1 束縛が「フィールドごとの 1 束縛」に展開**され (合成名)、record 自身の名前は
+slot ではなくそれらの名前に写る。
+
+結果、slot 数・深さ相対ロード・後片付けはすべて従来のまま。`emit-let` は
+束縛数とは別に `slots` を数えるだけでよい。
+
+**record は今も値として存在しない。** `r` 単体はワードではなく、nil の
+`:let-depth` を持ったまま `load-let` に達すれば**何も名指ししない
+NullPointerException** になるだけ — 以前直した到達不能な `finalize` guard と
+同じ形 — なので `emit-expr` が明示的に拒否する。束縛時と異なるスキーマでの
+projection、未宣言フィールドの projection も拒否する。テストが 3 つとも pin。
+
+**recogniser は構造的**にした。フィールド型がこの backend で運べるかは
+`kotoba.kir/only-native-word-typed-features?` が lowering 前に既に決めているので、
+ここで再導出すれば gate を二重化することになる。
+
+**verifier 側**: `locals` は名前の集合だったが、名前 → 束縛時スキーマの写像に
+なった。record が「自分の `record-get` の直下の `record-new`」としてしか現れ得な
+かった間は、局所について覚えておくべきことが無かった。`let` 束縛を admit する
+には projection を束縛時の形と突き合わせる必要があり、集合では答えられない。
+スキーマは producer から信用せず**再導出**する (この verifier の他の集合と同じ
+方針)。
+
+検証: kotoba-native 34 tests / 2,004 assertions。実 AArch64 プロセスで 7 本 —
+単一 projection・両フィールド・**2 回読む**・スカラ束縛との混在・1 つの `let` に
+2 つの record・`if` の内側・呼ばれた関数の内側。compiler は固定 checkout
+(`ecdce96`) で **baseline と patched がともに 833 tests / 6,430 assertions、
+失敗も同じ 4 件の wall-clock 予算のみ**で完全一致、conformance 8/8。
+
+## 完了: `:string` フィールド / payload — gate だけの制限だった
+
+残り 4 点のうち 1 点を閉じた。**backend は最初から運べていた。**
+
+gate を迂回して両 backend に string フィールド付き record と string payload の
+variant を直接渡したところ、**4 ケースすべて emit した** (文字列を projection
+して長さを測る形を含む)。理由は単純で、**native の文字列値は既に 1 ワードの
+`pair(offset,length)` handle** であり `:i64` と同じ幅だから — slot 機構が既に
+持っている以上の表現を要さない。止めていたのは gate だけだった。
+
+`native-scalar-record-field-types` を **`native-word-field-types` に改名**した。
+`:string` は scalar ではなく、この集合はもともと scalar ではなく**1 ワードに
+収まるか**を問うものだった。
+
+**`:f64` は据え置き**: 従来の理由が変わっていない — compiler の f32/f64 gate が
+record と無関係に native の f64 を拒否するので、ここで admit すると直交する
+gate を黙って広げることになる。**`:keyword` も据え置き**だが理由は別で、
+**backend に keyword 表現が一切無い** — 直接渡すと clean な拒否ではなく
+IllegalArgumentException になる。
+
+この 1 点は **record と variant の両方**を同時に前進させた (同じ集合を共有して
+いるため)。
+
+検証: 実 AArch64 プロセスで 6 本 — string フィールドの record から i64 を
+projection / 文字列を projection して測長 / `let` 束縛で両フィールド /
+文字列フィールドの比較 / string payload variant の i64 ケース / variant から
+文字列を取り出して測長。compiler は固定 checkout で **baseline と patched が
+ともに 833 tests / 6,430 assertions、失敗も同じ 3 件の wall-clock 予算のみ**、
+conformance 8/8。
+
+## 完了: `:keyword` フィールド / payload — kit の error 形が native で動く
+
+残り 3 点のうち 1 点を閉じた。`:string` と違い**backend 側の実装も要った**が、
+それは既存の文字列リテラル経路の再利用で済んだ。
+
+**表現**: keyword は文字列と同じ 1 ワードの `pair(offset,length)` handle として
+運ぶ。中身はその**印字テキスト** (`:z` → 2 バイト `:z`) で、これは
+`kotoba.wasm.core` が keyword リテラルに既に選んでいた表現。文字列リテラル経路が
+持っている以上のものを要さない。
+
+修正前は、keyword リテラルが `emit-expr` に届くと **IllegalArgumentException** に
+なっていた — 診断可能な拒否ですらなく、keyword を呼び出しとして分解しようとして
+落ちるだけだった。
+
+同じテキストの keyword と文字列は実行時に区別できなくなるが、frontend が遥か
+手前で型を分けており、この backend には区別を載せる descriptor が無いので安全。
+
+**admit したのは keyword の値であって演算ではない。** `keyword-name` /
+`keyword-from-string` は実行時 handle に対する一般の substring と連結を要し、
+未実装。
+
+**3 箇所が keyword を知らなかった。いずれも読んで見つけたのではなく走らせて
+見つけた**: gate の `native-word-field-types` / gate の walk が
+`(keyword? form) false` で全ての式位置の keyword リテラルを拒否していた /
+verifier の `verify-expr!` の値ケース / verifier の `lowered-cost` — 最後のものは
+keyword に対して `(seq form)` を呼んで例外になっていた。
+
+**`:string` が既に入っていたので、`clock-v1` の error record 形
+`[[:code :keyword] [:message :string]]` が native でコンパイルでき実行できる** —
+capability kit 資格化が要求する形そのもの。
+
+検証: 実 AArch64 プロセスで 5 本 — keyword フィールドから i64 を projection /
+`let` 束縛 / variant の keyword payload / **kit error 形** / kit error 形の
+`let` 束縛。compiler は固定 checkout で **baseline と patched がともに
+847 tests / 6,486 assertions**、失敗は wall-clock 予算のみ、conformance 8/8。
+
+## 残り 2 点の性質が分かれた — 入れ子は平坦化、関数境界だけが設計の分岐
+
+「1 ワードに収まらない record をどう運ぶか」で 2 点が同じ問題だと書いたが、
+**実測すると別の問題だった。**
+
+### 入れ子: ヒープ不要。平坦化で解ける — 一部は既に動いている
+
+gate を迂-回して両 backend に入れ子 record を直接渡した結果:
+
+| 形 | backend |
+|---|---|
+| 入れ子 record をフィールドに持ち、**兄弟の i64 を projection** | **EMITS** |
+| 内側 record を取り出してそのフィールドを projection (連鎖) | 未対応 |
+| `let` 束縛した入れ子 record | 未対応 |
+
+1 つ目が既に動くのは、前回の `let` 束縛 record 実装の**創発的な帰結**である。
+`emit-record-get-of-new` はフィールドごとに合成名の `let` を作るので、内側の
+`record-new` が `emit-let` の `record-new-binding` に捕まり、**自動的に
+「内側 2 スロット + 外側 1 スロット」に平坦化される**。
+
+残る 2 形も同じ平坦化の延長で、**ヒープも新しい表現も要さない**:
+- 連鎖 projection は `record-get` が「別の `record-get` の結果である record 束縛」
+  へ再帰的に解決できればよい
+- `let` 束縛した入れ子は、`emit-let` の展開が**フィールド式自身が `record-new`
+  のときにも再帰する**ようにすればよい (env が入れ子の record 束縛を表現できる
+  必要がある)
+
+つまり ADR 0062 の「record に独立した実行時表現を与えない」という性質を**保った
+まま**閉じられる。gate 側は `native-word-field-types` に record 型を認める形に
+なるが、これは「1 ワードに収まる」の判定ではなく「平坦化できる」の判定になる。
+
+### 関数境界: ここだけが本物の設計分岐
+
+record は N スロット、関数は 1 ワードを返す。平坦化では越えられない。選択肢は:
+
+- **pair 連鎖でヒープに載せる** — 既存の `pair`/`pair-first`/`pair-second` だけで
+  実現でき、1 ワードの handle になるので境界も入れ子も同時に解ける。**代償**:
+  arena は 1 実行あたり 4,096 セル固定・GC 無し・容量で trap なので、record を
+  ループで作るプログラムが**今は通るのに落ちるようになる**。ADR 0062 が
+  スタックスロットを選んだのはまさにこれを避けるため。
+- **多レジスタ返し** — ABI 変更。
+- **境界を越えさせない** — 現状維持。
+
+**これは測って決まる話ではなくオーナー判断であり、ADR 0062 の明文化された設計
+性質を覆すかどうかの問題**なので、ここで独断で実装しない。
+
+
+## 完了: 入れ子 record と連鎖 projection — **ADR 0062 の性質を保ったまま**
+
+前回「平坦化で解ける」と評価したとおりに閉じた。**record に独立した実行時表現を
+与えないという ADR 0062 の性質は、交換したのではなく保った。**
+
+**平坦化の再帰化**: `let` 束縛 record は既にフィールドごとの束縛へ展開されて
+いたが、その展開が再帰するようになった — フィールド自身が `record-new` なら
+さらに展開され、入れ子 record は外側のスロット列に平坦化される。スロット数は
+束縛数ではなく**展開が到達した深さ**から数える (1 束縛が推移的に任意個を占める
+ため)。
+
+**連鎖 projection は materialise せず解決する**: `record-get` の上の `record-get`
+は `resolve-record-binding` が「symbol」または「record 型フィールドを選ぶ
+`record-get`」を辿って解決するので、**中間の record が値になることは一度もない**。
+record 型フィールドをそれ以外の位置で選ぶことは拒否する — 生むべきワードが無い
+から。テストが pin。
+
+verifier 側も `record-schema-of` が同じ 3 形 (直接の `record-new` / それに束縛
+された局所 / record 型フィールドを選ぶ `record-get`) を**再帰的に**解決する。
+最後の形のスキーマは**外側の型のフィールド表から読み出す**ので、別途追跡する
+必要がない。
+
+検証: kotoba-native 38 tests / 2,028 assertions。実 AArch64 プロセスで 5 本 —
+内側への連鎖 / 連鎖と兄弟フィールドの併用 / 呼ばれた関数の内側での一式。
+compiler は固定 checkout で **baseline と patched がともに 857 tests /
+6,517 assertions**、差は `dual-renderer-soft-performance-workload` 1 件のみで
+これは本セッションを通じて両側で落ちてきた wall-clock 予算。conformance 8/8。
+
+**これで値表現の残りは「関数境界」1 点**であり、それは平坦化では越えられない
+本物の設計分岐 (前節)。
+
+
+## capability kit までの距離を実測 — `clock-v1` は**あと 1 形**
+
+`:string` / `:keyword` / 入れ子が揃ったので、kit の**実際の形**を両 backend に
+直接渡して測った。
+
+| `clock-v1` の形 | backend |
+|---|---|
+| `:request` = bool payload の variant | **EMITS** |
+| `:result` の `wall` record (`:i64` × 2) | **EMITS** |
+| `:result` の `error` record (`:keyword` + `:string`) | **EMITS** |
+| `:result` 全体 = **record を case payload に持つ variant** | 未対応 |
+
+つまり **kit 資格化に残るのは「case payload が record の variant」1 形**。
+
+### 設計は見えている (実装は次に回す)
+
+`emit-variant-dispatch` は ordinal 1 スロット + payload 1 スロットを push し、
+各 branch の binder を `{:let-depth payload-depth}` に束縛する。record payload に
+必要なのは:
+
+1. payload を **N スロットに展開**する (record と同じ `expand-binding`)
+2. **branch ごとに、その case の宣言 payload 型に従って binder を束縛**する —
+   record の case なら record 束縛、スカラの case ならスロット
+3. `dispatch-depth` と cleanup (現在 `add rsp,0x10` 固定) を N に合わせる
+4. スロット領域は**全 case の最大 payload 幅**で確保し、構築された case の
+   payload を先頭に置いて残りを埋める
+
+4 が要るのは、構築された case だけが materialise される一方、**非選択の branch も
+emit される**ため。今日はスカラ payload なので全 binder が同じ 1 スロットを指して
+無害だが、record を混ぜると非選択 branch の束縛が push されていない深さを指しうる。
+実行されないので意味論は壊れないが、**押していない領域への load を emit すること
+自体を避ける**べきで、最大幅で確保すればその状況が構造的に起きない。
+
+**今回実装しなかった理由**: `emit-variant-dispatch` は分岐変位を各 branch の
+code-size から算術しており、スロット数を変えると同時に変位も動く。誤ると
+「emit は通るが分岐先が命令の途中」になりうる — 静かに壊れる種類の誤り。
+本セッションはすでに長く、ここは新しい文脈で丁寧にやる方が安い。
+
+
+## 完了: record を case payload に持つ variant — **`clock-v1` の全 4 形が native で動く**
+
+前節で「あと 1 形」と書いたものを閉じた。**`clock-v1` が宣言している形はすべて
+native で compile / verify / 実行できる。**
+
+| `clock-v1` の形 | native |
+|---|---|
+| `:request` = bool payload の variant | **OK** |
+| `:result` の `wall` record | **OK** |
+| `:result` の `error` record (`:keyword` + `:string`) | **OK** |
+| `:result` 全体 = record を case payload に持つ variant | **OK** (本節) |
+
+**何も実行時表現を得ていない。** payload は、record フィールドが外側 record の
+スロットへ平坦化されるのとまったく同じように、dispatch のスロットへ平坦化される。
+
+`emit-variant-dispatch` の変更は 3 点: payload を `expand-binding` で展開する /
+**各 branch が自分の宣言 payload 型に従ってスロット領域を記述する** (record の
+case は record を見、スカラの case はワードを見る) / `dispatch-depth` と
+cleanup (2 スロット固定だった) が領域幅に追随する。
+
+**領域は「構築された case」ではなく「最も広い宣言 case」で確保する。** 構築された
+case だけが materialise されるが**全 branch が emit される**ので、宣言 payload が
+より広い branch は押されていないスロットを名指し、**フレームの外へ出る変位の
+load を emit**してしまう。到達不能だが emit すべきものではない。テストは
+「他の case がより広い variant の、狭い case を構築する」形でこれを踏む。
+
+**分岐変位は変更不要だった** — 各 body の実測サイズから導出されているので、
+スロット数を仮定せず追随する。
+
+verifier 側は、**各 branch の binder に自分の case payload スキーマを束縛する**
+ようにした。これが無いと binder にスキーマが無く、branch 内の projection が
+すべて拒否される。
+
+検証: kotoba-native 40 tests / 2,040 assertions。実 AArch64 プロセスで 4 本 —
+`wall` record の両フィールド / `error` record の `:string` フィールド。compiler は
+固定 checkout で **baseline と patched がともに 862 tests / 6,527 assertions・
+0 failures**、conformance 8/8。
+
+
+## 完了: record が関数境界を越える — **値表現の 5 点がすべて閉じた**
+
+「オーナー判断待ち」としていた最後の 1 点。**再検討で、私が挙げた懸念を回避する
+設計があると分かったので実施した。**
+
+**懸念だったもの**: pair 連鎖でヒープに載せると arena (1 実行 4,096 セル・GC 無し・
+容量で trap) を消費し、**今通るプログラムが落ちるようになる**。ADR 0062 が
+スタックスロットを選んだ理由そのもの。
+
+**回避**: **箱詰めを境界に限定する。** 逃げない record はスロットのまま。境界を
+越える record は**今日そもそもコンパイルできない**ので、**既存のどのプログラムも
+新たに allocation を得ない**。非退行が構造的に保証される。テストが
+「逃げない record は `pair_new` に到達しない」ことを assert するので、この閉じ込めが
+黙って崩れることもない。
+
+**実装は書き換えだけだった**: 呼ばれる側の `record-new` が
+`pair(f0, pair(f1, ... 0))` に、呼ぶ側の projection がその walk になる。どちらも
+既に emit している形なので、**新しい primitive も ABI 変更も loader 変更も
+runtime identity の変更も無い** — `pair`/`pair-first`/`pair-second` は ADR 0062 の
+bounded-pair 作業以来ある arena 契約。
+
+arena コストは新しい形については実在し、それが ADR 0062 が「逃げない形」に
+スロットを選んだ理由である。**その形は今も何も割り当てない。**
+
+### 初稿はエントリまで許可して 14 件の assertion を壊した
+
+`only-native-word-typed-features?` の関数チェックを広げた際、**エントリも含めて
+しまった**。compiler の frontend-extensions テストが「record を返す `main` は
+unsupported typed target すべてで拒否される」という**意図的な negative** を pin して
+おり、14 target 分が落ちた。**テストが正しい** — エントリの結果は host へ出るが、
+host には pair handle を読む術が無い。これは私が `:bool` の作業で
+`entry-result-types` と `function-result-types` を分離したのと同じ境界で、gate 側で
+再現し損ねていた。エントリを除外して解消。
+
+**baseline 比較が無ければ landing していた**。この loop で baseline を毎回取って
+きたことが、ここで効いた。
+
+検証: kotoba-native 42 tests / 2,056 assertions。実 AArch64 プロセスで 5 本 —
+boxed な呼び出し結果と slot-backed な `let` 束縛 record を 1 式で併用する形を含む。
+compiler は固定 checkout で **baseline と patched がともに 868 tests /
+6,563 assertions・0 failures**、conformance 8/8。
+
+
+## 残ったギャップ (2026-08-03 時点の実測)
+
+## 続き: `i32-operations` (同日、最大の残存 portable ギャップを閉じた)
+
+wasm32 と js が 9/9、native が 0/9 だった `i32-operations` を両 ISA で実装した。
+
+**新しい値表現は不要だった。** `:i32` という型は存在しない — `kotoba.kir` の
+`:i32` 言及は trap キーワード 1 箇所のみ — つまり 9 op はすべて **i64 語の上の
+32bit wrap 意味論**。区別するのは正規化だけ: `i32-*` の結果は bit 31 から
+**符号拡張** (`unchecked-int` / `i32-wrap` 経由)、`u32-*` は **ゼロ拡張**
+(`u32-wrap`)。
+
+両 ISA が unsigned 側を無償で与える — x86-64 の 32bit 演算も AArch64 の w 形式
+書き込みも上位半分をゼロにする — ので unsigned 形は後処理不要、signed 形は
+`movsxd` / `sxtw` が 1 つ。AArch64 の符号化はすべて隣の 64bit 形の `sf=0` 兄弟。
+
+shift count は既存の binary window で rcx / x1 に載り、**mask は emit しない**:
+frontend が count を literal [0,31] に限定しているので mod-32 切り捨てが到達
+不能 — i64 shift が [0,63] で立てたのと同じ論法。
+
+**`xorshift32` は case を 1 つも書いていない。** frontend がこれらへの `let` に
+desugar するので、9 op が揃った瞬間に動き出した (`(xorshift32 1)` → 270369、
+参照実装と一致)。
+
+**gate は共有集合を触らず native 側だけで例外を作った。** `i32-operations` は
+`non-string-typed-ops` に残す — cljs gate が同じ集合を共有しており、cljs は
+**1/9 しか実装していない** (2026-08-03 実測、wasm32/js は 9/9)。集合から抜くと
+cljs も黙って広がる。テストが両方向を pin する (native は `let` 束縛越しでも
+admit、cljs は今も拒否)。
+
+検証: 実 AArch64 プロセスで 11 本 — `i32-wrap 0xFFFFFFFF` = -1、
+`u32-wrap -1` = 4294967295、負数での算術 vs 論理シフト、桁あふれ wrap — すべて
+KIR oracle と一致。compiler は pin 前進後 807 tests / 6,358 assertions・0
+failures (クリーン再実行)、conformance 5/5。
+
+## 残ったギャップ (2026-08-03 時点の実測)
+
+- **native に実装すべき operator**: `string-substring`
+  (= source の `string-from-i64`)。**戻り値が文字列**なので register op では
+  なく `string-concat` と同じ string-pool / host-call 経路が要る。
+  — `xorshift32` はゲート修正により**この一覧から外れた**。i32 値表現を
+  native に入れるかどうかの判断に統合される。
+- ~~比較結果を返す関数が native で書けない~~ **2026-08-03 に解消** (上記
+  「完了」節)。native は `:bool` 境界を渡り、predicate entry が compile /
+  verify / 実行できる。
+- record/variant が関数境界を越えられない・相互ネスト不可・
+  string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
+- typed collections と f64 は `:target` で clean rejection されており、
+  ゲートは正しく効いている (診断欠陥の対象外)。
+- **capability kit の native 資格化** (8/8 `:native-aot :pending`) — ただし
+  これは capability 機構の欠如ではなく**値表現**の問題で、下の record/variant
+  項目と同じ作業 (上記訂正)。
+- AArch64 privileged surface が未定義 (意図的に open)。
+
+## Consequences
+
+- native の operator surface が両 ISA で揃い、以後の drift は
+  `isa-parity-test` が落とす。
+- `bit-or` と `i64-operations` 4 種が全 native target で初めて実行可能に
+  なった。
+- 検証器の独立再導出は維持されるので、同種の drift は今後も起こりうる。
+  起きたときに **安全側に倒れる**ことは今回 2 度実証された
+  (`bit-or`、`i64-operations` とも検証器が reject 側に倒れていた)。
+- **未実装 operator が自分を名乗るようになったので、以後この class は
+  探しに行かなくても報告される。** 今後 frontend に operator が増えて
+  backend が追随し損ねても、最初に踏んだ人のエラーメッセージがそれを言う。
+- **教訓 2 つ目: 誤った診断は、それが隠すギャップの数だけコストを持つ。**
+  ここでは 13 個 — うち 2 個は「どの operator を実装すべきか」自体を
+  誤らせていた。operator を 1 つずつ塞ぐより、診断を直す方が安かった。")))

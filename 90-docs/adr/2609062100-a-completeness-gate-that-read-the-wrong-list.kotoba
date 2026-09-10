@@ -1,0 +1,108 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609062100-a-completeness-gate-that-read-the-wrong-list")
+  (:adr/title "A completeness gate that scanned the whole file, and the three tests that had never run")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/related (vector "ADR-2608136000"
+                "adr-2609061800-kotoba-web-architecture-fit"))
+  (:adr/repo "kotoba-lang/amu")
+  (:adr/body
+  "# A completeness gate that scanned the whole file
+
+## What happened
+
+`kotoba-lang/amu` keeps its test namespaces in two lists inside
+`test/kotoba/compiler/test_runner.clj`: a `(:require ...)` vector, and a
+separate `suite` vector. **Only the second is executed** — the runner reduces
+over `suite`, requiring each namespace as it goes.
+
+`test_runner_completeness_test` existed precisely to stop a namespace being
+absent from one of them. Its own docstring says so, and names the day it was
+written for: *Measured 2026-07-30: twelve namespaces were absent, four of them
+RED. The four green ones were the harder case — tests sitting outside the gate
+produce no symptom at all.*
+
+It read the file like this:
+
+```clojure
+(re-seq #\"kotoba\\.compiler\\.[a-z0-9.-]+-test\" (slurp \"test/.../test_runner.clj\"))
+```
+
+A regex over the **whole file**. A namespace named in `:require` alone
+satisfies it. The gate could not distinguish the two lists it was written to
+compare.
+
+## Measured 2026-09-06
+
+- 171 test namespaces on disk
+- 171 mentioned somewhere in the runner file — so the gate reported **0 missing
+  and passed**
+- **168 in the `suite` vector**
+
+Three had never been executed under `clojure -M:test`:
+
+| namespace | what it is |
+|---|---|
+| `kotoba.compiler.dom-app-driver-test` | the end-to-end test for the browser application driver |
+| `kotoba.compiler.loader-source-classpath-test` | |
+| `kotoba.compiler.dom-app-repaint-test` | added the same day, which is how this was found |
+
+The first is the costly one. It is the test that pins the driver's fuel model —
+one guest instance per interaction, 200 instantiations under load — and it was
+outside the gate.
+
+## How it was found
+
+Not by reading the gate. By adding a test, watching the suite total stay at
+1314, and asking why. The gate was green throughout.
+
+## The fix
+
+`region` locates each list by shape and `names-in` reads only that region, so
+`:require` and `suite` are compared separately. The `suite` result is reported
+first and by its own name, because that is the list whose absence produces no
+symptom. If either region cannot be located the check **fails** rather than
+degrading into a scan of nothing — a check that could not read its inputs must
+not report a pass.
+
+Break-tested: removing `dom-app-driver-test` from `suite` while leaving it in
+`:require` fails with `test namespaces never executed -- absent from the suite
+vector: (kotoba.compiler.dom-app-driver-test)`, and the run drops from 1321
+tests to 1316. Before the fix that same edit was green.
+
+## Two more instances from the same day, in my own work
+
+Both were caught by running the check in the broken direction, not by reading
+it. Neither would have been found by review.
+
+1. A repaint assertion filtered for `data-k` values of the form `t<digit>`.
+   The application numbers its items with **letters**, there being no
+   integer-to-string builtin in the guest, so the filter matched nothing and
+   the test stayed green with the optimisation it was written to measure
+   switched off. Rewritten to name the list's own elements (`UL`, `LI`).
+2. A break applied with a string replacement whose anchor did not match. The
+   replacement returned the file unchanged, the run was not broken at all, and
+   it reported green — which reads exactly like a successful demonstration that
+   the check does not over-fire. The replacement now asserts it found its
+   anchor before writing.
+
+The second is the more dangerous shape, because **a break that did not apply
+and a check that correctly declined to fire produce the same output.**
+
+## Correction to the record
+
+Two commit messages landed earlier the same day (`kotoba-lang/amu` PRs #823 and
+#826) stated that their full-suite runs covered `dom_app_driver_test`. They did
+not. The measurements in those messages stand; that sentence was wrong, and it
+was wrong for the reason this ADR is about.
+
+## The transferable part
+
+This workspace already holds the rule (ADR-2608136000): a check that could not
+measure must not return what a check that measured and found nothing returns.
+This is that rule applied one level up — **the gate over the gates**. When a
+runner lists its work by hand in more than one place, the check on it has to
+read each place separately, and has to say which one a name is missing from.
+
+A regex over a file answers the question *is this name written down anywhere*.
+That was never the question.")))

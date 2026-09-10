@@ -1,0 +1,65 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607198000-kotoba-postgresql-pool-operations")
+  (:adr/title "ADR-2607198000: PostgreSQL pool observability, health and drain")
+  (:adr/status "accepted") (:adr/doc_type "adr") (:adr/doc-type "adr")
+  (:adr/source-format "edn") (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19") (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true) (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for (vector "PostgreSQL pool operational control"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kototama/src/kototama/postgresql_pool_provider.clj"
+   "orgs/kotoba-lang/kotoba/providers/pg_pool_multi_consumer.kotoba"
+   "orgs/kotoba-lang/kotoba-lang/lang/transport-component-abi.edn"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"))
+  (:adr/supersedes (vector "adr-2607197900-kotoba-postgresql-x86-matrix-full-soak"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:stats (map (:bytes 32) (:encoding :eight-i32-big-endian)
+           (:fields (vector :status :connections :idle :leased :waiters
+                    :acquires :timeouts :evictions))
+           (:physical-handles-exposed false)))
+   (:health (map (:probe "select 1") (:scope :idle-connections)
+            (:failure :close-and-evict) (:replacement :next-acquire)))
+   (:drain (map (:new-acquire :deny) (:deadline :host-configured)
+           (:existing-lease :complete-and-reset)
+           (:deadline-expiry :force-close) (:result :forced-count)))
+   (:race-fix (map (:issue :draining-acquire-grew-hidden-lease)
+              (:fix :require-open-before-lease-or-grow)))
+   (:released-server (map (:product :postgresql) (:version "14.19")
+                     (:stats true) (:health-eviction true)
+                     (:graceful-drain true) (:forced-drain true)))
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:postgresql-interop")
+     (:result "stats, healthy/unhealthy probe, graceful and forced drain; exit 0"))))))
+  (:adr/body
+  "# ADR-2607198000: PostgreSQL pool observability, health and drain
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+Pool observability exposes only a fixed 32-byte counter record, never physical
+channel identifiers, endpoints, credentials or mutable host state. Health
+checks run `select 1` through each idle connection's compiled Kotoba provider;
+failure closes and evicts that connection. Drain deadlines are fixed by host
+configuration. Draining rejects every new acquire, permits existing leases to
+finish and reset, and force-closes remaining connections at the deadline while
+returning only the forced lease count.
+
+Acquire must test pool status before attempting idle selection or growth. The
+qualification exposed and fixed a race where the old expression could grow and
+lease a connection before the later draining-status branch denied the call.
+
+## Evidence
+
+Released PostgreSQL qualification reads the fixed stats record, probes a healthy
+connection, stalls a TLS proxy and observes health eviction and recovery. A
+graceful drain rejects a concurrent acquire, waits for release/reset and returns
+zero forced leases. A second drain crosses its host deadline, returns one and
+invalidates the stale token. The full prior matrix and soak remain green.
+
+This closes pool metrics, backpressure visibility, health eviction and graceful
+or deadline-forced drain without widening guest authority.")))

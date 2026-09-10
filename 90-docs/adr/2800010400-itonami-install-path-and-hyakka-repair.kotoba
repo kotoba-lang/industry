@@ -1,0 +1,175 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800010400-itonami-install-path-and-hyakka-repair")
+  (:adr/title "itonami.cloud install path (curl + kotoba build), and repairing nine files a resident bot left unreadable")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-02")
+  (:adr/body "## What this session did
+
+Owner asked for a curl install route on itonami.cloud and for the install
+steps to be carried in llms.txt, then added that `kotoba` CLI / `kotoba build`
+come first so that path had to be made sound too. On `next` the owner selected
+all four follow-ups: cut a kotoba release, drain the new dependency finding,
+extend the install funnel, and take a repo-bot floor finding.
+
+## Landed (all on default branches, all deployed where applicable)
+
+### 1. itonami.cloud install path — network-awai/cloud-itonami @ 2c3a4b0d867f
+
+- `/install.sh` returns **302 to kotoba-lang/kotoba's installer**, so
+  `curl -fsSL https://itonami.cloud/install.sh | sh` works. A redirect, not a
+  copy: the upstream installer verifies the release archive's published
+  SHA-256 before unpacking, and a second copy here would drift silently while
+  still looking installable.
+- **The defect this closed:** before the rule, `/install.sh` matched the SPA
+  catch-all and returned the home page **with HTTP 200**. Piping that into
+  `sh` is the failure mode the rule exists to remove.
+- `public/docs/install.md` — three routes (CLI, desktop app, no install at
+  all), each with the manual checksum form, plus an \"After it opens\" section
+  naming /isco-1212/ and /onboarding/.
+- `public/llms.txt` — an `## Install` section carrying the same content in
+  agent form.
+- Home install strip — a CLI column with the one-liner, and an app-lane link.
+  en + ja written; the other five locales fall back to :en by design.
+
+Measured end to end against the published route, not transcribed: the
+one-liner installed into an isolated prefix, and that binary then ran
+`rad new` -> `test` -> `build` to a 94-byte hello.wasm.
+
+### 2. kotoba rad --project resolution — kotoba-lang/kotoba @ eca2bead5ec3
+
+`cd hello && kotoba build` failed with `:wasm/source-not-readable
+./src/kotoba_app.kotoba`: with no `--project`, `rad-adapter/project-name`
+fell back to the literal `kotoba-app` because \".\" has no last path segment.
+The README that `rad new` SCAFFOLDS tells the reader to run `--project .`, so
+the scaffold's own instructions did not work. The host now resolves an
+absent/`.`/`./` project to the canonical path of `user.dir` before the pure
+planner sees it; an explicit project passes through byte-identical.
+
+The test pins the resulting PATH, not \"it did not throw\" — the bug was a
+wrong path reported as a successful plan. Control: with the resolution
+replaced by the identity it used to be, the test fails 5 of 8 assertions, on
+those assertions.
+
+### 3. app-hyakka repair — network-awai/app-hyakka @ 88a138dbaa73
+
+Came for one vulnerable package, found the build broken on main since
+2026-08-30 with a resident bot still committing over it.
+
+- `decode-uri-component@0.2.2` (GHSA-vcc3-ghjq-m6fr) reached production via
+  `css@^3.0.0` -> `source-map-resolve@^0.2.0`. `css` and `html` are declared
+  runtime dependencies with **zero imports anywhere** in the repo, so the fix
+  is deletion, not a bump. `datascript` stays — it is imported.
+- **Nine files repaired**, all one shape: content appended after the form it
+  belonged to had already closed. A set closed before its last element; a
+  vector closed and appended to four more times; `(defn ...)` spliced into
+  another defn's head so two collectors shared one body; a deftest truncated
+  mid-expression; `:sources` entries left open when the next key was written.
+  Introduced by `hyakka-source-scout`, one per run, from 4309f84f.
+- `scripts/read_check.clj` reads all 1,305 source and data files with the
+  ACTUAL reader, wired ahead of `npm test`. It uses the reader rather than a
+  bracket counter deliberately: the counter written first called a file
+  balanced that the reader rejects. Registers `#js` (without which seven
+  healthy .cljs files report unreadable and hide the real finding); exits 2
+  on an empty scan.
+
+`npm run build` completes (121 files, 0 warnings).
+
+## Not done, and why — these are the resume points
+
+### G1. kotoba v0.7.4 is NOT released. main is 18 commits ahead of v0.7.3.
+
+The `--project` fix therefore does NOT reach anyone installing through curl
+or Homebrew; both still deliver v0.7.3, and /docs/install.md says so.
+
+Blocked on platform coverage, not on the toolchain: GraalVM is now available
+at `~/.local/share/graalvm/graalvm-jdk-21.0.12+7.1` (extracted from
+Homebrew's download cache without sudo — the cask itself FAILS, it needs sudo
+for /Library/Java/JavaVirtualMachines and then exits 0 anyway after its purge
+step). **Only darwin-arm64 is buildable on this machine.** v0.7.3 shipped
+three platforms, and install.sh resolves `releases/latest/download`, so
+publishing a partial v0.7.4 would 404 for darwin-amd64 and linux-amd64 —
+it would break the curl route this same session shipped. A prerelease avoids
+that and reaches nobody.
+
+Also required, and not done: `:release/current` lives in
+`kotoba-lang/kotoba-lang` `lang/version-policy.edn` (a different repo), and
+`:release-notes {:require-surface-status-diff? true}` demands a
+surface-status diff in the notes.
+
+Next step: identify the builder that produced v0.7.3's darwin-amd64 and
+linux-amd64 artifacts (this workspace's fleet is all Apple silicon macOS), or
+decide the release is arm64-only and change install.sh's platform handling
+first so the other two platforms fail loudly rather than 404.
+
+### G2. app-hyakka `config/knowledge-ingest.edn` is still unreadable, so `npm test` fails.
+
+Same corruption at scale. Partial surgery on it was REVERTED rather than
+shipped: a file that looks repaired and still does not parse is worse than
+one that plainly does not.
+
+The reason for stopping is measurable: `clojure.edn/read` reports only 95 of
+~159 source entries inside the top-level map, while the hand-rolled delimiter
+analysis called the file balanced. That analysis was wrong twice in one
+session. Repairing it means deciding what each half-written entry was meant
+to be — authoring the ingest config, not repairing syntax — and belongs to
+whoever owns it.
+
+Next step: `cd orgs/network-awai/app-hyakka && clojure -M scripts/read_check.clj`
+names it. Decide per truncated entry: complete it from its own kind's
+convention, or drop it (it has never taken effect — the config has been
+unreadable, so the resident has not run with it).
+
+### G3. There is still no gate between a repo bot's commit and main.
+
+`read_check.clj` lives in app-hyakka and runs under `npm test`; the bot does
+not run `npm test`, which is exactly how nine broken files reached main. The
+check that would actually stand in the way is a fleet gate.
+
+Not written. The obstacle is real and worth stating: `:nbb-script` gates run
+under nbb (ClojureScript), which has no reader with `:read-cond`, and a
+delimiter-balance checker is the weaker check that already proved
+untrustworthy here. `:jvm-test` needs a `:test` alias app-hyakka does not
+have. Registration point is `scripts/fleet-ci/gates.edn` — app-hyakka already
+has one gate there (`hyakka-catalog-freshness`), which did not catch this
+because it checks catalog freshness, not readability.
+
+### G4. `kysely@0.27.6` in cloud-itonami/media — PRODUCTION, reachability `unused-direct`.
+
+Declared but zero imports, same shape as the css/html finding just fixed, so
+the remedy is deletion rather than a bump. Three advisories:
+GHSA-8cpq-38p9-67gx, GHSA-pv5w-4p9q-p3v2, GHSA-wmrf-hv6w-mr66.
+
+### G5. The SessionStart detector hook prints a command that does not exist.
+
+It prints `nbb --classpath \".:scripts/nbb_compat\" scripts/dependency-vulnerabilities.cljs`.
+That file is not in the repo and not on origin/main. The real detector, per
+`manifest/orgs-detectors.edn` `:dependency-vulnerabilities` `:argv`, is
+`nbb scripts/gen-dependency-inventory.cljs --osv --findings`. Every other
+detector line in that hook should be checked the same way.
+
+## Corrections made during the session
+
+Nine `backend_qualification_test` failures were first reported as
+\"pre-existing\" in kotoba. They were **environmental** — every one was an
+`evidence exists: ../kotoba-lang/... | ../amu/... | ../kototama/...`
+assertion failing because the /tmp worktree had no sibling repos. All nine
+files are present in the real checkout, and re-running there gives 118 tests
+/ 640 assertions / 0 failures. Same class as the `deploy_site_test` failures,
+which ARE environmental (sibling `net-kotobase/ipfs` is not checked out in
+this workspace at all).
+
+## Traps re-confirmed, for the next agent
+
+- **A generated file that regenerates SMALLER is stale, not fixed.**
+  `public/ops/index.html` was reverted twice: regenerating it from a /tmp
+  worktree drops whole yakuwari role entries, because the worktree lacks the
+  data that page reads.
+- **v0.4.1 is Cloud Itonami's latest STABLE.** The 0.5.x tags are
+  pre-releases and GitHub's `latest` resolves to v0.4.1, so the existing
+  download links were correct. Nearly \"fixed\" as a stale version.
+- **A /tmp worktree breaks sibling `../<repo>` paths**, which shows up as
+  test failures and `:local/root` classpath errors that look like real
+  breakage. Symlink the org dirs beside the worktree, or run in a tree whose
+  parent has them.
+- **`brew install --cask` can exit 0 without installing** when its sudo step
+  fails; the purge step's status is what you get.")))

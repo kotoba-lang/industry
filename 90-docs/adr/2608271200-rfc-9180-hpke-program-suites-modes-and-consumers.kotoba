@@ -1,0 +1,494 @@
+(vector (map 
+   (:db/id -1)
+   (:adr/id "adr-2608271200-rfc-9180-hpke-program-suites-modes-and-consumers")
+   (:adr/title "RFC 9180 HPKE: four modes landed, AES-GCM is the keystone for the rest")
+   (:adr/status "accepted")
+   (:adr/date "2026-08-27")
+   (:adr/body "# RFC 9180 HPKE — the whole surface, and what it costs
+
+Asked whether the wolfSSL article's HPKE was implemented here. It is:
+`kotoba-lang/org-ietf-hpke`, RFC 9180, portable .cljc. The article enumerates
+five KEMs, three KDFs, three AEADs and four modes; this had one of each KEM,
+KDF and AEAD, and one mode. The owner then asked for all four gaps: the
+remaining modes, the remaining suites, TLS-ECH, and ODoH/MLS.
+
+## The measurement that reordered the work
+
+The claim that stopped the other suites was written into org-ietf-hpke's own
+docstring: \"AES-GCM, P-256, P-384, P-521, X448, SHA-384 and SHA-512 are each
+an implementation this workspace does not have.\"
+
+Two of those were wrong. `sha2.sha512` has had SHA-384 and SHA-512 since the
+Ed25519 work, and `org-nist-sha2`'s README simultaneously documented them and
+listed them under \"Not implemented\" — the stale sentence sat three headings
+above the section describing the functions. Both files have been corrected.
+
+The rest was measured rather than assumed, and holds:
+
+  AES / AES-GCM     was absent. Every AES in the tree was Node's crypto
+                    (kotobase's storage profile and erasure lifecycle).
+                    GitHub code search reported nothing, but that index does
+                    not cover this org -- controls for `hpke` and `x25519`,
+                    both known present, also return zero, so the finding came
+                    from reading trees. **Now kotoba-lang/org-nist-aes.**
+  P-256/384/521     was absent -- btc-crypto has secp256k1 point arithmetic
+                    but schnorr.cljc and core.cljc are #?(:clj) only over
+                    java.math.BigInteger and the :cljs branch throws.
+                    **Now kotoba-lang/org-nist-ecc.**
+  X448 / Curve448   was absent entirely. **Now kotoba-lang/org-ietf-x448.**
+  HMAC-SHA384       was missing. Added.
+
+## What is done
+
+**Four modes, anchored to the RFC rather than to an oracle.** RFC 9180
+Appendix A.2 is this library's suite exactly -- DHKEM(X25519, HKDF-SHA256),
+HKDF-SHA256, ChaCha20Poly1305 -- and publishes base, PSK, Auth and AuthPSK.
+The earlier argument for shipping base alone was that the others would be
+untested code paths; that was an argument about evidence, and the evidence
+was in the specification.
+
+A.2 is extracted by `scripts/extract_rfc9180.cljs` from a text pinned by
+sha256, not transcribed. The repo had already been bitten once: an earlier
+suite claimed A.2 vectors and carried A.1's ikmR, caught only by an
+assertion on pkRm. 404 assertions on both runtimes, 591 with the oracle.
+
+Discrimination, measured one break at a time: dropping the mode byte from
+key_schedule_context turns 245 red across all four modes; swapping pkRm/pkSm
+in the auth kem_context turns 64 red and leaves base and PSK **green**;
+dropping auth-encap's second DH, the same 64. The localisation is the point
+-- it is what makes those numbers evidence about the added code.
+
+
+**HMAC-SHA-384**, for HKDF-SHA384. The substitution that matters is the key
+transformation: HMAC-SHA-384 and HMAC-SHA-512 share a 128-byte block, so
+using the wrong hash there changes nothing until a key exceeds 128 bytes.
+RFC 4231 case 6 is that key, and it is the single assertion the break turns
+red.
+
+**org-nist-aes** -- AES (FIPS 197, forward cipher only) and AES-GCM (SP
+800-38D), zero dependencies, seal/open mirroring chacha20.aead so an HPKE
+suite can be a parameter rather than a rewrite. Tested against the complete
+Wycheproof corpus: 316 cases, every group, no sampling, pinned by sha256 and
+re-extractable. 1,368 assertions on both runtimes, 1,667 with a javax.crypto
+oracle sweeping message, AAD and IV lengths the fixed corpus does not name.
+
+Two rows of its break table are worth carrying here. Incrementing the whole
+128-bit block instead of the low 32 bits turns **54** of 1,368 red -- the
+break is invisible to any message short enough not to carry. Comparing only
+the first tag byte turns **108** red and **only in the cases that are
+supposed to fail**: every correct decryption stays correct, so a suite
+without adversarial cases would have called it green.
+
+And one that is not hypothetical: it shipped on the first run with `Rcon[j]`
+written as `x^j` instead of `x^(j-1)`. The cipher was still a permutation,
+still round-tripped against itself, and agreed with nothing else in the
+world -- 866 assertions red. **Deriving a table protects against a mistyped
+constant, not against an off-by-one in the index that reads it**, which is a
+narrower guarantee than the derive-don't-transcribe habit implies.
+
+**org-nist-ecc** -- P-256, P-384 and P-521 over Fp, Jacobian coordinates,
+ECDH. One implementation, three parameter sets: all three have a = p - 3, so
+the doubling formula specialised for a = -3 is not an optimisation chosen for
+them, it is why they were given that a. Against the complete Wycheproof ECDH
+corpus (1,806 cases, raw-point encoding, pinned by sha256) plus a
+java.security oracle. 3,745 assertions on ClojureScript, 3,818 with the
+oracle.
+
+**org-ietf-x448** -- RFC 7748, the same shape as org-ietf-x25519. Against the
+RFC's own vectors and the complete Wycheproof corpus (510 cases). 1,107
+assertions on both runtimes.
+
+**HPKE, fully parameterised** -- five KEMs, three KDFs, four AEADs including
+export-only, four modes, against all seven RFC 9180 appendices. Each test
+builds its suite from the identifiers the vectors themselves declare, so the
+registries are checked too. 2,423 assertions on both runtimes, 2,610 with the
+BouncyCastle oracle.
+
+Appendix A.4 is the one that earns its keep: DHKEM(P-256, HKDF-SHA256) paired
+with HKDF-SHA512, so the KEM derives with SHA-256 while the key schedule
+derives with SHA-512 in the same suite. A library reading one KDF for both is
+right about six appendices out of seven.
+
+**tls.ech in org-ietf-tls** -- draft-ietf-tls-esni-25, the ECH data plane:
+configurations, EncodedClientHelloInner and its reconstruction,
+ClientHelloOuterAAD, seal and open, and the acceptance confirmation. Client
+side and client-facing server side in one namespace, so the tests run both.
+1,472 assertions on the JVM, 922 of them on ClojureScript.
+
+Measured before starting, as this ADR asked: ECH is **not an RFC** -- the
+datatracker gives draft-ietf-tls-esni no RFC number at revision 25 -- and the
+text publishes no test vectors. So the evidence is live ECHConfigList values
+pulled from real HTTPS resource records, two-sided round-trip, and each of
+s5.1's four MUST-aborts asserted by its own reason.
+
+**ECH offered from tls.client**, and **two live servers accept it**:
+crypto.cloudflare.com, and defo.ie -- a different operator publishing three
+configs in one list. Both decrypted a ClientHelloInner this client encrypted,
+used it, and signalled acceptance in ServerHello.random, which the client
+recomputed from its own inner transcript and matched. That is an independent
+implementation agreeing, and for ECH it is the only external evidence there
+is. The control: flipping one bit of the config public key gets :ech-rejected
+from both.
+
+The inner hello is padded by s6.1.3's scheme. Without it the ciphertext length
+tracks the inner SNI length -- the one thing ECH exists to hide -- so an
+unpadded client would advertise the length of the name it was hiding.
+
+**ECH is complete.** s6.1.6's rejection recovery landed too: the client
+finishes the handshake against the public_name, collects retry_configs from
+EncryptedExtensions, sends ech_required and returns an error rather than a
+connection -- because s6.1.7 says authenticating for the public name does not
+authenticate the origin. Measured against Cloudflare, which hands back a retry
+config with a different config_id from the one its DNS record publishes.
+
+ECH's HelloRetryRequest path stays unreachable rather than omitted: this
+client refuses HelloRetryRequest by name, so s7.2.1 cannot arise from it.
+
+**MLS signs, on five of seven suites.** Ed25519 for 1 and 3, ECDSA over
+P-256/384/521 for 2, 5 and 7 -- the latter built into org-nist-ecc against
+1,530 Wycheproof verification cases, 930 of them invalid, rejected across
+sixteen distinct reasons. Ed448 (suites 4 and 6) refuses by name, and a test
+asserts that rather than skipping those suites.
+
+**The MLS key schedule**, checked as a chain: 7 suites by 5 epochs, run
+forward from the initial init secret, never reading an epoch's init secret out
+of the fixture to feed the next. 17,340 assertions on both runtimes.
+
+RFC 9420's Figure 22 states its convention in prose above the diagram, and it
+is the one thing there that is easy to invert: Extract takes its salt from the
+top and its IKM from the left. Inverting it gives a key schedule that is
+entirely self-consistent -- every member running the same wrong code agrees
+with every other -- and shares nothing with anyone else. There is no way to
+catch that from inside a group. It is what an interop corpus is for, and it is
+the same shape as the two-sided-test finding above, one level up: a whole
+implementation agreeing with itself is not evidence either.
+
+**The MLS secret tree** -- RFC 9420 §9 and §6.3.2. 21 trees, 287 leaves, both
+ratchets, generations 0 and 15. 20,892 assertions on both runtimes.
+
+Two of its breaks are worth carrying. Siblings in the secret tree are told
+apart by the **context**, not the label: both children derive with the label
+tree, and what differs is left versus right. Swapping the roles of label and
+context makes siblings equal, so every member of the group would hold every
+other member's keys -- 2,240 red either way, and identical in the summary
+line to swapping left and right themselves.
+
+And generation 15 is why a corpus with two entries beats one with one. A
+ratchet is a hash chain, so an implementation that used the generation only as
+a context -- deriving generation 15 straight from the root -- agrees at
+generation 0 and diverges everywhere after. A corpus that published only
+generation 0 would have called it correct.
+
+**PSK secrets and transcript hashes** -- RFC 9420 §8.4 and §8.2, the key
+schedule's two remaining inputs. 21,114 assertions on both runtimes, against
+77 PSK combinations and 7 transcript suites.
+
+One technique there is worth keeping. A Commit's AuthenticatedContent is the
+confirmed-hash input followed by an opaque confirmation tag, and **the
+boundary between them is not marked** -- finding it by parsing means parsing a
+whole Commit. It does not have to be parsed: the tag is recomputable, so its
+encoded form is a known suffix, and matching it finds the boundary and
+verifies the tag in one step. That is stronger than parsing would have been,
+and it let a layer land before the layer underneath it.
+
+### A justification can be wrong in a way the code is not
+
+MLS-Exporter's label in the corpus is a 64-character string of hex digits. It
+was read as hex, and on the strength of that reading the labelled-KDF helper
+was generalised to accept raw bytes as well as strings -- with a docstring
+explaining why the generalisation was necessary and citing the vectors.
+
+It is a label that happens to look like hex, passed as text. The generalisation
+ran fine; it was needed by nothing; and the docstring asserted a fact about the
+corpus that was false. The code was harmless and the prose was not, because the
+prose is what the next reader would have believed.
+
+That is the third member of a family this ADR keeps finding: a justification
+written next to a branch is not evidence about that branch; a round-trip is not
+evidence about what both ends compute the same way; and now, a generalisation
+is not evidence that the case it generalises for exists.
+
+### The wrong answer came from our own documentation
+
+The previous revision of this ADR said this workspace had no portable
+signature, and made it a numbered prerequisite blocking all of MLS. It was
+false. org-ietf-ed25519's edwards.cljc and scalar.cljc have **zero** reader
+conditionals, and its ClojureScript smoke test asserts signatures
+byte-identical to the JVM's. It had been portable for some time.
+
+The claim was taken from CLAUDE.md, which listed that repository among the
+JVM-only libraries. That sentence was true when written and stopped being true
+without changing -- the same shape as org-nist-sha2's claim that SHA-384 and
+SHA-512 were absent, three headings above the section documenting them.
+
+This is the fifth absence claim in this program that turned out to be false,
+and the first where the wrong answer came from **reading this workspace's own
+prose instead of the repository**. The rule about searching before concluding
+absence is written against not looking; this was looking, in the wrong place,
+at something that looked authoritative. CLAUDE.md now says so at the point
+where the list is, and says to count reader conditionals instead of quoting
+it.
+
+### Documenting a trap is not removing it
+
+The public_name check of s6.1.7 was wrong twice, the same way both times. It
+takes a byte vector, and both wrong versions reached for characters: first a
+regex with one escape too many, so no name split and every valid name was
+rejected; then (map int over a string), which is code points on the JVM and
+zeros under ClojureScript. Then the test's own helper did the second one too.
+
+That second trap is documented in hpke.kdf/ascii, in this workspace, by us --
+and it was walked into three times in one afternoon by code written to be
+careful about it. The fix was not more care: the check compares bytes to byte
+constants now and never sees a character, which has neither failure available
+to it.
+
+### Only the live handshake noticed
+
+The transcript starts with whichever ClientHello the server used, and that
+decision was invisible to the entire unit suite. Forcing it to always pick the
+outer -- which gives a client that builds both hellos correctly, encrypts
+correctly, judges acceptance correctly, and then derives its keys from the
+wrong transcript -- left every test green.
+
+It is a named function with a test now. That is the third time this week the
+same remedy applied: org-nist-ecc's unreachable doubling branch, HPKE's
+unreachable rejection-sampling condition, and this. **A decision worth
+getting right is worth a name, because a decision buried in an expression is
+a decision no test can address.**
+
+**org-ietf-mls** -- RFC 9420's Appendix C tree arithmetic and the labelled
+operations of s5.1.3, s5.2 and s8. HPKE's third consumer. 16,510 assertions on
+both runtimes, against the working group's own corpus rather than a vendor's:
+tree-math's 10 trees from 1 to 512 leaves, and crypto-basics' seven suites.
+
+All seven cipher suites run -- and the signature half of none of them does.
+Every MLS suite names Ed25519, Ed448 or ECDSA, and this workspace has none of
+them portably. The suites are still listed, because their KEM, KDF and AEAD
+halves are what the key schedule and TreeKEM are built from, and the README
+says which half seven refers to.
+
+The nulls in tree-math are the interesting part: a leaf has no children and
+the root has no parent, and an implementation returning 0 or the node itself
+would agree with the corpus everywhere else.
+
+**And a break that hangs is a break nobody can measure.** Breaking `parent`
+made `direct-path` loop forever rather than fail. The loop is bounded now -- a
+path cannot be longer than the tree -- so a wrong `parent` produces an error
+instead of running out the clock. That bound is not defence against a hostile
+input; index arithmetic cannot be attacked. It exists so the failure is
+observable.
+
+### A two-sided test cannot check a value both sides agree on
+
+The finding from ECH, and it generalises past ECH. Both halves live in one
+namespace, so a **symmetric** change to the HPKE info left every round-trip
+test green. Dropping the ECHConfig from the info -- which makes the context
+wrong against any real peer -- broke **nothing at all** until the value was
+pulled into its own function and pinned to the draft's text rather than to
+the other half of the code.
+
+That is a third member of the family this ADR already records. A corpus can
+be complete and not cover what you assume; a justification written next to a
+branch is not evidence about that branch; and a round-trip is not evidence
+about anything the two ends compute the same way.
+
+Two bugs surfaced on the way, both in shapes CLAUDE.md warns about.
+tls.result/error merges the caller's context map **over** its own
+:tls/alert and :tls/reason, so passing :tls/reason in the context silently
+replaced the stable keyword -- invisible to any test asserting that an error
+happened rather than which one. And a test's expected value used (map int
+over a string), which is code points on the JVM and a vector of zeros under
+ClojureScript: the trap hpke.kdf/ascii documents, walked into by a test
+written to check exactly that class of thing.
+
+**org-ietf-odoh** -- RFC 9230, HPKE's first consumer here. 229 assertions on
+both runtimes. The response is not a second encapsulation: the target exports
+an AEAD key from the same HPKE context, salted with the query plaintext, so
+the client must keep that plaintext and the response is bound to those exact
+query bytes. RFC 9230 publishes no vectors; the corpus is cloudflare/odoh-go's
+and the tests are named for what it is.
+
+### Three findings from those two, worth more than the code
+
+**A corpus can be complete and still not cover the thing you assume it
+covers.** Wycheproof supplies both parties' keys, so nothing in its 1,806
+ECDH cases multiplies the base point: gx and gy could both be wrong and all
+of them would pass. Measured -- one wrong digit in P-256's gy leaves the
+whole corpus green and turns four assertions red, all of them in the
+parameter invariants and the java.security oracle.
+
+**A justification written next to a branch is not evidence about that
+branch.** org-nist-ecc's bignum wrapper was first justified by the doubling
+discriminant inside add-points. That branch turns out to be unreachable from
+scalar-mult -- left-to-right double-and-add adds P to a multiple of P that is
+never P -- so forcing it false left the entire suite green. The wrapper is
+necessary, but for a different branch (Z = 0 is the point at infinity, and
+ClojureScript's zero? answers false for a BigInt zero: 1,767 red). The
+sentence would have stood unchallenged because nothing tested what it named.
+
+**A break that is not a break reads exactly like a missing test.** In
+org-ietf-x448, an attempted break masked bit 7 off before setting it --
+`(bit-or (bit-and x 0x7F) 0x80)`, which is the identity. Zero failures. The
+finding looked like \"the clamp test does not discriminate\" and was actually
+\"the break was not one\". CLAUDE.md already warns about the mirror image of
+this (a red produced by breaking the wrong thing); this is the same error
+producing a green.
+
+## The MLS framing layer landed (2026-08-27)
+
+mls.proposal, mls.framing and mls.message: FramedContent, Sender,
+FramedContentAuthData, AuthenticatedContent, PublicMessage,
+PrivateMessage, MLSMessage, and the Proposal/Commit codecs framing cannot
+work without. Against the working group's message-protection corpus --
+seven suites, each with a proposal, a commit and an application message
+in both wire formats. 61 tests / 21,358 assertions on both runtimes.
+
+Both directions are exercised and they are labelled apart. Unprotecting
+what another implementation protected is the check that means something;
+protecting content and unprotecting it again is a round-trip, and a
+round-trip is only evidence that one implementation is self-consistent.
+
+Three guarantees sit underneath and a PublicMessage has two of them: the
+signature over FramedContentTBS says who wrote it, the membership tag
+over AuthenticatedContentTBM says the writer is in this group in this
+epoch, and encryption says nobody outside the group can read it. The tag
+is checked before the signature -- it is symmetric, so it rejects most
+garbage before any public-key work happens.
+
+Two findings worth keeping:
+
+**A parser needed a parser.** FramedContent embeds a Proposal or a Commit
+with no length prefix, so a reader that cannot say where a Commit ends
+cannot say where the signature after it begins. Only application content
+(an opaque<V>) is self-delimiting. This is why mls.proposal had to exist
+before framing could -- and why the transcript-hash layer, which landed
+first, had to reach the same content by recomputing the confirmation tag
+and matching it as a known suffix instead.
+
+**Refusing by name is not the same as not implementing.** add and update
+proposals, and a Commit's UpdatePath, carry KeyPackage and LeafNode --
+ratchet-tree encodings that do not exist yet. They return
+:unimplemented-proposal-type and :unimplemented-update-path rather than
+falling through the dispatch. This parser does not do that yet and that
+is not a proposal type are different things to tell a caller, and only
+the first one tells the caller to wait.
+
+Suites 4 and 6 sign with Ed448, which this workspace does not have. They
+are not skipped: their messages are decoded, their content codecs
+checked, and the signature step asserted to refuse by that name. A
+skipped suite and a passing suite look identical in a summary line.
+Application data may not travel as a PublicMessage (RFC 9420 6.1), and
+that refusal is placed before the signature step so it holds for those
+two suites as well -- a rule that depended on being able to sign would be
+no rule at all for the suites that cannot.
+
+Discrimination measured by breaking one thing at a time:
+
+  FramedContentTBS omits the GroupContext      31 red
+  the reuse guard is not applied               23 red
+  one ratchet for every content type           15 red
+  application data allowed in a PublicMessage   7 red
+  the membership tag is not checked             2 red
+  the private-message padding is not checked    1 red
+  restored                                       0
+
+## The ratchet tree landed (2026-08-27)
+
+mls.node, mls.tree-hash and mls.tree-ops: the node encodings, the tree hash
+and the resolution, and the three proposals that change the tree's shape.
+With those, the add and update proposals and a Commit's UpdatePath -- which
+refused by name -- go through. 76 tests / 47,141 assertions on both runtimes,
+against three more of the working group's corpora.
+
+**A codec corpus is not a semantic corpus.** The messages corpus is 300
+entries of structs another implementation serialised with random field
+values; nothing in it is cryptographically valid and none of it is meant to
+be. Decoding those bytes and re-encoding to the same bytes is agreement about
+the wire format and nothing more -- which is exactly the question a wire
+format raises and exactly not the question a tree raises. tree-validation, 98
+real trees with every node's hash and resolution, is a separate corpus and a
+separate set of tests, and the two counts are not added together.
+
+Four findings:
+
+**The corpus can miss the step that makes an operation distinctive.** Add is
+the only one of the three shape-changing proposals that does NOT blank the
+direct path -- it records the new leaf as unmerged instead. The working
+group's tree-operations corpus has two Add cases and neither reaches that
+step: one extends into an all-blank subtree, the other's blank leaf has no
+non-blank ancestor. Measured, before writing anything else: an implementation
+that blanks the path on Add passes that corpus with nothing red. The states
+had to come from tree-validation, which holds 63 trees where the leftmost
+blank leaf does sit under a non-blank ancestor -- and even there, the
+MUST-be-sorted rule for unmerged_leaves has no state anywhere in the corpus
+that tells the two orderings apart. That one case is constructed and labelled
+as constructed. **A passing corpus is evidence about what the corpus reaches,
+and finding out what it reaches is a separate measurement.**
+
+**A range check needs its accepting side tested too.** Epochs now go through
+a uint64 reader that refuses anything outside the range both runtimes hold
+exactly. The byte offsets in that check were off by two, so it would have
+refused valid epochs -- and a test that only asserted the too-big direction
+would have passed. It was caught by asserting the boundary from below as
+well. This is the mirror of the rule already in this workspace's CLAUDE.md
+about negative tests that pass for the wrong reason: **an over-strict check
+and a correct one produce the same output on the input a refusal test uses.**
+
+**A parser that throws is worse than one that refuses, and the corpus found
+it immediately.** Lifetime.not_after is routinely 2^64-1, which is what
+implementations actually put there. Reading it into a JVM long raises an
+uncaught ArithmeticException; reading it into a JavaScript number silently
+drops the low bits. The same read was reachable from decode-private-message
+with twelve bytes of peer-supplied input. Lifetime now keeps its two fields as
+eight-byte vectors -- nothing compares them, because the lifetime check is not
+implemented, and a number that cannot be trusted is a worse foundation for
+that check than bytes that can.
+
+**The workspace's own prose was wrong again, in the same shape as before.**
+mls.suite's docstring said no MLS suite here can sign, because ed25519 was
+JVM-only and there was no ECDSA. Both had stopped being true earlier in this
+same programme. It has been corrected in place, with the correction left
+visible: five of seven suites sign, Ed448 is the gap. This is the second time
+in this programme that a confident sentence about another repository's
+capability outlived the capability question it answered -- the first was
+CLAUDE.md's JVM-only list. Prose about what another repository can do goes
+stale silently and goes stale with an authoritative tone.
+
+Discrimination measured by breaking one thing at a time:
+
+  the leaf hash input uses the node index          3095 red
+  LeafNodeTBS omits the group id and leaf index     721 red
+  Add blanks the direct path                        169 red
+  the ratchet_tree is not extended after decoding   102 red
+  it is extended to odd, not to a power of two      102 red
+  trailing blanks are kept when encoding             51 red
+  the resolution lists unmerged by leaf index        21 red
+  Update does not blank the path                      2 red
+  Remove does not truncate the tree                   2 red
+  unmerged_leaves is appended to, not sorted into     2 red
+  the uint64 range check reads only the first byte    1 red
+  restored                                            0
+
+## What remains, in dependency order
+
+  1. MLS parent hashes       What makes a tree authenticated rather than
+                             merely agreed on: the tree hash says the group
+                             holds the same tree, the parent hash says each
+                             node's key was put there by someone entitled to.
+                             Everything it needs is now here.
+  2. MLS, after that         TreeKEM and Welcome.
+  3. Ed448                   MLS suites 4 and 6 name it and nothing here
+                             implements it. The other five suites sign, so
+                             this is not a prerequisite for MLS -- it is two
+                             of seven suites.
+
+## What this does not claim
+
+Nothing here is deployed. HPKE is a leaf library with no consumer in this
+workspace, which is the honest reading of \"implemented\": the primitive is
+real and the things RFC 9180 was written for are not built yet.
+
+The BouncyCastle oracle still covers base mode only. A second opinion on
+base mode is not a second opinion on auth mode, and the README says so
+rather than letting \"differential tested\" spread across all four.")))

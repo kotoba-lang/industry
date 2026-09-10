@@ -1,0 +1,47 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608311530-kotoba-lang-webest-profile")
+  (:adr/title "kotoba-lang org のウェブ刷新 (AAA クラス 3D ランディング) を専任 bot profile webest に担わせる")
+  (:adr/date "2026-08-31")
+  (:adr/status "accepted")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/repos (vector "kotoba-lang/kami-web" "kotoba-lang/webgpu" "kotoba-lang/kotoba-ui" "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2607022800-kotoba-lang-default-uiux-appkit-uikit-interface-fundamentals" "adr-2607011900-kotoba-lang-liquid-glass-ui" "adr-2608197300-growth-bot-architecture"))
+  (:adr/body "## Context — 実測 (2026-08-31)
+
+- kotoba-lang.org は GitHub Pages で稼働 (DNS: Cloudflare A + GitHub Pages deployment、2026-07-19 最新)。
+  現行は「post-quantum-by-default computing for AI agents」の静的ランディング。3D/モーション表現は無い。
+- 3D/WebGPU 資産は既に org 内に実在: kami-web (render-IR shape + glam 互換数学 + demos/)、
+  webgpu (kami.webgpu browser draw)、webgl、liquid-glass-ui + shitsuke + kotoba-ui
+  (ADR-2607022800 の default UI/UX)。HIG/WCAG audit gate (design-quality) は kura-site が
+  100/100 達成の実績あり。
+- Hermes bot fleet (ADR-2608197300 growth-bot 形) は稼働実績十分。profile 作成手順も確立済み。
+
+## Decision
+
+1. **新 bot profile `webest`** を立てる。担当: kotoba-lang.org のサイト刷新 +
+   Three.js/WebGPU 没入型 3D ランディング (粒子/カメラワーク/インタラクション) の設計・実装・デプロイ。
+2. **公開面は現行の GitHub Pages (kotoba-lang.org) を維持** — 新ドメイン/新 Workers は取らない
+   (kura-site の ADR-2607177500 先例: hostname 争奪のコストを避ける)。
+3. **資産の正を守る**: 幾何/アニメ定義は CLJC (kotoba.web.math / kotoba.web.render-ir) で書き、
+   JS は実行エンジン (three.js / WGSL) のみ。UI 層は kotoba-ui (shitsuke + liquid-glass-ui) 経由、
+   生 hex を書かない。
+4. **測定ゲート**: design-quality audit (kura-site 先例) + Lighthouse/実ロード計測を PR に添付。
+   3D は WebGPU→WebGL2→静的画像の 3 段 fallback を必須とする。
+5. **コンテンツの正直さ**: 数値は実測か modelled ラベル付き。性能実数は amu-native-bench
+   (kotoba native 40-48ns/call ≈ Rust、nbb は約113x 遅い — 2026-08-31 実測) を引用。
+6. **デプロイは PR 経由のみ**。main 直 push しない。
+7. cron routine は manager profile から割当 (週次設計測定 + CI/deploy 監視)。
+
+## Consequences
+
+- (+) kotoba-lang の公開面が org の実測技術 (WebGPU/CLJC/liquid-glass) を自らデモするショーケースになる。
+- (+) 既存資産 (kami-web/webgpu/kotoba-ui) に実 consumer が付き、ADR-2607011900 の
+  「実採用は個別 follow-up」が前進する。
+- (−) GitHub Pages は静的配信のみ — 3D アセットの最適化 (ドリズル/プリロード) を bot 側で面倒見る必要。
+- (−) WebGPU 非対応ブラウザ向けの fallback 3 段構成の実装コスト。
+
+## Verification
+- profile 作成: hermes profile create webest --clone (2026-08-31 実施、roster 反映確認済み)
+- description 設定: hermes profile describe webest --text ... --overwrite (実施済み)
+- SOUL.md: 保護ファイルのため承認フロー経由 (オーナー承認時に記入)")))

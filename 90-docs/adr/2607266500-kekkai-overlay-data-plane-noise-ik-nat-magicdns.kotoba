@@ -1,0 +1,220 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607266500-kekkai-overlay-data-plane-noise-ik-nat-magicdns")
+  (:adr/title "ADR-2607266500: kekkai overlay のデータ面を実装する — Noise IK 相互認証 (kotoba-lang/noise) + NAT hole punching / relay mesh + MagicDNS 常駐 agent (kotoba-lang/kekkai-node)")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-26")
+  (:adr/last-verified "2026-07-26")
+  (:adr/last_verified "2026-07-26")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "overlay-network")
+  (:adr/authoritative-for (vector "orgs/kotoba-lang/noise" "orgs/kotoba-lang/kekkai-node"))
+  (:adr/related (vector "orgs/kotoba-lang/kekkai" "orgs/kotoba-lang/murakumo"
+                "orgs/kotoba-lang/org-ietf-dns" "orgs/kotoba-lang/org-ietf-turn"
+                "orgs/kotoba-lang/bytes"
+                "90-docs/adr/2606271600-kotoba-stack-equivalences.edn"
+                "90-docs/adr/2607110300-kotoba-lang-net-kotobase-cloud-murakumo-decentralization-roadmap.edn"))
+  (:adr/body
+  "# ADR-2607266500: kekkai overlay のデータ面（Noise IK / NAT 越え / MagicDNS）
+
+**Status**: accepted
+**Date**: 2026-07-26
+**Deciders**: Jun Kawasaki
+
+## Context
+
+「kotoba-lang / gftdcojp に Tailscale と同じ機能があるか」を調べた結果（2026-07-26）、
+**control plane は実在するがデータ面が無い**ことが確定した。
+
+- `kotoba-lang/kekkai`（結界）は自称のとおり *Tailscale-equivalent **control plane***。
+  admission / netmap / ACL / route を coord-LLM ⊣ TailnetGovernor で扱い、charter で
+  **「パケットを運ばない・WireGuard config を push しない」**と明言している。README の
+  残タスクにも「WireGuard データ面エージェント（charter 外の別コンポーネント）との
+  netmap 受け渡し」が挙がっていた。
+- `kotoba-lang/murakumo` の `murakumo.cloud` / `murakumo.overlay` は
+  「Tailscale/WireGuard を置き換える」節を持ち、relay listener・QUIC driver・cert
+  rotation まで実在する。ただし封緘は **overlay 全体で 1 本の共有 `--auth-key` +
+  AES-GCM**。peer ごとの identity・forward secrecy・replay window が無い。
+- grep 結果として `utun` / `/dev/net/tun` / Noise IK / Curve25519 handshake は
+  kotoba-lang 全体でゼロ。NAT hole punching / DERP 相当も fleet overlay 側に無い
+  （`org-ietf-turn` の STUN/TURN は WebRTC 経路用）。MagicDNS 相当・常駐 node agent も無い。
+  本番は実 Tailscale（Tailscale SSH・tailnet 限定 ComfyUI）に依存していた。
+
+## Decision
+
+**2 つの repo を起こし、control plane と data plane の境界を kekkai の charter の
+まま保つ。**
+
+### 1. `kotoba-lang/noise` — Noise Protocol Framework rev 34（portable `.cljc`）
+
+- IK（WireGuard と同じパターン）/ XX / NN、`25519_ChaChaPoly_{BLAKE2s,SHA256}`。
+- **実装するもの**: protocol core 全部（CipherState / SymmetricState /
+  HandshakeState / token interpreter / patterns）、BLAKE2s（RFC 7693）、HMAC +
+  Noise HKDF、transport session（counter framing・replay window・rekey/expiry policy）。
+- **注入するもの**: X25519 と ChaCha20-Poly1305。constant-time な体演算とタグ比較は
+  手書き portable 実装が *積極的に劣る*ところなので、audited 実装から取る
+  （`provider.node` = Node/OpenSSL、`provider.noble` = @noble、`provider.jvm` = JCA）。
+  BLAKE2s だけは例外で自前実装（JCA に無い / hash に秘密依存分岐が無い）。
+- transport は Noise が規定しない 3 点だけを WireGuard に倣って足す:
+  ①8 byte little-endian counter を wire に載せる（associated data に含める）
+  ②replay window（既定 2048）③時間と量による rekey / expiry。
+- **WireGuard wire 互換は主張しない**（handshake framing・cookie・4 byte type header は
+  WireGuard 固有、identity は kekkai netmap 由来、運ぶのは L3 パケットでなく service
+  stream）。共有するのは暗号設計と session semantics。
+
+### 2. `kotoba-lang/kekkai-node` — 常駐 node agent（data plane）
+
+- `netmap`（deny-by-default 消費、admission と edge grant を分離不能に束ねる）/
+  `peer`（IK session + 経路判断 + tick）/ `disco`（candidate・hole punch・path 選択）/
+  `relay`（DERP 相当、両端の純プロトコル）/ `magicdns`（netmap を
+  `nameserver.resolver/IResolver` として提供）/ `launchd`（LaunchDaemon plist）は
+  すべて pure `.cljc`。`.cljs` は socket と timer だけ。
+- **connectivity first**: 全 peer は relay から始まる。direct 経路は probe が通った
+  ときの upgrade。discovery 中に到達不能にならない。
+- hole punch は **固定 burst schedule**（0/100/300/700/1500/3000/5000 ms）での
+  simultaneous open。適応的 backoff にしないのは、両側が同時に撃つ必要があり、
+  スケジュールが定数でなければ一致しないから。
+- **disco ping/pong は暗号化 session の内側**を通る。認証されない pong を許すと
+  誰でも peer の active path を動かせる（traffic hijack primitive）。
+- relay は **中身を読めない**（payload は peer 間で封緘済み、relay が見るのは宛先鍵だけ）
+  かつ **偽装登録できない**（client は netmap の relay 鍵に対して Noise IK で認証し、
+  routing table は *証明された* 鍵で引く）。relay 侵害のコストは metadata に限定される。
+- prologue に tailnet + netmap version を束ねる。古い netmap の peer は静かに stale ACL で
+  動くのでなく handshake が落ちる（代償: netmap rollout は協調手順になる）。
+- MagicDNS は **5354 番**に bind（53 は root 必要）。`/etc/resolver/<tailnet>` で
+  system resolver から向ける。常駐は **LaunchDaemon**（LaunchAgent はログアウトで死に、
+  SSH 越しの `launchctl list` に現れない — murakumo が実測で記録済みの罠）。
+
+## 着地（2026-07-26/27）
+
+| | |
+|---|---|
+| `kotoba-lang/noise` | `8eccaff35e1c6e5dec64fb81a9d62c7618e4b018`（public、**CI green**）|
+| `kotoba-lang/kekkai-node` | `a2d71684657644f6f484ee6d5aa99b8e66bd06b0`（public、**CI green**: nbb job = pure core + real-socket E2E、jvm job = pure core + lint）|
+| 本 ADR | `com-junkawasaki/root` main `a1bd3698` |
+| west 登録 | main `88021426`（west.yml、当該 2 entry のみ）+ `dfb51709`（repos.edn extra-projects）。両 pin は commit 前に GitHub API でサーバ側検証（`status=identical` = default branch tip）|
+| kekkai README | `kotoba-lang/kekkai` main `4d9a5da7`（データ面 agent の所在を明記、残タスクを「netmap を署名付きにする」へ更新）|
+
+PR は無し（新規 repo の初期 commit + 最小 diff の manifest 登録なので、API server-side
+clean commit で直接着地。open PR / 未 merge branch / stash / worktree はゼロ）。
+
+## 検証（2026-07-26 実測）
+
+- `noise`: **25 tests / 152 assertions、両 runtime（nbb + @noble / Temurin 21 + JCA）で 0 failures**、
+  lint clean。うち **85 assertions は公式 Noise known-answer vectors**（`cacophony`
+  vector set、snow 等が使う集合を `test/noise/cacophony_vectors.edn` に出典付きで保存）。
+  static と ephemeral の両方が固定されるので IK/XX/NN × BLAKE2s/SHA256 の 6 vector が
+  handshake + transport まで byte-exact でなければ落ちる。BLAKE2s は RFC 7693 §A と
+  OpenSSL（0/63/64/65/128/255 byte、block 境界）で二重に照合。
+- `kekkai-node`: pure core **47 tests / 149 assertions、両 runtime で 0 failures**
+  （namespace 単位で一致を確認。cljs.test の集計行は自身の累算仕様で 51/159 と出るが
+  実際に走ったのは 47/149）。
+- **real-socket E2E（`test/e2e.cljs`、relay + agent 2 台 + MagicDNS、全 green）**:
+  relay 認証・relay 経由の IK session 確立・封緘データ到達・relay が宛先鍵だけで転送・
+  **candidate 交換による relay → direct への経路昇格（両側）**・latency 計測・
+  direct 経路でのデータ通信・**経路変更で re-handshake しないこと**・実 DNS query への
+  MagicDNS 応答・tailnet 外の refused。
+
+### E2E が見つけた実バグ 2 件（regression test 済み）
+
+1. **retry が in-flight handshake を無効化していた**。retry 間隔 < RTT のとき、attempt N
+   への応答は attempt N+1 送信後に届く。pending state を差し替えていたため *正当な*
+   応答が認証失敗し、ログには「authentication failed」と出た（race なのに攻撃に見える）。
+   → 直近数回の attempt を世代 id 付きで保持して解決。
+2. **順序が乱れた応答が確立済み session を巻き戻せた**。両端が別 session を持ち、以後
+   全フレームが認証失敗。→ 世代 id が現在以上のときだけ採用。
+
+### CI が見つけた実バグ 1 件
+
+**`nbb.edn` の `:deps` が nbb に `bb`（babashka）を起動させていた。** 初回 CI が
+`/bin/sh: 1: bb: not found` で落ちた — ローカルは全部 green だったが、それは**この
+workstation に bb が入っていたから**。bb は ADR-2607173000 で script host として退役
+済みなので、依存していたこと自体が誤り。両 repo の `nbb.edn` から `:deps` を外し
+（sibling は `--classpath` で渡す、元々全ての documented invocation がそうしていた）、
+**PATH から bb を除いた状態で再検証**して green を確認した。教訓: 「ローカルで通った」は
+「CI で通る」の証拠にならない — ツールの有無が環境差として効く。
+
+### 性能（実測、都合の良い数字ではない）
+
+512 byte payload / packet: nbb + node provider **6–9 ms**、JVM + JCA **1.5–1.9 ms**、
+IK handshake は 150 ms / 75–110 ms。**約 100–600 packets/s**。raw OpenSSL は AEAD
+0.08 ms・DH 0.5 ms なので **暗号がボトルネックではない** — 残りは byte-vector ↔
+platform buffer の marshalling と interpreted glue。handshake / 制御 / ssh・RPC 級の
+トラフィックには十分、bulk 転送には不足。次手は hot path を platform buffer のまま
+通す（port 境界の内側なので protocol core は変わらない）か shadow-cljs で compile。
+
+測定が設計を変えた例: `@noble/curves` の X25519 は **1 DH 27 ms**（raw `node -e` でも
+再現したので nbb の所為ではない）で event loop を実際に飢餓させた。よって agent は
+`noise.provider.node`（Node/OpenSSL）を使い、noble provider は browser 用に残す。
+
+## 正直な gap
+
+- **netmap は local EDN file 読みで、署名を検証していない**（shape 検証のみ）。
+  最重要の残穴。file を書ける者が権限を持ててしまう。
+- **実 NAT での測定なし**。E2E の direct 経路は loopback なので hole punch *プロトコル*
+  の検証であって、特定 NAT の成否ではない。両側 symmetric NAT は構造上抜けず relay に
+  留まる（正しい挙動）。`disco/path-report` と `stun/candidates` の `:symmetric?` が計器。
+- **L3/TUN 面は無い**。service session を運ぶだけで network interface を提供しないので、
+  `100.x.y.z` を丸ごと routing する VPN の drop-in ではない。`:node/overlay-ip` は
+  MagicDNS の命名に使い、packet routing には使っていない。
+- `netmap/permitted?`（port 単位）/ `netmap/sessionable`（inbound-only edge）は実装・
+  test 済みだが agent はまだ enforce していない（`dialable`/`:overlay` のみで判定）。
+- rekey は `:rekey-due` として報告され session は正しく expire するが、agent は expiry
+  前の能動的 re-handshake をまだしない（180 s 境界で次の dial までギャップ）。
+- relay は netmap の先頭 1 本を使う。`relay/home` は latency 選択を実装済みだが
+  agent が relay mesh を probe していない。
+
+### この ADR の検証が **カバーしていない** 同 repo 内の並行作業（2026-07-27 時点）
+
+`kekkai-node` の working tree には別セッションが進行中の実装がある: `src/kekkai/node/packet.cljc`
+/ `packet_bridge.cljs` / `test/kekkai/node/packet_test.cljc`（L3 packet plane）、
+`platform/{android,apple}`、`docs/`、`kotoba/kekkai/packet_plane.kotoba`、
+`kekkai-tun-agent.example.edn`、`scripts/{build-android-packet-plane.sh,verify-packet-plane.mjs}`。
+**これらは本 ADR の測定・commit のどちらにも含まれない**（未検証のものを検証済みの主張の
+下に push しないため未 commit のまま残した）。着地させる担当者への申し送り:
+
+1. packet plane を commit するとき、README の「No L3/TUN plane」gap を必ず書き換える
+   （今の README は commit 済み状態としては正しいが、packet plane が入った瞬間に自己矛盾する）。
+2. `scripts/build-android-packet-plane.sh` と `scripts/verify-packet-plane.mjs` は
+   本 workspace の「`.sh` / `.mjs` を新規に書かない、nbb で書く」規則（CLAUDE.md）に反する。
+3. `src/kekkai/node/signed_netmap.cljs`（Ed25519 envelope 検証）は実装済みだが
+   `agent/load-netmap` が呼んでいない。下記 resume point の 1 番目がこれ。
+
+### Resume point（次に手を付ける具体的な順序）
+
+```
+cd orgs/kotoba-lang/kekkai-node
+# classpath は src:test:../bytes/src:../noise/src:../org-ietf-dns/src:../org-ietf-turn/src
+nbb --classpath <上記> run-tests.cljs   # pure core（現状 green）
+nbb --classpath <上記> test/e2e.cljs    # relay + agent 2 台 + MagicDNS の real-socket E2E
+```
+
+1. **netmap 署名検証を agent に配線する（最優先）**: `agent/load-netmap` が
+   `kekkai.node.signed-netmap/verify-envelope` を通るようにし、authority SPKI を config に
+   置く。合わせて kekkai 側（control plane）が署名 envelope を**発行**するようにする。
+   これが閉じるまで「node は netmap file を書ける者を信頼する」状態が残る。
+2. **`netmap/permitted?` / `sessionable` を agent が enforce する**（今は
+   `dialable`/`:overlay` のみ）。port 単位 ACL と inbound-only edge は実装・test 済み。
+3. **expiry 前の能動的 re-handshake**（今は `:rekey-due` を報告するだけなので 180s 境界で
+   次の dial までギャップが出る）。
+4. **実 NAT 測定**: 2 台以上の実 fleet node に agent を置き、`disco/path-report` の
+   `:via` と `stun/candidates` の `:symmetric?` を記録する。これが取れるまで hole punching の
+   成功率は不明のまま。
+5. **throughput**: hot path を platform buffer のまま通す（port 境界の内側で完結）か
+   shadow-cljs で compile。現状 ~100–600 pkt/s。
+6. murakumo overlay（共有 `--auth-key` + AES-GCM）からの移行と、Tailscale SSH 依存の解消は
+   1 と 4 が終わってから。
+
+## Consequences
+
+- `kekkai` の charter は変わらない。data plane はこの別 repo が持ち、control plane は
+  引き続きパケットを運ばない。kekkai README の残タスク「WireGuard データ面
+  エージェントとの netmap 受け渡し」はこの ADR で解消（受け渡し形式 = `:netmap/*` EDN）。
+- `murakumo` の overlay 封緘（共有 `--auth-key` + AES-GCM）は、この 2 repo に置き換える
+  移行対象になる。murakumo 側の relay / QUIC driver / cert 運用は資産として残る。
+- 本番の Tailscale 依存（Tailscale SSH での fleet ops）は **まだ外れていない**。
+  外すには上記 gap のうち netmap 署名検証と実 NAT 測定が先。
+")))

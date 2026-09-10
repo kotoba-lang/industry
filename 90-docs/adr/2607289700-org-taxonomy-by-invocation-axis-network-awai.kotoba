@@ -1,0 +1,1118 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607289700-org-taxonomy-by-invocation-axis-network-awai")
+  (:adr/title "ADR-2607289700: org 分類軸を「目的(公益/事業)」から「起動主体(organism/actor/service)」へ移し、network-awai (AWAI Network, L.L.C.) を営業主体 org として追加する")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-28")
+  (:adr/last-verified "2026-07-28")
+  (:adr/last_verified "2026-07-28")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "org-taxonomy-invocation-axis")
+
+  (:adr/authoritative_for
+  (vector "新規 repo がどの GitHub org に属するかの判定軸 — 目的軸(公益/事業)ではなく起動主体軸(organism/actor/service)"
+   "6 org それぞれの受け入れ境界: kotoba-lang / etzhayyim / cloud-itonami / gftdcojp / network-awai / com-junkawasaki"
+   "network-awai org = AWAI Network, L.L.C.(デラウェア LLC、etzhayyim 傘下の営業主体)のコード側対応物であること"
+   "Awai network 法人で動く 7 ドメイン(itonami.cloud / murakumo.cloud / isekai.network / babiniku.net / shinshi.club / aozora.app / kotobase.net)の repo 所属"
+   "adult 事業が Charter Rider v2.0 に違反しないこと、および adult repo の所属先が network-awai であること"
+   "ai-gftd-* prefix の意味の終了 — prefix は vendor 留保マーカーではなくなり、bare name へ rename する"
+   "jk-luxury org の解散方針"))
+
+  (:adr/supersedes (vector "adr-2606302300-org-taxonomy-4-orgs"))
+  (:adr/superseded-by (vector))
+  (:adr/superseded_by (vector))
+
+  (:adr/related
+  (vector "adr-2607289600-repo-taxonomy-three-planes"
+   "adr-2607012100-cloud-itonami-org-split"
+   "adr-2607261601-etzhayyim-org-reorg-audit"
+   "adr-2607242100-cloud-itonami-awai-network-operator-change"
+   "adr-2607242600-cloud-itonami-awai-gftd-payment-collection"
+   "adr-2607269500-two-entity-hiring-structure-us-first"
+   "adr-2607023000-ka-creative-craft-libs-isco-decomposition"
+   "manifest/repo-taxonomy.edn"
+   "manifest/kotoba-boundaries.edn"))
+
+  (:adr/body
+  "# ADR-2607289700: org 分類軸を起動主体へ移し、network-awai を営業主体 org として追加する
+
+**Status**: accepted
+**Date**: 2026-07-28
+**Deciders**: Jun Kawasaki
+**Supersedes**: ADR-2606302300 (4-org taxonomy)
+
+## Context
+
+ADR-2606302300 は org を **目的軸**(公益=etzhayyim / 事業=gftdcojp / library=kotoba-lang /
+cloud+data=com-junkawasaki)で切っていた。この軸は実装形態を決めないため、実測で破綻している:
+
+| org | 総数 | 目的軸が想定する中身 | 実測 (`manifest/repo-taxonomy.edn`) |
+|---|---:|---|---|
+| etzhayyim | 347 | 公益 agent | organism **3** / actor 36 / **lib 87** / corpus 20 / unclassified 58 |
+| gftdcojp | 66 | 商用 product | service **4** / actor 3 / app 6 / lib 6 / tombstone 11 |
+| cloud-itonami | 1597 | (ADR-2607012100 で例外的に追加) | actor 1050 / organisation-record 323 / app 22 / lib 28 |
+
+etzhayyim は 612 repo 中 466 が library であり (ADR-2607261601 の実測)、「公益かどうか」は
+repo が何であるかを教えてくれない。同じ理由で `ai-gftd-` prefix も破綻した — この prefix は
+本来「規制・Charter 上 gftd 事業体に留保する」マーカーだったが (ADR-2606302300
+`:repo-creation-check`)、現在 59 件に付いており、そのうち規制留保が理由なのは 6 件にすぎない。
+残りは creative・lib・weights・tombstone が prefix を惰性で引きずっている。
+
+さらに 2026-07-24〜26 に法人構造が変わった:
+
+- **AWAI Network, L.L.C.**(デラウェア LLC)が cloud-itonami の operator になった
+  (ADR-2607242100)、収納代行を持つ (ADR-2607242600)、米国側 principal である
+  (ADR-2607269500)
+- **Gftd Japan K.K.** が日本の運営法人 (ADR-2607269500)
+- GitHub org `network-awai` を 2026-07-26 に作成済み (本 ADR 執筆時点で 0 repo)
+
+法人が増えたのに org 軸が旧構造のままだったため、Awai network 法人で動くプロダクトの
+repo が gftdcojp と jk-luxury に散在している。
+
+## Decision
+
+### D1. org の判定軸は「起動主体 × 事業主体」の 2 軸（2026-08-03 改訂）
+
+ADR-2607289600 が確立した **runtime 面 `:repo/kind`** から導かれる**起動主体**
+（誰が起こすか）を第一軸に採る。「誰が起動するか」は repo 内の証拠から機械判定でき、
+目的の解釈に依存しない。
+
+**ただし起動主体だけでは org は決まらない。** 第二軸として**事業主体**
+（どの法人の事業か）を対等に置き、**org = f(起動主体, 事業主体)** とする:
+
+| | religious | security | consumer network | OSS / library | personal |
+|---|---|---|---|---|---|
+| **resident**（自分の loop と clock を持つ） | **etzhayyim** | — | **network-awai** | — | com-junkawasaki |
+| **on-demand**（呼ばれて動く） | **cloud-itonami** | **gftdcojp** | **network-awai** | kotoba-lang | com-junkawasaki |
+| **none**（lib / corpus） | — | — | — | **kotoba-lang** | **com-junkawasaki** |
+
+| org | 法人格 | 起動主体 | 事業主体 |
+|---|---|---|---|
+| **kotoba-lang** | —（OSS） | none / on-demand | 言語・ライブラリ |
+| **etzhayyim** | 宗教法人（任意団体、did:web:etzhayyim.com） | **resident** | 宗教 |
+| **cloud-itonami** | —（AGPL OSS fleet） | **on-demand** | 宗教核の基盤・産業 actor |
+| **gftdcojp** | Gftd Japan K.K. | on-demand | **B2B/B2G security** |
+| **network-awai** | **AWAI Network, L.L.C.**（DE） | resident / on-demand | **consumer network**（p2p / crypto / adult / creative） |
+| **com-junkawasaki** | 個人 | 任意 | cloud + data + 個人研究 |
+
+判定手順: `:repo/kind` を `manifest/repo-taxonomy.edn` から引いて起動主体を、
+blueprint / 運営ドメイン / 収納主体から事業主体を決め、上表で org を引く。
+
+**なぜ 2 軸にしたか（2026-08-03、証拠ベース再判定の結果）。** 初版の D1 は起動主体
+1 軸で org を決め、第二軸は「kind が `service` の場合のみ」要るとしていた。これは
+**resident kind でも成り立たない**ことが実測で分かった: `cloud-itonami/yukkuri` は
+`clj/src/yukkuri/cron.cljc` + `clj/src/yukkuri/aozora.cljc` + `did:web:yukkuri.gftd.ai` を
+実装した正真正銘の resident organism で、9 つの登録 organism identity の 1 つ
+（`yukkuri-organism.aozora.app`）でもある。1 軸の D1 に素直に通すと **etzhayyim（宗教法人）
+に落ちる**が、yukkuri は AWAI Network, L.L.C. が運営する consumer creative product で
+あって宗教法人の資産ではない。**自起動することは宗教法人の資産であることを意味しない。**
+
+同じ理由で、逆向きの誤配置も 1 軸では防げない。`cloud-itonami/yomi` は README で
+\"News Intelligence artificial organism\" と名乗るが heartbeat も resident loop も持たない
+request-scoped な StateGraph actor で、on-demand × 宗教 → cloud-itonami が正しい。
+2 軸ならどちらも一意に決まる（上表の ✅ 3 例）。
+
+**第一軸を機械判定するときは宣言でなく実装を見る**（`scripts/organism-readjudicate.cljs`）。
+README 宣言ベースの判定は取りこぼすより**過大報告**する — 実測では宣言だけの
+`yomi` / `kyoninka` / `sng` が 3 件、実装だけの `yukkuri` が 1 件だった。
+
+### D2. network-awai — Awai network 法人で動く 7 ドメイン
+
+以下は AWAI Network, L.L.C. が運営主体であり、repo も network-awai org に置く:
+
+| ドメイン | repo | 現 org |
+|---|---|---|
+| itonami.cloud | `cloud-itonami` | gftdcojp |
+| murakumo.cloud | `cloud-murakumo` | gftdcojp |
+| isekai.network | `network-isekai` | gftdcojp |
+| kotobase.net | `net-kotobase` | gftdcojp |
+| aozora.app | `app-aozora` | gftdcojp |
+| babiniku.net | `net-babiniku` | jk-luxury |
+| shinshi.club | `club-shinshi` | jk-luxury |
+
+**org 名 `cloud-itonami` と product repo `cloud-itonami` の衝突は rename で解かない。**
+前者は OSS 基盤 fleet の org、後者は itonami.cloud の business-os であり、
+移送後のパス `orgs/network-awai/cloud-itonami` で一意に区別できる。ADR-2607289600 が
+記録した名前衝突 (org 名かつ product 名かつ blueprint catalog 名) はこれで 2/3 が解消する。
+
+随伴 repo (同一ドメインのサテライト) も同時に移す:
+`aozora-appview` / `aozora-design-system` / `aozora-engine` / `aozora-yoro-ui` /
+`app-aozora-svelte` / `net-kotobase-ipfs` / `net-isekai-gen` / `local-murakumo` /
+`cloud-murakumo-market-analyst` / `cloud-murakumo-market-intel` / `club-shinshi-app` /
+`nexus-x402` (x402 = crypto 決済プロトコル、p2p/crypto 軸に該当)。
+
+### D3. adult は Charter Rider v2.0 に違反しない — network-awai に置く
+
+**オーナー判断 (2026-07-28): adult 事業は Charter Rider v2.0 §2 のいずれの条項にも違反しない。**
+したがって `orgs/gftdcojp/ai-gftd-livecam/NOT-MIGRATED-CHARTER-VIOLATION.md.edn` の
+判定は**失効**であり、当該マーカーファイルを削除する。ADR-2606302300 が
+`:axis-b-charter-rider-v2` の worked example として livecam を挙げていた記述も、
+本 ADR による supersede に伴い根拠を失う。
+
+**補足 (2026-07-28 実測)**: `pornhub` / `exoclick` のマーカーは当初から 「**NOT a Charter Rider §2 violation**、仏教的観点から adult は中立、規制対応 (年齢確認義務・プロバイダ責任制限法) のため vendor 残置」と書かれており、オーナー判断と既に一致していた。charter 違反を主張していたのは `livecam` の マーカーだけで、しかも 8 条項を列挙するのみで該当条項を特定していなかった。したがって撤去対象は livecam の 1 件、pornhub / exoclick は規制根拠を保持したまま operator 行のみ訂正する。
+
+adult repo は consumer network 事業として network-awai に置き、bare name に rename する:
+
+| 現 repo | 移送先 | rename |
+|---|---|---|
+| `gftdcojp/ai-gftd-livecam` | network-awai | `livecam` |
+| `gftdcojp/ai-gftd-pornhub` | network-awai | `pornhub` |
+| `gftdcojp/ai-gftd-exoclick` | network-awai | `exoclick` |
+| ~~`gftdcojp/ai-gftd-deai`~~ | **移送しない** | 実体確認の結果 adult 事業ではなかった — 下記「実施状況」参照 |
+
+### D4. `ai-gftd-` prefix を廃止し bare name にする
+
+prefix の本来の意味 (vendor 留保マーカー) は D1 の org 軸に吸収されたので、
+**prefix は情報を持たなくなった**。CLAUDE.md の「`-clj` suffix 禁止 — 言語は package identity
+ではない」と同じ論法で、**vendor 名も identity ではない**。59 件すべてから prefix を外す。
+
+裏付け: security プロダクトの**デプロイ先 DNS は既に bare name** である
+(`arms.gftd.ai` / `kakure.gftd.ai` / `mamori.gftd.ai` / `stripe.gftd.ai`)。
+bare name への rename は実運用 identity との一致でもある。
+
+**gftdcojp に残す = B2B/B2G security 9 件** (すべて `ai-gftd-` を外す):
+
+| 現名 | 新名 | 中身 | 面 |
+|---|---|---|---|
+| ai-gftd-arms | `arms` | 銃器 ID 認証 (軍・警察・許可所持者、chain of custody) | B2G |
+| ai-gftd-defence | `defence` | ITAR/ECCN 輸出管理・契約 FSM・audit-chain receipts | B2G |
+| ai-gftd-cyber-drill | `cyber-drill` | OT サイバーセキュリティ訓練 (WebVR) | B2B |
+| ai-gftd-kabuto | `kabuto` | attack-graph + 全世界対策ソリューション知識グラフ | B2B |
+| ai-gftd-tia | `tia` | Threat Intelligence Agent (なりすまし巡回・通報) | B2B/B2C |
+| ai-gftd-mamori | `mamori` | privacy guardian + ToS 不公正スコアラ | B2C/B2B |
+| ai-gftd-kakure | `kakure` | personal data exposure removal | B2C |
+| ai-gftd-misogi | `misogi` | reversible macOS hygiene console (deny-by-default) | B2B |
+| ai-gftd-smishing | `smishing` | smishing actor | B2B |
+
+`cloud-mamori` は同名だが**別プロダクト**である (実体確認 2026-07-28)。統合しない — 下記「mamori は統合しない」節を参照。
+
+### D5. creative は既に cloud-itonami にある — prefix だけ外す
+
+**実測 (2026-07-28、git remote で確認): creative 系 10 件は既に cloud-itonami org へ移送済み**
+(`animeka` `mangaka` `dougaka` `dougaka-kagaku` `dougaka-kodomo` `dougaka-vector`
+`yukkuri` `syosetsuka` `ongakuka` `gameka`)。ADR-2607023000 が定めた 3 レイヤ分解
+(技芸=kotoba-lang / 職能=cloud-itonami-isco / 商売=gftdcojp) のうち「商売レイヤは gftdcojp」
+という割当は、creative については**既に実態が cloud-itonami に移っている**。
+本 ADR はこの実態を追認し、当該セルを訂正する。
+
+gftdcojp に取り残されている 2 件も cloud-itonami へ移す: `ai-gftd-isekai`(→ isekai.network
+本体 `network-isekai` は network-awai。この repo は engine 側なので要判断) /
+`ai-gftd-ghosthacker-shiropico`(→ 作品 corpus、`ghosthacker-shiropico-assets` と統合判断)。
+
+cloud-itonami 内の `ai-gftd-*` 21 件のうち **actor は 2 件のみ** (`ai-gftd-itonami` /
+`ai-gftd-newscaster`、いずれも governor 実装あり。前者はテスト 20/69 assertions 通過)。
+残り 19 件の内訳は docs 6 / unclassified 8 / lib 3 / app 1 / tombstone 1 であり、
+**blueprint.edn を 0/21 が持たず、`kotoba-lang/industry` registry.edn の 459 entry にも
+0 件しか載っていない** = cloud-itonami の actor 契約に未登録。prefix を外すと同時に
+blueprint 起票 (actor として残すもの) と retire (docs/tombstone) を仕分ける。
+
+### D6. jk-luxury は解散する
+
+4 repo のうち `net-babiniku` / `club-shinshi` / `club-shinshi-app` は D2 により network-awai へ。
+残る `jk-corp` は法人記録なので com-junkawasaki へ移すか、network-awai の
+organisation-record として置くかを別途判断する。
+
+### D7. etzhayyim は organism のみ — ADR-2607261601 より厳しい
+
+ADR-2607261601 (accepted) は 612 entity の移行先を確定済み
+(cloud-itonami 220 / kotoba-lang 108 / gftdcojp 64 / stay 191 / stay-authority 11 / delete 1)。
+**本 ADR の D1 はその stay 191 をさらに絞る**: 宗教核であっても「呼ばれて動く actor」は
+cloud-itonami であり、etzhayyim に残るのは `organism` = 自分で起きるものだけである。
+
+現在 organism と判定されているのは 3 件 (`com-etzhayyim-ibuki` / `-kyoninka` / `-sng`)。
+ただし ADR-2607289600 の既知の限界 5 のとおり **organism 判定は README 宣言ベース**なので、
+heartbeat 実装を持ちながら宣言していない repo を取りこぼしている。移送前に
+`80-data/system/artificial-organism-actors.json` (9 identity) と突き合わせて再判定する。
+**この再判定が終わるまで etzhayyim からの大量移送は実行しない** (D9)。
+
+etzhayyim が organism のみになれば `com-etzhayyim-` prefix も情報を持たないので、
+D4 と同じ理由で bare name にする (`ibuki` / `kyoninka` / `sng`)。
+
+### D8. 移送しないもの (現状維持)
+
+`kotoba-lang` 1763 repo と `cloud-itonami` の taxonomy 系 1388 repo
+(`isic-` / `isco-` / `lei-` / `assoc-` / `jsic-` / `cofog-` / `unspsc-` / `iso3166-`) は
+既に軸に適合しているので触らない。taxonomy prefix は role リンクの正本
+(ADR-2607289600 D4) なので **prefix 廃止 (D4) の対象外**である — これは vendor 名ではなく
+分類標準コードであり、identity を持つ。
+
+### D9. 実行順序 — 影響範囲の小さい順に 4 phase
+
+各 phase は west.yml の **single-entry commit** で pin を進める
+(CLAUDE.md「wholesale 再生成は禁止」。rename は `gen-west-manifest.cljs --entry <name>`)。
+
+1. **Phase 1 — network-awai を埋める** (0 repo なので衝突リスクなし): D2 の 7 ドメイン + 随伴 — **実施済み (2026-07-28)。下記「実施状況」参照**
+2. **Phase 2 — adult 4 件**: D3。livecam の CHARTER-VIOLATION マーカー削除を含む
+3. **Phase 3 — ai-gftd- prefix 廃止**: D4 security 9 + D5 cloud-itonami 側 21
+4. **Phase 4 — etzhayyim**: D7 の organism 再判定が終わってから着手
+
+## 実施状況
+
+### Phase 1 — 完了 (2026-07-28、main commit `bbf80dfb389`)
+
+19 repo を network-awai へ transfer し、west 登録を追随させた。全件 private のまま
+(visibility 無変更)。org 側実測 `total_private_repos=19`、`public_repos=0`。
+
+| 内訳 | 件数 | repo |
+|---|---:|---|
+| 7 ドメイン | 7 | cloud-itonami / cloud-murakumo / network-isekai / net-kotobase / app-aozora / net-babiniku / club-shinshi |
+| aozora サテライト | 5 | aozora-appview / aozora-design-system / aozora-engine / aozora-yoro-ui / app-aozora-svelte |
+| murakumo サテライト | 3 | local-murakumo / cloud-murakumo-market-analyst / cloud-murakumo-market-intel |
+| その他 | 4 | net-kotobase-ipfs / net-isekai-gen / club-shinshi-app / nexus-x402 |
+
+**west.yml は生成器を通していない。** 対象 19 repo のローカル checkout は
+agent/* や codex/* の WIP ブランチ上にあり、`gen-west-manifest.cljs` は
+`working-head` (= ローカル HEAD) で pin するため、再生成すると pin を静かに書き換える。
+**実測: 抜き取った 9 件中 8 件で local HEAD != 既存 pin。** CLAUDE.md が記録する
+「pin 退行の罠」そのものなので、正経路である「当該 entry の行だけ編集」に従い
+path / remote / groups のみを書き換え、revision は一切触っていない。
+
+検証 (すべて実測):
+- **name -> revision の対応が origin/main と完全一致** = pin 変更 0 件
+- project 数 3830 で不変、旧 path 残存 0、remote 定義 6 -> 7
+- `west list` が 19 件すべて orgs/network-awai/* として解決
+- 移送後の remote で実 `git fetch` が成功 (exit 0、`ls-remote` が HEAD を解決)
+
+ローカル checkout は `mv` で移動済み (ワーキングツリーごと保持したので未コミット
+WIP は無傷 — net-kotobase 74 件 / club-shinshi 58 件 / nexus-x402 13 件 /
+app-aozora 12 件 / cloud-murakumo 7 件 / net-babiniku 2 件)。remote URL も張り替え済み。
+
+### Phase 2 — 完了 (2026-07-28、main commit は下記)
+
+adult 3 件を network-awai へ transfer し bare name へ rename、marker を処理した。
+全件 private のまま。
+
+| 旧 | 新 | pin | marker 処理 |
+|---|---|---|---|
+| gftdcojp/ai-gftd-livecam | network-awai/livecam | 0f9ecd9a25 -> d97e20f9df | CHARTER-VIOLATION を**削除** |
+| gftdcojp/ai-gftd-pornhub | network-awai/pornhub | ad1b0d46f6 -> 524d13dc47 | VENDOR-REGULATORY の operator 行のみ訂正 |
+| gftdcojp/ai-gftd-exoclick | network-awai/exoclick | 1e52aa6db4 -> d95aa8f6ed | VENDOR-REGULATORY の operator 行のみ訂正 |
+
+pin は marker commit の分だけ前進させた。**3 件とも `status=ahead / ahead_by=1 /
+behind_by=0` かつ default branch (main) の tip** であることを GitHub API で確認済み
+(存在・default branch 到達性・前進の 3 条件を満たす)。他 entry の path -> revision は
+完全一致、project 数 3831 で不変。
+
+### `ai-gftd-deai` は移送しない — 実体が adult 事業ではなかった
+
+D3 の当初リストに入れていたが、移送前の実体確認 (ローカル checkout が 0 file だったため
+GitHub 側を直接確認) で **`com-etzhayyim-app-deai` である**ことが判明した:
+
+- `README.edn`: `:name \"com-etzhayyim-app-deai\"` /
+  `:source \"etzhayyim/root/60-apps/etzhayyim-project-deai\"`
+- `CLAUDE.md`: `decom.etzhayyim.ai` — Spirit-in-Physics 研究データ収集フロントエンド。
+  **主目的は研究データ収集**で、出会い・マッチング機能は参加インセンティブ。
+  全データは spirit-in-physics.com (研究 SSoT) に送信される
+
+adult 消費者向け事業ではなく etzhayyim の研究アプリなので、network-awai の
+受け入れ境界 (consumer network + adult) に当たらない。D7 の etzhayyim 再判定
+(Phase 4) と併せて扱うべき対象として未決に送る。**名前 (`deai` = 出会い) だけで
+分類していたら誤配置していた** — ADR-2607289600 D5-1「名前 glob で種別を決めない」の
+実例として記録する。
+
+### Phase 3a — 未決項目のオーナー裁定を反映 (2026-07-28)
+
+オーナー裁定: jk-corp はそのまま残す / ai-gftd-isekai は特別なものが無ければ prune し
+network-isekai に必要なものだけ移動 / deai・manimani は network-awai へ / mamori は統合。
+4 件のうち 3 件を実行し、1 件 (mamori) は前提が成り立たないため実行しなかった。
+
+| 対象 | 実行 |
+|---|---|
+| `jk-corp` | jk-luxury に残置 (裁定どおり)。jk-luxury org は解散せず jk-corp 1 件で存続 |
+| `ai-gftd-deai` | network-awai/`deai` へ transfer + rename |
+| `ai-gftd-manimani` | network-awai/`manimani` へ transfer + rename。**GitHub 側で archived だったため unarchive -> rename -> 再 archive** の順で状態を保存 |
+| `cloud-manimani` / `local-manimani` | network-awai へ transfer (名前は据え置き) |
+| `ai-gftd-isekai` | 著作物 2 点を network-isekai へ移送し、MOVED tombstone を置いて **GitHub archive**。west では `groups: [archived]` (group-filter の `-archived` で既定取得対象外)、pin は tombstone commit へ前進 |
+
+**`ai-gftd-isekai` を削除せず archive にした理由**: 34 file のうち著作物は
+`scenes/isekai-overworld.jsonld` (IslandScene 定義) と `world.cljc`
+(kami-clj survivors コアループ) の 2 点で、これは network-isekai の
+`resources/scenes/` へ移送した。残りは build 成果物 (wasm / svelte 静的 htm) と
+e2e スクリーンショットで再生成可能。ただし本 repo は
+`appview/ai-gftd-wasm-isekai-is3k41w0/wrangler.jsonc` の worker
+`magatama-is3k41w0` の deploy 元であり、**`isekai.gftd.ai` が live か
+この環境から判定できなかった** (DNS は Cloudflare に解決、HTTP は 301 を返すが HTTPS が
+無応答。ただし `mamori.gftd.ai` / `arms.gftd.ai` も同じ挙動だったので環境側の
+問題の可能性がある)。live な deploy 元を不可逆に消す危険があるため archive (可逆) に留めた。
+live でないと確認できた時点で削除してよい。
+
+なお `network-isekai` (1,639 file、physics/realtime backend) と
+`ai-gftd-isekai` (34 file、isekai.gftd.ai のデモ appview) は**重複ではなく別物**
+だった。前者に後者の資産 (`isekai-overworld.jsonld` / `contract.clj` /
+`world.cljc`) は 1 件も存在しなかった。
+
+### `mamori` は統合しない — 同名だが別プロダクトだった
+
+オーナー裁定は「統合」だったが、実体確認の結果 **2 つは重複ではなく別の事業**である
+ことが判明したため実行しなかった。統合すると 2 プロダクトを混同して片方の設計意図を
+失う。
+
+| repo | 実体 | 規模 |
+|---|---|---|
+| `gftdcojp/ai-gftd-mamori` | **mamori.gftd.ai** — privacy data-sharing analyzer + ToS 不公正スコアラ。cookie-consent / iOS・macOS app-privacy の許可をインポートし「誰が自分のデータを受け取るか」を可視化 | `clj/src/mamori/{core,schema,score,taxonomy}.cljc` 計 813 行 + Cloudflare worker |
+| `gftdcojp/cloud-mamori` | **サイバー犯罪・暗号資産盗難の被害者インテークと referral 起草**。etzhayyim の actor クラスタ (助 tasuke / 辿 tadori / malak / crypto-asset-freeze) への照会ドラフトを作るだけで、凍結・送金・提出は一切行わない | `src/cloud_mamori/case.cljc` 91 行 + `docs/adr/0001-architecture.md` |
+
+守 (mamori) という語が両方に合うために同名になっただけで、扱うドメインも参照先も
+別である。**推奨**: `ai-gftd-mamori` を bare name `mamori` に rename し
+(mamori.gftd.ai を所有しているのはこちら、D4 の DNS 一致原則どおり)、
+`cloud-mamori` は被害者インテークであることが分かる名前へ改名する。
+どちらも security 面なので org は gftdcojp のまま。**この改名はオーナー裁定待ち。**
+
+### Phase 3 — 完了 (2026-07-28、main commit は下記)
+
+D4/D5 の `ai-gftd-` prefix 廃止を実行した。**rename のみで、org 移動と retire 判断は
+していない** (D5 が要求する blueprint 起票 / retire の individual 判断は未決 6 のまま)。
+対象は west 登録されていた 54 entry。
+
+| 処置 | 件数 | 内訳 |
+|---|---:|---|
+| bare name へ rename | 46 | gftdcojp 26 / cloud-itonami 20 |
+| role suffix へ rename | 1 | `ai-gftd-murakumo` -> `murakumo-mlx` |
+| rename せず archive | 2 | `ai-gftd-kotoba` / `ai-gftd-kotobase` |
+| 裁定後に archive | 2 | `ai-gftd-kaisya` / `ai-gftd-cyber-drill` (いずれも 2026-07-29) |
+| 既 archive のため据え置き | 3 | `ai-gftd-dogaka` / `ai-gftd-isekai` / `ai-gftd-shinshi` |
+
+rename 47 件は preflight (source が存在し archived でない / target 名が org 内で空き)
+を全件通してから実行し、47/47 成功した。GitHub は rename 後も旧名の redirect を保つ。
+
+**bare name が既に他 repo に取られていた 5 件**を先に判定した (west の `name:` は
+manifest 全体で一意でなければならず、`remote` + `name` から url を組むため
+GitHub の repo 名と一致している必要がある):
+
+| 対象 | 衝突相手 | 実体判定 | 処置 |
+|---|---|---|---|
+| `gftdcojp/ai-gftd-kotoba` | `kotoba-lang/kotoba` | README が「submodule link を切った、別 clone を使え」と述べるだけの **pointer stub、code 0 file** | archive |
+| `gftdcojp/ai-gftd-kotobase` | `kotoba-lang/kotobase` | `MOVED.md.edn` が net-kotobase (現 network-awai) への移設を宣言。`wrangler.jsonc` 自身が「not because this is live」と注記 | archive |
+| `gftdcojp/ai-gftd-murakumo` | `kotoba-lang/murakumo` | 中身は `mlx-distributed/` (MLX tensor-parallel 推論) のみ。相手は WASM mesh control plane で**別物** | `murakumo-mlx` へ rename (CLAUDE.md の role suffix 規則) |
+| `gftdcojp/ai-gftd-cyber-drill` | `cloud-itonami/cyber-drill` | **同一プロダクトの二重抽出**。前者は gftdcojp/ai-gftd-apps-gftdcojp 由来で `:runtime/status :blocked-pending-kami-api-port` (実行不能な保存コピー)、後者は etzhayyim/root 由来で three-renderer WebVR + 鍵ゲート worker を持つ**動く方** | **archive** (2026-07-29 オーナー裁定) |
+| `cloud-itonami/ai-gftd-kaisya` | `cloud-itonami/kaisya` | **同一プロダクトの二重抽出**。前者は Clojure langgraph runtime (`:standalone-ready`)、後者は etzhayyim/root 由来の BPMN 5 点のみ (`:kind :standalone-app-artifact`) | **archive** (2026-07-29 オーナー裁定) |
+
+保留にした 2 件は mamori と同じ「同名だが実体が違う」ではなく **同じものが 2 系統から抽出されて
+両方生き残っている**ケースで、どちらが正本かを決めるのは配置ではなく製品の裁定なので
+機械的な role suffix では逃がさなかった (逃がすと二重管理を固定化する)。
+
+**2 件とも 2026-07-29 のオーナー裁定で archive した。保留は 0 件になった。**
+
+- `ai-gftd-kaisya`: bare name `kaisya` は etzhayyim/root 由来の BPMN 側 (`cloud-itonami/kaisya`)
+  が保持する。archive 側の Clojure langgraph runtime
+  (`clj/src/kaisya/{graphs/registry,server}.cljc`) は消えておらず pin `ab9fe84119` から復元できる
+- `ai-gftd-cyber-drill`: bare name `cyber-drill` は etzhayyim/root 由来で実際に動く方
+  (`cloud-itonami/cyber-drill`、three-renderer WebVR + 鍵ゲート worker `cyber-drill-vendor`)
+  が保持する。archive 側は `RUNTIME-STATUS.edn` 自身が `:blocked-pending-kami-api-port` と
+  宣言する実行不能な保存コピーで、`semiconductor-chem-plant` シナリオ IP は pin `d6bbfcfe02`
+  から復元できる
+
+どちらも west では `groups: [archived]` にして既定取得対象から外した。
+
+既に GitHub archived だった 3 件 (`ai-gftd-dogaka` / `ai-gftd-isekai` /
+`ai-gftd-shinshi`) は rename しなかった。archived repo の rename は
+unarchive -> rename -> 再 archive を要し、**retired identity を書き換える実益がない**。
+
+このうち `ai-gftd-dogaka` と `ai-gftd-shinshi` は **GitHub 上は archived なのに west 側が
+`groups: [gftdcojp]` のままで既定取得対象に残っていた**ので 2026-07-29 に整合させた
+(`groups: [archived]` + `userdata: archived: true`、pin は据え置き)。
+
+結果として `ai-gftd-` を名前に残す repo は 7 件で、**7 件すべてが GitHub archived かつ
+west `groups: [archived]`** になった。稼働中で `ai-gftd-` を名乗る repo は 0 件。
+
+検証 (すべて実測):
+- **west.yml の revision multiset が編集前と完全一致** = pin 変更 0 件。旧 path の
+  revision が新 path にそのまま乗っていることも 1 件ずつ突き合わせ済み
+- project 数 **3832 で不変**、west `name:` の重複 0、rename で新たに生じた
+  dup basename 0 (生成器が org-basename 形に化ける条件に触れていない)
+- `manifest/repos.edn` の `:path-overrides` 108 -> 155 (+47)、`:archived` 10 -> 12 (+2)
+- `gen-west-manifest.cljs --check` は STALE のままだが、**その drift は本変更由来ではない**。
+  生成器出力との diff は origin/main 時点で 308 行あり、本変更後は **195 行に減った**
+  (prefix 除去で dup basename 判定が解消したため)。差分行に本 phase の 47+3 entry は
+  **1 件も現れない**ことを機械確認済み。既存 drift は ADR-2607289600 D9 の記録どおり
+
+**副次修正**: Phase 3a で書いた `ai-gftd-deai` 節に**エスケープしていない二重引用符が
+4 個**混入しており、本 ADR の EDN が `Invalid symbol` でパースできなくなっていた
+(CLAUDE.md が `tos.journal.edn` の事例で警告している破損と同型 — ローダは黙って nil に
+潰すので count 上は気付けない)。本 commit で escape を修正し、`edn/read-string` が
+通ることを確認した。同時に Phase 3a で付け忘れていた `ai-gftd-isekai` の
+`userdata: archived: true` も補った (archived entry の canonical form)。
+
+### 未決 2 / 3 — 決定 (2026-07-29、main commit は下記)
+
+#### `ghosthacker-shiropico-assets` は統合しない — 廃止済みバケットへの dangling ポインタだった
+
+`ghosthacker-shiropico` との統合を検討したが、**統合すると健全な annex に壊れたポインタを
+取り込むことになる**ので archive にした。実測:
+
+- `ghosthacker-shiropico-assets` の 45 blob はすべて **129-137 byte の git-annex ポインタ**で、
+  参照先は既に廃止された別バケット (`s3://ai-gftd-datasets/ghosthacker-shiropico/`、
+  bucket-scoped creds)。現行 dataset の `ASSETS-DATALAD.md` 自身が
+  「**That directory no longer exists on the current machine**」と記録している
+- 一方 42 点の character-ref 画像 (shiro/pico の 12 表情 x 2 + kamishibai) は
+  `cloud-itonami/yukkuri` の `appview/ai-gftd-wasm-yukkuri-y5kk5r1x/svelte/static/img/` に
+  **annex 非依存の実 git blob** (1MB 級、kamishibai 43 + emotions 24) として生存している。
+  これが参照ソースであることは `ASSETS-DATALAD.md` の recovery 記録とも一致した
+- 2 repo のファイル集合の重なりは 45 中 6 (datalad scaffold のみ) で、
+  中身は重複ではなく**世代違い**
+
+`ghosthacker-shiropico` 本体は **com-junkawasaki へ移送**した。D1 の `corpus` -> com-junkawasaki
+にそのまま当たり、姉妹作 `ghosthacker-*` 12 件が既に com-junkawasaki にある
+(`ghosthacker` / `-duet` / `-echoes` / `-family` / `-flow` / `-groove-core` / `-harmony` /
+`-lightning` / `-memorize` / `-timemachine` / `-tuning` / `-vamos`)。D5 の
+「gftdcojp に取り残されている 2 件も cloud-itonami へ移す」のうち本件については、
+同じ D5 の括弧書き「作品 corpus」が正しい行き先を指しており、そちらを採る。
+DataLad dataset なので `:manifest.repos/datalad` のキーも新 path へ移した — **Phase 3 の
+rename でこのキーが 1 件 stale になっていた** (west.yml は entry 行編集なので userdata は
+保たれていたが、生成器を通すと datalad userdata が落ちる状態だった)。repos.edn の
+path キー付き map 全体を監査し、Phase 3 由来の stale はこの 1 件だけと確認済み。
+
+#### `cloud-mamori` -> `cloud-kyusai`
+
+D4 で `ai-gftd-mamori` が bare name `mamori` を取ったので、同名だった別プロダクトを
+改名した。`cloud-kyusai` (救済) は被害者救済という中身をそのまま指し、姉妹 actor の
+和語命名 (助 tasuke / 辿 tadori / 守 mamori / 禊 misogi / 隠 kakure) とも揃う。
+`cloud-` prefix は portfolio 命名 (`cloud-itonami` / `cloud-murakumo` / `cloud-manimani`)
+を踏襲。中身は**サイバー犯罪・暗号資産盗難の被害者インテークと referral 起草**で、
+凍結・送金・提出は一切しない (すべて `:pending-approval` 起点で人間が transition する)。
+
+### 未決 6 — 決定 (2026-07-29)。D5 の前提が誤っていたので訂正する
+
+#### 訂正: blueprint.edn の不在は「actor 契約に未登録」の証拠ではない
+
+D5 は「cloud-itonami 内 21 件は blueprint.edn を 0/21 が持たず registry.edn 459 entry にも
+0 件しか載っていない = cloud-itonami の actor 契約に未登録」と書いたが、**これは誤りだった**。
+実測 (2026-07-29):
+
+- ローカルにある **blueprint.edn 1,379 件はすべて `cloud-itonami-*` 命名の repo** に属する
+  (isco / isic / assoc / municipality / unspsc / jsic / ドメインサービス)
+- `kotoba-lang/industry` の **registry.edn 459 entry の `:business-id` も 459/459 が
+  `cloud-itonami-*`**
+- **`gftd-talent-actor` — CLAUDE.md が canonical actor 3 例の 1 つとして名指しする repo —
+  も blueprint.edn を持たない**
+
+つまり blueprint.edn + registry.edn は **`cloud-itonami-*` blueprint フリートの契約**であって、
+名前付きプロダクト actor の契約ではない。blueprint.edn が無いことは、その repo が actor か
+どうかについて何も言っていない。**したがって D5 が想定した「blueprint 起票」という作業は
+これらの repo には存在しない。** 未決 6 は retire 判断だけに縮む。
+
+#### 21 件の内訳 (実測、2026-07-29)
+
+| 分類 | 件数 | repo | 根拠 |
+|---|---:|---|---|
+| **retire (archive 実施)** | 2 | `ads` / `oshikatsu` | 自身の `RUNTIME-STATUS.edn` が `:retired` / `:contract-only` を宣言。デプロイ面なし |
+| 既 archive | 1 | `ai-gftd-kaisya` | 二重抽出の裁定 (2026-07-29) |
+| actor (governor あり) | 2 | `itonami` / `newscaster` | `src/*/governor.cljc` + governor contract test |
+| actor 形 (governor なし、Python 系譜) | 1 | `jp-ashiba` | `actor/actor-manifest.jsonld` + cljc 8 モジュール。`:actor/status :canonicalized-in-flat-repository` |
+| app / library | 14 | `media` `news` `nemuri` `dougaka` `dougaka-kagaku` `dougaka-kodomo` `dougaka-vector` `gameka` `hakken` `mangaka` `animeka` `ongakuka` `syosetsuka` `yukkuri` | 実装 + テスト + (一部) CF worker を持つ稼働物。actor 契約の対象ではない |
+| data corpus | 1 | `pachinko` | 5 blob、実体は `data/topics/yukkuri-pachinko-topics.jsonld` 1.3MB のみ。yukkuri 向けのトピック源 |
+
+retire した 2 件はどちらも `NOT-MIGRATED-VENDOR-REGULATORY` (景表法・特商法 / 資金決済法、
+Settlement 軸で gftd が保持) の記録を持つので、削除でなく archive にして記録を保全した。
+
+**残る作業は「app / library 14 件を actor に仕立てる」ことではない。** それらは actor では
+ないというのが実測の答えで、D5 が二択 (actor か retire か) にしたのが誤りだった。
+`jp-ashiba` を cloud-itonami の governor 契約に載せるかどうかだけが本当の未決として残る。
+
+### Phase 4 前段 — organism 再判定を実施 (2026-07-29)。D7 は現状のままでは実行できない
+
+D9 は Phase 4 を「D7 の organism 再判定が終わってから着手」と条件付けていた。再判定を
+実施した結果、**D7「etzhayyim には artificial organism の自律 actor のみ」は repo レベルの
+フィルタとしては実行不可能**であることが分かった。
+
+#### 実測
+
+`80-data/system/artificial-organism-actors.json` に登録された organism は **9 件**で、
+すべて **プロダクト単位の did:key identity** (pds.aozora.app、`<product>-organism.aozora.app`):
+`itonami` / `manimani` / `isekai` / `shinshi` / `yukkuri` / `mangaka` / `babiniku` /
+`dougaka` / `animeka` — 全件 `state: registered`。
+
+- **9 件中 7 件が etzhayyim 側に repo を持つ** (`com-etzhayyim-app-<product>` および
+  `com-etzhayyim-<product>`)。持たないのは `shinshi` / `babiniku` の 2 件
+- しかし **1 organism は 2〜5 repo に分散し、2〜4 org にまたがる**。例: `isekai` は
+  `network-awai/network-isekai` + `kotoba-lang/kami-app-isekai` + `gftdcojp/ai-gftd-isekai`(archived)
+  + `etzhayyim/com-etzhayyim-isekai` + `etzhayyim/com-etzhayyim-app-isekai` の 5 箇所
+- **ADR-2607261601 の監査コーパス (612 entity、`90-docs/audits/etzhayyim-reorg-audit.datoms.edn`) は
+  organism 由来の etzhayyim repo を全件 `stay` に分類している** (`com-etzhayyim-app-itonami`
+  `com-etzhayyim-itonami` `com-etzhayyim-app-isekai` `com-etzhayyim-isekai`
+  `com-etzhayyim-app-manimani` `com-etzhayyim-app-yukkuri` `com-etzhayyim-app-mangaka`
+  `com-etzhayyim-app-dougaka` `com-etzhayyim-app-animeka` — すべて stay)
+- コーパスの移行先内訳 (実測クエリ): cloud-itonami 220 / stay 207 / kotoba-lang 108 /
+  gftdcojp 64 / stay-authority 11 / gftdcojp-or-stay 1 / delete 1 = 612
+
+#### 結論 — D7 を ADR-2607261601 の stay 集合と読み替える
+
+organism registry は**プロダクト単位**、D7 は**repo 単位**の規則なので、そのままでは
+噛み合わない。organism 由来の etzhayyim repo は監査でも全件 stay なので、D7 を機械適用
+しても 1 件も動かない。一方 D7 を字義通り「organism 以外は出す」と読むと、残り約 198 の
+stay repo (care / 相互扶助 / 憲章統治 / 観測 / 布教 / ファクトチェック / 宗教法務 /
+メンバー識別) まで追い出すことになり、**etzhayyim が宗教法人であることと矛盾する**。
+
+したがって **D7 は「etzhayyim = 宗教核 + organism の自律 actor」= ADR-2607261601 の
+`stay` + `stay-authority` (218 件) と読む**。D7 の「organism の自律 actor のみ」という
+記述は、この点で ADR-2607261601 を上書きしない。Phase 4 の実体は
+**ADR-2607261601 の Phase 1-3 (kotoba-lang 108 / cloud-itonami 220 / gftdcojp 64 = 392 repo の移送)**
+であり、その前提として同 ADR が挙げる `manifest/kotoba-boundaries.edn` の
+`:domain-actors` 更新が必要。本 ADR ではそこまで実行しない。
+
+#### 証拠ベースの再判定 (2026-08-03) — 宣言と実装は逆方向にずれていた
+
+2026-07-29 の再判定は **registry (9 identity) と repo 名の突き合わせ**で行った。D9 が
+本来挙げていた懸念 —「heartbeat 実装を持ちながら宣言していない repo を取りこぼして
+いる」— は repo 内実装を走査しないと答えられないので、そこを別に測った
+(`scripts/organism-readjudicate.cljs`、出力 `90-docs/audits/organism-readjudication.datoms.edn`)。
+
+D1 が定める organism の 2 条件を、宣言ではなく repo 内の証拠として別々に測る:
+**(a) 自分で起きる** = `heartbeat` を含むファイル名、または任意ディレクトリの
+`loop|tick|scheduler|cron|daemon.clj[cs]?`。**(b) 自分の did で対外発話する** =
+did 宣言 (`did:web:` / `did:key:`) かつ `publisher|aozora|cacao|pds.clj[cs]?` の実装。
+
+**旧検出器の盲点 2 つを埋めた**: (1) `README.md` / `readme.md` しか読んでいなかったが、
+`README.md` を持たず `README.edn` / `README.md.edn` だけを持つ repo が **150 件**ある
+(本 workspace の EDN-only 規約の帰結)。(2) README 先頭 4096 byte 打ち切り。
+
+実測 (3,632 present checkout / 4,034 west project):
+
+| verdict | 件数 | repo |
+|---|---:|---|
+| organism (自起動 + 自 did 発話 + 宣言) | 1 | `etzhayyim/com-etzhayyim-tomoshibi` |
+| organism-undeclared (実装あり・宣言なし) | 1 | `cloud-itonami/yukkuri` |
+| organism-partial (2 条件のうち 1 つ) | 7 | `cloud-itonami/kaname` `-/kouhou` `-/tashikame` / `etzhayyim/com-etzhayyim-ibuki` `-/root` `-/tamaki` / `gftdcojp/apps-gftdcojp` |
+
+**D9 の懸念は 1 件だけ当たった**: `yukkuri` は `clj/src/yukkuri/cron.cljc` +
+`clj/src/yukkuri/aozora.cljc` + `did:web:yukkuri.gftd.ai` を実装しており、9 identity の
+1 つ (`yukkuri-organism.aozora.app`) でもあるのに、**README.md を持たないため旧検出器から
+構造的に見えていなかった**。
+
+**だが支配的な誤差は逆方向だった。** `repo-taxonomy.edn` が README 宣言だけで
+`:repo/kind \"organism\"` としていた `yomi` / `kyoninka` / `sng` は、**いずれも
+heartbeat も resident loop も持たない**。`yomi` は publisher 実装も無い
+(`src/yomi/` は governor / intelllm / phase / sim / store / synthesis のみ) — README で
+\"News Intelligence artificial organism\" と名乗る request-scoped な StateGraph actor である。
+**README 宣言ベースの分類器は取りこぼすより過大報告する。**
+
+したがって D1 の etzhayyim 境界を証拠で機械適用すると、**残るのは実質 tomoshibi 1 件**に
+なる。これは前節の結論 (D7 は ADR-2607261601 の stay 集合と読む) を、別の測り方から
+裏付ける — 字義通りの organism フィルタは repo レベルでは機能しない。
+
+**`yukkuri` を etzhayyim へ移す判断はしない。** 自起動することは宗教法人の資産である
+ことを意味しない。yukkuri は AWAI Network L.L.C. が運営する consumer creative product で
+あり、D1 の第二軸 (service なら consumer network = network-awai) が優先する。
+**起動主体軸は org を一意に決めない** — これは D1 の限界として記録する。
+
+#### etzhayyim の orphan checkout 116 件を整理 (2026-08-03)
+
+再判定の走査中に、**west に登録されていない `orgs/etzhayyim/com-etzhayyim-*` の
+ローカル checkout が 122 件**残っているのを実測した。うち 116 件は
+`orgs/cloud-itonami/<bare-name>` に twin があり、GitHub 側は既に transfer 済み
+(`gh api repos/etzhayyim/com-etzhayyim-yomi` は `cloud-itonami/yomi` を返す = redirect)。
+west.yml も cloud-itonami 側だけを登録している。つまり**転送完了後に残った古い
+checkout の重複**で、`orgs/etzhayyim` を実態より 2 倍近く大きく見せていた。
+
+削除の前に 1 件ずつ着地判定した (CLAUDE.md「landed だと確信していても archive してから」):
+
+| 判定 | 件数 | 根拠 | 処置 |
+|---|---:|---|---|
+| HEAD が twin と一致 | 71 | `.git` の ref 直読 | 削除 |
+| HEAD がサーバ側で twin に包含 | 29 | `gh api .../compare/<etz-head>...HEAD` の `merge_base == etz-head` | 削除 |
+| HEAD がサーバに存在しない (404) | 14 | 未 push のローカル commit | **保全** |
+| 未コミット WIP あり | 2 | `ipaddress` (RIR datom + ops) / `kawase-yui` (lex/wire 11 file + docs/adr) | **保全** (patch を archive) |
+
+98 件を削除し、`orgs/etzhayyim` の実ディレクトリは **209 -> 111** になった。削除した
+一覧は `.git/stash-archive-2026-08-03-etz-orphan/deleted-orphan-checkouts.txt`。
+
+#### 保全した 16 件は DID シェルだった (2026-08-03) — 誤ペアリングと、その撤回
+
+未 push commit を持つ 14 件と未コミット WIP 2 件を調べたところ、etz 側と live 側は
+ahead/behind ではなく**別系統**で、`compare` API が 404 を返すのはそのためだった。
+
+**最初の判断は誤りだった。** `orgs/etzhayyim/com-etzhayyim-<n>` を bare name で
+`orgs/cloud-itonami/<n>` と突き合わせ、live 側に `.well-known/did.json` /
+`actor-manifest.jsonld` / `.nojekyll` / `src/<n>/murakumo.cljc` が「落ちている」と読んで
+13 repo へ復元 merge した。**実際には落ちていない。**
+
+`gh api repos/etzhayyim/com-etzhayyim-<n>` の redirect 先は
+**`cloud-itonami/<n>-actor`** であって `cloud-itonami/<n>` ではない。つまりあの
+orphan checkout は本 ADR 自身が記録した **did:web actor シェル 15 件**
+（`d41026419fe` で `<name>-actor` として移送済み）で、実装本体 repo の古い版ではなかった。
+同 commit が「bare name 衝突 13 件は『同名の別物』ではなく、実装本体 (bare name) と
+DID シェル (役割違い) の並びの問題だった」と書いていたのは、まさにこの区別である。
+**bare name 突合せはその区別を潰す。**
+
+13 repo すべてで `<n>-actor` 側に `did.json` が実在することを確認したうえで、複製を
+撤去した（`demining` 7 / `graph-sos-intel` 5 / `handotai` 5 / `hc` 3 / `insatsu` 8 /
+`intel` 7 / `jp-ashiba` 4 / `port` 8 / `vessel` 8 / `vin` 7 / `yabai` 64 /
+`tsukuru` 186 / `ipaddress` 22 file）。撤去後の blob 数が復元前と一致することを機械確認
+（`tsukuru` 37 -> 37、`yabai` 1458 -> 1458）。作業 branch は削除済み。
+
+**撤回の過程でもう 1 つ誤った**: 最初 `git revert -m 1 <merge>` を使ったが、worktree の
+base に当該 merge が無く revert が失敗し、続く `commit --amend` が直前の commit を
+書き換えた。結果、13 repo に「Revert ...」と題しながら中身は追加のみという
+**誤解を招く commit** が残った（force-push しないので消せない）。実際の撤去は後続の
+`DID シェルの複製 N file を撤去` commit である。
+
+**残った教訓**: identity 面の証拠が「見つからない」とき、それは欠落ではなく
+**別 repo が所有している**可能性を先に潰す。organism 再判定で `did-declared?` が
+軒並み false だったのも、bare name repo が identity を持たないのは正常だから
+（持っているのは `<n>-actor` 側）であって、証拠の欠落ではなかった。
+
+実際に twin だったのは `junbi` / `sng` / `kawase-yui` の 3 件のみで、いずれも
+内容は完全包含（復元すべきものは無かった）。全 16 件の元履歴は
+`<n>-actor` または twin 側の `rescue/etz-orphan-20260803` に退避済みで、本件の
+撤回では失われない。checkout は削除済み、`orgs/etzhayyim` は **111 -> 95**。
+
+#### `ipaddress` の 70 MB データセットは DataLad へ移さない (2026-08-03)
+
+`data/public-rir.datoms.kotoba.edn`（70 MB）は当初 B2 + DataLad への移行対象として
+記録したが、実体を確認したところ **`ops/public-rir-collection.edn` が毎時 cron
+（`7 * * * *`）で 5 RIR（apnic/ripe/arin/lacnic/afrinic）の delegated-stats から
+`kotoba.lang.internet-intel.collector/collect-rir!` で収集し、`:dedup :content-cid` で
+書き出す派生物**だった。
+
+**DataLad は代替不能な大容量バイナリのためのもので、再生成可能な収集出力はその対象ではない。**
+git にも DataLad にも入れず、収集 op（main に着地済み）から再生成するのが正しい。
+実体は `cloud-itonami/ipaddress-actor` の `rescue/etz-orphan-20260803` に残っている。
+
+#### boundaries の残 drift を解消 (2026-08-03)
+
+`d41026419fe` が `:cell-prefix-routes` の値 57 件を現在の repo 名へ直したが、
+key 集合の不変性だけを検査していたため **値が west に存在しない 6 件が残っていた**。
+実測して直した（key 集合 4/9/3/75 が不変であることは再確認済み、
+`kotoba-boundary-audit.cljs` は `:total 0` で通る）:
+
+| key | 旧値 | 新値 | 根拠 |
+|---|---|---|---|
+| `:primitive-routes` × 3 | `orgs/gftdcojp/app-aozora` | `orgs/network-awai/app-aozora` | D2 Phase 1 で移送済み。同 commit は `:atproto-actors` は直したが `:primitive-routes` を見落としていた |
+| `:cell-prefix-routes` `yorishiro` | `com-etzhayyim-yorishiro` | `com-etzhayyim-app-yorishiro` | west に実在するのは `app-` 付きの方 |
+
+**dangling 2 件（`elv` / `moto` -> `com-etzhayyim-moto`）は撤去した**（75 -> 73 key）。
+この repo は GitHub 上にも存在せず（redirect でなく 404）、`elv` / `moto` を prefix に
+持つ cell も workspace 内に 1 件も無い。所有者がいない prefix にダミーの owner を
+残すより、`prefix-route` を nil に落として `com-etzhayyim-TBD`（未所有マーカー）へ
+流す方が正しい。key 集合を不変に保つのは値の差し替え時の不変条件であって、
+死んだ route を温存する理由にはならない。
+
+なお `scripts/kotoba-boundary-audit.cljs` は `orgs/etzhayyim/` を 2 箇所で
+ハードコードしており（`actor-repo` / `prefix-route`）、値が cloud-itonami の bare name に
+なった今は path を誤って組み立てる。ただし audit 対象の
+`orgs/kotoba-lang/kotoba/crates/kotoba-kotodama` は ADR-2607072000 の Rust 撤去で
+既に存在せず、`:total 0` で通る（読む CI も無い — `.github/workflows/` は
+ADR-2607300900 で空）。**この 4 key は現状どこからも実効的に読まれていない**ので、
+audit ごと retire するかは別途判断する。
+
+#### 再判定の過程で見つかった manifest の実態乖離 (3 件)
+
+Phase 4 に着手する前に潰すべきものとして記録する。**移送より先にこちらを直す** —
+実態と食い違った manifest の上で 392 repo を動かすと乖離が増幅する。
+
+1. **etzhayyim の 5 repo が GitHub 上 archived なのに west が `groups: [etzhayyim]` のまま**
+   (`com-etzhayyim-business_manager` / `-gov_municipality` / `-infra_utility_connect` /
+   `-kotoba-datom` / `-kuni_umi`)。既定 west update の取得対象に残っていた。
+   **本 commit で整合させた**。ADR-2607261601 Phase 0 の twin 解消の残務にあたる
+   (twin 側の archive は実行済みだった)
+2. **etzhayyim の 26 repo が上流で bare name へ rename 済みなのに west は旧名のまま**
+   (`com-etzhayyim-aburi` -> `aburi` 等)。GitHub の redirect で fetch は通るため気付けない。
+   ただし **26 件中 21 件は bare name が既に他 org の west entry に取られている**ので、
+   追随には generator と同じ `<org>-<basename>` + `repo-path:` 変換が要る。**未実行**
+3. **`:manifest.repos/extra-projects` の陳腐化が `--check` STALE の主因**だった。
+   extra-projects は west.yml に無い旧 path (`orgs/gftdcojp/ai-gftd-ads` 等) を保持しており、
+   generator の `dup-basenames` は west path と extra-projects の**和集合**で計算されるため、
+   実在しない重複が名前を `<org>-<base>` に化けさせていた。Phase 3 で prefix を外したら
+   drift が 308 行 -> 195 行に減ったのはこれが理由。**未実行**
+
+### 未決 9 / 10 / 11 — 決定 (2026-07-29、main commit は下記)
+
+#### 未決 11 — `extra-projects` の陳腐化が `--check` STALE の主因だった
+
+`gen-west-manifest.cljs` の `dup-basenames` は **west.yml の path と `extra-projects` の
+和集合**で計算される。`extra-projects` には移送済み repo の旧 org path が残っていたため、
+**実在しない重複**が west name を `<org>-<base>` に化けさせていた。
+
+`extra-projects` を **3,465 -> 234** に整理した:
+
+| 削除 | 件数 | 理由 |
+|---|---:|---|
+| west.yml に既登録 | 3,200 | 登録の受け口としての役目は終わっている (`distinct` で潰れるだけ) |
+| `orgs/` で始まらない | 15 | generator が filter で捨てる純ノイズ (`cloud-itonami-lei-*` 等) |
+| 移送済み repo の旧 org path | 16 | `orgs/gftdcojp/adserver` -> 実体は `orgs/cloud-itonami/adserver` 等。phantom dup の発生源 |
+
+残した 234 は **west 未登録の実 repo (= 登録バックログ)** で、うち 3 件
+(`com-etzhayyim-oteint` / `-swachh-actor` / `-yomi`) はローカル checkout を持つ。
+
+併せて **`:manifest.repos/datalad` の stale キー 9 件を再キー**した。org 移送に追随できて
+おらず、**再生成すると 9 つの dataset から `datalad: true` / `annex-remote: b2` が黙って
+落ちる**状態だった (`west_annex.cljs` の annex-get/drop 対象から外れる)。
+
+結果、`nbb scripts/gen-west-manifest.cljs --check` が **`west.yml is up to date`** になった。
+ADR-2607289600 D9 が STALE と記録して以来はじめて通った。残っていた 45 行の drift は
+`userdata:` 内の行順と末尾改行だけだったので、値を変えずに generator の出力順へ正規化した
+(9 block)。
+
+#### 未決 10 — 前回の診断が誤っていた。rename ではなく重複だった
+
+前回「etzhayyim の 26 repo が bare name へ rename 済み、21 件が衝突」と書いたが**誤り**。
+`gh api` の `.name` だけを見て `.full_name` を見ていなかったため取り違えた。実際は
+**他 org へ transfer + rename 済み**で、25 件が `cloud-itonami`、1 件が `kotoba-lang` に居る。
+
+repo id を突き合わせた結果、**west に同一 repo の entry が 2 つ**ある状態だった
+(旧 etzhayyim path 側は GitHub の redirect 経由で解決するので fetch は通り、気付けない)。
+したがって正しい処置は rename ではなく**重複の解消**である。衝突 21 件という話も、
+rename を前提にした場合にだけ生じる幻で、実際には存在しなかった。
+
+**ただし単純削除は pin を巻き戻す。** 26 組の pin を GitHub API で比較したところ:
+
+| 比較 | 件数 |
+|---|---:|
+| 同一 | 19 |
+| **旧 etzhayyim entry 側が ahead** | 7 (`aburi` は 8 commit、`fleet` は 2 commit 先行) |
+| diverged / behind | 0 |
+
+先行していた 7 件の pin を生存側へ載せてから、26 件の重複 entry を削除した。
+`path-overrides` に 26 件を追加し、旧 path 参照が生存 path へ解決するようにしてある。
+project 数は **3,846 -> 3,820** (減ったのは重複 26 件のみ)。
+
+#### 未決 9 — `jp-ashiba` に governor は「まだ」要らない。actuation が 1 つも無い
+
+結論: **今は governor を載せる対象ではない。`send_via_mailer_xrpc` を wire する時点で必須。**
+
+実測すると、この repo は Python 実装 (`20-actors/jp-ashiba/py/`) からの **pure cljc port** で、
+**外部作用を持つ関数が 1 つも実装されていない**。各 namespace の docstring が「NOT ported
+(host-injected IO)」と明示している:
+
+| namespace | 未 port の作用 |
+|---|---|
+| `outbound-emailer` | `send_via_mailer_xrpc` (Resend 経由の実送信) / `pull_site_state` / `generate_site_proposal` (Murakumo LLM) / `select_vendor_candidates` / `conn.transact` / `send_handler` |
+| `satellite-detector` | pyzeebe task entry |
+| `owner-resolver` | Datalog pull と transact |
+| `safety-predictor` | host-injected IO |
+
+port されているのは `route-by-risk` / `route-by-send-status` / `build-*-tx-edn` のような
+**純関数のビルダとルーティングだけ**で、governor が止めるべき対象が存在しない。この状態で
+governor を書いても govern するものが無い。
+
+**発火条件**: `send_via_mailer_xrpc` は第三者 (土地所有者) への **cold outreach メール送信**で、
+CLAUDE.md の actor パターンが governor を要求する actuation そのもの。これを wire する commit と
+同時に、独立 Governor + append-only 台帳を入れること。
+
+**併せて記録する既知の落とし穴**: `seal.cljc` の `seal!` / `unseal` は「port ではなく新規実装」
+(python 側は両方 `NotImplementedError`) で JVM の AES-256-GCM を使うが、**鍵導出は
+`SHA-256(actor-did [+ run-graph])` の bridging placeholder** であり実 SecureVault の鍵管理
+(HSM / actor ごとの永続鍵) ではない。docstring に明記されているが、tier-2/tier-3 の封緘が
+本物だと誤認しないこと。実鍵への配線は governor と同じタイミングで潰すのが自然。
+
+### Phase 4 本体 — 完了 (2026-07-29)。ADR-2607261601 の Phase 1-4 を実行しきった
+
+監査コーパス 612 entity のうち **stay/stay-authority を除く 394 件**が移送対象。実行後の
+到達点は **389 移送済み / 4 retired-in-place / 1 保留** で、etzhayyim は **353 -> 235 repo**
+になった (監査の目標 stay + stay-authority = 218)。
+
+| 監査の移送先 | 件数 | 実際の到達先 |
+|---|---:|---|
+| cloud-itonami | 220 | cloud-itonami 220 (うち 13 は `-actor` 化、下記) |
+| kotoba-lang | 108 | kotoba-lang 104 / etzhayyim 4 (archived tombstone 3 + `signal` 保留) |
+| gftdcojp | 64 | **cloud-itonami 58 / gftdcojp 6** |
+| gftdcojp-or-stay | 1 | cloud-itonami (`tsumugu`) |
+| delete | 1 | archived (`com-etzhayyim-business_manager`) |
+
+**gftdcojp 64 件のうち 58 件は cloud-itonami に着いていた** (本セッション以前の作業)。監査は
+gftdcojp を指していたが、中身は `ec` / `casino` / `eigyo` / `contentengine` / `auto-sales-erp`
+等の事業アプリで、**D1 の gftdcojp = B2B/B2G security service には当たらない**。D1 に照らすと
+cloud-itonami (呼ばれて動く基盤) が正しいので、実態を追認し 58 件を動かし直さない。
+ADR-2607261601 が Phase 4 の前提としていた `kotoba-boundaries.edn` 更新は、
+「移送のためのゲート」ではなく**移送後の実態反映**として本 commit で実施した。
+
+#### 15 件は「did:web actor シェル」という単一のクラスだった — `-actor` で解いた
+
+bare name が移送先で埋まっていた 13 件 (cloud-itonami) + `i18n` / `os` (kotoba-lang) を
+個別に開けたところ、**全 15 件が同じ形**だった:
+
+```
+.well-known/did.json          <- did:web:etzhayyim.github.io:com-etzhayyim-<name>
+actor-manifest.jsonld         <- capabilities / convoSystemPrompt / aozora.app 登録
+src/<name>/murakumo.cljc      <- murakumo を呼ぶだけの 1 モジュール
+.nojekyll                     <- GitHub Pages 配信を想定
+```
+
+一方 bare name を持っている側は **実装本体** (appview / clj runtime / PROJECT.jsonld)。
+つまり衝突は「同名の別物」ではなく **実装 (bare name) と DID シェル (役割違い)** の並びの
+問題で、CLAUDE.md の role-suffix 規則と cloud-itonami の既存慣習 (`animeka-actor` /
+`dougaka-actor` / `gftd-audio-actor` / `swachh-actor`) にそのまま当たる。15 件を
+`<name>-actor` として移送した。**サイズで判断しかけたのは誤りだった** — etzhayyim 側が
+大きい例 (`tsukuru` 1258KB vs 51KB) もあるが、それは資産であって役割ではない。
+
+#### 訂正: did:web は 2 形式あり、大半は **live** — ただし repo 位置には依存しない
+
+当初この節は「これらの did:web は移送前から解決していない / DID 層は休眠」と書いたが、
+**誤りだったので訂正する**。`etzhayyim.github.io/com-etzhayyim-<name>/.well-known/did.json`
+が 404 なのを見て一般化したが、その URL はほとんどの repo の DID id と一致していなかった。
+
+実測 (94 repo を sampling、2026-07-29):
+
+| DID id の形式 | 件数 | 解決 |
+|---|---:|---|
+| `did:web:etzhayyim.com:actor:<name>` | **84** | **200 (live)** — `https://etzhayyim.com/actor/<name>/did.json` |
+| `did:web:etzhayyim.github.io:com-etzhayyim-<name>` | 5 | 404 (dead。etzhayyim org は Pages を持たない) |
+| `.well-known/did.json` 無し | 5 | — |
+
+**移送で壊れていない、という結論自体は変わらないが理由が違う。** live な方は
+**`etzhayyim.com` が repo とは独立に配信している** — 配信されている DID 文書は
+`alsoKnownAs: []` で、service は `pds.aozora.app` (AtprotoPersonalDataServer) と
+`/dnsaddr/etzhayyim.com/p2p/12D3KooW...` (AtprotoXrpc) を指すだけで、GitHub repo を
+一切参照していない。したがって repo をどの org へ移しても DID 解決には影響しない。
+repo 内の `.well-known/did.json` は配信元ではなく**ソース側の控え**である。
+
+dead な 5 件 (`cargo` / `fushin` / `kaname` / `kenchi` / `metsuke`) だけが
+`etzhayyim.github.io` 配信を前提にした古い形式で、これは元から解決していない。
+
+この訂正は D7 の organism 再判定の結論を変えない — organism registry
+(`artificial-organism-actors.json`) はプロダクト単位の `did:key` であって、
+ここで言う actor DID (`did:web`) とは別の層である。
+
+#### `credits` の pin 違反を解消した (子リポの main を進めた)
+
+`credits` の pin `57c47033ac` は未 merge branch `engi-r1-r6` の先端で default branch から
+到達できず、repoint すると pin 検証に落ちた。**移送前から origin/main にあった既存の違反**
+だが、pin 検証は変更 entry だけを見るため露見していなかった。実測すると main tip は
+PR #3 merge (2026-07-23T02:56)、branch tip はその 54 分後で 17 commit 先行・0 behind、
+open PR 無し — つまり PR を出し忘れたまま west だけが branch を pin し続けていた。
+pin を main tip に戻すと 17 commit を退行させるので、逆に **`engi-r1-r6` を main へ
+サーバ側 merge した** (`0071aeee3f`)。これで pin は default branch から到達可能になった。
+
+#### `signal` 1 件だけ保留
+
+`etzhayyim/com-etzhayyim-signal` は **TypeScript の Signal Protocol 実装**
+(`src/signal.ts` / `src/transport.ts`)。移送先の `kotoba-lang/signal` は
+「X3DH + Double Ratchet + sender-keys group ratchet の CLJC 再実装」で、Rust crate 撤去
+(kotoba PR #259) の後継として canonical。MIGRATION.edn が別プロジェクトとして参照する
+`com-etzhayyim-org-signal` は既に存在しない (404)。**同じ能力の並行実装をどちらに寄せるかは
+配置ではなく実装方針の裁定**なので触っていない。CLAUDE.md の runtime 優先順位からは
+cljc 側が canonical に読める。
+
+#### `kotoba-boundaries.edn` を実態に更新した
+
+| key | 旧 | 新 |
+|---|---|---|
+| `:owners :domain-actors` | `orgs/etzhayyim/com-etzhayyim-*` | `orgs/cloud-itonami/*` |
+| `:owners :atproto-actors` | `orgs/gftdcojp/app-aozora` | `orgs/network-awai/app-aozora` |
+| `:cell-prefix-routes` の値 | `com-etzhayyim-*` 57 件 | 現在の repo 名 |
+
+この 4 key は `scripts/kotoba-boundary-audit.cljs` (CI `clj-wgsl-parity.yml`) が実際に読む。
+**key 集合は 75/9/3/3 で完全に不変**であることを機械確認し、値だけを差し替えた。残る
+`com-etzhayyim-*` 参照 19 件は etzhayyim に残る repo なので正しい。
+
+### 後片付け — manifest の実態整合と登録バックログ (2026-07-29)
+
+移送を終えたあと、GitHub の全 repo (7 org / 3,994 件) と west entry を突き合わせて残った
+歪みを潰した。
+
+#### 実在しない west entry 8 件
+
+west にあるのに GitHub に無い entry が 8 件あった。7 件は rename / transfer 済みで移送先が
+**既に west に登録されている重複**で、旧 path は GitHub の redirect で解決するため fetch は
+通り気付けない状態だった (`cloud-itonami-isic-7500` -> `-750` / `com-junkawasaki/kotodama` ->
+`kotoba-lang/kotodama` / `multiformats-clj` -> `io-multiformats` / `org-arxiv-kotoba` ->
+`kotoba-lang/arxiv` / `spirit-in-physics` -> `org-spirit-in-physics` / `kotoba-git` ->
+`bonsai` / `kotoba-rad` -> `nekko`)。pin を比較すると **2 件は消す側が先行**していたので
+生存側へ載せてから削除した。8 件目 `app-kotoba-torrent` は repo 自体が削除済み
+(redirect 無しの 404、`git ls-remote` も Repository not found) で、fetch できない entry は
+`west update` を壊すため削除した。
+
+#### west.yml の構造破損 1 件
+
+commit `6ebf4b4b5fc` (loop-jiten の登録、Contents API single-entry commit) が
+**project ブロックを `remotes:` セクション内に挿入**していた。`remotes:` の要素は
+`{name, url-base}` なので `path:`/`revision:` を持つブロックが混ざると west が remote として
+誤解釈しうる。generator は正しく `projects:` に置こうとするため `--check` は STALE に
+なっていた。ブロックを `projects:` へ移して解消した。
+
+#### `:local/root` の壊れたエッジ 15 本
+
+`west-orphan-audit --blocking` が **fresh checkout で依存解決が落ちる**エッジを検出した。
+実体はすべて移送/改名に consumer 側の相対パスが追随していないもので、子リポ 15 ファイルを
+Contents API で修正した:
+
+| 参照先 | 変更 | consumer |
+|---|---|---:|
+| `cloud-murakumo` | gftdcojp -> network-awai | 11 |
+| `social-publication` | etzhayyim -> kotoba-lang | 2 |
+| `kotodama` | com-junkawasaki -> kotoba-lang | 1 |
+| `cloud-mamori` | -> `cloud-kyusai` | 1 |
+
+`mangaka` の remote は `../../cloud-murakumo` (= `orgs/cloud-itonami/cloud-murakumo`、
+存在しない path) を指しており、一度直された形跡があるのに行き先が違っていた。
+`kaname` / `kuni-umi` への書き込みは **HTTP 307** で失敗した — `manifest/cleanup-workflow.edn`
+が `:renamed-repo` trap として記録するとおり、GitHub は GET と `-f` POST は redirect するが
+`--input` POST には 307 を返し `gh` は追わない。`gh api repos/<slug> --jq .full_name` で実 slug
+に解決してから再実行した。対応する west pin 15 件も前進させた (全件 `status=ahead` を確認)。
+
+#### 登録バックログ 103 件を登録、`fastlane-certs` だけ除外
+
+未登録 172 件を分類し、実体のある 103 件を登録した (pin は各 default branch HEAD)。
+
+| 分類 | 件数 | 扱い |
+|---|---:|---|
+| workspace repo (live) | 104 | **103 を登録**、`fastlane-certs` のみ除外 |
+| personal / fork 相当 (com-junkawasaki) | 40 | west scope 外 |
+| migration leftover (`com-etzhayyim-*`、stay 対象) | 20 | 別途 |
+| archived | 7 | 登録不要 |
+| org-meta (`.github`) | 1 | project ではない |
+
+登録分の内訳は kotoba-lang 88 (**`capability-*` 50 が 1 件も登録されていなかった** /
+`app-*` 18 / その他 20) / gftdcojp 13 / cloud-itonami 1 / etzhayyim 1。
+
+**`gftdcojp/fastlane-certs` は登録しない。** Fastlane match の証明書ストアで、中身は
+`certs/distribution/*.p12` (秘密鍵) と `profiles/appstore/*.mobileprovision`。west に登録すると
+既定の `west update` で**全 clone に署名鍵が展開される**。CLAUDE.md の安全床および
+cleanup-workflow.edn の「credential-looking paths は skip」に従い除外し、ここに記録する。
+
+結果: project **3,822 -> 3,925**、`gen-west-manifest.cljs --check` = `west.yml is up to date`、
+`west-orphan-audit --blocking` の blocking は **0 件**。
+
+#### `com-etzhayyim-` は D4 の prefix 廃止対象ではない — reverse-DNS 識別子である
+
+残っていた `com-etzhayyim-*` 命名を D4 (`ai-gftd-` prefix 廃止) と同じ扱いにするか検討し、
+**しない**と結論した。実測: west には reverse-DNS 接頭辞を持つ entry が
+**`com-*` 1,261 / `org-*` 91 / `io-*` 10 / `net-*` 5 / `tech-*` 1** ある
+(`com-nvidia-isaac-sim` / `com-aave` / `com-abb-robotics` / `com-accela` /
+`org-w3-webgpu` / `org-bluesky-atproto` / `io-ipld` / `io-storj-node` /
+`tech-ipfs-specs-ipns` など)。
+
+つまり `com-etzhayyim-*` は **`com.etzhayyim` という reverse-DNS の identity 接頭辞**で、
+`ai-gftd-` のような vendor 留保マーカーとは別物。D4 の論拠は「vendor 名は identity では
+ない」であって、reverse-DNS の org identity には当たらない。204 件を bare name にすると
+残り 1,361 件の reverse-DNS repo と不整合になるので、**現状維持が正しい**。
+
+(prefix を外した場合の機械的な衝突は 204 中 8 件だけで技術的には可能だったが、
+「できる」と「すべき」は別だった。)
+
+ただし **org を出た repo が `com-etzhayyim-` を名乗り続けるのは別問題**。
+`cloud-itonami/com-etzhayyim-app-lawyer` と `cloud-itonami/com-etzhayyim-okaimono` は
+cloud-itonami へ移送済みだが旧名のまま。中身を開けると did:web シェルではなく
+**別ファセット**だった (`app-lawyer` = appview + PROJECT.jsonld / `lawyer` = AT Protocol
+lexicon + deploy workflow、`com-etzhayyim-okaimono` = `cells/*.edn` ドメインロジック /
+`okaimono` = project record)。bare name 側と役割が違い名前で区別できているので改名せず、
+未登録だった west 登録のみ行った。
+
+### 未着手として残るもの — ADR-2607261601 Phase 5 (統合リファクタ)
+
+移送は終わったが、同 ADR が「別途設計」とした**重複クラスタの統合**は手つかず。実測 (2026-07-29):
+
+| クラスタ | 現状 |
+|---|---|
+| `oil-*` 7 分割 | `cloud-itonami/oil-{coverage,distribution,midstream,refining,shipping,trading,upstream}` が現存 |
+| `kaname` 7 ドメイン集中 | `cloud-itonami/kaname` 1 repo に `charter`/`ethics`/`land`/`member`/`religious`/`tithe`/`treasury` の 7 cell-prefix route が集中 |
+| KAMI 創作 | `kami-mangaka-*` 8 repo |
+| ERP | `*erp*` 5 repo |
+| ERP (kyber 系) | 3 repo |
+| Web クロール | 3 repo |
+
+**ただし 5 クラスタのうち 2 つは「重複」ではなかった** (実測 2026-07-29):
+
+- **`kami-mangaka-*` 8 は重複ではなくモジュール族**。scene / expression / scene-author /
+  reader / page / text / qa / render がそれぞれ独立した `deps.edn` + `src/kami/mangaka/*`
+  を持つ意図的な分解で、`capability-*` 50 (各々 `capability.edn` +
+  `src/kotoba/capability/<x>/<y>.cljc`) と同型。**畳んではいけない。**
+- **`oil-*` 7 は「7 分割されたコード」ではなく、コードを持たない did:web シェル 7 件**
+  (各 6-7 file: `.well-known/did.json` + `actor-manifest.jsonld` +
+  `actor-manifest.test.ts` + `.nojekyll` + NOTICE)。しかも DID は
+  `did:web:etzhayyim.com:actor:oil-*` で **live**。統合は「コードの整理」ではなく
+  **7 つの live な DID identity を退役させるか**という外部影響のある判断になる。
+
+本当に重複なのは:
+- **`kyber` 3**: `cloud-itonami/kyber-qzzg06nh` (128 file、appview) /
+  `kotoba-lang/kyber` (32 file、Python langgraph `lg/`) /
+  `etzhayyim/com-etzhayyim-app-open-kyber` (126 file、1.4MB、R2-WORKER-WIRING +
+  SUITE-PY-WASM-MIGRATION の doc 付き) — 同一 ERP の 3 変種
+- **`kaname`**: 66 file / 282KB の実コードに 7 route が集中。分割は設計そのもの
+
+#### 結論 (2026-07-29): **Phase 5 は仕様どおりには実行しない**。5 クラスタすべてが誤分類だった
+
+残る 2 件 (`kyber` 統合 / `kaname` 分割) も中身を開けた結果、やはり重複ではなかった。
+5 クラスタを全件実測した結果は次のとおり:
+
+| クラスタ | ADR-2607261601 の想定 | 実体 (2026-07-29 実測) | 判断 |
+|---|---|---|---|
+| `oil-*` 7 | 7 分割されたコード | **コードなしの did:web シェル 7 件** (各 6-7 file)。DID は `did:web:etzhayyim.com:actor:oil-*` で **live** | 統合はコード整理でなく **live な DID identity 7 件の退役判断**。実行しない |
+| `kami-mangaka-*` 8 | KAMI 創作の重複 | **モジュール族**。scene / expression / scene-author / reader / page / text / qa / render が各々独立した `deps.edn` + `src` を持つ | 畳んではいけない |
+| `kyber` 3 | ERP 重複 | **層**。`kyber-qzzg06nh` = appview 3 面 (finance / ga / governance、Svelte) / `kotoba-lang/kyber` = langgraph agent graph (`lg/lg_kyber/graphs/*`) / `com-etzhayyim-app-open-kyber` = ERP worker + Playwright e2e + 移行 doc | 統合しない |
+| ERP 5 | ERP 重複 5 件 | **substring ノイズ**。`com-int**erp**ol` / `org-apache-tink**erp**op-gremlin` / `com-matt**erp**ort-api` が名前一致で拾われていた。実 ERP は `auto-sales-erp` (BPMN wire 4 file) と `kotoba-erp` (CRM 11.4MB) の 2 件で別物 | 対象が存在しない |
+| `kaname` 7 ドメイン集中 | 7 つに分割 | **cross-domain 統合器そのもの**。README いわく「per-domain observatory (tsumugi / keizu / kabuto / chie / shiori / abaki / shionome / busshi / hokorobi / kosatsu / inochi) を 1 つの multilayer graph に join し、最も多くのドメインで耐性を改善する構造位置 (要) を read 時に計算する META synthesis layer」。コードも `methods/{centrality,join,ingest,sos,coverage_report,route,gates}` というグラフアルゴリズム群で、7 ドメインの実装ではない | **分割すると存在意義が消える**。実行しない |
+
+**Phase 5 のクラスタは名前 (と substring) の類似から推定されたもので、中身の確認を経ていなかった。**
+実際にはいずれも「層の分解」「モジュール族」「DID シェル」「文字列の偶然一致」であり、
+統合すべき重複は 1 件も見つからなかった。したがって **ADR-2607261601 Phase 5 は
+「実行しない」で閉じる**。
+
+唯一、追加調査の価値があるのは **Web クロールの 2 件** —
+`kotoba-lang/kotobase-commoncrawl-actor` (197KB / 40 file、GOVERNANCE.md 付きの OSS repo) と
+`com-junkawasaki/net-kotobase-commoncrawler` (34KB / 23 file、`src/net_kotobase/commoncrawler/actor/{graph,nodes}.cljc`)。
+3 件目の `kotoba-lang/common-crawl` は appview なので層だが、この 2 件は
+どちらも「Common Crawl を読む」が、**確認したところ重複ではなく未配線の層**だった
+(2026-07-30 実測):
+
+| repo | 役割 |
+|---|---|
+| `kotoba-lang/kotobase-commoncrawl-actor` (197KB) | **governed actor**。operator が保守する seed list -> CDX 参照 -> 本文抽出 -> LLM 分類/要約 + embedding -> **独立 Governor** -> CACAO 自己発行 -> net-kotobase へ ingest。langgraph StateGraph で `gftd-talent-actor` / `robotaxi-actor` / `cloud-itonami` と同じ actor パターン |
+| `net-kotobase-commoncrawler` (34KB) | **WARC -> Datom 変換ライブラリ**。`warc.cljc` (range-fetch)、`html.cljc`、`images.cljc`、`ingest.cljc` (CDX 照会)、`store.cljc` (`kotobase.store/IStore` 経由の永続化)。Governor も CACAO も持たない |
+| `kotoba-lang/common-crawl` (117KB) | **appview** (Svelte + wrangler + xrpc)。別層 |
+
+問題は重複そのものではなく、**actor が library を消費していない**こと。actor の `deps.edn` は
+langgraph / langchain-store / cacao / ed25519 / cbor を git deps で pin するだけで
+`net-kotobase-commoncrawler` を参照しておらず、CDX 照会と capture 取得を各々が実装している。
+library 側の consumer は 0 件だった。
+
+**実施 (2026-07-30)**: `net-kotobase-commoncrawler` を **com-junkawasaki -> kotoba-lang** へ
+移送した。再利用可能な `.cljc` ライブラリなので D1 の
+「kotoba-lang = 言語・ライブラリ / com-junkawasaki = 個人 corpus」に照らして配置が誤っていた。
+consumer 0 件なので移送の影響は無い。名前は据え置き (どの product 向けかが名前に出ており、
+`kotoba-lang/common-crawl` (appview) との紛れも避けられる)。
+
+**未実施**: actor 側を library 消費へ配線して CDX/fetch の二重実装を解消すること。
+これはテストを伴う実装作業なので配置の整理とは分けた。
+
+これらは「7 repo を 1 つに畳む」「1 repo を 7 つに割る」という**設計判断そのもの**で、
+配置の付け替えではない。どれが正本になり何が壊れるかを決めてからでないと動かせないので、
+本セッションでは計測のみ行い実行していない。
+
+## Consequences
+
+- **`:repo/kind` が org 判定の入力になるため、`manifest/repo-taxonomy.edn` が
+  「分類メタデータ」から「配置の正本」に昇格する。** 生成器 `scripts/repo-taxonomy.cljs` の
+  精度がそのまま配置の正しさになるので、`unclassified` 112 / `absent` 430 を
+  デフォルト値で埋めない規律 (ADR-2607289600 D5-2) が一層重要になる
+- org と kind の不一致を機械検出できる。`scripts/repo-taxonomy.cljs` に
+  `--check-org` を足して CI で乖離を可視化する (別 PR)
+- GitHub repo rename は redirect が残るので外部リンクは壊れないが、**west.yml の
+  `name:` は追随が必要**。`manifest/fleet-db.edn` 側も dual-write 期なので
+  `fleet reconcile` が吸収するのを確認する
+- ADR-2606302300 の `:repo-creation-check` (layer test → 3-axis+Charter check) は
+  **Charter 判定部分が D3 で無効化される**。新しい判定は D1 の「kind → org、
+  service のみ security/consumer で二分」に置き換わる
+
+## 未決 (本 ADR では決めない)
+
+1. ~~`ai-gftd-isekai` と `network-isekai` の責任分界~~ **決定 (2026-07-28): 別物と確認。著作物を network-isekai へ移送し ai-gftd-isekai は archive**
+2. ~~`ai-gftd-ghosthacker-shiropico` と `ghosthacker-shiropico-assets` の統合~~ **決定 (2026-07-29): 統合しない。assets 側は廃止バケットへの dangling ポインタなので archive、本体は com-junkawasaki へ移送**
+3. ~~`cloud-mamori` と `ai-gftd-mamori` の統合~~ **統合しない (2026-07-28、別プロダクトと判明)**。`ai-gftd-mamori` -> `mamori` (Phase 3)、`cloud-mamori` -> `cloud-kyusai` (2026-07-29) で決着
+4. ~~`jk-corp` の行き先~~ **決定 (2026-07-28): jk-luxury に残置**
+4b. ~~`ai-gftd-deai` の行き先~~ **決定 (2026-07-28): network-awai/`deai`**
+5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
+6. ~~cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断~~ **決定 (2026-07-29): retire 2 件 (`ads` / `oshikatsu`) を archive。残りは app / library / data で actor 契約の対象外 — blueprint 起票という作業自体が存在しなかった (D5 の前提誤りを訂正)**。派生して残る唯一の未決は下記 9
+7. ~~`gftdcojp/ai-gftd-cyber-drill` と `cloud-itonami/cyber-drill`~~ **決定 (2026-07-29): `ai-gftd-cyber-drill` を archive、bare name は動く方 (cloud-itonami) が保持**
+8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**
+9. ~~`cloud-itonami/jp-ashiba` を governor 契約に載せるか~~ **決定 (2026-07-29): 今は不要 — actuation が 1 つも実装されていない (全 IO 境界が「NOT ported」)。`send_via_mailer_xrpc` (第三者への cold outreach 送信) を wire する commit と同時に独立 Governor + append-only 台帳を入れる。同時に `seal.cljc` の placeholder 鍵導出も実 SecureVault へ配線する**
+10. ~~etzhayyim 26 repo の上流 rename への west 追随~~ **決定 (2026-07-29): rename ではなく重複だった (他 org へ transfer 済み、repo id 一致)。先行していた 7 件の pin を生存側へ載せてから重複 26 entry を削除。衝突 21 件は rename 前提の幻で実在しなかった**
+11. ~~`:manifest.repos/extra-projects` の陳腐化解消~~ **決定 (2026-07-29): 3,465 -> 234 に整理、`:datalad` の stale キー 9 件も再キー。`--check` が `west.yml is up to date` になった**")
+
+  (:adr/decision-summary
+  (vector "D1 (2026-08-03 改訂): org = f(起動主体, 事業主体) の 2 軸。起動主体(resident/on-demand/none)だけでは org は決まらない — yukkuri は resident organism だが AWAI Network の consumer product であり、1 軸だと etzhayyim(宗教法人)に誤配置される。resident x religious=etzhayyim / on-demand x religious=cloud-itonami / any x security=gftdcojp / any x consumer-network=network-awai / none=kotoba-lang or com-junkawasaki。第一軸は宣言でなく実装で測る(organism-readjudicate.cljs)"
+   "D2: Awai network 法人で動く 7 ドメイン(itonami.cloud/murakumo.cloud/isekai.network/kotobase.net/aozora.app/babiniku.net/shinshi.club)の repo を network-awai へ。org 名と product 名の衝突はパスで区別し rename しない"
+   "D3: adult は Charter Rider v2.0 に違反しない(オーナー判断)。ai-gftd-livecam の NOT-MIGRATED-CHARTER-VIOLATION マーカーは失効・削除。adult 4 件は network-awai へ"
+   "D4: ai-gftd- prefix を廃止し bare name へ。デプロイ先 DNS が既に bare name であることが裏付け。gftdcojp に残る security は 9 件"
+   "D5: creative 10 件は既に cloud-itonami へ移送済み(git remote 実測)。ADR-2607023000 の「商売レイヤ=gftdcojp」セルを実態に合わせ訂正。cloud-itonami 内 ai-gftd-* 21 件は 0/21 が blueprint.edn を持たず registry 459 entry にも 0 件 = actor 契約未登録"
+   "D6: jk-luxury は解散。net-babiniku / club-shinshi / club-shinshi-app は network-awai へ"
+   "D7: etzhayyim は organism のみ(ADR-2607261601 の stay 191 をさらに絞る)。organism 判定が README 宣言ベースで取りこぼすため、再判定が終わるまで大量移送しない"
+   "D8: kotoba-lang 1763 と cloud-itonami の taxonomy 系 1388 は軸に適合済みで触らない。taxonomy prefix(isic-/isco-/lei-…)は分類標準コードであり identity を持つので prefix 廃止の対象外"
+   "D9: 4 phase で実行。network-awai を埋める → adult → prefix 廃止 → etzhayyim。west.yml は single-entry commit"))
+
+  (:adr/verify "nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>")
+  (:adr/artifact "manifest/repo-taxonomy.edn")
+  (:source/dataset "adr")))

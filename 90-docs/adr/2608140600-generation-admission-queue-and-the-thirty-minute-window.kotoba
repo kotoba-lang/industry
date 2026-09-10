@@ -1,0 +1,232 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608140600")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/title "生成ジョブの入場キュー —— 受理は即実行ではない。そして 38 分のジョブは、30 分ごとに止められる APU では完走しない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-14")
+  (:adr/last_verified "2026-08-14")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "murakumo-generation-queue")
+  (:adr/repos (vector "orgs/kotoba-lang/murakumo"
+              "orgs/gftdcojp/cloud-murakumo"
+              "orgs/com-junkawasaki/org-spirit-in-physics-comics"))
+  (:adr/authoritative_for
+  (vector "生成面の queue/job スタックが実際にどう積まれているか（Worker は素通し / ノードが job を持つ / 本物の queue は ComfyUI だけ）"
+   "資源クラスの宣言が manifest でなく kotoba-lang/murakumo の resources/murakumo/resource-classes.edn にあること"
+   "gad の APU で video モデルが同時に 1 つしか載らないこと、およびそれを誰が宣言しているか"
+   "H3 が外部から約 30 分周期で systemctl stop されており、38 分のジョブが構造的に完走しないこと"
+   "minimax-h3 の掲示価格 8cr/s と、その根拠（他社実勢との比較）"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends
+  (vector "2608100600(既定を minimax-h3 にした決定。本 ADR はその既定が『価格表に無い』『1800 秒で切られる』『30 分ごとに止められる』の 3 つで実運用に届いていなかったことを追記する)"))
+  (:adr/related
+  (vector "90-docs/adr/2608140400(SIP の原稿を焼いた記録。本 ADR の発端)"
+   "90-docs/adr/2608111721(placement authority を murakumo.task.plan に 1 本化する決定 —— あれは fleet-CI の task 配置で、生成ジョブは対象外)"
+   "90-docs/adr/2608136000(測れなかった検査が、測って問題が無かった検査と同じ値を返す)"
+   "90-docs/adr/2608026200(掲示 = fal 原価 × 2.0。本 ADR の価格はこの規則の外にある)"))
+
+  (:adr/body
+  "## Context
+
+オーナーの問い（2026-08-14）「この queue, jobs の stack はどう設計されている?
+api.murakumo.cloud 側で設計されている?」に答えるために実物を読んだ。答えは
+**『クラウド側には queue が無い』**で、続く指示「では設計実装」で作った。
+
+## 実際にどう積まれていたか（設計の前）
+
+3 層に見えるが、**本物の queue は一番下に 1 つだけ**だった。
+
+| 層 | 実体 | queue を持つか |
+|---|---|---|
+| Cloudflare Worker（`api.` / `murakumo.` / `generation.murakumo.cloud`） | `site_worker.cljs` の `generation-proxy!` | **持たない。** token を差し替え、submit で課金し、polling の応答が失敗を示せば返金する素通し |
+| ノードの `hunyuan3d-generation-api`（gad:8081） | `jobs = {}` + `threading.Lock` + `jobs.json` | **持たない。** submit のたびに `threading.Thread(...).start()`。上限も backpressure も無い |
+| ComfyUI（8188 / 8191） | `queue_running` / `queue_pending` | **これだけ。** 1 prompt ずつ実行するので結果として直列化する |
+
+**完了 callback はどこにも無い。** `site_worker` のコメントが自分でそう書いている
+——『upstream の完了 callback は無い』。課金面は「その job id を誰かが polling した
+とき」しか観測できず、呼び出し側が立ち去ったジョブのことは永久に知れない。
+
+`cloud-murakumo.queue` に純粋な `queued → running → done|failed` の状態機械が
+在るが、**Worker はこれを require していない**（`grep -c` = 0）。docstring 自身が
+『production control plane は同じイベントを kotoba/datomic に永続化*できる*』と
+書いていて、これは願望であって配線ではない。
+
+## Decision
+
+### A. 問題は「queue が無いこと」ではなく「1 つしかない資源を誰も宣言していないこと」
+
+gad の APU は memory を CPU/GPU で共有していて、**MiniMax-H3(~43GB)と Wan 5B は
+同時に載らない**。この事実は 2 か所に、どちらも宣言でない形で存在していた:
+
+1. ComfyUI の queue —— 1 prompt ずつ実行するので**偶然**直列化する（instance が
+   2 つある時点で 2 本同時に走りうる）
+2. `comfy_yield_sibling` —— 相方の torch memory を測り、8GB 以上なら**相方の
+   systemd unit を再起動する**手続き
+
+どちらも「この資源は 1 つしかない」とは言っていない。**言っていないので、
+受理したジョブ全部が即座にスレッドになり、APU を取り合っていた。**
+
+### B. 判断は表に、機構はノードに
+
+`kotoba-lang/murakumo` の `resources/murakumo/resource-classes.edn` が
+`:apu/video` capacity 1 を宣言する。**どのモデルが排他かはこの表が決め、
+ノードの Python は引いて数えるだけ**（aiueos の kernel が decision-free な機構
+だけを持つのと同じ分担、ADR-2607241100 D6）。台数やモデルを足すときに書き換える
+のは表であってコードではない。**表が読めなければ起動しない** —— 「制約が
+分からない」を「制約が無い」と読み替えない。
+
+置き場が manifest でなくノード側の repo なのは、この表をその場で読むのが
+ノードだから（写しを作れば必ずずれる。Python の制限付き EDN reader は
+decision-free な機構として同居させた）。
+
+### C. 入場キュー、boot 照合、deadline の導出
+
+- **submit がスレッドを起こさない。** クラスごとの FIFO と 1 本の dispatcher が、
+  容量が空いたときだけ起動する
+- **再起動時の照合** —— `jobs.json` は記録を残すがスレッドは残らない。これまで
+  再起動をまたいだジョブは**永久に `running`** で、本当に動いているものと
+  区別できなかった。boot で `failed` + 区別できる理由にする
+- **deadline を実測点から導く** —— 定数 1800 秒は fleet 自身の既定モデルが
+  その中で終われない値だった（実測 2284 秒 / ADR-2608100600 は 6038 秒）
+- **`GET /v1/generation/jobs`** —— 完了 callback が無いので、掃く側が id を
+  先に知らなくても「何が変わったか」を訊けるようにした。**掃く側はまだ無い**
+
+### D. 価格 8cr/s —— この 1 行だけ「fal 原価 × 2.0」で決めていない
+
+self-host なので fal 原価が存在しない。代替財の実勢（2026-08-14 実査）に合わせた:
+
+| | $/秒 |
+|---|---|
+| fal Hailuo 02 Std 768p | 0.045 |
+| **MiniMax 公式 H3 768p** | **0.076** ← うちの帯（640×640 = 0.41MP は 768p より下） |
+| MiniMax 公式 H3 2K | 0.123 |
+| fal H3 2K | 0.26 |
+| Kling 3.0 / Seedance 2.0 | 0.09–0.14 |
+| Sora 2 | ~0.10 |
+| Runway Gen-4.5 | ~0.20 |
+| Veo 3.1 Standard | 0.40–0.75 |
+| Wan 2.6 | 0.05 |
+
+**自分の GPU を持っていることを理由に frontier モデルを投げ売りしない。**
+原価は実測 **出力 1 秒あたり GPU 442 秒** + 電力 120W の**仮定**で $0.013/s、
+掲示÷原価 = 6.2（不変条件 1.8 を満たす）。
+
+## Consequences
+
+### 決定的 —— 38 分のジョブは、30 分ごとに止められる APU では完走しない
+
+**実測 2026-08-14、H3 は外部から約 30 分周期で `systemctl stop` されている:**
+
+```
+03:47 stop → 03:50 start
+04:18 stop → 04:21 start
+04:48 stop → 04:51 start
+05:19 stop → 05:21 start
+```
+
+止めているのは別セッション（tailnet IP `100.86.235.122`）で、
+`sudo -n systemctl stop comfyui-h3.service` → 約 2.5 分 farm を使う → `start`。
+30 分という cadence は、このマシンに居る 30 分 tick のループと一致する。
+
+**1 クリップ 38 分に対して、使える窓は 27 分。** 現在の geometry ではどのページも
+構造的に完走できない。今夜 p.1 が 3 回死んだのは全部これで、毎回 25〜38 分ぶんの
+GPU が捨てられた。
+
+**そしてその stop は、H3 にジョブが走っているかを見ていない。** 今回直したのは
+自分の側（投げる前に相手の busy を見る）で、**相手は止める前にこちらを見ていない**
+—— 同じ欠陥の鏡像である。`comfy_yield_sibling` は既にその判断を持っているのに、
+直接 `systemctl stop` する経路がそれを迂回している。
+
+**推奨は調停（止める側が走行中のジョブを見る）。** 窓に合わせて品質を落とすのは、
+他人の blind な停止に合わせて作品を劣化させることになるので採らない。
+
+### 宣言が縛れるのは、この API を通ったジョブだけ
+
+実測: こちらの queue が空（`running 0` / `depth {}`）なのに submit が
+`sibling ComfyUI still has a running job` で落ちた。render farm は ComfyUI へ
+**直接**投げられているので入場キューから見えない。起動前に ComfyUI 側の busy も
+見るようにして（`:external-busy-check :comfy-any`）拒否を待ちに変えたが、
+**走行中のジョブを守る手段は依然として無い**（上記）。
+
+### レビューで自分が入れた欠陥を 1 つ見つけた
+
+`class_externally_busy` は 30 秒 timeout の HTTP を、`queue_cv` を持ったまま
+叩いていた。あの condition は global `lock` を包んでいて submit・状態更新・
+ジョブ完了が全部それを取る —— **ComfyUI が固まると service 全体が 2 秒ごとに
+最大 30 秒ずつ止まる**。競合を直したつもりが、より悪い停止経路を作っていた。
+probe を lock の外へ出し、5 秒 TTL のキャッシュを入れた。
+
+### 同じ形の欠陥を 1 セッションで 5 回作った
+
+ADR-2608136000 が『測れなかった検査が、測って問題が無かった検査と同じ値を返す』
+として 1 日で 14 箇所見つけた class を、**設計側でそれを潰しているまさにその
+セッションで 5 回再生産した**:
+
+1. コマ抽出のシーン検出が等分割へ落ちる（申告するようにして解決）
+2. 検査が例外で落ち、summary を出さないまま終わる（`FAILED` を探す側から見ると沈黙）
+3. `gh pr checks` の「no checks reported」を「完了」と読む待ちループ
+4. `nohup ... &` の watcher —— **deploy しても通知が来ない**形
+5. probe を lock の中で叩く（上記）
+
+**設計（宣言・fail closed・両方向の検査）で潰しても、道具の書き方の方に出る。**
+
+## 現在地（2026-08-14 closing）
+
+### default branch に着地済み
+
+| repo | commit | 内容 |
+|---|---|---|
+| `kotoba-lang/murakumo` | `766302f`(#298) | 入場キュー本体 + ノードにしか無かった sibling-yield 94 行の回収 |
+| `kotoba-lang/murakumo` | `80e9d8b`(#299) | minimax-h3 の掲示価格 + 既定モデル未価格を落とす検査 |
+| `kotoba-lang/murakumo` | `7d523f6`(#300) | 外部占有の待ち + sweep 口 + probe を lock の外へ |
+| `com-junkawasaki/org-spirit-in-physics-comics` | `dc6f778` | geometry 導出・章ランナー・Ch.01 全 21 ページのショットリスト・競合の待ち |
+| `com-junkawasaki/root` | `6f9753b` | west pin 前進 |
+
+**deploy 済み**: gad の `hunyuan3d-generation-api` は repo と sha 一致
+（`26dbd5ac`、2026-08-14 14:21 JST）。healthz が `resourceClasses` /
+`queueDepth` を返し、sweep 口が応答することを実測。
+
+### 検証したこと
+
+- `scripts/test-generation-queue.py` **29 件**、両方向確認済み（容量判定を潰す /
+  reconcile を狭める / 外部 hold を外す / probe を lock に戻す / キャッシュを潰す
+  —— それぞれ該当する検査だけが赤くなることを確認）
+- `murakumo.infer.prices-test` **17 tests / 88 assertions**、価格 entry を
+  1 字変えると `model has no published price` で赤
+- live: 実ページの裏に 1 本投げると `queuePosition: 2` で**並んだ**
+
+### 未処理（優先順）
+
+1. **H3 の 30 分停止周期。** これが在る限り章は完走しない。止める側の経路を
+   特定して `comfy_yield_sibling` と同じ判断を通す（**次にやること**）
+2. **`wan2.2-5b` / `ltx-2.3` / `hunyuanvideo-1.5` の 10cr/s。** H3 が 8cr/s に
+   なったので、劣るモデルの方が高い。あの 3 行の $0.05/s は一度も測られていない。
+   **オーナー判断待ち**
+3. **完了 callback を掃く側**（cloud plane の reconciler）。口は開けたが
+   掃く者が居ない。node→cloud の webhook は「ノードに credential を置かない」に
+   反するので、cloud から掃く向きで
+4. **ノードをまたぐ配置。** `MURAKUMO_GENERATION_URL` は単一値で、生成面に
+   placement は存在しない。ADR-2608111721 は fleet-CI の task 配置の話で対象外
+5. **`:tier` を読む側が居ない** —— price 表の中にしか現れず、いまは飾り
+
+### 再開するとき最初に打つもの
+
+```bash
+# 30 分周期がまだ在るか（これが在る限り章は完走しない）
+ssh gad 'sudo journalctl -u comfyui-h3 --since \"-6h\" --no-pager | grep -E \"Stopped|Started\"'
+# 止めている経路を特定する
+ssh gad 'sudo journalctl --since \"-2h\" | grep \"systemctl stop comfyui-h3\"'
+# ノードの現在地
+curl -sS -H \"authorization: Bearer <token>\" http://127.0.0.1:18081/healthz | jq '{resourceClasses, queueDepth}'
+# 章の続き（ssh -L 18081/18191 が要る。p.10 と p.1 以外の 19 ページ）
+cd orgs/com-junkawasaki/org-spirit-in-physics-comics
+nbb --classpath \"scripts:../../kotoba-lang/kami-mangaka-page/src:../../kotoba-lang/kami-genko/src\" \\
+    scripts/manga/run.cljs volumes/vol01-water-city/chapter01 1 4 2 5 6 …
+```
+
+参照画像は Cloudflare Worker `sip-manga-refs`
+（`https://sip-manga-refs.04-feasts-minded.workers.dev/sip/ch01/`）が配っている。
+この Worker が消えると生成が参照なしになり、**キャラが出ない絵が黙って返る**。")))

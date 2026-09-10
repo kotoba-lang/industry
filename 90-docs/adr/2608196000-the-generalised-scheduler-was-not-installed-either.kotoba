@@ -1,0 +1,79 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608196000")
+  (:adr/title "The generalised scheduler was not installed either")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/supersedes "")
+  (:adr/body
+"## What was measured
+
+ADR-2608124800 found roughly twenty verification scripts that read `orgs/` and
+therefore cannot be murakumo fleet gates -- a node gets only the target repo's
+tree, so a detector that scans `orgs/` finds an empty workspace and can never go
+green. `root-permit-index` stood at 0 pass / 282 fail for exactly that.
+
+Its diagnosis is quoted in `scripts/orgs-detector-tick.cljs`'s own header:
+
+    That home existed as five uninstalled launchd plists in `scripts/` and was
+    never loaded; one of them was the only caller of three verifiers, one of
+    which guards custody that has already cost irreversible asset loss.
+    **Nothing was wrong with the checks. The scheduler was never installed.**
+
+So it built one registry-driven tick, `so the next detector is a registry entry
+rather than a sixth plist that also does not get installed`.
+
+Measured 2026-08-19: **that tick had no LaunchAgent either.**
+
+  - `ls ~/Library/LaunchAgents | grep -i detector` -- nothing
+  - `crontab -l | grep detector` -- nothing
+  - no plist anywhere in the workspace names `orgs-detector-tick`
+  - `~/.gftd/orgs-detector-tick/state.edn` last updated 2026-08-18T06:55Z,
+    about 32 hours earlier
+
+Fifteen detectors are registered against it. Run by hand, the tick works: it
+respects per-detector intervals, resolves findings, and writes state. Nothing
+was wrong with the checks. The scheduler was never installed -- again, and to
+the thing whose header says so.
+
+## Why it stayed invisible
+
+The SessionStart hook already computes per-detector staleness and prints
+`最終測定 4d前`. That reads as *nothing changed*, not as *nothing ran*, and the
+two are indistinguishable from a detector's own line: a detector that has not
+been run reports exactly what a detector with no new findings reports.
+
+## Decision
+
+1. **Install the LaunchAgent.** `com.gftd.orgs-detector-tick`, StartInterval
+   21600 (six hours -- the shortest per-detector interval; the tick skips what
+   is not due), WorkingDirectory at the superproject root, log to
+   `~/.gftd/orgs-detector-tick.stdout.log`. Loaded and confirmed in
+   `launchctl list`.
+
+2. **Keep the plist in the repository** at
+   `scripts/com.gftd.orgs-detector-tick.plist`. This is exactly what the five
+   uninstalled plists did, so it is not the fix -- it is how the fix is
+   reproducible on another machine.
+
+3. **The hook checks for the scheduler**, and says so louder than any single
+   detector's age, because every one of those ages is a consequence of it.
+   The absence prints an install command rather than a complaint.
+
+## Evidence
+
+Both directions, run against the real hook: with the plist present the warning
+is absent and the report prints; with the plist moved aside, the hook prints
+`⚠⚠ この tick に scheduler がありません`. The tick itself was run by hand first
+and wrote state -- 58 new vendored-copy findings, 93 resolved shadow-source-path
+findings, and a `binding-stale` on the Valueflows projection, none of which had
+been reported for 32 hours.
+
+## What this does not fix
+
+The check is for a plist file's existence, not for the job being loaded or
+firing. `launchctl unload` leaves the file in place, and the hook would say
+nothing. A stronger check would parse `launchctl list`, and it is not written.
+
+There are 34 `verify-*.cljs` scripts in `scripts/`; 15 are registered detectors
+and 5 are named by a fleet gate or a hook. **What runs the other 14 was not
+measured here.**")))

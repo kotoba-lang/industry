@@ -1,0 +1,159 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607257500-murakumo-resident-workers-and-fleet-read-surface")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-07-25")
+  (:adr/title "murakumo resident task workers (p50 241ms → 15ms) and the fleet read surface restored on nbb")
+  (:adr/repos (vector "orgs/kotoba-lang/murakumo"))
+  (:adr/related (vector "90-docs/adr/2607256000-murakumo-task-plane-distributed-execution.edn"
+                "90-docs/adr/2607256500-murakumo-transport-contract-multiplexing-admission.edn"
+                "90-docs/adr/2607173000-fleet-babashka-to-nbb.edn"
+                "90-docs/adr/2607071400-murakumo-family-k8s-wasmcloud-wadm-positioning.edn"))
+  (:adr/decision "{:resident-workers {:what \"one `ssh host bash -s` kept alive per slot; tasks framed onto its stdin as a subshell + the shared __murakumo_rc= sentinel + a per-task __murakumo_end=<id> delimiter\", :why-not-kotoba-server \"the gap list called for a resident worker ON kotoba-server, but only 5 of 11 fleet nodes run kotoba-server at all — a resident SHELL works on every reachable node today and does not couple batch execution to mesh health\", :default true, :fallbacks {\"--no-worker\" \"one ssh per task (keeps stderr separate)\", \"--no-multiplex\" \"also drop connection reuse\"}, :trade-offs [\"stderr merges into stdout, flagged as :stderr-merged? true\" \"a hung task is stopped by killing its worker: task -> :timeout?, worker respawned, the rest of that node's queue continues\"]}, :ops-status {:what \"nbb port of the bb-era `nodes` + `status`, folded into ONE ssh round trip per node (the bb version needed 3-4)\", :reuses \"murakumo.dash.state (.cljc): probe-command / probe-lines / parse-health / probe-node — decision logic is not re-implemented\", :not-ported \"murakumo.report is built on `format`, which nbb does not provide; the bb formatter stays put until those commands are ported\"}, :cli-defaults \"--nodes / --labels / --roles now apply as DEFAULTS to a --tasks file batch, each task still overriding them\"}")
+  (:adr/measurements "[{:what \"transport A/B, 110 tasks x 11 nodes, hostname -s, 1 slot/node\", :one-ssh-per-task {:p50-ms 241, :wall-ms 2572}, :multiplexed {:p50-ms 90, :wall-ms 1577}, :resident-workers {:p50-ms 15, :p95-ms 175, :wall-ms 403, :task-ms 3405}, :delta \"p50 -94%, wall -84% end to end\", :date \"2026-07-25\"} {:what \"worker failure paths, single node (asher, a macOS node whose ssh lies about exit codes)\", :result {:hang \"TIMEOUT at 2502ms, worker killed\", :next-task \"ran on the respawned worker (156ms)\", :failing-task \"exit 5 detected via the in-band sentinel\", :stderr \"merged into stdout as designed\"}, :date \"2026-07-25\"} {:what \"fleet read surface, first run\", :result {:reachable 11, :total 12, :kotoba-server-up 5, :binary-installed 5, :launchdaemon-installed 5, :daemon-flags \"RunAtLoad=true KeepAlive=true\", :watchdog-daemon 3}, :date \"2026-07-25\"} {:what \"offline tests\", :result {:tests 22, :assertions 127, :failures 0, :host \"nbb\"}, :date \"2026-07-25\"}]")
+  (:adr/findings "[{:id :half-the-fleet-is-unprovisioned-residency-itself-is-fine, :severity :high, :evidence \"/Library/LaunchDaemons/com.murakumo.kotoba-mesh.plist is installed on all 5 provisioned nodes (simeon, levi, joseph, dan, benjamin) with RunAtLoad=true and KeepAlive=true, plus com.murakumo.kotoba-mesh-watchdog on dan/simeon/joseph. Every live kotoba-server reports XPC_SERVICE_NAME=com.murakumo.kotoba-mesh and the full provisioned env (KOTOBA_AGENT_ED25519_HEX/DID, KOTOBA_P2P_*, roles/labels/ports, bootstrap peers), i.e. they are launchd-MANAGED services. The other 5 Macs (asher, judah, zebulun, naphtali, issachar) have neither the binary nor the daemon.\", :impact \"the gap is PROVISIONING, not residency: half the mesh fleet has never been (or is no longer) provisioned, while the provisioned half self-heals as designed\", :correction \"this finding was published twice in wrong forms — first as 'no node has the LaunchAgent plist', then as 'agents exist but none start kotoba-server / the live servers are launchd-adopted orphans'. Both came from looking only in ~/Library/LaunchAgents and from running `launchctl list` over SSH, which shows the USER domain and never lists a system daemon. PPID 1 is what a launchd-managed daemon looks like; it was misread as orphaning. The prose here is the measured state.\", :status \"README 'Status (honest)' corrected; provisioning the 5 dark Macs needs no rebuild (the installed binaries are byte-identical, sha256 f1c813cf...) and all 5 accept passwordless sudo, but it does need MURAKUMO_OPERATOR_SEED, from which each node's KOTOBA_AGENT_*/KOTOBA_P2P_* identity is deterministically derived — absent from the environment, from kagi under that name, and from the login Keychain under that service\"} {:id :provisioning-the-dark-macs-is-ready-except-for-the-operator-seed, :severity :info, :evidence \"prerequisites measured on all 5 unprovisioned Macs (asher, judah, zebulun, naphtali, issachar): `sudo -n true` succeeds on every one (so a LaunchDaemon can be installed), the kotoba/kotoba-server pair is byte-identical on the 5 healthy nodes and copyable node-to-node (no rebuild, bin/BUILD.edn pin kotoba 4f38b74a), free disk 58G/11G/23G with issachar at 1.3G and naphtali at 2.8G\", :blocker \"MURAKUMO_OPERATOR_SEED — each node's KOTOBA_AGENT_ED25519_HEX / KOTOBA_AGENT_DID / KOTOBA_P2P_ED25519_HEX / KOTOBA_AGENT_X25519_HEX is sha256(seed:node-name) per murakumo.identity, so a faithful provision cannot be assembled without it. Looked up by EXACT identifier only, per the no-enumeration rule: kagi returns `no such item: MURAKUMO_OPERATOR_SEED` and the login Keychain has no such service. Search stopped there rather than guessing name variants.\", :rejected-alternative \"letting the new nodes self-generate identities would silently diverge from the fleet's deterministic identity model, so it was not done\"} {:id :node-secret-printed-into-a-session-transcript, :severity :medium, :evidence \"while reading dan's ~/.gftd/mesh/run-mesh.sh the redaction pattern matched hex >=32 chars only; the value is base64, so the `--secret-key` argument of the gftd mesh tunnel was printed verbatim into the session output\", :containment \"the value was never written to any file, commit, ADR or ledger — it exists only in that conversation transcript; subsequent reads of config files were dropped in favour of key-name-only probes\", :owner-decision \"rotation of that node's gftd tunnel key is the owner's call; note that this key belongs to the gftd tunnel (murakumo.gftd.ai), not to the kotoba mesh\"} {:id :killed-worker-crashed-the-run-with-epipe, :severity :high, :evidence \"the first timeout test aborted the whole nbb process with an unhandled EPIPE on the next stdin write after the worker was SIGKILLed\", :fix \"kill! marks the worker dead synchronously (the close event arrives a tick later) and stdin errors are captured as worker failures instead of process-level exceptions\"} {:id :cli-placement-flags-ignored-for-file-batches, :severity :medium, :evidence \"`task run --tasks f --nodes asher` fanned out over the whole fleet — the flags only built the --n/--cmd template\", :fix \"flags become per-batch defaults that each task may override\"} {:id :links-column-is-history-not-current-peering, :severity :low, :evidence \"LINKS shows 18 on nodes whose kotoba-server binary has been removed\", :cause \"it counts distinct peers in ~/.murakumo/mesh.log, which outlives the binary\", :status \"documented in README rather than changed — the log grep is the same source reconcile uses, and replacing it needs a lattice ps --json on kotoba-server\"}]")
+  (:adr/known-gaps "[{:gap \"task runs are still recorded to a machine-local EDN ledger, not the kotoba Datom log\", :blocked-by \"repo.write needs the operator bearer token derived from MURAKUMO_OPERATOR_SEED, which is not present in this environment; shipping an unverifiable write path was refused\"} {:gap \"5 of the 10 mesh Macs (asher, judah, zebulun, naphtali, issachar) are unprovisioned — no binary, no daemon; the provisioned half self-heals correctly\", :blocked-by \"MURAKUMO_OPERATOR_SEED, from which each node's KOTOBA_AGENT_*/KOTOBA_P2P_* identity is derived; NOT blocked on the artifact (byte-identical binaries are copyable from any healthy node) nor on privileges (all 5 accept passwordless sudo)\", :note \"disk headroom is thin on issachar (1.3G) and naphtali (2.8G); the executable runbook is in the ADR body\"} {:gap \"the remaining bb-era commands (provision / up / down / mesh / deploy / reconcile / infer / model / dash) still have no runnable entrypoint\", :note \"`ops status` and `task probe` now cover the read side; the mutating commands are the next port, and murakumo.report needs a format-free rewrite first because nbb has no `format`\"} {:gap \"per-task floor is now ~15ms p50, bounded by the framed round trip on a shared stdin channel; further gains need a real RPC surface on kotoba-server\"} {:gap \"still no distributed object store / futures, no lineage re-execution, no gang scheduling, no autoscaler — the Ray-scope items from ADR-2607256000 are unchanged\"}]")
+  (:adr/body "# ADR-2607257500: resident task workers, and the fleet read surface restored
+
+**Status**: accepted
+**Date**: 2026-07-25
+**Deciders**: Jun Kawasaki
+**Scope**: `orgs/kotoba-lang/murakumo`
+
+## Context
+
+ADR-2607256500 left two gaps at the top of its list: the task plane's per-task
+floor was still an ssh channel open (~139ms p50 even multiplexed), and the
+bb-era control-plane commands still had no runnable entrypoint, so the fleet had
+no read surface beyond `task probe`. This ADR closes both, and records what
+closing the second one revealed about the fleet itself.
+
+## Decision
+
+### 1. Resident workers instead of one ssh per task
+
+Each slot keeps one `ssh host bash -s` alive; tasks are written onto its stdin
+as a subshell, followed by the shared `__murakumo_rc=` sentinel and a per-task
+`__murakumo_end=<id>` delimiter. The reader consumes exactly up to that
+delimiter, so one task's output cannot bleed into the next.
+
+| transport | per-task p50 | wall (110 tasks × 11 nodes) |
+|---|---|---|
+| one ssh per task | 241ms | 2572ms |
+| + connection multiplexing | 90ms | 1577ms |
+| + resident workers (default) | **15ms** | **403ms** |
+
+The earlier gap list asked for a resident worker **on kotoba-server**. That
+would serve only the 5 of 11 nodes currently running kotoba-server and would
+make batch execution depend on mesh health; a resident **shell** works on every
+reachable node today. Trade-offs are surfaced in the result map rather than
+hidden: stderr merges into stdout (`:stderr-merged?`), and a hung task is
+stopped by killing its worker — the task is reported `TIMEOUT`, the worker is
+respawned, and the rest of that node's queue continues. `--no-worker` restores
+one ssh per task (which keeps stderr separate).
+
+### 2. `ops status` — the read surface, on nbb
+
+`nodes` and `status` are folded into ONE round trip per node: `/health`,
+`wasm_executor`, peer links, hosted component CIDs, mesh binary presence and
+LaunchAgent state. The bb version needed 3–4 sequential ssh calls per node. The
+probe command, line parsing and row shape all come from the portable
+`dash/state.cljc` core the bb dashboard already used — no decision logic is
+re-implemented. `murakumo.report` is deliberately NOT ported: it is built on
+`format`, which nbb does not provide.
+
+## What the restored read surface found
+
+Running it, and cross-checking with an independent `task run` over all 11
+reachable nodes:
+
+- `~/.murakumo/bin/kotoba-server` exists on **5** nodes (simeon, levi, joseph,
+  dan, benjamin); those 5 answer `/health` with `wasm_executor: ready`.
+- The other **6 have no binary** — they are un-provisioned, not crashed.
+- **Residency is in place on the provisioned 5, as a system LaunchDaemon.**
+  `/Library/LaunchDaemons/com.murakumo.kotoba-mesh.plist`, `RunAtLoad=true`,
+  `KeepAlive=true`, with `com.murakumo.kotoba-mesh-watchdog` alongside it on
+  dan / simeon / joseph. Every live server reports
+  `XPC_SERVICE_NAME=com.murakumo.kotoba-mesh` and the full provisioned env, so
+  these self-heal as the README describes.
+- The installed binaries are **byte-identical** across the 5 nodes
+  (sha256 `f1c813cf…`), so redistributing that artifact needs no rebuild.
+
+**Correction.** This section first claimed that no node had the LaunchAgent and
+that the live servers were orphans with nothing to restart them; a second pass
+kept the conclusion and blamed the `ai.gftd.murakumo-*` agents. Both were wrong.
+The daemon lives in `/Library/LaunchDaemons`, not `~/Library/LaunchAgents`, and
+`launchctl list` over SSH reports the *user* domain only, so it never lists it —
+`PPID 1` is exactly what a launchd-managed daemon looks like. The gap is
+**provisioning, not residency**: the 5 dark Macs (asher, judah, zebulun,
+naphtali, issachar) were simply never provisioned. They all accept passwordless
+`sudo` and have room for the ~100MB binary pair (thin on issachar 1.3G and
+naphtali 2.8G), so the only missing input is `MURAKUMO_OPERATOR_SEED`.
+- `LINKS` counts peers in `~/.murakumo/mesh.log`, which outlives the binary, so
+  it reads as history rather than current peering.
+
+Re-provisioning does **not** need a rebuild — the artifact can be copied from any
+of the 5 healthy nodes. What it still needs is the operator seed
+(`MURAKUMO_OPERATOR_SEED`) that per-node identity and the LaunchAgent template
+are derived from; it is absent from this environment and from
+`.claude/skills/secrets-location-map`. Recorded in README `Status (honest)` so
+the next operator sees measured state next to the design claims.
+
+## Defects found while verifying
+
+1. **A killed worker took the whole run down.** After the timeout SIGKILL, the
+   next stdin write raised an unhandled EPIPE. `kill!` now marks the worker dead
+   synchronously (the close event arrives a tick later) and stdin errors are
+   captured as worker failures.
+2. **CLI placement flags were ignored for file batches** —
+   `task run --tasks f --nodes asher` fanned out fleet-wide. The flags are now
+   per-batch defaults that each task may override.
+
+## Consequences
+
+- Second-scale fan-out is no longer dominated by transport: 110 trivial tasks
+  across the fleet complete in 403ms wall.
+- The operator has a working read loop again (`ops status`), and it reports
+  measured state rather than the README's intent.
+- Two gaps stay open for reasons outside this change: Datom-log persistence of
+  runs needs the operator seed (absent from this environment — an unverifiable
+  write path was not shipped), and restoring the mesh on the 6 dark nodes needs
+  binaries this checkout does not carry.
+
+## Runbook — provisioning the 5 dark Macs (ready except for one input)
+
+Everything except the operator seed has been measured as ready, so the next
+session can execute this directly once the seed's location is known.
+
+**Blocked on**: `MURAKUMO_OPERATOR_SEED`. Every node's
+`KOTOBA_AGENT_ED25519_HEX` / `KOTOBA_AGENT_DID` / `KOTOBA_P2P_ED25519_HEX` /
+`KOTOBA_AGENT_X25519_HEX` is `sha256(seed:node-name)` (`murakumo.identity`), so
+the daemon's env cannot be assembled without it. Checked by exact identifier
+only: kagi says `no such item`, the login Keychain has no such service. Letting
+the new nodes self-generate identities was rejected — it would silently diverge
+from the fleet's deterministic identity model.
+
+**Ready**:
+
+| prerequisite | state |
+|---|---|
+| target nodes | asher, judah, zebulun, naphtali, issachar (5 of the 10 mesh Macs) |
+| artifact | `kotoba` + `kotoba-server` are byte-identical on the 5 healthy nodes (`f1c813cf…`) — copy node-to-node, no rebuild |
+| privileges | `sudo -n true` succeeds on all 5, so `/Library/LaunchDaemons` is writable |
+| disk | 58G (judah) / 23G (asher) / 11G (zebulun); **thin on issachar 1.3G and naphtali 2.8G** |
+| shape to reproduce | `com.murakumo.kotoba-mesh` daemon, `RunAtLoad=true`, `KeepAlive=true`, plus the watchdog daemon dan/simeon/joseph carry |
+
+**Order**: canary `asher` first (dark, nothing to conflict with) → verify
+`/health` and lattice peering via `ops status` → then the remaining four.
+`issachar` also carries a stale `com.etzhayyim.kotoba-server` plist pointing at
+a binary that no longer exists; clear that while provisioning it.
+
+## Verification
+
+22 offline tests / 127 assertions green under nbb, including framing tests that
+pin the delimiter rule the worker's correctness rests on. Live: the transport
+A/B above, the timeout/respawn/exit-code paths on a macOS node, and the fleet
+read surface itself. No fleet mutation has been performed under this ADR — every
+fleet interaction so far has been read-only.")))

@@ -1,0 +1,51 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607195300-kami-stem-interchange-display-color")
+  (:adr/title "KAMI adds aligned stem interchange and display color authority")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607195200-kami-effect-automation-delivery-loudness"))
+  (:adr/decision
+  (map (:daw (map (:bundle-format :zip)
+         (:bundle-entries (vector :project.edn :stems.edn :track-wav-files))
+         (:manifest-version 1)
+         (:stem-format (map (:sample-rate 44100) (:bit-depth 16) (:channel-layout :mono)))
+         (:timeline-origin-tick 0)
+         (:timeline-end-authority :project-duration-ticks)
+         (:render-order :sequential-offline-contexts)
+         (:processing :shared-master-effect-graph)))
+   (:nle (map (:color-authority :project/color-pipeline)
+         (:input-authority :media-metadata)
+         (:output-spaces (vector :srgb :display-p3))
+         (:grade-parameters (map (:color/exposure-stops (vector -5.0 5.0))
+                            (:color/contrast (vector 0.0 3.0))
+                            (:color/saturation (vector 0.0 3.0))))
+         (:preview-surface :graded-canvas)
+         (:production-source :same-graded-canvas-capture-stream)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "plugin hosting" "certified broadcast loudness conformance" "interleaved surround/Atmos stems"))
+    (:nle (vector "OCIO/ICC transforms" "HDR transfer functions and container color tagging" "certified true-peak/broadcast conformance" "persistent/background proxy jobs" "additional containers" "hardware encoder control"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "8c90ab6ec4659f641bf23edb651dc81ea40ac122"))
+   (:nle-commits (vector "965693514cd7516eabe69589da8c08e18b786150"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#10" "kotoba-lang/kami-app-nle#10"))
+   (:evidence
+   (vector "DAW passes 18 tests and 70 assertions; NLE passes 20 tests and 81 assertions, including deterministic manifest acceptance and bounded color authority."
+    "Both shadow-cljs production releases completed through the repository resource guard with zero compiler warnings after resolving one forward-reference warning."
+    "Initial external stem inspection found a 3-second drums file against 5-second peer stems; rendering duration was corrected from solo-track duration to project duration before merge."
+    "Chrome downloaded a ZIP containing project.edn, stems.edn and three WAV entries; direct EDN parsing verified manifest version 1, three tracks and timeline end tick 3840."
+    "External ffprobe verified all three corrected WAVs were exactly 5.000 seconds and 441044 bytes."
+    "NLE Chrome created a Display-P3 2D canvas context, applied brightness(2), contrast(1.2) and saturate(0.8), and persisted :project/color-pipeline in recovery EDN."
+    "Production instrumentation proved captureStream was invoked on the same Decoded video preview canvas while its grade filter was active; the WebM downloaded successfully."
+    "Automated Chrome contexts and local HTTP servers were closed after verification."
+    "Both application pull requests were reviewed and squash-merged."
+    "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN parsing verified accepted status, supersedes authority, bundle format and color authority."))))
+  (:adr/consequences
+  (vector "DAW collaborators can receive every track with deterministic naming and sample-aligned timeline length in one artifact."
+   "NLE preview and production delivery no longer diverge when applying the project display grade."
+   "Display-P3 canvas output is explicit, but WebM color tagging, ICC/OCIO conversion and HDR mastering are not claimed."
+   "Interleaved surround/Atmos deliverables remain distinct from the implemented mono track-stem bundle."))
+  (:adr/source-format "edn")))

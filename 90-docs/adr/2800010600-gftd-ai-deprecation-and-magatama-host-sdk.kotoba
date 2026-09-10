@@ -1,0 +1,95 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800010600-gftd-ai-deprecation-and-magatama-host-sdk")
+  (:adr/title "gftd.ai is deprecated; and what deleting magatama-host-sdk actually costs")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-02")
+  (:adr/body "## Two owner instructions, 2026-09-02
+
+1. `gftdcojp/magatama-host-sdk` may be deleted.
+2. **gftd.ai is deprecated; refactor everything onto itonami.cloud.**
+
+This ADR records what was measured before acting, including a correction to a
+framing this session itself produced.
+
+## Correction: \"six symbols\" was misleading
+
+The four appviews that depend on the SDK import exactly six names, and this
+session reported that as \"a six-symbol shell\". That is true of the IMPORT
+SURFACE and false about the WORK:
+
+| symbol | where | size |
+|---|---|---|
+| `asAgentTool` / `withCapabilityTags` / `withOCELEvent` | `app-options.ts` | 3 lines each, `CommandOption` setters, touch no database |
+| `nsid` | already exists in `kotoba-lang/xrpc` (`@etzhayyim/xrpc`, `./nsid`) | nothing to move |
+| **`createWorkerExport`** | `index.ts` | calls `createDefaultHostSDK` |
+| **`HostSDK`** | `index.ts` | the interface over the whole host |
+
+`createDefaultHostSDK` builds `app.ts` (993 lines), `host-imports.ts` (1,289),
+the PDS `XrpcClient`, the Hono router and the WIT export surface
+(`httpHandler` / `wHandler` / `serveHandler` / `shinkaHandler`).
+
+**The SDK is 67 files, 68,345 lines.** Two of the six symbols ARE that. Moving
+them is moving the host runtime, not extracting a shell. The option chosen on
+2026-09-02 (\"move the six symbols first, then delete\") was chosen on the
+misleading half of that description.
+
+## Every dependent is dead
+
+| appview | route | measured |
+|---|---|---|
+| `cloud-itonami/media` | media.itonami.cloud | **NXDOMAIN** |
+| `cloud-itonami/news` | news.gftd.ai | timeout |
+| `gftdcojp/ai-gftd-media` | media.gftd.ai | timeout |
+| `gftdcojp/mamori` | mamori.gftd.ai | timeout |
+
+Control: `gftd.ai` itself answers 200 from the same client, so the timeouts are
+the hosts and not the network.
+
+**No itonami.cloud successor exists.** `itonami.cloud/media`, `/news` and
+`/mamori` return 200, but so does `/definitely-not-a-page`, and all four
+responses are the same SHA-256 as the home page — the SPA catch-all
+(`/* /index.html 200`). The same trap this session hit at `/install.sh`, where
+a catch-all 200 would have fed the home page into `sh`. **A 200 from this site
+is not evidence a surface exists; compare the body hash to the home page.**
+
+## What follows
+
+Nothing is live, and the SDK exists only to serve those four. Porting 68,345
+lines of host runtime into kotoba-lang so that four dead appviews keep
+building is work with no consumer. If media / news / mamori are wanted on
+itonami.cloud, that is a build on the itonami stack — which is live and
+already serving — not a port of the gftd-era host SDK.
+
+So the recommendation is **retire rather than migrate**, and the sequencing
+question for the owner is whether the four appviews are retired with it.
+
+## Blocked on the owner either way
+
+The workspace token carries `gist, read:org, repo`. GitHub requires
+**`delete_repo`** for `DELETE /repos/{owner}/{repo}`, so this agent cannot
+delete the repository regardless of the decision. Repository deletion is also
+outside the standing authorization in CLAUDE.md.
+
+## The gftd.ai deprecation surface
+
+**21 wrangler configs across 20 repositories** route to gftd.ai:
+
+    cloud-itonami/media  cloud-itonami/news  gftdcojp/ai-gftd-media
+    gftdcojp/apex  gftdcojp/engi  gftdcojp/fashion  gftdcojp/itad
+    gftdcojp/mamori  gftdcojp/shirabe  net-kotobase/engine
+    net-kotobase/ipfs  network-awai/cloud-murakumo
+    network-awai/cloud-murakumo-api
+    network-awai/cloud-murakumo-api-categories-deploy
+    network-awai/cloud-murakumo-api-codex-categories
+    network-awai/cloud-murakumo-api-codex-categories-final
+    network-awai/cloud-murakumo-llms-codex  network-awai/local-murakumo
+    network-awai/local-murakumo-fastmtp  network-awai/local-murakumo-runpod5090
+
+Four of them are the magatama dependents above. **Liveness was measured only
+for those four** — the other sixteen are unmeasured, and the same catch-all
+trap applies to any of them fronted by a SPA, so check body hashes rather than
+status codes. Do not read this list as sixteen live services needing a port.
+
+The surface index (`90-docs/surface/surface.datoms.edn`) also still carries
+`news.gftd.ai -> orgs/gftdcojp/ai-gftd-news`, a fifth gftd-era repo not in the
+wrangler list.\n\n## 2026-09-02 実施分と、この ADR 自身の訂正\n\n### 訂正 1: `gftdcojp/ai-gftd-media` は別 repo ではない\n\nThis ADR listed it as a fourth dependent with its own dead route\n`media.gftd.ai`. It is **the same repository as `cloud-itonami/media`** —\n`GET /repos/gftdcojp/ai-gftd-media` answers `full_name: cloud-itonami/media`.\nThe transfer already happened and GitHub redirects the old name.\n\nWhat produced the wrong reading is a **stale duplicate checkout**:\n`orgs/gftdcojp/ai-gftd-media` sits at 2026-07-19 content, is registered in\n`manifest/west.yml` under NO name, and is clean with no unique commits. Two\ncheckouts of one repo at different pins look exactly like two near-identical\nrepos — the 9-line diff that made it read as a duplicate was six weeks of\ndrift, not a fork. So the dependent count is **three distinct repos**, not\nfour, and there is nothing to migrate here: the move is done.\n\n### 訂正 2: `generation.murakumo.cloud` is not a successor\n\n`murakumo-generation.gftd.ai` is live (403, auth-gated) and\n`generation.murakumo.cloud` answers 200, which reads like the obvious\ndestination. It is not: its body is **byte-identical to `murakumo.cloud/`**\n— the marketing page, not a generation API. Pointing a production generation\nupstream there would have failed silently.\n\nThat is the third time in this session the same trap produced a confident\nwrong answer (`/install.sh`, `itonami.cloud/media|news|mamori`, and here).\n**On these zones a 200 is not evidence a surface exists. Compare the body\nhash against the zone root and against a path known not to exist.**\n\n### Landed\n\n- `cloud-itonami/news` → `news.itonami.cloud` (ef299ba2). Not just the route:\n  `news.core/writer-did-for-source` minted `did:web:news.gftd.ai:writer:{slug}`\n  for every attributed source, and a did:web resolves from the host inside it,\n  so the constant had to move or mint unresolvable DIDs. 20 occurrences across\n  core/schema/taxonomy/tests/fixtures. `src/app.ts` was also returning\n  `movedTo: \"media.gftd.ai\"` to callers while media had been at\n  media.itonami.cloud for three weeks. Config only — not deployed.\n- `gftdcojp/shirabe` (dbcd917c): worker `ai-gftd-project-shirabe` → `shirabe`;\n  dropped `SHIRABE_DAEMON_URL`, which pointed at a dead host AND overrode the\n  code's own `?? \"http://127.0.0.1:8765\"` localhost default.\n\n### Already clean\n\n`gftdcojp/mamori` and `gftdcojp/engi` — other sessions had already dropped\ntheir routes and DIDs. Their remaining `gftd` strings are the\n`@gftd/magatama-host-sdk` dependency, provenance in MIGRATION.edn, and NSIDs.\n\n### Not touched, deliberately: `ai.gftd.apps.*`\n\nThese are **AT Protocol XRPC method identifiers** — wire contract with\ncallers, not decoration. `mamori`'s own README states the rule: \"The\n`ai.gftd.apps.mamori.*` NS is a leftover protocol identifier; do not rename\nit.\" `ai.gftd.apps.kotobase.datomic` is additionally translated server-side by\nkotobase.net, and this session established that kotobase.net cannot be probed\nfor method routing — it returns 401 for a method that does not exist as\nreadily as for one that does. Renaming a namespace that a live server\ntranslates, without being able to test it, is a data-plane break dressed as a\nstring cleanup.\n\n### Still open\n\n- `itad.gftd.ai` (200, genuinely live) and `murakumo-generation.gftd.ai` (403,\n  live, no verified successor) — both need a destination decision and a deploy\n  window, not a config sweep.\n- `fashion.gftd.ai` (dead) — same treatment as shirabe, not yet done.\n- `auth.gftd.ai` — a 19th host, found only because `authn.gftd.ai` 301s to it.\n\n## 完了状態（2026-09-02 セッション終了時）\n\n**west-registered な tree に、生きた `gftd.ai` の値は 1 つも残っていない。**\nmedia / news / apex / fashion / itad / mamori / shirabe の 7 repo すべてで\nlive-values=0。残る `gftd.ai` の文字列はすべて「なぜその host を退役させたか」\nを書いたコメントで、これは意図的に残す —— 死んだ名前より、理由が消えることの\n方が悪い。\n\n### Round 2 で着地した分\n\n| repo | commit | 内容 |\n|---|---|---|\n| `gftdcojp/itad` | 9aee4915 | itad.gftd.ai → itad.itonami.cloud。**唯一の live(200)** だったので実質的な cutover。43 箇所 / 21 ファイル —— SEO canonical・sitemap・robots・JSON-LD の `@id`、pickup token、そして**顧客が持つ書類に印字される** receipt / cert の verify URL。worker 名 `ai-gftd-itad` → `itad`。82 tests / 301 assertions / 0 failures |\n| `cloud-itonami/media` | 051656e8 | KOTOBA_BEARER の rotation note が、prune 対象の `authn.gftd.ai` を発行元として名指ししていた。死んだ issuer を rotation 手順に残すのは、note が無いより悪い |\n| `gftdcojp/fashion` | af5b8e8b | 最後の live value。dead route を**代替 host を書かずに**削除し、worker 名 `ai-gftd-fashion` → `fashion` |\n\n### 判断として記録しておくこと\n\n- **死んだ host は itonami.cloud に機械的に書き換えない。** mamori / shirabe /\n  fashion は route を落として代替を書いていない。誰も serve していない名前を\n  良い zone の側に作るだけになるし、custom domain の provisioning は\n  Cloudflare dashboard での owner operation で、route 行を書けば生えるものでは\n  ない。書き換えたのは live な itad と、itonami org 所有の news だけ。\n- **`gftd.co.jp` は触っていない。** 法人ドメインであり、itad の 古物商 免許申請\n  書類（URL 疎明）に載っている。deprecated な `gftd.ai` zone とは別物で、申請\n  書類からドメインを消すのは cleanup ではなく虚偽記載になる。\n- itad の licence dossier は **完成ドラフト（未提出）**なので更新した。提出済み\n  文書なら書き換えない。\n\n### 3 度目の stale-checkout 誤読\n\nこの ADR を書く直前の測定で `mamori` に live route と DID が残っていると報告\nしかけた。**working tree が pin より古かっただけ**（checkout 6e3ecb24 / pin\n67c8e602）。同期したら comment のみだった。このセッションで stale checkout に\n3 回騙されている（ai-gftd-media、cloud-murakumo-llms-codex、mamori）ので、\n**grep の結果を信じる前に pin / tip / checkout の 3 点を突き合わせる。**\n\n### 残件（次の agent の resume point）\n\n1. **どれも deploy していない。** news / itad / fashion / shirabe は config の\n   変更のみ。特に itad は live service なので、`custom_domain: true` が\n   itad.itonami.cloud の DNS を作る deploy が実際の cutover。\n2. **旧 worker が Cloudflare account に残る。** name 変更は deploy 時に別 worker\n   を作るので、`ai-gftd-project-shirabe` / `ai-gftd-itad` / `ai-gftd-fashion`\n   は手で削除する。\n3. **`gftd.ai` apex 自体。** `gftdcojp/apex` は Pages プロジェクトで live な\n   apex(200)を serve している。custom domain は dashboard 設定なので wrangler に\n   route が無い。zone を畳むなら会社の公開サイトをどうするかの owner 判断。\n4. **orphan checkout 5 件** —— disk 上にあるが west に**名前で登録されていない**、\n   clean で unique commit 0: `cloud-murakumo-llms-codex`,\n   `cloud-murakumo-api-codex-categories`, `…-final`, `…-categories-deploy`,\n   `gftdcojp/ai-gftd-media`。最初の「20 repo」という数を膨らませ、誤読を 2 回\n   生んだ原因。削除は `git-cleanup-conflict` の retirement 手順で。\n5. **`ai.gftd.apps.*` / `ai-gftd-itad.*` / `@gftd/magatama-host-sdk`** は未着手。\n   理由は上の節のとおり（wire contract / 内部大規模 refactor / repo 削除待ち）。")))

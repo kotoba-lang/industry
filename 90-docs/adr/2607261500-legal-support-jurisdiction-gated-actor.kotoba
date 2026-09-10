@@ -1,0 +1,202 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607261500")
+  (:adr/title "cloud-itonami-isic-6910-legalsupport — 法域ゲート付き AI 法務書類・手続支援アクター（紹介料を取らない）")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-26")
+  (:adr/org "cloud-itonami")
+  (:adr/repo "cloud-itonami/cloud-itonami-isic-6910-legalsupport")
+  (:adr/isic "6910")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "cloud-itonami isic-6910 legaltech actor governor jurisdiction-catalog access-to-justice")
+  (:adr/body
+  "## Context
+
+オーナーからの問い: 「今の cloud-itonami に、全世界の弁護士と法律相談者を
+マッチングする SaaS はあるか」。調査結果は **無い**。cloud-itonami の 1,225
+repo のうち法務ドメインは4つあるが、いずれも供給側の業務ロボットか読み取り
+専用のルールカタログで、相談者の獲得（client discovery）は設計に入っていない:
+
+- `cloud-itonami-isic-6910` — 同じ ISIC だが会社設立・登記代行にスコープ限定
+  （Registrar-LLM ⊣ RegistrarGovernor）
+- `cloud-itonami-isco-2611` — 単一法律事務所の案件ファイル管理・利益相反チェック
+- `cloud-itonami-isco-2612` / `-2619` — 私的仲裁の記録管理 / 公証・認証支援
+- `cloud-itonami-assoc-6910-jpn-nichibenren` — 日弁連 自主規制ルールの
+  read-only カタログ（actuation なし）
+
+二面マッチングの先行実装は `cloud-itonami-isic-7810`（雇用仲介）のみ。
+
+これを受けてオーナーが方向を指定した:
+**「法律については収集して edn に法的に成立するものを整理。成功報酬ではなく、
+AI agent による手続き・法的支援・書類手続き・ドキュメント支援をサービスに
+したい」**。
+
+## Decision
+
+`cloud-itonami/cloud-itonami-isic-6910-legalsupport` を新設する。
+**LegalSupportAdvisor ⊣ LegalSupportGovernor**（itonami actor パターン、
+ADR-2607011000）。収益は書類・手続支援そのものの対価であり、案件の取次ぎの
+対価ではない。
+
+### D1. 法域ルールを EDN コーパスにし、それを実行時のゲートにする
+
+`legalsupport.facts/catalog` は 15 法域・27 ルールを一次出典 URL 付きで持つ。
+これは**ドキュメントではなく実行経路**である: `legalsupport.governor` は毎回
+`legalsupport.admissibility/evaluate` を呼び、返った blocker はすべて HARD
+hold になる。未収載法域は提供できず、当該法域が認めないサービスモードは
+`:commit` に到達しない。commit された record は governor が依拠した
+`:citations` を持つので、監査台帳は「何を渡したか」だけでなく
+「どの出典で適法と判断したか」に答える。
+
+### D2. 検証階層を持ち、**未検証出典から許可を出さない**
+
+各ルールは `:rule/verification` を持つ:
+`:primary-source-read`（原典を取得して読了）/ `:official-url-retrieved`
+（公式規制当局ページを取得して読了）/ `:secondary-source-only`（解説要約のみ）。
+
+**二次情報のみに支えられた `:admissible` は `admissibility/verdict-for` が
+`:unsettled` に降格する**（`:downgraded-from` を記録）。制限的 verdict には
+この制約を課さない。**慎重方向に誤ればカバレッジを失うだけだが、許可方向に
+誤れば利用者を無資格法律業務の刑事責任に晒す**——この非対称をコードが体現する。
+`facts-test/permissive-verdicts-are-never-groundless` が全エントリで証明する。
+
+内訳: primary-source-read 8 / official-url-retrieved 1 / secondary-source-only 18。
+この 18 という数字を README と `coverage` で公表する（隠すと穴が見えなくなる）。
+
+### D3. 送客対価は法域を問わず設計上拒否する
+
+`admissibility/forbidden-revenue-modes` = `#{:revenue/per-referral-fee
+:revenue/success-fee-share}`。**その法域が許していても拒否する。** 根拠は
+オーナー指示（成功報酬ではない）に加えて構造的理由: 十分な数の法域が禁じて
+いるため、単一の世界プロダクトは最も厳しいルールを自らのルールにしないと
+成立しない。
+
+- 日本 — 弁護士法72条が「周旋」を業とすることを明文で禁止。加えて法務省
+  ガイドライン1(2)イ「第三者が提供する有償サービスの利用へ誘導し、利用時に
+  当該第三者から事業者へ金銭等が支払われるとき」は「報酬を得る目的」に
+  該当し得る = 弁護士への送客で弁護士から対価を得る構造そのもの
+- ドイツ — BRAO §49b Abs.3「受任の仲介に対する報酬・利益の授受は、相手が
+  弁護士であれ第三者であれ不可」
+- イングランド&ウェールズ — LASPO 2012 ss.56-60、人身傷害・死亡案件の紹介料禁止
+- ブラジル — OAB Provimento 205/2021、広告は情報提供的性格にとどまり
+  captação de clientela を構成してはならない
+- 米国 — 連邦の答えは無い。D.C. Rule 5.4(a) は非弁護士との法律報酬分配を禁止、
+  一方アリゾナは 2021 年に ER 5.4 を撤廃
+
+`governor-test` がアリゾナ型の寛容な法域でも再有効化できないことを証明する。
+
+### D4. 日本での成立根拠は「弁護士が自ら精査・修正する」セーフハーバー
+
+法務省大臣官房司法法制部「AI等を用いた契約書等関連業務支援サービスの提供と
+弁護士法第72条との関係について」（令和5年8月、PDF 全6ページ読了）の構造:
+
+72条違反には ①「報酬を得る目的」②「訴訟事件…その他一般の法律事件」（事件性）
+③「鑑定…その他の法律事務」の**3要件すべて**の該当が必要で、いずれか1つでも
+外れれば違反しない。**さらに3要件すべてに該当する場合でも、第4項**——
+サービスを弁護士・弁護士法人に提供し、当該弁護士（社員・使用人弁護士を含む）が
+利用結果も踏まえて**自ら精査し、必要に応じて自ら修正する**方法で利用するとき——
+**は違反しない**（(2) はインハウス弁護士による同等利用）。
+
+したがって日本の成立モードは `:mode/lawyer-reviewed` /
+`:mode/inhouse-reviewed`（第4項）と、`:mode/template-selection` /
+`:mode/document-assembly`（第3項(1)イ: 定型入力・選択肢でひな形が選別され
+そのまま/入力反映されて表示されるにとどまる場合は「鑑定…その他の法律事務」に
+該当しない）。`:mode/legal-analysis`（個別事案の経緯・背景を法的に処理して
+具体的な文書・リスク・修正案を表示）は 3(1)ア/3(2)ア に該当し得るため
+`:conditional`。
+
+収益面では 1(2)ウ が決定的で、**「顧問料・サブスクリプション利用料・会費等の
+名目を問わず金銭等を支払って利用資格を得たものに対してのみ提供するとき」も
+「報酬を得る目的」に該当し得る**——日本ではサブスクも無償扱いにならない。
+確実な経路は弁護士事務所への SaaS ライセンス（4(1) が全要件該当でもカバー）。
+
+### D5. Governor の HARD 不変条件に「レビュー弁護士の資格法域一致」を入れる
+
+第4項のセーフハーバーは「弁護士がいること」ではなく「その弁護士が自ら精査し
+自ら修正すること」を要求している。よって:
+
+1. client provenance 2. no-actuation（`:effect` は `:propose` のみ）
+3. matter basis 4. **admissibility**（カタログ由来の全 blocker）
+5. **licensed reviewer** — 有資格者が登録済み・資格検証済み・**matter の法域で
+   有資格**・自ら精査した記録あり。**他法域の資格者はレビュアーではない**——
+   越境レビューは lawyer-in-the-loop 設計が静かに無資格法律業務になる経路
+6. **dispute containment** — 事件性のある matter はどのモードでも有資格者なしに扱えない
+
+ESCALATE: 弁護士への取次ぎ / 新法域の開設 / 運営者の宣誓でのみ解錠されたモードの
+実行 / 低確信。
+
+### D6. LLM から収益モード・宣誓・レビュー事実を構造的に奪う
+
+`:revenue-mode` と `:attestations` は `store/operator-config` に、
+`:reviewer-self-reviewed?` は matter record に置き、governor が読む。advisor
+（LLM）はいずれも提案に載せられない。**自分で収益モードを名乗れる LLM は自分を
+有料紹介ビジネスに説得でき、「弁護士がレビューした」と主張できる LLM は
+サービスを適法にしている当の事実を捏造できる**からである。
+
+## Consequences
+
+### 今日提供できる範囲（`operating-envelope` の実出力、手書きではない）
+
+- **JPN**: service 4モード成立（template-selection / document-assembly /
+  lawyer-reviewed / inhouse-reviewed）、revenue は law-firm-saas-license のみ
+- **GBR (England & Wales)**: service 6モード成立（+ legal-analysis /
+  lawyer-directory）、revenue に consumer-document-fee / consumer-subscription も
+- **DEU / FRA / NLD / USA-AZ / USA-UT**: すべて `:conditional`
+  （運営者の登録・免許・サンドボックス認可を宣誓して解錠、以後毎回人間承認）
+- **AUS / BRA / CAN-ON / KOR / SGP / IND / USA / USA-DC**: 現時点で成立モード無し
+
+この非対称そのものがカタログの最も有用な事実である: England は留保業務を
+6類型に限定し法的助言を留保していないので機械が分析してよい。日本は法律事務を
+包括的に留保し、弁護士レビューのセーフハーバー経由でしか機械を入れない。
+**同じプロダクトで市場参入の構造が違う。**
+
+### GTM への含意
+
+- 消費者向けは **England & Wales 先行**（成立エンベロープが最も広い）
+- 法律事務所向けは **日本先行**（公表済みセーフハーバーの真ん中）
+- それ以外は「まず調査」——未収載約185法域は work queue であって verdict ではない
+
+### 継続的リスク
+
+法務省は 2026-01-09 の規制改革推進会議 資料5 で、①2023年ガイドラインの
+**再整理が必要**、②ガイドライン公表が**かえって開発を萎縮させている可能性**、
+③個人情報漏洩・ハルシネーションによる誤った法的情報拡散という技術的・社会的
+リスクへの**ガバナンス確保の検討が必要**、④72条は刑罰法規で個別のあてはめは
+司法判断であるため**個別具体サービスのホワイトリスト策定は困難**、と自ら述べて
+いる。**JPN の verdict は当局が可変と明言している面であり、定期再検証を要する。**
+ガイドライン自身も冒頭で「同条の解釈・適用は、最終的には裁判所の判断に委ねられる」
+と述べている。本カタログは当局が公表した考慮要素の再述であって、特定サービスの
+適法性の保証ではない。
+
+## Alternatives considered
+
+- **紹介料マーケットプレイス（当初の問いの素直な実装）** — 却下。D3 の通り
+  日本・ドイツ・ブラジル・英国(人身傷害)・DC で禁止側に倒れ、単一世界プロダクトに
+  ならない。加えてオーナーが明示的に否定した。
+- **`cloud-itonami-isic-7810`（雇用仲介）の複製** — 却下。7810 は matching 自体が
+  商品だが、法務では matching の対価取得が構成要件に触れる。骨格は参考にしたが
+  収益構造は反転させた。
+- **既存 `cloud-itonami-isic-6910` の拡張** — 却下。当該 repo は会社設立・登記代行に
+  スコープが確定しており、Registrar-LLM ⊣ RegistrarGovernor の不変条件は
+  government submission 前提。別 repo にした（先例: `-cryptoexchange` / `-facade` の
+  サフィックス方式）。
+- **法域カタログを人間可読ドキュメントに留める** — 却下。ドキュメントは実行時に
+  誰も読まない。カタログを governor の呼び出し経路に置いたことがこの repo の要点。
+- **未検証出典でも `:admissible` を出す** — 却下。D2 の非対称の通り。
+
+## Verification
+
+`clojure -M:test` 51 tests / 4,391 assertions green、`clojure -M:lint` warnings 0 /
+errors 0（いずれも実走。2026-07-26）。さらに変異テスト3件で suite が実際に
+噛むことを確認した:
+
+1. `forbidden-revenue-modes` を空集合に改竄 → 2 failures
+2. JPN の `:mode/referral-placement` を `:prohibited` → `:admissible` に改竄 → 8 failures
+3. governor のレビュアー資格法域一致チェックを無効化 → 2 failures
+
+いずれも復元後 0 failures。
+
+`data/jurisdiction-rules.datoms.edn`（276 entity、`:source/dataset
+\"legal-jurisdiction-rules\"`）は `clojure -M:emit-datoms` の生成物で、
+superproject の DataScript クエリ面（ADR-2607252000）に載る。`datoms-test` が
+`facts.cljc` との乖離で fail する。")))

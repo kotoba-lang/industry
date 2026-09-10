@@ -1,0 +1,84 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608020230-torihiki-authentication-is-consensus-state")
+  (:adr/title "ADR-2608020230: 認証はトランスポートではなくエンジンに属する — nonce と鍵束縛は合意状態である")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "torihiki-authentication-is-consensus-state")
+  (:adr/authoritative-for
+  (vector "torihiki の tx 認証の所在と署名対象"
+   "nonce の意味論（厳密連番・消費条件）"
+   "account id と公開鍵の束縛規則"))
+  (:adr/related
+  (vector "adr-2608020130-torihiki-total-block-application-and-api-surface"
+   "adr-2608011600-torihiki-verifiable-sequencer-log-phase2"
+   "adr-2608012100-torihiki-sha256-root-cljs-parity-and-published-terminal"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/torihiki"))
+  (:adr/body
+  "# ADR-2608020230: 認証は合意状態である
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ADR-2608020130 が「これは protocol であって transport ではない、**認証が無い**」と残した穴。`:account` は client が名乗るただの整数で、**誰でも他人の口座で取引できた。**
+
+## Decision
+
+### 1. 認証はエンジンに置く。トランスポートではない
+
+3 要素のうち 2 つが**合意状態**だから:
+
+- **nonce** は口座ごとの状態。validator 全員が値に合意していなければ「何が replay か」で不一致になる。
+- **鍵の束縛**も同じ。
+- transport に属するのは**枠づけ（HTTP ヘッダ・WS エンベロープ）だけ**で、そこは易しい方の半分。
+
+nonce をサーバに置くのは、**状態に合意する当のものの外側に replay 防御を置く**ことであり、それは replay 防御ではない。
+
+### 2. 署名対象は chain id・account・nonce・挙動を変える全フィールド
+
+- **chain id** = ドメイン分離。testnet で作った署名が mainnet の同じ tx を認可してはならず、それを止めるのは署名が「どのチェーン向けか」を覆っていることだけ。
+- **nonce** = 署名を 1 回限りにするもの。
+- **全フィールド**（トリガーの埋め込み注文も含む）。要約した payload は 2 つの異なる tx が 1 つの署名を共有できてしまう。フィールド列は**最小ではなく網羅的**にした——余分な 1 個は数バイト、欠けた 1 個は口座。
+
+### 3. nonce は厳密連番
+
+単調増加では不十分。飛びを許すと**鍵保持者が複数 tx に署名しておいて順序を後から選べる**——鍵を持つ者に並べ替えプリミティブを渡すことになる。
+
+### 4. 認証済みだが検証に落ちた tx も nonce を消費する
+
+保持者は**その nonce をその tx に対して**認可した。未消費のまま残すと署名が再利用可能になり、nonce の存在意義が消える。
+
+**認証自体の失敗は何も消費しない**——そのメッセージはそもそもその口座からのものではないから。
+
+### 5. account id は初回使用で鍵に束縛され、以後不変
+
+**鍵が本体で、id はその短い取っ手。** 再束縛可能な口座とは、鍵を持つ者から奪える口座である。
+
+id を鍵から導出（アドレス化）するのが本来の答えだが、**account id は book が slab に格納する整数**なので、ハッシュを切り詰めるとレジストレーション競合を**口座衝突**に置き換えることになる——そちらの方が悪い。実アドレス形式ができた時点で移行する。
+
+### 6. 検証関数は注入する
+
+`kotoba-lang/ed25519` は JVM 専用。import した瞬間、**ブロックを再検証したいブラウザが動けなくなる**（ADR-2608012100 と同じ理由）。
+
+## Consequences
+
+- (+) 他人の口座での取引が塞がれた。replay も塞がれた。
+- (+) nonce と鍵束縛が state root に入るので、**束縛済みの鍵を root を変えずに差し替えられない。**
+- (+) 未認証モードは残した——既に合意済みのログの replay で署名を再検証する必要は無い。
+- (−) **transport はまだ無い。** HTTP も WS も無く、注文を出す口は依然として無い。認証の意味論が揃っただけ。
+- (−) 実鍵（ed25519）の配線は未実施。テストは stand-in signer で配線を証明しているだけ。
+- (−) account id の先取り（他人が使う前に id を束縛する）は可能。id は単なる整数なので実害は「その id が使えない」だけだが、アドレス化すれば消える。
+
+## 残りギャップ
+
+1〜2 完了。3 は **protocol + 認証まで完了、transport（HTTP/WS）が残り**。
+4 端末 live 化、5 ADL 実行・段階証拠金・OI 上限、6 oracle 集約、7 engi 合意層、8 bridge・監査。
+")))

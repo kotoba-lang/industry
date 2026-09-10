@@ -1,0 +1,122 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608710000")
+  (:adr/title "kotoba-lang/shokyaku — 償却限度額 computed from the ordinance, and four things it refuses")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-18")
+  (:adr/repo "kotoba-lang/shokyaku")
+  (:adr/commit "978592367b645dd488846e9fe2c8b0e445122440")
+  (:adr/body
+  "## Context
+
+固定資産台帳 / 減価償却 had ZERO repos in this workspace. `nbb scripts/repo-search.cljs 償却資産`
+returned nothing across 4,208 west projects. Meanwhile `cloud-itonami/cloud-itonami-isco-4311`
+keeps books that will need 減価償却費 entries, and `kotoba-lang/taxlaw` already holds
+jurisdiction-keyed tax rules that this sits beside.
+
+## Decision
+
+Create `kotoba-lang/shokyaku` as a dependency-free (`:deps {}`) portable `.cljc` capability
+library, a sibling of `taxlaw` and `worklaw` and deliberately the same shape:
+
+- jurisdiction is a PATH (`[:jp]`), not a code
+- coverage is per FACET and per QUESTION, gated on `facet-of`, never on `covered?`
+- an uncatalogued jurisdiction is `nil` / `:none`, never `false` and never a pass
+- four-valued answers (`:none` / `:not-declared` / `:out-of-scope` / `:checked`) plus a
+  conservative convenience boolean
+
+There is deliberately NO `[:us]` entry. The United States depreciates assets — MACRS and
+IRC §168 exist — and this library has read none of them. Cataloguing it with every facet
+out of scope would record a decision nobody made.
+
+## Sources read verbatim (e-Gov law API v2, 2026-08-18)
+
+All three CurrentEnforced, repeal_status None, in the same responses the quotes came from.
+
+| Instrument | id | revision served |
+|---|---|---|
+| 法人税法 | 340AC0000000034 | _20260812_508AC0000000064 |
+| 法人税法施行令 | 340CO0000000097 | _20260731_508CO0000000094 |
+| 減価償却資産の耐用年数等に関する省令 | 340M50000040015 | _20260522_508M60000040029 |
+
+Verbatim: 法 第三十一条第一項; 施行令 第十三条, 第四十八条の二第一項・第五項, 第五十六条,
+第五十八条, 第五十九条第一項第一号・第二項, 第六十一条第一項第二号. 施行令 第四十八条
+(pre-2007 regime) was read and deliberately NOT implemented.
+
+Tables extracted from the same response and embedded as exact integer fractions:
+別表第八 (99 rows), 別表第九 (99), 別表第十 (99), 別表第三 (18), 別表第五 (2), 別表第六 (8).
+
+## What it computes
+
+定額法 and 定率法 償却限度額, including the 償却保証額 crossing into 改定取得価額 ×
+改定償却率, the 月割 of 第五十九条 (part-month rounds UP, per the article itself), and the
+備忘価額 ceiling of 第六十一条第一項第二号. Method-election validity by asset class and
+acquisition date.
+
+All arithmetic is INTEGER YEN and exact `{:num n :scale s}` fractions. ClojureScript has no
+distinct floating-point type — `1.0` reads as `1` — so a rate stored as a double would not
+round-trip under both runtimes. A non-integer 取得価額 is refused, not truncated.
+
+## What it refuses, and why
+
+1. **The method.** 法 第三十一条第一項 computes on 「その内国法人が当該資産について選定した
+   償却の方法」. Nothing defaults one; `:not-declared` names the permitted choices. The
+   article also provides for 「選定しなかつた場合」 via a 政令 not read here, so an undeclared
+   method has an answer in law that this catalog does not know.
+2. **端数処理 of the yen amount.** No provision found. The 省令 full text contains no 円未満,
+   no 切り捨て and no 切り上げ; the 端数 rules that exist govern MONTHS (第五十九条第二項, up)
+   and YEARS (省令 第三条第三項, down). Every inexact division carries
+   `:shokyaku/rounding :floor-not-in-statute` and the dropped remainder over its scale.
+3. **改定取得価額.** 第四十八条の二第五項第二号イ defines it as the 取得価額 of the year the
+   crossing happened — history a single-year function does not see. `:not-declared` until supplied.
+4. **耐用年数 for most tangible assets.** See below.
+
+## The 別表 that could not be read — measured, not assumed
+
+別表第一 (492 rows), 別表第二 (118) and 別表第四 (44) were FETCHED and are present in the API
+response. They are still not read: 細目 nests up to three levels and the nesting is marked
+ONLY by an empty 耐用年数 cell — a visual convention the JSON does not carry. 種類 and
+構造又は用途 carry `rowspan` and are recoverable; 細目 does not. **81 of 492, 11 of 118 and
+1 of 44 rows are such sub-group headers.** A 耐用年数 read out of them would be a guess about
+which parent a row hangs from, and a 耐用年数 nobody read must not produce a 償却限度額.
+
+Recorded as `:reachable-not-read` in `:catalog/tables-reachable-not-read`, surfaced by
+`tools/verify_citations.cljs`, and visible in `depth` as `:partly-read`.
+
+## Two figures that look familiar and are not what the article says
+
+- **The 1-yen 備忘価額 is not universal.** 第六十一条第一項第二号ロ caps 坑道 and the
+  第十三条第八号 intangibles at 「その取得価額に相当する金額」 — the FULL cost. Software
+  depreciates to ZERO. The 1 yen is イ's, for tangible and biological assets.
+- **別表第十 is not 別表第八 doubled.** 第四十八条の二第一項第一号イ（２）'s wording invites
+  the assumption. At 6 years 定額法 is 〇・一六七 and twice that is 〇・三三四, but the
+  declining-balance table says 〇・三三三; at 3 years the doubling gives 〇・六六八 and the
+  table says 〇・六六七. The article describes how the table was BUILT; the table governs.
+- Related: 構築物 and 建物附属設備 lost the 定率法 election on 平成28年4月1日 (第一号 イ/ロ),
+  and 建物 never had it under the current regime.
+
+## Verification
+
+- **33 tests / 517 assertions**, identical under `clojure -M:test`, nbb, and nbb run from a
+  FOREIGN working directory (`/tmp/elsewhere-shokyaku`). Portability that can fail.
+- **15 mutations, 15 killed, 0 survived.** The first blind run (mutations written from the
+  source before re-reading the suite) killed 11 and left 4. Three were real gaps and now have
+  tests: the 償却保証額 crossing is strict (「満たない」 is falls-short-of; equal is not short);
+  an over-depreciated asset must yield 0, not a negative limit; a whole year of service must
+  not be REPORTED as prorated. The fourth was an equivalent mutant, recorded as such in
+  `tools/mutations.edn` with the analysis rather than deleted, and retargeted.
+- `tools/verify_citations.cljs` resolves all three law ids against `kotoba-lang/jp.go.e-gov.elaws`
+  (9,536 laws): 3/3 in force with matching titles. It **exits 2 rather than reporting a pass**
+  when the corpus is absent, and separately counts the tables it did not read.
+- `tools/extract-tables.cljs` regenerates the tables from the live API with a `--check` gate;
+  `tools/gen-embedded.cljs` projects them into a namespace so there is no cwd-relative
+  resource read (the failure measured in `kotoba-lang/technology` on 2026-08-18).
+
+## Consequences
+
+- A bookkeeping actor can compute a 償却限度額 for an asset whose 耐用年数 it already holds,
+  and cannot obtain one for an asset class nobody read a table for.
+- `useful-life` answers only from 別表第三・第五・第六. Extending it to 別表第一/第二/第四
+  requires solving the 細目 nesting, which is a real piece of work and not a lookup.
+- The pre-2007 regime, 生産高比例法, リース期間定額法, 特別償却 and 減損 are each recorded in
+  `:jurisdiction/out-of-scope` with a reason, so a later reader can tell a decision from an
+  oversight.")))

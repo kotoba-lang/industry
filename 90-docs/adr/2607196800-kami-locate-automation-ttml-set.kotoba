@@ -1,0 +1,42 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607196800-kami-locate-automation-ttml-set")
+  (:adr/title "KAMI evaluates locate automation and imports timed TTML set states")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607196700-kami-audio-locate-ttml-recursive-cascade"))
+  (:adr/decision
+  (map (:daw (map (:locate-automation-lanes (vector :bus/gain :track/gain :track/send
+                                   :master/effect :plugin/parameter :plugin/wet-dry))
+         (:linear-policy :interpolate-value-at-locate)
+         (:step-policy :hold-last-value-at-locate)
+         (:future-event-policy :schedule-at-tick-minus-locate)
+         (:pre-first-point-policy :interpolate-from-project-base-at-zero)))
+   (:nle (map (:timed-set-properties (vector :tts/textAlign :tts/fontSize :tts/origin :tts/visibility))
+         (:timing-attributes (vector :begin :end :dur))
+         (:projection :split-caption-into-bounded-frame-segments)
+         (:hidden-policy :omit-active-hidden-segment)
+         (:malformed-timing-policy :reject-whole-import)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "third-party plugin SDK/isolation" "complete Mackie/HUI channel strips" "surround/Atmos"))
+    (:nle (vector "continuous TTML animation and full layout fidelity" "external notification delivery" "translation memory" "OCIO/ICC/HDR"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "1f87d4d"))
+   (:nle-commits (vector "d0d6c33"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#26" "kotoba-lang/kami-app-nle#26"))
+   (:evidence
+   (vector "DAW passes 32 tests and 137 assertions; NLE passes 33 tests and 168 assertions."
+    "Both production releases compiled through the repository resource guard."
+    "Chrome observed locate-time master-effect, bus, track and send values 3000, 0.5, 0.4 and 0.5 from one imported automation fixture."
+    "Chrome imported a three-second TTML caption with timed set changes and produced frame segments 0-30, 30-60 and 75-90."
+    "The active 30-60 segment preserved top/right/1.4; the hidden 60-75 segment was absent; base style resumed at 75-90."
+    "Both browser consoles had zero errors; Chrome was closed in finally and both local servers were stopped."))))
+  (:adr/consequences
+  (vector "A nonzero Continue now aligns both decoded samples and every implemented automation lane at one playhead boundary."
+   "Discrete IMSC set animation survives import as editable project-authoritative caption segments."
+   "Malformed supplied set timing cannot be silently treated as an untimed style."
+   "Continuous animation, complete TTML layout and third-party audio plugin isolation remain named commercial gaps."))
+  (:adr/source-format "edn")))

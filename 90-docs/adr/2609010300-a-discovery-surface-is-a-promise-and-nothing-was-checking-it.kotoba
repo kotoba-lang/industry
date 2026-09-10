@@ -1,0 +1,149 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609010300-a-discovery-surface-is-a-promise-and-nothing-was-checking-it")
+  (:adr/title "A discovery surface is a promise, and nothing was checking it")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/related (vector "adr-2608319800-the-itonami-economy-sells-answers-and-the-constraint-is-demand"
+                "adr-2609010200-a-faucet-gated-by-a-passkey-issues-the-grant-not-only-the-tokens"))
+  (:adr/body "x402.nexus now answers the four documents an agent looks for, and a
+detector checks that what they name is actually served.
+
+## What shipped
+
+- `GET /.well-known/mcp.json` -- MCP manifest, three tools.
+- `POST /mcp` -- JSON-RPC. `tools/list`, `tools/call`.
+- `GET /openapi.json` -- OpenAPI 3.1 for clients that read OpenAPI.
+- `GET /skill.md` -- SKILL.md for an agent that needs to buy here.
+- `/llms.txt` and the index page now name all of the above.
+- Unrouted paths answer 404. They used to answer the index page with 200.
+
+The tools are `list_catalog`, `service_stats` and `get_payment_challenge`.
+Each runs the same internal function its HTTP route runs. `apply_as_seller`
+was withdrawn: its only execution path was a self-fetch, and a POST with a
+side effect is not something to make work by adding a second way to invoke
+it. `/apply` stays in the OpenAPI document.
+
+## The defect class this surfaced, three times in one session
+
+Each of these looked like success from outside.
+
+1. Four endpoints were reported as already live because each answered 200.
+   The worker served its index page for every unrouted path, so a nonsense
+   path returned the same bytes. Only one of the four existed. The fix to
+   the report was one request to a path nobody could have advertised.
+
+2. `/.well-known/mcp.json` served a well-formed manifest advertising zero
+   tools. The renderer was called in the JSON-to-EDN direction, so it looked
+   for string keys in an EDN map, found none, and returned an empty model
+   rather than an error. The wrong direction returned a plausible empty.
+
+3. A tool in that manifest reached its endpoint by fetching the worker's own
+   origin. Cloudflare answered 522 -- a Worker calling its own hostname is a
+   subrequest back through the edge -- and the tool returned that error text
+   as its result, wrapped in a 200.
+
+A fourth, adjacent: the release build compiled a call to a `gateway`
+function that does not exist in that namespace. shadow-cljs reported it as
+`:undeclared-var`, which is the same warning it reports for a benign forward
+reference, and three benign ones sat beside it in a build carrying thirteen
+warnings. The thrown error surfaced to the caller as `parse error`, naming
+the request rather than the code. The forms were moved below every handler
+they call, so the file now has zero undeclared-var warnings and the next one
+will stand alone.
+
+## The detector, and why the negative control is the whole of it
+
+`scripts/verify-advertised-surfaces.cljs`, registered as
+`:verify-advertised-surfaces`. It reads a host's own `/llms.txt` and
+`/openapi.json`, extracts the same-host endpoints they name, and probes each
+one.
+
+Checking that an advertised path answers is not enough, and defect 1 is why:
+every path answered. What separates a served path from an unserved one is
+that its response differs from what the host says to a path nobody could
+have advertised. So the control is fetched first, and a body-for-body match
+is a finding however healthy its status code looks.
+
+A 404 alone is not a finding. A host that says no is telling the truth; it
+counts only where a document promised that path.
+
+Every red the detector produced before it had controls was its own
+extraction bug: GET-probing endpoints the document named POST, a placeholder
+truncated to its prefix (`/gateway/<seller>/<path>` becoming `/gateway/`),
+and fragment links that fetch the same document. All three are now
+self-test cases. The discriminating run is against a local host serving the
+two real shapes: a path advertised and answering 404 reports `absent`, the
+same path answering the index reports `same-as-control`, a path with a
+distinct body is clean, and a POST-only path advertised as POST answers 402
+and is clean -- which is what proves the method is read from the document
+rather than assumed.
+
+Measured 2026-09-01: 9 advertised paths on x402.nexus and 40 on
+itonami.cloud, both clean after the fixes.
+
+## Running it across the estate
+
+Ten of the 425 non-wildcard hosts in the surface index answer /llms.txt.
+Folding www and alias names leaves five documents, plus itonami.cloud which
+is not in that index. 81 advertised paths across those six.
+
+Three standing findings, each confirmed by hand:
+
+- atproto.etzhayyim.com/.well-known/did.json and
+  /.well-known/oauth-authorization-server answer Cloudflare 1033 -- a
+  hostname proxied by Cloudflare with nothing behind it. etzhayyim.com's own
+  llms.txt promises that host, and no repo in the surface index claims it.
+- mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message does not resolve in DNS at
+  all, although orgs/kotoba-lang/app-agentgateway declares that host.
+
+And one host reported UNMEASURED rather than red. yoro.etzhayyim.com
+redirects every path to aozora.app, which returns the same 2455 bytes for
+/search and for a path nobody routed. That is what a single-page app does,
+and this workspace requires single-page apps, so a served path and an
+unserved one genuinely cannot be told apart there from outside. Calling it a
+defect would be a standing red nobody should clear; calling it clean would
+be the lie this detector exists to prevent. The UNMEASURED lines print with
+or without --findings.
+
+## Six of its own bugs, in the order they were found
+
+Every red this detector produced before it had controls was its own:
+
+1. GET-probing endpoints a document named POST.
+2. A placeholder truncated to its prefix: `/gateway/<seller>/<path>` became
+   `/gateway/`.
+3. Fragment links, which fetch the same document by definition.
+4. Globs -- `/api/*` is a shape, not an address.
+5. Reading an HTML index served at /openapi.json as if it were a discovery
+   document, then reporting that index's own links as broken promises. It
+   committed the failure mode it was written to detect.
+6. A registrable-domain helper threaded with ->> instead of ->, which put the
+   string into str/split's regex position so every host returned the same
+   value, every host compared equal, and the same-site filter accepted
+   everything including foreign domains. Two self-test cases asserting that a
+   foreign domain is dropped are what caught it; without them this would have
+   shipped as a widening that looks exactly like a working filter.
+
+A seventh was caught by the harness rather than by a test: after the
+same-site change, the local discriminating host (127.0.0.1:8791) compared
+`0.1:8791` against `0.1`, every endpoint was dropped as off-site, and the one
+run that makes this detector go red silently stopped making it go red. The
+detector still exited 2, so it did not report clean -- but the reason had
+changed and nothing said so.
+
+All seven are self-test cases. 24 of them.
+
+## What this does not change
+
+The binding constraint is still demand, not surface. The catalog holds 25
+priced resources across 7 sellers and external payments remain at one, for
+$0.001, on 2026-08-14. Making the shop easier to find does not make anyone
+buy. This work was worth doing because an agent that cannot discover the
+terms cannot pay them either, but it is not evidence of demand and should
+not be read as any.
+
+The faucet, our own Base Sepolia ERC-20, and funding the dougaka buyer at
+0x38C2229589e2097486b4a3390f557E84cB69F30c all remain blocked on one
+external gas drip. Base is an OP-Stack rollup with difficulty 0 and a fixed
+miner address, so no fleet can produce testnet gas by mining; only a token
+can be issued, and issuing one still costs gas.")))

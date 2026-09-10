@@ -1,0 +1,94 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608011200-partitioned-root-vs-single-lane-writers")
+  (:adr/title "ADR-2608011200: partitioned root — 単一 writer の天井を、join 到達範囲を捨てずに外す（実測付き）")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-01")
+  (:adr/last-verified "2026-08-01")
+  (:adr/last_verified "2026-08-01")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "partitioned-root-vs-single-lane-writers")
+  (:adr/authoritative-for
+  (vector "kotobase の書き込み規律（単一 writer か partition か）"
+   "one-ref 規則を守ったまま書き込み並列度を上げる方法"
+   "Filecoin actor 設計のどこを借り、どこを borrow しないか"))
+  (:adr/related
+  (vector "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+   "adr-2608010940-evm-state-datom-indexer"
+   "adr-2607050500-arrangement-schema-version"
+   "adr-2607051000-arrangement-blind-encrypt"))
+  (:adr/body
+  "# ADR-2608011200: partitioned root — 単一 writer の天井を、join 到達範囲を捨てずに外す
+
+**Status**: accepted（実装済み・実測済み。kotobase 本体への適用は未着手）
+**Date**: 2026-08-01
+
+## Context
+
+ADR-260726 は「一緒にクエリしたいものは同じ ref に置く」「書き込み負荷を理由に ref を分けない」「黙ったシャーディングを禁じる」と定めた。その帰結として ADR-2608010940 は **「この面の上限 = DO 1 個のスループット」** という構造的天井を明記している。
+
+一方 Filecoin の state tree は、**各 actor の state が 1 つの root から吊るされた独立した IPLD サブツリー**という形を採っており、actor を増やしても書き込みが競合しない。ただし代償として **actor state を跨いで問い合わせることができず、歩いて回るしかない**。
+
+問いは「その形を、join 到達範囲を捨てずに借りられるか」。
+
+## Decision
+
+**借りられる。partition は shard ではない。**
+
+`arrangement.partitioned`（`kotoba-lang/arrangement` `d86caf92`）を実装した。
+
+- root は snapshot ではなく **`{partition-key → snapshot-cid}` の map** になる。
+- writer は 1 つの partition を所有し、`arrangement.core/commit!` を **ロック無しで**行う（content-addressed write は衝突しない）。その後 **pointer を 1 つ swap するだけ**。
+- **`restore-all` が全 partition を hydrate して 1 つの db に merge する。** 読み手は単一の joinable な面を見る。
+
+**shard は「何を問えるか」を割る。partition は「誰が書けるか」だけを割る。** Filecoin は前者の代償も払っているが、我々は払わない。中心テストは partitioned root と single-lane commit を同じ facts で比較し、**partition を跨ぐクエリ**が同じ答えを返すことを要求する。
+
+## 実測（主張ではなく測定）
+
+`clojure -M:bench <writers> <writes>`（real threads / real compare-and-set / facts ≈200 固定）。
+baseline は **warm な single lane**（db をメモリに保持し、CAS に負けた時だけ読み直す = 温まった DO の姿）。stateless 版だけを相手にするのは藁人形なので、強い方を基準にした。
+
+| writers | single-cached | partitioned | deferred | batched | single の無駄 commit |
+|---|---|---|---|---|---|
+| 1 | 9676ms | **12357ms** | 8354ms | 8824ms | 0% |
+| 2 | 12426ms | 2422ms | 2496ms | 2422ms | 40% |
+| 4 | 9257ms | 2307ms | 1181ms | 1087ms | 66% |
+| 8 | 24703ms | 1893ms | 426ms | **438ms** | 83% |
+| 16 | 25882ms | 6558ms | 359ms | **248ms** | 90% |
+
+全 discipline が同一の fact 集合を produce することを、timing を出す前に検証している。
+
+### 見出し以外に読み取るべき 2 点
+
+**1. writer が 1 本のとき partitioned は「遅い」**（12.4s vs 9.7s）。競合していない相手に root put を 1 回増やしているだけだから。**これは contention のための設計であって、無条件の勝ちとして売ってはいけない。**
+
+**2. 16 writers で naive な partitioned は退行する**（6.6s、CAS 1676 回）。write ごとに root を進めると、**競合が root に移動しただけ**になる。deferred / batched にすると 359ms / 248ms（全 run で CAS **1 回**）。`advance-root-batched!` はこのために存在する。
+
+つまり **「partition すれば速くなる」は誤り。「payload を競合窓の外に出し、かつ root 更新を束ねる」と速くなる。**
+
+### 効いている 2 つの要因
+
+single lane の無駄 commit は writer 数とともに 0% → 90% に増える。これが contention の signature。加えて single lane は毎回 **db 全体**を再 snapshot する（O(total)）のに対し、partition writer は自分の分だけ（O(total/N)）。両方とも「disjoint 所有」という同じ設計選択の帰結であり、writers=1 の control で前者が消えると差もほぼ消える（実測のとおり）。
+
+## Consequences
+
+- **書き込み並列度と join 到達範囲は、もはやトレードオフではない。** ADR-260726 の「ref を分けるな」は依然正しいが、**同じ ref の中を partition で割ることは禁じていない** — 読み手が 1 つの面を見る限り。
+- **代償は明示する**（発見させない）: 読み手は hydrate に O(partitions) の block read を払う。また同じ triple を 2 つの partition が書けば両方に bytes が残る（merge は集合和なので答えは正しいが重複する）。**重ならない軸で切ること** — chain id、actor、address 空間の shard など。payload の任意ハッシュで切ってはいけない。
+- **kotobase 本体への適用は未着手。** これは `arrangement` レベルの規律であって、kotobase の durable plane（`kotobase-peer` / D1 / DO）はまだ single lane。ADR-2608010940 の B1（EVM indexer の永続化）が最初の適用先候補。
+- **benchmark は in-memory store で測っている。** 実ストレージなら payload が pointer swap に対してさらに重くなるので、**この数字は partitioned 側にとって下界であって上界ではない。**
+
+## Filecoin actor 設計との比較（当初の問い）
+
+| | Filecoin FVM/FEVM | 今の kotobase | この ADR 後 |
+|---|---|---|---|
+| 書き込み並列 | actor 単位で衝突しない | 単一 CAS レーン | partition 単位で衝突しない |
+| 跨ぎクエリ | **できない**（歩くだけ） | できる（1 ref） | **できる**（merge して 1 面） |
+| 実行の検証 | 全 validator が再実行 | 無い | 無い（変えない） |
+| 読みのコスト | `eth_getStorageAt` は **VM で call を実行** | 索引を引く | 索引を引く |
+
+**性能に寄与しているのは FEVM ではなく actor-state-as-subtree の方**、という前回の分析はこの実測で裏付けられた。ただし借りるのは**状態の形だけ**で、合意・gas・再実行は borrow しない — 配信と分析という kotobase の仕事では、それらは必要でない性質への対価にしかならない（ADR-2608010930）。
+")))

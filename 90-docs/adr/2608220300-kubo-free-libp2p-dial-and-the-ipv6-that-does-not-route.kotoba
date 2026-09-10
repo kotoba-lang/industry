@@ -1,0 +1,104 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608220300-kubo-free-libp2p-dial-and-the-ipv6-that-does-not-route")
+  (:adr/doc_type "adr")
+  (:adr/topic "architecture")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-22")
+  (:adr/last_verified "2026-08-22")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative_for (vector "Kubo / go-libp2p を使わずに libp2p peer と接続できるかの正本"
+                          "fleet ノードの IPv6 到達性の実測と、それが外部ゲートである根拠"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related (vector "adr-2608220200-naming-plane-three-jobs-and-our-own-delegated-router"
+                "adr-2608220100-sanction-survivable-architecture"
+                "adr-2608136000-five-questions-before-trusting-green"))
+  (:adr/source-format "edn")
+  (:adr/title "ADR-2608220300: Kubo 無しで libp2p Noise XX が通った。IPv6 は経路が無く、修復は外部ゲート")
+  (:adr/body "# Context
+
+ADR-2608220200 で自前 delegated router を立てたが、その実装は **Kubo（go-libp2p）** であり、依存先が Cloudflare / cid.contact から Protocol Labs の実装へ移っただけだった。オーナー指示（2026-08-22）「kubo 依存もしないように, ipv6 の修正も進めて」。
+
+# Decision 1 —— socket を実装した。Kubo 非依存は実証済み
+
+`io-libp2p-specs-transport` の README は長く *what remains after this repo is the socket itself* で終わっていた。その socket を `libp2p.provider.node` として実装し、**Kubo も go-libp2p も js-libp2p も使わずに実 libp2p peer と Noise XX handshake を完了した。**
+
+## libp2p の Noise は素の Noise XX ではない
+
+pattern だけ実装した dialer は全ての実 peer に拒否される。上に 3 つ乗っている:
+
+1. 各 handshake message に **2 byte big-endian の長さ prefix**
+2. message 2 と 3 の中に **`NoiseHandshakePayload`** protobuf
+3. その署名は **`noise-libp2p-static-key:` || noise_static_public** に対してであって、payload に対してではない
+
+prologue は空。suite は `Noise_XX_25519_ChaChaPoly_SHA256` —— この workspace の既定である BLAKE2s **ではない**ので、`noise.provider.noble/ports` と suite の両方に `:sha256` を渡す必要がある。
+
+## 実測（2026-08-22、公開 libp2p peer `104.131.131.82:4001`、3/3 再現）
+
+```
+protocol        : Noise_XX_25519_ChaChaPoly_SHA256
+remote static   : 32 octets
+handshake hash  : 32 octets
+remote identity : {:key-type 0, :identity-key-len 550, :identity-sig-len 512}
+HANDSHAKE=OK
+```
+
+`key-type 0` は libp2p の KeyType enum で **RSA**、550/512 octets は RSA-2048 の SubjectPublicKeyInfo と署名である。これはその peer が実際に持っている鍵と一致するので、**protobuf schema は「throw せずに parse できた」ではなく「正しい答えを返した」ことで裏取りされている。**
+
+## 両方向を出した
+
+成功しか見せない dialer は証拠にならない（ADR-2608136000）。
+
+| 相手 | 結果 | exit |
+|---|---|---|
+| 実 libp2p peer | `HANDSHAKE=OK` | 0 |
+| TLS サーバ（`1.1.1.1:443`） | `ms-header: multistream :missing-newline` | 1 |
+| 閉じた port | `ms-header: socket error: ECONNREFUSED` | 1 |
+
+`read-until!` は timeout・socket error・空バッファでの切断のすべてで **reject し、nil を返さない**。返してしまうと「測れなかった」と「測って空だった」が同じ値になる。
+
+**実装中に踏んだ欠陥**: `pred` を try/catch の外で呼んでいたため、壊れた frame が promise chain の外へ throw し、非 libp2p の相手に対して **verdict ではなく stack trace** が出て、答えが確定した後も poll が回り続けていた。catch と停止を入れて直した。
+
+## まだ足りないもの
+
+**DHT ノードになるにはあと 2 つ**: Yamux の駆動（`.cljc` は同 repo に在るが誰も動かしていない）と、その stream 上の `/ipfs/kad/1.0.0`。handshake が通ったので残りは配管であって暗号ではない。
+
+着地: `kotoba-lang/io-libp2p-specs-transport` の `da8375b5aaef`、west pin 前進済み（fast-forward、ahead=2）。
+
+# Decision 2 —— IPv6 は経路が無い。修復は外部ゲートなので、そう記録する
+
+ADR-2608220200 は「公開されている IPv6 の `udp/4001` に inbound を通すのが最も安い修復」と書いた。**これは誤りだった。** 測ると IPv6 は inbound 以前に **outbound も動いていない**。
+
+| 測定 | 結果 |
+|---|---|
+| 公表アドレス 8 本の種別 | **全て `autoconf temporary`**（RFC 4941 privacy 拡張）で大半が `deprecated` |
+| 安定アドレスの有無 | **在る** —— `2408:210:2451:8400:188c:c1f7:123e:9871` が `autoconf secured`（RFC 7217、MAC 非依存で安定） |
+| host firewall | **pf・Application Firewall とも無効** —— 遮断はホストではない |
+| 外部 → simeon の ping6 | 100% loss |
+| **simeon → ipv6.google.com** | **100% loss** |
+| 対照: この機械 → ipv6.google.com | **0% loss / 16ms**（probe は生きている） |
+| simeon の IPv6 default route | 在る（gateway は CPE の link-local） |
+| simeon → 1.1.1.1（IPv4） | 0% loss / 3.9ms |
+
+**CPE が prefix と経路を広告しながら IPv6 を転送していない。** ホスト側でできることは無く、修復には CPE の管理画面が要る —— **S0c（レジストラ調達）と同じ外部ゲート**である。
+
+**対照実験を先に取っていなければ「inbound が塞がれている」と誤診していた。** 自分の probe が生きていることを示さずに 100% loss を読むと、原因を相手側に置いてしまう。
+
+## 適用した緩和
+
+- `net.inet6.ip6.use_tempaddr=0` を設定し `/etc/sysctl.conf` に永続化（回転アドレスの新規生成を止める）
+- `Addresses.NoAnnounce` に `/ip6/2408:210:2451:8400::/ipcidr/64` を設定 —— **届かないアドレスを公表し続けるのは、peer に無駄な dial を強いる分だけ有害**
+
+# Consequences
+
+- **Kubo は「今動いている実装」であって前提ではなくなった。** Tier 2 の経路は、自前 socket が Yamux と kad を得た時点で完全に自前になる。
+- **`libp2p.provider.node` は Kubo の代替ではない**（まだ dial しかできない）。router を止めて置き換えてよいという意味に読まない。
+- IPv6 の修復は S0c と同じ外部ゲートに移す。到達性の現実的な次の一手は **IPv4 の port forward**（同じく CPE）か、**公開アドレスを持つノードに router を置く**こと。
+
+# 未解決
+
+- **fleet ノードがセッション中に tailnet ごと落ちた**（`tailscale ping` timeout）。Mac mini はスリープする。**眠る router は router ではない** —— ADR-2608220200 発見 5 の「冷えた router」と同じ理由で、常時稼働は設定ではなく要件である。
+- launchd 永続化は依然として失敗したまま（`bootstrap: 5 Input/output error`）。
+- Yamux と `/ipfs/kad/1.0.0` は未実装。
+- 9 ノードの Kubo 有無・IPv6 状況は未測定。")))

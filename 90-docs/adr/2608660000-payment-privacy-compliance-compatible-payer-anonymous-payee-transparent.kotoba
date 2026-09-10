@@ -1,0 +1,250 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608660000-payment-privacy-compliance-compatible-payer-anonymous-payee-transparent")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "payment-privacy-compliance-compatible")
+  (:adr/title "ADR-2608660000: 決済プライバシーはコンプライアンス両立型に限る — 支払人は匿名、受取人は透明。zk shielded pool は自作しない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-10")
+  (:adr/last_verified "2026-08-10")
+  (:adr/last-verified "2026-08-10")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "kotoba stack の決済面において何を秘匿し何を秘匿しないかの方針（秘匿の非対称性）"
+   "zk shielded pool / mixer を自作しないという決定と、その理由"
+   "ENGI/EN・x402 credit 面に置く秘匿機構の第一候補（RSA blind signature）と、EC を採らない理由"
+   "association set を zk membership proof ではなく入口 KYC で構成する決定"
+   "Base USDC leg を公開のまま据え置く決定"
+   "実装着手前に通す 5 つの gate と、そのうち agent が代行しない項目"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector))
+  (:adr/related
+  (vector "adr-2608048000-kotobase-storage-consensus-payment-integration-and-tokenless-chain"
+   "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+   "adr-2607101100-engi-mutual-credit-kotobase-native-design"
+   "adr-2607052100-shinshi-crypto-payout-rail-regulatory-design-review"
+   "adr-2607093100-x402-monetization-gateway-integration"
+   "adr-2608039000-blockchain-decentralized-paths-must-not-presume-d1"
+   "adr-2607174500-kotobase-visibility-redaction-phase3"
+   "adr-2608070400-kotobase-client-held-security-and-searchable-encryption-tiers"))
+  (:adr/repos (vector "orgs/kotoba-lang/engi"
+              "orgs/kotoba-lang/en"
+              "orgs/kotoba-lang/inga"
+              "orgs/kotoba-lang/merkle-sum"
+              "orgs/kotoba-lang/ekyc"
+              "orgs/kotoba-lang/aml"
+              "orgs/kotoba-lang/sanctions"
+              "orgs/kotoba-lang/blind"
+              "orgs/kotoba-lang/treasury"
+              "orgs/kotoba-lang/pay"
+              "orgs/network-awai/nexus-x402"
+              "orgs/gftdcojp/engi"))
+  (:adr/evidence
+  (vector "orgs/gftdcojp/engi/scripts/finalize-nexus-settlement.mjs（payer address を明示送信）"
+   "orgs/kotoba-lang/engi/src/engi/core.cljc（agent-centric 台帳の schema docstring）"
+   "orgs/kotoba-lang/crypto/src/kotoba/lang/crypto.cljc（sha2 / hmac / hkdf のみ、EC 演算なし）"
+   "orgs/kotoba-lang/merkle-sum/README.md（Maxwell 型 merkle sum tree、inclusion proof）"
+   "orgs/kotoba-lang/ekyc/README.md（犯収法施行規則 6 条 1 項の非対面 10 方式）"
+   "manifest/west.yml 4,158 project の名前走査（zk / snark / plonk / ring / stealth / mixer 系ゼロ）"))
+
+  (:adr/body
+  "# ADR-2608660000: 決済プライバシーはコンプライアンス両立型に限る
+
+**Status**: accepted（2026-08-10）
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナーの問い（2026-08-10）: 「engi, en は base, robinhood のような usdc chain は
+できているか。これは monero のように誰が決済したか分からないようになっているか。
+l2 chain で誰が使ったか分からないようにする chain はあるか」。
+
+調査結果を提示したうえでオーナー指示: **「コンプライアンス両立型で ok」**。
+本 ADR はその指示を決定として固定する。
+
+前提として動かさないもの: ADR-2608048000（自前 token を持たない chain 経済圏、
+fuel は USDC 建て、収入は手数料 3 本）と ADR-2608010930（chain は自作せず、
+EVM 互換は読む側に限る）。本 ADR はその上に**秘匿の方針だけ**を足す。
+
+### 実測 A — 現在地は秘匿ゼロ、それも設計として明示的にそう
+
+| 面 | 何が見えるか |
+|---|---|
+| Base USDC / x402 | `finalize-nexus-settlement.mjs` が `payload: {txHash, from: payer}` を**明示的に送る**。treasury 側も Transfer log の from を読む。支払人・金額・時刻は誰でも見える |
+| ENGI/EN | did:key 同士の相互与信。DID は仮名だが、大域順序付きログを witness が検証するので連結可能 |
+| inga | committed state を quorum が見る。しかも現状 1 operator・4 DO の crash fault tolerance であって BFT ではない（自ら `/health` でそう申告している） |
+
+**秘匿を足していないのではなく、秘匿しない設計になっている。** ここを変えるのは
+機能追加ではなく設計変更である。
+
+### 実測 B — zk の基盤はゼロ、compliance の基盤はある
+
+`manifest/west.yml` の 4,158 project を名前で走査した結果、
+**zk / snark / plonk / halo / circom / ring signature / stealth / mixer 系の repo は
+1 件も無い。** Monero はこの workspace では M4 フリートの**マイニング対象**として
+しか登場しない（ADR-2607042800）。
+
+一方で、コンプライアンス側の部品は既にある（**再発明しない**）:
+
+| 部品 | 位置 | 何を持っているか |
+|---|---|---|
+| `ekyc` | `kotoba-lang/ekyc` | 犯収法施行規則 6 条 1 項の非対面 10 方式を、必要証跡の組合せごとに構造化。NIST SP 800-63A-4 の IAL 対応も無理に当てはめず正直に記録 |
+| `aml` | `kotoba-lang/aml` | AML screening substrate（scoring も enforcement もしない、adapter 面） |
+| `sanctions` | `kotoba-lang/sanctions` | west 登録済み（未 checkout） |
+| `merkle-sum` | `kotoba-lang/merkle-sum` | Maxwell 型 merkle sum tree + inclusion proof。負の中間和を拒否。PoR/PoL の共有実装 |
+| `crypto` | `kotoba-lang/crypto` | sha2-256/512・HMAC・HKDF。**EC 演算は無い** |
+| `eth-crypto` | `kotoba-lang/eth-crypto` | secp256k1（RFC 6979）。ただし **JVM-only** |
+
+## Decision
+
+### D1. 秘匿を非対称にする —— 支払人は匿名、受取人は透明
+
+**これがコンプライアンス両立型の定義であって、程度問題ではない。**
+
+脱税・制裁回避・資金洗浄を可能にするのは**受取側の秘匿**である。
+支払側の秘匿は購買履歴のプライバシーであって、それ自体は課税対象でも
+AML の対象でもない（現金がまさにその形をしている）。
+
+したがって:
+
+- 採る: 誰が払ったか、第三者と受取人から分からない
+- **採らない**: 誰が受け取ったか分からない
+- **採らない**: いくら受け取ったか分からない
+
+これは GNU Taler が明示的に設計原理として置いている形であり、
+Monero / Zcash の対称な秘匿とは別物である。**Monero 相当は採らない**と
+はっきり書く —— 「弱い Monero」を目指すと、両方を中途半端に失う。
+
+### D2. zk shielded pool を自作しない
+
+理由は 3 つあり、どれ 1 つでも単独で十分:
+
+1. **基盤がゼロ。** 上記のとおり zk 系 repo は 1 件も無い。Groth16 なら BN254 の
+   pairing 演算、R1CS、trusted setup、Poseidon が要る。
+2. **書ける場所が無い。** ADR-2607198300 が Rust を禁じ、この workspace の
+   ライブラリは第三者依存ゼロの `.cljc` を規律にしている。その制約下で
+   pairing ベースの証明系を自作するのは、規模でも危険度でも別事業である。
+3. **監査されていない自作 zk は privacy theater。** 秘匿できていると信じさせて
+   秘匿できていない状態は、秘匿が無い状態より悪い。これは
+   ADR-2608039990 が記録した「検出器を書いても走らせなければ意味がない」と
+   同じクラスの失敗で、そちらより被害が大きい。
+
+### D3. 機構の第一候補は RSA blind signature（Chaum）—— EC ではない
+
+**理由は暗号の好みではなく、動く場所の一致である。**
+
+ADR-2608010930 が既に記録している構造的ミスマッチ:
+*EVM の基礎暗号が動く場所と kotobase が動く場所が一致していない* —— kotobase は
+Cloudflare Workers（CLJS/ESM）で動くのに、`eth-crypto` の secp256k1 は JVM-only で
+`base-l2` の `abi` / `l2` / `paymaster` が全部 `.clj` なのはそれが理由だった。
+
+blind Schnorr / BDHKE（Cashu 型）を採ると、**同じ壁に正面からぶつかる。**
+一方 RSA blind signature が要るのは多倍長整数の modexp だけで、JVM の
+`BigInteger` と ClojureScript の `BigInt` の両方に載る。**この workspace で
+`.cljc` として閉じられる唯一の経路**であり、それが第一候補である理由。
+
+⚠ **名前の衝突に注意。** `kotoba-lang/blind` は **HMAC blind index**（保管サーバに
+値を見せないための keyed MAC）であって blind **signature** ではない。脅威モデルが
+別物なので、新しい repo は `blind-*` を名乗らない。命名は
+`manifest/repository-rules.edn` の面の順序に従って決める（role 面か subject 面か。
+`origin` 面ではない —— これは外部仕様の実装ではない）。
+
+### D4. association set は zk membership proof ではなく入口の KYC で作る
+
+Privacy Pools が zk でやること（この note は制裁対象由来ではないと証明する）を、
+我々は構成で得る: **入口を通った者しか note を持てない。**
+
+- deposit / withdraw の gate に `ekyc` + `aml` + `sanctions` を置く
+- gate を通らなかった資金は note にならない
+- note どうしは互いに区別が付かない（blind signature の性質）
+
+**差を隠さずに書く。** Privacy Pools は発行者が入口を見ないが、この構成では
+**発行者は入口を見る**。得られるのは第三者と受取人に対する非連結性であって、
+発行者に対する非連結性は「発行者が deposit と withdraw を結び付けられない」という
+より弱い（が実用上は本質的な）形にとどまる。ここを曖昧にしない。
+
+### D5. 支払能力は `merkle-sum` の proof-of-liabilities で外から検証可能にする
+
+blind signature 層は**新しい信頼を 1 つ生む** —— 発行者が債務を隠せる。
+発行された note の総額が裏付けを超えていても、利用者からは見えない。
+
+`merkle-sum` が既にあり、まさにこれを解く（root の `:sum` が総額そのもので、
+どの leaf の inclusion proof もその一部を再導出する。負の中間和は verifier が拒否）。
+したがって **PoL の公開を最初から義務にする**。後付けの運用ではなく、
+発行と同じ commit に載せる。
+
+### D6. Base USDC leg は公開のまま据え置く
+
+理由:
+
+1. **USDC は Circle が凍結できる。** 発行者に対する強い匿名性は構造的に成立しない。
+   「USDC で Monero 相当」は達成不能な目標であって、努力量の問題ではない。
+2. **Base に shielded pool を deploy するのは別事業。** Solidity + 監査 + 資金 +
+   運用が要り、ADR-2607052100 が既に記録した規律（vendor / PSP 選定と
+   compliance 認証は business/legal の決定であって engineering の決定ではない）に
+   そのまま当たる。
+3. **x402 の 1 リクエスト決済は $0.01 である。** 秘匿の価値より運用の単純さが勝つ。
+
+将来この leg をやる場合も **自作しない** —— 既存の privacy pool / shielded 実装を
+consume する。判断は改めて ADR にする。
+
+### D7. 着手前に通す gate（全部通るまでコードを書かない）
+
+| gate | 内容 | 誰が判断するか |
+|---|---|---|
+| **G1 法務** | 発行する note が前払式支払手段・為替取引・暗号資産のどれに当たるか。資金決済法上の登録要否 | **owner + 弁護士。agent は代行しない** |
+| **G2 custody** | 建値の決定。ENGI/EN は net-zero・non-minted で custody を持たない（ADR-2607101100）が、USDC 建てにした瞬間に custody が発生する | **owner**（money routing は custody 行為、ADR-2608048000 follow-up 1 と同じ規律） |
+| **G3 threat model** | 誰から何を隠すか、隠さないものは何かの表。D4 の「発行者は入口を見る」を含む | engineering（先に着手可） |
+| **G4 非連結性の実測** | 発行者のログから deposit → withdraw を復元できないことを、文書ではなく **assertion** にする | engineering |
+| **G5 PoL** | `merkle-sum` の PoL を最初の版から出す | engineering |
+
+**G1 は本質的な gate であって儀式ではない。** GNU Taler 自身が、免許を持つ発行体が
+運用する前提で設計されている。ここを飛ばして作ったものは、動いても使えない。
+
+## やらないこと（明示的に範囲外）
+
+- **mixer / tumbler**。D1 の非対称性を満たさない
+- **受取人の秘匿**。同上
+- **制裁対象アドレスの回避**。D4 の gate はその逆を目的とする
+- **既存の公開 x402 経路を秘匿経路で置き換えること**。並存させる。公開経路は
+  現に live で（retrieval fee が唯一の稼働面、ADR-2608048000 D6-2）、
+  それを止める理由が無い
+
+## Consequences
+
+### できるようになること
+
+- 支払人が、第三者と受取人に対して非連結になる
+- 受取人は透明なままなので、課税・AML・会計の経路が変わらない
+- 入口の KYC / AML / sanctions を通った資金だけが note になる
+- 発行者の債務が `merkle-sum` の PoL で外から検証できる
+
+### できないこと（誤読を防ぐために明記する）
+
+- **Monero 相当にはならない。** 受取人は見える
+- **発行者に対する強い匿名性は無い。** 発行者は入口を見る（D4）
+- **Base 上の USDC 決済は秘匿されない。** そのまま公開（D6）
+- **zk の非対話証明は得られない。** association は zk ではなく入口で作る（D2/D4）
+
+### 学び
+
+**「匿名にする」は機構の選択に見えて、実は誰から何を隠すかの表を書けるかどうかの
+問題である。** 表を書かないまま機構（Monero 型か zk か blind signature か）を選ぶと、
+選んだ機構が持っている秘匿の形を、そのままこちらの要件だと思い込むことになる。
+本 ADR で最初に決めたのが D1（非対称性）で、機構は D3 でようやく出てくるのは
+その順序が逆にならないようにするため。
+
+そしてもう 1 つ: **動く場所の一致は、暗号方式の優劣より先に効く。**
+D3 で RSA を EC より先に置いたのは暗号としての優越ではなく、
+`base-l2` が既に踏んだ壁（ADR-2608010930）を二度踏まないためである。
+
+## 次の一手
+
+- **G1 / G2 は owner の判断待ち。** engineering 側からは進められない
+- engineering 側で先にできるのは **G3（threat model 文書）だけ**。G4 / G5 は
+  実装が始まってからの検証条件であって、先行できない
+- 秘匿より先に効く未着地がある: `inga` の shadow が live で 0 records のまま
+  （ADR-2608048000 follow-up 2）。**chain が live でない状態で秘匿層を積まない**")))

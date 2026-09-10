@@ -1,0 +1,23 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608219100-session-close-maturity-ingest-and-jvm-exit-wave")
+  (:adr/doc_type "adr")
+  (:adr/topic "session-close")
+  (:adr/title "ADR-2608219100: セッション終了 —— maturity ingest 波と JVM exit 1 本")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-21")
+  (:adr/last_verified "2026-08-21")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "2026-08-20 maturity / JVM-exit セッションで何が default branch に着地したかの正本"
+   "そのセッションが残した resume point の正本"
+   "closing 中の west.yml wipe と forward restore (a3d92903) の記録"))
+  (:adr/source-format "edn")
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "adr-2608080000-itonami-maturity-improve-loop"
+   "adr-2608201300-no-new-jvm-runtime-surface"
+   "adr-2608200400-session-close-what-was-fixed-and-the-five-times-the-measurement-was-wrong"))
+  (:adr/body
+"# ADR-2608219100: セッション終了 —— maturity ingest 波と JVM exit 1 本\n\n「jvm 依存を外して成熟度をさらに高めて」から始まり、usa-hhs 以降の\naxis-ingest を連続で着地させたセッションの終了記録。\n**branch で成功したことと `main` に在ることを混同しない。**\n\n## 1. default branch に着地したもの\n\n### JVM exit（goal 完了分）\n\n| repo | tip (pin 一致) | 内容 |\n|---|---|---|\n| `cloud-itonami/credits` | `48b7a821d11b` | `org.clojure/data.json` → `kotoba-lang/json` (`json.compat`)。top-level `:deps` から maven JSON を外した。`clojure -M:test` 70/432 green |\n\n### axis-ingest（+ remasure）\n\n| repo | tip / pin | own (before→after) | ingest after | gate |\n|---|---|---|---|---|\n| `cloud-itonami-iso3166-usa-hhs` | `0d783715d77a` | 0.062→0.542 | 8761 | eCFR statute.facts; verify headings/quotes/absences |\n| `org-apqc-pcf` | `d86b2f826086` | ingest 後 0.055→0.170 | 6285 | verify_citations; 後続 docs も tip に在る |\n| `shigotoba` | `ef46c11000d6` | 0.085→0.143 | 4583 | job-API catalog |\n| `public-global` | `96643ec2ee26` | ingest 後 0.063→0.172 | 6829 | 28 citations; 後続 axis-test も tip に在る |\n| `cloud-itonami-lei-549300y7c05bkc4hzb40` (TENARIS) | `492267ebf992` | 0.064→0.362 | 6486 | GLEIF catalog |\n\nRemasure は evidence-only で root に載せる形に寄せた。\n\n## 2. 事故と修正（closing 中含む）\n\n- **sparse worktree からの merge が `manifest/west.yml` を消した**（本セッション中盤）。\n  tip で復元し、以後 evidence-only / 限定ファイルに限定した。\n- **closing で同じ事故を再発させた**（`agent/session-close-maturity-ingest` の sparse commit\n  `298aab24` が ~231k 削除を含み、merge `31fad05c` が main に載った）。\n  **forward fix** `a3d92903` で tree を毒 merge の first parent `36f309f3` に戻した\n  （west.yml size 1,052,663 を実測で確認）。毒 remote branch は削除済み。\n- 共有 checkout の乖離と `index.lock` 競合は、作業を outer worktree + `origin/main` 起点に寄せて回避。\n- statute/catalog leaf は top-level `:deps {}`（ADR-2608201300）。\n\n## 3. 検証\n\n- 各 leaf: live citation gate exit 0、壊した URL で exit 1 を実演\n- remasure: scan + dynamics + kernel-parity（無改変 PASS / +1bp FAIL）\n- pin: 当該 entry のみ verify-west-pins で FF 確認後に server-side merge\n\n## 4. 残作業\n\n- `app-scheduler` / `app-bpmn` / `app-houki` — 他 session worktree がブロック（触っていない）\n- tick の `:skipped :diverged-from-main` — 共有 checkout 乖離。次は outer WT from `origin/main`\n- fleet-db reconcile は手経路\n- 次の clean LEI 候補は tick 再実行（示唆: `cloud-itonami-lei-549300mmvl80rtbp3o28`）\n- 残 JVM surfaces（他 actor の data.json / http-kit）は別 tranche\n\n## 5. resume point\n\n```bash\ncd ~/github/com-junkawasaki\ngit fetch origin\ngit worktree add -B agent/maturity-next /tmp/root-maturity-next origin/main\ncd /tmp/root-maturity-next\nnbb --classpath \".:scripts/nbb_compat\" scripts/itonami-maturity-improve-tick.cljs\n# dirty なら次へ。WIP=1 で 1 repo × 1 軸。sparse で root を commit しない。\n```\n\nLedger: `~/.gftd/itonami-maturity-improve.ledger.edn`（2026-08-20 landed/remeasured）。\n")))

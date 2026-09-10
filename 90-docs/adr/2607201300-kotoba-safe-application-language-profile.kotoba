@@ -1,0 +1,117 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2607201300-kotoba-safe-application-language-profile")
+  (:adr/title "Kotoba safe application language profile")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-20")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/authoritative_for (vector "Kotoba Application Profile"
+                          "host logic, UI, LLM, state, workflow, and actor behavior in .kotoba"))
+  (:adr/supersedes (vector "adr-2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy"
+                   "the narrow-slice and general-application exclusions in adr-2607150000 and adr-2607151500"))
+  (:adr/related (vector "adr-2607100030-kotoba-kami-engine-host-imports"
+                "adr-2607100900-ghosthacker-anime-shiropico-lead-cljc-kotoba-workflows"
+                "adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"))
+  (:adr/body "# ADR-2607201300: Kotoba safe application language profile
+
+**Status**: accepted
+**Date**: 2026-07-20
+**Deciders**: Jun Kawasaki
+**Supersedes**: ADR-2607141900 and the narrow-slice/general-application
+exclusions in ADR-2607150000 and ADR-2607151500
+
+## Context
+
+ADR-2607141900 correctly measured that the 2026-07-14 legacy `.kotoba`
+emitter could not compile an existing cloud-itonami `.cljc` actor wholesale.
+It incorrectly promoted that implementation snapshot into a permanent policy
+that restricted Kotoba to hand-ported pure decision slices and excluded host
+logic, UI, LLM integration, and state.
+
+That restriction conflicts with the Kotoba-first application direction in
+ADR-2607100900 and with the capability system already used for `llm/infer`,
+HTTP, filesystem, database/PostgreSQL, topics, GPU, and `kami/engine`. The
+safety invariant is not purity. It is the absence of ambient authority: every
+observable effect must be explicit, typed, policy-granted, bounded, and
+auditable.
+
+## Decision
+
+Kotoba is a **safe application language** with four profiles:
+
+1. `kotoba/pure`: deterministic computation without capabilities.
+2. `kotoba/cell`: bounded computation with explicit capability calls.
+3. `kotoba/app`: lifecycle and workflow orchestration, UI view/event logic,
+   LLM/tool workflows, explicit state machines, actor behavior, supervision,
+   and effect-command production.
+4. `kotoba/host`: trusted runtime adapters and capability providers. This is
+   an implementation boundary, not authority ambiently available to app code.
+
+Application source owns product semantics. Providers own mechanisms that
+cannot live in the guest: Wasm instantiation, DOM/WebGPU/native mutation,
+sockets, credentials, provider SDKs, durable storage, transactions, timers,
+queues, placement, and recovery. An app may request those mechanisms only
+through a capability value supplied by the host and allowed by policy.
+
+### State and effects
+
+Safe app code does not gain ambient `atom`, `ref`, process globals, direct DOM,
+or direct SDK access. Stateful behavior is an explicit transition:
+
+```clojure
+(defn update [state event]
+  {:state (next-state state event)
+   :effects [{:cap :state/put :value persisted-view}
+             {:cap :ui/render :value view-tree}]})
+```
+
+The host checks every effect against declared and inferred effects, supplied
+capability values, package lock, runtime policy, quota, fuel/memory, and audit
+requirements. Results return as typed events. LLM output is untrusted data and
+must pass schema validation and application governor logic before any
+consequential capability call.
+
+### Capability families
+
+- UI: declarative view/scene commands and typed events; rendering mechanisms
+  stay provider-owned.
+- LLM: infer, stream, cancel, and tool-result operations; credentials and
+  provider transport stay host-owned.
+- State: get, put, compare-and-set, transaction, and subscribe through scoped
+  store/entity handles; persistence stays provider-owned.
+- Actor/workflow: send, receive, timer, checkpoint, spawn, and supervise
+  through scoped handles; scheduling and recovery stay provider-owned.
+- Lifecycle: start, event, suspend, resume, stop, and bounded effect dispatch;
+  runtime bootstrap stays trusted host code.
+
+A family is implemented only when its closed capability descriptor, effect
+inference, compiler admission, policy-gated provider, positive and denial
+fixtures, quota/audit behavior, and at least two-runtime parity evidence land.
+Unrestricted interop or documentation alone never satisfies this gate.
+
+### Migration policy
+
+The narrow-slice-only rule is removed. ADR-2607141900 is deleted from the
+active ADR set. The narrow-slice and general-application exclusions repeated in
+ADR-2607150000 and ADR-2607151500 are superseded and must not be used to reject
+Application Profile work. Their operator/ABI observations remain historical
+test evidence for the relevant legacy emitter/backend only.
+
+Migration proceeds through complete vertical slices after their capabilities
+pass conformance; it is not a mechanical `.cljc` rename or permission to admit
+arbitrary third-party dependencies. Shiropico is the first proving slice:
+
+state transition → LLM or ComfyUI effect → typed result event → governor
+validation → UI render effect → durable checkpoint.
+
+## Consequences
+
+- Host logic, UI, LLM integration, state, workflows, and actors are in scope
+  for `.kotoba` application authoring.
+- T1 memory safety, T2 effect soundness, and T3 capability confinement remain
+  mandatory; broader semantics do not permit ambient interop.
+- Application Profile is an accepted design target now. Individual capability
+  families are claimed implemented only after the completion gate passes.
+- Trusted host adapters remain necessary infrastructure, while product logic
+  remains authored in Kotoba.
+")))

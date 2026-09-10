@@ -1,0 +1,96 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608198600-a-gate-that-needs-clojure-must-ask-for-it")
+  (:adr/title "clojure を要する gate は :cap :jvm を宣言する（3 度目の同じ欠陥）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/related "adr-2608198500-unreachable-is-not-a-verdict adr-2608136000-five-questions-before-trusting-green adr-2608111721-placement-authority-is-murakumo")
+  (:adr/body
+  "## 観測
+
+`itonami-regenerate-*` 31 gate は `:cap` を 1 つも宣言していなかった。
+`required-cap` は `:nbb-script` を `:node` に既定するので、placement は
+どのノードにも置く。
+
+tick log から exit 90（到達不能）の行を除いて node 別に数えると、残る変数は
+ノードの能力だけになる:
+
+| node | pass | fail | clojure |
+|---|---|---|---|
+| benjamin | 9 | 0 | 有 |
+| joseph | 12 | 0 | 有 |
+| judah | 10 | 0 | 有 |
+| simeon | 11 | 1 | 有 |
+| levi | 4 | 0 | 有 |
+| asher | 5 | 1 | 有 |
+| **dan** | **0** | **4** | **無** |
+| **issachar** | **0** | **5** | **無** |
+| **naphtali** | **0** | **4** | **無** |
+
+**13 fail がちょうど 3 ノードに集まり、そこに pass が 1 つも無い。**
+残り 6 ノードは 51 pass / 2 fail。
+
+推測ではなく実測: `command -v clojure` は dan / issachar / naphtali で
+MISSING、他で present。`nodes.edn` の `:caps` も独立に同じ 3 ノードだけ
+`#{:node}`（`:jvm` 無し）としている。この gate の再生成コマンドは
+`clojure -M:dev:render-html` なので、その 3 台では走りようがない
+（`bash: line 4: clojure: command not found`）。
+
+## これは 3 度目である
+
+同じ欠陥が gates.edn に既に 2 回記録されている:
+
+1. `amu-native-conformance` — 同じ 3 ノードで 38 連敗。同じ tree に対して
+   **矛盾する判定**を出していた（c38f79d は joseph pass / naphtali fail）。
+2. `:shadow-test` — `required-cap` に載せ忘れて `:node` に既定し、JVM の無い
+   ノードに置かれた（2026-08-19、本 ADR と同日）。
+
+`probe.cljs` は `jvm?` を (javahome AND clojure) で計算するので、**`:jvm` とは
+正確に「clojure CLI がある」という意味**である。宣言しなければ、fleet の
+1/3 が repo についてではなく自分自身について答える。
+
+## 決定
+
+31 entry すべてに `:cap :jvm` を宣言する。`:jvm` を持つノードは
+judah / levi / simeon / joseph / benjamin の 5 台あり、枯渇しない。
+
+## 原因が読めたのは、同じ日に receipt の予算が広がったから
+
+**この診断は昨日まで不可能だった。** 旧予算では detail が
+`the actor cannot rebuild its own demo | FLEET-CI-EXIT: 1 | gate did not
+report success` で終わり、4 行上の `clojure: command not found` は切られて
+いた。log 全体でその行が現れるのはちょうど 2 回、どちらも予算拡大
+（kagami f95e627）の後である。
+
+したがって**証拠の主役は node 表**であり、直接の目撃 2 件は裏付けである。
+順序を逆にすると、2 件で 31 gate を語ることになる。
+
+## 2 本目の防御線 — gate 自身が棄権する（2026-08-19 追記）
+
+`:cap` は誤配置を**防ぐ**が、起きたときに**正直にする**わけではない。同じ欠陥が
+既に 3 回起きている以上、次に `:cap` を書き忘れた gate 群でも効くものが要る。
+
+`gates/itonami-regenerate.cljs` は `regen-cmd` の実体がノードに無ければ
+`FLEET-CI: cannot answer on <host>` を出して降りる。tick はその sentinel を
+`not-a-verdict?` で拾い、**台帳に書かず**、次の tick が別のノードで試す
+（ADR-2608198500 の extract failure と同じ扱い）。
+
+**形で当てない。** 「`command not found` を含む出力」を unreachable と読むのは
+やらない —— 本物の失敗の出力がたまたま工具の名前を含んでいたら、それを
+再分類してしまう。**gate が明示的に棄権を宣言したときだけ**。
+
+判定は `-main` の先頭で行う。`regen-cmd` は argv の flag なので tree を読む前に
+分かっており、後ろに置くと**答えられないと分かっているノードで workspace を作り
+依存を 2 本 clone してから棄権する**ことになる（最初の実装がそうなっていた）。
+
+### ノード実測（2026-08-19）
+
+| node | clojure | 結果 |
+|---|---|---|
+| issachar | 無 | 即棄権、exit 1、workspace も clone も作らない |
+| benjamin | 有 | 棄権せず通常の refusal（`no deps.edn`）に進む |
+
+2 行目が要点で、棄権が toolchain 固有であって無差別でないことを示す。
+
+tick 側は 26 tests / 63 assertions。gate の綴りを変えると drift test だけが落ちる
+（gate script は別ファイルとしてノードに配られるので、2 つの綴りを繋ぐものは
+この test しか無い）。")))

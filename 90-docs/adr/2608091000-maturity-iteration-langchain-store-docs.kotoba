@@ -1,0 +1,96 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608091000-maturity-iteration-langchain-store-docs")
+  (:adr/title "成熟度 1 反復: langchain-store の axis-docs — 仕事は済んだが着地していない（cross-org push 不能）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-09")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "maturity, langchain-store, docs, handoff, honesty, tooling")
+  (:adr/body
+  "## Context
+
+オーナー指示（2026-08-09）「成熟度を高めて」。skill `itonami-maturity-improve` の
+1 反復として実行した。
+
+## tick が指名したもの
+
+    lane: substrate（substrate 比率 0.0% / 床 2%）
+    fleet: 平均 M_own=0.3831  M_eff=0.3038  substrate drag=0.0793
+    1 位: orgs/kotoba-lang/langchain-store [lib]
+          own=0.220 eff=0.182 gain=30.26 band=:band/B
+          axis-docs = 1034bp → 満点で +2242bp
+
+lib 種別なので `business-model` / `pricing` は当たらない（当てれば水増しになる）。
+実質の穴は **`docs/operator-quickstart.md` が無いこと**。docs/ には ADR が 1 本
+あるだけだった。
+
+## やったこと
+
+`docs/operator-quickstart.md` を書き、**素の clone に対して全手順を実際に踏んだ**。
+skill の要求は「踏めない手順は書かない」なので、貼った出力はすべて実行結果である。
+
+確かめた内容:
+
+| 節 | 実測 |
+|---|---|
+| 取得とテスト | 新規 clone → `clojure -M:ci:test` = 13 tests / 40 assertions。documented な cljs コマンドも verbatim で同じ 13 件 |
+| `:ci` の役割 | `:ci` 無しでも cljs は解決する（`:deps` が既に公開 URL を指す）。差し替えているのは **pin だけ** |
+| smoke | `append-blob!` は名前に反し **同じ seq を upsert する**（`{:kind :b}` が消えて `:b2` になる） |
+| **最大の失敗** | **`identity-schema` を忘れると、例外も警告も無く実体が 2 件でき、`blob-lookup` は古い方を返す**。schema 有りなら 1 件・新しい方。両方を実行して対比した |
+| field-spec | `pull-pattern` / `map->tx` / `pull->map` の往復、`:default` の適用、identity 不在で nil。`pull->map` は 3 引数（2 引数の `ArityException` を実際に踏んだ） |
+| 非保証 | README の「`append-record!` は atomic でない / `now-ms` は本物の時計」を運用の言葉へ。新しい主張はしていない |
+
+**§3（identity-schema 忘れ）がこの文書の中心である。** エラーにならず黙って古い値を
+返す失敗は API 一覧からは読み取れず、316 repo が依存するライブラリでは最も高くつく。
+
+## この反復は着地していない
+
+**`kotoba-lang` に push できない。** `add_repo` は
+`cross-tier adds are not supported in v1`、GitHub MCP は
+`Access denied: repository \"kotoba-lang/langchain-store\" is not configured`
+を返す（read すら通らず、通るのは git の匿名 clone だけ）。
+
+したがって:
+
+- 成果物は `.handoff/langchain-store-quickstart/` に置いた。**成熟度スコアは
+  動いていない。** 動くのは port されたときである。
+- ledger の行（`~/.gftd/itonami-maturity-improve.ledger.edn`）は**書いていない** ——
+  あれは operator マシンのローカルファイルで、このコンテナに書いても operator の
+  loop には届かない。書いたふりをしない。
+- skill の語彙では `:outcome :partial`。**`:landed` ではない。**
+
+**この制約は今回に固有ではない。** 成熟度の対象は west project（= 別 org の repo）
+なので、**この session から着地できる maturity 反復は原理的に存在しない。**
+loop を回すなら、対象 org を初期ソースにした session が要る。
+
+## 副産物: tick が環境ミスを『測り直し』と誤診していた
+
+最初に tick を走らせたとき「計測値が読めない — 次の 1 手は測り直し」と出た。
+datoms は健在で、間違っていたのは root だけだった（tick は
+`~/github/com-junkawasaki` を既定にする。この環境では `/home/user/root`）。
+
+**測り直しは 1,700 repo を歩く重い反復**なので、環境の設定ミスでそこへ送り込むと
+その周がまるごと無駄になる。root が存在しないときは「計測の問題ではない」と言い、
+`COM_JUNKAWASAKI_ROOT` を案内するようにした。3 分岐すべてを確認済み
+（root 不在 / root 有り datoms 無し / 正常）。
+
+## Consequences
+
+- langchain-store の `axis-docs` は **port されるまで 1034bp のまま**。
+- `.handoff/` が 2 つ目になった（1 つ目は `org-signal-membership`）。**どちらも
+  同じ理由で溜まっている** —— 仕事はできるが着地できない。**溜め続けない**:
+  handoff が 3 つになる前に、対象 org のセッションを立てて流す。
+- tick は次のセッションを誤診で無駄打ちさせなくなった。
+
+## Alternatives considered
+
+- **着地できる repo を探して代わりにやる** — 却下。tick の 1 位を理由なく外すのは
+  skill が禁じている（外すなら理由を ledger に書く）。そして上位 5 件すべてが
+  kotoba-lang で、そもそも着地できる候補が無い。
+- **superproject 側の何かを『成熟度』と称して上げる** — 却下。成熟度は
+  ADR-2608052000 の 7 軸で定義された観測量で、superproject はその測定対象ではない。
+  別の仕事を成熟度向上と呼ぶのは、スコアではなく言葉の水増しになる。
+- **handoff にせず諦める** — 却下。実測して分かった §3 の失敗モードは、
+  port されるかどうかと無関係に価値がある。
+- **ledger にそれらしい行を書く** — 却下。operator マシンに届かないファイルへの
+  追記は、次周の tick から見れば存在しない。書いたことにしない。")))

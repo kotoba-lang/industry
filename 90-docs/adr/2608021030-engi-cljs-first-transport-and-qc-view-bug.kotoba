@@ -1,0 +1,94 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608021030-engi-cljs-first-transport-and-qc-view-bug")
+  (:adr/title "ADR-2608021030: engi の合意層は cljs first でよい — JVM 前提の QUIC は捨てる。nbb で初めて回して lock が一度も掛かっていなかったことが判明")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-cljs-first-transport-and-qc-view-bug")
+  (:adr/authoritative-for
+  (vector "engi 合意層の runtime 選択と transport 方針"
+   "QC が view を記録すること"
+   "engi の cross-runtime parity 検証"))
+  (:adr/related
+  (vector "adr-2608020830-engi-pacemaker-view-change"
+   "adr-2608020930-engi-catch-up-sync"
+   "adr-2607993000-engi-l1-byzantine-consensus-en-currency"
+   "adr-2608012100-torihiki-sha256-root-cljs-parity-and-published-terminal"
+   "adr-2608020330-torihiki-node-transport-durable-object-sequencer"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi"))
+  (:adr/body
+  "# ADR-2608021030: engi は cljs first でよい
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+オーナーの問い（2026-08-02）: 「jvm じゃなくて nbb, clojurescript で動かないかな?」
+
+ADR-2608020830 は p2p transport の残件として「murakumo overlay の QUIC は `.clj` = JVM 限定」と記録していた。**その前提そのものを問われて、初めて engi を nbb で回した。**
+
+## 判明したこと 1 — 合意層は cljs で動く
+
+`consensus` / `pacemaker` / `sync` はすべて nbb で動く。`engi.parity` が同一シナリオを両ランタイムで回して**同一 digest** を出すことを確認した:
+
+```
+commits=5;locked=6;tcview=9;entered=10;timeouts=[1000 2000 4000 8000]
+```
+
+## 判明したこと 2 — lock が一度も掛かっていなかった（実バグ）
+
+**`engi.consensus/qc` は `:engi.qc/view` を設定していなかった。** `pacemaker` は QC を view で順序づけて後のものに lock するので、`qc-view` は**本番経路が作る全 QC に対して 0** を返し、`(> 0 0)` により **lock が一度も掛からなかった。**
+
+これは飾りの欠落ではない: **lock が掛からない replica は、既に commit された block を落とす枝に投票する。** pacemaker が存在する理由そのものが無効化されていた。
+
+**pacemaker のテストは全部通っていた。** 証明書を手で組み立てて view を入れており、**コンストラクタを一度も呼んでいなかった。**
+
+> **自分で入力を組み立てるテストは、その入力を組み立てるコードについての証拠にならない。**
+
+これはこのセッションで繰り返し出た型の最も鋭い形である（ADR-2608012100 の「片方のランタイムでしか実行していない .cljc」、ADR-2608020530 の「stage 1 しかテストしていない waterfall」と同じ）。
+
+修正: `qc` に 3-arity を足して view を記録する（2-arity も有効で、単に最下位に順序づく）。`on-qc` は **nil の lock と view 0 の lock を区別する**——view 0 は正当な最初の view で、nil を 0 として strictly-greater を要求すると**最初の証明書も lock できなかった。**
+
+## Decision
+
+### 1. 合意層の transport は cljs first。JVM 前提の QUIC は採らない
+
+実測した選択肢:
+
+| 経路 | Node | Browser | Cloudflare Worker | 判定 |
+|---|---|---|---|---|
+| **WebSocket** | ✅ | ✅ | ✅（DO が接続を保持できる） | **採用** |
+| WebTransport (HTTP/3=QUIC) | 実験的 | ✅ | server 側なし | 分断する |
+| js-libp2p | ✅ | ✅ | ❌ | 重い・Worker で動かない |
+| murakumo overlay QUIC (`.clj`) | JVM のみ | ❌ | ❌ | **却下** |
+
+**WebSocket は、エンジンが既に動いている 3 箇所すべてで動く唯一の transport。**
+
+murakumo の QUIC を採ると **validator が JVM に固定され**、CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb、JVM は最後）に反するうえ、**Worker 上の sequencer が validator になれない**——`torihiki-node`（ADR-2608020330）で既に engine が Worker で動くことを実証している以上、これは実際の損失である。
+
+ADR-2607993000 の「murakumo overlay QUIC をそのまま再利用」は、**この理由で撤回する。**
+
+### 2. parity harness を engi にも置く
+
+`engi.parity`。**JVM スイートは ClojureScript についての証拠ではない。** torihiki が高い授業料で学んだこと（ADR-2608012100）を engi で繰り返さない。
+
+## Consequences
+
+- (+) validator が Node・ブラウザ・Cloudflare Worker のどこでも動きうる。
+- (+) lock が実際に掛かるようになった。pacemaker が意味を持つようになった。
+- (+) engi にも cross-runtime の実測がある。
+- (−) **WebSocket driver はまだ書いていない。** 決めたのは方針で、実装は次。
+- (−) 署名集約も未着手。
+- (−) WebSocket は QUIC の head-of-line blocking 回避を持たない。**validator 数が増えたときの実測をしていない**ので、これは選定であって最適化ではない。
+
+## 残りギャップ
+
+1〜6 完了。**7 は pacemaker・sync・runtime 方針が完了**、WebSocket driver と署名集約が残り。8 bridge・監査。
+")))

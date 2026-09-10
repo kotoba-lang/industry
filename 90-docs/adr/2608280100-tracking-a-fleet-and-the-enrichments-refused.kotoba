@@ -1,0 +1,104 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608280100-tracking-a-fleet-and-the-enrichments-refused")
+  (:adr/title "Tracking a fleet, and the four enrichments refused")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-28")
+  (:adr/repo "cloud-itonami/otent")
+  (:adr/related (vector "adr-2608273000-a-declared-interval-nothing-reads-back"))
+  (:adr/body "# Tracking a fleet, and the four enrichments refused
+
+`cloud-itonami/otent` went from three feeds to eight over 2026-08-27/28,
+and from 'where are things' to 'who is behind them'. The collection is the
+smaller half of what was learned; the refusals are the rest.
+
+## What is collected
+
+| table | rows | source |
+|---|---|---|
+| `otent_vessel` | 68k+ | Digitraffic (Finnish AIS) + global AIS filtered to listed hulls |
+| `otent_vessel_static` | 11.5k | who those vessels say they are |
+| `otent_vessel_risk` | 23,173 | OFAC, EU, UK, Swiss, Canadian, Ukrainian lists + MOU detentions |
+| `otent_ownership_link` | 3,473 | which organization controls which hull |
+| `otent_org_identity` | 1,449 | what identifies those organizations |
+| `otent_fire` | 29k+ | NASA FIRMS, global |
+
+`otent sanctions` joins them: 1,375 vessels in coverage, 897 checked, 101
+on a list, 45 shadow fleet, 66 sanctioned, 49 with a named controlling
+organization.
+
+`bin/collector.cljs` is the only resident process -- a WebSocket to
+AISStream, global, filtered to a watchlist built from the risk table.
+Measured: 71 messages/second and 5,710 distinct vessels in 90 seconds, a
+dedup ratio of 1.12. Keeping everything would be ~4.3 M rows/day against a
+read path that already fails at 21,000; filtered it is 124:1.
+
+## Four enrichments refused, each after measuring
+
+**GLEIF by name.** The obvious way to reach a parent company. Sampled 40 of
+555 controlling organizations: four exact-name hits, and one agreed on
+jurisdiction. GLEIF places `Odyssey Marine Inc.` in Nevada and `Patriot
+Inc.` in Delaware where the sanctions record says Marshall Islands.
+Recording those as identity asserts that a Nevada company owns a sanctioned
+tanker, and the error direction is defamatory.
+
+**GLEIF at all, for this population.** LEI on 2 of 555. The shadow fleet
+does not hold LEIs. What it holds is the IMO Company Number, on 478. The
+measurement inverted the plan rather than confirming it.
+
+**Joining the two IMO registries.** An IMO Ship Number identifies a hull, an
+IMO Company Number an owner; different registries, same seven-digit format,
+and in FollowTheMoney the same property name on both schemas. One collision
+in 2,607 live values: `IMO9036387` is both the Chinese vessel `New Konk` and
+the North Korean firm `KOREA YUJONG SHIPPING CO LTD`. One in 2,607 is the
+dangerous frequency -- invisible to a hand-written test, defamatory when it
+fires.
+
+**Sanctions data on the CC0 wiki plane.** `wiki.kotobase.net` publishes
+claims CC0-1.0; OpenSanctions is CC-BY-NC 4.0. Share-alike is survivable --
+`hyakka.license/database-copyleft` keeps the source's licence on the claim
+-- but non-commercial is not share-alike and there is no CC0 claim carrying
+a use restriction. CC0 is irrevocable. `hyakka.license/use-restricted`
+refuses rather than carving out, and `hyakka.senpaku-test` fails if such a
+source is added.
+
+## What did go to the wiki
+
+The `senpaku` corpus: 143 tanker identity items, 714 claims, each evidence a
+verbatim FIELD FRAGMENT (`\\\"name\\\" : \\\"LOOKMAN\\\"`) of one archived payload
+addressed by sha256. Not the record containing it -- a value read from the
+wrong field is still inside its record and passes a record-level check.
+
+An IMO check digit was added because the test caught real bad data: one
+tanker broadcasting nine digits. All 142 others pass, so it rejects a record
+rather than a category, and the exclusion is recorded with its reason.
+
+## Personal data
+
+The governor refused all 1,545 ownership rows on `:person-identifier`,
+because `owner` is a person marker. It was protecting something real: 49 of
+1,545 edges name a natural person as the owner of a vessel. The answer was
+to drop those 49, not to rename the field until the rule stopped noticing.
+
+## Coverage bounds, stated rather than implied
+
+Vessel positions were the Finnish receiver network only until the global
+collector landed, which is why the shadow-fleet tankers attacked in the
+Black Sea and Mediterranean were absent when asked about on 2026-08-27.
+Ownership is the multi-jurisdiction sanctions export: worth +31% globally
+and **3.2x for this fleet**, because EU and UK designations target the
+Baltic specifically. Quoting the global average would have understated it
+tenfold -- the wrong measurement, honestly reported.
+
+## Open
+
+- **Corporate hierarchy is not collected.** OFAC records who owns an asset,
+  not who owns the owner, and GLEIF does not cover this population.
+- **The port state control join has no target.** Paris MOU serves search as
+  an application, Tokyo MOU's database path 404s, EMSA THETIS has no open
+  API, Equasis requires registration and forbids bulk extraction. Probed
+  2026-08-28. The IMO Company Number is recorded and ready; there is
+  nothing openly published to join it to.
+- **`hyakka.license/use-restricted` guards only the `senpaku` corpus.**
+  Extending it repo-wide is a policy decision, and another session was
+  building a sanctions corpus in that repo at the time.
+")))

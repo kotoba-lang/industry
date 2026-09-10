@@ -1,0 +1,218 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608220100-openicc-autonomous-icc-procedure-bots")
+  (:adr/title "openicc — autonomous Rome Statute procedure bots, where publication is a consensus act")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-22")
+  (:adr/repo "etzhayyim/openicc")
+  (:adr/related (vector "adr-2608221500-kosatsu-durability-plane-anchor-delegation"
+                "adr-2605301600-danjo-public-accountability-oversight"
+                "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+                "adr-2608039000-no-d1-as-premise-on-decentralised-paths"
+                "adr-2608136000-five-questions-before-writing-a-check"))
+  (:adr/body
+  "## Context
+
+The owner asked for bots modelling the International Criminal Court, based on
+CopilotKit/openbot, the Nous Research Hermes Agent, and the cloud-itonami actor
+family, running autonomously, decentralised, on a blockchain, permanently. The
+requesting source was the UNIC Japan ICC page
+(https://www.unic.or.jp/activities/international_law/icc/).
+
+Before scaffolding, the etzhayyim charter guardrail in skill
+`new-project-scaffold` applied: a new actor whose nature is to NAME, RATE or
+AUDIT real government entities must have its scope confirmed with the owner
+rather than proceeding under the standing authorisation. ICC subject matter is
+squarely that — the four crimes of Article 5 are alleged against real States and
+real natural persons.
+
+Two questions were put to the owner on 2026-08-21.
+
+**Adjudication boundary.** The owner chose the heavier of three options: openicc
+performs its own Article 17 admissibility assessment and drafts Article 15(2)
+communications naming real States and real individuals. This was chosen with the
+conflict stated in the option text — it is the OPPOSITE of the `danjo` (弾正)
+charter, which is explicitly NON-adjudicating and whose G11 forbids ranking
+governments.
+
+**Chain plane.** The owner chose inga plus periodic anchoring to a public L1,
+over inga alone and over making a public L1 the source of truth.
+
+## Decision
+
+### D1 — openicc does not inherit danjo's charter; it carries its own, and it is heavier
+
+A repository authorised to name people needs more gates than one authorised only
+to observe, not fewer. `openicc.governor` implements fourteen, each with a named
+predicate, and `declared-but-unevaluated` fails if the charter and the
+implementation drift — a gate that is declared but never evaluated is decorative,
+which is worse than a shorter charter.
+
+danjo's prohibition survives in a narrowed form as G9: the only permitted
+assessment of a State is an Article 17 admissibility assessment expressed in the
+Statute's own limbs. No index, no ranking, no league table. Article 17 is a
+question about the COURT's competence, not a score about a State, and G9 refuses
+any output that reshapes it into one.
+
+### D2 — publication is a consensus act (G7). This is the whole safety argument
+
+The structural answer to `an autonomous bot that accuses people` is not a careful
+bot. It is that no single bot can publish: a finding naming a natural person
+requires a 2f+1 quorum certificate over its content address. A node that is
+compromised, misconfigured, or simply mistaken reaches `admitted?` in its own
+process and still publishes nothing, because the signatures do not exist.
+
+Autonomy is preserved — nobody approves each run. Unilateral action is not
+available. The bots are autonomous; they are not alone.
+
+### D3 — the only outbound channel is the Article 15(2) communication (G8)
+
+Article 15(1)-(2) invites any individual, group or organization to send
+information to the Prosecutor, who must analyse its seriousness. A communication
+is therefore an input the treaty asks for, not an accusation made outside the
+system. openicc has exactly one destination and G8 refuses every other: not the
+press, not the named party, not a public list. The Court decides; openicc
+submits.
+
+### D4 — an adversarial stage is mandatory and defaults to refuted (G6)
+
+A pipeline of agents that share a goal produces findings that share a bias, and
+the bias is invisible from inside because every stage agrees. `openicc.bot.defence`
+is rewarded for refuting, returns `:refuted? true` when the record is too thin to
+evaluate, and its verdict is binding. A defence bot that abstains on thin
+evidence is a rubber stamp with extra steps — thin evidence is exactly when the
+other bots are most likely wrong. Not-run is a refusal, never a pass.
+
+### D5 — the three planes are separated, and the deletion test is applied to the config, not to prose
+
+    block   the record itself, content-addressed (CID). Immutable.
+    ref     which record is current. Decided by an inga 2f+1 quorum.
+    anchor  a periodic public commitment that a head existed.
+
+ADR-2608039000's test is literal: delete it now; is data lost or correctness
+broken? `openicc.chain/validate` applies it to a configuration value and refuses
+rather than degrading, because a rule that lives only in a document is followed
+until somebody is in a hurry, and a deployment that silently falls back to a
+single-vendor ref plane would still pass every other test.
+
+The anchor plane carries the head CID and its certificate and NEVER the
+allegation text. Publishing allegations to a public chain would make them
+unretractable about a person later shown to have been wrongly named, which
+Article 66 does not permit.
+
+### D6 — persistence is a durable outer loop, not a long-running function
+
+`openicc.tick/run-tick` advances one situation by one phase and returns. Lease,
+tick, budget, checkpoint and crash recovery live outside it. The lease is a CAS
+against the ref plane — the inga quorum — so two nodes cannot both believe they
+hold it. Combined with G7 this gives the property the owner asked for: bots run
+autonomously and permanently on several machines, and no single one of them can
+publish an allegation.
+
+A tick that does nothing returns a `:halt-reason`. A tick returning `did=nil`
+with no reason is indistinguishable from one that worked.
+
+### D7 — the evidence floor is in every gate
+
+Each gate reports a SCANNED count and refuses a scan of zero with
+`:no-evidence`. This is ADR-2608136000 applied inside a single module: the
+failure this workspace keeps paying for is that a check which could not measure
+returns the same value as a check that measured and found nothing wrong.
+
+The rule earned its keep during implementation. G14 (murakumo-only inference)
+originally folded every finding's endpoint into one set, so a finding that
+recorded NOTHING disappeared behind its siblings that did — aggregate non-empty,
+gate satisfied, unattributed finding through. The two-directional test caught it
+and the gate now checks per finding.
+
+### D8 — the registry ships unverified, and says so
+
+`openicc.statute` and `registry/situations.seed.edn` are seeded from secondary
+sources and every entry is `:unverified-seed`. G2 makes them unpublishable, so
+running on real data today ends in a HOLD. That is correct behaviour and the
+end-to-end test pins it. The next step is verifying the registry against the
+depositary text and the Court's own record, one entry at a time — not sending
+anything.
+
+The UNIC page the owner pointed at states 124 States Parties and 10 situations
+as of 2016-11. Both are stale. They are recorded as `:stale-do-not-cite` — a
+record of what the requesting source said, never an authority for a number.
+
+### D9 — name plane
+
+`openicc` under `etzhayyim` is a FAMILY-plane name for an open implementation of
+the Statute's procedure, not an origin-plane mirror of the Court. An origin-plane
+repository mirroring icc-cpi.int would be `int-icc-cpi-*` under kotoba-lang and
+does not exist yet; if the Rome Statute text itself is later mirrored as a spec
+repository, that is where it goes. The two planes may hold the same subject
+(ADR-2608040100), and the README states the boundary.
+
+## Consequences
+
+- etzhayyim now holds a repository chartered to name real people. That is a real
+  increase in this workspace's exposure and it was an explicit owner decision,
+  taken with the danjo conflict stated. The mitigation is structural (G7), not
+  procedural.
+- Because publication requires a quorum, openicc cannot operate as a single
+  node. A one-node deployment can analyse and can never publish a named finding.
+  This is intended.
+- `:head-count` is the quorum profile, which is correct only for a MANAGED
+  validator set. If admission is ever opened, it must become `:stake-weighted`
+  or a Sybil buys a supermajority over signatures that authorise accusations.
+  Named in `openicc.chain.inga/quorum-predicate` rather than left implicit.
+- The analytic core is dependency-free portable `.cljc`, so it runs under nbb
+  today and is shaped for the Kotoba/WASM guest. `jurisdiction`, `admissibility`
+  and `elements` are pure decision cores and are the natural first `.kotoba`
+  tranche; the boundary is already drawn (collection assembly and effects
+  outside, judgement inside). Not done yet.
+- No live deployment, no lease, no real nodes, no anchor, nothing ever
+  dispatched. `dispatch-fn` and `anchor-fn` are injected with no defaults: a
+  defaulted destination is a destination nobody chose.
+
+- **KNOWN GAP, opened the same day (2026-08-22).** D5 above defines an anchor
+  record shape inside `openicc.bot.registry`. Later that day, while giving
+  `cloud-itonami/kosatsu` a durability plane, `kotoba-lang/kotobase-anchor-fevm`
+  was found: it already owns chain-neutral checkpoint receipts, its default
+  provider needs no chain, gas or RPC, and its receipts carry only salted opaque
+  commitments. kosatsu delegates to it
+  (adr-2608221500-kosatsu-durability-plane-anchor-delegation D1) precisely
+  because a second anchor format is a second answer to the question the anchor
+  plane exists to answer.
+
+  openicc has that second format. It was written before the existing one was
+  searched for, which is the failure the workspace rule about consulting the
+  index exists to prevent, and it is recorded here rather than left for a reader
+  to discover from the divergence. Nothing depends on it yet: `anchor-fn` is
+  injected, no adapter exists, and nothing has been anchored. **The fix is to
+  make `openicc.bot.registry/anchor-record` produce a
+  `kotobase.anchor.checkpoint` payload behind the existing `:inga`-style
+  provider alias, keeping `src/` dependency-free.** That is the first item of
+  unfinished work from this session.
+
+## Evidence
+
+Measured 2026-08-22 at etzhayyim/openicc ecb48bf:
+
+- `nbb run_tests.cljs` — 55 tests, 127 assertions, 0 failures, 0 errors.
+- `clojure -M:test` — the same `.cljc` suite on the JVM, identical counts. Worth
+  running both: a junk expression in the suite was passed through silently by
+  nbb and caught only by the JVM's arity check.
+- `clojure -M:inga:test -d test -d test-inga` — 63 tests, 142 assertions, with
+  the real `inga` quorum behind the seam.
+- `clojure -M:lint` — 0 errors, 0 warnings.
+- Every one of the fourteen gates is exercised in both directions: a dossier that
+  passes it, and the same dossier with exactly one thing broken, asserting that
+  the NAMED gate fires.
+
+## Alternatives considered
+
+- **Non-adjudicating mirror of the ICC's public record**, matching danjo. The
+  recommended option, and declined by the owner in favour of the assessing
+  design.
+- **Fully fictional simulator naming nobody.** Declined by the owner. It would
+  have removed the exposure and most of the point.
+- **A public L1 as the source of truth.** Declined: gas and permanence apply to
+  the allegation text, which Article 66 does not permit, and it leaves the
+  workspace storage contract.
+- **Reimplementing the quorum inside openicc.** Declined: a second implementation
+  of a consensus predicate is a second answer to the question the consensus plane
+  exists to answer. `inga.quorum` and `inga.head` are injected.")))

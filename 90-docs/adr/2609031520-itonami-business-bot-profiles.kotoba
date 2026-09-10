@@ -1,0 +1,105 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609031520-itonami-business-bot-profiles")
+  (:adr/title "itonami business bot profile — 設計と組織化")
+  (:adr/authoritative_for
+  (vector "itonami business bot profile の設計と組織化 — blueprint ごとの profile を
+    90-docs/business/itonami-business-bot-profiles.json に 1 ファイルで登録簿化する方針"
+   "profile schema v1（identity / mission / runtime / money / audit / health / provisioning の 7 面）"
+   "health は fail-closed（status running は健康の証拠にならない。last_error + published vs failed + recent checkpoint を読む）"
+   "profile は design + provisioning record であって launch ではない — launch は itonami-business-bots skill の checklist のみが行う"))
+  , (:adr/topic "itonami-business-bot-profiles")
+  , (:adr/related (vector "adr-2609022000-yui-five-domain-participation-empowerment-bot"
+                  "90-docs/business/agentmail-bot-profiles.json"
+                  "90-docs/adr/2608291009-bot-kumo-yata-three-unit-economy.edn"))
+  , (:adr/status "accepted")
+  , (:adr/doc_type "adr")
+  , (:adr/last_verified "2026-09-03")
+  , (:adr/body
+  "# ADR-2609031520: itonami business bot profile — 設計と組織化
+
+**Status**: accepted
+**Date**: 2026-09-03
+**Deciders**: Jun Kawasaki（agent 判断、恒久承認 2026-07-10 の範囲）
+
+## Context — 何を頼まれ、何が実測されたか
+
+オーナー指示（2026-09-03）: 「bot profile を設計、組織化して」。これは
+ADR-2609022000（yui、2026-09-02 オーナー指示「労働から解放する bot profile を立て、
+co-scientist アプローチで進める」）の直接の続きである。
+
+設計の前に live 実測した（全て 2026-09-03、commit of record 6664a7303d4）:
+
+| 面 | 実測 | 出所 |
+|---|---|---|
+| blueprint registry | 28 blueprint（static 23 + self-registered 5、staticUpdated 2026-09-03）、24 が repo リンク持ち | live GET https://itonami.cloud/api/open-business |
+| business bot 実体 | 2 件 launch 済（cloud-itonami-isic-7310 Advertising / network-awai-net-babiniku AI VTuber）— 前回測定（同日午前）時に 1 件だった 9219 が追加されている | live GET https://bots.itonami.cloud/v1/grok-bots/businesses |
+| bot の健康 | **両方とも status held**。7310 は tick 3・murakumo `error code: 1101`（JSON でないエラー本文の parse 失敗）で runtime.job/failed を繰り返す。9219 は tick 0・checkpoint なし | 同上 + 公開 activity feed |
+| labor 系（労働解放の中核） | labor/jobs/hr/hr-management の 7 blueprint（うち seed 4）— **bot 実体 0** | registry × businesses 突合 |
+| 経済面 | pool = trial（simulation、verified liquidity 0）。position は unique lending position・非譲渡・on-chain token なし・allowed_services は murakumo/kotobase のみ | live GET /v1/bot-economy |
+| knowledge resident 面 | hyakka knowledge-resident tick 399・pub 94 / fail 106、topic resident 9 件は全員 last_error「Kotobase transact 502 CPU limit」— collection は動き projection が半分落ちる half-healthy | live GET /api/v1/grok-bots/hyakka[/topics] |
+| mail identity 面 | agentmail inbox 3 件（kotobase-net / murakumo-cloud / murakumo-gpu-bench）は contact/ops 用で business ごとではない | 90-docs/business/agentmail-bot-profiles.json |
+
+前回（同日午前）の測定では「launched 1/28、かつ失敗中」と報告したが、この数時間で
+9219 が launch されていた — **この面は逐次変わりうるので、登録簿は測定時点の
+snapshot として持ち、live は常に API に聞く**。
+
+## Decision
+
+### 1. profile schema v1 — 7 面
+
+1 blueprint = 1 bot profile。profile は **design + provisioning record** であって
+launch ではない（launch は skill itonami-business-bots の checklist だけが行い、
+その 201 と live probe が success の根拠になる）。
+
+- **identity**: agentmail inbox は optional。inbox-scoped API key だけが bot 自身の
+  credential（org key は管理専用で bot の identity にならない —
+  agentmail-bot-profiles.json の規約を business bot にも拡張適用）
+- **mission**: 「全人類を労働から解放する」を blueprint の domain family に分解。
+  labor/jobs/hr/hr-management → labor-market-transparency、その他 → domain-automation
+- **runtime**: DO per bot・hourly bounded loop・model は murakumo-main alias（KV 解決、
+  model id のハードコード禁止 — ADR-2607173100）・governor は blueprint から
+- **money**: unique lending position のみ（trial LP、非譲渡、on-chain token なし）。
+  credit bounds 1000–50000 micro-USDC。allowed_services は murakumo/kotobase x402 のみ
+- **audit**: DO 単位 append-only ledger + 公開 credential-redacted activity feed
+  （sha256 / itonami-stable-json-v1 — live event で実測済みの形）
+- **health**: fail-closed。「running は健康の証拠にならない。last_error +
+  published vs failed + recent checkpoint を読む」— この規律を profile schema の
+  一部分として全 bot に適用する
+- **provisioning**: launched / seed-tenant / blueprint-only の 3 状態。次の一手
+  （next_action）を profile ごとに持つ
+
+### 2. 組織化 — 1 ファイル登録簿
+
+`90-docs/business/itonami-business-bot-profiles.json`（schema
+itonami.business-bot-profiles.v1）。business profile 28 + infra profile 4
+（hyakka knowledge-resident / topic residents / default resident / mail identities）。
+生成元の live snapshot（open-business / bot-economy / businesses / hyakka topics）と
+commit of record を generated_from に記録する。
+
+**現在地の正直な申告**（summary 面にそのまま載せる）: launched 2/28、
+seed-tenant 4、blueprint-only 22、**launched 2 件は両方 held または失敗中**。
+
+### 3. 次の一手（優先順）
+
+1. **7310 / 9219 の回収**: murakumo 1101（murakumo-main 側）と hyakka 502 CPU
+   （kotobase 側）の 2 つの共通基盤障害を回収する。個別 bot の launch をその上に
+   積まない
+2. **labor 系 3 blueprint（6399 / 6310 / 7810）の launch**: 労働解放の中核ドメイン
+   に bot 実体が 0 なのが現在地。launch checklist（skill）に従い、registry に
+   blueprint が在ることを事前確認してから行う
+3. **mail identity の business スコープ化**: 必要になった bot だけ個別 inbox を
+   発行する（org key を identity にしない規約は不変）
+
+## Consequences
+
+- 登録簿は snapshot である。live 状態は API に聞く（プローブ結果を登録簿に
+  焼き込んで「現在地」と誤読させない — summary の数字は generated_from の時点を
+  指す）
+- 1101 / 502 の 2 つの共通基盤障害は bot 個別の問題ではない。launch を増やすほど
+  同じ 2 箇所に失敗が積み上がる構造なので、bot 追加より先に基盤を回収する
+- yui（ADR-2609022000）の G6（no-fiat）と money 規律はこの profile schema と
+  衝突しない — spending は lending position のまま、何も発行しない
+- mail identity は business bot にはまだ付いていない。付けるときは
+  agentmail-bot-profiles.json と同じ規約（inbox-scoped key = bot の credential）で
+  登録簿に追加する
+")))

@@ -1,0 +1,384 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609062000-full-public-reference-genetics-rasen-kotobase")
+  (:adr/title "Full public-reference genetics into rasen; ledger canonical, kotobase.net as projection")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/related (vector "adr-2606101000" "adr-2607279200" "adr-2608039000" "adr-2608039700"))
+  (:adr/body "# Full public-reference genetics into rasen, with kotobase.net as the query face
+
+## The question that started it
+
+\"Is all the human DNA data in kotobase.net?\" No, and three separate layers were
+in the way. Measuring each of them, rather than answering from the shape of the
+repo, is what produced this decision.
+
+**Layer 1 — rasen does not write to kotobase.net at all.** `grep -rn kotobase`
+over `src/`, `tools/` and the EDN roots of `etzhayyim/actor-rasen` returns zero
+hits. The file named `kotoba.cljc` is a local append-only ledger writer that
+states \"performs NO network I/O\"; publication goes to IPFS pin + IPNS. The
+kotobase.net tenant plane was never wired as a destination.
+
+**Layer 2 — the corpus itself was 53 nodes.** Measured in
+`data/seed-genome-graph.kotoba.edn`: 16 gene, 14 phenotype, 12 variant, 6
+population, 5 pathway; the persisted ledger carries `:tx/count 583`.
+
+**Layer 3 — the path that would grow it does not run.** `ingest.cljc` refuses
+live ingest (\"REFUSED: live gene ingest (MyGene.info / MyVariant.info) is
+G7-gated network + not ported\"); only `--offline` re-addressing works. The
+Python original it was ported from is not in the repository. Upstream is fine:
+mygene.info and myvariant.info both answer 200. What is missing is one unported
+path, not egress and not the sources.
+
+## Decision
+
+Ingest the **full public reference corpus** — ClinVar in its entirety, gnomAD
+population-aggregate allele frequencies — and keep **individual genotypes out**,
+which is not a scope cut but the actor's constitution (G1: no individual
+genotype registry, no identifiable personal sequence, no sample- or family-level
+data; population frequencies at super-population scale only; location as COARSE
+cytoband only).
+
+Destination is **both faces, with an explicit direction**: the append-only
+content-addressed ledger stays canonical, and kotobase.net carries the same
+datoms as a **projection** — deletable and rebuildable from the ledger, per the
+superproject's projection rule. kotobase.net is where Datalog reaches the graph;
+it is never where the graph lives.
+
+## What the scale actually is (measured, not estimated from reputation)
+
+| source | measured |
+|---|---|
+| ClinVar `variant_summary.txt.gz` | 442,495,433 bytes (2026-08-31) |
+| ClinVar GRCh38 VCF | 193,427,450 bytes |
+| gnomAD v4.1 genomes, **chr21 alone** | 7,758,981,978 bytes |
+| gnomAD v4.1 exomes, **chr21 alone** | 2,250,319,809 bytes |
+
+chr21 is among the smallest chromosomes. The full gnomAD sites release is
+hundreds of gigabytes. That settles a design question rather than describing
+one: **the raw VCFs are not ingested.** Only per-variant super-population
+allele frequencies are extracted, which is also all G1 permits. Any raw bulk
+that must be retained goes to B2 + DataLad, never into git.
+
+Normalising 5,282 real ClinVar lines through the new code: 2,619 GRCh38 rows
+kept, 2,663 skipped, 4,365 nodes and 9,076 edges, 0 G1 violations. Kept plus
+skipped equals rows read. Extrapolated to the full release that is roughly 5.8M
+lines, about 2.9M GRCh38 rows, on the order of 10M edges and tens of millions of
+datoms.
+
+**Consequence the measurement forces:** the ledger is one EDN file holding 583
+datoms today. It cannot hold that. Sharding of the ledger is a prerequisite for
+the full run, not an optimisation of it.
+
+## Landed in this step
+
+`rasen.methods.clinvar` (etzhayyim/actor-rasen main a261f970) — the full-corpus
+normaliser, emitting the same node and edge shapes as the bounded producer so
+the two are interchangeable downstream.
+
+G1 is enforced as a check rather than described in a comment. `variant_summary`
+carries Chromosome / Start / Stop / PositionVCF; the ontology permits coarse
+cytoband only. `g1-violations` refuses any node carrying a coordinate attr,
+`row->graph` runs it over everything it emits, and it throws rather than
+reporting clean when handed a non-map, so an unreadable node is UNVERIFIED and
+not silently clean. The negative test pins the refusal reason, so an unrelated
+failure cannot be counted as a successful discrimination.
+
+The suite caught one real defect: MONDO ids were built with a doubled prefix
+(`ph.mondo-mondo-0011450`), which would have split every MONDO condition into
+two node ids — one from this producer, one from `ingest` — and the split would
+have been invisible in both. MONDO values carry their own prefix.
+
+Skipped rows return nil rather than an empty graph, and the accumulator reports
+rows and skips, so coverage cannot be silently overstated.
+
+## Sharding — landed (rasen main a979d183)
+
+`rasen.methods.ledger-shards`. Sharding does not touch the chain: a tx cid is
+sha256 over (datoms, prev-cid) and nothing else, so splitting the same linear
+sequence across files preserves every cid. `migrate!` asserts that instead of
+assuming it; on the real on-disk ledger (1 tx, 583 datoms) the head comes
+through byte-identical as b17a2fa1…d99990.
+
+The failure worth engineering against is not splitting but INCOMPLETENESS. Once
+the log is many files, walking the shards you can find yields a shorter chain
+that verifies perfectly — \"could not read shard 7\" returns the same ok as \"read
+every shard and all linked\". The index is therefore the evidence floor:
+`verify!` reports ok only after seeing exactly as many txs as the index says
+exist, and it separates :no-index, :index-invalid, :shard-missing,
+:chain-broken and :count-mismatch instead of collapsing them into false.
+`index-violations` throws for a non-index rather than reporting no violations.
+`reindex!` refuses to synthesise an index for an empty directory. `append-txs!`
+refuses a run that does not continue the head.
+
+Both refusal paths were broken deliberately and only their own tests failed:
+skipping unreadable shards failed the missing-shard tests, and removing the
+count floor failed the truncation test alone.
+
+**A defect in the existing ledger, found by trying to migrate it.**
+`kotoba/verify-chain` returned `{:ok true :length 0}` for a path that does not
+exist. `read-log` returning [] for a missing file is correct — `autorun` starts
+a fresh chain from genesis on a machine with no ledger — but folding that []
+into verification made \"there is no ledger here\" indistinguishable from \"I
+walked the whole ledger and every link holds\". It now refuses with :no-log.
+This is the same class the superproject CLAUDE.md records, sitting in the
+ledger's own verifier.
+
+Two writing hazards worth carrying forward. `pr-str` cannot write the index: it
+collapses same-namespace maps to `#:index{…}`, which the minimal reader in
+`kotoba.cljc` parses to the string \"#:index\" — silently, yielding an index that
+is not a map. And `data/persisted/` is gitignored by design (machine-local,
+regenerable from the committed seed), so a worktree has no ledger at all; that
+absence is exactly what surfaced the verifier defect.
+
+The actual migration of the live ledger is deliberately NOT done here. It
+belongs with the streaming runner — migrating with nothing to append is churn,
+and `publish.cljc` / `datom-emit` still read the single file.
+
+## Streaming runner — landed (rasen main ceeb9e87)
+
+`rasen.methods.clinvar-run`. Acquisition is separate from normalisation: a full release takes
+long enough that holding one HTTP connection across it is its own failure mode. The declared
+size is passed in by the caller rather than read from a response header, because babashka —
+which runs this repository — does not permit the HttpURLConnection header methods, and a size
+check that silently does nothing on the runtime we actually use is worse than none. Resume is
+keyed on the sha256 of the downloaded release, not Last-Modified: row offsets are only
+meaningful against the exact bytes they were counted in.
+
+:complete is returned only when the stream can be shown to have ended where the source said —
+gzip's own trailer validating, and a declared size matching. Otherwise :truncated. A bounded
+run returns :limited and can never claim the whole corpus.
+
+Measured against the live release (442,495,433 bytes, sha256:186ad283…04c9): fetch verified in
+21s; 40,414 rows read / 19,999 kept / 20,415 skipped in 180s = 224 rows/s; 560,445 datoms in
+28 txs across 3 shards; chain verifying.
+
+**The full run has not been done, and not for a reason in the code.** Extrapolated it is ~5.8M
+rows, ~7.2 hours, ~81M datoms, ~6.2 GB of ledger. This machine has 2.3 GB free of 927 GB
+(measured 2026-09-06, disk at 100%). Starting it would fill the disk and take every other
+session on this host down with it. The run needs either space here or the ledger on B2/DataLad
+per the superproject's large-binary rule — a storage decision, taken before the run, not
+during it.
+
+## kotobase projection — seam landed, transport blocked (rasen main 480f3656)
+
+`rasen.methods.kotobase-publish` carries no transport and no credential; writes go through an
+injected (fn [tx-edn] -> result). `kotoba-lang/kotobase-client` is the canonical client and is
+what a host wires this to — rasen runs under bb and that client is ClojureScript, and the seam
+exists so rasen does not grow a second one.
+
+The watermark is the part worth engineering. Publish a batch, advance, repeat — and a
+transport returning nil, or a 202 never applied, advances it exactly as far as a real
+acknowledgement does; the next run starts after datoms that were never stored and no later run
+goes back for them. So `acknowledged?` recognises success rather than assuming it, the run
+stops at the first unrecognised reply, and the resumed run re-sends that transaction rather
+than the one after it. The ledger is verified before anything is sent: projecting a ledger that
+does not verify would put datoms on the target that no shard accounts for, ending the
+rebuildability that makes it a projection at all.
+
+**Both faces of kotobase.net are currently unreachable, measured 2026-09-06.** POST
+/api/transact without credentials returns 401. The datom plane went Biscuit-required
+(net-kotobase ADR-2608280230) and CACAO no longer authenticates ordinary tenant reads or
+writes. The operator seed KOTOBA_SEED is a write-only Cloudflare Worker secret with no readable
+copy anywhere — by design, and changing it would change the operator DID and therefore the
+graph namespace. The archive plane's KOTOBASE_ARCHIVE_TOKEN returns `no such item` from the
+kagi vault today, the third swing for that one item; the secrets map has been corrected. Minting
+or guessing a credential is not something an agent does (safety floor 1), so this is owner
+action: issue a Biscuit for a rasen tenant, or restore the archive token.
+
+Entity identity is the target's property. Ledger ids are content-stable strings; whether a
+target upserts on one or mints a fresh entity per transaction cannot be checked without a live
+endpoint, so `publish!` does not claim idempotence and `:entity-fn` is where a host supplies
+what its target needs.
+
+## gnomAD frequencies — landed, and G1 caps the coverage (rasen main 480f3656)
+
+`rasen.methods.gnomad` emits population nodes and :allele-frequency 縁 and nothing else.
+
+Two constraints here are constitutional rather than technical, and both came from reading real
+gnomAD rather than the spec.
+
+A VCF record identifies a variant by CHROM/POS/REF/ALT. The only G1-safe identity it carries is
+its dbSNP rsID, and gnomAD leaves that empty for a large share of records — measured on a real
+v4.1 chr21 genomes prefix, 24,189 of 41,172 (58.8%). Those records are not representable at
+all. So `extract` partitions every record into :with-rsid and :without-rsid and `coverage`
+returns nil rather than a number when nothing was read: **full gnomAD coverage is false by
+construction**, and the counts exist so it cannot be claimed by accident.
+
+gnomAD publishes AF_XX and AF_XY — sex-stratified — beside the super-population keys, plus
+AF_fin / AF_asj / AF_ami / AF_mid / AF_remaining, all finer than :population/code admits. The
+mapping is an explicit allow-list, not a prefix match; a prefix match would sweep them in and
+the resulting edges would be indistinguishable from legitimate ones.
+
+Measured on the real prefix: 41,172 records → 21,573 distinct variants, 144,544 frequency edges
+across exactly six populations, 0 G1 violations, 5.4s (~7,600 records/s).
+
+**Scale, so nobody plans against the wrong number.** That 25 MB prefix is 0.32% of chr21
+genomes alone (7.76 GB). gnomAD v4.1 genomes is on the order of 760M variants; at 58.8%
+representable that is ~450M variants and billions of frequency edges — orders of magnitude
+beyond ClinVar's ~81M datoms, and not a run this host can hold under any arrangement. It needs
+the storage decision first, and probably a different machine.
+
+## R2 — the storage blocker is gone, and the run is under way (rasen main 079e89ca)
+
+`rasen.methods.shard-archive`. A sealed shard is immutable, so it lives in an object store and
+comes back when something reads it. `archive!` reads every upload BACK and sha256-compares it
+before removing the local file: a PUT returning 200 for a body that was never stored, a partial
+write, a bucket that drops it — each would otherwise end with the canonical bytes gone and the
+ledger discovering it at the next verify, with nothing to restore from. Only sealed shards are
+touched; the last one is still open for appends, and uploading it would store a prefix and call
+it the shard.
+
+**Demonstrated end to end on real R2, not on a mock.** With shard 0 freed locally, `verify!`
+refuses with :shard-missing rather than verifying the shorter chain; restoring it from R2
+returns {:ok true :tx-count 18 :shards 2}. The object is 15,821,265 bytes and the manifest
+carries its sha256.
+
+The source streams from HTTP now, for a measured reason: landing the 442 MB release first
+failed with ENOSPC mid-download. Free space on this host moved between 125 MB and 11 GB during
+the work, driven by other processes. Completeness for a stream rests on gzip's trailer — CRC32
+and uncompressed length, validated at end of stream — which is a stronger check than a byte
+count, not a weaker one. Passing :expect-bytes with a URL is refused rather than ignored.
+
+Steady-state local footprint is one open shard: ~10-30 MB, against ~6.2 GB if nothing were
+offloaded. **The full ClinVar run is streaming as of 2026-09-06**, resumable from its
+checkpoint, at ~252 rows/s.
+
+## Cloudflare R2 — how the credential actually works
+
+Three things the secrets map did not say, all measured 2026-09-06 and written back into it.
+
+`--region auto` must be passed explicitly. This host's aws config sets ap-northeast-1, SigV4
+puts the region in the signing scope, and R2 answers SignatureDoesNotMatch — **a correct key
+looks revoked**. That misdiagnosis was made once here before the region was pinned.
+
+The working path is a temp credential: keychain gftd.cf/API_TOKEN against
+POST /accounts/<acct>/r2/temp-access-credentials, scoped to one bucket, object-read-write, up
+to 7 days. Better than a long-lived account key, not worse. The kagi
+`CLOUDFLARE_R2_ACCESS_KEY` is present again (the map said absent) but only half-valid: its
+secret fails even with the region pinned, while its access-key-id is accepted as the temp
+credential's parent.
+
+`GET /user/tokens/verify` returns \"Invalid API Token\" for this account-scoped token while its
+R2 calls succeed. A failed verify there is not evidence the token is dead.
+
+## Not done, and blocking
+
+1. **A credential for kotobase.net.** Owner action — the datom plane is Biscuit-required and
+   the operator seed is a write-only Cloudflare secret by design; the archive token reads
+   `no such item` today. This is the only thing still blocking the projection half.
+2. **gnomAD at scale.** The extractor is verified on real records, but v4.1 genomes is on the
+   order of 760M variants, ~58.8% of them representable, and that is a different order of
+   magnitude from ClinVar. It needs its own run plan on top of the R2 offload.
+3. **Migrating the live single-file ledger** onto shards, with `publish.cljc` / `datom-emit`
+   pointed at them.
+
+## Notes for whoever continues
+
+The ADR number in the source docstrings of `clinvar.cljc` and
+`test_clinvar.cljc` briefly said 2609061800, which belongs to a different ADR
+(kotoba-web-architecture-fit). Corrected in rasen main 16d55c50.
+
+While landing this, a superproject EDN document written by another loop
+(`90-docs/business/revenue-agent-loop/runs/0037-kotobase-stab-001.edn`) was
+found broken by four raw quotes inside a body string, which closed it early and
+left the remainder to be read as symbols. Escaping restored it; content
+unchanged. This is the failure mode the superproject CLAUDE.md already records,
+and it recurred in a document written the same day.
+
+## Closing state (2026-09-06)
+
+**Landed.** `etzhayyim/actor-rasen` main `96d7d172`; the west pin and the shared checkout
+both sit on it, so checkout / pin / main are one thing. Suite: **148 tests, 905 assertions,
+0 failures**. Every refusal path added in this ADR's work was broken on purpose and only its
+own test failed.
+
+**The corpus is being built, and it is resumable.** Ledger at `~/.gftd/rasen-genome/ledger`
+— durable, not a session scratchpad, because a resident bot cannot own state that disappears
+with whoever started it. Sealed shards live in R2 `etzhayyim-rasen-genome` under
+`rasen-genome/`. Measured at close: **723,378 rows read, 238,439 kept, 459 transactions,
+9,187,054 datoms, 45 shards in R2, 14 MB on local disk** against the ~6.2 GB the corpus would
+be if nothing were offloaded.
+
+**The interruption handling was proven by the failure it was written for.** The live stream
+was cut twice. The first time predated the fix and died as an unclassified
+`SocketException`. The second time it produced
+`run!: the source connection was interrupted — refusing to report a corpus`, wrote
+`:run/status :interrupted`, and kept `rows/read 717069` — so the resumed run picked up where
+it stopped instead of re-reading a third of the release.
+
+### Resume point
+
+```bash
+# credentials: bucket-scoped, object-read-write, 7 days from 2026-09-06
+#   security find-generic-password -s gftd.cf -a API_TOKEN -w
+#   -> POST /accounts/<acct>/r2/temp-access-credentials
+#   ALWAYS pass --region auto; without it SigV4 signs for the config's region and R2
+#   answers SignatureDoesNotMatch, which makes a correct key look revoked.
+cd <a worktree of etzhayyim/actor-rasen at main>
+. /tmp/r2env.sh                      # or mint fresh credentials as above
+LEDGER_ROOT=$HOME/.gftd/rasen-genome/ledger \\
+CV_FP=clinvar-2026-08-31-sha186ad283 \\
+  bb <r2run.clj>                     # streams the release, resumes from the checkpoint
+```
+
+The run script is not in the repository — it is 20 lines of host glue that wires
+`clinvar-run/run!` to `aws s3api` through `shard-archive`'s injected `store-fn`. Rewriting it
+is a five-minute job and it deliberately carries the credential handling that the repo does
+not.
+
+### What blocks each remaining piece
+
+1. **ClinVar completion** — nothing but time and connection stability. The run is streaming
+   and resumes on its own.
+2. **kotobase.net projection** — owner action. The datom plane is Biscuit-required, the
+   operator seed is a write-only Cloudflare secret by design, and the archive token reads
+   `no such item`. An agent does not mint or guess a credential.
+3. **gnomAD** — needs its own run plan. The extractor is verified on real records; the corpus
+   is on the order of 760M variants with 58.8% representable, which is a different order of
+   magnitude from ClinVar's ~81M datoms.
+4. **The ledger migration** of the old single-file ledger, with `publish.cljc` / `datom-emit`
+   repointed at the shards.
+
+### Retained on purpose
+
+The worktree at `scratchpad/rasen-live` (branch `agent/live-run`) is NOT cleaned up: the
+ingest process is running out of it. Removing it would stop the only thing making progress.
+Its branch carries no commits of its own — it tracks main — so nothing is unlanded there.
+Whoever finishes the run should remove both.
+
+## Closing delta (2026-09-06, second close)
+
+**Rules updated from what this work actually stepped in** (superproject `47c26506`). Four
+edits to CLAUDE.md, all as *how to check* rather than as measured values, because this file
+warns repeatedly that a dated number gets quoted with the date stripped:
+
+1. A seventh question — **is that green from work done, or from work skipped?** The section
+   already warned about breaking something the wrong way and reading the red as a
+   demonstration; the mirror was missing. A correctly working skip / cache / gate returns the
+   same success value as a run that did the work.
+2. The heredoc hazard generalised beyond EDN: a backtick inside an unquoted heredoc is
+   executed and its word disappears; a bulk regex reaches into docstrings and closes a string
+   early. Both transformations succeed and only the meaning changes.
+3. **An index hit is not evidence that something works.** An accepted ADR can have no reader,
+   and a same-named thing on a different plane can make a mechanism look implemented.
+4. zsh word-splitting moved out of the west section — the trap is in the shell, not in west.
+   With it: a bulk operation is not judged by the absence of errors, and a zero result is
+   separated from an unreadable one by a control.
+
+**The corpus keeps building through interruptions.** Six cut connections so far; every one
+was classified and left its progress. Measured at this close: **1,300,267 rows read,
+521,290 kept, 761 transactions, 15,230,453 datoms, 76 shards in R2, 2.1 MB on local disk.**
+
+⚠ **The ledger's counts carry a one-time offset and should not be read as exact.**
+`rows/read` exceeds `kept + skipped` by exactly the checkpoint value at the moment the ledger
+was relocated to its durable path. The one-basis fix landed in `96d7d172`; the runs before it
+counted kept per-run, so the prefix those runs skipped was never folded into kept or skipped.
+**The split of that prefix cannot be recovered from the ledger** — deriving it would be
+inventing a measurement — so it is recorded here rather than corrected. Runs entirely on
+`96d7d172` and later satisfy `read = kept + skipped`; this ledger straddles the change.
+
+**What a supervisor would do, and why there isn't one yet.** Each interruption needs a
+restart, and the resume is a single command. The hermes profile's cron prompt already says to
+do exactly that when `ingest-process` goes yes→no with a checkpoint that is not `:complete`.
+It cannot run until the fleet's model plane has credit and capacity, so until then the
+restarts are manual.")))

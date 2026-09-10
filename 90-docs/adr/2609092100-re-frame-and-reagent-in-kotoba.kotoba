@@ -1,0 +1,131 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609092100-re-frame-and-reagent-in-kotoba")
+ (:adr/title "re-frame and reagent get Kotoba halves, and the call sites do not move")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-09")
+ (:adr/authority "owner request, 2026-09-09")
+ (:adr/repos "kotoba-lang/shitsuke")
+ (:adr/related "adr-2607270100-kotoba-centered-migration, adr-2608260900-no-svelte-no-react, adr-2608080100-single-page-app, lang/q9-migration.edn")
+ (:adr/body "Asked to continue the cljs -> Kotoba refactor from kotoba-lang/kotoba-script#100,
+make it deployable on Cloudflare, and give reagent and re-frame Kotoba
+equivalents so ClojureScript does not have to change much.
+
+## The decision
+
+`kotoba-lang/shitsuke` gains the re-frame pair as a Kotoba library --
+`kotoba/reframe_core.kotoba` (db, event, subscription, effect) and
+`kotoba/reagent_core.kotoba` (element builders; a view is a `:document`) --
+plus a portable bridge (`shitsuke.kotoba.guest`), two additive seam entries
+(`rf/install-guest!`, `r/kotoba-view`) and a Cloudflare Worker host
+(`runtime/reframe-worker.mjs`).
+
+The point is the CALL SITES. `(rf/dispatch [:counter/inc])` and
+`@(rf/subscribe [:counter/count])` are unchanged, and nothing at the call site
+says the handler now runs in Kotoba. A component moves one event id at a time.
+
+## Why the split falls where it does
+
+re-frame's own signatures are already what a Kotoba function can be:
+`db + event -> db` and `db + query -> value`. Three things stay on the host
+side, and none of them is a gap:
+
+  * the REGISTRY. `reg-event-db` installs a handler at runtime; Kotoba
+    dispatch is static, so an app module spells its registry as one `cond`
+    over `event-id` -- the same closed dispatch `defmulti`/`defmethod`
+    desugars to (guest-grammar `:closed-multimethod`).
+  * `app-db` ITSELF. `atom` in Kotoba is `:atom-local` (lang/local-state.edn):
+    a let-bound cell that may not be returned, stored or captured. So the db
+    is a value in and a value out, which is what re-frame's handler signature
+    always said, and what lets SSR and the browser share one handler.
+  * PERFORMING EFFECTS. A handler returns an inert `{:db .. :fx [[id v] ..]}`.
+    Both guest modules compile with an EMPTY `requiredCapabilities` and are
+    granted nothing, even for an app that sends mail.
+
+## The boundary is EDN text, and that is what makes it a seam
+
+The guest prints and reads its own values (`document-edn-print` /
+`document-edn-read`), so the crossing is `pr-str` one way and `read-string`
+the other, and what app code holds is ordinary Clojure data.
+
+Measured 2026-09-09 through the emitted ESM: the guest's EDN reader accepts
+`pr-str` output as it comes -- commas, any key order, keys the handler does
+not know, escaped quotes, non-ASCII. Had it wanted canonical bytes, every call
+site would have had to learn a codec, and the claim in the request -- that
+cljs does not change much -- would have been false.
+
+Not JSON, deliberately: JSON has no keyword and no i64, and the restricted-ESM
+ABI hands an i64 across as a BigInt, which `JSON.stringify` refuses outright.
+
+`document-print` / `document-read` remain available as the canonical codec.
+Measured the same day: it is HEX, and malformed input traps with a named code
+(`document-read-hex-charset`, `-truncated`, `-odd`), which is what lets a host
+answer 400 instead of guessing.
+
+## Cloudflare
+
+A restricted-ESM artifact from `kotoba -M compile --target js` RUNS ON WORKERD.
+Measured 2026-09-09, wrangler 4.103.0 `wrangler dev --local`: amu's
+`examples/todo-app.kotoba` answered a request in 17 ms, and the acceptance for
+this ADR's own Worker host passes 10/10 checks -- an i64 crossing
+`POST /api/step` and coming back, ordered effects out of `POST /api/dispatch`,
+and 400/404/405 on the three refusal paths.
+
+This is a second route to Cloudflare, not the first: `gftdcojp/ai-gftd-dougaka`
+already serves a wasm32-browser guest from a Worker (measured 2026-08-31). The
+ESM route needs no `WebAssembly.Module` import and no bundler step.
+
+`runtime/reframe-worker.mjs` is 135 lines of mechanism. Every judgement is the
+guest's; the one judgement the host makes is that a guest trap on
+caller-supplied text is a 400.
+
+## What was measured, and what each check would have missed
+
+  kotoba -M test         39 assertions over :jvm-kir, :js and :wasm
+                         (reagent_core 15, reframe_core 24)
+  guest_acceptance.cljs  14 checks against the EMITTED ESM, nbb, JVM-free
+  reframe_worker_...cljs 10 checks against workerd over HTTP
+  clojure -M:test        91 tests / 1158 assertions, the whole shitsuke suite
+
+Each of the four was broken on purpose once and the RIGHT check went red:
+`child` stopped appending (2 of 15 red, all three targets), `fx-effect`
+stopped building a pair list (fx tests only), `document->hiccup` dropped
+children (1 of 14), the Worker answered 500 instead of 400 (1 of 10), and
+`perform-fx!` stopped throwing on an effect nobody performs (1 of 18).
+
+Two failures were found this way rather than by reading:
+
+  * `children-of` defaulted to `document-null`, so counting the children of a
+    LEAF failed `document-container-required` on all three targets. The module
+    compiled; only running it said so.
+  * `db-has?` compared `document-contains` to 1. That head is typed `:bool`,
+    unlike `string-contains?` which is `:i64` -- the `?` is in one name and the
+    type is in neither.
+
+## Bounds, named rather than hidden
+
+  * a `:document` holds 256 nodes -- today's ceiling on one Kotoba screen.
+  * attribute values are strings in `reagent_core`.
+  * an instance's fuel is spent and never replenished, so the host makes a
+    fresh instance per call. Sound only because the guest is pure.
+  * a Kotoba app module is a multi-file project: `module-lock` then
+    `compile --module-lock`, not the single-file path.
+  * the kotoba CLI needs ABSOLUTE paths. A relative input is
+    \"input must be a regular file\"; a relative --output reports `:ok true` and
+    writes into the compiler's own working directory, not the caller's.
+
+## What this is NOT
+
+It is not a migrated production component. `kotoba/example_counter.kotoba` is
+the consumer that proves the libraries are usable as libraries -- an index hit
+is not evidence that something works, and neither is a library with no caller.
+Moving a real cljs app is the next step and is a whole-component build under
+`lang/q9-migration.edn`, whose wave 2 through 5 are `:not-authorized`.
+
+It is also not a production deploy. The Worker evidence is workerd via
+`wrangler dev --local`; nothing was deployed.
+
+The browser half is unexercised here: `install-guest!`'s `:cljs` branch needs
+real re-frame, which needs a shadow-cljs build, which needs a JVM. The seam
+test covers the `:clj` branch (mini runtime) and the bridge acceptance covers
+the artifact; a browser build covers neither and remains a gap.
+")))

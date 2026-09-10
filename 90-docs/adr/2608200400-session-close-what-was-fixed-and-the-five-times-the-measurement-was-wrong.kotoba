@@ -1,0 +1,117 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608200400-session-close-what-was-fixed-and-the-five-times-the-measurement-was-wrong")
+  (:adr/title "セッション close —— 直したものと、測り間違えた 5 回、そして信用してよい終値")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-20")
+  (:adr/topic "session-close")
+  (:adr/doc_type "adr")
+  (:source/dataset "adr")
+  (:adr/repos "com-junkawasaki/root and ~330 child repositories")
+  (:adr/authoritative_for (vector "what landed in this session and where the evidence for each is"
+                          "that the closure-collision numbers 260 and 622 came from an ad-hoc model that over-reports, verified false against a real classpath, and must not be quoted"
+                          "the trustworthy end state: verify-dep-coordinate-identity ACTIVE=0 REDUNDANT=3 LATENT=44"
+                          "the honest strength of each batch's evidence -- 188 suites unrun in one, 26 fully run in another"
+                          "the resume points, in priority order, with what blocks each"))
+  (:adr/related (vector "adr-2608200300-one-repository-two-coordinates-swept-and-three-times-i-measured-wrong"
+                "adr-2608200200-clock-native-aot-is-refused-by-an-accepted-adr-not-unfinished"
+                "adr-2608200100-clj-to-kotoba-follow-through-cross-runtime-defect-and-a-detector-that-measured-absence-as-emptiness"
+                "adr-2608191100-maturity-pass-on-the-five-kotoba-refactor-resume-points"
+                "adr-2608191000-kotoba-refactor-status-measured-and-claude-md-native-section-corrected"
+                "ADR-2608136000" "ADR-2608136800" "ADR-2608730000"))
+  (:adr/body "
+## このセッションが何をしたか
+
+オーナー指示「clj から kotoba native, amu, aya への refactor の状況は?」に始まり、
+`next` / `do it` / `最適な方針で進めて` / `残りも subagent で` を経て closing。
+**測ることと、測り間違いを訂正することが仕事の大半だった。**
+
+## 着地した実体（すべて default branch 上で祖先確認済み）
+
+| 領域 | 内容 |
+|---|---|
+| 座標の正準化 | 子リポ **約 330 merge**、west pin **約 320 件前進**（3 batch + blocked 解除 + langchain） |
+| cljc の cross-runtime | kotobase-storage / -pack / nekko / ipns / aiueos / xdr / oncrpc ほかで実欠陥を修正 |
+| fleet gate | `:nbb-test` 22 → 47、`:nbb-script` に aiueos の cross-runtime を追加、`:jvm-test` は 1 本も削らず |
+| detector | `verify-kotoba-source-census` と `verify-dep-coordinate-identity` を新規登録 |
+| CI | `orgs-detector-tick --admit-only` + `root-orgs-detectors-admission` gate |
+| ADR | 2608191000 / 191100 / 200100 / 200200 / 200300 / 本 ADR |
+
+## 見つかった実欠陥（コードが静かに間違っていたもの）
+
+- **char リテラルを int に変換する式が cljs で 0 を返す** —— aiueos の VFIO ioctl 番号が全部 type field を失い、
+  `VFIO_GET_API_VERSION` が 15204 でなく 100 だった。何も throw しない
+- **`(.-field record)` は SCI で undefined** —— kotobase-storage / -pack / kotobase /
+  datom-source の計 14 箇所以上。`kotobase-storage-pack` は nbb で 25 errors を出しながら
+  README に「Identical numbers on JVM and nbb」と書いてあった
+- **同じ char リテラル変換どうしを比べる test が 2 本**、何も検査せずに通っていた（hvt）
+- **`.contains` は Java String のメソッド** —— ipns の pubsub test、cljs で一度も走っていなかった
+- **`(Integer/parseInt s 16)` が `.cljc` に裸で** —— inference の namespace が SCI で load 不能
+- **同じライブラリが 2 revision で classpath に載る** —— kakure/apex の html、
+  isic-8291 の langchain（旧名@51e7b61 と新名@42ccbf5）
+- **`+'`/`*'` は cljs に無い** —— xdr が load 不能。直す過程で **JVM 側の既存バグ 2 件**
+  （範囲外 hyper の切り詰め、負の BigInt が long と違うバイト列）も出た
+
+## 私が測り間違えた回数 —— 5 回
+
+1. **detector が `:git/sha` しか数えなかった。** `:local/root` も座標である。含めると
+   依存 2,665 → 5,642
+2. **`:why` 文字列に引用符入りの EDN 例を書いて registry を parse 不能にした。**
+   admit が `no registry` と出たのを「確認した」と扱ったのが原因（今日 3 度目の
+   admission 破損、これは私）
+3. **「west が同じ repo を 2 度登録している」は偽。** west.yml は clean で、二重なのは
+   ディスク（252 orphan / 1 DIVERGENT shadow）
+4. **検証式を間違えて agent に渡した。** `grep '/compiler/|/amu/' | wc -l` は classpath の
+   *root* を数えるので、amu は src+resources で健全でも 2。agent が訂正した
+5. **closure モデルが over-report する。** 各 repo の *現在の* deps.edn で辺を辿り
+   alias 込みで歩くので、tools.deps の実 closure より広い。ground truth で確認:
+   モデルが amu 衝突と報告した `cloud-itonami/aidesk` の実 classpath は **0 件**
+
+**したがって「衝突 260 件」「589→622 に増えた」はどちらもこの道具の値であって、
+状態ではない。引用しないこと。**
+
+## 信用してよい終値
+
+| 指標 | 値 | 出所 |
+|---|---|---|
+| `verify-dep-coordinate-identity` | **ACTIVE=0 / REDUNDANT=3 / LATENT=44** | 登録済み detector、deps.edn 単位で厳密 |
+| 個別の 2→1 | 約 12 repo | 各 agent が `clojure -Spath` で実測 |
+| west pin 一致 | 4,177 / 4,209 | 残り 32 は他セッションの WIP |
+| registry admit | 29 entries、exit 0 | `--admit-only` |
+
+## agent が自分で止まった 3 回（すべて正しい判断）
+
+- **clock native-aot**: ADR 0240/0084 が構造的に拒否していることを証拠付きで示し、
+  TCB の C を書かずに停止
+- **compiler batch**: 改名が欠陥を *作る* ことを測定し、**27 件を revert**
+- **langchain batch**: 私の指示が **151 中 137 で間違い**だと測定。`:override-deps` の
+  旧座標は何にも一致しておらず、改名すれば眠った override が起動して pin された sha が
+  可変 checkout に化ける。削除に切り替えた
+
+## 検証の強さ（正直に）
+
+**188 のスイートは走らせていない。** load 200 超が継続し、これらは `.kotoba` を amu 経由で
+コンパイルする。amu batch の根拠は `-Spath` の解決（解決しなければ commit しない driver）で、
+**スイートより弱い**。一方、blocked 27 repo batch は **26 本すべて 332 commit の跳躍の
+前後で 0 failures を実走**しており、そちらは強い。
+
+## 引き継ぎ —— 次の一手（優先順）
+
+1. **`kotodama@802a04d` が旧 langchain 座標を宣言している。** `unspsc` と
+   `com-etzhayyim-unspsc` はこれが直るまで改名してはいけない（旧座標が *生きている*）
+2. **`mesh` の BTOK 移行** —— kotoba の guest メモリ文字列にフレームヘッダが付き、
+   `kotoba.mesh.node` は生で読む。3 段階の測定は ADR とcommit に記録済み
+3. **aiueos の coord 型不一致** —— `:local/root` と `:git/sha` の両方で宣言され、
+   **10 repo が classpath を組めない**。どちらの repo を変えるかは設計判断
+4. **252 の orphan checkout と 1 件の DIVERGENT shadow**（network-isekai-playtest）。
+   `verify-duplicate-registrations --disk` が列挙する
+5. **新規 gate 23 本が `:cd false`。** fleet で最初の緑 receipt が出たら `:cd true` へ
+6. `:implementation` 語彙の権威決定、clock の `:wall` —— どちらもオーナー判断
+
+## 触っていないもの（他セッションの作業）
+
+- 32 の dirty checkout。うち 4 本（com-adyen / com-airtable / com-allscripts /
+  com-athenahealth）は **legacy schema DSL を削除中**の同一パターンで、私の census が
+  報告している当のもの
+- `90-docs/observatory/observatory.datoms.edn` の未コミット変更（セッション開始前から）
+- `agent/gj-payroll-compliance-audit` / `agent/durable-observed-ref-v1` ほか他セッションの branch
+")))

@@ -1,0 +1,229 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608179000-kotobase-locale-continuity-across-the-signin-hop")
+  (:adr/doc_type "adr")
+  (:adr/topic "kotobase-locale-continuity-across-the-signin-hop")
+  (:adr/title "ADR-2608179000: kotobase.net → auth.kotobase.net のハンドオフで言語が失われていた（4 件修正・本番反映済み）。加えて、計測器が対象と噛み合っていない誤りを 1 日に 4 回踏んだ記録")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-17")
+  (:adr/last_verified "2026-08-17")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/related (vector "adr-2606090001-kotobase-net-degftd-domain-independence"
+                "adr-2608136000-five-questions-before-writing-a-check"
+                "adr-2608135200-checkout-is-not-the-repo"))
+
+  (:adr/context
+  "発端は「maze.co を契約して MCP で kotobase.net のユーザーテストを進めて」。
+   Maze は connector URL 待ちで着手できていないが、テスト設計のために live
+   ファネルを実測した結果、ロケール連続性の欠陥が 4 件出た。ユーザーテストを
+   壊れた導線に対して回さないための前処理として、4 件とも直して本番へ出した。
+
+   共通する形は 1 つ: **kotobase.net は英語が canonical の bilingual site で、
+   主要 CTA『Start free』が auth.kotobase.net へ渡す。その 1 ホップで、
+   訪問者が選んだ言語が毎回失われていた。**")
+
+  (:adr/decision
+  "(1) authn の /sign-in を要求された言語で返す（日本語原本 + 実行時に英語生成）。
+   (2) signup の return_to を location.pathname から作る（/ja を落とさない）。
+   (3) kb_locale cookie を Domain=kotobase.net にし、旧 host-only を同じ応答で retire。
+   (4) 廃止済み kotobase.gftd.ai はブラウザだけ apex へ 301。DID document は据え置き。")
+
+  (:adr/landed
+  (set "net-kotobase/control-plane ec295dd — authn: /sign-in answers in the language the request asked for"
+    "net-kotobase/control-plane 0a2049c — signup: return_to carries the page the visitor is on"
+    "net-kotobase/control-plane 5fe9fb7 — locale: cookie scope survives the sign-in hop"
+    "net-kotobase/control-plane fdf1045 — gftd.ai alias: browsers to apex, DID stays put"))
+
+  (:adr/deployed
+  (map (:authn (map (:worker "kotobase-authn") (:host "auth.kotobase.net")
+           (:versions (vector "3b292dd0-d837-40e3-9db6-a9b9ceba198b"
+                      "0fd6cb29-7c03-4843-8c1c-b9b3d6939a67"))))
+   (:gateway (map (:worker "net-kotobase") (:host "kotobase.net")
+             (:versions (vector "f82d04d0-538b-422f-9f28-31e007916abb"
+                        "20bbcbb0-da5e-439a-a1d1-900e4de226a1"
+                        "92c97d00-d679-414f-bdc3-c5d93d8c94d2"))))))
+
+  (:adr/evidence
+  (map (:live-verified-2026-08-17
+   (vector "auth sign-in: en-US,en → lang=en / ja → lang=ja / en q<ja q → lang=ja / fr-FR → lang=en / ヘッダ無し → lang=en"
+    "英語 sign-in の可視部分に日本語 0 件（<style> 内の DADS MIT 表示 デジタル庁 は据え置き。翻訳は違反）"
+    "cookie jar 実測: 日本語ブラウザで English を選ぶ → domain=.kotobase.net kb_locale=en → sign-in lang=en"
+    "cookie jar 実測: 英語ブラウザで 日本語 を選ぶ → kb_locale=ja → sign-in lang=ja"
+    "kotobase.net/en は 2 本の Set-Cookie（Domain 付き + host-only の Max-Age=0）"
+    "kotobase.gftd.ai は host-only のまま = multi-apex ガードが効いている"
+    "gftd.ai: browser /signup → 301 kotobase.net/signup、did.json は resolver/browser とも 200"
+    "return_to=…/ja/signup + Accept-Language: en → sign-in lang=ja"))
+   (:tests
+   (map (:authn "clojure -M:test — 52 tests / 356 assertions / 0 failures")
+    (:gateway-site "clojure -M:site-test — 53 tests / 561 assertions / 1 failure（既存、下記 gaps）")
+    (:authn-worker-smoke "test/apex_worker_smoke.cljs — 19/19（ビルド済みバンドルを実行）")
+    (:gateway-alias-smoke "test/legacy_alias_smoke.cljs — 7/7（ビルド済みバンドルを実行）")))
+   (:gates-verified-by-breaking
+   (vector "翻訳 key の順序を反転 → 会社のEmail address という半端翻訳が再現"
+    "key を 1 つ削除 → その文字列を名指しで報告"
+    "どこにも一致しない key を追加 → every-key-matches-something が検出"
+    "localize の配線を無効化 → locale 4 件だけ失敗、日本語側は緑のまま"
+    "cookie scope を任意ホストの登録可能親へ拡大 → gftd.ai 漏洩の assertion が失敗"
+    "retirement ヘッダを削除 → 移行テストが失敗"
+    "retirement に Domain を付与 → 『host-only でなければならない』が失敗"
+    "2 つの cookie を先頭一致で解決（gateway / authn 各 1） → 曖昧性テストが失敗"
+    "/.well-known 除外を削除 → machine 経路は通ったまま、browser 経路だけ失敗"))))
+
+  (:adr/body
+  "## なぜ 1 ホップで言語が失われていたか
+
+  4 件は別々のバグに見えるが、境界が 1 本しかないことが共通の原因である。
+  kotobase.net と auth.kotobase.net は**別デプロイ**（authn/deps.edn 曰く
+  『auth のバグが pinning と graph API を落とさないため』）で、両者を跨ぐ
+  状態は cookie と return_to しかない。その 2 本がどちらも壊れていた。
+
+  ### (1) authn は lang=\"ja\" 固定だった
+
+  Accept-Language も kb_locale も見ずに日本語を返していた。英語ページの主要
+  CTA から入った英語話者は、**身元を預ける一歩で読めない画面に着地**していた。
+
+  ページは日本語原本のまま、英語は実行時に生成する。方向が逆なだけで、形は
+  kotobase.site-i18n/admin-html が console に対して既にやっていたものと同じ。
+
+  **gateway と共有しない。** authn は別デプロイで classpath が届かない。
+  Accept-Language パーサ約 30 行の重複はその隔離の代金であり、正しい代金。
+
+  **翻訳はテンプレートにだけ当て、スロットを埋める前に済ませる。**
+  {{EMAIL}} 等は利用者由来の値で、翻訳表を人が入力したアドレスに通す理由は無い。
+
+  **key は文まるごと、長い順に適用。** これは理論ではない —— rendered
+  document で メールアドレス は 4 回（1 回は単独ラベル、3 回は長い key の内部）、
+  6桁のコード は 2 回同じ形で出る。順序を反転させると
+  `会社のEmail address` が再現した。site-i18n が `サポートed` の傷跡を
+  コメントに残しているのと同じ罠が、この文書でも生きていた。
+
+  ### (2) return_to が /ja を落としていた
+
+  `location.origin + '/signup'` と直書きしており、同じ文書が /signup と
+  /ja/signup の両方で配信されるため、**日本語の訪問者は認証後に英語ページへ
+  戻されていた**。2 行下のコメントは『JS upgrades it to preserve this origin,
+  path, and acquisition query』と書いていた —— 3 つのうち 2 つだけが本当だった。
+
+  これは (1) と噛み合う。path は authn が『どちらのサイトから来たか』を知る
+  手段でもあるので、prefix を落とすことは日本語 sign-in も同時に失わせていた。
+
+  ### (3) kb_locale が auth に届いていなかった
+
+  Domain 属性が無く host-only だった。**仕組みは動いていた** —— authn は
+  cookie を最優先で読み、手で送れば正しく効いた。cookie が届かないだけだった。
+
+  移行が本題。既存の host-only cookie は 1 年生きるので、スコープを広げるだけ
+  では同名の cookie を 2 つ抱え、どちらが読まれるかがヘッダ順で決まる。だから
+  **書く応答が同じ応答で古い方を retire する**（Max-Age=0、かつ意図的に
+  Domain 無し —— 付けたら今書いた方を消す。identity は (name, domain, path)）。
+  読む側 2 つは『ja と en が両方ある』を選択ではないとして扱い、曖昧でない
+  信号へ落とす。先頭一致は cond の姿をしたコイン投げである。
+
+  スコープは kotobase.net 配下だけ。**allowlist にしたのは、Domain 属性が
+  ヒントではなく放送だから。** 任意ホストの登録可能親を導出すると、
+  kotobase.gftd.ai では gftd.ai —— 無関係なサービス群 —— に配ることになる。
+
+  ### (4) 廃止ホストが 200 でサイト全体を配っていた
+
+  ADR-2606090001 と USING-AS-A-PIN-SERVICE.md は kotobase.gftd.ai を
+  『301 for browsers; XRPC still works』と書いてきたが、本番はどちらでもなく
+  **200 でサイト全体**を返していた。文書化された契約が何も記述していなかった。
+
+  **リダイレクトしてはいけない方が本題。** did:web:kotobase.gftd.ai は
+  そのホストの /.well-known/did.json で解決される。**廃止した名前でも、
+  その名前で発行した identity には答え続ける義務がある。** 全部を apex へ
+  飛ばすと、その DID を記録した相手だけが静かに解決できなくなる。
+
+  除外が冗長でないことは壊して確かめた: 外すと machine 経路は通ったまま
+  （resolver は Sec-Fetch を送らないので元々この分岐に来ない）、落ちるのは
+  browser 経路だけ。**クライアントがたまたまどうヘッダを付けるかに依存して
+  成り立つ不変条件は、明文化する価値がある。**
+
+  ## 計測器が対象と噛み合っていない誤りを 1 日に 4 回踏んだ
+
+  ADR-2608136000 の class が、今日は『検査が測れない』ではなく
+  **『検査する私の道具が対象と噛み合っていない』**という形で出た。4 回とも
+  出力は正常に見えた。
+
+  1. **`curl` に Accept ヘッダを付けずに /admin を叩き、401 JSON を
+     ユーザーが見る画面だと読んだ。** 実際はブラウザなら 302 で sign-in へ
+     飛ぶ。worker のソースにその分岐が『API クライアントが 302 で HTML の
+     sign-in に着いたら成功と誤読するから』という意図付きで書いてあった。
+     **P0 として報告し、修正を承認までもらってから、偽陽性と判明した。**
+  2. **JS のテストで `(?s)` を使った。** Java のインラインフラグで JS には
+     無く、`<style>` を剥がせないまま vendored DADS の MIT 表示
+     `Copyright (c) 2025 デジタル庁` を『半端翻訳』として報告した。
+  3. **`shadow-cljs release worker` をビルドして、signup 文書が入っているのは
+     `:entry` の方だと知らずにデプロイしかけた。** バンドルの中身を確認して
+     いなければ、変更が入っていないものを出して成功と報告していた。
+  4. **minified バンドルを `grep -c 'Max-Age=0'` で検査して 0 件を得た。**
+     minifier が `=` を `\\x3d` にエスケープしており、さらに `grep -c` は
+     minified バンドル（数行）では**行数**を数える。中身は正しく入っていた。
+
+  **教訓は 1 行に畳める: 出荷する artifact に対して、利用者と同じ形で測る。**
+  1 は利用者の形（ブラウザヘッダ）で測っていなかった。2 は実行環境の形
+  （JS regex）で書いていなかった。3 は artifact そのものを見ていなかった。
+  4 は artifact の表現（escape / 1 行）を知らずに数えていた。
+
+  以後この repo で採った実務: **ビルド済みバンドルを import して Worker と
+  して走らせる smoke**（authn/test/apex_worker_smoke.cljs が先例、
+  gateway 側に test/legacy_alias_smoke.cljs を追加）。その docstring が
+  『純粋層の 224 assertion が全部緑のままエントリが壊れていた』実測を
+  記録しており、今日それが 3 の形で再現しかけた。
+
+  ## Maze（未着手・ブロック中）
+
+  『maze.co を契約して MCP で』は**まだ実行できていない**。理由は 2 つとも
+  安全床と外部要因であって、技術的困難ではない:
+
+  - **アカウント作成はパスワード入力**（安全床①）。オーナーが Free を作成し、
+    j@awai.network でログイン済み。
+  - **connector URL が要る。** ブラウザ拡張が未接続で私が設定画面を読めない。
+    推測接続は 2 回で止めた（mcp.maze.co は DNS 解決せず、api.maze.co/mcp 等は
+    404）。URL はテナント固有かログイン後の文書にある。
+
+  **Maze MCP は beta で early-access 申請制**、かつ**研究を読む側**であって
+  study 作成は未実装（公式が『beyond research discovery to research creation』
+  を将来形で書いている）。承認後の場所は Settings → Personal → Integrations →
+  MCP で、Claude は marketplace 承認済みのためワンクリック。
+
+  Free は **10 testers/月**で、設計した 12〜16 名には届かない。
+
+  ## ユーザーテスト設計（成果物）
+
+  5 タスク・成功条件・計測項目・スクリーナ・Maze mission の開始/成功 URL を
+  artifact 化した: https://claude.ai/code/artifact/4db46199-b358-4b75-9e65-d2cd960987e5
+
+  **設定上の注意**: Task 3/4 は kotobase.net → auth.kotobase.net と
+  ホストを跨ぐ。study に両ホストを登録しないと記録がハンドオフで止まり、
+  **一番見たい段階で全員が失敗として記録される。**")
+
+  (:adr/gaps
+  (vector (map (:gap "gateway の :node-test がコンパイル不能")
+    (:detail "kotobase.sdk.e2e が存在せず browser_pq_test.cljs が require している。clean main でも同一。gateway の node テスト一式がまったく走っていない。")
+    (:severity "high")
+    (:owner "unassigned")
+    (:first-measured "2026-08-17"))
+   (map (:gap "draft-legal-pages-render-from-in-repo-markdown-test が失敗")
+    (:detail "terms/privacy の [CONFIRM:] マーカーが見つからない。clean main で同一を確認。法務文書は counsel レビュー前提のため本セッションでは触れていない。")
+    (:severity "medium")
+    (:owner "unassigned")
+    (:first-measured "2026-08-17"))
+   (map (:gap "Maze MCP 未接続")
+    (:detail "connector URL 待ち。Settings → Personal settings → Integrations → MCP。無ければ maze.co/platform/mcp/ の early-access 申請が先。")
+    (:severity "medium")
+    (:owner "Jun Kawasaki"))
+   (map (:gap "kotobase.gftd.ai のルート自体は残置")
+    (:detail "wrangler.jsonc の kotobase.gftd.ai/* binding は撤去していない。DID document を配り続ける必要があるため、ルート撤去は DID の移行計画とセットでないと行えない。")
+    (:severity "low"))
+   (map (:gap "superproject checkout が origin/main から 63 behind")
+    (:detail "本セッションで superproject に commit はしていない。90-docs/adr/2608170100 と manifest/west.yml の未コミット変更はセッション開始時点で既に存在し、他セッションのもの。")
+    (:severity "low"))))
+
+  (:adr/resume
+  "次の 1 手は Maze の connector URL を受け取って `claude mcp add --transport http maze <URL>` を通すこと。
+   それが来ない間に着手できる最上位は gateway の :node-test 復旧
+   （`cd orgs/net-kotobase/control-plane/kotobase-api-gateway-cljs && ./node_modules/.bin/shadow-cljs compile node-test`
+   が kotobase.sdk.e2e 欠落で落ちることを確認するところから）。
+   本セッションの 4 件は全て main 着地・本番反映・live 検証済みで、再開時に必要な作業は無い。")))

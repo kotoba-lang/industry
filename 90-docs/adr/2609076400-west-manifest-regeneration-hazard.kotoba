@@ -1,0 +1,85 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609076400-west-manifest-regeneration-hazard")
+  (:adr/title "west.yml drifts from its generator by 67 entries and zero pins — and my first reading of why was wrong")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-07")
+  (:adr/body "## What was measured
+
+`nbb scripts/gen-west-manifest.cljs --check` exits 1: the committed
+`manifest/west.yml` is not what the generator produces today.
+
+Measured 2026-09-07 by copying west.yml aside, regenerating, diffing per entry,
+and restoring (working tree verified unchanged afterwards each time):
+
+    67 entries differ
+    0  `- name:` or `revision:` lines differ
+
+**No pin would move.** Every difference is group assignment or `userdata`:
+
+    ~65  committed `groups: [gftdcojp]` (or another stale org)
+         -> generated `groups: [cloud-itonami]` / `[com-junkawasaki]`
+    5    committed `groups: [archived]` + `userdata: {archived: true}`
+         -> generated drops both
+
+## Which side is right: the generator
+
+The group changes are corrections. `action-paid-outreach`, `app-6ir`, `app-ka`
+and the rest **live at `orgs/cloud-itonami/…`** while west.yml still calls them
+`gftdcojp`. The generator derives the group from the path, so it is reading the
+world as it is; the committed file is carrying names from before the gftd
+retirement moved those repositories. Same for the five `archived` entries:
+`ai-kaisya`, `kami-engine-render`, `kami-engine-io` and the others are marked
+archived in west.yml but **their current paths are not among the twenty
+`:archived` keys in `repos.edn`**, so the policy no longer declares them
+archived and the generator stops emitting it.
+
+## I had this backwards first, and the way I found out is the point
+
+The first pass concluded the opposite — that regenerating would strip DataLad
+`userdata` from `m365-archive`, `product-corpus`, `llm-dataset` and
+`emr-claims-primary-sources`, unisolating four large-binary datasets from
+default `west update`. That would have been severe, so it was checked rather
+than reported.
+
+It was false. `m365-archive`'s committed and generated blocks are **byte
+identical**, `groups: [datalad]` and `userdata: {datalad: true}` included, and
+its `:datalad` policy key matches its west path exactly.
+
+The error was in how the affected entries were identified: `grep -B12
+'datalad: true'` on the committed file, which names entries that merely sit
+NEAR a marker rather than entries that appear in the diff. Proximity in a file
+is not membership in a change set. Comparing per-entry blocks gave 67 names,
+and none of the four was among them.
+
+**壊したものと報告されたものが一致することを確かめる** applies to reading a
+diff, not only to breaking a check on purpose.
+
+## What is still open
+
+Whether those five entries *should* still be archived. The generator is
+faithfully following `repos.edn`, but whether the policy is right — genuinely
+un-archived, or lost the key when a repo moved path — is intent, not
+measurement, and this ADR does not settle it. The consequence of regenerating
+is that five repositories leave the `archived` group and re-enter the default
+`west update` scope.
+
+## The standing instruction still holds, for a different reason
+
+CLAUDE.md's layout quickstart shows the bare `nbb scripts/gen-west-manifest.cljs`;
+its Git-operations section forbids wholesale regeneration commits, after the
+incident where one registration flushed 44 broken pins to main. That prohibition
+is about **pins**, and this drift touches none — but a 67-entry bulk change is
+still unreviewable as one commit, and it silently answers the archived question
+above by fiat.
+
+So: keep using `--entry <name>`. Three repositories were registered that way
+today (`cloud-itonami-cli`, `cloud-itonami-apex`, plus pin advances), each a
+five-line diff with server-side pin verification. None is implicated here —
+their entries match their checkouts, and a sample of 401 checked-out projects
+found zero differing from their pins, so this is not checkout staleness.
+
+## Next step
+
+Decide the archived question for those five, then land the group corrections
+deliberately — ideally `--entry` per repository, or one commit that says in its
+message that it is the gftd-retirement group catch-up and lists the five.")))

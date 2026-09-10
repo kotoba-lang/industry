@@ -1,0 +1,147 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607254700-stale-west-checkout-diagnosis-and-foreign-wip-landing")
+  (:adr/title "ADR-2607254700: west 共有 checkout の陳腐化に起因する誤診断の手順化と、他者 WIP を着地させる際の境界")
+  (:adr/status "proposed")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-25")
+  (:adr/last-verified "2026-07-25")
+  (:adr/last_verified "2026-07-25")
+  (:adr/authoritative false)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "west-checkout-staleness-operations")
+  (:adr/authoritative-for (vector))
+  (:adr/related
+  (vector "adr-2607254500-ethereum-full-node-kotoba-wasm-component"
+   "adr-2607022900-west-pin-server-side-verification"
+   "manifest/cleanup-workflow.edn"
+   ".claude/hooks/west-pin-verify-guard.cljs"
+   "scripts/verify-west-pins.cljs"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:incident-count 3)
+   (:root-cause "west 共有 checkout は manifest の pin 時点であって upstream 最新ではない")
+   (:false-conclusions (vector "compiler に Component 出力が無い" "main の west.yml に pin 退行がある"))
+   (:decisions (vector :absence-proof-requires-origin
+               :pin-guard-diagnosis-order
+               :foreign-wip-landing-boundary))))
+  (:adr/body
+  "# ADR-2607254700: west 共有 checkout の陳腐化に起因する誤診断の手順化と、他者 WIP を着地させる際の境界
+
+**Status**: proposed
+**Date**: 2026-07-25
+
+## Context
+
+ADR-2607254500（Ethereum execution client の設計）を起票する過程で、同一の
+根本原因から **3 回**、事実誤認または誤診断が発生した。いずれも
+**west の共有 checkout（`orgs/<org>/<repo>`）を最新の upstream だと暗黙に
+仮定した**ことによる。
+
+CLAUDE.md は既に pin 鮮度について警告しているが、警告の形が
+「push/pull の前に確認せよ」という手順であり、**調査・判断の入力として
+共有 checkout を読むとき**の危険を名指ししていなかった。
+
+### 誤り 1: 機能の不在を共有 checkout の grep で結論づけた
+
+`orgs/kotoba-lang/compiler/src` を `wasm-component` で grep して 0 件だったため
+「compiler は Wasm Component を出力できない」と結論し、それを ADR の中心的主張
+として起票・マージした。実際にはその checkout が `origin/main` から
+**143 commits 遅れて**おり、現在の main には Component 実装が 3272 行
+（`component_core.clj` 2467 / `component_composition.clj` 567 /
+`component_wit.clj` 172 / `component_artifact.clj` 66）存在した。
+ADR は訂正済み。
+
+### 誤り 2: pin 検証ガードの失敗を main の異常と読んだ
+
+ブランチ削除の push が PreToolUse ガードに
+`cloud-itonami-isic-563: d9a7fb00→f1a925ac は前進ではありません(status=behind)`
+で拒否され、これを「main の west.yml に pin 退行があり誰も push できない」と
+報告した。実際は逆で、**main の west.yml は正しく**、GitHub API で確認すると
+両 entry とも子リポの default branch HEAD と `identical` だった。
+遅れていたのは**ローカルの子 checkout**（`f1a925ac` / `ab7c68eb`）で、
+ガードは「この状態で再生成したら pin が退行する」と正しく警告していた。
+`west update` で解消。
+
+### 誤り 3: 他者の未 push commit をベースごと信用しかけた
+
+compiler の共有 checkout にオーナーの未 push commit が 3 件あり、そのうち
+`536d643` を現 main に cherry-pick しようとした。差分を確認したところ、
+143 commits 古いベース由来で `:maturity` を `L1-L6-landed` から
+`P0-P1-in-progress` へ**後退**させ completed 一覧を短縮する内容と、
+意図的らしい `:transport-adr` 削除が**混在**していた。そのまま着地させれば
+main の記録を静かに巻き戻していた。
+
+## Decision
+
+### D1. 不在の証明は `origin/<default-branch>` に対してのみ行う
+
+**共有 checkout への grep / find / ls で「機能が無い」「ファイルが無い」を
+結論づけてはならない。** 不在を主張する前に:
+
+```
+git -C orgs/<org>/<repo> fetch origin
+git -C orgs/<org>/<repo> rev-list --left-right --count origin/<default>...HEAD
+git -C orgs/<org>/<repo> grep <pattern> origin/<default> -- <path>
+```
+
+左側が非ゼロなら checkout は遅れており、その grep 結果は不在の証拠にならない。
+**存在**の証明には共有 checkout で足りる（あるものはある）が、
+**不在**の証明には必ず `origin` を見る。この非対称性が要点である。
+
+### D2. pin ガードの失敗は「ローカルが古い」を第一仮説にする
+
+`verify-west-pins` / `west-pin-verify-guard` が `status=behind` で拒否したとき、
+診断は次の順で行う:
+
+1. **manifest の pin と子リポ default branch を GitHub API で比較する。**
+   `identical` なら **main は正常**で、問題はローカルにある
+   ```
+   gh api repos/<org>/<repo>/compare/<pinned-sha>...<default-branch> --jq '{status, ahead_by, behind_by}'
+   ```
+2. `identical` だったら、ローカル子 checkout の HEAD を見る。pin より古ければ
+   `west update --fetch smart <name>` で解消する。**west.yml は触らない**
+3. `identical` でない場合に限り、pin 自体の修正を検討する
+
+**ガードの警告文を「main が壊れている」と読まない。**
+`ローカル子リポが遅れたまま再生成していませんか` はこの第一仮説を
+既に示唆している。
+
+### D3. 他者の WIP を着地させるときの境界
+
+古いベースの上にある他者（オーナー含む）の未 push commit を現 main に
+着地させる場合:
+
+- **commit 自身の親に対する差分**（`git show <sha>`）を読む。
+  `git diff origin/main <sha>` は 143 commits 分の巻き戻しを含むため
+  意図の判定に使えない
+- **純粋に追加的で、現 main の内容と衝突しないハンクだけ**を着地させてよい
+- **意図と巻き戻しが混在する commit は着地させない。**
+  どのハンクが意図でどれが古いベースの副作用かは、書いた本人にしか判定できない。
+  代理で選り分けることは、他者の意図を書き換えることである
+- 着地させなかったものは、**理由と該当ハンクを名指しして報告する**。
+  黙って放置しない
+
+本 ADR 起票時の適用例: `f435960`（README に 16 行純追加、削除ゼロ、
+ADR-2607252500 を参照）は着地させた。`536d643`（maturity 後退と
+`:transport-adr` 削除の混在）は着地させず、オーナー判断に回した。
+
+## Consequences
+
+- 「不在の証明」に一手間かかるが、誤った ADR を起票して訂正するコストより安い
+- pin ガードの失敗が「共有インフラの障害」として誤報告されなくなる
+- 他者の WIP が、代理判断で静かに書き換えられることがなくなる
+- CLAUDE.md の pin 鮮度節は push/pull 前の手順を定めているが、本 ADR は
+  **調査の入力として読むとき**を対象にする。両者は補完関係にある
+
+## Alternatives rejected
+
+| 代替案 | 判定 | 理由 |
+|---|---|---|
+| 全 west project を常時最新に保つ | 却下 | pin は再現性のためにある。最新追従は pin の目的を壊す |
+| 共有 checkout での調査を全面禁止 | 却下 | 存在の証明には十分で、`origin` 越しの grep より速い。不在の証明だけを縛れば足りる |
+| 他者の WIP を常に無視する | 却下 | 未 push のまま滞留させるのも害。純追加分は着地させられる |
+| 混在 commit をハンク単位で選り分けて着地 | 却下 | 意図の代理判定になる。報告して本人に返す |
+")))

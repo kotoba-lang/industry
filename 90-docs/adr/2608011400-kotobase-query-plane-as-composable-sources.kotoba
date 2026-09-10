@@ -1,0 +1,363 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608011400-kotobase-query-plane-as-composable-sources")
+  (:adr/title "ADR-2608011400: kotobase の query plane を差し替え可能な source の組み合わせにする — 外部DBとの比較と、O(DB) 天井の解消")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-01")
+  (:adr/last-verified "2026-08-17")
+  (:adr/last_verified "2026-08-17")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotobase-query-plane-as-composable-sources")
+  (:adr/authoritative-for
+  (vector "kotobase のクエリ経路のアーキテクチャ選択肢と、その組み合わせ方"
+   "PostgreSQL / Neo4j / ArangoDB / NebulaGraph / ClickHouse / RisingWave との位置関係"
+   "O(database) per query という天井の所在と解消順序"
+   "各改善を「書き換え」ではなく独立 lib として持つ理由"))
+  (:adr/related
+  (vector "adr-2608011200-partitioned-root-vs-single-lane-writers"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2608010940-evm-state-datom-indexer"
+   "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"))
+  (:adr/body
+  "# ADR-2608011400: query plane を差し替え可能な source の組み合わせにする
+
+**Status**: accepted（seam + 2 実装は着地済み。brick 2/3/4 は未着手）
+**Date**: 2026-08-01
+
+## Context — 天井は merge ではなかった
+
+「Datalog の join は全 datom を必要とするので merge が要る、という設計自体が長期的な限界では」という問いから測った。**方向は正しく、犯人が違った。**
+
+**merge のコスト**（facts 2000 固定、20 クエリ）:
+
+| k | eager merge | block reads | fold 1 回 | compacted の 1 クエリ |
+|---|---|---|---|---|
+| 1 | 1567ms | 200 | 56ms | 1ms |
+| 50 | 4408ms | 2260 | 170ms | 0ms |
+| 200 | 9697ms | 8260 | 966ms | **0ms** |
+
+**merge が高いのではなく、クエリ経路で merge するのが高い。** 畳んでから引けば per-query は 0ms。全 LSM エンジンが到達した結論と同じで、答えも同じ（background compaction）。
+
+**本当の天井**（k=1、partition が無関係な条件）:
+
+| facts | hydrate | block reads |
+|---|---|---|
+| 2,000 | 57ms | 50 |
+| 8,000 | 152ms | 155 |
+| 32,000 | 678ms | 640 |
+
+**結果サイズではなくデータベースのサイズに比例する。** `arrangement.query/query` と `arrangement.datalog/q` は materialize 済みの `db` を取り、`arrangement.core/restore` はそれを `pt/scan-prefix get-fn root \"\"`（木全体）で作る。外挿すると 10^6 datoms で ~21s / ~20,000 block reads。Worker + D1 では block read がネットワーク往復なので、CPU 律速ですらない。
+
+**そしてこれはアーキテクチャの限界ではなく未実装だった。** leaf key は `(pr-str [blind(a) blind(b) blind(c)])` — **各成分が独立に blind されて連結**されている。blind 鍵を持つ読み手は任意の先頭成分の prefix を復号なしで導出でき、`prolly-tree/scan-prefix` は既に key-range pruned（\"descending into O(path) blocks for a keyed read instead of the whole tree\"）。**primitive は揃っていて、query を store に繋いだ人がいなかっただけ。**
+
+## 外部システムとの位置関係
+
+**注記: これらを同一ワークロードでベンチしていない。** storage engine の構造と計算量の比較であって測定ではない。決定的な軸は 1 つ — **1 クエリが O(結果) を読むか O(DB) を読むか**。
+
+| | storage engine | クエリ計算量 | 書き込み | multi-hop | 検証可能 | edge |
+|---|---|---|---|---|---|---|
+| PostgreSQL | heap + B-tree, MVCC | O(log n + result) | primary 1 | recursive CTE、深いと劣化 | ✗ | ✗ |
+| ClickHouse | MergeTree = ソート済み part + 背景 merge | O(スキャンした granule) | 並行 insert 多数 | join が弱い | ✗ | ✗ |
+| Neo4j | ネイティブ隣接リスト | **1 hop O(1)** | primary 1 | **クラス最強** | ✗ | ✗ |
+| ArangoDB | RocksDB (LSM) | O(log n + result) | sharded | 良好 | ✗ | ✗ |
+| NebulaGraph | RocksDB, vertex hash shard, Raft | O(log n + result) + hop ごと往復 | **scale-out** | shard 跨ぎは往復 | ✗ | ✗ |
+| RisingWave | Hummock LSM on S3 | **O(1)**（join を書き込み時に済ませる） | 多 writer | MV 次第 | ✗ | ✗ |
+| **kotobase（改善前）** | prolly-tree, content-addressed | **O(DB)** | **1** | **書けない** | **✓** | **✓** |
+| kotobase（本 ADR 後） | 同上 | **O(log n + result)** | N（ADR-2608011200） | 未実装 | ✓ | ✓ |
+
+**(a) ClientHouse の MergeTree は、我々が ADR-2608011200 で作った partitioned root + compaction と同じ設計。** 再発明だが、収束先が正しいことの証拠。
+**(b) RisingWave は「read で join しない」別解**（incremental MV）。brick 3 はその特殊ケース。
+**(c) Neo4j の index-free adjacency は構造的に欠けている。** prefix scan を入れても埋まらない（brick 4）。
+
+**kotobase が勝てる軸は throughput ではなく、検証可能・content-addressed・暗号的にテナント分離された事実をエッジから配ること**（上の 6 つは全部 ✗）。スキャン量で ClickHouse に、走査で Neo4j に勝とうとするのは筋が悪い。
+
+## Decision — 書き換えず、独立した lib を組み合わせる
+
+**どの戦略が正しいかを、どれも測る前に決めない。** そのために seam を切る。
+
+**`kotoba-lang/datom-source`（新規、依存ゼロ）** — 契約のみ:
+
+```
+(defprotocol IPatternSource
+  (-scan [this pattern]))   ; [s p o]、nil = wildcard → #{{:s :p :o}}
+```
+
+combinator: `of-quads`（参照実装）/ `merged`（k 個を 1 つに = partitioned root の読み）/ `filtered`（`visible?`）/ `counting`（設計の比較には wall-clock でない数値が要る）。combinator 自身が source なので入れ子になる。
+
+**そして conformance suite**。これが「似ている」を「交換可能」に変える部分。`check` は deftest ではなく**データを返す** — 実装側リポにこちらのテストフレームワークを強制する suite は契約ではなく依存。suite 自体が「object 位置を無視する source を REJECT する」ことをテストしている（何でも通る suite は何も証明しない）。
+
+### brick の依存関係
+
+```
+datom-source（契約・依存ゼロ）
+  ├─ arrangement.source/materialized   ← 現状の materialize 経路。baseline
+  ├─ arrangement.source/cursor         ← prefix scan。★実装済み
+  ├─ [brick 2] compaction              ← merged を畳んで 1 source に
+  ├─ [brick 3] materialized view       ← 書き込み時に畳む（RisingWave 型）
+  └─ [brick 4] adjacency               ← multi-hop（Neo4j 型）
+```
+
+storage を読む実装は、その storage を所有する lib に置く（`arrangement` の index format は `arrangement` の知識）。seam は契約と combinator と conformance だけを持つ。
+
+## 実測（brick 1、着地済み）
+
+`arrangement` `1183d1a9`。**20,000 facts で `[_ p _]` の scan が 3 block、full hydrate が 72 block — 24 倍。** この比はデータベースが大きくなるほど開く（片方は O(path + result)、もう片方は O(DB)）。
+
+**conformance suite が production のバグを 1 件見つけた。** `arrangement.query/query*` に `[_ _ o]`（値だけ束縛）の分岐が無く、`:else` に落ちて**データベース全体を返していた** — 与えられた object を無視して。単一 clause のクエリが誤答し、その形の Datalog clause は全 datom の中間集合を作っていた。索引が無い形なので正直な O(DB) スキャンで修正（`:ocp` は ref 値の object しか張らない。Datomic の AVET も `[a v e]` で同じ穴を持つ）。
+
+## Consequences
+
+- **各 brick は独立に着脱・比較できる。** 同じ conformance を通り、同じ `counting` で測れる。「最終的な kotobase のアーキテクチャ」は brick の組み合わせとして選ぶもので、あらかじめ決めるものではない。
+- **`blind-input` を public にした。** docstring 自身が「cold reader が prefix seek のために再導出する」と書いていたのに private で、そのせいで読み手ごとに再実装が必要だった（crypto 入力の複製が乖離する典型）。
+- **`cursor` は当面 JVM のみ。** cljs では `decrypt-fn` が Promise を返すので scan 全体が async になり、protocol の形が変わる。同期スタブで偽装していない。
+- **`[_ _ o]` はどの実装でも O(DB)。** この index 族の構造的性質であって実装の手抜きではない。
+
+## brick の現在地（2026-08-01 時点、すべて実測付き）
+
+| brick | 状態 | 実測 |
+|---|---|---|
+| **seam** `datom-source` | ✅ | 2 実装が同じ conformance を通過（seam が検証済み） |
+| **1 cursor** | ✅ `arrangement` `1183d1a9` | 20,000 facts で `[_ p _]` scan が **3 block vs full hydrate 72（24x）** |
+| **datalog を seam 上へ** | ✅ `1c0f86a0` | 2-clause join が **7 block vs hydrate 71（10.1x）** |
+| **2 compaction** | ✅ `1c0f86a0` | k=50 で **merged 50 block/scan → compacted 2（25x）** |
+| **3 view** | ✅ `datom-source` `cd069ba4` | 被覆パターンは map lookup。`absorb` は O(new-quads × patterns) |
+| **4 adjacency** | ✅ `datom-source` 2026-08-17 in-memory | 100-chain + 10k noise: 2 out-lookups vs 10100 examined. Packed form not landed. ADR-2608170200 |
+
+### datalog を seam に載せた話（当初「最優先」としていたもの）
+
+cursor が単一 scan を 72→3 block にしても、`arrangement.datalog/q` が
+materialized `db` を取る限り**実際の Datalog クエリには 1 つも届かなかった** —
+join が始まる前に全部 hydrate されるので。
+
+engine が clause を解決している場所は**ちょうど 2 箇所**（positive 1 / negated 1）
+だった。両方を `scan*` 経由にした。`scan*` は materialized db（従来の引数、無変更）と
+`IPatternSource` の両方を受ける。**この 1 つの間接化で join engine 全体が seam に乗る** —
+cursor に差し替えると join のコストが変わるが、join のロジックは 1 行も変わらない。
+
+`visible?` を両分岐で同一に適用しているのは意図的。source 側が
+`arrangement.query/query` と違う絞り方をすると、**negation が positive clause から
+見えない事実を観測できてしまう** — 性能の詳細ではなく正しさの穴。
+
+### compaction が「ただの snapshot」を作ることの意味
+
+`compact-root!` の出力は**通常の snapshot** なので `cursor` がそのまま読む。
+**読み手は compaction を知らなくてよい** — これがブリックであることの条件で、
+compacted snapshot を conformance suite 全体に通すテストがある（等価だと主張する
+コメントではなく）。
+
+### view の限界は docstring に書いてある（発見させない）
+
+**view は source を追わない**（`absorb` するまで新しい事実は見えない = 自信を保ったまま
+静かに陳腐化する）。**被覆は厳密**（`[nil \"knows\" nil]` が被覆でも
+`[\"alice\" \"knows\" nil]` は別）。`{:fallback? false}` で未被覆パターンを例外にできる。
+**retraction は非対応** — 集合への追加は monotonic だが除去はそうでなく、撤回された
+事実を黙って保持する view は view が無いより悪い。
+
+## ⚠ 重大な訂正（2026-08-01、brick 4 に着手する前に判明）
+
+**「kotobase のクエリは O(DB)」という本 ADR の前提は、production には当たらない。**
+
+測っていたのは `arrangement` 単体だった。**production の kotobase は
+`kotobase-peer` の Merkle-LSM で動いており、既に range-pruned read を持っている**
+（ADR-2607201600 / 2607211343 / 2607244000、いずれも accepted・deploy 済み）:
+
+- `kotobase-peer/core.cljc` の `cold-datoms`: 「Touches only the chosen index tree's
+  blocks along the components prefix path (range-pruned via
+  `prolly-tree.core/scan-prefix`) ... a keyed read stays small **regardless of graph
+  size**」— **brick 1 が既にある。**
+- `kotobase_peer/compaction.cljc`（325 行）— **brick 2 が既にある。**
+- `kotobase_peer/materialized_view.cljc`（747 行）— **brick 3 が既にある。**
+- ADR-2607201600 は Hummock 型 sorted runs を明示参照 — 本 ADR が「RisingWave 型」と
+  して brick 3 に挙げたものを、**先に借りていた。**
+
+**`arrangement.blind-input` の docstring が最初から書いていた**（「a cold reader
+re-derives to seek by prefix (`kotobase-peer`'s `cold-datoms`)」）。それを
+「prefix seek は可能である」の根拠として読み、**「既に実装されている」と読まなかった。**
+`arrangement` は精査したが、**「arrangement は production kotobase が実際に使う経路か」を
+一度も問わなかった**のが原因。CLAUDE.md が繰り返し要求している「作る前に、同種の重なる
+仕組みが既にないか確認する」の失敗例。
+
+### それでも残る価値
+
+- **`[_ _ o]` の correctness バグは本物で、production に live だった**（下記）。
+  conformance suite が無ければ見つかっていない。
+- seam（`datom-source`）は `arrangement` と `kotobase-peer` の 2 つの実装系を
+  同じ契約で比較できるようにする面がまだある — ただし**それは本 ADR が主張した
+  「O(DB) を解消する」ではなく、「2 系統を統一する」という別の価値**。
+- 数値（24x / 10.1x / 25x）は `arrangement` 単体に対しては正しいが、**production
+  kotobase に対する改善量ではない。**
+
+## production に live だった correctness バグ
+
+`kotobase-peer/q` は値だけを束縛したパターン `[nil nil \"30\"]` に対して
+**グラフ内の全 quad** を返していた。Datalog も
+`{:find [?e ?a] :where [[?e ?a \"30\"]]}` に対して**全 (s,p) 組**を返していた
+（当初「unification が literal を再チェックするので Datalog 側は性能問題止まり」と
+推論したが、**実測が誤りを訂正した** — 他 2 位置が変数のとき literal は再チェック
+されない）。
+
+`kotobase-peer` `0e48dbef` で修正。pin は arrangement main ではなく **backport**
+（`maint/value-only-pattern` `221e3f3b`）— main へ上げると commit-delta/insert-many
+系が入り、kotobase-peer 自身の 259 test 中 30 件が落ちる（実測: bump 前 0 failures、
+bump 後 22 failures + 8 errors）。その upgrade は別作業。
+
+## 解消済み（2026-08-01）
+
+**arrangement pin を main へ上げた**（`kotobase-peer` `282768fa`）。30 件の失敗は
+1 つの原因が複数の顔で出ていたもので、**schema-version 2 の leaf を version 1 として
+decode していた**。これは大声で失敗しない — typed wrapper を triple として decode する
+ので行数は合い、フィールドだけが入れ替わる（`{:e 16 :a [[4 \"alice\"] ...] :v_edn \"nil\"}`）。
+その壊れた component が `blind-input` に届いたものが
+「component is not a blindable scalar」だった。`leaf-decoder` が snapshot の
+schema-version を読んで codec を選ぶようにして 3 箇所すべてを修正（JVM / cljs /
+`cold-datoms-async`。最後のは `snap` が decode 地点でスコープ外だったので構造を変えた）。
+259 tests / 811 assertions green（pin 移動前と同数）。backport
+`maint/value-only-pattern` は依存経路から外れた。
+
+**brick 4「multi-hop が書けない」は誤りだった。** `arrangement.datalog` は再帰ルール
+（semi-naive fixpoint）を持ち、推移閉包は実際に計算できる（実測: chain 長 5/20/50/100 で
+64/90/327/854ms、正答）。**Gremlin surface（5 ステップ）だけを見て「書けない」と
+判断したのが誤り。** 残る問題は「書けない」ではなく「遅い」で、それは index-free
+adjacency か fixpoint 評価の改善という別の作業。
+
+## brick 5/6: cache stack（2026-08-01、実測付き）
+
+外部分析（Hummock がなぜ速いか）を突き合わせた結果、**分析が挙げる速さの要因の
+うち kotobase に無いのはキャッシュ層だけ**だと分かった。調べた結果:
+
+| Hummock の要因 | kotobase |
+|---|---|
+| immutable append-only SST / block 単位 Range read / block サイズ制御 / compaction 分離 / MVCC / incremental MV | ✅ すべてある |
+| **block cache** | ❌ 無い |
+| **metadata cache** | ❌ `verified-node` が毎回 再読込＋再ハッシュ |
+| **index 読み経路の Bloom** | ❌（view にはある） |
+| **local tier** | ❌ |
+
+そして multi-hop が遅い原因も同じだった。**再帰クエリは同一パターンを 22 回
+スキャンしている**（distinct patterns = 1）。magic sets の問題ではなく
+**キャッシュミスの問題**。
+
+2 つの lib として実装し、engine を 1 行も変えずに**包んで**足せるようにした:
+
+- **`kotoba-lang/block-cache`** — CID キーの block cache。**content-addressed
+  なので invalidation が原理的に不要**（TTL も coherence protocol も要らない）。
+  bound は entry 数ではなく **byte**（kotobase の block は 16–128KB なので
+  「1000 entries」は 16MB にも 128MB にもなり、128MB Worker では致命的）。
+  `:verify!` は **miss 時のみ** — 変わりようのないものを毎回再ハッシュしても
+  何も証明しない。
+- **`datom-source/cached`** — scan 単位。**pattern は version ではない**ので
+  1 クエリ / immutable snapshot にスコープする（block cache の安全性は
+  こちらには継承されない。テストで staleness を固定してある）。
+
+**実測**（`clojure -M:cache-bench`、再帰クエリ）:
+
+| composition | k=40 | k=80 | k=160 |
+|---|---|---|---|
+| cursor（baseline） | 43 blocks | 83 | 163 |
+| + block-cache | **2** | **2** | **2** |
+| + scan-cache | **2** | **2** | **2** |
+| + 両方 | **2** | **2** | **2** |
+
+**O(k) → 定数 2。定数はデータ量で動かない。**
+
+⚠ **blocks 列を読むこと、ms 列ではなく。** ベンチの store は in-memory map で
+block read のコストがゼロなので、**block cache は時間の勝ちを示せない**（
+bookkeeping を足すだけ）。その価値は block read の実コストに比例し、production
+では R2/D1 の往復。実際 k=160 で block-cache 単独が baseline より遅い行が出る —
+**存在しないコストに対して最適化を測るとこうなる**という見本。
+
+## kotobase-peer への適用（2026-08-01、実測付き）
+
+**`:cache/get` / `:cache/put` は `merkle-lsm` が最初から宣言していて、
+何も解釈していなかった。** この 2 つの effect type を repo 全体で grep すると
+定義箇所の 2 回しか出てこない — **設計は block cache の穴を空けてあり、
+誰も埋めていなかった。** だから全 read が object store に行き、全 block が
+到着のたびに再ハッシュされていた。
+
+`kotobase-peer.cache`（`5c30211b`）が埋めた。**engine の read path は 1 行も
+変えていない** — `get-fn` は host が渡すので、host が包むだけ。
+
+**実測（実 read path、fake reader ではなく）**: `cold-datoms` の point read を
+5 回で **uncached 15 blocks → cached 3（5.0x）**。検証は read ごとから
+**block ごと 1 回**に（`verified-node` は今も毎回再ハッシュしている）。
+壊れた block が cache 越しでも throw することはテストで固定した — verify-on-miss
+は verify-never ではない。
+
+### metadata cache は「サイズで分ける」ことで実現した
+
+Hummock が metadata cache と block cache を分けるのは bookkeeping ではなく
+**eviction** のため。metadata は小さく hot、data block は大きく cold で、
+**1 回の広い scan が共有 LRU の hot metadata を全部追い出す**（LRU は recency
+のヒューリスティックで、広い scan はそれを破る典型パターン）。
+
+kotobase は自明な場所でこの分割ができない — `get-fn` は `(fn [cid] bytes)` で、
+CID は「snapshot node か data block か」を語らない。**しかしサイズが語る。**
+snapshot node は小さく、`block-sizing` が data block を 16–128KB に保つ。
+`block.cache/segmented` は byte 閾値（8KB）で 2 つの独立予算に分ける。
+**「共有 cache は同じ総容量でも metadata を失う」ことをテストで対にして固定した**
+（良い方だけ見せる eviction の主張はテストではない）。
+
+### local tier と Bloom
+
+- **local tier**: `block.cache.worker/cache-api`（Workers Cache API）を実装。
+  Promise ベースなので同期 `IBlockCache` には載らず、**async 用の別 protocol**に
+  した（同期シムで偽装していない）。per-colo なので **edge ごとに初回 miss** が
+  正常であり、global hit rate を期待しない。
+- **index 経路の Bloom は、思ったほどの穴ではなかった。** `merkle-lsm` は既に
+  `select-run-refs-by-first-component` / `overlapping-run-ranges` /
+  `build-range-directory`（paged 版も）を持っており、**range による run pruning が
+  実装済み**。sorted-run LSM では range pruning が主で Bloom は従（range が重なる
+  point lookup 用）。**Bloom が効くのはその狭い場合だけで、当初「無い」と書いたのは
+  過大評価だった。**
+
+## 未着手（次に再開する人へ、具体的なコマンド付き）
+
+1. **local tier を Workers 上で実測する。** `block.cache.worker/cache-api` は
+   実装済み・未計測。in-memory store では block cache は時間の勝ちを示せない
+   （実 I/O が無い）ので、**実 R2/D1 の後ろでないと数字が出ない**。
+   再開点: `kotobase-peer.cache/cached-get-fn` を `net-kotobase` の
+   `KOTOBASE_D1_URL` 経路に噛ませ、`/evm/receipts` と同じ要領で block read 数を
+   比較する。
+2. **Bloom を本当にやるか判断する。** `merkle-lsm` は range pruning
+   （`select-run-refs-by-first-component` / `overlapping-run-ranges` /
+   `build-range-directory`）を既に持つので、Bloom が効くのは **range が重なる
+   point lookup** だけ。やる前にその頻度を測ること — 測らずに作ると今日 4 回
+   繰り返した「既にあるものを作る」になる。
+3. **multi-hop のキャッシュで説明できない分。** 再帰クエリの block read は
+   `datom-source/cached` で O(k)→定数になったが、`ms` はまだ k に対して伸びる
+   （fixpoint の binding 集合操作）。magic sets / sideways information passing が
+   本命だが、`arrangement.datalog` は他セッションが触っている領域
+   （`agent/datalog-join-frontier` 等）なので、**着手前に突き合わせること**。
+
+## このセッションで学んだこと（次に繰り返さないために）
+
+**「無い」と書く前に、production が実際に使う経路を確認する。** 今日 4 回、
+存在するものを存在しないと書いた:
+
+| 主張 | 実際 |
+|---|---|
+| 「kotobase のクエリは O(DB)」 | `arrangement` 単体の話。production は `kotobase-peer` の Merkle-LSM で range-pruned |
+| 「brick 1/2/3 が無い」 | `cold-datoms` / `compaction.cljc` / `materialized_view.cljc` として既存 |
+| 「multi-hop が書けない」 | 再帰ルール（semi-naive fixpoint）で書ける。Gremlin surface だけを見ていた |
+| 「index 経路の Bloom が無い」 | range pruning が主機構として実装済み。Bloom は狭い補完 |
+
+共通の原因は **「そのライブラリは production が使う経路か」を問わなかったこと**。
+`arrangement` は精査したが、`kotobase-peer` を見なかった。**証拠は
+`blind-input` の docstring に最初からあった**（「a cold reader re-derives to
+seek by prefix (`kotobase-peer`'s `cold-datoms`)」）— それを「可能である」の
+根拠として読み、「既に実装されている」と読まなかった。
+
+**それでも conformance suite は元が取れた**: production に live だった
+correctness バグ（`[_ _ o]` が全 DB を返す）を見つけた。これは
+`kotobase-peer/q` と Datalog の両方に効いていた。 — 上の 2 lib は `arrangement` 層で実測しただけで、
+   production の `verified-node` / `cold-datoms` にはまだ入れていない
+2. **multi-hop の高速化**（上記。100 ノードで 854ms は on-chain の資金追跡には遅い） — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
+   別物で、`arrangement` に新しい索引が要る。prefix scan では埋まらない。
+2. **kotobase 本体への適用** — brick はすべて `arrangement`/`datom-source` の層にあり、
+   kotobase の durable plane（kotobase-peer / D1 / DO）はまだ materialize 経路。
+3. **cljs 対応** — `cursor` は JVM のみ（`decrypt-fn` が cljs では Promise を返すため
+   scan 全体が async になり protocol の形が変わる）。同期スタブで偽装していない。
+")))

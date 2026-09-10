@@ -1,0 +1,93 @@
+(vector (map (:db/id -1), (:adr/id "ADR-2608181200"), (:adr/title "B2 raw live qualification — G5 が要求した別 ADR（計画であって資格化ではない）"), (:adr/status "proposed"), (:adr/date "2026-08-18"), (:adr/supersedes ""), (:adr/superseded-by ""), (:adr/body "`net-kotobase/ipfs` の B2 adapter を **live qualified** と呼べる条件を固定する。
+ADR-2608171256 の **G5** が「別 ADR で測れ」と明示的に要求したもので、本 ADR は
+その計画であって**資格化そのものではない**。着手時点で証拠は 0 件であり、
+`b2_raw_live_qualified:false` は本 ADR が緑になるまで動かない。
+
+## 1. なぜ「実装済み」で足りないか
+
+G4（2026-08-17 closed）が同じ罠を実演している。Worker は prebuilt CAR を**一度も
+parse せず** `application/vnd.ipld.car` として流していた —— 3 byte の `text/html` が
+CAR として出ていき、**test がそれを正しい振る舞いとして固定していた**。
+
+そして G4 の変更は **live probe で実証できなかった**。production は
+`b2_configured:false` で、archive keyspace は object を持ったことがない ——
+**未検証経路が在ろうと無かろうと probe は 38/38 で通る**。
+
+> **`b2_configured:false` のまま通る live probe は、B2 について何も言っていない。**
+
+fake transport と SigV4 regression は implementation evidence であり、
+実 bucket に対する主張ではない。両者を混同しないことが本 ADR の存在理由。
+
+## 2. credential —— 新しい経路を作らない
+
+**adapter は構造上 read-only である。** `b2.cljs` が持つ signing 関数は
+`b2-signed-get` / `b2-fetch-get` / `b2-get-bytes` の 3 つだけで、**PUT / DELETE を
+署名する関数が無い**。したがって qualification に要る権限は
+**1 bucket への read only** であり、それ以上は不要な authority。
+
+**credential の入手・保持は `kotoba-lang/com-backblaze-secure` を通す。**
+新しい credential 経路を書かない。あの repo は bucket allowlist、
+capability gate（list/read と write と delete を分ける）、全 tool 応答からの
+**強制 redaction**、append-only audit ledger を持ち、**実際の漏洩事故**
+（`b2 account authorize` の JSON 出力が scoped key を transcript に出した）から
+生まれている。qualification のために平の env var を配ることは、その repo が
+構造的に不可能にした失敗をやり直すこと。
+
+⚠ **本 ADR の実行者は credential をフォームや transcript に自分で入力しない**
+（安全床①）。read-only key の発行は owner 側の操作で、agent は
+com-backblaze-secure 経由の**狙い撃ち取得**しかしない。
+
+## 3. probe matrix —— 何を、何に対して測るか
+
+**実 bucket、既知 CID の canary object 1 件**に対して測る。canary は raw block
+（`PUT /ipfs/:cid` が受ける raw CIDv1）とし、bytes と CID を ADR に固定する。
+
+| # | probe | 期待 | 何が壊れていたら落ちるか |
+|---|---|---|---|
+| 1 | full GET | 200、bytes が canary と byte 一致、CID 再導出が一致 | SigV4、endpoint 正規化、region 導出 |
+| 2 | Range GET | 206、部分 bytes 一致 | **Range header を含む署名**（`b2-fetch-get` は request-headers を署名に通す） |
+| 3 | ETag drift | Worker が出す ETag は **CID 由来**（`\"<cid>\"` / `\"<cid>.bytes-<s>-<e>\"`）であり、**B2 の ETag / `x-bz-content-sha1` をそのまま透過しない** | upstream の ETag を素通しする回帰 |
+| 4 | missing key | `b2-get-bytes` が **nil**（404 → nil、他の非 2xx は throw） | 404 と 5xx の混同 |
+| 5 | CAR negative | `cars/<type>/<target>.car` key が **一度も読まれない**（G4 で direct 経路は撤去済み） | 撤去した経路の復活 |
+
+**3 は「一致する」ではなく「独立している」ことの検査**である。CID 由来 ETag は
+storage の ETag と一致する必要が無く、**一致を期待する検査を書くと B2 の実装詳細に
+gateway を縛る**。
+
+## 4. 資格化の条件、および資格化しない条件
+
+**5 本すべてが実 bucket に対して緑**で、かつ receipt が
+**endpoint host / bucket / region / canary CID / 実行時刻**を記録したときにのみ
+`b2_raw_live_qualified:true` へ動かす。
+
+**次は資格化ではない**（G4 の教訓をそのまま持ち込む）:
+
+- `b2_configured:false` で 38/38 通る live probe
+- fake transport / SigV4 unit regression の緑
+- 「実装したから閉じた」—— G4 自身が **implementation-qualified** と live を
+  区別している
+
+## 5. この suite 自身が「走れなかった」を報告できること
+
+ADR-2608136000 の要求を、この suite に**先に**当てる。
+
+- **evidence floor** —— 実行した probe を数え、`PROBED<TAB>n` を印字する。
+  **n < 5 で qualified を報告できない。**
+- **「答えられなかった」専用の結果** —— credential 不在・bucket 未設定・canary 不在は
+  **pass でも fail でもない第 3 の値**（exit 0/1 以外）で終わる。
+  `b2_configured:false` は **skip であって pass ではない**。
+- **両方向** —— canary を 1 byte 変えた copy に対して probe 1 と 3 が落ちることを、
+  qualification の前に一度見る。**落ちない検査は劇場。**
+
+## 6. 範囲外（明示）
+
+- **write / archive enable は含まない。** `net-kotobase` の storage-mode decision を
+  伴うため、ADR-2608171256 の恒久承認にも本 ADR にも入らない。
+- **G6（certificate quota）と G7（DHT/Bitswap）は別物**で、本 ADR は触れない。
+
+## 7. 現在地
+
+**証拠 0 件。** 本 ADR は計画のみで、`b2_raw_live_qualified:false` は維持。
+着手の前提は「owner が read-only key を com-backblaze-secure に登録する」ことと
+「canary object を実 bucket に置く」ことで、**どちらも agent 側では完了できない**。
+")))

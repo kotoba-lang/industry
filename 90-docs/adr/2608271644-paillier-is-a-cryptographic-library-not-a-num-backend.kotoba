@@ -1,0 +1,49 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608271644-paillier-is-a-cryptographic-library-not-a-num-backend")
+  (:adr/title "Paillier は num backend ではなく独立した暗号ライブラリである")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/deciders (vector "owner" "implementation session 2026-08-27"))
+  (:adr/related (vector "adr-2607300900-murakumo-fleet-ci"
+                "adr-2607211600-shallow-depth1-policy-reversal-full-history-default"))
+  (:adr/body "## 文脈
+
+暗号化 LM-head の最初の縦切りでは、Paillier の鍵・暗号文・wire・準同型演算・暗号化
+matrix/vector 評価を `kotoba-lang/num` の `num.paillier` に置いた。実装と実証には成功したが、
+所有境界は誤っていた。
+
+`num` の正本は portable な数値配列、dtype、backend protocol と実行器である。一方 Paillier が
+所有するのは秘密鍵、公開鍵 fingerprint、暗号文の群要件、modulus 上の範囲、乱数化、wire の
+検証である。これは数値 backend の差し替えではなく暗号学的 trust boundary で、LLM inference
+以外の集計・private analytics からも再利用できる。
+
+## 決定
+
+1. subject 面の公開ライブラリ `kotoba-lang/paillier` を作る。名前は org segment がまだ言って
+   いない暗号方式だけを担い、言語 suffix は付けない。
+2. production namespace は `paillier.core` とする。鍵生成、暗号化・復号、加算、公開 scalar
+   倍、rerandomize、EDN wire、bounded `encrypted-matvec` をここが所有する。
+3. `kotoba-lang/num` から `num.paillier` とその説明・テストを削除する。互換 shim は置かない。
+   新 API の既知 consumer は inference だけで、shim を置くと num が暗号 library を依存として
+   抱え、誤った所有境界を固定するからである。
+4. `kotoba-lang/inference` は `paillier` を直接 pin し、暗号化 LM-head の protocol/oracle/receipt
+   だけを所有する。num への既存依存は通常の数値実行のために残す。
+
+## security boundary
+
+- production 鍵は 2048 bit 以上。小さい鍵は明示的 test escape のみ。
+- private key material の serializer は作らない。公開 wire と ciphertext wire は key identity、
+  range、invertible residue membership を検査する。
+- public `input-bound` から各 row の最悪値を計算し、signed plaintext modulus の wrap 可能性を
+  fail closed で拒否する。出力 ciphertext は既定で rerandomize する。
+- Paillier は malleable な additive PHE であり、FHE/CCA security/constant-time BigInteger を
+  主張しない。authenticated envelope、decryption-oracle 禁止、side-channel hardening は利用側の
+  deployment gate として残る。
+
+## migration と完了条件
+
+新 library 単体 test/lint、num からの除去後の全 test/lint、inference の全 test/lint と暗号化
+LM-head receipt を順に通す。3 component を default branch に merge し、west の paillier 登録と
+num/inference pin を server-side single-entry で着地させ、genpon ledger と署名 fleet head を
+最新 main から reconcile するまでを同じ変更の完了条件とする。
+")))

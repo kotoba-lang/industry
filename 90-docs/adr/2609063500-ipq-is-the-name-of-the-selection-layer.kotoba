@@ -1,0 +1,377 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609063500-ipq-is-the-name-of-the-selection-layer")
+ (:adr/title "IPQ —— 有界で検証可能な選択の層に名前を付ける。wire は multicodec private use area、repo 名の origin 面には付けない")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-06")
+ (:adr/related (vector "adr-2609063000-what-the-ipld-stack-integrates-and-what-only-compiles"
+               "2609060000-ipld-adl-selector-car-boundaries"
+               "2608051000"
+               "adr-2608039970"
+               "2608040100"))
+ (:adr/body "## 決定
+
+**content-addressed なデータに対する「有界で検証可能な選択」の層を IPQ と名付ける。**
+オーナー指示（2026-09-06）「ipq で計画には含めつつ、進めて」。
+
+名前が付く先は 3 つあり、付かない先が 1 つある。
+
+| 付く | 何に |
+|---|---|
+| 計画 | この層をこれから何段で作るか、という話をするときの語 |
+| wire | IPNI advertisement の metadata protocol identifier |
+| surface | HTTP の path prefix `/ipq/v1/` |
+
+**付かないのは repo 名の origin 面である。** ADR-2609063000 のとおり
+`repository-rules.edn` の `:plane-order` は origin 面を最優先にし、
+`ip*` prefix は ipfs.tech / ipni.io / ipfs.io から機械的に導出された他者の
+authority である。今日作った `kotobase-protocol-ipq` は矛盾しない ——
+これは `kotobase-` family + capability 名であって、`kotobase-protocol-ipfs`
+と同じ形。IPFS の mirror は `io-ipfs` という別の repo が担っている。
+**family prefix が付いている限り、末尾の語は capability であって出所ではない。**
+
+## IPQ/1 が主張すること、しないこと
+
+profile 番号が正直さの置き場である。
+
+- **IPQ/1 が証明するのは**: 名指しされた traversal が、CID に hash する
+  block の上で実際に走ったこと。producer が触ったと言う block だけで、
+  verifier が同じ matches に到達できること（`replay-selection`）。
+- **証明しないのは**: database range や Datalog 解の完全性。それには
+  authenticated index boundaries が要る（kotobase ADR-2609060000）。
+
+だから今日名乗れるのは Selection までであり、`Query` を名乗る層に
+`/1` を付けて出す。完全性を運ぶ profile があるとすればそれは別の番号であって、
+同じ番号の「静かに良くなった版」ではない。
+
+## wire 上の番号は private use area から採る
+
+multicodec table を実測して選んだ（2026-09-06）:
+
+- README の Reserved Code Ranges / Private Use Area が `0x300000-0x3FFFFF` を
+  「reserved for internal use by applications and will never be assigned any
+  meaning as part of the Multicodec specification」と定める
+- table.csv にこの範囲の entry は **0 件**、`0x0940` も未割当
+- 登録済み transport family は `0x10` 刻み（0x0900 bitswap / 0x0910
+  graphsync-filecoinv1 / 0x0920 ipfs-gateway-http / 0x0930 filecoin-piece-http）
+
+よって `transport-ipq-selection-http = 0x300940` = private-use base +
+登録が要求するはずの slot。**未登録の番号を private 範囲の外で名乗るのは、
+所有していない registry への squatting である。** 範囲の中で名乗るのは
+その範囲の用途そのもので、しかも自己記述的 —— この番号を知らない reader は
+「application-private だ」と学ぶのであって「壊れている」とは読まない。
+
+## 段取り
+
+| 段 | 中身 | gate |
+|---|---|---|
+| **S1** | wire の名前 + surface の実装 | **2026-09-06 landed** |
+| **S2** | deploy —— Worker shell に載せ、本番 block 面の実 CID に対して smoke | **2026-09-06 landed**（下記） |
+| **S3** | advertise —— 広告 chain の metadata に IPQ を並記 | **2026-09-06 landed**（gate は赤のまま。下記） |
+| S4 | consume —— **再定義された**。配線の前にまず graph read 経路を観測可能にする | ADR-2609064500。pack が 97% の逐次項に効くという前提は、この workspace 自身の測定に否定されている |
+| S5 | IPQ/2 —— authenticated index boundaries | 未着手・未スケジュール |
+
+**S3 の gate が要点である。** metadata を足したつもりで落ちても、広告は
+成功し、indexer は 200 を返し、provider は今までどおり見つかる ——
+つまり **足し忘れと足した結果が出力で区別できない**。検査を先に書く。
+
+## S1 で landed したもの
+
+- `kotoba-lang/io-ipni-specs` `7b69b9ef` —— `ipni.metadata` に
+  `ipq-selection-http` / `ipq-selection-profile` / `ipq-selection-http-bytes` /
+  `read-ipq`。**`ipq?` という述語は意図的に作っていない** —— boolean は
+  `:not-ipq`（他所へ回せ）と `:profile-unsupported`（相手は IPQ provider で、
+  遅れているのはこちら）を同じ値にする。この 2 つは反対の指示である。
+  nbb 34 tests / 113 assertions、JVM 41 / 138。control: 番号を
+  private 範囲外の `0x0940` に動かすと、範囲 assertion と pin した wire bytes
+  が名指しの理由で赤くなる。
+- `kotoba-lang/kotobase-protocol-ipq`（新規）—— `GET /ipq/v1` が profile と
+  budget を公開し、`GET|HEAD /ipq/v1/selection/{root}?selector=<base64url dag-cbor>`
+  が CARv1 を返す。pure cljc handler、injected block port の上。
+  ADR-2608051000（1 repo = 1 capability）に従って `kotobase-protocol-ipfs` に
+  同居させていない —— この surface は selector engine と CAR codec を要求し、
+  それを low-privilege gateway repo に引き込むのが、あの規則が防いでいるもの。
+
+## S2 で landed したもの（2026-09-06）
+
+**`net-kotobase/ipfs`（= ipfs.kotobase.net）に `/ipq/v1/` を載せ、Worker version
+`96882734-87ca-4ccf-8697-3c3c209f5ca7` として deploy した。**
+
+同期の handler と非同期の R2 を繋ぐのは **handler 自身の refusal** である。
+`404 missing-block` は traversal が到達して読めなかった CID を 1 つ名指しするので、
+in-memory の block map の上で handler を回し、CID を名指されたらそれを fetch して
+map に足し、また回す。
+
+    fetches  = traversal が必要とする distinct block の数（最適）
+    restarts = 同数。ただし各回は map に対する純粋な再走査
+
+network の代価は正しく、CPU は visited node に対して二乗である。これが許されるのは
+traversal が有界だから（256 block が公開された天井で、再走査は I/O を触らない）で、
+代替の async cursor は `ayatori.remote` が既に持っている。**`x-ipq-fetches` を
+200 の header に出す**ので、この主張は仮定ではなく観測できる。
+
+終了は timeout ではなく構造で保証する —— 各反復は return するか、二度と削除されない
+集合に CID を 1 つ足すかのどちらかで、その集合は block 予算で有界。空で返ってきた CID も
+足すので、handler が同じ CID を再び名指した時点で loop は止まり、**呼び出し側が見るのは
+handler 自身の 404 である。shell は handler が確立していない不在を発明しない。**
+
+**本番実測**（`scripts/ipq_smoke.cljs`、実広告 block `bafyreiaupk64…` に対して）:
+1 field の selection は fetch 1 / match 1 / 広告どおりの peer id / root のみ /
+unused 0、Link を跨ぐと fetch 2 / proof 2 block・root 先頭。**返った CAR は
+呼び出し側の root に対してローカルで replay して同じ答えに到達する** —— これが
+IPQ/1 の主張そのもので、200 が返ることではない。
+
+⚠ **io-ipld / io-ipld-car の pin を 12 / 9 commit 進めた。** `ipld.dag-json`（shell が
+使う base64）も `replay-selection`（答えを検査可能にするもの）も旧 pin の後に入っており、
+新しい tree は @noble/hashes の npm 依存も落としている。bump 後の全 suite は
+134 tests / 568 assertions（127 / 540 から）で回帰なし。
+
+**control を 2 本取った。** ①fetch した block を cache に入れない（trampoline が忘れる）
+と replay test が 404 になり `x-ipq-fetches` が消える ②`wanted-cid` の status guard を
+広げると「`missing-block` と言う 502」が retry 対象になる。
+**②は 1 度書き直している** —— 最初は status 範囲を広げても**何も赤くならなかった**。
+error 名の集合だけで全 4xx を弾いており、status 検査は何も担っていなかったからである。
+**どのテストにも区別できない guard は guard ではない。**
+
+## 実装中に測って分かったこと 2 件
+
+**1. bytes が正しくても container が違えば黙って 0 件になる。**
+`dag-json/base64-decode` は Clojure の vector を返す。下流の CBOR reader は
+入力長を `.length` で測るので、vector では `undefined` になり、decoder は
+**0 バイトを見て `cbor: unexpected end of input` と言う**。厄介なのは
+round-trip 検査が緑になることで、実際に `(vec decoded)` と元を比べる debug は
+`:eq true` を出しながら、handler 経由の全 request が落ちていた。
+`ipld.car.bytes/as-bytes` はこのために在る。control: `as-bytes` を外すと
+selector を渡す test が全部赤くなる。
+
+**2. `kotobase-protocol-core` の deps.edn の申告が古い。**
+「src has no dependencies at all — verified by grep at the 2026-08-05 split」と
+書いてあるが、後から入った `kotobase/protocols/blocks.cljc` が
+`kotobase.store` を require している。今日 IPQ の handler がそれを踏んで
+`Could not find namespace: kotobase.store` で落ちた。IPQ 側は block port を
+直接取ることで回避した（IStore fallback は block の bytes を document 値として
+datom 面に載せる経路で、selector engine が読む先として誤り。ADR-2608039970）が、
+**protocol-core の申告自体は直っていない。** 別件として残す。
+
+## 登録の道
+
+- multicodec に `0x0940` / `transport-ipq-selection-http` を要求する PR
+- trustless gateway 仕様に対する IPIP（`?selector=` で CAR を返す口）
+
+**どちらも未着手で、どちらもこの計画を塞がない** —— private-use 番号で
+動くことがその設計意図だからである。登録が通れば、その時点で両方の番号を
+受理する移行期間を置く（`ipq-selection-http-registration-request` を
+定数として隣に置いてあるのはそのため）。
+
+## S3 で landed したもの（2026-09-06）—— そして仕様の散文が外れていた
+
+**gate を先に書いて赤くしてから publisher を直した。** 現在:
+
+    ok   advertisement-metadata-is-well-formed  —  1 protocol(s): transport-ipfs-gateway-http
+    FAIL advertisement-announces-ipq            —  not announced: not-ipq (found 2336)
+
+`not-ipq` であって `undecodable` ではない —— field は読めて、IPQ が本当に無い。
+この 2 つは別の文で、片方は provider について、もう片方は reader についての話である。
+
+### 仕様の散文と参照実装が食い違い、参照実装が勝った
+
+IPNI.md は metadata を「uvarint の protocol 識別子 + protocol 固有バイト、追加の
+protocol について繰り返す」と書き、gateway-http には「no following metadata」と
+書いている。**それは wire format ではない。** go-libipni v0.8.2（indexer が実際に
+動かす実装）に対して 2026-09-06 に測った:
+
+    a012                 REJECTED  expected 3 readable bytes but read 2
+    a01200               accepted
+    a01200c092c00101     REJECTED  EOF
+    a01200c092c0010101   accepted  [gateway-http Code(3148096)]、remarshal がバイト一致
+
+真の framing は uvarint(protocol) ++ uvarint(payload長) ++ payload で、
+「no following metadata」は**長さ 0 の payload** であって長さの不在ではない。
+
+**この測定は、同じ日に landed させた 2 つを反転させた:**
+
+- 本番広告の末尾 00 を「仕様に無い自作の 1 バイト」と書いたが、**それは長さ 0 の
+  接頭辞で正しい。** 誤っていたのは 2 バイトを出していた gateway-http-bytes の方で、
+  無害だったのは publish するのが cljs ではなく ipni-drain だったからにすぎない。
+- landed させた ipq-selection-http-bytes は長さ接頭辞を欠いており、**wire では
+  EOF で拒否される。** go-libipni は未登録 code を Unknown として読み、Unknown は
+  code → 長さ → payload の順に読む。
+
+**bitswap だけは参照実装の中でも例外**で、長さ接頭辞を持たない裸の識別子なので後ろに
+何も連結できない（801200a01200 は拒否される）。encode-sequence はそれを出すことを拒否する。
+
+### 守り
+
+**参照実装に対する conformance を committed test にした**（net-kotobase/ipfs の
+ipni-drain/test/go-compat/metadata_test.go、npm test に接続）。両方向の control 付き
+—— 2 バイト gateway が拒否されること、長さ無し IPQ が拒否されることを assert しないと、
+受理側の assert は何も証明しない。**1 つの wire format について独立した 2 つの言明**が
+あることが要点で、それが 1 日ずれていたのがこの訂正である。
+
+### 検査を書く途中で 3 回間違えた
+
+どれも「測れなかった」が「測って問題なかった」と同じ顔をする形:
+
+1. 広告 block を publisher-host から取っていた。ipni.kotobase.net は publisher 面で
+   全 path に surface descriptor を返すので、/ipfs/<cid> は JSON を返し、抽出器は
+   Metadata を見つけられない —— **Metadata を持たない広告と見分けが付かない。**
+   取得元は、直前の check が「serve できる」と証明した retrieval host にした。
+2. resolve が nil を返すのは「namespace が古い」ときも「無い」ときも同じで、その nil を
+   呼ぶと run 全体が途中で死ぬ。両方の fn を揃って要求するようにした。
+3. **nbb の require は top-level form の間でしか await されない。** def の中に畳んだら、
+   checkout が在って正しいのに全 resolve が nil になり、:unmeasured を返し続けた。
+
+### まだ言えないこと
+
+**広告はまだ出ていない。** drain は outbox event（= 次の pin）で publish する Queue
+consumer なので、IPQ を載せた最初の広告はその時点で出る。それまで
+advertisement-announces-ipq は赤のままで、**それが正しい状態である。** 緑になったら、
+それは「広告が出た」ことの観測であって、誰かが手で報告した事実ではない。
+
+着地: io-ipni-specs 082c9916 / net-kotobase/ipfs 2ffdffc6（drain version
+175f6148-6cdd-4bf4-acd3-8b7dda04bdf0）/ root 554d898e /
+kotobase-protocol-core b7ddcd48。
+
+## 現在地と再開点（2026-09-06 closing）
+
+**landed**: S1（wire の名前 + 純関数の surface）と S2（deploy + 本番 smoke）。
+**次**: S3（advertise）。
+
+S3 の最初の 1 手は publisher を直すことではなく、**検査を先に赤くすること**である。
+理由は繰り返しになるが要点なので書く —— 広告の metadata に IPQ を足し忘れても、
+広告は成功し、indexer は 200 を返し、provider は今までどおり見つかる。
+**足し忘れと足した結果が出力で区別できない。**
+
+    # 1. 先に検査を足して、赤いことを見る
+    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-ipni-publisher-record.cljs
+    #    → 広告の Metadata を decode し、ipni.metadata/read-ipq が :ok? true を
+    #      返すことを assert する行を足す。現状の広告は
+    #      transport-ipfs-gateway-http だけなので、これは赤くなる。
+    # 2. それから publisher 側（広告 chain を作っている経路）に
+    #    ipni.metadata/ipq-selection-http-bytes を並記する
+    # 3. cid.contact に反映されたことを実測する
+    curl -sS https://cid.contact/cid/<advertised-cid>
+
+✅ **その問いは答えが出た**（上の S3 節）。1 広告・1 Metadata フィールドの中に
+uvarint(protocol) ++ uvarint(長さ) ++ payload を昇順に連結する。context-id を分ける
+必要はない。A0 12 00 の末尾 00 は長さ 0 であって余分ではなかった。
+
+S4（consume）と S5（IPQ/2）は未着手のまま。S4 の測り方は round trip 数であって
+bytes でも wall clock でもない。
+
+## 主張しないこと
+
+- 本番の **graph query 経路** が IPQ を使っている、とは言わない。S2 で載ったのは
+  **retrieval 面**（ipfs.kotobase.net）であって、`kotobase-graph-database` worker は
+  何も変わっていない（S4 が未了）
+- 広告に IPQ が載っている、とは言わない（S3 が未了）
+- IPQ が完全性を証明する、とは言わない（S5 が未了）
+
+## 残っている 1 件 —— IPQ は live だが、まだ announce されていない（2026-09-06 実測）
+
+検査は `scripts/verify-ipni-publisher-record.cljs --findings`（`--classpath` に
+`orgs/kotoba-lang/io-ipni-specs/src` を足す）。今日の実行は 13 検査中 12 が ok で、
+1 件だけ赤い:
+
+    ok   advertisement-metadata-is-well-formed  —  1 protocol(s): transport-ipfs-gateway-http
+    FAIL advertisement-announces-ipq           —  not announced: not-ipq (found 2336)
+
+`2336` = `0x920` = `transport-ipfs-gateway-http`。つまり **live の advertisement は
+gateway だけを名乗っており、IPQ を名乗っていない。**
+
+**コードの問題ではない。** `ipni-drain/src/index.ts` の `KOTOBASE_METADATA` は既に
+両方を運ぶ形（`a0 12 00` ++ `c0 92 c0 01 01 01`）で main に在り、drain Worker は
+今日 12:47 UTC に deploy 済み。赤いのは **advertisement chain の head が
+その前に発行されたものだから**である（head は
+`bafyreiaupk64m6ghvgwslukgq2rz2m5fwxut7qwlpojkj4apczbg34ie5e` のまま）。
+
+**そして head を進める経路は、内容を作らずには存在しない。** advertisement を
+発行するのは `kotobase-api-gateway-cljs` の `git_private_snapshot.cljc` だけで、
+`advertise?` は private git snapshot の append に付くフラグである
+（`publish-advertisement` は `append-candidate` の中からしか呼ばれない）。
+再 announce だけをする admin 経路は無い（探した）。**metadata の 1 field を
+直すために private git plane へ中身を捏造しない。**
+
+したがってこの finding は次の条件で閉じる: **次に `advertise` 付きの private git
+snapshot が 1 本 append されたとき。** それまでは「live だが未 announce」であり、
+IPNI 経由で provider を探す client は IPQ endpoint に辿り着けない。
+**待ちであって、未実装ではない。** 検査は赤のままにしておく —— 緑にする方法は
+発行することであって、検査を弱めることではない。
+
+## wire format は CARv1（2026-09-06 実測、記録の訂正ではなく口頭の訂正）
+
+descriptor は `\"response\": {\"content-type\": \"application/vnd.ipld.car\", \"car-version\": 1}`
+と言う。**実測もそのとおり** —— live の selection 応答の先頭は
+
+    3a a2 65 72 6f 6f 74 73 81 d8 2a 58 25 …
+    ^^ varint(58)  ^^ dag-cbor map  ^^^^^^^^^^^^^^^^^ \"roots\"
+
+で、**CARv2 の pragma（`0a a1 67 76 65 72 73 69 6f 6e 02`）では始まらない**。
+ADR-2609060000 が既に「HTTP streaming may use CARv1」と書いているとおりで、
+文書は正しい。CARv2 は pack（L0b）の形式であって、この応答の形式ではない。
+この 2 つを口頭で混ぜると、replay する側が index を探しにいく。
+
+## IPQ/2（range selection）の可否は測った —— 正直に名乗れる claim と、名乗れない claim（2026-09-06）
+
+**「key-range の IPLD selector が無いので IPQ/2 は着手できない」は、もう現在地ではない。**
+`kotoba-lang/prolly-tree` に `verify-range` が着地した（merge `20a94b27a48e`、west pin
+`c5e420e93638`）。JVM 76 tests / 3,053 assertions、cljs 84 / 3,068、どちらも 0 failures。
+
+### 名乗れる claim（C1、成立）
+
+**「この結果は、この root に対する `scan-range` と等しい」** は、証明として正直に運べる。
+控えは全部 refuse し、しかも**名指しの理由で** refuse する:
+
+| 壊し方 | 拒否 |
+|---|---|
+| 残すべき block を 1 個落とす（5 block の証明の全位置で） | `:prolly-tree/block-missing` |
+| 同じ tree の別の**本物の** leaf を境界 leaf とすり替える | `:prolly-tree/block-missing` |
+| すり替えでなく**追加**する（欠落側が撃てない形にする） | `:prolly-tree/unexpected-block` |
+| bytes を改竄する（全位置） | `:prolly-tree/block-missing` |
+| root を差し替える | `:prolly-tree/block-missing` |
+| leaf が親の主張する span の外に出る | `:prolly-tree/entry-outside-span` |
+
+すり替えが「CID 不一致」でなく「欠落」として落ちるのは、archive を**再 hash して**
+索引しているから —— 呼び手は CID を 1 つも渡さないので、すり替えは
+「欠落 + 余剰」に分解される。
+
+### 名乗れない claim（C2、実測で反証）
+
+**完全性は運べない。** root の max-key を過少申告した doctored root に対し、
+window `[key-0001, m0)` で prover は `[]` を返し、**verifier は `[]` を受理する**。
+同じ root を素の scan で開くと **4,000 行**在る。別形（最後の child の主張を信じる形）
+では scan+verify が **0 行**で一致する一方、同じ root に `diff/range-diff` を当てると
+**313 行**出る。
+
+**したがって IPQ の descriptor が言っている
+`doesNotProve: \"that a database range or Datalog answer is complete\"` は、
+用心ではなく実測された境界である。** 完全性を運びたいなら別の commitment が要る ——
+**prover が選べない何かに由来する、あるいはそれで署名された max-key**。
+この構造に対して schema-version の作業を積んでも出てこない。
+
+### コスト
+
+**余分なバイトはゼロ。** 4,000 key・120 window（擬似乱数と境界ちょうどの両方）で、
+scan と proof が同じ block 数・同じバイト数を読む（JVM 873 / 2,547,074 で一致、
+cljs 852 / 2,458,423 で一致 —— 2 runtime の差は共有 `lcg` が 2^53 を超えることに
+由来し、実測して記録済み）。**独立な 2 標本でどちらも 0。**
+⚠ これは *block* のバイトであって、CARv1 の framing（header・block ごとの varint と
+binary CID）は container のコストであり proof のコストではない。
+
+### 副産物の finding（未修正）
+
+`core/range-children` と `diff/span-intersects?` は**最後の child について既に食い違って
+いる**（主張された max-key vs `+infinity`）。**保守側に寄せることは C2 の未採用の修正では
+ない** —— verifier がその規則を借りると、prover が読んでいない block を要求することに
+なり、正直な証明を全部 refuse する。
+
+### 方法（記録に値する 2 件）
+
+- **最初の mutation は何も赤くしなかった。** `diff` の `+infinity` を借りれば C2 の
+  テストが壊れると予測したが、壊れなかった —— `upper` と主張 max-key は**最後の child
+  以外**では同じ値で、fixture が過少申告していたのは*最初*だった。
+  **答えを変えない mutation は、何も検査していない。**
+- **mutation D は殺すしかなかった。** `demand` を throw でなく fallback にすると、
+  既に通過した node に walk が再入して無限再帰する。**refuse は答えを正直に保つだけで
+  なく、walk を停止させているもの**でもある。
+")
+))

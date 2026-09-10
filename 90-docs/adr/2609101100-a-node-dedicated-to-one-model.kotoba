@@ -1,0 +1,108 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609101100-a-node-dedicated-to-one-model")
+  (:adr/title "A node dedicated to one model: issachar serves murakumo-27b, as a mechanism")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/related (vector "adr-2609100100-one-model-per-node" "adr-2609021500-fleet-outbound-hygiene"))
+  (:adr/body
+  "Owner instruction 2026-09-10, in two parts that are one decision: `1 台を 27B
+専用機にして待てる用途に使う` and `murakumo cloud fleet で, 基本的に1台当たり1つの
+model しか host しないように設計してください`. issachar was approved as that machine.
+
+## What was measured, and why the numbers live in the artifact
+
+Every constant in the new `kotodama.inference.edge/qwen3-8-27b` was read from
+issachar with vm_stat before and after loading, not derived from a parameter
+count:
+
+  the node's own footprint, every model plane evicted   1,871,740,928 wired
+  the same node with this model serving                15,961,800,704 wired
+  difference minus the weights                            546,190,368  KV +
+                                                                       compute +
+                                                                       runtime
+  swap in use, idle vs. serving                         425 MB vs 417 MB
+
+Two of those force design rather than decorate it.
+
+**The OS reserve.** The 9B replicas reserve 3 GiB. That GiB above the measured
+2.09 is not slack they were wasting -- it is the ComfyUI, the ollama and the RPC
+shard those minis also host. Apply it here and the plan refuses a machine that
+demonstrably runs this model; keep the neighbours and the plan admits a machine
+that will swap. So the reserve is per-artifact, and the one-model rule is what
+makes the smaller number true.
+
+**The wired-memory limit.** This model wires 15,222 MiB while serving and these
+minis default to 13,312 -- below it. `murakumo infer provision` already raised
+the limit, with `sysctl -w`, which does not survive a boot. The failure that
+prevents is the quiet one: the node reboots, the limit reverts, the model loads
+anyway on the CPU, llama-server reports healthy, the queue worker enrols, and
+every job is served at a fraction of the speed by a node that says nothing is
+wrong. It is now a root LaunchDaemon whose install verifies by reading the
+sysctl back, because bootstrapping a job that runs `sysctl -w` succeeds whether
+or not the write did.
+
+## The conversion is an eviction, not an addition
+
+  murakumo edge dedicate issachar murakumo-27b --evict
+
+Gate, evict, wire, install -- and the order is the content. Evicting before
+wiring because a limit is only meaningful once the memory it governs is not
+being spent by three other planes; wiring before installing because a server
+started under the old limit runs on the CPU and says it is healthy.
+
+**Eviction means the launchd job, not the process.** All four planes on issachar
+were system LaunchDaemons with KeepAlive: a `pkill` is undone in seconds and a
+`bootout` is undone by the next boot. The plists are moved into
+`/Library/LaunchDaemons/evicted-by-murakumo/`, which launchd does not scan, so
+the eviction survives a reboot and putting the node back is one `mv`. A plane
+this table has no launchd label for is reported as stopped-but-not-kept-stopped
+rather than as a clean eviction.
+
+The rule is also expressed in launchd: every model other than murakumo-edge
+shares one pair of labels (`com.murakumo.model-{server,join}`), so a node cannot
+hold two dedicated models -- installing the second replaces the first.
+
+## Measured after the conversion
+
+issachar hosts exactly one plane. `POST /v1/chat/completions` with
+`model: murakumo-27b` on api.murakumo.cloud answers in 20 s at 6.3 tok/s, from
+issachar's worker DID. `/infer/nodes` shows it live and fresh as the pool's only
+murakumo-27b replica.
+
+## Two things found and NOT fixed, stated plainly
+
+**The gateway reports the wrong model.** `worker.cljs` put the constant
+\"murakumo-edge\" on every queue-served completion. True while the queue served
+one model; false the hour a second joined it. A caller keeping receipts -- which
+is what the Hermes bots do -- records every 27B answer against the wrong model,
+and nothing in the response disagrees. The fix is written and tested
+(`local-murakumo.edge-queue/result-model`, merged), and it is CLJS, so it
+reaches production only through a governed artifact refresh. That refresh cannot
+be done honestly from this workspace today: 41 of the 51 siblings recorded in
+release/cljs/manifest.json have moved since the artifact was built, so a refresh
+here would roll 41 libraries into the live gateway alongside a one-line label
+fix. Rebuilding in a workspace pinned to the recorded SHAs was tried; the
+control build of UNMODIFIED source produces 1,183,631 bytes against the
+committed 1,183,632, differing from byte 150,948 in Closure's symbol renaming,
+so there is no byte-identity check available to show a refresh ships only this
+change. **api.murakumo.cloud still reports murakumo-edge for 27B answers.**
+
+**The 27B's usable output band is narrow at both ends.** Raising
+maxOutputTokens looked right and is wrong: at 6.3 tok/s the queue's own result
+window caps output near 1024 tokens, so raising it converts truncation into
+timeouts. Lowering it is worse in the other direction -- measured, an 80-token
+budget was spent entirely inside reasoning_content and returned finish_reason
+\"length\" with content \"\", an HTTP 200 carrying nothing that a caller cannot
+tell from a model with nothing to say. 1024 stays; the band is recorded beside
+it.
+
+## Still open
+
+- **simeon** is reachable and serving nothing: 353 of 53,536 ports free, model
+  not loaded, queue worker gone, registry stale. Reachable and working are
+  different facts and the fleet board now says so.
+- **levi, naphtali, zebulun, asher, xavier** dark. levi needs a console;
+  FileVault will not let a headless mini finish an unattended reboot.
+- **Enrolment retry belongs in-process** under `murakumo.infer.backoff`.
+  ThrottleInterval 60 is a bound on the bleeding, not the cure.
+- **234 `~/.hermes/profiles/`** still pin OpenRouter.")))

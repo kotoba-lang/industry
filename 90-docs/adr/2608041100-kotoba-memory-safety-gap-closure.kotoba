@@ -1,0 +1,260 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608041100")
+  (:adr/title "kotoba/compiler/native の memory safety: 実測した4つの穴を閉じ、残りを名指しする")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-04")
+  (:adr/depends-on "ADR-safe-capability-language（kotoba repo）/ ADR-2607072000（Rust 撤去）/ compiler ADR-0003（aiueos target）")
+
+  (:adr/context
+  "「今の kotoba-lang/kotoba, compiler, native は memory safe に設計されているか」
+   という問いから始まり、面ごとに実測した。結論は面によって違う。
+
+   ## 元々安全だった面（今回触っていない）
+
+   `kotoba compile` → KIR → native/wasm の新経路は構造的に memory-safe。
+   言語面に生ポインタが無く、wasm 出力は memory/table/global を一切 export せず
+   （compiler docs/architecture.md）、native の heap は host 所有 arena の
+   ハンドル方式でインデックス境界検査つき（kexe_loader.c:171-181）。free が
+   存在しないので use-after-free / double-free が構造的に不在。
+
+   ## 実測で見つかった4つの穴
+
+   ### 1. legacy `kotoba wasm emit`: 生メモリ op が user source から使えた
+
+   `mem-byte-at`/`mem-i32-at`/`byte-store!`/`i32-store!` が grammar catalog の
+   `:admitted-builtins` にあり、`:forbidden-heads` にも safe_analyzer_facts.edn の
+   `:non-executable-forms` にも無く、`compile-wasm-expr` は境界検査なしで
+   `i32.load`/`i32.store` に直接 lower していた。つまり任意の .kotoba モジュールが
+   自分の linear memory 全体を read/write でき、pair ハンドル・string の
+   (ptr,len) ヘッダ・container 内部を偽造できた。wasm sandbox が守るのは
+   モジュール境界であって内部の抽象ではない。
+
+   **ADR-safe-capability-language.md はこの gate を「T1 部分 ✅」と主張し、
+   根拠として `subset.rs` を挙げていた。それは ADR-2607072000 で撤去された
+   Rust ツリーのファイルで、置き換えが作られないまま約1年主張だけが残っていた。**
+
+   ### 2. host import が guest 指定アドレスに書いていた
+
+   `(ptr,len,out-ptr,out-cap)` ABI は **guest が出力先を指定する**設計で、
+   host 側の `write-bytes!` は `n > cap`（データが宣言容量に収まるか）しか
+   検証していなかった。ptr も cap も guest 由来なので
+   `(clipboard-read 0 65536)` ——**リテラル 0 を渡すだけ、alloc も denied op も
+   不要**——で host がモジュール自身の data segment を潰せた。guest の store を
+   塞いで host の store を開けたままにするのは primitive の移動でしかない。
+   該当 8 op: clipboard-read / http-fetch / keychain-read / fs-read / log-read /
+   random-bytes / kgraph-get-objects / kgraph-query。
+
+   これは #1 を閉じたときの自分の論拠の誤りでもある。「`alloc`/`str-ptr` は
+   逆参照を塞げば host import に渡す不透明トークンにすぎない」と書いたが、
+   **書き込み系 import にアドレスを渡すこと自体が write primitive** だった。
+
+   ### 3. kernel-* の base が任意の計算値だった（ring 0）
+
+   native backend は access 前に本物の境界検査を emit している
+   （length ≤ 静的上限、base ≠ 0、index < length、違反は UD2/brk）が、それが
+   縛るのは「宣言された窓の内側」だけで、窓そのものは caller が決める。
+   frontend は全引数 `:i64` しか要求しなかったので
+
+       (kernel-load-u8 (kernel-load-u8 attacker-buf len i) 4096 0)
+
+   ——攻撃者データの1バイトをそのまま物理アドレスとして使う——が admission を
+   通っていた。ring 0 なので任意物理メモリ。
+
+   ### 4. kexe_loader.c の符号付きオーバーフロー
+
+   `checked_string_concat` が `length_a + length_b` を**計算してから**和を
+   `< 0` で検査していた。符号付きオーバーフローは C では未定義なので、
+   コンパイラはそれが起きない前提でこの検査を削除してよい。オペランドは
+   guest が書ける pair セル由来で、それを信用しないことがこの関数の存在理由。
+   **Windows 版 `kexe_loader_windows.c` は最初から加算前に検査していた** ——
+   2つある loader の片方だけが落ちていた。")
+
+  (:adr/decision
+  "4つすべてを閉じ、閉じられない部分は機械可読な形で名指しした。
+
+   ## 1 → user source での逆参照 deny（kotoba）
+
+   deny 対象は「アドレスを**逆参照**する 4 op」だけに絞った:
+   `mem-byte-at`/`mem-i32-at`/`byte-store!`/`i32-store!`。
+   `alloc`/`str-ptr`/`bytes-ptr` は admit のまま —— 最初は含めていたが、
+   実測したら例外宣言が必要なファイルが 41 個になり、host op を呼ぶほぼ全
+   ファイルに marker が付いて無意味になると分かったため（絞った結果 16 個）。
+
+   検査は **surface 側**で行う。string/container の sugar はこの 4 op へ
+   lower されるので、lowering 後に検査すると普通の文字列コードが落ちる。
+   admission（`check`）と emitter（`wasm-binary`）の両方に配線したので、
+   emitter 直呼びが抜け道にならない。
+
+   escape hatch は Rust の `unsafe` と同じ発想で局所化・命名:
+   `(ns _ {:kotoba/raw-memory <reason>})` または deployment の
+   `:kotoba.policy/allow-raw-memory`。`:kotoba.policy/forbid-raw-memory` は
+   module 宣言ごと無効化するので「どこにも生メモリが無い」を 16 ファイル
+   監査せずに証明できる。
+
+   ## 2 → host 出力窓の境界づけ（kotoba）
+
+   `writable-output-window` が heap base 以上・linear memory 内を要求。
+   data segment（全 string literal と定数、`str-ptr` が指す先）が host からは
+   書けなくなる。ns docstring に「この ABI を実装する host は出力窓を検証
+   しなければならない」と要件を明記（browser / Worker も同じ ABI）。
+
+   **alloc 済みであることは要求しない**。最初の版は `ptr+cap <= bump pointer`
+   を要求して `demo_actor_host_sha256.kotoba`（`(sha256-hex 0 0 2048 64)` ——
+   alloc せず heap base ちょうどに書く）を壊した。この ABI は heap base より上を
+   guest の自由なスクラッチとして扱い alloc は任意なので、**規則が間違いで
+   demo が正しかった**。容量 0 の窓も同様に除外（`(log-read 0 0)`）。
+   逆に `demo_actor_host_keypair.kotoba` の `(gen-keypair 0 64)` は自分の
+   heap base より下を指しており、そちらは demo を直した。
+
+   ## 3 → rooted provenance + kernel-subregion（compiler / native / kir / verifier / aiueos）
+
+   まず **rootedness**: すべての base は literal / `kernel-boot-info` /
+   parameter に辿れること。taint は call site 越しに fixpoint で伝播する
+   （aiueos は base を再帰ヘルパに通すので局所解析では不足）。内部 caller の
+   無い base parameter は C kernel が渡す ABI 境界で、`kernel-region-report`
+   が名指しする。
+
+   次に **narrowing の検査**。厳格版（算術一切禁止）を先に実装したら aiueos
+   39 オブジェクト中 6 個が落ち、理由はすべて同じ正当なパターンだった ——
+   range-check 済みブロック内のレコードを hash する
+   `(fnv (+ base object-offset) object-length)`。そこで
+   `(kernel-subregion base length offset sublen)` を新設し、両 ISA が実際の
+   検査を emit する（親が非 null、offset ≤ length、sublen ≤ length-offset、
+   違反は UD2/brk）。**和ではなく残余と比較**するので敵対的な組み合わせでも
+   wrap せず、比較は全て unsigned なので負の i64 は巨大値として弾かれる。
+   手書き `(+ base offset)` は base 位置で拒否。
+
+   ## 4 → 加算前検査（compiler / artifact）
+
+   `length_a > INT64_MAX - length_b` を加算前に検査。Windows 版が最初から
+   使っていた順序に合わせただけで、新しい不変条件ではない。loader の pinned
+   identity が変わるので artifact の `loader-source-sha256` を a723dea1 に前進。
+   旧 identity を名乗る receipt は検証を通らなくなる —— drift detector が
+   設計どおり働いている状態。")
+
+  (:adr/consequences
+  "## 着地（すべて default branch 上、ancestry 確認済み）
+
+   | repo | commit | 内容 |
+   |---|---|---|
+   | kotoba | e8b857dc | T1 生メモリ deny gate + 16 module 宣言 + audit tool |
+   | kotoba | e7a9d479 | host 出力窓の境界づけ |
+   | compiler | 66f9dff2 | rooted provenance + loader 加算順序 |
+   | compiler | 0ecfc76f | kernel-subregion 要求 |
+   | kotoba-native | 2b345473 | 両 ISA の emission + encoding assertions |
+   | kotoba-kir | 4710a4c8 | op 登録 |
+   | kotoba-verifier | f3f620c3 | 独立検証側の許可 |
+   | artifact | c1da859a | loader identity 前進 |
+   | aiueos | abda46e8 | 9 オブジェクト 14 箇所の移行 |
+
+   ## 検証
+
+   - kotoba: 468 tests / 8359 assertions、失敗 6 —— すべて sibling repo の
+     evidence path（`../kototama/…`）で、/tmp worktree から走らせたため解決しない。
+     無改変 origin/main でも同一の 6 件。
+   - compiler: 862 tests / 6527 assertions、**0 failures**。
+   - kotoba-native 36 / kotoba-kir 80 / kotoba-verifier 5 / artifact 2、すべて green。
+   - native の encoding は **emit したバイト列を逆アセンブルして**確認
+     （otool -tvV）。x86-64・aarch64 とも 3 分岐すべてが ud2 / brk に着地。
+   - aiueos 44 オブジェクトすべてが provenance 規則を通過（0 rejected）。
+     7 件は本規則以前から存在する型エラーで、check-value-types! で先に落ちる。
+   - kotoba の gate は CLI 実地でも確認: 偽造モジュールは `check` でも
+     `wasm emit` でも拒否され artifact は 1 バイトも書かれない。
+
+   ## 途中で見つけた自分のバグ（すべてテストが先に発見）
+
+   1. `kernel-base-uses` が `(rest args)` を walk していたため、base 位置に
+      入れ子になった narrowing の親が検査されず、untraceable な base を
+      ロンダリングできた。
+   2. `:offset-static?` が `(drop 2 form)` —— 3 要素の `(+ base offset)` では
+      正しいが 4 引数 op では length を offset と読み、静的 narrowing を
+      全部 dynamic と報告していた。
+   3. aarch64 の期待 encoding を 2 語書き間違え、正しい emit コードに対して
+      テストが落ちた。**バイト列を目で読んで期待値を書くのは危険**という実例。
+
+   ## 検証できないと判明したこと（前回の自分の記述を訂正）
+
+   x86-64 は Rosetta で実行できる（確認済み、exit code も正しい）が、それは
+   無関係だった —— **kernel target は linkable な ELF オブジェクトで、そもそも
+   プロセスとして実行できない**。既存の kernel op も同様に実行テストを持たず、
+   ISA parity が確立した水準。今回はそれを encoding assertion で強化した。
+
+   ## 巻き込み事故
+
+   kernel-subregion には kir/native/verifier の pin 更新が必要で、kir と native の
+   pin は連動している（片方だけ戻すと pure-native pilot suite が落ちる）ため、
+   upstream の「native で :string record フィールドを許可」も一緒に入り、
+   `native_executor_test` の否定テスト 2 件が反転した。capability が実際に
+   コンパイルできることを確認した上で assertion を反転させたが、着地直前に
+   upstream が同じ修正（#506）を入れたのでそちらを採用した。")
+
+  (:adr/gaps
+  "## 未閉鎖（優先度順）
+
+   ### gap 3: escape hatch の内側が無防備 —— 最優先
+
+   `:kotoba/raw-memory` を宣言した 16 module の内部は生メモリが自由。うち
+   13 が pg/http/db の wire provider ——**信頼できないネットワークバイト列を
+   パースしているコードそのもの**。実測 `mem-byte-at` 351 箇所 /
+   `byte-store!` 223 箇所（`mem-i32-at`/`i32-store!` は 0）。
+   db_transport 167、pg_scram 119、http_transport 77。
+
+   **574 箇所のソース移行は間違った形**。正しいのはバックエンドで境界検査を
+   emit することで、ソース変更ゼロ。非対称にする必要がある:
+   - write (`byte-store!`): `[heap-base, high-water)` のみ（literal を守る）
+   - read (`mem-byte-at`): `< high-water` のみ（data segment の読みは正当 ——
+     `(mem-byte-at (str-ptr s) i)` で定数を読むのは普通）
+
+   host 側の `writable-output-window` と同じ規則で対称性が取れる。
+   **着手しなかった理由**: emission に scratch local の確保が要る。既存
+   バックエンドは `byte-store!` で `<value>` を2回 emit する（local 不使用）
+   流儀だが、アドレスを3回 re-emit すると副作用が3重になる危険があり、
+   正しくやるなら `let` と同じ local-index 機構（runtime.clj:4108-4130）に
+   参加する必要がある。信頼できない入力をパースするホットパスに新しい wasm
+   制御フローと local 確保を入れる作業で、この repo 自身の基準
+   （plausibility ではなく proof）に照らして長いセッションの終端で始めるべき
+   ではないと判断した。**wasm 経路は実行して検証できる**ので、次に着手すれば
+   gap 2 より強い証拠を付けられる。`byte-store!`（破壊 primitive、223 箇所）
+   から、pg/http provider の component テストを実行証拠にするのが順序。
+
+   ### heap object 間の混同
+
+   host 出力窓も生メモリ deny も「どの**領域**に書けるか」は縛るが
+   「どの**オブジェクト**か」は縛らない。bump allocator が個別 extent を
+   記録しないため検査材料が無い。閉じるには allocator 側の変更が要る。
+
+   ### kernel の entry window 自体
+
+   rooted + 検査つき narrowing により「正しい entry window ⇒ 派生窓すべて
+   正しい」が成立したが、entry window 自体（base parameter とその length が
+   ABI 境界を越えて一緒に来る）は検証できない。`kernel-region-report` が
+   その境界を名指しする。
+
+   ### C の TCB
+
+   aiueos kernel C/asm 5,877 行 + kexe_loader.c 782 + Windows 版 960。
+   CLAUDE.md の方針は「判断を含まない機構層のみ」だが、**それを自動検査する
+   仕組みは見つけていない**（網羅的に探してはいないので「無い」とは断言しない）。
+
+   ### 未監査
+
+   - x86_64 backend の bounds-check emission は kernel-subregion 以外を
+     読んでいない（aarch64 のみ精読）。分岐変位が手計算なので価値がある。
+   - 今回入れた gate は fuzz していない。
+   - `kotoba-native/peephole` の size-preserving 書き換えは未確認。
+   - `:kotoba.policy/forbid-raw-memory` を CI で強制する仕組みは無い。")
+
+  (:adr/resume
+  "次の最初の具体的コマンド（gap 3、write 側から）:
+
+       cd orgs/kotoba-lang/kotoba && git fetch origin \\
+         && git worktree add -b agent/guest-store-window /tmp/kotoba-storewindow origin/main
+       # runtime.clj の byte-store! lowering（`git grep -n \"byte-store! (let\" src/kotoba/runtime.clj`）に
+       # heap-base 以上 / global 0 未満の検査を emit する。local 確保は
+       # runtime.clj:4108-4130 の let と同じ next-local / :local-types 機構に参加させる。
+       # 実行証拠: clojure -M:test（transport_component_test と real_host_providers_test が
+       # 574 箇所の経路を実際に通す）
+
+   参考実装: `kotoba.wasm-exec/writable-output-window`（同じ規則の host 側）。
+   audit: `clojure -Sdeps '{:paths [\"src\" \"resources\" \"tools\"]}' -M -m raw-memory-audit`
+   （gate 自身を走らせて対象 module を列挙する。regex ではない）。")))

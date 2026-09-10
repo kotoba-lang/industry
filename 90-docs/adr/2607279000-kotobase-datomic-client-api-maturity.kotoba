@@ -1,0 +1,116 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607279000-kotobase-datomic-client-api-maturity")
+  (:adr/doc_type "adr")
+  (:adr/topic "kotobase-datomic-client-api-maturity")
+  (:adr/title "ADR-2607279000: Kotobase Datomic Client API maturity — official API surface, not XRPC")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-27")
+  (:adr/last_verified "2026-07-27")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for (vector "kotobase.datomic.client as datomic.client.api drop-in"
+   "D1 Worker /api/* Client API paths (application/edn, not XRPC)"
+   "Honest boundary vs Cognitect proprietary Cloud wire"
+   "Maturity evidence for D1-backed Datomic API"))
+  (:adr/repos (vector "kotoba-lang/kotobase-engine"
+   "kotoba-lang/kotobase-storage-d1"
+   "gftdcojp/net-kotobase"))
+  (:adr/related (vector "adr-2607265000-kotobase-d1-datomic-edn-api"
+   "adr-2606161600-datomic-cloud-client-api-parity"
+   "adr-2606201800-transit-json-datomic-client-compat"))
+  (:adr/body "## Context
+
+D1-backed Kotobase already had Datomic *grammar* compatibility
+(ADR-2607265000) and net-kotobase had an XRPC `ai.gftd.apps.kotobase.datomic.*`
+shape. The owner asked to raise maturity and keep the API **fully compatible
+with the official Datomic Client API**, not XRPC.
+
+The published Client API is `datomic.client.api` (arg-maps, return maps,
+anomaly categories). Cognitect Cloud's on-wire Transit protocol is
+proprietary and not fully documented; claiming wire identity with
+`com.datomic/client-cloud` without golden capture would be dishonest
+(ADR-2606201800 already required capture as a gate).
+
+## Decision
+
+### D1. Library surface = `kotobase.datomic.client`
+
+New namespace `kotobase.datomic.client` implements the public Client API:
+
+- Lifecycle: `client`, `connect`, `create-database`, `delete-database`, `list-databases`
+- DB values: `db`, `as-of`, `since`, `history`, `sync`, `with-db`
+- Read: `q` (arg-map + multi-arity), `qseq`, `pull` (arg-map + multi), `datoms`,
+  `seek-datoms`, `rseek-datoms`, `index-range`, `index-pull`, `db-stats`, `tx-range`
+- Write: `transact`, `with`
+- Explicit unsupported: `administer-system` (Cloud control plane)
+
+Server types:
+
+- `:kotobase-local` / `:dev-local` — in-process engine (tests + embed)
+- `:kotobase` — HTTP client against `/api/*` (EDN)
+
+Datoms are adapted to `{:e :a :v :tx :added}` with keyword attributes.
+Pull returns keyword keys and scalar card-one values.
+
+### D2. HTTP surface = `/api/*`, not XRPC
+
+`kotobase-storage-d1` Worker prefers:
+
+```
+POST /api/q | /api/transact | /api/pull | /api/datoms | /api/tx-range | /api/db | ...
+Content-Type: application/edn
+```
+
+Legacy `/v1/*` remains as aliases. **No XRPC NSIDs** on this path.
+`GET /health` reports `api: \"datomic.client.api\"`, `xrpc: false`,
+`maturity: \"client-api-beta\"`.
+
+### D3. Honest boundary with Cognitect client-cloud
+
+API compatibility ≠ proprietary wire compatibility. Until Transit golden
+vectors are captured against real Datomic Cloud, applications should
+`require` `kotobase.datomic.client` (or alias it), not point
+`com.datomic/client-cloud` at Kotobase. This ADR does **not** supersede
+the capture requirement in ADR-2606201800; it delivers the public API
+maturity that apps and LLMs need without waiting on reverse engineering.
+
+### D4. Maturity evidence
+
+- `kotobase-engine` test suite: 12 tests / 80 assertions / 0 failures
+  (includes dedicated `datomic-client-test` covering lifecycle + q/pull/datoms
+  Client shapes)
+- D1 `scripts/verify.mjs` continues to cover authz + projection E2E
+- Production load/SLO qualification remains an open follow-up (same as
+  ADR-2607265000 non-goals)
+
+## Consequences
+
+- Apps can write against the official Client API shape without learning XRPC.
+- net-kotobase XRPC remains for existing BaaS clients; new D1 apps use `/api/*`.
+- Cognitect cloud client live E2E stays blocked on Transit capture.
+- Maturity label: **client-api-beta** (feature-complete public API, verified
+  unit/E2E core path, not yet production-SLO-gated).
+
+## Verification
+
+```bash
+cd orgs/kotoba-lang/kotobase-engine && clojure -M:test
+# 12 tests, 80 assertions, 0 failures
+
+# D1 health reports Client API:
+# GET /health → {api:\"datomic.client.api\", xrpc:false, maturity:\"client-api-beta\"}
+```
+
+### Production D1 route (2026-07-27)
+
+- Host: `https://kotobase-storage-d1.aozora.app`
+- Worker version: `88f7425f-db31-433a-a083-7bb0a33c1a1c`
+- Remote verify.mjs: all checks green including `/api/*` Client API
+- west pins: engine `2bf0ecfa`, storage-d1 `7a2fe90b`
+
+
+### net-kotobase edge (2026-07-27)
+
+- main `7ac5fd3a` — `POST /api/*` Client API → D1, Transit+EDN, XRPC marked legacy
+- ADR `docs/adr/2607279100-client-api-edge-d1-bridge.md`
+")))

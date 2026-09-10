@@ -1,0 +1,75 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608022500-engi-committed-blocks-execute")
+  (:adr/title "adr-2608022500: commit された block が実行される — 順序に合意して何も適用しないプロトコルは、誰も欲しがっていないものに合意している")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-committed-blocks-execute")
+  (:adr/authoritative-for
+  (vector "engi の state machine seam（machine / apply-fn / root-fn）"
+   "commit と adopt の区別"))
+  (:adr/related
+  (vector "adr-2608022400-engi-equivocation-is-recorded"
+   "adr-2608022000-engi-replica-nobody-had-ever-run-it"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi/commit/8c0553b34fa6b34b7e42087697e1bdf7216abed4"))
+  (:adr/body
+  "# ADR-2608022500: commit された block が実行される
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+**順序に合意して何も適用しないプロトコルは、誰も欲しがっていないものに合意している。**
+
+これまで `:committed` は「4 つの replica が一致し、どの replica も何もしない block の列」だった。そして**示されていた性質は、見た目より弱かった** —— **結果に何も依存していないとき、順序の一致は偶然に正しくなりやすい。**
+
+## Decision
+
+### 1. machine は注入する
+
+`{:state s0 :apply-fn ... :root-fn ...}`。**engi は transaction が何かを知らないし、知ってはならない** —— 取引 chain ならそれは `torihiki.state`、送金台帳なら `engi.core` であり、**どちらかを import した consensus 層は「ちょうど 1 つの application のための consensus 層」になる。**
+
+### 2. **commit された** block だけを、各 1 回ずつ、順に適用する
+
+adopt されただけの block を適用するのは**まだ差し替えられうる block を適用すること**であり、**後から取り消すこと**こそ 3-chain 規則が不要にしているもの。
+
+`uncommitted-blocks-are-not-applied` がこの区別を assert する —— **「adopted」と「committed」は 1 フィールド違いで、混同しやすい。**
+
+### 3. harness の machine は**意図的に順序依存**にする
+
+各 block を走る digest に畳み込む。**結果が順序に依存しない machine は「順序への合意」を検査不能にする** —— そしてその合意こそ**このプロトコルが産出する唯一のもの**なので、それが見えない test は何も測っていない。
+
+### 4. machine が無ければ `state-root` は nil
+
+**もっともらしい定数ではなく。** block を並べて何も実行しない replica には **root すべき state が無い**。ゼロを返せば、**そういう replica 同士が全部「間違った理由で」一致してしまう。**
+
+## 実測
+
+```
+  common committed prefix: 113 blocks
+  all replicas agree     : true
+  same state at block 112 : true (113:c51298e1f1da50a1)
+```
+
+**validator set の内側に Byzantine、外側に forger を置いた状態で。**
+
+root は**同じ commit 高さで**比較する —— replica は任意の瞬間に正当に 1〜2 block ずれているので、「今の状態」で比較すると**正しさと無関係な理由で落ちる。**
+
+## Consequences
+
+- (+) 「4 プロセスが順序に合意する」が「**同じ state に到達する**」になった。
+- (+) 決定論バグが root の不一致として表面化する。
+- (−) **harness の machine は torihiki ではない。** 機構は証明したが、**取引 chain を engi 上で走らせてはいない** —— これが次の大きな一手。
+- (−) **torihiki-node は依然として単一 sequencer**（`/head` がそう言っている）。engi と接続されていない。
+- (−) 証拠は保持されるが slash されない（bond 供給元が未デプロイ）。
+- (−) 証拠は伝播しない。
+
+199 tests / 1118 assertions。JVM/nbb parity 一致。
+")))

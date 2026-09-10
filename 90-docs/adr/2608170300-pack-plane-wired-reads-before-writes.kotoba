@@ -1,0 +1,107 @@
+(vector (map (:adr/repos (vector "kotoba-lang/kotobase-storage" "kotoba-lang/kotobase-storage-pack" "net-kotobase/control-plane" "net-kotobase/engine")), (:adr/supersedes nil), (:adr/status "accepted"), (:adr/id "ADR-2608170300"), (:adr/body "ADR-2608160100 established block -> pack -> object as the physical plane.\nThis records what it took to WIRE it into a Worker that already has a\nhistory, and three decisions that ADR did not contain.\n\n## 1. The bootstrap circularity, and why the pointer needs no signature\n\nBlocks live at `blocks/<graph>/<cid>`; the head record carries only\n`{:chain-cid :sequence}`. Packing moves location to (pack CID, offset,\nlength), which the catalog answers -- so a catalog kept as datoms IN the\ngraph cannot be read without first reading the graph.\n\nThe pointer must therefore live outside the packs. Resolved in two parts:\n\n- Each pack is sealed with the PREVIOUS pack's CID as its CARv2 root, so the\n  packs form a chain. One CID reaches every earlier pack, and each pack's own\n  CARv2 index locates its blocks. `bootstrap-catalog!` is that walk -- the\n  catalog with the catalog taken away, which is what makes ADR-2608160100's\n  word `projection` true rather than aspirational.\n- The tip of that chain is one object beside the head (`packs/<graph>/\n  tip.json`), UNSIGNED and deliberately not a field in the signed IPNS\n  record.\n\nThe signature is unnecessary because every block leaving a pack is rehashed\nagainst the CID that was asked for. A tip that is stale, missing, or planted\nby whoever can write the bucket costs a lookup that FAILS; it cannot produce\na block that is wrong. What a bad tip can do is hide newer blocks, which is\nthe freshness problem a stale head already has. Integrity is the CID's job\nhere; the pointer is availability.\n\nA pack cannot link to itself -- its CID is the hash of its own bytes -- so\nthe only constructible cycle involves packs written by something other than\nthis store, which is what the `seen` set is for. `max-packs` bounds a chain\nthat is merely very long. Two hazards, two mechanisms.\n\n## 2. Reads before writes, and the order does not commute\n\nProduction writes through one call (`store/flush!`) and reads through\n`fetch-block-cached`, which was L1 -> L2 -> one B2 object per CID. Switching\nwrites to packs while reads only know objects produces a graph whose new\nblocks cannot be read back -- in an isolated environment too, just privately.\n\nSo the packed tier went in FRONT of the durable read first. It is safe to\nland before anything writes packs because a graph with no packs has no tip,\nan empty location table, and every CID disclaimed -- the read takes exactly\nthe path it took before. That is measured, not argued: all 233 pre-existing\nengine tests pass unchanged AND still pass when the packed tier is broken.\n\nCost of wiring early: one `tip.json` 404 per graph per isolate, held for the\nisolate's life. Stated in the docstring and pinned by a test, because a\nround trip nobody can explain later is worse than one that is written down.\n\n## 3. Removing the migration fallback is a measurement, not a date\n\n`pack-migration` reads packed-first and sends only CIDs the catalog\nDISCLAIMS to the per-object plane. It will not fall back for a CID the\ncatalog claims: if the catalog says (pack, offset, length) and the pack\ncannot produce it, that is a storage fault, and serving the same CID from\nthe old plane would convert it into a silent success that stays in place\nuntil the fallback is removed -- at which point it becomes data loss with\nno warning in between.\n\n`:fallback-lookups` is the stopping condition. While it is non-zero there is\nhistory outside the packs and removing the fallback loses it. The counter is\ntied to bytes actually served, not to how CIDs were classified: the first\nversion asserted only the classification and read 3 even with the fallback\ndeleted entirely.\n\n## Current state (2026-08-17)\n\nLanded on default branches, west pins advanced (root f78d1f7):\n\n  net-kotobase/control-plane      e3dfb02  signed half-open ranged reads\n  kotoba-lang/kotobase-storage    1b84313  contract that compiles in cljs\n  kotoba-lang/kotobase-storage-pack f6a4da8 pack chain, async datom catalog\n                                           (last 2 commits by another session)\n  net-kotobase/engine             dd6a043  tip, migration, bootstrap catalog,\n                                           read wiring, write gate, counters\n\nPRODUCTION IS UNCHANGED. `KOTOBASE_PACK_WRITES` is off, so `store/flush!`\nstill PUTs one object per block and the packed tier finds nothing. The only\nnew cost is the tip 404 above.\n\n## Open, in order\n\n1. testnet (`kotobase-cf-wasm-testnet`, its own B2 bucket AND prefix) with\n   KOTOBASE_PACK_WRITES=1 and KOTOBASE_TIMING=1. `wrangler tail` then shows\n   `:packed-write` (what a commit became) and `:packed-reads` (what reading\n   it cost). No measurement of the real thing exists yet -- every number so\n   far is from the suites.\n2. The production catalog. `pack-catalog-async/datom-catalog` needs\n   `{:transact! :q}` against the engine's datom plane, which is unwired and\n   is its own decision. `pack-catalog-bootstrap` is the bridge and its price\n   is honest: it walks EVERY pack, so a thousand commits is a thousand\n   object GETs per isolate, and a cold isolate pays for the whole history\n   before returning one block.\n3. Production cutover, gated on (1) and on `:fallback-lookups` reaching zero.\n\n## Two upstream defects found by building this\n\n- `kotobase-storage/validate-object-store!` passed a computed protocol to\n  `satisfies?`, which is a function on the JVM and under nbb but a\n  compile-time macro in ClojureScript. The namespace did not build with the\n  compiler that builds the Workers. Both CI gates are JVM or nbb, so neither\n  could catch it: an interpreter never performs the macroexpansion that\n  fails. Fixed in 1b84313; `clojure -M:cljs-compile` added there as the\n  missing question.\n- `net-kotobase/engine` could not `npm run test:cljs` from a clean checkout:\n  a `file:` dependency pointed at a sibling path that exists in no layout.\n  deps.edn carried a comment about having fixed exactly this for the clojure\n  dep; the npm side was left behind.\n\n## Step 1 executed and measured (2026-08-24)\n\n`KOTOBASE_PACK_WRITES=1` landed on main for env.testnet (engine `0d04d00a`) and was deployed (Worker version 3c195c02, tagged). Workload: 26 sequential commits (schema + 25 x 3-datom entities, fresh tenant) + reads, driven direct at `kotobase-cf-wasm-testnet.aozora.app`. Note for the next bench: direct calls carry no `x-kotobase-tenant-did` edge header, so owner-bound reads 403 as `owned by another tenant` until the bench stamps the header itself.\n\n**The write gate works.** wrangler tail with KOTOBASE_TIMING=1: 26/26 commits produced `:packed-write` (one pack per commit, block-count 3-7). Write p50 total 1,569ms = head-read 134 + flush 899 + head-write 484. Auto-fold also writes packs (5-7 blocks).\n\n**Cutover stays blocked, and now on a named defect that is NOT the pack plane.** The same workload read back:\n\n| deployment | code | pack writes | q rows (of 25) | datoms |\n|---|---|---|---|---|\n| kotobase.net (production) | pre-merge | off | 25/25 | 56 |\n| testnet 73b26ee1 | main | ON | 9-14, varies by graph | 54 |\n| testnet 1857f652 | main | off | 17 | 54 |\n\nSame rows on every repeat within a graph; different across graphs. The data is present (a raw `datoms` scan returns every bench datom) but `q` hydration is silently partial, HTTP 200. Gate off does not fix it and production code does, so the regression rode in with the post-`5c4ccee` read-path changes — the read-budget/prefetch-wave merge `bc51f61` is the prime suspect. Its budget REFUSES loudly by design, but `block-fetcher` resolves nil for an absent block, and an async read path that treats nil as absent-and-skip rather than miss-and-retry hydrates partially with no error (the manifest warmer already documents the nil-skip as a hint; the same nil shape on the correctness path is the defect class ADR-2608136000 names — the read that could not finish returns the same shape as the graph that is small). Also observed on the packed graph: auto-fold degrades to persistent `InternalError` after ~2 successes, and one post-fold q took 10.3s.\n\nReproduction: 25 commits + reads with a persisted tenant seed. Testnet graphs: did:key:z6MkwWW5... (packed, rows 14), did:key:z6Mkg7dW... (packed, rows 9), did:key:z6Mkgog1... (gate off, rows 17); production control did:key:z6MkfPDG... (rows 25).\n\nStep 1 is therefore complete as a measurement, and its verdict: fix the silent-partial read regression on main (and the fold InternalError) before any pack read number can be trusted, then re-run this workload. env.testnet stays on main with the gate ON — catching exactly this is what the environment is for.\n\n## The producer is deployed to production now, and still cannot be read (2026-09-09)
+
+Deployed on the owner's instruction, from the engine tree at
+net-kotobase/engine 9c29ddc (the revision that gives `:fallback-lookups` a
+producer at the real seam):
+
+    kotobase-engine-candidate   Worker version cdf48c7c-246a-4a30-af14-8f90cdbec922
+                                verified tagged at Git revision fe355d09dec0
+                                routes: backend.kotobase.net + workers.dev
+
+Measured immediately after, from outside:
+
+    GET  /            200  kotobase-graph-database        the new version serves
+    GET  /_health     503  missing KOTOBASE_B2_KEY_ID, KOTOBASE_B2_APP_KEY,
+                           KOTOBA_SEED; keyring missing-signing-seed
+
+So the corrected accounting -- `pack=` and `object=` in `x-kotobase-kv-stats`,
+where `object` is the fallback the gate asks about -- is now IN production and is
+not yet OBSERVABLE there. A read cannot reach the durable tiers without B2
+credentials, and supplying a Worker secret is the owner's action, not this
+session's (safety floor: credentials are never typed by the agent).
+
+The release bundle was checked rather than assumed: the emitted worker contains
+the summary with `object` in it after `shadow-cljs release worker`. A grep for
+`object=` finds NOTHING, because the Closure compiler writes the equals sign as a
+hex escape in advanced output -- so the search string never appears literally. The
+wrong instrument, and it would have read as a missing fix.
+
+What each remaining step would unlock, so the order is on the record:
+
+  1. Supply the three secrets to `kotobase-engine-candidate`. Then
+     `/_health` answers 200 and a read through the edge can produce
+     `pack=` / `object=` -- the first numbers this gate has ever had.
+  2. Resolve the testnet worker-name collision. `env.testnet` is declared by BOTH
+     engine and control-plane/kotobase-graph-database with the same worker name
+     and custom domain, so a `deploy:testnet` from engine REPLACES the tree that
+     currently serves testnet (control-plane, which has no pack namespaces).
+     That is a swap of what a shared environment runs, it is reversible only by
+     redeploying the other tree, and it was NOT done in this session.
+
+## The pack plane is not serving anywhere, and one of my own corrections was wrong (2026-09-09)
+
+Measured today, from outside, with no credential:
+
+    GET https://backend.kotobase.net/_health
+      503  {ok false, missing [KOTOBASE_B2_KEY_ID KOTOBASE_B2_APP_KEY KOTOBA_SEED],
+            keyring {ok false, error missing-signing-seed}, edge_admission false}
+
+    GET https://kotobase-cf-wasm-testnet.aozora.app/_health
+      200  {ok true, canonical_cloudflare_independent true,
+            object_store {mode migrating, backfill_enabled false}, ...}
+
+The second response is the decisive one. `canonical_cloudflare_independent` and
+`object_store` exist ONLY in net-kotobase/control-plane/kotobase-graph-database's
+worker -- grep: 2 occurrences there, 0 in net-kotobase/engine -- and that tree has
+NO pack namespaces at all. No pack_reader, no pack_writes, no pack_tip, no
+pack_migration; its fetch path is L1 -> L2 -> B2.
+
+So the tree with the pack plane (engine) is not the tree serving testnet, and its
+own host answers 503 for three missing secrets.
+
+**Therefore: nothing in production or testnet writes or reads a pack.** An earlier
+note of mine on this ADR and on kotoba-lang/ayatori iterations 01-04 said pack
+writes were live in testnet behind a measured gate. That was wrong -- it read the
+engine tree and inferred a deployment. ayatori's original statement, that nothing
+in production writes a pack, was right, and this section restores it.
+
+Why the candidate is 503 is written in control-plane's own config: worker secrets
+are per-script and write-only, so a script that cannot re-supply
+KOTOBASE_B2_KEY_ID/_APP_KEY cannot be renamed or split -- and that is what
+`blocked kotobase-cf-wasm-staging from becoming net-kotobase-engine`.
+`kotobase-engine-candidate` is a new script; its secrets were never supplied.
+
+### Both trees claim the same testnet worker
+
+engine/wrangler.jsonc and control-plane/kotobase-graph-database/wrangler.jsonc each
+declare an `env.testnet` with the worker name `kotobase-cf-wasm-testnet` and the
+custom domain `kotobase-cf-wasm-testnet.aozora.app`. A `deploy:testnet` from
+either tree therefore REPLACES the other's code on that host, and nothing in
+either config says so. Today's live `_health` says control-plane deployed last.
+
+This is why no deploy was made from this session. Pushing engine to that name
+would swap the serving tree on a shared environment through a name collision, and
+supplying the candidate's secrets is an owner action. Both are named here rather
+than done.
+
+### The gate's metric had no producer, and now has one
+
+The stopping condition on this ADR is `:fallback-lookups` reaching zero.
+`pack-migration/packed-with-fallback`, the store that would produce it, is
+constructed NOWHERE in engine's src -- only in its own test -- and
+`pack-migration/stats` has no callers. The gate has been quoted as the blocker
+since 2026-08-17 and could not have produced a number.
+
+What does exist is `store/block-fetch-stats-summary`, served as the
+`x-kotobase-kv-stats` response header. It was also wrong: `fetch-block-cached`
+charged `:pack` in the packed branch and then `:b2` in the shared tail, which runs
+for a pack hit too, so one pack-served block was counted in BOTH tiers and `b2`
+meant `some durable tier answered`. Measured over a real pack: `pack=1;b2=1` with
+no per-object GET issued at all. engine 9c29ddc renames it to `object`, charges it
+inside its own branch, and asserts both directions over a real pack.
+
+So after that revision the gate is readable over HTTP -- `pack + object` are the
+durable reads and `object` is the fallback -- but only once a tree carrying the
+pack plane is actually serving, which is the item above.
+
+## That verdict was cleared on 2026-09-07, and re-measured 2026-09-09\n\nBoth blockers it names were ONE defect. `net-kotobase/engine` 904fbbd (2026-09-07, \"a block the read required and could not fetch refuses by name\") types the condition, and `xrpc.cljs` says so at the catch site: the alternative was \"rows quietly missing from a 200, or a JS TypeError wearing the word InternalError\" — the short read and the fold InternalError, from the same unfetched block.\n\nA read that needs a block no tier can produce now answers 503 BlockUnavailable, retryable, naming the CID, with NO datoms array at all — beside GraphTooLargeToHydrate rather than beside the 400s.\n\nRun 2026-09-09, `node test/e2e-block-unavailable.mjs`, ENTITIES = 25 — this workload, not a smaller one — ALL GREEN in both configurations:\n\n    gate off        an incomplete read is not a 200 (503, rows=null)\n                    the refusal names itself and names the CID\n                    putting the block back restores ALL 25 ROWS (200, 25)\n    PACK_WRITES=1   a complete cold read returns ALL 25 ROWS (200, 25)\n                    pack writes sealed one pack per commit (25)\n                    incomplete -> 503; restored -> all 25 rows\n\nSo the number this step could not get — 25 — is now obtained WITH the gate on, and the failure mode that made 14/9/17 possible is a typed refusal instead of a short success.\n\nStep 1's stopping condition is therefore met and the cutover is no longer blocked on it. What remains before cutover is the ORIGINAL gate, unchanged and still unmeasured: `:packed-write` / `:packed-reads` from env.testnet and `:fallback-lookups` reaching zero. A green e2e is not that measurement — it proves the read fails closed, not that history has finished moving into packs.\n\n⚠ And one measurement argues against cutting over as currently DESIGNED, independently of any defect. kotoba-lang/ayatori's co-scientist iteration 05 measured a commit-scoped pack against the chain walk and got 0.50x — a 2x LOSS — because one commit, one pack puts exactly one chain link in each pack (N/P = 1.00, the worst ratio there is). Root ADR-2608021000 records that chain as 97% of hydrate's sequential term, its depth equal to the number of unfolded transactions. The write side is a 9x win (144 puts -> 16). The read side of a chain is not, under this grouping. Packing the NOVELTY WINDOW rather than the commit is what iteration 05 predicts at N/P = 64, and it is unbuilt."), (:adr/date "2026-08-17"), (:adr/amends "ADR-2608160100"), (:db/id -1), (:adr/title "The packed block plane, wired: reads before writes, and the pointer that needs no signature")))

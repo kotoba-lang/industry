@@ -1,0 +1,66 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608025000-a-replica-was-dropping-its-own-vote")
+  (:adr/title "adr-2608025000: replica は自分の票を捨てていた — 全員が quorum にちょうど 1 票足りなかった理由")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-own-vote-and-certificate-signatures")
+  (:adr/authoritative-for
+  (vector "fold-vote の署名要求（verifier が決める）"
+   "証明書が運ぶ署名の完全性"))
+  (:adr/related (vector "adr-2608024900-nobody-holds-a-certificate-for-their-own-tip"))
+  (:adr/evidence (vector "https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"))
+  (:adr/body
+  "# ADR-2608025000: replica は自分の票を捨てていた
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## deploy 済み chain が block を commit した（初）
+
+**3 replica が height 5 / committed 3。** それまでのすべての読み取りは `committed -1` だった。
+
+## 原因
+
+`fold-vote` は **verifier に訊く前に署名を要求していた。** それは**各 replica の「自分の票」を弾く** —— **Worker は非同期に署名する**ので、**票を作った瞬間に畳まれる写しには、まだ署名が無い。**
+
+**全員が quorum 3 にちょうど 1 票足りなかった。** そして**各自が「自分の票」を 200 件、`:unsigned` として記録していた。**
+
+**それが、それまでのすべての読み取りが示していた形**であり、**どれもそれを名指せなかった。**
+
+（計器 `:dropped-votes` と `:last-dropped-vote` を入れて、`last-dropped-vote.witness == 自分自身` を見た瞬間に決まった。）
+
+## そして、できた証明書は運べない
+
+```
+  tip-certificate {origin fold-vote, witnesses 3, sigs 2, views {w2 7, w4 7}}
+```
+
+**witness 3、署名 2** —— **欠けているのは作った本人の署名**、署名前に畳まれたもの。
+
+**ローカルでは問題なく certify され、peer は誰も検証できない。** だから 1 block 遅れた w3 は `below-quorum` で拒否し、**永久に追いつけない。** **3 者のために commit し、4 人目を連れて行けない chain。**
+
+## Decision
+
+- **verifier が決める。署名の有無も含めて。** 緩めてはいない —— **知らない witness に nil 署名を渡された verifier は false と言う**（直接 assert 済み）。**replica は自分が作った票を納得させられる必要が無い。**
+- **自分の witness を特別扱いしない。** 特別扱いが**無署名の写しを記録に入れていた。** **署名済みの写しは dispatch が署名した直後に畳み戻す。** 無署名を捨てる代償は往復 1 回で、**得られるのは peer が検査できる証明書** —— **作る価値があるのはそれだけ。**
+
+## 現在地
+
+変更後: **height 2 / committed 0** —— 証明書は依然形成され、往復 1 回ぶん遅く、**w3 が復帰できるかは未確認。**
+
+## Consequences
+
+- (+) **deploy 済み chain が初めて commit した。**
+- (+) 「なぜ全員がちょうど 1 票足りないか」が解けた。
+- (−) 証明書の署名完全性の修正は、効果測定が未了。
+- (−) w3 の catch-up は未解決。
+
+engi 227 tests / 1171 assertions、parity 不変、in-process harness は pass。
+")))

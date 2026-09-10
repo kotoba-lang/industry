@@ -1,0 +1,212 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607299900-tradeable-token-policy-reversal")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-07-29")
+  (:adr/last_verified "2026-07-29")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2607299900: tradeable token を発行する方針へ転換 — charter の no-own-token 条項を解除し、token を準圏に置く。EN と credits の非投機性証明は無傷のまま、投機面を1圏に隔離する")
+  (:adr/topic "tradeable-token-policy-reversal")
+  (:adr/repos (vector "orgs/kotoba-lang/loop-system-dynamics" "orgs/network-awai/cloud-murakumo" "orgs/network-awai/net-kotobase"))
+
+  (:adr/authoritative_for
+  (vector "tradeable token を発行するという方針そのもの（オーナー指示 2026-07-29）。ADR-2607995000 §1 と etzhayyim charter の no-own-token / no-speculative-finance 条項（ADR-2607021800 J1）による禁止を、token 1点について解除する"
+   "token の配置: 準圏（junbi）。EN（縁圏）と credits（労圏）は不変。膜規則に `TOKEN → credits`（一方向 mint）を追加し、`credits → TOKEN` は現行どおり禁止"
+   "token の sink 設計: (a) x402 の TOKEN 払い割引 + 受領分 burn (b) witness bond を USDC から TOKEN へ (c) treasury release governance の stake 加重"
+   "発行体と運営者の分離: 運営者は awai network（米国法人、murakumo.cloud / kotobase.net を運営）。発行体は運営者と同一にしない — dual-axis doctrine（ADR-2607071000）の chain 軸に置く"
+   "『token は capital を連れてくるが settlement demand は連れてこない』という区別。両者を混同した計画は本 ADR を根拠に差し戻す"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends
+  (vector "90-docs/adr/2607995000-kotoba-three-sphere-economy.edn（膜規則に `TOKEN → credits` を追加。§1 の非投機性証明は EN と credits については無傷で残る）"
+   "90-docs/adr/2607021800（etzhayyim charter の no-own-token / no-speculative-finance 条項を token 1点について解除。EN の非価格は解除しない）"
+   "90-docs/adr/2607259800（`issue-a-tradeable-token` の :charter-excluded を解除。同 ADR が『辞退した最大レバーも数値化する』としていたため、反転は1フラグの変更と再計算で済んだ）"
+   "90-docs/adr/2607994000（witness bond の建値を USDC から TOKEN へ。role 非対称 floor そのものは不変）"))
+
+  (:adr/related
+  (vector "90-docs/adr/2607030030-murakumo-inference-economy-gtm.edn（労働裏付け発行・pre-mine 無し。本 ADR はこれを変えない）"
+   "90-docs/adr/2607110300-...decentralization-roadmap.edn（Phase 4 = 独立第三者 + skin in the game）"
+   "90-docs/adr/2607993000-engi-l1-byzantine-consensus-en-currency.edn（no-L1 方針の先行する部分撤回）"
+   "orgs/kotoba-lang/loop-system-dynamics/src/loop_system_dynamics/token_economy_comparison.cljs（decision map。本 ADR で :charter-excluded を解除）"))
+
+  (:adr/problem
+  "オーナー指示（2026-07-29）: 「tradeable なネイティブトークンの方針を切り替えて、murakumo.cloud, kotobase.net をちゃんと crypto 決済需要、ニーズが集まるようにしたい」。
+
+**この転換は既に定量化されていた。** ADR-2607259800（accepted, 2026-07-25）は介入をランク付けした際、charter が禁じる `issue-a-tradeable-token` を**省かずに採点し別枠で報告**していた:
+
+    9.00  issue-a-tradeable-token          ← charter 禁止で別枠
+    6.30  instrument-the-en-loop           ← allowed の最上位
+    5.95  asymmetric-witness-bond
+    5.25  open-facilitator-to-third-party-sellers
+    4.00  credits-multilateral-acceptance
+
+> charter 禁止なので別枠で報告する — **最大レバーを辞退しているという事実自体が定量化に値し、黙って省くと残りのランキングを不当に良く見せる。**
+
+つまり技術的・設計的なブロッカーは存在せず、**charter だけ**が止めていた。同 ADR は Holochain を前例として記録している: 「EN は HoloFuel と同じ設計を独立に導出したもので、Holochain は $20.4M を 2018 年に調達しながら 2026 年時点で HoloFuel 本体が未ローンチ。**設計が同じなら成長曲線も同じになる。**」
+
+そして同 ADR の自己評価は **「需要側は一切動いていない」「今回追加した機構は全て未配線である。本番の呼び出し元を持つものは無い」** と記録している。実測でも `murakumo.cloud/.well-known/x402` は `resources: []`（`MURAKUMO_TREASURY_ADDR` が deploy 済み worker に未設定）で、既存の crypto 決済面すら片肺のまま稼働している。")
+
+  (:adr/decision
+  "### 1. charter の no-own-token 条項を token 1点について解除する
+
+ADR-2607021800 J1 の no-own-token / no-speculative-finance と、ADR-2607995000 §1 の「内部単位はどちらも償還不能 ⇒ 投資対象として成立しない」を、**tradeable token の発行に限って**解除する。**EN の非価格は解除しない**（下記 §2）。
+
+### 2. token は準圏（junbi）に置く。EN と credits は触らない
+
+```
+準圏 junbi   USDC / fiat / ★TOKEN(tradeable、外部市場)
+    │ mint(一方向)                ★TOKEN → credits : 可
+    ▼                             ★credits → TOKEN : 禁止（現行どおり）
+労圏 credits  換金不可のまま。供給者は credits を受け取り続ける（変更なし）
+縁圏 EN       非価格・非発行・非交換のまま。一切触らない
+```
+
+理由:
+
+- **EN に値段を付けない。** WIR Bank（1934年〜、スイス GDP 約2%）と Sardex が、投機なしで macro 規模に到達した唯一の実証経路であり、EN はその系譜にある唯一の資産である。ここに外部価格を付けると代わりが効かない。ADR-2607995000 §3 が per-transfer 外部手数料を廃止して閉じた裏口を、再び開けることにもなる。
+- **credits の非償還を維持する。** `credits → TOKEN` を禁じたままなら、§1 の構造的非投機性証明は **EN と credits については無傷**で残る。投機面は準圏1つに隔離され、明示的なラベルが付く。
+- **supersede が最小で済む。** 膜規則への追加は1行。ADR-2607259800 Decision 3 が `credits → 第三者 seller` を1行で足したときと同じ形で、同じ論拠（**移転可能性は償還可能性ではない**）が効く。
+
+### 3. sink を必ず3つ入れる — 無ければ純投機になり、決済需要は増えない
+
+| sink | 型 | 効果 |
+|---|---|---|
+| (a) x402 を TOKEN 払いすると USDC より割引。受領した TOKEN は burn | Render BME | **使用量に比例して供給が減る。唯一、決済需要に直結する** |
+| (b) witness bond を USDC → TOKEN に置換（ADR-2607994000 の role 非対称 floor は不変） | Livepeer LPT（= 働く権利） | ロックアップ。security budget と結びつく |
+| (c) treasury release governance を stake 加重に（kekkai の allow/deny 記録に投票を接続） | 一般 | 既存機構の拡張。新コンポーネントを増やさない |
+
+**供給者（fleet ノード）は credits を受け取り続ける。** token を受け取るのは witness と外部市場だけ。これで「供給者への報酬」と「消費者の支払い」の分離 —— Helium / Akash / Livepeer / Filecoin / WIR の5例すべてが到達した形 —— を、膜を壊さずに入れられる。
+
+### 4. 発行体は運営者と同一にしない
+
+運営者は **awai network（米国法人）** — murakumo.cloud / kotobase.net を運営する（オーナー指示 2026-07-29）。
+
+**発行体を運営者と同一にしない。** 比較した5例すべてが分離している（Filecoin: Protocol Labs / Filecoin Foundation、Livepeer: Livepeer Inc / Foundation、Akash: Overclock Labs / Akash Network）。これは書類上の話ではなくアーキテクチャであり、米国法人では特に効く —— Howey の common enterprise と efforts of others が同一主体に揃うのが最も厳しい姿勢だからである。
+
+**そしてこの分離は既に存在する。** dual-axis doctrine（ADR-2607071000）が `chain 軸 = etzhayyim junbi Safe` / `fiat 軸 = gftdcojp` と定めており、awai network は既に運営者として両者と別である（`MURAKUMO_TREASURY_ADDR` は junbi Safe を指す）。新しい entity を作る前に、**この既存の軸に token を載せられないかを先に検討する** —— 新設は最後の手段とする。
+
+### 5. capital と settlement demand を混同しない（本 ADR の恒久ルール）
+
+9.00 が測っているのは **capital・security budget・貢献者流入**であって、決済需要ではない。決済需要の律速は ADR-2607259800 が特定済みで、**acceptance density = 1**（operator 自身の fleet しか credits の受け取り手がいない）である。
+
+**token 発行は capital engine には必要条件だが、需要にもループ着火にも十分条件ではない。** Holochain がその実例である。したがって token 発行は必ず acceptance density 側の介入（`open-facilitator-to-third-party-sellers` 5.25、`credits-multilateral-acceptance` 4.00）と**セットで**進める。片方だけを実行した計画は本 ADR を根拠に差し戻す。")
+
+  (:adr/implementation
+  "{:done
+    [{:repo \"orgs/kotoba-lang/loop-system-dynamics\" :merge \"d0655e77\"
+      :what \"token_economy_comparison.cljs の :charter-excluded / :charter-basis を解除し :policy-change を記録。ns docstring を『partition は空だが保持する』に更新。テストを3件差し替え（新ランキング / 空 partition の明示 / capital vs settlement demand の区別を assert）\"
+      :verified \"8 tests / 37 assertions green。runner がランキングを end-to-end で再現\"
+      :new-ranking [[9.00 :issue-a-tradeable-token] [6.30 :instrument-the-en-loop] [5.95 :asymmetric-witness-bond]
+                    [5.25 :open-facilitator-to-third-party-sellers] [4.00 :credits-multilateral-acceptance]
+                    [3.00 :broker-actor-for-credit-imbalance] [2.40 :settle-on-usdc-do-not-bootstrap-monetary-security]]}]
+    :not-done-deliberately
+    [{:what \"token contract の作成・デプロイ・配布・上場\"
+      :why \"CLAUDE.md の安全床②（資金の売買・送金・変換・trade をしない）に該当し、かつ発行体の法的構成が未確定。設計と ADR は agent 判断で進めてよいが、発行そのものは owner + 弁護士の領域\"}]
+    :next
+    [{:step 1 :what \"x402 の片肺を直す — murakumo.cloud/.well-known/x402 が resources: [] を返している（MURAKUMO_TREASURY_ADDR が deploy 済み worker に未設定）。facilitator 側は $0.01/req を宣伝しているのに直接 offer が空\" :blocked-by nil :note \"token を待たずに今すぐできる no-regret\"}
+     {:step 2 :what \"acceptance density の配線 — 第三者 seller と facilitator 開放は実装済みだが未配線\" :blocked-by nil}
+     {:step 3 :what \"発行体の確定（既存 chain 軸に載せる vs 新設）\" :blocked-by \"米国法・弁護士確認\"}
+     {:step 4 :what \"sink (a)(b)(c) の実装\" :blocked-by \"step 3\"}]}")
+
+  (:adr/open-decisions
+  "[{:id :issuing-entity
+     :question \"発行体をどこにするか — dual-axis doctrine の既存 chain 軸（etzhayyim junbi Safe）に載せるか、新しい財団を設ける か\"
+     :constraint \"運営者（awai network、米国法人）と同一にしない（Decision 4）\"
+     :owner \"owner + 弁護士\"}
+    {:id :us-regulatory
+     :question \"米国法人が関与する tradeable token 発行の法的構成\"
+     :items [\"SEC / Howey — 発行体と運営者が同一だと common enterprise + efforts of others が揃う\"
+             \"FinCEN MSB 登録および州の money transmitter ライセンス（49州）— 決済トークン事業の実務上の主要な壁\"
+             \"CFTC（security でない場合の commodity 該当）\"
+             \"OFAC/制裁スクリーニング\"
+             \"既存の露出: storefront の『ノード所有シェア + compute 収益シェア』SKU を ADR-2607995000 §3 が既に『証券類似で ADR 上の扱いが無い』と自認済み。token を出すとここが増幅される\"]
+     :note \"上記は設計上の入力であって法的助言ではない。この領域は法改正が速く、本 ADR 執筆時の agent の知識は 2026-05 時点である。弁護士確認が前提\"
+     :owner \"owner + 弁護士\"}
+    {:id :sphere-placement-confirmation
+     :question \"Decision 2（準圏に置く）はオーナー確認を経ていない agent の推奨である\"
+     :alternatives [\"credits 自体を token 化する（Phase 4 の第三者 witness 問題が直接解ける代わりに §1 の証明が credits について失効し、前払い使用権が請求権に変わって規制上の重みが増す）\"
+                    \"三圏を廃して単一 token 経済に作り直す（設計は単純になるが EN の相互信用系譜と労働裏付け発行を失う）\"]
+     :note \"準圏案を採ったのは、既存 invariant を最も多く保ちつつ指示を満たすため。反転は膜規則の1行と sink の宛先変更で済む範囲に留めてある\"
+     :owner \"owner\"}]")
+
+  (:adr/known-gaps
+  "[{:gap \"token の具体設計（供給量・初期配布・emission・上場方針）は本 ADR に無い\"
+     :why \"発行体が未確定で、それが決まると設計可能な範囲が変わるため。方針の転換と配置の決定を先に固定した\"}
+    {:gap \"sink (a)(b)(c) はいずれも未実装\"
+     :note \"(b) は ADR-2607994000 の bond を建値だけ差し替える形なので最も小さい\"}
+    {:gap \"acceptance density = 1 は本 ADR では変わらない\"
+     :note \"Decision 5 のとおり token では動かない。step 1/2 が実際の需要側の作業\"}
+    {:gap \"etzhayyim charter の改正手続きそのものは本 ADR の範囲外\"
+     :note \"本 ADR は token 1点についての解除を記録する。宗教法人側の内部手続きが別に要るなら owner が判断する\"}
+    {:gap \"（訂正）west pin の破損は存在しなかった — agent の誤読\"
+     :detail \"本 ADR の作業中に kotoba-lang/dynamics の pin が壊れていると報告したが誤りだった。manifest は remote・working tree・HEAD のいずれも 439d8cec… で正しく、その commit は実在し main の tip である。実際の原因は orgs/kotoba-lang/dynamics のローカル checkout が 270c884（pin の祖先、12 commits 遅れ）で stale だったことで、`west update` で解消する通常の状態にすぎない。`upload-pack: not our ref` は agent が誤った sha を明示 fetch した結果であって、上流の force-push でも pin の破損でもない\"
+     :lesson \"CLAUDE.md は `upload-pack: not our ref` を『確度の高い force-push の実サイン』と書いているが、それは pin が正しいことを確認した上での話である。sha を1文字読み違えれば同じエラーが出る。壊れていると報告する前に、その sha を GitHub API で引いて存在を確かめる — 今回それを後からやって誤りが判明した。誤報は loop-system-dynamics d0655e77 の commit message にも入っており、そちらは履歴なので訂正できない\"}]")
+
+  (:adr/body
+  "# ADR-2607299900: tradeable token 方針への転換
+
+## 一行で
+
+**止めていたのは charter だけだった。** 技術的・設計的なブロッカーは無く、この lever は 2026-07-25 に既に 9.00 と採点され、allowed 全項目を上回ったまま「charter 禁止」として別枠に置かれていた。本 ADR はその1フラグを外す。
+
+## なぜ反転が1フラグで済んだか
+
+ADR-2607259800 が**辞退した選択肢を省かずに採点していた**からである:
+
+> charter 禁止なので別枠で報告する — 最大レバーを辞退しているという事実自体が定量化に値し、黙って省くと残りのランキングを不当に良く見せる。
+
+その規律のおかげで、今回やったことは新しい主張を組み立てることではなく、`:charter-excluded` を外して再計算することだった:
+
+```
+before                                after
+allowed   6.30 instrument-the-en      9.00 issue-a-tradeable-token
+declined  9.00 issue-a-token          (empty)
+```
+
+**辞退を数値で残しておくと、方針転換のコストが後から計算できる。** これは今後の「やらない」決定にも適用する。
+
+## 何を守り、何を差し出したか
+
+守ったもの:
+
+- **EN の非価格**（縁圏）— WIR/Sardex に連なる唯一の非投機の実証経路。ここは触らない。
+- **credits の非償還**（労圏）— `credits → TOKEN` は禁止のまま。§1 の証明は EN と credits については無傷。
+- **労働裏付け発行・pre-mine 無し** — 供給者は credits を受け取り続ける。
+
+差し出したもの:
+
+- **構造的非投機性が経済圏全体の性質ではなくなった。** 準圏に投機可能な単位が入る。ADR-2607995000 §1 の「内部単位はどちらも償還不能 ⇒ 投資対象として成立しない」は、これからは**内部2圏についての主張**であって経済圏全体についての主張ではない。この縮小は明記して残す。
+- **`instrument-the-en-loop` が1位から陥落した。** これは EN の作業の格下げではなく、反転の可視化されたコストである（テストがそう assert している）。
+
+## 一番間違えやすいところ
+
+**token は capital を連れてくる。settlement demand は連れてこない。**
+
+9.00 が測っているのは security budget と貢献者流入であって、決済需要ではない。決済需要の律速は `acceptance density = 1` —— operator 自身の fleet しか credits を受け取らない —— で、これは token を出しても 1 のままである。
+
+Holochain が実例である: $20.4M を調達し、8年後もループは着火していない。**token はそのプロジェクトに資金を与えたが、ループは回らなかった。**
+
+したがって発行は必ず acceptance density 側とセットで進める。そして**最初にやるべきは token ではない**:
+
+```
+step 1  x402 の片肺を直す   murakumo.cloud/.well-known/x402 → resources: []
+                            （facilitator 側は $0.01/req を宣伝しているのに直接 offer が空）
+step 2  acceptance density の配線（実装済み・未配線）
+step 3  発行体の確定         ← 法務
+step 4  sink (a)(b)(c)      ← step 3 待ち
+```
+
+step 1 と 2 は token を待たずに今日できて、しかも**それ自体が crypto 決済需要の実体**である。
+
+## 発行体について
+
+運営者は awai network（米国法人）。**発行体は運営者と同一にしない** —— 比較した5例すべてが分離しており、米国法人では Howey の観点で特に効く。
+
+そして**その分離は既に持っている**: dual-axis doctrine が `chain 軸 = etzhayyim junbi Safe` / `fiat 軸 = gftdcojp` と定め、awai network は運営者として両者と別に立っている。新しい財団を作る前に、この既存の軸に載せられないかを先に検討する。
+
+## 実際にはまだ何も発行していない
+
+本 ADR が landed した時点で存在するのは**方針の転換と配置の決定**だけである。contract も配布も上場も無い。それらは CLAUDE.md の安全床（資金の売買・送金・変換をしない）と未確定の法的構成の両方に触れるため、owner と弁護士の領域として意図的に手を付けていない。")))

@@ -1,0 +1,391 @@
+(vector (map (:db/id -1)
+  (:adr/id 2799008132)
+  (:adr/title "cloud-itonami-isco-8132 — Photographic Products Machine Operators Plant Scheduling and Logistics Coordination Coverage")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-18")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/scope (vector "cloud-itonami/cloud-itonami-isco-8132" "kotoba-lang/occupation"))
+  (:adr/related (vector "2799008112-cloud-itonami-isco-8112-mineral-stone-processing-plant-operators-coverage"
+                "2799008131-cloud-itonami-isco-8131-chemical-products-plant-machine-operators-coverage"
+                "2799008114-cloud-itonami-isco-8114-cement-stone-mineral-products-machine-operators-coverage"))
+  (:adr/references (vector 2607121000))
+  (:actor/id :cloud-itonami-isco-8132)
+  (:actor/name "Photographic Products Plant Scheduling and Logistics Coordination Practice")
+  (:actor/isco-08 "8132")
+  (:actor/domain :manufacturing/photographic-products-plant-scheduling-logistics-coordination)
+  (:actor/governor "PhotoLabCoordGovernor")
+  (:actor/wave 3)
+  (:actor/robotics? true)
+  (:actor/coordination? true)
+  (:actor/proposal-ops (vector :log-work-record :schedule-crew-operation :flag-safety-concern :coordinate-supply-order))
+  (:actor/always-escalate-ops (vector :flag-safety-concern))
+  (:actor/hard-checks (vector :no-operator :no-plant :no-actuation :unknown-op :scope-excluded-action))
+  (:actor/scope-excluded-ops (vector :finalize-processing-operation-decision :authorize-processing-operation
+                              :proceed-with-processing-operation :declare-chemical-safety-cleared
+                              :finalize-chemical-safety-clearance :override-plant-safety-officer-judgment
+                              :override-safety-officer-judgment))
+  (:actor/scope-excluded-terms (vector "finalize the processing-operation decision" "finalize the processing operation decision"
+                                "proceed with the processing operation" "authorize the processing operation"
+                                "commence the processing operation"
+                                "declare the chemical safety cleared" "declare chemical safety cleared"
+                                "declare the chemical safety clearance" "finalize the chemical safety clearance"
+                                "override the plant safety officer's judgment"
+                                "override the safety officer's judgment"
+                                "override plant safety officer judgment"))
+  (:actor/cost-threshold-escalate-ops "{:coordinate-supply-order 2000}")
+  (:actor/confidence-floor 0.6)
+  (:operation/nodes (vector :intake :advise :govern :decide :request-approval :commit :hold))
+  (:operation/entry-point :intake)
+  (:phase/rollout "{0 {:label \"read-only\", :writes #{}, :auto #{}}, 1 {:label \"assisted-logging\", :writes #{:log-work-record}, :auto #{}}, 2 {:label \"assisted-coordination\", :writes #{:schedule-crew-operation :coordinate-supply-order :log-work-record}, :auto #{}}, 3 {:label \"supervised-auto\", :writes #{:flag-safety-concern :schedule-crew-operation :coordinate-supply-order :log-work-record}, :auto #{:schedule-crew-operation :coordinate-supply-order :log-work-record}}}")
+  (:registry/maturity :implemented)
+  (:registry/repo "https://github.com/cloud-itonami/cloud-itonami-isco-8132")
+  (:registry/business-id "cloud-itonami-isco-8132")
+  (:registry/required-technologies (vector :robotics :identity :audit-ledger))
+  (:registry/operating-states (vector :intake :propose :approve :execute :audit))
+  (:test/simulator :photolab.actor-test)
+  (:test/counts "{:total 23, :assertions 49, :failures 0, :errors 0}")
+  (:test/coverage (vector :governor-hard-checks :advisor-shapes :integration :store-contract
+                  :scope-exclusion-self-trip-regression :operator-verification :plant-verification
+                  :closed-op-allowlist :supply-cost-threshold-escalation :safety-concern-always-escalates))
+  (:adr/body "# ADR 2799008132: cloud-itonami ISCO-08 8132 Photographic Products Machine Operators plant scheduling/logistics coordination coverage
+
+## Status
+
+Accepted
+
+## Context
+
+This is part of the occupation-classification track (sibling to the
+`cloud-itonami-isic-*` industry-actor rollout, same governing
+ADR-2607121000): codify every ISCO-08 occupation unit group as an
+autonomous \"actor\" (LLM/advisor behind an independent Governor, a
+`langgraph.graph` StateGraph, append-only audit ledger), modeled on a
+robotics premise -- a robot performs the occupation's physical/
+administrative work, proposing actions to an independent Governor that
+gates them, never dispatches hardware itself, always escalates
+high-stakes decisions to a human. This ADR covers **ISCO-08 class 8132
+-- Photographic Products Machine Operators** only, Wave3
+(production/trades) of the rollout (Wave0/1/2 100% complete, Wave3
+batches 1-12 already landed: 72 occupations so far, the entire 75xx
+craft-trades range and initial 81xx mining/plant range complete).
+
+The `kotoba-lang/occupation` registry's live `{:id \"8132\" ...}` entry
+was verified against a fresh clone before any work began (`clojure -M
+-e \"(require 'kotoba.occupation) (println
+(kotoba.occupation/get-occupation \\\"8132\\\"))\"` from a checkout with
+the `kotoba-lang/technology` sibling present at the correct
+`../technology` relative path), and its `:name` read exactly
+\"Photographic Products Machine Operators\" -- confirming the premise,
+no mismatch. Prior to this ADR the entry's `:maturity` was `:spec`
+with `:required-technologies [:robotics :identity :audit-ledger]` and
+no `:repo`/`:business-id`; no repository existed at
+`cloud-itonami/cloud-itonami-isco-8132` (`gh api` 404 confirmed before
+scaffolding). This ADR and its companion registry edit promote the
+`8132` entry to `:implemented`.
+
+Photographic Products Machine Operators run film/photo-processing
+equipment using darkroom chemicals (developer, fixer, and historically
+some toxic silver-based/chromium compounds) -- a chemical-exposure
+hazard, plus an equipment hazard from rollers and processing
+machinery. The controlling constraint for this vertical is that the
+closed op allowlist must NEVER include any op that directly finalizes
+a processing-operation-execution decision or a chemical-safety-
+clearance decision, nor override a plant safety officer's judgment --
+those decisions must always be a hard permanent block, never
+auto-commit-eligible. This actor is deliberately scoped to PLANT
+SCHEDULING/LOGISTICS COORDINATION ONLY -- it never operates processing
+equipment or makes chemical-safety-clearance decisions itself.
+
+The reference implementation mirrored for module SHAPE and the
+closed-allowlist + independently-verified-provenance safety pattern is
+[`cloud-itonami/cloud-itonami-isco-8112`](https://github.com/cloud-itonami/cloud-itonami-isco-8112)
+(Mineral and Stone Processing Plant Operators: `store`/`advisor`/
+`governor`/`actor` split, `langgraph.graph` StateGraph, full doc set,
+an already-landed closely-related plant-operation safety pattern) --
+cloned and read in full in this session, independently re-tested
+(fresh clone, `clojure -M:test` re-run green: 23 tests / 49
+assertions, 0 failures / 0 errors, confirming its \"VERIFIED working\"
+status before mirroring).
+
+## Decision
+
+Publish `cloud-itonami/cloud-itonami-isco-8132` as an OSS plant
+scheduling/logistics-coordination actor for photographic products
+machine operators, following the SAME governed-actor architecture as
+every prior `cloud-itonami-isco-*` actor in this fleet: **Photographic
+Products Machine Operations Coordination Advisor ⊣
+PhotoLabCoordGovernor** on a `langgraph.graph` StateGraph
+(`io.github.kotoba-lang/langgraph`, git-sha-pinned identically to the
+reference's `deps.edn` -- a different library coordinate from the
+`langgraph-clj` used by the unrelated `20-actors/*` actor family),
+with an independent Governor, human-in-the-loop approval via
+`interrupt-before`, and an append-only audit ledger.
+
+This actor is deliberately **plant scheduling/logistics coordination
+ONLY, never direct processing-operation-execution or chemical-safety-
+clearance authority** -- it must NEVER be designed to exercise,
+simulate exercising, or propose exercising a processing-operation-
+execution decision, a chemical-safety-clearance decision, or any
+override of a plant safety officer's judgment. These are not merely
+gated behind escalation -- they are structurally absent from the
+op-allowlist entirely.
+
+### Closed proposal-op allowlist (all `:effect :propose`)
+
+- `:log-work-record` -- production-run/inventory/progress data
+  logging
+- `:schedule-crew-operation` -- crew/shift/task scheduling proposal
+- `:flag-safety-concern` -- surface a chemical-exposure/equipment-
+  condition concern, ALWAYS escalates, NEVER auto-commit eligible
+- `:coordinate-supply-order` -- darkroom-chemical/film-stock
+  procurement proposal
+
+This actor has **NO op, anywhere in its allowlist, that resembles** a
+processing-operation-execution decision or a chemical-safety-clearance
+decision, nor an override of a plant safety officer's judgment. These
+are **structurally absent from the op-allowlist entirely**, not merely
+gated behind escalation -- an op such as
+`:finalize-processing-operation-decision` cannot even be proposed by
+the reference mock advisor (its `infer`/`rationale-for` functions only
+ever emit one of the four allowlist ops), and if any code path (a
+forged proposal, a future LLM advisor, a misbehaving fork) ever
+produced such an op, the governor's closed-allowlist HARD check
+(`:unknown-op`) rejects it unconditionally and permanently. A second,
+independent HARD check (`:scope-excluded-action`) names seven
+concretely-forbidden ops (`photolab.governor/scope-excluded-ops`:
+`:finalize-processing-operation-decision`,
+`:authorize-processing-operation`,
+`:proceed-with-processing-operation`,
+`:declare-chemical-safety-cleared`,
+`:finalize-chemical-safety-clearance`,
+`:override-plant-safety-officer-judgment`,
+`:override-safety-officer-judgment`) as defense-in-depth, and is
+verified by dedicated unit tests
+(`photolab.governor-test/hard-on-scope-excluded-op-finalize-processing-operation-decision`,
+`.../hard-on-scope-excluded-op-authorize-processing-operation`,
+`.../hard-on-scope-excluded-op-proceed-with-processing-operation`,
+`.../hard-on-scope-excluded-op-declare-chemical-safety-cleared`,
+`.../hard-on-scope-excluded-op-override-plant-safety-officer-judgment`).
+
+### Four HARD governor checks (permanent, un-overridable)
+
+1. **Operator unregistered** -- any proposal must resolve to an
+   independently registered photo-processing equipment operator
+   record (`:no-operator`). Never trusts the proposal's own claim of
+   who the operator is.
+2. **Plant unregistered** -- any proposal must cite an independently
+   registered plant site (`:no-plant`). Together with check 1, this
+   directly implements the CRITICAL invariant that an operator/plant
+   record must be independently verified/registered before any
+   action.
+3. **Effect not `:propose`** -- any other `:effect` value is a HARD
+   block (a claim to directly actuate outside governance)
+   (`:no-actuation`).
+4. **Op not allowed / scope-excluded action** -- any `:op` outside the
+   closed four-op allowlist is a HARD, PERMANENT block (`:unknown-op`),
+   and independently, any proposal whose `:op` names one of the seven
+   concretely-forbidden ops above, OR whose free-text `:rationale`
+   names a finalization/execution action for a processing-operation-
+   execution decision, a chemical-safety-clearance decision, or an
+   override of a plant safety officer's judgment, is a second HARD,
+   PERMANENT block (`:scope-excluded-action`), evaluated
+   unconditionally on content -- defense-in-depth on top of the
+   allowlist check: even if a future change somehow widened the
+   allowlist, content-based rejection still independently blocks
+   processing-operation-execution/chemical-safety-clearance/safety-
+   officer-override language wherever it appears in free text.
+
+### One always-escalate (SOFT) gate, one threshold gate, plus the general confidence floor
+
+- `:flag-safety-concern` -- ALWAYS escalates to a human, regardless of
+  confidence (governor's implicit always-risky check). This is the
+  ONLY channel by which the robot may surface a chemical-exposure/
+  equipment-condition observation -- it never resolves the concern
+  itself, and the robot's role ends at \"here is the hazard data,\"
+  never \"here is what I recommend doing about plant safety.\"
+- a `:coordinate-supply-order` proposal whose `:cost` exceeds
+  `supply-cost-threshold` (2000, inclusive boundary verified by
+  `ok-supply-order-at-threshold-boundary`) -- always needs human
+  sign-off, independent of confidence. This is an ESCALATION, not a
+  hard block, per the task's explicit domain design: an over-threshold
+  darkroom-chemical/film-stock order is not itself unsafe, unlike a
+  processing-operation-execution or chemical-safety-clearance/safety-
+  officer-override attempt, which is why it is handled by a different
+  mechanism (soft escalate vs. structural absence).
+- (advisor confidence below `confidence-floor` 0.6 also escalates, for
+  any op.)
+
+### Self-trip guard (fleet-known bug class, carried over from the sibling ISIC/ISCO tracks)
+
+A governor's scope-exclusion term list phrased as a bare noun (e.g.
+\"developer\", \"fixer\", \"silver\") can accidentally match inside the mock
+advisor's own default rationale text for a legitimate proposal,
+self-blocking the actor's own happy path -- this is exactly the risk
+this vertical's own vocabulary (a plant coordination actor working
+adjacent to darkroom-chemical processing equipment necessarily
+discusses those concepts to do its scheduling/logging job) could
+trigger if phrased carelessly. `photolab.governor/scope-excluded-phrases`
+is phrased exclusively as finalization/execution ACTIONS (e.g.
+\"finalize the processing-operation decision\", \"declare the chemical
+safety cleared\", \"override the plant safety officer's judgment\" --
+matching the task's own worked example phrasing), never bare nouns,
+and
+`photolab.governor-test/default-mock-advisor-proposals-never-self-trip-on-scope-exclusion`
+is a dedicated regression test asserting every op in the closed
+allowlist, driven through the default mock advisor, never trips
+`:scope-excluded-action`. The mock advisor's own default rationale
+template was deliberately written to contain the bare nouns (\"logged
+work record for operator ...\", \"scheduled crew operation for
+developer/fixer processing-line shift ...\", \"... routed for plant
+safety officer review\") WITHOUT containing any of the full
+finalization-action phrases, so the regression test is a genuine
+stress test of the bare-noun-vs-action-phrase distinction, not a
+vacuous pass. Green on first run in this session -- the
+scope-exclusion self-trip guard itself was never tripped during
+development.
+`photolab.actor-test/holds-a-scope-excluded-op-even-at-high-confidence`
+additionally exercises the same invariant through the full graph run,
+confirming a scope-excluded proposal never reaches `commit-record!`
+regardless of disposition path.
+
+## Consequences
+
+- `kotoba-lang/occupation` registry's `{:id \"8132\" ...}` entry
+  promoted from `:spec` to `:implemented`, with `:repo`/`:business-id`
+  set to the real repository
+  (`https://github.com/cloud-itonami/cloud-itonami-isco-8132` /
+  `cloud-itonami-isco-8132`), and `maturity-summary`'s implemented
+  count bumped accordingly (recomputed live from the registry via
+  `kotoba.occupation/maturity-summary`, not assumed, immediately
+  before the edit).
+- Full test suite (`clojure -M:test`): 23 tests, 49 assertions, 0
+  failures, 0 errors -- raw output captured in this ADR's
+  `:test/counts` and in the task report, independently re-verified
+  against a brand-new fresh clone of the pushed repository (not just
+  the local working copy).
+- `clj-kondo` lint (`clojure -M:lint` -- this actor's `deps.edn`
+  defines a `:lint` alias, matching the `cloud-itonami-isco-8131`
+  sibling's more current `deps.edn` pattern rather than the slightly
+  older `cloud-itonami-isco-8112` reference, which lacks one): 0
+  errors, 0 warnings in the final pushed commit (one pre-existing
+  unused-binding warning in `photolab.advisor`'s `infer` was found and
+  fixed during this session by dropping an unused `:as request`
+  destructure binding -- a trivial no-behavior-change cleanup, tests
+  re-confirmed green after the fix, before push).
+- No `manifest/west.yml` changes -- this actor is registered purely via
+  the `kotoba-lang/occupation` capability registry, consistent with
+  sibling `cloud-itonami-isco-*`/`cloud-itonami-isic-*` actors.
+- No `kotoba-lang/technology` dependency was added to the actor's
+  `deps.edn` -- only the central `kotoba-lang/occupation` registry
+  itself depends on it, to resolve `:required-technologies` stacks.
+- This ADR is EDN-only, matching the live `90-docs/adr` convention
+  (commit `6d2d0eeda658`, \"Remove all .md, normalize ADRs to
+  tx-data\") -- a single-entity EDN vector with an `:adr/body` string
+  blob rather than a paired `.md`+`.edn`.
+
+## Alternatives considered
+
+- Giving the actor an op like `:approve-processing-operation` or
+  `:approve-chemical-safety-clearance` that is merely gated behind an
+  always-escalate list: rejected outright per the task's explicit
+  domain-design guidance and prior `cloud-itonami-isco-*` precedent
+  (e.g. `cloud-itonami-isco-8112`) -- an always-escalate op still
+  means the *capability* to finalize a processing-operation-execution
+  decision or a chemical-safety-clearance decision exists in the code
+  path and is merely deferred to a human gate. For a decision this
+  severe (chemical-exposure hazard, equipment hazard from
+  rollers/processing machinery), the capability itself must not exist.
+  The only op related to plant-safety escalation is
+  `:flag-safety-concern`, which surfaces the need for human/plant-
+  safety-officer attention and never itself decides, authorizes, or
+  defers a processing-operation or chemical-safety-clearance decision
+  for later automatic execution.
+- Making the supply-cost ceiling a HARD block: rejected per the task's
+  explicit domain design -- an over-threshold darkroom-chemical/
+  film-stock order is not itself unsafe, so it is handled as a soft
+  escalate gate, not a hard block; only the processing-operation-
+  execution/chemical-safety-clearance/safety-officer-override class is
+  a hard, unconditional block.
+- A bare-noun scope-exclusion term list (e.g. `[\"developer\" \"fixer\"
+  \"silver\"]`): rejected outright per the fleet-known self-trip bug
+  class described above, and per CLAUDE.md's own worked example for
+  this exact task, which explicitly warns against exactly this pattern
+  -- phrase scope-exclusion terms as finalization/execution ACTIONS
+  (\"finalize the processing operation\", \"declare the plant safety
+  cleared\", \"override the plant safety officer's judgment\"), never
+  bare nouns (\"developer\", \"fixer\", \"silver\"). This actor's own domain
+  necessarily discusses developer/fixer/silver concepts to do its
+  scheduling/logging job, so a bare-noun list would risk self-blocking
+  the actor's own legitimate proposals (regression-tested directly
+  against rationale text that deliberately contains those bare nouns).
+- Collapsing the processing-operation-execution exclusion and the
+  chemical-safety-clearance exclusion into a single generic
+  \"operational-decision\" exclusion category: rejected -- the task's
+  domain design names these as two textually distinct forbidden
+  decision classes (\"finalize the processing-operation decision\" vs.
+  \"declare the chemical safety cleared\"), so this ADR keeps them as
+  separate concretely-named ops and separate scope-excluded phrase
+  entries (with dedicated tests for each) rather than merging them,
+  matching the task's explicit worked phrasing examples verbatim.
+- Merging `operator` and `plant` into a single entity (only checking
+  one provenance record): rejected -- the two-entity provenance shape
+  (independently-registered operator AND independently-registered
+  plant) matches the CRITICAL invariant that an \"operator/plant record
+  must be independently verified/registered before any action\" and
+  the established pattern from prior `cloud-itonami-isco-*` actors
+  with two-sided provenance checks.
+
+## Itemized safety confirmation
+
+Every op in this actor's closed proposal-op allowlist, and why it is
+safe under the constraints above:
+
+1. **`:log-work-record`** -- production-run/inventory/progress data
+   logging only. Requires an independently registered operator AND
+   plant (`:no-operator`/`:no-plant`). Not a processing-operation-
+   execution or chemical-safety-clearance decision in any respect --
+   it is a records-management action.
+2. **`:schedule-crew-operation`** -- crew/shift/task scheduling
+   proposal only. Cannot carry a processing-operation-execution
+   decision (structurally absent from the op's field shape; any such
+   attempt via free text is caught by the `:scope-excluded-action`
+   content check). Does not authorize, finalize, or draw any
+   conclusion about a specific processing operation -- it is a
+   calendar/logistics action.
+3. **`:flag-safety-concern`** -- surfaces a chemical-exposure/
+   equipment-condition concern to a human/plant safety officer; ALWAYS
+   escalates, unconditionally, at every confidence level, NEVER
+   auto-commit eligible. This is the ONLY channel through which a
+   safety observation may be surfaced, and it explicitly never
+   resolves, decides, or acts on anything itself, nor does it ever
+   declare a chemical safety clearance -- the plant safety officer
+   reviews and acts entirely on their own authority.
+4. **`:coordinate-supply-order`** -- darkroom-chemical/film-stock
+   procurement proposal only (item, cost). Not a processing-operation-
+   execution or chemical-safety-clearance decision of any kind -- it
+   is a purchasing-logistics action, gated by ordinary cost-ceiling
+   escalation (above 2000 always escalates).
+
+No op in this allowlist, and no op anywhere in this codebase, resembles
+directly finalizing a processing-operation-execution decision or a
+chemical-safety-clearance decision, nor overriding a plant safety
+officer's judgment -- these categories are structurally absent, not
+gated, confirmed by: (a) the closed four-op allowlist itself
+(`photolab.governor/allowed-ops`), (b) seven concretely-named
+forbidden-op fixtures rejected at the governor-unit level
+(`photolab.governor/scope-excluded-ops`,
+`photolab.governor-test/hard-on-scope-excluded-op-finalize-processing-operation-decision`,
+`.../hard-on-scope-excluded-op-authorize-processing-operation`,
+`.../hard-on-scope-excluded-op-proceed-with-processing-operation`,
+`.../hard-on-scope-excluded-op-declare-chemical-safety-cleared`,
+`.../hard-on-scope-excluded-op-override-plant-safety-officer-judgment`),
+and (c) a content-based scope-exclusion check independent of the `:op`
+field (`photolab.governor/scope-excluded-phrases`,
+`.../contains-excluded-phrase?`), tested directly against a rationale
+that attempts to finalize a processing-operation decision, declare the
+chemical safety cleared, or override a plant safety officer's judgment
+even via an otherwise-allowlisted op
+(`photolab.governor-test/hard-on-scope-excluded-rationale-even-with-allowlisted-op`,
+`.../hard-on-scope-excluded-rationale-override-plant-safety-officer`,
+`.../hard-on-scope-excluded-rationale-declare-chemical-safety-cleared`).")))

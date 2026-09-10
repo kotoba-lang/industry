@@ -1,0 +1,251 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608160200")
+  (:adr/title "State / Transaction / Capability / CausalLink / Effect — kotoba stack の 5 つの canonical IR と、実行そのものを addressed にすること")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-16")
+  (:adr/last-verified "2026-08-16")
+  (:adr/last_verified "2026-08-16")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-stack-canonical-irs")
+  (:adr/related
+  (vector "ADR-2608160100"
+   "ADR-2608139980"
+   "ADR-2607279200"
+   "ADR-2608039970"
+   "ADR-2608039700"
+   "ADR-2608038000"
+   "ADR-2607241100"))
+  (:adr/authoritative-for
+  (vector "kotoba stack が共有する 5 つの canonical IR とその所有者"
+   "Execution を値として addressed にすること、および memo 化してよい条件"
+   "capability receipt は行ではなく値であること"
+   "causality は principal ごとの署名付き DAG であり、単一 chain でも global consensus でもないこと"
+   "5 つの IR はすべて ADR-2608160100 の物理層に載る（第二の artifact store を作らない）"))
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/body "## Context
+
+ADR-2608160100 が物理層（block / pack / object）を決めた。**その上に何を置くかは
+まだ 1 箇所に書かれていない。** stack の語彙は既に揃っている——
+
+```text
+kotoba     言葉        言語
+amu        編む        compile + project link
+綾          あや        amu の backend（存在名を持たない）
+kototama   言霊        run + runtime link
+aiueos     あいうえお   grant + provider
+murakumo   叢雲        placement（grant しない）
+inga       因果        合意が要るときの ref
+kotobase                datom 面の永続と query
+```
+
+（ADR-2608139980。**この ADR は改名を再開しない** —— 綾 は backend の面の説明語で
+あって製品名にしない、という決定はそのまま。）
+
+欠けているのは名前ではなく、**その全員が同じ 5 つの値で話しているという宣言**である。
+実測 2026-08-16、5 つのうち 4 つは既に実在するが別々の形をしていて、1 つは
+半分しか無い。
+
+## Decision
+
+### 1. canonical IR は 5 つ。それ以外は組み合わせ
+
+| IR | 何を固定するか | 今日の所有者 | 現在地（実測） |
+|---|---|---|---|
+| **State** | ある時点のデータベース値 | `arrangement` + `chain` | **在る**。4 covering index root + commit |
+| **Transaction** | state を動かす 1 単位 | `kotobase` / `chain` | **在る**。ただし authority と causes を持たない |
+| **Capability** | 何をしてよいか | `aiueos` / `lang/capability-semantics.edn` | **在る**。`:cap/kind` `:cap/resource` `:cap/holder` `:cap/expires` `:cap/provenance` |
+| **CausalLink** | なぜそれが起きたか | `chain` | **半分**。親は `prev` 1 本、logical clock 無し |
+| **Effect** | 外界に何が起きたか | `kototama` | **半分**。receipt の要件はあるが値になっていない |
+
+そして 6 つ目、これらを束ねる **Execution**。
+
+```text
+Execution = {program, input, state, runtime, policy, effects} → CID
+```
+
+### 2. 5 つはすべて IPLD 値であり、ADR-2608160100 の物理層に載る
+
+**第二の artifact store を作らない。** amu が織った反物（`:kotoba.output-set/v1`
+マーカーと `:kotoba.provenance/v1` sidecar）、kototama の receipt、kotobase の
+state と transaction は、**同じ object 面の同じ CAR pack** に入る。artifact の
+identity は artifact の CID のままで、pack はそれを変えない。
+
+これは技術的な倹約ではなく、query 面の問題である —— 別の store に置いた
+ものは join できない（ADR-260726 の ref 1 本規則）。「この artifact を実行した
+receipt はどれか」は、artifact と receipt が同じ面に居るときだけ答えられる。
+
+### 3. Transaction は authority と causes を持つ
+
+今日の commit は `{root, index_roots, prev, seq}` で、**誰の権限で書かれたかを
+持っていない**。足す:
+
+```clojure
+{:tx/base-state    <state CID>
+ :tx/program       <program CID>
+ :tx/input         <input CID>
+ :tx/authority     <capability CID>     ; どの grant がこの書き込みを許したか
+ :tx/causes        [<CID> ...]          ; prev だけでなく、原因になった値すべて
+ :tx/logical-time  {...}
+ :tx/actor         <principal>
+ :tx/signature     ...}
+```
+
+`:tx/authority` が無いと、**監査は「誰が書いたか」までしか遡れず「なぜ書けたか」に
+届かない**。capability-semantics.edn は既に
+`:attempt-always-receipted true` と書いている —— その receipt を transaction が
+指せるようにする、というだけの変更である。
+
+### 4. Capability の core IR は名前付き scope。UCAN / CACAO / OCapN は adapter
+
+正本は `kotoba-lang/kotoba-lang` の `lang/capability-semantics.edn`
+（`:identity-keys` / `:grant-keys` / `:policy-keys` / `:rules`）。
+**UCAN を core semantics にしない。** 外部との相互運用は境界の adapter で行い、
+`org-chainagnostic-cacao` などの mirror repo がその面を持つ。
+
+理由は既に決まっている: **数値 capability ID は wire ABI であって source 語彙では
+ない**（ADR-2607279200）。同じ規律を identity 面にも当てる —— UCAN の JWT 形も、
+CACAO の chain 形も wire であって、core が話す語ではない。
+
+**VC と capability を混ぜない。** `この人は医師です` は claim（`org-w3-vc`）、
+`このレコードを読んでよい` は capability。policy が前者から後者を導くのであって、
+前者が後者ではない。
+
+### 5. Effect は行ではなく値にする
+
+**現在地**: `kototama.linear-journal` は `Durable at-most-once capability
+consumption journal` で、EDN を 1 行ずつ追記するファイルである。at-most-once の
+安全性は本物で、**捨てない**。足りないのは 2 つ:
+
+- receipt が **content-addressed でない** —— CID で引用できない
+- journal が **chain でない** —— 追記順以外の因果を持たない
+
+決定: receipt を IPLD 値にし、journal を parent-linked chain にする。
+`:receipt/cap` `:receipt/at` `:receipt/call` `:receipt/outcome` という既存の
+requirement はそのまま field になる。at-most-once の判定は今までどおり journal が
+持つ（CID にしたからといって重複実行が防げるわけではない —— **content addressing は
+冪等性ではない**）。
+
+### 6. Execution CID を memo key にしてよい条件
+
+vision の `Execution CID → cache lookup → Result CID` は正しいが、**無条件では
+ない**。memo 化してよいのは:
+
+- **effect set が空**（純粋）、または
+- **effect log が完全に記録されていて replay できる**（外部応答・clock・乱数の
+  値が receipt に入っている）
+
+そのどちらでもない execution の CID は **receipt であって cache key ではない**。
+この区別を落とすと、`同じ program に同じ input を与えたのだから同じ結果のはず`
+という理由で、**外界が変わったことを見ない cache** ができる。
+
+amu 側には既に build の同型物が在る —— `:kotoba.output-set/v1` は artifact +
+provenance + マーカーを 1 つの sealed な集合にし、`amu sign-output-set` が
+Ed25519 で署名し、検証は attestation・trust policy・revocation・validity
+interval まで見て初めて `:publisher-authenticated true` を返す。**この規律を
+build から run へ広げる**のがこの決定であって、新しい仕組みを発明するのではない。
+
+### 7. Causality は principal ごとの署名付き DAG。global consensus を既定にしない
+
+`chain` は `prev` 1 本の線である。一般化して、**principal ごとに 1 本の署名付き
+causal DAG**（複数親、logical clock 付き）にする。Holochain の source-chain の
+発想は参考にするが、単一 chain には畳まない。
+
+**合意が本当に必要な経路だけ inga に接続する**（ADR-2608038000）。
+2f+1 の quorum 証明書それ自体が条件付き書き込みなので、そこにだけ agreement が
+入る。**それ以外の場所に consensus を置かない** —— 置けば、置いた分だけ
+分散型経路が単一の裁定者に依存する（ADR-2608039000 が D1 について言ったのと
+同じ形の誤り）。
+
+consistency は object ごとに選ぶ（`:eventual` / `:causal` / `:serializable`）。
+**全部を strong にしない。**
+
+### 8. 綾（backend）は権限を持たない
+
+`kotoba-wasm` / `kotoba-native` / `kotoba-script` / `kotoba-component` は amu が
+織る柄であって、**自分で artifact identity を定義しない・自分の物理層を持たない・
+自分で grant しない**。backend ごとに違うのは lowering だけで、
+State / Transaction / Capability / CausalLink / Effect の形は全 backend で同一である。
+
+これは既存の qualification 表（`:reference` / `:wasm-aot` / `:native-aot` / `:jit`）と
+両立する: **ある backend でまだ動かないことは、その backend が別の IR を持つ
+理由にならない**（ADR-2608650000 の「恒久と一時を混ぜない」と同じ規律）。
+
+## Consequences
+
+- 監査の到達範囲が変わる。今日は `どの commit がどの値を書いたか` まで。この決定の
+  後は `どの grant がそれを許し、どの実行が起こし、その実行が外界に何をしたか` まで
+  1 つの面で辿れる。
+- **cache が減る場面がある。** effect log を持たない execution は memo できなく
+  なる。これは損失ではなく、今まで測っていなかったものを測るようになるということ。
+- receipt が値になると **保存量が増える**。1 receipt あたりの block は小さいので、
+  ADR-2608160100 の pack が効く場所そのものになる（40 byte/block の index cost が
+  効いてくるのはここ）。
+
+## この ADR が決めないこと
+
+- **query / compute backend**（Substrait / Pregel / actor / differential dataflow）。
+  ADR-2608039970 が既に `Datalog は必須 IR ではない` と決めており、backend を足すのは
+  別の、証拠付きの決定である。**この ADR を根拠に Pregel repo や Substrait repo を
+  起こさない。**
+- **改名**。ADR-2608139980 の名前決定はそのまま。
+- **global consensus の採用**。inga に繋ぐ経路の選定は個別に行う。
+
+## いま着地したもの / まだのもの
+
+**着地**（2026-08-16）:
+
+| 一手 | どこに | 実際に landed したもの |
+|---|---|---|
+| receipt を値にする | `kototama` `linear-journal` | 各行が自分のバイト列の **raw CIDv1** で addressed。`entry-cid` / `canonical-line` はファイルだけから再計算できる |
+| journal を parent-linked chain に | 同上 | `:prev` + `verify-chain`。改竄・削除が**どこで**壊れたか言う。`:prev` の無い旧 journal は *unchained prefix* として報告し、腐敗とは呼ばない（呼べば既存の全 journal で検査が無意味になる）。ただし chained entry から `:prev` を剥がすのは legacy として受理しない —— その抜け道が偽造経路になる |
+| Execution 値と memo 可否 | `kototama` `execution` | `execution-cid` は常に答え（memo できない実行も引用できる）、`memo-key` は replay 可能なときだけ CID を返す。**2 関数に分けたのはフラグが無視できるから** |
+| `:tx/authority` `:tx/causes` | `chain` | `causes` は他 principal の系列からの**親**。`authority` が無いと監査は「誰が」で止まり「なぜ許されたか」に届かない |
+| principal ごとの causal DAG | `chain` | `walk-causal` / `verify-causal`。`lamport` は親の `1 + max` として**導出**し caller から受け取らない —— 時計が辺と食い違えない |
+
+**at-most-once は 1 ミリも動いていない。** content addressing は冪等性ではない ——
+CID は二重実行を止めず、file lock と fsync と count が止める。journal の既存テスト
+（budget 3 に対して 32 並行 claim → ちょうど 3）は**無改変で通る**。
+
+**既存 commit の identity も動いていない。** `chain` の追加フィールドは渡された
+ときだけ書かれ、変更前の実装から採った 2 つの CID をテストに固定してある。既存 8
+テストは無改変で通る。
+
+**replay 可能とは何か**（`memo-key` が nil を返さない条件）:
+**source**（clock / 乱数 / ネットワーク読み）は**値**が記録されていること ——
+`:outcome :ok` は「呼んだ」と言っているだけで「何が返ったか」を言っておらず、
+`:ok` に対して replay すれば答えを捏造する。**sink** は outcome。そして
+**分類されていない effect kind は memo を拒否**する（`capability-semantics.edn` の
+`:unknown-kind :deny` をここに当てたもの —— 見慣れない effect が「見慣れないことに
+よって」cacheable になってはならない）。
+
+**未着地**:
+
+| 次の一手 | 置き場所 |
+|---|---|
+| ~~receipt の 4 field~~ | **着地（2026-08-16）**。claim は provider 実行の*前*に書かれる（それが at-most-once であって exactly-once でない理由）ので、outcome は必然的に 2 つ目の entry。source 用の `:receipt/value` も載る —— `kototama.execution` が cache key を許す条件がまさにそれ。`:attempt-always-receipted` は `unreceipted`（outcome の無い消費を答える）で**検査可能**になった —— claim と provider 復帰の間の crash はそこに出る |
+| receipt を dag-cbor にする（generic tooling が field を読めるように）。CBOR 依存を zero-dep の repo に持ち込むので**読み手が現れてから払う** | `kototama` |
+| 署名。`chain` は `authority` の shape しか検証しない（grant の正当性判断は aiueos） | `aiueos` 境界 |
+| UCAN / CACAO adapter を core から adapter 面へ寄せる | 境界 repo |
+
+**どれも `.kotoba` の決定核として書けるかを先に見る**（ADR-2608650000）。
+receipt の妥当性判定・memo 可否・scope の交差はスカラと record で表せる判断で、
+コレクションの組み立てと effect は `.cljc` に残る —— `murakumo` の
+`kotoba/*_core.kotoba` 33 本が先例。
+
+## Alternatives
+
+- **IR を 12 個にする**（Value / Type / CID / Principal / Reference / Capability /
+  Object / Message / State / Transaction / Effect / CausalLink / Computation）。
+  そのうち Value / Type / CID / Principal / Reference は**既に言語と io-ipld と
+  multiformats が持っている**ので、canonical IR として重ねて定義すると正本が
+  2 つになる。5 + Execution は「まだ 1 箇所に無いもの」だけを数えた結果である。
+- **Effect を capability に畳む。** grant と、その grant が実際に使われた記録は
+  別の値である。畳むと `許されていたが使わなかった` と `使った` が区別できない。
+- **Execution を kotobase の transaction に畳む。** 実行は state を変えないものが
+  多数あり（query、生成、検証）、それらを transaction にすると台帳が実行ログに
+  なる。")))

@@ -1,0 +1,107 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608261125")
+  (:adr/title "Drive は保存先の手前で client-side encryption し、macOS File Provider で同期頻度と実体保持を分離する")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-26")
+  (:adr/last-verified "2026-08-26")
+  (:adr/last_verified "2026-08-26")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "drive-client-encryption-file-provider")
+  (:adr/related (vector "ADR-2608171200" "adr-2608012600-kotobase-large-object-plane-lfs-and-annex"))
+  (:adr/repos (vector "orgs/kotoba-lang/envelope"
+              "orgs/kotoba-lang/com-apple-fileprovider"
+              "orgs/cloud-itonami/cloud-itonami-app"))
+  (:adr/body
+  "# 文脈
+
+Drive のバイトを Kotobase、Storj、filesystem その他の object store に置く時、TLS や
+provider-side encryption だけでは、保存先が平文を読める。必要なのは、**保存先 adapter を
+呼ぶ前に client が暗号化し、保存先には ciphertext だけを渡す境界**である。
+
+また『常に同期するか』と『ローカルに実体を保持するか』は別の判断である。前者は変更を
+送受信する時期、後者は placeholder を materialize / evict する方針であり、一つの boolean
+に潰すと Google Drive 型の online-only と Dropbox 型の常時実体同期を共存できない。
+
+ADR-2608171200 は 2026-08-17 時点で File Provider を未実装とし、Swift extension の
+例外 ADR を着手条件にしていた。本 ADR はその例外を認め、実装・署名・実機検証の正本を
+更新する。NFS 面は互換経路として残すが、placeholder、同期バッジ、CloudStorage domain の
+正経路は File Provider とする。
+
+# 決定
+
+1. 暗号 envelope と同期状態モデルは `kotoba-lang` が自前実装する。暗号 wire は
+   `kotoba-lang/envelope`、macOS の portable な mode / item / HTTP contract は
+   `kotoba-lang/com-apple-fileprovider` に置く。Cloud Itonami app は統合と policy を担う。
+   Apple framework を呼ぶ最小の Swift shim だけは platform 境界として許す。
+2. 内容は保存先選択より前に AES-256-GCM で暗号化する。受取人ごとの X25519 + HKDF wrap は
+   content key だけを包み、共有の追加・削除で内容 ciphertext を再 upload しない。
+   logical content ETag は envelope 変更と分離する。
+3. principal 共有は受取人 public key への key wrap を追加する。URL 共有は秘密を URL fragment
+   に置き、server、package、永続 state に fragment secret を渡さない。transport TLS は必要だが、
+   client-side encryption の代替ではない。
+4. 失効は current package から recipient wrap を外す。これは以後の正規取得を止めるが、
+   過去に復号済みのコピーや object-store history を忘れさせない。強い失効が必要なら content key
+   を rotation し、内容を再暗号化する。この限界を UI/API から隠さない。
+5. schedule と residency は直積として独立に持つ。
+
+   | 軸 | 値 | 意味 |
+   |---|---|---|
+   | schedule | continuous / manual / paused | 常時 polling / 明示同期のみ / 停止 |
+   | residency | online-only / automatic / pinned | 遅延取得 / OS 判断 / 常時実体保持 |
+
+   従来の普通の folder sync は placeholder を持たないため pinned のみを受け付ける。
+6. File Provider extension は localhost の authenticated API だけを読み書きする。
+   `/v1/file-provider/items` 以下に enumerate、create、modify、upload、materialize、delete、mode
+   を置き、extension に Kotobase credential や保存先 credential を持たせない。
+7. private X25519 key は principal ごとに app data directory の mode 0600 file として atomic に
+   書く。既知 path の狙い撃ち読みだけを行い、秘密や URL fragment を log / state に出さない。
+
+# 実装・観測証跡
+
+- `kotoba-lang/envelope` main `3b31e3f4c1414ffd4406168ef449e4b8fc573397`
+  （PR #2）。JVM 13 tests / 49 assertions、npm 40 / 111。JVM JCA と browser WebCrypto が
+  同じ固定 wire vector を開ける。
+- `kotoba-lang/com-apple-fileprovider` main
+  `25b10f4d6c3cc041da7ca99aa1a0f1535d3f4758`（PR #1, #2）。Swift 3 tests が緑で、
+  host + embedded File Provider extension の unsigned build が成功した。residency は
+  `downloadLazily` / `inherited` / `downloadEagerlyAndKeepDownloaded` に対応する。
+- `cloud-itonami/cloud-itonami-app` main
+  `9c71bd26f1f46310bcfd40359e2495d4bec6b77d`（PR #182, #183, #184）。focused suite は
+  342 tests / 1370 assertions、失敗 0。HTTP の create → upload → materialize → mode 往復と、
+  remote JSON の unsigned byte 正規化を通した。実データで encrypted envelope の 813 bytes を
+  Finder の file size として返す欠陥を見つけ、logical plaintext size を分離した follow-up は
+  1 test / 13 assertions、clj-kondo とも緑。
+- app bundle は Kotobase に CID
+  `bafkreigce6ews2du2pb3hccoxgirrsdaxdmb4npgt7t72ux5qxmt3o5lpu` として publish し、
+  PUT 201 / GET 200 / byte-identical を観測した。graph CID は
+  `bafyreiahqbzxiou7j7y7pj74ctnxt4lcy2spp7xkxdevhhuudy5d43u5gy`、PUT 201 / GET 200。
+- link wrap の live probe は one-time secret を `url-fragment` placement で返し、state と package
+  のどちらにも secret が無いことを確認した。wrap を 1→3 に増やしても ciphertext chunk は
+  byte-identical。テスト link 2 本を失効し、current link 0 と rotation-required を観測した。
+  UI は fragment grant を sessionStorage のみに置き、hash fragment 付き URL を表示する。
+- superproject main `8ba79fc05482285d9175489e2d0a71b18b20151f` で Cloud app pin を
+  `9c71bd2...` へ server-verified fast-forward し、他 2 repo と合わせて 3 HEAD が一致した。
+- resident は immutable release `~/.cloud-itonami/releases/9c71bd2...` から起動し、`/health`
+  200。`Finder E2EE検証 2026-08-26/client-encrypted-check.txt` を作成し、67-byte upload と
+  materialize の SHA-256 が一致した。schedule/residency は一度 paused/online-only を観測後、
+  manual/pinned に戻した。保存 object は 813 bytes、package v1 / AES-256-GCM / X25519 /
+  HKDF-SHA256 / recipient wrap 1 / ciphertext chunk 1 で、既知の plaintext 文字列は存在しない。
+- ad-hoc signed host と embedded extension は `codesign --verify --deep --strict` を通り、extension
+  と domain 登録まで成功した。ただし File Provider daemon は `user-disabled` を返し、
+  `~/Library/CloudStorage` への projection はまだ無い。development provisioning は Xcode に保存済みの
+  account 再ログイン拒否と profile 不在で失敗したため、Finder 実体往復は OS の拡張許可後の gate。
+
+# 帰結と残る境界
+
+- Kotobase / Storj / filesystem の違いは ciphertext の置き場所の違いになり、provider を
+  信頼して平文を預ける設計ではなくなった。metadata（名前、サイズ、時刻、共有関係）の秘匿は
+  別課題であり、内容暗号化だけから匿名性を主張しない。
+- 圧縮や chunking は AEAD より前に行う。暗号化後の圧縮を保存量対策として採らない。
+- signed host の install、File Provider domain 登録、Finder 上の test folder 往復は source/build
+  完了とは別の実機 gate とし、観測できるまで『Finder で利用可能』とは報告しない。
+- 既に復号した受取人、端末 backup、provider version history まで cryptographic erase できるとは
+  主張しない。")))

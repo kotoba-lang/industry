@@ -1,0 +1,195 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607300100-dead-gftd-host-prune-and-ipfs-kotobase-standup")
+  (:adr/doc_type "adr")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "infra-hostname-retirement")
+  (:adr/last_verified "2026-07-30")
+  (:adr/related (vector "2607072000-gftdcojp-net-kotobase-ipfs-gateway-split"))
+  (:adr/title "ADR-2607300100: retiring the dead gftd.ai hosts, and standing up ipfs.kotobase.net")
+  (:adr/body "# ADR-2607300100: retiring the dead gftd.ai hosts, and standing up ipfs.kotobase.net
+
+**Status**: accepted (all work landed on default branches; two deploys live)
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki (owner directive), agent execution
+
+## Context
+
+Six gftd.ai hostnames were confirmed dead and directed for pruning
+(owner, 2026-07-29): `gateway.gftd.ai`, `mcp.gftd.ai`, `atproto.gftd.ai`,
+`dispatcher.gftd.ai`, `ipfs.gftd.ai`, `llm.murakumo.gftd.ai`. The directive
+distinguished two kinds of reference: (a) docs and code presenting a dead host
+as current procedure, which get fixed, and (b) historical records, which stay.
+
+Two findings reshaped the work partway through.
+
+**The successor does not replace what the old PDS did.** `atproto.gftd.ai`
+moved to `aozora.app`, but `pds.aozora.app` is a fresh, empty atproto PDS:
+`com.atproto.sync.listRepos` returns `[]`, and every gftd lexicon —
+`ai.gftd.apps.llm.chatCompletions`, `ai.gftd.agent.converse`,
+`ai.gftd.cohort.seed` — answers 404 MethodNotImplemented. The old PDS was also
+an LLM gateway and a custom-lexicon host; the successor is only a PDS.
+Repointing those callers would have replaced a dead host with a live 404.
+
+**One repo owned the hostnames rather than consuming them.** A first pass
+generated 155 rewrites in `ai-gftd-apps-gftdcojp` before `wrangler.jsonc`
+showed `\"routes\": [\"atproto.gftd.ai/*\", \"mcp.gftd.ai/*\"]` on Worker
+`ai-gftd-pds-2603241700`. Its hostname strings are the server naming itself
+(`isPds = hostname === \"atproto.gftd.ai\"`, the advertised `hosts:` in
+`repo.ts`), so pointing them at a successor is meaningless and, in the routing
+predicate, wrong. All 155 were reverted.
+
+## Decision
+
+**Retire rather than repoint, and repoint only where a successor genuinely
+serves the same thing.** Concretely:
+
+- `atproto.gftd.ai` / `mcp.gftd.ai` — the Worker was already gone from the
+  account (`wrangler deployments list` returns code 10007). Only the routes
+  were removed, so a redeploy cannot reclaim the names. The Cloudflare route
+  outliving the Worker is why these hostnames resolved in DNS and answered
+  530/000.
+- LLM callers — routed to `api.murakumo.cloud/v1/chat/completions` directly,
+  fulfilling the standing \"murakumo should use murakumo.cloud\" directive. The
+  reason it had not happened was that the LLM gateway was reached *through*
+  the dead PDS. The PDS hop existed only to dodge CF WAF 1033 on same-account
+  subrequests to `llm.gftd.ai`; `api.murakumo.cloud` is off that zone, so the
+  reason is gone.
+- `ipfs.gftd.ai` — a real successor was built: `ipfs.kotobase.net`.
+- Everything with no successor — made honest (503/404/omitted field) rather
+  than pointed somewhere plausible.
+
+**`ipfs.gftd.ai` was deliberately not re-bound to the new Worker**, though
+both MIGRATION.md Phase 3 and ADR-2607072000 listed it as a route alongside
+`ipfs.kotobase.net`. Aiming a retired hostname at a live Worker would undo the
+directive that retired it.
+
+## What landed
+
+| repo | commit | change |
+|---|---|---|
+| gftdcojp/ai-gftd-apps-gftdcojp | 83578ea | removed the two routes; Worker retired |
+| gftdcojp/magatama-host-sdk | 34e7e1e | LLM path to api.murakumo.cloud; DID doc stops advertising a dead PDS; xrpc-client origin configurable |
+| cloud-itonami/yukkuri | e5e9222 | CLAUDE.md's \"DEFAULT\" LLM path corrected |
+| cloud-itonami/syosetsuka | d4c3227 | unreachable hops marked in the architecture flow |
+| gftdcojp/chat-shell | 38607fb, d88a872 | dead backends split out of the manifest; dead MCP router default dropped |
+| etzhayyim/com-etzhayyim-app-ai-gftd-chat-shell | 5bc0aa7, 8d9adab | same, byte-identical copies |
+| gftdcojp/hume | 950d271 | removed a gatewayUrl that could never have fetched |
+| etzhayyim/root | aa0a510, 04873c4 | pin-receipt gateway: emptied, then set to ipfs.kotobase.net once it existed |
+| network-awai/net-kotobase-ipfs | cba68cf | ipfs.kotobase.net stood up |
+| network-awai/net-kotobase | 58eb361 | published retrieval docs corrected + bundles rebuilt |
+| com-junkawasaki/root | 5c697a5 | ADR-2607072000 moved to live |
+
+Deploys: `net-kotobase-ipfs` version bd9548ab (new), `net-kotobase` version
+4f121668 (redeploy so the corrected llms.txt actually ships — those files are
+compile-time inlined via shadow.resource rc/inline).
+
+## ipfs.kotobase.net
+
+Live, verified: `/health` 200; `/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG`
+200 with 254,355 bytes in 0.15s, byte-identical to ipfs.io and kotobase.net;
+`/ipns/en.wikipedia-on-ipfs.org` 200; `/ipfs/not-a-cid` 502.
+
+The Worker was already written and tested (ADR-2607072000); only `routes` was
+commented out. B2 is deliberately left unconfigured — upstream still runs
+`KOTOBASE_B2_ARCHIVE_CIDS=0`, so the bucket is empty and read credentials
+would buy a miss round-trip per request while serving nothing. Every hit takes
+the `KOTOBASE_IPFS_GATEWAY_URL` fallback (`https://ipfs.io`, chosen over
+dweb.link and w3s.link because those 301 to a per-CID subdomain first while
+ipfs.io answers 200 directly in 0.08s; cloudflare-ipfs.com is dead and
+trustless-gateway.link 406s a plain GET).
+
+**This means retrieval latency and availability currently ride on the public
+IPFS network, not on kotobase's own storage.** For a caller that is not a
+degraded mode — a pinned CID is on the swarm, which is what makes it fetchable
+at all — but it is a real dependency and is stated as such in the published
+docs. Turning archiving on upstream and setting `KOTOBASE_B2_*` promotes B2 to
+the first tier with no change to the hostname or its callers.
+
+No DNS step was needed: `custom_domain: true` plus `workers_routes (write)`
+was enough for Cloudflare to create the record. The token holds `zone (read)`
+only and could not have written one directly.
+
+## Documentation that was wrong
+
+Four published or authoritative claims were false and are corrected:
+
+- `kotobase.net/llms.txt` and `/llms-full.txt` told every reader to resolve
+  CIDs at `ipfs.gftd.ai` (530). These are served by the Worker, so it was live
+  misinformation.
+- `net-kotobase/docs/USING-AS-A-PIN-SERVICE.md` said the Worker's own
+  `GET /ipfs/<cid>` returns 404 \"not archived and no gateway configured\" in
+  production. It returns 200 with real content; `/ipfs/not-a-cid` returns 502
+  \"archive gateway unavailable\" — the repo's own string. A gateway URL was
+  already configured in production.
+- `net-kotobase-ipfs`'s `gateway.cljs` docstring claimed no
+  `KOTOBASE_IPFS_GATEWAY_URL` was configured \"anywhere in this org\". It was.
+  What was missing was the hostname, not the capability.
+- `MIGRATION.md`'s redirect-keep policy said legacy hosts stay resolvable as
+  301/alias and that references should not be rewritten. Still true of
+  `kotobase.gftd.ai` (200); false of `ipfs.gftd.ai` (530), which is neither
+  redirect nor alias. The note now says which is which, because \"leave the
+  references alone\" is right for one and wrong for the other.
+
+## Verification
+
+- `net-kotobase-ipfs`: 11 tests / 34 assertions, 0 failures (re-run after the
+  docstring edit).
+- `etzhayyim/root` ipfs-pinner: 22/22 (node --test), twice — once for the
+  removal, once for the ipfs.kotobase.net default.
+- `gftdcojp/hume`: 6 tests / 27 assertions, 0 failures (clojure -M:test).
+- `net-kotobase`: `[:worker]` 97 files 0 warnings; `[:entry]` 155 files 12
+  warnings, all `:infer-warning` externs inference and pre-existing — this
+  change touched only .txt and .md, so it cannot have introduced one. Bundle
+  diff was exactly 10 lines (5 old-host removals, 5 new-host additions), which
+  also confirms the checked-in bundles were in sync with main's source.
+- `chat-shell` x2: both wrangler.jsonc still parse (vars 7 to 5); tsc clean on
+  the rewritten handler apart from implicit-any from `./$types` being
+  unresolvable outside a SvelteKit build.
+- Post-deploy smoke: kotobase.net `/`, `/health`, `/.well-known/did.json`,
+  `/llms.txt`, `/ipfs/<cid>` all 200; kotobase.gftd.ai 200;
+  ipfs.kotobase.net/health 200.
+
+**Not verified**: `magatama-host-sdk`'s vitest suite. `@etzhayyim/xrpc` is a
+`workspace:*` dependency whose workspace root is `ai-gftd-apps-gftdcojp`, which
+an isolated worktree cannot assemble; the typecheck there ran with imports
+unresolved. **Also not verified**: the B2 code path in `net-kotobase-ipfs` —
+with no credentials set, `b2-configured?` is false in production, so that
+branch has only ever run against the unit tests' fake `fetch`.
+
+## Open, needing an owner decision
+
+1. **A credential sits in plaintext in an archive.** `m365-archive`'s Teams
+   export contains an org-shared API key (`sk_live_org_3a8f…`) posted to a
+   channel. The host it authenticated is dead, so it is probably inert, but
+   the archive is immutable by policy and this is a rotation decision, not an
+   edit.
+2. **`jp-ashiba` looks retired but is not archived.** No Worker on the account
+   under either name, `jp-ashiba.gftd.ai` does not connect. Its
+   `actor-manifest.jsonld` `@context` points at `atproto.gftd.ai/contexts/...`
+   (404 at the successor). Fixing a dead actor's manifest is low value; the
+   real question is whether to archive the repo.
+3. **`ai-gftd-arms` DoDAF diagrams and `ai-gftd-apps-gftdcojp` lexicon
+   descriptions** still name the dead hosts. Judged category (b) — they
+   describe a system as it was — and deliberately left.
+4. **Turning on B2 archiving** in net-kotobase is the thing that makes
+   ipfs.kotobase.net independent of the public IPFS network. Its own
+   `docs/ENVIRONMENT.md` requires a separate ADR for that.
+
+## Resume point
+
+Everything above is on default branches; nothing is parked on a branch or in a
+worktree. The next concrete step, if item 4 is wanted:
+
+```bash
+# confirm the current state rather than trusting this ADR
+curl -s https://ipfs.kotobase.net/_app/meta          # {\"b2_configured\":false,...}
+gh api repos/network-awai/net-kotobase/contents/worker/wrangler.jsonc \\
+  --jq '.content' | base64 -d | grep KOTOBASE_B2_ARCHIVE_CIDS
+```
+
+Then: write the ADR that `docs/ENVIRONMENT.md` requires, flip
+`KOTOBASE_B2_ARCHIVE_CIDS=1`, backfill or accept forward-only archiving, and
+set `KOTOBASE_B2_{ENDPOINT,BUCKET,KEY_ID,APP_KEY}` on `net-kotobase-ipfs` with
+a read-only key. The gateway hostname and every caller stay unchanged.
+")))

@@ -1,0 +1,126 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608319600-itonami-has-its-own-identity-and-the-claude-oauth-patch-is-upstream")
+  (:adr/title "itonami is an app with its own identity on the hermes runtime, and the Claude OAuth patch it would have carried is already upstream")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+
+  (:adr/context
+  "Asked to design an `itonami-claude-auth` plugin for the itonami CLI,
+   mirroring `kristianvast/hermes-claude-auth` (a Claude Code OAuth bypass for
+   hermes-agent).
+
+   The first version of this ADR read `~/.local/bin/itonami` — one line,
+   `exec .../hermes -p itonami` — and concluded that itonami *is* a hermes
+   profile, therefore not a separate thing to name. The owner corrected it the
+   same day: hermes and itonami are different applications. The correction is
+   right and the error is worth naming, because it is a shape that recurs.
+
+   ONE PROCESS IS NOT ONE APPLICATION. Two boundaries were collapsed:
+
+     runtime  — hermes-agent. One binary, one venv, one site-packages, shared
+                by 25 profiles. Genuinely shared, and nothing per-app can be
+                built at this layer.
+     app      — itonami. Its own identity `did:webvh:...:itonami.cloud`, its
+                own public face (itonami.cloud, @itonami), its own SOUL.md and
+                scope, its own config.yaml / .env / state.db / skills / cron
+                under `profiles/itonami/`.
+
+   The per-app credential boundary is first-class, not incidental:
+   `hermes_cli/env_loader.py` loads a profile's `.env` with `override=True` and
+   then REMOVES profile-managed keys absent from it, so one app's credentials
+   do not leak into another's runtime. An app here can hold its own key.
+
+   What the shim proves is only that the two apps share an interpreter. That
+   bears on whether an interpreter-level `.pth` patch can be per-app (it
+   cannot). It says nothing about identity, which is what an auth plugin is
+   actually about.")
+
+  (:adr/decision
+  "1. Do not port hermes-claude-auth under any name. Not because itonami is not
+      a separate app — it is — but because the patch has no work left to do.
+      Measured with no patch installed, a one-shot call reached
+      api.anthropic.com and answered, on the Claude Code OAuth token. hermes
+      0.20.6 ships the transforms first-party. See :adr/evidence.
+
+   2. If a repo is later warranted, the name is `cloud-itonami/plugin-claude-auth`.
+      Derivation: `plugin-` (ADR-2608318100) names the agent host being adapted;
+      the host for this subject is the itonami app, and the org segment
+      cloud-itonami already says itonami (ADR-2608040170), so the name carries
+      only what is left — `plugin-claude-auth`. NOT `itonami-claude-auth`, which
+      says itonami twice.
+
+   3. Do not flip the itonami default to anthropic by editing
+      `profiles/itonami/config.yaml`. That edit would be silently reverted:
+      `scripts/hermes-hyakka-bots/resolve_free_model.cljs` owns the `model:`
+      block and its `install-profile-configs!` writes it into EVERY profile's
+      config.yaml — measured 2026-08-31 across 23 profiles. A change there is a
+      change to the free-model floor (`free-model-policy.edn`), which has an
+      owner, and belongs in that mechanism rather than beside it.")
+
+  (:adr/evidence
+  "PATCH NOT NEEDED — measured with `~/.hermes/patches/` absent and no `.pth`:
+
+     $ itonami chat --provider anthropic -m claude-sonnet-4-6 -q 'Reply with exactly: OK' -Q
+     OK
+
+   agent.log for that turn:
+     Lazy-installing anthropic==0.87.0 for feature 'provider.anthropic'
+     provider=anthropic ... at https://api.anthropic.com
+     API call #1: model=claude-sonnet-4-6 provider=anthropic in=15814 out=4 latency=4.1s
+
+   The lazy install shows it was the first real Anthropic call on this machine,
+   so no earlier state served it.
+
+   The credential used was the Claude Code OAuth token and could have been
+   nothing else:
+     - read_claude_code_credentials() -> source=macos_keychain, sk-ant-oat
+       (OAuth, not sk-ant-api), refresh present, valid. Read by known
+       identifier, not by enumerating the keychain.
+     - No ANTHROPIC_API_KEY in session env, in either .env, or in either
+       config.yaml. The one injected secret is OPENROUTER_API_KEY from keychain
+       item gftd.openrouter.
+     - `hermes auth status anthropic` reports logged out; credential_pool holds
+       only openrouter and copilot; active_provider is nil.
+
+   WHY hermes no longer needs the patch — agent/anthropic_adapter.py:
+     - build_anthropic_kwargs(..., is_oauth) docstring: 'When is_oauth is True,
+       applies Claude Code compatibility transforms: system prompt prefix, tool
+       name prefixing, and prompt sanitization.'
+     - `oauth-2025-04-20` is in the beta header list at line 480.
+   These are the transforms hermes-claude-auth existed to inject.
+
+   NO AUTO-DISCOVERY — the item the first version of this ADR left UNVERIFIED
+   is now measured, under HERMES_PROFILE=itonami:
+     is_provider_explicitly_configured('anthropic')  = False
+     is_provider_explicitly_configured('openrouter-free') = True
+     _anthropic_oauth_credentials_present()          = True
+   The credentials are present AND the gate refuses them. Anthropic is reached
+   only on an explicit choice — the `--provider anthropic` flag in the smoke
+   test was that choice. Claude is not silently reachable from itonami.")
+
+  (:adr/consequences
+  "Nothing was built and nothing was configured. Claude is reachable from
+   itonami today with `itonami --provider anthropic -m <model>`, per invocation.
+
+   The load-bearing output is negative: an agent asked for `itonami-claude-auth`
+   should read this rather than clone a patch that would collide with hermes
+   0.20.6's own OAuth path.
+
+   WHAT IS STILL OPEN, and it is the part the correction exposes. On the
+   `--provider anthropic` path, itonami borrows the OWNER's Claude Code session
+   out of the macOS keychain. For an app that has its own DID and its own public
+   face, that is the wrong shape: its usage is indistinguishable from the
+   owner's, cannot be separately budgeted, revoked, or audited, and ends when
+   the owner logs out. Giving itonami a credential of its own is a real design
+   question with a real seam to build on (per-profile .env with override and
+   leak removal). It is not the question that was asked here and is not decided
+   by this ADR.
+
+   Two things reopen the patch question, both measurable rather than assumed:
+   a hermes update that drops the is_oauth transforms or the oauth-2025-04-20
+   beta (re-run the smoke test; a 4xx from api.anthropic.com is the signal, not
+   a fallback answering), and a decision to move the free-model floor.")
+
+  (:adr/related (vector "adr-2608318100-plugin-prefix-agent-host-plugin-adapter"
+                "adr-2608040100-repo-name-four-planes"
+                "adr-2608040170-identity-is-org-slash-name"))))

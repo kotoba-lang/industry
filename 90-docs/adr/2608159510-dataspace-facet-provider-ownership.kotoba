@@ -1,0 +1,44 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608159510")
+  (:adr/title "Dataspace assertion を provider-local publication とし retract と facet unwind を所有 facet に閉じる")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-15")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:source/dataset "adr")
+  (:adr/related (vector "ADR-2608154100" "ADR-2608159400"))
+  (:adr/repos (vector "kotoba-lang/provider" "com-junkawasaki/root"))
+  (:adr/body
+  "## 問題
+
+ADR-2608154100 の reference dataspace provider は facet leave で assertion と
+observation を自動撤収していた。しかし assertion の所有記録が EDN 値だけだったため、
+別 facet が構造的に同じ値を assert すると、一方の leave が他方の publication まで
+消した。明示 retract も request の facet 外にある同値 assertion を消せた。これは
+`provider が assertion の出所を持つ` という Syndicate の維持集合を value equality と
+混同した実装欠陥である。
+
+## 決定と実装
+
+`provider.dataspace` の各 assert に単調な provider-local assertion ID を割り当てる。
+facet は値ではなく ID 集合を所有する。
+
+- explicit retract は `facet-id + structural value` が一致する cell だけを削除する。
+- facet leave はその facet が所有する ID だけを削除し、その observation ID だけを捨てる。
+- 同じ EDN を別 facet または root が assert した publication は独立して残る。
+- explicit retract 後は facet の ID 集合からも削除し、後続 leave は 0 件を返す。
+- ID は host 内部状態であり kit ABI や wire data へ出さない。EDN から authority や
+  ownership handle を復元できるようにはしない。
+
+これは tuple-space provider の lifecycle 修正であり、CID-addressed incidence history の
+global tombstone semantics を変更しない。両 backing を混在させないという
+ADR-2608154100 の境界は維持する。
+
+## Evidence
+
+- `kotoba-lang/provider` PR #181、main
+  `c221e19384ca25aa0daf11593dc3d5cb95e12558`。
+- dataspace + matcher: 15 tests / 45 assertions、0 failures。
+- provider full suite: 281 tests / 2658 assertions、0 failures。
+- facet predicate を故意に外す break test は ownership test 3 assertions が赤になり、
+  復元後に full suite green。")))

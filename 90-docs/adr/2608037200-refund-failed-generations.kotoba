@@ -1,0 +1,22 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608037200-refund-failed-generations")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/deciders "Jun Kawasaki")
+  (:adr/topic "generation-refund")
+  (:adr/title "ADR-2608037200: 失敗した生成の返金を spend の反転として実装する")
+  (:adr/authoritative-for (vector "credits の返金がどの事象で表されるか（transfer ではない）"
+                          "返金が mint にならないための不変条件（額は台帳由来・冪等・spend 実在）"
+                          "失敗の観測点が顧客の状態ポーリングであること、その代償"))
+  (:adr/related (vector "90-docs/adr/2608036900-generation-credits-billing-wired.edn"
+                "90-docs/adr/2608026200-murakumo-credits-plan-on-fal-modal-delaware.edn"
+                "90-docs/adr/2608037100-fal-adapter-generalization.edn"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/body
+  "\n# ADR-2608037200: 失敗した生成の返金 —— spend の反転として\n\n**Status**: accepted（2026-08-03、本番反映済み）\n**Date**: 2026-08-03\n**Deciders**: Jun Kawasaki\n\n## Context\n\nADR-2608036900 で生成の課金を submit 時点に結線した。これは正しい（後払いに\nすると失敗時に『成果物は出たが課金されていない』が残り、fleet GPU と fal を\n無料で回すことになる）が、**そのあと upstream が失敗すると顧客は払い損**になる。\n\nfal は自社エラーを課金しないので murakumo は損をしない。損をするのは顧客だけで、\nこれは ADR-2608026200 §4 が変動費に『再試行・失敗の吸収 2.5%』を積んでいる\n前提とも食い違っていた。ADR-2608036900 はこれを既知の未解決として明記していた。\n\n## Decision\n\n### 1. 返金は transfer ではなく spend の反転\n\n『treasury から payer へ transfer する』でも数字は合うが意味が違う。返金は\n**起きなかった消費の取り消し**であって第三者からの支払いではなく、原資も要らない\n（fal に払っていないのだから）。transfer で表すと原資を持つ口座が必要になり、\nその口座が枯れた日に返金が止まる —— **会計の形が運用の可用性に化ける。**\n\n`murakumo.infer.credits/refund` を一級の事象として置き、`balances-step` が\nspend と同じ形で符号だけ変えて畳む（`ledger-violations` が 2 つ目の解釈を\n持たないように）。\n\n### 2. 返金が mint にならない保証は、台帳を読める場所に置く\n\n構成子は純粋なので額の正しさを検査できない。`refundable` が feed を畳んで:\n\n1. そのジョブの spend が実在するか\n2. **既に返金されていないか** —— 状態ポーリングは何度でも来るし Worker は\n   再試行するので、『2 回目は拒否』を台帳側に置かないとポーリング回数ぶん\n   credits が湧く。呼び出し側は覚えている場所になれない\n3. **額は台帳が持っている spend そのもの**。呼び出し側に額を渡させない ——\n   渡させた瞬間、過大返金が API の引数になる\n\nその前提として **spend イベントに job id を記録する**ようにした。それまで\n`:run/spend-for` は `{:model :units}` しか持たず、『どの生成に対する支払いか』\nが台帳から引けなかった＝返金が原理的に不可能だった。\n\n### 3. 観測点は upstream の完了通知ではなく、顧客の状態ポーリング\n\n完了 callback はこの Worker の外にあり、作れない。状態ポーリングは必ず通る。\n\n**代償は隠さない: 誰もポーリングしなければ返金も起きない。** 完全な解は\nupstream 側の完了通知で、それまではこれが取れる最善。\n\n**ポーリングの応答は返金の成否に関わらずそのまま返す。** 台帳が落ちている\nときに状態確認まで 500 にするのは、失敗の上に失敗を重ねて、顧客が何が起きたか\nを見る手段まで奪う。\n\n### 4. cancelled は返金しない\n\n顧客が自分で止めたジョブの credits を戻すかは**値付けの判断**であって配管の\n判断ではない。返さない側に倒す —— 黙って mint するより、あとから直しやすい。\nジョブ id が読めない応答も同様に何もしない。\n\n## Consequences\n\n- 課金は submit のままで、失敗は事後に戻る。`plan` レールの消費（レート窓）は\n  戻らない —— 窓は前払い残高ではなく時間で回復するものなので、返金の対象が無い。\n- 返金は append-only 台帳に事象として残る（`:run/refund-for` に job、\n  `:run/refund-reason` に理由）。何がどれだけ戻ったかは feed から再生できる。\n- **未解決**: ポーリングされないジョブは返金されない（上記 3）。\n\n## 検証（2026-08-03）\n\n- `murakumo.infer-credits-test` 25 tests / 111 assertions —— 反転で残高が戻る、\n  同じ job の 2 回目は `:already-refunded`、存在しない job は `:no-such-spend`、\n  額が台帳由来であること、0 以下の返金は構成子が拒否すること。\n- `local-murakumo` 139 tests / 744 assertions、両バンドル compile。\n- `cloud-murakumo` 357 tests / 25,879 assertions（既知 8 failure は x402-offer /\n  treasury、無関係）。\n- compiled Worker への nbb smoke **15 checks** —— 失敗ジョブが返金を起こす、\n  ポーリング応答はそのまま返る、台帳が 409 を返してもポーリングは壊れない。\n- live: `POST https://api.murakumo.cloud/infer/refund` が 401（ルート実在 +\n  write gate の内側）。\n\n## Resume point\n\n1. **upstream の完了通知**。これが入ればポーリング依存が消える。\n2. fal live round-trip で `veo-3.1-fast` 等の `:unverified` を上げる\n   （ADR-2608037100 の resume point、未実施）。\n3. 画像系 fal モデルの結線（出力 `{images:[{url}]}`、記述子は対応済み）。\n")))

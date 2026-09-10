@@ -1,0 +1,153 @@
+(vector 
+  (map (:db/id -1)
+   (:adr/id "adr-2608070200-desktop-app-identity-comes-from-app-kotoba-edn")
+   (:adr/title "ADR-2608070200: デスクトップ app の macOS identity は app.kotoba.edn が正本（Tauri 相当を kotoba-shell が生成する）")
+   (:adr/status "accepted")
+   (:adr/doc_type "adr")
+   (:adr/source-format "edn")
+   (:adr/date "2026-08-06")
+   (:adr/last-verified "2026-08-06")
+   (:adr/authoritative true)
+   (:adr/deciders (vector "Jun Kawasaki"))
+   (:adr/topic "kotoba-shell-app-identity")
+   (:adr/repos (vector "orgs/kotoba-lang/shell"
+               "orgs/cloud-itonami/cloud-itonami-app"
+               "manifest/west.yml"
+               "scripts/west-pin-put.cljs"))
+   (:adr/authoritative-for
+   (vector "local app の window title / Dock 名 / Dock icon / window サイズは app.kotoba.edn だけが宣言し、launcher は宣言しない"
+    "宣言された :app/icon が見つからないときは汎用 icon で起動せず :shell/app-icon-missing で失敗する"
+    ":kotoba/web surface は entry point を持たない正当な surface であり、:kotoba/dom と同格に app run できる"
+    "kotoba-shell app run は macOS で host を .app に入れて起動する（Tauri が事前生成する wrapper を起動経路で生成する）"
+    "bin/kotoba-shell は自分が同梱する shell を実行する（cwd の deps.edn に載っている pin ではない）"
+    "cloud-itonami-app の surface は jp-go-dds の web surface 1 本であり、liquid-glass の kotoba/dom surface は撤去済み"
+    "west.yml の pin は省略形でも読めて、前進時に 40 桁へ修復される"))
+   (:adr/related
+   (vector "adr-2607313000-itonami-app-resident-install-and-agent-session"
+    "adr-2608053000-cloud-itonami-app-session-close"
+    "adr-2608062000-jp-go-dds-is-the-workspace-base-design-system"))
+   (:adr/evidence
+   (vector "orgs/kotoba-lang/shell/src/kotoba/shell/launcher.clj"
+    "orgs/kotoba-lang/shell/bin/kotoba-shell"
+    "orgs/kotoba-lang/shell/bin/kotoba-shell-host-macos-window.swift"
+    "orgs/kotoba-lang/shell/test/kotoba/shell/launcher_test.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/app.kotoba.edn"
+    "orgs/cloud-itonami/cloud-itonami-app/bin/cloud-itonami-app"
+    "orgs/cloud-itonami/cloud-itonami-app/scripts/make-app-icon.swift"
+    "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/server.clj"
+    "scripts/west-pin-put.cljs"))
+   (:adr/landed-commits
+   (vector "kotoba-lang/shell d2dc8df — 古い kotoba/dom surface（liquid-glass）を撤去"
+    "kotoba-lang/shell 2bbace9 — an app's icon and its web surface come from its manifest"
+    "kotoba-lang/shell 61e8b9b — the CLI runs the shell it lives in"
+    "kotoba-lang/shell 5d9480a — the menu bar says what the app is called"
+    "kotoba-lang/shell ea5b4fb — the Dock calls the app what the manifest calls it"
+    "cloud-itonami/cloud-itonami-app 30b13ba — the window's name, icon and size come from app.kotoba.edn"
+    "cloud-itonami/cloud-itonami-app 51c9435 — the in-process shell matches the one the launcher runs"
+    "com-junkawasaki/root f83d885 — a pin written short stays short"))
+   (:adr/body
+   "# ADR-2608070200: デスクトップ app の macOS identity は app.kotoba.edn が正本
+
+## Status
+
+accepted（2026-08-06）。default branch に着地済み。west pin も前進済み
+（shell = ea5b4fb、cloud-itonami-app = 51c9435 を含む pin）。
+
+## Context
+
+`bin/cloud-itonami-app` を起動すると **古い UI が出た**。原因は checkout の
+stale ではなく **app が surface を 2 本持ち、launcher が古い方を優先していた**こと:
+sibling に `kotoba-lang/shell` の checkout があると liquid-glass の
+`:kotoba/dom` surface を選び、無いときだけ jp-go-dds の web surface を
+ブラウザで開いていた。設計上「native host で動く方」が優先されていたが、
+その native 側が古い方だった。
+
+さらに icon と title が「shell の設定で反映されない」状態だった。実測した内訳:
+
+| 面 | 何が読むか | 当時の状態 |
+|---|---|---|
+| window title | `NSWindow.title` | `--title` があり動いていた |
+| menu bar / Dock 名 | `CFBundleName` | **host は Info.plist を持たない裸の実行ファイル**なので macOS は**ファイル名**を使う |
+| Dock icon | `applicationIconImage` | **host に `--icon` 引数が存在しない** |
+| window サイズ | host 引数 | あるが manifest から渡す経路が無い |
+
+加えて `kotoba-shell app run` は `:kotoba/dom` 以外の manifest を
+`:shell/app-runtime-invalid` で拒否していたため、**web surface の app は
+manifest で宣言できず**、`KOTOBA_SHELL_WEB_URL` を export して起動するしかなかった。
+
+## Decision
+
+**local app の macOS identity は `app.kotoba.edn` が唯一の宣言場所とし、
+kotoba-shell がそれを macOS の identity に変換する。** launcher（bash）は
+「server が要るか」だけを決め、名前・icon・窓については何も知らない。
+
+1. **`:kotoba/web` を一級の surface にする。** URL を持つ surface は entry point を
+   持たないのが正しいので、`:runtime :kind` を要求しない。macOS + `:web-url` が
+   あれば plan が通る。
+2. **`:app/icon` は manifest 相対で解決し、無ければ失敗させる。** 汎用 icon で
+   起動するのは「設定していない」のと見分けがつかないので、
+   `:shell/app-icon-missing` で止める。
+3. **`CFBundleName` を `NSApplication.shared` の**前**に書く。** app object は
+   初期化時に一度だけ名前を読むので、後から書いても compile も run も通るのに
+   何も変わらない（テストは呼び出しの有無ではなく**順序**を検査する）。
+4. **macOS では host を `.app` に入れて起動する。** LaunchServices は
+   プログラム自身のコードが走る**前**に実行ファイル名でプロセスを登録するので、
+   Dock tile と ⌘-Tab は runtime の rename では直らない。`:app/id` ごとに
+   `target/apps/<id>/<Name>.app` を生成する — **Tauri が事前に作る wrapper を、
+   起動経路で同じ manifest から作る**。plan は何も生成せずに path を報告でき、
+   `--execute` のときだけ書く。
+5. **`bin/kotoba-shell` は自分が同梱する shell を実行する。** `clojure` は cwd の
+   deps.edn を merge するので、`io.github.kotoba-lang/shell` を pin している app の
+   directory から叩くと**その pin の shell が走っていた**。同じ lib key を使えば
+   最後に merge される `-Sdeps` が置き換える。
+6. **古い `:kotoba/dom` surface を撤去する**（`app.clj` /
+   `bin/cloud-itonami-app-action` / 対応テスト）。surface は jp-go-dds の web 1 本。
+
+## Consequences
+
+- app の名前・icon・窓を変えるのに **`app.kotoba.edn` 以外を編集しなくてよい**。
+  launcher にも swift にも title は書かれていない。
+- 宣言された icon が消えたら**起動が失敗する**。静かに汎用 icon になることはない。
+- macOS の identity は LaunchServices から検証できる（実測:
+  `\"Cloud Itonami\"` / `bundleID=cloud.itonami.app`）。
+- **`.app` の中に icon は入っていない。** icon は runtime の
+  `applicationIconImage` で当たるので、プロセスが起動するまでの一瞬は
+  汎用 tile になる。PNG→`.icns` には `sips` と `iconutil` が要るので、
+  その一瞬が実際に目に付いたときに足す。
+
+## 副次的に直したもの（どちらも独立した defect）
+
+**`west-pin-put.cljs` が省略形の pin を読めなかった。** west.yml の 4,123 件中
+1 件だけ（`cloud-itonami-app` が `c90f782aceff`）が 12 桁で書かれており、
+40 桁固定の正規表現がそれを読めず
+`could not read the entry's revision/path from the tip` で止まっていた。
+**厳格さは省略形の混入を防いでいない — 防いだのは「40 桁を書き戻せる唯一の道具が
+その entry を触ること」だけだった。** 到達性も fast-forward も GitHub の compare API が
+省略形のまま解決するので、7〜40 桁を読んでも安全性は落ちない。前進のたびに修復される。
+
+**`cloud-itonami-app` の deps.edn の shell pin が 5 commit 古かった。**
+`workspace.clj` は `kotoba.shell.launcher` を in-process で呼び、
+`bin/cloud-itonami-app` は同じ CLI を shell out する。両者が別の shell だと、
+library 側が CLI 側の受け付ける manifest を拒否する。
+
+## Non-goals / open items
+
+- **`.icns` を bundle に入れること**（上記のとおり保留）。
+- **iOS / Android の identity**: `bin/kotoba-shell-run-ios-app` は既に
+  CFBundleName を書く Info.plist を生成しているが、macOS の bundle 生成とは
+  別実装のまま。共通化はしていない。
+- **`release build --target macos`** は依然として `--app-bundle` を呼び出し側から
+  受け取る。今回作った `ensure-macos-bundle!` は起動用であって配布用ではない
+  （署名も notarization も通っていない）。
+- **省略形 pin は再発する。** 2026-08-07 11:29 の `fa13fefdfe4`
+  「manifest: advance cloud-itonami-app pin」が、40 桁の
+  `d8cb86c71aca...` を **12 桁の `62d2ae39fe66` に書き換えた** —— 同じ entry が、
+  同じ日に、また短くなっている。出所は `west-pin-put.cljs` ではなく
+  **手で書いた manifest 編集**。読めるようにしたので前進は止まらないが、
+  **書く側は塞いでいない**。塞ぐなら `verify-west-pins` / fleet gate 側で
+  40 桁を強制する（この ADR ではやっていない）。
+- **同じ commit のまま 40 桁へ修復する経路が無い。** `west-pin-put` は
+  fast-forward を要求するので、pin が指す commit を変えずに桁だけ直すことは
+  できない（`identical` で refuse される）。修復は次の実際の前進でしか起きない。
+")
+   (:adr/last_verified "2026-08-06")))

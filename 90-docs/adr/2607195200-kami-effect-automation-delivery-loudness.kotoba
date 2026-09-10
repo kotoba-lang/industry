@@ -1,0 +1,52 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607195200-kami-effect-automation-delivery-loudness")
+  (:adr/title "KAMI adds effect automation and peak-safe NLE delivery loudness")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607195100-kami-send-and-audio-envelope-automation"))
+  (:adr/decision
+  (map (:daw (map (:effect-authority :project/master-effects)
+         (:automation-authority :effect/automation)
+         (:parameters (map (:filter/cutoff-hz (vector 40.0 20000.0))
+                      (:delay/time-sec (vector 0.0 1.0))
+                      (:delay/feedback (vector 0.0 0.9))))
+         (:point-schema (vector :automation/tick :automation/value))
+         (:ordering :ascending-tick)
+         (:schedulers (vector :realtime-audio-context :offline-audio-context))
+         (:consumers (vector :playback :master-wav :normalized-master-wav :track-stems))))
+   (:nle (map (:master-gain-authority :project/master-gain)
+         (:delivery-authority :project/delivery-audio)
+         (:policy-keys (vector :delivery/normalize? :delivery/target-lufs :delivery/sample-peak-ceiling-db))
+         (:export-pass-order (vector :actual-timeline-preflight :gain-decision :production-media-recorder))
+         (:preflight-sources (vector :embedded-video-audio :independent-audio-lanes))
+         (:loudness-measurement (vector :k-weighted :stereo-channel-power-sum :absolute-gate :relative-gate))
+         (:peak-measurement :per-channel-sample-peak)
+         (:normalization-constraint :minimum-of-target-loudness-and-peak-headroom)
+         (:export-container :webm)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "plugin hosting" "certified broadcast loudness conformance" "bundled multichannel stems"))
+    (:nle (vector "color management" "certified true-peak/broadcast conformance" "persistent/background proxy jobs" "additional containers" "hardware encoder control"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "db8f84a5186da9b234bbb6399d4e4e7dc5b4dfdd"))
+   (:nle-commits (vector "8721c14e16f76e7294e726535b5589ca09370ae9"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#9" "kotoba-lang/kami-app-nle#9"))
+   (:evidence
+   (vector "DAW passes 17 tests and 66 assertions; NLE passes 19 tests and 78 assertions, including range/order validation, gated loudness and peak-constrained gain decisions."
+    "Both shadow-cljs production releases completed through the repository resource guard with zero compiler warnings."
+    "DAW Chrome observed twelve AudioParam ramps including configured 1000 Hz cutoff, 0.4 second delay and 0.5 feedback endpoints, with effect authority persisted in recovery EDN."
+    "NLE Chrome completed actual-timeline preflight and a second-pass MediaRecorder export, reported -19.5 LUFS, -18.6 dBFS sample peak and a peak-constrained +6.6 dB gain for a -5 LUFS target and -12 dBFS ceiling."
+    "External ffmpeg ebur128 measured the delivered file at -13.3 LUFS and -11.9 dBTP, proving the requested loudness target yielded to the peak ceiling; a normal -18 LUFS run differed from ebur128 by 0.4 LU."
+    "External ffprobe identified Opus audio and VP8 video in the production WebM."
+    "Automated Chrome contexts and local HTTP servers were closed after verification."
+    "Both application pull requests were reviewed and squash-merged."
+    "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN parsing verified accepted status, supersedes authority, effect authority and delivery authority."))))
+  (:adr/consequences
+  (vector "DAW master effects can change over musical time without realtime/offline render divergence."
+   "NLE master gain and delivery policy survive save, recovery and package workflows as project EDN."
+   "NLE production export measures the same mixed timeline it records and prevents loudness normalization from exceeding the configured sample-peak ceiling."
+   "The sample-peak ceiling is not represented as certified true peak; broadcast certification remains explicit follow-up scope."))
+  (:adr/source-format "edn")))

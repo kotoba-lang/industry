@@ -1,0 +1,168 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608021200-m365-shared-mailbox-archive-and-query-plane")
+  (:adr/doc_type "adr")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "m365-archive-query-plane")
+  (:adr/last_verified "2026-08-02")
+  (:adr/related (vector "2608011100-m365-gftdcojp-tenant-identity-audit-and-offboarding"
+                "2606271700-cloud-itonami-business-os"))
+  (:adr/title "ADR-2608021200: 共有メールボックスをアーカイブし、mailbox を横断クエリの次元にする")
+  (:adr/body "# ADR-2608021200: 共有メールボックスをアーカイブし、mailbox を横断クエリの次元にする
+
+**Status**: accepted（実データで実証済み）
+**Date**: 2026-08-02
+**Deciders**: Jun Kawasaki（オーナー指示）, agent execution
+**Repos**: `gftdcojp/m365-archive`, `network-awai/cloud-itonami`
+
+## Context
+
+オーナー指示: 「c@, ce@, cs@, hello@, jinji@, somu@, branding@ などの共有メールボックスを
+全てデータ受信できるようにしたい。EDN で取り込んで Datomic query ができるように。
+cloud-itonami で組織アカウントを連携したい。メールボックス内のデータなども監査用に
+download して分析できるように。」
+
+着手時点の `m365-archive` は **j.kawasaki の 1 箱（約 11.6 万通）のみ**を保持していた。
+契約・請求・人事・法務の一次情報は共有メールボックス側にあり、クエリ面から見えていなかった。
+また ADR-2608011100 で、退職者 5 名のメールボックスが共有メールボックス変換を経ずに
+ライセンスだけ外されており猶予期間の経過で消失しうることが判明していた。
+
+## Decision
+
+### 1. 取り込みの前提条件を 2 つ揃える
+
+**どちらか一方でも欠けると Graph は 403/404 を返す。**
+
+- Entra アプリ `gftd-m365-archive` に委任スコープ **`Mail.Read.Shared`**（テナント全体）。
+  `Mail.Read` はサインインユーザー自身の受信箱しか読めない。
+- サインインユーザーが各メールボックスに **FullAccess**（Exchange 側の委任。Graph の
+  スコープとは別物）。共有 16 箱は既に保有していた。退職者 5 箱は付与した。
+
+権限が無いとき Graph が返すのは 403 ではなく **404 ErrorItemNotFound** で、
+「存在しない」と読めてしまう。取り込み対象が空だと誤診しやすい。
+
+### 2. メールボックスごとにディレクトリを分ける
+
+`ingest-mail.cljs` は以前から `--mailbox` を受け取っていたが、**全メールボックスが
+`mail/<folder>` と `mail/folders.json` を共有**していた。どの箱にも「受信トレイ」が
+あるため、2 箱目が 1 箱目のフォルダにメッセージを混入させ、フォルダ索引を上書きする。
+
+名前付きメールボックスを `mail/<local-part>/` 配下に分離した。サインインユーザーは
+従来のフラット root を維持する（B2 に annex 済みの 11.6 万通を移行せずに済ませるため）。
+
+取り込み対象の正本は `bin/mailboxes.edn`。ドライバ `bin/ingest-mailboxes.cljs` は
+1 箱の失敗で数時間の実行を止めず、箱ごとの成否を最後に報告する（再実行で途中再開）。
+
+### 3. `:mailbox` を独立した属性として持つ
+
+`extract-facts.cljs` の `:folder` は「`mail/` とファイル名の間すべて」だったため、
+メールボックス名が folder に溶け込む。サインインユーザーの `somu` という名前の
+フォルダと `somu@gftd.co.jp` 全体が区別できず、**横断クエリが静かに間違う**。
+`split-mailbox-folder` で `:mailbox` を分離した（未知の先頭要素はサインインユーザーに
+fallback = 従来のフラットレイアウトと同義）。
+
+### 4. mailbox は cardinality-many
+
+Datomic 側 `:gftd.m365/mailbox`、cloud-itonami 側 `coalesce-messages` とも
+**1 メッセージに複数の mailbox** を持たせる。同一 Message-ID が somu@ と keiri@ の
+両方に届くのが常態だからである。cardinality-one にすると 2 箱目以降を静かに落とす。
+
+cloud-itonami では 3 案を比較し **B 案**（活動は Message-ID で 1 つ、mailbox は集合）を
+採った。A 案（活動 ID に mailbox を含める）は既存 ID を全て変え「1 通のメール」が箱の数
+だけ活動になる。C 案（後勝ち）は実装ゼロだが監査用途で使えない。B は Datomic 面と
+意味論が揃う。
+
+## 結果（実測）
+
+- **22 メールボックス / 203,247 通 / 11 GB** を取り込み、失敗 0。
+  共有 16 箱（somu 20,542 / keiri 16,709 / hello 2,709 / pd 2,562 / cs 2,319 / c 1,597 /
+  jinji 1,300 / branding 1,048 ほか）+ 退職者 6 箱（h.sendachi 22,791 / y.sakamoto 4,311 /
+  t.chikada 3,577 / k.bakshi 3,437 / a.oda 3,297 / f.tanaka 2,381）。
+- **B2 へ 93,713 ファイルをアップロード（失敗 0）**、`git annex whereis` で実在を検証。
+  git 履歴と `git-annex` ブランチも GitHub へ push 済み。
+- facts: messages 203,021 / threads 150,432 / people 8,562 / orgs 3,810 / crm 4,122。
+  **94,155 行が `:mailbox` を持つ（22 メールボックス）**。残る 108,866 行は `.eml` の
+  実体が B2 ポインタのまま引き継がれた分で、`git annex get mail/` 後の再生成で付く。
+- **Datomic ローダが実データで完走**（messages 171,251 / blobs 202,282 / threads 150,432 /
+  teams-msgs 100,162 / invoices 3,075 / contracts 559 / entries 52,634）。
+  メールボックス別ビューが 23 メールボックスを返す。
+- **cloud-itonami の実取り込みが完走**: activities 312,523 / actors 8,671 /
+  artifacts 175,454 / effects 141,271。全 24 種の facts が `:available? true`。
+
+**2 つの独立実装が同じ数字に収束した。** messages の activities は Datomic 側
+（`group-by :message_id`）も cloud-itonami 側（`coalesce-messages`）も **171,251**。
+203,021 行の facts が同じ値に収束したことは、「メール 1 通とは何か」の定義が
+2 つの面で揃っている証拠になる。
+
+**メールボックスを跨ぐメールは 2,578 件**（`:mailbox` 付き 90,427 Message-ID 中）。
+上位は keiri∩somu 493 / c∩keiri 311 / h.sendachi∩somu 221 で、監査で最も知りたい
+経理・総務・法務にまたがる請求書と契約書がここに集まる。cardinality-one なら
+この 2,578 件すべてで届け先が片方だけになっていた。
+
+## 実データを流して初めて見つかった既存バグ
+
+いずれもフィクスチャでは再現しない。**実データを流さなければ見つからなかった。**
+
+1. **Datomic ローダが JSONL→EDN 移行（ADR-0013）以降ずっと壊れていた。**
+   `orgs.edn` / `people.edn` / `projects.edn` を `rd-edn`（先頭 1 フォームのみ）で
+   読んでおり、裸の map を transact すると Datomic はエントリを tx フォームと解釈して
+   `:db.error/not-a-data-function :org/domain` で落ちる。`rd-jsonl` に修正。
+   移行後このローダが完走したのは今回が初めてのはずである。
+
+2. **`:db/index` は On-Prem 専用属性**で、client API（`datomic/local`）は
+   `:db.error/not-an-entity` でスキーマ全体を拒否する。1 属性の指定ミスで何もロード
+   されない。
+
+3. **`coverage-report` が ingest と食い違っていた。** `kind-report` が `facts->tx` を
+   通さず `m365/fact->tx` を直接 mapcat していたため、coalesce が report 側だけ
+   適用されず、report は 203,021 activities と報告する一方 ingest は 171,251 を生成した。
+   「取り込みが完了したか」を判断するときに引用される数字なので、無い方がマシな誤り。
+   `facts->tx` 経由に統一し、両経路の一致を検証するテストを追加した。
+
+## Consequences
+
+- 共有メールボックスの契約・請求・人事情報が Datalog の射程に入った。
+  `:gftd.m365/mailbox` で「どの部署の箱がこの契約メールを見たか」を引ける。
+- 退職者 6 箱（3.6 万通）が B2 の暗号化バックアップ下に入り、消失リスクが下がった。
+  ただし ADR-2608011100 backlog #2（共有メールボックス変換）は依然として必要。
+- **継続取り込みは自動化されていない。** 今回は手動実行であり、アーカイブが再び
+  古くなる構造は変わっていない。着手前の取得時点は 2026-06-17 だった。
+
+## 残る gap
+
+1. `git annex get mail/` → 再生成で残り 108,866 行にも `:mailbox` を付与
+2. 継続取り込みの自動化（cron / routine）
+3. `facts/accounts.edn` が git-annex 未取得（組織アカウント管理の中核データ）
+4. ADR-2606271700 は cloud-itonami の配置を `orgs/gftdcojp/cloud-itonami` と記すが、
+   実体は `orgs/network-awai/cloud-itonami` にある（記述の乖離）
+
+## 作業中に判明したワークスペースの負債（本 ADR の対象外だが記録する）
+
+- **`m365-archive` の `.git/index.lock` が 6 日前（2026-07-26 23:34）の 0 バイト
+  stale lock だった。** 誰も掴んでおらず、このリポジトリでは約 1 週間あらゆる
+  `git commit` が失敗し続けていた。作業ツリーに 13 万件超の未コミット差分が溜まり、
+  ローカルが `github/main` から遅れ、`.bb`→`.cljc` 移行 WIP が未 push のまま残って
+  いたのは、すべてこの 1 つの lock の帰結と見られる。
+- `README.md` の他者 WIP（`.bb`→`.cljc` 参照更新、94 行）を `stash@{0}` に退避し、
+  パッチを `.git/stash-archive-20260802/` にも保全した。対応するファイル名変更が
+  未 push のため pop していない。
+- `kotoba-lang/bonsai` が origin/main から 23 コミット遅れ + 未コミット WIP 4 件。
+  これにより cloud-itonami のフルテストスイート（`-M:local:test`）が
+  `No such var: arr/restore` でビルドできない。本 ADR のテストは `src`+`test` のみの
+  最小 classpath で実行した（`cloud-itonami.facts` の推移的依存はリポジトリ内で閉じる）。
+
+## マージ時に防いだ静かな退行
+
+`github/main` とのマージで生成物 7 ファイルが競合した。annex キーのサイズを比較すると
+**main 側の方が大きいものが 5 件**あった（threads 47.1MB vs 37.9MB、crm 818KB vs 605KB
+ほか）。こちらの `extract-facts` はローカルの古い prior facts を基準に再生成しており、
+実体未取得の 105,733 通分を引き継げていなかった。自分の生成物を採っていれば main の
+facts を静かに退行させていた。
+
+**生成物の競合は「どちらかを選ぶ」のではなく再生成で解く。** 退行を防ぐため一旦 theirs を
+採用し、B2 から main の facts を取得してから再生成した。結果は全ファイルで main の
+上位互換になった（messages 203,021 ≥ 113,274 ほか）。
+
+検証は **行数と `:mailbox` の両方**で行う。行数だけ見れば退行を見逃し、`:mailbox` だけ
+見れば取りこぼしを見逃す。
+")))

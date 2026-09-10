@@ -1,0 +1,121 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609092200-the-build-is-a-value-and-the-easy-one-is-kiyaku")
+ (:adr/title "The build is a value, the easy one was kiyaku, and the browser stack is blocked on regex")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-09")
+ (:adr/authority "owner request, 2026-09-09")
+ (:adr/repos "kotoba-lang/kotoba-build, kotoba-lang/kiyaku, kotoba-lang/shitsuke")
+ (:adr/related "adr-2609092100-re-frame-and-reagent-in-kotoba, adr-2608080100-single-page-app, lang/q9-migration.edn, kotoba-lang/app-browser-author")
+ (:adr/body "Owner request, 2026-09-09: pick an easy one to migrate, but implement the
+re-frame and shadow-cljs equivalents in Kotoba first, and look at
+kotoba-lang/htmldom and cssom while doing it.
+
+## 1. The build is a value — kotoba-lang/kotoba-build (new repo)
+
+shadow-cljs takes a config and DOES things. `kotoba/build_core.kotoba` decides
+all of it and does none of it: `plan` turns a config document into an ordered
+vector of inert steps, `shell-html` is the single-page document, `manifest` is
+what the record means. `bin/kotoba_build.cljs` (nbb) spawns the compiler,
+writes files, measures bytes and serves a directory.
+
+  [:module-lock ..] [:compile ..] [:runtime {:assets ..}] [:write ..]
+  [:manifest ..] | [:serve ..] | [:refuse ..]
+
+The guest compiles with an EMPTY requiredCapabilities, because deciding a
+build touches nothing. A release build ends by recording what it produced; a
+dev build ends by serving it, and nothing about the emitted module differs.
+
+The shell is one document, one bundle, one mount (ADR-2608080100), and the
+driver is amu's runtime/dom-driver.mjs -- required rather than rewritten, the
+browser-stack charter's rule. It takes a FACTORY because an instance's fuel is
+spent and never replenished.
+
+THE TITLE IS ADMITTED, NOT ESCAPED. A title carrying < > & \" or ' is refused
+and the build stops. kotoba-lang/html already owns HTML escaping, and a second
+copy of an escaping rule is how one copy gets fixed and the other stays broken.
+
+Measured 2026-09-09: 18 assertions over :jvm-kir/:js/:wasm, and 14 acceptance
+checks that BUILD the example app, SERVE it, and CLICK it in headless Brave
+over CDP -- 0 -> 1 -> 2 -> 1 -> reset 0. Breaking `inc` to map to an ignored
+event turned exactly the three click checks red.
+
+Two things the harness had to learn by measurement, both of the shape this
+workspace keeps writing down: the dev server does not listen until the compile
+has finished, so a browser that navigates early gets ERR_CONNECTION_REFUSED and
+every query on that page reads as null; and an expression that THREW must not
+be recorded as a nil value, or a page that never loaded is indistinguishable
+from a page whose elements happen to be empty.
+
+A multi-repo build links with a REPEATED --source-path (measured). The example
+app is written against shitsuke's Kotoba re-frame pair in another repository
+and resolves it that way.
+
+Named bound: browser-host.mjs is 155 KB of Wasm host shipped for one function,
+`reconcileUiDocument`. The manifest shows it as bytes rather than hiding it.
+The fix is upstream -- amu splitting the reconciler out -- not a second
+reconciler in kotoba-build. There is no watch and no hot reload; --mode dev
+serves, it does not rebuild, and it says so.
+
+## 2. The easy one — kiyaku.returns
+
+`kotoba-lang/kiyaku` is 397 lines across 7 namespaces and already registers
+its events through shitsuke's re-frame seam, which is why it was the cheapest
+place to start. `kotoba/returns_core.kotoba` is the decision content of
+`kiyaku.returns`: the RMA statechart, the refund arithmetic, the restock
+filter.
+
+nil becomes a Result. The .cljc says a refused transition is nil and every
+caller has to remember that; the port answers [:result :document :keyword], so
+a caller that ignores the error arm does not compile. The .cljc version of that
+mistake is `(or (transition r to) r)` -- which is in kiyaku.events today, and
+which silently keeps the old status.
+
+Measured: 21 assertions over three targets, and 99/99 differential parity
+between the .cljc that ships and the ESM amu emitted, over 11 returns x (qty,
+refund, restock, 5 transitions, refund-with-restock). BOTH SIDES RUN -- the
+oracle is the namespace required from src with its siblings on the classpath,
+not a table of remembered answers. Allowing :shipped -> :refunded turned
+exactly two of the 99 red.
+
+NOTHING IS CUT OVER. kiyaku.returns is still what every consumer gets and
+stays the oracle until a soak says otherwise. `return-activity` is not ported:
+it projects onto chobo.ledger in another repository, a module boundary rather
+than a language one.
+
+## 3. The browser stack, measured rather than guessed
+
+Counted 2026-09-09 (defn count / regex literals / atom sites / interop sites):
+
+  kotoba-lang/html      162 lines .cljc   2 .kotoba files, parity-gated
+  kotoba-lang/css       120 lines .cljc   3 .kotoba files, parity-gated
+  kotoba-lang/htmldom  2114 lines, 59 defn, 11 regex, 0 atom, 3 interop
+  kotoba-lang/cssom   10098 lines, 242 defn, 115 regex, 6 atom, 65 interop
+                    + 18792 lines, 311 defn, 67 regex, 6 atom, 14 interop (layout)
+
+Two conclusions, and one of them reverses the obvious guess:
+
+  * `html` is NOT the easy one, even though its Kotoba port is nearly complete.
+    Its consumers are the problem: shitsuke.hiccup delegates its tag/attribute
+    primitives to html.core, and scripts/build-kotoba-pages.cljs builds every
+    kotoba-lang Pages site through it. shitsuke already faced this exact choice
+    and DECLINED (README, ADR-2608120200 section 1): delegating a browser
+    render path to a runtime-registered artifact turns \"works on require\" into
+    \"throws unless register-kir! ran first\". The port being finished does not
+    make the cutover cheap; the consumers decide that.
+
+  * REGEX IS THE RECURRING BLOCKER, not size. htmldom is the most migratable of
+    the three -- no atoms, no protocols, 3 interop sites, and loop/recur is
+    admitted -- and what stands in the way is 11 regex literals. cssom has 115
+    in one file. Kotoba has string-index-of / string-contains? /
+    string-substring / string-split-count and no regex head, so every port so
+    far hand-rolls a scanner (html_core's tag-sugar scanner is exactly that).
+    A bounded, admitted pattern surface is worth more to the browser stack than
+    any single port.
+
+## What this is not
+
+Not a production deploy: the Worker and browser evidence is workerd via
+`wrangler dev --local` and headless Brave over CDP. Not a whole-component
+cutover: `lang/q9-migration.edn` keeps the oracle until a soak, and waves 2
+through 5 remain :not-authorized.
+")))

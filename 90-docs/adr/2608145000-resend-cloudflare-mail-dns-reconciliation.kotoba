@@ -1,0 +1,175 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608145000")
+  (:adr/title "Resend 11 ドメインのうち 5 件が未完了だった —— 受信は Resend と Cloudflare の 2 系統に割れており、「partially_failed」は片方では正常")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-14")
+  (:adr/tags "mail resend cloudflare dns dmarc email-routing kotobase itonami")
+  (:adr/body
+  "## 文脈
+
+Resend のダッシュボードが 11 ドメイン中 5 件を未完了として表示していた
+（`not_started` 3 / `partially_failed` 2）。オーナーの問い —— 「Resend の
+メール設定, Cloudflare での DNS 設定がまだ適切ではない?」
+
+実測したところ **3 種類の別々の問題が 1 つの症状に見えていた**。
+
+## 実測（2026-08-14、Resend API + 権威 NS + Cloudflare API）
+
+### ① 3 ドメインは DNS が 1 本も無い
+
+`mail.shinshi.club` / `mail.aozora.app` / `mail.x402.nexus` は 1 日前に Resend へ
+登録されただけで、**要求される 4 レコードが全部欠けていた**。ADR も repo 内の
+参照も存在しない —— ダッシュボードで登録し、DNS を作る側が実行されなかった。
+
+### ② `mail.kotobase.net` は受信 MX が本当に無い
+
+送信 3 本（DKIM / SPF MX / SPF TXT）は verified。受信 MX は
+**Resend のものも Cloudflare のものも、どちらも存在しなかった**ので
+`*@mail.kotobase.net` 宛は全てバウンスしていた。apex の `kotobase.net` には
+Email Routing の MX が入っており catch-all → `worker:kotobase-mail` も有効なので、
+**ゾーンごと落ちていたのではなく `mail.` サブドメインだけが抜けていた**。
+
+ADR-2607175100 はこの経路を Email Routing → mail edge Worker →
+`mail.ingestInbound` と設計している。設計はあり、実装（Worker）もあり、
+**DNS の 3 行だけが無かった**。
+
+### ③ `mail.itonami.cloud` の `partially_failed` は誤設定ではない
+
+```
+MX mail.itonami.cloud -> 21 route1.mx.cloudflare.net (Cloudflare Email Routing)
+rule: test@mail.itonami.cloud -> worker:cloud-itonami-mail-inbound  [on]
+```
+
+Resend は自分の `inbound-smtp.us-east-1.amazonaws.com` が無いことを failed と
+報告するが、ここは意図どおり Cloudflare で受けている。DKIM/SPF は verified で
+**送信は正常**。直す対象は DNS ではなく、Resend 側の inbound 設定である。
+
+**受信は fleet 内で 2 系統に割れている** —— `mail.murakumo.cloud` だけが Resend の
+受信 MX を使い（4 本すべて verified）、`kotobase` / `itonami` は Cloudflare
+Email Routing。ダッシュボードの色は方式の違いを写しているだけで、
+**緑が正しさを意味していない**。
+
+### ④ DMARC がほぼ全滅
+
+未設定: `kotobase.net` `itonami.cloud` `murakumo.cloud` `shinshi.club`
+`aozora.app` `x402.nexus` `email.gftd.co.jp`。
+既存: `etzhayyim.com` `gftd.ai` `email.gftd.ai` `gftd.co.jp`（すべて `p=none`）。
+
+`_dmarc.mail.kotobase.net` だけは `p=quarantine; rua=mailto:dmarc@mail.kotobase.net`
+が入っていたが、**その rua の宛先に MX が無く、レポートは届きようがなかった**
+（サブドメインに厳しいポリシーがあり、apex には何も無いという逆立ちでもあった）。
+
+## 決定
+
+1. **新規 3 ドメインは Resend 受信 MX を使う**（オーナー判断）。`mail.murakumo.cloud`
+   と同じ形で 4 本すべてを作り、Resend 上で verified にする。
+2. **`mail.kotobase.net` の受信は Cloudflare Email Routing**。ADR-2607175100 の設計と
+   既存の `kotobase-mail` Worker がそこに在るので、DNS をそちらへ合わせる
+   （apex `kotobase.net` の MX セットを `mail.` に鏡写しする）。
+3. **`mail.itonami.cloud` の受信 MX は作らない。** Resend の failed 表示は
+   Resend 側で inbound を切って解消する（DNS 側は正しい）。
+4. **DMARC の rua は `dmarc@kotobase.net` 1 本に集約する** —— kotobase.net の
+   Email Routing catch-all が既に `worker:kotobase-mail` へ配送しているので、
+   **実際に届く宛先**である（下記の実験でこれも裏が取れた）。外部ドメインを
+   rua にするため RFC 7489 §7.1 の認可レコード
+   `<zone>._report._dmarc.kotobase.net TXT \"v=DMARC1\"` も同時に作る。
+5. **ポリシーは 6 ゾーンとも `p=quarantine`**（オーナー判断 2026-08-14、当初の
+   `p=none` から同日中に引き上げ）。⚠ **これは aggregate report を 1 通も読まずに
+   上げたものである。** 整合していない正当な送信元があれば、その瞬間から隔離される。
+   `rua` は残してあるので、レポートに正当な送信元の failure が出たら
+   `dmarc-policy` を戻して `--update-conflicts` で下げられる。
+   道具は既定でポリシーを書き換えない —— 公開済みの DMARC 文字列は他人の決定で
+   あって片付けるべき drift ではないので、動かすには `--update-conflicts` を
+   明示する必要がある。
+
+## 実施（26 レコード、6 ゾーン、失敗 0）
+
+道具は `scripts/provision-resend-dns.cljs`（nbb、dry-run 既定、`--execute` で適用）。
+**DKIM/SPF の値をファイルに転記せず Resend API から都度取得する** ——
+鍵がローテートされたときに静かに drift しないため。
+
+| ゾーン | 作成 |
+|---|---|
+| shinshi.club / aozora.app / x402.nexus | 各 5（Resend 4 + DMARC 1） |
+| kotobase.net | 9（Email Routing MX 3 + DMARC 1 + 認可 5） |
+| itonami.cloud / murakumo.cloud | 各 1（DMARC） |
+
+## 実測した罠
+
+- **`GET /user/tokens/verify` の `1000 Invalid API Token` は鍵の死を意味しない。**
+  keychain `gftd.cf`/`API_TOKEN` はこれを返しながら
+  `/zones/{id}/dns_records` の読み書きに通った。verify は user-owned token 用の
+  endpoint で、account-scoped token では権限不足になる。
+  **鍵の生死は、実際に使う endpoint で判定する。**
+- **kagi の `no such item` は不在の証拠にならない。** documented かつ確実に存在する
+  `itonami-mail-age` すら同じ文字列を返した（vault が unlock されていない）。
+  **存在が確実な item で到達性そのものを先に確かめる。**
+- **secrets-location-map の「実測で存在しない」は 9 日で腐っていた。**
+  2026-08-05 に `gftd.cf` は NOT FOUND と記録されていたが、2026-08-14 には
+  PRESENT。過去の実測を現在の不在の証拠として引用したために、到達できる鍵が
+  手元にありながら「資格情報が無い」と結論しかけた。
+- **作成前に `dig` を打つと、その NXDOMAIN が 30 分キャッシュされる**
+  （SOA minimum 1800）。作成直後に public resolver が空を返すのは伝播の失敗では
+  なくネガティブキャッシュである。
+  ⚠ **その区別に「権威 NS へ直接引く」を使ってはいけない。** この環境から
+  `dig @everton.ns.cloudflare.com` は、Cloudflare API 上に確実に存在する
+  レコードに対しても空を返した（一度だけ成功したのは偶然で、それを根拠に
+  「権威は応答している」と書きかけた）。**判定に使える面は 2 つだけ** ——
+  設定の正本は **Cloudflare API**、送信者が見る値は **public resolver 複数**。
+  両者が一致したときに初めて完了と言える。
+
+## Resend MCP —— ダッシュボード操作だと思っていたものが API だった
+
+`https://mcp.resend.com/mcp`（公式ホスト、`Authorization: Bearer <API key>` が
+そのまま通る）を local scope で登録した。**リポジトリの `.mcp.json` には入れない**
+—— header にトークンを書くので、commit されるファイルに置くと鍵が漏れる。
+
+これで**残件だと書いた「ダッシュボードでしかできない」作業が消えた**:
+`update-domain` の `capabilities.receiving: \"disabled\"` で
+`mail.kotobase.net` / `mail.itonami.cloud` の Resend 受信を停止し、
+**両者は `partially_failed` から `verified` になった**。
+
+教訓は前節と同型 —— **「API が無い」も、確かめずに書けば古い実測と同じ嘘になる。**
+本 ADR は初版でこれを残件に挙げていたが、MCP のツール表を 1 回引けば済んだ。
+
+## 受信は実測した —— catch-all はサブドメイン宛を拾う（2026-08-14）
+
+「MX を足したこと」は「受信できること」の証明ではないので、実際にメールを通した。
+**1 通では足りない** —— delivered を見ても、それが「ルールが照合した」結果なのか
+「このテストは何を送っても delivered になる」だけなのか区別できない。同じ
+Cloudflare MX 上で**ルールの有無だけが違う対照**を並べた:
+
+| # | 宛先 | 条件 | 結果 |
+|---|---|---|---|
+| **A** | `probe@mail.kotobase.net` | Cloudflare MX + catch-all **ON** | **delivered** |
+| **B** | `norule-probe@mail.itonami.cloud` | 同じ MX、**ルール無し** | **bounced `550 5.1.1`** |
+| **C** | `test@mail.itonami.cloud` | 同じ MX、ルール有り | **delivered** |
+
+B が hard bounce したので、**このテストは失敗を出せる**。したがって A の delivered は
+情報を持つ ——**Cloudflare Email Routing の zone catch-all はサブドメイン宛を拾う。
+`mail.kotobase.net` は受信できており、`itonami` のような明示ルールは要らない。**
+`_dmarc.mail.kotobase.net` の `rua=dmarc@mail.kotobase.net` も、これで届く宛先に戻った。
+
+**副産物（itonami 側の実在するギャップ）**: `mail.itonami.cloud` は catch-all が
+**OFF** で有効なルールが `test@` 1 本しか無い。**それ以外の宛先は全て
+`550 5.1.1` で hard bounce する** —— actor 宛のアドレスを増やす予定があるなら、
+1 アドレスずつルールを足すか catch-all を入れる必要がある。
+
+## 残件
+
+- **新規 3 ドメインの SPF 行が `pending`。** DNS は public resolver 3 種で解決
+  済み、レコードの内容は verified な `mail.murakumo.cloud` と同一。
+  Resend/SES 側の非同期検証待ちと見ているが、**「DNS は正しいのだから通るはず」は
+  観測ではない** —— verified を見るまで完了としない。
+  ⚠ **`verify-domain` を繰り返し叩かないこと。** あれは全行を `pending` に
+  リセットしてから再チェックするので、90 秒ごとに叩く監視は**進捗を毎回消す**。
+  実際 DKIM が一度 verified に到達していたのを、こちらの再送で pending へ戻した。
+  **監視は読み取り専用にする。**
+- `email.gftd.co.jp` の DMARC は未実施 —— `gftd.co.jp` は GoDaddy がゾーンを
+  持っており、この Cloudflare token では書けない。
+- `p=quarantine` のまま `rua` のレポートを待つ。正当な送信元の failure が出たら
+  下げる（上記 決定 5）。
+- `email.gftd.co.jp` の DMARC は未実施 —— `gftd.co.jp` は GoDaddy がゾーンを
+  持っており、この Cloudflare token では書けない。
+- 全ゾーン `p=none`（観測モード）。rua のレポートを見てから `p=quarantine` へ
+  上げる判断をする。")))

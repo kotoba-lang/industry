@@ -1,0 +1,125 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609092000-a-facilitator-that-teaches-what-it-refuses")
+ (:adr/doc_type "adr")
+ (:adr/topic "a-facilitator-that-teaches-what-it-refuses")
+ (:adr/title "x402.nexus: a request that cannot be evaluated is not a verdict — typed errors, seller self-service, webhooks, and a docs site that names the libraries")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-09")
+ (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+ (:adr/repos (vector "network-awai/nexus-x402" "kotoba-lang/x402-directory" "kotoba-lang/x402-sdk" "com-junkawasaki/root"))
+ (:adr/body "## What this session changed, and what it measured first
+
+Three landings on x402.nexus, each starting from a measurement against the
+LIVE service rather than from a reading of the code.
+
+### 1. A request that could not be evaluated stopped answering as a verdict
+
+Measured live: `POST /verify {\"nonsense\":1}` answered **200** with
+`{\"isValid\":false,\"invalidReason\":\"unsettled: tx-not-found\"}`. Nothing about
+that request had been evaluated -- `payment` and `requirements` were both
+absent, `pay.x402/payload-errors` compared nil to nil, found every field equal,
+and the chain was asked for the receipt of transaction `undefined`. The caller
+was told their transaction is not on chain, so the first thing every integrator
+does (send a half-right body) sent them to debug their wallet.
+
+The line now drawn: **400 = we could not evaluate this, no chain call was
+made. 200 + isValid:false = we evaluated it and the payment is bad.**
+Mismatches between payment and requirements stay on the 200 side -- paying on
+the wrong chain is a real answer about a real payment.
+
+Two things the old path also threw away: `verdict` throws ex-info NAMING the
+network it has no RPC for and the handler replaced it with the string `bad
+request`; and there was no request id anywhere. Both fixed -- every response
+now carries `x-request-id`, derived from `cf-ray` so the id a caller quotes is
+the id in the edge log, computed once per request and threaded so header and
+body cannot disagree.
+
+`/openapi.json` documented neither `/verify` nor `/settle` -- the two routes
+that MAKE this a facilitator, neither of which takes a credential -- while the
+HTML page for humans had listed them the whole time. Wrong way round for a
+service whose buyers are programs.
+
+### 2. Idempotency, MCP tools, seller keys, settlement webhooks
+
+* `Idempotency-Key` on `/settle` only (the one route with an effect to be
+  unsure about). Body fingerprinted AS RECEIVED, not re-serialised: two
+  encoders ordering keys differently mean the same request. Does NOT replace
+  the spend gate -- the gate refuses a second CHARGE (a replay), the key makes
+  a second ATTEMPT harmless (a retry). KV has no CAS, so two simultaneous
+  first attempts can both proceed; stated rather than papered over.
+* `verify_payment` / `settle_payment` over MCP. Neither takes a credential
+  over HTTP, so this grants an agent nothing it did not already have.
+* Seller keys. The only settlement route was `/admin/settlements/<seller>`
+  behind ADMIN_TOKEN -- the OPERATOR's credential, which would hand a seller
+  every other seller's ledger. `/apply` already proves domain control; it now
+  exchanges that, once, for `sk_live_`. Stored as sha256. Rotation is proved by
+  the ORIGIN, deliberately not by the old key: the reason to rotate is usually
+  that the old one is lost. `GET /v1/me` `/v1/settlements` `/v1/events`,
+  `POST /v1/keys/rotate`. The seller comes from the key and never from the URL.
+* Webhooks, with the promise stated in full: **one delivery attempt, no
+  retries.** The event is durable BEFORE it is sent (appended, awaited) and
+  delivered via `ctx.waitUntil`; `GET /v1/events?since=` is the contract and
+  the webhook is a latency optimisation over polling it. Emitted from the
+  gateway path too -- gateway proxy is the mode that exists so a seller does
+  NOT run its own gate, and it would otherwise have been the one seller with
+  no events at all.
+
+Found on the way: `nexus.apply/origin-host` ACCEPTED IP literals while both
+error messages it feeds had said `no IP literal` the whole time (`host-re`
+admits 127.0.0.1). A refusal that exists only in the message it would have
+printed is not a refusal -- and this host is fetched.
+
+### 3. The docs surface became a docs site
+
+Measured on the live page before any of it: the first line of code was ~2,900px
+down under a 31-row inventory table; npm / pip / cargo / go get appeared **zero
+times** in the HTML, in /llms.txt and in /skill.md while all four client
+libraries had been published for eight days; there were **zero**
+`prefers-color-scheme` rules; and /skill.md named three MCP tools while the
+manifest served five.
+
+`x402-directory` grew `:pre-sections-html` so the operator, not the library,
+decides whether a quickstart sits above or below the inventory. Language tabs
+are radio inputs and sibling selectors with no script -- partly for the usual
+reasons and mostly because a model fetching the page reads the MARKUP, so all
+five snippets are in the text whether or not a browser selects one.
+
+`nexus.theme` said `DADS has no dark palette`. True when written, false since
+`jp-go-dds.dark` grew one: an implementation state written down as a property
+of the design system, still deciding the page's appearance after the reason
+expired.
+
+## What the checks taught, which is the part worth keeping
+
+**Four checks in this session were satisfied by absence before they were
+fixed.** That is the workspace's recurring defect, met four more times:
+
+1. `payload-errors` answered `[]` for nil-against-nil, so the shape check
+   passed and the chain reported on a transaction nobody had named.
+2. The cross-seller test asserted on the envelope's `seller` field -- which
+   comes from the key -- instead of on the entries. A mutation that kept the
+   correct LABEL and served one seller's rows to everyone PASSED. This is the
+   security boundary of the whole seller API and it was being checked by
+   reading back a label.
+3. The `:pre-sections-html` ordering test compared `.indexOf` values, and
+   `.indexOf` answers -1 for absent, so `(< -1 n)` is true: deleting the
+   emission entirely left the test green.
+4. Two invented CSS token names (`--color-background`, `--color-text-body`)
+   shipped into the docs stylesheet. An unmapped custom property resolves to
+   NOTHING and the rule collapses in silence; the page looked unchanged.
+
+Only mutation testing found 2 and 3; only rendering found 4.
+
+**And one instrument lied in the other direction.** I concluded twice that dark
+mode was broken because two screenshots were byte-identical. They were
+identical because headless Chrome on this machine defaults to
+`prefers-color-scheme: dark`, so BOTH were dark. Computed styles from the
+browser settled it in one call; a pixel comparison never could have, because it
+cannot tell `no difference` from `no difference measured`.
+
+**The deterministic design-quality audit scored 100.00 before and after.** It
+has converged on its ten axes and sees none of: content order, whether a
+published library is mentioned, language coverage, dark support, or copy
+affordances. Recorded here as a no-regression floor, explicitly NOT as evidence
+of improvement -- a converged gate quoted as a score is the same defect this
+ADR is otherwise about.")))

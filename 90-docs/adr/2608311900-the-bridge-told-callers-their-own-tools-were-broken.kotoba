@@ -1,0 +1,308 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608311900-the-bridge-told-callers-their-own-tools-were-broken")
+  (:adr/title "claude-bridge が caller に「あなたの道具は壊れている」と報告していた —— guest の拒否された試行を salvage する")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-31")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/last-verified "2026-08-31")
+  (:adr/authoritative true)
+  (:adr/topic "claude-bridge-tool-calls")
+  (:source/dataset "adr")
+  (:adr/authoritative_for "claude-bridge が caller 宣言ツールをどう返すか（salvage の発火条件と、配管エラーを転写しない床）")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2608200200-claude-bridge-502-max-turns-and-the-tool-flag-that-was-not-a-tool-flag"
+                "adr-2608311100-relay-credit-metering-and-the-operator-identity-that-blocked-it"
+                "adr-2608301700-hermes-and-itonami-bot-reliability-session"
+                "adr-2608136000"))
+  (:adr/body "## 症状 — bot が「自分の道具が全部壊れている」と報告した
+
+hermes の bot が、operator にこう報告した（2026-08-31、原文）:
+
+    今、ツール呼び出しが軒並みエラーになっています。message_agent も含め、
+    memory のような無害なツールですら \"No such tool available\" となり、
+    フリート確認のための ping を1件も送信できていません。
+
+hermes は壊れていなかった。**caller（hermes）の道具は全部正常で、その報告は
+bridge の内部エラーを caller の世界の事実として転写したもの**だった。同じ文は
+ADR-2608311100 にも 1 行だけ現れる（\"The local bridge is also broken
+independently — it answers `No such tool available` for every tool. That is why
+it must not be first.\"）。そこでは fallback 順を変えて回避しただけで、機構は
+特定されていない。
+
+## 機構 — 測った
+
+`claude-bridge` は guest を `--tools \"\"` で起動する（ADR-2608200200。これが無いと
+guest が本当に Bash を実行する）。したがって guest が持つ道具は
+`StructuredOutput` 1 つだけで、caller の道具は system prompt で「あなたは持って
+いない。名前を挙げれば caller が走らせる」と説明される。
+
+**guest はそれでも直接呼びに行く。** 実 CLI を bridge と同じ引数で回した
+event stream（2026-08-31）:
+
+    system  init            tools=['StructuredOutput']
+    assistant TOOL_USE      name=terminal input={\"command\":\"ls -a /tmp/hermes-probe\"}
+    TOOL_RESULT is_error=1  <tool_use_error>Error: No such tool available: terminal</tool_use_error>
+    assistant TOOL_USE      name=terminal   (同じ呼び出しを再試行)
+    TOOL_RESULT is_error=1  <tool_use_error>Error: No such tool available: terminal</tool_use_error>
+    assistant TOOL_USE      name=StructuredOutput
+                            {\"content\":\"Listing the files now.\",
+                             \"tool_calls\":[{\"name\":\"terminal\",\"arguments\":{...}}]}
+    RESULT  subtype=success num_turns=4
+
+この run は**立ち直った**（4 ターン中 2 ターンを無駄にしたが、最後に正しく
+tool_calls を返した）。立ち直らない run では、guest は諦めて**その拒否メッセージを
+`content` に書き、`tool_calls` を空のまま返す**。同日、live bridge に対する実測:
+
+    \"Both `terminal` and `read_file` returned \"No such tool available\" errors,
+     so I couldn't list the files in /tmp/hermes-probe. This looks like a
+     tool-access issue on the bridge side.\"
+    → HTTP 200 / tool_calls 無し / finish_reason=stop
+
+caller から見ると、これは「道具が壊れている」という**権威ある答え**である。
+bridge の log にも `calls=0` としか出ないので、成功と区別が付かない。
+CLAUDE.md の「測れなかった検査が、測って問題が無かった検査と同じ値を返す」の、
+返答側の形。
+
+## 決定 — 床を 2 枚
+
+**1. directive（prompt 側）。** 拒否メッセージを名指しし、それが bridge の配管の
+話であって caller の道具の話ではないと書く。「絶対に caller に転写するな」も書く。
+
+**2. salvage（機構側）。** prompt は model が拒否できる要求なので、これだけでは
+床にならない。`attempted-caller-calls` が event stream から guest の**拒否された
+直接呼び出し**を拾う —— **その試行こそが「どの道具をどう呼ぶか」という model の
+決定**であり、拒否は配管の都合でしかない。`salvage-tool-calls` はそれを
+`tool_calls` に入れる。
+
+意図的に狭くしてある:
+
+| 条件 | 動作 | 理由 |
+|---|---|---|
+| `tool_calls` が既に在る | 触らない | common path を 1 バイトも変えない |
+| 拒否された試行が在り、返答が空 or 配管の話 | 試行を tool_calls にする | これが直したかった形 |
+| 拒否された後に**普通に答えた** | 触らない | 放棄した呼び出しを蘇らせるのは別のバグ |
+| caller が宣言していない名前（`Bash` 等）の試行 | 拾わない | caller が実行できない。`--tools \"\"` が防いでいる agent 化そのもの |
+| 拾えるものが無く、返答が配管の話 | **HTTP 502** | 嘘を 200 で返すより、caller が再試行できる誤りの方がよい |
+
+## 検証 — 両方向を、実 HTTP で
+
+`scripts/verify-bridge-tool-call-salvage.cljs`（新規、exit 0/1/2）。stub の
+`claude` を `CLAUDE_BRIDGE_BIN` で差し込み、**実物の bridge を実 HTTP で**
+4 ケース駆動する。実 CLI を使わないのは、この挙動が guest の *ときどき* であって
+**要求に応じて赤くできない検査は沈黙と同じ**だから（CLAUDE.md の問い 5）。
+
+    ok    salvage       諦めた返答からも caller は tool_call を受け取る
+    ok    healthy       正しく名指しした呼び出しは素通り（無回帰）
+    ok    recovered     放棄した試行は蘇らせない
+    ok    unrecoverable 配管の苦情は 502。転写しない
+    CASES 4 / all cases held
+
+**discrimination を確認した**: `salvage-tool-calls` を identity に差し替えて同じ
+スイートを当てると exit 1 で `salvage` と `unrecoverable` の 2 件だけが落ち、
+`healthy` と `recovered` は緑のまま。つまりこの 2 件は「全部通る」から通って
+いるのではない。
+
+## live の実測（restart 前後、同一リクエスト）
+
+|  | before | after |
+|---|---|---|
+| tool_calls | 0（配管の苦情を content に） | 1（`terminal`、引数そのまま） |
+| prompt_tokens | 32,887 | 6,222 |
+| 応答 | 長時間 | 4.3s |
+| bridge log | `calls=0` | `calls=1` |
+
+## directive は直接呼び出しを止めていない —— 測ったら 12 回中 7 回（2026-08-31 追記）
+
+上の after 1 本を見て「directive だけで guest が直接呼び出しをやめた」と最初に
+書いた。**誤りだった。** その時点では試行回数を数える手段が無く、
+`salvaged=` が出ていないことを「試行が無かった」と読んだ —— 発火しなかった床と、
+そもそも要らなかった床が、出力で区別できていなかった。
+
+数えられるようにしてから同じ形の 12 リクエストを流した結果:
+
+    runs=12  with-attempts=7  salvaged=0
+
+**58% の run で guest はいまだに caller の道具を直接呼びに行っている。** 今回は
+12 本とも自力で立ち直った（`calls=1`）ので salvage は 1 度も要らなかったが、
+**旧来の失敗の前提条件は過半の run で今も成立している。** salvage は dead code
+ではなく、コイン投げの下に敷いた網である。
+
+数え方: `:attempted` を tools 付き結果**全部**に（0 も含めて）載せ、log に
+`attempts=N` として出し、process 生涯の `{:runs :with-attempts :salvaged}` を
+`/health` の `tool_runs` に出す。分母が無いと「salvage が発火しない」は
+*directive が効いている* とも *salvage が死んでいる* とも読めて、両者は正反対の
+対応を要求する。refuse された run も数える —— 成功だけ数えると 502 の床が
+一度も働いていないように見える。
+
+検査は 5 ケース目で counter を assert する（`runs=4 / with-attempts=2 /
+salvaged=1`）。`Bash` の試行が with-attempts に入らないこと（caller が宣言して
+いない名前は「caller の道具に手を伸ばした」ではない）と、refuse された run が
+runs に入ることを、この 1 ケースが同時に固定する。refuse の計上だけを外すと
+このケースだけが `expected runs=4, got {:runs 3 …}` で落ちる。
+
+## 同時に直したもの — 恒久的に exhausted だった credential
+
+`verify-hermes-agent-health`（登録済みだが一度も走っていなかった）を初めて回した:
+
+    SCANNED 29 file(s) across 25 profile(s)
+    FINDING fail hermes-credential:bridgetestclone/openrouter/f0fb65
+    FINDING fail hermes-credential:bridgetestfresh/openrouter/f0fb65
+    FINDING fail hermes-credential:murakumo-eng/openrouter/f0fb65
+
+3 profile の pool が `last_status: exhausted` / `last_error_code: 402` /
+`last_error_reset_at: null` を持っていた。null は**永久に再試行しない**。
+fingerprint は `sha256:6cb1ae5a…` で、root の生きている entry と shell env の
+`OPENROUTER_API_KEY` はどちらも `sha256:4ad8bc54…`（値は読まず fingerprint だけを
+比較した）。**鍵は生きていて、pool の状態だけが古かった。**
+
+`hermes --profile <p> auth reset openrouter` を 3 profile に当てて解消
+（detector 再実行で fail 0）。
+
+⚠ その `auth reset` は **`Reset status on 0 openrouter credentials` と表示しながら
+3 件とも実際にリセットした**（前後で `last_status` が `exhausted` → `None`）。
+upstream hermes の `auth_reset_command` の表示欠陥で、この repo の問題ではないが、
+**その出力を測定として引用しない**こと。
+
+## fleet の現在地（2026-08-31 11:36 実測）
+
+    cron          24h: completed 160 / unknown 2 / failed 0
+                   7d: completed 1180 / failed 65 / unknown 6  (94.3%)
+                  担っているのは itonami-po / kotobase-po / murakumo-po の 3 profile
+    profile 活動   25 中 12 が直近 12h 以内に発話、13 が 158.5h 沈黙
+                  158.5h 側は 1 点に固まっている = 作られてから一度も駆動されて
+                  いない（クラッシュではなく仕事が無い）
+    gateway       running / ticker heartbeat 11s
+
+## 自分が 1 回間違えた形
+
+cron を数えるとき `started_at > <unix秒>` で絞ったが、この列は **ISO-8601 の
+文字列**である。SQLite では TEXT は常に数値より大きいので、**フィルタは 1 行も
+落とさなかった**。その結果「直近 24h の 111 実行が全部 failed」と読みかけた
+（実際は 08-19〜08-24 の履歴で、job は既に disabled）。ISO 文字列同士の比較に
+直して測り直したのが上の表。ADR-2608301700 が同じ日に 4 回記録した
+「照合器が別のものを掴んでいるのに、その結果を測定として報告した」形の再発。
+
+## 同じ誤帰属の連鎖が、もう 1 本 log の中で動いていた（2026-08-31 追記）
+
+log を読み直して見つけた: bridge が model `murakumo-main` を 3 回受け取り、
+Claude CLI が `unrecognized_model` で 404 を返し、bridge がそれを **502
+upstream_error** にしていた。
+
+出所は codinator の `auxiliary.compression.model: murakumo-main`
+（`base_url` は murakumo）。primary が落ちると auxiliary 呼び出しは
+fallback の claude-bridge へ行くが、**model 名は primary のものを持ったまま**
+なので、CLI にとっては存在しないモデルになる。
+
+502 は「一時障害」なので hermes は 3 回再試行する —— 決して成功しない要求に対して。
+そして compression が死ぬと、detector の docstring が書いているとおり
+**次のエラーは長さのせいにする**。この ADR の冒頭の事件と同じ誤帰属の連鎖が、
+規模を小さくして同時に走っていた。実際 `verify-hermes-agent-health` が残していた
+warn `hermes-compression-dead:codinator` の本文は
+`502 - claude reported an error subtype=success terminal_reason=api_erro…` で、
+bridge log の `murakumo-main` 404 3 本と同じ形をしている。
+
+**決定**: CLI が `unrecognized_model` を報告したら **400 invalid_request_error**
+にし、本文に「この bridge が serve するモデル」を並べる。理由は 429 のときと同じ
+——**再試行で直らないものを再試行させない**。型も直した（`case` で 400 →
+`invalid_request_error`。OpenAI client はこの型で分岐する）。
+`unrecognized_model` は result event ではなく **stderr** に載るので、
+`upstream-status` は stderr も受け取る。
+
+検査は 6 ケース目。400 マッピングだけを外すと**このケースだけ**が
+「still 502 upstream_error — hermes reads that as transient」で落ちる。
+
+⚠ 最初この fixture は caller に `claude-sonnet-5`（serve 済み）を要求させながら
+stub には別モデルの拒否を演じさせていたので、bridge のエラー本文が
+**serve しているモデルを「serve していない」と言う**形になった。fixture を現実に
+合わせ（caller が `murakumo-main` を要求する）、本文が拒否されたモデル名と
+serve 一覧の両方を含むことを assert している。
+
+**hermes 側の config は触っていない** —— 25 profile の auxiliary が primary の
+model 名を持ったまま fallback する設計は hermes 側の話で、ここで直すのは
+「その要求が来たときに正直で再試行不能な答えを返す」ことだけ。
+
+## live の証拠が出そろった（2026-08-31 追記）
+
+**salvage は実際に発火した。** fleet 全体に health ping を投げた際の bridge log:
+
+    <- claude-sonnet-5 ...ms ...B calls=1 attempts=1 salvaged=1
+
+`/health` の累計は `runs=29 with-attempts=13 salvaged=1`。**45% の run が今も
+caller の道具に直接手を伸ばしており**、そのうち 1 本は自力で立ち直れず、床が拾った。
+上の「12 run で試行 7・salvage 0」に「だから床は要らない」と読める余地はもう無い。
+
+**400 も発火した。** 同じ窓に `-> murakumo-main 1 block(s) tools=1` が来て
+`<- ERROR ... this bridge does not serve model \"murakumo-main\" -- it serves …`
+で即座に返った。**`tools=1` の auxiliary 呼び出し**であり、codinator の
+compression と同じ形。以前ならここで 502 が返り、hermes が 3 回叩いていた。
+
+## fleet ping — 24/24 が応答した（2026-08-31）
+
+各 profile に「今ツールを呼べるか。呼べるなら 1 つ実行して答えよ」を投げた。
+
+    24 profile 中 24 が応答（exit 0）
+    22 が実際に tool を実行したと報告（date / echo / web_search の実結果つき）
+     2 が「呼べない」と回答
+
+⚠ **最初の測定は嘘だった。** 並列 5・上限 180s で回したところ 13 本が exit 124 に
+なり、危うく「13 bot が無応答」と報告するところだった。**それは私の timeout で
+あって bot の障害ではない** —— 並列 3・上限 420s で回し直すと 15 本すべてが
+31〜243s で正常応答した。負荷の高いマシンで測った timeout を、対象の性質として
+報告しない。
+
+**「呼べない」と答えた 2 本は、自己申告を鵜呑みにせず測った。**
+
+- `bridgetestclone` —— hermes が **tools=0 で問い合わせている**（ping 窓で
+  tools=0 はこの 1 本だけ）。しかも走ったのは claude-bridge ではなく
+  **cursor-bridge (9181) の `cursor-grok-4.6-high`**。bridge の欠陥ではない。
+- `itonami-sales` —— 「この profile は設計上 tool 無しで動く」と答えたが、
+  **config に toolsets 制限は無い**。bridge log の対応行は
+  `calls=0 attempts=1`（応答 179B ≒ 保存された 182B）。つまり**道具に手を伸ばし、
+  拒否され、自分の言葉で言い訳を書いた** —— 拒否文の literal を含まないので
+  salvage の条件（空 or 配管の話）に当たらなかった。**bot の自己説明は測定ではない。**
+
+## detector 自身が、見えていない窓を見たと言っていた
+
+`verify-hermes-agent-health` は `errors.log` **1 本だけ**を読み、`48h` と印字して
+いた。実際に読めていたのは rotation を生き延びた分だけである。
+
+同じ日、desktop クライアントが **存在しない session へ永久にポーリング**していて
+（`948207dd` に加えて新しく `5bced081` も。**どちらも state.db に無く、
+`gateway_routing` は空**なので、stale id はクライアントのメモリにしかない）、
+errors.log の **96.3%** がその 1 行、生き残っていた最古の行は **55 分前**だった。
+
+rotate 済みの `errors.log.1` / `.2` も読むようにして両方向を比べた:
+
+    live のみ:      LOGSPAN full=24/26   `<root>` の compression 所見が無い
+    rotate 込み:    LOGSPAN full=25/26   その所見が戻る
+
+**洪水は実際に所見を 1 件消していた。** さらに `LOGSPAN` を常に印字し、
+rotation で欠けた profile（TRUNCATED）と、単に履歴が短いだけの profile（YOUNG）を
+分けて報告する —— **fleet の最小値を取ると、1 分前にできた log 1 本が全体を
+0.0h に引きずり、他が健全であることを隠す。**
+
+## 直していないもの
+
+- **`approval.pending` の busy poll**: 11:08–11:19 の 11 分で 1,573 行、全部同じ
+  reaped session (`948207dd`) に対する `session-scoped RPC rejected`。upstream
+  hermes の desktop client 側の polling で、errors.log を実質使えなくしている。
+  この repo のコードではない。
+- **salvage は「自分の言葉で諦めた」run を拾えない。** 条件が「返答が空 or
+  拒否文の literal を含む」なので、`itonami-sales` のように model が自分の言葉で
+  言い訳を書くと素通りする。実測 29 run 中 `calls=0 attempts=1` が 4 本あり、
+  そのうち何本がこの形かは分けられていない。条件を「試行があれば常に」まで
+  広げると、拒否された後に**普通に答えた** run（`recovered`）を壊すので広げて
+  いない。分けるにはテキスト以外の手がかりが要る。
+- **approval.pending の永久ポーリングは止めていない。** 停める手は Hermes
+  desktop の再起動だけだが（launchd の job は `not running` で、動いている
+  pid 25535 は PPID 1 の別インスタンスなので `kickstart` は効かない）、
+  **その時点で operator の session が稼働中だった**（数秒おきに terminal を
+  実行して各 profile の cron を点検していた）。log ノイズを直すために稼働中の
+  turn を中断するのは割に合わない。detector 側は rotate 済みを読むようにして
+  実害を消したので、再起動は operator の都合のよいときでよい。
+- **`bridgetestclone` は tools=0 で問い合わせている**（ping 24 本中この 1 本だけ）。
+  bridge は宣言が無いので正しく「道具は無い」と答え、bot も正しくそう報告した。
+  つまり bridge の欠陥ではなく、その test clone 固有の profile 設定。姉妹の
+  `bridgetestfresh` は同じ ping で実際に tool を実行して返している。
+")))

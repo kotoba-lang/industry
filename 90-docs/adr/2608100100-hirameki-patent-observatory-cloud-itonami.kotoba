@@ -1,0 +1,117 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608100100")
+  (:adr/title "特許観測を cloud-itonami/hirameki に据える — kotoba-lang は lib だけにする")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-10")
+  (:adr/supersedes-scope "ADR-2607251552 の residency 部分（loop が toshokan-patents に居るという前提）")
+  (:adr/related "2606212200 2607251552 2607072300 2608081200 2608080100 2607173000 2605241500")
+  (:adr/body
+  "## 何が起きていたか
+
+オーナーの問い「特許情報を取得して分析, edn, datalad で保存する repo, actor はある?
+どれぐらい収集できている?」に対して、最初に **4 件**と答えた。これは誤りだった —
+ローカル checkout の west pin が 47 commit 遅れていて、remote main には **618 特許 /
+10,528 quads / seed 1,613 件待ち**が入っていた。
+
+そして本当の問題はそこではなかった。**その収集は 2026-07-28 に止まっており、
+13 日間誰も気づいていなかった。** LaunchAgent は launchctl にロードされておらず、
+loop は `kotoba-lang/toshokan-patents` という **library repo の中**に住んでいた。
+ライブラリの中のデーモンは誰の actor でもないので、止まっても誰も見ない。
+
+## 決定
+
+オーナー指示（2026-08-10）「kotoba-lang 側は lib だけにしたい」に従い、3 層に分ける。
+
+| repo | 持つもの |
+|---|---|
+| `kotoba-lang/toshokan-patents` | **lib のみ** — HTML→field-map（純粋）+ 1 リクエスト。ループもデータも持たない |
+| `cloud-itonami/hirameki` | **actor** — ループ・種のポリシー・カーソル・分析・ゲート・コンソール |
+| `cloud-itonami/hirameki-patents` | **corpus** — journal / shard / CID manifest（DataLad dataset） |
+
+actor は `etzhayyim/com-etzhayyim-hirameki`（閃・patent observatory、gates G1–G9、
+analyze/ingest/dataset/autorun）を port した。**新規に起こさなかった** —
+CLAUDE.md『「無い」と結論する前に検索する』の規則どおり、既存を使う。
+
+`manifest/observatories.edn` に 23 件目として登録（ADR-2608081200）。22 件の中に
+特許 observatory だけが空いていた。
+
+## 実測した現在地（2026-08-10）
+
+corpus 625 特許（harvest 618 + curated 7）/ 引用エッジ 2,448 / 未取得フロンティア
+1,331 / 管轄 20 / 出願人（組織）287・named-HHI 0.013。
+
+**これは世界の標本ではない。** 4 件の種特許（CRISPR ×2・水性塗料・mRNA-LNP）から
+歩いた引用グラフの近傍で、約 2 億件に対して 0.0003%。上位保有者に塗料メーカーが
+並ぶのは種の 1 件が塗料特許だったからで、塗料産業についての事実ではない。
+`ingest-provenance.edn` にこれを明記した。
+
+**CPC 分類が無い。** Google Patents のページは CPC 記号を載せていないので、技術分野別の
+集中度はこの corpus からは計算できない。行は `:field \"UNKNOWN\"` を持ち、タイトルからの
+推測はしない。CPC を供給できるのは USPTO ODP の経路だけで、実装済み・fixture でテスト済み
+だが**ライブ API に対して一度も実行していない** — `:operator-step-not-yet-run` と記録した。
+
+## CID が検証不能になっていた（設計変更を要した）
+
+`bafkrei…` の CIDv1/raw は **1 ブロックのハッシュ**で、`ipfs add --cid-version=1
+--raw-leaves` と一致するのは 256 KiB の chunker 上限までである。corpus が 7 行から
+625 行に増えて 280 KB に達した時点で、publish-manifest が主張する CID は**黙って
+検証不能になっていた**。実測:
+
+    corpus 280,078 bytes
+      主張   bafkreibo345qp6u5zkpf3zrbp4hbwtl6u5ov53gsixb43azzgnw7svk3va
+      ipfs add bafybeicpvod7rmqy2l74m32tjf3gtaez6q2axx5pznwofi4aaeedlcy3pm
+
+UnixFS DAG を自前で組むと publish が IPFS 実装に依存し、「daemon 無しで検証できる」
+という repo 自身の約束を壊す。**成果物を 1 ブロックに収まるシャードに分割**し、
+上限を超えるシャードは publish 自体を拒否する形にした。5 シャードすべてが実際の
+`ipfs add` と byte 一致することを確認済み。
+
+`verify.clj` は bytes / CID / ブロック上限に加えて **シャードの件数合計**も検査する —
+CID はシャードが無傷であることは証明するが、**シャードの集合が欠けていないことは
+証明しない**。1 バイト書き換えで exit 1、戻すと exit 0 になることを確認した。
+
+## DataLad を実体化した
+
+`dataset.edn` は `:git-annex-ipfs-ready` と書いてあったが annex は初期化されていなかった。
+`datalad create` を実行し annex を実体化（uuid 321b04b1）。**ただし何も annex には
+入れていない** — `.gitattributes` が `*.edn` を git に流しており、280 KB でそれは正しい
+（annex 化すると行単位の diff とレビューを失う）。annex は operator legs が生む bulk
+（`*.tsv`）のためにある。content remote は annex 対象が無いので未設定で、GitHub は
+そもそも annex content を配れない（`git-annex-shell` が無い）。
+
+## テストが捕まえた実バグ（実装後ではなく、書いている最中に）
+
+- **corpus**: 共同出願特許の `:assignee` が quad の順序に依存していた。同じ事実を別の
+  順序で畳むと別の保有者が名乗る（US8697359B1 は Broad **と** MIT）。
+- **dataset**: シャード packer が確定済みグループを acc に積まずに捨てていた。**625 行中
+  54 行しか書かず**、CID もバイト数も内部整合していたので下流は誰も気づけない。
+- **normalize**: `Individual`（Google の個人出願プレースホルダ）が集中度表の**第 2 位、
+  6.0%** として入っていた。Nippon Paint より上。誰についての事実でもない。
+- **autorun**: `verify-chain` を文字列キーで読んでいて（隣の actor の形）、**健全な台帳が
+  毎回「chain BROKEN」と出ていた**。常に赤い信号は無視される。
+- **analyze**: `.cljc` なのに `format` を無条件に使っていて cljs で壊れる。
+- **views**: 自分で作った 2 つの `--hig-*` トークンが**無言で何にも解決しない**。
+
+最後の 1 件に対しては、ビルド時に「使われているトークン − 定義されているトークン」を
+突き合わせて exit 1 する検査を入れた。**トークン名の当て推量は、誰かがページを見るまで
+正しい名前と区別がつかない。**
+
+## 検証
+
+`clojure -M:test` 60 tests / 261 assertions 0 failures · autorun 3 cycle で 1 tx +
+2 no-op（内容で冪等）· harvest ライブ 1 件（US10584378B2、引用 43、404 は nil）·
+design-quality 監査 100.00（min 95）· crossing test 4 view 移動で文書 1 枚維持。
+**すべてのゲートについて「壊すと落ちる」ことを実際に確認した。**
+
+## 残っている穴
+
+1. **収集が止まったままである。** loop は動くが常駐していない。フロンティア 1,331 件は
+   1 tick 1 件なので、そのまま 1,331 tick 分の残作業。常駐化（murakumo fleet か
+   LaunchAgent）は未着手。
+2. **CPC が無い** ため field 面の分析が curated seed 7 件に限られる。USPTO ODP key の
+   取得は operator ステップ。
+3. **DID を持たない。** 隣の actor は解決しないホストの did:web を持っているが
+   （実測: watari.etzhayyim.com は DNS 解決しない）、それを複製しなかった。
+   `identity.edn` に `:not-yet-published` と書いてある。
+4. **コンソールが deploy されていない。** ビルドは通り監査も通るが、cloud-itonami の
+   sites plane には出していない。")))

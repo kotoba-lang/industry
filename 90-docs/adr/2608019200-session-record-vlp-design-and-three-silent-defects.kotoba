@@ -1,0 +1,211 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608019200-session-record-vlp-design-and-three-silent-defects")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-08-01")
+  (:adr/last_verified "2026-08-01")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2608019200: セッション記録 — cloud-itonami の AMM 型 business model 設計と、その過程で見つけた3つの「静かに間違う」欠陥")
+  (:adr/topic "session-record-vlp-and-silent-defects")
+  (:adr/repos (vector "orgs/com-junkawasaki/root"
+              "orgs/network-awai/nexus-x402"
+              "orgs/network-awai/cloud-itonami"
+              "orgs/kotoba-lang/loop-system-dynamics"))
+
+  (:adr/authoritative_for
+  (vector "このセッション（2026-07-31 夜〜2026-08-01）の成果が 4 repo に散っていることの索引。何が着地し、何が owner 判断待ちで止まっているかを1箇所で読む"
+   "設計作業の副産物として本番バグが3件見つかったという事実と、その共通原因（wire 境界の型仮定）"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector))
+
+  (:adr/related
+  (vector "90-docs/adr/2607321200（VLP 設計本体。status: proposed）"
+   "90-docs/adr/2608019000（JSON 境界の keyword 値 —— 欠陥クラス）"
+   "90-docs/adr/2608019100（superproject の 6 時間ごとの再 shallow 化）"
+   "90-docs/adr/2607320500（法的構成。VLP の curve はこれの反転要求）"
+   "90-docs/adr/2607319000（Uniswap の実測 value accrual。本設計の出発点）"))
+
+  (:adr/problem
+  "オーナー指示（2026-07-31）: 「今の cloud-itonami の business model を uniswap のような AMM としたい。LP として資産を lock する、or 情報を lock する。トークンエコノミーを検討してみて」、続いて「大事なのは AMM で、cloud-itonami は分散型 SaaS なので初期駆動の LP になる。LP に載せた後、それを原資に AI agent がビジネスを運用する」。
+
+以後 `/loop` で反復。**設計は早期に収束し、以降の大半は実装と検証に費やされた。その過程で本番バグが3件出た。**
+
+成果が root / nexus-x402 / cloud-itonami / loop-system-dynamics の 4 repo に散っており、索引が無いと次に読む者が全体像を掴めない。本 ADR がその索引である。")
+
+  (:adr/decision
+  "### 着地したもの（commit は全て default branch 上）
+
+**設計** — `ADR-2607321200`（status: **proposed**）
+
+- Uniswap から写すのは bonding curve ではなく「**LP に払い token には払わない**」という選択。同 workspace 実測（ADR-2607319000）で Uniswap は fees $850M/yr のうち保有者に 3.3%、V4 は 0%、残りは供給側
+- curve は**収益請求権**に貼る（希少・cold start あり）。**blueprint アクセス**（非競合財）には貼らない
+- seller は**価格 tier ごと**（3〜5個）。registry の `upsert-seller` は 1 seller = 1 rule、価格は rule 単位なので、一律価格も 458 seller も採らない
+- envelope = `min(capital, max(seed-floor, min(k·revenue, theta-max·capital)))`。θ は式から消える（capital が約分される）
+- **cloud-itonami は kekkai を使わない**（1155 repo で 0 件）。資金統治の substrate は `authority.clj` の4不変条件 + `kernels/*.kotoba` を SSoT とする propose/censor/execute の 3 点
+
+**実装** — 純関数の連鎖が通った
+
+```
+network-awai/nexus-x402
+  5349cea  settlement に :path を記録（何が買われたか。path は既に引数にあり渡していなかっただけ）
+  79f31ea  GET /admin/settlements/<seller> に :by-path fold（/stats には置かない）
+network-awai/cloud-itonami
+  b24df79a  kernels/envelope（θ と refusal。整数・0/1 flag・float 禁止）
+  978c7ba9  wasm twin が無いことを docstring に明記
+  17a46f4f  vertical-revenue（:by-path → envelope の refusal flag）
+  446b9226  nexus-x402 の実出力を fixture 化して契約テスト
+kotoba-lang/loop-system-dynamics
+  50ca93b   lever ranking を再現可能に（honesty 制約をテストが持つ）
+```
+
+**運用** — `ADR-2608019100`
+
+```
+com-junkawasaki/root
+  9b0aaf44  shallow 再発の原因特定（~/.gftd の launchd tick、6時間周期）
+  92e02084  同じ死角にもう1件（west 子リポが到達可能 commit 1 件まで潰れていた）
+  ed8f6ef2  scripts/audit-gftd-scripts.cljs（死角を repo 側から可視化）
+  0ea1e8d7  allowlist が秘密を除外することを起動時に検査
+```
+
+### 設計の副産物として出た本番バグ3件 — 共通原因は1つ
+
+**3件とも例外を出さず、空にも見えず、もっともらしい値を返していた**（`ADR-2608019000` で欠陥クラスとして固定）:
+
+| # | 場所 | 症状 |
+|---|---|---|
+| 1 | `account_store`（2026-07-26、既存） | 全フィールド nil → **サインインが常に失敗** |
+| 2 | `vertical-revenue`（本セッションで作り、本セッションで発見） | path lookup が往復後に必ず miss → **自信のあるゼロ** |
+| 3 | `agent-hint-breakdown`（既存） | 全バケット 0 のまま → **`:hyp/nexus-x402-agent-demand` 事業仮説ゲートが常に 0** |
+
+原因は `:keywordize-keys true` / `parse-string s true` が**キーだけを戻し値には何もしない**こと。**予防は1つ** —— 手で組んだ fixture ではなく実往復でテストする。3件とも既存スイートが全部緑のまま本番の値が間違っていた。
+
+**同じ穴は1段上にも残っていた**: 修正後もテストは「`revenue-by-path` はこう返すはず」という想定に対して書かれており、その実出力には一度も当たっていなかった（446b9226 で fixture 化して解消）。
+
+### 方法論として残ったもの
+
+- **回帰テストは修正前のコードで実際に落ちることを確認してから landing する。** 本セッションで5回実施（vertical-revenue / agent-hint / audit 規則 / allowlist guard / 契約 fixture）。前後どちらでも通るテストはこの欠陥に何も守らない
+- **出力を切った grep を根拠に「存在しない」と主張しない。** `head -12` で切った grep から「governor はどこからも呼ばれていない」と誤報し、次の反復で撤回した
+- **repo の外で動くが repo を触るものは、hook も lint も grep も届かない死角。** `~/.gftd/` で git を fetch する script は 2 件あり **2 件とも** ADR-2607211600 に違反していた（母数 2 で違反 2）")
+
+  (:adr/implementation
+  "{:blocked-on-owner
+    [{:what \"VLP step 3 — envelope を authority に載せる\"
+      :why \"`authority.clj` の CONTENT BINDING と SINGLE USE の作り直しを含む。card/eSIM/voice/payment が依存する consent 背骨であり、安全性の不変条件を agent 単独判断で変えるべきでない\"
+      :state \"**未接続の最後の1本。** 決定層（kernels/envelope + vertical-revenue）は着地済みで、欠けているのは authority 側の受け口だけ\"}
+     {:what \"VLP step 1 — vertical ごとの gateway seller rule 登録\"
+      :why \"tier 境界を引く実測データが存在しない（外部有償 0）\"}
+     {:what \"settlements の DO 直列化（LP 配当の前提条件）\"
+      :why \"x402.nexus は live 本番カスタムドメイン、DO migration は実質不可逆、現在の settlement 流量はゼロ\"}
+     {:what \"curve と share の発行\"
+      :why \"ADR-2607320500 の custody 回避決定の反転であり、Howey が素直に当たる。owner + 弁護士\"}
+     {:what \"audit-gftd-scripts の hook/CI 接続\"
+      :why \"接続判断は owner のもの。かつ現在 3 件の既知違反（.sh × 3、うち 2 件 launchd 稼働中）があり、繋げば即座に落ちる\"}
+     {:what \"`.sh` 3 件の nbb 移行 — **1 件は判断済み（移行しない）**\"
+      :judged \"`run-itonami-5820-serve.sh`（15行）は移行しない。実物を読んだ結果: kagi から `ISIC5820_API_TOKEN` を読んで環境へ渡し `exec clojure` で置き換わる live サービス起動器である。nbb 化は (a) **資格情報の受け渡し経路を1つ増やす** (b) launchd のプロセス監視が依存する **`exec` のプロセス置換意味論を崩す** —— 得られるのは形式的な適合だけで、割に合わない\"
+      :remaining \"`heartbeat.sh`（96行、launchd 稼働中）と `worker.sh`（250行、**呼び出し元不明**）は未判断。worker.sh は誰が呼ぶか分からないものを触ることになるので、まず所在を確かめるのが先\"
+      :correction \"audit script の `shell-script` 規則は当初『既存も nbb へ移す対象』と書いていたが、それは実物を読む前の決めつけだった。CLAUDE.md が禁じているのは**新規作成**である。**過剰に強い報告は読み手に報告全体を無視させる**ので、inventory（.sh が在る）を述べて判断は人に委ねる表現へ直した\"}
+     {:what \"stash 3 件の処分\"
+      :why \"他セッションのもの。読み取りのみで棚卸し済み —— **3 件とも未着地の新規登録を含まない**（extra-projects のプロジェクト名集合に差が無く、stash@{1} の fleet-ci 4 ファイルは main とバイト同一）。残る差分はフィールド値と、main が既に追い越した ADR 版\"}]
+   :verification-complete
+   [{:what \"shallow 修正の実効 — **両方とも本番実走で検証済み**\"
+     :fleet-ci-murakumo \"修正 04:34 → 05:29 実走 → org-spirit-in-physics-comics は shallow=false 維持\"
+     :qwen36 \"修正 04:05 → **08:43 実走**（予測と一致）→ superproject は shallow=false、到達可能 commit 18,209。tick 自体も正常終了（landed on main → run end、終了コード 0）\"}
+    {:what \"**ADR-2607321200 の load-bearing な主張を全て実装に当て直した**\"
+     :why \"§5a で docstring だけを根拠に『コードで強制している』と断定して外したため、同じ過ちが他に無いかを全節に対して見直した\"
+     :results [\"§3 authority の4不変条件 — **裏付けられた**。owned-proposal! の status 前提条件、approval-match-issues の明示 digest 比較（:context/digest-mismatch / :context/digest-absent）。しかも pure で、その理由が本 ADR の規律と同じ\"
+               \"§4 天井 — **精密化**。transport は実際に HTTP を送る（governed actor 宛、esim は到達可能）。天井は『送れない』ではなく『**consent surface が送れる op はどの phase の :auto 集合にも恒久的に含まれない**ので受け手が常に pending を返す』。結論は変わらず、むしろ強まる\"
+               \"§4b θ の収益入力 — 実測（実出力 fixture）\"
+               \"§4c seller/tier — 実コード読解（upsert-seller / rule->requirements / handle-gateway）\"
+               \"§5a 非エクイティ — **訂正**。設計意図は明確だが equity-blocklist は memo 部分一致で `revenue share` / `revenue distribution` を通す（実測）。止めているのは意図であって filter ではない\"]}]
+   :closing-state
+   {:date \"2026-08-01\"
+    :landed \"全 4 repo で default branch 上。私の local/remote branch・worktree は 0 件、未コミット 0 件、open PR 0 件\"
+    :loop \"CronDelete 407231df で停止済み（30分間隔・32 反復）\"
+    :others-wip \"**触っていない**: stash 3 件（root、読み取り棚卸し済み）/ local branch 6 件（cloud-itonami、全て他セッション）/ worktree 3 件（tamaki-workspaces）/ branch agent/form-submissions（root）/ open PR network-awai/nexus-x402#6（07-30 の別セッションの DO-NOT-MERGE cleanup PR）\"}}")
+
+  (:adr/known-gaps
+  "[{:gap \"VLP は proposed のまま、本番の呼び出し元がゼロ\"
+     :note \"純関数の連鎖は通ったが、誰も呼んでいない。ADR-2607321200 の :chain-status に同じことを書いてある。ADR-2607259800 が『追加した機構は全て未配線』と自己記録したのと同じ状態を、隠さず同じ言葉で残している\"}
+    {:gap \"cloud-itonami edge/ の監査は exhaustive ではない\"
+     :note \"『JSON 由来の値を keyword で dispatch』という1パターンを screen した。動的に組まれた keyword 値や間接参照を経た比較は捕まえていない\"}
+    {:gap \"`~/.gftd/` の死角そのものへの対処は未着手\"
+     :note \"可視化（audit script）はしたが、これらを repo に取り込むか点検を自動化するかは運用上の決定で owner 判断\"}
+    {:gap \"本 ADR はセッション記録であり、設計上の新しい決定を含まない\"
+     :note \"決定の正本は ADR-2607321200 / 2608019000 / 2608019100 にある。本 ADR はそれらへの索引\"}]")
+
+  (:adr/body
+  "# ADR-2608019200: セッション記録
+
+## 何を頼まれ、何をしたか
+
+**頼まれたのは設計だった** —— cloud-itonami の business model を AMM 型にする検討。それは早期に収束し、**以降の大半は実装と検証に費やされた。その過程で本番バグが3件出た。**
+
+## 設計の要点（正本は ADR-2607321200）
+
+**Uniswap から写すのは bonding curve ではない。** この workspace 自身の実測では、Uniswap の fees $850M/yr のうち保有者に届くのは 3.3%（V4 は 0%）で、残りは供給側に行く。つまり「Uniswap のような」とは **LP に払い token には払わない**という選択のことで、cloud-itonami はその選択を既にしている。
+
+curve は **収益請求権**に貼る（希少で cold start がある）。**blueprint アクセス**には貼らない（非競合財で、serve しても在庫が減らない）。
+
+## 見つかった3つのバグ — すべて同じ理由
+
+**例外を出さない。空にも見えない。もっともらしい値を返す。**
+
+| 場所 | 症状 |
+|---|---|
+| `account_store`（既存） | 全フィールド nil → サインインが常に失敗 |
+| `vertical-revenue`（本セッション作） | lookup が必ず miss → **自信のあるゼロ** |
+| `agent-hint-breakdown`（既存） | 全バケット 0 → **事業仮説ゲートが常に 0** |
+
+原因は `:keywordize-keys true` が **キーだけを戻し値には何もしない**こと。書いた `:agent` は読むと `\"agent\"` である。
+
+**3件とも既存テストは全部緑だった。** fixture が手書きだったから —— **テストは wire ではなく著者の思い込みを検証していた。**
+
+## このセッションで身についた検証の作法
+
+- **回帰テストは修正前のコードで実際に落ちることを確認してから landing する**（5回実施）
+- **出力を切った grep を根拠に「存在しない」と言わない**（`head -12` で誤報し、次の反復で撤回した）
+- **repo の外で動くが repo を触るものは死角** —— `~/.gftd/` で git を fetch する script は 2 件あり、**2 件とも**規約違反だった
+
+## 止まっている場所
+
+**未接続の端は1本だけ**: envelope を `authority.clj` に載せること。決定層は着地済みで、欠けているのは受け口だけである。
+
+ただしそれは card / eSIM / voice / payment が依存する consent 背骨の不変条件（CONTENT BINDING と SINGLE USE）を作り変える話なので、**agent 単独の判断で触るべきではないと考えている。** 他の未着地項目（tier 割当・DO 直列化・curve 発行）も同様に owner 判断か法務待ちである。
+
+## 正直に
+
+**VLP は proposed のまま、本番の呼び出し元はゼロである。** 純関数の連鎖は通ったが、誰も呼んでいない。ADR-2607259800 が『追加した機構は全て未配線』と自己記録したのと同じ状態であり、同じ言葉で残しておく。
+
+## 次の人が最初に打つコマンド
+
+```bash
+# 1. VLP の現在地を1画面で読む
+nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+  '[:find ?id ?st :where [?e \"adr/id\" ?id] [?e \"adr/status\" ?st]
+    [?e \"adr/topic\" \"cloud-itonami-vertical-liquidity-pools\"]]'
+
+# 2. lever ranking を再計算する（数字は全て再現可能）
+nbb --classpath \"orgs/kotoba-lang/loop-system-dynamics/src:orgs/kotoba-lang/dynamics/src\" \\
+  -e \"(require '[loop-system-dynamics.cloud-itonami-vlp-levers :as v]) (v/-main)\"
+
+# 3. ~/.gftd の死角を点検する（現在の既知違反は .sh 3 件のみ）
+nbb scripts/audit-gftd-scripts.cljs
+
+# 4. 連鎖が動くことを確かめる（nexus-x402 の実出力に対する契約テスト）
+cd orgs/network-awai/cloud-itonami && clojure -M:test
+#    → 1337 tests / 8903 assertions。19 failures は本セッション着手前と同一の既存セット
+```
+
+## owner の判断待ち（優先順）
+
+1. **VLP の採否**（ADR-2607321200 を accepted にするか）—— これが決まらないと以降が動かない
+2. **step 3 の可否** —— envelope を `authority.clj` に載せる。card/eSIM/voice/payment が依存する consent 背骨の不変条件 2 と 4 を作り直す話
+3. **`equity-blocklist` に `revenue share` / `revenue distribution` /「収益分配」を足すか** —— FIEA guard の実測された漏れ。1行で閉じる
+4. audit script を hook/CI に繋ぐか（繋げば現在 3 件で即座に落ちる）
+5. `.sh` 残り 2 件（`heartbeat.sh` / `worker.sh` —— 後者は呼び出し元の特定が先）
+6. stash 3 件の処分（読み取り棚卸し済み、**未着地の新規登録は含まれない**）")))

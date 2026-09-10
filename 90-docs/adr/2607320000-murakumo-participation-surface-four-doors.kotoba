@@ -1,0 +1,242 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607320000-murakumo-participation-surface-four-doors")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "proposed")
+  (:adr/date "2026-07-31")
+  (:adr/last_verified "2026-07-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2607320000: murakumo.cloud の参加導線を設計する — 4つの扉（使う / 買う / 貢献する / token）と、identity が壊れているという前提条件")
+  (:adr/topic "murakumo-participation-surface")
+  (:adr/repos (vector "orgs/network-awai/cloud-murakumo" "orgs/network-awai/local-murakumo"))
+
+  (:adr/authoritative_for
+  (vector "murakumo.cloud の参加導線を『4つの扉』として定義すること: ①使う(x402、identity 不要) ②買う(credits、did:key 必要) ③貢献する(node enroll、did:key + 実測 capability) ④token(現在は閉じている)"
+   "**改訂（2026-08-02、ADR-2608026200 §5-3）: 『サインアップ・メール・パスワードを導入しない』はオーナー判断で撤回された。** did:key は引き続き credits 台帳の口座キー（署名主体・可搬性）だが、メール + Stripe Customer を『復旧・請求・法定住所』の層として**束ねる**（置き換えではない）。請求先住所が集まることで、住所不明の未使用残高が Delaware へ escheat する構造的欠陥も塞がる。扉①（x402、identity 不要）はそのまま残る"
+   "did:key 生成は失敗したら fail closed であること。鍵素材を持たない識別子を発行してはならない"
+   "『valid did:key』の判定は系全体で1つであること。storefront と acceptance metric が別々の定義を持つ現状は欠陥である"
+   "token の扉は、token が実在するまで**閉じていると明示表示する**こと。『近日公開』等で実在を含意しない"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector))
+
+  (:adr/related
+  (vector "90-docs/adr/2607319500（Aethir 型 developer compute 設計。本 ADR はその需要側の入口）"
+   "90-docs/adr/2607319800（D3 実装。③ の実測 capability 要求はここから）"
+   "90-docs/adr/2607299900（token 未発行。④ が閉じている根拠）"
+   "90-docs/adr/2607319000（MCC と terms の矛盾。④ の表示文言に直接効く）"
+   "90-docs/adr/2607300100（duplicated-truth 欠陥クラス。did:key の二重定義は同クラス）"
+   "orgs/network-awai/cloud-murakumo `src/cloud_murakumo/storefront.cljc` / `site_worker.cljs`、orgs/network-awai/local-murakumo `src/local_murakumo/infer_view.cljc`"))
+
+  (:adr/problem
+  "オーナー指示（2026-07-31）: 「murakumo.cloud からすぐに この経済圏に参加, token 購入、参加ができるように設計して」。
+
+実測（2026-07-31、live に対して）で分かったのは、**バックエンドはほぼ揃っていて、入口が1枚も無い**ということだった。
+
+**動いているもの:**
+
+| 経路 | 実測 |
+|---|---|
+| `POST /api/store/checkout` | **動作する**。`{\"skuId\":\"credits-starter\",\"country\":\"jp\"}` → `credits checkout requires a valid did:key account`（= 検証まで到達）。空 body → `unknown country` |
+| x402 offer | **live**。`/.well-known/x402` が $0.01/req・USDC on Base・payTo を返す |
+| `POST /infer/nodes` | 受理する（45 件が enroll 済み） |
+| credits mint | $1 = 100cr、5% treasury。Stripe webhook → topup は結線済み |
+
+**入口が無い:**
+
+| path | 実測 |
+|---|---|
+| `/join` `/signup` `/pricing` `/store` `/infer` | **すべて 404** |
+| `/` | 200。ただし **リンクが1本も無い**（`href` は `/css/dds.css` のみ）。『Decentralized GPU Cloud, Blockchain-Native』というコピーだけがある |
+
+つまり **『Blockchain-Native』と広告しながら、参加する方法がサイト上に1つも存在しない。** 足りないのは機能ではなく、既にあるエンドポイントに到達できるページである。")
+
+  (:adr/finding
+  "[{:id :browser-generated-did-key-is-not-a-did-key
+     :severity :critical
+     :where \"orgs/network-awai/local-murakumo src/local_murakumo/infer_view.cljc:546-549 および :925-927\"
+     :what \"ブラウザが生成する did:key は did:key ではない。Ed25519 公開鍵を **base64** して **英数字以外を除去**し **32文字に切り詰めて** `did:key:z6Mk` に連結している。正しい did:key は multicodec 0xed01 を前置した公開鍵の **base58btc** で、Ed25519 なら `z6Mk` の後に 44 文字前後が続く（切り詰めない）\"
+     :code \"did='did:key:z6Mk'+btoa(String.fromCharCode(...raw)).replace(/[^a-zA-Z0-9]/g,'').slice(0,32)\"
+     :worse \"**失敗時の fallback が鍵ですらない**: `catch(e){did='did:key:z6Mk'+Math.abs(Date.now()).toString(36);}` — WebCrypto の Ed25519 が使えない環境では、**鍵素材を1バイトも持たない識別子**（タイムスタンプ）が口座として発行される。その口座は CACAO に署名できないので、ADR-2607995000 §7 が外部参加者の前提とした署名 gate を原理的に通れない\"
+     :explains \"ADR-2607300100 が記録した本番値 `density 1 / holdable 0` の原因がこれである。acceptance metric は『ed25519 did:key は 45–48 base58 文字』という構造判定をしており、上記の生成物はどれもそれを満たさない。**受領者が全員 fixture だったのではなく、そもそも有効な did:key が1つも作られていなかった**\"
+     :severity-note \"これは表示の問題ではない。did:key は murakumo の**口座そのもの**であり、壊れた識別子で参加した人は credits を受け取れても、その口座を後から鍵で証明できない\"}
+
+    {:id :two-definitions-of-valid-did-key
+     :severity :high
+     :class \"ADR-2607300100 の duplicated-truth 欠陥クラス\"
+     :a \"`storefront.cljc:119-121` `valid-account-did?` = `did:key:` で始まり長さがそれより長い、だけ。`did:key:x` を通す\"
+     :b \"`/infer/acceptance` の `:holdable` = ed25519 did:key は 45–48 base58 文字、という構造判定\"
+     :consequence \"同じ系の中で『有効な did:key』の意味が2つある。決済側は緩く、計測側は厳しい。**決済が通った口座が、計測上は保持不能と数えられる。** どちらかが正しいのではなく、1つでなければならない\"}
+
+    {:id :the-storefront-exists-but-nothing-links-to-it
+     :severity :high
+     :what \"`storefront.cljc` は SKU（credits-starter/growth/scale、node-mac-mini、node-gpu-l4）と国別価格を持ち、`site_worker.cljs` は `POST /api/store/checkout` を実装して Stripe セッションを作る。**どちらも動く。** しかし `/store` も `/pricing` も 404 で、トップページはこれらへのリンクを1本も持たない\"
+     :note \"kotobase.net の signup funnel が 404 だった事故（ADR、2026-07-25）と同型だが、あちらは壊れていた。こちらは**最初から作られていない**\"}]")
+
+  (:adr/decision
+  "### 前提条件（扉の前に直すもの）— identity
+
+**did:key は murakumo の口座そのものである。** サインアップ画面もメールもパスワードも無く、鍵がそのまま口座になる —— これは弱点ではなく、この経済圏の最も良い部分である（`infer_view.cljc` 自身が『あなたの鍵(did:key)がこのタブの中で生成され、そのまま credits 口座になります』と書いている）。**その生成が壊れている以上、どの扉を作っても意味がない。**
+
+1. **正しい did:key を生成する** — multicodec `0xed01` を前置した Ed25519 公開鍵の base58btc。**切り詰めない。**
+2. **fail closed にする** — WebCrypto の Ed25519 が使えない環境では、**識別子を発行せずにそう表示する**。タイムスタンプを口座にしない。これは D3 で `:capability/source` を『欠落なら :declared』にしたのと同じ規律で、**測れない/作れないものを作れたことにしない**。
+3. **`valid did:key` の定義を1つにする** — 構造判定（base58btc・multicodec prefix・長さ）を1箇所に置き、storefront と acceptance metric の両方がそれを呼ぶ。
+
+### 4つの扉
+
+```
+扉①  使う      x402 で払う                identity 不要・登録不要   ← 今日動く
+扉②  買う      credits を買う              did:key + Stripe        ← 今日動く（要 identity 修正）
+扉③  貢献する  node として稼ぐ             did:key + 実測 capability ← 今日動く（要 D3 配線）
+扉④  token     ―――――――――――――――   閉じている               ← 実在しない
+```
+
+**扉① 使う（agent-native、最も摩擦が低い）**
+
+x402 で `$0.01/req`。アカウントも did:key も要らない。**これが最短の参加経路であり、既に live である。** ページがやることは、`/.well-known/x402` の内容を人間可読にし、curl 1本で通る例を出すことだけ。
+
+**扉② 買う（credits）**
+
+did:key を生成 → SKU を選ぶ → `POST /api/store/checkout` → Stripe。バックエンドは全部ある。$1 = 100cr、5% が treasury。**credits は換金不可の前払い使用権**である（ADR-2607995000 の膜規則）ことを購入前に明示する —— これは免責ではなく、この経済圏の設計そのものである。
+
+**扉③ 貢献する（node）**
+
+did:key を生成 → **自分の capability を実測** → `POST /infer/nodes` → memory×time に比例して credits を得る。
+
+**D3 の要求がここに効く**: 申告値は `:capability/source :measured` を伴わなければならず、伴わないものは `:declared` として memory×time の分母から外れる（ADR-2607319800）。**『測ってから参加する』が参加条件になる。** 現在 45 件が同一の 32 GiB を申告している状態は、この扉が正しく作られていれば発生しない。
+
+**扉④ token — 閉じている、と表示する**
+
+**token は存在しない。** contract も配布も上場も無く（ADR-2607299900）、発行体の法的構成も未確定である。したがって:
+
+- **「近日公開」「coming soon」等、実在を含意する表示をしない。**
+- 代わりに**何が真になれば開くのか**を書く: 発行体の確定（法務）→ contract のデプロイ → sink の実装。ADR-2607299800 が示したとおり、③ 担保と ⑤ 手数料徴収を止めているのと**同じ1つの決定**がこの扉も止めている。
+- **live の `terms.md` は既に MCC を『a transferable utility token』として公に記述している**（ADR-2607319000 の未解決 finding）。ページと terms が食い違ったまま参加導線を作ると、**矛盾が購入導線に載る**。扉④ を開ける前にこの矛盾を解消することが前提条件である。
+
+### 設計上の一行
+
+**足りないのは機能ではなくページである。** ①②③ のバックエンドはすべて実装済み・live で、必要なのは既存エンドポイントに到達できる1枚の導線と、その前提となる identity の修正である。④ だけは実装では開かない。")
+
+  (:adr/open-decisions
+  "[{:id :token-door-copy
+     :question \"扉④ をどう表示するか。『閉じている』と書くか、扉自体を出さないか\"
+     :note \"出さない方が安全だが、terms.md が MCC を公に記述している以上、サイトが沈黙すると『terms にはあるがサイトには無い』という別の食い違いになる。推奨は『token は未発行である』と明示し、terms の記述との関係を1行で書くこと\"
+     :owner \"owner + 弁護士\"}
+    {:id :who-fixes-did-key
+     :question \"did:key 生成の修正は local-murakumo（infer_view.cljc）と cloud-murakumo のどちらが所有するか\"
+     :note \"現在の生成コードは local-murakumo の infer_view.cljc に文字列として埋め込まれた JS である。参加導線が cloud-murakumo 側に載るなら、生成ロジックは共有 cljc に出して両方が同じ実装を呼ぶべきである（さもなくば three-way の duplicated truth になる）\"
+     :owner \"owner\"}
+    {:id :node-sku-in-the-same-funnel
+     :question \"storefront の node-mac-mini / node-gpu-l4（ownership share + compute revenue share）を同じ参加導線に載せるか\"
+     :note \"ADR-2607995000 §8 が『証券類似で ADR 上の扱いが無い、別 ADR で扱うまで販売を拡大しない』と自認している。参加導線に載せることは販売の拡大にあたる可能性が高い\"
+     :owner \"owner + 弁護士\"}]")
+
+  (:adr/implementation
+  "{:done []
+    :not-done-deliberately
+    [{:what \"実装は行っていない（本 ADR は設計）\"
+      :why \"指示は『設計して』。かつ UI を書く前に skill `kotoba-uiux` を読むのが repo 規約であり、identity 修正（前提条件）が先に来る\"}
+     {:what \"扉④ の実装\"
+      :why \"token が存在しない。実装で開く扉ではない\"}]
+    :next
+    [{:step 1 :what \"did:key 生成の修正（multicodec 0xed01 + base58btc、切り詰めない、fail closed）と `valid-did-key?` の単一化\"
+      :blocked-by nil
+      :note \"**これが最優先。** 扉②③ はこれが正しくないと口座が壊れたまま増える。そして現在 45 件の enroll 済みノードは全部この壊れた識別子を持っている\"}
+     {:step 2 :what \"扉①（x402）のページ化 — /.well-known/x402 を人間可読にし curl 例を出す。identity 修正を待たずに出せる\" :blocked-by nil}
+     {:step 3 :what \"扉②（credits）のページ化 — did:key 生成 → SKU 選択 → checkout\" :blocked-by \"step 1\"}
+     {:step 4 :what \"扉③（node）のページ化 — 実測 capability を伴う enroll。D3 の :capability/source を送る\" :blocked-by \"step 1 + D3 の production 配線\"}
+     {:step 5 :what \"扉④ の表示文言\" :blocked-by \":token-door-copy と MCC 矛盾の解消\"}]}")
+
+  (:adr/known-gaps
+  "[{:gap \"既存 45 件の enroll 済みノードの扱いを決めていない\"
+     :note \"全部が壊れた did:key を持つ。修正後に再 enroll を求めるのか、旧識別子を移行するのか（移行は鍵素材が無いので原理的に不可能なケースがある）は本 ADR では決めていない\"}
+    {:gap \"did:key 生成コードの実際の失敗率を測っていない\"
+     :note \"WebCrypto の Ed25519 サポートは環境依存で、fallback（タイムスタンプ）に落ちた割合は不明。45 件のうち何件が fallback 由来かは調べていない\"}
+    {:gap \"ページのデザイン・文言・UI 実装は本 ADR に無い\"
+     :note \"skill kotoba-uiux（shitsuke.hig → liquid-glass-ui → kotoba-ui）に従うこと、という制約だけを記録する\"}
+    {:gap \"扉① の x402 は identity 不要だが、それゆえ credits fold に貢献者として現れない\"
+     :note \"ADR-2607995000 是正3 が x402 収益を credits fold に合流させているが、支払った側は口座を持たない。摩擦の低さと台帳上の可視性はトレードオフであり、本 ADR はこれを解消していない\"}
+    {:gap \"『すぐに参加できる』の定量的な目標を置いていない\"
+     :note \"到達から最初の settled 取引までの時間・離脱率などは未定義。ADR-2607319500 の acceptance density が唯一の関連指標だが、参加導線の成否を測る指標にはなっていない\"}]")
+
+  (:adr/body
+  "# ADR-2607320000: murakumo.cloud の参加導線 — 4つの扉
+
+## 一行で
+
+**バックエンドはほぼ揃っていて、入口が1枚も無い。** そして入口を作る前に、口座（did:key）の生成が壊れているのを直す必要がある。
+
+## 実測した現在地
+
+```
+動く                                       入口
+POST /api/store/checkout  ✅ 検証まで到達    /join     404
+/.well-known/x402         ✅ live           /signup   404
+POST /infer/nodes         ✅ 受理           /pricing  404
+credits mint $1=100cr     ✅ webhook 結線    /store    404
+                                            /         200 だが href は CSS 1本のみ
+```
+
+**『Decentralized GPU Cloud, Blockchain-Native』と広告しながら、参加する方法がサイト上に1つも存在しない。**
+
+## 扉より先に直すもの — 口座が壊れている
+
+`infer_view.cljc` はこう書いている: 「あなたの鍵(did:key)がこのタブの中で生成され、**そのまま credits 口座になります**」。
+
+これはこの経済圏の最も良い部分である —— サインアップも、メールも、パスワードも無い。**その生成が壊れている。**
+
+```js
+did = 'did:key:z6Mk' + btoa(...).replace(/[^a-zA-Z0-9]/g,'').slice(0,32)   // base64 → 記号除去 → 32文字切り詰め
+catch(e) { did = 'did:key:z6Mk' + Date.now().toString(36) }                 // ← 鍵素材ゼロ
+```
+
+正しい did:key は multicodec `0xed01` を前置した公開鍵の **base58btc** で、切り詰めない。そして **catch 節は鍵ですらない** —— WebCrypto の Ed25519 が使えない環境では、タイムスタンプが口座として発行される。その口座は **CACAO に署名できない**ので、ADR-2607995000 §7 が外部参加者の前提とした署名 gate を原理的に通れない。
+
+**これは ADR-2607300100 の `holdable 0` の原因である。** あの ADR は「受領者は全員 fixture」と正直に書いたが、実際にはもっと悪い —— **有効な did:key が1つも作られていなかった。**
+
+さらに『有効な did:key』の定義が系内に2つある:
+
+| | 判定 |
+|---|---|
+| `storefront/valid-account-did?` | `did:key:` で始まり、それより長い。`did:key:x` を通す |
+| `/infer/acceptance` の `:holdable` | ed25519 did:key は 45–48 base58 文字 |
+
+**決済側は緩く、計測側は厳しい。決済が通った口座が、計測上は保持不能と数えられる。** duplicated-truth 欠陥クラスの、口座という最も重い場所での実例である。
+
+## 4つの扉
+
+```
+①  使う      x402 で払う          identity 不要      ← 今日動く。最短経路
+②  買う      credits を買う        did:key + Stripe   ← バックエンド完備
+③  貢献する  node として稼ぐ       did:key + 実測      ← D3 がここに効く
+④  token     ――――――――――   閉じている        ← 実装では開かない
+```
+
+**扉③ に D3 が効く。** 申告 capability は `:capability/source :measured` を伴わなければ memory×time の分母から外れる（ADR-2607319800）。つまり **「測ってから参加する」が参加条件になる**。45 件が同一の 32 GiB を申告している現状は、この扉が正しく作られていれば起きない。
+
+**扉④ は実装では開かない。** token は存在せず（contract も配布も上場も無い）、発行体の法的構成も未確定である。ADR-2607319800 が特定した「③ 担保と ⑤ 手数料徴収を止めている同じ1つの決定」が、この扉も止めている。
+
+したがって扉④ には **「近日公開」を書かない**。実在しないものを実在するかのように見せる導線は、購入導線の上では特に有害である。代わりに**何が真になれば開くのか**を書く。
+
+そして **live の terms.md は既に MCC を『a transferable utility token』として公に記述している**（ADR-2607319000 の未解決 finding）。**ページと terms が食い違ったまま参加導線を作ると、矛盾が購入導線に載る。** 扉④ を開ける前にこの解消が要る。
+
+## 順序
+
+```
+1. did:key 生成の修正 + valid-did-key? の単一化   ← 最優先。②③ の前提
+2. 扉①（x402）のページ化                          ← 1 を待たずに出せる
+3. 扉②（credits）                                 ← 1 待ち
+4. 扉③（node、実測 capability 付き）               ← 1 + D3 配線待ち
+5. 扉④ の文言                                     ← MCC 矛盾の解消待ち
+```
+
+**足りないのは機能ではなくページである** —— ただし1枚目のページを作る前に、口座を直す。
+
+## 正直に言っておくこと
+
+- **既存 45 件の壊れた口座の扱いを決めていない。** 鍵素材が無い識別子は原理的に移行できない。
+- **fallback に落ちた割合を測っていない。** 45 件のうち何件がタイムスタンプ由来かは未調査。
+- **UI 実装は本 ADR に無い。** skill `kotoba-uiux` に従うという制約だけを記録した。
+- **扉① は identity 不要ゆえに、払った人が台帳上の口座を持たない。** 摩擦の低さと可視性のトレードオフは解消していない。")))

@@ -1,0 +1,26 @@
+(vector (map (:adr/id "adr-2608262300-kotoba-amu-world-class-proof-scope-and-roadmap")
+  (:adr/title "Kotoba/Amu 性能 — 証明範囲・三段階目標・最適化ロードマップ")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-26")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related
+  (vector "adr-2608260800-kotoba-stack-performance-world-class"
+   "adr-2607198300-kotoba-native-aot-no-jvm-runtime"
+   "adr-2608242900-the-oracle-reach-depended-on-module-size"
+   "adr-260726-kotobase-query-plane-is-one-ref"))
+  (:adr/repos
+  (vector "com-junkawasaki/root"
+   "kotoba-lang/amu"
+   "kotoba-lang/kotoba-mir"
+   "kotoba-lang/kotoba-native"
+   "kotoba-lang/kotoba-lang"))
+  (:adr/authoritative_for
+  (vector "世界最速を名乗れる証明範囲の三段階定義"
+   "性能最適化の実装優先順位"
+   "総合ベンチマーク suite の最低要件"
+   "マーケ限定クレームとエンジニアリング次手の分離"))
+  (:adr/body "2026-08-26、オーナー調査の結論を正本化する。Kotoba/Amu は限定条件ではすでに世界最速級である。言語全体として「世界最速」を名乗るには、対象領域と証明範囲を大幅に広げる必要がある。測定値の鮮度は amu docs/performance.md と公開 JSON が正本であり、本 ADR は方針と優先順位を固定する（数値は日付付き証拠に委ね、standing rule へ焼かない）。\n\n## 現在地（2026-08-26 時点の読み方）\n\n### コンパイル（cold Wasm、極小プログラム）\n\n公開測定（2026-08-26）では cold Wasm コンパイルが Kotoba 42.919 ms、Rust 123.26 ms（約 2.87 倍速）。ただしツールチェーン起動中心の限定測定。公開: kotoba-lang.org/benchmarks/compile-wasm-latest.json。再現: kotoba-lang/kotoba-lang bench/public-compile-comparison。\n\ncold の完全経路はホスト負荷に強く依存する。静かな測定では loaded compiler 約 0.5–0.6 s、worker cache hit 約 6–7 ms。生成コードより cold compiler の起動・ロードが弱点。\n\n### 実行（整数スカラーカーネル）\n\nApple M4 整数カーネルでは Amu native と LLVM 最適化 Rust が 5.85 ns 対 5.80 ns まで接近。perfgate.core/qualify は差を認定せず「同等圏」が正確。同一日 load 101 下の 7 回測定（Amu 23.50 ns、Rust 22.64 ns、6889fa7）は性能証明に使わない。\n\n実行速度の既存証拠は主に整数カーネル。allocation、collections、strings、I/O、concurrency、実アプリへの一般化は performance.md が拒否している。\n\n### MIR / レジスタ割当\n\nMIR は SSA、phi、比例 spilling、call-live preservation まで進んだが 2026-08-26 に **バックエッジ CFG liveness** を landed（kotoba-mir `c03eb817`、ADR 0012 `:cfg-liveness true`）。`cfg-last-uses` は live-out を反復し、バックエッジ terminator まで last-use を延長。`use-indexes` はテキスト順のまま（全 block-end 疑似 use は cross-branch eviction を壊す）。同日 **dominator tree** を landed（`3719bbd`、ADR 0012 `:cfg-dominator-tree true`）。未着手: spill coalescing、instruction scheduling。\n\n## 決定 — 三段階の目標定義\n\n1. 世界最速の cold capability-safe Wasm compiler（限定版は 2026-08-26 公開極小経路で達成済み）\n2. 安全境界込みで Rust/LLVM と同等以上の native scalar runtime（狭い整数カーネルでは perfgate 拒否＝同等圏）\n3. 公開した総合 suite の geometric mean で首位の capability-safe language（未着手）\n\n## 決定 — 最適化の実装優先順位\n\n1. CFG 全体（kotoba-mir: dominator、CFG live-in/out、call-clobber、loop/back-edge live range、spill coalescing、rematerialization、instruction scheduling）\n2. KIR 最適化パイプライン（SCCP、DCE、GVN/CSE、inlining、LICM、BCE、tail-call、monomorphization）\n3. データ表現（連続 vector/buffer、escape analysis、SROA 拡大、bulk string primitive、arena）\n4. SIMD 正式契約（NEON/AVX2/Wasm SIMD、vectorization）\n5. 二段階 backend（fast/verified KEXE + 実験 peak LLVM oracle）\n6. Amu cold compile AOT 化（bundle、worker cache、self-host）\n\nWIP=1: (1) の残り（spill coalescing / instruction scheduling）。KIR (2) は MIR 骨格後。\n\n## 決定 — 試験体系（段階 3）\n\nscalar/SIMD/alloc/string/parser/IO/concurrency、cold+p95+RSS+energy、AArch64+x86-64、C/Rust/Zig/Go 等比較。静かな専用ノード、30+ サンプル、raw 公開、perfgate。証拠平面は ADR-2608260800。\n\n## resume\n\n2026-08-26 landed: kotoba-mir バックエッジ CFG liveness（`c03eb817`、west pin `29cbb6ae`）。\n2026-08-26 landed: amu `kernel_loop_call` runtime-comparison fixture（`043945d5`、west pin 同コミット、`loop-call-mix-v1`、rust + amu wasm/native、CI smoke 両 fixture）。\n2026-08-26 landed: kotoba-mir CFG dominator analysis（`3719bbd`、west pin 同コミット、ADR 0012 `:cfg-dominator-tree true`）。\n\nNext:\n1. spill coalescing / instruction scheduling（kotoba-mir）\n2. KIR パイプライン骨格\n\npeak/LLVM は (1) 後に別 ADR。\n\n## Consequences\n\nPositive: 限定最速と言語全体最速の境界固定、バックエッジ CFG liveness・dominator tree・loop+call perf fixture が main に着地。\nNegative: 段階 3 まで時間。極小 Wasm 数値の過大解釈リスクを継続拒否。")))

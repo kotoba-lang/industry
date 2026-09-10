@@ -1,0 +1,55 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809030700-hyakka-darkweb-connector-policy")
+  (:adr/title "hyakka に darkweb / .onion ソースを入れるか: 入れない。公開 threat-intel feed で代替する")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-03")
+  (:adr/related (vector "adr-2608272100-hyakka-free-model-policy"))
+  (:adr/body
+  "## 出発点の問い
+
+オーナー: 「hyakka (wiki.kotobase.net) に darkweb などの crawler はあるか」
+→ 現行 connector 47種 (~200 source) は全て公開・公的ソースのみ。darkweb 系は
+存在しない。代替案 (a) 公開 threat-intel feed 追加 と (b) darkweb connector 新設
+の両方が指示されたため、(b) の方針をここに決定として書く。
+
+## Context
+
+- hyakka の ingest 契約は全 connector に共通して:
+  1. 一次ソース (first-party / authoritative-registry / owner-verified) であること
+  2. `:access \"public\"` には `:license` が必須 (cite と republish は別の行為)
+  3. `:third-party-wiki-prose` / `:user-generated` は全 corpus で禁止
+  4. gate (`verify_source_proposal.cljs`) が URL を自分で fetch して確認する
+- darkweb の主要コンテンツ (フォーラム投稿・マーケットリスティング・ペースト
+  サイト) はほぼ構造的に 3 (user-generated) に該当する。
+- Tor 経由の fetch は egress 匿名化を伴い、fetch の「HTTP 200 確認」が
+  network policy と jurisdiction の問題を持ち込む。hyakka は依頼者個人の
+  ワークステーションで動く resident であり、攻撃的 reconnaissance を
+  実行する位置にない。
+- 脆弱性 cor pus の実利的な要求 (「実際に悪用されている脆弱性を知りたい」) は
+  公開の authoritative feed で満たせる: NVD (既存)、CISA KEV (PR #327 で追加)、
+  将来は CISA advisories / GitHub GHSA / EPSS。
+
+## Decision
+
+1. **darkweb / .onion connector は作らない。** hyakka の corpus policy は
+   primary + licensed に固定されており、例外を設けることは corpus 全体の
+   証明可能性を損なう。
+2. 「darkweb で話題になっている脆弱性」に相当する信号は、公開の
+   authoritative registry (CISA KEV = 実悪用の公式証跡) で代替する。
+   これを (a) として同日実施した (network-awai/app-hyakka PR #327)。
+3. もし将来、脅威インテリジェンス要求が KEV では満たせなくなった場合は
+   - OTX pulses (API key 必須、subscribed feed) など **公開 API で key-gated
+     のもの** を次の候補とする。darkweb 直接ではない。
+   - その場合も本 ADR の Decision 1 は再協議の対象としない。別 ADR を起す。
+
+## Consequences
+
+- wiki.kotobase.net は darkweb コンテンツを一切含まない。これは制約ではなく
+  特性として README 等に記載されるべきである。
+- vuln-coverage-scout の対象に cisa-kev が加わるため、同 bot のレバー
+  (`:max-cves` 的な knob) を KEV 側にも用意するかは hyakka-maint の判断。
+- (a) の cisa-kev は web-document kind を使うため新 connector 実装は不要。
+  corpus \"vulnerability\" に :authoritative-registry class で入る。"))
+ (map (:db/id -2)
+  (:adr/link true)
+  (:adr/target "network-awai/app-hyakka PR #327")))

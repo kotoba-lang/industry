@@ -1,0 +1,200 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607312100-kotobase-layering-block-ref-split-signed-head")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "kotobase の層と依存: block 面と ref 面を割り、ref を署名付き head にする")
+  (:adr/topic "kotobase-layering-block-ref-split-signed-head")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-31")
+  (:adr/last-verified "2026-07-31")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "kotobase スタックの層(L0-L10)と依存の向き"
+   "block 面と ref 面の分離、および各層と repo の対応"
+   "ref の実現方式(署名付き head record であって provider CAS ではない)"
+   "クエリの実行場所(client/peer が権威、edge は cache)"
+   "物理表現 2 系統(merkle-lsm / prolly-tree)の段としての位置づけ"))
+
+  (:adr/related
+  (vector "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607299200-kura-erasure-coded-storage-network"
+   "adr-2607211343-kotobase-merkle-lsm-production-gap-closure"
+   "adr-2607311100-hyakka-knowledge-wiki-on-kotobase"
+   "adr-2607311800-compaction-bounded-by-fanin-cid-checkpoints"
+   "adr-2607061800 (署名付き IPNS head)"
+   "adr-2607051000 (ciphertext-over-CID persistence)"))
+
+  (:adr/decision-summary
+  (vector "D1: L0-L10 の層を定め、依存は下向きのみとする"
+   "D2: block 面と ref 面を別々の provider に載せられるようにする。protocol は元から分かれており、束ねていたのは backend の定義（両方の実装を要求）だった。B2 が優秀な block ストアかつ劣悪な ref ストアであることが実測論拠。実装済み: kotobase-storage 9296e91"
+   "D3: ref は provider の CAS ではなく署名付き head record にする。どの block ホストでも成立し、検証が client 側で完結する。provider CAS は最適化に降格"
+   "D4: ref を writer ごとに分けない。ADR-260726(join は ref 1 本)と正面衝突するため、分散より結合を取る"
+   "D5: クエリは client/peer で回す。edge は cache と fallback であって権威ではない。現行の blind key + AEAD value は既にこれを前提にした形"
+   "D6: 動画・画像などのバイト列は L2 の住人。datom 面は CID とメタデータのみ持つ(本文に join できないのが代償)"
+   "D7: merkle-lsm を書き込み最適層、prolly-tree を読み取り最適層として段に位置づける"))
+
+  (:adr/artifact
+  (vector "kotoba-lang/prolly-tree e91eefc (insert / insert-many)"
+   "kotoba-lang/arrangement d95ec63 (commit-delta!)"
+   "kotoba-lang/kotobase-storage-s3 4e7ff95 (race.cljs: CAS は逐次テストで資格認定できない)"))
+
+  (:adr/verify
+  (vector "cd orgs/kotoba-lang/kotobase-storage-s3 && nbb --classpath 'src:test:../kotobase-storage/src' -e \"(require '[race]) (race/main)\""
+   "nbb scripts/west-orphan-audit.cljs --blocking   ; L0 repo の未登録を検出"))
+
+  (:adr/body
+  "# Context
+
+オーナーの目標（2026-07-31）: IPLD/CID を中心に据え、Datomic クエリと暗号化を保ちつつ、
+動画・画像も同じく CID で持ち、index と materialized view も CID/IPLD で表現し、Storj のように
+保存時点で分散暗号化し、**サーバ側で中間処理をせず、分散ホストと client だけで計算して cache で
+最適化する**。「どう依存を整理すると美しいか」。
+
+同日のデバッグで、現行実装の詰まりがほぼ全部 1 つの曖昧さから出ていることが分かった:
+**不変コンテンツと、ただ 1 つの可変ポインタが、同じ protocol に束ねられている。**
+
+# Decision
+
+## D1. 層と依存の向き（下向きのみ）
+
+    L0  bytes     multiformats / cbor / ipld(link,encode,decode) / value codec
+    L1  crypto    blind(keyed MAC) / encrypt-decrypt(AEAD) / erasure code
+    L2  block面   put/get by CID              -- 不変。CAS を持たない
+    L3  ref面     read-ref / compare-and-set  -- 可変なのはここだけ
+    L4  構造      prolly-tree(順序付きマップ) / merkle-lsm(run,level)  L2 上の純関数
+    L5  モデル    arrangement(4 index, quad) / datom
+    L6  DB値      snapshot / chain / novelty / fold
+    L7  クエリ    datalog / pull / datoms     L6 値 + L2 read だけに依存
+    L8  ビュー    materialized view = L6 値の純関数、結果を L2 ブロックとして publish
+    L9  ホスト    s3-r2 / d1 / ipfs / kura(storj的) / memory   L2 を実装
+    L10 消費者    peer(client) / edge worker / CLI             L7 をローカルで回す
+
+## D2. L2 と L3 を別 protocol に割る
+
+**訂正（2026-07-31、実装時に判明）**: 当初この節は「1 protocol に束ねている」と書いていたが
+**誤り**だった。`IBlockStore` と `IRefStore` は最初から別 protocol で、ns docstring にも意図的に
+分けたと明記されている。実際に束ねていたのは **backend の定義**の方である: `backend?` が両方の
+実装を要求し、`ports` が 1 つの store を両方の役割に使っていたため、**provider は blocks と refs の
+両方を提供できなければ使えなかった**。割るべきは protocol ではなく backend だった。
+
+その分離を入れると（`kotobase-storage` 9296e91、`block-capabilities` /
+`validate-block-store!` / `compose`）:
+
+- **block 面は信用不要・不特定多数・消去符号ありでよい**（IPFS / Storj / B2 / R2 / S3）
+- **ref 面は「合意が取れる 1 箇所」だけに絞れる**
+
+2026-07-31 の実測が論拠。B2 は**優秀な block ストアで劣悪な ref ストア**である（S3 API に
+条件付き書き込みが無く CAS が last-write-wins になり、2 writer が両方 published を返す。
+`kotobase-storage-s3` の `test/race.cljs` が決定的に再現）。束ねているせいで「B2 は使えるか」が
+二択になっているが、割れば「blocks は B2、ref は別」が素直に書ける。
+
+## D3. ref は provider の CAS ではなく **署名付き head record** にする
+
+これが本 ADR の中心的な提案である。ref を「storage provider の CAS」で実現する限り、
+block 面の自由（誰でもホストしてよい）が ref 面の制約（条件付き書き込みを持つ provider に限る）に
+汚染され続ける。
+
+代わりに **head を署名付きの単調増加レコード**にする:
+
+    head/v1 = { ref-name, seq, snapshot-cid, prev-head-cid, issuer-did, sig }
+
+- **どの block ホストでも成立する。** head 自体が CID 付きの不変ブロックになり、条件付き
+  書き込みを要求しない。B2 でも IPFS でも Storj でも置ける。
+- **検証が client 側で完結する。** 署名と seq を読み手が自分で確かめられるので、
+  「サーバを信用しない」という目標と一貫する。provider の CAS は**正しさの要件ではなく
+  高速な衝突検出の最適化**に降格する。
+- **機構は既にある。** `kotobase-client` の `kotobase.ipns`（署名付き IPNS head、
+  ADR-2607061800、JVM 側と byte 一致を検証済み）、`kotoba-lang/tech-ipfs-specs-ipns`、
+  および本 superproject の fleet-db（署名付き `fleet-head.edn` と quorum govern）。
+
+**残る代償を名指しする**: 署名は fork を防がない。同じ seq に 2 つの署名付き head が
+生まれうる。したがって **ref ごとに writer は 1 人**という規律は依然必要で、それは
+Durable Object / actor が担う（DO はグローバル一意かつシングルスレッドなので、
+write lease や fencing epoch を自前で書かずに得られる）。署名が与えるのは
+**ホスト非依存の検証可能性**であって、合意そのものではない。
+
+## D4. ref を writer ごとに分ける案は採らない
+
+分散に最も素直なのは「writer ごとに ref を持ち CRDT でマージ」だが、これは
+**ADR-260726（Datalog join は ref 1 本までしか届かない）と正面衝突する**。ref を割った瞬間に
+横断クエリが永久に立てられなくなり、この基盤の存在理由が消える。
+**分散したいことと 1 クエリで結合したいことが真に対立する唯一の箇所**であり、本 ADR は
+**結合を取る**。
+
+## D5. クエリは client/peer で回す。edge は cache と fallback executor であって権威ではない
+
+L7 が L6 値と L2 read しか触らない限り、同じコードが client でも Worker でも CLI でも動く。
+つまり「サーバで中間処理をしない」は**再実装ではなく配置の選択**になる。
+
+現行の永続化フォーマットは既にこれを前提にしている: leaf の key はブラインド（keyed MAC、
+prefix で引けるが平文ではない）、value は AEAD 暗号文。**サーバは値を復号できないので値で
+フィルタできない。** 設計の向きは合っていて、ズレているのは実行場所だけである。
+
+cache は CID キーなので正しさの議論が要らない（内容が変われば名前が変わる）。
+
+## D6. バイト列は L2 の住人であって L5 の住人ではない
+
+動画・画像はブロック + マニフェストノードで、datom 面が持つのは CID とメタデータ datom だけ。
+**代償**: 保存した動画の中身に対して Datalog で join はできない。抽出して datom 化したものだけが
+引ける。ADR-2607311100 D4 と同じ線。
+
+## D7. 物理表現 2 系統を段として位置づける
+
+現状 arrangement/prolly-tree と merkle-lsm が並存し、ADR-2607211343 は後者を本番物理ストアと
+宣言しているのに、live の `/v1/fold` は前者を通る。**曖昧さは美しさの反対。** 素直な解決は:
+
+    merkle-lsm  = 書き込み最適層（run を積み、compaction で畳む）
+    prolly-tree = 読み取り最適層（順序付き、prefix seek、増分更新）
+
+2026-07-31 に `prolly-tree` へ `insert`/`insert-many`、`arrangement` へ `commit-delta!` が入り、
+**読み取り層が増分更新可能になった**ので、この二層構成が成立する条件が初めて揃った。
+
+# 現在地: 層と repo の対応
+
+| 層 | repo | 状態 |
+|---|---|---|
+| L0 | `io-multiformats` | **登録済み・checkout 済み** |
+| L0 | `io-ipld`（`ipld.value` / `cbor.core` を含む） | **登録済み・checkout 済み** |
+| L0 | `cbor` | 独立 repo としては存在しない。ns は `io-ipld` 側にある |
+| L1 | `erasure` | 登録済み |
+| L2+L3 | `kotobase-storage` | **束ねている。D2 の分割対象** |
+| L4 | `prolly-tree` / `kotobase-peer`(merkle-lsm) | 登録済み |
+| L5 | `arrangement` / `datom` | 登録済み |
+| L6 | `chain` / `kotobase-peer` | 登録済み |
+| L7 | `arrangement.query` / `arrangement.datalog` | arrangement 内 |
+| L9 | `kotobase-storage-{s3,d1,ipfs,postgres,sqlite,git,kura}` | 8 系統。大半は L2 だけで足りる |
+| L9 | `kura` / `kura-node` / `kura-bugyo` | 登録済み。**既に理想的に分かれている** |
+| L10 | `kotobase-client` / `kotobase-engine` | 登録済み |
+
+`kura` の分け方は本 ADR が全体に求める形の先行例である: `kura` は**バイトを動かさない**決定層
+（配置・修復・監査・支払い順序）、`kura-node` がディスクとソケットと鍵、`kura-bugyo` が
+コーディネータループ。判断と機構が分かれている。
+
+**訂正（2026-07-31）**: 当初この節は「`multiformats` と `ipld` が west 未登録で、fresh checkout が
+依存を解決できない実害がある」と書いていたが**誤り**だった。実際に依存されているのは
+`io-multiformats` / `io-ipld` で、**両方とも登録済み・checkout 済み**である。誤判定の原因は
+名前で、`multiformats` / `ipld` は GitHub のリネーム転送により古い名前でも解決するため、
+別の未登録 repo が存在するように見えた。同じ日に `west-orphan-audit --blocking` が exit 0 で
+通っていたのが反証だったのに、それを裏付けとして扱わなかった。**L0 の登録作業は不要。**
+
+# 実装順（依存の向きを変えない順）
+
+1. **L2/L3 分割**（`kotobase-storage` の protocol を 2 つに割る）。既存バックエンドは
+   block 面だけ実装すればよくなり、ref 面の実装は 1 つに絞る。
+2. **署名付き head**（D3）。`kotobase.ipns` の既存実装を ref 面の実装として持ち上げる。
+3. ~~L0 repo の west 登録~~ — **不要**（上記の訂正参照。既に登録済みだった）。
+4. `fold!` の全体 hydrate 除去（`commit-delta!` を使う。ADR-2607311800 系列の続き）。
+5. クエリ実行を client/peer に寄せる（D5）。edge は cache に降格。
+
+1 が最初の単位である理由: **依存の向きを一切変えずに、その後の全部を可能にする**から。
+
+# Non-goals
+
+- ref を writer ごとに分ける（D4）
+- 暗号文の上でサーバが view を計算する（不可能。view は書き手が計算して publish、D5/L8）
+- IPFS をネットワークとして本番経路に入れる（現状 `/ipfs/*` は B2 上の CAR アーカイブ
+  control plane であり、DHT/Bitswap ノードではないと API-CONTRACT が明記している）
+")
+))

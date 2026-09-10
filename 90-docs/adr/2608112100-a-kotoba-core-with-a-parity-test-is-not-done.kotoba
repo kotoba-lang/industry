@@ -1,0 +1,184 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done")
+  (:adr/title "ADR-2608112100: parity test の付いた .kotoba core は「完了」ではない —— host が呼ぶまでは、判断は cljc 側にある")
+  (:adr/status "accepted, implemented")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-11")
+  (:adr/last-verified "2026-08-11")
+  (:adr/last_verified "2026-08-11")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "decision-core-delegation")
+  (:adr/tags "kotoba, cljc-migration, decision-core, oracle, kir, parity, cloud-itonami")
+  (:adr/related (vector "adr-2608110100-selfhost-analyzer-was-removed-not-progressing"
+                "adr-2608650000-kotoba-permanent-vs-temporary-constraints"
+                "adr-2608111900-native-becomes-an-execution-path-when-verification-is-per-session"
+                "2607279200"))
+  (:adr/supersedes "")
+  (:adr/superseded_by "")
+  (:adr/authoritative true)
+  (:adr/authoritative-for
+  (vector "決定核を .kotoba に切り出した後、どこまでやれば「移った」と言えるか"
+   "host が shipped KIR を呼ぶ seam の形（3 repo で同型）"
+   "KIR entry boundary が host から受け取れる値（2026-08-11 実測）"))
+  (:adr/body
+  "# ADR-2608112100: parity test の付いた core は「完了」ではない
+
+**Status**: accepted, implemented
+**Date**: 2026-08-11
+
+## Context
+
+`cloud-itonami/cloud-itonami-app` には決定核が 3 本あった —— `policy.kotoba` /
+`fleet_core.kotoba` / `organism_worker.kotoba`。それぞれに同じ判断を書いた `.cljc` が
+並び、parity test が「両方に同じ入力を与えて同じ答えを要求する」形で縛っていた。
+
+これは**正しい第 1 歩**で、実際に仕事をしていた —— その test が入る前、`policy.cljc` は
+docstring で「policy.kotoba の host-side mirror である」と名乗りながら、**2 つの
+ファイルは 1 つも関数を共有していなかった**（`.kotoba` 側は誰も呼ばない
+`select-provider-tier` を export し、`provider-allowed?` には対応物が無かった）。
+
+**しかし parity test で縛られた 2 実装は、やはり 2 実装である。** ADR-2608110100 が
+`ADR-safe-capability-language` §0.1 から引いた測り方はこうだった:
+
+> self-hosting の進捗は「host の行数を減らす」ではなく
+> **「安全性判断の正本が Kotoba 側へ移った slice が増える」**ことで測る。
+
+この基準で見ると、**正本はまだ移っていなかった**。走っていたのは `.cljc` で、
+`.kotoba` は検査済みの複製だった。
+
+## Decision
+
+### 1. 「切り出した」の完了条件は host が呼ぶこと
+
+**`.kotoba` core を書いて parity test を付けた時点を『移行した』と記録しない。**
+完了条件は **host がその成果物を実行していること**。それまでは
+「Kotoba でも書けることを確認した」のであって、判断が移ってはいない。
+
+実装（`cloud-itonami-app` `98a57c6`）: `cloud.itonami.app.kotoba-oracle` が
+shipped `resources/cloud/itonami/app/oracle/*.kir.edn` を読んで export を実行し、
+3 つの host は**判断でない半分だけ**を残す —— map を読む、collection を歩く、throw する。
+`kotoba-kir` は runtime 依存になり、**compiler は test-only のまま**。
+
+**この seam の形はワークスペースに 3 例ある**（`kotoba-selfhost-contracts` の
+`oracle.clj`、`murakumo` の `murakumo.kotoba.oracle`、今回の `kotoba-oracle`）。
+4 例目を書く前にこの 3 つを見ること。共通形は「id → shipped 成果物 → `ir/execute`、
+fallback 無し」。
+
+### 2. parity test では検出できない 2 つを別に持つ
+
+host が delegate した瞬間、parity test の意味が変わる（比較相手が消える）。
+**parity test が構造的に見られない検査を 2 つ足す:**
+
+| 検査 | なぜ parity test では無理か |
+|---|---|
+| **drift**: shipped 成果物 == 現ソースの compile 結果 | parity test は毎回 fresh compile する。**shipped 成果物を一度も読まない** |
+| **delegation**: 反対を答える core を差し込むと host が追従する | host が copy を持っていても parity test は通る —— **copy こそが比較対象**だから |
+
+両方とも着地前に変異で確認した（stale 成果物で 3 件 fail、`loopback-host?` を
+host の `contains?` に戻すと delegation test が fail）。
+
+**parity test 自体は捨てない。** 真理値表と多 target compile 検査は価値が残るので、
+「2 実装が一致する」ではなく「host が規則に到達する」と読み替えて維持する。
+
+### 3. KIR entry boundary は host から record / option / keyword を受け取れる（実測）
+
+`policy-kotoba-parity-test` は **「record は literal として entry boundary を越えられない
+—— guest の中で構築される」**と書き、各 case を 0 引数 wrapper に包んで**毎回
+再コンパイル**していた。**2026-08-11 に当該 pin で実測して偽と確認**:
+
+| 値 | host が渡す形 |
+|---|---|
+| record | `[schema field …]`（**宣言順**） |
+| `[:option :string]` | `[[:option :string] true \"x\"]` / `[[:option :string] false]` |
+| `:keyword` 結果 | そのまま返る |
+
+`[:ref :schema/name]` parameter も同様に通る。**murakumo の `oracle/record` は
+2026-07-29 に同じことを記録していた**（「hand-built vector is accepted」）—— つまり
+この誤りは、既にある測定結果を引かずに書かれた。
+
+**production の呼び出し経路は再コンパイルできない**ので、この誤りは test の中では
+回避策で済んでいたが、delegation では致命的だった。現在は test で pin してある。
+
+## 委譲できない core がある —— 境界は「コレクションを持つかどうか」（2026-08-12 実測）
+
+完了条件（host が呼ぶこと）は、**どの core にも到達可能とは限らない。**
+
+`kotoba-lang/mokuroku` の `bounded.kotoba` を委譲しようとして実測した:
+
+| catalog の item 数 | 結果 |
+|---|---|
+| 12 | ok |
+| **13** | **`ADT value exceeds node limit`** |
+
+ファイルカタログが 13 件で拒否されるので、**この core は production 経路になれない。**
+`kotoba-lang/app-files` も同じ形だった（兄弟の `bounded?` が 8 件で打ち切る）。
+
+**規則はこうである（下の訂正も読むこと）: 効いているのは interpreter の node 上限で、
+問われるのは「その値の大きさがドメインに比例して増えるか」である。**
+
+委譲に成功した 5 つの core —— `policy` / `fleet_core` / `organism_worker`（cloud-itonami-app）、
+`model`（calendar）、`clock`（crdt）—— は**すべてスカラか、小さな固定 record** を取る。
+`bounded.kotoba` は `[:map :keyword item]` と `[:set :keyword]` を guest の中に持つ。
+これが差である。
+
+これは ADR-2608650000 の「決定核を切り出す」規律の**測られた境界**であり、
+`murakumo` の `infer_join_core.kotoba` が冒頭で
+\"partition-work / enrollment map assembly stay cljc (vectors/maps).\" と自ら宣言しているのと
+同じ線を、別の側から確認したものになる。
+
+### 訂正: 「コレクションなら不可」は強すぎた（同日、`fsm` を測って）
+
+最初この節を「コレクションを持つなら委譲できない」と書いた。**それは型の話にしてしまっており、
+誤りである。** `kotoba-lang/fsm` の `advance-player-v1` は `events [:set :keyword]` を取る ——
+コレクションである。測ると:
+
+| event set の大きさ | 結果 |
+|---|---|
+| 32 | ok |
+| **33** | 拒否 |
+
+そして **この FSM の実アルファベットは 3**（`:jumping` / `:moving` / `:still`）で閉じている。
+10 倍の余裕があり、**`fsm` は委譲できる。**
+
+差は型ではなく**増え方**である:
+
+| core | guest が持つもの | 大きさ | 委譲 |
+|---|---|---|---|
+| `mokuroku/bounded` | カタログの item | **利用者のファイル数に比例** | 13 で拒否 → **不可** |
+| `fsm/advance-player-v1` | 入力イベントの集合 | **閉じたアルファベット 3** | 上限 32 → **可** |
+| `clock` / `model` / `policy` | スカラ・小さな固定 record | 定数 | 可 |
+
+**問うべきは「コレクションか」ではなく「その大きさがドメインに比例して増えるか」。**
+閉じた語彙は、たとえ集合であっても、1 つの判断ぶんのデータである。
+
+**したがって `mokuroku` は委譲しない。** parity gate（この ADR で言う「第 1 歩」）が
+その core に対して取れる最大であり、それは後退ではなく**その core の性質**である。
+同じ理由で、コレクションを guest 側に持つ core を新しく書くときは、
+**それが parity gate 止まりになることを承知で書く**こと。
+
+## Consequences
+
+- **`.kotoba` core を持つ他 repo は同じ状態にある可能性が高い** —— core があり、
+  parity test があり、host が呼んでいない。**「切り出し済み」を「移行済み」と読まない。**
+- **delegation は tender ではない。** KIR interpreter で in-process 実行するだけで、
+  capability gate も supervisor も無い。今回の 3 core は `kotoba/pure`（effect 無し・
+  capability 無し）なので gate すべきものが無い。**effect を持つ core が出た時が
+  tender の出番**であり、`architecture.md` の「次は tendered Wasm component」という
+  記述はそれに合わせて訂正した。
+- **native とは別の話。** ADR-2608111900 は native 実行経路、これは KIR delegation。
+  この 3 core は native 語彙内に収まるよう書かれているが、**delegate 先は KIR**である
+  （word-typed 述語に process 境界を払う理由が無い、という同 ADR の結論のとおり）。
+
+## Evidence
+
+- `cloud-itonami/cloud-itonami-app` `98a57c6`: 3 core の delegation + `kotoba-oracle`
+  + drift/delegation gate。**104 tests / 755 assertions、0 failures**（この変更が
+  触る全 namespace）。変異 2 件で落ちることを確認済み。
+- `com-junkawasaki/root` `881a5f6`: west pin 前進（fast-forward 検証済み）。
+- **full suite はこの環境では走らない**（本変更と無関係の既存事由）:
+  `mail-projects-test` が load 時に存在しないバイナリを exec し、
+  cognitect.test-runner は絞り込み前に全 namespace を load するので、
+  1 件の load 失敗が走査全体を落とす。
+")))

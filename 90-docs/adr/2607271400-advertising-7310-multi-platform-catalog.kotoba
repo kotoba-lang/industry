@@ -1,0 +1,180 @@
+(vector (map (:db/id -1),
+  (:adr/id "adr-2607271400-advertising-7310-multi-platform-catalog"),
+  (:adr/title "ADR-2607271400: cloud-itonami-isic-7310 媒体カタログを4媒体に拡張 — 共有カテゴリ語彙・open/closed セット・未転記国別表は hold・法域スコープ表明"),
+  (:adr/status "accepted"),
+  (:adr/doc_type "adr"),
+  (:adr/date "2026-07-27"),
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)")),
+  (:adr/topic "advertising-7310-multi-platform-catalog"),
+  (:adr/related (vector "adr-2607261200-advertising-7310-media-platform-layer"
+                "adr-2607081900-cloud-itonami-advertising-7310-coverage"
+                "adr-2607171600-docs-edn-only-datascript-query")),
+  (:adr/supersedes (vector)),
+  (:adr/superseded_by (vector)),
+  (:adr/amends (vector "adr-2607261200-advertising-7310-media-platform-layer D2（媒体1件のみで出す）を撤回。他の決定は不変。")),
+  (:adr/repos (vector "com-junkawasaki/root" "cloud-itonami/cloud-itonami-isic-7310")),
+  (:adr/authoritative true),
+  (:adr/authoritative_for (vector "cloud-itonami-isic-7310 の媒体カタログに載る媒体の一覧と、その転記深度(index ページのみ/sub-page 未読)の申告"
+                          ":ad-category の共有語彙(category-vocabulary)と、そこに business category のみを入れる境界"
+                          "未転記の国別許可表を :per-category-unenumerated として hold 扱いにする規約"
+                          "法域スコープ表明(jurisdiction-attestations)の意味論")),
+  (:adr/last_verified "2026-07-27"),
+  (:adr/source-format "edn-only (ADR-2607171600)"),
+  (:adr/child-adr "cloud-itonami/cloud-itonami-isic-7310 docs/adr/0003-multi-platform-catalog.md"),
+  (:adr/child-commit "067af11f365869fde20478069568c23a8e2a56b7"),
+  (:adr/pin-advance "manifest/west.yml cloud-itonami-isic-7310: fd7c3cda2a46c41a1b03e41fab6273844cfbc031 -> 067af11f365869fde20478069568c23a8e2a56b7"),
+  (:adr/primary-sources (vector "https://support.google.com/adspolicy/answer/6008942 (Google 広告のポリシー、4分類 index、2026-07-27 直接読み取り)"
+                        "https://transparency.meta.com/policies/ad-standards/ (Meta 広告規定 index、2026-07-27 直接読み取り)"
+                        "https://about.ads.microsoft.com/en-us/policies/disallowed-content (Microsoft Advertising Disallowed Content、2026-07-27 直接読み取り)"
+                        "https://about.ads.microsoft.com/en-us/policies/restricted-categories (Microsoft Advertising Restricted Content、2026-07-27 直接読み取り)"
+                        "https://openai.com/policies/ad-policies/ (OpenAI 広告ポリシー v1.3、2026-07-26 直接読み取り、ADR-2607261200 で転記済み)")),
+  (:adr/known-gaps (vector "各媒体の per-category sub-page（制限カテゴリの国別許可表）は未読。よって google/meta/microsoft の制限カテゴリ出稿は現状すべて hold する。"
+                   "4媒体とも open-ended な留保条項（Google「その他の制限付きビジネス」/ Microsoft 'Areas of Questionable Legality' 等）を持ち、列挙不能。本カタログの clean verdict は媒体承認の必要条件であって十分条件ではない。"
+                   "Meta の special ad categories（住宅/雇用/信用）はターゲティング制約であり、本 actor はターゲティングをモデル化していないため未実装。")),
+  (:adr/verification "clojure -M:dev:test → 68 tests / 419 assertions, 0 failures 0 errors（ADR-2607261200 時点は 57/220）。clojure -M:lint → errors 0（既存の未使用 css var 警告 1 件のみ）。clojure -M:dev:run で cross-platform disposition 表と新規 hold の実発火を確認。docs/samples/operator-console.html 再生成済み。"),
+  (:adr/body
+  "## Context
+
+ADR-2607261200 は媒体プラットフォーム層を作り、**意図的に1媒体だけ**
+（`chatgpt-ads`）を転記して出した。Google / Meta / Microsoft は「URL は実在確認
+済みだが未読」として不在にした。当時これは正しい判断だった — 読んでいない
+ポリシーを記憶から seed すれば、カタログは有能に見えて厳密により危険になる。
+
+読みに行った理由は「カタログが薄く見えるから」ではない。**1媒体のカタログは、
+この層が存在する理由そのものを表現できない**からである。entry が1つしかない
+状態では `category-disposition` はグローバルなルール表と区別がつかず、
+「全媒体が ChatGPT と同じ挙動をする」と後から暗黙に仮定するコード変更が入っても
+何も壊れない。この層の中心的主張は「媒体は互いに独立した権威であり、実際に
+食い違う」ことなのに、その主張自体が未検証だった。
+
+3媒体の index を実際に読んだ結果、食い違いは具体的で、2箇所では**判定が反転**した:
+
+| category | chatgpt-ads | google-ads | meta-ads | microsoft-advertising |
+|---|---|---|---|---|
+| `:travel-experiences` | permitted | permitted | permitted | **restricted** |
+| `:legal-services` | **prohibited** | permitted | permitted | restricted |
+| `:political` | prohibited | **restricted** | **restricted** | prohibited |
+| `:ticket-reselling` | **not-permitted** | permitted | permitted | restricted |
+
+ChatGPT が何の手続きもなく配信する旅行キャンペーンが、Microsoft では制限
+カテゴリである。政治広告は Microsoft では全面禁止、Google/Meta では認証付きで
+可能。単一の「この広告は OK か?」述語は、少なくとも1媒体に対して必ず間違う。
+
+## Decision
+
+### D1. 3媒体を、それぞれの policy index から転記する
+
+index ページのみ。**per-category の sub-page は読んでいない**ので、各 entry の
+`:transcription-notes` にそう明記し、持っていない深さを持っているかのように
+装わない。3媒体とも文書自身がバージョン番号を名乗らないので、`:policy-version`
+は「どのページを・いつ読んだか」を記録し、バージョンを捏造しない。
+
+### D2. 共有 `category-vocabulary`
+
+`:ad-category` は4 entry が共通して索く1つの閉じた語彙から引く。これが無いと
+「媒体が食い違っている」ことと「媒体ごとに綴りが違う」ことが区別できず、1つの
+entry のタイポが黙ってポリシー差として読まれてしまう。`platform_test.clj` が
+「どの entry が名指すカテゴリも語彙のメンバーである」ことを固定する。
+
+語彙が持つのは **business category**（キャンペーンが何を宣伝しているか）だけ。
+各媒体がカテゴリ分類と並べて列挙する content / site-quality の失敗
+（Microsoft の 'Inaccessible site' / 'Non-Indexed Sites' / 'Unmoderated UGC'、
+Google の編集基準・技術要件、Meta の不適切な言葉・プライバシー規定）は意図的に
+除外した — それらは特定のクリエイティブやランディングページの性質であって、
+キャンペーンが「何のための」ものかではない。カテゴリとしてモデル化すれば
+カタログはより完全に見えるが、`category-disposition` が2つの異なる意味を持つ
+ことになる。
+
+### D3. open / closed カテゴリセットは仮定せず転記する
+
+ChatGPT は「名指していないカテゴリはすべて不許可」と述べる。他3媒体は禁止と制限を
+列挙するが集合を閉じない。`:closed-category-set?` を媒体ごとに記録することで、
+未掲載カテゴリは ChatGPT では `:not-permitted`、他3媒体では `:permitted` に解決
+される。open な3媒体の `:permitted-categories` は空である — 許可リストを公開して
+いないのだから、それを発明することは ADR-2607261200 が防ごうとしている捏造その
+ものになる。
+
+### D4. 未転記の国別許可表は hold であって yes ではない
+
+新規3媒体はいずれも制限カテゴリを国別に限定しているが、その表は index ページに
+無い。読んでいない法域集合を記録することも、キーを省いて述語を許容側に倒すことも
+せず、`:restricted-category-jurisdictions :per-category-unenumerated` という
+sentinel を置き、`restricted-category-allowed-jurisdiction?` はこれを見たら
+**全法域に対して false** を返す。
+
+結果として、Google / Meta / Microsoft 上の制限カテゴリ出稿は現状すべて HARD hold
+する。**これは意図した挙動である。** 代替（表を参照していないから true を返す）は、
+誰も読んでいない文書を根拠に、媒体が禁じているかもしれない国でキャンペーンを
+走らせることを意味する。この穴は `:transcription-notes` に明記し、
+`an-untranscribed-country-table-holds-everywhere` でテスト固定し、**述語を緩める
+のではなく表を転記することで**閉じる。
+
+### D5. 法域スコープ表明
+
+Meta は EU で表示される全広告に EU DSA の受益者/支払者開示を要求する。これを
+`:required-attestations` に入れると JPN 限定キャンペーンが EU 限定要件で hold
+され、省くと法的義務を取りこぼす。よって
+`:jurisdiction-attestations {iso3 -> #{...}}` を追加し、
+`required-attestations` / `missing-attestations` がキャンペーンの法域を取るように
+した。
+
+列挙したのは `DEU` のみ — `advertising.facts/catalog` に存在する EU 法域が DEU
+だけだからで、2つのカタログは一緒に拡張する。note にそう書いてある。
+
+これは同時に `:distinguishable-from-product-ui` を正しい場所に留める:
+その要件は**生成面に付随するのであって fleet に付随するのではない**ので
+`chatgpt-ads` 単独のまま。
+`generative-attestation-follows-the-surface-not-the-fleet` が他3媒体がそれを
+継承しないことを固定する。
+
+### D6. `cross-platform-disposition`
+
+「全カタログ媒体はこのカテゴリをどう扱うか」に1関数で答える — 代理店が買い付け
+前に最初に訊く質問。媒体を別々にモデル化しているからこそ答えられるので、
+なぜ別々にするのかの最も安い実証にもなっている。
+
+## Alternatives considered
+
+- **1媒体のままで層は証明済みとする**: 却下。entry が1つでは中心的主張が未検証で、
+  ChatGPT の形を仮定する最初の regression が CI を通ってしまう。
+- **per-category sub-page も転記する**: 却下ではなく**先送り**し、拡張タスクとして
+  記録した。Google の制限カテゴリ sub-page だけでも国別表が数十ある。要約から
+  転記すれば ADR-2607261200 D2 が拒んだ失敗をそのまま再導入することになる。
+  読まれるまで hold する、が安全な中間状態。
+- **4媒体の分類を1つに正規化する**: 強く却下。この層の出力そのものである食い違いを
+  消してしまう上、正しいマージが存在しない — `:political` は1つの表の中で同時に
+  prohibited（Microsoft）かつ restricted（Google）ではありえない。
+  `platforms-disagree-and-must-keep-disagreeing` が具体的な食い違いを assert する
+  ので、将来の「整理」はその理由を文章で述べているテストを削除しなければならない。
+- **Meta の special ad categories（住宅/雇用/信用）をモデル化する**: 現時点では却下。
+  admissibility ではなく**ターゲティング**を制約するもので、本 actor はターゲティングを
+  モデル化していない。黙って不在にせず `:transcription-notes` に穴として記録した。
+
+## Consequences
+
+- カバレッジ 1 → 4 媒体。`coverage` の note は**各 entry が捉えていないもの**
+  （全媒体が持つ open-ended な留保条項）を先頭に置く — 大きくなった数字が
+  「完全である」と読まれないように。
+- 新規3媒体上の制限カテゴリ出稿は、国別表が転記されるまですべて hold する。
+  運用者はこれに即座に直面するので、`docs/operator-guide.md` に専用節
+  （「Why your restricted-category campaigns are all holding」）を書いた。
+- `missing-attestations` / `required-attestations` / `compliance-checklist` に
+  法域 arity を追加（1-arity も維持）。
+- demo store に campaign-10..12 を追加。それぞれ cross-platform の効果を1つずつ
+  分離する: Google の open set 通過、DEU の Meta での法域スコープ表明 hold、
+  ChatGPT が許可するカテゴリの Microsoft での制限 hold。
+- テスト 57 → 68、assertion 220 → 419。
+- **本カタログの clean verdict は媒体承認の必要条件であって十分条件ではない。**
+  4媒体あると1媒体のときより忘れやすいので、README・`coverage` の note・子リポ
+  ADR-0003 の3箇所に明記した。
+
+## 実装の所在
+
+- 子リポ: `cloud-itonami/cloud-itonami-isic-7310`
+  （`src/advertising/platform.cljc` の 4 entry + `category-vocabulary` +
+  `cross-platform-disposition`、`test/advertising/platform_test.clj`、
+  `docs/adr/0003-multi-platform-catalog.md`）
+- 子リポ main: `067af11f365869fde20478069568c23a8e2a56b7`
+- superproject pin: `manifest/west.yml` 当該 entry のみ前進
+  （`fd7c3cd` → `067af11`、2 ahead / 0 behind）
+")))

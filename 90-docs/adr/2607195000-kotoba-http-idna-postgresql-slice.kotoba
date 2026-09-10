@@ -1,0 +1,77 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607195000-kotoba-http-idna-postgresql-slice")
+  (:adr/title "ADR-2607195000: Bounded chunked HTTP, endpoint canonicalization, and PostgreSQL query slice")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19")
+  (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for
+  (vector "bounded HTTP chunked response decoding"
+   "transport endpoint canonical form"
+   "initial PostgreSQL component protocol slice"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kotoba/providers/http_transport.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kototama/src/kototama/transport_provider.clj"
+   "orgs/kotoba-lang/kotoba-core-contracts/resources/kotoba/runtime/capability_contract.edn"))
+  (:adr/supersedes (vector "adr-2607184900-kotoba-linker-concurrency-qualification"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:http-chunked :bounded-in-place-decode)
+   (:chunk-extensions :reject)
+   (:chunk-trailers :reject)
+   (:content-length-plus-transfer-encoding :reject)
+   (:endpoint-hostname :idna-std3-lowercase-no-root-dot)
+   (:endpoint-ipv6 :canonical-bracketed-policy-key)
+   (:postgresql-slice :authenticated-tls-simple-query)
+   (:postgresql-startup-auth :pending)
+   (:production-qualified false)
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:test")
+     (:result "116 tests, 389 assertions, 0 failures"))
+    (map (:cwd "orgs/kotoba-lang/kotoba-core-contracts")
+     (:command "clojure -M:test")
+     (:result "15 tests, 258 assertions, 0 failures"))
+    (map (:cwd "orgs/kotoba-lang/compiler")
+     (:command "clojure -M:test")
+     (:result "270 tests, 3239 assertions, 0 failures"))
+    (map (:cwd "orgs/kotoba-lang/wasm-webcomponent")
+     (:command "npm test")
+     (:result "all verification scripts pass"))))))
+  (:adr/body
+  "# ADR-2607195000: Bounded chunked HTTP, endpoint canonicalization, and PostgreSQL query slice
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+The Kotoba HTTP provider accepts a single case-insensitive `Transfer-Encoding:
+chunked` field only when Content-Length is absent. It decodes chunks in place
+under the caller's response cap. Chunk extensions, trailers, malformed hex,
+truncation and CL/TE coexistence fail closed.
+
+Transport hostnames use IDNA STD3 ASCII, lowercase and removal of one DNS root
+dot. IPv4 and IPv6 literals use InetAddress canonical numeric form; IPv6 policy
+keys are bracketed to keep host and port unambiguous. Whitespace and NUL are
+rejected before resolution.
+
+The first product-specific database component operation is `pg-simple-query`.
+It emits the PostgreSQL `Q` frame over a verified TLS channel and accepts only
+the bounded AuthenticationOk followed by ReadyForQuery response used by this
+slice. This operation assumes an already-authenticated TLS endpoint or proxy;
+it does not claim PostgreSQL startup or authentication negotiation.
+
+## Maturity boundary
+
+PostgreSQL SSLRequest, StartupMessage, SASL/SCRAM authentication, general
+backend message streaming, cancellation and transaction orchestration remain
+open. External PKI/revocation and real-browser bridge evidence also remain
+outside this qualification.")))

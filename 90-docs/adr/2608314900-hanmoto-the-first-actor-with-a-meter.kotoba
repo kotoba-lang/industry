@@ -1,0 +1,206 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608314900-hanmoto-the-first-actor-with-a-meter")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "actor-hanmoto")
+  (:adr/title "ADR-2608314900: 版元（hanmoto）—— 計器を価格より先に持つ最初の actor。作った直後に、offer ladder がそれを見られないことが分かった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/cloud-itonami/actor-hanmoto"))
+
+  (:adr/authoritative_for
+  (vector "`cloud-itonami/actor-hanmoto`（版元）の存在・主題・境界。**kawaraban 瓦版 は何が言われたかを運び、hanmoto 版元 は誰が言えるかを運ぶ**"
+   "この actor が **計器を価格より先に**持つこと。ADR-2608110200 の順序をそのまま採る"
+   "register が host しか持たず、account 174,592 行を持たないこと。計器も同じ線を守り、caller を hash して記録すること"
+   "`itonami-actor-pnl.cljs` の母集団が **tree ではなく cache（evidence file）から来る**こと、およびそれを出力に書くこと"))
+
+  (:adr/related
+  (vector "90-docs/adr/2608314000-itonami-bot-profile-is-the-price-book.edn（profile = price book、offer ladder）"
+   "90-docs/adr/2608314300-publisher-census-into-the-datalake.edn（register の中身の出所）"
+   "90-docs/adr/2608313700-yata-one-design-account-is-derived-not-issued.edn（caller は did:pkh。口座は導出であって発行ではない）"))
+
+  (:adr/measured
+  (vector "repo: `cloud-itonami/actor-hanmoto`（public）、初期 commit `642d18bf`、west 登録 `62f05f29`。**pin == repo の default branch tip** を確認"
+   "完了ゲート `scripts/west-orphan-audit.cljs --blocking` **exit 0**"
+   "テスト: **14 tests / 37 assertions / 0 failures**（`clojure -M:test`）"
+   "metering detector: **meter-shaped 1**（31 → 0 だった集団に 1 件目）。`orgs/cloud-itonami/actor-hanmoto/src/hanmoto/usage.cljc` を名指しした"
+   "**offer ladder は hanmoto を見なかった** —— no-offer は 31 のまま、合計も 31 のまま。理由は『値札が無い』ではなく **母集団が 2026-08-30T15:52Z 生成の evidence file から来ており、そこに hanmoto が居ない**（grep 0 件）から"
+   "修正後: `EVIDENCE <path> <mtime>` と `POPULATION from evidence, not from the tree / on-disk=32 / in evidence=41 / UNSEEN=1` を数の前に印字。`--findings` で `evidence-behind-the-tree` が `actor-hanmoto` を名指しする"
+   "負のコントロール: hanmoto の actor.edn を一時的に外すと UNSEEN が消え、戻すと 1 に戻る"
+   "register の内容: 27,307 host（blog 13,319 / social 10,012 / media 1,730 / forum 306 / events 232 / books 80 / unknown 1,628 = 6.0%）"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-31）「bot を作って ok」。
+
+直前に測った鎖は動かなかった —— governed actor 31 体のうち、**計器を持つのが 0、
+値札を持つのが 0**。そして 2 つは独立ではない: `pricing/problems` は誰も数えていない
+次元を引用する invoice を拒否するので、**計器の不在が値札の不在の上流**である。
+
+だから 1 体、端から端まで閉じるものを作る。**1,964 体に足す 1 体ではなく、
+残りが写せる参照として。**")
+
+  (:adr/decision
+  "### D1. 順序 —— 計器が先、価格は後
+
+ADR-2608110200 がその順序の理由を書いている:
+
+> **価格は後から決められる。計測されなかった月は後から計測できない。**
+
+だから `hanmoto.usage` が先に在り、`pricing.edn` は全 plan が `:proposed` で
+gate が 5 つとも未達である。**数字は議論されるために在る。**
+
+その 5 つのうち 1 つ目が `:meter-running` —— 『計器は純関数で、host が繋がっていない。
+まだ何も記録していない』。**自分の未達を自分で名乗る。**
+
+### D2. 境界 —— 瓦版は何が言われたか、版元は誰が言えるか
+
+`actor-kawaraban`（瓦版）が隣に居る。混同しやすいので README が線を引く:
+
+| | 運ぶもの |
+|---|---|
+| **kawaraban** 瓦版 | **何が言われたか** —— outlet / 面 / 見出し / byline / link |
+| **hanmoto** 版元 | **誰が言えるか** —— 発行しているホストそのもの |
+
+見出しは kawaraban のもの。それを配ったホストはここのもの。
+
+CLAUDE.md の『面をまたぐ同一主題は可。条件は README が最近接 repo との境界を
+述べること』に従う。
+
+### D3. register は host だけ。account は 1 行も持たない
+
+上流 corpus は account を 174,592 行持つが、この register は 0 行持つ。
+
+CLAUDE.md が repo-wide mandatory として書いている —— account が join できる先は
+`:service/host` → `:service/domain` だけで、その join は service さえ在れば成立する。
+**発行者の register は組織の register である。**
+
+**そして計器も同じ線を守る。** caller は `did:pkh:eip155:8453:0x…`（払った鍵から
+導出。ADR-2608313700）で、**月ごと・顧客ごとの salt をかけて hash してから記録する**。
+使用量の export は監査できるが名簿にはならない。
+
+register が拒否しているものに計器がなってしまっては、線が引けていない。
+
+### D4. 計器の形は authn.usage から採る。発明しない
+
+期間（`month-of` / `scope`）・**重複排除できるキー**（`mac-key`）・集計（`report`）。
+
+そして純粋である —— `digest` は注入で、この ns は crypto を持たず I/O をしない。
+
+2 つの規律を足した:
+
+- **`dimensions` に無い次元では鍵を作らない。** 計器が数えないものを価格表が
+  引用できる状態を作らない
+- **`report` は読めなかった鍵を `:unreadable` として数える。** 黙って捨てる fold は、
+  捨てるものが無かった fold と同じ合計を報告する
+
+### D5. offer ladder が新しい actor を見られなかった —— それも直す
+
+hanmoto を作った直後、metering detector は 1 件増え、**offer ladder は 31 のまま
+動かなかった。**
+
+原因は母集団の出所である。ladder（`itonami-actor-pnl.cljs`）は
+`manifest/itonami-maturity-evidence.edn` を読む —— **13 時間前に生成された cache** で、
+hanmoto は入っていない。だから hanmoto は `no-offer` に数えられたのではなく
+**一度も見られなかった**。そして出力にはそれが書かれていなかった。
+
+修正: 数の前に **何をいつ読んだか**を印字し、tree に在って evidence に無い repo を
+`UNSEEN` として名指しする。
+
+⚠ **その修正でも 1 度間違えた。** 最初 `on-disk(32) - in-evidence(41)` を引いて
+`UNSEEN 0` を出した。2 つは比較できない —— evidence の `:repo/has-actor-edn?` は
+tree 内のどこに actor.edn があっても真になる（この script 自身が contamination として
+報告している性質）。**集合の差**で取り直した。")
+
+  (:adr/implementation
+  (vector "landed: `cloud-itonami/actor-hanmoto` —— README / actor.edn / pricing.edn / deps.edn / src(census, usage) / test。14 tests / 37 assertions"
+   "landed: west 登録（superproject `62f05f29`、Git Data API 経由。west.yml が 1 MB 超で Contents API がインラインで返せないため blob/tree/commit を使った）"
+   "landed: `itonami-actor-pnl.cljs` が母集団の出所と鮮度を印字し、UNSEEN を名指しする"
+   "landed: 本 ADR"
+   "not-done: register を実際に serve すること。`hanmoto.census` は純関数で、host も route も無い"
+   "not-done: 計器を走らせること。gate `:meter-running` が未達で、それを自分で書いている"
+   "not-done: catalog 登録。gate `:catalog-entry` 未達"
+   "not-done: evidence file の再生成。UNSEEN が消えるが、それは 1,965 repo の再スキャンで、この ADR の範囲ではない"))
+
+  (:adr/known-gaps
+  (vector "**何も記録していない。** 計器は純関数で、host が無い。`:meter-running` gate はそれを名乗る"
+   "**register は 2026-08-09 のスナップショット。** 名簿を売るなら鮮度が要る（gate `:register-refreshed-on-a-schedule`）"
+   "**unknown 6.0% を API が返す設計になっていない。** README には書いたが、gate `:unknown-tail-disclosed-in-product` は未達 —— カテゴリの数だけ返して未分類を返さない API は、完成しているように読める答えを返す"
+   "**evidence file が古いまま。** UNSEEN=1 は今日直した印字で見えるようになったが、直す（再スキャンする）のはこの ADR の外"
+   "**ladder はまだ hanmoto を `proposed` に置けない。** evidence が追いつくまで、price book が在るのに段に現れない"))
+
+  (:adr/open-decisions
+  (vector "register を serve する host をどこに置くか（x402 経由なら D3 の did:pkh がそのまま caller になる）"
+   "evidence file を再生成するか、ladder の母集団を tree 直読みに変えるか"))
+
+  (:adr/body
+  "# ADR-2608314900: 版元 —— 計器を先に持つ最初の 1 体
+
+## 一行で
+
+**31 体が計器を持たず値札も持たなかったので、順番どおりに 1 体作った。**
+そして作った直後、**それを数えるはずの検出器が見られなかった。**
+
+## 順序
+
+ADR-2608110200 が理由を書いている ——
+『**価格は後から決められる。計測されなかった月は後から計測できない。**』
+
+だから `hanmoto.usage` が先で、`pricing.edn` は全 plan が `:proposed`、
+gate は 5 つとも未達である。1 つ目の gate が `:meter-running` で、
+『計器は純関数で host が繋がっていない。まだ何も記録していない』と**自分で名乗る**。
+
+## 境界
+
+| | 運ぶもの |
+|---|---|
+| kawaraban 瓦版 | **何が言われたか** |
+| hanmoto 版元 | **誰が言えるか** |
+
+見出しは瓦版のもの。それを配ったホストはここのもの。
+
+## 線は register と計器の両方に引く
+
+register は 27,307 の **host** を持ち、上流 corpus の **account 174,592 行を 0 行**持つ。
+発行者の register は組織の register である。
+
+**そして計器も同じ線を守る** —— caller は払った鍵から導出した `did:pkh` で、
+月ごと・顧客ごとの salt をかけて hash してから記録する。
+使用量の export は監査できるが名簿にはならない。
+
+**register が拒否しているものに計器がなってしまっては、線が引けていない。**
+
+## 作った直後に出た穴
+
+metering detector は 1 件増えた。**offer ladder は 31 のまま動かなかった。**
+
+『値札が無い』からではない。ladder の母集団は 13 時間前に生成された evidence file
+から来ていて、**hanmoto はそこに居ない**。数えられたのではなく、一度も見られなかった。
+そして出力にはそれが書かれていなかった。
+
+同じ問いに 2 つの検出器が別々の数を返し、片方は『無い』ではなく『見えない』だった
+—— これはこの session が何度も記録してきた形である。
+
+直した: 数の前に **何をいつ読んだか**を書き、tree に在って evidence に無い repo を
+`UNSEEN` として名指しする。
+
+### 直しながらもう 1 度踏んだ
+
+最初 `on-disk(32) − in-evidence(41)` を引いて **UNSEEN 0** を出した。
+見えていない actor が実在するのに 0 と報告しかけた。
+
+2 つは比較できない数である —— evidence の `:repo/has-actor-edn?` は tree 内の
+どこに actor.edn があっても真になる（**この script 自身が contamination として
+報告している性質**）。集合の差で取り直した。
+
+**引き算する前に、2 つの数が同じものを数えているか確かめる。**
+
+## まだ売っていない
+
+serve する host は無く、計器は一度も動いておらず、catalog にも載っていない。
+gate はそれを 5 つとも名乗っている。
+
+**この 1 体が示したのは『売れる』ではなく『順番どおりなら組める』である。**")))

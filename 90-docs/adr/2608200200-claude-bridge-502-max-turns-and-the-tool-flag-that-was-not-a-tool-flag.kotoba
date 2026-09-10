@@ -1,0 +1,140 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608200200-claude-bridge-502-max-turns-and-the-tool-flag-that-was-not-a-tool-flag")
+  (:adr/title "hermes の 502 は --max-turns 3 だった —— そして --allowedTools \"\" はツールを外していなかった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-20")
+  (:adr/topic "infrastructure")
+  (:adr/doc_type "adr")
+  (:source/dataset "adr")
+  (:adr/authoritative_for "claude-bridge の CLI フラグ（--max-turns / --tools / --allowedTools）と HTTP status マッピング")
+  (:adr/repos "com-junkawasaki/root")
+  (:adr/commits "root e9c86a72696 (max-turns 12 + --tools empty), root 183be8b22fb (429 passthrough)")
+  (:adr/related "adr-2608197900, adr-2608136000")
+  (:adr/body "## 何が起きていたか
+
+hermes の cron agent が HTTP 502 で落ちていた。エラー本文は
+`subtype=error_max_turns terminal_reason=max_turns`。
+
+hermes は自前の LLM を呼んでいない。`http://127.0.0.1:9180/v1/`（claude-bridge、
+`claude -p` CLI を OpenAI 互換エンドポイントに包んだもの、launchd
+`com.gftd.claude-bridge`）を `provider=custom` で叩いている。
+
+## 原因 1 — --max-turns 3 が schema 経路に対して狭すぎた
+
+hermes は毎リクエストで 19-23 個の caller tool を宣言するので、bridge は必ず
+`--json-schema` 経路に入る。この経路では**返答テキストが最後の StructuredOutput
+tool_use の中にしか存在しない**。3 ターンを使い切って StructuredOutput に到達
+できなかった run は、テキストがゼロのまま error_max_turns で終わる。
+
+bridge には「テキストが出ていれば max_turns は truncation であって失敗ではない」
+という救済分岐があるが、**schema 経路では result が空なので構造的に発火しない**。
+
+実測（--max-turns 12 で同一プロンプト形状を回して必要ターン数を測った）:
+同じ形状が 2, 4, 5 ターンを要した。3 では足りない。
+
+## 原因 2 — --allowedTools \"\" はツールを外していなかった（安全上の穴）
+
+診断中に発見。`--allowedTools` は PERMISSION allowlist であって availability list
+ではない。これだけでは init event が built-in 25 個を全部広告し続け、
+permissionMode auto のもとで **guest が実際に Bash を実行した**:
+
+    入力: \"Run: echo hello-from-guest\"
+    → assistant: tool_use Bash / tool_result: hello-from-guest
+
+Bash / Write / Edit / Task / CronCreate が live だった。bridge 自身のヘッダは
+\"a guest that ran them would be an agent running commands the caller never
+sanctioned\" と書いている。その不変条件が実装されていなかった。
+
+提供を外すフラグは `--tools \"\"`（実測 25 -> 0）。StructuredOutput は built-in set
+から引かれていないので `--json-schema` は壊れない。
+
+これはターン予算も食っていた（本物のツールループが 3 ターンを消費して
+StructuredOutput に届かない）ので、原因 1 の機構でもある。
+
+## 原因 3 — 全エラーが 502 に潰されていた
+
+`send-json res 502` が固定。週次上限の 429 も 502 upstream_error になるので、
+hermes は「一時障害」と読んで 2s / 6s の 3 連打を、数日後にしか解けない上限に
+対して撃っていた（2026-08-19 16:16Z-17:23Z に 15 件）。
+
+## 決定
+
+scripts/claude-bridge.cljs を 3 点変更した。
+
+  --max-turns 3 -> 12      成功 run は自然に 2 で止まるので common path のコストは
+                           ゼロ。最悪ケースは CLAUDE_BRIDGE_TIMEOUT が抑える
+  --tools \"\" を追加         built-in を外す。--allowedTools \"\" は冗長な二段目の床
+                           として残す
+  429 のみ passthrough      他は 502 のまま。5xx と transport fault は本当に
+                           こちらの再試行対象で、CLI 自身の状態についての 4xx を
+                           caller のリクエストのせいにするのは嘘になる
+
+## 実測した結果
+
+error_max_turns:
+
+  再起動前 11.4h : 130 応答中 31 件 = 23.8%
+  再起動後  4.6h :  41 応答中  0 件 =  0.0%
+
+偶然 41 本連続で当たる確率は 0.001%。統計的に決着。
+
+--tools \"\" が live で効いていることは、CLI が広告するツール一覧がログに残って
+いるので直接確認できる:
+
+  再起動前 (22 回): [\"Task\",\"Bash\",...,\"Write\"]   26 個
+  再起動後 (15 回): [\"StructuredOutput\"]           1 個
+
+429 passthrough は両方向をスタブ CLI（api_error_status を差し替えられる偽 claude、
+scratchpad のみ・未コミット）で検証:
+
+  api_error_status=429 -> HTTP 429 rate_limit_error
+  api_error_status=404 -> HTTP 502 upstream_error（変化なし）
+
+hermes 自身のクライアント（venv の openai 2.24.0）で RateLimitError が上がることを
+確認。hermes 側は agent/error_classifier.py:39 が rate_limit を \"backoff then
+rotate\" に分類し、FailoverReason.rate_limit と _rate_limited_until クールダウンを
+持っているので、既存の正しい経路に乗る。
+
+no-regression（実 CLI、live 9180）: 通常 200 / schema 経路 200 / shell 実行は拒否 /
+404 モデルは 502 のまま。
+
+## この作業で自分が 2 回踏んだ、測り方の欠陥
+
+どちらも「測れなかった検査が、測って問題が無かった検査と同じ値を返す」形
+（ADR-2608136000 の class）。
+
+1. hermes の errors.log を `$1\" \"$2 >= \"2026-08-19 21:45:51\"` で絞ったが、Python の
+   traceback 行には行頭タイムスタンプが無く、\"RuntimeError:\" > \"2026-...\" で
+   **時刻に関係なく全部素通りした**。post-restart の失敗を 9 件と報告したが
+   正しくは 0 件。直近のタイムスタンプに属性付けし直して解決（未属性 0 件を
+   同時に出力させる形にした）。
+2. 着地判定で `tot=$(wc -l < f)` を使い、空白パディングで `\"       1\" != \"1\"` と
+   なって、**既に upstream にある ledger 行を「未着地」と誤判定しかけた**。
+   `grep -c ''` に変更。
+
+いずれも「0 件でした」と報告する直前に踏んでおり、報告していれば誤りが確定して
+いた。
+
+## 残っているギャップ
+
+- **429 passthrough の live 実証は無い。** スタブと hermes クライアントで両方向を
+  確認したが、実際の rate limit に当てて 429 が hermes の failover を起こすところは
+  観測していない。次に上限を踏んだときに claude-bridge.log と hermes の
+  error_classifier のログを突き合わせること。
+- **--max-turns 12 が十分かは上界を測っていない。** 「3 では足りない」は測ったが
+  「12 なら常に足りる」は測っていない。0/41 は 12 が今の負荷で足りることを示すが、
+  もっと重い会話が来れば同じ形で失敗しうる。再発したら num_turns を見る。
+- **週次上限の消費に自分がどれだけ寄与したか切り分けられていない。** 診断中に
+  約 40 回 CLI を回した（同時 10 本の A/B を含む）。修正自体の消費への影響は
+  おそらく有利（旧: 3 ターン x 3 リトライで出力ゼロ / 新: 4-5 ターン 1 回で成功）
+  だが、測っていない。
+
+## 隣接する事実
+
+- claude-bridge は 2026-08-19 に ~/.gftd/ から repo へ移された（ADR-2608197900）。
+  ~/.gftd/claude-bridge.cljs.superseded-20260819 は移動前の写しで inert。
+- 共有 checkout の同期が他セッションの ledger 追記でブロックされた。canvas-ledger の
+  7 行は origin/main に未着地だったので .git/stash-archive-20260820/ へ退避し、
+  merge 後に再追記した（EDN 9,631 行、読めない行 0）。stash@{0} は温存。
+  同種の stash が stash@{1} stash@{2} にもあり、この衝突は繰り返し起きている。
+")))

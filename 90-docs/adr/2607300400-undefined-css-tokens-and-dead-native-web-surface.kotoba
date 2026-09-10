@@ -1,0 +1,138 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607300400")
+  (:adr/title "Undefined CSS custom properties fail silently; the kotoba-shell native web surface was never wired")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/tags (vector "css" "design-system" "jp-go-dds" "kotoba-shell" "verification" "accessibility"))
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/context
+  "Adding a Worker tab to cloud-itonami-app required looking at the rendered UI. The Claude-in-Chrome extension was not connected, so the native shell path was investigated as the alternative. Both the CSS and the shell turned out to have silent, pre-existing defects that no test or reviewer had caught, because in each case the failure mode renders as something that looks deliberate.")
+  (:adr/decision
+  "1. Treat an undefined CSS custom property as a build failure, not a styling preference. Add a test that cross-checks every `var(--token)` in an app's stylesheet against the tokens its design system actually defines. cloud-itonami-app now has one (`app-css-only-references-design-system-tokens-that-exist`); it was verified to fail and name the offending token when a bogus token is injected. Any repo consuming jp-go-dds should carry the same guard.
+
+2. Do not claim a UI is verified from source inspection or from a static HTML render alone. Render it in a real engine and read back computed values. Two of the three worker state chips were transparent while the markup and CSS both read as correct.
+
+3. A parsed-but-unconsumed flag is a defect, not a stub. `--web-url` was read and discarded for three revisions while two apps exported KOTOBA_SHELL_WEB_URL and silently got the kotoba:dom surface. Either consume an option or remove it; a flag that is accepted and ignored reads as working.
+
+4. A commit that adds call sites must add the declarations they need. `5c39631` added uses of five members that were never declared, leaving the host uncompilable — and therefore the whole native shell unstartable — for three revisions. Build the thing you changed before landing it.")
+  (:adr/consequences
+  "The token guard makes a whole class of silent styling failure loud. It also means adding a token to an app requires the design system to define it first, which is the intended direction.
+
+The native shell now starts and can render any app's web surface, so the workspace has a browser-extension-free way to render a page, capture it, and read back JS errors and computed styles: `kotoba-shell-host-macos-window --smoke --web-url <url> --screenshot <path>`. Smoke mode does not take activation, so it is safe to run while other sessions are working. This is the recommended way to verify a UI change on this machine.
+
+Two apps' native paths change behaviour as a result: cloud-itonami-app and local-manimani now show their web surface where they previously showed kotoba:dom. That is what they asked for, but it is a visible change on first run after this pin advance.")
+  (:adr/body
+  "## 1. Undefined CSS custom properties are silent
+
+An undefined custom property does not fall back through the cascade. The declaration becomes **invalid at computed-value time** and resolves to the property's initial (or inherited) value. `background: var(--nope)` therefore yields `transparent` — it does not keep a grey inherited from a base class — and `outline: 4px solid var(--nope)` yields `outline-style: none`.
+
+cloud-itonami-app referenced **21 distinct tokens, of which 7 did not exist** in jp-go-dds (17 usages):
+
+| referenced (nonexistent) | actual effect | replaced with |
+|---|---|---|
+| `--color-focus-yellow` (6x) | every `:focus-visible` computed to `outline-style:none` — **no keyboard focus ring anywhere in the app** | `--color-primitive-yellow-300` |
+| `--color-success-700` (3x) | invisible text | `--color-semantic-success-2` |
+| `--color-success-600` (1x) | invisible status dot | `--color-semantic-success-1` |
+| `--color-success-50` (2x) | transparent chip background | `--color-primitive-green-50` |
+| `--color-error-700` (2x) | invisible text | `--color-semantic-error-1` |
+| `--color-error-50` (2x) | transparent chip background | `--color-primitive-red-50` |
+| `--color-warning-yellow-200` (1x) | transparent chip background | `--color-primitive-yellow-200` |
+
+jp-go-dds names semantic colors `--color-semantic-{success,error,warning-yellow}-{1,2}` and primitives `--color-primitive-{green,red,yellow,...}-{50..1200}`. **It defines no focus token at all and ships no `:focus-visible` rules of its own**, so apps must choose one; `--color-primitive-yellow-300` (#ffd43d) matches the JP-gov focus convention.
+
+Measured before/after in WKWebView: `.state-chip--done` and `--fail` went from `rgba(0, 0, 0, 0)` to `rgb(230, 245, 236)` / `rgb(253, 238, 238)`.
+
+Fixed in cloud-itonami/cloud-itonami-app `ab2c080`.
+
+### The same bug in tamaki-observer-web
+
+`orgs/kotoba-lang/shell/apps/tamaki-observer-web/src/tamaki/observer/style.cljs` referenced `var(--color-focus-yellow)` in `button:focus-visible,select:focus-visible`, so no button or select had a focus ring. Confirmed against the built artifact, not just the source: `dist/style.css` contains **no** `--color-*focus*` definition at all, and `jp-go-dds.tokens/skin-css` — which `build_css.clj` concatenates after `dds.css` — does not define it either. Fixed in `658dfde` (source only; `dist/style.css` is regenerated by the shadow `:compile-finish` hook).
+
+Two apparent extra undefined tokens there, `--stock` and `--tone`, are false positives: `--stock` is set inline at runtime (`style=\"--stock:…\"`) and `--tone` is declared as a map-string key (`{\"--tone\" \"#54f69a\"}`), which a naive `--name:` scan misses. A guard test for that repo has to allow element-scoped properties, so the cloud-itonami-app test is not directly portable to it.
+
+## 2. The kotoba-shell native web surface never rendered — now fixed
+
+**Resolved in kotoba-lang/shell `658dfde`.** All three defects below are fixed; the description is kept because the root cause and the contract it exposes are the useful part.
+
+### Root cause of the build failure
+
+`156a501` compiles with 0 errors. `5c39631` (\"rescue: the additive half of the parked shell WIP\") added call sites for `KotobaActionTarget.endpoints` / `.bodies` / `.inputValues`, `field.delegate = actionTarget`, and `retainedWindowDelegate` **without adding any of the declarations** — the rescue took the additive half literally and left the half that declares what the additions use. Every revision from `5c39631` onward fails with the same 10 errors.
+
+The consumers determine the missing shape, so it was restored rather than guessed:
+
+- `endpoints`/`bodies` keyed by action id, `inputValues` keyed by input id;
+- `controlTextDidChange` keeps a field's text current — the only reason a field takes that object as its delegate;
+- **`perform` must emit `value`**. `bin/cloud-itonami-app-action` reads `.value` as the prompt, so while `perform` omitted it the native chat button posted an empty prompt on every click. Now built through `emit()`/JSONSerialization, because the text is arbitrary and string interpolation broke the event line on any quote or newline.
+- `retainedWindowDelegate` was dropped rather than declared: the top-level `let delegate` is already a strong global, so the write was redundant and declaring it would only add a written-but-never-read warning.
+
+### Original three defects
+
+Three stacked defects in `kotoba-lang/shell` (was `origin/main` = `d46824a`):
+
+1. **`bin/kotoba-shell-host-macos-window.swift` does not compile** — 10 errors, e.g. `cannot find 'retainedWindowDelegate' in scope`, and `KotobaActionTarget` is missing `endpoints`/`bodies`/`inputValues` and does not conform to `NSTextFieldDelegate` while call sites use all four. Reads as a half-finished refactor. Because `bin/kotoba-shell-app-runtime` rebuilds the host inside `launch()`, **the native shell cannot start for any app**.
+2. **`--web-url` is parsed and discarded** — read once at line 311, never used; `WKWebView(` appears 0 times despite `import WebKit`.
+3. **The runtime never passes `--web-url`** to the host.
+
+### The change that fixes 2 and 3
+
+In the window host: add `--settle-seconds`; add a `writePNG(image:path:)` (the existing `writePNG(view:path:)` uses `cacheDisplay`, which **cannot capture a WKWebView** because it renders out of process — use `takeSnapshot`); inject a `WKUserScript` at `.atDocumentStart` collecting `window.onerror`/`unhandledrejection`/`console.error` into `window.__kotobaErrors` so page failures are reportable with no extension attached; add a `WKNavigationDelegate` that in smoke mode waits for `didFinish` rather than a fixed delay, then reads the errors, snapshots, emits `web/errors` + `visual/captured`, and terminates; mount a `WKWebView` as window content when `webURL != nil` (`loadFileURL` for `file:` URLs) keeping kotoba:dom as the default; and guard the existing fixed-delay smoke block with `webURL == nil`.
+
+In smoke mode use `setActivationPolicy(.accessory)` + `.normal` window level + `orderFrontRegardless()` instead of `makeKeyAndOrderFront` + `activate(ignoringOtherApps:)`. **An observation boundary must not become the active app**: this machine runs many concurrent sessions and stealing activation corrupts whichever one is being typed into.
+
+In `bin/kotoba-shell-app-runtime`, inside `launch()`:
+`[[ -n \"${KOTOBA_SHELL_WEB_URL:-}\" ]] && host_args+=(--web-url \"$KOTOBA_SHELL_WEB_URL\")`
+
+### Verification
+
+Builds clean with no warnings. The kotoba:dom surface still renders and captures (regression check, since it is the default path). `--web-url` renders both a `file://` page and the live cloud-itonami-app at `http://localhost:1341/`, reporting `web/errors: []` with that app's full interaction script running — which is how the Worker surface was finally confirmed to execute without throwing against the real DOM.
+
+## 3. `push.default = upstream` in kotoba-lang/shell sends branch pushes to main
+
+`kotoba-lang/shell` has `push.default = upstream` in its git config. A branch created with `git worktree add -b <name> origin/main` therefore has `origin/main` as its upstream, and **`git push origin <name>` pushes the commit to `main`, not to `refs/heads/<name>`**. It reports `Everything up-to-date` afterwards while `gh api .../merges` fails with `Head does not exist`, because the branch was never created remotely.
+
+`658dfde` landed on main this way — a clean fast-forward, no force-push and no history rewrite, but not the intended feature-branch-plus-server-side-merge route. Anyone intending a reviewable branch in this repo must push an explicit refspec: `git push origin <name>:refs/heads/<name>`.")
+  (:adr/gaps
+  "RESOLVED
+1. kotoba-lang/shell window host now compiles (root cause: `5c39631` added call sites without declarations) — `658dfde`.
+2. `--web-url` now mounts a WKWebView, and the runtime forwards it — `658dfde`.
+3. `apps/tamaki-observer-web` focus ring now points at `--color-primitive-yellow-300` — `658dfde`. Source only; `dist/style.css` is regenerated by the shadow `:compile-finish` hook, and was left alone because another session had it open.
+4. The native chat button posted an empty prompt on every click (`perform` never emitted the `.value` its consumer reads) — `658dfde`.
+
+OPEN
+5. cloud-itonami-app: the Worker UI is verified structurally, over HTTP, and as a native WKWebView render of the live app with its real script running and zero JS errors. It has NOT been driven through a completed passkey ceremony, because that needs a real authenticator. Closing this needs a WebAuthn virtual authenticator in the host, not more test coverage.
+6. Workspace: `nbb scripts/gen-west-manifest.cljs --check` reports STALE on plain `origin/main`, independent of any single entry — whole-fleet local-checkout drift, because the generator pins from local working HEADs. Deliberately not addressed: the only way to make it green is the wholesale regeneration that is forbidden. The `--check` signal is therefore not usable as a gate in its current form.
+7. Workspace: `manifest/docs-edn-only.cljs verify` fails on four counts, and `md=75` is one of them even though it is not printed as a section — 75 `.md` files still live under `90-docs` against the EDN-only policy, which is a migration decision, not a repair.
+
+   Of the 22 unparseable EDN files, **3 are now fixed** (`METRICS-DEPLOYMENT-COORDINATION-SUMMARY`, `MONTH-3-AUTOMATIC-ROLLBACK-TRIGGERS`, `MONTH-3-PRE-FLIGHT-READINESS-PLAN`) and **19 remain**, plus 7 non-tx-data ADRs and 7 path-md-refs.
+
+   `verify` itself was under-reporting. Its text-level checks (md-path references, source-format residue) sat inside the same `let` as `edn/read-string`, so **a parse error skipped them for that file**. Fixing one parse error appeared to add md-path hits that had in fact always been there. The checks are now independent, which moved path-md-refs from a reported 4 to a true 7. Expect the same for `not-tx` as the remaining 19 parse errors are fixed: that check legitimately needs parsed content, so its total is still a lower bound.
+
+   Two diagnostic scripts were added because the reader message is actively misleading here — it names where the wreckage surfaced, not where it started, often hundreds of lines away:
+   - `scripts/docs-edn-parse-report.cljs` — every failing file with its reader error (`verify` caps its listing at 20).
+   - `scripts/docs-edn-locate-break.cljs` — the actual defect line. A delimiter-stack scan reports surplus, mismatched and unclosed delimiters with the line that opened them; when delimiters are sound it falls back to prefix-parsing for malformed strings and tokens. No heuristics, so `pr-str` body blobs full of escaped quotes do not false-positive. Diagnoses all 19 in seconds.
+
+   Worth knowing before repairing any of these: `edn/read-string` reads only the first form and **silently ignores trailing text**, so a surplus delimiter at the very end of a file is harmless while one in the middle stays invisible until EOF.
+
+   The 19 were left alone deliberately. Each needs a structural judgement inside a document this work does not own — e.g. `MONTH-3-CANARY-EXECUTION-TIMELINE` has a map opened on line 193 that is never closed across 200+ lines of nested phase maps, and the `}` could correctly go in several places. A fix that parses but nests differently is worse than a loud failure, because the loader nils bad shapes and the document would then be silently wrong instead of silently absent. The three that were fixed were each unambiguous — a dropped `\"`, a dropped `}`, an invalid `80+` literal and a digit-initial keyword name — and the structural one was confirmed by checking the repaired shape (5 risk maps, each with exactly `:risk :likelihood :impact :mitigation`) rather than by assuming.
+8. Environment: an orphaned process (`resource-guard run build -- clojure -M:server`, PPID 1) holds the workspace-wide `build` scope lock, so a long-running server blocks every session's builds. Left alone — not this session's process. The underlying flaw is that a server was started under the `build` scope at all.
+9. cloud-itonami/cloud-itonami-app: the shared west checkout is stuck behind `origin/main` because another session holds uncommitted edits to `web.clj`, `server.clj`, `identity.clj`, `deps.edn` and `core_test.clj` there. Their edits are based on a pre-token-fix tree, so committing them may revert the token fix and worker routes. This is the shared-checkout-direct-edit hazard, and it can only be resolved by that session.")
+  (:adr/verification
+  "Re-verified at close against each repo's current default branch, not against the commits this work created — three other sessions landed in cloud-itonami-app meanwhile.
+
+- cloud-itonami-app @ 0e3a5c6: `clojure -M:test` → **56 tests / 321 assertions, 0 failures** (includes worker, worker-http and the design-token guard). `clojure -M:lint` → 0 errors, 10 warnings, **all in other sessions' new files** (mail_sync, bitcoin_wallet, agent_control, account_link_sync), none in files touched here. Every warning is `Unresolved var` — the same call-sites-without-declarations shape that made the shell host uncompilable, so it is worth watching.
+- kotoba-lang/shell @ 658dfde: the macOS window host compiles with **0 errors and 0 warnings**. Both native surfaces captured during development: kotoba:dom (regression check) and `--web-url` against both a `file://` page and the live app.
+- The Worker surface was rendered in WKWebView with the app's real interaction script running: `web/errors: []`, and the URL advanced to `#settings`, proving `showView` and the view-change hook executed.
+- west pins reachable from their child tips: cloud-itonami-app 7113377b (advanced further by another session, this work included), shell 658dfded.
+
+Not verified: a completed passkey ceremony. It needs a real authenticator, so the Worker tab has never been driven while unlocked. Everything behind that gate is covered at the HTTP layer instead.")
+  (:adr/resume
+  "Highest-value next steps, in order:
+
+1. `nbb --classpath \".:scripts/nbb_compat\" scripts/docs-edn-locate-break.cljs $(nbb --classpath \".:scripts/nbb_compat\" scripts/docs-edn-parse-report.cljs | grep -oE '90-docs/[^ ]+\\.edn')` — prints the exact defect line for each of the 19 remaining unparseable docs. Repair one document per commit and confirm the resulting shape, not just that it parses.
+2. Decide the 75 `.md` files under 90-docs. `docs-edn-only.cljs migrate` exists for the ADR subset; the rest is a policy call, not a repair.
+3. Port the design-token guard to every repo consuming jp-go-dds. For tamaki-observer-web it needs to allow element-scoped properties first (`--stock` set inline, `--tone` as a map-string key), so the cloud-itonami-app test is not directly portable.
+4. If the Worker tab behind the passkey gate must be seen, add a WebAuthn virtual authenticator to the window host. More test coverage cannot reach it.
+5. `gen-west-manifest.cljs --check` cannot be made green without the forbidden wholesale regeneration; either fix the generator to pin from remote tips rather than local working HEADs, or stop treating `--check` as a gate.")
+  (:adr/evidence
+  "cloud-itonami/cloud-itonami-app 6297483 (Worker tab), ab2c080 (token fix), dac84a2 (HTTP endpoint tests). kotoba-lang/shell 658dfde (host repair, --web-url, tamaki focus ring). Superproject west pins advanced in fe0b4cf6ccc, d8b8c81a33e and this commit. 28 tests / 206 assertions pass, clj-kondo clean, host builds warning-free, both native surfaces capture.")))

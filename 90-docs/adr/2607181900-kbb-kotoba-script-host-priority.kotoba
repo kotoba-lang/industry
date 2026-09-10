@@ -1,0 +1,237 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607181900")
+  (:adr/title "kbb — script/tooling host 優先順位を kbb > nbb > (bb退役) に据える（kbb v1 実装進行中、slice 3 着地 2026-09-05）")
+  (:adr/topic "kbb-kotoba-script-host-priority")
+  (:adr/doc_type "adr")
+  (:adr/status :accepted)
+  (:adr/date "2026-07-18")
+  (:adr/last_verified "2026-09-05")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/related (vector "2607100100-runtime-priority-apps-jvm-bb-demoted"
+                "2607173000-fleet-babashka-to-nbb"
+                "2607171700-repo-wide-cljc-to-kotoba-source-migration"))
+  (:adr/source-format "edn")
+  (:adr/context
+  "オーナー指示 2026-07-18「ADR を更新して kbb を優先、次が nbb, bb は退役」。
+  調査で判明した現状:
+  1) ADR-2607100100（2026-07-10）は app/library の第一 runtime 順序を
+     `kotoba wasm runtime > clojurewasm > ClojureScript > nbb`（JVM/nbb は
+     降格）と定めたが、Decision §3 で repo 運用 tooling（scripts/・
+     .claude/hooks/・west 拡張）を明示的にこの順序から除外し、
+     「新規スクリプトは nbb で書けるなら nbb を優先」という別トラックに
+     していた。
+  2) ADR-2607173000（2026-07-17、進行中）はその運用 tooling トラックを
+     fleet 全体に広げ「canonical scripting/task host = nbb only」「bb.edn /
+     #!/usr/bin/env bb は禁止・退役」を決定し、Wave 0 は完了、Wave 1-4 は
+     現在も進行中（CI gate `scripts/verify-no-babashka.cljs` 含む）。
+  3) `kotoba-lang/kotoba-script` は checked KIR → capability-confined `.mjs`
+     を出す guest 向けコンパイルバックエンドで、ambient authority
+     （fs/shell 等）を意図的に持たない。nbb が果たしている「fs/shell に
+     ambient にアクセスできる高速 ops script host」の役割はカバーしない。
+  4) `kotoba run entry.kotoba`（`.kotoba`/`.cljk` 実行）は CLI として
+     既に存在するが、現行実装は `orgs/kotoba-lang/kotoba/bin/kotoba-clj`
+     経由の JVM 実行（`exec clojure -M -m kotoba.launcher`）であり、
+     ADR-2607100100 の順序では最後の手段の tier。nbb を置き換えられる
+     「速い起動 + ambient 権限を持つ Kotoba script host」＝ここでいう
+     `kbb` は、2026-07-18 時点でコードとして存在しない。")
+  (:adr/decision
+  "{:script-host-priority [:kbb :nbb], :retired [:bb], :status-of-kbb :not-yet-implemented, :interim-canonical-host :nbb, :kbb-capability-model :explicit-grant-not-ambient, :migration-discipline :wave-based-like-2607173000, :no-historical-adr-mass-rewrite true}")
+  (:adr/body
+  "# ADR-2607181900: kbb を script/tooling host 優先順位の先頭に据える（roadmap、kbb は未実装）
+
+**Status**: accepted（オーナー指示 2026-07-18）
+**Related**: ADR-2607100100（app/library 第一 runtime 順序）、
+ADR-2607173000（fleet-wide bb→nbb retirement、進行中）、
+ADR-2607171700（`.kotoba`/`.cljk`/`.cljc` source contract）
+
+## Context
+
+上記 context 節のとおり、現状は「app/library の runtime 順序」と
+「運用 tooling の script host」が別トラックで、後者は nbb 一本足（bb は
+退役中）になっている。オーナーは、bb→nbb のときと同じパターンで
+「今は nbb が最速の現実解だが、Kotoba 自身が host になれるならそちらを
+優先すべき」という方向に揃えたいと指示した。
+
+一方で `kbb` という具体的な実装は存在しない。`kotoba-script` は目的が違う
+（capability-confined guest compiler、ambient authority 無し）。既存の
+`kotoba run` は JVM 経由で遅く、ops script host としては未検証。この ADR は
+**将来の優先順位を確定する roadmap 決定**であり、「今日から nbb 禁止」
+という即時切り替えではない。ADR-2607173000 の decision・exit-criteria・
+進行中の Wave 1-4・CI gate（`verify-no-babashka.cljs`）はこの ADR によって
+変更されない。
+
+## Decision
+
+1. **Script/tooling host の優先順位を `kbb` → `nbb` → （退役: `bb`）とする。**
+   app/library 側の優先順位（ADR-2607100100: kotoba wasm runtime →
+   clojurewasm → ClojureScript → nbb）と同じ「Kotoba 側で動くならそちらを
+   優先する」原則を、運用 tooling にも適用する形で揃える。ADR-2607100100
+   Decision §3 が運用 tooling を別トラックとして切り出していた部分は、
+   本 ADR により「nbb がその別トラックの現状の正本、kbb がその次の目標」
+   という位置付けに更新される。
+2. **`kbb` は 2026-07-18 時点で存在しない。** 本 ADR は kbb 実装の着手を
+   承認するが、完了・切り替えを宣言するものではない。**kbb が下記の
+   readiness gate を通過するまでは、nbb が引き続き script/tooling host の
+   正本のままとする。** ADR-2607173000 の「canonical scripting/task host =
+   nbb only」は無効化されない — bb を対象にした decision であり、kbb を
+   禁止するものではないため両立する。
+3. **`bb`（babashka）は退役のまま。** 本 ADR は bb を復活させない。
+   ADR-2607173000 の bb 退役 wave・exit-criteria をそのまま引き継ぐ。
+4. **kbb の設計原則（実装時に守るべき制約）**:
+   - `.kotoba`/`.cljk` source（ADR-2607171700）を読む、JVM を経由しない
+     高速起動の host。役割は今日の nbb と同じ（repo 運用スクリプト・
+     hooks・CI ツーリング）。
+   - fs/process/env/network 等の host 効果は **明示的に付与された
+     capability**（起動時に渡す grant）経由のみとし、bb/nbb のような
+     ambient global（`require 'clojure.java.shell` 的にどこからでも
+     召喚できる権限）にしない。これは Kotoba 言語自体の core design
+     （deny-by-default、capability confinement、ADR-safe-capability-
+     language）と矛盾させないための制約であり、既に実証済みの
+     capability-contract 基盤（`kotoba-core-contracts`、
+     `kototama.tender`、`wasm-webcomponent/actor-host.js` の grant
+     パターン）を再利用し、ops tooling 用に別の ambient 権限モデルを
+     新規発明しない。
+   - `kotoba-script`（capability-confined KIR→ESM の guest コンパイル
+     バックエンド）とはスコープを分離したまま維持する — kbb はそれを
+     置き換えない。
+   - 現行 JVM 経由の `kotoba run`（`bin/kotoba-clj`）ともスコープを分離する
+     — それは entry point 実行（app runtime、ADR-2607100100 で最後の
+     手段 tier）であり、kbb が担う「高速 ops script host」とは別物。
+5. **readiness gate（kbb が `nbb` を実際に代替できると認めるための条件、
+   bb 退役と同じ規律で進める）**:
+   - kbb が実在し、fs read/write・process exec・env・EDN/JSON 相当の
+     capability grant surface を備え、テストがある。
+   - 既存 `scripts/*.cljs` / `.claude/hooks/*.cljs` の代表的なサブセットが
+     kbb 上で同等に動作する（回帰テスト green）。
+   - `scripts/verify-no-babashka.cljs` 相当の検証ゲートが kbb 版として
+     用意され、大規模移行の強制はそのゲートが通ってから宣言する。
+   - 移行は ADR-2607173000 と同じく Wave 単位で進め、単一のメガコミットで
+     一斉切り替えしない。歴史的 ADR 本文は mass-rewrite しない（同 ADR
+     決定事項 6 を継承）。
+6. **readiness gate を通過するまでの運用**: 新規の運用スクリプトは
+   引き続き nbb で書く（変更なし）。kbb の存在を前提にしたスクリプトを
+   書かない。kbb 実装自体は本 ADR の範囲外の別タスクとして進める。
+
+## Consequences
+
+- CLAUDE.md の「運用 tooling の script host は nbb のみ（ADR-2607173000）」
+  節に、本 ADR への forward pointer を追記する（nbb の現行正本ステータスは
+  維持したまま、将来 kbb 優先に変わる旨を明記）。
+- ADR-2607173000 は本文を書き換えず、本 ADR を指す短い addendum のみ追記する。
+- kbb 実装は別途フォローアップタスクとして着手する。本 ADR はその設計制約
+  （§4 の capability-grant モデル）を先に固定する。
+
+## 現在地 (2026-09-05、slice 1-3 着地)
+
+readiness gate への進捗 (全て実測付きで landed / in-flight):
+
+- **slice 1** (landed 2026-09-05): `:env/read` runtime capability (id 258,
+  kotoba-core-contracts 0cdac65a) + 実 env-read provider (per-name fail-closed,
+  kotoba b9e5d7ca) + kbb policy admission (`:kbb/env-resource-scope-required`)。
+  kotoba-lang effect row 7cca78dc。
+- **slice 2** (landed 2026-09-05): `fs-browse` 実 provider (dir-tree scope,
+  kotoba dd8cf587) + interpreter string heads (string-length/= /concat/substring
+  + nth — wasm lowering にはあったが interpreter に無かった) +
+  **kbb 版 verify-no-babashka gate** (src/verify_no_bb.kotoba — positive
+  fixture 3 違反検出 / clean 0 / scope escape fail-closed を実測)。
+- **slice 3** (2026-09-05): compiler wire ids 33 `:env/read` / 34 `:fs/browse`
+  (kotoba-lang 8d5a7b1d + kotoba-sema bf01d4a8)、verifier が `:string` entry
+  result を許可 (kotoba-verifier 1ee32cab)、amu pin 前進 (PR kotoba-lang/amu#791、
+  kotoba 側 78ec29ed)。
+- **JVM-free 実測**: `amu check --jvm-free` (env-read admission 通過)、
+  `amu compile --target aarch64 --jvm-free` (native KEXE 生成)、
+  kexe_loader 実行 (cap allow→分岐通過 / deny→SIGTRAP fail-closed、
+  capability fixture 42)。
+- **残 gate 項目**: ① nbb スクリプト代表サブセットの kbb 移植 (gate 条件②)
+  ② string-typed capability の host provider 実装 (loader 側 stub はあるが
+  実 getenv binding は未接続) ③ kbb 自体の JVM-free host 化 (v1 は
+  bootstrap JVM host) ④ tasks.edn facade 検査の kbb 版 (EDN reader 依存)。
+
+- **slice 4 (2026-09-05/06 着地、amu PR #799 merged CI 13/13 green)**:
+  compiler wire id 35 = `:fs/app-data` (runtime id 202) — kotoba-lang#560 /
+  kotoba-sema#52 / amu sema pin ec2e2fe5。loader に fs_app_data_read_provider:
+  parent-resolved scope (fork 前 realpath)、Seatbelt `(allow file-read*
+  (subpath <resolved-entry>))`、guest path の granted+resolved 両綴り lexical
+  match + resolved 綴りへの re-spell、O_NOFOLLOW + portable fd containment
+  (macOS F_GETPATH / Linux dev+ino)。artifact#14/#16/#17 が loader-source-sha256
+  を 9a37d5eb まで前進 (identity pin + fuzz baseline 同時更新)。実測: in-scope
+  read 成功 (両綴り / 15 bytes → string-byte-length=15)、scope 外 / empty scope /
+  symlink 逃し / deny bitmap 全て SIGILL、no-allow SIGTRAP、filesystem+network
+  probe は引き続き deny、conformance / lang-native-conformance / fuzz-native /
+  sanitizer 全 green。write 半分は未実装 (次スライス: write provider、kbb shim、
+  tasks.edn facade の kbb 版)。
+- **js leg (2026-09-06、ADR-2609062200)**: `kotoba-script` を `.cljc` 化し
+  `amu compile --target js --jvm-free` を nbb で host（amu ADR 0340、PR #827）。
+  kotoba に `bin/kbb_js.cljs`（Node host、provider 35/33/34/20、receipt は v1 同形）と
+  script library `lib/kbb/{fs,env,browse,proc}.kotoba`（`--source-path lib`）を追加。
+  demo_kbb_fs_read_native は js でも 84（native と同値）、cold start 1.7 s。
+  js は配布成果物ではなく oracle（ADR-2609051100 の決定は変わらない）。
+
+## 記録 (2026-09-05、native backend slice — slice 4 の手前)
+
+**着地 (kotoba agent/kbb-native-slice)**: `kbb --backend native` が
+既存 native AOT backend 経由で `.kotoba` スクリプトを実行する。設計は
+「compile to native + 許可された invocation は policy 側で前実行」の
+narrow 形:
+
+- guest の `(proc-exec \"<index>\")` を desugar 前の forms で機械的に
+  書き換え、policy 側で guard-call (v1 interpreter と同一の receipt
+  journal 付き) により前実行し、その exit status word (exit 0 → 1
+  truthy / それ以外 → 0) をリテラルに置換する。guest はコマンドバイトを
+  持たない契約は slice 2 から不変。
+- 書き換え後の guest は capability 呼び出しを 0 個含むので、native
+  artifact は **空の allow bitmap** で admission され、`kotoba.verifier`
+  署名 → `kototama.native.executor` (measure-runtime で reviewed
+  kexe_loader.c を 2 回ビルドして identity 測定 → verify → loader
+  プロセス実行) で実行される。amu tools/ は classpath resource
+  (`kotoba/lang/capability-catalog.edn` の URL) から解決する。
+- 実測 (macOS arm64): demo_kbb_proc_exec.kotoba が native 経路で
+  `:result 0` (interpreter slice と同一)、receipt 1 件
+  (`:host/proc-exec` / `\"echo\"` / `:ok`)。スカラー `typed-cap-call`
+  (wire id 33, i64→i64) は loader の deterministic provider で
+  7→8 round-trip 実測。loader プロセス単体 cold start ~11ms (warm)、
+  JVM orchestrator 込み execute 150-190ms / session invoke 12ms。
+- **cold start 実測 (正直な数字)**: `clojure -M -m kotoba.kbb ...`
+  (v1 interpreter) median **17.9s** (5 回, min 13.9)。`--backend
+  native` は JVM CLI 起動が残るため median 18.1s と JVM 起動税が
+  同額 — native 化は実行エンジン部分 (~interpreter steps) を短縮する
+  が CLI 起動税は別課題。**真の JVM-free 経路は実在する**:
+  `bin/amu --jvm-free compile` (nbb, ~2.2s) → kexe_loader 実行
+  (~11ms) ≈ **2.2s** だが、これは sealed artifact の sign/verify host
+  層 (kototama-native/executor.clj が JVM-only) を経ない省略経路で、
+  kbb 統合は未達。
+- **未達 (次スライス)**: ① verifier/executor host 層の nbb 移植
+  (sign/verify + measure-runtime orchestration — ed25519 検証の CLJS
+  実装が要) ② string/option/result typed capability の loader 側実
+  provider (env-read/getenv は identity stub のまま) ③ proc-exec 以外
+  の capability (env-read/fs-browse/fs-read) の native 経路での扱い
+  (同様の pre-exec 書き換えで拡張可能だが未実装) ④ kbb CLI 自体の
+  GraalVM native-image 化または nbb 移植 (CLI 起動税の解消)。
+
+gate 条件③ (kbb JVM-free host 化) は **in progress**: native 実行
+経路の接続は実証済み、JVM-free CLI host 層が残る。
+
+gate 条件②③が満たされるまで nbb が script host の正本のまま変わらない
+のは Decision 6 のとおり。
+
+## Rejected alternatives
+
+1. **今すぐ kbb を正本にして nbb を禁止する。** 却下: kbb はコードとして
+   存在せず、進行中の ADR-2607173000 Wave 1-4 と CI gate を無根拠に破壊する。
+2. **`kotoba-script` を ops script host に転用する。** 却下: 意図的に
+   ambient authority を持たない guest 向け compiler backend であり、
+   host 側運用スクリプトが必要とする fs/shell アクセスの前提と逆。
+3. **kbb に bb/nbb 同様の ambient 権限を持たせる。** 却下: Kotoba
+   言語自体の capability-safety という core design と矛盾する。ops
+   tooling 用途であっても明示 grant モデルを維持する。
+
+## References
+
+- `orgs/kotoba-lang/kotoba-lang/README.md`（`.kotoba`/`.cljc`/`.cljk` source
+  contract）
+- `orgs/kotoba-lang/kotoba-script/README.md`（capability-confined KIR→ESM
+  backend、ambient authority 無し）
+- `orgs/kotoba-lang/kotoba/bin/kotoba-clj` + `src/kotoba/launcher.clj`
+  （現行 `kotoba run` は JVM 経由）
+- ADR-2607100100（app/library 第一 runtime 順序）
+- ADR-2607173000（fleet-wide bb→nbb retirement、進行中）\n\n## 2026-07-25 — ledger 運用部分は撤回（ADR-2607257000）\n\n本 ADR が導入した `90-docs/adr-ledger/adr-ledger.edn` + `scripts/adr-ledger-append.cljs` の append-only 運用は、オーナー判断（2026-07-25）で撤回された。ADR は最新状態のみを記述し、その場で書き換える。履歴は git が持つ。ledger と追記スクリプトは削除済み、既存 77 events は各 ADR 本文の「## 改訂履歴」節へ統合済み。**kbb > nbb >（退役 bb）の script-host 優先順位という本 ADR の主決定は生きている** — 撤回されたのは ledger 運用部分のみ。詳細は ADR-2607257000。")))

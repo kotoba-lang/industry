@@ -1,0 +1,131 @@
+(vector (map (:db/id -1)
+  (:adr/id "2800004900")
+  (:adr/title "murakumo.cloud にスマホ向け device console を置く — 可視化は push、追加は QR + 端末側の所持証明")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-18")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "murakumo, devices, fleet, enrolment, qr, aiueos, d1, appview, mobile, dads")
+  (:adr/body
+  "## 決定
+
+`murakumo.cloud/#devices` に、**自分が所有する device を 1 つの面で見る**
+console を置く。fleet.edn の Mac mini と、label を scan して claim した aiueos
+box を、**did:key という 1 つの identity** で並べる（オーナー選択 2026-08-18:
+「両方を 1 つの面に」）。追加は `#claim` の QR 経路。
+
+実装は `network-awai/cloud-murakumo` に着地済み（main `65b70d7`、west pin
+`b9a0b37`）。
+
+## 作らなかったもの — enrolment の決定核
+
+**`aiueos.enroll` が既に完成していた。** claim の状態機械（`:factory` →
+`:claimed` → `:released`、物理 reset だけが `:factory` へ戻す）・canonical な QR
+encoding・9 個の deny reason・`:attested` / `:tofu` の 2 段階 trust。
+`murakumo.enroll` が fleet 側の半分（did:key の命名・label 照合）を持つ。
+
+したがって **cloud-murakumo は 1 つも規則を書き直していない**。`cloud-murakumo.devices`
+はそれを呼ぶだけで、足したのは**輸送の封筒だけ**（後述）。「無い」と結論する前に
+索引を引く規則（2026-08-04）が、そのまま効いた事例。
+
+同じ理由で base58 decode も書いていない。一度自分で書いたが、34 byte の値を
+JavaScript の number に積む実装で、**2^53 を超えて静かに壊れる**ものだった。
+`sekisho.didkey/public-key-of` が byte vector 上の除算で正しく解いており、しかも
+この workspace で did:key が妥当かを決める**唯一の定義**である。
+
+## 3 つの設計判断
+
+### 1. telemetry は push する。Worker は tailnet に入らない
+
+node は tailnet に居り、edge の Worker はそこへ dial できない。**方向を反転**し、
+既に credential を持つ operator host が probe して**集約した snapshot を 1 本
+push** する。これは fleet の不変条件とも一致する —— node はこの経路の credential
+を 1 つも持たない（`:slot/attested`、ADR-2608111721）。
+
+device 自身の鍵は別物である。device 上で生成され、外に出ず、claim 時の所持証明
+にだけ使う。**置いた credential ではない。**
+
+collector は**答えなかった node を batch から落とす**。`{load: 0}` を送れば健康な
+idle machine として描画される —— 「測れなかった検査が、測って問題が無かった検査と
+同じ値を返す」（ADR-2608136000）の、まさにその形。1 台も答えなければ **exit 3**
+で終わる。`0` にすると、tailnet が落ちてから失敗し続けている job が、動いている
+job と見分けられない。
+
+### 2. label は 2 つの QR を持つ。parser は 1 つ
+
+canonical payload は `aiueos:1;did=…;model=…;endpoint=…;token=…` で、これは
+`aiueos.enroll` の所有物。**どの携帯の camera app もこの scheme を browser に
+渡さない。** そこで label は https URL も持つ:
+
+    https://murakumo.cloud/#claim?q=<percent-encoded canonical payload>
+
+**第 2 の encoding ではなく、同じ文字列をそのまま運ぶ封筒**である。
+`devices/parse-claim-url` は URL / fragment / 手打ちの payload の 3 形を受け、
+どれも `aiueos.enroll/parse-qr` に落ちる。query ではなく fragment なのは、
+fragment が Referer にも server log にも出ないため（token 自体は仕様上 secret
+ではないが、払う必要のない露出は払わない）。
+
+面内 scan は `BarcodeDetector` がある platform でだけ。**現在の iOS Safari は
+全て持たない**ので、貼り付け欄が常設で、scan button の方が条件付き。WASM decoder
+は polyfill しない —— 大半の訪問者が開かない導線のために数百 KB を全訪問に課す
+ことになる。
+
+### 3. 所持証明は 3 者で行い、鍵は携帯に載せない
+
+photograph された label は、**未 claim かつ到達可能な箱**に対してしか価値を持たない
+（`aiueos.enroll` の設計そのもの）。そこに presence の証明を足す:
+
+1. 携帯が scan して claim を要求する
+2. **server** が 1 回限りの nonce を発行する
+3. **device** が、外に出したことのない鍵で nonce に署名して返す
+4. server が検証（WebCrypto Ed25519）し、**そこで初めて** `aiueos.enroll/claim`
+   が走る
+
+判定は grant / deny のどちらでも `device_claims` に追記する。**refusal を記録
+しない表は、label が photograph されたこと（1 分に 20 回の refusal）を映せない。**
+
+## 「まだ観測していない」は緑ではない
+
+`liveness` に、観測の無い device を `:live` として返す arm は**無い**。
+`:unknown` は独立した状態で、UI でも別の印（塗りではなく輪郭）で描く。
+未来の時刻を報告する device（時計の壊れた node）も `:unknown` に落ちる ——
+さもないと恒久的に live に張り付く。
+
+**test は mutation で確かめた。** 未観測を `:live` にすると 6 個が落ち、
+呼び出し側の検証済みの答えを使わず所持を仮定すると claim の refusal test が
+落ちる。落ちることを見ていない gate は劇場（ADR-2608102000）。
+
+## D1 の位置づけ
+
+**appview であって premise ではない**（ADR-2608039000）。heartbeat は 1 interval で
+再観測でき、所有は append-only な `device_claims` から replay できる。落としても
+custody は失われない —— 秘密鍵はそもそも device から出ていない。
+
+## 実測
+
+- suite 422 test / 25,603 assertion、失敗 8 —— **base commit の 8 と同一**
+  （dispatch / gen / models、いずれも先行して赤い）。base で 410/8 を実測して
+  比較した
+- `:app` `:worker` の両 cljs bundle が compile し、両方に device 経路が入っている
+- 生成物の再生成は `public/css/dds.css` の 26 行（全て自分の rule）だけを
+  取り込み、**同じ実行が巻き込んだ blog / models HTML の drift は revert した**
+  —— あれは先行して stale だったもので、しかも手元の jp-go-dds checkout は
+  origin より 6 commit 遅れている。他人の staleness を、遅れた入力で焼き直さない
+
+## 作っていないもの（docs/devices.md に明記した）
+
+- **SPA の sign-in。** console は murakumo.cloud が既に消費している viewer
+  contract（`Authorization: Bearer <authn.kotobase.net session>`）を読むが、
+  **この SPA はまだそれを取得しない**。sign-in は kotobase.net で起き、token を
+  ここへ戻す redirect が無い。それまで console は `signed out` を描く。
+  穴を埋めるために local な account 系を発明すれば、それがこの workspace が
+  繰り返し持たないと決めてきた 2 つ目の identity になる（ADR-2607299300）
+- **device 側の agent。** `/challenge` を polling して attestation を返すものが
+  まだ無いので、claim は `awaiting-proof` に達して time out する。満たすべき
+  contract は docs に書いた。鍵は `aiueos.provider.device` が持つ
+
+## 次の一手
+
+1. device agent（`/challenge` → 署名 → `/attest`）を aiueos 側に置く
+2. sign-in redirect（kotobase.net → murakumo.cloud への token 受け渡し）
+3. collector を operator host に launchd 常駐させ、fleet 13 台を register する")))

@@ -1,0 +1,128 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608200300-ledger-seq-collisions-and-the-projection-identity-built-on-them")
+  (:adr/title "canvas-ledger の :event/seq は 333 個が重複していて、投影の :db/id がそれを identity にしていた")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-20")
+  (:adr/topic "infrastructure")
+  (:adr/doc_type "adr")
+  (:source/dataset "adr")
+  (:adr/authoritative_for "canvas-ledger の :event/seq 一意性と、gftd.kotobase の :db/id 構成")
+  (:adr/repos "com-junkawasaki/root")
+  (:adr/commits "root b9bc616d4e4 (detector + baseline), root 3ab23dac497 (stable :db/id + regression test)")
+  (:adr/related "adr-2607254000, adr-2607021600, adr-2607180400, adr-2608136000, adr-2608200200")
+  (:adr/body "## 何が壊れていたか
+
+`gftd.ledger/append!` は新しい event に `(inc (max ローカルファイルの seq))` を打つ。
+read と write の間で**何も掴んでいない**。だから:
+
+- 同じマシンで同時に走る loop は同じ max を読み、同じ seq を書く
+- 別々の checkout が独立に追記すると、git は両方を黙ってマージする
+  （ファイル末尾の別の行なので conflict にならない）
+
+**着地したあとは conflict ではなく、静かな重複になる。** 誰も数えていなかった。
+
+## 実測（origin/main、2026-08-20）
+
+    canvas-ledger.edn          9,624 events / 9,271 distinct seq
+                               衝突した seq 333 個
+                               自分の id を持たない event 353 件
+                               （全ペアが別内容。冪等な再追記は 0 件）
+    design-quality-ledger.edn    200 events / 衝突 0
+
+design-quality が 0 なのが効いている —— これは **その writer の性質**であって
+ledger 一般の性質ではない。
+
+## なぜ効くか
+
+`gftd.kotobase/event->entity` が `:db/id` を `\"bmc.event/<seq>\"` で作り、docstring
+自身が理由を書いていた: *\"Stable :db/id = event/seq so re-asserts are
+cardinality-one upserts.\"* キーが一意でないとき cardinality-one は
+**2 番目の event が最初の隣に載るのではなく置き換える**ことを意味する。
+
+**いま失われていないのは設計が健全だからではない。** `bmc-dual-write` は
+スケジュールされて走っており、2026-08-19 から `Could not find namespace:
+kotobase.client` で失敗し続けている。衝突は**解除されているのではなく装填されて
+いた**。
+
+fold（`gftd.canvas/fold` = `(reduce apply-event idx events)`）は file 順で適用し、
+seq で index しない。`:event/seq` を参照するのは `ledger.cljc` と `kotobase.cljc`
+だけ。つまり seq の一意性に依存していたのは **投影の identity 1 箇所だけ**だった。
+
+## 決定
+
+2 つに分けた。**検出**と**無害化**は別の主張だから。
+
+### 1. 検出 — `scripts/verify-ledger-seq-collision.cljs`（root b9bc616d4e4）
+
+baseline `manifest/ledger-seq-baseline.edn` に対する ratchet。既存の 333 は
+据え置き（ledger は書き換えない）、**増えたら落ちる**。
+
+4 方向を実測（exit はパイプ無しで読む。パイプ後の `$?` は `tail` のもの）:
+
+    baseline のまま   exit 0
+    衝突を 1 つ足す    exit 1、ファイル名と差分を名指し
+    戻す              exit 0
+    どちらも読めない    exit 2 —— 測れなかった run を clean にしない
+    --self-test       exit 0
+
+self-test は真の衝突とバイト同一の再追記を区別し、**EDN の 2 つの綴り**
+（`#:event{... :seq N}` と `:event/seq N`）を両方見ることを確かめる。片方だけ
+見た最初の計測は **333 を 225 と読んでいた**。
+
+baseline は **cone を広げた worktree から**生成した。既定の cone のままだと
+design-quality を「不在」として部分カウントを焼き込むところだった
+（docs-edn-only baseline が phantom 6 件を拾ったのと同じ形）。
+
+### 2. 無害化 — `event->entity` の `:db/id`（root 3ab23dac497）
+
+一意な seq は `\"bmc.event/<seq>\"` のまま。曖昧な seq だけ
+`\"bmc.event/<seq>-<digest>\"` になり、**両方に接尾辞が付く**ので位置で勝つ側が
+出ない。
+
+同じ corpus・同じ probe で両方向:
+
+    origin/main   9,628 events -> 9,275 distinct :db/id, 353 件が消える
+    この commit   9,628 events -> 9,628 distinct :db/id,   0 件
+
+8,942 件は読みやすい bare id のまま。既存の `bmc.event/42` アサーションも通る。
+
+`digest` は `canonical` 上の djb2 で、各ステップを 2^53 未満に抑えてあるので
+JS の double と JVM の long が同じ数を出す。`hash` は runtime 依存なので id には
+使えない。
+
+## テストが私自身の欠陥を 2 つ捕まえた
+
+regression test を書いた意味そのものなので記録する。
+
+1. **最初のテストは登録されていなかった。** 囲みの `deftest` が閉じる前に挿入して
+   しまい入れ子になり、一度も走らなかった。suite は **50 tests / 336 assertions の
+   まま green** で、走らない regression test を出荷しかけた。テスト数を見ていなければ
+   気付いていない。現在 51 / 344。
+2. **`digest` に本物のバグがあった。** `pr-str` を hash していたので、map/set の
+   反復順が未規定である以上 `{:a 1 :b 2}` と `{:b 2 :a 1}` が**同じ event に別の id
+   を与えて**いた —— この変更が防ごうとしている失敗そのもの。`canonical`（map と set
+   はソート、sequential は順序を保つ）を挟んで解決。実 corpus で検証: 9,628 件全部を
+   キー挿入順を逆にして作り直しても id は完全一致。
+
+## 残っているギャップ
+
+- **writer は直っていない。** `append!` は今も read-then-write で、2 つの loop や
+  2 つの checkout は衝突を作り続ける。detector の clean な run は「まだ衝突して
+  いない」であって「衝突しえない」ではない。ADR-2607254000 が別 ledger で出した
+  結論（ロックは同一 filesystem しか守らないので追記前に origin と同期する）が
+  そのまま当たるが、`append!` は library 関数で git を呼べない。**識別子を writer
+  一意にする**（seq を順序ヒントに降ろし、identity を別 key に持つ）方が筋がよい。
+- **`bmc-dual-write` は壊れたまま**（`kotobase.client` が無い）。直すと投影が動き出す。
+  そのとき衝突は無害化済みだが、**壊れている理由自体は調べていない**。
+- **既存の 333 は ledger に残る。** append-only なので書き換えない。ratchet が
+  増加だけを止める。
+- **stash が溜まり続けている。** 共有 checkout の canvas-ledger を巡る退避が 6 件。
+  今日だけで 3 件増えた。これは上の writer 問題の git 側の顔で、同じ根から出ている。
+
+## 隣接
+
+私の測り方の欠陥が今日 4 回（awk のタイムスタンプ比較 / `wc -l` の空白 /
+パイプ後の `$?` / 登録されないテスト）。**4 件とも「0 件でした」「green です」と
+報告する直前**に踏んでいる。ADR-2608136000 の class が、検査対象ではなく
+**検査する側**に出た形。
+")))

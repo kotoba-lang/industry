@@ -1,0 +1,363 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608198100")
+  (:adr/title "kekkai が決めるのは到達性、ref が決めるのは権限 —— 複数 bot が network 越しに同じ base を操作する具体設計")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "kekkai, kekkai-node, bots, overlay, noise, netmap, inga, unixfs, car, nfs, virtual-shell, oci, cloud-itonami")
+  (:adr/body
+  "## 決定
+
+ADR-2608198000（共有するのは disk ではなく base の CID）を、実在する kekkai
+overlay の上に具体化する。オーナー指示 2026-08-19『実際に kekkai を活用して
+複数 bots が network over で同じ disk 仮想環境を操作する設計をまとめて』。
+
+```
+                    ┌──────────────────────────────┐
+                    │ kekkai（制御面・人間承認）      │  admit / netmap / ACL
+                    └───────────────┬──────────────┘  packet は運ばない
+                        署名付き netmap│（Ed25519 envelope）
+        ┌───────────────┬────────────┴───────┬────────────────┐
+        ▼               ▼                    ▼                ▼
+   ┌─────────┐     ┌─────────┐        ┌───────────┐    ┌───────────┐
+   │ bot node│     │ bot node│        │ inga witness│   │ workstation│
+   │  (host) │     │  (host) │        │  tag:refs  │   │ tag:human  │
+   └────┬────┘     └────┬────┘        └─────┬─────┘    └─────┬─────┘
+        │ Noise IK      │ Noise IK          │                │ ssh
+        └───────────────┴───────────────────┘                │
+             ref CAS だけが overlay を通る                      ▼
+                                                        ┌───────────┐
+   bot ⇄ bot は netmap で deny。星形は規約ではなく構造。      │ drive/NFS │
+                                                        └───────────┘
+        bulk（block / CARv2 pack）は overlay を通らない ——
+        通常の HTTPS で object store（kotobase archive / R2 / B2）へ直行
+```
+
+### D1. 二層に分ける —— kekkai は到達性、application は権限
+
+**kekkai は『その bot がその面に session を張れるか』だけを決める。**
+『その bot がその ref を進めてよいか』『どの Drive を見るか』『read か write か』
+は決めない。これは私たちの運用方針ではなく kekkai 自身の charter である
+（G1 coordinate のみ・G4 anti-surveillance: 制御面は reachability を authorize
+するが、トンネルを流れるものを記録しない。`kekkai.acl` は port と capability
+までしか持たない）。
+
+したがって:
+
+| 問い | 誰が答えるか |
+|---|---|
+| この bot は ref 面に届くか | kekkai netmap（deny-by-default、tag grant、port） |
+| この bot は ref を進めてよいか | **inga の quorum + 要求に載る署名**（did:key / CACAO） |
+| どの workspace / Drive か | application（actor 束縛・Drive ACL・承認カード） |
+| 誰が何をしたか | **ref chain と承認カード**。overlay は記録しない（G4） |
+
+**network 上の位置を authority の代わりにしない。** 到達できることは、
+書いてよいことではない。
+
+### D2. bot ⇄ bot に grant を書かない。星形を netmap で作る
+
+policy に bot 同士の grant を**置かない**。bot は ref と object 面にだけ届き、
+互いには届かない。合流は必ず ref の CAS を通る。
+
+これは ADR-2608198000 の D8（bytes は渡すが authority は渡さない）と
+cloud-itonami-app ADR-0062（note は渡るが grant・approval・memory・effect は
+渡らない）を、**規約ではなく構造**にしたもの。`kekkai.acl` は deny-by-default
+なので、grant を書かない限り 2 つの bot node は session を張れない。
+
+### D3. 役割は tag。tag の所有は policy が持つ
+
+selector は `user` + `tags`（`acl/principals`）。次の 5 つで足りる:
+
+```clojure
+{:tag-owners {\"tag:bot\"   [\"jun\"]
+              \"tag:refs\"  [\"jun\"]
+              \"tag:blocks\" [\"jun\"]
+              \"tag:drive\" [\"jun\"]
+              \"tag:human\" [\"jun\"]}
+ :grants [{:src [\"tag:bot\"]   :dst [\"tag:refs\"]   :ports [\"8443\"] :capabilities [:private-http]}
+          {:src [\"tag:human\"] :dst [\"tag:drive\"]  :ports [\"12049\"] :capabilities [:private-http]}
+          {:src [\"tag:human\"] :dst [\"tag:bot\"]    :ports [\"22\"]   :capabilities [:ssh]}]}
+```
+
+- **`:capabilities` を省略しない。** 省略時の既定は `[:overlay]` のみ（session
+  確立だけ）で、これは意図的な床である —— capability が後から増えたときに、
+  それ以前に書かれた policy が黙って新しい権限を与えないため。`:ssh`
+  `:private-http` `:tun` は grant ごとの opt-in。
+- **tag の自称は escalation なので policy が所有者を持つ**（`acl/tag-owned?` /
+  `unowned-tags`、governor が hold する）。
+- **`:tailnet` 未設定は wildcard ではない。** `acl/default-tailnet` に解決される。
+  bot 群を別組織として切るなら tailnet を分け、越境は `peering`（両組織の人間承認）
+  にする。
+
+### D4. bulk を overlay に載せない
+
+kekkai-node の実測（2026-07-26、512 byte payload、この workstation）:
+
+| | packet あたり | IK handshake |
+|---|---|---|
+| nbb + Node OpenSSL | 6〜9 ms | 約 150 ms |
+| JVM provider | 1.5〜1.9 ms | 75〜110 ms |
+
+**おおよそ 100〜600 packet/s**。repo 自身が『handshake・制御・ssh/RPC 形の
+session には十分、bulk transfer には不十分』と書いている。block / CARv2 pack は
+数十 MB〜数百 MB になるので、**overlay を通さない**。
+
+overlay を通さなくてよい理由が content address 側にある: pack は immutable で、
+読み手が CID で検証でき、機密なら ADR-2608198000 の D5 で address する前に
+seal してある。**つまり bytes は経路の秘匿を必要としていない。** overlay を
+挟むと得るものが無く、bottleneck だけが残る。
+
+overlay を通るのは **ref CAS と小さな RPC** だけ。ここは 1 リクエストが数百
+byte で、頻度も commit 単位なので上の帯域で足りる。
+
+### D5. 同期の境界は host。container は `--network none` のまま
+
+`virtual_shell.clj` の container は `--network none --read-only`、bind mount は
+`/workspace` 1 つだけ（ADR-0051）。**この不変条件を緩めない。**
+
+```
+host: base pack を HTTPS で取得 → work tree を materialize
+      → container を --network none で起動（compute だけ）
+      → 出た差分を commit / pack → HTTPS で object 面へ
+      → overlay 越しに ref CAS
+```
+
+container は network を持たないので **同期に参加しない**。overlay の session を
+持つのは host の kekkai node ただ 1 つ。この形なら仮想環境側に足すものは無い。
+
+### D6. bot node は長命。task ごとに node を作らない
+
+kekkai には **ephemeral node が無い**（実測: `kekkai` / `kekkai-node` の src に
+`ephemeral` は node の概念として存在せず、`:listen-port 0` の UDP port の意味で
+1 箇所出てくるだけ）。そして `:node/admit` は charter G2 で**常に人間**であり、
+governor の high-stakes は override できない。
+
+したがって **task ごとに node を起こす設計は、task ごとに人間の承認を要求する**。
+**事前に admit された固定プールの bot node**を持ち、そこへ work を割り当てる。
+これは cloud-itonami-app ADR-0061（bots are persistent peers）と同じ向きで、
+偶然ではなく同じ制約から出ている。
+
+### D7. netmap の再発行は協調的な一手。task ごとに publish しない
+
+Noise の prologue が **tailnet + netmap version** を束ねるので、古い netmap の
+peer は handshake が**大きな音を立てて失敗する**（stale ACL で静かに動き続ける
+よりよい、という意図的な設計）。代償は本物で、netmap の rollout は協調ステップに
+なる。**bot の起動・停止のたびに netmap を publish しない** —— プールを先に
+publish し、稼働状態は ref 側の値として持つ。
+
+### D8. Drive / NFS は人が見る面。bot の work tree にしない
+
+ADR-2608198000 の D6 をこの文脈で繰り返す。加えて **NFS 側の実測**:
+`org-ietf-nfs` は NFS と MOUNT を**同一 TCP ポート**で提供し portmapper を
+実装しない（`mount_nfs -o port=12049,mountport=12049`）ので、**userspace の TCP
+forwarder に載る形をしている**。載せられることと、載せるべきことは別である ——
+partial write が read-modify-write で毎回ファイル全体、`:max-file-bytes` 既定
+64 MiB、そこへ D4 の帯域が重なる。**人が Finder で覗く経路として使い、bot の
+build tree にしない。**
+
+## 実測して見つかった 3 つの穴（この設計を組む前に塞ぐ）
+
+### 1. userspace forwarder は peer identity を消す
+
+`kekkai.node.stream-edge` の service 側は `netmap/permitted?` を **proven な
+peer key に対して**正しく検査する（`handle-open!`）。しかしその後は**普通の
+loopback TCP socket**でサービスに繋ぐので、サービスから見た `remote-address` は
+`127.0.0.1` になる。
+
+一方 `cloud.itonami.app.nfs/authorize-fn` は principal を
+**`remote-address` を netmap の `:node/overlay-ip` と突き合わせて**導出する
+（`node-for`）。両者を素直に繋ぐと `node-for` が nil を返し、policy 設定時は
+**全部拒否**になる。つまり『kekkai の上で NFS を共有する』は今日そのままでは
+動かない —— しかも失敗の仕方が『誰も入れない』なので、危険側には倒れない。
+
+- **今日の回避**: peer ごとに service 側の loopback ポートを分け、**ポートで
+  principal を決める**。protocol 変更が要らない。
+**2026-08-19、両方とも着地した**（`kekkai-node` `7570afe` → `467b02c`）。
+
+- **回避（1 peer 1 port）**は実測で成立（下記『測った』1）。service を変えられない
+  ときの安い答えとして今も有効。
+- **本筋**: `edge/principal-of`。`handle-open!` が loopback socket の
+  **source port** を、既に証明済みの peer と結んで記録し、同居する service は
+  自分が握っている接続の `socket.remotePort` を引いて訊く。
+  - **PROXY protocol header にしなかった**のは意図的。header はその port の
+    全 service が opt-in している場合しか安全でなく、opt-in していない service
+    に当たったときの失敗は「拒否」ではなく**壊れた最初のリクエスト**になる。
+    byte 列に何も注入しないので、agent が parse しない protocol でも効く ——
+    実際 HTTP を通した。
+  - entry は socket と同じ寿命しか持たない。source port は再利用されるので、
+    接続より長生きする entry は「答えが無い」ではなく**別人の名前を答える**。
+  - 秘密ではない。同じホストの任意の local process が『この port は誰か』を
+    引ける。operator が既に持っているホストについての metadata である。
+
+### 2. cloud-itonami-app が読む policy は署名されていない
+
+`:nfs {:policy …}` は**オペレータが設定ファイルに書いた map** であり、
+`kekkai.netmap` が射影して `kekkai.envelope` が Ed25519 で封をした netmap では
+ない。`:node/actor`（Drive の持ち主を決める field）に至っては **kekkai 側に
+存在しない app 独自の拡張**である（実測: kekkai / kekkai-node の src に
+`node/actor` は 1 件も無い）。
+
+`kekkai-node` 側は既に envelope を検証している（`agent/load-netmap`、
+未署名は明示 opt-in が要る）。**app 側にその半分が無かった。**
+
+**2026-08-19 に閉じた**（`cloud-itonami-app` `0b05918`）。
+`:nfs {:netmap {:envelope-file … :authority-spki-b64 …} :capability …}` が
+`kekkai.envelope/verify` を通る —— signer・digest・signature を、**parse する前に**
+検査する。admission は `kekkai.node.netmap` の `authorized?` + `permitted?` を
+**再利用**した（同じ規則を 2 度書けば規則は 2 つになり、2 つめは誰も実 netmap に
+対して確かめない方である）。`:policy` は残るが `:allow-unsigned-policy? true` が要る
+—— node が未署名 netmap の前に置いているのと同じスイッチ。
+
+**`:node/actor` は app 側に降ろした。** kekkai に actor の概念は無く、持たせても
+いけない。node id → Drive の持ち主の対応は `:actors` として app が持つ。
+
+**capability は設定必須で、既定を置かない。** kekkai の語彙は
+`:overlay :ssh :private-http :tun` で `:nfs` は無い。ここで既定を選ぶと、
+その既定を既に持っている全ての edge に黙って許可を与えることになる。
+
+### 3. ephemeral node が無い（D6 の根拠）
+
+これは穴というより天井。ここに挙げるのは、『bot を動的に足す』設計を書き始めて
+から気付くと設計をやり直すことになるため。
+
+## 併せて効く既知の制約
+
+- **L3/TUN 面が無い。** `:node/overlay-ip` は MagicDNS の名前解決用で routing
+  していない。forward できる TCP サービス以外は載らない。
+- **NAT の実測が無い。** E2E の direct path は loopback で、hole punch の
+  *protocol* は検査済みだが、この fleet の NAT が実際どう振る舞うかは未測定。
+  対称 NAT 同士は構造的に punch できず relay に留まる。
+- **relay は 1 本だけ使う。** `relay/home` は測定から選べるが、agent は netmap の
+  先頭を使う。
+- **`netmap/permitted?`（port 粒度）と `sessionable`（inbound-only）は実装・
+  テスト済みだが agent がまだ強制していない** —— gate は `dialable` / `:overlay`
+  まで。D3 の port 指定は**今日は forwarder 側でしか効かない**。
+
+## 実装されたのは計器だけ
+
+**この ADR の設計は 1 行も実装されていない。** landed したのは下記 3 本の
+**測るための probe** であって、bot が実際に共有する work tree ではない。
+上の『3 つの穴』と下の『残っているもの』が現在地であって、図が現在地ではない。
+
+## 測った（2026-08-19）—— 3 つとも走らせた
+
+### 1. 1 peer 1 port は成立する。そして erasure は実在する
+
+`kekkai-node` の `test/principal_e2e.cljs`（landed `7570afe`）。relay 1 + agent 3、
+実 Noise IK session、同一ホスト上の loopback service 2 本。bot-b は自分の port だけ、
+bot-c は自分の port だけを grant され、**bot 同士には edge が無い**。
+
+- 各 bot の forward は、その bot に grant された service に着く
+- **service が受け取るのは `127.0.0.1` だけ** —— 証明済みの peer key は、
+  downstream が使える時点では消えている。だから 1 peer 1 port は最適化ではなく
+  **機構**である
+- 相手の port への生 OPEN は service 側で拒否され、**その service には接続すら行かない**
+- bot-b と bot-c は session を張らない。互いを netmap の peers に**書いてあるのに**
+  張らない —— 止めているのが edge の不在であることを、仮定ではなく assert している
+
+**2 回、壊して確かめた。そして 1 回目の break が probe の側を直した。** bot-b の
+grant に相手の port を足すと、その port についての 2 つの check *だけ*が落ちる。
+bot 間に `:overlay` edge を足すと、session の 2 つの check *だけ*が落ちる。
+——ただし最初の probe は OPEN 注入の 800 ms 後に registry を読んでおり、
+**drive host が受理して接続した OPEN を『拒否された』と報告していた**（受理された
+stream は直後に破棄される。偽装元の peer が `:no-such-stream` を返すため）。
+admission は今、`handle-open!` が entry を入れ socket がまだ解決していない
+**同じ tick** で読む。最初の誤りを捕まえたのは接続カウンタだけだった。
+
+### 2. 同一 ref・同一 sequence に 2 writer —— 片方が負け、勝者を教えられる
+
+`inga-node` の `script/ref_race.cljs`（landed `54a04b7`）。witness 7 process。
+同じ `[ref seq]` に別 CID の record を **2 つの別 witness へ同時に**投げ、
+**どちらも受け取っていない 3 つめ**から読む。
+
+```
+committed log:  [[0 \"cid-from-bot-b\"]]
+bot-b outcome:  {:certified? true}
+bot-c outcome:  {:certified? false, :current \"cid-from-bot-b\"}
+```
+
+**敗者の record は disk に書かれすらしない** —— `store/sink-blocks!` は既に
+ファイルのある sequence を飛ばす。first-wins が実際に着地するのはそこ。
+敗者が**勝者の CID を教えられる**ことが、負けを回復可能にする半分である。
+
+判定は再実装していない: `inga.ref/project` が committed log を first-wins で畳み、
+`inga.ref/outcome` が勝敗を答える。この script が供給するのは network だけ。
+
+`BOTH_WIN=1` が control で、**最初は control になっていなかった** —— head 1 件だけを
+projection にしていたので、別 sequence で両者が commit していても
+『exactly one writer won』が通った。今は log を projection にし、control は
+意図した 2 つの check を落とす。
+
+⚠ **これは ordering の決定を測ったのであって、`inga.ref` の cert 検証ではない。**
+`inga.ref` と `inga-node` は今日 **散文でしか繋がっていない**（`inga-node` の
+どこにも `inga.ref` の require は無い）。kekkai が 2026-08-06 に埋めた
+publisher/consumer の穴と同じ形の穴が、ref 面にもう 1 つある。
+
+### 3. per-block と packed の request 数
+
+ADR-2608198000 側に記録した。**D3 は支持され、『1 commit = 1 pack』は誤りだった**
+（object 天井 4 MiB）。
+
+## 穴を塞ぎに行って、もう 1 つ見つかった（2026-08-19）
+
+**HTTP を forwarder に通した瞬間に、half-close の bug が出た。**
+本文が connection close でしか区切られない応答（Content-Length も chunked も
+無い）は、実 overlay で **6 回中 2 回失敗した**。
+
+state machine は正しく、**報告だけが落ちていた**。`on-frame` の `:fin` 分岐は
+自分のコメントで『FIN は後から送られた data を追い越しうる』と述べ、その場合の
+`:fin-at` も正しく記録する。しかし `:stream-peer-fin` を出すのは
+**contiguous prefix が既に FIN に届いていたとき**だけで、data が後から届いて
+prefix を完成させた場合、`:data` 分岐は `:events []` を返していた。peer の close は
+state に取り込まれ、誰にも伝わらない。forwarder はそのイベントでしか local socket を
+`end` しないので、**client は既に書かれた本文を待ち続けた**。どちらの frame が先に
+着くかに依存するので flaky だった。
+
+`stream_test/a-fin-that-overtook-its-data-is-still-reported` が決定的に固定し
+（FIN を data より先に渡す）、fix 無しでは**まさにその欠けたイベント**で落ちる。
+in-order の場合を control として隣に置いた。overlay probe は **4/6 → 8/8**。
+
+**測るために作った道具が、測る対象の欠陥を見つけた**形。raw echo と ssh は
+EOF に依存しないので、この bug は landing 以来ずっと隠れていた。
+
+## 残っているもの
+
+- **穴 3（ephemeral node）は塞がない。** これは欠陥ではなく天井で、charter G2
+  （machine approval は常に人間、override 不能）から出ている。**D6 が答えである** ——
+  事前 admit した固定プールを持つ。実装すべきものは無い。
+- ~~**`inga.ref` ⇄ `inga-node` の継ぎ目**~~ **塞いだ**（`inga` `ba437b4` /
+  `inga-node` `bd21f38`）。ここに以前書いていた『QC を record に添えればよい』は
+  誤りで、witness は `vote-payload`（block-hash 入り）に署名し
+  `head/verify-cert` は head record を検査する —— **別のバイト列**だった。
+  代わりに **membership を証明する**: record がこの block に在り、この block の
+  hash を証明書が名指し、その証明書が検証できる（`inga.commitment`、
+  `inga.ref` の `head-of!` seam、`/committed` が proof を head と一緒に返す）。
+  7 witness process で**勝者の head をオフライン検証**するところまで測ってある。
+  経緯・3 つの選択肢・実測は **ADR-2608198200**。
+  **残り**: seam と verifier と producer を 1 つの store として組んだ稼働構成。
+- ~~**NFS を forwarder 越しに使う経路**~~ **閉じた**（`kekkai-node` `04c4fa6` /
+  `cloud-itonami-app` `19d77b9`）。`edge/principal-endpoint` が
+  `GET /principal?port=<source port>` を loopback だけに出し（**bind は
+  127.0.0.1 固定、選択肢を置かない** —— ホストの外に出せば『誰が何に繋いでいるか』の
+  地図になる）、app 側は netmap が住所で答えられなかったときだけそれを訊く。
+  - **訊くのは 2 番目**。overlay の住所で既に名指せる peer に round trip を
+    足さない（counter で assert してある）。
+  - **名指されたことは許可ではない** —— peer は変わらず `authorized?` /
+    `permitted?` を通る。`:principal-endpoint` は `:netmap` 無しでは拒否する。
+  - **lookup を設定した時点で、loopback は自己認可をやめる。** agent が名指せない
+    local 接続は、設定 actor として admit せず拒否する。さもないと『わざわざ
+    overlay の後ろに置いた Drive』を、その機械の中の何でも mount できる。
+  - lookup の失敗（到達不能・遅い・壊れた応答・404）は全て nil = 拒否。
+    **答えられなかった lookup と『誰でもない』と答えた lookup を区別できる形にしない。**
+
+## 関連
+
+- ADR-2608198000 — bot が共有するのは disk ではなく base の CID（本 ADR はその具体化）
+- ADR-2607266500 — kekkai-node（データ面。Noise IK・hole punch・relay・MagicDNS）
+- ADR-2608171200 — 共有 surface の実測（macOS で NFS が唯一）
+- ADR-2608038000 / 2608670000 — inga（ref plane）と witness が process であること
+- ADR-2608160100 — block / pack / object の 3 段
+- ADR-2608039000 — 分散を名乗る経路で D1 を premise にしない
+- cloud-itonami-app ADR-0051（networkless OCI computer）/ 0057 / 0058 / 0061 / 0062
+- kekkai charter G1〜G4（`kotoba-lang/kekkai` README）")))

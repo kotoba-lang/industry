@@ -1,0 +1,223 @@
+(vector (map 
+  (:db/id -1)
+  (:adr/id "adr-2608301700-hermes-and-itonami-bot-reliability-session")
+  (:adr/title "hermes / cloud-itonami bot 信頼性セッションの gap ledger と resume point")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-30")
+  (:adr/related (vector "adr-2608301600-tamaki-and-cloud-itonami-are-separate-planes" "adr-2608271450" "adr-2607300900"))
+  (:adr/body "## この文書は何か
+
+2026-08-30 の 1 セッションの gap ledger と resume point。何を直し、何を**検証し**、
+何が **default branch に在り**、何が未着手かを、次の agent が会話履歴なしで再開できる
+粒度で記録する。設計判断は ADR-2608301600（tamaki と cloud-itonami は別の面）に在り、
+ここは運用側の現在地である。
+
+## 出発点 — 測ったこと
+
+hermes cron の `executions.db`、直近 7 日 161 実行: completed 113 / failed 26 /
+unknown 20 / running 1。未解決 incident 18 件のうち 13 件が timeout。
+
+同時発火を疑って測ったが**原因ではなかった** —— 失敗 46 件のうち 45 件は単独発火中に
+起きている（同一 5 秒窓に 2 本以上発火した実行は 161 中 17、うち失敗は 1）。
+「job が多すぎる/分散すべき」という仮説は、この数字が否定する。分散しても
+OpenRouter は 1 アカウント 1 キーなので provider 側の待ち時間は台数で割れない。
+
+## 直したもの — すべて default branch に在る
+
+| commit | repo | 内容 |
+|---|---|---|
+| `6258dcf` | root | stale watchdog の床 600s / resolver の refuse 解除 / 有料 glm を `:primary` 化 / BLOCKED prompt |
+| `69df7c6` | root | 39 agent job に固有 workdir（相乗り 0） |
+| `94a59f2` | root | ADR-2608301600 |
+| `5a28357` | root | 走る prompt が正本という事実の記録 + `-M` の取り込み |
+| `726621c` | cloud-itonami/otent | tick の子に 240s 上限 |
+| `636e3a4d` | network-awai/cloud-itonami | 無人 tick の shell-out に上限 |
+| `d4a516a4` | network-awai/cloud-itonami | 失敗の理由を捨てるのをやめる |
+
+### 1. stale watchdog（記録エラー 21 件中 19 件）
+
+`run_agent.py` の `_compute_non_stream_stale_timeout` は 90s →（50k tok 超）150s →
+（100k tok 超）240s と自動で伸びる。記録された 19 件は**この 3 つの閾値ちょうど**で、
+スケーリングは効いていて、それでも返っていない。per-run prompt 総量は median 857k /
+p90 5.1M token。明示設定（`providers.<n>.stale_timeout_seconds`）だけが run budget cap
+に縛られず床になる。600s を policy 側のデータとして置いた。
+
+**検証**: hermes 自身の `get_provider_stale_timeout` が当該 provider に 600.0、
+無関係な provider に `None` を返す（全部に 600 を返しているのではない）。
+
+### 2. resolver が全 run で refuse していた
+
+手で足された top-level `openrouter:` ブロックが所有していないキーだったため、
+`resolve_free_model.cljs` は exit 2 で書き込みを拒否し続けていた。しかもそれを呼ぶ
+`hyakka-model-refresh` は disabled。**日次のモデル再解決は事実上死んでいた。**
+所有キーに加え、cache 設定を policy 側のデータにした。
+
+**検証**: `--check-config` が exit 2 → exit 0。
+
+### 3. モデルは有料 glm のまま（オーナー判断）
+
+`usage_audit.jsonl` 136 call、同一日・同一 job 群:
+`z-ai/glm-5.3-flash` 56 ok / 7 fail (11%)、`minimax/minimax-m3:free` 46 ok / 16 fail (26%)。
+resolver の install 経路を回すと**全 job がより悪い方へ移る**ので回さなかった。
+`:primary` が probe を短絡し、毎 run 「その id がまだ listed か」だけを検査する。
+
+⚠ `cohere/north-mini-code:free` の 0/11 を三者の最良と読まないこと。fallback 2 番目
+なので primary が失敗した後の短い後半しか担っておらず、median 24s が他の ~200s に対して
+その証拠である。
+
+**検証**: listed で exit 0、存在しない id を渡すと exit 1 と delisting のメッセージ。
+
+**同時に作りかけたバグ**: `render-config` は `auxiliary.openrouter_model` にも同じ
+model-id を書くので、有料 primary を通すと `free_only: true` を宣言した行の直下で
+背景トラフィックを課金レーンに乗せるところだった。切り離して無料 runner-up に固定。
+
+### 4. workdir — 39 agent job に 39 個の固有 workdir
+
+10 job が共有スーパープロジェクト（複数 Claude セッションが同時に編集する tree）で
+起動し、8 本が 3 つの bot worktree に相乗りしていた。`kotoba-migration-scout` が
+`TERMINAL_CWD read lock` を 660s 待って諦めた実測がある。
+
+相乗りは構造的だった —— 1 つの evidence script が複数 job に使われ、worktree を
+**script ごとの** env 既定で選ぶので、その script が担当する job は全部同じ tree に
+落ちる。`hyakka_coverage_evidence.py` の docstring は「family をまたぐ共有が
+hyakka-source-scout を約 11 時間止めた」と書いた上で、同じ tree を coverage 2 本に
+渡していた。
+
+hermes は job id も job 名も cron script に渡さない（仮定せず確認した）が、
+`cwd = job.workdir` で起動する（`cron/scheduler.py` の `_script_cwd`）。したがって
+`--workdir` が共有 script から見える唯一の per-job signal。3 script が
+「env → worktree な cwd → 従来の既定」の順で決めるようにした。**worktree でない cwd は
+信用せず既定に落とす** —— 以前そこはスーパープロジェクトで、それを origin/main に
+同期するのがこの script 群が避けたい事故そのもの。
+
+**検証**: 15 cases / 0 failed。初回は 12 failed だったが、それはハーネスが関数を
+最初の `return` で切っていたためで、全ケースが「末尾まで落ちて None を返す関数」を
+測っていた —— 本物の赤だが別物を測っていた。抽出した本体に `return` が 3 つあることを
+先に assert する形に直した。
+
+### 5. cloud-itonami の無人 tick に上限
+
+`sh` / `run` が `execFileSync` / `spawnSync` を timeout 無しで呼んでいた（Node の既定は
+無制限）。launchd は前の run が生きている間は次を起こさないので、上限の無い 1 コールは
+1 回の poll を遅らせるのではなく**周期そのものを止める**。
+
+実測: mail-drain が 900s 周期に対し 5h15m（21倍）、kakuninya が 1800s に対し 5h00m
+（10倍）、otent-tick が 300s に対し 5h10m（62倍）。**その間ずっと
+`launchctl list` は `last_exit=0` を報告していた** —— launchd は終了したときにしか
+exit を記録しないので、終わらない job は前回の値を持ち続ける。
+`~/.itonami/mail-drain-status.edn` は詰まっている間 `:ok? true` を書いており、
+同時に `:finished-at nil` も書いていた。ファイルは知っていて、誰もその欄を読んでいない。
+
+**結果**: 3 台とも完走に戻った（mail-drain 80 秒で完走・6 時間半ぶりの
+`:last-success`、kakuninya exit 0、otent-tick exit 0）。
+
+### 6. 失敗の理由を捨てていた
+
+上限が発火した最初の run が報告したのは `mail-drain: wrangler failed: ` —— コロンの
+後が空。原因は timeout より前からあり、timeout が露出させた: `sh` が
+`(or (.-stderr e) (.-message e))` で組み立てており、**Clojure では空文字が truthy**
+なので空の stderr が勝って `.message` が捨てられていた。SIGKILL された child は
+何も書かないので、新しい失敗クラスが生まれた瞬間に理由が消えた。
+
+**検証**: 5 cases / 0 failed。修正前の式に同じスイートを当てると 4/5 が落ち、
+落ちた 4 件はすべて空文字を返す。
+
+### 7. 走る prompt は repo のファイルではない
+
+cron job の prompt は `~/.hermes/cron/jobs.json` に inline で入っている。repo の
+`.prompt.md` を直しても、`~/.hermes/scripts/` にコピーしても、走るものは変わらない
+——どちらも job に流し込む経路が無い。
+
+実測: inline prompt を持つ 42 job のうち 37 が repo と一致、5 が古い版で走行。
+**うち 3 本はこのセッション自身が直して landed して配備したもの。**
+1 本（`kotoba-migration-scout`）は逆で、job 側に `-M` の修正があり repo に無く、
+repo を押し込んでいれば静かに戻していた。5 本すべて解消。
+
+## この日、私が 4 回間違えた形（同型）
+
+**照合器が別のものを掴んでいるのに、その結果を測定として報告した。**
+
+1. basename で配備 vs repo を照合し、複数 bot family の同名ファイル（`verify_bundle.py`
+   `README.md`）を比べて乖離 2 件の偽陽性を出した。
+2. 「冒頭が含まれるか」で job ↔ prompt を照合し、共通の前文だけで別 bot のファイルに
+   当たり、古い版 9 本と報告した（正しくは 5 本）。
+3. 関数を最初の `return` で切って抽出し、12 cases を落として「壊れている」と読みかけた。
+4. サンプル 1 回で「シェルアウトではない」と結論し、実際には呼び出しの合間を見ていた。
+
+いずれも**赤は本物で、測っている対象が違った**。対策として入れたのは、
+全候補をスコアして明確な勝者を要求すること、抽出物の構造を先に assert すること、
+そして結論の前に待って測り直すこと。
+
+## 現在地（2026-08-30 15:37 時点）
+
+```
+hermes        gateway pid 44354 running / ticker last_success 11s 前
+              12:00 以降 11 run: completed 8 / running 1 / claimed 1 / unknown 1
+              新しい timeout エラー 0 件
+cloud-itonami launchd 13 台: 待機 exit=0 が 6 / 赤 3 / 実行中 4
+配備の乖離    0（97 ファイル中 93 が repo と一致、4 は別名で版がある/未管理）
+git           root / otent / cloud-itonami すべて origin/main と 0/0
+```
+
+## 未解決 — 優先順
+
+1. **datalake 3 台が赤**: `dns-resolver-datalake`（`Silently is not ISeqable` で 9/9
+   失敗、987,060 行 pending。`export_and_sync.cljs` は reader を通るので構文ではない。
+   未診断）、`sukashi-datalake`、`hirameki-datalake`（**理由をログに出していない**）。
+   朝は 1 台に見えていたものが 3 台に広がった。
+2. **`wrangler kv key list --remote` が 120 秒返らない理由**。上限は「毎周期止まる」を
+   「1 周期を捨てる」に変えただけ。次の run から名前付きの理由が出る。
+   ⚠ 手で叩くときは launchd 側と重複しないこと（この日 1 度重複を起こした）。
+3. **otent の 240s 上限は一度も発火していない。** 落ちる向きを見せていない検査は
+   landed とは言えない。
+4. **飛ばされた 3 本**（`bots-aozora-pulse` / `shinshi-cast-post` / `legal-news-source`）。
+   hermes 自身の `compute_next_run` に作成時刻を与えると期待値と 1 日ずれる。週次の
+   `shinshi-producer` だけ一致するので計算式の誤りではなく、今日の枠が 1 回静かに
+   消費された。`cron/jobs.py:3654` の再アンカー経路なら INFO を出すが、その行が無い。
+   **原因未測定。判定は明日 09:50 / 10:10 / 10:20。**
+5. **42 bot 中 31 が UNREGISTERED**（Keychain seed 無し、`register.cljs` 未実行）。
+   `bots-aozora-pulse` は動くがそのため exit 1 で終わる。鍵を作る操作なので未実行。
+6. **OpenRouter に spend cap が無い**（`limit: null`、実測 $0.14/日）。このキーは
+   provisioning key ではないので設定できず、owner の web UI 操作。
+7. **BLOCKED の分類器がコマンドを捨てる。** prompt 側は直したが、拒否ログが
+   クラスだけ記録して入力を捨てるので、次に起きたとき何が拒否されたか読めない。
+   hermes 本体側の性質。
+8. **cloud-itonami の 9/13 が run ごとの結果を持たない。** ADR-2608301600 の移行手順 1
+   がこれを塞ぐ。
+9. **ADR-2608301600 の手順が未着手**: 13 本に run record を載せる / `app-scheduler` の
+   引き取り（tick と custody の移設）。
+
+## 明日の判定
+
+- 08:40 `hyakka-model-refresh` 初回（再有効化済み。`:primary` を尊重するはず）
+- 09:50 / 10:10 / 10:20 飛ばされた 3 本が再発するか
+- 朝まで通しての hermes 失敗率（今日 12:00 以降は 11 run で timeout 0 だが標本が小さい）
+
+## 次の最初のコマンド
+
+```bash
+# 1. datalake 3 台の赤を切り分ける（いちばん実害がある）
+tail -40 /tmp/sukashi-datalake.log /tmp/hirameki-datalake.log
+launchctl list | grep datalake
+
+# 2. hermes の一晩の成績
+sqlite3 ~/.hermes/cron/executions.db \\
+  \"select status,count(*) from executions where claimed_at>'2026-08-30T12:00' group by status;\"
+
+# 3. 飛ばされた 3 本が再発したか
+python3 -c \"import json;d=json.load(open('$HOME/.hermes/cron/jobs.json'));\\
+  print([(j['name'],j['next_run_at']) for j in (d['jobs'] if isinstance(d,dict) else d) \\
+  if j['name'] in ('bots-aozora-pulse','shinshi-cast-post','legal-news-source')])\"
+```
+
+## 保全した他者の作業（触っていない）
+
+- `network-awai/cloud-itonami` の open PR 3 件（#545 #532 #531）。#545 は今日だが
+  `src/cloud_itonami/account.cljc` / `test/.../test_runner.cljc` で、この
+  セッションの変更とは重ならない。
+- 共有 checkout の未追跡 5 件（`scripts/hermes-hyakka-bots/` の
+  commons-image-scout / sitelink-scout / wikidata-class-scout の prompt、
+  `hyakka_coverage_evidence.py`、`hyakka_notability_audit.py`）と
+  `90-docs/observatory/observatory.datoms.edn` の変更。
+- `agent/murakumo-api-auth-contract-20260829` と `agent/gap-domain-topics` は
+  他セッションの worktree が使用中（`+` 付き）。")))

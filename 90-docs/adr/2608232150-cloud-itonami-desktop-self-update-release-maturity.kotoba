@@ -1,0 +1,125 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608232150-cloud-itonami-desktop-self-update-release-maturity")
+  (:adr/title "Cloud Itonami desktop self-update release maturity")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-23")
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "Cloud Itonami desktop updater の 2026-08-23 時点の成熟度 score"
+   "DMG 版の update button 経路に対する preview / stable 合格判定"
+   "source、release、実機観測、未検証を分離した配布証拠"))
+  (:adr/related
+  (vector "adr-2608212400-cloud-itonami-app-native-signin-one-path"
+   "adr-2608232028-itonami-bots-west-clj-kotoba-refactor-maturity"))
+  (:adr/repos (vector "orgs/cloud-itonami/cloud-itonami-app"))
+  (:adr/body "# ADR-2608232150: Cloud Itonami desktop self-update release maturity
+
+## Status
+
+Accepted — **総合 81/100、limited-preview-ready / stable-blocked**。公開 DMG から signed update を検出、検証、stage、終了時適用、再起動、health、receipt まで macOS arm64 で実測した。一方、Developer ID notarization と Windows Authenticode / Windows 実行は未達なので stable release とは呼ばない。
+
+## Decision
+
+Settings は 1 個の更新 action を持つ。最初の操作で check → signed manifest 検証 → asset download → size / SHA-256 検証 → stage を行い、stage 後の同じ action は window を閉じる。launcher helper が旧 process 終了後に bundle を置換し、`/health` 成功時だけ更新を確定、失敗時は `.previous` へ rollback する。
+
+更新 authority は GitHub Release の存在ではなく embedded Ed25519 public key で検証した `update-manifest.edn` とする。helper は staging 後にも package SHA-256、manifest と bundle の exact version、forward-only version、bundle ID、publisher continuity を再検証する。Developer ID install から ad-hoc install への downgrade は拒否する。
+
+実機検証中、v0.5.1 helper が replacement を open した時点で `pending` が残り、新 launcher が同じ package を二重適用する race を検出した。PR #143 は future helper が `pending` を atomic claim するよう修正し、失敗 claim を launch loop せず archive する。PR #144 は旧 helper との移行互換として、pending version が replacement 自身の version と一致する場合は通常起動して predecessor helper の health check を成立させる。
+
+v0.5.2 は race の片側だけを直した superseded preview と明示する。合格対象は v0.5.3 (`d5cbb050cee0dfe908c736edc6af1657375e684d`) とする。
+
+## Observed evidence
+
+### Source and release
+
+- PR #141: one-action updater、publisher continuity、launcher-time apply、staging recheck。merge `e0825453d1e52ada1bee7fc998c2ce7481bfc676`。
+- PR #142: bounded `last-applied.edn` receipt と Settings の更新完了表示。merge `b6e1fca741dd668f8317b03a9f3959b2db777eb4`。
+- PR #143: staged package の one-helper atomic claim。merge `59e75f97f7acbe804a08b2402981b6399dcadeea`。
+- PR #144: old-helper / replacement-version compatibility guard。merge `d5cbb050cee0dfe908c736edc6af1657375e684d`。
+- GitHub prerelease v0.5.3 は上記 exact commit を target とし、DMG、macOS ZIP、Windows ZIP、signed manifest、SHA256SUMS を公開した。
+- v0.5.3 DMG SHA-256 は `9812f02b1b7ad32398149f796a6699912465f97adb924351cfa8156009077044`。macOS update ZIP は `ed635f019c1dfb433c13388ac3dc9ec82d449391167234f9a5cf8c962d6c4e23`。manifest は embedded Ed25519 key で検証済み。
+- superproject `manifest/west.yml` は server-side single-entry commit `00eefd75fc48e45c8662db7290f8ce7c1f512704` で v0.5.3 merge commit を pin した。その後 app main は 2 commit fast-forward し、観測時点の superproject main は release commit を祖先に持つ `792f8986cd9d577f849fae2b5b3e65328df3fb39` を pin している。
+
+### Tests and negative evidence
+
+- v0.5.3 source の full suite: 1812 tests / 10744 assertions / 0 failures / 0 errors。
+- v0.5.1 receipt 実装後の full suite: 1812 tests / 10738 assertions / 0 failures / 0 errors。
+- checksum implementation を一時的に zero digest へ壊す mutation で updater test が red、復元後 green を観測した。
+- v0.5.3 DMG は `hdiutil verify` PASS、展開 app は `codesign --verify --deep --strict` PASS、bundle version 0.5.3。
+- v0.5.0 → v0.5.1 の最初の公開 DMG 試験は二重 helper race を実際に再現し、health timeout と rollback log を得た。失敗を成功証拠に数えず PR #143 / #144 の入力にした。
+
+### End-to-end update observation
+
+1. `/Applications/Cloud Itonami.app` v0.5.1 を起動し `/health` 200 を確認。
+2. Settings button と同じ same-origin `POST /api/update/check` は installed 0.5.1 / available 0.5.3 を返した。
+3. 同じ button implementation の `POST /api/update/download` は signed asset を検証し `status=downloaded`、`restart-required=true` を返した。
+4. native window の shell host を終了し、launcher の apply-on-close path を実行した。
+5. replacement v0.5.3 が起動し `/health` 200。二重 helper process は 0 件。
+6. `/api/update` は `last-applied` として from 0.5.1 / version 0.5.3 / applied-at を返した。
+7. `pending.applied-*` と `/Applications/Cloud Itonami.app.previous` (v0.5.1) が残り、rollback material を確認した。
+
+UI wiring は source test で同じ一つの button が check / download / close を呼ぶことを検査した。今回の実機 mutation は button が呼ぶ HTTP route と native close path を直接駆動したもので、pointer click automation の証拠とは区別する。
+
+## Score model
+
+成熟度は implementation `I` 30%、macOS operation `O` 25%、evidence `E` 20%、distribution trust / portability `T` 25% とし、`M = round(0.30I + 0.25O + 0.20E + 0.25T)` とする。stable の critical gate は加重点で相殺しない。
+
+| 面 | score | 根拠 |
+|---|---:|---|
+| Implementation `I` | 94/100 | signed manifest、bounded download、staged recheck、forward-only、publisher continuity、one-helper claim、old-helper compatibility、rollback、receipt、one-action UI を実装 |
+| macOS operation `O` | 95/100 | 公開版 0.5.1 → 公開版 0.5.3 の check / download / apply / reopen / health / receipt を実機完走。pointer click 自体は直接観測していない |
+| Evidence `E` | 91/100 | full suite 2 回、mutation red/green、DMG / codesign、失敗 race と修正後 E2E。反復 sample と forced rollback mutation は未実施 |
+| Trust / portability `T` | 42/100 | Ed25519 と ad-hoc preview continuity は有効。Developer ID notarization、Windows Authenticode、Windows runtime E2E は未達 |
+| Weighted maturity `M` | **81/100** | `round(0.30*94 + 0.25*95 + 0.20*91 + 0.25*42) = 81` |
+
+判定 tier:
+
+- 0–39: prototype
+- 40–59: internal-only
+- 60–79: preview-candidate
+- 80–89: limited-preview-ready（preview critical gate が全 green の場合のみ）
+- 90–100: stable-candidate（stable critical gate が全 green の場合のみ）
+
+従って v0.5.3 は limited-preview-ready。stable critical gate が赤なので、score 81 を stable readiness と読まない。
+
+## Critical gates
+
+### Preview PASS
+
+- exact source commit の prerelease assets と signed manifest が存在する。
+- release manifest、asset size / digest、bundle ID、forward version、publisher continuity を fail-closed で検証する。
+- public predecessor から check / stage / apply / reopen / health / receipt を同一機で完走する。
+- failure 時の previous bundle と bounded logs が残る。
+- full suite green、最低 1 件の updater mutation が red → restore green。
+
+v0.5.3 は全項目 PASS。
+
+### Stable PASS
+
+- macOS Developer ID Application (Team ID `3A5CBTEBFP`) 署名と Apple notarization / stapling / Gatekeeper assessment。
+- Windows Authenticode publisher pin と Windows x64 実機で install / update / rollback E2E。
+- macOS と Windows 各 5 回以上の predecessor update sample、成功率 100%、stale helper / pending loop / rollback loss 0。
+- Settings の pointer / keyboard 操作を含む human surface E2E と accessibility label 検査。
+
+現時点は全項目未達または一部未達のため stable FAIL。
+
+## Consequences
+
+- GitHub の最新版として v0.5.3 preview を使う。v0.5.2 は superseded evidence であり配布対象にしない。
+- Developer ID identity が無い環境では stable release を生成しない。build script の stable channel は fail-closed を維持する。
+- 次の最大成熟度向上は機能追加ではなく Developer ID / notarization と Windows trust / runtime qualification である。
+- updater の完了表示は authority ではない。`last-applied.edn` が壊れていても signed discovery と update validation は変えない。
+
+## References
+
+- https://github.com/cloud-itonami/cloud-itonami-app/releases/tag/v0.5.3
+- https://github.com/cloud-itonami/cloud-itonami-app/pull/141
+- https://github.com/cloud-itonami/cloud-itonami-app/pull/142
+- https://github.com/cloud-itonami/cloud-itonami-app/pull/143
+- https://github.com/cloud-itonami/cloud-itonami-app/pull/144
+- `docs/adr/0030-desktop-updates-are-signed-staged-and-rolled-back.md`
+")))

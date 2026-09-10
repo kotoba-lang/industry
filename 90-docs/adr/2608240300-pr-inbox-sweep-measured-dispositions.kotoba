@@ -1,0 +1,178 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2608240300-pr-inbox-sweep-measured-dispositions")
+ (:adr/title "2026-08-24 PR inbox sweep: 59 open PRs given a measured disposition")
+ (:adr/status "accepted")
+ (:adr/date "2026-08-24")
+ (:adr/related (vector "adr-2608136000"
+"adr-2608102000"
+"adr-2607300900"))
+ (:adr/body "# 2026-08-24 PR inbox sweep: 59 open PRs given a measured disposition
+
+オーナー指示は「review and merge」、続いて「cleanup」、最後に amu#607 の名指し。
+59 件すべてに disposition を付けた。**15 merged / 26 closed / 18 open**（うち
+2 件は archived repo で書き込み不能）。open 18 件は全件に測定付きのレビュー
+コメントを残してある。
+
+## 中心的な発見: `:additive` はビルドについて何も言わない
+
+cleanup workflow の `:additive` 規則は「その名前のパスが default branch に
+無いから既存行を書き換えない」という**行についての**議論であり、**動くか
+どうか**は別である。今日それが 3 回破れた:
+
+- `cloud-itonami/kawase-yui#7` — 削除ゼロ、新規ファイルのみ。実行すると
+  `Unable to resolve symbol: kawase/cell-specs`。ns 形が `kawase_yui.murakumo`
+  （アンダースコア）で require 側は `kawase-yui.murakumo`。直した上でなお
+  8 failures / 6 errors —— `cell-specs` が `{:null {:legacy-cell \"null\" ...}}`
+  という生成器のプレースホルダ 1 件だけで、README とテストが言う 5 cell が無い。
+- `cloud-itonami/actor-kurashimori#5` — 同型。6 tests / 8 failures / 2 errors。
+  R3 gate が `[]` を返し、**代行 send がブロックされていない**（この actor の
+  存在理由そのもの）。
+- `cloud-itonami/cloud-itonami-app#122` — `identity/browser-handoffs` は
+  test ファイル内の 2 箇所にしか存在せず、`kotoba.user-test` namespace は
+  fleet のどこにも無い。
+
+いずれも kotoba-kir#54（landed した test が 5 日間 suite をコンパイル不能に
+していた）と同じ形。**`:additive` は必要条件であって十分条件ではない。**
+
+## 2 つ目: 走らせられなかったテストの exit code
+
+`kawase-yui` / `actor-kurashimori` の `run-murakumo-tests.cljs` は
+`(zero? (+ (:fail r) (:error r)))` で exit を決めるが、nbb の `run-tests` は
+`nil` を返すので `(zero? 0)` が常に真になる。**8 failures で exit 0。**
+ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と同じ値を
+返す」の最短形。判定には印字されたカウントを読んだ。
+
+## 3 つ目: append-only データは textual merge できない
+
+2 件が「どちらに merge しても失う」状態だった。datom 単位で実測:
+
+| PR | branch にしか無い | main にしか無い |
+|---|---|---|
+| `kotoba-lang/toshokan#15` | 512 datom | **3,198 datom** |
+| `cloud-itonami/yabai-actor#7` | 45,886 record | **38,442 record** |
+
+textual 3-way merge に union を表現する手段が無く、`ct-watch-state.edn`
+（resume cursor、6 行が両側で全て相違）は選ぶのではなく再計算するしかない。
+両方 open のまま数字付きで報告した。**採取器が git ファイルに書きながら
+別コピーが走ると毎回この代償が出る** —— DataLad/annex か単一 writer への
+移行を検討する価値がある。
+
+## 4 つ目: hash は選ぶものではなく計算し直すもの（amu#607）
+
+`amu#607` は 165 commit 遅れ、11 conflict。`tools/kexe_loader.c` は
+**union** だった —— main が `KEXE_TYPED_DATASPACE_V1` / `dataspace_inject` を、
+branch が `hosted_clock_v1` と `valid_typed_value` の clock arm を足していた。
+両方残した結果、loader の sha256 は**どちらの提案とも一致しない**:
+
+    POSIX    bea13f88ebbc95e84fb13117bb2c4c68f199607760f41d4b430ec518223cfcd5
+    Windows  c8de65d259fe6f7adb636f89f98b87c1e1e9838aa3572af6ca43f388c1040ed2
+
+`kotoba-lang/artifact` を古い値のまま置いたところ **66 テスト**が
+`native loader source identity mismatch {:expected \"f28b175f...\" :actual
+\"bea13f88...\"}` を上げた。admission gate が正しく作動した形。artifact に
+recompute 値を先に着地させ（`f9dff412`）、amu の pin を合わせて解消した。
+
+**`artifact#12` の POSIX 提案値 `0c600501...` は branch 単体の loader の
+hash であって union のものではない。** Windows 値 `c8de65d2...` は競合が
+無かったため branch の値がそのまま union の値だった。この非対称は
+「片方が競合した」という事実だけから導出できる。
+
+## 5 つ目: 同じ語が 2 つの意味を持っていた（`:jit`）
+
+`amu#607` の 6 つの qualification test が `:jit :pending` を assert していた。
+その docstring は `:jit` を「将来の KIR→native runtime compiler、wasmtime
+Cranelift ではない」と定義している。しかしこの repo で `:jit` は
+**kotoba-script `:js-kotoba-v1` を V8 で実行すること**であり、main には
+kit ごとに `jit-*-guest-round-trips-on-kotoba-script-v8` がある
+（CLAUDE.md の kit 節も同じ定義）。main の語義に揃え、
+`native-aot-qualification-test` は自分が測っていない key を pin するのを
+やめた。**別定義から反対を assert する 2 つ目のファイルが、1 つの語を
+2 つの意味にする経路だった。**
+
+## 6 つ目: どこでも緑にならない gate
+
+`amu/scripts/wasmtime_tool.cljs` は wasmtime **42.0.1** を pin していたが、
+`kotoba-component/resources/kotoba/lang/component-model-v1.edn` は
+`:minimum-wasmtime-major 43` を宣言している。WASI 0.3 の suite はその数字を
+読むので、42 のままでは**ローカルでも CI でも永久に赤**だった（CI も同じ
+テーブルから provision する）。43.0.2（要件を満たす最小 major の最小 patch）
+へ上げ、4 プラットフォーム分の digest を実測した。
+
+「落ちない gate は劇場」の対偶。**一度も緑にならない gate も同じだけ無内容。**
+
+## 7 つ目: 壊し方を間違えた赤は成功した実演に見える
+
+amu の負のコントロールを 2 回やった。1 回目は clock oracle の call site を
+削除 —— 25 failures / 66 errors という派手な赤が出たが、正体は
+`error: unused function 'hosted_clock_v1' [-Werror,-Wunused-function]` で
+**ビルドが落ちただけ**、挙動の証拠ではない。破棄して外科的にやり直した:
+`read_wall_millis` を 1 時間ずらす（関数は使われたまま）と
+**その 1 assertion だけ**が `hosted oracle must read the host clock, not a
+synthetic constant` で落ちた。1 failure / 0 errors、他は動かない。
+
+## 保留した唯一の主張
+
+`clock-v1.edn` の `:wasm-aot` は `:pending` のまま、
+`clock_wasm_aot_qualification_test.clj` は着地させていない。composed
+component が link しない:
+
+    component imports instance `wasi:clocks/system-clock@0.3.0`, but a
+    matching implementation was not found in the linker
+      instance export `now` has the wrong type
+
+**wasmtime 43.0.2 と 45.0.3 の両方で同一**なので version の床ではなく、
+`package-clock-wasi-provider` が出す WIT が wasmtime の実装と食い違っている。
+どの WASI 0.3 revision を狙うかは amu ADR 0263 の問いで、merge が決めること
+ではない。ADR 0263 を `proposed` にして測定値を記録した。
+
+## 着地したもの
+
+merged 15: cloud-murakumo#87（**現 main が gate 未設定時に匿名・無制限で
+推論を proxy していた実バグ**、negative control で `expected 503, actual 200`）/
+cloud-murakumo#73（x402 有料 infer-memory、conflict を両側 union で解決、
+463 tests 0 failures）/ amu#607 / kotoba-component#121 / cloud-itonami-app#123 /
+marketplace-order#3 / nexus-x402#16 / murakumo#322 / murakumo#308 / nemuri#3 /
+yukkuri#9 / animeka#6 / animeka-actor#1 / kotobase-storage-s3#3 / jk-corp#1 /
+（PR 外）toshokan `ce63e44` = ndl.cljs の重複 70 行を ndl-core へ委譲。
+
+closed 26。主な根拠はすべて測定: langchain#19（削除する dep を test ns が
+まだ require、suite が 0 tests になる）/ shell#26（2026-08-19 に測定済みの
+bundle 修正を revert）/ local-murakumo#140（GATEWAY_URL 復旧を巻き戻し）/
+meyasu#2（main の strict prefix、branch 固有 0 行）/ syosetsuka#3（`.cpcache`
+の machine-absolute path）/ kotoba-mir#21・kotoba-sema#14・amu#628（main 緑・
+branch 赤、失敗はいずれも branch 自身が触るファイル）/ kagami#1・
+kotoba-native#55・kotoba-verifier#29・artifact#12・cloud-itonami-app#72
+（main が上位互換）/ bonsai#18・apqc#7（`bb` / `.sh` の新規追加は禁止）ほか。
+
+## west pin
+
+`b054bef7` で 3 件前進: amu `ee9bc1b`→`18564bc` / artifact
+`b7181ba`→`f9dff41` / kotoba-component `b44c99a`→`68acc72`。
+`verify-west-pins` OK。
+
+## 残っている gap（優先順）
+
+1. **toshokan#15 / yabai-actor#7 の union 書き戻し。** 放置するほど差が開く。
+   両 repo とも「採取器が複数走った」構造なので、単一 writer か annex への
+   移行まで含めて決める。
+2. **amu clock の WASI 0.3 seam。** ADR 0263 の問い。
+   `package-clock-wasi-provider`（kotoba-component）の WIT を wasmtime の
+   `wasi:clocks/system-clock@0.3.0` に合わせる。suite は amu の
+   `agent/clock-wasm-aot` branch から復元できる。
+3. **kawase-yui#7 / actor-kurashimori#5 の生成器。** テストと README は正しく、
+   生成された `cell-specs` が壊れている。再 emit すればよい。
+4. **cloud-itonami-app#122。** `kotoba.user-test` namespace の所在を特定する
+   （fleet のどこにも無い）。
+5. **kotobase-cljc-worker#19 / wasm-webcomponent#20 / kotobase-storage-d1#18 の
+   再 cut。** いずれも conflict が diff の中心部で、merge ではなく現 main から
+   の replay が要る。
+6. **cloud-itonami-app#28（537 commit 遅れ）は分割。** 4 主題を別 PR に。
+7. **archived repo の 2 PR。** `gftdcojp/241001-lifescience-web#514/#521` は
+   read-only で close も comment も 403。owner が unarchive するしかない。
+
+## 再開点
+
+    gh search prs --author=@me --state=open --limit 100
+
+各 open PR には今日の測定コメントが付いている。次の 1 手として最も価値が
+高いのは gap 1（union 書き戻し）—— 唯一、待つほど悪化するもの。")))

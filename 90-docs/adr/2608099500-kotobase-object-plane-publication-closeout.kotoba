@@ -1,0 +1,89 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608099500-kotobase-object-plane-publication-closeout")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "kotobase-object-plane-publication-closeout")
+  (:adr/title "ADR-2608099500: s3.kotobase.net object plane の publication closeout — direct merge を ready PR の review 証跡で閉じる")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-09")
+  (:adr/last_verified "2026-08-09")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/repos (vector "com-junkawasaki/root"
+              "network-awai/net-kotobase"
+              "kotoba-lang/kotobase-protocols"
+              "kotoba-lang/kotobase-protocol-s3"))
+
+  (:adr/authoritative_for
+  (vector "ADR-2608061200 の実装・deploy・検証が default branch に存在することと、publication review をどの PR で閉じたか"
+   "初回着地が ready PR を経由しなかったという publication gap と、その修復範囲"
+   "production Worker write の未実証、zebulun 未停止、SupportXMR 未払い残高を closeout 後も open gap として保持すること"))
+
+  (:adr/related
+  (vector "adr-2608061200-s3-kotobase-object-plane-b2-x402-envelope"
+   "adr-2607042800-m4-metal-mining-fleet"
+   "AGENTS.md#closing"))
+
+  (:adr/context
+  "2026-08-06 の実装は `network-awai/net-kotobase` 31f8f874、`kotoba-lang/kotobase-protocols` d908d00a、`kotoba-lang/kotobase-protocol-s3` bb2846af として各 default branch に着地し、Cloudflare Worker version 789655fa-dff7-4921-998d-978adfe4d8b9 まで deploy された。ADR-2608061200 は設計、tests、実 B2 workerd 検証、production write credential gap を記録している。
+
+しかし当時の publication は feature branch push 後に GitHub merge API で直接 default branch へ入れたため、ready PR の review / mergeability / checks を 1 箇所に束ねた証跡が無い。これは現在の `AGENTS.md` `closing` 規則（明示 stage → commit → push → ready PR → review/check確認 → merge → default branch確認）を満たさない。実装を再着地させたり履歴を書き換えたりはせず、現在の default branch を review 対象として publication evidence を追加する。")
+
+  (:adr/decision
+  "本 closeout は ready PR `https://github.com/com-junkawasaki/root/pull/1808` を唯一の review 証跡とする。
+
+PR は既に着地済みの実装を再適用しない。代わりに次を review scope とする:
+
+1. ADR-2608061200 と実装 repo 3 件の default-branch commit が相互に矛盾しないこと。
+2. mutable head/ref CAS は R2、immutable content-addressed block は B2 という境界が維持されていること。
+3. sealed object を server-side 圧縮しないこと、x402 が per-object opt-in で匿名 write を許さないこと。
+4. worker 84 tests / 320 assertions、library 6 tests / 27 assertions、実 B2 workerd の binary byte-identical 検証という evidence が正本に残っていること。
+5. production Worker を write credential で実証できていない境界を、成功済みと誤記していないこと。
+
+review で blocker が見つかった場合は本 PR を merge せず修正する。blocker が無ければ ready PR を mergeし、default branch に本 ADR が存在することを確認して closeout とする。")
+
+  (:adr/consequences
+  "**positive**
+
+- 実装 commit と ADR の存在だけでなく、review scope・結論・mergeability を GitHub PR 1 件で追跡できる。
+- 既に deploy 済みの本番コードを無意味に revert/reapply せず、履歴を書き換えずに publication gap だけを閉じる。
+- production write 未実証を open gap のまま保持し、workerd+B2 evidence と production evidence を混同しない。
+
+**negative / open**
+
+- この PR は過去の direct merge を PR merge に変換しない。履歴上、実装 commit は direct/server-side merge のままである。本 PR が提供するのは事後 review と publication receipt である。
+- ~~`WRITE_TOKEN` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` の operator copy 不一致により、production Worker 経由の write は未実証。~~ **2026-08-18 に実証して閉じた（ADR-2608182100）**: Keychain の `WRITE_TOKEN` で PUT 200 / GET byte 一致 / HEAD / ListObjectsV2 / DELETE 204、壊した token と token 無しは 401。不一致とされていたのは面の取り違えで、記録は pinning 面に対する測定だった。
+- B2 は `kura-phase0-b2` の `s3-kotobase/` prefix を間借りしており、専用 bucket 移行は未実施。
+- multipart upload / range GET は未実装。
+- Monero fleet は 9/10 node を durable-disable 済みだが、SSH 到達不能の `zebulun` は復帰時に mining を再開する。SupportXMR の 0.049107 XMR は payout threshold 未満で、回収は owner action。")
+
+  (:publication/pr "https://github.com/com-junkawasaki/root/pull/1808")
+  (:publication/review_status "self-reviewed-no-blockers")
+  (:publication/review_evidence
+  (map (:reviewed_at "2026-08-09")
+   (:pr_ready true)
+   (:mergeable "MERGEABLE")
+   (:merge_state "CLEAN")
+   (:github_checks 0)
+   (:github_checks_note "GitHub Actions は無効。CI/CD 正本は murakumo fleet。PR 自身は docs-only EDN なので targeted parse と diff check を実施")
+   (:targeted_edn_parse "pass")
+   (:diff_check "pass")
+   (:full_docs_gate
+   (map (:command "nbb --classpath .:scripts/nbb_compat manifest/docs-edn-only.cljs verify")
+    (:status "fail-pre-existing-baseline")
+    (:summary "今回ADRを含む EDN 2023件は parse-errors=0。非zeroの理由は既存 known-md-files baseline が削除済み .md を保持、既存 path-md-refs 11件、既存 non-tx EDN 7件")
+    (:change_attribution "none of the reported paths is this PR's new ADR; targeted parse and diff check pass")))
+   (:changed_files (vector "90-docs/adr/2608099500-kotobase-object-plane-publication-closeout.edn"))
+   (:implementation_reachability "all implementation/evidence commits reachable from each repository main")
+   (:live_health (map (:s3_diag 200) (:s3_anonymous_get 401) (:atproto_health 200) (:pinning_health 200)))
+   (:findings (vector))
+   (:nonblocking_findings (vector "full docs gate baseline is stale; repair is outside this docs-only closeout PR"))))
+  (:publication/default_branch "main")
+  (:publication/implementation_commits
+  (vector "network-awai/net-kotobase@31f8f8745ea3063e73ea34ef1bee56216668ddcb"
+   "kotoba-lang/kotobase-protocols@d908d00ac89c6dfdcb985ffc308be0dd5649e9b6"
+   "kotoba-lang/kotobase-protocol-s3@bb2846af4428afbbe316b3f5a3c15a823da5809d"
+   "com-junkawasaki/root@e885d41c0acdb2b4f42ab780006ccc7670652617"))
+
+  (:adr/resume_point
+  "最優先は production write credential の caller inventory と owner-approved rotation。次に dedicated B2 bucket への content-addressed block copy。zebulun が tailnet に復帰した場合は `sudo launchctl disable system/com.mining.xmrig` を実行し、`launchctl print-disabled system` で確認する。SupportXMR payout threshold の変更は資金操作なので owner が dashboard から行う。")))

@@ -1,0 +1,45 @@
+(vector 
+  (map (:db/id -1)
+   (:adr/id "adr-2608053000-cloud-itonami-app-session-close")
+   (:adr/title "ADR-2608053000: cloud-itonami-app セッションクローズ（Inbox/メール/多組織・多アカウントと UI コンテキスト）")
+   (:adr/status "accepted")
+   (:adr/doc_type "adr")
+   (:adr/source-format "edn")
+   (:adr/date "2026-08-05")
+   (:adr/last-verified "2026-08-05")
+   (:adr/authoritative true)
+   (:adr/deciders (vector "Jun Kawasaki"))
+   (:adr/topic "cloud-itonami-app-session-close")
+   (:adr/repos (vector "orgs/cloud-itonami/cloud-itonami-app"))
+   (:adr/authoritative-for
+   (vector "メール連携を接続単位で分離し、同じ provider の複数アカウントを同時接続できることを正本化する"
+    "Inbox は連携済みアカウントの同期メールとレガシー保管フォルダを統合して表示する"
+    "メール項目に org / projects / person の文脈を保存する API を最小限持つ"
+    "passkey/設定導線と session を維持したまま、同一画面内でメール同期トリガやフィルタを実行できる"
+    "このセッションでの実装追加は DataScript クエリ整合性を壊さない範囲で実施する"
+    "未解決事項は ADR として残し、次セッションのクローズ時に明示的に受け渡す"))
+   (:adr/related
+   (vector "adr-2608039700-agent-loop-git-datalad-source-kotobase-query-projection"
+    "adr-2607130700-kotoba-lang-mail-archive-datomic-datascript-parity"
+    "adr-2607269500-two-entity-hiring-structure-us-first"
+    "adr-2607106600-cloud-itonami-iso3166-wave-rus-che-bel-aut-batch32"))
+   (:adr/evidence
+   (vector "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/mail_sync.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/identity.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/mailbox.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/workspace.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/server.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/resources/cloud/itonami/app/interaction.js"
+    "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/web.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/test/cloud/itonami/app/mail_sync_test.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/test/cloud/itonami/app/mailbox_test.clj"
+    "orgs/cloud-itonami/cloud-itonami-app/test/cloud/itonami/app/mailbox_http_test.clj"))
+   (:adr/body
+   "# ADR-2608053000: cloud-itonami-app セッションクローズ（Inbox/メール/多組織・多アカウントと UI コンテキスト）\n\n## Context\n\nこのセッションでは、`cloud-itonami-app` の Inbox 表示不良と、メール連携の単一アカウント制約、\nUI の文脈不足を起点に、`org`/`project`/`person` を跨いだ運用を継続できる最小実装をまとめた。\n\n既存の `:mail-sync` 保存形は provider 汎用キーで衝突しやすく、複数アカウント連携・同日再接続・\n組織ごとの分離に不向きだった。`mailbox` も legacy 保存と連携保存が分断され、手動 sync と\n紐づけ UI が不足していた。\n\n## Decision\n\n+1. **Mail 連携を接続単位で扱う**  
+`mail_sync` の接続キーを `org:provider:<digest>` で固定化し、接続ごとに状態（token、watch、cursor、message）を分離。\n+`list-connected` 系 API も接続 ID を返し、同 provider 複数アカウントを保持できるようにする。\n\n2. **inbox 表示を接続メール + legacy フォルダ統合に変更**  
+`workspace/inbox` は接続済みアカウント由来メッセージと `m365-archive` を結合して返す。\n+アカウントフィルタと organization フィルタを追加し、同名アカウント混在でも混線しない。\n\n3. **message を org/project/person へ接続可能にする**  
+`mailbox` にコンテキスト保存 API を追加（`organization-ids`, `project-ids`, `person`）。\n+新規 UI でメール詳細から直接紐づけできる。\n\n4. **OAuth callback の即時同期を導線化**  
+接続完了時に `mail-sync/start!` を起動し、次回定期同期まで待たずに inbox に取り込み候補を出しやすくする。\n\n5. **UI 側の最低限導線を追加**  
+Inbox にアカウント切替、手動 sync ボタン、関連付け表示を追加。既存設計を壊さない\n+
+## Consequences\n\nこの決定により、同一 provider の複数接続を保ちながら `org`/`project`/`person` を基準に整理しやすくなり、\n+Inbox の取り込み見え方が deterministic になる。\n+\n+- `m365-archive` と同期経路の混在に起因する表示欠損が解消される。\n+- 接続アカウント間で cursor/message が衝突しにくくなり、再接続時の混在 bug が収束しやすい。\n+- 後続セッションで passkey/専用画面、project/issue/agent 連携を追加しやすい状態になる。\n\n## Non-goals / open items\n\n- 本 ADR は OAuth クレデンシャルの初期供給や外部 secrets 管理の追加は扱わない。  `GOOGLE_CLIENT_ID` / `M365_CLIENT_ID` が未設定だと接続自体は成立しない。\n+- projects の Kanban 自動化、issue の AI 走査連携、workspace 全体の drive 同期待ちは次セッション対象。\n+- passkey 導線の専用画面化・再認証体験調整は本 ADR では扱わず、別 ADR/issue で受ける。\n")
+   (:adr/last_verified "2026-08-05")))

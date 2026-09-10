@@ -1,0 +1,143 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608042000-kotobase-lake-format-agnostic-object-catalog")
+  (:adr/doc_type "adr")
+  (:adr/topic "kotobase-lake-format-agnostic-object-catalog")
+  (:adr/title "ADR-2608042000: lake は「受け入れ時に parse しない」ことで format 非依存になる — format は claim であって gate ではない（kotobase-lake）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-04")
+  (:adr/last_verified "2026-08-04")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+
+  (:adr/repos (vector "orgs/kotoba-lang/kotobase-lake"
+              "orgs/kotoba-lang/kotobase-storage"
+              "orgs/kotoba-lang/datom-source"))
+
+  (:adr/authoritative_for
+  (vector "kotobase を『ファイル形式を問わず何でも入る lake』にするときの分解 — 受け入れ(admit)・分類(sniff)・遅延 parse(reader) の責任境界"
+   "object entity と claim entity の切り分け（bytes だけの関数か、observer 依存か）"
+   "宣言 media type と観測 magic bytes が矛盾したときの扱い（記録であって拒否ではない）"
+   "magic byte 分類器の prefix 上限とその代償の明示（512 byte、ISO 9660 は構造上検出不能）"
+   "圧縮/コンテナ形式を『不一致』と採点しない規則（:enveloped）"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector))
+  (:adr/related
+  (vector "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog（byte を datom 面に載せない。この ADR はその境界の metadata 側を厚くする）"
+   "adr-2608012600-kotobase-large-object-plane-lfs-and-annex（transport 面。4MiB 上限 / presigned / tenant 分離 / REMOVE は依然そちらの G1）"
+   "adr-260726-kotobase-query-plane-is-one-ref（catalog を 1 ref に置く理由）"
+   "adr-2608039700-agent-loop-git-datalad-source-kotobase-query-projection（workspace の lake 役は Git+EDN+DataLad、kotobase は projection という配置）"
+   "adr-2607175000-kotobase-datalad-annex-persistence"
+   "adr-2608041000-kotoba-lang-apache2-license-unification（新規 repo の LICENSE 既定）"))
+
+  (:adr/decision-summary
+  "{:new-repo \"kotoba-lang/kotobase-lake\", :language :cljc, :runtime-deps [\"datom-source\"], :license :apache-2.0, :namespaces [\"kotobase.lake.sniff\" \"kotobase.lake.catalog\" \"kotobase.lake.reader\"], :refusal-reasons #{:cid :size :tenant :ingested-at}, :format-refusals 0, :prefix-bytes 512, :entities {:object [:cid :size], :claim [:declared-media-type :filename :source-uri :tenant :ingest-actor :observed :sniffer-version]}, :out-of-scope [:transport :columnar :pushdown :byte-fetch]}")
+
+  (:adr/verify
+  (vector "cd orgs/kotoba-lang/kotobase-lake && clojure -M:test   ; => Ran 19 tests containing 118 assertions. 0 failures, 0 errors.（JVM）"
+   "nbb --classpath \"src:test:$HOME/.gitlibs/libs/io.github.kotoba-lang/datom-source/b42f6e6f.../src\" test/run.cljs   ; => 19 tests / 118 assertions, 0 failures 0 errors（cljs 解釈）"
+   "clojure -M:cljs -m cljs.main --target node -m kotobase.lake.cljs-runner   ; => 19 tests / 118 assertions, 0 failures 0 errors（cljs コンパイル）"
+   "clojure -M:lint   ; => errors: 0, warnings: 0"
+   "nbb scripts/gen-west-manifest.cljs --entry kotobase-lake   ; => OK kotobase-lake, pin f87291d31595 は main から到達可能。diff は当該 entry のみ 5 行"
+   "west.yml 全体の --check は STALE だが原因は既存の他 repo（orgs/cloud-itonami/cloud-itonami-app が pin 43942c42 に対し local HEAD a8190b01 + 未コミット変更）。local checkout 400 件を標本抽出して drift は 1 件のみ、本 ADR の変更とは無関係。wholesale 再生成はこの pin を黙って動かすので実行しない"))
+
+  (:adr/body
+  "# ADR-2608042000: format は claim であって gate ではない
+
+**Status**: accepted
+**Date**: 2026-08-04
+
+## Context
+
+オーナー要求（2026-08-04）: 「lake としては ファイル形式問わずになんでも入れるようにしたい」。
+
+直前の調査（同日）で kotobase の lake 適性を実測し、**storage 基盤としては既に成立している / 分析 query 面としては真ん中が丸ごと無い**と判定していた。
+
+### 既にあったもの
+
+- **object 面は既に format 非依存**。`kotobase-storage` の `IObjectStore` は digest で keyed された不透明 bytes を扱うので、format 非依存は*下では既に無料*である。`:presigned-transfer` / `:proxied-transfer` の profile 宣言、`object-id` による git-LFS `oid` / git-annex `SHA256E` / CIDv1 の純関数相互変換、`verifying-block-store` による CID 再検証も揃っている。
+- **時間・不変性・provider 中立**も揃っている（commit DAG / epoch / MVCC / S3・R2・B2・IPFS・PostgreSQL・SQLite・D1）。
+
+### 無かったもの
+
+**catalog。** 置いた bytes を CID でしか引けないなら、それは lake ではなく行儀のよい cache である。しかも `byte を datom 面に載せない`（ADR-2608039970）という正しい境界があるので、**metadata 面を厚くする以外に discovery を回復する道が無い**。
+
+同時に、`grep` で確認した限り Parquet / Arrow / Iceberg / Delta / ORC の実装は fleet 内に存在しない（`kotoba-delta` は code-edit 用 DeltaDB、`com-snowflake` は API clean-room actor で、いずれも無関係）。つまり『raw file を in-place で query する』側の道具も無い。
+
+## Decision
+
+### D1. format 非依存とは「write path が parse しないこと」である
+
+`admit` の拒否理由は **4 つだけ**: `:cid` 欠落 / `:size` が非負整数でない / `:tenant` 欠落 / `:ingested-at` 欠落。いずれも**記録が無意味になる**という理由であって、**バイトが気に入らない**という理由ではない。
+
+**format は拒否理由に無く、allowlist も置かない。** unknown format、長さ 0、filename 無し、media type 無し、宣言と magic bytes の真っ向対立 — すべて admit する。これを守るのは prose ではなく test（`accepts-anything`）で、空・1 byte・512 個のゼロ・512 個の 0xFF・切り詰めた PNG magic・UTF-8 テキスト・暗号化ノイズを表で回している。
+
+### D2. object entity と claim entity を分ける
+
+| entity | id | 持つもの | いつ真か |
+|---|---|---|---|
+| object | `obj:<cid>` | `cid` `size` | 常に、誰にとっても |
+| claim | `claim:<tenant>\\|<cid>\\|<ingested-at>` | 宣言 media type・filename・source URI・tenant・actor・**sniff 観測結果** | 1 回の ingest、1 人の観測者にとって |
+
+`cid` と `size` は**バイトだけの関数**なので、2 つの tenant が同じ PDF を入れたら**同じ object** になる（dedup は追加機能ではなく content addressing が既に済ませたこと）。
+
+それ以外はすべて**バイト *と* 観測者の関数**である。宣言 media type は producer の主張で偽でありうる。sniff 結果は本 library の主張で `sniff/rules` が変われば変わる。**どちらかを object に置くと、分類器の更新が黙って履歴を書き換える。** よって claim 側に置き、`:claim/sniffer-version` で*どの分類器が喋ったか*を残す — **観測者が何も言わなかった場合も version は記録する**（後の再分類が『比較』になり、沈黙の出所の当て推量にならない）。
+
+claim id は生成せず (tenant, cid, ingested-at) から導出する。再送・backfill 再実行が**同一 quad 集合**を生み、見分けのつかない 2 件目を積まない。
+
+### D3. 宣言と観測の矛盾は記録であって拒否ではない
+
+`text/csv` と宣言されたものが `%PDF-` で始まっていたら `:claim/declared-vs-observed \"conflict\"` として**記録して受け入れる**。拒否は**最も調べる価値のあるオブジェクトだけを門前払いする**ことになる。後から `conflicting-claims` で引ける。
+
+### D4. sniff は境界付き prefix・parse なし・nil が正常
+
+3 性質すべてを構造で保証する: `classify` は prefix を受け取る（gigabyte を渡す引数が存在しない）、規則は固定 offset のバイト比較のみ（malformed input で throw しえない）、認識できなければ `nil`。
+
+**`nil` が正常であることが要点。** CSV / TSV / JSON / NDJSON / EDN / YAML / plain text / 各種 log は**どんな bound でも magic bytes を持たない**。これは後で埋める穴ではなく、**宣言 media type を claim として残さねばならない理由そのもの**である。
+
+`prefix-bytes` は 64 でなく **512** — `tar` の `ustar` が offset 257 にあるため。ISO 9660 の `CD001` は offset 32769 なので**構造上ここでは検出不能**。これは発見されるのでなく明記され、**テストで固定**する（代償が不明な bound は誰にも評価できない）。
+
+### D5. 圧縮/コンテナは層違いであって不一致ではない
+
+`:gzip` の観測に対する `text/csv` の宣言は `:enveloped` であって `:conflict` ではない。不一致と採点すれば、lake が受け取る圧縮データのほぼ全部に旗が立つ。
+
+### D6. parse は read 時に遅延し、失敗は object 単位に閉じる
+
+- **reader が無いのは失敗ではない。** catalog 済み・取得可能・join 可能のまま。unparseable な object が*query の穴*になる lake は、まだそれを認めていない schema-on-write である。
+- **decoder が throw しても query は落ちない。** malformed input は実データの常態。`:decoder-threw` として記録し、parse できた object のスキャンは続く。
+- **type は仮説。** declared → observed の順に試し、決着をつけるのは*どの decoder が成功したか*（`:via`）。write 時にも read 時にも「正しい type」は宣言されない。
+
+### D7. catalog は 1 つの ref に置く
+
+Datalog の join 到達範囲はちょうど ref 1 本（ADR-260726）。ref を跨いで shard した catalog は、**object 横断の問いに答えられない catalog** であり、それは問いのほとんどである。
+
+### D8. transport はこの ADR の範囲外
+
+任意サイズの任意ファイルを実際に着地させるには **ADR-2608012600 の G1**（presigned direct-to-storage、archive 経路の tenant 分離、認証付き read、REMOVE）が要る。現行 live 経路は `PUT /ipfs/:cid` が body を Worker で中継して 4 MiB で頭打ち、`GET /ipfs/:cid` は未認証 gateway。**本 repo はそれを直さないし、それに依存もしない。** catalog の性質ではないものを catalog で直したことにしない。
+
+## 実装中に出た証拠 — JVM が green のまま cljs だけが壊れていた
+
+本 repo の**最初の green な JVM 実行（19 tests / 118 assertions、0 failures）は、cljs 専用の欠陥の上に乗っていた。**
+
+`(int c)` は JVM では文字のコードポイントだが、**ClojureScript で文字列を seq すると 1 文字の *文字列* が返り、`(int \"%\")` は 0 になる**。結果、`ascii` で組んだ magic bytes が**全部ゼロ列にコンパイルされ**、ゼロ埋めされた任意のバッファにマッチした — 257 個のゼロ + `ustar` の tar fixture が `:pdf` と分類された。nbb では **118 assertion 中 15 が失敗**し、JVM は 0 failure のままだった。
+
+修正は `ascii-bytes` を **public にすること**だった。同じ 1 行が test helper 側にも複製されており、**間違える機会が 2 つ、捕まる機会が 0 だった**。
+
+CI は nbb（速い解釈実行）と `cljs.main`（コンパイル）の**両方**を回す。どちらも他方の代用にならない。CLAUDE.md の「2 runtime parity」規則が抽象論ではないことの実例として記録する。
+
+## Consequences
+
+- **何でも入る。** ただし「入る」と「content を query できる」は別物で、decoder の無い形式は catalog までで止まる — それが schema-on-read の正しい姿であって、劣化ではない。
+- **分析スキャンの経済性は何も変わらない。** 列指向でなく、pushdown も partition 統計も無い。datom 面の query cost は依然 O(database)（`datom-source` の実測: 2k facts で 57ms/50 block reads、32k で 678ms/640）。**lake を名乗るときここを黙らない。**
+- **分類器を更新しても履歴が壊れない。** `sniffer-version` が claim 側にあるので、再分類は上書きでなく比較になる。
+- `kotobase-lake` は runtime 依存が `datom-source` 1 本（それ自体 zero-dep portable `.cljc`）。`IPatternSource` を再定義しない — protocol の 2 つ目の定義は、query surface が認識し損ねる 2 つ目のものになる。
+
+## Alternatives considered
+
+- **admit 時に format allowlist で弾く。** 却下。要求そのもの（何でも入れる）に反するうえ、mislabel された object という最も価値のある調査対象を選択的に捨てる。
+- **sniff 結果を object entity に置く。** 却下。分類器更新が全 object の履歴を黙って書き換える。分類は bytes *と* 分類器の関数である。
+- **conflict を warning としてログに出すだけ。** 却下。ログは join できない。datom 面に置けば SQL / SPARQL / Cypher から同じ問いが引ける。
+- **bytes を chunk して datom 面に載せ、全部 query 可能にする。** 却下。ADR-2608039970 が明示的に禁じている境界であり、4 MiB 天井の原因そのもの。
+- **Parquet/Iceberg 互換層を先に作る。** 却下（今回は）。それは『TB を in-place で scan する』問題で、『何でも入る』問題とは別。混ぜると両方中途半端になる。")))

@@ -1,0 +1,257 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608133000")
+  (:adr/title "The suite nobody ran: 48 reds were four defects, three of them one class")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-13")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/body "`cloud-itonami` の JVM suite は 8 failures / 40 errors を報告していた。
+48 件は 48 個の問題ではなく、**4 つの defect** で、しかもうち 3 つは
+**同じ 1 つの誤りの繰り返し**だった。40 errors は今 0 になっている。
+
+## 数を比べない —— member で比べる
+
+同じ commit・同じ tree に対して、記録されている実測は 3 通りある:
+
+| いつ / どこで | tests | assertions | failures | errors |
+|---|---|---|---|---|
+| 2026-08-12 の merge | 1665 | 16613 | 9 | 40 |
+| ADR-2608131500（別機） | 1665 | 16610 | 7 | 40 |
+| **今回（本機、load 86→98）** | 1665 | **16613** | **8** | 40 |
+
+**count は機械ごとに違う。** だから継承した数字は手掛かりであって測定値では
+なく、以下はすべて **1 台の同じ機械での前後比較**として出している。
+
+### before（`0569712bb`、11m09s、load 86→98）
+
+failures 8:
+
+    ops-identity-resolves-the-committed-public-identity  ops_keys_test.clj:103
+    doctor-product-party-coverage-report-and-gate        doctor_test.cljc:9555
+    doctor-product-party-coverage-report-and-gate        doctor_test.cljc:9556
+    doctor-product-party-coverage-report-and-gate        doctor_test.cljc:9579
+    doctor-product-party-coverage-report-and-gate        doctor_test.cljc:9580
+    declaration-matches-the-actors                       os_test.cljc:292
+    company-operating-set-can-be-imported-and-driven     company_test.cljc:67
+    bootstrap-join-and-coverage-report                   product_party_test.cljc:207
+
+errors 40 = `runtime.cljc:49` × 28 ＋ `runtime.cljc:554` × 12。
+
+### after（`5fda0245`、9m57s、load 93→…）
+
+failures 6、errors **0**。消えたのは `declaration-matches-the-actors`、
+`ops-identity-...`、および 40 errors 全部。残る 6 は product-party 系
+（後述、環境で決まる）。tests は 1665→1667、assertions は 16613→16772
+（新しい test 2 本 ＋ **これまで到達できていなかった assertion**）。
+
+## grouping が本物であることの証拠
+
+同じ message を持つことは同じ原因の証拠にならないので、**message ではなく
+ex-data の構造**を見た。
+
+28 件の `op-set-mismatch` は、`:problems` payload を `sort -u` に通すと
+**1 個に潰れる**:
+
+    {:rule :runtime/op-set-mismatch,
+     :vertical \"cloud-itonami/cloud-itonami-isic-7310\",
+     :declared-only [],
+     :adapter-only [:actuation/order-creator-tieup :creator/screen :tieup/verify]}
+
+同一 vertical・同一 3 op・`:declared-only []`（＝純粋に追加方向の drift）。
+28 件は 28 個の壊れ方ではなく、1 つの宣言が 28 箇所から読まれていただけ。
+
+12 件の `No itonami activities in store` は逆に、**同じ message で別々の
+fixture** だった（`:activities` が 1 / 5 / 24 の 3 種）。そして **どれも 0 では
+なかった** —— store には活動が在るのに「無い」と投げていた。ここで
+「local fixture が無い」という継承した診断が**誤り**だと分かった。
+
+## defect 1 — os.edn の写しが vertical より 3 op 遅れていた
+
+### どちらが正本か（変える前に決めた）
+
+**vertical 側が正本。** `os.edn` 自身の冒頭がそう書いている ——
+「`:ops` は vertical 自身の allowlist と一致する。**ここが正本ではない**
+—— 正本は各 repo の `governor/allowed-ops` か `phase/{read,write}-ops` で、
+この宣言はその写し」。機械的な整合ではなく、宣言された権威に従った。
+
+`advertising.phase` は repo 側 ADR-0004 で `tieup-ops`
+（`:creator/screen` `:tieup/verify` `:actuation/order-creator-tieup`）を
+足しており、`os.edn` はそれを写していなかった。`runtime/check-native!` は
+**集合の一致**を要求するので、runtime を組み立てる os test 全部が落ちていた。
+
+`:boundaries` / `:subject-private?` は動かしていない。tie-up の op も
+subject は campaign のまま（repo 側の `exec!` はすべて `:subject
+\"campaign-21\"`）で、creator の `@handle` は campaign に付く属性であって
+主体ではないため。写しの規則が縛るのは `:ops` だけ、というのも根拠。
+
+### red → green
+
+`os.edn` を直し、生成器 `scripts/generate-os-registry.cljs` で
+`registry_data.cljc` を再生成（手編集していない。`--check` 一致）。
+
+- 修正前: os-test 141 tests → 1 failure ＋ 28 errors
+- 修正後: os-test 143 tests / 3474 assertions → **0 / 0**
+- **source だけ戻して test を残す**と、同じ機械・同じ harness で再び赤
+  （`declaration-matches-the-actors` ＋ 28 errors）。戻して再確認済み。
+
+### 導出だけでは足りないので literal を足した
+
+既存の `declaration-matches-the-actors` は**両辺を `advertising.phase` から
+導出**するので、vertical が tie-up を**落とした**場合には両辺が同時に動いて
+**緑のまま**になる。そこで op 名を literal で書く test を 2 本足した
+（`advertising-declares-the-creator-tieup-lifecycle` /
+`advertising-never-actuates-without-a-human-at-any-phase`）。
+新しい var を import していないので**未修正の tree でもコンパイルが通り**、
+実際に通した上で赤くなることを確認した（`os.edn が :creator/screen を
+宣言していない` ほか、8 対 5 の count 不一致まで）。読み込みを拒否して
+落ちる test は何も証明しない。
+
+## defect 2〜4 — smoke harness が、実サーバに無いフィールド名を 3 つ使っていた
+
+`cloud_itonami/kotoba.cljc` の `local-xrpc-host-caps` は kotobase-server を
+偽装する。**3 つとも独立の誤りで、前の 1 つが次の 1 つを隠していた** ——
+直すたびに新しい赤が出てきた。権威はすべて実サーバ
+（`kotoba-lang/kotobase-server` の `handler.cljc`）のソースで確認した。
+langchain 側の docstring だけに頼っていない。
+
+| # | harness | 実サーバ（handler.cljc） | 症状 |
+|---|---|---|---|
+| 2 | pull が `:entity_edn` を返す | `do-pull` の pattern 経路は **`:result_edn`**（`:entity_edn` は別 NSID `datomic.entity` のもの） | 在りもしないフィールドを読む → nil → `{}`。activities が「1 件あるが空 map」になり lane/state で絞れず queue が空 → **`No itonami activities in store`（12 errors）** |
+| 3 | pull が `:entity` を `edn/read-string` | `do-pull` は `:entity` を**そのまま**使う | langgraph の checkpoint lookup ref `kotoba-xrpc-store-test/1` が `Invalid token` で落ちる。entity id は EDN として妥当である必要が無い |
+| 4 | entid が `:entity` を返す | `do-entid` は **`:entity_id`** を返す | entid が常に nil → `approval/effect-by-id` が nil → status 読み直しが「approved でない」と判定 → 実行が全部 `:skipped :no-longer-approved` |
+
+値の形も直した。`kotobase-peer/pull` は flat な `{p #{o...}}` を返す
+（docstring に明記、`handler/redact-pulled` も `set?` を分岐に持つ）ので、
+属性値を **set で包み、キーは `pr-str` した文字列**にした。
+
+### red → green（kotoba-test 単体）
+
+    修正前   15 tests /  34 assertions / 0 fail / 7 error   (No itonami activities)
+    #2 のみ  15 tests /  34 assertions / 0 fail / 7 error   (Invalid token — 別の赤)
+    #2+#3    15 tests /  69 assertions / 3 fail / 0 error   (no-longer-approved)
+    #2+#3+#4 15 tests /  69 assertions / **0 fail / 0 error**
+
+assertion 数が 34→69 に増えているのが要点で、**これまで到達すらしていな
+かった検査が動き出した**ことを意味する。
+
+### 意図的に live edge と食い違わせた 1 点（隠さない）
+
+`langchain.kotoba-db/decode-pull-value` は「文字列だけは生で来る」と live
+edge の実測（2026-07-18）を記録している。それに合わせて生で載せる実装も
+試したが、`:checkpoint/state` のように**中身がそれ自体妥当な EDN である
+文字列**が復号側の `(= v (pr-str parsed))` を通って map に化け、langgraph
+の `->ckpt` が二度目の `edn/read-string` で `ClassCastException` になる。
+一律 `pr-str` なら全型が往復するのでそちらを採り、**`pull-wire-value` の
+docstring に食い違いとして明記した**。したがって **この harness の緑を
+「live でも通る」と読んではいけない**。live 側の当否は
+`kotoba-lang/langchain` の decode 側の課題として残す（未起票、下記 owed）。
+
+## defect 5 — オーナーが破棄した did を test が主張し続けていた
+
+`ops-identity-resolves-the-committed-public-identity` は
+`did:key:z6MkqN7wed8...`（2026-07-14 bootstrap）を期待していたが、
+committed な `resources/ops-identity.edn` は `did:key:z6Mkujw6SKMJ...` を持つ。
+
+**正本は resource 側。** `18343c6b6`（2026-07-25、オーナー）が
+「re-mint (irreversible — these dids are NOT the 2026-07-14 ones)」として
+鍵材を作り直し、旧 did は復元不能だと commit 本文に書いている。
+`ops-keys/ops-identity` の解決順も env > committed resource > dev default。
+
+これは ADR-2608131500 が `org-id` で見つけたのと**同じ形**——
+**修正されたはずの状態をそのまま主張し続ける test**が、走らせるものが
+無いために生き残っていた。今回は 19 日間。期待値を現行 did の literal に
+更新し（回転を静かに追随させず意識的に更新させるため resource を読んで
+比べる形にはしない）、回転しても残る性質として「dev default に落ちて
+いないこと」を別途足した。
+
+## 直さなかったもの —— product-party の 6 件
+
+残る 6 failures（`bootstrap-join-and-coverage-report` /
+`company-operating-set-can-be-imported-and-driven` /
+`doctor-product-party-coverage-report-and-gate` × 4）は**環境で決まる**。
+
+test は `bootstrap-join!` の `:source` が `#{:seed :fixture}` である
+ことを期待するが、`bootstrap-join!` の docstring は
+`:gtin-catalog|:seed|:fixture` の 3 つを正当な戻り値として宣言しており、
+`:gtin-catalog` が**第一候補**である。その分岐は
+`../../etzhayyim/com-etzhayyim-gtin/data/product.edn` が在るかどうかで
+決まる —— **本機には在る**（実測）。だから bootstrap は文書どおり
+primary 経路を通り、test は fallback を前提にしているので落ちる。
+coverage が 0.8 でなく 1.0 なのも同じ理由（catalog の分だけ厚い）。
+
+sibling の pin ずれではない: `product-party` の west pin
+`c450968…` は checkout とも upstream main とも**一致**している（確認済み）。
+
+**直さなかった理由**: これを決定的にするには「この test はどの source を
+使うか」を固定する手段が要るが、`bootstrap-join!` は `([])` と `([st])`
+しか持たず、その口を足すのは設計判断である。どちらが正本か
+（test の期待か、docstring が宣言する 3 分岐か）を repo から一意に
+決められなかったので、**赤を消す側を選ばずに残した**。
+
+## gate —— landed ではなく **owed**。理由は 2 つあり、どちらも実測
+
+`:jvm-test` gate を `scripts/fleet-ci/gates.edn` に足していない。
+
+### 理由 1: fleet では classpath がそもそも解決しない（測った）
+
+`git archive HEAD` で**fleet が実際に配る tree そのもの**を作り、
+sibling が 1 つも無い状態で走らせた:
+
+    $ clojure -Spath -M:kernels
+    Error building classpath. Local lib io.github.kotoba-lang/stripe-ops not found
+
+`deps.edn` の **base `:deps` に `:local/root` が 117 件**ある（alias 側は 9 件）。
+つまり `:test` だけの問題ではなく、**どの alias でも落ちる**。
+
+これは `:kernels` alias 自身の主張を否定する。あの alias は
+「the fleet ships one repository's tree … so `:test` cannot be a gate.
+**Everything below resolves from git.**」と書いてfleet 向けに作られたが、
+alias の `:extra-deps` が git なだけで base の 117 件は残っており、
+**fleet 向けに書かれた alias が fleet で走らない**。誰も気付かなかったのは、
+やはり**それを走らせるものが無かった**ため。
+
+`:ship-git-deps` は git 依存を運ぶ機構で（ADR-2608132000）、
+`:local/root` sibling は運ばない。
+
+### 理由 2: 今日の時点で緑ではない（6 failures）
+
+CLAUDE.md は「gate は fleet で 1 回緑を見るまで landed と数えない」とし、
+**赤いまま置かれた gate は沈黙と等価**とする（このワークスペースは既に
+286 連敗・300 連敗の gate を抱えている）。到着時点で赤い gate は足さない。
+
+### egress は原因ではない（測った）
+
+README の「ノードに外向き HTTPS が無い」は 1 台 1 日の値なので、実測し直した:
+
+    judah  maven=200  clojars=200
+    levi   maven=200  clojars=200
+
+**詰まっているのは network ではなく sibling 依存。**
+
+### landed にするために要ること
+
+1. base `:deps` の 117 件の `:local/root` を、fleet で解決できる形
+   （`:git/sha` pin、または gate 用の `:replace-deps` alias）にする。
+   これは依存ポリシーの決定なので単独で起票する。
+2. product-party の 6 件を決定的にする（上記の設計判断）。
+3. その上で `{:name \"cloud-itonami\" :org \"network-awai\" :gate :jvm-test}` を
+   足し、**fleet 上の receipt で緑を 1 回観測してから** landed とする。
+
+## 着地
+
+- `network-awai/cloud-itonami` main: `5fda0245f815`
+  （branch `fix/jvm-test-root-causes` → `gh api .../merges`）
+- west pin: `71d50a972fcd` → `5fda0245f815`、
+  `verify-west-pins --only cloud-itonami` が fast-forward として OK
+- 本番 deploy は**していない**（今日の `10cf6e86…` とは別の判断）
+
+## 測定条件
+
+すべて 1 台、load 73〜99 の並行作業下。同一スクリプトが load 1 で 26.5s、
+load 133 で 2m06s になる機械なので、**所要時間は test の速さの指標ではない**。
+full suite は before 11m09s（load 86→98）/ after 9m57s（load 93→）。
+
+なお最初の baseline 実行は、別セッションが共有 scratchpad の `wt/` を
+掃除したために途中で消滅した（`billing_cap_core.kotoba` の
+FileNotFoundException として現れた）。以後は衝突しない専用 path に移した。
+")))

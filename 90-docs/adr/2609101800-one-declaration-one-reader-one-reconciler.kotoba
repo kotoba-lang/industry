@@ -1,0 +1,132 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609101800-one-declaration-one-reader-one-reconciler")
+  (:adr/title "The fleet's topology: one declaration, one reader, one reconciler")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/related (vector "adr-2609101600-which-models-run-stably-on-16-gib"
+                "adr-2609101100-a-node-dedicated-to-one-model"
+                "adr-2609100100-one-model-per-node"))
+  (:adr/body
+  "Owner instruction 2026-09-10: tidy the topology so the cluster runs
+efficiently and stably.
+
+## The field was already there, and nobody read it
+
+`fleet.edn` carries `:node/serves` on every node. Eleven of the twelve said
+`:unstated`, one said a bare model id, and a grep across murakumo and the API
+for a reader returned nothing. The fleet had a slot for its own topology,
+empty, with no consumer -- and every symptom measured that day follows from
+it:
+
+- five minis each ran four model planes, and nothing said that was wrong
+- the media plane on those minis had rendered NOTHING, ever: dan's ComfyUI
+  showed 0 history entries with its checkpoint unloaded, benjamin's and
+  simeon's did not answer, and simeon had no checkpoint at all
+- the fleet console showed every node as `qwen35-iq2:latest`, a model none of
+  them was serving, while its own API underneath had the per-node truth
+- a `llama-server` appeared on dan holding 2.6 GB on :8094 with parent PID 1
+  and no launchd job; only a process listing found it
+
+None of those is a machine failing. They are a fleet with no answer to *what
+is this node for*.
+
+## The shape
+
+    murakumo edge topology [<node>|all] [--apply]
+
+`murakumo.fleet.topology` holds a closed vocabulary and the verdict;
+`murakumo.fleet.one-model` measures; `edge-install` runs it. The declaration:
+
+    :unstated                                     nobody has decided
+    :none                                         deliberately idle
+    {:plane :text  :model \"murakumo-edge\"}
+    {:plane :media :model \"waiREALMIX_v11.safetensors\"}
+    {:plane :ring-member}
+    {:plane :ad-hoc}
+
+**`:unstated` is not a default and is never folded into a pass.** A node
+nobody has decided about is not in the right state and not in the wrong state,
+and a reconciler that picked either would churn it or bless it. The fleet
+summary prints the count and says it in words, because `drift=0` on a fleet of
+undecided nodes reads as health. `:unmeasured` is likewise never conformant.
+
+`--apply` only ever EVICTS. Starting a plane needs a model, a checkpoint and
+an admission check, which `dedicate-node!` owns; a missing plane is reported
+and left rather than half-started by a function whose job is tidying.
+
+## Two defects this replaces, both found by running it on the fleet
+
+**The plane-to-label table was a fixed guess.** benjamin serves the ad-hoc
+plane from `ai.gftd.ollama.benjamin` where dan and simeon use
+`com.murakumo.ollama`. An eviction driven by the table left ollama running on
+benjamin and reported a clean sweep; only the `MURAKUMO_STILL_LOADED` guard
+caught it. Labels are now DISCOVERED by reading every plist's
+ProgramArguments and classifying on the executable path -- the same check that
+was the only one that worked in the 2026-09-09 gftd cutover, for the same
+reason: a label says what somebody called a job, the argv says what it runs.
+
+**A missing label had two meanings and one response.** Not running means
+nothing to evict; running with no job means refuse. `evict-labels` now takes
+the measured planes so it can tell them apart. The second case is dan's
+orphan 27B, and a tool that reported `nothing to evict` would have called that
+node tidy. Without the measurement the refusal fired on every safe eviction
+instead -- which is how the first version behaved on judah.
+
+A third, smaller: `evict-script` counted still-loaded jobs the instant after
+`bootout`, which returns before launchd finishes unloading. It reported 1 and
+2 jobs still loaded on simeon and dan; both were 0 seconds later with every
+plist parked. It now settles first. A guard that cries wolf is a guard an
+operator learns to skip.
+
+## The topology as declared and measured, 2026-09-10
+
+    judah      text   murakumo-edge              conformant (reconciled)
+    benjamin   media  waiREALMIX_v11             conformant
+    simeon     media  waiREALMIX_v11             conformant
+    dan        media  waiREALMIX_v11             drift -- REFUSED, see below
+    gad        media  waiREALMIX_v11             drift -- REFUSED, no launchd
+    issachar   text   murakumo-27b               unmeasured (dark)
+    xavier     text   qwen3-vl-30b-a3b           unmeasured (dark)
+    naphtali zebulun levi joseph asher           unstated (all dark)
+
+    fleet: conformant=3 drift=2 unstated=5 unmeasured=2
+
+dan is refused because the text plane on it has no launchd job: it is another
+session's 27B, started 14:02 that day from a path and port this work never
+used, and CLAUDE.md's rule on other agents' work products applies. gad is
+refused because the discovery script reads macOS plists and gad is Linux --
+honest, and it means gad can never be reconciled by this tool.
+
+## What the image side now is
+
+benjamin, simeon and dan carry WAI (`waiREALMIX_v11`, 6.94 GB) and nothing
+else; benjamin and simeon are WAI-only on disk. Measured warm at 768x768,
+25 steps: 72 s/image on all three. At 1024x1024 the same model takes 152 s and
+grows swap by 1,675 MB with 5.94 GB compressed, which `model-fit` calls
+`:swapping`. **768 is the operating point, and it is a property of the
+resolution, not of the checkpoint.**
+
+Converting the two port-exhausted nodes was the right way round for a reason
+that had to be measured to be believed: image work is local, but a localhost
+TCP connection still takes an ephemeral port, and with the range full neither
+node could reach its own ComfyUI (0 of 5 curls). Evicting ollama freed 11434
+and let the floor drop to 9000; both went to 5 of 5.
+
+## Still open
+
+- **hokusai is not published.** `/v1/images/generations` works and routes
+  through `GATEWAY_URL` to gad's bridge; `awai-network/hokusai` returns 503 by
+  design in `dead_hosted_model.js`; and the fleet-aware `infer-gateway`
+  (`pick-any-node!`, which would select a WAI mini by checkpoint) is running on
+  NO node -- job absent and :8790 unbound everywhere. Publishing hokusai on the
+  minis needs that gateway deployed and fronted; publishing it on gad needs one
+  config change. Owner decision.
+- **The fleet console's HTML lies.** `/api/state` has correct per-node
+  residents; the page renders `qwen35-iq2:latest / advertised, not loaded` on
+  every row. The API is right and the page is wrong, uniformly, which is the
+  worst way to be wrong.
+- issachar and joseph are up, on the LAN, with port 22 open and no credential
+  that reaches them.
+- The heartbeat backoff still crosses its own deadline (30 s cadence, first
+  retry at 60-75 s, freshness line at 60 s), and the control plane still
+  carries two disagreeing thresholds (60 s and 120 s).")))

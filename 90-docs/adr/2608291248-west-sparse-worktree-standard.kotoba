@@ -1,0 +1,115 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608291248-west-sparse-worktree-standard")
+  (:adr/title "ADR-2608291248: west 管理 superproject の worktree は sparse root + targeted west update を既定にする")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-29")
+  (:adr/last-verified "2026-08-29")
+  (:adr/last_verified "2026-08-29")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "west-sparse-worktree-standard")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/authoritative-for
+  (vector "com-junkawasaki/root の新規 task worktree の既定 checkout shape"
+   "sparse root と west child checkout の分離"
+   "full checkout を明示的な例外にする操作境界"))
+  (:adr/related
+  (vector "adr-2607211600-full-history-default"
+   "adr-2607011300-west-worktree-topdir"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/evidence
+  (vector "2026-08-29 origin/main: tracked 233,867 files"
+   "2026-08-29 orgs/personal/takeout + orgs/personal/drive: 215,356 files"
+   "2026-08-29 minimal sparse integration probe: 702 materialized files, 721 sparse index entries, index 77,960 bytes"
+   "2026-08-29 targeted west probe: west topdir was the external root worktree and only kagami was checked out (58 files)"))
+  (:adr/body
+  "# ADR-2608291248: west 管理 superproject の worktree は sparse root + targeted west update を既定にする
+
+**Status**: accepted
+**Date**: 2026-08-29
+
+## Context
+
+`com-junkawasaki/root` の `origin/main` は 233,867 tracked files を持つ。そのうち
+`orgs/personal/takeout` と `orgs/personal/drive` だけで 215,356 files あり、manifest
+pin、ADR、root script の変更にも通常の `git worktree add` は全件を materialize
+していた。linked worktree は object database を共有するが、working tree と通常 index
+の展開コストは消さない。
+
+west project は root Git tree の submodule ではない。したがって root の view と、必要な
+child repo の取得は別々に選べる。全 root tree と全 west project を task ごとに取得する
+必要はない。
+
+## Decision
+
+新しい root task worktree は `scripts/root-worktree.cljs` を入口にする。
+
+1. 分岐元は fetch 済み `origin/main`。stale な local `main` から分岐しない。
+2. worktree は superproject 外に置く。`west init -l manifest` の topdir 誤認を防ぐ。
+3. 既定は `--no-checkout` + cone-mode sparse checkout + sparse-index。
+4. root view は profile（`minimal` / `docs` / `policy`）と明示 `--include` の和だけ。
+5. west は `--west <name>` で名指しした project だけ `west update --fetch smart` する。
+   project 0 件の update は実行しないので、意図せず全4,000+ projectを歩く経路を作らない。
+6. full root checkout は `--profile full` を明示した場合だけ。
+7. `--detach` は検査専用。編集する task は `codex/<task>` branch を作る。
+8. 作成途中で失敗した worktree は自動削除しない。pathを報告し、WIP/ignored contentを
+   検査してから cleanup する。
+9. この環境で `.git` pointer file が symlink に置換される既知問題は、作成完了時に
+   symlink の realpath を使って標準の一行 gitdir pointer fileへ戻す。参照先は推測しない。
+10. cleanup は `root-worktree.cljs remove <path>` を使う。rootとtargeted west childの
+    tracked/untracked/ignored contentを検査し、何かあれば除去を拒否する。最後の検査後に
+    gitdir pointerを再正規化し、間にtarget側Git操作を挟まずworktree removeする。
+
+## Standard flows
+
+root script / manifest task:
+
+```bash
+nbb scripts/root-worktree.cljs create <task>
+```
+
+ADR / policy task:
+
+```bash
+nbb scripts/root-worktree.cljs create <task> --profile docs
+nbb scripts/root-worktree.cljs create <task> --profile policy --include 90-docs/design-quality
+```
+
+west child を必要とする task:
+
+```bash
+nbb scripts/root-worktree.cljs create <task> --west <project-name>
+```
+
+clean worktreeの終了:
+
+```bash
+nbb scripts/root-worktree.cljs remove <helper-printed-exact-path>
+```
+
+task branchはworktreeと一緒に削除しない。branch retirementはgit-cleanup-conflictの
+archive-before-delete規則で別に扱う。
+
+child checkout は manifest pin の detached checkout である。子repoへ変更を積む前に、
+その repo の primary remote を明示 fetch し、現在の default branch から子repo自身の
+task branchを作る。component merge 後の root pin/reconcile は root task branchで扱う。
+
+## Measured result
+
+2026-08-29 の実 integration probeでは、minimal profile は 233,867 tracked files の
+rootから702 filesだけを materializeし、sparse indexは721 entries / 77,960 bytesだった。
+targeted west probeは external rootをwest topdirにし、`kagami` だけを取得した。
+
+## Consequences
+
+- root-only task の filesystem churn、index走査、作成時間を大幅に削減する。
+- full history方針は変えない。shallow cloneではなく、履歴/object共有とworking view縮小を
+  組み合わせる。
+- sparse viewからrepo-wide inventoryを結論してはならない。全体棚卸しは共有full checkout、
+  `git ls-tree` / `git ls-files --cached`、または目的専用auditを使う。
+- west childをroot sparse pattern外へ置くとGitのsparse-index拡張警告が出る場合があるが、
+  child repo自体は独立Git checkoutである。root inventoryとchild inventoryを混同しない。")))

@@ -1,0 +1,107 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608251016-hermes-murakumo-public-api")
+  (:adr/title "Hermes primary inference は api.murakumo.cloud。gad Tailscale 直結は primary にしない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-25")
+  (:adr/tags (vector "hermes" "murakumo" "itonami" "inference" "closing"))
+  (:adr/related (vector "adr-2608011400" "adr-2608197300" "adr-2607173100"))
+  (:adr/body
+  "## Context
+
+2026-08-24 夜、Cloud Itonami と Hermes Agent が `api.murakumo.cloud` を正しく使っているか、
+安定して推論できているかを測った。UI は両方生きていた。推論が詰まっていた原因は
+アプリのクラッシュではなく、gad 上の llama.cpp が **configured=1 / available=0** だったことと、
+Hermes の primary `model.base_url` が public API ではなく Tailscale 直結
+`http://100.82.98.110:8090/v1`（gad）だったこと。
+
+Cloud Itonami の operator config（`~/.cloud-itonami/data/config.edn`）は既に
+`https://api.murakumo.cloud/v1` を見ていた。Chrome の `localhost:1338/#/signin` は
+別セッションで、passkey は踏んでいない。
+
+Hermes Desktop v0.20.5 は安定。auxiliary（vision / web_extract / skills_hub）は既に
+public API。primary だけが gad 直結だった。その経路で ~27k token の非ストリーム呼び出しが
+600s timeout → retry を繰り返し、唯一の slot を占有していた。
+
+## Decision
+
+1. Hermes の primary `base_url` を `https://api.murakumo.cloud/v1` にする。
+   Tailscale 直結は primary にしない。fallback（`127.0.0.1:9180` Claude Code CLI）は残す。
+2. yaml を書いたあと **gateway `--replace` だけでは足りない**。multiplex された
+   `hermes serve` は Desktop（LaunchAgent `ai.hermes.desktop`）の子プロセスが持っており、
+   起動時に URL をキャッシュする。Desktop 本体は落とさず、serve 子だけを SIGTERM して
+   再生成させる。
+3. gad の `--parallel` は 2 まで。`murakumo-ring.service.d/qwen38.conf` が既に
+   `--parallel 2` / `-c 524288` を持っている（2026-08-24T13:28Z の drop-in）。
+   27B Q4 × 512k ctx のまま N を増やさない。llama-server は再起動しない。
+4. canvas-watch cron は public API の alias 名 `murakumo-main` に pin する。
+   snapshot が `qwen3.8-27b` のまま空 model だと、canvas が動いた tick だけ
+   `drift_skip` して、変化なし tick は `ok` に見える。
+
+この決定の対象は **このマシンの `~/.hermes`** である。west / GitHub の子リポではない。
+正本の記録だけ superproject の ADR に残す。
+
+## Implemented (machine-local, 2026-08-25)
+
+- `~/.hermes/config.yaml` と `~/.hermes/profiles/*/config.yaml` 25 ファイルの
+  `model.base_url` を `https://api.murakumo.cloud/v1` に置換。
+  バックアップ: `~/.hermes/backups/base-url-20260825`。
+  live yaml に `100.82.98.110` は 0。
+- Desktop 所有の stale `serve` をリサイクル。gateway は `ai.hermes.gateway` を kickstart。
+- `hermes --profile itonami-po cron edit c4db1ea65061 --provider custom --model murakumo-main`。
+  これで 3 本の canvas-watch（itonami / murakumo / kotobase）が揃った。
+  murakumo (`406c4ed94d10`) と kotobase (`84a50c9f3410`) は既に pin 済みだった。
+
+## Landing (closing, 2026-08-25)
+
+- PR https://github.com/com-junkawasaki/root/pull/2508 MERGED 2026-08-25T01:20:48Z
+- evidence commit `009bcd7c74849f6da3b46764e17bf578211a33f7`
+- merge commit `ebd663f3c6fe4ee538acdfa0fcfb38c3dc76787b`
+- session worktree `/tmp/root-close-hermes-murakumo-api` と branch
+  `agent/close-hermes-murakumo-api` は削除済み。
+- archive: `.git/stash-archive-2026-08-25/agent-close-hermes-murakumo-api.patch`
+
+shared checkout は dirty `90-docs/business/canvas-ledger.edn` と untracked `orgs/` があるため
+fast-forward していない。それはこのセッションの成果物ではない。
+
+## Verification
+
+| いつ (JST) | 何 | 結果 |
+|---|---|---|
+| 08:45 | `POST https://api.murakumo.cloud/v1/chat/completions` model=murakumo-main max_tokens=16 | HTTP 200, 22s, prompt 59 + completion 16。content は空、thinking が `reasoning_content` |
+| 08:37 | Desktop auto-continue | OpenAI client `provider=custom base_url=https://api.murakumo.cloud/v1 model=murakumo-main` |
+| 10:01 | `https://api.murakumo.cloud/ready` | 200, request-capacity configured=2 busy=0 available=2, fleet 11/11 |
+| 10:01 | Cloud Itonami `127.0.0.1:1338/health` | 200 `cloud-itonami-app` |
+| 10:01 | この Mac → gad:8090 | 0 connections |
+| 10:08 | itonami-canvas-watch jobs.json | model=murakumo-main provider=custom, snapshot null |
+| 10:22 | first close `/ready` | slot probe timeout (`request-capacity.status=0`) — yaml は public API のまま。gad 直結に戻していない |
+| 11:05 | second close yaml line 3 | `base_url: https://api.murakumo.cloud/v1` |
+| 11:05 | second close `/ready` | ok=true, request-capacity configured=2 busy=1 available=1, fleet 11/11 |
+
+Hermes CLI の `hermes chat --safe-mode` は user config を無視して OpenRouter
+`z-ai/glm-5.2` に倒れる（402）。これは yaml の不具合ではない。`--provider custom` を付けた
+CLI は public API を開く。16k 級の agent system prompt が乗るので、slot 確認用の ping には
+短い `POST /v1/chat/completions` を使う。
+
+## Not done / do not redo
+
+- gad `--parallel` を 3 以上にしない（未測 VRAM）。
+- `mailbox-triage`（`8cf8421b60f9`）は paused。m365 logout。このセッションの対象外。
+- Cloud Itonami Chrome sign-in / passkey は踏まない。
+- `hermes model` は interactive 専用。CLI 既定の対話ピッカーは動かしていない。
+- superproject / west pin / llama-server unit は変更していない。
+
+## Resume
+
+次 agent が最初にやること:
+
+```bash
+python3 -c 'from pathlib import Path; print(Path.home().joinpath(\".hermes/config.yaml\").read_text().splitlines()[2])'
+curl -sS https://api.murakumo.cloud/ready
+/Users/junkawasaki/.hermes/hermes-agent/venv/bin/hermes --profile itonami-po cron list
+```
+
+1 行目が `base_url: https://api.murakumo.cloud/v1` なら yaml は再置換しない。
+`ready` の `request-capacity.available` が 0 なら slot を測り、gad 直結に戻さない。
+canvas-watch がまた `drift_skip` したら snapshot ではなく `--provider custom --model murakumo-main` を見る。
+")
+))

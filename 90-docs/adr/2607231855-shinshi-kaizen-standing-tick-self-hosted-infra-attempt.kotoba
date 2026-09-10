@@ -1,0 +1,199 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607231855")
+  (:adr/title "Shinshi Kaizen Standing-Tick: Self-Hosted Infra Attempt (murakumo.cloud / git.kotobase.net) — Findings, Shipped Work, and Remaining Gap")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-23")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/type "decision-record")
+  (:adr/body "
+## Summary
+
+Attempted to replace claude.ai's cloud routine (RemoteTrigger, 403'd on the
+jk-luxury org) and a Mac LaunchAgent fallback with a fully self-hosted daily
+kaizen-reconciliation tick for jk-luxury/club-shinshi-app's progress/BMC
+snapshot (docs/260613-progress.{datoms.edn,clj} + docs/260613-bmc-lean.
+{datoms.edn,clj} — the artifact ADR-2606131400 in jk-luxury/club-shinshi
+declares authoritative), running on murakumo.cloud (LLM backend) and
+git.kotobase.net (repo host, replacing a GitHub PAT dependency).
+
+**Net result:** murakumo.cloud as an LLM backend works and a Cloudflare
+Cron Trigger + tick implementation was built for it (not yet deployed,
+blocked on a GitHub write credential). git.kotobase.net turned out to
+require a full self-sovereign git-push protocol for ANY write — assessed
+as disproportionate for this use case, so that direction is PAUSED, not
+completed. One genuinely valuable piece of shared infra WAS shipped and
+deployed as a side effect: a private-repo read gate on the real
+git.kotobase.net Worker, previously 100% publicly readable with no way to
+host anything confidential there.
+
+## Context
+
+- claude.ai's `RemoteTrigger` cloud-routine API returned 403 for
+  jk-luxury/club-shinshi-app — no GitHub App/org authorization for that
+  org on the cloud-routine surface. Same wall as ADR-2607172900
+  (cloud-itonami / itonami-qwen36-tick).
+- A session-local `CronCreate` job and a Mac `launchd` LaunchAgent
+  (`~/.gftd/run-shinshi-kaizen-tick.cljs`, `com.gftd.shinshi-kaizen-tick`
+  plist) were both built as working fallbacks — both are Mac-uptime-
+  dependent, which prompted the request to self-host the recurring tick
+  on murakumo.cloud instead.
+- The user explicitly rejected a GitHub fine-grained PAT for the write
+  path (long-lived, personal-account-tied, sits as a raw secret in a
+  Worker) and asked to avoid GitHub Actions too, preferring the tick's
+  execution and repo-write both live on owned infra (murakumo.cloud /
+  git.kotobase.net).
+
+## Investigation and findings
+
+### murakumo.cloud (`gftdcojp/cloud-murakumo`)
+
+No pre-existing scheduling/routine-hosting capability — purely a static
+SPA + LLM inference reverse-proxy Worker (`site_worker.cljs`) + Stripe
+checkout + x402 billing. No Cron Trigger, no Durable Object, no
+consumer-registry pattern existed.
+
+**Built** (branch `feat/shinshi-kaizen-scheduled-tick`, pushed, NOT yet
+merged/deployed): `cloud_murakumo/shinshi_kaizen.cljs` — a `scheduled()`
+Cloudflare Cron Trigger handler wired into `site_worker.cljs`'s default
+export alongside the existing `fetch` handler. Design: ONE single-shot
+LLM completion per tick (not an agentic tool loop) against
+`MURAKUMO_OPENAI_URL` (the same upstream this Worker already proxies),
+given the current 4 file contents + a GitHub commit-log-since-last-check,
+asked to answer `NO_DRIFT` or full replacement file contents in a
+`===FILE: path===...===END===` wire format. Guardrails ported from the
+LaunchAgent prototype: size-deviation (>50%), missing `kaizen-verified`
+header marker, and a hand-written balanced-bracket parser — any failure
+aborts the WHOLE tick, nothing written. Repo I/O originally targeted the
+GitHub REST + Git Data API (blob/tree/commit/branch/merge, atomic
+multi-file commit) — this is the part blocked on a write credential
+(the rejected PAT). Verified: shadow-cljs release build clean (0
+warnings), `wrangler deploy --dry-run` parses config and bundles. NOT
+deployed — `wrangler.jsonc`'s `triggers.crons: [\"13 0 * * *\"]` addition
+and the GITHUB_TOKEN secret requirement are both still only on the
+feature branch.
+
+### git.kotobase.net — two non-overlapping systems discovered
+
+1. **`kotobase.protocols.git`** (pure lib in `kotoba-lang/kotobase-protocols`,
+   `src/kotobase/protocols/git.cljc`) — dumb-HTTP only (`GET`/`PUT` on
+   `info/refs`, `HEAD`, `objects/{2}/{38}`), no sha1 verification, no
+   smart protocol. Deployed as part of `kotobase-protocols-worker`
+   (canonical source now `gftdcojp/net-kotobase/protocols-worker`, the
+   sibling repo `kotoba-lang/kotobase-protocols-worker` is explicitly
+   marked retired in its own `package.json`). Confirmed via the
+   Cloudflare API this Worker actually serves `s3.kotobase.net`,
+   `atproto.kotobase.net`, and `pinning.kotobase.net` — **NOT**
+   `git.kotobase.net`, despite that repo's `wrangler.jsonc` listing it as
+   a route (a stale/wrong config entry).
+2. **`kotobase-git`** (`worker/git-worker.mjs` in the SAME
+   `kotoba-lang/kotobase-protocols` repo, no `wrangler.jsonc` existed for
+   it) — this IS what `git.kotobase.net` actually routes to (confirmed
+   via `GET /accounts/:id/workers/domains` on the Cloudflare API, and by
+   the live `/health` response matching this file's exact JSON shape,
+   which the other system doesn't even implement). Backed by D1
+   (`repos`/`delegates`/`refs`/`objects`/`audit`/`event_outbox` tables —
+   a genuine Radicle-shaped per-repo owner+delegate access-control data
+   model), R2 (loose objects + CIDv1 canonical blocks), a KV namespace,
+   and a `murakumo-kaizen` queue (interesting name — pre-existing,
+   unrelated to this session's work, not investigated further).
+   **Reads** (`gitRead`): zero auth, by design (dumb-HTTP \"clonable\").
+   **Writes** (`/xrpc/kotobase.git.*`): gated first by a shared
+   `ADMIN_TOKEN` bearer, then — unconditionally, not optional — by
+   `kotoba-rad`-style Nekko Ed25519 request signing (`did:key`), a
+   per-ref `sigref` signature, **quorum approval** (a CACAO delegation
+   chain from the repo's `owner_did` down to each approving signer,
+   verified against `delegates`), AND a live round-trip to kotobase.net's
+   OWN separate Datomic XRPC endpoint
+   (`ai.gftd.apps.kotobase.datomic.datoms`) to verify a matching
+   `:git.ref/sigref` projection exists before the ref update is accepted.
+   There is no simpler write path — `gitRead` has no `PUT` handler at
+   all, unlike the other (non-git-serving) system.
+
+### Decision: pause git.kotobase.net as the write target
+
+Implementing the full Nekko/sigref/quorum/kotobase-projection protocol
+client-side (did:key identity mint, CACAO delegation chain mint, per-ref
+signing, a live kotobase.net datomic transact+query round-trip) purely to
+let a daily 4-file reconciliation tick push a commit is disproportionate
+— this protocol reads as infrastructure for a genuinely multi-party /
+multi-agent governance scenario (`bounds: {maxFiles, maxChangedLines,
+maxSpendUsd, allowedPhases}` fields visible in the ref-set event payload
+strongly suggest an autonomous-agent-fleet governance system, not a
+single trusted daily job). **Deferred, not abandoned** — if a second
+consumer with a genuine multi-signer governance need shows up, this is
+the right system to extend into. For now, jk-luxury/club-shinshi-app's
+kaizen docs STAY on GitHub (not relocated to kotobase) — ADR-2606131400's
+authority claim over `docs/260613-*` remains in force, unchanged by this
+ADR.
+
+## What WAS shipped (deployed to production, verified live)
+
+**Private-repo read gate for `git.kotobase.net`** (`kotobase-git` Worker,
+`kotoba-lang/kotobase-protocols` commit `331acf3`, merged to main): the
+dumb-HTTP read surface had ZERO authentication for GET/HEAD on ANY
+hosted repo (by original design — \"making it clonable\" per
+`bin/seed_git.cljs`'s own docstring) prior to this change. This is a real
+privacy exposure for anything confidential hosted there. Added
+`PRIVATE_GIT_REPO_PREFIXES` (a plain, non-secret Worker var — comma-
+separated `org/repo` names) + `isPrivateRepo()`/`privateRepoPrefixes()`:
+a matching repo's GET/HEAD on `info/refs`/`HEAD`/`objects/{sha}` now
+requires the same `ADMIN_TOKEN` bearer a write already needs. Every other
+repo, and every non-git surface, is unaffected — boundary-tested (a repo
+like `club-shinshi-kaizen-evil` does not false-positive match
+`club-shinshi-kaizen`) and smoke-tested live post-deploy (health/other-
+repos/write-gate unchanged; the one configured private repo now 401s
+without a bearer, 404s — correctly past the gate — with a valid one).
+
+The `PRIVATE_GIT_REPO_PREFIXES` list currently contains
+`jk-luxury/club-shinshi-kaizen` (a placeholder repo name reserved for the
+paused kotobase-native direction) — nothing is actually seeded there
+yet, since the write-path decision above means this repo was never
+populated. The gate itself is real, live, and immediately reusable for
+any FUTURE confidential repo on this substrate without further work.
+
+`net-kotobase/protocols-worker`'s `wrangler.jsonc` still lists
+`git.kotobase.net` as a route despite not actually owning that hostname —
+flagged here as a known-stale config entry (not touched further in this
+ADR's scope; an identical read-gate mistakenly added there was cleanly
+reverted, commit `6e1f4a6` in `gftdcojp/net-kotobase`, once the
+Cloudflare API confirmed the real routing target).
+
+**`ADMIN_TOKEN` on `kotobase-git` was rotated** (old value was
+unrecoverable — Cloudflare secrets are write-only and it wasn't in
+Keychain/kagi under any name checked) — new value stored in kagi
+(compartment `net-kotobase`, item `KOTOBASE_GIT_ADMIN_TOKEN`) and
+mirrored to Keychain (`kotobase-git:ADMIN_TOKEN`). **Any other consumer
+of the old `ADMIN_TOKEN` value is now broken** and needs the new one —
+not verified whether any existed; this is the one real risk this ADR
+knowingly accepted (user explicit call: rotate now, unknown blast radius
+accepted).
+
+## Current gap (nothing standing/live for the actual kaizen tick today)
+
+1. No cloud-hosted recurring kaizen tick is currently running anywhere
+   (the Mac LaunchAgent from ADR-2607172900's pattern was built earlier
+   this session as `com.gftd.shinshi-kaizen-tick` + a session `CronCreate`
+   job, but the CronCreate job was explicitly cancelled once the
+   murakumo.cloud direction was chosen — the LaunchAgent's live status
+   was not re-verified at ADR-writing time).
+2. `cloud-murakumo`'s `feat/shinshi-kaizen-scheduled-tick` branch has a
+   working, build-verified Cron Trigger tick, but it targets the GitHub
+   REST/Git-Data API for writes and has no credential to use (PAT
+   rejected; GitHub App and GitHub Actions-native alternatives were
+   proposed but neither was chosen/built before the git.kotobase.net
+   detour started).
+3. The git.kotobase.net direction is paused per the decision above — no
+   further work will land there for THIS use case unless revisited.
+
+## Recommendation (not yet actioned)
+
+Pick up the GitHub-credential decision that was interrupted by the
+git.kotobase.net detour: either (a) a GitHub App (short-lived
+installation tokens, no long-lived PAT, still satisfies \"no PAT\") for
+`cloud-murakumo`'s already-built tick, or (b) move the tick logic into a
+`.github/workflows/*.yml` scheduled workflow inside
+jk-luxury/club-shinshi-app itself (GitHub Actions' automatic
+per-run-scoped `GITHUB_TOKEN`, zero stored credential at all, but the
+execution host is GitHub Actions rather than murakumo.cloud). Both were
+on the table before this ADR's detour and remain the live options.
+")))

@@ -1,0 +1,361 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608091000")
+  (:adr/doc_type "adr")
+  (:adr/topic "itonami-bousai-plane-integration")
+  (:adr/title "防災は 1 本の産業ではなくフェーズで割った面 —— 散っていた実装 3 本と R0 の三幅対を 1 つの設計に統合し、『権威を持たない』を散文から境界名へ移す")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-07")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authoritative_for
+  (vector "営み OS における防災面の構成（before/during/after の分担と、産業側の災害スライスの位置づけ）"
+   "境界名 :hazard/public-safety の意味と、それが強制する連携モード"
+   "cloud-itonami-cofog-03.2 を防災面の最初の vertical とする決定と、その適合差分の埋め方"
+   "etzhayyim の三幅対（sonae / kazaori / shidemori）を OS の面に載せない決定とその理由"
+   "日本の防災官庁 leaf（気象庁 / 消防庁 / 内閣府防災）を作らない決定"
+   "次の 1 本を選ぶ tick の走査範囲が ISIC 前綴じに閉じている問題の扱い"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "2608070000" "2608060000" "2608052000" "2607082700" "2607131000"
+                "2606091200" "2605263200" "2800002100"))
+  (:adr/repos (vector "network-awai/cloud-itonami"
+              "cloud-itonami/cloud-itonami-cofog-03.2"
+              "cloud-itonami/cloud-itonami-isic-4211"
+              "cloud-itonami/cloud-itonami-isco-5411"
+              "etzhayyim/com-etzhayyim-sonae"
+              "etzhayyim/com-etzhayyim-kazaori"
+              "etzhayyim/com-etzhayyim-shidemori"))
+
+  (:adr/body
+  "# ADR-2608091000: 防災面の統合設計
+
+## 問い
+
+『今の cloud-itonami に防災関係の営みは設計実装されているか』。答えは
+**『無い』でも『ある』でもなく『散っている』**だった。散り方が悪く、
+どの索引を引いても全体が出ない。この ADR はその散らばりを 1 つの面に
+統合する設計を決める。
+
+## 現在地（実測 2026-08-07。README の自己申告と実測を区別して書く）
+
+### 実装があるもの（すべて cloud-itonami org）
+
+| repo | 中身 | 実測した形 |
+|---|---|---|
+| `cloud-itonami-cofog-03.2` | COFOG 03.2 消防サービス。火災リスク点検ロボット（熱・煙センシング + 植生密度スキャン）を InspectionAdvisor ⊣ Fire-Risk Governor が gate | `src/firerisk/*.cljc` 7 本、**`.clj` は 1 本も無い**。`governor/allowed-ops` = `#{:log-inspection :fire-hazard-survey :escalate-hazard :schedule-reinspection}`。phase 3 の `:auto` は `#{:log-inspection}` のみ。**nbb で load 可**（langgraph + langchain を classpath に置いた場合） |
+| `cloud-itonami-isic-4211` Slice 1 | 台風時の法域別作業中止判定 → 全作業員へ mail+phone で警報 dispatch、地震・暴風後の義務点検が作業再開を gate（ADR-2607082700） | **既に OS に宣言済み・`:binding :native`**。`phase.cljc:79` で phase 3 の `:auto` に `:actuation/dispatch-alert` が入っている |
+| `cloud-itonami-isco-5411` | 消防署の装備 readiness・シフト・補給の事務調整。突入・トリアージ・現場指揮は `scope-excluded-ops` として名指しで除外 | `src/firestation/*.cljc` 4 本。**`phase.cljc` も `operation.cljc` も無い** —— `actor.cljc` が直接 `build-graph` を持つ pre-standard 形 |
+
+### 設計だけあるもの（すべて etzhayyim org、R0）
+
+`sonae`（備え・before、ADR-2606091200）→ `kazaori`（風折・during、ADR-2605263200）
+→ `shidemori`（死出守・after）の三幅対。**cell は import 時 RuntimeError で
+非実行**。実在するのは registry と invariant test だけ:
+
+- sonae — `registry/warning-sources.edn` に権威ある警報発信元の allowlist
+  **20 件 / 16 法域**、fail-closed invariant test 20 件
+- kazaori — `registry/agencies.seed.json`（民間災害対策機関ディレクトリ、
+  全件 `verificationStatus=\"unverified-seed\"`）、`methods/emergency.cljc`
+  189 行の純関数エンジン、charter-gate test
+
+### 無いもの
+
+- 営み OS（`orgs/network-awai/cloud-itonami/os.edn`）に**防災系 vertical は 0 本**。
+  宣言済み 20 本のうち防災に触れるのは 4211 の災害スライスだけ
+- 気象庁 / 消防庁 / 内閣府防災の個別 blueprint（`jpn-cao` / `jpn-mic` /
+  `jpn-mlit` の README にも防災の記述なし。`jpn-reconstruction`＝復興庁だけある）
+
+## 問題は 3 つあり、どれも『やる気』ではなく『構造』だった
+
+### 1. 散り方が org 境界と分類体系の両方をまたぐ
+
+本命の三幅対は **etzhayyim** org、実装は **cloud-itonami** org。しかも
+cloud-itonami 側は COFOG（機能分類）・ISCO（職業分類）・ISIC（産業分類）に
+1 本ずつ散っている。`nbb scripts/concept-lookup.cljs 防災` は**『語彙に無い』**
+と答え、`repo-search 防災 disaster` は 6 件しか出さず、そのうち本命 sonae は
+etzhayyim にある —— どちらの索引でも全体像は出ない。
+
+### 2. 次の 1 本を選ぶ機械が、防災を候補にすら入れていなかった
+
+`scripts/itonami-os-maturity-tick.cljs:203` の candidate 走査は
+
+    (filter #(str/starts-with? % \"cloud-itonami-isic-\"))
+
+**ISIC 前綴じだけ**を見る。つまり cofog-03.2 は —— 実装済みで、nbb で load でき、
+`.clj` を 1 本も持たないのに —— **却下されたのではなく、一度も候補集合に
+入っていない**。tick が『未宣言の ISIC 441 本のうち標準形適合 219 本』と
+報告するとき、COFOG も ISCO も名前付き actor もその 441 に含まれていない。
+
+### 3. 同じ不変条件を 3 つの repo が別々の散文で持っている
+
+- sonae: G8『NO false authority — 公式 地震/津波 警報を発出しない』
+- kazaori: 『OBSERVATIONAL directory — 自前の alert 発信なし・response 指揮なし』
+- isco-5411: `scope-excluded-ops` に `:issue-tactical-command`
+  `:authorize-structure-entry` `:perform-triage` …
+- cofog-03.2: `high-stakes` に `:coordination/hazard-escalation`（確度に関係なく人）
+
+**同じことを 4 回、別々の言葉で書いている。**散文なので機械は検査できず、
+5 本目を足す人はどれも読まない可能性がある。
+
+## 決定
+
+### D1. 防災を 1 本の vertical として作らない。フェーズで割る
+
+防災は産業ではなく**時間の相**である。すでに sonae/kazaori/shidemori が
+before/during/after で割っており、この分割を統合設計の骨格として採用する。
+
+    before（予防・減災・備え・早期警戒）   sonae ⟶ [実装は cofog-03.2 が一部を担う]
+    during（対応）                        kazaori
+    after（復旧・検証）                    shidemori ／ 4211 :inspection/screen
+
+**産業側の災害スライス（4211 Slice 1、cofog-03.2）は『before の実装断片』で
+あって防災 actor ではない。**この位置づけを固定することが統合の中身であり、
+新しい repo を起こすことではない。
+
+### D2. 『権威を持たない』を境界名にする —— `:hazard/public-safety`
+
+os.edn は既に**境界集合が異なる 2 vertical をつなぐ規則は `:carry` しか
+書けず、`:invoke` を書くと load 時に throw する**という機械の規則を持つ
+（`wiring/compile-rules`）。この仕掛けを再利用する。
+
+防災面の vertical に境界 `:hazard/public-safety` を宣言する。意味は
+**『この面の出力は公衆の安全に直接触れるが、この面は公式警報・避難指示・
+緊急事態宣言・現場指揮のいずれの権威も持たない』**。
+
+帰結: この境界を持つ vertical と持たない産業 vertical をつなぐ辺は、
+既存規則によって**構造的に `:carry`（人が運ぶ）に強制される**。
+4 つの repo が別々に書いていた散文の不変条件が、1 つの境界名として
+機械の側に移る。
+
+**境界名は『どの法域のどの主体のデータか』を表すという既存の用法から
+少し外れる**（これは主体ではなく権威の不在を表す）。それでも同じ列に置くのは、
+強制したい規則が同一だから —— 別の機構を足すより、既にある機構が
+同じ答えを出すならそちらを使う。この逸脱は意図的であり、os.edn の
+コメントに明記する。
+
+### D3. 防災面の最初の vertical は cofog-03.2
+
+実測根拠（すべてこの ADR の執筆時に確かめた）:
+
+- `src/` 全 7 本が `.cljc`、`.clj` は 0
+- **nbb で load できた** —— `orgs/kotoba-lang/langgraph/src` と
+  `orgs/kotoba-lang/langchain/src` を classpath に足した状態で
+  `firerisk.{operation,phase,governor,store,registry}` が全て解決した
+- `operation/build` は store を第 1 引数に取る（標準 shim の
+  `(standard/vertical ops (op/build db))` にそのまま合う）
+- phase 3 の `:auto` は `:log-inspection` のみ。`:fire-hazard-survey` と
+  `:schedule-reinspection` は『`write-ops` だが**どの phase の `:auto` にも
+  入れるな**』と phase.cljc 自身が注記している
+
+**標準形との差分は 2 つだけ**: `phase/read-ops` が無い（`write-ops` のみ）、
+`store/seed-db` が無い（`mem-store` + `sample-data!` の 2 段）。
+
+**この 2 つは shim ではなく repo 側に足す。** shim で
+`(doto (store/mem-store) (store/sample-data!))` と書けば動くが、それは
+147 本が共有する形から 1 本だけ外れるということで、
+『shim が育ち始めたら OS 側に判断が漏れている合図』（standard.cljc の
+docstring）に該当する。shim は 4 行に保つ。
+
+### D4. 連携は 1 本だけ宣言する（`:carry`）
+
+    cofog-03.2 :escalate-hazard (commit) ⟶ 4211 :inspection/screen   mode :carry
+
+火災リスク点検が『即時の消防 dispatch を要する活動中ハザード』を確定したら、
+同じ建物の施工現場は作業を止めて点検し直すべきである。
+
+**`:invoke` にできない理由が 2 つあり、どちらも単独で十分**:
+
+1. 境界が違う（cofog-03.2 は `:hazard/public-safety`、4211 は `#{}`）ので
+   D2 の規則が `:carry` を強制する
+2. **強制が無くても `:invoke` は死んだ辺になる。** 4211 の
+   `:inspection/screen` の主体は 4211 自身の台帳に登録された site であり、
+   上流にその登録を作る権限は無い。`:mint-from-rule` で作った主体は必ず
+   落ちる —— `custody-transfer->forwarding-record`（ADR-2800002100）で
+   実測済みの同型である
+
+なお `:inspection/screen` は 4211 のどの phase の `:auto` にも入っていない
+（phase.cljc:79 の phase-3 `:auto` は `#{:site/intake :actuation/dispatch-alert}`）
+ので、運ばれた先で必ず人か governor が動く。
+
+### D5. isco-5411 は今回繋がない
+
+標準形に未適合。`phase.cljc` / `operation.cljc` が無く、`actor.cljc` が
+直接 `build-graph` / `run-request!` / `approve!` を持つ pre-standard 形なので、
+shim に翻訳以上の判断を書かないと繋がらない。**repo 側を標準形に寄せてから
+繋ぐ**（`closed-op-allowlist` の 4 op はそのまま `write-ops` になる）。
+
+### D6. etzhayyim の三幅対は OS の面に載せない
+
+`:binding :unbound` として載せることは技術的に可能だが、**載せない**。
+
+理由は R0 だからではない（`:unbound-reason` を書けば済む）。
+**kazaori の緊急事態宣言は Council Lv6+ の 7 人中 4 人以上が所有しており、
+sonae は『imminence signal を出して handoff するだけ』と自分で決めている。**
+これを cloud-itonami の営み面に並べると『cloud-itonami が防災を回している』
+と読める —— それ自体が D2 で禁じた false authority の一種である。
+
+参照はこの ADR が持つ。三幅対が R1 に上がり、統治の所在が面の上で
+誤読されない形（別 org 面、または明示的な権威表示）が決まったら再考する。
+
+### D7. 気象庁 / 消防庁 / 内閣府防災の leaf を作らない
+
+sonae の `registry/warning-sources.edn` が既に**権威ある警報発信元の
+allowlist を 20 件 / 16 法域**持っている。官庁 blueprint を起こすと
+**2 つ目の権威の名簿**ができ、どちらが relay 元の正本か決められなくなる。
+relay 元の正本は 1 つに保つ。
+
+### D8. tick の走査範囲を分類ファミリまで広げる（2026-08-07 着地）
+
+`scripts/itonami-os-maturity-tick.cljs` の ISIC 前綴じフィルタを
+`#\"^cloud-itonami-(isic|isco|cofog|jsic|nace|naics|unspsc)-\"` に置き換えた。
+
+**1 行変える前に判定を検証した**（この ADR が「検証が先」と書いていたもの）。
+1,379 repo 全部に `conformance` を掛けた実測:
+
+| 族 | 本数 | 適合 | 落ちた理由 |
+|---|---|---|---|
+| isic | 442 | 220 | phase op 集合なし 103 / seed-db なし 79 / JVM 専用 21 / governor なし 17 |
+| **isco** | 340 | **0** | **phase op 集合なし 337** —— 職業 blueprint は構造的に別の形 |
+| **cofog** | 5 | 1 → **5** | `:no-seed-db` だけで 4 本 —— **2026-08-07 に 4 本とも直した（下記）**|
+| unspsc | 5 | 1 | 同じく `:no-seed-db` 4 |
+| jsic | 3 | 0 | phase op 集合なし 3 |
+
+判定は非 ISIC でも壊れない（理由が族ごとに一貫している）。**広げて今すぐ増える
+候補は unspsc-27 の 1 本だけ**だが、cofog / unspsc の 8 本が「1 行の距離」に
+あることが**初めて面に出た** —— これは走査を広げなければ永久に見えなかった。
+
+#### 実際に詰めた: COFOG 族は 5 本とも標準形になった（2026-08-07）
+
+見えた 4 本に、cofog-03.2 と同じ 2 つ（`phase/read-ops` = `#{}` と
+`store/seed-db` = `(-> (mem-store) (sample-data!))`）を足した。4 本とも
+`write-ops` が `governor/allowed-ops` と一致しており（実測）、`read-ops` を
+空集合と書くのは嘘ではない。振る舞いは変えていない。
+
+| repo | ns | 主題 | test | merge |
+|---|---|---|---|---|
+| cofog-04.5 | `infrainsp` | 運輸（道路構造物点検） | 93 tests / 243 assertions | `e008349f` |
+| cofog-05.1 | `wastecollect` | 廃棄物管理（収集・選別） | 64 / 185 | `eeb08e3f` |
+| cofog-06.3 | `leaksurvey` | 上水道（漏水調査） | 74 / 202 | `a29d4386` |
+| cofog-07.4 | `vectorsurvey` | 公衆衛生（媒介生物調査） | 76 / 209 | `cc6c582f` |
+
+4 本とも 0 failures / 0 errors、`clojure -M:lint` 0 errors 0 warnings、
+nbb で load 可・`(op/build (seed-db))` が graph を返すことを実測。west pin
+4 件前進（`16bf3759`、diff は `+4 -4`）。
+
+**測って確かめた**: 適合数 222 → **226**（ちょうど +4）。族の表から cofog 行が
+消えた（落ちる repo が 0 になった）。4 本の M_own は 0.505–0.535 で、ISIC 上位
+（0.72–0.75）の下に並ぶ —— 順位が付いているので、上位が繋がれば自然に上がってくる。
+**残るのは UNSPSC 4 本**で、こちらも `:no-seed-db` だけ。
+
+**entity 面（`lei-` 法人実体 / `iso3166-` 国・官庁 / `assoc-` 業界団体 /
+`municipality-` 自治体）は候補に入れない。** 適合しているものが 57 本あるが、
+あれは営みの分類ではなく**実体の名簿**で、「次に繋ぐ 1 本」として提案する対象では
+ない。ただし**黙って落とさず件数と例を毎周報告する**（人が判断できるように）。
+
+### D9. 二重着手ガードは、守るべき場所に掛かっていなかった（2026-08-07 発見・修正）
+
+D8 を実装する過程で見つけた、防災とは無関係だがより重い欠陥。
+
+`queued-repos` は「既に着手済みの営み」を除くための仕掛けだが、**2 つの理由で
+何も防いでいなかった**:
+
+1. **PR しか見ていなかった。** 接続フロー（skill `itonami-os-connect`）は PR を
+   作らず `gh api .../merges` でサーバ側マージする。実測 2026-08-07 時点で
+   open PR は **0 件**、一方 `agent/itonami-os-isic-6492` という**作業中の枝が
+   remote に在った**。
+2. **枝名から repo 名を抜けていなかった。** 旧実装は
+   `#\"(cloud-itonami-isic-[0-9]+)\"` で抽出していたが、実際の枝名は
+   `agent/itonami-os-isic-6492`（prefix 無し）や `agent/itonami-os-cofog-032`
+   （ドットが落ちている）で、**1 件も一致しない**。
+3. さらに、抽出できていたとしても**掛かっていたのは宣言済み vertical にだけ**で、
+   **候補プールには掛かっていなかった** —— 二重実装が起きるのは候補側である
+   （ADR-2608070000 が記録した isic-4921 の 2 回実装がまさにそれ）。
+
+修正: open PR **と remote branch の両方**を読み、接続フローの命名
+（`itonami-os` / `os-connect`）の枝だけを対象に、両辺を英数字へ正規化した
+部分一致で照合する。**直後が数字なら別 repo**（`isic851` が `isic8510` の
+部分文字列になるため）。候補プールにも掛け、外した repo を毎周報告する。
+
+検証（両方向）: 実在する 3 つの綴りに当たり（`isic-6492` / `cofog-03.2` /
+`isic-851`）、`isic-8510` と `isic-64920` と無関係な repo には**当たらない**。
+枝が空なら誰も外れない。修正後の tick は
+`別の枝が着手中なので候補から外した: cloud-itonami-isic-6492` を出し、
+次の 1 手が isic-4630 に移った —— **別セッションと衝突しなくなった。**
+
+## この設計が嘘になりうる場所（次の反復が最初に確かめること）
+
+1. **cofog-03.2 の nbb load は、langgraph + langchain を明示的に classpath に
+   置いた状態での結果。** 営み OS の面を作る生成器の classpath にこの 2 本が
+   入っているかは未確認。入っていなければ `:binding` は `:native` にならない
+2. **`81 tests / 210 assertions green` は README の自己申告であって、
+   この ADR の執筆時に実行していない。**接続する反復は必ず実際に走らせる
+3. **D4 の連携は『同じ建物』を前提にしている。**cofog-03.2 の site と 4211 の
+   site が実務で同一物を指すかは、両者の store を並べて確かめていない。
+   `:carry` なので運ぶ人が同定するが、同定できない場合この辺は無意味になる
+4. **`:actuation/dispatch-alert` が phase 3 で auto commit される**のは実測
+   （4211 phase.cljc:79）。理由は README:154 の『災害警報の dispatch は
+   速さそのものが安全である』。宣言済み 20 本の phase-3 `:auto` を数えた
+   ところ、他はほぼ intake 形（記録の受理）で、**外向きの通信を自動で出す
+   op をこの理由で置いているのは 4211 だけ**。防災面を広げるとき、この
+   例外が『防災だから』を理由に増殖しやすい —— 増やすなら 1 本ごとに
+   同じ強さの理由を書く
+
+## 着地（2026-08-07。設計と同じ日に接続まで済んだ）
+
+D3 と D4 は**面に載った**。手順ではなく結果を書く。
+
+| | commit |
+|---|---|
+| upstream 標準形化（`phase/read-ops` + `store/seed-db`） | `cloud-itonami/cloud-itonami-cofog-03.2` `f878dd86` |
+| OS 接続（shim / os.edn / hydrate / endpoints / 生成器 / deps / sites / test） | `network-awai/cloud-itonami` `bc605964` |
+| west pin 前進 2 件 | `com-junkawasaki/root` `08d76404` |
+
+**実際に回した結果**（生成器が実物の actor を実行。`OS_SITE_AT=2026-08-07T12:00:00Z`）:
+
+    台帳 65  :log-inspection      insp-1  確定    （phase 3 の :auto はこれだけ）
+    台帳 66  :escalate-hazard     hz-1    承認待ち（どの phase の :auto にも無い）
+    台帳 67  :escalate-hazard     hz-1    確定    （人の承認後）
+    台帳 68  :fire-hazard-survey  fh-1    保留    （未検証 site を台帳から独立に判定）
+    台帳 69  :log-inspection      insp-2  保留    （:effect :propose の宣言なし）
+
+公開面: https://cloud-itonami.itonami.cloud/cloud-itonami-cofog-03.2/ （200）。
+宣言は 20 → **21 本、接続済み 15 → 16 本**。
+
+**検証**: `clojure -M:test` = 1476 tests / 9855 assertions。失敗集合は
+`origin/main` の baseline（1473 / 9810）と **1 行も違わない**（既知 19 件:
+doctor / kotoba-xrpc / ops-keys / product-party / company 系）。上流側は
+`clojure -M:test` 81 tests / 210 assertions / 0 failures、`clojure -M:lint`
+0 errors 0 warnings —— **README の自己申告だった 81/210 を実際に走らせて確認した**。
+
+### 設計になかった発見: `:effect :propose` を誰が宣言するか
+
+この actor の governor は**最初の検査**で request 自身が `:effect :propose` を
+宣言していることを要求する（接続済み 15 本にこの要求は無い）。shim が黙って
+足せば全 op が通るが、その瞬間この検査は **OS 経由の全トラフィックで空振り**に
+なる —— OS が呼び出し側の宣言を代筆することになる。
+
+**代筆しない**方を選んだ。宣言は呼び出し側に残り、宣言し忘れた呼び出しは
+`:not-propose-effect` で HOLD される（面の台帳 69 とテスト
+`the-os-does-not-forge-the-propose-declaration` がこれを固定する）。代償は
+API 呼び出し側もこの field を送る必要があること —— 不適合として ledger に
+記録済みで、恒久的には actor 側が兄弟に寄せる番。
+
+## 帰結
+
+- 防災は『無い』から『**before の一部が実装済み・OS 未接続、during と after は
+  R0 で別 org**』という位置づけの明示に変わる。読み手が現在地を 1 回で読める
+- 4 つの repo に散っていた『権威を持たない』が 1 つの境界名になり、
+  5 本目を足す人が散文を読まなくても機械が同じ答えを出す
+- **tick が防災を候補にできない**という構造的な見落としが記録される。
+  これは防災に限らず、COFOG / ISCO / 名前付き actor の全部に効いている
+")
+
+  (:adr/gaps
+  (vector "UNSPSC 残り 4 本は `store/seed-db` の 1 行だけで候補になる（COFOG 4 本は 2026-08-07 に済ませた）。未着手"
+   "標準形になった COFOG 4 本はまだ OS に接続していない（候補プールに入っただけ）。M_own 0.505-0.535 で ISIC 上位の下に並ぶ"
+   "ISCO 340 本は 337 本が phase op 集合を持たない別構造。標準形へ寄せる道筋は未検討"
+   "分類に紐づかない適合 57 本（crowdfunding-* / marketplace-* 等の営みらしきものを含む）を OS に載せるかは未決。今は毎周報告するだけ"
+   "tick が読む os.edn は共有 checkout のものなので、その checkout が main より遅れていると宣言数を過少に報告する（2026-08-07 実測: 21/16 が 20/15 に見える）"
+   "isco-5411 の標準形化（phase.cljc / operation.cljc 新設）が未着手。pre-standard 形なので shim に判断を書かないと繋がらない"
+   "cofog-03.2 だけ request に `:effect :propose` 宣言を要求する不適合が残る（shim は代筆しない選択）。API 呼び出し側もこれを送る必要がある。恒久的には actor 側が兄弟に寄せる番"
+   "etzhayyim 三幅対（sonae / kazaori / shidemori）は R0 のまま。cell は import 時 RuntimeError。D6 のとおり面には載せていない"
+   "防災面に載っているのは before の断片 1 本だけ。during / after は面に無い（載せない判断であって、埋まった穴ではない）"
+   "共有 checkout `orgs/network-awai/cloud-itonami` が別セッションの未コミット WIP で dirty のため ff できず、deploy は隔離 worktree から行った。共有 checkout は main より遅れたまま"))))

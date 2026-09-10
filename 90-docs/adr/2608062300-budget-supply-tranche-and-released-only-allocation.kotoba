@@ -1,0 +1,136 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608062300-budget-supply-tranche-and-released-only-allocation")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "budget-supply-tranche-and-released-only-allocation")
+  (:adr/title "ADR-2608062300: 「予算がある」と「今それを配れる」を同じ数値に潰さない — budget-supply.edn の tranche 化と released-only 配分")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-06")
+  (:adr/last_verified "2026-08-06")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/repos (vector "com-junkawasaki/root"))
+
+  (:adr/authoritative_for
+  (vector "budget-supply.edn の :supply/pools は tranche を supply node として持ち、配分可能質量は released tranche の max - committed - spent だけである"
+   ":tranche/eligible-products が :undetermined または未記載の tranche は、どの product にも資金を出せない（コードで eligibility を推測しない）"
+   "held / stranded / exhausted な tranche を質量ゼロの supply node として OT に渡さない（意味論と数値の両方の理由）"
+   "eligibility が分断されている場合、需要比例の正規化は連結成分ごとに行う"
+   "portfolio-allocation.edn は :supply/placeholder? が真である限り、owner 未確認の placeholder を配分した結果であることを生成物自身に明示する"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+
+  (:adr/related
+  (vector "adr-2608062200-capital-pool-identity-and-the-double-allocated-three-million"
+   "adr-2607194500-bmc-portfolio-ot-allocation"
+   "adr-2607246100-revenue-agent-loop-capital-allocation-governor"
+   "adr-2607269000-murakumo-mk1-minimax-capital-allocation"
+   "90-docs/business/budget-supply.edn"
+   "90-docs/business/capital-pools.edn"
+   "90-docs/business/portfolio-allocation.edn"
+   "70-tools/bmc/src/gftd/allocate.cljc"))
+
+  (:adr/context
+  "ADR-2608062200 が pool の**同一性**（id と正本 ADR）を定めた。本 ADR はその入力を実際に読む allocator を実装する。
+
+ADR-2607194500 の `gftd allocate` は supply node が 1 個の退化ケースで、README も ns docstring も『将来 tranche を supply node にすれば非自明な輸送構造に拡張できるが未実装』と自ら書いていた。その未実装が問題になったのは、**tranche 構造が既に存在していたから**である — ADR-2607246100 §2 は JPY 3,000,000 を T1 300k / T2 700k / T3 1M / T4 1M の evidence-gated tranche に分けており、2026-07-24 時点で release されているのは T1 だけだった。
+
+つまり 2026-07-24 から 2026-08-06 までの 13 日間、この workspace には次の 2 つが同時に存在していた:
+
+- **実際に配れる金**: JPY 300,000（T1 のみ、行き先は cloud-itonami 1 件）
+- **allocator が配っていた金**: JPY 10,000,000（owner 未確認の placeholder、12 product へ需要比按分）
+
+後者の生成物 `portfolio-allocation.edn` は `club-shinshi 1,120,219` `net-kotobase 1,038,251` のような具体的な数値を並べており、**予算決定に見える**。実際には owner が確認していない数値を按分したものであり、しかも需要スコアが最も高い club-shinshi は ADR-2607246100 のどの tranche にも eligible として書かれていない。
+
+**問題は精度ではなく型である。** 『予算がある』と『今それを配れる』は違う量なのに、単一の `:supply/total-amount` はこの 2 つを 1 つの数値に潰していた。tranche を足すだけでは解決しない — held な tranche を『質量 0 の supply node』として渡すと、意味論的には『配れる金 0 円の口座』に見えて正しそうだが、数値的には `log(0) - logsumexp(全マスク行)` = `-Inf - (-Inf)` = **NaN** を作る（実測: これを試すと cloud-itonami の配分額が `##NaN` になる）。")
+
+  (:adr/decision
+  "### 1. tranche を supply node にする
+
+`budget-supply.edn` に `:supply/pools` を足す。各 pool は `:pool/id` と `:pool/authority`（正本 ADR）をちょうど 1 つずつ持ち（ADR-2608062200 決定 1）、`:pool/tranches` を持つ。tranche の配分可能質量は:
+
+    released なら  max(0, :tranche/max - :tranche/committed - :tranche/spent)
+    それ以外なら   0
+
+`:tranche/max` は**上限であって支出目標ではない**（ADR-2607246100 §2『JPY 3,000,000 is a maximum envelope. Unreleased capital remains a reserve.』）。
+
+### 2. tranche を 4 クラスに分け、全部を印字する
+
+| class | 条件 | 意味 |
+|---|---|---|
+| `:allocating` | released・質量 > 0・demand に居る eligible product あり | 今配れる |
+| `:stranded` | released・質量 > 0 だが行き先が宣言されていない | 出せる金だが宛先が無い |
+| `:exhausted` | released だが max - committed - spent ≤ 0 | 使い切った |
+| `:held` | release 条件未達 | **未割当ではなく意図された hold** |
+
+分類は全 tranche をちょうど 1 回ずつ覆う（重複なし・取りこぼしなし）。これは検査で強制する — 分類から落ちた行は『配れる金』と区別できないまま消えるため。
+
+### 3. `:undetermined` を「全 product に出せる」と読み替えない
+
+ADR-2607246100 は T2–T4 の対象 product を書いていない。書かれていない eligibility をコードで補完すると、**ADR が決めていない配分を allocator が勝手に決める**ことになる。よって `:undetermined` と未記載は空集合とし、その tranche は `:stranded` になる。
+
+### 4. sinkhorn に渡すのは `:allocating` だけ
+
+held / stranded / exhausted を質量ゼロの supply node として渡さない。理由は 2 つあり、どちらか一方でも十分:
+
+- **意味論**: 配れない金を『配れる金の一種（額 0）』として同じ行列に入れると、held と exhausted の区別が消える。
+- **数値**: 質量 0 の行は `u_i = log(0) - logsumexp_j(M_ij + v_j)` を計算する。その行が全マスク（eligible な列が無い）なら `logsumexp` は ##-Inf を返すので `-Inf - (-Inf)` = NaN になり、**その NaN が plan 全体に伝播する**。`logsumexp` が全マスクを ##-Inf で返す既存の実装は列マスクを安全にするためのもので、行の質量 0 を救わない。
+
+### 5. eligibility が分断されていたら連結成分ごとに解く
+
+supply node × product の二部グラフを連結成分に分け、需要比例の正規化を**成分ごと**に行う。全体比例にすると、ある成分の供給質量が別の成分の需要に引かれて transport 自体が実行不能になり、質量が消える。
+
+成分内でも Gale–Hoffman 条件は自動では満たされないので、`:feasible?` は sinkhorn の収束と周辺分布残差から**実測して**報告する。満たせない場合も数値を捏造せず `:marginal-error` をそのまま出す。
+
+### 6. placeholder は生成物自身が名乗る
+
+`:supply/placeholder? true` のとき、`portfolio-allocation.edn` の冒頭に『この表の総額は owner 未確認の placeholder であって pool ではない』という警告と、`capital-pools.edn` への参照を出す。placeholder でない予算には出さない（本物の予算まで疑わしく見えるため）。
+
+### 7. コマンド
+
+    gftd allocate pools        # 端末表示
+    gftd allocate pools md     # 90-docs/business/capital-pools.edn 再生成
+
+`--budget` は受け付けない。pool の総額は正本 ADR が決めるもので、CLI flag が決めるものではない。")
+
+  (:adr/consequences
+  "- **今配れる額が初めて計算されて出る。** 2026-08-06 実測: 配分可能 300,000 / held 2,700,000 / stranded 0 / 宣言済 pool 総額 3,000,000。eligible product は cloud-itonami 1 件、not-eligible 11 件。
+- **需要が高い product が 0 円になることが可視化される。** 需要スコア最高の club-shinshi（68.3）と 2 位の net-kotobase（63.3）はどちらも 0 円 — 需要ではなく ADR の eligibility が決めるため。これは allocator の欠陥ではなく、ADR-2607246100 が cloud-itonami 以外を T1 の対象に書いていないことの正しい反映である。
+- **`portfolio-allocation.edn` の 10,000,000 が消えるわけではない。** ADR-2607194500 の経路は互換のため残す。ただし生成物自身が placeholder であることを名乗る。2 つの生成物が並ぶことになるが、**答えている問いが違う**ので統合しない。
+- **T2 を release するとき、対象 product を ADR に書かなければ `:stranded` として出る。** これは意図した摩擦で、release と eligibility の宣言を同時に要求する。
+- **marketing 予算は構造的に 0 のまま。** `:pool/use-envelope` の `:paid-channel-experiments 300,000` は T3 まで実行できない（ADR-2607246100 が『非オーナー実決済が出るまで有償広告禁止』を authoritative_for に持つ）。これは未割当ではなく意図された hold であり、budget-supply.edn の `:pool/use-envelope-note` に明記した。
+- **生成物には gate が付いた（2026-08-07 追記）。** 導入当初、`capital-pools.edn` を検査するものは 1 つも無かった —— `manifest/projections/` の contract は 2 件（agent-source-query / training-corpus）だけで business 系は 0 件、`scripts/fleet-ci/gates.edn` にも budget-supply / capital-pools を見る entry が無かった。現在は `root-capital-pools` gate（正本 `scripts/verify-capital-pools.cljs`、fleet adapter `scripts/fleet-ci/gates/capital-pools-check.cljs`）が `budget-supply.edn` から pool 算術を**再導出して** `capital-pools.edn` の本文と照合する。projection contract（`:canonical-edn-v1`）を使わないのは、あれが捕まえるのが生成物の手編集だけで、**budget-supply.edn だけが動いた場合を捕まえない**ため —— T2 を release する編集は budget-supply.edn 側にしか現れないので、実運用で最初に起きるドリフトがちょうど死角に入る。
+- **本 ADR も 3,000,000 が 1 つなのか 2 つなのかを決めていない。** ADR-2608062200 と同じく、係争は `:pool/contested-by` として記録され、`allocate pools` が毎回警告として印字するだけである。額を勝手に半分にも 2 倍にもしない。")
+
+  (:adr/verification
+  "**実装**: `70-tools/bmc/src/gftd/allocate.cljc` に `pool-nodes` / `components` / `solve-component` / `allocate-pools` / `render-pools-table` / `render-pools-md` を追加。`gftd/cli.cljc` の `:clj` / `:cljs` 両ブランチに `pools-inputs` と `[\"allocate\" \"pools\"]` を追加。
+
+**テスト**: `70-tools/bmc/test/gftd/allocate_test.cljc` に 10 deftest を追加。スイート全体で 39 tests / 244 assertions → **49 tests / 294 assertions、0 failures**（`nbb 70-tools/bmc/run-tests.cljs`）。
+
+**gate が落ちることを実際に確認した**（通ることだけを見て landed としない）。3 通りに壊してテストを走らせた:
+
+| 壊し方 | 結果 |
+|---|---|
+| `:undetermined` を「全 product に出せる」と読み替える | 5 failures（`pool-undetermined-eligibility-is-not-guessed`） |
+| 連結成分を無視して全体を 1 成分として解く | 5 failures。x への 100,000 が **7,317.07** に化け、y が 219,512 に膨らんだ |
+| held/stranded/exhausted も質量 0 の supply node として sinkhorn に渡す | 7 failures。cloud-itonami の配分額が **##NaN**（決定 4 の数値的理由が実測で再現） |
+
+3 通りとも元に戻して 0 failures を再確認した。
+
+**実データでの実行**（`GFTD_ROOT=<root> nbb 70-tools/bmc/bin/gftd.cljs allocate pools`）:
+
+    growth-2026H2/T1  released  allocating  300000   →  cloud-itonami
+    growth-2026H2/T2  held      held        700000   →  (未宣言)
+    growth-2026H2/T3  held      held       1000000   →  (未宣言)
+    growth-2026H2/T4  held      held       1000000   →  (未宣言)
+
+    配分可能 300000 | held 2700000 | stranded 0 | 宣言済 pool 総額 3000000
+    tranche クラス: allocating=1 stranded=0 held=3 exhausted=0
+    product: eligible=1 (cloud-itonami) / not-eligible=11
+    components=1 converged=true feasible=true marginal-error=1.16e-10
+    ⚠ 係争中の pool: growth-2026H2 — ADR-2607269000 (proposed) が 3000000 を主張
+
+同じ入力で `gftd allocate`（既存経路）は 10,000,000 を 12 product へ按分し、club-shinshi に 1,120,219 を割り当てる。**桁が違うだけでなく、答えている問いが違う。**
+
+**この ADR が検証していないこと**: オーナーの実際の手元資金。`:pool/total-amount 3000000` は ADR-2607246100 の記述をそのまま写したものであり、銀行残高と照合していない。`:tranche/committed 0` / `:tranche/spent 0` も同様に ADR-2607246100 の Run 0020 の記述由来で、実際の支出台帳とは突き合わせていない（突き合わせる台帳がまだ無い）。")))

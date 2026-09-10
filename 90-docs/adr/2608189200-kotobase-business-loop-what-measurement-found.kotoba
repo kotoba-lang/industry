@@ -1,0 +1,158 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608189200")
+  (:adr/title "kotobase.net を business として回す —— 払おうとした 3 件を弾いていた x402、買えなかった Starter、成立しえない価格")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-18")
+  (:adr/deciders "Jun Kawasaki（「kotobase.net として business を回すには」→ next ×5 → closing）")
+  (:adr/repos (vector "com-junkawasaki/root" "net-kotobase/control-plane" "kotoba-lang/org-chainagnostic-cacao"))
+  (:adr/relates-to "ADR-2608136000（検査を書く前・緑を信じる前の 5 問）, ADR-2607022600（funnel spec）, ADR-2607093100（x402 per-request billing）, ADR-2607261700（plan catalog）, ADR-2608141800（USD list + $25 Starter）, ADR-2607268000（CACAO は org-chainagnostic-cacao）")
+  (:adr/body
+  "# ADR-2608189200: kotobase.net を business として回すために測ったこと
+
+**Status**: accepted (2026-08-18)
+
+## 出発点
+
+「kotobase.net として business を回すには」。実測から始めた —— 憶測で施策を並べない。
+
+`GET https://kotobase.net/api/funnel`（当日）:
+
+```
+visitors 3,471  signups 28  checkouts 0
+x402: challenges 19 -> submissions 3 -> settlements 0 / rejections 3
+```
+
+売る準備は**できていた**。live Stripe price（¥19,800）、特商法ページ（事業者 Gftd Japan、
+2026-08-17 更新）、x402 の 402 応答、nexus catalog 掲載 —— すべて稼働中。
+詰まっていたのは 3 箇所で、そのうち 2 つを塞いだ。
+
+## 詰まり① x402 —— 払おうとした 3 件を 3 件とも弾き、理由を捨てていた
+
+`kotobase.x402/handle` は却下理由を計算して 402 のボディで支払者に渡した後、**捨てていた**。
+`on-event` がステージのキーワードしか運ばないので、`x402:rejections` は失敗を数えるだけで
+一つも名指しできなかった。ADR-2608136000 の「受け取ったエラー本文を捨てていないか」そのもの。
+
+**landed**（control-plane `157ec56`）:
+
+- `handle` が `{:event :rejection :reasons [...] :detail ...}` を emit
+- 閉じた理由語彙（検証前 2 種 + `pay.x402/payload-errors` 8 種 + `settlement-unverified`）。
+  語彙外は `\"unknown\"` —— **支払者が KV のキー空間を伸ばせない**
+- `/api/funnel` に `rejection-reasons` と、evidence floor として
+  `rejections-classified` / `rejections-unexplained`
+
+**過去 3 件の理由は永久に不明**。カウンタしか残っておらず復元元が無い。答えられるのは 4 件目から。
+
+本番実測: 不正な X-PAYMENT を 1 回投げ、`rejections 3->4 / classified 0->1 /
+reasons {\"malformed-header\": 1}`、unexplained は 3 のまま。**この 1 件は probe であり実需要ではない。**
+
+## 詰まり② Starter が買えなかった
+
+到着している客層（個人エンジニア）に合う唯一の段が mailto 専用だった。
+`/signup` のボタンは Free と Professional（¥19,800）だけ。**$25 を払いたい人はまずメールを書かされる。**
+
+`plans.cljc` は既に答えを持っていた（`:yen-equivalent \"¥3,750\"`、「対応する Stripe Price が
+できれば checkout を開く」）。つまり価格の判断は済んでおり、欠けていたのは配線だけ。
+
+**landed**（control-plane `e0f7b0e`、Stripe `price_1U5gk4LGWYDWP5eYK9moZr1m` ¥3,750 livemode）:
+
+- `hosted-starter` を `:motion :self-serve` に。`STRIPE_PRICE_STANDARD`（¥2,980）は**使わない** ——
+  別の金額で legacy `standard` 契約者用に予約
+- legacy tier 文字列 `starter` は **Professional のまま**。向け直すと既存契約者が再課金される
+- `self-serve-paid-plan-id` を `first` -> `last`。Starter は `:plan/order` 最小なので、
+  `first` のままだと **tier 無しの決済イベントの既定が Professional から Starter に移り、
+  Professional 支払者を格下げ**していた —— この default が防ぐはずの失敗そのもの
+- 特商法に Starter ¥3,750 を追加し、見積専用リストから除外。**セルフサーブの段の価格が
+  そのページに無い状態は法令上の欠陥**なので、ボタンと同じ変更で出した
+
+**i18n gate が本物の regression を止めた**: 説明文の書き換えで旧文が翻訳表の逐語キーだったため
+`/ja/landing` が英語のみ・`/ja/signup` が半分英語になっていた。日本語も同時更新。
+
+**認証済み end-to-end 実測**: 使い捨て鍵の CACAO でテナントとして
+`POST /billing/checkout {\"tier\":\"hosted-starter\"}` -> **200**、
+live session `mode=subscription currency=jpy amount_total=3750`、
+metadata に `tenant_did` と `tier`。funnel `checkouts` が 0->1 に動いた。
+session は expire し、**カウンタは probe 前の値（0 / `{}`）に戻した** ——
+合成イベントを残すと初の外部 activation に見え、BMC advisor が実需要として読む。
+
+## 派生 cacao CLI は apex が必ず拒否するトークンしか作れなかった
+
+上の認証で踏んだ。`kotoba cacao` は `cacao.core/mint` を直接呼ぶので全トークンが
+domain `kotoba.etzhayyim.com` + eip4361 を持ち、apex は `kotobase.net` / caip122 しか受けない。
+**apex の 401 は理由を運ばない**ので、鍵違い・期限切れ・署名エンコード違いと区別できない。
+ライブラリは `mint-kotobase-apex` を持ち docstring に「apex の拒否は理由を運ばないから
+mint 時に拒否する」と書いてあるのに、CLI がそこを通っていなかった。
+
+**landed**（org-chainagnostic-cacao `c70ba68`）: `--apex` / `--op-cap`。
+併せて flag parser のバグ —— boolean flag の概念が無く常に次のトークンを値として食うので
+`--apex --op-cap datom:read` は `:apex` に `\"--op-cap\"` を束縛し**capability を落としていた**。
+
+本番実測（同一 seed・2 トークン、不正 tier で funnel と Stripe の手前で止める）:
+`--apex なし 401` / `--apex あり 400 \"tier must be one of hosted-starter, ...\"`。
+400 = 認証が通った。副作用ゼロ。おまけにこの本文が **hosted-starter が本番の受理語彙に
+入っていることを独立に裏付けた**。
+
+## 詰まり③ x402 の challenge が増えないのは宣伝の問題ではない
+
+| 有料 | 無料の対 | 判定 |
+|---|---|---|
+| `POST /x402/xrpc/*` $0.002 | `/xrpc/*` -> **401** | **本物の提案**。支払いがアカウントの代わり |
+| `GET /x402/ipfs/{cid}` $0.001 | `GET /ipfs/{cid}` -> 無料・無認証・無制限 | **完全に劣後**。同一の `b2w/serve-archive-target` 呼び出しで終わり、無料側は関数全体に認証も quota も rate limit も無い |
+| （無し） | `GET /ipld/{cid}` -> 無料・無認証 | 同じ製品を**売っていない**。しかも canvas の 24h サンプルは毎回ここが上位 |
+
+**read plane は 2 本の無料経路で配られ、価格が付くのは 1 本、しかもそれは混んでいない方。**
+生涯 challenge 19 件は当然の結果で、`/.well-known/x402` と公開 nexus catalog は
+**成立しえない価格**を掲示している。
+
+**landed**（control-plane `fe160af`）—— 計器のみ。paywall も rate limit も足していない:
+
+- `unmetered-twin-reads` 同時に売っている経路で無料に配った read
+- `unpriced-plane-reads` 一度も売りに出していない経路で無料に配った read
+
+**意図的に分けた。** 前者は価格を迂回された需要、後者は値付けしていない需要で、
+**示唆する決定が逆**。合計すると区別が消える。成功 serve だけ数え、challenge が
+0 なら比は `nil`（捏造した 0 にしない）。
+
+## 未達 —— 正直に
+
+- **両カウンタは 0 のまま、0 から動くことを実演できていない。** 公開された実在 CID が無く、
+  `PUT /ipfs/:cid` は CACAO を拒否し（エラー形状が違う＝別の認証経路）、**DELETE 経路が
+  無いので合成オブジェクトの後始末ができない**。実トラフィック待ち。
+  **これは測定値ではない。** 今日直し続けた「走れなかった検査が合格と同じ値を返す」形。
+- **詰まり③の外部会話 0 件は未着手。** 実在企業への連絡なので明示の go 待ち。
+  `named-accounts.edn` の全件が `:send? false` で、ファイル自身が
+  「commercial go/no-go が no-go の間は営業禁止」と書く。**その no-go の根拠だった
+  merchant 不一致は本日解消済み**なので、まずそのフラグ自体の有効性を判断する必要がある。
+
+## 運用上の発見（再発防止として記録）
+
+- **Stripe アカウントが 3 つあり、うち 2 つが同名 \"Gftd Japan株式会社\"。**
+  `acct_1AFjSQLGWYDWP5eY`(kotobase の正) / `acct_1OMUMDBcblPoapUJ`(manimani 側) /
+  `acct_1TuxvPIzvFrqWhXK`(AWAI Network —— 実行計画が net-kotobase live sale への
+  使用を明示的に禁止)。**名前では選べない。account id で選ぶこと。**
+  1 日で 2 回誤りかけた。`secrets-location-map` に Stripe の記載はゼロで、それが遠回りの原因。
+- **MCP の Stripe キーは意図的に read-only**（launcher が「書き込みは CLI」と明記）。
+  ただし `PostProducts` は通った —— read-only と説明されたキーが live 書き込みをした。
+  締めるなら Products も read に落とす。
+- `stripe login` が発行するのは full secret key ではなく **restricted key**。
+  Prices Write はオーナーがダッシュボードで有効化した。
+- **npx はこのマシンで壊れている**（CLAUDE.md 既知）。`pnpm dlx` を使う。
+- **zsh は変数を単語分割しない。** 監視ループで `set -- $V` が `$1=\"0 0\"` になり即 break した ——
+  CLAUDE.md が `west update` について警告しているのと同じ罠が、`west` 以外でも出る。
+
+## 通した検証
+
+- control-plane 463 tests / 2,280 assertions green（着地時点）
+- org-chainagnostic-cacao 67 tests / 252 assertions green
+- **新しい主張はすべて反転して赤になることを確認済み**: 空 cause の記録削除 / 全件分類済みの仮定 /
+  旧 parser の復元 / apex 分岐を plain mint に戻す / 比を `(max 1 challenges)` で割る。
+  いずれも**壊したものと報告されたものが一致すること**を確認した。
+
+## Consequences
+
+- 個人エンジニアが人を介さず kotobase を買えるようになった。次に `checkouts` が動いたら
+  **それは本物**（合成分は復元済み）。
+- 4 件目以降の x402 却下は理由を答えられる。
+- 「x402 が売れない」を宣伝で解こうとする経路が閉じた —— 数が出るまで待てる。
+- **公開 catalog が成立しえない価格を載せている**という未解決の事実が残る。
+  これを直すのは「何を売るか」の決定であって、実装の問題ではない。
+")))

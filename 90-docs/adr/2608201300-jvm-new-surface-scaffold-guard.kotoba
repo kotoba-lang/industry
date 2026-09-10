@@ -1,0 +1,37 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608201300-jvm-new-surface-scaffold-guard")
+  (:adr/title "Scaffold and deps edits must not grow jvm-runtime-deps or production .clj")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-20")
+  (:adr/related (vector "adr-2608170200-jvm-dependency-surface-measured-repowide"
+                "adr-2608136000-five-questions-before-believing-a-check"))
+  (:adr/body "Context
+
+`90-docs/migration/kotoba-wasm-runtime-cutover.edn` already sets
+`:new-jvm-runtime-dependencies :forbidden`. Detector
+`scripts/verify-jvm-dependency-surface.cljs` measures standing
+`:jvm-runtime-deps` and `:jvm-source` debt. Neither stops an agent from
+scaffolding a new repo with production `.clj` or adding cheshire to
+top-level `:deps` — prose in CLAUDE.md and the cutover contract was not
+enough (same class as branch-sync: reminder ≠ enforcement).
+
+Decision
+
+1. Admission (new only). Editing an existing production `.clj` or an
+   existing third-party leaf is allowed. Creating a new production `.clj`
+   path, or adding a new top-level maven/external-git leaf that is not
+   `org.clojure/clojure` and not lint/test/build tool coords, is refused.
+2. Portable default for scaffold. New project source is `.cljc` / `.cljs`
+   / `.kotoba`. `test/` and `*_test.clj` remain allowed. Workspace git and
+   `:local/root` deps remain allowed. Tool coords stay under aliases.
+3. Enforcement. `scripts/jvm_new_surface_policy.cljs` classifies;
+   PreToolUse hook `.claude/hooks/jvm-new-surface-guard.cljs` on
+   Write|Edit|StrReplace and on `git commit`/`git push`. Fail-open on
+   parse/IO errors. Owner override: `JVM_NEW_SURFACE_ALLOW=1`.
+4. Policy home. `manifest/repository-rules.edn` `:workspace-policies
+   :jvm-new-surface`. Skill `new-project-scaffold` states the same defaults.
+
+Consequences
+
+Standing debt does not shrink by this ADR. Growth stops. Detector still
+reports what already exists. Mass port of legacy `.clj` is out of scope.")))

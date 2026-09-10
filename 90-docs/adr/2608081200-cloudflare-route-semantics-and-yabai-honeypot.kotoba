@@ -1,0 +1,38 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608081200-cloudflare-route-semantics-and-yabai-honeypot")
+  (:adr/title "ADR-2608081200: 公開 route の 404/403 と Yabai honeypot 観測を分離する")
+  (:adr/status "accepted, implemented")
+  (:adr/doc_type "adr")
+  (:adr/date "2026-08-08")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "cloudflare-route-semantics-and-yabai-honeypot")
+  (:adr/related (vector "adr-2607170800-yabai-cloudflare-zone-scanner-ingest-honeypot"))
+  (:adr/supersedes (vector "adr-2607170800 の catch-all 200 / no-block 方針"))
+  (:adr/superseded_by (vector))
+  (:adr/authoritative true)
+  (:adr/authoritative_for (vector "babiniku.net と shinshi.club の未実装 route の HTTP status"
+                          "Cloudflare analytics と Yabai 公開 IOC の privacy/attribution boundary"
+                          "scanner observation の日次・週次 routine"))
+  (:adr/last_verified "2026-08-08")
+  (:adr/body "# ADR-2608081200: route semantics と honeypot observation の分離
+
+## Context
+
+`/.env`、`/.git/HEAD`、`terraform.tfstate` などが homepage と同じ HTML を HTTP 200 で返していた。secret leakage は確認されなかったが、未実装 URL を実在 page として扱うため crawler、SEO、human analytics が不正確になり、公開サイトの HTTP semantics と honeypot 観測が結合していた。
+
+## Decision
+
+1. babiniku.net は `/` と実 asset/API のみ、shinshi.club は共有 route vocabulary が認める deep link と実 asset/API のみを 2xx にする。その他は 404 + no-store + noindex。
+2. `.env`、`.git`、WordPress/PHP、framework console 等は Cloudflare custom WAF rule で 403。WAF/HTTP analytics に source observation を残す。
+3. probe/unknown route は human pageview と visitor telemetry に数えない。
+4. Yabai は rolling 7-day window を日次 sweep し、2 zone 以上または 50 probe request 以上の source だけを confirmed IOC として公開する。candidate は保存・公開しない。IP は人や組織の帰属ではなく、shared/compromised infrastructure の可能性を伴う観測 source と表現する。
+5. query、header、cookie、body、User-Agent、raw path は公開しない。application structured log も raw IP/path を持たず Ray ID と分類だけを持つ。source-address の system of record は Cloudflare HTTP analytics とする。
+
+## Consequences
+
+正規利用の deep link は allowlist test で保護され、未実装 URL は正しい 404/403 になる。honeypot 能力は fake content を返すことではなく、edge で安全に観測・集約する能力になる。単発の正式 scanner や誤送信を公開上の攻撃者へ誤帰属するリスクを下げる。
+
+## Operations
+
+rule SSoT は `90-docs/gates/cloudflare-public-route-honeypot-rule.edn`。日次 21:20 UTC の GitHub Actions、週次 false-positive/route-drift/correction review、secret/PII exposure または正規 route block 時の fail-closed stop を運用する。")
+  (:adr/decision-summary "{:sites [\"babiniku.net\" \"shinshi.club\"] :http {:known 2xx :unknown 404 :sensitive 403} :observation :cloudflare-http-analytics :human-analytics :documented-routes-only :publication {:window-days 7 :confirmed-threshold \"zones>=2 or requests>=50\" :candidates :withheld :attribution :network-source-only} :cloudflare {:babiniku-ruleset \"bca72dac6c8447698240439ddeed79cd\" :shinshi-ruleset \"630813ed7ecd44218ceccc3a93ca6511\" :shinshi-worker-version \"a6bfdc14-a593-485a-b240-83665aede20f\"} :rule \"90-docs/gates/cloudflare-public-route-honeypot-rule.edn\"}")))
