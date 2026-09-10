@@ -1,0 +1,75 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111500-the-four-harness-layers-do-not-carry-equal-information")
+  (:adr/topic "q9-parity-harness-coverage")
+  (:adr/title "The four harness layers do not carry equal information, and one of them cannot vary at all")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609111400-a-repository-that-answers-25-is-worth-more-than-nine-that-answer-30"))
+  (:adr/body
+  "## Context
+
+Third batch of generated parity harnesses -- `com-adobe`,
+`com-ads-b-aviation`, `com-aftership` -- each generated, checked, compiled to
+aarch64-macos, executed, compared, and only then landed. Coverage moves from
+eleven to fourteen of twenty.
+
+The previous ADR argued that `com-adyen`'s route count of 25 was what made the
+other repositories' 30s readable. This iteration asked the same question of the
+other three layers, before choosing the batch.
+
+## The measurement that shaped the batch
+
+Every remaining pilot was read for its pagination constants and entity count:
+
+    all nine remaining     default-limit 20   max-limit 100
+    com-aftership          5 entities
+    the other eight        6 entities
+
+So the layers rank, and they are not close:
+
+  **route-count** VARIES. 25 where a repository declares five entities, 30 where
+  it declares six, on both sides. Its agreement is evidence about a derivation.
+
+  **as-int** DIFFERS, in every repository, on exactly one selector. It is the
+  control: the row that proves the harness reached the artifact at all.
+
+  **as-bool** is uniform across the cohort, but it is uniform because the
+  boolean vocabulary is genuinely the same everywhere, not because nothing
+  could differ.
+
+  **page-limit** CANNOT vary. All twenty pilots declare `default-limit 20` and
+  `max-limit 100`, so `8 of 8` is uniform by construction. It is the weakest row
+  in the harness and would agree even if the implementations had diverged in
+  ways these eight inputs cannot reach.
+
+`com-aftership` was included in this batch for the same reason `com-adyen` was
+in the last: it declares five entities, so the batch is not three repetitions of
+one answer.
+
+## Result
+
+    com-adobe             route-count 30 = 30
+    com-ads-b-aviation    route-count 30 = 30
+    com-aftership         route-count 25 = 25
+
+as-bool 9 of 9 and page-limit 8 of 8 in all three; as-int 5 of 6 with the
+`\"12abc\"` row differing -- the twelfth, thirteenth and fourteenth
+reproductions.
+
+## Why this is worth writing down rather than just counting
+
+`14 of 20` invites being read as a completeness figure. It is not one. It is
+four layers, of which one carries a real per-repository signal, one is a
+control that always fires, one is uniform for a legitimate reason, and one is
+uniform because a constant is shared cohort-wide.
+
+Nothing here is wrong -- but a future reader deciding whether the cohort is
+'verified' should know that `page-limit 8 of 8`, repeated fourteen times, is a
+single fact about two `def`s rather than fourteen independent confirmations.
+
+The layers that would carry per-repository information are the ones the
+generator still refuses: store, filter, pagination, handler and expand, all of
+which need fixtures shaped to the repository's own entities.")))
