@@ -12052,4 +12052,141 @@
      :find "#\"[^A-Za-z0-9._~-]\""
      :replace "#\"[^A-Za-z0-9-]\""
      :must-fail ["safe-rkey-preserves-the-unreserved-characters"
-                 "safe-rkey-strips-the-did-web-prefix-only-at-the-start"]}]}]}
+                 "safe-rkey-strips-the-did-web-prefix-only-at-the-start"]}]}
+
+  {:repo "orgs/kotoba-lang/crm"
+   :label "crm の 4 名前空間 —— 「まだ誰も押していない側」と、二つ目の host"
+   ;; この repo は 21 test / 89 assertion で緑だった。2026-09-10 に 8 つの壊し方を
+   ;; 当てたところ **8 つとも緑のまま通った** —— 落ちない検査ではなく、
+   ;; **その不変条件を一度も見ていない検査**が 8 つ在った。以下はその 8 つと、
+   ;; そこから出てきた host の問題。
+   ;;
+   ;; 形はどれも同じで、**通る例と落ちる例の両方が在るのに、押していない側が在る**:
+   ;; mismatch は「多すぎる」だけを、clamp は「上限」だけを、decay は「過去」だけを、
+   ;; exit-stage の除外は「キーが無い」だけを見ていた。CLAUDE.md の 5 問目
+   ;;（両方向を出しても境界が無ければ演算子は見えない）の、境界ではなく**向き**の版。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :crm/final-stage-becomes-unreachable
+     :note "terminal guard は from が terminal なら拒否する。それを『to が terminal でも拒否』へ
+            広げるのは、この関数に対する最も自然な書き間違いで、**:closed-won へ至る経路が
+            1 本も無くなる**（商談が成立できないパイプライン）。旧 suite が緑だった理由は
+            単純で、immediate-next の例が :qualification 止まり、exit の例が :closed-lost 宛て
+            —— **『完走できるか』を訊く assertion が 1 つも無かった**"
+     :file "src/kotoba/crm/pipeline.cljc"
+     :find "     (and (not (contains? terminal from-stage))\n"
+     :replace "     (and (not (contains? terminal from-stage))\n          (not= to-stage (last ordered-stages))\n"
+     :must-fail ["valid-transition?-permits-reaching-the-final-ordered-stage"
+                 "next-stages-and-valid-transition?-agree-on-every-pair"]}
+
+    {:id :crm/negative-months-before-the-start-date
+     :note "`(max 0 …)` を外す。旧 suite は clamp の**遠い側**（term を超える as-of）だけを
+            見ており、近い側は空いていた。契約開始**前**の as-of で elapsed が負になり、
+            straight-line は**負の認識収益**を返す —— 例外ではなく、actor が計上する数値。
+            落ちるのではなく嘘をつく形なので、下流のどこにも音が立たない"
+     :file "src/kotoba/crm/revrec.cljc"
+     :find "    (max 0 (min term-months raw))"
+     :replace "    (min term-months raw)"
+     :must-fail ["elapsed-months-never-goes-negative-before-the-start-date"]}
+
+    {:id :crm/revrec-mismatch-drops-the-absolute-value
+     :note "`abs*` を外す。旧 assertion は **全部 proposed > truth** だったので負側が一度も
+            通らず、ground truth 6000 に対する proposed 3000 が**無言で合格**した。
+            recompute がまさに捕まえるために在る向きが、検査されていなかった側だった"
+     :file "src/kotoba/crm/revrec.cljc"
+     :find "(> (abs* (- (double proposed-amount-usd) (double truth)))"
+     :replace "(> (- (double proposed-amount-usd) (double truth))"
+     :must-fail ["mismatch-flags-an-understated-amount-too"
+                 "mismatch-tolerance-boundary-is-exclusive-on-both-sides"]}
+
+    {:id :crm/leadscore-mismatch-drops-the-absolute-value
+     :note "revrec と同型。score で stage 遷移を許す governor は**両方向に**騙される
+            —— 低く出た score は、誰にも理由を告げずに lead を止める"
+     :file "src/kotoba/crm/leadscore.cljc"
+     :find "     (when (> (abs* (- proposed-score truth)) tolerance-points)"
+     :replace "     (when (> (- proposed-score truth) tolerance-points)"
+     :must-fail ["mismatch-flags-an-understated-score-too"]}
+
+    {:id :crm/decay-clamp-removed
+     :note "**この suite で 2 番目に重い。** 旧 decay assertion は event の日付が全て
+            as-of 以前で、下限 clamp に一度も届いていなかった。外すと 0.5^(負) が **1 を超える**
+            —— event を 1 つ未来日付にするだけで自分の重みを**無制限に**掛け算できる。
+            誤差ではなく gaming の経路で、しかも point-values の表を読んでも見えない"
+     :file "src/kotoba/crm/leadscore.cljc"
+     :find "  (let [days (max 0 days-elapsed)]"
+     :replace "  (let [days days-elapsed]"
+     :must-fail ["decay-never-lifts-an-event-above-its-full-weight"]}
+
+    {:id :crm/reached-stage-wins-over-the-current-stage
+     :note "`or` の 2 項を入れ替える。fixture の entity は **:stage と :reached-stage を
+            両方持つものが 1 つも無かった**ので、優先順位そのものが未固定だった。
+            :stage が新しい事実（今どこに居るか）、:reached-stage は退出時の記録なので、
+            逆に読むと**まだ進んでいる entity を後ろへ credit する** —— dashboard には
+            『失っていない人を失った funnel』として出る"
+     :file "src/kotoba/crm/funnel.cljc"
+     :find "  (or (pipeline/stage-rank ordered-stages stage)\n      (when (some? reached-stage)\n        (pipeline/stage-rank ordered-stages reached-stage))))"
+     :replace "  (or (when (some? reached-stage)\n        (pipeline/stage-rank ordered-stages reached-stage))\n      (pipeline/stage-rank ordered-stages stage)))"
+     :must-fail ["reached-counts-prefers-the-current-stage-over-a-recorded-reached-stage"]}
+
+    {:id :crm/unrecognized-reached-stage-defaults-to-rank-0
+     :note "docstring は『推測せず除外する』と書いているが、旧 exclusion test は
+            **:reached-stage を持たない** entity だけを見ていた。`(some? …)` で
+            短絡するので rank 引きに一度も到達せず、**在るが不正な値**は未検査。
+            0 に落とすと、typo 1 つが funnel の entry を 1 件でっち上げる"
+     :file "src/kotoba/crm/funnel.cljc"
+     :find "      (when (some? reached-stage)\n        (pipeline/stage-rank ordered-stages reached-stage))))"
+     :replace "      (when (some? reached-stage)\n        (or (pipeline/stage-rank ordered-stages reached-stage) 0))))"
+     :must-fail ["reached-counts-excludes-an-unrecognized-reached-stage-rather-than-guessing"]}
+
+    {:id :crm/cent-rounding-dropped-on-cljs-only
+     :note "**この suite で一番大事な 1 本。`clojure -M:test` はこの変異に対して緑のまま終わる**
+            —— reader conditional の :cljs 分岐は JVM から構造的に見えないので、host が
+            1 つしか無かった頃の suite はこの退行を永久に報告できなかった（labor の
+            :labor/guard-kept-on-jvm-dropped-on-cljs と同じ class）。
+            ⚠ **二つ目の host を足しただけでは足りなかった。** 実測 2026-09-10: この変異は
+            当初 **両方の host で緑**だった —— suite 中の金額が全て割り切れており、
+            **round そのものを一度も通っていなかった**。1000.00 を 3 で割る例を足して
+            初めて片側が赤くなる。『二つ目の host が在る』と『二つ目の host が見る』は別"
+     :file "src/kotoba/crm/revrec.cljc"
+     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :green-marker "portable-check: OK"
+     :find "     :cljs (js/Math.round cents)))"
+     :replace "     :cljs cents))"
+     :must-fail ["recognized-revenue-is-actually-rounded-to-the-cent"]}
+
+    {:id :crm/cent-rounding-dropped-on-jvm-only
+     :note "**上の対。** こちらは JVM で赤く、**nbb では緑**。両方を持って初めて
+            『二つ目の host が仕事をしている』が言える —— 片側だけだと、
+            *どちらの host も* 見ている変異と区別が付かない。CLAUDE.md の
+            『両方向を出したことがあるか』の、host 軸の版"
+     :file "src/kotoba/crm/revrec.cljc"
+     :find "  #?(:clj  (Math/round (double cents))"
+     :replace "  #?(:clj  (double cents)"
+     :must-fail ["recognized-revenue-is-actually-rounded-to-the-cent"]}
+
+    {:id :crm/point-rounding-dropped-on-cljs-only
+     :note "同じ形が leadscore にも在る。⚠ こちらは JVM が**偶然**守っていた
+            —— Clojure では `(= 10 10.0)` が false なので round を外すと JVM は落ちるが、
+            **cljs では同じ数なので true**。つまり『JVM が赤くなる』ことは
+            cljs 側が検査されている証拠にならない。半減期のちょうど半分
+            （20 × 2^-0.5 = 14.142…）を足して、cljs 側でも観測できるようにした"
+     :file "src/kotoba/crm/leadscore.cljc"
+     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :green-marker "portable-check: OK"
+     :find "  #?(:clj  (long (Math/round (double x)))\n     :cljs (js/Math.round x)))"
+     :replace "  #?(:clj  (long (Math/round (double x)))\n     :cljs x))"
+     :must-fail ["a-decayed-score-is-actually-rounded-to-a-whole-point"]}
+
+    {:id :crm/portable-runner-quietly-covers-less
+     :note "**refusal の床。exit 2 でなければならない。** 名前空間の一覧は静的に書くしかない
+            （require はコンパイル時に解決される）ので、それは tree についての主張になる。
+            一覧が 1 つ失われても `RAN 30 tests` と印字して緑を返せてしまうため、
+            runner は disk と突き合わせ、答えられないなら 0 でも 1 でもない値で終わる。
+            実測 2026-09-10: この変異で exit 2 / `REFUSED` になることを確認した"
+     :file "test/run_portable.cljs"
+     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :green-marker "portable-check: OK"
+     :find "    kotoba.crm.revrec-test])"
+     :replace "    kotoba.crm.funnel-test])"
+     :must-fail ["REFUSED"]}]}]}
