@@ -1,0 +1,83 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110700-as-int-is-the-only-i64-divergence-in-the-wave-1-cohort")
+  (:adr/topic "q9-wave1-artifact-verified-parity")
+  (:adr/title "as-int is the only i64 divergence in the wave-1 cohort, measured against executed artifacts")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609110600-the-as-int-divergence-is-a-cohort-decision-not-a-repository-one"
+                "adr-2609110500-a-parity-harness-found-the-oracles-own-two-branches-disagree"))
+  (:adr/body
+  "## Context
+
+The previous iteration established that all 20 wave-1 pilots carry the same
+`as-int` reader conditional, making the choice of a normative branch a cohort
+decision. It left one question open: is that the ONLY place a port and its
+oracle disagree, or merely the first one found?
+
+It is the only one, in the i64 layers.
+
+## Reproduce
+
+Three pilots have a whole-component build. For each of
+`com-abb-robotics`, `com-aadhaar` and `com-aave`:
+
+    # the artifact, executed rather than built
+    amu check   src/*/whole_component.kotoba --jvm-free --policy policy.edn
+    amu compile src/*/whole_component.kotoba --target aarch64-macos \\
+                --policy policy.edn --output a.kexe
+    amu extract-native a.kexe --symbol oracle-as-int --output n.bin   # :offset
+    KEXE_FUEL=100000000 kexe-loader n.bin <offset> 1 aarch64 7,23 <selector>
+
+    # the oracle
+    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+
+Then compare SELECTOR BY SELECTOR, matching on the label the harness printed
+rather than by column position. That detail is not pedantry: the first attempt
+printed the two sides as rows of unequal length -- the harness emits seven
+`as-int` selectors and the native side had been asked for six -- and the
+columns appeared to disagree everywhere. Aligning on the label showed one
+disagreement, not six.
+
+## Result
+
+    as-bool      9 of 9 agree, in all three pilots
+    page-limit   8 of 8 agree, where measured
+    as-int       agrees on every selector except \"12abc\", in all three
+
+`amu check` and `amu compile` returned `:ok true` for all three, and every
+number quoted came out of the executed artifact.
+
+## Why this scopes the pending decision rather than adding to it
+
+Naming a normative branch for the reader conditional does not leave a tail of
+other mismatches behind it. For these layers it closes the parity question
+instead of opening it, so the owner decision that is now blocking wave-1
+requalification is a single decision with a bounded consequence.
+
+## The one differing row is what makes the comparison readable
+
+A comparison that reports nothing but agreement cannot be distinguished from a
+comparison that never executed the artifact. All three of these runs would have
+looked identical -- rows of matching numbers -- had the loader been pointed at
+the wrong offset, had the fixtures drifted apart, or had the harness silently
+failed to load the oracle.
+
+The `\"12abc\"` row is the thing that rules those out. It differs, it differs in
+the same place in all three, and the reason it differs was measured rather than
+inferred. Read that way, it is not a defect the cohort has to fix before
+trusting the rest; it is the evidence that the rest was actually checked.
+
+## Not claimed
+
+The rendered-JSON hash layers remain uncompared. The `.kotoba` hashes a
+rendering, and the rendering is the port's own convention, so a hash
+disagreement there would confound a behaviour difference with a layout
+difference. Comparing them would need a rendering contract that does not exist
+yet, and inventing one to make a number appear would be measuring the harness
+rather than the port.
+
+Seventeen of the twenty pilots still have no whole-component build at all, so
+nothing here is a statement about them.")))
