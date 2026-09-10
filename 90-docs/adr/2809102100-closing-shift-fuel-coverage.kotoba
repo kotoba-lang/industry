@@ -1,0 +1,52 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809102100-closing-shift-fuel-coverage")
+  (:adr/title "A computed shift count, a fuel charge one instruction cheaper, and every coverage number in the session measured against a quarter of its evidence")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/related (vector "ADR-2608136000" "ADR-2809041200" "ADR-2607173100"))
+  (:adr/context
+  "One session, three threads, and the same failure shape under all of them: a thing was written, a tool reported success, and the thing was not there.
+
+  Thread one asked how much slower aiueos is than an Ubuntu server for amu native output. The answer was unmeasured, and getting it honest required building an instrument. Thread two broke language ceilings so that C need not be called. Thread three was a repeating kaizen loop over the OS coverage taxonomy and the repo maturity axes.
+
+  Three claims made during the session were wrong and were corrected by measurement rather than by review: that aiueos has no ring 3 (it boots a signed CPL3 ELF, 100 scans), that the blocker for the CPL3 build was a stale dependency pin (the pin was stale in the checkout, not on main), and that aiueos calibrates its TSC (it does so only under one ifdef).")
+  (:adr/decision
+  "LANDED AND VERIFIED ON DEFAULT BRANCHES.
+
+  aiueos: ADR-0211 (icount turns a clock that cannot measure into a counter that can), ADR-0212 (the C-free conversion order and the rule that blocks most of it), ADR-0213 (the first kernel conversion is a retirement, not a rewrite), a CLAUDE.md written out of the traps measured in the repo, the relay-parity gate, an AIUEOS_TSC_CALIBRATED_OK marker, seven marker attributions derived from preprocessor guards, and a canonical os-coverage task. PRs 333 337 338 339 340 341 344 345.
+
+  Language surface: a computed shift count is admitted. Four gates required an integer literal in 0..63 -- the frontend subset in kotoba-sema, the KIR admission predicate in osaho, the verifier in kotoba-verifier, and by inheritance the backends. The x86-64 emitter already emitted the variable-count group and already routed the count through emit-rhs-window, so nothing about the lowering changed; only the admissions did, plus a range guard because kotoba.kir traps outside 0..63 while CL is taken mod 64. aarch64 refuses a computed count rather than lowering it unguarded. kotoba-codegen 36, kotoba-native 172, osaho 89, kotoba-sema 79, kotoba-verifier 55.
+
+  Performance: the fuel charge decrements first and branches on the sign its own dec leaves. Measured by disassembling one three-operation loop before and after: 15 executed instructions per iteration become 14, the fuel share 3 becomes 2, the function 127 bytes becomes 117. Charged on every step of every re-entering function.
+
+  west: the aiueos pin advanced 302b94cc to e50b1808, which is what let repo-maturity see the CLAUDE.md at all.")
+  (:adr/consequences
+  "THE MEASUREMENT THAT MATTERS MOST IS THE ONE ABOUT MEASUREMENT.
+
+  Every coverage number quoted in this session -- 53.8 percent, time 0/1, the attribution buckets -- was computed against kernel-serial.log alone, one of the four logs the smoke writes. With all four the same boot scores 66/117 rather than 63/117. Five markers were unproven purely because of the evidence set, and three of them are the loader's own markers, which go to uefi-debug.log. The ledger's past entries used multiple logs every time; the single-log habit was introduced here. The durable fix is that there was no canonical invocation to follow, and now there is one.
+
+  A SECOND MEASUREMENT ABOUT MEASUREMENT: adding a stage marker to aiueos took its maturity composite DOWN, 0.946 to 0.820, because a nil axis is excluded from the composite and a 0.4 axis is included. The repo scored higher by not answering. There is also no published R0 to R5 rubric anywhere in the workspace, so that axis is scored against an undefined scale.
+
+  PIN CHAINS DO NOT END AFTER ONE LINK. Merging a producer and its consumer in the right order was not enough: kotoba-native main went red because its own kotoba-codegen pin did not move, caught by checking out main and running the suite rather than by assuming. Fixed in kotoba-native 173. The same shape then appeared twice more, at aiueos to amu and at west pin to repo-maturity.")
+  (:adr/gaps
+  "AMU PIN ADVANCE IS BLOCKED AND MUST NOT BE MERGED AS IT STANDS. amu PR 928 advances four pins (kotoba-native, osaho, kotoba-sema, kotoba-verifier) and has two failing required checks, test macos-14 and test ubuntu-latest, against a main whose recent runs are green. The advance spans 23 commits of which 4 are this session, so the cause is not attributable without the run logs, which GitHub withholds until the run completes. RESUME HERE: read the failed job logs, and if the cause is not one of the four changes, split the advance so each repo moves alone.
+
+  UNTIL 928 MERGES, NEITHER THE COMPUTED SHIFT COUNT NOR THE CHEAPER FUEL CHARGE IS THE DEFAULT BEHAVIOUR OF amu. Both are verified through plain bin/amu with the pins applied locally, and neither reaches a caller through the pinned toolchain.
+
+  AND AFTER 928, aiueos PINS amu IN THREE PLACES in its deps.edn, all at 6889fa73. That is the next link.
+
+  CEILINGS NOT BROKEN: arity is 5 and six parameters are refused, which is what forces a struct to be flattened into one region rather than passed as base and length pairs. There is no kernel-load-u64, so 64-bit fields cross as hi and lo u32 pairs. Words are signed, so C code whose correctness rests on unsigned 64-bit arithmetic overflows silently -- measured in inference_status, where a documented token bound holds for unsigned and fails here. There is no indirect call through a function pointer with the firmware ms_abi convention, which is why qualification.c is 84 percent marshalling. Variable-count shift is now expressible but variable-count ROTATE is not: bit-shift-left and unsigned-bit-shift-right are refused and i32-shift-left and i64-shift-left take a literal count only.
+
+  A LARGER FUEL WIN IS DESIGNED AND UNIMPLEMENTED. machine_ir counted-self-recur-plans is advisory until a backend implements the runtime non-negative fallback and exact saturating precharge contract. Precharging a counted loop once would take the in-body fuel cost from 2 to 0 rather than from 3 to 2.
+
+  THE C-FREE REFACTOR IS SIZED BUT NOT STARTED. Zero C files are converted. The kernel is 20,059 lines of C in 31 files across 8 symbol-level layers. The conversion coefficient is about 2.15 applied to JUDGMENT lines, stable across four measured files, while the judgment FRACTION varies from 16 percent to 100 percent. The 13,481 figure for judgment-shaped lines is an upper bound of unknown looseness because the asm and volatile heuristic does not see marshalling. The boundary is one-way: C calls Kotoba in 99 places, Kotoba cannot call C, so conversion is bottom-up only.
+
+  SIXTEEN MARKERS REMAIN UNCLASSIFIED and their runtime guards are now read but not recorded: device readiness, injected faults, prior-boot state. Attributing them is the next coverage iteration.")
+  (:adr/verification
+  "kotoba-native: 406 tests, 5,572 assertions, 0 failures, 0 errors, run on main after the codegen pin fix rather than on the branch.
+
+  The instrument: three independent measurements of one loop agree at 15 guest instructions per iteration -- objdump counted by hand, QEMU TCG under icount shift=0 sleep=off, and perf stat on Zen5 silicon at 15.0041. Whole-run instruction totals were REFUTED as an instrument: the same image run twice differs by 3.8 million instructions because icount makes the guest clock deterministic and does not make OVMF device polling loops spin the same number of times.
+
+  The Linux half of the boundary is banked at 348.5 retired instructions per syscall, with a null arm subtracted to remove loop bookkeeping rather than estimating it. The aiueos half is not measured: the CPL3 path builds and boots, but scans=100 is a literal in kernel/main.c that the smoke greps verbatim and the smoke has no icount hook.
+
+  aiueos coverage after all merges, through the registered task: from 4 evidence logs, CORE 66/117 at 56.4 percent.")))
