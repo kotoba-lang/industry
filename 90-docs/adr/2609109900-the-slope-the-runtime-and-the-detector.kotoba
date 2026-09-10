@@ -1,0 +1,188 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609109900-the-slope-the-runtime-and-the-detector")
+  (:adr/topic "query-plane-followups")
+  (:adr/title "傾き・runtime・検出器 —— pack の取り分は測れたが天井は production の 500 で、digest の値は runtime ではなく interpreter のものだった")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotobase-protocol-ipq"
+                "kotoba-lang/io-ipld" "kotoba-lang/ayatori" "net-kotobase/ipfs"))
+  (:adr/related (vector "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
+                "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
+                "adr-2608160100-block-car-pack-object"
+                "adr-2609060000-ipld-adl-selector-car-boundaries"
+                "adr-2608252400-the-query-was-never-what-was-slow"))
+  (:adr/validation (map
+    (:measured "3 follow-ups, 28 measured rows, every timing fitted with r-squared reported")
+    (:route "nbb, one shadow-cljs release bundle, wrangler dev (workerd), one live HTTPS origin")
+    (:machine "10 cpus, loadavg 13.0-29.2 during the runs")
+    (:evidence "90-docs/query-plane/2026-09-10-query-plane-followups.edn")
+    (:not-measured (vector "a pack actually placed" "the engine compiled" "whether dag-json should be supported"))))
+  (:adr/body "## Context
+
+ADR-2609109800 は次の 3 つを名指しで残した。オーナーが逆順（3 → 2 → 1）で
+進めるよう指示した。**3 つとも答えが出た。そのうち 2 つは、私が前の ADR に
+書いた内容を訂正させる。**
+
+## Q3 —— pack の取り分は測れた。天井は production の欠陥だった
+
+IPNI の advertisement chain は `PreviousID` の連結リストなので、
+`ExploreRecursive` で任意の深さの実 DAG を歩ける。**この bench が publish した
+graph ではなく、origin が既に serve している graph である。**
+
+    depth  status  blocks fetches   f=b        p50
+        0     200       1       1   true      159.6
+        2     200       2       2   true      272.8
+        4     200       4       4   true      538.9
+        8     200       8       8   true     1044.6
+       12     200      12      12   true     1576.3
+       13     200      13      13   true     1770.9
+       14     500       -       -      -          -   <- fit から除外
+
+    最小二乗（9 点）: 固定 21.1 ms + **1 block あたり 132.5 ms**、r^2 = 0.9978
+
+- **block 1 本 = fetch 1 本が全行で成立**する。これは相関ではなく機構である。
+- **pack の取り分の上限は (N-1) x 132.5 ms。** 13 block なら 1.6 秒。
+  intercept 21.1 ms は pack が取れない床。
+- ⚠ **pack を実際に置いたときの range read コストは測っていない** ——
+  それは store の性質であって、この曲線からは出ない。この ADR が言えるのは
+  **賞金の大きさ**だけである。
+- ⚠ **500 の行を fit に入れていない。** 応答しなかった request を線に通すと、
+  壊れた request が高価な request に見える。
+
+### 決定 Q3: この経路で pack は追う価値がある。ただし chain の結論を輸入しない
+
+ADR-2608160100 は novelty window について「本番深さでの取り分は 1 round trip」と
+結論している。**あれは commit chain の話であって、ここではない。** IPQ の
+traversal は chain ではなく、傾きは実測で 132.5 ms/block ある。
+
+## Q3b —— 測っている途中で production の 500 を踏んだ
+
+**depth <= 13 は 200、depth >= 14 は 500。** 中身は Cloudflare の HTML で、
+error code は **1101 Worker threw exception**。
+
+原因は深さではなかった。**chain の 14 本目の block の codec が dag-json
+（0x0129）だった**からで、matcher 1 個の selection でも同じ 500 になる:
+
+    GET /ipq/v1/selection/baguqeeraxdv3l52lkykjlfsvoglog3hxtqfhbkseu74ee6wc2qsi32zatgrq?selector=oWEuoA
+    -> 500 (Cloudflare 1101)
+
+**control**: 同じ CID を `/ipni/v1/ad/{cid}` で引くと 200（652 bytes）。
+**store は持っている。**
+
+根本原因は `kotobase.protocols.ipq/selection` の catch にある。`:type` ごとの
+`case` で 5 種類を status に写し、**default 節が `(throw e)`** になっている。
+その関数の docstring はこう始まる ——
+*Run one selection and map every failure onto a status that means something
+different from the others.* **default 節がそれをしていない。**
+Worker の中で throw すると Cloudflare の 500 になるので、
+**この surface が持っている名前付き refusal の語彙**（`selector-not-dag-cbor` /
+`root-not-held` / `selector-required` / `missing-block` / `resource-limit`）の
+どれでもない答えが返る。
+
+### 決定 Q3b: 欠陥として記録し、ここでは直さない
+
+直す形が 2 つあり、その選択は測定ではなく設計判断だから ——
+①dag-json を支持する（`ipld.dag-json` は実在する）②名前を付けて拒否する。
+**どちらにせよ default 節の `(throw e)` は残せない。**
+live な共有 surface への変更なので、次の一手として出す。
+
+## Q2 —— digest の値は runtime のものではなく interpreter のものだった
+
+ADR-2609109800 は digest を nbb で測り、「nbb は workerd ではない」と注意書き
+した。**その一語が 2 つの違いを隠していた** —— nbb は別の runtime であり、
+かつ **compiler ではない**（SCI、interpreter）。
+
+同じ 3 つの query 値を 3 面で測った。**3 面とも HTTP 越しに N 回まわさせて N に
+回帰する** —— Worker の中の時計は process の時計と同じようには進まないので、
+外から傾きを採れば 3 面で同じ方法が使える。
+
+    runtime      query        ms/digest    intercept       r2
+    interpreted  plain           0.8929        1.69   0.9997
+    interpreted  hierarchy       4.7722        0.97   0.9999
+    interpreted  triple         10.1418       -4.17   0.9998
+    compiled     plain           0.0821        1.31   0.9877
+    compiled     hierarchy       0.4367        1.01   0.9987
+    compiled     triple          0.9428        1.56   0.9982
+    workerd      plain           0.1388        4.25   0.9918
+    workerd      hierarchy       0.6685        2.57   0.9997
+    workerd      triple          1.3671        6.95   0.9989
+
+    interpreted / compiled   10.9x   10.9x   10.8x
+    compiled / workerd        0.59x   0.65x   0.69x
+    interpreted / workerd     6.4x    7.1x    7.4x
+
+**correctness control**: 9 行すべてが address を返し、distinct はちょうど 3
+（query ごとに 1 本）。**3 つの runtime が同じ CID を出し、その値は
+ADR-2609109700 の最初の probe のものと一致する。**
+
+### 訂正 —— ADR-2609109800 P5 の絶対値
+
+あの ADR は「hierarchy-rules を載せる固定費 約 3.9 ms」と書いた。
+**production（workerd）では 0.6685 - 0.1388 = 約 0.53 ms である。** 7 分の 1。
+
+⚠ **訂正はここまでで、P5 の比の主張までは否定されていない。**
+あれは digest（5.05 ms）と materialized query（5.94 ms）を比べていて、
+**両方 interpreted だった**ので、同じ 10x を被っているなら比は保たれる。
+**codec と engine が同じ penalty を被る保証は無く、engine をコンパイルして
+測っていない。** だから P5 は「絶対値が誤り、比は未検証」であって「正しい」でも
+「誤り」でもない。
+
+**この形は ADR-2609109800 の全数値に当たる。** あの ADR は
+「比だけが結論、絶対値はこの機械のもの」と自分で書いていた。**それは正しかった
+が、十分ではなかった** —— 「この機械のもの」ではなく「この interpreter のもの」
+だったので、production への写像は機械の話ではなく約 10x の話だった。
+
+### もう 1 つの自作のバグ
+
+最初の run で address の control が「9 行、distinct 1」と報告した。
+**n=0 の run が `(str nil)` = 空文字列を返し、cljs では空文字列が truthy なので
+`or` がそれを採っていた。** 9 行が完全一致して見えて、実は 9 行とも address を
+持っていなかった。前の ADR で rows 列の無い bench を踏んだのと同じ形が、
+**その ADR を書いた次の bench で再発した。**
+
+## Q1 —— 検出器を landed した
+
+`scripts/verify-materialized-reference-join.cljs`、`manifest/orgs-detectors.edn`
+に登録。**報告するのは形であって判定ではない** —— 参照が entity id かどうかは
+DATA の性質で、source scan には見えないので、finding は「ここを確かめろ」。
+
+    orgs/ 一掃: 44,736 files, 19 findings, 14 repos, 27 秒
+
+**両方向を landing の前に見せた**: 両方の marker を持つ fixture は exit 1 で
+finding 1 件、どちらも持たない fixture は exit 0、存在しない directory は
+**exit 2 REFUSED**（空の scan は clean ではない）。
+
+⚠ **最初の版は、それを trip させるために作った fixture に 0 を返した。**
+alias の綴り一覧（`bridge/materialize` 等）で照合していて、fixture は別の
+綴りを使っていた。**綴りを当てそこねて 0 を返す検査**は、この registry が
+防ぐために在る形そのものなので、ファイルにその経緯を書いた。
+
+runtime 側の証明は `90-docs/query-plane/selftest_reference_join.cljs`。
+**`main` は boolean ではなく失敗数を返す。** 2 つの graph 形を同一にすると
+4 checks 中 2 が FAIL して exit 1 になる。
+
+## 測っていないこと（clean ではなく未測定）
+
+- **pack を実際に置いた場合の range read コスト。** 賞金は測ったが、価格は測っていない。
+- **engine をコンパイルした場合の速度。** digest だけ 3 面で測った。
+- **dag-json を支持すべきか拒否すべきか。** 設計判断であって測定ではない。
+- **19 findings のうち実際に key 参照をしているものが何件か。** shape であって verdict ではない。
+
+## Reproduce
+
+evidence は `90-docs/query-plane/2026-09-10-query-plane-followups.edn`。
+
+    nbb --classpath \"orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_ipq_pack_opportunity.cljs
+
+    cd 90-docs/query-plane/digest-runtime
+    ln -sfn ../../../orgs/net-kotobase/ipfs/node_modules node_modules
+    node ../../../scripts/resource-guard.mjs run build -- ./node_modules/.bin/shadow-cljs release esm
+    cd - && nbb --classpath \"…\" 90-docs/query-plane/bench_digest_runtimes.cljs
+
+    nbb scripts/verify-materialized-reference-join.cljs orgs
+    nbb --classpath \"…\" 90-docs/query-plane/selftest_reference_join.cljs
+
+**3 本とも control を持ち、その control は落ちる向きで走らせてある。**
+")))

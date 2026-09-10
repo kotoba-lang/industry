@@ -1,0 +1,108 @@
+#!/usr/bin/env nbb
+;; Rule-based inference over a MATERIALIZED document store, where a
+;; cross-document reference by key silently answers less than it should.
+;;
+;; ## The defect, measured 2026-09-10 (ADR-2609109800 P6)
+;;
+;; `kotobase.query.bridge/materialize` mints one entity per document, named
+;; `:<collection>/<key>`. A document whose value NAMES another document by its
+;; key therefore does not join to that document's entity: the two are a string
+;; and a keyword, so they are two values.
+;;
+;; With a plain `:where` this shows up as an empty result, which is loud. With
+;; `:rules` it does not. A fixpoint that cannot climb simply stops climbing:
+;;
+;;     references are entity ids   (owl-type i0 ?c) -> 4 classes, the whole chain
+;;     references are key strings  (owl-type i0 ?c) -> 1 class, the asserted one
+;;
+;; No exception, no empty set. A plausible partial answer, which is the one
+;; wrong answer that looks exactly like a right one.
+;;
+;; ## What this reports, and what it deliberately does not
+;;
+;; It reports a SHAPE: source that runs rule-carrying queries over a
+;; materialized document store. It does NOT claim those queries are wrong --
+;; whether the references are entity ids is a property of the DATA, which no
+;; source scan can see. The finding says *check this*, the same way
+;; `verify-codec-seq-expansion` says *measure this*.
+;;
+;; The runtime half is `--self-test`, which builds both graphs and asserts the
+;; predicate below actually separates them. A detector whose failing direction
+;; has never been run is a detector nobody has justified.
+;;
+;;   nbb scripts/verify-materialized-reference-join.cljs --findings orgs
+;; The runtime half lives next to the evidence it produced, because it needs a
+;; classpath this detector deliberately does not have:
+;;
+;;   90-docs/query-plane/selftest_reference_join.cljs
+;;
+;; Exit: 0 clean, 1 findings, 2 REFUSED (could not answer).
+
+(ns verify-materialized-reference-join
+  (:require ["fs" :as fs]
+            ["path" :as path]
+            [clojure.string :as str]))
+
+(def source-ext #{".clj" ".cljc" ".cljs"})
+
+;; Both halves must be present for the hazard to exist. `materialize` alone is
+;; a plain document query, and `:rules` alone may be running over a graph this
+;; bridge never touched.
+;; Just the word, because the call is always through an alias and the aliases
+;; differ per file (`bridge/`, `legacy/`, `q/`, `b/`). Narrowing it to a list of
+;; alias spellings is how a detector comes to report zero for the reason that it
+;; guessed the wrong spelling -- measured 2026-09-10, when the first version of
+;; this file scored zero against a fixture built to trip it.
+(def materialize-marks ["materialize"])
+(def rule-marks [":rules"])
+
+(defn- refuse! [why]
+  (println (str "REFUSED\t" why))
+  (.exit js/process 2))
+
+(defn- files-under [dir]
+  (let [out (atom [])]
+    (letfn [(walk [d depth]
+              (when (< depth 12)
+                (doseq [e (try (fs/readdirSync d (js-obj "withFileTypes" true))
+                               (catch :default _ []))]
+                  (let [n (.-name e) p (path/join d n)]
+                    (cond
+                      (and (.isDirectory e)
+                           (not (contains? #{".git" "node_modules" "out" "target" ".nbb"
+                                             ".shadow-cljs" ".cpcache"} n)))
+                      (walk p (inc depth))
+                      (and (.isFile e) (contains? source-ext (path/extname n)))
+                      (swap! out conj p))))))]
+      (walk dir 0))
+    @out))
+
+(defn- finding! [sev k detail]
+  (println (str "FINDING\t" sev "\t" k "\t" detail)))
+
+(defn- scan [dir]
+  (when-not (try (.isDirectory (fs/statSync dir)) (catch :default _ false))
+    (refuse! (str "not a directory: " dir)))
+  (let [files (files-under dir)]
+    (when (zero? (count files))
+      (refuse! (str "no source files under " dir " -- an empty scan is not a clean one")))
+    (println (str "SCANNED\t" (count files)))
+    (println "NOTE\torgs/ is west-managed; a project that is not checked out is invisible here, so SCANNED is not a workspace total")
+    (let [hits (for [f files
+                     :let [src (try (fs/readFileSync f "utf8") (catch :default _ nil))]
+                     :when src
+                     :when (and (some #(str/includes? src %) materialize-marks)
+                                (some #(str/includes? src %) rule-marks))]
+                 f)
+          hits (vec hits)]
+      (doseq [f hits]
+        (finding! "warn" (str/replace f (str dir "/") "")
+                  "rule-carrying query over a materialized document store: confirm cross-document references are entity ids (:<coll>/<key>), not key strings -- ADR-2609109800 P6"))
+      (println (str "FINDINGS\t" (count hits)))
+      (.exit js/process (if (seq hits) 1 0)))))
+
+(defn -main [& args]
+  (let [dir (or (first (remove #(str/starts-with? % "--") args)) "orgs")]
+    (scan dir)))
+
+(apply -main (vec *command-line-args*))

@@ -1,0 +1,30 @@
+;; The compiled half of the digest-runtime measurement (ADR-2609109900).
+;;
+;; ADR-2609109800 measured `:query/digest` under nbb and said, in its own
+;; caveat, that nbb is not workerd. nbb is also not a COMPILER -- it is SCI,
+;; an interpreter -- so that caveat was hiding two differences in one word.
+;; This build produces the compiled bundle so the two can be separated.
+;;
+;;   cd 90-docs/query-plane/digest-runtime
+;;   ln -sfn ../../../orgs/net-kotobase/ipfs/node_modules node_modules
+;;   node ../../../scripts/resource-guard.mjs run build -- \
+;;     ./node_modules/.bin/shadow-cljs release esm
+;;
+;; The symlink is deliberate: this measurement borrows an existing worker
+;; project's toolchain rather than installing a second one.
+{:source-paths ["src"
+                "../../../orgs/kotoba-lang/io-ipld/src"
+                "../../../orgs/kotoba-lang/org-ietf-cbor/src"
+                "../../../orgs/kotoba-lang/io-multiformats/src"
+                "../../../orgs/kotoba-lang/org-nist-sha2/src"
+                "../../../orgs/kotoba-lang/org-w3-owl2/src"
+                "../../../orgs/kotoba-lang/text/src"]
+ :dependencies []
+ :builds {:esm {:target :esm
+                :output-dir "out"
+                ;; `worker` rather than `default`: shadow generates externs from
+                ;; inferred property names and a `default` export makes it emit
+                ;; `var default;`, which is a reserved word and fails Closure.
+                ;; The bench generates a three-line default-export shim instead.
+                :modules {:bench {:exports {worker digest-runtime.core/worker
+                                            digestN digest-runtime.core/digest-n}}}}}}

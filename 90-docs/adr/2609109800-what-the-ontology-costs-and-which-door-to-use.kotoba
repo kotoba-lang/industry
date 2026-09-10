@@ -8,7 +8,8 @@
   (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/ayatori" "kotoba-lang/datalog"
                 "kotoba-lang/org-w3-owl2" "kotoba-lang/kotobase" "kotoba-lang/kotobase-server"))
-  (:adr/related (vector "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
+  (:adr/related (vector "adr-2609109900-the-slope-the-runtime-and-the-detector"
+                "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
                 "adr-2608252400-the-query-was-never-what-was-slow"
                 "adr-2608230200-a-query-whose-plan-reads-the-whole-graph-does-not-run"
                 "adr-2607299900-projection-vs-blocks-query-cost"
@@ -163,6 +164,26 @@ IPQ の traversal は chain ではない。**測ってから決める。**
 
 rows 列を足して初めて 0 が見え、そこから P6 の join 破れが見つかった。
 **「速い」という測定結果が、そのまま欠陥の隠れ場所だった。**
+
+## 訂正 —— この ADR の絶対値は runtime のものではなく interpreter のものだった（2026-09-10、ADR-2609109900）
+
+上の全ての ms は nbb で測ってある。この ADR はその注意書きを
+「この機械のもの」と書いたが、**それは正しくて不十分だった** ——
+nbb は別の runtime であるだけでなく **compiler ではない**（SCI、interpreter）。
+
+同じ digest を 3 面で測った結果:
+
+    interpreted (nbb)   hierarchy 4.77 ms/digest
+    compiled (Node)     hierarchy 0.44 ms/digest    10.9x
+    workerd             hierarchy 0.67 ms/digest     7.1x（nbb 比）
+
+- **P5 の絶対値は誤り。** production で hierarchy-rules を載せる限界費用は
+  **約 0.53 ms** であって 3.9 ms ではない。
+- **P5 の比の主張は未検証であって誤りではない。** digest と materialized query は
+  どちらも interpreted で測ったので、同じ penalty を被るなら比は保たれる。
+  **engine をコンパイルして測っていない。**
+- **P1〜P4 の比は乱れていない**（両側とも同じ interpreter で測っている）。
+  **絶対値だけを production の値として引用しない。**
 
 ## 測っていないこと（clean ではなく未測定）
 
