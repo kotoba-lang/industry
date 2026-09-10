@@ -1,0 +1,7 @@
+# Build artifacts of the digest-runtime measurement (ADR-2609109900).
+# `out/` is the shadow-cljs release bundle and `node_modules` is a symlink to
+# an existing worker project's toolchain -- both are reproduced by the two
+# commands in shadow-cljs.edn's header, and neither belongs in the tree.
+out/
+node_modules
+.shadow-cljs/

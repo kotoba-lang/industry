@@ -1,0 +1,80 @@
+;; ADR-2609109900 の測定。**手で数値を直さない** —— 直すときは bench を回す。
+;; load 13〜29 の機械。結論は比と構造値であって絶対値ではない。
+{:measured "2026-09-10"
+ :adr "adr-2609109900-the-slope-the-runtime-and-the-detector"
+ :extends "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
+ :machine {:cpus 10 :loadavg-range [13.0 29.2]}
+
+ :q3-pack-opportunity
+ {:bench "90-docs/query-plane/bench_ipq_pack_opportunity.cljs"
+  :question "IPQ の read path は block 数に対してどう伸びるか。pack の取り分はいくらか"
+  :dag "IPNI advertisement chain（PreviousID の連結リスト）を ExploreRecursive で歩く。live IPNI signed head から取るので固定 CID を焼いていない"
+  :reps 7
+  :rows [{:depth 0 :status 200 :blocks 1 :fetches 1 :bytes 562 :p50 159.6}
+         {:depth 1 :status 200 :blocks 1 :fetches 1 :bytes 562 :p50 152.6}
+         {:depth 2 :status 200 :blocks 2 :fetches 2 :bytes 1065 :p50 272.8}
+         {:depth 4 :status 200 :blocks 4 :fetches 4 :bytes 2071 :p50 538.9}
+         {:depth 6 :status 200 :blocks 6 :fetches 6 :bytes 3077 :p50 870.7}
+         {:depth 8 :status 200 :blocks 8 :fetches 8 :bytes 4060 :p50 1044.6}
+         {:depth 10 :status 200 :blocks 10 :fetches 10 :bytes 5020 :p50 1356.2}
+         {:depth 12 :status 200 :blocks 12 :fetches 12 :bytes 5980 :p50 1576.3}
+         {:depth 13 :status 200 :blocks 13 :fetches 13 :bytes 6461 :p50 1770.9}
+         {:depth 14 :status 500 :note "excluded from the fit -- a non-200 is not a slow 200"}]
+  :fit {:intercept-ms 21.1 :per-block-ms 132.5 :r-squared 0.9978 :points 9}
+  :fetches-equals-blocks true
+  :prize "1 traversal 1 pack なら (N-1) x 132.5 ms が上限。intercept 21.1 ms は pack が取れない床"
+  :not-measured "pack を実際に置いた場合の range read コスト。それは store の性質であって、この曲線からは出ない"}
+
+ :q3b-production-defect
+ {:surface "https://ipfs.kotobase.net/ipq/v1"
+  :symptom "HTTP 500、Cloudflare error 1101 Worker threw exception、body は Cloudflare の HTML"
+  :trigger "root block の codec が dag-json（0x0129）のとき。selector は matcher 1 個でも起きる"
+  :repro "GET /ipq/v1/selection/baguqeeraxdv3l52lkykjlfsvoglog3hxtqfhbkseu74ee6wc2qsi32zatgrq?selector=oWEuoA"
+  :found-how "IPNI ad chain の 14 本目がその codec だった。depth<=13 は 200、depth>=14 で 500"
+  :control "同じ CID を /ipni/v1/ad/{cid} で引くと 200（652 bytes）。store は持っている"
+  :root-cause "kotobase.protocols.ipq/selection の catch が :type ごとの case で、default が (throw e)。docstring は「every failure onto a status that means something different」と言っているが、default 節がそれをしていない"
+  :expected "名前付きの refusal（この surface は selector-not-dag-cbor / root-not-held / selector-required を既に持つ）。dag-json を支持するかどうかは別の設計判断"
+  :fixed? false
+  :why-not-fixed "live な共有 surface への変更で、かつ「dag-json を支持する」か「名前を付けて拒否する」かは設計判断。記録して次の一手として出す"}
+
+ :q2-digest-runtime
+ {:bench "90-docs/query-plane/bench_digest_runtimes.cljs"
+  :harness "90-docs/query-plane/digest-runtime/ （shadow-cljs :target :esm。out/ と node_modules は生成物）"
+  :question "ADR-2609109800 の digest の値は runtime のものか、interpreter のものか"
+  :method "3 面とも HTTP 越しに N 回まわさせて N に回帰する。Worker の中の時計は進み方が違うので、外から傾きを採る"
+  :reps 5 :counts [0 25 50 100 200]
+  :rows [{:runtime "interpreted" :query "plain" :ms-per-digest 0.8929 :intercept 1.69 :r2 0.9997}
+         {:runtime "interpreted" :query "hierarchy" :ms-per-digest 4.7722 :intercept 0.97 :r2 0.9999}
+         {:runtime "interpreted" :query "triple" :ms-per-digest 10.1418 :intercept -4.17 :r2 0.9998}
+         {:runtime "compiled" :query "plain" :ms-per-digest 0.0821 :intercept 1.31 :r2 0.9877}
+         {:runtime "compiled" :query "hierarchy" :ms-per-digest 0.4367 :intercept 1.01 :r2 0.9987}
+         {:runtime "compiled" :query "triple" :ms-per-digest 0.9428 :intercept 1.56 :r2 0.9982}
+         {:runtime "workerd" :query "plain" :ms-per-digest 0.1388 :intercept 4.25 :r2 0.9918}
+         {:runtime "workerd" :query "hierarchy" :ms-per-digest 0.6685 :intercept 2.57 :r2 0.9997}
+         {:runtime "workerd" :query "triple" :ms-per-digest 1.3671 :intercept 6.95 :r2 0.9989}]
+  :ratios {:interpreted-over-compiled [10.87 10.93 10.76]
+           :compiled-over-workerd [0.59 0.65 0.69]
+           :interpreted-over-workerd [6.43 7.14 7.42]}
+  :correctness-control "9 行すべてが address を返し、distinct は 3（query ごとに 1）。3 runtime が同じ CID を出す。値は最初の probe（ADR-2609109700）のものと一致"
+  :correction "ADR-2609109800 P5 の絶対値は interpreter のもの。production（workerd）で hierarchy-rules を載せる限界費用は 0.6685 - 0.1388 = 約 0.53 ms であって 3.9 ms ではない"
+  :correction-limit "P5 の『materialized query 1 本と同じ桁』という比は否定されていない —— engine 側も interpreted で測ったので同じ 10x を被っている可能性が高い。ただし codec と engine が同じ penalty を被る保証は無く、engine をコンパイルして測っていない"
+  :self-inflicted-bug "最初の run は address の control が全行 1 distinct を報告した。n=0 の run が (str nil) = 空文字列を返し、cljs では空文字列が truthy なので or がそれを採っていた。9 行が『完全に一致』に見えて、実は 9 行とも address を持っていなかった"}
+
+ :q1-detector
+ {:detector "scripts/verify-materialized-reference-join.cljs"
+  :self-test "90-docs/query-plane/selftest_reference_join.cljs"
+  :registered-in "manifest/orgs-detectors.edn :verify-materialized-reference-join"
+  :reports :shape
+  :why-shape-only "参照が entity id かどうかは DATA の性質で、source scan には見えない。finding は『ここを確かめろ』"
+  :sweep {:files 44736 :findings 19 :repos 14 :seconds 27}
+  :both-directions {:fixture-with-both-marks {:exit 1 :findings 1}
+                    :fixture-with-neither {:exit 0 :findings 0}
+                    :missing-directory {:exit 2 :output "REFUSED"}}
+  :first-version-scored-zero "alias の綴り一覧（bridge/materialize 等）で照合していたため、それを trip させるために作った fixture に 0 を返した。綴りを当てそこねて 0 を返す検査は、この registry が防ぐために在る形そのもの"
+  :self-test-control "2 つの graph 形を同一にすると 4 checks 中 2 が FAIL、exit 1。main は boolean ではなく失敗数を返す"}
+
+ :not-measured
+ ["pack を置いた後の実測（store の range read コスト）"
+  "engine（datalog / bridge）をコンパイルした場合の速度。digest だけ 3 面で測った"
+  "dag-json root を IPQ が支持すべきか拒否すべきか —— 設計判断であって測定ではない"
+  "detector の 19 findings のうち、実際に key 参照をしているものが何件か（shape であって verdict ではない）"]}

@@ -858,6 +858,48 @@
               what an empty scan and an unreadable candidate return, so a run that
               could not answer never returns the value a clean run returns."}
 
+  {:id       :verify-materialized-reference-join
+   :title    "rule-based inference over a materialized document store, where a reference by key answers less and does not say so"
+   :why      "2026-09-10 (ADR-2609109800 P6, ADR-2609109900): `kotobase.query.bridge/
+              materialize` mints one entity per document, named `:<collection>/<key>`.
+              A document whose value names another document BY KEY therefore does not
+              join to that document's entity -- a string and a keyword are two values.
+              Under a plain `:where` that is an empty result, which is loud. Under
+              `:rules` it is not: a fixpoint that cannot climb simply stops climbing.
+              Measured on a four-deep class chain, the same graph and the same query
+              return 4 classes when references are entity ids and 1 -- the asserted
+              one -- when they are keys. No exception, no empty set, a plausible
+              partial answer. It was found only because a bench printed its ANSWER
+              SIZE next to its timing; the first version of that bench had no rows
+              column and reported the empty query as a fast one.
+              This CANNOT be a fleet gate: it reads orgs/, which a gate never ships.
+              It reports a SHAPE and never a verdict -- whether a given call's
+              references are entity ids is a property of the DATA, which no source
+              scan can see, so the finding says CHECK THIS. The runtime half that
+              proves the shape is worth reporting is
+              90-docs/query-plane/selftest_reference_join.cljs, which returns a COUNT
+              of failing checks and reddens 2 of 4 when the two graph shapes are made
+              identical."
+   :argv     ["nbb" "{{repo}}/scripts/verify-materialized-reference-join.cljs" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- the shape changes only when
+                                         ; someone writes a new inference call
+   :timeout-ms  600000                   ; 10m -- ~22x the measured 27s runtime
+   :writes   :none
+   :measured "2026-09-10: 27s over orgs/, 44,736 source files scanned, 19 findings in
+              14 repos. Both directions shown before landing: a fixture holding both
+              marks exits 1 with the finding, one holding neither exits 0, and a
+              missing directory exits 2 REFUSED rather than 0 -- an empty scan is not
+              a clean one. The first version scored ZERO against the fixture built to
+              trip it, because it matched a list of alias spellings (`bridge/
+              materialize`, `legacy/materialize`) and the fixture used another; that
+              is recorded in the file, because a detector reporting zero for having
+              guessed the wrong spelling is the failure this registry exists to
+              prevent."}
+
+
   {:id       :verify-printed-value-identity
    :title    "a durable identity computed over a PRINTED value, where the address then depends on printer behaviour"
    :why      "ADR-2609107000 decision 1 says each plane keeps its own envelope and puts

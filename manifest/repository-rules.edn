@@ -513,8 +513,23 @@
    :policy/cost-model {:derived-tuples "n*D + D(D-1)/2"
                        :time "linear in individuals, roughly quadratic in hierarchy depth"
                        :design-variable :hierarchy-depth}
-   :policy/fixed-per-request {:digest "value-cid over the whole query value, so rules are in it: ~1.1ms bare, ~5.0ms with hierarchy-rules"
+   ;; Corrected 2026-09-10 (ADR-2609109900). The first numbers here were nbb's,
+   ;; and nbb is not only a different runtime, it is an INTERPRETER. Measured in
+   ;; three places over HTTP with the count regressed out: interpreted is ~10.9x
+   ;; compiled, and workerd is ~1.5x compiled. So the marginal cost of carrying
+   ;; hierarchy-rules in the query value is ~0.53ms in production, not ~3.9ms.
+   :policy/fixed-per-request {:digest {:interpreted-ms {:bare 0.89 :hierarchy 4.77}
+                                       :compiled-ms {:bare 0.08 :hierarchy 0.44}
+                                       :workerd-ms {:bare 0.14 :hierarchy 0.67}
+                                       :marginal-ontology-cost-workerd-ms 0.53}
                               :admission "two orders below; do not optimise"}
+   ;; The caveat that ADR-2609109800 attached to every one of its numbers was
+   ;; right and not sufficient: they were not this MACHINE's, they were this
+   ;; INTERPRETER's, and the mapping to production is a factor of ten rather
+   ;; than a question of load. The ratios inside that ADR are not disturbed
+   ;; where both sides were interpreted; the engine has not been compiled and
+   ;; measured, so digest-versus-query is unverified rather than wrong.
+   :policy/measurement-runtime-caveat :interpreter-not-just-machine
    ;; The received wisdom, narrowed rather than superseded: ADR-2608252400's
    ;; "the query was never what was slow" is a property of queries WITHOUT
    ;; rules. With hierarchy-rules at depth 16 the query is 99% of the request.
@@ -527,13 +542,37 @@
    :policy/materialized-reference :entity-id-required
    :policy/materialized-reference-hazard :silent-partial-answer
    :policy/materialized-reference-gate-writable true
+   ;; Measured 2026-09-10 over the IPNI advertisement chain, 9 points, r^2 0.9978.
+   ;; The prize a pack could take is (N-1) x per-block; the intercept is the
+   ;; floor it cannot.
    :policy/transfer-cost {:fetches-per-block 1
+                          :per-block-ms 132.5
+                          :fixed-ms 21.1
+                          :r-squared 0.9978
+                          :pack-prize "(N-1) x per-block-ms, upper bound; the price of a range read is NOT measured"
                           :p50-ms {:one-block 132.0 :three-blocks 353.0}
                           :refusal-ms {:malformed-selector 14.2 :root-not-held 121.9}
                           :pack-opportunity "collapse N fetches into one range read (ADR-2608160100), whose per-chain conclusion does NOT transfer here -- measure before adopting"}
    :policy/performance-evidence "90-docs/query-plane/2026-09-10-query-plane-performance.edn"
    :policy/performance-caveat "nbb / Node 26 on a workstation at loadavg 13-22, not workerd. The ratios are the result; the milliseconds are this machine's"
-   :policy/detector nil
+   ;; Landed 2026-09-10 for the entity-id hazard only. It reports a SHAPE, never
+   ;; a verdict: whether a given call's references are entity ids is a property
+   ;; of the data. 44,736 files, 19 findings, and both directions plus the
+   ;; refusal were run before it landed.
+   :policy/detector "scripts/verify-materialized-reference-join.cljs"
+   :policy/detector-self-test "90-docs/query-plane/selftest_reference_join.cljs"
+   ;; Found 2026-09-10 while measuring the transfer slope, and NOT fixed here:
+   ;; a dag-json root makes the IPQ worker throw, which Cloudflare renders as a
+   ;; 500 with an HTML body -- an answer that is none of this surface's named
+   ;; refusals. `selection`'s catch maps five ex-data types onto statuses and
+   ;; re-throws the rest, while its own docstring says it maps EVERY failure.
+   :policy/known-defect
+   {:surface "https://ipfs.kotobase.net/ipq/v1"
+    :trigger :root-block-codec-dag-json
+    :symptom "HTTP 500, Cloudflare 1101 Worker threw exception"
+    :root-cause "kotobase.protocols.ipq/selection default branch (throw e)"
+    :decision-needed "support dag-json, or refuse it by name -- either way the re-throw goes"
+    :fixed false}
    :policy/gate nil
    :policy/why-no-gate "no predicate enumerates the ways an ontology could reach an evaluator other than the two doors; a gate that has never been shown to fail is theatre, so build the third door first and watch it redden"
    :policy/measured-on "2026-09-10"
