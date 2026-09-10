@@ -52,15 +52,8 @@
 ;; much: a 429 storm is mostly one long request holding a slot.
 ;;
 ;; `context_length 262144` -- the model's own maximum, which is
-;; Qwen3.8-27B's `n_ctx_train`.
-;;
-;; ⚠ This is the MODEL's maximum, and since 2026-09-10 it is NOT what any
-;; head serves. gad's two 262144-token slots were the only ones that reached
-;; it, and gad was moved to video generation only (adr-2609100500). Chat now
-;; runs on b70 at 32768/slot x2 and xavier at 8192. Declaring 262144 here is
-;; still correct -- hermes needs >= 64,000 to start at all, the murakumo pool
-;; routes by fit, and the value describes the model rather than the box --
-;; but do not read it as a promise that a 200k prompt will be served.
+;; Qwen3.8-27B's `n_ctx_train`, and what gad's two slots actually serve
+;; (`--ctx-size 524288 --parallel 2`, read live off /props on 2026-09-10).
 ;;
 ;; Two floors meet here and both were measured, not reasoned about.
 ;;
@@ -171,7 +164,8 @@
 ;; ── The contract ─────────────────────────────────────────────────────────
 ;; One map. Everything downstream reads it; nothing re-derives a value.
 
-(def contract
+(def contract-api
+  "The public gateway. Default, and the one the reasoning above is about."
   {:base-url          "https://api.murakumo.cloud/v1"
    :ready-url         "https://api.murakumo.cloud/ready"
    :provider          "murakumo"
@@ -181,6 +175,75 @@
    :stale-timeout     600
    :request-timeout   900
    :max-parallel-jobs 6})
+
+(def contract-cluster
+  "The murakumo qwen cluster, reached on the tailnet: judah + dan, each
+  serving Qwen3.8-27B GSQ-RCO at the IQ3_XXS budget behind
+  `scripts/infer-cluster.cljs`. `--head cluster`.
+
+  ## Why direct and not through api.murakumo.cloud
+
+  The gateway serves a fixed allow-list (`MURAKUMO_MODELS` in
+  cloud-murakumo-api's wrangler.toml) and resolves each id to an endpoint in
+  KV. Putting this model there needs four things, not one: a cloudflared
+  ingress on judah (its tunnel is CONFIGURED BUT NOT RUNNING, measured
+  2026-09-10), a KV entry, an allow-list edit, and a Worker deploy. Until
+  those exist the gateway has no route to judah at all -- it is a Cloudflare
+  Worker and judah is tailnet-only. This is the same boundary the fleet
+  console hit. Reaching the head directly is not a shortcut around murakumo;
+  it is how a murakumo fleet node is reachable today.
+
+  ## Every number here was measured on judah, 2026-09-10
+
+  `context_length 65536`, and it is the tightest constraint in this file.
+  Hermes refuses any model under 64,000 (agent/model_metadata.py
+  MINIMUM_CONTEXT_LENGTH), and on a 16 GB machine this model cannot reach
+  that with the fleet's usual q8_0 cache: from the file's own geometry
+  (64 blocks, 4 KV heads, key/value 256) the cache is 136 KiB/token at q8_0,
+  so 65536 context wants 9.13 GB on top of 8.42 GB of weights -- 18.05 GB on
+  a 17.18 GB machine. At q4_0 the same context costs 4.83 GB, total 13.75 GB,
+  and it loads: wired 12.1 GB, swap unmoved, 7.58 tok/s. So the cache type is
+  not a preference here, it is what makes hermes able to use this head at all.
+
+  ⚠ THE WEIGHT IS IQ3_XXS, NOT IQ2_XS, and the difference is measured rather
+  than assumed. From ISTA-DASLab's own evaluation against BF16, IQ2_XS gives up
+  9.14 points of LiveCodeBench v6 (85.71 -> 76.57) and 5.05 of GPQA-Diamond;
+  IQ3_XXS matches the base exactly on AIME25 and trails by 1.14 on LCB, for
+  1.7 GB more. It is also the largest quant that stays under the 16 GB Macs'
+  ceiling while clearing hermes's 64,000 window.
+
+  ⚠ q4_0 IS A QUALITY TRADE, not a free win, and it is being made on top of a
+  model already quantized to a 3-bit budget. Tool calling was verified rather
+  than assumed -- the head returns a real tool_call
+  (`get_weather {city: Kyoto}`, finish_reason tool_calls), which is the only
+  capability hermes strictly requires. Anything subtler is unmeasured.
+
+  ⚠ ONE HEAD IS NOT ENOUGH, WHICH IS WHY THIS IS A CLUSTER. A 16 GB node
+  runs `--parallel 1`; hermes needs ~208,900 job-seconds/day (770 runs at
+  2048 max_tokens, 7.6 tok/s measured) and one slot supplies 86,400 -- 2.4x
+  over. Two heads give 172,800, i.e. 1.2x, so the gateway stays configured as
+  the fallback and takes the overflow rather than the queue growing.
+
+  ⚠ RAW TAILNET IPs INSIDE THE CLUSTER, because MagicDNS does not resolve on
+  this machine (`judah.tail110d8b.ts.net` -> could not resolve, measured).
+  Tailscale addresses are stable per node, but this is a real fragility.
+
+  ⚠ Only judah and dan are members. benjamin was measured at 8.7 GB of swap
+  and simeon at 16.3 GB, on 17 GB machines -- the console's own loadability
+  check refuses a node past half its RAM in swap, and simeon is the standing
+  example of why (18 GB swapped, 180 s for zero bytes)."
+  {:base-url          "http://127.0.0.1:8795/v1"
+   :ready-url         "http://127.0.0.1:8795/health"
+   :provider          "murakumo"
+   :model             "qwen38-27b-gsq-iq3xxs"
+   :max-tokens        2048
+   :context-length    65536
+   :stale-timeout     600
+   :request-timeout   900
+   :max-parallel-jobs 6})
+
+(def contract
+  (if (contains? #{"cluster" "judah"} (opt "--head" nil)) contract-cluster contract-api))
 
 ;; Models api.murakumo.cloud will NOT serve an anonymous caller. Measured
 ;; 2026-09-10; each returned 402 with `hosted_alternative: murakumo-main`.
@@ -284,7 +347,13 @@
         cj    (parse chat)
         tool  (some-> cj :choices first :message :tool_calls first :function :name)]
     {:ready-status (:status ready)
-     :ready-ok     (boolean (:ok rj))
+     ;; Two shapes, because two things answer this. The gateway's /ready
+     ;; returns {ok true, ...}; a bare llama-server head (`--head judah`)
+     ;; has no /ready at all and its /health returns {"status":"ok"}.
+     ;; Reading only the first reports a live head as down -- a false
+     ;; failure, which is the same class of wrong as a false pass and
+     ;; costs a real cutover.
+     :ready-ok     (boolean (or (:ok rj) (= "ok" (:status rj))))
      :degraded     (vec (or (:degraded rj) []))
      :capacity     (get-in rj [:inference :request-capacity])
      :pool         (get-in rj [:inference :pool-available])
@@ -857,8 +926,19 @@
                                                 " free=" (:free %)
                                                 (when (zero? (or (:free %) 0)) " (busy, not absent)"))
                                           (:wide-heads p)))
-                      "NONE IN THE POOL")))
-      (when (empty? (:wide-heads p))
+                      (if (= contract contract-api)
+                        "NONE IN THE POOL"
+                        (str "n/a — direct head, ctx "
+                             (:context-length contract)
+                             " (a single head publishes no pool)")))))
+      ;; ⚠ THE POOL QUESTION ONLY EXISTS FOR THE GATEWAY. `wide-heads` is
+      ;; read out of murakumo-main's capacity-members, which a single head
+      ;; reached directly does not publish -- so under `--head judah` it is
+      ;; ALWAYS empty and this block would announce "no head clears the
+      ;; floor" about a head measured serving 65,536. A check that cannot
+      ;; apply must say so, not fail: reporting a live head as down is the
+      ;; same class of wrong as reporting a dead one as up.
+      (when (and (empty? (:wide-heads p)) (= contract contract-api))
         (println)
         (println "    ! No head in the pool clears hermes's 64,000-token floor")
         (println "      (MINIMUM_CONTEXT_LENGTH, agent/agent_init.py), so every agent")
@@ -866,16 +946,10 @@
         (println "      excludes heads a request cannot fit, so requests above the")
         (println "      narrow heads' window match NO head and come back 502 with no")
         (println "      x-murakumo-route-head at all.")
-        (println "      ⚠ Do NOT restart murakumo-ring on gad to fix this. gad was")
-        (println "      moved to video generation only on 2026-09-10 (owner decision,")
-        (println "      adr-2609100500); murakumo-ring is stopped and `disabled` there")
-        (println "      on purpose, and gad is the box's ComfyUI/Hunyuan3D renderer.")
-        (println "      Chat inference is b70 (32768/slot x2) and xavier (8192).")
-        (println "      The pool's fit table is a HAND-MAINTAINED constant in")
-        (println "      cloud-murakumo-api src/local_murakumo/provider_catalog.cljc")
-        (println "      (:members, capacity-measured-at 2026-09-07) — it still says")
-        (println "      b70=16384 and lists gad=262144. Live /ready disagrees. Fix the")
-        (println "      table, not the heads.")
+        (println "      Check gad first — measured 2026-09-10, murakumo-ring.service")
+        (println "      was `enabled` but `failed` after its STOP timed out, and")
+        (println "      Restart=on-failure does not recover that. On the head:")
+        (println "        systemctl reset-failed murakumo-ring && systemctl start murakumo-ring")
         (println "      /ready says ok:true while this is true — do not read .ok."))
       (println))
     (if (seq fs)
