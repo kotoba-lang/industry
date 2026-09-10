@@ -1,0 +1,80 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111300-eight-of-twenty-pilots-now-have-a-parity-harness")
+  (:adr/topic "q9-parity-harness-coverage")
+  (:adr/title "Eight of twenty pilots now have a parity harness, and the same row differs in every one")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609111200-coercion-coverage-is-kind-level-and-was-already-complete"
+                "adr-2609110700-as-int-is-the-only-i64-divergence-in-the-wave-1-cohort"))
+  (:adr/body
+  "## Context
+
+All twenty wave-1 pilots carry a whole-component build. Until this week four
+carried a parity harness, so sixteen components had been built and never
+compared against the oracle they replace -- the state
+`com-abb-robotics`' own record calls `:not-claimed`.
+
+`scripts/gen-parity-harness.cljs` closes that. This iteration ran it on three
+more repositories and verified each against its own compiled artifact rather
+than landing harnesses unverified, because a harness that has never been run is
+the same 'built but never compared' state one level up.
+
+## Reproduce, per repository
+
+    nbb scripts/gen-parity-harness.cljs <repo-dir> <src-dir-name>
+    amu check   src/<ns>/whole_component.kotoba --jvm-free --policy policy.edn
+    amu compile src/<ns>/whole_component.kotoba --target aarch64-macos \\
+                --policy policy.edn --output a.kexe
+    amu extract-native a.kexe --symbol <oracle> --output s.bin   # prints :offset
+    KEXE_FUEL=100000000 kexe-loader s.bin <offset> <arity> aarch64 7,23 <selector>
+    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+
+## Result
+
+`com-abb-800xa`, `com-accelbyte` and `com-ach-network`, none previously touched
+by this work, each: `amu check :ok true`, compiled to aarch64-macos, executed,
+and compared selector by selector.
+
+    route count   30 on both sides
+    as-bool       9 of 9
+    page-limit    8 of 8
+    as-int        5 of 6, the \"12abc\" row differing
+
+Identical in all three. Coverage moves from five to eight of twenty.
+
+## The differing row is the reason the other numbers can be read
+
+`as-int` of `\"12abc\"` is 0 from each artifact and 12 from each oracle under nbb.
+That is the cohort-wide reader-conditional divergence: the oracle's `:cljs`
+branch is `js/parseInt` and its `:clj` branch is `Long/parseLong`, which throws
+and yields 0, and every component matches `:clj`.
+
+These are the sixth, seventh and eighth independent reproductions. More
+usefully, in each run it is the only row that differs -- so a run in which
+everything matched would not be a better result, it would be a reason to
+suspect the harness never reached the artifact. The generated harness says so in
+its own docstring rather than leaving the next reader to work it out.
+
+## What the generator still refuses to emit
+
+Only the route count and `as-int` / `as-bool` / `page-limit` over the shared
+fixture table -- the layers derivable without a judgement call. The store,
+filter, pagination, handler and expand layers need fixtures shaped to each
+repository's entities, and the four hand-written harnesses disagree about them:
+twenty sections in `com-aadhaar`, eleven in `com-abb-robotics`. An arm that runs
+without asserting anything about its repository is worse than an absent one.
+
+So eight of twenty is coverage of four layers, not of the components. That
+distinction is worth keeping in view when this number is quoted.
+
+## An operational note
+
+Three worktree creations failed at the start of this iteration with `missing but
+already registered worktree`. Earlier iterations had removed worktree
+DIRECTORIES with `rm -rf` without `git worktree remove`, leaving git's
+registrations behind. `git worktree prune` clears them. Removing a worktree by
+deleting its directory looks like it worked and fails the next time the path is
+reused.")))
