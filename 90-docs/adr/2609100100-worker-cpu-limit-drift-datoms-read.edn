@@ -711,5 +711,72 @@ filter→take ならその最後の行が返る。**他のどのケースも両�
 **この pin が在るので、遅延 3 層の除去はもう安全に測れる。** 順序は
 「テストが先、refactor が後」であって、逆にしてはいけなかった。
 
+## closing — 現在地と再開点（2026-09-10）
+
+### 着地したもの（全 commit が default branch の祖先であることを確認済み）
+
+| repo | commit | 内容 |
+|---|---|---|
+| net-kotobase/control-plane | `eb9d6f59` | `limits.cpu_ms 30000` をソースに明示（drift の封鎖） |
+| | `92cd617f` | store 呼び出し probe（走行中に吐く） |
+| | `f9c4dee7` | trampoline の handler 再実行 probe |
+| | `d2fbcf0b` | novelty size probe（O(1)） |
+| | `641d2135` → `75936d2a` | write パス memo を object store へ → **同日撤回**（説明の付かない spin） |
+| | `a7164736` / `93d9c720` | peer pin 前進（bulk hydrate / assert batching） |
+| | `e1ea28c8` | fetch バイト数の計上 |
+| kotoba-lang/kotobase-peer | `5e60546b` / `3845b868` | novelty **構造** walk を async に（fold / read） |
+| | `9a9e011f` | hydrate を bulk load に（**予測 −14MB / 実測 −15.5MB**） |
+| | `e0446c00` | fold の assert 連続を batch 化（順序保存） |
+| | `5d19ab4f` | **`cold-datoms-async` の limit × visible? 意味論を pin** |
+| kotoba-lang/kotobase-server | `925760bf` | `do-fold` が snapshot-keyed memo を渡す |
+| kotoba-lang/ayatori | `218b68de` / `9e1af1ba` / `f3476bf5` | co-scientist 反復 08 / 09 / 10 |
+| | `a45211ec` | Q9 whole-component を `:blocked`（crypto kit 欠落） |
+| com-junkawasaki/root | ADR 11 回更新 | 本 ADR |
+
+**PR は 1 本も作っていない**（すべて `gh api .../merges` の server-side merge）。
+west pin は 4 repo とも default branch tip と一致。
+
+### 検証
+
+kotobase-peer **258 tests / 1035 assertions**、control-plane **459 / 1557**、
+kotobase-server **182 / 680**、ayatori **141 / 421** —— すべて 0 failures。
+**新規テストはすべて「壊して赤」を確認済み。** 本番 deploy 15 回、
+`deploy-versioned.mjs` の revision tag 検証つき。
+
+⚠ **既知の別件 fail**: control-plane の `npm run architecture:check` は
+無改変の origin/main でも同一に落ちる
+（`external runtime dependency debt … kotobase-index-prolly-standalone/package.json`）。
+本セッションの変更とは無関係。
+
+### 未解決（優先順）
+
+1. **`yoro-social-v2` は fold できない。** 未 fold novelty **820**、fold は
+   128 MB の isolate 天井に当たる（`cpu_ms 300000` でも不可）。
+2. **app-aozora-pds は 73% loadShed** —— 1 の直接の帰結。
+3. 説明できているメモリは 19 MB / 74〜82 MB。**残りは churn。**
+
+### 再開点（推論からではなく、ここから）
+
+**`cold-datoms-async` の行構築（`for` → `filter` → `take` → `vec`）を 1 pass に。**
+per-row churn の最大の残り。**意味論は `5d19ab4f` が pin 済みなので、今度は
+安全に測れる**（この pin が無かったので前回は書いて捨てた）。
+
+    cd orgs/kotoba-lang/kotobase-peer && npm run test:nbb   # 258/1035/0 が基準
+    # 変更後、必ず: 上流の limit 切り詰めを外して cold-scan-limit… だけが落ちることを見る
+
+その後: ①効果をメモリで測る（`memoryUsageBytes` 分位数、母数 100 以上）
+②fold が通ったら cron 配線（**通る前に配線しない** —— 失敗を 5 分ごとに走らせるだけ）
+③read 側の retract summary は独立に効く。
+
+### 触っていないもの（他者の作業物）
+
+- `kotoba-lang/kotobase-peer` の `codex/fold-async-reads`（2026-07-27、diverged、未 merge）
+- 他セッションの worktree 7 本（`root-kotoba-native-commands` / `root-migrate-nbb-edn` /
+  `root-q9-gen-adr2` / `root-spotwork-extract` / `itonami-growth-bot` / `wt-hp` /
+  `wt-tsukuru-scout`）と control-plane の `cp-deploy`
+- control-plane の open PR 16 本（dependabot / cursor）
+- ⚠ **deploy 済みの Worker は `e1ea28c8`、control-plane main は `98f4ed6b`（+2 commit）。**
+  差分は他者の security-contact 系で、私の deploy 対象ではないため進めていない。
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
