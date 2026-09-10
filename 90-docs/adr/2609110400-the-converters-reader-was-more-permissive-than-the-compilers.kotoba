@@ -1,0 +1,116 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110400-the-converters-reader-was-more-permissive-than-the-compilers")
+  (:adr/topic "kotoba-adl-convert-source-admissibility")
+  (:adr/title "The converter's reader was more permissive than the compiler's, so it renamed files into a spanless failure")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba"))
+  (:adr/related (vector "adr-2609110300-kotoba-adl-convert-asks-whether-a-clojure-consumer-remains"))
+  (:adr/body
+  "## Context
+
+Owner instruction 2026-09-10, continuing the converter work. The previous
+change made the consumer guards set-aware. This one is about a different gap:
+the converter was willing to rename files the compiler cannot read.
+
+## The gap, and how to see it
+
+`kotoba adl convert` decides a source file is parseable using
+`kotoba.adl.reader/read-cst`. That reader is NOT the one `amu check` uses, and
+it is more permissive. Reproduce with a five-line probe against the reader
+directly:
+
+    nbb --classpath <kotoba>/src probe.cljs
+      shebang     read-cst ACCEPTS
+      // lines    read-cst ACCEPTS
+      regex #\"    read-cst ACCEPTS
+      #js         read-cst ACCEPTS
+      plain       read-cst ACCEPTS
+
+So `:unparseable-source` never fires for any of them, the file is renamed, and
+`amu check` then answers `source reader rejected input`. In six of seven cases
+that error carries NO span, which is an error a reader cannot act on.
+
+## How the constructs were found: bisect the real file
+
+Every one of the four was found by cutting a real landed file down to the
+offending line. Nothing here came from reading a grammar, and that matters,
+because reading produced three wrong answers first.
+
+    for each top-level form boundary N:
+      head -n N file.kotoba > b.kotoba
+      amu check b.kotoba --jvm-free
+
+On the smallest read-failure file the first prefix already failed, and the
+bisect inside it terminated at ONE line: `#!/usr/bin/env bb`. A shebang. The
+other three came out the same way -- a first line beginning `//`, a `#\"regex\"`,
+and a `#js` literal.
+
+⚠ Three hypotheses formed by reading rather than bisecting were all wrong, and
+each looked plausible enough to implement:
+
+  (def x {:a 1})        admitted -- so it is not 'map literals'
+  (def x \"doc\" {:a 1})  admitted -- so it is not the docstring arity
+  #(+ % 1)              admitted -- so it is not the fn-literal
+
+The one that mattered most: `:kotoba.error/map-literal-value` does not name a
+literal at all. Bisecting showed the catalog alone passes and the failure
+appears when a function USES it -- `(get catalog association)`, a dynamic
+projection of a map constant. That is a language capability gap, which ADR-q9
+says to record as `:blocked`, not to work around in a converter.
+
+## Decision
+
+The source branch refuses, by name, what amu's source reader will not read:
+`:executable-script`, `:not-clojure-source`, `:regex-literal`, `:js-literal`,
+`:inst-literal`, `:uuid-literal`, `:object-literal`.
+
+Refusing is deliberately conservative. A false refusal leaves a file where it
+was; a false admission moves a file and stops it being readable. Those costs
+are not symmetric, so the check errs toward refusing.
+
+## Two defects found by controls, not by review
+
+**The scanner blanked the character it was searching for.** Strings and
+comments are blanked before scanning for dispatch tags, and the first version
+took the `\"` of `#\"` as an ordinary string opener. It therefore erased the very
+two-character sequence it was looking for and ADMITTED every regex. The control
+that caught it is a pair, and neither half alone would have:
+
+    regex in code        must REFUSE
+    same text in string  must ADMIT
+
+**The reported reason named the consequence, not the cause.** Refusals were
+computed from the final pass, by which point the converting set can be empty
+and the build guard refuses everything against an empty set. A file refused in
+iteration 1 for its own reason was reported as `compiled-by-build-config` --
+true, and useless. The reason is now taken from the iteration where the file
+FIRST dropped out. On two real repositories this split one cascade attribution
+into seven distinct causes.
+
+Both defects were introduced in this session's own work, and both were found
+because a control demanded the check fail in one direction and pass in the
+other.
+
+## Result: this lowers the count on purpose
+
+Measured on two real repositories, 65 files: convertible went from 17 to 11.
+The six removed are five `executable-script` and one `js-literal` -- exactly the
+shapes bisected to `source-read-failed` above. The change buys precision, not
+volume: what remains is what amu can read, and what is refused now names a
+cause a person can act on.
+
+## What is still not claimed
+
+Converting is not compiling. Measured the same day, 30 landed `.kotoba` files
+from 30 distinct repositories were put through `amu check` and none passed,
+while the control -- a real Kotoba module -- did. The two dominant rejections
+are a language gap (dynamic projection of a map constant) and reader
+constructs, and neither is a converter defect.
+
+Reader conditionals are worth naming explicitly because an earlier triage
+treated them as the main obstacle: `#?(` appeared in ZERO of the eleven
+read failures in this sample. That earlier reading should not be carried
+forward without re-measuring.")))
