@@ -1,0 +1,107 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110800-a-generator-fallback-produced-a-selector-that-measured-nothing")
+  (:adr/topic "q9-generator-ref-arity")
+  (:adr/title "A generator fallback produced a selector that measured nothing, and amu check could not see it")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang" "kotoba-lang/com-accela"))
+  (:adr/related (vector "adr-2609110700-as-int-is-the-only-i64-divergence-in-the-wave-1-cohort"))
+  (:adr/body
+  "## Context
+
+`scripts/gen-whole-component.cljs` generates a whole-component port from the
+oracle's own `entity-specs` table. Its docstring says why it exists: a hand port
+carried a sibling's expand-oracle selectors into a repository whose entity table
+has different fields, and four arms would have gone green measuring an empty
+fold. Deriving every name from the spec table means \"that class cannot be
+carried\".
+
+For the TABLES that holds. For two blocks it did not.
+
+## The defect
+
+`cred-row` and `oracle-expand` were not regenerated. They were reached only by a
+token pass, and that pass carried a fallback:
+
+    [(:ref-field-2 canon) (or (second (:ref-fields f))
+                              (first (:ref-fields f))   ;; <- this
+                              (:ref-field-2 canon))]
+
+When the target entity declares ONE ref, `ref-field-2` collapses onto
+`ref-field-1`. A one-ref repository therefore got `childPartId -> projectId` on
+top of `parentPartId -> projectId`.
+
+Measured on the SHIPPED `com-accela` component:
+
+- `cred-row` emitted `\"projectId\"` twice -- a duplicate JSON key -- alongside a
+  `\"quantity\"` field no accela spec declares.
+- `oracle-expand` selector 4, the `expand BOTH refs` case, asked for
+  `\"projectId,projectId\"`.
+
+## Why it was invisible
+
+Run all six selectors of the compiled artifact:
+
+    amu extract-native a.kexe --symbol oracle-expand --output oe.bin   # :offset
+    KEXE_FUEL=100000000 kexe-loader oe.bin <offset> 1 aarch64 7,23 <sel>
+
+    sel 0 -> 303754089      sel 3 -> 499508843
+    sel 1 -> 499508843      sel 4 -> 303754089      <- identical to sel 0
+    sel 2 -> 701086944      sel 5 -> 499508843
+
+Selector 4 returns exactly selector 0's value. It cannot tell a fold that ran
+twice from one that ran once. In `com-abb-robotics`, whose BOM genuinely
+declares two refs, the same selector IS distinct.
+
+**`amu check` answers `:ok true` either way.** Both objects are built with `jkv`
+calls, so the compiler has no schema for them. A green check is not evidence
+that a fixture is well formed, and neither the duplicate key nor the degenerate
+selector was reachable from any type.
+
+## Decision
+
+Both blocks are generated from the spec table, and the `BOTH` selector exists
+only when there is a second ref for it to be about -- when there is not, the
+generated file says so in a comment rather than emitting an arm that duplicates
+another. The fallback is removed rather than adjusted, and the evidence floor
+now also refuses a surviving template ref-field name: previously the alias hid
+exactly that signal by rewriting it into a real name.
+
+## The control, which is the half that matters
+
+Removing selector 4 everywhere would also make the symptom go away, and would be
+a reduction rather than a fix. So the check is a pair:
+
+    regenerate com-abb-robotics (BOM has two refs)
+      -> selector 4 present, asking for \"parentPartId,childPartId\"
+      -> cred-row carries BOTH ref fields
+    regenerate com-accela (Permit has one ref)
+      -> no selector 4, and the file states why
+
+Same generator, two inputs, opposite outputs. Both regenerated components pass
+`amu check :ok true`, and accela's compiled artifact now answers 991960698 for
+selector 4 -- the unexpanded floor it shares with 1, 3 and 5 -- instead of
+duplicating selector 0's 827109938, while 0 and 2 stay distinct so the oracle
+still discriminates.
+
+## What was deliberately not done
+
+The components are not regenerated. The shipped ones were measured, and
+replacing a measured artifact is a separate step that deserves its own run and
+its own parity numbers. Regenerating `com-abb-robotics` today would rewrite 41
+lines of code whose values are recorded.
+
+## What this says beyond one generator
+
+A generator that derives most of its output from data, and reaches the rest
+through a token substitution, has two different reliability stories in one file.
+The derived part cannot carry a stale name; the substituted part can, and will
+do it silently, because a substitution that finds nothing to replace and a
+substitution that replaces with the wrong thing produce the same exit code.
+
+The generator's own docstring is the thing to read carefully here. It claimed
+the carried-selector class was closed. It was closed for the tables it names and
+open for the two blocks it does not, and nothing in the output distinguished
+those two regions.")))
