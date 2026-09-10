@@ -170,6 +170,16 @@
     ;; まで戻らない**。port 枯渇の唯一の治療が再起動なので、この 2 つは対で要る:
     ;; `authrestart` が true なら `sudo fdesetup authrestart` が次回 boot の
     ;; unlock を事前承認するので遠隔でも戻る。`shutdown -r` は戻らない。
+    ;; ⚠ **tailnet を失った瞬間に、そのノードへの道が全部消える。**
+    ;; 実測 2026-09-10: naphtali は 68 日間ずっと動いていたが、ephemeral port が
+    ;; 尽きて外向き接続が 1 本も張れず、coordination server に届かないので
+    ;; tailnet 上は 15 日間 "offline" だった。**機械は生きていて、LAN からは
+    ;; 入れた。** 「届かない」と「落ちている」は別物で、その差は LAN 経路が
+    ;; あるかどうかでしか分からない。
+    ;;
+    ;; だから **健全なうちに LAN 住所を採る。** 尽きてから探すと、mDNS も
+    ;; 答えない（naphtali は回復後も答えない —— 沈黙は不在の証拠ではない）。
+    "echo lanaddr=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')"
     "echo filevault=$(sudo -n fdesetup status 2>/dev/null | grep -qi 'is On' && echo on || echo off)"
     "echo authrestart=$(sudo -n fdesetup supportsauthrestart 2>/dev/null || echo unknown)"
     "echo wasmtime=$(command -v wasmtime)"
@@ -337,6 +347,7 @@
              :free-gb free
              :npm-registry-status (str npmreg)
              :tcp-time-wait (num timewait)
+             :lan-address (let [a (str (:lanaddr n))] (when (seq a) a))
              :filevault? (= "on" (:filevault n))
              :supports-authrestart? (= "true" (:authrestart n))
              :ephemeral-ports-in-use ports-in-use
@@ -468,7 +479,7 @@
   ;; and the numbers looked unmeasurable rather than unwritten.
   (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtoolsv wasmtime wasmtimev wac wacv rosetta caps max-parallel detail loopback role
                 npm-registry-status tcp-time-wait ephemeral-ports-in-use port-exhausted?
-                ephemeral-range filevault? supports-authrestart?]} n]
+                ephemeral-range filevault? supports-authrestart? lan-address]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -510,6 +521,9 @@
                 ;; 実測 2026-09-10）。
                 (when ephemeral-range (str " :ephemeral-range " (pr-str ephemeral-range)))
                 (when port-exhausted? " :port-exhausted? true")))
+         ;; tailnet を失った後に残る唯一の道。健全なうちにしか採れない。
+         (when (and reachable? lan-address)
+           (str "\n   :lan-address " (pr-str lan-address)))
          ;; 再起動可能性。port 枯渇の治療が再起動しかない以上、これは
          ;; capability と同じ重さの事実である（実測 2026-09-10、simeon を
          ;; これを見ずに再起動して失った）。
