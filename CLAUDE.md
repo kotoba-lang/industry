@@ -1964,6 +1964,28 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
   （実測: `DEPS added deps.edn` → `REWROTE 6 files` → `clojure -M:test` 緑 →
   `nbb tools/gen-tmlanguage.cljs` が `Could not find namespace`。JVM suite は
   `deps.edn` を読み `.cljs` を一度も load しないので緑のまま）。
+  ⚠ **`:deps` の座標を解決するとき、nbb は babashka を呼ぶ**（2026-09-10 実測）。
+  `nbb-deps.jar` を `bb ... uberjar` で組むので、**bb が無い機械では cold cache の
+  1 回目が失敗する**。この workspace は bb を script host として退役させており
+  （ADR-2607173000）、GitHub-hosted runner にも入っていない:
+
+  ```
+  bb 有り・cold   exit 0（.nbb/.cache/<hash>/ を 8 ファイル作る）
+  bb 無し・cold   exit 1  /bin/sh: 1: bb: not found
+  bb 無し・warm   exit 0  ← cache さえ在れば bb は要らない
+  ```
+
+  **この机の上では見えない** —— 手元には bb が入っている。実際に音を立てたのは
+  CI で、`kotoba-lang/amu#916` の `server-kind` が 88 秒の success から 15 秒の
+  failure に変わった（cache を「再生成できる scratch」として消した直後）。
+  **`<hash>` は解決済み依存集合に対する hash なので、deps が動くたびに新しい
+  ディレクトリが要る** —— だから `.nbb/` を ignore すると、その日は通って
+  **次の依存更新で CI が壊れる**。
+  実測 2026-09-10: `nbb.edn` に `:deps` を書いた repo は **234 件**（`nbb.edn` を
+  持つ 1,369 件のうち）。その全部が壊れているという意味ではない —— CI で nbb を
+  走らせるか、bb が在るかで決まる。**「cold cache かつ bb 無し」で走る経路が
+  在るかを、repo ごとに測ってから ignore する。**
+
   **sha も `:paths` も隣の project file から複写する** —— project file が coordinate を
   名指していなければ sha を選ばずに拒否する。推測した `:paths` は、正しく見えて何も
   解決しない宣言そのもの。検出は `scripts/verify-nbb-declaration-visible.cljs`
