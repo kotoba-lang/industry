@@ -170,4 +170,90 @@
 
    :retire/post-state
    "~/github は com-junkawasaki と p153 のみ。p153 は前回同様、実ファイルを持つため未着手。
-    superproject の worktree 登録に ~/github 配下を指す stale entry は無い。"}]}
+    superproject の worktree 登録に ~/github 配下を指す stale entry は無い。"}
+
+    {:retire/date "2026-09-10"
+     :retire/agent "claude (git-cleanup-conflict)"
+     :retire/scope "superproject worktree/branch の棚卸しと、未着地 ledger の保全"
+
+     :retire/landed
+     [{:pr 3081 :merge "feb6a7363456c99ef255497c7d4e0a97c3902002"
+       :what "この receipts ファイル自身の 2 commit。branch codex/worktree-retire-receipts-20260910 は
+              origin/main から 14 behind で FF できず、CLAUDE.md の禁止どおり rebase せずに
+              origin/main から切った worktree へ cherry-pick して着地させた。
+              着地前に測ったもの: 追加 174 行・削除 0 行、path は main に存在しない
+              (create mode 100644)、merge-base 以降 main はこの file を触っていない (overlap 空)、
+              複製した file は元と byte 同一、EDN として読み戻せる。"}
+      {:pr 3083 :merge "2017a0080ccaa44b7ed5cf17272ab713d81c2ea6"
+       :what ".dep-coordinate-canon.json を .gitignore へ。verify-dep-coordinate-identity.cljs の
+              canon-cache-file で、無ければ GitHub から作り直す cache。untracked かつ un-ignored の
+              あいだ、cleanup のたびに :additive の着地候補に上がり続けていた
+              (:residue-gate / :stale-ignore-gate と同じ誤った論証 —— main に無いのは
+              cache が無い理由であって、新しい仕事である理由ではない)。"
+       :gate "ignore-rule-gate を適用して base tree に当てた。origin/main が track する
+              235,196 path のうち **0 件**にしか当たらない。⚠ 素朴に数えると 36,234 件で、
+              その全部が repo 自身の入れ子 .gitignore (orgs/personal/takeout/ 配下) の分だった ——
+              check-ignore -v で出所を分けて初めて自分の規則の取り分が 0 と分かる。
+              両方向の control: 規則は当の cache には当たり、west.yml と docs/design/*.png には当たらない。"}]
+
+     :retire/removed
+     {:worktrees ["root-worktree-retire-receipts-land-20260910 (PR 3081 で merge 済み)"
+                  "root-ignore-dep-coordinate-cache-20260910 (PR 3083 で merge 済み)"
+                  "root-cleanup-receipts-20260910 (この entry を着地させたあと)"]
+      :branches ["codex/worktree-retire-receipts-20260910 —— ancestor-of-main は NO
+                  (cherry-pick で sha が変わったため)。content containment で判定:
+                  追加 156 行のうち main に無いもの 0 件 = landed。"
+                 "codex/worktree-retire-receipts-land-20260910 (ancestor-of-main YES)"
+                 "codex/ignore-dep-coordinate-cache-20260910 (ancestor-of-main YES)"]
+      :archive ".git/stash-archive-20260910/branches/ に diff と commit log を退避してから削除した。"}
+
+     :retire/preserved
+     {:worktree "/private/tmp/itonami-spam-release (branch codex/spam-release-20260909)"
+      :why "manifest/fleet-db.ledger.edn に未 commit の append が 3,590 件
+            (seq 16324-19913、:pin/reconcile-legacy 3,287 + :repo/added-legacy 303)。
+            byte 一致でも、:event/at を落とした意味キーでも、3,590 件すべてが origin/main に無い。
+            fleet-db.edn 側にも 1 行の変更がある。"
+      :disposition "着地させない。fleet-db.ledger.edn は署名付き VCS プレーンで CLAUDE.md が
+                    手編集を禁じており、:pin/reconcile-legacy は fleet reconcile
+                    (origin/main の west.yml を入力にした kagami reconcile) の担当。
+                    worktree と branch はそのまま残す。**オーナー判断が要る。**"
+      :archive ".git/stash-archive-20260910/unlanded-ledger-events-20260910/"
+      :live "ps の argv がこの path を 3 件参照していた = 生きている session が掴んでいる。
+             idle でない worktree は退役させない。"}
+
+     :retire/concurrent
+     "この session と並行して、同じ skill を回す別の agent が動いていた。実測: 最初の
+      inventory では worktree 20 / local branch 21 だったものが、こちらが read-only の
+      dry-run しか回していない間に 7 / 9 へ減り、最終的に 2 / 3 になった。消えた 14 worktree は
+      すべて clean かつ ancestor-of-main で、.git/stash-archive-20260910/ に
+      deleted-remote-branches.tsv (287 行) と branches/ として退避されていた ——
+      **失われたものは無い。** 報告では、自分がやったことと相手がやったことを分けて書く。"
+
+     :retire/corrections
+     ["gh api を for ループで叩いて 2 つの commit が upstream に無いと結論しかけた。
+       原因は zsh が `set -- $pair` を単語分割しないこと (CLAUDE.md が既に警告している形) で、
+       URL が壊れて 404 が返っていた。**404 は GitHub の答えではなく自分の shell のバグだった。**
+       repo 自身と default branch head を control に取ってから測り直すと、
+       cloud-itonami/kyusai も network-awai/cloud-murakumo も 0 ahead で完全に landed。"
+      "並行 agent の archive index は scripts/maturity-loop/mutations.edn を UNLANDED と
+       label していたが、現 origin/main に対して測ると追加 31 行のうち欠けているものは 0 件
+       (両方向の control 付き: 在るはずの id は見つかり、無いはずの id は見つからない)。
+       file 全体でも main に無い行は 2 行だけで、どちらも括弧の深さと字下げが違うだけの
+       構造行だった (main 側は 12,030 行、worktree 側は 8,231 行)。
+       おそらく worktree の古い base に対して測っている —— この workflow が
+       『判定の前提が古いと結論が全部ずれる』と警告している形そのもの。"]
+
+     :retire/removal-obstacle
+     "前回の entry が記録した `.git` symlink 問題に、今回も 2 回当たった。root-worktree.cljs は
+      作成時に gitdir ポインタへ正規化するが、その後 git-annex が symlink へ戻す
+      (cherry-pick が `unable to convert .git file to symlink` と警告を出す)。
+      標準の `gitdir: <abs path>` ファイルへ書き直せば --force なしで受理される。"
+
+     :retire/post-state
+     "superproject は main、origin/main と同期、tracked な変更 0・stash 0・open PR 0。
+      worktree 2 (本体と保全した itonami-spam-release)、branch 3 (main / git-annex /
+      codex/spam-release-20260909)。west-orphan-audit --blocking は exit 0 で、
+      訊けなかった候補も 0 件 (exit 2 ではない)。未 track のまま残したもの:
+      docs/design/ の PNG 5 枚 (約 10.4 MB —— 大容量バイナリは git 履歴ではなく
+      B2 + DataLad。黙って ignore もしない) と orgs/personal/litigation/ の 7 file
+      (personal は west の対象外)。"}]}
