@@ -89,11 +89,16 @@
   []
   (let [from-edn (try
                    (->> (edn/read-string (fs/readFileSync (path/join here "nodes.edn") "utf8"))
-                        :nodes (map :host) (remove nil?))
+                        :nodes
+                        (keep (fn [n] (when (:host n)
+                                        {:host (:host n) :lan (:lan-address n)}))))
                    (catch :default _ nil))
         extra (->> (str/split (str (flag "--hosts" "gad")) #",")
-                   (map str/trim) (remove str/blank?))]
-    (vec (distinct (concat from-edn extra)))))
+                   (map str/trim) (remove str/blank?)
+                   (map (fn [h] {:host h :lan nil})))
+        by-host (reduce (fn [m n] (update m (:host n) #(merge % n)))
+                        {} (concat from-edn extra))]
+    (vec (vals by-host))))
 
 ;; ---------------------------------------------------------------- measure
 
@@ -132,27 +137,54 @@
                  :when (and k v (seq k))]
              [(keyword k) v])))
 
+(def jump-host (flag "--jump" "gad"))
+(def lan-only? (bool-flag "--via-lan-only"))
+
+(defn- ssh-measure
+  "1 経路で 1 回試す。`via` は答えた経路の名前で、**成功の中でも経路が違えば
+  違う事実**（tailnet で答えたノードと、tailnet を失って LAN でしか答えない
+  ノードは、同じ『生きている』ではない）。"
+  [args via]
+  (let [r (cp/spawnSync "ssh" (clj->js args)
+                        #js {:input remote-script :encoding "utf8" :timeout 45000})]
+    (when (zero? (or (.-status r) 1))
+      {:via via :stdout (str (.-stdout r))})))
+
 (defn measure-host
-  "1 ノードを測る。**答えなかったら nil ではなく `:unmeasured` を返す** ——
-  呼び出し側が『測れなかった』と『空いていた』を出力で区別できるように。"
-  [host]
-  (let [r (cp/spawnSync "ssh"
-                        (clj->js ["-o" "BatchMode=yes" "-o" "ConnectTimeout=8"
-                                  "-o" "StrictHostKeyChecking=accept-new"
-                                  host "sh" "-s"])
-                        #js {:input remote-script :encoding "utf8" :timeout 45000})
-        code (.-status r)]
-    (if-not (zero? (or code 1))
-      {:host host :state :unmeasured
-       :detail (str "ssh exit " code " " (str/trim (subs (str (.-stderr r)) 0 160)))}
-      (let [kv (parse-kv (.-stdout r))
+  "1 ノードを測る。tailnet で答えなければ **踏み台経由の LAN でもう一度訊く。**
+
+  ⚠ この 2 本目が無いと、port が尽きたノードは『到達不能』としか言えない ——
+  実測 2026-09-10、naphtali はそれで 15 日間「落ちている」ことにされていた。
+  実際には動いていて、LAN からは入れ、sysctl 1 行で戻った。**tailnet を
+  失うことと、機械が死ぬことを、出力で区別する。**
+
+  答えなかったら nil ではなく `:unmeasured` を返す —— 呼び出し側が
+  『測れなかった』と『空いていた』を区別できるように。"
+  [{:keys [host lan]}]
+  (let [base ["-o" "BatchMode=yes" "-o" "ConnectTimeout=8"
+              "-o" "StrictHostKeyChecking=accept-new"]
+        ;; **使ったことのない退路は退路ではない。** `--via-lan-only` は
+        ;; tailnet を飛ばして LAN 経路だけを試す —— 障害が起きる前に、
+        ;; その道が本当に通ることを確かめるための操作。
+        via-tailnet (when-not lan-only? (ssh-measure (concat base [host "sh" "-s"]) :tailnet))
+        via-lan (when (and (nil? via-tailnet) lan (not= host jump-host))
+                  (ssh-measure (concat base ["-J" jump-host (str host "@" lan)
+                                             "sh" "-s"])
+                               :lan))
+        answer (or via-tailnet via-lan)]
+    (if-not answer
+      {:host host :state :unmeasured :lan lan
+       :detail (str "tailnet も"
+                    (if lan (str " LAN(" lan ", " jump-host " 経由) も") " LAN 経路の記録も無く")
+                    " 答えない")}
+      (let [kv (parse-kv (:stdout answer))
             freekb (js/parseFloat (:freekb kv))
             lo (js/parseInt (:portlo kv)) hi (js/parseInt (:porthi kv))
             used (js/parseInt (:portsused kv))
             span (when (and (not (js/isNaN lo)) (not (js/isNaN hi))) (inc (- hi lo)))]
         (if (js/isNaN freekb)
-          {:host host :state :unmeasured :detail "df が読めなかった"}
-          {:host host :state :measured
+          {:host host :state :unmeasured :lan lan :detail "df が読めなかった"}
+          {:host host :state :measured :via (:via answer) :lan lan
            :free-gb (/ freekb 1048576.0)
            :capacity (:capacity kv)
            :time-wait (when-not (js/isNaN (js/parseInt (:timewait kv)))
@@ -172,7 +204,11 @@
   (let [measured (filter #(= :measured (:state %)) results)
         unmeasured (filter #(= :unmeasured (:state %)) results)
         low-disk (filter #(< (:free-gb %) floor-gb) measured)
-        low-port (filter #(and (:port-frac %) (>= (:port-frac %) port-ceiling)) measured)]
+        low-port (filter #(and (:port-frac %) (>= (:port-frac %) port-ceiling)) measured)
+        ;; **tailnet を失ったが生きている。** fleet はここへ仕事を配れないので
+        ;; 健全ではないが、`:unmeasured` とは行動が違う —— こちらは遠隔で戻せる
+        ;; （実測: sysctl で range を広げると egress が戻り、tailscale が再接続した）。
+        off-tailnet (filter #(= :lan (:via %)) measured)]
     (cond
       ;; **evidence floor.** 0 台を clean として報告しない。答えられなかったのだから
       ;; 0 でも 1 でもない値で終わる。
@@ -182,11 +218,13 @@
                  " —— これは『全ノード健全』ではない")}
 
       :else
-      {:healthy? (and (empty? low-disk) (empty? low-port))
+      {:healthy? (and (empty? low-disk) (empty? low-port) (empty? off-tailnet))
        :measured (count measured) :unmeasured (count unmeasured)
        :low-disk (mapv :host low-disk) :low-port (mapv :host low-port)
+       :off-tailnet (mapv :host off-tailnet)
        :persist {:measured (count measured) :unmeasured (count unmeasured)
-                 :low-disk (mapv :host low-disk) :low-port (mapv :host low-port)}
+                 :low-disk (mapv :host low-disk) :low-port (mapv :host low-port)
+                 :off-tailnet (mapv :host off-tailnet)}
        :why (str/join " / "
                       (cond-> []
                         (seq low-disk)
@@ -198,7 +236,10 @@
                         (conj (str "ephemeral port " (int (* 100 port-ceiling)) "%超: "
                                    (str/join ", " (map #(str (:host %) " "
                                                              (int (* 100 (:port-frac %))) "%")
-                                                       low-port))))))})))
+                                                       low-port))))
+                        (seq off-tailnet)
+                        (conj (str "tailnet 上は不在だが LAN で生きている（遠隔で戻せる）: "
+                                   (str/join ", " (map :host off-tailnet))))))})))
 
 ;; ---------------------------------------------------------------- self-test
 
@@ -229,6 +270,16 @@
          "port 不明のノードは port 理由では赤くしない")
     (chk (not (:healthy? (verdict [{:host "noports" :state :measured :free-gb 2.0 :port-frac nil}])))
          "port 不明でも disk では赤くなる")
+    ;; LAN でしか答えないノードは、健全でも到達不能でもない第三の状態。
+    ;; この 3 つが 1 つの値に潰れると、15 日気づかれない（実測 naphtali）。
+    (chk (not (:healthy? (verdict [(assoc (m "offnet" 40.0 0.10) :via :lan)])))
+         "LAN でしか答えないノードは緑にしない —— fleet は仕事を配れない")
+    (chk (:healthy? (verdict [(assoc (m "onnet" 40.0 0.10) :via :tailnet)]))
+         "tailnet で答えたノードは緑")
+    (chk (not (:refused? (verdict [(assoc (m "offnet" 40.0 0.10) :via :lan)])))
+         "LAN で 1 台測れていれば REFUSE ではない —— 測れているのだから")
+    (chk (= ["offnet"] (:off-tailnet (verdict [(assoc (m "offnet" 40.0 0.10) :via :lan)])))
+         "どのノードが tailnet を失ったかを名指しする")
     (println (str "self-test: " (count @fails) " failed"))
     (doseq [f @fails] (println "  FAIL:" f))
     (count @fails)))
@@ -246,7 +297,8 @@
         (println
          (if (= :unmeasured (:state r))
            (str "  " (:host r) ": 測れなかった — " (:detail r))   ;; ← 「合格」と別の行
-           (str "  " (:host r) ": 空き " (.toFixed (:free-gb r) 1) "GiB (" (:capacity r) ")"
+           (str "  " (:host r) ": " (if (= :lan (:via r)) "[LAN経由/tailnet不在] " "")
+                "空き " (.toFixed (:free-gb r) 1) "GiB (" (:capacity r) ")"
                 (if (:port-frac r)
                   (str "  port " (:port-used r) "/" (:port-span r)
                        " (" (int (* 100 (:port-frac r))) "%)"
