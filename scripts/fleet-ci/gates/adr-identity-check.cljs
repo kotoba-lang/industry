@@ -65,11 +65,23 @@
 (def verifier (path/join root "scripts" "verify-adr-identity.cljs"))
 (def adr-dir (path/join root "90-docs" "adr"))
 
+;; The ADR corpus is Kotoba ADL now, so the verifier decodes with kotoba.adl.
+;; That namespace lives in a west child, and west children are NOT distributed
+;; to nodes, so it is vendored into the tree and handed to nbb explicitly here.
+;; Measured 2026-09-10 on an extracted tree: without this the verifier dies with
+;; `Could not find namespace: kotoba.adl`, and this gate exits 93 rather than
+;; reporting a pass it could not make.
+(def vendored-codec (path/join root "scripts" "kotoba_adl"))
+
 ;; 展開失敗による false-pass を構造的に防ぐ。90 は「tree が期待どおり届いて
 ;; いない」を表す tick.cljs 側の慣習。
 (when-not (fs/existsSync verifier)
   (die! 90 "scripts/verify-adr-identity.cljs missing after extract"
         "— :include-ext に .cljs が要る（無いと gate が正本を呼べない）"))
+
+(when-not (fs/existsSync vendored-codec)
+  (die! 90 "scripts/kotoba_adl missing after extract"
+        "— :include-ext に .cljs が要る（vendored ADL codec が届いていない）"))
 
 (when-not (fs/existsSync adr-dir)
   (die! 90 "90-docs/adr missing after extract"
@@ -79,7 +91,11 @@
 (def result
   (try
     {:code 0
-     :out (cp/execFileSync "npx" (clj->js ["--yes" "nbb" verifier
+     ;; `--` matters: without it npx parses --classpath as its own option and
+     ;; ends up spawning the .cljs file directly (EACCES). Measured 2026-09-10.
+     :out (cp/execFileSync "npx" (clj->js ["--yes" "--" "nbb"
+                                           "--classpath" vendored-codec
+                                           verifier
                                            "--dir" adr-dir "--min" min-adrs])
                            #js {:encoding "utf8" :cwd root :maxBuffer 33554432})}
     (catch :default e
