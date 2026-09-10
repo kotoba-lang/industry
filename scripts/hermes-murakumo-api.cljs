@@ -52,8 +52,15 @@
 ;; much: a 429 storm is mostly one long request holding a slot.
 ;;
 ;; `context_length 262144` -- the model's own maximum, which is
-;; Qwen3.8-27B's `n_ctx_train`, and what gad's two slots actually serve
-;; (`--ctx-size 524288 --parallel 2`, read live off /props on 2026-09-10).
+;; Qwen3.8-27B's `n_ctx_train`.
+;;
+;; ⚠ This is the MODEL's maximum, and since 2026-09-10 it is NOT what any
+;; head serves. gad's two 262144-token slots were the only ones that reached
+;; it, and gad was moved to video generation only (adr-2609100500). Chat now
+;; runs on b70 at 32768/slot x2 and xavier at 8192. Declaring 262144 here is
+;; still correct -- hermes needs >= 64,000 to start at all, the murakumo pool
+;; routes by fit, and the value describes the model rather than the box --
+;; but do not read it as a promise that a 200k prompt will be served.
 ;;
 ;; Two floors meet here and both were measured, not reasoned about.
 ;;
@@ -859,10 +866,16 @@
         (println "      excludes heads a request cannot fit, so requests above the")
         (println "      narrow heads' window match NO head and come back 502 with no")
         (println "      x-murakumo-route-head at all.")
-        (println "      Check gad first — measured 2026-09-10, murakumo-ring.service")
-        (println "      was `enabled` but `failed` after its STOP timed out, and")
-        (println "      Restart=on-failure does not recover that. On the head:")
-        (println "        systemctl reset-failed murakumo-ring && systemctl start murakumo-ring")
+        (println "      ⚠ Do NOT restart murakumo-ring on gad to fix this. gad was")
+        (println "      moved to video generation only on 2026-09-10 (owner decision,")
+        (println "      adr-2609100500); murakumo-ring is stopped and `disabled` there")
+        (println "      on purpose, and gad is the box's ComfyUI/Hunyuan3D renderer.")
+        (println "      Chat inference is b70 (32768/slot x2) and xavier (8192).")
+        (println "      The pool's fit table is a HAND-MAINTAINED constant in")
+        (println "      cloud-murakumo-api src/local_murakumo/provider_catalog.cljc")
+        (println "      (:members, capacity-measured-at 2026-09-07) — it still says")
+        (println "      b70=16384 and lists gad=262144. Live /ready disagrees. Fix the")
+        (println "      table, not the heads.")
         (println "      /ready says ok:true while this is true — do not read .ok."))
       (println))
     (if (seq fs)
