@@ -200,6 +200,34 @@
 
 (def ^:private code-markers ["deps.edn" "package.json" "src" "bb.edn" "shadow-cljs.edn" "Cargo.toml"])
 
+(defn- rust-test-files
+  "tracked な *.rs のうち `#[test]` を含むファイルの本数。
+
+  Rust の test は慣習として `tests/` ではなく src の `#[cfg(test)] mod tests` に
+  住む。だからディレクトリの有無では測れない。git grep で **tracked file だけ**を
+  見るので `target/` や vendor 済みの crate は数に入らない。
+
+  **『0 件だった』と『数えられなかった』を分ける。** git grep は一致 0 件でも
+  exit 1 を返し、本当の失敗でも非ゼロを返す。status が 1 で stderr が空のときだけ
+  0 と言い切り、それ以外は数を返さない（この file の header が言う 4 値の設計。
+  測れなかったものを :broken に畳むと、それは『test が無い』と同じ顔をする）。"
+  [repo]
+  (try
+    (let [out (str (.execFileSync cp "git"
+                                  (clj->js ["-C" repo "grep" "-l" "-F" "#[test]" "--" "*.rs"])
+                                  #js {:encoding "utf8"
+                                       :stdio #js ["ignore" "pipe" "pipe"]
+                                       :timeout 20000 :maxBuffer 4194304}))]
+      {:ok? true :n (count (remove str/blank? (str/split-lines out)))})
+    (catch :default e
+      (let [status (.-status e)
+            err    (str/trim (str (or (.-stderr e) "")))]
+        (if (and (= 1 status) (str/blank? err))
+          {:ok? true :n 0}
+          {:ok? false :err (if (str/blank? err)
+                             (str "git grep が exit " status)
+                             (subs err 0 (min 120 (count err))))})))))
+
 (defn- floor-test-signal [abs]
   (if-not (some #(exists? (str abs "/" %)) code-markers)
     ;; コードが無い repo に test を要求しない。ただしこれは**測った上での** :n/a で
@@ -209,10 +237,28 @@
                  (try (str (.readFileSync fs (str abs "/deps.edn") "utf8")) (catch :default _ nil)))
           pkg  (when (exists? (str abs "/package.json"))
                  (try (str (.readFileSync fs (str abs "/package.json") "utf8")) (catch :default _ nil)))]
-      (if (or (exists? (str abs "/test")) (exists? (str abs "/tests"))
-              (and deps (str/includes? deps ":test"))
-              (and pkg (re-find #"\"test\"\s*:" pkg)))
+      (cond
+        (or (exists? (str abs "/test")) (exists? (str abs "/tests"))
+            (and deps (str/includes? deps ":test"))
+            (and pkg (re-find #"\"test\"\s*:" pkg)))
         [:ok nil]
+
+        ;; `Cargo.toml` は上の code-markers に入っている ―― つまり Rust repo は
+        ;; **検査対象に数えられながら、認識できる test 信号を一つも持っていなかった**。
+        ;; 上の 4 つはどれも Clojure か Node の形しか見ないので、Rust に対しては
+        ;; 構造的に当たらない。実測 2026-09-10: test-signal :broken 69 件のうち
+        ;; Cargo.toml を持つ 7 件を数え直すと **6 件が実際には test を持っていた**
+        ;; (kotoba-v2025 は 86 ファイル、kami-apps は 18 個の `#[test]`)。
+        ;; 本当に 0 件だったのは 1 件だけ。「測れなかった検査が、測って問題が
+        ;; あった検査と同じ値を返す」形 (ADR-2608136000) の、偽陽性側の顔である。
+        (exists? (str abs "/Cargo.toml"))
+        (let [{:keys [ok? n err]} (rust-test-files abs)]
+          (cond
+            (not ok?) [:unmeasured (str "*.rs の #[test] を数えられない: " err)]
+            (pos? n)  [:ok nil]
+            :else     [:broken "test dir も test alias も #[test] も無い"]))
+
+        :else
         [:broken "test dir も test alias も無い"]))))
 
 (defn- measure [bot]
