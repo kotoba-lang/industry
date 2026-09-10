@@ -1377,15 +1377,34 @@ pass にしない。**
   `crypto-policy` の epoch）。**新しく設計しない** —— 実装側は既にこの道を採っている。
 - **監査ログ自体が個人データである。** public に出るのは commitment、principal /
   purpose / resource / timestamp は selective disclosure。
+  ⚠ **2026-09-10 に測ったら、境界は既に正しかった** —— receipt は identity を
+  運べず（`receipt-keys` はちょうど 9、`exact-keys!` が `:principal` を
+  `:invalid-keys` で拒否、`forbidden-keys` は入れ子も歩く）、`:principal` は
+  request envelope の側にあって receipt は digest でしか指さない。**代わりに
+  reach の gap が出た** —— kotobase の 6 namespace が `.clj` で、**public audit
+  plane はこの service が deploy される runtime では走らない**。
+  「機構が在る」と「service の走る場所で走る」は 2 つの主張。
 
 ⚠ **この面に gate は無く、それは決定である**（ADR-2609108000 D8）。上の 4 つは
 「文書が 2 つの概念を混ぜていないか」を問うもので、機械が判定できる述語ではない。
 **落ちることを確かめていない gate は劇場**なので landing させていない。
 
-⚠ **2026-09-10 の実測で、3 つは不在・1 つは未測定と判定した** —— query の推論防御 /
-correlation・fingerprinting の棚卸し / LINDDUN threat model が不在、IPLD traversal の
-上限（max blocks / depth / fanout / decompression ratio）が未測定。**未測定は clean ではない。**
-**この判定を「もう塞がっている」と読まない**（表と現在地は ADR が持つ。ここに書き写さない）。
+⚠ **2026-09-10 に 4 件を測り、3 件が動いた。** 不在のまま残ったのは
+**query の推論防御 1 つだけ**である:
+
+- **correlation** —— 不在ではなかった。envelope の nonce が全ての下流識別子に
+  届くので、同じ principal が同じ query を 2 回走らせても公開識別子は 1 つも
+  一致しない。
+- **traversal 上限** —— 在る。`ipld.graph` と `prolly-tree.diff` は
+  **部分集合すら拒否する fail-closed**。ただし **`scan-prefix` の 3-arity は
+  `limit = nil = 無制限` で、deploy される read path の 2 つの call site は
+  どちらもそちら**（`scan-range` には limit 引数が無い）。**在ることと、
+  通る扉に在ることは別。**
+- **LINDDUN matrix** —— 敷いた。ただし **78 セル中 10 セルだけ**が記録されており、
+  **68 セルは未測定であって clean ではない。**
+
+**「もう塞がっている」と読まない。** 表・現在地・再現手順は ADR と
+`90-docs/security/` が持つ。**ここに数値を書き写さない。**
 
 ## live service の永続化境界は `kotobase.net`（repo-wide mandatory、2026-08-15、ADR-2608159100）
 

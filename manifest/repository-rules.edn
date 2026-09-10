@@ -268,10 +268,45 @@
    :policy/detector nil
    :policy/gate nil
    :policy/why-no-gate "the invariants are read-side rules about documents, not predicates over a tree"
-   :policy/measured-absent #{:query-inference-protection
-                             :correlation-fingerprinting-inventory
-                             :linddun-threat-model}
-   :policy/unmeasured #{:ipld-traversal-bounds}
+   ;; Re-measured 2026-09-10, and three of the four moved. What is absent is a
+   ;; DEFENCE for the query channel; the rest turned out to be present, or to
+   ;; be a residue that is named rather than closed.
+   :policy/measured-absent #{:query-inference-protection}
+   :policy/unmeasured #{}
+   ;; Present, and measured to be so.
+   :policy/measured-present
+   {:receipt-carries-no-identity
+    {:evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+     :how "receipt-keys is exactly nine fields; exact-keys! refuses :principal as :invalid-keys; forbidden-keys walks nested values"}
+    :public-identifiers-do-not-repeat
+    {:evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+     :how "the envelope nonce reaches :request/digest, the receipt, and the receipt's own address"}
+    :traversal-bounds
+    {:evidence "90-docs/security/traversal-bounds-census.edn"
+     :how "ipld.graph and prolly-tree.diff both refuse a partial limit set before reading a block"
+     :but "scan-prefix's 3-arity is unlimited and both deployed call sites take it"}}
+   ;; Named, not closed. Removing this would remove the agreement the receipt
+   ;; exists to provide, so closing it has to be a decision, not a fix.
+   :policy/named-residues
+   {:result-root-equality-oracle
+    {:evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+     :says "a party who can read receipts observes that an answer changed without reading it"
+     :decision-pending :whether-to-blind}}
+   ;; Gaps found while measuring something else. Both are about REACH: a
+   ;; mechanism that exists somewhere the service does not run, and a check
+   ;; that is stated in policy but not enforced by anything.
+   :policy/measured-gaps
+   {:audit-plane-is-jvm-only
+    {:evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+     :namespaces #{"transparency_log" "audit_anchor" "retention_qualification"
+                   "recovery_qualification" "operations_qualification"
+                   "qualification_host"}
+     :says "the audit plane exists; it does not run where the service runs"}
+    :propose-not-authorize-is-unenforced
+    {:evidence "orgs/kotoba-lang/ayatori src/ayatori/agent.cljc"
+     :says "ayatori.agent/validate is real; nothing checks that passing it is not authorisation"}}
+   :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
+   :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}
   }
 

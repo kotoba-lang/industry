@@ -1,0 +1,86 @@
+;; STRIDE x LINDDUN over the six planes of this stack.
+;;
+;; ADR-2609108000 alternative A2 deferred this until 1-4 of its status_detail
+;; were measured, on the grounds that a matrix laid over an unknown current
+;; position cannot tell an empty cell from a cell that needs nothing. Those
+;; measurements are done, so this is the matrix.
+;;
+;; ONE RULE: a cell exists here only if something was measured or a gap was
+;; named. The grid is 6 planes x 13 threats = 78 cells and most of them are
+;; not here. `:matrix/coverage` says how many, and it is the evidence floor --
+;; a matrix that looks full is the failure mode this file is shaped to avoid.
+[{:db/id -1
+  :matrix/id "privacy-threat-matrix"
+  :matrix/coverage true
+  :source/dataset "privacy-plane"
+  :matrix/measured-on "2026-09-10"
+  :matrix/planes ["kotoba" "kotobase" "ayatori" "agent" "ipld" "key"]
+  :matrix/stride ["spoofing" "tampering" "repudiation" "information-disclosure"
+                  "denial-of-service" "elevation-of-privilege"]
+  :matrix/linddun ["linking" "identifying" "non-repudiation" "detecting"
+                   "data-disclosure" "unawareness" "non-compliance"]
+  :matrix/cells-total 78
+  :matrix/cells-recorded 10
+  ;; These five must sum to :cells-recorded, and with :cells-unrecorded to
+  ;; :cells-total. A reader can count the entities below and check. A matrix
+  ;; whose declared coverage does not equal its counted coverage is the
+  ;; failure this file exists to make visible.
+  :matrix/cells-measured 5
+  :matrix/cells-measured-residue 1
+  :matrix/cells-gap 3
+  :matrix/cells-unmeasured-here 1
+  :matrix/cells-unrecorded 68
+  :matrix/note "68 unrecorded cells are UNMEASURED, not clean. Absence of a cell is absence of a measurement."}
+
+ {:db/id -2 :cell/plane "ayatori" :cell/stride "information-disclosure"
+  :cell/linddun "detecting" :cell/status :measured :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/ayatori bench/inference-channel-01.edn"
+  :cell/finding "The scan ceiling reports the cardinality it refused at, before visible? is consulted. Under a policy hiding every datom of a collection, a caller recovered the exact datom count (17/17, 12 probes), the existence of one named individual, and her field count (5/5). The built-in ceiling discloses the same quantity to a caller that names no cap."
+  :cell/reviewed-threat-applicable false
+  :cell/why-not "The reviewed shape (aggregate allowed, rows denied) needs an aggregate-only mode. visible? is per-datom and required; there is no such mode."}
+
+ {:db/id -3 :cell/plane "ayatori" :cell/stride "denial-of-service"
+  :cell/linddun "detecting" :cell/status :measured :source/dataset "privacy-plane"
+  :cell/evidence "90-docs/security/traversal-bounds-census.edn"
+  :cell/finding "scan-prefix has a 3-arity whose limit defaults to nil = unlimited, scan-range takes no limit at all, and both call sites the deployed read path uses take the unbounded form. Cost follows the database rather than the answer."}
+
+ {:db/id -4 :cell/plane "ipld" :cell/stride "denial-of-service"
+  :cell/linddun "detecting" :cell/status :measured :source/dataset "privacy-plane"
+  :cell/evidence "90-docs/security/traversal-bounds-census.edn"
+  :cell/finding "ipld.graph/selection-cursor requires four positive limits and refuses a partial set before reading a block; prolly-tree.diff/sync-blocks* requires three and rejects 0. Fail closed, no default. The bound exists; it is the query plane's two doors that skip it."}
+
+ {:db/id -5 :cell/plane "kotobase" :cell/stride "information-disclosure"
+  :cell/linddun "data-disclosure" :cell/status :measured :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+  :cell/finding "A receipt cannot carry an identity. receipt-keys is exactly nine fields, exact-keys! refuses :principal as :invalid-keys, and forbidden-keys walks nested values so a credential under :cost is :forbidden-field. :principal lives in the request envelope, cited only by digest."}
+
+ {:db/id -6 :cell/plane "kotobase" :cell/stride "information-disclosure"
+  :cell/linddun "linking" :cell/status :measured :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+  :cell/finding "The envelope nonce reaches :request/digest, the receipt, and the receipt's own address, so two runs of the same query by the same principal share no public identifier and the transparency leaf does not repeat."}
+
+ {:db/id -7 :cell/plane "kotobase" :cell/stride "information-disclosure"
+  :cell/linddun "detecting" :cell/status :measured-residue :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+  :cell/finding ":result/root is the address of the answer, so a party who can read receipts observes that an answer changed without reading it. This is the property that makes a receipt auditable; a per-reader blind removes the channel and the agreement together."
+  :cell/decision-pending "whether to blind it"}
+
+ {:db/id -8 :cell/plane "kotobase" :cell/stride "repudiation"
+  :cell/linddun "non-repudiation" :cell/status :gap :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/kotobase docs/disclosure-surface-measurement.md"
+  :cell/finding "Six namespaces are .clj, so the runtime this service deploys on has no source to load them -- transparency_log, audit_anchor, retention_qualification, recovery_qualification, operations_qualification, qualification_host. execution-contract is .cljc and runs everywhere. The audit plane exists; it does not run where the service runs."}
+
+ {:db/id -9 :cell/plane "agent" :cell/stride "elevation-of-privilege"
+  :cell/linddun "non-compliance" :cell/status :gap :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/ayatori src/ayatori/agent.cljc"
+  :cell/finding "ayatori.agent/validate is the entry an LLM writes through and it is real. Nothing mechanically enforces that passing validation is not authorisation -- the pipeline generate/parse/schema-validate/static-effects/authority-check/risk-classify/admission/execute is stated in policy, not checked."}
+
+ {:db/id -10 :cell/plane "kotoba" :cell/stride "tampering"
+  :cell/linddun "non-compliance" :cell/status :gap :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/amu src/kotoba/compiler/nbb/output_attestation.cljs"
+  :cell/finding "Ed25519 publisher attestation binds marker, sealed provenance, artifact identity and target, and its own docstring says it does not replace output admission. Dual-compiler agreement and independent rebuild are absent, so a compromised compiler is attested rather than detected."}
+
+ {:db/id -11 :cell/plane "key" :cell/stride "information-disclosure"
+  :cell/linddun "data-disclosure" :cell/status :unmeasured-here :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/kotobase src/kotobase/disclosure_grant.cljc"
+  :cell/finding "Recipient-bound key delivery with authority windows and epochs exists, and its docstring states the right non-claim: a delivery receipt means authorised envelope release, never human reading, successful decryption, or absence of out-of-band copies. Its repo tests are not this measurement, so the cell is recorded as not measured HERE rather than as passing."}]

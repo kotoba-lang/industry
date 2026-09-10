@@ -60,10 +60,10 @@
 | 6 | schema CID が trust root | `kotobase.execution-contract` が protocol adapter に暗黙の既定を禁じている | 部分（migration proof は無い） |
 | 7 | compiler supply-chain | `output-attestation` + amu の output set / provenance | 部分（dual-compiler / independent rebuild は無い） |
 | 8 | revocation / crypto erasure | `kotobase.disclosure-grant`（recipient-bound、docstring が「delivery receipt は人が読んだことでも復号成功でも帯域外コピーの不在でもない」と明記）、`authority-window`、`crypto-policy` | 実在 |
-| 9 | result CID が metadata | `kotobase.transparency-log`（key-epoch-aware checkpoint + receipt retention） | 部分（public/private の境界宣言が無い） |
-| 10 | audit log 自体が個人情報 | 同上 | 部分 |
-| 11 | correlation / fingerprinting | 該当機構を見つけられなかった | **不在** |
-| 12 | DoS（fuel / traversal 上限） | `:materialize-over-budget` は在る。IPLD traversal 側（max blocks / depth / fanout / decompression ratio）は未確認 | 未測定 |
+| 9 | result CID が metadata | 2026-09-10 に**測った**。`:result/root` は答えの content address なので**答えを読まずに「変わったこと」が観測できる** —— これは receipt を監査可能にしている性質そのもので、per-reader に blind すると channel と一緒に「2 人の読み手が一致する」性質も消える | **residue（欠陥ではない。名指しした）** |
+| 10 | audit log 自体が個人情報 | 2026-09-10 に**測った**。receipt は identity を運べない（`receipt-keys` はちょうど 9 で `exact-keys!` が拒否、`forbidden-keys` は入れ子も歩く）。`:principal` は request envelope の側にあり、receipt は digest でしか指さない | **境界は正しい**（ただし下記の runtime reach） |
+| 11 | correlation / fingerprinting | 2026-09-10 に**測った**。envelope の nonce が `:request/digest` → receipt → receipt 自身のアドレスまで届くので、**同じ principal が同じ query を 2 回走らせても公開識別子は 1 つも一致しない**（transparency leaf は CID しか持たない） | **不在ではなかった** |
+| 12 | DoS（fuel / traversal 上限） | 2026-09-10 に**測った**（census は下記）。`ipld.graph` と `prolly-tree.diff` は fail-closed で**部分集合すら拒否する**。`scan-prefix` の 3-arity は `limit = nil = 無制限`、`scan-range` は limit 引数が無く、**deploy される read path の 2 つの call site はどちらも無制限側** | **在るが、query plane の通る扉には無い** |
 
 LINDDUN は 90-docs 全体で 0 hit。STRIDE は 6 文書に語として出るが、いずれも threat-model 文書ではない。
 
@@ -117,6 +117,15 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
 **これは D3 を予想外の向きに強めた。** resource budget は privacy budget では*ない*
 だけでなく、**それ自身が開示経路**である。走査量の上限は、上限した量を公表する。
 
+**2026-09-10 の追加測定で、想定していなかった gap が 1 つ出た。** kotobase の
+**6 つの namespace が `.clj`** で、この service が deploy される runtime には
+読むソースが無い —— `transparency_log` / `audit_anchor` / `retention_qualification` /
+`recovery_qualification` / `operations_qualification` / `qualification_host`。
+`execution_contract` は `.cljc` なので上の境界はどこでも走る。**public audit plane
+だけが走らない。** CLAUDE.md は JVM を runtime 順位の最後に置いているので、
+「audit plane が在る」と「audit plane が service の走る場所で走る」は 2 つの主張で、
+今支持されているのは前者だけである。
+
 **副産物として 1 件の欠陥が出た。** ADR-2607280100（クリアランスの設計統合、accepted）の代替案 A2「クリアランスごとに ref / データベースを分ける」の却下理由は「D4 のとおり join が ref 1 本までしか届かない」である。**この前提は 2026-09-04 に ADR-2809040800 が実測で反転させている**（join の到達範囲は ref の本数ではなく合成の有無で決まる）。A2 の却下理由は現在偽。ただし A1（datom に 5 列目を足す）の却下理由（ブロック形式・CBOR・merkle-LSM・compaction を壊す）は独立に生きているので、**D2「ラベルは属性に付ける」という決定自体は倒れない** —— 倒れたのは却下の 2 番目の理由だけ。ADR-2607280100 に注記を足し、決定は動かさない。"
 
   :adr/alternatives
@@ -145,12 +154,31 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
    開示を受け入れる）は決定であって、この測定はその入力。
    ⚠ 測ったのは**ライブラリの seam であって deploy された surface ではない**。
    3-arity を wire に出している呼び出し側の棚卸しは未実施。
-2. public receipt に principal / purpose が入っていないことを測る（D6）。
-3. IPLD traversal の上限（max blocks / depth / fanout / decompression ratio）が在るかを測る。#12 は未測定であって clean ではない。
-4. correlation / fingerprinting（#11）—— 内部 CID を境界にそのまま出しているかの棚卸し。
-5. ADR-2607280100 の Step 2〜5（ラベルを属性に束縛して伝播させる）。この ADR は Step 1 が landed であることを再確認しただけで、進めていない。
-6. STRIDE x LINDDUN matrix を 6 面（Kotoba / Kotobase / Ayatori / Agent / IPLD / Key）に敷く（A2）。1〜4 の実測が入ってから。
-7. dual-compiler / independent rebuild（#7）。
+2. ~~public receipt に principal / purpose が入っていないことを測る~~ **完了（2026-09-10）**。
+   `orgs/kotoba-lang/kotobase` の `scripts/measure-disclosure-surface.cljs` /
+   `docs/disclosure-surface-measurement.md`、pin `3771367ad092`。**境界は正しい。**
+   代わりに **6 namespace が JVM 専用**という gap が出た（`:adr/evidence` 参照）。
+3. ~~IPLD traversal の上限を測る~~ **完了（2026-09-10）**。
+   `scripts/measure-traversal-bounds.cljs` /
+   `90-docs/security/traversal-bounds-census.edn`。**在るが、query plane の
+   通る 2 つの扉には無い。** decompression ratio は pack 経路に非適用
+   （ciphertext で ratio 1.003、圧縮しないと既に決めてある）。
+4. ~~correlation / fingerprinting~~ **public plane については完了（2026-09-10）** ——
+   nonce が全ての下流識別子に届くので公開識別子は繰り返さない。
+   ⚠ **残っているのは「内部 CID を境界にそのまま出しているか」の棚卸しで、
+   そちらは未実施。**
+5. ADR-2607280100 の Step 2〜5（ラベルを属性に束縛して伝播させる）。**未着手。**
+   この ADR は Step 1 が landed であることを再確認しただけで、進めていない。
+   ⚠ ただし A2 の却下理由が古くなった（同 ADR の注記）ので、Step 2 に入る前に
+   「属性に付ける」と「合成前提で分ける」を測り直す価値がある。
+6. ~~STRIDE x LINDDUN matrix~~ **完了（2026-09-10）**。
+   `90-docs/security/privacy-threat-matrix.datoms.edn`。**78 セル中 10 セルだけ**が
+   記録され、`:matrix/coverage` が declared == counted を読み手に数えさせる形で
+   持つ。**68 セルは未測定であって clean ではない。**
+7. dual-compiler / independent rebuild（#7）。**未着手。** attestation は在るので、
+   compromised compiler は**検出されるのではなく attest される**（matrix の
+   `kotoba × tampering` セル）。
+8. **3-arity を wire に出している呼び出し側の棚卸し**（前回の測定が残したもの）。未実施。
 
 **gate は無い**（D8）。上の 1〜4 はどれも「測る」であって「直す」ではないので、測った結果が clean なら gate は要らず、汚れていればそこで初めて何を強制すべきかが決まる。"
 

@@ -1,0 +1,87 @@
+[{:db/id -1
+  :doc/id "traversal-bounds-census-2026-09-10"
+  :doc/title "Traversal bounds census — bounded where they were written, unbounded on the path the query plane walks"
+  :doc/path "90-docs/security/traversal-bounds-census.edn"
+  :doc/harness "scripts/measure-traversal-bounds.cljs"
+  :doc/measured-on "2026-09-10"
+  :source/dataset "privacy-plane"
+  :doc/body "# Traversal bounds, measured 2026-09-10
+
+ADR-2609108000 listed IPLD traversal bounds as **unmeasured**, and unmeasured
+is not clean. This is the measurement. It EXERCISES each seam rather than
+grepping for the word limit — a seam that names a limit and defaults it to
+unlimited reads exactly like one that enforces it, and grep cannot tell them
+apart.
+
+Harness `scripts/measure-traversal-bounds.cljs`, 16 assertions, exit 0.
+Run it from the superproject root, or pass `--root <checkout>`; section F
+reads the west-managed `orgs/` tree and **fails closed** rather than
+reporting a pass when it cannot.
+
+## Bounded, fail closed, no default
+
+| seam | required | on missing |
+|---|---|---|
+| `ipld.graph/selection-cursor` | `:max-blocks` `:max-bytes` `:max-depth` `:max-matches` | throws `:ipld/invalid-limit` **before reading a block** |
+| `prolly-tree.diff/sync-blocks*` | `:max-blocks` `:max-bytes` `:max-reads` | throws `:prolly-tree/invalid-limit`, and `0` is not a limit |
+
+Both refuse a partial set, not merely an empty one — three of the four is
+still a refusal. There is no permissive default to fall back on. Measured.
+
+## Unbounded, on the path the query plane uses
+
+`prolly-tree.core/scan-prefix` has two arities and they differ in exactly
+this:
+
+    (scan-prefix get-fn root prefix)        ; limit = nil = UNLIMITED
+    (scan-prefix get-fn root prefix limit)  ; bounded
+
+On a 400-entry tree the 3-arity returns 400; the 4-arity with 5 returns 5;
+`0` returns empty without walking. `scan-range` takes no limit parameter at
+all — its arity is `[get-fn root-cid lo hi]`, and a nil bound is unbounded.
+
+**Both call sites the deployed read path uses take the 3-arity:**
+
+- `arrangement/core.cljc` — snapshot hydrate, empty prefix, no limit, and it
+  decrypts every leaf it reads.
+- `arrangement/source.cljc` — pattern read, key-range pruned by
+  `key-prefix`, still no limit.
+
+Section F pins those two call sites by exact anchor and **fails if an anchor
+is not found exactly once**, so a moved call site reads as a finding rather
+than as a silent pass.
+
+## What this composes with
+
+It is the same shape as the ayatori finding recorded in
+`orgs/kotoba-lang/ayatori` `bench/inference-channel-01.edn`: cost follows the
+database rather than the answer, everywhere on this path, and the ceiling
+that notices is the thing that reports the size. **The bound is not missing
+from the codebase. It is missing from the two doors the query plane walks
+through.**
+
+## Not concluded here
+
+- Whether the hydrate SHOULD be bounded. A snapshot hydrate that must read
+  the whole snapshot is bounded only by refusing to serve large graphs, and
+  `materialize` already chose to do exactly that with a ceiling. Which of the
+  two behaviours belongs on which path is a decision.
+- Decompression ratio, listed alongside the other bounds in ADR-2609108000,
+  is not applicable on the pack path: that path measured a compression ratio
+  of 1.003 on ciphertext and decided not to compress. Nothing to bomb.
+- Fanout is bounded implicitly by `:max-blocks` on the seams that have it and
+  not at all on the two that do not. It is not separately measured.
+
+## Both directions
+
+- Break the countdown so counts change (`(take (inc @left) ms)`): exit 1, and
+  the failures are `4-arity with a limit stops` and `boundary: limit == n-1`.
+  **The `limit == n` probe does not move** — only the pair separates them,
+  which is why the pair is there.
+- A first attempt broke the descent guard instead (`(pos? @left)` to
+  `(>= @left 0)`) and the harness stayed green. That break changes how many
+  blocks are read and not how many entries come back, so it was the wrong
+  break, not a blind spot. Recorded because the mistake is the cheap one to
+  make.
+- Move an anchor in section F: exit 1, `anchor found 0 times`.
+- Unmodified: exit 0, `SCANNED 16`."}]
