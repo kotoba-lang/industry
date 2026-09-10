@@ -713,6 +713,49 @@
   ;; a NEW PARSE ERROR. Do not add to this list -- repair the document instead.
   [])
 
+;; ---------------------------------------------------------------- Kotoba ADL
+;;
+;; A converted document is .kotoba (ADR-2609101300). Its notation is
+;; S-expressions, so the EDN reader parses it -- and returns the NOTATION,
+;; nested lists, not the value. Every content check below (`not-tx`,
+;; `split-string-keys`) walks maps, so on an undecoded document they find
+;; nothing and pass. Leaving that alone would mean each converted file silently
+;; leaves the checks while `parse-errors=0` reads exactly as before.
+;;
+;; The notation's authority and full codec are kotoba-lang/kotoba
+;; `lang/adl.kotoba` and `kotoba.adl`; this is the decode half, so the checks
+;; below stay single-sourced instead of growing a second copy.
+(declare adl-decode)
+
+(defn- adl-entry [e]
+  (when-not (and (seq? e) (= 2 (count e)))
+    (throw (ex-info (str "map entry must be a (k v) form, got " (pr-str e)) {})))
+  [(adl-decode (first e)) (adl-decode (second e))])
+
+(defn- adl-decode [x]
+  (cond
+    (vector? x) (mapv adl-decode x)
+    (not (seq? x)) x
+    :else
+    (let [h (first x) more (rest x)
+          t (when (symbol? h) (name h))]
+      (case t
+        ;; EDN's reader rejects a duplicate key, so this must too -- otherwise
+        ;; the two notations disagree about the same corruption and a converted
+        ;; document gets a weaker check than the one it replaced.
+        "map" (let [pairs (mapv adl-entry more)
+                    ks (map first pairs)]
+                (when-not (= (count ks) (count (set ks)))
+                  (throw (ex-info (str "duplicate key in (map ...): "
+                                       (pr-str (map key (filter #(> (val %) 1) (frequencies ks)))))
+                                  {})))
+                (into {} pairs))
+        "vector" (mapv adl-decode more)
+        "set" (set (map adl-decode more))
+        "list" (apply list (map adl-decode more))
+        ("uuid" "timestamp" "bytes" "link") (str (first more))
+        (doall (map adl-decode x))))))
+
 (defn verify!
   "EDN が 90-docs の唯一の正本であることを機械検証する。
    - 90-docs 配下に .md が無い
@@ -725,7 +768,8 @@
         ;; `git-listed-under-90-docs`. Paths are repo-relative, which is also the
         ;; form the baselines are written in.
         md-left (git-listed-under-90-docs ".md")
-        edn-listed (git-listed-under-90-docs ".edn")
+        edn-listed (vec (concat (git-listed-under-90-docs ".edn")
+                                (git-listed-under-90-docs ".kotoba")))
         abs (fn [rel] (str root "/" rel))
         ;; The .md baseline can be answered from the index alone. The .edn checks
         ;; cannot: they read file CONTENT, and content that is not in this working
@@ -753,7 +797,10 @@
         (when (re-find bad-sf-re raw)
           (swap! sf-hits conj (str f)))
         (try
-          (let [content (edn/read-string {:default (fn [_tag v] v)} raw)]
+          (let [parsed (edn/read-string {:default (fn [_tag v] v)} raw)
+                content (if (str/ends-with? (str f) ".kotoba")
+                          (adl-decode parsed)
+                          parsed)]
             (when (and (str/includes? (str f) "/adr/")
                        (not (multi-entity-tx? content))
                        (not (already-tx-data? content)))

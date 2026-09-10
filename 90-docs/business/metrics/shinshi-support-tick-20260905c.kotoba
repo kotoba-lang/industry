@@ -1,0 +1,38 @@
+(map (:doc/id "shinshi-support-tick-20260905c")
+ (:doc/status "draft")
+ (:doc/date "2026-09-05")
+ (:doc/actor "shinshi-support cron tick")
+ (:doc/type :issue-draft)
+
+ ;; 実測 (2026-09-05 JST 午後, GET https://shinshi.club/api/funnel / /pay/quote / /.well-known/x402)
+ (:observed
+ (map (:funnel-7d "visitors 410 / chatters 86 / scenes 152 / paying 0 (api/funnel 実測)。window は rolling 7d のため日次単純比較は不正確だが、chatters は前 tick (81) から増加・paying は引き続き 0")
+  (:live-rail "GET /pay/quote?usd=0.5 → 200、本 tick も chain=ethereum / custody=safe-multisig / usdc-contract=Eth mainnet (0xA0b8…) / fee $0.10 / net $0.40 / fee-hint 'gas 高め — L2 推奨' の自己矛盾のまま。一方 /.well-known/x402 は network=base / payTo=0xf15928…67Ac / $0.50 / facilitator x402.nexus で正常")
+  (:deploy-lag "PR #42/#44/#51 merge済み・live 未反映は 5 日継続 (9/4 tick 2 回 + 9/5 tick ×2 + 本 tick)。/api/funnel の :quotes も本 tick 実測で未出現 — quote 表示数は依然未計測")))
+
+ ;; agentChat ログの所在
+ (:agentchat-logs
+ "個別 session ログは本リポジトリ内に存在しないことを確認 (shinshi*.edn / agentchat* のファイル検索、projects/.tamaki 配下は該当なし)。正本は D1 chat_event_daily の集計のみ。個別 session の離脱理由は未計測 — 集計シグナルのみで判断")
+
+ ;; 来て止まった人のシグナル (aggregate)
+ (:dropoff-signals
+ (vector "chatters 86 (7d)・paying 0 — chat を始めた人は増えているのに quote 以降で全員離脱のパターンが 5 日連続で不変"
+  "quote 実測: $0.50 に fee $0.10 + ethereum mainnet gas が乗る表示が live のまま。fee-hint 自身が 'L2 推奨' を返す自己矛盾で、/.well-known/x402 (network=base) との食い違いがユーザーに見えている — 離脱の一次要因は rail の不正直さ (実測)"
+  "agentChat の内訳: chat を開始した 86 名が free 枠枯渇後どこで止まったかは chat_event_daily に粒度がなく未計測 (quote 表示回数・free quota 枯渇 event 共に)"
+  "離脱者捕捉導線 (premium_waitlist) は未実装のまま — 再接触手段なし"))
+
+ ;; 返信 draft (送信しない — 承認待ち)
+ (:reply-drafts
+ (vector (map (:to "shinshi-eng (owner 承認経由)")
+   (:subject "[shinshi-club] deploy lag 5 日継続 — chat 利用者は増加中 (86/7d) だが quote が ethereum のまま・:quotes 未計測 (support tick 2026-09-05c)")
+   (:body "support tick より。2026-09-05 (3 回目) 実測: GET /pay/quote?usd=0.5 が本日も chain=ethereum を返します (fee $0.10・net $0.40・fee-hint は 'L2 推奨' と自己矛盾)。一方 /.well-known/x402 は network=base を正しく広告 — quote と discovery の食い違いがそのままユーザーに見えています。GET /api/funnel の :quotes も未反映で、quote を見た人数は未計測のまま。funnel 7d は chatters 86 (増加傾向)・paying 0 で、chat を始めた人だけが増えて quote 以降で全員離脱している状態です。PR #42/#44/#51 (merge済み) の手動 deploy か CI 設定追加を依頼します。deploy 後 24h で :quotes 初読を報告します。")
+   (:action-required "owner の deploy 承認"))))
+
+ ;; 提案 (測定に対する work、実施は承認待ち)
+ (:proposals
+ (vector "quote 表示 event の funnel emitter 実装 (PR #51 deploy 含む) — chatters→paying 間の暗箱解消の初手"
+  "chat_event_daily に free quota 枯渇 event を足す — 'chat を始めたが quota で止まった' 人数の初計測 (agentChat 離脱点の可視化)"
+  "premium_waitlist を quote 画面に実装し離脱者捕捉を開始 (0 件のままのテーブルを実使用に)"
+  "/pay/quote の chain 値を /.well-known/x402 (base) と一致させる — 食い違いは quote 開示の正直さに直結"))
+
+ (:rule-guard "数字は全て本 tick 実測 (GET /api/funnel・/pay/quote・/.well-known/x402)。agentChat 個別 session は未計測と明記。個別ユーザー特定は不可 — 集計シグナルのみ。送信なし。"))

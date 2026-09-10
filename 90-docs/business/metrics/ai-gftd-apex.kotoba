@@ -1,0 +1,44 @@
+(map (:health-status 200),
+ (:zone-name "gftd.ai"),
+ (:workers-invocations-7d
+ (map ("magatama-sh1n5h1x" 11480), ("ai-gftd-chat-shell" 32))),
+ (:zone
+ (map (:requests-7d 291611),
+  (:pageviews-7d 4848),
+  (:uniques-7d-sum 5854),
+  (:zone "gftd.ai"))),
+ (:sources (vector :cloudflare :stripe :health)),
+ (:paths
+ (map (:ok
+  (vector (map (:path "/"), (:requests 701))
+   (map (:path "/favicon.ico"), (:requests 81))
+   (map (:path "/mysql.sql"), (:requests 59))
+   (map (:path "/wp-content/database.sql"), (:requests 54))
+   (map (:path "/data.sql"), (:requests 42))
+   (map (:path "/db.sql"), (:requests 38))
+   (map (:path "/dump.sql"), (:requests 37))
+   (map (:path "/backup.tar.gz"), (:requests 36)))),
+  (:status-mix (map (:ok 2087), (:server-error 639), (:client-error 5592))),
+  (:real-4xx 5391),
+  (:window "24h"))),
+ (:stripe
+ (map (:active-subscriptions 0),
+  (:active-subscriptions-unpaid 0),
+  (:active-subscriptions-account-wide 0),
+  (:apex-active-subscriptions 0),
+  (:murakumo-paid-charges 0),
+  (:murakumo-paid-amount-minor 0),
+  (:charges-total 11),
+  (:last-charge-epoch 1718681591))),
+ (:as-of "2026-09-04"),
+ (:traffic-quality
+ (map (:window "24h"),
+  (:probe-4xx-pct 67),
+  (:error-5xx-pct 8),
+  (:real-4xx-pct 65))),
+ (:top-paths
+ "上位 page (24h, 2xx/3xx): / 701 · /favicon.ico 81 · /mysql.sql 59 · /wp-content/database.sql 54 · /data.sql 42 | 4xx(probe) 67% · 4xx(real) 65% · 5xx 8%"),
+ (:conversion (map (:pct 0))),
+ (:signal
+ "gftd.ai 実測 291611 req/7d・5854 uniques(日次和)・うち4xx probe 67%(24h) (real 65%)、workers 11512 inv/7d、Stripe active subs 0"),
+ (:subscription (map (:free 0), (:plus 0), (:conversion-pct 0))))

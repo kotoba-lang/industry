@@ -92,13 +92,56 @@
 
 (def root (str/trim (:out (shell/sh "git" "rev-parse" "--show-toplevel"))))
 
+(declare adl-decode)
+
+(defn- adl-entry [e]
+  (when-not (and (seq? e) (= 2 (count e)))
+    (throw (ex-info (str "map entry must be a (k v) form, got " (pr-str e)) {})))
+  [(adl-decode (first e)) (adl-decode (second e))])
+
+(defn adl-decode
+  "Kotoba ADL notation -> the value it denotes (ADR-2609101300).
+
+   A .kotoba document is S-expressions, so the EDN reader parses it and hands
+   back the NOTATION -- nested lists -- not the value. Every loader below walks
+   maps, so an undecoded document contributes no entities and `count` simply
+   gets smaller: the dataset leaves the query face without any loader reporting
+   an error. Decoding here, in the one shared read helper, keeps that from
+   being something each loader has to remember."
+  [x]
+  (cond
+    (vector? x) (mapv adl-decode x)
+    (not (seq? x)) x
+    :else
+    (let [h (first x) more (rest x)
+          t (when (symbol? h) (name h))]
+      (case t
+        "map" (let [pairs (mapv adl-entry more)
+                    ks (map first pairs)]
+                (when-not (= (count ks) (count (set ks)))
+                  (throw (ex-info "duplicate key in (map ...)" {})))
+                (into {} pairs))
+        "vector" (mapv adl-decode more)
+        "set" (set (map adl-decode more))
+        "list" (apply list (map adl-decode more))
+        ("uuid" "timestamp" "bytes" "link") (str (first more))
+        (doall (map adl-decode x))))))
+
+(defn data-file?
+  "Either notation. One extension no longer tells you what a file holds
+   (ADR-2609101300), so enumerations ask this rather than testing for .edn."
+  [p]
+  (let [s (str p)]
+    (or (str/ends-with? s ".edn") (str/ends-with? s ".kotoba"))))
+
 (defn slurp-edn
   "未知の reader タグ（例 #md \"...\"）はタグを捨てて値だけ返すフォールバックを
    常に有効にする（さもないと clojure.edn/read-string がタグ未知で例外を投げ、
    呼び出し側の try/catch で丸ごとスキップされてしまう — 各カテゴリで
    個別にタグを解釈するより、ここで一箇所吸収する方が安全）。"
   [path]
-  (edn/read-string {:default (fn [_tag v] v)} (slurp path)))
+  (let [parsed (edn/read-string {:default (fn [_tag v] v)} (slurp path))]
+    (if (str/ends-with? (str path) ".kotoba") (adl-decode parsed) parsed)))
 
 (defn slurp-edn-lines
   "1行1トップレベルEDNフォームの疑似JSONL形式を読む（RAD identity journal・
@@ -285,7 +328,7 @@
 
 (defn adr-files []
   (->> (file-seq (io/file root "90-docs" "adr"))
-       (filter #(str/ends-with? (str %) ".edn"))
+       (filter #(data-file? %))
        (sort-by str)))
 
 (defn adr-entities-from-file
@@ -321,7 +364,7 @@
 
 (defn docs-edn-files []
   (->> (file-seq (io/file root "90-docs"))
-       (filter #(str/ends-with? (str %) ".edn"))
+       (filter #(data-file? %))
        (remove #(str/includes? (str %) "/adr/"))
        (remove #(str/includes? (str %) "/metrics/")) ; metrics は business-metrics で別ロード
        (remove #(str/ends-with? (str %) "canvas-ledger.edn")) ; canvas-ledger で別ロード
@@ -380,7 +423,7 @@
 (defn foreign-adr-files [{:keys [dir]}]
   (if (.exists dir)
     (->> (file-seq dir)
-         (filter #(str/ends-with? (str %) ".edn"))
+         (filter #(data-file? %))
          (remove #(re-find #"(?i)(index|registry)\.edn$" (str %)))
          (sort-by str))
     []))
@@ -424,7 +467,7 @@
 (defn business-metrics-files []
   (let [dir (io/file root "90-docs" "business" "metrics")]
     (if (.exists dir)
-      (->> (file-seq dir) (filter #(str/ends-with? (str %) ".edn")) (sort-by str))
+      (->> (file-seq dir) (filter #(data-file? %)) (sort-by str))
       [])))
 
 (defn business-metrics-entities [next-tempid!]
@@ -459,7 +502,7 @@
 (defn kawasakijun-files []
   (let [dir (io/file root "orgs" "kawasakijun")]
     (if (.exists dir)
-      (->> (file-seq dir) (filter #(str/ends-with? (str %) ".edn")) (sort-by str))
+      (->> (file-seq dir) (filter #(data-file? %)) (sort-by str))
       [])))
 
 (defn kawasakijun-entities [next-tempid!]
@@ -1928,7 +1971,7 @@
     (if (.exists dir)
       (let [skipped (atom [])
             es (->> (file-seq dir)
-                    (filter #(str/ends-with? (str %) ".edn"))
+                    (filter #(data-file? %))
                     (sort-by str)
                     (mapcat (fn [f]
                               (let [rows (vector-of-maps-entities f)]
@@ -2238,7 +2281,7 @@
       []
       (let [role-files (when (.exists roles-dir)
                          (->> (file-seq roles-dir)
-                              (filter #(str/ends-with? (str %) ".edn"))
+                              (filter #(data-file? %))
                               ;; sort-by str, not sort: File objects are not
                               ;; comparable, and plain `sort` throws.
                               (sort-by str)))

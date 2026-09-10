@@ -1,0 +1,427 @@
+(map (:as-of "2026-09-04"),
+ (:sources (vector :cloudflare :health :emitter)),
+ (:workers-invocations-7d (map ("nexus-x402" 6164))),
+ (:health-status 200),
+ (:catalog
+ (map (:x402Version 1),
+  (:service "nexus-x402"),
+  (:count 31),
+  (:items
+  (vector (map (:seller "kekkai"),
+    (:method "POST"),
+    (:path-prefix "/kekkai/x402/"),
+    (:gateway "https://x402.nexus/gateway/kekkai/kekkai/x402/…"),
+    (:description
+    "one deny-by-default kekkai edge decision, organisation boundary first"),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "gleif"),
+    (:method "GET"),
+    (:path-prefix "/v1/lei/"),
+    (:gateway "https://x402.nexus/gateway/gleif/v1/lei/…"),
+    (:description
+    "hosted lookup of one LEI on the joined GLEIF projection (legal name, jurisdiction, status, ownership edges). CC0 identity; price is for the query, not exclusive rights. A LEI not in the joined tier returns 404 and is never billed."),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/trm"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/trm…"),
+    (:description
+    "Official Colombian USD/COP TRM from Superintendencia Financiera."),
+    (:price
+    (map (:usd "0.005"),
+     (:micros "5000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/tibc"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/tibc…"),
+    (:description "Official Colombian TIBC."),
+    (:price
+    (map (:usd "0.005"),
+     (:micros "5000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/captaciones"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/captaciones…"),
+    (:description "Official Colombian deposit rates."),
+    (:price
+    (map (:usd "0.005"),
+     (:micros "5000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/tasas-activas"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/tasas-activas…"),
+    (:description "Official Colombian active credit rates."),
+    (:price
+    (map (:usd "0.005"),
+     (:micros "5000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/fic"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/fic…"),
+    (:description "Official Colombian FIC fund returns."),
+    (:price
+    (map (:usd "0.005"),
+     (:micros "5000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/weather"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/weather…"),
+    (:description "Weather clone."),
+    (:price
+    (map (:usd "0.003"),
+     (:micros "3000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/scrape"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/scrape…"),
+    (:description "Scrape clone."),
+    (:price
+    (map (:usd "0.008"),
+     (:micros "8000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/v1/pr-watch"),
+    (:gateway "https://x402.nexus/gateway/colombia-trm/v1/pr-watch…"),
+    (:description "GitHub PR/issue watch."),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "colombia-trm"),
+    (:method "GET"),
+    (:path-prefix "/v1/appstore-watch"),
+    (:gateway
+    "https://x402.nexus/gateway/colombia-trm/v1/appstore-watch…"),
+    (:description "App Store watch."),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"))))
+   (map (:seller "hyakka"),
+    (:method "POST"),
+    (:path-prefix "/x402/query"),
+    (:gateway "https://x402.nexus/gateway/hyakka/x402/query…"),
+    (:description
+    "One 15-minute multi-hop join pass over the wiki.kotobase.net claim graph: up to 3 hops, either direction, across any of the corpora listed at /api/v1/datasets. Single-hop lookups stay free at /api/v1/corpus/*. Claims are CC0-1.0; the price is for the traversal, not for rights in the data."),
+    (:direct "https://wiki.kotobase.net/x402/query…"),
+    (:settles-via-facilitator true),
+    (:price
+    (map (:usd "0.05"),
+     (:micros "50000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v1/chat/completions"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/chat/completions…"),
+    (:description
+    "per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens per request"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))),
+    (:credits
+    (map (:amount "1"),
+     (:asset "CREDITS"),
+     (:network "murakumo"),
+     (:scheme "credits"),
+     (:payTo "murakumo"),
+     (:redeemable false))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v1/chat/completions"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/chat/completions…"),
+    (:description
+    "per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens per request"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v1/infer-memory"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/infer-memory…"),
+    (:description
+    "infer+memory: OpenAI-compatible inference plus durable Kotobase receipt CID, up to 25,000 output tokens per request"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))),
+    (:credits
+    (map (:amount "1"),
+     (:asset "CREDITS"),
+     (:network "murakumo"),
+     (:scheme "credits"),
+     (:payTo "murakumo"),
+     (:redeemable false))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v1/infer-memory"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/infer-memory…"),
+    (:description
+    "infer+memory: OpenAI-compatible inference plus durable Kotobase receipt CID, up to 25,000 output tokens per request"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v2/chat/completions"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/chat/completions…"),
+    (:description
+    "x402 v2 EIP-3009 per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v2/chat/completions"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/chat/completions…"),
+    (:description
+    "x402 v2 EIP-3009 per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v2/infer-memory"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/infer-memory…"),
+    (:description
+    "x402 v2 infer+memory with Kotobase operation lifecycle and durable receipt CID, up to 25,000 output tokens"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "murakumo"),
+    (:method "POST"),
+    (:path-prefix "/x402/v2/infer-memory"),
+    (:gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/infer-memory…"),
+    (:description
+    "x402 v2 infer+memory with Kotobase operation lifecycle and durable receipt CID, up to 25,000 output tokens"),
+    (:price
+    (map (:usd "0.01"),
+     (:micros "10000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "kotobase"),
+    (:method "GET"),
+    (:path-prefix "/x402/ipfs/"),
+    (:gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/…"),
+    (:description "per-request content-addressed storage read"),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))),
+    (:credits
+    (map (:amount "0.1"),
+     (:asset "CREDITS"),
+     (:network "murakumo"),
+     (:scheme "credits"),
+     (:payTo "kotobase"),
+     (:redeemable false))))
+   (map (:seller "kotobase"),
+    (:method "GET"),
+    (:path-prefix "/x402/ipfs/"),
+    (:gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/…"),
+    (:description "per-request content-addressed storage read"),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "kotobase"),
+    (:method "POST"),
+    (:path-prefix "/x402/xrpc/"),
+    (:gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/…"),
+    (:description
+    "per-query knowledge-graph read (datomic.q / graph.sparql / graph.query / datomic.datoms / datomic.pull; explicit graph CID in body, no account)"),
+    (:price
+    (map (:usd "0.002"),
+     (:micros "2000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))),
+    (:credits
+    (map (:amount "0.2"),
+     (:asset "CREDITS"),
+     (:network "murakumo"),
+     (:scheme "credits"),
+     (:payTo "kotobase"),
+     (:redeemable false))))
+   (map (:seller "kotobase"),
+    (:method "POST"),
+    (:path-prefix "/x402/xrpc/"),
+    (:gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/…"),
+    (:description
+    "per-query knowledge-graph read (datomic.q / graph.sparql / graph.query / datomic.datoms / datomic.pull; explicit graph CID in body, no account)"),
+    (:price
+    (map (:usd "0.002"),
+     (:micros "2000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "hanmoto"),
+    (:method "GET"),
+    (:path-prefix "/x402/counts"),
+    (:gateway "https://x402.nexus/gateway/hanmoto/x402/counts…"),
+    (:description nil),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "hanmoto"),
+    (:method "GET"),
+    (:path-prefix "/x402/counts"),
+    (:gateway "https://x402.nexus/gateway/hanmoto/x402/counts…"),
+    (:description nil),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "hanmoto"),
+    (:method "GET"),
+    (:path-prefix "/x402/host/"),
+    (:gateway "https://x402.nexus/gateway/hanmoto/x402/host/…"),
+    (:description nil),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "hanmoto"),
+    (:method "GET"),
+    (:path-prefix "/x402/host/"),
+    (:gateway "https://x402.nexus/gateway/hanmoto/x402/host/…"),
+    (:description nil),
+    (:price
+    (map (:usd "0.001"),
+     (:micros "1000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "hanmoto"),
+    (:method "GET"),
+    (:path-prefix "/x402/unclassified"),
+    (:gateway "https://x402.nexus/gateway/hanmoto/x402/unclassified…"),
+    (:description nil),
+    (:price
+    (map (:usd "0.002"),
+     (:micros "2000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"))))
+   (map (:seller "hanmoto"),
+    (:method "GET"),
+    (:path-prefix "/x402/unclassified"),
+    (:gateway "https://x402.nexus/gateway/hanmoto/x402/unclassified…"),
+    (:description nil),
+    (:price
+    (map (:usd "0.002"),
+     (:micros "2000"),
+     (:asset "USDC"),
+     (:network "base-sepolia"),
+     (:payTo "0xD030410BABA777b1e7FacABf679295641203628A"))))
+   (map (:seller "shinshi"),
+    (:method "GET"),
+    (:path-prefix "/x402/premium/"),
+    (:gateway "https://x402.nexus/gateway/shinshi/x402/premium/…"),
+    (:description nil),
+    (:price
+    (map (:usd "0.50"),
+     (:micros "500000"),
+     (:asset "USDC"),
+     (:network "base"),
+     (:payTo "0xf1592811063554e2EDfC137964aE181C830967Ac")))))),
+  (:settlements
+  (map (:count 7),
+   (:usd-total 0.083),
+   (:recorded 11),
+   (:duplicates 4),
+   (:agent-hint (map (:agent 5), (:human 0), (:unknown 2))),
+   (:sources
+   (map (:direct
+    (map (:paid-calls 4),
+     (:paying-wallets 3),
+     (:unique-repeat-buyers 1),
+     (:repeat-rate 0.3333333333333333),
+     (:service-gmv-usd 0.053000000000000005),
+     (:repeat-buyer-revenue-usd 0.002),
+     (:repeat-buyer-revenue-share 0.03773584905660377))),
+    (:direct-agent
+    (map (:paid-calls 3),
+     (:paying-wallets 1),
+     (:unique-repeat-buyers 1),
+     (:repeat-rate 1),
+     (:service-gmv-usd 0.03),
+     (:repeat-buyer-revenue-usd 0.03),
+     (:repeat-buyer-revenue-share 1))))))))), 
+ (:signal "workers 6164 inv/7d"))
