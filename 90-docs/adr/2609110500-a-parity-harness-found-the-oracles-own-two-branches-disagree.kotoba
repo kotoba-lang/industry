@@ -1,0 +1,113 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110500-a-parity-harness-found-the-oracles-own-two-branches-disagree")
+  (:adr/topic "q9-whole-component-parity-and-session-close")
+  (:adr/title "A parity harness found the oracle's own two reader-conditional branches disagree")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/com-abb-robotics"))
+  (:adr/related (vector "adr-2609110400-the-converters-reader-was-more-permissive-than-the-compilers"
+                "adr-2609110200-a-moving-defcid-reaches-the-conformance-corpus-and-no-deployment-lock"))
+  (:adr/body
+  "## What this closes
+
+`com-abb-robotics` carries the third whole-component build. Its own
+migration-record.edn listed, under `:not-claimed`, that the `oracle-*`
+functions existed and were RUN and their values discriminated -- but had never
+been compared value-by-value against `main.cljc`. Running a thing and agreeing
+with the thing it replaces are two different claims, and only the second is a
+port. `q9-oracle.cljs` now exists in that repository (merged 8641d0b1) and
+closes it.
+
+## Reproduce
+
+    # the CLJC side
+    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+
+    # the artifact side
+    amu check   src/abb_robotics/whole_component.kotoba --jvm-free --policy policy.edn
+    amu compile src/abb_robotics/whole_component.kotoba --target aarch64-macos \\
+                --policy policy.edn --output abb.kexe
+    amu extract-native abb.kexe --symbol <oracle-name> --output s.bin   # prints :offset
+    KEXE_FUEL=100000000 kexe-loader s.bin <offset> <arity> aarch64 7,23 [selector]
+
+Both sides were RUN in this pass. `amu check` returned `:ok true`, `amu
+compile` returned `:ok true` at 237845 bytes, and every number below came out
+of the executed artifact rather than a build log.
+
+## What agrees, and what does not
+
+Agreeing: route count 30 on both sides -- computed from the entity table rather
+than written down; nine of nine `as-bool` selectors; five of six `as-int`.
+
+Disagreeing, on exactly one input: `as-int` of `\"12abc\"` is 0 from the artifact
+and 12 from the oracle run under nbb.
+
+**It is not a port defect, and finding that out is what the harness bought.**
+The oracle's `as-int` is a reader conditional whose two branches disagree with
+each other on this input:
+
+    :cljs   js/parseInt(\"12abc\", 10)      -> 12   (takes the leading digits)
+    :clj    Long/parseLong(\"12abc\")       -> throws, caught, -> 0
+
+Both were RUN rather than read. `nbb` printed 12; `clojure -M -e` printed 0.
+The component matches the `:clj` branch.
+
+So `parity with the oracle` is not a well defined property for this input. The
+same harness reports a mismatch under nbb and a match on the JVM, and which one
+is a bug depends on a decision nobody has made. It is recorded rather than
+resolved: choosing a normative branch is a semantic decision about the product,
+not a migration step.
+
+This is worth generalising. A `.cljc` oracle is not one program. Where its
+branches diverge, a port cannot be `faithful` to it -- it can only be faithful
+to one branch, and the migration owes an explicit choice.
+
+## A method note about what was compared
+
+The expand layer is compared as a COUNT of the keys the fold added, not as a
+hash of the rendered record. The `.kotoba` hashes a rendering, and the
+rendering is this port's own convention, so a hash comparison there would
+confound a behaviour difference with a layout difference. Counting asks the
+question the two-ref fold is actually for: did it run once, twice, or not at
+all.
+
+## Session state at close
+
+Landed to default branches this session, all verified present on `main`:
+
+  - kotoba `c146f3df`  adl convert: consumer guards ask whether a Clojure
+    consumer REMAINS; conversion set settled as a fixpoint
+  - kotoba `47aa4de0`  adl convert: refuse what amu's source reader cannot
+    read, and name the construct
+  - com-abb-robotics `8641d0b1`  the parity harness and this finding
+  - amu `#838` merged (dependabot, 13/13 green). `#837` then conflicted on the
+    same lock file and is left for dependabot to rebase.
+  - ADRs 2609110000, 2609110100, 2609110200, 2609110300, 2609110400 and this
+    one. West pins advanced for `kotoba` and `com-abb-robotics`.
+
+## Resume point
+
+**The rename**: 824 repositories landed. 90 remain FAIL, and they are two
+different problems: about 85 have no branch on the remote, so they need the
+rename RE-RUN rather than a pull request; the rest are archived repositories,
+which are a category and not a failure. The PR recovery finished cleanly --
+110 recovered, 0 still rate-limited.
+
+**The converter**: convert is not compile. 30 landed `.kotoba` files from 30
+distinct repositories were put through `amu check` and none passed, while a
+real Kotoba module passed as the control. The two dominant rejections are a
+language gap -- dynamic projection of a map constant, `(get catalog k)` -- and
+reader constructs. Neither is a converter defect.
+
+**Next concrete step for Q9**: `com-aadhaar` and `com-aave` have `q9-oracle.cljs`
+and now so does `com-abb-robotics`. Run the same harness against the other two
+and see whether the `as-int` divergence reproduces there -- both are ports of
+the same template, so if it does, the reader-conditional question is a cohort
+decision rather than a repository one.
+
+⚠ Left in place deliberately, not cleaned: 21 `wt-*` worktrees under the
+session scratchpad from earlier agent runs. They are not this session's to
+delete; `nbb scripts/worktree-retire.cljs --root . --apply` is the sanctioned
+route and refuses anything dirty or in use.")))
