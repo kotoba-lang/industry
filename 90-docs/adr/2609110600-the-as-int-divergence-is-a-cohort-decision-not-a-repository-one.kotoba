@@ -1,0 +1,91 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110600-the-as-int-divergence-is-a-cohort-decision-not-a-repository-one")
+  (:adr/topic "q9-wave1-reader-conditional-cohort")
+  (:adr/title "The as-int divergence is a cohort decision, and naming a normative branch settles twenty pilots at once")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609110500-a-parity-harness-found-the-oracles-own-two-branches-disagree"))
+  (:adr/body
+  "## Context
+
+The previous iteration's parity harness on `com-abb-robotics` disagreed with
+its oracle on exactly one input, and the cause was not a port defect: the
+oracle's `as-int` is a reader conditional whose two branches disagree with each
+other. That ADR named the open question -- is this one repository's problem or
+the cohort's -- and this one answers it by measuring.
+
+## It is the cohort's
+
+All 20 wave-1 pilots carry the same conditional, and the `:clj` branch is
+textually identical across all 20. The machine record is
+`kotoba-lang/lang/q9-wave1-tranche-1.edn` under
+`:reader-conditional-divergence-2026-09-10` (merged db38dff4).
+
+## Reproduce
+
+Per pilot, the `:cljs` branch:
+
+    cd orgs/kotoba-lang/<pilot>
+    nbb --classpath src:<kotoba-lang/text>/src -e \\
+      '(require (quote [<ns>.main :as m]))
+       (println (m/as-int \"12abc\") (m/as-int \" 42 \"))'
+    -> 12 42
+
+The `:clj` branch is the same expression under a JVM:
+
+    clojure -M -e '(require (quote [clojure.string :as s]))
+      (defn as-int [v] (cond (number? v) (long v)
+        (string? v) (try (Long/parseLong (s/trim v)) (catch Exception _ 0)) :else 0))
+      (println (as-int \"12abc\") (as-int \" 42 \"))'
+    -> 0 42
+
+And the artifact side, executed rather than built:
+
+    amu extract-native abb.kexe --symbol oracle-as-int --output s.bin   # :offset
+    KEXE_FUEL=100000000 kexe-loader s.bin <offset> 1 aarch64 7,23 3
+    -> 0
+
+## Two controls, because a census of 20-of-20 is otherwise unreadable
+
+A census in which every row matches cannot be distinguished from a predicate
+that is stuck returning true. Both directions were checked.
+
+**The detector can say no.** The same grep answers `no-rc` for
+`whole_component.kotoba` and for `q9-oracle.cljs`. So 20-of-20 is a census, not
+a stuck answer.
+
+**The branches agree on well-formed input.** `\" 42 \"` gives 42 on both
+branches. Without that row the divergence could have been a broken harness
+rather than a property of the source; with it, the two branches are shown to
+differ *only* on trailing garbage, which is the actual shape of the defect.
+
+## Decision: recorded, deliberately not resolved
+
+Naming a normative branch changes what the actor does with `\"12abc\"` -- 12 or
+0 -- and that is a semantic decision about the REST surface, not a migration
+step. ADR-q9 is explicit that a component is not reduced to a smaller predicate
+to make a gate green, and silently adopting whichever branch the port happened
+to match would be the same move in a different costume. The port matches
+`:clj`; that is a fact about the port, not a ruling.
+
+What changes is the SCOPE of the decision. Because all twenty carry the same
+conditional and the same `:clj` text, whoever settles it settles all twenty at
+once, and no per-repository investigation is owed.
+
+## What this generalises to
+
+**A `.cljc` oracle is not one program.** Where its reader-conditional branches
+diverge, a port cannot be `faithful to the oracle` -- it can only be faithful to
+one branch, and the migration owes an explicit choice.
+
+That has a practical consequence for how parity is read in this cohort: the
+same harness reports a mismatch under nbb and a match on the JVM, and neither
+reading is wrong. A parity result from a `.cljc` oracle must therefore say which
+runtime produced it, or it is not a result.
+
+⚠ This also means a green parity run is not automatically reassuring. If a
+future harness reports full agreement against a `.cljc` oracle without naming
+its runtime, that is a report to re-measure rather than to trust.")))
