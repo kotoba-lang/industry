@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2609100100-worker-cpu-limit-drift-datoms-read"
-  :adr/title "Cloudflare Worker 課金の 85% は 1 script の 2% のリクエストで、直接の原因は repo に書かれていない cpu_ms 120000 だった（accepted）"
+  :adr/title "Cloudflare Worker 課金の 85% は 1 script の 2% のリクエストで、その 2% は app-aozora-pds が 73% loadShed している原因と同じ 1 本の遅い読みだった —— 直接の引き金は repo に書かれていない cpu_ms 120000（accepted）"
   :adr/status :accepted
   :adr/date "2026-09-10"
   :adr/deciders ["Jun Kawasaki"]
@@ -107,6 +107,63 @@ bound である。**
   script で filter。tail は `npx wrangler tail <script> --format json`
   （pretty-print された JSON object が連結されて出るので、行単位ではなく
   `JSONDecoder.raw_decode` で舐める）。
+
+## ⚠ これは課金の話ではなかった —— app-aozora-pds が 73% 落ちている
+
+上の単一テナントは **app-aozora**（`AOZORA_OPERATOR_TENANT_ID`、
+`orgs/network-awai/app-aozora-engine/pds/wrangler.jsonc:99`、ADR-2608291500 の
+operator tenant）だった。その PDS を同じ 7 日で測ると:
+
+  app-aozora-pds   loadShed             18,919 req (73%)  wall p50 196s  p99 3,601s
+  app-aozora-pds   success               6,074 req        wall p50   4s
+  app-aozora-pds   clientDisconnected      782 req        wall p50  30s
+  app-aozora-pds   scriptThrewException     17 req
+
+**`loadShed` は Cloudflare が過負荷で受け付けを拒んだリクエストである。**
+73% がそれで、wall の中央値が 196 秒。一方この Worker 自身の CPU は
+7 日で 0.57 CPU-h / 25,762 req = **1 件あたり 80ms しか使っていない。**
+つまり **PDS は計算していない。196 秒ずっと subrequest を待っている。**
+subrequest は 7 日で 176,382 本（1 リクエストあたり 6.8 本）で、その先が
+`datoms.kotobase.net` である。
+
+因果は閉じている:
+
+  datoms の読みが数秒 CPU を焼く
+    → PDS は 1 リクエストで 6.8 本待つので wall が 196s になる
+      → 溜まって Cloudflare が 73% を loadShed する
+        → 捨てられた PDS の in-flight subrequest が graph-database 側で
+          clientDisconnected として CPU を焼いたまま残る
+          → 呼び出し側は ~25s で諦めて再試行し、再試行は cold から
+            hydration をやり直す
+
+**だから今回の値上がりは症状であって、原因は app-aozora が本番で
+壊れていることである。** 課金は、それが計器として最初に鳴っただけ。
+
+## なぜ read cache が効かないか（測った上での推論）
+
+`run-authorized-read` の read cache は CACAO を持つ読みだけを除外するので、
+aozora の Biscuit 経路は**キャッシュ対象である**。効いていないのは、
+key が `(chain-cid, method, body)` だからで、**bot が投稿し続ける限り
+head が動き、chain-cid が毎回変わる。** 書き込みが続くグラフに対して
+content address で keyed された read-through cache は原理的に効かない。
+
+加えて deploy 済み設定は `KOTOBASE_PHYSICAL_INDEX_QUALIFICATION: 0`
+（physical index off）である。つまり読みは毎回 novelty から full hydration
+している。**このフラグを勝手に立てない** —— repo は `qualification/` と
+`PROMOTION.md` に昇格の証拠経路を持っており、未 qualify の index を本番
+グラフで有効化するのはその経路を飛ばすことになる。
+
+## 次の一手（この ADR は実行していない）
+
+1. `yoro-social-v2` の novelty chain の深さと datom 数を測る
+   （`dbStats` / `basisT`。Biscuit は kagi compartment `gftdcojp` の
+   `aozora-pds-biscuit-sa-token`）。CLAUDE.md の実測では fold 閾値 64 /
+   `novelty-segment-size` 16 なので、**畳まれていない chain がどれだけ
+   伸びているかが hydration コストの分母**である。
+2. 深さが原因なら fold を回す。原因でないなら physical index の
+   qualification を進める。**どちらかを決める前に 1 を測る。**
+3. PDS 側の fan-out 6.8 と timeout ~25s を見直す。ただし
+   **上流が速くなるまで、ここを触っても loadShed は動かない。**
 
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
