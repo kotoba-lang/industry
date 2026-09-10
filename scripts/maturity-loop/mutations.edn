@@ -12329,4 +12329,72 @@
       :file "test/softdev/actor_test.kotoba"
       :find "(ns softdev.actor-test"
       :replace "(ns softdev.actor-tests"
+      :must-fail ["REFUSED"]}]}
+
+   {:repo "orgs/cloud-itonami/cloud-itonami-isco-3117"
+    :label "isco-3117 verdict の排他性 —— hold と escalate が同時に真になったことを、誰かが見ているか"
+    ;; isco-2519 と同じ日に同じ改名で暗くなった suite（8 tests / 29 assertions が
+    ;; `Ran 0 tests` に、どちらも exit 0）。runner も床も同じ形なので、ここに
+    ;; 登録する価値は「暗くなったこと」ではなく **その先で見つかった 3 つの盲点**にある。
+    ;;
+    ;; 既存の検査はどれも自分が気にする field だけを assert していた —— hard 系は
+    ;; `:hard?` を、escalation 系は `:escalate?` と `(not :hard?)` を見て、
+    ;; **`:ok?` を誰も否定していなかった**。結果として verdict の構成を 3 通りに
+    ;; 壊しても 8 tests / 29 assertions は緑のままだった（実測 2026-09-11）。
+    ;;
+    ;; 最も重いのは 3 番目。governor の docstring は hard を "never overridable" と
+    ;; 書いているが、`:hard?` と `:escalate?` が同時に真な verdict はまさにその一文が
+    ;; 禁じる状態で、hold すべき提案について人に sign-off を求めることになる。
+    ;; `:decide` は `:hard?` を先に読むので **routing は生き残り、矛盾だけが verdict に
+    ;; 残る** —— actor 経由では観測できず、verdict 自身に問うしかない。
+    ;;
+    ;; 5 件とも当てて赤くなるところを実際に見てから登録した。
+    :cmd ["nbb" "test/run_suite.cljs"]
+    ;; isco-2519 と同じ理由で exit と併せて見る。REFUSED の回にもこの行は出る。
+    :green-marker "failures=0 errors=0"
+    :mutations
+    [{:id :isco3117/confidence-floor-admits-the-line
+      :note "`(< conf floor)` を `<=` へ滑らせる。**境界ちょうど**の入力（CLAUDE.md 5 問目）。
+             この suite は 0.5 / 0.8 / 0.95 を持っていて 0.6 を持っていなかったので、
+             反転しても緑だった —— 通る例と落ちる例が両方あっても、線上の 1 件が無ければ
+             演算子は見えない"
+      :file "src/mining_metallurgy/governor.kotoba"
+      :find "low? (< conf confidence-floor)"
+      :replace "low? (<= conf confidence-floor)"
+      :must-fail ["confidence-floor-is-a-floor"]}
+
+     {:id :isco3117/ok-forgets-the-safety-escalation
+      :note "`:ok?` から `(not safety-op?)` を落とす。safety hazard が「人が見る」と
+             「そのまま通してよい」を同時に主張する verdict になる"
+      :file "src/mining_metallurgy/governor.kotoba"
+      :find "(and (not hard?) (not low?) (not safety-op?))"
+      :replace "(and (not hard?) (not low?))"
+      :must-fail ["verdict-dispositions-are-mutually-exclusive"]}
+
+     {:id :isco3117/ok-forgets-low-confidence
+      :note "`:ok?` から `(not low?)` を落とす。上と同じ穴の別の口"
+      :file "src/mining_metallurgy/governor.kotoba"
+      :find "(and (not hard?) (not low?) (not safety-op?))"
+      :replace "(and (not hard?) (not safety-op?))"
+      :must-fail ["verdict-dispositions-are-mutually-exclusive"]}
+
+     {:id :isco3117/escalation-outranks-a-hard-block
+      :note "`:escalate?` から `(not hard?)` の番人を落とす。**この repo が存在する理由**
+             —— 採掘・発破・鉱石品位判定は技術者の権限ではない、という hard block —— が
+             人の sign-off で越えられる形になる。`:decide` は `:hard?` を先に読むので
+             routing は生き残り、矛盾は verdict の中だけに残る"
+      :file "src/mining_metallurgy/governor.kotoba"
+      :find "(and (not hard?) (or low? safety-op?))"
+      :replace "(or low? safety-op?)"
+      :must-fail ["verdict-dispositions-are-mutually-exclusive"]}
+
+     ;; ── 床。exit 2 でなければならない ──────────────────────────────
+     {:id :isco3117/a-test-namespace-drops-out
+      :note "**refusal の床。exit 2 でなければならない。** ns 名を 1 文字変えるとその
+             namespace は収集されず、残り 5 件は緑のまま通る。0 件だけを拒否する床
+             （actor-crew の先例）はこれを **PASS と報告する** —— 実測 2026-09-11:
+             `only 5 of the 10 tests README.md publishes ran` / exit 2 になった"
+      :file "test/mining_metallurgy/governor_test.kotoba"
+      :find "(ns mining-metallurgy.governor-test"
+      :replace "(ns mining-metallurgy.governor-tset"
       :must-fail ["REFUSED"]}]}]}
