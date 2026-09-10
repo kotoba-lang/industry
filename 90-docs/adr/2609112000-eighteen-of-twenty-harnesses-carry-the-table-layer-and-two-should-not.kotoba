@@ -1,0 +1,64 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609112000-eighteen-of-twenty-harnesses-carry-the-table-layer-and-two-should-not")
+  (:adr/topic "q9-harness-relevel")
+  (:adr/title "Eighteen of twenty harnesses carry the table layer, and the two that do not should keep what they have")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609111900-predicting-what-a-repair-must-not-change-is-what-made-it-readable"))
+  (:adr/body
+  "## What was uneven
+
+The entity-table layer was added mid-way through generating the cohort's
+harnesses, so the ones produced before it compared four layers and the ones
+after compared five. That showed up directly in the previous iteration's
+verification counts -- 23 rows compared in some repositories and 29 in others --
+which is how it was noticed.
+
+Eleven harnesses lacked the layer, not the nine estimated last iteration. The
+estimate was made from the row counts of a partial run rather than by asking
+every repository.
+
+## Nine were re-generated; two were deliberately left alone
+
+Nine were generator output and simply predate the layer. Regenerated, compiled,
+executed, verified: entity table agreeing in all nine.
+
+`com-abb-robotics` and `com-accela` also lack the table layer, and were NOT
+regenerated. Their harnesses are hand-written and carry MORE than the generator
+emits -- store, filters, pagination, handlers, expand, and the float arm.
+Replacing them with generator output would trade several layers of
+repository-specific behaviour for one layer of table data.
+
+That is worth stating as a decision rather than an oversight, because a
+completeness count invites levelling everything to the same shape, and here the
+uneven pair is the richer one. `18 of 20` is the honest figure and the two
+exceptions are better than the eighteen.
+
+## Why the layer was worth backfilling at all
+
+Of the four layers those nine harnesses had, `page-limit` cannot vary across
+this cohort: every pilot declares `default-limit 20` and `max-limit 100`. So
+each of those harnesses carried one row of per-repository signal -- the as-int
+control -- and three that could not distinguish its repository from any other.
+
+The entity table changes that: it hashes
+`entity|plural|id-prefix|fields|required|coerce` per spec from the repository's
+own table on both sides.
+
+## A detail that confirms it tracks the data
+
+`com-adyen` and `com-aftership` produce FIVE table rows where the rest produce
+six, because they declare five entities. The same two produce a route count of
+25 where the rest produce 30. Two independently derived quantities moving
+together with the entity table is what distinguishes a derivation from a
+constant.
+
+## Verification
+
+Each of the nine: harness regenerated, component compiled to aarch64-macos,
+artifact executed through `tools/kexe_loader.c`, entity table compared row by
+row. Six of six for the six-entity repositories, five of five for the two
+five-entity ones, zero disagreements.")))
