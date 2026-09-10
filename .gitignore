@@ -5164,3 +5164,13 @@ hyakka-wiki-index.key
 .env
 .env.*
 !.env.example
+
+# Rebuildable detector cache. `scripts/verify-dep-coordinate-identity.cljs` writes
+# `.dep-coordinate-canon.json` at the superproject root as `canon-cache-file` and
+# refills it from GitHub when it is absent, so nothing is lost by not tracking it.
+# Untracked and un-ignored, it was a standing `:additive` landing candidate: absent
+# from `main` for the reason a cache is absent, not for the reason new work is
+# (`:residue-gate` / `:stale-ignore-gate`). Gated before writing, per
+# `:ignore-rule-gate`: this rule matches 0 of the 235,196 paths `origin/main` tracks,
+# and a control confirms it does match the cache itself.
+/.dep-coordinate-canon.json
