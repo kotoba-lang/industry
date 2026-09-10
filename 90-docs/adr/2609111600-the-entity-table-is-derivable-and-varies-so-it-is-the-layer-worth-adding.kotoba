@@ -1,0 +1,81 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111600-the-entity-table-is-derivable-and-varies-so-it-is-the-layer-worth-adding")
+  (:adr/topic "q9-parity-harness-table-layer")
+  (:adr/title "The entity table is derivable and it varies, which is why it was the layer worth adding")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609111500-the-four-harness-layers-do-not-carry-equal-information"))
+  (:adr/body
+  "## Context
+
+Six pilots still had no parity harness, and finishing them would have been two
+more batches of the same four layers. The previous ADR had just established why
+that is weak: `page-limit`'s `8 of 8` is uniform across the cohort BY
+CONSTRUCTION, because every pilot declares `default-limit 20` and `max-limit
+100`. Repeating it six more times adds six rows and no information.
+
+So this iteration added a layer instead of six repositories.
+
+## Why the entity table and not one of the others
+
+The layers the generator refuses -- store, filter, pagination, handler, expand
+-- all need fixtures shaped to a repository's entities, and inventing those is
+the failure the component generator had to be taught not to commit.
+
+`oracle-table` needs no fixture. It hashes
+
+    entity|plural|id-prefix|fields|required|coerce
+
+for each spec, and the Clojure side builds the same string from the same
+`entity-specs`. Both sides derive from the repository's own table. Nothing is
+constructed for the test to consume.
+
+It also has the property `page-limit` lacks: it varies. Two repositories cannot
+agree on it unless their entity tables agree.
+
+## It is a runtime check for a defect that passes amu check
+
+The component generator carries an evidence floor because a component whose
+tables still answer the TEMPLATE's prefixes compiles and returns `:ok true` --
+measured, that is exactly what its first run produced. That floor is a
+string scan over the generated file.
+
+The table layer catches the same defect at RUN time, from the other side: if
+`id-prefix-of` answers `abbrobot_par` where the spec says `accela_pro`, the
+hashes disagree.
+
+## Controls
+
+A layer that always agrees is precisely what was being replaced, so two:
+
+  **index sensitivity** -- compare the Clojure side's `table i` against the
+  artifact's `table i+1`. Differs in 5 of 5. The comparison knows which entity
+  it asked about.
+
+  **per-repository signal** -- `com-adobe` and `com-agleader` share 0 of their
+  6 table hashes.
+
+## Verification
+
+Both repositories: `amu check :ok true`, compiled to aarch64-macos, executed
+through `tools/kexe_loader.c`.
+
+    route-count   30 = 30
+    as-bool       9 of 9
+    page-limit    8 of 8
+    table         6 of 6
+    as-int        5 of 6, the \"12abc\" row differing
+
+Coverage is now fifteen of twenty, and for the two repositories in this
+iteration it is five layers rather than four.
+
+## What is still not covered, and what that costs
+
+The fixture-shaped layers remain absent everywhere. The table layer narrows the
+gap in a specific way: it verifies that the component's DATA agrees with the
+oracle's data. It says nothing about whether the component's BEHAVIOUR over that
+data agrees -- that is what the store, filter, pagination and handler layers
+would test, and they are still only present in the four hand-written harnesses.")))
