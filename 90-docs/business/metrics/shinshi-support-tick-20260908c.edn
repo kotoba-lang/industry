@@ -1,0 +1,39 @@
+{:doc/id "shinshi-support-tick-20260908c"
+ :doc/status "draft"
+ :doc/date "2026-09-08"
+ :doc/actor "shinshi-support cron tick"
+ :doc/type :issue-draft
+
+ ;; 実測 (2026-09-08 22:03 JST, GET https://shinshi.club/api/funnel / GET /pay / GET /pay/quote?usd=0.5 / GET /.well-known/x402 / git log)
+ :observed
+ {:api-funnel "本 tick 実測 (22:03): {funnel {visitors 3272 / chatters 171 / scenes 145 / quotes 0 / paying 0}, window 7d, source shinshi.d1:pv_daily+chat_event_daily+pay_quote_daily+pay_run}。:quotes は live に出現継続だが値は 0"
+  :intraday-delta "同日 3 回目。12:49 tick (3224/162/136/0/0) → 15:54 tick (3241/165/139/0/0) → 本 tick 22:03 (3272/171/145/0/0)。visitors +31 / chatters +6 / scenes +6 と rolling 7d 内で増え続ける一方、:quotes は 3 回とも 0 のまま。chatters が 162→171 と 9 増える間も quotes は一度も立たない — '(a) 計装直後の空' 説は 3 回の観測で実質崩れ、'(c) emitter が /pay/quote エンドポイント側のみで client の pay-wall render 側から fire されない → 常に 0 に張り付く' 説の重みが更に増す。'(b) free quota (20 msg) が 7d 窓内に枯渇していない' とは依然区別不能"
+  :live-rail "GET /pay → 200 (継続)。GET /pay/quote?usd=0.5 → {chain base / custody eoa / asset USDC / treasury 0xf1592811063554e2EDfC137964aE181C830967Ac / fee $0.10 / net $0.40 / fee-hint 'gas 数セント — 少額決済向き'}。/.well-known/x402 と完全整合 (network=base / 同一 payTo / 3 resource: premium unlock $0.50 / chat=20 msg free quota 後 $0.50 / video=no free tier)。決済 rail は引き続き自己矛盾なし"
+  :usdc-received "本 tick は JSON-RPC 未再計測 (09-04 実測 payTo Base balanceOf = 0x0)。funnel paying 0 と矛盾なし"}
+
+ ;; agentChat ログの所在
+ :agentchat-logs
+ "個別 session ログは本リポジトリに存在しないことを前 tick で確認済み。正本は D1 chat_event_daily の集計のみ。個別 session の離脱理由は引き続き未計測 — 集計シグナルのみで判断。本 tick も個別転記文の取得は不可のため、ユーザー発言ベースの返信 draft は作らない。"
+
+ ;; 来て止まった人のシグナル (aggregate — 個別 session 詳細は未計測)
+ :dropoff-signals
+ ["quotes 0 が同日 3 回目 (12:49→15:54→22:03) でも継続。chatters 162→171 と増える間も quotes は 0 のまま — 前 tick の 3 説のうち '(a) 計装直後の空' は同日 3 観測で実質崩れ、'(c) emitter が client render 側に未配線なら常に 0' の可能性が支配的。ただし free quota (20 msg) が 7d 窓内に枯渇していない '(b)' とも未だ区別不能 — 切り分け計器が依然必要"
+  "chatters 171 は観測史上最大規模の chat 流入が継続 (visitors 642→3272 の増は source に pay_quote_daily/pay_run 併入による測定方法の差であり実ユーザー 5 倍とは断定しない)"
+  "rail の不正直さは解消済み (実測で quote=discovery 完全整合)。ただし chatters−quotes が最初の定量離脱点になるには quotes が 0 のままでは測れない — 暗箱は quote 表示回数レベルで未開のまま"
+  "agentChat 内訳 (free quota 枯渇後に止まった人数) は chat_event_daily に粒度がなく依然未計測 — chatters が増えても離脱理由は集計的に見えないまま"
+  "premium_waitlist は実装状況未確認のまま — 増え続ける離脱者に対して再接触手段なし"]
+
+ ;; 返信 draft (送信しない — 承認待ち)
+ :reply-drafts
+ [{:to "shinshi-eng (owner 承認経由)"
+   :subject "[shinshi-club] quotes 0 が同日 3 回の観測でも継続 — emitter 配線の切り分けを 1 計器に固定 (support tick 2026-09-08c)"
+   :body "support tick より (当日 3 回目、22:03 実測)。決済 rail は前回どおり完全整合です: GET /pay → 200、/pay/quote?usd=0.5 が chain=base / custody=eoa / fee $0.10 / fee-hint 'gas 数セント' で /.well-known/x402 と同一 payTo 0xf1592811063554e2EDfC137964aE181C830967Ac。funnel は visitors 3272 / chatters 171 / scenes 145 / quotes 0 / paying 0。12:49 の tick から chatters 162→171 と 9 増えているのに :quotes は 3 回とも 0 のままです。これで '(a) 計装直後の空' 説は実質崩れ、'emitter が /pay/quote エンドポイント側のみで client の pay-wall render 側からは fire されない → 常に 0 に張り付く' 説の重みが支配的になりました。切り分けはどちらか一方で十分です — (1) クライアントの quote 表示時に render 側で :quotes を fire させる、あるいは (2) chat_event_daily に free quota 枯渇 event を足す。どちらかで quotes 0 が『実測ゼロ』か『計器未配線』かが確定します。なお visitors 642→3272 の増は source への pay_quote_daily 併入による測定方法の差と見ていますので実ユーザー 5 倍とは扱いません。決済実績は引き続き paying 0・USDC は 09-04 時点 0x0 (本 tick 未再計測)。送信はしません — 実施可否の判断のみお願いします。"
+   :action-required "owner 承認 (送信は support からはしません)"}]
+
+ :proposals
+ ["quotes 0 の切り分けを 1 計器に統一する — client render 側で fire (推奨) か、chat_event_daily へ free quota 枯渇 event 追加。両方でなく一方で良い。これで『計測ゼロ』か『計器未配線』かが確定"
+  "visitors 642→3272 の増加は source 併用による測定方法の差と確定 — 実ユーザー 5 倍との誤読を避けるために Ledger に固定"
+  ":quotes が 0 のままの間は chatters−quotes の離脱点算出は保留し、quotes が立つまで前項の配線切り分けを続ける"
+  "premium_waitlist を quote 表示時に実装 (18+ age-gate 維持) — 離脱者捕捉の開始"]
+
+ :guard "数字は全て本 tick 実測 (GET /api/funnel 1 回・/pay 200・/pay/quote?usd=0.5・/.well-known/x402・git log)。agentChat 個別 session は未計測と明記。個別ユーザー特定不可 — 集計シグナルのみ。USDC 受領は本 tick 未再計測 (09-04 時 0x0) と明記。visitors の増は測定方法の差と確定。送信なし。"}

@@ -1,0 +1,52 @@
+;; Run 0103 - cron stability + sixty-sixth consecutive signup read (2026-09-07 JST)
+;; Role: kotobase-stab stabilization loop, 1 iteration. canvas-ledger.edn NOT touched.
+;; Measured live 2026-09-07 17:32 JST. Recovered sandbox (0037-not-measured, 2026-09-07-not-measured-*).
+
+{:measured
+ {:funnel-pulse
+  "nbb kotobase_lead_loop.cljs funnel-pulse => EXIT=0, RESULT=recorded. VISITORS=9205 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 1 :signups 0 :checkouts 0} (delta vs internal prev 9204; concurrent curl read 9205, same counter). UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false, SCORE=unchanged."
+  :api-funnel
+  {:visitors 9205 :signups 31 :checkouts 0
+   :by-source {:visitors {:openai-ads 3 :organic 7637}
+               :signups {:organic 27 :other 1}}
+   :x402 {:challenges 38 :submissions 4 :rejections 4 :settlements 0
+          :settlement-rate 0 :rejection-reasons {:malformed-header 1}
+          :rejections-classified 1 :rejections-unexplained 3
+          :unmetered-twin-ratio 0 :unmetered-twin-reads 0
+          :unpriced-plane-reads 0 :attempt-rate 0.10526315789473684}}
+  :stability-checks
+  [{:path "/" :status 200 :time-s 0.050 :note "healthy"}
+   {:path "/signup" :status 200 :time-s 0.106 :note "healthy"}
+   {:path "/ipld/v1" :status 400 :time-s 0.043 :note "expected 400 = route exists, params required; baseline 2026-09-03 re-confirmed"}
+   {:path "/ipld/" :status 404 :time-s 0.262 :note "bare /ipld/ 404 is normal (route requires params)"}
+   {:path "/api/funnel" :status 200 :time-s 0.061 :size-bytes 483}]
+  :all-healthy? true
+  :flags
+  ["visitors 9187 (run 0102, ~17:05 JST) to 9205 (+18; organic 7617 to 7637). signups static at 31 (sixty-sixth consecutive read, runs 0037 to 0103). checkouts 0. x402 flat (38/4/0/0, unexplained 3 unchanged)."]}
+
+:score-selection
+{:selected
+ "UNCHANGED: counsel written-advice return on the net-kotobase legal packet - the sole remaining gate on the 75pt row (cloud-itonami 6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51/48 red rows. Carried through all prior cron runs (0038 to 0103)."
+ :reason
+ "SCORECARD ranking unchanged (all top rows blocked, counsel-gated per run 0021 gate rewrite: terms/privacy/DPA live and owner-approved; only registration/tax counsel written advice missing). This run is the 66th consecutive read with signups=31; visitors rose +18 over ~27m (organic +20). Conversion gap (visitors rising, signups stuck at 31) is a page/offer blocker, not reach - but the legal gate takes precedence: paid solicitation stays no-go until counsel approval is returned. WIP stays 1."
+ :wip "1 (counsel follow-up awaiting human send + counsel reply)"}
+
+:experiment
+{:type :draft-proposal
+ :status "carried over from run 0045 - no owner decision observed yet"
+ :trigger "signups static at 31 across sixty-six consecutive reads while visitors rose (to 9,205). Conversion, not reach, is the gap; the blocker is the /signup offer."
+ :what "/signup activation variant: add the actual price anchor (Secure Managed JPY 19,800/mo - only live-priced SKU per run 0033) plus one primary CTA next to the signup form. No deploy by this bot."
+ :expected-signal "signups counter above 31, and/or checkout-start > 0, in a post-variant window."
+ :recipient "owner (kotobase.net operator). Internal draft only - no write/send/deploy performed by this bot."
+ :deploy-owner "owner decision required - live worker change, outside this bot's no-deploy boundary"
+ :sent? false}
+
+:next
+[{:what "counsel reply (unchanged blocker since 0038; unblocks the 75/65/62/61/51/48 rows)"}
+ {:what "visitor-signup gap and any conversion drift; recommend owner-side UA/referrer split (API exposes only organic/openai-ads counts)"}
+ {:what "x402: any movement from submissions 4 / settlements 0 / unexplained 3 = first demand signal"}]
+
+:canvas-ledger-touched? false
+:score-raised? false
+:exaggeration-guard
+"Verified external revenue = 0. 31 signups are NOT revenue/demand. 4 x402 submissions / 0 settlements is NOT revenue. +18 visitors over ~27m is traffic, not conversion; source labels only (organic/openai-ads), cause unverified. All deltas read from live counters. Nothing sent, nothing deployed, nothing fabricated. All stability checks healthy (200/200/400/404/200). Dry-run only, no push/send/deploy."}

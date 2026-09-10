@@ -1,0 +1,129 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0037-kotobase-stab-not-measured-tooling"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0037 — kotobase-stab measurement outage; all signals NOT-MEASURED (shell + web gateway down); no send, no score change"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0037-kotobase-stab-not-measured-tooling.edn"
+  :doc/run_number 37
+  :doc/status "stopped — measurement unavailable"
+  :doc/date "2026-09-08"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100); kotobase-stab SOUL (kotobase.net 安定化 bot)"
+  :doc/body "# Run 0037 — kotobase-stab 1 iteration; measurement outage
+
+**Status:** stopped — measurement unavailable (not clean, not a pass)
+**Started / ended:** 2026-09-08
+**Owner:** agent (kotobase-stab cron)
+**Mode:** cash-first (verified external revenue = 0, per SCORECARD 2026-08-14)
+**Prior run:** 0036 (GLEIF dogfood; external revenue still 0)
+
+## Tooling outage (root cause, measured this run)
+
+- terminal (shell) backend returned **empty output, exit 0 for every command
+  including `echo hello world; date`** — no `nbb funnel-pulse`, no `curl` possible.
+- web tool-extract backend: \"web is configured to use nous (set via hermes tools),
+  but the Nous Tool Gateway is not available (not entitled or unreachable)\" —
+  `https://kotobase.net/api/funnel`, `/`, `/signup`, `/ipld/v1`, `/ipld/` all
+  **not retrieved**.
+- Local file tools (read_file / write_file) worked; used to read the loop script,
+  README, SCORECARD, and run 0036.
+
+## Signals (measured / not-measured)
+
+| Signal | Value | Result |
+|---|---|---|
+| `nbb … funnel-pulse` | not-measured | shell down |
+| `curl https://kotobase.net/api/funnel` | not-measured | shell + web down |
+| stability: GET / | not-measured | web down (do NOT claim 200) |
+| stability: GET /signup | not-measured | web down (do NOT claim 200) |
+| stability: GET /ipld/v1 (400 = route present) | not-measured | web down (do NOT claim 400) |
+| stability: GET /ipld/ (404 = normal) | not-measured | web down (do NOT claim 404) |
+
+Per kotobase-stab SOUL: unreachable / no response is **not-measured**, NEVER clean.
+No funnel visitor/signup/checkout numbers and no HTTP status codes are asserted in
+this run because none were measured. No score was raised. No demand prior changed.
+
+## Canvas (inherited prior, NOT updated this run; not re-measured)
+
+- Verified external revenue = 0 (SCORECARD 2026-08-14). Owner dogfood does not count.
+- net-kotobase: Standard ¥2,980/mo owner-confirmed but live charge remains ¥19,800;
+  commercial go = no-go; counsel written advice not obtained; score 58/100.
+- Bottleneck (profile): traffic real (~2.08M req/7d, 1,068 uniques, 4xx ~2%);
+  Stripe active subscriptions = 0; visitors 246 → signups 0 → acquisition blocked.
+- Queued kotobase WIP: net-kotobase named-accounts discovery; Beekle form
+  (https://beekle.jp/contact) still requires human Chrome (Turnstile); do not
+  expand to 100 contacts on 0 replies.
+
+## Hard gates
+
+- [x] safety/content/consent/region — no outreach made
+- [x] payment verification and fulfillment — no payment path touched
+- [x] honest product/entitlement — nothing offered
+- [x] applicable legal/refund/operator boundary — no solicitation made (counsel gate still red)
+- [x] secret/treasury/privacy — no secrets handled
+
+**Gate:** green (no action taken; no gate touched)
+
+## One selected action (WIP=1)
+
+**Selected: do not send, do not expand.** With all signals not-measured there is no
+measured basis to advance or re-order the candidate queue, and the standing
+directional rule for the current funnel shape (traffic real → signups 0) is
+„change one activation/offer element\", which must be chosen from real numbers.
+WIP remains the Beekle named-account outreach, still blocked on human Chrome/Turnstile —
+unchanged, not re-scored.
+
+**Bounded experiment (DRAFT only — NOT executed, NOT sent):**
+When tooling is restored and the baseline is measured, run one single-element
+activation test on kotobase.net landing/signup: change the pricing/offer copy to
+surface the owner-confirmed **Standard ¥2,980/mo** (currently live charge is
+¥19,800 and ¥2,980 is not published on /pricing), against a fixed 7-day window,
+measuring signups and /api/funnel checkouts. This is a fare/offer/placement change
+per the decision rule (utilization/external intent present, checkout 0). No email,
+no post, no deploy, no paid acquisition, no counsel-bypass. One element only.
+Target: external (non-owner) signup and a verified non-owner payment — not a
+manufactured funnel tick.
+
+## Success / continue / stop
+
+- Success: a non-owner signup + one verified non-owner payment/checkout on the tested offer.
+- Continue: with fresh measurements, re-run the 100-point score and pick the max.
+- Stop: if measurement outage persists past 14 days without recovery.
+- Timebox: 14 days or 20 person-hours, whichever comes first.
+
+## Result
+
+**Person-hours:** ~1 (tooling diagnosis + run record; no field measurement possible)
+
+**External evidence:** none this run — all endpoints not-measured. No revenue, no
+checkout, no signup asserted.
+
+| Funnel stage | Before (prior canvas) | After (this run) | Delta |
+|---|---|---|---:|
+| Verified external payments | 0 | 0 | 0 |
+| Revenue / gross profit | 0 | 0 | 0 |
+| Visitors / uniques | ~2.08M req / 1,068 (profile) | not-measured | — |
+| Signups | 0 | not-measured | — |
+
+## Score after
+
+**Unchanged (do not re-score on not-measured data).** kotobase/net-kotobase stays
+58/100 per SCORECARD 2026-08-14. No axis moved; no code shipped.
+
+## Decision
+
+`continue` — blocked pending restoration, then re-measure.
+
+Reason: the bottleneck is acquisition (signups 0), but no fresh measurement exists
+to responsibly select today's one action. The draft activation/offer experiment is
+staged but unexecuted per the no-outbound rule.
+
+**Next verification (this is the immediate next step, not an outward send):**
+1. bring terminal + web tooling back (repair hermes tools / web entitlement)
+2. re-run `nbb kotobase_lead_loop.cljs funnel-pulse`
+3. re-curl `/`, `/signup` (expect 200), `/ipld/v1` (expect 400 = route present),
+   `/ipld/` (expect 404 = normal)
+4. only then SELECT the max-score action and execute/refine the draft experiment if
+   score and gates permit.
+
+**Tranche verdict:** `hold` — no non-owner receipt; no T2 release.
+"}
+]

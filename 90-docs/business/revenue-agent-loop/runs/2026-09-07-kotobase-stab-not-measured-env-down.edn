@@ -1,0 +1,59 @@
+;; kotobase-stab cron run — 2026-09-07
+;; Status: not-measured (execution environment unavailable this run)
+;; This file is date-anchored, NOT part of the NNNN-sequential series, because
+;; the runs/ directory could not be listed this run (terminal/ripgrep sandbox
+;; was down) and the next sequential number could not be verified. Numbering
+;; must be reconciled by the next operator before treating this as a run record.
+;; canvas-ledger.edn is NOT touched (single-writer rule preserved).
+{:as-of "2026-09-07T00:00:00+09:00"
+ :kind :kotobase-stab-run
+ :scope :net-kotobase
+ :run-type :stabilization-iteration
+
+ ;; --- Live measurement this run ---
+ ;; NOT MEASURED. nbb funnel-pulse could not run: terminal backend returned
+ ;; empty output for every command (sandbox unavailable; search_files also
+ ;; reported "Terminal environment unavailable ... sandbox may still be
+ ;; starting or was removed"). web_extract/web_search failed too: Nous Tool
+ ;; Gateway not available (not entitled or unreachable).
+ :funnel-pulse {:scanned 0 :ok false :unanswered true :score-raised? false
+                :reason "terminal-sandbox-unavailable; nbb funnel-pulse did not execute"}
+ :stability-check {:scanned 0 :ok false :unanswered true
+                   :reason "curl could not run (terminal down); / /signup /ipld/v1 not re-measured live"}
+
+ ;; --- Last actually-recorded pulse (earlier today; already in metrics, read this run) ---
+ :last-recorded-pulse {:as-of "2026-09-07T12:30:31+09:00"
+                       :status 200 :ok true
+                       :funnel {:visitors 8919 :signups 31 :checkouts 0}
+                       :delta {:visitors 3457 :signups 0 :checkouts 0}
+                       :external-funnel-change? false
+                       :x402 {:challenges 38 :submissions 4 :settlements 0
+                              :settlement-rate 0 :attempt-rate 0.10526315789473684}}
+ ;; 2026-09-04 net-kotobase.edn snapshot (reference): visitors 5462, signups 31,
+ ;; checkouts 0, Stripe active-subscriptions 0, 24h real-4xx 3%, 5xx 28%.
+
+ ;; --- Selection ---
+ ;; WIP=1 remains Beekle (net-kotobase named-accounts discovery queue).
+ ;; Per next-form contract: WIP stays Beekle until a thank-you/success exists;
+ ;; do not surface ELYZA/iASYS/Laboro/Enison; skip Helpfeel; do not send.
+ :selection {:wip-id "beekle"
+             :wip-org "Beekle"
+             :wip-contact "https://beekle.jp/contact"
+             :wip-status :blocked
+             :blocked-reason "Cloudflare Turnstile never rendered headless (0 iframes, submit disabled). Did not bypass CAPTCHA. Needs human Chrome. (named-accounts.edn 2026-08-13)"
+             :score "unchanged; no new revenue/evidence this run; external revenue remains 0"
+             :revenue-score "not re-scored this run (no new evidence)"}
+
+ ;; --- Bounded experiment (DRAFT only; NOT SENT) ---
+ ;; One action: deliver the DESIGN-PARTNER-OFFER discovery copy to Beekle's
+ ;; official form (https://beekle.jp/contact) once human Turnstile is available.
+ ;; Contract forbids outward send from cron; draft + recipient recorded only.
+ :experiment {:status "drafted-not-sent"
+              :action "Submit 30-min problem-interview request to Beekle official contact form"
+              :recipient {:org "Beekle" :form "https://beekle.jp/contact" :kind :official-form}
+              :offer "30-minute problem interview + optional 14-day unpaid alpha (design-partner; no paid solicitation)"
+              :from-name "Jun Kawasaki"
+              :from-email "hello@gftd.co.jp"
+              :from-org "Gftd Japan 株式会社"
+              :draft "Subject: GraphRAG design-partner request (30 min, unpaid alpha)"
+              :do-not-send true}}

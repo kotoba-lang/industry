@@ -1,0 +1,52 @@
+;; Run 0105 - cron stability + sixty-eighth consecutive signup read (2026-09-07 JST)
+;; Role: kotobase-stab stabilization loop, 1 iteration. canvas-ledger.edn NOT touched.
+;; Measured live 2026-09-07 ~19:11 JST (apt funnel-pulse as-of 2026-09-07T19:11:23+09:00).
+;; Sandbox measuring again (terminal backend recovered from earlier env-down runs).
+
+{:measured
+ {:funnel-pulse
+  "nbb kotobase_lead_loop.cljs funnel-pulse => EXIT=0, RESULT=unchanged. VISITORS=9307 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 0 :signups 0 :checkouts 0} (internal delta vs 19:10:24 pulse at 9307; a sibling pulse already captured 9307 minutes before this one). UNCHANGED=true, EXTERNAL-FUNNEL-CHANGE=false, SCORE=unchanged."
+  :api-funnel
+  {:visitors 9307 :signups 31 :checkouts 0
+   :by-source {:visitors {:openai-ads 3 :organic 7732}
+               :signups {:organic 27 :other 1}}
+   :x402 {:challenges 38 :submissions 4 :rejections 4 :settlements 0
+          :settlement-rate 0 :rejection-reasons {:malformed-header 1}
+          :rejections-classified 1 :rejections-unexplained 3
+          :unmetered-twin-ratio 0 :unmetered-twin-reads 0
+          :unpriced-plane-reads 0 :attempt-rate 0.10526315789473684}}
+  :stability-checks
+  [{:path "/" :status 200 :time-s 0.180 :note "healthy"}
+   {:path "/signup" :status 200 :time-s 0.419 :note "healthy"}
+   {:path "/ipld/v1" :status 400 :time-s 0.422 :note "expected 400 = route exists, params required; baseline 2026-09-03 re-confirmed"}
+   {:path "/ipld/" :status 404 :time-s 0.122 :note "expected 404 = bare route (params required); baseline 2026-09-03 re-confirmed"}]
+  :all-healthy? true
+  :flags
+  ["+26 visitors vs run 0104 (9281, ~18:41 JST) to 9307 (organic 7707 -> 7732, +25; openai-ads 3 flat). signups static at 31 (sixty-eighth consecutive read, runs 0037-0105). checkouts 0. x402 flat (38/4/0/0, unexplained 3 unchanged). Stripe active-subscriptions 0 (metrics file 2026-09-04)."]}
+
+:score-selection
+{:selected
+ "UNCHANGED: counsel written-advice return on the net-kotobase legal packet - the sole remaining gate on the 75pt row (cloud-itonami 6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51/48 red rows. Carried through all prior cron runs (0038 to 0105)."
+ :reason
+ "SCORECARD ranking unchanged (all top rows blocked, counsel-gated per run 0021 gate rewrite: terms/privacy/DPA live and owner-approved; only registration/tax counsel written advice missing). This run is the 68th consecutive read with signups=31; visitors keep rising (+26 since run 0104) while signups are pinned at 31 - a conversion/offer blocker, not a reach problem. But the legal gate takes precedence: paid solicitation stays no-go until counsel approval is returned. WIP stays 1. Score stays 58/100 prior (no new external evidence: 0 checkout, 0 payment)."
+ :wip "1 (counsel follow-up awaiting human send + counsel reply)"}
+
+:experiment
+{:type :draft-proposal
+ :status "carried over from run 0045 - no owner decision observed yet"
+ :trigger "signups static at 31 across sixty-eight consecutive reads while visitors kept rising (to 9,307). Conversion, not reach, is the gap; the blocker is the /signup offer."
+ :what "/signup activation variant: add the actual price anchor (Secure Managed JPY 19,800/mo - only live-priced SKU per run 0033) plus one primary CTA next to the signup form. No deploy by this bot."
+ :expected-signal "signups counter above 31, and/or checkout-start > 0, in a post-variant window."
+ :recipient "owner (kotobase.net operator). Internal draft only - no write/send/deploy performed by this bot."
+ :deploy-owner "owner decision required - live worker change, outside this bot's no-deploy boundary"
+ :sent? false}
+
+:next
+[{:what "counsel reply (unchanged blocker since 0038; unblocks the 75/65/62/61/51/48 rows)"}
+ {:what "visitor-signup gap and any conversion drift; recommend owner-side UA/referrer split (API exposes only organic/openai-ads counts)"}
+ {:what "x402: any movement from submissions 4 / settlements 0 / unexplained 3 = first demand signal"}]
+
+:canvas-ledger-touched? false
+:score-raised? false
+:exaggeration-guard
+"Verified external revenue = 0 (Stripe active-subscriptions 0). 31 signups are NOT revenue/demand. 4 x402 submissions / 0 settlements is NOT revenue. +26 visitors since run 0104 is traffic, not conversion; cause unverified. All deltas read from live counters (nbb funnel-pulse + /api/funnel). Nothing sent, nothing deployed, nothing fabricated. All stability checks healthy (200/200/400/404). Dry-run only, no push/send/deploy."}

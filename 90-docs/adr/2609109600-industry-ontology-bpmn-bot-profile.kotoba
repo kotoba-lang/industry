@@ -1,0 +1,60 @@
+(vector (map  (:db/id -1)
+  (:adr/id "adr-2609109600-industry-ontology-bpmn-bot-profile")
+  (:adr/title "industry-ontology-bpmn bot profile: 各産業のオントロジーと BPMN プロセス定義の継続的記録・提案プレーン")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/tags (vector "industry"
+"ontology"
+"bpmn"
+"logistics"
+"hyakka"
+"app-bpmn"
+"hermes"
+"murakumo"))
+  (:adr/related (vector "adr-2609100300-hermes-bots-onto-murakumo-api"
+"adr-2608159100"
+"adr-2607173100"
+"adr-2608039970"))
+  (:adr/body "## Context
+
+オーナー指示（2026-09-10）: 各産業のオントロジー、BPMN を記録していく bot profile を立て、wiki.kotobase.net / itonami bot / itonami.cloud で活動を公開し、deposit を受け付ける。
+
+測定と調査:
+1. 物流・道路貨物輸送（ISIC 4923 / ISCO 8332）の既存資産:
+   - `cloud-itonami/cloud-itonami-isic-4923` (RoadFreightDispatchAdvisor ⊣ Governor)
+   - `cloud-itonami/vehicle` (SQL グラフ + DID 車両・点検記録)
+   - `kotoba-lang/soko` (在庫・出荷・引当 domain library)
+   - `cloud-itonami/app-bpmn` & `kotoba-lang/org-omg-bpmn` (BPMN 2.0 EDN レジストリ)
+   - `network-awai/app-hyakka` (wiki.kotobase.net)
+2. オントロジー特定（Wikidata 実測）:
+   - Q177777 (Logistics), Q43193 (Truck), Q22733 (Garage), Q1310967 (Automobile repair shop), Q508846 (Truck driver), Q706835 (Auto mechanic)
+3. 推論基盤と安定性（ADR-2609100300）:
+   - `https://api.murakumo.cloud/v1` の `murakumo-main` (`qwen3.8-27b-throughput-b70`, ctx 262,144) は実測レイテンシ ~473ms で稼働。
+   - `scripts/loop-status-publish.cljs` が Hermes 常駐 cron を走査し、`itonami.cloud/bots/#residents` へ自動同期。
+   - deposit/支援窓口は Base Mainnet USDC トレジャリー `0xA00366234D29d4F882088048c0B2fa0dB7302D4E` および Aave V3 LP (`POST /api/v1/bot-economy/lp/deposits`)。
+
+## Decision
+
+1. **新 bot profile の設置**:
+   - `~/.hermes/profiles/industry-ontology-bpmn/` を scaffold。
+   - `profile.yaml`: 各産業のオントロジーと BPMN プロセス定義を記録・連携提案する bot。
+   - `yakuwari.edn`: `:industry.observe`, `:industry.propose-ontology`, `:industry.propose-bpmn` を自律許可。`:publish`, `:ledger-append` は `:blocked`（bot は propose まで）。
+   - `SOUL.md`: 1 tick = 1 産業の提案、実測重視、propose-only。
+   - `cron/jobs.json`: `industry-ontology-bpmn-tick` (ID: `252275796a4c`, schedule: `0 6 * * *`)。
+   - 推論: `https://api.murakumo.cloud/v1` (`murakumo-main`, context 262,144)。
+   - skill: `hyakka-knowledge-pipeline` を profile 内に配備。
+
+2. **第1弾（物流 ISIC 4923）成果物の正本配置**:
+   - `workspace/proposals/isic-4923-ontology-sources.proposal.edn` (Wikidata QID 6 件)
+   - `workspace/proposals/isic-4923-freight-order.bpmn.edn` (受発注・運行管理プロセス)
+   - `workspace/proposals/isic-4923-vehicle-mro.bpmn.edn` (車両点検・整備・MRO ワークオーダー)
+
+3. **公開と預託（Deposit）の整合**:
+   - テレメトリ: `scripts/loop-status-publish.cljs` (dry-run exit 0 確認) により `https://itonami.cloud/bots/#residents` に反映。
+   - 預託: `https://itonami.cloud/bots/#support` および `#funding-details` にて Base Mainnet USDC 受付。
+
+## Consequences
+
+- 毎朝 06:00 JST に `industry_ontology_bpmn_evidence.py` が走り、未整備産業のオントロジー・BPMN プロセスが継続的に起票・提案される。
+- bot は propose に厳格制限されており、本番デプロイや台帳改変の暴走リスクはない。
+- 推論は `api.murakumo.cloud` 経由で行われ、OpenRouter クレジット枯渇の影響を受けない。")))

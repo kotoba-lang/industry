@@ -1,0 +1,41 @@
+;; One selector, two addresses -- and which one is publishable.
+;;
+;; ADR-2609109700. An IPLD Selector is a value, so it can be addressed. It is
+;; addressable two ways here and they DISAGREE:
+;;
+;;   ipld/cid (selector/encode s)  the canonical Data Model bytes -- what IPQ
+;;                                 already puts on the wire, and the only one
+;;                                 another IPLD implementation can compute
+;;   vc/value-cid s                the authoring value, Clojure keywords and
+;;                                 all -- local to this stack
+;;
+;; That is ADR-2608148200 one plane over: identity and location may be the
+;; same bytes and different CID strings, and it is not a bug. It becomes one
+;; the moment both are published. The control is a second selector differing
+;; in one field name; both addressings move for it, so the disagreement above
+;; is between two addressings and not between two values.
+;;
+;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/selector_address.cljs
+
+(ns selector-address
+  (:require [ipld.selector :as sel]
+            [ipld.core :as ipld]
+            [kotoba.value.codec :as vc]))
+
+(def a {:selector :explore-fields
+        :fields {"defs" {:selector :explore-all :next {:selector :matcher}}}})
+
+;; control: same shape, one field name changed
+(def b {:selector :explore-fields
+        :fields {"docs" {:selector :explore-all :next {:selector :matcher}}}})
+
+(defn- report [label s]
+  (println label)
+  (println "  data-model     =" (pr-str (sel/to-data-model s)))
+  (println "  CID(dag-cbor)  =" (ipld/cid (sel/encode s)))
+  (println "  value-cid      =" (vc/value-cid s)))
+
+(report "selector A" a)
+(report "selector B (control)" b)
+(println "the two addressings agree?"
+         (= (str (ipld/cid (sel/encode a))) (str (vc/value-cid a))))

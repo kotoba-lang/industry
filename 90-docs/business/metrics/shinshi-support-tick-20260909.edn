@@ -1,0 +1,39 @@
+{:doc/id "shinshi-support-tick-20260909"
+ :doc/status "draft"
+ :doc/date "2026-09-09"
+ :doc/actor "shinshi-support cron tick"
+ :doc/type :issue-draft
+
+ ;; 実測 (2026-09-09, GET https://shinshi.club/api/funnel / GET /pay / /pay/quote?usd=0.5 / /.well-known/x402 / git log)
+ :observed
+ {:api-funnel "{funnel {visitors 14432 / chatters 178 / scenes 151 / quotes 0 / paying 0}, window 7d, source shinshi.d1:pv_daily+chat_event_daily+pay_quote_daily+pay_run}。:quotes は live に出現継続だが値は 0 — 09-08 12:49 / 15:54 / 22:03 に続き 4 回連続"
+  :visitors-surge "visitors 3272 (09-08c) → 14432 (本 tick) と 4.4x。source 文字列は前 tick と同じ (pv_daily+chat_event_daily+pay_quote_daily+pay_run)。今回の増は source 併入では説明できないため、窓/集計側の変更を疑う。実ユーザー 4 倍とは断定しない。一方 chatters 178 は 09-08c (171) から +7 と着実に増加継続"
+  :live-rail "GET /pay → 200 (継続)。GET /pay/quote?usd=0.5 → {chain base / custody eoa / asset USDC / treasury 0xf1592811063554e2EDfC137964aE181C830967Ac / fee $0.10 / net $0.40 / fee-hint 'gas 数セント — 少額決済向き'}。/.well-known/x402 と完全整合 (network=base / 同一 payTo / 3 resource: premium unlock $0.50 / chat=20 msg free quota 後 / video=no free tier)。決済 rail は引き続き自己矛盾なし"
+  :usdc-received "本 tick は JSON-RPC 未再計測 (09-04 実測 payTo Base balanceOf = 0x0)。funnel paying 0 と矛盾なし"}
+
+ ;; agentChat ログの所在
+ :agentchat-logs
+ "個別 session ログは本リポジトリに存在しないことを前 tick 群で確認済み。正本は D1 chat_event_daily の集計のみ。個別 session の離脱理由は引き続き未計測 — 集計シグナルのみで判断。本 tick も個別転記文の取得は不可のため、ユーザー発言ベースの返信 draft は作らない。"
+
+ ;; 来て止まった人のシグナル (aggregate — 個別 session 詳細は未計測)
+ :dropoff-signals
+ ["quotes 0 が 4 回連続 (09-08 12:49 / 15:54 / 22:03 / 09-09)。chatters 171→178 と増え続ける間も quotes は一度も 0 以外を返さない — 09-08c の切り分け要求 (client render 側で :quotes を fire、か chat_event_daily へ free quota 枯渇 event 追加) は未解決のまま。git log に該当配線変更はなし"
+  "visitors 3272→14432 の 4.4x は source 併入では説明不可 (文字列同一) だが、実ユーザー増とも断定しない — 窓/集計の変更を疑い、Ledger に『未確定の計量異常』として固定。chatters 178 は観測史上最大規模の chat 流入が継続"
+  "rail の不正直さは解消済み (実測で quote=discovery 完全整合)。ただし chatters−quotes が最初の定量離脱点になるには quotes が 0 のままでは測れない — 暗箱は quote 表示回数レベルで未開のまま (4 観測)"
+  "agentChat 内訳 (free quota 枯渇後に止まった人数) は chat_event_daily に粒度がなく依然未計測 — chatters が増えても離脱理由は集計的に見えないまま"
+  "premium_waitlist は実装状況未確認のまま — 増え続ける離脱者に対して再接触手段なし"]
+
+ ;; 返信 draft (送信しない — 承認待ち)
+ ;; 本 tick は新規 reply draft を作らない。
+ ;; 09-08c の draft (→ shinshi-eng / owner 承認経由, 件名 "quotes 0 が同日 3 回の観測でも継続 — emitter 配線の切り分けを 1 計器に固定") が
+ ;; 唯一の action-pending 依頼として生きている。本 tick の観測 (4 回連続 0) はその依頼を補強するが内容を変えない — 同日再送はノイズ。
+ ;; support から範囲内で取れる次の一手は無し (送信・deploy はしない。個別 session 詳細は計測不可)。
+ :reply-drafts []
+
+ :proposals
+ ["09-08c の切り分け依頼を追跡項目として維持 — quotes 0 が 4 回連続した時点では『計装直後の空』はほぼ脱落、『emitter 未配線』か『free quota 未枯渇』の択一。どちらか 1 計器 (client render fire 推奨) で確定させる"
+  "visitors 3272→14432 の計量異常を Ledger に固定 — source 文字列同一での 4.4x は実勢ではなく窓/集計側の変更の可能性が高く、実ユーザー 4 倍との誤読を防ぐ。採用可否の判断待ち"
+  ":quotes が 0 のままの間は chatters−quotes の離脱点算出は保留し、quotes が立つまで前項の配線切り分けを続ける"
+  "premium_waitlist を quote 表示時に実装 (18+ age-gate 維持) — 離脱者捕捉の開始"]
+
+ :guard "数字は全て本 tick 実測 (GET /api/funnel・/pay 200・/pay/quote?usd=0.5・/.well-known/x402・git log)。agentChat 個別 session は未計測と明記。個別ユーザー特定不可 — 集計シグナルのみ。USDC 受領は本 tick 未再計測 (09-04 時 0x0) と明記。visitors 4.4x は実ユーザー増と断定せず『計量異常』として Ledger に提案。新規 reply draft は作らず 09-08c の依頼を追跡項目として維持。送信なし。"}

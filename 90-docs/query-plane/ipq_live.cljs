@@ -1,0 +1,70 @@
+;; The transfer half, measured against the deployed surface.
+;;
+;; ADR-2609109700. The proposal this ADR arranges asks for GraphSync: run a
+;; selector against a provider and get back the blocks that prove the result.
+;; That role is filled here by IPQ/1 over HTTP (`kotobase-protocol-ipq`),
+;; advertised through IPNI under protocol id 0x300940
+;; (`transport-ipq-selection-http`). This probe runs it end to end against
+;; the live origin, with three refusals as controls -- a selector that is not
+;; DAG-CBOR, a root nobody holds, and no selector at all. Each returns a
+;; DIFFERENT named error, so a 200 above them is a 200 for the reason claimed.
+;;
+;; The root is taken from the live IPNI signed head rather than hard-coded:
+;; a fixed CID in a probe stops being a measurement the day it is unpinned.
+;;
+;; Read-only GETs. Run from anywhere:  nbb 90-docs/query-plane/ipq_live.cljs
+
+(ns ipq-live)
+
+(def origin "https://ipfs.kotobase.net")
+(def indexer "https://ipni.kotobase.net")
+
+;; base64url DAG-CBOR, printed by 90-docs/query-plane/selector_address.cljs
+(def matcher "oWEuoA")            ; {".":{}}
+(def explore-all "oWFhoWE-oWEuoA") ; {"a":{">":{".":{}}}}
+
+(defn- GET [url]
+  (-> (js/fetch url)
+      (.then (fn [r]
+               ;; arrayBuffer, not text: a CAR is binary, and decoding it as
+               ;; UTF-8 to count it reports a byte total that is not the one
+               ;; that crossed the wire.
+               (-> (.arrayBuffer r)
+                   (.then (fn [buf]
+                            {:status (.-status r)
+                             :headers (js->clj (js/Object.fromEntries
+                                                (.-headers r)))
+                             :bytes (.-byteLength buf)
+                             :text (.decode (js/TextDecoder.)
+                                            (js/Uint8Array. buf))})))))))
+
+(defn- ipq [root selector]
+  (GET (str origin "/ipq/v1/selection/" root
+            (when selector (str "?selector=" selector)))))
+
+(defn- line [label {:keys [status headers] :as r}]
+  (let [h (fn [k] (get headers k))]
+    (println (str label "  " status
+                  (if (= 200 status)
+                    (str "  blocks=" (h "x-ipq-blocks")
+                         " matches=" (h "x-ipq-matches")
+                         " car-bytes=" (:bytes r))
+                    (str "  " (subs (:text r) 0 (min 90 (count (:text r))))))))))
+
+(-> (GET (str origin "/ipq/v1"))
+    (.then (fn [{:keys [text]}] (println "profile      " text)))
+    (.then (fn [_] (GET (str indexer "/ipni/v1/head"))))
+    (.then (fn [{:keys [text]}]
+             (let [root (get-in (js->clj (js/JSON.parse text)) ["head" "/"])]
+               (println "ipni head    " root)
+               (-> (ipq root matcher)
+                   (.then (fn [r] (line "matcher     " r)))
+                   (.then (fn [_] (ipq root explore-all)))
+                   (.then (fn [r] (line "explore-all " r)))
+                   (.then (fn [_] (ipq root "zzzz")))
+                   (.then (fn [r] (line "control: bad selector" r)))
+                   (.then (fn [_] (ipq (str "bafyreia" (apply str (repeat 51 "a"))) matcher)))
+                   (.then (fn [r] (line "control: bad root    " r)))
+                   (.then (fn [_] (ipq root nil)))
+                   (.then (fn [r] (line "control: no selector " r)))))))
+    (.catch (fn [e] (println "PROBE FAILED" (str e)))))
