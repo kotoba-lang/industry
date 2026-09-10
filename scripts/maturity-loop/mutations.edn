@@ -1182,7 +1182,39 @@
      :file "test/appkit/cljs_runner.cljs"
      :find "            [clojure.string :as str]))"
      :replace "            [kotoba.lang.text :as str]))"
-     :must-fail ["cljs-runner-is-bare-launchable-test"]}]}
+     :must-fail ["cljs-runner-is-bare-launchable-test"]}
+
+    ;; ── 深さを持つ合成 ────────────────────────────────────────────────
+    ;; この suite の body/rows 検査はどれも **平らな** body を渡していた
+    ;; （`["x"]` / `[:p "marker"]` / `{k marker}`）。list-view の rows は
+    ;; たまたま 1 段ネストしている（`[[:li ...] [:li ...]]`）ので mangle は
+    ;; 既に赤い。**panel の body だけが無防備**で、しかも入れ子になるのは
+    ;; panel の方である —— toolbar の下に list を置いた pane が README の
+    ;; usage 例そのもので、この repo が在る理由でもある。
+    ;;
+    ;; 下の 2 つは 2026-09-10 に 17 test / 36 assertion の suite に対して
+    ;; **両 runtime とも exit 0（緑）** だった実測。list-view 側の鏡
+    ;; （rows の flatten / remove vector?）は 2 つとも既に赤いので、これは
+    ;; gap ではなく **この repo が繰り返し作る panel / list-view の非対称**
+    ;; の、辺を入れ替えた形。
+    ;;
+    ;; ⚠ この 2 つを部分文字列で捕まえようとしないこと。flatten した markup は
+    ;; "liquid-glass__list--thick" も "Row 1" も **エスケープされた文字列として
+    ;; 含む** —— pane は目に見えて壊れているのに `includes?` は全部 true を返す。
+    ;; 検査は各 child を **その child 自身の単独 render** と突き合わせる。
+    {:id :appkit/panel-body-flattened
+     :why "pane の子が markup として届くこと。flatten すると入れ子の要素が裸の keyword と属性 map に崩れ、kotoba-ui はそれを **エスケープされたテキスト**として描画する —— 利用者の画面には `:div{:class &quot;liquid-glass__list...&quot;}` が可視のゴミとして出る。それでいて既存の検査は 1 本も落ちなかった"
+     :file "src/appkit/core.cljc"
+     :find "([body opts] (ui/panel body (merge default-panel-opts opts)))"
+     :replace "([body opts] (ui/panel (vec (flatten body)) (merge default-panel-opts opts)))"
+     :must-fail ["composed-children-arrive-as-markup-test" "composed-children-keep-caller-order-test"]}
+
+    {:id :appkit/panel-element-children-dropped
+     :why "同じ不変条件を別の壊し方で —— 要素の子だけを落として文字列を残す形。既存の body 検査は `[\"x\"]` と `[:p \"marker\"]` しか渡しておらず、そのどちらも vector の子を持たないので 1 本も噛まなかった。body が空になると liquid-glass v1 の `(ui/panel [] ...)` は throw するので、`render-or-report` が無ければ suite は **どの assertion も名乗っていない理由**で赤くなる"
+     :file "src/appkit/core.cljc"
+     :find "([body opts] (ui/panel body (merge default-panel-opts opts)))"
+     :replace "([body opts] (ui/panel (vec (remove vector? body)) (merge default-panel-opts opts)))"
+     :must-fail ["composed-children-arrive-as-markup-test" "composed-children-keep-caller-order-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
