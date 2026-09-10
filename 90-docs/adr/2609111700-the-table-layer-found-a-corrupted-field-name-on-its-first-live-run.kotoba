@@ -1,0 +1,94 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111700-the-table-layer-found-a-corrupted-field-name-on-its-first-live-run")
+  (:adr/topic "q9-entity-name-substitution")
+  (:adr/title "The table layer found a corrupted field name on its first live run, and amu check had passed it")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang" "kotoba-lang/com-agora"))
+  (:adr/related (vector "adr-2609111600-the-entity-table-is-derivable-and-varies-so-it-is-the-layer-worth-adding"))
+  (:adr/body
+  "## What happened
+
+The entity-table layer was added last iteration on the argument that it derives
+from the repository's own spec table on both sides and therefore VARIES, unlike
+`page-limit`. Its first run against three fresh repositories produced a
+disagreement:
+
+    com-agones           table 6 of 6
+    com-agora            table 5 of 6, index 3 differing
+    com-airbus-analytx   table 6 of 6
+
+`com-agora` index 3 is `Room`. Reading both renderings:
+
+    component  \"maxChannelicipants:int,recording:bool\"
+    oracle     \"maxParticipants:int,recording:bool\"
+
+`maxParticipants` had become `maxChannelicipants`.
+
+## The mechanism
+
+The component generator replaces the template's entity names with the target's.
+The template's root entity is `Part`; agora's is `Channel`. The replacement was
+an unanchored substring, so it fired inside `maxParticipants` -- a FIELD name
+that merely contains the letters of an entity name.
+
+This is the same shape as the `.clj` / `.cljc` prefix aliasing this workspace
+hit earlier in the same week: a substring replacement reaching inside a longer
+word.
+
+## Why nothing else caught it
+
+`fields-of` and `coerce-table-of` return STRINGS, so:
+
+  - `amu check` returns `:ok true`. The compiler has no schema for their contents.
+  - The generator's evidence floor scans for surviving TEMPLATE stems
+    (`abbrobot`, `abb_robotics`). A corrupted TARGET word is not a template
+    stem, so it is invisible to that check by construction.
+  - The four other harness layers pass: route count, as-int, as-bool and
+    page-limit never read a field name.
+
+The component shipped, compiled, ran, and answered questions about a field
+called `maxChannelicipants`.
+
+## Blast radius, and a correction to my own first measurement
+
+Every pilot's `fields-of` and `coerce-table-of` were compared against its own
+`entity-specs`. The answer is ONE repository, two rows.
+
+The first version of that scan said three repositories. Its field-name regex was
+`[A-Za-z]+`, which dropped the digits from `last4` and `countryIso3` and
+declared `com-ach-network` and `com-aftership` mismatched when their components
+are correct. The scanner was wrong, not the components -- worth recording,
+because a corruption scan that over-reports sends someone to regenerate working
+code.
+
+## The fix and its control
+
+Entity names are now replaced on a word boundary. Prefixes and namespace tokens
+keep the plain form: `abbrobot_par` cannot occur inside another identifier, and
+anchoring those would break `src/abb_robotics/`.
+
+Controls, both required:
+
+  **it repairs the break** -- com-agora regenerated, `amu check :ok true`,
+  compiled, executed, table 6 of 6 where it was 5 of 6.
+
+  **it changes nothing that was right** -- com-accela, where the substitution
+  also fires (`Part` -> `Project`) and the output was already correct,
+  regenerates byte-identical.
+
+A re-scan of all twenty now reports zero mismatched rows.
+
+## What this says about the layer
+
+The table layer was added on a theoretical argument -- derivable, varies,
+catches a defect class the evidence floor cannot see. It found a real instance
+on its first live run, in a repository nobody suspected, in a component that had
+passed every check it was subject to.
+
+The four layers that preceded it have never disagreed except on the one row they
+are designed to disagree on. That is not a criticism of them; it is the reason
+this one was worth adding, and the reason the fixture-shaped layers are still
+worth wanting.")))
