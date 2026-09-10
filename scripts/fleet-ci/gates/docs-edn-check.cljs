@@ -179,7 +179,17 @@
     (try
       (let [s (str (fs/readFileSync f "utf8"))
             ;; 空ファイル・コメントのみは read-string が nil を返すのが正常。
-            v (reader/read-string (str "[" s "]"))]
+            ;;
+            ;; ⚠ 閉じ括弧の前に改行を入れる。`;;` 行コメントは行末まで伸びるので、
+            ;; 末尾に改行が無いファイルでは `"]"` が**最後のコメントに飲み込まれ**、
+            ;; その文書が壊れているという報告になる。実測 2026-09-10、
+            ;; 90-docs/business/revenue-agent-loop/runs/0037-… は全行が `;;` の
+            ;; 健全なファイルだが最後のバイトが `。` で、gate は
+            ;; `Unexpected EOF while reading item 0 of vector` と報告していた ——
+            ;; **道具の側の欠陥を、文書の側の欠陥として名指ししていた。**
+            ;; 現在の repo で当たるのは 1 件だが、条件は「コメントで終わり改行が無い」
+            ;; だけなので、いつでも増えうる。
+            v (reader/read-string (str "[\n" s "\n]"))]
         (when strict-keys
           (let [odd (distinct (bad-keys v))]
             (when (seq odd)
