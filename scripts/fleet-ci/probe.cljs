@@ -278,7 +278,12 @@
   [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac rosetta curl tar host npmreg
            timewait ephemeral] :as n}]
   (if (or (not reachable?) (contains? operator-hosts host))
+    ;; ⚠ operator も unreachable も、**LAN 住所だけは落とさない。** ここは
+    ;; caps を全部外す枝なので、以前は :lan-address もろとも捨てていた ——
+    ;; つまり「gate を回さないノード」から、tailnet を失ったときの唯一の
+    ;; 戻り道を消していた。役割と到達手段は別の話。
     (assoc n :caps #{} :max-parallel 0
+           :lan-address (let [a (str (:lanaddr n))] (when (seq a) a))
            :role (if (contains? operator-hosts host) :operator :unreachable))
     (let [free (num (:freegb n))
           cores (num (:cores n))
