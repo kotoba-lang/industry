@@ -1,0 +1,84 @@
+[{:db/id -1
+  :adr/id "adr-2609102600-the-pages-had-no-home"
+  :adr/title "cloud-murakumo-site: the pages had no correct home, so each repo kept a copy"
+  :adr/status "accepted"
+  :adr/date "2026-09-10"
+  :adr/related ["adr-2609102400-a-guard-aimed-at-a-shadowed-file"]
+  :adr/body
+  "Owner instruction 2026-09-10: create `cloud-murakumo-site`. It resolves the
+ownership question ADR-2609102400 left open, and the measurement explains why
+the duplication happened at all rather than merely that it did.
+
+## The layering nobody had drawn
+
+`cloud_murakumo/site/*.cljc` existed in BOTH `cloud-murakumo` and
+`cloud-murakumo-app`, both on the `:site` classpath, one shadowing the other.
+The question was which repo should own them. Neither, as it turns out:
+
+    cloud-murakumo        deploy, the site Worker, the generator
+            |
+    cloud-murakumo-site   the pages                     <- new
+            |
+    cloud-murakumo-app    storefront, spec, fleet-state, gen, insight,
+                          fleet-metrics
+
+Every namespace the pages reach outside `site/` -- all six of them -- lives in
+`cloud-murakumo-app`, and NONE in `cloud-murakumo`. So the pages sit above the
+domain and below the deploy, and there was no repo at that layer. Each of the
+two adjacent repos kept a copy because each needed them and neither could own
+them. The duplication was a missing layer, not carelessness.
+
+## What moved and what did not
+
+Moved (16 `.cljc`): the pages, including `fleet.cljc` and `giemon.cljc`, which
+existed only in cloud-murakumo-app and therefore did render.
+
+Not moved:
+
+- `generate.clj` -- the generator, not a page. It stays with what runs it.
+- `legal.clj`, `landing_locales.clj`, `trust.clj` -- `.clj`, and ADR-2608201300
+  forbids placing new production `.clj`. They stay where they already are.
+
+For the six divergent files the canonical copy is `cloud-murakumo`'s, because
+it is the one that rendered and it was current to 09-09 across 68 commits in
+thirty days. The sixteen commits `cloud-murakumo-app` made in the same window
+went into files that never rendered; that work is not deleted -- it is in that
+repo's history and can be ported deliberately, which is the opposite of how it
+arrived.
+
+## The proof, and what it caught
+
+All 61 generated pages were hashed before the move and after it, and compared
+byte for byte. They are identical.
+
+It took three attempts, and each failure was worth more than the pass:
+
+1. Removing only `cloud-murakumo`'s copy broke the build with
+   `No such var: market/locales`. With one copy gone, the OTHER stale copy won
+   the classpath -- proving that removing one side does not fix shadowing.
+2. After removing both, the same error persisted from a stale `.cpcache`, the
+   trap CLAUDE.md already records.
+3. The first byte comparison then failed on `docs.html` and `free.html`,
+   because the new repo had been seeded from the shared `cloud-murakumo`
+   working tree, which was **six commits behind origin/main** and carried a
+   docs page missing an hour-old change. Re-seeded from `origin/main` of both
+   repos.
+
+A comparison that had only ever passed would have told me none of that. The
+third failure is the one worth keeping: seeding a new repo from a working tree
+is how a fresh repo is born stale.
+
+## Registered
+
+`repos.edn :extra-projects` + `gen-west-manifest.cljs --entry
+cloud-murakumo-site`, pin verified reachable from main; `cloud-murakumo` and
+`cloud-murakumo-app` pins advanced in the same commit, both fast-forward.
+
+## Follow-up
+
+- `test/shadowed-site-sources.json` in `cloud-murakumo` can now be emptied:
+  the files it lists no longer exist in two places. It is left in place in this
+  commit so the ratchet's own removal is a separate, reviewable step.
+- `insight.cljc` in cloud-murakumo-app says in a docstring that
+  `cloud-murakumo.site.onprem-3d/locale-order` is 正本 and that it holds a
+  copy. That is a second, smaller duplication of the same kind, unmeasured."}]
