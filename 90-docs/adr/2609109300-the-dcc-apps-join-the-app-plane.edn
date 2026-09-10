@@ -151,6 +151,44 @@ manifest には `:archive :unpublished` と `:archive-blocked-on` を書いた �
 結果として、この 5 本は itonami.app からは配れるが **公開 IPFS gateway /
 cid.contact からは引けない。** 既存 7 本との差はここ 1 点だけである。
 
+## 現在地と再開点（2026-09-10 closing。数値は毎回測り直す）
+
+**live**（`{name}.itonami.app`、すべて byte-identical、`nosuchapp` は 404 の control）:
+
+    modeler 497,390 / animator 274,610 / sculpt 253,373 / cad 271,552 / bim 888,746
+
+app 面のカバレッジ（`verify-app-content-address orgs`、**checkout を pin に合わせた後**）:
+
+    SCANNED 527 / ADDRESSED 450 / EXEMPT 0 / UNPUBLISHED 0 / LOCATED 77 / UNREADABLE 0   (exit 1)
+
+⚠ **1 回目の測定はこの 5 本を 1 件も数えなかった。** 検査は working tree を読むが、
+共有 checkout はまだ古い pin に居た —— `main` に在ることと、`orgs/` の tree に在ることは
+別である。`west update --fetch smart` の後に測り直して +5/+5 になった。
+**exit 1 は LOCATED 77 が残っているためで、この作業とは無関係**（ADR-2609092600 の残件 2）。
+
+**再現手順**（script を 1 本も要さない。archive token が戻ったら 3 を差し替える）:
+
+1. `clojure -M:cljs -m shadow.cljs.devtools.cli release app`（bim-editor だけ sibling
+   `../physics` を worktree の隣に置く必要がある）
+2. cloud-itonami の `gen-selfcontained-doc.cljs <repo>/public --out dist/<entry>.html`
+   → `verify-selfcontained-doc.cljs dist/<entry>.html`（実 Chrome、file://）
+3. origin 面のみ: `wrangler r2 object put kotobase-graph-database-production/ipld/{cid}
+   --file <doc> --content-type application/vnd.ipld.raw --remote` →
+   `{cid}.ipfs.itonami.cloud` から取り直して `cmp`。
+   **token が戻ったら、この 1 段の代わりに `scripts/publish-document.cljs` を使う**
+   （archive → R2 → 読み戻しを 1 本で行う正経路）
+4. `_dnslink.{entry}.itonami.app TXT dnslink=/ipfs/{cid}` を zone
+   `ec18ec8afbbb85f0c0aabaaceeba5890` に。**Cloudflare MCP が今日の通る経路**
+5. `west-pin-put.cljs kami-app-<name> HEAD`
+
+**次の 3 手**（着手しやすい順）:
+
+1. **amenominaka**（Twinmotion 相当）を同じ形に。`public/` が複数 html + vendor
+   ディレクトリなので、1 document への畳み方が別の判断になる。
+2. **archive(B2) + IPNI announce** —— `KOTOBASE_ARCHIVE_TOKEN` が戻ってから 5 本。
+3. **repo 改名** `kotoba-lang/kami-app-*` → `cloud-itonami/app-itonami-*`
+   （ADR-2609109200）。entry 面が live になった今が正しい順序。**entry 名は動かさない。**
+
 ## 拾わなかったもの
 
 - **repo の改名。** ADR-2609109200 は「{name}.itonami.app を配る repo は
