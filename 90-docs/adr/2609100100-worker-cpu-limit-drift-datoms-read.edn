@@ -250,5 +250,68 @@ accelerator であり、不在は `append-novelty-index!` が既にサポート�
 通り、fold だけが backlog を減らせて、その fold が抜けられない。app-aozora は
 73% loadShed のまま。
 
+## 実装した・デプロイした・そして足りなかった（2026-09-10、正直な結果）
+
+上の「直す場所」を実装して本番に入れた。**2 つとも本物の欠陥で、テスト付きで
+着地している。そして yoro-social-v2 は依然として読めず、畳めない。**
+
+### 着地したもの
+
+| | |
+|---|---|
+| kotobase-peer `5e60546b` | `fold!` の novelty **構造** walk を `async-get-fn` に（`walk-novelty-entries-async` / `novelty-entries-async` / `novelty-cids-async` / `take-oldest-novelty-async`、prelude を cljs 分岐へ移動） |
+| kotobase-peer `3845b868` | **read パスも同じ** —— `prune-novelty-cids` が無条件に全 walk していた。`prune-novelty-cids-async` + `verified-node-async` + `indexed-novelty-entries-async`、`hot-datoms` に配線、さらに index が答えられる scan は full walk を**そもそも払わない**ように遅延化 |
+| control-plane `b12f3229` / `8ee32342` | pin 前進 + tracked bundle 再生成 + 本番 deploy（version `172d71c5` → `16b89c3e`） |
+
+検証: kotobase-peer **256 tests / 1028 assertions / 0 failures**（origin/main 28e018b の
+254/1019 から）。worker 側 **455 tests / 1525 assertions / 0 failures**。
+`shadow-cljs release worker` 0 warnings。
+
+**両方の新テストは discriminate することを確認した**（壊すとそのテストだけが、
+名乗った理由で落ちる）。特に **indexed 分岐は既存 255 tests では覆われて
+いなかった** —— 壊しても緑だった。2026-09-03 の write outage fix が依存する
+経路なので、これを覆うテストを足した。
+
+### それでも直らなかった
+
+deploy 後の実測:
+
+| | |
+|---|---|
+| 有界 fold `max_novelty=4` | **500 / 36.3s**（前 35.7s） |
+| component 限定 datoms（policy scan と同じ形） | **504 / 25.2s**（edge deadline） |
+| 素の datoms `limit 1` | **504 / 25.5s** |
+
+⚠ **「壁時計が動かない」を「改善が無い」と読んではいけない。** どちらの実行も
+`cpu_ms` 30,000 の天井で殺されるので、**壁時計は天井を測っているのであって
+仕事量を測っていない。** 改善が実在しても、まだ足りなければ同じ数字が出る。
+**どこまで進んだかは計器が無いと分からない。**
+
+したがって **「trampoline の再実行が支配項だった」という推論は、本番では
+確認されていない。** 手元では正しい変更で、テストも discriminate する。だが
+この graph を直すには足りず、支配項の同定は**未測定のまま**である。
+
+### 次の一手は最適化ではなく計器
+
+この repo の `wrangler.jsonc` が自分で書いている規則がそのまま当てはまる:
+
+> Thirty seconds of CPU for a hundred entities is a number that **needs a
+> phase attached to it** before anyone raises `limits.cpu_ms` or starts
+> optimising.
+
+`KOTOBASE_TIMING` は transact の phase しか出さない。fold と read には出ない
+（400s の tail で fold のログは 0 本）。**worker 側で write/read の store fn を
+包んで、fetch 回数・decrypt 回数・各段の経過を数えて出す**のが次。どの段が
+30 秒を使っているかを見てから直す。推論で 2 回当てにいって 2 回とも足りなかった。
+
+### 残っている既知の O(N)（bound の外）
+
+有界 fold は今も: ①`:remaining-entries` のために `back` 全体を walk
+②残り全部の novelty chain を `build-novelty-chain!` で書き直し
+③残り全部の subject index を `build-novelty-index!` で書き直し。
+`max_novelty` はこの 3 段を覆わない。**②③を bound するには index chain の
+link 方向（現在は新しい方が head、`rest` が古い方を指す）を変える必要があり、
+これは別の設計変更である。**
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
