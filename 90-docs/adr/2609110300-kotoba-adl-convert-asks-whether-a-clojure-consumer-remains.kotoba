@@ -1,0 +1,108 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110300-kotoba-adl-convert-asks-whether-a-clojure-consumer-remains")
+  (:adr/topic "kotoba-adl-convert-set-aware-guards")
+  (:adr/title "kotoba adl convert asks whether a Clojure consumer remains, not whether one exists")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba"))
+  (:adr/related (vector "adr-2609110200-a-moving-defcid-reaches-the-conformance-corpus-and-no-deployment-lock"))
+  (:adr/body
+  "## Context
+
+Owner instruction 2026-09-10: improve the performance of kotoba convert.
+
+Measured first, because 'performance' had two candidate meanings and only one
+of them was the problem. Throughput was never the bottleneck -- a whole
+repository classifies in seconds. The bottleneck was the SUCCESS RATE:
+`kotoba adl convert` converted nothing at all.
+
+    for each of eight real target repositories:
+      cd <repo> && nbb --classpath <kotoba>/src <kotoba>/bin/kotoba_adl.cljs \\
+        convert <repo>/src
+
+    SCANNED 56    WOULD-CONVERT 0    REFUSED 56 compiled-by-build-config
+
+## What was actually wrong
+
+Two guards decide whether a source file may be renamed, and both asked the
+wrong question. They asked 'does a consumer exist?' when the question they
+exist to answer is 'will a Clojure consumer REMAIN after this pass?'.
+
+Converting a tree file-by-file, every file blocks every other: A requires B so
+B is refused, and A is refused for its own requirer. A tree that is entirely
+self-consistent converts nothing.
+
+## What was deliberately NOT done
+
+The build guard was added the same day and it is the reason the number is zero.
+Removing it would have raised the number immediately, and it would have been
+the exact failure this workspace names -- shrinking a predicate to make a gate
+green.
+
+Its rationale is a property, not an implementation state, and it names a real
+incident: nbb and the clojure CLI resolve a namespace from `:paths` by
+EXTENSION, so renaming a file to `.kotoba` makes it invisible to the build and
+nothing reports an error. kotoba-lang/datalog was renamed while three nbb
+scripts still required `datalog.core`, and the datom query face has been dead
+since. A rename does not fail.
+
+Measured at the commit before that guard, on the same corpus: 7 of 56
+convertible. Those seven were not a capability that was lost -- they were seven
+files that would have gone silently out of their build.
+
+## The change
+
+The set of paths converting in a pass is threaded through classification.
+
+- A consumer that is ITSELF converting in this pass is not a Clojure consumer
+  afterwards, so it is not evidence against converting the file.
+- A source root that converts ENTIRELY leaves no Clojure namespace under it for
+  any runtime to resolve by extension. A root that converts PARTIALLY is still
+  refused, and that partial case is exactly what the datalog incident was.
+
+Whether one file may convert depends on which others convert, so the answer is
+a fixpoint, not a single pass: start optimistic, classify, drop what was
+refused, repeat. The set only shrinks, so it terminates. The iteration bound is
+REPORTED, and a run that does not settle exits 2 rather than reporting a pass.
+
+## Result, isolated
+
+The comparison holds the input fixed -- whole repository, two repositories, 65
+files -- and varies only the converter, so the improvement is not confounded
+with the change in how it is invoked:
+
+    unmodified           11 convertible, 41 refused compiled-by-build-config
+    set-aware fixpoint   17 convertible, 35 refused compiled-by-build-config
+
+Plus six files, and the guard still refuses thirty-five.
+
+## The control, which is the half that matters
+
+A change that only makes a number go up is indistinguishable from a change that
+disabled a check. So the same improved code was handed a PARTIAL set -- `src/`
+only, while `test/` and `scripts/` keep requiring those namespaces:
+
+    SCANNED 21    WOULD-CONVERT 0    REFUSED 21 compiled-by-build-config
+
+Same code, two inputs, opposite verdicts. The guard fires when it should and
+stands down when it should not.
+
+The evidence floor was re-checked in the same pass and still refuses: an empty
+scan prints `Refusing to report a pass: scanned 0 files` and exits 2. That exit
+code had to be taken from a file rather than a pipe -- read through `| tail` it
+reads 0, which is `tail`'s status and not the check's.
+
+## What this does NOT claim
+
+Converting is still not compiling. A converted file is renamed, not translated:
+measured the same day, 30 landed `.kotoba` files drawn from 30 distinct
+repositories were put through `amu check` and 0 passed, while the control -- a
+real Kotoba module -- passed. The rejection reasons are the work list, and two
+classes are two thirds of it: `:kotoba/source-read-failed` and
+`:kotoba.error/map-literal-value`, 11 each of 30.
+
+So this ADR moves one number: how much of a repository `kotoba adl convert` is
+willing to touch. It does not move the number that matters for Q9, which is how
+much of it the compiler accepts.")))
