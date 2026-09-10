@@ -1,0 +1,73 @@
+[{:db/id -1
+  :adr/id "adr-2609102400-a-guard-aimed-at-a-shadowed-file"
+  :adr/title "A guard aimed at a shadowed file is no guard: six site sources have two copies and one renders"
+  :adr/status "accepted"
+  :adr/date "2026-09-10"
+  :adr/related ["adr-2609102200-https-required-and-generate-now"]
+  :adr/body
+  "Follow-up to ADR-2609102200, which named one thing not done: a check that
+fails when `llms.txt` and the docs page disagree. Writing that check found why
+the repo's EXISTING guard had never fired.
+
+## The shadowing
+
+`src/cloud_murakumo/site/docs.cljc` was COPIED to `cloud-murakumo-app` on
+2026-08-31, not moved. Both files still exist, and both directories are on the
+`:site` classpath:
+
+    1  src                                    <- this repo, wins
+    2  resources
+    ...
+    7  .../cloud-murakumo-app/src             <- shadowed
+    8  .../cloud-murakumo-app/resources
+
+So this repo's copy renders and the other one is invisible. A previous fix
+repointed `test/llms_public_api_test.mjs` at the -app copy, believing the file
+had moved -- its comment says so. The result, measured 2026-09-10: `/docs` and
+`/llms.txt` disagreed for an hour, the live page rendered from the copy the
+test was NOT reading, and the assertions passed the whole time.
+
+**A guard aimed at a shadowed file is not a weaker guard. It is no guard**, and
+it is worse than none because it reports a pass.
+
+## It is not one file
+
+    file              changed lines between the two copies
+    blog.cljc         632
+    market.cljc       360
+    go.cljc           296
+    onprem_chat.cljc  275
+    onprem.cljc       243
+    chrome.cljc        52
+
+Direction, measured from git rather than assumed: `cloud-murakumo` took **68
+commits** touching `site/` in thirty days with every file current to 09-09;
+`cloud-murakumo-app` took **16**, and those edits landed in files that never
+render. Three files exist only in -app (`giemon.cljc`, `landing_locales.clj`,
+`trust.clj`) and are therefore NOT shadowed -- those do render.
+
+## What was changed, and what deliberately was not
+
+Which repo owns the site source is an owner decision, and 1,858 lines of
+divergence are not something a test should force. Nothing was moved or deleted.
+What changed is that the problem can no longer be silent:
+
+- `llms.txt` must name every model and every public route `/docs` names. That
+  is the exact drift of 2026-09-10, and `llms.txt` is what an agent reads
+  first, so a model documented only in HTML is undiscoverable to it.
+- `llms.txt` must keep stating that HTTPS is required.
+- A ratchet over the shadowed files (`test/shadowed-site-sources.json`): a NEW
+  divergence fails; an entry that has become identical fails, so the list can
+  only shrink; and an entry that exists on only one side fails.
+
+That last rule came from testing the ratchet against itself. Adding an entry
+for a file absent from the sibling passed **silently**, because the comparison
+loop only walks files present in both -- so a stale entry would have sat there
+forever. It is the same shape as the bug the ratchet exists to catch, one level
+up, and it was caught only because the check was broken deliberately in both
+directions before being trusted.
+
+## Owner decision pending
+
+Which repo owns `cloud_murakumo/site/`. Until then the seven listed files stay
+listed, and every edit to the -app copy of one of them changes nothing."}]
