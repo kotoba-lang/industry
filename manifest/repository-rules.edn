@@ -345,7 +345,30 @@
     :unknown-label-rounding {:object :up :subject :down}
     :overlapping-prefixes :higher-wins
     :coercion-observable-as :unknown-levels
-    :gap "nothing mints read-classified/<label> capabilities yet; declarable and enforced, not issuable"}
+    :gap "nothing mints read-classified/<label> capabilities yet; declarable and enforced, not issuable"
+    ;; Step 3, same ADR. Reads get the lattice; an undeclared label stops
+    ;; returning the same value as a cleared one. The comparison is still
+    ;; abac's -- this layer records only whether abac was given enough.
+    :read-side
+    {:enforced-in "orgs/kotoba-lang/kotobase src/kotobase/kotobase.cljc"
+     :pin "c722fb166b11"
+     :every-method-emits :classification-decision
+     :undeclared-denies-when :classification-required?
+     :denial :kotobase/classification-undeclared
+     :ordered-above :abac-denied
+     :why-ordered "when both would deny, the undeclared reason is the one a caller can act on; the policy reason reports a check that was never reached"
+     :judgment-stays-in :kotoba.security.abac/evaluate
+     :had-no-tests-before true
+     :gap "opt-in, like capability-required? beside it; unconditional declaration is Step 4's compile-time job"}
+    ;; Measured 2026-09-10 rather than assumed: Step 2 does NOT reach the
+    ;; server. kotobase-server pins kotobase-peer at an older sha and that
+    ;; pin is frozen on evidence (2026-08-04: unpinning turned 78/332 green
+    ;; into 16 failures). So problem 4 is blocked on a MEASURED pin advance,
+    ;; not on adding a dependency -- and a dependency with no reader in src
+    ;; moves nothing.
+    :server-side {:status :blocked
+                  :blocked-on :kotobase-peer-pin-advance-in-kotobase-server
+                  :do-not "add the security dep before something reads it"}}
    :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
    :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}

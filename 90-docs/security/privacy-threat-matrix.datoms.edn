@@ -20,17 +20,17 @@
   :matrix/linddun ["linking" "identifying" "non-repudiation" "detecting"
                    "data-disclosure" "unawareness" "non-compliance"]
   :matrix/cells-total 78
-  :matrix/cells-recorded 12
+  :matrix/cells-recorded 13
   ;; These five must sum to :cells-recorded, and with :cells-unrecorded to
   ;; :cells-total. A reader can count the entities below and check. A matrix
   ;; whose declared coverage does not equal its counted coverage is the
   ;; failure this file exists to make visible.
   :matrix/cells-measured 6
-  :matrix/cells-implemented 1
+  :matrix/cells-implemented 2
   :matrix/cells-measured-residue 1
   :matrix/cells-gap 3
   :matrix/cells-unmeasured-here 1
-  :matrix/cells-unrecorded 66
+  :matrix/cells-unrecorded 65
   :matrix/note "68 unrecorded cells are UNMEASURED, not clean. Absence of a cell is absence of a measurement."}
 
  {:db/id -2 :cell/plane "ayatori" :cell/stride "information-disclosure"
@@ -56,6 +56,14 @@
   :cell/linddun "detecting" :cell/status :measured :source/dataset "privacy-plane"
   :cell/evidence "90-docs/security/traversal-bounds-census.edn"
   :cell/finding "ipld.graph/selection-cursor requires four positive limits and refuses a partial set before reading a block; prolly-tree.diff/sync-blocks* requires three and rejects 0. Fail closed, no default. The bound exists; it is the query plane's two doors that skip it."}
+
+ {:db/id -14 :cell/plane "kotobase" :cell/stride "elevation-of-privilege"
+  :cell/linddun "non-compliance" :cell/status :implemented :source/dataset "privacy-plane"
+  :cell/surface "kotobase authorize-xrpc"
+  :cell/evidence "orgs/kotoba-lang/kotobase src/kotobase/kotobase.cljc + test/kotobase/authorize_xrpc_test.cljc, pin c722fb166b11"
+  :cell/finding "ADR-2607280100 Step 3: the lattice is evaluated on reads, not only writes. Egress stays a write question; every method now emits a classification-decision labelled read or write. abac's required-rank is nil for an undeclared resource and nil raises no violation, so unclassified read as allowed for the same reason cleared ones do -- the decision records which happened, and classification-required? turns the first into :kotobase/classification-undeclared. The comparison stays in abac (D6); this layer only records whether abac was given enough to make it."
+  :cell/had-no-tests-before true
+  :cell/gap "opt-in: a caller that omits classification-required? is unchanged. Making declaration unconditional is Step 4's compile-time job."}
 
  {:db/id -13 :cell/plane "kotobase" :cell/stride "elevation-of-privilege"
   :cell/linddun "data-disclosure" :cell/status :implemented :source/dataset "privacy-plane"
