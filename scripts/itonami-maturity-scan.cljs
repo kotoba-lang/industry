@@ -247,14 +247,33 @@
 ;; 独立 Governor + append-only ledger のパターン（skill build-actor）で、
 ;; そのどの部品が実在するかを file 名から測る。名前は itonami-fleet-audit.cljs の
 ;; :components と同じ語彙に合わせてある。
+;; **拡張子の値域は `fact-file-re` と同じ理由で `src-ext` から導く。** ここは
+;; 2026-09-11 まで `(cljc|cljs|clj)` を手で書いており、`src-ext` が既に持って
+;; いた `kotoba` を持っていなかった。fact-file 側は 2026-09-10 に同じ欠陥を
+;; 直したが、**この 7 本は直っていなかった** —— 1 つの列を 2 箇所に書いた
+;; ときの、直し忘れた方である。
+;;
+;; 症状は fact-file のときと同型で、**改名は内容を 1 バイトも変えないのに
+;; component が消える**。実測 2026-09-11、cloud-itonami-isco-3117 の
+;; origin/main（25993cf、`.clj*` → `.kotoba` の一括改名だけの commit）:
+;;
+;;     e031f43 (.cljc)   :component/count 2  [:governor :store]
+;;     25993cf (.kotoba) :component/count 0  []
+;;
+;; **0 は「部品が無い」と全く同じ値である。** governed 軸は
+;; `component/count / 7` なので、改名した actor は「Governor を持たない
+;; actor」として測られ、この loop はそこへ『部品を足せ』という手を配り続ける
+;; —— 足した部品も同じ理由で数えられないので、上げようのない軸である。
+(def component-ext-alt (str/join "|" (sort src-ext)))
+
 (def component-patterns
-  {:operation  #"(?i)(^|/)operation[s]?\.(cljc|cljs|clj)$"
-   :governor   #"(?i)(^|/)(governor|policy)\.(cljc|cljs|clj)$"
-   :store      #"(?i)(^|/)store\.(cljc|cljs|clj)$"
-   :phase      #"(?i)(^|/)phase\.(cljc|cljs|clj)$"
-   :sim        #"(?i)(^|/)sim\.(cljc|cljs|clj)$"
-   :facts      #"(?i)(^|/)facts\.(cljc|cljs|clj)$"
-   :ledger     #"(?i)(^|/)ledger\.(cljc|cljs|clj)$"})
+  {:operation  (re-pattern (str "(?i)(^|/)operation[s]?\\.(" component-ext-alt ")$"))
+   :governor   (re-pattern (str "(?i)(^|/)(governor|policy)\\.(" component-ext-alt ")$"))
+   :store      (re-pattern (str "(?i)(^|/)store\\.(" component-ext-alt ")$"))
+   :phase      (re-pattern (str "(?i)(^|/)phase\\.(" component-ext-alt ")$"))
+   :sim        (re-pattern (str "(?i)(^|/)sim\\.(" component-ext-alt ")$"))
+   :facts      (re-pattern (str "(?i)(^|/)facts\\.(" component-ext-alt ")$"))
+   :ledger     (re-pattern (str "(?i)(^|/)ledger\\.(" component-ext-alt ")$"))})
 
 (defn- collect [org repo]
   (let [rel  (str "orgs/" org "/" repo)
