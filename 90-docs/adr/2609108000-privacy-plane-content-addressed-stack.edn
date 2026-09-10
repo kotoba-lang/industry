@@ -54,7 +54,7 @@
 |---|---|---|---|
 | 1 | CID = authority と誤認 | `kotobase.execution-contract`（1 実行 = 署名される contract、fail closed・暗黙の既定を足さない）、`kotoba.compiler.nbb.output-attestation`（Ed25519 が marker + provenance + artifact identity + target を束ねる。docstring 自身が「独立した output admission を置き換えない」と書いている） | 実在 |
 | 2 | DAG metadata leakage | ADR-2607051000 ciphertext-over-CID persistence。ciphertext identity で addressing する形は在る | 部分（形は在る。threat model が無い） |
-| 3 | query が oracle になる | `bridge/default-max-datoms` + `:materialize-over-budget` は**走査量**。存在照会・adaptive probing・aggregation 下限は無い | **不在**（D3 の混同点） |
+| 3 | query が oracle になる | 2026-09-10 に**測った**（下記）。レビューが挙げた形（aggregate だけ許す surface）は**この plane には存在しない** —— 可視性の seam は `visible?` 1 本で per-datom・required なので、aggregate だけを許すモードが無い。**代わりに走査上限そのものが oracle だった** | **不在**（防御は無い。ただし channel は measured） |
 | 4 | agent-generated form | `ayatori.agent`（validate / ->engine-query / repair-turn / system-prompt。LLM が書く入口として設計されている） | 実在（ただし propose/authorize の分離は文書化されていない） |
 | 5 | capability escalation | `kotoba.security.information-flow`（4 段 lattice + `evaluate-egress`）、`kotoba.security.abac`（no-read-up）、`kotobase-peer.policy`（read 側の 2 値可視性） | 部分（ADR-2607280100 Step 1 のみ landed） |
 | 6 | schema CID が trust root | `kotobase.execution-contract` が protocol adapter に暗黙の既定を禁じている | 部分（migration proof は無い） |
@@ -66,6 +66,56 @@
 | 12 | DoS（fuel / traversal 上限） | `:materialize-over-budget` は在る。IPLD traversal 側（max blocks / depth / fanout / decompression ratio）は未確認 | 未測定 |
 
 LINDDUN は 90-docs 全体で 0 hit。STRIDE は 6 文書に語として出るが、いずれも threat-model 文書ではない。
+
+**2026-09-10、`:status_detail` の 1 番目を実施した。正本は
+`orgs/kotoba-lang/ayatori` の `bench/inference-channel-01.edn`（harness は
+`bench/inference_channel.cljs`、pin `e47e26b6cb06`）。**
+
+測りに行った脅威は**適用されなかった**。レビューの例（行は読めないが `count` は
+許される）は aggregate 専用モードを前提にするが、この plane にそれは無い。**その隣に
+在った。**
+
+    materialize : [store coll-keys]  |  [store coll-keys max-datoms]
+                   ↑ どちらの arity にも visible? が無い
+
+`visible?` は `q` が**構築済みの db の上で**適用する。ns docstring はこれを
+「safe by construction」と書いており、**値については実際にそのとおり**（測った ——
+`q` は空集合を返し、`entity-attrs` は空集合を鍵の下に残さず entity ごと prune する。
+「属性が在ることだけ伝えて中身を隠す」漏れを避ける正しい実装）。**cardinality に
+ついての主張ではない。** そして走査を止める ceiling は、**止めた時点の running total を
+`ex-data` に載せて返す** —— 可視性の判断は 1 度も行われていない。
+
+clinical collection の全 datom を隠す policy の下で回収できたもの:
+
+| channel | 回収した値 | 費用 | 要るもの |
+|---|---|---|---|
+| 1 回の呼び出し | `:datoms 6` + collection 名 | 1 probe | 3-arity |
+| 正確な総数（clinical） | 17（真値 17） | 12 probes | 3-arity |
+| 正確な総数（store 全体） | 25（真値 25） | 12 probes | 3-arity |
+| **組み込み ceiling** | **200004 datoms** | **1 call** | **2-arity** |
+| 名指しの個人の存在 | delta 7 | 24 probes | 3-arity |
+| その個人の項目数 | 5（真値 5） | 24 probes | 3-arity |
+
+**deployment に効くのは 4 行目である。** `max-datoms` を呼び出し側に選ばせない wire
+surface は、それゆえに沈黙しているわけではない —— 組み込みの閾値も閾値であり、
+跨いだ瞬間に running total を報告する。
+
+5 行目がレビューの脅威が別の道から到着したもの。**1 人の名指しの個人の臨床記録が
+在るか無いかだけが違う 2 つの store は、回収される総数が違う。** その人の値は 1 つも
+読めておらず、`visible?` は彼女の datom を全て拒否している。
+
+**両方向を測った**（harness は boolean ではなく**個数**を返し、自分の control が
+成り立たないときは 0 でも 1 でもない exit 2 で**報告を拒否する**）:
+
+- control を壊す（何も隠さない policy）→ exit 2、`REFUSING to report the channel`。
+  値を隠す 2 つの assertion が落ち、「policy が空振りしていない」assertion は通る。
+- 比較を `(> n max-datoms)` から `(>= …)` に反転 → exit 1、4 件失敗。うち 2 件は
+  **ちょうど境界に置いた probe**。**この 2 件が無ければ演算子は見えない** ——
+  他の probe は両方の綴りで通る。
+- 戻す → exit 0、13 assertion。
+
+**これは D3 を予想外の向きに強めた。** resource budget は privacy budget では*ない*
+だけでなく、**それ自身が開示経路**である。走査量の上限は、上限した量を公表する。
 
 **副産物として 1 件の欠陥が出た。** ADR-2607280100（クリアランスの設計統合、accepted）の代替案 A2「クリアランスごとに ref / データベースを分ける」の却下理由は「D4 のとおり join が ref 1 本までしか届かない」である。**この前提は 2026-09-04 に ADR-2809040800 が実測で反転させている**（join の到達範囲は ref の本数ではなく合成の有無で決まる）。A2 の却下理由は現在偽。ただし A1（datom に 5 列目を足す）の却下理由（ブロック形式・CBOR・merkle-LSM・compaction を壊す）は独立に生きているので、**D2「ラベルは属性に付ける」という決定自体は倒れない** —— 倒れたのは却下の 2 番目の理由だけ。ADR-2607280100 に注記を足し、決定は動かさない。"
 
@@ -89,7 +139,12 @@ LINDDUN は 90-docs 全体で 0 hit。STRIDE は 6 文書に語として出る�
   "**この ADR が landed させたのは組織原理と実測だけで、機構は 1 つも足していない。**
 
 未着手（優先順）:
-1. ayatori の inference channel を 1 本の再現手順にする（存在照会 0/1、adaptive probing、result identity の変化）。D4 のとおり、防御より先。
+1. ~~ayatori の inference channel を 1 本の再現手順にする~~ **完了（2026-09-10）**。
+   結果は `:adr/evidence` の後段。`ayatori` pin は `e47e26b6cb06` へ前進済み。
+   **防御は入れていない** —— 何を選ぶか（粗い拒否 / `visible?` を見た count /
+   開示を受け入れる）は決定であって、この測定はその入力。
+   ⚠ 測ったのは**ライブラリの seam であって deploy された surface ではない**。
+   3-arity を wire に出している呼び出し側の棚卸しは未実施。
 2. public receipt に principal / purpose が入っていないことを測る（D6）。
 3. IPLD traversal の上限（max blocks / depth / fanout / decompression ratio）が在るかを測る。#12 は未測定であって clean ではない。
 4. correlation / fingerprinting（#11）—— 内部 CID を境界にそのまま出しているかの棚卸し。
