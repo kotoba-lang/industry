@@ -12269,4 +12269,64 @@
      :green-marker "portable-check: OK"
      :find "    kotoba.crm.revrec-test])"
      :replace "    kotoba.crm.funnel-test])"
-     :must-fail ["REFUSED"]}]}]}
+     :must-fail ["REFUSED"]}]}
+
+   {:repo "orgs/cloud-itonami/cloud-itonami-isco-2519"
+    :label "isco-2519 semver-as-arithmetic —— 拒否が拒否のままか、そして suite が『暗くなった』ことを緑と区別できるか"
+    ;; この repo の suite は 2026-09-10 の `.kotoba` 一括改名で **走らなくなった**。
+    ;; `clojure.tools.namespace` はその拡張子を歩かないので `cognitect.test-runner`
+    ;; は 1 件も集めず、`Ran 0 tests containing 0 assertions` を **exit 0** で返した
+    ;; —— 前日の「15 tests / 34 assertions 緑」と同じ値である。実行できなかった検査が、
+    ;; 実行して問題が無かった検査と同じ値を返す（ADR-2608136000 の 2 問目・4 問目）。
+    ;;
+    ;; 現在の runner は `.kotoba` を scratch に `.cljc` として置いて nbb で走らせ、
+    ;; **README.md が公表している件数**を床にする。actor-crew の先例は 0 件だけを
+    ;; 拒否するので、15 → 12 に静かに減った suite はそこでは緑で通る。下の 4 件目は
+    ;; まさにその差を測るためのもの。
+    ;;
+    ;; 4 件とも 2026-09-11 に、当てて赤くなるところを実際に見てから登録した。
+    :cmd ["nbb" "test/run_suite.cljs"]
+    ;; exit 0 と併せて見る。REFUSED の回にもこの行自体は出る（件数が床に届かなかった
+    ;; だけで failures は 0 なので）——**だから marker だけでは足りず、exit を見る**。
+    :green-marker "failures=0 errors=0"
+    :mutations
+    [{:id :isco2519/version-admits-a-re-release
+      :note "`version<` を `<` から `<=` 相当へ滑らせる。同一 version の再リリースが通る。
+             CLAUDE.md の 5 問目が要求する **境界ちょうど**の入力で、通る例と落ちる例が
+             両方あっても線上の 1 件が無ければ演算子は見えない"
+      :file "src/softdev/governor.kotoba"
+      :find "(neg? (compare (vec a) (vec b)))"
+      :replace "(not (pos? (compare (vec a) (vec b))))"
+      :must-fail ["hard-on-version-not-advanced"]}
+
+     {:id :isco2519/set-difference-direction-flipped
+      :note "API surface の集合差を逆向きにする。**この repo が存在する理由**（破壊的変更は
+             集合差で機械検出できる）そのものが反転し、削除は追加として、追加は削除として
+             読まれる"
+      :file "src/softdev/governor.kotoba"
+      :find "(set/difference cur-surface (set new-surface))"
+      :replace "(set/difference (set new-surface) cur-surface)"
+      :must-fail ["holds-a-breaking-change-disguised-as-patch"
+                  "ok-minor-release-with-addition"
+                  "hard-on-breaking-change-without-major"
+                  "hard-on-addition-without-minor"]}
+
+     {:id :isco2519/confidence-floor-removed
+      :note "低確信の human sign-off を実質無効化する（0.6 → 0.0）。escalation は
+             「常に人が見る」と README が書いている側の不変条件"
+      :file "src/softdev/governor.kotoba"
+      :find "(def confidence-floor 0.6)"
+      :replace "(def confidence-floor 0.0)"
+      :must-fail ["escalates-low-confidence"]}
+
+     ;; ── ここが、この suite に床が要る理由 ──────────────────────────
+     {:id :isco2519/a-test-namespace-drops-out
+      :note "**refusal の床。exit 2 でなければならない。** test の ns 名を 1 文字変えると
+             その namespace は収集されず、残り 12 件は緑のまま通る。0 件だけを拒否する
+             床（actor-crew の先例）はこれを **PASS と報告する** ——
+             実測 2026-09-11: この変異で `only 12 of the 15 tests README.md publishes ran`
+             / exit 2 になることを確認した"
+      :file "test/softdev/actor_test.kotoba"
+      :find "(ns softdev.actor-test"
+      :replace "(ns softdev.actor-tests"
+      :must-fail ["REFUSED"]}]}]}
