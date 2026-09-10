@@ -1,0 +1,122 @@
+(vector
+ (map
+  (:adr/id "adr-2609112400-payload-v3-is-one-rewrite-and-one-decision")
+  (:adr/title "Payload v3 is one rewrite and one decision")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609076000-kir-is-an-ipld-codec-schema-and-adl"))
+  (:adr/body "
+## The question
+
+Root gap 02 asks whether payload v3 is possible and, if it is, what it
+costs. The first two candidate measurements are already answered and
+landed: all twelve normalize tags are representable, so there is no named
+blocker waiting on io-ipld, and a moving DefCID reaches the language
+conformance corpus and zero deployment locks.
+
+This iteration measured the third thing, which is the one that sets the
+price: what a converter would actually have to DO, dimension by dimension.
+
+## Where it is measured
+
+kotoba.kir-value-codec-differential-test in osaho. That namespace already
+NAMED the three dimensions; what it did not say is what each one costs.
+Three tests were added, one per dimension, rather than a parallel probe.
+
+Run it:
+
+    clojure -M:test -n kotoba.kir-value-codec-differential-test
+
+## Dimension 1 -- tag alphabet. Mechanical.
+
+A total mapping. Twelve normalize tags, twelve codes, plus one code the
+codec has and normalize never emits (link). Nothing waits on io-ipld.
+
+The test hands each side its OWN representation, which matters: an earlier
+pass at this measurement handed normalize a bare platform float, read the
+refusal as a missing capability, and nearly reported v3 blocked. Both
+sides do refuse the other spelling, and the reason LITERALS are pinned
+rather than the fact that something threw.
+
+## Dimension 2 -- i64. NOT a formatting difference. This is the finding.
+
+normalize states in its own comment that (i64 5) and 5 denote one value
+and must share one identity, and it gives both the form the same tagged form.
+The codec gives them code-integer and code-int64, and different bytes.
+
+The two sides disagree about HOW MANY VALUES THERE ARE. A converter
+cannot re-encode its way across that; it has to decide, and both answers
+cost something:
+
+  always emit code-integer      keeps the normalize invariant, but the
+                                explicit i64 wrapper cannot round-trip and
+                                values beyond the exact range have no code
+  emit code-int64 when wrapped  round-trips, but SPLITS an identity that
+                                is one today, so (i64 5) and 5 would get
+                                different DefCIDs
+
+This is the only non-mechanical part of payload v3. Everything else is a
+rewrite; this is a decision about the value identity of the language.
+
+## Dimension 3 -- map key order. Crosses, not merely differs.
+
+The prior text says the orders differ. Different orders could still agree
+on every key set that actually occurs, which would make the conversion
+cheap. They do not agree.
+
+Witness, one two-key map with keys aa and b:
+
+    normalize  ->  aa then b     rank, then structural compare
+    codec      ->  b then aa     shorter encoding first, then bytewise
+
+So order cannot be carried through and every map with two or more keys
+re-sorts. That is the mechanical cause of the frozen-vector result already
+on the record: all ten disagree.
+
+## The answer
+
+v3 is possible. The cost is one rewrite and one decision.
+
+The rewrite is dimensions 1 and 3 together, and it moves every DefCID --
+which was already known from the frozen vectors and now has a named cause
+rather than only a measurement.
+
+The decision is dimension 2, and it is the only part a converter cannot
+make on its own: whether (i64 5) and 5 remain one identity. Nothing in the
+measurement settles it, because it is not a fact about the encoders.
+
+## Seen red
+
+Each of the three tests was broken through the SOURCE, not through its own
+expected literals, and each failed naming the thing that was broken:
+
+  tag the i64 wrapper separately   -> dimension 2 fails, showing the int
+                                      tag against the new one, and the
+                                      frozen goldens also move, which
+                                      confirms the break reached DefCID
+                                      assembly
+  reverse the normalize map sort   -> dimension 3 fails on the witness
+  rename the float refusal literal -> dimension 1 fails on the pinned
+                                      literal, one assertion, and a
+                                      control that only asked whether
+                                      something threw would have passed
+
+## A trap worth recording
+
+The worktrees for this measurement could not be cut with origin/main.
+west checkouts carry their remote under the ORG name, so the io-ipld
+remote is kotoba-lang, not origin. The first attempt used origin/main for
+every repository with stderr discarded, and io-ipld silently got no
+worktree at all -- the loop reported success for osaho and said nothing
+about the one that failed. It was caught only because the loop printed a
+line per repository.
+
+Resolve the remote per repository rather than assuming, and never discard
+stderr on the step that creates the thing you are about to measure.
+
+## What is not claimed
+
+Nothing here promotes io-ipld from test-only to :deps. That is the v3
+decision itself and it needs the dimension 2 answer first. The pin stays
+where ADR-2609076000 decision 1 put it.
+")))
