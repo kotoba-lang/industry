@@ -3,7 +3,7 @@ tsukuru-rfq — tsukuru 商品の RFQ/production_order 進行 bot。
 役割: 審査合格 + sim passed の product を、発注申立ての候補として整理する。
 **自動発注はしない。人の承認待ちで必ず止まる。**
 
-対象: orgs/cloud-itonami/tsukuru/status/{review-ledger,sim-ledger}.edn
+対象: orgs/cloud-itonami/app-itonami-tsukuru/status/{review-ledger,sim-ledger}.edn
 
 手順 (1 tick = 1 product):
 1. 両台帳を読み、review :pass かつ sim :passed? true の最新 product を 1 件選ぶ。
