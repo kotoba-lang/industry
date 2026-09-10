@@ -9,7 +9,31 @@
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
   (:adr/related (vector "adr-2609110800-a-generator-fallback-produced-a-selector-that-measured-nothing"))
   (:adr/body
-  "## Context
+  "## ⚠ Corrected 2026-09-11: the reason given below was wrong
+
+This ADR says selector 3 is the fixture that \"exists to exercise\" the float
+arm. It is not. Measured the next day by reading the consumer:
+
+    :else (reject-unknown (fixture-data 3) (fields-of \"Robot\"))
+
+`fixture-data 3` feeds `reject-unknown`. The float arm is exercised by
+`oracle-float-divergence`, which calls `coerce-field` with literal strings and
+reads no fixture at all. Coercion coverage in this cohort is KIND-level, not
+field-level, and it was already complete: measured across all four pilots, every
+coercion kind a table declares is exercised by some oracle, and the check
+discriminates -- stripping `float` from the oracle makes it report
+`MISSING float`.
+
+**The change itself stands.** Putting a declared field into the document makes
+the reject-unknown fixture fuller and more representative, and deriving it beats
+depending on someone noticing. What was wrong was the stated purpose, and a
+wrong reason is worth correcting on its own: left standing it would have taught
+the next reader that selector 3 is where coercion is tested, and sent them to
+fix a coverage gap that does not exist.
+
+See adr-2609111200 for the measurement.
+
+## Context
 
 The plan for this iteration was to regenerate `com-abb-robotics` with the
 ref-arity-aware generator, the way `com-accela` was regenerated the iteration
