@@ -12,18 +12,45 @@
 ;; ここには「deps.edn から引く」と書いてあったのに、その下に引いた結果の
 ;; スナップショットが貼ってあったため、読む側は貼られた列の方を使った）:
 ;;
-;;   CP=".:scripts/nbb_compat:orgs/kotoba-lang/amu/src:orgs/kotoba-lang/amu/resources"
-;;   for r in $(grep -oE 'io\.github\.kotoba-lang/[a-z0-9-]+' orgs/kotoba-lang/amu/deps.edn \
-;;              | sed 's|.*/||' | sort -u); do
-;;     [ -d "orgs/kotoba-lang/$r/src" ] || echo "MISSING checkout: $r"   # west update で取る
-;;     CP="$CP:orgs/kotoba-lang/$r/src"
-;;     [ -d "orgs/kotoba-lang/$r/resources" ] && CP="$CP:orgs/kotoba-lang/$r/resources"
-;;   done
+;;   R=$HOME/github/com-junkawasaki     # orgs/ が populate されている本体 checkout
+;;   CP=$(nbb --classpath ".:scripts/nbb_compat" \
+;;         scripts/itonami-maturity-parity-classpath.cljs --root "$R") || true
 ;;   nbb --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljs \
 ;;     [--evidence manifest/itonami-maturity-evidence.edn] \
 ;;     [--datoms 90-docs/system-dynamics/itonami-maturity.datoms.edn] \
 ;;     [--kernel 90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba] \
 ;;     [--batch 300] [--limit N]
+;;
+;; deriver の exit は 3 値: 0 = 全部 checkout 済み / 1 = classpath は出たが未 checkout
+;; の repo が在る（stderr に repo 名と west update の行。だから `|| true` が要る）/
+;; 2 = REFUSED —— 起点の amu/deps.edn が読めず、stdout に**何も出さない**。
+;; **2 のとき CP は空文字なので、そのまま gate を回さない。**
+;;
+;; ⚠ **`--root` は cwd ではなく「orgs/ が populate されている本体 checkout」。**
+;; この gate は worktree から走らせるのが常なので `--root "$PWD"` と書くと
+;; worktree 自身を指し、sparse checkout に orgs/ が無いので毎回 exit 2 REFUSED に
+;; なる（実測 2026-09-10。CP が空のまま gate を回すと、起動しない = exit 1 = 本物の
+;; FAIL と同じ値、という上の罠にそのまま落ちる）。
+;;
+;; ⚠ **ここに shell の for ループを書き戻さない。** かつてここには
+;; `grep -oE 'io\.github\.kotoba-lang/…' amu/deps.edn` を 1 回まわす recipe が
+;; 貼ってあり、上の「列を貼らない」という警告を守っていてもなお 2 通りに壊れた:
+;;
+;;   1. **1 段しか辿らない。** 依存は推移的なので、閉包の計算も推移的でなければ
+;;      ならない。実測 2026-08-31: `sha2.core` を持つ org-nist-sha2 は amu の
+;;      *直接*依存ではなく security 等を経由した先に居るため、
+;;      `Could not find namespace: sha2.core` で起動しなかった。
+;;      再実測 2026-09-10: 1 段 = 17 repo / 推移閉包 = 31 repo。**14 repo を落とし**、
+;;      その中に org-nist-sha2 が居る（落ちる 14: amu datom dev-protobuf kgraph
+;;      kotoba-codegen kotoba-gmir kotoba-kir kotoba-mir org-ietf-cbor
+;;      org-ietf-ed25519 org-ietf-x25519 org-nist-sha2 security text）。
+;;   2. **zsh が `for r in $CLOSURE` を単語分割しない**ので classpath が 2 entry に
+;;      潰れる（CLAUDE.md の `west update $NAMES` と同じ罠）。
+;;
+;; どちらも症状は同じで、**gate が落ちるのではなく起動しない**。そして
+;; **起動しなかったときの exit も 1** で、本物の FAIL と同じ値である ——
+;; exit だけを見て「不一致があった」と読まない。毎回
+;; `Could not find namespace:` が出ていないことを確かめる。
 ;;
 ;; ## 何を検査するか
 ;;
