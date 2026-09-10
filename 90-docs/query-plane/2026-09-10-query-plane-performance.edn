@@ -1,0 +1,98 @@
+;; ADR-2609109800 の性能測定。**数値を手で直さない** —— 直すときは bench を回す。
+;;
+;; ⚠ この機械は並行 agent が走っており load は 13〜22 だった。だから
+;; **結論は比と構造値であって絶対値ではない。** 各 bench は変種を同じ
+;; process の中で交互に測るので、load の山は片側だけには乗らない。
+;; 行ごとに rows を出しているのは、「速いのは答えていないから」を
+;; 出力から見えるようにするため。
+{:measured "2026-09-10"
+ :adr "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
+ :extends "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
+ :route "nbb, no JVM; one live HTTPS origin"
+ :machine {:cpus 10 :loadavg-range [13.0 22.5] :runtime "nbb / Node 26"
+           :caveat "not workerd. 比だけを結論にする"}
+ :base {:org-w3-owl2 "b23571a" :datalog "fef2eb4" :datom-source "6936d20"
+        :ayatori "d6f3431" :kotobase "faa5cc0" :kotobase-server "197cd9d"
+        :arrangement "checked-out" :io-ipld "f2d0487"}
+
+ :benches
+ [{:bench "90-docs/query-plane/bench_inference_cost.cljs"
+   :question "2 つの扉（rules で導出 / closure を書き込む）はどちらが速く、何回目の query で逆転するか"
+   :reps 5
+   :rows
+   [{:n 100  :depth 2  :asserted 101  :closed 201   :sub-pairs 1   :type-pairs 200
+     :rows 100 :agree? true :ms-virtual 12.14 :ms-material 0.72 :ms-build 1.15 :x 16.86 :crossover 0.10}
+    {:n 100  :depth 4  :asserted 103  :closed 403   :sub-pairs 6   :type-pairs 400
+     :rows 100 :agree? true :ms-virtual 19.09 :ms-material 1.08 :ms-build 1.92 :x 17.66 :crossover 0.11}
+    {:n 100  :depth 8  :asserted 107  :closed 807   :sub-pairs 28  :type-pairs 800
+     :rows 100 :agree? true :ms-virtual 70.75 :ms-material 0.62 :ms-build 3.84 :x 114.78 :crossover 0.05}
+    {:n 100  :depth 16 :asserted 115  :closed 1615  :sub-pairs 120 :type-pairs 1600
+     :rows 100 :agree? true :ms-virtual 337.33 :ms-material 0.59 :ms-build 6.88 :x 571.58 :crossover 0.02}
+    {:n 1000 :depth 2  :asserted 1001 :closed 2001  :sub-pairs 1   :type-pairs 2000
+     :rows 1000 :agree? true :ms-virtual 69.65 :ms-material 6.18 :ms-build 8.52 :x 11.27 :crossover 0.13}
+    {:n 1000 :depth 4  :asserted 1003 :closed 4003  :sub-pairs 6   :type-pairs 4000
+     :rows 1000 :agree? true :ms-virtual 155.72 :ms-material 5.92 :ms-build 16.42 :x 26.32 :crossover 0.11}
+    {:n 1000 :depth 8  :asserted 1007 :closed 8007  :sub-pairs 28  :type-pairs 8000
+     :rows 1000 :agree? true :ms-virtual 681.90 :ms-material 5.84 :ms-build 35.95 :x 116.79 :crossover 0.05}
+    {:n 1000 :depth 16 :asserted 1015 :closed 16015 :sub-pairs 120 :type-pairs 16000
+     :rows 1000 :agree? true :ms-virtual 3665.85 :ms-material 5.94 :ms-build 80.95 :x 617.61 :crossover 0.02}]
+   :cost-model {:derived-tuples "n*D + D(D-1)/2（表の type-pairs / sub-pairs と一致）"
+                :time "n について線形、D について概ね二乗。D=2->16（8 倍）で 53 倍、n=100->1000（10 倍）で 10.9 倍"}
+   :maintenance {:add-one-individual-asserted-ms [0.00 0.03]
+                 :add-one-individual-closed-ms [0.01 0.07]
+                 :not-measured "subClassOf を 1 本足すと closure の n*D 行すべてが無効になる。この bench は ontology を編集しない"}
+   :discriminates "rows が 8 行すべてで一致する。build には closed index の全構築を課しており（marginal cost の過大見積もり）、それでも crossover < 1"}
+
+  {:bench "90-docs/query-plane/bench_request_overheads.cljs"
+   :question "ontology を query 値に載せる固定費（digest と admission）はいくらか"
+   :reps 21
+   :rows
+   [{:query "no ontology" :clauses 1 :rules 0 :digest-ms 1.13 :admit-ms 0.019 :verdict :admitted}
+    {:query "hierarchy-rules" :clauses 12 :rules 8 :digest-ms 5.05 :admit-ms 0.080 :verdict :admitted}
+    {:query "triple-rules" :clauses 28 :rules 16 :digest-ms 9.93 :admit-ms 0.142 :verdict :refused}]
+   :finding "digest は clause 数に概ね線形（1.13 + 約 0.35/clause）。hierarchy-rules を載せる固定費 約 3.9 ms は、n=1000 の materialized query 1 本（約 5.9 ms）と同じ桁"
+   :discriminates "3 行目が REFUSED を返すので、この表は admission が実際に判定した上での値である"}
+
+  {:bench "90-docs/query-plane/bench_materialize_share.cljs"
+   :question "ontology は request 全体の何割か —— 従来の支配項 materialize と同じ行に置く"
+   :reps 5
+   :rows
+   [{:n 100  :depth 4  :datoms 309  :rows-plain 100 :rows-onto 100
+     :materialize-ms 2.50 :q-plain-ms 1.01 :q-onto-ms 17.53 :onto-share 0.8246}
+    {:n 100  :depth 16 :datoms 345  :rows-plain 100 :rows-onto 100
+     :materialize-ms 2.61 :q-plain-ms 0.85 :q-onto-ms 332.90 :onto-share 0.9897}
+    {:n 1000 :depth 4  :datoms 3009 :rows-plain 1000 :rows-onto 1000
+     :materialize-ms 21.77 :q-plain-ms 5.60 :q-onto-ms 144.33 :onto-share 0.8352}
+    {:n 1000 :depth 16 :datoms 3045 :rows-plain 1000 :rows-onto 1000
+     :materialize-ms 19.74 :q-plain-ms 5.12 :q-onto-ms 3542.79 :onto-share 0.9930}]
+   :finding "rules を持たない query では materialize が支配項（n=1000 で 19.7 対 5.1、79%）。hierarchy-rules を depth 16 で載せると **request の 99% が query 側**になり、支配項が入れ替わる"
+   :control {:shape "class を entity id ではなく document key で参照した同じ graph"
+             :depth 4
+             :owl-type-returned 1
+             :expected 4
+             :says "エラーにも 0 にもならず、assert された 1 件だけを返して止まる。もっともらしい答えであって誤り"}
+   :discriminates "rows-plain と rows-onto が一致する。最初に書いた版はこの列が無く、rows-onto=0 の空 query を 40 ms と報告していた"}
+
+  {:bench "90-docs/query-plane/bench_ipq_latency.cljs"
+   :question "有界 selection の wire コスト"
+   :reps 15
+   :origin "https://ipfs.kotobase.net"
+   :rows
+   [{:selection "matcher" :status 200 :blocks 1 :fetches 1 :bytes 562
+     :p50-ms 132.0 :p90-ms 162.1 :min-ms 118.8}
+    {:selection "explore-all" :status 200 :blocks 3 :fetches 3 :bytes 1148
+     :p50-ms 353.0 :p90-ms 366.4 :min-ms 331.9}
+    {:selection "control: root not held" :status 404 :bytes 96
+     :p50-ms 121.9 :p90-ms 139.6 :min-ms 106.0}
+    {:selection "control: bad selector" :status 400 :bytes 89
+     :p50-ms 14.2 :p90-ms 16.2 :min-ms 11.3}]
+   :finding "block 1 本あたり fetch 1 本。3 block で約 110 ms/block 増える。形が壊れた selector は store に触る前に 14 ms で拒否され、root を持たない場合は lookup 分（122 ms）を払う"
+   :implication "ADR-2608160100 の CARv2 pack が効く場所はここ —— 3 fetch を 1 range read に畳む"
+   :not-derivable "block 数 2 点は曲線ではない。per-block コストをこの表から外挿しない。fetches 列が機構としての 1:1 を示すだけ"}]
+
+ :not-measured
+ ["workerd 上の値。ここは nbb / Node 26"
+  "triple-rules の実行コスト（admission が拒否するので測っていない。拒否される経路の速度は決定に効かない）"
+  "ontology 編集時の closure 再構築コスト"
+  "深さ 16 を超える階層、および分岐のある（chain でない）階層"
+  "materialize-memo を効かせた場合の share（memo hit なら materialize 項は消え、ontology の割合はさらに上がる方向）"]}

@@ -1,0 +1,94 @@
+;; What a bounded selection costs over the wire.
+;;
+;; ADR-2609109700 D6 records that IPQ/1 is live and that its role is
+;; GraphSync's. It records no latency. This measures the transfer half against
+;; the deployed origin: the same two selectors the evidence file names, run
+;; REPS times each, reported as p50 and p90 rather than a mean, because one
+;; scheduling stall in a public network path moves a mean and not a median.
+;;
+;; A refusal is timed alongside on purpose. If a 404 cost the same as a 200
+;; the server would be doing the work before deciding, and a caller could
+;; probe the store for free -- which is the shape ADR-2609108000 spent a day
+;; measuring one layer up.
+;;
+;; ## What this CANNOT tell you
+;;
+;; Two block counts, 1 and 3, is not a curve. No per-block cost is derived
+;; here and none should be read out of it: the difference between the two rows
+;; is one number about one pair of traversals on one day, and TLS setup,
+;; colocation and cache state are all inside it.
+;;
+;;   nbb 90-docs/query-plane/bench_ipq_latency.cljs
+
+(ns bench-ipq-latency
+  (:require ["os" :as os]))
+
+(def origin "https://ipfs.kotobase.net")
+(def indexer "https://ipni.kotobase.net")
+(def reps 15)
+
+(def matcher "oWEuoA")
+(def explore-all "oWFhoWE-oWEuoA")
+(def absent-root (str "bafyreia" (apply str (repeat 51 "a"))))
+
+(defn- percentile [xs p]
+  (let [v (vec (sort xs))]
+    (nth v (min (dec (count v))
+                (js/Math.floor (* p (count v)))))))
+
+(defn- one [url]
+  (let [t0 (js/performance.now)]
+    (-> (js/fetch url)
+        (.then (fn [r] (-> (.arrayBuffer r)
+                           (.then (fn [buf]
+                                    {:ms (- (js/performance.now) t0)
+                                     :status (.-status r)
+                                     :bytes (.-byteLength buf)
+                                     :blocks (.get (.-headers r) "x-ipq-blocks")
+                                     :fetches (.get (.-headers r) "x-ipq-fetches")}))))))))
+
+(defn- serial
+  "Sequential on purpose: parallel requests would measure this machine's
+  socket scheduling as much as the origin's."
+  [url n acc]
+  (if (zero? n)
+    (js/Promise.resolve acc)
+    (-> (one url) (.then (fn [r] (serial url (dec n) (conj acc r)))))))
+
+(defn- fmt [x] (.toFixed x 1))
+
+(defn- report [label url]
+  (-> (serial url reps [])
+      (.then (fn [rs]
+               (let [ms (map :ms rs)
+                     f (first rs)]
+                 (println (str (.padEnd label 26)
+                               (.padStart (str (:status f)) 6)
+                               (.padStart (str (or (:blocks f) "-")) 8)
+                               (.padStart (str (or (:fetches f) "-")) 8)
+                               (.padStart (str (:bytes f)) 11)
+                               (.padStart (fmt (percentile ms 0.5)) 9)
+                               (.padStart (fmt (percentile ms 0.9)) 9)
+                               (.padStart (fmt (apply min ms)) 9)))))))) 
+
+(println (str "load " (pr-str (mapv #(.toFixed % 2) (os/loadavg)))
+              "  reps " reps "  origin " origin))
+(println)
+(println "selection                 status  blocks fetches      bytes      p50      p90      min")
+
+(-> (js/fetch (str indexer "/ipni/v1/head"))
+    (.then (fn [r] (.json r)))
+    (.then (fn [j]
+             (let [root (get-in (js->clj j) ["head" "/"])]
+               (-> (report "matcher (1 block)" (str origin "/ipq/v1/selection/" root "?selector=" matcher))
+                   (.then #(report "explore-all (3 blocks)" (str origin "/ipq/v1/selection/" root "?selector=" explore-all)))
+                   (.then #(report "control: root not held" (str origin "/ipq/v1/selection/" absent-root "?selector=" matcher)))
+                   (.then #(report "control: bad selector" (str origin "/ipq/v1/selection/" root "?selector=zzzz")))
+                   (.then (fn [_]
+                            (println)
+                            (println "A refusal that costs as much as an answer means the work happened")
+                            (println "before the decision. Read the two control rows against the first two.")
+                            (println "Two block counts are not a curve. What licenses reading the second")
+                            (println "row as three round trips is the fetches column, which is a mechanism")
+                            (println "rather than a correlation -- one fetch per block, no packing.")))))))
+    (.catch (fn [e] (println "PROBE FAILED" (str e)))))

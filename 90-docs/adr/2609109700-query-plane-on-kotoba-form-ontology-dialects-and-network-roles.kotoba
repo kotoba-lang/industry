@@ -9,7 +9,8 @@
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/ayatori" "kotoba-lang/kotobase"
                 "kotoba-lang/kotobase-server" "kotoba-lang/datalog" "kotoba-lang/org-w3-owl2"
                 "kotoba-lang/io-ipld" "kotoba-lang/kotobase-protocol-ipq"))
-  (:adr/related (vector "adr-2609109400-kotoba-form-dag-kotoba-and-what-guest-and-host-actually-name"
+  (:adr/related (vector "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
+                "adr-2609109400-kotoba-form-dag-kotoba-and-what-guest-and-host-actually-name"
                 "adr-2609107000-everything-is-a-form-arranged-against-what-runs"
                 "adr-2609101300-kotoba-adl-notation"
                 "adr-2609101837-corpus-cid-plane-and-ontology-admitted-inference"
@@ -249,6 +250,23 @@ keyword vocabulary で書くか IRI vocabulary で書くかで CID が変わる�
   作るなら engine の中の話であり、ここでは作らない。
 
 **「証拠が在る」と「どの行がどの規則から出たかが言える」は 2 つの主張である。**
+
+### D3 と D4 の続き —— どちらの扉を使うかは 2026-09-10 に測った
+
+この ADR は扉を 2 つに固定したが、**どちらを使うかは書かなかった。**
+ADR-2609109800 がそれを測っている。要点だけ:
+
+- **既定は扉 (b)**（closure を書き込む）。扉 (a) は 11〜618 倍遅く、crossover は
+  1 query 未満 —— 最初の 1 回の query が終わる前に closure の構築は元が取れる。
+- **扉 (a) の値は速度ではなく再現性**（ontology が `:query/digest` の中に居る）。
+  選ぶ理由は ①ontology が変わる ②一度しか訊かない ③浅い ④書き込めない、のどれか。
+- **コストは深さに対して概ね二乗。** ontology の設計変数は語彙の大きさではなく
+  **連鎖の深さ**である。
+- **D4 の「admitted」は「cheap」ではない**（admission 自身がそう言っている）。
+  admission のコストは 2 桁下で無視してよいが、通った query が安いわけではない。
+- ⚠ **`bridge/materialize` の上では、document を key で参照した値は
+  その document の entity に join しない。** エラーにも 0 にもならず、
+  assert された分だけを返して止まる。ADR-2609109800 P6。
 
 ## 作らないもの
 
