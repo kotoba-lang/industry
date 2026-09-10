@@ -366,5 +366,62 @@ profile / 実 prolly snapshot の形 / blind-fn）に差がある。
 ⚠ **`blind-fn` は本番では実 crypto（HMAC 系）でローカル対照では恒等だった。**
 最初に疑うべきはそこ —— この対照が作った差そのものである。
 
+## 300 CPU 秒でも fold は完了しない —— 予算の問題ではない（2026-09-10、実測）
+
+上の「次の一手」を順に実行した結果を、成功したものと失敗したものの両方で記録する。
+
+### 実装して着地したもの（すべてテスト付き・discriminate 確認済み）
+
+| repo | sha | |
+|---|---|---|
+| kotobase-peer | `5e60546b` / `3845b868` | fold と read の novelty **構造** walk に `async-get-fn` を通す |
+| kotobase-server | `925760bf` | `do-fold` の `nil nil` → `:rows-cache-*`（snapshot-cid keyed） |
+| control-plane | `92c3a302` | `write-store-extras` が `:rows-cache-*` を供給 |
+| control-plane | `641d2135` | その memo を Cache API → **object store**（global）へ |
+| control-plane | `92cd617f` / `f9c4dee7` / `d2fbcf0b` | probe 3 種（store 呼び出し / handler 再実行 / novelty size） |
+
+### 効かなかったもの、その順に
+
+1. **memo の配線**（`do-fold` に slots を渡す）→ fold 4 回とも復号 1,665、32,000ms CPU で死ぬ。
+2. **memo を global store へ**（colo スコープ仮説の排除）→ fold 3 回とも同じ。
+   ⚠ **この実験は設計上どちらに転んでも決定的だった** —— global で当たらない以上、
+   残る候補は「hydrate が完走していない」だけになる。
+3. **`cpu_ms` を 300,000（上限）に上げた保守ウィンドウ + 無界 fold**
+   → **330 秒 client timeout まで応答せず、novelty は 820 のまま。**
+   `cpu_ms` は即座に 30,000 へ戻し、独立した GET で確認済み。
+
+### したがって
+
+**この graph の fold は、Worker に許される最大 CPU（300 秒）でも終わらない。**
+「予算のすぐ外側」ではない。820 entry と ~2,500 行規模の再構築が 300 CPU 秒を
+超えるということは、**どこかが superlinear で、その場所はまだ測っていない。**
+probe は store 呼び出しの外側までしか届かず、fold の hydrate 後の仕事
+（novelty 適用 / `qs/commit!` の tree 再構築）の中は見えない。
+
+⚠ **推論は 5 回してすべて外れた**（chain walk の長さ / trampoline の再実行 /
+AES-GCM / snapshot 側 / 予算のすぐ外側）。次は測ってから動く。
+
+### 残っている道は 3 つで、どれも小さくない
+
+1. **Worker の外で畳む。** graph は content-addressed なので、鍵を持つどのプロセスでも
+   畳んで head を publish できる。⚠ **今日は実行できない** —— `KOTOBA_SEED` を含む
+   4 つの secret は Worker の write-only binding で読めず、テナントのデータ暗号鍵を
+   持ち出すのは別種の判断である。
+2. **fold を再開可能にする。** hydrate を chunk 単位で memo に書き、次の invocation が
+   途中から始まる。`max_novelty` が本来与えるはずだった「毎回必ず前進する」を、
+   bound が覆っていない hydrate 側にも与える。
+3. **fold の内側を測る。** `qs/commit!` と novelty 適用に phase timer。**2 を実装する前に
+   これをやる** —— 300 秒を超える理由が分かっていないのに再開可能にしても、
+   再開の回数が分からない。
+
+### read 側は別の話で、そちらは道が見えている
+
+read の支配項は未 fold novelty **820** で、snapshot 側は既に O(result)
+（`limit 1` に 4 gets / 1 decrypt、snapshot が 4 倍でも不変。ayatori
+`bench/coscientist-iteration-09.edn`）。`:limit` では縛れない（後の entry が前の行を
+retract しうるので全 retraction が要る）が、**tx block に retract の要約を持たせれば
+縛れる** —— block は既に subject token を持っているので、同じ形で足せる。
+fold が直らなくても read はこれで軽くなる。
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
