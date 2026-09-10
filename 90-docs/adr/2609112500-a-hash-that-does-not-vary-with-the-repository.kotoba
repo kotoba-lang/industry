@@ -1,0 +1,101 @@
+(vector
+ (map
+  (:adr/id "adr-2609112500-a-hash-that-does-not-vary-with-the-repository")
+  (:adr/title "A hash that does not vary with the repository")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112300-a-generator-written-to-stop-a-class-stopped-one-instance"))
+  (:adr/body "
+## What this iteration did
+
+Regenerated oracle-handlers from each repository's own root spec, the same
+treatment oracle-filters got in the previous iteration. Twelve components
+landed, verified against their own compiled aarch64 artifact.
+
+## The defect
+
+Selector 6 is the update-SUCCESS arm. Selector 7 is already its 404 case,
+and selector 13 hashes a field the update is supposed to have written --
+so 6 was always meant to be the 200.
+
+It updated with a field named jurisdiction. No entity in this cohort
+declares that except com-aadhaar's, INCLUDING the template's own Part,
+whose fields are partNumber, name, revision and material. An unknown field
+is rejected, so selector 6 measured 400 everywhere and the 200 path was
+never exercised in any repository.
+
+Selector 13 then hashed a field the rejected body does not carry.
+
+## The tell, and the sentinel
+
+Selector 13 read 7 in com-agones and 7 in com-airtable, while selector 14
+read 298858833 and 515051998 in the same two. A hash that does not vary
+with the repository is hashing a constant -- here the empty string, which
+is what field returns for a key the body does not have.
+
+That 7 is worth naming. It is the value this selector reads whenever the
+field name is wrong, which is exactly the defect class. So the floor for
+the regenerated block is: selector 6 is 200, and selector 13 is not 7.
+
+## Reproduce
+
+    nbb scripts/gen-whole-component.cljs <template> <worktree> <src-dir>
+    amu compile src/<src>/whole_component.kotoba --target aarch64-macos
+      --policy policy.edn --output wc.o
+    amu extract-native wc.o --symbol oracle-handlers --output h.bin
+    for s in 6 13; do
+      KEXE_FUEL=100000000 ./kexe-loader h.bin <offset> 1 aarch64 <caps> $s
+    done
+
+    before   sel 6 = 400   sel 13 = 7
+    after    sel 6 = 200   sel 13 = a hash of the value written
+
+## Nothing was traded away
+
+The rejection arm stays covered. reject-unknown is ONE function, and
+handle-create calls it with the same (fields-of entity); selector 2
+already feeds it an unknown key. Making 6 succeed does not remove
+coverage of rejection, it restores coverage of success.
+
+## Seen red
+
+Putting a foreign field name back into the regenerated block returns
+selector 6 to 400 and selector 13 to 7 -- the exact signature every one of
+these components shipped with.
+
+## A control of mine that was wrong
+
+The first control asked whether selector 13 now varies between
+repositories, on the reasoning that a constant hash was the tell. It does
+not vary: com-agones and com-abb-robotics both read 727477728, because 13
+hashes the VALUE written and that value is a literal chosen in the
+generator.
+
+The control was mis-specified, not the fix. The discriminating property is
+7 against not-7, not per-repo variation: if the generator emitted a field
+name the entity does not declare, the update would reject and 13 would
+drop back to 7. Recorded because the number looked like the symptom it was
+supposed to rule out, and reading it that way would have condemned a
+correct change.
+
+## Not fixed, named
+
+com-abb-robotics is the generator's template and its component is NOT a
+fixed point of the generator -- the unpatched control leaves 15 added and
+4 removed lines, so it carries hand edits and was not machine rewritten.
+Its own selector 6 still measures 400. Since the block is now generated
+rather than copied, that text no longer propagates to anything.
+
+The other repositories skipped in the previous iteration are skipped here
+for the same named reasons: com-aftership, com-adyen and com-airtable
+declare no refs on any spec so the generator refuses them outright, and
+com-airbus-analytx is hand adapted.
+
+## What is still refused
+
+The three hash-valued selectors of oracle-store. The pagination layer,
+read but not yet generated. The harness does not yet compare the handler
+layer at all -- this iteration fixed what the component's own oracle
+measures, which is the precondition for generating that comparison, not
+the comparison itself.
+")))
