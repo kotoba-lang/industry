@@ -858,6 +858,61 @@
               what an empty scan and an unreadable candidate return, so a run that
               could not answer never returns the value a clean run returns."}
 
+  {:id       :verify-printed-value-identity
+   :title    "a durable identity computed over a PRINTED value, where the address then depends on printer behaviour"
+   :why      "ADR-2609107000 decision 1 says each plane keeps its own envelope and puts
+              the VALUES through one value model, and that ADR says of itself that
+              nothing checks it. This is the half that breaks most cheaply. The failure
+              is on the record: ADR-2609076000 states that DefCID payload v1 `hashed
+              (pr-str canonical-edn) while labelling the CID dag-cbor, which was wrong
+              on both halves`. Addressing a printed value makes identity depend on the
+              printer -- map order (a Clojure map switches from array-map to hash-map
+              past eight entries, measured in this workspace on css.core/declarations),
+              float spelling, i64 past 2^53 under JS, and keyword-vs-string, which is
+              the single ambiguity ipld.value exists to close. None of that throws: the
+              value prints, the digest computes, the CID returns, and the only
+              difference is that one value now has two addresses -- which makes no
+              sound until something reads it back.
+              This is a SHAPE, not a verdict. Hashing printed text is correct when the
+              TEXT is the artifact (a source file, a log line, a document a person
+              reads). It is wrong only when the VALUE is the artifact, so the finding
+              says `measure which one this is`.
+              This CANNOT be a fleet gate: it reads orgs/, which a gate never ships."
+   :argv     ["nbb" "{{repo}}/scripts/verify-printed-value-identity.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- identity code changes rarely, and a
+                                         ; finding here is never urgent within a day
+   :timeout-ms  1800000                  ; 30m -- the first full sweep took about 6
+   :writes   :none
+   :measured "First full sweep 2026-09-10: SCANNED 27,823 source files under checked-out
+              orgs/, FINDINGS 64 across 33 repositories, all of them rule A. Five drawn
+              at random were opened and all five were the shape: akashi/cid.cljc
+              addresses a Datom log over `(cid (pr-str v))` and its own docstring
+              asserts `pr-str is deterministic for the EDN shapes the Datom log uses`;
+              aratame/ledger.cljc digests each entry of a hash-CHAINED ledger as
+              `(digest-fn (pr-str body))`; kotoba/codebase_effects.clj computes a
+              policy-cid over a printed map and defends itself with `(into (sorted-map)
+              ...)`, which is the mitigation that shows the hazard is real and only
+              covers the top level; murakumo/overlay/dial.clj digests a wire frame the
+              same way; eigyo-list hashes a printed vector of ids.
+              Rule B (print then address within one threading form) reports ZERO across
+              those 27,823 files, and that number is the point: written first as a
+              400-character window it reported 22, and every one of them was an
+              artifact of the window -- mail_relay/seal.cljs seals `(pr-str payload)`,
+              where the printed text IS the artifact, and an unrelated
+              `plaintext-digest` three lines up fell inside the window. Rewritten to
+              read the threading STEPS it reports none here while still firing on its
+              own fixture, which is what keeps a rule that never fires distinguishable
+              from a rule that stopped working.
+              Two false-positive classes were closed while writing it, and the second
+              was a real bug: the detector reported four hits in its own docstrings,
+              because a Clojure CHARACTER LITERAL -- the `\\\"` in `(= c \\\")` -- was read as
+              the start of a string, inverting the scanner's state for the rest of the
+              file. verify-codec-seq-expansion's splitter, which this one was copied
+              from, has the same hazard."}
+
   {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
    :why      "2026-08-18/19: one NUL byte makes file(1) classify a source file as
