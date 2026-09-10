@@ -84,6 +84,11 @@
                           (= c \") (recur (inc i) depth start false in-cmt? false out)
                           :else    (recur (inc i) depth start true in-cmt? false out))
           in-cmt?   (recur (inc i) depth start false (not= c \newline) false out)
+          ;; 文字リテラル。`\"` を「文字列の開始」と読むと、そこから状態が反転して
+          ;; 以降のファイル全部が逆になる。実測 2026-09-10、`(= c \")` を含む 2 form の
+          ;; 入力で、この関数は form を 2 個ではなく **1 個** と数えていた —— 呼び出し側
+          ;; から見ると findings が静かに減る。`\)` を数えないためにも、ここで飛ばす。
+          (= c \\)  (recur (+ i 2) depth start false false false out)
           (= c \;)  (recur (inc i) depth start false true false out)
           (= c \")  (recur (inc i) depth start true false false out)
           (= c \()  (recur (inc i) (inc depth) (if (zero? depth) i start) false false false out)
@@ -143,14 +148,39 @@
        (not (has-indexed-path? form))
        (boolean (some #(<= 2 (call-count form %)) helpers))))
 
+(defn blank-strings
+  "文字列リテラルと行コメントの中身を、長さと改行を保ったまま空白に置き換える。
+
+   これが無いと、**検出器は自分の docstring と自分の fixture を検出する** ——
+   実測 2026-09-10、このファイル自身が 2 件（`known-bad-a` と、splitter の
+   fixture）を報告していた。位置を保つのは行番号をずらさないため。"
+  [src]
+  (let [n (count src)]
+    (loop [i 0 in-str? false in-cmt? false esc? false out (vec src)]
+      (if (>= i n)
+        (apply str out)
+        (let [c (nth src i)
+              blank (fn [v] (if (= c \newline) v (assoc v i \space)))]
+          (cond
+            esc?     (recur (inc i) in-str? in-cmt? false (blank out))
+            in-str?  (cond (= c \\) (recur (inc i) true in-cmt? true (blank out))
+                           (= c \") (recur (inc i) false in-cmt? false out)
+                           :else    (recur (inc i) true in-cmt? false (blank out)))
+            in-cmt?  (recur (inc i) false (not= c \newline) false (blank out))
+            (= c \\) (recur (+ i 2) false false false out)
+            (= c \;) (recur (inc i) false true false (blank out))
+            (= c \") (recur (inc i) true false false out)
+            :else    (recur (inc i) false false false out)))))))
+
 (defn findings-in
   "1 ファイルの該当。`{:rule :a|:b :line n}` の列。"
   [src]
-  (let [helpers (materialising-helpers src)]
-    (loop [forms (top-level-forms src) pos 0 out []]
+  (let [blanked (blank-strings src)
+        helpers (materialising-helpers blanked)]
+    (loop [forms (top-level-forms blanked) pos 0 out []]
       (if-let [form (first forms)]
-        (let [at (str/index-of src form pos)
-              line (inc (count (re-seq #"\n" (subs src 0 (or at 0)))))
+        (let [at (str/index-of blanked form pos)
+              line (inc (count (re-seq #"\n" (subs blanked 0 (or at 0)))))
               out (cond-> out
                     (expand-then-regroup? form)        (conj {:rule :expand-then-regroup :line line})
                     (materialise-to-compare? helpers form) (conj {:rule :materialise-to-compare :line line}))]
@@ -180,6 +210,15 @@
        (when-not (= (byte-vector bytes) (byte-vector canonical))
          (throw (ex-info \"not canonical\" {})))))")
 
+(def known-good-with-char-literal
+  "正しい形だが、**文字リテラル `\\\"` を含む**。splitter がこれを文字列の開始と
+   読むと、続く form が丸ごと飲み込まれて検出が静かに止まる。ここでは 2 つの
+   top-level form に割れることを self-check が要求する。"
+  "(defn scan [c] (if (= c \\\") 1 2))
+   (defn encode [bytes]
+     (let [bits (mapcat (fn [b] [b]) (seq bytes))]
+       (->> bits (partition 5 5 nil) (apply str))))")
+
 (def known-good
   "置き換えた後の形。どちらの規則にも当たらない。"
   "(defn encode [bytes]
@@ -194,11 +233,17 @@
   []
   (let [a (findings-in known-bad-a)
         b (findings-in known-bad-b)
-        g (findings-in known-good)]
+        g (findings-in known-good)
+        ;; 文字リテラルで splitter の状態が反転すると、この 2 form の入力は 1 form に
+        ;; なり、2 つ目に置いた既知の不良が見えなくなる。見えることを要求する。
+        cl (findings-in known-good-with-char-literal)
+        forms (count (top-level-forms known-good-with-char-literal))]
     (when (and (some #(= :expand-then-regroup (:rule %)) a)
                (some #(= :materialise-to-compare (:rule %)) b)
-               (empty? g))
-      {:bad-a (count a) :bad-b (count b) :good (count g)})))
+               (empty? g)
+               (= 2 forms)
+               (some #(= :expand-then-regroup (:rule %)) cl))
+      {:bad-a (count a) :bad-b (count b) :good (count g) :char-literal-forms forms})))
 
 ;; ── 走査 ──────────────────────────────────────────────────────────────────
 

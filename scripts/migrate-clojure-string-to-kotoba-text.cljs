@@ -173,6 +173,13 @@
             esc?    (recur (inc i) (conj out \space) in-str? false false)
             (and in-str? (= c \\)) (recur (inc i) (conj out \space) true true false)
             in-str? (recur (inc i) (conj out (if (= c \") c \space)) (not= c \") false false)
+            ;; 文字リテラル。`\"` を文字列の開始と読むと、そこから code と string が
+            ;; 入れ替わり、**この関数が守っている境界そのものが反転する** —— 実測
+            ;; 2026-09-10、`(= c \")` を含む入力では続く `\"TAIL\"` が blank されずに
+            ;; code として残った。長さを保つため 2 文字とも出す。
+            (= c \\) (recur (+ i 2)
+                            (if (< (inc i) n) (conj out c (nth src (inc i))) (conj out c))
+                            false false false)
             (= c \") (recur (inc i) (conj out c) true false false)
             (= c \;) (recur (inc i) (conj out \space) false false true)
             :else (recur (inc i) (conj out c) false false false)))))))
