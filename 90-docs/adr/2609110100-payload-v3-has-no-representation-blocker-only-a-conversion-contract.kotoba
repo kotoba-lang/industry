@@ -1,0 +1,101 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110100-payload-v3-has-no-representation-blocker-only-a-conversion-contract")
+  (:adr/topic "gap-02-payload-v3-tag-coverage")
+  (:adr/title "Payload v3 has no representation blocker: all twelve normalize tags round-trip through kotoba.value.v1")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/osaho" "kotoba-lang/io-ipld"))
+  (:adr/related (vector "adr-2609076000-kir-is-an-ipld-codec-schema-and-adl"))
+  (:adr/body
+  "## Context
+
+ADR-2609076000 decision 1 put io-ipld into osaho as a TEST-ONLY dependency and
+made promotion to :deps the payload v3 decision. The cost side was already
+measured: all ten frozen vectors disagree with kotoba.value.v1 along three
+dimensions (tag alphabet, integer representation, map ordering).
+
+The half that had not been measured is whether v3 is POSSIBLE. If any tag that
+osaho's normalize emits has no representation in kotoba.value.v1, then v3 is
+not a decision at all -- it waits on an io-ipld extension, and that extension is
+a blocker with a name.
+
+## Measurement
+
+The twelve tags are read off osaho's kotoba.kir.definition-identity/normalize
+on origin/main rather than from memory: nil bool int str kw sym bytes f64 map
+set vec list.
+
+Reading io-ipld's code table and counting thirteen codes (0-7, 9, 16-19, where 8
+is link) is a WEAKER claim than it appears. A code can exist while its encoder
+rejects the shape osaho actually produces, and osaho does not produce bare
+numbers -- it renders integers and floats as decimal STRINGS inside its
+normalize output. So the measurement round-trips a representative value per tag
+through kotoba.value.codec/encode-value and decode-value.
+
+Reproduce from origin/main worktrees, not the shared checkouts:
+
+    git -C orgs/kotoba-lang/osaho    worktree add --detach WT origin/main
+    git -C orgs/kotoba-lang/io-ipld  worktree add --detach WT kotoba-lang/main
+
+The second remote is NOT called origin. west checkouts name the remote after
+the org, so `origin/main` does not resolve in io-ipld and the worktree add
+fails with `invalid reference`. Run the probe from the io-ipld worktree:
+
+    nbb --classpath src:io-multiformats/src:text/src:org-ietf-cbor/src:org-nist-sha2/src \\
+        gap02-tag-coverage.cljs
+
+Five repositories are needed on the classpath and only one of them (text) is
+named in io-ipld's nbb.edn; the rest surface one at a time as
+`Could not find namespace`.
+
+## Result: thirteen of thirteen, with four discriminating controls
+
+Every tag round-trips, including the i64 wrapper carrying a value beyond the
+JavaScript safe-integer range. Four controls are rejected, each for a DIFFERENT
+named reason -- :value/unwrapped-number, :value/record-unsupported,
+:value/float-nan, :value/int64-not-an-exact-integer -- so the probe is not one
+that passes everything put in front of it.
+
+**There is no representation blocker. Payload v3 is possible.**
+
+What v3 costs is therefore a CONVERSION CONTRACT, not an upstream extension.
+The three known differences stay exactly as measured, and each is now known to
+be a mapping rather than a gap: osaho's twelve lowercase string tags against
+v1's numeric codes; osaho's decimal-string numbers against v1's required Int64
+and Float64 wrapper records; and the two map orderings. v1 also carries one code
+osaho's normalize never emits -- link, code 8 -- so in that direction v1 is a
+superset.
+
+## The first run reported a false blocker, and the shape of that error matters
+
+The first version of this probe passed a bare 1.5 and reported
+`f64 REJECTED :value/unwrapped-number`, which reads exactly like the named
+blocker this measurement was looking for. It is not one. The codec's own
+rejection carries the hint `wrap a float with ipld.value/float64` -- the
+rejection was of the probe's shape, not of the tag.
+
+This is the failure this workspace already names: the red that comes from
+breaking it the wrong way looks like a successful demonstration. It was caught
+only because the reason literal was printed next to the verdict and turned out
+to be the SAME literal the NaN control produced -- two rows that should have
+failed for different reasons failing for the same one. A probe that had recorded
+only pass and fail would have shipped the false blocker.
+
+The bare float is therefore kept as a CONTROL rather than deleted, so the
+wrapper is what discriminates, and the mistake cannot quietly return.
+
+A second probe bug was found the same way: the cases were built eagerly, so a
+constructor rejection escaped the try and killed the whole run instead of being
+recorded as one row. Cases are thunks now.
+
+## Consequences and what is next
+
+- v3 is a decision about conversion and blast radius, not about capability.
+  Nothing is waiting on io-ipld.
+- The unmeasured half of gap 02 remains: the blast radius of a moving DefCID --
+  how many DefCIDs are baked into locks, manifests and cache keys. That count,
+  not representability, is what decides whether v3 is affordable.
+- This ADR does not promote io-ipld to :deps. It removes one candidate reason
+  for not doing so.")))
