@@ -27,9 +27,9 @@
   ;; failure this file exists to make visible.
   :matrix/cells-measured 6
   :matrix/cells-implemented 2
-  :matrix/cells-measured-residue 1
+  :matrix/cells-measured-residue 2
   :matrix/cells-gap 3
-  :matrix/cells-unmeasured-here 1
+  :matrix/cells-unmeasured-here 0
   :matrix/cells-unrecorded 65
   :matrix/note "68 unrecorded cells are UNMEASURED, not clean. Absence of a cell is absence of a measurement."}
 
@@ -97,7 +97,9 @@
  {:db/id -9 :cell/plane "agent" :cell/stride "elevation-of-privilege"
   :cell/linddun "non-compliance" :cell/status :gap :source/dataset "privacy-plane"
   :cell/evidence "orgs/kotoba-lang/ayatori src/ayatori/agent.cljc"
-  :cell/finding "ayatori.agent/validate is the entry an LLM writes through and it is real. Nothing mechanically enforces that passing validation is not authorisation -- the pipeline generate/parse/schema-validate/static-effects/authority-check/risk-classify/admission/execute is stated in policy, not checked."}
+  :cell/finding "Measured 2026-09-10 by running it. validate refuses 22 of 30 probes across 11 literals and allows 8; blinding the unknown-attribute branch flips 7 to allowed, blinding entity-position flips 2, and blinding the :where walk flips 25 to :unbound-find-var rather than to allowed, so that check is a backstop. 0 of the 11 literals mention authority, permission, visibility, principal or tenant, and neither does the arity: a third argument naming a principal is accepted and silently discarded while the query stays allowed, where omitting the schema fails closed. A validated query does reach execution with nothing between: the same query reading a sensitive attribute returns 2 rows under the visible? the workspace query adapter actually passes -- manifest/edn_query_datalog.cljs line 112, (constantly true), the single such call site outside docstrings -- and 0 rows under a visible? that denies it, so the seam works and the adapter holds it open. Of 17 files referencing the namespace, 2 are real non-test consumers, both benchmarks, and 0 of 2 perform an authority check between validation and execution. Stages 4 through 7 of the stated pipeline have no code in this tree: there is nothing to enforce because nothing was written."
+  :cell/evidence-harness "orgs/kotoba-lang/ayatori scripts/measure-agent-validate.cljs + scripts/measure-agent-execution-reach.cljs, pin d6f343139c69"
+  :cell/not-measured "no model was called: whether an LLM in practice writes queries that pass validate and read what it should not is unmeasured; only that nothing would stop it"}
 
  {:db/id -10 :cell/plane "kotoba" :cell/stride "tampering"
   :cell/linddun "non-compliance" :cell/status :gap :source/dataset "privacy-plane"
@@ -105,6 +107,8 @@
   :cell/finding "Ed25519 publisher attestation binds marker, sealed provenance, artifact identity and target, and its own docstring says it does not replace output admission. Dual-compiler agreement and independent rebuild are absent, so a compromised compiler is attested rather than detected."}
 
  {:db/id -11 :cell/plane "key" :cell/stride "information-disclosure"
-  :cell/linddun "data-disclosure" :cell/status :unmeasured-here :source/dataset "privacy-plane"
-  :cell/evidence "orgs/kotoba-lang/kotobase src/kotobase/disclosure_grant.cljc"
-  :cell/finding "Recipient-bound key delivery with authority windows and epochs exists, and its docstring states the right non-claim: a delivery receipt means authorised envelope release, never human reading, successful decryption, or absence of out-of-band copies. Its repo tests are not this measurement, so the cell is recorded as not measured HERE rather than as passing."}]
+  :cell/linddun "data-disclosure" :cell/status :measured-residue :source/dataset "privacy-plane"
+  :cell/evidence "orgs/kotoba-lang/kotobase scripts/measure-disclosure-grant.cljs, pin faa5cc00419c"
+  :cell/finding "Measured 2026-09-10 by RUNNING it: 94 probes over release! and delivery-verification, each asserting the reason literal; 94 matched prediction, 7 released, 87 refused across 19 distinct refusal literals. The expiry boundary sits where the source says (now == expires-at refuses :request-expired, one unit earlier releases, now == not-before releases) and mutating before? from < to <= flips exactly those probes. A wrong recipient is refused for the reason it names: dropping the single recipient equality releases exactly 2 probes and no others. No port shape is permission -- 36 probes of nil, integer, map, keyword, non-callable and outright dissoc release 0, and a port answering anything not literally true releases 0 of 15. A refusal before release writes nothing."
+  :cell/residue "delivery-verification hardwires (constantly true) as its nonce ledger, so the recipient side verifies the same delivery twice with no distinction; its one non-test consumer, ayatori.disclosure/decryptor, re-reads context and refuses :authority-changed on an epoch shift but adds no ledger. Separately, :authority-epoch-revoked is unreachable from this entry -- every epoch disagreement is caught earlier by equality as :scope-mismatch or :request-mismatch, and removing those two comparisons is what makes the literal appear, on 5 probes."
+  :cell/not-measured "no real cryptography (verify!/sign! are string-equality fixtures); HPKE AAD binding; the JVM path; whether any caller wraps delivery-verification with its own nonce ledger (the one that exists does not)"}]

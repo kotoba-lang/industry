@@ -42,6 +42,17 @@
     警告している当のもの）。
 
   **検証: 265 tests / 1062 assertions / 0 failures**（変更前 258 / 1035 / 0）。
+
+  ⚠ **この実装には欠陥があり、2026-09-10 に Step 5 の作業中に見つかって直した。**
+  `prefix-levels` を `read-value`（1 回デコード）で読んでいたが、隣の
+  `read-vec`（prefix リスト用の既存 reader）は**2 回デコード**する。wire を通る値は
+  必ず string blob なので、**実際の transaction が運ぶ `prefix-levels` は `map?` で
+  false になり、level は黙って落ち、prefix は `:restricted` に戻り、正しく
+  clearance を持つ viewer がエラーなしで拒否されていた。**
+  **テストが緑だったのは、手で `pr-str` を 1 回だけ掛けて行を組んでいたから** ——
+  **wire が決して produce しない形を pin していた。** 修正は `read-map` として
+  peer 側に landed（policy の書式を読む場所は 1 つ）。
+  隣に 2 つの reader が在るとき、写す方を間違えると**何も音を立てない。**
   判別 4 本、いずれも名乗っている assertion に当たる:
   ①属性側の未知を下へ丸める → **既存の legacy テストが落ちる**（旧 binary が
   本当に新規則を通っている証拠）②主体側の未知を上へ丸める → 非対称テストだけ
@@ -73,7 +84,38 @@
   required 系 4 本 ③枝を abac の下へ→**順序テストだけ**。
 
   ⚠ **option を渡さない呼び出し側は今日と同じ**（`capability-required?` と同じ opt-in）。
-  申告を無条件に必須化するのは Step 4 の compile 時の仕事で、runtime flag の仕事ではない。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 未着手。**\n- **Step 5 — `kotobase-server` への security 依存追加(問題4): 未着手。ブロッカーを測った(2026-09-10)。**
+  申告を無条件に必須化するのは Step 4 の compile 時の仕事で、runtime flag の仕事ではない。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 未着手。**\n- **Step 5 — `kotobase-server` への security 依存追加(問題4): 完了(2026-09-10)。**
+  4 段 clearance が server 面に届いた。`kotobase-peer` `d7dba0972436` /
+  `kotobase-server` `ef2bc2ddba30`、west pin 両方前進済み。
+
+  **予測は外れた。** 「2026-08 と同じ `newer-version` swap で pin 前進が止まる」と
+  読んだが、**逆だった** —— floor が peer の built-against より**古く**なっており、
+  同じ 3 つの名前が同じ場所で壊れた（53 failures + 1 error、全 read が空）。
+  floor は freeze ではなく **ratchet** で、peer が名指す値まで前進させれば直る。
+  `arrangement 9c9f45d` は sparql surface が引く `9e90426` を今も dominate する
+  （ancestor 検証済み）ので 2026-08 の保護は生きている。
+
+  **security 依存は足していない。** `src/` の 1 行も `kotoba.security.*` を読まず、
+  読む必要も無い —— lattice は peer 経由で届き、宣言は peer が持つ。
+  **読む側の無い依存は何も動かさない。** 4 つ目の enforcement point も作っていない。
+
+  ⚠ **この前進の途中で、silent な欠陥が 2 件出た。**
+  ①`handler.cljc` が `(get-in db [:spo …])` を読んでいた。arrangement は index key を
+  `:eavt` 系に改名済みなので **stale な `:spo` は nil を返し、0 行を「成功として」
+  答える** —— `enforce_schema` の transaction が空の delta を永続化して `:ok` を
+  報告していた。公開アクセサ + `check-shape!` に直した。
+  ②下記 Step 2 の欠陥（`read-value` / `read-map`）。
+
+  ⚠ **床は failure 数ではなく warning 数だった** —— `arrangement 9c9f45d` が呼ぶ
+  `ds/in-range?` / `ds/scan-range` / `ds/IAsyncPatternSource` は pin された
+  `datom-source b42f6e6` に存在しないが、**182 テストは 1 本も赤くならなかった**。
+  ClojureScript は別 namespace の未宣言 var を warning にしてコールを出すので、
+  suite は `:undeclared-var` 8 件（baseline 0）のまま緑だった。nbb が実行時に
+  解決して throw したから表に出ただけである。
+
+  ⚠ **未測定の follow-up**: `security-mode` / `max-datoms-per-tx` /
+  `required-purpose` も同じ single-decode で読まれており、②と同じ理由で
+  wire から到達不能な疑いがある。**測っていないので、そう主張しない。**
 
   当初「Step 2 が問題4 を部分的に閉じたのでは」と考えたが、**測ると偽だった** ——
   `kotobase-server` は `kotobase-peer` を**古い sha (`4926d13`) に pin** しており、

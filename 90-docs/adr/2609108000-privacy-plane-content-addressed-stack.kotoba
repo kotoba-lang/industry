@@ -182,11 +182,17 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
    `:kotobase/classification-undeclared` に変える。pin `c722fb166b11`。
    判定は abac のまま（D6）。**`authorize-xrpc` にはそれまでテストが 1 本も無かった。**
 
-   **Step 5 は未着手で、ブロッカーを測った** —— `kotobase-server` は
-   `kotobase-peer` を古い sha に pin しており、その pin は
-   **2026-08-04 の実測（78/332 green → 16 failures）を根拠に意図的に凍結**されている。
-   Step 5 の実体は「security を足す」ではなく「pin を測定付きで前進させる」。
-   **読む側の無い依存を先に足さない。**
+   **Step 5 も完了（2026-09-10、subagent）** —— pin を測定付きで前進させ、
+   4 段 clearance が server 面に届いた（`kotobase-peer d7dba0972436` /
+   `kotobase-server ef2bc2ddba30`）。**security 依存は足していない** ——
+   lattice は peer 経由で届き、`src/` の 1 行も読まないから。
+   ⚠ **予測は外れた**: floor は freeze ではなく **ratchet** で、止めたのは
+   `newer-version` swap ではなく**古すぎる floor** だった。
+   ⚠ **その途中で私の Step 2 実装の欠陥が出た** —— `prefix-levels` を
+   1 回デコードで読んでおり、**wire を通る値は必ず 2 重 encode なので level が
+   黙って落ち、正しく clearance を持つ viewer が拒否されていた。**
+   テストが緑だったのは**手で組んだ行が wire の形ではなかった**から。
+   詳細は ADR-2607280100。
 
    ⚠ **4 段は「宣言できて強制される」が「配れる」ではない** ——
    `read-classified/<label>` capability を発行する経路はまだ無い。
@@ -202,7 +208,16 @@ surface は、それゆえに沈黙しているわけではない —— 組み�
    **意味的に等価な artifact を出すことを比較する harness** であって、
    依存の追加ではない。
 
-9. **matrix の残り 65 セルは埋めない。** 埋めるには 65 回測る必要があり、
+9. **matrix の弱かった 2 セルは実測に変えた（2026-09-10、subagent）** ——
+   `key` 面は `:unmeasured-here` → `:measured-residue`（94 probes / 19 の拒否理由 /
+   port 形状 36 probes で release 0。residue は nonce ledger が
+   `(constantly true)` に固定されていること）、`agent` 面は `:gap` のまま
+   **測定済みの gap** に（validate は 30 probes 中 22 を 11 の理由で拒否するが、
+   **11 のどれも authority / permission / visibility / principal / tenant を
+   名指さない**。実 consumer 2 件はどちらも bench で、**validate と execute の
+   間に authority 検査を持つものは 0 件**）。**13 / 78 セル。**
+
+10. **matrix の残り 65 セルは埋めない。** 埋めるには 65 回測る必要があり、
    測らずに埋めることは matrix そのものが防ぐために形を与えられている失敗である
    （`:matrix/note` が「セルの不在は測定の不在である」と書いている）。
    **「格子が埋まっている」ことは「脅威が無い」ことの証拠にならない** ——
