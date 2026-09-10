@@ -179,17 +179,51 @@
       (= out (str pin))       [:ok nil]
       :else                   [:broken (str "HEAD " (subs out 0 7) " ≠ pin " (subs (str pin) 0 7))])))
 
-(defn- floor-landed [abs]
+(defn- on-a-remote?
+  "HEAD を含む remote-tracking branch が 1 本でも在るかを `[:ok? … :on? …]` で返す。
+
+  `@{u}` が解決できない checkout（detached HEAD）でも「この作業は
+  失われうるか」だけは測れる。:landed 床が本当に問うているのは
+  upstream の有無ではなく、**HEAD がこの working copy にしか無いか**である。"
+  [abs]
+  (let [{:keys [ok? out err]} (git abs "branch" "-r" "--contains" "HEAD")]
+    (if ok?
+      {:ok? true :on? (not (str/blank? out))}
+      {:ok? false :err err})))
+
+(defn- floor-landed
+  "この checkout にしか無い作業が在るか。
+
+  ⚠ **detached HEAD を :unmeasured に畳まない**。旧実装は `@{u}` が解決できなければ
+  そこで止めていたが、**それは作業が無いことではなく、見ていないこと**である。
+  実測 2026-09-10、`kotoba-lang/amu`: amu-rank bot が毎 tick **detached HEAD の上に
+  commit しており**、その 5 commit（docs/codegen-coscientist.md ほか）はどの remote
+  branch にも無かった。`@{u}` は `fatal: HEAD does not point to a branch` で倒れるので
+  床は毎周 :unmeasured を返し、`fold-one` がそれを :cleared に畳んで
+  **RESOLVED（塞がった床）として報告していた**。
+
+  upstream が解決できないときは remote-tracking branch に聞く。それも
+  答えなかったときだけ :unmeasured。"
+  [abs]
   (let [dirty (git abs "status" "--porcelain" "--untracked-files=no")
         ahead (git abs "rev-list" "--count" "@{u}..HEAD")]
     (cond
       (not (:ok? dirty))               [:unmeasured (str "status を取れない: " (:err dirty))]
       (not (str/blank? (:out dirty)))  [:broken (str "未 commit " (count (str/split-lines (:out dirty))) " ファイル")]
-      ;; upstream が無い branch は「進んでいない」ではなく「測れない」。ここを ok に
-      ;; 畳むと、push されていない branch が静かに緑になる。
-      (not (:ok? ahead))               [:unmeasured (str "upstream を解決できない: " (:err ahead))]
-      (= (:out ahead) "0")             [:ok nil]
-      :else                            [:broken (str "未 push " (:out ahead) " commit")])))
+      (:ok? ahead)                     (if (= (:out ahead) "0")
+                                         [:ok nil]
+                                         [:broken (str "未 push " (:out ahead) " commit")])
+      ;; upstream が無い branch は「進んでいない」ではない。ok に畳むと
+      ;; push されていない branch が静かに緑になるが、:unmeasured に畳むと
+      ;; 今度は **実在する未着地の作業が報告から消える**。remote に聞く。
+      :else
+      (let [{:keys [ok? on? err]} (on-a-remote? abs)]
+        (cond
+          (not ok?) [:unmeasured (str "upstream も remote-tracking branch も解決できない: " err)]
+          on?       [:ok nil]
+          :else     [:broken (str "detached HEAD の commit がどの remote branch にも無い"
+                                  (let [h (git abs "rev-parse" "--short" "HEAD")]
+                                    (when (:ok? h) (str " (" (:out h) ")"))))])))))
 
 (defn- floor-readme [abs]
   (let [p (str abs "/README.md")]
@@ -281,21 +315,65 @@
   (into {} (for [[k [val d]] (:floors m) :when (= val v)] [k d])))
 
 (defn- fold-one
-  "1 体分の測定を前の行に畳み込み、[next-row events] を返す。"
+  "1 体分の測定を前の行に畳み込み、[next-row events] を返す。
+
+  ⚠ **「塞がった」と「測れなくなった」を分ける。** 旧実装の
+
+      cleared (remove (set (keys now-broken)) (keys prev-broken))
+
+  は「前は割れていて、いま割れていない床」を cleared としていた。**:unmeasured は
+  『割れていない』に含まれる**ので、床が答えるのをやめただけで RESOLVED（塞がった床）
+  として名指しで報告され、GROWTH の cleared にも数えられていた。ADR-2608136000 の
+  2 問目（実行できないとき何を返すか）の鏡 —— この file は floor 側でその規律を
+  何度も守っているのに、畳む側で捨てていた。
+
+  実測 2026-09-10、`kotoba-lang/amu`: detached HEAD で `@{u}` が倒れ :landed が
+  :unmeasured になった周に、**どの remote にも無い 5 commit を抱えたまま**
+  `RESOLVED kotoba-lang/amu landed` が出た。checkout ごと消えた repo も同じ経路で
+  全床が一斉に cleared になる。
+
+  cleared は **:ok を測れたときだけ**。broken → :unmeasured は :went-blind として
+  別に出す。`:since` は :blind 行が引き継ぐので、床が再び測れて割れていても
+  経過日数が今日にリセットされない。"
   [id prev m at]
   (let [first? (nil? prev)
         prev-broken (:broken prev {})
+        prev-blind (:blind prev {})
         now-broken (by-verdict m :broken)
         now-unmeasured (by-verdict m :unmeasured)
+        now-ok (set (keys (by-verdict m :ok)))
         now-na (set (keys (by-verdict m :n/a)))
+        ;; 床が最初に割れた（か、見えなくなった）時刻。blind を経由しても失わない。
+        since-of (fn [f] (or (get-in prev-broken [f :since])
+                             (get-in prev-blind [f :since])
+                             at))
         newly (remove (set (keys prev-broken)) (keys now-broken))
-        cleared (remove (set (keys now-broken)) (keys prev-broken))
+        ;; 塞がった = 前は割れていて、**いま :ok を測れた**床。
+        cleared (filter now-ok (keys prev-broken))
+        ;; 見えなくなった = 前は割れていて、いま :ok でも :broken でもない床。
+        blinded (remove #(or (contains? now-broken %) (now-ok %)) (keys prev-broken))
         row {:last-tick at
              :ticks (inc (:ticks prev 0))
              :status (:status m)
              :reason (:reason m)
              :broken (into {} (for [[f d] now-broken]
-                                [f {:since (get-in prev-broken [f :since] at) :detail d}]))
+                                [f {:since (since-of f) :detail d}]))
+             ;; 測れない床は「無い床」ではない。:since を持ったまま残す。
+             ;;
+             ;; ⚠ `now-unmeasured` だけでは足りない。bot ごと :unmeasured（checkout が
+             ;; 無い等）のとき `:floors` は `{:checkout …}` しか持たないので、割れて
+             ;; いた :landed / :pinned は **:unmeasured ですらなく、行から消える** ——
+             ;; 戻ってきた周に :since が今日にリセットされ、何日割れていたか分から
+             ;; なくなる。消えた床も blinded として持ち越す。
+             :blind (into {} (for [f (distinct (concat (keys now-unmeasured)
+                                                       blinded
+                                                       (remove #(or (contains? now-broken %)
+                                                                    (now-ok %))
+                                                               (keys prev-blind))))]
+                               [f {:since (since-of f)
+                                   :detail (or (get now-unmeasured f)
+                                               (:reason m)
+                                               "床が返らなかった")}]))
              :unmeasured now-unmeasured
              :na now-na}
         events (cond
@@ -310,7 +388,12 @@
                   (for [f cleared]
                     {:at at :bot id :event :cleared :floor f
                      :since (get-in prev-broken [f :since])
-                     :age-days (age-days (get-in prev-broken [f :since] at))})))]
+                     :age-days (age-days (since-of f))})
+                  (for [f blinded]
+                    {:at at :bot id :event :went-blind :floor f
+                     :was (get-in prev-broken [f :detail])
+                     :detail (or (get now-unmeasured f) (:reason m) "床が返らなかった")
+                     :since (get-in prev-broken [f :since])})))]
     [row (vec events)]))
 
 ;; ---------------------------------------------------------------- report
@@ -443,6 +526,16 @@
       (when (pos? empty-repos)
         (println (str "EMPTY-REPO\t" empty-repos
                       " 体は README もコードも無い —— README の欠落ではなく repo が空"))))
+    ;; 床単位で測れていないもの。bot 単位の UNMEASURED（checkout が無い等）とは別で、
+    ;; **こちらは checkout が在るのに その床だけ答えない**。0 件と混同させない。
+    (let [blind (frequencies (for [[_ r] in-roster
+                                   [f _] (:blind r)]
+                               f))]
+      (when (seq blind)
+        (println)
+        (println "BLIND（床は在るのに答えない。clean ではない）")
+        (doseq [[f n] (sort-by (comp - val) blind)]
+          (println (str "  " (name f) "\t" n " 体")))))
     (when (pos? unmeasured)
       (println)
       (println "UNMEASURED の理由")
@@ -605,7 +698,8 @@
           (let [scanned (count wave)
                 baseline (filter #(= :first-observation (:event %)) all)
                 broke (filter #(= :broke (:event %)) all)
-                cleared (filter #(= :cleared (:event %)) all)]
+                cleared (filter #(= :cleared (:event %)) all)
+                blinded (filter #(= :went-blind (:event %)) all)]
             (if (zero? scanned)
               (do (println "REFUSED\tSCANNED 0 —— 測っていないものを clean と報告しない") 2)
               (do
@@ -619,6 +713,11 @@
                                #(str (:bot %) "\t" (name (:floor %)) "\t" (:detail %)))
                 (print-events! "RESOLVED（塞がった床）" cleared
                                #(str (:bot %) "\t" (name (:floor %)) "\t" (:age-days %) "d 経過"))
+                ;; 割れていた床が答えるのをやめた。**RESOLVED と同じ欄に出さない** ——
+                ;; 直ったのではなく、見えなくなっただけ。
+                (print-events! "WENT-BLIND（測れなくなった床。塞がったのではない）" blinded
+                               #(str (:bot %) "\t" (name (:floor %)) "\t" (:detail %)
+                                     (when (:was %) (str "\t前回: " (:was %)))))
                 (println)
                 (report! registry {:bots acc})
                 0))))))))
