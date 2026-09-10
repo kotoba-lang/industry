@@ -1,0 +1,60 @@
+;; manifest/chain-deployments.edn — the consensus/sequencer deployments this
+;; workspace runs, and how to ask each one whether it is still moving.
+;;
+;; ## Why this file exists
+;;
+;; Measured 2026-09-10: `torihiki-validator-v3` — four witnesses, chained
+;; HotStuff, `inga.replica`, quorum 3 of 4 — had been halted since 2026-08-15,
+;; **26 days**, split 2-2 at height 5616. Two independent measurements agreed:
+;; the highest checkpoint every witness holds (5600) was written 2026-08-15
+;; 08:03:25Z, and the pacemaker's own view counter (1,496,323, advancing
+;; 0.69/s while the height advanced 0) divided out to 25.1 days of spinning.
+;;
+;; Nothing noticed. There was no launchd job, no observatory entry, and the
+;; repo bot for `torihiki-node` measures `checkout / pinned / landed / readme /
+;; test-signal` — five floors, none of which asks whether the chain moves. The
+;; repository was green the whole time.
+;;
+;; That is the shape CLAUDE.md's eight questions describe: a check that could
+;; not see the failure returns the value of a check that looked and found
+;; nothing. So the answer is not another repo floor. It is a detector that
+;; asks the deployment itself, which is what `scripts/verify-chain-liveness.cljs`
+;; does and what this file tells it to ask.
+;;
+;; ## Fields
+;;
+;;   :id          keyword, stable. Findings are keyed under it forever.
+;;   :kind        :consensus (a witness set that votes) or :sequencer (one
+;;                writer, no votes). A sequencer cannot fork or lose a quorum,
+;;                so only the liveness half of the detector applies to it.
+;;   :chain-id    what the deployment calls itself. Checked against `/head`:
+;;                a reply from a chain with a different id is NOT this
+;;                deployment answering, and is reported rather than believed.
+;;   :base        origin. `/head` and `/block` hang off it.
+;;   :witnesses   the names, in the order the set was defined. Single-element
+;;                for a sequencer.
+;;   :witness-param  query parameter naming a witness, or nil when the
+;;                deployment serves exactly one.
+;;   :quorum      how many must agree. Recorded so a finding can say what the
+;;                votes it counted were short OF, rather than just counting.
+;;   :note        one line: what this deployment is for.
+;;
+;; **Adding a deployment here does not deploy anything.** It adds a question.
+{:deployments
+ [{:id :torihiki-validator-v3
+   :kind :consensus
+   :chain-id "torihiki-engi-devnet-1"
+   :base "https://torihiki-validator-v3.04-feasts-minded.workers.dev"
+   :witnesses ["w1" "w2" "w3" "w4"]
+   :witness-param "w"
+   :quorum 3
+   :note "torihiki (the exchange state machine) executing blocks ordered by inga, four Durable Object witnesses. Generations v1 and v2 answer `Gone` and are deliberately absent."}
+
+  {:id :torihiki-node
+   :kind :sequencer
+   :chain-id "torihiki-devnet-1"
+   :base "https://torihiki-node.04-feasts-minded.workers.dev"
+   :witnesses ["_"]
+   :witness-param nil
+   :quorum 1
+   :note "the single-writer Durable Object sequencer. `/head` says `consensus: none` about itself. This is the deployment that actually carries an order book."}]}

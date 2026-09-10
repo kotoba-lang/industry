@@ -4253,4 +4253,50 @@
               number until west brings the checkouts along. A count that has not moved is not
               evidence that nothing landed."}
 
+  {:id       :verify-chain-liveness
+   :title    "the deployed chains, asked whether they are still moving"
+   :why      "2026-09-10: `torihiki-validator-v3` -- four witnesses, chained HotStuff,
+              inga.replica, quorum 3 of 4 -- had been halted for 26 days, split 2-2 at
+              height 5616, and nothing in this workspace was in a position to say so.
+              Two independent measurements agreed on the date: the highest checkpoint every
+              witness still holds (5600) was written 2026-08-15 08:03:25Z, and the pacemaker's
+              own view counter, advancing 0.69/s while the height advanced 0, divided out to
+              25.1 days of spinning. The repo bot for `torihiki-node` was green throughout --
+              its five floors (checkout, pinned, landed, readme, test-signal) are all questions
+              about a git tree, and the chain is not in the tree. Cannot be a fleet gate: a
+              gate ships one repo's tree and no network identity, and the question here is
+              about a running deployment, not a source file."
+   :argv     ["nbb" "{{repo}}/scripts/verify-chain-liveness.cljs" "--findings"
+              "--registry" "{{repo}}/manifest/chain-deployments.edn"]
+   :cwd      :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h -- one per tick
+   :timeout-ms  180000                   ; 3m: two samples 20s apart plus a bounded block window
+   :measured "2026-09-10: 5 of 5 witnesses across 2 deployments, ~45s wall. Exit 1, reporting
+              `halted:torihiki-validator-v3` and `fork:torihiki-validator-v3@5616` unattended --
+              the same two facts that took a session to find by hand.
+              The registry path is passed explicitly rather than derived from {{root}}: the
+              deployments a run measures must be the ones the checkout holding the script
+              declares, or a worktree silently measures another generation of the chain.
+              DISCRIMINATED BEFORE REGISTRATION, and the broken copy's report matched what was
+              broken each time: disabling the halt comparison fails 5 of 11 self-test cases;
+              slipping that same comparison by one fails EXACTLY the boundary case (an advance
+              of one block) and nothing else; disabling the fork comparison drops exactly the
+              fork key; disabling the regression check drops exactly the sequencer case.
+              The self-test prints a COUNT (`SELF-TEST n/11 cases`), not a boolean, so one
+              regression and a broken build cannot print the same thing.
+              WARNING, and it is the useful half of this note: the first live run was WRONG and
+              the fixture suite did not catch it. It called `torihiki-node` FROZEN. A sequencer's
+              /head carries `height`, not `committed` and `view`, so both deltas came off a nil
+              and landed on the value a dead witness set produces. A single writer with nothing
+              to write is idle, which is the normal state of a devnet nobody trades on. The two
+              kinds are now asked different questions, and an unreadable progress field reports
+              `no-progress-field` -- unmeasured -- instead of a verdict.
+              What a clean run means, exactly: the chain advanced between two samples seconds
+              apart and its witnesses agreed on the CIDs in one window above the last common
+              commit. It is not a safety proof, it verifies no signatures, and it cannot see a
+              fork already buried under a common checkpoint."}
+
 ]}
