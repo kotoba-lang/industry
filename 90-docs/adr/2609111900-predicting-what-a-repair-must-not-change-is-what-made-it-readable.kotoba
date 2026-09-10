@@ -1,0 +1,70 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111900-predicting-what-a-repair-must-not-change-is-what-made-it-readable")
+  (:adr/topic "q9-credrow-backfill")
+  (:adr/title "Predicting what a repair must NOT change is what made eleven regenerations readable")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609111800-twenty-of-twenty-have-a-harness-and-eleven-carry-a-defect-it-cannot-see"))
+  (:adr/body
+  "## What was repaired
+
+Eleven of the twenty wave-1 pilots shipped a `cred-row` that emitted its ref
+field TWICE -- a duplicate JSON key -- next to a `quantity` field the repository
+does not declare. Each names a different field, which is what makes it
+recognisable rather than a copy-paste:
+
+    com-8th-wall sceneId    com-abb-800xa tagId       com-accelbyte playerId
+    com-ach-network customerId               com-acorrd-standards policyId
+    com-acquia assetId      com-adobe projectId       com-ads-b-aviation objectId
+    com-agleader fieldId    com-agones playerId       com-airbyte connectorId
+
+All eleven regenerated with the current generator. A re-scan of the cohort now
+reports zero.
+
+## Nothing that was checking could see it
+
+`amu check` returns `:ok true`: the object is built with `jkv` calls and the
+compiler has no schema for its contents. And no layer of the parity harness
+reads `cred-row` -- route count, as-int, as-bool, page-limit and the entity
+table all derive from `entity-specs` or from a fixed table of strings.
+
+So this was not caught by a check. It was caught by asking, after building the
+harness, what the harness still could not see.
+
+## The prediction, made before the runs
+
+A regeneration that rewrites `cred-row` and nothing else must leave every
+harness layer exactly where it was, because no layer reads `cred-row`. That was
+written down first and then measured on all eleven:
+
+    compared 23 or 29 rows per repository
+    differ    exactly 1, and always the as-int \"12abc\" control
+
+If a second row had moved, the correct conclusion would not have been \"the
+repair worked\" -- it would have been that the regeneration changed something
+else as well, and the change would have needed finding before landing.
+
+This is the same instrument as `oracle-float-divergence` during the
+com-abb-robotics regeneration: a value that MUST NOT move is what lets a page of
+values that did move be read. The difference here is that the prediction covered
+every layer rather than one oracle, so the eleven runs are eleven confirmations
+rather than eleven repetitions.
+
+## Verification
+
+Each of the eleven: regenerated, `amu check :ok true`, compiled to
+aarch64-macos, executed through `tools/kexe_loader.c`, and every harness layer
+re-compared afterwards.
+
+## What is left
+
+The harnesses themselves are now uneven. Nine were generated before the
+entity-table layer existed and compare 23 rows; eleven compare 29. That shows up
+directly in the numbers above and is the next thing to level.
+
+Nothing in this iteration touched the fixture-shaped layers -- store, filter,
+pagination, handler, expand -- which remain present only in the four
+hand-written harnesses.")))
