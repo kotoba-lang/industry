@@ -1,0 +1,173 @@
+;; 退役させた worktree の証跡。CLAUDE.md「並行エージェント運用」/ ADR-2609061800 の
+;; 「着地後の後片付けまでが完了条件」を、片付けた側が後から証明できるようにする台帳。
+;;
+;; scripts/worktree-retire.cljs は landed/clean/old/idle/unlocked を判定して自動で
+;; retire するが、判定は **default branch への到達性** しか見ない。default branch に
+;; 未着地でも同一内容が別の remote branch に存在する worktree は `keep (unlanded)` と
+;; 報告されて残り続ける。その 1 件を人が消したなら、なぜ安全だったのかはここに残す。
+;; 消した根拠が残らない削除は、次に同じ判断をする者にとって存在しないのと同じ。
+;;
+;; 追記のみ。entry を消すのではなく、新しい entry を足す。
+{:registry/id :com-junkawasaki.root/worktree-retire-receipts
+ :registry/authority "root"
+ :registry/entries
+ [{:retire/date "2026-09-10"
+   :retire/scope "~/github 直下に残っていた worktree シェル一式"
+   :retire/reclaimed-bytes 648388608          ; 618M (158M + 460M)
+   :retire/verdict
+   "対象 2 worktree はいずれも作業ツリー clean、かつ全内容が remote に存在。
+    保存すべき未保存作業は 0 件だった。"
+
+   :retire/worktrees
+   [{:worktree/path "/Users/junkawasaki/github/worktrees/itonami-ios-20260908/orgs/cloud-itonami/cloud-itonami-app"
+     :worktree/repo "orgs/cloud-itonami/cloud-itonami-app"
+     :worktree/branch "codex/ios-device-registration-20260908"
+     :worktree/head "3a961a96ca"
+     :worktree/size "158M"
+     :worktree/size-note "実体はビルド成果物 — target/ 78M + mobile/ 67M"
+     :worktree/state :landed
+     :worktree/evidence "git rev-list --count origin/main..codex/ios-device-registration-20260908 => 0"
+     :worktree/removed-by "nbb scripts/worktree-retire.cljs --only ~/github/worktrees --min-age-days 1 --apply"
+     :worktree/tool-verdict "RETIRE (landed, clean, 2.1d)"
+     :worktree/branch-disposition "git branch -d（ツールが安全削除）"}
+
+    {:worktree/path "/Users/junkawasaki/github/codex-worktrees/orgs/network-awai/cloud-itonami"
+     :worktree/repo "orgs/network-awai/cloud-itonami"
+     :worktree/branch "codex/nous-style-subscriptions"
+     :worktree/head "b46280467"
+     :worktree/size "460M"
+     :worktree/state :unlanded-but-mirrored
+     :worktree/tool-verdict "keep (unlanded) — origin/main への到達性のみを見るため"
+     :worktree/evidence
+     {:evidence/claim "b46280467 の内容は origin/codex/nous-style-subscriptions (47db3b5ef) と完全同一。差分は commit metadata (committer timestamp) のみ。"
+      :evidence/tree-local  "2ef6636e1fa4eb77e5ca2487c2fc10e398a4d558"
+      :evidence/tree-remote "2ef6636e1fa4eb77e5ca2487c2fc10e398a4d558"
+      :evidence/patch-id-local  "652e048cb3d0821fc6c129c4e409f08a44cba8d5"
+      :evidence/patch-id-remote "652e048cb3d0821fc6c129c4e409f08a44cba8d5"
+      :evidence/parent-shared "0533e31c2"
+      :evidence/porcelain-lines 0
+      :evidence/commands ["git rev-parse b46280467^{tree}"
+                          "git rev-parse origin/codex/nous-style-subscriptions^{tree}"
+                          "git show <ref> | git patch-id --stable"
+                          "git diff --stat b46280467 origin/codex/nous-style-subscriptions  ;; => empty"]}
+     :worktree/removed-by "git worktree remove（--force なし。git 自身の dirty check を第二の床として通した）"
+     :worktree/branch-disposition
+     "local branch は残置。`git branch -d` は origin/main 未着地のため拒否し、`-D` を
+      使えば b46280467 への到達手段が消える。ref は 0 バイトで、消して得るものが無い。"}]
+
+   :retire/shells-removed
+   [{:shell/path "~/github/worktrees"           :shell/held "symlink 2 + 空 dir"}
+    {:shell/path "~/github/codex-worktrees"     :shell/held "symlink 4 + 空 dir"}
+    {:shell/path "~/github/.codex-worktrees"    :shell/held "空"}
+    {:shell/path "~/github/m1030"               :shell/held "空"}
+    {:shell/path "~/github/tamaki-workspaces"   :shell/held ".DS_Store のみ"}
+    {:shell/path "~/github/murakumo-workspace"  :shell/held "symlink 7 + .DS_Store"}
+    {:shell/path "~/github/scratchpad"          :shell/held "symlink 3"}]
+
+   :retire/shells-method
+   "symlink を `find -type l -delete` で先に外し、リンク先 14 件の生存を 1 件ずつ確認
+    してから shell を rm -rf した。rm -r は symlink を辿らないが、辿らないことを
+    確認せずに 618M を消すのは検証ではない。"
+
+   :retire/dangling-at-removal
+   ["/private/tmp/murakumo-request-parallelism  (murakumo-workspace/kotoba-lang/murakumo)"
+    "/tmp/cloud-murakumo-slice-b                (scratchpad/.../network-awai/cloud-murakumo)"]
+
+   :retire/untouched
+   [{:path "~/github/p153"
+     :reason "空シェルに見えたが synventures-ontology/{people,ontology}.ttl の実ファイルを保持。
+              作成時刻が本作業中（16:37）で別プロセス由来。判定できないものは消さない。"}]
+
+   :retire/post-state
+   "com-junkawasaki 本体・orgs/cloud-itonami/cloud-itonami-app・orgs/network-awai/cloud-itonami
+    のいずれの `git worktree list` にも、削除済み path を指す stale registration は残っていない。"}
+
+  {:retire/date "2026-09-10"
+   :retire/scope "~/github に残っていた最後の 3 つ — west 宣言済みの stray clone 2 件と、superproject の sparse worktree 1 件"
+   :retire/reclaimed-bytes 442499072          ; 422M (421M + 168K + 648K)
+   :retire/trigger "owner 指摘:「com-junkawasaki 内の west repo 管理が適切では?」— 正しかった。"
+
+   :retire/west-adopted
+   [{:project/name "com-intel-xe-driver"
+     :project/stray-path "~/github/com-intel-xe-driver"
+     :project/canonical-path "orgs/kotoba-lang/com-intel-xe-driver"
+     :project/west-revision "2d0808a55e16b349aca168c8a95c168e499068b9"
+     :project/stray-head    "2d0808a55e16b349aca168c8a95c168e499068b9"
+     :project/tree "d2745b6eb9"
+     :project/remote-after "kotoba-lang"}
+    {:project/name "fleet-manifest"
+     :project/stray-path "~/github/fleet-manifest"
+     :project/canonical-path "orgs/com-junkawasaki/fleet-manifest"
+     :project/west-revision "f17ac7bcba5c498a23c61a72b9291a91390275c6"
+     :project/stray-head    "f17ac7bcba5c498a23c61a72b9291a91390275c6"
+     :project/tree "21e99263cf"
+     :project/remote-after "com-junkawasaki"}]
+
+   :retire/west-adopted-finding
+   "どちらも manifest/west.yml に canonical path つきで **既に宣言されていた** のに、
+    実体は ~/github 直下の手動 clone として浮いていた。HEAD は west の pin と 1 bit も
+    違わず、clean・unpushed 0・stash 0。つまり west 管理外にあること自体が唯一の差分で、
+    `west update <name>` で canonical path に materialize すれば stray は定義上不要になる。
+    remote 名も手動 clone の `origin` から west 規約の remote 名に揃った。"
+
+   :retire/west-adopted-method
+   "west update は project 名を明示して実行した。引数なしの `west update` は宣言済み
+    全 project を取りに行くため、scripts/root-worktree.cljs が構造的に禁じている。"
+
+   :retire/worktrees
+   [{:worktree/path "/Users/junkawasaki/github/codex-cosmos-h3-record"
+     :worktree/repo "root (superproject)"
+     :worktree/branch "codex/cosmos-h3-record"
+     :worktree/head "09d9d727630"
+     :worktree/size-before "421M"
+     :worktree/sparse-cone [".agents" "90-docs/adr" "manifest" "scripts"]
+     :worktree/state :landed
+     :worktree/evidence "git rev-list --count origin/main..codex/cosmos-h3-record => 0"
+     :worktree/branch-disposition "git branch -d（着地済みのため受理）"
+
+     :worktree/why-it-looked-unsafe
+     "`git status` が 2571 行 dirty（?? 2237 / D 334）で、retire の clean gate に落ちていた。
+      内訳を見るまでは 421M の未保存作業に見える。実際は sparse cone の外に orgs/ の
+      overlay が流し込まれていただけで、authored な変更は 1 行も無かった:
+        - ?? 2237 のうち 2236 は本体 orgs/ への symlink
+        - D 334 は cone 外 index entry が symlink に覆われて deleted と報告されたもの
+          （`git sparse-checkout reapply` で 0 行になった＝作業ではなく表示の問題）"
+
+     :worktree/real-children-verified
+     {:count 9
+      :method "symlink 越しの scan は本体を読んでしまい 1620 repo が unpushed に見えた。
+               実体 9 件に絞り、さらに fetch してから判定し直したところ全件 unpushed 0。
+               remote-tracking が古いだけの『未 push』は未 push ではない。"
+      :children
+      [{:child "orgs/kotoba-lang/sekisho"                     :size "116K" :unpushed 0 :in-main true}
+       {:child "orgs/kotoba-lang/org-ietf-ed25519"            :size "144K" :unpushed 0 :in-main true}
+       {:child "orgs/kotoba-lang/murakumo"                    :size "5.6M" :unpushed 0 :in-main true}
+       {:child "orgs/kotoba-lang/kisekae"                     :size "100K" :unpushed 0 :in-main true}
+       {:child "orgs/kotoba-lang/grant"                       :size "872K" :unpushed 0 :in-main true}
+       {:child "orgs/network-awai/cloud-murakumo-app"         :size "2.0M" :unpushed 0 :in-main true}
+       {:child "orgs/network-awai/cloud-murakumo"             :size "93M"  :unpushed 0 :in-main true}
+       {:child "orgs/network-awai/cloud-murakumo-free-preview" :size "93M" :unpushed 0 :in-main false
+        :note "本体に無いが cloud-murakumo の別ブランチ worktree。HEAD 29f7595 は network-awai/main に含まれる。"}
+       {:child "orgs/network-awai/cloud-murakumo-hanzo"       :size "147M" :unpushed 0 :in-main false
+        :note "同上。HEAD ebbd8e7 は network-awai/main に含まれる。"}]
+      :surprise "この 9 件は独立 clone ではなく親 repo の **登録済み worktree** だった。
+                 rm -rf したため stale registration が 9 件残り、親 7 repo で
+                 `git worktree prune` して解消した（55->52 など）。
+                 最初から `git worktree remove` を使えば prune は要らなかった。"}
+
+     :worktree/removal-obstacle
+     "`.git` が gitdir ファイルではなく symlink（-> ../com-junkawasaki/.git/worktrees/...）
+      だったため `git worktree remove` が validation error 2 で拒否。標準の
+      `gitdir: <abs path>` ファイルに直してから、--force なしで受理させた。
+      --force で押し切れば git 自身の dirty check を飛ばすことになる。"}]
+
+   :retire/dangling-at-removal
+   ["orgs/kotoba-lang/kami-app-daw" "orgs/kotoba-lang/kami-app-nle" "orgs/kotoba-lang/kami-genko"]
+   :retire/dangling-note
+   "symlink 削除後に 3 件の target が MISSING になったが、削除前に取った scan（cosmos-scan.tsv）
+    に最初から現れていない＝削除前から dangling。`find -type l -delete` は target を消せない。
+    どれも west.yml 未宣言で、参照そのものが古かった。"
+
+   :retire/post-state
+   "~/github は com-junkawasaki と p153 のみ。p153 は前回同様、実ファイルを持つため未着手。
+    superproject の worktree 登録に ~/github 配下を指す stale entry は無い。"}]}
