@@ -191,9 +191,13 @@ Three things are needed before `:consumer-cutover` can be attempted, and none
 is a Kotoba problem:
 
 1. ~~A positive control on the bytes plane.~~ **Resolved above.**
-2. An answer to what `built-rust-raw` names for a repository with no Rust:
-   a real artifact built elsewhere, a historical provenance string carried
-   forward through the relocation, or a value nobody has checked.
+2. ~~An answer to what `built-rust-raw` names.~~ **Resolved 2026-09-10,
+   ADR-2609103000.** It is the first candidate -- a real artifact built
+   elsewhere -- and it was reproduced byte-identical rather than argued:
+   one 101-line Rust crate in `kotoba-lang/cleanroom-browser-runtime`,
+   built 1,000 times with only an embedded name string differing.
+   It was never pinned, which is why every CID 404s, and it implements
+   none of the routes its manifest advertises.
 3. Whoever consumes `did:web:etzhayyim.com:actor:aave-compat` identified,
    since the manifest declares an actor with an `exec` of
    `browser-local|donated-mesh` and that is the real consumer.
@@ -222,9 +226,13 @@ optimises the number this session moved will not reach kotoba-only.
 
 **Next concrete step, in priority order:**
 
-1. **Answer what `built-rust-raw` names.** 1,026 manifests declare an artifact
-   CID; 0 are present. This blocks every consumer cutover, and it is not a
-   Kotoba problem. `verify-declared-artifact-present` now measures it daily.
+1. ~~**Answer what `built-rust-raw` names.**~~ **Done 2026-09-10,
+   ADR-2609103000.** The artifact is real and reproducible, was never pinned
+   (a declared-unfinished operator step, not loss), and is a generic stub
+   shared across 1,000 actors. This **unblocks** rather than confirms the
+   cutover: there is no working artifact to regress, and ADR-2609102000
+   already measured zero external consumers.
+   `verify-declared-artifact-present` continues to measure it daily.
 2. **com-aave's remaining 8 gate items**, of which `:consumer-cutover` is
    blocked on (1). `artifact-equivalence`, `capability-denial` and
    `reproducibility` are not.
@@ -242,8 +250,10 @@ optimises the number this session moved will not reach kotoba-only.
     manifest/dependency-substitution.edn          7 entries now :qualification'd
     :dependency-substitution/jvm-runtime-deps-shape-2026-09-10
 
-**Owner decisions still open**, none of which an agent should take: what
-`built-rust-raw` names; who consumes `did:web:etzhayyim.com:actor:aave-compat`;
+**Owner decisions still open**, none of which an agent should take: whether
+1,000 manifests may keep advertising capabilities their artifacts do not
+implement (ADR-2609103000, the substantive finding); whether to pin that
+corpus as-is; who consumes `did:web:etzhayyim.com:actor:aave-compat`;
 whether `weight-kototama`'s stored snapshot prefixes may be re-addressed;
 whether wave-1's 20 pilots are re-qualified or retired.
 
