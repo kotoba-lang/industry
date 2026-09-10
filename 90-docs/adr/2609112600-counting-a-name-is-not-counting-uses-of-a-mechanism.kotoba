@@ -1,0 +1,113 @@
+(vector
+ (map
+  (:adr/id "adr-2609112600-counting-a-name-is-not-counting-uses-of-a-mechanism")
+  (:adr/title "Counting a name is not counting uses of a mechanism")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112400-payload-v3-is-one-rewrite-and-one-decision"))
+  (:adr/body "
+## The correction
+
+The previous iteration recorded dimension 2 -- whether (i64 5) and 5 stay
+one identity -- as payload v3's only non-mechanical part, and described
+the cost of unifying as: the explicit i64 wrapper cannot round-trip.
+
+That framing treated the wrapper as something a user writes. It is not.
+Measured 2026-09-11: the compiler puts EVERY host integer through it, on
+both hosts. `kotoba.compiler.definition-identity/canonical-value` is
+handed to the alpha-normalization walk as `:scalar`, so it reaches every
+scalar leaf of every definition, and its own docstring gives the reason --
+it erases the one place where the JVM holds a long and nbb holds a
+BigInt, and it is free ONLY because the two normalize to the same bytes.
+
+So the unification is not a convenience to be traded away. It is
+load-bearing for the compiler, and a v3 that splits on the wrapper does
+not move one fixture, it changes every integer in every definition.
+
+## How the count misled me
+
+A first pass grepped for the wrapper keyword and found three occurrences
+in osaho and ZERO in amu, and read that as: the mechanism is exercised
+only by its own tests. The opposite is true. amu never spells the keyword
+because it CONSTRUCTS the wrapper through the constructor, so a search for
+the literal finds the one repository that defines it and misses the one
+that uses it everywhere.
+
+Counting occurrences of a name is not counting uses of a mechanism.
+
+## The live defect this found
+
+The conversion payload v3 needs already exists, written ahead of need in
+osaho's payload-v3-unwrap test and deliberately kept in test/ because
+putting it in src/ would require promoting io-ipld and thereby take the v3
+decision by accident.
+
+Its i64 branch was unconditional: every wrapper became the value model's
+exact integer. And the only test that reached that branch used an
+out-of-range value -- the single case where unconditional is right. The
+conversion was tested exactly where it happened to be correct.
+
+## Measured
+
+Each of the ten frozen payloads, shaped the way the compiler shapes one
+(every integer wrapped), encoded both ways:
+
+    drafted    261 273 296 261 261 280 387 702 275 264
+    magnitude  221 233 256 221 221 240 347 614 243 232
+
+Eight bytes per integer. The magnitude column is byte-identical to the
+same payload with no wrappers at all, and that equality is the property
+worth naming: wrapping every integer costs nothing, which is why the
+compiler does it, and the conversion has to preserve it.
+
+Control: a payload containing no integers shows delta 0.
+
+An earlier run of this comparison showed delta 0 for every vector, which
+looked like the fix doing nothing. It was correct -- the FIXTURES carry
+bare integers, not wrappers, so there was almost nothing for either
+conversion to act on. The measurement was right and the expectation about
+its input was wrong. A payload has to be shaped the way the compiler
+shapes one before it can show this at all.
+
+## Reproduce
+
+    cd <osaho worktree>
+    clojure -M:test -n kotoba.kir.payload-v3-unwrap-test
+
+## Seen red
+
+Restoring the unconditional branch fails 18 assertions across both new
+tests. The boundary is exact on purpose: max-safe-integer must stay
+compact and max+1 must not, because a comparison with no value on the line
+cannot show which operator it is using.
+
+## A control of mine that was wrong
+
+The first version asserted that bare and wrapped encode DIFFERENTLY beyond
+the exact range. They do not merely differ -- the bare form cannot be
+encoded at all, and the codec refuses it. That is a stronger fact and it
+is the reason the wrapper exists. The refusal literal is now pinned rather
+than the inequality.
+
+## Where this leaves the decision
+
+v3 must decide by MAGNITUDE, not by the presence of the wrapper. That
+keeps normalize's unification, keeps the compiler's canonicalization free,
+and spends the exact-integer code only where the value model actually
+needs it.
+
+Dimensions 1 and 3 remain a rewrite that moves every DefCID. What changed
+is that dimension 2 is no longer an open question with two defensible
+answers: one of them is now measured to be wrong.
+
+## Not claimed
+
+io-ipld stays test-only. The conversion still lives in test/ and nothing
+here promotes it.
+
+## Noticed, not fixed
+
+osaho main carries two pre-existing failures in
+kir_bit_or_typed_admission_test (the i64 shift family). They are on the
+clean baseline as well as after this change, and are a separate concern.
+")))
