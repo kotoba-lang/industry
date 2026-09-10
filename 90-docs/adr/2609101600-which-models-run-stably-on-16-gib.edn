@@ -1,0 +1,91 @@
+[{:db/id -1
+  :adr/id "adr-2609101600-which-models-run-stably-on-16-gib"
+  :adr/title "Which models run stably on a 16 GiB node, what stably means, and the two nodes that went dark measuring it"
+  :adr/status "accepted"
+  :adr/date "2026-09-10"
+  :adr/related ["adr-2609101100-a-node-dedicated-to-one-model"
+                "adr-2609100100-one-model-per-node"]
+  :adr/body
+  "Owner instruction 2026-09-10: not gad -- find out which models run stably on
+16 GiB, and record it. issachar was the bench.
+
+## `stable` needed a definition before anything could be measured
+
+Two failures the same day fixed what the word has to cover, and neither is the
+model refusing to load:
+
+- The weights are mmap'd. A model that does not fit does not fail -- it pages.
+- A node earns its place in the pool by sending a heartbeat that ARRIVES. If
+  inference starves the machine's network path the gateway drops the node while
+  llama-server sits there answering /health.
+
+So a config is `:stable` only when it loads, does not grow swap past the noise
+floor, keeps an outbound request inside a quarter of the gateway's own 60 s
+freshness line, and still has 8% of the machine free. The rule and its tests
+are `murakumo.fleet.model-fit`; the probe is rendered from the same namespace.
+
+## What was actually measured
+
+    config              verdict     tok/s   free    outbound(load)   swap
+    ornith9b  ctx 65536  stable      17.5   21.1%   594 ms           +0 MB
+    ornith9b  ctx 131072 loaded       --      --    698 ms           --
+    ornith9b  ctx 262144 loaded       --      --      --             --
+    qwen27b   ctx 8192   (separate)    6.3    4.8%    --             -8 MB
+    qwen27b   ctx 16384  NOT MEASURED
+    qwen27b   ctx 32768  NOT MEASURED
+
+The 9B at the context the fleet already serves it at is comfortably stable and
+nearly three times faster than the 27B. It is the model this hardware is
+shaped for. The 9B loaded at 131072 and at its full native 262144 in about two
+seconds, but `loaded` is all that says: the ladder starts a server and serves
+short requests, so it measures the ctx SETTING, not the ability to fill it.
+Whether the KV cache is allocated eagerly at those settings is unmeasured --
+the wired-memory readings that would have answered it were not captured before
+the bench went dark. Do not read `loaded` as `has that much usable context`.
+
+## The two nodes that went dark, and a causal claim withdrawn
+
+issachar stopped answering ssh during the study. I reported that as a
+measurement -- the model config taking the node off the network, the way a 27B
+at ctx 32768 had taken levi off the network the day before. **That attribution
+was wrong and is withdrawn.** Twenty minutes later joseph went dark the same
+way, and nothing had been run on joseph.
+
+What is actually true, measured from dan on the LAN and from the gateway:
+
+    node      LAN ping   ssh :22   model :8092   tailnet    heartbeat
+    issachar  OK         OPEN      shut          offline    3448 s stale
+    joseph    OK         OPEN      shut          offline    1454 s stale
+    dan/judah/benjamin/simeon -- all direct, all live
+
+Both machines are alive. Only the tailnet path is gone, and both dark nodes are
+the only two whose tailscale peering had fallen back to a DERP relay (`relay
+\"tok\"`); the four healthy nodes all hold direct connections to the same NAT
+address. The cause is NOT established. Port exhaustion is not it -- benjamin
+has 52,015 sockets in TIME_WAIT with 1,521 ports free and is fine, while
+issachar had 13,807 and is not.
+
+## The finding that matters more than the ladder
+
+**Neither dark node has a second way in, and the reason is structural.**
+`ssh issachar` authenticates over the tailnet as Tailscale SSH; the same key
+offered to the LAN sshd on 192.168.1.23 is refused, as is every key dan holds.
+So port 22 is open, the machine is up, it is three metres away on the same
+switch, and there is no credential that reaches it. This is the gap
+`murakumo.access` was written to report, and it reported it honestly -- one
+path -- while the fleet kept operating as though one path were enough.
+
+That is the real answer to `how do we make this stable`, and it is upstream of
+any model choice: **a node whose only access path is the overlay network is one
+daemon away from needing a console, and two of six are there now.**
+
+## Resume point
+
+- `/tmp/model-fit-results.txt` on issachar holds the completed configs of the
+  matrix, including whatever the 27B ladder recorded. macOS does not clear
+  /private/tmp on reboot, so it should survive. Read it first.
+- The 27B ladder above ctx 8192 is unmeasured, and so is the KV eagerness
+  question for the 9B above 65536.
+- Recovery of issachar and joseph needs a console or a LAN credential. Putting
+  an authorized_key on each node's native sshd is the change that stops this
+  recurring, and it is the same one levi has been waiting for."}]
