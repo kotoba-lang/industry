@@ -37,7 +37,17 @@
   ;; clojure.java.shell" before this fix, independent of the secret-resolve
   ;; refactor).
   (let [script (str root "/scripts/b2-creds.cljs")
-        classpath (str root ":" root "/scripts/nbb_compat:" root "/orgs/kotoba-lang/secret-resolve/src")]
+        classpath (str root ":" root "/scripts/nbb_compat:"
+                       root "/orgs/kotoba-lang/secret-resolve/src:"
+                       ;; secret-resolve moved off clojure.string onto
+                       ;; kotoba.lang.text; without this entry b2-creds dies
+                       ;; with "Could not find namespace: kotoba.lang.text" and
+                       ;; annex-get/annex-drop cannot run at all. Measured
+                       ;; 2026-09-10: exit 1 with that message before, creds
+                       ;; JSON after. A reclaim path nobody can run is how 137
+                       ;; GB of annexed content stayed resident on a disk at
+                       ;; 99% full.
+                       root "/orgs/kotoba-lang/text/src")]
     (cond
       (not (.existsSync fs script)) (fail "scripts/b2-creds.cljs がありません。")
       (not (zero? (:exit (sh "which" "nbb")))) (fail "nbb が見つかりません。")
