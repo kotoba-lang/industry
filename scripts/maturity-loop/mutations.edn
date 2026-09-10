@@ -382,6 +382,116 @@
      :replace "     (zero? refusals)\n     \"  PASS\\n\""
      :must-fail ["report-refuses-to-report-a-pass-with-no-refusals"]}]}
 
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-2523"
+   :label "isco-2523 netops —— 一度も走っていなかった suite と、1 op しか読まない不変条件"
+   ;; この repo は 2 つの欠陥を同時に持っていた。どちらも「落ちた値」と
+   ;; 「通った値」が同じ値になる形である。
+   ;;
+   ;; 1. **suite が rename 以来 1 度も走っていなかった。** 8dfad97 が
+   ;;    .clj/.cljc を .kotoba へ改名し、deps.edn は cognitect.test-runner の
+   ;;    ままだった。clojure.tools.namespace は .kotoba を解決しないので、
+   ;;    実測 2aa259b で `clojure -M:test` は
+   ;;    `Ran 0 tests containing 0 assertions. 0 failures, 0 errors.` を
+   ;;    **exit 0** で出した。README は「14 tests / 29 assertions green」と
+   ;;    書いており、しかもそれは**正しかった** —— 何かが load しさえすれば
+   ;;    14 件は無傷で通る。誰も気づかなかったのは、走らなかった suite が
+   ;;    全部走って無事だった suite と同じ値を返すからである。
+   ;;
+   ;; 2. **governor の rule 検査が `(= :add-rule op)` の内側に在った。**
+   ;;    allowlist の顔をした denylist で、名指しした 1 op の外では同じ
+   ;;    rule 本体が 1 度も読まれない。登録済み client + 有効 rule 1 本に対し:
+   ;;
+   ;;      {:op :add-rule            :rule {... 存在しない zone ...}}
+   ;;        => :hard? true  [:unknown-zone]
+   ;;      {:op :draft-change        :rule {... 同じ本体 ...}}
+   ;;        => :ok? true    []
+   ;;      {:op :delete-every-rule   ...}            誰も宣言していない op
+   ;;        => :ok? true    []
+   ;;      {:op :apply-to-production :rule {... 存在しない zone ...}}
+   ;;        => :escalate? true []                   本番の live 変更
+   ;;
+   ;;    4 つ目が最悪で、**governed に見えた** —— 止まって人間に訊いたからで
+   ;;    ある。人間に届いたのは「違反なし」と書かれた、存在しない zone を
+   ;;    引く本番ネットワーク変更だった。**「止まった」ことと「理由を示した」
+   ;;    ことは別**で、出力からは区別できなかった（isco-3522 が同じ形で
+   ;;    :approve-service-restoral を通していたのと同型）。
+   ;;
+   ;; green marker は `netops: OK` —— **`0 failures, 0 errors` を使わない**。
+   ;; あれは 0 件走った run が印字する文字列そのもので、この suite が 1 日
+   ;; 緑に見えていた理由である。
+   ;;
+   ;; 7 件とも 2026-09-10（UTC）に、当てて赤くなるところを実際に見てから
+   ;; 登録した。うち 2 件は test ではなく **floor の拒否**を確かめるので、
+   ;; :must-fail に拒否理由そのものを置いてある —— 「名乗っている理由で
+   ;; 拒否したか」まで見るため（ADR-2608136000 の 6 問目）。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "netops: OK"
+   :mutations
+   [{:id :np/rule-checks-regated-on-add-rule
+     :note "中心の修正を戻す。rule 本体の検査が再び 1 op の内側に入り、
+            zone 基底・shadow 検出・foreign zone の 3 つが同時に外れる"
+     :file "src/netops/governor.kotoba"
+     :find "        checkable? (and rule client-record)"
+     :replace "        checkable? (and (= :add-rule op) rule client-record)"
+     :must-fail ["zone-basis-applies-to-every-operation-carrying-a-rule"
+                 "foreign-zone-refused-under-every-operation-carrying-a-rule"
+                 "shadow-detection-applies-to-every-operation-carrying-a-rule"
+                 "production-apply-with-an-invented-zone-holds-rather-than-escalating"
+                 "holds-a-draft-change-citing-a-zone-that-does-not-exist"]}
+
+    {:id :np/vocabulary-reopened
+     :note "supported? を全許可に戻す = governor が denylist だった頃の形。
+            advisor が LLM 応答を parse できず :op :unknown を出したときも、
+            hold ではなく低 confidence の escalate に落ちる"
+     :file "src/netops/governor.kotoba"
+     :find "  (contains? operations op))"
+     :replace "  (or (some? op) (contains? operations op)))"
+     :must-fail ["hard-on-undeclared-operation"
+                 "undeclared-operations-answer-false-everywhere"
+                 "an-unparseable-advisor-proposal-holds"]}
+
+    {:id :np/empty-basis-admitted
+     :note "空基底の節を落とす。どちらの側にも zone を持たない rule は何にも
+            一致しないが、active rule が 0 本なら包含で捕まえる相手が居ない"
+     :file "src/netops/governor.kotoba"
+     :find "      (and rule (empty? basis))"
+     :replace "      (and false rule (empty? basis))"
+     :must-fail ["hard-on-empty-rule-basis"]}
+
+    {:id :np/rule-body-not-required
+     :note "rule 本体を必須でなくす。本体無しの :add-rule / :draft-change が
+            『検査すべきものが無い』ので静かに通る"
+     :file "src/netops/governor.kotoba"
+     :find "(defn rule-required? [op] (boolean (get-in operations [op :rule-required?])))"
+     :replace "(defn rule-required? [op] false)"
+     :must-fail ["draft-change-requires-a-rule-body" "hard-on-missing-rule-body"]}
+
+    {:id :np/escalation-outranks-hold
+     :note "hold した提案も同時に escalate させる。誰も yes と言えない提案が
+            人間の承認待ちに並ぶ（isco-3522 の :tt/phase-order-swapped と同型）"
+     :file "src/netops/governor.kotoba"
+     :find "     :escalate? (and (not hard?) (or low? risky-op?))}))"
+     :replace "     :escalate? (or low? risky-op?)}))"
+     :must-fail ["production-apply-with-an-invented-zone-holds-rather-than-escalating"]}
+
+    {:id :np/runner-blind-to-kotoba
+     :note "**元の欠陥そのものを再現する。** runner から .kotoba が見えなくなり、
+            src も test も 0 件になる。floor が無ければこれは 0 tests / exit 0、
+            つまり緑と区別が付かない"
+     :file "run_tests.kotoba"
+     :find "(def source-ext #{\"kotoba\" \"cljc\" \"clj\"})"
+     :replace "(def source-ext #{\"cljc\" \"clj\"})"
+     :must-fail ["REFUSING TO REPORT A PASS: no sources found"]}
+
+    {:id :np/floor-unpublished
+     :note "README が件数の公表をやめる。floor は「0 より多い」ではなく
+            「公表値を下回らない」なので、公表が消えること自体が拒否になる ——
+            黙って 0 になる floor は floor ではない"
+     :file "README.md"
+     :find "25 tests / 73 assertions green."
+     :replace "The suite is green."
+     :must-fail ["REFUSING TO REPORT A PASS: README.md publishes no"]}]}
+
   {:repo "orgs/cloud-itonami/app-bpmn"
    :label "app-bpmn cross-plane —— README が散文で述べている食い違いを、散文の外で保つ"
    ;; この repo の README は冒頭で「三つの面は互いに一致していない」と言い、
