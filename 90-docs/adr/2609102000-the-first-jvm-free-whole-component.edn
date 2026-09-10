@@ -213,7 +213,7 @@ does not build.
 written in Kotoba, and starting no JVM process. Against that:
 
     repositories satisfying BOTH        0   (com-aave proves the build, not the ship)
-    Q9 per-repository gate items done   4 of 12 for com-aave
+    Q9 per-repository gate items done  10 of 12 for com-aave (ADR-2609104500)
     jvm-runtime-deps                    75 -> 63 this session, 11 repos cleared
     of those 11, actually JVM-free       4   (7 kept jvm-source/jvm-build/babashka)
 
@@ -233,9 +233,11 @@ optimises the number this session moved will not reach kotoba-only.
    cutover: there is no working artifact to regress, and ADR-2609102000
    already measured zero external consumers.
    `verify-declared-artifact-present` continues to measure it daily.
-2. **com-aave's remaining 8 gate items**, of which `:consumer-cutover` is
-   blocked on (1). `artifact-equivalence`, `capability-denial` and
-   `reproducibility` are not.
+2. ~~**com-aave's remaining 8 gate items.**~~ **Six landed 2026-09-10,
+   ADR-2609104500**: kotoba-cli-check, kotoba-cli-build, artifact-equivalence,
+   capability-denial, reproducibility, repository-tests. `whole-public-surface`
+   is 33/34 with one declared omission. **`consumer-resolution` is the only
+   one left.**
 3. **The 4 malformed `ns` forms** (kouhou, shinshi-growth-actor, tashikame,
    wt-kouhou) — deliberately unfixed until the detector existed. It exists now.
 4. `jvm-build` 452 if the goal is repository count; `jvm-source` 207 if the
