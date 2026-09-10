@@ -423,5 +423,63 @@ retract しうるので全 retraction が要る）が、**tx block に retract �
 縛れる** —— block は既に subject token を持っているので、同じ形で足せる。
 fold が直らなくても read はこれで軽くなる。
 
+## 27 秒は in-memory の db 構築である —— phase split で局在した（2026-09-10、確定）
+
+前節が「どこかが superlinear で、そこは probe が届かない」で終わっていた。
+届かせた。**engine は触っていない** —— fold の各 phase は呼ぶ store 関数が違うので、
+それを数え分ければ phase が分かれる:
+
+    hydrate / novelty 読み     async-get-fn + decrypt-fn
+    qs/commit! の tree 再構築   encrypt-fn   + blind-fn   (+ store の put!)
+
+### 測定（control-plane `b38afdf8` をデプロイして実測）
+
+    {\"op\":\"write\",\"gets\":135,\"decrypts\":1665,\"encrypts\":0,\"blinds\":0,\"ms\":5512}
+    outcome=exceededCpu  cpu=32500ms
+
+**`encrypts:0` / `blinds:0`。** fold は `qs/commit!` に**一度も到達していない**。
+そして **store 呼び出しは最初の 5.5 秒で全部終わり、残り約 27 秒は store を
+1 回も呼ばない純 CPU** である。
+
+`fold!` の cljs 分岐で、読み込みと `qs/commit!` の間に在るものは 1 つだけ:
+
+    db (reduce (fn [db q] (apply-quad db q ref?)) hydrated-db novelty-quads)
+
+**~2,500 quad を in-memory db に入れる reduce が、約 27 CPU 秒。**
+1 quad あたり約 10ms —— 4 本のソート済み索引への挿入としては桁が違う。
+`apply-quad` かその下の永続コレクションが superlinear である。
+
+これは root ADR-2609051700 が base32 の lazy seq で記録した形と同型:
+**基盤ライブラリの定数倍は、呼び出し側の profile に現れない。**
+5 回の推論（chain の長さ / trampoline / AES-GCM / snapshot 側 / 予算）は
+すべて「呼び出し側で説明が付く場所」を探していて、実際の項は 2 層下に在った。
+
+### 同じ日に自分で作った回帰と、その撤回
+
+`641d2135`（write パスの memo を Cache API → object store）は**失敗の形を悪化させた**:
+
+    前   gets:135 decrypts:1665、32,000ms で死ぬ
+    後   trampoline 2 行のみ（handlerRuns 2 / syncGets 1 / puts 0 / ms 7）、
+         store 呼び出しの probe 行ゼロ、それでも 32,000ms
+
+**7ms 地点から予算全部を焼き、store をほぼ呼ばない。** どちらも畳めないので
+結果としての回帰ではないが、**説明の付かない spin を本番に置いたままにしない**
+ため同日に撤回した（`75936d2a`）。`durable-rows-cache-*` と注入 seam とテストは
+残してあるので、spin を測れば 1 行で戻せる。
+
+⚠ **この撤回のおかげで phase split の測定が取れた** —— durable memo が入ったままだと
+store 呼び出しが出ず、`encrypts:0` という判定材料そのものが得られなかった。
+
+### 次の一手
+
+**`apply-quad` を測る。** arrangement の中で、n 個の quad を空でない db に
+入れるコストが n に対してどう伸びるかを bench で出す。ローカルで再現できる
+（今日の `bench/snapshot_vs_novelty.cljs` と同じ形で、mem-store・恒等 crypto、
+fold ではなく apply の側を掃引する）。**Worker も本番グラフも要らない。**
+
+そこが線形になれば fold は通り、auto-fold が再開し、820 が減り、read も軽くなる。
+**read 側の retract summary はそれとは独立に効く**（`:limit` が novelty walk を
+縛れるようになる）。
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
