@@ -11789,4 +11789,134 @@
      :file "src/hirameki_patents/checks.clj"
      :find "(when (some #(re-find #\"imposes\" (str %)) attrs)"
      :replace "(when (and false (some #(re-find #\"imposes\" (str %)) attrs))"
-     :must-fail ["refuses-a-patent-that-imposes-on-something"]}]}]}
+     :must-fail ["refuses-a-patent-that-imposes-on-something"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-2433"
+   :label "medsales governed actor —— 拒否は今も、名乗っている理由で起きるのか"
+   ;; この actor の 5 部品（operation/facts/phase/ledger/sim）は 2026-09-10 に
+   ;; 足したが、**部品を置くことと拒否が増えることは別**なので、1 つ 1 つを
+   ;; 「変更前の tree で実測した誤許可」に対して書いた。ここに載せる mutation は
+   ;; その誤許可を**そのまま戻す**形にしてある —— 構文を壊すだけの mutation は
+   ;; 「コンパイルが通らない」しか証明しないため。
+   ;;
+   ;; 11 件とも 2026-09-10 に、当てて赤くなる（緑のままになる）ところを実際に
+   ;; 見てから登録した。load average 19、並行 clojure 16 本の下で測っている。
+   ;;
+   ;; ⚠ **refusals の件数は判定に使えない。** buyer-gate-unconditional は
+   ;; 拒否を 23 → 25 に**増やす**（全部を拒否するゲートは、拒否のテストを全部
+   ;; 通る）。捕まえているのは clean 側の 3 scenario で、これが
+   ;; ADR-2608136000 の 5 問目「両方向を出したことがあるか」そのもの。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [;; ── sim が捕まえる 6 件 + harness 自身の 1 件 ────────────────────
+    {:id :ms/bulk-order-loses-the-product-checks
+     :note "product/indication/buyer の検査を :approve-sale だけに戻す（変更前の実測形）。
+            **拒否の件数は 23 のまま動かない** —— 4 つの bulk order は
+            `request-approval` に落ちるので「拒否された」は真のまま。
+            変わるのは理由だけで、`got=#{}` —— 人間は空の違反一覧を見て
+            制限品目の大口発注に署名する。:because がこれを捕まえる"
+     :file "src/medsales/governor.cljc"
+     :find "(op/cites-product? (:op proposal))"
+     :replace "(= :approve-sale (:op proposal))"
+     :cmd ["clojure" "-M:sim"]
+     :green-marker "  PASS"
+     :must-fail ["BAD bulk-order-off-label"
+                 "BAD bulk-order-unlicensed-buyer"
+                 "BAD bulk-order-unregistered-product"
+                 "BAD bulk-order-another-clients-product"
+                 "WRONG-REASON"]}
+
+    {:id :ms/reserved-op-demoted-to-undeclared
+     :note "reserved の 1 件を綴り違いにする。op は依然 hard block されるので
+            **phase だけ見る scenario なら通る** —— :reserved-op（権限境界）と
+            :undeclared-op（語彙の穴）は別の失敗であって、reviewer が読む
+            情報量が違う"
+     :file "src/medsales/operation.cljc"
+     :find ":register-product-indication\n   {:reason"
+     :replace ":register-product-indication-TYPO\n   {:reason"
+     :cmd ["clojure" "-M:sim"]
+     :green-marker "  PASS"
+     :must-fail ["BAD reserved-op-register-product-indication"
+                 "want=:reserved-op got=#{:undeclared-op}"]}
+
+    {:id :ms/confidence-ceiling-removed
+     :note "床だけで天井を外す（変更前の実測形）。confidence 99.0 が
+            escalation を買い抜けて **commit まで通る**"
+     :file "src/medsales/facts.cljc"
+     :find "(and (number? c) (<= 0 c) (<= c 1))"
+     :replace "(and (number? c) (<= 0 c))"
+     :cmd ["clojure" "-M:sim"]
+     :green-marker "  PASS"
+     :must-fail ["BAD unusable-confidence-above-one" "actual=commit"]}
+
+    {:id :ms/no-client-id-branch-removed
+     :note "「id を名乗っているか」を先に訊く枝を外す（変更前の実測形）。
+            空 map の client が nil キーに入り、client を名乗らない request に
+            答える。**その request は :hold には行く** —— :product-wrong-client
+            という**別の問い**で。理由を pin していなければ緑のまま"
+     :file "src/medsales/facts.cljc"
+     :find "(not (identified? (:client-id request)))\n    [{:rule :no-client-id"
+     :replace "false\n    [{:rule :no-client-id"
+     :cmd ["clojure" "-M:sim"]
+     :green-marker "  PASS"
+     :must-fail ["BAD request-without-client-id"
+                 "want=:no-client-id got=#{:product-wrong-client}"]}
+
+    {:id :ms/licensed-buyer-gate-made-unconditional
+     :note "免許保有者ゲートを :restricted? に関係なく全品目へ当てる。
+            ⚠ **拒否は 23 → 25 に増える。** 拒否側の scenario は全部通り、
+            落ちるのは clean 側 3 件。両方向を持たない table はこれを見逃す"
+     :file "src/medsales/facts.cljc"
+     :find "(if-not (:restricted? product)"
+     :replace "(if-not true"
+     :cmd ["clojure" "-M:sim"]
+     :green-marker "  PASS"
+     :must-fail ["BAD clean-sale-unrestricted-no-buyer-licence-needed"
+                 "got=#{:unlicensed-buyer}"]}
+
+    {:id :ms/indication-subset-inverted
+     :note "部分集合の向きを逆にする。オフラベルの scenario は**そのまま赤く
+            ならない**（逆向きでも空でない差が出るため）—— 捕まえるのは
+            「適応を主張しない sale」という clean 側の 1 件"
+     :file "src/medsales/facts.cljc"
+     :find "(set/difference (set claimed) (set (:approved-indications product)))"
+     :replace "(set/difference (set (:approved-indications product)) (set claimed))"
+     :cmd ["clojure" "-M:sim"]
+     :green-marker "  PASS"
+     :must-fail ["BAD clean-sale-claiming-no-indication" "got=#{:off-label-claim}"]}
+
+    {:id :ms/scenario-table-reduced-to-clean-commits
+     :note "harness 自身への mutation。table から拒否を全部落とすと
+            **mismatches=0 の完全に整合した run** ができる —— それを
+            緑にしないことがこの harness の存在理由"
+     :file "src/medsales/sim.cljc"
+     :find "(let [results (mapv run-one scenarios)"
+     :replace "(let [results (mapv run-one (filterv #(= :commit (:expect %)) scenarios))"
+     :cmd ["clojure" "-M:sim"]
+     :green-marker "  PASS"
+     :must-fail ["refusals=0" "REFUSING TO REPORT A PASS"]}
+
+    ;; ── sim が原理的に見られない 2 件（unit test だけが捕まえる）──────
+    {:id :ms/ledger-unchained
+     :note "台帳の連鎖を切り、常に prev 0 で hash する。**sim は緑のまま** ——
+            ほぼ全 scenario が graph を 1 回しか回さず、1 件の台帳は prev 0 が
+            正当だから。sim.cljc の docstring がこの盲点を名指ししており、
+            これはその宣言が本当かどうかの検査でもある。graph を 2 回回す
+            actor-test と、手で組んだ台帳を見る ledger-test が捕まえる"
+     :file "src/medsales/ledger.cljc"
+     :find "(let [prev (if (seq ledger) (:ledger/hash (peek (vec ledger))) 0)"
+     :replace "(let [prev 0"
+     :must-fail ["the-ledger-it-leaves-behind-verifies"
+                 "each-entry-commits-to-its-predecessor"
+                 "the-ledger-distinguishes-a-human-approved-write-from-an-automatic-one"]}
+
+    {:id :ms/phase-ordering-reversed
+     :note ":hard? より :escalate? を先に見る。**sim は緑のまま** —— governor が
+            :escalate? を (and (not hard?) ...) で計算するので、両方立った
+            verdict を今日は出さない。この順序は 2 本目の独立した guard であり、
+            落ちるのは phase-test の 1 assertion ちょうど"
+     :file "src/medsales/phase.cljc"
+     :find "(:hard? verdict)     :hold\n    (:escalate? verdict) :request-approval"
+     :replace "(:escalate? verdict) :request-approval\n    (:hard? verdict)     :hold"
+     :must-fail ["hard-beats-escalate"]}]}]}
