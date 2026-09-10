@@ -1358,6 +1358,17 @@ pass にしない。**
   threshold aggregation を先に入れない。先にやるのは今の ayatori が何を漏らすかの
   再現手順（存在照会 0/1、adaptive probing による個体値復元、result identity の変化）。
   **測っていない防御は、測っていない攻撃に対する劇場。**
+  ⚠ **2026-09-10 に測った。レビューが挙げた形（aggregate だけ許す surface）は
+  この plane には存在しない** —— 可視性の seam は `visible?` 1 本で per-datom・
+  required なので、aggregate だけを許すモードが無い。**在ったのは走査上限の側で、
+  `materialize` はどちらの arity にも `visible?` を取らないため、ceiling は
+  可視性の判断が 1 度も行われないうちに「止めた時点の datom 数」を `ex-data` で
+  返す。** 値を 1 つも読めない呼び出し側が、正確な総数・名指しの個人の存在・
+  その人の項目数を回収できた（`max-datoms` を名指さない 2-arity でも組み込み閾値で
+  漏れる）。**resource budget は privacy budget でないだけでなく、それ自身が
+  開示経路である。** 再現は `orgs/kotoba-lang/ayatori` の
+  `bench/inference_channel.cljs`（記録は `bench/inference-channel-01.edn`）。
+  **防御はまだ入れていない** —— 何を選ぶかは決定であって、これはその入力。
 - **agent が触れてよいのは propose まで。** `generate → parse → schema validate →
   static effects → authority check → risk classify → admission → execute` のうち、
   agent は左 3 つ。`ayatori.agent/validate` は実在するが、**validate が通ることは

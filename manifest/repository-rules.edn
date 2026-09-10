@@ -214,7 +214,15 @@
    {:resource {:exists true
                :implemented-by "kotobase.query.bridge/default-max-datoms"
                :signals :materialize-over-budget
-               :bounds :work-performed}
+               :bounds :work-performed
+               ;; Measured 2026-09-10: it is not merely NOT a privacy budget,
+               ;; it is itself a disclosure channel. `materialize` takes no
+               ;; `visible?` in either arity, so the scan the ceiling bounds
+               ;; runs over every document before a visibility decision
+               ;; exists, and the refusal reports the running total it
+               ;; stopped at. A bound on work publishes the quantity bounded.
+               :is-itself-a-channel true
+               :channel-evidence "orgs/kotoba-lang/ayatori bench/inference-channel-01.edn"}
     :privacy {:exists false
               :bounds :information-disclosed
               :blocked-on :measure-the-channel-first}}
@@ -222,7 +230,26 @@
    ;; threshold aggregation are not to be added until the channel they close
    ;; has a reproduction. An untested defence against an unmeasured attack is
    ;; theatre in both directions.
-   :policy/inference-channels-measured false
+   ;;
+   ;; Done 2026-09-10, and it moved the target. The reviewed threat -- an
+   ;; aggregate-only surface answering 0/1 -- is NOT APPLICABLE here: the only
+   ;; visibility seam is `visible?`, per-datom and required, so there is no
+   ;; aggregate-only mode to abuse. The channel that does exist is the scan
+   ;; ceiling. Values are genuinely hidden (`q` returns the empty set,
+   ;; `entity-attrs` prunes the entity rather than leaving empty sets under
+   ;; its keys); counts are not.
+   :policy/inference-channels-measured true
+   :policy/inference-channel-evidence
+   {:harness "orgs/kotoba-lang/ayatori bench/inference_channel.cljs"
+    :record "orgs/kotoba-lang/ayatori bench/inference-channel-01.edn"
+    :pin "e47e26b6cb06"
+    :measured-on "2026-09-10"
+    :reviewed-threat :not-applicable
+    :found :scan-ceiling-reports-refused-cardinality
+    :recovered #{:exact-datom-count :existence-of-a-named-individual
+                 :that-individual-field-count}
+    :reachable-without-naming-a-cap true
+    :defence-chosen :none-yet}
    ;; Generate, validate and authorize are three steps, and an agent reaches
    ;; only the first two. `ayatori.agent/validate` passing is not admission.
    :policy/agent-output :proposal-only
