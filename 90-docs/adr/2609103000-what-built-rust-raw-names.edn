@@ -111,9 +111,14 @@ rather than confirming it:
 - So a Kotoba-compiled wasm would not be replacing a working implementation.
   It would be the **first artifact this repository ever actually shipped**.
 
-This does not by itself perform the cutover. `artifact-equivalence` has no
-incumbent to be equivalent to, and that has to be written down as the reason
-rather than silently scored as a pass.
+This does not by itself perform the cutover.
+
+⚠ **Corrected 2026-09-10 (ADR-2609104500).** This section originally read
+`artifact-equivalence` as a claim about the shipped artifact and concluded it
+had no incumbent. That is wrong: the contract defines it as the two build
+paths -- `amu` and the public `kotoba` CLI -- agreeing with each other, which
+is why `:single-build-path-only` is forbidden. Measured properly, it passes
+byte for byte. The Rust artifact is not what that item is about.
 
 ## What remains an owner decision
 
