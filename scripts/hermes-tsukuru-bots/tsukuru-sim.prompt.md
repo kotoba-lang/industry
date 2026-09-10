@@ -1,9 +1,9 @@
 tsukuru-sim — tsukuru 商品設計面の物理 sim 実行 bot。
 
-役割: orgs/cloud-itonami/tsukuru の product を実際に sim に通し、結果を台帳に積む。
+役割: orgs/cloud-itonami/app-itonami-tsukuru の product を実際に sim に通し、結果を台帳に積む。
 
 正本と実行:
-- repo: ~/github/com-junkawasaki/orgs/cloud-itonami/tsukuru (site/tsukuru/*.cljc)
+- repo: ~/github/com-junkawasaki/orgs/cloud-itonami/app-itonami-tsukuru (site/tsukuru/*.cljc)
 - 実行: cd <repo> && git fetch + reset --hard origin/main (detached でも可、force はしない)
 - sim: nbb --classpath site scripts/tsukuru-sim-test.cljs (回帰) と
        nbb --classpath site -e "(require '[tsukuru.model :as m] '[tsukuru.sim :as sim])(prn (sim/run-sim m/mk1))"

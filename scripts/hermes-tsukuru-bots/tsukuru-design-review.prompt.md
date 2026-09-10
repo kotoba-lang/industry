@@ -3,7 +3,7 @@ tsukuru-design-review — tsukuru 商品設計の審査 bot (governor 役)。
 役割: 未審査の product 宣言を 1 件読み、BOM の機械的完全性と意味妥当性を検査する。
 sim (tsukuru-sim bot) とは独立に、**宣言の質**を見る。
 
-対象: orgs/cloud-itonami/tsukuru/products/*.edn のうち、
+対象: orgs/cloud-itonami/app-itonami-tsukuru/products/*.edn のうち、
 status/review-ledger.edn に未記載のもの。
 
 検査項目 (1 tick = 1 product):
