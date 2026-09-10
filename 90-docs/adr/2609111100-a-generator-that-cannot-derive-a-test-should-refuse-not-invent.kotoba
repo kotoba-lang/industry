@@ -1,0 +1,76 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111100-a-generator-that-cannot-derive-a-test-should-refuse-not-invent")
+  (:adr/topic "q9-generator-no-refs")
+  (:adr/title "A generator that cannot derive a test should refuse, not invent the input the test needs")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang" "kotoba-lang/com-aave"))
+  (:adr/related (vector "adr-2609111000-an-unchanged-oracle-is-the-control-for-a-regeneration"))
+  (:adr/body
+  "## Context
+
+`com-aave` was the last pilot to check against a generated candidate. It was
+chosen because it declares coercions on unrequired fields across three entities
+-- more than any other pilot sampled -- so if the fixture gap closed last
+iteration existed anywhere else, it should be widest there.
+
+The generator never got that far.
+
+## What happened
+
+    nbb gen-whole-component.cljs <template> <repo> aave
+    Error: No item 0 in vector of length 0
+
+All four aave specs are `:refs {}`. `ref-row` indexed the empty ref-field vector
+and the run died. An index error is the worst available outcome: it names
+nothing, writes nothing, and leaves the caller to guess whether the input, the
+template or the generator was at fault.
+
+The condition was already known to the code. `plan` computes `:refs-exercised?`
+and the summary line already prints `expand folds over nothing in this
+repository`. It simply was not honoured at the point where it mattered.
+
+## Decision: refuse, and do not invent
+
+The generator now refuses with the entity list and a hint, exits 2, and writes
+nothing.
+
+The tempting alternative is to generate something. The hand-written `com-aave`
+component shows exactly what that something would look like, and it is good
+work: it passes `expand` a SYNTHETIC ref table -- `\"liquidityIndex:ReserveData\"`
+-- so the fold runs even though the real table yields nothing, and it keeps
+selector 0 on the REAL table so the emptiness is documented rather than hidden.
+
+A person weighed that and chose it. A generator doing the same on its own would
+be manufacturing the very test input whose absence it exists to detect. The arms
+would go green over a fold the production path never performs, and the green
+would look exactly like the green from a repository where the fold really runs.
+
+That is the distinction worth keeping: **a human may construct a test input and
+say so; a generator that constructs one has removed the reader's ability to tell
+a derived test from an invented one.**
+
+## Reproduce
+
+    # refuses, exit 2, writes nothing
+    nbb gen-whole-component.cljs <template> <com-aave> aave
+    # still generates, exit 0
+    nbb gen-whole-component.cljs <template> <com-accela> accela
+
+⚠ Read those exit codes from a file, not through a pipe. Measured again in this
+iteration: `... | tail -3; echo exit=$?` printed `exit=0` for the refusing run,
+because that is `tail`'s status. The refusal was on screen and the exit code
+said the opposite.
+
+## What this leaves unanswered
+
+The question this iteration set out to ask -- does `com-aave`'s hand-written
+coercion fixture carry the same gap the generator's did -- is still open, and
+cannot be answered by generating a candidate. It has to be read directly. What
+IS known is that its fixture is richer than a generated one would be: it carries
+`\" 80 \"` with surrounding spaces to exercise trimming and `\"YES\"` to exercise a
+case-insensitive bool, neither of which a placeholder generator produces.
+
+`com-aadhaar` remains unexamined against a candidate.")))
