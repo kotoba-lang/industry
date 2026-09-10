@@ -1,0 +1,58 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809101800-kotoba-migration-model-eval")
+  (:adr/title "Which model for clj to Kotoba: the migration bot's model pin was never compared, and the two things that actually make it cheaper are not the model")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/related (vector "ADR-2608650000" "ADR-2607279200" "ADR-2607173100" "ADR-2608136000" "ADR-2809041200"))
+  (:adr/context
+  "The question asked was how to identify the cheapest model for the clj to Kotoba refactor using murakumo.cloud. The harness that answers it already existed and was not being used as one.
+
+  scripts/hermes-kotoba-migration-bots has a decision-free candidate ranker (candidates.cljs, 7,857 .clj/.cljc files across 2,450 kotoba-lang repos measured 2026-09-10) and an objective gate (verify-kotoba-migration.cljs, exit 0/1/2) whose README states each check was verified to reject its own broken case. What it did not have was a comparison: all three jobs are pinned to z-ai/glm-5.3-flash through openrouter-free, and that pin appears nowhere as the outcome of a measurement. It is an assertion.
+
+  murakumo's role in this question is not that of an equal contestant. It is owner-operated, so its marginal cost per token is approximately zero, which makes it the price floor: the question it answers is binary -- does the free option clear the gate often enough. If it does, the search ends there regardless of what a metered model would score.
+
+  Two endpoint facts were measured rather than read off the registry. api.murakumo.cloud/v1/chat/completions answers (HTTP 200, murakumo-main resolving to qwen3.8-27b-throughput-b70) and returns usage and timings, which is the measurement surface. The endpoint the registry DECLARES for murakumo-main, infer.murakumo.cloud/v1/chat/completions, answers HTTP 404; the registry marks that entry status unverified, so this is a declared value disagreeing with a measured one rather than a contradiction.")
+  (:adr/decision
+  "MEASURE COST PER ACCEPTED MIGRATION, NOT TOKENS AND NOT PASS RATE. A model at half the price with a third of the accept rate is more expensive. The registry's own gemma-4-12b-it note is this trap already written down -- 'slower (7.5 vs 12.7 tok/s) AND needs a much larger token budget to converge' -- where the throughput figure alone had the sign backwards on total cost.
+
+  THE ORACLE IS RUNNING THE ARTIFACT, NOT COMPILING IT. The harness owns the input set, computes ground truth by running the original .cljc under nbb, then runs the model's COMPILED artifact on the same inputs and compares. Expected values are never sent to the model.
+
+  This is not ceremony. time-pad4 produced a module that compiled cleanly 3/3 and returned 007 where the Clojure returns 0007 -- an off-by-one in the cond ladder, identical across all three reps. A compile-only gate would have accepted all three, which is precisely the failure the bot's own README names as its highest blast radius: working Clojure replaced by subtly-wrong Kotoba. The comparison was verified in the other direction with a deliberately wrong pad2 (< 3 instead of < 2): it compiles with exit 0 and is caught only by execution.
+
+  LANDED: scripts/hermes-kotoba-migration-bots/model-eval/ -- eval-runner.cljs (per-task, with an optional --repair loop), batch-test.cljs, compare.cljs, where.cljs, cachetest.cljs, tasks.edn (the fixed 12-task set), the two result files, and a README carrying every number below with its reproduction command.
+
+  FIRST MEASUREMENT, 2026-09-10, murakumo-main = qwen3.8-27b-throughput-b70, 12 tasks x 3 reps: pass 6, parity-fail 3, compile-fail 13, parity-not-measured 14. 4,495 tokens and 57.9s of model latency per accepted migration. On the three tasks the harness could actually grade, 6/9.
+
+  DO NOT ADD A REPAIR LOOP. Feeding the compiler's own diagnostic back (never expected values, so a parity-fail stays terminal) cost 1.90x the tokens and 1.80x the wall clock and produced ZERO additional accepted migrations. passes-needing-repair = 0. It converted compile-fail into compiles on kotoba-io-len 3/3 and netcap-surface-to-cap 1/3 -- but only on tasks the harness cannot grade, so what it bought was a module nobody verified. Every task that could be graded already compiled on the first attempt. And the failure that actually costs you is structurally invisible to it: time-pad4 compiles, so no diagnostic exists to feed back.
+
+  THE TWO LEVERS THAT DO WORK ARE NOT THE MODEL.
+
+  1. Shape pre-filter, 2.25x, losing no passes. Dropping candidates whose Clojure signature touches map / atom / set / char / keyword takes tok/accept from 4,495 to 2,001. The dropped seven burned 14,967 tokens (55.5% of the budget) across 21 runs for ZERO passes, and two repair rounds did not rescue them. candidates.cljs ranks by line count, interop markers and throw forms; it never asks whether the value shapes are expressible in today's profile.
+
+  2. Batching 3-4 functions per call, 2.46x, with verdicts identical task for task. 89.8% of all tokens were the rules block re-sent once per task; output was 10.2%. On the same three tasks, per-task 1,164 tok/accept and 17.6 s/accept became 474 and 10.4.
+
+  The batch ceiling is operational rather than qualitative. batch-of-3 ~20.8s OK, batch-of-4 ~25.9s OK, batch-of-6 ~30.2s refused 2/2 with {\"error\":\"murakumo fleet unreachable: Error: connection_refused\"}. A small request (6.2s) and a 12-item batch of trivial functions (30.2s, HTTP 200) both succeed, so the fleet is healthy and only calls whose generation crosses ~30s are refused.
+
+  PROMPT CACHING IS A LATENCY LEVER, NOT A TOKEN LEVER. The same 1,297-token prefix sent three times reported cached=0 every time while wall clock went 7,512 -> 4,352 -> 4,340 ms. Prefix reuse exists in the compute path and the token accounting does not report it. Since murakumo is owner-operated and its real cost is time, this is worth having; it is not a way to send fewer tokens.")
+  (:adr/consequences
+  "basho-320-18b WAS NOT MEASURED, and that is the open half of the request. Probed four times over about two hours, direct and through the gateway: HTTP 404 modal-http: workspace ac-qrwBVal0OY1NvoOHAJjUPJ is disabled, and HTTP 502 from api.murakumo.cloud (the gateway proxies to Modal and receives the same non-JSON body). modal app list authenticates and reports basho-320-1... as deployed, so this is an account-level state on Modal's side -- billing or spend limit is the usual cause -- and not an app fault, and not something this workspace's tokens can change. The registry declares it serving / fresh, verified 2026-09-04. RESUME POINT: when the workspace is re-enabled, `nbb eval-runner.cljs --tasks tasks.edn --models murakumo-main,basho-320-18b --reps 3` runs the identical 36.
+
+  NO COMBINED FILTER-PLUS-BATCH MULTIPLIER IS RECORDED, deliberately. Two of the five tasks surviving the shape filter (string-pad-left, string-pad-right) require kotoba.string.pad, which is not on the harness classpath, so their ground truth is UNAVAILABLE and their pass/fail cannot be counted. Multiplying 2.25 by 2.46 would state a precision nobody measured. Closing it costs one classpath entry and one run.
+
+  THE PROMPT HAD TO BE MEASURED BEFORE IT COULD BE WRITTEN, and this is the reusable part. A first draft asserted that count, subs, str and = work on strings. Every one of those is false in this profile, and had the eval run on it, it would have measured the prompt's misinformation rather than the model. The compiler said so precisely, one probe at a time: count requires a bounded vector... A string has no element count in this profile; subs is not a builtin; equality type is outside the safe value profile -- use string=? for string equality; and (str n) on an :i64 is an expression type mismatch. The working set is string-length / string-substring / string=? / string-concat / string-from-i64, verified by compiling AND running a reference module.
+
+  AND THAT PROBE RETIRED A STALE SENTENCE IN THE REFERENCE THE PRODUCTION PROMPT POINTS AT. amu/examples/todo-app.kotoba's header states that Kotoba has no integer-to-string builtin and builds two documented workarounds (26-item cap, a 9+ counter) on that basis. string-from-i64 exists, compiles, and returns 07 for 7. The scout prompt names todo-app as THE reference shape, so a model reading it is being taught a constraint that has been lifted. Not fixed here -- it is amu's file and the workarounds may have other reasons -- but it is the ADR-2809041200 shape exactly: an implementation snapshot that became language, still steering design after the ceiling moved.
+
+  HARNESS LIMITS, so a later reader does not mistake them for findings. Cross-runtime comparison is defined for scalar returns only; map, char and keyword shapes report parity-not-measured, which is NOT a pass and is counted separately everywhere. --top in candidates.cljs is parsed and never used (only --pool is), so the fixed task set is built by running it 12 times against a throwaway --seen ledger, 62s per run. Ground truth needs the original namespace to load under nbb, and a task whose repo pulls a sibling repo reports UNAVAILABLE rather than being silently skipped.
+
+  METHOD NOTES, all of them failures caught first.
+
+  A measurement failure and a quality failure returned the same number. batch-of-12 first reported pass-rate 0.0% -- which reads as batching destroys quality -- when the truth was {\"error\":\"murakumo fleet unreachable\"} at exactly 30.2s. The tell was ptok=0: a call that returns no prompt tokens did not run. This is CLAUDE.md's first question (what does the check return when it could not run) reproduced in a harness written by someone who had just read it.
+
+  The first parity-fail was mine, not the model's. The artifact side emitted a GT| prefix the ground-truth side stripped, so a correct migration was reported as expected [07] got [GT|07]. Caught because the values were identical modulo the prefix. A harness bug and a model failure are the same red.
+
+  Boundary inputs are what caught the only real defect. time-pad4's ladder is wrong exactly at a 1-character string; inputs 7, 1234, 0 and 12345 include that boundary. Without it the task passes.
+
+  Three reps is a floor, not caution. At temperature 0.2, string-pad-right flipped 3/3 between the baseline and the repair run -- from compiling to compile-fail -- with no repair round involved in the baseline. A single verdict is a coin flip.
+
+  NEXT, in order of measured effect: add the shape filter to candidates.cljs (it halves the budget and improves the candidate the daily bot draws), then a batch mode of 3-4, then the ~30s route ceiling. The glm-5.3-flash pin stays where it is until a run compares it -- this ADR does not move it, it makes moving it evidence-based.")))
