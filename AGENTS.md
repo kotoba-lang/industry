@@ -1105,7 +1105,9 @@ CertGovernor）。
   `.kotoba` のデータファイルは S 式なので `cljs.reader` がそのまま読む。
   入れ子 map/vector は `pr-str` した string blob（`manifest/edn-datomize.cljs` と同型）。
   ⚠ **この節は 2026-07-17 に `.edn` only として書かれ、tree に追い越された。**
-  実測 2026-09-10: ADR 面は **2,884 件すべて `.kotoba`、`.edn` は 0**。
+  実測 2026-09-10: ADR 面は **2,884 件すべて `.kotoba`**。⚠ **その数時間後に `.edn` の ADR が 1 件着地した**
+  （`2609101900-q9-rename-reverted-pending-admission.edn`）—— 下の `adr-new.cljs` の
+  欠陥の実例である。**この規則は現状の記述ではなく方向であって、件数で読まない。**
   ⚠ **`90-docs/` 全体は kotoba only では*ない*。** datom catalog と ledger は `.edn` のまま
   **617 件**在り（business 165 / lake 77 / community-coverage 46 / maturity 42 / evidence 39 …）、
   `.md` も 88 件残っている。gate `docs-edn-check` は `.edn` と `.kotoba` の両方を受ける。
