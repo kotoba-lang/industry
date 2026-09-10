@@ -1,0 +1,103 @@
+(vector
+ (map
+  (:adr/id "adr-2609112700-a-refusal-scoped-wider-than-its-reason")
+  (:adr/title "A refusal scoped wider than its reason")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112500-a-hash-that-does-not-vary-with-the-repository"))
+  (:adr/body "
+## What was frozen
+
+com-aftership, com-adyen and com-airtable declare :refs {} on every spec.
+The generator refused the whole run on that basis, so each improvement
+since -- the entity table, the fixtures, oracle-filters, oracle-handlers,
+none of which touch a ref -- stopped at that one line.
+
+Measured 2026-09-11, all three still carried both defects already fixed
+everywhere else: oracle-filters answering the same number for all six
+selectors, and handler selector 6 measuring 400 with selector 13 hashing
+an absent field.
+
+That is the compounding shape. A refusal scoped wider than its reason does
+not just block one thing once; it blocks everything afterwards, quietly,
+and the gap grows with every fix that lands elsewhere.
+
+## What was NOT relaxed
+
+The reasoning behind the refusal is intact. A generator that invented a
+ref pair would manufacture the input whose absence it exists to detect,
+and its arms would go green over a fold the production path never
+performs. Nothing here invents one.
+
+## Skipping did not work, and the floor said so
+
+The first attempt skipped the ref blocks and regenerated the rest. The
+evidence floor refused: the generator builds from the TEMPLATE, so an
+un-regenerated cred-row keeps parentPartId, childPartId and the BOM
+entity, and the output would name a relationship the repository does not
+have.
+
+I had checked the SHIPPED components for those tokens and found none, and
+concluded skipping was safe. The generator does not start from the shipped
+component. The floor caught the error that reading had not.
+
+## So the blocks are deleted
+
+cred-row, seeded-both and oracle-expand form a closed cluster: cred-row
+feeds seeded-both, both feed oracle-expand, and the only tie outside it is
+the oracle-expand export. The three come out together, and the export with
+them.
+
+That is a public-surface change, of the kind ADR-q9 allows by explicit API
+decision. It is the right one: a fold over nothing should be absent rather
+than present and vacuous, which is the same rule the harness already
+states for its own arms.
+
+## Two things the refusal had been hiding
+
+The substitution table resolves ref-prefix and ref-ent through the ref
+entity, which is nil here. str/replace with a nil replacement throws from
+inside clojure.string, naming the reducer rather than the token -- an
+error that says where it broke and not what broke. Substituting a token
+for nothing is never right, so a nil replacement is now dropped and
+REPORTED.
+
+That report earned itself immediately. It names BOM, which survives in
+oracle-store's last selector: in these three repositories that selector
+queries an entity the repository does not have. It still returns 0, so the
+store-layer parity landed earlier measured five of five agreeing -- the
+harness queries a real other entity holding no rows, the component queries
+a nonexistent one, and both answer 0. Agreement for two different reasons.
+Recorded here; not fixed in this iteration.
+
+## Reproduce
+
+    nbb scripts/gen-whole-component.cljs <template> <worktree> <src-dir>
+
+A ref-less repository now prints DROPPED-BLOCKS and SKIPPED-TOKENS and
+writes; a ref-having one prints neither and is byte-for-byte idempotent.
+
+    filters  before 5,5,5,5,5,5   after 5,5,0,1,0,5
+    handlers before sel6=400 sel13=7   after sel6=200 sel13=<hash>
+
+com-airtable is 5,5,0,5,5,5: Base declares :fields and :required
+identical, so no field carries a row index and the two uniqueness
+selectors are omitted with a comment rather than faked by repeating a
+required field. The floor -- selector 1 matches every row, selector 2 none
+-- is met.
+
+## Control
+
+On a ref-having repository the patched generator is byte-for-byte
+idempotent and prints neither new line. Without that control the change
+could have altered seventeen components silently.
+
+## Still outside
+
+com-airbus-analytx remains skipped for a different and unchanged reason:
+it is hand adapted, 16 added and 23 removed lines against the generator's
+output, and is not machine rewritten.
+
+com-abb-robotics, the template itself, is still not a fixed point of its
+own generator.
+")))
