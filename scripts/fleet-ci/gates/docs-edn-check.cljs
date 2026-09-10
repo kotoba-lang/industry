@@ -83,10 +83,22 @@
   of the sentence closed the map. The document parsed, the entity had a key of
   `10`, and this check — symbols only — said nothing. `adr-bad-keys` below is the
   narrow answer: integer keys are legitimate in this corpus generally, and not in
-  an ADR."
+  an ADR.
+
+  ⚠ BARE means unqualified, and that word was in this docstring before it was in
+  the code. `(filter symbol? ...)` also matched QUALIFIED symbols, which is how
+  dependency coordinates are written -- `io.github.kotoba-lang/kotobase-engine`,
+  `thheller/shadow-cljs`. That never showed while the check only ran over
+  90-docs, where no deps.edn exists. Measured 2026-09-10 at repository root: of
+  10 files with symbol keys, 8 were deps.edn whose keys were ALL qualified, and
+  the 2 real ones (`ZAF`; `to disagreeing three app`) had NO qualified keys at
+  all. The split is clean in both directions, so the rule is the namespace and
+  not a filename allowlist -- a deps.edn whose prose really did break would
+  still produce a bare symbol and still be caught."
   [v]
   (cond
-    (map? v) (concat (filter symbol? (keys v)) (mapcat bad-keys (vals v)))
+    (map? v) (concat (filter #(and (symbol? %) (nil? (namespace %))) (keys v))
+                     (mapcat bad-keys (vals v)))
     (sequential? v) (mapcat bad-keys v)
     :else nil))
 
