@@ -619,5 +619,54 @@ probe に**バイト数**を足す（`async-get-fn` が返す長さの累計）�
 
 **db 表現にも rows にも encode にも、もう手を入れない。合計 4 MB しかない。**
 
+## 収支が合った —— このメモリは retained ではなく churn である（2026-09-10、まとめ）
+
+ブロックの**バイト数**を計器に足して測った（control-plane `e1ea28c8`）:
+
+    {\"op\":\"write\",\"gets\":135,\"decrypts\":1665,\"encrypts\":0,\"blinds\":0,
+     \"fetchedKB\":666,\"ms\":6676}   outcome=exceededCpu cpu=32000ms
+
+**fold が取ってくるブロックは全部で 0.65 MB**（135 gets ≈ 5 KB/block）。
+`wasmMemoryBytes` は全 status で **0**（WASM でもない）。
+
+### 収支
+
+    baseline（success の memP50）        14.6 MB
+    fetch したブロック                    0.65 MB
+    rows 配列 + built db + encode 文字列   3.78 MB
+                                        --------
+    説明できるもの                        19.0 MB
+    本番の fold                           74〜82 MB
+    **未説明**                            **約 55〜63 MB**
+
+**0.65 MB の入力から数十 MB が生成されている。** 入力でも保持でもないなら、
+残るのは **transient な allocation churn** —— GC が追いつかない速度で作られる
+ゴミそのものが peak を作っている。
+
+### それが正しいことの、既に取れている証拠
+
+**hydrate を bulk 化したとき memP50 が 89.9 → 74.4 MB（−15.5 MB）動いた。**
+あの変更は retained を減らしていない（built db は前後とも 2.17 MB）。減らしたのは
+**行ごとに永続 db を作り直す churn だけ**である。**churn を減らしたらメモリが
+減った = このメモリは churn である。**
+
+### したがって直し方
+
+**「保持を減らす」ではなく「1 行あたりの allocation を減らす」。** 同じ lever を、
+まだ per-row で allocate している残りの場所に当てる —— `cold-datoms-async` の
+decrypt → decode → row map 構築の経路（1,665 行ぶん）。
+
+⚠ **retained を測って対象を選ばない。** 内訳（3.78 MB）は「そこを削っても意味が
+ない」ことは教えるが、「どこを削るべきか」は教えない。churn は retained に現れない。
+
+### 死んだ仮説（9 個、すべて測定で）
+
+chain walk の長さ / trampoline の再実行 / AES-GCM / snapshot 側 / CPU 予算 /
+`qs/commit!` / `blind-fn` / `apply-quad` / ブロックキャッシュ・WASM メモリ。
+
+**当たったのは 1 つだけ**（メモリであること、そして churn であること）で、
+それも「予測 −14MB → 実測 −15.5MB」で検証された。**推論ではなく、
+計器を 1 層ずつ深くしたことが効いた。**
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
