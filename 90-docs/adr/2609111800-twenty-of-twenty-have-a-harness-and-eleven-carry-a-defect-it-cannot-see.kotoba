@@ -1,0 +1,70 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111800-twenty-of-twenty-have-a-harness-and-eleven-carry-a-defect-it-cannot-see")
+  (:adr/topic "q9-parity-harness-coverage")
+  (:adr/title "Twenty of twenty pilots have a parity harness, and eleven carry a defect no layer of it can see")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang"))
+  (:adr/related (vector "adr-2609111700-the-table-layer-found-a-corrupted-field-name-on-its-first-live-run"))
+  (:adr/body
+  "## Coverage is complete, and that is the smaller half of this entry
+
+`com-airbyte` and `com-airtable` close the cohort. All twenty wave-1 pilots now
+carry a parity harness, each verified the same way before landing: generate,
+`amu check`, compile to aarch64-macos, execute through `tools/kexe_loader.c`,
+compare selector by selector.
+
+Both: route count 30 on both sides, as-bool 9 of 9, page-limit 8 of 8, entity
+table 6 of 6, as-int 5 of 6 with the cohort-wide `\"12abc\"` divergence.
+
+## The measurement that matters more
+
+Having built the harness, the obvious next question is what it still cannot
+see. The generator was fixed three times this week -- ref arity, comment
+ownership, the coercion fixture -- and components generated before those fixes
+never received them. So every component was scanned for the signatures.
+
+**Eleven of twenty emit a duplicate JSON key in `cred-row`.** Verified by
+reading two of them rather than trusting the count:
+
+    com-8th-wall   (jkv \"sceneId\" ...) twice, plus a `quantity` field
+    com-airbyte    (jkv \"connectorId\" ...) twice, plus a `quantity` field
+
+That is the pre-fix `ref-field-2 -> ref-field-1` aliasing, shipped.
+
+**No layer of the harness reads `cred-row`.** Route count, as-int, as-bool,
+page-limit and the entity table are all derived from `entity-specs` or from a
+fixed table of strings. A duplicate key in a fixture is invisible to all five,
+and `amu check` returns `:ok true` because the object is built with `jkv` calls.
+
+So `20 of 20` and `11 of 20 defective` are both true, and they are not in
+tension: they measure different things.
+
+## One column of that scan was not trustworthy
+
+The scan also flagged a `quantity` field as foreign in sixteen components. In
+`com-abb-robotics` `quantity` is a REAL field of `BOM`, so the signature is
+repository-dependent and over-reports. Only the duplicate-key column is
+unambiguous -- a duplicate JSON key is wrong regardless of the repository -- and
+that is the number quoted above.
+
+The same shape as yesterday's over-reporting corruption scan, which called two
+correct components mismatched because its regex dropped the digits from `last4`.
+A scan that is right about the defect and wrong about its extent still sends
+someone to regenerate working code.
+
+## What this leaves
+
+The honest reading of the cohort right now:
+
+  twenty components, all compiling and executing
+  twenty harnesses, five layers each, all verified against their artifacts
+  eleven components carrying a duplicate-key fixture defect
+  zero components carrying a corrupted table (fixed and re-scanned yesterday)
+
+The eleven need regeneration with the current generator. That is mechanical --
+the generator is fixed and idempotent on already-correct output, measured on
+`com-accela` -- but it moves recorded hash values in every affected record, so
+it wants its own iteration rather than riding along with a coverage push.")))
