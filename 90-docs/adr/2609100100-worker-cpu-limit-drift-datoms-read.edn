@@ -165,5 +165,90 @@ content address で keyed された read-through cache は原理的に効かな�
 3. PDS 側の fan-out 6.8 と timeout ~25s を見直す。ただし
    **上流が速くなるまで、ここを触っても loadShed は動かない。**
 
+## 根本原因（2026-09-10 測定、確定）—— novelty の *構造* walk が同期トランポリンに残っている
+
+前節の「次の一手」を実行した結果、原因は fold の未実行でも snapshot hydration でも
+なかった。**novelty の連結リストを歩く経路が `with-blocks` の同期トランポリンの
+ままで、O(N^2) になっている。**
+
+### 測定
+
+| 測ったこと | 結果 |
+|---|---|
+| `dbStats`（行を 1 つも復号しない）空グラフ / 同テナント・同ハンドラ | **1.50s で 200**、`novelty_size 0` |
+| `dbStats` `yoro-social-v2` | **25s edge deadline / 60s とも返らない** |
+| 有界 fold `max_novelty=1` | 500 / **34.9s** |
+| 有界 fold `max_novelty=2` | 500 / **34.1s**（tail 実測 `exceededCpu` cpu=30000ms） |
+| 有界 fold `max_novelty=4` | 500 / **35.7s** |
+| transact 1 件（400s の tail で観測） | **`exceededCpu` cpu=30000ms** |
+| `*/5` cron 1 件 | **`cpu=0ms wall=0ms logs=0`**（両 reconciler フラグが 0） |
+| 400s の tail 中の fold 関連ログ | **0 本**（auto-fold は一度も走っていない） |
+
+**bound を 1 / 2 / 4 と 4 倍動かしても時間が動かない** —— 支配項は bound の中に無い。
+
+### なぜ snapshot hydration ではないと言えるか
+
+`hydrate-db-cached` は **rows を計算した時点で、novelty を適用する前に** cache-put!
+する（docstring がその理由を明記している。「hydrate に成功した後で CPU 予算を
+超えた fold のために」）。read 経路は `read-store-extras` でその colo 共有 cache
+（Cache API、snapshot-cid keyed、immutable 1 年）を持っている。**7 日間 275 万回
+読まれて一度も速くなっていない。** snapshot hydration が支配項なら、最初の 1 回で
+cache が埋まり以後は消えているはずである。
+
+### 何が O(N^2) なのか
+
+`walk-novelty-entries` は `ipld/get-node get-fn cid` を逐次ループで呼ぶ。Worker 上の
+`get-fn` は `with-blocks` のトランポリンで、**1 ブロックの miss が呼び出し全体を
+root から再実行させる** —— N 個のノードを触る walk が O(N^2) になる。
+
+これは既知の欠陥で、**半分だけ直っている。** `fold!` の `async-get-fn` の docstring:
+
+> confirmed live that routing ONLY the hydrate through it was insufficient: a
+> Worker's whole `h/handle` call is one `with-blocks` retry loop, and a
+> novelty-block miss restarts the ENTIRE call. Routing BOTH read paths through a
+> direct async fetch removes `with-blocks` from `fold!`'s critical path entirely.
+
+`async-get-fn` は `read-tx-block-async` と `cold-datoms-async`（= 中身の読み）には
+通っている。**`walk-novelty-entries` / `novelty-entries` / `novelty-cids` /
+`take-oldest-novelty`（= 構造の walk）には通っていない。** `take-oldest-novelty` は
+`fold!` の platform split の *外* で同期に呼ばれる。
+
+### `max_novelty` は 5 段のうち 1 段しか bound していない
+
+有界 fold が backlog N に対して実際にやること:
+
+1. `back` 全体を walk（同期トランポリン、**O(N^2)**）
+2. 残り全部を `build-novelty-chain!` で書き直す（O(N) encode + N/16 put）
+3. 残り全部の subject index を `build-novelty-index!` で書き直す（同上）
+4. snapshot を hydrate
+5. **tx block を max_novelty 個だけ fold** ← bound が効くのはここだけ
+
+`do-fold` の docstring は「A bounded call makes guaranteed forward progress ... an
+ops/cron driver can drain any backlog in slices」と書くが、**1 スライスが O(backlog)
+なので N を k 刻みで抜くのに O(N^2/k) かかる。** 無界 fold は 2 と 3 をやらない
+（novelty を空にするだけ）ので、**bound を付けた方が余分に働く。**
+
+### したがって、前の版が「次の一手」に挙げた 2 つはどちらも外れだった
+
+- **cron fold を配線する** —— 同じ fold を呼ぶだけで、同じ 30 秒で死ぬ。
+- **physical index を qualify する** —— 別軸で有用だが、この walk は消えない。
+
+### 直す場所（1 repo、engine）
+
+**`kotobase-peer`: novelty の構造 walk に `async-get-fn` を通す。**
+`cold-datoms-async` を入れたときと同じ形の変更で、`fold!` の cljs 分岐に
+`take-oldest-novelty` を取り込む必要がある（現在は platform split の外に在る）。
+副次的に、有界 fold は 2 と 3 を bound 相当に縮めるべき（subject index は
+accelerator であり、不在は `append-novelty-index!` が既にサポートする状態）。
+
+`origin/main` (28e018b) の baseline は **254 tests / 1019 assertions / 0 failures**
+で緑。この変更は cljs の async 面を広げるので、その suite を回して着地させる。
+
+### 現在地
+
+**`yoro-social-v2` は自力で回復できない。** 読み・書き・fold のすべてが同じ walk を
+通り、fold だけが backlog を減らせて、その fold が抜けられない。app-aozora は
+73% loadShed のまま。
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
