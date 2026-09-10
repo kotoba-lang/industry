@@ -29,6 +29,11 @@
   `{:public 0 :internal 1 :confidential 2 :restricted 3}`** ——
   `flow/ranks` の alias ではなく、**`:personal` も持たない。**
   **D1 が消すために存在した二重定義は、それが最も効く場所に残っていた。**
+  **`amu 8015c1785e5f` で閉じた**（deps.edn の security を `b13c5e12 → d87f3342` へ
+  前進。forward-only、ahead 44）。確認済み: その sha の `classification-rank` は
+  `flow/ranks` の alias である。**座標を宣言するだけで動かさない場合を先に測って
+  ある**（`clojure -Spath` が集合として同一、60 entry）—— **依存を書くことと、
+  その版が classpath に載ることは別。**
   これは CLAUDE.md が繰り返し記録している「基盤ライブラリの pin は、fix が main に
   在っても届かない」の 3 例目（同日の他の 2 例: kotobase-server の peer pin、
   kotobase-server の datom-source floor）。Step 4 の PR がこの pin を
@@ -105,10 +110,12 @@
   required 系 4 本 ③枝を abac の下へ→**順序テストだけ**。
 
   ⚠ **option を渡さない呼び出し側は今日と同じ**（`capability-required?` と同じ opt-in）。
-  申告を無条件に必須化するのは Step 4 の compile 時の仕事で、runtime flag の仕事ではない。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 実装済み。3 repo 中 2 つが merge 済み(2026-09-10、subagent)。**
-  `kotoba-lang bf670cf2ef2c` / `kotoba-sema 90baa17c0bb5`（west pin 前進済み）。
-  **`amu` は PR #929 のまま** —— branch protection が PR + status check を要求し、
-  `test (ubuntu-latest)` が実行中だった。west pin は `b57bcdb6981a` のまま。
+  申告を無条件に必須化するのは Step 4 の compile 時の仕事で、runtime flag の仕事ではない。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 実装済み。3 repo すべて merge 済み(2026-09-10、subagent)。**
+  `kotoba-lang bf670cf2ef2c` / `kotoba-sema 90baa17c0bb5` / `amu 8015c1785e5f`
+  （west pin 3 本とも前進済み。amu は PR #929、required check 2 本とも green）。
+  ⚠ 非 required の `browser-matrix (windows-2025)` だけ FAILURE だが、
+  原因は `repo1.maven.org` が `org.clojure:clojure:pom:1.12.0` に **403** を返した
+  runner の network 障害で、同 job は base sha の main では成功している。
 
   `:kotoba.security/classification` を capability-catalog の全 entry
   （= effect descriptor）に載せ、**ラベルを caller のものから言語のものに移した。**

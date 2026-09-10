@@ -399,8 +399,8 @@
     :declared-on :capability-catalog-entry
     :refused-by "kotoba.compiler.effect-classification/check! via kotoba.compiler.effect-row/check"
     :reachable-by-policy false
-    :landed {:kotoba-lang "bf670cf2ef2c" :kotoba-sema "90baa17c0bb5"}
-    :not-landed {:amu "PR 929; west pin still b57bcdb6981a"}
+    :landed {:kotoba-lang "bf670cf2ef2c" :kotoba-sema "90baa17c0bb5"
+             :amu "8015c1785e5f"}
     ;; Measured, not assumed: arming it unconditionally gives 277 failures and
     ;; 1186 errors, because abac denies whenever a resource classification is
     ;; present and the subject's rank is nil -- and no amu policy names a
@@ -415,7 +415,15 @@
    ;; different claims.
    :policy/lattice-duplication-survived-on-the-compiler-classpath
    {:until "2026-09-10" :pinned-by "osaho" :at-sha "b13c5e12"
-    :fixed-in "amu PR 929 (security b13c5e12 -> d87f3342)"}
+    :fixed-in "amu 8015c1785e5f (security b13c5e12 -> d87f3342)"
+    :verified "read abac.cljc at d87f3342: classification-rank is the alias to flow/ranks"
+    ;; Declaring the coordinate without moving it was measured first: the
+    ;; resolved classpath came back set-identical at 60 entries. Writing a
+    ;; dependency and having that version on the classpath are two things.
+    :declaring-is-not-resolving true
+    ;; osaho itself still pins b13c5e12; what changed is amu's top-level floor,
+    ;; which tools.deps lets win. Not measured: every other consumer of osaho.
+    :not-measured "other consumers of osaho may still resolve b13c5e12"}
    :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
    :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}
