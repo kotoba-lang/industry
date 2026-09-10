@@ -1,0 +1,33 @@
+{:doc/id "shinshi-x402-tick-20260909"
+ :doc/status "draft"
+ :doc/date "2026-09-09"
+ :doc/actor "shinshi-sales cron tick"
+ :doc/type :issue-draft
+
+ ;; 実測 (2026-09-09 JST, 全て GET/web fetch + Blockscout V2 API 実行値)
+ :observed
+ {:live-endpoints
+  {"GET /pay" "200 — 人間向け 3 段階 UI 継続 (quote→手動 USDC 送金→tx ハッシュ claim)。自身の treasury アドレスは UI に非表示 (入力で取得する流れ)"
+   "GET /pay/quote?usd=0.5" "200 — chain=base / custody=eoa / treasury 0xf1592811063554e2EDfC137964aE181C830967Ac / fee $0.10 / net $0.40 (rail 整合継続)"
+   "GET /.well-known/x402" "200 — network=base / 同一 payTo / 3 resource (premium / chat=20 msg free quota 後 / video=no free tier) 継続"
+   "GET /x402/premium/test" "402 challenge 正常 (maxAmountRequired 500000 = $0.50)"}
+  :usdc-received "payTo EOA 0xf15928…67Ac: Base 上 transactions_count=0 / token_transfers_count=0 / ERC-20 token-balances=[] (Blockscout V2 実測 2026-09-09)。treasury Safe 0xA00366…2D4E: transactions_count=0 / token_transfers_count=0 (同)。→ 実 USDC 送金 0 件 (09-04 JSON-RPC 0x0 から変化なし)"
+  :funnel-7d "visitors 417 / chatters 111 / scenes 150 / paying 0 (GET /api/funnel 実測 2026-09-09)。前 tick 09-08b 同一計器値 3241/165/139/0/0 と比較し visitors−2824 / chatters−54 — 7d rolling 窓の移動差に注意"
+  :metrics-file "90-docs/business/metrics/club-shinshi.edn as-of 2026-09-04 (7d): 371/71/161/paying 0, 4xx probe 18% — 09-04 以降の再生された実測値は無く STALE のまま"
+  :_metrics-revenue "GET /_metrics/revenue → {error forbidden} 継続 = ExoClick imp/revenue 未計測。runs 0021 (2026-07-09) の USD 0・imp 0 記録のみ、日次監視未実装"
+  :quotes-counter "funnel :quotes は /api/funnel 応答に本 tick では含まれず (09-08 では live 出現・0) — 常に 0 に張り付く仮説 '(c) client render 側未配線' か、応答 payload の取り消しがあったか不明。出現/欠落そのものが未計測"}
+
+ ;; 転換 0 の specific な理由 (本 tick の 1 件)
+ :conversion-zero-cause
+ "USDC 手動自己送金 3 段階フローは chatters が来ても (7d 111 人) 実行不能に近い: /pay UI は treasury アドレスを UI に常時表示せず、quote → ウォレットで USDC を手動送金 → tx ハッシュを claim 送信という手順で、Base mainnet USDC (gas 手動)・tx ハッシュ手入力・DID/アドレス手入力を一般 visitor に要求する。chat free quota が枯渇した chatters に対してこの 3 段階は転換に至る摩擦を持ち得ない (rail 自体は正しい — 摩擦の問題)。→ 'x402 自動送金の UX に接続する' か 'wallet Connect + 送金先自動入力 + claim 自動化' が必要。価格 ($0.50) の変更は提案のみで owner approval"
+
+ ;; shinshi-eng issue 起案 (送信しない — 承認待ち)
+ :issue-draft
+ {:title "[x402] /pay の 3 段階手動 USDC 自己送金フローは一般 chatter に実行不能 — 送金先自動入力 + claim 自動化で摩擦を除去する提案 (実測 2026-09-09)"
+  :body-要点
+  ["実測: GET /pay → 200。quote→『表示の treasury アドレスへ USDC を送金』→『tx ハッシュを送って claim』の 3 段階が継続。treasury アドレス (0xf15928…67Ac) は UI に常時表示されず quote 応答にのみ存在。/pay/quote は chain=base / custody=eoa / fee $0.10 で /.well-known/x402 と完全整合 (rail の不正直さは解消済み)。"
+   "影響: 7d chatters 111 に対し paying 0 (funnel 実測)、payTo EOA の Base 受金 token_transfers_count=0 (Blockscout V2 実測)。rail は正しいがフローが人間に操作不可能に近い。chat free quota 枯渇後の 20 msg 以降の継続課金 ($0.50 / 20msg) が配信されても転換に繋がらない状態が継続。"
+   "提案 (draft — owner approval 前): (a) /pay UI に treasury アドレスを常時表示 + copy button / QR、(b) wallet connect による自動送金 + 送金先自動入力、(c) tx ハッシュの自動 claim (ユーザーが送金したら client が tx hash を自動 POST)。x402 の自動化済 rail に接続する経路が最も摩擦が低い。"
+   "計測: PR #51 の :quotes counter が本 tick の /api/funnel 応答から消えている — 出現/欠落を含めて配線状況の再確認を依頼。"
+   "ask: (a)(b)(c) のうちどれを implement するか判断を shinshi-eng に依頼 (実装は approval-required)。価格・条件の変更は行わない。"]}
+ :rule-guard "数字は全て本 tick 実測 (GET /pay 200・/pay/quote 200・/.well-known/x402 200・/x402/premium/test 402・GET /api/funnel・Blockscout V2 counters + token-balances)。/_metrics/revenue は forbidden 継続 = ExoClick imp 未計測。club-shinshi.edn は as-of 09-04 で STALE。価格・条件の変更なし。"}

@@ -1,0 +1,72 @@
+;; Does an ontology reach a query, and is it inside the query's identity?
+;;
+;; ADR-2609109700. Two questions, one probe:
+;;
+;;   1. `owl.rules` emits RDFS/OWL-2-RL entailment as `:rules`, in the shape
+;;      `datalog.core/q` takes. Nothing in this workspace had ever run the two
+;;      together. This runs them, with two controls -- the same query without
+;;      the rules (fewer answers), and the same rules over a graph with one
+;;      hierarchy edge cut (fewer answers again). A ruleset that returned
+;;      everything and a ruleset that derived nothing would both look like a
+;;      pass against only one of those.
+;;
+;;   2. `kotobase.governed-execution` binds `:query/digest` to
+;;      `(value-cid query)`. If the ontology travels as `:rules` INSIDE that
+;;      value, then it is inside execution identity and an auditor re-derives
+;;      it. The three addresses printed below are what makes that a fact
+;;      rather than a reading of the source.
+;;
+;; nbb, no JVM. Run from the superproject root:
+;;
+;;   nbb --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/ontology_entailment.cljs
+;;
+;; `datom-source` is on that path because `datalog.core` requires it; without
+;; it nbb reports a missing namespace rather than a query answer.
+
+(ns ontology-entailment
+  (:require [owl.rules :as rules]
+            [datalog.index :as idx]
+            [datalog.core :as dl]
+            [kotoba.value.codec :as vc]))
+
+(def ^:private ref? (constantly false))
+(def ^:private visible? (constantly true))
+
+(defn- db-of [triples]
+  (reduce (fn [db [s p o]] (idx/assert-quad db {:s s :p p :o o} ref?))
+          (idx/empty-db)
+          triples))
+
+(def full
+  [["Felix"  :rdf/type        "Cat"]
+   ["Cat"    :rdfs/subClassOf "Mammal"]
+   ["Mammal" :rdfs/subClassOf "Animal"]])
+
+;; control: the top hierarchy edge removed. If the rules are deriving rather
+;; than enumerating, Animal disappears and nothing else does.
+(def cut (vec (butlast full)))
+
+(def asserted-only {:find '[?c] :where '[["Felix" :rdf/type ?c]]})
+(def with-ontology {:find '[?c] :where '[(owl-type "Felix" ?c)]
+                    :rules (rules/hierarchy-rules)})
+(def with-iri-vocabulary {:find '[?c] :where '[(owl-type "Felix" ?c)]
+                          :rules (rules/hierarchy-rules rules/iri-vocabulary)})
+
+(defn- answers [db query]
+  (sort (map first (dl/q db query visible?))))
+
+(defn -main []
+  (println "== 1. entailment, and the two controls")
+  (println "asserted only, full graph    ->" (pr-str (answers (db-of full) asserted-only)))
+  (println "ontology rules, full graph   ->" (pr-str (answers (db-of full) with-ontology)))
+  (println "ontology rules, one edge cut ->" (pr-str (answers (db-of cut) with-ontology)))
+  (println)
+  (println "== 2. is the ontology inside execution identity?")
+  (println "cid(query, no rules)      =" (vc/value-cid asserted-only))
+  (println "cid(query, keyword voc)   =" (vc/value-cid with-ontology))
+  (println "cid(query, IRI voc)       =" (vc/value-cid with-iri-vocabulary))
+  (println "distinct addresses        ="
+           (count (set (map vc/value-cid
+                            [asserted-only with-ontology with-iri-vocabulary])))))
+
+(-main)

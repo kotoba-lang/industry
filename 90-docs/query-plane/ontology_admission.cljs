@@ -1,0 +1,36 @@
+;; What does the deployed admission gate do with an ontology?
+;;
+;; ADR-2609109700. `owl.rules` ships TWO rulesets and says the difference is a
+;; full scan: `hierarchy-rules` names every predicate literally,
+;; `triple-rules` derives triples whose PREDICATE is a variable and its base
+;; case is `[?s ?p ?o]`.
+;;
+;; `kotobase.server.admission` reads rule bodies, not only `:where`, and
+;; refuses a clause whose attribute is unbound. So the cost decision the OWL
+;; library leaves to the caller is enforced by the server, by name, before a
+;; block is read. This probe is what turns that from two docstrings agreeing
+;; into one measured verdict -- and it discriminates, because the two rulesets
+;; get opposite answers.
+;;
+;;   nbb --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/kotobase-server/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/ontology_admission.cljs
+
+(ns ontology-admission
+  (:require [owl.rules :as rules]
+            [kotobase.server.admission :as adm]))
+
+(def hierarchy
+  {:find '[?c] :where '[(owl-type "Felix" ?c)]
+   :rules (rules/hierarchy-rules)})
+
+(def triple
+  {:find '[?o] :where '[(owl-triple "Felix" :knows ?o)]
+   :rules (rules/triple-rules)})
+
+(defn- report [label query]
+  (let [{:keys [admitted? refusals]} (adm/admit query)]
+    (println (str label
+                  "  admitted?=" admitted?
+                  "  refusals=" (pr-str (mapv (juxt :reason :where) refusals))))))
+
+(report "hierarchy-rules (literal predicates)" hierarchy)
+(report "triple-rules    (predicate unbound) " triple)
