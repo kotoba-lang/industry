@@ -1,0 +1,32 @@
+(map (:health-status 200),
+ (:zone-name "manimani.cloud"),
+ (:zone
+ (map (:requests-7d 2287),
+  (:pageviews-7d 298),
+  (:uniques-7d-sum 275),
+  (:zone "manimani.cloud"))),
+ (:sources (vector :cloudflare :health :emitter)),
+ (:cloud (map (:signups 1))),
+ (:paths
+ (map (:ok
+  (vector (map (:path "/u/junkawasaki/decisions"), (:requests 47))
+   (map (:path "/"), (:requests 35))
+   (map (:path "/robots.txt"), (:requests 8))
+   (map (:path "/llms.txt"), (:requests 3))
+   (map (:path "/health"), (:requests 2))
+   (map (:path "/cdn-cgi/trace"), (:requests 1)))),
+  (:status-mix (map (:client-error 105), (:ok 96), (:server-error 2))),
+  (:real-4xx 105),
+  (:window "24h"))),
+ (:as-of "2026-09-04"),
+ (:traffic-quality
+ (map (:window "24h"),
+  (:probe-4xx-pct 52),
+  (:error-5xx-pct 1),
+  (:real-4xx-pct 52))),
+ (:top-paths
+ "上位 page (24h, 2xx/3xx): /u/junkawasaki/decisions 47 · / 35 · /robots.txt 8 · /llms.txt 3 · /health 2 | 4xx(probe) 52% · 4xx(real) 52% · 5xx 1%"),
+ (:conversion (map (:oss-active 0), (:cloud-paid 0), (:pct 0))),
+ (:oss (map (:installs 0))),
+ (:signal
+ "manimani.cloud 実測 2287 req/7d・275 uniques(日次和)・うち4xx probe 52%(24h) (real 52%)"))

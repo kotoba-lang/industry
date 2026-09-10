@@ -1260,7 +1260,7 @@
   ;; 防ぐ床（gate 側の --min と二重に掛ける）。
   {:name "org-spirit-in-physics-comics" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--min" "50"]
-   :include-ext [".edn"] :min-files 50 :cd true}
+   :include-ext [".edn" ".kotoba"] :min-files 50 :cd true}
 
   ;; superproject 自身。GitHub Actions の docs-edn-verify と同じ不変条件を、
   ;; Actions に依存しない経路で持つ（2026-07-26: com-junkawasaki と gftdcojp の
@@ -1346,7 +1346,7 @@
   {:name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/docs-edn-check.cljs"
    :script-args ["--sub" "90-docs/adr" "--min" "1400" "--strict-keys"]
-   :include-ext [".edn"] :min-files 1500 :cd false}
+   :include-ext [".edn" ".kotoba"] :min-files 1500 :cd false}
 
   ;; cloud-itonami-app の 90-docs。**同じ gate、隣の repo、対象外だっただけ**。
   ;;
@@ -1391,7 +1391,7 @@
    :name "cloud-itonami-app" :org "cloud-itonami" :gate :nbb-script
    :script "gates/docs-edn-check.cljs"
    :script-args ["--sub" "90-docs" "--min" "6" "--strict-keys"]
-   :include-ext [".edn"] :min-files 30 :cd false}
+   :include-ext [".edn" ".kotoba"] :min-files 30 :cd false}
 
   ;; cloud-itonami-app の実際のテストスイート。**この repo は 209 個の test ファイルと
   ;; 2,189 個の test を持ちながら、fleet gate は隣の docs-edn 1 本だけだった** ——
@@ -3664,7 +3664,7 @@
   ;;    未エスケープ引用符は文字列を静かに終わらせて以降の散文をデータに変える。
   {:name "network-isekai" :id "isekai-docs-edn" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs" "--min" "10"]
-   :include-ext [".edn"] :min-files 10 :cd false}
+   :include-ext [".edn" ".kotoba"] :min-files 10 :cd false}
   ;; aiueos — the OS. `:alias "test-fleet"` rather than `:test`, and the
   ;; difference is one test: `every-kotoba-source-is-built-or-declared-unbuilt`
   ;; carries `^:upstream-blocked` and the alias drops exactly that selector.

@@ -1,0 +1,34 @@
+(map (:doc/id "shinshi-x402-tick-20260904c")
+ (:doc/status "draft")
+ (:doc/date "2026-09-04")
+ (:doc/actor "shinshi-sales cron tick")
+ (:doc/type :validation-tick)
+
+ ;; 実測 (2026-09-04 20:30 JST, 全て curl/JSON-RPC 実行値)
+ (:observed
+ (map (:live-endpoints
+  (map ("GET /pay" "404 (前回 tick 20260904b から変化なし)")
+   ("GET /pay/quote?usd=0.5" "200 — 旧虚偽値のまま: chain=ethereum / custody=safe-multisig / usdc-contract=Eth mainnet 0xA0b8…6eB48 (Base 修正未反映)")
+   ("GET /.well-known/x402" "200 — network=base, payTo=0xf15928…67Ac, $0.50, facilitator=x402.nexus 正常")
+   ("GET /api/funnel" "200 (初めて直接計測成功)")))
+  (:chain "payTo EOA Base USDC balance = 0 (eth_call balanceOf 実測 0x0) → 実 USDC 送金 0 件、quote 成功数は PR #51 未deploy により未計測")
+  (:funnel-7d "visitors 412 / chatters 74 / scenes 167 / paying 0 (api/funnel 実測、前回 386/72/163/0)")
+  (:exoclick "imp/revenue 未計測 — dashboard API 接続不可。変化なし")
+  (:repo "origin/main HEAD 25debdb (PR #57 merge)。deploy 経路なしのまま (gh run list 404)")))
+
+ ;; 前回比
+ (:delta "funnel 7d: 386→412 visitors (+26), 72→74 chatters, 163→167 scenes, paying 0→0。/pay 404・quote 旧値・USDC 0・imp 未計測は全て前回から不変。→ 前回特定した deploy lag が未解消のまま訪問者だけが増え続けている状態")
+
+ (:conversion-zero-cause
+ "deploy lag (20260904b で特定、未解消が再実測で確認): PR #42/#44/#51 は origin/main merge済みだが live /pay 404・/pay/quote は ethereum 旧値。rail も UI も quote 計測も 'fix済みだが稼働していない'。")
+
+ (:issue-draft
+ (map (:title "[deploy] #42/#44/#51 の pay 修正が merge済みでも live 未反映のまま 24h+ 経過 — 訪問者は増加中 (412/7d) だが転換計測不能")
+  (:to "shinshi-eng")
+  (:body-要点
+  (vector "再実測 (2026-09-04 20:30 JST): live GET /pay→404、/pay/quote?usd=0.5→200 だが chain=ethereum・custody=safe-multisig・usdc-contract=Eth mainnet (修正前の値)。origin/main 25debdb には 758f748 (#42)/9ac7569 (#44)/quote counter (#51) 含まれる。Base USDC balanceOf(payTo)=0x0 実測。"
+   "変化: 前回 tick (同日 15:30) から visitors 386→412 と増加しているが、fix が live されていないため全訪問者が転換不能・quote 計測 (PR #51) も不能のまま流入が無駄になっている。"
+   "ask: deploy pipeline の設置 (repo に Actions 無し・gh run list 404) または手動 deploy。merge/deploy は approval-required。"
+   "計測: deploy 後 24h で /api/funnel :quotes を初読し quote 成功数・転換率を初計測する。価格 ($0.50) 変更なし・提案も本 tick では行わない。"))))
+
+ (:rule-guard "数字は全て実測 (curl / JSON-RPC / git)。ExoClick imp は未計測のまま記載。価格変更なし。"))

@@ -135,11 +135,53 @@
 ;; when git cannot answer (an extracted tree with no .git, which is exactly
 ;; what the fleet ships). The two disagree in both directions: git alone
 ;; misses the extracted tree, the walk alone picks up untracked scratch.
+;; ---------------------------------------------------------------- Kotoba ADL
+;;
+;; A .kotoba data file is S-expressions, so cljs.reader already parses it --
+;; but what it returns is the NOTATION (nested lists), not the value. Run
+;; `bad-keys` on that and it finds no maps at all and passes vacuously: the
+;; check would silently stop discriminating on every converted file, which is
+;; precisely the failure this gate exists to catch.
+;;
+;; So decode, and keep ONE key check rather than growing a second copy for the
+;; new notation. This is the decode half only -- the notation's authority and
+;; full codec are kotoba-lang/kotoba `lang/adl.kotoba` and `kotoba.adl`. The
+;; gate cannot require them: tick.cljs ships a gate as a single file's
+;; contents, so a gate has no classpath to share.
+(declare adl-decode)
+
+(defn- adl-entry [e]
+  (when-not (and (seq? e) (= 2 (count e)))
+    (throw (ex-info (str "map entry must be a (k v) form, got " (pr-str e)) {})))
+  [(adl-decode (first e)) (adl-decode (second e))])
+
+(defn- adl-decode
+  "Kotoba ADL notation -> the value it denotes."
+  [x]
+  (if-not (seq? x)
+    (if (vector? x) (mapv adl-decode x) x)
+    (let [h (first x)
+          more (rest x)
+          t (when (symbol? h) (name h))]
+      (case t
+        "map" (let [pairs (map adl-entry more)
+                    ks (map first pairs)]
+                (when-not (= (count ks) (count (set ks)))
+                  (throw (ex-info "duplicate key in (map ...)" {})))
+                (into {} pairs))
+        "vector" (mapv adl-decode more)
+        "set" (set (map adl-decode more))
+        "list" (apply list (map adl-decode more))
+        ("uuid" "timestamp" "bytes" "link") (str (first more))
+        ;; any other head is a generic Form; walk its children so the key
+        ;; check still reaches anything nested inside it
+        (doall (map adl-decode x))))))
+
 (defn tracked-edn-files [dir]
   (try
     (let [out (.execFileSync child-process "git"
                              #js ["-C" dir "ls-files" "--cached" "--others"
-                                  "--exclude-standard" "-z" "--" "*.edn"]
+                                  "--exclude-standard" "-z" "--" "*.edn" "*.kotoba"]
                              #js {:encoding "utf8" :maxBuffer (* 64 1024 1024)})]
       (->> (str/split out #"\u0000")
            (remove str/blank?)
@@ -155,7 +197,8 @@
          (let [n (.-name e) p (path/join d n)]
            (cond
              (.isDirectory e) (when-not (contains? skip-dirs n) (walk p))
-             (str/ends-with? n ".edn") (swap! out conj p)))))
+             (or (str/ends-with? n ".edn")
+                 (str/ends-with? n ".kotoba")) (swap! out conj p)))))
      dir)
     @out))
 
@@ -201,7 +244,8 @@
             ;; **道具の側の欠陥を、文書の側の欠陥として名指ししていた。**
             ;; 現在の repo で当たるのは 1 件だが、条件は「コメントで終わり改行が無い」
             ;; だけなので、いつでも増えうる。
-            v (reader/read-string (str "[\n" s "\n]"))]
+            raw (reader/read-string (str "[\n" s "\n]"))
+            v (if (str/ends-with? f ".kotoba") (mapv adl-decode raw) raw)]
         (when strict-keys
           (let [odd (distinct (bad-keys v))]
             (when (seq odd)
@@ -222,13 +266,15 @@
                                "followed was read as structure")]))))))
       (catch :default e
         (swap! bad conj [f (ex-message e)]))))
-  (println (str "edn files: " (count files) "/" (count listed)
-                " unparsable: " (count @bad)))
+  (let [n-kotoba (count (filter #(str/ends-with? % ".kotoba") files))]
+    (println (str "data files: " (count files) "/" (count listed)
+                  " (.edn " (- (count files) n-kotoba) ", .kotoba " n-kotoba ")"
+                  " unparsable: " (count @bad))))
   (doseq [[f msg] (take 20 @bad)]
     (println "  FAIL" (path/relative root f) "—" msg))
   (when (seq unreadable)
     (println (str "=== " (count unreadable)
-                  " .edn ARE IN GIT BUT NOT IN THIS WORKING TREE ==="))
+                  " DATA FILES ARE IN GIT BUT NOT IN THIS WORKING TREE ==="))
     (println "  This checkout does not contain them, so their content was not read.")
     (println "  Fix: run from a full checkout, or sparse-checkout add their directories.")
     (doseq [f (take 10 unreadable)] (println " " (path/relative root f)))

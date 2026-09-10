@@ -1,0 +1,73 @@
+(map (:health-status 200),
+ (:zone-name "kotobase.net"),
+ (:workers-invocations-7d
+ (map ("net-kotobase" 296389), ("kotobase-cf-wasm-staging" 2618553))),
+ (:zone
+ (map (:requests-7d 2632835),
+  (:pageviews-7d 2496),
+  (:uniques-7d-sum 1343),
+  (:zone "kotobase.net"))),
+ (:sources (vector :cloudflare :stripe :health :emitter)),
+ (:paths
+ (map (:ok
+  (vector (map (:path
+    "/bafyreicdpd4qqjzrhlykctjnwoo66yez5vig6lzcqlv6loqqowc6uwgpby"),
+    (:requests 2209))
+   (map (:path
+    "/bafyreidsp6qtcbr4jfddycl6a7vmvq7et2vf2mz5astndi5m2d6yaftipm"),
+    (:requests 191))
+   (map (:path
+    "/bafyreicc6pfbnpwzzutxeuwvnisyvtp2xiyc7zvxmy7gzzsw6zpr4qaeuq"),
+    (:requests 90))
+   (map (:path
+    "/v1/read-audit/witness-statements/bafyreifeziigkg2xqebx3534vwi5n6gyu22dovbei3ifbnmlc3ticpdfum"),
+    (:requests 88))
+   (map (:path
+    "/bafyreigibseepqmyu3bc6bvkx4j2bbyimcgguyxtj5j4svzmcmqtmx3pie"),
+    (:requests 54))
+   (map (:path
+    "/bafyreieisdbk6lowj5qmx2ncrycdbbzenozitwpu2dsruzcc2x4dsnl6ha"),
+    (:requests 48))
+   (map (:path
+    "/bafyreigbkyxp6aaw2pkt6ugzogfjnannky6enysf66n5k4fda3nuzmzw7u"),
+    (:requests 48))
+   (map (:path
+    "/v1/read-audit/witness-statements/bafyreiac6mfqajmkob6vajttonycucwf6py6nb4mn2dyee6df6ooixktw4"),
+    (:requests 44)))),
+  (:status-mix (map (:ok 8555), (:server-error 3411), (:client-error 417))),
+  (:real-4xx 391),
+  (:window "24h"))),
+ (:stripe
+ (map (:active-subscriptions 0),
+  (:active-subscriptions-unpaid 0),
+  (:active-subscriptions-account-wide 0),
+  (:apex-active-subscriptions 0),
+  (:murakumo-paid-charges 0),
+  (:murakumo-paid-amount-minor 0),
+  (:charges-total 11),
+  (:last-charge-epoch 1718681591))),
+ (:as-of "2026-09-04"),
+ (:traffic-quality
+ (map (:window "24h"), (:probe-4xx-pct 3), (:error-5xx-pct 28), (:real-4xx-pct 3))),
+ (:top-paths
+ "上位 page (24h, 2xx/3xx): /bafyreicdpd4qqjzrhlykctjnwoo66yez5vig6l… 2209 · /bafyreidsp6qtcbr4jfddycl6a7vmvq7et2vf2m… 191 · /bafyreicc6pfbnpwzzutxeuwvnisyvtp2xiyc7z… 90 · /v1/read-audit/witness-statements/bafyre… 88 · /bafyreigibseepqmyu3bc6bvkx4j2bbyimcgguy… 54 | 4xx(probe) 3% · 4xx(real) 3% · 5xx 28%"),
+ (:funnel (map (:visitors 5462), (:signups 31), (:checkouts 0))),
+ (:signal
+ "kotobase.net 実測 2632835 req/7d・1343 uniques(日次和)・うち4xx probe 3%(24h) (real 3%)、workers 2914942 inv/7d、Stripe active subs 0"),
+ (:x402
+ (map (:unmetered-twin-ratio 0),
+  (:rejection-reasons (map (:malformed-header 1))),
+  (:unmetered-twin-reads 0),
+  (:unpriced-plane-reads 0),
+  (:challenges 33),
+  (:submissions 4),
+  (:settlement-rate 0),
+  (:rejections 4),
+  (:rejections-classified 1),
+  (:settlements 0),
+  (:rejections-unexplained 3),
+  (:attempt-rate 0.12121212121212122))),
+ (:by-source
+ (map (:visitors (map (:openai-ads 3), (:organic 3936))),
+  (:signups (map (:organic 27), (:other 1))), 
+  (:checkouts (map)))))
