@@ -1,0 +1,163 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110000-six-defects-in-the-mass-rename-and-how-to-reproduce-each")
+  (:adr/topic "mass-rename-defects-and-their-reproductions")
+  (:adr/title "Six defects in the .clj to .kotoba mass rename, each with the command that reproduces it")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2609109400-kotoba-form-dag-kotoba-and-what-guest-and-host-actually-name"))
+  (:adr/body
+  "## Context
+
+The owner instruction of 2026-09-10 is: rename every .clj/.cljc/.cljs to
+.kotoba across the workspace, tests included, and let the kotoba CLI say what
+broke. Reader errors are fixed afterwards by grepping what the rename surfaced.
+
+This ADR records the defects found in the driver that carries that out. It
+records the REPRODUCTION for each, not the counts. Counts written into a
+document here get quoted next week with the date dropped, which is the failure
+this workspace keeps warning about.
+
+Eighteen defects have now been found in this one script. Twelve were recorded
+earlier; this covers 13 through 18. The rate matters more than any single
+defect: a bulk operation over thousands of repositories generates defect
+classes faster than reading the script finds them, and all six below were found
+by measuring a run rather than by review.
+
+## Decision 13: the exclusion criterion must be derived, not enumerated
+
+The exclusion list was a hand-written enumeration whose stated criterion was
+that the repository fleet gate names a clj-family :entry by path. That
+criterion is correct for what it names, because :entry is not additive -- there
+is one path and renaming the file removes it. It is not the criterion the
+exclusion exists for.
+
+It is replaced by a measurement: parse every launchd plist, take the
+repositories named in ProgramArguments, EnvironmentVariables and
+WorkingDirectory -- chiefly as nbb --classpath orgs/<org>/<repo>/src entries --
+and intersect with real repository slugs. Those repositories run on a SCHEDULE,
+so renaming their sources means nbb stops resolving the namespace at the next
+tick.
+
+    nbb gen-live-exclusions.cljs sizes.tsv
+
+SIZE IS THE WRONG PROXY, and this inverts the framing the investigation began
+with. Among the unprotected repositories this surfaced, jp-go-gbiz-info carries
+ONE clj-family file, jp-go-npb-kanpou two, secret-resolve six -- while
+murakumo, the fleet CI itself, carries a few hundred. Any file-count floor high
+enough to protect murakumo renames the other three and breaks
+com.gftd.gbizinfo-refresh at its next tick. A size floor is not a weaker
+version of this criterion; it is a different and wrong one.
+
+The evidence floor is the part that makes the answer usable:
+
+    nbb gen-live-exclusions.cljs /tmp/two-fake-slugs.tsv    -> exit 2, REFUSED
+    nbb gen-live-exclusions.cljs sizes.tsv                  -> exit 0
+
+An unreadable set of plists returns the same empty answer as a machine with no
+scheduled jobs at all, and an empty exclusion set means rename everything. So
+zero is REFUSED rather than clean. Note also that a strict plist parser refused
+11 of 77 plists that plutil reads without complaint; every one of those 11
+would have been silently dropped from the exclusion.
+
+## Decision 14: .clj is a PREFIX of .cljc and .cljs
+
+The reference rewriter and its detector were unanchored substring matches. For
+a moved path X.clj, any text occurrence of X.cljc had its head rewritten and
+kept the orphan letter behind, giving X.kotobac.
+
+    printf 'see src/talent/facts.cljc' > R.md
+    FROM=src/talent/facts.clj TO=src/talent/facts.kotoba perl rewrite.pl R.md
+
+Before the fix R.md reads facts.kotobac. After it, R.md is unchanged and the
+rewriter exits 1.
+
+The collision guard could not have caught this. It inspects files that EXIST,
+and the case that reproduced it is a README naming a .cljc file where only the
+.clj exists. Two further parts were fixed alongside it. The pull request body
+asserted that project files are NOT updated, which had become false, so on the
+order of 1,550 pull requests would each have carried a false statement about
+their own diff. And the reference count was computed but never emitted, so
+rewrote 14 references and rewrote 0 were indistinguishable; it is emitted now,
+and it varies across repositories.
+
+## Decision 15: the rewriter must refuse binary files
+
+grep -F matches a byte sequence anywhere, including inside compiled artefacts,
+and perl -pi then rewrote those bytes in place. Measured on a .pyc carrying a
+path in a docstring constant: the rewrite grew the file by two bytes without
+updating the marshal length prefix in front of it.
+
+    python3 -c 'import marshal; marshal.loads(open(P,\"rb\").read()[16:])'
+
+That loads before the rewrite and raises ValueError, bad marshal data, after.
+Same file, same loader, and it fails for the reason named. The rename is +3
+bytes, so ANY length-prefixed container holding such a path corrupts the same
+way: .pyc, zip and jar entries, .class, sqlite, protobuf descriptors. Git
+records these as binary, so the corruption is INVISIBLE in the pull request
+diff -- a reviewer sees a file listed as changed with no visible change.
+
+Detection and rewrite are now a single perl pass that refuses binaries. That
+also removed a second hazard: the previous pair used two different regex
+engines, grep -E with a hand-rolled sed escape and perl quotemeta, so a path
+containing plus, brace or pipe was escaped by one and not the other, and the
+two could disagree about whether the file matched at all.
+
+## Decision 16: a run must pin its own bytes
+
+zsh reads a script INCREMENTALLY. It seeks back to the byte offset it had
+reached and carries on. Editing the file while a pass runs therefore does not
+take effect next run; the RUNNING pass begins executing the new bytes at an
+offset chosen by the old layout.
+
+    cat > v.zsh          # echo phase-1; sleep 2; echo phase-2
+    zsh v.zsh &  sleep 0.5;  rewrite v.zsh;  wait
+
+The unguarded run dies with an unmatched-quote error, and v.zsh parses cleanly
+as a whole file -- which is what proves the death is offset-driven rather than
+a syntax error anyone could have seen. This is the exact reported shape of five
+slice deaths that had no established cause: harness exit 1, a zero-byte run
+log, and a trailing echo that never ran, meaning the shell died rather than the
+script exiting.
+
+The cause was the author of the script editing it while slices were running,
+twice. A slice agent recorded the script sha256 at launch and found a different
+one at exit, having never edited it.
+
+A run now snapshots itself: the first invocation copies the script to a
+read-only file named with timestamp and pid, re-execs from it, and records the
+snapshot path and its sha256 in the ledger. The snapshot is kept rather than
+cleaned up, because it is the only record of what a given ledger was produced
+by.
+
+## Decision 17: one ledger record is one line
+
+On failure gh writes multi-line error text, and it landed in the sha field
+unaltered, so a FAIL record spanned several ledger lines. Resume was never
+affected, because continuation lines do not begin with a slug and a tab, but
+the ledger stopped being one-record-per-line, and one-record-per-line is the
+only property that makes it countable.
+
+## Decision 18: an archived repository is a category, not a failure
+
+Three repositories are archived on GitHub, so push and pull-request creation
+are both read-only refusals. Recording that as FAIL sends a reader after
+recoverable work that cannot exist. It is now recorded as ARCHIVED, and the
+question is asked only on the failure path, so it costs one API call per
+failure rather than one per repository.
+
+## Consequences
+
+Every one of these six was found by measuring a run, and none by reading the
+script. Four share one shape this workspace already names: the failing case
+returns the same value as the succeeding case. An unreadable plist set returns
+an empty exclusion; a rewrite that silently does nothing returns the same exit
+as one that worked; a corrupted binary shows an empty diff; a zsh-killed run
+leaves a ledger that resume reads as merely incomplete.
+
+One instruction is withdrawn and recorded as withdrawn. Slice agents had been
+told not to re-measure before running. That was wrong: decisions 13, 15, 16, 17
+and 18 were all found through exactly that channel, by agents measuring what
+they had been told to take on trust.")))
