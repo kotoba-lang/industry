@@ -119,6 +119,64 @@ in Clojure is not a Q9 migration, and `:next-action` is already
 `:requalify-wave-1-pilots-as-whole-component-builds`. This ADR is the first
 repository measured against the contract that replaced it.
 
+## Consumer cutover: measured, and blocked on something else entirely
+
+The gate's `:consumer-cutover` is the next thing this repository needs, so it
+was measured 2026-09-10. It does not mean what it looked like it meant.
+
+**External consumers of `aave.main`: zero.** Nothing outside `com-aave`
+requires it. The only references workspace-wide are Q9 ledger `:baseline-paths`
+entries, a prose mention in `com-aadhaar/q9-findings.edn`, and the repository's
+own tests and oracle harness. This is a leaf; there is no downstream namespace
+to switch.
+
+So the deliverable is the artifact, not the namespace -- and `manifest.json`
+says what the artifact is:
+
+    \"wasmCid\":        \"bafkreidytpismfkcitfathhfhibefvg6o4tgseipdd6tcvwstayenaitye\"
+    \"wasmProvenance\": \"built-rust-raw\"
+    \"runtime\":        \"kotoba-wasm\"
+
+**The shipped artifact is declared as built from Rust**, while the repository
+contains **0 `.rs` files and 0 `.wasm` files**. Neither `main.cljc` nor
+`whole_component.kotoba` produces it. This is not local to com-aave:
+**1,000 manifests in the workspace carry `built-rust-raw`**, with **999
+distinct CIDs**, so they are not one placeholder copied around.
+
+Note the standing rule this sits against: ADR-2607072000, Rust is not written
+in kotoba-lang, and `.cljc` is the answer where Rust would have been.
+
+**Whether those artifacts exist is UNVERIFIED, and that is the block.**
+`com-aave`'s CID and six sampled others all return 404 from
+`https://kotobase.net/ipfs/<cid>`. That is not evidence of absence: a
+deliberately bogus CID returns 404 from the same route, no positive control
+was found -- no CID in this workspace's ledgers is known to be stored and
+fetchable -- and the apex returning 200 says nothing about the `/ipfs/` route.
+So the honest statement is **not found**, never **absent**.
+
+This is where the cutover stops, and it stops for a reason worth naming: **you
+cannot cut a consumer over to a Kotoba-built artifact without first
+establishing what the current artifact is, or whether one exists.** Publishing
+a Kotoba-compiled wasm over an unverified CID would replace one unverified
+claim with another.
+
+Three things are needed before `:consumer-cutover` can be attempted, and none
+is a Kotoba problem:
+
+1. A positive control on the bytes plane -- one CID known to be stored,
+   fetched successfully, so a 404 becomes evidence.
+2. An answer to what `built-rust-raw` names for a repository with no Rust:
+   a real artifact built elsewhere, a historical provenance string carried
+   forward through the relocation, or a value nobody has checked.
+3. Whoever consumes `did:web:etzhayyim.com:actor:aave-compat` identified,
+   since the manifest declares an actor with an `exec` of
+   `browser-local|donated-mesh` and that is the real consumer.
+
+The whole-component result above stands on its own: the component builds and
+answers JVM-free. What is now known is that **shipping it is blocked upstream
+of Kotoba**, on the provenance and availability of an artifact this repository
+does not build.
+
 ## Reproduce
 
     # PATH trap first, and prove it fires
