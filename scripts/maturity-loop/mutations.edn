@@ -12459,4 +12459,107 @@
       :file "test/mining_metallurgy/governor_test.kotoba"
       :find "(ns mining-metallurgy.governor-test"
       :replace "(ns mining-metallurgy.governor-tset"
-      :must-fail ["REFUSED"]}]}]}
+      :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/cloud-itonami/tsukuroi"
+   :label "tsukuroi run_tests —— 二度死んだ suite と、その死に方を誰も見なかったこと"
+   ;; この suite は 2 回止まっており、2 回とも**テストではなく runner が壊れて**いた。
+   ;;
+   ;;   1. runner が `require` を使い、*file* から repo root を遡る namespace 群が
+   ;;      全部 load で死んだ（相対 path の 2 つ上は "" で、その親は null）。
+   ;;   2. 4f5aacb が 1 を直した**次の commit** 7f5f047 が、6 ファイルを .kotoba へ
+   ;;      改名した —— 0 insertions / 0 deletions の純粋な git mv で、runner が持って
+   ;;      いた 3 本の literal path は動かなかった。実測 2026-09-11、pin 77a51528:
+   ;;      `clojure -M run_tests.kotoba` は FileNotFoundException で exit 1、
+   ;;      **走ったテストは 0**。
+   ;;
+   ;; しかも改名は読み方も壊していた。Clojure は `#?(...)` の可否を**ファイル名**で
+   ;; 決める（Compiler.readerOpts は ".cljc" にしか許さない）ので、path を直しても
+   ;; "Conditional read not allowed" で止まる。だから runner は自分で
+   ;; `:read-cond :allow` で読み、plan は**列挙せず discover する**。
+   ;;
+   ;; 下の 9 件は 2026-09-11 に**手で当てて赤くなるところを見てから**登録した。
+   :cmd ["clojure" "-M" "run_tests.kotoba"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [;; ── runner が「何を読むつもりか」を誰も測っていなかった ─────────────
+    {:id :tsukuroi/discovery-narrows-to-underscore-test
+     :note "`*_test` という慣習だけを test と見なす。methods/ の 2 本が plan から
+            静かに落ち、残りは緑のまま通る —— **走った本数が減ったことは、
+            走った本数を見ていない検査からは見えない**。実測: Ran 3（14 ではなく）"
+     :file "run_tests.kotoba"
+     :find "(filter source-file?)"
+     :replace "(filter #(and (source-file? %) (str/includes? (.getName ^File %) \"_test\")))"
+     :must-fail ["runner-plan-is-every-test-file-on-disk"]}
+
+    {:id :tsukuroi/plan-names-a-file-that-moved
+     :note "**2026-09-10 に実際に起きた形。** plan に .cljc の古い名前が 1 本混じる。
+            discovery を入れた今は自然には起きないが、誰かが再び列挙を足したときに
+            捕まえるのはこの向きの assertion であって、逆向きではない"
+     :file "run_tests.kotoba"
+     :find "(mapv (fn [f] [(.getPath ^File f) (declared-ns f)]) files)"
+     :replace "(conj (mapv (fn [f] [(.getPath ^File f) (declared-ns f)]) files) [\"test/tsukuroi/methods/test_charter_gates.cljc\" 'tsukuroi.methods.test-charter-gates])"
+     :must-fail ["runner-plan-is-every-test-file-on-disk"]}
+
+    {:id :tsukuroi/print-plan-cannot-be-measured
+     :note "plan を**測れなかった**実行が、plan が**一致した**実行と同じ値を返さない
+            ことの確認（ADR-2608136000 の 2 問目）。--print-plan を exit 3 にする"
+     :file "run_tests.kotoba"
+     :find "(System/exit 0))"
+     :replace "(System/exit 3))"
+     :must-fail ["runner-plan-is-every-test-file-on-disk"]}
+
+    ;; ── 改名が壊したもう半分 ──────────────────────────────────────────
+    {:id :tsukuroi/probe-written-as-cljc
+     :note "reader conditional の可否は**中身ではなく拡張子**が決める、という主張
+            そのものを反転させる。probe を .cljc で書けば load-file は受理するので、
+            拒否理由の literal を待っている assertion が赤くなる"
+     :file "test/tsukuroi/runner_test.kotoba"
+     :find "as-kotoba (probe-file \".kotoba\")"
+     :replace "as-kotoba (probe-file \".cljc\")"
+     :must-fail ["reader-conditionals-are-granted-by-the-file-name-not-the-content"]}
+
+    ;; ── 憲章ゲート。テストは前からあったが、噛むところを誰も見ていなかった ──
+    {:id :tsukuroi/defensive-only-weakened
+     :note "patchProposal.defensiveOnly の const true を false に。**この actor が
+            存在してよい理由**（G5 DEFENSIVE-ONLY、Charter Rider §2(a)）が schema の
+            上で緩む"
+     :file "lex/patchProposal.edn"
+     :find "\"const\" true,"
+     :replace "\"const\" false,"
+     :must-fail ["g5-defensive-only-no-exploit"]}
+
+    {:id :tsukuroi/merge-authority-taken
+     :note "remediationMandate.mergeAuthorityHeld の const false を true に。
+            PROPOSE-ONLY（G4）が構造ではなく運用の約束に降格する"
+     :file "lex/remediationMandate.edn"
+     :find "\"const\" false,"
+     :replace "\"const\" true,"
+     :must-fail ["g4-propose-only-no-autonomous-merge"]}
+
+    {:id :tsukuroi/validation-runs-against-the-live-target
+     :note "patchValidationResult.ranAgainstLiveTarget の const false を true に。
+            G9 —— 検証は sandbox であって live target ではない —— が外れる"
+     :file "lex/patchValidationResult.edn"
+     :find "\"const\" false,"
+     :replace "\"const\" true,"
+     :must-fail ["g9-sandbox-not-live-target"]}
+
+    {:id :tsukuroi/a-gate-is-renumbered-out-of-the-set
+     :note "manifest の G13 を G14 に。件数は 13 のままなので **count を数える検査は
+            通り**、集合を見る検査だけが落ちる。2 本の別ファイルの test が同時に赤く
+            なるのは、この不変条件が 1 箇所ではなく 2 箇所で守られているから"
+     :file "manifest.edn"
+     :find "\"G13\""
+     :replace "\"G14\""
+     :must-fail ["all-13-gates-declared" "thirteen-gates-present"]}
+
+    ;; ── 床。exit 2 でなければならない ──────────────────────────────
+    {:id :tsukuroi/discovery-finds-nothing
+     :note "**refusal の床。** discover する runner が何も discover しなかったとき、
+            出力は緑の実行と見分けが付かない —— 0 tests / 0 failures / exit 0。
+            runner は代わりに exit 2 で拒否する"
+     :file "run_tests.kotoba"
+     :find "(io/file \"test\")"
+     :replace "(io/file \"test-nonexistent\")"
+     :must-fail ["refusing to report a pass"]}]}]}
