@@ -86,15 +86,30 @@
   (when-not (#{"annex-get" "annex-drop"} action) (fail "usage: nbb manifest/west_annex.cljs annex-get|annex-drop [project ...]"))
   (let [targets (cond->> (projects) (seq wanted) (filter #(contains? (set wanted) (:name %))))]
     (when (empty? targets) (fail "対象となる DataLad project がありません。"))
-    (let [env (merge (getenv-all) (resolve-b2))]
+    (let [env (merge (getenv-all) (resolve-b2))
+          ;; Worst child status wins, and it is this script's status. Measured
+          ;; 2026-09-10: `datalad drop .` on m365-archive reported
+          ;; "impossible: 10242 (cannot drop modified content, save first)",
+          ;; dropped nothing, left 137 GB resident -- and this script exited 0,
+          ;; which is what a reclaim that actually ran also does. A caller
+          ;; watching the status could not tell the two apart.
+          worst (atom 0)
+          note! (fn [code] (swap! worst max (or code 0)) code)]
       (doseq [{:keys [name path remote]} targets]
         (let [dir (str root "/" path)]
           (println (str "== " action ": " name " =="))
           (if-not (.existsSync fs dir)
-            (binding [*out* *err*] (println (str name " は未取得。先に west update --group-filter +datalad " name)))
+            (do (binding [*out* *err*]
+                  (println (str name " は未取得。先に west update --group-filter +datalad " name)))
+                (note! 1))
             (case action
               "annex-get" (when (enable-b2! dir remote env)
-                            (if (datalad?) (run! dir env "datalad" "get" ".")
-                                (run! dir env "git" "annex" "get" "--from" remote)))
-              "annex-drop" (if (datalad?) (run! dir env "datalad" "drop" ".")
-                                 (run! dir env "git" "annex" "drop")))))))))
+                            (note! (if (datalad?) (run! dir env "datalad" "get" ".")
+                                       (run! dir env "git" "annex" "get" "--from" remote))))
+              "annex-drop" (note! (if (datalad?) (run! dir env "datalad" "drop" ".")
+                                      (run! dir env "git" "annex" "drop")))))))
+      (when-not (zero? @worst)
+        (binding [*out* *err*]
+          (println (str action " は完了しませんでした (worst exit " @worst ")。"
+                        "上の出力を読むこと — 何も転送されていない可能性があります。")))
+        (exit @worst)))))
