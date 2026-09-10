@@ -1,0 +1,162 @@
+(vector
+ (map
+  (:adr/id "adr-2609112200-a-canned-reading-substituted-without-checking-the-measurement")
+  (:adr/title "A canned reading substituted without checking the measurement")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112100-the-rule-against-inventing-fixtures-does-not-cover-a-whole-oracle"))
+  (:adr/body "
+## What this iteration did
+
+Rolled the oracle-store count layer out from one pilot to all sixteen
+generated harnesses, and fixed two defects found on the way. Both defects
+have the shape this workspace keeps recording: something was written, it
+looked right, and it said something untrue.
+
+## Reproduce the rollout
+
+For each generated pilot, from an origin/main worktree in the scratchpad
+(never the shared orgs/ checkout):
+
+    nbb <kotoba-lang>/scripts/gen-parity-harness.cljs <worktree> <src-dir>
+    cd <worktree>
+    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+    amu check   src/<src>/whole_component.kotoba --policy policy.edn
+    amu compile src/<src>/whole_component.kotoba --target aarch64-macos
+                --policy policy.edn --output wc.o
+    amu extract-native wc.o --symbol oracle-store --output store.bin
+    for s in 0 3 4 5 7; do
+      KEXE_FUEL=100000000 ./kexe-loader store.bin <offset> 1 aarch64 <caps> $s
+    done
+
+<offset> is the :offset the extract step prints. <caps> are the capability
+ids in that repository's own policy.edn, not a constant. Both sides must
+produce the same five values, and those five must not be all one value.
+
+Two flags are easy to get wrong and fail in unrelated-looking ways:
+extract-native takes the COMPILED artifact, not the source (given the
+source it reports EDN input contains trailing forms), and both check and
+compile need --policy or admission denies the two declared capabilities.
+
+## The control is a mutation, not a cross-comparison
+
+Every pilot yields the identical 3,2,3,3,0. That is correct, because the
+selectors test persistence semantics and those do not vary by repository.
+But it means agreement across repositories proves nothing, and comparing
+two different selectors only shows that two different questions have
+different answers.
+
+So the layer was seen red by breaking the component. In a scratch copy of
+com-airtable, the absent-id guard in store-retract was changed to remove
+row 0 instead of returning the store unchanged, then recompiled and rerun:
+
+    selector 4 alone moves 3 -> 2; selectors 0, 3, 5 and 7 hold.
+
+That is the semantic the layer claims to test, retract an id that is not
+there and the count must not move, and it is the only one that moved.
+
+## Defect 1: the harness said the store layer was not generated
+
+The generator wrote a docstring listing the store, filter, pagination,
+handler and expand layers as NOT generated, forty lines above the store
+layer it emits. Every generated harness carried the contradiction,
+including the one landed in the previous iteration together with the store
+layer itself. The docstring now says what that iteration actually decided:
+the unit is a SELECTOR, not a layer.
+
+## Defect 2: a field whose value was the name of its own variable
+
+Twelve of twenty landed migration-record.edn files carried a literal
+dollar-R-E-A-D-I-N-G string where the reading of the expand oracle
+belongs. The cause is one character in the shell that wrote them: an
+unquoted heredoc in which that variable was written with a leading
+backslash, so the backslash suppressed the one expansion while the
+neighbouring values expanded correctly. Both branches of the script
+computed a careful, honest reading; neither ever reached a file.
+
+This is the harder half of the class already documented here. A MISSING
+field is visible. A field holding the variable's own name is a string: it
+passes the reader, passes a string? type assert, passes the parse gate,
+and reads at a glance as though a reading is present. The type check
+adopted for the (str ...) in EDN defect does not catch it, because nothing
+about the type is wrong.
+
+Reproduce, per repository:
+
+    git show origin/main:migration-record.edn | grep -c READING
+
+## Why the repair had to be measured, not pasted
+
+The obvious repair is to substitute back the branch text the script would
+have produced, chosen by ref-count. Doing that would have shipped a false
+sentence.
+
+The ref-bearing reading asserts that selector 4 equals selector 0 because
+the ref entity carries exactly one ref. One pilot, com-airbus-analytx, has
+ref-count 2, and its own recorded values show selector 4 differing from
+selector 0, with six selectors yielding four distinct values. The canned
+text even names com-abb-robotics as the repository where this differs, and
+would have been pasted unchanged into a second one.
+
+So the repair re-derives every clause from the values in the record before
+choosing a text, and REFUSES with exit 2 rather than writing when the
+floor it is about to assert does not hold. Three readings resulted, and
+which one a repository gets is decided by its own measurement.
+
+Reproduce the discrimination:
+
+    for r in com-airtable com-agones com-airbus-analytx; do
+      gh api repos/kotoba-lang/$r/contents/migration-record.edn --jq .content
+        | base64 -d | grep -oE 'UNEXERCISED|carries exactly one|carries TWO refs'
+    done
+
+Three repositories, three different answers. A repair that produced the
+same text for all three would be indistinguishable from one that never
+read the values.
+
+## Three bad probes in one iteration, all mine
+
+Recorded because the same reflex caught all three and no gate did:
+
+1. A scan for the nine vars the harness calls reported all nine missing in
+   all twenty repositories. grep is line-based, so a trailing whitespace
+   class never matches a var whose arglist starts on the next line. That
+   is the com-8th-wall defect already fixed IN THE GENERATOR, reintroduced
+   in the probe that was checking the generator.
+2. A layer-presence scan reported no route layer in files that have one.
+   The row is labelled main(route-count), not route.
+3. A table checking the reading's claims used positional splitting of an
+   unquoted variable in zsh, which does not word-split, so all three claim
+   columns compared empty strings and printed a uniform, vacuous verdict.
+
+In each case the tell was uniformity. A column that reads the same for
+every row has usually not been measured.
+
+## A note on checking this document
+
+Balanced parentheses and an even number of quotes is not a reader. This
+ADR passed both and the ADL reader still refused it with unsupported
+escape in string, because the first draft quoted the placeholder with
+backslash-escaped quotes and used backslash line-continuations in the
+shell examples. Read the file back with kotoba.adl/read-string and inspect
+the parsed value, not the byte counts.
+
+## What is landed
+
+Sixteen generated harnesses carry the five count-valued store selectors,
+each verified against its own component compiled to aarch64-macos and
+executed. Twelve migration records carry a reading derived from their own
+values. Seventeen west pins advanced in one commit.
+
+## What is still refused
+
+The three hash-valued selectors of oracle-store, and the filter,
+pagination, handler and expand layers. None has been read selector by
+selector.
+
+The four hand-written harnesses (com-aadhaar, com-aave, com-abb-robotics,
+com-accela) are richer than the generator's output and are not
+regenerated. That list is FOUR, not the two recorded in earlier
+iterations: com-aadhaar and com-aave were found to carry every layer when
+the cohort was measured rather than recalled.
+")))
