@@ -1,0 +1,147 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110500-the-q9-procedures-other-half-a-doctor-that-fixes-forward")
+  (:adr/topic "kotoba-doctor-fix-forward")
+  (:adr/title "The Q9 procedure's other half: a doctor that fixes forward, and two ways of judging a repair that throw away correct ones")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba"))
+  (:adr/related (vector "adr-2609101900-q9-rename-reverted-pending-admission"
+                        "adr-2609110300-kotoba-adl-convert-asks-whether-a-clojure-consumer-remains"
+                        "adr-2609110400-the-converters-reader-was-more-permissive-than-the-compilers"))
+  (:adr/body
+  "## Context
+
+Owner instruction 2026-09-10, restating a standing one: **rename to .kotoba
+FIRST, then fix with build, compile, doctor.**
+
+I had started in the opposite direction -- adding an `amu check` gate in front
+of `kotoba adl convert`, so nothing would be renamed unless the compiler would
+already accept it. That is a converter that refuses to convert, and it is not
+the owner's procedure. Recorded because the instinct was strong and wrong: the
+previous two ADRs both LOWERED the convertible count on purpose, and a third
+lowering felt like continuity rather than the drift it was.
+
+## What was actually missing
+
+Measured 2026-09-10: `kotoba` had exactly ONE subcommand, `adl`. `amu` has no
+doctor either. So the second half of the owner's procedure had no tool at all
+-- a renamed tree could be diagnosed one file at a time by hand, and repaired
+not at all.
+
+That is the gap ADR-2609101900 fell into. Twenty repositories were renamed,
+`amu check` could say why each of nineteen files failed, and the only actions
+available were to read nineteen answers by hand or revert. It was reverted.
+
+## What was measured
+
+The closure of those twenty repositories -- 29 source files, copied out,
+renamed to .kotoba, checked in project mode against amu 94e9c29b:
+
+    29 refused. Nineteen of them with ONE message:
+      :kotoba/project-link-failed  project module requires an explicit :export vector
+       5  only one :export, one :capabilities and alias-only :require clauses
+       2  source reader rejected input
+       2  imports require [namespace :as alias]
+       1  namespace docstring exceeds admission limit
+
+This reproduces ADR-2609101900's four classes on a wider corpus (29 vs 19
+files) and adds a fifth. The dominant class is mechanical.
+
+## Decision
+
+`kotoba doctor <paths> [--source-path <dir>] [--fix]`. Diagnose by running
+`amu check` over the tree and grouping failures by the code and message amu
+itself returns -- the tally IS the work list. With `--fix`, apply the
+mechanical repairs and re-run amu.
+
+Result on the same corpus:
+
+    14 repaired    the :export class 19 -> 5
+    the tree now shows THIRTEEN distinct defects instead of one wall:
+      protocol-declaration, variadic parameters, count-receiver,
+      unbound-symbol, parameter-use-conflict, unknown-operation, ...
+
+The five remaining each have a public `def` of a VALUE. amu requires an export
+to name a declared function and says so exactly -- `answer is a def constant,
+not a function; export a function that returns it`. The repair refuses those
+by name rather than exporting only the functions. Two refusals are load-bearing
+and both are the same rule:
+
+  **A repair never narrows the module's public surface to satisfy a check.**
+  `(:export [])` would pass amu's presence test while publishing nothing, and
+  a module that links because it exports less than its source did is the shape
+  Q9's whole-component rule exists to forbid.
+
+## Two ways of judging a repair, both of which threw away correct ones
+
+Worth recording because both looked like the careful choice.
+
+**Judging on whether the FILE came out clean kept 0 of 14.** Adding
+`(:export [union])` to kotoba.set.union genuinely admits the clause; amu then
+refuses the module further in for a variadic parameter -- a second, unrelated
+defect the export repair was never going to reach. Requiring a clean file
+means only modules with exactly one defect can ever be repaired, which is not
+fixing forward. Judged on whether the CLASS THIS REPAIR TARGETS moved, the
+same code keeps 14. What keeps that honest is the other arm: if the finding is
+unchanged, the edit did nothing and is undone.
+
+**Judging file-by-file then cost 3 more.** In project mode amu links the whole
+graph, so a module is refused because a module it REQUIRES is refused. The
+sorted walk reaches datalog/index.kotoba before datom/source.kotoba, so index
+was repaired, re-checked against an unrepaired dependency, and reverted.
+
+⚠ `:source` does not separate those. Measured: with index repaired and its
+dependency not, amu answers `:source \"index.kotoba\"` -- the ENTRY it was asked
+about, not the module actually missing the vector. So ordering is solved where
+it belongs: every repair is applied BEFORE any is re-checked, and a third pass
+re-measures the whole tree. The counts reported are that measurement, not a
+deduction from the first two passes.
+
+## Controls
+
+Four mutations, each caught by exactly the test that names the behaviour:
+emitting `(:export [])`; a verdict that always says progressed; privacy by
+text scan instead of CST (the negative half is `^:private` inside a
+DOCSTRING, which must exclude nothing); and dropping the bytes after the
+insertion point.
+
+⚠ **The fourth passed every test.** Every fixture happened to end its ns form
+flush against the closing paren, so there were no trailing bytes to drop. A
+fixture with trivia between the last clause and the paren -- the shape
+kotoba.set.union actually has -- turns it red. A control suite that covers
+only the shapes you thought of is the same green as one with nothing to find.
+
+At the CLI, refusing and passing are different exit codes and both were
+exercised: 0 files scanned, `$AMU` unset with amu off PATH, and `$AMU` pointing
+at nothing all exit 2. A tree amu admits exits 0 with no findings -- so a
+finding here is a measurement and not a habit.
+
+## What this does NOT claim
+
+**It does not move admission on that corpus: 0 of 29 files are admitted.** It
+moves the WORK LIST -- from one message repeated nineteen times to thirteen
+named defects, of which the language-level ones (variadic parameters, count
+receivers, unannotated parameters whose uses disagree) are decisions and not
+edits a tool should make.
+
+It does not resume the rename. ADR-2609101900's three options are still the
+owner's to choose. What changes is that option 1 -- fix admission first, then
+re-rename -- now has a tool for the mechanical two thirds of it.
+
+It says nothing about `kotoba adl convert`'s refusals. The build guard still
+refuses a partial conversion of a source root, and should: a rename does not
+fail, and nbb resolves namespaces by extension.
+
+## Landed
+
+kotoba-lang/kotoba c4ff5ca71f43 (PR #618). Repairs are portable `.cljc` in
+`kotoba.doctor`; only tree-walking and the subprocess are in the nbb driver.
+`test/kotoba/doctor_test.cljc`, 8 tests / 22 assertions, registered in
+`run-tests.cljs`. west pin 47aa4de0 -> c4ff5ca7.
+
+⚠ That runner needs the full `clojure -Spath -M:test` classpath and fails on
+`did.core` without it -- verified identical on origin/main's own copy, so it is
+pre-existing and not this change. The new test has no external dependency and
+runs standalone.")))
