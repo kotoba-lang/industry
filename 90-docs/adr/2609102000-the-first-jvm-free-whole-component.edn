@@ -146,13 +146,40 @@ distinct CIDs**, so they are not one placeholder copied around.
 Note the standing rule this sits against: ADR-2607072000, Rust is not written
 in kotoba-lang, and `.cljc` is the answer where Rust would have been.
 
-**Whether those artifacts exist is UNVERIFIED, and that is the block.**
-`com-aave`'s CID and six sampled others all return 404 from
-`https://kotobase.net/ipfs/<cid>`. That is not evidence of absence: a
-deliberately bogus CID returns 404 from the same route, no positive control
-was found -- no CID in this workspace's ledgers is known to be stored and
-fetchable -- and the apex returning 200 says nothing about the `/ipfs/` route.
-So the honest statement is **not found**, never **absent**.
+**Those artifacts are not stored. This was UNVERIFIED for one measurement,
+and the blocker was then resolved.**
+
+The first pass found `com-aave`'s CID and six sampled others returning 404
+from `https://kotobase.net/ipfs/<cid>` and stopped there, because a
+deliberately bogus CID returns 404 from the same route and no positive control
+was in hand. A 404 with no control is `not found`, never `absent`.
+
+The control was then found without writing anything: `manifest/appview-catalog.edn`
+carries `:kotoba.app{:bundle-cid ...}` entries, and **5 of 5 sampled return 200
+on the same route.** One was verified the whole way -- 78,054 bytes fetched,
+sha256 taken, CIDv1 recomputed, and it equals the declared CID exactly:
+
+    computed  bafkreia2cc444k5yrw57uhszfrvbri7wee3ljbpb5wfcorykk72kgxhjaq
+    declared  bafkreia2cc444k5yrw57uhszfrvbri7wee3ljbpb5wfcorykk72kgxhjaq
+
+So the route works, serves content-addressed bytes, and verifies. A 404 from it
+is now evidence.
+
+Re-measured with that control passing **in the same run**:
+
+    built-rust-raw distinct CIDs   999
+    sampled                         40
+      200 (stored)                   0
+      404 (not stored)              40
+    control, same run              200
+
+**Nothing in the sample is retrievable at the address its own manifest
+declares.** The claim is bounded to the sample -- 40 of 999 -- and to the
+plane `ipfs://<cid>` names, which is the plane the manifests point at.
+
+The contrast is the useful part: this workspace **does** publish artifacts
+successfully. The app plane's `:bundle-cid` entries are stored and verify. The
+actor manifests' `wasmCid` population is a separate set that is not.
 
 This is where the cutover stops, and it stops for a reason worth naming: **you
 cannot cut a consumer over to a Kotoba-built artifact without first
@@ -163,8 +190,7 @@ claim with another.
 Three things are needed before `:consumer-cutover` can be attempted, and none
 is a Kotoba problem:
 
-1. A positive control on the bytes plane -- one CID known to be stored,
-   fetched successfully, so a 404 becomes evidence.
+1. ~~A positive control on the bytes plane.~~ **Resolved above.**
 2. An answer to what `built-rust-raw` names for a repository with no Rust:
    a real artifact built elsewhere, a historical provenance string carried
    forward through the relocation, or a value nobody has checked.
