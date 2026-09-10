@@ -208,6 +208,25 @@
 ;; 計数対象の言語。**この集合の外で書かれた実装は、7 軸のどれにも現れない。**
 (def src-ext #{"cljc" "cljs" "clj" "kotoba"})
 
+;; 実 URL 引用を数えにいくファイル（axis-ingest）。**拡張子の値域は `src-ext`
+;; ＋ `edn`**（catalog は source としても data としても書かれる）。ここを別の列
+;; として書くと、片方だけが更新されて静かにずれる —— 2026-09-10 に実際に
+;; そうなった。オーナー指示で `.clj*` を
+;; `.kotoba` へ一括改名した波が着地したとき、`src-ext` は `kotoba` を既に
+;; 持っていたのにこの正規表現は持っておらず、**中身が 1 バイトも変わっていない
+;; catalog が `:ingest/fact-file-count 1 → 0` に落ちた**（実測: bel-feb は
+;; citation 4 → 2、usa-ama も fact-file 1 → 0）。改名は内容を変えないので、
+;; これは低下ではなく**計測の取りこぼし**である。放置すると loop は「引用が
+;; 足りない」と言い続け、次の反復を『数えられないファイルに引用を足す』方へ
+;; 送り出す —— 上げようのない軸を目標として配り続けることになる。
+;;
+;; 2 つ目の列を作らないために def は 1 つだけ置き、両方の使用箇所がこれを読む。
+(def fact-file-ext (conj src-ext "edn"))
+
+(def fact-file-re
+  (re-pattern (str "(?i)(^|/)(facts|catalog|jurisdictions?)\\.("
+                   (str/join "|" (sort fact-file-ext)) ")$")))
+
 ;; プログラムのソースだと言い切れる拡張子（データ・文書・設定は入れない）。
 ;; **スコアには一切入らない。** これは「この instrument はこの repo を読めて
 ;; いない」と言うためだけの語彙で、:maturity/* はどれもこの集合を見ない。
@@ -264,7 +283,7 @@
             deps-text   (slurp* (str root "/deps.edn"))
             deps        (parse-deps rel deps-text)
             ;; facts.cljc / data/ 内の実 URL 引用数。「実データを引いているか」の直接証拠。
-            fact-files  (filterv #(re-find #"(?i)(^|/)(facts|catalog|jurisdictions?)\.(cljc|cljs|clj|edn)$" %) files)
+            fact-files  (filterv #(re-find fact-file-re %) files)
             data-files  (filterv #(str/starts-with? % "data/") files)
             citation-n  (reduce + 0
                                 (map (fn [f]
@@ -329,7 +348,7 @@
             ;; 25 ファイル（scan は 1,936 repo を歩くので、ここは安くなければならない）
             other-decl  (filterv #(and (re-find #"(?i)\.(jsonld|json|edn|md|ttl|yaml|yml)$" %)
                                        (not (str/starts-with? % "data/"))
-                                       (not (re-find #"(?i)(^|/)(facts|catalog|jurisdictions?)\.(cljc|cljs|clj|edn)$" %))
+                                       (not (re-find fact-file-re %))
                                        (not (re-find #"(?i)^(package|package-lock|tsconfig)" %)))
                                  files)
             uncounted-urls (count (into #{}
