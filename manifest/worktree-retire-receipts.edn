@@ -1,0 +1,83 @@
+;; 退役させた worktree の証跡。CLAUDE.md「並行エージェント運用」/ ADR-2609061800 の
+;; 「着地後の後片付けまでが完了条件」を、片付けた側が後から証明できるようにする台帳。
+;;
+;; scripts/worktree-retire.cljs は landed/clean/old/idle/unlocked を判定して自動で
+;; retire するが、判定は **default branch への到達性** しか見ない。default branch に
+;; 未着地でも同一内容が別の remote branch に存在する worktree は `keep (unlanded)` と
+;; 報告されて残り続ける。その 1 件を人が消したなら、なぜ安全だったのかはここに残す。
+;; 消した根拠が残らない削除は、次に同じ判断をする者にとって存在しないのと同じ。
+;;
+;; 追記のみ。entry を消すのではなく、新しい entry を足す。
+{:registry/id :com-junkawasaki.root/worktree-retire-receipts
+ :registry/authority "root"
+ :registry/entries
+ [{:retire/date "2026-09-10"
+   :retire/scope "~/github 直下に残っていた worktree シェル一式"
+   :retire/reclaimed-bytes 648388608          ; 618M (158M + 460M)
+   :retire/verdict
+   "対象 2 worktree はいずれも作業ツリー clean、かつ全内容が remote に存在。
+    保存すべき未保存作業は 0 件だった。"
+
+   :retire/worktrees
+   [{:worktree/path "/Users/junkawasaki/github/worktrees/itonami-ios-20260908/orgs/cloud-itonami/cloud-itonami-app"
+     :worktree/repo "orgs/cloud-itonami/cloud-itonami-app"
+     :worktree/branch "codex/ios-device-registration-20260908"
+     :worktree/head "3a961a96ca"
+     :worktree/size "158M"
+     :worktree/size-note "実体はビルド成果物 — target/ 78M + mobile/ 67M"
+     :worktree/state :landed
+     :worktree/evidence "git rev-list --count origin/main..codex/ios-device-registration-20260908 => 0"
+     :worktree/removed-by "nbb scripts/worktree-retire.cljs --only ~/github/worktrees --min-age-days 1 --apply"
+     :worktree/tool-verdict "RETIRE (landed, clean, 2.1d)"
+     :worktree/branch-disposition "git branch -d（ツールが安全削除）"}
+
+    {:worktree/path "/Users/junkawasaki/github/codex-worktrees/orgs/network-awai/cloud-itonami"
+     :worktree/repo "orgs/network-awai/cloud-itonami"
+     :worktree/branch "codex/nous-style-subscriptions"
+     :worktree/head "b46280467"
+     :worktree/size "460M"
+     :worktree/state :unlanded-but-mirrored
+     :worktree/tool-verdict "keep (unlanded) — origin/main への到達性のみを見るため"
+     :worktree/evidence
+     {:evidence/claim "b46280467 の内容は origin/codex/nous-style-subscriptions (47db3b5ef) と完全同一。差分は commit metadata (committer timestamp) のみ。"
+      :evidence/tree-local  "2ef6636e1fa4eb77e5ca2487c2fc10e398a4d558"
+      :evidence/tree-remote "2ef6636e1fa4eb77e5ca2487c2fc10e398a4d558"
+      :evidence/patch-id-local  "652e048cb3d0821fc6c129c4e409f08a44cba8d5"
+      :evidence/patch-id-remote "652e048cb3d0821fc6c129c4e409f08a44cba8d5"
+      :evidence/parent-shared "0533e31c2"
+      :evidence/porcelain-lines 0
+      :evidence/commands ["git rev-parse b46280467^{tree}"
+                          "git rev-parse origin/codex/nous-style-subscriptions^{tree}"
+                          "git show <ref> | git patch-id --stable"
+                          "git diff --stat b46280467 origin/codex/nous-style-subscriptions  ;; => empty"]}
+     :worktree/removed-by "git worktree remove（--force なし。git 自身の dirty check を第二の床として通した）"
+     :worktree/branch-disposition
+     "local branch は残置。`git branch -d` は origin/main 未着地のため拒否し、`-D` を
+      使えば b46280467 への到達手段が消える。ref は 0 バイトで、消して得るものが無い。"}]
+
+   :retire/shells-removed
+   [{:shell/path "~/github/worktrees"           :shell/held "symlink 2 + 空 dir"}
+    {:shell/path "~/github/codex-worktrees"     :shell/held "symlink 4 + 空 dir"}
+    {:shell/path "~/github/.codex-worktrees"    :shell/held "空"}
+    {:shell/path "~/github/m1030"               :shell/held "空"}
+    {:shell/path "~/github/tamaki-workspaces"   :shell/held ".DS_Store のみ"}
+    {:shell/path "~/github/murakumo-workspace"  :shell/held "symlink 7 + .DS_Store"}
+    {:shell/path "~/github/scratchpad"          :shell/held "symlink 3"}]
+
+   :retire/shells-method
+   "symlink を `find -type l -delete` で先に外し、リンク先 14 件の生存を 1 件ずつ確認
+    してから shell を rm -rf した。rm -r は symlink を辿らないが、辿らないことを
+    確認せずに 618M を消すのは検証ではない。"
+
+   :retire/dangling-at-removal
+   ["/private/tmp/murakumo-request-parallelism  (murakumo-workspace/kotoba-lang/murakumo)"
+    "/tmp/cloud-murakumo-slice-b                (scratchpad/.../network-awai/cloud-murakumo)"]
+
+   :retire/untouched
+   [{:path "~/github/p153"
+     :reason "空シェルに見えたが synventures-ontology/{people,ontology}.ttl の実ファイルを保持。
+              作成時刻が本作業中（16:37）で別プロセス由来。判定できないものは消さない。"}]
+
+   :retire/post-state
+   "com-junkawasaki 本体・orgs/cloud-itonami/cloud-itonami-app・orgs/network-awai/cloud-itonami
+    のいずれの `git worktree list` にも、削除済み path を指す stale registration は残っていない。"}]}
