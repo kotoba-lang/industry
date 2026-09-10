@@ -366,9 +366,28 @@
     ;; into 16 failures). So problem 4 is blocked on a MEASURED pin advance,
     ;; not on adding a dependency -- and a dependency with no reader in src
     ;; moves nothing.
-    :server-side {:status :blocked
-                  :blocked-on :kotobase-peer-pin-advance-in-kotobase-server
-                  :do-not "add the security dep before something reads it"}}
+    ;; Landed 2026-09-10: the pin advance was the deliverable, and no
+    ;; security dep was added because nothing in the server's src reads
+    ;; kotoba.security.* -- the lattice arrives through peer, which declares
+    ;; it. Two silent defects surfaced on the way, both of the same family:
+    ;; a stale read that answers zero rows SUCCESSFULLY.
+    :server-side {:status :landed
+                  :peer-pin "d7dba0972436"
+                  :server-pin "ef2bc2ddba30"
+                  :security-dep-added false
+                  :why-not "nothing in src reads it; a dependency with no reader moves nothing"
+                  :defects-found
+                  {:stale-index-key
+                   "handler.cljc read (get-in db [:spo ...]) after arrangement renamed its index keys to :eavt; a stale key reads as nil and answers zero rows successfully, so enforce_schema persisted an empty delta and reported :ok"
+                   :wire-encoding
+                   "prefix-levels was read with a single decode while every value a transaction carries arrives double-encoded, so the level was dropped in silence and a correctly-cleared viewer was refused with no error; the tests passed because they built rows by hand in a shape the wire never produces"}
+                  ;; The floor to read was the WARNING count, not the failure
+                  ;; count: ClojureScript reports an undeclared var in another
+                  ;; namespace as a warning and emits the call anyway, so 182
+                  ;; tests stayed green over 8 :undeclared-var warnings where
+                  ;; the baseline had 0.
+                  :measured-floor :undeclared-var-warnings
+                  :not-measured "security-mode, max-datoms-per-tx and required-purpose are read the same single-decode way and may be unreachable over the wire for the identical reason -- suspected, not measured"}}
    :policy/threat-matrix "90-docs/security/privacy-threat-matrix.datoms.edn"
    :policy/threat-matrix-coverage "10 of 78 cells recorded; 68 are unmeasured, not clean"
    :policy/measured-on "2026-09-10"}
