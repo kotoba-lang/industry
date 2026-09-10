@@ -22,7 +22,28 @@
   "**D1. 格子は1つ。** `kotoba.security.information-flow/ranks` を唯一の定義とし、`abac/classification-rank` はその alias にする(public var 名は後方互換のため残す)。abac が no-read-up(subject clearance vs resource classification)、information-flow が no-write-down(egress と declassification)を決めるという役割分担を明文化する。**実装済み** — kotoba-lang/security `96870fb478f07f762bf7f5c5f0066fdf47ebf90c`(main)。\n\n**D2. ラベルは datom ではなく属性(`:a`)に付ける。** datom の実体は `{:e :a :v_edn :added}` の4-tuple(`kotobase-peer/core.cljc:604`)で、5列目を足すとブロック形式・CBOR・merkle-LSM・compaction が全て壊れる。kotobase は Datomic 流に \"schema is just datoms too\"(`core.cljc:265`)なので、`:db/valueType` と同じ場所に `:kotoba.security/classification` を1個足すだけで済む。\n\n**D3. read 側の強制は `kotobase-peer.policy` の一般化で行う。新しい seam を作らない。** 同 ns は既に「policy は worker 設定ではなく in-graph データ(`kotobase.policy/read` エンティティの datom)で、chain を同期した任意の peer が同一 policy を強制する」という設計になっており、`visible-for` が返す行フィルタを datoms / cold-datoms / hot-datoms / q / view-rows の**全てが既に通している**。`:protected-prefixes` を `{prefix → level}` に一般化し、`visible-for` を `(>= viewer-clearance attr-level)` にする。既存の binary は `{\":dm.\" :confidential}` と写像でき **zero-regression で移行できる**。\n\n**D4. クリアランスを ref 境界で分けてはならない。** ADR-260726-kotobase-query-plane-is-one-ref のとおり `kotobase.core/open` は `:ref-name` を1つしか取らず、Datalog join の到達範囲はちょうど ref 1本。`:confidential` 用 ref を切った瞬間に横断クエリが永久に不可能になる(sekaiju MMO のシャーディング事故と同型)。属性レベルのラベル + 行フィルタなら**同じ ref に置いたまま可視性だけ変えられる** — この制約下ではこれが唯一の正解。\n\n**D5. 言語仕様には effect の型としてのみ載せる。値の型には載せない。**\n\n*載せる根拠:* kotoba は既に T3 capability confinement を持ち、`kotoba/app` は ambient な DOM / network / credential / eval を一切持たず、外に出る経路は `{:cap :state/put :value ...}` という typed effect **だけ**である(`docs/lang/application-profile.md`)。IFC が一般の言語で破綻する最大の原因(暗黙フロー・ambient channel)が構造的に既に閉じているため、**ラベルが漏れうる経路が effect しかない**。effect set に classification を載せるだけで、Jif / FlowCaml 級の型システムを書かずに termination-insensitive な範囲の保証が取れる。これは kotoba の capability confinement があって初めてコスパが成立する話であり、一般論としての「言語に IFC を入れる」とは別物。\n\nさらに、問題点3(context 欠損の fail-open)は実行時チェックでは原理的に塞げない。effect descriptor に classification を必須項目として載せれば `compiler/admission.cljc` が**申告の欠損そのものを compile 時に deny** できる。これが穴3を構造的に消す唯一の手段。`application-profile.md` の completion gate 1〜4(typed descriptor → effect inference → policy-gated provider → denial fixture)にそのまま乗り、既存の枠組みを壊さない。\n\n*載せない根拠:* 値レベルの label polymorphism、関数型への label 注釈、declassify の型規則は導入しない。`kotoba/app` が effect 経由でしか外に出られない以上、値レベルまで降りても**追加で得られる保証がほぼゼロ**で、型検査の複雑さと `.kotoba` の学習コストだけが増える。加えて `security/docs/information-flow-non-claims.md` が covert / timing / cache channel を明示的に非-claim にしている以上、値レベル IFC を入れても脅威モデル上の到達点は動かない。\n\n**D6. 判定ロジックを言語側に複製しない。** abac が既に no-read-up を実装済みなので、言語側に同じ判定を書くと3つ目の重複になる。言語がやるべきは**判定ではなく、申告の強制と静的な label 推論**であり、判定は `security` repo の1関数に集約したままにする。\n\n**D7. 非-claim は維持する。** 言語に入れても covert / timing / cache channel は閉じない。`information-flow-non-claims.md` の非-claim 範囲を改訂せずに済む範囲に設計を留め、「言語でやったから安全」と主張しない。")
 
   (:adr/status_detail
-  "Step 1 のみ実装済み。Step 2〜5 は未着手。\n\n- **Step 1 — 格子1本化(D1): 完了。** kotoba-lang/security `96870fb478f07f762bf7f5c5f0066fdf47ebf90c` が main。`abac/classification-rank` を `flow/ranks` の alias に変更し、重複を再導入させない回帰テスト `classification-lattice-is-not-duplicated`(alias 同一性 + ラベル順序)を追加。**検証: `clojure -M:test` で 211 tests / 1065 assertions / 0 failures**(変更前は 210 tests / 1063 assertions / 0 failures)。挙動変更なし — 2つの map は既に同一内容だった。\n- **Step 2 — `kotobase-peer.policy` の4段化(D3): 完了(2026-09-10)。**
+  "Step 1 のみ実装済み。Step 2〜5 は未着手。\n\n- **Step 1 — 格子1本化(D1): security の main では完了。⚠ compiler の classpath 上では
+  2026-09-10 まで偽だった（同日 subagent が測り、私が独立に確認）。**
+  `osaho`（admission の在り処。ex-`kotoba-kir`）は `security b13c5e12` を pin しており、
+  **その sha の `abac/classification-rank` は今も独自の map
+  `{:public 0 :internal 1 :confidential 2 :restricted 3}`** ——
+  `flow/ranks` の alias ではなく、**`:personal` も持たない。**
+  **D1 が消すために存在した二重定義は、それが最も効く場所に残っていた。**
+  これは CLAUDE.md が繰り返し記録している「基盤ライブラリの pin は、fix が main に
+  在っても届かない」の 3 例目（同日の他の 2 例: kotobase-server の peer pin、
+  kotobase-server の datom-source floor）。Step 4 の PR がこの pin を
+  `d87f3342` へ前進させる。**「実装済み」と「使われている classpath 上で実装済み」は
+  別の主張である。**
+
+- **Step 1 — 格子1本化(D1)、security 側: 完了。** kotoba-lang/security `96870fb478f07f762bf7f5c5f0066fdf47ebf90c` が main。`abac/classification-rank` を `flow/ranks` の alias に変更し、重複を再導入させない回帰テスト `classification-lattice-is-not-duplicated`(alias 同一性 + ラベル順序)を追加。**検証: `clojure -M:test` で 211 tests / 1065 assertions / 0 failures**(変更前は 210 tests / 1063 assertions / 0 failures)。挙動変更なし — 2つの map は既に同一内容だった。\n;; ⚠ この ADR は 2026-07-27 時点の場所を名指しており、3 つが現在偽である
+;; （2026-09-10 実測）: `compiler/admission.cljc` は存在しない（compiler repo は
+;; `amu`、admission は `osaho` の `kotoba.kir.admission` で、入口は
+;; `kotoba.compiler.effect-row/check`）。`application-profile.md` は `kotoba-lang`
+;; ではなく `kotoba` に在る。`scripts/check-vendored-copies-fleet.cljs` は
+;; kotoba-lang の main で走らない（`kotoba.lang.text` が classpath に無い）ので、
+;; **repo を跨ぐ catalog drift を自動で測っているものは現在ひとつも無い。**
+
+- **Step 2 — `kotobase-peer.policy` の4段化(D3): 完了(2026-09-10)。**
   `:kotobase.policy/prefix-levels`(`{prefix → label}`)を policy entity に追加し、
   `visible-for` を `(>= viewer-rank level-rank)` にした。**prefix の LIST が
   「何が保護対象か」を、level が「どれだけか」を言う** —— 2 つ目の真実の源を作らない。
@@ -84,7 +105,35 @@
   required 系 4 本 ③枝を abac の下へ→**順序テストだけ**。
 
   ⚠ **option を渡さない呼び出し側は今日と同じ**（`capability-required?` と同じ opt-in）。
-  申告を無条件に必須化するのは Step 4 の compile 時の仕事で、runtime flag の仕事ではない。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 未着手。**\n- **Step 5 — `kotobase-server` への security 依存追加(問題4): 完了(2026-09-10)。**
+  申告を無条件に必須化するのは Step 4 の compile 時の仕事で、runtime flag の仕事ではない。\n- **Step 4 — kotoba effect descriptor への classification 追加(D5): 実装済み。3 repo 中 2 つが merge 済み(2026-09-10、subagent)。**
+  `kotoba-lang bf670cf2ef2c` / `kotoba-sema 90baa17c0bb5`（west pin 前進済み）。
+  **`amu` は PR #929 のまま** —— branch protection が PR + status check を要求し、
+  `test (ubuntu-latest)` が実行中だった。west pin は `b57bcdb6981a` のまま。
+
+  `:kotoba.security/classification` を capability-catalog の全 entry
+  （= effect descriptor）に載せ、**ラベルを caller のものから言語のものに移した。**
+  `kotoba.compiler.effect-classification/check!` が `effect-row/check`
+  （両 host で唯一の admission 入口）から走り、**申告が無いか rank できない grant を
+  拒否する。ここに届く policy key は無い。** kotoba-lang の `validate!` が
+  classification を持たない entry を拒むので、**漏れは作られた場所で捕まる。**
+
+  **end-to-end の証拠**（`(cap-call 200 7)` だけを持つ guest に `[:cap/call 200]` を
+  **grant する** policy、`bin/amu compile --target wasm32`）:
+  base `b57bcdb6` は **exit 0 で wasm を出す**（問題3 そのもの）、branch は
+  **exit 65 `:kotoba/admission-denied` — `effect declares no classification`**。
+
+  **検証**: amu JVM 1373/10394/0/0 → **1390/10447/0/0**、amu nbb 40/132 → **56/181**、
+  kotoba-lang は failure set が変更前後で**同一**（10 fail / 2 err、すべて既存）、
+  kotoba-sema 484/2261/0/0 で不変。判別 8 本。うち 2 本は**予測より広く落ちた**と
+  報告されている（`hash/sha256` が amu suite 全体の例示 capability だったため 9 ns /
+  14 assertions）——**壊れたものと報告されたものは一致している。**
+
+  ⚠ **no-read-up の比較は policy が subject clearance を名指したときだけ arm される。**
+  無条件 arm を**測った上で**採らなかった: `(if true …)` にすると
+  **277 failures / 1186 errors**（abac は resource に classification が在り subject の
+  rank が nil のとき拒否するため）。かつ **amu のどの policy も `:clearance` を
+  名指していない**。**D5 の無条件な半分は「申告」の側**であり、そちらは policy 無しで
+  強制されている。\n- **Step 5 — `kotobase-server` への security 依存追加(問題4): 完了(2026-09-10)。**
   4 段 clearance が server 面に届いた。`kotobase-peer` `d7dba0972436` /
   `kotobase-server` `ef2bc2ddba30`、west pin 両方前進済み。
 
