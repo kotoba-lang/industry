@@ -152,7 +152,26 @@
     ;; Three of three healthy, five of five wedged. A reboot is the only
     ;; remedy this repo knows of; nothing here performs one.
     "echo timewait=$(netstat -an -p tcp 2>/dev/null | grep -c TIME_WAIT)"
-    "echo ephemeral=$(netstat -an -p tcp 2>/dev/null | awk 'NR>2 {print $4}' | sed 's/.*\\.//' | awk '$1>=32768 && $1<=65535' | sort -u | wc -l | tr -d ' ')"
+    ;; ⚠ **範囲を決め打ちしない。** ここは 2026-09-10 まで 32768-65535 を定数で
+    ;; 持っていたが、**この fleet のどのノードもその範囲ではない**（実測:
+    ;; benjamin/simeon は 9000-65535、dan/judah は 16384-65535、linux の gad は
+    ;; 32768-60999）。窓を決め打ちすると窓の外の消費が見えず、下から埋まる
+    ;; ノードで「まだ空いている」と答える。**ノードに訊く。**
+    "eplo=$(sysctl -n net.inet.ip.portrange.first 2>/dev/null)"
+    "ephi=$(sysctl -n net.inet.ip.portrange.last 2>/dev/null)"
+    "if [ -z \"$eplo\" ]; then epr=$(sysctl -n net.ipv4.ip_local_port_range 2>/dev/null); eplo=$(echo $epr | awk '{print $1}'); ephi=$(echo $epr | awk '{print $2}'); fi"
+    "echo eplo=$eplo"
+    "echo ephi=$ephi"
+    "echo ephemeral=$(netstat -an -p tcp 2>/dev/null | awk 'NR>2 {print $4}' | sed 's/.*\\.//' | awk -v a=$eplo -v b=$ephi '$1>=a && $1<=b' | sort -u | wc -l | tr -d ' ')"
+    ;; ⚠ **FileVault は「再起動できるか」を決める。** 実測 2026-09-10、私はこれを
+    ;; 測らずに simeon を `shutdown -r now` して**失った** —— FileVault が有効な
+    ;; Mac は再起動すると pre-boot 認証画面で止まり、ネットワークスタックが
+    ;; 上がらない。ssh も tailscale も mDNS も無く、**物理的にパスワードを打つ
+    ;; まで戻らない**。port 枯渇の唯一の治療が再起動なので、この 2 つは対で要る:
+    ;; `authrestart` が true なら `sudo fdesetup authrestart` が次回 boot の
+    ;; unlock を事前承認するので遠隔でも戻る。`shutdown -r` は戻らない。
+    "echo filevault=$(sudo -n fdesetup status 2>/dev/null | grep -qi 'is On' && echo on || echo off)"
+    "echo authrestart=$(sudo -n fdesetup supportsauthrestart 2>/dev/null || echo unknown)"
     "echo wasmtime=$(command -v wasmtime)"
     "echo wasmtimev=$(wasmtime --version 2>/dev/null | awk '{print $2}')"
     ;; `wac` is the third tool amu's component tests reach for, and the reason
@@ -260,11 +279,18 @@
           ;; Not a cap condition — `loopback?` already withholds everything,
           ;; and adding a second gate on the same fact would let the two
           ;; disagree. This is the DIAGNOSIS that travels with the verdict:
-          ;; the ephemeral range is 32768-65535, so anything near 32,768 in
-          ;; use means the next connection this node tries to open — to
-          ;; anywhere, including itself — has nowhere to come from.
+          ;; the node's OWN ephemeral range (measured, not assumed), so that
+          ;; "near the top" means the next connection this node tries to open
+          ;; — to anywhere, including itself — has nowhere to come from.
+          ;;
+          ;; ⚠ 分数で持つ。台数分の窓が違うので、絶対数の閾値は窓ごとに違う
+          ;; 意味になる（16000 は 56,536 幅では 28%、28,232 幅では 57%）。
           ports-in-use (num ephemeral)
-          port-exhausted? (>= ports-in-use 16000)
+          port-span (let [lo (num (:eplo n)) hi (num (:ephi n))]
+                      (when (and (pos? lo) (> hi lo)) (inc (- hi lo))))
+          port-frac (when (and port-span (pos? port-span))
+                      (/ ports-in-use port-span))
+          port-exhausted? (boolean (and port-frac (>= port-frac 0.5)))
           base? (and (seq curl) (seq tar) loopback?)
           jvm? (and base? (seq javahome) (seq clojure) (>= free 8))
           node? (and base? (seq npx) (>= free 5))
@@ -311,7 +337,11 @@
              :free-gb free
              :npm-registry-status (str npmreg)
              :tcp-time-wait (num timewait)
+             :filevault? (= "on" (:filevault n))
+             :supports-authrestart? (= "true" (:authrestart n))
              :ephemeral-ports-in-use ports-in-use
+             ;; 窓そのものを隣に置く。数字だけでは「多い」が判定できない。
+             :ephemeral-range (when port-span [(num (:eplo n)) (num (:ephi n))])
              ;; Recorded only when true. A key that is always present and
              ;; usually false reads as noise; one that appears exactly when a
              ;; node is wedged is the first thing anyone will see.
@@ -387,8 +417,26 @@
     ;; `loopback?` already does that — so what these pin is that the number
     ;; reaches nodes.edn and that a wedged node is labelled rather than
     ;; merely stripped.
-    (check (:port-exhausted? (classify (merge base {:ephemeral "32767"})))
-           "a full ephemeral range is labelled — zebulun/simeon/benjamin/asher, measured")
+    ;; ⚠ **窓を渡す。** 数だけでは「多い」が決まらない —— 32,767 は
+    ;; 9000-65535 の窓では 58%、32768-60999 の窓では 116%（あり得ない）。
+    ;; 2026-09-10 まで、この test は窓を渡さずに絶対数だけで判定させていた。
+    (check (:port-exhausted? (classify (merge base {:ephemeral "32767"
+                                                    :eplo "9000" :ephi "65535"})))
+           "a nearly-full ephemeral range is labelled — benjamin/simeon 2026-09-10, measured")
+    (check (nil? (:port-exhausted? (classify (merge base {:ephemeral "29"
+                                                          :eplo "16384" :ephi "65535"}))))
+           "a healthy node in a DIFFERENT window carries no label — judah/dan, measured")
+    ;; 境界ちょうど。>= を > に取り違えたら、ここだけが落ちる（ADR-2608136000 5 問目）。
+    (check (:port-exhausted? (classify (merge base {:ephemeral "28268"
+                                                    :eplo "9000" :ephi "65535"})))
+           "exactly 50% of the window is exhausted — the >= side of the operator")
+    (check (nil? (:port-exhausted? (classify (merge base {:ephemeral "28267"
+                                                          :eplo "9000" :ephi "65535"}))))
+           "one port below the boundary is not — the other side")
+    ;; 窓が測れなかったノードを「空いている」と読まない。
+    (check (nil? (:port-exhausted? (classify (merge base {:ephemeral "60000"}))))
+           "no window measured means no verdict, not a clean one — a count with
+            no range to divide it by cannot say whether it is large")
     (check (nil? (:port-exhausted? (classify (merge base {:ephemeral "29"}))))
            "a healthy node carries no label at all, rather than a false one")
     (check (nil? (:port-exhausted? (classify base)))
@@ -419,7 +467,8 @@
   ;; below on their first run: the probe reported them as `-` for every node
   ;; and the numbers looked unmeasurable rather than unwritten.
   (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtoolsv wasmtime wasmtimev wac wacv rosetta caps max-parallel detail loopback role
-                npm-registry-status tcp-time-wait ephemeral-ports-in-use port-exhausted?]} n]
+                npm-registry-status tcp-time-wait ephemeral-ports-in-use port-exhausted?
+                ephemeral-range filevault? supports-authrestart?]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -456,7 +505,19 @@
          (when (and reachable? tcp-time-wait)
            (str "\n   :tcp-time-wait " tcp-time-wait
                 " :ephemeral-ports-in-use " (or ephemeral-ports-in-use 0)
+                ;; 窓を数の隣に置く。数だけでは「多い」が判定できず、しかも
+                ;; 窓はノードごとに違う（9000-65535 / 16384-65535 / 32768-60999、
+                ;; 実測 2026-09-10）。
+                (when ephemeral-range (str " :ephemeral-range " (pr-str ephemeral-range)))
                 (when port-exhausted? " :port-exhausted? true")))
+         ;; 再起動可能性。port 枯渇の治療が再起動しかない以上、これは
+         ;; capability と同じ重さの事実である（実測 2026-09-10、simeon を
+         ;; これを見ずに再起動して失った）。
+         (when reachable?
+           (str "\n   :filevault? " (pr-str (boolean filevault?))
+                " :supports-authrestart? " (pr-str (boolean supports-authrestart?))
+                (when (and filevault? (not supports-authrestart?))
+                  " :remote-reboot :UNSAFE-physical-access-required")))
          (when (and reachable? (seq (str npm-registry-status)))
            (str "\n   :npm-registry-status " (pr-str (str npm-registry-status))))
          (when reachable? (str "\n   :caps " (pr-str (or caps #{})) " :max-parallel " (or max-parallel 0)))

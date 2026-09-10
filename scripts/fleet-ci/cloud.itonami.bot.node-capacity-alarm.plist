@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>cloud.itonami.bot.node-capacity-alarm</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd "$HOME/github/com-junkawasaki" &amp;&amp; exec /opt/homebrew/bin/nbb --classpath scripts/fleet-ci scripts/fleet-ci/node-capacity-alarm.cljs</string>
+  </array>
+  <!-- Hourly, matching the operator-side capacity-alarm. Disk on these nodes
+       went from workable to 2.6GiB without anything ringing, and the ephemeral
+       port budget only moves in one direction until a reboot, so what an hourly
+       check buys is the difference between "clean something up" and "the node
+       cannot open a socket to itself". One ssh round trip per node per hour. -->
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/junkawasaki/.itonami/node-capacity-alarm.log</string>
+  <key>StandardErrorPath</key><string>/Users/junkawasaki/.itonami/node-capacity-alarm.log</string>
+  <key>ProcessType</key><string>Background</string>
+</dict>
+</plist>

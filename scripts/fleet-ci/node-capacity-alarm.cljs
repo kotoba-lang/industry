@@ -1,0 +1,280 @@
+#!/usr/bin/env nbb
+;; node-capacity-alarm.cljs — fleet ノード側の「尽きかけ」を、尽きる前に 1 回鳴らす。
+;;
+;; `capacity-alarm.cljs` は *この機械* を測る（gate はノードへ tree を配るので
+;; operator の空きを見られない、という理由でそこに居る）。**その鏡が無かった** ——
+;; ノード側の空きは probe.cljs が `:free-gb` として測るが、probe は手で回すもので、
+;; **その値に対して鳴るものが何も無かった。**
+;;
+;; 実測 2026-09-10、それが何を許したか:
+;;
+;;   judah  空き 2.6Gi（99% 使用）   dan 空き 4.1Gi（98%）
+;;   benjamin ephemeral 52,263 / 56,536 使用（92%）  simeon ほぼ同じ
+;;
+;; どちらも**音を立てずにそこまで行った**。console は「0 of 12 routable」と
+;; 出していたが、それは症状であって、どちらの原因も名指ししていない。
+;;
+;; ## なぜ port を disk と同じ警報で測るのか
+;;
+;; 同じ形の故障だからである —— **単調に増える有界資源**で、尽きた瞬間に
+;; 「無関係な場所」で症状が出る。disk が尽きると checkout が落ち、port が尽きると
+;; **ノードは自分自身にすら接続できなくなる**（probe.cljs 137-141 行が
+;; `curl http://127.0.0.1:...` が 000 を返す実測を記録している）。
+;;
+;; ⚠ **ephemeral range を定数で持たない。** probe.cljs は 32768-65535 を
+;; 決め打ちしているが、この fleet のノードは実際には **9000-65535** に広げてある
+;; （実測 `net.inet.ip.portrange.first: 9000`）。窓を決め打ちすると、窓の外の
+;; 消費が見えないまま「まだ空いている」と答える。**ノードに訊く。**
+;;
+;; ## 測れなかったことを「健全」と同じ値にしない（ADR-2608136000 の 1・2 問目）
+;;
+;; ssh が答えなかったノードは `:unmeasured` であって clean ではない。**1 台も
+;; 測れなかったら REFUSE（exit 2）** —— 0 台を「全部健全」として報告しない。
+;;
+;; ## ⚠ port が埋まったノードを再起動するときの唯一の正しい方法
+;;
+;; **`shutdown -r now` を使わない。** この fleet の Mac は全台 FileVault が有効で、
+;; 通常の再起動は pre-boot 認証画面で止まる —— ネットワークスタックが上がらないので
+;; ssh も tailscale も mDNS も無く、**物理的にパスワードを打つまで戻らない**。
+;;
+;;   ✅ sudo fdesetup authrestart     次回 boot の unlock を事前承認する（遠隔可）
+;;   ❌ sudo shutdown -r now          pre-boot 画面で止まる（物理アクセスが要る）
+;;
+;; 実測 2026-09-10: これを測らずに simeon を `shutdown -r now` して失った。
+;; `nodes.edn` の `:filevault?` / `:supports-authrestart?` が probe から入る。
+;;
+;;   nbb --classpath scripts/fleet-ci scripts/fleet-ci/node-capacity-alarm.cljs \
+;;       [--floor-gb 15] [--port-ceiling 0.75] [--hosts a,b] [--notify false] [--self-test]
+
+(ns fleet-ci.node-capacity-alarm
+  (:require ["node:child_process" :as cp]
+            ["node:fs" :as fs]
+            ["node:path" :as path]
+            [clojure.edn :as edn]
+            [clojure.string :as str]
+            [transition-alarm :as alarm]))
+
+(def args (vec *command-line-args*))
+(defn- flag [n d] (let [i (.indexOf args n)] (if (neg? i) d (nth args (inc i)))))
+(defn- bool-flag [n] (>= (.indexOf args n) 0))
+
+(defn- num-flag
+  "A threshold that did not parse is not a threshold — `capacity-alarm` argued
+  this and the argument does not change here: every comparison against NaN is
+  false, so a typo in the floor would make this alarm report healthy forever."
+  [name default parse]
+  (let [raw (flag name default) v (parse raw)]
+    (when (js/isNaN v)
+      (println (str "node-capacity-alarm: " name " が数値ではありません: " (pr-str raw)))
+      (js/process.exit 2))
+    v))
+
+;; 15 GiB: このノード群が抱える model が 1 本 9.4 GiB なので、「1 本入れ直せる」
+;; ところが行動可能な最後の線。これを割ると、片付ける前に取得が失敗する。
+(def floor-gb (num-flag "--floor-gb" "15" js/parseFloat))
+;; 0.75: 実測 benjamin は 92% で**まだ繋がる**（curl 200）。尽きてから鳴る警報は
+;; 鳴った時にはもう ssh も入れない。行動できるうちに鳴らす。
+(def port-ceiling (num-flag "--port-ceiling" "0.75" js/parseFloat))
+(def notify? (not= "false" (flag "--notify" "true")))
+(def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp")
+                                        ".itonami" "node-capacity-alarm-state.edn")))
+(def here (path/dirname *file*))
+
+;; ---------------------------------------------------------------- roster
+
+(defn roster
+  "名簿は 1 つ。probe が生成した nodes.edn の host 一覧を使い、二つ目の名簿を
+  作らない。`--hosts` は追加であって置換ではない（head node の gad は mac mini の
+  probe 対象ではないが、同じ 2 つの資源で死ぬ）。"
+  []
+  (let [from-edn (try
+                   (->> (edn/read-string (fs/readFileSync (path/join here "nodes.edn") "utf8"))
+                        :nodes (map :host) (remove nil?))
+                   (catch :default _ nil))
+        extra (->> (str/split (str (flag "--hosts" "gad")) #",")
+                   (map str/trim) (remove str/blank?))]
+    (vec (distinct (concat from-edn extra)))))
+
+;; ---------------------------------------------------------------- measure
+
+;; 1 往復で全部取る。**stdin で `sh -s` に流す** —— probe.cljs が実測で書き残した
+;; とおり、`ssh host sh -lc "<script>"` はリモートの login shell が先に展開して
+;; ネストした quote が壊れる。stdin なら原理的に起きない。
+;;
+;; macOS と Linux の両方で動かす: df の -i は Linux では block 情報を *置き換える*
+;; ので併用しない。netstat が無い Linux では ss を使う。
+(def remote-script
+  (str/join
+   "\n"
+   ["export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH"
+    "if [ -d /System/Volumes/Data ]; then V=/System/Volumes/Data; else V=/; fi"
+    "echo volume=$V"
+    "df -k \"$V\" | awk 'NR==2{print \"freekb=\" $4; print \"capacity=\" $5}'"
+    ;; ephemeral range は**ノードに訊く**。決め打ちの窓は窓の外を見ない。
+    "lo=$(sysctl -n net.inet.ip.portrange.first 2>/dev/null)"
+    "hi=$(sysctl -n net.inet.ip.portrange.last 2>/dev/null)"
+    "if [ -z \"$lo\" ]; then r=$(sysctl -n net.ipv4.ip_local_port_range 2>/dev/null); lo=$(echo $r | awk '{print $1}'); hi=$(echo $r | awk '{print $2}'); fi"
+    "echo portlo=$lo"
+    "echo porthi=$hi"
+    ;; その範囲に居る **distinct な local port** を数える。状態は問わない ——
+    ;; TIME_WAIT でも ESTABLISHED でも、その port は次の接続には使えない。
+    "if command -v netstat >/dev/null 2>&1 && netstat -an -p tcp >/dev/null 2>&1; then"
+    "  echo portsused=$(netstat -an -p tcp | awk 'NR>2 {print $4}' | sed 's/.*[.:]//' | awk -v a=$lo -v b=$hi '$1>=a && $1<=b' | sort -u | wc -l | tr -d ' ')"
+    "  echo timewait=$(netstat -an -p tcp | grep -c TIME_WAIT | tr -d ' ')"
+    "elif command -v ss >/dev/null 2>&1; then"
+    "  echo portsused=$(ss -tan | awk 'NR>1 {print $4}' | sed 's/.*[.:]//' | awk -v a=$lo -v b=$hi '$1>=a && $1<=b' | sort -u | wc -l | tr -d ' ')"
+    "  echo timewait=$(ss -tan state time-wait | wc -l | tr -d ' ')"
+    "fi"]))
+
+(defn- parse-kv [s]
+  (into {} (for [l (str/split-lines (str s))
+                 :let [[k v] (str/split (str/trim l) #"=" 2)]
+                 :when (and k v (seq k))]
+             [(keyword k) v])))
+
+(defn measure-host
+  "1 ノードを測る。**答えなかったら nil ではなく `:unmeasured` を返す** ——
+  呼び出し側が『測れなかった』と『空いていた』を出力で区別できるように。"
+  [host]
+  (let [r (cp/spawnSync "ssh"
+                        (clj->js ["-o" "BatchMode=yes" "-o" "ConnectTimeout=8"
+                                  "-o" "StrictHostKeyChecking=accept-new"
+                                  host "sh" "-s"])
+                        #js {:input remote-script :encoding "utf8" :timeout 45000})
+        code (.-status r)]
+    (if-not (zero? (or code 1))
+      {:host host :state :unmeasured
+       :detail (str "ssh exit " code " " (str/trim (subs (str (.-stderr r)) 0 160)))}
+      (let [kv (parse-kv (.-stdout r))
+            freekb (js/parseFloat (:freekb kv))
+            lo (js/parseInt (:portlo kv)) hi (js/parseInt (:porthi kv))
+            used (js/parseInt (:portsused kv))
+            span (when (and (not (js/isNaN lo)) (not (js/isNaN hi))) (inc (- hi lo)))]
+        (if (js/isNaN freekb)
+          {:host host :state :unmeasured :detail "df が読めなかった"}
+          {:host host :state :measured
+           :free-gb (/ freekb 1048576.0)
+           :capacity (:capacity kv)
+           :time-wait (when-not (js/isNaN (js/parseInt (:timewait kv)))
+                        (js/parseInt (:timewait kv)))
+           ;; port 側は測れないことがある（netstat も ss も無い）。その時は
+           ;; **nil にして、0.0 と混ぜない** —— 0.0 は「がら空き」を意味する。
+           :port-used used :port-span span
+           :port-frac (when (and span (not (js/isNaN used)) (pos? span))
+                        (/ used span))})))))
+
+;; ---------------------------------------------------------------- verdict
+
+(defn verdict
+  "測定結果の集合から判定を組む。**judgement はここ 1 箇所** —— 呼び出し側で
+  再導出しない。"
+  [results]
+  (let [measured (filter #(= :measured (:state %)) results)
+        unmeasured (filter #(= :unmeasured (:state %)) results)
+        low-disk (filter #(< (:free-gb %) floor-gb) measured)
+        low-port (filter #(and (:port-frac %) (>= (:port-frac %) port-ceiling)) measured)]
+    (cond
+      ;; **evidence floor.** 0 台を clean として報告しない。答えられなかったのだから
+      ;; 0 でも 1 でもない値で終わる。
+      (empty? measured)
+      {:healthy? false :refused? true
+       :why (str "1 台も測れなかった（" (count results) " 台に ssh）"
+                 " —— これは『全ノード健全』ではない")}
+
+      :else
+      {:healthy? (and (empty? low-disk) (empty? low-port))
+       :measured (count measured) :unmeasured (count unmeasured)
+       :low-disk (mapv :host low-disk) :low-port (mapv :host low-port)
+       :persist {:measured (count measured) :unmeasured (count unmeasured)
+                 :low-disk (mapv :host low-disk) :low-port (mapv :host low-port)}
+       :why (str/join " / "
+                      (cond-> []
+                        (seq low-disk)
+                        (conj (str "空き < " floor-gb "GiB: "
+                                   (str/join ", " (map #(str (:host %) " "
+                                                             (.toFixed (:free-gb %) 1) "GiB")
+                                                       low-disk))))
+                        (seq low-port)
+                        (conj (str "ephemeral port " (int (* 100 port-ceiling)) "%超: "
+                                   (str/join ", " (map #(str (:host %) " "
+                                                             (int (* 100 (:port-frac %))) "%")
+                                                       low-port))))))})))
+
+;; ---------------------------------------------------------------- self-test
+
+(defn- self-test
+  "**個数を返す。** boolean は「1 件の退行」と「壊れた検査」を区別できない
+  （CLAUDE.md 8 問目）。判定が両方向に振れることと、**境界ちょうど**で
+  演算子が見えることを確かめる（5 問目の但し書き）。"
+  []
+  (let [fails (atom [])
+        chk (fn [ok label] (when-not ok (swap! fails conj label)))
+        m (fn [h gb frac] {:host h :state :measured :free-gb gb
+                           :port-frac frac :port-span 56536 :port-used (int (* frac 56536))})]
+    ;; 両方向
+    (chk (:healthy? (verdict [(m "ok" 40.0 0.10)])) "健全なノードは緑")
+    (chk (not (:healthy? (verdict [(m "full" 2.6 0.10)]))) "空き 2.6GiB は赤")
+    (chk (not (:healthy? (verdict [(m "wedged" 40.0 0.92)]))) "port 92% は赤")
+    ;; 境界ちょうど。>= と > を取り違えたらここだけが落ちる。
+    (chk (not (:healthy? (verdict [(m "edge" 40.0 port-ceiling)])))
+         (str "port がちょうど床 (" port-ceiling ") は赤 —— >= の側"))
+    (chk (:healthy? (verdict [(m "edge" floor-gb 0.10)]))
+         (str "空きがちょうど床 (" floor-gb "GiB) は緑 —— < の側"))
+    ;; 測れなかったことは健全ではない
+    (chk (:refused? (verdict [{:host "x" :state :unmeasured}]))
+         "1 台も測れなければ REFUSE であって clean ではない")
+    (chk (:refused? (verdict [])) "空の名簿も REFUSE")
+    ;; port を測れなかったノードを 0.0（がら空き）と読まない
+    (chk (:healthy? (verdict [{:host "noports" :state :measured :free-gb 40.0 :port-frac nil}]))
+         "port 不明のノードは port 理由では赤くしない")
+    (chk (not (:healthy? (verdict [{:host "noports" :state :measured :free-gb 2.0 :port-frac nil}])))
+         "port 不明でも disk では赤くなる")
+    (println (str "self-test: " (count @fails) " failed"))
+    (doseq [f @fails] (println "  FAIL:" f))
+    (count @fails)))
+
+;; ---------------------------------------------------------------- main
+
+(defn -main [& _]
+  (if (bool-flag "--self-test")
+    (js/process.exit (if (zero? (self-test)) 0 1))
+    (let [hosts (roster)
+          _ (println (str "node-capacity-alarm: " (count hosts) " 台を測る …"))
+          results (mapv measure-host hosts)
+          v (verdict results)]
+      (doseq [r (sort-by :host results)]
+        (println
+         (if (= :unmeasured (:state r))
+           (str "  " (:host r) ": 測れなかった — " (:detail r))   ;; ← 「合格」と別の行
+           (str "  " (:host r) ": 空き " (.toFixed (:free-gb r) 1) "GiB (" (:capacity r) ")"
+                (if (:port-frac r)
+                  (str "  port " (:port-used r) "/" (:port-span r)
+                       " (" (int (* 100 (:port-frac r))) "%)"
+                       (when (:time-wait r) (str " TIME_WAIT " (:time-wait r))))
+                  "  port 未測定")))))
+      (if (:refused? v)
+        (do (println (str "node-capacity-alarm: REFUSED — " (:why v)))
+            ;; 0 でも 1 でもない = 「答えられなかった」
+            (js/process.exit 2))
+        (do
+          (alarm/run!
+           {:label "node-capacity-alarm"
+            :check (constantly v)
+            :state-file state-f
+            :notify? notify?
+            :messages
+            {:broke ["fleet ノードの資源が尽きかけています"
+                     (fn [{:keys [why]}]
+                       (str why "。disk: ~/.ollama と ~/.cache/huggingface が"
+                            "再取得可能。port: 再起動でしか戻らないが、"
+                            "⚠ FileVault 有効機は `sudo fdesetup authrestart` を使う"
+                            "（`shutdown -r` は pre-boot 画面で止まり遠隔では戻らない）"))]
+             :recovered ["fleet ノードの資源が戻りました"
+                         (fn [{:keys [measured]}]
+                           (str measured " 台すべて床の上"))]}})
+          (println (str "node-capacity-alarm: 測定 " (:measured v)
+                        " / 未測定 " (:unmeasured v)))
+          ;; 警報自身は常に 0（transition-alarm の契約）。
+          (js/process.exit 0))))))
+
+(apply -main args)
