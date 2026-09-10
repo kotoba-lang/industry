@@ -313,5 +313,58 @@ deploy 後の実測:
 link 方向（現在は新しい方が head、`rest` が古い方を指す）を変える必要があり、
 これは別の設計変更である。**
 
+## 計器を入れて測った —— 仮説 3 つが全部消えた（2026-09-10）
+
+`probing-extras`（store-extras の `:async-get-fn` / `:decrypt-fn` を数える）と
+`trampoline-probe`（`with-blocks` の **handler 再実行回数**を数える）を実装・
+デプロイして、殺される実行から実測した。**どちらも途中で吐く** —— 天井で
+殺される isolate は自分のサマリに到達しないため。
+
+### 消えた仮説
+
+| 仮説 | 実測 | 判定 |
+|---|---|---|
+| I/O（ブロック取得） | fold: async gets **75**。read: **0** | **違う** |
+| trampoline の O(N²) 再実行 | handlerRuns は**どこでも 100 未満**（100 の倍数のログが 1 本も出ない） | **違う** |
+| AES-GCM 復号 | ローカル bench: 1,800 件が **92ms（64B）〜2.3s（64KB）** | **違う** |
+
+**私は 3 回推論し、3 回とも外した。**（walk の長さ / trampoline / 復号）
+どれも実在する欠陥ではあり、2 つは修正して着地させたが、支配項ではなかった。
+
+### 残った形
+
+    read   cpu=23838ms  T handlerRuns:5 syncGets:10 ms:24
+                        E {\"op\":\"read\",\"gets\":0,\"decrypts\":200,\"ms\":19552}
+
+    read   cpu=25917ms  T handlerRuns:5 syncGets:326 ms:4045
+                        E {\"op\":\"read\",\"gets\":0,\"decrypts\":400,\"ms\":22101}
+
+    transact cpu=32000ms T handlerRuns:5 syncGets:10 ms:24
+                        E {\"op\":\"write\",\"gets\":122,\"decrypts\":78,\"ms\":21835}
+
+**store 呼び出しの間で純 CPU が焼かれている。** 復号 1 件あたりの*間隔*が
+50〜100ms。I/O はほぼゼロ（`gets:0` の read が在る = ブロックは全部キャッシュ
+済み）。**グラフは小さい**（75 ブロック）。
+
+### ローカル対照
+
+同じ engine を合成グラフで回すと（`commit!` → `hot-datoms`、mem-store、
+crypto は恒等）:
+
+    n=100 hot-datoms=159ms   n=200 343ms   n=400 1026ms   n=800 1272ms
+
+ほぼ線形で、800 行で 1.3 秒。本番は同程度の行数で 25 秒 —— **線形外挿の
+約 10 倍。** つまり engine の漸近計算量ではなく、**本番固有のもの**（実 crypto
+profile / 実 prolly snapshot の形 / blind-fn）に差がある。
+
+### 次の一手
+
+**同じ probe をもう 1 層深く。** `cold-datoms` / `scan-prefix` / `apply-quad` /
+`blind-fn` に phase timer を入れて、50〜100ms の間隔がどの関数に居るかを
+名指しする。3 回の推論が全部外れた後で 4 回目を推論で始めない。
+
+⚠ **`blind-fn` は本番では実 crypto（HMAC 系）でローカル対照では恒等だった。**
+最初に疑うべきはそこ —— この対照が作った差そのものである。
+
 **この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
   :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
