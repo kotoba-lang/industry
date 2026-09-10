@@ -1,0 +1,94 @@
+(vector
+ (map
+  (:adr/id "adr-2609112800-presence-is-not-verification-and-the-digest-beside-it-was-never-checked")
+  (:adr/title "Presence is not verification, and the digest beside it was never checked")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609110200-a-moving-defcid-reaches-the-conformance-corpus-and-no-deployment-lock"))
+  (:adr/body "
+## What this iteration set out to do
+
+Re-measure gap 02's second candidate: the blast radius of a moving DefCID,
+the count baked into locks, manifests and cache keys. Several recent ADRs
+have asserted that v3 moves every DefCID while citing an older count, so
+the count was worth re-deriving rather than repeating.
+
+## It was already answered, and better
+
+adr-2609110200 measured it on 2026-09-10 and landed the result: the reach
+is the language conformance corpus and it stops there; zero of the
+candidates is a deployment lock, an app manifest or a capability. It also
+records the two traps -- that every dag-cbor CID shares the prefix so app
+and graph CIDs would be counted as DefCIDs, and that the files named
+contract-lock.edn and invalid_definition_cid_lock.edn are conformance
+fixtures rather than locks -- and it reports a RANGE rather than a single
+number, because one regex arm undercounted and reporting either alone
+would present an artefact of the regex as a property of the corpus.
+
+Today's scan, cut differently, reproduces that conclusion independently.
+Recorded as a replication, not as a new answer.
+
+## What the different cut did add
+
+The earlier ADR cut by whether a file names a DefCID key. This one cut by
+whether a file is COMMITTED:
+
+    build outputs (untracked)   35 files
+    committed                   10 files
+
+and of the committed ones, every path but one is a conformance fixture or
+a test fixture. The exception is a shipped artifact's provenance:
+network-awai/cloud-murakumo-cli, the provider kernel.
+
+## Is that a lock? No, and the reason is worth keeping
+
+The rule is that finding a mechanism is not finding a working one, so the
+question is what READS it. Three readers exist, and all three check the
+same thing:
+
+    provenance present / ABSENT
+
+Presence, not content. Nothing verifies the DefCIDs inside it, so the
+provenance is a receipt rather than a binding and the earlier ADR's zero
+stands.
+
+## But the digest beside it was recorded and never checked
+
+The publication set records a sha256 for every file it ships, including
+that provenance. Nothing compared them. Measured: both agree today -- the
+good case, and precisely the case in which an absent check is invisible.
+
+That is the gap this iteration closed. `verify-kernel` now compares every
+digest the publication set names, reports a COUNT of mismatches rather
+than a boolean, and REFUSES with exit 2 when the set cannot be read, so a
+check that could not run does not look like one that ran and found
+nothing.
+
+## Why it belongs to gap 02
+
+It makes the blast radius detectable instead of silent. If a payload
+change moves the DefCIDs in that provenance, its bytes move with them; the
+kernel would still load, still pass its arithmetic self-check, and still
+report `provenance present`. Now the digest check goes red and names the
+file.
+
+So the v3 answer is unchanged and better supported: nothing deployed pins
+a DefCID, and the one deployed artifact that carries them will now say so
+if they move.
+
+## Reproduce
+
+    cd <cloud-murakumo-cli worktree>
+    nbb scripts/verify-kernel.cljs        # 0 clean, 1 failures, 2 refused
+
+Seen red both ways:
+
+    move one DefCID inside the provenance  -> exit 1, names the file and
+                                              both digests, 1 mismatch
+    remove the publication set             -> exit 2 REFUSED, not 0
+
+## What is not claimed
+
+No new blast-radius number. adr-2609110200 remains the measurement of
+record and its range is not restated here. io-ipld stays test-only.
+")))
