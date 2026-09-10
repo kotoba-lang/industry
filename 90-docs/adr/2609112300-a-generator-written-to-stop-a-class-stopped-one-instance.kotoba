@@ -1,0 +1,150 @@
+(vector
+ (map
+  (:adr/id "adr-2609112300-a-generator-written-to-stop-a-class-stopped-one-instance")
+  (:adr/title "A generator written to stop a class stopped one instance")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112200-a-canned-reading-substituted-without-checking-the-measurement"))
+  (:adr/body "
+## What this iteration measured
+
+Read oracle-filters, oracle-paginate and oracle-handlers selector by
+selector, which is what the previous iteration named as next. The reading
+found a defect big enough that the layer question became secondary.
+
+## The finding
+
+oracle-filters answered the SAME NUMBER for all six of its selectors in
+seventeen of the twenty wave-1 pilots.
+
+The literals it filters on -- jurisdiction and externalId -- are
+com-aadhaar's field names. The component ignores a filter key its entity
+does not declare and returns every row, so every selector collapsed onto
+the row count. Six questions, one answer.
+
+    com-aadhaar  5,3,5,1,0,5   its own fields, correct
+    com-aave     5,3,5,1,0,5   adapted by hand, correct
+    com-accela   5,0,5,5,5,5   half adapted -- jurisdiction is real here,
+                               externalId is not
+    com-agones   5,5,5,5,5,5   carried
+    com-adyen    5,5,5,5,5,5   carried
+
+Two independent methods agree. The static scan compares each component's
+filter literals against its own entity-specs; the dynamic measurement runs
+the compiled aarch64 artifact. They pick out the same repositories.
+
+## How severe, measured rather than argued
+
+Delete the filter entirely -- make apply-filters return its rows
+unchanged -- recompile, and com-agones measures 5,5,5,5,5,5. That is
+byte-for-byte what the shipped components measured.
+
+A component with no filtering at all was indistinguishable, under the
+shipped acceptance oracle, from a component with filtering. That is the
+whole content of the defect and it is one command to reproduce.
+
+## The chain
+
+com-aadhaar was written first and its filter literals are its own fields.
+com-abb-robotics was hand ported from it and carried them. com-abb-robotics
+then became the generator's template -- its names are the canon, declared
+in gen-whole-component.cljs. Every repository generated from that template
+inherited aadhaar's field names.
+
+The generator exists BECAUSE of this class. Its header says so: the hand
+port carried com-aadhaar's expand parameter into the expand oracle, and
+the fix was to derive that block from the spec table. Then the same header
+asserts that every field name is derived and the class cannot be carried.
+
+It was carried, in the block next door. oracle-filters was never in the
+block list, and the token pass substitutes ENTITY names and REF-FIELD
+names, not ordinary field names. A generator written to stop one instance
+of a class stopped that instance.
+
+## The fix and its floor
+
+oracle-filters is now regenerated from the root spec, like oracle-expand.
+The floor is a PAIR on ONE field: selector 1 matches every seeded row and
+selector 2 matches none. A filter that matches everything and a filter
+that matches nothing are the two ends, and a component that ignores the
+key silently collapses them onto each other -- so the pair is exactly what
+the old oracle could not express.
+
+Selectors 3 and 4 index the non-required field that seeded-row carries the
+row number in, reaching the exactly-one and no-row cases. Where every
+field of the entity is required there is no such field, and the generator
+omits those two selectors with a comment saying why rather than faking
+them by repeating a required field.
+
+## Reproduce
+
+    nbb scripts/gen-whole-component.cljs 
+      <com-abb-robotics>/src/abb_robotics/whole_component.kotoba 
+      <repo-worktree> <src-dir>
+    amu compile src/<src>/whole_component.kotoba --target aarch64-macos 
+      --policy policy.edn --output wc.o
+    amu extract-native wc.o --symbol oracle-filters --output f.bin
+    for s in 0 1 2 3 4 5; do
+      KEXE_FUEL=100000000 ./kexe-loader f.bin <offset> 1 aarch64 <caps> $s
+    done
+
+## The guard on the rollout
+
+A component is only rewritten where the UNPATCHED generator reproduces the
+shipped file byte-for-byte. That control had to be run first, and it also
+caught a mistake of mine: the first attempt used com-aadhaar as the
+template and produced a component whose namespace was aadhaar's. The canon
+is com-abb-robotics, declared in the generator. With the right template the
+diff against every shipped component is empty.
+
+Four repositories were skipped and stay defective, each for a named reason
+rather than a silent pass:
+
+  com-aftership, com-adyen, com-airtable  the generator REFUSES them --
+    every spec declares :refs {}, so no expand oracle can be derived
+  com-airbus-analytx                      hand adapted, 16 added and 23
+    removed lines against the generator's output; not machine rewritten
+
+## A second defect, in one repository
+
+com-airtable's seeded-row emits the JSON key `name` twice. seeded-row uses
+the first non-required field to carry the row index and FALLS BACK to the
+first required field when the entity has none; airtable's Base declares
+:fields and :required identical, so the fallback repeated a key already
+present.
+
+That is the same fallback shape the generator removed from ref-field-2,
+for the same consequence, documented eight lines below in the same file.
+The fallback is now the `_` padding slot the under-two-required case
+already used.
+
+Note what did NOT see this. The store layer landed last iteration compares
+row COUNTS, and a duplicate key inside a row does not change a count, so
+that layer agreed 5 of 5 on com-airtable while the row it seeded was
+malformed. A count layer is worth having and cannot see inside a row.
+
+## The layer question, answered per selector
+
+oracle-handlers returns i64 for fifteen of its selectors -- status codes
+for 0 through 9, counts for 10 through 12 -- and str-hash for 13 and the
+else arm. So it splits thirteen derivable, two refused, which is the
+per-selector shape again rather than a per-layer verdict.
+
+But two of its derivable selectors are damaged by the same carried names:
+selector 6 updates with {jurisdiction: US} and measures 400, not 200,
+because the field is unknown and gets rejected -- the update-success path
+is never exercised. Selector 13 hashes a field that update never wrote.
+
+So the handler layer is not ready to generate yet, and the reason is now
+named rather than guessed.
+
+## What is still refused
+
+The three hash-valued selectors of oracle-store. The handler layer, until
+its fixtures are derived the way the filters are now. The pagination layer,
+which was read this iteration -- it packs a count and a boolean into one
+i64 and is derivable -- but not yet generated.
+
+The four skipped repositories above still filter on fields they do not
+declare.
+")))
