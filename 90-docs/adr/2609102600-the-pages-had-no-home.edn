@@ -74,11 +74,40 @@ is how a fresh repo is born stale.
 cloud-murakumo-site`, pin verified reachable from main; `cloud-murakumo` and
 `cloud-murakumo-app` pins advanced in the same commit, both fast-forward.
 
+## What the move then broke, and how it was found
+
+Both halves of the guard work landed red, and a closing audit found them rather
+than the commits that caused them. Both are the same mistake:
+
+- `llms_public_api_test.mjs` kept reading `../src/cloud_murakumo/site/docs.cljc`
+  after the pages moved, so the whole file threw ENOENT. That is the SECOND
+  time this one line has been wrong, in opposite directions -- it previously
+  pointed at cloud-murakumo-app because a copy had been mistaken for a move,
+  and read a file nothing rendered while passing for weeks.
+- `dead_hosted_model.test.mjs` pinned `return await legacyWorker.fetch(await
+  rewriteDeadHostedModel(` as a literal, and the very NEXT commit changed the
+  statement into `const answered = ...` so that `augmentModels` could see the
+  response. A correct change that read as breakage, shipped because that commit
+  ran the hokusai suite and not this one.
+
+**When a file moves, or an expression a guard names changes, that guard moves
+in the same commit and its suite runs before the commit lands.** Running the
+suite that covers what you just wrote is not the same as running the suite that
+names what you just moved.
+
+Repaired: the site test follows the pages to cloud-murakumo-site and refuses
+with a reason if the sibling is absent, rather than throwing a raw ENOENT; the
+API guard pins the call shape rather than how its result is bound, and still
+fails when the public fall-through is unwired.
+
 ## Follow-up
 
-- `test/shadowed-site-sources.json` in `cloud-murakumo` can now be emptied:
-  the files it lists no longer exist in two places. It is left in place in this
-  commit so the ratchet's own removal is a separate, reviewable step.
+- `test/shadowed-site-sources.json` is now EMPTY and its test guards the way
+  back: a page copied into `cloud-murakumo` or `cloud-murakumo-app` would
+  rejoin the `:site` classpath and silently stop one copy rendering. It reads
+  working trees rather than main, because that is what `:local/root`
+  resolves -- a stale sibling really would shadow, and it caught exactly that
+  during this closing.
 - `insight.cljc` in cloud-murakumo-app says in a docstring that
   `cloud-murakumo.site.onprem-3d/locale-order` is 正本 and that it holds a
   copy. That is a second, smaller duplication of the same kind, unmeasured."}]
