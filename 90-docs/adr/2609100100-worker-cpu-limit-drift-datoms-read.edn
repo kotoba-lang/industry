@@ -1,0 +1,112 @@
+[{:db/id -1
+  :adr/id "adr-2609100100-worker-cpu-limit-drift-datoms-read"
+  :adr/title "Cloudflare Worker 課金の 85% は 1 script の 2% のリクエストで、直接の原因は repo に書かれていない cpu_ms 120000 だった（accepted）"
+  :adr/status :accepted
+  :adr/date "2026-09-10"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/related ["ADR-2608159100" "ADR-2609051700" "ADR-2608136000" "ADR-2607300900"]
+  :adr/context "2026-09-10、Cloudflare の Worker 課金が高い理由を測った。アカウント全体の
+Worker CPU は直近 7 日で 1,132 CPU-hours / 4,077 M CPU-ms、6.06M requests。
+Workers Standard は CPU 時間で課金されるので、リクエスト超過は $4.8/月 相当の
+誤差でしかなく、払っているのは実質 CPU だけである（30 日換算 17,473 M CPU-ms、
+超過分 約 $349/月）。
+
+## 1 本の script が 85%、その中の 2% のリクエストが全部
+
+  kotobase-cf-wasm-staging   964.5 CPU-h (85.2%)  2,754,233 req
+  local-murakumo             160.3 CPU-h (14.2%)  1,846,416 req
+  残り 97 本                    7.6 CPU-h ( 0.7%)  1,460,000 req
+
+`kotobase-cf-wasm-staging` は名前に反して staging ではない。CLAUDE.md が
+定める本番 capability origin `datoms.kotobase.net` を serve している
+(ADR-2608159100)。status で割ると、払っている先が出る:
+
+  exceededResources     53,754 req ( 2.0%)  631.1 CPU-h (55.7%)  p50 32.5s
+  clientDisconnected   217,755 req ( 7.9%)  324.7 CPU-h (28.7%)  p50 2.4s
+  success            2,482,942 req (90.1%)    8.8 CPU-h ( 0.8%)  p50 2.2ms
+
+**答えを返したリクエストはほぼ無料である（p50 2.2ms / p99 10.5ms /
+p99.9 214ms）。課金されているのは、殺されたものと、客が帰った後も
+回り続けたものだけ。**
+
+## 直接の原因は設定の drift で、日付が付いている
+
+deploy 済みの script は `limits.cpu_ms: 120000`（既定 30s の 4 倍）を
+持っていた。**`wrangler.jsonc` には `limits` ブロックが無い。** つまり
+この値は repo のどこにも書かれておらず、script の modified_on
+2026-09-08T02:00Z に out-of-band で入った。しかも wrangler は config が
+`limits` を省略しているとき既存の設定を消さないので、**その後の deploy は
+どれもこの drift を戻さなかった。**
+
+その時刻で割ると効果が測れる:
+
+                      before (30s)              after (120s)
+  exceededResources    9,157 req/d  79.8 h/d   3,315 req/d  111.6 h/d
+  clientDisconnected  25,221 req/d  24.6 h/d  41,578 req/d   99.1 h/d
+  success            338,219 req/d   0.4 h/d 488,561 req/d    3.6 h/d
+                                   ---------              ----------
+                                   104.8 CPU-h/d          214.3 CPU-h/d
+
+**上限を上げても遅い読みは終わらなかった。** 1 件あたり 4 倍長く焼いてから
+死ぬようになり、待たされる側がより多く帰った（clientDisconnected の
+p50 CPU が 97ms → 4,004ms）。アカウント全体の Worker CPU が倍増した。
+
+同じファイルの `KOTOBASE_TIMING` の隣に、2026-08-30 の実測として
+`limits.cpu_ms を上げる前に、その 30 秒に phase を付けろ` と書いてあった。
+**その警告は正しく、そして守られなかった。** 警告が repo の中にあり、
+上限は repo の外にあったからである。
+
+## 何を焼いているか（wrangler tail、150 秒）
+
+  42 canceled  POST /xrpc/ai.gftd.apps.kotobase.datomic.datoms   190.0 CPU-s
+  46 ok        GET  /v1/read-audit/witness-statements              0.157 CPU-s
+
+150 秒の壁時計で 190 CPU 秒 = **1.27 コアを連続で回して、全部捨てている。**
+42 件すべてが単一テナント `did:web:kotobase.net:tenant:t_929a4e84e1b24defac1b01ff`
+から、api-gateway 経由（`x-internal-trust` / `x-kotoba-client-ip` あり）、
+user-agent は `kotobase-client/1`。wall 時間が 25,790ms に 5 件、16,487ms に
+3 件と正確に一致する塊で並ぶ。**呼び出し側が約 25 秒で諦めて再試行し、
+再試行は毎回 cold から hydration をやり直している。**
+
+## 決定
+
+`wrangler.jsonc` に `limits: { cpu_ms: 30000 }` を明示する（net-kotobase/
+control-plane main の eb9d6f59）。値は drift 前に数ヶ月動いていたもので、
+`xrpc.cljs` の `default-read-budget-ms`（20s wall / 25s ceiling）が
+前提として書いている数でもある。**あの budget は、この数より下に居る間だけ
+bound である。**
+
+同時に、動いている script の設定を API で 120000 → 30000 に戻した
+（ソースを直しても走っている Worker は変わらないため）。29 binding /
+4 secret / observability がすべて無傷であることを独立した GET で確認し、
+`datoms.kotobase.net` が 200 を返すことを確認した。
+
+## この決定が直していないもの（follow-up）
+
+1. **wall budget は pure compute を bound しない。** `with-read-budget` の
+   deadline は store の get/decrypt/async-get を包んだところでしか
+   check! されない。store 呼び出しを挟まない O(N^2) の hydration は
+   deadline に一度も到達しない（実測: wall 25.0s に対し CPU 24.8s の
+   invocation が在る）。`xrpc.cljs` 自身が `engine-level seam
+   (kotobase-peer の hydrate-db-cached / cold-datoms-async)` として
+   follow-up に挙げている。
+2. **切断した呼び出し側に気づかない。** 週 217,755 件の読みが、既に
+   帰った client のために最後まで計算されている。`request.signal` は
+   `caller-context` まで来ているのに、そこから先へ渡っていない。
+   ⚠ ただし **workerd が cancel 時点で isolate を止めるのかは未測定** で、
+   止めるなら abort 対応の取り分はゼロである。**取り分を測ってから実装する。**
+3. **1 テナントの再試行ループ。** 上の 3 つの status の全部が、実質
+   単一テナントの datoms 読みから来ている。呼び出し側の timeout を
+   server の budget より長くするか、再試行に上限を付けるか、そもそも
+   その query を速くするか。**どれを採るにせよ、まず誰が何を polling して
+   いるかを名指しする。**
+
+## 測り直し方（値ではなく手順を残す）
+
+  account GraphQL `workersInvocationsAdaptive`、`status` で group、
+  script で filter。tail は `npx wrangler tail <script> --format json`
+  （pretty-print された JSON object が連結されて出るので、行単位ではなく
+  `JSONDecoder.raw_decode` で舐める）。
+
+**この ADR の数値は 2026-09-10 の記録であって、今日の値ではない。**"
+  :adr/decision "`limits.cpu_ms` を wrangler.jsonc に 30000 として明示し、走っている script の設定も同じ値へ戻す。上限を上げることで遅い読みを通そうとしない —— 遅い読みが止まらない理由は 2 つ（wall budget が pure compute を bound しない / 切断に気づかない）あり、どちらも上限とは無関係である。"}]
