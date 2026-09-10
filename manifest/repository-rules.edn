@@ -502,6 +502,37 @@
                                        :via ["kotobase.execution-contract receipt" "IPQ CAR"]}
                        :per-row {:exists false
                                  :blocked-on "the fixpoint does not carry rule identity into an answer"}}
+   ;; ADR-2609109800, measured. The doors above are both legal; this is which
+   ;; one to reach for. Door (a) is 11x-618x slower and the crossover is under
+   ;; ONE query, even charging door (b) with a full index rebuild -- so (a) is
+   ;; chosen for reproducibility, not for speed.
+   :policy/door-default :materialized
+   :policy/door-rules-when #{:ontology-changes :asked-once :shallow-hierarchy
+                             :cannot-write-derived-datoms}
+   :policy/door-rules-value :reproducibility-not-speed
+   :policy/cost-model {:derived-tuples "n*D + D(D-1)/2"
+                       :time "linear in individuals, roughly quadratic in hierarchy depth"
+                       :design-variable :hierarchy-depth}
+   :policy/fixed-per-request {:digest "value-cid over the whole query value, so rules are in it: ~1.1ms bare, ~5.0ms with hierarchy-rules"
+                              :admission "two orders below; do not optimise"}
+   ;; The received wisdom, narrowed rather than superseded: ADR-2608252400's
+   ;; "the query was never what was slow" is a property of queries WITHOUT
+   ;; rules. With hierarchy-rules at depth 16 the query is 99% of the request.
+   :policy/dominant-term {:without-rules :materialize :with-rules :query}
+   ;; A wrong answer that looks like a right one, and it is gate-able because
+   ;; the control fails: `bridge/materialize` mints `:<coll>/<key>` per
+   ;; document, so a value naming another document BY KEY does not join to
+   ;; that document's entity. The fixpoint then returns the asserted row and
+   ;; stops -- not an error, not empty, a plausible partial answer.
+   :policy/materialized-reference :entity-id-required
+   :policy/materialized-reference-hazard :silent-partial-answer
+   :policy/materialized-reference-gate-writable true
+   :policy/transfer-cost {:fetches-per-block 1
+                          :p50-ms {:one-block 132.0 :three-blocks 353.0}
+                          :refusal-ms {:malformed-selector 14.2 :root-not-held 121.9}
+                          :pack-opportunity "collapse N fetches into one range read (ADR-2608160100), whose per-chain conclusion does NOT transfer here -- measure before adopting"}
+   :policy/performance-evidence "90-docs/query-plane/2026-09-10-query-plane-performance.edn"
+   :policy/performance-caveat "nbb / Node 26 on a workstation at loadavg 13-22, not workerd. The ratios are the result; the milliseconds are this machine's"
    :policy/detector nil
    :policy/gate nil
    :policy/why-no-gate "no predicate enumerates the ways an ontology could reach an evaluator other than the two doors; a gate that has never been shown to fail is theatre, so build the third door first and watch it redden"

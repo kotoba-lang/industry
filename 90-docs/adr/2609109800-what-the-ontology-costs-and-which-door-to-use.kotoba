@@ -1,0 +1,192 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609109800-what-the-ontology-costs-and-which-door-to-use")
+  (:adr/topic "query-plane-performance")
+  (:adr/title "ontology のコストと、2 つの扉のどちらを使うか —— 深さが設計変数であり、rules を載せた query では支配項が入れ替わる")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/ayatori" "kotoba-lang/datalog"
+                "kotoba-lang/org-w3-owl2" "kotoba-lang/kotobase" "kotoba-lang/kotobase-server"))
+  (:adr/related (vector "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
+                "adr-2608252400-the-query-was-never-what-was-slow"
+                "adr-2608230200-a-query-whose-plan-reads-the-whole-graph-does-not-run"
+                "adr-2607299900-projection-vs-blocks-query-cost"
+                "adr-2608160100-block-car-pack-object"
+                "adr-2609108000-privacy-is-the-fourth-plane"
+                "adr-2608039970-the-base-is-the-datom-plane-not-datalog"))
+  (:adr/validation (map
+    (:measured "4 benches, 19 measured rows, every row carrying its answer size")
+    (:route "nbb / Node 26, no JVM; one live HTTPS origin")
+    (:machine "10 cpus, loadavg 13.0-22.5 during the runs, 5 concurrent claude sessions")
+    (:evidence "90-docs/query-plane/2026-09-10-query-plane-performance.edn")
+    (:base "org-w3-owl2 b23571a / datalog fef2eb4 / datom-source 6936d20 / ayatori d6f3431 / kotobase faa5cc0 / kotobase-server 197cd9d / io-ipld f2d0487")
+    (:not-measured (vector "workerd" "ontology edits" "branching hierarchies" "materialize-memo hits"))))
+  (:adr/body "## Context
+
+ADR-2609109700 は ontology が execution に入る扉を 2 つに固定した ——
+query 値の中の `:rules`（door a）と、書き込まれた derived datom（door b）。
+**どちらを使うかは書いていない。** 同じ ADR の D4 は `hierarchy-rules` が
+admission を通ることを測ったが、admission 自身の docstring が
+「述語が bound であることは read が RANGE だということであって、その range が
+小さいということではない」と言っている。つまり **admitted は cheap ではない。**
+
+この ADR はその空白を測って埋める。⚠ **load 13〜22 の機械で測った**ので、
+**結論は比と構造値であって絶対値ではない。** 各 bench は変種を同じ process の
+中で交互に測り、行ごとに答えの件数を出す。
+
+## 測ったこと
+
+### 1. 2 つの扉を同じ graph の上で競わせる
+
+n 個体、深さ D の class 連鎖。door (a) は `(owl-type ?i C_top)` +
+`hierarchy-rules`、door (b) は closure を書き込んだ上での `[?i :rdf/type C_top]`。
+
+     n depth  asserted   closed  sub-pairs type-pairs  rows  virtual-ms  material-ms  build-ms      x  crossover
+   100     2       101      201          1        200   100       12.14         0.72      1.15  16.86       0.10
+   100    16       115     1615        120       1600   100      337.33         0.59      6.88 571.58       0.02
+  1000     2      1001     2001          1       2000  1000       69.65         6.18      8.52  11.27       0.13
+  1000     8      1007     8007         28       8000  1000      681.90         5.84     35.95 116.79       0.05
+  1000    16      1015    16015        120      16000  1000     3665.85         5.94     80.95 617.61       0.02
+
+（8 行の全表は evidence ファイル）
+
+- **rows は 8 行すべてで一致する。** 速い扉が「答えていないから速い」ではない。
+- **x は 11 倍から 618 倍。** 効かせているのは n ではなく **D**。
+- **crossover は全セルで 1 未満**（0.02〜0.13）。しかも build には
+  **closed index の全構築**を課してある —— marginal cost の過大見積もりである。
+  それでも**最初の 1 回の query が終わる前に closure の構築は元が取れる。**
+
+### 2. コストの形 —— 深さが設計変数である
+
+導出タプル数は表の値とちょうど一致する: `type-pairs = n*D`、
+`sub-pairs = D(D-1)/2`。**load が動かせない数**なので、時間はこれで説明される。
+
+    n について     線形       n 100 -> 1000（10 倍）で 10.9 倍
+    D について     概ね二乗   D 2 -> 16（8 倍）で 53 倍
+
+**深さ 16 の階層は深さ 2 の 53 倍かかる。** ontology を設計するときの変数は
+語彙の大きさではなく**連鎖の深さ**である。
+
+### 3. ontology を query 値に載せる固定費
+
+    query             clauses  rules  digest-ms  admit-ms  verdict
+    no ontology             1      0     1.13      0.019   admitted
+    hierarchy-rules        12      8     5.05      0.080   admitted
+    triple-rules           28     16     9.93      0.142   REFUSED
+
+`:query/digest` は query 値全体の `value-cid` なので、**rules はそこにも乗る。**
+clause 数に概ね線形（1.13 + 約 0.35/clause）。
+
+- **hierarchy-rules を載せる固定費は約 3.9 ms** で、これは n=1000 の
+  materialized query 1 本（約 5.9 ms）と**同じ桁**である。無視しない。
+- **admission は 2 桁下**（0.08 ms）。ここは最適化しない。
+- 3 行目が REFUSED を返すので、この表は admission が実際に判定した上での値。
+
+### 4. request 全体に占める割合 —— 支配項が入れ替わる
+
+従来の支配項 `materialize`（O(database)、ADR-2608252400 / ADR-2607299900）と
+同じ行に置く:
+
+     n depth  datoms  rows-plain  rows-onto  materialize-ms  q-plain-ms  q-onto-ms  onto-share
+   100     4     309         100        100            2.50        1.01      17.53      82.5%
+   100    16     345         100        100            2.61        0.85     332.90      99.0%
+  1000     4    3009        1000       1000           21.77        5.60     144.33      83.5%
+  1000    16    3045        1000       1000           19.74        5.12    3542.79      99.3%
+
+**rules を持たない query では materialize が支配項**（n=1000 で 19.7 対 5.1、79%）——
+ADR-2608252400 の「query は遅くなかった」はここでも真である。
+**hierarchy-rules を深さ 16 で載せると request の 99% が query 側になる。**
+
+### 5. 転送側 —— block 1 本 = fetch 1 本
+
+    selection                 status  blocks fetches      bytes      p50      p90      min
+    matcher                      200       1       1        562    132.0    162.1    118.8
+    explore-all                  200       3       3       1148    353.0    366.4    331.9
+    control: root not held       404       -       -         96    121.9    139.6    106.0
+    control: bad selector        400       -       -         89     14.2     16.2     11.3
+
+- **形が壊れた selector は store に触る前に 14 ms で拒否される。** 9 倍安い。
+- **root を持たない場合は lookup 分（122 ms）を払う** —— 答えとほぼ同じ。
+  時間で held / not-held は区別できない（timing oracle は無い）が、
+  **status code が持っているかどうかを 122 ms あたりで答える**のは事実である。
+- **block 1 本につき fetch 1 本。** ⚠ block 数 2 点は曲線ではないので
+  per-block コストを外挿しない。**外挿の代わりに fetches 列が機構を示している。**
+
+## 決定
+
+**P1. 既定の扉は (b) —— ontology が安定しているなら closure を書き込む。**
+11〜618 倍で、crossover は 1 query 未満。過大に見積もった build cost でもそうなる。
+
+**P2. 扉 (a) を選ぶ理由は速度ではない。** rules が正しいのは、
+①ontology が変わる ②その graph に一度しか訊かない ③深さが浅い（D<=2 で 11 倍）
+④**derived datom を書き込む権限が無い**（read-only な相手の graph）のいずれか。
+これは真っ当な理由であって、負けを認めることではない —— door (a) の値は
+**再現性**である（ontology が `:query/digest` の中に居る、ADR-2609109700 D3）。
+
+**P3. ontology の設計変数は深さである。** 語彙を増やすより連鎖を深くする方が
+高い。深い分類を入れるときは、その深さを設計判断として書く。
+
+**P4. ADR-2608252400 の結論の適用範囲を狭める（supersede しない）。**
+「query は遅くなかった」は **rules を持たない query の性質**であって、
+query 面の性質ではない。rules を載せた瞬間に支配項は query 側へ移る。
+
+**P5. digest の固定費は無視しない。admission は無視してよい。**
+前者は materialized query 1 本と同じ桁、後者は 2 桁下。
+
+**P6. materialize 済み store の上で rule 推論をするなら、参照は entity id で
+なければならない。** `bridge/materialize` は document ごとに `:<coll>/<key>` の
+entity id を鋳造するので、**document を key で参照した値は、その document の
+entity に join しない。**
+
+⚠ **これはエラーにならず、0 にもならない。** 実測（深さ 4）:
+
+    参照が entity id     owl-type -> 4 件（全階層）
+    参照が key の文字列   owl-type -> 1 件（assert された 1 件で止まる）
+
+**assert された分だけを返して黙って止まる** —— もっともらしい部分解であり、
+空の答えより悪い。**この形は gate にできる**（上の control が実際に落ちる）。
+ここでは書かないが、書ける形として再現手順ごと記録する。
+
+**P7. CARv2 pack が効く場所は IPQ の fetch 数である**（ADR-2608160100）。
+3 block を 3 fetch で取っており、pack なら 1 range read に畳める。
+⚠ ただし **ADR-2608160100 は本番深さでの取り分が 1 round trip だと結論している。**
+その結論は commit chain についてのもので、**ここへそのまま輸入しない。**
+IPQ の traversal は chain ではない。**測ってから決める。**
+
+## 自分の誤りの訂正
+
+この ADR の 4 番目の bench は、**最初の版が rows 列を持っていなかった。**
+その版は n=1000 深さ 16 の ontology query を **40 ms** と報告した ——
+実際には **rows-onto = 0**、つまり空の query を測っていた。
+真の値は **3542 ms**、88 倍である。
+
+rows 列を足して初めて 0 が見え、そこから P6 の join 破れが見つかった。
+**「速い」という測定結果が、そのまま欠陥の隠れ場所だった。**
+
+## 測っていないこと（clean ではなく未測定）
+
+- **workerd 上の値。** ここは nbb / Node 26。比だけが結論。
+- **triple-rules の実行コスト。** admission が拒否するので測っていない。
+- **ontology 編集時の closure 再構築。** subClassOf を 1 本足すと closure の
+  `n*D` 行すべてが無効になる。この bench は ontology を編集しない。
+- **深さ 16 を超える階層と、分岐のある階層。** 測ったのは chain だけ。
+- **`materialize-memo` が効いた場合の share。** memo hit なら materialize 項が
+  消えるので、ontology の割合は**さらに上がる**方向。
+
+## Reproduce
+
+evidence は `90-docs/query-plane/2026-09-10-query-plane-performance.edn`。
+bench は 4 本:
+
+    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_inference_cost.cljs
+
+    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/kotobase-server/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_request_overheads.cljs
+
+    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/ayatori/src:orgs/kotoba-lang/kotobase/src:orgs/kotoba-lang/arrangement/src:orgs/kotoba-lang/prolly-tree/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_materialize_share.cljs
+
+    nbb 90-docs/query-plane/bench_ipq_latency.cljs
+
+**4 本とも答えの件数を各行に出す。** 件数の列が無い性能表は、
+速い実装と何もしていない実装を区別できない —— この ADR がその実例である。
+")))
