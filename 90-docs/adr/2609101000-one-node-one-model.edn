@@ -1,0 +1,94 @@
+[{:db/id -1
+ :adr/id "adr-2609101000-one-node-one-model"
+ :adr/title "1 ノード 1 モデル — 数えたら全ノードが 4 つ載せていた"
+ :adr/status "accepted"
+ :adr/date "2026-09-10"
+ :adr/related ["adr-2609092600-cluster-stability-cosci-daemons-and-filevault" "adr-2609021500-fleet-node-outbound-hygiene-contract"]
+ :adr/body "オーナー指示 2026-09-10「murakumo cloud fleet で、基本的に 1 台当たり 1 つの
+model しか host しないように設計してください」。規則を宣言で終わらせず、
+**測れる不変条件と、破らせない gate** にした記録。
+
+## 測ってから決めた（規則は一度も守られていなかった）
+
+`murakumo edge models` 実測、到達可能な全ノードが違反:
+
+| node | plane 数 | 内訳 |
+|---|---|---|
+| simeon / joseph / issachar / dan / benjamin | **4** | text + ring-member + media + ad-hoc |
+| judah | 3 | ComfyUI 無し |
+| gad | 2 | text + media |
+
+**16 GiB のマシンに 4 つのモデル。** これは整頓の話ではない —— 前日 levi で 27B を
+測るのに edge server（RSS 7.9 GB）・ComfyUI・ollama・RPC worker を全部止める
+必要があったのはこれが理由で、**4 つ載せたノードは、どのモデルもフルサイズでは
+serve できない**。そしてその事実を fleet のどこも言っていなかった。
+
+## 何を「1 model」と数えるか（3 つの判断）
+
+**1. 待機中のプロセスも数える。** 常駐で大きいのは llama-server だけ
+（issachar で 7.9 GB、対して ComfyUI 0.68 GB、rpc-server と ollama は 200 MB 未満）。
+**バイトで数えればこの 3 つは「空き」になるが、空きではない** —— それぞれ動いた
+瞬間にメモリを取る。そこで生まれる失敗は「2 つが同時に働くその瞬間まで、空きが
+あるように見えるノード」で、これが最も見えにくい形である。だから**ホストの数**を
+数える。
+
+**2. `rpc-server` も数える。** serve しているモデルは gad のものだが、貸している
+RAM と GPU はこのノードのものである。**ノード自身の容量にとっては、モデルの一部を
+host していることと同じ。**
+
+**3. `:none` は違反ではない。** 何も host していないノードは「空いている」の
+であって「壊れている」のではない。違反として報告すると、**何のためのノードかを
+決める前に埋めろ**という圧力になる。
+
+## 検出器は初回に間違えて、fleet がそれを見つけた
+
+最初の実装は `ComfyUI` を**大文字小文字を区別して**照合していた —— gad の綴りである。
+mac 6 台は `comfyui/main.py` と綴るので、**4 プレーン載っているノードを 3 と報告した**。
+
+**過少報告は危険な方向である** —— 既に満杯のノードへの install を通してしまう。
+現在は case-insensitive で、特異性を綴りではなく**文字列そのもの**
+（`comfyui/main.py` / `ollama serve`）が担うので、`comfyui-setup-guide.txt` には
+反応しない。
+
+## 強制
+
+`one-model-gate` は、別の plane を既に host しているノードへの install を
+**拒否し、何が邪魔しているかを名指しする**。`--evict` はオペレータが「このノードは
+何のためか」を言う操作。issachar で実測:
+
+```
+install :text -> refused: hosts media, ring-member, ad-hoc;
+                 pass --evict to say this node is for text instead
+with --evict  -> admitted
+```
+
+**測れなかったノードは pass ではなく拒否。** プロセス一覧が読めないノードは
+「いくつ載っているか不明」であり、**不明の上に install することが、この fleet が
+4 つ載せるに至った経路そのもの**である。
+
+## やっていないこと（意図的）
+
+**何も evict していない。** gate は今日、全ノードで拒否する —— それが正しい開始
+状態である。どのノードをどの plane に充てるかは**オペレータの判断**であって、
+checker を出荷したことの帰結ではない。
+
+## 併せて記録: 無料モデル 4 つの指示との衝突
+
+同日の指示「無料モデルは awai-network/basho, hokusai, giemon, hanzo の 4 つ」に
+ついて、**4 つとも今日は無料でも匿名でもない**ことを実測した:
+
+| model | 匿名で叩いた結果 |
+|---|---|
+| `awai-network/basho` | `self_model_requires_identity` —— **従量課金の vendor backend**（Modal）。無料匿名にすると、他人が operator の請求書を使える |
+| `awai-network/hokusai` | `research_model_not_ready` —— origin が未配備 |
+| `awai-network/giemon` | `research_model_requires_identity` —— passkey-biscuit と評価済み adapter sha を要求 |
+| `awai-network/hanzo` | HTTP 000（応答なし。gateway に定義が無い） |
+
+giemon / hokusai の閉鎖は**意図的で文書化されている** ——
+`dead_hosted_model.js` が「この host 境界は、評価済み adapter を持つ origin が
+配備されるまで閉じたままにする。**公開カタログへの昇格は別個の測定された操作で
+あって、この transport を足したことの帰結ではない**」と書いている。
+
+したがってこの 4 つを「無料モデル」として設定に書くことは、
+(a) 従量課金を匿名に開放し (b) 明示的な研究モデルの gate を破る。
+**4 つのうちどれを、どの代償で開くか**はオーナー判断が要るので、設定は書いていない。"}]
