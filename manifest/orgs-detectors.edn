@@ -768,6 +768,52 @@
               as structure. That exact shape is now a control fixture; reverting the
               fix makes the detector REFUSE rather than report."}
 
+  {:id       :verify-declared-artifact-present
+   :title    "actor manifests that declare an artifact CID the bytes plane does not have"
+   :why      "2026-09-10 (ADR-2609102000): found while trying to cut a Q9 whole-component
+              migration over to its consumers. `com-aave/manifest.json` declares
+              a wasmCid with \"wasmProvenance\": \"built-rust-raw\" in a repository
+              holding zero .rs and zero .wasm files, and neither main.cljc nor
+              whole_component.kotoba produces it. Measured over orgs/: **1,053
+              manifest.json, 1,026 declaring a wasmCid, 0 present, 1,026 absent** --
+              1,000 `built-rust-raw` and 26 `program-source-cid-clj`, all in
+              kotoba-lang, 1,026 distinct CIDs so they are not one placeholder
+              copied around. ADR-2607072000 is the standing rule this sits against:
+              Rust is not written in kotoba-lang. The consequence for the migration
+              campaign is direct -- a consumer cannot be cut over to a Kotoba-built
+              artifact while the artifact it would replace is unverified."
+   :argv     ["nbb" "{{repo}}/scripts/verify-declared-artifact-present.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "CONTROL\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- and it reaches the network, so it
+                                         ; is not cheaper to run more often
+   :timeout-ms  2700000                  ; 45m -- ~3x the measured 15m for 1,026 fetches
+   :writes   :none
+   :network  :reads-kotobase-bytes-plane
+   :control  "THE POINT OF THIS DETECTOR IS ITS CONTROL. A 404 alone proves nothing:
+              a deliberately bogus CID returns 404 from the same route, and an apex
+              health check says nothing about /ipfs/. A run that cannot show the route
+              serving a known-good object cannot tell `the artifact is missing` from
+              `the gateway is down`, and those two must never return the same value.
+              So every run first fetches control CIDs, verifies the returned bytes hash
+              back to them, and REFUSES with exit 2 before judging any manifest. The
+              controls are read from manifest/appview-catalog.edn rather than hardcoded
+              -- a hardcoded control rots silently, and a rotted one makes every run
+              REFUSE, which is at least loud. The evidence regex is the CONTROL line,
+              not SCANNED, for the same reason."
+   :measured "2026-09-10: 1,053 manifests, 1,026 declared, 0 present, 1,026 findings,
+              exit 1. Control: 3 CIDs fetched and CID-verified in the same run; one was
+              checked end to end by hand first (78,054 bytes, sha256, CIDv1 recomputed,
+              equal to the declared CID). Six directions shown: absent -> exit 1;
+              a synthetic manifest declaring a CID that IS stored -> PRESENT 1, exit 0;
+              a manifest declaring no CID -> exit 0 clean; the gateway pointed at a dead
+              route -> exit 2 REFUSED rather than 1,026 false findings; the CID function
+              broken by one byte -> exit 2 `200 but the bytes hash to ...`; zero manifests
+              -> exit 2. Fetches are pooled at 8 in flight: 1,026 issued at once invites a
+              rate limit, which this detector would correctly read as unreachable and
+              REFUSE on -- a self-inflicted refusal."}
+
   {:id       :verify-codec-seq-expansion
    :title    "base codecs that expand a byte into a seq per bit, whose constant factor never appears in the caller's own profile"
    :why      "2026-09-05 (ADR-2609051700): multiformats.base32/encode expanded every
