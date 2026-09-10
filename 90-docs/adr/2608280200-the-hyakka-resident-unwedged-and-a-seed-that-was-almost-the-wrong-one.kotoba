@@ -1,0 +1,109 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608280200-hyakka-resident-unwedged-and-the-wrong-seed")
+  (:adr/title "hyakka resident の 2 つの詰まりを外し、間違った seed を publish 直前で止めた")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-28")
+  (:adr/tags (vector "hyakka" "resident" "kagi" "identity" "kotobase" "cadence"))
+  (:adr/related (vector "adr-2608271450-hermes-hyakka-growth-bots"
+                "adr-2608272100-hermes-bots-on-free-models"
+                "adr-2608280100-hyakka-into-the-r2-data-catalog"
+                "2607311100"))
+  (:adr/body "## 1. 1 個の失われたアーカイブが 17 時間パイプラインを止めていた
+
+毎時 tick は 2026-08-27 15:27 を最後に成功しておらず、毎回同じ行で終わっていた ——
+`raw archive missing 858e9647…`。詰まりは 2 つで、同じ形だった。
+
+**順序が逆だった。** `upload-raw!` は B2 に既に在るかを訊く前に **local 実体を要求**
+していた。実測: raw entry 734 件中 69 件が local に無く、**そのうち 68 件は既に B2 に
+在った**。アップロード済みで local を掃除しただけ。済んだ仕事を証明するために手元の
+コピーを要求する形が、掃除を恒久停止に変えていた。B2 を先に訊き、local は本当に
+不在のときだけ要求する。
+
+**69 件目は両方から消えていた**（`858e9647…`、wikidata-tokyo、353,421 bytes）。
+`fail!` が throw し、呼び出し側の `doseq` が tick 全体を放棄し、以降の receipt・
+ledger・投影・デプロイが道連れになった。**1 個の消失が「パイプラインなし」と等価に
+なってはいけない。** sha を報告して先へ進む。
+
+**同じ形が 1 段先にもあった。** `publish-kotobase!` は kagi の seed が無いと throw し、
+その throw が**公開カタログのデプロイまで奪って**いた。Kotobase の ref と公開カタログは
+別の出口・別の読者である。seed 不在は記録済みだったが、**それがデプロイも人質にして
+いたことは記録されていなかった。**
+
+どちらの skip も黙らない。print し、tick の要約行に出て、どちらでも exit 1。
+
+結果: tick が完走し、live wiki が items 961 → 1,007、raw-claims 7,251 → 7,680 へ動いた。
+steady-state 149 秒。cadence を `StartInterval 3600 → 900`（15 分）にした。
+
+## 2. 間違った seed を publish の 15 分前で止めた
+
+オーナー指示「seed, kagi を再発行」に対し、**再発行する前に復旧を試みた**のは正しかった。
+`~/.kagi/vault.edn.bak`（08-15 03:06 UTC = 消失の数分前）から 64-hex の
+`hyakka-kotobase-seed` が出た。derive した DID は ADR-2607311100 に記録されていた。
+
+**それを一致と読んだのが誤りだった。** 同じファイルの 4 行下が、それを「**旧** DID」と
+呼んでいる。08-15 の消失後に v2 へ migration が完了しており、v1 graph は orphan。
+次の tick は 296 ledger を**誰も読まない graph へ publish**していた。
+
+**そして失敗しなかったはずである。** `:apex` は issuer 自身の graph に書くので、
+**間違った seed は静かに別 ref へ分岐する。無い seed だけが騒ぐ。**
+
+被害はゼロ（間の tick は全て seed 不在で SKIP、publish は 1 度も起きていない）。
+
+### 構造的な防止
+
+resident は publish の前に、derive した DID を `expected-tenant-did`
+（`did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo`）と突き合わせる。
+導出は app-hyakka の `scripts/verify_identity.cljs`（`kotobase.cid` 経由 = live plane が
+使う権威）に委譲し、2 つ目の実装を書かない。
+
+**seed は 64 hex であることでも、docs のどこかに出てくる DID を derive することでも
+同定されない。この 1 つを derive することで同定される。**
+
+### seed の現在地
+
+- **v1 は復旧できた。** 08-15 の調査が「手段は尽きた」と結論したのは、当時 `.bak` が
+  7/19 だったため —— その後の kagi 操作が消失直前の vault で .bak を上書きしていた。
+  `hyakka-kotobase-seed-v1-orphan-recovered` として保全。捨てていない。
+- **v2 は復旧できない。** cloud vault（最終 push 7/25、mint 8/24）に無く、`.bak` は
+  v1 時代、APFS snapshot 0 件、Time Machine destination 未設定、recovery share 無し。
+  **オーナーによる再登録以外に経路が無い。**
+- `hyakka-kotobase-seed` には非 64-hex の説明文字列を入れて塞いである（kagi に削除
+  コマンドが無いため）。v2 復元時はそのまま上書きしてよい。
+
+## 3. bot の cadence — ロックを測ってから決める
+
+前日の提案「hyakka 毎時 / itonami 6 時間」は**間違いだった**。`TERMINAL_CWD` の write
+ロックはプロセスに 1 本しかなく、待ち上限は `max(inactivity 600, floor 120) + margin 60
+= 660 秒`。`itonami-coverage-scout` は **57 分**保持するので、その間の毎時 hyakka は
+11 分待って TimeoutError で死ぬ。1 日 4 回の itonami が毎回 5 本の hyakka を殺す設計。
+
+衝突しない slot に組み直した（source 8/日・ontology 4/日・itonami 各 2/日）。
+シミュレーションで writer 衝突 0 件、無料枠 340 calls/day（上限 1000）、
+ロック占有 255 分/日 = 18%。
+
+## Verification
+
+| 何を | 結果 |
+|---|---|
+| resident tick | 完走。`deployed=true`、`lost-archives=0`。live wiki が実際に動いた |
+| DID ガード（両方向） | v1 seed × v2 DID = 拒否（期待 DID を名指し）/ v1 seed × v1 DID = 通過 |
+| ガードの再現テスト | 有効な 64-hex seed が在る状態で publish 拒否、同じ tick で `deployed=true` |
+| cadence | タイムライン検算で writer 衝突 0、最狭 6.8 分（相手は reader） |
+| 無料モデル bot | source-scout `completed` 27 calls / ontology-scout `completed` 1 call（`source=builtin`） |
+| lake | 5 表 commit + 読み戻し一致、独立読み出しで 7,912 行 |
+
+## 未了（resume point）
+
+1. **v2 seed の再登録（オーナーのみ）。** 復元すれば次の tick が 299 件を自動で
+   追いつかせる（ガードが先に検証する）。
+   `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi add hyakka-kotobase-seed`
+2. **seed の単一障害点は閉じていない。** 2 度消えている。v2 が戻った時点で
+   `kagi push` か 2 台目への `device grant` を取るまでこの節は開いたまま。
+3. **app-hyakka PR #4** が open。PubChem が CC-BY-NC 4.0 で、gate は fetch 可否と
+   source-class しか見ずライセンスの意味を見ない —— 人の判断。
+4. **`itonami-ingest-scout` は一度も走っていない。** 57 分は coverage からの推定で、
+   90 分を超えると 02:30 / 14:30 の source と衝突する（衝突しても壊れず、待った側が
+   11 分で loud に失敗する）。初回実測は 15:00。
+5. **lake の `hyakka_claim.subject` に他表と join する鍵が無い。**
+6. **cloud-itonami-app の Bot は 0 体。** 作成は Passkey 必須の 61 ルート（ADR-0006）で
+   オーナー操作。config・admission・実推論（`usage.cost 0`）は検証済み。")))

@@ -1,0 +1,153 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608220300-examlaw-government-side-tax-examination-procedure")
+  (:adr/title "政府側の税務調査は「権限の手続要件」を出所付きで持つ面から起こす — kotoba-lang/examlaw、absence is never authority")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-22")
+  (:adr/tags (vector "tax" "government" "jurisdiction" "capability-library" "kotoba-lang" "safety-property"))
+  (:adr/related (vector "adr-2608171800-taxlaw-jurisdiction-catalog-verified-against-the-corpus"))
+  (:adr/repos (vector "kotoba-lang/examlaw" "kotoba-lang/taxlaw" "kotoba-lang/worklaw"
+              "cloud-itonami/cloud-itonami-isco-3352"))
+  (:adr/updated "2026-08-22")
+  (:adr/body "## 文脈
+
+「今の cloud-itonami で、日本政府・米国・EU・その他全世界国家の政府側の
+税務調査などのシステムは各国の法規制に基づいて設計実装・公開されているか」
+という問いに対し、2026-08-22 に測って答えは **無い** だった。実測:
+
+- `cloud-itonami/cloud-itonami-isco-3352`（Government Tax and Excise Officials）が
+  唯一「税務当局の職員」を扱うが、README 冒頭の no-enforcement-authority guarantee の
+  とおり allowed-ops は 4 つ（申告記録・調査アポ日程・懸念フラグ・備品調達）だけで、
+  更正・賦課・徴収に相当する op はコードのどこにも無い。さらに `src/` と
+  `blueprint.edn` に国税通則法も IRC も EU 指令も参照が無く、ISCO-08 職業分類ベースで
+  法域中立である。
+- 国 blueprint 225 件と agency leaf 37 件のうち、JPN は MOF まで（国税庁は無い）、
+  USA は Treasury まで（IRS は無い。当の README が Not the ... IRS と自ら書いている）。
+  EU は ISO 3166 が国コードなので機関の面が構造的に無い。225 件はすべて視点が
+  事業者側（申告する側）である。
+- `kotoba-lang/taxlaw` は実質があるが、答える問いは「この書類はこの取扱いを支えるか」
+  であって調査する側の道具ではない。
+- `com-irs` / `com-etax` / `com-hmrc` は名前だけで、3 repo とも src が 240 行の同型
+  生成テンプレート。
+- VIES / Peppol / SAF-T / CRS / FATCA は west.yml 全 4,229 project の name 面に 0 件。
+
+つまり欠けているのは actor でも国 blueprint でもなく、**国家の調査権限それ自体に
+かかる手続要件を、出所付きで持つ面**である。
+
+## 決定
+
+`kotoba-lang/examlaw` を起こす。`taxlaw` / `worklaw` の兄弟で、形は同じにし、
+**不変条件を 1 つだけ反転させる**。
+
+`taxlaw` / `worklaw` は私人の義務を鍵にするので保守側は pass を出さない方向
+（absence is never sufficiency）。この repo は国家権限を鍵にするので保守側は逆になる:
+
+    ABSENCE IS NEVER AUTHORITY.
+
+未読の法域は `:permitted` を返さず `:no-catalog` を返し、返り値に権限と読める key を
+一切持たない。`authorized?` は `(empty? unmet)` ではない。
+
+### 実装した安全性質（散文ではなくテストとして）
+
+**この library は調査権限の行使を決して authorize しない。** 最も当局に有利な記録を
+組み立てて、全 catalog 法域の全調査権限について `authorized?` が false、
+`disposition` が `:requires-official-determination` になることを assert する。
+成り立つ理由は、どの法域でも調査権限が「法が名前のある職員自身の判断に委ねた条件」で
+始まるから（国税通則法第七十四条の二の『調査について必要があるとき』、
+26 U.S.C. 7602(a) の for the purpose of ascertaining the correctness of any return）。
+これらは `:req/kind :official-determination` として機械的に充足不能にしてある。
+
+性質が空虚でないことも別テストで押さえる（`:exam/close-examination` は行政手続なので
+`authorized?` が true になりうる）。
+
+**この性質は初回実行で自分の存在を正当化した** —— `[:us] :exam/contact-third-party` で
+落ち、7602(a) の目的要件と 7602(c)(1) の intent 要件（a notice shall not be issued ...
+unless there is an intent at the time such notice is issued）が catalog から抜けている
+ことが分かった。完璧な通知記録があれば第三者接触を可としていた。
+
+### 出所
+
+全 quote を 2026-08-22 に公式 publisher から取得し、byte-exact span として持つ:
+
+- `[:jp]` 国税通則法 74-2 / 74-7 / 74-8 / 74-9 / 74-10 / 74-11 / 74-13 / 128
+  （e-Gov 法令 API、revision 337AC0000000066_20260624_508AC0000000046）
+- `[:us]` 26 U.S.C. 7602(a)(b)(c)(d) / 7605(a)(b) / 7521(a)(b)(d)（govinfo、2023 edition）
+- `[:eu]` Directive 2011/16/EU Art 11(1) / 12(1) / 12a(1) / 12a(2)
+  （EUR-Lex、2024-01-01 consolidation）
+
+`:source/elided?` が quote 中の省略記号の有無と一致することを test が assert する
+（黙って短縮された quote は build を落とす。初回実行で 1 件捕まえた）。
+
+### 測って分かった、folklore と食い違う点
+
+- **74-8 と 7602(b) は正面から逆を向く。** 前者は質問検査権を『犯罪捜査のために
+  認められたものと解してはならない』とし、後者は目的が include the purpose of
+  inquiring into any offense であると明言する。同じ事実（違反を疑いながら帳簿を見る）が
+  日本では blocked、米国では permitted。米国はその代わり Justice Department referral が
+  効いている間 summons を 7602(d) で塞ぐ。
+- **再調査の既定も逆。** 7605(b) は年度ごと 1 回を既定にし書面通知を要求する。
+  74-11 第五項は『新たに得られた情報に照らし非違があると認めるとき』を許す。
+- **米国に一般的な事前通知規定は無い。** 7602(c) は第三者接触の通知、7521(b)(1) は
+  before or at an initial interview の説明。どちらも調査の事前通知ではない。
+  facet は `:silent` ではなく `:read`（読んで、無かった）として記録する。
+- **国税通則法第七十四条の九第一項の掲記事項は 7 号であって 11 ではない。**
+  実質 6 号 + 第七号の政令委任。実務で引かれる 11 は国税通則法施行令第三十条の四が
+  加える分で、この catalog は施行令を読んでいない。3 つの数を全部持ち、gap を名指しする。
+- **第百二十七条は調査拒否の罰則ではない。** 職員の守秘義務違反である。拒否は
+  第百二十八条第二号。127 を先に掴んで誤ったので、誤りの側を記録に残した。
+
+### EU の entry は「権限が無い」ことそのもの
+
+`[:eu]` は catalog に在り、全調査 action が `:no-catalog` を返す。誰も見ていないから
+ではなく、見て読むものが無いから。協力条項はすべて権限を加盟国へ差し戻す
+（Art 11(1) in accordance with the procedural arrangements laid down by the latter、
+Art 12a(2) in accordance with the laws and procedural requirements of the Member State
+where the activities of a joint audit take place）。EU レベルの調査権限を発明することは
+この library がなしうる最も重大な誤りなので、`:out-of-scope` に理由付きで記録する。
+
+Art 12a が 2023-01-01 consolidation に無く 2024-01-01 に在ることも、DAC7 の適用日から
+推論せず両方 fetch して**測った**。誤った consolidation に pin した catalog は
+joint audit が存在しないと報告する。
+
+Art 12a(2) は訪問側職員を **2 法域の下限**で縛る（officials of another Member State
+shall not exercise any powers that would exceed the scope of the powers granted to them
+under the laws of their Member State）。したがって `joint-audit` は 2 法域を取り、
+どちらかが未読なら `:no-catalog` を返す。未読集合との交差は未読集合ではない。
+
+## 現在地（正直に、2026-08-22 時点）
+
+- **5 法域 / 18 facet / 53 source。** `world-coverage` は分母を要求し既定値を持たない。
+  universe を 12 とすると jurisdiction は **5/12**、**facet は 43/216**。低いほうが正しい図。
+  内訳は jp `read 11 / partly 1 / silent 6`、us `read 8 / oos 2 / silent 8`、
+  eu `read 1 / oos 13 / silent 4`、de `read 10 / partly 2 / silent 6`、
+  es `read 8 / partly 2 / oos 2 / silent 6`。de の 10 個目 `:exam/cross-border` は
+  `[:eu]` 由来で、`:facet/from` がどの階層から来たかを記録する。
+- **24 test / 670 assertion**、7 通りの破壊を実測して復元済み: `authorized?` を
+  `(empty? unmet)` にすると 39、`eval-clause` の `:unknown` を `:no` に潰すと 14、
+  子の silent が親の read を上書きすると 1、最深階層だけを使うと 2、
+  `:unread-instrument` / `:conduct-duty` / `:two-jurisdiction` を disposition から
+  外すと 2 / 3 / 3。
+  **後ろ 3 つは最初の試みが緑のままだったから存在する** —— catalog 済みの全 action が
+  複数の非充足可能 requirement を同時に持つので、bucket を 1 つ消しても
+  catalog 由来の答えは 1 つも変わらなかった。合成 result に対して 1 bucket ずつ
+  当てる以外に、どれが効いているかを見る方法は無い。
+- **やっていないこと**（次の単位であって、この ADR が済ませたことではない）:
+  (1) 仏伊 —— 取得経路（PISTE credential / DILA LEGI open-data dump）が要る。
+  同じ 403 を別に読み直すことではない。
+  (2) `cloud-itonami-iso3166-jpn-nta` / `-usa-irs` の agency leaf。
+  (3) 残り 186 法域 —— 各国の手続法を 1 つずつ読む以外の近道は無い。
+  (4) 施行令・IRM・LGT art 101.4.a / art 113・AO §§ 80, 173(2), 194, 200a, 328 ff。
+  いずれも `:unread-instrument` か `:silent` として明示してある。
+
+\n\n## 追加決定（2026-08-22、同日）—— 法域は path であり、facet universe は増える\n\n**オーナー指示「残りの法域で影響力が大きいところから進めて」に対し、順序の根拠を\nこの library に固有の構造から取った。** `[:eu]` は既に catalog に在ったが、\nArt 12a(2) が訪問側職員を 2 法域の下限で縛るので、**加盟国が 1 つも読まれていない\n間、joint-audit はどのペアでも `:no-catalog` を返す**。協力層は catalog に在って\n不活性だった。だから GDP 順で EU 外の大国へ行く前に、加盟国を 2 つ読んだ。\n\n読んだのは **独 (Abgabenordnung §§193-203)** と **西 (Ley 58/2003 arts 141-159)**。\nどちらも公式 publisher の consolidated XML から byte-exact に取れる。\n\n### 決定 1: 法域は code ではなく path\n\n`[:eu :de]` は `[[:eu] [:eu :de]]` に解決し、**両階層の requirement の和**を取る。\nworklaw の `[:us :ca]` と同型。merge 規則は 2 つで、**どちらも失敗するテストが\n見つけた**:\n\n- **親は自分が実際に読んだ facet だけを渡す。** EU の 13 個の `:out-of-scope` は\n  EU についての言明であって独についてではない。伝播させると、誰も読んでいない\n  独の再調査法が「意図的に対象外」として報告される。\n- **子の `:silent` は親の `:read` を上書きしない。**「この階層は何も言っていない」は\n  「あの階層は言った」を outrank できない。子の `:out-of-scope` は勝つ（不在ではなく決定だから）。\n\n未 catalog の階層は**自分の階層で** unchecked になる —— `[:eu :fr]` は `[:eu]` が\ncatalog に在ることで covered に見えてはならない。\n\n### 決定 2: facet universe は法域が新しい問いを明かしたら増やす（14 → 18）\n\n`:exam/impartiality`（AO 199(1) zugunsten wie zuungunsten）/ `:exam/duration-limit`\n（LGT 150.1 の 12 か月）/ `:exam/premises-entry` / `:exam/commencement-information`。\n最後の 1 つは **US 7521(b)(1) が `:exam/representation` に誤って置かれていた**ことも\n直した。\n\n**4 つとも、既に catalog 済みの日米のスコアを下げる。** それが正しい方向である ——\n分母が分子と一緒にしか増えないなら、測っているのは無知ではなく労力になる。\n\n### 決定 3: pass でない在り方をあと 2 つ\n\n- **`:conduct-duty`** —— 記録では確立できない職員の行為義務（AO 199(1)）。\n  裁量的判断ではないので `:official-determination` と呼ぶのは誤標識だった。\n  完全な独記録では**これだけが残り**、`authorized?` を false に保つ。\n- **`:unread-instrument`** —— 法が、この catalog が行っていない先を指す\n  （LGT 142.2 → art 113、国税通則法 74条の9 第七号 → 政令）。`:unmet` ではなく、\n  決して pass ではない。\n\n### 逆を向く条文は 2 組から 4 組へ\n\n- **事前通知**: AO 197(1) は Prüfungsanordnung・開始予定・**検査官の氏名**を\n  angemessene Zeit vor Beginn に通知する。LGT 151.2 は\n  *la inspección podrá personarse sin previa comunicación*。同じ大陸・同じ指令の下で\n  既定が逆で、同一の行為に対し独は例外条項を要し西は何も要さない。\n- **誰を実地調査できるか**: AO 193 は**適法性のゲート**（事業者・農林業・自由業・\n  147a、それ以外は 3 号のいずれか）。7602(a) も 74条の2 も納税者の**類型を名指ししない**。\n  日米の形で書いた checker は、独の一般被用者への調査を通してしまう。\n- **犯則目的の第 3 の答え**: AO 201(2) は禁止でも包含でもなく、\n  刑事的評価を**別手続に留保**し、その旨を告げるべきものとする。2 点は binary に\n  見えたが、3 点目がそうでないことを示した。\n\n### 仏伊は「優先度」ではなく「取得可能性」で欠けている\n\n経済規模では仏が西より先に読まれるべきだった。Légifrance は **HTTP 403**、\nbulk API (PISTE) は このワークスペースが持たない credential を要する。\n**bot 保護は回避せず、二次資料で代替もしなかった** —— 教科書から言い換えた 1 条は、\n周囲の byte-exact な span とデータ上区別がつかない。Normattiva はさらに悪く、\n**HTTP 200 で 373 KB、中に法が無い**（抽出可能テキストは 9.5 KB のサイト chrome）。\nstatus code を見る pipeline はこれを成功した fetch として記録する。記事見出しの\n存在を assert して捕まえた。\n\n## 帰結
+
+- **調査対象の選定・スコアリング・順位付けの機能をこの repo に足さない。** 現在
+  そのための入口が無く、足すにはこの repository を編集する必要がある（runtime の
+  入力からは到達できない）。isco-3352 の no-enforcement-authority guarantee と同じ構造。
+- 新しい法域を足すとき、**pass を 1 つでも広げてはならない。** coverage は facet 単位で
+  持ち、action ごとの requirement を持たない法域は `:no-catalog` を返す。
+  taxlaw が『adding a jurisdiction must not widen a single pass』で踏んだ罠と同型。
+- `:out-of-scope` は双方向 test で縛る。out-of-scope と印した facet は必ず理由に解決し、
+  記録された理由は必ず out-of-scope と印された facet に属する。初回実行で欠陥を 1 件
+  捕まえた（jp の `:exam/cross-border` が『未読』という理由を out-of-scope として
+  持っていた。未読は silent であって意図的除外ではない）。
+")))

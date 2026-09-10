@@ -1,0 +1,316 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608110200")
+  (:adr/title "ADR-2608110200: Clerk 相当としての差分を 3 状態で数え、identity を cloud-itonami の ISIC-6311 事業として売る — authority は kotobase.net のまま、事業面と service 面を分ける")
+  (:adr/status "accepted")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-11")
+  (:adr/last-verified "2026-08-11")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "clerk-parity-and-identity-saas")
+  (:adr/repos (vector "orgs/network-awai/net-kotobase"
+              "orgs/cloud-itonami/app-auth"
+              "orgs/kotoba-lang/authentication"
+              "orgs/kotoba-lang/mfa"
+              "orgs/kotoba-lang/authenticator"
+              "orgs/kotoba-lang/onetime"
+              "orgs/kotoba-lang/sekisho"))
+  (:adr/related (vector "2608039950"
+                "adr-2607252000-authn-kotobase-net-identity-service"
+                "adr-2607302145-passkey-first-cacao-authentication-and-cross-device-recovery"
+                "2608110100"))
+  (:adr/data "90-docs/comparison/clerk-parity.datoms.edn")
+
+  (:adr/authoritative-for
+  (vector "Clerk との差分は「稼働 / 部品はあるが未配線 / 無い」の 3 状態で数えること"
+   "identity を売る事業面は cloud-itonami（ISIC 6311）に置き、service 面は authn.kotobase.net のまま分けること"
+   "authority（DID namespace）は kotobase.net から動かさないこと"
+   "価格はコードではなくデータとして持ち、計測は次元付き usage event で行うこと"
+   "外販を決める前に drop-in SDK / webhook / 管理画面 / コンプライアンスへ投資しないこと"))
+
+  (:adr/context
+  "オーナーの問い（2026-08-11）は『Clerk との比較』、続いて『MFA なども含めて Clerk 相当の
+   SaaS 認証として比較』、続いて『課金なども含めて cloud-itonami で Clerk のような SaaS
+   として公開したい』。
+
+   ## 3 状態で数え直したら、判断が変わった
+
+   36 項目を数えた結果は **稼働 13 / 部品はあるが未配線 9 / 無い 14**（うち 2 件は意図的）。
+   全 36 行は `90-docs/comparison/clerk-parity.datoms.edn` に datom として載っており、
+   `:source/dataset \"clerk-parity\"` で引ける。
+
+   ## 直前の自分の回答が間違っていた
+
+   1 つ前の比較で『MFA なし・SAML なし・SMS なし』と書いた。それは
+   `authn.kotobase.net` の**配線**の話としては正しいが、**部品の有無としては誤り**だった。
+   索引を引き直した実測:
+
+   - `authentication.core/achieved-level` が factor 集合から
+     `:none → :single-factor → :multi-factor → :phishing-resistant` を判定し、
+     `level-satisfies?` が要求水準と比較する。**MFA の判断層は実装済み・テスト済み**
+   - `kotoba-lang/mfa` は用途ごとに必要 factor を選ぶ substrate で、
+     `risk_planner` / `live_risk` / `orchestrator` という**リスクベース適応 MFA**まで持つ
+   - `kotoba-lang/authenticator` に `auth/otp`（TOTP/HOTP）・`auth/base32`・
+     `auth/uri`（`otpauth://` = QR 登録）が揃っている
+   - `kotoba-lang/onetime` は SMS コードと**リカバリコード**を明示的に対象に含む
+   - `authentication/deps.edn` は faceid / touchid / webauthn / onetime / oauth / oidc /
+     saml の 7 つを実際に依存として持っている
+
+   **『無い』と『配線されていない』を混ぜると、見積もりが 1 桁変わる。** MFA は数週間の
+   機能開発ではなく、4 つのライブラリを factor verifier に接続し登録画面 2 枚と失効経路を
+   書く仕事だった。CLAUDE.md の『無いと結論する前に索引を引く』が、また同じ形で効いた。
+
+   ## 事業面の置き場所には既存の否定がある
+
+   ADR-2608039950 は『検討して採らなかった置き場所』として **cloud-itonami** を挙げ、
+   『あそこは ISIC コード付きの事業を actor が回す場所。認証は事業ではなく**インフラ**で、
+   他の全 repo が依存する土台。多数の小サービスに埋めると依存の向きが逆転する』と書いた。
+   今回の指示はその上に来る。")
+
+  (:adr/decision
+  "## 決定 1 — 3 層に分ける。ADR-2608039950 の否定は service 面にだけ効く
+
+       authority   did:web:kotobase.net:*        変えない（ADR-2608039950 決定 1）
+       service     authn.kotobase.net            インフラ。ここに実装が在る
+       business    cloud-itonami / ISIC 6311     売る面。契約・価格・計測・請求
+
+   ADR-2608039950 が退けたのは『認証**サービス**を cloud-itonami の 1 サービスとして
+   埋めること』であって、**事業として売ること**ではない。依存の向きも逆転しない ——
+   blueprint が authn に依存し、authn は blueprint を知らない。
+
+   repo は `cloud-itonami/cloud-itonami-isic-6311-identity`（sub-blueprint 形。先例は
+   `cloud-itonami-isic-6311-chainexplorer`。`-6311` 本体は市場データ集約で埋まっている）。
+   プロダクト層の判断ライブラリは既存の `kotoba-lang/sekisho`（関所）。
+
+   ## 決定 2 — 配線が先。作るのは後
+
+   未配線 9 件は数日、無い 14 件のうち難物 5 件は数ヶ月。**順序を逆にすると、
+   商談で最初に落ちる理由（MFA が無い）を抱えたまま SDK を書くことになる。**
+
+   実行順（商談で落ちる理由になる順）:
+
+   1. **TOTP + リカバリコード** — `authenticator` + `onetime` を factor verifier に接続
+   2. **MFA ポリシー / step-up** — `mfa` の planner を接続。判断層は既に在る
+   3. **カスタムドメイン** — `AUTHN_APEXES` の設定と DNS。コードは本番に載っている
+   4. **MAU 計測** — 決定 4
+   5. **SMS OTP** — `onetime` + `com-twilio`
+   6. **データ所在** — Durable Object の jurisdiction。EU 顧客が来てからでは高い
+
+   ## 決定 3 — 価格はコードではなくデータ
+
+   価格表は blueprint の `pricing.edn` に置き、service は**次元付きの usage event を
+   出すだけ**にする（`{:tenant :dimension :at}`、dimension は `:mau` / `:verification` /
+   `:tenant-month`）。こうすると:
+
+   - 価格モデルの変更が authn の deploy を要求しない
+   - MAU 課金・従量課金・x402 の per-call のどれにも同じ計測で対応できる
+   - **価格を決める前に計測を始められる** —— 逆順は不可能で、計測していない過去は
+     遡って請求できない
+
+   `nexus-x402` は既に 3 seller のテナント登記を持つマルチテナント gateway として
+   稼働しており、ADR-2608039950 が『repo ではなくパターンを借りる』と書いたとおり
+   運用形を借りる。
+
+   ## 決定 4 — 公開販売の前に満たすゲート
+
+   これらが揃うまで**有償の公開提供を開始しない**（無償の自社利用と、条件を明示した
+   個別提供は別）:
+
+   1. MFA（TOTP + リカバリコード）が稼働している
+   2. テナントごとのカスタムドメインが有効化されている
+   3. usage event の計測が動いており、請求の根拠が再構成できる
+   4. authn 自身の可用性宣言（status / SLO）が公開されている
+   5. 利用規約・プライバシー・DPA が identity service を対象として書かれている
+   6. **custody の開示** —— 鍵はサーバ保管（passkey で解錠）で、侵害されれば全利用者と
+      して署名できる。KMS/HSM 境界は未実装。**これを書かずに売らない。**
+
+   ## 決定 5 — 外販を決めるまで、難物 5 件に投資しない
+
+   drop-in UI コンポーネント / SDK / 汎用 webhook / 管理ダッシュボード /
+   コンプライアンス認証は、**自社利用のためだけなら 1 つも要らない**。外販の意思決定が
+   下りてから着手する。先に作ると、維持コストだけが恒久化する。
+
+   ## 決定 6 — SAML は OIDC で足りない顧客が現れてから
+
+   `saml` repo は XML 署名検証を host port として空にしている。c14n の罠が多く、
+   認証境界で誤ると署名の意味が消える。**OIDC で済む顧客は OIDC で済ませる。**")
+
+  (:adr/consequences
+  "## 現在地（2026-08-11）
+
+   ### 着地したもの
+
+   - **決定 3 の計測が本番で動いている。** `authn.usage`（純粋: UTC の月・scope・
+     鍵の形・集計）+ `authn.usage-flow`（hash / put-once / bump / list）+
+     `durable/op-bump`（月が鍵に入っているので window を持たない原子的な加算）+
+     `GET /v1/usage`（fail-closed）。net-kotobase `9027a63`、Worker version
+     `77600d6e-3538-4374-86b4-53f4cf733c35`、west pin `468a013`。
+     課金の単位は**暦月あたりの distinct subject**で、put-once で重複排除する ——
+     それが最適化ではなく metric 本体であり、後から復元できない唯一の値。
+     subject は scope+month で salt して hash してあるので、usage 面は
+     『何人か』に答えられて『誰か』には答えられない。
+   - **上流の前提を外した。** `kotoba-lang/authenticator` に非同期 HMAC ホスト
+     向けの純粋な半分（`counter-bytes` / `counter-for` / `code-from-hmac`）を
+     公開（`699a375`、pin `b078ddf`）。authn は `nodejs_compat` を意図的に切って
+     いるので、これが無いと TOTP は**そもそも edge で計算できなかった**。
+   - smoke test が review より先に本物のバグを 1 件捕まえた: `op-bump` が最初
+     カウンタを top level に書いており、`op-list` は record の value slot しか
+     返さないので、**全ての月が検証回数 0 として請求に出るところだった**。
+   - smoke test は見えないものを主張しない: 並行加算の assertion は落とした ——
+     本物の Durable Object はプラットフォームがオブジェクト単位で直列化するが
+     Map スタブはしない。スタブに待ち行列を足せば「通る」が、それは自分の
+     エミュレーションを検査しているだけになる。
+
+   - **決定 2 の実行順 1（TOTP + リカバリコード）が本番で動いている。**
+     共通 lib は `kotoba-lang/authenticator`（`auth.verify` / `auth.recovery` /
+     `auth.adapters.webcrypto`、`291cfa3`、pin `f3d7d69`）—— オーナー指示
+     「共通 lib 部分は kotoba-lang org」に従う。deployable 側は net-kotobase
+     `3b03e4f`、Worker version `1a7d174f-b68c-4611-a918-5fa064897587`、
+     west pin `43acad17`。
+     判断の置き場所は `onetime` ではなく `authenticator` にした ——
+     `onetime` は verification *flow* の枠組み（`IOneTime` port・レート制限・
+     単回消費）で TOTP の実装を持たず、そちらに書くと TOTP 実装が 2 つになる。
+   - **TOTP secret は KEK 封筒に入れた**（オーナー指示「より安全な方向で」）。
+     `custody/seal-secret!` は署名鍵と同じ封筒を使う —— この namespace が
+     『wrapping scheme が両者で drift しないため』に在る以上、その論拠は
+     署名鍵で止まらない。DEK 側の項目名が同一なので、**rotation sweep は
+     prefix を 1 つ足すだけでこの記録も回す**。
+   - **締め出しは構成上起きない**: 登録は本人がコードを出せて初めて完了する
+     （途中でやめた secret は何も gate しない）／step-up は passkey ブロックと
+     独立に走る（`navigator.credentials` が無い端末で email サインインした人も
+     証明できる）／`disable!` は counter も消す（残すと再登録した新しい secret の
+     コードが全部古い counter 以下として拒否され、登録できて入れなくなる）／
+     リカバリコードは登録と同じ手順で発行する（後回しにすると「電話しか入口が
+     無い窓」ができる）。
+   - pending session は `valid false` + `mfaRequired`。既存の consumer は
+     `valid false` を未サインインとして扱うので、**MFA を知らない consumer も
+     安全側に落ちる**。新しい truthy な状態を足していたら、新語を教えていない
+     全ての場所で人が黙ってサインインしていた。
+
+   - **決定 1 の事業 blueprint が公開された。**
+     `cloud-itonami/cloud-itonami-isic-6311-identity`（public / AGPL-3.0、
+     `3a2b954`）。`-6311` 本体は市場データで埋まっているので sub-blueprint 形
+     （先例 `-chainexplorer`）。**価格は `pricing.edn` という data、請求は
+     `cloud-itonami.identity.pricing/invoice` という純関数**で、service は
+     金額を一切知らない —— 価格改定が認証サービスの deploy を要求しない。
+     10 tests / 38 assertions。
+     不変条件のうち 5 つは「例外を出さずに請求が狂う道」を塞ぐもの:
+     計測していない次元は値付けできない（丸ごと拒否する。誰も数えていない
+     数字を見積もるのは見積もらないより悪い）／全ての金額はその件数を併記する
+     （辿れない金額は更新時に必ず争われる）／**計測していない月は 0 の月では
+     ない**（請求書上は同じに見え、意味は正反対）／無料枠は請求を生まない
+     （上限を持つ plan は従量単価を持たない）／gate が 1 つでも開いていれば
+     課金しない（`pricing/sellable?` が data から答える。今日は false）。
+   - **まだ何も販売していない。** 全 plan が `:status :proposed` で、決定 4 の
+     6 gate のうち 3 つ（カスタムドメイン・可用性宣言・identity service 向けの
+     規約）が未達。custody の開示は数字の隣に置いた —— 別の場所に置いた開示は
+     売っているものからずれる。
+
+   ### 実行順 3（カスタムドメイン）は今やらない
+
+   ADR-2608039950 は『何も使わない公開ホスト名を今作るのは、先回りの面を
+   増やす行為なので作らない』と定めており、有効化の引き金は**apex が増えた
+   ことではなく、その apex の session を読む app が実在すること**である。
+   itonami は自前の RP（`itonami.cloud`）で `app.itonami.cloud/auth` を持つと
+   決めた（ADR-2608110100）ので、`auth.itonami.cloud` を authn Worker に
+   向けるのは重複であり RP の衝突でもある。**顧客が現れてから有効化する。**
+
+   - **可用性を外から測り始めた（gate 4 は開いたまま、理由が変わった）。**
+     共通 lib は `kotoba-lang/uptime`（`dd63825`、west 登録済み）—— **観測されて
+     いない窓は 100% ではなく `:unobserved`**、**prober 自身の失敗は `:down` では
+     なく `:inconclusive`**、**coverage が薄い窓の SLO は `:met` ではなく
+     `:cannot-say`**。10 tests / 41 assertions、観測ゼロを 1.0 にすると 2 件落ちる
+     ことも確認。
+     prober は blueprint 側（`scripts/probe.cljs` + `com.gftd.identity-probe`、
+     5 分間隔 launchd、`efbb3c9`）。**service の外から**測る —— 自分自身に
+     「動いているか」を聞く service は落ちている時に何も言わない。
+     実測 2026-08-11: 3 target × 15 観測、100% だが expected schedule の **1.4%**
+     なので `slo-verdict` は正しく `:cannot-say` / `:insufficient-coverage` を返す。
+   - **gate 4 が開いている理由は「何も測っていない」から「測ったものを publish
+     していない」に変わった。** 観測は operator マシンのローカルにしか無い
+     （追跡すると west checkout が恒久的に dirty になり他セッションの
+     `west update` を止めるため、意図的に untracked）。gate note にそう書いた ——
+     **直った問題を書いたままの gate note は、間違った理由で閉まり続け、
+     やがて間違った理由で開く。**
+
+   ## Closing（2026-08-11）
+
+   ### この session で default branch に着地したもの（全件 contained を実測）
+
+   | repo | commit | 中身 |
+   |---|---|---|
+   | `cloud-itonami/app-auth` | `7e06367` | TS/Svelte を撤去し cljs Worker。`app.itonami.cloud/auth` |
+   | `kotoba-lang/authenticator` | `291cfa3` | `auth.verify` / `auth.recovery` / `auth.adapters.webcrypto` |
+   | `network-awai/net-kotobase` | `3b03e4f` | 使用量計測 + TOTP/リカバリコード/step-up |
+   | `cloud-itonami/cloud-itonami-isic-6311-identity` | `efbb3c9` | 事業 blueprint（価格 = data）+ 外形 prober |
+   | `kotoba-lang/uptime` | `dd63825` | 観測 → 可用性 statement |
+
+   west pin: `43acad17`（net-kotobase）/ `f3d7d69`（authenticator）/ `b416124`
+   （blueprint）/ `03a9d2a`（uptime）/ `16d17d6`（app-auth）。
+   deploy: `itonami-app-auth` version `852340a4`、`kotobase-authn` version `1a7d174f`。
+
+   ### 検証（この session の合計）
+
+   - JVM: authn 42 tests / 273 assertions、app-auth 8 / 52、authenticator 38 / 177、
+     uptime 10 / 41、pricing 10 / 38 —— **failures 0**
+   - built-artifact smoke: app-auth 26 checks、authn usage 17、authn TOTP 26、
+     既存 apex 9 —— 全通過
+   - RFC parity: RFC 4226 Appendix D 10 ベクタ + RFC 6238 Appendix B SHA-1 6 ベクタ
+   - design-quality: app-auth sign-in 100.00 / authn sign-in 100.00（min 95）
+   - negative check: redirect 封じ込め・TOTP drift 窓・可用性の unobserved・
+     free tier の課金・gate の充足 —— **5 件すべて、壊すと実際に落ちることを確認**
+
+   ### 本番の最終実測（2026-08-11）
+
+   `app.itonami.cloud/auth` `/auth/health` `/auth/v1/session` = 200。
+   `authn.kotobase.net` `/health` `/sign-in` `/v1/session` = 200、
+   `/v1/totp` = 401（未サインイン。正）、`/v1/usage` = 404（fail-closed。正）。
+   prober は launchd で稼働し、観測は 15 → 30 に伸びた。
+
+   ### 次に着手する 1 つ（resume point）
+
+   **`AUTHN_USAGE_TOKEN` を置いて計測を読めるようにする。** 記録は動いているが
+   読み出し口が閉じており、『読めないデータは証拠ではない』という自分の基準に
+   照らして未達。long-lived な operator credential なので owner が決めて保管する:
+
+       cd orgs/network-awai/net-kotobase/authn && wrangler secret put AUTHN_USAGE_TOKEN
+       curl -H 'authorization: Bearer <token>' https://authn.kotobase.net/v1/usage
+
+   ### まだのもの
+
+   - **`AUTHN_USAGE_TOKEN` は未設定**なので `/v1/usage` は 404 のまま。記録は
+     動いており、読み出しは秘密を 1 つ置けば開く。**遡れないのは記録だけ**なので
+     この分割を採った。
+   - 実行順 3（カスタムドメイン）・4（MAU の読み出し）・5（SMS）・6（データ所在）
+     は未着手。事業面の blueprint repo（決定 1）もまだ作っていない。
+
+   - 比較 36 行は `90-docs/comparison/clerk-parity.datoms.edn` に datom として載り、
+     `[?e \"source/dataset\" \"clerk-parity\"]` で引ける。keyword 値は datascript 側で
+     裸文字列になるので、query では `\"unwired\"` のように**コロン無し**で書く
+   - 散文版は artifact として公開済み
+   - `app.itonami.cloud/auth` は稼働（ADR-2608110100）
+
+   ## 意図的に受け入れる不利
+
+   - **面が増える。** authority・service・business を分けたので、価格や規約を変える人と
+     コードを変える人が別の repo を見る。分けない案（authn に価格を持つ）は、
+     価格改定のたびに認証サービスを deploy することになるので採らない
+   - **cloud-itonami に『事業ではないもの』が 1 つ増える。** ISIC 6311 は
+     『データ処理・ホスティング』なので分類としては正しいが、他の blueprint が
+     『actor が回す事業』であるのに対し、これは『既にあるインフラを売る』形になる
+   - **Clerk に今日勝てるのは 4 点だけ** —— 即時失効・移植可能な DID identity・
+     MAU 課金なしの自前運用・datom 面との join。外販の訴求はこの 4 点に絞る
+
+   ## 既知の gap
+
+   1. **価格が未決。** 決定 3 のとおり計測を先に始められるが、公開には数字が要る
+   2. **status / SLO が無い。** 決定 4 のゲート 4
+   3. **規約が identity service を対象にしていない。** cloud-itonami の既存 legal は
+      別の事業のもの
+   4. **custody の KMS/HSM 境界が未実装。** 自社利用では受容できるが、他社に売るなら
+      監査で必ず問われる（決定 4 のゲート 6 が要求するのは解決ではなく開示）
+   5. **この ADR は 1 つ前の自分の回答を訂正している。** 『MFA なし』は配線の話としては
+      正しく、部品の話としては誤りだった。同じ誤りは 2026-08-04 にも起きており
+      （CLAUDE.md『無いと言う前に索引を引く』）、**索引を引く手順は prose の指示
+      だけでは守られない**という証拠がまた 1 件増えた")))

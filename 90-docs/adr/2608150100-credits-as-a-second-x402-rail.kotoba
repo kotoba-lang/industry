@@ -1,0 +1,106 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608150100")
+  (:adr/title "credits を x402 の accepts に載せる —— 台帳側の穴を 2 つ塞いでから")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-15")
+  (:adr/body
+"## 決定
+
+x402.nexus は USDC on Base に加えて **murakumo credits** を受け付ける。
+402 challenge の `accepts` に 2 レールを並べ、gateway は scheme が `credits` の
+支払いを murakumo の append-only 台帳へ転送する。
+
+**credits は money ではない。** labour-issued・holder 間 transferable・
+fiat/USDC/EN へ redeemable でない（ADR-2607995000 §1）。したがって:
+
+- USDC の側（`:networks` / `:asset` / `:price`）は一切変えない
+- credits は `:networks` に足さず**別項目**で announce する（\"murakumo\" は
+  chain ではなく、chain として扱った client は address を持たない台帳に対して
+  EIP-3009 authorization を決済しようとする）
+- credits の支払いは **SETTLEMENTS_KV に書かない**。あの索引は /ycbench を支え
+  `summary` が `:usd` を合算するので、credits の entry は USD 収益を非-money で
+  水増しするか nil で合計を壊すかのどちらかになる
+
+live の価格は murakumo の 2 resource に 1 credit（`credits-per-usd` = 100 なので
+$0.01 と同値）。acceptance density は operator 自身なので `:independent` は 0 の
+まま —— これは ADR-2607259800 が明示的に予告した状態で、水増ししない。
+
+## 配線の前に見つけた穴 2 つ
+
+**この 2 つを塞ぐまで credits を x402 に繋いではいけなかった。**
+
+### 1. `/infer/transfer` に認証が無かった（実測 2026-08-15、live）
+
+`/infer/spend` と `/infer/refund` は未認証で 401 を返すのに、10 行隣の
+`/infer/transfer` には gate が 1 つも無く、未認証の呼び出しが `admit-transfer`
+まで到達していた。止めていたのは残高検査だけで、それは solvency の答えであって
+authentication の答えではない。`:from` は request body から素直に読まれるので、
+残高のある口座を名指しすれば誰でも他人の credits を動かせた。
+
+**3 route のうち、他人の価値を他人へ動かす唯一のものが、いちばん緩かった。**
+
+`write-gate/transfer-authorized?` は `authorized?` と違い CACAO だけを見る ——
+共有秘密（MURAKUMO_SERVICE_TOKEN）が正しい primitive なのは「operator が他の
+手段で既に確かめた事実を記録する」場合で、holder-to-holder transfer はそれに
+当たらない。`authorized?` のままだと、共有秘密を持つ全プロセス（credits を
+受け付ける x402 facilitator を含む）が台帳のどの口座からでも引ける。
+
+### 2. 認証だけでは、買い手が facilitator に口座全体を渡すことになる
+
+`cacao-authorized?` が答えるのは「本当に Alice か」だけ。それを証明する bearer は
+Alice の残高全体に対する権限であり、**第三者に渡した瞬間に意味が変わる。**
+
+そこで CACAO の SIWE `resources` に
+`murakumo:transfer?to=<to>&credits=<amount>` が在ることを要求する。resources は
+CACAO ツールが署名前の人間可読メッセージに描画する欄なので、署名者は「誰に」
+「いくら」を読んでから署名する。**誰かに支払うことと口座を渡すことの差は、
+capability が自分の上限を名乗るかどうかにある。**
+
+金額は文字列でなく**数値で比較する**。`.cljc` で `(str 1.0)` は JVM が \"1.0\"、
+ClojureScript が \"1\" —— 署名側と検証側がどちらも正しく描画しても食い違う。
+formatter を 1 つ選んで両側が同じものを選んだと期待するより、クラスごと消す。
+
+さらに **nonce を単回使用**にした。scope を付けても replay は止まらない ——
+買い手は実際に「その seller にその額を払う」ことを承認しているので、署名の
+どこにも「1 回だけ」とは書いていない。消費済み nonce の索引は feed 自身
+（`consumed-nonces`）で、第 2 の store を同期させる必要が無い。
+
+⚠ `normalize-run` の whitelist に `\"transfer-nonce\"` が要る。落とすと
+`consumed-nonces` が保存済みイベントから 1 件も読めず、replay 検査が
+**合格を返す**（実行されないのではなく合格する形の失敗、ADR-2608136000）。
+
+## 上流の bug 1 件
+
+`pay.facilitator/gate` は credits 専用 rule で throw していた
+（`rule->requirements` → `parse-usdc` が金額無しで throw）。`payment-option-errors`
+と `register-seller` は membrane amend 以来 credits 専用 rule を受理してきたので
+registry はそれを保持でき、**最初の未払いリクエストが gateway ごと落とす**状態
+だった。`rule->accepts` には書かれた日から `(:usd rule)` guard が在る —— 2 つの
+関数は同じ commit で追加され、その commit が可能にするために存在したケースを
+片方だけが考慮していなかった。
+
+/catalog の filter も `valid-rule?` から `payment-option-errors` へ。前者は USDC
+価格を要求するので **credits 専用 seller は menu から黙って落ちていた** ——
+agent は見つけられないものを買えない。
+
+## 順序と fail-closed
+
+`serve-credits!` は DECIDE（pure）→ credits を MOVE → proxy。台帳への append が
+このレールの reservation で、支払う対象の effect より前に起きる。台帳が未設定・
+到達不能・201 以外を返す、のいずれも 402。
+
+## 現在地（2026-08-15 実測）
+
+- `/.well-known/x402` が credits を announce（台帳が設定されている時のみ）
+- `/catalog` の murakumo 2 件が `credits: {amount \"1\"}` を持つ
+- 402 challenge の `accepts` が 2 件（USDC 先頭、credits 次）
+- `/infer/transfer` は未認証・bogus bearer・壊れた CACAO のいずれも 401
+
+**未実証**: 正の経路（実際の CACAO を持つ買い手が credits で 1 件買う）は
+production で 1 度も通していない。pure 層の test は両方向を押さえているが、
+それは live の証拠ではない。
+
+## 変更した repo
+
+network-awai/local-murakumo 232ca58 + 1bdf8ab / kotoba-lang/pay c329b0f /
+network-awai/nexus-x402 fccc187。west pin は 4 件とも前進済み。")))

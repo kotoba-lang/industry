@@ -1,0 +1,226 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608280900-world-scale-dns-domain-collection")
+  (:adr/title "世界規模のDNS/ドメイン技術情報収集を許可する — bulk enumeration の PII 懸念とは区別し、着地先は R2 Data Catalog（hyakka claim graph ではない）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-28")
+  (:adr/related (vector "2607309950"
+                "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+                "ADR-2608148200"))
+  (:adr/body "# 世界規模のDNS/ドメイン技術情報収集を許可する
+
+オーナー指示（2026-08-28）「ドメインは全世界のドメイン情報を収集したい、
+securitytrailのように」。app-hyakka（wiki.kotobase.net）に ASN/prefix enrichment を
+足した直後の会話の続きで、対象を「configに書いた8ドメイン」から「世界のドメイン」へ
+拡大する決定。
+
+## 前提 ADR との緊張関係
+
+`adr-2607309950`（domain registry plane: SRS/EPP/RDAP/DNSSEC/billing）は、RDAP の
+bulk search 実装を明示的に**拒否**した:
+
+> registry の namespace 全体に対する無制限検索は bulk-extraction endpoint であり、
+> うっかり提供することが登録データが一括で流出する経路
+
+この懸念は妥当で、撤回しない。しかし本 ADR が許可する収集は**別の性質のデータ**である
+ことを明確にする。
+
+## 区別: registrant PII の bulk-extraction か、DNS技術情報の収集か
+
+| データ種別 | registrant PII を含むか | 2607309950 の対象か | 本 ADR の対象か |
+|---|---|---|---|
+| RDAP/WHOIS の registrant lookup（bulk search） | **含む**（GDPR以降 redact されるが依然 registrant 識別子・組織名等） | **対象。禁止のまま** | 対象外 |
+| Certificate Transparency logs（crt.sh 等） | 含まない（公開鍵証明書のSAN=ホスト名のみ） | 対象外 | **対象** |
+| TLD zone file（CZDS 経由、NSデリゲーションのみ） | 含まない（ドメイン名+委任NSのみ、registrant情報は zone file に無い） | 対象外 | **対象** |
+| 能動的DNS解決（A/AAAA/MX/NS、既知ドメインリストに対して） | 含まない（技術的な名前解決結果のみ） | 対象外 | **対象** |
+
+**判定基準はデータの性質であって規模ではない。** 「world-scale」という規模の大きさが
+2607309950 の懸念を呼び起こしたが、対象データが registrant PII を一切含まない
+技術情報（証明書ログ・ゾーン委任・DNS解決結果）である限り、bulk-extraction の懸念は
+当たらない。RDAP/WHOIS の registrant bulk search は本 ADR の後も禁止のまま。
+
+## 決定
+
+### 1. 現実的なスコープ（「全世界」ではなく「到達可能な範囲を宣言してから測る」）
+
+「世界の全ドメイン」（3.5〜3.7億件）を文字通り列挙することは、無料・合法・単独運用の
+範囲では不可能と実測済み（商用パッシブDNSフィード=年間数千〜数万USD規模が必要、
+主要ccTLD含む多くのレジストリはbulk zone accessを一般提供しない）。CLAUDE.md の
+system-dynamics 節「文字通り列挙することと、原理上排除しないモデルを作り持っている
+データで誠実に計算することは別物」と同型の判断として、以下を初期スコープとする:
+
+- **CT logs**（crt.sh、無料・APIキー不要）— 新規発行された証明書のホスト名を継続収集
+- **Tranco Top-1M**（無料・研究用途で広く使われる「実際にアクセスされている
+  ドメイン」リスト）— 能動的バルクDNS解決（A/AAAA/MX/NS）の種リスト
+- **CZDS zone file**（.com/.net/.org等の主要gTLD、ICANN承認制・無料）— **本 ADR は
+  設計上許可するが、承認取得はオーナーの外部アクション**（ICANNアカウント登録+
+  レジストリごとの Zone Data Access Agreement 締結が必要で、agent が代理署名すべき
+  範囲を超える）。承認が下りるまで zone-actor は G7 ゲート閉のまま dormant。
+
+「これで世界の全ドメインが埋まる」とは主張しない。coverage は data として持ち、
+gap は gap として表示する（hyakka の D9 と同じ規律）。
+
+### 2. 着地先は R2 Data Catalog（Iceberg）— hyakka の claim graph ではない
+
+hyakka（wiki.kotobase.net）は「網羅性を主張しない」sourced claim graph で、実測
+2026-08-28 時点で claims=7949・items=1057 でも配信 snapshot JSON が約6MB。
+Tranco Top-1M 規模（数百万 claim）をそのまま items/claims として流し込むと:
+
+- Worker が bundle する catalog snapshot が肥大化し配信不能になる
+- hyakka の「1 item = 1 encyclopedia entry」という設計意図と、
+  「1 item = 1 raw resolved IP」という bulk data の性質が合わない
+- `:claim/corpus` で分けても同じ ref に millions of datom が載り、
+  既存の corpus（vulnerability / game 等）のクエリコストに波及する
+
+**したがって bulk な生DNSデータは Cloudflare R2 Data Catalog（Apache Iceberg、
+bucket `cloud-itonami-datalake`）に着地させる。** 既に実績がある経路
+（`scripts/hyakka-datalake-export.cljs` + `scripts/datalake-sync.py`、
+ADR-2608280100「hyakka into the R2 Data Catalog」）と同型のパターンを再利用する。
+hyakka は必要な範囲（既に claim graph 内に居る company/domain 等の entity に
+対応する DNS 情報だけ）を将来 join で参照してよいが、bulk データ自体を
+wiki item として複製しない。
+
+### 3. 収集は G7 ゲート付き deterministic collector（`build-actor` の langgraph-clj
+   StateGraph+Governor actor パターンではない）
+
+`yabai-actor`（crt.sh 収集）・`ipaddress-actor`（RIR delegated-stats）が既に確立して
+いる形——LLM判断を含まない deterministic collector、offline-default、明示的
+`--live` フラグ（GATE-G7・`<NAME>_OPERATOR_GATE`）でのみ実ネットワークに出る——を
+踏襲する。`build-actor` skill の langgraph-clj StateGraph + Governor + CACAO
+自己発行パターンは LLM 提案/検閲ループ向けで、決定論的なバルク収集には過剰。
+
+新規 actor:
+
+- **`cloud-itonami-dns-resolver`**（新規）— Tranco Top-1M を種に、bounded tick
+  （1 tick = N domains、cursor 方式。hyakka の `local-lei`/`nvd-cve` と同型）で
+  能動的 DoH 解決（A/AAAA/MX/NS）を行い、NDJSON → Iceberg（`cloud_itonami` namespace）
+  に commit する。G7 ゲート `DNS_RESOLVER_OPERATOR_GATE`。
+- **`cloud-itonami-zone-ingest`**（新規、設計のみ・dormant）— CZDS zone file を
+  `kotoba-lang/zone`（既存の RFC 1035 zone-file parser、車輪の再発明をしない）で
+  パースし、ドメイン名 + NS delegation を同じ Iceberg 面に積む。CZDS credential が
+  無いため今回は G7 ゲート閉のまま。
+- **`cloud-itonami/yabai-actor`**（既存）— CT logs 収集はそのまま。将来的に
+  継続監視（CT log tail）へ拡張する余地は残すが、本 ADR ではスコープ外。
+
+### 4. コストと同意
+
+無料データソース（CT logs / Tranco / CZDS）のみを対象とする限り、標準作業の常時許可
+（CLAUDE.md「外部への影響を伴う操作」節）の範囲内。商用パッシブDNSフィード
+（Farsight/DNSDB・SecurityTrails API等、年間数千〜数万USD）の契約は本 ADR の対象外
+——それは費用支出の意思決定であり、CLAUDE.md 安全床②（資金の売買・送金をしない）の
+文脈で別途オーナー判断が必要。
+
+## Consequences
+
+- hyakka の claim graph はこの ADR の影響を直接受けない（bulk data を持たない）。
+  将来 join したくなったら、その時に別 ADR で境界を引く。
+- `cloud-itonami-dns-resolver` は**実装済み・稼働中**（2026-08-28〜29 実測）。
+  Tranco（毎時）+ Common Crawl（13分毎）の resident tick が
+  `orgs/cloud-itonami/cloud-itonami-dns-resolver` main へ commit を積み続けている。
+  R2 Data Catalog（`cloud_itonami.dns_resolution`）へは launchd 常駐
+  `com.cloud-itonami.dns-resolver-datalake`（毎時）が同期する。
+- `cloud-itonami-zone-ingest` は CZDS 承認というオーナー側の外部アクションが完了する
+  までの間、README に「G7 ゲート閉・CZDS credential 待ち」と明記した状態を維持する
+  （**未着手** — repo 自体まだ作成していない。設計のみ）。
+- 「全世界のドメイン」を今後引用する時は、この ADR の実際のスコープ
+  （CT logs + Tranco Top-1M + 将来のCZDS）を指すのであって、文字通りの全数ではない
+  ——引用する側がこの区別を落とさないよう、hyakka 側にも registry.cljc の coverage
+  ノートと同様の「主張しない」記述を、resolver-actor 側の README にも置く。
+
+## R2 Data Catalog 同期のスケーラビリティ（2026-08-29 解消。経緯を残す）
+
+**旧状態**: 同期は毎回テーブル全体をメモリに載せて `t.overwrite()` していたため、
+コストが「変わった量」ではなく「テーブル全体の大きさ」に比例した。台帳が伸びれば
+確実に壁に当たる設計で、実際に何度も当たった。
+
+**現在**: 差分だけを `mode: upsert` で送る。恒久修正は完了している。
+
+### 何を直したか
+
+- **`scripts/datalake-sync.py`**（共有 loader。LEI/watchlist/hyakka も使う）
+  - `mode: upsert | append` + `join_columns` —— 差分だけを送る。upsert は冪等なので
+    再送しても重複しない（実測: 同じ差分の再送で `updated=0 inserted=0`）
+  - `partition_by` —— Iceberg の partition evolution。既存ファイルは旧 spec のまま
+    読めるので非破壊
+  - `timestamp_columns` —— string ではなく `timestamp(us, UTC)`。**新規テーブルのみ**
+    （既存列の string→timestamptz は pyiceberg が正しく拒否する。retrofit には
+    テーブル再作成が要るので暗黙にはやらない）
+  - **snapshot の自動 expire**（`--snapshot-retention-days`、既定 7、全 caller に適用）。
+    実測: hyakka_claim は毎時同期 1 日で snapshot 57 個
+  - commit 後の検証は snapshot summary の `total-records` を読む。全件 re-scan を
+    やめた（2300万行では**検証自体が commit より重かった**）
+- **`export_and_sync.cljs`** —— Iceberg にまだ無い行を `pending-delta-shards/` で
+  追跡し、それだけを chunk 化して送る。chunk ごとに checkpoint するので中断しても再開できる
+- **`catchup_sync.cljs`**（新規）—— 一回限りの大量 backlog 専用。shard を 4 個ずつ
+  streaming で読んで送る（RSS 約 40MB〜500MB。以前は 10〜16GB）。時間単位 job と
+  同じ lock を取るので catalog の main branch で競合しない
+
+### 途中で踏んだもの（同じ轍を踏まないため）
+
+- **V8 の `Map` は 2^24 = 16,777,216 entry が上限**。実測でちょうど 16,604,474 行で
+  `Map maximum size exceeded`。**heap を上げても直らない**（構造的上限であって
+  メモリ量の問題ではない）。accumulator を 256 shard に分割して解決
+- **復旧のつもりの seed が OOM を作った** —— pending-delta を accumulator の全コピーで
+  seed したら、通常の fold 実行が 2300万行×2 を同時に保持することになった。
+  「新規 fold が無いなら accumulator を読まない」「fold 後に明示的に解放する」で解消
+- **⚠ 古い loader に新しい spec を渡すと `mode` は黙って無視され全量 overwrite になる。**
+  実測: catch-up 実行中に superproject checkout を別作業の一環で一瞬 pre-upsert 版へ
+  戻してしまい、次の chunk（361,588 行）が **13,778,525 行を消してテーブルを置き換えた**。
+  Iceberg の snapshot から rollback して復旧（full scan で行数を実測確認）。
+  投影なので正本は失われていないが、再同期に数時間かかるところだった。
+  ログに兆候は出ていた —— 正常な upsert は `committed (upsert) ... updated=N inserted=M`、
+  事故時は素の `committed`。
+  **対策（fail closed）**: caller は `--require-incremental-support` を渡す。古い loader は
+  argparse が `unrecognized arguments` で exit 2 にする。さらに loader 側も、
+  非 overwrite の `mode` を要求する spec にこのフラグが無ければ拒否する。
+  **4 方向すべてを実測**（新+flag=通る / 新-flag=拒否 / **git から取り出した旧 loader**+flag=拒否 /
+  mode 無しの既存 spec=影響なし）。CLAUDE.md が名指ししている形そのもの ——
+  **できなかった操作が、できた操作と同じ顔をして返る**。
+
+### catch-up は完走した（2026-08-30 実測）
+
+**テーブルは accumulator と完全に一致した。**
+
+| | 値 |
+|---|---|
+| `cloud_itonami.dns_resolution` | **24,384,882 行** |
+| accumulator-shards | **24,384,882 行**（一致） |
+| shard 進捗 | 256/256、progress ファイルは削除済み |
+| commit 種別 | 全て `committed (upsert)` |
+
+出発点は 10,122,230 行だったので、+1,426 万行。途中 load 400〜500 で何時間も
+飢餓状態になったが、1 バッチごとの checkpoint と upsert の冪等性で、**遅くはなっても
+壊れも巻き戻りもしなかった**。lock は解放済みで、毎時 job は次の tick から通常運転
+（新しい ledger ファイルだけを fold → その差分だけ upsert）に戻る。
+
+⚠ ログの健全性は `committed (upsert)` で見る。素の `committed` は overwrite 経路。
+
+### Avro / Iceberg を自前で持った（2026-08-29）
+
+この ADR が「共有 loader だから片手間で変えない」と書いた `datalake-sync.py` の
+Python 依存は、**理由が 1 つに絞れたので潰した**:
+
+- `kotoba-lang/org-apache-avro` に **writer** を実装（fastavro が読めることを実測）
+  + container metadata（Iceberg は manifest ヘッダに schema と partition spec を置く）
+- `kotoba-lang/org-apache-iceberg`（新規）が metadata.json v2 / manifest list /
+  manifest を portable `.cljc` で書く。**pyiceberg が読めることを実測**（行の値まで）
+
+**ただし置き換えは未完**。catalog の compare-and-set（REST）が残っており、
+`datalake-sync.py` は現役のまま。詳細は ADR-2608292200。
+
+### 残っている宿題
+
+- **`resolved_at` の timestamptz 化は「やらない」を推奨に変えた**（2026-08-30 実測）。
+  当初は「pruning のためにいずれやる」と書いたが、測ったら前提が違った:
+  **`source_date` の identity partition が既に効いている**（`spec: [1000: source_date:
+  identity(7)]`）ので、日付範囲の絞り込みという主目的はもう満たされている。
+  timestamptz が追加で効くのは日内の時刻での絞り込みで、それはファイル単位の
+  min/max 統計に依存するが、**この writer は統計を書かない**（狭める方向に誤った
+  bound は答えから行を消すため、意図的に null のまま）。つまり**今の構成では
+  timestamptz の利得はほぼゼロ**。
+  一方コストは、24,384,882 行のテーブルの作り直し + snapshot 172 個の履歴喪失 +
+  数時間の再同期という**破壊的で不可逆な操作**。統計を書くようになった時に、
+  その時の実測で再評価する。
+- **`export_and_sync.cljs` と同型の「毎回全件再パース」構造が
+  `scripts/hyakka-datalake-export.cljs` にも残っている。** 台帳が 9.7MB と桁違いに
+  小さいので今は問題になっていないが、同じ壁に向かってはいる（今回は触っていない）
+")))

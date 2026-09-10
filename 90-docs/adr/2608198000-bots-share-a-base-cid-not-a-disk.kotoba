@@ -1,0 +1,228 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608198000")
+  (:adr/title "bot が network 越しに共有するのは disk ではなく base の CID —— UnixFS は block 面にだけ置く")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "unixfs, ipld, cloud-itonami, bots, virtual-shell, inga, car, drive, nfs, kagi, oci, shared-workspace")
+  (:adr/body
+  "## 決定
+
+**複数 bot が network 越しに共有するのは、可変な disk ではなく immutable な
+base の CID である。** 各 bot は自分の writable overlay を持ち、合流は ref 1 本
+への compare-and-set で行う。オーナー判断 2026-08-19（問い:『bots が network
+over で同じ disk, 仮想環境を共有するならどういった設計が良いか。unixfs が
+いい感じがするけど?』）。
+
+形は **git そのもの**である —— content-addressed object + 可変 ref + CAS +
+明示的 merge + worktree 分離。新しい分散ファイルシステムを作るのではなく、
+object store を UnixFS 面に、ref plane を inga に置き換えた git 形にする。
+
+| 層 | 何を置くか | 部品 | 可変か |
+|---|---|---|---|
+| block | ファイルのバイト列。UnixFS leaf / dag-pb node | kotoba-lang/tech-ipfs-specs-unixfs + io-ipld の ipld.dag-pb | 不変 |
+| pack | commit 単位の CARv2。(pack CID, file-offset, frame-length) | kotoba-lang/io-ipld-car の ipld.car.v2/pack | 不変 |
+| object | pack を置く場所。**Range 読みを宣言できること** | kotobase archive / R2 / B2 | 不変 |
+| ref | 『今この workspace はこれ』**唯一の可変点** | inga.ref（IRefStore、CAS を quorum が決め :linearizable-ref を宣言）。witness は inga-node の常駐 process | 可変・1 本 |
+
+これは ADR-2608160100 の block → pack → object をそのまま使う。新しい物理層を
+足さない。
+
+### D1. 可変なのは ref 1 本だけ。ロックを置かない
+
+CAS に負けた側が rebase する。分散ロックマネージャを作らない。
+
+**根拠は既に手元にある**: cloud-itonami-app の virtual_shell.clj は *1 台の PC の
+中ですら* per-workspace lock と host-wide semaphore を要求している（同じ repo で
+2 つの mutating shell を同時に走らせないため）。そのロックを network 越しに
+引き伸ばすのが、この設計で一番やってはいけない一手である。
+
+inga を使う場合、**2f+1 の quorum 証明書それ自体が条件付き書き込み**なので、
+ホスト側の UPDATE … WHERE seq = ? / onlyIf.etagMatches / If-Match が経路から
+消える。ADR-2608039000 のとおり、分散を名乗る経路で D1 や Durable Object を
+premise にしない（ref が消えると正しさが壊れるなら premise であり、cache では
+ない）。
+
+### D2. 1 workspace = 1 ref
+
+kotobase の Datalog join はちょうど ref 1 本しか届かない
+（ADR-260726-kotobase-query-plane-is-one-ref）。『書き込み負荷が心配だから
+あとで分ける』をやると、bot 横断の問い —— 誰がどのファイルを触ったか、どの
+overlay が base から何 commit 離れたか、どの pack がどの commit のものか ——
+が二度と書けなくなる。分けるなら、**何が join できなくなるかを名指しで書く**。
+
+### D3. 1 CID = 1 object をやめ、commit ごとに 1 pack
+
+network 越しで最初に効くのはここである。実測値が隣にある: cloud-itonami-app
+ADR-0057 の Drive store は 100 MiB の upload で **403 リクエスト**（400 leaves
++ 3 nodes）を出す。bot の work tree は小ファイルが数万個あるので、1 CID =
+1 object のままだと round trip で死ぬ。
+
+packing policy は **write-locality。1 commit = 1 pack** を既定にする —— ただし
+**object 面の天井で切る**。pack も object であり、archive の
+`max-object-bytes` は 4 MiB なので、それを超える commit は複数 pack になる
+（下の実測。この 1 文は測ってから足した）。
+
+⚠ :packed-blocks を名乗るなら object 面の **:range-read を併せて宣言する**
+（ADR-2608160100）。Range の無い store で packed を名乗ると『pack 全体を GET
+して 1 block を取り出す』実装が動く —— round trip は減るのに転送量が爆発する、
+成功に見える失敗になる。
+
+**成功の指標は round trip 数**。bytes でも wall-clock でもない。
+
+### D4. 木は commit の tree として持ち、UnixFS directory は投影にする
+
+identity は commit CID、location は pack（ADR-2608148200 の identity と location
+の分離をそのまま適用する）。
+
+UnixFS directory を**可変 namespace として使わない**。理由は 2 つあり、どちらも
+実測または既決である:
+
+- rename 1 回で root まで木の高さ分の CID が全部変わる。書き込みコストだけ増える。
+- それを入れても『今の木はどれか』を答えるのは結局 ref なので、可変な 1 点は
+  消えない。cloud-itonami-app ADR-0057 が UnixFS directory を実装しなかった理由
+  （Drive が既に木・ACL・バージョンを持っているので二重回答になる）は、bot の
+  work tree でも同じ形で効く。
+
+人が IPFS gateway で覗きたいときだけ UnixFS directory を生成して export する。
+
+### D5. 機密なら address する前に seal する。そして代償を名指しする
+
+kotobase archive の CID は**無認証で読める**（GET https://kotobase.net/ipfs/{cid}、
+ADR-0057 決定 8）。bot の work tree にソース・鍵・顧客データがあるなら、平文の
+まま content address してはならない。cloud-itonami-app ADR-0013 の形を使う ——
+Kagi seal → ciphertext の CID を公開、semantic CID は private。
+
+**代償**: seal すると random nonce のため同じ平文が同じ ciphertext にならず、
+**bot 間の dedup が消える**。convergent encryption で戻せるが、それは『同じ
+ファイルを持っているか』を答える equality oracle を公開することである。
+どちらかを選ぶしかない。**黙って選ばない** —— 選んだ側を repo の README に書く。
+
+### D6. mount は『見るため』。work tree を mount しない
+
+NFSv3 の面は既に測って選ばれている（cloud-itonami-app ADR-0058 / superproject
+ADR-2608171200: macOS で kext 不要・第三者インストール不要・署名不要・root 不要の
+唯一の surface）。ただしその面の性質も測られている:
+
+- partial write が read-modify-write で毎回ファイル全体のコストになる
+- :max-file-bytes は既定 64 MiB で、超えたら遅くなるのではなく拒否する
+
+したがって **build tree / work tree を NFS に置かない**。人が Finder で見る面と、
+bot が git で回す面を分ける。NFSv3 は認可を一切持たない（AUTH_SYS の uid は
+クライアントが選ぶ）ので、認可は kekkai（netmap、deny-by-default、port 粒度、
+非 loopback bind は policy 無しなら throw）。
+
+### D7. 仮想環境の identity は OCI image digest。ここに UnixFS を入れない
+
+共有するのは running container ではなく **image の digest** である。
+cloud-itonami-app ADR-0051 / virtual_shell.clj が既にこの形で動いている:
+1 Bot = 1 container、admitted な Git root だけを /workspace に mount、network
+なし・host credential なし・Docker socket なし・Linux capability なし。
+
+OCI layer は既に sha256 で content-addressed である（org-oci-distribution が
+workspace に在る）。UnixFS に置き換えて得られるのは『IPFS gateway から引ける』
+だけで、翻訳コストを払う。**環境の identity は image digest + policy** とし、
+ここは block 面と分ける。
+
+### D8. 共有するのは bytes であって authority ではない
+
+cloud-itonami-app ADR-0062 が既に決めている境界を、共有 disk で崩さない ——
+note は渡るが grant・approval・memory・effect は渡らない。bot ごとに別 overlay・
+別 ref を持たせ、合流は必ず CAS にすることで、『あちらの bot がこちらの承認カードに
+答えられる』形が構造的に作れないようにする。
+
+## なぜ『UnixFS を disk にする』が効かないか
+
+UnixFS は **immutable な木の写真**であり、可変 namespace を持たない。2 体の bot が
+書いた瞬間に『今の木はどれか』を答える別の可変な 1 点が必ず要る。UnixFS を厚く
+使ってもその 1 点は消えず、D4 のとおり書き込みコストだけが増える。
+
+UnixFS が正しく効くのは **block 面ちょうど 1 層**である。そこでは:
+
+- 任意の IPFS 実装が読める（kubo 0.41 の実ブロックに対して検査済み。
+  ipfs add -Q --cid-version=1 --raw-leaves の出力と一致する）
+- 同じファイルを持つ 2 体の bot が 1 つの object を共有する（平文の場合。D5 参照）
+- codec は既に workspace にあり、自分の出力ではなく実 kubo ブロックに対して
+  検査されている（tech-ipfs-specs-unixfs + io-ipld の ipld.dag-pb）
+
+## 現在地（実測 2026-08-19）
+
+**この 3 つは 3 つの別の面であり、1 本になっていない。**
+
+| 面 | 実装 | content address | 複数端末 | 複数 bot |
+|---|---|---|---|---|
+| Drive（disk） | cloud-itonami-app ADR-0057 / 0058 | **UnixFS CIDv1**。ただし opt-in（CLOUD_ITONAMI_DRIVE_OBJECT_STORE=kotobase、既定は Storj か data-dir 直下の fs）。UnixFS directory は未実装、削除も未実装 | hosted Drive への folder_sync（ADR-0027）。NFS mount は既定 loopback | **MCP に drive tool は露出していない**（mcp.clj） |
+| repository（git 面） | cloud-itonami-app ADR-0013 / 0015 | **sha256:<hex>**（repository_storage.clj の content-cid）。multibase でも multicodec でもない ——**CID ではない** | signed head + key envelope を別デバイスが Kagi root VMK で解いて hydrate | MCP の tenant repository read/write/publish、semantic CID の CAS |
+| bot の shell | virtual_shell.clj / ADR-0051 | 無し（普通の filesystem 上の普通の git） | **1 台の中だけ**。cross-machine は ADR-0062 が decided だが host 側未着地（no remote transport, no delivery） | host-wide semaphore + per-workspace lock で直列化 |
+
+ADR-0057 決定 8 は repository 状態を UnixFS archive に**入れない**と明示している
+（公開 CID になるため）。つまり『git 管理される中身が UnixFS で addressed される』
+形になっていないのは、抜けではなく決定である。本 ADR はその決定を覆さない ——
+覆さずに済むように D5（address する前に seal する）を置いている。
+
+## 実装されたのは計器だけ
+
+**この ADR の設計は 1 行も実装されていない。** pack 層も、ref plane の配線も、
+UnixFS を base に据えた work tree も無い。landed したのは**それを測る計器**
+（`io-ipld-car` の `round_trips.cljs`）であって、設計ではない。
+上の表の『現在地』が現在地であって、本 ADR の表ではない。
+
+## 測った（2026-08-19）—— D3 は支持された。ただし『1 commit = 1 pack』は誤り
+
+instrument は `kotoba-lang/io-ipld-car` の `script/round_trips.cljs`（landed
+`d4f4ea9`）。network を叩かない —— block-per-object store の request 数は
+block 集合の関数なので、block を数えれば**推定ではなく厳密**になる。latency は
+測っていない（この ADR の指標は round trip 数であり、道具はその数だけを報告する）。
+
+| tree | files | bytes | blocks | block-per-object | packed |
+|---|---:|---:|---:|---:|---:|
+| `cloud-itonami/cloud-itonami-app` | 497 | 7.6 MiB | 510 | **510 PUT** | **2 PUT** |
+| `kotoba-lang/kekkai-node` | 75 | 353 KiB | 75 | **75 PUT** | **1 PUT** |
+
+255 倍と 75 倍。network 越しの agent work tree にとって、これは設計を分ける大きさ。
+
+**ただし D3 の書き方が 1 箇所間違っていた。** 『1 commit = 1 pack』は object 面の
+天井を無視している —— pack も object であり、
+`kotobase.archive-put/max-object-bytes` は **4 MiB**。7.7 MiB の pack は archive が
+拒否する。正しくは **1 commit = 天井で切った N pack**（write-locality は保つ）。
+測定スクリプトの最初の版はまさにこの誤りを犯して『1 request』と報告した ——
+**設計文の誤りが、それを測る道具に複製されていた。**
+
+読み過ぎてはいけない結果が 2 つ、同じ測定から出た:
+
+- **1 つの tree の中の dedup はゼロ**（510 block / 510 distinct CID）。content
+  address が効くのは **commit をまたぐ時と、同じ base を持つ agent 同士**であって、
+  1 枚のスナップショットの中ではない。**1 tree の測定はそれを見ることができない。**
+- **497 中 492 が 1 block**（256 KiB chunk 未満）。per-file の読みは packed でも
+  unpacked でも 1 GET で、packing が read 側で買うのは **tree 全体の取得** ——
+  base を materialize する agent が実際に行う操作の方である。
+
+exit code は 3 つに割った: `0` 答えた / `2` 測るものが無い / `3` 答えられない
+（grouping の見積りが天井を超える pack を作った）。読めなかったファイルは数えて
+印字する —— `inga` は `node_modules` が commit 済みでローカルに無いため
+**231 unreadable** と出る。黙って 1/3 の tree を測って答えるより良い。
+
+**次**: dedup は commit をまたいで測る（同じ tree の 2 世代）。1 tree では原理的に
+出ない数字を、出ないまま放置しない。
+
+## 作らないもの
+
+- 分散 FUSE / POSIX ファイルシステム
+- 分散ロックマネージャ
+- 可変 namespace としての UnixFS directory
+- ref plane としての D1 / Durable Object（ADR-2608039000）
+
+3 つとも『共有 mutable disk』という前提から出てくる。前提を D1（本 ADR の D1）で
+落としてあるので、どれも要らない。
+
+## 関連
+
+- ADR-2608160100 — block / pack / object の 3 段と :packed-blocks の宣言規則
+- ADR-2608148200 — identity の CID と location の CID は別の文字列
+- ADR-2608038000 — inga（ref plane、quorum 証明書が条件付き書き込み）
+- ADR-2608670000 — inga の witness は Durable Object ではなく process
+- ADR-2608039000 — 分散を名乗る経路で D1 を premise にしない
+- ADR-260726-kotobase-query-plane-is-one-ref — join 到達範囲はちょうど ref 1 本
+- ADR-2608171200 — 共有 surface の実測（NFS が macOS で唯一）
+- cloud-itonami-app ADR-0013 / 0015 / 0027 / 0051 / 0057 / 0058 / 0062")))

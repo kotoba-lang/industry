@@ -1,0 +1,127 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2608301300-wave-3-codecs-and-the-dual-runtime-mandate")
+ (:adr/title "wave 3 の codec 11 本と、両 runtime 実行の必須化")
+ (:adr/status "accepted")
+ (:adr/date "2026-08-30")
+ (:adr/related "adr-2608301200-transport-capabilities-and-wave-2-protocol-codecs")
+ (:adr/body "## 何をしたか
+
+ADR-2608300200 / 2608301200 に続く第 3 波。臨床・航空・防衛バス・IoT メッシュの
+codec 12 本。
+
+  臨床      org-dicomstandard-dicom (NEMA PS3) / org-loinc / org-openehr (ADL 1.4)
+            int-who-icd10
+  金融・EV  org-fixtrading-fix / org-iso-15118 (V2GTP)
+  航空防衛  com-aviation-ia-arinc-429 / com-aviation-ia-arinc-664 (AFDX)
+            gov-defense-mil-std-1553
+  IoT       org-csa-iot-zigbee / org-threadgroup-thread / org-csa-iot-matter
+
+clone から実測: 7,852 src 行 / 475 bit 演算 / 333 test / 483,902 assertion /
+0 failure。**全 12 本を JVM と ClojureScript の両方で orchestrator が走らせ、
+両者の test 数・assertion 数が一致することを確認した。**
+
+## 決定 —— dual-runtime を必須にした
+
+wave 1 と 2 で、JVM は緑なのに cljs で黙って誤る .cljc の byte コードが 8 件出た。
+この波では**両 runtime での実行を conformance floor の必須項目にし、各 agent には
+「あなたの場合どこが危ないか」を名指しで書いた**（ARINC 429 の bit 32、Matter の
+64 bit Node ID、FIX の文字上の checksum、ADL の文字単位 parse）。
+
+結果、**同じ波でさらに 2 件見つかった（累計 10 件）**:
+
+- **org-dicomstandard-dicom** —— `(int c)` が cljs で 0 を返し、**全ての VR コードと
+  ASCII テキスト byte を黙ってゼロ化していた**。副産物として、Java の
+  `String.trim()` は NUL を剥がすが JS の `.trim()` は剥がさない、も発見
+- **org-csa-iot-matter** —— 符号付き int64 の復号が 2^64 付近の符号なし値を作って
+  引く実装で、**負の値が全部 0 になっていた**（境界値だけの話ではない）
+
+2 件とも JVM では緑だった。wave 1・2 の規則のままなら壊れたまま出荷していた。
+
+## 検出器（ADR とは別 commit で着地済み）
+
+`scripts/verify-cljc-runtime-parity.cljs`。バグを pattern match しない
+（`(int x)` が数値なら正しいので誤検出だらけになる）。測るのは**構造的な前提**:
+.cljc の repo は両 runtime で動くと**名乗っている** —— cljs で実際に走ったことが
+あるか。
+
+実測: scanned 4,258 / 4,290、`.cljc` claiming 3,517、cljs 検証経路なし 2,180、
+**うち byte 操作をしているもの 318 = error 集合**、残り 1,862 は :info。
+
+⚠ **error を 318 に絞ったのは私の判断である。** subagent は 2,180 を平坦に出した。
+**2,180 件立つ検出器は無視され、無視される検出器は劇場である**（このワークスペース
+自身の言葉）。318 は実際に 10 件のバグが出た母集団。
+
+⚠ **判別確認を一度間違えた。** `--findings` の text 出力は error 400 行で打ち切られ
+辞書順なので `orgs/kotoba-lang/*` に到達しない。そこに無いことを「clean」と読んで
+統制群 8 本のうち 4 本を誤って FLAGGED と報告しかけた。`--json` で全 2,180 件を
+見て測り直した。**「測れなかった」を「測って問題なかった」と読む形そのもの**を、
+その形を検出するための検出器の検証で踏んだ。
+
+## round-trip test は正しさを証明しない（FIX の発見）
+
+org-fixtrading-fix の判別証明が示した: checksum の `mod 256` を `mod 255` に壊すと、
+独立計算した vector test は即座に落ちたが、**round-trip test は通り続けた** ——
+encode と decode が同じ壊れた算術を共有しているから。
+
+**round-trip が証明するのは自己整合性であって正しさではない。** 独立に計算した
+期待値を pin する理由がこれ。README に記録した。
+
+## 判別が「何も捕まえなかった」ことを報告した例
+
+org-csa-iot-zigbee の agent は reserved-frame-type の検査を無効化したが
+**どの test も落ちなかった** —— 本物のカバレッジ欠落。持っていない証明を報告せず、
+足りない test を書き足し、それが固有に発火することを確認してから報告した。
+これが期待する振る舞いである。
+
+## 引いた線 —— licence と安全
+
+**licence**: LOINC の code database は Regenstrief、ICD-10 は WHO の著作物。
+**表を vendor しない**と明示的に制約し、公開されている構造（LOINC の Mod-10
+check digit、ICD-10 の code 文法と章範囲、release file の parser）だけを実装させた。
+検証: org-loinc に `.csv`/`.tsv` は 0 件、code 形の文字列は 9 個で全て fixture
+（実在の公開例 `2951-2` / `718-7` と合成境界値）。README 冒頭が
+「Ships no LOINC content」。
+
+**安全**: 航空・防衛バスと臨床の README に、airworthiness / certification / 医療保証を
+主張しないことを書かせた。gov-defense-mil-std-1553 のものが最も良い ——
+「not a validated component of a weapons or aircraft data bus」。
+
+⚠ 私はこの disclaimer を一度「無い」と報告しかけた。grep が 1 行に収まる前提で、
+実際は行折り返しの向こう側にあった。**grep の否定的結果を不在の証明に使わない**。
+
+## 再利用
+
+IEEE 802.15.4 MAC を org-csa-iot-zigbee に 1 度だけ書き、org-threadgroup-thread が
+HTTPS + 到達可能な :git/sha で依存する（pin `855d2b0` が zigbee main の祖先である
+ことを確認）。org-csa-iot-matter は transport 非依存なので**依存しないのが正しい**。
+
+## 出所と provenance
+
+ARINC / CiA / ETG / PI / CSA / Thread Group の文書はいずれも有料または会員限定。
+各 README に構造知識の出所（Wireshark dissector、SOEM、p-net、OpenThread、
+connectedhomeip、公開 app note）と**最も確信の低い値**を名指しで書かせた。
+自由に引用できたのは RFC（4944 / 6282 / 1071 / 791 / 768）と DICOM PS3、
+MIL-STD-1553B の公開資料だけ。
+
+`manifest/origin-domains.edn` に arinc / 1553 / aviation-ia / mil-std / afdx の
+記載は無かった（397 行を grep して 0 件）ので、私が決めた名前を使い、各 README の
+Naming 節にその事実を記録した。**記録が無い = UNVERIFIED であって CONFORMANT では
+ない**という既存規則に従い、名前からドメインを逆算していない。
+
+## 最良の vector provenance（openEHR）と、その逆（ICD-10）
+
+org-openehr は **openEHR.org が公開している実 ADL 1.4 archetype 2 本**を取得して
+逐語で埋め込み、URL を README と fixtures に明記した上で parse→serialize→re-parse
+が完全一致することを確認している。wave 3 で最も強い出所。
+
+int-who-icd10 は逆の判断をした —— **WHO の実文言を使えた ClaML fixture で、
+意図的に架空の placeholder ラベルを使った。** 境界に近づかないため。
+どちらも正しい判断で、方向が違うだけである。
+
+## 残した負債
+
+- **検出器が立てた 318 件を 1 件も直していない**。数字が立っただけの状態で放置すると、
+  このワークスペースが繰り返し警戒してきた「立っているだけの検出器」になる
+- capability の classpath shadowing と `:reference` 天井（ADR-2608301200 のまま）
+- amu 全体 suite の 15 failures / 9 errors（オーナー計測）
+")))

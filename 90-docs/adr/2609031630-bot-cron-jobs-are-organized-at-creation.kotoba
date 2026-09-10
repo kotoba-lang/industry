@@ -1,0 +1,91 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609031630-bot-cron-jobs-are-organized-at-creation")
+  (:adr/title "Bot を立てるとき cron job も同じ工程で organize する — 後付けの個別設定を禁止する")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-03")
+  (:adr/body
+  "## What was missing
+
+Bot (Hermes profile / itonami Bot / grok-bots resident) は、作られるときに
+「周期業務がどの周期で回るか」が同時に決まらない。cron job は後から
+ad-hoc に足され、実測 (2026-09-03) の状態がその証拠:
+
+- `manager` profile に **weekly と名の付く job が 4 本、実 schedule は
+  `0/15/45 * * * *` (毎時)** — seiri-weekly-audit / codec-conformance-weekly /
+  webest-weekly-web-audit / web3-marketer-weekly-draft。うち web3-marketer は
+  prompt 内の規律 (`[SILENT]`) で毎時発火を封じている = schedule と意味が
+  不一致で、コストは毎時支払い続けている。
+- `seiri-weekly-audit` は `manager` に置かれ、**専用 profile `seiri` は
+  cron を 1 本も持たない** — bot の役割と job の所有が一致していない。
+- minute 0 に **9 本**が集中 (9 profile 計 25 job のうち)。ticker が
+  毎時 0 分に 9 job 同時起動する。
+- `codinator` に paused 1 本 + completed 2 本の残骸。
+- agentmail inbox 3 本は profile 化済みだが、**チェック周期がどこにも
+  存在しない** (mail-check の経路が未配線)。
+
+## Decision — bot 作成工程に cron organize を同梱する
+
+**新しい bot / profile / resident を作る工程は、cron job の設計までを
+同じ 1 工程として完了する。cron が要らない場合も「要らない」を明示して
+記録する (缺席の默認を禁止)。** 以降の規則は既存 bot にも遡って適用する。
+
+1. **所有者一致**: job は、その業務を担う bot 自身の profile に置く。
+   代理実行 (manager が代わりに回す) は、対象 bot が cron を持てない
+   場合に限り、job 名または prompt に理由を 1 行書く。
+2. **名前と周期の一致**: job 名の周期語 (hourly / daily / weekly) と
+   schedule expression が一致しなければならない。weekly なら
+   `N N * * N` 形、hourly なら `M * * * *` 形。
+3. **発火周期は「目的の再評価周期」で決める**: 監視は異常が腐るより
+   早く、測定は値が変わる周期で、監査は週次以上。毎時発火を
+   prompt の `[SILENT]` 規律で封じる設計は禁止 — 必要なのは
+   schedule を引くことなので。
+4. **分刻みの分散**: 同一 tick に複数 job が起動しないよう、
+   cron の分フィールドを job ごとにずらす (実測: minute 0 に 9 本集中)。
+   新規 job は既存の分フィールド一覧を見て空いている分を選ぶ。
+5. **ライフサイクル**: once job は完了後 state に残さない (completed を
+   残さない)。paused は再開予定が具体的なときだけ許す。棚卸しは
+   `cronjob list` で週次に見る。
+6. **prompt 規律の標準装備**: 全 job の prompt に
+   (a) 捏造禁止 — 実測できない値は unknown と書く、
+   (b) SILENT 規約 — 変化が無ければ正確に `[SILENT]`、
+   (c) 成果物の置き場所 (ファイルパス or 返信本文) を書く。
+   この 3 点は既存 job から抽出した実績規律 (yui-weekly /
+   web3-marketer-weekly-draft / four-domain-qa-judge) である。
+7. **証跡**: 作成時に schedule expression と最初の 1 発火の結果を
+   記録する (next_run_at の確認で足りる)。
+
+## 既存 bot への適用 (2026-09-03 実施分)
+
+- agentmail 3 inbox (kotobase-net / murakumo-cloud / murakumo-gpu-bench):
+  `itonami` profile に `agentmail-mail-check` を 1h 周期で作る
+  (規則 2/3 により hourly)。scoped key は Keychain
+  `agentmail-inbox-key-<localpart>`、読み取りは
+  https://api.agentmail.to/v0/inboxes/{id}/messages。
+- manager の weekly 4 本: schedule を実週次へ引き、seiri 分は
+  `seiri` profile へ移す。
+- minute 0 集中: 分フィールドを再配分する。
+- codinator の completed 2 本: 削除。
+
+## Boundaries
+
+- この規則は Hermes cron の運用規律であり、grok-bots DO resident の
+  1h loop (interval_ms 3_600_000) の内部設計は対象外。ただし
+  「bot 作成時に周期業務の設計を同梱する」という原則は共通。
+- script 主体の job (hyakka / tabi の evidence script 群) は既に
+  規則 2/4 を満たしている — この規則はそれを形式化するもので、
+  既に適合している job の書き直しを要求しない。
+
+## 改訂履歴
+
+- 2026-09-03 (4a75551396f): **定義の正本が repo に着地した。**
+  `~/.hermes/profiles/<p>/cron/jobs.json` は端末固有の稼働状態で他端末に
+  同期されないため、cron job の「定義」の正本を
+  `scripts/hermes-cron-jobs/hermes-cron-jobs.json`
+  (7 profile / 29 job、生成器 `export_cron.py`、`--check` で live と
+  一致検査) に置いた。cron を作る/変える/消したら export を回して
+  repo に着地させる。credential 値は形状検出して値そのものは焼かない
+  (実測の誤検知 `'task_comments'` → `sk_` 部分一致を長さしきい値で排除)。
+  新端末 re-register 手順は `scripts/hermes-cron-jobs/README.md`。
+  稼働状態 (paused/last_run) だけは各端末ローカルのまま、という境界は
+  台帳 schema に明記済み。") )
+ )

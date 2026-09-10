@@ -1,0 +1,251 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800005300-cache-read-ttl-contract-comparison")
+  (:adr/title "agent loop の LLM 契約は cache read 会計と TTL で選ぶ — Kimi/Qwen/Z.ai/OpenRouter 実測比較と現行 Claude Max 構成の追認")
+  (:adr/date "2026-08-29")
+  (:adr/status "accepted")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/body "## Context — この workspace のトークン消費は cache read が 98.5%
+
+2026-08-29 に実測した（このワークステーションの ~/.claude/projects セッションログ 795 ファイル、直近 30 日、239,159 assistant メッセージの usage を全数集計）:
+
+| 種別 | 30日 | 構成比 |
+|---|---|---|
+| cache read | 841 億 tok | 98.5% |
+| cache write | 10.9 億 tok | 1.3% |
+| output | 1.9 億 tok | 0.2% |
+| 非キャッシュ input | 173 万 tok | ~0% |
+| 合計 | 854 億 tok/月 | |
+
+git 履歴側の裏付け: superproject 30 日 19,945 commits + 子リポ 4,287 checkout の無作為 500 サンプル実測から外挿で月 ~46,000 commits（LLM 起因 commit 1 件 ≈ 200 万 tok）。この 854 億は本機の Claude Code 分のみで、cloud routine / murakumo fleet 推論 / Codex / Cursor を含まない下界。現行契約は Claude Max ×3 + Cursor ×1 + GPT Pro ×1（月 $700〜1,400 程度）で、Fable 5 API 生値換算 $107k/月 相当を吸収している。
+
+このミックスでは、モデルの定価 (input/output) はほぼ無意味で、**(1) cache read 単価・割引率、(2) TTL（キャッシュ寿命）、(3) 定額プランの枠消費が cache read をどう数えるか**の 3 点が実効コストを決める。
+
+## 調査結果（2026-08-29 実測。価格・仕様は動くので、引用時は再測定すること）
+
+### (1) API の cache read 単価（OpenRouter models API 実測）
+
+| モデル | input $/M | output $/M | cache read $/M | read/input | cache write |
+|---|---|---|---|---|---|
+| Claude Fable 5 | 10.00 | 50.00 | 1.000 | 10% | 1.25x（5m）/ 2x（1h） |
+| Claude Opus 5 | 5.00 | 25.00 | 0.500 | 10% | 同上 |
+| Claude Sonnet 5 | 2.00 | 10.00 | 0.200 | 10% | 同上 |
+| GPT-5.1 | 1.25 | 10.00 | 0.125 | 10% | 無料（自動） |
+| GPT-5.2 | 1.75 | 14.00 | 0.175 | 10% | 無料（自動） |
+| GPT-5.2-pro | 21.00 | 168.00 | **割引なし** | 100% | — |
+| Kimi K3 | 3.00 | 15.00 | 0.300 | 10% | 無料（自動、min 256 tok） |
+| Kimi K2.7-code | 0.95 | 4.00 | 0.190 | 20% | 無料（自動） |
+| Qwen3.8-Max | 2.00 | 6.00 | 0.250 | 12.5% | 1.25x（明示 cache_control） |
+| GLM-5.3 | 1.40 | 4.40 | 0.260 | 19% | 無料（自動） |
+| GLM-5.3-flash | 0.075 | 0.25 | 0.015 | 20% | 無料（自動） |
+| DeepSeek v3.1（OpenRouter 経由） | 0.55 | 1.65 | **割引なし** | 100% | — |
+
+実測ミックス（cr 98.5% / cw 1.3% / out 0.2%）での blended 単価と月 854 億 tok の換算: GLM-5.3-flash $0.016/M（$1.4k/月）< GPT-5.1 $0.16/M（$13.8k）< Kimi K2.7-code $0.21/M（$17.8k）< Sonnet 5 $0.25/M（$21.5k）< GLM-5.3 $0.28/M（$24.2k）< Qwen3.8-Max $0.29/M（$24.9k）< Kimi K3 $0.37/M（$31.4k）< Opus 5 $0.63/M（$53.6k）< Fable 5 $1.26/M（$107.3k）。定価 input が安い GLM-5.3 より GPT-5.1 が blended で安い — cache read 割引率（10% vs 19%）が定価差を逆転させる。
+
+### (2) TTL — cache read 単価が「適用されるか」を決める
+
+| 提供元 | TTL | 制御 |
+|---|---|---|
+| Anthropic | 5 分（既定）/ **1 時間**（明示） | cache_control で明示。1h は write 2x |
+| OpenAI | 自動、**最短 30 分** | 制御なし（負荷次第で退避） |
+| Gemini | 5 分固定（更新されない） | 明示 |
+| Kimi/Moonshot・Z.ai/GLM・DeepSeek・Groq・Grok | **3〜5 分**、platform 管理 | 自動・制御なし |
+
+TTL が切れた read は write/input 価格に化ける。ScheduleWakeup 20〜30 分間隔の slow loop や再開セッションでは、3〜5 分 TTL 勢の cache read 単価は**実際にはほぼ適用されない**（Kimi K2.7 で全ミスなら $0.95/M → $81k/月 相当まで悪化）。1 ターン数秒〜数分の interactive coding では 3〜5 分でも保つ。**slow loop に耐える TTL を持つのは Anthropic（1h 明示）だけ**で、OpenAI 30 分が次点。
+
+### (3) 定額プランの枠消費会計 — ここが最大の差別化点
+
+| 契約 | 月額 | cache read の枠消費 | 出所の確度 |
+|---|---|---|---|
+| Claude Max | $100〜200/acct | コスト加重（read = input の 10% 相当） | 実測（本 workspace が現に月 854 億 tok を Max ×3 で吸収） |
+| Kimi 会員（Andante 49 / Moderato 99 / Allegretto 199 / Allegro 699 元） | ~$7〜98 | **cached tokens は枠に数えない**（uncached input + output のみ計上） | 非公式ガイド記載。契約前に公式で要検証 |
+| GLM Coding Plan（Lite $18 / Pro $72 / Max $160、5h + 週次 credit 窓） | $18〜160 | credit 式 (input×6.9 + cached×1.7 + output×24)/10k → cached は input の **~25% 加重**。オフピーク（SGT 平日 14-18 時以外）50% 引き | 複数ガイド一致 |
+| Qwen Coding Plan（Pro $50。Lite は 2026-03 新規停止） | $50 | 会計非公開。コミュニティ実測でキャッシュヒット率が低く枠消費が速いとの報告複数 | 弱い |
+| OpenRouter | 定額なし（従量 + credit 手数料 ~5.5%） | 上流の cache 価格を素通し。**provider によっては cache 割引が消える**（DeepSeek 経由で実測、割引なし表示） | OpenRouter docs + models API 実測 |
+
+試算: 実測ミックスを GLM Coding Plan credit 式に入れると月 ~1,550 万 credits 必要 = Max プラン（週 14 万）の **~26 契約分** — GLM 定額はこの量を吸収できない。Kimi は cached 不算入が真なら枠消費は uncached in + out の月 ~13 億 tok だけで、会計上は最も agent-loop 向き — ただし TTL 3〜5 分なので slow loop では cached にならず結局計上される点に注意（会計の強さと TTL の弱さが打ち消し合う）。
+
+## Decision
+
+1. **主契約は Claude Max（複数アカウント）を維持する。** 決め手は単価でも会計でもなく **1h TTL**。この workspace の loop は 20〜30 分 tick が主体で、これに耐えるキャッシュを持つ契約が他にない。実測でも Max ×3 が月 854 億 tok を現に吸収している。
+2. **バルク・低品質許容の処理（分類・要約・大量バッチ）の従量オフロード先は GLM-5.3-flash（OpenRouter 経由）を第一候補にする。** blended $0.016/M は 2 位に 10 倍差。ただし TTL 3〜5 分なので、オフロードするのは「1 回で読み切る」バッチ形の仕事に限る（loop を移さない）。
+3. **品質が要る従量オフロードは blended で選ぶ**（GPT-5.1 > Kimi K2.7-code > Sonnet 5 の順、定価 input で選ばない）。cache 割引が消える経路（OpenRouter の一部 provider、GPT-5.2-pro）は避ける。
+4. **Kimi 会員は「interactive 専用の増枠」としてなら検討に値する**（cached 不算入が公式に確認できた場合のみ）。slow loop には移さない。
+5. **Qwen Coding Plan は採らない**（会計非公開 + キャッシュヒット率への否定的報告 + Lite 新規停止）。
+6. **契約・単価の数値は本 ADR の日付の測定値であり、定数として他文書へ転記しない**（CLAUDE.md の「実測値を規則に書かない」則に従う。引用する側は再測定する）。
+
+## Consequences
+
+- 月次の実効レート監視は「blended $/M at 実測ミックス」で行う。定価表での比較は禁止（GPT-5.1 と GLM-5.3 の逆転が示すとおり誤る）。
+- loop の tick 間隔を新設・変更するときは、行き先モデルの TTL と突き合わせる。TTL より長い tick の loop を 3〜5 分 TTL の契約に置くと、cache read 前提のコスト見積りが崩れる。
+- 本測定は本機のみ。cloud routine / fleet 推論 / Codex / Cursor 分の計測は未実施（未測定であって少ないではない）。
+
+## 改訂履歴
+
+- 2026-08-29(同日 2 回目): OpenRouter の routing とキャッシュ局所性、murakumo.cloud の cache read 設計を追加調査した(下記 2 節)。
+- 2026-08-29(同日 4 回目): 計器の 2 つの穴(streaming 未計測 / origin label が常に誤り)を塞いだ。下記『計器の穴を塞いだ』節。
+- 2026-08-29(closing): origin は end-to-end で確認、**streaming は未確認のまま**であることを記録し、下記『現在地』を予測から実測に直した。resume point を追加。
+- 2026-08-29(同日 3 回目): murakumo に cache 計器を実装して deploy し、live で測った。下記『murakumo の cache read 設計の現在地』の判定が **測定によって置き換わった** —— 『未設計に近い』は routing/会計については正しかったが、node 層については誤りで、cache は動いている。ただし byte-identical な要求にしか効かない。
+
+## OpenRouter 等 aggregator の追加知見 — routing がキャッシュを割る
+
+prompt cache は **provider ローカル**(Anthropic は account 単位ですらある)で、provider を跨いで持ち越されない。OpenRouter の既定 routing は同一モデルでもリクエストごとに provider を切り替えうるが、**cache-aware / sticky routing は docs に存在しない**(2026-08-29 確認)。つまり既定のまま使うと cache read 前提の見積りは崩れる。対策は provider の pin: `provider: {order: [...], allow_fallbacks: false}` か `only`。これは可用性(fallback)とキャッシュ局所性のトレードオフであり、cache read 98.5% のワークロードでは pin が正しい側。加えて provider によっては cache 割引自体が消える(DeepSeek 経由で実測、read = input の 100%)。**aggregator を挟む場合は「割引率」「TTL」に加えて「routing がキャッシュを割らないか」が第 3 の検査項目になる。**
+
+## murakumo.cloud の cache read 設計の現在地(2026-08-29 実測)— 未設計に近い
+
+自前 fleet なので cache read は課金でなく**プリフィル時間の問題**として現れる(18k tok の再評価 ≈ 83 秒 vs cache hit 7〜13 秒、gad 実測)。3 層で見た:
+
+1. **ノード層(llama-server)**: 起動フラグに cache 関連なし(`deploy/llama-server.service` 実測)。llama.cpp 既定の slot 単位 exact-prefix 再利用だけが効いている。`--parallel 1〜2` なので、異なる会話が interleave すると互いの prefix cache を蹴り出す。`--cache-reuse`(チャンク再利用)や slot save/restore は未使用。
+2. **routing 層**: **二つの実装が逆を向いている。** `local-murakumo/readiness.cljc` は 2026-08-29 に leader 固定(B70 先頭)へ直し、その理由として「leader 交代が llama.cpp prefix cache を割り、常駐 bot の ~18k tok transcript が毎回ゼロから再評価された」と実測付きで記録している。一方 `cloud-murakumo/gateway.cljc` は **round-robin のまま**(44 行・62 行)で、直したばかりの anti-pattern を gateway 側が再生産している。
+3. **会計層**: usage に cached トークンの区別が無い(cost.cljc / gen_billing.cljc に該当フィールドなし)。cache hit 率は**未測定**(clean ではない)。
+
+**含意**: murakumo に cache read は「設計されている」とは言えない。効いているのは llama.cpp の既定動作 + local-murakumo の leader 固定だけで、gateway の round-robin と会計の欠落が穴。直すなら (a) gateway を会話/bot キー の sticky routing に変える、(b) llama-server の usage(timings.prompt_n の削減分)を cached として計上する、(c) hit 率を測ってから `--cache-reuse` 等を検討する、の順。本 ADR は現在地の記録であり、修正の実施は別途。
+
+## 実装と live 実測(2026-08-29、3 回目の改訂)
+
+計器を書いて deploy し、実際に測った。**「murakumo に cache read は設計されていない」
+という前節の判定は、node 層については誤りだった** —— 測っていなかったので
+分からなかっただけで、cache は動いている。ただし効く範囲が狭い。
+
+### landed(network-awai/local-murakumo `c1b3e1b`、api.murakumo.cloud に deploy 済み)
+
+- `cost/cached-prompt-tokens` — 3 つの出所を優先順に読む:
+  `timings.cache_n` > `usage.prompt_tokens_details.cached_tokens` > `prompt_tokens - prompt_n`。
+  **直接申告を導出より優先**する。fleet の origin は同質ではない(llama.cpp の b70/gad の
+  ほかに OpenAI 互換 origin が居る)ので 2 番目が要る。
+- **取れなければ nil。0 を捏造しない。** cache miss の実測 0 と、フィールド欠落を出力から
+  区別できることがこの計器の要点そのもの —— これが無ければ「測れなかった」が
+  「cache が効いていない」と同じ顔になる(ADR-2608136000 の 6 問の 1 問目)。
+- `cost/cache-summary` — 測れた run だけを分母にした hit 率。`:runs-measured` と
+  `:runs-total` を両方出すので、**小さい標本が fleet 全体の真実を騙れない**。
+  測れた run が 0 件なら nil(未測定であって hit 率 0% ではない)。
+- `/v1/messages` 応答の usage に `cache_read_input_tokens`(測れたときだけ)。
+  ⚠ Anthropic API と違い `input_tokens` は cached を**含んだ**総 prompt(llama.cpp usage の
+  素通し)。既存 consumer の課金計算を変えないための意図的な非互換。
+- 検証: 198 tests / 1039 assertions green、**壊すと落ちることを 2 方向で確認**(導出経路と
+  OpenAI 標準経路をそれぞれ壊して該当テストだけが落ちることを見た)。governed release
+  artifact も規定どおり refresh(`ui.js` は byte-identical に再生成され、変化が
+  `worker.js` だけに閉じていることが確認できた)。
+
+### live 実測 — cache は byte-identical にしか効かない
+
+api.murakumo.cloud → `qwen3.8-27b-throughput-b70`、連続 4 回:
+
+| 要求 | cache_n | prompt_n | prompt_ms |
+|---|---|---|---|
+| seed(新しい prefix) | 0 | 1230 | 1200 |
+| **byte-identical な再送** | **1226** | **4** | **171**(7 倍速) |
+| 同じ 1226-token prefix + 別の 4-token tail | **0** | 1230 | 1204 |
+| 同じ prefix + さらに別の tail | **0** | 1230 | 1193 |
+
+**含意**: 長い安定 prefix + 変化する tail という **agent loop の形そのものが、この origin では
+毎ターン全再評価**になる。この workspace の消費が cache read 98.5% で成立しているのは
+Anthropic 側の cache であって、murakumo 側ではない。
+
+**機構は未特定。** 候補は llama-server の `--cache-reuse`(既定 0。prefix が分岐した後の
+再利用を司る flag なので第一候補)、slot 選択(`--parallel 2` で分岐要求が空 slot に
+落ちている可能性)、chat template。**どれも測っていないので、原因として書かない。**
+次の一手は b70 で `--cache-reuse` を入れて上表を取り直すこと —— この repo からは b70 に
+到達できない(Cloudflare private binding。gad は tailnet に居るが当時 health=000)ため未実施。
+
+### deploy 後の初期値(標本が小さい。fleet の hit 率として引用しない)
+
+`GET /infer/cost` の `:cache` は deploy 直後に
+`{:runs-measured 5 :runs-total 200 :hit-rate 0.966}` を返した。**200 中 5 件しか測れて
+いない**(残りは計器より前に記録された run)ので、この 0.966 は fleet の hit 率ではない。
+ring が入れ替われば代表性が出る。**`:runs-measured` を見ずに `:hit-rate` を引用しない。**
+
+### routing / 会計の判定は変わらない
+
+- 会計の穴は**塞がった**(上記)。
+- routing: live 経路(`local-murakumo/readiness.cljc` の leader 固定)は 2026-08-29 に
+  修正済みで正しい。`cloud-murakumo/gateway.cljc` の round-robin は
+  **`.cljs` worker からの呼び出しが 1 件も無く、live traffic を運んでいない**(実測)。
+  したがって「直したばかりの anti-pattern を gateway が再生産している」という前節の
+  記述は、**live の害としては誇張**だった —— 将来 live 化するときに塞ぐべき seam であって、
+  今日壊れている経路ではない。sticky routing の実装は未着手(pure fn + test で足りる)。
+
+## 計器の穴を塞いだ(2026-08-29、4 回目の改訂)
+
+3 回目で入れた計器には 2 つの穴があり、どちらも **「測れていない」が「問題なし」と
+同じ顔をする**形だった。両方 landed / deploy 済み(f35d020, 008608e)。
+
+### 穴 1 — streaming が一切測れていなかった
+
+cost/stream-run は tokens と elapsed しか受け取らず、prompt/cached を持たなかった。
+つまり GET /infer/cost の hit 率は **非 streaming だけの標本**で、しかもそれが標本だと
+出力から分からなかった。llama.cpp は streaming でも最終チャンクに timings を載せる
+(実測: finish_reason チャンク。**delta は空 map であって nil ではない**ので、usage 専用の
+枝には落ちない。usage はさらに別チャンク)。stream state machine が cond のどの枝でも
+timings/usage を控えるようにし、非 streaming と同じ cached-prompt-tokens の優先順で測る。
+
+**まだ塞がっていない**: /v1/chat/completions の streaming は verbatim passthrough で
+**run を 1 件も記録しない**(cache だけでなく cost も未計測)。SSE 本文に触らない設計なので、
+tee するには live streaming 経路を変える必要がある。:by-mode にも現れない ——
+記録が無いものは分母にすら入らない。
+
+### 穴 2 — origin label が常に誤りで、直したつもりの 1 回目も誤りだった
+
+head-node は env の静的値(既定 \"gad\")を返すだけで、実際にどの origin が応答したかを
+見ていなかった。b70 が捌いた run も \"gad\" と記録され、origin ごとの hit 率が出せなかった。
+
+**1 回目の修正(f35d020)は効かなかった。** resolve-endpoint が返すのは *候補* であって、
+実際に応答した origin ではない —— main pool はその先の fetch-inference で failover する
+(既定候補は gad、実際に捌くのは b70 が常態)。候補で label すると修正前と**まったく同じ
+誤答**を返す。しかも by-origin が {\"gad\" 200} という「それらしい」形で出るので、
+**出力を見ても間違いだと分からない**。この ADR が扱っている失敗の型そのものが、
+その修正の中で再発した。
+
+2 回目(008608e)で fetch-inference に任意の on-origin callback を足し(既定 nil =
+従来どおり)、候補が実際に応答した枝で呼ぶ。deploy 後の実測で by-origin が
+b70 runs=2 hit=0.9959 を報告し、初めて修正が確認できた。
+
+**教訓: unit test はこの区別を持てない。** 候補と served の違いは live の failover でしか
+現れないので、テストは緑のまま誤った label を通す。**この種の修正は deploy 後の
+end-to-end 観測でしか検証できない。**
+
+### cache-summary に :by-origin / :by-mode を足した
+
+label を直すだけでは分解は得られず、**分解こそが目的**だった。全体を 1 つの率に畳むと、
+ある origin の 0% が別の origin の 100% に薄められて見えなくなる。:by-mode は
+「その率が sync だけの標本ではないか」を出力から判定可能にする。
+
+⚠ **ring が入れ替わるまで by-origin の gad バケットは信用しない。** 200 run の ring には
+修正前の run(静的 label で記録された、真の origin が不明なもの)が混ざっており、
+実測時点で gad runs=198 の中身は「gad が捌いた run」ではなく「修正前の run」である。
+新旧を出力から区別する手段は無い —— 時間が解決する(ring が 200 run で一巡する)。
+
+### 現在地(2026-08-29 closing 時点の実測。標本であって定数ではない)
+
+| 何を | 状態 |
+|---|---|
+| origin label (穴 2) | **end-to-end 確認済み**。by-origin が gad 125 / b70 75 に分かれ、ring が回るにつれ b70 が 53 から 75 へ増えた(= 誤 label の古い run が置き換わっている) |
+| streaming 計測 (穴 1) | **landed / deploy 済みだが未確認**。deploy から数時間、by-mode は sync 200 のみで **stream バケットが 1 度も立っていない** |
+
+⚠ **streaming を「直した」と読まない。** unit test は緑だが、穴 2 の 1 回目がまさに
+「unit test 緑・deploy 済み・実際には誤り」だった。同じ形をここで繰り返さないために、
+**stream バケットが実際に立つまでは未確認**とする。立たない理由は 2 つ考えられ、
+どちらかは未判別: (a) /v1/messages streaming のトラフィックが単に来ていない
+(b) 拾えていない。**判別しないまま (a) と決めつけない。**
+
+### resume point(次に座る人が最初にやること)
+
+1. GET /infer/cost の cache.by-mode を見る。stream バケットが立っていれば穴 1 は確認済みになる。
+2. 立っていなければ、認証付き(ANTHROPIC_PROXY_TOKEN)で /v1/messages streaming を 1 本通して
+   (a)/(b) を判別する。**無認証の /v1/chat/completions では判別できない** —— そちらは
+   verbatim passthrough で run を 1 件も記録しない別の穴なので、by-mode に何も現れない。
+3. 穴 1 が確認できたら、origin x mode の内訳を読んでから b70 の --cache-reuse を測る
+   (b70 は Cloudflare private binding 越し、gad は 2026-08-29 時点 health=000 で到達不能)。
+**この 0.88 と、上の「byte-identical にしか効かない」実測は矛盾していない** ——
+実トラフィックに同一 prefix の再送(健全性 probe / retry / cron)がどれだけ含まれるか
+次第で、両立する。**どちらか一方を fleet の実力として引用しない。**
+分解が入ったので、次はこの内訳(origin x mode)を読んでから --cache-reuse を測る。
+
+## 出所
+
+- OpenRouter models API（cache read 単価、2026-08-29 実測）/ OpenRouter prompt caching docs（TTL・自動/明示・pass-through）
+- Kimi: kimi.ai resources（K3/K2.7 価格）、kimi-ai.chat guide（cached 不算入の記述）、Moonshot context-caching guide（自動・min 256 tok）
+- Z.ai: docs.z.ai devpack、GLM Coding Plan 各ガイド（credit 式・multiplier・オフピーク）
+- Qwen: Alibaba Model Studio（Qwen3.8-Max GA 価格）、コミュニティ報告（キャッシュヒット率）
+- ローカル実測: ~/.claude/projects 全数集計 + git log / rev-list サンプリング（本 ADR Context 節）")))

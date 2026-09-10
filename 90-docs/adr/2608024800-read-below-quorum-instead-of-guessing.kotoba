@@ -1,0 +1,64 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608024800-read-below-quorum-instead-of-guessing")
+  (:adr/title "adr-2608024800: below-quorum を推測せず読む — 3 署名すべてが落ち、証明書は witness ごとの view を持っていなかった")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-below-quorum-detail")
+  (:adr/authoritative-for
+  (vector "engi.sync の :below-quorum の内訳計器"
+   "deploy 済み chain の残る 1 つの未読事項"))
+  (:adr/related (vector "adr-2608024700-a-certificate-must-remember-each-signatures-view"))
+  (:adr/evidence (vector "https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w3"))
+  (:adr/body
+  "# ADR-2608024800: below-quorum を推測せず読む
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## `:below-quorum` は 4 つの拒否を 1 つに潰していた
+
+証明書は **署名が無い / 署名が欠けている / 署名が悪い / 単に数が足りない** のどれでもありうる。`engi.sync` はすべてを `:below-quorum` にする。
+
+**私はこれを 2 回誤読した** —— 1 度目は「鍵の可用性」（鍵は無事だった）、2 度目は「payload の view」（**本物の欠陥で、直り、そして停止は解消しなかった**）。
+
+**3 度目は推測しなかった。**
+
+## 読み取り
+
+```
+  witnesses   [w1 w2 w4]      3 つ、閾値は満たす
+  sigs        [w1 w2 w4]      すべて存在
+  views       null            <- 証明書は witness ごとの view を持っていない
+  qc-view     2
+  attest      bad-signature
+  per-witness {w1 false, w2 false, w4 false}
+```
+
+**3 署名すべてが落ちる。** 証明書に witness ごとの view が無いので、**すべての payload が `qc-view` 2 から再構成される** —— 一方**票は、それぞれの replica が到達していた view で署名されている。**
+
+## wire は犯人ではない
+
+**view 5, 6, 7 で作った証明書を encode / decode して、同じ 3 つが返ることを直接確かめた**（推測ではなく）。**この証明書は、views を持たずに「作られた」。**
+
+## 残る問い
+
+**どの構築経路が views を落とすか。** 候補は短い:
+
+- `fold-vote` は、各票が view を持つ保存済み投票から `att/certify` する
+- それ以外に証明書が `:qcs` へ入る経路は、すべて wire 由来
+
+## Consequences
+
+- (+) `:below-quorum` の内訳（どの拒否・どの witness）が読めるようになった。
+- (+) wire が除外され、問題が「構築経路」に絞られた。
+- (−) **deploy 済み chain は依然停止。残り 1 問、未読。**
+
+engi 224 tests / 1164 assertions、parity 不変、in-process harness は pass。
+")))

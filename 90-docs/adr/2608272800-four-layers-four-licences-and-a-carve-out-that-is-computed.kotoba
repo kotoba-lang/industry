@@ -1,0 +1,146 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608272800-four-layers-four-licences-and-a-carve-out-that-is-computed")
+  (:adr/title "wiki.kotobase.net のライセンスを宣言した —— 4 層に 4 つの答え、copyleft の例外は手で持たず計算する")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "hyakka, wiki.kotobase.net, licence, cc0, odbl, apache-2.0, provenance, agent-ingest, enospc, closing, resume-point")
+  (:adr/body
+  "## 決定
+
+**wiki.kotobase.net が配るものを 4 層に分け、層ごとに別のライセンスを宣言する。**
+1 つに丸めると必ずどれかが壊れる。
+
+| 層 | ライセンス | 理由 |
+|---|---|---|
+| claim graph（datom） | **CC0-1.0** | 主張のグラフなので Wikidata と同じ扱い |
+| prose article（`:article/body`） | **CC BY-SA 4.0** | 創作的表現なので Wikipedia 側の系譜 |
+| この面を配るコード | **Apache-2.0** | 特許グラントが付く（MIT には無い） |
+| archive した原資料のバイト列 | **この面のライセンスの対象外** | 各出典自身の条件。配信可否は `:source/access` |
+
+オーナー判断（2026-08-27）。宣言前の状態は **ライセンスが 1 つも無い**（LICENSE ファイル
+無し・サイトに記載無し）＝既定 all rights reserved で、百科として出しているものとしては
+これが一番まずかった。
+
+## claim を CC0 にした理由 —— 寛容さではなく実務
+
+事実そのものは著作権の対象になりにくく、縛れるとしたらデータベースの側である。
+そのうえで **claim ごとに CC BY-SA を掛けると attribution stacking が起きる** ——
+query 1 本の結果に数百の帰属表示が乗り、消費する側は遵守できない。Wikidata が CC0 で
+Wikipedia が CC BY-SA なのはこの違いによる。
+
+**CC0 でも帰属は失われない。むしろ細かい。** この面は claim ごとに `:claim/source` を
+持ち、そこから出典 URL・取得時刻・archive の CID・admit された出典クラスに辿れる。
+ライセンス表示より粒度の細かい来歴が、既にデータの中にある。
+
+⚠ **CC0 は撤回できない。** 後から緩めることはいつでもできるが、縛り直すことはできない。
+
+## 例外は手で持たず、計算する（この ADR の中心）
+
+CC0 は**私たちの主張**に対して出せる許諾であって、他者が copyleft で提供した
+データベースに対して出せる許諾ではない。派生データベースまで share-alike が届く
+ライセンス（現在は ODbL-1.0 = OpenStreetMap）の出典から取り出した claim は、
+その出典のライセンスのまま残る。
+
+**判定は `:source/license` から導出し、例外リストを手で維持しない。** 手で維持した
+リストは connector が 1 つ増えた瞬間に古くなり、**古くなったことが出力に現れない** ——
+サイトは、許諾できないデータに対して CC0 を宣言し続ける。したがって
+`hyakka.license-test` は**例外集合が空のビルドを拒否する**（空は「ODbL 出典が抜けた」と
+「導出が壊れた」の区別がつかない。どちらも人間の判断が要り、どちらも黙って通っては
+ならない）。
+
+内容 copyleft（記事に掛かった CC BY-SA 等）は**例外に入れない**。あれが縛るのは表現で、
+claim は表現ではない。データベース copyleft が縛るのは抽出そのもので、この面がやって
+いるのはまさに抽出である。
+
+## 2 つの非対称を、両方向の assert で固定した
+
+- **未記録の出典ライセンスは CC0 を妨げない。copyleft は妨げる。**
+  未記録（585 中 468）は *archive バイト列を再配布してよいか* の gap であって、
+  私たち自身の主張に対する許諾を差し止める理由ではない（引用と再配布は別の行為）。
+  同時に、**未記録はパブリックドメインという意味でもない**。
+- **出典を解決できない claim は CC0 に既定しない。** dangling な `:claim/source` は、
+  既定すると「確かめていない許諾を publish する」唯一の経路なので `:unknown-source`
+  として分離する（実測 0 件）。
+
+## live の実測（deploy 後）
+
+```
+GET /health -> license {
+  claims: CC0-1.0, articles: CC BY-SA 4.0, code: Apache-2.0,
+  claims-under-cc0: 6070, claims-excepted: {ODbL-1.0: 64},
+  claims-with-unknown-source: 0 }
+```
+
+人間向けは `/policy#license` が**同じ計算結果**を出す（人間用と機械用で別々に書かない）。
+agent は 1 リクエストで取り込み可否を判断できる。
+
+## 検証
+
+**110 tests / 1,441 assertions / 0 failures.** 3 つの不変条件は壊して落ちることを
+確認してから landed とした:
+
+| 壊した箇所 | 落ちたテスト |
+|---|---|
+| 出典を解決できない claim を CC0 に既定 | `a-claim-with-no-resolvable-source-is-not-quietly-cc0` |
+| `database-copyleft` を空に | `the-copyleft-carve-out-is-not-empty` ほか 3 件 |
+| 値セルを旧実装に戻す（前段の変更） | `an-action-page-links-its-mechanism-items` |
+
+**この control が、この変更自身の弱点を 1 つ見つけた** —— `/policy` が `ODbL-1.0` を
+散文でベタ書きしていたので、規則を空にしてもページは ODbL と言い続けた。ページを規則から
+生成する形に直し、テストも規則を走査する形にした。**規則についてのページを手書きすると、
+それ自体が乖離しうる第 2 の正本になる。**
+
+## 着地
+
+`a2bd291` → merge **`b8d72e9`** → deploy **`aa1625f6`** → west pin `446606d`（この merge を含む）。
+新規ファイル: `LICENSE`（Apache-2.0 全文）・`LICENSE-DATA.md`（内容側）・
+`src/hyakka/license.cljc`・`test/hyakka/license_test.cljs`。
+**LICENSE を 1 本にしない** —— コード用の許諾が黙って claim にも掛かる。
+
+## 運用の実測 —— ディスクが埋まると agent は自力で復旧できない
+
+deploy の途中で root volume が満杯になり（927G 中 915G 使用）、**Bash ツール自体が
+実行不能になった**。実行前に出力ファイルを作る設計なので、`df` すら `ENOSPC` で弾かれ、
+**掃除するコマンドを 1 つも走らせられない**。
+
+- コードは既に main に landed していたので失われたものは無いが、**deploy は未完のまま
+  だった** —— このとき「ライセンスが live になった」と報告してはならない（配信していたのは
+  1 つ前の version）。
+- agent 側の正しい振る舞いは、**正確な現在地（landed / not deployed）を述べ、
+  実行してほしいコマンドをオーナーに渡すこと**。
+- 主因はこのセッション単独ではない（並行セッションの build が同じ `/private/tmp` と
+  `~/.shadow-cljs` を使う）。**空き容量は 13G のままで、次の重い build でまた詰まる。**
+
+## 未解決（前 ADR から継続）
+
+1. **tenant seed `hyakka-kotobase-seed` の復元（オーナーのみ可能）** —— datom 面への
+   projection は 12 日・262 file 遅れたまま。read も同じ鍵を要求するので現在地は UNVERIFIED。
+   詳細と手順は ADR-2608272200
+2. seed の単一障害点（2 度消えている。`kagi push` か 2 台目への `device grant`）
+3. 原本バイト列のアップロード（receipt 715 件すべて etag nil）
+4. **ディスク** —— 99% 使用。次の build で再発する
+5. **未記録の出典ライセンス 468 件の棚卸し** —— CC0 の宣言は妨げないが、
+   *archive バイト列を配れるか* はこれを埋めるまで答えられない
+
+## resume point
+
+```
+# ライセンスの現在地は 1 リクエストで読める
+curl -s https://wiki.kotobase.net/health | jq .license
+
+# 例外が増えたか（新しい connector が copyleft 出典を持ち込んでいないか）
+#   → test が落ちるので気づけるが、確認だけなら上の claims-excepted を見る
+
+# 未記録 468 件の棚卸しを始めるなら、出典側から
+#   :source/license が無い source を publisher ごとに数え、
+#   publisher 単位でライセンスを引いて config に足す
+```
+
+## 参照
+
+- 実装: `orgs/network-awai/app-hyakka/src/hyakka/license.cljc`（純関数・データ）、
+  検査は `test/hyakka/license_test.cljs`、文書は `LICENSE-DATA.md`
+- 隣接: ADR-2608272200（kaiyaku corpus と seed のブロッカー。R2 Data Catalog を
+  使っていないことの実測もそこ）、ADR-2607311100（hyakka 本体）")))

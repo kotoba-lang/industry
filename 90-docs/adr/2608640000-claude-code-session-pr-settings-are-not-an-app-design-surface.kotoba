@@ -1,0 +1,144 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608640000-claude-code-session-pr-settings-are-not-an-app-design-surface")
+  (:adr/title "ADR-2608640000: Claude Code の PR/セッション設定は cloud-itonami-app の設計面ではない（そして「PR の自動修正」は今この workspace で発火しない）")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "agent-harness-vs-business-governance-boundary")
+  (:adr/date "2026-08-08")
+  (:adr/last_verified "2026-08-08")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for (vector "Claude Code のセッション設定（ブランチプレフィックス / PR 自動作成 / ドラフト作成 / PR 自動修正 / マージ後自動アーカイブ）と cloud-itonami-app の責務境界"
+                          "この workspace で「PR の自動修正」が反応できる信号の実測値"
+                          "agent セッションの branch prefix を 2 系統で共存させる方針"))
+  (:adr/related (vector "2607141700" "2607300900" "2608081500" "2608082300"))
+
+  (:adr/context
+  "問いは 1 つだった —— 「Claude Code の PR 設定（ブランチプレフィックス `claude` / プルリクエストを
+自動的に作成する / ドラフトとして作成 / プルリクエストの自動修正 / PR のマージまたはクローズ後に
+自動アーカイブ）は cloud-itonami app に設計統合されているか」。
+
+答えは **統合されていない** で、その調査から 4 つの事実が出た。
+
+## 1. app には 5 設定のどれにも対応物が無い（実測 2026-08-08、shallow clone 全文走査）
+
+| 設定 | app 側 |
+|---|---|
+| ブランチプレフィックス | 無い（branch / prefix の概念がコードに無い） |
+| PR 自動作成 | 無い（`git push` / create-branch / PR 作成の呼び出しが 0 件） |
+| ドラフトとして作成 | 無い（draft state の表現が無い） |
+| PR の自動修正 | 無い（check-run / workflow-run / CI failure の受け口が 0 件） |
+| マージ/クローズ後の自動アーカイブ | 無い（session lifecycle の表現が無い） |
+
+`pull_request` の出現は repo 全体で **1 箇所だけ**。`src/cloud/itonami/app/github_projects_source.clj`
+の Projects v2 GraphQL クエリ中の `... on PullRequest{...}` で、item の *content 種別*
+（Issue / PullRequest / DraftIssue）として **読む**だけである。書き戻すのは
+`github_projects_writeback.clj` の `write-status!` で、**Status single-select フィールド 1 個のみ**
+（`verify-basis!` の楽観ロック付き）。PR を作る・レビューする・マージするコードは無い。
+
+## 2. 境界は事故ではなく設計である
+
+app の ADR-0014（kanban-work-is-governed-by-organizational-performers）の制御ループは
+
+```
+WorkItem -> yakuwari policy -> Person approval -> bounded AgentRun
+         -> effect/test receipts -> explicit board move
+```
+
+の 6 plane で、**agent の作業が実際に生む branch と PR はこの 6 plane に入っていない**。
+同 ADR は performer 分類で system と person を意図的に分離しており（人工 worker は
+`:dodaf/person` を名乗れない）、harness の機構をここに混ぜると境界が 1 つ消える。
+`agent_control.clj` も session name `cloud-itonami-agent` の in-app agent
+（browser / computer tool + HIL 承認）で git 面を持たない。`repos.clj` / `fleet.clj` は
+superproject の `manifest/repo-taxonomy.edn` + `manifest/repo-maturity.edn` を join する
+**read-only の repo 単位**ビューで、PR / branch 粒度ではない。
+
+## 3. 隣接する設計は ADR にあるが、app にも GitHub の PR 面にも降りていない
+
+ADR-2607141700（cloud-itonami git-native business CI/CD, accepted）が、まさにこの形を持つ ——
+「proposal ref 到着 = PR、承認 = did:key 署名付き ff-only merge、実行 = post-merge itonami-runner、
+監査 = audit ref への append」。ただし backend は kotoba-git / kotoba-rad で GitHub は public mirror 扱い、
+かつ ADR 自身の status が `merge-ui = D`（設計のみ）・`persistence = I`（local EDN）・
+**top gap = governor not wired into the git merge path** と申告している。
+
+## 4. 「PR の自動修正」が反応できる CI 信号が、この workspace の repo には無い（実測）
+
+- GitHub Actions は ADR-2607300900 で repo 単位に無効化済み。CI の正本は murakumo fleet。
+- `scripts/fleet-ci/tick.cljs` は **tip 駆動**で、自身のコメント（L873 付近）が
+  「patch は tip 駆動のこの CI には存在しない —— 検証しているのは既に default branch に載った commit」
+  と書いている。つまり PR head は検証対象ですらない。
+- 同ファイル L865 の「commit status 書き戻し」節は **見出しコメントだけで実装が無い**
+  （`/statuses/` の呼び出しは repo 全体の grep で 0 件）。
+
+したがってこの設定が起き上がる契機は、現状 **レビューコメントだけ**である。")
+
+  (:adr/decision
+  "**D1. これら 5 設定は Claude Code（harness）のセッション設定であり、cloud-itonami-app の
+設計面には取り込まない。** app が governs するのは *work*（WorkItem -> approval -> AgentRun ->
+receipts -> board move）であって、その作業を運ぶ branch / PR / セッションの機構ではない。
+app 側に同じ lifecycle を持たせると、同一の状態に owner が 2 つできる。ADR-0014 の
+performer 分離（system は person を名乗れない）を守るためにも、機構は harness 側に置いたままにする。
+
+**D2. ただし「agent 作業の着地物 = branch / PR」が governance loop に載っていないことは gap として
+記録する。** ADR-0014 の 6 plane には artifact plane が無く、`effect/test receipts` の次が
+いきなり `explicit board move` になっている。実際には receipts と board move の間に
+「どの commit / どの PR がその receipt の根拠か」という結び目があり、今はどこにも表現されていない。
+これを閉じるのは D5 の判断待ち。
+
+**D3. 「プルリクエストの自動修正」は、この workspace では『レビューコメントにのみ反応する機能』
+として扱う。CI が green であることの根拠にしない。** 上記の実測（Actions 無効・fleet-ci は tip 駆動・
+commit status 書き戻し未実装）により、PR に CI 失敗が現れる経路が存在しない。設定を ON にしておくのは
+無害だが、「CI を見張っている」と読まない。fleet-ci に PR head 検証と commit status 書き戻しを足すかは
+本 ADR の範囲外（別 ADR）。
+
+**D4. branch prefix は 2 系統（ローカルセッションの `agent/*` と cloud セッションの `claude/*`）を
+統一せず共存させる。** 直近 40 merge のうち 27 が `agent/`。`.claude/hooks/branch-create-main-sync-guard.cljs`
+を含め hook は prefix を仮定していないので壊れない。prefix は「どの種別のセッションが作った枝か」という
+情報を持っており、潰すと失われる。**代わりに cleanup（skill `git-cleanup-conflict`）の棚卸しは
+prefix 横断で行う** —— 片方の prefix しか見ない棚卸しは、もう片方を不可視の滞留にする。
+
+**D5. GitHub の PR 面を governed proposal 面の入力にするかどうかは、オーナー判断として open にする。**
+選択肢は (a) ADR-2607141700 の propose -> govern に GitHub PR を入力として繋ぐ、(b) kotoba-rad の
+patch 面に寄せて GitHub は mirror のままにする。どちらも本 ADR では決めない —— 決めるべきなのは
+「どの面が承認の正本か」であって、harness の設定をどう並べるかではないため。")
+
+  (:adr/consequences
+  "- cloud-itonami-app に branch / PR / セッションの機構を足す作業は、本 ADR がある限り
+  『設計統合されていないから足す』という理由では始めない。始めるなら D5 を先に決める。
+- 「PR の自動修正」を根拠に CI 品質を語らない。この workspace の CI の正本は murakumo fleet の
+  署名付き receipt（`manifest/fleet-ci.edn`）であって、PR のチェックマークではない（そもそも出ない）。
+- fleet-ci が PR head を検証しないことは、tip 駆動という設計の帰結であって欠陥ではない ——
+  ただし『PR が緑に見える』ことは起こり得ないと明示的に知っている必要がある。
+- 2 系統の branch prefix が残るので、棚卸しスクリプトや手順で prefix を 1 つに決め打ちしない。
+- D2 の gap（receipt と board move の間に artifact の結び目が無い）は未解決のまま残る。")
+
+  (:adr/body
+  "# ADR-2608640000: Claude Code の PR/セッション設定は cloud-itonami-app の設計面ではない
+
+**Status**: accepted / **Date**: 2026-08-08 / **Decider**: Jun Kawasaki
+
+本文は `:adr/context` / `:adr/decision` / `:adr/consequences` に分かれて入っている。
+
+## 一行で
+
+Claude Code の 5 つの PR 設定（ブランチプレフィックス / PR 自動作成 / ドラフト作成 / PR 自動修正 /
+マージ後自動アーカイブ）は **cloud-itonami-app に統合されていない**。これは欠落ではなく境界であり
+（D1）、app の governance loop が governs するのは work であって harness の機構ではない。
+ただし『agent 作業の着地物 = branch / PR』が loop に載っていないのは gap（D2）で、
+『PR の自動修正』はこの workspace では CI 失敗に反応できない（D3、実測）。
+
+## 検証したこと
+
+| 対象 | 方法 | 結果 |
+|---|---|---|
+| cloud-itonami-app 全文 | shallow clone -> `src` / `resources` / `docs` を走査 | `pull_request` 1 件（GraphQL の content 種別のみ）、branch / draft / check-run / workflow-run は 0 件 |
+| Projects v2 書き戻し | `github_projects_writeback.clj` を読む | `write-status!` が Status single-select 1 フィールドのみ、`verify-basis!` の楽観ロック付き |
+| governance loop の plane | app の `docs/adr/0014-kanban-work-is-governed-by-organizational-performers.md` | 6 plane に artifact（branch / PR）が無い |
+| CI 信号 | `scripts/fleet-ci/tick.cljs` を読む + `/statuses/` を grep | tip 駆動（PR head は対象外）、commit status 書き戻しは見出しコメントのみで実装 0 件 |
+| branch prefix | `git log --merges -40` の prefix 集計 | `agent/` が 27 件。hook は prefix を仮定していない |
+
+## この ADR が答えていないこと
+
+- fleet-ci を PR head 対応にするか（別 ADR）。
+- ADR-2607141700 の propose -> govern に GitHub PR を繋ぐか kotoba-rad patch に寄せるか（D5、open）。
+- ADR-0014 に artifact plane を足す具体設計（D2 の gap、D5 に従属）。")))

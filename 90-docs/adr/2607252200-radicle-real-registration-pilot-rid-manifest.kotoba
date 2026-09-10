@@ -1,0 +1,138 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607252200-radicle-real-registration-pilot-rid-manifest")
+  (:adr/doc_type "adr")
+  (:adr/topic "radicle-real-registration-pilot")
+  (:adr/status "accepted")
+  (:adr/last_verified "2026-07-25")
+  (:adr/authoritative_for
+  (vector "本家 Radicle(heartwood) への実登録を開始したという事実と、その識別子(node DID / RID)の記録"
+   "登録範囲を段階化する方針（パイロット10本 → 検証 → 拡大）と、private repo を既定で対象外とすること"
+   "RID の正本を manifest/repos.edn :manifest.repos/rad-rids に置き、west.yml userdata を projection とすること"
+   "west.yml userdata の複数フィールド(datalad / archived / rad-rid)共存フォーマット"
+   "kotoba-lang/nekko(旧 kotoba-rad) は Radicle 等価の自前実装であり、本家 Radicle 登録とは別物であること"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs"
+   "adr-2606280300-kotoba-rad-git-sovereign-repo"
+   "adr-2607022300-itonami-gftdcojp-private-tenant-kotoba-rad-git-storage"
+   "adr-2607160005-kotoba-fleet-agent-vcs-west-successor"
+   "adr-2607161801-kotoba-vcs-suite-tree-motif-naming"))
+  (:adr/identity
+  "{:node-alias \"junkawasaki\", :node-did \"did:key:z6MkpPKisDoVCDsunNZTtX1eEErH8tcdeNpXrVVfDRkhsWEk\", :rad-version \"1.9.1\", :rad-home \"~/.radicle\", :passphrase-store {:tool \"kagi\", :item \"radicle-node-passphrase\", :compartment \"personal\"}, :seed-connected \"rosa.radicle.network:8776\", :preferred-seeds [\"iris.radicle.network:8776\" \"rosa.radicle.network:8776\"], :network \"main\", :inbound-listen false}")
+  (:adr/pilot-rids
+  "{\"orgs/kotoba-lang/nekko\" \"rad:z8g6evEq3KDp3GU5tT8KyzyekE6D\", \"orgs/kotoba-lang/kotoba-git\" \"rad:z35iT2FBX6eRTmvyaM4vwbYko4oc\", \"orgs/kotoba-lang/kotobase-peer\" \"rad:zXMGEtQAKL1mWkFWtQ1K7E4fcnAJ\", \"orgs/kotoba-lang/chain\" \"rad:zNo3rgHBhU4jEBR16uxJEzDHThTa\", \"orgs/kotoba-lang/prolly-tree\" \"rad:z2csgJdXNH82WCYorkSGKoKcHmVeJ\", \"orgs/kotoba-lang/arrangement\" \"rad:zf55ikYQRPpJrb6in2jcmcDpUqFL\", \"orgs/kotoba-lang/io-ipld\" \"rad:z4NmVQNdcDMVL73t8STmkKnPv5f8D\", \"orgs/kotoba-lang/io-multiformats\" \"rad:zkgvWHhCuamVxwccgkJRdSrBK8kH\", \"orgs/kotoba-lang/kotobase\" \"rad:z25cymq3Gerey8XzUyXXFxXuEbdxk\", \"orgs/kotoba-lang/kotoba-fleet\" \"rad:z3aZiAjwotUuPbKviUtNYihvrhRWR\"}")
+  (:adr/inventory
+  "{:measured-on \"2026-07-25\", :source \"gh api orgs/<org>/repos --paginate\", :orgs {\"etzhayyim\" {:total 623, :private 353}, \"kotoba-lang\" {:total 1656, :private 1}, \"cloud-itonami\" {:total 1343, :private 1}}, :total 3622, :private 355, :checkout-bytes \"~11.7GB (etzhayyim 4.4G / kotoba-lang 6.3G / cloud-itonami 976M)\"}")
+  (:adr/body
+  "
+# ADR-2607252200: 本家 Radicle への実登録を開始する（パイロット10本 + RID を manifest の正本に置く）
+
+**Status**: accepted（パイロット完了。拡大は未決）
+**Date**: 2026-07-25
+**Deciders**: Jun Kawasaki（指示: 「radicle の実登録を進めて」）
+
+## Context
+
+調査の結果、**etzhayyim / kotoba-lang / cloud-itonami の repo は本家 Radicle に
+一切登録されていなかった**。実測（2026-07-25）:
+
+- `rad` CLI 未インストール（`radare2`/`radiff2` は無関係）、`~/.radicle` 無し
+- `rad:z…` 形式の RID はリポジトリ全体で 0 件、`.rad/` ディレクトリ・rad remote も 0 件
+- `manifest/west.yml` の全 project が GitHub org remote
+- manifest 内の \"Radicle\" 参照は `manifest/fleet-keys.edn` のコメント
+  （`:canonical — Radicle-crefs-style quorum policy`）1 行のみ
+
+grep で大量にヒットする `kotoba-rad`（2026-07-16 に **`nekko`** へ rename）は
+**本家 Radicle への登録ではなく Radicle 等価層の自前実装**である
+（ADR-2607072200 / ADR-2606280300）。ADR-2607072200 の Status 自身が
+\"both repos created, code real and unit-tested, **not yet published/registered**\"
+と明記しており、本 ADR はその \"not yet\" を解消する最初の一歩にあたる。
+
+## Decision
+
+### 1. 本家 Radicle(heartwood) 1.9.1 を導入し、node identity を1つ作る
+
+`did:key:z6MkpPKisDoVCDsunNZTtX1eEErH8tcdeNpXrVVfDRkhsWEk`（alias `junkawasaki`）。
+**鍵の passphrase は kagi（compartment `personal`、item `radicle-node-passphrase`）に置く** —
+安全床①（認証情報は credential 専用ツール経由）に従い、平文でも環境変数の永続設定でもなく
+vault に置き、node 起動時に `kagi get` から `RAD_PASSPHRASE` に流す。
+node は inbound listen を有効化せず（`listen: []`）、outbound で公開 seed に接続する。
+
+### 2. 登録は段階化する。パイロット10本を先に打ち、private は既定で対象外
+
+対象母数は 3 org 合計 **3,622 repo（うち private 355、checkout 実体 ~11.7GB）**。
+これを一括登録しない。理由は、**Radicle への public 登録は取り消せない**
+（seed に複製された後は unpublish できない）ため、規模を出す前に
+所要時間・storage 増加・seed 到達性を実測する必要があるから。
+
+パイロットは **kotoba-lang の VCS suite 中核10本**（すべて GitHub public、
+= Radicle 登録で新たに公開される情報がゼロの集合）を選んだ:
+`nekko` / `kotoba-git` / `kotobase-peer` / `chain` / `prolly-tree` /
+`arrangement` / `io-ipld` / `io-multiformats` / `kotobase` / `kotoba-fleet`。
+10本すべて `rad init --public` に成功し、`rosa.radicle.network` へ同期済み
+（`rad sync status` で in-sync を確認、local storage 増加は 2.9MB）。
+
+**private 355 本（etzhayyim 353 を含む）は今回登録しない。** Radicle の
+private repo は実験的機能で、誤設定時の露出リスクが public 登録より高い。
+そもそも「GitHub private repo を Radicle に載せる」は visibility の実質的な変更に
+あたり、CLAUDE.md の恒久承認の**対象外**（要事前確認）である。
+
+パイロットは共有 west checkout を汚さないよう **scratchpad の clean clone から実行した** —
+`rad init` は `.git/config` に rad remote を足すため、共有 checkout で走らせると
+並行セッションと干渉する。RID は genesis identity doc（name/description/delegates/
+visibility）の CID であって作業ツリーの状態に依存しないので、clean clone から取った
+RID はそのまま恒久的に有効である。
+
+### 3. RID の正本は `manifest/repos.edn`、west.yml は projection
+
+`:manifest.repos/rad-rids`（path → RID の map、他の map 値と同じ pr-str blob 形式）を
+SSoT にする。`scripts/gen-west-manifest.cljs` がこれを west.yml の
+`userdata.rad-rid` として出力し、`fleet reconcile` が fleet-db へ
+`:repo/rad-rid` datom として吸収する。fleet-db / ledger は従来どおり手編集しない。
+
+**west.yml の `userdata:` は 1 project につき1ブロックにまとめる。** 従来の生成器は
+datalad と archived をそれぞれ独立に `userdata:` を出す排他 `cond` だったため、
+rad-rid を足すと同一 project に `userdata:` が二重に出る壊れた YAML になりえた。
+`cond->` でフィールドを積み上げ、末尾に1回だけ出す形に変更した（datalad entry の
+出力が byte 単位で不変であることを実測確認済み）。
+
+### 4. kagami(fleet-vcs) の west.yml パーサを先に追随させる
+
+`fleet/west.cljc` の project field パーサは**未知フィールドで例外を投げる**仕様
+（generator dialect drift の検知）。そのため生成器が `rad-rid:` を出し始めた瞬間に
+`fleet reconcile` が丸ごと落ちた — 実測で確認した上で kagami 側を先に修正した
+（parse / emit-entry / kdb.repo->tx + rad-rid 単独と datalad 共存の round-trip テスト）。
+`kotoba-lang/kagami` cb09b93 へ merge し、west pin を fast-forward で前進させている。
+この順序を守らないと CI `fleet-projection-verify.yml` が main で赤くなる。
+
+## Consequences
+
+- 3 org の repo は **今後 GitHub と Radicle の両方に存在する**（パイロット10本のみ）。
+  GitHub 側は引き続き既定の作業経路で、Radicle は ADR-2607022300 が示す
+  「GitHub を one-way publish mirror に格下げする」長期方向への実測可能な足場になる。
+- パイロット10本への今後の push は GitHub と Radicle の**二重 push が必要**になる
+  （`git push origin` と `git push rad`）。この二重化の自動化は本 ADR のスコープ外。
+- RID は west.yml/fleet-db から query 可能になったが、**パイロット10本のうち
+  west.yml に反映済みは6本のみ**。残り4本（kotobase-peer / arrangement / io-ipld /
+  io-multiformats）は共有 checkout の HEAD が west pin と乖離しており、
+  userdata を足すと pin 前進が混ざるため見送った — RID 自体は repos.edn（正本）に
+  10本すべて記録済みで、pin が揃った時点の再生成で自動的に west.yml へ出る。
+
+## Open questions（拡大の判断材料）
+
+1. **public 3,267 本へ拡大するか。** パイロット実測は 10 repo / 5.1MB clone に対し
+   storage 2.9MB・所要数分。単純外挿で ~11GB 規模・数時間のバッチになる。
+   公開 seed（iris/rosa）への負荷も考慮が要る。
+2. **private 355 本をどうするか。** Radicle private repo を使うか、Radicle には
+   載せないままにするか。露出リスクの評価が必要。
+3. **二重 push の自動化。** kagami/fleet に `git push rad` を組み込むか、
+   post-push hook にするか。
+\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+Radicle 拡大: 自前 seed(gad)構築、etzhayyim private 353本を監査して352本を public 化、app-deai は gftdcojp/ai-gftd-deai へ private 移設
+
+自前 seed: gad(tailnet 100.82.98.110:8776)に radicle-node を systemd 常駐(linger 有効)、node.seedingPolicy={default:allow,scope:all}、preferredSeeds=[] で公開 seed 非依存。node ID did:key:z6MkmUNjE8mrWx7d1NVnYCWZFokoTMaPNxmubf8RpBfAu8Me、passphrase は kagi radicle-seed-gad-passphrase。実測: rad init は node 起動時 5.3s(到達不能な preferred seed があると 8.5s〜38.7s)に対し node 停止時 234ms。並列化は node の単一ロックで逆効果(jobs=16 で 0.09 repo/s < 直列 0.19)。announce は双方が listen していないと成立しない(片方向だと All seeds timed out)。seedingPolicy は node の下でトップレベルに置くと無視され既定 block のまま。 監査: etzhayyim private 353本を trufflehog(git履歴込み --no-verification)+PII regex で走査。REVIEW 70本のうち高深刻度は全て誤検知 — secret:Github/CloudflareApiToken は migration.edn の :revision/:tree(etzhayyim/root の実在 commit と API 照合)、Postgres は train.jsonl の合成接続文字列、jp-mynumber は UI 文言と公的窓口名(12桁実番号 0件)、credit-card は Luhn 検証なし regex が数値IDに反応、Hunter は Monster Hunter Stories 3、bank-acct はスキーマ定義文。false negative 二次チェック(*.pem/id_rsa*/credentials*.json 等)は 0件。実質的だったのは email のみで、絞り込むと第三者アドレスが残るのは 16本、うち本物の実在個人アカウントは lexicons-bundle の M365 1件のみ。 結果: 352本を GitHub public 化(etzhayyim public 270→622, private 353→0)。app-deai のみ owner 判断で gftdcojp/ai-gftd-deai として private 移設(transfer+rename, SHA 7810f8bb 不変)、manifest も追随(repos.edn path 差し替え + west.yml 旧entry削除+--entry で正順挿入)。
+")))

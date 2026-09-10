@@ -1,0 +1,133 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit")
+  (:adr/title "移行の単位は kotoba/app の vertical slice であって、判断核ではない")
+  (:adr/status "superseded")
+  (:adr/date "2026-08-26")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/supersedes "")
+  (:adr/superseded-by "kotoba-lang/docs/adr/ADR-q9-whole-component-build-migration.md")
+  (:adr/related
+  (vector "adr-2607201300-kotoba-safe-application-language-profile"
+   "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+   "2608650000"
+   "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban"
+   "adr-2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy"
+   "adr-2608261200-rule-kaizen-loop-implementation-snapshot-is-not-language"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/amu" "kotoba-lang/kotoba-lang" "kotoba-lang/org-ietf-smtp" "kotoba-lang/murakumo"))
+  (:adr/authoritative_for
+  (vector "clj / cljc → .kotoba の移行単位は kotoba/app の vertical slice であるという決定"
+   "判断核（decision core）は named backend が値を admit できないときの fallback であり、言語の書き方ではないという決定"
+   "切り方は guest と host（ambient authority）であり、判断と残り、文字列と整数ではないという決定"))
+  (:adr/body
+  "2026-08-26、オーナーの問い: 1 スライス、判断という考え方自体も適切なのか。
+今の amu の最新と kotoba-lang の理想から、正しい ADR と rule に直せ。
+
+答えは否である。『1 スライス = 1 判断表』は言語の理想でも、amu が要求する
+既定の移行でもない。それは ADR-2607141900 と同じ種類の誤りである。実装の
+スナップショット（当時の emitter が actor を丸ごと通せない、native が
+word 型しか通さない、SMTP の判断が整数だった）を、Kotoba の書き方として
+固定してしまう。
+
+## 言語の理想（すでに accepted）
+
+正本は ADR-2607201300 と ADR-2607279200 と
+`kotoba-lang/kotoba-lang/lang/surface-status.edn` と
+`kotoba-lang/amu/resources/kotoba/lang/application-language.edn` である。
+測定値をこの本文に焼かない。kit の :status と backend の execution-status は
+その場で読め。
+
+Kotoba は safe application language である。4 profile は
+`kotoba/pure` / `kotoba/cell` / `kotoba/app` / `kotoba/host`。
+新規の product logic、workflow、UI の view/event、LLM/tool loop、
+state machine、actor は、必要な capability が実装済みなら `kotoba/app` が
+第一候補である。narrow-slice-only は 2607201300 が削除済みである。
+
+安全の境界は純度ではなく ambient authority の排除である。ゲストは
+ソケット、credential、DOM 破壊、SDK、eval、interop を持たない。
+effect は data（inert request value）であり、authority は host-bound
+capability である。通常の source は capability ID も WIT も書かない
+（推論が既定、ADR-2607279200 決定 2）。
+
+source は Clojure-shaped のままである。`def` / `defn` / `let` / `if` /
+`cond` / map / vector / set / record / 文字列 / document で application を
+書く。判断だけ、スカラーだけ、に閉じて書く様式は言語に無い。
+
+amu の参照実装は `examples/todo-app.kotoba` である。コメントが自分で
+『A whole interactive web application, written only in Kotoba』と名乗り、
+契約は `init` / `view` / `step`（state + event → next-state）である。
+文字列も `:document` も `cond` も使っている。判断表ではない。
+compiler availability is not language admission。unavailable backend は
+implementation gap であって、指定された安全な言語機能を削る理由ではない。
+
+## 切り方
+
+切る線は 1 本である。
+
+- ゲストが持つ: product semantics。普通の Kotoba 値と、named typed operation。
+- ホストが持つ: 機構。Wasm の instantiate、DOM/WebGPU/native の破壊、
+  ソケット、credential、provider SDK、durable の物理操作、timer、配置。
+
+切らない線:
+
+- 判断 と 残りのプログラム
+- 文字列 と 整数（ADR-2608261000 の否定は生きている）
+- wasm/web で書ける application を、native が word 型だからという理由で
+  スカラーに潰すこと
+
+`:max-parameters 5` は admission の床である。溢れたら record / document に
+畳む（todo-app がそうしている）。プログラムを 5 整数の述語群へ分解する
+理由にはならない。
+
+## 正しい移行
+
+移行は extension rename でも、判断核の抽出でもない。ADR-2607279200 決定 5
+の 4 分類が既定である。
+
+1. portable pure logic — 同じ Clojure-shaped source を `.kotoba` へ。
+2. portable effectful application logic — ambient call を named typed
+   operation に置換し、effect inference と host kit parity を通す。
+3. host mechanism — 物理操作は provider に残し、product semantics を持たせない。
+4. operational scripts — kbb が qualify するまで nbb。
+
+vertical slice は、capability が conformance を通ったあとの一本の製品経路
+である（2607201300: state → LLM/ComfyUI → typed event → governor → UI →
+checkpoint。2607279200 Delivery 7: Cloudflare route、murakumo workflow、
+browser UI）。1 判断表ではない。1 commit を有界にするのは正しい。有界は
+スカラーを意味しない。
+
+oracle の `.cljc` は、その slice の gate（source fidelity、semantic parity、
+safety、host parity、performance、release、rollout）が揃うまで消さない。
+oracle は照合用の写しであり、意味の正本ではない。コマンド線・応答の意味・
+UI の view はゲストの product semantics である。『コマンド文字列は `.cljc`』
+は不適切（ある日の SMTP fallback を言語にした読み）。`.kotoba` を `.cljc`
+から require しない（require-graph）。mirror を作らない。
+公開 compile は `kotoba compile`。skip と pass を同じ顔にしない。
+
+## 判断核は fallback である
+
+ADR-2608650000 の分類（書けない理由を恒久の安全と backend 未達に分ける）は
+生きている。決定 4 の『移行の単位は決定核』は、ここで降格する。
+
+決定核の抽出が正当なのは、**名指しした backend** がその値を admit できない
+ときだけである。先例は murakumo の `kotoba/*_core.kotoba`（native が
+word 型のとき、決定だけを切り出して 33/33 が載った）。SMTP の
+`protocol_core` も同じ形の fallback であり、テンプレートではない。
+
+fallback を使うときはモジュール先頭に、何が一時で、どの backend のどの
+欠落が埋まったら外すかを書く。書かなければ、wasm/web で todo-app が
+動いているあとも、次のスライスが判断表を模倣する。
+
+wasm / web / `:js-kotoba-v1` に対して、最初から判断核へ潰さない。
+そこでは application を application として書く。native に無いことは
+言語の天井ではない（2608650000 決定 3、application-language の :rule）。
+
+## 残すもの / 捨てるもの
+
+残す: 書けない理由の分類。文字列禁止の否定。`.cljc` oracle（照合用。意味の
+正本ではない）。require しない。parity。`ex-info` → Result。`.cljk` は
+`:clj-kotoba` であって JVM target ではない。`cond` は desugar する。
+
+捨てる: 『正しい移行 = 1 判断表』。『Kotoba は判断だけ書く言語』。
+『コマンド文字列は `.cljc`』。amu が判断以外を拒否した、という説明。
+native の欠落を wasm/web の様式にする mill。
+")))

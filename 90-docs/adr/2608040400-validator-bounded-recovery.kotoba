@@ -1,0 +1,79 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608040400")
+  (:adr/title "復旧は 1 invocation 分より高くつけない — torihiki-validator の CPU クラッシュループ")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-04")
+  (:adr/tags (vector "kotoba-lang" "torihiki" "cloudflare" "durable-object" "consensus" "incident"))
+  (:adr/body
+  "## 事象
+
+`torihiki.pages.dev` が全リクエスト 500 を返していた（いつからかは不明。
+発見は 2026-08-04、オーナーの成熟度質問がきっかけ）。ページの `data-node` は
+`torihiki-validator`（4 replica の BFT chain）を指しており、witness w1〜w4
+すべてが 26〜38 秒かけて HTTP 500（Cloudflare 1101）。
+
+`wrangler tail` の実ログ（90 秒間）:
+
+    70   exceeded its CPU time limit and was reset
+    124  overloaded — requests queued for too long
+
+## 原因
+
+`boot` が永続 log 全体を `.list`（limit 無し）1 回 + `r/replay` 1 回で畳んで
+いた。これは chain と共に伸びるコストで、Durable Object の invocation ごとの
+CPU 予算は伸びない。ある高さを超えると replay が予算を超え、Cloudflare は
+オブジェクトを **reset** し、reset は in-memory 状態を捨てるので、次の
+invocation はまた 0 から replay して同じブロックで超える。
+
+**自分では終われないクラッシュループ**である点が普通の遅い起動と違う。復旧に
+必要な作業そのものが復旧を殺すので、オブジェクトの中の何一つ動かない ——
+`/reset`（poisoned な replica を捨てるための route）を含めて。それは `boot` の
+後ろにあり、boot が壊れているときには到達できなかった。
+
+実測値: **replica あたり 1,749 キー**。それが 1 invocation で畳まれていた。
+
+## 決定
+
+1. **`catchUp`** — log を 1 invocation あたり 25 ブロックずつ畳む。`r/replay` は
+   height 昇順の `reduce` なので、昇順の N ページは全件 1 回と厳密に等しい。
+   `blk:` キーは既に 12 桁ゼロ埋めの height なので辞書順 = height 順で、
+   `startAfter` が正しい cursor になる。
+   **追いつくまで投票しない**のは最適化ではなく安全規則 —— 半分畳んだ log から
+   投票する replica は既に投票した height で再び投票することになり、それは
+   equivocation（このシステムが唯一 slash する行為）を事故で自分に対して犯す。
+
+2. **`/wipe` を `boot` の手前に置く。** 復旧経路は、それが直す対象に依存しては
+   ならない。
+
+3. **`/wipe` はページ分割にする。** `deleteAll` は「キーが何個あろうと 1 回の
+   storage 操作」で、長く走る storage 操作もまたオブジェクトを reset させる。
+   実際に必要だったストレージでは 16 秒後に
+   `storage operation exceeded timeout` で落ちた —— 救うために書いた boot replay
+   と同じ形のバグを、30 分後に自分で書いた。**無界の復旧経路は復旧経路ではない。**
+
+## 結果
+
+4 replica を wipe（1,749 キーが 0.78 秒で排出）。chain は genesis から再開し、
+1 分で tip 33 / committed 31、equivocators なし。`script/verify.cljs`（HTML への
+assertion ではなく実ブラウザでページをクリックする方）が本番に対して pass:
+faucet 受理、注文成立、block 61 → 77、nonce 1 → 3。
+
+## 直っていないこと（正直に）
+
+- **log は依然として無界**なので、追いつくコストは O(chain) invocation のまま。
+  各 invocation が有界になっただけで、**恒久的な障害を遅い起動に変えた**という
+  クラスの変化であって、問題の消滅ではない。snapshot が本当の答えで、
+  `torihiki-node` の README は最初からそれを既知の限界として名指ししている。
+
+- **validator に transaction が着地しない**（2026-08-04 時点、未解明）。
+  faucet も注文も nonce が進まず、`txs-in-chain` は 4 のまま `resting` 0。
+  同じブラウザクライアントで単一シーケンサ `torihiki-node` には着地する
+  （collateral $100,000、nonce 1→3、実約定も発生）。疑い: 受信した replica の
+  in-memory mempool が eviction で失われ、かつ catch-up 中は `/msg` に 503 を
+  返すため参加できない窓が長い（＝この変更が実運用上この症状を悪化させて
+  いる可能性がある）。認証の伝播自体は設計されている（`verifyTxs` が proposal
+  内の tx を各 replica で検証する）ので、認証の穴ではない。
+
+  この結果、本番 `torihiki.pages.dev` のチャートは「まだ約定がありません」/
+  「板が空です」を正しく表示する状態にある。チャート側の検査は実データに対して
+  別途 pass 済み（ADR-2608040300）。")))

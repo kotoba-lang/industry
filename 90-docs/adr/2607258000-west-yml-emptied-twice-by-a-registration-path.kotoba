@@ -1,0 +1,75 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607258000-west-yml-emptied-twice-by-a-registration-path")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-07-25")
+  (:adr/title "manifest/west.yml was emptied twice by an entry-registration write path — incident, repair, and the entry that never landed")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/related (vector "90-docs/adr/2606272237-manifest-workflow.edn"
+                "90-docs/adr/2607022900-west-pin-verify.edn"
+                "90-docs/adr/2607160005-kotoba-fleet-agent-vcs-west-successor.edn"))
+  (:adr/decision "{:incident \"manifest/west.yml reached main as a 0-byte file twice within one day, from the same entry-registration write path\", :timeline [{:commit \"ad193ef4\", :subject \"chore(manifest): add abi west entry\", :size-after 0} {:commit \"0bd2b5e18\", :subject \"fix(manifest): restore west.yml -- ad193ef4 emptied it entirely\", :size-after 725746} {:commit \"7803359c\", :subject \"chore(manifest): advance abi pin\", :size-after 0} {:commit \"e23fdf309\", :subject \"manifest: restore west.yml (emptied AGAIN by 7803359) + advance dynamics/loop-system-dynamics pins\", :size-after 725746}], :impact \"with a 0-byte manifest `west update` resolves no projects at all, and any concurrent single-entry pin edit silently no-ops because its search string is not present — one murakumo pin advance was lost that way and had to be re-applied\", :repair \"restore the last good blob (byte-identical to the pre-break state) and re-apply only the single-entry edits made in between; never regenerate wholesale, which is what the standing manifest rule already says\", :not-restored \"the `abi` entry itself: it never landed (the restore points predate it) and its intended pin is unrecoverable from an empty-file diff, so re-registration belongs to whoever owns that work\"}")
+  (:adr/measurements "[{:what \"blob size of manifest/west.yml per commit, main\", :series [{:commit \"70ac08025\", :bytes 725582} {:commit \"f67479814\", :bytes 725746} {:commit \"0f1bb7762\", :bytes 725746} {:commit \"ad193ef4a\", :bytes 0} {:commit \"0bd2b5e18\", :bytes 725746} {:commit \"7803359c6\", :bytes 0} {:commit \"e23fdf309\", :bytes 725746}], :date \"2026-07-25\"} {:what \"restored content integrity\", :result {:bytes 725746, :projects 3725, :sha256-prefix \"77ea9ecf\", :identical-to \"0f1bb7762 (pre-break)\"}, :date \"2026-07-25\"} {:what \"abi entry presence after restore\", :result {:matches-for-name-abi 0}, :date \"2026-07-25\"}]")
+  (:adr/findings "[{:id :empty-file-writes-are-not-caught-by-the-pin-verifier, :severity :high, :evidence \"both empty-file commits reached main; the west-pin-verify guard checks that PINS are reachable from their upstream default branch, which an empty file trivially satisfies because it declares no pins\", :implication \"a size/structure floor (non-zero bytes, project count within a delta of the parent commit) is a different check from pin reachability, and only the latter exists\"} {:id :a-lost-single-entry-edit-fails-silently, :severity :medium, :evidence \"a murakumo pin advance applied with a search-and-replace against an already-empty file changed nothing and the resulting merge carried only the ADR; the edit was noticed later by reading the manifest back from main\", :implication \"single-entry manifest edits should assert that the search string was found, not just that the command exited 0\"} {:id :two-sessions-repaired-the-same-file-concurrently, :severity :low, :evidence \"a restore prepared in this session hit HTTP 409 on merge because another session had already landed an equivalent restore (e23fdf309)\", :handling \"the losing side re-read the tip, dropped its now-redundant restore and re-applied only its own one-line pin edit — no force-push, per the standing rule\"}]")
+  (:adr/known-gaps "[{:gap \"kotoba-lang/abi is still absent from manifest/west.yml — the registration never landed\", :owner \"the session that ran ad193ef4 / 7803359c; it should fix the write path that produced two empty files before re-running `gen-west-manifest.cljs --entry abi`\"} {:gap \"no structural floor on manifest/west.yml in CI or in the PreToolUse guard (non-zero size, project count sanity vs the parent commit)\", :note \"proposed here as the concrete follow-up; not implemented in this ADR\"}]")
+  (:adr/body "# ADR-2607258000: `manifest/west.yml` emptied twice by a registration write path
+
+**Status**: accepted
+**Date**: 2026-07-25
+**Deciders**: Jun Kawasaki
+**Scope**: `com-junkawasaki/root`
+
+## What happened
+
+`manifest/west.yml` reached `main` as a **0-byte file twice in one day**, both
+times from the same entry-registration path:
+
+| commit | subject | size after |
+|---|---|---|
+| `ad193ef4` | chore(manifest): add abi west entry | **0** |
+| `0bd2b5e18` | fix(manifest): restore west.yml — ad193ef4 emptied it entirely | 725,746 |
+| `7803359c` | chore(manifest): advance abi pin | **0** |
+| `e23fdf309` | manifest: restore west.yml (emptied AGAIN by 7803359) + advance pins | 725,746 |
+
+With an empty manifest, `west update` resolves **no projects at all**. The
+second-order damage is quieter: a concurrent single-entry pin edit (murakumo
+`5a7a55fe → 4551bcc7`) was applied by search-and-replace against the emptied
+file, matched nothing, exited 0, and merged as a no-op. It was caught only by
+reading the manifest back from `main` afterwards, and re-applied.
+
+## Why the existing guards did not catch it
+
+`scripts/verify-west-pins.cljs` and the PreToolUse guard check that each pin is
+a commit reachable from its upstream default branch. **An empty file satisfies
+that trivially** — it declares no pins, so there is nothing to fail. Pin
+reachability and structural integrity are different properties, and only the
+first is enforced.
+
+## Repair
+
+Restore the last good blob and re-apply only the single-entry edits made in the
+interval — never regenerate wholesale (the standing manifest rule already says
+this, because regeneration pins from local working HEADs and can silently roll
+pins back). The restored content here is byte-identical to the pre-break state
+(725,746 bytes, 3,725 projects, sha256 `77ea9ecf…`).
+
+Two sessions prepared a restore at the same time; the one that lost the race
+(HTTP 409) re-read the tip, dropped its redundant restore, and landed only its
+own one-line pin edit. No force-push, per the standing rule.
+
+## What is still missing
+
+**`kotoba-lang/abi` has no entry in the manifest.** Its registration never
+landed — both restore points predate it, and an empty-file diff carries no
+information about the intended pin, so it cannot be reconstructed by a third
+party. Whoever owns that work should fix the write path that produced two empty
+files, then re-register with `gen-west-manifest.cljs --entry abi`.
+
+## Follow-up
+
+Add a structural floor for `manifest/west.yml` alongside the pin verifier: fail
+a write whose result is zero bytes, or whose project count drops by more than a
+small delta from the parent commit. That is the check that would have stopped
+both incidents at the source instead of after the fact.")))

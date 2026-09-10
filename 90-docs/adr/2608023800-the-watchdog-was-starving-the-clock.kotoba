@@ -1,0 +1,76 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608023800-the-watchdog-was-starving-the-clock")
+  (:adr/title "adr-2608023800: watchdog が時計を飢えさせていた — 全 request で timer を張り直す watchdog は、負荷の下で決して発火しない timer")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "validator-clock-and-genesis-certificate")
+  (:adr/authoritative-for
+  (vector "genesis 証明書の検証免除"
+   "DO alarm の rearm 条件"
+   "deploy 済み BFT chain の稼働実測"))
+  (:adr/related (vector "adr-2608023700-deployed-chain-authenticates-transactions"))
+  (:adr/evidence (vector "https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"))
+  (:adr/body
+  "# ADR-2608023800: watchdog が時計を飢えさせていた
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 実測（deploy 済み、無干渉）
+
+```
+  w1 h 187 com 185 root 815d80a082f8fe
+  w2 h 187 com 185 root 815d80a082f8fe
+  w3 h 187 com 185 root 815d80a082f8fe
+  w4 h 187 com 185 root 815d80a082f8fe
+```
+
+**毎秒 0.75 block 前後。4 replica が torihiki の state root で一致。**
+
+## バグ 2 つ
+
+### ① genesis 証明書に署名を要求していた（engi）
+
+`start` は最初の提案が justify できるように **genesis 用の証明書を捏造する。** **誰も署名していない —— 誰も投票していないから。genesis は全 replica が構成上持っている唯一の block。**
+
+`handle-new-view` は new-view が運ぶ証明書を再検証する（正しい）が、**そこに例外が無かった。** だから **「まだ何も certify していない replica」の new-view はすべて拒否され**、**彼らは「timeout した」と互いに伝えられなかった。** view は **5, 6, 6, 6** に散り、**timeout certificate は形成されない。**
+
+**何も throw しない** —— **検証できない証明書を拒否するのは、そのコードの仕事そのもの**だから。
+
+### ② watchdog が時計を飢えさせていた（自作）
+
+`rearm` は**全 request で alarm を上書き**していた。**受信 message ごとにこれが走る**ので、**peer traffic が続く限り、到着のたびに alarm が 400ms 先へ押し出され、一度も発火しない。**
+
+**4 つのうち 3 つが height 0 で、160 message を受け取りながら、一度も何も送っていなかった。** 4 つ目は leader で **traffic が少なく、隙間があり、tick できた** —— **だから「follower 側の問題」に見えた。**
+
+**全 request で timer を張り直す watchdog は、負荷の下で決して発火しない timer。**
+
+これは **2 iteration 前の自分の修正**（落ちた alarm が pending に見える問題への対処）。判定を**「pending が無い、または pending が既に期限切れ」**にして両方を満たす。
+
+## 何が見つけたか
+
+**`/head` が genesis hash・tip hash・受信 message の型別カウントを返すようにしたこと。** **4 者が両方の hash で一致し、動いている型は `new-view` だけ** —— **原因の候補が非常に短いリストになる。**
+
+## transaction 認証は deploy 済み chain で機能する
+
+**account の鍵でない鍵で署名された transaction は `:bad-signature` で拒否される。**
+
+## 未解決
+
+**同時に投げた正規の transaction 2 通が両方 `:bad-nonce` で拒否され、account の collateral は 0 のまま。** 2 つの別 replica に投げたので**順序を決めるのは chain** であり、**nonce 2 が先に来れば 1 通は説明できるが 2 通は説明できない。**
+
+## Consequences
+
+- (+) **deploy 済み BFT chain が自走し、4 者が一致し、transaction を認証する。**
+- (−) nonce の件は未解決。
+- (−) 鍵配布は TOFU、terminal は単一 sequencer を向いたまま、catch-up は未検証。
+
+engi 210 tests / 1136 assertions、parity 不変、in-process harness も pass。
+")))

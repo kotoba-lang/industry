@@ -1,0 +1,196 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608301500-workspace-importer-plane")
+  (:adr/doc_type "adr")
+  (:adr/topic "workspace-importer-plane")
+  (:adr/title "importer 面 —— connector の単位は API、importer の単位は tenant grant。1 tenant 1 writer、bots は読む")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-30")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authoritative_for
+  (vector "importer の契約は kotoba-lang/importer が正本（connector の兄弟であって、その一種ではない）"
+   "importer の単位は tenant grant。connector の単位は API"
+   "1 tenant = 1 resident writer。bots は importer を走らせず、corpus を読む"
+   "bot が触る corpus 面は bearer profile の read-only connector。provider scope を宣言できない"
+   "cursor は sink が書いた件数を受けてからしか動かない（persist-then-move）"
+   "corpus の応答は必ず coverage を伴う。rows だけを返す arity を持たない"
+   "測っていない did:web を名乗らない"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "2608097000" "2608093000" "2608136000" "2608039970" "2608160100"))
+  (:adr/repos (vector "kotoba-lang/importer"
+              "cloud-itonami/m365-ingest"
+              "cloud-itonami/actor-google-workspace-ingest"
+              "com-junkawasaki/root"))
+  (:adr/body
+  "# ADR-2608301500: importer 面
+
+**Status**: accepted / **Date**: 2026-08-30
+
+## Directive
+
+オーナー指示（2026-08-30）「google workspace, m365 からの importer もそれぞれ
+cloud itonami repo として 設計して. bots が この importer をそれぞれ使う前提なら、
+どういう repo として設計実装するのが適切?」
+
+## 実測した現在地（2026-08-30）
+
+**部品は揃っており、importer という面だけが無かった** —— ADR-2608097000 が
+connector について書いたのと同じ形である。
+
+| 在る | 状態 |
+|---|---|
+| `kotoba-lang/connector` + 8 connector | live。`cloud-itonami-app` の `connectors.clj` が registry を組み、`bots.clj` が `connector.invoke/call` を実際に呼んでいる |
+| `cloud-itonami/m365-ingest` | descriptor + deny-by-default gate（9 cell × 7 gate）。**executor は無い**（docs/adr/0001 が自らそう書いている） |
+| `cloud-itonami/app-email-service-adapter` | Outlook+Gmail を 1 repo に入れた先行実装。seed で未接続、HTTP surface について 4 ファイルが互いに食い違う |
+| `kotoba-lang/mail-archive` | Gmail の bulk archive（content-addressed blob + 2 backend の query parity）。実質 JVM 専用 |
+| `gftdcojp/m365-archive` | 生バイトの DataLad dataset |
+| Google Workspace 側の cloud-itonami ingest actor | **無い**（west 全 4,312 project を走査して確認） |
+
+## Decision
+
+### D1. importer は connector ではない —— 1 writer / N reader
+
+connector は request 形・無状態なので、N 体の bot が N 回呼んでよい。importer は
+cursor 形・有状態で、delta token・rate limit 予算・tenant credential・corpus を持つ。
+
+「bots がそれぞれ importer を使う」を *library を link して各自 sync する* と読むと、
+1 tenant に対して cursor が N 本・credential の複製が N 個・1 つの throttle 予算の
+N 分割ができ、**そして全員が『最新です』と答える**（cursor の内側からは何も見えない）。
+
+したがって **tenant ごとに 1 体の resident writer、bots は reader**。CLAUDE.md が
+kotobase ref について書いている「書き込み負荷を理由に ref を分けない。先に単一
+writer を置く」と同じ形である。
+
+### D2. connector の単位は API、importer の単位は tenant grant
+
+これが「なぜ Google が connector 3 本・importer 1 本なのか」への答えで、一見の
+不整合を消す。3 つに割ると、1 つの admin 同意に対して resident 3 体・gate 3 枚・
+governance 記録 3 つができる。
+
+その代わり Google は cursor が 3 系統（Gmail `startHistoryId` / Drive `pageToken` /
+Calendar `syncToken`）あり、失効の仕方も 3 通り違う。M365 は Graph 1 API なので
+folder ごとの delta 1 系統。**この非対称が『1 つの importer を parameterise する』を
+否定する** —— それを試したのが `app-email-service-adapter` で、いま 4 ファイルが
+食い違っている。
+
+### D3. repo は 3 つ、うち 1 つは既存
+
+| repo | 面 | 役割 | execution |
+|---|---|---|---|
+| `kotoba-lang/importer` | subject（bare、`connector` の兄弟） | 契約。I/O ゼロ、credential 無し | `:none` |
+| `cloud-itonami/m365-ingest` | 既存 —— **新規に作らない** | M365 importer actor | `:resident` |
+| `cloud-itonami/actor-google-workspace-ingest` | role | Google Workspace importer actor | `:resident` |
+
+4 つ目は作らない。corpus writer と store は `cloud-itonami-app` が既に持っており、
+切り出すと ref 1 本規則（join 到達範囲 = ちょうど 1 ref）を割る。
+
+**`m365-ingest` の名前は `actor-` を持たない。** 2026-08-11 のオーナー指示による
+`actor-` prefix は `:must-not [:hide-an-executable-actor-behind-a-bare-name]` を持つが、
+この repo は executor が入った今も **HTTP を送らず・token を持たず・書き込まない**
+（返すのは effect の列）ので、実行主体が現れる時点で `actor-m365-ingest` へ改名する。
+改名の条件を名前ではなく**性質**で書いておく。
+
+### D4. bots が触るのは corpus 面で、そこに provider scope は存在しえない
+
+corpus は `importer.connector` の `corpus_*` tool として connector 面に載る。
+`bots.clj` に新しい経路は 1 本も要らず（registry に provider を 1 つ足すだけ）、
+全 tool が `:read` なので two-tier rule の hold も発生しない。
+
+**auth profile は `bearer`。** `connector.validate` は scope 機構を持たない provider に
+scope を宣言することを **error** にするので、`corpus_*` は Google / Microsoft の
+scope を宣言**できない** —— 規約ではなく `connector.provider/provider` が load 時に
+throw する。**N 体の bot が tenant のメールを読み、そのうち 0 体が `gmail.readonly`
+を持つ。** これが writer/reader 分割の安全上の見返りである。
+
+書き込み（メール送信）は従来どおり `com-google-gmail` / `com-microsoft-graph` に残す。
+corpus 側に write tool を足すと、mailbox を動かせる経路が 2 本になり、**片方だけ
+consent 画面に scope が出る**状態になる。
+
+### D5. 3 つの静かな失敗に、それぞれ名前空間を与える
+
+**cursor が sink の書いた分を追い越す。** 次の delta は新しい token の後から始まるので、
+取り残した record はどの run にも二度と現れない。穴は恒久で、以後の run は全部緑。
+→ `importer.cursor/advance` は token を受け取らない。plan の件数と **sink 自身の報告**を
+受け取り、食い違えば拒否する。
+
+**backfill を読み切る前に incremental へ昇格する。** 以後 delta を追って毎回緑になり、
+昇格より前は一度も読まれない。→ `cursor/promote` は exhausted でなければ拒否する。
+
+**取り込んでいない mailbox への問い合わせが `[]` を返す。** bot は『返信は無い』と
+読んで行動する。→ `coverage/answer` が corpus 結果の唯一の constructor で、
+**rows だけを取る arity を持たない**。
+
+### D6. 測っていない `did:web` を名乗らない
+
+実測: `did:web:itonami.cloud` は **200**、`did:web:itonami.cloud:actor:<name>` は
+**404**（兄弟 actor でも同じ）。後者を名乗れば `m365-ingest` と同じ形
+（『名乗る DID は解決せず、解決する DID は誰も名乗っていない』）になる。
+
+新 actor の manifest は `\"did\": null` で、**この repo に現れる `did:web:` のうち
+identity-claims が測っていないものを test が拒否する**。その checker は
+合成した未測定 DID で先に噛むことを見せてから、実際の集合が空であることを主張する
+（空を返す検査は、走らなかった検査と同じ顔をするため）。
+
+## 検証
+
+| | |
+|---|---|
+| `kotoba-lang/importer` | 37 tests / 105 assertions、**11 mutation** すべてを pin する test が捕捉 |
+| `cloud-itonami/m365-ingest` | 65 tests / 292 assertions（`--network` で 316）、**5 mutation** 捕捉 |
+| `cloud-itonami/actor-google-workspace-ingest` | 26 tests / 77 assertions、**10 mutation** 捕捉 |
+
+3 つとも mutation harness を同梱し、**無改変の写しが緑であることを先に確かめてから**
+壊し始める（harness 自身が壊れていれば全 mutation が『捕まえた』に見える）。
+
+## 副産物 —— connector 面の runner が赤くても exit 0 を返していた
+
+`importer` の mutation harness は初回に **11/11 が survived** を報告した。11 個の弱い
+test ではなく、runner が 1 つ壊れていた。nbb では `clojure.test/run-tests` が **nil を
+返す**ので、この workspace で 9 repo が使っている書き方
+
+```clojure
+(let [{:keys [fail error]} (t/run-tests 'ns)]
+  (js/process.exit (if (pos? (+ fail error)) 1 0)))
+```
+
+は nil を 2 回分解して 0 に足し、**赤いまま exit 0 で終わる**。無改変の
+`com-google-gmail` を借りて scope を 1 つ書き換えたところ、**4 failures と exit 0** を
+実測した。
+
+影響は 9 repo（走査 163 本中）で、うち 5 本は connector 面そのもの ——
+`connector` / `com-google-gmail` / `com-google-drive` / `com-google-calendar` /
+`com-microsoft-graph`。残りは `gftdcojp/tia` / `kotoba-lang/noren` /
+`cloud-itonami/loop-noren` / `cloud-itonami/kakekomi`。
+
+ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と同じ値を返す」の
+最上位版である —— ここでは**失敗した検査**が成功と同じ値を返しており、その 1 箇所が
+repo 内の他の全検査を装飾にする。新しい 3 repo は `:end-run-tests` の報告から exit を
+採る。**既存 9 repo の修正は未実施**（下記 gap）。
+
+## Gaps（測って記録しただけ。直していない）
+
+1. **9 repo の runner が赤でも exit 0** —— 上記。新規 3 repo は直っているが、
+   既存 9 本は未修正。connector 面 5 本を含むので、あの面の緑は現時点で**未測定**
+   と読むべきである。
+2. **corpus の read 側 endpoint はまだ無い。** `importer.connector` は
+   `/api/corpus/*` への request を組み、応答が coverage を持たなければ拒否するが、
+   `cloud-itonami-app` 側にその path はまだ実装されていない。**bot はまだ corpus を
+   読めない。**
+3. **sink・resident host・blob store が無い。** effect を適用する主体、cursor を
+   永続化する場所、生バイトの置き場（`m365-archive` / B2 が候補）は未接続。
+   つまり **importer はまだ 1 通も取り込んでいない。**
+4. **`{:plan :tombstones :incremental-token}` という shape を 2 actor が独立に
+   実装している。** kernel に名前を与えていないので drift しうる。抽出の trigger は
+   3 本目の importer。
+5. **`app-email-service-adapter` の処遇が未決。** 役割（OAuth connect の appview）は
+   importer と別だが、現状 4 ファイルが食い違う。残すか退役かは測ってから決める。
+6. **`m365-ingest` の `actor-` 改名は未実施**（D3 の条件どおり、実行主体が入る時）。
+
+## Consequences
+
+- 「bots が importer を使う」は **read** であって run ではない、と構造で表現された。
+  N 体の bot が tenant のメールを読み、provider scope を 1 つも持たない。
+- importer を足すたびに repo が 1 本増えるが、cursor の規律・coverage・receipt は
+  kernel が 1 本持つ。2 本目（Google）を書いたとき、kernel 側に足した契約は 0 だった。
+- **この ADR は『まだ動いていない』ことを Gaps に列挙している。** 3 repo とも緑で
+  mutation も噛むが、緑なのは『書いたものが自分の主張どおりに振る舞う』ことであって
+  『メールが 1 通入った』ことではない。")))

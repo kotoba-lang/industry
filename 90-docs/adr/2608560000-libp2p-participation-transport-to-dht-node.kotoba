@@ -1,0 +1,141 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608560000-libp2p-participation-transport-to-dht-node")
+  (:adr/title "ADR-2608560000: libp2p に実際に参加する —— socket から DHT ノードまで")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "libp2p-participation")
+  (:adr/date "2026-08-04")
+  (:adr/last_verified "2026-08-04")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "kotoba-lang/io-libp2p の kotoba.net.libp2p.*（socket / handshake / connection / node / serve / store / validate / dnsaddr）"
+   "この workspace が libp2p ネットワークに対して何を主張できるか"
+   "QUIC / libp2p TLS / mplex を実装していない理由"))
+
+  (:adr/context
+  "ADR-2608550000 の L5（naming）は delegated router 経由で実 DHT に IPNS record を
+   publish するところまで到達したが、**自分は DHT ノードではなかった** ——
+   routing table を持たず、誰の query にも答えず、inbound stream は全部 reset していた。
+
+   `io-libp2p-specs-kad-dht` の README 自身が、完全参加に足りないものを名指ししていた:
+   multiaddr / TCP or QUIC / security handshake（Noise XX）/ multistream-select /
+   stream muxer（Yamux）/ identify。**そして protocol 側は既に全部この workspace に
+   あった** —— multistream と Yamux は `io-libp2p-specs-transport`、Noise XX は
+   `noise`（JVM provider 込み）、multiaddr は `io-multiformats`、protobuf は
+   `dev-protobuf`、DHT protocol は `io-libp2p-specs-kad-dht`。
+
+   欠けていたのは **socket と、それらを順に走らせるもの**、そして誰も書いていなかった
+   **libp2p の identity binding** の 3 つだけだった。")
+
+  (:adr/decision
+  "`kotoba-lang/io-libp2p` に `kotoba.net.libp2p.*` を置き、既存の純粋な状態機械を
+   再実装せずに socket とループだけを供給する。
+
+   | ns | 役割 |
+   |---|---|
+   | `handshake` | libp2p の identity binding（`noise-libp2p-static-key:` 署名） |
+   | `keys` | Ed25519 / RSA / ECDSA identity 鍵の JVM 検証 |
+   | `identify` | `/ipfs/id/1.0.0` と、その中で唯一検査できる主張 |
+   | `connection` | driver: 3 つの積み重なった framing を順に、注入された port の上で |
+   | `socket` | TCP mechanism のみ（connect / 正確に n octet 読む / write / close） |
+   | `dial` | 組み立て: multiaddr in、認証済み接続 out |
+   | `serve` | 何を返すか（identify snapshot、routing table からの kad 応答） |
+   | `node` | listen / answer / remember / lookup。`kad.table` と `kad.lookup` を駆動 |
+   | `store` | record（検証必須・deny-by-default）と provider（期限切れ）、両方上限付き |
+   | `validate` | 具体的な validator —— `/ipns/`（署名・期限・sequence）と `/pk/` |
+   | `dnsaddr` | `/dnsaddr/…` TXT 解決、名指しされた peer id で絞り込み |
+
+   ## 設計上の要点
+
+   - **identity binding が要**。Noise XX が相互認証するのは static X25519 鍵で、libp2p
+     の peer は**別の鍵**で識別される。両者を結ぶものが Noise には無いので、libp2p は
+     identity 鍵で `\"noise-libp2p-static-key:\" || 自分の static 公開鍵` に署名する。
+     これが無いと peer は「誰のものでもない鍵」を認証し、dial した peer id は未検証。
+     **static 鍵は handshake から取り、payload からは決して取らない**（自分が束縛されて
+     いる鍵を自分で名乗れる payload は何も証明しない）。
+   - **鍵の型は caller の verifier に渡す**。今日のネットワークの大半は RSA identity で、
+     著者が使う型だけを通す library は libp2p の大半を拒否しながら security check の
+     ように見える。何を受け入れるかは policy で caller のもの。
+   - **record 検証は注入・deny-by-default**。DHT に「有効な record」の普遍的定義は無く
+     namespace ごとの規則しかない。**検査できないものを受け入れるノードは、何も
+     受け入れないノードより悪い**。
+   - **`serve` は socket を持たない**。応答が peer 無しでテストできることが重要なのは、
+     間違った応答の失敗モードが「peer が黙ってこちらを無用と判断する」ことで、
+     誰にもエラーが見えないから。
+   - **`serve-streams!` は `node.clj`（JVM）に置く**。thread が要るので、`future` を使う
+     serving loop を `.cljc` に書けば **名前だけ portable** になる。")
+
+  (:adr/consequences
+  "## 主張してよいこと（実測済み）
+
+   - **peer に dial して identity を証明できる** —— public peer で Ed25519（`megaphone`）と
+     RSA（`kubo/0.32.1/mars.i.ipfs.io`）の両方。
+   - **DHT に query できる** —— `/ipfs/kad/1.0.0` FIND_NODE で closer peers 20 件の実応答。
+   - **go-libp2p がこちらに dial して identify できる** —— Kubo 0.41 で
+     `ipfs swarm connect` 成功、`ipfs id` が `kotoba-libp2p/0.1` を報告、
+     `ipfs ping` が Pong（8.20 ms）。
+   - **kad に応答する** —— 自ノード 2 台で、table 3 件から FIND_NODE を応答し呼び出し側が
+     5 件学習。検証済み record の保存と取得、無効 record の拒否、caller の実 peer id での
+     provider 記録。
+   - **`/ipns/` を検証する** —— 署名（key が名指す鍵で）・期限・sequence の 3 点。
+   - **Kademlia の eviction 規則を守る** —— 満杯 bucket で incumbent に ping し、
+     不在のときだけ newcomer を入れる。
+
+   ## 主張してはいけないこと
+
+   - **QUIC / libp2p TLS / mplex は無い。TCP のみ。** これは実装の遅れではなく
+     **依存方針の判断待ち**である:
+     - QUIC は JVM に API が無くフルスタックが要る。
+     - libp2p TLS は libp2p 拡張（OID 1.3.6.1.4.1.53594.1.1）付き自己署名証明書が要り、
+       **JVM 標準に証明書ビルダーが無い**ので BouncyCastle 相当の依存が要る。
+     - mplex は実装自体は小さいが、実測した peer は全て Yamux をネゴシエートした。
+       誰も使わない deprecated muxer に面を増やす価値は無い。
+     いずれも cljc-first 方針に対する外部 Java 依存の持ち込みで、agent 判断ではなく
+     オーナー判断の領域。
+   - **PUT_VALUE / ADD_PROVIDER の永続化は無い**（プロセス内 store のみ）。
+   - **自分で publish した provider record の定期 republish は呼び出し側の責任**
+     （`republish!` はあるが scheduler は持たない）。
+
+   ## 見つけた欠陥（すべて無音で、相手のせいに見えた）
+
+   1. **`yamux/decode` は frame ではなく `{:frame … :rest …}` を返す。** wrapper から
+      フィールドを読むと全部 nil、`:type` が nil なので DATA に見えず、**payload を
+      一度も消費しない**。次の read がその payload を header として読み、1 フレーム目で
+      desync。症状は「handshake 成功直後の Connection reset」で、crypto を指していた。
+   2. **connection は 1 本の stream ではない。** go-libp2p は accept した瞬間に自分から
+      `/ipfs/id/1.0.0` を開き、ping も送る。自分の stream だけ待つ reader はそれを全部
+      捨て、相手の negotiation が 5 秒でタイムアウトして接続を落とす。**相手のログにしか
+      出ない。**
+   3. **multiaddr は wire 上では octets。** 文字列を渡しても protobuf は `bytes` に黙って
+      length-prefix する。identify の `listenAddrs` では `error reading identify message`、
+      kad の `closer-peers.addrs` では**エラーすら出ず**呼び出し側がタイムアウトした。
+   4. **identify は 1 メッセージで、FIN が要る。** 無いと peer は続きを待つ。これだけが
+      `AgentVersion: \"\"` と実名の差だった。
+   5. **peer id は鍵 protobuf の multihash**。生の鍵で provider record を書くと、保存され、
+      返され、**決して一致しない**。
+   6. **`:or` はキーが「無い」ときだけ効く。** 明示的な nil は `\"\"` にエンコードされ、
+      go-libp2p は `AgentVersion: \"\"` と報告する。
+   7. **「返信なし」も結果**（拒否された PUT_VALUE、ADD_PROVIDER）。stream を閉じないと、
+      呼び出し側はハングと見分けのつかないタイムアウトを待つ。
+
+   **教訓**: 相手側のログを読むまで 1〜6 のどれも見えなかった。ローカルに Kubo を
+   立てるのが、推測を続けるより桁違いに速かった。
+
+   ## 着地
+
+   | repo | commit | 内容 |
+   |---|---|---|
+   | kotoba-lang/io-libp2p | 1072aca | socket / identity binding / driver |
+   | kotoba-lang/io-libp2p | 23eb8bf | muxer 修正（実 DHT query まで） |
+   | kotoba-lang/io-libp2p | c31e615 | node 化（listen / serve / table / lookup / dnsaddr） |
+   | kotoba-lang/io-libp2p | 75d7618 | store / ping / probe / refresh |
+   | kotoba-lang/io-libp2p | 15e54d6 | `/ipns/` 検証 / supersede / announce / republish |
+   | com-junkawasaki/root | 17aee3f | manifest pin |
+
+   45 tests / 129 assertions green、lint clean。")
+
+  (:adr/related
+  (vector "2608550000-cid-native-codebase-authoring-compile-discovery"
+   "kotoba-lang/io-libp2p-specs-kad-dht README（delegated router は DHT ノードだが、この process は違う）"
+   "kotoba-lang/io-libp2p-specs-transport README（socket 以外は揃っていた）"))))

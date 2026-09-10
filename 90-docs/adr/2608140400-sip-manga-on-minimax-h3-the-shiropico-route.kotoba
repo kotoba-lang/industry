@@ -1,0 +1,303 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608140400")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/title "Spirit in Physics の原稿を shiropico の経路で焼く — 既定モデルは minimax-h3。ついでに、その既定モデルが 30 分で打ち切られ、課金経路からは値段が無くて呼べないことが分かった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-13")
+  (:adr/last_verified "2026-08-13")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "manga-generation-pipeline")
+  (:adr/repos (vector "orgs/com-junkawasaki/org-spirit-in-physics-comics"
+              "orgs/kotoba-lang/murakumo"
+              "orgs/network-awai/cloud-murakumo"
+              "orgs/kotoba-lang/kami-mangaka-page"
+              "orgs/kotoba-lang/kami-genko"))
+  (:adr/authoritative_for
+  (vector "SIP(org-spirit-in-physics-comics)のネーム→原稿の生成経路が scripts/manga/ にあること"
+   "SIP の参照画像は既に焼かれた白黒原稿であって resources/images/characters/*.png ではないこと"
+   "run_video_job の待ちが 1800 秒固定で、minimax-h3 が既定 geometry で完走できないこと（および失敗後も ComfyUI が走り続けること）"
+   "minimax-h3 が generation.murakumo.cloud（課金プロキシ）の価格表に無く、公開経路から呼べないこと"
+   "1 クリップの実測（640×640 / 124 frames / 20 steps / 参照 3 枚、ADR-2608100600 の 175 frames・参照なしとは別の点）"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends
+  (vector "2608100600(既定を minimax-h3 にした決定。本 ADR はその既定が課金経路に届いていないことを追記する — 同 ADR が『spec を直して serving を直していなかった』と書いた事故の 3 枚目)"))
+  (:adr/related
+  (vector "90-docs/adr/2608033000(ネーム→原稿の経路そのもの。1ページ=1クリップ・参照契約・komawari/tategaki の分担)"
+   "90-docs/adr/2608136000(測れなかった検査が、測って問題が無かった検査と同じ値を返す — 本 ADR の 3 件の欠陥は全部この形)"
+   "90-docs/adr/2607173100(モデル id をハードコードしない)"))
+
+  (:adr/body
+  "## Context
+
+オーナー指示（2026-08-13）「今の spirit-in-physics の manga 版を minimax h3 を
+ベースに, ghosthacker shiropico の作り方で manga を作って」。対象は Ch.01
+（既にレンダ済みの唯一の章）を作り直す方、分量は 1 ページ。
+
+『Spirit in Physics』は 8 巻 62 章の EDN 作品で、ネーム
+（`volumes/<vol>/chapter<NN>/storyboard.edn`）は全章そろっている。一方
+**レンダ済みなのは Ch.01 だけで、それも「1 コマ 1 枚の絵」であって原稿ではない**
+—— コマ割りも吹き出しも無く、20 枚の絵が並んでいるだけ。
+
+『GHOST HACKER — シロとピコ』側には、ネームから B4 原稿までを通した経路が
+ADR-2608033000 として実測付きで固定してある。**その経路を SIP に向け、engine を
+ADR-2608100600 が `:video` の既定に据えた minimax-h3 にした。**
+
+## Decision
+
+### A. 経路は `org-spirit-in-physics-comics/scripts/manga/` に置く（4 段）
+
+```
+storyboard.edn ─shotlist─▶ shotlists/page-NN.edn ─generate─▶ page-NN.mp4
+                                                  ─panels──▶ page-NN.panels.edn
+                                                  ─compose─▶ page-NN.png
+```
+
+shiropico から持ってきた不変条件はそのまま:
+
+- **1 ページ = 1 クリップ。** 1 プロンプトに `SHOT 1..3` を並べ、1 本のクリップから
+  各コマの静止画を抜く。1 コマ 1 クリップは 4 倍払う —— H3 では金ではなく壁時計を。
+- **幾何をどこにも書かない。** ショットリストが持つのは段と読み順の beat と
+  `:shot/beat-weight` だけで、rect は毎回 `kami.mangaka.komawari` が導く。
+- **文字を焼かない。** ナレーションと台詞はネームから来て、compose の時に
+  `kami.mangaka.tategaki` が組む。絵に焼かれた文字は直せない。
+- **参照は『そのまま 1 コマになる絵』。**
+
+### B. SIP の参照画像は `characters/*.png` ではない
+
+この repo の `resources/images/characters/{tamaki,nei,…}.png` は**実写調の AI
+ポートレート**で、本編の白黒ペン画とは別物である。ADR-2608033000 D-4 のとおり
+参照はその絵柄ごと再生されるので、これを渡すと原稿が実写に寄る。
+
+代わりに**既に本編として焼かれた白黒原稿**を参照にした:
+
+| slot | 出所 | 何を担うか |
+|---|---|---|
+| `<Picture 1>` | p7 の環の顔（寄り） | identity |
+| `<Picture 2>` | p7 の机上のポッド | 小道具の形 |
+| `<Picture 3>` | p4 の環の全身 | 絵柄（トーン・ペン画）と全身の設計 |
+
+shiropico が `character-refs/` に矛盾する 2 系統を同居させて事故ったのと同じ形が
+ここにもある —— **違いは、SIP では両方とも「本作のもの」で、片方が別の絵柄だという
+こと。** 除去ではなく用途の切り分けで解いた。
+
+### C. 参照画像の配信は Cloudflare Worker（`sip-manga-refs`）
+
+fleet の host は参照 URL を**平文 GET で取りに行く**（`comfy_upload_image` が
+`urlopen` して ComfyUI へ再アップロードする）。HEAD 必須は hosted の fal 経路の
+話で、self-hosted には掛からない。この repo は private なので raw URL は使えない。
+
+**B2 も kagi の Cloudflare 項目も、索引の記述どおりには存在しなかった**（下記）ので、
+`wrangler` の OAuth セッションで static assets の Worker を 1 本立てた。
+
+## Consequences
+
+### 実害（重い方）— fleet の既定モデルは、fleet 自身の job API から完走できない
+
+`run_video_job` の待ちは **`deadline = time.monotonic() + 1800`**（30 分）で固定されて
+いる。MiniMax-H3 は ADR-2608100600 自身が **100.6 分**と測ったモデルである。
+
+つまり **既定モデルを既定の geometry で投げると、30 分で `failed` になる。**
+実測 2026-08-13: `640×640 / 124 frames / 20 steps` + 参照 3 枚のジョブが
+`status=failed`、`error=\"timed out waiting for ComfyUI\"`。
+
+**より悪いのは、失敗が終了ではないこと。** API が諦めた後も ComfyUI は計算を
+続けており（`queue_remaining: 1` のまま 31 分後も生きていた）、GPU は焼き続ける。
+つまりこの経路では:
+
+- 呼び出し側は `failed` を受け取る
+- **しかし GPU は空かない**
+- 素直に再投入すると、まだ走っている 1 本目の**後ろに 2 本目が積まれる**
+
+今回の 1 本は ComfyUI の `/history/<prompt_id>` から直接回収した。**ジョブの記録は
+`failed` のまま、成果物は存在する** という状態になっている。
+
+ADR-2608100600 が `POST /v1/generation` での live 検証を「した」と書いているのは
+矛盾しない —— あれは**参照なしの t2v** で、30 分に収まった。**既定モデルであること
+と、既定の使い方で完走することは別**で、後者は測られていなかった。
+
+直し方は 3 つあり、どれも 1 行では終わらない:
+
+1. **deadline をモデルの実測から引く。** catalog は既に `:sec-per-clip 6038` を
+   持っている（H3）。定数 1800 の代わりにこれを使えば、モデルを足すたびに
+   deadline を手で直す必要が無くなる。**ただし `:sec-per-clip` は 175 frames の
+   値**なので、frames に対して線形に伸ばす必要がある（ADR-2608100600 自身が
+   「絶対値として引用しない」と書いている）。
+2. **諦めるときに ComfyUI 側も止める。** さもないと「失敗したのに GPU が空かない」
+   が残り、再投入が事態を悪化させる。
+3. **`failed` と『まだ走っている』を呼び出し側が区別できるようにする。**
+   今は同じ `failed` で、成果物が後から出てくることを知る手段が無い。
+
+### 実害（軽い方）— fleet の既定モデルが、課金経路からは呼べない
+
+`generation.murakumo.cloud`（公開・請求される面）に `minimax-h3` を投げると:
+
+```
+HTTP 400 {\"model\":\"minimax-h3\",
+          \"error\":\"model has no published price — refusing to quote\"}
+```
+
+catalog は同じモデルを `:video` の **`default`** かつ `verified` と宣言している。
+つまり **model を指定しない呼び出しも、指定する呼び出しも、公開経路では通らない。**
+原因は `kotoba-lang/murakumo` の `resources/murakumo/prices.edn` の `:video` に
+entry が無いこと（`wan2.2-ti2v-5b` / `ltx-2.3` / `hunyuanvideo-1.5` は在る）。
+
+**ADR-2608100600 は『spec を直して serving を直していなかった』と書いたが、面は
+3 枚あった** —— spec（cloud-murakumo の murakumo.edn）・serving（fleet の
+generation API）・**価格（prices.edn）**。同 ADR は前 2 枚を揃えて終わりにしており、
+3 枚目は見ていない。既定を動かす作業は、この 3 枚を全部動かすまで終わらない。
+
+**価格をいくらにするかは決めていない**（ここで黙って決めるべきではない）。
+数字を置くための材料だけ記す: 他の self-hosted comfy モデルは
+`:credit/per-video-second 10 / :cost/usd-per-second 0.05` で並んでいる。H3 は
+同じ fleet の同じ GPU だが**実時間あたりの占有が桁違い**なので、同じ行を写すと
+「1 台しかない H3 インスタンスを何時間も占有する」ことが値段に出ない。
+
+今回の 1 本は fleet へ直接投げた（`ssh -L 18081:127.0.0.1:8081 gad`）。
+**直接経路は課金を迂回する。既定にしない。**
+
+### 索引が実態と食い違っていた資格情報が 3 件
+
+`secrets-location-map` の記述どおりに引いて、3 件とも空振りした:
+
+| item | 記述 | 実際 |
+|---|---|---|
+| `MURAKUMO_DOUGAKA_GENERATION_TOKEN`（kagi） | 再発行済み・実在 | `no such item`（署名鍵の方は実在したので mint し直した） |
+| `BACKBLAZE_CDN_BUCKET_KEY_ID/_KEY`（1Password） | bucket `ai-gftd-cdn` 用 | 鍵は読めるが **bucket が存在しない**（`bad_bucket_id`） |
+| `CLOUDFLARE_GLOBAL_API_KEY` / `CLOUDFLARE_R2_ACCESS_KEY`（kagi） | 2026-08-05 に保管・検証済み | どちらも `no such item` |
+
+索引自身が「記述を前提に計画を立てず、着手前に実際に引く」と書いており、
+その注意書きは正しかった。**この 3 件は該当ファイルの記述を直す必要がある。**
+
+### 沈黙が緑として蓄積する形（ADR-2608136000）が、1 セッションで 3 つ出た
+
+どれも「間違った答えを、正しい答えと同じ顔で」返した:
+
+1. **EDN は評価しない。** ショットリストに `:shot/prompt (str \"a\" \"b\")` と書くと、
+   リストがそのまま文字列化されて `(str \"a\" \"b\")` の 12 文字がプロンプトに入る。
+   **API は 200 を返し、クリップも返ってくる。** 出力の絵を見るまで気づけない。
+   → `assemble` が `string?` を検査して落ちるようにした。
+2. **`(.slice js/process.argv 3)` は `--classpath` で 1 つずれる。**
+   `nbb --classpath X script.cljs arg` だと **X が第 1 引数として渡り**、
+   `ENOENT: no such file` になる。エラーの本文にクラスパス文字列が出るので
+   「クラスパスが壊れている」と読める —— 実際は引数の取り方が壊れていた。
+   → 引数は `*command-line-args*`（`cljs.core` にある。`nbb.core` には無い）で取る。
+3. **komawari の重み語彙は閉じている。** `#{:splash :large :medium :small :beat}` に
+   無いキーワードは `beat-weight` の `(get t w 1.0)` で**黙って 1.0 になる**。
+   scaffold が独自に `:establish` を吐いていたので、3 コマの重みが全部同じになり、
+   「komawari が効いていない」ではなく「均等なページ」という**もっともらしい**
+   出力が出ていた。→ ネームの `:gh/size` をこの 5 語へ写す。
+
+### 既定 geometry が正方形で、ネームのコマが横長
+
+`640×640` は ADR-2608100600 が「実際に完走を確認した」値として選んだもので、
+そこは動かしていない。ただし 3-panel-vertical のコマは横長（およそ 2:1）なので、
+`preserveAspectRatio=slice` で**上下が切れる**。切れて困るのは寄りの二人組
+（環が覗き込む構図）で、ここは次に直す対象。選択肢は 2 つ:
+
+- 横長 geometry（例 `896×512`、8n+1 でなく 17k+5 の格子と /32 の両方を満たす値）を
+  **実測してから**既定にする。ADR-2608100600 が 768×768 を「完走を確認していない」
+  という理由で退けたのと同じ規律を守る。
+- ページ側を正方形寄りのコマ割りにする（ネームを変えることになるので、こちらは
+  作品の判断）。
+
+### 実測（この 1 本）
+
+`640×640 / 124 frames / 20 steps / 参照 3 枚`、gad の ComfyUI-h3（8191）で
+**38 分 04 秒**（= 114 s/step）。測ったときのノードの load average は 3.57 で、
+このジョブ以外に重いものは載っていない。
+
+**ADR-2608100600 の 292 s/step と直接比べない** —— あちらは 175 frames で参照なし、
+こちらは 124 frames で参照 3 枚。frames は 0.71 倍、s/step は 0.39 倍で、
+**frames に対して線形ではない**。したがってどちらの値も『H3 の速さ』ではなく
+『その条件での 1 点』であって、deadline を引くための係数にはまだ足りない
+（2 点あるだけで、参照枚数の効きが分離できていない）。
+
+出力は 640×640 / 124 frames の mp4（365 KB）+ 32 kHz ステレオ音声。
+音声は原稿には使わないが、H3 は常に一緒に作る。
+
+### シーン切れ目の検出は落ちた（そして、そう言った）
+
+`panels.cljs` は 3 ショットに対して切れ目 2 つを期待したが **1 つしか見つからず**
+（3.0 秒の 1 点）、等分割へ落ちた。`panels.edn` の `:panels/segmentation` が
+`{:fallback :equal-division :reason \"…found 1 cut(s) at [3]; 2 expected…\"}` と
+記録している。
+
+**3 コマともネームどおりの絵になったのは、等分割がたまたま合っていたから**で、
+検出が効いたからではない。ここを黙って落とす実装だったら、「3 枚抜けた」という
+成功と同じ形の出力になって区別できなかった（ADR-2608136000 問 4）。
+
+H3 のショット切り替えは硬いカットではなく溶暗に近いので、閾値 0.2 では 1 つしか
+超えない。`:scene-threshold` は設定に出してあるが、**下げれば良いとは限らない**
+（ショット内の明滅も拾う）。次の手は閾値いじりではなく、
+**期待するショット数に対して最も分離の良い n-1 個の切れ目を選ぶ**ことだと思われる。
+
+### 結果の評価（正直に）
+
+**通った**: ネームの 3 ビートが 1 クリップに順番どおり入り、白黒漫画の絵柄が
+最後まで保たれ、3 コマ目の環が参照どおりの顔で出た。旧経路の p.10 3 コマ目が
+「球体の中の少女と有機的な塊」だったのに対し、**ネームが要求していた
+『ポッド越しに目が合う』が実際に描かれている。**
+
+**届いていない**: (1) 既定 geometry が正方形なのでコマの上下が切れ、3 コマ目は
+環の頭頂部が落ちている（クリップには写っている）。(2) 1・2 コマ目は
+ネームどおり（『光が動く』『かすかな輪郭』）ではあるが、ポッドの内部として
+読めるほどの情報が無い。(3) 全体の調子が既存原稿（高コントラストのペン画 +
+トーン）より軟らかい。**この 1 ページを『既存 20 枚と差し替えてよい』とは
+まだ言えない。** 言えるのは、経路が通ることと、3 コマ目が旧経路より正しいこと。
+
+## Alternatives considered
+
+- **課金プロキシの価格表に `minimax-h3` を足して deploy する。** 常時許可の範囲では
+  あるが、**価格を決めることになる**ので今回はしていない。1 行の追加で公開経路が
+  開くので、値が決まれば即座に閉じられる。
+- **`characters/*.png` を参照に使う。** 却下。実写調のポートレートなので、
+  ADR-2608033000 D-4 の『参照はその絵柄ごと再生される』がそのまま当たる。
+- **既存の Ch.01 レンダをそのまま使い、コマ割りと写植だけ足す。** 却下 ——
+  ネームが求めている絵と実際のレンダが食い違っている（p10 の 3 コマ目は
+  「ポッド越しに目が合う」はずが、球体の中の少女と有機的な塊になっている）。
+  組版だけ足しても、その食い違いは残る。
+
+## 現在地（2026-08-14）
+
+### 着地済み
+
+| repo | branch | 内容 |
+|---|---|---|
+| `com-junkawasaki/org-spirit-in-physics-comics` | `agent/sip-manga-minimax-h3` | `scripts/manga/` の 4 段 + Ch.01 p.10 の原稿・クリップ・コマ・receipt |
+| `com-junkawasaki/root` | `agent/sip-manga-h3-adr` | 本 ADR |
+
+参照画像の配信は Cloudflare Worker `sip-manga-refs`
+（`https://sip-manga-refs.04-feasts-minded.workers.dev/sip/ch01/`）。
+
+### 続き（2026-08-14、同日中の後続作業）
+
+**1 ページ焼いたあと『この感じで進めて』を受けて章を回した。以下は
+ADR-2608140600 が正本**（生成面の queue 設計、H3 の 30 分停止周期、価格）。
+本 ADR に閉じる範囲だけ更新する:
+
+- **geometry をコマの形から導くようにした**（下記「未処理 3」を解消）。画素数は
+  409,600 に保ち比だけ変える —— 3 段組み 864×448 / 2 段 736×544 / 扉 512×768。
+  **ただし比を変えた壁時計は測っていない**（画素数が同じなので据え置きの『はず』）。
+- **Ch.01 の残り 20 ページ・34 コマのショット演出を書いた**（`:shot/neme` に
+  日本語のネームを併記）。p.10 で『1・2 コマ目がポッドの内部として読めない』と
+  評価した点は、抽象的なコマに支えになる形を必ず 1 つ入れる方針で書き直した。
+- **章は完走していない。** H3 が外部から約 30 分周期で停止されており、
+  1 クリップ 38 分が窓に収まらない（ADR-2608140600）。**焼けた原稿は p.10 の 1 枚**。
+
+### 未処理（優先順）
+
+1. **`run_video_job` の 1800 秒。** 既定モデルが既定の使い方で完走しない。
+   上の 3 点（deadline を実測から引く / 諦めるとき ComfyUI も止める /
+   `failed` と『まだ走っている』を区別する）が揃うまで、H3 は
+   **ジョブ API 越しには使えない**。
+2. **`prices.edn` の `:video` に `minimax-h3` が無い。** 値段が決まれば 1 行。
+   決まるまで公開経路は閉じたまま。
+3. ~~**正方形 geometry と横長コマの食い違い。**~~ **解消**（2026-08-14、
+   `page/derive-geometry`）。ただし**変更後の壁時計は未実測**。
+4. **`secrets-location-map` の 3 件の乖離**（上記）を該当ファイルに反映する。
+5. **合成したページを reader が読まない。** `resources/images/episodes/…` は
+   1 コマ 1 枚の path で、ページ全体の置き場が無い。`script/build.clj` の話だが、
+   その build は ADR-2608131600 のとおり今は動かない。")))

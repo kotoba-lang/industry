@@ -1,0 +1,259 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809070200-cleanup-land-walks-worktrees-as-repos")
+  (:adr/title "cleanup-land walks 96 linked worktrees as repositories and its slug collision skips the real repo; and a third custody plane the search-before-absent rule does not name")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-07")
+  (:adr/context "A `git cleanup conflict` pass on 2026-09-06/07 against com-junkawasaki/root and its
+4,514 west checkouts. The read-only surveys came back healthy in the places this
+workspace has learned to watch: `scripts/west-orphan-audit.cljs` reported
+true-orphan-git 0 and renamed-UNVERIFIED 0, and `scripts/cleanup.cljs --unlanded`
+reported 236 UNLANDED child repos of 4,514 scanned (75 holding untracked work),
+with its completion line present so the run is known not to have been killed.
+
+The findings below are not about those surveys. They are about the WRITE side,
+`scripts/cleanup-land.cljs`, whose dry-run plan for this fleet was 121 targets.
+Nothing in this ADR was reached by reading code alone; each item was measured, and
+where a both-directions test was available it was run.
+
+This ADR is an evidence record for a cleanup session. It changes no policy on its
+own; it names four defects in one tool, one broken edge that was repaired, and one
+methodological gap in an existing repo-wide rule that this session walked into.")
+  (:adr/decision "## 1. cleanup-land enumerates linked worktrees as repos (96 of 121 targets)
+
+Measured 2026-09-06: of the 121 targets in the dry-run plan, **96 have a `.git`
+that is a FILE** (a linked-worktree gitdir pointer) and only 25 are ordinary
+checkouts. Spot-checked three: `orgs/cloud-itonami/.wave5-2022` is a worktree of
+`cloud-itonami-isic-2022` sitting on branch `agent/flagship-item2-2022` with 4
+uncommitted changes; `.w5-1040` is a worktree of `cloud-itonami-isic-1040` on
+`agent/item2-w5-1040`; `.wt-run` is a worktree of `cloud-itonami-app` with 21.
+
+`--apply` would therefore have opened `:review` PRs proposing OTHER SESSIONS'
+in-progress work, which its author deliberately put on an `agent/*` branch,
+against the parent repository's DEFAULT branch.
+
+The cause is known and is in this repo's own record. `:gitdir-file-blindspot`
+(2026-08-22) found that the enumeration `find orgs -maxdepth 3 -name .git -type d`
+could not see checkouts whose `.git` is a file, and `orgs/kotoba-lang/kotoba` was
+invisible to the tool while holding 7,494 lines of uncommitted work. The fix was to
+drop `-type d`. That was correct for the case it addressed. It also made every
+linked worktree in the fleet enumerate as a repository, because a worktree's `.git`
+is a file for the same reason a submodule-era gitdir pointer is.
+
+Removing a blind spot widened the aperture onto a population nobody intended to
+walk. `own-repo-root?` (`rev-parse --show-toplevel` resolving to the directory
+itself) is cited in that section as the real defence against stub `.git` files, and
+it does not separate these two cases: a linked worktree IS its own toplevel.
+
+The discriminator that does separate them is `git rev-parse --git-common-dir`: for
+an ordinary checkout it resolves inside the directory, for a linked worktree it
+resolves into the PARENT repository. That question is not asked today.
+
+## 2. The slug collision resolves backwards, and skips the real repo
+
+When two paths map to one GitHub slug, cleanup-land lets the first claim win and
+reports the loser. Measured 2026-09-06, the loser was the real repository in both
+observed cases:
+
+- `orgs/network-awai/.hyakka-deploy` (a worktree of app-hyakka) claimed
+  `network-awai/app-hyakka`, so **`orgs/network-awai/app-hyakka` was skipped with
+  67 landing candidates**. That repo is west-registered at
+  `path: orgs/network-awai/app-hyakka`; the worktree appears in west 0 times. It
+  was also the top rank-1 hazard in the survey (untracked=16 by `git status`).
+- `orgs/net-kotobase/control-plane-legal-candidate` claimed
+  `net-kotobase/control-plane`, so **control-plane was skipped with 31 candidates**.
+- `orgs/cloud-itonami/.cloud-itonami-app-adopt` claimed `cloud-itonami/app`, so
+  `cloud-itonami/cloud-itonami-app` was skipped with 1.
+
+Dot-prefixed names sort before ordinary ones, so the scratch copy wins the race by
+construction rather than by accident. The tie-break should prefer the path west
+registers; failing that, the checkout whose `--git-common-dir` is its own.
+
+## 3. The west-registration handoff would register worktrees as west projects
+
+The plan's closing section named 99 of 119 landed repos as lacking a `west.yml`
+path and printed a ready-to-run command beginning
+`nbb scripts/west-triple-sync.cljs plan --names .cloud-itonami-app-adopt,.w5-0124,
+.w5-1040,...`.
+
+Those names are worktree directories. The orphan audit's own classification puts
+them under `:worktree-scratch` (53) and `:worktree-of-registered` (28) and says
+session debris is never auto-registered. So one tool prints a command whose effect
+the other tool's rules forbid. The handoff was added (2026-08-23) precisely because
+stopping at pushed-to-GitHub is how a GH-only orphan gets made; it needs the same
+worktree filter as items 1 and 2, or it converts a correct warning into a wrong
+instruction.
+
+## 4. `:additive` with every cleanup-land gate green is still not safe to merge
+
+`kotoba-lang/amu#824`, `cleanup: land untracked WIP (127 files)`, +4553/-0, opened
+by an earlier cleanup pass at 09:27Z on 2026-09-06 and NOT a draft. Every gate
+cleanup-land owns was green on it. It was nevertheless BLOCKED: the required check
+`test (ubuntu-latest)` failed on all three platforms, roughly two minutes into the
+job, at this step:
+
+    Run npx nbb scripts/check-workflows.cljs
+    workflow-lint: POSIX shell execution files found:
+      docs/amufalsify-grep.sh, scripts/amufalsify-dbg-tmp.sh, ... (12 total)
+
+That gate is the repo enforcing CLAUDE.md's 2026-07-14 rule (sh is prohibited,
+write it in nbb) on its own contents.
+
+This is the seventh instance of the argument `:residue-gate`, `:nested-repo-gate`,
+`:stale-ignore-gate`, `:unresolved-refs-gate`, `:source-twin-gate` and
+`:revert-residue-gate` each refute: absent from the default branch is not the same
+as new work, and additive-by-path is not the same as safe-to-merge. What is new
+here is the SOURCE of the refusal. The six existing gates all encode knowledge
+cleanup-land carries. This one came from the target repository, which cleanup-land
+never asks.
+
+The general form: **cleanup-land runs a fixed gate list and never consults the
+repo's own required checks.** The cheap remedy is not a seventh gate but an order
+of operations: for `:additive`, open the PR, then merge only after the repo's
+required checks pass, rather than merging on the classification alone. That also
+costs nothing where a repo has no checks.
+
+Composition of #824's 127 files, measured: 12 `*.sh` (all `*-tmp.sh`,
+`*-20260906*.sh`, `probe-*.sh`), 104 `amubench-append-<timestamp>.py` /
+`amufalsify-append-<timestamp>.py`, 8 probe stdout `.txt` and one `.bak114`, and
+**3 files of real content**. The scratch is written into the repo by an amu cron
+loop and matches no `.gitignore` entry.
+
+Disposition taken: archived the 380 KB patch, landed the 3 real files as
+`kotoba-lang/amu#836` reusing #824's blobs verbatim, closed #824 with the evidence.
+Proven both directions on the real pipeline, same gate and same repo, differing
+only in whether the `.sh` files are present: `check-workflows` FAILURE on #824,
+SUCCESS on #836; all three `test` platforms green on #836.
+
+## 5. Test-run output reaches `:additive` because no gate names it
+
+`orgs/kotoba-lang/torihiki` planned `:additive 487 files` and was the only
+`:additive` target in the fleet. The repo tracks 60 files and **0** under
+`evidence/`; its `.gitignore` names only `/target /.cpcache /node_modules
+/.nbb-deps`. The 487 are 214 `.out`, 108 `.err`, 137 `.md`, 25 Clojure files and a
+few others, all under `evidence/`, and the `.out` files contain test stdout
+(`Running tests in #{\"test\"}`).
+
+`junk-re` does not cover `.out`/`.err`, and `base-ignore-gate!` correctly reported
+`scanned 487, excluded 0` because the base `.gitignore` does not exclude them
+either. Both gates worked as written. The content is still run output.
+
+Not landed. A previous pass had already opened draft `torihiki#13` for the same
+corpus, which is the correct holding action. Whether an evidence corpus belongs in
+that repo is a repo-policy question, not a cleanup question.
+
+## 6. A third custody plane that the search-before-concluding-absent rule does not name
+
+This session concluded, and wrote into an archive index, that the content of the
+deleted `gftdcojp/ai-gftd-apex` existed nowhere but 7 dangling worktrees. **That
+was wrong.** The search covered `orgs/` (fleet-wide grep for the distinctive
+literals `hunyuan3d-vrm` and `murakumo-scene-v1`: 0 hits outside those directories)
+and GitHub (`gftdcojp` has 9 repositories, full paginated listing, none apex). It
+did not cover `~/repo-archive/`.
+
+`manifest/gftd-retirement.edn` lists apex under
+`[:closing :landed :deleted-with-verified-bundles]`, and
+`~/repo-archive/gftdcojp-apex-20260906.bundle` (632 KB, written 18:42 that day)
+reports `The bundle records a complete history` and contains
+`src/gftd/apex/generation_api.cljc` byte-identical at 294bda414862 to the worktree
+copy.
+
+The repo-wide rule 'search before you conclude X is absent' names
+`scripts/repo-search.cljs`, the concept and surface indexes, and `git ls-files -v`
+for sparse-cone gaps. Every one of those answers a question about LIVE content.
+Retired content lives in a plane none of them reads, and the register that names
+that plane is a single EDN file most searches never open. Three custody planes now
+exist -- the working tree, GitHub, and the bundle archive -- and the rule names two.
+
+The corrected finding is narrower and was measured both ways. The 7 worktrees are 4
+distinct trees differing in exactly one file, `src/gftd/chat/views.cljc` (7 parallel
+agent attempts at it). Against every blob for that path across all bundle refs (13
+distinct), `claude-2` IS present and `claude-10` (8471d6d8f5a1), `codex-1`
+(8a08897f9798) and `codex-5` (6e1252374282) are NOT. Those three uncommitted
+variants are the only content in those directories that exists nowhere else. All
+357 files were archived by copy and the archive index entry was corrected in place
+rather than left standing.
+
+## 7. A repaired edge, and one silenced but unrepaired
+
+REPAIRED. `orgs/network-awai/cloud-itonami/deps.edn` resolved
+`io.github.gftdcojp/cloud-mamori` through `../../gftdcojp/cloud-kyusai`. GitHub
+redirects that slug to `cloud-itonami/kyusai`, which west carries at
+`orgs/cloud-itonami/kyusai`, so the declaration resolved only on machines predating
+the move and no fresh checkout could build a classpath for any `-M:local`
+invocation. Judged against the consumer's own `origin/main` (the shared checkout was
+70 commits behind, and the audit had classified the edge UNJUDGED for exactly that
+reason), not against the drifted tree. The residue directory was at the same commit
+as the west pin (a7d7203), clean, with an identical `src/` file set. Retargeted at
+the west path via a server-side single-entry commit; PR #609 merged; pin advanced
+47a98001 -> 0f07d0aa; checkout synced. The audit's `local-root-UNJUDGED` count went
+1 -> 0.
+
+SILENCED BUT NOT REPAIRED. The one remaining blocking edge, `orgs/gftdcojp/apex`
+consumed by `orgs/network-awai/net-babiniku`, was cleared by a concurrent session
+during this one (`35300e3`, merge `1ee08f9`) by deleting the dead `:extra-paths`
+entry. Its commit message states that no code here requires an apex.* namespace.
+`orgs/network-awai/net-babiniku/scripts/provider_contract_probe.clj` line 4 still
+reads `[gftd.apex.generation-api :as apex]`, unchanged. The namespace is
+`gftd.apex.*`, not `apex.*`. So `bb provider-contracts` still cannot resolve, and
+the audit now exits 0. The retirement claim in that message is correct; the
+namespace claim is not.")
+  (:adr/consequences "WHAT IS TRUE NOW (verified at close, 2026-09-07):
+
+- superproject: 0 ahead / 0 behind origin/main, 0 tracked changes, 0 stashes,
+  0 open PRs. The one stash (canvas-ledger WIP) was verified landed -- its 3 events
+  byte-identical to origin/main lines 10628 and 10630, with an altered-key control
+  that correctly missed -- archived, then dropped.
+- `nbb scripts/west-orphan-audit.cljs --blocking` exits 0: no blocking registration
+  gaps and no un-adjudicated candidates. Note that exit 0 here is partly the result
+  of item 7's silencing, not only of item 7's repair.
+- non-draft cleanup PRs fleet-wide: 3 -> 0. Every cleanup PR that could merge
+  without a human is disposed. `amu#824` closed after rescue; `kotoba-lang#570` and
+  `#572` closed as superseded (all 16 and 7 net-added `jvm-dep-ledger.edn` lines
+  already on main by semantic key with `:event/at` stripped, against a 193-line
+  file, with a control line correctly absent). All three archived before closing.
+- merged this session: network-awai/cloud-itonami#609, kotoba-lang/amu#836.
+  Pins advanced for both (cloud-itonami -> 0f07d0aa, amu -> b0dcfe4d), each through
+  `scripts/west-pin-put.cljs` with its three server-side checks passing.
+- archive: `.git/stash-archive-20260906/` holds 4.5 MB -- 3 PR patches, the stash
+  patch, and 357 copied files under `orphaned-worktrees/` -- with an index.txt
+  entry per item.
+
+WHAT WAS DELIBERATELY NOT DONE:
+
+`cleanup-land --apply` was NOT run, on the evidence of items 1-3. Running it in the
+current state would open roughly 90 `:review` PRs, most of them proposing other
+sessions' feature-branch work against default branches, and would merge item 5's
+487 files of test output.
+
+RESUME POINT, in priority order:
+
+1. Fix cleanup-land's target enumeration before the next `--apply`
+   (`scripts/cleanup-land.cljs`). One question separates the two populations:
+   `git rev-parse --git-common-dir` resolving outside the directory means linked
+   worktree. Gate items 1, 2 and 3 on it, and print the count walked and the count
+   skipped as worktrees, so that skipping is distinguishable from finding nothing.
+   Prove it both ways as the existing gates do: a real repo still plans, a worktree
+   does not, and app-hyakka's 67 candidates become reachable again.
+2. Then re-run `nbb scripts/cleanup-land.cljs` and re-read the plan. It should
+   shrink from 121 targets to about 25.
+3. For `:additive`, merge on the repo's required checks rather than on the
+   classification (item 4).
+4. Decide torihiki's evidence policy (item 5) -- `torihiki#13` holds it correctly
+   meanwhile. Same question for amu's cron scratch, which will re-plan every pass.
+5. Repair `net-babiniku`'s `:provider-probe` for real (item 7): either restore
+   `gftd.apex.generation-api` from
+   `~/repo-archive/gftdcojp-apex-20260906.bundle` into a repo the taxonomy accepts,
+   or remove the require and the assertions that depend on it. Do not recreate
+   `gftdcojp/apex`: its deletion is recorded and bundle-verified, and recreating it
+   would reverse a decision rather than repair a break.
+6. Consider naming `~/repo-archive/` and `manifest/gftd-retirement.edn` in the
+   search-before-concluding-absent rule (item 6), so the retired plane is reachable
+   from the same habit as the live one.
+
+BACKLOG NOT DRAINED, and honestly: fleet open PRs went 103 -> 108 across this
+session. 3 were closed and 2 merged here; concurrent loops opened about 8. Of the
+108: 31 sit in archived repositories and can be closed by nobody (both verified
+archived=true), 25 are cleanup-shaped and all drafts, 52 are ordinary. One pass
+does not out-drain the generators, and reporting the backlog as shrinking would be
+false.")
+  (:adr/related (vector "ADR-2608136000" "adr-2608230300-west-registration-gap-closure" "2607300700" "2608036400" "adr-2606291100-cleanup-worktree-branch-stash-pr-merge"))))

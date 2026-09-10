@@ -1,0 +1,110 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608319800-the-itonami-economy-sells-answers-and-the-constraint-is-demand")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/title "itonami の経済は答えを売る。律速は供給ではなく需要 —— そして走らなかった検査は、動いた検査と同じ顔をする")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "itonami-x402-economy")
+  (:adr/repos (vector "orgs/cloud-itonami/actor-hanmoto"
+              "orgs/network-awai/nexus-x402"
+              "orgs/kotoba-lang/org-biscuitsec"
+              "orgs/kotoba-lang/pay"))
+  (:adr/related (vector "2608291009" "2608110200" "2608313700" "2608180200" "2608026100"))
+  (:adr/body "2026-08-31, one session on the itonami x402 economy. Five decisions and one
+measurement that changed what the next step should be.
+
+## Decisions
+
+**1. hanmoto sells answers, not the register.** Both upstream directories were
+read rather than assumed: NodeInfo 2.x carries a per-server licence over 26,406
+rows with no bulk export, and plc.directory publishes 901 rows for replication
+with no dataset licence attached. No licence covers the aggregate, so this
+service cannot grant one. TERMS.md says that in its first paragraph. The
+licence facts live once, as data in hanmoto.offer/upstream-licensing, and
+/terms serves that rather than a second prose summary that could drift from the
+first. /terms is free, because a buyer cannot agree to terms it must pay to
+read.
+
+**2. A priced path must arrive through the facilitator.** Measured that
+morning: the gateway answered 402 while the origin answered 200 with the data.
+The price was real and so was the bypass, and from the seller side the two
+calls were the same shape. The origin now requires the shared secret nexus
+injects, and fails closed when it holds none. Down is correct there, and this
+repo had already decided the same question the same way for an unmetered
+resource.
+
+**3. as-of and checked-at are two dates, not one.** as-of is when the data last
+changed; checked-at is when it was last re-derived. Re-deriving from the corpus
+tip reproduced the 2026-08-09 counts exactly, so the register is old and not
+wrong -- a claim only two fields can make. A rebuild that stamped as-of with
+its own run time would make every stale snapshot look new.
+
+**4. Checks are decoded when this implementation can evaluate them, refused by
+name when not.** biscuit.wire counted a block's checks and dropped them, so
+every token carrying one was refused, and every reference token carries one.
+Expressions, a kind other than One, and disjunctions stay refused, and the
+refusal withholds the whole block: an empty or partial check list folds to
+vacuously satisfied, so a token would become more permissive for being harder
+to read.
+
+**5. No policy is not permission.** pay.x402-buyer refuses when given no spend
+policy. An agent that has not been told what it may spend has not been
+authorised to spend anything, and treating silence as freedom is the most
+dangerous available default. It also chooses the cheapest acceptable offer
+rather than the first that parses, because the order of accepts is the seller
+side choice.
+
+## The measurement that redirects the next step
+
+The ladder reads in-catalog 1 of 32 actors, 31 with no offer, and margin
+computable for none. But the settlement ledger, corrected for double counting,
+shows one external payment in the system lifetime: 0.001 USD on 2026-08-14.
+SKUs went 19 to 22 during the session and external payments went 0.
+
+So the binding constraint is demand, not supply. Making 31 more actors sellable
+would produce 31 payable things nobody buys. The honest next steps are the
+second external payment, and attribution: five accounts have spent metered
+credits and none of them is an actor, so no actor has a measured cost at all.
+
+## What kept being true
+
+A check that never ran is indistinguishable from a check that works. It
+appeared all day, and more than half the instances were mine:
+
+- the ladder claimed no receipt store existed; the ledger had been live for
+  weeks with 772 rows
+- hanmoto called grant with an empty base, so every token reported no scope --
+  invisible because no token had ever reached that line
+- a settlement ledger counted the same transaction up to four times, and the
+  field added to make that visible was computed after the folding, so it could
+  never fire
+- a build exited 127 and the ship ran as a separate command, so only the second
+  exit code was read
+- a detector written to catch that reported the two correct repos as findings,
+  twice, for two different reasons in one expression
+
+The recurring cure is the same: an evidence floor that refuses rather than
+reporting a clean scan, a reason literal pinned so a rename fails loudly, and a
+negative control that breaks the exact claim and watches the test that names it
+go red.
+
+## Gaps, and whose they are
+
+Not ours to close: the second external payment (demand), which murakumo account
+belongs to which actor (whoever knows), and the custody decision for hanmoto
+root key -- whose key, in which kagi compartment. The mechanism is proven live:
+a token minted here was verified, its checks run, its scope read, and the meter
+recorded count/query/kotoba://graph/hanmoto-probe/2026-08.
+
+Open and technical: biscuit has no expression evaluator, so time-limited
+delegation cannot be honoured; its encoder writes facts-only authority blocks,
+so an agent cannot narrow its own authority and hand it on; and the x402 buyer
+has no host seam, which stays unbuilt because no bot wants to buy anything yet.
+
+Measured across the tree: 58 ship scripts, 17 can send out an artifact nobody
+built, 39 build outside the shared guard, 2 do both. Registered as
+verify-ship-builds-first rather than fixed by 56 unverified edits.")))

@@ -1,0 +1,169 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608600000-semantic-merkle-lisp-db-block-granularity-measured")
+  (:adr/title "ADR-2608600000: Semantic Merkle Lisp DB のブロック粒度・投影・CID キャッシュを実測した —— 「キャッシュ命中率は編集量ではなく被依存集合が決める」")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "kotoba-stack")
+  (:adr/date "2026-08-06")
+  (:adr/last_verified "2026-08-06")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/related (vector "2608550000-cid-native-codebase-authoring-compile-discovery"
+                "2608580000-kotoba-hash-native-completion-kotobase-code-graph-projection"
+                "2608590000-kotobase-capability-bench-orbit-ceramic-actordb"
+                "2608039970-kotobase-datom-plane-not-datalog"))
+  (:adr/authoritative_for
+  (vector "semantic block の粒度（全ノード CID / 定義単位 CID / 意味チャンク）の選択根拠"
+   "CID ビルドキャッシュの命中率を見積もるときに使ってよい変数"
+   "kotoba.codebase.semantic-code/namespace-block の commit コスト特性"
+   "『semantic block だけでは database にならない』の定量的な裏付け"))
+
+  (:adr/context
+  "オーナー提案（2026-08-06）: kotoba 中心なら DB を「正規化 S 式・値・型・効果・
+評価結果を同じ CID 付き意味グラフとして保持する永続計算機」と定義すべき。全 cons cell を
+CID 化する案 A は避け、定義単位（案 B）か意味チャンク（案 C）にする。相対コストモデルと
+1M 定義でのストレージ概算、memoization による 2.27〜3.8 倍の短縮見積りが添えられていた。
+提案自身が「実測ベンチマークではなく相対コストモデル」と明記していた。
+
+## 着手前に確認したこと —— 提案の大半は既に決定・実装済みだった
+
+- **`kotoba-lang/codebase`**: `semantic-code` が checked definition を canonical
+  DAG-CBOR に落とし、その CIDv1 が定義 identity。**局所束縛は de Bruijn 索引、解決済み
+  global は tag-42 IPLD link、定義自身の名前は hash 対象に入らない**。`typed-code` は
+  identity を compiler の checked KIR に載せ替え済み（ADR-2608550000）。namespace commit /
+  closure block / execution receipt / pure build-cache key も実在。
+- **`kotobase.code-graph`**: その datom 投影（definitions / types / artifacts /
+  namespace-commits / execution-receipts / query-receipts）が既にある。
+- **ADR-2608580000**: kotobase 面は codebase の **projection であって premise ではない**
+  （削除テスト付き）。
+
+したがって提案の優先順位 1・4〜9 は新規決定ではなく **既存の追認**。実際に未決だったのは
+**粒度（案 A / B / C）と、そこに付いていた見積り**だけなので、そこだけを実測した。
+
+## 実測装置
+
+`kotoba-lang/kotobase` の `capability-bench/`（`run-semantic.cljs` + `semantic/*.cljc`）。
+**3 つの戦略はすべて『実物の `kotoba.codebase.semantic-code` が出した IR』を chunk する**
+（pinned SHA、nbb 上で実行）。identity は固定し、ブロック境界だけを動かした。
+
+corpus は生成物だが形は実測: workspace の全 `.kotoba`（`crdt` + `hash` の 72 定義）を
+parse すると **49.5 nodes/定義（中央値 40）、depth 平均 7.2 / 最大 15**。生成器はこれを
+狙い、出た値（55.9 / 57 / 8.1 / 11）を報告する。fan-out 8 は提案側の仮定をそのまま仮定として使用。")
+
+  (:adr/decision
+  "**粒度は「バイト律速か往復律速か」で選ぶ。単一の推奨値を置かない。** 実測（2,000 定義 /
+111,729 ノード）:
+
+| 戦略 | blocks | blk/定義 | bytes | B/定義 | hydrate 1 定義 | 10% 編集の新規 block | 同 新規 bytes |
+|---|---|---|---|---|---|---|---|
+| 全ノード(A) | 29,795 | 14.9 | 4.27 MB | 2,133 | 47.1 | 11,659 | 1.85 MB |
+| 定義単位(B) | 2,002 | 1.0 | 3.26 MB | 1,629 | **1** | 1,717 | 2.84 MB |
+| 意味チャンク(C) | 16,235 | 8.1 | 3.83 MB | 1,913 | 8.3 | 8,691 | 2.11 MB |
+
+- **dedup は見積りよりずっと強い。** 55.9 nodes/定義に対し全ノード方式の実 block は
+  **14.9/定義**（73% が重複解消 —— `{op:local,index:0}` や `{op:intrinsic,+}` は全定義で
+  同一ブロック）。提案の「1M 定義 = 40M block、5〜9 GiB」は約 3.7 倍の過大評価。
+  **線形外挿（実測ではない）**で 1M 定義: B ≈ 1.63 GB / 1.0M block、C ≈ 1.91 GB / 8.1M、
+  A ≈ 2.13 GB / 14.9M。B についての提案見積り 2.5〜3.5 GiB より低い。
+- **読み出しコストは提案どおり悪い。** 1 定義の hydrate は B=1 block、A=**47 block**
+  （node cache 無しの冷たい値。unique 14.9 より多いのは共有 leaf を再取得するため）。
+  実行を DAG interpret でなく compiled artifact 経由にする、という優先順位 5 の裏付け。
+- **書き込み増幅は block 数と逆向きに動く —— ここがチャンク化の本当の論拠。**
+  10% 編集で B は最少 block（1,717）だが最大 bytes（2.84 MB、1 リテラル変更で ~1.6 KB の
+  定義を丸ごと書き直す）。C は block 5 倍で **bytes 26% 減**、A は block 7 倍で **35% 減**。
+  **帯域が律速ならチャンク、往復が律速なら定義単位。**
+
+**投影は最適化ではなく database の条件。** 同じ 155 件の答え（effect 宣言を持つ定義）に
+datom index は **2 block**、object 面だけの走査は **4,000 block**（定義 + type block）。
+2,000 定義で 2,000 倍、以降線形に開く。逆依存も同じ index から: hub 20 件を seed にすると
+**2,000 定義中 1,999 が影響**（index 4,032 block）、leaf 20 件なら 20 件（40 block）。
+
+**`namespace-block` は commit ごとに namespace 全体を書き直す（実測された欠陥）。**
+2,000 名前で second commit のコスト:
+
+| 変更内容 | flat（現行実装） | name→CID Prolly Tree |
+|---|---|---|
+| 1,717 定義が変化 | 98,058 B | 150,957 B |
+| **leaf 1 定義だけ変化** | **98,058 B** | **19,776 B** |
+
+1 定義の commit が namespace 全体（名前数に線形）を書き直す。同じ map を Prolly Tree に
+置けば未変更領域が CID で共有され 19.8 KB に落ちる。**この 1 点だけが実測と現行実装の
+不一致**であり、上流で直す価値がある。
+
+**pure だけ memoize / effect は receipt、は維持する。** ただし見積りの前提は誤り。")
+
+  (:adr/consequences
+  "## 最重要 —— CID キャッシュの命中率は編集量ではなく被依存集合で決まる
+
+評価面の実測（2,000 定義、slice 200）:
+
+| | 評価回数 | cache hit | receipt | ms |
+|---|---|---|---|---|
+| cold | 1,263 | 1,117 | — | 5,980 |
+| **leaf** 編集後の再ビルド | 14 | 222 | 14 | **365** |
+| **hub** 編集後の再ビルド | 1,712 | 1,087 | 1,169 | **7,938** |
+
+leaf 編集なら **16 倍速**。hub 編集は **cold より遅い** —— キャッシュは死重になり、全
+dependent の CID が変わり、effectful 定義は receipt を出し直す。
+
+理由は構造的で、これが提案の見積りを無効にする: **Merkle code graph では 1 定義の編集が
+その推移的 dependent すべての CID を変える**。したがって再利用率は `1 − 編集割合` では
+なく、コールグラフと「どこを編集したか」の関数:
+
+| dep shape | 編集数 | 編集位置 | 変化した CID (of 150) | 1 編集あたり無効化 | 再利用率 |
+|---|---|---|---|---|---|
+| library | 1 | leaf | 1 | 1× | **0.99** |
+| library | 1 | hub | 150 | **150×** | **0** |
+| library | 3 | random | 150 | 50× | 0 |
+| library | 15 | leaf | 15 | 1× | 0.90 |
+| uniform | 1 | hub | 150 | 150× | 0 |
+| chain | 1 | random | 54 | 54× | 0.64 |
+
+**`random` 行は平均ではなく二峰性**である —— hub を外せばほぼ何も無効化せず、1 つでも
+掴めば下流全部が無効化される。2,000 定義で 10% ランダム編集を行うと 1,717 identity が
+変化し再利用率 0.14。**計画に使える平均は存在しない。** 使える数字は「この定義の
+dependent 集合はどれだけか」であり、それはまさに逆依存 index が答える量。
+
+したがって提案の『80% が前回と同じ → 2.27 倍 → 最大 3.8 倍』は **leaf 局所の作業に限れば
+妥当（実測 16 倍まで出る）**、**library/hub を触る作業では 1 倍未満**。ビルドキャッシュの
+効果を単一の混合命中率で報告する運用は、唯一効く変数を隠す。
+
+## 実務への落とし込み
+
+1. **既定は定義単位（案 B、現行実装）を維持する。** 往復コストが支配的で、hydrate 1 block・
+   dedup 後 storage 最小という測定結果がそれを支持する。
+2. **帯域が律速な経路（closure transfer / 同期）でのみ意味チャンク（案 C）を検討する。**
+   編集あたり bytes が 26% 減る代わりに block 数が 5 倍になる、という測定済みの交換。
+3. **全ノード CID（案 A）は既定にしない。** dedup は見積りより効くが、hydrate 47 block と
+   storage 1.31 倍を正当化する用途がまだ無い。
+4. **`namespace-block` を Prolly Tree 化する**（唯一の実測された現行実装の欠陥）。
+5. **ビルドキャッシュの効果を単一命中率で報告しない。** 逆依存 index で「編集対象の
+   dependent 集合」を出し、leaf 作業と library 作業を分けて報告する。
+
+## この ADR が縛らないこと
+
+- **これは deployment ベンチマークではない。** corpus は C1 lowering が受理する部分集合で
+  生成したもの（形だけ実 `.kotoba` に較正）。ms 値は nbb/SCI 由来で引用しない —— block 数・
+  byte 数・無効化係数だけが移植可能。
+- **Wasm は一切測っていない。** 実行面は artifact CID キャッシュ + 小さな KIR interpreter で
+  模しており、`kotoba.kir/execute` の性能ではない。
+- 1M 定義への外挿は線形であり、そのラベルを外して引用しない。
+- ADR-2608550000 / 2608580000 の決定（identity = checked KIR、kotobase 面は projection）を
+  変更しない。この ADR はその上の粒度と見積りだけを実測で置き換える。")
+
+  (:adr/body
+  "実装・生データ・方法論の正本は `kotoba-lang/kotobase` の
+`capability-bench/README-semantic.md`（方法論と全結果表）、`results/semantic.edn`（生 EDN）、
+`results/semantic.txt`（コンソール出力）。
+
+構成:
+
+- `src/kotobase/semantic/corpus.cljc` —— 実 `.kotoba` 由来の形統計 + 決定論的生成器、
+  編集位置（`:leaf` / `:random` / `:hub`）の指定
+- `src/kotobase/semantic/chunk.cljc` —— 3 つの粒度戦略と hydrate（block fetch 計数付き）
+- `src/kotobase/semantic/plane.cljc` —— datom 投影 / Prolly index / 逆依存伝播 /
+  namespace commit（flat vs tree）/ CID keyed 評価キャッシュと effect receipt
+- `run-semantic.cljs` —— 実行系
+
+依存は vendoring ではなく pinned SHA の実 repo（`codebase` / `prolly-tree` / `io-ipld` /
+`dag-cbor` / `io-multiformats`）。")))

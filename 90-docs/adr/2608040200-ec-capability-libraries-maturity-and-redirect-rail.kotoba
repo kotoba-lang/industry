@@ -1,0 +1,159 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608040200-ec-capability-libraries-maturity-and-redirect-rail")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-08-04")
+  (:adr/last_verified "2026-08-04")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2608040200: EC capability library 4 本（mise / omise / okaimono / kessai）の成熟度 —— 実測した欠陥 8 件、hosted-redirect rail の新設、そして正直な stage 宣言はスコアを下げる")
+  (:adr/topic "ec-capability-libraries-maturity-and-redirect-rail")
+  (:adr/repos (vector "orgs/com-junkawasaki/root"
+              "orgs/kotoba-lang/mise"
+              "orgs/kotoba-lang/omise"
+              "orgs/kotoba-lang/okaimono"
+              "orgs/kotoba-lang/kessai"))
+  (:adr/related (vector "adr-2608040100（murakumo Node 24 / storefront。この 4 本を迂回した理由の記録）"
+                "adr-2606302206（mise を共通 EC system として起こした決定）"
+                "adr-2607121900（omise / okaimono を courier 5320 向け capability として起こした決定）"
+                "adr-2607072340（kessai payment gateway）"
+                "adr-2607021700（portfolio maturity scoring）"))
+
+  (:adr/authoritative_for
+  (vector "mise / omise / okaimono / kessai の 2026-08-04 時点の成熟度（R2）と、各 repo が R3 に上がるための不足"
+   "同 4 本で実測により確定した欠陥と、その修正方針"
+   "hosted-redirect 決済を kessai の第 3 rail `:redirect` として設計し、authorize/capture に押し込まないという決定"
+   "mise の redirect 経路（注文を支払いの前に作る）を mise.redirect に隔離し、mise.checkout を kessai から独立に保つという決定"
+   "repo-maturity の composite が正直な stage 宣言で下がるという観測と、その解釈"))
+
+  (:adr/context
+  "オーナー指示（2026-08-04）: 「mise, kessai, omise, okaimono の成熟度を高めて」、続いて「next」。
+
+## 着手時の状態
+
+4 本とも `manifest/repo-maturity.edn` の composite は 0.76〜0.79 で、一見そろって良い。しかし内訳を見ると **4 本すべて `:maturity/stage-score` が nil** だった —— 重み 0.30 の最大軸が欠けたまま、残り 4 軸を再正規化した値が composite として出ていた。
+
+## 作業の前提が壊れていた（自分の変更より前の回帰）
+
+着手直後、**`manifest/west.yml` が origin/main で壊れており `west` が一切動かなかった**:
+
+    Cannot find required key 'url-base'. Path: '/remotes/3'.
+
+4 件の register commit（b08b87f com-instagram / 90ad1e9 com-tiktok / 37ac17f com-linkedin / 83f8a20 com-vimeo-upload）が、single-entry のサーバ側編集で新しい project entry を **`projects:` ではなく `remotes:` の側に**挿入していた。remotes は url-base しか持たない配列なので、remote/revision/path/groups を持つ entry が入るとスキーマ検証が落ちる。しかも 4 件は file 全体で 1 回ずつしか現れず、**projects 側には存在しない** —— 壊れていただけでなく登録もされていなかった。")
+
+  (:adr/decision
+  "## 1. 実測してから触る。推測では直さない
+
+8 件すべて REPL で再現してから修正した。以下は「疑わしい」ではなく「こう出た」である。
+
+### mise（4 件）
+
+- **`line-total nil 3` → `Price{:amount 0}`**。値付けミスが『正当な無料商品』と見分けのつかない形で描画され、気付くのは代金が動いたあと。単価の無い明細行は拒否する。`multiply` の nil 許容は `cart/net-total` が『割引なし』を `(multiply nil -1)` で表現しているため**仕様として残す**が、`:amount` が数値でない Price（不在ではなく破損）は投げる。
+- **`reserve` が在庫割れを 0 に clamp して成功を装う**。`reserve-many` はさらに悪く、満たせない行を潰しつつ残りの行を減算し、『一部が満たせない注文』を『一部成功した注文』として返していた。`reserve` は不足なら nil、`reserve-many` は all-or-nothing に変更。clamp が要る用途には `reserve-clamped` を明示的に残した。
+- **郵便番号を持たない国へ配送できなかった**。香港の完全な住所が `{:postal \"required\"}` で弾かれる。厳しい検証ではなく、**誰も書いていない国別ブロックリスト**として機能していた。
+- **`email-valid?` が `\"@.com\"` / `\"@@@.com\"` / `\"a b@x.com\"` を通していた**。local part の無いアドレスは下流の検査を全部通り、注文確定後の送信時に黙って bounce する。
+
+### omise（3 件）
+
+- **`window-valid?` が `open < close` を要求**していたので `[\"22:00\" \"02:00\"]` が不正になり、**居酒屋・コンビニ・深夜薬局は `store` 構築ごと拒否**されていた。`open > close` を『日を跨ぐ』の意味に変更し、`open-at?` は前日から跨いだ window も見る。**ここを片方だけ実装するのがこのバグの典型形**で、hours テーブルは正しく見えるのにその店が一番忙しい時間帯だけ閉店と判定される。
+- **`\"24:00\"` 締めが表現不能**（h≤23 を要求）。24:00 のみ 1440 として受理。24:30 は不正のまま、24:00 開店は不可、`open = close` は 0 分とも 24 時間とも読めるので拒否。
+- **`store` が空 id を通す一方 `validate-store` は `:missing-id` で弾いていた**（構築器と検証器が別の答えを出す）。
+
+### omise / okaimono 共通（1 件）
+
+- **JSON が RFC 8259 違反**。`json-str` が backslash / quote / `\\n` だけを見ており、スプレッドシート由来の値にタブや CR が混ざると生の制御文字が JSON 文字列に出て、**どのパーサも受け付けない出力**になっていた。U+0020 未満を全てエスケープ。CSV も `\\r` が引用トリガに無く、CR を行終端とみなす読み手には 1 行が 2 行に割れていた。okaimono は決済監査に流す台帳なので、これは体裁ではなく**監査証跡の破損**。
+
+### 旧テストが欠陥を仕様として固定していた
+
+mise の `reserve-many` テストは在庫 0 の sku を 1 個引きながら『成功』を期待し、コメントに `; clamped at 0` と書いてあった。omise のテストは日跨ぎ window と 24:00 を『不正』として固定していた。**意図ごと書き換えた。**
+
+## 2. hosted-redirect は authorize/capture ではない —— 第 3 の rail を作る
+
+前回 mise と kessai の R3 不足として別々に記録した 2 つは、実体は同じ 1 つの穴だった: **どちらも hosted-redirect 決済（Stripe Checkout / PayPal / Adyen HPP）を表現できない。** ADR-2608040100 で murakumo の物販が両方を迂回した理由もこれである。
+
+### kessai `:redirect`
+
+`:card` は ISO 8583、`:wire` は ISO 20022 pain.001 —— どちらも merchant が instrument を保持し 2 段（reserve → settle）を駆動する前提。hosted redirect では **merchant は instrument を一度も持たず、authorization を発行せず、capture もできない**。session を作り payer を送り出し、あとから結果を*知る*だけ。`:card` に押し込むと『誰も実装できない capture』が残り、台帳がそれを待ち続ける。
+
+`kotoba.kessai.redirect` が守らせる不変条件:
+
+- **戻り URL は支払いの証拠ではない。`observe-return` は構造上 `:succeeded` に到達できない** —— どんな引数を渡しても settle しない。payer は URL を書き換えられるし、払わずに到達もできるし、はるかに多くは**払ってからタブを閉じて戻ってこない**。この関数を用意しない設計もあり得たが、**用意しなければ `?status=success` のハンドラは `mark-*` に対して書かれ、そこで settle してしまう** —— 安全な置き場所を提供することが目的。
+- **`confirm` は金額と通貨を session と照合する。** 改竄されたクライアント・使い回された session id・通貨換算の取り違えを捕まえる唯一の場所で、**happy path では一度も通らないので最も省略されやすい。**
+- **`confirm` は event id で冪等**（PSP は同じ event を再送する仕様なので、これは『起きるかもしれない』ではなく必ず起きる）。
+- **`confirm` は例外を投げない。** webhook ハンドラが投げると 5xx になり、PSP は同じ壊れた event を永久に再送する。
+- **終端状態は復活しない**（期限切れ後に届いた succeeded は履行できる支払いではない）。**時計を読まない**（`expire-if-due` は `now` を受け取る）。
+
+確定した session だけが `->payment-ref` で PaymentRef に射影され、既存の `settlement-entries` がそのまま動く。status は `:captured` —— リダイレクト決済に merchant が呼べる capture は無いので、`:authorized` にすると誰も実装できない capture を台帳が待ち続ける。
+
+### mise `mise.redirect` —— 注文は支払いの「前」に作る
+
+    place-order            : authorize → 成功なら Order を作る（card-present 由来）
+    redirect/begin→confirm : Order(:pending) を作る → payer を送る → webhook で :paid
+
+**順序が逆であることが本質。** 成否があとから webhook で届くので、注文が先に無いと webhook が『どの注文の話か』を引く先が無い。
+
+`mise.redirect` だけが kessai に依存する（`mise.checkout` は素のまま —— リダイレクト決済を使わない消費者にこの結合を読ませる理由が無い）。この層でしか止まらないもの:
+
+- **戻り URL に success で戻ってきても注文は `:paid` にならない**（作成／送出／戻りの 3 状態すべての拒否をテストで固定）
+- **注文対 session の突き合わせ。** kessai の照合は session 対 event なので、**正しい金額の session を別の注文に当てる**のはここでしか止まらない。
+- **通貨の minor unit を推測しない。** 3 桁小数通貨（KWD/BHD/OMR…）は拒否する —— ×100 で作ると **10 分の 1 の金額で session ができ、しかも決済は通る**（少なく請求されるだけ）ので誰も気付かない。`:->minor` を明示的に渡させる。
+- **`confirm` は `:pending` 以外を動かさない**（webhook 再送で二重に `:paid` にしない）。
+
+## 3. stage を正直に宣言するとスコアは下がる。それを受け入れる
+
+4 本とも CLAUDE.md に R-tier の梯子を定義し `Status: R2` を宣言した。R2 =『ドメイン契約が揃い test/lint/CI 緑、git 座標で消費可能、**ただし本番の消費者で未実証**』。
+
+composite を据え置くには stage ≈ 0.79（= R4『本番負荷で実証され運用記録がある』）が必要だが、4 本とも本番の消費者が 1 つも無いので主張できない。
+
+**従来の 0.76〜0.79 は良さの証明ではなく、最大の軸が欠けていたことによる下駄だった。** 軸を埋めた分だけ下がるのが正しい挙動であり、ここで R4 と書けば数字は上がるがそれは計測ではなく劇場になる。
+
+## 4. west.yml の修復（作業の前提）
+
+remotes → projects への移動のみ。revision は 4 件とも元の値をそのまま運んでおり pin は 1 つも変わっていない（diff は 20 insertions / 20 deletions で +/- の revision 行が完全対応）。**再発防止は本 ADR の範囲外** —— single-entry のサーバ側編集が『名前でソート位置を探して挿入』する際にどちらの配列に居るかを見ていない疑いがあり、そこは manifest workflow 側の課題として残す。")
+
+  (:adr/measurements
+  (vector "修正前の実測（REPL）: mise `(line-total nil 3)` → Price{:amount 0} / `(reserve (stock {\"A\" 3}) \"A\" 10)` → on-hand 0（available? は false）/ `(reserve-many (stock {\"A\" 3 \"B\" 5}) [[\"A\" 10] [\"B\" 1]])` → {A 0, B 4} / `validate-shipping-address` HK 完全住所 → {:postal \"required\"} / `email-valid?` \"@.com\"・\"@@@.com\"・\"a b@x.com\" → すべて true"
+   "修正前の実測（REPL）: omise `(window-valid? [\"22:00\" \"02:00\"])` → false かつ同 hours での store 構築 → nil / `(hhmm->minutes \"24:00\")` → nil / `(store \"\" \"\" \"\")` → 非 nil（validate-store は :missing-id）/ stores->json が生のタブ・CR・U+0001 を JSON 文字列内に出力"
+   "テスト増分: mise 70 tests/182 assertions → 81/234。omise 17/72 → 19/82。okaimono 10/41 → 12/50。kessai 10/87 → 21/139。全 repo 0 failures / 0 errors。lint は 4 repo とも errors 0（mise のみ既存 warning 35 が残存、redirect 由来の新規 warning なし）"
+   "CI: kotoba-lang/{mise,omise,okaimono,kessai} 4 本とも main で success"
+   "repo-maturity composite の変化: mise 0.793→0.743→0.747 / omise 0.761→0.710 / okaimono 0.772→0.705 / kessai 0.783→0.711→0.718。stage-score は 4 本とも nil→0.400（:status-r2）、structural-score は mise 0.60→1.00、他 3 本 0.75→1.00"
+   "composite を据え置くのに必要な stage は約 0.79（= R4 相当）。4 本とも本番消費者ゼロのため主張不可"
+   "pin 前進で解決していたもの: mise の LICENSE 欠如（c2f0748 で Apache-2.0 追加済み）と okaimono の `:local/root \"../html\"` 依存（ef60ec1 で git 座標化済み、それ以前はクローン単体で `clojure -M:test` が classpath エラーで起動しない）。superproject が古い pin を握っていただけだった"
+   "west.yml 修復の検証: 修復前は `west list` がパース失敗、修復後 4047 projects。com-instagram / com-linkedin / com-tiktok / com-vimeo-upload の 4 件が正しい revision と path を返す"
+   "west pin: mise dd90197→f1bea9e→754b632 / omise 857e69f→6f00541 / okaimono 4e8611a→ddd87a7 / kessai 718726e→e4d8b84→50d8af9"))
+
+  (:adr/consequences
+  "## 得られたもの
+
+- **EC 4 本が hosted-redirect 決済を表現できるようになった。** ADR-2608040100 で『どちらの層でもない』として迂回した技術的理由はもう無い。
+- 8 件の欠陥はいずれも**本番で金額・在庫・監査証跡を静かに壊す種類**で、happy path では出ない。テストで意図ごと固定した。
+- 4 本すべてが自分の stage を宣言するようになり、composite が『測っていない軸を持つ値』ではなくなった。
+
+## 残っている不足（R3 への距離）
+
+**4 本とも R3 の条件は同じ: 実際の消費者が本番でこれを叩いていること。コードを足しても上がらない。**
+
+| repo | R3 の不足 |
+|---|---|
+| mise | 本番の消費者。最短は murakumo storefront の `mise.redirect` 移行 |
+| kessai | 同上（`:redirect` の実消費者）。`:card` / `:wire` にも実決済の消費者が無い |
+| omise | 5320 actor が本番で叩いた記録が無い |
+| okaimono | 同上。加えて**注文に `placed-at` が無く SLA も滞留時間も計算できない**（配送台帳としての次の穴） |
+
+## 未着手と既知の別件
+
+- **murakumo storefront の `mise.redirect` 移行は未着手。** 本番稼働中の経路なので、並行実装 → webhook を両経路に流して突き合わせ → 切替、の順序が要る。
+- **`network-awai/cloud-murakumo` には test workflow が存在しない。** 唯一の workflow は `pages.yml`（Publish Creative Studio to GitHub Pages）で、**直近 30 run すべてが `deploy` job で failure**。私の変更より前から継続しており本件とは無関係だが、**371 tests / 25,950 assertions のスイートを CI が一度も回していない**ことを意味する。ローカル実行が唯一の検証経路。
+- west.yml の remotes 誤挿入の**再発防止は未実施**。")
+
+  (:adr/evidence
+  (vector "kotoba-lang/mise main 754b632（f1bea9e 欠陥修正 + CLAUDE.md、0dbee05 mise.redirect、754b632 dep 記述修正）"
+   "kotoba-lang/omise main 6f00541 / kotoba-lang/okaimono main ddd87a7"
+   "kotoba-lang/kessai main 50d8af9（e4d8b84 CLAUDE.md、50d8af9 :redirect rail）"
+   "com-junkawasaki/root main: d95cfd3（west.yml 修復）→ e237056（EC 4 本の pin + ledger）→ dfa491a（redirect の pin + ledger）"
+   "各 repo の CLAUDE.md に R-tier の梯子と『触るときに壊してはいけない不変条件』を記載。manifest/repo-maturity.edn に 4 本の新スコアを反映（生成物、`nbb scripts/repo-maturity.cljs --only <path> --merge-existing` で再生成）"
+   "本 ADR は実運用の消費者を持たない。すべての検証はライブラリのテストと lint であり、本番トラフィックによる実証は含まない。"))
+
+  (:adr/body
+  "本文は :adr/context / :adr/decision / :adr/measurements / :adr/consequences / :adr/evidence を参照。結論を 1 行で: **8 件の実測された欠陥を直し、hosted-redirect を第 3 の rail として表現できるようにし、stage を正直に R2 と宣言した結果 composite は下がった —— 下がったことが、この作業が計測であって劇場でないことの証拠である。**")))

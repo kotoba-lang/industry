@@ -1,0 +1,64 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607198300-kotoba-security-assurance-model")
+  (:adr/title "ADR-2607198300: Repository-wide security assurance model")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19")
+  (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-security-assurance")
+  (:adr/authoritative-for
+  (vector "repository-wide security reporting semantics"
+   "security maturity and evidence levels"
+   "critical release-gate caps"
+   "security heatmap semantics"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/security/policy/security-assurance-model.edn"
+   "orgs/kotoba-lang/security/docs/security-assurance-model.md"
+   "orgs/kotoba-lang/security/registers/stack-security-assurance.edn"
+   "orgs/kotoba-lang/security/registers/stack-security-score.edn"))
+  (:adr/decision-summary
+  (map (:scope :kotoba-lang/repo-wide)
+   (:mandatory-fields
+   (vector :score :maturity :grade :release-gate :evidence :residual-critical-gaps))
+   (:score-range (vector 0 100))
+   (:maturity-range (vector :L0 :L4))
+   (:evidence-range (vector :E0 :E5))
+   (:grade-range (vector :S :F))
+   (:release-gates (vector :pass :partial :fail :blocked :not-applicable))
+   (:scalar-is-safety-probability false)
+   (:heatmap-is-release-authority false)))
+  (:adr/body
+  "# ADR-2607198300: Repository-wide security assurance model
+
+## Context
+
+A scalar 0–100 average is useful for prioritization but can be mistaken for a
+probability of safety. It also hides a critical zero behind strong unrelated
+controls. Stars and letter grades have the same problem when presented alone.
+
+## Decision
+
+Every kotoba-lang repository security report must include six independent
+fields: weighted Security Control Maturity, L0–L4 maturity, S–F grade,
+release gate, E0–E5 evidence, and residual critical-gap count.
+
+The machine-readable rule in kotoba-lang/security defines weights, levels,
+heatmap bands and critical caps. Any critical control below 40 caps grade at C;
+below 20 forces a failed release gate. Missing signed production evidence or
+an unresolved critical gap prevents a pass.
+
+The heatmap is mandatory for stack-wide reports, but its colors are navigation
+only. Neither a score, grade, stars nor green cell authorizes release.
+Likelihood × impact × exposure remains a separate residual-risk calculation.
+
+## Consequences
+
+Reports become less compressible but cannot conceal catastrophic gaps in an
+average. Score changes require executable evidence; production qualification
+requires fresh authority-signed receipts. Accepted non-goals remain explicit
+gray/N/A cells rather than silently improving or reducing a release decision.")))

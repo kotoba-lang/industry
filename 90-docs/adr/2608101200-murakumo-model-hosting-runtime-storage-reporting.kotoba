@@ -1,0 +1,92 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608101200-murakumo-model-hosting-runtime-storage-reporting")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "murakumo.cloud model hosting Phase 5 — ONNX/safetensors runtime, encrypted dual-region bytes, and jurisdiction reporting outbox")
+  (:adr/topic "murakumo-model-hosting-runtime-storage-reporting")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-10")
+  (:adr/last-verified "2026-08-10")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "ONNX and safetensors-transformers promotion into the Murakumo fleet"
+   "private model-byte encryption and APAC/WNAM application-level replication"
+   "US, UK, and Japan external-report preparation, approval, delivery, and receipt boundaries"))
+
+  (:adr/decision-summary
+  (vector "D1: ONNX and safetensors-transformers use a fixed offline image; repository code, arbitrary argv, and custom auto_map are forbidden"
+   "D2: every model block and revision root is written with a customer-supplied SSE-C key to both APAC primary and WNAM replica before publication succeeds"
+   "D3: reads fail over to the replica and scheduled reconciliation repairs one-sided retry windows without making D1 the bytes authority"
+   "D4: external reports require a typed trust case, fixed jurisdiction/destination pair, human draft, distinct human approval, and recorded receipt"
+   "D5: NCMEC and NCA connectors remain fail-closed until authority credentials and legal onboarding exist; Japan IHC uses a manual-portal receipt path"
+   "D6: the production boundary is cloud-murakumo merge d1f7957216ea8e5b6e3c20fa81360e619e613da0, D1 migration 0006, Worker version 7ab2b884-743e-40c9-b398-9ff6ec92f704, and the gad runtime image sha256:fc6753b11035a6e79fffd3692acb834c18b72ca3e064b52e64e16e09d14aec66"))
+
+  (:adr/verify
+  (vector "curl https://murakumo.cloud/api/v1/model-hosting | jq .phase_5"
+   "wrangler d1 migrations list murakumo-model-registry --remote"
+   "wrangler r2 bucket info murakumo-model-blocks"
+   "wrangler r2 bucket info murakumo-model-blocks-replica"
+   "launchctl print gui/$(id -u)/cloud.murakumo.model-fleet"
+   "ssh gad 'docker image inspect murakumo-model-runtime:phase5'"))
+
+  (:adr/body
+  "# Context
+
+Phase 4 proved isolated dynamic loading and GGUF rollout, but explicitly left ONNX
+and safetensors deployment unsupported. Private/gated bytes were access-controlled
+but not protected with an operator-held encryption key, storage had one region, and
+trust cases had no governed handoff to external reporting channels.
+
+# Decision
+
+ONNX promotion accepts exactly one top-level graph. The fixed CPU ONNX Runtime image
+derives named inputs from the graph and executes bounded probes. Safetensors promotion
+requires a standard Transformers config/tokenizer/weight bundle, forbids Python files
+and `config.auto_map`, and loads only local files with `trust_remote_code=false` and
+`use_safetensors=true`. Both formats run as an unprivileged user with a read-only root,
+bounded tmpfs/resources, dropped Linux capabilities, no-new-privileges, loopback-only
+canary and production ports, checksum revalidation, health gate and retained rollback.
+
+R2 remains the immutable bytes authority. The Worker requires a 256-bit SSE-C key and
+two distinct bucket bindings. A put succeeds only after encrypted writes to APAC primary
+and WNAM replica; reads prefer primary and fail over to replica, and deletes cover both.
+Scheduled reconciliation records and repairs one-sided failures. This is application-
+level replication, not a claim that one Cloudflare R2 bucket natively replicates regions.
+
+External reporting is an outbox, not automatic legal adjudication. A moderator drafts
+from an existing trust case and a different moderator approves. Code fixes the allowed
+pairs to US/NCMEC CyberTipline and UK/NCA CSEA for credentialed CSAM reporting, and
+JP/Internet Hotline Center for manual portal handoff. Runner endpoints cannot be supplied
+by repository metadata or arbitrary request data. Every claim, retry, failure, external
+reference and CID receipt is recorded. Legal counsel/authority onboarding still decides
+whether a concrete case is reportable and supplies connector credentials.
+
+# Evidence
+
+`network-awai/cloud-murakumo#51` merged as `d1f7957`. Remote D1 migration 0006 is
+applied and the Phase 5 capability is live in Worker version
+`7ab2b884-743e-40c9-b398-9ff6ec92f704`. The empty pre-existing object plane required no
+plaintext backfill. R2 reports primary APAC and replica WNAM with zero objects in each.
+The SSE-C key is a Worker secret with a Keychain escrow; the token-signing secondary is
+escrowed in Kagi. The gad image was rebuilt from the merge and returned deterministic
+ONNX output `[[[1.0,1.0]]]` and safetensors text `hello 200` under the production sandbox
+flags. Scanner and fleet LaunchAgents run from the merged component checkout.
+
+Targeted Phase 5, fleet, external-report and model-hosting tests pass. The repository-wide
+test command still has unrelated pre-existing failures for a MusicGen pricing declaration
+and a generated model-hosting asset, so it is not recorded as a full-suite pass.
+
+# Remaining boundary
+
+No user model is deployed until a clean revision receives governed promotion. NCMEC/NCA
+automatic delivery is implemented but deliberately inactive without authority-issued
+credentials and completed legal onboarding. Japan remains a human portal handoff with a
+required receipt. This ADR does not determine ownership, illegality, or a statutory duty
+for an individual case.
+
+# Manifest
+
+root's `cloud-murakumo` pin advances separately through the guarded single-entry server
+workflow to `d1f7957216ea8e5b6e3c20fa81360e619e613da0`.")))

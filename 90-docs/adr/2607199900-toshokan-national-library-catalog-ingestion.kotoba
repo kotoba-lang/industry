@@ -1,0 +1,228 @@
+(vector (map (:db/id -1) (:adr/consequences (vector "kotoba-lang/toshokan exists as a new repo, a read-only reference/archive
+   actor (no Governor/actuation -- same class as cloud-itonami-gtin-catalog
+   and cloud-itonami-lei-corporate-tos-catalog per ADR-2607110300's own
+   'archive actor, not advisor+governor' distinction) that harvests public
+   bibliographic metadata (title/creator/publisher/date/identifier/subject
+   -- never full text, never digitized page images) from national library
+   catalogs and preserves it via ADR-2607072300's git-journal-as-source-
+   pattern, folded into kotobase.net via the same pull-based batch job
+   shape ADR-2607113500 proved for cloud-itonami-lei-*." "Of the 5 requested jurisdictions, 3 got real, tested, working harvesters
+   (NDL, LOC, Korea NL/NA) and 2 (Iran NLAI, Russia RSL/NLR) got an
+   explicit :spec-tier non-implementation with the reason recorded in
+   code, not silently dropped -- both because no official API/OAI-PMH/SRU
+   exists for either (only unofficial third-party HTML scrapers, e.g.
+   github.com/ketabchi/melli and github.com/OnlyFart/RslParser, which is
+   itself evidence there is no sanctioned channel), and because both sit
+   in sanctions-sensitive territory (OFAC ITSR for Iran, the post-2022
+   Russia regime) where the Berman Amendment informational-materials
+   exemption plausibly applies but has not been reviewed by counsel for
+   this specific use." "End-to-end pipeline verified with REAL data, not a design on paper: a
+   5-record NDL SRU harvest (title=\"夏目漱石\") wrote 34 quads to
+   80-data/public/ndl.journal.edn, a 5-record LOC JSON API harvest
+   (\"natsume soseki\") wrote 81 quads to loc.journal.edn, and
+   scripts/kotobase-ingest-toshokan.cljs folded both into a fresh
+   self-minted did:key identity's toshokan-library-catalog graph on
+   backend.kotobase.net -- confirmed queryable afterwards via a live
+   :eavt datoms scan (NDL entity ndl:R100000002-I000001786297 = 8 attrs
+   incl. title '愛と真実の人びと'; LOC entity loc:2015456729 = 11 attrs
+   incl. title 'Natsume Sōseki shūhen jinbutsu jiten...'), matching
+   ADR-2607113500's own 'proven with real data, not paper' bar." "Korea NL's harvester (toshokan.sources.korea-nl) is fully coded against
+   the documented nl.go.kr Open API wire format but is BLOCKED on a human
+   action: registering for an API key at
+   https://www.nl.go.kr/NL/contents/N31101010000.do. This is a Korean-
+   government per-account approval flow; whether a non-Korean applicant
+   can register without a resident/business registration number is
+   unverified -- calling toshokan.sources.korea-nl/search without
+   NL_GO_KR_API_KEY set throws immediately with the registration URL
+   rather than silently no-op'ing, so the gap stays visible." "The current harvest is a manually-triggered, small-sample proof (5+5
+   records), not a scheduled bulk sync -- ADR-2607072300's own
+   'webhook/west-update-hook remains a future extension, not implemented
+   here' scoping applies equally to this ADR. Bulk/continuous harvesting
+   (NDL's Free Data Service + JAPAN/MARC weekly dumps; LOC's 2017 25M-
+   record bulk set; either's OAI-PMH resumption-token paging) is future
+   work, deliberately not attempted in this first cut."))
+  (:adr/authoritative_for (vector "This repo's own 80-data/public/*.journal.edn files are the authoritative
+    source of the library metadata this actor has harvested -- kotobase.net
+    is a derived, rebuildable index over them, per ADR-2607072300, not the
+    sole store." "The :library/* attribute schema (source, source-url, title, creator,
+    publisher, date, language, format, identifier variants (ndc/lccn/isbn),
+    subject, retrieved-at, harvest-source) defined in
+    orgs/kotoba-lang/toshokan/src/toshokan/quad.cljs and each
+    toshokan.sources.* namespace is the canonical shape for library
+    bibliographic facts in kotobase; any future library source (including a
+    later Iran/Russia implementation, or NDL/LOC bulk-dump ingestion) should
+    reuse it rather than inventing a parallel one." "toshokan.sources.iran-nlai and toshokan.sources.russia-rsl are the
+    authoritative record of WHY those two jurisdictions are unimplemented
+    (no official API found; sanctions-sensitive) -- re-litigating this from
+    scratch in a future session should start by reading those namespace
+    docstrings, not re-researching from zero."))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/topic "toshokan-national-library-catalog-ingestion")
+  (:adr/related (vector "90-docs/adr/2607072300-actor-public-data-git-journal-kotobase-index.edn"
+                "90-docs/adr/2607110300-cloud-itonami-lei-corporate-tos-catalog.edn"
+                "90-docs/adr/2607113500-kotobase-net-ingestion-cloud-itonami-lei.edn"
+                "90-docs/adr/2607092600-cloud-itonami-libraryops-9101-coverage.edn"
+                "orgs/kotoba-lang/toshokan"
+                "orgs/kotoba-lang/kotobase-client"))
+  (:adr/status "accepted")
+  (:adr/id "adr-2607199900-toshokan-national-library-catalog-ingestion")
+  (:adr/doc_type "adr")
+  (:adr/last_verified "2026-07-19")
+  (:adr/body "
+# ADR-2607199900: kotoba-lang/toshokan — 国立図書館カタログの kotobase 保全（5法域中3法域を実装、2法域は spec-only）
+
+**Status**: accepted, 2026-07-19
+**Deciders**: Jun Kawasaki（+ Claude、オーナー承認のうえ設計・実装・実データ end-to-end 検証まで実施）
+
+## Context
+
+オーナーからの質問: 「国立国会図書館や米国・韓国・イラン・ロシアの国会図書館などの
+図書データを ingest して kotobase に保全する repo は設計実装済みか」。
+
+調査の結果:
+
+- `cloud-itonami-isic-9101`（ADR-2607092600、\"Community Library and
+  Archive\"）は既存だが、これは ISIC 9101 分類の**業界コンプライアンス
+  シミュレーション actor**（貸出・法定納本・修復士サインオフを
+  Governor で検閲する架空エンティティのシミュレーション）であり、実在の
+  図書館から実データを ingest するものではない。同ADR自身が
+  「kotoba-lang org を library/archive/ils/catalog/marc/preservation 系の
+  名前で検索したが0件だった」と明記。
+- `manifest/repos.edn` / `90-docs/adr/` 全体を再検索したが、OAI-PMH /
+  Z39.50 / MARC 系のingestプロトコルを扱う repo、および当該5法域の
+  データをkotobaseに保全する具体設計は存在しなかった。
+- 5法域それぞれの実際のデータアクセス手段を実地調査（WebSearch/WebFetch
+  +自前の curl 検証）した結果、明確な二極化が判明:
+  - **NDL（日本）**: SRU/OpenSearch/OAI-PMH が公式に公開済み
+    （https://ndlsearch.ndl.go.jp/api/sru 等）。認証不要、非商用利用は
+    登録不要。dcndl（DC-NDL RDF）レコードスキーマ。Free Data Service /
+    JAPAN・MARC 週次ダンプによるバルク取得経路もある。
+  - **LOC（米国）**: loc.gov JSON API・SRU・LCCN Permalink API・Linked
+    Data Service (id.loc.gov) が公式公開、キー不要。2017年の2500万件
+    バルクMARCデータセットも現存。
+  - **Korea NL/NA（韓国）**: nl.go.kr / nanet.go.kr に公式 Open API は
+    あるが、**アカウント登録+APIキー発行が必須**（韓国政府ポータル、
+    外国人が登録可能かは未検証）。
+  - **Iran NLAI**: 公式API/OAI-PMH/SRU/バルク輸出は**一切存在しない**。
+    唯一の窓口はペルシア語のみのレガシーOPAC（opac.nlai.ir）で、到達性も
+    不明瞭（WebFetchはECONNREFUSED）。非公式スクレイパー
+    （github.com/ketabchi/melli）の存在自体が公式チャネル不在の傍証。
+    加えてOFAC対イラン制裁（31 CFR Part 560）の射程内で、Berman
+    Amendment（31 CFR 560.210(c)）による情報資料の適用除外が及ぶ可能性は
+    あるが、政府公開OPACへの直接該当ガイダンスは見つからず、法務未レビュー。
+  - **Russia RSL/NLR**: 同様に公式API/OAI-PMH/SRUは存在しない
+    （非公式スクレイパー github.com/OnlyFart/RslParser の存在が傍証）。
+    RUSMARC形式。制裁の射程は限定的と見られるが（純粋な書誌メタデータの
+    輸入は情報資料の適用除外が及ぶ可能性）、そもそも技術的にAPIが無い。
+
+既存の設計パターンとして、ADR-2607072300（actor の公開データは自リポジトリの
+git 履歴内 EDN quad-log `80-data/public/*.journal.edn` が正本、kotobase.net は
+そこから折り込む派生インデックス）と、それを実際に動かした
+ADR-2607113500（cloud-itonami-lei-* 105社分の実データを real transact で
+kotobase.net に折り込み、105/105成功・失敗ゼロを実証したpull-based batch fold
+job）が、今回のユースケース（国立図書館の公開書誌データの定期的ハーベスト→
+kotobase保全）に構造的にそのまま当てはまる。ADR-2607110300 が定義した
+「advisor+governor の actuation actor ではなく、read-only 参照/アーカイブ
+actor」という区分も同様に適用できる（図書館データのハーベストにガバナンスで
+検閲すべき『作動』は存在しない）。
+
+## Decision
+
+### 1. 新規リポジトリ: `kotoba-lang/toshokan`（図書館、role suffix 不要な短い和名）
+
+`kotoba-lang` org 直下、`gijiroku`（議事録actor）・`tayori`（correspondence
+actor）と同型の短い日本語名の read-only archive actor として配置。
+`cloud-itonami`（実在企業ドメイン）でも `etzhayyim`（自己主権法人レイヤー）
+でもなく、公共知識インフラの保全という性質が kotoba-lang の言語/インフラ層に
+最も近いと判断。visibility は kotoba-lang org 既定の public
+（repos.edn `:orgs :visibility`）。
+
+### 2. スコープ: 5法域中3法域を実装、2法域は明示的 `:spec`
+
+- **実装**（`toshokan.sources.ndl` / `.loc` / `.korea-nl`）: 公式API/
+  ドキュメントに基づく実動作するハーベスタ。NDL・LOCは実データで
+  end-to-end検証済み（下記）。Korea NLはコード完成済みだが
+  `NL_GO_KR_API_KEY` 未設定では即座に例外を投げる（サイレントno-opにしない）
+  — 登録は人間の手作業（韓国政府ポータルの個別審査制、外国人可否は未検証）
+  であり自動化の対象外。
+- **spec-only、非実装**（`toshokan.sources.iran-nlai` / `.russia-rsl`）:
+  `search`/`->quads` を呼ぶと理由付きで例外を投げるだけのプレースホルダ。
+  理由は namespace docstring に一次情報として記録（公式APIが存在しない、
+  制裁法域で法務未レビュー）。将来公式APIが出現した場合はここに実装を書く
+  ことをdocstringで明記。
+
+この2/5の縮退はオーナーへの事前確認なしに判断した——安全フロア
+「④CAPTCHA/bot検出の回避をしない」の精神に沿い、非公式スクレイパーしか
+存在しない外国政府システム（うち1つは制裁法域）への自動アクセスを新規に
+書くのは、本リポジトリの既存の`:spec`成熟度階層（cloud-itonami-isic-*
+fleetの`:implemented`/`:blueprint`/`:spec`と同型）に素直に収まる判断であり、
+オーナーが後で異議があれば上書き可能なようestablished conventionとして
+残す。
+
+### 3. アーキテクチャ: git journal 正本 + kotobase.net 派生インデックス
+
+- `80-data/public/<source>.journal.edn`（source = ndl/loc/korea-nl）が
+  正本。ADR-2607072300と同じ `[entity attr value tx op]` タプルの単一
+  トップレベルEDNベクタ形式。
+- `scripts/harvest.cljs <source> \"<query>\" [max]` — 該当APIから取得し
+  ジャーナルに追記するのみ（kotobase.netには触れない）。
+- `scripts/kotobase-ingest-toshokan.cljs` — ADR-2607113500の
+  `kotobase-ingest-cloud-itonami-lei.cljs`と同型の pull-based batch fold
+  job。差分は1点のみ: LEI版は105個の**他リポジトリ**をGitHub Contents
+  API経由で列挙・取得するのに対し、本スクリプトは**自リポジトリ内**の
+  ジャーナルファイルをローカルに直接読む（本actorは単一リポジトリで
+  複数ソースを持つ構成のため）。自己主権 Ed25519 identity を初回生成し
+  `scripts/.kotobase-ingest-toshokan-identity.hex`（gitignore）に永続化、
+  グラフは `kotobase/db/<did>/toshokan-library-catalog`。tx_edn の
+  wire形式はエンティティmap `[{:db/id e :ns/attr v ...} ...]`
+  （ADR-2607113500が発見した`[:db/add e a v]`は不可、という制約を継承）。
+- `:library/*` 属性スキーマ: `:library/source`（:ndl/:loc/:korea-nl）・
+  `:library/source-url`・`:library/title`・`:library/creator`・
+  `:library/publisher`・`:library/date`・`:library/language`・
+  `:library/format`・識別子系（`:library/ndc`・`:library/lccn`・
+  `:library/isbn`）・`:library/subject`・`:library/retrieved-at`・
+  ingest時に付与される`:library/harvest-source`。
+
+### 4. XML/JSONパース: 正規表現ベース、フルXMLパーサ依存なし
+
+NDLのdcndl（RDF/XML、`<recordData>`内でHTMLエンティティ二重エスケープ
+されている）とLOCのJSON APIは、いずれも安定した既知スキーマなので、
+npm依存を増やさずnbb組み込みのnode:fs+正規表現で抽出する
+（`toshokan.sources.ndl`のdocstringに明記のとおり、スキーマがドリフト
+したら本物のXMLパーサへの切り替えを検討）。
+
+## 実データによる end-to-end 検証（実測、2026-07-19）
+
+1. `npx nbb --classpath src scripts/harvest.cljs ndl 'title=\"夏目漱石\"' 5`
+   → NDL SRUから実5件取得、`80-data/public/ndl.journal.edn`に34 quads
+   （tx 1）を書き込み。
+2. `npx nbb --classpath src scripts/harvest.cljs loc \"natsume soseki\" 5`
+   → LOC JSON APIから実5件取得、`loc.journal.edn`に81 quads（tx 1）。
+3. `scripts/kotobase-ingest-toshokan.cljs` 実行 → 新規 identity
+   `did:key:z6Mkg3S26m9nUbpV6aPh3VtZJwxssii2sLohuQSQWHJA2pTj` を自己発行、
+   `toshokan-library-catalog` グラフへ実transact:
+   `OK ndl entities=5 datom_count=39` / `OK loc entities=5 datom_count=60`
+   / `korea-nl SKIP（journal空、キー未登録のため未実行）`。総計 ok:2
+   failed:0。
+4. `client/datoms` の `:eavt` スキャンで実際にクエリ可能なことを確認
+   （例: `ndl:R100000002-I000001786297` の `:library/title` =
+   \"愛と真実の人びと\"、`loc:2015456729` の `:library/title` =
+   \"Natsume Sōseki shūhen jinbutsu jiten...\"）。ADR-2607113500と同じ
+   「紙の上の設計で終わらせず実データで証明する」基準を満たした。
+
+固定fixture（`test/fixtures/ndl-sru-sample.xml` / `-multi-sample.xml` /
+`loc-search-sample.json`、いずれも上記と同じ実APIから取得した実レスポンス）
+に対する `clojure.test` ベースの単体テスト（5 deftest、26 assertions、
+全通過）も用意し、ネットワーク接続なしでパーサ回帰を検出できるようにした。
+
+## Consequences
+
+上記 `:adr/consequences` を参照。次の一歩として想定されるが本ADRのスコープ外:
+バルク/定期ハーベスト（NDL Free Data Service・JAPAN/MARC週次ダンプ・LOC
+2017年バルクセットの取り込み）、Korea NLのAPIキー登録（人間のタスク）、
+Iran/Russiaの将来的な公式API出現時の実装、west/manifest登録後の
+CI/scheduled-routine化。
+")
+  (:adr/title "ADR-2607199900: kotoba-lang/toshokan — 国立図書館カタログの kotobase 保全（5法域中3法域を実装、2法域は spec-only）")
+  (:adr/source-format "edn")))

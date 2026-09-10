@@ -1,0 +1,121 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608720000")
+  (:adr/title "The cleanup was mostly a stale pin, and four of my own measurements lied before I caught them")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-18")
+  (:adr/repo "com-junkawasaki/root")
+  (:adr/commit "3cfba31f533")
+  (:adr/body
+"## Context
+
+A `cleanup` session on the superproject. Entry state: 7 stashes, 36 local branches,
+30 worktrees, 0 open PRs, no merge conflicts anywhere. `cleanup.cljs --unlanded`
+reported **765 UNLANDED child repos out of 4,406 scanned**.
+
+## Decision 1 — the 606-repo `dirty=7` signature was a stale pin, not committed build junk
+
+606 of the 765 carried the identical signature `dirty=7`: seven deleted `.cpcache/`
+files. Read from the checkout alone that is build cache committed into 606 repos, and
+the obvious remedy is a fleet-wide sweep to untrack and ignore it. **I reported exactly
+that, and it was wrong.**
+
+`.cpcache` is absent from `main` in every one of those repos and their `.gitignore`
+already names it: a commit `cleanup: untrack .cpcache and ignore it` landed upstream
+**2026-08-14**. The sweep had already happened. What never happened was the pin advance,
+so west kept every checkout parked one commit before it. Acting on my own recommendation
+would have written ~606 pointless commits against repos that were already fixed.
+
+This is ADR-2608136800's rule (checkout, west pin, and the repo's `main` are three
+different things) failing on its second application **in the same session** — I had
+already used it, correctly, an hour earlier to dismiss five 'blocking' dep edges as
+stale-checkout artifacts. A corrected error class reappearing on the next subject is
+the pattern, not the exception.
+
+**Advanced 628 pins** (`advance-pins.cljs`, revision lines only — no wholesale
+regeneration), landed as `3cfba31f533` (603) and `71f09cea190` (25).
+`verify-west-pins`: 603 changes, all fast-forward, 0 fail, 0 warn.
+Proved both directions: `com-baidu` / `com-binance` went `dirty=7` → `dirty=0` after
+`west update`. A pin advance that left checkouts dirty would have been theatre.
+
+Measured all 606 rather than sampling: 601 `ahead_by=1`, 2 `ahead_by=3` (same commit
+plus a portable-suite-on-nbb test change), 11 already current, 3 not west-registered.
+
+**The value is not the seven files.** It is that 606 of 765 UNLANDED entries were noise,
+and noise at that ratio buries the 8 repos holding genuinely untracked work.
+
+## Decision 2 — the 4 repos with real untracked work get archived, not PR'd
+
+With the noise cleared, `cleanup-land` planned **zero `:additive` files**. Every
+untracked file was gated out (`skip-nested-repo` caught a duplicate clone of the
+west-registered `netsync`; `rename-residue` caught ADR 0043→0046; `skip-credential`,
+`skip-workflow-policy`, `skip-junk` caught the rest) or demoted to `:review`.
+
+All four `:review` repos are `:close-stale-revert-risk`. Merging any would revert newer
+`main` content:
+
+| repo | behind main | untracked files `main` also changed |
+|---|---|---|
+| `cloud-itonami/actor-kawaraban` | 108 | 53 / 53 |
+| `network-awai/cloud-itonami` | 240 | 7 / 7 |
+| `net-kotobase/control-plane` | 548 | 4 / 4 |
+| `kotoba-lang/kotoba-wasm` | 16 | 2 / 3 |
+
+**No PRs opened.** The runbook records kawaraban #28 being closed as stale-revert-risk
+and regenerated an hour later; opening these rebuilds that parking lot. Archived 378
+untracked files + 4 tracked patches (43 MB) under
+`.git/stash-archive-20260818/unlanded-checkouts-20260818/`, each with `provenance.txt`.
+Nothing deleted from any working tree.
+
+## Finding — a 170-byte actor seed that exists only on one disk
+
+In `network-awai/cloud-itonami`, gitignored and therefore invisible to `git status` and
+to every survey that feeds cleanup:
+
+```
+.itonami-crm-test/identity.edn — 170 bytes, actor Ed25519 :seed-hex + :did (z6Mke…)
+```
+
+**Present in no commit and in no twin checkout.** One `git clean -xfd` destroys it
+irrecoverably. Copied verbatim into the archive at mode 600; value never printed, and
+deliberately not committed anywhere — it is a secret, which is what `skip-credential`
+exists to keep out of git.
+
+This is a second live instance of ADR-2608138400's class (kawaraban `.kawaraban/`,
+157 bytes). Two instances found by two different sessions means the gitignored plane is
+a standing hazard, not an anecdote. **Owner decision pending**: move to kagi/Keychain, or
+declare it disposable test material.
+
+## Four measurements that returned a confident wrong answer
+
+Recording these because each is the ADR-2608136000 shape — a check that could not run
+returning the same value as a check that ran and found nothing.
+
+1. **Ledger containment said `missing=0`.** The kaiyu-kaizen ledger is multi-line
+   pretty-printed EDN (49 events / 491 lines); line-by-line parsing produced garbage.
+   Re-read with a whole-file reader: all 5 stashes held events genuinely absent from
+   `main` — the opposite verdict.
+2. **A guessed filename read as 'not in main'.** I typed `2608170500` for an ADR that is
+   `2608110600`. It reported the skip instead of counting it clean, which is the only
+   reason I noticed.
+3. **`jq '.commits[-1]'` turned 'already current' into `ERR`.** An `identical` compare
+   carries an empty commit list. 9 repos looked like failures; retried individually they
+   were all `ahead=0`. 'Already fine' and 'could not ask' rendered in the same column.
+4. **A capped compare read as clean.** `control-plane` showed `OVERLAP=0`; the compare
+   API caps at 300 files and it had 315. Per-file, **all 4 were changed by `main` after
+   our base.** 'Not found in the first 300' is not 'no overlap'.
+
+Two process notes. The push guard earned its keep: my first pin branch went stale while I
+worked and would have **regressed 7 unrelated pins** other sessions had advanced — I
+re-derived from current `origin/main` rather than rebasing. And my first population came
+from `grep 'dirty=7$'`, whose anchor silently dropped 35 repos whose survey line carried
+an extra marker (`dirty=7; locals=1`); round 2 exists only because of that.
+
+## Consequences
+
+- 628 pins advanced; the next `--unlanded` survey should drop from 765 to roughly 137.
+- The 8-repo untracked population is measured, archived and dispositioned — none of it
+  is landable as-is.
+- One actor seed is preserved locally and awaiting an owner decision.
+- `kagami reconcile` (absorbing these pins into genpon / `fleet-db.edn`) was **not** run.
+  It absorbs all drift, not only mine, while other sessions are actively writing.
+")))

@@ -1,0 +1,118 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2809041000-ipld-query-path-already-exists-measured")
+ (:adr/title "IPLD/IPNI から kotobase で query する経路は既に在る — 実測 4 件と、-list を写さないという決定")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-04")
+ (:adr/related (vector "adr-2809040800-kotobase-join-reach-is-composition-not-ref-count" "adr-2608160100-kotobase-block-car-pack-object" "adr-2608039700-agent-loop-git-edn-datalad-source-of-truth"))
+ (:adr/body "## 問い
+
+「kotobase で IPLD / IPNI からデータを query できるようにしたい」に対して、何が
+既にあり、何が欠けているか。2026-09-04 に測った。
+
+## 結論を先に
+
+**新しく設計するものは無い。部品は 4 つとも実在し、繋ぐ 1 本が欠けているだけ。**
+そして接続部の形は、推測ではなく既存コードが既に決めている。
+
+## 実測 1: 到達範囲は ref の本数で決まらない
+
+別 ADR（adr-2809040800）に分離済み。要旨: `datom-source` の `merged` に、答えが
+どちらの partition 単独にも存在しない 2 ホップ join を通すと届く。旧
+ADR-260726 の「別 ref に分けたら二度と join できない」は実装天井の記述だった。
+
+## 実測 2: 現状のコストは O(database)
+
+`of-quads`（= materialize 相当の全走査）に、答えが常に 5 行の 2 ホップ問いを当てた。
+
+```
+facts    答え   scans   触った quad
+   60      5       2            51
+  600      5       2           501
+ 6000      5       2          5001
+24000      5       2         20001
+```
+
+**scans は 2 で一定**（query の形が決める）。増えるのは 1 scan が返す量で、これが
+読む block 量になる。`datom-source` の ns docstring が言う O(result) ではなく
+O(database) が再現した。
+
+⚠ **`-scan` の回数を指標にすると改善は見えない。** 測るべきは往復回数ではなく
+「1 往復あたりに引き寄せた量」。
+
+## 実測 3: prolly-tree の range scan は O(path)
+
+同じデータを `\"述語|目的語|主語\"` の順序保存キー（= AVET）で prolly tree に載せ、
+`prolly-tree.core/scan-range` の `get-fn` 呼び出し回数を数えた。
+
+```
+facts    tree の block 数   全走査 read   range read   答え
+   60                  1             1            1      1
+  600                  3             3            2      1
+ 6000                 25            25            2      1
+24000                109           109            2      1
+```
+
+全走査は block 数に線形（109）、range scan は **2 のまま一定**。
+
+## 実測 4: CID 検証を挟んでも読み取り回数は変わらない。そして改竄は拒否される
+
+`prolly-tree` は自前で `verified-node` を持ち、木を降りる各 node を
+`(ipld/cid bytes)` と突き合わせている。**CID 検証は既に読み取り経路の中にあり**、
+外側から `verifying-block-store` で包む必要はない。
+
+検証付きで測り直しても range read は 2 のまま。そして判別テスト —— block の bytes
+を差し替えて読ませると `:kotobase.storage/cid-mismatch` で拒否された。**両方向を
+見ている**（正常なら 2 block 返る、改竄なら throw）。これを確かめずに「検証を挟んだ」
+と書けば劇場になる。
+
+## `IStore/-list` は CID 空間で表現しない —— 禁止された戦略である
+
+繋ぎ込みの最後の穴だと思っていた `-list`（collection の key 一覧）は、**表現する
+必要が無い**。`materialize` が `-list` を使うのは「全部列挙して全部 `-get` する」
+ためだけで、それが実測 2 の O(database) の正体である。
+
+`datom.source.plane` の catalog が、これを機械可読な形で既に禁じている:
+
+```clojure
+:equality {:contract :IPatternSource
+           :cost     :log-plus-result
+           :allows   #{:pattern-scan :cursor-prefix}
+           :forbids  #{:hydrate-then-scan :graphsync-selector :ipld-schema-walk}}
+```
+
+`:hydrate-then-scan` が forbidden。「Admission is data: a request is a map, a
+refusal is a map. **Silence is not a pass.**」
+
+## 接続部は既に書かれている
+
+`kotobase.datom-plan/plan` が pattern → index の写像を pure 関数として持つ:
+
+```
+[s p _] -> eavt      [_ p o] -> avet
+[_ p _] -> aevt      [_ _ o] -> eavt + post-filter
+```
+
+`avet` が実測 3 で使った `\"located-in|kyoto|...\"` の順序そのもの。**4 covering
+index を content-address 上に置く必要がある、という設計は既に存在した。**
+
+## GraphSync selector は今は要らない
+
+実測 3 で path が浅く（24,000 facts / 109 block の木でも 2 block）、selector の
+価値である「O(path) の逐次往復を 1 往復に畳む」が効かない。plane catalog も
+equality class では `:graphsync-selector` を forbidden にしている。**木が深く
+なってから効く最適化であって、いま作る部品ではない。**
+
+## 残る未検証
+
+- **`get-fn` を実 transport（IPNI provider 解決 + IPFS 取得）に差し替えたときの
+  往復回数。** 今日測ったのは全てローカルの block 読み取りである。
+- 暗号化 corpus では効かない。`scan-range` の docstring が明記するとおり
+  HMAC-blinded key は順序を保存しないので prefix + decrypt + filter に落ちる。
+
+## Consequences
+
+- 「IPLD から query する」ために新規リポジトリは要らない。`datom-plan/plan` →
+  `prolly-tree/scan-range` → `get-fn` を実 transport、が経路。
+- `-list` を content-address 空間に写す設計を検討しない。禁止戦略である。
+- 改善幅を主張するときは実測 2 と 3 を並べる: 24,000 facts / 答え 5 行で
+  **20,001 quad → 2 block**。")))

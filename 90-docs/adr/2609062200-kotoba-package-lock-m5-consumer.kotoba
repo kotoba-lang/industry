@@ -1,0 +1,181 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609062200-kotoba-package-lock-m5-consumer")
+ (:adr/title "amu consumes a Kotoba package lock: ADR-kotoba-package-cid-lock M5")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-06")
+ (:adr/body "## Context
+
+`ADR-kotoba-package-cid-lock` (kotoba-lang/kotoba-lang, accepted 2026-06-30)
+specified how a Kotoba package is referenced: never `name + version`, always a
+CID-pinned, signed lock entry naming the repository identity, the commit, the
+source tree, the manifest, the signer DIDs and the capability grant.
+
+By 2026-09-06 that contract had a validator (`kotoba.lang.package-contract`,
+`.cljc`), a registry kernel (`kotoba.lang.package-registry`), published registry
+data, a retrieval adapter (`kotoba-lang/package-registry-ipfs`), and a
+conformance corpus of 6 accepting and 12 rejecting fixtures. Its own maturity
+list recorded M5 -- `kotoba-lang/registry` or `kotoba-cli` consumes the same
+suite -- as outstanding, and it was: `grep` for `kotoba.lock` or
+`kotoba.package/` across the amu source tree returned nothing.
+
+The practical consequence was that the only way for one `.kotoba` module to
+depend on another was `--source-path <dir>`. Every field a lock carries was a
+claim no build checked.
+
+Two things stood in the way, and both were stale implementation state rather
+than design:
+
+1. `kotoba.lang.package-contract` verified signatures only under `:clj`. Its
+   docstring gave the reason -- no portable Ed25519 verifier existed in the
+   dependency graph -- which was true when written and false by 2026-09-06:
+   `kotoba-lang/org-ietf-ed25519` carries a `:cljs` branch over `node:crypto`,
+   and the repository already depended on it. Under `:cljs` every signature was
+   rejected, so no signed manifest could be consumed off the JVM at all.
+2. `manifest-integrity-error` -- recompute a manifest's `:manifest-cid` from
+   its content -- lived in `kotoba.security.package-admission`, which is `.clj`.
+   Without it a signature binds only to the manifest's self-declared cid, so
+   any other field can be changed after signing.
+
+Neither was a security hole. Both were walls, and both were invisible because
+the JVM suite was green throughout: a `:clj` test cannot load the `:cljs`
+branch.
+
+## Decision
+
+Land M5: amu produces and consumes a package lock, JVM-free on the build side.
+
+**Two locks, composed, not competing.**
+
+| lock | question it answers |
+|---|---|
+| `kotoba.lock.edn` (`:kotoba.lock/version 1`) | WHO, and WHAT MAY IT DO -- package identity, commit, signer DIDs, capability grant |
+| `kotoba.modules.edn` (`:kotoba.module-lock/v1`) | WHICH BYTES -- every module in the closed graph by CID |
+
+They compose in that order: a package lock resolves to source roots, the linker
+walks them, `module-lock` pins the result. `--package-lock` and `--module-lock`
+are mutually exclusive -- adding path-resolved roots to a pinned build would
+reintroduce the search a lock exists to remove.
+
+**tools.deps stays at authoring time.** Choosing between conflicting transitive
+git pins is its job and a second resolver written in nbb would be free to
+disagree with it. This is the same split `scripts/lock-classpath.cljs` already
+uses for amu's own classpath: resolve once at authoring time, record the answer
+as CID pins, and let the build side have no resolver, no network and no JDK. A
+commit id is a content address, so the recorded answer is reproducible without
+re-deriving it.
+
+**Five checks bind the materialised tree to the lock**, and every one was
+broken on its own to watch it fire with its own message:
+
+| check | what it refuses |
+|---|---|
+| `git-commit` | a checkout that is not at the commit the lock pins |
+| `tree-cid` | a tree whose content does not hash to `:dep/tree-cid` |
+| `manifest-signature` | a forged or misattributed Ed25519 signature |
+| `manifest-integrity` | a manifest edited after signing |
+| `definition-cids` | a build whose graph lacks a definition the lock pins |
+
+The last one is why this is a pin rather than a path search with ceremony.
+Definition CIDs are context-independent -- measured, `double-it` hashes to
+`bafyreihmm4hh...` compiled alone and again as a dependency of another module --
+so a CID the lock names either appears in the built graph or these are not the
+bytes that were signed. `:dep/definition-cids` is optional in the contract
+(effectful code stays component-addressed until its capability interface is in
+the typed KIR) and REQUIRED by amu, because without it nothing checks the
+materialised tree against the lock.
+
+**amu defines the tree serialization the kernel deliberately does not.**
+`tree-cid-error` takes tree bytes from its caller and says why: a source tree is
+not part of the data that kernel receives. `:kotoba.package-tree/v1` is a sorted
+listing of `<relative path><TAB><sha256 hex>`, UTF-8 -- not a tar or a zip,
+which carry mtimes and uids that differ between two materialisations of the same
+content. `package-manifest.edn` is excluded for the same reason `:manifest-cid`
+is excluded from its own hash.
+
+**Deny by default.** Absent `--trust`, the declared capability set is empty, so
+any dependency requesting a capability is refused. A pure library grants nothing
+and passes.
+
+**No network.** Dependency trees are read from `--packages <dir>`, the way
+locked module bytes are read from `--blocks`. Fetching is the authoring side's
+job, and keeping it there is what lets a build be reproduced on a machine with
+no credentials.
+
+## Evidence
+
+End to end, with `clojure` and `java` on PATH replaced by scripts that print
+FORBIDDEN and exit 99 -- deny-and-trace, not merely absent:
+
+    package-manifest -> package-lock -> check -> compile   exit 0, FORBIDDEN x0
+    module-lock --package-lock -> compile --module-lock     exit 0, FORBIDDEN x0
+    node run.mjs main.wasm                                  run(5) = 10
+    pinned build vs unpinned build                          byte-identical
+
+`run(5) = 10` is the dependency's own `double-it` executing.
+
+Ten negative controls, each refused with its own message and the baseline green
+before and after; 15 regression cases in `test/nbb/package_lock.cljs`, every
+rule in both directions, each rejection asserted by REASON rather than by
+refusal. That distinction is not pedantry: in kotoba-core-contracts the same
+forged-signature fixtures were reported as rejected by a runtime that verified
+no signature at all. Replacing the tree-cid check with `nil` fails exactly the
+two tree-cid cases and nothing else.
+
+Portability measured rather than assumed. JVM and Node compute the same manifest
+CID for the same fixture (`bafyreifyfayk...`).
+
+## Findings this turned up
+
+* The conformance corpus's own `positive/package-manifest.edn` declares a
+  `:manifest-cid` that is not its content's CID. It was never wrong under the
+  checks this repository ran -- integrity was one repo away and `.clj`-only.
+  `positive/self-consistent-manifest.edn` is the corpus's first self-consistent
+  signed manifest. Both facts are now pinned by tests in both runtimes.
+* `run_portable.cljs` accepted a `[root]` argument and discarded it: nbb does
+  not put the script in `*command-line-args*`, so `second` read the second
+  argument. It agreed with the truth by accident because every caller ran from
+  the repository root.
+* `bin/amu` rewrote `--name kotoba-lang/demo-util` into an absolute filesystem
+  path because the value contains a slash. The manifest was written with that as
+  its package name and every check passed, because a package name is only ever
+  compared to itself.
+* `pr-str` writes `#:ns{...}`, which amu's own bounded reader refuses; and that
+  reader returns integers as BigInt, so the portable contract's
+  `(= 1 (:kotoba.lock/version m))` was false for a lock amu had just written and
+  validated.
+* `amu module-lock --package-lock` accepted the flag and pinned a graph that did
+  not contain the dependency, because `module-lock!` read `--source-path`
+  directly.
+* `kotoba-lang/amu` has GitHub Actions ENABLED (`{\\\"enabled\\\":true}`, measured
+  2026-09-06) with two required status checks on `main`, contrary to the
+  workspace-wide statement that Actions are disabled per repo. This is recorded
+  rather than acted on: whether to disable it is a separate decision.
+* `kotoba-core-contracts` shipped `scripts/check-package-contract.bb`, a
+  hand-maintained SECOND copy of the validator running on a retired script host,
+  which had already drifted once. Its own header said it should go and named the
+  workflow OAuth scope as the blocker; that remote is SSH, so the blocker did
+  not apply. Removed, along with a workflow file naming it, after measuring that
+  repository's Actions as disabled.
+
+## Not done
+
+* `kotoba.security.package-admission` still carries its own `.clj` copies of
+  `manifest-without-self-cid` / `compute-manifest-cid` / `manifest-integrity-error`
+  now that the portable kernel has them. It should delegate; it does not yet.
+* `amu package-lock` does not fetch. `--packages` must already be populated;
+  there is no `amu package-fetch`, though refusals name one.
+* The pre-existing `capability effects are not classified
+  #:capability{:id \\\"env/read\\\"}` error in kotoba-core-contracts, from a4932ce,
+  is untouched: choosing that capability's effect set is a semantic call for
+  whoever registered it. It is why no `:jvm-test` fleet gate was registered for
+  that repository -- it would be red for a reason unrelated to this work.
+* No lock is consumed by anything in production yet. M5 is the consumer
+  existing; adopting it is separate.
+
+## Consequences
+
+`--package-lock` is now the answer to how one Kotoba package depends on
+another, and `--source-path` keeps its place as the unpinned development
+path. The signature verification and manifest integrity work is load-bearing
+rather than decorative: amu exercises both on every resolved dependency.
+")))

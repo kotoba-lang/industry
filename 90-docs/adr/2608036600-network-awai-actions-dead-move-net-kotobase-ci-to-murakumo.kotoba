@@ -1,0 +1,194 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608036600-network-awai-actions-dead-move-net-kotobase-ci-to-murakumo")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "network-awai の GitHub Actions は起動していない — net-kotobase の CI を murakumo fleet に移す（hermetic な半分だけ、残りは理由付きで残す）")
+  (:adr/topic "net-kotobase-ci-on-murakumo-fleet")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "network-awai org の GitHub Actions が実行されていないという実測と、その範囲"
+   "net-kotobase の CI のうち murakumo fleet に載せた部分と、載せられない部分の境界"
+   "fleet gate `net-kotobase-hermetic-check.cljs` が何を検証し、何を検証しないか"))
+
+  (:adr/related
+  (vector "adr-2607300900-github-actions-is-not-executing-move-ci-to-murakumo-fleet"
+   "adr-2607255500-fleet-ci-tip-driven-murakumo-cdci"
+   "adr-2607178000-fleet-ci-murakumo-standing-runner"
+   "adr-2607250100-kotobase-maturity-bar-vs-production-databases"))
+
+  (:adr/verify
+  (vector "gh api 'repos/network-awai/net-kotobase/actions/runs?per_page=100' --jq '.workflow_runs[]|\"\\(.created_at) \\(.conclusion)\"' | sort | awk '$1>\"2026-08-03T01:12\"'   ; => すべて failure"
+   "gh api repos/network-awai/net-kotobase/actions/runs/30779028268/jobs --jq '.jobs[]|{conclusion,steps:(.steps|length)}'   ; => failure / steps 0"
+   "nbb scripts/fleet-ci/tick.cljs --only net-kotobase --dry-run --no-pr --signer-pem ~/.gftd/fleet-ci-signer-tip.pem   ; => pass"))
+
+  (:adr/body
+  "# Context — Actions が「落ちている」のではなく「動いていない」
+
+kotobase の成熟度を点検する過程で、`network-awai/net-kotobase` の CI が全滅している
+ことが分かった。**テストが落ちているのではない — job が起動していない。**
+
+| 実測（2026-08-03） | 結果 |
+|---|---|
+| 01:12Z 以降の run | **全 workflow が failure**（enterprise-isolation / worker / authn / kotobase-cf-wasm / protocols-worker / metadata / CodeQL / repository-security / public-smoke） |
+| その job の steps | **0 件**、所要 1–10 秒 |
+| 最後の成功 | 2026-08-03T01:10Z 前後（public-smoke は 08-02T23:32 まで緑） |
+| 同 org の他 repo | cloud-itonami・network-isekai も同日 failure、local-murakumo は 07-20 から |
+| kotoba-lang org | **健全**（kotobase-peer / arrangement / datalog とも 08-02 に success） |
+
+steps 0 件・log 無しは runner が job を拾っていない徴候で、ADR-2607300900 が
+com-junkawasaki / gftdcojp で測ったのと同じ症状（そちらは課金停止だった）。
+**アカウント（org）単位**で止まっており、リポジトリ側の設定の問題ではない。
+
+これが実害である理由: `docs/ENTERPRISE-READINESS.md` の P0 gate 表は
+tenant isolation・supply chain・availability を「CI-gated」と主張している。
+その CI が起動していないので、**今日の分については裏付けが無い**。
+
+# Decision
+
+**Actions を直そうとせず、ADR-2607300900 の決定（Actions ではなく murakumo fleet）を
+network-awai にも適用する。** ただし全部は移せないので、境界を明示する。
+
+## 移したもの — `scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs`
+
+`gates.edn` に 1 entry（`{:name \"net-kotobase\" :gate :nbb-script … :cd true}`）。
+検査ロジックは複製せず、**repo 自身の verifier をそのまま呼ぶ**:
+
+| # | 内容 | 置き換えた workflow |
+|---|---|---|
+| A | `node scripts/verify-tenant-isolation.mjs` | `enterprise-isolation.yml` **全体** |
+| B | `bb scripts/check-metadata.cljc` | `metadata.yml` **全体** |
+| C | `bb <script> --syntax-check` × 21 | `worker.yml` の syntax 半分 |
+| D | `python3 -m py_compile` + `unittest test_gremlin.py` | `sdk.yml` の python leg **全体** |
+
+## 移せないもの（黙って落とさない）
+
+- **`npm ci` / `pnpm install` / `shadow-cljs` / `cargo` を要するもの** —
+  worker release・protocols-worker・kotobase-cf-wasm・authn・sdk の ts/rust leg・
+  repository-security の npm audit。ノードは tailnet だけに繋がっていて
+  npm registry に届かない（tick.cljs の `ship-git-deps!` が JVM 依存を operator 側
+  から配っているのと同じ制約）。
+- **live smoke**（`public-smoke.yml` / `protocols-public-smoke.yml`、5 分毎）—
+  ノードに kotobase.net への egress が無い。**operator 側には有る**ので、これは
+  「fleet に載らない」ではなく「fleet の現在の実行モデルに載らない」。
+  operator 側 gate という新しい実行場所を作るかどうかは別決定。
+- **deploy と `b2-dr-drill.yml`** — credential が要る。fleet-ci 不変条件 3
+  （鍵はノードに配らない）と両立しない。なお b2-dr-drill は **workflow が
+  存在するだけで run 0 件**で、Actions が生きていた頃から一度も走っていない。
+
+**したがって green の意味は「hermetic subset が通った」であって「出荷可」ではない。**
+出荷判断は `docs/MURAKUMO-CI.md` の `murakumo-worker-check.cljc deploy-ready`
+（pnpm/npm を要するので operator 側）のまま変わらない。
+
+# 実装で分かったこと（全て実測）
+
+- **`git archive` の tarball には `.git` が無い。** `check-metadata.cljc` は対象
+  ファイルの列挙に `git ls-files --cached --others --exclude-standard` を使うので、
+  素の展開ディレクトリでは signal 128 で死ぬ。gate は `git init && git add -A` で
+  index を復元する。tarball の中身はその sha で tracked だったファイルそのものなので、
+  ファイルを足しも引きもしない。
+- **`--syntax-check` の包含リストは fail open だった。** workflow は 22 本を名指し
+  していて、新しい script が足されても黙って未検査になる。gate は逆に
+  **ディレクトリを走査して 3 本だけ名指しで除外する**（除外理由も記録）。
+  除外リスト自体が腐らないよう、存在しないファイルを除外し続けていたら fail する。
+- **`--syntax-check` が見ているものは思ったより狭い。** bb は form を頭から読んで
+  評価し、script は flag を見て自分で exit するので、**その exit 点より後ろの
+  壊れた form は読まれない**。感度測定: `ops-check.cljc` の末尾に `(defn broken [`
+  を足しても 21/21 pass、ns form の直後に入れると parse error で落ちた。
+  GitHub Actions の同じ step も同じ意味しか持っていなかった —— この gate は
+  忠実に移しただけで、強くはしていない。
+- **`execFileSync` は成功時 stdout しか返さない。** python の unittest は summary を
+  stderr に書くので、最初の版は `Ran 2 tests … OK` を取りこぼして
+  **通っているテストを fail と報告した**。`spawnSync` に変えて両方拾う。
+  fleet-ci README の『exit 0 を信用しない』の裏返しで、
+  **『出力が無い』も信用してはいけない**（無いのではなく見ていなかった）。
+
+# 検証
+
+- gate 単体を judah で実行 → `OK — tenant-isolation + metadata + 21 syntax checks +
+  python sdk conformance`。
+- **感度測定**（gate が実際に落ちることの証明）: tenant-isolation matrix から
+  required surface を 1 つ落とす → `FAIL tenant-isolation`。ns form 直後に壊れた
+  form を入れる → `FAIL syntax: 1 scripts failed`。
+- fleet-ci の本経路で E2E: `tick.cljs --only net-kotobase --dry-run --no-pr` →
+  git+SSH で private repo の tip 解決（token 無し）→ 3.2MB tarball を asher へ
+  ssh stdin で送出 → gate 実行 → `FLEET-CI-EXIT: 0` → **署名付き receipt
+  `38ceebb5598c`**（signer `did:key:z6Mkjyh…`、checks 2 required 2）。
+- ノード要件は gate 側で fail closed（`bb` / `node` / `python3` / `git` の
+  いずれかが無ければ exit 91 = 「検証できなかった」。合格にしない）。
+  実測で満たすのは judah / asher / levi。
+
+# Consequences
+
+- net-kotobase は **commit ごとに** 4 本の hermetic gate を通るようになり、
+  green なら west pin が自動前進する（`:cd true`）。Actions の復旧を待たない。
+- ENTERPRISE-READINESS の「CI-gated」主張のうち、**tenant isolation の証拠登録簿は
+  fleet で裏が取れる**ようになった。supply chain / availability / recovery は
+  依然 Actions 側にあり、今日は動いていない。
+- tick は net-kotobase の **open PR 22 本のうち 10 本**まで head も検証する
+  （tick.cljs の repo あたり既定上限）。残り 12 本は log に番号が出る。
+
+# 常駐化で出た本物の false pass — tick.cljs の out-file が :name で割られていた
+
+登録の翌時間に LaunchAgent（5 分間隔の tip 駆動 tick）を入れて初めて
+**1 repo に多数の work item がぶら下がる状況**（net-kotobase の tip 1 本 +
+PR head 6 本が同一 batch）が発生し、fleet-ci 本体のバグが露出した。
+
+    2026-08-03T03:55:48Z 受領書 4341a6272f47（main に landed 済み）
+      :pass :gate/test-net-kotobase-08c4a07-…
+            detail「1 of 4 hermetic checks failed: metadata | FLEET-CI-EXIT: 1」
+    → **verdict は pass、detail は EXIT 1**。その pass を根拠に
+       CD が west pin を c7205f8 → 08c4a07 に前進させた。
+
+原因は `tick.cljs:1065`。ノード側の展開 dir と gate script は（line 500 に記録が
+ある 2026-07-29 の事故で）既に **work item の `:id`** で割られていたが、
+**operator 側の out-file だけが `:name`（= repo 名）のまま**だった:
+
+    :out-file (path/join tmp (str \"gate-\" (:name w) \".out\"))
+
+verdict は `grep '^FLEET-CI-EXIT: 0$' <out-file>` で決まる。同一 batch の 7 本が
+同じ path に `>` で書き込むので、**互いの出力を上書きし verdict が取り違わる**。
+5 本が緑・2 本が赤だったため、赤の 1 本が緑の出力を grep して pass になった。
+`root` の 4 gate も `:name` が同じなので、**同じ競合をずっと起こしていた**
+（4 本とも緑だったので表面化しなかっただけ）。
+
+修正は `:id` + tip の sha7 で割る 1 箇所（ノード側の割り方に合わせる）。
+
+**検証**: 修正版で同じ batch を回すと、11 本すべてで verdict と自分の出力が一致した。
+独立に手で再現した結果とも一致する:
+
+| work item | 独立実行 | 修正前の受領書 | 修正後 |
+|---|---|---|---|
+| tip 08c4a07 | pass | **pass（detail は EXIT 1）** | pass |
+| PR#239 da2e939 | fail (metadata) | fail | fail |
+| PR#272-276 | pass | pass | pass |
+| PR#1/238/257/269 | — | — | fail 90（`verify-tenant-isolation.mjs` が無い古い branch） |
+
+**前進させた pin は結果的に正しかった**（08c4a07 は独立実行で緑）。害は出ていないが、
+それは運であって仕組みではない。なお PR head が pin を進めることは起き得ない —
+CD は直前に `gh-tip` を取り直して一致しない work item を skip するので、
+PR head（default branch の tip と一致しない）は構造的に弾かれる。
+
+**PR#239 は本物の赤**: `check-metadata` の workflow action 版数 drift。
+Actions が動いていれば `metadata.yml` が捕まえていたもので、
+誰も見ていなかった期間に溜まった実害の 1 件目。
+
+**残る同種の弱点（未修正）**: 受領書の `:subject` の `:tips` / `:pins` / `:nodes`
+も `:name` で map 化しているので、7 本走っても 1 エントリしか残らない
+（どの sha を記録するかは実質不定）。verdict の正しさには影響しないが、
+署名付き append-only 台帳としては誤解を招く。shape を変えると fleet-db projection
+側の consumer に波及するので、別途。
+
+# 残り
+
+- **live smoke を operator 側 gate として置くか**の決定（現状 5 分毎の可用性計測が
+  止まっている。fleet の実行モデルには egress の無いノードしか無い）。
+- npm 系（release / shadow-cljs / audit）をどうするか。選択肢は
+  ①ノードに npm registry への egress を開ける ②operator 側で回す
+  ③Actions の org 課金を直す —— ③は Actions を信頼し続けることになる。
+- network-awai の他 repo（cloud-itonami / network-isekai / local-murakumo）も
+  同じ状態。同じ手当てが要る。")))

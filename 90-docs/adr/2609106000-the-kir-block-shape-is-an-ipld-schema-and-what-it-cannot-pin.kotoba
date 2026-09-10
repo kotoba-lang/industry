@@ -1,0 +1,159 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609106000-the-kir-block-shape-is-an-ipld-schema-and-what-it-cannot-pin")
+  (:adr/topic "kir-block-shape-is-an-ipld-schema")
+  (:adr/title "The KIR block shape is an IPLD Schema, two things it cannot pin, and four surface families the convergence claim did not cover")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/osaho" "kotoba-lang/amu" "kotoba-lang/io-ipld"))
+  (:adr/related (vector "adr-2609076000-kir-is-an-ipld-codec-schema-and-adl"
+                "adr-2609081400-a-grammar-is-a-surface-not-a-language"
+                "adr-2609092600-app-plane-identity-naming-location-kind"))
+  (:adr/body
+  "## Context
+
+ADR-2609081400 measured an external design proposal (Unison x Lisp x IPLD) against
+what Kotoba already had, and left a table with two rows unfinished and one row
+untested. This ADR records closing two of them, and names a red on osaho main that
+the work walked into.
+
+The two addressed here:
+
+- ADR-2609076000 decision 2 -- the KIR block shape is an explicit IPLD Schema,
+  written in ipld.schema-dsl and validated as Schema DMT by
+  ipld.schema/compile-schema. It was the one decision in that ADR with nothing on
+  disk.
+- ADR-2609081400's stated limit -- surface convergence was discharged for three
+  pairs, and destructuring, protocol dispatch, match and the document forms were
+  named as unmeasured.
+
+## Decision 1: the schema is a resource, and it pins shape only
+
+`osaho/resources/kotoba/kir/definition-identity.ipldsch` describes the DAG-CBOR
+block a DefCID addresses -- the output of `normalize` over `identity-payload`,
+which is what `cbor/encode` is handed.
+
+It is a RESOURCE, not a source dependency. ADR-2609076000 decision 1 landed
+io-ipld in osaho test-only on purpose, because promoting it to `:deps` is the
+payload v3 decision. Compiling a schema costs no byte of any block, so a schema
+belongs on that side of the line. No CID moved.
+
+What is pinned, and is therefore no longer prose: the closed twelve-tag
+vocabulary (one per branch of `normalize`), the arity of each variant, the
+data-model kind of each body, the map entry shape, and the named-reference
+closure tying the four collection bodies back to Node.
+
+## Decision 2: two things IPLD Schema cannot express here, named in the file
+
+Measured against io-ipld 973e26a5.
+
+**The positional discriminator.** A node is a list whose element 0 is the tag.
+Every union strategy ipld.schema supports -- keyed, kinded, envelope, inline,
+stringprefix, bytesprefix -- discriminates on a map key, a data-model kind, or a
+string or byte prefix. None reads a discriminant out of list position 0, and a
+kinded union over these twelve is refused at compile time as an ambiguous table
+because all twelve are the list kind. So Node is declared as a bare list and the
+dispatch is the checker's.
+
+**The tag bound to its variant.** `tag Tag` admits all twelve members in every
+variant, so a nil-tagged two-element node unifies against IntNode. There is no
+singleton string type to bind one member. The checker asserts the equality the
+enum cannot.
+
+The second is ASSERTED rather than described:
+`the-schema-alone-cannot-tell-a-nil-node-from-an-int-node` requires that
+unification to SUCCEED. If ipld.schema ever gains a singleton type, that
+assertion fails -- which is how a check that has become redundant gets
+reconsidered deliberately, instead of being deleted after someone notices nothing
+goes red.
+
+## Decision 3: the shape verdict refuses to answer checkedness
+
+ADR-2609076000 decision 4 said a block that validates against the schema and then
+fails admission must not report what one that passes both reports. That is now in
+code, not only in prose: the verdict carries `:checked :not-answered`, and a test
+fails if it ever grows a checkedness key. The schema is not an admission gate and
+does not pretend to be one.
+
+## Decision 4: the convergence corpus covers four families, and the core spelling
+must be the DOCUMENTED desugar target
+
+`amu/test/kotoba/compiler/surface_convergence_portable_test.cljc` pairs each of
+four constructs with its canonical-core spelling and asserts equal DefCIDs, with
+a negative control per case. It runs on the file-free seam `definition-cids` uses
+(sema/analyze then di/definitions), so it is exercised on nbb as well as the JVM
+rather than shelling out to a built CLI.
+
+The finding worth carrying is not that they converge. It is that the FIRST
+attempt reported divergence for two of the four, and both times the probe was
+wrong: `nth` with a default is a different call from the pair lookup
+`:nested-destructuring` names, and an `if` on the scrutinee skips the let that
+`:match`'s single-evaluation requires. Both spellings are semantically equivalent
+to their sugar and neither is what the grammar says the sugar becomes.
+
+Reported the other way round, that would have entered the record as a language
+defect that does not exist. So: **a case that reports divergence is a claim about
+the probe until the core spelling is checked against lang/guest-grammar.edn**, and
+the test's own failure message says so to whoever reads the red.
+
+A second shape is recorded there: the protocol case's control changes a method
+body, so the record CONSTRUCTOR correctly does not move. The assertion is that
+the control moves at least one definition, not every one. Asserting every one
+would be false for the right reason, and would get fixed by weakening the case.
+
+## What was found and NOT fixed: osaho main is red
+
+`kotoba.kir-bool-parameter-test/the-native-gate-still-refuses-what-it-always-refuses`
+fails on an unmodified worktree at osaho origin/main 7a6a27b: the native
+admission gate returns true where the test requires false. It is not caused by
+the schema work -- a clean detached worktree reproduces it alone -- and it was
+already there when the schema branch merged onto main. Named here so it is a
+finding with a date rather than a surprise for the next reader.
+
+## Reproduce
+
+The schema, in an osaho worktree at origin/main (NOT the shared checkout):
+
+    git -C orgs/kotoba-lang/osaho worktree add --detach <dir> origin/main
+    cd <dir> && clojure -M:test -n kotoba.kir.definition-identity-schema-test
+
+It prints a SCANNED line carrying the block and node counts. To confirm it
+discriminates rather than merely passing, change IntNode's body from String to
+Int in the .ipldsch and run it again: the frozen vectors go red, because
+integers are carried as decimal text and that is what keeps :clj and :cljs on
+the same bytes.
+
+The convergence corpus, in an amu worktree at origin/main:
+
+    git -C orgs/kotoba-lang/amu worktree add --detach <dir> origin/main
+    ln -s <shared amu>/node_modules <dir>/node_modules
+    cd <dir> && npm run test-nbb-portable-tests
+
+It prints one CONVERGED line per family. To confirm both halves discriminate,
+replace one core spelling with a semantically equivalent but undocumented one
+(the agreement half fails), then make one control equal to its sugar (the
+discrimination half fails, naming itself).
+
+Do not run either in the shared checkout. It is behind origin/main, and a pure-S
+spelling there returns :subset-reject, which reads as the language refusing the
+form.
+
+## What is NOT claimed
+
+- The schema does not validate a nested node through unification. Node is a bare
+  list, so a child is only checked to be a list by the schema; the recursion is
+  the checker's walk.
+- The schema says nothing about canonical ORDER inside a set or a map. That is
+  the producer's invariant and the differential test's business.
+- payload v3 is untouched. io-ipld remains test-only in osaho and every frozen
+  vector still disagrees with kotoba.value.v1.
+- Per-node CID remains undecided and unbuilt. ADR-2609081400's reasoning stands:
+  a subterm under a binder is an open term, and the cheaper mechanism for
+  node-level editing is a path into a sealed block, which ipld.selector and
+  ipld.graph already provide.
+- The corpus covers four families. The document forms named by ADR-2609081400
+  were not measured here.
+- Neither landing is a fleet gate. The schema test runs under osaho's
+  `clojure -M:test`; the corpus runs under amu's portable nbb suite and its PR
+  checks.")))

@@ -1,0 +1,100 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608090200")
+  (:adr/doc_type "adr")
+  (:adr/topic "murakumo-model-hosting-policy-community")
+  (:adr/title "murakumo.cloud model hosting に policy、refs、community、moderation を統合する")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-09")
+  (:adr/deciders (vector "Jun Kawasaki" "OpenAI Codex"))
+  (:adr/authoritative_for
+  (vector "model repository の public、gated、private visibility と grant semantics"
+   "immutable revision に対する mutable branch と immutable tag の責務"
+   "model card、license、task、framework、base model provenance の公開 projection"
+   "examples、ratings、likes、comments、ranking の community plane"
+   "report、moderation queue、moderation audit event の authority と境界"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "2608090100"))
+  (:adr/repos (vector "com-junkawasaki/root" "network-awai/cloud-murakumo"))
+  (:adr/body
+  "# ADR-2608090200: murakumo.cloud model hosting policy and community
+
+**Status**: accepted / **Date**: 2026-08-09
+
+## Context
+
+ADR-2608090100 で immutable model artifact、repository/revision API、D1 projection と
+R2 authority を導入した。次の段階では Civitai / Hugging Face Hub に必要な公開 policy、
+named refs、gated/private access、作例・評価・コメント・ranking、report/moderation を
+同じ hosting plane に統合する必要がある。
+
+## Decision 1 — immutable revision と mutable refs を分ける
+
+revision CID とその block graph は引き続き R2 上で immutable とする。branch と tag は D1
+の `model_refs` projection とし、branch は fast-forward のみ、tag は削除されるまで immutable
+とする。ref 更新で revision bytes や provenance を書き換えない。
+
+model card、SPDX license、task、framework、base model provenance は repository projection
+から公開する。revision publish 時には利用した raw block を `model_revision_blocks` に関連付け、
+raw CID endpoint も repository policy と grant を通す。
+
+## Decision 2 — visibility と grant
+
+`public` は metadata と content を匿名公開する。`gated` は metadata を発見可能に保ち、
+license acceptance を伴う access request が owner に承認された reader/publisher だけに content
+を公開する。`private` は metadata と content の両方を owner または grant 保有者に限定する。
+publisher grant は revision publish を許可するが、repository policy と moderation authority は
+owner/moderator に残す。
+
+これは registry authorization であり暗号化ではない。同一 raw CID が別の public repository
+から公開されている場合、その block を secret に戻すことはできない。
+
+## Decision 3 — community projection と ranking
+
+作例は revision CID と uploaded asset CID を結び、media type、prompt、negative prompt、seed、
+bounded parameters を記録する。非owner作例は pending から開始する。ratings、likes、comments は
+D1の可変projectionとし、artifact graph のauthorityにはしない。
+
+ranking は raw count 順ではなく、neutral five-rating prior を持つ Bayesian score と bounded な
+approved example/like evidenceを用いる。新規1 ratingだけで即座に首位にならない設計とし、式と
+algorithm idをpublic APIで公開する。
+
+## Decision 4 — moderation は人間の監査可能なpolicy plane
+
+authenticated user は repository/example/comment を report できる。`model-hosting-moderate` または
+`all` scope の moderator は queue を読み、approve、hide、quarantine、reject、restore、resolve、
+dismiss を適用できる。各判断は `model_moderation_events` にappendする。
+
+moderation は malware scan や copyright adjudication の自動保証ではない。immutable bytes は
+削除・書換えず、発見性とauthorizationをD1 policyで制御する。
+
+## Browser surface
+
+`/models/#model-hub` に repository/file/revision publish、branch/tag、gated access request、rating、
+comment、example upload、ranking を統合する。token はpage memoryだけに保持する。Web Cryptoに
+streaming SHA-256がないためbrowser fileは512 MiBでfail closedし、protocol/CLIの上限とは分ける。
+
+## Landed evidence
+
+- child repo PR `network-awai/cloud-murakumo#47`、merge commit
+  `114de778418d5ab81383ade80e162d782605287b`
+- D1 remote migration `0002_model_hosting_policy_community.sql` と
+  `0003_model_hosting_provenance_projection.sql` を database
+  `1ac7c030-b487-48ce-92a9-b144ad95055d` に適用
+- Cloudflare Worker version `7b0dc030-2389-4978-899d-9ca9dc62e5e6` を production deploy
+- pure policy/site 15 tests / 79 assertions、compiled Worker 7 tests、generation catalog regression
+  10 tests、app/worker/mobile/mobile-sw release build 0 warnings
+- Miniflare実統合で publish、branch、gated request/approval、raw block denial/grant、rating、comment、
+  example、moderation、report、ranking、provenanceを確認
+- productionでPhase 2 capabilityを8回連続確認し、public ranking=200、unauthorized write=401、
+  moderator queue fail-closed、Model Hub assets/DOMを確認
+- agent-browserで実画面、全4 form、interactive controls、console/page errorなしを確認
+
+## Remaining boundary
+
+upstream Hugging Face mirror/import、orphan R2 block garbage collection、malware scanning、automated
+copyright adjudication、hosting revisionからGPU fleetへのgoverned automatic promotion/deployは別phaseとする。
+
+## Manifest
+
+root の `cloud-murakumo` pin は merge commit
+`114de778418d5ab81383ade80e162d782605287b` に単一entry fast-forwardする。")))

@@ -1,0 +1,123 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608120800-the-kami-namespace-collisions-are-two-designs-not-a-stale-copy")
+  (:adr/title "ADR-2608120800: kami.* の衝突は「古いコピーが残っている」ではなく、同じ名前の下に別設計が 2 つある —— 削除では解けない")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-12")
+  (:adr/last-verified "2026-08-12")
+  (:adr/last_verified "2026-08-12")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kami-namespace-collision-map")
+  (:adr/tags "clojure, classpath, namespace, kami, kami-engine-sdk, extraction, owner-decision")
+  (:adr/related (vector "adr-2608120600-two-repos-shipping-one-namespace"
+                "2607102200"))
+  (:adr/supersedes "")
+  (:adr/superseded_by "")
+  (:adr/authoritative true)
+  (:adr/authoritative-for
+  (vector "kami.fsm / kami.gpu / kami.input / kami.scene の衝突について、誰がどちらの API を必要としているか"
+   "この衝突が削除で解けない理由"
+   "オーナー判断を要する 5 点"))
+  (:adr/body
+  "# ADR-2608120800: 同じ名前の下に別設計が 2 つある
+
+**Status**: accepted（地図であって解決ではない）
+**Date**: 2026-08-12
+
+## Context
+
+ADR-2608120600 は同一 namespace を複数 repo が出している 27 件を数え、
+`kami-engine-sdk` と抽出済みライブラリの 3 件を「**抽出が途中で止まっている**」と
+書いた。**この記述は誤っていた。** 消費者を実測して分かったのは、SDK 側のコピーが
+古い残骸ではなく**別の設計意図を持つ現役の層**だということである。
+
+## 実測（2026-08-12、checkout 済み repo のみ）
+
+### SDK 側は残骸ではない
+
+SDK の `kami/fsm.cljc` / `kami/input.cljc` の docstring は **ADR-0040 /
+clj-wgsl-ledger Phase 1.2** を引き、**wasmi-safe な CLJ→WASM 層**として自らを説明
+している。「抽出元に取り残された古い写し」ではなく、**別の目的で書かれた別物**。
+
+- `kami.fsm`: 抽出側は EDN 記述の state machine（`advance` は event **集合**を取り
+  keyword を返す）、SDK 側は transition table walker（`advance` は**単一** event を
+  取り `:transitioned?` を含む **map** を返す）。**`advance` だけが名前を共有し、
+  arity も戻り値型も非互換。**
+- `kami.gpu`: **共有名ゼロ。** 抽出側 11 defs（capability tier / render-graph 解決）、
+  SDK 側 3 defs（`IGpuBackend` / `ensure-assets!` / `submit!`）。
+- `kami.input`: **共有名ゼロ。** 抽出側（`host`）15 defs でブラウザ向け（`wire!` を含む）、
+  SDK 側 5 defs で純粋な binding 層。
+
+### 削除で解けない —— SSoT 自身が相手の消費者
+
+**`kotoba-lang/host`（`kami.input` の SSoT）が、SDK の `kami.gpu` を使っている**
+（`host/src/kami/backend/browser.cljc` が `IGpuBackend` を require、`host/deps.edn` が
+SDK に依存）。つまり「SDK のコピーを消す」で解ける形になっていない。
+**1 つの classpath に 2 つの意味が載り、両方が生きている。**
+
+### 両側に載っている repo（実際に痛む場所）
+
+`kotoba-lang/webgpu`（fsm + gpu + host→SDK）/ `network-awai/network-isekai`
+（SDK + host + webgpu）/ `kotoba-lang/kami-app-isekai`。
+`kami-web` は両側に載るが当該 namespace を require していない（露出のみ）。
+
+### 既に払われている代償が 2 つある
+
+1. **`network-isekai` の 3 つ目のコピー**（`isekai/player_fsm.cljc`）。
+   同 repo の `deps.edn` は測定結果まで書いている ——
+   **`.cljs` が `.cljc` に順序と無関係に勝ち、起動時に
+   `TypeError: Cannot read properties of undefined`**。
+2. **`kotoba-lang/gpu` の 3 つ目のコピー**（`src/kotoba/gpu.cljc`）。
+   ファイルは「`kami.gpu` を再 export せず実装を所有する。classpath 順序が
+   この契約の意味を変えてはならないから」と書いている ——
+   **重複を回避策として選んだ記録**。README はそれを「thin facade」と呼んで
+   矛盾していたので訂正した（`kotoba-lang/gpu` `8e8ebc4`）。
+
+### どちらの repo も相手を認めていない
+
+`fsm` / `gpu` の README は「SSoT」と宣言し、`host` は surface を宣言する。
+**5 repo のどの README・docstring・CHANGELOG にも「SDK も同じ namespace を出している」
+「移行中」という記述は無い。** 唯一の in-repo の言及が上記 `kotoba/gpu.cljc` の
+遠回しな一文で、あとは全部下流（network-isekai）にある。
+
+## Decision
+
+### 1. ADR-2608120600 の「抽出が途中で止まっている」を訂正する
+
+この 3 件は**片付けではなく設計判断**である。同 ADR が「まとめて直さない」と決めた
+のは正しかったが、理由の記述が間違っていた。
+
+### 2. 削除候補は 2 つだけ、しかも「消してよい」ではない
+
+外部消費者がゼロなのは SDK の `kami/fsm.cljc` と `kami/input.cljc`
+（SDK 自身の `contract_test.cljc` のみが使う）。ただし**両者は意図された層として
+文書化されている**ので、削除は計画の破棄であって掃除ではない。
+**「消費者ゼロ」は「消してよい」を意味しない。**
+
+### 3. オーナー判断が要る 5 点（ここでは決めない）
+
+1. `kami.fsm` はどちらが正か（`advance` が非互換なので改名なしの共存は不可能）
+2. `kami.gpu` はどちらが正か（**きれいな答えが無い** —— `host` が SDK 側を使い、
+   `webgpu` が抽出側を使い、`webgpu` は `host` に依存する）
+3. `kotoba.gpu` の 3 つ目のコピーは到達点か、それ自体が負債か
+4. `kami.scene` の authority は `kami-contracts` か SDK か（**byte 同一**、かつ
+   **`kami-contracts` に依存する deps.edn が 1 つも無い**）
+5. SDK の `fsm`/`input` は将来の CLJ→WASM 経路のために予約されているのか、今削れるのか
+
+## Consequences
+
+- **この地図が無いと、次に踏んだ人は同じ調査をやり直す。** 既に 2 回、別々の場所で
+  重複という回避策が選ばれ、どちらも原因を上流に報告していない。
+- 検出は `scripts/verify-namespace-collisions.cljs` が担う。**この ADR は
+  「なぜ検出されたものが自明に直せないか」の側**。
+- 調査範囲は checkout 済み repo のみ（west 4,166 中 3,523）。
+  「外部消費者ゼロ」はこの working copy の中での話。
+
+## Evidence
+
+- 消費者の対応表は read-only の並列調査で作成し、file:line で裏付け済み
+- `kami/scene.cljc` は md5 一致（`19e7e037…`）
+- `kotoba-lang/gpu` `8e8ebc4`: README の「thin facade」を訂正
+")))

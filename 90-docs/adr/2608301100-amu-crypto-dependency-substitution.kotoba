@@ -1,0 +1,45 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608301100-amu-crypto-dependency-substitution")
+  (:adr/title "Crypto dependency substitution via host-provider + Kotoba oracle")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-30")
+  (:adr/related (vector "adr-2608260200-kotoba-lang-external-dependency-substitution"
+                "adr-2608301000-loop-dependency-substitution-wave-scaffold"))
+  (:adr/body
+  (list pr-str
+   (map (:context
+    "2026-08-30 wave 1 measured @noble/ciphers and classified it :host-boundary because portable org-ietf-chacha20-poly1305 and org-nist-aes pass RFC vectors but are 500–4000× slower under nbb on hot paths. That removed the coordinate from dependency-substitution-wave entirely — but the user expectation was amu-based substitution (kotoba oracle + explicit providers), not 'do nothing' or naive package.json deletion.")
+
+    (:decision
+    (vector "Introduce :kind :host-provider on :first-party-exists ledger entries for crypto npm coordinates where portable .cljc exists but hot paths need native-speed injection."
+     "verify-dependency-substitution emits substitution-via-host (not substitution-available) for these entries."
+     "dependency-substitution-wave-tick parses via-host findings and prefers them over naive rewire."
+     "Substitution ladder per coordinate: portable .cljc reference → Kotoba scalar oracle (amu compile + parity test, SMTP precedent) → reference/correctness provider in consumer repos → production provider (noble/node/wasm) until measured safe to drop npm."
+     "Deleting @noble/ciphers or @noble/hashes from package.json while still calling provider/noble is forbidden — tests stay green while landing speed regression."))
+
+    (:consequences
+    (vector "@noble/ciphers and @noble/hashes return to the wave pool as substitution-via-host."
+     "First slice landed: org-ietf-chacha20-poly1305 kotoba/chacha20/aead_params + noise.provider.reference for AEAD."
+     "Second slice landed 2026-08-30: org-nist-sha2 kotoba/hash/subpath_dispatch (KIR parity) + noise.hash.reference and kagi.digest.reference for SHA-256."
+     "kotobase-server GCM-SIV stays deferred (no aes.gcm substitute). tick skips reference-complete repos and deferred repos."
+     "Future: org-ietf-blake2 kotoba oracles for remaining @noble/hashes subpaths; wasm crypto capability kit remains separate work."))
+
+    (:verification
+    (vector "nbb scripts/verify-dependency-substitution.cljs --self-test"
+     "nbb scripts/dependency-substitution-wave-tick.cljs --limit 4"
+     "clojure -M:test in org-ietf-chacha20-poly1305 (parity test)"
+     "clojure -M:test in org-nist-sha2 hash.subpath-dispatch-kotoba-parity-test"
+     "npm test in noise with reference provider on classpath"))
+
+    (:landed-2026-08-30
+    (map (:com-junkawasaki/root
+     (vector "c6b8871dc22 depsub tick: defer GCM-SIV and skip reference-complete repos"
+      "dbbfd04359c west pin org-nist-sha2 cb67e53"
+      "5f53339a488 fix: cond parity in dependency-substitution-wave-tick"))
+     (:kotoba-lang/org-nist-sha2
+     (vector "cb67e53e590e kotoba/hash/subpath_dispatch oracle + KIR parity (2 tests, 19 assertions)"))
+     (:tick-evidence
+     "WAVE @noble/ciphers: DEFERRED-SKIPPED kotobase-server; REFERENCE-COMPLETE-SKIPPED kagi+noise; CANDIDATES 0")))
+
+    (:resume-point
+    "Next wave coordinate @noble/hashes — add reference providers in io-storj-node, org-chainagnostic-cacao, and the +1 consumer from verify --findings. Optionally teach tick to advance when all open repos for a coordinate are deferred+reference-complete (today @noble/ciphers stays selected with CANDIDATES 0)."))))))

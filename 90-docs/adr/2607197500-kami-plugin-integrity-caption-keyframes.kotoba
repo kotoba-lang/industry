@@ -1,0 +1,39 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607197500-kami-plugin-integrity-caption-keyframes")
+  (:adr/title "KAMI verifies audio packages and expands TTML keyframes")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607197400-kami-plugin-isolation-caption-spline"))
+  (:adr/decision
+  (map (:daw (map (:third-party-package
+         (map (:integrity :sha-256-source)
+          (:verification :before-registration)
+          (:capabilities (map (:allowlist (vector :audio-processing)) (:undeclared :reject)))
+          (:project-authority (vector :source-sha256 :capabilities))
+          (:tamper-policy :reject)))))
+   (:nle (map (:multi-keyframe-animation
+         (map (:ttml-input (vector :values :keyTimes :keySplines))
+          (:maximum-values 17) (:maximum-intervals 16)
+          (:key-times :strictly-increasing-zero-to-one)
+          (:representation :project-authoritative-intervals)
+          (:consumers (vector :frame-preview :production-capture :imsc-export))))))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:daw (vector "publisher signatures and trust store" "formal vendor certification" "surround/Atmos"))
+    (:nle (vector "interactive keyframe curve editor" "OCIO/ICC/HDR" "MOV/MXF/IMF delivery"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "a9227c1")) (:nle-commits (vector "fa18f41"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#33" "kotoba-lang/kami-app-nle#33"))
+   (:evidence
+   (vector "DAW passes 38 tests and 180 assertions; NLE passes 40 tests and 199 assertions."
+    "Both guarded optimized builds produced non-empty main.js artifacts."
+    "Chrome accepted a matching package, persisted its digest and capability, and rejected modified source."
+    "Chrome expanded three TTML values into two spline intervals and preserved them through EDN and IMSC export."
+    "All six browser assertions passed with zero console errors; Chrome and local servers were closed."))))
+  (:adr/consequences
+  (vector "Accidental or malicious source modification is detected before AudioWorklet registration."
+   "Multi-keyframe TTML timing survives ingest, project evaluation, production capture and equivalent segmented delivery."
+   "Publisher identity, interactive curve editing and high-end delivery formats remain explicit commercial gaps."))
+  (:adr/source-format "edn")))

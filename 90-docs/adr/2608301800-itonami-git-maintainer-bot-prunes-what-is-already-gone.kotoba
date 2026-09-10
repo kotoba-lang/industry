@@ -1,0 +1,184 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608301800-itonami-git-maintainer-bot-prunes-what-is-already-gone")
+  (:adr/title "定期的な git 片付けを itonami bots に持たせた —— 直せるのは「既に消えた worktree 登録」だけで、残りは報告する")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-30")
+  (:adr/tags (vector "cloud-itonami" "bots" "loop-yakuwari" "git" "cleanup" "worktree" "deterministic" "workforce"))
+  (:adr/related (vector "adr-2608136000" "adr-2608124400" "adr-2608300200" "adr-2607300900"))
+  (:adr/body "# 定期的な git 片付けは bot にできる —— ただし bot にできる部分だけ
+
+## Context
+
+オーナー指示（2026-08-30）「itonami cli bots に定期的に git conflict cleanup をする
+bots を用意して」。
+
+`itonami bots` は cloud-itonami-app の workforce Bot 群で、名簿は
+`network-awai/loop-yakuwari`、常駐 tick は `:bot/cadence-minutes` が回す。
+つまり「定期的に」の機構は既に在り、足りないのは **役と、その役が呼べる道具**だった。
+
+### まず測った —— 「conflict」は今日 0 件である
+
+`orgs/` 配下 4,696 checkout を .git メタデータだけで走査（2026-08-30）:
+
+| 何 | 件数 |
+|---|---|
+| 中断中の操作（MERGE_HEAD / rebase / cherry-pick / revert） | **0** |
+| stash を持つ repo | 6 |
+| 生きている linked worktree | 791 |
+| **working tree が既に消えている worktree 登録** | **80（65 repo）** |
+
+`manifest/cleanup-workflow.edn` の runbook は 5 つの別物を「cleanup」と呼んでいる。
+そのうち **機械が最後まで終えられるのは最後の行だけ**で、しかもそれは
+**どの surface にも出ていなかった** —— 消えたディレクトリの登録は `ls` に映らず、
+1 checkout の `git status` は残り 4,000 について何も言わない。
+
+## Decision
+
+### 1. 道具は `git_hygiene_status` / `git_hygiene_prune` の 2 つだけ
+
+`cloud-itonami-app` の `cloud.itonami.app.git-hygiene`。`disk-space` と同型で、
+Bot は削除するパスも実行する command も受け取らない。prune の対象は
+**呼び出し時に読み直した証拠**から host が決め、`git -C <checkout> worktree prune`
+という固定 argv を起動する。shell は経路のどこにも無い。
+
+- **standalone clone だけを prune する。** linked worktree の `.git` は
+  所有 repo と共有された metadata を指すので、そこで prune すると
+  誰も granted していない root を操作することになる。
+- **locked worktree を上書きしない。** git 自身が locked を prune しないことが、
+  取り外し可能媒体上の working tree を守っている機構であり、
+  ここで二つ目の判断を持つとそれが壊れる。
+
+### 2. 直さないものは「報告する」と明示する
+
+中断中の merge・stash・dirty tree は **報告のみ**。理由は能力ではなく境界:
+
+| 対象 | 直せない理由 |
+|---|---|
+| 中断中の操作 | conflict の解決は内容についての判断 |
+| stash | runbook が `.git/stash-archive-<date>/` への退避を先に要求する（「landed だと確信している」は省略の理由にならない） |
+| branch / dirty | 退役には push と server-side merge が要る。この identity は network も credential も持たない |
+
+報告は妥協ではない。**80 件は誰も見ていなかった。**
+
+### 3. 実行は決定論的で、model provider を跨がない
+
+`bots.clj` に `run-git-hygiene!`（`run-disk-maintenance!` と同型）。理由は測定値:
+この変更の直前 50 resident run のうち **45 が `:provider/http-error`** だった。
+内容が「status を 1 回、件数が非ゼロなら prune を 1 回」で尽きる pass に planner は
+要らず、planner を通すと provider の障害が片付けを無期限に止められるようになる。
+Bot identity・capability gate・cadence・run ledger・transcript はそのまま。
+
+### 4. 名簿側は 1 役
+
+`loop-yakuwari` に `:cloud-itonami/git-maintainer`（Git Maintainer、
+`:git.inspect` / `:git.cleanup` とも autonomous、cadence 60）。
+15 ではなく 60 なのは、stale 登録が溜まるのは日単位だから。
+`businesses.edn` の vocabulary と `:business/roles` にも足した。
+
+### 5. CLI から読める
+
+`itonami bots hygiene [--root <west-root>]`（読み取りのみ、host 側。
+`bots refactor scan` と同じ位置）。
+
+## Consequences
+
+- **実測（2026-08-30、実 workspace）**: `listed 4302 / scanned 4285 / unreadable 17`、
+  stale worktree 登録 **76 件 / 62 repo**、stash 8 件 / 6 repo、中断中 0、
+  live worktree 775。`unreadable 17` は fetch されていない checkout であって
+  clean ではない —— 出力で区別できる。
+- `.git` メタデータだけを読むので subprocess は prune のときにしか起きない。
+  4,302 project の走査が毎 tick 現実的なのはそのため。
+- **両方向を見せた。** `prune-checkout!` の `worktree prune` を `status --porcelain`
+  に差し替えると、prune を主張する assertion だけが赤くなった
+  （`:pruned 1 → 0`、`registrations stale` が `#{\\\"stale-tree\\\"}` のまま、
+  `:after :stale-worktrees` が 1）—— 6 failure、いずれも prune 由来で、
+  無関係な test は 1 本も動かなかった。無改変では 2104 tests / 12516 assertions /
+  0 failures。
+- test は本物の repo と本物の worktree を作り、本当にディレクトリを消す。
+  手書きした `.git/worktrees/<name>/gitdir` に対する test は、この namespace の
+  reader をこの namespace 自身の書式観に当てるだけで、
+  **prune が主張どおりのものを消し、主張どおりのものを残すか**を何も言わない。
+- **残る穴**: west 未登録の checkout（`orgs/` を歩くと 4,696、projection は 4,302）は
+  対象外。名簿が authority なので意図的だが、改名前の古いパスに残る stale 登録は
+  この bot からは見えない。撤去は `git-cleanup-conflict` の retirement へ。
+- **`:git.cleanup` を持たない Bot は planner 経路に落ちる**（`git-hygiene-relief-bot?`
+  は 2 つとも autonomous のときだけ真）。status だけの Bot は普通の resident job
+  として走り、provider 障害の影響を受ける。
+
+## 隣の質問への答え（同じセッションで訊かれたもの）
+
+**「itonami cli bots に tasks 機能はある?」** —— ある。ただし 3 つの別物である:
+
+| 何 | 形 | 定期的か |
+|---|---|---|
+| `itonami bots task --id <bot-id> --text <依頼>` | 1 回の依頼を投げて結果を待つ（`POST /api/agent-bots/<id>/messages`、660s） | **いいえ** |
+| resident tick | `:bot/cadence-minutes` + `workforce_cadence_core.kotoba` の適応 back-off | **はい。これが「定期的」の機構** |
+| routines | 記録した workflow を再実行（`/api/bots/:id/routines`、`POST /api/bots/routines/fire`） | はい。ただし **CLI からは呼べない** —— route が `require-csrf!` を持ち、生成 command registry（190 command）に載らない |
+
+したがって「定期的に走る bot」を作る正しい経路は `bots task` の繰り返しではなく、
+**名簿に役を足して cadence を持たせる**ことであり、この ADR はそれをした。
+
+
+## 着地（2026-08-30）
+
+| 何 | どこ |
+|---|---|
+| app（tool・capability・deterministic runner・CLI） | `cloud-itonami/cloud-itonami-app` merge `14d1853` |
+| 名簿（役） | `network-awai/loop-yakuwari` merge `34677ca` |
+| west pin | loop-yakuwari `d06d2f46`、cloud-itonami-app `91db6216` |
+| 共有 checkout | `orgs/network-awai/loop-yakuwari` を pin `34677ca` に合わせた（superproject の index.lock を別セッションが持っていたため `west update` ではなく直接 checkout した） |
+
+**動いている（2026-08-30 19:03 JST 実測）。** resident は release `509f557` で走り、
+`bots provision` が 135 bots / 23 businesses を通し、`Cloud Itonami · Git Maintainer`
+（`bot-workforce-ec92ab44-…`）が名簿に載っている。`itonami bots hygiene` は新しい
+CLI shim から実数を返す（`listed 4303 / scanned 4285 / unreadable 18`、
+stale 76 件 / 62 repo、stash 9 件 / 7 repo、中断中 0、live worktree 780）。
+
+`CLOUD_ITONAMI_WORKSPACE_ROOT` は plist に既に在るので新しい設定は要らない。
+
+### そこへ着くまでに 2 回、成功に見える失敗を踏んだ（両方このセッション内で実測）
+
+**1. `launchctl kickstart -k` は plist の編集を読まない。** 読むのは *loaded* な
+job 定義であって、ディスク上のファイルではない。plist の release path を書き換えて
+kickstart すると **PID は変わる**（33124 → 36560）ので成功に見えるが、**cwd は古い
+release のまま**だった。2 回やって 2 回とも古いままだったのを、`lsof -p <pid> -d cwd`
+で測って初めて気づいた。`itonami status` は 200 を返すので、**動作確認としては無力**
+—— 「新しい build が動いているか」に答えていない。正しいのは
+`launchctl bootout gui/$UID/<label>` → `launchctl bootstrap gui/$UID <plist>`。
+
+**2. CLI が起こす headless server が、launchd の job から port 1338 を奪う。**
+`itonami` の `ensure-server!` は server が居なければ自分で起こす。その子は
+`CLOUD_ITONAMI_APP_DIR` を持つが **`CLOUD_ITONAMI_WORKSPACE_ROOT` を持たない**。
+入れ替えの隙にそれが 1338 を掴むと、launchd 側は bind できず `LastExitStatus 256`
+で再起動を繰り返し、**port を持っている方は env が欠けている**。
+
+その状態で `bots provision` が返したのは
+`loop-yakuwari workforce registry is not checked out` —— checkout は 34677ca で
+無傷に在った。`registry-root` が `$CLOUD_ITONAMI_WORKSPACE_ROOT/orgs/network-awai/
+loop-yakuwari` を組み立てるので、**env が空だと相対パスが外れ、「checkout が無い」
+という顔で報告される**。原因はファイルではなく環境変数だった。
+
+直し方の順序: `bootout` →（orphan を kill）→ `bootstrap` → **cwd と env と port を
+それぞれ実測**。確認できたもの: serving pid 49260 / cwd `releases/509f5575` /
+`CLOUD_ITONAMI_WORKSPACE_ROOT` 有り / `LastExitStatus 0` / provision 135 通過。
+
+### まだ観測できていないこと（resume point）
+
+**決定論的な resident pass が tick で走るところは、まだ一度も見ていない。**
+`next-run-at` は 2026-08-28T14:27Z のまま（2 日超過）で、直近 50 run の内訳は
+`provider/http-error 40 / completed 8 / provider/denied 1 / running 1` ——
+max-active 2 の fleet が飽和している。CLI から tick を強制する手段は無い。
+
+planner 経路（`itonami bots task`）で 2 回試したが、どちらも
+**「モデルへの接続に失敗しました（HTTP 503）」** で終わった。これは決定論的経路を
+作った理由そのものであって、道具の失敗ではない —— ただし
+**「道具が動く」ことの証明にもなっていない**ので、未測定として残す。
+
+次に確かめること: `itonami bots messages --id bot-workforce-ec92ab44-…` に
+`Git hygiene pass completed by the bounded resident capability.` で始まる receipt が
+現れ、`itonami bots hygiene` の `stale-worktrees` が 76 から下がること。
+
+**main 側の既知の赤（この変更由来ではない）**: `every-authority-ships-disabled` が
+`origin/main` 自身で落ちている —— #236 が `:number` を endpoint つきで
+`defaults.edn` に載せたため。触っていない。
+")))

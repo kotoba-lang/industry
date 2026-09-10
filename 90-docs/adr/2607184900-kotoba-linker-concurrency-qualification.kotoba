@@ -1,0 +1,49 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607184900-kotoba-linker-concurrency-qualification")
+  (:adr/title "ADR-2607184900: Serialized component bridge scratch qualification")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-18")
+  (:adr/last-verified "2026-07-18")
+  (:adr/last_verified "2026-07-18")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for (vector "JVM component linker shared-scratch concurrency"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kototama/src/kototama/linker.clj"
+   "orgs/kotoba-lang/kototama/test/kototama/tender_test.clj"))
+  (:adr/supersedes (vector "adr-2607184800-kotoba-dns-and-http-framing-qualification"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:provider-memory :independent)
+   (:scratch-allocation :one-isolated-64-kib-page)
+   (:concurrency :serialized-per-provider-link-set)
+   (:overflow :reject-before-provider-call)
+   (:production-qualified false)
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:test")
+     (:result "114 tests, 373 assertions, 0 failures"))))))
+  (:adr/body
+  "# ADR-2607184900: Serialized component bridge scratch qualification
+
+**Status**: accepted
+**Date**: 2026-07-18
+
+## Decision
+
+One linked provider owns one isolated 64 KiB bridge page. Every call using that
+page is serialized across consumer instances, pointer arguments are rewritten
+into the page, and declared buffers alone are copied. A layout exceeding the
+page is rejected before the provider export is invoked. Executable evidence
+runs sixteen independent consumers concurrently through one provider and also
+exercises the 65,537-byte rejection boundary.
+
+## Maturity boundary
+
+This establishes memory isolation and deterministic shared-scratch behavior for
+the JVM prototype. It is not a throughput claim, a formal linear-memory proof,
+or evidence for distributed providers or a browser SharedArrayBuffer bridge.")))

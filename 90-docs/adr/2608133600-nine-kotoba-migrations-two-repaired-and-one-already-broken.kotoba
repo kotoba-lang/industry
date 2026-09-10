@@ -1,0 +1,315 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608133600")
+  (:adr/title "Nine .kotoba migrations without a load path: two repaired, and the one the inventory called latent had been broken for 24 days")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-13")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/body "## 何をしたか（一行で）
+
+ADR-2608132400 が棚卸しした 9 件の `.kotoba` 移行残骸のうち、**実在の消費側を名指しできる
+2 件（`postfx` / `cartpole-math`）を修理して着地させた**。残り 7 件は修理していない。
+そして棚卸しそのものが 1 件更新される —— **`cartpole-math` は「消費側なし」ではなかった。**
+
+## 訂正 1 —— 9 件のうち消費側が居るのは 1 件ではなく 2 件
+
+ADR-2608132400 の表は `postfx` だけを「消費側が在る」とし、残り 8 件を「無し」とした。
+**`cartpole-math` の判定が誤っている。** `kotoba-lang/webgpu` が
+`test/compute_golden_test.clj` と `scripts/gen_compute_golden.clj` の両方から
+`[kami.cartpole-math :as cm]` を require している。
+
+なぜ提供側 gate の表から漏れたか。gate は「同じ path で `.clj/.cljc/.cljs` が消され、
+そこに `.kotoba` が在る」を見る。`7c6cb307` はその形の削除
+（`src/kotoba/cartpole_math.cljc` → `.kotoba`）**も**やったので gate は正しく鳴っていた。
+だが消費側が要求している `kami.cartpole-math` は
+**`src/kami/cartpole_math.cljc` という別 path で、跡に `.kotoba` が置かれていない** ——
+つまり丸ごと削除である。gate はその path を見ないし、見る必要もない（`.kotoba` が無い
+path は gate の問いの外）。**「消費側が居るか」を答えるのは gate ではなく消費側の探索**で、
+ADR-2608132400 はその探索を checkout 済みの範囲で行い、`kami.cartpole-math` を
+`postfx` と同じ丁寧さでは追っていなかった。
+
+## 訂正 2 —— `cartpole-math` は時限式ですらなかった。24 日前に爆発済みだった
+
+`postfx` は「pin が破損を隠していた」。`cartpole-math` は違う:
+
+    kotoba-lang/webgpu/deps.edn:
+      io.github.kotoba-lang/cartpole-math
+        {:git/sha \\\"7c6cb3076689165b9aa63487e39ef119841beca4\\\"}   ← 削除 commit **そのもの**
+
+pin 先が移行の 4 commit 手前（postfx）ではなく、**移行 commit 自体**である。実測
+2026-08-13、webgpu を現行 pin のまま回すと:
+
+    Testing atmosphere-graph-test    Ran 3 tests / 13 assertions   0 failures
+    Testing capture-presence-test    Ran 2 tests / 12 assertions   0 failures
+    Testing cascade-shadow-test      Ran 1 tests / 12 assertions   0 failures
+    Execution error (FileNotFoundException) at compute-golden-test/eval2859
+    Could not locate kami/cartpole_math__init.class, kami/cartpole_math.clj
+    or kami/cartpole_math.cljc on classpath.
+
+**suite は 3 つ目の名前空間で abort する。** 2026-07-20 からずっとそうだった。誰も
+気付かなかったのは、この workspace の CI が repo 単位で自分の tree しか見ないからで、
+これは ADR-2608071000 が最初に書いた欠陥そのものが 3 例目として再発したという意味である。
+
+したがって「pin が破損を隠しもし被害を限定もした」（ADR-2608130900）は普遍則ではない。
+**pin が移行 commit 以降を指していれば、pin は何も守らない。**
+
+## 修理した 2 件
+
+形は ADR-2608130900 の css 形をそのまま踏襲した —— `.kotoba` は authority として
+一切巻き戻さず、`.cljc` を load path として復元し、両者の一致を主張する parity gate を
+足し、`kotoba-lang/compiler` を `:deps` から `:test` へ移し、repo 内の
+`production-source-authority` 系 assertion を**削除ではなく narrow** し、
+`docs/adr/0001` に amendment を書いた。
+
+### kotoba-lang/postfx — merged `12744735`
+
+- `src/postfx.cljc` を `15c7fda2^` から復元。
+- `test/postfx_parity_test.clj`（9 test）。
+- 消費側 `kotoba-lang/kami-postfx-scene` の pin を `876fe9de` → `12744735` へ前進、
+  merged `45de0401`。
+
+### kotoba-lang/cartpole-math — merged `e03723e9`
+
+- `src/kami/cartpole_math.cljc`（105 行の SSoT）と `src/kotoba/cartpole_math.cljc`
+  （facade）の**両方**を `7c6cb307^` から復元。gate が名指ししたのは後者だけだが、
+  facade は前者を require するので片方だけでは load path にならない。
+- `test/cartpole_math_parity_test.clj`（6 test）。
+- 消費側 `kotoba-lang/webgpu` の pin を `7c6cb307` → `e03723e9` へ前進、merged `771aa240`。
+
+## `.kotoba` と復元した `.cljc` は一致しているか
+
+**postfx: verbatim 復元で一致した。** 移行後に `8968e7e`（`option-value-of` →
+`option-or`）が入っているが、これは同じ意味の書き換えで観測可能な差は無い。
+`.cljc` の `{:keys [threshold]}` が欠損キーに対して返す `nil` と、guest の
+`(option-or (document-get config key) (document-null))` が返す明示 null は、
+canonical document 符号化では同じ `[\\\"null\\\"]` になる。dsl-core / async のように
+authority 側が意味を変えていた事例とは違い、ここは差が無かった —— **差が無いことも
+diff を取って初めて言える**ので、部分 config（キー欠損）を corpus の半分に入れて
+両側で突き合わせた。
+
+**cartpole-math: 物理は verbatim。ただし一致は 1.0e-13 であって bit 一致ではない。**
+guest は host の `Math.sin` を import せず `f64-sin-bounded` / `f64-cos-bounded` を
+使う（ADR 0001 が意図してそう決めている）。さらに乗算の結合が違う ——
+`.cljc` は `(* pml theta-dot theta-dot sin-t)`、`.kotoba` は
+`pml * (theta-dot * (theta-dot * sin-t))`。この許容差は私が持ち込んだものではなく、
+**この repo の既存 `cartpole-math-test` が既に 1.0e-13 で guest と Clojure oracle を
+比べている**。
+
+**物理を 1 演算でも書き換えなかった理由は golden である。** `kotoba-lang/webgpu` の
+`fixtures/cartpole-compute-golden.json` は `kami.cartpole-math/canonical-step` の
+`%.12g` 直列化の SHA-256 を pin している。復元した tree が実際に再現する値:
+
+    b26f67a139ace0c4af23c5cfd507e5db9922edb6ccd22f600d956eba4276dfc9
+
+これは fixture の `expected-output-hash` と一致する。**parity test はこの hex を
+literal で pin している** —— 直列化を変えたら webgpu ではなく cartpole-math が落ちる。
+
+## parity が取れなかった点（隠さずに書く）
+
+### postfx — pipeline の 32 要素上限
+
+guest の pipeline は KIR の document-vector で **32 要素まで**。`.cljc` に上限は無い。
+`.cljc` を 32 に狭めるのは parity ではなく、この library が一度もしていない約束を
+足すことになる。parity test は **32 まで一致を主張し、33 個目で guest が拒否し
+`.cljc` が受理するという乖離そのものを assert する**。実運用で最大の preset は
+`final-fantasy` の 10 効果で、`kami-postfx-scene` の出荷 EDN もそれを超えない。
+
+これは async の 32/64 と同型だが**当たり方が違う** —— async では唯一の消費側
+scheduler が 64 を実際に開いていたので guest がその channel を構築すらできなかった。
+postfx では消費側が bound の内側に居る。**同じ bound でも、消費側がどこに居るかで
+「乖離」か「移行が狭すぎた」かが決まる。**
+
+### postfx — `effect-types` は値と関数
+
+`.cljc` は `def` した set、guest は nullary 関数。Kotoba に top-level 値束縛が無い
+ためで、意味の差ではなく表現の差。parity test はメンバーシップを比較し、束縛の形は
+比較しない。
+
+### cartpole-math — `output-bytes` / `output-hash` には guest 側の相手が存在しない
+
+guest には bytes も float の文字列化も SHA-256 も無い。**parity は原理的に取れない。**
+黙って除外すると「9 個の export のうち 7 個を比べた」が「一致した」に化けるので、
+`output-hash-has-no-guest-counterpart-and-is-pinned-by-the-consumer` という名前の
+test を置き、guest と比べる代わりに**消費側の golden が依存している hex と byte 列を
+literal で pin した**。比較できないものを「比較しなくてよいもの」にはしない。
+
+ついでに、この 2 関数を `#?(:clj …)` で囲った。`.cljc` という拡張子は移行前から
+**持っていない可搬性を主張していた**（`format` と `java.security.MessageDigest`）。
+物理の方は本当に可搬なので囲っていない。
+
+### cartpole-math — 面の形が違う
+
+guest は `step-x` / `step-x-dot` / `step-theta` / `step-theta-dot` という**スカラ 4 本**を
+export する（typed ABI が `:f64` を運ぶため）。`.cljc` の `step` は 4-vector を返す。
+主張した関係は
+`(step cfg state action) == [(step-x …) (step-x-dot …) (step-theta …) (step-theta-dot …)]`
+で、これは ADR 0001 の Consequences が自分で書いている
+「hosts assemble the four scalar outputs into their preferred state representation」
+そのものである。
+
+## test が「直す前は赤い」ことを実測した
+
+CLAUDE.md「落ちない gate は劇場」。両 repo とも、復元した `.cljc` を壊して**意図した
+test だけが赤くなる**ことを見てから戻し、緑を再確認して landing した。
+
+| repo | 壊し方 | 赤くなった test |
+|---|---|---|
+| postfx | `add` を append→prepend | `add-agrees-step-by-step` / `curated-presets-agree` / `preset-effect-order-…`（33 failures） |
+| postfx | `bloom-params` から `_pad` を落とす | `gpu-uniform-layout-constructors-agree`（2） |
+| postfx | `effect-types` から `:ssao` を抜く | `effect-types-have-the-same-members`（3） |
+| postfx | `.cljc` 側にも 32 上限を入れる | `the-guest-refuses-a-33rd-effect-and-this-namespace-does-not`（1 error） |
+| cartpole-math | force clamp を外す | `step-agrees-with-the-four-scalar-guest-exports`（8） |
+| cartpole-math | semi-implicit → explicit Euler | 同上 + `output-hash-…`（hash と byte 列が動く） |
+| cartpole-math | `%.12g` → `%.10g` | `output-hash-…`（2） |
+| cartpole-math | facade が `step` の x を反転 | `the-facade-forwards-to-the-same-implementation`（8） |
+
+**parity test ファイル全体を消して赤くする実験はしていない。** それは `require` が
+解決しないだけで、ADR 依頼が禁じた「load できずに落ちる test」に当たる。壊すのは
+**復元した実装**であって test の可視性ではない。
+
+## 実測値（before → after）
+
+| repo | 自身の suite before | after | lint |
+|---|---|---|---|
+| kotoba-lang/postfx | 3 tests / 12 assertions | **12 tests / 177 assertions** | clj-kondo 0 errors / 0 warnings |
+| kotoba-lang/cartpole-math | 2 tests / 7 assertions | **8 tests / 93 assertions** | 0 errors（`:lint` の対象を `test` から `src test` へ拡げた。cljs 分岐の unused binding 警告 5 件、`--fail-level error`） |
+
+いずれも 0 failures / 0 errors。
+
+### 消費側（消費側の repo には 1 バイトも触らずに測った）
+
+`-Sdeps '{:deps {… {:local/root …}}}'` で提供側だけ差し替えている。
+
+| 消費側 | 現行 pin のまま | provider = origin/main（`.kotoba` のみ） | provider = 復元後 |
+|---|---|---|---|
+| kotoba-lang/kami-postfx-scene | 15 tests / 145 assertions 緑 | **load 失敗** | **15 / 145 緑** |
+| kotoba-lang/webgpu（`compute-golden-test`） | **load 失敗（= 現行 pin が移行 commit）** | 同左 | **3 tests / 24 assertions 緑** |
+
+postfx 側の load 失敗は
+`Could not locate postfx__init.class, postfx.clj or postfx.cljc on classpath`。
+
+**webgpu には別件の赤が残っている。** `pipeline-specs-test` が
+`fixtures/pipeline_specs.edn differs from kami.pipelines` で落ちる。**現行 pin でも
+同じように落ちる**（`-n pipeline-specs-test` で単独確認済み）ので今回の変更とは
+無関係な既存の fixture drift であり、見つけたままにしてある。cartpole-math の pin を
+前進させたのは `compute-golden-test` が緑になることを確認した後である。
+
+## gate 出力（before → after）
+
+`nbb scripts/fleet-ci/gates/kotoba-provider-orphan-check.cljs <dir> --min 1`。
+床（90 = `.git` 無し / 91 = `--min` 未満 / 92 = `git ls-files` 失敗）はいずれも
+踏んでいない —— **before は 1、after は 0**、どちらも実際の判定である。
+
+    postfx        before EXIT=1  \\\"src/postfx.kotoba … deleted in 15c7fda2e4d8\\\"
+                  after  EXIT=0  \\\"1 .kotoba scanned, 0 sibling-less, 0 with a deleted Clojure sibling\\\"
+    cartpole-math before EXIT=1  \\\"src/kotoba/cartpole_math.kotoba … deleted in 7c6cb3076689\\\"
+                  after  EXIT=0  \\\"1 .kotoba scanned, 0 sibling-less, 0 with a deleted Clojure sibling\\\"
+
+before は `origin/main` の detached worktree に対して、after は修理 worktree に対して
+測った（共有 checkout ではない）。
+
+**注意: cartpole-math の after が 0 になったことは、`kami.cartpole-math` が戻ったことを
+意味しない。** gate は `.kotoba` の兄弟しか見ないので、facade だけ戻しても 0 になった。
+**この repo で本当に消費側を直したのは、gate が見ていない方のファイルである。**
+gate 0 を「この repo はもう安全」と読んではいけない。
+
+## 消費側 pin の棚卸し（修理そのものより価値がある方）
+
+checkout 済み 4,415 project に対して 2 つの走査を回した（実測 32.3 秒 / 22.1 秒、load 86–120）:
+
+1. `orgs/**/deps.edn` 3,493 件のうち、9 提供側の git URL を持つもの
+2. `*.clj` `*.cljc` `*.cljs` 全件のうち、9 提供側の ns を require 形で書いているもの
+   （単一セグメント `postfx` / `tilemap` / `usd-native` / `kami-app-quarry-walk` を
+   含む —— これらは消費側検出器 `verify-require-graph` の `external?` が
+   「ドットを含まない ns は third-party」として構造的に落とすので、あちらの沈黙は
+   証拠にならない）
+
+結果は **消費側 2 件のみ**で、両方とも移行前後の sha を pin していた:
+
+| 消費側 | 提供側 | pin していた sha | 位置 | 状態 | 解決 |
+|---|---|---|---|---|---|
+| kotoba-lang/kami-postfx-scene | postfx | `876fe9de` (2026-07-02) | 移行の **4 commit 手前** | 時限式（pin が守っていた） | `12744735` へ前進、merged `45de0401` |
+| kotoba-lang/webgpu | cartpole-math | `7c6cb307` (2026-07-20) | **移行 commit そのもの** | **既に破損（24 日）** | `e03723e9` へ前進、merged `771aa240` |
+
+**残り 7 提供側（rtx-native / annotation / kami-app-quarry-walk / kami-usd-native /
+pbrt / replicator / tilemap）を deps.edn から参照している repo は 0 件、
+ns を require している repo も自分自身の test 以外に 0 件。**
+
+### west pin 側は landmine ではない
+
+9 提供側の `manifest/west.yml` pin を全部確認した。**9 件すべてが移行 commit かそれ以降**
+（多くは 2026-08 の Apache-2.0 一括 commit）を指しており、消費側 deps.edn のような
+「移行前に留まっている pin」は west 側には 1 件も無い。`west update` を回しても
+この欠陥は顕在化しない —— **顕在化させるのは Clojure の classpath であって west ではない。**
+
+### この棚卸しの限界（正直に）
+
+- **checkout されていない west project の消費側は見ていない。** west は 4,124 project を
+  持ち、走査したのは checkout 済み 4,415 ディレクトリ。「2 件」は下限であって総数ではない。
+- **`:local/root` / shadow-cljs の `:source-paths` / nbb の `--classpath` で提供側を
+  載せている経路は deps.edn 走査に映らない。** require 形の走査は拾うので二重に見ているが、
+  文字列連結で ns を作る呼び出しは両方をすり抜ける。
+- **7 件を「消費側なし」と書いたのは今日の checkout に対してである。** ADR-2608132400 が
+  同じ範囲で `cartpole-math` を「無し」と判定して誤っていたことを思えば、この列を
+  「潜在」の証明として引用しない方がよい。**やっていないのは修理であって、判定ではない。**
+
+## 直していない 7 件（境界を明示する）
+
+| repo | path | 削除 commit | gate | 消費側 | 状態 |
+|---|---|---|---|---|---|
+| kotoba-lang/rtx-native | src/kotoba/rtx_native.kotoba | `c5e3c158` | **EXIT=1 のまま** | 検出範囲に無し | **未修理** |
+| kotoba-lang/annotation | src/annotation/core.kotoba | `775081a4` | **EXIT=1 のまま** | 同上 | **未修理** |
+| kotoba-lang/kami-app-quarry-walk | src/kami_app_quarry_walk.kotoba | `b55cf842` | **EXIT=1 のまま** | 同上 | **未修理** |
+| kotoba-lang/kami-usd-native | src/usd_native.kotoba | `e56fffc2` | **EXIT=1 のまま** | 同上 | **未修理** |
+| kotoba-lang/pbrt | src/kotoba/pbrt.kotoba | `17bcaf80` | **EXIT=1 のまま** | 同上 | **未修理** |
+| kotoba-lang/replicator | src/kotoba/replicator.kotoba | `d875a29e` | **EXIT=1 のまま** | 同上 | **未修理** |
+| kotoba-lang/tilemap | src/tilemap.kotoba | `2ce204c3` | **EXIT=1 のまま** | 同上 | **未修理** |
+
+7 件とも GitHub archived ではない（`gh api repos/kotoba-lang/<r> --jq .archived` が
+全件 `false`）ので、push が拒否される類の負債ではない —— **単に時間で切った。**
+修理の形は上の 2 件と同じで、1 件あたり「削除 commit から `.cljc` を復元 →
+`.kotoba` と意味を突き合わせ → parity test → 落ちることを確認 → repo 内の
+authority assertion を narrow → ADR 0001 amendment」である。
+
+**9 件のうち 2 件を直したことを「9 件のうち 2 件が壊れていた」と読まないこと。**
+7 件も同じように load できない。違うのは、今日の checkout の中に require している
+コードが見つからなかったという点だけである。
+
+## west pin
+
+| project | before | after |
+|---|---|---|
+| kotoba-lang/postfx | `425f8726` | `12744735` |
+| kotoba-lang/cartpole-math | `83eb8342` | `e03723e9` |
+| kotoba-lang/kami-postfx-scene | `850fd9aa` | `45de0401` |
+| kotoba-lang/webgpu | `7a0ff33f` | `771aa240` |
+
+`nbb scripts/advance-pins.cljs kotoba-lang <list> --execute` が当該 4 entry のみ書き換え
+（`{:advanced 4, :already 0, :lookup-failed 0, :not-in-manifest 0}`）、
+`nbb scripts/verify-west-pins.cljs --only <name>` が 4 件とも fast-forward として OK。
+`manifest/west.yml` は手編集していない。
+
+## 検証していないこと
+
+- **7 件の修理。** 上表のとおり。
+- **`.kotoba` を native ターゲットで実際に compile して失敗するところ。** どちらの
+  `.kotoba` も `:document` / `:vector-f64` を跨ぐので `kotoba-kir` の
+  `only-native-word-typed-features?` を通らないと演繹しているが、compile は走らせて
+  いない（ADR-2608071000 / ADR-2608130900 と同じ限界）。
+- **`postfx` の restricted-JS / typed-Wasm 経路。** repo 内の既存 `postfx-test` が
+  node を起動して両方を検査しており、それは緑のまま通っている。私が足した parity は
+  KIR インタプリタ経路だけで、JS/Wasm 側と `.cljc` を直接比べてはいない。
+- **提供側 gate の fleet receipt。** ADR-2608132400 は「`git archive` が `.git` を落とす
+  ので gates.edn に載せられない」と書いたが、**本作業の途中で別セッションが
+  ADR-2608134200 でその負債を返した** —— `tick.cljs` に `:ship-self-bundle true` が入り、
+  対象 repo が bundle として配られるようになり、`postfx` / `dsl-core` / `async` の entry が
+  origin/main に載っている。そこへ `cartpole-math` の entry を足した（同 ADR が定めた
+  「修理された repo から足す」に従い、赤い列から 1 件外れた形）。**それでも私は fleet の
+  receipt を見ていない。** 本 ADR の gate 緑は 4 件とも**手元で測った値**である。
+
+  そして gates.edn のコメントにも書いたが、**`cartpole-math` の gate が緑であることは
+  `kami.cartpole-math` が戻ったことを意味しない。** gate は `.kotoba` の兄弟しか見ない。
+  消費側が実際に require している `src/kami/cartpole_math.cljc` は gate の視界の外にある
+  —— この repo で本当に webgpu を直したファイルを、gate は一度も見ていない。
+- **`orgs-detector-tick` の再実行。** 共有 checkout が west pin のまま古いので、pin が
+  landed して `west update` が回った後に green へ落ちることの確認は次の作業。")))

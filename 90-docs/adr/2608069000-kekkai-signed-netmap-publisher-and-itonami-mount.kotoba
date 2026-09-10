@@ -1,0 +1,195 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608069000")
+  (:adr/title "kekkai: the signed-netmap publisher that did not exist, and the itonami mount that does now")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-06")
+  (:adr/tags (vector "kekkai" "netmap" "zero-trust" "itonami" "x402" "cloud-itonami"))
+  (:adr/supersedes "")
+  (:adr/body
+  "## 出発点の問い
+
+オーナー: 「今の tailscale で接続できる fleet に kotoba kekkai を使って ssh 接続
+できる? app.itonami.cloud/kekkai で kekkai の itonami も公開できる? 決済も x402
+での決済にサポートしている?」
+
+3 つとも実測した。1 つ目は No で、その No の理由を掘ったところ**もっと手前に
+穴が空いていた**。2 つ目と 3 つ目は着地させた。
+
+## 実測: SSH は kekkai を経由していないし、今日はできない
+
+tailnet は生きている（15 ノード、`ssh judah` / `ssh levi` は通る、zebulun は
+port 22 timeout）。ただしそれは **素の Tailscale + OpenSSH** で、kekkai は
+一切関与していない。judah・levi・ローカルのいずれにも kekkai プロセスも
+LaunchAgent/LaunchDaemon も無い。
+
+さらに構造的なブロッカーが 2 つある。**これは「まだ実装していない」ではなく
+「今日の設計では通らない」**:
+
+1. **kekkai-node は L3/TUN 面を持たない。** repo 自身の README が
+   『it does not present a network interface, so it is not a drop-in for a
+   `100.x.y.z`-routes-everything VPN。`:node/overlay-ip` は MagicDNS の命名に
+   使われるのであって packet の routing には使われない』と書いている。
+   macOS で全トンネルを張る経路は `NEPacketTunnelProvider`（Apple の
+   Network Extension）で、署名と entitlement が要る — repo 自身が release
+   gate として挙げている。
+2. **オーバレイに再送層が無い。** `peer.cljc` にあるのは handshake の retry
+   だけで、データフレームの seq/ack/retransmit は無い。したがって TUN を
+   迂回して userspace で TCP を転送する経路を作るにも、**信頼性層を新規に
+   書く必要がある**（それ自体が独立したプロトコル設計）。
+
+したがって「kekkai で ssh」は、(i) Apple 署名込みの NE 経路か (ii) 存在しない
+reliable-stream 層のどちらかを要する。今日の作業では**やっていない**。
+
+## その手前で見つかった穴 — 受け渡し形式に実装が無かった
+
+kekkai-node の README は制御面との受け渡しを
+`:netmap/{version,tailnet,self,peers,edges,relays}` の EDN と明記し、
+`kekkai.node.signed-netmap` は Ed25519 envelope を検証できる。
+`agent/load-netmap` は既にその検証を呼んでいる（README の『single most
+important remaining hole』という記述の方が陳腐化していた）。
+
+**しかしその形を産出するコードが、どこにも無かった。** 制御面は `:netmap`
+という制御面レコードと assessment を書き、node はファイルを読み、2 つの repo は
+**散文だけで繋がっていた**。node が `allow-unsigned-netmap?` で動いていたのは
+node 側の手抜きではなく、**署名された netmap を発行する主体が存在しなかった**
+から。node の docstring が `fleet.edn` について警告している穴（『それを書ける
+人間が誰でも fleet になる』）が、一層下で開いていた。
+
+## 決定 1 — 発行側を書いた（kotoba-lang/kekkai、main 着地済み）
+
+- **`kekkai.netmap`** — 純粋な射影。`{:nodes :plane :relays :heartbeats}` から
+  1 ノード分の wire netmap へ。
+- **`kekkai.envelope`** — Ed25519 の封緘/検証。payload は base64 のバイト列で
+  運ぶ（署名はバイト列に掛かるので、再直列化の合意を要求すると読み手ごとの
+  正規化差が署名破りか署名衝突になる）。
+- **`acl/grant-match` + `grant-capabilities`** — capability は**それを認可した
+  grant と一緒に運ぶ**。既定は `[:overlay]` のみで、`:ssh` 等は grant ごとの
+  opt-in（capability が後から増えたときに、それ以前に書かれた policy が黙って
+  それを付与しないため）。
+- **`store/netmap-inputs`** — 1 回の publish に 1 スナップショット（`plane` の
+  先例と同じ）。
+- **`store/demo-data` に `:static-pub` / `:overlay-ip`** — 制御面は *device* を
+  admit するが、データ面は *key* を dial する。別の事実なので別のフィールド。
+
+### 決定として書き留める 3 つの読み
+
+1. **どちらの向きにも edge が無い peer は「拒否」ではなく「不在」。**
+   tailnet 全員を載せた netmap は、grant を持たない組織の名簿を各ノードに
+   配ることになり、ノードはそれを忘れられない。
+2. **edge はあるが expired / unadmitted な peer は、印を付けて発行する。**
+   node 側が `judah: :key-expired` と言えるのはこのため。ここで濾すと
+   「失効」と「打ち間違い」が区別できなくなる（`peer-table` の docstring が
+   その 2 状態は違うと明言している）。
+3. **cross-tailnet peer は active peering があっても発行しない。** これは
+   好みではなく限界で、隠さず報告する（`netmap/excluded` の
+   `:cross-tailnet-not-carriable`）。`prologue-string` が**発行側の** tailnet を
+   Noise prologue に束縛するので、peering された別 tailnet の 2 ノードは
+   異なる prologue を導き handshake が失敗する — しかも『認証失敗』という、
+   peering とは無関係に読めるメッセージで。握手できないと分かっている peer を
+   載せるより、外して理由を言う方がよい。越境を運ぶには prologue が peering を
+   束縛する必要があり、それはデータ面のプロトコル変更。
+
+### テストが見つけた実バグ
+
+**peer / edge の順序が入力順に依存していた。** netmap はバイト列として署名
+されるので順序は署名の一部であり、store 経由の publish と手組みの publish が
+**全ての事実で一致し、バイト列で食い違った** — 同じ論理 netmap に 2 つの署名。
+id 順に整列して修正し、順序非依存を性質としてテストに固定した。
+
+## 決定 2 — 境界をバイト列で固定した（cross-repo parity）
+
+1 つの形式に 2 実装は必ず乖離する。しかも静かに乖離する（key 順・整数の
+印字・namespace-map 印字が変わると、発行側では検証できて node 側では読めない
+envelope ができる）。
+
+そこで `kotoba-lang/kekkai` の `test/fixtures/netmap.signed.edn` を正とし、
+- 発行側は「現在のコードが吐くバイト列と一致するか」を assert（Ed25519 は
+  RFC 8032 で決定的なので再現する）、
+- `kekkai-node` の `publisher-parity-test` は**同じファイル**を
+  `signed-netmap/verify-envelope` に通して `netmap/validate` まで通す、
+- 偽造テストは payload と digest の**両方**を書き換えて署名だけ残す
+  （digest を直さない改竄は digest チェックが捕まえるので、署名について
+  何も証明しない）。
+
+`*print-namespace-maps*` は load-bearing で、明示的に束縛している —— 既定値が
+plain run と REPL で違うので、束縛しないと**人間が手で発行したときだけ**壊れる。
+
+実測: kekkai 119 tests / 343 assertions（97/277 から）、kekkai-node
+58 tests / 187 assertions（54/168 から）、両方 lint clean。west pin 前進済み。
+
+## 決定 3 — itonami として mount した（cloud-itonami/kekkai、live）
+
+`https://app.itonami.cloud/kekkai` に Worker を deploy（dispatch namespace
+`ai-gftd-repository-dispatch`）。**エンジンは複製していない** — `kekkai.acl`
+（TailnetGovernor が proposal を censor するのと同じ pure `.cljc`）を git 依存で
+消費し、HTTP の封筒と決済ゲートだけを足す。`decide_test` は、返す答えが
+`edge-decision` の答えとフィールド単位で一致することを assert する
+（governor と食い違う policy engine は、policy engine が無いより悪い）。
+
+| | | |
+|---|---|---|
+| `GET /health` | liveness | 無料 |
+| `GET /blueprint.edn` | Open Business Blueprint | 無料 |
+| `POST /netmap/verify` | 署名 netmap envelope の検証 | **無料** |
+| `POST /x402/acl/decide` | deny-by-default の edge 判定 1 件 | USD 0.001 |
+
+**署名はしない。** netmap を発行するとは authority 鍵を持つことで、公開
+インターネットから到達できる Worker はそれを置く場所として間違っている。
+発行は制御面に残す。
+
+### 何に計器を置き、何には置けないか
+
+憲章 G4 は『`:traffic/*` も `:user/activity` も名前空間として存在しない —
+制御面は到達性を認可し、トンネルを流れたものを記録しない』。**従量課金は測定を
+要求するので、このエンジンの上に帯域課金は載らない** —— 載せた瞬間、このエンジンを
+使う理由そのものが消える。
+
+だから計器は**認可**に置いた。それは制御面がすでに下していて、すでに genealogy
+台帳に書いている判断であり、**プレーンが知らないと約束したことを知らずに数えられる
+唯一の単位**。
+
+**検証は意図的に無料。** 本物かどうかを確かめる行為に値段を付けると、検証を
+払えないノードは検証せずに動く — この境界がまさに防ごうとしている失敗。
+
+### 3 つ目の verifier
+
+`kekkai.itonami.verify` は envelope 検証の**3 実装目**（JVM 発行側 / Node
+node 側 / WebCrypto edge）。3 つ目が drift でなく許容されるのは、**3 つとも
+同じ fixture に固定されている**から。live で実 fixture を検証し、別の authority
+では `:untrusted-netmap-signer` で拒否することを確認した。
+
+## 決定 4 — x402 seller として登録した（live）
+
+`x402.nexus`（`network-awai/nexus-x402`）の KV レジストリに `PUT
+/admin/sellers/kekkai` で登録。**live facilitator を再デプロイしていない**
+（`SELLERS_JSON` の編集 + deploy より、KV 登録の方が共有インフラに触らない）。
+公開 catalog は 4 → 5 items。gateway 経路
+（`/gateway/kekkai/kekkai/x402/acl/decide`）が 402 challenge を返すことまで実測。
+
+ゲートは **facilitator に到達できないときも fail closed** —— `/verify` に
+到達できない verifier は支払いについて何も知らず、『不明』は『支払済』ではない。
+ただし 2 つの閉じた扉は区別して報告する（`:facilitator-unreachable` は待て、
+`:payment-invalid` は払い直せ）。区別しない 1 つの 402 は、既に払った呼び手を
+二重払いに送る。
+
+**価格 USD 0.001 は開始値であってオーナーが決めた値ではない。** catalog の
+既存レンジ（kotobase 0.001–0.002 / murakumo 0.01 / shinshi 0.50）に合わせた。
+公開価格なので、オーナーの判断で変えるべきもの — 変更は KV の 1 PUT で済む。
+
+## 訂正
+
+このセッションで一度、**「app.itonami.cloud は router が生きているのに何も
+配信していない」と誤って結論した**。全パスが 404 だったのを router の 404 と
+読んだが、実際には `/yotei` の 404 は **yotei 自身**が返していた（`/yotei/health`
+は `{\"ok\":true,\"actor\":\"yotei\",\"mount\":\"/yotei\"}` を返す）。router の
+404 は `{\"error\":\"actor not deployed\",\"actor\":...}` という別の body で、
+それを見分けずにステータスコードだけで判断したのが誤り。mount 機構は壊れて
+いない。
+
+## 残っていること
+
+- **kekkai での SSH**（上記 2 ブロッカー）。順序としては reliable-stream 層の
+  方が Apple 署名より手前だが、どちらも独立したスコープ。
+- **relay がまだ制御面レコードではない**（発行時の設定値）。
+- **cross-tailnet を運ぶ prologue** の設計（データ面のプロトコル変更）。
+- kotobase.net origin 復帰時の live 結合 1 回（既存項目）。")))

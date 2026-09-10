@@ -1,0 +1,204 @@
+(vector (map (:db/id -1)
+  (:adr/id "2800004500")
+  (:adr/doc_type "adr")
+  (:adr/topic "qwen38-2p4t-a95b-self-host-vs-api")
+  (:adr/title "Qwen3.8-2.4T-A95B は自前ホストしない —— fleet は FP8 に対して 15 倍足りず、$2/$6 の従量 API が損益分岐を作れない")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-13")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authors (vector "Claude Opus 5 (Claude Code)"))
+  (:adr/authoritative_for
+  (vector "Qwen3.8-2.4T-A95B（および Qwen3.8-Max）をこのワークスペースでどう使うかの決定"
+   "murakumo fleet 10 ノードの実測メモリ/ディスク在庫と、そこから導かれる「載る/載らない」の判定手順"
+   "2.4T クラスのモデルについて、自前ホストと従量 API の損益分岐をどう計算するか"
+   "SSD ストリーミング（WASTE 方式）で巨大 MoE を低速で動かす経路を、このワークスペースで採るか否か"))
+  (:adr/related (vector "2607173100" "2607300900" "2608111721"))
+  (:adr/repos (vector "com-junkawasaki/root" "gftdcojp/murakumo-mlx" "gftdcojp/cloud-murakumo"))
+  (:adr/evidence
+  (vector "fleet 10 ノード全て Mac16,10 / hw.memsize 17179869184 = 16 GiB。合計 160 GiB（2026-08-13 実測、全ノード ssh）"
+   "fleet 空きディスク: judah 62 / benjamin 62 / joseph 46 / simeon 36 / dan 27 / levi 22 / zebulun 22 / asher 15 / issachar 8 / naphtali 6 GiB = 合計 306 GiB（同日実測）"
+   "workstation: Apple M1 Max / 32 GiB / 空き 111 GiB（同日実測）"
+   "モデルカード実測: 2.4T total / 95B active / 512 expert(11 activated) / 92 層 / hidden 8192 / native 262,144 ctx / BF16"
+   "murakumo-main alias 実測 2026-08-13: alias-for=qwen3.6-35b-a3b endpoint=https://infer.murakumo.cloud/v1/chat/completions status=serving"
+   "WASTE (sqliteai/waste) 公表値: Kimi K3 2.78T を WASTE 形式 982 GB / trunk 常駐 27 GB / 0.49-0.54 tok/s on 64GB MacBook Pro M5 Pro / context 4K"
+   "workstation Thunderbolt: 40 Gb/s ポートあり。外付け NVMe は未接続（/Volumes は DMG 2 件のみ、2026-08-13 実測）"))
+  (:adr/body
+  "# ADR-2800004500: Qwen3.8-2.4T-A95B は自前ホストしない
+
+**Status**: accepted / **Date**: 2026-08-13
+
+## Directive
+
+オーナーが 4 問を順に出した —— (1) `huggingface.co/Qwen/Qwen3.8-2.4T-A95B` を動かすにはどうしたらいいか
+(2) Modal / RunPod なら月額いくらか (3) 3.8-Max を提供している API のトークン価格は
+(4) Claude / Codex のような公式の定額プランはあるか。
+
+## 決定
+
+**自前ホストしない。使うなら従量 API を murakumo alias 経由で繋ぐ。**
+`murakumo-main` は変更しない（fleet が serve していないモデルを main が指す状態を作らない）——
+必要になった時点で別 alias entry を足す。
+
+## 1. ローカルは 1 桁半足りない。チューニングの問題ではない
+
+| | 重み |
+|---|---|
+| BF16（HF 本体） | 2.4T × 2B = **約 4.8 TB** |
+| FP8（`Qwen/Qwen3.8-2.4T-A95B-FP8`） | **約 2.4 TB** |
+| 4bit 量子化（仮） | 約 1.2 TB |
+
+実測した在庫は **fleet 合計 160 GiB unified memory**（10 台 × Mac16,10 = M4 mac mini 16 GiB）と
+**空きディスク合計 306 GiB**。FP8 に対して RAM で **約 15 倍**足りず、
+**そもそも重みを置く場所も無い**（FP8 で 2.4 TB、最大空きノードでも 62 GiB）。
+2bit まで潰しても約 600 GB でまだ 4 倍足りない。
+
+**`95B active` は容量を救わない。** MoE の active パラメータ数は per-token の演算量であって、
+512 expert の重みは全部常駐している必要がある。ここを取り違えると
+「A95B なら 95B 相当の RAM で載る」という誤った結論が出る。
+
+## 2. GPU を借りる場合の月額（2026-08-13 時点の公表価格）
+
+FP8 で重み 2.4 TB。KV cache と activation を足すと HBM は実質 3 TB 以上。
+NVIDIA の公式レシピは **8×B300 × 2 ノード（16 GPU, TP16）**。
+
+| | GPU 単価/hr | /hr | 月額（730h） |
+|---|---|---|---|
+| RunPod 16× B300 (Secure) | $7.39 | $118 | **$86,300** |
+| RunPod 16× B200 | $5.89 | $94 | **$68,800** |
+| RunPod 24× H200 (Secure) | $4.39 | $105 | **$76,900** |
+| Modal 16× B300 | $7.10 | $114 | **$82,900** |
+| Modal 16× B200 | $6.25 | $100 | **$73,000** |
+| Modal 24× H200 | $4.54 | $109 | **$79,500** |
+
+別途ストレージ（2.4 TB 常駐）が RunPod 高性能ボリューム約 $336/mo、Modal 約 $130/mo。
+Modal は Team プラン $250/mo が加算される。
+
+**Modal の秒課金・scale-to-zero はこのサイズでは効かない。**
+2.4 TB を 16 GPU にロードするコールドスタートが現実的でないため、
+ウォームコンテナ常駐 = 24/7 課金に戻る。Modal を選ぶ理由があるとすれば価格ではなく開発体験。
+マルチノードは **RunPod Instant Clusters が最大 64 GPU と明記**しており素直。
+
+## 3. 従量 API の価格（2026-08-13 時点）
+
+| モデル | 入力 /1M | 出力 /1M | ctx |
+|---|---|---|---|
+| Qwen3.8-Max | $2.00 | $6.00（暗黙キャッシュ入力 $0.25） | 1M |
+| Qwen3.8-2.4T-A95B | $1.80 | $5.40 | 262K |
+
+本家 Alibaba Cloud Model Studio が $2/$6 の**フラット一律**（context を伸ばしても単価が上がらない）。
+OpenRouter は同額の素通し。Model Studio は OpenAI / Anthropic / DashScope 互換エンドポイントを出す。
+
+**Max とオープンウェイト版は別 SKU。** 262K で足りるなら A95B 版が 1 割安い。
+
+## 4. 損益分岐は稼働率 7%
+
+$68,800/mo（16× B200）を $6/M で割ると **月 115 億出力トークン**。
+16 GPU × 4K tok/s（NVIDIA 実測値）= 月 1,680 億トークンが理論上限なので、
+**稼働率およそ 7% を超えると自前が安くなる**。ただし GPU 単価だけの比較で、
+運用・冗長化・ノード障害対応は入っていない。**$2/$6 は 2.4T クラスとしてかなり安く、
+自前を正当化するには相当な常時負荷が要る。**
+
+## 5. 定額プランは存在するが 3.8-Max を含まない
+
+**Qwen Coding Plan**（Alibaba Cloud Model Studio）: Lite 約 $10/mo、Pro 約 $50/mo で
+**最大 90,000 リクエスト/月**。**Claude Code / Qwen Code / Cline / OpenClaw から使える。**
+ただし公式アナウンスの対象は **Qwen3.5-Plus / Qwen3-Coder 系**で、**3.8-Max の記載は無い**。
+
+3.8-Max は 2026-07-19 のプレビュー時 Token Plan の背後にゲートされ、
+**2026-08-03 の GA で通常の従量課金に移行**した。**今のところ 3.8-Max を定額で使う公式窓口は無い。**
+
+参考（同日時点）: Claude Code Pro $20 / Max $100 / $200、Codex Go $8・Plus $20 / Pro $100・$200、
+GLM Lite $18 / Pro $80 / Max $168、Kimi ¥49〜¥699、MiniMax Starter $10。
+**Qwen Pro $50 で 90K リクエスト/月は最安クラス**で、1 リクエスト平均 1K 出力トークンでも
+従量換算 $540 相当 —— 桁で得になる。
+
+**Qwen Code CLI の無料 OAuth 枠は 2026-04-15 に終了**（1,000/日 → 100/日 → 廃止）。
+CLI 自体はオープンソースで無料のまま、無料の推論が付かなくなった。
+
+## 6. SSD ストリーミング（WASTE 方式）も成立しない —— active が効く
+
+2026-08-13 追記。オーナーが HN item 49123386（**WASTE** / `sqliteai/waste`）を挙げ、
+低速でも動くパターンでの試算を求めた。**結論は不採用。** 理由が 3 つあり、どれも単独で致命的。
+
+WASTE は trunk を RAM に常駐させ、活性化した expert だけを毎トークン NVMe から
+直接ストリームする（OS ページキャッシュをバイパス、expert は 3bit 残差 VQ）。
+公表実測は **Kimi K3 2.78T を WASTE 形式 982 GB / trunk 27 GB / 0.49-0.54 tok/s
+（64 GB MacBook Pro M5 Pro）/ context 4K**。
+
+### 理由 1: WASTE は Qwen3.8 に対応していない
+
+リポジトリ自身が intentionally narrow と名乗り、対象は Kimi K3。
+コードレビューで Qwen3.6-27B (NVFP4) を評価した記述はあるが 27B の話であり、
+2.4T-A95B のサポートは無い。**移植も軽くない** —— WASTE は K3 のハイブリッド注意に
+合わせた absorbed KV cache を実装しており、Qwen3.8 は
+Gated DeltaNet 3 層 + Gated Attention 1 層の 4 層ブロック × 23 という別構成なので
+KV 経路を書き直すことになる。
+
+### 理由 2: 95B active がこの方式と最悪の相性
+
+WASTE 形式のビット単価（982 GB / 2.78T = 0.353 B/param）を当てると
+**Qwen3.8-2.4T は約 848 GB**、trunk 常駐は 25-40 GB 程度。
+
+**この方式では active パラメータ数がそのまま毎トークンの読み出し量になる。**
+Qwen の 95B active は Kimi K3 の 2-3 倍で、速度もエネルギーも線形に悪化する。
+
+| 構成 | 毎トークン読み出し | 帯域 | 速度 |
+|---|---|---|---|
+| A: この Mac（M1 Max 32GB + TB4 外付け） | 約 21 GB | 2.8 GB/s | 約 0.13 tok/s |
+| B: 64GB 機 + 内蔵 NVMe | 約 21 GB | 7 GB/s | 約 0.33 tok/s |
+| C: 参考・Kimi K3 実測 | — | — | 0.50 tok/s |
+
+**手元のハードは 2 箇所で詰まる。** (a) RAM 32 GB —— WASTE の実測環境は 64 GB で
+trunk 27 GB を引いた 37 GB を expert キャッシュに使う。32 GB では trunk を置いた時点で
+キャッシュがほぼ残らない。(b) 内蔵空き 111 GiB に 848 GB は入らないので外付け NVMe が必須だが、
+TB4 は実効 2.8-3.1 GB/s で内蔵の半分以下 —— **帯域がそのまま速度になる方式なのでここが効く**。
+
+### 理由 3: 電気代だけで既に API より高い
+
+電気 31 円/kWh、45W、150 円/$ 前提。
+
+| | 速度 | 月産トークン | 電気代 /1M | 1M に要する日数 |
+|---|---|---|---|---|
+| A: この Mac | 0.13 tok/s | 34.1 万 | **$19.9** | **89 日** |
+| B: 64GB 機 | 0.33 tok/s | 86.7 万 | $7.3 | 35 日 |
+| C: Kimi K3 実測 | 0.50 tok/s | 131 万 | $4.8 | 23 日 |
+| **API（A95B 出力）** | — | 無制限 | **$5.40** | 即時 |
+
+さらに設備費。外付け 2TB NVMe (TB4) が約 $200、ケース A の年産 410 万トークンで割ると
+**$48.8/1M トークン**（1 年償却）。電気と合わせて **年 1 目で $68.7/1M = API の 12.7 倍**。
+3 年償却でも $36/1M でまだ 6.7 倍。加えて **context 4K** なので、
+Qwen3.8 の売りである 262K / 1M を捨てることになる。
+
+### 持ち帰る一般則
+
+**この方式が意味を持つのは、代替が月 $70k の GPU クラスタしか無い場合だけ。**
+Qwen3.8 には $5.40/M の従量 API という中間解が既にあり、そこが埋まっているので
+HN 著者の論法はそのまま移らない。そして —— 第 1 節の
+「active は容量を救わない」の裏返しとして —— **SSD ストリーミングでは active が
+速度とエネルギーを直接支配する。total が動くことと、実用速度で動くことは別。**
+
+## この ADR の価格を定数として引用しない
+
+**上の価格は全て 2026-08-13 時点の公表値**であり、GPU 単価もトークン単価も
+プランのティアも数週間で動く。ADR-2607173100 が model id について言っているのと同じ理由で、
+**ここに書いた数字をコード・スクリプト・設定の既定値に焼かない。**
+残してよいのは *計算の仕方*（重みサイズの出し方、稼働率の損益分岐の立て方、
+active パラメータは容量を救わないという事実）であって、*測った値* ではない。
+
+第 5 節の「Coding Plan に 3.8-Max は入っていない」は**公開情報からの判断であって
+Model Studio コンソールの実測ではない**。契約前にコンソールで確認すること。
+第三者比較サイト（`codingplan.org` 等）は Qwen プランに GLM-5 / Kimi-K2.5 / MiniMax-M2.5 が
+含まれると記載しているが**公式の内容と食い違う**——リセラー経由の再販枠と思われる。
+
+## 現在地 / resume point
+
+- `murakumo-main` は **未変更**（qwen3.6-35b-a3b のまま）
+- 3.8 系への alias は **未作成**。作る場合は Model Studio のキー取得 →
+  murakumo KV に `alias-for` / `endpoint` を PUT（ADR-2607173100 の解決順に従う）
+- **WASTE 方式は不採用**（第 6 節）。外付け NVMe は買っていない。再検討する条件は
+  「WASTE 側が Qwen3.8 系をサポートし、かつ 64 GB 以上のホストが手元にある」の両方が揃った時
+- ローカルで 16 GiB ノードに載せたい場合の現実解は `Qwen3.6-27B` の MLX 4bit
+  （実測 4.6 bit/weight で 16 GB に収まる）。配線は `orgs/gftdcojp/murakumo-mlx/mlx-distributed` に既存
+- Qwen3.8 の小型メンバー（27B クラス）は早期報告があるものの、
+  2026-08-13 時点で HF 上に確認できず（アーキテクチャもライセンスも未公開）
+")))

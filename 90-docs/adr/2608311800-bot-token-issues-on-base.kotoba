@@ -1,0 +1,284 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608311800-bot-token-issues-on-base")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "bot-token-issues-on-base")
+  (:adr/title "ADR-2608311800: BOT の発行チェーンを Base に固定する —— 選んだのではなく既に全部が Base に在り、外れていたのは mainnet 前提の設計文書 1 本だった。そして contract を決めるのは監査コストではなく sink (a) の EIP-3009 である")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+
+  (:adr/repos
+  (vector "com-junkawasaki/root"
+   "orgs/cloud-itonami/app-credits"
+   "orgs/cloud-itonami/junbi"
+   "orgs/cloud-itonami/kawase-yui"
+   "orgs/network-awai/nexus-x402"
+   "orgs/kotoba-lang/base-l2"
+   "orgs/kotoba-lang/erc20"
+   "orgs/kotoba-lang/treasury"))
+
+  (:adr/authoritative_for
+  (vector "BOT の発行チェーンは Base（CAIP-2 eip155:8453）であること。ADR-2608291009 が未定のまま残した発行面を、ここで埋める"
+   "on-chain に出るのは BOT だけであること。KUMO と YATA は contract を持たない —— 労圏の単位に contract を与えると、その瞬間に外部市場が付き、償還不能性が実効的に失効する"
+   "BOT の contract は Circle の FiatTokenV2_2 + FiatTokenProxy を採ること。決め手は監査コストではなく EIP-3009 である（D4）"
+   "solidity の evm_version を道具の既定に委ねず、対象チェーンに対して明示 pin すること（Base は prague）"
+   "app-credits の TOKEN_DESIGN_ETHEREUM.md が置いた Ethereum Mainnet 前提を撤回し、TOKEN_DESIGN_BASE.md に置き換えること"
+   "itonami に bUSD という設計は存在しないこと。近傍の 2 件（junbi の HAKARI、kawase-yui）はどちらも意図的に token ではないこと"
+   "Base に決めても、発行前に塞ぐべき 5 件が 1 件も減らないこと。チェーンの決定は順序の決定ではない"))
+
+  (:adr/amends
+  (vector "90-docs/adr/2608291009-bot-kumo-yata-three-unit-economy.edn —— BOT の発行チェーン・contract・decimals・sink (a) の実装面を埋める。3 単位の型、膜の通過規則、収入裏付け発行はいずれも不変"
+   "orgs/cloud-itonami/app-credits/TOKEN_DESIGN_ETHEREUM.md —— 対象チェーンを Ethereum Mainnet とする前提を撤回する"))
+
+  (:adr/related
+  (vector "90-docs/adr/2607299900-tradeable-token-policy-reversal.edn（token を準圏に置く決定。sink (a)(b)(c) の初出）"
+   "90-docs/adr/2607320500-legal-structure-three-roles-no-foundation-no-custody.edn（発行体 ≠ 運営者が既存法人で満たせないこと、Q1=NO 推奨）"
+   "90-docs/adr/2608010930-kotobase-chain-and-evm-compatibility-scope.edn（チェーンを自作しない。EVM 互換は読む側に限定）"
+   "90-docs/adr/2607321200-cloud-itonami-vertical-liquidity-pools-amm-shaped-token-economy.edn（VLP share。貸付の形をした唯一の設計）"
+   "90-docs/adr/2607021800-etzhayyim-junbi-reserve-basket.edn（HAKARI と gate J1/J2/J3）"
+   "90-docs/adr/2607995000-kotoba-three-sphere-economy.edn（膜規則の原典）"
+   "90-docs/adr/2607300100-x402-credits-acceptance-session-and-duplicated-truth-defect-class.edn（Safe threshold の非対称）"))
+
+  (:adr/measured
+  (vector "Base chainId = 0x2105（8453）。latest block が blobGasUsed / excessBlobGas / parentBeaconBlockRoot に加えて requestsHash を持つ —— Cancun だけでなく Prague まで有効。したがって solc 0.8.28 + forge 既定の evm_version=prague は Base に対しては正しい"
+   "USDC 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 は symbol=USDC / decimals=6。junbi の token-registry の pin と一致"
+   "EURC 0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42 は symbol=EURC / decimals=6。同上"
+   "Chainlink 0x7e860098F58bBFC8648a4311b374B1D669a2bc6B の description は USDC / USD、0xDAe398520e2B67cd3f27aeF9Cf14D93D927f8250 は EURC / USD。junbi/oracle.clj の pin と一致"
+   "Uniswap v3 factory 0x33128a8fC17869897dcE68Ed026d694621f6FDfD の feeAmountTickSpacing(3000) が 60 を返す。Base に live"
+   "treasury Safe 0xA00366234D29d4F882088048c0B2fa0dB7302D4E は Base で threshold=1 / owners=1（0xe255d68563c974ac061484cece4e57de02a4e0da、code が空なので EOA）。Ethereum mainnet では threshold=2 / owners=3"
+   "同 Safe の Base USDC 残高は 10210488 micros = 10.21 USDC"
+   "itonami.cloud/.well-known/x402 は 404。murakumo.cloud と kotobase.net は 200 で、どちらも network=base / asset=USDC / payTo=0xA003…D4E"
+   "kotobase.net/metrics は challenges 23 / submissions 4 / settlements 0。決済レールは一度も成立していない"
+   "itonami.cloud/api/fleet/metrics は externalPaid 0 / activeSubscriptions 0 / agentRuns7d 84"
+   "GCCStablecoin.sol は transferWithAuthorization / permit / DOMAIN_SEPARATOR / nonces のいずれも実装していない（grep 0 件）。関数は transfer / approve / transferFrom / increaseAllowance / decreaseAllowance / configureMinter / removeMinter / mint / burn / pause / unpause / blacklist / unBlacklist / updateMasterMinter / updatePauser / updateBlacklister / transferOwnership / _transfer の 18 本"
+   "vendored の Circle 実装は EIP3009.sol を持ち、FiatTokenV2 / FiatTokenV2_2 / FiatTokenUtil が transferWithAuthorization を実装している"
+   "nexus-x402 の pay/x402.cljc は scheme=exact の payload を EIP-3009 authorization として構成し、assetTransferMethod に eip3009 を入れる。asset の既定は usdc-base 定数で固定されている"
+   "junbi/chain.clj の token-registry は :jpyc の :address を nil にしており、read-balance は nil のとき例外を投げる。一方 core.cljc の既定 basket weights は usdc 0.40 / jpyc 0.40 / eurc 0.20 —— 重みの 40% が on-chain で読めない"
+   "GCC は Ethereum mainnet の 0x799d24a6FFBb758C6E2Ed8f981822A17Eaa5F30B に実在する。name=Gftd Computing Credits / symbol=GCC / decimals=6 / totalSupply=10,000,006.711595 / version()=2。EIP-1967 と zeppelinos の proxy slot がどちらも 0 なので直接デプロイであり upgradeable ではない。supplyCap() は revert する（GCCStablecoin.sol ではない）。owner / masterMinter / blacklister はいずれも junbi Safe 0xA003…D4E"
+   "同 GCC は authorizationState と nonces に応答する —— EIP-3009 と EIP-2612 を持つ。junbi Safe の保有は 10,000,000.000000 GCC で供給の 99.99993%。Uniswap v3 mainnet factory の getPool(GCC, USDC, fee) は 500 / 3000 / 10000 のいずれも 0 を返し、プールは存在しない。Base 上の同アドレスは code 0 バイト"
+   "murakumo.cloud/legal/terms.md の 52 行目が MCC を現在形で a transferable utility token と記述している。MCC はどのチェーンにも存在しない"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-31）は 2 段階で来た。前段は「では base の前提で」、後段は「itonami で bUSD, bot token の設計がなかったかな?」。
+
+前段は ADR-2608291009 が :adr/status proposed のまま残した最大の穴（BOT をどのチェーンで出すか）を閉じる指示であり、後段は索引の照会である。両方に答える。
+
+## 後段への答え —— bot token は在る。bUSD は無い
+
+bot token は **BOT**（ADR-2608291009、proposed、2026-08-29）。KUMO（演算）/ YATA（保管）/ BOT（交換可能 token）の 3 単位設計で、KUMO と YATA の相互交換を禁じることで内部為替を構造的に作らない。
+
+bUSD は無い。近い位置に 2 つあるが、どちらも **意図的に token ではない**:
+
+- **HAKARI（秤）** —— junbi の SDR 型 basket unit of account。Tier-1 は既に Base L2 の USDC / EURC / JPYC。gate J1 が「HAKARI は token として mint しない」を governor/forbidden-actions で構造的に禁じている。J3 は USDT を構造的に排除
+- **kawase-yui（為替結）** —— Base L2 の canonical stablecoin による相互扶助送金。README が明示している通り No new token is minted
+
+⚠ **測定の限界を先に書く。** gh search code を 4 org（cloud-itonami / network-awai / kotoba-lang / gftdcojp）に当てて bUSD は 0 件だったが、**positive control（HAKARI と YATA）でも 0 件を返した**。つまりあの検索は discriminate しておらず、GitHub 側は **未測定**である。上の結論は checkout 済みツリーの git grep と west の名前索引の範囲でしか成立しない。この ADR は「無い」と書いていない —— 「測った範囲に無い」と書いている。
+
+## 前段への答えの出発点 —— Base は選択ではなかった
+
+チェーンを比較して Base を選んだのではない。索引を引いたら、**既に全部が Base に置かれていた**:
+
+| 面 | 現在地 |
+|---|---|
+| junbi の Tier-1 準備資産 | Base L2 の USDC / EURC / JPYC（:chain :base-l2） |
+| kawase-yui の決済 | canonical Base L2 stablecoins |
+| x402 の quote と settlement | network=base、asset=USDC on Base、payTo は junbi Safe |
+| treasury Safe | Base（および mainnet） |
+| ABI / JSON-RPC / ERC-4337 | kotoba-lang/base-l2 —— 名前がチェーンそのもの |
+
+外れているのは 1 本だけだった —— app-credits の TOKEN_DESIGN_ETHEREUM.md が「対象チェーン: Ethereum Mainnet」と書いている。この ADR の実務的な中身の半分は、その 1 本を撤回することである。")
+
+  (:adr/decision
+  "### D1. BOT の発行チェーンは Base（eip155:8453）
+
+理由は流動性でも gas でもなく **資産フローの単一性**である。x402 の quote は既に network=base、収益が着く Safe も Base、junbi の準備資産も Base。ここ以外に BOT を出すと、**存在する唯一の決済面と token が別の場所に分かれる**。
+
+Ethereum Mainnet は却下しない が、今やる理由が無い。TOKEN_DESIGN_ETHEREUM.md は mainnet + Uniswap v3 に厚い集中流動性を敷く前提だが、on-chain 残高 10.21 USDC・外部有償 0 の段階でその LP は維持できない。**L1 は Base から橋を架ける形で後から**であって、出発点ではない。
+
+Filecoin FEVM も却下する。kotobase-anchor-fevm は自ら non-authoritative と宣言する checkpoint anchor であって決済レールではなく、その contract は Filecoin precompile も PieceCID も使わない（どの EVM でも動く）。token を要求している設計は 1 つも無い。
+
+自作チェーンは ADR-2608010930 で accepted 済みの却下。本 ADR はそれを覆さない。
+
+### D2. on-chain に出るのは BOT だけ。KUMO と YATA は contract を持たない
+
+ADR-2608291009 D1 の帰結を、実装面で言い直す。KUMO と YATA は償還不能な労圏の計量単位であり、ERC-20 として発行した瞬間に外部市場が付き、DEX 上で値が付き、**膜規則が禁じている KUMO/YATA → BOT の経路が市場として実現してしまう**。
+
+したがって:
+
+- KUMO / YATA の残高・移転は kotobase の datom 面（murakumo.infer.credits と kotobase の quota 面）に留める
+- 保有者間移転は可（ADR-2608291009 の表のとおり）だが、それは台帳内の移転であって token の transfer ではない
+- **BOT → KUMO / YATA の一方向 mint は、on-chain の BOT burn と台帳への credit の 2 段で実装する。** 逆向きの経路は実装しない
+
+### D3. evm_version は道具の既定に委ねず、対象チェーンに対して明示 pin する
+
+Base に対しては `evm_version = prague` を foundry.toml に**書く**。実測では forge 1.7.1 の既定が既に prague なので値は変わらないが、**既定は道具のバージョンで動く**。同じ workspace に前例が両方ある:
+
+- `gftdcojp/apps-gftdcojp/.../geth-private/contracts/foundry.toml` は `evm_version = paris` を pin し、理由（genesis が shanghaiTime を持たず PUSH0 を拒否する）をコメントに書いている。**これが正しい形である**
+- `kotoba-lang/kotobase-anchor-fevm/foundry.toml` は pin を持たない。名前が fevm で Filecoin Calibration profile を配りながら、実効 evm_version は prague であり、**一度も実 deploy されていない**ので Calibration で通るかは未測定である
+
+後者は本 ADR の scope 外だが、follow-up として名指ししておく（known-gaps）。
+
+### D4. contract は Circle の FiatTokenV2_2 + FiatTokenProxy。決め手は EIP-3009 であって監査コストではない
+
+TOKEN_DESIGN_ETHEREUM.md の 3.6 節は Circle 実装の再利用を「監査コスト最小化」を理由に推している。その理由は正しいが弱い。**強い理由は sink (a) が要求する wire である。**
+
+sink (a) は「x402 を BOT で払うと USDC より割引、受領した BOT は burn」である。x402 の canonical EVM scheme は `exact` で、その payload は **EIP-3009 の transferWithAuthorization**（nexus-x402 の pay/x402.cljc が `:assetTransferMethod eip3009` を書いている）。つまり:
+
+> **EIP-3009 を実装しない token は、x402 の exact で払えない。sink (a) が成立しない。**
+
+実測したとおり `GCCStablecoin.sol` は EIP-3009 も EIP-2612 も持たない（18 関数、いずれも該当なし）。一方 vendored 済みの Circle 実装は `EIP3009.sol` を持ち `FiatTokenV2_2` がそれを継承している。
+
+**そしてこの導出は、既に一度実行されていた。** mainnet の GCC（0x799d24a6…）は `version()` が 2 を返し `supplyCap()` が revert する —— **`GCCStablecoin.sol` からではなく Circle FiatToken V2 から deploy されている**。`authorizationState` と `nonces` に応答するので EIP-3009 と EIP-2612 の両方を持つ。
+
+つまり D4 は新しい選択ではなく、**既に取られた選択を、その理由と一緒に書き直したもの**である。前版の設計文書は理由を監査コストと書いていたが、実際に効いているのは EIP-3009 である。
+
+したがって:
+
+- **BOT = FiatTokenV2_2 の実装 + FiatTokenProxy**。Safe を owner / pauser / blacklister / masterMinter に置く
+- `GCCStablecoin.sol` は **BOT の候補から外す**。private geth（chainId 260425）と anvil（1337）に deploy 済みの GCC は別物であり、本 ADR はそれを改名も転用もしない
+- decimals は **18**。USDC の 6 に合わせない —— BOT は stablecoin ではなく、掲示価格に対する丸め粒度を細かく保つ側が正しい
+- blocklist は **残す**。BOT の用途上は過剰に見えるが、制裁対応の口を後から足すのは upgrade を要するのに対し、使わない権限を Safe に置いておくコストは低い。ただし **blocklist 操作は必ず on-chain 記録 + 監査ログ公開**とする（TOKEN_DESIGN の 3.5 の要件をそのまま引き継ぐ）
+
+### D5. sink (a) の実装点は nexus-x402 の asset 固定を外すこと
+
+現在 `pay/x402.cljc` の `usdc-base` は定数で、`v2-payment-requirements` の `:asset` 既定がそこを指している。requirement は既に **複数 asset を配列で返せる形**を持っているので、必要な変更は:
+
+1. asset を network ごとの index から引く（ADR-2608010930 の 6 が testnet 側で既にやった修正と同じ形。**未知チェーンで黙って Base に fallback する罠**を再現しないこと）
+2. BOT 建ての requirement を USDC 建てと並べて返す。割引は価格側で表現する
+3. 受領した BOT を burn する経路を settlement 後に置く
+
+これは BOT が存在しなくても **1 と 2 の形だけは先に用意できる**。ただし本 ADR は実装を landing させない（D7）。
+
+### D6. TOKEN_DESIGN_ETHEREUM.md を撤回し TOKEN_DESIGN_BASE.md に置き換える
+
+参照している他ファイルは 0 件（grep 済み）なので rename は安全。書き換えるのは次の 5 点で、それ以外の節（供給方針・Treasury 還流・mint/burn ポリシー・USDC 準拠の安全性設計・KPI）は Base でもそのまま有効なので保つ:
+
+1. 対象チェーンを Ethereum Mainnet から Base（eip155:8453）へ
+2. GCC という 1 つの token を前提にした記述を、BOT / KUMO / YATA の 3 単位（ADR-2608291009）へ接続する。**on-chain に出るのは BOT だけ**
+3. contract の選択理由を監査コストから EIP-3009 へ（D4）
+4. Phase 3 の「L2 展開（Arbitrum/Base）」という記述は、Base が出発点になったので**将来の分岐ではなく既定**である旨に直す
+5. Safe の運用に Base の threshold=1 という実測を書き入れる
+
+### D7. Base に決めても、発行前に塞ぐ 5 件は 1 件も減らない
+
+チェーンの決定は順序の決定ではない。ADR-2607299900 の Decision 5（token は capital を連れてくるが settlement demand は連れてこない）と ADR-2608291009 の実装順（1〜5 は BOT 無しで実行でき、全てが測定を増やす）は不変である。
+
+| # | 塞ぐもの | 現在地（実測） | 誰の領域 |
+|---|---|---|---|
+| 1 | Base Safe が 1-of-1 | threshold=1 / owner 1 名の EOA。しかも x402 の quote は network=base なので、**収益が実際に入るのは弱い方** | owner |
+| 2 | settlements が 0 | challenges 23 / submissions 4 / settlements 0 | agent + owner |
+| 3 | HAKARI の 40% が読めない | junbi の basket weights の jpyc 0.40 に対し token-registry の :address が nil。コードは fake read を拒否して throw する（正しい規律） | Council 承認 |
+| 4 | terms.md の MCC 記述 | 未発行の token を live の法務文書が現在形で transferable utility token と書いている | owner + 弁護士 |
+| 5 | 発行体 ≠ 運営者 | ①サービス運営も③chain 資産保管も AWAI Network, L.L.C.。ADR-2607320500 §1 のとおり満たす手段が現存しない | owner + 弁護士 |
+
+**1 は本 ADR の中で最も緊急である。** BOT の treasury を Base Safe に置くなら、今日その Safe は単一 EOA が全部握っている。")
+
+  (:adr/implementation
+  (vector "landed: 本 ADR（90-docs/adr/2608311800-bot-token-issues-on-base.edn）"
+   "landed: orgs/cloud-itonami/app-credits の TOKEN_DESIGN_ETHEREUM.md を TOKEN_DESIGN_BASE.md へ rename し、D6 の 5 点を書き換え"
+   "landed: orgs/cloud-itonami/app-credits の merge commit 8d7ef7760adf（TOKEN_DESIGN_BASE.md への rename と書き換え、CLAUDE.md と operator-quickstart.md の参照修正）。verify-docs-claims.cljs は前後とも exit 0、tracked file は 81 のまま"
+   "landed: west pin を app-credits について前進（superproject commit 0d2b69e980c7、e2651b82→8d7ef776、ahead=2 behind=0 をサーバ側で検証）"
+   "not-done-deliberately: contract の作成・デプロイ・配布・上場。CLAUDE.md の安全床②（資金の売買・送金・変換・trade をしない）に該当し、かつ発行体の法的構成が未確定（ADR-2607320500 §6）"
+   "not-done-deliberately: nexus-x402 の asset 固定の解除（D5 の 1 と 2）。BOT が存在しない段階で本番決済面の requirement 形状を変えると、settlements 0 の原因切り分けが 1 つ増える。settlements が 1 になってから触る"
+   "not-done-deliberately: kotobase-anchor-fevm の evm_version pin。本 ADR の scope 外の別 repo であり、Base の決定とは独立に直すべき欠陥として known-gaps に名指しする"))
+
+  (:adr/known-gaps
+  (vector "kotobase-anchor-fevm の foundry.toml が evm_version を持たない。実効値は forge 既定の prague で、Filecoin Calibration profile を配りながら Calibration で通るかは未測定（evidence ディレクトリが無く、docs に deploy 済みアドレスが 0 件）。D3 の原則に反しているが、本 ADR は Base の決定であり、この修正は別 PR にする"
+   "gh search code が positive control でも 0 件を返したので、bUSD の不在は GitHub 側では未測定である。checkout 済みツリーと west 名前索引の範囲でしか主張していない"
+   "mainnet の GCC をどう扱うかが未決である。供給 10,000,006.711595 のうち 10,000,000 を junbi Safe が保有し、Uniswap プールは 1 つも無い —— deploy 済み・mint 済み・未上場という状態。upgradeable ではないので Base へ移すことはできず、扱いは (a) 放置 (b) 退役 (c) BOT の前身として位置づけ直す のいずれか。本 ADR は決めない"
+   "本 ADR の初版は GCC の deploy 先を private geth と anvil だけと書いていた。誤りである。原因は foundry の broadcast/ ディレクトリを根拠にしたこと —— あれは forge script が実行した deploy しか記録しないので、別経路で出した mainnet の GCC は 1 行も現れない。**deploy の有無をリポジトリの成果物から結論しない。チェーンに訊く。**"
+   "BOT の供給量・初期配布・emission カーブは本 ADR に無い。ADR-2608291009 が収入裏付け発行（外部決済収入と finalize された witness duty のみが mint する）を決めているので、固定初期供給という形自体が採れない可能性がある。掲示価格の決め方（同 ADR D6 の 4 手順）が先"
+   "decimals 18 という選択は、KUMO / YATA の掲示価格がまだ 1 つも測られていない状態で決めている。価格が決まったときに 18 では粗すぎる／細かすぎるという判断が出たら、proxy 越しでも decimals は変えられないので再デプロイになる"
+   "sink (b) witness bond / (c) governance stake 加重 / (d) bot enrolment bond は本 ADR で contract 面に落としていない。(b) は ADR-2607994000 の bond の建値差し替えなので最も小さい"
+   "BOT → KUMO / YATA の 2 段実装（on-chain burn + 台帳 credit）は、burn の finality と台帳書き込みの間に窓が開く。再編成に対する confirmations 方針を決めていない。treasury/core.cljc は USDC 受領で 3 confirmations を使っているが、それが burn にも適切かは未検討"
+   "Base Safe の 1-of-1 を直す作業そのものは owner の署名を要するので、agent は状態を測ることしかできない。本 ADR は測って記録するに留まる"))
+
+  (:adr/open-decisions
+  (vector "blocklist を BOT に残すか（D4 は残す判断をしたが、これは agent の推奨であってオーナー確認を経ていない）。残すと規制対応の口を持てるが、交換可能 token に発行体が凍結権を持つことの是非は性質決定に近い"
+   "BOT の ticker を BOT のままにするか。ASCII 3 文字で ticker に使えるが、DEX や集約サイトで一般名詞として衝突しやすい"
+   "upgrade 可能にするか。TOKEN_DESIGN は UUPS + Timelock + Safe 承認を条件に許すと書き、初期は non-upgradeable を推している。FiatTokenProxy を採ると upgrade 可能側になるので、この推奨と正面から当たる"
+   "Uniswap v3 を採るか、Base のネイティブ DEX を採るか。Uniswap v3 factory が Base に live であることは実測したが、Base 上の流動性がどこに厚いかは測っていない"))
+
+  (:adr/body
+  "# ADR-2608311800: BOT を Base で出す
+
+## 一行で
+
+**Base は選んだチェーンではなく、既に全部が置かれていたチェーンだった。** 準備資産も、送金基盤も、x402 の quote も、treasury Safe も、ABI ライブラリの名前すら Base である。外れていたのは設計文書 1 本だけで、この ADR の実務はその 1 本を撤回することと、contract の選択理由を正しい方に置き換えることである。
+
+## 一番効いた発見 —— contract を決めるのは監査コストではなかった
+
+TOKEN_DESIGN_ETHEREUM.md は Circle 実装の再利用を「監査コスト最小化」で推していた。理由としては正しいが、**それは決め手ではない。**
+
+決め手は sink (a) である。sink (a) は「x402 を BOT で払うと割引、受領分は burn」で、これは ADR-2607299900 が 3 つの sink のうち唯一 **決済需要に直結する** と名指ししたものである。そして x402 の canonical EVM scheme は `exact` で、その payload は EIP-3009 の `transferWithAuthorization` を運ぶ。
+
+```
+sink (a) を成立させたい
+  → x402 の exact で BOT を払えなければならない
+    → token が EIP-3009 を実装していなければならない
+      → GCCStablecoin.sol は実装していない（実測、18 関数に無い）
+      → Circle の FiatTokenV2_2 は実装している（EIP3009.sol を継承）
+```
+
+つまり **contract の選択は経済設計から一意に決まる。** 好みでも監査費用でもない。この向きで導出しておくと、後から「自前実装の方が小さいのでは」と戻ってきたときに、何が壊れるかが 1 行で言える —— sink (a) が壊れる。
+
+## Base であることが確認できたもの、できなかったもの
+
+実測（2026-08-31）で junbi が pin している Base のアドレスは 4 つとも生きていた —— USDC、EURC、Chainlink の USDC/USD と EURC/USD。**pin が実在を保証しないので引いた**が、引いたら全部合っていた。
+
+合っていなかったものが 1 つある。junbi の既定 basket は `{:usdc 0.40 :jpyc 0.40 :eurc 0.20}` だが、`token-registry` の `:jpyc` は `:address nil` である。docstring がその理由を自分で書いている —— **An asset with :address nil is NOT readable yet — never fake a read.** そして `read-balance` は実際に throw する。
+
+規律としては正しい。fake read を返す実装より無限に良い。しかし帰結は動かない: **HAKARI の重みの 40% は、今日 on-chain から計算できない。** これを D7 の 3 番として記録する。
+
+## bUSD について、および「無い」と言うことについて
+
+bUSD は見つからなかった。近い 2 つ（HAKARI と kawase-yui）はどちらも**意図的に token ではない** —— junbi は gate J1 が mint を構造的に禁じ、kawase-yui は README で No new token is minted と明示する。
+
+ただし「無い」と書く前に、自分の測定器を測った。gh search code を 4 org に当てて bUSD 0 件を得たあと、**positive control として HAKARI と YATA を同じ形で引いたら、それも 0 件だった。** あの検索は discriminate していない。
+
+これは CLAUDE.md が repo-wide mandatory として書いている形そのものである —— 測れなかった検査が、測って問題が無かった検査と同じ値を返す。したがって本 ADR は「bUSD は存在しない」とは書かない。**checkout 済みツリーと west の名前索引の範囲に無い**と書く。GitHub 側は未測定である。
+
+## 前回の一覧が不完全だったこと
+
+同じセッションの前段で token 形のものを 4 つ挙げたが、**BOT が抜けていた。** 原因は ADR をファイル名パターン（token|erc20|evm|fevm|chain|credit）で絞ったことで、`2608291009-bot-kumo-yata-three-unit-economy.edn` はそのどれにも当たらない。2 日前に landed した、まさに問われていた設計を、名前の形だけで落とした。
+
+`:adr/title` を横断で引けば当たっていた（実際、次に引いたときは 1 発で出た）。**ファイル名は索引ではない。**
+
+## 途中で自分の主張が 1 つ壊れたこと
+
+本 ADR の初版は「GCC の public chain への deploy は 0」と書いた。**誤りだった。**
+
+app-credits の CLAUDE.md にアドレスが書いてあったので引いたところ、
+**GCC は Ethereum mainnet に生きていた** —— 供給 10,000,006.711595、うち
+10,000,000 を junbi Safe が保有し、Uniswap v3 のプールは 3 つの標準 fee tier の
+どれにも存在しない。deploy 済みで、mint 済みで、上場されていない。
+
+原因は根拠の選び方である。foundry の `broadcast/` ディレクトリを読んで
+chainId 260425 と 1337 しか無いことを確認したが、**あれは forge script が
+実行した deploy しか記録しない。** 別経路で出したものは 1 行も現れない。
+
+**deploy の有無をリポジトリの成果物から結論しない。チェーンに訊く。**
+
+この訂正は D4 を弱めない。むしろ裏付ける —— mainnet の GCC は
+`version()` が 2 を返し `supplyCap()` が revert するので、
+`GCCStablecoin.sol` ではなく **Circle FiatToken V2 から deploy されている**。
+EIP-3009 も EIP-2612 も持っている。**同じ導出が既に一度実行されていて、
+その理由が文書に書かれていなかった**だけである。
+
+## この ADR が変えないもの
+
+- ADR-2608291009 の 3 単位の型、膜の通過規則、KUMO ↔ YATA の相互交換禁止、収入裏付け発行 —— 全部不変
+- ADR-2608010930 の「チェーンを自作しない / EVM 互換は読む側に限定」—— 不変。BOT を Base で出すことは、既製チェーンの利用であって EVM の自作ではない
+- ADR-2607320500 の Q1=NO 推奨（保有者還流 $0 なら発行体は要らない）—— 不変。**本 ADR は「出すと決めた場合にどこで出すか」を決めたのであって、「出す」を決めていない**
+- 発行前に塞ぐ 5 件（D7）—— 1 件も減らない
+
+## 最後に、順序について
+
+Base に決めたことで動きやすくなったように見えるが、律速は動いていない。settlements は 0 のままで、cloud-itonami の 1,958 repo のうち値札を持つのは 2 枚のままである。
+
+ADR-2608291009 が自分で書いている —— **経済圏の律速は token の不在ではない。**「働いて収入を産む」の *収入* の側が、1,958 分の 1,956 で存在していない。
+
+チェーンを固定することの価値は、その先の実装が分岐しなくなることであって、着火が近づくことではない。")))

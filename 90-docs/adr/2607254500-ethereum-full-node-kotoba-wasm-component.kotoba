@@ -1,0 +1,333 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607254500-ethereum-full-node-kotoba-wasm-component")
+  (:adr/title "ADR-2607254500: Ethereum full node (geth 互換) を Kotoba + Wasm Component tier で実装する — 実現可能性判定・層設計・段階計画")
+  (:adr/status "proposed")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-25")
+  (:adr/last-verified "2026-07-25")
+  (:adr/last_verified "2026-07-25")
+  (:adr/authoritative false)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "ethereum-full-node-kotoba")
+  (:adr/authoritative-for (vector))
+  (:adr/related
+  (vector "adr-2607252500-kotoba-wasm-component-first-execution-boundary"
+   ;; 本 ADR の前提を切り出した follow-up。Phase 1 以降はこの 2 つに依存する。
+   "orgs/kotoba-lang/compiler/docs/adr/0076-general-canonical-abi-lowering.md"
+   "adr-2607254600-kotoba-language-capability-gaps-computational-workloads"
+   "adr-2607254700-stale-west-checkout-diagnosis-and-foreign-wip-landing"
+   "orgs/kotoba-lang/compiler/docs/adr/0075-component-target-declared-budgets-and-admission-request.md"
+   "adr-2607172600-kotobase-bitcoin-ethereum-clients"
+   "adr-2607172700-bitcoin-ethereum-boundary-correction"
+   "adr-2607201300-kotoba-safe-application-language"
+   "adr-2607241100-kotoba-stack-topology-and-design-cleanup"
+   "orgs/kotoba-lang/kototama/src/kototama/component-platform.edn"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/backend/wasm.cljc"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/frontend.cljc"
+   "orgs/kotoba-lang/kotoba-core-contracts/resources/kotoba/runtime/capability_contract.edn"
+   "orgs/kotoba-lang/org-ethereum-jsonrpc"
+   "orgs/kotoba-lang/eth-crypto"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:question "kotoba 言語で設計実装し kototama runtime 上で動く geth 完全互換 Ethereum client は存在するか、無ければ作れるか")
+   (:existing-answer "存在しない。org-ethereum-jsonrpc / eth-crypto / base-l2 / chain は合計約 2000 行の .cljc/.clj/.cljs で、EVM・state trie・RLP・devp2p・Engine API のいずれも持たない read-only observer")
+   (:feasibility :blocked-on-component-shape-generality-and-target-exposure)
+   (:target-tier :wasm-component-kotoba-v1)
+   (:rejected-tier :native-aot-for-ordinary-application)
+   (:blocking-dependency "compiler の Component 出力は実在するが、対応 KIR 形状が allowlist で、CLI target として露出しておらず、fuel budget を宣言しない")
+   (:fuel-wall-status "target architecture には存在しない。legacy core-wasm backend 固有")
+   (:correction "初版は compiler に Component 出力が無いと記載していたが誤り。143 commits 古い共有 checkout を計測していた。2026-07-25 訂正")))
+  (:adr/body
+  "# ADR-2607254500: Ethereum full node (geth 互換) を Kotoba + Wasm Component tier で実装する
+
+**Status**: proposed
+**Date**: 2026-07-25
+
+## Context
+
+オーナーから『今の kotoba-lang に kotoba 言語で設計実装し、kototama runtime 上で動く
+Ethereum geth 完全互換の client はあるか』と問われ、続けて『では設計実装して、フルノード
+実装』と指示された。
+
+### 既存資産の棚卸し（結論: フルノードは存在しない）
+
+| repo | 実体 | 行数 |
+|---|---|---|
+| `org-ethereum-jsonrpc` | JSON-RPC クライアント。read-only method whitelist をコードで強制 | 508 |
+| `eth-crypto` | secp256k1 / Keccak-256 / EIP-712 プリミティブ（`:clj` 限定、cljs は stub） | 622 |
+| `base-l2` | Base L2 の RPC/ABI/paymaster ラッパ | 767 |
+| `chain` | Ethereum 無関係。IPLD parent-linked commit chain | 103 |
+
+いずれも `.cljc`/`.clj`/`.cljs` であって `.kotoba` ではなく、`kototama` への参照も持たない。
+EVM インタプリタ・Merkle Patricia Trie・RLP・devp2p/RLPx・Engine API・state DB は
+一つも存在しない。すなわち現状は『他人の geth に JSON-RPC で問い合わせる観測者』であり
+『geth の代替』ではない。
+
+### 実行 tier の前提が本 ADR 起票当日に変わっている
+
+オーナーは当初 ADR-2607198300（native AOT 経路、no JVM/Node/Rust bypass）を参照するよう
+指示した。しかし同 ADR は **2026-07-25 14:47 のコミット `1bd1ed913b5` で削除され**、
+ADR-2607252500（Kotoba は Wasm Component-first、aiueos は guest control plane +
+native micro-TCB）に supersede されている。本 ADR は新しい正本 ADR-2607252500 に従う。
+
+ADR-2607252500 決定 4 は native AOT の用途を boot/firmware・aiueos kernel・Wasm engine・
+driver・root-key adapter・明示的に trusted とした低遅延 primitive に限定し、
+『通常の Kotoba application を native ABI/OS syscall に直接接続する新規経路は作らない』と
+定める。Ethereum full node は通常の application であるから、**native AOT は選べない**。
+target は `:wasm-component-kotoba-v1` である。
+
+## Feasibility determination（実測。推測ではない）
+
+### 1. fuel 512 の壁は target architecture には存在しない
+
+legacy の core-wasm backend は全モジュールに固定の fuel global を焼き込む:
+
+- `compiler/src/kotoba/compiler/backend/wasm.cljc` の `global-sec [1 0x7e 1 0x42 0x80 0x04 0x0b]`
+  = `(global (mut i64) (i64.const 512))`。チェックイン済みの実バイナリ
+  `compiler/test/nbb/golden/*.wasm` を hexdump し `01 7e 01 42 80 04 0b` を直接確認した。
+- 全関数プロローグが `global.get; eqz; if; unreachable; end` で減算し、guest から補充不可能。
+- `tools/kexe_loader.c:616` も `shared->context.fuel = 512;`。
+- `compiler/src/kotoba/compiler/native_executor.clj:539` が `(= 512 (:initial fuel))` を assert。
+
+Keccak-256 を 1 回（24 ラウンド）回すだけでこの予算を超えるため、この経路では EVM は
+1 トランザクションどころか 1 ハッシュも完走しない。
+
+**しかし Component tier ではこれが構造的に解消している。**
+`kototama/src/kototama/component-platform.edn` は `:target :wasm-component-kotoba-v1` を
+宣言し、`:required-budgets [:fuel :memory-pages]`（sync profile）/
+`[:fuel :memory-pages :deadline-ms :max-items :max-bytes]`（async profile）を
+**component ごとに交渉される admission budget** として要求する。
+`kototama/src/kototama/component_platform.clj:59` の検証は
+『正の整数であること』のみで、**上限を設けていない**。
+すなわち fuel は codegen に焼かれた定数ではなく、component 単位の宣言的資源境界になる。
+これは Ethereum full node にとって決定的で、Component tier を選ぶ最大の技術的理由である。
+
+### 2. Component 出力は実在する（初版の記述は誤りだった。2026-07-25 訂正）
+
+**訂正**: 本 ADR の初版は『compiler は Component を出力できない、`wasm-component` で
+grep して 0 件』と記載した。これは誤りである。計測対象が
+`orgs/kotoba-lang/compiler` の**共有 west checkout であり、`origin/main` から
+143 commits 遅れていた**（かつオーナーの未 push commit 3 件が乗った状態だった）。
+現在の `origin/main`（`f6ee539`）を計測し直した結果は次のとおり。
+
+| ファイル | 行数 | 内容 |
+|---|---|---|
+| `src/kotoba/compiler/component_core.clj` | 2467 | Canonical ABI lowering |
+| `src/kotoba/compiler/component_composition.clj` | 567 | provider 合成・closed world |
+| `src/kotoba/compiler/component_wit.clj` | 172 | WIT world 生成 |
+| `src/kotoba/compiler/component_artifact.clj` | 66 | `wasm-tools component embed` / `new` による実バイナリ生成と preamble 検証 |
+
+`component_artifact.clj:10` は `(def target :wasm-component-kotoba-v1)` を宣言し、
+`core.clj:81` の `compile-component` が
+compile → WIT emit → component-core emit → wasm-tools package を実行する。
+生成物は `{:format :wasm-component/v1 :wasi-version 0.3.0 ...}`（WASI version は文字列）で、
+kototama の `component-platform.edn` と target 名・WASI version が一致している。
+component 系のテストも 3 本存在する（`component_artifact_test.clj` /
+`component_composition_test.clj` / `component_wit_test.clj`）。
+
+**したがって『Component を出せない』というブロッカーは存在しない。**
+
+### 2b. 実際に残っているギャップ（再計測に基づく）
+
+1. **対応 KIR 形状が allowlist である。** `component_core.clj:480` の
+   `assert-supported!` は形状を列挙して許可する fail-closed 方式で、
+   `:scalar-capability-call` / `:record-capability-call` / `:variant-capability-call` /
+   `:string-expression` / `:scalar-record-identity` / `:nested-record-identity` /
+   `:variant-identity` / `:string-field-record-identity` / `:scalar-record-projection`
+   などは**いずれも『関数 1 個・export 1 個』条件付き**である。
+   一般形として通るのは `(every? scalar-function? exports)` の `:scalar` のみで、
+   `scalar-function?` は param/result が `#{:i64 :f32 :f64}` に限られる
+   （`component_core.clj:17`）。`core.clj:81` の docstring 自身が
+   『the currently qualified scalar slice』『Structured/provider Canonical ABI
+   lowering remains fail-closed』と明示している。
+   Ethereum の各 module は多関数かつ capability effect を持つため、現状では通らない。
+2. **CLI target として露出していない。** `target.cljc` に
+   `:wasm-component-kotoba-v1` の profile は無く、`cli.clj` にも component の
+   分岐が無い（両ファイルを grep して 0 件）。`compile-component` は API 関数として
+   のみ存在する。
+3. **fuel budget を宣言しない。** core module の fuel global は依然
+   `backend/wasm.cljc:1401` の `global-sec [1 0x7e 1 0x42 0x80 0x04 0x0b]` で 512 固定であり、
+   artifact も `:budgets` を持たない。`component-platform.edn` が要求する
+   `:required-budgets [:fuel :memory-pages]` を満たす admission envelope は
+   まだ生成されない。
+4. **admission envelope 未生成。** `component_platform.clj/validate-world!` が要求する
+   `:admission-keys`（`:target :wasi-version :profile :imports :exports :grants
+   :provider-bindings :ambient-wasi :budgets :identity`）の完全な envelope を
+   compiler は出力しない。`:grants` は policy 側の責務なので compiler が出すべきではないが、
+   残りは compiler が出せる。
+5. **typed collection（externref）の Component 表現が未設計。** core module の typed 命令は
+   `0x6f`（externref）を使う（例 `[0x60 3 0x7f 0x6f 0x6f 1 0x6f]`）。Canonical ABI で
+   これを渡すには resource type 設計が要る。u256 の limb 配列や EVM stack/memory は
+   typed vector 前提なので、Ethereum にとってはこれが実質的な最大の設計課題である。
+
+### 3. 言語表面のギャップ（いずれも設計で吸収可能、ただしコスト）
+
+| 項目 | 実測 | EVM への影響と対処 |
+|---|---|---|
+| i64 シフト/ローテート | **無し**。`i32-shift-left/right`・`u32-shift-right` のみ（0x74/0x75/0x76 + `i64.extend` 0xac/0xad） | Keccak-f[1600] の 64bit lane 回転と u256 が直接書けない。**32bit limb 表現**で吸収する（u256 = 8 limb、32x32 積が i64 に収まる）。ただし呼び出し数が増えるので fuel 予算に効く |
+| `bit-and` / `bit-xor` | **i64 で存在**（0x83 / 0x85） | 良好 |
+| `bit-or` / `bit-not` | 無し | `or a b = xor a (xor b (and a b))`、`not a = xor a -1` で導出 |
+| `max-parameters` | 5（かつ f64 5 個で miscompile 実績。`mining-pool/bounded_vardiff.kotoba` に記録） | EVM state を record（`max-record-fields` 32）に詰めて 1 引数で渡す |
+| `loop` / `recur` | 無し。再帰のみ | tail-self-call 最適化があるが反復ごとに fuel を消費する |
+| リテラル上限 | `max-list-items` 128 / `max-typed-map-entries` 31 / `max-record-fields` 32 / `max-heterogeneous-vector-items` 32 | いずれも**ソースリテラルの admission 上限**。runtime の typed vector 成長とは別。EVM stack (1024) や memory は runtime vector 前提で設計する |
+| 関数数・式ノード | `max-functions` 1024 / `max-expression-nodes` 50000 / source 1 MiB | 名前空間を分割して吸収（`--source-path` の closed graph） |
+
+### 4. capability のギャップ
+
+`kotoba-core-contracts/resources/kotoba/runtime/capability_contract.edn` の閉じた import 表を精査した。
+
+**在るもの（Ethereum にとって重要）**:
+- `net/connect` 238 + `net/transport` 240（`transport_write` / `transport_read` /
+  `transport_close`）+ `crypto/tls` 239 → **生 TCP が guest から叩ける。devp2p/RLPx は
+  原理的に書ける。**
+- `graph/kotoba` 209、`fs/app-data` 202、`clock/monotonic` 211、`random/bytes` 212、
+  `data/cbor` 245、`data/json` 246。
+
+**無いもの**:
+- **keccak256**（`hash/sha256` 222 のみ。Ethereum は SHA3-256 ではなく Keccak-256 で
+  padding が異なり互換性が無い — `eth-crypto/core.cljc` の冒頭コメントが同じ罠を記録している）
+- **secp256k1 ecrecover / sign**（`identity/sign` 220 / `identity/verify` 221 は Ed25519 系）
+- ブロック本体を保持できる **永続 KV**（`graph/kotoba` は datom store、`fs/app-data` は
+  app データ用。mainnet full state は 1TB 級で、いずれも設計上想定していない）
+
+なお ADR-2607252500 決定 3 により、これらを `wasi:filesystem` / `wasi:sockets` の
+包括権限で埋めることは**禁止**である。aiueos-owned の狭い WIT interface として、
+対象・operation・byte/item quota・deadline・audit identity を型と grant の双方で束縛する。
+
+## geth 『完全互換』の適合範囲を定義する
+
+『完全互換』を無定義に掲げると検証不能になるため、本 ADR で範囲を確定する。
+
+**互換対象（適合を測る）**:
+1. **consensus / EVM 適合** — `ethereum/tests`（GeneralStateTests・BlockchainTests）と
+   EEST fixtures をパスすること。これが『同じチェーンを同じように受理・拒否する』の実質。
+2. **Engine API 適合** — `engine_newPayloadV*` / `engine_forkchoiceUpdatedV*` /
+   `engine_getPayloadV*` を CL（Lighthouse 等）から駆動できること。
+3. **JSON-RPC 表面適合** — `eth_*` / `net_*` / `web3_*` / `debug_*` の主要部を
+   execution-apis スキーマに対して適合させること。
+4. **devp2p 適合** — RLPx + `eth/68` で geth ピアと実際にハンドシェイクし同期できること。
+5. **hive** による統合テスト。
+
+**互換対象外（明示的に含めない）**:
+- geth の Go 内部 API・パッケージ構造・`geth` CLI フラグ体系の再現
+- geth 固有の DB フォーマット（freezer / pathdb）とのバイナリ互換
+- snap sync の**サーバ側**提供（初期はクライアント側のみ）
+- `les` / 廃止済みプロトコル
+
+つまり『geth と同じ判定を下し、同じ外部インタフェースを話す』ことを互換と定義し、
+『geth の実装を写す』ことは互換と定義しない。
+
+## Architecture
+
+ADR-2607252500 の下向き capability flow に従い、Kotoba application component 群として構成する。
+
+```text
+native micro-TCB (verified Wasm engine, isolation, key use, adapter enforcement)
+  -> aiueos guest control-plane component (grant policy, audit, placement)
+  -> provider components  [eth-net / eth-store / eth-crypto-prim]
+  -> Kotoba application components  [eth-core / eth-evm / eth-sync / eth-api]
+```
+
+### レイヤ（すべて `.kotoba`、`kotoba/pure` と `kotoba/app` profile を分ける）
+
+| module | profile | 内容 | 依存 |
+|---|---|---|---|
+| `eth.u256` | pure | 256bit 符号なし整数。**32bit limb x 8** を typed i64 vector で保持 | — |
+| `eth.rlp` | pure | RLP encode/decode | u256 |
+| `eth.keccak` | pure | Keccak-256。lane を hi/lo 32bit 半語で保持し i32 シフトで回転 | — |
+| `eth.trie` | pure | Merkle Patricia Trie（secure trie 含む） | keccak, rlp |
+| `eth.types` | pure | Header / Transaction（Legacy・2930・1559・4844）/ Receipt / Log / Withdrawal | rlp, u256 |
+| `eth.evm` | pure | EVM インタプリタ。opcode dispatch・gas・memory・stack・call frame・precompile | u256, keccak |
+| `eth.fork` | pure | fork ルール表（Frontier〜Prague）と activation | — |
+| `eth.state` | pure | account / storage モデル、state transition | trie, evm |
+| `eth.consensus` | pure | header / block 検証、PoS 適合 | types, state |
+| `eth.rlpx` | app | RLPx handshake（ECIES）+ `eth/68` wire | crypto-prim, net |
+| `eth.sync` | app | full sync / snap sync（client 側）、chain reorg | consensus, rlpx |
+| `eth.engine` | app | Engine API（CL 接続） | consensus |
+| `eth.rpc` | app | JSON-RPC サーバ表面 | state, consensus |
+| `eth.node` | app | orchestration | 全部 |
+
+### 新設する狭い WIT interface（provider component、ambient WASI ではない）
+
+- `eth:net/peer-stream` — 単一 TCP 接続に限定。宛先は grant で束縛、byte quota と
+  deadline を必須にする。`net/connect` + `net/transport` の上に置く。
+- `eth:store/chain-kv` — append-only なブロック/レシート格納と、versioned な state KV。
+  key 空間・item 数・byte 数を grant で束縛。
+- `eth:crypto/keccak256` と `eth:crypto/secp256k1-recover` — 性能上の理由で host 側に置く
+  primitive。**判断を含まない機構のみ**（ADR-2607241100 D6 の decision-free mechanism 原則）。
+  guest 内 pure 実装（`eth.keccak`）を conformance の正本として残し、host 実装は
+  differential test で常時照合する。
+
+## Blocking dependencies（本 ADR 単独では解けないもの）
+
+1. **Component の対応形状を『一般の Kotoba application』まで広げること。**
+   Component 出力そのものは実在する（節 2 参照）ので、必要なのは新規実装ではなく
+   `component_core.clj/assert-supported!` の allowlist 拡張である。具体的には
+   (a) 多関数かつ capability effect を持つ module、(b) typed collection（externref）の
+   resource type 表現、(c) `:wasm-component-kotoba-v1` の CLI target 露出、
+   (d) fuel/memory-pages budget の宣言と admission envelope 生成。
+   このうち (b) が最も設計負荷が高く、Ethereum にとって実質的な前提である。
+2. **i64 シフト/ローテート命令の追加**（`i64.shl` 0x86 / `i64.shr_s` 0x87 / `i64.shr_u` 0x88 /
+   `i64.rotl` 0x89）。32bit limb で回避可能だが、Keccak と u256 の fuel 消費を大幅に削減する。
+   codegen への純粋な追加であり TCB を広げない。
+3. **`eth:crypto` provider の capability 追加**（keccak256 / secp256k1）。
+   閉じた import 表への追記であり、オーナー承認事項。
+4. **state 用の永続ストレージ provider**。既存の `graph/kotoba` / `fs/app-data` では
+   規模が合わない。
+
+## Phased plan
+
+- **Phase 0（compiler 待ちでも着手可能）** — `eth.u256` / `eth.rlp` を `.kotoba` で実装し、
+  現行 core-wasm target で**コンパイル可能性**と、512 fuel 内に収まる小さな entry point での
+  **実行**を検証する。必要 fuel の実測値をここで取り、Phase 1 以降の budget 見積りの根拠にする。
+- **Phase 1** — `eth.keccak` / `eth.trie` / `eth.types`。keccak は 32bit 半語実装。
+  空 trie root と既知ベクタで適合を取る。
+- **Phase 2** — `eth.evm` + `eth.fork` + `eth.state`。`ethereum/tests` GeneralStateTests を
+  fork ごとに通す。ここが最大の工数。
+- **Phase 3** — `eth.consensus` + BlockchainTests。mainnet の実ブロックを import 再生できること。
+- **Phase 4** — `eth.rlpx` + `eth.sync`。geth ピアとの実ハンドシェイクと同期。
+- **Phase 5** — `eth.engine` + `eth.rpc`。CL 接続と hive。
+
+各 Phase の完了条件は『テストが通ること』であって『実装が存在すること』ではない。
+スクリーンショットや部分実行を完了根拠にしない。
+
+## Alternatives rejected
+
+| 代替案 | 判定 | 理由 |
+|---|---|---|
+| native AOT tier で実装 | 却下 | ADR-2607252500 決定 4 が通常 application の native 直結経路を禁じている |
+| legacy core-wasm backend で実装 | 却下 | fuel 512 が codegen に焼かれており、Keccak 1 回すら完走しない |
+| `.cljc` で書いて後から移行 | 却下（本 ADR の範囲では） | 既存 4 repo が既にこの形で、それが『kotoba 実装が無い』という当初の問いの答えそのもの。runtime 優先順位にも反する |
+| geth を fork / Go を呼ぶ | 却下 | Kotoba stack の目的（portable capability confinement）を満たさない |
+| 包括的 WASI 権限で穴を埋める | 却下 | ADR-2607252500 決定 3 が明示的に禁じている |
+
+## 正直な状態表明
+
+本 ADR は**設計であって実装ではない**。起票時点でコードは 1 行も書かれていない。
+Phase 0 すら未着手である。
+
+**初版の誤りと、その原因（再発防止のため記録する）**:
+初版は『compiler は Wasm Component を出力できない』を中心的主張として起票され、
+その根拠は `orgs/kotoba-lang/compiler/src` に対する grep 0 件だった。しかし
+この共有 west checkout は `origin/main` から **143 commits 遅れており**、
+かつオーナーの未 push commit が 3 件乗った状態だった。実際の `origin/main` には
+Component 出力の実装が 3272 行存在した。
+
+教訓: **`orgs/<org>/<repo>` の共有 checkout に対して『機能が存在しない』を
+grep で結論づけてはならない。** west の pin は manifest が示す時点であって
+upstream の最新ではなく（CLAUDE.md『pin 鮮度』節が同じ罠を警告している）、
+不在の証明には `git fetch` 後の `origin/<default-branch>` を計測する必要がある。
+本 ADR の再計測はすべて `origin/main` の `f6ee539` に対して行った。
+
+なお compiler の共有 checkout には**オーナーの未 push commit が 2 件残っている**
+（`536d643` guest grammar authority、`f435960` Wasm Components を既定実行パスにする README）。
+143 commits 遅れた base の上にあるため素直には push できない。別途 landing が必要で、
+本 ADR はそれに手を付けていない。
+
+また『geth 完全互換フルノード』は geth 本体が約 70 万行の Go であることを踏まえると、
+本 ADR の Phase 0〜5 は単一セッションで到達できる規模ではない。
+本 ADR はその全体像と適合の定義、そして着手順序を確定させるためのものである。
+")))

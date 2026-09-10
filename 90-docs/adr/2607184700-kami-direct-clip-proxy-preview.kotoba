@@ -1,0 +1,48 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607184700-kami-direct-clip-proxy-preview")
+  (:adr/title "KAMI adds direct DAW clip movement and original-safe NLE proxy preview")
+  (:adr/date "2026-07-18")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607184600-kami-media-directory-relink-search"))
+  (:adr/decision
+  (map (:daw (map (:clip-pointer-preview :runtime-only)
+         (:pointer-up :single-project-generation)
+         (:pointer-cancel :discard)
+         (:keyboard-step-ticks 120)
+         (:keyboard-coarse-step-ticks 480)
+         (:minimum-start-tick 0)
+         (:undo-redo :persistent-project-history)))
+   (:nle (map (:proxy-trigger :explicit-per-asset)
+         (:proxy-format "video/webm;codecs=vp8,opus")
+         (:proxy-max-dimensions (vector 640 360))
+         (:proxy-video-bps 800000)
+         (:proxy-audio-bps 96000)
+         (:silent-source-duration :wall-clock-frame-hold)
+         (:preview-source :proxy-when-enabled-and-ready)
+         (:production-export-source :original)
+         (:package-source :original)
+         (:proxy-persistence :runtime-only)
+         (:resource-teardown (vector :capture-tracks :derived-object-urls))))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+                                (:daw (vector "plugin hosting" "LUFS/true-peak" "bus automation" "bundled multichannel stems"))
+                                (:nle (vector "persistent/background proxy jobs" "color management" "multitrack audio lanes/EQ" "additional containers and hardware encoder control"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "ba9cbbaa3b7a75f6672e1b2e2a9956d189e9821c"))
+   (:nle-commits (vector "984c9afb1a957b0f2192ea3b16d0de0aafe6ca63"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#5" "kotoba-lang/kami-app-nle#5"))
+   (:evidence (vector "DAW passes 13 tests and 51 assertions; NLE passes 15 tests and 56 assertions, including proxy/original source selection invariants."
+              "Both shadow-cljs production releases completed through the repository resource guard."
+              "DAW Chrome moved Beat A by pointer, restored its exact original position through undo, then moved it by the keyboard without console errors."
+              "NLE Chrome generated a valid 96x64 VP8 WebM proxy from a real silent MP4, retained 0.999 seconds of its 1.000 second source duration, selected it for preview, then restored the original Blob URL when proxy preview was disabled."
+              "All capture tracks, automated browser contexts and local HTTP servers were closed after verification."
+              "Both application pull requests were reviewed and squash-merged."
+              "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN parsing verified accepted status, supersedes authority and original-export policy."))))
+  (:adr/consequences
+  (vector "DAW arrangement editing now supports direct manipulation without writing transient pointer positions into project history."
+   "Keyboard users receive deterministic fine and coarse clip movement over the same authoritative project operation."
+   "NLE users can derive lighter preview media locally while exports and portable packages remain tied to original bytes."
+   "Proxy generation currently consumes foreground playback time and derived blobs do not survive reload; durable background proxy jobs remain follow-up scope."))
+  (:adr/source-format "edn")))

@@ -1,0 +1,208 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608190700")
+  (:adr/doc_type "adr")
+  (:adr/topic "defensive-publication-robotics-prior-art")
+  (:adr/title "DP-2026-001: robotics を先行技術として公開する — 公開は既にできていた。欠けていたのは日付の立証と、審査官が読む言語だった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/last_verified "2026-08-19")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative_for
+  (vector "kotoba-lang robotics 群を先行技術として公開する方針と、その証拠バンドルの所在"
+   "自分では特許を取らないという決定（防御のみ）"
+   "先行技術の日付立証に使う手段の階層（何が accredited で何がそうでないか）"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "adr-2608041000-kotoba-lang-apache2-license-unification"
+   "ADR-2608123000"
+   "adr-2607198300"))
+  (:adr/decision-summary
+  "{:goal :block-third-party-patents-only, :own-filing :never, :threat-jurisdiction [:cn :us :ep :jp], :repos-fixed 31, :publication \"com-junkawasaki/prior-art\" :dp-id \"DP-2026-001\", :timestamps {:rfc3161 \"FreeTSA (verified, NOT accredited)\" :ots \"Bitcoin anchor via OpenTimestamps\"}, :archive {:software-heritage {:accepted-at-landing 9 :remaining 22 :cause :anonymous-rate-limit}}, :notice-added 28, :notice-skipped 3, :pins-advanced 28, :indexable-site \"https://com-junkawasaki.github.io/prior-art/ (Scholar citation_* + DC + bilingual + sitemap)\", :records-split 10, :indexnow :submitted, :bitcoin-anchor \"block 963148, all four .ots verify Success\", :software-heritage \"29/31\", :wayback \"5/5 bundle + 12/12 site, CDX-confirmed\", :pins \"31/31 == remote head\", :not-done [:west-registration :accredited-tsa :zenodo-doi :tdcommons-submission :swh-last-2]}")
+  (:adr/body
+  "# Context
+
+オーナー質問（2026-08-19）「今の kotoba-lang に robotics 関係の lib はどれぐらい実装されている? また、ここで公開しておくことで、後で特許などを主張されないようにするには?」。続けて「複数を組み合わせて公開, 特許主張は中国など想定している. 自分が特許を取る道自体は不要。他の特許取得を防御できればok」。
+
+## 実測した robotics の現在地（2026-08-19）
+
+`orgs/kotoba-lang` の 2,138 checkout を README キーワードで抽出し、`src/` の実 LOC を数えた。**合計 ≒ 17,000 src LOC / 9,000 test LOC / 31 repo。テストは実行していない — LOC と export 名からの評価である。**
+
+中身は均一ではなく 3 層に割れる:
+
+| 層 | repo（src LOC / test LOC） |
+|---|---|
+| 実体のある中核 | `com-nvidia-isaac-sim`(3,078/1,429) `kami-autodrive`(1,584/1,454) `com-nvidia-isaac-lab`(1,480/711) `kami-articulated`(804/462) `org-ros`(743/273) `kami-sensor-sim`(740/353) `org-ros-urdf`(519/191) `swarm-choreo`(544/236) `com-sony-dualsense`(554/299) `teleop`(341/208) `robotics`(314/152) `governor`(506/379) |
+| 薄い facade（~190 LOC の同型 CRUD） | `com-ros-robotics` `com-ros2-nav` `com-abb-robotics` `com-universal-robots` `com-bluefin-robotics` `com-liquid-robotics` `com-modbus-tcp` |
+| **test 0 行** | `com-nvidia-isaac`(551/0) `com-cobot-assembly`(562/0) `com-semicon-robotics`(552/0) |
+
+`com-nvidia-isaac-sim` が本命で、空間ベクトル代数（Plücker / crm / crf）・RNEA / CRBA・geometric Jacobian・forward/inverse dynamics・GJK/EPA・摩擦つき接触 impulse solver・DLS-IK（position / pose）・LQR（DARE）・軌道生成（cubic / quintic / min-jerk / waypoint）・vectorized batch を持つ。
+
+**無いもの（正直に）**: リアルタイム制御（モータドライバ、EtherCAT / CANopen、周期実行保証）。ROS のトランスポート（CDR エンコードと rosbridge の op 形はあるがソケットは無い）。SLAM（occupancy grid はあるがループクロージャ / graph SLAM は無い）。学習系の知覚。
+
+# Decision
+
+## 1. 防御のみ。自分では出願しない
+
+3 つを分ける:
+
+1. 他人が後から同じ発明で特許を取るのを防ぐ → 先行技術を作る。公開で達成できる。**これだけを目標にする。**
+2. 既存の他人特許を侵害しない → 公開では一切達成できない。`com-nvidia-*` `com-abb-*` のような clean-room facade は逆方向のリスク。
+3. 自分が特許を取る → 公開で閉じる。**閉じてよい**（オーナー判断 2026-08-19）。
+
+したがって日本特許法30条・米 102(b)(1) のグレース期間を確保する必要は無い。EPO に原則グレースが無いことも制約にならない。
+
+## 2. 欠けていたのは公開ではなく、日付の立証と言語だった
+
+先行技術として効くには 3 つ要る。実測した現在地:
+
+| 条件 | 判定前 |
+|---|---|
+| 公然と利用可能（特許法29条1項3号 / 中国専利法22条「为公众所知」） | **既に達成**。31 repo すべて public、Apache-2.0 |
+| 日付が立証できる | **欠落**。git の commit date と GitHub の `pushed_at` は自己申告で改竄可能 |
+| 当業者が実施できる程度の開示 | **不足**。コードはあるが、**審査官はコードを検索しない** |
+
+3 番目が中国を想定したときに決定的になる。CNIPA の審査官が英語の GitHub リポジトリに到達する確率は低い。**だから中国語の開示文が要る。**
+
+## 3. 何を作ったか
+
+`com-junkawasaki/prior-art`（public、CC0-1.0）に `DP-2026-001-robotics/`:
+
+- **`DISCLOSURE-001-robotics.md`**（6,409 語）。10 の技術思想を「課題 → 機構 → **変形例**」で書いた。英語本文 + **中文摘要（全 10 節をカバー）** + 日本語要旨。開示した機構: ①独立 governor による admit ②アクチュエーションを型付き capability にして未付与動作を**記述不能**にする ③1 機も飛ばす前の全編隊検証 ④deadman + chord e-stop ⑤運動学記述からの actuator BOM + 連続トルク検証ゲート ⑥sim / 学習 / 制御を兼ねる決定論的無依存 dynamics kernel ⑦domain randomization をデータで表す ⑧異種測距源の単一 occupancy 融合 ⑨載具物理をデータとする単一 GNC step ⑩実行の content-addressed identity。
+- **`evidence-manifest.txt`**。31 repo を remote default-branch の commit SHA-1 + tree SHA-1 で固定。**git の tree SHA-1 は Merkle で全内容をコミットするので、この 6,716 byte のファイル 1 枚が 31 repo の全内容を固定する。**
+- **RFC 3161 token（FreeTSA）** 3 通と **OpenTimestamps** 3 通。`openssl ts -verify` → `Verification: OK`。
+- `VERIFY.md`（誰でも自分で検証できる手順）、`SHA256SUMS`、SWH 申請記録。
+
+**変形例を意図的に広く列挙したのが肝である。** 後願が上記機構の自明な変形に向けられたとき、それが「自明だった」という主張ではなく**明示の書面開示**に当たるようにするため。新規性ではなく進歩性で効く。
+
+## 4. 日付立証の階層を混同しない
+
+**FreeTSA はいかなる法域でも認定タイムスタンプ事業者ではない。** 構造的に妥当で誰でも検証できるが、日本の総務大臣認定タイムスタンプ・eIDAS qualified timestamp・中国の联合信任时间戳服务中心（UniTrust）と同等ではない。`kotoba-lang/org-ietf-rfc3161` が `:verified`（構造と署名）と `:trusted`（証明書を誰が保証したか）を別フィールドにしていて、trust predicate 無しでは `:trusted :unknown` を返すのは、まさにこの区別のためである。自己発行タイムスタンプが認定タイムスタンプに見えるのは、両者を 1 個の boolean に潰したときに起きる。
+
+したがって **README に「Honest limits」節を置き、認定でないことを明記した。** 認定 TSA を後から同じ digest に対して打てば、このバンドルは置き換えではなく**強化**される（digest が既に固定されているので）。
+
+OpenTimestamps の Bitcoin アンカーは、最高人民法院の互联网法院 / 在线诉讼規則が区块链存证を受容している経路に一致するので、中国では RFC 3161 より通りやすい可能性がある。**どちらが強いかは法域依存なので両方打った。**
+
+## 5. NOTICE — 28 repo に追加し、3 repo は意図的に触らなかった
+
+NOTICE を持っていた 3 repo（`com-nvidia-isaac` `com-cobot-assembly` `com-semicon-robotics`）の中身は Apache-2.0 に**追加条件を課していた**:
+
+> This software is distributed under the Apache License 2.0 with the etzhayyim Charter Compliance Rider v3.1 (see CHARTER-RIDER.md). By using, modifying, or redistributing this software, you accept both …
+
+**そして `CHARTER-RIDER.md` は 3 repo のいずれにも存在しない**（実測: Contents API が 404）。GitHub は 3 repo を Apache-2.0 と表示している一方、NOTICE は別の条件だと言っており、その条件の本文は読めない。**受領者が遵守できない条件が課されている状態**であり、Apache-2.0 §3 の特許許諾に依拠する外部採用者にとっては採用不能を意味する。
+
+この rider を残り 28 repo に**複製しなかった**。復元でも撤去でもなく、オーナー判断を要する。追加した 28 repo の NOTICE は最小限で、`No additional terms or conditions apply.` と DP-2026-001 への指示を持つ。
+
+## 6. やっていないこと（blocker として明示する）
+
+| 項目 | 理由 |
+|---|---|
+| **Software Heritage 22/31 未申請** | 匿名 API が ~10 件/時で throttle。resume worker を detach 済み（`swh-resume.py`、~3h）。無料の SWH API token があれば一撃で終わる |
+| **認定 TSA** | 有償契約が要る。日本＝総務大臣認定事業者、中国＝联合信任（tsa.cn）。**digest は既に固定済みなので後から打てる** |
+| **TDCommons / IP.com 投稿** | 審査官が引く NPL DB に載せる経路。**中国を想定するならここが最も効く未実施項目** |
+| **中国語で索引される公開先** | 中文摘要は書いたが、CNKI 等に索引される場所には置いていない |
+| **west 登録（`prior-art`）** | `--entry` splice は checkout 済みパスから block を生成するので、共有 `orgs/` に clone が必要。publication artifact は何の依存でもないので、manifest 書き込み経路のリスクに見合わない |
+
+## 7. 中国について、勝ち目を誤解しないための 1 点
+
+**中国の実用新案（实用新型）と外観設計は実体審査を経ずに登録される。** したがって先行技術は**登録を阻止しない** — 事後の無効宣告請求（专利复审和无效审理部）で使う武器になるだけである。発明特許（发明专利）は実体審査があるので阻止に効く。
+
+無効審判での証拠形式要件も効いてくる: 外国語証拠は中文訳の提出が要り、インターネット証拠は公証または承認されたタイムスタンプの裏付けを求められるのが通常である。**つまり中文の開示文と、中国で通用するタイムスタンプの 2 つが、そのまま証拠能力の要件に対応している。** 前者は今日作った。後者は未実施。
+
+# Consequences
+
+- robotics 31 repo の内容は、2026-08-19 07:18 UTC に存在したことを 2 系統の独立した手段で立証できる状態になった。
+- 自分で特許を取る道は閉じた。オーナーの明示的判断であり、これを制約として引用してよい。
+- **`evidence-manifest.txt` の 31 行は当時の pin であって現在の tip ではない。** NOTICE 追加で 28 repo の tree SHA は既に動いている。manifest は snapshot であって追随するものではない — 「commit X の時点でこうだった」は永久に真である。新しい snapshot が必要なら DP-2026-002 を起こす。
+- 28 pin を前進させた（`advance-pins.cljs` → `verify-west-pins.cljs` で 28/28 fast-forward 検証済み）。ADR-2608123000 の「license sweep の後ろで manifest が進まなかった」を繰り返さないため。
+
+## 8. 分割と索引面（2026-08-19 追記、同日実施）
+
+**omnibus 1 件では見つからない。** TDCommons は**レコード単位で title / abstract を索引**するので、
+6,400 語 1 本では検索にほぼ当たらない。10 件に分割した（`tdcommons/DP-2026-001-NN-<slug>.{md,pdf}`、
+各々自己完結・英語本文 + 中文摘要）。CJK が tofu ではなく**抽出可能な実グリフ**であることを
+`pdftotext` で実測した（潰れていれば検索不能になるので、目視でなく機械で確かめた）。
+
+**さらに、アカウント不要で TDCommons と同じ到達性を得る経路を実装した。**
+`https://com-junkawasaki.github.io/prior-art/` を GitHub Pages で公開し、各レコードに
+**Google Scholar の `citation_*` meta**（`citation_title` / `citation_author` /
+`citation_publication_date` / `citation_pdf_url`）と Dublin Core、`description`、`keywords` を付けた。
+**Scholar はこの meta で索引し、Scholar が Google Patents の非特許文献コーパスを供給する** ——
+審査官が実際に検索するのはそこである。加えて中文セクション・sitemap.xml・robots.txt。
+IndexNow で Bing / Yandex に 12 URL を送信（202 / 200）。
+
+**serve されている meta と中文を実測で確認した**（`curl` して grep）。Pages が live になったことも
+polling で確認しており、`gh api` が 200 を返したことを live の証拠にしていない。
+
+## 9. アカウント登録は agent 側でできない（2026-08-19、境界の記録）
+
+オーナー質問「claude work で取得、アカウント登録は進められないの?」。**できない。**
+安全床①（認証情報を自分でフォーム入力しない）に該当する —— アカウント作成はパスワードを決めて
+フォームに打ち込む行為そのものである。kagi / Keychain を狙い撃ちで確認したが
+（`zenodo` / `software-heritage` / `tdcommons` / `orcid`）いずれも未登録。**keychain の総当たりはしない**（安全床⑦）。
+
+**詰まっているのはそこだけである。**
+
+| 作業 | 誰が |
+|---|---|
+| アカウント作成・パスワード入力・メール認証 | **オーナーのみ** |
+| ログイン済みブラウザでの投稿フォーム操作（PDF アップロード、title/abstract 入力） | **agent 可**（credential 入力ではない） |
+| token を kagi / Keychain に置いた後の API 全自動化（Zenodo / SWH） | **agent 可**（安全床①の credential 専用ツール経路） |
+
+したがって最小のオーナー作業は「1 回ログインする」または「token を 1 つ kagi に入れる」であって、
+10 件の投稿作業そのものではない。
+
+## 10. Closing state（2026-08-19 10:0xZ）
+
+**証拠力の中核は完成している。** 内容の固定・日付の立証・第三者アーカイブ・索引面の 4 つが揃った。
+
+| | 状態 | 確かめ方 |
+|---|---|---|
+| 内容の固定 | 31 repo を commit + tree SHA-1 で固定 | `evidence-manifest.txt`、tree hash は Merkle で全内容をコミット |
+| **Bitcoin アンカー** | **完了。block 963148。4 ファイルとも `ots verify` が Success** | `ots verify <file>.ots` |
+| RFC 3161 | 6 token、`openssl ts -verify` OK。**FreeTSA は非認定** | `VERIFY.md` |
+| Software Heritage | **29/31** | `software-heritage-status.json` |
+| Internet Archive | **証拠バンドル 5/5・サイト 12/12**、CDX で実確認 | `wayback-status.json` / `wayback-status-site.json` |
+| 索引面 | Pages live、Scholar `citation_*` + DC + 中文 + sitemap、IndexNow 送信済 | `curl` で serve 実測済み |
+| west pin | **31/31 が remote head と一致** | `gh api` で全件再測 |
+| SHA256SUMS の整合 | `shasum -c` 4/4 OK（追記は新規ファイルで行い、anchor 対象を書き換えていない） | `shasum -a 256 -c SHA256SUMS` |
+
+**Bitcoin アンカーが一番効く。** RFC 3161 の FreeTSA token と違って**誰の鍵にも依存しない**ので
+「認定事業者でない」という留保が要らず、しかも中国の互联网法院が受容している形式そのものである。
+
+### 追記のときに守った規律（次の agent もこれを守ること）
+
+**anchor 対象のファイルを書き換えない。** `software-heritage-save-requests.json` は `SHA256SUMS` に
+覆われており、`SHA256SUMS` は RFC 3161 token と Bitcoin anchor を持つ。29/31 に進んだからといって
+中身を更新すると、**anchor が attest しているバイト列と実ファイルが食い違う**。現在値は
+`software-heritage-status.json` という**新規ファイル**に書いた。digest を固定した意味はここにある。
+
+### resume point
+
+1. **Zenodo（最短で効く）** — `zenodo-deposit.py` は dry-run 検証済み。41 ファイル / 5.42 MB、
+   `related_identifiers` 33 件（うち 31 件が各 repo の commit 固定 URL）。
+   `security add-generic-password -s zenodo -a $USER -w '<token>'`（scope は `deposit:write` と
+   `deposit:actions` のみ）を置けば `python3 zenodo-deposit.py --sandbox` → 本番の順で DOI が出る。
+   **全ファイルの checksum 照合に通ってからでないと publish しない**実装。
+2. **TDCommons** — アカウント（登録＝パスワード入力なので agent 不可）と Chrome 拡張の接続
+   （実測: `tabs_context_mcp` が \"Browser extension is not connected\"）の 2 つが未達。
+   投稿順・title・abstract・keywords は `SUBMISSION-SHEET.md` に確定済み。
+   **ただし優先度は下がった** —— TDCommons の目的だった Google Patents NPL への到達性は、
+   Scholar `citation_*` を付けた Pages サイトでアカウント無しに確保済みで、B は経路の二重化である。
+3. **SWH 残り 2 件**（`kami-app-sarutahiko-factory` / `kami-app-hygaccess-plant`）— detached worker が
+   throttle 明けに投げる。取りこぼしたら `software-heritage-status.json` の `how_to_finish` の通り。
+4. **認定 TSA / 公証** — 有料。**紛争が起きてから、その法域に合わせて買えばよい。**
+   digest は固定済みなので後から同じ digest に打てて、置き換えではなく強化になる。
+   前倒しで買うのは費用対効果が悪い（中国の实用新型は実体審査が無く、金を払っても登録は止まらない）。
+
+### やらなかったこと、とその理由
+
+- **west への `prior-art` 登録** — `--entry` splice は checkout 済みパスから block を生成するので
+  共有 `orgs/` に clone が要る。publication artifact は何の依存でもなく、manifest 書き込み経路の
+  リスクに見合わない。
+- **3 repo の rider NOTICE**（`com-nvidia-isaac` / `com-cobot-assembly` / `com-semicon-robotics`）—
+  Apache-2.0 に追加条件を課しながら、参照先の `CHARTER-RIDER.md` が**存在しない**（Contents API 404）。
+  受領者が遵守できない条件が課されている状態で、Apache-2.0 §3 の特許許諾に依拠する外部採用者にとっては
+  採用不能を意味する。**復元か撤去かはオーナー判断**なので、28 repo に複製せず、触らずに残した。")))

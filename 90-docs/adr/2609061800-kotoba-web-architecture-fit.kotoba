@@ -1,0 +1,434 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609061800-kotoba-web-architecture-fit")
+  (:adr/title "Which web architectures fit the Kotoba language surface, scored from facts rather than asserted")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/authority "kotoba-lang/kotoba-lang lang/*.edn at origin/main")
+  (:adr/related (vector "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+                "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"
+                "ADR-2608136000"
+                "ADR-2608136800"
+                "2608080100"))
+  (:adr/upstream-authority (vector "kotoba-lang/kotoba-lang docs/adr/ADR-kotoba-language-surface-status.md"
+                           "kotoba-lang/kotoba-lang adr-2608301500-guest-syntax-restrictions-classified-by-shielding-mechanism"
+                           "kotoba-lang/kotoba-lang lang/abort-ability.edn"
+                           "kotoba-lang/kotoba-lang lang/local-state.edn"
+                           "kotoba-lang/amu resources/kotoba/lang/application-language.edn"))
+  (:adr/dataset "90-docs/architecture-fit/architecture-fit.datoms.edn")
+  (:adr/rubric "manifest/architecture-fit-rubric.edn")
+  (:adr/rubric-substrate "manifest/substrate-fit-rubric.edn")
+  (:adr/dataset-substrate "90-docs/architecture-fit/substrate-fit.datoms.edn")
+  (:adr/detector "scripts/architecture-fit-score.cljs")
+  (:adr/body
+  "# Which web architectures fit Kotoba, and how that was decided
+
+## Context
+
+The question asked was which architectures suit building a web framework or
+library on today's Kotoba language surface. Answering it from memory would have
+reproduced a failure this workspace has recorded repeatedly: quoting an
+implementation ceiling as though it were a property of the language.
+
+The root CLAUDE.md was itself behind. Read at origin/main on 2026-09-06:
+
+- `kotoba-lang/kotoba-lang` 232182d
+- `kotoba-lang/amu` 1e5b7b8f
+- `kotoba-lang/kotoba-kir` af2275d
+
+Each was fetched and confirmed equal to origin/main before being read, because a
+west checkout is not the repository's main (ADR-2608136800).
+
+Five things are landed that the prose in CLAUDE.md still described as absent or
+as blockers:
+
+1. `defrecord` / `defprotocol` / `extend-type` / `extend-protocol` are
+   implemented, with profile `bounded-closed-world-static-dispatch`,
+   `dynamic-fallback false`, and an unknown receiver rejected statically.
+2. First-class closures are implemented: `fn`, `invoke`, `apply`, `fn-ref`,
+   arity 0 to 4, capture plus parameter limit 5, with public `[:fn ...]`
+   contracts crossing project-module boundaries.
+3. `typed-eval` is `:implemented`. `(eval request)` takes a bounded document
+   naming a checked DefCID, admitted on typed interface, effect row, allowed
+   effects, fuel and max depth, with `:no-source-text` in its safety list.
+4. `throw` and `try` exist (abort slice 2). An aborting function still cannot
+   be exported, and throw is refused inside loop, doseq, dotimes, lazy thunks
+   and fn literals, and in any function whose effect row carries a
+   `:dataspace/*` operation.
+5. `atom` / `swap!` / `reset!` / `deref` exist (local-state slice 1, decided
+   2026-09-02). The cell may appear only as the first argument of those forms,
+   in the body that binds it. Passing, returning, storing, capturing in a fn or
+   reading inside an iteration form is refused by name.
+
+Also read: the capability kits. `ui-v1` is a declarative flat tree of at most 32
+nodes committed against a base revision with bounded pull for events;
+`http-ingress-v1` is host-injects and guest-polls with one pending accept and a
+queue of 8; `state-v1` is a host-owned key-value store of 256 entries whose
+values are strings; `dataspace-v1` is assert, retract, observe and facets. Four
+of the fourteen kits are qualified on `wasm-aot`, which is the browser target.
+
+## Decision
+
+### 1. Score against named invariants, not against taste
+
+Seven axes, each bound to an invariant that is written down in the authority
+files, with its disposition and shielding axis carried alongside:
+
+| axis | invariant | disposition |
+|---|---|---|
+| authority | no-ambient-authority | intentional-security-constraint, code-identity |
+| state | no-ambient-mutation | intentional-security-constraint, authority |
+| dispatch | closed-world-static-dispatch | implemented-partial, dispatch-bypass |
+| bounds | bounded-admission | intentional-security-constraint, resource-bounds |
+| errors | explicit-errors | intentional-security-constraint, control-effect-tracking |
+| concurrency | no-unbounded-concurrency | intentional-security-constraint, resource-bounds |
+| identity | no-guest-macros | intentional-security-constraint, code-identity |
+
+Recording the disposition matters more than recording the score. Three of these
+have a widening path on file and four do not, so an architecture that fails on a
+widening axis is waiting, while one that fails on a permanent axis has to be
+rewritten.
+
+### 2. Separate the facts from the judgement, and derive the number
+
+Three artifacts, and no score is authored in any of them:
+
+- `90-docs/architecture-fit/architecture-fit.datoms.edn` holds FACTS. Each
+  architecture names one level per axis from a closed vocabulary, plus a
+  first-party evidence URL and a note identifying the single fact that sets its
+  lowest axis. `:source/dataset` is `architecture-fit`, so it joins the datom
+  plane that `manifest/edn-query.cljs` already loads.
+- `manifest/architecture-fit-rubric.edn` holds the JUDGEMENT: the level to score
+  mapping, one table, applied uniformly.
+- `scripts/architecture-fit-score.cljs` is the only place a total exists.
+
+A disagreement is expressed by editing a level and recomputing. It cannot be
+expressed by arguing with a printed number, because there is no printed number
+to argue with that was not derived a moment ago.
+
+### 3. The detector answers in three values, not two
+
+Exit 0 clean, exit 1 the dataset disagrees with the rubric, exit 2 REFUSED. An
+empty dataset returns 2, not 0: a scan of nothing is not a clean scan
+(ADR-2608136000). Measured on 2026-09-06, all three fire:
+
+- unmodified: exit 0, `SCANNED 57 entries`, clean
+- one level changed to a keyword the rubric does not carry: exit 1, reported as
+  `react-hooks unknown-level axis=state value=:totally-made-up`
+- the exact string `:arch/errors :exception-control-flow ` deleted, which occurs
+  once in the file: exit 1, reported as `rails missing-axis axis=errors`
+- dataset replaced with `[]`: exit 2, REFUSED
+
+The break and the report were compared each time. A first attempt at the second
+case used a regex that spanned entities and produced seven findings with blank
+entry names; that was a broken break rather than a successful demonstration, and
+it was redone.
+
+The check has already caught a real error: `:arch/entries` was hand-typed as 50
+and the dataset holds 57. The first run refused to print a table.
+
+## Findings
+
+57 entries, mean 43.9, standard deviation 14.8, range 14 to 70, median 45.
+
+### The binding constraint is bounds, not the security invariants
+
+`bounds` has the lowest mean of any axis at 5.4, and is the lowest-scoring axis
+for 12 of 57 entries, more than any other. The axes that get discussed --
+ambient authority and ambient mutation -- bind 10 each.
+
+This is the result worth carrying forward. Teams port an architecture expecting
+to fight the capability model, and what actually stops them is max-parameters 5,
+closure arity 4, ui-v1's 32 nodes, http-ingress-v1's single pending accept.
+Those are numbers in files that move; the security invariants are not.
+
+`dispatch` has the largest spread (sd 3.0), so it is the axis where the field
+genuinely disagrees and therefore the one where the rubric is most worth
+challenging.
+
+### Family order, by mean total
+
+managed-effect-ui 66.8 (n=4), component-model 66, coordination 64,
+effect-description 62 (n=3), hypermedia 59, effect-typed 57.4 (n=5),
+typed-server 50.5 (n=8), actor 46.5 (n=4), clojure 41 (n=5), continuation 38,
+reactive-ui 35.7 (n=11), di 32.3 (n=7), plugin 21, mvc-orm 19.6 (n=5).
+
+Two of these are worth naming.
+
+**The client-side reactive family scores below the typed-server family and below
+the actor family.** React, Reagent, Solid, Svelte, Vue, MobX and Lit average
+35.7. The cause is the same in every case and it is not the rendering model: it
+is a mutable cell held outside the function that reads it. `local-state.edn`
+lists `captured-by-a-fn-literal` and `stored-in-a-collection-or-record` among
+the refused escapes, which is a ratom and a `useState` cell described exactly.
+
+**Dependency injection is the second-worst family.** This is the surprise, since
+DI is normally the thing one adopts to get away from ambient authority, and the
+authority axis does credit it. It is undone on dispatch and identity, because a
+container resolves by name at run time. One measured fact settles it: a
+capability handle is not a value in the source surface. `cap-acquire` and
+`has-capability?` appear in the grammar's admitted builtins, but the frontend
+answers that the operation has no admitted type signature and no admitted
+lowering. There is nothing for a system map to hold.
+
+Hexagonal ports-and-adapters at 52 is the exception inside that family, and the
+difference is precisely that nothing is resolved by name.
+
+### The top of the table is not a coincidence
+
+Elm 68, Elmish 66, WASI 0.3 HTTP component 66, free monad interpreter 65,
+Syndicate dataspace 64, CQRS event sourcing 63, Halogen 63, Unison 62.
+
+Three of the top eight already exist as shipped capability kits or as the
+compile target: `ui-v1` is TEA, `dataspace-v1` is Syndicate, and
+`wasm-component-kotoba-v1` with WASI 0.3.0 is the component model. Two more --
+free monad and CQRS -- describe the same move the capability invariant
+describes: the unit produces a description and something with authority
+interprets it.
+
+HTMX at 59 is the highest-scoring client architecture in the table, and it
+scores there by declining to be one. For a UI kit whose whole surface is
+commit-a-tree and pull-events, hypermedia over the wire fits better than any
+client-side reactive framework measured here.
+
+Racket appears at both ends: Syndicate at 64 and the continuation-based
+web-server at 38. A captured continuation is the unbounded non-inspectable
+object that bounded admission cannot admit. The language is not the unit of fit.
+
+## Consequences -- what a Kotoba web framework is
+
+1. A handler, not a server. `http-ingress-v1` is synchronous accept-then-reply
+   with one pending accept. Routing, concurrency and connection management are
+   the host's.
+2. Routes and middleware are literal values. `require`, `resolve`, `ns-resolve`,
+   `var`, `load`, `load-file`, `load-string`, `read-string` and `binding` are
+   forbidden heads, so a table assembled by scanning namespaces has no
+   mechanism. reitit route data and a Pedestal interceptor chain are the two
+   existing shapes that port unchanged.
+3. The request is a record, not an argument list. max-parameters is 5 and
+   `pure-product-profile.edn` states the policy outright as keep-5-use-records,
+   with a preference order of record, option, hetero-vector, flat arity at most
+   five. Record fields go to 32.
+4. Handler abstraction is `defprotocol` plus `extend-protocol` over a closed set
+   of records, resolved statically, with an unknown receiver refused at compile
+   time.
+5. The extension point is a DefCID. Typed eval is the only admitted way to run
+   something not present at link time, and it names content rather than source.
+   A plugin system that loads source text is not a thing to be worked around; it
+   is a thing to be replaced with content addressing.
+6. Boundaries return `[:result T E]`. throw exists but an aborting function
+   cannot be exported.
+7. The view is a 32-node flat tree committed against a base revision. That is
+   optimistic concurrency over the whole tree, not a diff protocol, so there is
+   nothing for a virtual-DOM differ to do.
+8. State has three places, and which one is a counting question before it is a
+   design question: a `let`-local cell that cannot escape, `state-v1` at 256
+   entries with string values, or `dataspace-v1` at 256 assertions with facets.
+   One global store holding everything fits none of them.
+
+## What this does not claim
+
+The facts are checkable against the cited first-party documents. The level
+assigned to each fact is judgement, and the rubric turning a level into a number
+is judgement. No gate produced these totals and none of them is a measurement.
+
+The ranking is fit with one language surface. It is not a ranking of these
+architectures as architectures, and a low score is not a defect in the thing
+scored -- Rails at 14 is at the bottom because every convenience it is admired
+for is the thing one of these seven invariants exists to refuse.
+
+Twenty named frameworks were not covered: Ember, Nuxt, Remix, Sinatra, Flask,
+Gin, Rocket, Vapor, Play, Micronaut, Quarkus, Deno Fresh, Astro, Nitro, Leptos,
+Dioxus, Seaside, Ur/Web, Opa and Wasp. Their absence is absence of measurement.
+
+Do not quote the numbers in this document as current. The ceilings they are
+measured against live in `lang/guest-grammar.edn` under `:admission-limits` and
+in each kit's `:qualification`, and those move. Rerun the detector.
+
+## Amendment 2026-09-06 -- a second lens, because the first had a blind spot
+
+The owner asked why Elm beat re-frame and Reagent, then asked for the question
+to be recomputed from the substrate -- Kotoba's pure syntax, Unison properties,
+IPLD, IPNI, IPFS, CARv2, biscuit -- rather than from what already exists.
+
+The first part has a short answer and it is in the numbers, not in taste.
+re-frame loses four axes to Elm: state 5 against 10 (one atom the whole program
+holds), dispatch 4 against 10 (handlers registered into a mutable table at load
+time), errors 4 against 10 (no failure contract), identity 5 against 9 (macros
+are how it is used). Reagent loses on state 3 and authority 3 for one reason: a
+ratom is a cell held outside the function that reads it, and the reader is
+discovered by dereferencing during render. Elm did not win for being pure. It
+won because the state is a value, the message set is sealed, and failure is a
+value.
+
+The second part exposed a real defect in the first rubric. Its seven axes
+measure fit with the guest language surface as it ships. Not one of them looks
+at content addressing, IPLD, IPNI, CARv2 or biscuit -- so it can rank an
+architecture that merely compiles above one the substrate was built for, and it
+did. A second rubric now scores the same question from the substrate down, and
+deliberately does not ask whether an implementation or a kit exists.
+
+scripts/architecture-fit-score.cljs takes --rubric and --dataset, so both lenses
+run through one scorer and one validator. What a dataset entry must carry is now
+declared by its rubric (:entry-contract), because the two lenses group by
+different things and cite different kinds of source. The v1 lens is unchanged
+and still totals mean 43.9 -- checked, because a refactor that moves the numbers
+is a different change.
+
+### The eight substrate axes
+
+cid-identity (Unison definition CID + IPLD value CID), structural-sharing (IPLD
+merkle links), fetch-locality (CARv2 write-locality packs and range reads),
+discoverability (IPNI provider records and IPFS retrieval), attenuation
+(biscuit), effect-row (abilities, effect rows, the Effect IR), replay (the
+Execution IR), pure-surface (the guest grammar, included because the substrate
+is only reachable through the language).
+
+### What changed, and what did not
+
+19 entries, mean 50.2, range 14 to 76, median 58.
+
+**The front-end answer changes.** Merkle document UI scores 74; TEA with its
+state in memory scores 52. The shape is the same and survives -- state plus
+event to next state, view a pure function of state. The representation is what
+the substrate replaces: state and view are IPLD values, so the rendered document
+has a CID, and two renders are compared by walking down while their CIDs differ.
+Neither the full-tree commit ui-v1 does today nor a virtual-DOM differ: the
+update set is a property of the data. TEA loses exactly four axes and they are
+the four the first lens had no column for -- the model is a value nobody can
+name, the view is rebuilt then diffed, everything is bounded by one tab's
+memory, and no third party can fetch any of it.
+
+re-frame at 40 is worth reading rather than dismissing: two of its three central
+ideas -- effects returned as data, a pure reducer from event to next state --
+are exactly right here and score 9 each. The third, one atom the whole program
+holds, is what costs it. Replace the cell with a CID and most of re-frame
+survives the translation. Reagent at 23 and React at 22 do not, for the same
+reason in both cases: the shape of the computation is not a value anywhere.
+
+**The stack that falls out is one answer per layer, and it is coherent rather
+than assembled**: event sourcing where one event is one CAR pack (76) for the
+durable plane, Merkle-CRDT local-first (75) for convergence, merkle document UI
+(74) for the interface, extension by DefCID (74), IPLD selector query (72),
+abilities or program-as-value (70) for effects, biscuit attenuation (67) for
+authority. They are one system said seven ways: the application is a fold over a
+content-addressed log, every intermediate is a CID, the UI is the newest state's
+document, authority is a token that only narrows, and discovery is an indexer.
+
+**Discoverability is the axis that separates the field** (mean 5.1, widest
+spread at 3.8). Every in-process architecture scores 1 on it, and that single
+fact is what reorders the table relative to the first lens.
+
+Datomic-shape is the instructive near-miss: seven axes right, and fetch-locality
+2, because the query surface takes a materialised database so cost is
+O(database) rather than O(result). That number was measured, not reasoned about.
+The IPLD selector reaches 8 on the same axis by making the question name the
+subgraph.
+
+### What this does not say
+
+Nothing here is an adoption recommendation. The substrate lens deliberately does
+not ask whether an implementation exists, and on that question the first lens is
+still the one to read: ui-v1 is what ships, and it commits a 32-node flat tree
+against a base revision. A merkle document UI is what to build toward, not what
+can be imported this week. The gap between the two lenses for the same
+architecture is the size of the work, and saying so is the point of having both.
+
+The break tests were run the same way as for the first lens: an unknown level
+reports `merkle-document-ui unknown-level axis=replay`, a removed evidence URL
+reports `biscuit-attenuated-request missing-required-field`, and an empty
+dataset REFUSES with exit 2 rather than passing.
+
+## Amendment 2026-09-06 (2) -- the closest existing systems, and two investigations
+
+Asked which existing framework in Haskell, Unison, Lisp or elsewhere comes
+closest, seven were scored rather than described and are now rows in the
+substrate dataset: IPVM with UCAN and WNFS (75), Willow with Meadowcap (70), the
+AT Protocol repository (64), Automerge (63), Hypercore and Holepunch (63),
+Spritely Goblins (47), self-adjusting computation (26).
+
+The attenuation ladder gained a level while scoring them, and it corrected an
+existing row rather than only accommodating a new one. A hypercore read key and
+an Erlang pid are both unforgeable references that grant exactly what they grant
+and cannot be narrowed, which is neither an attenuable token nor a value whose
+level text promises narrowing is possible. `:unforgeable-bearer` at 7 says that,
+and actor-otp moved from 9 to 7 because a pid was never narrowable.
+
+Two answers are worth carrying. IPVM reaches the Execution IR from the other
+direction -- an invocation names its task, its effects and its authority, and
+the receipt is the CID of what happened -- and it is the closest existing system
+to the whole stack, at spec maturity and with no interface layer. AT Protocol is
+the only entry here running at scale, and it is instructive for the axis it
+drops: a repository is a Merkle Search Tree of DAG-CBOR records synced as CAR
+with an AppView folding the firehose, and authority is a DID plus an OAuth
+session, so nothing attenuates.
+
+### Investigation 1 -- the interface layer. The earlier claim was wrong.
+
+This ADR said the merkle document UI had no close existing implementation and
+that the interface was where the novelty lay. That was not measured, and it is
+false. It is largely built, in this workspace, and has been since 2026-07-27.
+
+`kotoba-lang/amu` carries nine W4 slices whose exit gate is, in the migration
+plan's own words, that one logical UI or document value can be inspected as
+data, rendered to an HTML stream, reconciled to browser DOM, hashed
+deterministically, and rejected when its resource bounds are exceeded. That
+sentence is the requirement list for a merkle document UI, written before this
+ADR asked for one.
+
+What is measurably there: thirty-six `document-*` operations callable from guest
+source, among them `document-sha256`, `document-canonical-bytes`,
+`document-equal?`, `document-assoc`, `document-merge` and `document-print` with
+`document-read` as its inverse. `reconcileUiDocument` is real, lives in
+`amu/runtime/browser-host.mjs` and is called from `dom-driver.mjs`. Slice 3 has
+`document-sha256` producing the same hex under the KIR interpreter, restricted
+ESM and real wasm on the browser host. Slice 6 has the pure guest HTML stream
+and the host DOM reconcile agreeing byte for byte on one shared document, still
+agreeing after a persistent `document-assoc` leaf update, with the digests
+differing. Slice 7 makes `document-print` emit the hex of
+`document-canonical-bytes` -- the same encoding the digest uses.
+
+So the gap is not the idea and not the primitives. It is the same shape as the
+fs and process capabilities: **the language has it and the kit does not.**
+`ui-v1` speaks a flat set of at most 32 nodes carrying parent keywords; the
+document plane speaks a tree with canonical bytes and a digest. Slice 4 says so
+in its own docstring -- it does not replace the flat `:ui/commit` capability
+kit, which W5 owns.
+
+One reading hazard found on the way: `document-sha256` is **not** in
+`guest-grammar.edn` under `:admitted-builtins`, and it is callable from guest
+source regardless. That list is not the authority for the document family.
+Do not conclude an operation is absent from its absence there.
+
+### Investigation 2 -- convergence. Also already here, and there are two answers.
+
+`kotoba-lang/crdt` exists: portable CLJC convergent-replica primitives for
+Kotoba document editors, pure data and pure functions, no network, no storage,
+no actor identity -- hosts own every effect and the package only knows how to
+merge. Its README states the gap it fills more precisely than this ADR could:
+`kotobase`'s `IStore` gives durable persistence and an append-only log, but
+`put`/`get` is last-writer-wins, so two editors racing on one key silently drop
+a write; `mst` gives a merkle-diff primitive for comparing state but not for
+merging it. Its single runtime dependency is `clock.kotoba`, which is to say the
+Lamport rules are themselves written in Kotoba and are what runs.
+
+Its neighbours are registered west projects too: `mst` (AT Protocol Merkle
+Search Tree primitives in CLJC), `prolly-tree` (a content-addressed
+probabilistic B-tree), `chain` (a parent-linked content-addressed commit chain
+whose `prev` is a real tag-42 IPLD link), and `inga` (the consensus plane,
+ADR-2608038000).
+
+That last pair is the finding. Convergence here has **two** answers and they are
+not the same choice: `crdt` merges without coordination, `inga` orders with a
+2f+1 quorum. Which one a given plane takes is a decision to make per plane, not
+a gap to fill -- and this ADR should not have implied there was one answer
+waiting to be built.
+
+### What this changes about the recommendation
+
+The stack the substrate lens derived is not a proposal. It is an inventory.
+`io-ipld`, `io-ipld-car`, `io-ipni-specs`, `mst`, `prolly-tree`, `chain`,
+`crdt`, `inga`, `xyz-ucan`, `org-biscuitsec` and `atprotocol` are all registered
+west projects and all CLJC, and the document plane in `amu` covers the
+interface. What is missing is not the parts. It is the assembly, and the one
+named piece of it is W5: the kit that would let the UI layer address the
+document plane it already has instead of a flat set of thirty-two nodes.")))

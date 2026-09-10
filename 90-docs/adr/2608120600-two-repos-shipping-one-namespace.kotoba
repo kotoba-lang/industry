@@ -1,0 +1,166 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608120600-two-repos-shipping-one-namespace")
+  (:adr/title "ADR-2608120600: 同じ namespace を 2 つの repo が出していて、classpath で勝った方が黙って採用される —— 27 件が同一 classpath に載りうる")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-12")
+  (:adr/last-verified "2026-08-12")
+  (:adr/last_verified "2026-08-12")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "namespace-collision-across-repos")
+  (:adr/tags "clojure, classpath, namespace, extraction, drift, detector")
+  (:adr/related (vector "adr-2608120200-what-the-kotoba-cores-actually-run"
+                "adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done"))
+  (:adr/supersedes "")
+  (:adr/superseded_by "")
+  (:adr/authoritative true)
+  (:adr/authoritative-for
+  (vector "同一 namespace を複数 repo が出している箇所（2026-08-12 実測）"
+   "そのうち同一 classpath に載りうるものの判定方法"
+   "検出器 scripts/verify-namespace-collisions.cljs の使い方と限界"))
+  (:adr/body
+  "# ADR-2608120600: classpath で勝った方が黙って採用される
+
+**Status**: accepted
+**Date**: 2026-08-12
+
+## Context
+
+`.kotoba` core の移行を追っていて、`network-awai/network-isekai` が player FSM の
+**ローカルコピー**を持っているのを見つけた。理由は docstring に書いてある:
+
+> `kami-engine-sdk` と抽出済みの `kotoba-lang/fsm` が**どちらも `kami/fsm.cljc` を
+> 互換性のない API で publish している**。SDK が classpath に勝つので、
+> `kotoba.fsm` facade は **ClojureScript で undefined var にコンパイルされる**。
+
+つまり facade が再 export している var が、勝った方の実装には存在しない。
+**JVM なら load 時に落ちるが、cljs では `undefined` になって静かに通る。**
+この回避策の代償が「同じ規則の 3 つ目のコピー」で、**原因を報告するものは何も無かった。**
+
+## 実測（2026-08-12、checkout 済み 3,523 repo / 13,918 namespace path）
+
+| | 件数 |
+|---|---|
+| 複数 repo が出している namespace | 455 |
+| うち**内容が異なる**（divergent） | 224 |
+| うち**同一 classpath に載りうる**（co-classpath） | **27** |
+
+**内容差だけでは信号にならない。** 大半は scaffold —— actor repo はテンプレート生成なので
+`association/facts.cljc` は数十 repo に存在し、かつ**中身が違うのが正しい**（別の団体だから）。
+判別軸は「両者が 1 つの classpath に載りうるか」で、これは
+「一方が他方に依存する / 第三の repo が両方に依存する」を deps.edn から推移閉包で見る。
+
+### 27 件の内訳（4 群）
+
+| 群 | 内容 |
+|---|---|
+| **`cloud-murakumo` が 2 org に**（19 + 15 file） | `gftdcojp/cloud-murakumo` と `network-awai/cloud-murakumo` が同じ namespace を別内容で持つ |
+| **`compiler` と `amu`**（4 file） | 改名途中で両方が `kotoba.compiler.*` を出す。差があるのは 4 file だけで、amu が先行している |
+| **`kami-engine-sdk` と抽出済みライブラリ**（3 file） | `kami/fsm.cljc`←`kotoba-lang/fsm`、`kami/gpu.cljc`←`gpu`、`kami/input.cljc`←`host`。**抽出が途中で止まっている** |
+| **`pay` / `treasury`** | `pay/*.cljc` を **4 repo**、`treasury/core.cljc` を **5 repo** が出す（ライブラリ + 消費側に取り込まれたコピー） |
+
+`kami/scene.cljc`（`kami-contracts` と SDK）は **byte 単位で同一**なので divergent には
+入らない —— ただし衝突であることに変わりはなく、片方が動いた瞬間に上の群へ移る。
+
+## 訂正（2026-08-12 同日）: 27 のうち 19 は衝突ではなかった
+
+**「co-classpath 27 件」は水増しだった。** そのうち 19 件は *2 つの repo* ではなく
+**1 つの repo が 2 つの path に checkout されている**もので、衝突ではなく
+**二重登録**である:
+
+- `kotoba-lang/compiler` と `kotoba-lang/amu` は同じ GitHub repo（id 1297097065）
+- `gftdcojp/cloud-murakumo` と `network-awai/cloud-murakumo` も同じ repo（id 1285031835）
+
+改名しても GitHub がリダイレクトするので旧名は動き続け、**旧 entry を残したまま
+新 entry を足す**と 1 つの upstream に 2 つの path・2 つの pin が付く。
+共有している namespace は全部「衝突」に見えるが、実体は**同じ project の 2 つの commit**。
+
+**実際の衝突は 8 件**: `kami/fsm.cljc` `kami/gpu.cljc` `kami/input.cljc`（→ADR-2608120800）、
+`kotoba/lang/package_registry.cljc`、`pay/core.cljc` `pay/facilitator.cljc`
+`pay/x402.cljc`、`treasury/core.cljc`。
+
+検出器は root commit を見て両者を分けるようになった（同じ upstream の checkout は
+root commit を共有する）。fork も root を共有するので、これは**別バケツに落とすだけ**で
+捨てはしない。二重登録そのものは `scripts/verify-duplicate-registrations.cljs` が扱う ——
+実測 **35 repo が 75 path に登録**されており、全件が GitHub id 一致で確認済み（fork はゼロ）。
+
+## 8 件の内訳（2026-08-12 に全件を追った）
+
+| namespace | 状況 |
+|---|---|
+| `kami/fsm.cljc` `kami/gpu.cljc` `kami/input.cljc` | **別設計が 2 つ**。ADR-2608120800。削除では解けない |
+| `pay/core` `pay/facilitator` `pay/x402` `treasury/core` | **vendoring**（衝突ではない）。ADR-2608121000。課金経路で drift |
+| **`kotoba/lang/package_registry.cljc`** | 下記。**8 件中いちばん鋭い** |
+
+### `package_registry` —— 依存関係が確定しているので、必ず同居する
+
+`kotoba-lang/kotoba-lang` と `kotoba-lang/kotoba-core-contracts` の両方が
+`kotoba.lang.package-registry` を出しており、**前者が後者に依存している**。
+kami の 3 件は「同居しうる」だったが、これは**同居が確定**している。
+
+同じ設計の **2 通りの書き方**である（共有 10 関数: `resolve-record` `validate`
+`lookup` `normalize` `record-problems` `lock-from-requests` `record->lock-dep`
+`registry-key` `registry-version` `version-only-request?`）。
+`kotoba-lang` 側が 126 行の圧縮版（docstring 無し、`required` / `check-case`）、
+core-contracts 側が 251 行（docstring 付き、`record-required` / `record-optional`）。
+**戻り値も同一ではない** —— `record-problems` の非 map ケースは
+前者が `{:problem :registry/record-not-a-map}`、後者が `:value` 付き。
+
+**対象が何かが問題である。** これはパッケージ受理の kernel ——
+「name@version を実行可能入力にしない」「CID pin された lock を必ず出す」を担う。
+消費者は `kotoba/package_admission.clj`、`security/package_admission.clj`、
+`package-registry-ipfs`、core-contracts 自身の network 層。
+**classpath で勝った方が「何をロードしてよいか」の意味を決める。**
+
+ここでも決めない（どちらが正本かは owner 判断）。記録する目的は、
+**依存が確定しているのに 2 実装が載っている**という事実を、次に触る人が
+探し直さずに済むようにすること。
+
+## Decision
+
+### 1. 検出器を置く。一括修正はしない
+
+`scripts/verify-namespace-collisions.cljs`（nbb、superproject root から実行）。
+`--check` は co-classpath な divergent が 1 件でもあれば exit 1。
+
+**27 件をまとめて直さない。** それぞれ意味が違う ——
+org 間の重複はどちらが正かの判断、改名途中は完了させる作業、抽出途中は削除する作業、
+vendoring は依存に置き換える作業。**まとめて 1 つの PR にできる類ではない。**
+まず見えるようにする。
+
+### 2. 除外リストを持たない
+
+scaffold 族を名前で除外する実装にしない —— 族が増えるたびに編集が要り、
+**その編集こそ忘れられる**。代わりに①内容が同じか②同一 classpath に載りうるか、
+という repo の構造から導ける 2 軸で分ける。
+**drift し始めた scaffold 族は、何もしなくても勝手に現れる。**
+
+### 3. 「clean」の意味を出力に書く
+
+checkout 済み repo しか見ない。west は 4,166 project を管理していて手元にあるのは 3,523。
+**clean は「ここにある範囲で衝突が無い」であって「存在しない」ではない**ので、
+スクリプトは走査した repo 数を必ず出す。
+
+## Consequences
+
+- **fleet gate には今日は載せない。** 27 件が既知で残っているので、今 `--check` を
+  必須にすると常に赤い gate になる。gate 化は群ごとに片付いてからで、
+  それまでは手で走らせる検出器として置く。
+- **`kotoba.fsm` facade は現状 cljs で壊れている**（network-isekai の申告どおり）。
+  修正は「どちらの `kami.fsm` が正か」を決める破壊的変更なので、ここでは決めない。
+  記録した目的は、次に踏んだ人が**原因を探し直さなくて済む**こと。
+- 依存辺は deps.edn から**テキストで**読む（`:git/url` の github path と `:local/root`）。
+  取りこぼすと co-classpath 判定が**静かになる方向**にずれる ——
+  報告を増やす方向には壊れないので、この向きを選んだ。
+
+## Evidence
+
+- `nbb scripts/verify-namespace-collisions.cljs` 実行: 3,523 repo / 13,918 path /
+  455 collision / 224 divergent / 27 co-classpath
+- `--check` の挙動確認: fleet で exit 1、衝突の無いツリーで exit 0
+- `kami/gpu.cljc` は `gpu`(11 defs) と SDK(3 defs) で**共有名ゼロ**、
+  `kami/input.cljc` は `host`(15 defs) と SDK(5 defs) で**共有名ゼロ**、
+  `kami/fsm.cljc` は共有が `advance` のみ
+")))

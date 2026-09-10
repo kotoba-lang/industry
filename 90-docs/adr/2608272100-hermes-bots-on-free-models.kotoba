@@ -1,0 +1,239 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608272100-hermes-bots-on-free-models")
+  (:adr/title "hyakka の Hermes bot を無料モデルで動かす — モデルは名指しせず毎回測る、艦隊は床ではなく最後の控え")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/tags (vector "hermes" "openrouter" "hyakka" "bots" "murakumo" "free-models"))
+  (:adr/related (vector "adr-2608271450-hermes-hyakka-growth-bots"
+                "adr-2608251016-hermes-murakumo-public-api"
+                "adr-2607173100"
+                "adr-2608136000"
+                "adr-2608271900"))
+  (:adr/body "## Context
+
+オーナー指示（2026-08-27）「hermes bots で free モデルを使って bots を動かすようにして」。
+
+直前の会話は OpenRouter の stealth モデル `ox-alpha` についてで、あれは 8/20 に
+無料で現れ、3 日で 11.6 兆トークンを処理して OpenRouter の記録を塗り替え、8/24 に
+無料枠を閉じた。正体は Z.ai の GLM-5.3-Flash だった。**登場から消滅まで 4 日。**
+
+bot は ADR-2608271450 で `murakumo-main`（自社艦隊の公開 alias）に載ったばかりで、
+金銭的には既に無料である。したがってこの指示は『無料にしろ』ではなく『外部の無料枠を
+使え』と読んだ。実際 OpenRouter の無料枠には、このワークスペースが自前では買えない
+モデルが載っている（測定時、550B と 1M context が複数、いずれも 0 円）。
+
+## Decision
+
+### 1. モデル id をどこにも書かない
+
+無料モデル id は、この workspace が今まで扱ったどの pin よりも速く動く。
+ADR-2608271450 が記録した `qwen3.6-35b-a3b` の事故——艦隊が配信をやめた後も設定に
+残り、抽出が数週間 401 を返し続け、それでも tick は 0 で終わり続けた——を、
+もう一段速い階層で再演することになる。
+
+そこで `scripts/hermes-hyakka-bots/resolve_free_model.cljs` が、
+`free-model-policy.edn` の**床**（context 下限・tool 対応）だけを持ち、
+いま無料のモデルを OpenRouter に問い、生き残りを**測る**。
+
+### 2. 順位付けではなく probe
+
+能力の代理指標は全部嘘をつく。2026-08-27 に無料枠を context 降順に並べると、
+**2.6B が 550B の上に来た**。並べ方の問題ではなく、context が能力ではないという話。
+
+probe は hyakka bot が実際にやる 3 つを訊く:
+
+1. 正確な引数を持つ tool call を出す（Hermes は全ての行動を tool で駆動する）
+2. 出力厳密指定の指示に従う（prompt は「stop」「land nothing」と言う）
+3. 読める EDN を書く（gate が読む提案ファイルは EDN）
+
+1 に落ちたら 2 と 3 は使わない。3/3 が primary、残りの 3/3 は fallback 段に入る。
+
+### 3. 『混んでいる』は『できない』ではない
+
+無料枠は午後になると大半が 429 を返す（ある run で 15 中 9）。rate limit・403・5xx・
+そして **HTTP 200 の body に埋め込まれた upstream error** は unavailable として
+記録し、点数を付けない。答えたモデルだけが数字を持つ。
+
+**この区別を書いている最中に 3 回間違えた。** 429 を 0/3 と記録し、200 の中の
+overload を 0/3 と記録し、3 つ目の task で来た 429 を 2/3 と記録した。3 回とも
+receipt は『無料枠を測ったが力不足だった』と読める形で残った——実際に起きていたのは
+『無料枠が混んでいた』である。ADR-2608136000 の形そのもの。
+
+`resolve_free_model_test.cljs` が 17 例でこれを留める。**本物の namespace を
+require する** —— 最初の版は分類器をコピーしており、分類器を壊しても緑のままだった。
+規則を 1 つずつ消して、5 つとも個別に赤くなることを確認した。
+
+### 4. 艦隊は床ではなく最後の控え
+
+policy は当初 murakumo を『always free, always ours, currently serving』と書いた。
+**3 語目が測定当日に偽だった。** 18:50 に 200 を返した公開 chat API が 19:05 には
+Authorization ヘッダの有無に関わらず 400 `Unauthorized` を返し、その間ずっと
+`/infer/models/murakumo-main` は `status: serving` `verdict: fresh` と答え、
+`/ready` は 503 を返していた（ADR-2608271900）。19:20 には戻っていた。
+
+したがって resolver は install 時に**床を踏んでみて** receipt に書く。踏んでいない床は
+床ではなく主張である。そして 3/3 を取った他の無料モデルを艦隊の**前**に並べる——
+同じ pool への 2 本目のレーンではなく、別プロバイダの控えになる。
+
+### 5. 混んでいたことで過去の合格を失わない
+
+429 の多さのせいで、同じ日の 3 回の full run が 3 つの別モデルを primary に選んだ。
+そこで (a) 直近 receipt の 3/3 判定を policy の窓（7 日）だけ引き継ぎ、(b) 現職が
+今回も 3/3 なら現職を維持する。測っていないものを測ったことにはせず、churn だけ止める。
+
+## What landed
+
+| | |
+|---|---|
+| resolver | `scripts/hermes-hyakka-bots/resolve_free_model.cljs`（nbb） |
+| policy | `free-model-policy.edn` — 床・probe 数・受け皿・鍵の所在・aux |
+| test | `resolve_free_model_test.cljs` — 17 例、実 namespace を require |
+| refresh | `refresh_free_model.py` + cron `hyakka-model-refresh`（`40 8 * * *`、`--no-agent`） |
+| 主モデル | 無料の 3/3 モデル（install 時点 `cohere/north-mini-code:free`） |
+| 控え | 無料の 3/3 モデル、その後に `murakumo-main` |
+| 鍵 | login Keychain `gftd.openrouter` → `secrets.command` |
+
+`--if-stale` が日次の形。鍵の要らない 1 リクエストで済み、installed model が
+無料一覧から落ちたか receipt が 7 日を過ぎたときだけ probe する。
+
+## 実測で分かった罠
+
+**`providers.<n>.key_cmd` は使えない。** 鍵を平文にしない一番素直な口だが、
+hermes v0.20.5 では**主ターンだけが通り、補助タスクが全部死ぬ**——
+`'CommandTokenSource' object has no attribute 'strip'`。補助はセッション表題だけ
+ではなく**コンテキスト圧縮**を含み、この bot は 35 分走る。`secrets.command`
+（KEY=VALUE を 1 度だけ返すヘルパ）に替えて解消した。ログ上、この文字列は
+key_cmd 期の 1 行だけに出て、以後 0。
+
+**OpenRouter の鍵を渡すだけで課金レーンが開く。** Hermes の補助フォールバック既定は
+`google/gemini-3.6-flash` で、これは**有料**。鍵が env に入った瞬間、背景トラフィックが
+そこへ行きうる。この account は上限未設定（`limit: null`、usage $474）。
+`auxiliary.free_only: true` を resolver が書く。
+
+**補助タスクを艦隊に pin してはいけない。** 一度そうしたら、艦隊が落ちている間
+全セッションが `Auxiliary title generation failed: HTTP 400 Unauthorized` を出した。
+pin は指す先より可用ではありえない。pin を外すと主 provider に乗り、429 時は
+主チェーンを歩いて回復した。
+
+**nbb では `js/__filename` が nil で、`process.argv[1]` は nbb 本体である。**
+両方の素直な読み方を順に踏んだ: 片方は policy パスを呼び出し元の cwd 依存にし
+（repo root から実行していたので**偶然**通った）、もう片方は run-as-script ガードを
+常に偽にして、**スクリプトが何もせずに exit 0 した**。`--classpath` があると
+`argv[2]` はスクリプトですらない。走査して `.cljs` を探す。
+
+**namespace を require しただけでプロセスが exit してはいけない。** policy 読み込みを
+top-level に置いたせいで、テストが対象を require した瞬間に refuse して落ちた。
+読み込み失敗は覚えておいて `-main` が投げる。
+
+**cron job の id を焼かない。** Hermes の id は job を作り直すと変わる。焼いた id は
+**何も更新せずに成功し続ける**。shim は名前で引き、名前が無ければ refuse する。
+
+**python の `.replace()` は不一致でも黙っている。** render-config への patch が
+1 度 no-op し、stdout は無料の控えを載せたと言い、生成された YAML には無かった。
+関数ごと書き直して直した。生成物は生成してから読む。
+
+## Verification
+
+| 何を | 結果 |
+|---|---|
+| 分類器テスト | 17 例 0 失敗。5 規則を 1 つずつ消して 5 回とも赤くなることを確認 |
+| refusal 経路 | 鍵なし=2 / 読めない policy=2 / `:fallback` 無し=2 / models API 不達=2 / 床が高すぎ=1 / config に未所有キー=2 |
+| `--if-stale` 4 分岐 | 現行維持=0 / 一覧落ち=probe / receipt 老化=probe / receipt 無し=probe |
+| フォールバック | primary を実在しない id にして `hermes chat -q` → `Model fallback: … unavailable; using murakumo-main` → 期待トークン |
+| 実 harness の tool 呼び | `hermes chat --yolo` が 2 tool calls を実行し sha `446606d` を返す。ground truth と一致 |
+| どのモデルが記録されたか | `state.db` の `session_model_usage` に `cohere/north-mini-code:free`。警告の不在ではなく行で確認 |
+| 補助タスク | `title_generation` 行が復帰。`CommandTokenSource` はログに 1 回のみ（key_cmd 期） |
+| refresh job | Hermes cron 経由で `completed`（run `5b94e332…`） |
+
+## 未了・注意
+
+- **無料枠のレート上限を account 事実として先に誤報告した。** 公開ドキュメントの
+  `50/day` を引いたが、`GET /v1/key` は `is_free_tier: false` / usage $474 を返す——
+  この account は 1000/day。**ドキュメントの既定値を、その account の測定値として
+  引用しない。**
+- 主モデルは週次 full probe のたびに動きうる。現職優先で churn は抑えたが、
+  『先週と同じモデル』は保証しない。
+- `auxiliary.free_only` が有料レーンを実際に拒むところは**見ていない**。設定した
+  だけで、拒否の実演はしていない。
+- 艦隊の 400 は ADR-2608271900 の未解決項目のまま。ここでは床を測って記録する
+  ようにしただけで、直してはいない。
+- bot 本体（35 分、23 calls、PR を開く）は無料モデルでまだ一度も完走していない。
+  次の 9:20 の fire が最初の実測になる。
+
+## Closing（2026-08-28）
+
+### 両方の bot が無料モデルで完走した
+
+| run | 結果 |
+|---|---|
+| `hyakka-source-scout` `e2100381` | **completed** 3分15秒・27 calls（murakumo 時代の同種 run は 35 分） |
+| `hyakka-ontology-scout` `a51ffc32` | **completed** 1 call・`source=builtin`（**scheduler が自分で発火**） |
+
+どちらも `session_model_usage` の行で確認した。警告の不在では判定していない。
+ontology 側は signal が空だったので何も提案せず worktree は clean —— 設計どおりの正解。
+
+source-scout は妥当な提案（ENA taxonomy / PubChem）を作りながら **PR を開けなかった**。
+prompt は「step 6 で gate、step 7 で config 編集」だが、bot は先に config を編集し、
+gate は live config を読むので自分の編集が `already configured` として返ってきた。
+綺麗な config に対して同じ提案は exit 0 で通る。app-hyakka PR #4 として着地させた
+（PubChem が CC-BY-NC 4.0 で、gate は fetch 可否と source-class しか見ずライセンスの
+意味は見ないため、merge せず人の判断に残した）。汚れた worktree を残すと
+`hyakka_evidence.py` の `git checkout --detach` が失敗して**次の run が REFUSED になる**。
+
+### refresh の horizon が 2 つの名前しか無かった
+
+翌日、cron table は 3 → 5 に増えていた。別セッションが同じ pattern で
+`itonami-ingest-scout` / `itonami-coverage-scout` を作っており、**どちらも
+`murakumo-main` のまま**だった。片方は一晩で **57 分・入力 186 万トークン**を艦隊で
+使った —— 艦隊が既定でなくなった翌晩に。
+
+名前のリストは 6 体目が現れても落ちない。黙って置き去りにし、**何もすることが無かった
+run と同じ顔をする**。既定を「agent 駆動の job すべて」に変え、意図的な pin は
+`HYAKKA_MODEL_OPT_OUT` で表明する形にした。毎回 `COVERS` ブロックを印字する。
+
+### そして広げた refresh が、走って何も変えなかった
+
+08:40 の定期実行は `current` を報告して exit 0 で終わり、2 つの job は艦隊を指したまま
+だった。**「そのモデルはまだ無料か」と「bot が実際にそれを指しているか」は別の問い**で、
+`--if-stale` は前者しか訊いていなかった。job への書き込みは install 経路にしか無かった。
+突き合わせは 1 リクエストも probe も要らないので、current 経路でも行い job ごとに 1 行
+出すようにした。
+
+**同じ「測っていない一致を、測った一致として報告する」形が、この ADR の中で 3 回
+出ている**（429 の分類、refresh の horizon、current 経路の無動作）。
+
+### 現在地
+
+4 つの agent job すべてが `cohere/north-mini-code:free` @ `openrouter-free`。
+1 本を意図的に `murakumo-main` へ戻して refresh をかけ、引き戻すことを確認済み。
+
+### 未了
+
+- `cloud-itonami-app` の Bot は 1 体も存在しない。作成は Passkey 必須の 61 ルート
+  （ADR-0006）で、`agent_session.clj` 自身が「ブラウザ以外に取得経路は無い」と書いて
+  いる。config・admission・実推論（`usage.cost 0`）は検証済みで、Bot が 1 体できた
+  瞬間から無料モデルで動く。
+- `auxiliary.free_only` が有料レーンを実際に拒むところは見ていない。設定しただけ。
+- ディレクトリ名は `scripts/hermes-hyakka-bots/` のままだが、もう hyakka 専用ではない。
+
+## Closing 2（2026-08-28）
+
+### refresh の horizon と cadence を直した
+
+翌日 cron table は 3 → 5 に増えており、別セッションが作った
+`itonami-ingest-scout` / `itonami-coverage-scout` が **`murakumo-main` のまま**だった。
+片方は一晩で 57 分・入力 186 万トークンを艦隊で使った。refresh を「agent 駆動の job
+すべて」に広げ（`HYAKKA_MODEL_OPT_OUT` で opt-out）、さらに `--if-stale` の current
+経路でも job を突き合わせるようにした —— 「そのモデルはまだ無料か」と「bot が実際に
+それを指しているか」は別の問いで、前者しか訊いていなかった。
+
+**cadence の提案は間違っていた。** 「hyakka 毎時 / itonami 6 時間」は
+`TERMINAL_CWD` write ロック（プロセスに 1 本、待ち上限 660 秒）を測らずに書いたもので、
+57 分保持する itonami の裏で毎時 hyakka が TimeoutError で死ぬ。衝突しない slot に
+組み直した: source 8/日・ontology 4/日・itonami 各 2/日、writer 衝突 0、
+無料枠 340 calls/day、ロック占有 18%。詳細は ADR-2608280200。
+
+### 現在地
+
+4 agent job すべてが無料モデル（`cohere/north-mini-code:free` @ `openrouter-free`）。
+1 本を意図的に `murakumo-main` へ戻して refresh をかけ、引き戻すことを確認済み。")))

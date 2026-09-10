@@ -1,0 +1,208 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608036700-enterprise-gap-execution-measurement-restored-dr-blocked")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "enterprise gap の実行 — 可用性計測は復旧、DR drill は「B2 は 1 アカウント 1 リージョン」で止まった")
+  (:adr/topic "kotobase-enterprise-gap-execution")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "kotobase.net の可用性計測が今どこで回っているか、その主張の限界"
+   "b2-dr-drill が実行できない理由（engineering ではなく調達）"
+   "並行書き込みの競合を顧客面に開示した事実"))
+
+  (:adr/related
+  (vector "adr-2607250100-kotobase-maturity-bar-vs-production-databases"
+   "adr-2608036600-network-awai-actions-dead-move-net-kotobase-ci-to-murakumo"
+   "adr-2607300900-github-actions-is-not-executing-move-ci-to-murakumo-fleet"))
+
+  (:adr/verify
+  (vector "launchctl list | grep com.gftd.kotobase-slo-tick   ; => 登録済み"
+   "tail -1 ~/.gftd/kotobase-slo.ndjson                ; => verdict pass の receipt"
+   "gh api repos/network-awai/net-kotobase/actions/secrets --jq .total_count   ; => 0"
+   "gh api repos/network-awai/net-kotobase/environments/production/secrets --jq .total_count ; => 0"))
+
+  (:adr/body
+  "# Context
+
+ADR-2607250100 の優先順（①計測復旧 ②性能 gate ③storage DR ④表面の実装/明記
+⑤性能そのもの）に対して、実行できるところまでやった記録。
+
+# 1. 可用性計測は復旧した（限界つき）
+
+**問題**: 2026-08-03T01:12Z 以降、network-awai org の Actions が job を 1 本も
+起動せず、`slo-gate`（日次）と 5 分毎の `public-smoke` / `protocols-public-smoke`
+が同時に死んだ。**可用性を連続計測しているものがゼロ**になっていた。
+
+**murakumo fleet には載せられない**: ノードは tailnet だけに繋がっていて
+kotobase.net への egress を持たない（ADR-2608036600 で測定済み）。egress を
+持つのは operator ホストだけなので、そこで回す。
+
+着地: `kotobase-cf-wasm/slo/operator_tick.cljs` +
+`com.gftd.kotobase-slo-tick.plist`（5 分間隔、LaunchAgent 登録済み・稼働確認済み）。
+
+- tree は**毎回 GitHub から取り直す**。手元の共有 checkout は実際に 340 commit
+  遅れていた。
+- tip が変わったときだけ `npm ci`。**これを飛ばすと resilience probe だけが
+  『@noble/curves が無い』で落ち、本番が壊れているように見える** —— 実際に踏んだ。
+- 毎 tick: `slo/probe.cljs`（無認証・約 2 秒）。6 時間ごと:
+  `slo/resilience_probe.cljs`（240 req 持続負荷 + 25-way 書込競合、約 22 秒）。
+- verdict は receipt 本文の `:verdict` で決め、exit code だけを信用しない。
+- 実測: apex p95 118ms / backend p95 155ms / edge-only p95 25ms /
+  unauth-write-rejected / testnet read、resilience も pass。
+
+**満たさないもの（receipt の `:limits` に毎回書き出している）**:
+paging をしない・**単一ホスト依存**（この Mac が寝ていれば計測も止まる）・
+独立した status surface ではない。**したがって『連続計測している』と主張して
+よい範囲は、receipt が実際に並んでいる区間だけ。** ゼロよりはるかに良いが
+qualified ではない。恒久解は Cloudflare cron 等のホスト非依存な probe と、
+Kotobase/Cloudflare の外にある status 面。
+
+# 2. b2-dr-drill は engineering では通せない
+
+**結論: 止まっているのは実装ではなく調達。**
+
+- `dr:check`（hermetic self-test）は **PASS**。harness は健全で、prefix は
+  `dr-drill` セグメントを必須にしており本番データに触れない設計。
+- `b2-dr-drill.yml` は **primary / secondary の 10 個の GitHub secret** を要求する。
+  実測: repo secrets **0 件**、production environment secrets **0 件**。
+  つまり入力が一度も存在しなかった —— run 0 件はこれで説明がつく。
+- drill は `primary.region !== secondary.region` かつ両方が
+  `s3.<region>.backblazeb2.com` であることを **fail-closed で要求**する。
+- **Backblaze はアカウントに 1 リージョンしか割り当てられない**（ベンダー公式:
+  『複数リージョンに置きたいならリージョンごとに別アカウントが必要』）。
+  この workspace の B2 は全て `us-west-004`（`manifest/repos.edn` と
+  worker の設定の両方で確認）。
+
+したがって二地域 drill を通すには **2 つ目の Backblaze アカウント**（別リージョン）
+が要る。サインアップと支払い手段の登録は安全床②により agent の作業ではない。
+
+**やってはいけない回避策**（明記して封じる）: 同一リージョンの 2 バケットで
+drill の自己ガードを迂回して「PASS」を作ること。それは recovery を qualified に
+せず、ADR-2607250100 が排除しようとしている劇場そのもの。
+secondary を別プロバイダ（R2 等）に広げるのは**設計判断**であって、
+evidence contract（両者が B2 の別リージョンであること）を書き換える必要がある。
+
+# 3. 並行書き込みの競合を顧客面に開示した
+
+`docs/API-CONTRACT.md` は同一グラフへの並行書き込みの挙動を**一言も書いていなかった**。
+実測値（25-way で 22 ok / 3×409、50-way で 28/50 conflict）は drill と ADR には
+あったが、顧客が読む面には無かった。`## Concurrent Writes to One Graph` を追加:
+
+- B2 に conditional put が無いので CAS は write-then-read-back で閉じており、
+  その窓は実在する
+- 落ちた書き込みは**破損ではなく拒否**（block は content-addressed）
+- 高競合下では受理された一部が head から到達不能になりうるが CID では引ける
+- クライアントは 409 を想定して backoff せよ、last-writer-wins を仮定するな
+- graph を割れば書き込みは捌けるが、**Datalog join が届かなくなる代償**がある
+- single-writer-per-graph はこれに当たらない
+
+# 4. 残り（agent 側では閉じられないもの）
+
+| 項目 | 何が要るか |
+|---|---|
+| 独立ペンテスト | assessor の選定と契約。scope / RFP / 鍵ピン留め / retest 契約は**準備済み** |
+| CI-only deploy | Cloudflare 資格情報を CI に置く。ただし **Actions がそもそも動いていない**ので、先に課金かフリート deploy 経路の決着が要る |
+| branch protection / required checks | この GitHub プランでは API 上存在しない（403）。プラン変更 |
+| 24x7 rota・独立 status 面 | 人と外部ホスティング |
+| 性能 gate（LDBC を CI に） | データセットの置き場所。ノードは egress が無いので operator 側 tick（本 ADR の slo tick と同型）が現実的な次の一手 |
+
+# closing — 2026-08-03 セッションの着地点と再開点
+
+## 着地したもの（すべて default branch 上を確認済み）
+
+**com-junkawasaki/root**
+
+| commit | 内容 |
+|---|---|
+| `2ada8333` | net-kotobase の CI を murakumo fleet に載せる gate + ADR-2608036600 |
+| `3255479` | fleet-ci の verdict out-file を `:id` で割る（false pass の修正） |
+| `b60fe1b` | ADR-2607250100 を 8 軸とも 2026-08-03 の実測に同期 |
+| `69faa8de` | 本 ADR |
+| `07028434` / `4c456ba9` / `57558e91` | west pin 3 本を remote HEAD へ（single-entry API commit） |
+
+**network-awai/net-kotobase**
+
+| commit | 内容 |
+|---|---|
+| `496f707` | dependabot の Actions 版数 5 本 + `expected_uses` allowlist |
+| `41e7687` | ipld-crypto group（major）+ それが必要とする noble v2 import 移行 |
+| PR #272-277 | shadow-cljs 3.4.11（6 workspace）—— 全て実ビルド/テスト後に merge |
+| PR #238 / #294 | hono patch / ipld-cacao-auth（cborg major を含む） |
+| `4f81578` | operator ホストでの可用性計測 tick + LaunchAgent |
+| `1037e7a` | 並行書き込みの競合を `docs/API-CONTRACT.md` に開示 |
+
+PR #257 / #269（DO-NOT-MERGE）は **merge せず close**。branch は残し、patch を
+`orgs/network-awai/net-kotobase/.git/stash-archive-2026-08-03/` に退避済み。
+
+## 検証したこと（数と、やらなかったこと）
+
+- fleet gate 単体（judah/asher/levi）+ **感度測定 2 通り**（matrix から required
+  surface を抜く / ns form 直後に壊れた form を入れる）—— どちらも赤になることを確認。
+- shadow-cljs 6 workspace: clj-edge 304 tests/1513 assertions・cf-wasm
+  137/312 + advanced release build・protocols-worker 44/163・authn/mail-worker
+  build・migrations は **main の control も同一の 45 failures**（bump 由来ではない）。
+- ipld-crypto: cf-wasm 137/312 + release build（542,900 bytes）、clj-edge 304/1513、
+  protocols-worker 44/163、mail-worker build。
+- ipld-cacao-auth: worker unit tests 全通過（DAG-CBOR IPLD block の直列化を含む）+
+  `wrangler --dry-run` ビルド。
+- SLO: apex p95 118ms / backend p95 155ms / edge-only p95 25ms / unauth-write 拒否 /
+  testnet read、resilience（240 req 持続負荷・敵対入力・25-way 書込競合）とも pass。
+- **やっていない検証**: Actions 版数 5 本が「動くこと」。この org では Actions が
+  起動しないので実行して確かめる手段が無い。確認したのは workflow と allowlist の
+  一致だけ。
+
+## 稼働している常駐（このマシン）
+
+| LaunchAgent | 間隔 | 状態 |
+|---|---|---|
+| `com.gftd.fleet-ci-tip-tick` | 300s | 稼働中。net-kotobase を含む 19 repo + PR head を検証し、green で west pin を前進 |
+| `com.gftd.kotobase-slo-tick` | 300s | 稼働中。receipt は `~/.gftd/kotobase-slo.ndjson` |
+
+**CD が実際に回った証拠**: net-kotobase の pin は最後の merge 後に fleet-ci が
+自動で `1037e7a1`（= remote HEAD）まで前進させた。
+
+## 保全した他者の WIP（触っていない）
+
+- `orgs/kotoba-lang/prolly-tree` — 未コミット 2 件、local head は pin より 14 遅れ。
+  west が skip した（正しい挙動）。**触っていない。**
+- `orgs/network-awai/net-kotobase` — branch `codex/absorb-cljc-worker-migration-260718`
+  の 07-18 commit 上に修正 47 / 削除 1 / 未追跡 30。**リセットしていない。**
+  working diff（2.1MB）と未追跡リストを `.git/stash-archive-2026-08-03/` に退避済み。
+  実測: 48 modified のうち 17 は PR #269 が捕まえていた分、**31 はどの PR にも
+  入っていない**。処分にはオーナーの判断が要る。
+- superproject の未追跡（`.agents/` `docs/` `orgs/cloud-itonami/` 等）は
+  セッション開始時から存在。**触っていない。**
+
+## 再開点（次の人が最初に打つコマンド）
+
+```bash
+# 1. 計測が生きているか
+tail -3 ~/.gftd/kotobase-slo.ndjson
+launchctl print gui/$(id -u)/com.gftd.kotobase-slo-tick | grep -E 'runs|last exit'
+
+# 2. fleet CI が回っているか
+tail -20 ~/.gftd/fleet-ci-tick.log
+nbb scripts/fleet-ci/tick.cljs --plan
+
+# 3. 次の一手（性能 gate）: LDBC を operator 側 tick にする
+#    雛形は kotobase-cf-wasm/slo/operator_tick.cljs（同じ形）
+#    bench 本体: orgs/kotoba-lang/kotobase-peer の kotobase-peer.ldbc-snb-bench
+```
+
+**優先順**（ADR-2607250100 Decision 2 と同じ）: ①計測の恒久化（ホスト非依存へ）
+②性能 gate ③storage DR（**別リージョンの B2 アカウント 1 つ**でブロック解除）
+④表面の実装/明記 ⑤性能そのもの。
+
+# Consequences
+
+- 「可用性を測っている」と言えるようになったが、**その主張の有効範囲を receipt
+  自身が申告する**形にした（読み手が過大評価できない）。
+- DR の未達は『やっていない』ではなく『アカウントが 1 つしかない』という
+  一行の事実に還元された。オーナーの作業は「別リージョンで B2 アカウントを
+  1 つ作り、バケットとスコープ鍵を用意する」だけになる。
+- 顧客が並行書き込みで 409 を見たときに、契約文書がその挙動を説明する。")))

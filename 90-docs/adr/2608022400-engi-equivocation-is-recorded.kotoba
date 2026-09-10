@@ -1,0 +1,86 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608022400-engi-equivocation-is-recorded")
+  (:adr/title "adr-2608022400: 自分自身を証明する唯一の罪 — equivocation を記録し、harness に validator set の内側の Byzantine を置く")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-equivocation-is-recorded")
+  (:adr/authoritative-for
+  (vector "engi の equivocation 検出と証拠の保持"
+   "harness の Byzantine validator"))
+  (:adr/related
+  (vector "adr-2608022300-engi-catch-up-goes-through-sync"
+   "adr-2607994000-engi-l1-permissionless-staking-equivocation-slashing"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi/commit/77f9e04102944e5bfd05ef61521c0afed14797c0"))
+  (:adr/body
+  "# ADR-2608022400: 自分自身を証明する唯一の罪
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+**1 つの witness が 1 つの height で異なる block に対して投じた、どちらも署名され、どちらも検証できる 2 票 —— 両方が正直であることはありえない。**
+
+**このプロトコルの他のどこにもこの性質は無い。** 遅い replica と検閲する replica は見分けがつかない。順番を飛ばした leader と crash した leader も見分けがつかない。**これだけが 2 通の message だけから、誰にでも、報告者を信用せずに判定できる** —— これが「slash に値する唯一のもの」である理由。
+
+`engi.stake` には `detect-equivocation` / `verify-equivocation-evidence` / `slash` があった。**どれも呼ばれていなかった。このリポジトリで 4 つ目の「丁寧に書かれ、到達されない namespace」。**
+
+## Decision
+
+### 1. 2 票目を拒否し、**証拠を保持する**
+
+拒否は面白い部分ではない —— **quorum が既に、Byzantine 少数派が 1 つの height で 2 つの block を certify するのを止めている**（`a-quorum-cannot-form-for-both-blocks` が「安全性は検出に依存しない」ことを assert する）。
+
+**保持が要点。** 無視されるだけの equivocator は**何も払わず、次の height でまた同じことを、永久に、無料でできる。**
+
+### 2. 1 票目は数え続ける
+
+**正直な半分を捨てると、equivocator が「後悔した投票を自己矛盾によって撤回できる」ことになる。**
+
+### 3. 証拠は再検証する（検出結果を信用しない）
+
+`engi.stake` が消費する形なので `slash` がそのまま受け取る。**votes の到着を見ていない第三者が検査できることが、そもそも slash に値する理由**だから。
+
+### 4. harness に **validator set の内側**の Byzantine を置く
+
+**w4 は本物の鍵を持ち、投票する height ごとに、誰も propose していない block に対して 2 票目に署名する。**
+
+これは forger（見知らぬ他人）とは**別の生き物**である —— **「見知らぬ他人は我々に嘘をつけない」と「validator は我々に嘘をつけない」の違い**であり、consensus プロトコルが本当に対象としているのは後者。
+
+## 実測
+
+```
+  byzantine validator    : w4 (equivocates at every height)
+    w1 holds proof against  [\"w4\"] — 220 verified
+    w2 holds proof against  [\"w4\"] — 220 verified
+    w3 holds proof against  [\"w4\"] — 220 verified
+  certificates for the block it invented: 0
+
+  common committed prefix: 109 blocks
+  all replicas agree     : true
+```
+
+## 検出器が「何にでも発火する」のは、発火しないのと同じくらい無用
+
+- **再送は equivocation ではない**（再試行する peer がやること）
+- **異なる height への投票は equivocation ではない**（さもなくば全正直 validator が block 2 で slash 対象）
+- **署名の無い矛盾は証拠ですらない** —— 署名の段階で先に拒否され、**誰も検査できない証拠は証拠ではない**
+
+## Consequences
+
+- (+) 4 つの経路（投票・view 変更・catch-up・equivocation）が塞がった。
+- (+) harness の敵が「外部の他人」と「内部の validator」の 2 種類になった。
+- (−) **証拠は保持されるが slash されない。** bond の供給元（Base L2 エスクロー）が未デプロイなので、slash する残高が存在しない —— torihiki の `:bridge-authority` が未設定なのと同じ形の穴。
+- (−) **証拠は伝播しない。** 各 replica は自分が見たものだけを持つ。gossip も、chain への記録も無い。
+- (−) equivocation 以外の Byzantine 挙動（提案の withhold、選択的 censoring）は検出されない —— **原理的に**、上記の理由で。
+- (−) commit された block は何も実行しない。
+
+195 tests / 1097 assertions。JVM/nbb parity 一致。
+")))

@@ -1,0 +1,196 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608301500-guest-syntax-restrictions-classified-by-shielding-mechanism")
+  (:adr/doc_type "adr")
+  (:adr/topic "guest-syntax-restrictions-classified-by-shielding-mechanism")
+  (:adr/title "記法制限は shielding axis で分類する — Unison 的 identity と biscuit 的 authority で防げる害に記法禁止を恒久としない")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-30")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Fable 5 (Claude Code)"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by "")
+  (:adr/related (vector "2608650000"
+                "adr-2607201300-kotoba-safe-application-language-profile"
+                "2607279200"
+                "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban"
+                "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"
+                "2608242100"))
+  (:adr/repos (vector "com-junkawasaki/root"
+              "kotoba-lang/kotoba-lang"
+              "kotoba-lang/amu"
+              "kotoba-lang/kotoba"))
+  (:adr/authoritative_for
+  (vector "guest 記法制限（forbidden-heads）を shielding axis で分類する規約と、その 5 軸の定義"
+   "definition CID（Unison 的 identity）と grant 交差 dispatch（biscuit 的 authority）で防げる害には記法禁止を恒久としないという決定"
+   ":authority 軸（atom/swap!/reset! 等）の :state ability desugar への widening path と、その前提条件"
+   ":explicit-errors の恒久内容の精密化 — 恒久なのは untracked control effect の禁止であり、typed abort/exception ability は widening 可能という決定（ADR-2608650000 の改訂）"
+   "ADR-safe-capability-language.md の削除済み .rs 証拠を歴史的記録として扱い、confinement matrix の層順 assert を UNVERIFIED と記録する決定"))
+  (:adr/body
+  "# 記法制限は shielding axis で分類する
+
+## Context
+
+オーナー指示（2026-08-30）: 今までの ADR はそこがちゃんと考慮されていなかったので、
+Unison 的性質、また biscuit で防げるものについては記法を制限しないようにしてほしい。
+再度分析・設計・整理して ADR と rule を更新、.rs などはもう無いので除去。
+
+それまでの状態には 3 つの欠陥があった。
+
+1. `lang/surface-status.edn` の 7 つの `:intentional-security-constraint` は
+   全部が同じ『security』という 1 つの袋に入っており、**どの機構が守るから
+   禁止なのか**を名指ししていなかった。読み手には eval の禁止と atom の禁止が
+   同じ強さに見える — 実際には前者は緩められず、後者は ability への desugar で
+   緩められる。
+2. うち 5 つが根拠として指す `docs/adr/ADR-safe-capability-language.md` の
+   実行可能な証拠（`tests/safe_confinement_matrix.rs` の層順 assert ほか
+   約 55 箇所の `.rs` 参照）は、kotoba#259 `604896171` の Rust workspace 撤去で
+   **削除済み**だった。文書は ✅ のまま、現行 tree に port は無い。
+   測れない検査が緑のまま残る形（ADR-2608136000 の class）。
+3. ADR-2608650000 は explicit-errors（throw/try/catch 禁止）を『恒久』と
+   分類したが、**なぜ恒久なのか**（何の機構でも代替できないのか）を
+   分析していなかった。Unison は Exception を typed ability として持つ —
+   非局所脱出そのものは、effect row に載れば安全に共存できる先例がある。
+
+## 分析 — landed 済みの 3 つの防御機構
+
+禁止を再分類する前提として、既に landed している機構を確認した。
+
+### 機構 1: Unison 的 code identity（CI1-CI7 実装済み、2026-08-03）
+
+`ADR-kotoba-code-identity-and-abilities.md`（kotoba-lang/kotoba-lang）。
+definition CID は正規化 typed KIR + profile version + 宣言 interface +
+依存 definition CID の hash であり、**effect row は CID の中身**
+（conformance の negative case `:negative-effect-row-mismatch` が
+`:definition/hash-mismatch` で拒否することを固定している）。
+elaboration pipeline は closed reader → bounded pure desugar →
+type/schema inference → interprocedural effect inference →
+implicit ability elaboration → typed KIR → definition CID。
+
+この機構が守るもの: **code の identity が behavior を記述すること**。
+守れないもの: 実行時の authority（それは機構 2）、資源（機構 3）。
+
+### 機構 2: biscuit 的 authority（capability-semantics v2）
+
+`lang/capability-semantics.edn`: `:biscuit-role :delegated-grant-only`、
+`:scope-attenuation-only true`、`:only-local-authorizer-may-allow true`、
+`:unknown-kind :deny` / `:missing-grant :deny` / `:expired-grant :deny`、
+effective scope = statically-possible ∩ requested ∩ delegated ∩
+local-policy ∩ runtime-available、`:attempt-always-receipted true`、
+call-time の kind/expiry 再検査（`resolve-use`、defense in depth）。
+
+この機構が守るもの: **guest が named typed operation として要求した effect の
+authority**。守れないもの: dispatch を通らない経路（interop）、コードの
+admission そのもの（eval）、CPU/スケジューリング。
+
+### 機構 3: resource bounds
+
+fuel（instance 生涯）、admission limits（`:bounded-admission`）、
+provider timeout。CID も grant も CPU を計量しない。
+
+## Decision
+
+### 1. メタ規則 — 禁止は shielding axis を名指しする
+
+guest 記法の禁止（`:forbidden-heads` の各 head）は、**どの機構でも代替
+できない不変条件**を名指ししなければ恒久を名乗れない。分類は 5 軸:
+
+| axis | 意味 | 恒久か |
+|---|---|---|
+| `:code-identity` | 機構 1 が要求する。CID が behavior を記述しなくなる | **恒久**（機構 1 の存在自体が根拠。biscuit は無力） |
+| `:dispatch-bypass` | 機構 2 の guard を通らない経路を作る | **恒久**（portable/trusted に VM 境界が無い限り） |
+| `:authority` | 害が ambient な authority であり、機構 2 が同じ害を named ability として防げる | **恒久ではない。widening path を持つ** |
+| `:control-effect-tracking` | 害が untracked な制御 effect であり、typed ability + checked unwind で track できる | **恒久ではない。widening path を持つ** |
+| `:resource-bounds` | 機構 1 でも 2 でも計量できない資源 | 恒久（計量 ability が設計されるまで） |
+
+正本は `kotoba-lang/kotoba-lang` `lang/surface-status.edn` の各 invariant の
+`:shielding-axis` / `:widening-path`（本 ADR と同日に landed、4d42a80d）。
+
+### 2. 各 head の分類（landed 済み）
+
+| head | axis | 判定 |
+|---|---|---|
+| eval load load-file require use ns-resolve resolve | :code-identity | **緩めない**。eval されたコードは effect-inferred されず CID にも入らない — 認めた瞬間 identity と behavior が切れる。Unison 的性質はこの禁止を弱める理由ではなく**強める理由** |
+| defmacro | :code-identity | **緩めない**。展開は compiler 内のコード実行（build-time）で、CID は desugar 後の KIR を hash するため、無制限 macro は早期実行と source identity の非可読の両方を生む。`defdesugar` が bounded な代替 |
+| . .. new import | :dispatch-bypass | **緩めない**。interop は guard-component-ability-call に**到達しない**ので grant 交差も receipt も revocation も見えない。biscuit が無力なのは biscuit の欠陥ではなく経路の外だから。wasm32 ABI では空虚に成立（経路が物理的に無い）、portable/trusted では subset gate が唯一の境界 |
+| atom swap! reset! volatile! ref dosync | :authority | **恒久ではない**。害は mutation ではなく ambient であること。`:state` capability kit が既に non-ambient な状態モデルとして reference-implemented。widening path: これらの head を state kit の typed operation へ desugar する（下記前提条件） |
+| set! binding var alter-var-root | :authority | ability model 未設計のため widening path 無し。禁止のまま（dynamic scope の ability 化は未決定） |
+| throw try catch | :control-effect-tracking | **恒久の中身を精密化**。恒久なのは untracked control effect の禁止。ambient 形は全 backend で拒否のまま、`[:result T E]` が現行の必須 surface。typed abort/exception ability（Unison の Exception と同型、effect row に現れ checked unwind を伴う）は将来 ADR 経由で widening 可 |
+| future pmap agent send send-off locking | :resource-bounds | 禁止のまま。CID も grant も CPU を計量しない。fuel は instance 生涯で、ambient thread はそれを逃れる。sub-budget 付き structured-spawn ability は設計可能だが未決定 |
+
+### 3. widening の前提条件（fail-closed sequencing）
+
+**本 ADR は grammar を 1 head も緩めない。** `:forbidden-heads` は不変。
+緩和が land するのは、各 widening path の前提条件が**全部**揃ったときだけ:
+
+- `:state-kit-desugar`（atom/swap!/reset!/volatile!/ref/dosync）:
+  ① 対象 backend での state kit qualification
+  ② capability handle を格納値として schema 拒否（affine provenance 追跡の保全）
+  ③ effect row に :state が現れること
+  ④ positive / negative 両方の conformance vectors
+- `:typed-abort-ability`（throw/try/catch）:
+  ① `:checked-lexical-facet-unwind`（dataspace の facet retraction を含む
+     checked unwind）
+  ② effect row への統合（推論が abort effect を伝播すること）
+  ③ positive / negative 両方の conformance vectors
+
+順序を fail-closed にする理由は実測済み: 2026-08-12、`reset!` と `swap!` は
+invariant に名指しされながら forbidden-heads に無く、『lowering が無い』という
+**偶然**によってのみ拒否されていた（grammar-authority の
+`:forbidden/security-surface-not-forbidden` がこの形を塞いだ経緯が
+`guest-grammar.edn` のコメントに記録されている）。前提条件の前に記法だけ
+緩めれば、同じ形を自分で作ることになる。
+
+### 4. 削除済み .rs 証拠の扱い（除去の実施形）
+
+`docs/adr/ADR-safe-capability-language.md`（kotoba-lang/kotoba-lang）を更新した:
+
+- Status 直下に日付付き注記『証拠の現在地（2026-08-30 追記）』を追加。
+  `crates/kotoba-clj` は kotoba#259 で撤去済み、本文中の全 `.rs` 証拠パスは
+  歴史的記録、**敵対的 confinement matrix の層順 assert
+  （subset→型→effect→capability）は現行 tree に port が無く UNVERIFIED**。
+- Implemented ヘッダ行と confinement matrix 行の ✅ を歴史的/UNVERIFIED に訂正。
+- 現行 enforcement を名指し: ① amu elaboration pipeline admission
+  （deny-by-default、`:minimal-policy` 推論）② `grammar_authority.clj` +
+  `check-grammar-authority.cljs`（forbidden ⊇ security surfaces を fail-closed
+  検査）③ `lang/capability-conformance/` fixtures ④ kotoba-lang/kotoba の
+  `cap_{affine,typed,table,passing}_test.clj`。
+
+行の全削除ではなく歴史的記録として残した（90-docs 規約『経緯の抹消が目的では
+ない』）。**未着地の負債として残るもの**: 層順 assert の現行 port（re-port する
+まで UNVERIFIED のまま）。
+
+### 5. ADR-2608650000 と CLAUDE.md の改訂
+
+- ADR-2608650000: 恒久 2 つのうち explicit-errors の中身を精密化
+  （untracked control effect の禁止が恒久、typed ability は widening 可）。
+  bool 恒久は変更なし。
+- CLAUDE.md『恒久として引き受けるのは 2 つだけ』節: 同じ精密化 + shielding
+  axis の導入を追記。
+
+## Consequences
+
+- **今日 compile が変わるものは無い。** 変わったのは分類と、その分類が
+  機械に載ったこと（`:shielding-axis` は surface-status に、
+  forbidden ⊇ security-surfaces は grammar-authority が検査し続ける）。
+- 移行作業者への効果: `.cljc` の atom/throw を見たとき、『Kotoba では永遠に
+  書けない形』ではなく『:state ability / [:result T E] に移す形（将来
+  desugar で書き戻せる可能性がある）』として扱える。判断が変わるのは
+  host に残すか guest に移すかの分類で、:authority 軸の状態は
+  **guest の product semantics なら guest に移す**（ADR-2608261100 の
+  切り方と一致）。
+- eval / interop / defmacro を望む設計は、記法の解禁を待つのではなく
+  設計を変える（宣言データ、defdesugar、named operation）。この 3 つは
+  機構が成熟しても解禁されない。
+- 層順 assert の re-port が行われるまで、『全防御層を貫く実行可能
+  threat model がある』とは主張しない。
+
+## 実測（2026-08-30）
+
+- kotoba-lang/kotoba-lang: 4d42a80d で landed（surface-status +
+  guest-grammar comment + vendored copy sync + ADR md 注記）。
+  `check-grammar-authority.cljs`: W0 PASS、forbidden 31 / classified 138 /
+  unclassified 0。west pin 前進 1971cf9e。
+- `.rs` 参照は約 55 箇所（token census を本文編集前に採取）。
+- biscuit の位置づけは capability-semantics v2 の
+  `:biscuit-role :delegated-grant-only` を根拠とし、token が runtime
+  authority に昇格しないこと（grant は上界、authority は local authorizer の
+  交差後 capability value のみ）は本 ADR でも不変。")))

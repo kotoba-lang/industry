@@ -1,0 +1,62 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607197600-kotoba-postgresql-version-matrix-contention-soak")
+  (:adr/title "ADR-2607197600: PostgreSQL version matrix and bounded contention soak")
+  (:adr/status "accepted") (:adr/doc_type "adr") (:adr/doc-type "adr")
+  (:adr/source-format "edn") (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19") (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true) (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for (vector "PostgreSQL version matrix and bounded pool soak"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kototama/docs/postgresql-qualification.edn"
+   "orgs/kotoba-lang/kototama/scripts/verify-postgresql-matrix.sh"
+   "orgs/kotoba-lang/kototama/.github/workflows/ci.yml"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"))
+  (:adr/supersedes (vector "adr-2607197500-kotoba-postgresql-crash-half-open-recovery"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:runtime (map (:minimum-jdk 21) (:jdk-11-denial :javax.crypto.KEM-missing)))
+   (:local-matrix (map (:platform :macos-arm64) (:jdk 21)
+                  (:postgresql (vector "14.19" "15.13" "17.9")) (:status :pass)))
+   (:required-ci (map (:platform :linux-x86_64) (:jdk 21)
+                 (:postgresql (vector 14 15 17)) (:workflow :postgresql-interop)))
+   (:bounded-soak (map (:workers 3) (:operations 90) (:connections 2)
+                  (:leases-at-end 0) (:waiters-at-end 0) (:handles-at-end 0)
+                  (:guest-scratch :fixed-reuse)))
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "bash scripts/verify-postgresql-matrix.sh")
+     (:result "PostgreSQL 14.19, 15.13, 17.9 on JDK 21/macOS arm64; pass"))
+    (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:postgresql-interop")
+     (:result "3 workers x 30 acquire/query/reset/release operations; exit 0"))))))
+  (:adr/body
+  "# ADR-2607197600: PostgreSQL version matrix and bounded contention soak
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+PostgreSQL qualification requires majors 14, 15 and 17 on JDK 21 or newer.
+JDK 11 is not a supported cell: all three attempted cells fail before runtime
+with the absent `javax.crypto.KEM` class used by secret authority. The matrix,
+features, soak terminal invariants and commands are owned by the machine-readable
+`docs/postgresql-qualification.edn` contract. Linux x86_64 runs the same three
+released versions as a required non-fail-fast CI matrix.
+
+The interop gate also runs three guest consumer instances through two physical
+pool connections for 90 acquire/query/reset/release operations. Guest query
+scratch is reused at fixed bounded addresses rather than growing linear memory.
+Completion requires no leases, waiters or native handles.
+
+## Evidence
+
+The full crash, half-open, rotation, pool and protocol qualification passes on
+Homebrew PostgreSQL 14.19, 15.13 and 17.9 with Temurin 21 on macOS arm64. The
+contention soak completes 30 operations from each of three concurrent workers,
+retains exactly two physical connections until close, and terminates cleanly.
+
+This closes the locally available released-version matrix and bounded
+contention soak. Linux CI results and longer wall-clock soak remain freshness
+evidence, not permission to weaken the contract.")))

@@ -1,0 +1,400 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608124800")
+  (:adr/title "Which detectors actually gate anything, and five that assert PASSED without measuring")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-12")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related (vector "ADR-2608120600" "ADR-2608121000" "ADR-2608123000" "ADR-2607300900"))
+  (:adr/body
+  "## The question
+
+This workspace has accumulated a great many verification scripts. **How many of
+them actually gate anything?** Four more were built today, and **none of the
+three ADRs recording them mentions `gates.edn` or fleet-ci at all** — they
+shipped without an answer to who runs them.
+
+## Five scripts assert a named security control and measure nothing
+
+`scripts/security-gate-{abac-audit,audit-trail-test,georestores-test,
+hsm-export-test,paging-test}.cljs`.
+
+Measured, and re-confirmed independently: **all five contain zero
+`process.exit` and zero `exitCode` assignments.** They print `PASSED` and return
+0 unconditionally.
+
+- One **computes sha256 by returning the literal string `deadbeef…` regardless
+  of input.**
+- One prints hardcoded page-out counts.
+- One hardcodes a Keychain rejection exit code **without ever invoking
+  `security`.**
+
+And they **name themselves G-004 through G-008**, asserting that key export,
+geo-restore, ABAC deny-by-default and audit trails are verified.
+
+**These are worse than unwired detectors, because their existence reads as
+coverage of named controls.** Nothing runs them today, and **wiring them would
+make the theatre load-bearing** — a gate that always passes is worse than no
+gate, because it occupies the slot where a real one would go.
+
+## Four wired gates are permanently red, which is the same silence in uniform
+
+`root-repository-roles` **0 pass / 867 fail**, `root-permit-index` 0/282,
+`root-observatory-registry` 0/269, `root-itonami-org-id` 0/268.
+
+**A standing red is indistinguishable from a new red.** 867 consecutive failures
+is not a signal anyone can act on. Only `root-permit-index` has a diagnosis —
+CLAUDE.md already records that its input is never in the shipped tree, so it is
+structurally impossible to green. **The other three have not been diagnosed.**
+
+## The four permanent reds, diagnosed — and the counts I quoted were misleading
+
+**`manifest/fleet-ci.edn` is a ROLLING WINDOW, not the full history.** Its
+earliest receipt is 2026-08-04; older versions in git hold receipts back to
+2026-07-16. So `0 pass / 867 fail` is a statement about the current window only,
+and for one of these four it materially misled me.
+
+### `root-repository-roles` — it WAS green, and the minute it broke is known
+
+**Last passed 2026-08-03T11:05:26Z. First failed one tick later**, a single
+clean pass-to-fail transition. So this gate **has been demonstrated to work in
+both directions in production** — stronger evidence than the break/unbreak note
+it lacks. It has been red for roughly **1,010** consecutive runs, not 867.
+
+**The verifier is fail-fast**, so a receipt only ever shows the FIRST violation
+and the true count has never been visible. Measured per-repo: **4 violations of
+23**, all one class — a child repo's declared `:depends-on` drifting behind its
+own `deps.edn`. The other 19 pass, so every later assertion in that verifier has
+simply never been reached since 2026-08-03.
+
+**The structural problem underneath is worse than the violations.** This gate is
+attached to `root` but **is not a function of root's tree** — it fetches HEAD
+for 23 repos over the network. **Root cannot make it green, and the receipt is
+stamped with root's sha while measuring something else**, so re-running the same
+root sha on a different day gives a different verdict. It measures HEAD, not the
+pin, so **it is not attributable to any commit.**
+
+**CLOSED — green for the first time since 2026-08-03, and one of the four was
+the dependency rather than the declaration.**
+
+`provider` declared nothing wrong: `io-ipld` was in `:deps`, but **zero `src`
+namespaces reference it** — it appears in exactly one test, as an *independent
+oracle* checking our own canonical wire format. It is not shipped. **It was
+moved to the `:test` alias rather than added to the declaration**, beside
+another dependency already test-only for the same reason. Making the check agree
+with a mistake would have been the easier fix and the wrong one.
+
+The other three were stale declarations, each dependency confirmed as a real
+`src` require. One had drift **in both directions**: a commit swapped one
+dependency for another and never touched the declaration.
+
+**One judgement call, and the way it was handled is the point.** `dag-cbor` sits
+in `:deps` while no `src` namespace references cbor — it is a deliberate co-pin
+at the same sha another dependency already resolves, so two layers agree on the
+codec byte for byte instead of inheriting a transitive pin. **Deleting it would
+also have made the gate green, and would have quietly handed that choice away.**
+It was declared instead, with the reasoning in the commit — **reviewable rather
+than buried.**
+
+**The later assertions ran for the first time since 2026-08-03, and they pass.**
+Role direction, acyclicity and prefix declarations all executed and none failed;
+the three new edges are permitted without an exception. One non-failing note
+remains: a repo declaring an authority library while shipping no git deps has
+that claim **reported as unverified rather than as passed.**
+
+**Greenness here is still not a property of any commit.** The same root sha will
+give a different verdict tomorrow if any of those 23 repos moves — including
+going red again with no root commit involved. And it measures HEAD, **not the
+west pin**, so it says nothing about the tree this superproject actually builds
+against.
+
+### `root-observatory-registry` — five of nine are the gate being stale
+
+A 2026-08-11 rename moved repo names to the role plane and added a `:repo` key,
+**keeping `:name` as the ledger identity** — the registry documents the contract.
+The gate checks `:name` and has never heard of `:repo`. **It was right when
+written; the thing it guards changed under it.**
+
+One is a genuine registry gap. One flags **a deliberately documented
+requirement** — routing a summary outside the checkout is mandatory, and the
+invariant cannot express *this path must NOT be in the repo*. And two are
+genuine by the letter while **the harm they claim is falsified by measurement**:
+`plutil -lint` accepts all ten plists and the job the gate says cannot load **is
+loaded**.
+
+It has **never once been green** across its entire lifetime, and unlike its
+neighbours it carries **no break/unbreak record** — so it has never been shown
+to discriminate at all.
+
+**Resolved 2026-08-12. It is green, and it has now been shown to discriminate.**
+
+All four classes were fixed in the order above, and none of the nine was fixed
+by deleting an invariant — the `:change-rate` / `:importance` / `:blocked-by` /
+`:unmeasured` discipline that only this gate checks is intact and is exercised
+by four of the sixteen demonstration cases.
+
+- **Invariant 5** now resolves the repo as `(or (:repo o) (:name o))`, which is
+  the contract the registry itself documents (`:repo` omitted means `:name` is
+  the repo name). Five violations vanish.
+- **The genuine gap** was `com-etzhayyim-rasen`, the one entry the rename left
+  without a `:repo`; its west project is `actor-rasen`, under the org the entry
+  already named.
+- **Invariant 4 was conflating two things.** What it exists to catch is a
+  *relative* path, which silently means a different place depending on where the
+  process started; an absolute path does not have that defect. It now rejects
+  relative paths as before, and requires an absolute path outside the repo to
+  carry `:args-outside-repo` with a reason — so the deliberate case is expressible
+  and an accidental write outside the repo is still caught. hayari declares it,
+  citing the concrete reason: the default target is tracked, so every run would
+  dirty the west checkout and `west update` would then skip the project.
+- **Invariant 11 was true, and its stated reason was false.** Measured:
+  `plutil -lint` returns OK for all ten plists, and the job the gate said could
+  not load was loaded with a PID from a file byte-identical to the flagged repo
+  copy. But a *conforming* XML parser is a different matter — expat rejects both
+  flagged files at exactly the offending lines and accepts the other eight. XML
+  1.0 section 2.5 forbids a double hyphen inside a comment, so the files really
+  are not well-formed; the harm is not that launchd ignores them but that no XML
+  tool other than Apple's deliberately lenient parser can read them. **The check
+  was kept, its rationale corrected, and the two comments fixed** — all ten now
+  satisfy both parsers.
+
+**The demonstration CLAUDE.md requires now exists**, in
+`scripts/fleet-ci/gates/observatory-registry-discriminate.cljs`: sixteen cases,
+each breaking one invariant in a throwaway copy, asserting a non-zero exit *and*
+that the violation reported is that invariant's own message — so a red caused by
+some other invariant cannot be mistaken for detection — then restoring and
+asserting exit 0. Baseline green, 16/16, harness exits 0. The record lives in
+the gate's own header so that editing an invariant surfaces it in the diff.
+
+**Writing the harness immediately paid for itself**: two cases first reported
+*broken but still green*, and both were faults in the breaking, not the gate —
+one replaced an occurrence of the key inside a comment and left the real key
+intact, the other renamed a tag to a string that still contained the substring
+being searched for. Reviewed by eye, both would have counted as demonstrations.
+**A check on a check is theatre by the same rule as the check itself.**
+
+### `root-itonami-org-id` — it is correctly reporting an undeployed fix
+
+Six of eight domain pairs disagree with the rule. One root cause: the endpoint
+re-exports a **checked-in compiled artifact**, and its source **was fixed on
+2026-08-10, two hours after the gate's first red** — with a docstring naming the
+bug — **and never rebuilt.** The gate has been right for two days.
+
+A caveat for whoever rebuilds: for two domains the rule's reversed form does not
+match the existing org names, so a correct intake will mint ids that disagree
+with two live orgs. That is an owner decision, not a gate bug.
+
+### `root-permit-index` — the recorded diagnosis holds, and is not the only cause
+
+Run **on a machine that does have the input**, it still fails: the committed
+projection is genuinely behind its sources. **Re-homing it alone would look like
+a completed fix and then stay red.**
+
+### What generalises
+
+**None of the four is a broken check in the `npx` sense** — no laptop-versus-node
+difference affected any verdict. Two of the four are attached to `root` while
+measuring something root does not contain, which is the same structural error as
+`root-permit-index` in a form that is easy to miss, because those two **do**
+produce a verdict rather than failing to run. A gate that answers about someone
+else's HEAD is not a gate on this repo; it is a monitor wearing a gate's badge.
+
+## Most of today's detectors cannot be root gates, and that is structural
+
+CLAUDE.md's `root-permit-index` finding generalises: **a fleet gate ships only
+the target repo's own tree**, so anything reading `orgs/` can never be green
+there. That covers `verify-vendored-copies`, `verify-namespace-collisions`,
+`verify-duplicate-registrations`, `verify-require-graph`, `annex-custody-verify`,
+`west-orphan-audit`, `dataset-monotonic-check` and roughly a dozen migration
+audits. Two of them say so in their own headers.
+
+**So the answer for these is not `add a gates.edn line` — it is that they need a
+different home.** A local scheduled tick on a machine that has `orgs/`, which is
+what the uninstalled plists below were.
+
+Reading outside the repo entirely: `audit-gftd-scripts` inspects `$HOME/.gftd`,
+and **a fleet node's home is a different machine's**, so a node result would be
+meaningless. `annex-custody-verify` needs B2 credentials, which invariant 3
+forbids on nodes.
+
+**Gatable as-is, root-tree only**: `verify-adr-identity`, `closing-check`,
+`cross-repo-change-guard`, `verify-no-babashka`, the bmc test runner, and two
+fleet-ci unit tests that are pure logic with no I/O.
+
+One useful clarification about the constraint: *self-contained in one file*
+binds the **wrapper**, not the detector. The working gates here are thin
+wrappers that `execSync` the repo's own multi-file script out of the extracted
+tree, each dying loudly if the target is missing after extraction.
+
+## The cheapest recovery in the survey is an uninstalled plist
+
+Five launchd plists live in `scripts/` and **are not installed**. One of them,
+`com.gftd.tsukuru-maturity-tick`, is **the only caller of three verifiers**, and
+one of those guards something that has already been lost — ADR-2607252000
+records SHIRO and PICO ep01 assets **actually lost**, B2 unreachable and IPFS
+pins garbage-collected, **irreversibly**. The other two cover customer names and
+part numbers leaking through annexed **file paths** even where content is
+encrypted, and consent-tier datasets being silently merged.
+
+**Nothing was wrong with the check. The scheduler was never loaded.**
+
+## `root-rename-residue` is gated, and its required proof is missing
+
+It is the one detector from today that is wired, and it is well built — the
+wrapper refuses to report success unless the output carries an `N cases OK`
+summary with N at or above the fixture count, **specifically so a git-less
+environment running only the pure cases cannot go green.** 20 receipts, 0
+failures, and it is live in production inside `cleanup-land.cljs`.
+
+CLAUDE.md's requirement — **break the target, see exit 1; unbreak it, see
+exit 0** — was recorded nowhere. The 21 fixture cases include negatives, which
+is evidence the *classifier* discriminates; **it is not evidence the *gate* goes
+red.**
+
+**Done 2026-08-12. The record lives in the wrapper's own header comment**
+(`scripts/fleet-ci/gates/rename-residue-check.cljs`), as a table of break ->
+exit code -> message, because that puts it next to the floors it exercises: a
+diff that lowers `min-cases` or deletes a floor now carries the line naming that
+floor's exit code. Summary of what was measured, each by actually breaking a
+copy of the tree and running the gate in the fleet's own `<dir>`-first shape:
+
+- collapsing `classify` to a single verdict — either direction — **exits 1**;
+- deleting the git-fixture half **exits 94**, and the underlying test in that
+  run **exited 0 printing `PASS — 13 cases OK`** — the floor is what stopped it,
+  not the test;
+- deleting the summary `println` **exits 93**;
+- removing any of the three required paths **exits 90**, each naming which;
+- putting a flag before `<dir>` **exits 90** — the argv hazard fails closed here
+  rather than producing a false green.
+
+The floors are distinguishable from one another. Two further findings: the gate
+is **green on a tree filtered to `.cljs` only** (350 files at `3b0371f4`,
+`:min-files 300` — 50 of margin), so unlike `root-permit-index` it is not
+structurally unable to pass on a shipped tree, though that margin is thin and
+moves: it read 355 an hour earlier, before a sibling session retired the five
+`security-gate-*` scripts; and **a forged summary line still passes** — a test
+entry reduced to `(println \"PASS — 21 cases OK, 0 failures\")` reports green,
+since `N` is a floor and not a cross-check. That is outside what these floors
+claim: they close *environment* failures, and an edit to the test body is closed
+by diff review, not by the gate.
+
+**Limit of the demonstration**: it ran on this laptop, where npm 11.12.1
+misparses `npx --yes nbb --classpath X file.cljs` (measured: the argument is
+resolved as `github:scripts/…`, `npm ERR! code 128`), so a PATH shim calling
+`nbb` directly stood in for `npx`. It establishes that the gate's *decision
+logic* goes red and green as claimed; it does **not** establish that the npx
+invocation path works on a node, nor the converse. Node-side evidence is the
+receipt.
+
+## One correction to the brief that produced this survey
+
+I told the surveying agent that `audit-gftd-scripts` reports 3 live
+**shallow-fetch** violations. As run at survey time it reports 3 violations of
+kind **`:shell-script`**, and no shallow-fetch violations at all.
+
+**Both readings are correct at their own moment**: a sibling agent fixed the
+three shallow-fetch violations earlier the same day, taking the count from 6 to
+3 and leaving exactly the shell-script ones. The surveying agent measured after
+that fix and reported the discrepancy rather than reconciling it to my claim,
+which is the right behaviour — **it could not have known, and asserting my
+number would have been worse than contradicting it.**
+
+## Ranked by what each would have caught, and when
+
+1. **`verify-vendored-copies`** — weeks of live drift on payment-confirmation
+   paths, one copy missing the guard whose absence accepts an unconfirmed
+   payment as confirmed. Needs a home with `orgs/`.
+2. **`verify-require-graph`** — a deleted namespace broke 12 repos for 17 days.
+   Already paid once.
+3. **Install `com.gftd.tsukuru-maturity-tick`** — recovers three verifiers at
+   once, one guarding custody that has already cost irreversible asset loss.
+   Cheapest recovery here.
+4. ~~`verify-adr-identity`~~ — **GATED, merge `ccb47c1fa06`, and it was red.**
+
+   Two `:adr/id` collisions introduced 2026-08-08 had gone unnoticed for four
+   days, plus two ambiguous references pointing at one of them. **A prior session
+   had OBSERVED them and recorded them verbatim in its own close, and declined
+   to fix.** Fixed here by the rule *the later arrival moves*, which
+   independently agreed with where every existing citation points. 25 collisions
+   down to the 23 in the debt table, whose docstring says the table must never
+   grow — so *add it to the table* was never an available fix.
+
+   **A correction to my brief.** I said dropping `90-docs/adr` would make the
+   script report zero ADRs and exit 0. **It does not** — tested with the floor
+   disabled: it still exits 1, because a fourth check fires and all 23 debt-table
+   entries stop colliding. **The detector cannot pass vacuously on an empty
+   corpus.** The `:min-files` floor is still right to exist — it turns an obscure
+   23-line stale-debt spew into one legible line — but it is defence in depth,
+   not the only thing standing between the fleet and a vacuous pass.
+
+   **The two layers catch different mistakes**, which is why both are needed:
+   filtering to `.cljs` drops the ADRs and the floor stops it; filtering to
+   `.edn` drops **the detector itself**, which the floor passes and the gate
+   guard catches at exit 90. **That second row is not hypothetical** — the
+   fleet's own tick carries a comment recording it happening on 2026-07-29.
+
+   **Proven on real fleet hardware**, not this laptop: shipped to a node over
+   ssh and run through the production invocation shape. Fixed tree exit 0;
+   duplicate id injected exit 1; removed again exit 0; corpus missing exit 90;
+   detector missing exit 90. Locally it first hit the documented npm breakage —
+   **and the third floor caught that too**, refusing to report a pass for a run
+   that may not have scanned anything.
+
+   Limits stated: one node of ten, `tick.cljs` not run end to end (so signing,
+   status posting and scheduling are unexercised), and the `:min-files`
+   rejection shown arithmetically and by reading the code rather than by
+   executing the tarball filter.
+5. **`audit-gftd-scripts`** — belongs in a SessionStart hook, because it is the
+   only thing that looks outside the repo at all.
+6. `verify-namespace-collisions`, `verify-duplicate-registrations` — real,
+   dated, ungatable in root.
+7. ~~Prove `root-rename-residue` can go red.~~ **Done 2026-08-12**; the record
+   is in the wrapper header, and the one hole it does not close (a forged
+   summary line) is named there.
+8. **Diagnose the four permanent reds**, then fix, re-home or retire each. A red
+   that never changes is as silent as no detector.
+9. **Delete or rewrite the five `security-gate-*` scripts.**
+
+## What could not be determined
+
+Whether the three undiagnosed permanent reds fail for the `root-permit-index`
+reason or for a genuine violation — that needs reading each failure detail.
+Whether `root-rename-residue` was manually demonstrated to fail before landing;
+**absence of a record is not proof it was not done** — moot as of 2026-08-12,
+since it has now been demonstrated and the demonstration left a trace. ## DETERMINED: silently dropped, and the documentation still says they run
+
+The five uninstalled plists were **not retired** — they were dropped, and this
+workspace's real retirement mechanism proves the difference. When
+`com.gftd.hayari-tick` was genuinely retired its plist was moved to an
+`_archive/` directory **and an ADR recorded the move**. Ten older plists sit in a
+dated launchd archive. **None of the five is in either.**
+
+Three ADRs affirmatively record three of them as installed, bootstrapped and
+kickstart-verified — and one **demonstrably worked**, repairing a seven-document
+backlog on 2026-08-08, one commit per document, exactly as designed. **No ADR
+records removing any of them and no logs survive for any of them.**
+
+**The larger finding is the documentation gap.** Six skills state that a resident
+loop calls them every cycle. **None is loaded**, and three of the six **have no
+plist anywhere** — not in the repo, not on the machine. The surviving plists also
+cite sibling jobs that do not exist.
+
+**So the documentation asserts a schedule that has not existed for days**, which
+is the same shape as this document's other findings, one layer up: a detector
+nobody runs reads as coverage; **a loop nobody runs reads as a routine.**
+
+**A caution against reinstalling them blind.** Three of the five launch an
+autonomous model loop with permission checks skipped, on 8-hour, 1-hour and
+6-hour intervals, one of them fanning out to two dozen parallel agents per wave,
+and they commit and push. **That is a materially different decision from
+installing a read-only monitor** and needs explicit consent. Exactly one of the
+five — a detection-only sync probe whose own header states it never writes to
+`main` — is the safe one.
+
+## What could not be determined
+
+Whether the three undiagnosed permanent reds fail for the `root-permit-index`
+reason or for a genuine violation — that needs reading each failure detail.
+Whether `root-rename-residue` was manually demonstrated to fail before landing;
+**absence of a record is not proof it was not done** — moot as of 2026-08-12,
+since it has now been demonstrated and the demonstration left a trace.")))

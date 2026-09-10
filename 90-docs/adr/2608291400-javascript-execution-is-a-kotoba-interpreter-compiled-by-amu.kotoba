@@ -1,0 +1,452 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608291400-javascript-execution-is-a-kotoba-interpreter-compiled-by-amu")
+  (:adr/title "JavaScript の実行系は Kotoba で書いて amu でコンパイルする — amu は JS をコンパイルしない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-29")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/repos (vector "com-junkawasaki/root"
+              "kotoba-lang/org-ecma-international-262"
+              "kotoba-lang/browser"
+              "kotoba-lang/dom-gpu"
+              "kotoba-lang/amu"
+              "kotoba-lang/htmldom"))
+  (:adr/body "## 問い
+
+`kotoba-lang/browser` の JavaScript 実行が QuickJS の WASM バイナリ
+（`quickjs-emscripten-core` + `@jitl/quickjs-singlefile-cjs-release-sync`）に
+依存している。ADR-2607198300 が『実行成果物が JVM/JS/Rust ホストに依存しない』と
+決め、ADR-2607072000 が『Rust が必要な実装は全て cljc』と決めた workspace で、
+第三者の C 製バイナリが production の実行経路に載っている。これをどう外すか。
+
+## amu は JS をコンパイルしない — 向きを取り違えない
+
+**amu は Kotoba のコンパイラであり、JS は入力にできない。** `bin/kotoba` の usage 行が
+入力を `<file.kotoba|file.cljk|file.cljc>` と定めており、amu の `src/` に現れる
+`javascript` は全て**出力**側の語（`:js-kotoba-v1`、`.mjs`、`:format :javascript/v1`）。
+JS フロントエンドは存在しない。
+
+したがって『amu で JS を動かす』は『amu が JS をコンパイルする』ではなく:
+
+    ページの script テキスト ──実行時の入力──> Kotoba で書いた JS インタプリタ
+                                              ──amu compile──> wasm32 ──> browser の host スロット
+
+**これは QuickJS と構造的に同じもの**である。QuickJS も『C で書かれた JS インタプリタを
+emcc が WASM にしたもの』であって、C コンパイラが JS を読んでいるわけではない。
+置き換わるのは C → Kotoba と emcc → amu の 2 つだけで、`browser.runtime` の
+`:runtime/eval` / `:runtime/call` / `:runtime/job-drain` という宿るスロットは動かない。
+
+**ターゲットは `wasm32-browser` であって `js` ではない。** JS で書かれた JS
+インタプリタは、動かすのに JS エンジンを要する（消そうとしているものを要する）。
+
+## 決定
+
+1. **JS 実行系の正本は `kotoba-lang/org-ecma-international-262`** — Kotoba で書き
+   amu でコンパイルする ECMA-262 部分集合インタプリタ。名前は origin 面
+   （ecma-international.org の逆順 + 主題 262、ADR-2608040100）。
+2. **QuickJS は消さない。差分オラクルとして残す。** 移行が終わるまで、同じ JS を
+   両方に通して一致を測るために必要である。消えるのは『production の実行経路が
+   QuickJS に依存している』という状態の方であって、QuickJS そのものではない。
+3. **エンジン自身が capability を要求しない。** `kotoba -M check` が
+   `:effects #{}` を報告する。DOM も fetch も storage も、browser 側の既存
+   capability 経路（`browser.compat.webapi`）が担い、インタプリタは値を返すだけ。
+
+## 実測した現在地（2026-08-29 セッション終了時）
+
+| | |
+|---|---|
+| 言語 | 式・変数（`var`/`let`/`const`）・代入・`if`/`else`・`while`・**`for`**・ブロック・**関数**（宣言/式/再帰/相互再帰/巻き上げ/**参照捕捉クロージャ**）・**配列**・**オブジェクト**・**メンバ参照と代入**・**メソッド呼び出し**・**`this`**・**組み込みメソッド 10 個**・**`try`/`catch`/`throw`**・`typeof`・コメント |
+| 未実装 | `finally`、`Error` オブジェクト、プロトタイプ、破壊的配列メソッド、`for...in`/`of`、セル解放 |
+| 自前テスト | **143/143**。restricted ESM 成果物と **wasm32 の中**の両方で |
+| 差分テスト | **実 V8 と 159 件中 156 件一致**（`test/differential.cljs`） |
+| wasm32-browser | **38 KB、instantiate して中で 143/143 が通る** |
+| ソース | `src/ecma262.kotoba` 約 1,700 行、capability ゼロ（`-M check` が `:effects #{}`） |
+
+**記録済み乖離は 3 件、全部に理由がある**:
+
+1. `7 / 2` —— JS の数値は IEEE-754 double、このエンジンは i64 なので切り捨て
+2. 内部エラー（ReferenceError / TypeError / SyntaxError）が catch で**メッセージ文字列**として届く
+   —— `Error` オブジェクトのコンストラクタが無いため。**投げた値は型を保つ**ので、割れるのは内部エラーだけ
+3. 素の呼び出しの `typeof this` —— 実エンジンは sloppy mode でグローバルオブジェクトを入れる。
+   このエンジンにグローバルオブジェクトは無い
+
+**捕捉は参照である**（当初は値渡しで、それが 4 件目の乖離だった）。環境を 1 本の文字列の中で
+2 領域に割った —— `<bindings-length>:<bindings><cells>`。**束縛**が名前→セル id、
+**セル**がセル id→値。関数値は束縛だけを捕らえ、セルは実行中のプログラムと共に呼び出しへ
+入り、呼び出しから出る。`var`/引数は新しいセルを確保（シャドウ）、代入は見つけたセルを
+書き換える。**環境は元から全体を流れていたので、この分割は配管を増やさなかった** ——
+7 つ目のレコードフィールドなら全構築箇所に触ることになった。
+
+⚠ **セルは解放されない。** id は確保時の領域長なので再利用できず、領域は増え続ける。
+64 KiB の文字列上限に長時間実行なら到達する（ページスクリプトなら届かない）。
+
+## 測って初めて分かった天井（どれも文書に無かった）
+
+- **fuel の既定は instance 生涯で 512 演算**。パーサは最初の文に届く前に使い切る。
+  `--fuel` は省略可能なオプションではない。既定のままだと 48 件中 2 件しか通らない。
+- **typed ADT 値は実行時に 64 ノード / 深さ 12 で頭打ち**（`kotoba-kir` の
+  `adt-node-limit` / `adt-depth-limit`、CLI knob 無し、emit された
+  `assertTypedValue` が実行時に数える）。`[:option [:ref :js/node]]` を 4 本持つ
+  record は 1 ノードあたり約 8 ノードを消費するので、**AST は約 6 ノードで頭打ち** —
+  `(1 + 2) * 3` が既に超える。
+- **`[:vector [:ref R]]` は safe profile の外**。flat な arena も vector では作れない。
+  `[:map :string [:ref R]]` は通るが 31 entry まで。
+- **`pair` を戻り値として関数境界を越えると restricted ESM で trap する**
+  （`:jvm-kir` と `:wasm` では通る）。`record` は 3 backend とも通る。
+  境界を越える値は record にする。
+- 上記 2 つの帰結として、このエンジンは **AST を持たない直接評価器**であり、
+  **環境は文字列**である。これは様式ではなく測定された制約であって、
+  どちらかの上限が動いたら**外す**。ADR-2608650000 の分類でいう
+  『backend の未達』であって『言語の恒久的な設計』ではない。
+
+## wasm32 backend の欠陥 — 見つけて直した（2026-08-29）
+
+**当初この ADR は『`--target wasm32-browser` は `:ok true` を返しながら
+instantiate できないモジュールを出す』と記録した。原因を特定して直した。**
+
+`kotoba-lang/kotoba-wasm` の emitter が **call の operand を 1 バイトで
+書いていた**。Wasm の index operand は ULEB128 なので、127 を超える値を
+1 バイトで書くと切り捨てにはならない —— 上位ビットが LEB の**継続ビット**
+なので、デコーダは**次の命令バイトを飲み込み**、存在しない index を報告する。
+
+実測: 183 関数のモジュールで function 182（`0xB6`）への call が
+`function index #694 is out of bounds` になった。**694 = 54 + (5 << 7)**
+——`0xB6` の下位 7 ビットと、直後にあった `0x05` opcode である。
+
+**誰も気づかなかった理由は単純で、129 関数に達するまでどの index も
+2 バイト目を要さないから。** この JS エンジンが最初にそこを越えた。
+
+直し方: `encode-local-operands` は既に `::local-get/set/tee` に対して
+正しく ULEB を書いていたので、同じ pass に `::call` token を足し、
+**101 箇所の生の `[0x10 index]` を全部そこへ通した**（3 箇所は既に
+`[0x10] (uleb index)` と書かれていた）。新しい call site が同じ誤りを
+再導入できない形にした。
+
+gate: 200 関数を全部呼ぶモジュールを組み、`wasm-tools validate` と
+`wasmtime` で検査する test を追加。**両方向で確認済み** —— emitter を
+戻すと `func 200 failed to validate` で落ち、戻すと namespace 58 tests /
+292 assertions・suite 全体 111 / 503 が緑。
+
+**この class の教訓は『コンパイラが緑を返した』ことの方**である。
+`:ok true` と壊れた成果物が同時に出るのは、CLAUDE.md が『測れなかった検査が、
+測って問題が無かった検査と同じ値を返す』と呼ぶ形の、最も高くつく版である。
+emit は検査ではないが、**emit の成功が『動く成果物ができた』と読まれる**
+限り同じことが起きる。
+
+## amu が取り込めなかった理由と、その解消（2026-08-29）
+
+修正を amu の pin に載せると 37 failures が出た。原因を三点で測った:
+
+| amu の kotoba-wasm pin | 中身 | 結果 |
+|---|---|---|
+| `aac02618`（当時の pin） | 基準 | 1154 tests / 8526 assertions、**0 failures** |
+| `f6635d8` | + `c7d3514` のみ | 1154 / 8489、**37 failures** |
+| `a739f37` | + `c7d3514` + ULEB 修正 | 1154 / 8489、**37 failures（同一）** |
+
+同じ test・同じ分布・同じ assertion 数なので、**ULEB 修正は 1 件も足していない。**
+
+**原因は `c7d3514`「replay the typed-Wasm implementation that only existed in
+a checkout」が emitter 側の半分だけを replay したこと。** bulk vector 構築の
+ために `kotoba:typed/vector-from-memory-i64` という新しい import を出すように
+なったが、`amu/runtime/browser-host.mjs` にその実装が来ていなかった。症状は
+`forbidden-import`。
+
+**直した（amu `514819906d80`）。** host 側 3 点:
+
+- allowlist に function と **`kotoba:typed/scratch` の memory import**
+- **instantiate ごとに** 2 ページ固定の `WebAssembly.Memory` を生成
+- `vector-from-memory-i64(descriptorId, offset, count)` の実装（item 予算は
+  `vector-conj-i64` と同一）
+
+**この path は host が memory を provide して import させる形なので profile の
+中に収まる。** `validateModule` は今も memory を *export* する module を拒む。
+
+⚠ **ここで一度、逆向きの誤った結論に飛びかけた** ——「browser profile は memory
+export を禁じるので host は guest memory を読めない、よってこの import は構造的に
+不可能」。実際は import で渡す設計だった。kotoba-wasm 側の gate を切る方向に
+進みかけて、**kotoba-wasm 自身の 10 test が『bulk path が在ること』を assert して
+落ちた**ので気づいた。**kotoba-wasm は 1 バイトも触っていない。**
+
+結果: **1154 tests / 8526 assertions、0 failures** —— 手つかずの baseline と
+**同じ assertion 数**。conformance の golden digest は再生成した（`c7d3514` が
+出力を正当に変えたため。golden test 自身が直し方を名乗る）。
+
+⚠ **単発の再現を CLI で試みたが判別材料にならなかった。** 3 バージョンとも同じ
+`:error :internal` を返す（conformance kit は JVM の `lc/run-case` 経由で走る）。
+決め手は full suite の三点比較で、**1 ケースだけを速く回す手立てが無いことが、
+この種の切り分けを高くしている。** 後で `clojure -M -e \"(load-file …)\"` が
+その速い経路だと分かり、そこから原因まで数分だった。
+
+## 併せて直した browser の成熟度（別件だが同じセッションの実測）
+
+- **`kotoba.wasm.abi` の 3 層がずれていた。** `:append-content`（CSS 生成内容）と
+  `:create-comment` が encode と apply には在って **admit に無く**、
+  `validate-batch` の default に落ちて **batch 全体を巻き込んで落としていた**。
+  修正 + 18 op 全部を 3 層に通す gate を追加（両方向で確認済み、dom-gpu `475e2cb`）。
+- **`wit/kotoba-dom.wit` は 18 op 中 9 op に host 関数を持たない。** 既存の
+  `wit-contract-test` は手書き 9 サンプルしか符号化しないので一度も問うたことが
+  なかった。gate に記録済み。
+- **`htmldom` が 2026-08-05 の `a4f6b94` から `<html>`/`<body>`/`<head>` を落として
+  いる**（Brave 実測に基づく正しい*フラグメント*解析規則）。browser のページロードは
+  文書解析なので `document.body` が常に null になり、2026-07 に書かれた 2 つの
+  smoke test が**24 日間赤のまま誰にも気づかれなかった** — cljs suite が CI に無く、
+  この checkout で一度も走っていなかったため。正しい直し方は htmldom に文書解析
+  モードを足すことだが、cssom conformance 855 case と browser 754 test に波及する。
+
+## 陳腐化していた記述（rule-kaizen）
+
+CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文字列の
+組み込みが無い』と書き、その回避策（26 項目の上限、`9+` 表示）を設計に焼いていた。
+**`string-from-i64` は在る。** `string-code-point-at` / `string-contains?` /
+`string-join` / `string-replace-all` / `string-split-count` / `string-byte-length` /
+`string-fold-case` も在り、`lang/guest-grammar.edn` の `:predicates` が挙げる
+3 つ（`string-concat` `string-length` `string-substring`）より遥かに広い。
+文法ファイルは `string=` と書いているが実際の名前は `string=?` である。
+
+## Exit gate（現在地）
+
+- ~~**G1**: amu の wasm32-browser が instantiate できるモジュールを出す~~
+  **達成**（kotoba-wasm `a739f37` の ULEB 修正 + amu `5148199` の bulk vector host 実装）。
+- **G2**: 関数・オブジェクト・配列が入り、差分 corpus が browser の実 smoke suite が使う JS を覆う。
+  **達成。** 言語面は `break`/`continue`/`finally`/`this`/builtin/`try` に加えて
+  `new Error(...)`・複合代入・`++`/`--` まで入り、corpus は host V8 に対して 210 件。
+- ~~**G3**: 同じ JS を QuickJS とこのエンジンに通し、`browser.runtime` 経路で一致を測る。~~
+  **着地**（`browser` `test/runtime-differential.cljs`）。**そしてすぐに 5 つの穴を出した** ——
+  どれも自前の 180 テストが 1 件も落とさずに通していたものである:
+
+  | 割れ方 | quickjs-ng | このエンジン（当時） |
+  |---|---|---|
+  | `typeof window` | undefined | error |
+  | `typeof nope` | undefined | error |
+  | `null.x` | TypeError を投げる | 投げず `undefined` |
+  | `new Error('boom')` | Error object | new is not defined |
+  | `'x'.toUpperCase` | 関数 | undefined（builtin 未実装） |
+
+  **これが差分テストを書いた理由そのものである。** 単体テストは誰かが書こうと思ったことしか
+  検査しない。`typeof window !== 'undefined'` は実ページで最も多い feature detection の
+  書き方だが、自分でテストを書くときには思いつかない —— 相手のエンジンに訊いて初めて出た。
+- **G4**: production の既定エンジンを差し替える。**未達だが、ブロッカーだった橋は架かった。**
+
+  差し替えに要るのは JS の言語機能ではなく **ホストオブジェクトの橋**だった
+  （`browser.compat.quickjs` は `:dom/query` `:dom/mutate` `:event/listen` `:net/fetch` 等
+  12 の import で Web API に繋がっている）。**capability を足さずに架けた。**
+
+  ```
+  host: snapshot (element id -> textContent)  ──┐
+                                                ▼
+                eval-dom(source, snapshot) ──> effect log ──> host が replay
+  ```
+
+  書き込みを**実行しない。値として返す。** これはこのワークスペースが `kotoba/app` に
+  対して既に引いている契約そのもの（`state + event -> next-state + inert effects`、
+  ADR-2607201300 / ADR-2608261100）で、その結果 **`document` を束縛したまま
+  `kotoba -M check` は `:effects #{}` を答え続ける**。`browser.runtime/ecma262` の
+  `:imports #{}` は欠落ではなく、**import する先が無い**という事実である。
+
+  代償は正直に書く: ①ゲストは自分の書き込みを読み返せない（read は host が注入した
+  snapshot から答える）②知っているホストオブジェクトは `document.getElementById` だけ。
+  **どちらも quickjs-ng に対して両方向で測ってある** —— `test/runtime-differential.cljs`
+  は実エンジンに同じログ形式を書く `document` シムを与えて 2 つのログを突き合わせる。
+  記録した文字列との照合ではない。
+
+  **`addEventListener` も同じ形に載った。** これは書き込みではなく**関数を渡す**
+  操作なので、capability の無いゲストは呼び返してもらえない。そこで:
+
+  - 登録は**登録そのもの**を返す —— 要素・イベント種別・ハンドラの**番号**。
+    関数はゲストの中に留まり、番号だけが境界を越える。
+  - 発火は第 2 の入口 `eval-dom-event(src, dom, n)`。**スクリプトを再実行**して
+    環境を組み直し、**ログを空にしてから**ハンドラ n を呼ぶので、返るのは
+    そのハンドラ自身の effect だけである。
+
+  再実行は「呼び出しの間に状態を持たない」ことの代償であり、正直な代償でもある ——
+  **状態は host が持つ**のだから、ゲストは毎回すべてを渡されなければならない。
+  ハンドラは自分が閉じ込めた変数を見る（capture が効く）。それが、関数ではなく
+  番号だけを渡す理由そのものである。
+
+  **属性・`document.title`・`console.log` も同じ形に載った。** ここで効いたのは
+  「`document` と `console` を予約 id のノードにする」こと（`#document` / `#console`、
+  HTML の id では綴れない）—— コードを減らす小技ではなく、**特殊ケースを消す**手である。
+  `document.title = x` が「任意のノードのプロパティへの書き込み」と同じ規則になり、
+  代入経路の規則が 3 本から 1 本になった。
+
+  ゲストが届く面の全体:
+
+  | | 読む | 書く |
+  |---|---|---|
+  | element | `textContent` / `getAttribute(n)` | `textContent` / `setAttribute(n,v)` / `addEventListener(type,fn)` |
+  | `document` | `title` / `getElementById(id)` | `title` |
+  | `console` | — | `log(…)` |
+  | global | — | `setTimeout(fn,ms)` / `fetch(url)` |
+
+  **`setTimeout` は `addEventListener` と同じ形で、同じ registry を共有する。**
+  どちらも「後で呼ぶ関数」をホストに渡す操作で、capability の無いゲストには時計も
+  呼び返しも無い。返るのは登録（遅延とハンドラ番号）で、発火は同じ第 2 の入口。
+  タイマ id として返すのはハンドラ番号である —— このエンジンが持つ identity が
+  それしか無いから。
+
+  これで全部である。他は `undefined` で、page script はそれを検査できる ——
+  ブラウザが持たない機能を検査するのと同じやり方で。
+
+  **`fetch` も同じ形に載った。ここが本当の試金石だった** —— promise を返すからである。
+  返るのは pending request（`#req<n>` という id のノード。新しい値の型は要らなかった）で、
+  n が registry の枠。`.then(fn)` はその枠にハンドラを収め、同じ request を返すので
+  chain できる。ホストが request を実行し、**応答を添えてその枠を発火する**:
+
+  ```
+  eval-dom                              -> 5:fetch7:#window14:9:/api/data1:0
+                                           ( host が fetch する )
+  eval-dom-event-arg(…, 0, the-body)    -> 11:textContent3:out8:the body
+  ```
+
+  **effect model が存在する理由そのものの往復が、capability 無しで閉じた。**
+  ゲストは network に一度も触らず、応答はホストが手渡すデータである。
+
+  ⚠ **その応答の渡し方で、素直な方法が効かない。しかも理由が正しい。**
+  呼び出し「前」に caller の環境へ束縛してもだめで、**引数の無い宣言済み仮引数は
+  `undefined` に束縛される**（`function f(a) { return typeof a }; f()` が
+  `undefined` を答えるのはそのため）ので、外側の束縛を shadow する。だから
+  `bind-args` の「後」に束縛する。同じ理由でその入口は `call-fn` に委譲せず呼び出しを
+  展開して書いてある（`call-fn` は既に言語の上限である 5 引数）。
+
+  残る G4 の条件は `new Worker` だけになった。
+
+## 次の一手（resume point）
+
+**次は `browser` 側の host adapter である。** ゲスト側は揃った ——
+`textContent` の読み書き、`addEventListener` の登録と発火まで、すべて
+effect-as-value で通り、quickjs-ng に対して両方向で測ってある。まだ無いのは
+**effect ログを実 htmldom に適用する host 側**で、これは `browser` の仕事:
+
+1. 実 document から snapshot を作る（element id -> textContent）
+2. `eval-dom` を呼ぶ
+3. ログを parse して `dom-bridge/apply-mutation` に流す
+   （`textContent` の設定は `:remove-children` + `:create-text` + `:append-child`）
+4. `addEventListener` の登録を実イベント配送に繋ぎ、発火時に `eval-dom-event` を呼ぶ
+
+そこまで行けば、`browser.demo` の実 `<script>` を QuickJS 抜きで走らせて
+**同じ document になることを比較できる** —— それが G4 の本当の合格条件である。
+
+**その次**が `new Worker` / `fetch` / `setTimeout`。どれも同じ問いに帰着する ——
+**返す値で言えるか、それとも呼び返しが要るか。** `addEventListener` は前者だった。
+
+**その他、残っている穴**:
+
+- **数値が i64 で IEEE-754 ではない。**これは*言語*の穴である（実測 2026-08-29）:
+  `:f64` の値は Kotoba を通るが演算に lowering が無く、`(+ x x)` は
+  `expected i64, got f64` で拒否される。ソフト浮動小数点なら書ける
+  （`bit-and`/`bit-or`/`bit-xor`/`quot` は在り、shift は無いので `*`/`quot` で代用）。
+- **prototype chain**（constructor と `instanceof` は landed —— `new Point(7).x` は
+  7、object を返す constructor はそれを返し、method 内の `this` は receiver。
+  無いのは `Point.prototype` であって、共有 method 表も継承も無い。object は
+  `%ctor`（JS の識別子では綴れない名前）に生成時の名前を憶えており、`instanceof` は
+  それを読む。`o['%ctor']` では届く —— bracket lookup は任意の文字列を取るので。
+  本物の穴で、小さい穴で、隠さずに書いてある）（旧記述: `instanceof` は landed —— 鎖が
+  無いので `catch` が実際に訊く問い（`e instanceof TypeError`）に、捕まえた error の
+  `name` で答える。知らない constructor には `false` を返す。これは拒否ではなく
+  本当の答えである: このエンジンに、その constructor の instance は存在しない）
+- **cell は解放されない**（README の Gaps に理由つきで記録済み）
+- **`browser.demo-smoke-test` はこのセッションの前からハングしていた**（実測 2026-08-29）。
+  HEAD 版はその namespace に入ったあと 10 分以上何も出さず、kill した。1 回の delivery
+  pass に **約 8 秒**かかり、2 回回しても WebSocket の echo は `#ws-proof` に届かない。
+  **これは私の変更が壊したものではない。** 直したのは「ハングが遅い成功と見分けられない」
+  ことだけで、`with-deadline` が 120 秒で理由付きの失敗にする。**echo が届かない理由は
+  未調査**であり、直したと書かない。
+
+  **排除できたもの**（2026-08-29 実測）: ①待ち時間の長さではない（500ms、および
+  1 回目の delivery 後にさらに 3 秒 —— どちらも placeholder のまま）②WebSocket
+  機構ではない（`quickjs-websocket-smoke-test` が同じ `websocket-fn`・同じ
+  delivery 形・同じ 500ms 境界で、同じ実行の中で通る）③handle の漏れではない
+  （失敗後に測って TCP handle は 0）。**残る差分**: このテストは既に 3 つの script
+  tag と実 Worker と実 fetch を走らせた session に `onmessage` を登録し、handler は
+  `document.title` ではなく `document.getElementById(...)` 越しに書く。どちらが効いて
+  いるかは判っていない。
+
+  **⚠ 機械を測ってからテストを疑うこと。** 実測 2026-08-29、このテストは「ハングして
+  いる」ように見えたが、その大半は**同じスイートが 4 本同時に走っていた**ことだった。
+  `scripts/resource-guard.mjs` が直列化するのは **build であって、その後に走る test
+  ではない**。guard を待つ retry loop は、前の実行が生きているうちに次を起動する。
+  4 本のうち listening server を握れたのは 1 本で、残る 3 本は **server を持てないまま
+  最初の `println` にも到達せず 0% CPU で止まっていた**。
+
+  これで症状は全部説明がつく —— 出力前の沈黙、0% CPU、TCP handle 0、そして
+  **届かない WebSocket echo**（自分の server が無いのだから echo する相手がいない）。
+
+  **私はこの 1 件で診断を 5 回外した**（idle → syscall block → promise の無限再帰 →
+  重い実処理 → 落ち着かない flow）。原因は毎回同じで、**たまたま捕まえた状態から
+  機構を推測し、それを一般化した**こと。しかも状態はコピーごとに違っていた。
+
+  **同じ形の測定ミスがもう 1 つ。安く再発するので名指ししておく**:
+  `pgrep -f <node target/node-tests.js> | head -1` は、node 本体より先に
+  **shell の wrapper**（`sh -c npm run compile:node-test && node ...`）に当たる。
+  「0% CPU だから idle」という観測のいくつかは **wrapper を見ていた**。実測では
+  wrapper が 0% のとき本体は 80% で回っていた。**測りたいプロセスを名指しすること。**
+
+  **道具について残る本物の知見** —— 答えを出したのは CPU profile だけで、取り方が肝
+  だった。`--cpu-prof` は**正常終了時にしか書かない**ので `timeout` に殺されると何も
+  残らず、プロセス内の timer も使えない（測ろうとしている当の状態が loop を飢えさせる）。
+  **inspector は別スレッドで動く**ので外から駆動できる。profile の答えは
+  self 時間の 86.7% が `cljs.core`、5.8% が `cssom.layout/node_style`、stack 深さ 126
+  —— **無限ループではなく重い実処理**であり、native sample の全サンプルが
+  `PromiseFulfillReactionJob` に見えたのは、各ステップを駆動する promise chain が
+  そこに立っていただけだった。
+
+  **`Promise.race` の deadline は同期的な重さも microtask の嵐も bound できない。**
+  timer は checkpoint が drain しない間は発火しない。これは計器の構造的な限界である。
+
+  **contention とは独立に残る、本物の弱さ**: `start-demo-server!` は serve できない
+  とき**黙って止まる**。自分の server を起こせないテストは、待つのではなくそう言う
+  べきである。**ここでは直していない。**
+
+  **競合を全部排除した 1 本だけの実行での実測（closing 時点）**: `browser.demo-smoke-test`
+  に入ってから **5 分半、CPU 48% で回り続け、最初の println にすら到達しない**。
+  完走までは走らせていない。したがって closing 時点で言えるのは
+  **「少なくとも非常に遅い」までで、「ハングする」とは測っていない**。
+  次に触る人はここから始めるとよい —— 完走まで走らせて時間を測るか、
+  `load-html!` の中で何にその時間が使われているかを inspector 経由の CPU profile で
+  見るか。前回の profile の答えは `cssom.layout` と `cljs.core` の map 操作だった。
+
+  **event loop を実際に掴んでいたものは 3 つ在り、3 番目は私の計器そのものだった**
+  （どれも本物の欠陥だが、**見かけ上のハングの原因ではなかった**） —— `Promise.race` は負けた側を
+  止めないので、`with-deadline` が張った 120 秒の timer が Node を生かし続けていた
+  （テスト 2 本で最大 240 秒、0% CPU、socket も無し —— 暴こうとしていたハングと
+  同じ顔）。settle 時に `clearTimeout` する。他の 2 層は、ゲストが開いた socket と、
+  **server が accept 済みの接続**（Node の `.close()` は既存接続を閉じない）。
+  ⚠ 最初に書いた修正（delivery を poll し直す）は**前提が間違っていた** —— 1 回 8 秒
+  かかるので 40 回試せば 320 秒で、deadline の内側に収まらない。しかも
+  `Promise.race` は**負けた側を止めない**ので、engine を dispose した後も再帰が回り続けた。
+  測ってから設計し直した。
+- **エンジンが遅い。** G3 の 35 ケースが数分かかる（scannerless で loop body を毎回
+  読み直す設計。README の Gaps の第一項がその理由）。QuickJS を置き換えるなら
+  ここは測って書く必要がある —— **まだ測っていない。**
+
+## 道具そのものについて測ったこと（2608291400 の 2 件）
+
+- **テストヘルパーは最初のテストより上に置く。** chunked wasm harness は
+  「最初のテストより上」を全チャンクに配るので、使うテストの隣に書いた `dom-is` は
+  1 チャンクにしか入らず、**それを持たない最後のチャンクだけがコンパイルに失敗した**。
+  ハーネスは 240 件の合格を合格として報告せず **refuse（exit 2）した** —— だから
+  見つかった。
+- **その規則を説明したコメントが、説明していた区切り文字を含んでいて、区切りになった。**
+  `first-test` の検出が行頭に錨付けされていなかったため、散文中の最初の言及が
+  境界として拾われた。いまは行頭の改行から始まる形だけを探す。
+
+⚠ **実測済みの罠 3 つ**
+
+- **`bin/kotoba` の shebang は npx 経由で nbb 1.4.208 を拾い、このマシンでは出力なしで
+  exit 194 する。** 根本原因は amu が `node_modules` を自分自身への絶対 symlink として
+  追跡していたことで、`837572f` で untrack 済み。
+- **`west update` は west project を detached HEAD で checkout する。** 子リポで commit
+  すると branch に乗らず、main への送出が「Everything up-to-date」と言いながら何も
+  送らない。commit 後に `git branch --show-current` が空でないことを確かめる。
+- **`nbb … | tail` の `$?` は `tail` の値である。** G3 の 1 回目はこの形で走らせたため、
+  5 件の割れを印字しながら **exit 0 に見えていた**。CLAUDE.md がまさにこの形を
+  「実行できなかった検査が、実行して問題が無かった検査と同じ値を返す」の最短形として
+  挙げている。`> log 2>&1; echo EXIT=$?` にすること。
+
+## 参照
+
+- 実装: `kotoba-lang/org-ecma-international-262` `14a79ed`（`src/ecma262.kotoba` 約 1,700 行、
+  `test/differential.cljs` 159 ケース）
+- 修正: `kotoba-lang/dom-gpu` `475e2cb`、`kotoba-lang/kotoba-wasm` `a739f37`（ULEB call operand）
+- 関連 ADR: 2607198300（実行成果物の非依存）、2607072000（Rust を書かない）、
+  2608650000（恒久の安全 vs backend の未達）、2607279200（Kotoba 中心の移行）、
+  2608040100（origin 面 = 実ドメインの逆順）、2607051140（browser の分割）")))

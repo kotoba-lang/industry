@@ -1,0 +1,94 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608021530-engi-real-keys-end-to-end")
+  (:adr/title "adr-2608021530: 実鍵を通す — 非同期の検証器を同期の規則に橋渡しし、署名を入れ替えた証明書が Worker で拒否されることを実測する")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-real-keys-end-to-end")
+  (:adr/authoritative-for
+  (vector "engi の Ed25519 実装位置と witness 識別"
+   "非同期検証器と同期規則の接合"
+   "証明書検証の end-to-end 実測"))
+  (:adr/related
+  (vector "adr-2608021430-engi-certificates-carry-signatures"
+   "adr-2608021330-engi-inbound-half-and-worker-measurement"
+   "adr-2608020230-torihiki-authentication-is-consensus-state"))
+  (:adr/evidence
+  (vector "https://engi-node.04-feasts-minded.workers.dev/head"
+   "https://github.com/kotoba-lang/engi"))
+  (:adr/body
+  "# ADR-2608021530: 実鍵を end-to-end で通す
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ADR-2608021430 で証明書に署名を載せたが、**実鍵は繋がっていなかった**——テストは stand-in signer で**配線を証明していただけ**で、実鍵が payload と wire と platform の検証器を生き延びるかについては何も言っていなかった。
+
+## Decision
+
+### 1. 非同期の検証器は、規則を非同期にせずに橋渡しする
+
+WebCrypto の verify は Promise を返し、`verify-certificate` は同期。
+
+**規則を async にするのは、transport の都合を合意規則に押し込むこと**——`torihiki-node` が「ブロック適用前に署名を検証し `apply-block` を async にしない」で既に拒否した取引と同じ。
+
+形は: **何を検査すべきか訊く**（`pending-checks`）→ **runtime のやり方で解決する** → **lookup を返す**（`lookup-verifier`）。
+
+### 2. lookup に無いものは **false** であって unknown ではない
+
+**「訊かれなかった」を受理として扱う検証器は、呼び出し側の帳簿の穴を「検証済みの署名」に変える。** 壊れた証明書を「証明書が無い」と読む codec と同じ欠陥。
+
+### 3. Ed25519 は 1 箇所だけが知る
+
+`engi.attest.ed25519`。既存の `engi.crypto` の隣ではなく `attest` の下に置いたのは、**それが `attest` が引数に取る検証器の実装だから**——主題で束ねる名前より、関係を言う名前の方が価値がある。
+
+### 4. witness の識別子は**公開鍵そのもの**
+
+名前→鍵の対応表が要らなくなり、**その表を誰が編集してよいかという問い**も消える。`torihiki.auth` が逆方向から到達した結論（鍵が本体、id は取っ手）と同じ。
+
+**証明書が自己記述的になる**: 検査に必要なものが全部その中にある。
+
+## 実測
+
+`script/check-real-keys.cljs`（ローカル）と `script/check-worker-signed.cljs`（デプロイ済み Worker）:
+
+```
+verify (honest)   : nil
+verify (swapped)  : :bad-signature
+verify (post-wire): nil
+verify (wrong chn): :bad-signature
+```
+
+Worker 側 `/head`:
+
+```
+{\"type\":\"new-view\",\"signed\":true,\"witnesses\":3,\"verified\":true, \"reason\":null}
+{\"type\":\"new-view\",\"signed\":true,\"witnesses\":3,\"verified\":false,\"reason\":\"bad-signature\"}
+```
+
+**swapped が価値のある事例である。** 2 つの署名は**個別には有効**で、**入れ替えた位置では両方とも無効**。これが証明するのは、**witness が署名 payload に束縛されている**ことであって、**名前を数えるだけでは決して得られない性質**である。
+
+## Consequences
+
+- (+) 実鍵・実ソケット・実 Worker・実検証器が**まとめて**測定された。**それぞれ単独の測定では「システムが動く」とは言えない。**
+- (+) 非同期／同期の接合が、他の node でも再利用できる形になった。
+- (−) **鍵の配布・ローテーションが無い。** witness 集合は設定であり、鍵を失った witness は quorum を消費し続ける（oracle publisher と同じ未解決、ADR-2608020730）。
+- (−) **engi-node は誰でも接続できる。** 証明書は検証するが、**接続そのものは認証しない。**
+- (−) ブラウザでの実測はまだ。
+
+## また「deploy ≠ 稼働」に当たった
+
+certificate 検証を deploy した直後の実行が**まだ version 1 と旧 role 文字列を返した。** Durable Object は evict まで起動時のコードを走らせる。**このセッションで 3 度目**——`/head` の `code-version` はそのために在る。
+
+## 残りギャップ
+
+1〜6 完了。**7 は実装項目がすべて完了**（pacemaker・sync・wire・driver・受理側・署名・実鍵）、鍵配布とブラウザ実測が残り。8 bridge・監査。
+")))

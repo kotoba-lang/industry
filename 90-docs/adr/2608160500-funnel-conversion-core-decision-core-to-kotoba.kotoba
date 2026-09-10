@@ -1,0 +1,240 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608160500")
+  (:adr/title "BMC funnel の転換率・ボトルネック判定を .kotoba の決定核に切り出し、整数 basis point にする")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-15")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:source/dataset "adr")
+  (:adr/related
+  (vector "ADR-2608155000"
+   "ADR-2608136000"
+   "ADR-2608098000"
+   "ADR-2608052000"
+   "ADR-2607279200"
+   "ADR-2608122000"
+   "ADR-2608650000"
+   "ADR-2607022600"
+   "ADR-2607203000"))
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/body
+  "## 何をしたか
+
+`70-tools/bmc/src/gftd/funnel.cljc` の `evaluate-funnel` が持っていた
+**スカラの判断**（1 段の転換率・benchmark との差・どの段がボトルネックか・
+そもそも測れているか）を `70-tools/bmc/kotoba/funnel_core.kotoba`
+（`kotoba/pure`、capability 0）へ切り出し、参照実装は `gftd.funnel`
+**そのもの**に置いたまま（2 つ目の名前空間を作らない）、両者の完全一致を
+fleet gate `root-funnel-core` が毎回見るようにした。
+
+ADR-2608155000（fabric actor core）と同型で、この repo の clj/cljc→kotoba
+移行の 3 例目（1 例目 ADR-2608098000 の `manifest/org-id.kotoba`）。
+
+3 点セット:
+
+| もの | 置き場 |
+|---|---|
+| kernel（正本） | `70-tools/bmc/kotoba/funnel_core.kotoba` |
+| artifact | `70-tools/bmc/kotoba/funnel_core.mjs`（+ provenance / manifest / inputs、コミット済み） |
+| 参照 | `70-tools/bmc/src/gftd/funnel.cljc`（日次 routine `bmc-business-operate-daily` が実際に読む） |
+| gate | `scripts/fleet-ci/gates/funnel-core-check.cljs` |
+
+**食い違ったら kernel が正しく、`.cljc` を直す。**
+
+## 移した境界
+
+kernel が持つのは 15 関数、すべて i64 と bool のスカラ:
+`absent` / `gap-absent` / `clamp-bp` / `measured?` / `denominator?` /
+`step-measured?` / `rate-known?` / `conversion-bp` / `benchmark-known?` /
+`benchmark-bp` / `gap-known?` / `gap-bp` / `below-benchmark?` /
+`bottleneck-wins?` / `pct-bp`。
+
+`.cljc` に残したもの: `funnel-specs` 表・段ベクタの走査・`get-in`・提案 map・
+canvas の重複除去・コレクションを要する文字列整形・metrics edn の形を知る
+橋渡し（`count->bp-input` / `benchmark->bp`）。当時の CLAUDE.md の
+「移行の単位は決定核。repo 全体を移そうとしない」に従った。現行の単位は
+ADR-2608261100。この funnel 核は native 向け fallback として読む。
+
+## 単位を整数 basis point（10000 = 1.0）にした
+
+比較・算術が i64 のみ（`>=` に `:f64` を渡すと
+`expression type mismatch: expected i64, got f64` でコンパイルが落ちる、
+2026-08-15 実測）ため、率は bp で表す。語彙は
+`90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba` に合わせた
+（`clamp-bp` は同じ意味、除算は `quot` で端数は常に下側）。
+
+**ただし `conversion-bp` は `ratio-bp` ではない。** `ratio-bp` は 10000 で
+頭打ちにするが、転換率は 10000 bp を超えることが実際に起きる —— 後段の
+emitter が前段より多く数えるとき。そこで clamp すると
+**emitter どうしが食い違っているという信号が消えて**「ちょうど 100%、健全」に
+見える。だから clamp しない。実測: `cloud-itonami` の awareness→acquisition は
+現在ちょうど 10000 bp で、これが 10000 を超えた日に気づけなくなる。
+
+## 挙動を変えた点（切り捨てで公開値が動きうる）
+
+### 1. `:rate` / `:gap` の鍵と型が変わった
+
+`evaluate-funnel` が返す step は `:rate`（double）/ `:gap`（double）ではなく
+**`:rate-bp` / `:gap-bp` / `:benchmark-bp`**（i64）を持つ。`:benchmark` は
+spec が書いた小数のまま据え置き。**同じ鍵の下で型だけ変えると読み手に
+気づかせずに 100 倍ずれる**ので、名前を変えて壊れて見えるようにした。
+repo 全体を検索して、この 2 鍵の外部の読み手は無かった（`gftd.funnel` 内と
+`bmc_test.cljc` のみ）。
+
+### 2. bp 切り捨ては現行 6 product のボトルネック選択を変えない（実測）
+
+`90-docs/business/metrics/*.edn` の実データで、移行前の double 実装と
+移行後の bp 実装を突き合わせた（2026-08-15）。**6 product すべてで
+ボトルネックは同一。** 切り捨てで値が動いたのは 2 箇所だけ:
+
+| product | step | double×10000 | bp |
+|---|---|---|---|
+| net-kotobase | awareness→acquisition | 83.25008325008326 | 83 |
+| cloud-murakumo | awareness→activation | 2844.9502133712663 | 2844 |
+
+どちらも表示パーセント（`pct-bp`）は変わらない（1% / 28%）ので、canvas の
+snapshot 文字列も変わらず、advisor 側の重複除去が churn しない。
+
+**将来この差がボトルネック選択を変えうる形**: 2 つの step の gap が 1 bp
+（0.01 ポイント）未満で並んでいるとき、切り捨てが同点を作りうる。同点は
+後ろの段が勝つ（下記）ので、その場合は前の段から後ろの段へ移る。
+
+### 3. 負の件数は数ではなく「読めなかった」（実バグの修正）
+
+`count->bp-input` は負値を `(absent)` にする。移行前は `-1` が素の数として
+算術に入り、`from=1000, to=-1` なら率 -10 bp・gap 負となって
+**その段をボトルネックに仕立てていた**。emitter が -1 を「不明」の意味で
+出す経路があるので、これは仮定ではない。ADR-2608136000 の
+「測れなかったものが、測って悪かったものと同じ顔をする」そのもの。
+
+### 4. 「分母が無い」と「測れていない」を出力で区別する（実バグの修正）
+
+前段が 0 件の step は **両端とも測れている**が率を出せない。移行前は
+`(when (and fc tc (pos? fc)) …)` で `:rate` が nil になり、`render-text` の
+`(if (:rate st) … \"(未計測)\")` によって **計器が無い段とまったく同じ文字列**で
+綴られていた。読み手には「visitors が 0 だった」と「visitors を測っていない」が
+判別できない。
+
+kernel はこれを 2 つの述語に分けた（`step-measured?` と `rate-known?`）。
+`evaluate-funnel` は `:measurable` に加えて `:rate-known` を返し、
+`render-text` は前者だけ真のとき `(分母なし)` と綴る。
+
+**ボトルネック選択の挙動は変わっていない**（移行前も分母 0 は候補にならなかった）。
+変わったのは*報告*で、直したのは「飛ばしたのか合格したのかが出力で分かるか」
+（ADR-2608136000 の 4 問目）である。ここを『ボトルネック判定のバグを直した』と
+書くのは誇張になるので書かない。
+
+### 5. benchmark を持たない段には gap が無い（不変条件として固定）
+
+`gap-bp` は benchmark 不在のとき `(gap-absent)` = -100000 を返し、**0 を
+返さない**。0 は「benchmark ちょうど」という実在の gap なので、既定値に
+使えない。
+
+**これは移行前も正しかった**（`(when (and rate bench) …)` が nil を返していた）。
+bp への書き換えで 0 が魅力的な既定値になるため、番兵を分けて明示的に固定した。
+新しい修正ではなく、移行で失いかけたものを守った。gap の番兵に 0 でも -1 でもなく
+-100000 を選んだのは、実在の gap が `[-10000, ∞)` に収まる（`benchmark-bp` が
+`clamp-bp` を通すので benchmark ≤ 10000、率 ≥ 0）ため、到達不能だから。
+
+### 6. 同点のボトルネックは後ろの段が勝つ（明示化）
+
+移行前は `(apply min-key :gap measured-below)` で、Clojure の `min-key` は
+**等しいキーのとき最後の要素を返す**（2 引数版 `(if (< (k x) (k y)) x y)`、
+3 引数以上はループ内が `<=`。2026-08-15 に nbb で実測）。この暗黙の規則を
+`bottleneck-wins?` の `cand <= best` として明示し、移行で静かに反転させないよう
+kernel と `.cljc` の両方にコメントで残した。
+
+## gate（`root-funnel-core`）
+
+fabric-actor-core gate と同じ 4 つ:
+
+1. **artifact ↔ source** — `.mjs` の `sourceDigest` == `.kotoba` の sha256
+2. **purity** — `requiredCapabilities` が空。**読めなかったときを空と読まない**
+3. **parity** — case 表 1,740 件で kernel == cljc、ε 無し
+4. **evidence floor** — 走った件数が `--min`（既定 1700）未満なら fail
+
+加えて参照側の入力そのものも見る: `funnel-specs` が 6 product / 13 benchmark
+より縮んでいないか、宣言された benchmark が**誤差なく整数 bp になるか**
+（ここが崩れると kernel と cljc は一致したまま両方が spec の意図からずれる）、
+`count->bp-input` が「読めない」と「読めて 0」を取り違えていないか。
+
+case 表が名指しで踏む分岐: 分母 0 / 分子 0 / 両端が等しい / 率 1.0 超 /
+benchmark 不在 / benchmark ちょうど / gap 同点。
+
+### 落ちることを 3 通りで実演した（2026-08-15）
+
+| 壊したもの | 報告 |
+|---|---|
+| 参照の `pct-bp` を `(+ bp 50)` → `(+ bp 49)` | `FAIL pct-bp [50] — kernel says \"1\" but cljc says \"0\"` ほか 4 件、exit 1 |
+| `.kotoba` に 1 行足して再コンパイルしない | `artifact<->source: BROKEN`、sha 両方を印字、exit 1 |
+| case 表の `counts` を 16 → 3 に縮める | parity は 0 failing のまま `ran 994 cases` / `FAIL only 994 cases ran, floor is 1700` |
+
+3 つ目が「parity 緑のまま床だけが落ちる」ことを示しているのが要点で、
+これが床の存在理由そのものである。
+
+無改変では `ran 1740 cases, 0 failing` で exit 0。
+
+### `:include-ext` を絞った tree でも緑
+
+`.kotoba .mjs .cljc .cljs .edn` の 2,880 ファイルへ絞った tree で緑
+（`ran 1740 cases, 0 failing`）。**`.cljs` は必須**で、外すと
+`gftd.canvas` → `scripts/nbb_compat.cljs` が解決できず
+`could not run … Could not find namespace: scripts.nbb-compat` で落ちる
+（これも実測済み。落ちて exit 1 になるので、静かに緑にはならない）。
+
+## テスト
+
+`nbb 70-tools/bmc/run-tests.cljs`: 移行前 **49 tests / 294 assertions / 0 失敗**
+→ 移行後 **49 tests / 317 assertions / 0 失敗**。
+
+動いた assertion は 3 つだけ:
+
+- `(< (Math/abs (- 0.03 (:rate …))) 1e-9)` → `(= 300 (:rate-bp …))`
+- `(neg? (:gap …))` → `(= -200 (:gap-bp …))`
+- `(not (neg? (:gap (second …))))` → `(= 4000 (:rate-bp …))` + `(= 1000 (:gap-bp …))`
+
+3 つ目は**それ自体が silent pass だった**: cljs の `(neg? nil)` は false を
+返すので、gap が nil でも通る assertion だった（ADR-2608136000 の 1 問目）。
+実値を見る形に置き換えた。
+
+足した 7 つの testing ブロック: 分母 0 / 分子 0 / benchmark 不在 /
+benchmark ちょうど / 率 1.0 超 / 負の件数 / gap 同点。
+
+## murakumo fleet の LLM を使った範囲（正直に）
+
+オーナー指示に従い `scripts/murakumo-codegen.cljs`（`murakumo-main` alias →
+qwen-agentworld-35b-a3b）で下書きを取った。実測 7.1–7.7 tok/s、2 job 並列。
+
+- **qwen が書いたもの**: kernel 15 関数の機械的な転記（私が関数ごとの意味・
+  番兵の値・分岐の順序を仕様として与えたもの）と、case 表の素案。
+- **私が直したもの**: qwen の kernel は `>` `>=` `<=` `=` `let` を使っており、
+  この profile で通るか未確認だった（採用した版は `<` と入れ子 `if` だけで
+  書き直してある）。case 表は重複と埋め草があり、`[30 1000]` のように
+  意図した比を逆にしていたので作り直した。
+- **設計（bp 化・番兵の選び方・`ratio-bp` を使わない判断・同点規則・
+  gate の 4 検査）は qwen ではなく私が決めている。** 実測どおり、qwen は
+  もっともらしく見えて誤る Kotoba を出す。裁定はコンパイラと parity gate で、
+  正しさの責任はこちらにある。
+
+## 残していること
+
+- gate の `gates.edn` への登録は**この commit に含まれていない**。3 タスクが
+  同じ行域に追記して衝突するため、オーケストレータがまとめて登録する。
+  登録する entry:
+  `{:name \"root\" :id \"root-funnel-core\" :org \"com-junkawasaki\"
+    :gate :nbb-script :script \"gates/funnel-core-check.cljs\"
+    :script-args [\"--min\" \"1700\"]
+    :include-ext [\".kotoba\" \".mjs\" \".cljc\" \".cljs\" \".edn\"]
+    :min-files 2000 :cd false}`
+- したがって **fleet 上で 1 度も緑になっていない**。CLAUDE.md の
+  「gate は fleet で 1 度緑になるまで landed としない」に照らすと、
+  この gate はまだ landed ではない。登録後の最初の receipt を見ること。
+- kernel は native に載らない（`typed-cap-call` も再帰値も使っていないので
+  admission gate 自体は通りうるが、確認していない）。これは backend の話で
+  あって言語の天井ではない（ADR-2608650000）。
+
+## 改訂履歴
+
+2026-08-26: 『移行の単位は決定核』への従いを当時の切り方として書き、
+現行を ADR-2608261100 へ付けた。
+")))

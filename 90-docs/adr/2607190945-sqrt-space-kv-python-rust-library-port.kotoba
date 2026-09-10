@@ -1,0 +1,228 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607190945-sqrt-space-kv-python-rust-library-port")
+  (:adr/title "ADR-2607190945: sqrt-space-kv を Python + Rust から使えるコミュニティ向けライブラリとして com-junkawasaki/sqrt-space-kv に追加")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "sqrt-space-kv-python-rust-port")
+  (:adr/date "2026-07-19")
+  (:adr/last_verified "2026-07-20")
+  (:adr/last-verified "2026-07-20")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative-for
+  (vector "sqrt-space-kv の Python/Rust ポートの配置先 org・repo（kotoba-lang ではなく既存の com-junkawasaki/sqrt-space-kv に統合）"
+   "canonical .cljc とのクロス言語 conformance を golden-fixture テストで担保する方式（Rust core + PyO3/FFI・WASM-as-SSoT を採らない理由）"
+   "新規公開ライブラリのドキュメントにおける対外メッセージング制約（誇大な数値なしの中立的ユーティリティとして公開）"
+   "PyPI Trusted Publishing（トークン非保存）を Python 側の正経路にする方針"))
+  (:adr/authoritative_for
+  (vector "sqrt-space-kv の Python/Rust ポートの配置先 org・repo（kotoba-lang ではなく既存の com-junkawasaki/sqrt-space-kv に統合）"
+   "canonical .cljc とのクロス言語 conformance を golden-fixture テストで担保する方式（Rust core + PyO3/FFI・WASM-as-SSoT を採らない理由）"
+   "新規公開ライブラリのドキュメントにおける対外メッセージング制約（誇大な数値なしの中立的ユーティリティとして公開）"
+   "PyPI Trusted Publishing（トークン非保存）を Python 側の正経路にする方針"))
+  (:adr/related
+  (vector "orgs/com-junkawasaki/sqrt-space-kv"
+   "orgs/com-junkawasaki/sqrt-space-kv/python"
+   "orgs/com-junkawasaki/sqrt-space-kv/rust"
+   "orgs/com-junkawasaki/sqrt-space-kv/tests/fixtures/golden.json"
+   "orgs/com-junkawasaki/sqrt-space-kv/.github/workflows/publish.yml"
+   "orgs/com-junkawasaki/sqrt-space-kv/RELEASE.md"
+   "orgs/com-junkawasaki/sqrt-space-kv/90-docs/adr/2607190900-python-rust-library-port.edn"
+   "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/sqrt_space.cljc"
+   "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/kv_runtime.cljc"
+   "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/sqrt_space_kv_fixtures.clj"
+   "90-docs/adr/2607182800-sqrt-space-kv-mla-composability-maturity-review.edn"
+   "90-docs/adr/2606302300-org-taxonomy-4-orgs.edn"
+   "90-docs/adr/2607021330-org-repo-visibility-policy.edn"
+   "90-docs/adr/2607010930-clj-wgsl-migration.edn"
+   "https://pypi.org/project/sqrt-space-kv/"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/superseded_by (vector))
+  (:adr/problem
+  "sqrt-checkpoint KV残留ポリシーの実装は orgs/gftdcojp/cloud-murakumo の
+   private な .cljc（sqrt_space.cljc / kv_runtime.cljc、依存ゼロの純粋数学
+   コード ~550行）にのみ存在し、Python/Rust コミュニティが利用する経路が
+   なかった。唯一の公開 repo（com-junkawasaki/sqrt-space-kv）は論文・
+   ベンチマークのみでソースコードはゼロだった。")
+  (:adr/decision
+  "cloud-murakumo の sqrt_space.cljc と kv_runtime.cljc の純粋部分
+   （kv_policy.cljc のエンジン固有 serving glue と Clojure 専用 CLI/ファイル
+   I/O は除外）を、依存ゼロの独立した python/ パッケージと rust/ クレート
+   として手動移植し、既存の公開 repo com-junkawasaki/sqrt-space-kv に追加
+   した（新規 kotoba-lang repo は作らない — オーナー指示: この技術は
+   kotoba-lang 基盤に限定されないため。GitHub は同一 org 内で同名 repo を
+   作れないため、別名の新規 repo か既存 repo への統合の二択で、後者を選択）。
+
+   canonical .cljc との conformance は tests/fixtures/golden.json（新規
+   cloud-murakumo の :sqrt-kv-fixtures エイリアスで生成、手動で
+   sqrt-space-kv 側に vendor — private↔public org 境界を跨ぐため CI 自動同期
+   はできない）で担保し、python/tests・rust/tests 双方がこれを検証する。
+
+   Rust core + PyO3/uniffi 等の FFI バインディング方式は採らない
+   （ADR-2607010930 が言及する forbidden-authority-files 規約 —
+   このワークスペースは Rust+PyO3 workspace を意図的に削除し .cljc 統一へ
+   移行した経緯があり、それと整合しない）。WASM を単一正本にする方式
+   （.kotoba 完成 + kotoba wasm emit + wasmtime 消費）も、~550行の依存ゼロ
+   ライブラリに wasm ランタイム依存を追加するのは不釣り合いとして不採用。
+
+   新規ライブラリのドキュメント（python/README.md・rust/README.md・
+   モジュール docstring）には誇大な圧縮率数値（90-97%）を掲載しない —
+   ADR-2607182800 が対外発信をゲートしている（host paging 下で
+   2.2-3.7倍のデコード減速という未解決のトレードオフがあるため）。既存の
+   リポジトリ trunk README.md（既存の研究報告、今回新規に追加したものでは
+   ない）はそのまま維持した。
+
+   Python の実配布は PyPI Trusted Publishing（GitHub Actions OIDC、
+   tag push トリガー）を正経路にし、APIトークンを一切保存しない。crates.io
+   側は同等の仕組みがないため、手動 `cargo login`/`cargo publish`（token は
+   1Password + macOS Keychain に保管、値は非コミット）で運用する。")
+  (:adr/consequences
+  (vector "com-junkawasaki/sqrt-space-kv に python/・rust/ パッケージが追加された。
+    両パッケージとも LICENSE（MIT、両 repo とも従来存在しなかった）付き"
+   "cloud-murakumo に golden-fixture ダンプスクリプトが追加された
+    （sqrt_space_kv_fixtures.clj、:sqrt-kv-fixtures エイリアス）"
+   "初回ポート時に Python 版 block_stream_attn に実バグ（ループ間で m を
+    m_new に更新し忘れ、複数ブロックで結果が破綻）があり、golden-fixture
+    照合テストが即座に検出した — この手法の価値を実証する形になった"
+   "cloud-murakumo（private gftdcojp）と sqrt-space-kv（public
+    com-junkawasaki）は org を跨ぐため、fixture 同期は CI 自動化できず
+    手動運用（CONTRIBUTING.md に手順を記載）"
+   "west.yml の既存 sqrt-space-kv エントリ（com-junkawasaki）はリネーム
+    不要 — 通常の pin 前進のみ実施済み"
+   "PyPI: `pip install sqrt-space-kv` で公開済み・動作確認済み（v0.1.0、
+    2026-07-19、Trusted Publishing 経由・トークン非保存）"
+   "crates.io: `cargo add sqrt-space-kv` はまだ使えない — publish が
+    403 Forbidden（authentication failed）でブロック中。原因未特定
+    （トークンの publish-new スコープ不足 / アカウントのメール未検証の
+    いずれかが濃厚）。crates.io API トークンは 1Password（item
+    \"crates.io API Token\"、Private vault）と macOS Keychain
+    （service=crates.io, account=CRATES_API_KEY）に保管済み（値はここには
+    書かない）"))
+  (:adr/open-questions
+  (vector "golden-fixture の attention 出力に対するクロス言語許容誤差（現状
+   1e-6、言語内は1e-9）は初期値であり、実運用で緩すぎ/厳しすぎが判明したら
+   見直す"
+   "cloud-murakumo の .cljc が将来変更された場合の同期タイミング/
+   バージョニング規約は「手動、CONTRIBUTING.md に記載」以上に厳密化されて
+   いない"
+   "crates.io publish の 403 Forbidden の根本原因未特定 — 次セッションで
+   https://crates.io/settings/tokens のスコープと
+   https://crates.io/settings/profile のメール検証状況を確認し、必要なら
+   publish-new スコープ付きの新トークンを再発行してから
+   `cargo login`→`cargo publish` を再試行する"))
+  (:adr/body
+"# ADR-2607190945: sqrt-space-kv を Python + Rust から使えるコミュニティ向けライブラリとして com-junkawasaki/sqrt-space-kv に追加
+
+## 経緯
+
+オーナーから「com-junkawasaki の sqrt-space-kv を実際に python, rust
+などでも利用して、コミュニティが利用できるように計画して」という依頼を
+受けた。調査の結果、`sqrt-space-kv`（com-junkawasaki）は論文・ベンチマーク
+のみのリサーチ結果 repo で、実装本体は `gftdcojp/cloud-murakumo` の
+private な `.cljc`（`sqrt_space.cljc` / `kv_runtime.cljc`、~550行の依存
+ゼロ純粋数学）にあることが判明した。
+
+当初は「新規ライブラリは org-taxonomy ADR-2606302300 に従い kotoba-lang
+に置く」方針で計画したが、オーナーから「kotoba-lang ではなく
+com-junkawasaki に配置してほしい。これは kotoba-lang に限るものではない
+ので」との指示があり、方針を変更。GitHub は同一 org 内で同名 repo を
+作れないため、既存の `com-junkawasaki/sqrt-space-kv`（既に public）に
+`python/`・`rust/` を追加する単一 repo への統合を選択した。
+
+## 実装方針の決定
+
+Python/Rust への配布方式については、以下を比較検討した:
+
+1. **各言語への手動移植 + golden-fixture 照合テスト（採用）** — Rust
+   crate と Python package をそれぞれ純粋な再実装（~550行、依存ゼロ）と
+   して書き、canonical な `.cljc` から生成したゴールデン fixture で
+   3言語の出力が一致することを CI で検証する。既存の Python ベンチマーク
+   スクリプト（`cloud-murakumo/scripts/bench_sqrt_kv_mac.py`）が既に
+   このパターンの実例（手動移植された `sqrt_keep_indices` 等）。
+2. **WASM を単一正本にする方式（不採用）** — `.kotoba` 実装を本番
+   アルゴリズム全体まで拡張し `kotoba wasm emit` で実 `.wasm` を生成、
+   Python は wasmtime-py、Rust は wasmtime crate 経由で同一バイナリを
+   ロードする。ドリフトが構造的に起きない利点はあるが、~550行の依存ゼロ
+   ライブラリに wasm ランタイム依存を追加するのは不釣り合いと判断。
+3. **Rust core + PyO3/maturin FFI バインディング（不採用）** — 古典的な
+   「Rust 実装 + 自動生成 Python バインディング」方式。このワークスペースは
+   ADR-2607010930 で言及される `forbidden-authority-files` 規約のもと、
+   Rust+PyO3/FFI バインディング構成を意図的に削除し `.cljc` 統一へ移行した
+   経緯があり、既存の慣行と逆行するため不採用（`kami-mangaka-scene` に
+   現役の PyO3 利用が一部残るが、これは規約制定前の既存資産であり新規
+   タスクの模倣対象にはしない）。
+
+## 実装内容
+
+- `cloud-murakumo` に `src/cloud_murakumo/sqrt_space_kv_fixtures.clj`
+  （新規、`:sqrt-kv-fixtures` deps.edn エイリアス）を追加し、
+  `optimal-block`/`tree-height`/`keep-indices` の掃引、6戦略×3 S値の
+  `strategy-cost`、決定論的 LCG による attention exactness ケース3件、
+  residency 適用ケース1件を含む `golden.json` を生成できるようにした。
+  server-side merge で cloud-murakumo main に着地済み（commit
+  `0c2722b`）。
+- `com-junkawasaki/sqrt-space-kv` に以下を追加し、server-side merge で
+  main に着地済み（commit `9338755`）:
+  - `LICENSE`（MIT、リポジトリ全体で初）
+  - `python/`（`pyproject.toml`、`src/sqrt_space_kv/{cost_model,residency,attention}.py`、
+    `tests/`、zero runtime deps、`requires-python >=3.11`）
+  - `rust/`（`Cargo.toml`、`src/{cost_model,residency,attention}.rs`、
+    `tests/golden.rs`、zero runtime deps、テストのみ `serde_json` dev-dep）
+  - `tests/fixtures/golden.json`（cloud-murakumo から手動 vendor）
+  - `.github/workflows/{python-ci,rust-ci}.yml`（push/PR で pytest・
+    cargo test + clippy + fmt）
+  - `CONTRIBUTING.md`・`RELEASE.md`（PyPI/crates.io 名前空き確認を含む
+    手動リリース手順）・`CHANGELOG.md`・`SECURITY.md`
+  - トップレベル `README.md` に Library セクションと Layout 更新を追加
+    （既存の研究報告部分は変更していない）
+- 実装中、Python 版 `block_stream_attn` の初回移植に実バグがあった:
+  ブロックストリーミングのループで `m` を次イテレーションの `m_new` に
+  更新し忘れており（Clojure の `recur` は明示的に次状態を渡すが、Python
+  の `while` ループでは手動更新が必要）、複数ブロックで結果が大きく
+  破綻していた（誤差 ~0.13、正しい実装は ~1e-16）。golden-fixture 照合
+  テストがこれを一発で検出した — この手法を採用した理由を実地で裏付ける
+  結果になった。Rust 版は同じ罠を認識した上で実装したため初回から
+  正しく通過。
+- ローカル検証: `pytest` 9/9 pass、`cargo test` 5/5 pass、`ruff check`
+  clean、`cargo clippy -- -D warnings` clean、`cargo fmt --check` clean、
+  `python -m build --sdist --wheel` 成功後クリーン venv での import
+  スモークテスト成功、`cargo publish --dry-run --allow-dirty` 成功。
+  いずれも GitHub Actions CI（push 時）で green を確認済み。
+
+## Addendum 1（2026-07-19〜20）: PyPI 公開完了・crates.io は認証で保留
+
+**PyPI**: 名前空き確認（`pypi.org/pypi/sqrt-space-kv/json` → 404）を経て、
+`.github/workflows/publish.yml`（tag push トリガー、test→build→
+`pypa/gh-action-pypi-publish` の3ジョブ構成）を追加、server-side merge で
+main に着地（commit `ed19662`）。オーナーが
+https://pypi.org/manage/account/publishing/ で pending publisher
+（owner=com-junkawasaki, repo=sqrt-space-kv, workflow=publish.yml,
+environment=pypi）を登録後、`v0.1.0` タグを push して実行 —
+test/build/publish 全ジョブ green、**PyPI に公開完了**
+（https://pypi.org/project/sqrt-space-kv/）。クリーン venv での
+`pip install sqrt-space-kv` → import → `keep_indices(4096)` 呼び出しまで
+実機で確認済み。APIトークンは一切保存していない（OIDC のみ）。
+
+**crates.io**: 名前空き確認（`crates.io/api/v1/crates/sqrt-space-kv` →
+404、User-Agent 必須）は完了。`cargo login` は crates.io/me での
+ブラウザ発行トークンが必須で CLI 単体では完結しないことを確認
+（`gh auth login` 型の自動コールバックは crates.io には無い）。オーナーが
+トークンを発行・共有し、`cargo login` は成功（`~/.cargo/credentials.toml`
+に保存）。同トークンは 1Password（item \"crates.io API Token\"、Private
+vault、フィールド `credential`/`username=CRATES_API_KEY`）と macOS
+Keychain（`security add-generic-password -a CRATES_API_KEY -s crates.io`）
+にも保管した（オーナー指示）。ただし `cargo publish`（rust/ v0.1.0）は
+**403 Forbidden（authentication failed）で失敗** — トークン文字列自体は
+保存値と一致確認済みなので、原因はトークンのスコープ不足（新規 crate
+公開には `publish-new` スコープが必要）かアカウントのメール未検証の
+いずれかと推定、未確定のまま次セッションに持ち越し（open-questions 参照）。
+
+## 未実施
+
+crates.io への実際の公開（`cargo publish`）が 403 で未完了。オーナーが
+https://crates.io/settings/tokens のスコープと
+https://crates.io/settings/profile のメール検証状況を確認し、必要なら
+`publish-new` スコープ付きの新トークンを発行 → 1Password/Keychain 更新 →
+`cargo login`→`cargo publish` を再試行する。")))

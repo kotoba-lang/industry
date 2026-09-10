@@ -1,0 +1,132 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800005500-additive-review-split-strands-halves-of-one-change")
+  (:adr/title "cleanup-land の :additive / :review 分割は 1 つの変更の半分だけを着地させることがあり、それを捕まえる gate は着地する側しか見ていない")
+  (:adr/date "2026-08-30")
+  (:adr/status "accepted")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/repos (vector "com-junkawasaki/root" "cloud-itonami/app-mail-relay" "network-awai/loop-consumability"))
+  (:adr/related (vector "adr-2608136000-six-questions-before-trusting-green" "adr-2800005000-cleanup-survey-enumeration-roots-and-symlinked-gitdirs" "adr-2608230300-renamed-unverified-is-not-an-orphan"))
+  (:adr/body "## Context — cleanup の分割規則そのものが repo を壊した
+
+`manifest/cleanup-workflow.edn` の `:land` は着地候補を 2 つに割る。`:additive`
+（untracked のみ。default branch に同名パスが無いので既存の行を書き換えない → commit
+→ PR → **merge**）と `:review`（tracked file への変更。stale な base が黙って main を
+巻き戻しうる → PR は作るが **merge しない**）。
+
+この分割の論拠は 1 ファイルずつ見れば正しい。**壊れるのは、1 つの変更が両方の側に
+またがっているときである。**
+
+2026-08-30 の cleanup で `cloud-itonami/app-mail-relay` を実測した。前日 2026-08-29 の
+`cleanup: land untracked WIP (19 files)`（`e653997e`、PR #1 で merge）が source を
+19 本着地させ、**同じ変更の設定側は `:review` に落ちて誰も処置しなかった。**結果として
+main は 1 日以上こう在った:
+
+| main に在るもの | main に無いもの |
+|---|---|
+| `src/mail_relay/send.cljc` が `mail.draft` / `mail.message` / `mailer.core` を require | `deps.edn` の `io.github.kotoba-lang/mail` と `.../mailer` の宣言（`grep -c` = 0） |
+| `src/mail_relay/worker.cljs` が `[mail-relay.root-auth :as root-auth]` を require し `root-auth/verify` を呼ぶ（44 行目・573 行目） | `src/mail_relay/root_auth.cljs` そのもの（contents API が **404**） |
+
+**同じ 1 回の pass が同じ repo で 2 回踏んでいる。**1 つ目は `:additive` と `:review` の
+境界、2 つ目は credential gate の境界。どちらも「この 1 ファイルを着地させてよいか」には
+正しく答え、「このファイルを着地させ *ない* ことで repo が壊れるか」を誰も問わなかった。
+
+## Decision — gate は片側しか見ていない、と明記する
+
+`:unresolved-refs-gate`（ADR 相当の記述は `manifest/cleanup-workflow.edn`）は、まさに
+この class を捕まえるために在る —— 着地する `.clj/.cljc/.cljs` の ns 形から `:as` alias を
+読み、その namespace の source がこの repo に在るなら、alias 経由で使われた symbol が
+実際に定義されているかを検査する。`kotoba-kir` で 5 日間 0 tests run だった原因を
+これが見つけた。
+
+**しかしこの gate は「着地するファイルが、既に在るものを参照できるか」しか見ない。**
+2026-08-29 の事故はその逆向き —— **着地しなかったファイルを、既に着地したものが
+参照している。**gate は着地集合の側に立っているので、構造的に見えない。
+
+したがって:
+
+- **`:additive` と `:review` に割れた候補が同じ repo に同時に在るときは、`:additive`
+  だけを merge しない。**分割は「1 ファイルが安全か」の答えであって「この部分集合が
+  一貫しているか」の答えではない。
+- **着地後に repo が自分自身を解決できるかを、着地集合ではなく repo 全体に対して測る。**
+  今回の 2 件はどちらも `main` の tree に対する 1 回の問い（`deps.edn` は require された
+  namespace を宣言しているか / require された path は tree に在るか）で出た。
+- **credential gate の drop は無条件でよいが、drop したことは repo の一貫性の問題として
+  残る。**`root_auth.cljs` を落とした判断自体は正しい（path が `root_auth`）。誤りは、
+  その caller を同じ batch で merge したこと。
+
+## 実際にやったこと（2026-08-30）
+
+両方の半分を着地させ、main を修復した:
+
+| repo | merge | 内容 |
+|---|---|---|
+| `cloud-itonami/app-mail-relay` | `83f61f8b` | `deps.edn`（`mail` / `mailer` の git dep + `:local` override）・`.gitignore`・`run-tests.cljs`・`README.md` |
+| `cloud-itonami/app-mail-relay` | `f58a0fbc` | `src/mail_relay/root_auth.cljs`（99 行） |
+| `network-awai/loop-consumability` | `10f9e551` | `evidence/consumability.ledger.edn` に溜まっていた 882 tick |
+
+測ってから着地させた記録:
+
+- `app-mail-relay` は 4 path とも **main が checkout base 以降 1 度も動いていない**
+  （base blob sha == main blob sha）。巻き戻すものが無い。
+- 依存 pin は 2 本とも default branch から到達可能（`mail` は main tip と identical、
+  `mailer` は main の祖先）。**未 merge branch 上の commit を pin にしない**規則に適合。
+- `root_auth.cljs` は **99 行すべて読んでから** publish した。base58btc / base64 の
+  decode と WebCrypto Ed25519 の検証だけで、秘密は 1 つも無い（secret 形の代入 0、
+  PEM marker 0、唯一の長い literal は base58 の字母表）。ns docstring 自身が
+  「検証に鍵は要らない —— 公開鍵は did:key に載っている」と書いている。
+  **credential gate が当たったのは path であって内容ではない。**
+- `loop-consumability` は base が main tip（0 behind）・削除 0 行・HEAD の 531 行が
+  作業ファイルの byte 単位の prefix。`:append-only-ledger-gate` の言う未着地の *データ*。
+
+3 件とも west pin を前進させ、checkout を pin に合わせるところまでやった。**GitHub に
+push しただけでは終わっていない**（`cleanup-workflow.md` の該当節）。
+
+## 第 2 の発見 — 走っている loop が共有 checkout に書き、commit しない
+
+append-only 台帳が 2 つ、この形で溜まり続けている:
+
+| ファイル | 書き手 | この session で観測した増分 |
+|---|---|---|
+| `90-docs/business/canvas-ledger.edn`（root） | `advisor:auto` routine | 1 時間の間に 2 回。seq 13904-13905 と 13906-13907 を別々に着地させた |
+| `evidence/consumability.ledger.edn`（loop-consumability） | consumability loop | 882 tick の backlog を着地させた 1 時間後に 3 tick |
+
+**手で着地させるのは踏み車である。**cleanup を回すたびに dirty で見つかり、着地させても
+次の tick で戻る。直す場所は cleanup ではなく loop の側 —— **自分が append したものを
+自分で commit する**。それまで、この 2 ファイルが dirty であることを cleanup の未処理
+として数え直さないこと。
+
+## 測定の罠（この session で実際に踏んだもの）
+
+- **`git status` の dirty は content の dirty ではない。**共有 checkout の 2 つの
+  worktree が `dirty=115` / `dirty=117` を報告したが `git diff` は空だった（stat data の
+  stale）。別の 1 つは 233,821 件の「変更」を報告し、その全部が `D` で、実体は 4.0K の
+  空の殻だった。**判定は `git diff --name-only HEAD` と `ls-files --others` で採る。**
+- **west checkout の `--not --remotes` は unpushed を過大に報告する。**2 つの nested repo が
+  21 commit / 1 commit 未 push に見えたが、tip は両方 GitHub に在った（fetch refspec が
+  `refs/west/*` なので remote-tracking ref が無い）。
+- **`git worktree remove` は `.git` が symlink だと `not a .git file` で拒否する。**
+  git-annex が worktree の `.git` を symlink に変える。94 件がこれで失敗した。
+  gitdir pointer file に戻してから remove する。
+- **`$rev:$path` を shell 変数で組み立てると zsh が食う。**`rev-parse` が commit sha を
+  返し、それを blob sha と比較して「20 件全部が differ」という誤答が出た。`${rev}:${path}`
+  と閉じるか `git ls-tree -r --name-only <rev> -- <path>` を使う。
+
+## Resume point
+
+superproject は `origin/main` と同期済み。**未処理として残したもの**（優先順）:
+
+1. `kotoba-lang/sdk` —— `package.json` が `@noble/ciphers` を落とすが `package-lock.json`
+   は依然それを持ち、しかも transitive に `^1.3.0` を要求している。source は 1 箇所も
+   import していないので方向は正しいが、lock を再生成しないと不整合。**`:needs-review`。**
+2. `com-junkawasaki/org-spirit-in-physics` —— arXiv 原稿 11 ファイルが未 commit
+   （`main.tex` / `main_ja.tex` 書き直し、`main.pdf` 986KB → 235KB）。base は現行。
+   **オーナーの著述中の作業なので cleanup では触らない。**
+3. 上記の loop 2 本を、自分の append を commit するように直す。
+4. `gftdcojp/apps-gftdcojp` の west update 失敗は外部 submodule
+   （OpenZeppelin の renovate branch の force-update）。`upload-pack: not our ref
+   313e5ee7` もそこ。**こちらの force-push ではない。**
+
+退避先は `.git/stash-archive-20260830/`（72MB）—— branch 151 本の diff+log、
+worktree の未コミット patch 8 本、意味キーで main に無かった台帳イベント 63 件、
+west skip の掃き出し 3 件、child repo の判断済み patch 群。")))

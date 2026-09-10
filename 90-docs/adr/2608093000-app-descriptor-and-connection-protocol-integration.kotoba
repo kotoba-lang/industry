@@ -1,0 +1,208 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608093000")
+  (:adr/doc_type "adr")
+  (:adr/topic "app-descriptor-and-connection-protocol-integration")
+  (:adr/title "app 記述子は 4 つ、接続 protocol は 3 つ、カタログに install が無い —— 1 記述子・1 接続語彙・1 同意儀式に寄せる")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-08")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authoritative_for
+  (vector "cloud-itonami の app 記述子は blueprint.edn を正本とする（manifest.edn の :app/* を吸収する方向）"
+   "app 間のデータ共有を tenant_connection の capability 語彙で表す（新しい protocol を作らない）"
+   "同意儀式は passkey/start-authorization! を使う（新しい consent flow を書かない）"
+   "Fleet 画面が「一覧」から「接続」に変わるときの経路"
+   "itonami-fleet-catalog.edn を再生成できない現在の理由と、その責任の所在"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "2606072200" "2607141700" "2608060000" "2607300900"))
+  (:adr/repos (vector "cloud-itonami/cloud-itonami-app"
+              "cloud-itonami/yotei"
+              "com-junkawasaki/root"))
+  (:adr/body
+  "# ADR-2608093000: app 記述子と接続 protocol の統合
+
+**Status**: accepted / **Date**: 2026-08-08
+
+## Directive
+
+オーナー質問（2026-08-08）「こういった app が cloud-itonami-app の画面から自然に
+接続できるようにするには? またそれぞれの app を install, 接続するような uiux は
+統合されている? appstore みたいに. oauth 的な情報の受け渡しの protocol は設計統合
+されている?」→「yes」（ADR 化の指示）。
+
+## 実測した現在地（2026-08-08）
+
+**部品は在る。互いを知らない。** 3 つの問いに順に答える。
+
+### ① 画面から接続できるか —— 仕組みは在り、yotei が載っていなかった
+
+cloud-itonami-app の **Fleet 画面**（`web.clj` の `data-view-panel \"fleet\"`）は
+`resources/itonami-fleet-catalog.edn` を読む。これは
+`scripts/gen-itonami-fleet-catalog.cljs` が `cloud-itonami/*/blueprint.edn` から
+生成する **1,215 件・うち callable 77 件**のカタログ。
+
+**`blueprint.edn` を持つ repo は 1,393。yotei は持っていなかった** —— org で唯一
+デプロイ済みかつ公開到達可能な app が、app を一覧する画面から存在しなかった。
+`:endpoint` の有無が callable / directory record を分ける唯一の軸。
+
+→ `cloud-itonami/yotei` に `blueprint.edn` を追加（`fe1af24`）。
+
+### ② install / connect の UX —— カタログはストアではない
+
+| 在る | 無い |
+|---|---|
+| 1,215 件のカタログ + Fleet 画面 | 「入れる」操作 |
+| `:endpoint` による callable 判定 | 「自分の org に接続する」 |
+| | カタログ → 接続 → 同意 を繋ぐ線 |
+
+### ③ OAuth 的 protocol —— 良い設計が 3 つ、参照し合っていない
+
+| | 実体 | 向き |
+|---|---|---|
+| `tenant_connection.clj` | capability 限定・TTL 60s〜24h・失効可能な lease。request → approve → grant → revoke | **内向き**（agent → tenant） |
+| `passkey/start-authorization!` | 操作 context を**サーバ側で束縛**する同意儀式。`:kind` を分けて「ログインしただけの assertion が承認として通る」のを防ぐ | 内向き |
+| `identity` の provider 群 | Google / Microsoft / GitHub への PKCE + refresh。`calendar.readonly` は既に scope に在る | **外向き** |
+
+**`tenant_connection` の capability 語彙は全て内向き**（`tenant.read` /
+`workspace.write` / `actor.invoke` / `repository.*`）。「yotei が free/busy を
+読んでよい」に相当するものが無い。**app 間のデータ共有がこの protocol の対象外**
+であることが、統合されていない一番の実質。
+
+### app 記述子が 4 つある（1 つはこのセッションが増やした）
+
+| 形式 | 使用数 |
+|---|---|
+| `blueprint.edn` | 1,393 |
+| `manifest.edn`（actor 系） | 数十 |
+| `kotodama.jsonld` + `APP_*` wrangler vars（etzhayyim appview） | 数十 |
+| **`:app/mount` / `:app/org`（2026-08-08 に yotei へ追加）** | **1** |
+
+4 つ目は**既存を確認せずに作った**。`blueprint.edn` の存在を見ていれば足さなかった。
+CLAUDE.md の「『無い』と結論する前に索引を引く」に反した実例をここに記録する。
+
+## Decision
+
+### D1. app 記述子は `blueprint.edn` を正本とする
+
+`:app/mount` `:app/org` `:app/surface` は `:itonami.blueprint/*` 名前空間に吸収する。
+**新しい記述子形式を作らない。**
+
+吸収が済むまでの間、両方を持つ repo（現在 yotei のみ）は**重複させない**。
+問いが違うため:
+
+- カタログ = 「何が在って、呼べるか」
+- manifest = 「どこにマウントされ、誰の所有か」
+
+両者は **`:id == repo 名 == script 名 == :app/mount のセグメント`** で join する。
+この 4 つは構造上ひとつの文字列（dispatch router が script 名で振り分ける）。
+
+### D2. app 間のデータ共有は `tenant_connection` の capability として表す
+
+**新しい protocol を作らない。** 既に request → approve → TTL → revoke が在る。
+足りないのは語彙だけなので、外向き capability を追加する。命名は
+`<domain>.<resource>.<verb>`:
+
+- `calendar.freebusy.read` —— yotei が owner の空き時間を読む
+- `calendar.event.write` —— 確定した 予約 を owner のカレンダーに書く（将来）
+
+**capability は allowlist のまま**（`allowed-capabilities` set）。open な文字列に
+しない —— 語彙が閉じていることが、grant 画面に何を表示すべきか決まる理由。
+
+### D3. 同意は `passkey/start-authorization!` を使う
+
+**新しい consent flow を書かない。** あれは既に 2 つの正しいことをしている:
+
+1. 操作 context を**サーバ側で束縛**する（client に再提出させない ——
+   同意した後に中身をすり替えられない）
+2. `:kind` を `:assertion` と分ける（ログインの assertion が承認として通らない）
+
+passkey は**署名はできるが復号はできない**。したがって承認は passkey でよく、
+**暗号化された内容を読む操作は鍵を持つ端末に残る**（yotei の owner CLI が実例）。
+
+### D4. Fleet 画面は「一覧」から「接続」になる
+
+```
+カタログ項目 → tenant_connection/request → passkey/start-authorization!
+             → grant（TTL 付き）→ 失効可能
+```
+
+3 つとも既に在る。**繋がっていないだけ。**
+
+## Consequences
+
+- **記述子の統合には移行が要る。** 1,393 の `blueprint.edn` は動いており、
+  変更するのは `:app/*` を持つ側（現在 1 repo）。逆ではない。
+- **capability 語彙を増やすと grant 画面の文言が要る。** 「この app に何を許すか」を
+  人が読める形にできない capability は追加しない。
+- **passkey に寄せると web console で連絡先が読めない。** これは制約ではなく設計:
+  復号鍵をブラウザに置かない理由が消えるわけではない。
+
+## 実装状況（2026-08-08 closing 時点。すべて default branch に着地済み）
+
+| | | 着地 |
+|---|---|---|
+| D1 `:app/*` → `:itonami.blueprint/*` の吸収 | ✅ | yotei `bdb3e56` / gen `72f13ff` |
+| D2 外向き capability + 文言の構造的強制 | ✅ | app `57c89cb` |
+| D3 同意 = `passkey/start-authorization!` | ✅ 既存を使用 | — |
+| D4 Fleet 画面の「接続」 | ✅ | app `0cf364ab` / yotei `a921f18` |
+| yotei の `blueprint.edn` | ✅ | `fe1af24` |
+| **カタログ再生成（下記）** | ✅ | app `80ad7bbc` / gen `f28b493` |
+
+## itonami-fleet-catalog.edn —— 解決済み。partition の assertion が正しかった
+
+**当初この ADR は「再生成すると fleet_test が 2 本落ちるので範囲外」と書いていた。
+調べたら片方は本物のバグを捕まえていたので、直した。**
+
+### `:per-repo-evidence` は実行モデルではなく「指示」だった
+
+4 つ目の bucket を足すのが素直に見えたが、それはバグを埋めることだった。
+`manifest/repository-rules.edn` はこれを**値ではなく指示**として定義している ——
+「prefix が ROLE ではなく KEY の場合ひとつの execution 値を持てない。`:repo/kind` を
+証拠由来の taxonomy から読み、名前から推論するな」。
+
+**generator はその sentinel をそのままカタログに書いていた**（185 行）。分割
+assertion はそれを捕まえていた。修正は rule 自身の `:execution-source`
+（file / attribute / mapping）を経由する —— ここに写しを置かない
+（ADR-2607299000 が語彙を superproject に移した理由と同じ）。
+
+authority の予告どおりの数字が出た:
+
+| | |
+|---|---|
+| organisation-record → `:none`（除外） | **154** |
+| actor → `:on-demand` | 31 |
+| actors | 1,448 → **1,294**（ちょうど 154 減） |
+| callable | **79 のまま**（到達可能なものは失われていない） |
+| partition | `1294 == 1269 + 13 + 12` ✅ |
+
+### `:resident` 10 → 13 は benign
+
+`loop-*` 11 + `person-*` 2。同じテストが assert する role と一致しており、
+コメントが「8 → 9 は tripwire が仕事をしている姿」と言うとおりに発火していた。
+母集団を名指しして上げた。「unclassified は今は空」というコメントも直した（12 件ある）。
+
+**`--check` は OK。** yotei の行は `:mount` `:org` `:requests` `:endpoint` を持ち、
+D4 の接続 UI が描画するものが揃っている。
+
+## 残っている gap（優先順）
+
+1. **記述子の統合は yotei 1 repo だけ。** `kotodama.jsonld` + `APP_*` wrangler vars を
+   使う etzhayyim appview 群は未着手。移行対象は少数派の側であって、1,393 の
+   blueprint 側ではない
+2. **接続 UI は未検証。** サーバ・カタログ・capability は実測したが、
+   Fleet 詳細から実際にクリックして grant まで通す往復は動かしていない
+   （tenant が要る）
+3. **`oteint` の blueprint が 1 件 skip され続けている**（actor blueprint でも
+   company record でもない）
+
+## 参考: この判断が生まれた経緯
+
+yotei（`cloud-itonami/yotei`）を Calendly 相当として実装する過程で、
+`app.itonami.cloud/yotei` に公開・稼働させ、Durable Object・封筒暗号・署名確定・
+free/busy ingest まで通した。その後「他の app と同じように扱えるか」を確認したところ、
+**カタログに存在しないことが分かった**。")
+  (:adr/consequences
+  "D1-D4 すべて default branch に着地済み（2026-08-08）。カタログも再生成され --check は OK。
+記述子統合の移行対象は :app/* を持つ側（1 repo）であって 1,393 の blueprint 側ではない。
+capability を増やすときは grant 画面に出す人間可読の文言を同時に決める。
+passkey に寄せた結果、web console からは暗号化された連絡先を読めない —— これは設計であって不足ではない。
+itonami-fleet-catalog.edn は再生成すると fleet_test が 2 本落ちる状態のままで、yotei は直るまで Fleet 画面に出ない。")))

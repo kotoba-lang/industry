@@ -1,0 +1,218 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608312600-acceptance-density-and-the-fold-that-could-not-read-its-own-api")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "acceptance-density-and-the-fold-that-could-not-read-its-own-api")
+  (:adr/title "ADR-2608312600: acceptance density を測りに行ったら、測定器が自分の API を読めていなかった —— 『0 paid』は相手が居ないことではなく、綴りが違うことだった。そして x402 側の『未配線』は既に古い")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+
+  (:adr/repos
+  (vector "com-junkawasaki/root"
+   "orgs/kotoba-lang/murakumo"
+   "orgs/network-awai/cloud-murakumo"
+   "orgs/network-awai/nexus-x402"))
+
+  (:adr/authoritative_for
+  (vector "acceptance density が 2 つの別々の量であること —— (A) x402/USDC の seller 多様性 と (B) credits を実際に受け取った相手の数。ADR-2608291009 step 5 は (A) の状況を引いて (B) を律速と呼んでおり、そこが混ざっていた"
+   "(A) は既に配線済みであること。facilitator は self-serve で開いており、実在の第三者 seller が live の 402 経路を持つ。ADR-2607299900 :next step 2 の『第三者 seller と facilitator 開放は実装済みだが未配線』は 2026-08-31 時点で古い"
+   "(B) の実測値と、その測り方。公開 feed を正準の reader で畳んではならないこと"
+   "`murakumo.infer.credits` が公開 feed（/infer/runs）の wire 形を読めなかったこと、および `from-wire` / `balances-of-wire` がその唯一の正しい入口であること"
+   "読めなかった件数を残高の隣に必ず出すこと（`:read` / `:skipped` / `:unreadable`）"))
+
+  (:adr/amends
+  (vector "90-docs/adr/2608291009-bot-kumo-yata-three-unit-economy.edn —— 実装順 step 5 の記述を訂正する。(A) は配線済み、(B) が未着火"
+   "90-docs/adr/2607299900-tradeable-token-policy-reversal.edn —— :next step 2 の『実装済みだが未配線』を撤回する"
+   "90-docs/adr/2607259800-token-economy-and-monetary-system-dynamics.edn —— acceptance density = 1 という値の出所を明示する（(B) についての値であり、(A) ではない）"))
+
+  (:adr/related
+  (vector "90-docs/adr/2608312300-gftd-out-of-the-bot-economy-path.edn（step 2 の landing と step 1 のブロックを記録した直前の ADR）"
+   "90-docs/adr/2608026100-murakumo-credits-as-unit-of-account-opaque-backend.edn"))
+
+  (:adr/measured
+  (vector "(A) x402/USDC 側、live 2026-08-31: x402.nexus/catalog は 16 item / 6 seller / **3 つの distinct payTo**。facilitator は /apply が self-serve（『Publish an x402 discovery document at your own host and POST /apply — no token, no waitlist』）"
+   "(A) 3 payee のうち 0xA00366234D29d4F882088048c0B2fa0dB7302D4E は junbi Safe（gleif / kekkai / kotobase / murakumo）。0xf1592811063554e2EDfC137964aE181C830967Ac（shinshi）は**自分たちのもの**（orgs/gftdcojp/.nexus-x402-tamaki-*/wrangler.jsonc に在る）。EOA / nonce 0 / USDC 0"
+   "(A) 0x4945092C6586F078E0eD2130a53b0CDEe90c6796（colombia-trm）は **west にも 90-docs にも repo が無く**、コロンビア金融監督庁の TRM / TIBC / 預金金利 / 貸出金利 / FIC を各 $0.005 で売っている。EOA / nonce 0 / **USDC 0.08 受領済み**。GET https://x402.nexus/gateway/colombia-trm/trm は **HTTP 402** を返し、challenge の payTo はその第三者自身のアドレス"
+   "(B) credits 側、api.murakumo.cloud/infer/runs の 764 事象: transfer は **1 件だけ**（did:key:z6MkCustomer2 → did:key:z6MkbbbbCCCC…、1 credit）。宛先はテスト形の DID"
+   "(B) サーバ自身の GET /infer/credits はその宛先の残高を 1 と返す —— **サーバは数えている**"
+   "(B) しかし `murakumo.infer.credits/accepting-sellers` を同じ公開 feed に当てると **#{} すなわち 0**。キーを :run/transfer に直すと 1 になる"
+   "**正準の `balances` を公開 feed に当てた結果: 口座 2。サーバは 48。48 中 44 が食い違う。**原因は綴りで、公開 feed は \"spend\" / \"transfer\" / \"topup\" / \"grant\" / \"shares\" という接頭辞の無い文字列キーを使う。cond の分岐が全部外れ :else に落ち、settle 済み run として読み替えられる"
+   "`from-wire` を通すと **48 口座すべてが 1e-6 以内で一致（食い違い 0）**。内訳は read 756 / skipped 3（pending-topup）/ unreadable 5"
+   "その unreadable 5 件は `shares` も `total` も持たない run —— 記録されたが精算されていない"
+   "着地: kotoba-lang/murakumo 91f04ea84436（from-wire / balances-of-wire / unreadable / no-op、37 tests / 192 assertions）、west pin ad246374e341"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-31）「next」。ADR-2608312300 が step 1 をブロック、step 2 を landed と記録した直後なので、次はブロックされていない **step 5（acceptance density を上げる）**である。ADR-2608291009 はこれを『BOT より前に来る』と明記している。
+
+現在地を測りに行った。**2 つのことが分かり、どちらも文書と食い違っていた。**")
+
+  (:adr/decision
+  "### D1. acceptance density は 2 つの別々の量である。1 語で呼ぶのをやめる
+
+| | (A) x402 の seller 多様性 | (B) credits の受け取り手 |
+|---|---|---|
+| 単位 | USDC | credits |
+| 測り方 | catalog の distinct payTo | 台帳の transfer の distinct 宛先 |
+| 2026-08-31 | **6 seller / 3 payee / 実在の第三者 1**（colombia-trm） | **1、しかもテスト DID** |
+| ADR-2607259800 が『= 1』と呼んだのは | ではない | **こちら** |
+
+ADR-2608291009 の step 5 は『第三者 seller と facilitator 開放は実装済みで未配線』と
+(A) の状況を引きながら、律速として (B) を指していた。**同じ語で 2 つの量を指していたので、
+(A) が動いても (B) が動いたように読め、逆も起きる。**以後、必ず (A)/(B) を分けて書く。
+
+### D2. (A) は配線済みである。『未配線』の記述を撤回する
+
+実測: facilitator は `/apply` が self-serve（token 無し・waitlist 無し。payTo は
+申請者自身の discovery 文書から読むので request body からは取らない）。catalog には
+**west にも 90-docs にも repo を持たない第三者**が 5 資源を並べ、その gateway URL は
+**HTTP 402 を返し、challenge の payTo は第三者自身のアドレス**で、そのアドレスは
+USDC を 0.08 受領している。
+
+**したがって『第三者 seller と facilitator 開放は実装済みだが未配線』は古い。**
+ADR-2607299900 の :next step 2 は完了として扱う。
+
+⚠ **(A) が動いたことを (B) の前進として引用しないこと。** colombia-trm が受け取るのは
+USDC であって credits ではない。膜の規則（ADR-2608291009 D3）でも別の圏である。
+
+### D3. (B) は実質 0 である。ただし『0』の出所を取り違えていた
+
+台帳には transfer が 1 件在り、**サーバはそれを数えている**（宛先残高 1）。
+一方 `cloud-murakumo.credits-admission/acceptance-density` の docstring は
+『0 paid / 0 registered today』と書いている。
+
+**その 0 は『相手が居ない』ではなく『読めなかった』だった。**
+`accepting-sellers` は `:run/transfer` で filter するが、公開 feed は `\"transfer\"` と綴る。
+
+実測すると (B) の paid は **1、宛先はテスト形の DID**。つまり
+**実在の第三者に credits が払われたことはまだ一度も無い。** 結論としては
+『実質 0』で正しいが、**その結論に至る経路が壊れていた**ので、直さなければ
+本物の 1 件目が来ても同じ 0 が出続ける。
+
+### D4. 公開 feed は `from-wire` を通してから畳む。素の feed を正準 reader に渡さない
+
+`murakumo.infer.credits/from-wire` が公開形を正準形へ写す唯一の入口である。
+`balances-of-wire` はそれを通した fold を返す。
+
+**`balances` の意味は 1 バイトも変えていない。** `ledger-violations` の docstring が
+「戻り値を変えると既に書かれた feed を遡って読み替えることになる」として禁じており、
+それはここにも当たる。だから直したのは reader の側だけで、既存の fold の振る舞いは不変。
+
+**検証は fixture ではなく突き合わせで行った** —— 公開 feed を `from-wire` で畳んだ結果が、
+サーバ自身の 48 口座と 1e-6 以内で全一致する。
+
+### D5. 読めなかった件数を残高の隣に必ず出す
+
+`balances-of-wire` は `:read` / `:skipped` / `:unreadable` / `:unreadable-keys` を返す。
+
+- `unreadable`（知らない形）と `no-op`（知っているが残高を動かさない形）は**別の値**である。
+  同じにすると『8 件読めなかった』と『8 件は効かない種類だった』が呼び出し側で潰れる
+- **`:unreadable` が 0 でない結果の `:balances` を残高として引用しない。**
+  それは『台帳がそう言っている』ではなく『この読み手にはそこまでしか見えなかった』である
+
+これは CLAUDE.md が repo-wide mandatory として挙げる形（測れなかった検査が、測って
+問題が無かった検査と同じ値を返す）への直接の対策で、**今回の欠陥はその実例だった** ——
+`balances` は 0 も例外も返さず、48 口座のうち 2 口座という**もっともらしい数**を返していた。")
+
+  (:adr/implementation
+  (vector "landed: kotoba-lang/murakumo 91f04ea84436 —— from-wire / balances-of-wire / unreadable / no-op。37 tests / 192 assertions、clj-kondo 0/0。負のコントロール 3 本（no-op を unreadable に潰す / unreadable の件数を捨てる / transfer 分岐を外す）とも、壊した主張を名乗るテストが赤くなる"
+   "landed: west pin murakumo eb5e5d4b→91f04ea8（superproject ad246374e341、ahead=2 behind=0 をサーバ側検証）"
+   "landed: 本 ADR"
+   "not-done-deliberately: cloud-murakumo の credits-admission を from-wire 経由に繋ぎ直すこと。あの ns は Worker のどこからも呼ばれていない（参照はテストのみ）ので、繋ぐ先を決めるのが先"
+   "not-done-deliberately: acceptance density を live surface に出すこと。今日の測定は /infer/runs を取って手で畳んだもので、常設の計測器にはなっていない"
+   "not-done-deliberately: /infer/runs の出力形を正準形へ寄せること。live API の出力を変えると既存の消費者に当たる。読み手を直す方が安全で、実際そちらで足りた"))
+
+  (:adr/known-gaps
+  (vector "**公開 feed に未精算の run が 5 件ある** —— `shares` も `total` も持たない。残高には効かないが、記録されて精算されなかった run が在ることは所見であり、`no-op` に入れず `unreadable` のまま残した"
+   "**(B) の registered 側は未測定。** `credits-accepting-sellers` は facilitator の rule 表を要求するが、この測定はその表に到達していない。paid だけを測って registered を 0 と書かない"
+   "`cloud-murakumo.credits-admission` は Worker のどの経路からも呼ばれていない（参照は自身のテストのみ）。acceptance density の測定器は在るが、公開面が無い"
+   "colombia-trm が受領した 0.08 USDC が我々の gateway 経由の決済かどうかは確かめていない。**第三者 seller が実在し 402 経路が生きていること**は測ったが、**その第三者に我々経由で誰かが払ったこと**は測っていない"
+   "今日の突き合わせは 1 時点のスナップショットである。feed も残高も動くので、この一致は『この方式で一致した』であって『恒常的に一致する』ではない。常設の計測器がそれを言うべきだが、まだ無い"))
+
+  (:adr/open-decisions
+  (vector "acceptance density を live surface に出すか。出すなら api.murakumo.cloud か、cloud-murakumo の homeostasis 収集器か"
+   "/infer/runs の出力形を正準形に寄せるか。読み手を直したので急がないが、2 つの綴りが並存し続ける"
+   "credits-admission をどこに繋ぐか（今はどこからも呼ばれていない）"))
+
+  (:adr/body
+  "# ADR-2608312600: 測定器が自分の API を読めていなかった
+
+## 一行で
+
+**acceptance density を測りに行って、測定器の方が壊れていた。** 『0 paid』は
+相手が居ないことの記録ではなく、`:run/transfer` と `\"transfer\"` の綴りの違いだった。
+
+## 2 つ見つかって、両方とも文書と食い違っていた
+
+**1 つ目は良い方。** x402 側の『第三者 seller と facilitator 開放は実装済みだが未配線』は
+**もう古い**。facilitator は self-serve で開いていて、west にも 90-docs にも repo を持たない
+第三者（コロンビアの金融監督データを $0.005 で売っている）が catalog に居り、
+その gateway は 402 を返し、challenge の payTo はその第三者自身のアドレスで、
+そこには USDC が 0.08 入っている。
+
+**2 つ目は悪い方。** credits 側の測定器は、自分たちの API が公開している feed を
+読めていなかった。
+
+```
+(balances published-feed)   口座  2
+GET /infer/credits          口座 48
+食い違い                    48 中 44
+```
+
+**0 でも例外でもなく、もっともらしい数が返っていた。** これは CLAUDE.md が
+repo-wide mandatory として名指ししている形そのもので、しかも今回は
+**その形を測るための道具の側**に出た。
+
+## なぜ気付きにくかったか
+
+`cloud-murakumo.credits-admission/acceptance-density` の docstring は
+『0 paid / 0 registered today』と書いている。そして**結論としてはそれで正しい** ——
+実在の第三者に credits が払われたことはまだ一度も無い。
+
+だから誰も疑わなかった。**正しい結論が、壊れた経路から出ていた。**
+台帳には transfer が 1 件在って、サーバはそれを数えていて（宛先残高 1）、
+測定器だけがそれを見ていなかった。
+
+放っておくと、**本物の 1 件目が来ても同じ 0 が出続ける。**
+それが「今は 0 で合っているから急がない」が効かない理由である。
+
+## 直し方 —— 意味を変えず、読み手を足す
+
+`balances` は触っていない。`ledger-violations` の docstring が
+「戻り値を変えると既に書かれた feed を遡って読み替えることになる」と禁じており、
+それはこの場合にも当たる。足したのは `from-wire`（公開形 → 正準形）と
+`balances-of-wire`（それを通した fold）だけ。
+
+**検証は fixture ではなく突き合わせでやった。** 公開 feed を `from-wire` で畳んだ結果が
+サーバ自身の 48 口座と全一致する。手で作った形に対して緑になっても、
+今回の欠陥はまさに『想定した形』と『実際に出ている形』のずれだったので、
+それでは同じ穴を踏む。テストの fixture も、エンドポイントが実際に返したバイトにした。
+
+## 読めなかったことを、読めたことと同じ顔にしない
+
+`balances-of-wire` は `:read` / `:skipped` / `:unreadable` を返す。
+`unreadable`（知らない形）と `no-op`（知っているが残高を動かさない形）は
+**別の値**にしてある —— 同じにすると「8 件読めなかった」と
+「8 件は効かない種類だった」が呼び出し側で潰れる。
+
+live の feed では 756 read / 3 skipped / 5 unreadable。
+その 5 件は `shares` も `total` も持たない run で、**記録されたが精算されていない**。
+残高には効かないが、それは所見なので `no-op` に入れずに残した。
+
+## 統合の現在地
+
+| step | 状態 |
+|---|---|
+| 1 YATA の原価 | ブロック（B2 の実請求が console にしか無い） |
+| 2 KUMO の hold/capture/release | landed |
+| 3 YATA を x402 に | step 1 待ち |
+| 4 bot の損益を 41 actor に | step 1 と 2 |
+| **5 acceptance density** | **(A) 配線済み / (B) 実質 0、測定器は今日直した** |
+| 6 BOT の発行体 | owner + 弁護士 |
+
+**律速は動いていない。** (B) が 0 である限り、credits は operator の外で使えない。
+ADR-2607299900 §5 の恒久ルール（token は capital を連れてくるが settlement demand は
+連れてこない）は今日も有効で、**今日やったのは『測れるようにした』であって
+『上げた』ではない。**")))

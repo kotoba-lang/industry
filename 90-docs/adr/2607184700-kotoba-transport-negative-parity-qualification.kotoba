@@ -1,0 +1,69 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607184700-kotoba-transport-negative-parity-qualification")
+  (:adr/title "ADR-2607184700: Transport negative matrix and high-level web runtime parity")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-18")
+  (:adr/last-verified "2026-07-18")
+  (:adr/last_verified "2026-07-18")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for
+  (vector "transport and HTTP negative qualification matrix"
+   "browser/Node high-level HTTP parity boundary"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kototama/test/kototama/tender_test.clj"
+   "orgs/kotoba-lang/wasm-webcomponent/src/actor-host.js"
+   "orgs/kotoba-lang/kototama/src/kototama/browser.cljc"))
+  (:adr/supersedes (vector "adr-2607184600-kotoba-db-frame-component-e2e"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:double-close :denied-minus-one)
+   (:tls-name-mismatch :consumes-handle-and-peer-eof)
+   (:slow-peer :finite-timeout)
+   (:content-length-property-matrix "17x17 complete versus partial bodies")
+   (:browser-node-raw-socket false)
+   (:browser-node-http-get :explicit-injected-bridge)
+   (:redirect-policy :manual)
+   (:production-qualified false)
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:test")
+     (:result "110 tests, 364 assertions, 0 failures"))
+    (map (:cwd "orgs/kotoba-lang/wasm-webcomponent")
+     (:command "npm test")
+     (:result "all dependency-free native WebAssembly verification scripts pass"))
+    (map (:cwd "orgs/kotoba-lang/compiler")
+     (:command "clojure -M:test")
+     (:result "270 tests, 3239 assertions, 0 failures"))))))
+  (:adr/body
+  "# ADR-2607184700: Transport negative matrix and high-level web runtime parity
+
+**Status**: accepted
+**Date**: 2026-07-18
+
+## Decision
+
+Qualify affine and framing failures as executable behavior: a second close of
+the same handle returns minus one; TLS server-name mismatch consumes and closes
+the TCP handle; slow reads terminate under the finite socket timeout; and a
+17x17 Content-Length/body-size matrix accepts every complete body and rejects
+every partial one under the actual compiled Kotoba parser.
+
+Browser and Node parity is defined at the safe high-level component boundary,
+not by exposing raw sockets. The JavaScript host contract now recognizes the
+full declared import catalog and links `http_get` only when an explicit
+synchronous bridge is injected. It supplies exact host, port, path, maximum
+response bytes and manual redirect policy. Absence of that bridge leaves the
+import unavailable.
+
+## Maturity boundary
+
+This closes the first negative matrix and high-level HTTP parity seam. It does
+not prove DNS rebinding resistance after resolution, external PKI/revocation,
+case-insensitive/duplicate HTTP framing headers, chunked decoding, concurrent
+linker stress, or a real browser SharedArrayBuffer deployment.
+")))

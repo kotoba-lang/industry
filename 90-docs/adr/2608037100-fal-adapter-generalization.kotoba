@@ -1,0 +1,23 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608037100-fal-adapter-generalization")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/deciders "Jun Kawasaki")
+  (:adr/topic "fal-adapter-generalization")
+  (:adr/title "ADR-2608037100: seedance アダプタを fal モデル記述子へ一般化し、frontier tier を実行可能にする")
+  (:adr/authoritative-for (vector "fal 経由モデルの追加手順（記述子 1 件 + 価格 1 件）"
+                          "engine :seedance と :fal の関係（同一実装・別名）"
+                          "duration/resolution が enum を外れたときに丸めないこと"))
+  (:adr/related (vector "90-docs/adr/2608026200-murakumo-credits-plan-on-fal-modal-delaware.edn"
+                "90-docs/adr/2608036800-murakumo-generation-catalogue-and-model-status.edn"
+                "90-docs/adr/2608036900-generation-credits-billing-wired.edn"
+                "90-docs/adr/2607170500-seedance-hosted-video.edn"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/body
+  "\n# ADR-2608037100: seedance アダプタを fal モデル記述子へ一般化する\n\n**Status**: accepted（2026-08-03、本番反映済み）\n**Date**: 2026-08-03\n**Deciders**: Jun Kawasaki\n\n## Context\n\nADR-2608026200 §3-2 が `video/frontier-fast` を 35cr/秒 と決め（Higgsfield の\n$2.84/8秒 を $2.80 で下回るための価格）、`prices.edn` に veo-3.1 / veo-3.1-silent\n/ veo-3.1-fast が載っていた。**しかし `:engine :fal` に対応するコードが存在せず、\nOSS tier より上は 1 つも売れなかった。** 価格が先にあって実行が無い状態。\n\n`:seedance` は「1 モデル専用のアダプタ」として書かれていたが、実測すると\n**ほぼ全部が共通部分**だった（8 endpoint の queue OpenAPI を比較、2026-08-03）:\n\n- 共通: queue プロトコル（submit → `:status_url` → `:response_url` → download）、\n  `Authorization: Key`、ref の data: URI 畳み込み、成果物の SHA-256 確定\n- 固有: endpoint と、**同じ概念の綴り**だけ\n  - duration `\"4s\"`(veo) / `\"4\"`(seedance) / `4`(wan, 整数 enum)\n  - resolution 480p/720p vs 720p/1080p/4k vs 720p/1080p\n  - 参照画像 `image_urls` / `reference_image_urls` / `image_url`(単数)\n  - 音声 `generate_audio` / 無し\n\n## Decision\n\n**「モデルごとにアダプタを書く」を「モデルごとに記述子を 1 行足す」に置き換える。**\n`engine.cljc` の `fal-models` が endpoint・duration の綴り・解像度 tier・\naspect ratio・参照画像のキーと形・音声・出力パスを持ち、`fal-invocation` が\nそれだけを見てリクエストを組む。\n\n**seedance も同じ記述子で表現し、経路を 1 本にする。** live 検証済みの経路を\n別に残すと、そちらだけが直り続ける状態になる。安全性は既存の seedance body\nテスト群（path / `image_urls` / string enum の duration / `generate_audio` false /\n省略挙動）が characterization として担保しており、一般化後も無改造で通る。\n旧ビルダーと死んだヘルパは**残さず削除**した —— 2 つ目の答えを置かない。\n\n### 記述子が「潰さずに」表現しなければならなかった 2 点\n\n1. **veo は refs の有無で endpoint 自体が変わる。** t2v と image-to-video が\n   別 endpoint で、後者は `image_url` を**単数必須**にする。fal がそう割って\n   いる以上こちらも割る必要があるが、murakumo の model id は 1 つに保ちたいので\n   `:refs-endpoint` を持たせた。参照画像を 2 枚渡したら**黙って捨てずに拒否**する。\n2. **veo-3.1 の音声フラグは locked。** 80cr/秒 は音声ありの原価 $0.40/秒 に\n   対応する価格なので、音声を opt-out できると「高い方で課金して安い方を出す」\n   リクエスト形が存在してしまう。構造的に禁じる。\n\n### enum を外れた duration は丸めない\n\nveo に 5 秒を頼んで 4 秒か 6 秒が黙って返るのは、解像度の fail-closed が\n既に禁じている silent substitution と同じ。投げる。\n\n## Consequences\n\n- 新しい fal モデルの追加は記述子 1 件（+ 価格 1 件）になる。\n  ここに無い綴りが出たら**記述子の語彙を増やす** —— 分岐を増やさない。\n- 結線した 4 モデル（veo-3.1-fast / veo-3.1-silent / veo-3.1 / wan-2.7）は\n  すべて **`:status :unverified`**。スキーマは fal の queue OpenAPI から実測して\n  組んだが、**実 API キーでの round-trip は通していない**。seedance が\n  `:production` なのは live 検証を通したからで、同じ顔で出さない。\n- wan-2.7 は公開ウェイトが無く self-host できないので、fleet の $0/h 経路には\n  永久に載らない。hosted 一択であることを spec と価格表の両方に明記した。\n\n## 検証（2026-08-03）\n\n- cloud-murakumo: 356 tests / 25,870 assertions。既知の 8 failure（x402-offer /\n  treasury）は本変更の前から存在し無関係。engine-test は 17 tests / 150\n  assertions で、seedance の body 不変と新モデルの綴りの両方を固定。\n- compiled Worker への nbb smoke: 課金 12 checks + カタログ 10 checks green。\n- live: 公開カタログが 10 モデルを status つきで返す（fleet 4 / hosted 6）。\n\n## Resume point\n\n1. **live round-trip で `:unverified` を上げる。** 実 API キーで 1 本ずつ\n   走らせ、成功したものだけ `:production` にする。veo-3.1-fast が最優先\n   （価格表の先頭に置いた主力）。\n2. 画像系 fal モデル（seedream v5 / flux-2 / nano-banana 等）。出力が\n   `{images:[{url}]}` なので `:out` 記述子は既に対応済み、ダウンロード側の\n   拡張子分岐だけが残る。\n3. 失敗ジョブの返金（ADR-2608036900 の未解決、未着手）。\n")))

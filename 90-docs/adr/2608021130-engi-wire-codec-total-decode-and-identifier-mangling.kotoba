@@ -1,0 +1,75 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608021130-engi-wire-codec-total-decode-and-identifier-mangling")
+  (:adr/title "ADR-2608021130: engi.wire — decode は決して throw しない。JSON 形状を構造的に検査したら、witness の同一性が wire で壊れていた")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-wire-codec")
+  (:adr/authoritative-for
+  (vector "engi の consensus メッセージ符号化"
+   "peer からのメッセージ復号の全域性"
+   "wire 上の識別子表現"))
+  (:adr/related
+  (vector "adr-2608021030-engi-cljs-first-transport-and-qc-view-bug"
+   "adr-2608020830-engi-pacemaker-view-change"
+   "adr-2608020930-engi-catch-up-sync"
+   "adr-2608020130-torihiki-total-block-application-and-api-surface"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi"))
+  (:adr/body
+  "# ADR-2608021130: engi.wire
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ADR-2608021030 で transport を WebSocket に決めたが、**consensus メッセージには符号化が無かった。** pacemaker は「何をすべきか」を、sync は「何を信じてよいか」を決めるが、**どちらも何も言えなかった。**
+
+## Decision
+
+### 1. decode は決して throw しない
+
+peer は Byzantine かもしれず、壊れているかもしれず、別バージョンかもしれない。`decode` は**メッセージか理由**を返す。
+
+**throw する codec は、全 peer に「ゴミを送れば replica を殺せる」経路を渡す**——consensus 規則が防いでいるどの攻撃より安い。
+
+`torihiki.api` が tx について到達したのと同じ規則で、**同じバグの後**である（ADR-2608020130）。
+
+### 2. 符号化形は JSON 形状であることを**構造的に検査する**
+
+`json-safe?` が「文字列・数値・真偽値・nil・vector・文字列キー map」だけで出来ていることを検査する。**ランタイムごとに JSON ライブラリを入れるより、性質を直接検査する方が安い。**
+
+なぜ必要か: **keyword が紛れ込んでもメモリ内の round trip は通る。** 実 transport が serialise して初めて文字列になるので、**codec 自身のテストは通り、最初の実 peer が違うものを見る。**
+
+### 3. その検査が即座に実バグを見つけた
+
+**`(str :w1)` は `")(:w1"`。** keyword の witness は、wire を往復すると**出て行った時と別の識別子**になって戻る。
+
+`engi.consensus/qc` は**相異なる** witness を数える。したがって **wire メッセージから組み立てた証明書と、ローカルで組み立てた証明書は、誰が署名したかについて食い違う**——quorum 算術が 2 つの異なる名前集合の上で走る。
+
+`wire-id` は `name` ではなく**先頭のコロンだけを落とす**。`name` は `:org/w1` と `:other/w1` を同一 witness に潰すので、**置き換えるバグより悪い。**
+
+### 4. その他の規則
+
+- **未知の type は無視でなく拒否。** 分からないものを黙って捨てるのは、**2 つのバージョンが「合意している」と信じて並走する**やり方。
+- **壊れた証明書は「証明書が無い」ではない。** そうでないと peer は**自分の high QC を壊すことで格下げできる。**
+- **全メッセージが有界。** `engi.sync` が segment について言うのと同じ論拠。
+
+## Consequences
+
+- (+) transport が運ぶものが定まった。
+- (+) parity が wire も両ランタイムで覆う（`wire=(\"w1\" \"w2\" \"w3\");jsonsafe=true`）。
+- (−) **driver は未実装。** メッセージは定義されたが、運ぶものは無い。
+- (−) **署名は wire に含まれない。** vote への署名は witness-quorum の担当で、未接続。
+- (−) 上限値は選定値で実測較正をしていない。
+
+## 残りギャップ
+
+1〜6 完了。**7 は pacemaker・sync・runtime 方針・wire が完了**、WebSocket driver と署名集約が残り。8 bridge・監査。
+")))

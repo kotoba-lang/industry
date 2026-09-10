@@ -1,0 +1,123 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2607262100")
+  (:adr/title "DNS 名の正規化欠陥と、実行されていなかったテスト群（gftd.co.jp 所有確認 TXT の実配置で発覚）")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-26")
+  (:adr/tags (vector "cloud-itonami" "dns" "governor" "testing" "gftd.co.jp"))
+  (:adr/body
+  "## 文脈
+
+gftd.co.jp を cloud-itonami の最初のテナントにするため、所有確認 TXT
+`_itonami-verification.gftd.co.jp` を **1件だけ、経路全体の検証として**
+実配置した（`clojure -M:dns-verify gftd.co.jp --execute`）。狙いはレコードを
+置くことそのものではなく、別々に作った継ぎ目が繋がっているかの証明:
+
+    /api/onboarding/challenge   置くべき値（live）
+    dns-ops/propose             effect に組み立て
+    dns-ops/check               DnsGovernor（提案時）
+    dns-provider/apply-record!  DnsGovernor（実行直前に再判定）→ GoDaddy
+    /api/onboarding/verify      DoH で観測（live）
+
+実際に走らせた結果、繋がっていない箇所が3つ見つかった。**このうち2つは、
+レコードを置くまで誰も気付けなかった** — これが「1件を検証として実装する」
+ことの値打ちだった。
+
+## 見つかった欠陥
+
+### 1. FQDN と ゾーン相対名 を突き合わせていなかった（重大）
+
+同じレコードが経路によって2つの綴りで現れる:
+
+    FQDN        `_itonami-verification.gftd.co.jp.`  challenge / DoH 観測側
+    ゾーン相対  `_itonami-verification`              プロバイダが返す形、
+                                                     GoDaddy が受け付ける唯一の形
+
+`cloud-itonami.domain/classify` は両者を正規化せずに比較していたため
+`existing` が常に空になり、**あらゆるレコードが `:additive`（安全・自動承認
+可）に化けていた**。実測: gftd.co.jp の実 zone 53 レコードに対して常に
+`:additive` を返していた。
+
+`plan` の `:safe-to-apply` は `:additive` のみ、という設計上の安全弁は
+正しかったが、**その入力である分類そのものが壊れていた**ので機能していない。
+今回の `_itonami-verification` はたまたま本当に追加だったが、apex の TXT
+（SPF・google-site-verification など8件が同居）や MX を提案していれば、
+破壊的な REPLACE が「追加のみ（既存レコードに触れない）」と表示されて
+自動承認されていた。GoDaddy の PUT は (type,name) 単位の **置換** なので、
+apex TXT への1件の書き込みで既存8件が消える。
+
+対処:
+
+- `domain/relative-name` を導入し、比較の両辺を必ず通す
+- `classify` に zone を渡す 3-arity を追加、`plan` から渡す
+- `dns-ops/check` は zone が無ければ **`:zone-unknown` で hold**（fail-closed）。
+  「分類できない」を「追加のみ」と読み替えない
+- `describe` の「N 件が消えます」も同じ正規化で数える。ここだけ生の名前で
+  比較すると 0 件と表示され、承認する人が「何も消えない」と読む —
+  **過少カウントは危険な側の誤り**
+
+### 2. GoDaddy の PUT に FQDN を渡していた（HTTP 422）
+
+`PUT /v1/domains/{domain}/records/{type}/{name}` の name はゾーン相対名。
+FQDN を渡すと 422。`kotoba-lang/godaddy-dns` の docstring は正しく
+「`name` is the host label relative to the zone ('@' for the apex)」と
+規定していたので、これは呼び出し側の誤り。
+
+変換は **GoDaddy アダプタの中**に置いた。Cloudflare は FQDN を取るので、
+判断の面（`domain` / `dns-ops`）を provider の癖で汚さない。
+
+結果的にこの 422 が欠陥1を隠していた: 書けていれば誤分類に気付かないまま
+zone に着地していた。**皮肉なことに、壊れた書き込みが壊れた判断を守った。**
+
+### 3. これらのテストは一度も実行されていなかった（根本原因）
+
+`test/cloud_itonami/test_runner.cljc` は名前空間を明示列挙する方式で、
+`domain-test` / `dns-ops-test` / `domain-reverify-test` /
+`organization-domain-multi-test` / `enterprise-onboarding-test` はいずれも
+**未登録**だった。ファイルは存在し、契約テストとして書かれていたのに、
+`clojure -M:test` では一度も走っていない。
+
+これが欠陥1が live zone まで到達した理由である。「テストがある」ことと
+「テストが走っている」ことの差が、そのまま本番 DNS への距離になっていた。
+ベースラインと修正後で `Ran 1078` が一字も変わらなかったことで検出した
+（新しいテストを足したのに総数が動かない＝走っていない）。
+
+5本を登録して 1078 → 1142 tests（+64）。**未登録の名前空間は他にも20本以上
+残っている**（`crm-test`・`license-*`・`australia-*` 等）。一括登録は失敗が
+まとめて噴く可能性があるので本 ADR の範囲外とし、別途扱う。
+
+## 決定
+
+- DNS 名は比較・書き込みの前に必ず `domain/relative-name` を通す
+- zone が不明なら Governor は allow しない（fail-closed）
+- provider 固有の名前形式の変換は provider アダプタが持ち、判断の面には
+  持ち込まない
+- テストランナーへの登録漏れは「テストが無い」と同義として扱う。新しい
+  テスト名前空間を足したら `test_runner.cljc` への登録までが完了条件
+
+## 検証（実データ、2026-07-26）
+
+    zone 53 records → PUT（相対名）→ 権威 NS(ns67.domaincontrol.com) に約15秒で伝播
+    dig @1.1.1.1 / DoH(cloudflare-dns.com) Status 0 で観測
+    live POST https://itonami.cloud/api/onboarding/verify
+      → {\"verified\":true, \"next\":\"admin\", \"org\":\"gftd-co-jp\"}
+    再実行 → allow / no-op「変更なし（既に同じ値）」、zone 54 records
+      （修正前ならここでも :additive と誤判定していた）
+
+テスト: 1142 tests / 7925 assertions。失敗はベースラインと同一の
+12 failures 13 errors（runtime.cljc 12・doctor 4・substance 4 ほか、
+いずれも本変更と無関係の既存分）。新規の失敗なし。
+
+## 認証情報
+
+GoDaddy の API キーは 1Password `gftdcojp` vault の item **`gftd.godaddy`**
+（フィールド `GODADDY_API_KEY` / `GODADDY_API_SECRET`、命名は `gftd.resend`
+等の既存規約に合わせた）。`skill secrets-location-map` に追記済み。
+
+gftd.co.jp の NS は `ns67/ns68.domaincontrol.com` = GoDaddy がゾーンを
+ホストしているため、keychain の Cloudflare zone token（`gftd.cf`）では
+書けない。`op run` は既知の interactive auth timeout に当たるので
+`op read` で環境変数に注入する。
+
+## 実装
+
+`gftdcojp/cloud-itonami` `e79715a1`（`91b8c9e9` のマージ）。")))

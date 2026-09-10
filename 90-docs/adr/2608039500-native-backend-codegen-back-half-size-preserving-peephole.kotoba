@@ -1,0 +1,231 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole")
+  (:adr/title "ADR-2608039500: native backend の codegen back half を開く — size-preserving deterministic peephole を最初の pass にする")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/last_verified "2026-08-03")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "native-backend-codegen-back-half")
+  (:adr/authoritative-for
+  (vector "kotoba-lang における LLVM 相当 / JVM 相当の現在地の測定結果 (2026-08-03)"
+   "codegen back half (SSA / regalloc / optimizer / linker) の所有 tier と置き場"
+   "GC / メモリ管理の所有 tier"
+   "JIT / 実行エンジン内製を主経路にしない理由"
+   "native backend の最適化 pass が満たすべき size-preserving 不変条件"))
+  (:adr/related
+  (vector "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "adr-2607252500-kotoba-wasm-component-first-execution-boundary"
+   "adr-2607198300-kotoba-execution-without-jvm-node-rust"
+   "adr-2607299400-kotoba-migration-remaining-frontier-resequence"
+   "kotoba-lang/compiler docs/adr/0004-nbb-native-wasm32-compile-path"
+   "kotoba-lang/kotoba-native PR #5"))
+  (:adr/evidence-commits
+  (vector "kotoba-lang/kotoba-native ce96c930948da17700d1187d23ab774e3e299709"
+   "com-junkawasaki/root 5c9c2df93f88f0a74c020af95657c5208a0099d2"))
+  (:adr/body
+  "# ADR-2608039500: native backend の codegen back half を開く
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+オーナーから「compiler / aiueos / kototama を調査し、LLVM・JVM に相当するものが
+kotoba-lang で設計・実装されているか」を問われ、続けて「back 側の設計実装をしたい。
+この VM を作るとしたら kototama が適切か」と問われた。実測して答えた結果が本 ADR。
+
+### 測定結果 (2026-08-03)
+
+**LLVM 相当は「前半分」が実在し、「後半分」が存在しない。**
+
+実在するもの: 中間表現 `kotoba-kir` (`kir.cljc` 2,394 行 + `kir/value.cljc`
+1,973 行)、ターゲットレジストリ `kir/target.cljc` の 22 プロファイル、
+複数バックエンド (`kotoba-native` の x86_64 801 / aarch64 735 / elf64 425、
+`kotoba-wasm`、`kotoba-component`、`kotoba-script`)、オブジェクト形式の直接生成
+(ELF64 / PE32+ / KEXE / wasm / Component / restricted-ESM。アセンブラも
+リンカも LLVM も通さない — `compiler/README.md` が明文で
+'never invoke an assembler, LLVM, a JVM JIT, or a Wasm runtime')、
+リファレンスインタプリタ (`kir/execute`、純粋 main の compile-time oracle)、
+独立検証器 `kotoba-verifier` (KIR から再生成して機械語バイト一致を要求)。
+
+存在しないもの: SSA / CFG (KIR は式木で `eval-expr` の再帰評価。基本ブロック概念なし)、
+**最適化パスがゼロ** (`register alloc` / `liveness` / `peephole` / `inline` /
+`dead code` を 4 repo の src 全体に grep してヒットゼロ)、レジスタアロケータ
+(値は一律 8 バイト word で rax/x0 を通り、中間値は push してデプス相対で読み戻す
+スタックマシン)、リンカ。
+
+**JVM 相当は「安全性側」が JVM より厚く、「ランタイム側」が不在または借り物。**
+
+実在: 検証器 (bytecode verifier 相当だが再生成一致という強い形)、封印コンテナ KEXE
+(class file 相当)、ローダ (aiueos `loader.c` + W^X supervisor = classloader 相当)、
+fuel / memory-pages / host-call quota。
+
+不在: GC (`compiler/docs/architecture.md` が 'General allocation, tracing GC, and a
+production-strength VM sandbox remain absent'、pair アリーナは固定 4,096 セルで
+free も再利用もできず容量で trap)、JIT (意図的)、動的クラスロード / リフレクション /
+スレッド。実行エンジンのコアは kototama が Chicory (JVM) / wasmtime (Rust) を embed —
+`kototama/docs/maturity.md` の梯子に JVM/JS 以外の層が無い。
+
+### 「kototama が適切か」への答え
+
+**半分だけ正しく、しかも作るべきでない部分の受け皿。** ADR-2607266000 の tier
+taxonomy が答えを決めている: T2 生成 / T3 実行 / T5 機構。kototama は T3 tender で、
+README が 'Do not reimplement the compiler here' と明記している。
+
+## Decision
+
+### 1. codegen back half は T2 に置く。kototama ではない
+
+SSA / regalloc / optimizer は `kotoba-native` の内部に置く。IR を分ける必要が
+生じたら T0 に `kotoba-mir` を足すが、**先に repo を切らない** — KIR の式木のまま
+pass が書けなくなった時点で判断する。`kotoba-verifier` が `kotoba-native` に
+依存しているので、最適化をそこに置けば検証器が自動的に同じ pass を再実行する。
+
+### 2. 最適化は決定的でなければならない (この repo 固有の絶対条件)
+
+検証器は KIR から再生成した機械語バイトの一致で検証する。したがって
+**非決定的な最適化はこの stack では原理的に入らない** — プロファイル駆動、
+時間予算で打ち切る探索、並列 pass の順序依存、乱択ヒューリスティック。
+LLVM をそのまま真似できないのはここ一点。
+
+これは制約であると同時に強みで、決定的最適化しか入らない = 再現ビルドと最適化が
+最初から両立する。
+
+### 3. 最適化 pass は size-preserving でなければならない (第一段階)
+
+両バックエンドは関数内分岐変位を**emit 時に平のバイトとして焼き込む**
+(x86-64 の `if` は `(le32 (code-size then-code))`、aarch64 は
+`(cbz-x0 (+ 8 (code-size then-code)))`、variant-dispatch チェーンも同様)。
+焼き込まれた後、その変位バイトはトークン列中の他のバイトと区別がつかず、
+トークン列は命令境界を持たない。**バイト数を変える pass は、それをまたぐ全変位を
+静かに壊す** — しかも命令境界が無いので、どんなサイズ検査でも捕まえられない。
+
+よって不変条件は「書き換えた window は置き換えた window と**厳密に同じバイト数**を
+占め、差分は正準 no-op で埋める」。`kotoba.native.peephole/pad-to` がこれを構造的に
+強制し、違反すると throw する。この不変条件の下では、焼き込み済み変位も遅延変位も
+pass の存在を知る必要がない。
+
+コードは縮まない。縮むのはメモリトラフィック。**padding を回収するには先に変位を
+遅延トークン化する必要があり、それは別の、より大きな変更**。
+
+### 4. 認識は KIR の form に対して行う。emit 済みバイトに対しては行わない
+
+古典的 peephole は命令列のバイトパターンを照合するが、ここでは unsound —
+トークン列は区切りの無いバイトの海なので、64 ビット即値のバイトがたまたま opcode を
+綴っていたら命令として書き換えてしまう。`constant-operand` は KIR の**operand form**
+を見る。
+
+### 5. GC は T2+T3+T5 の合作。kototama 単独では不可能。順序は最後
+
+arena を所有しているのは loader (`kexe_loader.c`) で、backend は context-v2 の
+固定オフセット 56/64/72 の callback しか触れない。aiueos 側は kernel の
+`memory.c`/`paging.c`。**GC には backend (T2) が stack map を出す必要があり、
+これは kototama では作れない。**
+
+さらに現行 README は 'no GC pause or unbounded growth' を**セキュリティ性質として
+宣伝**しているので、GC 導入はこれを意識的に反転する ADR を要する。実装言語は
+aiueos の前例 (decision-free C mechanism + `.kotoba` 判断) に従い、
+mark/sweep の機構は C、いつ回収するか・予算は `.kotoba`。
+
+**順序上は最後**: record/variant が関数境界を越えられない現状 (compiler ADR 0062/0063 —
+`(record-get (record-new ...) field)` の直接ネスト一形のみ) では escape する
+オブジェクトがほぼ存在しない。逃がせる値を作れるようにするのが先。
+
+### 6. JIT / 実行エンジンの内製は主経路にしない
+
+3 つの独立した壁が構造的に排除している:
+
+1. ADR-2607266000 決定 4 が Rust を core 依存経路に入れないと定め、その帰結として
+   'Wasm engine を core に埋める設計 (D1 Wasmtime JIT / D2 Wasmtime AOT) は
+   この制約下では主経路にできず、同一 KIR から Component と native を出す
+   **二面出力**が主経路になる' と名指ししている。
+2. Windows supervisor が `ProcessDynamicCodePolicy` でロード後の新規実行可能
+   マッピングを禁止する。JIT は定義上これを破る。W^X も同様。
+3. iOS プロファイルは 'runtime JIT permission を含意しない' と明記。
+
+**engine を自給する道は native AOT を厚くする道であって、Wasm engine を自作する
+道ではない。** 決定 1〜4 がまさにそれ。
+
+## Implementation (2026-08-03 着地)
+
+`kotoba-lang/kotoba-native` PR #5 → main `ce96c93`。superproject の west pin を
+`7716a2c` → `ce96c93` に GitHub API single-entry commit で前進 (`5c9c2df`、
+diff 1 行、server-side 検証で ahead_by 2 / behind_by 0 / merge_base == 旧 pin)。
+
+- 新 ns `kotoba.native.peephole` (129 行、`.cljc`): `constant-operand` /
+  `nop-x86-64` (Intel SDM Vol. 2B Table 4-12) / `nop-aarch64` (0xd503201f) /
+  `pad-to` (不変条件を構造的に強制)。
+- 最初の書き換え: 二項演算の右オペランドが compile-time 定数のとき、
+  accumulator を守る spill/reload 往復は不要 — 定数を直接スクラッチレジスタ
+  (rcx / x1) に置く。`mov rcx,imm64` と `load-constant-reg 1` は accumulator 形と
+  同じ幅で符号化されるので、window は spill と reload をちょうど落とす
+  (x86-64 で 5 バイト、aarch64 で 20 バイトが no-op になる)。落ちるのは
+  スタックストア・ロード・レジスタ移動、aarch64 では加えて sp 往復。
+- 両バックエンドの `emit-binary` と n 項算術ループの両方に配線。
+
+### 検証
+
+| 対象 | 結果 |
+|---|---|
+| kotoba-native 自身 | 13 tests / 1,755 assertions。padding 不変条件を全許容長で、window バイト列を両 ISA で厳密照合 |
+| compiler (pin 前進後の実測、ADR-2608039600) | **785 tests / 6,294 assertions、0 failures** + `native-conformance` 5/5。`native-executor-test` (実 supervised native プロセス) と `verifier-profile-test` を含む |
+| ~~差分ネイティブ実行 12 本~~ | **当時の記述は無効** — 下記訂正を参照 |
+
+> **訂正 (2026-08-03、ADR-2608039600)**: 本 ADR の初版は
+> 'compiler の 785 tests / 6,290 assertions を **この branch で pin を override して**
+> 通した' と記録していたが、その override は**効いていなかった**。
+> `-Sdeps '{:override-deps ...}'` をトップレベルに渡していたが、`:override-deps` は
+> **alias キー**であり alias を活性化しない限り無視される (`-Spath` で確認したところ
+> classpath には pin 済みの `~/.gitlibs/.../502f2921.../src` が入っていた)。
+> よってあの実行は pin 済み backend に対するもので、'差分ネイティブ実行 12 本が
+> baseline と一致' も baseline 同士の比較であり、何も証明していなかった。
+> 正しい指定は `-Sdeps '{:aliases {:ovr {:override-deps {...}}}}' -M:ovr:test`。
+> **結論は現在正しく実測で裏付けられている** — peephole が `kotoba-native` main に
+> 入り、ADR-2608039600 の pin 前進で compiler が実際にそれをビルドした上で、
+> 上表の数値が通っている。誤っていたのは当時引用した証拠であって結論ではない。
+| JVM vs nbb | 分岐入りプログラムで両 ISA バイト単位一致 (compiler ADR-0004 の dual-runtime parity 維持) |
+
+`kotoba-verifier` は同じ `emit-program` を呼んで再生成する
+(`verifier.cljc` の `target-contracts`) ので、再emit一致はこの pass が保つ
+決定性から従う。検証器が独自に持つのは型/形状 admission
+(`native-scalar-record-type?` 等) であって命令符号化ではない — 本変更は後者しか
+触らないので admission 面は無影響。
+
+## 副産物として発見した既存バグ (本 ADR では修正しない)
+
+`bit-xor` / `bit-and` / `bit-or` が **aarch64 バックエンドの n 項 op 集合
+`#{+ - * quot}` に無い** (x86-64 には 3 つとも有る)。結果、これらは
+`emit-call` に落ちて未定義関数扱いになり、`finalize` で NullPointerException で
+死ぬ — clean rejection ですらない。差分実行で baseline でも同一に再現することを
+確認済みで、本変更とは無関係。別途 follow-up。
+
+## Consequences
+
+- native backend に最適化 pass を足す型が定まった。以後の pass は同じ
+  size-preserving + KIR-form 認識の型で足せる。
+- コードサイズは縮まない。真のサイズ削減には変位の遅延トークン化が必要で、
+  それが次の自然な段階。
+- **本変更は codegen を強くするが、native が application を走らせられるように
+  するものではない。** `compiler/docs/native-aot-baseline.md` が明記するとおり
+  native 経路には provider/capability 機構が一切なく、それは T3 側の別線。
+- compiler の 189 ADR に GC / register allocation / optimizer の ADR はゼロで、
+  ADR-2607299400 の残り frontier も全項目が言語表層だった。本 ADR が
+  この方向の最初の 1 本。
+
+## Notes
+
+- west.yml は `--check` が STALE を報告するが、これは他 repo のローカル checkout が
+  pin と乖離しているためで本変更とは無関係。**wholesale 再生成はしない** —
+  CLAUDE.md が記すとおり生成器はローカル working HEAD で pin するので、
+  遅れた checkout があると黙って pin を退行させる。本 entry は server-side で
+  到達性・前進性を検証済み。
+- `manifest/fleet-db.edn` の kotoba-native revision (`dce66c7`) は west.yml より
+  古いままで、本変更以前からそうだった。`fleet reconcile` は現在手動運用。
+- 作業中、別セッションが同じ共有 checkout で kotoba-native の f64 算術
+  (`ADR-2608030300 stage 1`) を進めているのを観測した。彼らの作業は本 merge の
+  上に載っており衝突しない。")))

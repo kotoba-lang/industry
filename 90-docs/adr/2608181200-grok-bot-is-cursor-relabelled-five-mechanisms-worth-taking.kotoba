@@ -1,0 +1,306 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608181200-grok-bot-is-cursor-relabelled-five-mechanisms-worth-taking")
+  (:adr/title "Grok Bot is Cursor relabelled; five of its mechanisms are worth taking into cloud-itonami-app")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-14")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:source/dataset "adr")
+  (:adr/related
+  (vector "ADR-2608130100"
+   "ADR-2608136000"
+   "ADR-2607252000"
+   "ADR-260726-kotobase-query-plane-is-one-ref"
+   "ADR-2608039000"))
+  (:adr/repos (vector "orgs/cloud-itonami/cloud-itonami-app"))
+  (:adr/body
+  "Measured 2026-08-14 against `/Applications/Grok Bot.app` v0.18.0 as installed on this
+machine. Method: parse `Contents/Resources/app.asar` (681 entries, 126 MB logical), extract
+the 146 non-dependency files, read the bundles. The preload and host bundles are NOT
+minified and retain `// src/host/...` module-path comments and JSDoc, so the design
+rationale is readable as written.
+
+Nothing here was obtained by running the app against its servers, by intercepting traffic,
+or by using any credential. Everything below is from files on disk plus `codesign`, `ps`
+and the app's own data directory.
+
+---
+
+## What it is
+
+`CFBundleIdentifier` is `com.anysphere.sand`. Signed `Developer ID Application: Anysphere
+Incorporated (DCNK4UB866)`, hardened runtime. `package.json` says `name: sand`,
+`author: SpaceXAI`, `homepage: https://cursor.com`. It talks to `api2.cursor.sh`,
+`api3.cursor.sh/tev1/v1`, `review.cursor.com`, `metrics.cursor.sh`. `~/Library/Application
+Support/Grok Bot/sand-secrets.json` holds `cursor-access-token` / `cursor-refresh-token` /
+`cursor-machine-id`.
+
+**`@anysphere/grok-bot` is declared in `package.json` and contributes zero modules to the
+shipped bundles.** Counting workspace packages by module-path comment across the four
+bundles: proto 425, agent 355, local-exec 277, agent-exec 171, mcp-core 144,
+cursor-plugins 109, shell-exec 90, hooks 89, redacted-protos 82 — and grok-bot 0. The
+Grok-specific surface is four things, none of them code in this artifact: product naming;
+the server-side `aiserver.v1.GrokBotService`; five feature flags (`grok_bot_dynamic_tools`,
+`grok_bot_conversation_size_limits`, `grok_bot_conversation_gc`, `grok_bot_connect`,
+`grok_primary`); and `SIGN_UP_TYPE_GROK`.
+
+`dist/native/sand-op-launcher` — a signed helper that starts the 1Password CLI after
+verifying its code signature (`identifier \"com.1password.op\" and anchor apple generic and
+certificate leaf[subject.OU] = \"2BUA8C4S2C\"`) and passes `--vault --account --format=json
+--raw --expires-in` — ships in the bundle with **no caller in any bundled JS**. The only
+reference to `dist/native` is the WebAuthn signer's path resolution.
+
+**Take: a dependency list is not an inventory of what shipped.** Both findings came from
+counting module-path comments in the built artifact, not from reading `package.json`.
+
+## Process topology
+
+    electron-main/main.cjs      17.7 MB   window, update, settings, Cursor auth
+      +- electron-preload/*.cjs           IPC bridge (\"dune\" RPC)
+    host/host-main.cjs          23.9 MB   agent runtime; 35 extensions
+      +- agent-isolation/                 agent-store-worker, transcript-mirror-worker
+    node-agent-coordinator      gateway, OAuth, WebAuthn, local-exec relay
+    local-exec-daemon/main.cjs   8.6 MB   separate process, separate lifecycle
+    renderer/                     22 MB   React 19 + Vite + StyleX + TipTap + noVNC
+    native/sand-webauthn-signer  4.3 MB   Rust, CTAP2/FIDO2 over USB HID
+    native/sand-op-launcher                1Password CLI launcher (no caller)
+
+`aiserver.v1.GrokBotService` has 30 unary methods plus two server-streaming
+(`WatchSandBoxMigration`). Ten carry an `Admin` prefix. The centre of it is
+`EnsureSandBox`, whose response hands over the whole box in one shot:
+
+    EnsureSandBoxResponse { cluster, tenant_id, pod_id,
+                            network_token,
+                            exec_daemon_url, exec_daemon_auth_token,
+                            gateway_url,     gateway_token,
+                            vnc_url, fork_vnc_base_url,
+                            terminals_folder, image_update_available }
+
+Three independent tokens for three planes. `Box` is an interface with several
+implementations (`loopback-sand-box`, `shared-desktop-sand-box`); optional capabilities are
+absent methods that raise named errors (`BoxEnvironmentSyncUnsupportedError`,
+`BoxMcpUnsupportedError`) rather than booleans on a config.
+
+---
+
+## How it stores data
+
+**Three planes, and they are not the same store.**
+
+1. **Per-agent directory, local.** `~/.sand/agents/<agentId>/`. The id is validated as a
+   safe folder segment (no `/`, `\\\\`, NUL, `.`, `..`) AND re-checked by resolving and
+   asserting the `relative()` result has no separator — belt and braces against traversal.
+   Inside: `audit.jsonl` (append-only, local, always written).
+
+2. **SQLite, WAL, checkpointed before it is captured.** `store.db` and
+   `conversation-blobs.db` via node's built-in `node:sqlite`. The host tracks a write
+   generation and a live-handle count per db path, and runs `PRAGMA wal_checkpoint(TRUNCATE)`
+   before snapshotting, verifying the fold with `checkpointed >= log` and falling back to
+   `stat(db-wal).size === 0`. Sidecars `-wal` / `-shm` / `-journal` are named as a set.
+
+3. **Content-addressed blobs for conversation state.** `agent-kv` stores conversation state
+   as blobs addressed by hex id, with typed serdes (`Utf8Serde`; `ProtoSerde` which records
+   `typeName` in the blob type). A conversation is a graph of blob references; a missing
+   blob is unrecoverable and says so in one sentence with up to three 12-hex-char ids
+   (`BlobNotFoundError`). Layers: `cached-blob-store`, `retry-blob-store`,
+   `writethrough-middleware`, `typed-blob-store`, `controlled`.
+
+**Sync to the backend uses S3 ETag as the conditional write**, normalized with
+`stripS3EtagQuotes` + lowercase, guarded by an OS-level `store-lock`, with unresolved
+conflicts appended to `.sync/conflict-events.jsonl` (and `.pending.jsonl`), directory mode
+0700. Store source ids are classified `user` / `team` / `cloud` / bare-uuid — the same
+store can be owned at three scopes.
+
+**Audit is dual-written and filtered.** Local `audit.jsonl` always; the backend outbox
+(`~/.sand/agents/audit-outbox.json`) batches 50, flushes every 5 s, caps at 2000 pending,
+backs off 30 s honouring `Retry-After`. `isBackendForwardable` sends an MCP tool call only
+when its transport is `stdio`. Audited action kinds: `mcpToolCall`, `shellCommand`,
+`browserNavigation`, `computerUseSession`, each a typed `SandAuditEvent` with
+`{eventId, occurredAtMs, agentId, turnId, boxId}`.
+
+## How it shares context
+
+**Not by sharing a store — by naming a room, and by classifying every field.**
+
+`cross-user-sharing` is 12 modules built on rooms: `xuser-relay`, `xuser-remote-turns`,
+`xuser-turn-dedupe-store`, `xuser-room-tombstone-store`, `xuser-departure-obligations`,
+`xuser-pending-departure-store`, `xuser-state-reconcile`, `xuser-wire-normalization`. The
+names carry the design: turns are deduped, rooms get tombstones, leaving has obligations
+that outlive the leave, and the wire form is normalized separately from the local form.
+
+The stronger mechanism is redaction. `packages/redaction` defines
+
+    DataClassification: safe | code | credentials | path | provider_info | unspecified
+    SENSITIVE_CLASSIFICATIONS = everything except safe, INCLUDING unspecified
+    PrivacyMode: UNSPECIFIED=0 NO_STORAGE=1 NO_TRAINING=2
+                 USAGE_DATA_TRAINING_ALLOWED=3 USAGE_CODEBASE_TRAINING_ALLOWED=4
+    PrivacyCapability (purpose): storage_for_training | storage_for_logging
+                               | storage_for_usage | unsafe_always_allowed
+
+and one total function `allowedPurpose(privacyMode, purpose, classification) -> bool`:
+`safe` always true; `unsafe_always_allowed` always true; **`credentials` and `unspecified`
+always false**; `UNSPECIFIED` privacy mode denies exactly like `NO_STORAGE`; under
+`NO_TRAINING` logging admits only `path` and `provider_info`; unknown purpose throws
+against a TypeScript exhaustiveness variable.
+
+`packages/redacted-protos` then generates **80 per-message codecs** (`toRedacted*` /
+`fromRedacted*`) from a per-field classification table. Measured field counts across those
+tables: 986 `SAFE`, 701 `CODE`, 318 `PATH`, 39 `CREDENTIALS`. Content-bearing fields become
+`RedactedString` wrappers that are not strings until someone calls `.unwrap(purpose)`. A
+new field with no classification is `unspecified`, and `unspecified` is denied.
+
+## How agents talk to each other
+
+**Three distinct mechanisms, deliberately not one.**
+
+1. **Subagent (parent to child).** `agent.v1.SubagentPersistedState` carries
+   `{conversation_state, created_timestamp_ms, last_used_timestamp_ms, subagent_type,
+   model_id, environment, cloud_subagent, first_class_bc_id,
+   cloud_requested_environment_build_id, machine}`. Delegation with persisted state and a
+   target machine.
+
+2. **Coordinator tools (peer to peer), exposed to the model as tools.** `CreateAgent`,
+   `SendToAgent{tool_call_id, agent_id, message, delivery, title}`, `GetAgentStatus`,
+   `ReadAgentTranscript`, `StopAgent` — each with `Args`/`Success`/`Error`/`Result`/`ToolCall`
+   messages. In the classification table `agent_id` and `delivery` are `SAFE` while
+   `message` and `title` are `CODE`: addressing is metadata, content is content.
+
+3. **Group chat (many agents in one room).** About 120 lines, and the whole termination
+   argument is in five constants: `GROUP_MAX_ROUNDS = 3`, `GROUP_MAX_MEMBER_TURNS = 10`,
+   `GROUP_MAX_MESSAGES_PER_TURN = 2`, `GROUP_PROMPT_HISTORY_LIMIT = 24`,
+   `SHARED_ROOM_HISTORY_LIMIT = 24`. `orderRoundSpeakers` rotates the speaking order by
+   `round % members` so no member always speaks first. `resolveResponders` scans back to
+   the last USER message and collects `@name` / `@everyone` / `@all` mentions since; if
+   nobody was mentioned, everyone answers. `isPassContent` lets a member answer `pass` or
+   `(pass)` and be treated as declining, which is what keeps a bounded round from
+   manufacturing noise. Groups may not nest: `SandGroupNestingError` refuses with the
+   remedy in the message.
+
+---
+
+## Five mechanisms to take into cloud-itonami-app
+
+### 1. Approval has a lifetime, and its unit is the user's direction
+
+`SandLocalToolPermissionController` is the piece worth copying whole. Its own comments
+state the invariants:
+
+- A new direction from the user **retires every approval the agent holds** and denies
+  anything still waiting on an unanswered card, \"so consent can never leak across turns\".
+  The agent's direction epoch moves forward; work still running keeps the epoch it
+  captured.
+- A refusal is remembered **with its epoch**, keyed by `sha256(target)` so the raw command
+  or path is not retained. \"A refusal recorded before the caller's direction started is
+  the user's older answer to older work, and the direction they have given since is free
+  to ask again.\"
+- Widening the setting to `always` **does not cover callers that began before the grant**;
+  they ask as they would have.
+- The exact-refusal memory is bounded (512 per agent). Eviction ages by DIRECTION first
+  and only then by insertion order, and **every eviction raises a saturation marker so
+  that direction and all older ones are refused wholesale**. \"The budget bounds MEMORY
+  without ever bounding the guarantee.\"
+- Deleting an agent invalidates before dropping bookkeeping, and leaves a tombstone so a
+  call still unwinding is refused rather than read as unremarkable.
+
+This is ADR-2608136000's rule — a check that could not measure must not return the pass
+value — applied to consent. cloud-itonami-app's `bots/decide!` today records one decision
+per card and has none of: expiry by direction, memory of refusals, or a safe answer when
+that memory overflows. ADR-0044 fixed the adjacent defect (the app demanded an
+authorization on turns that needed nothing); this is the same family and is not yet done.
+
+### 2. Data classification is per field, generated, and unclassified means sensitive
+
+`allowedPurpose` is three scalars in and one bool out, no effects, fail-closed on unknown
+in BOTH arguments. That is the shape of a `kotoba/pure` decision core, and it is a better
+first candidate than most of what is in `cloud-itonami-app/src/*.kotoba` today, because the
+alternative is what the app has now: judgements about what may leave the machine spread
+across `transcript`, `system-prompt` and each connector. ADR-2608130100 made \"named and
+reviewed before it can happen\" the thesis; this is the mechanism that makes it checkable
+per field instead of per code path.
+
+### 3. Agent-to-agent needs three shapes, not one
+
+cloud-itonami-app has `handoff` (one Bot to another) and nothing else. The three shapes
+answer different questions — delegate and keep the result (subagent), address a peer and
+carry on (coordinator), converse in a bounded room (group). Merging them produces either a
+handoff that cannot converse or a chat that cannot terminate. If a group form is added,
+take the five constants and `pass` with it: those, not the prompt, are what make it stop.
+
+### 4. Two primitives, about twenty lines each
+
+`WriteEpoch` — `begin()` returns a settle function; `isStale(snapshotAtStart)` answers
+\"did a write land between my read and now\". The stale-card and permanent
+`waiting-connection` defects fixed in ADR-0044 were both this shape.
+
+`assertPathOutsideProtectedRoots` — checks the resolved path AND its realpath against the
+protected roots, resolving a not-yet-existing path to its nearest existing ancestor. A
+symlink into a protected root is caught. Applies directly to Drive sync and attachment
+staging.
+
+### 5. Generate the identifiers, and check the list that cannot be generated
+
+`extension-ids.generated.ts` derives 35 extension ids from the registry, so an extension
+cannot be named by a string that does not exist. But `registry.ts` is a hand-written array
+and nothing checks that the two agree. cloud-itonami-app's `test_runner.clj` already does
+better — it refuses to run a suite that does not cover every test file on the path, and
+its docstring records the measurement that made it necessary. **Keep that; do not copy the
+weaker half.**
+
+---
+
+## What not to take
+
+- **Do not take the box-provisioning shape as a model for a remote execution plane.**
+  `EnsureSandBox` returns three bearer tokens and three URLs from one call, and the box
+  then polls `/local-exec/requests` to ask the user's machine to run things. That is a
+  reasonable product; it is the inverse of ADR-2608130100's thesis, where the policy has
+  to reach the work.
+- **Do not take `sand-secrets.json`'s file mode.** Its three values are Chromium OSCrypt
+  envelopes (base64 of bytes beginning `v10`, keyed to the login Keychain), so 0644 is not
+  an exposure — but the same app writes `gateway-descriptor.json` at 0600 and the
+  local-exec daemon files at an explicit 0600. One place lost the discipline.
+- **Do not read a shipped-but-uncalled binary as a capability.** `sand-op-launcher` can
+  drive the 1Password CLI. Nothing in this artifact calls it. Whether the box side calls
+  it, or it is dead weight from a shared build, cannot be determined from the bundle, and
+  writing down either answer would be inventing evidence.
+
+## Verification
+
+- asar header parsed directly (16-byte header, JSON directory); 681 entries, 146 files
+  extracted excluding `dist/deps`, to
+  `scratchpad/grokbot/extracted/`.
+- Service and message shapes read from the Connect-ES service definitions and
+  `proto3.util.newFieldList` field tables in `host/host-main.cjs`.
+- Field-classification counts by regex over the generated tables: SAFE 986, CODE 701,
+  PATH 318, CREDENTIALS 39.
+- `codesign -dv --verbose=4` and `codesign -d --entitlements`: Developer ID Anysphere
+  (DCNK4UB866), hardened runtime, entitlements limited to apple-events, allow-jit, camera,
+  audio-input; no App Sandbox; helpers run `--no-sandbox`.
+- Secret-at-rest form determined structurally (base64 decode, first three bytes) without
+  printing any value.
+
+## Consequences
+
+1. **Item 1 (approval lifetime) is DONE**, landed 2026-08-14 as
+   `cloud-itonami-app` ADR-0046 (`abf546a`). The direction epoch is implemented:
+   `send!` advances it, an approval card records the direction it was raised under, and
+   `bot_core.kotoba/request-standing` decides where a held request stands from three
+   scalars. It fixed a measured defect — a second message replaced the run while the card
+   stayed undecided, so the Bot reported `waiting-approval` for the rest of the
+   conversation and rendered a button whose only outcome was 承認待ちの操作がありません。
+
+   **The hashed refusal key and the saturation marker were deliberately NOT built**, and
+   this ADR's original wording asking for them was wrong to name them as requirements
+   without checking reachability. Rejecting a held write clears the run, so nothing
+   re-proposes inside one direction; in a later direction the refusal correctly would not
+   hold; and routines and handoffs are refused by `may-start?` / `may-fire?` while a run
+   is held. There is no path, and a check that cannot discriminate is theatre. ADR-0046
+   records the condition under which it becomes reachable — a direction running
+   concurrently with the person answering, or a rejection that stops clearing the run.
+2. Item 2 (classification + `allowedPurpose`) is a `.kotoba` decision core candidate under
+   the ADR-2608650000 rules: scalars in, bool out, `[:result T E]` instead of throw, and a
+   parity test against the cljc caller.
+3. Items 3-5 are recorded here and are not scheduled.
+4. This ADR describes an external artifact at one version. If it is re-examined, re-measure
+   rather than citing these numbers: v0.18.0 is a moving target and the counts above are
+   dated 2026-08-14.")))

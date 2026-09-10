@@ -1,0 +1,121 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2608260100-murakumo-outbound-plumbing-and-lead-collection")
+ (:adr/title "murakumo.cloud のアウトバウンド: リストではなく配管を通した日")
+ (:adr/status "accepted")
+ (:adr/date "2026-08-26")
+ (:adr/body "murakumo.cloud のアウトバウンドを 1 日で「リストを作る」から「配管が通っている」へ
+進めた記録。**成果より、測って捨てたものの方が多い。**
+
+## 1. 何を作ったか（すべて main 着地・実測済み）
+
+| 面 | 実測 |
+|---|---|
+| JP 節税 ICP | 母集団 17,275 社 -> 観測 2,103 -> 送れる行 2,079（web 318 / post 1,761） |
+| EU SKU B ICP | 母集団 8,831 -> 観測 3,000 -> 送れる行 2,990（web 312 / post 2,678） |
+| intent 採点 | base（被覆 100%）と boost（部分被覆・加点のみ）を分離。足さない |
+| datalake | Iceberg 0 -> 2 表（gleif_lei_joined 18,930 / gleif_lei_closure 108,368） |
+| GLEIF 分母 | LEI 総数 3,411,119 / 307 法域 / ISSUED 1,958,561 / JP 19,266 |
+| custody | fail=0 unverified=0 NOTE=0（開始時は沈黙 4・UNVERIFIED 2） |
+| フォーム監査 | 587 件中 **送れるのは 152 件（25.9%）**。JP 108 / EU 44 |
+
+## 2. 測って捨てた提案（4 つ）
+
+**推測で立てた対策を実装しなかったことが、この日の主な成果である。**
+
+1. 送信前 MX 検証 -> バウンス 8 件中 **0 件**しか防げない（8 ドメイン全部 MX 有り）
+2. 会社概要ページも読む -> 取得率 **+3%**（30 社中 1 社）
+3. 税理士チャネルを gBizINFO から -> URL 保有率 **4%**（25 社中 1 社、例外 0 件で再測定）
+4. web 検索で士業のメールを集める -> **6.3%**（64 社）。95% CI 上端 15%
+
+4 は route の失敗であって segment の失敗ではない。8/24 の送信記録から宛先を復元して
+同じ収集器を当てると **23 件中 12 件**でメールが取れ、12 件とも当日送られたアドレスと
+一致した。web 検索は SEO 順に並べ、**SEO 投資は「メール公開」ではなく「フォーム設置」を
+予測する** —— 両者は代替物である。
+
+## 3. 自分のコードで見つけた欠陥（すべて修正・着地）
+
+どれも「拒否できない検査が、検査して問題が無かったのと同じ値を返す」形:
+
+- **robots.txt が cross-origin で常に許可に倒れていた。** 種の origin の robots だけを
+  引き、path を `^org` の str/replace で切り出すので、別ホストでは path が URL 丸ごと
+  になりどの Disallow にも前方一致しない。**本番 2 経路（JP 2,103 社 / EU 3,000 社）の
+  両方**に在った。site-probe/blocked?* に寄せた
+- **exit code の契約が一度も効いていなかった。** die! が exitCode を立てて throw する形は
+  nbb では exit 1 になる。「答えられなかった」を 2/3 で表す規律が空文だった
+- **窓口メールの出所を台帳に落としていた。** extract-emails は mailto/text を分けるが
+  ->record が :email だけを取り出していた。台帳の :via は 0 件だった
+- **社名検索の 1 件目を採っていた。** リコー -> 閉鎖済み子会社、ABEJA -> 別会社に解決され、
+  どちらも :ok で連絡先まで取れていた
+- **候補 URL の順位付けが無かった。** Stockmark の /company/information が本物の窓口を
+  押しのけた。通ることと正しいことは別
+- **リダイレクト元を台帳に書いていた。** 記録した 10 件中 8 件が 301/307/308
+
+## 4. 配管（今日直した 3 点）
+
+- **apex に MX が 1 件も無く、公開している hello@ / ryo@ 宛が全部バウンスしていた。**
+  Cloudflare Email Routing を有効化（Resend はドメイン上限で塞がっていた）。
+  probe 4 本で確認: bounced -> suppressed -> ryo@ delivered -> hello@ delivered
+- バウンス 8 件を抑制（MX 検証は測って作らなかった）
+- **開封・クリックを測っていなかった。** opened 0 は「誰も開いていない」ではなく
+  「測っていない」だった。両方有効化
+
+⚠ **probe 2 で send-email は Email sent successfully! を返しながら status は
+suppressed だった。送信 API の戻り値を配信の証拠にしない。**
+
+## 5. いま送れるもの
+
+    フォーム   152 件（JP 108 / EU 44）   実行可能・量あり・今日確定
+    メール     JP 21 / EU 97             増やす道は 4 つとも潰れた
+    郵送       JP 1,761 / EU 2,678       量は最大。agent は物理的に送れない
+
+日本のフォームの **46.3% が電話番号を必須**にしている（EU は 13.6%）。折り返し電話を
+前提にした窓口であり、非同期のテキスト往復ではない。
+
+**送信は 1 件もしていない。** フォーム送信の可否はオーナーの判断待ち。
+
+## 6. 未測定（「無い」ではない）
+
+- 返信の有無。Reply-To が外部 AgentMail で、ここからは中を見られない
+- jun@gftd.group への最終到達。delivered が言うのは Cloudflare の MX まで
+- intent の重み（経営力向上 3.0 / DX 2.0 / 事業継続力強化 1.0）と半減期 12 ヶ月。
+  **返信が 0 件なので検証手段が存在しない**
+- gBizINFO の過去日付経路。フォームの入力欄だけが根拠
+- IT 顧問セグメント（8/24 リストの約 1/3）。低収率ではなく**未測定**
+- ドイツ Foerderkatalog（機械可読な入口が無い）、台湾（見つけられなかった）、
+  SAM.gov / 韓国（登録が要る）、Spark（未インストール）
+
+## 7. 構造的に埋まらないもの
+
+- **SKU A は EU に売れない。** 購入導線が JP shipping の Stripe リンク 1 本。
+  US/CN から checkout が開かれているのに買えない
+- **EU の代理指標は日本より弱い。** 日本の認定は法的に設備取得と結びつくが、
+  Horizon の採択は計算資源の購入を要求しない。重みでは埋められない
+- 2026-08-24 の gBizINFO スナップショットは恒久欠落（loop の取りこぼし）
+
+## 8. 次の一手
+
+**フォーム 152 件が、agent が実行できて量のある唯一のチャネル。** ただし送信は
+オーナーの判断。送るなら小さく始めて、日本側は電話必須の 46.3% を受ける体制を先に決める。
+
+再開コマンド:
+
+    nbb --classpath \".:scripts/nbb_compat\" scripts/annex-custody-verify.cljs
+    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-west-pins.cljs
+
+データは network-awai/cloud-murakumo（private）の docs/gtm/leads/ にある。
+coverage.md / coverage-forms.md / coverage-partner-sites.md / outbound-ops.md が
+それぞれ何を測って何を測っていないかを書いている。")
+ (:adr/landed "kotoba-lang/property main 5b8ef1c（robots cross-origin 修正まで）。
+network-awai/cloud-murakumo main ea2a538（private。リード台帳と coverage 4 本）。
+com-junkawasaki/root main f3cf321 + pin 前進 4 件。
+com-junkawasaki/jp-go-gbiz-info main 7e127c8（custody 節 + numcopies 2）。
+com-junkawasaki/org-gleif-projections main 46ad7ee（GLEIF 分母）。
+ADR: 2608251500（法域外レジストリ調査）/ 2608251700（gbiz custody 登録）/ 2608252100（EU）。")
+ (:adr/verification "kotoba-lang/property: clojure -M:test 255 tests / 1124 assertions 緑、
+clojure -M:lint errors 0（warning 13 は既存の他ファイル由来）。
+exit code 契約を 3 経路で実測（引数不足 3 / 0 件 2 / 成功 0）。
+annex-custody-verify: projects=33 ok=13 fail=0 unverified=0 skipped=20、NOTE 0。
+verify-west-pins --only property,cloud-murakumo,jp-go-gbiz-info,org-gleif-projections: OK。
+未実施: フォーム送信の受理可否（送らないと測れない）、robots cross-origin 修正の自動検査
+（I/O 層なので実行で確かめただけ）。")
+))

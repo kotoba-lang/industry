@@ -1,0 +1,105 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609100100-lookahead-lands-and-lookbehind-is-blocked-upstream")
+ (:adr/title "Lookahead lands, and lookbehind is blocked upstream")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-10")
+ (:adr/authority "owner instruction, 2026-09-10")
+ (:adr/repos "kotoba-lang/pattern, kotoba-lang/amu, kotoba-lang/cssom")
+ (:adr/related "adr-2609093400-dot-was-wrong-and-the-suite-was-told-to-look-away, adr-2609093300-captures-and-the-end-of-the-regex-blocker, kotoba-lang/pattern#4, kotoba-lang/amu#915")
+ (:adr/body "Continuing into 2026-09-10. After the `.` fix, cssom had two named gaps left:
+non-greedy and lookaround. This takes lookaround, and it splits in two.
+
+## Lookahead landed
+
+`op 9 look` costs no input, so like split, jmp, save and the anchors it lives
+in the epsilon closure. Its sub-code is THE SAME PROGRAM run from another
+program counter -- there is no second machine and no second format:
+
+  base      look(a = base+1, b = base+L+2, c = negated)
+  base+1    ... the sub-pattern, L instructions ...
+  base+L+1  match          <- ends the nested run
+  base+L+2  whatever follows
+
+The terminating `match` is what stops the nested run: op 6 wins and no thread
+steps past it, so the sub-code cannot run on into the outer program.
+
+22/22 against JavaScript, including cssom `^0+(?=\\d)`, the negative form,
+stacked lookaheads, and one that can never be satisfied.
+
+## Lookbehind is blocked, and the block is upstream
+
+A lookbehind asks whether the sub-pattern ends here, which needs a backward
+scan; the scan needs its own function; that function is the SEVENTH member of
+the machine recursion group, and amu runs out of heap there.
+
+Filed as kotoba-lang/amu#915 with two reproducers:
+
+  * a synthetic ring of trivial mutually recursive functions OOMs at EXACTLY
+    8 while 5, 7, 9, 10, 11 and 12 compile -- a point defect, not a threshold;
+  * `pattern-vm` real group compiles at 6 and OOMs at 7, whether the seventh
+    is the real `behind-scan` or a one-line dummy that merely joins the cycle.
+
+Mutual recursion itself is admitted and gets a group CID, so this is not a
+language limit. It is also not a reason to reshape the feature: the module
+that WOULD ship is kept whole, as
+`test/fixtures/pattern_vm_with_lookbehind.kotoba`, and
+`test/lookbehind_probe.cljs` compiles it EXPECTING FAILURE. The day amu can
+build it, the probe goes red and the block is over. That is the
+kotoba-clj-to-kotoba rule about machine-checking a removal condition, applied
+to a block this session created rather than one it inherited.
+
+The probe also compiles the SHIPPING module and requires that to succeed, so
+\"the toolchain is broken\" and \"the block is still in place\" cannot return the
+same answer. It has a third exit code for the first case.
+
+## Measured
+
+  pattern-vm selfcheck     18/18
+  pattern-emit selfcheck   19/19
+  lookahead vs JavaScript  22/22
+  vm parity               320/320
+  pattern parity          284/284
+  emit parity             168/168  + 6 ahead of the .cljc oracle
+  compile parity          157/157
+  capture parity         1278/1278
+  expressible                      `:refused/lookahead` LEFT the ratchet
+  lookbehind probe                 still blocked, as expected
+
+## The break that did not discriminate
+
+\"Ahead of the .cljc oracle\" is now counted per named feature, and the comment
+claimed that stops the category becoming a drawer for anything unexplained.
+Replacing the lookahead predicate with a catch-all `(fn [re] true)` changes
+NOTHING: every pattern that reaches that branch today already matches a named
+feature, so the guard is structural rather than demonstrated.
+
+That is recorded in the file as unexercised rather than asserted as working.
+A trace never taken cannot be told from one that cannot be taken -- the
+workspace rule about stub logs, in a place it does not usually get applied:
+to a claim in a comment about a test.
+
+## The third obsolete assertion
+
+`test-refusals` asserted `(?=a)` was refused; it now asserts `(?<=a)` is.
+That is the third assertion this week that pinned a CEILING as though it were
+a decision -- `(?m)` yesterday, `.` and newline the same day, `(?=` today.
+All three were written by someone recording what the code did at the time, in
+good faith, in a test whose job is to notice change.
+
+The pattern worth carrying: an assertion that a thing is REFUSED is a claim
+about the implementation, not about the language, unless the refusal has a
+derivation. Write the reason next to it, so the next reader can tell which
+kind it is without measuring.
+
+## Where the goal stands
+
+htmldom is fully expressible and answers identically to JavaScript. cssom has
+two gaps left, both now with a named reason:
+
+  * non-greedy (3 patterns) -- a SEMANTICS decision, not an implementation
+    task. Under leftmost-longest `*?` and `*` cannot differ, so supporting it
+    means either giving the VM priority semantics -- which changes every
+    answer the parity suites currently pin, including the POSIX/Perl probe --
+    or refusing it permanently and rewriting the three patterns.
+  * lookbehind (1 pattern) -- blocked on kotoba-lang/amu#915, with the probe
+    holding the removal condition.")))

@@ -1,0 +1,82 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609103000-rm-rf-through-a-symlink")
+ (:adr/title "rm -rf followed a symlink into the live tree and deleted eleven checkouts")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-10")
+ (:adr/body "## 事故（2026-09-10）
+
+`kotoba-kir` → `osaho` の改名追従を 11 repo に当てる driver を書いた。sibling
+path（`../../kotoba-lang/...`）が解決する位置に worktree を置く必要があったので、
+scratch に layout を作った:
+
+    $SCRATCH/orgs/<org>  ->  実体の orgs/<org> への symlink
+
+driver は各 repo の先頭で `rm -rf <worktree>` を実行する。worktree のパスが
+`$SCRATCH/orgs/<org>/<repo>` だったため、**`rm -rf` が symlink を辿って実体の
+ディレクトリを 11 個削除した。**
+
+**`git worktree add` はその後で失敗し、出力は `FAIL <repo> worktree` を 11 行
+返した。** 私はそれを「worktree を作れなかった」としか読まなかった。削除に
+気づいたのは、後続の `grep` が急に何も返さなくなったからである。
+
+## 復旧
+
+    復旧済み  8 / 11
+    復旧不能  3
+
+| 経路 | 件数 |
+|---|---|
+| west 登録（`west update`） | 3（kura-conformance / kura-coordinator / app-aozora-engine） |
+| GitHub から再 clone | 2（gftdcojp/tia は cloud-itonami/tia へのリダイレクト、local-murakumo） |
+| **親 repo の object store に残っていた worktree** | 3（cloud-murakumo-api の basho-build / categories-deploy / codex-categories。`git worktree list` が `prunable` として commit を保持していた） |
+
+**復旧できなかった 3 件**:
+
+    orgs/network-awai/local-murakumo-fastmtp
+    orgs/network-awai/local-murakumo-modal-shared
+    orgs/network-awai/local-murakumo-runpod5090
+
+尽くした経路と結果:
+
+| 経路 | 結果 |
+|---|---|
+| GitHub（7 org 全部に問い合わせ） | どこにも無い |
+| west 登録 | 未登録 |
+| 親 repo の object store | `local-murakumo` の `.git` も同じ事故で消し、再 clone したので失われた |
+| APFS snapshot（Data volume） | `No snapshots for disk3s5` |
+| Time Machine | `tmutil: No destinations configured` |
+| 索引に記録された sha | 無し |
+
+ADR-2608301500 は 2026-08-30 時点で
+`missing: network-awai/local-murakumo-fastmtp (use new-project-scaffold to create)`
+と書いており、これらは remote に存在しないローカル専用ディレクトリだったと
+読める。**それは免責ではない** —— 未 push の作業が在ったなら失われた。
+
+## 規則
+
+**`rm -rf` を、途中に symlink を含みうるパスへ向けない。**
+
+CLAUDE.md は既に「worktree は superproject ルートの外に作る」「worktree が隔離
+するのは working tree であって object store ではない」と書いている。この事故が
+足すのは 3 点目である —— **scratch に作った「実体への symlink を含む layout」は、
+書き込み操作にとって scratch ではない。** 読むぶんには sandbox に見えるが、
+`rm -rf` と `git worktree add` は symlink の先に着地する。
+
+守り方:
+
+1. **削除の前に、そのパスが symlink を跨いでいないか確かめる。**
+   `[ \"$(cd \"$(dirname \"$p\")\" && pwd -P)\" = \"$(dirname \"$p\")\" ]` のように
+   物理パスと論理パスを突き合わせる。跨いでいたら削除しない。
+2. **sibling layout が要るときは、実体を symlink するのではなく worktree の側を
+   実ディレクトリに置き、*読むだけ* の隣接ツリーだけを symlink する。**
+   書き込み先の org は必ず実ディレクトリにする。
+3. **`rm -rf` の代わりに `git worktree remove` を使う。** あれは対象が worktree
+   でなければ拒否する —— この事故でも、11 件すべてで拒否していたはずである。
+
+## 出力の読み方
+
+`FAIL <repo> worktree` は「worktree を作れなかった」と読める。実際に起きたのは
+「消したあとに作れなかった」だった。**同じ 1 行が、無害な失敗と破壊的な成功の
+両方を表しうる。** driver が `rm -rf` を打つなら、打った件数と、打つ前に対象が
+worktree だったかを出力に出すこと。
+")))

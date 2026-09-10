@@ -1,0 +1,78 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607172250-ghosthacker-rows-format-direct-komawari")
+  (:adr/title "ADR-2607172250: 手書き rows-of-beats 形式を komawari に直接渡す exporter 経路")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-17")
+  (:adr/last_verified "2026-07-17")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "ghosthacker-rows-format-direct-komawari")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related (vector "adr-2607172230" "adr-2607141700" "adr-2607051520"))
+  (:adr/body "## Context
+
+ADR-2607172230 は実 episode(6本、`:gh/panels` フラット配列 + `:shot`/
+`:gh/pageLayout`)向けにヒューリスティックな beat 導出を実装した。一方
+`episodes/ep1-komawari-redesign/episode.edn` は最初から別形式 —
+komawari の `propose-page-layout` が本来受け取るネイティブ入力そのもの
+(`:rows` = ビートの行の配列、各行は `:panel/id`/`:beat/weight`/`:visual`/
+`:dialogue`/`:beat/intensity`/`:beat/vector` を著者が直接指定するビート
+map の配列)— を持つ『komawari-beat-format design demo』として先行して
+存在していた。この形式のページは本来ヒューリスティック推測を経由する
+必要が無く、著者が明示した意図をそのまま komawari に渡せる。exporter が
+この経路を持たないことが follow-up として残っていた。
+
+## Decision
+
+1. `scripts/export-aozora-manga-work.cljs` の `->pages` を分岐: page が
+   `:rows` キーを持てば(hand-authored 形式)推測をスキップして直接
+   `kami.mangaka.komawari/propose-page-layout` に渡す。無ければ従来の
+   `:shot`/`:gh/pageLayout` ヒューリスティック経路(ADR-2607172230)。
+   どちらの経路も governor 不通過時は幾何なしフォールバック(visual/
+   dialogue は保持)という同じポリシーを共有。
+2. rows→export-panels 変換ロジックは `scripts/komawari_rows_export.cljs`
+   という**独立モジュール**(アンダースコア区切りファイル名)に切り出し、
+   `export-aozora-manga-work.cljs` と新規 `scripts/
+   verify-rows-format-export.cljs`(ep1 の実データに対する回帰チェック)
+   の両方から共有。**理由**: nbb の `:require` は標準 Clojure の
+   dash→underscore 変換でファイルを解決するため、ハイフン区切り
+   ファイル名(`export-aozora-manga-work.cljs` 自身)は直接実行はできても
+   他スクリプトから `:require` できない(実機検証で確認 — hyphen ファイルの
+   require は \"Could not find namespace\" で失敗、同じ内容を underscore
+   ファイル名にすると成功)。既に ADR-2607172230 の `Run:` コマンドに
+   刻まれた entrypoint スクリプト名を改名するより、共有部分だけ切り出す
+   方を選んだ。
+3. 副産物として `export-aozora-manga-work.cljs` 末尾の無条件 `(-main)` を
+   entrypoint guard 化: `--classpath <dir>` フラグが `process.argv` の
+   インデックスをずらす(`argv[2]` が `\"--classpath\"` になる)ため、
+   固定インデックス比較は静かに壊れる(実機で発生を確認: guard 一見動いて
+   いるように見えたが実は git clone 時点の生成物ファイルを見ていただけ
+   だった)。`*file*` を `process.argv` 全体に対して走査するガードに修正し、
+   他スクリプトからの安全な `:require` を可能にした。
+4. `:gh/episodeId` を持たない `ep1-komawari-redesign` 自体を本番 export に
+   含める判断はスコープ外のまま。ADR-2607141700 が『design demo、実コンテンツ
+   ではない』と明示した既存判断を維持 — 中身は Ren/Nei の単発デモ場面で、
+   `arc0-*` の Yuto 正史とは別の題材であることを本 ADR 作成時に確認した
+   (収録するかはコンテンツ側の決定であり、plumbing の完成とは独立)。
+
+## Consequences
+
+- 将来 `:gh/episodeId` を持つ実 episode が rows 形式で著者ジオメトリを
+  直接指定した場合、exporter は自動的にヒューリスティック推測を経由せず
+  その意図をそのまま使う(コード変更不要)。
+- 本番 export(213 pages / 968 panels / 968 with :rect)は byte-identical
+  (ADR-2607172230 の `resources/aozora-manga-work.edn` と diff 無し)—
+  実 episode はどれも `:rows` を持たないため今回のリグレッションはゼロ。
+- 検証: `verify-rows-format-export.cljs` を ep1 実データに対して実行
+  — 5 pages / 22 panels / 22 with :rect / 10 with :tilt、10項目の
+  assertion すべて通過(パネル数保存・visual/dialogue 保持・rect形状・
+  NaN 無し・tension/impact beat による tilt 発生を個別確認)。")
+  (:adr/authoritative_for
+  (vector "exporter の ->pages は page が :rows(komawari propose-page-layout ネイティブ入力: ビートの行の配列)を持てば直接 komawari に渡し、無ければ ADR-2607172230 の :shot/:gh/pageLayout ヒューリスティックを使う — どちらも governor 不通過時は幾何なしフォールバック"
+   "rows→export-panels 変換は scripts/komawari_rows_export.cljs(独立・アンダースコア命名モジュール)が正本。nbb の :require はハイフン区切りファイル名を解決できない(直接実行は可、require不可)ため、共有ロジックは常にアンダースコア命名の別モジュールに切り出す — この制約は ghosthacker 以外の nbb スクリプト間 require でも同様に適用される"
+   "nbb entrypoint スクリプトで (-main) の自動実行を条件付けるガードは *file* を process.argv の固定インデックスと比較してはいけない(--classpath 等のフラグでインデックスがずれる、実機で破損を確認済み) — process.argv 全体を走査する"
+   "ep1-komawari-redesign を本番 ghosthacker export に含めるかはコンテンツ側の決定として引き続きスコープ外(ADR-2607141700 の既存判断を維持) — plumbing の完成とは独立"))
+  (:adr/artifacts "{:ghosthacker \"com-junkawasaki/ghosthacker@bcc8c489 (merge of agent/rows-format-direct-komawari)\"}")))

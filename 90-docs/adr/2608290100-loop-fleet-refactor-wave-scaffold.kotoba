@@ -1,0 +1,218 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608290100-loop-fleet-refactor-wave-scaffold")
+  (:adr/title "ADR-2608290100: loop-fleet-refactor-wave — cloud-itonami fleet 向け常駐 refactor 波（D1 premise 除去 + kotoba 移行）")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-29")
+  (:adr/last-verified "2026-08-29")
+  (:adr/last_verified "2026-08-29")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "loop-fleet-refactor-wave")
+  (:adr/repos (vector "orgs/cloud-itonami/loop-fleet-refactor-wave"))
+  (:adr/authoritative-for
+  (vector "orgs/cloud-itonami/ 配下 100+ repo に対する常駐 refactor 波 actor の存在理由と 2 mission の境界"
+   "Mission A（D1 premise 除去）の判定基準の出典（ADR-2608039000 をそのまま適用し、ここで再定義しない）"
+   "Mission B（clj/cljc → .kotoba）の移行単位の出典（ADR-2608261100 をそのまま適用し、ここで再定義しない）"
+   "波のパターン（tick → dispatch N fresh agent → 中央で pin 前進 → 再測定）を svelte-cljs-wave から借りたという事実と、何を変えたか"))
+  (:adr/related
+  (vector "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+   "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+   "adr-2608261100-kotoba-app-vertical-slice-migration-unit"
+   "adr-2607279200-kotoba-centered-compiler-migration-plan"
+   "adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"
+   "adr-2608260900-svelte-react-retirement-cljs-reagent-re-frame-jp-go-dds"))
+  (:adr/evidence
+  (vector "90-docs/adr/2608039000-d1-is-not-a-premise-in-decentralized-paths.edn（Mission A 判定基準の正本）"
+   ".claude/skills/kotoba-clj-to-kotoba/SKILL.md（Mission B 手順の正本）"
+   ".claude/skills/svelte-cljs-wave/SKILL.md + scripts/svelte-cljs-wave-tick.cljs + scripts/svelte-cljs-wave-loop.cljs + scripts/com.gftd.svelte-cljs-wave.plist（波のパターンの模写元）"
+   "manifest/repository-rules.edn :vocabulary/rules の loop- prefix 定義（:execution :resident）"
+   "gh api repos/cloud-itonami/loop-fleet-refactor-wave — 2026-08-29 時点 404（名前衝突なし確認済み）"))
+  (:adr/body
+  "# ADR-2608290100: loop-fleet-refactor-wave
+
+**Status**: accepted
+**Date**: 2026-08-29
+
+## Context
+
+オーナー指示（2026-08-29）: `orgs/cloud-itonami/` 配下 100+ の独立 git repo
+（`cloud-itonami-isic-*` / `app-*` 等）に対して、2 種類の refactor を継続的に
+進める常駐 loop actor を立てる。
+
+1 回限りの一括 batch ではなく、`svelte-cljs-wave` と同型の**常駐 tick loop**に
+する理由: 対象が 100+ repo あり、1 セッションで全部を安全に検証しながら進めるのは
+非現実的で、かつ svelte-cljs-wave が実測で確立した「1 波 = 少数 repo 並列 + 中央
+pin 前進 + 再測定」というパターンが、この 2 mission にもそのまま当てはまるため。
+
+### 2 つの mission（ここでは判定基準を再定義しない — 出典 ADR がそれぞれ正本）
+
+**Mission A — D1 premise 除去**。判定基準は ADR-2608039000 が持つものをそのまま
+使う: 「分散」「decentralized」「blockchain」を名乗る経路の中で、単一ベンダの
+条件付き書き込み（Cloudflare D1 等）が CAS/合意/ref の裁定者、または head/ref/
+chain 状態/台帳の source of truth になっている箇所。判定操作は「その D1 を今
+消したら、データが失われるか正しさが壊れるか」。壊れなければ cache/projection
+であり対象外。分散性を名乗らない普通のアプリの D1 利用は対象外（ADR-2608039000
+自身が明記）。
+
+**Mission B — clj/cljc → .kotoba 移行**。移行単位は ADR-2608261100 が持つものを
+そのまま使う: 1 repo・1 wave につき 1 つの kotoba/app vertical slice（state →
+effect → event → governor → UI → checkpoint）。恒久制約と一時的な backend gap の
+区別は ADR-2608650000 + `kotoba-lang/kotoba-lang` の `lang/surface-status.edn`
+`:disposition` を出典とする（ここで独自に判断基準を作らない）。
+
+両方に該当する repo があってもよいが、1 回の agent 投入では**どちらか片方だけ**を
+1 スライス分に留める（2 mission を混ぜた大きな diff は作らない）。
+
+## Decision
+
+### 1. 新規 repo: `cloud-itonami/loop-fleet-refactor-wave`
+
+`manifest/repository-rules.edn` の `loop-` prefix 規約（`:role
+:continuous-orchestrator`、`:execution :resident`）に従う。org は `cloud-itonami`
+（対象 repo 群と同じ org。既存の `cloud-itonami/loop-noren` が『org 名は名前に
+繰り返さない』の先例——このリポジトリも `itonami` を名前に含めない）。visibility
+は `cloud-itonami` org の既定（実測: `cloud-itonami-isic-3520` / `app-warehouse`
+とも `private:false` = public）。
+
+### 2. superproject 側の資材（svelte-cljs-wave と同じ 3 点セット）
+
+- `scripts/fleet-refactor-wave-tick.cljs` — 候補を**測る**だけ（決定論、モデルを
+  起こさない）。Mission A/B それぞれの独立した走査を持ち、`:mission` タグ付きで
+  候補を返す。custody-gate や in-flight 判定は svelte-cljs-wave の実測知見
+  （custody 契約の中身判定・linked worktree + remote branch の両方を見る
+  in-flight 判定）をそのまま踏襲する——同じ罠がここでも起きうるため。
+- `.claude/skills/fleet-refactor-wave/SKILL.md` — 波の手順書。svelte-cljs-wave の
+  「fork は調査専用・実行は fresh agent + 子リポ内 worktree」の教訓をそのまま適用
+  する（`isolation: \"worktree\"` は superproject の worktree しか作らず `orgs/`
+  子リポの中身を含まないため、この用途には使わない）。
+- `scripts/com.gftd.fleet-refactor-wave.plist` — launchd 常駐 job。interval は
+  svelte-cljs-wave と同じ 3600s を初期値にする（実測で調整可能）。
+
+### 3. 波のパターンは svelte-cljs-wave の模写だが、対象走査は独自
+
+tick → 候補があるときだけ claude を起こす → skill が fresh agent を N 体
+dispatch → 中央（loop 実行環境）で west pin 前進 → 再測定、という骨格は
+そのまま借りる。変えたのは「何を候補として測るか」（Mission A: D1 CAS-arbiter
+usage の grep + decentralization self-claim の確認、Mission B: 小さい自己完結
+`.clj`/`.cljc` decision core の発見）で、ここは cloud-itonami fleet 固有の
+ロジックとして新規に書く。
+
+## Consequences
+
+- (+) 100+ repo の refactor を、1 度に大きく触らず、少数の並列 wave で安全に
+  進められる。
+- (+) 既存 skill（svelte-cljs-wave / kotoba-clj-to-kotoba）の判断基準をそのまま
+  再利用するので、判定基準の二重管理（このリポジトリ独自の基準を作ってしまい
+  出典 ADR とずれる）を避けられる。
+- (−) Mission A は ADR-2608039000 の現在地表が 2026-08-03 時点のもので、実際の
+  candidate 数が 0 になる可能性がある（同 ADR 自身が『規則の制定と、既存経路の
+  移行完了は別物』と明記）。0 件なら「0 件だった」と正直に記録し、Mission B を
+  優先する。捏造した candidate を作らない。
+- (−) 2 mission を 1 つの tick/skill に同居させたので、tick の複雑さは
+  svelte-cljs-wave 単体より高い。将来的に mission ごとに分離する判断もありうるが、
+  今回は『同じ fleet に対する複数種の refactor 波』という共通点を優先し、1 repo に
+  同居させた。
+
+## Alternatives considered
+
+- **Mission ごとに別の loop repo を作る。** 却下（今回）。対象 repo 集合が同じ
+  （`orgs/cloud-itonami/`）で、波のインフラ（tick/skill/loop/plist の骨格）が
+  9 割共通なため、まず 1 repo に同居させ、運用実績が割れる形を要求したら分割する。
+- **1 回限りの batch script にする（常駐 loop にしない）。** 却下。100+ repo を
+  安全に進めるには継続的な観測が要り、`loop-` prefix の `:execution :resident`
+  規約とも整合しない。
+
+## 実測記録（波の実行のたびにここを更新する — ADR-2607257000 の『最新状態のみ』規約）
+
+- 2026-08-29 実測（Mission A、`orgs/cloud-itonami/` スコープ）: **候補 0 件。**
+  `net-kotobase` の head plane（旧 `kotobase-cf-wasm`、現 `orgs/net-kotobase/engine`）
+  は既に D1 head plane を撤去済み（`wrangler.jsonc` に『D1 head plane was retired
+  … do not re-add』の明記あり、B2 が durable head の正本、`inga` の quorum ref
+  plane が次段として testnet で稼働中）。`orgs/cloud-itonami/` 配下で
+  `d1_databases` を持つのは `dougaka` / `kenbun` / `cloud-itonami-translation` /
+  `mangaka`（×2） / `yukkuri` の 6 Worker のみで、いずれも README に「分散」
+  「decentralized」「blockchain」の自己申告が無く、ADR-2608039000 §4 の対象外
+  （通常の appview データ）。`gftdcojp/engi`（settlement、ADR-2608039000 の現在地表
+  に載っていた repo）も README に分散性の自己申告が無く、この loop のスコープ外
+  （そもそも `orgs/cloud-itonami/` の外）。**捏造した candidate は作らず、この
+  波では Mission B を優先する。** 0 件は『規則の制定と既存経路の移行完了は
+  別物』（ADR-2608039000 自身の言明）のとおり、規則違反が無いことの証拠であって
+  tick 器の欠陥ではない — tick はこの sweep を毎波継続し、新しい repo が
+  cloud-itonami に増えた時に再判定する。
+- 2026-08-29: repo scaffold 着地。`cloud-itonami/loop-fleet-refactor-wave`
+  作成（初期 commit `8166cd3`、`README.md` + `deps.edn` + `src/loop_fleet_refactor_wave/
+  mission_{a,b}.cljc` + test、34 assertion pass）。west 登録
+  （`manifest/repos.edn` `:extra-projects` + `manifest/west.yml` entry、
+  `com-junkawasaki/root` merge commit `36aa0bcc3c336e8bb16c3f5e73ca6265f5dd9906`）。
+  ADR 本体・tick script v1 も同じ commit で着地。
+- 2026-08-29 実測（初回 tick を実 fleet に対して実行）: `orgs/cloud-itonami/`
+  は 1,853 repo・14,361 対象ファイル。Mission A raw 0（上記の通り）。Mission B
+  raw 9,686 —— ただし tick v1 の `candidate-slice?` は size/custody/twin/
+  host-signal しか見ておらず、**最小順ソートで上位 4 件が 4 行の
+  `run_tests.clj`（`require` + `run-tests` + `System/exit`、判断ゼロ）**になった。
+  Mission B の実候補（`cloud-itonami-app` の `store_core.cljc` 121 行、純粋な
+  state-transition 関数）はこの順位では出ない——**tick 器自体の欠陥**であり、
+  `operational-script-signal?`（runner basename + run-tests 呼び出し検出）と
+  `defn-count`（≥1 defn 要求）を `loop-fleet-refactor-wave` の `mission_b.cljc`
+  （merge commit `7d4d356bdb52225b297d5f3a05bd759b6f876cf7`）と
+  `scripts/fleet-refactor-wave-tick.cljs`（両方とも `com-junkawasaki/root`
+  merge commit `36860e87d59692484cf92172ec48e8d0a70d9ca4`）に同時に足して修正した。
+  west pin も追従（`loop-fleet-refactor-wave` を `7d4d356` へ、commit
+  `a008f914b8c51936a95a7d752561f71705288054`）。修正後の再実行では
+  `run_tests.clj` 系は消えたが、**新たな既知の穴**が 1 つ残っている:
+  `host-mechanism-signal?` の正規表現が `babashka.http-client` を認識せず、
+  `tadori/src/tadori/host/http.clj`（実際は network authority を持つ host
+  adapter）を誤って通した。この穴は次波の follow-up として残す（黙って直った
+  ことにしない）。
+- 2026-08-29: skill (`fleet-refactor-wave`)・loop 起動 script
+  (`fleet-refactor-wave-loop.cljs`)・launchd plist
+  (`com.gftd.fleet-refactor-wave.plist`) を着地
+  （`com-junkawasaki/root` commit `36860e87d59692484cf92172ec48e8d0a70d9ca4`、
+  上記 tick 修正と同じ commit）。plist は既存 launchd job label と衝突しない
+  ことを `launchctl list` で確認の上インストール・`launchctl bootstrap` 済み
+  （`launchctl list` に `com.gftd.fleet-refactor-wave` として登録確認済み）。
+  interval 3600s、`RunAtLoad` false のため次の自然発火は最大 1 時間後。
+- 2026-08-29: 初回の実 Mission B 波、着地・検証済み。`cloud-itonami/
+  cloud-itonami-app` の `src/cloud/itonami/app/store_core.cljc`（121 行、純粋な
+  state-transition 関数群）を対象に fresh agent（fork ではない）を1体投入し、
+  scratch clone + `agent/kotoba-migration` branch + サーバ側 merge の手順で
+  着地させた。**merge commit `895795f043ed2787f390f9489905995803ac2823`
+  （`gh api repos/cloud-itonami/cloud-itonami-app/commits/895795f...` で
+  独立に存在・main 到達を確認済み、branch も削除確認済み）。** west pin も
+  追従（`cloud-itonami-app` を `895795f` へ、commit
+  `c670cf9491eabbb4e1682f005be336a4ce4b385f`）。
+
+  **移した部分**: `src/cloud/itonami/app/store_core.kotoba`（新規）が
+  `retention-drop-count`（window-eviction の算術 `max(0, size - cap)`、
+  `append-message`/`record-response` の trim が共通で使っていたもの）を
+  export。同 repo に既存の `fleet_core.cljc`/`fleet_core.kotoba`
+  oracle-bridge パターンをそのまま踏襲。4 target（wasm32-kotoba-v1 /
+  js-kotoba-v1 / x86_64-kotoba-v1 / aarch64-kotoba-v1）とも compile 確認。
+  独立確認: `kotoba_oracle.cljc` の `cores` map に `:store-core` キーが
+  追加され、値が `store_core.kotoba` のパスを指していることを `gh api` で
+  直接確認済み。
+
+  **host 側に残した部分**: `new-id`（`random-uuid` を使う——randomness は
+  capability 経由でしか正当に扱えず、この wave のスコープ外）と `:sessions`
+  （実行時文字列キーの map。legacy map literal は keyword key のみ、typed
+  `[:map K V]` は 1 entry 1 型のみ、`:document` は 256 node/depth 8 の上限
+  ——実測した backend gap として両ファイルのヘッダに明記、ADR-2608650000 の
+  「一時制約」分類）。
+
+  **検証**（agent 報告を `gh api` で独立に裏取り済み。diff の対象ファイルは
+  `resources/.../store-core.kir.edn` / `kotoba_oracle.cljc` /
+  `store_core.cljc` / `store_core.kotoba` / `oracle_cases.cljc` /
+  `store_core_kotoba_parity_test.clj` / `test_runner.clj` の 7 本のみ、
+  report と一致）。agent 側の申告: full JVM suite 2053 tests / 12078
+  assertions / 0 failures（rebase 後の 1 回の一時的 flake — `store-core` を
+  require しない無関係な worker-queue test — を隔離テストと 2 回目の
+  full run で切り分け済み）、`bin/test-oracle-cljs` 218/218（ClojureScript
+  実行）、`.kir.edn` 15 本の byte-for-byte no-drift 再生成確認。
+
+  **tick 器の既知の穴（この波では未修正、次波の follow-up として明記）**:
+  `host-mechanism-signal?` の正規表現が `babashka.http-client` を認識せず、
+  `tadori/src/tadori/host/http.clj`（network authority を持つ host adapter）
+  を誤って候補として通した。")))

@@ -1,0 +1,53 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609021500-fleet-node-outbound-hygiene-contract")
+  (:adr/title "fleet ノードの outbound 衛生契約 — 1 つの daemon がノード自身を飢えさせられない構造にする")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-02")
+  (:adr/related (vector "adr-2609021200-itonami-cloud-agent-basho-glm53-serverless-budget"
+                "ADR-2608111721" "ADR-2607300900"))
+  (:adr/body "# fleet ノードの outbound 衛生契約
+
+**Status**: accepted / 2026-09-02 / owner question「構造的な問題? こういった burst などが発生しないようにする全体アーキテクチャなどを検討して整えて」。実装と証跡の正本は `kotoba-lang/murakumo` の `docs/adr/ADR-260902-fleet-outbound-hygiene.md`。ここには fleet 全体に効く決定だけを置く。
+
+## 何が起きたか（2026-09-02 実測）
+
+- benjamin: `kotoba-server` は 60 日稼働・libp2p は 18 peer と繋がったまま、`/health` は 7 月 6 日から応答なし。原因はノードの **ephemeral port range（32,768）が TIME_WAIT 32,479 で満杯**で、ノード発の全 `connect()` が `EADDRNOTAVAIL`。
+- simeon: 同じ枯渇（16,277 / 16,384）。mesh watchdog の**自分の probe**が失敗し、健康な `kotoba-server` を 2 分ごとに kill し続けていた。
+- TIME_WAIT の集合は 10 秒後も byte 同一で、生成源（`com.murakumo.edge-join` = `infer-join.cljs`）を止めても 60 秒で 1 つも減らない —— **kernel が TIME_WAIT を回収していない**（両ノード uptime 60 日）。
+- `sysctl -w net.inet.ip.portrange.first=16384` で 1 秒後に `/health` 200。サーバは終始正常だった。
+
+## なぜ構造的か
+
+fleet ノードは**独立した daemon の寄せ集め**である（edge-join / kotoba-mesh + watchdog / rpc-worker / desired-agent / hajime-tick / comfyui / edge-server）。各 daemon が自前の HTTP client と自前の cadence と自前の「retry」を持ち、ノード全体の outbound 予算を誰も知らず、「gateway が落ちた」と「自分が socket を開けない」を誰も区別せず、health に基づいて行動する唯一の component（watchdog）が**自分の client 側を測って server の結論を出していた**。
+
+自己持続した 3 条件: ①バックオフ無し（cadence c で失敗し続ける loop は 1/c の速さで range を埋め続け、二度と drain しない）②観測者が観測対象と運命を共にしている ③圧力の信号が無い（`ops status` は HEALTH=down しか出さず、人間の次の一手も watchdog と同じ誤りになる）。
+
+## Decision — ノード常駐 daemon が従う 4 規則
+
+| 規則 | 実装（kotoba-lang/murakumo） |
+|---|---|
+| **Back off, bounded, with jitter.** 失敗ごとに 2 倍、上限 5 分、成功で reset、fleet が gateway に再同期しないよう jitter | `murakumo.infer.backoff`（pure .cljc、JVM test）を `poll-worker` の poll / heartbeat loop が使う |
+| **Classify before retrying.** `EADDRNOTAVAIL` / `EMFILE` / `ENOBUFS` は*自ホスト*の飢え → 上限いっぱい待って log にそう書く。refused / DNS / timeout は*gateway* → 幾何バックオフ | `backoff/classify`、`poll-worker/schedule-after-failure!` |
+| **A watchdog may only act on the failure it can prove.** strike の前に `nc` で素の TCP connect を試す: `EADDRNOTAVAIL` → 「このホストは port 切れ」と log、strike しない / refused → KeepAlive の仕事 / connect OK + HTTP 死亡 ×2 → 2026-07-02 型の wedge、kill。log 行がどの場合かを名指しする | `deploy/com.murakumo.kotoba-mesh-watchdog.plist.tmpl` |
+| **Headroom is provisioned, pressure is visible.** root LaunchDaemon が boot 時に `net.inet.ip.portrange.first=16384`（49,152 port）。`ops status` に PORTS 列（`TIME_WAIT/range %`）、90% 以上で `PORT-EXHAUSTED` を NOTE に出す | `deploy/com.murakumo.sysctl-baseline.plist.tmpl`、`provision/plan.cljc`、`core.clj` provision、`ops.cljs` |
+
+headroom は治療ではなく**余白**（1 daemon の欠陥がノードの欠陥になるまでの距離）。治療は規則 1、規則 2 が 1 を正直にし、規則 3 が増幅を止め、規則 4 が人に見せる。
+
+## fleet-wide に効く決定
+
+1. **ノードに常駐する新しい poller は、`murakumo.infer.backoff` と同じ契約（分類 + 有界バックオフ + jitter）無しに置かない。** 自前の `setTimeout` 固定 cadence の retry を新規に書かない。
+2. **health を根拠に kill / restart する機構は、自分の観測が失敗した理由を先に確かめる。** 「probe が失敗した」は「対象が死んだ」の証拠ではない（CLAUDE.md「検査を書く前・緑を信じる前の 6 問」の 2 問目と同型: *実行できないとき何を返すか*）。
+3. **ノードの port 圧力は fleet の可観測量である。** `ops status` の PORTS 列が正本。90% 超で HEALTH=down なら、それはノードの client 側であって server ではない。
+4. **TIME_WAIT が生成源停止後も減らないノードは再起動対象**（userland から回収できない）。判断は PORTS 列の実測で行い、自動化はしない（推論 / mining と同居する 16 GB ノードの再起動は operator の決定）。
+
+## まだやらないこと（次の構造的一手）
+
+- **One node agent, one outbound channel**: N daemon × N HTTP client を、接続プール（api.murakumo.cloud への keep-alive）を持つ**ノードごとの 1 agent** に多重化し、desired-state agent の pull と KSE push で per-daemon polling を置き換える。placement authority と同じ場所（`murakumo.task.plan` / `murakumo.fleet.inventory`、ADR-2608111721）に属する変更で、本 ADR は既存 daemon をそこまで生き延びさせるもの。
+- `sysctl-baseline` の label は host literal（兄弟 label は `kotoba/provision_plan_core.kotoba` で parity test 下）。定数の移設として follow-up。
+
+## 着地（2026-09-02）
+
+- benjamin / simeon: sysctl baseline（root daemon）+ 新 watchdog + 新 poller を配備し `edge-join` を再 enroll。両ノード `/health` 200。
+- kotoba-lang/murakumo: 実装 + ADR-260902 は main `d4a1eb7`、west pin `b8c1927`。JVM test 87 / 1,649 assertions / 0 failures（backoff・provision-plan・parity・oracle-authority）。`ops status` の PORTS 列は parser を nbb で実測（`32723/49152` → 67%）、live 表示は closing 時点で tailnet が relay に落ちて ssh timeout のため未確認。
+- 未解決: benjamin の固着 TIME_WAIT（~32,700）は再起動でしか回収されない。simeon は closing 時点で ssh 到達不能（tailnet 側）。`sysctl-baseline` label の Kotoba oracle 移設は follow-up。
+- 次の一手: (1) tailnet 回復後 `nbb scripts/run-task.cljs ops status --no-multiplex` で PORTS 列を実測し、90% 超のノードを再起動対象として記録 (2) `murakumo provision` を operator seed 持ちで全 macOS ノードに回し、新 watchdog / sysctl-baseline / poller を fleet 全体へ（今回は benjamin / simeon に手動配備） (3) 「one node agent, one outbound channel」を `murakumo.task.plan` 側の ADR として起票。")))

@@ -1,0 +1,111 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608209400-the-ledger-posts-at-a-rate-the-chart-does-not-declare")
+  (:adr/title "仕訳側を測った —— 税区分の分母は 151 でも 12 でもなく、元帳は chart が宣言していない税率で記帳していた")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-20")
+  (:adr/implemented true)
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "moneyforward-journal-tax-usage")
+  (:adr/related (vector "adr-2608209000-moneyforward-parity-has-a-denominator-now"
+                "adr-2608209200-mf-chart-of-accounts-projected-and-checked-per-account"))
+  (:adr/repos (vector "90-docs/accounting" "scripts" "orgs/kotoba-lang/shohyo"))
+  (:adr/authoritative-for
+  (vector "税区分の分母を『記帳で実際に使われた区分』に置く決定（マスタ 151 でも科目既定 12 でもない）の正本"
+   "chart が宣言する税率と元帳が記帳した税率の乖離（0.08 が宣言されていない）という測定結果と、その 2 通りの直し方の正本"
+   "完全に測った期と page-1 の下界を混ぜない、というこの dataset の読み方の正本"))
+  (:adr/body "# 何を測ったか
+
+ADR-2608209000 は税区分について open gap を 1 つ残していた:
+
+> **仕訳が持つ税区分は測っていない** —— 科目の既定値と、実際に記帳で使われた区分は
+> 別物である。測るには `getJournals` が要る（未実施）。
+
+測った。**分母は 151 でも 12 でもなかった。**
+
+    税区分マスタ              151 件
+    科目表が参照している       12 件
+    FY2026 の仕訳が使った       4 件   ← 459/459 journals、全ページ
+
+FY2026 は **完全**（459 journals / 1,141 posting side / 5 ページ全取得）。使われたのは
+対象外 905・課仕 10% 217・課売 10% 11・非売 8 の 4 種だけ。
+
+# その 4 は「この事業者が使う区分」ではない
+
+**過年度を標本した瞬間に崩れた。** FY2019 の page 1 だけで `課仕 8%` が 62 posting、
+FY2020 の page 1 で `課仕 (軽)8%` が 4 posting、FY2019 に `共-課仕 8%` が 1 posting。
+
+    FY2019  page 1/8   下界  3 種  (課仕 8% / 共-課仕 8% を含む)
+    FY2020  page 1/12  下界  4 種  (課仕 (軽)8% を含む)
+    FY2023  page 1/19  下界  4 種
+    FY2026  5/5        完全  4 種
+
+**したがって税率の集合は {0, 0.1} ではなく {0, 0.08, 0.1}。**
+`共-`（共通課税仕入）が出たことも別途効く —— 課税売上割合による按分が実際に
+記帳に存在する。
+
+## 完全と下界を混ぜない
+
+`mf-journal-usage.edn` は期ごとに `:usage/complete?` を持ち、false の期は
+`:usage/pages-fetched` / `:usage/pages-total` が何分の何かを言う。**下界を
+「その期はこの 4 種しか使っていない」と読まない** —— ADR-2608136000 の
+「測れなかった検査が、測って問題が無かった検査と同じ値を返す」のデータ側の形である。
+
+⚠ 会計期間は 9 期あり、ここに在るのは 4 期、うち完全は 1 期。
+
+# 見つかった本物の gap
+
+`scripts/verify-mf-tax-rate-coverage.cljs`:
+
+    DECLARED  [0 0.1]        — chart が持つ税率
+    POSTED    [0 0.08 0.1]   — 元帳が実際に使った税率
+    FINDING   high  tax-rate:not-declared:0.08  (FY2019, FY2020)
+
+**元帳は 0.08 で記帳しているのに、chart のどの科目もそれを宣言していない。**
+`bookkeeping.shohizei` は chart が税率を宣言しなければ `:rates-not-declared` を
+返す —— それは正しい。**問題は返さないのに足りていない場合**で、{0, 0.1} を
+宣言した chart は shohizei を満足させるが、その chart で 8% の期を組み替えると
+8% の仕入が税率の区分から静かに落ちるか 10% に混ざる。**どちらも貸借は合う。**
+
+これは chart の写し間違いではなく**モデルの gap** である: chart は MF の
+「現在の科目既定値」の射影で、MF の現在の既定は 10%。過年度を組み替えるには
+期ごとの税率が要る。直し方は 2 つあり、どちらも設計判断:
+
+1. chart に期を持たせる（`:mf/tax-rate` を期別にする）
+2. `shohizei` が税率を chart ではなく**仕訳から**取る（記帳がすでに区分を持っている）
+
+## 検査の途中で、こちらの表の欠落が先に出た
+
+最初の run は `tax-rate:not-declared:0.08` ではなく
+`tax-rate:unknown-category:課仕 8%` を 3 件返した —— `mf-tax-categories.edn` が
+「科目表が参照する 12 件」だけを持っていて、仕訳が使う 8% 系を 1 件も持って
+いなかった。**税率が引けない区分は集計から静かに落ちる**ので、実測した 3 件を
+表に足して表の範囲を「科目表が参照 + 仕訳が使用」に広げた。
+
+**検査が 0.08 を勝手に補わなかったのが効いた。** 表に無い区分に既定の税率を
+当てていれば、`POSTED` は正しく見えて finding は出ず、こちらの表の欠落も
+chart の gap も両方隠れていた。
+
+# 部門についても 1 つ測れた
+
+FY2026 の 1,141 posting side のうち **821（72%）が部門を持たない**。名前付きは
+8 部門で、うち 2 つは `【廃止】`。
+
+ADR-2608209000 の次の一手 4 は「部門の次元を journal entry と posting に足す
+（設計変更）」だが、**足したところでこの事業者の実データでは 28% しか埋まらない。**
+部門別 P/L を「出せる」と「意味がある」は別で、後者はまだ言えない。
+
+# 検査は gate にできるが、まだ登録しない
+
+入力（`mf-journal-usage.edn` / `mf-tax-categories.edn` / `gftd-japan-chart.edn`）は
+すべて root repo の中にあるので、`gen-mf-chart.cljs --check` と同じく **fleet gate に
+できる**。**していないのは、今それが赤いから** —— 恒久的に赤い gate は
+「落ちない gate は劇場」の対偶で、同じだけ無内容になる（CLAUDE.md）。
+
+**登録の条件**: 上の 2 案のどちらかで 0.08 の gap を閉じ、fleet で 1 度緑になること。
+
+実演した 4 状態: 現状 exit 1（0.08）/ FY2026 だけなら exit 0 / 表から 1 件抜くと
+exit 1 で `unknown-category` と `not-declared` の**両方** / 入力欠落は exit 3。
+")))

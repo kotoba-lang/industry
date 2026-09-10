@@ -1,0 +1,103 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608040500")
+  (:adr/title "jp-go-dds に dark を足す — 上流が持たないのは palette であって色ではない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-04")
+  (:adr/tags (vector "kotoba-lang" "jp-go-dds" "design-system" "dark-mode" "accessibility" "uiux"))
+  (:adr/body
+  "## 課題
+
+オーナー指示（2026-08-04）: torihiki-terminal の UI/UX を jp-go-dds に寄せる、
+かつ **jp-go-dds 自体に dark mode を設計追加する**。
+
+`jp-go-digital-design-system` はデジタル庁デザインシステム（DADS）の cljc
+hiccup 実装で、**light 固定**だった。上流に dark palette が存在せず、
+`jp-go-dds.page` が `color-scheme: light` を明示し、`tokens.cljc` の docstring は
+『dark が要るアプリは DADS ではなく kotoba-ui skin を選ぶ、が正しい分岐』と
+書いていた。トレーディング端末は通常 dark なので、この分岐のままでは指示を
+満たせない。
+
+## 決定 1 — 色を作らず、ramp を逆から辿る
+
+**無いのは palette であって色ではない。** 上流は 10 色相 + key を 13 段
+（50 100 200 … 1200）、neutral grey を 12 段持ち、どの ramp も単調に暗くなる。
+dark を『同じ ramp を逆から辿ること』と定義すれば、新しい色を一つも発明せずに
+dark が出る。規則は 1 本:
+
+    ramp の i 番目 → 同じ ramp の (n-1-i) 番目
+
+**index で鏡映する**ので例外表が要らない。数値で `N → 1000-N` を計算する方が
+自然に見えるが、grey の `50` `420` `536` に写り先が存在せず ramp ごとの例外に
+なる。規則の一様性は、中間 grey が数単位ずれることより価値がある。
+
+## 決定 2 — 反転は primitive 層で行う
+
+`--color-key-*` も `--color-semantic-*` も `tokens/hig->dads` の `--hig-*` 契約も
+primitive を指しているので、**primitive を反転すれば全部が無改造で追従する** ——
+semantic の dark 版も `--hig-*` の dark bridge も component CSS の書き換えも
+一つも要らず、`dads-*` の markup がそのまま dark になる。
+
+`--hig-*` 側に dark bridge を足す設計だと `dads-*` を使う component は light の
+まま取り残され、同じページに light の button と dark の地が同居する。実装量の
+差ではなく、**層を間違えると直らない**。
+
+## 決定 3 — light 値は抽出して退避する（循環参照を避ける）
+
+鏡映は対合なので `red-800: var(--red-400)` と `red-400: var(--red-800)` を同じ
+要素に書くと CSS の custom property 循環になり、両方 invalid になって色が全部
+消える。vendored CSS の `:root` から light の実値を**抽出**して `--dds-light-*`
+に退避し、dark はそれだけを参照する。抽出であって書き写しではないので
+`scripts/vendor.cljs` の palette 更新に追従する（`dark.cljc` に色の literal は
+1 つも無く、テストがそれを固定する）。
+
+## 決定 4 — `:root:root` にする（`@media` は specificity を上げない）
+
+`@media (prefers-color-scheme: dark)` の中の `:root` は外の素の `:root` と同じ
+強さ (0,1,0) なので、後から出る `:root` 宣言に順序だけで負ける。そして負ける
+相手が実在した: `tokens/a11y-css` の `:root { color-scheme: light }`（アプリは
+これを `skin-css` 経由で app CSS 側に出す）。**auto-dark が黙って無効化される**
+—— CSS はこれをエラーにしないので、症状は『OS を dark にしても何も起きない』
+だけになる。dark を `:root:root` (0,2,0)、`[data-theme]` を
+`:root:root[data-theme=…]` (0,3,0) にして、明示指定 > auto > 素の `:root` を
+順序に依存せず固定した。
+
+## 決定 5 — 検査は計算にする
+
+`dark_test` が WCAG の相対輝度から contrast を計算して閾値に当てる。地
+`#1a1a1a` に対する実測:
+
+| token | dark 値 | contrast |
+|---|---|---|
+| gray-800（本文） | #e6e6e6 | 13.94:1 |
+| gray-700 | #cccccc | 10.84:1 |
+| gray-600 | #b3b3b3 | 8.30:1 |
+| gray-536 | #999999 | 6.11:1 |
+| key-900（primary action） | #9db7f9 | 8.76:1 |
+| semantic-error-1 | #ff7171 | 6.51:1 |
+| semantic-success-1 | #259d63 | 5.04:1 |
+| semantic-warning-orange-1 | #fb5b01 | 5.47:1 |
+| semantic-warning-yellow-1 | #ebb700 | 9.37:1 |
+| solid-fill button（地 key / 字 white） | — | 8.76:1 |
+| **反転しない場合の key blue #0017c1** | — | **1.57:1** |
+
+最後の行が dark を設計する理由そのもの。目視でも LLM 判定でもなく決定論の検査に
+してあるのは、上流の再 vendor で palette が動いたときに黙って劣化させないため。
+
+JVM 46 tests / 924 assertions、nbb 43 / 915、どちらも 0 failures。
+
+## これは上流ではない
+
+`dds-ext-*` の layout 補助と同じ身分の拡張であり、デジタル庁が承認した dark
+ではない。ns docstring と README の両方に最初の段落として明記した。
+
+## 未了
+
+**terminal 自体の skin swap（kotoba-ui → jp-go-dds）は未着手。** 現行の
+`torihiki-terminal` は `kotoba-ui` の `app-shell` / `nav-bar` / `panel` / `grid` /
+`stack` / `->page` に依存しており、jp-go-dds にはこれらに相当する shell が
+`dds-ext-*`（container / section / grid / stack / card / hero）しか無いので、
+`view.cljc` 全体の書き換えになる。動作確認済みのページを壊すリスクがあるため、
+チャート配線（ADR-2608040300）を先に着地させて分離した。
+
+なお **チャートは既に skin 非依存**にしてある（色を `--hig-*` で参照するので
+kotoba-ui でも jp-go-dds でも正しく出る）ので、skin swap はチャートに影響しない。")))

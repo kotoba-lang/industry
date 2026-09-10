@@ -1,0 +1,80 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608100200")
+  (:adr/title "空の checkout は west にも triple-sync にも映らない — org-threejs が network-isekai の JVM gate を全部止めていた")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-10")
+  (:adr/related "2607173200 2607211600 2607011300")
+  (:adr/body
+  "## 実測（2026-08-10、再現手順つき）
+
+```
+$ cd orgs/network-awai/network-isekai && clojure -M test/itonami_quality_test.cljc
+Error building classpath. Manifest file not found for kotoba-lang/org-threejs
+in coordinate #:local{:root \".../orgs/kotoba-lang/org-threejs\"}
+```
+
+`orgs/kotoba-lang/org-threejs` の checkout の状態:
+
+```
+$ git log --oneline -1
+fatal: your current branch 'init_placeholder' does not have any commits yet
+$ ls
+node_modules  src  target  test        # deps.edn が無い
+$ git status --porcelain
+?? .gitignore
+?? src/                                 # 計 4 KB
+```
+
+**commit ゼロの `init_placeholder` branch**に居るので `deps.edn` が無く、
+pin（`31ba3565`）への checkout は上記 2 つの未追跡パスに阻まれて
+`Please move or remove them before you switch branches` で止まる。
+
+## なぜ気付きにくいか
+
+1. **west は「壊れている」と言わない。** `west update` は pin に checkout を
+   合わせるだけで、合わせられなかったこと自体は流れていく。
+2. **triple-sync の blocking scope が 0 を返す。**
+   `nbb scripts/west-triple-sync.cljs plan --scope blocking` は
+   `scope=blocking managed=0 actions=0 reports=0`。ADR-2607173200 が用意した
+   「fresh checkout を壊している分」の検出は、**この形を拾っていない**。
+3. **壊れているのは別の repo。** 症状が出るのは `org-threejs` を
+   `:local/root` で参照している側（network-isekai とその同類）で、そちらを
+   いくら見ても原因は無い。座標名から「three.js の mirror が要るのか」と
+   読んでしまいやすいが、要るのは **checkout の修復**だけ。
+
+## 影響範囲
+
+`deps.edn` に `:local/root \"../../kotoba-lang/org-threejs\"` を持つ repo の
+**JVM 経路が全部**。network-isekai では `itonami-visual` / `feed-index` /
+`lobby-catalog` / `visual` / その他 `clojure -M` 系すべて。nbb 経路
+（`nbb.edn` の `:paths`）は org-threejs を含まないので影響を受けない。
+
+## 今回やったこと / やらなかったこと
+
+**やらなかった**: 未追跡ファイルの削除。4 KB の scaffold 残骸に見えるが、
+共有 west checkout にある他者の未追跡物であり、CLAUDE.md の
+「勝手に破棄しない」に該当する。
+
+**やったこと**: gate を回すために private な classpath を組んだ。
+`orgs/kotoba-lang/*` の各 repo への symlink を張った dir を作り、
+`org-threejs` だけ pin revision の fresh clone に差し替えて、その中に
+worktree を置く（`../../kotoba-lang/...` の相対解決がそのまま効く）。
+
+```bash
+mkdir -p $W/orgs/kotoba-lang
+for d in <root>/orgs/kotoba-lang/*; do ln -sfn \"$d\" $W/orgs/kotoba-lang/$(basename $d); done
+rm $W/orgs/kotoba-lang/org-threejs
+git clone -q git@github.com:kotoba-lang/org-threejs $W/orgs/kotoba-lang/org-threejs
+(cd $W/orgs/kotoba-lang/org-threejs && git checkout -q 31ba3565744071742ed47521ec958cc8f431c6d8)
+```
+
+## 直すべきこと（未実施 / owner 判断が要る）
+
+1. **共有 checkout の修復** — 未追跡の `.gitignore` と `src/` の出所を確かめ、
+   捨ててよいなら退避してから pin へ checkout する:
+   `git -C orgs/kotoba-lang/org-threejs fetch --all && git checkout 31ba3565…`
+2. **検出の追加** — 「commit ゼロ / manifest 欠落の checkout」を
+   `west-triple-sync.cljs` の blocking scope が拾うようにする。この形は
+   `west update` でも `verify-west-pins` でも見えないので、拾えるのはここだけ。
+   他に同じ状態の repo が居ないかの棚卸しも同時に要る（今回は 1 件しか見ていない）。
+")))

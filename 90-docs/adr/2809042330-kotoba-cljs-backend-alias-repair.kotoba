@@ -1,0 +1,23 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809042330-kotoba-cljs-backend-alias-repair")
+  (:adr/title "kotoba cljs backend: implemented but unreachable through the CLI — alias repaired, backend first-class")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-04")
+  (:adr/related (vector "ADR-2607151500" "ADR-2607279200" "ADR-2607260100"))
+  (:adr/context
+  "Owner direction 2026-09-04: align kotoba with the JSCL/Parenscript lineage — cljs parts should run through kotoba's own pure s-expression -> JS path, building on the existing JS emit in the kotoba CLI.
+
+Measured before acting:
+- `kotoba compile --target web` (js-kotoba-v1, kotoba-script backend, restricted ESM) works end to end: a 5-line .kotoba compiles to a 56KB .mjs, `instantiateKotoba({}).main()` answers 42n under Node. This is the FIRST-CLASS JS path and already matches the design (KIR -> checked restricted ESM, no cljs runtime).
+- The cljs target was the broken one. `amu compile --target cljs` exited 70 :internal on every source — while JVM-level `compile-source :cljs-kotoba-v1` returned :cljs/v1 and the emitted namespace answered (main) = 3 under nbb. Root cause: amu cli.clj parse-target aliased js/javascript/js-browser but NOT cljs/cljs-node/cljs-browser; `--target cljs` fell through `(keyword s)` to the bare `:cljs`, which dispatch! rejected as :unsupported-target, and the ex-info escaped as a Throwable -> :internal.
+- surface-status.edn already flagged the wider gap: :kotoba-cljs appears in :sugar :backends sets with no entry in guest-grammar.edn :backends and multiple UNMEASURED entries. The backend exists (backend.cljs, KIR -> plain cljs source text, its own 0/false vs 0-as-false and comparison-returns-1/0 semantics documented); the surface naming never caught up.")
+  (:adr/decision
+  "1. REPAIR, NOT REBUILD. The JS story kotoba needs already exists in two layers: js-kotoba-v1 (kotoba-script, restricted ESM, BigInt i64, capability grants — the web/application target) and cljs-kotoba-v1 (backend.cljs, plain cljs source text — the cljs-host target). Fixed the bridge: amu PR kotoba-lang/amu#779 adds the three aliases to parse-target plus a CLI regression test. Verified: --target cljs emits readable cljs source, 168 namespaces / 1311 tests / 9511 assertions green.
+
+2. CLS NOT CSS: the cljs source emitter stays a real target alongside restricted ESM, not deprecated. It is the path that makes kotoba functions callable from nbb/cljs hosts without an ABI, and ADR-2607151500 documents its semantics deltas honestly (safe-int bound instead of silent wraparound).
+
+3. THE REMAINING GAP IS MEASUREMENT, NOT CODE. surface-status.edn's :kotoba-cljs UNMEASURED entries (peek/pop/keys et al, measured 2026-09-03) are now reachable through a working CLI — the follow-up is to measure each against :cljs-kotoba-v1 and fill the :backends-measured entries, then add :kotoba-cljs to guest-grammar.edn :backends where it is actually implemented. EXECUTED same day: peek i64-vector executes under nbb ((peek [7 8 9]) = 9), pop executes after amu#786 admitted vector-take to the cljs gate and lowered it ((vector-count (pop [7 8 9])) = 2), keys/vals were unreachable from ANY backend because no canonical [:map K V] could be built from admitted source — and on 2026-09-05 THAT too was fixed: the :internal was kotoba-script lacking typed-map-keys/typed-map-vals (kotoba-lang/kotoba-script#93 implemented both heads), amu#788 pinned it and aliased `--target web` (the kotoba CLI's own spelling, which the amu CLI had also dropped as :unsupported-target — third instance of the same alias-gap class). CLI E2E: (vector-count (keys {10 1 20 2})) = 2n under Node. Recorded in kotoba-lang#546+#547+#548. :kotoba-cljs still refuses the typed-map family at the cljs gate's deliberate collection scope (amu core.clj cljs-bounded-vector-ops carries only the vector slice) — widening it is backend.cljs work, not a recording task. guest-grammar.edn :backends still lacks :kotoba-cljs; adding it belongs with that widening.
+
+4. WHAT THIS IS NOT. This does not make cljs the default web target — js-kotoba-v1 remains primary (compile --target web). It does not reopen the legacy `kotoba cljs emit` surface path (launcher-owned, still package-admission-gated).")
+  (:adr/consequences
+  "amu main gains the aliases on merge of #779. The kotoba-lang tree's surface-status UNMEASURED rows for :kotoba-cljs become measurable with one command (`amu compile <f> --target cljs`). The JSCL/Parenscript comparison the owner drew holds: kotoba-script ≈ JSCL's position (subset semantics carried to JS with its own runtime contract), backend.cljs ≈ Parenscript's position (textual, host-friendly). Both are now reachable without knowing their full profile names.")))

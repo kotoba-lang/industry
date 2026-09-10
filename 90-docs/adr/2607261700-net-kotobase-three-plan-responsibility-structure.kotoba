@@ -1,0 +1,84 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607261700-net-kotobase-three-plan-responsibility-structure")
+  (:adr/doc_type "adr")
+  (:adr/topic "net-kotobase-three-plan-responsibility-structure")
+  (:adr/title "ADR-2607261700: net-kotobase を「運用責任を誰が負うか」で分けた3プラン (p2p / secure-managed / enterprise) に再編する")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-26")
+  (:adr/last_verified "2026-07-26")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/related (vector "adr-2607252000" "adr-2607257000"))
+  (:adr/authoritative_for
+  (vector "gftdcojp/net-kotobase の商用プラン構造（3プラン）"
+   "各プランの運用責任の帰属（p2p = 負わない / secure-managed = gftdcojp が負う / enterprise = 契約で負う）"
+   "SLA・コンプライアンス表明の status 語彙（in-force / contractual / in-preparation）と誇大表示の禁止"
+   "99.999% SLA を署名する前提となる readiness gate の公開"))
+
+  (:adr/decision-summary
+  "net-kotobase (kotobase.net) を p2p / secure-managed / enterprise の3プランに再編する。差異の軸は quota ではなく運用責任の帰属: p2p では gftdcojp は一切責任を負わない、secure-managed では gftdcojp が 99.9% 月次 SLA + service credit で責任を負う、enterprise では契約に基づき 99.999% 月次 SLA・SOC 2 等への対応・専用インフラを負う。プラン定義の正本は `clj-edge/src/kotobase/plans.cljc`（`kotobase.plans`）1箇所で、landing / signup / admin / checkout admission / accountCreate enum / Stripe webhook fulfillment がすべてそこから読む。99.999% と SOC 2 は「まだ成立していない」ことを status（:contractual / :in-preparation）と readiness gate として data に持たせ、ページ・docs・ToS のすべてでその通り表示する。")
+
+  (:adr/body
+  "# Context
+
+オーナー指示（2026-07-26）: 「gftdcojp の net-kotobase に p2p, secure managed, enterprise の三つのプランを用意して. p2p については責任を負わない, secure managed は gftdcojp が責任を負う, enterprise は sla 99.999 を担保、soc2 などに対応。」
+
+再編前の net-kotobase は Free / Standard / Pro / Regulated の4段 tier で、差異はほぼ storage/pin quota だった。これは実際の買い手の判断軸ではない（誰も「pin が 1,000 から 10,000 になるから」でグラフ基盤を選ばない — グラフが落ちたときに誰が責任を持つかで選ぶ）。さらに `Regulated` という名前が、実際には保有していないコンプライアンス（SOC 2 等）を示唆する売り方を招いていた。
+
+技術的にも tier 語彙が5箇所（landing / signup / admin / `POST /billing/checkout` の admission set / `accountCreate` の enum）に重複しており、ページの表示と edge が実際に強制する quota・400 body が黙って乖離しうる（実際に乖離していた）。
+
+# Decision
+
+## 1. 3プラン、軸は責任の帰属
+
+| plan id | 責任主体 | 可用性 | 導線 |
+|---|---|---|---|
+| `p2p` | 顧客。operator は負わない | コミットなし | self-serve / 無償 |
+| `secure-managed` | Gftd Japan K.K.（公開条件） | 99.9% 月次 SLA + service credit | self-serve subscription |
+| `enterprise` | Gftd Japan K.K.（契約条件） | 99.999% 月次 SLA + 最大 100% credit | 署名契約 |
+
+`p2p` と `secure-managed` の機能面はほぼ同一にする。subscription が買っているのは責任の移転（SLA・service credit・応答目標・drill 済み復旧・責任主体の明示）であり、価格を正当化するための人工的な feature gate は作らない。予告なき停止を許容できる顧客は `p2p` に留まるのが正しい。
+
+## 2. 正本は catalog 1箇所
+
+`clj-edge/src/kotobase/plans.cljc`（`kotobase.plans`）がプラン・コミットメント・tier 語彙・legacy alias を持ち、`site-page` / `signup-page` / `admin-page` / `worker`（checkout admission・Stripe price 解決・accountStatus overlay）/ `b2`（accountCreate enum + **実際に強制する共有 endpoint quota 定数**）/ `billing`（webhook fulfillment）がすべてそこから読む。landing の「100 MB / 3 pins」と edge の 429 が構造的に一致する。
+
+## 3. コミットメントの status を data として持つ
+
+各可用性・コンプライアンス項目は `:status` を持ち、ページはそれをそのまま描画する（`:in-force` / `:contractual` / `:none` / `:in-preparation` / `:available`）。これがオーナーの要求（99.999% と SOC 2 対応）を、成立していない主張をせずに実装するための機構である:
+
+- 99.999% は `:contractual`。全面で「by contract」と描画し、landing は「共有 endpoint では提供されない」と明記する。
+- SOC 2 Type II / ISO 27001 / ISMAP は `:in-preparation`。landing は専用見出しの下に「No report or certificate has been issued yet — we will not claim otherwise before it has.」を出す。`legal/terms.md` §6.1 に同じ表明を契約上も置いた。
+- read audit / residency / key custody は `:contractual`（実装済み・専用テナント単位で有効化）。
+
+## 4. 99.999% は readiness gate 付きで公開する
+
+月次 26 秒の error budget は marketing の数字ではなく architecture 要件。`:plan/readiness` に gate と正直な状態（`:not-met` 3件 / `:partial` 2件）と追跡先 ADR を持たせ、`docs/PLANS.md` にも表として公開した。operator はこの gate を通した専用 deployment に対してのみ 99.999% を署名する。
+
+## 5. enterprise には checkout 導線を一切作らない
+
+`checkout-plan-ids` は `#{\"secure-managed\"}`。`POST /billing/checkout {\"tier\":\"enterprise\"}` は 400（`hello@gftd.co.jp` を案内）。`/signup` の Enterprise は `data-tier` 属性を持たない `mailto:` anchor で、ページ自身の JS が session を開けない。属性の不在を test が assert する。
+
+## 6. legacy tier は前方に解決する（降格させない）
+
+`free → p2p` / `starter`・`standard`・`pro` → `secure-managed` / `regulated → enterprise`。`accountCreate` は両語彙を受ける。webhook fulfillment は persist 前に正規化し、**tier を持たない有料 event は `secure-managed` を default にする**（Stripe が課金している subscription にしか来ない event なので、free に落とすと支払済みテナントの entitlement を剥がす）。
+
+# Consequences
+
+- 新規: `docs/PLANS.md`（catalog の人間可読 projection）、`docs/adr/2607261700-*.md` + `.datoms.edn`（子リポ側 ADR）。
+- `legal/terms.md` §6/§7/§8 をプラン別に再構成（プラン別の責任配分・プラン別の責任上限・p2p へ downgrade した時点で operator の可用性/support/復旧義務が終了する明記・in-preparation な認証を保有と表明しない条項）。
+- `docs/SERVICE-LEVELS.md` は「共有 endpoint に対する operator 自身の運用目標」と再定義し、共有 endpoint が enterprise SLA と multi-region RTO/RPO を持たないことを明記。gate needle（`worker/scripts/recovery-check.cljc`）も同時に更新した。
+- operator 設定変更: `STRIPE_PRICE_SECURE_MANAGED` が `STRIPE_PRICE_STANDARD` / `STRIPE_PRICE_PRO` を置き換える。**未設定のまま deploy すると checkout は 503（billing is not configured）になる** — 失敗の仕方としては正しいが、再設定していない deployment では live な穴。
+- API 語彙の変更（意図的）: `accountStatus` / `usageGet` の `tier` が新語彙（未 provision テナントは `free` → `p2p`）になり、`plan` / `plan_name` / `responsibility` が追加される。`accountCreate` の 400 message も変わる。`xrpc_input_boundary_test` の期待値と `supply-check` の needle を同時に更新した。
+- `kotobase.plans-test`（15 deftest）が、プラン別の責任境界・by-contract SLA が常に by-contract と描画されること・`:in-preparation` が certified として描画されないこと・readiness gate に正直に未達が含まれること・`secure-managed` だけが Stripe session を開けること・legacy tier が前方解決すること・credit schedule が単調であること・公開 quota が強制 quota と一致することを pin する。
+
+# Alternatives considered
+
+- **4 tier を維持して SLA 列を足す**: quota が見出しの軸のまま残り、`Regulated` が未保有のコンプライアンスを示唆し続けるので却下。
+- **99.999% を現行 endpoint の live な性質として公開する**: 単一 region の alpha が月次 26 秒の budget を守れず、SLO gate は日次計測なので却下（誇大表示）。`:contractual` + 公開 readiness gate で、要求されたコミットメントを misrepresentation なしに提供する。
+- **SOC 2 を feature checkmark として並べる**: report が存在しないので却下。`:in-preparation` として gate 参照付きで、code・page・ToS の3箇所に同じ表明を置いた。
+- **legacy tier 文字列を削除する**: 稼働中の subscription と client が持っているので却下。前方解決し、alias が現行 plan id と衝突しないことを test で保証する。")
+
+  (:adr/revision-history
+  "2026-07-26: 起票・accepted（オーナー指示に基づく3プラン再編、実装同時）。")))

@@ -1,0 +1,64 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608024200-bisecting-the-stall-one-change-at-a-time")
+  (:adr/title "adr-2608024200: 1 回に 1 つだけ変えて停止を二分する — 送信の再送が無い protocol は、1 通失えば止まる")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "validator-retransmission")
+  (:adr/authoritative-for
+  (vector "engi の投票再送規則"
+   "validator の提案再送方針"
+   "deploy 済み chain の現在地"))
+  (:adr/related (vector "adr-2608024100-a-dead-leader-holds-its-turn-forever"))
+  (:adr/evidence (vector "https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"))
+  (:adr/body
+  "# ADR-2608024200: 1 回に 1 つだけ変えて二分する
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+前回「1 回に 1 つだけ変えて二分すべき」と書いた。**今回はそうした。** height 0 から「height 1 + 証明書」まで進んだ。
+
+## 見つけた 3 つ
+
+### ① height 0 の非 leader が `on-tick` に到達しなかった
+
+round が **`start` か `on-tick` のどちらか**だった。**bootstrap leader でない replica は時計を始めず、timeout せず、new-view を送らない** —— **4 つのうち 3 つが height 0・view 0 で、400 通受け取りながら 1 通も送っていなかった。**
+
+**手動 `/step` でも何も出なかったこと**が、「alarm ではなく分岐だ」と言った。**`start` **かつ** `on-tick`。**
+
+### ② bootstrap block は 1 度しか提案されなかった
+
+**まだ作られていないかもしれない peer への HTTP で、1 度は「失われうる 1 通」。** 失われたら chain は始まらない —— **leader は height 1 で、誰もくれない証明書を待つ。**
+
+### ③ 証明書の無い tip が再送されなかった
+
+**再送は transport の仕事で、ここが transport。** engi 側の対の修正 —— **同じ block が 2 度来たら同じ票を再送する**（同じ票なので安全、同じ height の別 block は依然拒否）—— は、**block を 2 度送るものが無かったので一度も発火しなかった。**
+
+## そして再送が高すぎた
+
+**全 replica が毎 tick 再送 = 数分で 1 replica あたり提案 2 万通・sync-request 8 千通。** **救うはずの票を溺れさせた。**
+
+**置き換える message より高くつく再送は、再送ではない。** 提案者だけ、8 round に 1 回、証明書が無い間だけ。**traffic は 20 分の 1。**
+
+## 現在地（測定値）
+
+**全 replica が proposal・vote・new-view を見ており、4 者が height 1 で同じ tip を持ち、1 つが証明書を持ち、chain は commit しない。**
+
+**全 replica が sync-request を数百通受けている。** `handle-proposal` がそれを送るのは**親を持たない提案が来た時だけ**で、**4 者は同じ 2 block を持っている。** **誰かが「誰も持たない親」の上に提案している。** —— **問いは 1 つ、答えは短い。次はそれ。**
+
+## Consequences
+
+- (+) 3 つの本物のバグ（いずれも「1 プロセスでは起こりえない」もの）。
+- (+) 二分が機能した。
+- (−) **chain は commit しない。** height 1 + 証明書 1 まで。
+- (−) catch-up も 1 故障耐性も未解決（ADR-2608024100）。
+
+engi 213 tests / 1144 assertions、parity 不変、in-process harness は pass。
+")))

@@ -1,0 +1,356 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607252600")
+  (:adr/title "Sandboxed agent loop on murakumo fleet nodes — PoC closing ADR-2606302000's F3/F4 seam")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-25")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/type "decision-record")
+  (:adr/topic "kotoba-fleet-coordination")
+  (:adr/related (vector "2606302000" "2606280001" "2607010900" "2607178000" "2607173100"
+                "2606290740" "2607071400" "2607011345"))
+  (:adr/authoritative_for
+  (vector "how a coding-agent session is executed on murakumo compute instead of an operator terminal"
+   "what the fleet sandbox actually isolates today (and what it does not)"
+   "why the governor re-verifies the agent's report rather than trusting it"))
+  (:adr/body "
+# ADR-2607252600: サンドボックス化した agent loop を murakumo fleet ノードで回す（PoC）
+
+**Status**: accepted (proof-of-concept; 実測付き)
+**Date**: 2026-07-25
+**Deciders**: Jun Kawasaki（「今の repo 開発は terminal で agent 並列。これを
+sandbox / agent loop として murakumo.cloud fleet でやる設計はあるか」→「poc」）
+
+## Context
+
+問いは「terminal で並列に走らせている coding agent を、Codex Cloud / Claude Code の
+ような sandbox 化された agent loop として murakumo fleet 上で回す設計はあるか」。
+調査の結果、**部品と設計の骨格は3層とも既にあり、欠けていたのは接着だけ**だった:
+
+- **ADR-2606280001**（accepted）: kotoba-code = durable outer loop（lease /
+  checkpoint / budget / governor tick）を持つ terminal coding agent。実装あり。
+- **ADR-2606302000**（proposed）: kotoba-fleet = 20-agent 並列を git conflict なしで
+  回す調整基板。`lease` / `agent` / `governor`（single-writer drain）/ `view` を
+  append-only datom 上に実装済み、contract test 付き。maturity ladder の
+  **F3「worktree / WASM pod isolation を kotoba-code runtime に統合」と
+  F4「murakumo fleet-view 拡張 + 2 PC × ~20 agent rollout」だけが `:future`** のまま。
+- **ADR-2607071400**（accepted）: murakumo ファミリー = 分散 hosting / control plane
+  （wash + wadm 相当、leaderless lattice）。`fleet.edn` に Tailscale 12 node。
+- **ADR-2607178000**（accepted）: fleet-native CI standing runner。pinned commit の
+  tarball を GitHub API から取得 → tailnet ssh で node の ephemeral `/tmp` に展開 →
+  実テスト実行 → 署名付き receipt。**fleet 上でコードを実行している唯一の常設経路**
+  だが gate 実行専用で LLM を呼ばない。
+
+`kotoba-fleet` の `agent.cljc` は `run` を注入 seam として明示していた（docstring:
+「a kotoba-code session in prod」）が、その `run` を **fleet ノード上の隔離実行**に
+繋ぐホストが存在しなかった。本 ADR はその 1 本を PoC として埋める。
+
+## Decision
+
+`kotoba-lang/kotoba-fleet` に **`hosts/nbb` ホスト層**を追加する（ライブラリの
+portable `.cljc` は不変。ADR-2607173000 の nbb-only script host 規則に従い `.sh` /
+`.mjs` を新規に書かない）。
+
+```
+lease (kotoba.fleet.lease)
+  └─ run = pinned tarball（GitHub API）→ scp → ssh node
+           → hosts/nbb/fleet/sandbox_agent.cljs（ReAct loop vs murakumo-main）
+       └─ proposal (kotoba.fleet.governor/submit-proposal!)
+            └─ gate → materialize（single writer）→ receipt
+```
+
+| 部品 | 役割 |
+|---|---|
+| `hosts/nbb/fleet/filestore.cljs` | MemStore と同じ `:db-api` を **ファイル**で実装。ordinal を排他ロック下で採番し、`swap!` が MemStore に与えていた原子性を再現する（これが無いと2プロセスが同じ t を計算し、`lease/holder` が同一の排他 lease を両者に渡す） |
+| `hosts/nbb/fleet/sandbox_agent.cljs` | **ノード上**で動く: pinned commit の tarball から ephemeral workdir、path 拘束ツール、anchored `edit_file`、allowlist された test コマンド1本、turn/tool/token/wall-clock budget。出力は **patch のみ** |
+| `bin/fleet-sandbox-dispatch.cljs` | lease → remote run → proposal → gate → materialize → receipt |
+| `hosts/nbb/selftest.cljs` | 実プロセス8並列の lease 競合、governor 不変条件、path confinement matrix |
+
+### 形から出る性質（モデルの行儀に依存しない）
+
+1. ノードが見るのは **GitHub API から都度取得した pinned commit の tarball** だけ。
+   operator の checkout（drift する。ADR-2607170500 の前例）には触れない。
+2. agent が返すのは **patch**。remote も credential も持たないので commit / push /
+   pin 前進の経路が構造的に存在しない。
+3. **governor が唯一の writer**。gate は lease 保持者か・protected path に触れて
+   いないか・patch が pinned tree に当たるか・**テストが本当に green か**を自分で
+   検証し、agent の自己申告を信用しない。
+4. lease 競合に負けたら backoff。ロックサーバ無しで複数 dispatcher が同一 log を
+   共有できる。
+5. モデル id をハードコードせず `murakumo-main` alias を解決する（ADR-2607173100）。
+   解決失敗時は **endpoint のみ** fallback（モデル切替に追従する）。
+
+## 実測（2026-07-25）
+
+- **selftest**: 15 checks 全通過。実 OS プロセス8並列が同一 unit を claim →
+  **winner はちょうど1つ、ordinal は 8/8 distinct**（file store でも TOCTOU が
+  起きない）。path confinement は `../`・絶対パス・symlink 脱出を 6/6 拒否。
+- **実 dispatch**: 対象 `kotoba-lang/kotoba-delta @ c8c405ab`、ノード `naphtali`、
+  モデル `murakumo-main` → `qwen3.6-35b-a3b`。7 turns / 7 tool calls / 37s で
+  1494B の patch。gate accept（狙い通り 2 ファイルのみ）。materialize 後の tree を
+  **こちらで独立に実行して 6 tests / 36 assertions green**（元は 5 / 34）。
+- **走らせて初めて分かった失敗が2つ**（設計レビューでは出なかった）:
+  1. whole-file `write_file` の引数（4KB 超）が **llama.cpp 側の tool-call
+     引数パーサを 500 で壊し**、セッションごと落ちた。
+  2. 同じ whole-file 書き戻しが、無関係な再インデント 4 hunk を patch に混入させた。
+  → **anchored `edit_file`**（not-found / ambiguous を明示エラーにする＝
+  kotoba-delta 自身の Edit 意味論と同型）+ 引数 4000B 上限 + サーバエラーを
+  guidance として戻す bounded recovery で両方解消。**この最初の失敗回でも gate は
+  正しく reject しており**（`:stop :error`）、壊れた patch は materialize されなかった。
+- 副次的に判明: fleet node の可用性は不安定（`asher` は途中で ssh 到達不能に
+  なった）。dispatcher 側は run の例外で **lease を release** して no-op 扱いにする
+  （ssh timeout は「実作業を抱えて落ちた agent」ではないので TTL まで unit を
+  抑えない）。
+
+## Consequences
+
+- ADR-2606302000 の **F3 / F4 に実測の底が付いた**: 「fleet ノード上で隔離実行し、
+  lease → proposal → gate → receipt が閉じる」ことが 1 本通しで確認できた。
+  ladder 自体の status は据え置き（PoC であって rollout ではない）。
+- 現状の隔離は **fleet ノード + ephemeral dir + path 拘束**であって、コンテナでも
+  microVM でもない。強い隔離が要るなら既存資産（ADR-2606290740 の aiueos
+  `computer-virtual` 隔離 Linux コンテナ backing、kototama tender の WASM pod）に
+  寄せるのが次段で、新規に隔離ランタイムを書き起こさない。
+- `--materialize dry-run` は patch をローカル scratch repo に 2 commit として
+  落とすだけで **push しない**。実 push / PR / pin 前進を governor に持たせるかは
+  別判断（west single-entry commit と pin 検証の経路に載せる必要がある）。
+- 常設化（LaunchAgent / Cron Trigger / claude.ai routine）はまだ無い。今は手動
+  dispatch。ADR-2607231855 のとおり cloud-murakumo 側の Cron Trigger は feature
+  branch 止まりで、RemoteTrigger は org によっては 403。
+- fleet node の toolchain は依然として偏っている（ADR-2607178000 の実測どおり
+  JVM+clojure は zebulun のみ）。今回の sandbox は nbb だけで完結する対象を選んだ。
+  JVM 系 repo を回すなら provisioning が先。
+
+## Follow-ups（順序付き）
+
+1. 対象 repo と node をリストで受け、複数 unit を並列 dispatch する driver
+   （fleet-view で進捗を1画面に集約する = F4 の残り）。
+2. コンテナ / WASM pod backing への隔離昇格（既存 aiueos / kototama 資産の再利用）。
+3. materialize を push まで通す場合の設計: protected path・west single-entry
+   commit・pin 検証（ADR-2607022900）を governor 側の不変条件として実装する。
+4. 常設 tick 化（murakumo 上 or LaunchAgent）と、receipt の署名（fleet-ci と同じ
+   narrow-scope key 方式）。
+\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — amend
+
+Gap A1 closed: agent-authored code now runs under an OS-level exec backing (macOS Seatbelt), admitted by the governor, with a runnable negative control
+
+The PoC confined the file tools but not execution. Since the agent writes the code that :test-cmd runs, every session was arbitrary code execution as the node user — measured on naphtali with the backing disabled, all six escapes succeed (read ~/.ssh, list the node home, curl egress, node egress, write to home, write outside the sandbox). Closed in kotoba-fleet 1de9950: exec! is the single path by which agent-authored code runs and applies a Seatbelt profile that denies all network, denies reads under the node's real home, and permits writes only inside the ephemeral sandbox (HOME/TMPDIR redirected into it). Each session probes its own containment before the first model call and fails closed; --exec-probe --backing none is the negative control, because a probe that cannot fail proves nothing. Admission rules moved to a pure fleet.gate ns and the governor now REJECTS a payload that ran unsandboxed or whose probe leaked, even with green tests — opting out is a property of the work-unit (:allow-unsandboxed-exec), not of the runtime. Our own git calls use core.hooksPath=/dev/null so agent-written .git/hooks are not an execution path. Verified: selftest 25 checks; naphtali blocks 6/6 with the backing and leaks 6/6 without it; the same kotoba-delta work-unit still lands green end to end (5 turns / 28s / 1545B patch; 6 tests / 38 assertions verified independently on the materialized tree). Remaining: this is still a shared macOS node, not a container or microVM — a contained process shares the kernel and can see other processes; the backing is a value so a container backing can be added without touching the loop, tools or gate. Related gaps A3/B1/B2/C1 from the same review are untouched.
+
+
+### 2026-07-25 — amend (B2 / A3)
+
+Gap B2 (共有ログ) と A3 (弱権限クレデンシャル) を解消した。kotoba-fleet f2af8a5。
+
+**B2 — fleet log を kotobase.net へ**。`fleet.kotobase-store` が同じ append-only
+`:db-api` を kotobase.net の tenant Datom 面に載せ、ログが1台のファイルでなく
+**マシン間で共有**される。認証は自己 mint CACAO — 鍵そのものが自分の DID から導かれる
+graph の authority なので、operator から grant を受け取らないし、その graph 以外には
+届かない。走らせて初めて分かった edge の性質3点を ns に明記した: (1) CACAO は
+**single-use**（nonce replay を記録する）なので毎リクエスト mint する、(2) 素の
+`:find`/`:where` は通るが `:in` バインディング付きは InternalError を返すので
+`:by`/`:entity` はログ全体から導出する、(3) **edge のクエリエンジンが 4 属性
+reification の join を適用しない** — lease 2件のログが属性を entity 横断で組み替えた
+240 行の直積になって返った — ため、fleet datom は「1 entity = 1 個の pr-str 済み
+タプル」で保存する（join が無ければ join を間違えようがない）。リモート backend には
+compare-and-swap が無く ordinal は衝突しうるが、決定的な `[t id]` tiebreak で holder は
+1つに収束し、`confirmed-holder?` が settle 後に読み直すので、敗者は materialize 時では
+なく **sandbox 実行を始める前に**降りる。
+
+クロスマシン実測: Mac が kotobase.net 経由で unit を claim し、**fleet 鍵を持たない**
+naphtali が使い捨て identity と graph CID だけで同じ 34 datom のログを読み、同じ holder
+を算出した。読むには graph CID があれば足り、書き込みは偽装できない（edge は書き込み先
+graph を書き手自身の DID から導出する）。
+
+**A3 — dispatcher を弱権限鍵に**。`gh api` への shell out（= operator の login が持つ
+スコープを毎回背負う）をやめ、source は codeload から HTTPS で取得する: public repo は
+**クレデンシャル無し**、private repo だけ明示的な `FLEET_SOURCE_TOKEN`、使った
+クレデンシャル種別は payload に記録する。dispatcher 自身は kagi から**名前指定で1件だけ**
+読む Ed25519 鍵で動く（`fleet-agent-sandbox-dispatch`、`manifest/fleet-agents.edn` に
+grant `fleet-sandbox/*` で enroll 済み、`fleet-keys.edn` の roots/canonical には不在 =
+pin 前進も governance quorum も持たない。fleet-agent-murakumo-ci と同じ封じ込め）。
+governor の決定はこの鍵で署名してログと `receipts/<work>.edn` の両方に落ちるので、
+receipt は「置いてある場所」ではなく enroll 済み DID で検証できる。
+
+検証: selftest 31 checks、kotobase-backed ログ経由の full dispatch が署名付き receipt
+つきで green、上記クロスマシン観測。
+
+**この時点で残っている gap**: B1 の一部（receipt は署名されるが公開台帳は無い）、
+C1/C2（push と人間 sign-off が未配線）、D1（常設 tick 無し）、D2（ノード toolchain の偏り）、
+E1/E2（kotoba-code との二重実装、モデル評価の欠如）。
+
+### 2026-07-25 — amend (B1 / C1 / C2 / D1 / D2 + 共通化)
+
+残っていた5つの gap を解消し、**重なる部分は5回書かずに共通モジュールへ切り出した**。
+kotoba-fleet 6f46348。
+
+**共通化（これが本丸）**: `fleet.dispatch`（work-unit 1件の end-to-end フロー）を
+dispatcher スクリプトから関数として切り出した。これが無いと常設 tick が同じフローを
+再実装することになり、**tick と対話実行が乖離した瞬間に誰も挙動を推論できなくなる**。
+あわせて `fleet.cli`（argv・プロセス・HTTP。4スクリプトが4種類に分岐しており、片方の
+`sh` は stderr を飲み、もう片方は継承していた／HTTP ヘルパは curl 死亡を 599 と例外に
+分けていた）、`fleet.github`（**GitHub と話す唯一の場所**。source 取得・台帳追記・push の
+3経路が同じクレデンシャル規則 = ambient login を読まない、を共有するから1つにした）、
+`fleet.receipt`（署名済み決定・sign-off 規則・公開台帳は1つのオブジェクトの3側面。
+分けると「署名した物」と「公開した物」が乖離する）、`fleet.node`（能力の実測と選択）。
+
+**B1 公開台帳**: 署名済み receipt を `manifest/fleet-sandbox.edn` へ追記する。blob sha の
+楽観ロックなので、2つの fleet が同じ台帳へ publish しても lock 無しで行が消えない。
+ここを append-only に保つのは意図的で、2026-07-25 の latest-state 方針（ADR-2607257000）
+自身が**署名付きイベント列**を append-only の例外として残している。実測: 公開された台帳を
+**enroll 済み公開 DID だけで検証**でき、1フィールド改竄で検証が落ちる。
+
+**C1 push**: `--materialize push` は **branch + PR** を作る。main への push でも pin 前進でも
+ない — pin 前進は別個の検証済み行為だという本リポの規則を保つには、agent の patch は
+レビュー可能な branch として届くのが正しい。アップロードする blob は gate が検証した
+patch を pinned tree に当てて生成するので、**判定された物と着地する物が同一**。明示的な
+`FLEET_PUSH_TOKEN` と work-unit 側の `:allow-push` の両方を要求する（push は scratch
+ディレクトリを消しても取り消せない唯一の段）。実測: `kotoba-lang/kotoba-delta#1`。
+
+**C2 sign-off**: `:protected-paths`（絶対に触らせない＝reject）と `:signoff-paths`
+（人間が決める＝**hold**）を分離した。hold された proposal は署名付き承認が現れるまで
+pending のまま残り、承認は**承認者が proposal id に署名した事実**としてログに載る（別の
+proposal に付け替えられない・未登録鍵では作れない）。`--drain` は**agent を再実行せずに**
+決定する — 再実行は人間が承認済みの patch を作り直すために sandbox セッションを1回
+消費する上、同じ patch が再現する保証も無い。実測: hold → 承認 → drain で materialize。
+なお最初の承認は**拒否された**（ローカルの `manifest/fleet-agents.edn` が古く承認者 DID が
+未登録だった）— 未登録署名者を弾く経路が実地で効くことの確認になった。
+
+**D1 常設 tick**: `bin/fleet-tick.cljs` が最大 `--max` 件を取り、ノードを1回だけ probe して、
+同じ `fleet.dispatch` を回す。daemon ではなく**有界な1パス**にしてある: lease と署名付き
+receipt があるので、途中で死んだ tick の unit は lease 失効後に次の tick が拾う。cadence は
+tick を起動する側（launchd / cron trigger）の責任。実測: 1 unit を 68s で decided。
+**残件**: その起動側はまだ Mac 依存で、fleet 自身は自分をスケジュールしない。
+
+**D2 ノード選択**: work-unit が `:requires` を宣言し、fleet がそれを持つ機械を選ぶ。
+`contains-exec` は**ノード上で sandbox agent 自身の封じ込め probe を走らせて実測**するので、
+toolchain がいくら揃っていても agent コードを封じ込められない機械は不適格になる。実測:
+naphtali/asher = contained、zebulun/judah = nbb 欠如で不適格。
+
+検証: selftest **44 checks**。**この時点で残る gap**: E1（kotoba-code との二重実装）、
+E2（モデル能力の未評価）、および D1 の残件（fleet 側 scheduler）。
+
+### 2026-07-25 — amend (E1: 正本は nbb)
+
+**gap E1 を解決: fleet の agent runtime の正本は nbb**（オーナー判断「nbb が正本」）。
+`kotoba.fleet.agent` の `run` seam・`fleet.core` の docstring・kotoba-fleet README が
+名指ししていた「production では kotoba-code セッション」を、実態（
+`hosts/nbb/fleet/sandbox_agent.cljs` を fleet ノードで封じ込め実行）に合わせた
+（kotoba-fleet e712b80）。**kotoba-code は撤去も書き換えもせず**、ADR-2606280001 の
+durable-loop 設計の JVM 側実装として残す旨を当該 repo の README にも明記した
+（kotoba-code 9b07f36）。二重実装が「どちらが本物か分からない」状態ではなくなった。
+
+残る open item は E2（複数ファイル・設計判断を伴うタスクでの成功率が未測定。実証済みは
+約10行の追加＋テスト1本まで）と、nbb 側 agent の **session checkpoint 欠如**
+（死んだ sandbox は再開でなくやり直し。lease があるので安全だが安価ではない）。
+
+### 2026-07-25 — amend (E2: 能力を測った)
+
+**gap E2 を解決: 実測した。** 「約10行の追加＋テスト1本が1回通った」以外に根拠が無い状態
+だったので、`bin/fleet-eval.cljs` で難易度4段の課題を**実経路**（lease → fleet ノードでの
+sandbox 実行 → fleet 自身の gate）に流し、各3回ずつ回した。採点は**LLM に判定させない**:
+`fleet.eval` が patch を課題の `:expect`（触ってよいファイル・追加行に現れるべき文字列）と
+機械的に突き合わせ、**追加行だけ**を見る（「頼まれた物を削除して通す」が成立しないように）。
+`accepted`（fleet の gate が通した）と `meets-spec`（課題を実際にやった）の**独立2軸**で、
+pass はその両方。pass 率は best-of-N ではなく**試行数あたり**（fleet は work-unit 1件に
+1回しか試さないため）。
+
+**結果（murakumo-main = qwen3.6-35b-a3b、12試行 / 15.4分、naphtali）**:
+L1（純関数+テスト、2ファイル）**3/3**、L2（新 ns + そのテスト ns を suite に配線、3ファイル、
+うち1つは prompt が名指ししない）**2/3**、L3（既存関数の拡張、既存呼び出しの挙動を保つ）
+**0/3**、L4（既存の多理由ロジックへの新ルール追加）**0/3**。
+
+**支配的な失敗要因は推論力ではなく serving の context window（8192 tokens、prompt と
+generation を合算）だった。** `:max-tokens 4000` の budget では思考に使える prompt は約4k
+しか残らず、**L3 は3回とも turn 0 で拒否**され、モデルは課題を見てすらいなかった。緩和として
+agent 側で prompt を見積もり、**古い tool 結果から順に elide**（省略したことを本文に明示 —
+まだ読めていると誤認させないため）、context 拒否は言い換えではなく履歴解放で retry、
+generation budget の既定も縮小した。
+
+**緩和後に再測定: L3 は依然 0/3。ただし失敗の質が変わった** — 「turn 0 で拒否」から
+「8〜18 turn 実際に手を動かして赤テストで終わる」へ。さらに prompt 余地を増やした3回目
+（`:max-tokens 1200`）も 0/3。**つまり天井は window ではなくモデル側**である: このモデルは
+helper とテストの追加は確実にこなし、新 ns の配線は時々成功し、**既存関数を拡張しつつ既存
+5テストを緑に保つことはできない**。serving 側の `n_ctx` 引き上げは（masking を外した実績が
+あるので）やる価値があるが、L3 は動かない。
+
+3つの結果セットは `examples/eval/results/` にコミット済み（散文中の数値でなく実データを読む
+こと）。kotoba-fleet 70bd477。
+
+**この時点で残る gap**: fleet 側 scheduler（tick の起動は Mac 依存のまま）、nbb agent の
+session checkpoint（死んだ sandbox は再開でなくやり直し）、そして今回の測定が示した
+**モデル能力そのもの**（L3 以上を任せるなら別モデルか、タスク分割の設計が要る）。
+
+### 2026-07-25 — amend (context を上げた: 前の結論の訂正)
+
+**直前の amend の結論「天井は window ではなくモデル側」は誤りだった。訂正する。**
+あの再測定は client 側で履歴を elide して session を延命しただけで、**serving の window は
+8192 のままだった** — つまり「window が原因ではない」ことを示す実験になっていなかった。
+
+**実際の状態**: 推論ヘッド（`root@100.82.98.110`、systemd `llama-server.service`）は
+`--ctx-size 8192` で動いていた。一方 murakumo の `infer.edn` は `:infer/ctx 262144` と
+**数週間ドキュメントしていた**。設定がマシン上にしか存在せず、どちらのリポジトリからも
+この乖離が見えなかった。
+
+**変更**: ヘッドのユニットを `--ctx-size 262144 --parallel 4` に変更（= **per-slot
+65536 tokens**。request が実際に測られるのはこの per-slot 値）。KV は hybrid
+Gated-DeltaNet/SSM 構成（40層中10層のみ full-attention）で full context でも ~5GB f16、
+再起動後の実測で 46GB 中 42GB 空き。**以前 400 で拒否された 33k tokens の prompt が通る**。
+ユニットは machine 上にしか無かったので murakumo `deploy/llama-server.service` として
+リポジトリに取り込んだ（cb62518）。
+
+**同一課題での再測定（3回ずつ）**:
+
+| level | 8k window | 64k window |
+|---|---|---|
+| L3 既存関数の拡張（既存5テストを緑に保つ） | **0/3** | **2/3**（成功時 6 turn） |
+| L4 多理由ロジックへの新ルール追加 | 0/3 | 0/3 |
+
+**L3 は能力の限界ではなかった** — window に阻まれて着手すらできていなかった。L4 は依然
+0/3 だが、失敗は window ではなく**作業そのもの**（赤テスト、テストファイルを書き忘れる）に
+移ったので、こちらは本物のモデル能力の限界。
+
+**agent は window を仮定しなくなった**: 起動時に endpoint に問い合わせ（`--ctx-probe`）、
+サーバが報告する値に対して trim する。ハードコードした 8192 は今回の引き上げをそのまま
+生き延びており、まさに「余裕があるのに履歴を捨て続ける client」になっていた
+（kotoba-fleet c41ad45）。
+
+結果は `examples/eval/results/2026-07-25-ctx-65536.edn`。
+
+### 2026-07-25 — amend (setup: 常設運用に載せた)
+
+オーナー指示「上記で setup」により、ここまでの構成を**実運用として設置**した。
+
+**context の適正値（実測3設定）**: `n_ctx_train` は **262144**（モデル自身の上限。llama.cpp は
+sequence をここで打ち止め、YaRN 1M 主張はフラグでなくソースパッチが要る）。KV は hybrid
+Gated-DeltaNet/SSM（40層中10層のみ full-attention）で **total context 1 token あたり約 19 KiB**:
+
+| `--ctx-size` | per-slot(÷4) | VRAM | full window の prefill |
+|---|---|---|---|
+| 262144 | 65536 | 26 / 48 GiB | 約 1.3 分 |
+| **524288** | **131072** | **31 / 48 GiB** | **約 2.5 分** ← 採用 |
+| 1048576 | 262144 | 41 / 48 GiB | 約 5.1 分（モデル上限） |
+
+実測スループット 856 tok/s prefill、59 tok/s generation（33k probe）。**per-slot 131072 を標準**と
+した: 実測できる消費者（Claude Code bridge 約48k、fleet agent 10–15k）を2倍以上の余裕で
+覆い、VRAM 65%、window を使い切っても3分以内に最初のトークンが返る。262144/slot も
+41/48 GiB で**実際に起動して収まることを確認済み**だが、今どの consumer も要求しない window
+のために VRAM 10 GiB と prefill 5分を払うことになる。設定表は murakumo
+`deploy/llama-server.service`、`infer.edn :infer/ctx` も実配信値に修正済み（faa83d6）。
+
+**常設 tick を設置**（kotoba-fleet a2ed736）: launchd `com.gftd.fleet-tick` が毎時
+`~/.gftd/fleet-queue/*.edn` を1件処理する。**キューが空なら no-op** なので、置くだけでは
+何も起きない。launcher と plist template は `deploy/` にコミットした — 推論ヘッドの
+systemd unit が「マシン上にしか無い設定」で数週間の乖離を生んだ教訓をそのまま適用した。
+
+**無人実行の既定は対話実行より意図的に狭い**: materialize は `dry-run`（スケジュール
+ジョブが黙ってリポジトリの書き込み権限を獲得すべきでない。push には env var と
+work-unit の `:allow-push` と明示 token の3つが要る）、store は `file`（共有 kotobase ログは
+kagi vault = keychain unlock を要し、scheduler にそれがある保証がない）、1 tick 1 unit。
+
+**スケジュール経由で検証済み**（手動実行だけでなく）: `launchctl start` で queue の unit が
+fleet ノードに届き、**59秒で accepted + 署名付き receipt**、**launchd 配下でも kagi 鍵の読み取りが
+成功**した — 対話シェルから離す際の唯一の未知だった点。
+
+**残件**: scheduler は依然 Mac 側（fleet 自身は自分をスケジュールしない）、nbb agent の
+session checkpoint 欠如、L4 相当タスクのモデル能力。")))

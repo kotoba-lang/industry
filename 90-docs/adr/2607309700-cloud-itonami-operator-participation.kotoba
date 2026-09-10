@@ -1,0 +1,121 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607309700-cloud-itonami-operator-participation")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/topic "cloud-itonami-operator-participation")
+  (:adr/title "ADR-2607309700: cloud-itonami-app で1つの事業者として fleet に参与する — アプリが検証できないこと（許認可・deploy 経路）を検証できるふりで描かない")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/last-verified "2026-07-30")
+  (:adr/last_verified "2026-07-30")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/tags (vector "cloud-itonami" "cloud-itonami-app" "operator" "fleet" "blueprint"
+             "jp-go-dds" "licence" "deploy" "honesty-rails"))
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related (vector "adr-2607309600-itonami-business-plane-and-console"
+                "adr-2607299000-repository-rules-workspace-authority"))
+
+  (:adr/authoritative-for
+  (vector "cloud-itonami-app における事業者（operator）entity と参与ファネル（① プロファイル → ② 適合 → ③ 要件 → ④ 表明 → ⑤ 稼働）の正本"
+   "許認可を :self-attested として記録し、readiness が :attested を返して :met を決して返さないという決定の正本 — アプリは許認可の実在を検証しない"
+   "deploy 経路を推測せず、blueprint が同梱を宣言していない限り deploy の導線を出さないという決定の正本"
+   "endpoint 登録が実測 :up のときだけ通り、:down も :unknown も記録しないという決定の正本"
+   "fleet catalog の :deploy-config フィールド（リポジトリから読んだ事実）の正本"))
+
+  (:adr/context
+  "オーナー指示: 「今の cloud-itonami-* の org, repo を cloud-itonami-app でも表示して、cloud-itonami- の1つの事業者側として、参与できるような uiux を設計してほしい」。
+
+**実測した現在地。** `cloud.itonami.app.fleet` は 1,213 actor の directory を既に持っていたが、出口が MCP しか無く、`web.clj` からの fleet 参照は**ゼロ**だった。「誰が運用しているか」を表す概念はどこにも無く、blueprint にも operator を表す欄は無い。fleet の全ての blueprint が「有資格の事業者が fork して deploy・運用・販売できる OSS 事業」と名乗っているのに、その事業者になる道がアプリの中に無かった。
+
+もう一つの実測: **1,213 のうち実際に稼働して応答するのは 10 件**（`:on-demand` 1,199 / `:resident` 10）。だから「参与」を素直に実装すると、ほぼ全ての blueprint について「まだ誰も動かしていないもの」を「今すぐ始められる事業」として見せることになる。
+
+**設計判断はオーナーに確認した**（AskUserQuestion）。参与が最終的に何を生むかで作るものが変わるため、3案を提示した:
+  (a) ローカル表明 + 適合診断のみ（外部依存ゼロ）
+  (b) fleet 側に operator レジストリを新設して公開
+  (c) 稼働まで通す — 参与 → 要件充足 → deploy → endpoint 登録
+
+**オーナーは (c) を選択**し、その選択肢に私が明記した2つの警告——「deploy 経路は blueprint ごとに異なる」「許認可の実在をアプリは検証できない」——も込みで選んだ。表示範囲は「全件を一様に表示」を選択（actor 1,213 + 企業レコード 185）。
+
+したがって本 ADR の主題は、**(c) を選びながらその2つの警告を嘘にしない方法**である。")
+
+  (:adr/decision
+  "`cloud-itonami-app` に 2 面（Fleet ディレクトリ / 事業者）を追加し、`cloud.itonami.app.operator` を領域として置く。UI は**アプリが既に乗っている jp-go-dds（デジタル庁デザインシステム）に揃える** — skill `kotoba-uiux` は新規 UI に kotoba-ui を要求するが、このアプリは `jp-go-dds.page` に既に commit 済みで、日本の事業者向け公共性のあるプロダクトとして DDS は妥当な選択であり、一方的な re-stack はしない。
+
+## 設計の背骨: アプリに分からないことを分かったように描かない
+
+**1. 許認可を検証しない。** 日弁連にも弁護士会にも財務局にも照会経路が無い。だから許認可は `:self-attested` として、表明者と日付つきで記録する。`readiness` はこれを `:attested` として返し、**`:met` を決して返さない**。`save-profile!` は入力の `:licence/verification` を信用せず上書きするので、`:verified` を差し込む経路が存在しない。UI は全ての許認可行に `attestation-caveat`（「自己表明です。このアプリは許認可の実在を検証していません。」）を添える——caveat は requirement map に乗って運ばれるので、caveat 抜きで描画できない。
+
+なお、許認可の実在検証を**モデル化している governor は既にある**（`cloud-itonami-isic-6910-legalsupport` / `lawfirm` の `partner/verification-violations`）。それは運用時に actor 自身が行う検査であって、ここに記録するのは事業者の自己申告という別物・より弱いものである。混同しない。
+
+**2. deploy 経路を推測しない。** catalog generator に `:deploy-config` を追加した——`wrangler.jsonc` / `wrangler.toml` / `fly.toml` / `Dockerfile` の実在を repo から読んだ**事実**で、推論ではない。実測 **1,213 件中 11 件**（`:cloudflare` 10 / `:container` 1）。残り 1,202 件について `readiness` は `:absent` を返し、「運用者が deployment を自分で構築します（1,213 件中 deploy 経路を同梱するのは 11 件です）」と件数つきで書く。**deploy ボタンは出さない。** これは `fleet` が `:endpoint` に課している「住所を推測しない」を、住所の作り方まで一段広げたもの。
+
+**3. アプリが本当に検証できるのは最後の一歩だけで、そこは実際に gate する。** `register-endpoint!` は endpoint を probe し、**`:up` 以外では記録しない**。`:down` も `:unknown` も通さない——到達できなかったことは稼働の証明にならない（`fleet` が health に引いているのと同じ線を、逆方向にも引く）。
+
+**4. 判定できないものは blocking にしない。** `:absent` / `:unknown` / `:none` / `:attested` は `blocking-states` に入れない。「わからない」を「不可」に変えるのは「可」に変えるのと同じだけ不誠実なので、表示して運用者に委ねる。blocking にするのはアプリが実際に判定できる `:unmet` だけ（maturity `:blueprint`、必要技術の未保有、許認可の完全未表明）。
+
+## 参与ファネル
+
+    ① プロファイル  業種 ISIC / 職種 ISCO / 管轄 ISO 3166 / 保有技術 / 許認可（自己表明）
+    ② 適合          fit — 業種3点・職種3点・管轄1点の単純加算。0点は出さない
+    ③ 要件          readiness — 成熟度・governor・許認可・必要技術・deploy 経路
+    ④ 表明          declare! — 表明者必須（匿名の表明は表明ではない）
+    ⑤ 稼働          register-endpoint! — 実測 :up のときだけ
+
+`fit` は透明な加算にした。適合しなかった理由を訊かれた事業者は、自分で検算できる答えを受け取るべきで、スコアだけ渡されるべきではない。管轄を業種・職種より軽くしたのは、**正しい業種で国が違う事業者には適応する余地があるが、正しい国で業種が違う事業者には無い**から。
+
+`declare!` は要件未充足でも通す。運用できないものを評価するのは、何が足りないかを知る正常な経路であり、`:adoption/stage` がその差を記録する。`withdraw!` は記録を消さない——運用して止めた事実は、一度も始めなかったのとは違う（fleet の台帳が hold も積むのと同じ理由）。
+
+## fleet 側の変更
+
+`probe-endpoint` を公開した（複製ではなく）。`probe-health!` は catalog 内の actor しか probe できず、今 deploy したばかりの endpoint はそこに無い——west pin から再生成される catalog に載るのは数時間〜数日後で、`register-endpoint!` が確認したいのはまさにその前の瞬間である。")
+
+  (:adr/consequences
+  "**着地**: `cloud-itonami/cloud-itonami-app` `da970edd33a9230ad2183722823cc5b230ded853` / `com-junkawasaki/root` `4ff484dae6d161a24e49fe5bd41cfd2833d08aab`（catalog generator）・`a93774cd00582da2691365e6d0f8a739095296b7`（pin 前進）。
+
+**検証**: `clojure -M:test` 442 tests / 1,865 assertions green、`clojure -M:lint` errors 0（warning 11 は `documents_test.clj` の既存分）。アプリの実マークアップ・実 CSS・実 JS に、稼働中のアプリから取得した実 API 応答を差し込んで描画確認した（Passkey gate は迂回していない）。
+
+**既存テストに1度捕まった。** `core-test` の `app-css-only-references-design-system-tokens-that-exist` が、私の書いた `--color-semantic-error-4` / `--color-semantic-success-4` を「jp-go-dds が定義していないトークン」として弾いた。jp-go-dds は各 semantic 色に `-1` と `-2` しか持たない。**捏造したトークンを CI が止めた**ので `-1`/`-2` に直した。この repo の「実在するものしか使わない」規律が働いた実例として記録する。
+
+## ADR-2607309600 との衝突 — 解消済み（相手側が解消した）
+
+本 ADR は当初この節を「未解決」として書いていた。事実は次のとおりで、**解消済みに書き換えた**。
+
+同日 accepted の **ADR-2607309600（itonami-business-plane-and-console）が cloud-itonami-app の sidebar menu 構造の正本**であり、「12 項目が平らに並んでいた状態」を BUSINESS（対象）/ WORKSPACE（道具）/ SETTINGS の 3 段に分けると決め、`Canvas / Loops / Portfolio / Repos` の 4 view を設計していた。その `Repos` は本 ADR の `Fleet` と同じものを指していた。
+
+**私はその ADR を読まずに実装し、平置きの nav に 2 項目足した。** これは 2607309600 の決定に反する実装で、しかもこのセッションで繰り返し「作る前に既存の仕組みを確認する」と書いていた規律を、自分が `90-docs/adr/` の同日分を見ずに UI 構造を決めることで破った。
+
+**その後 2607309600 側が着地し、私の 2 項目を自分で正しい場所に統合した**（app main `799a34d` 時点）:
+
+    (nav-group \"BUSINESS\")
+    (nav-item \"portfolio\" ...) (nav-item \"canvas\" ...)
+    (nav-item \"fleet\" ...)     (nav-item \"operator\" \"事業者\" ...)
+    (nav-item \"contracts\" ...)
+    (nav-group \"WORKSPACE\")  … 8 項目 …
+    (nav-group \"SETTINGS\")
+
+**`Repos` は作られず、私の `Fleet` 命名がその枠に採用された。** view panel に重複は無く（14 view、いずれも1件ずつ）、`/api/operator` 系 7 経路と両 panel は無傷。両者が混ざった main で `clojure -M:test` 512 tests / 2,156 assertions green、`clojure -M:lint` errors 0 を確認した。
+
+したがって本 ADR は **menu 構造と view 名について一切の authority を主張しない**——その正本は 2607309600 である。本 ADR が正本なのは operator の領域モデルと2つの honesty rail だけで、これらは 2607309600 の Business entity 設計と競合しない（あちらは BMC / system dynamics / fleet の join key、こちらは事業者の参与）。
+
+**教訓として残す**: 平行セッションが同じアプリの同じ面を同日に触る前提では、ADR を書く前ではなく**実装を始める前**に `90-docs/adr/` の同日分を読む必要がある。今回は相手側が寛容に吸収したので実害が出なかっただけで、逆順（私が後から着地）なら menu を2度壊していた。
+
+## その他の限界
+
+1. **`fit` はコード完全一致しか見ない。** 「ISIC 6910 の隣接分野」のような近さを拾えないので、事業者側から見ると取りこぼす。正しい距離の定義は実利用しないと決められないと判断して、今回は入れなかった。
+2. **`:deploy-config` は deploy 経路の**存在**しか言わない。** その経路で実際に deploy できるか、必要な資格情報が何かは言わない。
+3. **operator は1インストールに1つ。** 複数事業者を1つのアプリで扱う形にはしていない（アプリが local-first の単一 tenant 前提のため）。2607309600 の Tenant / Business 設計が着地したら見直す対象。
+4. **`:adoption/*` はローカルの `state.edn` にしか無い。** fleet 側は「誰が運用しているか」を依然として知らない。それを公開する案 (b) はオーナーが選ばなかったので、実装していない。")
+
+  (:adr/evidence
+  (vector "fleet.clj は 1,213 actor の directory を持つが web.clj からの参照はゼロだった（grep -c fleet src/cloud/itonami/app/web.clj = 0）"
+   "1,213 actor / callable 10 / company-records 185 / :on-demand 1,199 / :resident 10"
+   ":role facet = sector-agent 459, occupation-agent 340, jurisdiction-agent 225, association-compliance-agent 80, municipal-agent 62, classification-agent 15, continuous-orchestrator 8, marketplace-service 7"
+   "deploy 経路を同梱する blueprint は 1,213 件中 11 件（:cloudflare 10 / :container 1）"
+   "catalog 再生成の差分は pin 更新 82 件 + deploy-config 11 件 + 新規 loop-consumability のみ（構造比較で確認）"
+   "clojure -M:test 442 tests / 1,865 assertions green、clojure -M:lint errors 0"
+   "core-test が捏造トークン --color-semantic-error-4 / --color-semantic-success-4 を検出し修正させた（jp-go-dds は -1 と -2 のみ定義）"
+   "ADR-2607309600 が menu 構造と Repos view の正本。本実装の nav 平置きはそれに反していたが、2607309600 側が着地時に fleet / operator を BUSINESS 段へ統合し、Repos ではなく Fleet 命名を採用して解消した（app main 799a34d）"
+   "解消後の main で clojure -M:test 512 tests / 2,156 assertions green、lint errors 0、view panel 14 件に重複なし、/api/operator 7 経路が無傷"))))

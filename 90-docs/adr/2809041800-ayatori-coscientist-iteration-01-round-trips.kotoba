@@ -1,0 +1,34 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809041800-ayatori-coscientist-iteration-01-round-trips")
+  (:adr/title "ayatori co-scientist iteration 01: round trips as the fitness, and a hypothesis the measurement refuted")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-04")
+  (:adr/related (vector "adr-2809041500-ayatori-carv2-pack-plane-and-disk-derived-suite"
+                "ADR-2608160100" "ADR-2608021000" "ADR-2607132300" "ADR-2606141500"
+                "adr-2809041200-doubt-rules-not-grounded-in-properties"))
+  (:adr/context
+  "ADR-2809041500 landed a CARv2 pack plane in kotoba-lang/ayatori and closed with two things explicitly unmeasured: the round-trip counts came from an in-memory range server, and the transfer-volume claim that justifies refusing :packed-blocks without :range-read was argued from the format rather than measured. This iteration applies the Co-Scientist loop (ADR-2606141500; ported in 90-docs/design-quality/coscientist.cljc) to close that.
+
+The loop is Generate -> Reflect -> Rank -> Evolve -> Meta. What keeps it from being theatre is the judge: ADR-2607132300 records a three-LLM panel scoring four libraries 4.0-5.0/5 while missing four concrete gaps none of them named. So the judge here is an execution, not an opinion.
+
+bench/fitness.cljs is that judge. It counts and never times -- ADR-2608160100 sets the metric as round trips, and this workstation runs many agents at once, so a millisecond figure would describe the machine's load. Two arms answer the SAME query over the SAME snapshot, and the harness exits 2 if they ever disagree on the answer, so a cheaper arm cannot win by returning less. The corpus holds the answer size at 3 rows while the database grows, so the sweep is a statement about the database and not the result.
+
+BASELINE: a 16x database grew round trips 2.00x. The persistent path is therefore not O(database) -- it follows the index ranges the query names, as ayatori.remote claimed. That is now measured rather than asserted, and it is the good news. Two other things stood out: discoveries equalled block-reads at every size, and bytes grew 7.9x for a 16x database while reads grew 2x.")
+  (:adr/decision
+  "H1 -- DISCOVERY NOBODY NEEDED. provider-block-getter called discover-fn once per block even when the fetch-fn ignored the provider entirely, which is exactly what pack-fetcher does. Those IPNI lookups were waste: N round trips whose results were discarded. Measured in isolation: 6 blocks cost 6 discoveries and 6 fetch-attempts through :fetch-fn, and 0 of each through the new :block-source. A source's bytes are verified on the same path as a provider's -- being local is not being trusted -- and a source that answers wrongly is SKIPPED the way a mismatching provider is, but counted as :source-failures so a corrupt pack is visible rather than merely slow. Absent :block-source, behaviour is unchanged.
+
+THE MEASUREMENT REFUTED H1 HALF WAY. End to end at 800 subjects: per-object 12 round trips / 109,764 bytes; packed 8 round trips / 394,217 bytes. Round trips fell 1.5x and transfer rose 3.6x -- a win on the metric ADR-2608160100 names and a loss on the one that actually scales. A loop whose judge was an opinion would have shipped that.
+
+H4, EVOLVED -- READ THE FRAME, NOT A WINDOW. range-open asked for a fixed 64 KiB per block because the CARv2 index stores where a frame starts and not how long it is; ipld.car.v2/locate says so and names the alternative (read to the next record). The records are sorted and the header gives the payload end, so each frame ends where the next begins, derivable with no extra fetch. ayatori.pack/bounded-index does that, and the derived lengths are asserted equal to the ones car2/pack itself computed -- a drift there either truncates a frame or pulls in the next one. Result at 800 subjects: packed 8 round trips / 110,996 bytes. NET: 1.50x fewer round trips at parity transfer, the +1.1% being the header and index reads, which are bounded rather than proportional.
+
+TWO FINDINGS THAT WERE NOT HYPOTHESES. First: the synchronous open-snapshot returned #{} under nbb when handed a Promise-returning blind-fn, and arrangement.core/commit! REQUIRES one on cljs, so following its contract and then opening synchronously is the natural way to arrive there. Measured: the same snapshot answered #{[\"s1\"]} with a synchronous blind-fn and #{} with a Promise-returning one, with no error in between -- a query that COULD NOT RUN returning what a query that ran and matched nothing returns. It now refuses, naming open-snapshot-async. The probe is one call with a sentinel; a blind-fn that throws on the sentinel tells us nothing, so that case is allowed through rather than refused on a guess. Second: read-block had destructured :block from read-frame, which returns :bytes, so it returned nil for every block while the round-trip test stayed green -- ipld.car.bytes/equal? answers true for two nils and both sides were missing.
+
+Landed as kotoba-lang/ayatori#17 (b577813c). West pin advanced da2cee9f -> b577813c.")
+  (:adr/consequences
+  "Verified at b577813c: nbb 99 tests / 309 assertions, JVM 94 / 298, both 0 failures. Every change was discriminated by breaking it -- removing the range-read gate, making read-block GET the whole archive, reverting to the read-ahead window, shifting a derived length by one byte, moving :block-source after discovery, and returning a source's bytes unverified -- and each fails the test that names it.
+
+The transfer-volume claim ADR-2809041500 could only argue from the format is now measured, and it measured LARGER than the argument suggested: over-fetching did not merely waste bandwidth, it tripled it while improving the headline metric. That combination is the reason the :range-read refusal has to sit where both halves are visible.
+
+What remains unmeasured, stated rather than implied (bench/coscientist-iteration-01.edn carries the same list as seeds for iteration 02): :block-source is threaded through the SYNCHRONOUS getter only, so a Worker on open-snapshot-async still pays discovery per block behind a pack -- the async path needs the source awaited and coalesced with :in-flight. The byte figures come from an in-memory range server; round trips are transport-independent but bytes are not. No query in the sweep touched more than one pack, so the multi-pack regime -- the one where a pack catalog starts to matter -- is unmeasured. And packing POLICY is untouched: nothing in production writes a pack, so this measures reading one.
+
+Method note for the next iteration: the value of the loop here came from the arm that lost. The generate step produced a plausible hypothesis, the reflect and rank steps agreed with it, and only running it exposed that it traded one cost for a larger one. Keeping both arms on the same query, with a refusal when their answers diverge, is what made that visible rather than a footnote.")))

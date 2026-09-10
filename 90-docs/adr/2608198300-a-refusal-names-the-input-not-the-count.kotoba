@@ -1,0 +1,83 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608198300-a-refusal-names-the-input-not-the-count")
+  (:adr/title "入力を拒む gate は、件数ではなく欠けている入力の名前を言う")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/related "adr-2608136000-five-questions-before-trusting-green adr-2608102000-three-checks-before-fixing-a-red-gate adr-2607300900-ci-is-murakumo-fleet-not-github-actions")
+  (:adr/body
+  "## 観測
+
+`amu-windows-loader-cross` は kotoba-lang/amu の PR #547 と #548 に対して、
+90 秒ごとにこう言い続けていた（実測 2026-08-19、10 日間）:
+
+    GATE-INPUT-REJECTED amu-windows-loader-cross#pr547 1949567 —
+    filter found only 67 files for kotoba-lang/amu (expected >= 70) —
+    refusing to build a gate input that would trivially pass
+
+拒否そのものは正しい。誤っているのは**理由**である。その枝に無いのは 67 番目の
+ファイルではなく、**この gate が実行する verifier 本体**
+`scripts/windows-loader-cross-compile.cljs` で、枝（9〜10 日前の Dependabot の
+dep bump）の方が gate より古い。件数はその副作用にすぎない。
+
+件数だけを読むと `:min-files` を下げに行く。**実際にそうしかけた。** 床を下げれば
+gate は走り、wrapper が exit 90 で「verifier is missing」と正しく言う —— つまり
+正しい答えは 1 段下に既にあったのに、tick のメッセージが読み手をそこから
+遠ざけていた。しかも床を下げれば、空 tree を弾くという床本来の役目は弱まる。
+直すべきは枝であって床ではない。
+
+これは ADR-2608136000 の族だが、形が 1 つ新しい。あそこで数えた 14 件は
+「測れなかった検査が、測って問題が無かった検査と同じ値を返す」だった。ここは
+**拒否は正しく出ているのに、拒否の理由が別の修理を指している**。沈黙ではなく誤配。
+出力があるぶん質が悪い —— 10 日間、毎分読める場所に出ていて、誰も直せなかった。
+
+## 決定
+
+gate は `gates.edn` で `:require-paths` を宣言できる。`filtered-tarball!` は
+**件数の床より先に**それを検査し、欠けていれば名前で拒否する。出所を 2 つに
+分けるのは、対処が違うから:
+
+| 状態 | 言うこと | 直す先 |
+|---|---|---|
+| tree に無い | `... which <repo> does not have at <sha> — the gate cannot answer here. Rebase or close the branch; do not lower :min-files` | 枝 |
+| tree にあるが filter が落とした | `... but :include-ext <ext> does not ship — widen :include-ext` | gate の宣言 |
+| どちらでもない | 従来どおり件数の床 | filter が壊れている |
+
+2 つ目は 2026-07-29 に実際に起きている（root の docs-edn gate と
+repository-roles gate が同じ sha の tarball を取り違え、verifier 本体を含まない
+tree で走って exit 90）。あの時は wrapper の床が拾ったが、名前で拒否していれば
+tick が、ノードを 1 台使う前に言えていた。
+
+宣言したのは `amu-jdk-free`(4 件) と `amu-windows-loader-cross`(2 件)。どちらも
+**wrapper が自分の `required-paths` として既に持っている**リストと同じ。重複では
+なく、**拒否する主体が違う**: wrapper は tree を受け取ってから言う、tick は
+配る前に言える。2 つが乖離しないことは unit test が固定する。
+
+## 適用範囲
+
+`:include-ext` を持つ gate だけ（`filtered-tarball!` を通るもの）。全体 tarball の
+gate は tree をそのまま受け取るので、この検査は wrapper 側の床と同じものになる。
+`:ship-self-bundle` とは併用不可（bundle は tree の部分集合ではない）。
+
+**cache miss のときだけ走る。** 既に tarball がある sha に後から `:require-paths`
+を足すと、その sha では検査されない。fail-open だが degrade 先は今日の挙動
+（wrapper の exit 90）なので、tick ごとに ls-tree を増やしてまで塞がない。
+拒否された sha は tarball を作れていないので、実害のある stale cache は原理的に
+存在しない。
+
+## 証拠
+
+`scripts/fleet-ci/tick-unit-test.cljs` に 4 件。fixture の tree は PR #547 の
+実測（`git ls-tree -r --name-only refs/pull/547/head`）から作った。
+
+**落ちることを確認済み**: `tick.cljs` から `:require-paths` の検査ブロックだけを
+外すと 4 failures / 2 errors になり、失敗の `actual` に production で 10 日間
+出ていた文言がそのまま現れる。戻すと 23 tests / 52 assertions が 0 failures。
+
+床が消えていないことも固定した: 名指しした入力が全部あるとき、件数の床が
+従来どおり `expected >= 5000` と言う。
+
+## 残っていること
+
+PR #547 / #548 自体は未処理。dep bump（@noble/hashes 2.0.1→2.3.0、
+@playwright/test 1.62.0→1.62.1）で、枝が gate より古いので rebase か close が要る。
+この ADR が変えたのは**そう分かること**であって、枝ではない。")))

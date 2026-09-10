@@ -1,0 +1,234 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608100500")
+  (:adr/title "ABI の `cid?` は `#\"b.+\"` だった（\"banana\" が通る）。復号する判定に置き換えた — 下流の fixture は 122 件が偽 CID")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-10")
+  (:adr/last_verified "2026-08-10")
+  (:adr/supersedes "")
+  (:adr/context
+  "オーナー質問（2026-08-10）「defcid 以外の cid もちゃんと活用できている?」の
+   調査から出た。ADR-2608100400 が DefCID について答えた続き。
+
+   ## CID の種類ごとの実態（実測）
+
+   | CID | 実態 |
+   |---|---|
+   | `capability/definition-cid` | **実 CID 56 個 / 57 repo**。kototama が strict に admit。最も広く実運用 |
+   | `component-cid` | `(mf/cidv1-raw bytes)`。計算・検査とも実在 |
+   | module lock CID | compiler `module_lock.clj`。`mf/cidv1-raw` + 宣言値との突き合わせ + block store。**強制されている** |
+   | `definition-cid`(DefCID) | canonical だが CLI に出ない（ADR-2608100400） |
+   | `artifact-cid` / `plan-cid` / `code-closure-cid` / `policy-cid` / `input`・`outcome-cid` | 下記 |
+   | `source-tree-cid` | **authority ファイル以外に出現ゼロ**（`:status` も無い） |
+   | `package-manifest-cid` | 同上 |
+   | **BuildCID** | compiler ADR 0222 が『SourceCID, DefCID, **BuildCID**, ArtifactCID は distinct identity』と名指し。**workspace 全体で出現ゼロ** |
+
+   ## 本題 — `cid?` が 2 つあり、強さが桁違いだった
+
+       ;; kototama/component_platform.clj:19
+       ;; \"True only for a fully decodable CIDv1 with a well-formed multihash\"
+       ;;   → varint を読み multihash を検証。強い。
+
+       ;; abi/src/kotoba/abi/contract.cljc:172（変更前）
+       (defn- cid? [value]
+         (and (string? value) (boolean (re-matches #\"b.+\" value))))
+       ;;   → \"b\" で始まる任意の文字列。\"banana\" が通る。
+
+   そして **portable な ABI 契約層（`valid-plan?` / `valid-execution-identity?`）が
+   使っていたのは弱いほう**。`:artifact-cid` `:plan-cid` `:code-closure-cid`
+   `:policy-cid` `:input-cid` `:outcome-cid` `:grant-cids` … 全部これで検査されていた。
+
+   **kototama は既に気づいていた。** deps.edn に io-multiformats を入れた理由が
+   1 行で書いてある —— *『Component admission verifies identity CIDs structurally
+   before linking; a leading `b` is not evidence of content addressing』*。
+   つまり **kototama 経由の admission は strict、ABI 契約だけを信じる経路は弱い**
+   という非対称が存在していた。弱いほうだけに依存していた consumer（実測）:
+   `compiler/plan.cljc`、`aiueos/contract.cljc`（2 箇所）、`code-graph`、`kotobase`。")
+
+  (:adr/decision
+  "`kotoba-lang/abi` の `cid?` を **CIDv1 を実際に復号する判定**に置き換えた
+   （abi `32ee84b`）。kototama のものと同じ形:
+
+   version=1 / codec>0 / hash-fn>0 / hash-len>0 かつ **hash-len が残りバイト数と
+   一致**すること。
+
+   **abi は依存ゼロで JVM / ClojureScript / nbb に portable**でなければならないので、
+   io-multiformats を足さず **base32 と varint をこの repo 内で portable に実装**した
+   （約 40 行）。`cid?` は `defn-` から **public** にした —— identity を検査したい
+   consumer が同じものを書き直さずに済むように。
+
+   ## 公開 conformance vector が偽 CID を配っていた
+
+   `portable-execution-v1-vectors` は**他の実装が再現して合意を証明する**ためのもの
+   だが、`\"bafyportablehostcontract\"` を identity として配っていた。実 CIDv1
+   （`cidv1-raw(sha2-256(\"kotoba portable execution contract v1\"))` =
+   `bafkreid4qjrk54dtbrpa4zx3b2umgsvevohcm7z436igajsdd34khleu2q`）に置き換え、
+   **再計算できるよう由来を明記**した。
+
+   ## gate
+
+   1. 述語そのもの —— 実 CID（capability plane の 2 種 + 凍結 DefCID vector +
+      この repo の vector）を通し、`\"banana\"` / `\"bafy-artifact\"` /
+      `\"bafyportablehostcontract\"` / 切り詰めた CID / 誤 multibase prefix /
+      大文字 / nil / 数値 を弾く。
+   2. **accept される conformance vector の中の identity が全て実 CID**であること。
+      reject 側の vector は `:policy-cid nil` / `:wit-world-cid nil` を**意図的に**
+      持つので対象外（壊れた identity こそがその vector の存在理由）。
+
+   旧 regex に戻すと 0 → **7 failures**。無改変で 18 tests / 134 assertions green。")
+
+  (:adr/consequences
+  "## 下流の fixture は 122 件が偽 CID（実測 2026-08-10）
+
+   consumer は abi を **git SHA で pin** しているので**今日は何も壊れない**。
+   壊れるのは pin を進めた時で、その時に必要な作業量が以下:
+
+   | repo | CID 風の文字列（distinct） | 実 CID に見えるもの |
+   |---|---|---|
+   | compiler | 16 | 1 |
+   | aiueos | 27 | 0 |
+   | code-graph | 24 | 0 |
+   | kotobase | 28 | 0 |
+   | kototama | 27 | 0 |
+   | **計** | **122** | **1** |
+
+   code-graph の実物: `\"bafyapproval\"` `\"bafyartifact\"` `\"bafybad\"`
+   `\"bafybasis\"` `\"bafyclosure\"` `\"bafycompiler\"` `\"bafycomponent\"`
+   `\"bafydecision\"` `\"bafyenvelope\"` `\"bafygrant\"` `\"bafyhostreceipt\"`
+   `\"bafyinput\"` `\"bafylock\"` `\"bafyother\"` … —— **1 つも CID ではない。**
+
+   これは責めるべき手抜きではなく、**弱い述語が許した当然の帰結**である。
+   読みやすいラベルを CID の位置に書けるなら、そう書く。述語が強くなって初めて
+   コストが現れる。
+
+   ## だから pin はまだ進めていない
+
+   1 repo だけ進めると fleet が不揃いになり、5 repo 全部となると 122 件の fixture
+   移行という別サイズの作業になる。**abi の変更だけを landed とし、pin 前進は
+   独立した作業として残した。**
+
+   移行の形は決まっている: テスト用ヘルパ `(cid-for \"approval\")` =
+   `cidv1-raw(sha2-256(label))` を各 repo に置けば、**読みやすさを保ったまま
+   distinct な実 CID** になる。ラベルがそのまま由来なので、値を magic にしない。")
+
+  (:adr/migration-completed
+  "**2026-08-10 に 5 repo すべて完了。** 各 repo は pin を進めてテストを回し、
+   fixture を実 CID に替え、1 件を偽に戻して落ちることを確認してから landed。
+
+   | repo | 着地 | 実測した失敗 → 修正後 | mutation |
+   |---|---|---|---|
+   | code-graph | `9a30ab0` | 1 error → 0（16 tests / 58 assertions） | 2 failures + 2 errors |
+   | kotobase | `cd19cbb` | 2 failures + 2 errors → 0（83 / 2,549） | 2 failures + 2 errors |
+   | aiueos | `3dea605` | 10 failures + 2 errors → 0（416 / 1,206） | 2 failures |
+   | kototama | `88f42f5` | 8 failures + 6 errors → baseline の 6（172 / 1,165） | 2 errors |
+   | compiler(amu) | `2644eb9` | 0 → 0（931 / 7,331） | 1 error |
+
+   west pin: abi `448e1b4` / code-graph `93efd03` / kotobase `170cd42` /
+   aiueos `4ac56f9` / kototama `878a318` / amu `481e078`。
+
+   ## 予想と実測がずれた点
+
+   **122 件の fixture のうち、実際に `cid?` を通っていたのは一部だった。**
+   kotobase は 34 件の CID 風文字列のうち 24 件、compiler は 16 件のうち **1 件**。
+   残りは block key・error label・string-index のキーで、identity 検査を一度も
+   通っていない。**pin を進めて実測してから直す**方が、数えて直すより正確だった。
+
+   **aiueos の 12 失敗のうち 8 件は CID ではなく供給網ゲートだった。**
+   dep の SHA を変えると TCB inventory / SBOM / reproducibility が drift として
+   落ちる。`qualification/tcb-inventory.edn` は**手で維持する記録**で自動生成
+   ではないので、dep を進めるのは証拠を伴う意図的な行為になる —— 設計どおり。
+
+   ## テストが理由を取り違えていた 1 件（kototama）
+
+       (is (= :invalid-identity
+              (code (assoc-in valid [:identity :component-cid] \"bafycomponent\"))))
+
+   『admission が identity を束縛する』ように読めるが、`validate-identity!` は
+   **component-cid が CID であること**しか要求せず、値の一致は見ない。この
+   fixture は「復号できない」ので弾かれていた。実 CID にすると通る —— 正しい。
+   非 CID を渡す形に書き直し、**well-formed だが別の CID は受理される**ことを
+   第 2 の assertion で明示した。**偽の fixture は、テストが何を測っているかを
+   隠していた。**
+
+   ## 名前の衝突（aiueos）
+
+   helper を `cid` と名付けたら `execution_decision_test` の既存
+   `(def cid …)` と衝突し、以降の呼び出しが全部
+   `String cannot be cast to IFn` になった。`cid-of` に改名。
+   **順序ではなく名前で避けるべき衝突。**
+
+   ## 付随して分かったこと
+
+   **`kotoba-lang/compiler` は `kotoba-lang/amu` に改名済み**（push 時に GitHub が
+   リダイレクト）。west は既に `amu` / `orgs/kotoba-lang/amu` として登録していた。
+   ローカル checkout だけが旧名で残っている。なお `amu` はメタファ名なので、
+   ADR-2608040100 の規則により **README 冒頭の名乗り + `concept-vocabulary.edn`
+   登録**が要る（未確認）。")
+
+  (:adr/string-predicates
+  "## 【2026-08-11】string 述語を `:bool` にした。半分だけ着地している。
+
+   オーナー判断で 3 件とも『やる』。②から着手し、**言語側は landed、consumer の
+   移行は未了**という状態で止めた。
+
+   ### landed: kotoba-sema `171e23f`（west pin `0a1850c`）
+
+   `string=?` と `string-contains?` が `:bool` を返す。profile 5（compiler
+   ADR 0191）が `= < > <= >= not not= zero? pos? neg? empty? some?` を `:bool`
+   にしたときの取り残しで、**同じ frontend の中で後から入った
+   `string-index-contains` は `:bool`** だった。`:i64` に戻すと 1 failure + 2 errors。
+
+   **profile 6 に入れた。** `surface-status` に `:profile-introduced 6` の entry は
+   0 件、`version-policy` はまだ 5 を active としているので 6 は開いている。ここに
+   入れることで **6 に中身が生まれ**、空の profile を released 宣言してから次の
+   breaking change で 7 を切る事態を避けられる。
+
+   ### 未了: amu の移行（着手して止めた）
+
+   sema pin を進めて amu の全スイートを回すと **8 failures / 5 errors**:
+
+   | | |
+   |---|---|
+   | ERROR | bounded-string-search-and-case-fold-have-cross-target-conformance |
+   | ERROR | string-concat-produces-a-pool-handle-comparable-to-a-literal |
+   | ERROR | string-equal-compares-content-not-handle-identity |
+   | ERROR | **string-equality-remains-i64-through-recursive-reference-calls** |
+   | ERROR | typed-bounded-strings-remain-strings-through-checked-kir-and-web |
+   | FAIL | dual-backend-pilot-suite-green |
+   | FAIL | every-pure-product-case-passes-profile-admission |
+   | FAIL | **golden-digests-match-live-compile** |
+   | FAIL | suite-reports-profile-split |
+
+   4 番目は**名前が旧挙動を主張している** —— その前提ごと書き直す対象。
+   8 番目は **golden digest** で、KIR の型が変わったので動く。
+
+   **golden を理解せずに再生成しない。** それはこの ADR 系列がずっと直してきた
+   『canonical に見えて何も封じていない』の同型になる。次の担当は、まず digest が
+   何を含んでいて string 述語の型がどこに効いているかを読むこと。
+
+   conformance kit の移行だけは形が確定している（`string_contains_kit.kotoba` の
+   `(+ p q)` → `(+ (if p 1 0) (if q 1 0))`、ADR 0191 が『機械的』と呼ぶ移行そのもの)。
+
+   ### 今日の状態は壊れていない
+
+   amu は **sema の旧 pin のまま**なので、今日時点で赤いものは無い。言語の変更は
+   sema にあり、amu は移行が済んだ時点で pin を進めて採る。")
+
+  (:adr/next
+  "- ~~5 repo の fixture 移行（122 件）→ abi pin 前進~~ **完了（上記）**
+   - `source-tree-cid` / `package-manifest-cid` は authority の宣言だけで実装が無い。
+     使わないなら authority から落とすか `:status :not-implemented` を明記する
+     （宣言だけの identity は、在ると誤読される）。
+   - **BuildCID は ADR 0222 が名指ししているのに存在しない。** ADR 側を直すか
+     実装するか、どちらかに寄せる。
+   - `artifact-cid` を**バイト列から計算している箇所は見つけられなかった**
+     （`component-cid` の `mf/cidv1-raw` に相当するものが無い）。読まれ・渡されては
+     いる。無いと断定はしないが、確認できなかったことは確認できなかったと記録する。
+   - `module_lock/lock-cid` は `pr-str` を経由する（DefCID payload v1 が捨てた形と
+     同型）。`sorted-map` で順序は固定され中身も string→string に限られるので
+     v1 の事故ほどの危険度ではないが、cross-implementation を主張するなら要検討。")
+
+  (:adr/references
+  "ADR-2608100400 (DefCID は canonical だが CLI に出ない) /
+   compiler ADR 0222 (SourceCID/DefCID/BuildCID/ArtifactCID を distinct と宣言) /
+   kotoba-lang lang/code-identity.edn (identities の正本) /
+   abi 32ee84b (この変更) / kototama component_platform.clj (強い cid? の原型)")))

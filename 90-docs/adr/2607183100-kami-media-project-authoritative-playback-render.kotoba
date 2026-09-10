@@ -1,0 +1,25 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607183100-kami-media-project-authoritative-playback-render")
+  (:adr/title "KAMI DAW and NLE project documents are authoritative for playback and render")
+  (:adr/date "2026-07-18")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607183000-kami-daw-nle-browser-production-io"))
+  (:adr/decision
+  (map (:daw-authority "Every imported AudioBuffer is registered as an asset and referenced by :clip/asset-id. Realtime playback, effects and offline WAV export schedule the same project clips and buffers.")
+   (:nle-authority "Every imported video is registered by :clip/source-id. Preview uses clip-at-frame and export consumes render-segments in timeline order with source-in and duration.")
+   (:fallback-rule "DAW oscillator clips remain explicit built-in assets for the initial sample; missing imported NLE assets block render rather than being silently skipped.")
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates (map (:daw (vector "recording" "trim/fade editing" "automation" "meters" "bus/stem export"))
+                                (:nle (vector "gap/overlap policy" "transitions" "trim handles" "proxy/cache" "color management" "delivery presets"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "443eb99" "0e9d298"))
+   (:nle-commits (vector "64deef9" "1e6abdd" "d38d2d0"))
+   (:evidence (vector "DAW Pages release green; Chrome imported a real WAV, rendered 48 waveform peaks and exported a 441044-byte master without page errors."
+              "NLE pure tests cover clip-at-frame and render-segments source/start/duration authority."
+              "NLE Pages release green; Chrome imported two real WebM assets, sought through the second bound clip, applied cinema effect and exported a 172612-byte timeline master without page errors."))))
+  (:adr/consequences
+  (vector "The primary architectural gap identified in the commercial comparison—editing data disconnected from produced media—is closed for the supported feature subset."
+   "Feature breadth remains substantially below commercial DAW/NLE products and is tracked as explicit gates rather than hidden by the maturity label."))
+  (:adr/source-format "edn")))

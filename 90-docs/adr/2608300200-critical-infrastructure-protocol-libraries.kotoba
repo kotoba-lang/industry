@@ -1,0 +1,132 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2608300200-critical-infrastructure-protocol-libraries")
+ (:adr/title "重要インフラ protocol の 15 lib と、名乗りと中身を分ける検出器")
+ (:adr/status "accepted")
+ (:adr/date "2026-08-30")
+ (:adr/body "## 問い
+
+「重要インフラ・主要産業で、まだ不足している lib はあるか」
+
+## 測ったこと
+
+産業カバレッジは穴ではなかった。cloud-itonami の ISIC は 456 class / 88 division
+全てに repo があり、「この産業が無い」という形の欠落は無い。
+
+本当の問題は別の形をしていた。protocol を名乗る repo と、protocol を実装した repo が、
+このワークスペースの持つ全ての索引（repo 名・west manifest・concept 索引・maturity
+score）で区別できない。
+
+| repo | src 行 | bit/byte 演算 | 実体 |
+|---|---|---|---|
+| org-ietf-tls | 4,317 | 241 | 実装 |
+| org-modbus | 558 | 77 | 実装 |
+| com-modbus-tcp | 182 | 0 | CRUD facade |
+
+com-modbus-tcp は entity-specs + routes で POST /v1/requests を出す 182 行であって、
+Modbus を実装していない。maturity 指標は bytes と scaffold-marker で採点するので
+scaffold-marker-hits 0 = 綺麗、と答える。
+
+src を持つ 1,000 repo が 231 個の schema しか共有していない。com-nmea2000-marine は
+OCPP（EV 充電）の schema（ChargeSession / Connector / Trip）を持ち、決済 47 repo は
+Stripe の object model（PaymentIntent / Payout / Refund）を共有する。Fedwire は
+PaymentIntent 型ではない。
+
+⚠ com- / org- の prefix は品質分類ではない（オーナー指摘 2026-08-29）。出所ドメインの
+逆順であって、たまたま同じ template farm で生成された塊が com- に寄っただけである。
+
+## 決定 1 — 検出器を置く
+
+scripts/verify-protocol-lib-substance.cljs（manifest/orgs-detectors.edn の
+:verify-protocol-lib-substance）。repo 自身の README/docstring が protocol / codec /
+format を名乗り、かつ entity-specs + routes + /v1/ の facade 形をしていて、かつ src/
+全体の bit/byte 演算が 0 のものを報告する。
+
+初回: exit 1、302 findings / 4,230 scanned / 25 UNVERIFIED。
+3206 + 722 + 302 = 4230 = SCANNED。読めなかった 25 は clean に畳まない。
+
+判別は subagent の報告ではなく orchestrator が測り直した。FLAGGED: com-modbus-tcp,
+com-opc-ua, com-iso-8583, com-nmea2000-marine, com-fedwire。not flagged: org-modbus,
+org-ietf-tls, io-libp2p（org- / io- / tech- / dev- は 1 件も flag されない）、および
+com-stripe, com-adyen —— facade 形で bit 演算 0 だが README が platform としか
+名乗らない。実在の REST platform の REST wrapper はそれが正しい形である。
+
+正直な数は 302 であって 1,000 ではない。722 の facade repo は protocol を名乗って
+いないので、報告すれば規則を守った側を罰することになる。
+
+⚠ 名乗りの signal 自体が template の定型文（deep system protocol, backed by Datomic
+and Py Kotodama WASM）なので、com-morningstar が protocol を名乗るのは生成器がそう
+書いたからである。finding は成立するが、その主張は考えられたものではなく生成物である。
+
+## 決定 2 — 実在しなかった 15 本を書く
+
+  IoT messaging   org-mqtt (3.1.1 + 5.0), org-ietf-coap (RFC 7252 + 7959)
+  電力系統        org-dnp3 (IEEE 1815), ch-iec-60870-5-104, ch-iec-61850 (GOOSE)
+  network ops     org-ietf-snmp (v1/v2c), org-ietf-radius (RFC 2865/2866)
+  時刻・車両      org-ieee-1588 (PTPv2), org-sae-j1939 (CAN)
+  建物・OT        org-bacnet (ASHRAE 135), org-opcfoundation-ua (IEC 62541-6)
+  音声            org-ietf-sip (RFC 3261), org-ietf-rtp (RFC 3550)
+  医療・カード    org-hl7-v2 (ER7 + MLLP), org-iso-8583
+
+合計 11,114 src 行 / 730 bit 演算 / 525 test / 22,669 assertion / 0 failure。\n（この 4 数は最初 9,717 / 668 / 500 / 20,497 と書いた。作業中に暗算で出した値で、4 つとも誤り。全 15 repo を clone し直して測り直した値がこれである。register commit e262172 の message には誤った方が残っている —— history は書き換えない。）
+全 suite を orchestrator が自分で走らせ、exit code は pipe を通さずファイルに落として
+採った（cmd | tail は tail の exit を返す）。
+
+## 適用した conformance floor
+
+1. .cljc のみ。encode と decode の両方向で実 wire byte を扱う
+2. test vector は spec 引用。確認できないものは
+   「;; constructed, not a published spec vector」と source に書く
+3. 不正入力は throw ではなく名前付き error 値を返し、test は理由 keyword そのものを
+   pin する（「何かで落ちた」で通る test は別のバグでも通るので無価値）
+4. negative test が判別することを、壊して・その assertion が鳴ることを見て証明する
+5. deps.edn の top-level は org.clojure/clojure + workspace git dep のみ
+6. .github/workflows を作らない（CI は murakumo fleet）
+
+## 再利用（配線）
+
+org-ietf-snmp と ch-iec-61850 は既存の org-ietf-asn1（796 行の BER/DER）に依存させ、
+2 本目の BER codec を生やさなかった。その :git/sha pin が org-ietf-asn1 の main tip と
+identical であることを確認した —— deps.edn の pin には west pin と違って gate が無い。
+
+org-dnp3 は org-modbus の CRC 規律を踏襲: bitwise 実装と table 実装が全 65,536 通りの
+2 byte 入力で一致し、両方が CRC RevEng の公表 check 値 0xEA82 を出す。
+
+## test vector の出所（正直に）
+
+公表 byte vector が実在するのは 3 つだけ: RADIUS の MD5（RFC 1321 A.5 の 4 vector）、
+DNP3 の CRC check 値、IEEE-754 定数。
+
+IEC 61850 は有料規格なので、ASN.1 文法は libiec61850 と Wireshark の dissector から
+再構成し、そう source に明記した上で最も確信の低い値（Data CHOICE tag 17）を名指しして
+いる。MQTT / CoAP / BACnet / OPC UA / ISO 8583 は spec が byte 単位の worked example を
+印刷していないため、full packet vector は全て constructed 表記。SNMP と RADIUS の
+packet vector は独立に書いた実装と突き合わせた（cross-checked であって published では
+ない）。
+
+## 途中で見つかった実バグ
+
+- OPC UA の decode-int32 が JS の bit-or 自動符号拡張に依存しており、cljs で正しく
+  JVM で静かに誤っていた（JVM long は 32 bit で負に折り返さない）
+- ISO 8583 の (int c) が JVM では code-point、cljs では数値 parse で、非数字が黙って
+  0 になり 02A0 が妥当な MTI として通っていた
+- MQTT が (mapv int s) の zero-vector 罠を踏んだ（org-modbus の docstring が警告して
+  いるのと同じ形）
+- org-ietf-sip の test fixture が Content-Length: 40 を宣言しながら body が 33 byte
+  で、library が [:error :sip/short-body] で正しく拒否していた。fixture 側の誤り。
+  INVITE 側は逆に body 42 に対し 40 宣言で、切り詰められたまま緑だった
+
+## 残っている穴（wave 2）
+
+west.yml 4,265 名と concept 索引の両方で不在を確認した: AMQP, LoRaWAN, Zigbee,
+Thread, Matter, OSPF, NETCONF/YANG, Diameter, PROFINET, EtherCAT, CANopen,
+ISO 15118, DICOM wire, LOINC, ICD-10, openEHR, FIX, ARINC, AFDX, MIL-STD-1553,
+RTSP, SRTP。
+
+SDP（RFC 4566）も無い。rtc / webrtc / org-w3-webrtc-signaling は在るがどれも SDP codec
+ではない。
+
+## しないこと
+
+302 の facade repo を書き直さない。leverage は検出器の側にあり、差が全索引にとって
+不可視でなくなったことが成果である。既存の逸脱を一括改名しないという既存方針と同型。
+")))

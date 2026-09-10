@@ -1,0 +1,90 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608270300-zone-analytics-is-not-retrieval-evidence")
+  (:adr/title "Zone analytics counted as content retrieval, and a class of shared secrets that cannot be repaired")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/tags (vector "net-kotobase" "murakumo" "measurement" "secrets" "biscuit" "discovery"))
+  (:adr/related (vector "adr-2608270230-murakumo-alias-declared-serving-while-dead"
+                "adr-2608136000-six-questions-before-trusting-green"))
+  (:adr/body
+  "## 1. business metrics の :paths :ok は zone analytics であって retrieval の証拠ではない
+
+90-docs/business/metrics/net-kotobase.edn の :paths :ok は Cloudflare zone
+analytics が 2xx/3xx と分類した path の一覧である。**content が retrieval できた
+ことの測定ではない。** 2026-08-27 の 1 セッションで、この 1 ファイルの読み違いから
+**3 回続けて誤った結論**を出した。
+
+1. 5xx 35% を現在の危険として報告した → 実際は 2026-08-22 の値で 5.1 日 stale、
+   CF_API_TOKEN が無いので更新できず、live で触れる面は全部 green だった
+   (marketing 200 / 全 /api/* が 401 / health?deep=1 が graph_database 込みで ok)。
+   正しくは **未測定**であって、fine でも broken でもない。
+2. checkout が存在しないと報告した → 実際は POST /billing/checkout が在り、
+   /signup は p2p / hosted-starter / secure-managed の 3 tier button を
+   render して JS で叩いている。401 は auth 要求であって故障ではない。
+   pricing の href だけを見て self-serve 経路が JS 駆動であることを見落とした。
+   0 checkouts は **導線の欠落ではなく転換の問題**という別の診断になる。
+3. 上位 CID が 404 なので content が消えたと報告した → **その CID が held で
+   あった証拠を持っていない。** 3360 requests は root path /bafyrei... に対する
+   zone の 2xx 分類で、この site は root の未知 path に HTML を返す。
+
+**規則: :paths :ok を content availability の測定として引用しない。**
+retrieval を測るなら /ipfs/{cid} に ?format=raw または
+Accept: application/vnd.ipld.raw で当てて status を見る (下記)。
+
+## 2. kotobase は 435 object を持ち、正しく serve できるようになったが、誰にも告知していない
+
+2026-08-26 の commit 61d6aad3 が Trustless Gateway の作法を実装した。それ以前は
+?format=raw も Accept: application/vnd.ipld.raw も無視して PUT 時の content-type を
+返しており (同日実測: 同じ request が appview ごとに text/html と
+application/octet-stream)、HEAD は GET が 200 を返す URL に 404 を返していた。
+2026-08-27 に確認: HEAD と GET は一致し、?format=raw も通る。**修正は deploy 済み。**
+
+commit 自身が **operator は 435 object を demonstrably holds** と書いている。
+しかし 2026-08-27 実測、https://kotobase.net/.well-known/did.json の service は
+AtprotoPersonalDataServer 1 件のみで、**transport-ipfs-gateway-http を告知していない**。
+retrieval client はこの gateway を発見できない。
+
+commit の文面は「修正しないと告知できなかった」であって「告知した」ではない。
+**告知は別工程で、いま unblocked のまま未実施。** pinning and hosting を売る面で、
+持っている 435 object を誰にも見つけられない状態である。次の一手はここ。
+
+## 3. 読み戻せない共有秘密は、注意では直らない
+
+commit bb4b6db7 (2026-08-26) が PUT /ipfs/{cid} について書いている:
+静的文字列 1 本が唯一の鍵で、**live が受け取る値は custody の記録と違い、kagi には
+documented name の item が無く、Worker secret は読み戻せない。**
+その commit の言葉で **a shared unreadable string has no repair**。
+対処は静的文字列の再発行ではなく、**issued Biscuit (data:write) を受け付ける**こと。
+public key で検証するので Worker は盗む価値のあるものを持たない。
+
+**同じ欠陥が model registry の write gate に残っている。**
+api.murakumo.cloud の /infer/models/:id 書き込みは env MURAKUMO_SERVICE_TOKEN で
+gate されており、secrets-location-map の murakumo.md は
+MURAKUMO_API_TOKEN_SECRET (2026-08-21 実測) と LOCAL_MURAKUMO_SERVICE_TOKEN
+(2026-08-15 実測) の **両方が kagi に存在しない**と記録し、復旧はオーナー操作だと
+書いている。archive door が昨日解いたのと同型の問題が、registry 側に残っている。
+
+**推奨: archive door と同じく、registry の write gate も issued Biscuit を
+受け付ける形にする。** 前例は自分の estate の中に既にあり、昨日 landed している。
+
+この 1 個の gate が open な限り、次の 2 つは着地できない:
+* alias murakumo-main の context 262144 と実測 524288 の食い違い
+* qwen3.8-27b が registry に無い (404) こと。ADR-2608270230 参照
+
+## 4. 共有 checkout は 638 commit 遅れていた
+
+orgs/network-awai/net-kotobase の checkout は origin/main から 638 behind。
+mailto の文字列が local tree に無かったので危うく存在しないと結論しかけた
+(git grep origin/main で在った)。**この checkout から読んだものを現在地として
+引用しない。**
+
+## 実施した修正
+
+marketing_pages.cljc:258 が plan 名を生のまま mailto URL に埋めており、
+Business Critical tier が subject=kotobase%20Business Critical という
+href 内の生スペースを render していた。sales-led tier の唯一の導線である。
+兄弟の 2 箇所 (signup_page.cljc / site_page.cljc) は
+(str/replace (:plan/name p) \" \" \"%20\") で正しく encode していたので、
+3 箇所目をそれに揃えた。net-kotobase/control-plane main に 3566a36d で merge 済み。
+生成物 resources/kotobase/site/pricing.html (両 locale の 2944 行目) は
+scripts/render_site.clj の出力なので、再生成 + deploy するまで site には届かない。")))

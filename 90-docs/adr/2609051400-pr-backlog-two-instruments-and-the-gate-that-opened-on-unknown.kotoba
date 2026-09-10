@@ -1,0 +1,64 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609051400-pr-backlog-two-instruments-and-the-gate-that-opened-on-unknown")
+  (:adr/title "PR backlog: the drain saw part of the queue, the producers saw none of it, and the gate opened on unknown")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-05")
+  (:adr/related (vector "adr-2809042300-hermes-bot-repair-the-watchdog-had-been-down-longest"
+                "ADR-2608136000" "ADR-2607300900" "ADR-2608313500"))
+  (:adr/context
+  "Owner, 2026-09-05: github で pr が積もってしまっているので, hermes agent bot で pr が積み上がらないように整えて.
+
+Measured before the work. 265 open PRs across the seven fleet orgs: 146 authored by com-junkawasaki, 99 by dependabot, 20 by others. Of our own 146, 87 were CONFLICTING and 54 were drafts; the oldest was 522 days old and 56 were over a week old. Throughput was not the problem -- 348 PRs merged on 09-04 alone. The residue was.
+
+Three separate breaks produced it, and only one of them was visible as a failure.
+
+1. THE DRAIN WAS BEING KILLED MID-DISCOVERY. pr-cleanup/pr-queue-review ran 11:32 to 13:00 -- 88 minutes -- and ended in `Interrupted by shutdown before terminal completion`, its second consecutive failure. It had no measurement prelude, so each run spent most of its budget re-discovering the queue with gh calls, and a run that does not finish disposes of nothing. A 6-hour period made this worse, not better: the longer the gap, the larger the queue each run had to rediscover.
+
+2. THE OTHER DRAIN COULD NOT SEE MOST OF THE QUEUE. kotoba-merger ran every 30 minutes, reported ok, and searched with `head:svelte-to-cljs` and `head:bot` prefixes. Branches named `agent/*` -- which is what the cleanup and coding bots produce -- were outside every query it made. A green job that has never looked at the majority of its own queue reports success truthfully and changes nothing.
+
+3. THE PRODUCERS HAD NO STOPPING CONDITION. cloud-itonami/otent carried 22 open PRs, 21 of them CONFLICTING, fed by six hourly jobs that each branch from main and touch the same files (src/otent/imagery.cljc, test/run.cljs). Each merge conflicts every sibling behind it. The repo merges its newest PR and leaves the rest to rot: PRs #1, #3, #6, #7, #11 have been open since 08-30/08-31 while #59 through #65 merged.")
+  (:adr/decision
+  "TWO INSTRUMENTS, one on each side of the queue. Source of truth is scripts/hermes-pr-queue/ in the superproject; profile copies are terminal-local.
+
+A. pr_queue_scan.cljs (nbb) + pr_queue_scan.py (thin launcher, because the Hermes runner executes .sh via bash and everything else via Python -- ADR-2809042300). One GraphQL search per org, paged; per PR it reports age, draft, mergeable, checks, files, and a blob-level containment verdict (are all the paths this PR touches already byte-identical in its base?). Output is a bounded, ranked worklist of at most 25 WORK lines with an action each: CLOSE-SUPERSEDED? / VERIFY-AND-MERGE / RESOLVE-THEN-MERGE / DRAFT-DECIDE / INVESTIGATE-RED. Full fleet scan measured at 37 seconds. It is wired as the cron `script:` of both drain jobs, so its stdout is injected into the agent prompt: the agent no longer discovers, it disposes.
+
+Evidence floor: one failed query prints REFUSED and exits 2 -- neither 0 nor 1, because the queue was not measured. A partial queue is never reported as a short one.
+
+B. backlog_gate.py, called from the producers' evidence scripts. It counts the bot's own open PRs in the repository it is about to open one in, and over cap (default 5) tells the run to drain one instead of adding another. Wired into all six otent jobs through their shared otent_vision_evidence.py, plus a matching rule in each of the six prompts.
+
+JOB REPAIRS. pr-queue-review: scan prelude, 360m -> 120m, and an explicit per-run budget (merge 3 / resolve 2 / close 3, stop at 25 minutes) because a run that finishes small beats a run that is killed large. pr-queue-pulse: paused, with paused_reason recorded in jobs.json -- its diff-only observation is now the scan prelude, and it was spending 10-16 agent-minutes per run re-measuring what the review job measures. kotoba-merger: head-prefix search removed, scan worklist as input, and its name field -- which held a fragment of its own prompt -- fixed to kotoba-merger-tick.
+
+THE GATE OPENED ON UNKNOWN, AND THAT WAS FOUND BY TESTING THE FAILING DIRECTION. `gh pr list --repo <nonexistent> --author X --json number` exits 0 and prints `[]`. Adding --author routes the query through search, which answers an unreachable repository the same way it answers a repository with no open PRs. Without a probe, a renamed, deleted, or out-of-reach repo reads as a short queue and the producer gate opens. The gate now resolves `gh api repos/<repo>` before counting, and all three states were exercised: over (exit 1, 22 PRs listed), under (exit 0), unresolvable (exit 1, blocked). unknown blocks exactly like over.")
+  (:adr/consequences
+  "Drain capacity is now 12 review runs a day at 3 merges plus 2 resolutions plus 3 closes each, against roughly 30-60 PRs a day that do not self-merge, and both drain bots see the whole queue rather than a prefix of it.
+
+Not fixed, and not claimed: the 99 open dependabot PRs. Since GitHub Actions is disabled fleet-wide (ADR-2607300900) those PRs can never carry a check, so `merge when green` is structurally unavailable for them -- the choice is to verify them by running the repo suite, or to stop generating them and keep only the alerts, which the workspace already measures through its own dependency-vulnerabilities detector. That is an owner decision and is left open.
+
+The backlog gate is wired into otent only. app-hyakka (13 open) is next; the helper is repo-agnostic and each producer needs one import plus one prompt clause.
+
+Side effect to disclose: testing the patched otent evidence script with OTENT_EVIDENCE_COOLDOWN_H=0 called throttle mark() and moved otent-earth-ingest's 24h cooldown forward to 2026-09-05T14:01 JST. The previous value is not recoverable and was not reconstructed, because inventing a timestamp is worse than reporting the loss. The practical effect is bounded: that repo is over cap, so the gate blocks it from producing anyway. Producer scripts must be tested with HERMES_CRON_THROTTLE_DIR pointed at a scratch directory.
+
+Verification: the scan was run against the live fleet from the profile workdir exactly as the runner invokes it (exit 0, 44 lines, 138 open at 14:06 JST); the gate was exercised in all four directions (over, under, unresolvable, and with the stale window widened so a stuck repo reads under, which proves the filter is applied rather than decorative); the repaired pr-queue-review was triggered with `hermes cron run` and observed executing rather than read back from config.
+
+AMENDMENT 2026-09-05 16:10 JST -- THE VERIFICATION RUN DIED, AND NOTHING SAID SO. The 14:04 run this ADR cites as executing did not finish. Its process was gone by 16:05 (machine under memory pressure: load 26, one nbb holding 4 GB; the same pressure killed this session own monitor). The job record was unchanged: last_status error from the 13:00 run, failure_streak 2, last_run_at 13:00. `cron list` showed a job that had simply not run since 13:00. A run that was killed and a run that never started are the same shape on the job record, which is the exact class ADR-2608136000 names, sitting inside the machinery meant to drain the queue.
+
+The runner has a reaper -- cron.executions/recover_interrupted_executions, which checks pid liveness and marks only provably-dead owners unknown -- but it runs at ticker startup and from the cron TOOL path. A CLI `hermes cron run` did not reap: measured, the 14:04 row was still `running` with a dead pid after a fresh dispatch started. It was reaped by calling that function directly (1 row -> unknown, whether side effects ran is unknown by construction).
+
+So verify-hermes-profile-fitness learned the axis: stranded-execution reads each profile cron/executions.db for rows in claimed/running whose owning pid is unobservable. Severity is measured the way missing-workdir is -- minutes old is a warn (the ticker will reap it on its next start), over an hour is a fail (the job has silently stopped). pid liveness is conservative: an observable pid counts as live even though pids are reused, because under-reporting is the safe direction for a finding whose remedy is to reap a row. Both directions were exercised on the real sqlite path against a fixture profile, not only through the pure function: dead pid -> fail naming the profile and job, pid 1 -> nothing. Self-test 22 -> 26 assertions.
+
+Whether a stranded row BLOCKS later dispatch is unproven and is not claimed here. The runner comment says a stale claim would block every later manual run; observed, a manual dispatch started while the stale row was present, and a scheduled execution sat in `claimed` for six minutes alongside it without starting. Two observations, no conclusion.
+
+CLOSING 2026-09-05 16:25 JST. Three things this session is leaving true, and one it is leaving open.
+
+THE DETECTOR SHIPPED WITH THE DEFECT IT WAS BUILT TO CATCH, AND IT WAS CAUGHT BY USING IT. The stranded-execution axis landed with `sqlite3 -readonly`. Every execution ledger in the fleet is WAL; a read-only connection cannot bring up the -shm it needs and sqlite3 exits 14 unable to open database file. The catch turned that into no rows, so a detector for runs that die without a trace reported a clean fleet an hour after a dead-owner row appeared in the profile it was written for. Its pure-function self-tests passed the whole time. Fixed by querying on a normal connection (the statement is a SELECT) and by returning an unqueryable ledger as a reason, reported as execution-ledger-unreadable. A self-test that builds a real WAL ledger with sqlite3 and queries it was added, because that is the only kind that could have failed. Self-test 26 -> 29.
+
+MEASURED AFTER THE FIX: 15 STRANDED ROWS ACROSS THE FLEET, the oldest 1112 minutes. Fifteen bots had a run die and their job records read exactly as they read before it started. Seventeen rows were reclaimed with the runner own checker across 17 profiles; the detector now reports none. Both directions were therefore shown in production, not only in fixtures: 15 found, reaped, 0 found.
+
+THE PR DRAIN ITSELF IS STILL UNVERIFIED END TO END. Two triggered runs of pr-queue-review died: 14:04 (process gone by 16:05) and 16:06 (reaped at 16:23). Neither wrote a report. The job record still reads last_status error from 13:00 with failure_streak 2, and next_run_at 18:06. The cause is this machine, not the configuration -- load 26 with a 4 GB nbb resident, and the same pressure killed two of this session own background waiters. So the claim this ADR is entitled to make is narrow: the two instruments are verified by running (scan exit 0 against the live fleet from the runner own workdir; gate exercised in four directions; detector 15 -> 0), the job configuration is verified by reading back and by dispatching, and no completed drain run has been observed.
+
+RESUME POINT. Watch the 18:06 pr-queue-review run and the :17/:47 kotoba-merger-tick runs. If they keep dying, the next move is not another prompt change: either reduce what the machine is carrying, or make the safest part of the drain deterministic (the scan already computes the CLOSE-SUPERSEDED set; closing with evidence needs no model). Queue at close, measured 16:30 JST: 72 open of ours (from 146 at 13:50), 4 clean, 35 dirty, 27 draft, plus the 99 dependabot PRs that remain an open owner decision. cloud-itonami/otent went 22 to 0 between 14:30 and 16:30 -- 20 closed, 16 of them merged.
+
+THAT DRAIN IS NOT ATTRIBUTED TO THIS WORK, and cannot be from here. Every bot and every session in this fleet acts as com-junkawasaki, so `mergedBy` says com-junkawasaki for all 16 and identifies nobody. kotoba-merger ran at 14:31 for 28 seconds and its merge log records one review comment and no merges; both pr-queue-review runs died. Eight other sessions were live on this machine. The honest statement is that the queue halved during the session and the mechanism that was repaired cannot be shown to be what halved it. What CAN be shown is what was run: the scan, the gate in four directions, and the fitness axis at 15 stranded rows then 0.
+
+One unplanned demonstration is worth recording: the closing scan hit a GitHub API timeout on the last of the seven orgs and printed `SCANNED prs=70 failed_queries=1` followed by REFUSED, exit 2. Without the floor it would have reported 70 open PRs -- a smaller, calmer, wrong number, at exactly the moment a summary was being written from it.")
+  (:adr/tags (vector "hermes" "cron" "pr-queue" "fleet" "evidence-floor"))))

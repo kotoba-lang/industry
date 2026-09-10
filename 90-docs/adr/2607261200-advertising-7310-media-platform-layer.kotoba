@@ -1,0 +1,199 @@
+(vector (map (:db/id -1),
+  (:adr/id "adr-2607261200-advertising-7310-media-platform-layer"),
+  (:adr/title "ADR-2607261200: cloud-itonami-isic-7310 に媒体プラットフォーム層を追加する — 出稿は法域の適法性だけでなく媒体自身の広告ポリシーでも HARD gate する"),
+  (:adr/status "accepted"),
+  (:adr/doc_type "adr"),
+  (:adr/date "2026-07-26"),
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)")),
+  (:adr/topic "advertising-7310-media-platform-layer"),
+  (:adr/related (vector "adr-2607081900-cloud-itonami-advertising-7310-coverage"
+                "adr-2607141600-langchain-store-adoption"
+                "adr-2607171600-docs-edn-only-datascript-query")),
+  (:adr/supersedes (vector)),
+  (:adr/superseded_by (vector)),
+  (:adr/repos (vector "com-junkawasaki/root" "cloud-itonami/cloud-itonami-isic-7310")),
+  (:adr/authoritative true),
+  (:adr/authoritative_for (vector "cloud-itonami-isic-7310 における媒体プラットフォーム広告ポリシーの表現(advertising.platform/catalog)とその転記規律"
+                          "媒体側 HARD governor check 6 種の定義と、法域側 check family との独立性"
+                          "生成面(generative surface)広告における識別可能性表明の必須化")),
+  (:adr/last_verified "2026-07-26"),
+  (:adr/source-format "edn-only (ADR-2607171600)"),
+  (:adr/child-adr "cloud-itonami/cloud-itonami-isic-7310 docs/adr/0002-media-platform-layer.md"),
+  (:adr/child-commit "fd7c3cda2a46c41a1b03e41fab6273844cfbc031"),
+  (:adr/pin-advance "manifest/west.yml cloud-itonami-isic-7310: a718e142a483ae7da86ecf8889fa63861854d406 -> fd7c3cda2a46c41a1b03e41fab6273844cfbc031"),
+  (:adr/primary-sources (vector "https://openai.com/policies/ad-policies/ (OpenAI 広告ポリシー v1.3 / 更新 2026年7月15日、2026-07-26 直接読み取り)"
+                        "https://help.openai.com/en/articles/20001207-ads-in-chatgpt-the-basics (Ads in ChatGPT: The Basics)"
+                        "https://www.ftc.gov/business-guidance/resources/native-advertising-guide-businesses (FTC Native Advertising: A Guide for Businesses)")),
+  (:adr/deliberately-absent (vector "https://support.google.com/adspolicy/answer/6008942 (google-ads — URL は実在確認済みだが未読のため catalog に入れない)"
+                            "https://transparency.meta.com/policies/ad-standards/ (meta-ads — 同上)"
+                            "Microsoft Advertising policies (同上)")),
+  (:adr/verification "clojure -M:dev:test → 57 tests / 220 assertions, 0 failures 0 errors (変更前は 30 tests / 127 assertions)。clojure -M:lint → errors 0（既存の未使用 css var 警告 1 件のみ、本変更とは無関係）。clojure -M:dev:run で媒体側 6 hold + 法域側 4 hold の実発火を確認。docs/samples/operator-console.html を再生成し 10 種の hold reason が実描画されることを確認。"),
+  (:adr/body
+  "## Context
+
+`cloud-itonami-isic-7310`（ISIC Rev.5 7310 = 広告代理業）は ADR-2607081900
+で actor 化されたが、その HARD check は**すべて法域側**だった —
+`advertising.facts` が景表法 / FTC Act / CAP Code / UWG をカタログし、
+governor は出典を示せない法域引用を hold する。
+
+しかし広告代理店は「適法であること」だけでは足りず「**出稿できること**」が
+必要である。各媒体プラットフォームは自前の広告ポリシー（カテゴリ分類・
+広告主事前承認制度・掲載コンテキスト除外）を公開しており、それはどの法域の
+法律の言い換えでもない。景表法上まったく適法なキャンペーンが、買い付けた
+媒体のポリシーでカテゴリごと拒否されることは普通に起きる。
+
+本 ADR 以前、actor はこれを一切表現していなかった: campaign entity は
+「どの媒体向けか」すら持たず、`:actuation/place-campaign` は対象媒体が明示的に
+禁止しているカテゴリのキャンペーンでも placement record を起票できた。
+
+直接のきっかけはオーナーからの具体的な問い（「cloud-itonami に ChatGPT 広告
+などの広告運用を代行する広告代理店の itonami はあるか」）だが、露呈した穴は
+一般的なものである。
+
+さらに **LLM 応答面（generative surface）の広告は、紙・検索・ディスプレイに
+無い失敗モードを持つ**。バナー面では「これは広告か?」はレイアウトが答える —
+ユーザーが広告枠として学習済みのスロットに座る。生成面ではアシスタント自身の
+散文が主コンテンツなので、その散文に似せた広告はアシスタントの回答として読まれる。
+OpenAI の広告ポリシーはこれを独立した禁止事項にしている（`インターフェースの模倣`
+— 広告は ChatGPT の製品体験と明確に区別できなければならず、OpenAI インター
+フェースの外観・機能・表現を模倣する広告は削除または修正要求の対象）。これは
+FTC の native advertising ガイダンス（広告は広告として識別可能でなければならない）
+と同じ消費者保護原則の媒体レベルの表現であり、クリエイティブレビューの
+チェック項目ではなく構造的な gate に値する。
+
+## Decision
+
+### D1. `advertising.facts` の拡張ではなく、姉妹カタログとして `advertising.platform` を作る
+
+両者は**別の権威**（規制当局 vs 私企業プラットフォーム）に代わって別の問いに
+答え、失敗モードが異なり、キーも異なる（ISO3 vs platform id）。統合すると
+片方の形をもう片方に強制することになり、監査台帳から「どちらの権威が拒否したか」
+が読めなくなる。
+
+`advertising.platform` は `advertising.facts` の誠実性規律をそのまま継承する:
+未転記の媒体は policy-basis を持たない、advisor はそれを捏造してはならない、
+governor は hold する。
+
+### D2. カタログは媒体 1 件だけを載せて出す
+
+`chatgpt-ads` のみ。<https://openai.com/policies/ad-policies/> を 2026-07-26 に
+**直接読み取って**転記（文書自身が名乗る v1.3 / 更新 2026年7月15日）。
+補助として help center の `Ads in ChatGPT: The Basics` を参照。
+
+`google-ads` / `meta-ads` / Microsoft Advertising は実在する URL に実在する
+ポリシーを公開しており、**意図的に不在**とする。それらを端から端まで読んでいない
+以上、誠実に転記できる分類が存在しないためである。記憶や検索結果サマリから
+seed すれば、カタログは 4 倍有能に見えて厳密により危険になる —
+**不在の媒体は `no-platform-policy-basis` で HARD hold するが、捏造された媒体は
+誰も書いていない規則でキャンペーンを通してしまう。** `coverage` はこの穴を
+隠さず報告する（`advertising.facts/coverage` が未 seed の ~190 法域に対して
+やっているのと同じ規律）。
+
+これは本 ADR で**読んで最も物足りず、守ることが最も重要な**決定である。
+
+### D3. 自己矛盾する一次情報は保守側に倒して転記する
+
+OpenAI のポリシーは法務サービスについて自己矛盾している: 第2節前文は
+法務サービスを金融・ヘルスケアと並べて case-by-case 承認可能として挙げるが、
+専用の「法的サービス」節は法律相談・代理・法的サービスの広告は許可されないと
+述べる。`:legal-services` は**禁止**（保守的読み）として記録し、矛盾そのものを
+entry の `:transcription-notes` に逐語で残した。**曖昧さを許容側に解決する
+gate は gate ではない。** 再分類には運営者からの書面確認を要し、読み直しでは足りない。
+
+### D4. HARD check 6 種、すべてキャンペーン自身の恒久フィールドから計算する
+
+| rule | 発火条件 |
+|---|---|
+| `:no-platform-policy-basis` | 対象媒体のポリシーが未転記 |
+| `:platform-check-incomplete` | 適合性評価が未実施のまま actuation |
+| `:platform-prohibited-category` | 媒体が明示禁止、または closed category set で未掲載 |
+| `:platform-restricted-category-unapproved` | 制限カテゴリで広告主承認が無い、または媒体の許可法域外 |
+| `:platform-attestation-missing` | 必須表明が積極的に宣言されていない |
+| `:sensitive-placement-context` | ポリシーが除外するコンテキストへの掲載要求 |
+
+すべて HARD（人間承認者が override できない）で、すべてキャンペーン自身の
+恒久フィールドを転記済みポリシーに突き合わせて計算する — proposal を検査しない、
+`media-spend-exceeds-authorized-budget-violations` と同じ ground-truth 規律。
+`:actuation/place-campaign` だけでなく `:platform/verify` でも評価されるので、
+適合性 op は**自分自身の発見で HARD hold** する（clean な評価を書いて後続の
+actuation がそれを証拠として読む、という抜け穴を塞ぐ）—
+`misleading-claim-risk-unresolved-violations` が確立した規律。
+
+未知媒体は**カスケードしない**: `category-disposition` は `:prohibited` ではなく
+`:no-policy-basis` を返し、他の述語はすべて空/false を返すので、発火するのは
+`no-platform-policy-basis` ただ 1 つ。`test/advertising/platform_test.clj` が
+これを固定している — 全述語が「誰も転記していない媒体について語ることを拒否」
+しなければならない。未知媒体に `:permitted` と答える helper は、それを守っている
+唯一の check を迂回してしまうからである。
+
+### D5. 不在は同意ではない
+
+`missing-attestations` は明示的な `true` のみを数える。
+`:distinguishable-from-product-ui` を省略した、あるいは `false`/`nil` にした
+キャンペーンは表明していない。これが `:generative-surface?` を飾りでなく
+荷重部材にする機構である: 媒体が生成面としてフラグされ、そのフラグが
+ポリシーが識別可能性を要求する理由であり、表明は代理店が積極的に宣言しなければ
+governor が出稿を通さないもの、という連鎖になる。
+
+### D6. `:platform/verify` は新しい write op、どの phase でも auto にしない
+
+phase 2 の `:writes` で `:media-plan/verify` / `:risk/screen` に合流し、
+どの phase の `:auto` にも入らない。理由は全 sibling の screening op と同じ:
+キャンペーンが媒体の広告ポリシーに適合すると署名することは正規化ではなく
+コンプライアンス判断である。
+
+### D7. 第2の actuation op は作らない
+
+`high-stakes` は ADR-0001 D1 が blueprint 自身の文面から根拠づけた単一メンバー
+`#{:actuation/place-campaign}` のまま。媒体は唯一の実世界行為の**パラメータ**で
+あって第2の行為ではない。媒体別 actuation op はリポジトリ中で最も危険な op を
+カタログのサイズ分だけ増殖させ、将来の媒体ごとに human-approval 不変条件を
+壊す機会を与える。
+
+したがって placement number は法域スコープのままとし（媒体別に採番し直すと
+既存 placement が黙って番号を変える）、媒体は placement record の**フィールド**
+として記録する — 監査人が「この広告は実際どこで走ったか」を再構成するのに
+必要なのはそちらである。
+
+## Alternatives considered
+
+- **`advertising.facts` に統合**: 却下（D1）。台帳がどちらの権威の拒否か
+  言えなくなる。
+- **google/meta/microsoft を一般知識から seed**: 却下（D2）。リポジトリ全体が
+  防ごうとしている失敗モードそのもので、出稿を gate するカタログでそれをやるのは
+  自己矛盾。
+- **媒体適合性を soft check（hold でなく escalate）にする**: 却下。人間の代理店
+  担当者が媒体の categorical な拒否を承認で押し切ることは、法域の拒否を押し切れない
+  のと同様にできない — キャンペーンは走らないか、走って引き下ろされる。escalate に
+  すると交渉不能な gate をクリックで通す習慣を運用者に教え込むことになる。
+- **生成面 mimicry をクリエイティブレビュー項目にする**: 却下。媒体自身の独立した
+  禁止事項であり、広告が広告として識別可能でなくなる地点＝真実性広告法制の核心。
+  HARD check 側に属する。
+
+## Consequences
+
+- 出稿は `:media-plan/verify` と `:platform/verify` の**両方**を要求するように
+  なった。`governor_contract_test.clj` の `verify!` helper は両方を走らせ、既存の
+  actuation テストはそれに合わせて更新した。
+- campaign entity に `:target-platform` `:ad-category`
+  `:advertiser-approval-on-file?` `:attestations`
+  `:requested-placement-contexts` が増えた。後ろ 2 つは複合値で Datomic backend
+  では EDN-blob codec に乗る。store contract で round-trip parity を担保。
+- demo store に campaign-5..9 を追加。いずれも法域側は clean で、媒体側の
+  ちょうど 1 つの rule だけで hold される。
+- **運用者に反復義務が発生する**: 広告ポリシーは変わる（seed した entry 自身の
+  changelog が 2026-03 の v1.0 から 2026-07 の v1.3 まで動いている）ので、
+  `:read-on` の陳腐化は読み直しタスクである。`docs/operator-guide.md` に
+  「Adding a media platform」節として記録した。
+- カタログ 1 件というカバレッジは実際の限界であり、正直に報告している。
+  拡張は安く、捏造は高い — これが意図した非対称性である。
+
+## 実装の所在
+
+- 子リポ: `cloud-itonami/cloud-itonami-isic-7310`
+  （`src/advertising/platform.cljc` / `governor.cljc` の媒体側 6 check /
+  `test/advertising/platform_test.clj` / `docs/adr/0002-media-platform-layer.md`）
+- 子リポ main: `fd7c3cda2a46c41a1b03e41fab6273844cfbc031`
+- superproject pin: `manifest/west.yml` の当該 entry のみ前進
+  （`a718e142` → `fd7c3cd`、2 ahead / 0 behind）
+")))

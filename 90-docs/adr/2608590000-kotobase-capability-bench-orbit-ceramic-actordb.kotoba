@@ -1,0 +1,191 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608590000-kotobase-capability-bench-orbit-ceramic-actordb")
+  (:adr/title "ADR-2608590000: kotobase を OrbitDB / Ceramic / ActorDB の形で capability 実装し、同一 datom workload で計測した —— 「速い」ではなく「何を諦めた対価か」を測る")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "kotobase-capability-bench")
+  (:adr/date "2026-08-06")
+  (:adr/last_verified "2026-08-06")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "kotobase の Prolly/commit-DAG 形と OrbitDB / Ceramic / ActorDB 形の capability 比較"
+   "『分散 CID DB の性能比較』を引用するときに何を引用してよいか（構造コストであって deployment ベンチではない）"
+   "FVM/決定論的実行境界を DB のホットパスに置いたときの実測コストの出所"
+   "actordb 形の shard 数トレードオフ曲線"))
+
+  (:adr/context
+  "オーナー質問（2026-08-06）:「kotobase を orbits, ceramic, actordb ベースで capability
+実装して性能を比較してみてほしい」。前段に FVM + Actor Model で CID ベース DB を作る設計案
+（オンチェーン FVM とオフチェーン ref-fvm の区別、actor 粒度、OrbitDB / Ceramic との性能差の
+推定）があり、その推定を **実測に置き換える**のがこのタスク。
+
+前段の文書自身が『完全に公平な公開ベンチマークは確認できなかった』と書いており、TPS 値を
+捏造するよりアーキテクチャからの推定の方が役に立つ、としていた。ここで作ったのはその中間物
+—— **実物の content addressing と実物の index 実装の上で、構造由来のコストだけを測る**装置。
+
+## 何が実物で、何がモデルか（これを取り違えると数字が嘘になる）
+
+**実物**: block 面は本物の canonical DAG-CBOR + CIDv1/sha2-256（`kotoba-lang/io-ipld` /
+`dag-cbor` / `io-multiformats`、pinned SHA）。kotobase の index は本物の
+`kotoba-lang/prolly-tree`（`prolly-tree.diff` の構造差分含む）。OrbitDB の merge 意味論は
+本物の `kotoba-lang/crdt`（LWW-Register + Lamport clock）を `[entity attribute]` ごとに使用。
+workload は 1 本の決定論的 datom 列を 4 backend に同一再生（同一 seed → 同一 entity・値・
+更新・query key）。
+
+**モデル**: 3 つの外部アーキテクチャは**公開されている「形」の再実装であってコードではない**。
+js-ipfs も libp2p も ceramic-one も Erlang も無い。ネットワークも無い（全 store が in-memory）。
+再現したのはコストを決める構造 —— 書き込みがどこに落ちるか、query が何を materialise しな
+ければならないか、replica が何を fetch するか —— であって、実装の定数ではない。
+
+**したがって: ここの数字を OrbitDB / Ceramic / ActorDB の throughput として引用してはならない。**
+引用してよいのは block 数・byte 数・message 数・boundary crossing 数（アーキテクチャの性質）
+であって、ミリ秒ではない（nbb/SCI インタプリタ上の値で、CBOR decode を過大に、I/O を過小に
+評価する）。
+
+## 実装場所
+
+`kotoba-lang/kotobase` の `capability-bench/`（`.cljc` 9 本 + nbb entry 3 本）。
+runtime 優先順位（CLAUDE.md）に従い cljs/nbb、JVM 非依存、`.mjs` / `.sh` は新規に書いていない。")
+
+  (:adr/decision
+  "**capability を先に宣言し、宣言していない操作は数字を返さない。** 16 個の capability 語彙
+（`:covering-index` `:verifiable-index` `:global-snapshot` `:structural-delta-sync`
+`:interest-sync` `:analytical-projection` `:deterministic-execution` 等）を定義し、backend は
+構築時に宣言を検証、harness は本当にできない操作を `::unsupported` で返す。**『できないこと』
+が高速な 0 として計上されるのを構造的に禁じる**のがこの層の存在理由。
+
+ただし `find-by-value` / `range-scan` は**拒否しない** —— covering index を持たない backend も
+「全部 materialise すれば」答えられるので、拒否するとこの比較が測りたかったコストそのものが
+隠れる。代わりに全ての答えが `:via`（`:index` / `:index-fanout` / `:projection` /
+`:full-materialisation` / `:materialised-index`）を持ち、どれが index 由来かは matrix が言う。
+`snapshot-read` だけは `:global-snapshot` で guard する（Ceramic の正直な答えは『できない』）。
+
+**4 backend が同じ答えを返すことを先に固定する**（`verify.cljs`）。性能比較は答えが一致して
+いなければ無意味。実際これが**本物のバグを 1 件捕まえた**: index key を `(name a)` で作って
+おり `:person/age` の namespace が落ちていた。その結果 AVET の retraction が旧値を引けず、
+1 entity が 2 都市に同時に存在する stale entry が残っていた。prolly と actordb は同じバグを
+共有していたので互いには一致し、orbit / ceramic との不一致で初めて露見した。")
+
+  (:adr/consequences
+  "## 実測（2026-08-06、4,000 entity / 20,000 datom / 定常 200 txn / actordb 8 shard）
+
+### 書き込み 1 txn あたり
+
+| backend | puts | put bytes | gets | actor msgs |
+|---|---|---|---|---|
+| kotobase-prolly | 14.32 | 176,947 | 22.56 | 0 |
+| orbit | 1 | 158 | 0 | 0 |
+| ceramic | 1 | 125 | 0 | 0 |
+| actordb(8) | 8.15 | 74,276 | 13.49 | 3 |
+
+covering index 3 本 + commit block は append-only 1 entry の **14 倍の block write と
+約 1,400 倍の byte** を書く。これは非効率ではなく capability の値段（gets は書き換えのために
+読む index path と、AVET を現在値 index に保つための retraction 読み）。
+
+### query 1 op あたり
+
+| 操作 | kotobase-prolly | orbit | ceramic | actordb(8) |
+|---|---|---|---|---|
+| point read | 3.02 gets | **0 gets**（local index） | 1.05 gets | 2.15 gets |
+| find by value | 3.46 gets `:index` | 0 gets だが**毎回 4,000 entity 走査** | 81.9 gets（projection 償却） | 17.46 gets / **8-way fan-out** |
+| range scan | 16 gets | 0 gets / 4,000 走査 | **0 gets**（projection warm） | 30 gets |
+| snapshot at basis | 3 gets / 24.7 KB | **216 gets / 499 KB を毎回** | **unsupported** | 2.05 gets |
+
+- **OrbitDB の『読みが只』は本物で、その対価も本物。** hash graph の外の local index が答える
+  ので block read 0、しかしそれは**証明できず・replay で再構築され・順序を持たない**ので、
+  値検索と範囲検索は毎回 4,000 entity の全走査になる。
+- **Ceramic は projection が全て。** 一度の構築に 3,902 stream / 4,095 block read、50 query で
+  償却して 81.9 reads/op、warm になった後の range scan は **block read 0**。cross-stream query
+  は遅いのではなく**導出物**で、払うのは導出コストと staleness。
+- **log replay 型の time travel は償却しない。** OrbitDB は snapshot 1 回ごとに 216 entry の
+  log 全体を歩く（216 block / 499 KB）。commit DAG は過去状態を『再計算』でなく『addressing する
+  root』にするので 3 block / 24.7 KB。
+
+### replica sync —— 構造差分の主張は生き残るが、regime を間違えると逆転する
+
+| 状況 | kotobase-prolly | orbit | ceramic | actordb(8) |
+|---|---|---|---|---|
+| 空から | 222 blocks → 60,800 entries | 216 blocks → 216 entries | 4,200 blocks → 4,200 events | 183 blocks（critical path **26**）→ 40,400 entries |
+| 200 txn 遅れ | 273 blocks → 1,192 entries | 200 blocks → 200 entries | 200 blocks → 200 events | 244 blocks（critical path 36）→ 792 entries |
+| interest 限定（4,000 中 100） | 273（interest 無視） | 200（無視） | **7 blocks** | 244（無視） |
+
+**大きな乖離**では Prolly diff が 222 block read で 60,800 entry を運ぶ（共有 subtree は CID
+比較 1 回）。**小さく散らばった乖離**では OrbitDB の log replay より**多く読む**（273 vs 200）
+—— 単一 entity 更新 200 件は 78 leaf のほとんどに触るので共有がほぼ無い。
+**『構造差分は常に log replay に勝つ』は偽。勝つのは 2 root の共有分に比例する。**
+
+正直な artifact を 2 つ: OrbitDB の log が 216 entry なのは bulk import を 16 txn に束ねたから
+（entity ごとに書けば Ceramic と同じ 4,200 になり、snapshot read も同じ倍率で悪化する）。
+Ceramic の interest 勝ちは本物だが狭い —— **『要らないデータの同期を断れる唯一の形』**である
+という一点。
+
+### shard 数トレードオフ（actordb、2,000 entity / 100 txn）
+
+| shards | puts/txn | point gets | find-by-value gets/op | cross-shard txn msgs | sync blocks | critical path |
+|---|---|---|---|---|---|---|
+| 1 | 11.12 | 2.02 | 2.7 | 3 | 71 | 71 |
+| 4 | 8.01 | 2.02 | 8.7 | 14 | 83 | 23 |
+| 16 | 6.21 | 1.92 | 31.7 | 50 | 130 | 12 |
+| 64 | 4.19 | 1.42 | 86.7 | 191.75 | 241 | 9 |
+
+両方向に単調 = チューニング用のつまみではなく**本物のトレード**。64 shard は txn あたりの
+block write を **2.7 倍削り** sync の critical path を 71→9 に縮める一方、**値 query の block
+read が 32 倍**、**shard をまたぐ txn の message が 64 倍**になる。point read はほとんど動かない
+（shard の木は小さいが、降下は元々対数）。定常 txn は単一 entity なので single-shard fast path
+（3 message）を通り、2PC のコストは全 shard に跨る bulk load 側に出ている。
+
+### FVM 境界 —— 『index の形が税率を決める』
+
+| backend | crossings/txn | copied bytes/txn | crossings/point-read | crossings/full-sync |
+|---|---|---|---|---|
+| kotobase-prolly+fvm | 36.88 | 472,605 | 3.02 | 222 |
+| actordb+fvm | 21.64 | 205,622 | 2.15 | 183 |
+| orbit+fvm | 1 | 204 | **0** | 216 |
+| ceramic+fvm | 1 | 171 | 1.05 | 4,200 |
+
+決定論的実行は **block access 単位の税**なので、**txn あたりに触る block が多い形ほど高く付く**。
+3 index の Prolly txn を Wasm 境界に入れると **1 txn = 約 37 回の host crossing と 0.5 MB の
+コピー**、append-only entry は 1 crossing / 204 byte。in-memory コピーはほぼ只なので**壁時計は
+ほとんど動かなかった** —— だから**持ち帰るべき数字は ms ではなく crossing 数**で、各自の
+executor の syscall コストを掛ければよい。
+
+結論は『FVM は DB を載せるには遅すぎる』ではなく **『index の形が税率を決める』**。1 write が
+1 block しか触らない形は境界にほぼ気付かず、3 本の index path を書き換える形は 37 回気付く。
+
+## この ADR が縛らないこと
+
+- **これは deployment ベンチマークではない。** 実 OrbitDB / Ceramic ノードの数値ではないし、
+  ネットワーク・consensus・gas・ディスク I/O は一切入っていない。
+- **ms 値を性能指標として引用しない。** インタプリタ由来。counter を引用する。
+- ADR-2608039000（分散型経路に D1 を前提にしない）・ADR-260726-kotobase-query-plane-is-one-ref（Datalog join は ref 1 本まで）・
+  ADR-2608039970（base は datom 面であって Datalog ではない）を変更しない。この ADR は
+  それらの前提の上で『形ごとの構造コスト』を測っただけ。
+
+## 再実行
+
+```bash
+cd orgs/kotoba-lang/kotobase/capability-bench
+npm install && npm run setup
+nbb --classpath \"$(nbb setup.cljs --print-classpath)\" verify.cljs   # 4 backend の答えが一致すること
+nbb --classpath \"$(nbb setup.cljs --print-classpath)\" run.cljs --entities 4000 --updates 200 --shards 8 --fvm
+```
+")
+
+  (:adr/body
+  "実装・生データ・方法論の正本は `kotoba-lang/kotobase` の `capability-bench/`
+（`README.md` に方法論と全結果表、`results/latest.edn` に生 EDN、`results/shards-*.edn` に
+shard sweep）。この ADR はそこで測った内容と、そこから引用してよい範囲の決定を記録する。
+
+構成:
+
+- `src/kotobase/capability.cljc` —— capability 語彙 + 宣言検証 + guard
+- `src/kotobase/capability/blockstore.cljc` —— 計測付き block store / conditional ref /
+  actor message / FVM host-guest 境界（block を往復でコピーし crossing を数える）
+- `src/kotobase/capability/workload.cljc` —— 決定論的 datom workload と index key 符号化
+- `src/kotobase/capability/backend/{kotobase_prolly,orbit,ceramic,actordb}.cljc`
+- `src/kotobase/capability/bench.cljc` —— phase と会計
+- `verify.cljs`（4 backend 答え一致 gate）/ `run.cljs` / `setup.cljs`
+
+依存は vendoring ではなく pinned SHA の実 repo（`prolly-tree` / `io-ipld` / `dag-cbor` /
+`io-multiformats` / `crdt`）—— benchmark が kotobase 本体から静かに乖離しないため。")))

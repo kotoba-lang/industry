@@ -1,0 +1,41 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607196700-kami-audio-locate-ttml-recursive-cascade")
+  (:adr/title "KAMI aligns decoded audio locate and resolves recursive TTML cascades")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607196600-kami-midi-transport-imsc-style-resolution"))
+  (:adr/decision
+  (map (:daw (map (:locate-authority :displayed-musical-tick)
+         (:decoded-clip-policy (map (:spanning-clip :start-now-at-source-offset)
+                               (:future-clip :retain-relative-delay)
+                               (:ended-clip :do-not-schedule)))
+         (:web-audio-boundary (vector :AudioBufferSourceNode/start-offset :remaining-duration))
+         (:midi-continue :same-locate-aware-playback-path)))
+   (:nle (map (:style-resolution (vector :element-inline :recursive-style-reference :ancestor-inheritance :region-fallback))
+         (:region-resolution :ancestor-region-id)
+         (:cycle-policy :visited-element-set-terminates-resolution)
+         (:resolved-properties (vector :tts/textAlign :tts/fontSize :tts/origin))))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "locate-aware interpolation for every automation lane" "third-party plugin SDK/isolation" "complete Mackie/HUI channel strips" "surround/Atmos"))
+    (:nle (vector "TTML animation/full layout fidelity" "external notification delivery" "translation memory" "OCIO/ICC/HDR"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "05f2397"))
+   (:nle-commits (vector "a37df6e"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#25" "kotoba-lang/kami-app-nle#25"))
+   (:evidence
+   (vector "DAW passes 31 tests and 132 assertions; NLE passes 33 tests and 168 assertions."
+    "Both production releases compiled through the repository resource guard."
+    "Chrome decoded a WAV at the default nonzero playhead and observed AudioBufferSourceNode.start with source offset 1.5 seconds."
+    "Chrome imported a fixture combining style-to-style references, div inheritance, body region inheritance, recursive region styling and a cyclic reference."
+    "Downloaded NLE EDN preserved top position, right alignment and 1.4 font scale; both browser consoles had zero errors."
+    "Browser automation closed Chrome in finally and both local servers were stopped after verification."))))
+  (:adr/consequences
+  (vector "Decoded audio and MIDI Continue now share the selected musical playhead instead of restarting audio from timeline zero."
+   "Common IMSC documents can reuse recursively composed styles and inherited regions without losing the supported caption properties."
+   "Cycle detection bounds hostile or malformed style graphs."
+   "Automation interpolation at a nonzero locate point and full TTML layout/animation remain named gaps rather than being overclaimed."))
+  (:adr/source-format "edn")))

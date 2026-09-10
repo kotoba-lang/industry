@@ -1,0 +1,405 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607301300-itonami-cloud-org-repo-site-publishing-rule")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/last_verified "2026-07-30")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2607301300: itonami.cloud/{org}/{repo} を GitHub Pages 相当の公開サイト面にする。宣言レジストリに載ったものだけが resolve し、未登録は 404 —— SPA catch-all に落とさない。最初の実物は cloud-itonami/inkan（印影ジェネレータ）")
+  (:adr/topic "itonami-cloud-org-repo-site-publishing-rule")
+  (:adr/repos (vector "orgs/network-awai/cloud-itonami" "orgs/cloud-itonami/inkan"))
+
+  (:adr/authoritative_for
+  (vector "itonami.cloud の公開サイト面の正本: KRP §4 の `/{org}/{repo}[/…]`。GitHub Pages と同じく、repo ごとの静的サイトをこの形で配信する"
+   "公開の宣言は `sites.edn`（手書き）。ディレクトリを置いただけでは公開されない。`:source` は repository ごとに宣言し、名前から導出しない（ADR-2607299300 §3 と同じ規律）"
+   "未登録 `{org}/{repo}` は 404。登録済みサイトでも宣言ファイル一覧に無いパスは 404（KRP §4 rule 8）"
+   "予約 first-segment（`api` / `docs` / `css` …）は `public/` と `functions/` の実在エントリから生成する。手書きリストにしない"
+   "サイト実体の置き場は Pages deploy 同梱（`public/sites/{org}/{repo}/`）。R2 ではない"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+
+  (:adr/related
+  (vector "90-docs/protocols/kotoba-resource-protocol.edn（KRP §4 の HTTP projection 8 rules。rule 8 『Unknown resources return 404 and never fall through to a homepage』が本 ADR の中心）"
+   "90-docs/adr/2607299300-murakumo-cloud-krp-org-repo-addressing-did-account.edn（murakumo.cloud に同じ addressing を決めた先行 ADR。本 ADR はそれを itonami.cloud で**実装した**もの。§3『registry は宣言データ。path が parse できるだけでは存在を意味しない』『location は宣言する。名前から導出しない』を継承する）"
+   "90-docs/adr/2607122200-kotoba-lang-ui-hig-semantic-layer-topology.edn（公開サイトの UI が乗る design system。skill kotoba-uiux）"
+   "orgs/cloud-itonami/inkan（印影の組版エンジン。最初の公開サイトの中身）"
+   "orgs/kotoba-lang/jp-go-digital-design-system（DADS。この公開サイトの UI スタック。README が『採用する repo は理由を ADR に書くこと』と定めており、その理由は本 ADR の decision 7）"
+   "90-docs/adr/2607141915（ai-gftd-itad が kotoba-ui から DADS へ opt-out した先行 ADR）"))
+
+  (:adr/problem
+  "オーナーの問い（2026-07-30）は『itonami.cloud/{org}/{repo} で公開できるんだっけ?』で、答えは**半分だけ Yes** だった。
+
+実測（2026-07-30）:
+
+- `/api/{org}/{repo}/…` は**実在し live**。`functions/api/[org]/[repo]/` 配下に metrics / drive / chat / calendar / register 等が実装済みで、`/api/gftdcojp/cloud-itonami/metrics` は 200 JSON を返す。
+- **裸の `/{org}/{repo}` は存在しなかった。** `/cloud-itonami/tate`・`/zzz-nonexistent/qqq`・apex の3つが**バイト同一**（84,530 バイト、SHA `c214b4de…`）の cockpit SPA HTML を 200 で返していた。原因は `public/_redirects` の最終行 `/* /index.html 200`。
+- これは KRP §4 rule 8（未知は 404、homepage に fall through しない）への違反であり、同時に『存在しないものが存在するように見える』面でもあった —— agent がこの URL を叩くと、404 ではなく**もっともらしい HTML** が返る。
+
+ADR-2607299300 が `/{org}/{repo}` を公開面とする決定を既に出していたが、あれは **murakumo.cloud についての決定**で、しかもそこでも未実装（実測 404）。itonami.cloud に適用された事実は無かった。
+
+置き場の選択も推測ではなく実測で決めた: この環境の Cloudflare OAuth token の Token Permissions に **r2 が無い**（`pages (write)` / `workers_kv (write)` / `d1 (write)` はある）。したがって R2 backed の配信は今日は選べない。")
+
+  (:adr/decision
+  "### 1. 公開 URL は `/{org}/{repo}[/…]`、実体は Pages deploy 同梱
+
+`public/sites/{org}/{repo}/…` に置いた静的アセットを、`functions/[org]/[repo]/`
+のルータが `env.ASSETS` 経由で返す。R2 ではないのは上記の scope 実測による ——
+『将来 R2 にする』とも書かない（必要になった時に決める）。
+
+`_redirects` には `/sites/* /sites/:splat 200` を catch-all の**前**に足す。
+これが無いと `/*` が拾って SPA が返り、`env.ASSETS` 経由の取得まで index.html
+になる（この repo の `_redirects` が `/docs/*` 等に同じ identity rewrite を
+持っているのと同じ理由）。
+
+### 2. 宣言されたサイトだけが resolve する
+
+正本は `sites.edn`（手書き、org/repo/title/description/source/dir）。
+ファイル一覧と予約語は `scripts/generate-sites-registry.cljs` が生成し、
+`functions/edge/sites-registry.js`（Function が import）と
+`public/sites/registry.json`（discovery 面）に出す。
+
+`:source` は **repository ごとに宣言する。名前から導出しない。** URL の形が
+`{org}/{repo}` に合うからといって `github.com/{org}/{repo}` があるとは限らず、
+導出すれば嘘を claim することになる（ADR-2607299300 §3 の
+`locations-are-declared-not-derived` と同じ規律）。
+
+### 3. 未登録は 404。**宣言ファイル一覧が安全境界**
+
+登録済みサイトでも、宣言された `:files` に無いパスは `env.ASSETS` を叩く前に
+404 にする。ASSETS の miss 時の挙動（`_redirects` の catch-all に落ちて SPA が
+200 で返る）に安全性を依存させないため。副作用としてパストラバーサルもここで
+塞がる（`../../_redirects` も `%2e%2e` 版も whitelist 照合で落ちる）。
+
+### 4. 予約 first-segment は生成する
+
+`public/` と `functions/` の実在エントリの和（`_` 始まりを除く、38 件）。
+手書きリストにすると、新しいページを足した人がここを更新し忘れた瞬間に
+そのページが `{org}/{repo}` ルータに食われる —— 生成なら構造的に起きない。
+
+### 5. 判断は純 .cljc、機構だけ JS。**入口は route ではなく middleware**
+
+`cloud-itonami.sites/resolve-request`（純 `.cljc`）が
+`:pass-through` / `:redirect` / `:asset` / `:not-found` を返し、
+`cloud-itonami.edge.sites` が Response を組む。shadow-cljs `:sites-api`
+（`:esm` / `:advanced`）で `functions/edge/sites-core.js` に出す。
+
+**呼び出し口は `functions/_middleware.js`。`functions/[org]/[repo]/` という
+route ファイルにしてはいけない。** route にすると `functions/api/health.js` の
+ような同じ深さの静的ルートを覆い、しかも **route handler の `context.next()` は
+『次に match する route 関数』ではなくアセットサーバへ直行する**ので、覆われた
+関数が永久に呼ばれなくなる。middleware の `next()` は正しく後続の route 関数へ
+続く。`handle` は管轄外で **`nil` を返し、`next()` を呼ばない** —— 呼ぶと
+middleware 自身の後続処理（`/api/*` の html-leak guard）まで飛ぶ。
+`:edge-api` 共有バンドルに足さないのは `:nudge-api` / `:register-api` と同じ理由
+（あれは procurement→approval→store.cljc の `fs` require で現在ビルド不能）。
+`cloud-itonami.sites` が引くのは `clojure.string` だけなので単体でビルドできる。
+
+### 6. 最初の公開サイトは cloud-itonami/inkan（印影ジェネレータ）
+
+規則だけ作って中身が無いと、その規則が本当に動くか分からない。実物として
+**印影ジェネレータ**を同時に公開する（GMOサインの電子印鑑 —— 丸-縦/丸-横/丸-日付/
+角-1〜3列 —— を下敷きに、法人実印の二重丸を足した8型）。
+
+組版エンジンは別 repo `cloud-itonami/inkan` の純 `.cljc`。ブラウザでは
+**同じ .cljc を scittle が読む**（この repo の marketplace ページと同じ手）——
+JS に書き直すと組版が2実装になり、SVG と PNG が必ず食い違う。
+
+書体は **OFL のみ**（Shippori Mincho / Zen Old Mincho / Yuji Syuku / Yuji Boku /
+Noto Serif JP、Google Fonts の unicode-range サブセットで漢字を完全カバー）。
+**篆書体・印相体・古印体・隷書体は未対応**（探した範囲で OFL の実用フォントが
+無い）。似た別の書体で代用はしない —— 『無い』を『それらしい何か』で埋めない。
+
+### 7. この公開サイトの UI は kotoba-ui ではなく DADS（デジタル庁デザインシステム）
+
+オーナー指示（2026-07-30）。このモノレポの標準 UI スタックは kotoba-ui
+（ADR-2607122200 / skill `kotoba-uiux`）だが、`kotoba-lang/jp-go-digital-design-system`
+は **『日本の公共・行政文脈のサービス』向けの明示的な opt-out 先**として置かれて
+おり（README が『採用する repo は理由を ADR に書くこと』と定めている）、印影は
+印鑑登録・契約書・行政手続きの文脈そのものなので、ここがまさにその適用先。
+先行例は `gftdcojp/ai-gftd-itad`（ADR-2607141915）。
+
+**代償を明記する: light mode 固定になる。** 上流デジタル庁に dark palette が
+無いため、DADS を選ぶことは dark を捨てることと同義。dark が要るなら kotoba-ui へ
+戻すのが正しい分岐であって、**dark を自作しない**（jp-go-dds README の指示）。
+外部リクエストは webfont だけ opt-in する（DADS 自体は外部リクエストゼロが既定だが、
+印影の書体そのものが Google Fonts の OFL フォントなので、ここは落とせない）。
+
+### 8. 共通クロームは**プラットフォームが被せる**。サイト側に書かせない
+
+『cloud-itonami のサービスの一つだと分かる』ヘッダー・パンくず・フッターは、
+公開ルール側（`cloud-itonami.site.service-chrome` / `service-page`）が持つ。
+
+**各サイトに書かせる設計は成立しない。** 実証: この公開ルールを作った直後、
+別セッションが `cloud-itonami/cloud-itonami-rirekisho`（履歴書）を登録し、
+そちらは自前の `rk-header` を持っていた。サイトごとにヘッダーを書く設計なら、
+2 サイト目の時点でもう共通ではなくなっていた。
+
+方式は **HTML への注入**（サイトに view を公開させない）。公開サイトは自分の
+repo で完結した `document` を組むので、プラットフォームが `<html>` を組む形に
+すると全サイトの repo 改造が要る —— 他セッションが触っている repo を巻き込むし、
+将来のサイトにも同じ改造を強いる。文字列手術の脆さは次の 4 点で潰す:
+
+1. アンカー（`<body…>` / `</body>` / `</style>`）が無ければ**例外**。
+   クローム無しのページを黙って出さない。
+2. breadcrumb CSS を渡し忘れても例外（core 14 に breadcrumb は無いので、
+   渡さないと **markup は出るのにスタイルだけ当たらない**）。
+3. 冪等（二重適用しない）。
+4. **`generate-sites-registry.cljs` がクローム有無を検査し、無いサイトは
+   登録できない。** 規約ではなく構造で共通を保証する。
+
+内容はレジストリの projection —— サービス名・説明・ソースは `sites.edn` の宣言を
+使い、ページ側に書かせない（登録名と表示名が食い違っても両方それらしく見える）。
+兄弟サービスの一覧は **2 件目が登録されるまで出さない**（自分だけが並ぶ『切替』は
+機能ではなく演出）。nav は本体サイドバーの部分集合でラベルも一致させる（同じ場所を
+別の名前で呼ぶと同じサイトだと分からなくなる）。運用者向けの `/#pane-*` は入れない。
+
+上流 DADS に対応物が無いヘッダー/フッターは `dads-*` を名乗らず
+`itonami-chrome-*`（jp-go-dds 自身が `dds-ext-*` で上流と区別しているのと同じ規律）。
+パンくずだけは上流に実物があるので `dads-breadcrumb` の vendor 済み CSS に載せる。")
+
+  (:adr/consequences
+  "**得られたもの**
+
+- `itonami.cloud/{org}/{repo}` が GitHub Pages と同じ感覚で使える。新しいサイトの追加は `sites.edn` に 6 行と、`public/sites/{org}/{repo}/` にアセットを置いてレジストリ再生成するだけ。
+- 未知のリソースが 404 を返すようになり、KRP §4 rule 8 違反が解消した。agent が存在しない URL を叩いたときに『もっともらしい HTML』ではなく機械可読な 404 が返る。
+- 既存の全経路は無傷（予約 prefix で `context.next()`）。`/api/*` の html-leak guard も従来どおり効く。
+
+**代償・限界（正直に）**
+
+- **サイト更新に Pages deploy が要る。** R2 backed なら deploy 無しで差し替えられたが、token に r2 scope が無いので今日は選べない。
+- **`/sites/{org}/{repo}/…` という生パスでも同じバイトが取れる。** Pages のアセットは deploy dir に居るのでこれは構造的。正準 URL は `/{org}/{repo}/` の方で、registry.json もそう宣言している。
+- **クロスリポジトリのビルドは自動化されていない。** `cloud-itonami/inkan` の変更をサイトに反映するには `scripts/generate-inkan-site.cljs` を回して commit する。west の pin 前進に連動する仕組みは無い。
+- **印影の SVG は閲覧側フォントに依存する。** グリフをアウトライン化していない（フォントの glyf/CFF 解析はこの repo が持つべき機構ではないと判断した）。自己完結が要るなら PNG（canvas でラスタライズ）を使う。
+- **印影そのものに法的効力は無い。** 実印の効力は印鑑登録に、電子契約の効力は電子署名法上の電子署名に由来する。この道具は見た目を作るだけで署名も認証もしない —— 公開ページにもそう明記した。")
+
+  (:adr/evidence
+  "**実装前の状態（この ADR の出発点）**
+
+    curl https://itonami.cloud/cloud-itonami/tate      -> 200 text/html 84,530B
+    curl https://itonami.cloud/zzz-nonexistent/qqq     -> 200 text/html 84,530B
+    curl https://itonami.cloud/                        -> 200 text/html 84,530B
+    shasum -> 3件とも c214b4deea2923e5b79706db468d5ba3053741bd
+
+    wrangler whoami -> account ai-gftd-cloud / Token Permissions に pages(write)、r2 は無い
+
+**テスト**
+
+- `cloud-itonami.sites-test` — 5 tests / 43 assertions、0 failures。予約 prefix の pass-through、未登録の 404、宣言ファイル一覧が安全境界（`../../_redirects`・`%2e%2e` 版・`..%2f` 版がすべて 404）、301 の trailing-slash 寄せ、パーセントエンコード解決。
+- `inkan.geometry-test` / `inkan.svg-test` — 15 tests / 357 assertions、0 failures。枠外逸脱ゼロ（丸は中心距離、角は矩形）、縦書きの読み順が右→左・上→下、文字落ちゼロ、升目詰めで重ならない、XML エスケープ。
+
+**テストが実際に捕まえた欠陥（3件、いずれも『通ってから直した』ではなく落ちて直した）**
+
+1. 横書きの読み順が逆（`grid-glyphs` が ci=0 を右端に置くのに、入力を反転して渡していた）。
+2. 丸印の横書きが枠外へ 9.72mm（枠半径 9.0mm）—— 1行 N 文字の升目に文字を引き伸ばしていた。丸印の升目を正方形にし、最後に `fit-into-circle` で必ず収める不変条件を足して解消。
+3. **幾何テスト全通過の状態で `:square-1` が判読不能だった** —— 升目の縦横比 4:1 に字面を引き伸ばしていた。これは数値テストでは捕まらず、`scripts/preview.cljs` を実ブラウザでレンダリングした目視で発見（字面の縦横比を [0.5, 2.0] に締める修正）。**『測っていない品質は演出』の実例**として、目視面をコードで用意しておく価値がここにある。
+
+**ビルド**
+
+    shadow-cljs release sites-api -> functions/edge/sites-core.js 114,587B、`eval(` 0 件
+    （Cloudflare の deploy pipeline は到達不能でも eval() を含む Worker script を静的に弾く）
+
+**scittle の適合確認（推測でなく実測）**
+
+    reader conditional `#?(:cljs …)` -> :browser 枝を取る
+    defmulti / defmethod            -> 動く
+    多 namespace の require          -> 動く
+    src 読み込みの .cljc をそのまま  -> inkan.svg/seal が 762 文字の SVG を返す
+
+**本番デプロイして初めて出た欠陥（2件）—— ローカルの検証では出なかった**
+
+これが本 ADR でいちばん重要な記録。**45 の unit assertion も 17 の bundle 検査も
+ローカルのブラウザ検証も全部通った状態で、本番に出した瞬間に2つ壊れた。**
+
+1. **`/api/*` の 2 セグメント経路が全滅（502）。** `/api/health`・`/api/status`・
+   `/api/metrics`・`/api/jobs`・`/api/badge`・`/api/freepath`・`/api/org` を実測で
+   確認。原因は `functions/[org]/[repo]/index.js` が `functions/api/health.js` と
+   同じ深さで match し、**route handler の `context.next()` が「次に match する
+   route 関数」ではなくアセットサーバへ直行する**こと。health.js が呼ばれず SPA が
+   返り、既存の html-leak guard がそれを 502 に変えていた（guard が無ければ、
+   API が HTML を返していることに誰も気付かなかった）。→ middleware に移して解決。
+   4 セグメントの `/api/{org}/{repo}/metrics` は静的セグメント優先で正しく
+   解決していたため、**浅い経路だけが壊れるという見つけにくい形**をしていた。
+2. **`/{org}/{repo}/` が内部パスへ 308 リダイレクトしていた。** Pages のアセット
+   サーバは `…/index.html` を `…/` へ 308 する。`env.ASSETS` にそのまま投げて
+   結果を素通ししていたので、`/cloud-itonami/inkan/` が
+   `/sites/cloud-itonami/inkan/` へ 308 —— 内部レイアウトが Location として外に
+   漏れ、正準 URL も壊れていた。→ ディレクトリは最初から `index.html` を付けずに
+   取り、それでも 3xx が返ったら Location を公開形に書き戻す。
+
+**なぜローカルで出なかったか**: (1) は Pages の route 解決と `next()` の意味論
+そのもので、`wrangler pages dev` を通さない静的サーバ検証では再現しない。
+(2) は Pages のアセットサーバの正規化挙動で、同じく本番経路にしか無い。
+**『ローカルで全部通った』は『本番で動く』の証明ではない**という、この面では
+繰り返し確認される事実の実例。デプロイ後の live 実測を手順から外さないこと。
+
+**DADS 移行で見つけた欠陥（2件）—— どちらも例外にならず静かに壊れる**
+
+1. **`jp-go-dds.core/select` は `[opts options]` の順**（`[options opts]` ではない）。
+   逆に渡しても vector の map destructure は例外にならないので**黙って壊れ**、
+   `<option value=")(:id">f-kind</option>` のような選択肢が出る。
+2. **同 `select` は現在値を表現できなかった。** placeholder しか `selected` に
+   せず、`:value` が無い。既定値を持つフォームでは consumer が『18mm を既定に
+   した』つもりでも実際に選ばれるのは options の先頭で、**見た目は正常**なので
+   気付かない（実測: 印影が 18.0mm のつもりで 12.0mm で描画されていた ——
+   プレビュー SVG が 168px = 12 × 14px/mm）。→ 回避策で誤魔化さず
+   **jp-go-dds 側に `:value` を実装**した（`kotoba-lang/jp-go-digital-design-system`
+   commit `c787de2`、12 assertion 追加、既存 246 assertion 通過）。この欠陥は
+   DADS を使う**すべての**フォームに影響していたので、consumer 側で直すのは誤り。
+
+**発見した実装上の罠（2件）**
+
+1. **scittle の script は `<head>` ではなく body 末尾に置く。** head に置くと `page.cljs` が body 生成前に走り、`getElementById` が全部 nil を返して**何も起きないまま静かに終わる**（プレビューが空、status が『読み込んでいます』で固着）。
+2. **shitsuke の `button` は `:id` を DOM に出さない**（`:class`/`:act`/`:disabled`/`:title`/`:type` だけ）。`:id` でボタンを取ろうとすると配線が黙って外れる。hook は `:act` → `data-act` で取る。")
+
+  (:adr/status_2607302200
+  "**closing 時点（2026-07-30）の現在地。**
+
+## 着地済み（すべて default branch 上、live 実測で確認）
+
+    network-awai/cloud-itonami   2d13f9e5  公開ルール + 共通クローム + 生成器 + テスト
+    cloud-itonami/inkan          6dea1812  組版エンジン + 公開ページ（新規 repo）
+    kotoba-lang/jp-go-dds        c787de2   select に :value（現在値の表現）
+    com-junkawasaki/root         5d22dad6  本 ADR / 24901389 + 7629bf38 west.yml
+                                           b70a4274 repos.edn :extra-projects
+
+live（2026-07-30 最終確認）:
+
+    /cloud-itonami/inkan/                      200 text/html
+    /cloud-itonami/inkan                       301 → 末尾スラッシュ
+    /cloud-itonami/cloud-itonami-rirekisho/    200 text/html（共通クローム入り）
+    /cloud-itonami/inkan/secret.env            404 json（宣言外ファイル）
+    /zzz-nonexistent/qqq                       404 json（未登録）
+    /sites/registry.json                       200 json
+    /api/health /api/status /api/{org}/{repo}/metrics  200 json（回帰なし）
+    / /marketplace/ /isco-1212/ /docs/ /css/   200（既存面すべて無傷）
+
+## 検証（closing 時に再実行した実測値）
+
+    cloud-itonami sites+chrome    17 tests / 102 assertions   0 failures
+    verify-sites-bundle           17 checks                   all passed
+    generate-sites-registry --check  canonical (2 sites, 37 reserved)
+    inkan geometry+svg            15 tests / 357 assertions   0 failures
+    jp-go-dds 全体                 27 tests / 246 assertions   0 failures
+
+## gap 3 / 2 / 1 の解消（2026-07-30、closing 後の追加作業）
+
+**3 と 1 は、私が記録したギャップの前提そのものが誤っていた。** 下の「未実装」節は
+その訂正後の状態に書き換えてある。
+
+### 3. design-quality —— bridge は要らなかった。ただ走らせればよかった
+
+『`--hig-*` 前提の audit を DADS 面にどう当てるか未決』と書いたが、
+`kotoba-lang/design-quality` の監査は **token 非依存**だった —— rendered HTML +
+inline CSS を HIG/WCAG ヒューリスティクス（viewport / safe-area / dvh /
+tap-target 44px / focus-visible / reduced-motion / overflow / color-scheme /
+responsive / semantics / input-zoom / contrast）で見るだけで、`--hig-*` を参照しない。
+`jp-go-dds` README の token bridge の記述から、監査も token を見ると思い込んでいた。
+
+    scripts/score-sites.cljs   登録済み全サイトを 12 軸で採点（--min で gate）
+
+対象はレジストリから引く（名前を手書きすると新サイトが黙って採点対象から漏れる）。
+design-quality の **CLI は core 10 軸しか出せず** `input-zoom` / `contrast` を
+有効にするフラグを持たないので、ライブラリを直接呼ぶ。
+
+実測: **inkan 100.00 / rirekisho 100.00、findings ゼロ**（12 軸）。
+**空振りで満点になっていないことも裏取りした** —— `100vh` / `transition` /
+`animation` / `@keyframes` がいずれも 0 件なので、`:dynamic-viewport` と
+`:reduced-motion` の 1.0 は『直すものが無い』という正しい挙動。
+
+### 2. クロス repo ビルド
+
+    scripts/build-sites.cljs           全サイト build → レジストリ再生成 → 採点
+    scripts/build-sites.cljs --check   publish 鮮度検査（古ければ exit 1）
+
+ビルド手順（`:generator` / `:classpath` / `:env` / `:source-dir`）は `sites.edn` の
+1 エントリに宣言する —— サイトを 1 つ足す作業を 1 箇所に閉じ、README や人の記憶に
+置かないため。レジストリは `sourceCommit` を記録するようになり、source repo の HEAD と
+比較できる。**判定不能（source 未 checkout / 記録なし）を『新鮮』と読み替えない。**
+
+### 1. 自動ゲート —— GitHub Actions は死んでいなかった
+
+『Actions は job 起動せず赤のまま』と書いたが、それは **superproject**
+（ADR-2607300900）の話。**この repo の CI は動いており job も起動する**（実測:
+CI conclusion=success、jobs=4）。ADR の記述を別 repo に読み替えて適用していた。
+
+`ci.yml` に STRICT job `sites` を追加（`nbb scripts/run-task.cljs test-sites`）。
+**standalone checkout で確実に動くものだけ**入れた:
+
+    sites-registry-check   レジストリ canonical（共通クローム有無の検査を含む）
+    sites-bundle-verify    sites-core.js を実 import して 17 検査
+
+`score-sites` と `build-sites --check` は west sibling / source repo checkout が
+要るので**入れていない** —— continue-on-error の飾りにしない。この `ci.yml` 自身が
+『`bb` 未インストールのまま何ヶ月も黙って死んでいた』失敗を記録している。
+
+### 訂正（この作業中に自分が出した誤り）
+
+`fb0393b8` の commit message に『rirekisho の公開物が古い commit のままだった』と
+書いたが**検証していない**。実際に起きたのは「ローカル source checkout が 2 commit
+古くビルドが失敗した」ことで、同期後の再ビルド出力は既存の公開物と**バイト同一**
+だった。`sourceCommit` の記録は今回が初なので、それ以前の publish 鮮度は判定できない。
+訂正は `4c530966` の merge commit message に残してある（履歴は書き換えない）。
+
+### STRICT gate を入れた直後に自分で赤くした（2026-07-31、2 件とも自分の欠陥）
+
+**gate を入れることと、gate が通る状態を作ることは別物だった。** 追加した
+`publishing surface` job は main で 2 回連続して赤くなり、どちらも私の欠陥だった。
+
+**1. レジストリを環境依存にしてしまった。** 鮮度検査のために `sourceCommit`
+（source repo の HEAD）を `registry.json` に混ぜたが、これは環境に依存する値で、
+source repo が checkout されない CI では再生成が `null` になる。結果
+`generate-sites-registry.cljs --check` が**構造的に必ず STALE** を返し、gate が
+恒久的に赤くなった。
+
+  → レジストリは `sites.edn` と実ファイルだけから決まる projection に戻した。
+    **『どこで生成しても同じ内容』が `--check` の成立条件**である、というのが
+    ここで学んだ不変条件。publish 鮮度は `public/sites/build-state.json` に分離し、
+    `build-sites.cljs` が書き `--check` がそれを読む。
+
+**2. 検査の fake が本番と違い、Node のバージョンで結果が変わった。**
+`verify-sites-bundle.cljs` の fake context が `request` を素のオブジェクト
+（`#js {:url … :headers #js {:get fn}}`）にしていた。handler はそれを
+`new Request(url, request)` の init に渡すので、undici はこの偽 headers を dict と
+して読み `get` 関数をヘッダ値と解釈して落ちる。**Node 26（手元）では通り
+Node 22（CI）で落ちる**という環境依存の偽陰性。
+
+  → 本物の `Request` を渡す形にした。本番の workerd は本物の Request を渡すので、
+    現実に寄せた fake の方が検査としても正しい。
+
+**再発防止として実際にやったこと**: 修正のたびに `git archive HEAD` で
+**siblings の無い展開先を作り、CI と同条件で `test-sites` を回してから** push した。
+手元で通ることは standalone で通ることを意味しない —— この 2 件はどちらもその差で出た。
+
+## 未実装・既知のギャップ（次の担当者向け）
+
+1. **CI ゲートは standalone で動く 2 つだけ。** `score-sites` と
+   `build-sites --check` は west レイアウトが要るため CI に載っておらず、**人が
+   ローカルで回す前提**。生成器を通さず `public/sites/` を手で置けばクローム検査も
+   すり抜ける（レジストリ生成を経由しないため）。
+2. **build は人が起動する。** `sites-build` / `sites-fresh-check` は cron にも
+   west pin 前進にも繋がっていない。鮮度が「見える」ようにはなったが「自動で直る」
+   わけではない。
+3. **`Deploy itonami.cloud` workflow が壊れている（本 ADR の対象外だが重大）。**
+   push-to-main の deploy が `CLOUDFLARE_API_TOKEN` 未設定で毎回 failure。つまり
+   **本番反映は手動 deploy でしか起きていない。** 修復は secret 設定＝オーナー作業。
+4. **`inkan` の SVG はアウトライン化していない**（閲覧側フォント依存）。自己完結が
+   要るなら PNG。フォント glyf/CFF 解析はこの repo が持つべき機構ではないと判断。
+5. **篆書体・印相体は未対応**（OFL の実用フォントが見つからない）。代用しない。
+6. `/sites/{org}/{repo}/…` の生パスでも同じバイトが取れる（Pages のアセットは
+   deploy dir に居るので構造的）。正準 URL は `/{org}/{repo}/`。
+7. 観測（本 ADR の対象外・別担当）: `jp-go-dds` に `test/jp_go_dds/skin_test.cljc`
+   があるが `test/run_tests.cljs` に登録されておらず走っていない。
+
+## 次の一手（resume point）
+
+    cd orgs/network-awai/cloud-itonami
+    nbb scripts/verify-sites-bundle.cljs && nbb scripts/generate-sites-registry.cljs --check
+
+3 番（design-quality の当て方）を決めるのが最も価値が高い。決めるまでは
+『DADS 面の品質は未計測』が正しい表明であって、スコアを出さずに良し悪しを
+主張しない。")
+
+  (:source/dataset "adr")))

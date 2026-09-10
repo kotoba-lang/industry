@@ -1,0 +1,178 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607286000-cloud-itonami-llm-compute-placement")
+  (:adr/doc_type "adr")
+  (:adr/topic "cloud-itonami-llm-compute-placement")
+  (:adr/title "ADR-2607286000: cloud-itonami の LLM 演算配置 — 面ごとに演算場所を固定し、FHE/MPC は採らない")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-28")
+  (:adr/last_verified "2026-07-28")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/related (vector "adr-2607285000-cloud-itonami-sealed-blinded-open-planes-threshold-custody"
+   "adr-2607173100-murakumo-main-model-alias"
+   "adr-2607110300-kotoba-lang-net-kotobase-cloud-murakumo-decentralization-roadmap"
+   "adr-2607030030-cloud-murakumo-economic-phases"))
+  (:adr/authoritative_for
+  (vector "cloud-itonami の LLM 演算をどの面でどこ (tenant device / tenant fleet / operator fleet) で回すかの割り付け"
+   "FHE および MPC による transformer 推論を採らない決定と、その根拠 (性能が桁違い / 非共謀前提が成立しない)"
+   "暗号化したまま演算する3手法 (構造推論 / 暗号化検索 / 仮名化) の定義と、仮名化が暗号ではないという表示義務"
+   "layer sharding は機密性の機構ではない・attestation は非ログの証明ではない、という非主張の明文化"
+   "sensitivity split の前段層数 N をセキュリティパラメータとして明示的に持つ規約"))
+
+  (:adr/decision-summary
+  "cloud-itonami は預かるだけの Proton と違い預かったデータの上で LLM advisor を回すため、暗号設計の前に演算場所を決める必要がある。FHE/MPC 推論は性能が5〜6桁および2〜4桁遠く、かつ MPC は非共謀複数当事者を要するため採らない。代わりに面ごとに演算先を固定する: open と blinded は operator fleet (blinded は値をブラインドしたまま等価 join / prefix seek が効くので構造推論で助言できる)、sealed は tenant fleet か tenant device。分散秘匿としては relay の job が既に requester identity を持たない性質 (who/what 分離) を test で pin し、sensitivity split で前段 N 層と output head を tenant 側に置く。layer sharding を秘匿の根拠として売らない (先頭ノードはプロンプト埋め込みを見る / activation は復元されうる)。")
+
+  (:adr/body
+  "# ADR-2607286000: cloud-itonami の LLM 演算配置 — 面ごとに演算場所を固定し、FHE/MPC は採らない
+
+**Status**: accepted（設計。実装は ADR-2607285000 Phase 4 として後続）
+**Date**: 2026-07-28
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2607285000 が cloud-itonami のデータを sealed / blinded / open の3面に割った。残る問いは「**どこで計算するか**」である。
+
+Proton は預かるだけなので zero-access が素直に成立する。cloud-itonami はそうではない——預かったデータの上で LLM advisor + CertGovernor + ReAct loop + Datalog クエリを回す business OS である。全面 E2EE にすると operator の LLM も読めなくなる。ここを曖昧にしたまま `envelope` を入れると、後から「advisor が動かないので復号する例外経路」が作られ、zero-access が名目になる。
+
+オーナー指示（2026-07-28）は3つのパターンの設計を求めた: 暗号化したまま演算する / LLM をローカルで動かす / 処理を分散して特定を困難にする。
+
+### 実測: murakumo に何があるか
+
+| 資産 | 実体 |
+|---|---|
+| `infer/plan.cljc` | memory-weighted **contiguous layer** partition（exo 型、pure cljc）。SSH も engine も platform も持たない data→data |
+| `infer/engine.cljc` | `:pipeline`(`--split-mode layer`) / `:tensor`(`row`、layer ごとに all-reduce) / `:expert`(MoE `-ot` regex pinning) |
+| `infer/relay.cljc` | work-dispatch の純粋状態機械。**job は `{:kind :input :price}` のみで requester identity を持たない**（`relay.cljc:40-71`） |
+| `infer/join.cljc` | 3 tier（browser WebGPU-wasm / wasm / native）。browser は outbound dial のみで NAT 越え不要 |
+| `overlay/` | 実働 QUIC driver・relay・cert・AES-256-GCM frame sealing（177 tests / 811 assertions） |
+| `witness-quorum` + `overlay/witness_dial_attest.cljs` | Ed25519 署名付き recompute verdict |
+| fleet | オーナー所有 Apple M4 実機 |
+| `murakumo-main` alias | KV 1 entry でモデル解決（CLAUDE.md 規約: override → alias → endpoint-only fallback） |
+
+重要な発見が2つある。
+
+1. **relay の job payload に requester identity が無い。** worker が受け取るのは `{:job-id :kind :input :price}` だけで、誰の依頼かは構造上わからない。「誰が」と「何を」の分離が、設計するまでもなく既に実装されている。
+2. **fleet がオーナー所有ハードウェア。** ローカル LLM は将来の話ではなく現在地であり、設計課題は「作れるか」ではなく「どの面をどこで回すか」の割り付けだけである。
+
+## Decision
+
+### D0. FHE と MPC による transformer 推論は採らない
+
+- **FHE**: 現行研究でも transformer 1 token に数十秒〜分。35B 規模で実用線から5〜6桁遠い。
+- **MPC（2PC/3PC secret sharing）**: 2〜4桁遅く、かつ**共謀しない複数当事者**が前提。運営主体が1社である現状ではセキュリティ前提自体が満たせない。
+
+「やれば動く」ではなく「桁が違う」ので諦める。この判断は性能改善で覆るものではなく、独立した ADR で明示的に再評価されるまで有効とする。
+
+### D1. 暗号化したまま演算する — 実際に成立する3つ
+
+**P1-a 構造推論（blinded 面のみで advisor を回す）** — 本 ADR の推奨の中心。
+
+blinded 面は値がブラインドされたまま等価 join と prefix seek が効く（`kotobase_peer/core.cljc:1509-1566`）。advisor は値を知らずに構造を読める:
+
+- 「承認が3回差し戻された effect が今月7件、うち5件は同じ approver」
+- 「decision から effect までの中央値が先月比 2.4 倍」
+- 「activity → decision の間に governor 却下が挟まった経路が12本」
+
+business OS の助言のかなりの部分がこの形である。**値を復号せずに出せる**ので operator の LLM に投げても zero-access が壊れない。`blind-fn` が既にあるため実装は配線だけ。
+
+**P1-b 暗号化検索（retrieval だけ暗号ドメインで完結）** — RAG の retrieval を blinded index 上で行い、ヒットした chunk だけを tenant 境界で復号して prompt に入れる。「何を検索したか」はブラインドされた token しか出ない。`kotobase-messenger` の E2E-safe search が同型の前例。
+
+**P1-c 決定論的仮名化** — client 側で実体値を安定した代替値に置換 → LLM → 返答を client で逆置換。**これは暗号ではない。** 補助知識を持つ相手には再識別される。使用条件は2つ:「補助的な層としてのみ使う」「custody に `:pseudonymized` と記録し zero-access と称さない」。
+
+### D2. LLM をローカルで動かす — 3 tier
+
+sealed 面を扱う唯一の正攻法。**鍵のある場所で演算する**。
+
+| tier | 実行場所 | モデル | 扱える面 | 既存資産 |
+|---|---|---|---|---|
+| **T1 device** | tenant のブラウザ/デスクトップ | 小型（WebGPU + wasm） | sealed 全部 | `join.cljc` の `:browser` tier |
+| **T2 tenant fleet** | tenant 所有ハードウェア | `murakumo-main` 相当 | sealed 全部 | murakumo 一式 |
+| **T3 operator fleet** | gftdcojp fleet | main | **blinded + open のみ** | 現状 |
+
+`murakumo-main` の解決順が既に規約なので、tenant endpoint への切替は config であって書き換えではない。
+
+正直なコスト: T1 のモデル品質は T3 に劣る。「同じ助言が場所を選ばず出る」とは言えない。**tier ごとに品質が違うことを UI に出す**。隠すと「なぜか今日は助言が浅い」という不信を生む。
+
+### D3. 処理を分散して特定を困難にする — ただし誤った前提を先に潰す
+
+**やってはいけない設計（明示的な非主張）:**
+
+- **layer sharding は機密性の機構ではない。** `plan.cljc` の contiguous layer 分割で「各ノードは一部しか見ないから安全」と考えるのは誤り。(1) 先頭シャードのノードは**プロンプトの埋め込みそのもの**を見る。(2) 中間 activation からの入力復元（embedding/hidden-state inversion）は特に浅い層で高い忠実度で成立する。分散は可用性とメモリの機構であって秘匿の機構ではない。
+- **attestation は「そのノードが入力をログしていない」ことを証明しない。** witness-quorum が証明するのは recompute の一致である。proof-of-compute と confidentiality を混同しない。
+
+そのうえで、実際に成立する分散秘匿を3つ採る。
+
+**P3-a 「誰が」と「何を」を別の当事者に分ける** — relay は依頼者を知るが内容を封じられ、worker は内容を見るが依頼者を知らない。両者が共謀しない限り再識別できない。`relay.cljc` の job 形状が既にこの形なので、足すのは2つだけ:
+
+1. relay 側で requester identity を job から**構造的に落とす**（今は偶然入っていないだけなので test で pin する）
+2. worker を**別の failure domain に置く**（同一 Cloudflare アカウント配下の witness1/2 では非共謀前提が成立しない）
+
+**P3-b sensitivity split** — layer 分割を「メモリ比例」ではなく「機密度」で切る。
+
+```
+[embed + 前段 N 層]   ← tenant 側（プロンプト平文はここから出ない）
+        │ 中間 activation のみ送出
+[中段]                ← fleet で分散実行
+        │
+[終段 + output head]  ← tenant 側（生成テキストはここでしか現れない）
+```
+
+`plan.cljc` は engine-agnostic な layer range を吐く純関数なので、分割の重み付けを差し替えるだけで実装できる。前段を tenant が保持することで layer-0 の埋め込み露出という最大の穴が塞がる。
+
+honest な限界: 中間 activation も情報を漏らす。**前段 N を大きくするほど安全で遅い**というトレードオフであり、**N はセキュリティパラメータとして明示的に持たせる**——「分散したから安全」ではなく「N=8 でこの程度」と言える形にする。
+
+**P3-c 匿名集合とカバートラフィック** — relay の queue に batch 境界を入れ、k 件未満なら遅延させる。`join.cljc` の browser tier が広いほど匿名集合が大きくなるので、**参加者拡大がそのままプライバシー強化になる**という整合が既にある。k を設定可能にし、その時の k を custody に記録する。
+
+### D4. 面ごとに演算先を固定する
+
+単一の万能解を探さない。
+
+```
+open     → T3 operator fleet（制約なし）
+blinded  → T3 operator fleet + P1-a 構造推論 + P3-a who/what 分離
+sealed   → T2 tenant fleet または T1 device
+           やむを得ず fleet を使う場合は P3-b sensitivity split + P1-c 仮名化、
+           かつ custody に :split / :pseudonymized を記録する
+```
+
+## 比較
+
+| | 秘匿の強さ | 実装コスト | 性能影響 | 可否 |
+|---|---|---|---|---|
+| FHE / MPC 推論 | 最強 | — | 桁違い | **不可（D0）** |
+| P1-a 構造推論 | 強（値が出ない） | 小 | なし | 即可 |
+| P1-b 暗号化検索 | 強 | 中 | 小 | 可 |
+| P1-c 仮名化 | **弱**（暗号ではない） | 小 | なし | 可・要ラベル |
+| P2 ローカル LLM | 最強（鍵と同じ場所） | 中 | モデル品質が落ちる | 即可 |
+| P3-a who/what 分離 | 中〜強（非共謀前提） | 小 | 小 | ほぼ実装済み |
+| P3-b sensitivity split | 中（N 依存） | 中 | N に比例 | 可 |
+| P3-c 匿名集合 | 中 | 中 | レイテンシ | 可 |
+
+## Consequences
+
+- (+) sealed 面を operator の LLM から隔離しても business OS の助言能力が全滅しない（P1-a が構造の助言を担う）。
+- (+) P3-a は追加実装がほぼ不要で、必要なのは「偶然そうなっている」を「test で pin された不変条件」に格上げすることだけ。
+- (-) T1/T2 の tier を実装するまで、sealed 面に対する advisor は存在しない。それは正しい状態だが、機能の穴として顧客に見える。
+- (-) P3-b は murakumo の plan を触るため、fleet の推論性能に直接影響する。N の既定値を決める実測が要る。
+- (-) 非共謀前提（P3-a）は、operator が relay と worker の両方を持っている限り成立しない。**現状は成立していない**ことを明記する。
+
+## Non-claims
+
+本 ADR は以下を主張しない。実装後もこれらを広告に使わない:
+
+- 「暗号化したまま AI が分析します」（FHE をやっていない。P1-a は値を見ないだけで、暗号文上の演算ではない）
+- 「分散しているので特定できません」（activation は漏れる）
+- 「ノードがログを取らないことを証明済み」（attestation は recompute の一致のみ）
+- 「仮名化により匿名です」（P1-c は暗号ではない）
+
+## Alternatives considered
+
+- **sealed 面にも operator の LLM を触らせる（zero-access を売らない）** — 一貫した選択肢であり却下ではない。採らなかったのは、ADR-2607285000 が zero-access を製品の性質として決めたため。後から変えると全部やり直しになる分岐なので、ここで固定する。
+- **TEE（SEV-SNP / TDX）で operator fleet 上の sealed 演算を正当化する** — 却下（今は）。Apple Silicon の fleet に該当機能が無く、TEE を持つ別ハードウェアの調達は fleet 構成の変更であって本 ADR のスコープを超える。attestation の意味も現行 witness-quorum とは別物になるため、必要になった時点で独立 ADR とする。
+- **layer sharding を秘匿の根拠として売る** — 却下。D3 の非主張に明記したとおり誤りであり、実装できても言ってはいけない。
+")
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))))

@@ -1,0 +1,135 @@
+(vector (map (:db/id -1)
+  (:adr/id "2800004300")
+  (:adr/doc_type "adr")
+  (:adr/topic "toolchain-host-plane-audit-2026-08")
+  (:adr/title "cljc→kotoba の移行は 4 repo で実質完了しており、残っていたのは host plane の検査漏れだった —— 監査 20 面・修正 10 件")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authors (vector "Claude Opus 5 (Claude Code)"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "2607289500" "2607279200" "2608650000" "2607198300"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba" "kotoba-lang/aiueos"
+              "kotoba-lang/amu" "kotoba-lang/kotoba-lang"))
+  (:adr/body
+  "## 決定
+
+**`kotoba` / `aiueos` / `kotoba-native` / `amu` において「cljc から .kotoba への
+refactor」は積み残しではない。** 残っている cljc は、accepted な計画が残ると言っている
+cljc である。この判断は `kotoba-lang` の handoff runbook §0b に記録した（`a7d0e3f8`）。
+
+したがって**この 4 repo に対する移行タスクを新規に起票しない。** 代わりに、per-slice
+checklist の最終行 —— *Host mechanism contains no product policy* —— を監査対象とする。
+
+## 根拠（測定値、2026-08-11 時点の main）
+
+| repo | `.kotoba` | 非 kotoba | その非 kotoba の正体 |
+|---|---|---|---|
+| aiueos | 5,093 L / 65 | 15,903 L | 59 個の kernel object が Kotoba。残りは host plane |
+| kotoba | 4,060 L / 103 | 24,748 L | `runtime.clj` 5,820 + `launcher.clj` 1,918 + `wasm_exec.clj` 862 |
+| amu | 1,053 L / 121 | 35,103 L | conformance fixture と examples。**製品 .kotoba は 0** |
+| kotoba-native | **0** | 7,042 L | x86-64/AArch64 backend 本体 |
+
+見た目が最も悪い 2 つは決着済みだった:
+
+- **amu は CLJ のまま** —— `ADR-reliability-t63-tool-vs-runtime` 決定 3:
+  *Compiler remains CLJ as the build/analysis tool — no requirement to self-host
+  the compiler before R3.*
+- **kotoba-native に .kotoba が無いのは構造** —— 機械語 backend であり、ADR-2607072000 が
+  「Rust になるはずのものは .cljc」と定めた面。
+
+計画自身の完了条件も *cljs/cljc remain only as bounded compatibility or implementation
+layers* と書いている。
+
+## 監査の結果 —— 20 面、修正 10 件
+
+支配的な欠陥の形は 1 つ: **手で維持された分類・語彙が、突き合わせる機構なしに複数箇所へ
+複製され、ずれる方向が fail-open。**
+
+| # | 場所 | 内容 | 着地 |
+|---|---|---|---|
+| 1 | kotoba `host_providers` | egress 分類に `net/connect`(238) / `component/http`(241) / `component/database`(242) が欠落 → allowlist 無しで全ホスト接続 | `8f3899c8` |
+| 2 | aiueos `contract` | overlay 語彙が二重管理。`:aiueos.policy/require-signed` が検証を通って黙って捨てられ、未署名を admit | `4e9a8ca6` |
+| 3 | aiueos `contract` | 同じ二重管理が逆向き。`:aiueos/crypto` 等 3 キーが parser に読まれるのに validator が拒否 | `4e9a8ca6` |
+| 4 | aiueos `contract` | 入れ子キー検査が 1 階層で停止。`{:memory_pages 4}` が通って既定 16 pages で走る | `4b534589` |
+| 5 | aiueos `contract` | device 束縛が無検証。三つ組が欠けると「1 デバイス 1 ドライバ」検査を**読み飛ばす** | `9b6aa9cb` |
+| 6 | aiueos `policy` | **未知の surface 名が kernel capability を全復活**（`:mmio/map` `:dma/map` 含む）。同じ nil を 8 行下では fail-closed に読んでいた | `cc8ab006` |
+| 7 | aiueos `contract` | 自分が #4 で入れた検査が、`normalize` の出力を拒否していた（自己回帰） | `5c9f2182` |
+| 8 | aiueos `execute` | topic gate を飛ばす未使用 arity の撤去 | `d6d43752` |
+| 9 | aiueos `hvt` | descriptor 1 本が 4 GiB を要求できた。連鎖長は縛られ、要素長は縛られていなかった | `8de4f613` |
+| 10 | aiueos `hvt` | 連鎖が descriptor table の外へ踏み出せた。`virtio` に強い検証器がありながら手書き再実装 | `f7cb8191` |
+
+**起票のみ（grant 意味論が repo 外の surface 構成に及ぶため独断で変えず）**:
+[aiueos#144](https://github.com/kotoba-lang/aiueos/issues/144) —— ①origin allowlist が
+`net/fetch` にしか届かない（`http/get-stream` 等 4 capability は無制限）②`forbid-effects`
+が審査対象の自己申告に依存（DMA だけ import から導出）。②は execute.cljc を読んだ後に
+severity を下方修正済み（リンク時 `UnlinkableException` が capability 所持を構造的に強制する）。
+
+## nbb fast path —— 使われていなかったので差が発見されていなかった
+
+`bin/kotoba` は `check` / `compile` / `worker` を **JVM を起動しない nbb 経路**へ振り分ける
+（実測 2.26s vs 10.14s、java プロセスをサンプリングして不在を確認）。この経路と JVM 経路を
+誰も比べていなかったため、3 件が食い違っていた:
+
+| 件 | 内容 | 着地 |
+|---|---|---|
+| `--help` | `test` を含む 4 subcommand が usage に無い（実装はある） | amu `a568650c` |
+| `check --json` | nbb が `:format` `:language-profile` `:exports` を返さない。`:format` は出力契約のバージョンで、機械消費側が dispatch する対象 | amu `41ffc54a` |
+| `compile` | **バイトは 350 B 完全一致**だが、JVM だけが `.provenance.edn` を書く。省略は意図的（依存閉包を軽く保つ）だが結果 map が黙っていた | amu `7cc1ac4e` |
+
+3 件ともテストで固定した。`worker` は 4 件目として調べ、**欠陥なし**。
+
+## 方法論として記録すべき 2 点
+
+**1. 共有 checkout で測って main の話として報告しない。** 偽の指摘を 2 回作りかけた
+（文法 244 行 vs 357 行、worker の `:format` 欠落）。どちらも原因は同じで、west の共有
+checkout が pin より古かった。CLAUDE.md は別文脈で同じことを言っている（共有 checkout は
+統合・閲覧専用、判断の入力は `origin/main`）。**測定は worktree で取る。**
+
+**2. パターンは対象の選定には効くが、当否は毎回測る。** 直近 5 面で予想が 3 回外れた ——
+似た 2 リストを統合しかけて止め（`network-resource-ops` は構文的性質、`network-cap-names` は
+能力分類で、別概念）、複製だと思ったものが導出だった（`wasm-cap-kind-ids`）、境界を超えたら
+黙って壊れると思ったら fuel helper に置き換わっていた（`max-collection-unroll-depth`）。
+**測定が無ければ、動いているコードを壊れていると記録して commit していた。**
+
+## この監査で「指摘なし」だった面（5）
+
+`signing.cljc`（署名範囲は ADR-0003 が明記）・`audit.cljc`（既存テストが充実、1 行 1
+エントリ不変条件だけ追加固定）・`vfio.cljc`（docstring が未検証性を自己申告、DMA 接合点の
+記述だけ追加）・`launcher.cljc`（CLI 経路も manifest/policy を検証済み）・`worker`。
+**すべての面から欠陥が出るなら基準が緩すぎる。**
+
+## 残っている gap（優先順）
+
+1. **[aiueos#144](https://github.com/kotoba-lang/aiueos/issues/144) の実装** —— surface 構成の
+   grant 意味論に触れるので、対象範囲を決めてから
+2. **`kotoba` の共有 checkout に他セッションの未着地作業 2,809 行**（新規 namespace 20 件を含む）。
+   west update が拒否される状態。退避済み（下記）
+3. **`kotoba` の `.git` が submodule 時代の遺物** ——
+   `gitdir: ../../../.git/modules/orgs/com-junkawasaki/kotoba`（org 名も誤り）
+4. **`backend_qualification_test` の既存失敗 6 件**（local evidence ファイル欠落）。
+   本セッションの全変更を通じて増減なし")
+
+  (:adr/evidence
+  "全変更は各 repo の main に merge 済み（PR ではなくサーバ側 merge commit）。
+
+west pin（root `540a9a1b68d` 時点）:
+  kotoba        9a178dd16ab6b967195f2a126c30d9a03d78eafd
+  aiueos        634af9391dcfcca89f79abadb3df3b5f4f195ccf
+  kotoba-native eeae98511a574a1be1280b3b3fbdaa1fbdd6efed
+  amu           7cc1ac4e4cca347653532f251d93407d6ce7097e
+  kotoba-lang   a7d0e3f8c8f9dcdbdc5755eb0468cd803c6ef32b
+
+検証（各着地時に全スイート実行）:
+  aiueos  clojure -M:test  425 tests / 1256 assertions  失敗 0
+  kotoba  clojure -M:test  526 tests / 8542 assertions  失敗 6（既存、backend-qualification-test）
+  amu     clojure -M:test  949 tests / 7486 assertions  失敗 0
+
+新規テストはすべて『修正を外すと落ちる』ことを実測してから着地させた。
+シグネチャ変更で旧 tree が arity 例外になる場合は、シグネチャを保ったまま検査だけ外して
+再測定している（『落ちない gate は劇場』）。
+
+保全した他者 WIP:
+  <scratchpad>/kotoba-wip-20260811/tracked-modifications.patch （3,398 行）
+  同 status.txt / 衝突する未追跡 2 件のコピー
+  working tree は 1 バイトも変更していない。")))

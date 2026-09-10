@@ -1,0 +1,790 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608122200")
+  (:adr/title "Closing: the clj->kotoba migration session, and what it found on the way")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-12")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/body
+  "## What this records
+
+A closing transaction for the session that advanced the clj->kotoba refactor.
+It exists so the next agent can resume without the conversation. Read the
+`in flight` section first -- six background agents were launched minutes before
+this was written and their work is NOT accounted for below.
+
+## The migration work that landed
+
+The task began as `make the kotoba CLI + amu native build actually work`. The
+blocker was not that native did not work -- it did -- but that every call
+re-verified the artifact, so `nx/execute` cost 1.9-3.6 s. Splitting it into
+`prepare` / `invoke` / `close!` in `kototama.native.executor` (tender-native
+ab76044, 1915ee1) brought it to 47 ms per call, with `admit-validity!`
+re-checking expiry, not-before, and revoked signers per invoke so the split
+does not buy speed by dropping a check.
+
+On top of that, a delegation seam was proven across five repos: an
+`oracle.cljc` that loads a shipped `*.kir.edn` and executes an export, with no
+fallback, plus a test-only generator and two gates (drift, delegation). The
+reference implementation is `cloud-itonami-app`'s `kotoba_oracle.cljc`
+(98a57c6); calendar, crdt, fsm and app-files reuse the template.
+
+### The boundary, measured rather than assumed
+
+Delegation is bounded by the interpreter's ADT node limit, not by whether a
+value is a collection. `mokuroku` refuses 13 catalog items; `fsm` accepts 32
+events over an alphabet of 3. The axis is whether the value's SIZE GROWS WITH
+THE DOMAIN. An earlier note in this series said `a collection cannot be
+delegated`; that was too strong and is corrected here.
+
+Value shapes at `ir/execute`, measured by running the guests: records cross as
+`[schema field ...]` in declared order; variants as `[schema case-tag payload]`;
+a typed set as `[[:set :keyword] [items...]]` -- NOT a Clojure set; `[:option
+:string]` as `[[:option :string] true \"x\"]`; `:document` as `[\"vector\"
+[[\"i64\" 50] ...]]`.
+
+### Defects the seams exposed
+
+Writing an oracle forces someone to state what a function means, and that is
+where the bugs were:
+
+- `calendar/model.cljc` `overlaps?` accepted zero-duration intervals (fixed,
+  d565658)
+- `app-files` declared a confinement rule and never enforced it -- `BrowseSource
+  -fetch` returned rows outside the granted directory (fixed 4d4a7bd, bound to
+  its core by a gate 6572f6c)
+- `net-kotobase` treasury: `js/parseInt` returned NaN on an unparseable block
+  header, NaN propagated, and a payment that was never confirmed was accepted
+  as confirmed -- the Worker returned success where it owed a 402 (fixed
+  dfa1143, with a test failing 5 assertions against the old copy and a
+  finite-head positive control that passes against both)
+- `nexus-x402`: a vendored header named `8a77e516` while the content was
+  `848158de` (fixed 6ca13bf, comments only)
+- `animeka`: a `:dev` alias `:local/root` named `orgs/kotoba-lang/
+  murakumo-generation`, which west never creates -- it resolved only for whoever
+  had the pre-rename directory as a leftover checkout (fixed 0c14939)
+
+## The gate discipline worth carrying forward
+
+`app-files`' gate states, per case, the directory each row is IN -- authored,
+never computed with the implementation's own `parent-of`. Deriving it would
+make the gate a mirror of the implementation: it would agree with ANY
+implementation, including a wrong one. Written down, it fails when the real rule
+stops recovering from a raw path what the author says the path means. Proven in
+three directions (guest always-true: 14 failures; always-false: 12; host
+replaced by `starts-with?`: 6, on exactly the descendant and root cases).
+
+## Three fleet detectors, and the errors in them
+
+`scripts/verify-{namespace-collisions,duplicate-registrations,vendored-copies}
+.cljs` were built this session. An independent verification pass reproduced all
+three and found real defects in two. Both have one shape: a report that reads as
+an all-clear when the check did not run.
+
+- `--check --verify-remote` FAILED OPEN. `gh` exits non-zero on an expired token
+  and on rate limiting; `github-id` read every failure as nil, so a broken `gh`
+  produced `0 CONFIRMED` and exit 0 -- a clean fleet reported in front of 40 real
+  duplicate registrations. Now three outcomes: CONFIRMED / REFUTED / UNVERIFIABLE,
+  with UNVERIFIABLE failing `--check` on its own. Measured with a `gh` on PATH
+  that exits 1: old exits 0, new exits 1.
+- `verify-namespace-collisions` walked only `<repo>/src` -- the THIRD instance of
+  one error this session. 3,528 -> 3,837 repos (4,828 source trees), 8 -> 11 real
+  collisions. The owner sets were wrong where it mattered most: `treasury/
+  core.cljc` listed 5 owners with 7 on disk, `pay/x402.cljc` 4 with 6, and both
+  missing copies included the one another ADR calls the worst in the fleet.
+
+The narrow-scan error recurred three times in one day, each time in a different
+script, twice after being corrected. Prose does not prevent it. What did catch
+it was running an independent verification pass over the detectors themselves.
+
+Also corrected: the claim that every duplicate-registration candidate was
+confirmed one upstream with no forks. Two candidates are DIFFERENT repositories
+sharing a root commit (`org-w3-svg` + `svgraph`; `com-unity-ads` +
+`com-unity-api-services`). Retiring either on the offline signal would have
+deleted a real project. Both were on disk when that claim was written.
+
+## Duplicate registrations: 35 -> 1
+
+The premise changed under measurement. Resolving all 4,162 west entries through
+the GitHub API by repository id (strictly stronger than the on-disk scan) leaves
+exactly ONE repository registered at two paths: `kotoba-lang/compiler` +
+`kotoba-lang/amu`, id 1297097065. A rename campaign is actively draining the
+rest. The other 39 root-commit groups are ORPHAN CHECKOUTS -- directories left
+by renames whose west entry is already gone. West will never recreate them.
+
+## In flight -- NOT accounted for above
+
+Six agents were launched immediately before this closing and are still running.
+Each may land a merge in a child repo. **A child merge without a west pin
+advance leaves the fleet reading a stale tree** -- the exact failure this session
+spent the day fixing. The next agent must check for their results and advance
+pins.
+
+1. ~~widen `verify-vendored-copies`~~ -- **DONE, merge 2d9a2de.** 24 -> 31 files
+   across 4 orgs. No verdict changed for any of the 24 already reported, so
+   nothing was lost by widening. `grep -rl VENDORED` finds 32; the one the scan
+   correctly does NOT report is a file that merely DOCUMENTS the vendored copy
+   beside it -- header matching now starts at the VENDORED token so a
+   `copied from` sentence elsewhere cannot be read as a provenance claim.
+
+   Four of the newly-visible files (`cypher/`, `graphql/`) declare no pin and
+   put their provenance INSIDE the `ns` docstring, where the `start at the first
+   (ns` subtraction cannot reach -- so the header counts itself as drift. They
+   are permanently STALE by design (the namespace rename is deliberate,
+   ADR-2608039970) and the report now says so on the line rather than letting
+   the number read as code drift. `no pin declared` is also now distinct from
+   `pin unverifiable`: never named one is not the same as named one we could not
+   read.
+
+   Caveat the agent raised and I am keeping: CURRENT is measured against each
+   library's LOCAL CHECKOUT HEAD, which is only as fresh as the last
+   `west update`. Three libraries were behind their pins on disk; zero commits
+   touched any measured file in between, so the numbers hold at the pin too --
+   but that had to be checked, not assumed. Same class as the other three
+   checkout-vs-repo errors this session.
+2. ~~refresh `wasm-webcomponent/.../kami_host.cljc`~~ -- **DONE, merge 7d78c84,
+   pin advanced.** Refreshed byte-for-byte to `dbc25ebc6`. Safe because the
+   upstream change is purely additive 3D support: the `ns` requires are
+   unchanged, no new reader conditionals or capabilities, new vars sit in the
+   portable section, and extra keys in the WebAssembly import object are ignored
+   by a guest that does not declare them. 12/12 suites, 299 assertions, identical
+   before and after -- which proves nothing broke, NOT that the 3D works, since
+   no test covers the new surface; that was checked by hand against the rebuilt
+   artifact instead. A covering test would have to be nbb (CLAUDE.md forbids new
+   `.mjs`) and is larger than the refresh.
+
+   Two things found on the way. The old pin `367b4a141b94` was **not an ancestor
+   of kotoba's main** -- it sat on a side branch and only happened to have the
+   same content as what landed. A vendored header can name a commit off the
+   mainline and nothing notices. And the checked-in ESM artifact is **not
+   byte-reproducible**: rebuilding from UNMODIFIED source already moves 85 lines
+   of Closure symbol renaming, because shadow-cljs resolves ClojureScript from
+   Maven at build time while its own version is lock-pinned. Only 23 of the 86
+   changed lines are attributable to the change.
+3. ~~investigate the three new `kami/ongaku/e2e/*` collisions~~ -- **RESOLVED:
+   they were FALSE POSITIVES of my own widening, and the detector is now fixed.**
+
+   `test/e2e/src` is a source root by name and ships to nobody: it is reachable
+   only through each repo's own `:e2e` alias, and tools.deps does not export a
+   dependency's aliases. Measured with `clojure -Spath -A:e2e` in the one repo
+   depending on two of the three -- neither tree appears. The three files are
+   also not copies: pairwise line similarity is 0.08-0.30 and no exported var
+   name overlaps. They are three different programs that share a path.
+
+   The fix narrows by DECLARATION, not by depth: a source tree counts when the
+   repo's own `:paths` / `:source-paths` names it. `:extra-paths` is excluded on
+   purpose. Narrowing by depth instead would have lost
+   `net-kotobase/kotobase-api-gateway-cljs/src`, which is nested AND declared and
+   holds the copy this detector exists to find. Measured after the change:
+   ongaku entries 3 -> 0, `treasury/core.cljc` owners still 7 (the original
+   narrow scan said 5), real collisions back to 8 with correct owner sets. A repo
+   that declares nothing keeps every tree -- unknown must read as `look`, not as
+   `skip`.
+
+   **Still OPEN, and the obvious fix was measured and rejected.** The collision
+   detector still walks only directories named exactly `src`, so 21 `src-*`
+   trees holding 51 Clojure files are invisible to it -- among them
+   `wasm-webcomponent/src-cljs/vendor/kotoba/kami_host.cljc`, whose namespace
+   `kotoba.kami-host` is also defined in `kotoba-lang/kotoba/src/`.
+
+   I tried making the DECLARED roots the source of the list rather than a filter
+   over a `src`-named scan, which would have ended the naming question outright.
+   It regressed, measurably: some repos declare `:paths [\".\"]`
+   (`kami-genre-base-systems`' sub-projects), which makes the repo root a source
+   root and manufactures namespace paths that carry their own prefix --
+   `src/kotoba/lang/package_registry.cljc` appeared as a finding. Duplicate-
+   registration suppression also collapsed from 19 to 4, because newly-visible
+   trees added a third owner with a different root commit and broke the
+   all-owners-share-a-root test. Reverted rather than landed.
+
+   **CLOSED, merge `3d5a70ad627`. And my diagnosis of the regression above was
+   wrong.**
+
+   The declaration is now the list itself, with two guards -- both found by
+   measurement, neither by reasoning:
+
+   - **A declared root must lie inside the repo.** `net-kotobase` declares 28
+     roots that resolve through `../..` into OTHER repositories
+     (`orgs/kotoba-lang/pay/src`, `.../kotobase/src`). Taken at face value they
+     make `net-kotobase` an owner of `pay`'s files, and the extra owner brings
+     its own root commit. **That -- not the `same-upstream?` shape I blamed --
+     is the actual mechanism behind the 19 to 4 collapse.** I proposed
+     re-deriving suppression per owner pair; the real defect was upstream of
+     suppression entirely.
+   - **A declared root must not be the declaring directory.** `:paths [\".\"]`
+     is legitimate and documented where it appears: `kotoba-lang`'s own deps.edn
+     has it so `io/resource` finds `lang/cli.edn`, and the 20 `games/*` ones
+     have it for `clojure -M author.clj` on files that carry no `ns` form.
+
+   All five acceptance criteria hold, and the DIVERGENT list is byte-identical
+   to before -- same 8 namespaces, same owners, same shas -- while the scan grew
+   from 4,539 trees to 5,005 and from 14,867 namespace paths to 16,164.
+
+   `kotoba.kami-host` is now visible, and it is **divergent but NOT
+   co-classpath** (no closure reaches both owners), so it lives in `--all`. That
+   exposed a real hole: divergent-not-co-classpath findings appeared in **no
+   mode at all**, and they are 216 of 243. They now have their own `--all`
+   bucket.
+
+   `wasm-webcomponent` is the sharpest illustration of what the name filter cost:
+   what it has named `src` is shadow-cljs's `:esm` OUTPUT directory. The filter
+   did not merely miss two real source trees -- it selected the build product
+   and discarded both.
+
+   **One thing was implemented, measured, and deliberately reverted.** Per-owner-
+   pair suppression satisfies four of the five criteria and holds suppression at
+   19, but it drops `treasury/core.cljc` entirely. The reason is a finding about
+   the detector rather than a bug: among treasury's 7 owners, the ONLY pair any
+   closure reaches together is `gftdcojp/cloud-murakumo` and
+   `network-awai/cloud-murakumo` -- one repo at two paths. So the finding is
+   promoted by a relationship the script itself classifies as NOT a collision,
+   and survives suppression only because owners that took no part in promoting it
+   disagree about upstream. Per pair, the same pair decides both halves and it
+   vanishes. `Restrict same-upstream to co-classpath participants` suppresses it
+   too, so per-pair suppression and keeping treasury are mutually exclusive on
+   today's data.
+
+   That was written above `same-upstream?` in the source instead of being fixed
+   by tuning a number: **CO-CLASSPATH is not the axis that finds
+   `treasury/core.cljc`.** Catching it on purpose needs a second axis this script
+   does not have, and `verify-vendored-copies.cljs` is the likelier home for it.
+
+   Left undone, and named rather than silently absorbed: the three repos deviate
+   from their own family convention. `plugin-host` and `project` scope their E2E
+   namespaces (`kami/ongaku/<subject>/e2e/`), as does the `org-w3-webaudio`
+   harness all five cite as their model; `sampler` dropped the segment at 00:25
+   on 2026-07-13 and `sequencer` and `notation` copied its shape within the
+   hour. Renaming is mechanical and needs no pin changes, but it is three repos'
+   worth of churn for a naming inconsistency that now costs nothing.
+4. ~~check `net-kotobase`'s `pay/core.cljc` + `pay/x402.cljc` for drift~~ --
+   **RESOLVED, benign, no change made.** All three vendored copies are
+   pin-honest. `pay/core.cljc` and `treasury/core.cljc` are byte-current;
+   `pay/x402.cljc` is stale by exactly one strictly-additive commit (`848158d`,
+   0 lines removed, +6 symbols, `ns` form byte-identical) that adds a v2 API
+   nothing in the repo calls -- `grep` for all six new names returns zero hits.
+   Every symbol the gateway actually calls is byte-identical to library HEAD.
+
+   It also fails CLOSED where it matters: a v2-shaped payload has no top-level
+   `:scheme`, so the vendored v1 `payload-errors` yields
+   `:x402/scheme-mismatch` and `authorize` returns 402. A v2-only buyer is
+   turned away with a 402 it is owed and is never served for free -- and that
+   coverage gap is identical at library HEAD, so it is a protocol gap for this
+   consumer, not drift. Refreshing would add 58 lines of unreachable API and
+   correct no behaviour, which is a change that cannot be defended.
+
+   Two corrections to the brief I gave that agent. First, my claim that
+   `net-kotobase` has vendored `pay`/`treasury` copies in more than one source
+   tree was WRONG -- there is exactly one copy of each, in
+   `kotobase-api-gateway-cljs/src/`. The `clj-edge` hits are shadow-cljs
+   analysis cache (`.cache.transit.json`), not copies. The `7 owners on disk`
+   figure is 7 REPOSITORIES fleet-wide, not 7 copies in this repo; the widened
+   collision detector is consistent with that and needs no correction.
+
+   Second, and worth carrying: the header's justification for vendoring at all
+   (`CI checks out one repo with no west workspace`) is true only of the
+   gateway. The sibling `protocols-worker` reads the LIVE library through
+   `../../../kotoba-lang/pay/src` in its `shadow-cljs.edn`, so one repo both
+   vendors and does not vendor the same library, for different build units.
+5. ~~investigate three self-shadowing namespaces~~ -- **RESOLVED: all three are
+   nominal, nothing changed.** No two trees share a classpath.
+   `net-kotobase`'s `clj-edge/` holds no build file at all -- commit `5a6a55b`
+   renamed the whole directory to `kotobase-api-gateway-cljs/` (136 tracked
+   files before, 0 after, recorded as 100%-similarity renames), and a later
+   cleanup commit `d96f18b` re-landed 14 stale untracked leftovers of it. So the
+   `clj-edge` copy is byte-identical to the revision immediately BEFORE the
+   commit that superseded its doctrine -- the old design, resurrected by a
+   cleanup pass. This corrects ADR-2608070100, which catalogues the leftovers as
+   `:legacy-pre-rename` but attributes them to the rename; the rename was clean.
+
+   `etzhayyim-py/src` is a PYTHON source root (`pyproject.toml` declares
+   `packages = [\"src/etzhayyim\"]`) holding exactly 2 `.cljc` files out of 212 in
+   the tools tree -- and both are the colliding ones. They are independent ports
+   of the same `.py`, not copies of each other; the relationship is declared in a
+   header on the ported side.
+
+   Worth knowing even though it is not a runtime hazard: PR #3235 hardened
+   `yoroshiku` to require an explicit PDS instead of reading an ambient env var,
+   and touched ONLY the copy that is on no classpath. The reachable copy still
+   falls back to a hardcoded host. Maintenance is being spent on the dead file.
+
+   The refined detector (item 3) no longer reports these three, because neither
+   `clj-edge/src` nor `etzhayyim-py/src` is declared in any `:paths`. The
+   detector and the investigation now agree, which is the outcome to want.
+6. ~~measure whether the three `:local/root` sites can be repointed~~ --
+   **ALREADY DONE on origin/main. My premise came from stale checkouts.**
+
+   All three were repointed days ago: `kotoba/deps.edn` at `4dbd1dcf`
+   (2026-08-10), `kototama/deps.edn` at `72d1adb` (2026-08-11). The `../compiler`
+   text I quoted is real but exists only in the SHARED CHECKOUTS under `orgs/`,
+   which sit behind their own west pins (`kotoba` at `6f3e36e2` with 33 dirty
+   entries; `kototama` at `0fcf11cf`).
+
+   **This is the third time in one session that reading a checkout produced a
+   claim about a repository that was false.** The vendored detector read
+   checkouts and could not see a fix that had landed; `animeka`'s broken alias
+   resolved for whoever had a leftover directory; and here I derived a blocking
+   prerequisite from files that main had already fixed. `main`, the pin, and the
+   checkout are three different things, and the habit of checking which one you
+   are looking at has to be deliberate -- prose about it did not make it so.
+
+   The retirement question is therefore UNBLOCKED. The agent ran the decisive
+   test: both suites with the `compiler` directory DELETED outright -- kototama
+   173 tests / 1171 assertions green, kotoba 536 / 8580 green. Ancestry
+   re-confirmed both ways (`ahead_by: 56, behind_by: 0`, merge_base == the old
+   pin). A sweep of 982 `:local/root`-using `deps.edn` files in checked-out repos
+   found no other reference; most west projects are not on disk, so that is
+   strong evidence rather than proof.
+
+   Preserve if anyone revisits: `kototama` kept the COORDINATE
+   `io.github.kotoba-lang/compiler` on purpose while moving only the path,
+   because `kotoba` declares that key transitively and an override wins only on a
+   key match.
+
+   Separate loose end: `orgs/kotoba-lang/amu` is checked out at `8ff1030` with 5
+   modified files, ahead of its west pin. That is pin freshness, not this
+   question.
+
+Pin advance, for each child repo they touch:
+
+    nbb scripts/advance-pins.cljs <org> <file-with-repo-name> --execute
+    nbb scripts/verify-west-pins.cljs
+
+## Open owner decisions -- recorded, not decided
+
+- **Retire the `compiler` west entry.** Evidence is one-sided: canonical
+  full_name is `kotoba-lang/amu`; the `compiler` pin is a strict ancestor 56
+  commits behind main while the `amu` pin IS main; every script that names a path
+  already names `amu`; a fleet-ci roles gate is already failing on the name
+  mismatch. **The prerequisite I recorded as blocking this is already satisfied
+  on main** (see in-flight item 6) and both consumers were measured green with
+  the directory deleted, so this is now a decision with nothing in front of it.
+  The ~104 deps.edn files spelling the coordinate
+  `io.github.kotoba-lang/compiler` do NOT block it; GitHub redirects them.
+- **39 orphan checkouts.** On-disk only, unregistered. Not verified free of
+  unpushed commits -- that is `git-cleanup-conflict` territory.
+- **`kotoba/lang/package_registry.cljc` divergence.** Bidirectional; 8 of 10
+  shared functions are on the acceptance path. Taking core-contracts wholesale
+  drops the `definition-cids` check and every definition-pinned package fails
+  `:definition/not-locked`; the reverse drops registry-layer checks that
+  `verify-lock` re-catches -- the failure MOVES rather than disappears. One
+  acceptance-visible difference: an invalid registry with empty requests returns
+  `ok? true` on one side.
+- **`kami.{fsm,gpu,input}` collisions** between `kami-engine-sdk` and
+  `fsm`/`gpu`/`host`.
+- **`kami-contracts`: abandoned or authority.** README and behaviour say opposite
+  things and nothing in the tree adjudicates. CI red for a month (failing in the
+  authority mechanism itself), zero `deps.edn` references, `kami.scene` an
+  unmodified pre-split copy still citing an `ARCHITECTURE.md` section that does
+  not exist here -- yet the superproject ledger names it authority and a repo in
+  another org hand-copied it saying it will follow. Cost is asymmetric: deleting
+  it orphans an untested cross-org promise.
+- **network-awai's dormant `cert_governor_app` and `media` groups.** The framing
+  `wasm dormant, JVM live` was wrong: the whole media subtree publishes nothing.
+  `cert_governor` is NOT a port of the production rule -- production gives the
+  advisor no disposition channel and the component's containment is LOOSER. All
+  three external tools ARE installed as pinned. One wiring line is the blocker.
+
+## Verification state
+
+`verify-west-pins.cljs` passed on every pin advance this session (each reported
+fast-forward). `verify-namespace-collisions --check` exits 1 (11 collisions, all
+owner decisions). `verify-duplicate-registrations --verify-remote`: 40 CONFIRMED
+/ 2 REFUTED / 0 UNVERIFIABLE. Superproject clean apart from pre-existing
+untracked `orgs/` directories and a modified `observatory.datoms.edn` that
+predate this session. No stashes, no worktrees, no branches of mine remain.
+
+## An error that travelled through three artifacts
+
+Recorded because the mechanism is more useful than the facts it corrupted.
+
+An agent reported that `net-kotobase`'s pre-rename leftovers came from clean
+100%-similarity renames -- `worker/` to `clj-edge/`, 48 files to 0. I wrote that
+into the deletion commit message, then quoted the commit message into a brief
+for the next agent, who checked it and found two errors:
+
+- `04e1514` renamed `worker/` to **`kotobase-edge/`**, not to `clj-edge/`, and
+  the count was **57**, not 48. `clj-edge/` and `worker/` were separate
+  coexisting directories; `clj-edge/` was emptied a day later by a different
+  commit.
+- They were **not** 100%-similarity moves. 16 of 56 renames in one and 102 of
+  133 in the other are R100; the rest are R068-R099 rename-plus-edit. The
+  directories were emptied COMPLETELY, which is the part the argument rests on
+  -- so the conclusion stands and the supporting numbers do not.
+
+Nobody was careless. Each step trusted the step before it because the step
+before it was specific: exact SHAs, exact counts, a named similarity index.
+**Precision is not provenance.** A number carried forward without being
+re-derived is a citation, and citations propagate whatever they were given.
+
+The workspace already carries a rule from earlier today -- verify a parallel
+agent's output before quoting it -- and this happened anyway, because the
+quoting was three steps removed from the reading. The practical form is
+narrower: **when a brief hands an agent facts, say where each came from**, so
+`measured by me` and `reported to me` are distinguishable at the point of use.
+The agent who caught this did exactly that in reverse, checking the brief
+against the repository rather than against the brief's confidence.
+
+The corrected version is in ADR-2608070100 (merge `52f3a1dc5ac`). The wrong
+numbers remain in the `net-kotobase` deletion commit and in the west pin commit
+that quoted it; those are history and are left alone.
+
+## Second closing, 2026-08-12 -- what is DONE and what is BLOCKED
+
+Fourteen agents ran after the first closing. Everything below either landed or
+is named here as unfinished; nothing is left implied.
+
+### Landed, with pins advanced
+
+`app-files` gate, `nexus-x402` header, `animeka` dep path, `net-kotobase`
+treasury NaN guard, `wasm-webcomponent` kami_host refresh, three `kami-ongaku`
+E2E namespace scopings, `kami-ongaku-project` dep bump, `net-kotobase` 17
+pre-rename leftovers, `etzhayyim/root` two claimable-host defaults.
+
+### Landed, pin NOT advanced -- BLOCKED
+
+**`kotoba-lang/vpn` merge `b9dfa224456f`.** The pin is still `3d2d269`. GitHub
+returned a secondary rate limit on `repos/*` while `gh api rate_limit` reported
+4,951 of 5,000 core remaining, so `verify-west-pins.cljs` could not run. **The
+pin was deliberately not advanced**: this workspace requires server-side
+verification of existence, default-branch reachability and forward motion, and
+advancing a pin that could not be verified would defeat the check rather than
+satisfy it. Retry when the secondary limit clears:
+
+    nbb scripts/verify-west-pins.cljs
+
+A guard is worth copying from that attempt. The first try interpolated `gh`'s
+403 JSON into a `perl -0pi -e` substitution as if it were a SHA. It failed only
+because the error text happened to contain characters perl could not parse --
+`manifest/west.yml` was untouched by luck. The retry validated the value against
+`[0-9a-f]*` before using it, and that guard is what stopped the second attempt
+cleanly. **Any script that takes a SHA from a command must check it looks like
+one.**
+
+### The cleanup pass that caused the leftovers is fixed -- merge `a4556402485`
+
+`:additive` is the one class `cleanup-land.cljs` auto-merges, and it merged on a
+single argument: no path of this name exists on the default branch, so no
+existing line can be rewritten. **A directory rename destroys that argument
+precisely** -- the moment `worker/` becomes something else, every old path stops
+existing on `main`. That is what a rename MEANS. A stale copy left at the old
+address therefore satisfies `:additive` perfectly, and the existing guard, which
+checks whether the same path is on base, is structurally blind to it.
+
+`scripts/rename_residue.cljs` asks history instead of the disk, since on disk
+residue and WIP are identical. Three signals: was this path a recorded rename
+SOURCE reachable from base; are these bytes already in the object database; was
+an ancestor directory moved away wholesale. The third handles the `.gitignore`
+case -- a generated file is in nobody's history, so the first two miss it, but
+following its dead parent forward through the rename chain (two hops in the real
+repo) reaches a live directory where `git check-ignore` excludes it. **A file the
+repo declares it ignores at its live address is not WIP at its dead one.**
+
+It excludes only the provable half, with no silent-drop path: `:residue` is
+dropped but reported by name WITH the live path (the bytes are still in the
+object database, so nothing is lost); `:suspect` -- path dead but content NOT in
+history, i.e. possibly a real edit against a stale copy -- is demoted to a draft
+PR rather than discarded; `:wip` is untouched. Working-tree files are never
+deleted.
+
+Proven against the real incident: the tree parked at `8f7fbaf^` with all 17
+leftovers restored classifies 17 residue, 0 suspect, 0 wip, and end-to-end the
+plan drops from 20 files to the 2 that are genuinely new plus 1 demoted to
+review. False-positive stress with 40 new files in live directories of the same
+496-rename repo gives 0 residue.
+
+Two things from it worth keeping beyond this fix:
+
+- **43 of 121 `orgs/kotoba-lang/*` checkouts do not resolve `<remote>/main`** --
+  west fetches into `refs/west/*`. A gate reading liveness from that ref would
+  have sat silent across a third of the fleet. Liveness now comes from the base
+  tree `cleanup-land` already fetches from the API.
+- Registered as fleet gate `root-rename-residue`, and confirmed red two ways
+  before landing. **This check's failure is invisible** -- a silent classifier
+  still exits 0, still prints a plan, still merges, and the only symptom arrives
+  after the next rename. It took six days to notice last time.
+
+Also settled: `manifest/cleanup-workflow.md` has **no generator**. It and the
+`.edn` have been hand-edited together in every commit that touches them, and the
+edn calls it `:reference-md`, not a projection.
+
+### `sdk-py` landed too -- merge `01fab5c46f7`. Pin BLOCKED, same limit as vpn.
+
+The credential disclosure was confirmed, not merely inferred: with a canary key
+and the transport stubbed, `chat` sent `authorization: Bearer <canary>` to
+`http://levi.local:4000/v1/chat/completions`. The second site was confirmed
+narrower exactly as suspected -- `default-request` hardcodes only
+`content-type`, and the stub signature has no header slot at all, so what leaks
+is query bodies and a trusted reply.
+
+**`levi` and `simeon` are murakumo mac-mini fleet nodes** (`scripts/fleet-ci/
+nodes.edn`) -- private LAN/tailnet hosts. That reframes the class: these are not
+typos, they are a developer's real machine names shipped as library defaults.
+
+The fix requires both endpoints and refuses rather than substituting an owned
+one, for two reasons worth keeping. There is no public endpoint serving a
+LiteLLM proxy on :4000 or an mst-projector on :8765, so any owned name would be
+an INVENTED address. And for `llm.cljc` an owned default would not close the hole
+anyway -- `ETZHAYYIM_LLM_KEY` belongs to the operator's proxy, so sending it
+anywhere WE picked still discloses it.
+
+The existing env reads were kept and none was added. They are this SDK's
+pre-existing, README-documented configuration channel and the only input these
+zero-arg functions have -- not an ambient read quietly introduced to replace the
+removed constant, which is the thing #3235 stripped from yoroshiku's twin. The
+distinction matters and the commit states it.
+
+**The caller check is the part worth carrying forward.** No production caller
+depended on the default, but **nine pre-existing tests did, silently** -- they
+queried without ever naming a host and passed against the `simeon.local`
+fallback. One of them, `test-400-error`, started passing for the WRONG reason
+once the endpoint became required, because a config error is also a
+`::mst-projector-error`. A test suite can encode a dependency on a bad default
+so quietly that removing the default is what reveals it.
+
+17 tests / 47 assertions baseline; 7 failures against unfixed source; 25 / 92
+green after.
+
+### Both remaining pins are BLOCKED on the same thing
+
+`kotoba-lang/sdk-py` (`01fab5c46f7`, pin at `6cd818b`) and `kotoba-lang/vpn`
+(`b9dfa224456`, pin at `3d2d269`). Advance both when the limit clears:
+
+    nbb scripts/advance-pins.cljs kotoba-lang <names-file> --execute
+    nbb scripts/verify-west-pins.cljs
+
+**The limit is a SECONDARY rate limit, and `gh api rate_limit` does not report
+it.** Measured at close: `rate_limit` said 4,879 of 5,000 core remaining while
+`gh api repos/kotoba-lang/sdk-py` returned HTTP 403 `API rate limit exceeded`.
+So the endpoint that exists to tell you whether you are rate limited will tell
+you that you are not. Probe the actual endpoint you need instead of trusting the
+meter -- the same shape as every other measurement error recorded here: the tool
+answered its own question correctly and a wider conclusion was drawn from it.
+
+### Three claims I passed to agents that were WRONG
+
+Recorded because in each case the agent measured rather than trusting me, and
+that is the behaviour to keep asking for:
+
+1. **`net-kotobase` has vendored copies in more than one source tree** -- it does
+   not; the second-tree hits were shadow-cljs analysis cache.
+2. **`worker/` was renamed to `clj-edge/`, 48 files, 100% similarity** -- it went
+   to `kotobase-edge/`, 57 files, and neither rename was uniformly R100. This one
+   originated in a commit message I wrote from an earlier agent's report, then
+   propagated into a brief. See the section above on how it travelled.
+3. **The `TODO_EXIT_NODE_IP` placeholder fails closed because of the
+   underscore** -- it does not. Measured three ways: httpx accepts and lowercases
+   it, `getaddrinfo` resolves underscore labels, and an end-to-end run against a
+   stub listener delivered the trust header and the peer key. What actually stops
+   it is that nothing answers for a DOTLESS name on the current search path,
+   which is environmental, not structural -- and a dotless name is exactly what a
+   search suffix completes (k8s uses `ndots:5`).
+
+Finding 3 also overturned the fix's premise: a ConfigMap in another repo ships
+the placeholder **verbatim as the value**, so `unset` was never the risk and a
+require-non-empty check would have passed on the only deployment that exists.
+The landed fix rejects the placeholder by name.
+
+### Two open findings nobody has decided
+
+- **`kotoba-lang/vpn` `provisioner/main.py:16` and `wg-agent/main.py:15`** gate
+  auth on `if SECRET and ...`, so an **unset secret disables authentication
+  entirely** on both ends. A genuine fail-open, arguably worse than the
+  placeholder, left alone because locking out a VPS-installed service deserves
+  its own decision. Current behaviour is pinned in a test so a change is
+  deliberate.
+- **266 of 4,165 west repos (6.4%) were never scanned** by the endpoint sweep --
+  not on disk. Heavily `cloud-itonami/actor-*` and `app-*`, which self-mint CACAO
+  against `kotobase.net`. Closing it needs `west update` on that group.
+
+## Final close -- five agents stopped mid-work, nothing lost
+
+A last batch of five was stopped before landing anything. **None had reached a
+commit**, so there is no partial state in any repository. Verified rather than
+assumed: no stray superproject worktrees, no remote branches created, and the
+one leftover child worktree (`agent/nomad-addr-env-scope` in `etzhayyim/root`)
+had zero uncommitted changes, zero commits ahead of `main`, and no remote
+counterpart -- it was removed. The other `/private/tmp` worktrees on this
+machine belong to other sessions and were left alone.
+
+Each had reached a useful partial answer, recorded here so the next attempt
+starts from it rather than from zero:
+
+- **vpn auth fail-open** -- had 19 passing tests for the provisioner side and was
+  about to write the `wg-agent` side, which has no tests at all.
+- **etzhayyim remaining endpoints** -- established that `benjamin.local` is the
+  **only** statement of the Nomad address anywhere in the repo (no `deps.toml`,
+  no other `:4646`), so there is no owned authority to route through. That
+  shapes the fix: as with the vpn placeholder, requiring the value may be the
+  only honest option.
+- **266 unscanned repos** -- the `west update` fetch was running. That work is
+  not wasted; whatever fetched stays on disk.
+- **detector re-measurement** -- the first detector reproduced its recorded
+  baseline **exactly**, which is the single most important of the four checks.
+- **kami collision brief** -- had located the prior mapping and was moving to
+  file contents.
+
+## Both blocked pins: CLEARED, merge `002f78641ca`
+
+`kotoba-lang/sdk-py` to `01fab5c46f7` and `kotoba-lang/vpn` to `b9dfa224456`,
+both verified fast-forward, both checkouts synced. The secondary rate limit
+lifted on its own; nothing was done to it beyond waiting and re-probing the
+endpoint that actually mattered rather than the meter.
+
+**The decision to leave them blocked was the right one and is worth keeping as
+precedent.** Advancing a pin that `verify-west-pins` cannot check does not
+skip a formality -- it produces a manifest entry that nobody ever verified,
+indistinguishable from one that was. The check exists precisely for the moment
+when it is inconvenient.
+
+## Close of the resumed batch
+
+Of the five agents resumed from their transcripts, **one finished and landed**
+(the vpn authorisation fix, ADR-2608122800 -- an unset secret was a tunnel
+takeover, not merely an auth bypass) and four were stopped again mid-work.
+
+**No repository holds partial state.** Verified: no child-repo worktrees left
+behind, no stray `/private/tmp` clones, no remote branches created, superproject
+clean apart from the pre-existing `observatory.datoms.edn`.
+
+One thing did need checking rather than assuming. A stopped agent's last words
+were that the shared `etzhayyim/root` checkout showed a deletion it wanted to
+confirm was not its own. It was not: `90-docs/baien/datasets` is a **submodule
+gitlink** (`160000`), one of several in that repo, none of which west populates.
+It survives a `west update` unchanged, which is how I confirmed it is structural
+rather than anything this session did. **An agent flagging a change it might
+have caused, instead of assuming it did not, is the behaviour that made that
+five-minute check possible.**
+
+Partial answers from the four, recorded so a resume starts from them:
+
+- **etzhayyim endpoints** -- cleanup was complete; only the checkout question
+  above remained.
+- **266-repo scan** -- had established that no compose file or k8s manifest
+  defines `vault` anywhere in the repo it was examining, and was moving to a
+  second site.
+- **detector re-measurement** -- confirmed `repos/*` GETs were working again and
+  was running `--verify-remote`, the one check the rate limit had blocked.
+- **kami collision brief** -- found the obvious greps too noisy because the
+  namespace segments are generic words, and was narrowing to files that actually
+  `require` the namespace. Worth carrying: a name like `kami.fsm` cannot be
+  searched for by substring in a fleet this size.
+
+## Third close, 2026-08-12 evening
+
+### One half-finished thing, finished
+
+The B2 publication of `gftd-motion-actor`'s annexed content (ADR-2608124200) had
+reached *content verified in B2* — three copies each — but **the `git-annex`
+branch had not been pushed**, so a fresh clone could not find any of it. Pushed:
+`babf541..481b085`. HEAD unmoved, working tree clean before and after. **The
+bytes now survive the loss of this machine, which was the entire point.**
+
+### CORRECTED: the repository was not empty, and is now populated and registered
+
+I reported `kotoba-lang/kotoba-server` as empty at 0 KB. **That was stale GitHub
+size accounting after an initial push** — the content had already landed. It is
+now populated and registered (`c4dada2b`, merge `eff53f23c3d`,
+`groups: [archived]`), with the whole 806-file workspace preserved because the
+crate has 19 direct path-dependencies and cannot build alone.
+
+**The lesson is the one this session kept relearning**: I read a number from an
+API and drew a conclusion about the thing it describes. Re-checking rather than
+re-pushing is what caught it — and re-pushing would have been the natural
+response to `0 KB`.
+
+Left open deliberately: **the repo is private**, and making one public is
+outside standing authorization. See ADR-2608124000.
+
+### (original, now corrected) One repository exists and holds nothing
+
+`kotoba-lang/kotoba-server` was **created** (private, 0 KB, default `main`) by an
+agent stopped before it could populate or register it. It is **not in
+`manifest/west.yml`** and contains nothing.
+
+**Deliberately left in place rather than deleted.** It is empty, so there is
+nothing to lose, and the next step for it — restoring the deleted Rust source per
+ADR-2608124000 — is exactly why it was created. Deleting and recreating buys
+nothing. **But an empty unregistered repo is a half-state and will read as
+finished work to anyone who only sees the name**, which is why it is recorded
+here.
+
+### Nothing else landed from that batch
+
+The `x-internal-trust` bridge work merged **nothing** — every candidate repo's
+`main` still carries an older commit. The final detector measurement had
+completed one run matching the post-fix baseline and was starting its second when
+it stopped; **its own rule is that a single run during fleet mutation is not a
+measurement**, so nothing from it should be quoted.
+
+### Resume, in dependency order
+
+1. **Populate and register `kotoba-lang/kotoba-server`** — the repo exists;
+   recovering the source at the pinned commit and registering it via the
+   single-entry manifest path is what remains. ADR-2608124000 carries the
+   naming rationale and the argument that this does not reverse the no-Rust ADR.
+2. **`x-internal-trust` on the seven bridges plus murakumo's write path** — the
+   safe half of the ordering in ADR-2608124000. Harmless today because the header
+   is unread while the server secret is unset, and it is the precondition for the
+   server side ever becoming a one-variable decision.
+3. **Re-measure the detectors**, two agreeing runs.
+4. **Removing the stray `gftd-motion-actor` clone is now unblocked** — the content
+   is in B2 and the branch is published, which were the two preconditions.
+
+## Final close, 2026-08-13
+
+Three agents stopped mid-work. **Nothing was lost, and one of them had already
+finished the part that mattered.**
+
+### The custody rescue landed before the stop
+
+`ghosthacker-shiropico-assets` — the 42 objects that were at ONE copy — are
+**42/42 present in B2, probed key by key by exit code**, and the `git-annex`
+branch is on the remote. Six of the seven unpublished maps were already
+published; the seventh was pushed during this close. **The at-risk content is no
+longer at risk.**
+
+### I walked into the trap I had fixed an hour earlier
+
+Checking which repos had their branch published, I picked the remote with
+`git remote | head -1` — **the first alphabetically** — which for annex repos is
+`b2`, a special remote whose URL is the literal string `b2`. Every check came
+back **0 branches published**, and I nearly recorded that the rescue had not
+landed.
+
+**This is the exact defect I diagnosed and fixed in
+`verify-duplicate-registrations.cljs` today**, twice: first narrowing to GitHub
+remotes, then preferring `origin`. I fixed it in the detector and then made the
+same mistake by hand, in an ad-hoc loop, within the hour.
+
+**A fix in one script is not a fix in the habit.** The next ad-hoc `git remote |
+head -1` will be wrong the same way.
+
+### One genuine oddity, recorded rather than resolved
+
+One repo's `ls-remote` succeeds and shows both branches, while `push` to the
+same remote fails with *could not read from remote repository*. **Read works,
+write does not.** The map is published and the content is in B2, so nothing is
+pending — but the asymmetry is unexplained and would block a future push.
+
+### Two agents stopped before landing anything
+
+The factory-plane verifier fix had both floors firing and was moving to the
+remaining failure modes. The observatory-registry fix was reading the hook to
+learn exactly what it compares, and had noted that **main was advancing rapidly
+with different repos each time** — which is true and is why every branch in this
+session was cut fresh from `origin/main` and re-applied on conflict.
+
+Both are recorded with their diagnoses in ADR-2608124800, so the next attempt
+starts from the diagnosis rather than from the symptom.
+
+## Resume point
+
+The five agents stopped at the previous close were **resumed from their
+transcripts** rather than restarted, so each continues from the partial answer
+recorded above rather than re-deriving it. Land each result, advance the pin for
+every child repo touched, and re-run the detectors.
+
+Beyond that the migration's decision-free surface is exhausted -- what remains
+is the owner-decision list above, plus the two findings nobody has decided (the
+vpn authentication fail-open, and the 266 repos the endpoint sweep could not
+reach).")))

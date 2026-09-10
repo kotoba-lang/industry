@@ -1,0 +1,152 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607309960-settlement-refunds-and-cljs-runtime-parity")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/topic "settlement-refunds-and-cljs-parity")
+  (:adr/title "ADR-2607309960: 返金を資金 gate の一部として実装する（net-captured）+ marketplace / settlement の .cljc スイートを ClojureScript でも実行する")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/last-verified "2026-07-30")
+  (:adr/last_verified "2026-07-30")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative-for
+  (vector "marketplace.acceptance が返金を net-captured-minor（着金 − 返金済み）として簿記し、settlement-status がその net を読む決定の正本"
+   "refund-instruction の上限を「まだ保持している額」とする決定（gross を基準にすると同じ金を2回返せる）の正本"
+   "apply-refund が返金総額を動かす唯一の関数である決定（呼び出し側の集計は gate から見えない）の正本"
+   "settleops の :propose-refund op と HARD check 9（解放済み / 係争中 / 保持額超過 / capture 無しを拒否）の正本"
+   "返金 instruction を store が「保存済み capture + 承認者名」から導出する決定（proposal は order/amount/reason のみ運ぶ、無記名の返金は一切書かない）の正本"
+   ":propose-refund を release と同じ phase 3 でのみ writable とし、どの phase でも auto にしない決定の正本"
+   "marketplace / cloud-itonami-marketplace-settlement の .cljc スイートを shadow-cljs :node-test で ClojureScript でも実行する決定、および governor_test を .clj → .cljc に移す決定の正本"
+   "shadow-cljs の :deps :aliases に :test を渡さない（:main-opts が clojure -A に届いて build が壊れる）ため :cljs-test alias を置く決定の正本"))
+  (:adr/related "adr-2607309800-settlement-funds-gate-unpaid-order-could-be-released, adr-2607309500-cloud-itonami-code-payment-acceptance-rail, adr-2607300900-github-actions-is-not-executing-move-ci-to-murakumo-fleet")
+  (:adr/body "
+# ADR-2607309960: 返金と cljs ランタイム parity
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（+ Claude。ADR-2607309800 が残した gap のうち
+オーナー指示『返金, b7』で選ばれた2件）
+
+## 1. 返金 — gate の一部であって、gate の外の機能ではない
+
+### Context
+
+`marketplace.acceptance/refund-instruction` は**組み立てるだけ**で、誰も簿記して
+いなかった。結果、**買い手に全額返金しても同じ注文が `:settled` のままで release
+できた**（出品者に運営の金から二重に払う）。actor 側には返金 op 自体が無く、
+超過入金を**拒否できるのに返せない**状態だった。
+
+### Decision
+
+**D1. 返金は `net-captured-minor`（着金 − 返金済み）として簿記し、
+`settlement-status` がその net を読む。** これで会計が全読者に自動的に伝播する:
+一部返金は `:short`、全額返金は状態が `:refunded` になって `:missing`、
+`releasable-to-settlement?` は**返金の存在を知らないまま**両方を拒否する。
+gate 側に返金の概念を足す必要が無い。
+
+**D2. `apply-refund` が返金総額を動かす唯一の関数。** 呼び出し側で集計した返金は
+gate から見えない。別 order / 別 PSP 取引の instruction は拒否する（同じ order に
+複数 capture がありうるので、取り違えると金が黙って解放される）。
+
+**D3. `refund-instruction` の上限は「まだ保持している額」**。gross を基準にすると
+**全額返金を2回**できてしまう。`:refund/partial?` も残高基準にした（残りを
+清算する返金は、前に何回あっても partial ではない）。
+
+**D4. settleops に `:propose-refund`（7番目の op）+ HARD check 9。** 拒否は release
+の鏡像:
+- **解放済み** → 拒否。その金は出品者に渡った。買い手にも返せば二重払いで、
+  訂正経路は dispute か chargeback であってこの op ではない。
+- **係争中** → 拒否。返金は dispute の**裁定そのもの**であり、この fleet の
+  actor は裁定しない（ADR-2607264000 D5）。
+- **保持額超過 / capture 無し** → 拒否。
+
+**D5. instruction は store が「保存済み capture + 承認者名」から導出する。**
+proposal は order / amount / reason しか運ばない。**無記名の返金は一切書かない**
+（`:payload` の `:approved-by` が無ければ instruction を作らない）。release が
+advisor の payload から名前を借りないのと同じ規律。
+
+**D6. `:propose-refund` は release と同じ phase 3 でのみ writable、どの phase でも
+auto にしない。** どちらも不可逆な外向きの資金移動で、「返金はできるが release は
+できない」phase は奇妙な半端状態になる。
+
+## 2. B-7 — portable と主張するなら portable な runtime で走らせる
+
+### Context
+
+両 repo とも `marketplace.edge` / `settleops.edge.worker` 以外は全て `.cljc` で、
+CLAUDE.md の runtime 優先順位は **ClojureScript > JVM**。にもかかわらず、スイートを
+走らせていたのは `clojure -M:test` だけだった。**portable は検査されていない主張**
+だった。
+
+### Decision
+
+**D7. 両 repo に shadow-cljs `:node-test` build を置き、`npm run test:cljs` で
+同じスイートを走らせる。**
+
+**D8. `governor_test.clj` を `.cljc` にする。** cljs 実行が唯一見られなかった
+namespace であり、かつ**拒否が最も重要な** namespace だった。governor を飛ばす
+スイートは actor の portability を証明しない。
+
+**D9. `:cljs-test` deps alias を置く。** shadow-cljs は `:deps {:aliases [...]}` を
+`clojure -A` に渡すので、既存の `:test` alias の `:main-opts` が**別の main に届いて**
+`Unknown option: --npm` で build が死ぬ。実測した落とし穴なので alias を分ける。
+
+### 結果（実測）
+
+| repo | JVM | ClojureScript on Node |
+|---|---|---|
+| `kotoba-lang/marketplace` | 175 tests / 747 assertions / 0 failures | **同じ 175 / 747 / 0** |
+| `…-marketplace-settlement` | 122 tests / 477 assertions / 0 failures | **同じ 122 / 477 / 0** |
+
+**発見（他 repo の portability smell）**: `kotoba-lang/product-party` の
+`valid-gtin?` が cljs で `:invalid-arithmetic` 警告を出す — `(int (nth s 13))` は
+JVM の char 演算で、JS では文字列が偶然正しく型強制されるため**通ってしまう**。
+今は動くが、あの repo の smell として記録する（ここでは直さない）。
+
+## 実装と着地
+
+- `kotoba-lang/marketplace` main **`57fc7b3`**: `net-captured-minor` /
+  `refunded-minor` / `apply-refund`、`settlement-status` の net 化、
+  `refund-instruction` の上限変更、shadow-cljs `:node-test`、README「Runtimes」節。
+  **169 tests / 719 assertions → 175 / 747**（両 runtime）、lint 0/0。
+- `cloud-itonami/cloud-itonami-marketplace-settlement` main **`cf64ec4`**:
+  `:propose-refund` + HARD 9 + store の導出簿記 + phase 表 + demo scenario 5
+  （解放済みへの返金拒否）+ cljs build + `governor_test` の `.cljc` 化。
+  **103 / 392 → 122 / 477**（両 runtime）、lint 0/0。
+- west pin 2 entry を GitHub API single-entry commit で前進（**`da88ca2`**）。
+- CI には cljs job を宣言したが、**この fleet の GitHub Actions は実行されていない**
+  （ADR-2607300900）。宣言であって実行証跡ではない、と workflow のコメントにも
+  README にも明記した。当面の実行経路はローカルの `npm run test:cljs`。
+
+## 残る gap（2026-07-31 更新）
+
+- **PSP client は無いまま**（意図的。attestation を持ち込む host が無い）。
+- ~~**`:mpm-static` の差額請求フロー**~~ — **2026-07-31 に解消（ADR-2607310200）**。
+  `shortfall-minor` / `top-up-request` / `apply-top-up`。着手時に、settleops の store が
+  2件目の capture で1件目を**上書きしていた実バグ**も判明し、加算に修正した。
+- **chargeback / dispute 経路**は `resolve-dispute`（人間）のみ。解放後の訂正を
+  actor が扱う経路は無い（意図的）。
+- 収納代行 / 資金移動業の判断は依然 owner のもの。
+- ~~`edge/worker.cljs` は未テスト~~ — **2026-07-31 に着手し、そこで
+  `marketplace.edge/run`・`outcome` が一度も存在しなかったこと**（Worker 6本が
+  壊れていたこと）が判明した。ADR-2607310200 で実装・テスト・6本の修復と deploy まで
+  完了。**ただし worker 自体の unit test は今も無い** — 検証は compile 0 warnings と
+  deploy 後の `/health` 200 / 未認証 401 まで。
+
+## Alternatives considered
+
+- **返金を settleops 側だけで集計する。** gate が読むのは
+  `acceptance/settlement-status` なので、actor のローカル集計は**gate から見えない**。
+  library に置いて net を一本化した。
+- **`refund-instruction` の上限を gross のままにする。** 全額返金を2回できる。
+- **proposal が instruction を組み立てて store がそれを書く。** advisor が捏造した
+  返金先・金額がそのまま出ていく。store が保存済み capture から導出する形にした。
+- **`:propose-refund` を phase 1 から writable にする。** capture が phase 1 で
+  書けるので対称に見えるが、返金は不可逆な外向き移動で release と同じ扱いが正しい。
+- **cljs 実行を諦めて `.clj` の governor_test を残す。** 拒否が最も重要な namespace を
+  検査しない parity は parity ではない。
+- **CI job を足さない**（Actions が動いていないから）。足さなければ Actions が
+  復旧しても永遠に走らない。宣言し、実行証跡ではないと明記する方を採った。
+")))

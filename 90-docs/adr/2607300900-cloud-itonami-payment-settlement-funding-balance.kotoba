@@ -1,0 +1,404 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607300900-cloud-itonami-payment-settlement-funding-balance")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/topic "itonami-payment-settlement-funding-balance")
+  (:adr/title "ADR-2607300900: cloud-itonami-app に funding account（残高の attest）と payment settlement authority を追加する — 誰も推測していない残高の上で支払いを承認記録する")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/last-verified "2026-07-30")
+  (:adr/last_verified "2026-07-30")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative-for
+  (vector "cloud-itonami-app における funding account（組織に紐づく銀行口座）のデータモデルと、口座番号を保持せず last4 + SHA-256 digest に還元する決定の正本"
+   "残高を attest（人が読んで記録する）値として扱い、銀行が示した :as-of を必須とする決定、および :never-recorded / :fresh / :stale の3値で「不明な残高はゼロでも無制限でもない」を表現する決定の正本"
+   "authority spine 上の4番目の authority として :payment/settle を追加し、資金不足を人に聞く前に拒否する決定（2026年6月の口座振替失敗を gate として符号化）の正本"
+   "重複決済判定を organization スコープかつ :committed のみとする決定の正本"
+   "ADR-2607300300 D4 の SIM-swap hold を銀行振込にも適用する決定の正本"
+   "balance / freshness / funding-account / settlement-history を server 側で計算し request の値を上書きする決定（gate を実効化する強制点）の正本"
+   "この機能の到達上限 — commit は governed settlement RECORD であって送金ではない、資金 gate は review 時点のみ — の明示"
+   "MCP agent surface が session を「迂回する」のではなく「解決する」設計、および承認（Passkey consent）を agent に一切露出しない決定の正本"
+   "支払いを承認できる authenticator を Secure Enclave + Touch ID とする決定、および「platform を要求すること」と「platform であると検証すること」を区別する assurance ladder の正本"))
+  (:adr/related "adr-2607300300-esim-voice-reception-card-issuing-integrated-design, adr-260726-kotobase-query-plane-is-one-ref, adr-2607247000-cloud-itonami-emi-electronic-money-institution-actor, adr-2607249000-cloud-itonami-card-issuing-actor")
+  (:adr/body "
+# ADR-2607300900: funding account と payment settlement authority
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（+ Claude。オーナー指示「口座情報を cloud-itonami-app の
+jk-corp と紐付けて、残高を把握して、支払いを api 承認処理で決済記録するように
+してほしい」に基づき実行）
+
+## Context — 実在する未払いと、既に一度失敗している事実
+
+これは仮想の要件ではない。JK株式会社は税理士法人TOTAL（担当: 水鳥智仁）に顧問料を
+負っており、**その回収は一度失敗している**。Gmail の実測（jun784@gmail.com、
+2026-07-30 時点）:
+
+- **2026-07-02**（message `19f208ab40cdfb68`）: 令和8年6月分の口座振替が
+  **残高不足により引き落とし未完了**。次回7月分の振替日に6月分を合算して請求する、
+  振替日前日までに **PayPay銀行口座**への資金準備を依頼。
+- **2026-07-30**（message `19fb09e87efe5d1c`、件名『【未納顧問料のご案内】税理士法人
+  TOTALの水鳥です。』）: 7月現在の未納分の顧問料について請求書を添付、**振込**を依頼。
+  添付ファイル名は `税務_未納のお知らせ_03356_ＪＫ㈱様_20260730_Y38500.pdf`。
+- **2026-06-19 〜 06-22**（`19edd577f38ab342`）: MoneyForward クラウド会計の
+  **PayPay銀行 API 連携が期限切れ** → 再連携依頼 → 06-20 に再連携完了、06-22 に
+  先方確認済み。
+
+### 金額について（正直に書く）
+
+**¥38,500 は添付 PDF のファイル名の `Y38500` トークンから読んだ値であり、PDF 本文は
+読んでいない。** 現在の Gmail MCP には添付ファイルを取得する tool が無く
+（`get_message` は attachment の id と filename しか返さない）、本文照合は
+できていない。したがって本 ADR は金額を**未検証**として扱い、実際の決済記録では
+owner が請求書本文の金額を入力する。ファイル名から推測した数値をそのまま
+`amount-minor` に焼くことはしない。
+
+### 設計の入力は「承認の欠落」ではなく「残高を知らなかったこと」
+
+6月に起きたのは承認漏れではない。**誰も当座貸越を承認していない** — 起きたのは、
+銀行が言うまで残高が足りないと分からなかったことである。したがって「承認だけを
+足す」設計は、同じ事故を**署名付きで**繰り返させる。資金 gate が無い承認は、この
+ケースにおいて何の防御にもならない。
+
+一方、consent 側の機構は既に存在する。ADR-2607300300 が入れた
+`cloud.itonami.app.authority` は 4 段階の背骨（決定論的 pre-check → Passkey consent →
+content digest → governed actor への hand-off）で、eSIM / card / voice を載せている。
+card adapter の daily-limit gate は求める形そのもの — **人に聞く前**に評価される
+算術的拒否であり、進めない要求が承認プロンプトになることが無い。
+
+欠けていたのは、金を照合する相手だった。app には銀行コネクタも口座モデルも無い。
+
+## Decision
+
+### D1. funding account は organization に属し、payment instrument を持たない
+
+`cloud.itonami.app.funding` は銀行口座を **Tenant** に紐づける（User ではない）。
+会社の口座は紐付けた個人より長生きし、user スコープにすると owner 交代で全ての
+未払いの資金元が黙って孤児になる。`:linked-by` は誰がやったかを記録するが所有者に
+はしない。
+
+**口座番号は保存しない。** 一度渡してよいが、保持されるのは下4桁と SHA-256 digest
+だけ。digest は consent が必要とする唯一の問い（承認した口座は記録上の口座か）に
+答え、送金には使えない。同じ還元を pre-check 内で**支払先**口座にも適用するので、
+`state.edn` に永続化される proposal にも転用可能な口座番号は入らない。
+
+### D2. 残高は attest され、銀行の時刻で日付が付き、決して推測されない
+
+銀行コネクタは無く、本 ADR でも足さない。残高は人が読んで記録するから存在する:
+
+- `:amount-minor` — 通貨の**最小単位**の整数。exponent は allowlist から引く。
+  未知通貨は default せず拒否する。exponent の推測は数値が 100 倍間違う経路。
+- `:as-of` — **銀行が示した instant**。必須で、now に default しない。3日前の
+  残高照会からの転記は、たった今打ち込んでも3日前の値である。
+- `:source` — `:owner-attested` / `:statement` / `:api` のいずれか。
+
+`funding/freshness` は純関数で `:never-recorded` / `:fresh` / `:stale` を返す。
+解析不能・欠落・**未来**の `:as-of` はすべて `:stale`。これは
+`authority.posture` の fail-closed 方向とは**逆のリテラル値**だが同じ原則である
+（未知は拒否の側へ倒す）。あちらは timestamp が制限を制御し、こちらは許可を制御する。
+
+**不明な残高はゼロでも無制限でもない。不明であり、拒否する。**
+`account-services` が使用量メータについて既に述べている
+（an unavailable meter is never presented as zero usage）のと同じ規律だが、金銭では
+利害が大きい: 大きく default すれば支払いが素通りし、ゼロに default すれば永久に
+全支払いが拒否される。
+
+### D3. :payment は spine 上の4番目の authority
+
+`cloud.itonami.app.authority.payment` は op を1つ（`:payment/settle`）持ち、固有の
+Passkey context type に束縛される。pre-check は純関数（全 fact が引数）で、この順に
+拒否する:
+
+| 拒否 | なぜこの位置か |
+|---|---|
+| `:payment/op-unsupported` | allowlist。default しない |
+| `:payment/posture-unknown` / `:payment/spend-hold` | D4 の cross-domain hold |
+| `:payment/payee-missing` / `:reference-missing` / `:amount-invalid` | 形 |
+| `:payment/account-not-linked` / `:account-inactive` / `:currency-mismatch` | 資金元 |
+| `:payment/settlement-history-unknown` / `:duplicate-settlement` | 既に払った請求書について「残高不足です」と言うのは、誤った問題へ人を送る |
+| `:payment/balance-unknown` | 古い/無い数値は答えではない |
+| `:payment/insufficient-funds` | **6月の失敗を gate として符号化したもの** |
+
+重複判定は請求書 reference をキーに、**organization スコープかつ `:committed` のみ**。
+請求書は会社が負うので、同僚が二重に決済するのが正にこの検査の対象である。また
+rejected / governor が refuse した proposal は何も決済していないので、それを
+settled と数えると未払いが宙に浮く。
+
+### D4. SIM swap は銀行振込も止める
+
+ADR-2607300300 D4 は、同一 subject の eSIM ownership transfer 後 7 日間 card の
+spend と issuance を制限する。回線を奪った者は第二要素を奪っており、典型手順は
+**回線を移し、次に使う**。この手順は、使うのがカードか銀行振込かを区別しない。
+よって `:payment/settle` も同じ hold を継承する。除外すれば不変条件の隣に扉を
+開けたままにすることになる。
+
+これが表現できるのは 4 authority の proposal が単一の store partition を共有して
+いるからで、これは `kotobase.core/open` が `:ref-name` をちょうど 1 本しか取らない
+ことの local な相似形である（ADR-260726）。書き込みスループットのために分割すれば、
+統合を正当化した唯一の不変条件を失う。
+
+### D5. fact は server のもので、caller のものではない
+
+`authority.api` は posture / funding account / balance / freshness / settlement
+history を store から計算し、request に載っていた値を**上書きする**。これが強制点で
+あり、adapter 側の必須入力検査は「忘れられないようにする」だけである。上書きが
+無ければ client は `{:balance {:amount-minor 99999999}}` を送って資金 gate を
+買い抜けられ、gate 全体が単なる助言になる。
+
+request から取るのは `:funding-account-id` だけ（どの口座から出すかは caller の
+決定）。ただし口座は**引き直す**ので、他 organization の id は nil に解決して拒否
+される。「organization の唯一の active 口座に default する」案は却下した — 暗黙の
+資金元は、便利にしてよい対象ではない。
+
+### D6. agent surface は session を迂回せず、解決する
+
+`cloud.itonami.app.mcp` の docstring は、mail / calendar / drive / chat を MCP に
+出さない理由をこう書いている — それらは `/api/*` の Passkey session の裏にあり、
+session を持たない面からそこへ回り込むのは app が意図した gate を弱めることになる。
+**金銭はその反論の強い版であって弱い版ではない。**
+
+そこで `cloud.itonami.app.payment-tools` は session を迂回せず**解決する**:
+`CLOUD_ITONAMI_MCP_SESSION` または login Keychain（service `cloud-itonami-app.mcp` /
+account `session-token`）の app session token → `identity/session` →
+`passkey-enrolled?`。token が無い・失効・revoke 済み・Passkey 未登録なら、funding /
+payment tool は **manifest に現れない**（「呼ぶと失敗する tool」ではない。必ず拒否する
+tool を publish するのは client に試行を誘い、理由を何も伝えない）。token は process
+単位で memoize するが **session は毎回再解決**するので、失効・revoke は即座に効く。
+
+**承認できる tool は無い。** `approve/start` / `approve/finish` は descriptor も
+dispatch 分岐も持たない。これは policy ではなく構造である — consent は operator が
+持つ authenticator の user-verifying WebAuthn assertion であり、agent が生成できる
+assertion は存在しない。`payment_commit` を出しているのは、それが**人間が既に digest に
+署名済み**の proposal にしか作用しないから（承認済みのものを authority へ運ぶのは
+使い走りであって判断ではない）で、spine は `:approved` 以外を拒否するので consent 段を
+跨げない。
+
+Keychain 読み出しは service / account を指定した**1件の狙い撃ち**で、列挙はしない。
+
+### D7. 承認できる authenticator を Secure Enclave + Touch ID に限る（2026-07-30 オーナー判断）
+
+D6 は「agent は承認できない、consent は operator が持つ authenticator の WebAuthn
+assertion だから」と書いた。**これは authenticator が本当に operator の持ち物である
+場合にだけ真**で、WebAuthn 自体はそれを保証しない:
+
+- 登録要求の `authenticatorSelection` は **client への「お願い」**であり、client こそが
+  制約したい対象である。
+- 応答の `authenticatorAttachment` は **client 申告で署名されていない**。
+- Chrome DevTools には **virtual authenticator** があり、`platform` を名乗り、user
+  verification を自動で通し、人間不在でプログラム的に署名する。その assertion は完全に
+  検証を通る。
+
+つまり D7 以前の正直な表現は「virtual authenticator を思いつかない agent なら承認
+できない」であり、これは安全性ではない。オーナーは **Secure Enclave + Touch ID**
+（鍵は非抽出、署名ごとにセンサー）を選択した。D7 はそれを願望でなく強制にする。
+
+**要求**: `authenticatorAttachment: platform` / `residentKey: required` /
+`userVerification: required` / **`attestation: direct`**。direct は理由が1つ —
+`none` ではブラウザが privacy のため **AAGUID をゼロ埋め**し、AAGUID は**署名済み**
+authenticator data に入る唯一の機種識別子だから。
+
+**検証**: `cloud.itonami.app.credential-assurance`（純関数）が段階付けする:
+`:unknown` < `:platform-claimed`（client の申告。**未署名**） <
+`:platform-attested`（署名済み authData 内の AAGUID が既知の hardware-backed 機種と
+一致） < `:hardware-attested`（attestation chain が設定済み root まで検証済み）。
+**証拠と呼べるのは下2段だけ。** AAGUID の許可リストは **Windows Hello の software
+profile を意図的に除外**している — これは本物の platform authenticator だが鍵が
+secure element に無い。`platform` と `hardware-backed` は別の性質で、agent の署名を
+止めるのは後者だけである。ゼロ埋め AAGUID は「疑わしい」ではなく「ブラウザが伏せた」
+なので、拒否せず1段下げる。
+
+**強制**: `authority/finish-approval!` に3つ目の gate として入る。既存2つとは別の問い
+に答える（match =「この提案に対する assertion か」、Governor =「免許事業者として
+admissible か」、いずれも**どんな authenticator が署名したかを問わない**）。credential
+は assertion の結果からではなく **store から id で引く** — 応答に自分自身を説明させたら
+意味がない。
+
+**出荷時の floor は `:platform-claimed`** で、これは最強の段ではない。理由を隠さず書く:
+このマシンのブラウザが direct attestation で実 AAGUID を出すかは**測定可能であって
+推測すべきものではない**。ハードウェアが超えられない floor を置くと、登録は成功して
+以後すべての支払いが拒否され、バグに見えて検査ごと消される圧力になる。
+`GET /api/passkeys/assurance` が達成レベル・その根拠・どの authority が受理するかを
+返すので、**1回登録してから証拠に基づいて floor を上げる**。**今日の floor では
+virtual authenticator も通る** — これを黙っていると読み手が「agent はもう排除された」
+と誤解するので明記する。
+
+`at-least?` は**両方向に fail-closed**（未知の level は最下段、未知の floor は
+充足不能）。誤字の floor が gate を黙って無効化するのが、この namespace が防ぐべき
+まさにその失敗だから。自分のテストが最初この permissive な挙動を assert していたので、
+テストではなくコードを直した。
+
+## Consequences
+
+### commit が意味すること
+
+**governed settlement RECORD であって、送金ではない。** この app は銀行 credential を
+持たず、口座番号を保存せず、決済網への経路を持たない。振込は人が銀行で行う。
+記録されるのは、何を負っていたか・どの口座から・誰が承認したか・その条件の digest に
+対する Passkey assertion。fleet の他 actor と同様 settlement actor は propose-only なので
+`:committed` は**governed proposal が記録された**ことを意味する。これを「支払済み」と
+描画する UI は嘘をついている。
+
+### 資金 gate は review 時点のみ
+
+残高は digest material に**意図的に含めない**。含めると無関係な入金のたびに正当な
+承認が無効化される。代償は隠さず明示する: review と commit の間に残高が落ちても
+この adapter は気付かない。`:balance-at-review` を proposal に記録して何を根拠に
+判断したかを読めるようにし、後からの不足を見るのは actor 側 governor の役目とする。
+
+### :payment は disabled で出荷される
+
+`defaults.edn` の他 authority と同様、`:endpoint nil` で。新規インストールに決済面は
+無い。有効化は deployment の判断。
+
+### error status
+
+spine 自身の拒否はこれまで未 mapping で 502 を返していた（無効な authority が
+「サーバが壊れている」と読めた）。`:authority/*` `:funding/*` `:payment/*` を mapping
+した。`:payment/insufficient-funds` は **402**（Payment Required の本来の用途）。
+
+### D8. 実際に登録を試みて分かったこと — 登録は一度も成功したことがなかった
+
+D7 を入れたあと実機で Touch ID 登録を試み、**3つの障害が順に現れた**。うち2つは
+D7 とは無関係の実バグで、D7 を入れなければ発見されないままだった。
+
+**① テストスイートが実データを上書きしていた（`d45b76d` で修正）。**
+`config/data-dir` が `./data` に既定していたため、リポジトリのルートで
+`clojure -M:test` を走らせるとテストが**実ストアに書く**。テスト内の
+`store/transact!` は18箇所あり、うち2つ（本セッションで追加した
+`payment_tools_test/seed-identity!` と既存の `core_test`）は `:identity` を
+丸ごと差し替える。実測: 本物の仮ユーザーが `{:id \"user-1\" :display-name \"Owner\"}`
+（`:email` も `:user-handle` も無い）に置き換わり、state.edn が 6617→1564 バイトに
+縮んだ。**着弾したのは本セッションで書いたフィクスチャであり、この点は当方の責任。**
+修正は `:test` alias が `-Dcloud.itonami.data-dir=target/test-data` を渡す形で、
+**システムプロパティが環境変数に勝つ**（通常と逆。プロパティは特定の起動が明示的に
+設定し、環境変数はシェルに残留しうる。env が勝つと `CLOUD_ITONAMI_DATA_DIR` を
+export した端末でスイートを走らせた瞬間に再発する）。18箇所を個別に直す案は却下
+（同期し続けるリストになり、19個目が載らない）。
+
+**② DID 導出が COSE を読めていなかった（`45a9dee` で修正）。**
+`did-key-from-cose` は Jackson の `readValue(bytes, Map.class)` を使うが、これは
+JSON 意味論（オブジェクトキーは常に文字列）を適用するため **CBOR の整数キーを
+文字列に変換する**。COSE_Key のラベルは整数（1=kty, -1=crv, -2=x, -3=y）なので
+`cose-value` の lookup は全て nil を返し、`(long kty)` が NullPointerException を
+投げ、catch-all が `:did/invalid-public-key` を報告していた。
+**どの credential でも、どのマシンでも、この関数が書かれて以来ずっと。**
+つまり **このアプリで Passkey 登録が完了したことは一度も無い**。隠れていた理由は
+2つ: `did_test.clj` が存在しなかったこと、そして `:did/*` がサーバのステータス表に
+無く `502 Bad Gateway` として出ていたこと（インフラ障害の顔をしていた）。今は
+**422** を返す。新しい `did_test.clj` は**実際に CBOR エンコードした COSE_Key**で
+テストする（手書き map ではラウンドトリップごとバグを飛ばすため）。shape ガードが
+到達可能になったことも検査する — 修正前は `(long kty)` が先に throw するので
+`:did/unsupported-public-key` は一度も発火できなかった。
+
+**③ ページにフォーカスが無く WebAuthn が起動しない（未解決・環境要因）。**
+①②を直した後も credential は記録されなかった。JS から直接 ceremony を叩いて確定:
+
+```
+NotAllowedError: The operation is not allowed at this time
+                 because the page does not have focus.
+```
+
+**MCP が操作するタブは前面ウィンドウではないため、`navigator.credentials.create()`
+が即座に reject される。** agent のクリックはページには届くが **OS フォーカスは
+与えない**ので、Touch ID のシートは一度も表示されていなかった。これはアプリのバグ
+ではなく、agent 主導のブラウザから WebAuthn を駆動することの構造的限界である。
+**この最後の一歩は人間が前面ウィンドウで押すしかない** — そしてそれは D7 が
+意図した性質そのもの（agent は承認できない）が、登録段階にも現れたということ。
+
+## 現在地（2026-07-30 時点）
+
+**稼働済み**: `:payment` authority を local deployment（`data/config.edn`）で有効化、
+app server を新コードで再起動（`/api/funding` `/api/authority/payment/*` が live、
+session 無しで 401 = route 有り・gate 有り）、superproject の `.mcp.json` に
+`cloud-itonami-app` stdio MCP server を登録（session token 未設定なので tool は 0 件 —
+これが設計どおりの既定）。
+
+**未達 / blocker（次の agent と owner のために）**
+
+0. **Passkey 登録（Touch ID）が唯一の残作業。ブロッカーは技術ではなくフォーカス。**
+   サーバ側は全て通ることを実測済み: `onboarding/resume` 200 →
+   `register/start` 200、返る options は
+   `authenticatorAttachment \"platform\"` / `userVerification \"required\"` /
+   `residentKey \"required\"` / `attestation \"direct\"`。
+   **再開手順**: (a) `localhost:1339` の Chrome ウィンドウを**クリックして最前面に
+   する**（タブ切替では不足。OS フォーカスが要る） (b) 「Passkey 登録を再開」を押す
+   (c) Touch ID に触れる。その後 `GET /api/passkeys/assurance` で実機の到達段
+   （`:platform-claimed` か `:platform-attested` か）を読み、届いていれば
+   `defaults.edn` の `:min-assurance` を上げる。**agent がこの手順を代行することは
+   できない**（D8 ③）。
+
+1. **jk-corp organization がまだ存在しない。** `data/state.edn` の唯一の organization は
+   `Personal`（`:organization-id nil` / `:status :pending-profile`）で、user は
+   `:status :pending-passkey` / `:passkey-enrolled? false`。
+   `identity/create-organization!` は `require-passkey!` を通るので、**owner が
+   Passkey 登録を完了するまで jk-corp は作れない**。これは agent が代行できる操作では
+   ない（WebAuthn ceremony であり、安全床①にも触れる）。
+2. **残高が未記録。** 銀行コネクタが無いので owner が PayPay銀行の残高を
+   `POST /api/funding/accounts/{id}/balance` で記録する必要がある。記録するまで
+   `:payment/balance-unknown` で拒否される（これは gate が働いている状態であって
+   不具合ではない）。
+3. **請求書金額が未検証**（上記 Context 参照）。
+4. **settlement actor が存在しない。** `:endpoint` に指す先が無いので、commit は
+   `:endpoint-not-configured` で `:authority-refused` になる。他 3 authority と同じ
+   現在地であり、この app 側の欠落ではない。
+
+### 将来の :api 残高経路
+
+MoneyForward クラウド会計は PayPay銀行と API 連携済み（2026-06-20 再連携、06-22
+先方確認）。`:source :api` はそこから残高を引く経路のために既に用意してあるが、
+**その連携は会計側にあり app 側には無い**。実装する場合も、送金能力を伴う
+credential を app に持たせない設計（読み取り専用）を維持すること — さもなければ
+本 ADR の他の拒否がすべて飾りになる。
+
+## 検証と着地
+
+- `clojure -M:test` — **360 tests / 1533 assertions / 0 failures**（merge 後の tree）。
+  追加: `did_test.clj`（実 CBOR COSE_Key、shape ガード到達性）、
+  `data_isolation_test.clj`（スイートの書き込み先が実ストアでないこと、
+  `store/state-file` が実際にその下にあること — 両者が食い違えば検査は無意味）。
+  新規: `funding_test.clj`（残高 freshness の純関数、口座番号が state.edn に出ない
+  ことの直接検査、organization スコープ）、`authority/payment_test.clj`（全拒否経路、
+  digest material の被覆、**client が自前の残高を送っても上書きされる**こと）。
+- `clojure -M:lint` — **0 errors**（warning 8 件はすべて既存で、追加分に起因しない）。
+  MCP 面は `payment_tools_test.clj`（session 無しなら manifest に出ないこと、Passkey
+  未登録 user では session が解決しないこと、revoke が即座に効くこと、承認系 tool 名が
+  存在しないこと、未承認 proposal を commit できないこと）。
+- **実 stdio JSON-RPC でも E2E 検証済み**（unit test だけではない）:
+  `funding_link_account` → `funding_record_balance ¥10,000` →
+  `payment_review ¥38,500` = `payment/insufficient-funds` 拒否 →
+  `funding_record_balance ¥120,000` → `payment_review` = `awaiting-passkey` + digest →
+  未承認 proposal の `payment_commit` = `authority/proposal-not-found` 拒否。
+  途中、`as-of` を未来の instant にした試行が `payment/balance-unknown` で拒否され、
+  「未来の timestamp は stale」の fail-closed 規則が実地で効くことも確認した。
+- app 着地: `cloud-itonami/cloud-itonami-app` main `c0b08d6`（authority）/
+  `254bbab`（MCP surface）/ `70d2152`（PayPay メール残高コネクタ）/
+  `46e9841`（platform authenticator assurance）/ `d45b76d`（テストのデータ隔離）/
+  `45a9dee`（DID/COSE 修正）、いずれも branch → server-side merge。全6件が main の
+  祖先であることを `gh api compare` で確認済み（behind_by=0）。
+- 支払い台帳: `90-docs/finance/payables.datoms.edn`（30 record、全件に根拠 Gmail
+  message id 付き）。**PayPay銀行は引落予定日の2日前に口座残高を平文でメールする**
+  という発見がここに記録されている（`fin-finding-balance-from-mail`）。
+- app ADR: `docs/adr/0005-payment-settlement-authority.md` /
+  `docs/adr/0006-which-authenticator-may-approve.md`。
+- superproject: `manifest/west.yml` の `cloud-itonami-app` pin を単一 entry の
+  GitHub API commit で前進（`5afb419` → `c0b08d6`、`09f712d` → `254bbab`）。
+  1回目は **409 で弾かれた** — 他 agent が同時に main を進めており、optimistic lock が
+  想定どおり働いた。再読込み → 祖先関係を GitHub API で検証
+  （`status: ahead` / `behind_by: 0`）→ 再 PUT で成立。
+- app 側 ADR: `docs/adr/0005-payment-settlement-authority.md`。
+
+## Alternatives considered
+
+- **銀行から残高を取得する。** この app が使える API が無く、取得すれば送金もできる
+  credential を持つことになり、本 ADR の他の拒否がすべて装飾になる。工数ではなく
+  この理由で却下。
+- **残高欠落を 0 と見なす。** 永久に全支払いを拒否し、欠測ではなくバグに見えるので、
+  検査を外す圧力になる。`:never-recorded` / `:stale` は拒否し、かつ理由を言う。
+- **重複判定を user スコープにする。** 重複検査が存在する唯一のケース（同じ請求書を
+  2人が払う）で素通りする。
+- **reference 必須をやめる。** reference が無いと同じ決済を二重に記録でき、しかも
+  どちらの記録も間違っていない状態になる。台帳が答えられなくなる。
+")))

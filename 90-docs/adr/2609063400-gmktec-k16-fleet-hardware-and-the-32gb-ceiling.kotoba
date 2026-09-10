@@ -1,0 +1,124 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609063400-gmktec-k16-fleet-hardware-and-the-32gb-ceiling")
+  (:adr/title "GMKtec K16 の仕様を記録する —— 32GB は購買の選択ではなく半田付け LPDDR5 の天井。MoE expert 分割は形が合うが、律速はメモリではなく OS")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/last_verified "2026-09-06")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "k16-fleet-hardware")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/aiueos"))
+  (:adr/authoritative_for
+  (vector "GMKtec K16 のハードウェア仕様（この workspace に記録が無かった）"
+   "32GB 上限が半田付け LPDDR5 由来の物理制約であること"
+   "SDAR-30B-A3B を 32GB 機へ expert 分割したときの 1 台あたり容量"
+   "K16 で推論を回すときの律速が容量ではなく OS/スタックであること"))
+  (:adr/related
+  (vector "adr-2609031030-aiueos-k16-pure-kotoba-physical-tcp-handoff（K16 の到達点は physical TCP まで）"
+   "adr-2609030900-aiueos-pure-kotoba-native-programme"
+   "adr-2609063000-dllm-phase0-block-diffusion-measured-on-murakumo-gad（forward 回数 2.36 分の 1 の実測）"
+   "adr-2609063200-sdar-vl-graft-target-image-and-video-already-wired"))
+
+  (:adr/body
+  "# ADR-2609063400: GMKtec K16 の仕様と 32GB の天井
+
+**Status**: accepted / 2026-09-06 / オーナー発言「32gb memory のデバイスが大量に用意できるんですが、それより多いのがあまり用意できない」
+
+## この ADR が埋める穴
+
+**K16 のハードウェア仕様は、この workspace のどこにも記録が無かった。**
+`grep -r GMKtec 90-docs/ manifest/` は 6 つの ADR に名前を出すだけで、CPU も
+RAM も GPU も書かれていない。K16 上で pure-Kotoba AIUEOS を動かす作業は
+ADR-2609031030 として詳細に記録されているのに、**その機械が何であるかは
+記録されていなかった。**
+
+## 実測仕様（製品情報、2026-09-06 取得）
+
+| 項目 | 実体 |
+|---|---|
+| CPU | AMD Ryzen 7 7735HS（Zen3+、8C/16T、最大 4.75 GHz） |
+| **GPU** | **AMD Radeon 680M（iGPU、RDNA2 = gfx1035）** |
+| **RAM** | **32GB LPDDR5-6400、半田付け（増設不可）** |
+| NIC | **2.5GbE ×2**（実機で RTL8125 を確認、ADR-2609031030） |
+| 拡張 | **OCuLink**、USB4、PCIe 4.0×4 スロット ×2 |
+
+**32GB は購買方針ではなく物理制約である。** LPDDR5 が半田付けなので、この機械を
+何台買っても 1 台あたりの上限は動かない。**したがって『もっと大きい機械を買う』は
+この fleet に対する選択肢として存在しない** —— 拡張するなら OCuLink 経由の外付け
+GPU か、台数を並べるかのどちらかになる。
+
+## 32GB 機を並べたときの容量計算（SDAR-30B-A3B、config から算出）
+
+`JetLM/SDAR-30B-A3B-Chat`: L=48、hidden=2048、experts=128、top-k=8、moe_inter=768。
+
+| 部位 | 規模 | 分割可否 |
+|---|---|---|
+| embeddings | 1.2 GiB | 共有 |
+| attention 全 48 層 | 1.7 GiB | 共有 |
+| **experts 全 48 層** | **54.0 GiB** | **分割対象** |
+| 合計 | 56.8 GiB | |
+
+**重みの 95% が expert。** expert parallelism はこれをそのまま台数で割る:
+
+| 台数 | 1 台あたり | 32GB に対して |
+|---|---|---|
+| 2 | 29.8 GiB | 余裕なし |
+| 3 | 20.8 GiB | 可 |
+| **4** | **16.3 GiB** | **推奨** |
+| 8 | 9.6 GiB | 大幅に余裕 |
+
+**通信は tensor parallel より桁で軽い。** top-k=8 / 128 experts なので 1 トークンが
+触るのは 8 個だけで、必要なのは層ごとの all-to-all であって all-reduce ではない。
+ADR-2607267000 が「多GPU tensor-parallel は高くて遅くて壊れやすい」と退けたのは
+TP の話であり、EP には当たらない。
+
+**block diffusion がここで効く。** ADR-2609063000 の実測では、同じ 20 問に対して
+forward 回数が AR 1146 に対し block=4 で 492 ——**2.36 分の 1**。単機では速さだが、
+**分散では同期往復がそのまま 2.36 分の 1 になる。**
+
+## 律速はメモリではなく OS である
+
+上の計算は「K16 が PyTorch を動かせる」ことを前提にしているが、**それは今日
+成り立っていない。**
+
+- **K16 は現在 AIUEOS（pure-Kotoba OS）で動いており、tailnet に居ない。**
+  ADR-2609031030 の到達点は **physical TCP まで**で、同 ADR が
+  『HTTPS response、CACAO/Biscuit、Murakumo node registration、heartbeat、
+  job polling、Qwen generation、decode tok/s はすべて未証明』と明記している。
+  **PyTorch はそこに存在しない。**
+- したがって分岐は **Linux で使うか / AIUEOS のまま進むか**であり、
+  後者は推論の話ではなく **AIUEOS に torch を admitted provider として
+  admit する programme**（ADR-2609030900 の続き）になる。
+
+## 未測定（仮定として使わないこと）
+
+1. **iGPU は LPDDR5 を CPU と共有する。** 32GB のうち何 GiB を VRAM として
+   切れるかは未測定。gad の gfx1151 が 48 GiB を carve-out できたことを
+   K16 に外挿してはならない。**上の 16.3 GiB が入るかは、この値が決める。**
+2. **Radeon 680M は gfx1035（RDNA2）** で、gad の gfx1151 とは世代が違う。
+   ROCm と torch がどこまで動くかは未測定。
+3. 実機に到達できないため、1 と 2 は**製品情報からの推論であって実測ではない**。
+
+## Decision
+
+1. **K16 の仕様をここに記録する**（今日まで記録が無かった）。
+2. **当面の計測箱は gad のままとする**（オーナー判断 2026-09-06「gad で ok」）。
+3. **K16 への expert 分割は『設計済み・未実測』として記録する。** 実行する前に
+   測る順序は (a) 1 台を Linux で立てて `rocminfo` と VRAM carve-out を実測
+   → (b) SDAR-8B（15.3 GiB）を単機で回す → (c) それから 4 台分割。
+   **(a) を飛ばして (c) を設計しない** —— 16.3 GiB が入るかは (a) の答えに依存する。
+
+## Consequences
+
+- **32GB は動かせない制約**なので、モデル選定は常にこの天井を前提にしてよい。
+  ≤32 GB に収まる dLLM は SDAR-8B(15.3)、SDAR-VL-Think-8B(16.1)、
+  LLaDA2.1-mini(30.3)、MMaDA-8B / Lumina-DiMOO(15.1)。
+- **27B 級の品質を単機 32GB で得る道は、この ADR の範囲では無い。**
+  30B-A3B は bf16 で 56.8 GiB あり、単機に載せるには量子化か offload が要る。
+  量子化には dLLM 固有の危険がある（DLLMQuant: AWQ W4A4 で LLaDA に 16% の
+  精度低下、誤差が denoising の反復で蓄積）。**W8 weight-only はその regime
+  とは別**だが、これも未測定である。
+")))

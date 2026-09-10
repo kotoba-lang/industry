@@ -1,0 +1,99 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607319600")
+  (:adr/title "lawfirm に送達（FAX/郵便/メール）・相談Q&A・永続化・workspace 投影を統合し、kaisya を会社ポータルとして設計実装する")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-31")
+  (:adr/last-verified "2026-08-01")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/tags (vector "lawfirm" "kaisya" "cloud-itonami" "actor" "governor" "fax"
+             "transmission" "qa" "kotoba-ui" "projection" "durable-store"
+             "misdirected-fax" "bengoshi"))
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/authoritative-for
+  (vector "送達先を「フィールド」ではなく「事件に登録されたレコード」にし、宛先を送信時に入力できなくする決定の正本"
+   "相談Q&Aの回答を書面と同じ draft → 弁護士精査 → 送信のはしごに載せ、軽い経路を作らない決定の正本"
+   "受任前の相談が事件単位の利益相反判定で捕捉されないため、質問レコード自身が日付入りスクリーンを持つ決定の正本"
+   "lawfirm.projection を一方向（記録 → workspace）に限定し、書き戻し経路を持たせない決定の正本"
+   "kaisya が practice に実行時依存せず、数字を一切計算せず、欠落を 0 として描かない会社ポータルであるという決定の正本"
+   "kaisya の業務プロセス一覧を bpmn/*.bpmn から生成し手で書き写さない決定の正本"))
+
+  (:adr/context
+  "ADR-2607309000 で lawfirm を「弁護士が受任から終結まで回せる practice OS」として実装したが、その時点で入っていたのは記録・利益相反・期限・預り金・書面・共同受任までだった。オーナーの問い（2026-07-31）は『今の cloud-itonami-* で lawfirm としての案件情報の管理、スケジュールの管理, fax, 分析や qa などの workspace は clouditonami をベースに設計実装されている? drive, docs, sheets, inbox, email などの cloud-itonami, kaisya などを活用しつつ』。
+
+実測した現在地は以下のとおりで、答えは『いいえ』だった。
+
+- **案件管理・期限管理は実装済み**（lawfirm、81 tests / 377 assertions、コンソール HIG/WCAG 100.00）。
+- **fax は存在しない。** lawfirm に fax の語すら無い。`kotoba-lang/fax` は west 登録済みだが中身は etzhayyim legacy app の seed（未消化の MIGRATION-TODO チェックリストのみ、actor 化されていない）。`cloud-itonami/yuubin` の CLAUDE.md が `fax.etzhayyim.com` に言及するが「Dropbox Fax UI manual handoff」で自動化されていない。
+- **QA は無い。** 法的 Q&A に近いのは別リポの `cloud-itonami-isic-6910-legalsupport`（法域ゲート付き）と `cloud-itonami-isco-2611` だが、ADR-2607309000 の訂正部分が確定させたとおり isic=事業軸 / isco=職業軸 / lawfirm=事務所運営で意図的に別物。
+- **cloud-itonami-app との結合はゼロ。** app は `/api/workspace/{drive,drive/documents,inbox,projects,scheduler}` と Gmail/Microsoft Graph OAuth 同期と docs/sheets/forms 生成を持つが、lawfirm の deps.edn には langgraph / governor / kotoba-ui しか無く、app 側のフリートカタログに lawfirm の行すら無い（`fleet_search` からも見えない）。
+- **kaisya は使える状態にない。** `cloud-itonami/kaisya` は bpmn/ + migration.edn だけの抽出スタブ（commit 1本）。`ai-gftd-kaisya` は CLAUDE.md 自身が『does not move or reply to mail』『no deployable Worker』と明記。
+- **永続化は無い。** `MemStore` はプロセス内のみで、ADR-2607309000 が『次にやるなら (a) Store の永続実装と Worker ingress』と残していた。
+
+オーナー指示は『fax, qa を設計統合, kaisya も uiux を設計実装統合』＋ ADR-2607309000 の残件 (a)(b) にあたる 3 項目（Store 永続化 / cloud-itonami-app workspace 接合 / 期限→scheduler・calendar 投影）。")
+
+  (:adr/decision
+  "**1. 送達に宛先フィールドを作らなかった。** これが本 ADR の中心的な設計判断である。誤送信は日本の法律事務所で最も多い守秘義務事故で、構造的な原因は1つ——宛先が、いちばん急いでいる人によって、紙に書かれた番号から、送信の瞬間に入力されること。だから `lawfirm.transmission` の送達は `:recipient-id` を指し、recipient は事件に登録されたレコードで、各経路（`:fax` `:post` `:email` `:hand` `:electronic-filing`）の宛先が「誰が」「いつ」確認したかを持つ。登録されていない宛先には送れず（HARD `:recipient-not-registered`）、確認から180日を超えた宛先も送れない（HARD `:recipient-channel-unverified`）。
+
+180日は弁護士登録の365日の半分にした。恣意ではなく減衰の速さが違うため——弁護士の登録は公開情報で告知イベントに紐づいて変わるが、FAX 番号や住所は事務所が移転して「覚えている相手にだけ」通知したときに変わる。
+
+この性質は `lawfirm.workspace/dispatch-plan` まで貫いてある。送信ゲートウェイに渡す plan は**記録から番号を引き直して**組み立て、呼び出し側は transmission-id しか渡せない。ここを request 由来にすると、ゲートが検証した番号とモデムがダイヤルする番号が別物になりうる。plan が組めないときは半端な plan を返さず `{:ok? false :reason ...}` を返す——半端な plan を受け取ったホストは手元の何かでフォールバックしうる。
+
+**2. 経路の制約表は沈黙を許可として読ませない。** `transmission/channel-restrictions` は確信を持って「不可」と言える組合せ（裁判所への FAX と訴状・控訴状・上告状・上告理由書等 — 民事訴訟規則3条1項 / 内容証明は郵便役務なので FAX 不可）だけを載せる。表に**無い**組合せは「可」ではなく `:requires-counsel-judgement` であり、それが送達を確信度に関わらず必ず escalate する理由でもある。`deadline/statutory` と同じ位置づけ（起案の補助であって権威ではない）。
+
+**3. FAX の送信確認を送達の証明として扱わない。** `:result` は機械が応答したことしか記録せず、書面自身の状態を進めない。送達の証明（送達報告書・配達証明）はそれ自体が別の書面であって、ここのフラグではない。
+
+**4. 相談Q&Aに軽い経路を作らなかった。** 回答は書面と同じ draft → 弁護士精査 → 送信のはしごを通る（HARD `:qa-answer-not-reviewed` / `:qa-reviewer-not-counsel`）。弁護士法72条の線は、回答が短いこと・メールで送ること・モデルが起案して人が「目を通した」ことでは動かない。Q&A を書面より軽くすると、事務所は形式的に見える文書に対しては規律を保ち、依頼者に実際に先に届く回答に対して失う——それがこの設計の全体的な失敗になる。`:draft-qa-answer` は billable-ops に入れた（「メールで答えるだけ」を計測されない業務にしないため）。
+
+**5. 受任前の相談には専用の利益相反スクリーンを付けた。** 質問は matter より**前**に来るのが法律相談の常態で、governor の利益相反不変条件はすべて matter スコープだから、受任前の質問については何も言わない。これが事務所が相手方の親族の質問に答えてしまう経路。だから `:matter-id` を持たない質問は、質問レコード自身が日付入り・署名付きのスクリーン（`:screened-by` / `:screened-on` / `:screen-cleared?`）を持たない限り回答を送れない（HARD `:qa-conflict-not-screened`）。`:send-qa-answer` と `:record-qa-question` を matter-scoped-ops に**入れなかった**のはこのため——入れると受付を塞ぐか、事務所を「問い合わせごとに事件を立てる」運用に追い込む（それ自体が利益相反ハザード）。
+
+**6. 「本文を記録に載せない」を約束から不変条件に変えた。** `governor/prose-keys`（`:body` `:text` `:content` `:summary` `:message` `:prose`）が受信記録・質問記録に本文があれば HARD hold する。`lawfirm.intake` が最初から持っていた約束だが、規約のままでは新しい入口が増えるたびに侵食される。
+
+**7. 到着物の記録には承認を要求しない。** 受信 FAX と依頼者の質問は世界についての事実であって判断ではない。書き留めるのに弁護士の承認が要る事務所は、単に書き留めない——そして「何を、いつ言われたか」の証拠が消える。`deadline-exempt-ops` にも両方を入れた（既に徒過している事件で到着物の記録を拒むのは、徒過より悪い）。
+
+**8. 投影は一方向にした。** `lawfirm.projection` は記録 → `calendar.model` / `drive.model` / ポータル向け summary の片道だけで、書き戻す関数を持たない。カレンダーが期限を動かせると、ゲートが判定に使う日付と弁護士が見る日付の出所が2つになり、**弁護士は画面を信じる**。`lawfirm.console` が表示専用の計算を禁じているのと同じ理由に、ネットワークホップが1つ増えただけの話。期限はイベントに `:calendar/all-day? true` と日付文字列のまま出す——`java.time` も `js/Date` も使わない `lawfirm.date` の理由がそのまま当てはまる（出訴期限は「どこかのタイムゾーンの午前0時」ではない）。
+
+**9. Store の第2実装を、両実装が同じ純関数群に委譲する形で入れた。** `store/durable-store` は受理した書き込みごとに db 全体を `:persist!` に渡す。`slurp`/`spit` は入れない（`.cljc` の可搬性）。書き込み順は publish → persist——persist を先にすると、CAS に負けた writer が「プロセスが採用していない状態」を既に書いてしまう。受理された書き込みが遅いホストに順不同で届きうるので各スナップショットに `::version` を持たせ、古いものを捨てる判断はホストに置いた（自分が何を書いたかを知っているのはホストだけだから）。`mem-store` と `durable-store` は同じ `db-*` 純関数に委譲する——2つの実装が各自の `conflict-check-of` を持つのは ADR-2607309100 で fleet が踏んだ欠陥クラスそのもので、ここではその2つが『テストが走る store』と『事務所が動かす store』になるぶん悪い。
+
+**10. kaisya は practice に実行時依存せず、数字を一切計算しない。** ポータルは `lawfirm.projection/practice-summary` が practice 側のゲートと同じ関数から算出した投影を描画するだけ。ここで再計算すれば、いずれ事務所コンソールと食い違い、**役員が見るのはポータルなので間違っている方が信じられる**。`lawfirm` はテスト時だけの依存で、`contract_test/lawfirms-real-output-satisfies-the-contract` が実際の producer の出力を契約に当てる（誰も走らせない契約はコメント）。
+
+**11. kaisya は欠落を 0 として描かない。** `contract/problems` が渡されなかった欄を名指しし、欠落パネルは数字より**上**に出て、欠落 metric は `—` を描く。「徒過 0」が実測なのか未入力なのか区別できない画面は、記録が与えていない保証を与えている。`cloud-itonami-app` が残高不明を ¥0 と描かないのと同じ判断。
+
+**12. kaisya の要対応は件数順でなく回復不能さ順に並べる。** 期限徒過 → 送達先の再確認 → 回答の精査待ち → 期限間近 → 送達結果の未確認。徒過は後から回復できず、宛先の再確認は電話1本で終わる。ポータルが件数で並べると、直せる問題が直せない問題を画面から押し出す。
+
+**13. kaisya に承認ボタンを置かない。** 承認は弁護士本人の行為で事務所コンソール側。ポータルに置くと「ポータルで承認できる」という誤った可能性を画面が示唆する。
+
+**14. 業務プロセス一覧は BPMN から生成する。** `kaisya.bpmn` が `bpmn/*.bpmn` を読んで `resources/kaisya/processes.edn` を吐き、`bpmn_test/processes-are-current` が抽出をやり直して突き合わせる。手で書き写した一覧は2つ目の真実になり、図を編集した瞬間に静かにずれ、**どちらももっともらしく見えるので気づけない**。")
+
+  (:adr/consequences
+  "**lawfirm に入ったもの**: `lawfirm.transmission`（送達・送達先・経路制約・受信）/ `lawfirm.qa`（相談Q&A・状態・分析）/ `lawfirm.projection`（calendar / drive / practice-summary への一方向投影）/ `lawfirm.workspace`（host が実装する4つの port と、到着物を actor の request に変える入口、`dispatch-plan`）/ `store/durable-store`。HARD 不変条件 14–18 と必須承認操作2件（`:transmit-work-product` `:send-qa-answer`）を追加し、13+7 → 18+9 になった。console に送達パネル・Q&A パネル・事務所全体の分析を追加。deps に `kotoba-lang/calendar` と `kotoba-lang/drive`（どちらも portable `.cljc`、型を足すだけで authority は足さない）。
+
+**kaisya に入ったもの**: `kaisya.contract`（形と欠落の報告、要対応の並び順）/ `kaisya.console`（kotoba-ui SSR ポータル）/ `kaisya.bpmn`（BPMN → EDN 生成器）/ `kaisya.demo`（3事件のサンプル会社）/ `kaisya.render-console`。deps は kotoba-ui スタックのみ（`lawfirm` は `:test` のみ）。
+
+**検証（2026-08-01 closing 時点の最終実測、着地した pin と同一ツリーで測定）**: lawfirm `clojure -M:test` **153 tests / 612 assertions** green（着手時 81/377 から）、`clojure -M:lint` warnings 0、コンソールは design-quality の決定論的 HIG/WCAG 監査 **100.00** を維持。kaisya `clojure -M:test` **25 tests / 56 assertions** green、lint warnings 0、ポータルも **100.00**、BPMN 抽出は 3 プロセス / 58 ステップ。cloud-itonami-app `clojure -M:test` **872 tests / 3838 assertions** green（着手時 847/3770 から）、`clojure -M:lint` errors 0（warnings 9 は全て自分が触っていないファイルの既存分：account_link_sync / agent_control / mail_sync / mailbox_http_test）。
+
+**着地の証跡**: 6 件の server-side merge すべてについて、テストしたブランチ先端の tree SHA と merge commit の tree SHA が一致することを確認済み（`behind_by: 0` でマージしたため merge が何も変えていない）——**テストしたツリーがそのまま main に載っている**。lawfirm `77beef5→eb81688` / `d0f4d00→4e3bc79` / `0028cc7→8889aa0`、kaisya `decf6a5→6db72ea`、app `8b6ea2b→66b3ead` / `cb0be36→eecdfdd`。
+
+**この作業中に見つけて直した自分の回帰**: `by-matter` を `->>` で呼んで引数が逆になり、`work-products-of` / `recipients-of` / `qa-questions-of` が常に空を返していた。既存テストは1件も落ちなかった——空の per-matter 読み取りは「書面の無い事件」として描画され、壊れたクエリには見えないため。`store_test/per-matter-reads-return-that-matters-rows` を回帰ガードとして追加した。
+
+**着地**: cloud-itonami/lawfirm main = `eb816888680868edb319446e3c37953a808e6a7b`（server-side merge、旧 pin `974b94f` から status=ahead / behind_by=0 / merge_base==旧pin を事前確認）。cloud-itonami/kaisya main = `6db72ead1bb7be21b244be5bb6d873694fd3ec42`。
+
+**既知の限界（回避策ではなく構造的なもの）**:
+1. 経路制約表も法定期間表と同じく起案の補助であって権威ではない。表に無い組合せは「可」ではない。
+2. FAX の送信確認は送達の証明ではない。
+3. 投影は片道で、カレンダー/ドライブ側の編集は記録に反映されない（これは欠落ではなく設計）。
+4. 永続化はスナップショット全書き。正しく、部分書き込みの中間状態を持たないが、一件記録が大きくなるとコストは線形。プロトコル境界があるので entity store への差し替えは `lawfirm.store` より上を変えない。
+5. **cloud-itonami-app 側の adapter は実装済み**（2026-07-31、app ADR-0010、main = `66b3eadb2a9a6712f4b54e61e3ee6fffaba91695`）。`cloud.itonami.app.lawfirm` が記録を `state.edn` の `:lawfirm/db` に持ち（`persist-db!` が version で古いスナップショットを捨てる — practice は publish→persist の順で書くので、自分が既に何を書いたか知っているのは host だけであり、この判定は host の責任）、archive inbox を `InboundPort` として供給し、Drive に一件記録のフォルダを作り、summary / docket / inbound sync / drive の各経路を Passkey session 越しに出す。**surface は既定で無効** — 一件記録を持つことは deployment 判断であって feature toggle ではない。app suite は最終的に 872 tests / 3838 assertions green、lint 0 errors。この adapter 自身の限界は3つ: (i) archive に fax が無いため **arrival は `:email` のみ**、(ii) **`dispatch-plan` を実行する transport が無い**（何をどの登録済み宛先へ送ればよいかは計算できるが、渡す先が無い）、(iii) 記録は **single-tenant**（`:lawfirm/db` は data directory ごとに1事務所。practice は per-user なものではないので per-principal にしなかったが、multi-tenant hosting は先送りでなく単に無い）。Drive port が**フォルダしか作らない**のも設計で、app の `documents/create!` は編集可能な office 文書を作るものであり、準備書面という名前の空のスプレッドシートは「提出物に見えて提出物でないもの」を Drive に置くことになる。
+6. **HTTP の入口は実装・本番稼働済み**（2026-08-01、`network-awai/cloud-itonami` main = `cc0192e963b7afde7edb0e9d742faac48a31ea95`、**itonami.cloud**）。Kotoba に ingress capability が 無いという制約は変わらないので、入口は当初の設計どおり cljs 側——shadow-cljs が lawfirm の actor スタック全体（langgraph 込み）を Cloudflare Pages Functions にコンパイルする。`POST /api/{org}/{repo}/lawfirm` と `GET .../lawfirm/{summary,docket}`、認証は既存の tenant CACAO capability（`lawfirm/write`）で専用 token を発明していない。**1リクエスト = 1操作 = 1トランザクション**: D1 から version N で読み、1操作を governor に通し、`UPDATE ... WHERE version = N`。負けたら最初からやり直しマージしない——同時に動く2人の弁護士はそれぞれ実際の記録に対して判定されねばならず、last-writer-wins は片方の預り金記録を黙って落とす。hold も書き戻す（何をしなかったかは弁護士会が聞く側の半分）。記録は1行に EDN で持つ——不変条件が記録全体を横断して検査されるため分割できず、JSON では `:trust` が `\"trust\"` になって `trust/commingled?` が「勘定の無い移動」として弾く。**本番 D1 (NRT) で検証済み**: 実レコード 4,450 bytes の INSERT が `changes:1`、stale writer（`WHERE version=1`、行は version 2）が **`changes:0`** で拒否、current writer が `changes:1` で着地、読み戻して lawfirm でパースすると keyword が保存され `stale-channels:1` を同じ関数が算出。スモーク行は削除済み（`lawfirm_practice` 0 行）。cljs suite 631 tests / 5975 assertions green。**未証明は CACAO を伴う HTTP のエンドツーエンドのみ**——CACAO は WebAuthn 署名で passkey なしにシェルから発行できない。3経路すべてが本番で `401 requires Authorization: CACAO <b64>` を返すこと（＝ルート配線と guard 作動）まで確認した。なお両コンソール（lawfirm / kaisya）の `:act` ボタンは依然 SSR の意味論しか持たない——載ったのは記録面であって画面ではない。
+7. **kaisya の BPMN プロセスと lawfirm の op は繋がっていない。** 「法務案件管理」の各ステップがどの op に対応するかはまだどこにも書かれていない。
+8. **送信 gateway は実装済み**（2026-07-31、app ADR-0011、cloud-itonami-app main = `eecdfddd79c2486b06316a2bcad8ec401fafa61e`）。`cloud.itonami.app.fax` が Dropbox Fax の API（`api.hellofax.com/v1`）に対して `DispatchPort` を実装する。**API を使うのは利便性ではなく統制**で、このワークスペースの先行実装（`etzhayyim-project-fax`）は Dropbox Fax を UI 手動ハンドオフとして使っており、オペレータが番号を打つ形は `lawfirm.transmission` が無くそうとしているものそのものだった。`To` は `dispatch-plan` が記録から読んだ番号で埋まり、route の呼び手が選べるのは「どの送達を実行するか」だけ。承認された書面の `:object-ref` の sha256 と一致しないバイト列は拒否する。パスワードは keychain から1件だけ狙い撃ちで読む（config にも env にも置かない）。**ただし実サービスには一度も接続していない** — 口座が未取得で、全テストは注入した transport を駆動する。API 有効化は Dropbox サポートへの申請＋有料プランが要り、v1 は v3 へ移行告知済み、1日200件で 429。
+
+   この実装中に、`dispatch-plan` が `:client-id` / `:bengoshi-id` を返していない欠陥が見つかった（lawfirm `8889aa0` で修正）。放置していれば **FAX は全部送られ、送信結果は一件も記録されない**（確認が `:no-client` で hold される）状態だった。テストで見つかり、本番では起きていない。
+
+9. **`kotoba-lang/fax` は依然として手つかずの legacy seed。** 送信は app 側が担うので当面の障害ではないが、あの repo の位置づけは未決のまま。
+
+10. **inbound fax が無い。** Dropbox Fax は受信も `DefaultInboundFaxCallbackUrl` に POST できるが、app が読む arrival は m365 archive の `:email` のみ。`lawfirm.transmission` の `:fax` 経路は送信半分しか埋まっていない。
+
+**次にやるなら**: (a) Dropbox Fax の口座取得と**実サービスに対する初回送信の検証**（コードは書けているが一度も接続していない — ここが最大の未証明）、(b) inbound fax（`DefaultInboundFaxCallbackUrl` → arrival）、(d) kaisya の BPMN ステップと lawfirm の op の対応付け、(e) practice record の multi-tenant 化。")))

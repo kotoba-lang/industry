@@ -1,0 +1,192 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608314600-datalake-loader-leaves-python")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "datalake-loader-in-nbb")
+  (:adr/title "ADR-2608314600: datalake の loader から Python を外した —— 部品は全部この workspace の .cljc に在り、移植は未着手だっただけ。.kotoba には今日はまだ載らない（fs capability が無い）が、載らないのは入口だけである")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/org-apache-iceberg"
+              "orgs/kotoba-lang/org-apache-parquet" "orgs/kotoba-lang/org-apache-avro"))
+
+  (:adr/authoritative_for
+  (vector "datalake の loader は `scripts/datalake-load.cljs`（nbb）であること。新規に Python を書かない"
+   "`.kotoba` に載らない理由が **fs capability の不在**であり、それは loader の**入口だけ**であること。byte の組み立て・object の PUT・catalog への commit は `storage-v1` / `http-v1` が実装済みなので載りうる"
+   "live commit がまだ配線されておらず、**そのことを refuse で言う**こと（黙って成功と区別が付かない出力にしない）"
+   "0 行の表を Iceberg に commit しないこと"))
+
+  (:adr/amends
+  (vector "scripts/datalake-sync.py の docstring —— 『この script を nbb へ移せない技術的理由はもう無い。移植は未着手である』の未着手を閉じる（dry-run 経路について）"))
+
+  (:adr/related
+  (vector "90-docs/adr/2608300900-datalake-stack-gap-audit.edn（Parquet+snappy / Iceberg 統計 / Avro writer）"
+   "90-docs/adr/2608314300-publisher-census-into-the-datalake.edn（この loader の最初の入力）"))
+
+  (:adr/measured
+  (vector "`datalake-sync.py` が自分で測って書いていた 4 点は全部 `.cljc` に在る: Parquet writer（`parquet.write`）/ metadata.json（ただの JSON）/ REST catalog（ただの HTTP）/ Avro manifest（`avro.file/write`、2026-08-29〜）"
+   "実行（2026-08-31、Python 不使用）: SPEC 3 tables → PARQUET publisher_service **27,307 行 / 1,244,263 bytes / 14 列**、publisher_category 35 行 / 751 bytes、publisher_coverage 1 行 / 1,977 bytes"
+   "入力 JSON 10,010,867 bytes → Parquet 1,244,263 bytes（**約 8 倍**、snappy）"
+   "Iceberg: 3 表それぞれに manifest + manifest-list + metadata.json を生成（snapshot id つき）"
+   "**往復検証**: `parquet.footer/parse`（write とは別経路）で読み戻して **num-rows 27,307 が一致**、14 列 / 1 row-group。`avro.file/record-count` が manifest 1 / manifest-list 1。metadata.json は Iceberg v2 の形（format-version / schemas / snapshots / current-snapshot-id / partition-specs / sort-orders / table-uuid）"
+   "**capability kit を今日数え直した: 14 種。fs / process / exec は無い**（can-frame / clock / datagram / dataspace / http / http-ingress / link-frame / llm / log / state / storage / stream-ingress / stream-object / ui）。script host `kbb` は west に 0 件"
+   "ただし **`storage-v1` と `http-v1` は `:reference` / `:wasm-aot` / `:jit` とも implemented**、`dataspace-v1` は `:native-aot` も implemented"
+   "負のコントロール 2 本: spec 不在 → REFUSED / 0 行の表 → **exit 2** で拒否し、空の表を commit しない"
+   "移植中に 1 件バグを出した。`:file-size-in-bytes` と書いたが正しくは `:file-size-bytes` で、**Avro の encoder が `avro: not an integer` で弾いた** —— nil が manifest に入って静かに壊れる形を、型が止めた"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-31）「py じゃなくて kotoba 言語で」。
+
+`datalake-sync.py` の docstring は 2026-08-29 に自分で測って、こう書いていた:
+
+> Iceberg の commit が要求するものを 1 つずつ見ると、欠けているのは 1 つだけ …
+> **4 つとも揃っており、この script を nbb へ移せない技術的理由はもう無い。**
+> 移植そのものはまだやっていない —— これは「移植は不要」ではなく「未着手」である。
+
+**未着手を閉じた。**")
+
+  (:adr/decision
+  "### D1. loader は nbb。Python はこの面から外れる
+
+`scripts/datalake-load.cljs` が `datalake-sync.py` を置き換える。使う部品は全部
+この workspace のもので、外部ライブラリは 1 つも要らない:
+
+```
+parquet.write/columns-of-rows + of-columns   データ file（snappy）
+iceberg.table/append                          manifest / manifest-list / metadata.json
+iceberg.rest/{load-table,commit,create-table} catalog（未配線、D3）
+kotobase.storage.s3/*                         object の PUT（未配線、D3）
+```
+
+pyarrow も pyiceberg も要らない —— **この機械にはどちらも入っておらず、
+PEP 668 が user install を拒否する**ので、Python 版はそもそもここでは走らない。
+nbb 版は走る。
+
+### D2. `.kotoba` に載らないのは入口だけである
+
+今日 capability kit を数え直した: **14 種、fs / process / exec は無い。**
+script host `kbb` も west に 0 件。**loader は local file から JSON を読むので、
+fs の無い言語では書けない。**
+
+**しかしそれは loader 全体の話ではない。**
+
+| loader の仕事 | 今日 `.kotoba` に載るか |
+|---|---|
+| local の JSON を読む | **載らない**（fs が無い） |
+| 行を列にして Parquet の byte を組み立てる | 純計算。載りうる |
+| manifest / metadata を組み立てる | 純計算。載りうる |
+| object を PUT する | **`storage-v1` が implemented** |
+| catalog に commit する | **`http-v1` が implemented** |
+
+つまり CLAUDE.md の app / host 分割でいえば、**host に残るのは入口の 1 つだけ**で、
+残りは product semantics として `.kotoba` に降ろせる。移すならその線で切る ——
+**「fs が無いから Kotoba では書けない」で止めると、載る 4 つまで諦めることになる。**
+
+⚠ ただし今日はやらない。単一ファイルの guest は stdlib を引けず（`--prelude` は
+CLJS backend しか読まない）、`:document` は 256 ノード、fuel は instance 生涯 512 で、
+**27,307 行分の byte を組み立てる作業がその天井の下に収まるかは測っていない。**
+測らずに「載る」と書かない。
+
+### D3. live commit は配線しない。**そしてそれを refuse で言う**
+
+object の PUT と `iceberg.rest/commit` は credential を要し、一度も走らせていない。
+だから `--dry-run` 以外で呼ばれたら **exit 2 で拒否**する。
+
+**成功と区別の付かない出力にしない。** 動かしたことのない経路を「たぶん動く」形で
+landing させると、最初に使う人がその検証をやることになる。
+
+### D4. 0 行の表を commit しない
+
+0 行は「データが無い」ではなく、たいてい「export が走っていない」。
+その 2 つを同じ緑にすると、空を実測として公開することになる。exit 2 で拒否する。")
+
+  (:adr/implementation
+  (vector "landed: scripts/datalake-load.cljs（nbb）。spec + JSON → Parquet(snappy) → Iceberg manifest / manifest-list / metadata.json"
+   "verified: 27,307 行を 1,244,263 bytes の Parquet にし、**別経路の `parquet.footer/parse` で読み戻して num-rows が一致**。avro manifest / manifest-list も `avro.file/record-count` で読めた。metadata.json は Iceberg v2 の形"
+   "verified: 負のコントロール 2 本（spec 不在 / 0 行）とも拒否し、空の commit をしない"
+   "not-done: live commit（object PUT + REST commit）。credential を要し未検証なので exit 2 で拒否する"
+   "not-done: `datalake-sync.py` の削除。live 経路が nbb 側で検証されるまで残す —— 動く道具を、動かしたことのない道具で置き換えない"
+   "not-done: `.kotoba` への移動（D2）。天井を測っていない"))
+
+  (:adr/known-gaps
+  (vector "**live commit が未検証。** dry-run までしか通していない。credential のある機械で 1 度通すまで、`datalake-sync.py` を消さない"
+   "**`.kotoba` の天井を測っていない**（D2）。fuel 512 / `:document` 256 ノード / 単一ファイルで stdlib 無し という制約の下に、Parquet の byte 組み立てが収まるかは未測定"
+   "型推論は spec の `int_columns` と値の検査で、boolean を文字列として保つ。Iceberg の boolean 型には落としていない"
+   "統計（lower/upper bounds）を manifest に載せていない。`parquet.footer/parse` が per-chunk 統計を報告するので材料は在るが、**推定しないという `iceberg.manifest/data-file` の規律**に従い、測って渡すまでは省略する（省略は『不明』という正直な答え）"))
+
+  (:adr/open-decisions
+  (vector "live commit をどの機械で 1 度通すか（credential が要る）"
+   "`.kotoba` へどこまで降ろすか（D2 の 4 つ）。先に天井の実測が要る"))
+
+  (:adr/body
+  "# ADR-2608314600: loader が Python を出る
+
+## 一行で
+
+**移植できない理由はもう無い、と script 自身が 2 日前に書いていた。** 閉じた。
+
+## 何が要ったか
+
+`datalake-sync.py` の docstring が自分で棚卸ししていた —— Iceberg の commit に要る
+4 つ（Parquet writer / metadata.json / REST catalog / Avro manifest）は
+**全部 portable な `.cljc` に在る**。最後の 1 つ（Avro writer）が 2026-08-29 に入って、
+それ以降は『未着手』だけが残っていた。
+
+外部ライブラリは 1 つも要らない。pyarrow も pyiceberg も —— **この機械には
+どちらも入っておらず PEP 668 が install を拒否するので、Python 版はそもそも
+ここでは走らない。nbb 版は走る。**
+
+```
+SPEC     3 tables
+PARQUET  publisher_service   27,307 rows   1,244,263 bytes   14 cols
+ICEBERG  publisher_service   snapshot=1345911957  files=2  metadata=2458 bytes
+```
+
+JSON 10.0 MB → Parquet 1.24 MB（約 8 倍、snappy）。
+
+## byte が出たことは正しさではない
+
+だから**別経路で読み戻した**。`parquet.footer/parse`（writer とは別のコード）が
+**num-rows 27,307 を返し、入力と一致**。`avro.file/record-count` が manifest 1 /
+manifest-list 1。metadata.json は Iceberg v2 の形（format-version / schemas /
+snapshots / current-snapshot-id / partition-specs / sort-orders / table-uuid）。
+
+## `.kotoba` について、正確に
+
+今日 capability kit を数え直した —— **14 種、fs / process / exec は無い。**
+`kbb` も west に 0 件。だから loader は `.kotoba` では書けない。
+
+**が、書けないのは入口だけである。**
+
+| | |
+|---|---|
+| local の JSON を読む | 載らない（fs が無い） |
+| Parquet の byte を組み立てる | 純計算 |
+| manifest / metadata を組み立てる | 純計算 |
+| object を PUT する | **`storage-v1` implemented** |
+| catalog に commit する | **`http-v1` implemented** |
+
+**「fs が無いから Kotoba では書けない」で止めると、載る 4 つまで諦めることになる。**
+CLAUDE.md の app / host 分割でいえば、host に残るのは入口 1 つで、残りは
+product semantics として降ろせる。
+
+今日やらないのは、**天井を測っていない**から —— 単一ファイルの guest は stdlib を
+引けず、`:document` は 256 ノード、fuel は instance 生涯 512。27,307 行分の byte 組み立てが
+その下に収まるかは未測定で、**測らずに「載る」と書かない。**
+
+## 動かしたことのない経路を、動くように見せない
+
+object の PUT と REST commit は credential を要し、一度も走らせていない。
+だから `--dry-run` 以外では **exit 2 で拒否する**。
+
+同じ理由で `datalake-sync.py` を消していない。**動く道具を、動かしたことのない道具で
+置き換えない。** live を 1 度通してから消す。
+
+## 移植中に型に助けられた
+
+`:file-size-in-bytes` と書いた（正しくは `:file-size-bytes`）。nil が manifest に
+入って静かに壊れるところを、**Avro の encoder が `avro: not an integer` で弾いた。**
+JSON を素通しする loader なら通っていた。")))

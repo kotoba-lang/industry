@@ -1,0 +1,478 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608060900")
+  (:adr/doc_type "adr")
+  (:adr/topic "access-analytics-dwell-and-transitions")
+  (:adr/title "滞在時間と遷移は session id 無しの集計で測る — heatmap は測らない。shinshi.club と babiniku.net に一次計測を入れ、fleet に共有のアクセス解析が無いことを記録する")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-06")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authoritative_for
+  (vector "club-shinshi / net-babiniku のアクセス解析の設計と現在地"
+   "session id を発行しないという選択と、それが遷移分析に課す上限"
+   "heatmap を測らないという決定とその理由"
+   "fleet に共有のアクセス解析基盤が無いという実測結果"))
+  (:adr/supersedes (vector))
+  (:adr/body
+  "# Context
+
+「club-shinshi, net-babiniku に滞在時間・遷移・heatmap のようなアクセス分析は
+統合設計されているか。cloud-itonami にそういう repo はあるか」という問いから
+始まった。答えは全部『無い』に近かったが、**それを確かめる過程で、この
+workspace の repo を読むときの手順の誤りが 2 つ露呈した**。両方とも記録する
+価値がある —— 同じ誤りは次も起きるからである。
+
+## 誤り 1: `orgs/` 配下を『現在の姿』として読んだ
+
+最初の調査は `orgs/network-awai/club-shinshi` の作業ツリーを読んで結論を出した。
+そこは **17 日前（2026-07-20）の detached HEAD** で、しかも未コミット変更を
+抱えていた。その状態を根拠に『滞在時間は宣言だけで未配線』『funnel_daily の
+migration が無い』『analytics ns が無くビルド不能』と報告したが、**3 つとも
+main では違った**。
+
+west の checkout は pin に合わせて任意の commit に置かれ、他セッションの WIP が
+乗っていることもある。**`orgs/<org>/<repo>` は「今そこにあるファイル」であって
+「その repo の現在地」ではない。** 判断材料にするなら
+`git worktree add … <remote>/main` を切ってそこを読む。
+
+## 誤り 2: repo 名から正本を推定した
+
+`club-shinshi` を読んで結論を出したが、**`shinshi.club` を実際に serve して
+いるのは `club-shinshi-app`** だった。両者の `wrangler.jsonc` は
+**同じ Worker 名 `magatama-sh1n5h1x`** を宣言しており、CLAUDE.md が警告する
+「最後にデプロイした人が勝つ」構造がそのまま存在する。
+
+正本の判定に使えたのは名前ではなく **live の応答**である:
+
+```
+curl -sS -o /dev/null -w '%{http_code}' https://shinshi.club/   # 200
+grep -o '\"pattern\"' wrangler.jsonc                            # shinshi.club (custom domain)
+```
+
+## 派生して見つかった、この ADR の対象外の壊れ
+
+`club-shinshi` 側の appview は **main でコンパイルできない**。PR #30
+（`f3b3272` refactor: extract numbered implementation layers、262 files /
+-24,190 行）が appview のソースを削除したが、`router.cljs` 等の require が
+残っており、**38 の namespace が解決しない**（`shinshi.worker.http`,
+`shinshi.ui.db`, `shinshi.ui.views.*` ほか）。同じコードは
+`club-shinshi-app` に在るので、あれは切り出しの残骸と読める。
+
+**この ADR ではこれを直さない。** 24,190 行の削除を戻すか、`club-shinshi` から
+appview を撤去するかは所有者の判断であり、計測の作業に混ぜてよい決定ではない。
+gap として記録する。
+
+# 実測した現在地（2026-08-06、live 基準）
+
+## shinshi.club（`network-awai/club-shinshi-app`、Worker `magatama-sh1n5h1x`）
+
+着手前に**実際にデプロイされていた**もの:
+
+| 面 | 実装 | テーブル |
+|---|---|---|
+| 到達数 | `worker/telemetry.cljs`、HTML リクエストごと | `pv_daily(day, tier, source, views)` |
+| 再訪 | `sv_first` / `sv_d7` / `sv_seen` cookie | `visitor_daily(day, new_visitors, d7_returns, returning_visits)` |
+| 広告充填 | `/_track` の `{t:'ad'}` beacon | `ad_request_daily(day, tier, requested, filled)` |
+| RUM | Cloudflare Web Analytics beacon | CF ダッシュボード |
+
+滞在時間・遷移・heatmap は **1 つも無かった**。
+
+なお本番 D1 には `funnel_daily` テーブルが存在するが、**デプロイ済みコードは
+そこへ 1 行も書かない**（別 repo 系統の残骸）。テーブルの存在は計測の存在を
+意味しない。
+
+## babiniku.net（`network-awai/net-babiniku`、Pages）
+
+**何も無かった。** telemetry も beacon も計測エンドポイントも無し。repo 自身の
+`docs/bmc-lean-loop-log.md` が iteration 0 以来
+『Key Metrics: none instrumented yet』と書き続けていた。
+
+## cloud-itonami
+
+**アクセス解析の repo は無い。** west.yml の cloud-itonami 1,723 entry を名前と
+README の両面で検索して該当ゼロ。近いものは:
+
+- `cloud-itonami/adserver` + `kotoba-lang/adnet` — 広告の imp/click と USDC 課金。
+  キャンペーン単位であって行動計測ではない
+- `kotoba-lang/senden` — `senden.funnel`（awareness→retention）+
+  `senden.attribution`（first/last/linear/multi-touch）。設計は妥当だが
+  **consumer ゼロ**。deps.edn から参照している repo は 1 つも無い
+- `kotoba-lang/log` — trace/span の構造化ログ。オブザーバビリティであって
+  プロダクト分析ではない
+- `loop-ux-kaizen` / `loop-consumability` — **成果物**を測るループ。実ユーザーは測らない
+
+つまり fleet に共有のアクセス解析基盤は存在せず、各 repo が自前で書くか書かないか
+だけの状態だった。
+
+# Decision
+
+## D1. session id を発行しない。滞在時間と遷移は集計で測る
+
+`club-shinshi-app` の `legal/privacy.md` §1.2 は、本サービスが
+『counts and dates only — no IP address, no device fingerprint, and no user
+identifier』を保持すると**対外的に宣言している**。session id を振れば
+per-visitor の経路復元が可能になり、この宣言は偽になる。データの性質も
+変わる（集計 → 個人に紐づく行動履歴）。
+
+したがって:
+
+- **滞在時間** = 粗いバケットの度数分布（`dwell_daily`）。duration そのものは
+  保存しない —— 低トラフィックでは per-visit の秒数は識別子に近づく
+- **遷移** = 1 次の (from → to) エッジの度数（`route_transition_daily`）。
+  個人の経路には join し直せない
+
+**この選択が諦めているものを明記する**: 3 ホップ以上の経路、per-user の
+funnel、離脱の因果、コホート別の行動差。それらが本当に必要になったら、
+必要なのは技術ではなく **privacy.md の改訂と、それに見合う保護**である。
+黙って session id を足さない。
+
+## D2. route は closed vocabulary に丸める。検査は書き込み側で行う
+
+両サイトとも beacon は公開エンドポイントで、誰でも POST できる。したがって
+**client の正規化は参考値**とし、worker / Function 側で既知語彙に丸める
+（未知は `other`）。これが:
+
+- テーブルの cardinality を有界に保つ唯一の仕組み
+- scene id・character id・入力プロンプト・検索語が『counts and dates only』の
+  テーブルに入る経路を塞ぐ唯一の仕組み
+
+送るのは **path ではなく route segment** のみ。
+
+**bucket だけは丸めずに落とす。** 未知の bucket は client のバグか偽造であり、
+既定値に流し込むと**そのテーブルが測るために存在する分布そのものを汚す**。
+
+## D3. heatmap は測らない
+
+クリック / スクロールの座標取得と session replay は実装しない。理由:
+
+1. **privacy の階が違う。** 座標列は事実上の行動記録で、D1 の集計とは別の
+   データ分類になる。privacy.md の宣言を書き換えずには入れられない
+2. **今の設問に対して過剰。** 「どの route が読まれ、次にどこへ行くか」は
+   D1/D2 で答えが出る。heatmap が要るのは『このページのどこが押されないか』で、
+   それはまだ問いになっていない
+3. **third-party SaaS を入れる決定を含む。** 自前実装は座標の正規化・
+   DOM バージョニング・サンプリングを伴い、規模に見合わない
+
+**非目標として明記する** —— 「まだやっていない」ではなく「やらないと決めた」。
+再考の条件は、privacy.md の改訂と、特定ページの改善という具体的な問いが
+立つこと。
+
+## D4. Cloudflare の RUM に依存しない
+
+ADR-2607282000 が itad.gftd.ai で実測したとおり、Free プランでは:
+
+- ホストで絞れる `httpRequestsAdaptiveGroups` は `time range wider than 1d` で拒否
+- 30 日取れる `httpRequests1dGroups` は**ホストで絞れない**（zone 全体のみ）
+
+zone に多数のサービスがぶら下がっているので、**サブドメイン単体では
+『先週と比べて増えたか』すら測れない**。CF beacon は補助として置くが、
+**プロダクト判断の根拠は自前の D1 集計**とする。
+
+なお **babiniku に CF Web Analytics の beacon token を発行できなかった**:
+wrangler の OAuth token に RUM scope が無く `/rum/site_info/list` が 403
+（`account (read)` `d1 (write)` 等はあるが RUM は無い）。CLAUDE.md が
+記録している r2 scope 欠落と同じクラスの穴。**dashboard での 1 手作業が要る**
+ので所有者に残す（Web Analytics > Add a site > babiniku.net）。
+一次計測を先に入れたので、これは blocker ではなく補助の欠落である。
+
+# 実装済み（着地・live 確認済み）
+
+## shinshi.club — `club-shinshi-app` PR merge `f7fa019`
+
+`0016_dwell_and_transition.sql` / `worker/track.cljs` の `dwell`・`nav` 分岐 /
+`worker/telemetry.cljs` の `normalize-route` + `route-segments` +
+`dwell-buckets` / 新規 `ui/analytics.cljs` / `ui/api.cljs` の beacon 2 本 /
+`ui/router.cljs`（pushState と popstate の両方）/ `ui/core.cljs`。
+
+SPA なので**初回ロード以降の遷移は pushState であり worker には 1 件も届かない**
+—— client が唯一の観測点である、というのが `ui/analytics.cljs` の存在理由。
+
+**popstate も計測する。** back/forward で回遊する読者を落とすと、
+『着地したページから動かなかった人』に見えてしまう。
+
+**active 秒は「可視 かつ フォーカスあり」でのみ進む。** 背景タブに放置された
+ページが一晩分の滞在を報告しない。タブを離れて戻った場合は**新しい注視
+セグメント**として計り直す —— 戻った後の読了が丸ごと落ちるため。
+
+**同一 segment 内の遷移は遷移として数えない**（/video/scene/a → /video/scene/b）。
+読者は video を離れていないし、video→video のエッジは信号を持つエッジを
+埋没させる。
+
+検証:
+
+- `112 tests / 3157 assertions, 0 failures`
+- **gate が落ちることを確認してから landed とした**: `normalize-route` の
+  whitelist を外すと 13 failures
+- `shadow-cljs release app worker` 成功、両 bundle に新コードを確認
+- 本番 D1 に `dwell_daily` / `route_transition_daily` を作成
+- **live probe（deploy 後、shinshi.club に実際に POST）**:
+
+| payload | 結果 |
+|---|---|
+| `{t:nav, from:home, to:video}` | `home → video` 1 行 |
+| `{t:nav, from:/etc/passwd, to:boa-hancock-scene-77}` | **`other → other`** に丸められた |
+| `{t:dwell, route:video, bucket:30_59}` | `video / 30_59` 1 行 |
+| `{t:dwell, route:ranking, bucket:bogus}` | **書かれない**（bucket は落とす） |
+
+検証で入れた 4 行は削除済み（`dwell_daily` 0 行 / `route_transition_daily` 0 行
+に戻して着手）。
+
+⚠ **`waitUntil` で書き込みは非同期**なので、204 の直後にクエリすると
+まだ入っていない。実際に一度これで『dwell が書かれていない』と誤診した。
+
+## babiniku.net — `net-babiniku`
+
+`0020_visit_telemetry.sql`（`visit_daily` / `dwell_daily` /
+`route_transition_daily`）/ 新規 `functions/api/track.js` / 新規
+`src/babiniku/analytics.cljs` / `web.cljs` の boot 配線。
+
+**`:ui/navigate` ではなく `:ui/route` を監視する。** 遷移はタブバーだけでは
+ない —— character card のクリックは `:scene/select` を通って `:chat` へ飛び、
+character 作成は `:create` に着地する。**タブのイベントだけを hook すると、
+最も信号を持つエッジ（home → chat の funnel）を取り逃がす。**
+re-frame の global `:after` interceptor が、どのイベント経由でも route 変更を
+捉える。
+
+**watch-room の視聴者は計測しない。** 共有リンクで来て一度も navigate しない
+ので、即離脱した訪問として記録されてしまう。
+
+検証: `track_api_test.cljs` **12 checks / 0 failures**、whitelist を外すと
+**4 failures**（gate が実際に落ちることを確認）。
+
+## 読む面（同日追加）
+
+計測しただけで読めないカウンタは劇場である —— 収集コストは同じまま何も買わず、
+さらに「その問いは見張られている」という誤った印象だけを与える。両サイトに
+secret-gated な read surface を足した。
+
+| | エンドポイント | 認証 |
+|---|---|---|
+| shinshi.club | `GET /_metrics/audience?window_days=&end_day=` | `x-internal-trust`（`/_metrics/revenue` と同じ gate、`metrics/authorized` に切り出して共有） |
+| babiniku.net | `GET /api/telemetry-report?window_days=&end_day=` | `Bearer`（`reaction-moderation.js` と同じ規約） |
+
+**集計値でも public にしない。** オーディエンス規模と funnel の形は business data である。
+
+**未設定のとき閉じる順序が本体。** 「間違った secret を弾く」より危険なのは、
+**secret が未設定のまま起動し、`authorization` を undefined と比較して誰にでも
+配ってしまう**経路である。shinshi は 500、babiniku は 503 を返す分岐を認証比較の
+*前* に置き、両方をテストで固定した。
+
+**各セクションが `collected-since` を持つ。** dwell / transition のテーブルは
+2026-08-06 に作ったので、それ以前まで遡る window は 0 行を返す。それを
+「誰も滞在していない」と読むのは正反対で、**行が無いのは NOT MEASURED**。
+呼び出し側が両者を区別できるよう境界を渡す。
+
+**window は両端 inclusive**（7 日 = 07-31〜08-06）。ここを 1 日ずらすと、人間が
+「今週」として読む数字が全部ずれる。90 日で clamp し、負値・非数でも範囲が
+反転しないことをテストで固定した。**1 本のクエリが失敗しても、そのセクションが
+空になるだけでレポート全体は返る。**
+
+検証: shinshi `122 tests / 3170 assertions, 0 failures`（403 分岐を外すと 4 failures）、
+babiniku `12 checks / 0 failures`（401 分岐を外すと 2 failures）。
+live: `shinshi.club/_metrics/audience` は secret 無し・誤 secret とも **403**、
+POST は 405、サイト本体は 200。
+
+⚠ deploy 直後は Cloudflare の伝播中に古い版が応答する。実際に一度
+「403 になっていない」と誤診した —— **deploy 直後の 1 回の probe を結論にしない。**
+
+# Consequences
+
+- 両サイトで『どの route がどれだけ読まれ、次にどこへ行くか』が初めて測れる。
+  babiniku は **これが初めての計測**であり、BMC ループが 0 件のまま回していた
+  Key Metrics に初めて実データが入る
+- **3 ホップ以上の経路と per-user funnel は測れない。** D1 の代償として明示的に
+  受け入れた。必要になったら privacy.md の改訂から始める
+- **heatmap は非目標。** 再考には D3 の 2 条件が要る
+- 両サイトのスキーマを意図的に揃えたので、**2 つのプロダクトの回遊を同じ形で
+  比較できる**。3 つ目が出てきたら、この形を `kotoba-lang` の共有ライブラリに
+  引き上げるのが自然（`senden` は funnel/attribution の語彙を既に持っているが
+  consumer ゼロなので、実際に使われる形が 2 つ揃ってから寄せる方が安全）
+
+
+# 訪問者数は audience ではなかった（2026-08-07 実測）
+
+前日に landed した計測を「実トラフィックが乗ったか」確認しに行ったところ、
+**pv_daily は 88 views を記録しているのに dwell_daily / route_transition_daily は
+0 行**だった。ADR に自分で書いた注意（`collected-since` が null なら beacon が
+動いていない可能性も疑う）に従って切り分けた。
+
+## 決定的だった signature
+
+```
+day        new_visitors  returning_visits  d7_returns
+2026-08-03      119            0               0
+2026-08-04       68            0               0
+2026-08-05       59            0               0
+2026-08-06       80            0               0
+```
+
+**5 日で約 400 の「訪問者」が居て、後日戻ってきた者が 1 人も居ない。**
+`returning_visits` は `sv_first` / `sv_seen` cookie で駆動していて、実ブラウザなら
+必ず送り返す。この長さの完全な 0 は「静かな週」ではなく
+**cookie を保持しない母集団**を意味する。
+
+## 推測で終わらせず、Cloudflare GraphQL で実測した
+
+（wrangler の OAuth token がそのまま通る —— ADR-2607282000 の知見）
+
+23 時間の上位クライアント:
+
+| requests | client |
+|---|---|
+| 118 | ClaudeBot |
+| 77 / 55 / 18 / 8 / 6 | ブラウザ形の UA（Mac / Win / Android / iPhone） |
+| 53 | SemrushBot |
+| **50** | **`gftd-bmc-collect/1.0`** ← このワークスペース自身の収集器 |
+| 41 | curl |
+| 18 | Go-http-client |
+| 17 | AhrefsBot |
+| 13 | wp-admin スキャナ |
+
+## 見つかった 2 つの欠陥（どちらも修正済み）
+
+**① 自己参照。** `skip-prefixes` に `/_metrics` が無かった。portfolio collector が
+`/_metrics/revenue` を定期的に叩き、**その polling が pageview かつ新規訪問者として
+数えられ、同じ collector がその膨らんだ訪問者数を business metric として読み戻して
+いた。** zone で 5 番目に多いクライアントが自分たちの収集器だった。
+
+**② bot 判定の穴。** `bot-re` は \"bot\" を含む UA しか弾かない。`Go-http-client/1.1`
+も `gftd-bmc-collect/1.0` も含まないので**人間の訪問者として計上されていた**。
+どちらも JavaScript を実行できない。
+
+## 0017 — JS 実行を証明する discriminator
+
+根本問題は「general tier に *ブラウザが我々のコードを実行した* ことを示す信号が
+1 つも無かった」こと。だから静かな週と空の週を区別できず、audience の数字を
+どちらの向きにも信じられなかった。
+
+`visit_daily`（0017）はページロードごとに 1 行、**JS を実行した場合のみ**。
+`/_metrics/audience` は両方と**その比 `js-execution-rate` を返す** —— 呼び出し側に
+計算させない。単独で読むと誤解を招くのは `pageviews` の方だからである。
+
+net-babiniku の 0020 と同じ列構成にしたので 2 プロダクトを比較できる。なお
+**babiniku の数字は最初から膨らんでいない** —— 唯一のカウンタが client-side beacon
+なので、構造的に bot が入れない。
+
+## これまでの pv_daily をどう読むか
+
+**過去の `pv_daily` / `visitor_daily` を audience として引用しない。** それらは
+HTTP リクエスト数であり、実測した内訳ではクローラと自前ツールが支配的だった。
+ブラウザ形の UA も存在するが、**JS 実行の証明なしには実在の人間と偽装した
+スクレイパを区別できない** —— まさにそれが 0017 の存在理由である。
+
+BMC の metrics に綴じ込む前にこれを直したのは意図的で、順序を逆にしていたら
+bot の数を business decision に流し込んでいた。
+
+# 着地点と再開点（2026-08-06 closing）
+
+## default branch に存在することを確認済み
+
+| repo | default branch tip | 内容 |
+|---|---|---|
+| `network-awai/club-shinshi-app` | `9138dae` | `f7fa019` 書く面（0016）+ `9138dae` 読む面 |
+| `network-awai/net-babiniku` | `569b1ef` | `09acad0` 書く面（0020）+ `569b1ef` 読む面 |
+| `com-junkawasaki/root` | `9314aae` → `a445dbd` | この ADR とその更新 |
+
+open PR ゼロ、自分の branch / worktree はすべて削除済み。本番デプロイ済み
+（`magatama-sh1n5h1x` version `fc8c05e8` / net-babiniku Pages）。
+
+## 2026-08-07 追記: 読む面は shipped した日から一度も動いていなかった
+
+前節が「200 経路を live で検証していない」と書いた、まさにその穴に本物のバグが
+入っていた。翌日 collector を繋ぐために secret を発行して初めて 200 を叩き、
+**全セクションが 0 / `collected-since` null** を返すことが分かった —— 同じ
+window の `pv_daily` には 595 views が入っているのに。
+
+原因は `telemetry/rows` の `(apply (.-bind (.prepare db sql)) binds)`。cljs の
+`apply` は statement から切り離したメソッドを呼ぶので workerd の D1 が throw し、
+直後の `.catch` が `[]` に変えていた。**`collected-since null` は NOT MEASURED の
+つもりで置いたのに、実際には NOT READ を意味していた** —— 正直な空に見える分だけ
+質が悪い。修正後の本番確認: pageviews 595 / new_visitors 486 /
+`collected-since 2026-06-11`（`club-shinshi-app` `2792b6c4`）。
+
+教訓を 2 つ、この ADR の他の項目より重く記録する:
+
+1. **「200 経路は unit test で確認済み」は検証ではない。** 実際 122 tests は
+   全部緑のまま、本番は 1 行も読めていなかった。secret が手元に無いことを理由に
+   live 検証を飛ばしたが、その secret は自分で発行できた（下記 D5）。
+2. **この bug は unit test では再現できない。** cljs の fn は detached な呼び出しを
+   受け入れるので、stub をどれだけ厳しくしても cljs.test 上では throw しない。
+   stub の docstring に「再現しない」と明記した —— 再現できるつもりの trap を
+   置く方が危ない。gate として効くのは「行がレスポンスまで届く」ことを見る test。
+
+## D5. 読み手ごとに別の secret を持たせる（2026-08-07 追加）
+
+`/_metrics/*` の gate は 3 つ目の secret `BMC_COLLECTOR_READONLY_SECRET` を受ける。
+collector に `GROWTH_ACTOR_READONLY_SECRET` を流用する（= 回して両方に配る）案を
+採らなかったのは、**片方の失効がもう片方を黙って壊す**から。判定は「設定済みの
+ものだけを候補にして一致を見る」形に整理し、空の presented 値が未設定 secret に
+一致しないことをテストで固定した。
+- **実トラフィックによる書き込みをまだ見ていない。** 検証用の行は削除して両サイトとも
+  0 行から開始したので、最初の実データが入るのはこれから。次に読むとき
+  `collected-since` が null なら「まだ誰も来ていない」だけでなく
+  「beacon が動いていない」可能性も疑うこと。
+
+## 次にやる最初のこと（2026-08-06 時点。08-07 に下記のとおり実施済み）
+
+実トラフィックが乗ったかの確認。babiniku の secret は macOS login keychain の
+service `net-babiniku TELEMETRY_REPORT_SECRET`（`security find-generic-password`
+で 1 件だけ取得する）。shinshi は既存の `DISPATCHER_INTERNAL_SECRET` を使う。
+
+```
+GET https://babiniku.net/api/telemetry-report?window_days=7
+    Authorization: Bearer <keychain の値>
+
+GET https://shinshi.club/_metrics/audience?window_days=7
+    x-internal-trust: <DISPATCHER_INTERNAL_SECRET>
+```
+
+その次に効く作業は **`70-tools/bmc` の collector からこの 2 本を叩き、
+`90-docs/business/metrics/*.edn` に綴じ込むこと** —— shinshi の
+`/_metrics/revenue` が既にその形を持っているので、`collect.cljs` に 1 本足す形で入る。
+
+**2026-08-07 に実施した**（`com-junkawasaki/root`）:
+
+- `gate-emitters` が **1 product に複数 emitter** を持てるようにした（map なら 1 本、
+  vector なら順に merge）。shinshi は公開の `/api/funnel` と secret-gated な
+  `/_metrics/audience` の 2 本を持つ。
+- gated emitter は Keychain の 1 件を**狙い撃ちで**引く（`:secret-service` +
+  `:auth-header :bearer|:internal-trust`）。**secret が無いときは匿名で叩かず
+  skip する** —— gated endpoint への無認証リクエストは 403 で、metrics ファイル上
+  「データが無い」と見分けが付かなくなる。
+- `net-babiniku` を `products` に追加（一次計測が入ったのに product 自体が無く、
+  metrics ファイルが存在しなかった）。**zone は付けていない** —— この作業機に
+  CF token が無く zone id を実在確認できないため。確かめていない id を書くより
+  無い方がよい。
+- live 確認: shinshi `/_metrics/audience` → 200（collector secret）/ 403（無し）、
+  babiniku `/api/telemetry-report` → 200。babiniku 側は `collected-since` が
+  まだ null（= 実トラフィックの beacon 書き込みがまだ 0 件）。
+- ⚠ **collector 自体はこの作業機で走らせていない**（`CF_API_TOKEN` も Keychain
+  `gftd.cf` も無く、`-main` が token 無しで throw する）。emitter 2 本の応答は
+  curl で個別に確認したが、`metrics/*.edn` の再生成は未実施。
+
+# Gaps
+
+- **`club-shinshi` の appview が main でコンパイルできない**（38 namespace 欠損、
+  PR #30 由来）。同じコードは `club-shinshi-app` にある。所有者判断: 復元するか
+  appview を撤去するか
+- **`club-shinshi` と `club-shinshi-app` が同じ Worker 名 `magatama-sh1n5h1x` を
+  宣言している。** 片方から deploy すると他方を巻き戻す。名前を分けるか
+  一方から wrangler 設定を外す必要がある
+- **本番 D1 の wrangler migration 台帳がずれている。** `migrations apply` は
+  `0006_actress_gender.sql` で `duplicate column name: gender` により停止する
+  （実際は適用済み）。0016 は DDL を直接適用した（`CREATE TABLE IF NOT EXISTS`
+  のみなので冪等）。台帳の修復は別作業
+- **babiniku の CF Web Analytics beacon 未設置。** wrangler OAuth token に
+  RUM scope が無い（403）。dashboard での 1 手作業
+- **`kotoba-lang/senden` は consumer ゼロのまま。** 今回 2 つのサイトが独自に
+  funnel 語彙を持ったので、3 つ目の前に寄せるかを決める
+- **読む面は API までで、ダッシュボードは無い。** `/_metrics/audience` と
+  `/api/telemetry-report` は JSON を返すが、それを人が見る画面は無い。次に効くのは
+  `70-tools/bmc` の collector からこの 2 本を叩き、`90-docs/business/metrics/*.edn`
+  に綴じ込むこと（shinshi の `/_metrics/revenue` が既にその形を持っている）
+- **fleet の EDN 面（`:source/dataset`）への取り込み経路が無い。** 2 サイトの
+  スキーマを揃えたので、`repo-taxonomy` / `market-intel` と join できる形で
+  載せられるはずだが、まだ載っていない
+- **babiniku の `TELEMETRY_REPORT_SECRET` は provisioning 済み**（Pages production
+  secret）。値は macOS login keychain の service
+  `net-babiniku TELEMETRY_REPORT_SECRET` にある。shinshi 側は既存の
+  `DISPATCHER_INTERNAL_SECRET` / `GROWTH_ACTOR_READONLY_SECRET` をそのまま使う")))

@@ -1,0 +1,135 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800010900-the-root-is-derived-not-stored")
+  (:adr/title "IPFS + WebAuthn passkey + contract を土台に置くと、root の保管先という問いが消える —— 導出するものに保管先は無い。Bitcoin anchor の推奨は撤回する")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/body "## Context
+
+オーナー指摘（2026-09-06）「ipfs, webauth passkey smartcontract をベースと
+しているんですが、その前提なら?」。
+
+**この前提を入れると、前 2 つの ADR が詰まっていた場所が消える。**
+ADR-2800010800 は root 秘密鍵の保管先（kagi のどの compartment / item か）が
+決まらないと genesis ceremony を実行できないとして止まっていた。
+
+## 保管先という問いが成立しない
+
+`kagi/unlock.clj` が既にこの形を持っている:
+
+```
+(defn- passkey-info [rp-id credential-id]
+  (str \"kagi/unlock/passkey-prf/v1\\u0000\" rp-id \"\\u0000\" credential-id))
+;; kek = HKDF(prf-output, salt, info) → VMK を unwrap
+```
+
+WebAuthn PRF の出力は認証器内の credential 束縛シークレットから**決定論的に**
+出る。**保存されるのは salt / nonce / wrapped だけで、KEK は毎回の ceremony で
+作り直される。**
+
+同じ形で delegation root の秘密鍵を導出できる ——
+`HKDF(prf-output, salt, \"kotoba.cloud/delegation-root/v1\")` → Ed25519 seed。
+**保存するのは salt と公開鍵だけ。**
+
+したがって「どの compartment / item に置くか」に答えは要らない。
+**置く物が無い。** ADR-2800010800 が待っていたオーナー判断は、
+前提を明示した時点で不要になった。
+
+### Secure Enclave の例外が要らなかった、3 つ目の理由
+
+ADR-2800010800 D3 は例外を 2 つの理由で拒否した（`passkey_bridge` が既に
+非ネイティブで届いている / 例外そのものが TCB を広げる）。**3 つ目がこれである
+—— passkey の認証器そのものがハードウェア enclave で、鍵は取り出せない。**
+Secure Enclave を JNI で呼びに行こうとしていたのは、**既に enclave の中に在る
+鍵の隣に、2 つ目の enclave を建てようとしていた**ということである。
+
+## Decision
+
+### D1. 土台は IPFS + WebAuthn passkey + contract。層の割り当てはこうなる
+
+| 層 | 何を持つか |
+|---|---|
+| **passkey（WebAuthn PRF）** | root 秘密鍵を**その場で導出**。静止した秘密は無い |
+| **smart contract** | 現在の root 公開鍵 / 現在の log CID / rotation 権限 / recovery quorum |
+| **IPFS** | log と artifact の本体（CID が自己証明、host 非依存） |
+| **biscuit** | そこから下の offline attenuation（ADR-2800010700 D6b、実装済み） |
+
+### D2. Bitcoin anchor の推奨を撤回する
+
+ADR-2800010800 D4 は Bitcoin anchor を「quorum の選択に依存しない一手」として
+推した。**この前提では要らない。**
+
+anchor が買うのは non-equivocation である。**contract が registry なら、
+contract の履歴がそれを与える。** ADR-2608057000 が Bitcoin に非可逆性を
+割り当てたのは *anchor 先を選ぶ* 文脈であって、registry を chain に置く場合を
+想定していない。二重に払う理由が無い。
+
+⚠ **撤回の範囲を広げないこと。** ADR-2608057000 の割り当て自体（checkpoint を
+anchor するなら Bitcoin）は有効なままである。消えるのは
+「**この root のために** anchor も要る」という部分だけ。
+
+### D3. `biscuit.rootkey` の pre-rotation ログは、役割が縮む
+
+あの設計が在る理由は docstring が書いている ——「a key fetched from a mutable
+location can be swapped by whoever controls that location, silently」。
+
+**IPFS では場所が mutable ではない。CID が内容そのものである。**
+可変な部分（どの CID が現在か）は contract が持つ。
+
+ログは残してよいが、**理由が変わる** —— 「host を信じないため」ではなく
+「履歴を読めるようにするため」。**したがって pre-rotation の commitment は
+安全性の要ではなくなり、可読性のための構造になる。** 今日 landed した
+`app-kotoba-cloud` の log 面（`/.well-known/biscuit-rootkey.json`）は
+そのまま使えるが、`authority` の値が指す先は contract になる。
+
+### D4. Ethereum の第 3 の用途を明示する
+
+ADR-2608057000 は Ethereum を **資産と償還** に割り当てている。
+**鍵の registry はその ADR が想定していない第 3 の用途である。**
+
+ADR-2608039000（分散型経路に単一ベンダの primitive を前提させない）には
+抵触しない —— 公開チェーンはベンダではない。だが**既存の割り当てを拡張するので、
+拡張したことを書いておく。** 次に ADR-2608057000 を読む者が、表に無い用途が
+運用されていることを知らないまま整合を判断しないように。
+
+### D5. `pqKeyRecovery: blocked` はこの構成で閉じる
+
+ADR-2800010800 の測り直し（同日）で、この穴は実在すると確認した ——
+`pq_key_lifecycle.cljc` に recovery / shamir / quorum は 0 件で、kagi の Shamir は
+**VMK の復旧**であって kotoba.cloud の PQ 鍵ではない。別システムの別の鍵である。
+
+**quorum が contract 側に来るので、この構成では設計に含まれる。**
+control plane の `pqKeyRecovery` は、contract が landed した時点で
+`blocked-independent-quorum-not-implemented` から動かせる —— **その前には動かさない。**
+
+## Consequences
+
+(+) ADR-2800010800 が待っていたオーナー判断（保管先）が不要になった。
+    **止まっていたのは前提が書かれていなかったからで、判断が無かったからではない。**
+
+(+) Secure Enclave の例外を拒否した判断が、3 つ目の理由で補強された。
+    passkey の隣に 2 つ目の enclave は要らない。
+
+(-) 本 ADR は ADR-2800010800 D4（Bitcoin anchor）を撤回する。
+    **同 ADR は同日中に 2 度書き換わったことになる** —— 初版で例外を勧め、
+    訂正で撤回し、本 ADR で D4 も撤回した。前提が書かれていない状態で
+    設計を積むと、こうなるという記録として残す。
+
+(?) contract の実装は無い。`.sol` は 65 本あるが、鍵 registry の先例は無い。
+
+(?) PRF からの導出は決定論的だが、**認証器を失うと root も失われる。**
+    recovery quorum が contract 側に来るのはそのためでもある ——
+    導出を選ぶことは、単一認証器を単一障害点にすることでもある。
+    **この 2 つは同時に landed しなければならない。**
+
+(?) `unlock.clj` は `.clj`（JVM）である。導出を browser 側でも回すなら
+    `.cljc` が要る。今日の実装（D1 の 2 番目）はそこを分ける。
+
+## Related
+
+- ADR-2800010800（root の安全と安定は別問題 —— D4 を本 ADR が撤回、
+  D3 の例外拒否は補強）
+- ADR-2800010700（kotoba.cloud の層と delegation、holder-side attenuation）
+- ADR-2608057000（anchor 先は Bitcoin と Ethereum —— D4 が第 3 用途を足す）
+- ADR-2608039000（分散型経路に単一ベンダの primitive を前提させない）
+- ADR-2608281100（agent が自分の鍵を持つ、`file-0600` を正式 provider にした決定）
+")))

@@ -1,0 +1,62 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607252000-kotobase-lei-catalog-cpu-outage-async-block-discovery")
+  (:adr/doc_type "adr")
+  (:adr/topic "kotobase-lei-catalog-cpu-outage-async-block-discovery")
+  (:adr/title "ADR-2607252000: backend.kotobase.net の cloud-itonami-lei-catalog グラフが CPU 上限で読めなくなっていた件 — 原因は容量ではなく trampoline の O(N^2)、修正と実測")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-25")
+  (:adr/last_verified "2026-07-25")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for (vector "kotobase の read/fold が Cloudflare Worker の CPU 上限に当たったときの一次診断は「データ量が多すぎる」ではなく「:async-get-fn が配線されているか」を先に疑う — 実測で wall のうち I/O はわずか 7% で、残りは with-blocks trampoline がブロック miss ごとにハンドラ全体を再実行する O(N^2) の CPU だった"
+                          "kotobase-server の do-fold は max_novelty をワイヤから受け取り engine の bounded fold に渡す（79356b87 以降）。これが無いと novelty backlog が CPU 予算を超えた時点で fold 自体が完走できなくなり、novelty は fold でしか減らないため恒久的に詰む"
+                          "kotobase-cf-wasm の write path（transact/fold）も read path と同じく store/block-fetcher による :async-get-fn を持つ（write-store-extras）。ただし read path の :db-cache-* / :rows-cache-* memo は write には渡さない — それらのキーは write が離脱しようとしている当の state だから"))
+  (:adr/related (vector "adr-2607110300-cloud-itonami-lei-corporate-tos-catalog"
+                "adr-2607250100-kotobase-maturity-bar-vs-production-databases"
+                "adr-2607072300"
+                "adr-2606231200"))
+  (:adr/artifacts (vector "kotoba-lang/kotobase-server 79356b87 (merge of agent/async-get-fn-cpu-fix)"
+                  "gftdcojp/net-kotobase e35d775b (merge of agent/kotobase-async-get-fn)"
+                  "backend.kotobase.net worker version 0d2852e6-c289-4240-8a95-abe673273bc8"))
+  (:adr/decision-summary "kotobase-server の do-datoms/hot-db に :async-get-fn を通し、do-fold が max_novelty を捨てるのをやめる。kotobase-cf-wasm の write path にも :async-get-fn を配線する。これで backend.kotobase.net の cloud-itonami-lei-catalog は 503(exceededCpu) から cold 3.77s / warm 848ms に回復し、123 件の novelty backlog を 13 回の bounded fold で完全排出できた。")
+  (:adr/source-format "edn")
+  (:adr/body "## 症状\n\n2026-07-25 時点で backend.kotobase.net 上の graph `kotobase/db/did:key:z6Mkh6mn.../cloud-itonami-lei-catalog` は **あらゆる操作が 503 を返し、事実上ロックされていた**。書き込み（datomic.transact）だけでなく、`datomic.datoms` に `:limit 5` を付けた最小の読み取りすら約35秒かけて失敗する。この結果、cloud-itonami-lei-* 161 リポジトリ分のデータは 1 件も取り込めていなかった（ADR-2607110300 の「連携統合」トラックが全面停止）。\n\n先行する調査ではこれを「グラフが Cloudflare Worker の予算を超えるまで育った backend capacity ceiling」と判断し、Workers プラン増強 / graph 分割 / Durable Objects 移行といったインフラ判断が必要な案件として扱っていた。ingest スクリプト側にも「backend capacity/pacing issue, not a client-side bug, so the fix here is to slow down」というコメント付きの pacing（INGEST_PACE_MS、既定2000ms）が入っていた。**この判断は誤りだった。**\n\n## 実測による原因特定\n\n`wrangler tail kotobase-cf-wasm-staging --format json` を張ったまま同じ読み取りを再現し、Worker 側の実イベントを取得した:\n\n```\noutcome:    exceededCpu\ncpuTime:    32500 ms\nwallTime:   34918 ms\nexception:  Worker exceeded CPU time limit.\nrequest:    POST /xrpc/ai.gftd.apps.kotobase.datomic.datoms\nresponse:   503\n```\n\n決定的なのは **cpuTime 32,500ms に対して wallTime 34,918ms** という比。差はわずか 2.4 秒で、つまり全体の 93% が純粋な CPU、実 I/O は 7% しかない。ブロック取得の往復回数でもデータ量でもネットワークでもなく、**CPU を焼いている何か**が原因である。subrequest 上限でもない（それなら別の outcome になる）。\n\n原因は `kotobase.server.trampoline/with-blocks`。これは同期的な `get-fn` 契約を非同期ストレージに橋渡しするために、**ブロックの cache miss が起きるたびにハンドラ全体を最初から再実行する**。したがって N 個のブロックに触る読み取りは、その読み取りを N+1 回実行する — O(N^2) の CPU。ブロックが B2 から来ようが L1/L2 キャッシュから来ようも関係ない（再実行のトリガーは in-memory cache の miss であって取得元ではない）ので、store.cljs のブロックキャッシュでは原理的に解消できない。\n\nこの失敗モードは既知だった。kotobase-peer#21 は同じ問題への逃げ道として `async-get-fn` アリティ（trampoline を迂回してブロックを直接非同期取得する）を追加済みで、その docstring 自身が gftdcojp/app-aozora#78 の実測を引用している: **5130 leaf の snapshot が trampoline 経由では 300 秒以上の CPU を要し、`scan-prefix-async` 経由では 806ms**。\n\n## なぜ「配線済みなのに効いていなかった」のか\n\n最も厄介だったのはここで、**seam は供給されていたが使われていなかった**:\n\n- kotobase-peer `afe47e09`（deploy 済み pin）: `hot-datoms` / `fold!` / `hydrate-chain-cached` の async アリティを **持っている**\n- kotobase-cf-wasm（deploy 済み main）: `read-store-extras` が `:async-get-fn (store/block-fetcher env g)` を **供給していた**（docstring にも「cold-datoms-async's O(N) discovery instead of the trampoline's O(N^2) re-walk」と書いてある）\n- kotobase-server `774e5ef`（中間層）: `do-datoms` が `hot-datoms` の **5引数アリティを呼んでおり、`:async-get-fn` を engine に渡していなかった**\n\nつまり供給側と消費側は揃っていて、ハンドラだけが黙って捨てていた。供給されているが使われていない seam は、他のあらゆる assertion では正常な実装と区別がつかない — これが本番でこの状態が続いた理由である。同じ層に、より深刻な同種の欠落がもう一つあった: `do-fold` が body から `:graph` だけを destructure しており、kotobase-client が以前から送っていた `max_novelty` を受理して無視していた。結果として **fold は常に unbounded にしか実行できなかった**。novelty は fold の完走でしか減らないので、backlog が一度 CPU 予算を超えると「減らすための fold が完走できないので永久に減らない」runaway に入る。これは kotobase-peer の `fold!` docstring が明示的に警告している状態そのものである。\n\n## 決定（実装した修正）\n\n**kotobase-server（79356b87）**\n\n1. `do-datoms`: `(:async-get-fn store)` を `hot-datoms` の async アリティに転送する。\n2. `hot-db`: rows-cache の有無ではなく **`:async-get-fn` の有無だけでも** `hydrate-chain-cached` 経路を取る。nil の cache slot を渡した場合は snapshot について素の `hydrate-db` 相当に落ちる一方、ブロック探索は `cold-datoms-async` を通る。rows-cache でゲートすると、rows-cache を持たない shell は async アリティを一切持たない `hydrate-chain` に落ち、O(N^2) を払い続けてしまう。\n3. `do-fold`: `max_novelty` を受け取り engine の bounded fold に渡す。数値でない値・0 以下は unbounded に degrade させる（「何も fold しない」に倒すと、成功に見えて前進しないため）。cache slot は意図的に nil — `fold!` の hydrate cache は SNAPSHOT cid キー、store の `:db-cache-*` は CHAIN cid キーで、混ぜると別々のキー空間が衝突する。\n4. `do-fold` の応答に `:novelty_remaining` を追加し、ops ドライバが dbStats を別途叩かずに 0 までループできるようにした。\n\nすべて additive かつ nil-safe。`:async-get-fn` を供給しない store と `max_novelty` を送らない caller の挙動はバイト単位で従来どおり。\n\n**kotobase-cf-wasm / net-kotobase（e35d775b）**\n\n5. `write-store-extras` を新設し、write path（transact/fold）にも read path と同じ `store/block-fetcher` 由来の `:async-get-fn` を渡す。fold こそこれを最も必要とする — snapshot 全体を読み直して再構築するため、trampoline だけの探索では大きな backlog が原理的に fold 不能になる。read path の `:db-cache-*` / `:rows-cache-*` memo は **渡さない**: それらは hydrate 元の state をキーにしており、write の目的はその state から離れることだから。\n6. `deps.edn`: kotobase-server pin を `774e5ef` → `79356b87`。peer/client pin は据え置き（`afe47e09` が既に必要な async アリティを持つ）— deps.edn が二度警告している three-pin 同時整合ルールを尊重した。\n\n## 実測結果\n\n| 状態 | `datoms :eavt limit 5` |\n|---|---|\n| 修正前 | **503 exceededCpu**（32,500ms CPU、読み取り不能） |\n| deploy 後・novelty 123件のまま | 31,121ms（辛うじて成功） |\n| novelty 排出後（cold） | **3,770ms** |\n| novelty 排出後（warm） | **848ms** |\n\nbounded fold による backlog 排出（`max_novelty` 8）は 13 ラウンドで完走し、各ラウンド 9.4〜16.1 秒（30 秒 CPU 予算に対して十分な余裕）で novelty 123 → 0。修正前はこの backlog に対する唯一の選択肢が unbounded fold であり、それは完走できなかった。\n\n検証は deploy 前に実施: kotobase-server 62 tests / 289 assertions 0 failures（従来 59/273。新規カバレッジは seam が「受理される」ことではなく **実際に到達される** ことを assert している）、kotobase-cf-wasm 77 tests / 148 assertions 0 failures、release build は `:undeclared-var` 警告 0（= pin のクロスバージョン不整合なし）。\n\n## 残る gap（この ADR では閉じていない）\n\n- `hot-datoms` の **novelty 側**は依然として同期 `read-tx-block` + `novelty-cids` で trampoline を通る。async 化されたのは snapshot 側だけ。novelty を小さく保てば実害は出ないが、これが「fold を定期実行しないと読み取りが再び重くなる」構造的な理由である。\n- **fold cron が無い**。今回は手動ドライバで排出した。app-aozora は書き込みトリガ fold（`WRITE_FOLD_MAX_NOVELTY` 既定40）と cron fold（既定200）を実装済みで、その設計をこちらにも移植するのが素直な次手。engine の `default-fold-threshold` は 64。\n- `hydrate-chain`（cached でない方）には async アリティが無い。今回は `hydrate-chain-cached` を nil cache で呼ぶ形で迂回した。\n- ingest スクリプトの `INGEST_PACE_MS` コメントは、この停止を「backend capacity/pacing issue」と診断した当時の記述のまま残っている。原因が pacing ではなかったことが判明したので、実測に基づいて緩める余地がある。\n\n## 教訓\n\n「Worker がリソース上限に当たった」を capacity 問題と読むと、プラン増強や sharding といった重いインフラ判断に直行してしまう。**cpuTime と wallTime の比を先に見る**べきだった — 93% が CPU という一点が、容量仮説を即座に否定し、アルゴリズム的原因（trampoline の再実行）に絞り込んだ。`wrangler tail --format json` はこれを数分で出す。\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+検証中に別個の pre-existing 不具合を発見: write-triggered auto-fold が acknowledged な transact を silently 取りこぼす
+
+ADR 本体の修正を deploy し 161 リポの取り込みを実行して検証したところ、transact が :ok true を返した company が graph に存在しない事象が再現した（161 件中 1〜6 件）。
+
+原因は本 ADR の修正とは別の、2026-07-24 に net-kotobase main へ入った write-triggered auto-fold（kotobase-cf-wasm/src/kotobase_cf_wasm/xrpc.cljs の schedule-auto-fold!）。novelty_size が閾値（既定8、KOTOBASE_FOLD_THRESHOLD）を超えた transact の後に ctx.waitUntil でバックグラウンド fold を投げる。
+
+その実装コメントは races について「safe by construction: do-fold no-ops on zero novelty, fold! is deterministic/content-addressed, and a lost head CAS just leaves the fold for the next crossing write」と述べているが、**この論証は fold が CAS に負ける方向しかカバーしていない**。fold が勝つ方向が抜けている:
+
+  1. transact T が head(seq=N, chain=C0) を読み、C1 を計算し、head(seq=N+1, C1) を PUT、read-back で自分を確認 → client に :ok true を返す
+  2. 先行 transact 由来の auto-fold F が（waitUntil 内で）同じ head(seq=N, C0) を読んでいて、fold 済み C2 を計算し head(seq=N+1, C2) を PUT、read-back で自分を確認 → 成功と判断
+  3. 最終的な head は後着の PUT = C2。C2 は T の commit を含まないので、**既に ack 済みの T が失われる**
+
+B2 には conditional write / CAS が無い（head.cljs の docstring が明記）ため、read-back チェックはこの窓を狭めるだけで塞げない。head.cljs 自身も『losing a race ... means the losing writer's commit becomes unreachable from the head』と認めているが、auto-fold はその『losing writer』が **既に成功応答を返した transact** になりうる経路を新設していた。
+
+実測: 取り込み3回で欠落は 6 → 1 → (検証中)。ingest は sorted 順の決定論的シーケンスで、auto-fold は 8 write ごとに発火するため、同じ位置の write が繰り返し clobber されうる（実際 969500J9KG4HF67VC976 / RATP Developpement は2回連続で欠落した）。
+
+この不具合は本 ADR の修正が導入したものではない（auto-fold は先行）。ただし本 ADR の修正で write path が実用速度になった結果、161 write 規模で初めて顕在化した。
+
+恒久対応の候補（未実施、オーナー判断事項）: (a) head を Durable Object に移す（Cloudflare DO は強一貫でトランザクショナルなので真の CAS が張れる）、(b) auto-fold を廃し ingest 完了後の明示 fold / cron に寄せる、(c) fold 側の head 書き込みを『自分が読んだ seq からの前進のみ』に制限する条件付き書き込みプロトコルを B2 上に自前実装する。暫定回避としては bulk ingest 中だけ KOTOBASE_FOLD_THRESHOLD を十分大きくして auto-fold を抑止し、完了後に手動 fold する運用が取れる。
+
+### 2026-07-25 — note
+
+検証完了: 取り込み 161/161、欠落0、読み取り 1.3秒
+
+seq 65 の note で『検証中』としていた取り込み完全性の最終結果:
+
+  GitHub 上の cloud-itonami-lei-* : 161
+  graph 内の :company/repo        : 161
+  欠落                            : 0
+
+内訳 — :company/lei 161（distinct 161）/ :company/legal-name 161 / :company/repo 161 / :tos/source-url 154（tos ドキュメントを持たない repo が 7 件あるため、これは欠落ではない）。
+
+read latency（:eavt limit 5、fold 済み・キャッシュ温）: 1,299ms / 1,247ms。修正前は 503 exceededCpu で読み取り不能、修正直後・novelty 満載時 31.1 秒、novelty 排出後 3.2〜3.8 秒だったので、fold 済み状態での定常値は約 1.3 秒。
+
+seq 65 で報告した auto-fold の lost-update は、取り込みを 3 回反復することで実データ上は解消した（欠落 6 → 1 → 0）。ただし**不具合自体は未修正のまま**であり、今後の bulk write でも同じ確率で acknowledged な write を取りこぼしうる。恒久対応（DO backed head / auto-fold 廃止 / B2 条件付き書き込み）は未着手のオーナー判断事項。取り込みが実質的に冪等（cardinality-one upsert）なので『反復して収束させる』運用は当面の回避策として機能するが、それは検証あってのことなので、bulk write のたびに本 ADR の diff-catalog 相当の完全性チェックを回すこと。
+")))

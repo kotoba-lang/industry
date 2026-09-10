@@ -1,0 +1,158 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609010900-the-bundle-carries-what-it-renders")
+  (:adr/title "The bundle carries what it renders; the claims move to the index")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/topic "hyakka")
+  (:adr/related "adr-2608312900-hyakka-metered-joins-x402-settles-biscuit-carries")
+  (:adr/body "# 状況
+
+wiki.kotobase.net の Worker は、配信する射影を丸ごとバンドルに載せていた。2026-09-01、
+`wrangler deploy` が `Script startup exceeded CPU time limit` を返し、**サービスが一切
+出荷できなくなった**。数時間前に着地していた修正も、そこで止まった。
+
+測ってから触った。module load を instrument して計測すると 1,889 ms、うち派生 projection
+（by-id ×3・walk-indexes・dataset-catalogue）が 334 ms で、**残り約 1,550 ms はカタログの
+リテラルそのもの**（最初のマーカーより前に評価される）。本番で動いていたビルドは catalog
+16.94 MB で起動し、これは 18.75 MB —— 22 時間の ingest で 10.7% 増えて超えた。
+
+派生を全部 delay にして着地させた（`acd0478c`）。**それでも Cloudflare は同じエラーで拒否
+した。** 18% を戻してもリテラル単体で予算を超えている。削り込みは道ではない。
+
+内訳を測ると claims が 18.6 MB の **91.8%**（17.1 MB）で、items 4.6%・sources 3.1%・他は
+1% 未満。しかも claims は 1 日約 2 MB 増える部分でもある。
+
+# 決定
+
+**バンドルは「描くもの」を運び、claims は運ばない。**
+
+機構は既にこの Worker の中に在った。`POST /x402/query` は content-addressed 索引を block
+単位で IPFS サービスバインディング越しに読み、`hyakka.corpus` が reader、
+`hyakka.corpus-index` が鍵の代数を持つ。無かったのは**この 17 corpus を覆う索引**だけで、
+公開済みの root は `game-kouryaku` 1 つしか覆っていなかった（hyakka-data 側にしか無い
+corpus に対して建てられたもの）。
+
+claims が使われていた先を、それぞれ 1 桁以上小さい形へ畳んだ:
+
+| 用途 | 畳んだ先 |
+|---|---|
+| 件数・licence 集計 | `:aggregates` 数百バイト |
+| サイト内検索 | item ごとの小文字化済み haystack 764 KB |
+| 無料の多段 walk | linked edge を `walk/indexes` が読む 3 フィールドに落としたもの |
+| item ページの主張表 | **畳まない —— 索引から読む** |
+
+最後の 1 つだけがネットワーク読みになる。item ページは corpus item 用に既にその形
+（Promise を返す経路）を持っていた。一覧は件数を、検索は文字列を必要としており、
+**どちらも claim を必要としていない。**
+
+実測: `catalog.cljc` 18,616,870 → 3,135,888 bytes。
+
+# 二度書かないと決めたこと
+
+**鍵は reader 自身の関数で作る。** builder は `hyakka.corpus-index` を require し、
+再実装しない。鍵の形を書き手と読み手が別々に知っていると、間違い方が「エラー」ではなく
+「0 行」になる。
+
+**entity は catalogue と同じ merge から出す。** `ledger.cljs` を
+`generate_catalog.cljs` から抽出して共有した。hyakka-data の builder は item を
+first-non-empty-wins で merge するが、ledger の規則は**属性ごとの last-write-wins**。
+2 つの射影がそこで食い違うと、wiki のページと有料 walk が同じ問いに違う答えを返し、
+何も失敗しない。抽出は挙動を変えていない —— 再生成した catalogue の sha256 が抽出前と
+一致した。
+
+**claim tuple は reader の 4 要素の後ろに 4 つ足す**（qualifiers・corpus・rank・
+asserted-at）。item ページは 4 つより多くを描く —— qualifiers が無ければ証跡が消え、
+rank が無ければ deprecated な claim が現行と同じ見た目になる。末尾に足せば games 索引は
+同じコードで読める（欠けた位置は nil で、それが 4 要素 entry の意味）。
+
+# 作ってしまった欠陥と、その形
+
+移行の途中で 3 つ作り、3 つとも**この repo が繰り返し名指ししている「測れなかったことが、
+測って何も無かったことと同じ顔をする」形**だった。
+
+1. **索引が ledger に遅れた item が「主張なし」として描かれる。** resident は 35 分ごとに
+   item を足し、索引は build ごとにしか publish されない。`ledger-claims` は entry が
+   無いと nil を返し、それを `[]` に畳んでいた。証跡を見せることが目的のページで、
+   新しく取り込まれた item が evidence-free に見え、誰にも報告されない。
+   いまは nil（索引に無い）と `[]`（entry はあり主張が 0）を分け、前者を
+   `Index Behind Catalogue`、到達不能を `Corpus Index Unavailable` として返す。
+   **直し方が違う 2 つを 1 つの文字列にすると、ログを読む人が間違った方へ行く。**
+2. **crosscheck が catalogue の消えた `:claims` を見ていた** —— 全 2,987 件を mismatch と
+   報告した。大声で壊れたのは良いが、測っていたものは何も無かった。fixture 参照に直した。
+3. **索引を再ビルド・再公開するものが無かった。** `build` を
+   `catalog → index → release`、`deploy` を `build → index:publish → wrangler deploy`
+   にした。バンドルが索引の root CID を pin するので索引はビルド前に要り、blocks が
+   配られていない root を pin した worker は全 item ページで失敗するので publish は
+   deploy の前に要る。
+
+**到達不能時に 502 で全部落とすのも間違いだった。** 見出し・クラス・記事本文・リンクは
+索引を要さない。ページは描き、表の位置に理由を書き、503 + `no-store` で返す。etag は
+付けない —— この body はその item の representation ではなく、後で 304 を返すと劣化した
+ページを現行として配ることになる。
+
+# 検証
+
+- suite（degraded page 変更前）: 533 tests / 23,956 assertions / 0 failures
+- **破壊検査**: staleness の区別（nil→throw）を元に戻すと **3 failures**、落ちたのは
+  staleness の assertion のみで他 530 は緑。壊したものと報告されたものが一致する
+- crosscheck: 2,987 items / 0 mismatched。1 つの leaf から claim を 1 件落とすと exit 1 で
+  その item と件数を名指しし、戻すと exit 0
+- 索引: 61 blocks、全て公開経路で byte 一致。root も leaf も 200、
+  `world/domain/kotobase.net` に 733 claims・8 要素 tuple・qualifiers あり
+- 集計: claims 21,782 / facts 13,129 / licence の ODbL 例外保持 / dataset 19 中 17 に claims
+
+# 未了
+
+degraded page を入れた後の suite と deploy は、共有ビルドロックの飽和（load average が
+一時 884、他セッションの JVM ビルド群）で未測定のまま。**3.13 MB が起動予算に収まるかは
+まだ測っていない** —— 16.94 MB が起動していたので強い期待はあるが、期待は測定ではない。
+
+# 残る設計上の問い
+
+`game-kouryaku` は**両方の索引に載っている**。有料 walk は hyakka-data の全量索引
+（1.09M entity）を、無料の item ページは ledger 索引（そのサンプル）を読む。同じ corpus に
+ついて 2 つの索引が別の完全性で答える状態で、`corpus-pin` のコメントが元々警告していた
+重なりそのもの。今日壊れてはいないが、どちらを正本と決めるまで残る。
+
+# 現在地（2026-09-01 closing 時点）
+
+**未着地。** `network-awai/app-hyakka` の branch `agent/the-bundle-carries-what-it-renders`
+（`960002b1`）に push し、draft PR #221 を開いた。merge していない —— degraded page
+（503 + 理由表示）を入れた後の suite が一度も完走していないため。
+
+共有ビルドロックが他セッションの JVM ビルドで何時間も飽和しており（load average は
+一時 884）、私の再試行は 3 秒間隔まで詰めても取り切れなかった。**一度、ロックで走らな
+かった run のログを `FAILs: 0` と読んだ** —— ログにはロックのメッセージしか無かった。
+以後は `Ran N tests containing` が出ることを条件にし、出なければ「走らなかった、これは
+pass ではない」と印字するようにした。
+
+## 再開手順
+
+    cd <worktree>            # or: origin/main から worktree を切って branch を checkout
+    npm test                 # scripts/resource-guard.mjs run build 越しに
+    npm run deploy           # catalog -> index -> release -> index:publish -> wrangler deploy
+
+deploy の順序には理由がある: バンドルが索引 root を pin するので索引はビルド前に要り、
+blocks が配られていない root を pin した worker は全 item ページで失敗するので publish は
+deploy の前に要る。
+
+## 直前の run が見つけた本物の regression（修正済み・未検証）
+
+catalogue item ページが索引なしでは描けなくなっていた。テスト自身のコメントが
+「catalogue item は corpus に問い合わせる前に memory から答える」と、壊れた不変条件を
+書いていた。502 で全部落とすのは過剰（見出し・クラス・記事本文・リンクは索引を要さない）、
+空の表を出すのは禁じた形。ページは描き、表の位置に理由を書き、503 + no-store + etag 無し
+で返す —— この body はその item の representation ではないので、後で 304 を返すと劣化した
+ページを現行として配ることになる。
+
+## 副産物として live に在るもの
+
+索引 blocks 61 本は既に公開済み（`kotobase-graph-database-production` の `ipld/<cid>`）。
+content-addressed で追加のみなので、この branch が merge されなくても既存の読み手を
+壊さない。root は `bafkreihmovk543cyshtmnfyv73xsqvubar2i6sv7kpvjtzhj22njamouoe`。
+
+## live との差
+
+wiki.kotobase.net は 2026-08-31 11:22Z のビルドのまま。9/1 に main へ着地した 2 つの
+文言修正（`metered` / `walk`）も、この移行も、まだ届いていない。壊れてはいない ——
+更新できないだけである。")))

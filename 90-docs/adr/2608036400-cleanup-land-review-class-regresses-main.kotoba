@@ -1,0 +1,69 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608036400")
+  (:adr/title "cleanup-land の :review クラスは main を巻き戻す — 3 ラウンドで退行 PR を 6 本生んでいた（+ sparse-checkout が PR #1570 で 172 万行削除を計上した件）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-03")
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)"))
+  (:adr/verification "superproject: origin/main と 0/0、stash 0、worktree 1（本体のみ）、conflict marker 0。west-orphan-audit --blocking exit 0（local-root-broken=0）。cleanup.cljs --unlanded 完走（3328 走査 / 1106 UNLANDED / PR 照会 186-200 往復・打切りなし）。着地物の内容検証: capability-graph.edn は nbb で EDN parse・5 entity・dataset cloud-itonami-capability-graph。bitcoin-node は origin/main に対し diff が加算とリファクタのみ（内容削除なし）を diff で確認。未実施: 子リポのテスト実行（bitcoin-node PR #2 の CI は未起動）。")
+  (:adr/known-gaps (vector "cleanup-land.cljs の :review クラスは冪等でない。:additive は base tree との blob sha 比較で既着地分を落とすが、:review にはその比較が無く、同じ stale な local ファイルから毎回新しい PR を作る。2026-07-30 / 08-01 / 08-03 の 3 ラウンドで drive #8/#9/#10・toshokan #11/#12/#13 の 6 本が生成された。"
+                   "cleanup-land.cljs は git の quote 表記を解かない。非 ASCII path は git が \"schema/amadeus_alt\\303\\251a.kotoba-schema\" と quote して返すが、reader はその文字列をそのままファイル名として開き ENOENT で skip する。"
+                   "cleanup-land.cljs は untracked な *ディレクトリ* をファイルとして読もうとし EISDIR で skip する。実測: compiler の .claude/worktrees/agent-*/ 11 件、kotobase-storage の自己参照 symlink 1 件。compiler の 'additive 11 files' はこの worktree ゴミの誤カウントであって WIP ではなかった。"
+                   "orgs/kotoba-lang/kotobase-storage/kotobase-storage は親自身を指す symlink。find / du が無限再帰する hazard。silent-delete しない方針のため未処置。"
+                   "gh api -X POST <repo>/git/trees が本 session の複数回の呼び出しで HTTP 404 を返した（同一 repo・同一 token で git/blobs POST は成功、権限は admin）。原因未特定。bitcoin-node はローカル worktree 経路で回避した。API 単発 commit 経路に依存する既存スクリプトが同じ壁に当たる可能性がある。"
+                   "fleet 全体の未着地は 1106 repo（走査 3328）。本 session が着手したのは ladder 最上位の untracked 保持 10 repo のみ。残りは :review / :branches クラスで、runbook どおり auto-merge 対象外。"))
+  (:adr/body
+  "## 決定
+
+**`scripts/cleanup-land.cljs` の `:review` クラスが生成する PR を、レビュー待ちの保全物として扱わない。** 実測では保全ではなく **`main` の巻き戻し**であり、`:additive` と同じ「既に着地済みなら落とす」比較を `:review` にも入れるまで、このクラスの出力は毎回人間が内容検証してから扱う。
+
+## なぜ
+
+`:review`（tracked ファイルへの変更）は runbook が auto-merge を禁じているクラスで、その理由は「stale な base が黙って main を巻き戻す」ため。今回それが仮説でなく実際に起きていた。
+
+`kotoba-lang/drive` と `kotoba-lang/toshokan` に、同一内容の draft PR が 3 世代（2026-07-30 / 08-01 / 08-03）open のまま積まれていた。中身は保全ではなく退行:
+
+```
+drive                          local   origin/main
+  README.md                       19       164
+  src/drive/workspace.cljc       108       209
+  test/drive/workspace_test.cljc  35       172
+
+toshokan
+  src/toshokan/sources/ndl.cljs   57       127
+```
+
+local 側は一貫して **main より古く小さい版**。merge すれば `workspace.cljc` の約 100 行（`ancestors`/`descendants` を含む）とテスト約 137 行が消える。`origin/main` に対する content-containment では、テキスト上異なる数行はすべて古い版の改行位置の差であって新規内容ではない — **未着地の実体はゼロ**。
+
+toshokan はさらに悪く、`deps.edn` を main の git pin から `{:local/root \"../kotobase-engine\"}` へ戻す。これは west-orphan runbook が撲滅対象にしている「fresh checkout で解決できない sibling dep」そのもので、merge すれば CI と新規 clone が壊れる。
+
+6 本すべて close した（理由と archive 位置をコメント済み、local コピーは無傷）。
+
+**冪等性が `:additive` にしか無いのが原因。** `:additive` は base tree と blob sha を比較して既着地分を落とすので再実行が安全だが、`:review` にはその比較が無く、同じ stale ファイルから毎回新しい PR を作る。ラウンドを重ねるほど、`main` はさらに前進して差は広がる — 退行の幅は時間とともに増える。
+
+`DO-NOT-MERGE` の draft 印は機能した（実害は出ていない）。壊れているのは印ではなく、**「保全すべき何かがある」と読める PR を、保全すべきものが無いのに作り続けること**。
+
+## PR #1570 — sparse-checkout が 172 万行の削除を計上していた
+
+別件だが同じ「stale な tree」の家系。`feat/capability-graph` の作業 commit `de973d3f36b` は **tree に 1 ファイルしか持たない**（`main` は 230,713）。GitHub はこれを **74 追加 / 1,724,462 削除**として計算し、merge すれば repo が消滅するところだった。
+
+原因は内容判断ではなく機械的なもの: sparse-checkout 状態で commit したため、checkout されていない全 path が削除として記録された。
+
+実体は追加 1 ファイル `90-docs/business/cloud-itonami-capability-graph.edn` のみ（`main` に不在）。current tip 上に server-side で replay して **PR #1594 → merged `c79fea5`**。branch tip が持っていたもう 1 ファイル `manifest/fleet-ci.edn` は main より **3 receipt 遅れ**ており固有の内容は無かったので、失われたものは無い。#1570 は理由付きで close。
+
+## 併せて処置した superproject の状態
+
+`agent/kotoba-common-lib-frontier-20260802`（origin/main から 2 ahead / 136 behind）に載っていた全項目が既着地だった — branch 2 commit の 9 ファイルは byte 一致または内容が main に存在、stash 1 件の 1 行は `package.json:13` に存在、dirty な ADR-2607302145 は main と byte 一致、untracked な `docs-edn-parse-guard.cljs` も byte 一致かつ main の `settings.json:52` に登録済み。全件を `.git/stash-archive-2026-08-03/` へ退避してから stash drop / branch 削除 / `main` へ FF。
+
+## 測定が嘘をつく箇所（記録）
+
+**survey の ahead/behind は fetch 前の ref を読むことがある。** `bitcoin-node` は `0 ahead / 0 behind` と出ていたが、`git fetch` 後は **2 behind** だった。この repo は crash テスト本体（`crash.clj` / `sqlite_crash_worker.clj`）が PR #1 で着地済みなのに、それを動かす CI job・`:crash-test` alias・`fuzz.clj` のヘルパが未着地で、**main 上のテストが実行不能**という実 gap を持っていた。同期してから current base 上で PR #2 として起票（tracked 変更なので merge しない）。
+
+**`untracked=N` は WIP の量ではない。** compiler の「additive 11 files」は `.claude/worktrees/agent-*/` の agent worktree ゴミであり、実 WIP は 0。ai-gftd-mangaka / ongakuka / org-threejs / toshokan の untracked も大半は「内容が既に main にある」ものだった。
+
+## 次にやること
+
+1. `scripts/cleanup-land.cljs` の `:review` に `:additive` と同じ base-tree blob sha 比較を入れ、既着地・退行のみの差分では PR を作らない。
+2. 同スクリプトの path 読み取りを修正（git quote 解除 / ディレクトリと symlink の除外）。
+3. `bitcoin-node#2` のレビューと merge。
+4. `orgs/kotoba-lang/kotobase-storage/kotobase-storage` の自己参照 symlink を owner 判断で撤去。
+")))

@@ -1,0 +1,80 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607184300-kotoba-component-linker-http-e2e")
+  (:adr/title "ADR-2607184300: Independent-memory Kotoba component linker and HTTP/TLS E2E")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-18")
+  (:adr/last-verified "2026-07-18")
+  (:adr/last_verified "2026-07-18")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for
+  (vector "JVM Kotoba component-to-component linking"
+   "HTTP provider high-level component ABI"
+   "independent linear-memory bridge semantics"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kototama/src/kototama/linker.clj"
+   "orgs/kotoba-lang/kotoba/providers/http_transport.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/http_consumer.kotoba"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/component_abi.clj"
+   "orgs/kotoba-lang/kotoba-lang/lang/transport-component-abi.edn"))
+  (:adr/supersedes (vector "adr-2607184200-kotoba-tls-transport-conformance"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:linker :implemented-jvm-prototype)
+   (:memory-model :independent-linear-memories)
+   (:bridge-buffer-model :isolated-grown-provider-page)
+   (:pointer-rewrite true)
+   (:copy-direction :manifest-declared)
+   (:consumer-provider-grants :separate-and-attenuated)
+   (:http-get :implemented-bounded-single-read)
+   (:e2e (vector :kotoba-consumer :kotoba-http-provider :native-tls))
+   (:browser-node-linker :pending)
+   (:production-qualified false)
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:test")
+     (:result "107 tests, 346 assertions, 0 failures; actual Kotoba consumer -> actual Kotoba provider -> verified native TLS HTTP GET"))
+    (map (:cwd "orgs/kotoba-lang/kotoba")
+     (:command "targeted kotoba.transport-component-test")
+     (:result "3 tests, 16 assertions, 0 failures; provider and consumer Wasm validate"))))))
+  (:adr/body
+  "# ADR-2607184300: Independent-memory Kotoba component linker and HTTP/TLS E2E
+
+**Status**: accepted
+**Date**: 2026-07-18
+
+## Context
+
+The transport/TLS provider was executable, but applications could receive only
+native HostFunctions directly. HTTP and database `.kotoba` sources were not
+yet usable as intermediate components. A first bridge attempt also proved that
+reusing a consumer pointer as the same provider-memory offset corrupts provider
+static data; Wasm instances do not share linear memory.
+
+## Decision
+
+Add a fail-closed JVM component linker. Link manifests declare the exact field,
+provider export, Wasm signature, and copy-in/copy-out pointer-length pairs.
+The linker grows one isolated page in provider memory, allocates every bridge
+buffer within that page, rewrites provider-call pointer arguments, and copies
+only declared bytes. Missing exports, duplicate bindings, invalid signatures,
+negative sizes, scratch overflow, and provider output beyond consumer capacity
+are rejected.
+
+Consumer HostCaps grant `component/http` or `component/database`; provider
+HostCaps separately grant the attenuated lower transport/TLS surface. A real
+Kotoba HTTP consumer and real Kotoba HTTP provider are compiled during the
+integration test, linked as separate instances, and execute a bounded HTTP/1.1
+GET over the verified native TLS provider to a real loopback TLS server.
+
+## Maturity boundary
+
+The structural JVM linker gap is closed as a prototype. HTTP currently performs
+one bounded response read and does not yet parse status, headers, chunking or
+redirects. Browser/Node linking, concurrency stress, external PKI/DNS evidence,
+production CI/soak and Q9 consumer cutover remain pending.
+")))

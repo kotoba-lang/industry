@@ -1,0 +1,125 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608320000-itonami-delegation-is-cacao-where-the-design-says-biscuit")
+  (:adr/title "itonami's delegation layer is CACAO where the design says Biscuit — the gap is not a missing rung")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+
+  (:adr/context
+  "Setting out to add a Biscuit rung to itonami's data plane, the way the four
+   kotobase query surfaces got one, the work turned out to be a different shape.
+   Recorded because the wrong shape is cheap to start and expensive to finish.
+
+   FIRST, the plane the six-apex probe measures is not a credentialed plane.
+   `itonami.cloud/api/authority` answers 200 to an anonymous caller, and so do
+   the six other public paths reached from its own links map — billing/status,
+   fleet/metrics, agent-runs, stripe, webauthn, nudge, maturity. It is a
+   discovery index. Scoring it for whether it reads a credential asks a question
+   it does not have.
+
+   SECOND, itonami does have exactly one credentialed plane, and it answers
+   correctly. `mcp.itonami.cloud/mcp` returns 401 with an RFC 9728 challenge
+   naming Bearer, a resource-metadata pointer and the required scope. It does
+   not read a Biscuit.
+
+   THIRD, that plane is not a Worker. `cloud-itonami-app/services/mcp-edge` is a
+   sixty-line path allowlist that authenticates nothing; the 401 comes from the
+   application at the other end of a named Cloudflare Tunnel, running on a
+   personal workstation bound to loopback. Measured: a JVM process is live here
+   and localhost:1338/mcp answers 401. Its README says in as many words that
+   this is the whole public surface of that machine.
+
+   FOURTH, and this is the finding: the app already has a delegation layer, and
+   it is CACAO. `cloud.itonami.app.capability` mints CAIP-74 grants — a SIWE
+   statement naming audience, resource and role, signed Ed25519 with the Drive's
+   own key, carrying an expiry, with `cacao.core/verify-chain` there for
+   re-grant. ADR-2608291700 places CACAO at session origin and on signed
+   artifacts and takes it OFF delegation; Biscuit is the delegation format.")
+
+  (:adr/decision
+  "No rung was added. Adding one to `oauth_resource/session` would have been a
+   rung that cannot fire, which is the failure ADR-2608291300 named when it
+   refused to put a passkey ceremony on unattended routes: something that looks
+   guarded by a mechanism that never runs.
+
+   The reason it cannot fire is concrete. `session` admits by mapping the
+   introspected `sub` — the Stable Principal — through `membership-for` to a
+   local membership, and ADR-2608311600 states that identity continuity does not
+   invent membership. A Biscuit presents a holder, not a Stable Principal, and
+   this app has no holder-to-membership binding. A rung written today would
+   verify a signature correctly, find no membership, and refuse every caller
+   forever, while its tests passed.
+
+   So the real work at this apex, in order:
+
+   1. Decide what binds a Biscuit holder to an Itonami membership. Until that
+      exists, no verifier makes the plane reachable.
+   2. Converge `cloud.itonami.app.capability` from CACAO onto Biscuit, or record
+      why this one delegation layer stays CACAO against ADR-2608291700.
+   3. Only then, the rung.
+
+   Nothing here is blocked on the verifier. `kotobase.biscuit-grant` in
+   kotoba-lang/grant answers `itonami://can/mcp:tools` today, since permits?
+   moved to authority's partial order (adr-2608319900's neighbour, grant
+   cbfa277) and the apex is segment 0 of a parsed scope rather than a prefix
+   constant.")
+
+  (:adr/measured-2026-09-01
+  "Both open items turned out narrower than this ADR states, and one of its
+   claims is wrong. Read this section before the ordering above.
+
+   ITONAMI ALREADY CARRIES BOT AUTHORITY AS A BISCUIT.
+   `cloud.itonami.app.bot-authority` exists and its opening line is that a
+   Bot's authority is carried as a biscuit and decided by `authority` — one
+   decider, verifiable holding only the root public key, no secret. The app
+   already depends on org-biscuitsec and authority. So the claim above that
+   itonami's delegation layer is CACOO where the design says Biscuit is true
+   only of `cloud.itonami.app.capability`, which shares DOCUMENTS. Bot
+   capability, the thing an unattended agent spends, is already Biscuit.
+
+   THE MISSING HALF IS THE HOLDER'S KEY, AND IT IS DELIBERATE.
+   That namespace says so under a heading called What is NOT here: attenuation
+   by the Bot itself. `biscuit.token/append` needs the private key the previous
+   block named, and no Bot holds one — bot-identity gives a Bot a name,
+   deliberately not a signing key. So the fleet can issue a Bot's authority and
+   anyone can verify it, and a Bot cannot hand a narrower slice to something
+   else. Their words: that is the next decision, not an oversight.
+
+   TWO HALVES IN TWO REPOSITORIES, NEITHER AWARE OF THE OTHER.
+   On 2026-09-01 `kotoba-lang/grant` gained the first measurement that the
+   READER honours a narrowing: a holder appends a block offline, the issuer is
+   never consulted, the narrowed token keeps what it kept and has lost what it
+   gave up, and appending cannot widen. That is exactly the property
+   bot-authority cannot yet exercise, because its holders have no key. One
+   repository proved the door opens; the other cannot reach the handle.
+
+   THE BINDING THIS ADR CALLED MISSING IS MOSTLY PRESENT.
+   A local User carries an Ed25519 did:key as the IDENTITY axis — assigned at
+   creation, unchanged by adding or revoking a Passkey, distinct from the
+   Passkey COSE did:key which names the credential. That is the right anchor
+   for a holder, and it matches the invariant another session declared the same
+   day: what crosses apexes is the principal, never the credential. What is
+   genuinely absent is only the reverse lookup, DID to membership, at the MCP
+   admission point — `membership-for` takes a user-id and nothing resolves a
+   holder DID to one.
+
+   SO THE OPEN DECISION IS NOT THE ONE THIS ADR NAMED. It is whether a Bot
+   holds a signing key. Without one, an unattended agent can spend authority
+   the fleet issued but cannot narrow it before handing it on, which is the
+   half of the 2026-09-01 direction — one human act, then bounded autonomous
+   spend — that the fleet cannot yet deliver.")
+
+  (:adr/consequences
+  "The six-apex score for itonami.cloud will not move by wiring a header. Two of
+   its four findings are about a plane that is public by design, and the other
+   two are downstream of a membership binding that does not exist yet.
+
+   A caution for whoever picks this up: the app runs on a workstation behind a
+   tunnel, so a change there cannot be verified the way a Worker can. Deploying
+   is restarting somebody's running process, and other things on this machine
+   reach it. That is a reason to land the binding decision first and the code
+   second, not a reason to skip verification.")
+
+  (:adr/related (vector "adr-2608311600-one-auth-design-across-six-apexes"
+                "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes"
+                "adr-2608291300-passkey-rooted-operator-authority-on-api-murakumo-cloud"
+                "adr-2608319900-credential-shape-is-per-apex-and-the-probe-reads-one-shape"))))

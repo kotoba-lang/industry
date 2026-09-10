@@ -1,0 +1,118 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608011600-torihiki-verifiable-sequencer-log-phase2")
+  (:adr/title "ADR-2608011600: torihiki Phase 2 — 検証可能な単一 sequencer ログ。verify-chain は「改竄されていない」を、replay は「state root が正しい」を証明する（別物）")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-01")
+  (:adr/last-verified "2026-08-01")
+  (:adr/last_verified "2026-08-01")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "torihiki-verifiable-sequencer-log-phase2")
+  (:adr/authoritative-for
+  (vector "torihiki のブロック生成とログ構造"
+   "sequencer が正直であることを第三者が検証する方法"
+   "署名と保存を torihiki に取り込まない判断"
+   "「sequencer であって consensus ではない」の呼び方"))
+  (:adr/related
+  (vector "adr-2608011200-torihiki-trading-dedicated-chain-hypercore-replacement"
+   "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+   "adr-2607050800-commit-dag-rename-to-chain"
+   "adr-2606041151-kotoba-commitdag-as-wal-and-incremental-query-tier"
+   "adr-2607993000-engi-l1-byzantine-consensus-en-currency"))
+  (:adr/evidence
+  (vector "https://github.com/kotoba-lang/torihiki"
+   "https://github.com/kotoba-lang/chain"))
+  (:adr/body
+  "# ADR-2608011600: torihiki Phase 2 — 検証可能な単一 sequencer ログ
+
+**Status**: accepted
+**Date**: 2026-08-01
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2608011200 が敷いた 4 段の Phase のうち、Phase 1（取引所 state machine）は完了している。Phase 2 は「単一 sequencer + 署名付き検証可能ログ」で、ADR-2608010930 Decision 5 の「単一 writer + CAS は sequencer であって consensus ではない、名乗るまで名乗らない」を実装レベルで守る段。
+
+実装は `kotoba-lang/torihiki` の `torihiki.log`、pin `deab904e7a3771552f24fca37e47196d28e2ac95`。
+
+## Decision
+
+### 1. WAL は `kotoba-lang/chain` を再利用する。作らない
+
+`chain.core` は parent-linked・content-addressed の commit chain で、`commit!` / `commit-info` / `chain` / `verify-chain` / `head` を持ち、storage を `put!` / `get-fn` で注入する。ADR-2606041151 が「CommitDag IS the write-ahead log」と定めたものそのもので、`state` は opaque な dag-cbor 値として扱われる。**同型の構造を torihiki 内に書き起こさない。**
+
+torihiki 側の commit body は `{\"height\" \"ts\" \"state-root\" \"txs\" \"sig\"}`。txs を**ダイジェストではなく実体で**載せる——ログの目的が再実行による検証である以上、再実行に必要なものがログの外にあってはならない。
+
+### 2. 保証は 2 つあり、混同してはならない
+
+これが本 ADR の中心。
+
+| 何を証明するか | 誰が |
+|---|---|
+| ログが**事後改竄されていない** | `chain.core/verify-chain`（各 commit が自分のバイト列から自分の CID に再導出でき、`seq` が 1 ずつ増える） |
+| 記録された **state root が正しい** | `torihiki.log/replay`（全 tx を fresh な exchange に再適用し、記録値と再計算値を突き合わせる） |
+
+**(1) は (2) を含意しない。** sequencer は「完全に整合し、改竄もされていない」チェーンを発行しながら、その中の state root を全部**捏造**できる。verify-chain はそれを通す——バイト列は一貫しているのだから。捕まえられるのは再実行だけである。
+
+これは机上の区別ではない。テスト `replay-catches-a-sequencer-that-invents-a-root` が、block 1 を正直に適用したうえで block 2 に無関係な整数 `123456789` を state root として載せたチェーンを作り、**`verify-chain` が true を返すこと**と**`replay` が height 2 で矛盾を指摘すること**を同時に assert している。この 2 つを 1 つの「検証」と呼んでいたら、運用者を信頼したまま「検証済み」と言うことになる。
+
+### 3. 署名と保存は注入する。torihiki に取り込まない
+
+`sign-fn` / `verify-fn` と `put!` / `get-fn` は引数。理由は 2 つあり、2 つ目が重い:
+
+1. torihiki の `must-not [:perform-io]`（`resources/repository-rules.edn`）を維持するため。
+2. **`kotoba-lang/ed25519` は JVM 専用**である。ログを検証したいのはブラウザや Worker であり、そこに JVM 専用の crypto を import した瞬間、**「誰でも再検証できる」という設計目的そのものが壊れる。** 検証者が動けない検証機構は機構ではない。
+
+その代わりテストは stand-in signer で**配線**を証明する: 署名対象が検証対象と一致すること、位置が署名に含まれること、無署名が失敗すること。**実鍵の配線は未実施**であり、それを「実装済み」とは書かない。
+
+### 4. 署名は payload だけでなく「位置」と state root を覆う
+
+`signing-payload` は `height` / `ts` / `state-root` / **`prev-cid`** / tx 列を含む。
+
+- **parent を含めない署名は splice を許す。** 正当に署名された block を別の親の下に接ぎ木すれば、運用者が作っていないチェーンを作れる。署名は payload ではなく**位置**にコミットしなければならない。
+- **state root を含めない署名は捏造した root を認証してしまう。** Decision 2 の攻撃に署名という信用を与えることになる。
+
+どちらもテストで固定した（`the-signature-covers-the-parent-not-just-the-block` / `the-signature-covers-the-state-root`）。
+
+### 5. 無署名ブロックは「検査対象外」ではなく「失敗」
+
+`verify-signatures` は `sig` が無いブロックで `{:ok false :reason :unsigned}` を返す。無署名を skip 扱いにすると、**署名できない攻撃者が作るものがちょうど無署名ブロック**なので、検証の有無を攻撃者が選べることになる。
+
+### 6. wire codec は汎用にしない
+
+tx の種類と載せてよいフィールドを明示列挙し、未知の種類と非整数フィールドを拒否する。汎用の keyword 走査 codec は、誰も載せるつもりの無かったフィールドを黙って往復させる——**何でも受け付けるブロック形式は、検証できないブロック形式である。**
+
+### 7. 名乗り方
+
+**sequencer であって consensus ではない。** 1 人の writer が順序を決め、投票も gossip も Byzantine 耐性も無い。README と ns docstring の両方に明記した。ADR-2608010930 Decision 5 が禁じた種類の嘘をつかない。
+
+## Consequences
+
+- (+) **運用者が検証可能になった。** ブロックストアを持つ誰でも `replay` で全 state root を独立に再計算できる。信頼の対象が「運用者」から「再実行」に移る。
+- (+) Phase 3 で engi の HotStuff に差し替えるとき、置き換わるのは**順序を誰が決めるか**だけで、ログ構造・検証経路・署名の覆う範囲はそのまま使える。
+- (+) `chain` を再利用したので、prolly-tree / arrangement と同じブロックストアを adapter 無しで共有できる。
+- (−) **実鍵が配線されていない。** 署名の seam はあり、テストは stand-in signer で通っている。実運用の鍵で署名した実績は無い。
+- (−) **永続化が無い。** ログは自分を記述するが、自分をどこにも保存しない。`put!` / `get-fn` の実装は呼び出し側の責務。
+- (−) **state root は依然として 32-bit FNV-1a。** replay 間の不一致検出には足りるが暗号学的コミットメントではない。署名がその root を覆っている以上、**衝突耐性の無いダイジェストに署名している**ことになる——Phase 3 より前に SHA-256 へ替えるべき既知の弱点であり、放置して「署名済み」と呼ばない。
+- (−) txs を実体で載せるためブロックが大きい。ダイジェスト + 別建て保存への分離は、必要になった時点で測ってから決める（今は測っていない）。
+
+## Alternatives considered
+
+- **ログ構造を torihiki 内に自作する。** 却下。`chain` が同じものを既に持ち、ADR-2606041151 がそれを WAL と定めている。
+- **`verify-chain` だけで「検証済み」とする。** 却下。Decision 2 のとおり、それは運用者の正直さを何も証明しない。この選択肢を却下できるようにするために、捏造チェーンのテストを先に書いた。
+- **ed25519 を直接 import する。** 却下。JVM 専用であり、検証者（ブラウザ / Worker）が動かせなくなる。
+- **txs のダイジェストだけ載せ、本体は別ストアに置く。** 保留。再実行に必要なものをログの外に出すと、ログ単体では検証できなくなる。サイズが実際に問題になってから、測ったうえで決める。
+- **無署名ブロックを skip する。** 却下。Decision 5。
+- **汎用 keyword codec。** 却下。Decision 6。
+
+## Follow-up（優先順）
+
+1. **state root を SHA-256 + 正準符号化に替える。** 署名が覆っている以上、ここが今いちばん弱い。
+2. 実鍵（ed25519）を `sign-fn` に配線した sequencer を、torihiki の外に作る。
+3. 永続ブロックストア（`put!` / `get-fn` の実装）。
+4. Phase 3: engi の chained HotStuff へ順序決定を移す。engi 側に無いのは pacemaker / view-change / p2p / 署名集約。
+5. cljs 側で `replay` を実際に走らせる（現状「動くはず」であって「動かした」ではない）。
+")))

@@ -1,0 +1,67 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809032100-cloud-itonami-distributed-nameserver")
+  (:adr/title "cloud-itonami 分散型 nameserver サービス: ENS offchain gateway (CCIP-Read) を Cloudflare Workers で運用し、zone は PR→review→merge で bot 自走、観測は既存 dns-resolver に接続")
+  (:adr/status "proposed")
+  (:adr/date "2026-09-03")
+  (:adr/related (vector "adr-2608280900-world-scale-dns-domain-collection"
+                 "adr-2809031900-hyakka-multilingual-ui-paid-data-plane"))
+  (:adr/body
+  "## 出発点の問い
+
+オーナー: itonami.cloud / cloud-itonami org で分散型 nameserver を
+web3 first で bot 運営したい。どう設計するか。
+
+## Context
+
+- 観測面は既にある: cloud-itonami-dns-resolver (ADR-2608280900) が
+  Tranco/Common Crawl のドメインを DoH で解決し R2 Data Catalog に蓄積。
+  ただしこれは**観測**であり、**権威 (authority) はない**。
+- 権威 DNS を自前の UDP:53 ネットワークで運用するのは、anycast・DNSSEC
+  鍵管理・ abuse 対応の運用負荷がこの org の現状 ( Workers + R2 中心) と
+  非対称に重い。一方 web3 first の命名層は ENS (EIP-137) が de facto で、
+  offchain resolver (EIP-3668 / CCIP-Read) を使えば既存の
+  DoH クライアント・ブラウザから到達できる形で権威を Worker に置ける。
+- 決済面の前例: ADR-2809031900 が x402 (Base) を API に適用済み。
+  登録・レコード更新の課金に同じ型を再利用できる。
+- bot 運営の型: cron bot プロファイル (max_tokens 16384, 1 run = 1 PR,
+  topic branch のみ) がこの workspace の標準。
+
+## Decision
+
+1. **権威は ENS offchain gateway (CCIP-Read) として実装する。UDP:53 の
+   anycast ネットワークは作らない。**
+   - Worker が `resolve(dnsname, record)` の EIP-3668 callback を返し、
+     gateways 名で DNS レコードを DNS wire format で応答する。
+   - レコードの source of truth は R2 (JSON zone manifest、hash addressed)。
+     on-chain には gateway URL のみ (`*.itonami.eth` は ENS offchain
+     resolver に委譲)。DNSSEC の署名は gateway が応答に含める
+     (cloudflare-dns.com の DNSSEC 実装に依存しない独自 zone は
+     DNSSEC 無しで開始し、後続 ADR で署名化)。
+   - 既存 DNS との相互接続: `itonami.cloud` の NS は従来型レジストラの
+     まま維持し、offchain 名 (`*.itonami.eth` / dnslink TXT) を web3
+     first の第一級とする。UDP:53 の分散化は必要になってから別 ADR。
+
+2. **zone manifest は git で管理し、PR → review → merge で bot 自走。**
+   - zone は `zones/*.edn` (JSON ではなく EDN、workspace の慣習) で、
+     レコードごとに source/target/ttl を明記。
+   - 変更は bot が topic branch で PR を出し、merge 後に CI が R2 に
+     sync する。bot は main に直接 push しない (fleet 慣習どおり)。
+   - 觀測データ (dns-resolver の R2 テーブル) を読んで、TTL 更新や
+     dead レコードの検出 PR を出すレポータ bot を後段に付ける。
+
+3. **登録・レコード更新は x402 で課金 (API のみ、参照解決は無料)。**
+   - `set` 系エンドポイント (レコード書き込み) に x402 (Base) を
+     要求。ADR-2809031900 と同型: 参照・resolve は無料、書き込み課金。
+   - レシートは hash addressed でログに残す。
+
+## Consequences
+
+- 新規リポジトリ cloud-itonami-dns-nameserver (Worker, cljc)。
+  EIP-3668 の wire format 実装が本体の作業。
+- UDP:53 の権威を持たないため、従来 DNS のみのクライアントからは
+  `*.itonami.eth` は見えない (ENS 対応 resolver / ccip-read 付き DoH
+  が必要)。この制約は明示的に受け入れる。
+- bot fleet に割る: (a) gateway Worker 実装、(b) zone manifest スキーマ
+  と sync CI、(c) レポータ bot (dns-resolver 観測 → PR)。本 ADR が
+  accepted になるまで bot は実装に入らない。")
+  ))

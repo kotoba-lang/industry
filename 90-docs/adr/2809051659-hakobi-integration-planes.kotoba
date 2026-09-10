@@ -1,0 +1,119 @@
+(vector (map (:adr/authoritative_for
+  (vector "hakobi verdict の消費者境界 — kotobase datom 面への projection、x402 per-claim settlement、inga power table への :delivery role の統合設計"
+   "hakobi kernel への VDT gate 追加（8953f24b、第6 verdict :rejected-latency-underproof）後の統合面の責任分担"))
+ (:adr/supersedes (vector))
+ (:adr/superseded-by (vector))
+ (:adr/topic "hakobi-integration-planes")
+ (:adr/related
+ (vector "orgs/cloud-itonami/hakobi（判定 kernel。本 ADR は消費者を定義するだけで kernel に変更を加えない"
+  "90-docs/adr/2609041345-hakobi-useful-delivery-kernel.edn（D1 が予約した統合 ADR の本丸"
+  "orgs/net-kotobase/control-plane（live service の durable plane は kotobase.net — repository-rules :live-service-durable-data"
+  "orgs/kotoba-lang/inga（consensus plane。inga.retrieval の :storage credit の隣に :delivery role が入る形"
+  "orgs/network-awai/nexus-x402 + orgs/kotoba-lang/x402-sdk（既存 x402 facilitator。3 seller 実稼働 2026-07-10 実測"
+  "orgs/gftdcojp/engi（settlement countersignature 境界。murakumo metering との分離パターンの移植元"
+  "orgs/kotoba-lang/kotoba-lang/lang/q9-migration.edn（Q9 — 移行単位の制約。VDT receipt composer は kotoba script host に capability が無いため nbb 据え置き）"))
+ (:adr/status "accepted")
+ (:adr/id "adr-2609051659-hakobi-integration-planes")
+ (:adr/doc_type "adr")
+ (:adr/last_verified "2026-09-05")
+ (:adr/body
+ "# ADR-2609051659: hakobi 統合面 — kotobase projection / x402 settlement / inga delivery role
+
+**Status**: accepted
+**Date**: 2026-09-05
+**Deciders**: Jun Kawasaki（実行は itonami agent、恒久承認の範囲）
+
+## Context
+
+hakobi kernel（ADR-2609041345）が VDT gate を獲得した（2026-09-05、pin
+8953f24b、61 assertion green）。検証ゲートは6 verdict になった:
+double-count → **latency-underproof** → circular-traffic → evidence gaps。
+
+ADR-2609041345 D1 は「測定経路・SBT 発行・token 経済は後続 ADR」と予約した。
+本 ADR はそのうち **verdict の消費者**（統合面）を固定する。実測した現在地:
+
+| 事実 | 値 | 出所 |
+|---|---|---|
+| hakobi kernel | 6 verdict、61 assertion green、VDT gate 実装済み | pin 8953f24b bin/run-tests.cljs 実測 |
+| live durable plane | kotobase.net（datom 面 + /ipld） | repository-rules :live-service-durable-data |
+| x402 facilitator | nexus-x402、3 seller 実稼働、settle は各 seller treasury、facilitator は鍵を持たない | nexus-x402 README 2026-07-10 実測 |
+| settlement countersign 境界 | engi（murakumo metering との分離。Ed25519 countersign + CIDv1 transfer ID） | engi README 実測 |
+| power table | inga.power の :storage role は既存 bond market に乗る。inga.retrieval は content-addressed なので hash 比較だけで検証可能 | inga README F3 実測 |
+| VDF 下界の標準化動向 | IETF draft-bakshi-vdt（2026-01、trusted clock なしで最低経過時間を証明） | datatracker 実測 |
+
+## Decision
+
+### D1. 三面分担 — kernel は純粋に留まり、統合は3つの消費者に置く
+
+hakobi kernel に I/O・鍵・決済を入れない（G4 維持）。verdict の消費者を3面に分ける:
+
+hakobi.kernel（純粋 — 判定と accounting）
+  → D2. kotobase datom 面 — :source/dataset hakobi-claims の projection
+  → D3. x402 — verified claim 単位の per-byte settlement
+  → D4. inga — :delivery role を power table に追加
+
+### D2. kotobase datom 面への projection（query 面）
+
+verdict 済み claim を :source/dataset hakobi-claims として kotobase datom
+面に投影する。属性は hakobi analyze-claim の string-keyed 出力に揃える
+（delivery_class / verified_count / verified_bytes_total）。bytes 本体を
+datom に埋めない — claim ID と CID 参照のみ。VDT token と challenger
+receipt は /ipld の CID として参照する（8 MiB 天井以下でも、生の署名列を
+datom に入れるのは byte-in-datom 迂回）。
+
+projection は ADR-2608039700 の制約に従う: source plane は hakobi claims の
+EDN（Git 管理正本）、kotobase は query projection。DB への直接書込みだけで
+source に戻らない mutation はしない。
+
+### D3. x402 — verified claim 単位の settlement
+
+配送請求者の報酬支払いに x402 を使う。engi の分離パターンを移植する:
+
+- hakobi carrier Worker が verified claim を受理し、CIDv1 claim ID を
+  transfer ID として engi 型 countersignature を発行する
+- nexus-x402 が facilitator として検証し、各 carrier treasury に settle する
+  （facilitator は鍵を持たない — 既存の実測済み分離）
+- 支払い対象は verified delivery のみ（G1: :bytes-reward 属性は存在しない —
+  スコアが 0 の claim は countersign 対象にならない。これは kernel の
+  verdict が機械的に保証する）
+- 料金モデルは posted price（$/GB）で開始する。nodal pricing（需要地点価格）
+  は校正 ADR の後続 — 現在は携行値を量産しない
+
+### D4. inga — :delivery role を power table へ
+
+inga.power の既存 bond market に :delivery role を追加する。:storage の
+inga.retrieval（witness に block を出させる retrieval sampling）と同型に、
+hakobi verified claim が :delivery role の credit になる:
+
+- credit の根拠は hakobi の :verified verdict（機械検査可能な datom）
+- Sybil 防御は bond（外部 collateral）— engi が USDC で bond するのと同じ
+  理屈（EN は正味ゼロなので bond にしても抑止にならない）を delivery に転用
+- 検証は content-addressed なので hash 比較に帰着する部分と、VDT の
+  sequential chain 再評価の部分に分かれる。後者の検証コスト = 評価コスト
+  （非 succinct、VDT docstring に記録済み）は receipt 検証 O(1) 回なので
+  許容する — succinct 化は将来 ADR
+
+### D5. VDT receipt composer の実装配置
+
+VDT challenge 発行・chain 評価・receipt 検証の運用面は nbb script とする
+（kotoba script host に VDF/chain 適切な capability が無く、Q9 移行単位として
+未達。nbb は ADR-2607173000 の正 script host）。hakobi.vdt の純関数は .cljc
+のまま両 runtime で読める。測定経路（challenger canary の実配布）は
+ADR-2609041345 D4 の hakobi carrier profile の次 cron tranche。
+
+## Consequences
+
+- (+) L5 verified delivery の消費者が3面（query / settlement / consensus
+  power）で明確になり、kernel は純粋に留まる
+- (+) G1 が機械的に強化される — settlement と credit は両方とも kernel の
+  verdict を入力にするので、:bytes-reward 経路は構造的に存在しない
+- (−) 実装は全面未着手（本 ADR は設計面）。carrier Worker / projection
+  writer / inga :delivery role はそれぞれ次 tranche の実装 ADR を要する
+- (−) 校正されていない閾値（0.5/0.3/0.5 は mio 携行値）で settlement が
+  動き始めるリスク — 校正 ADR を posted price 運用開始の前提にする
+- リスク: VDT calibration（min-latency-ms 対 T step の実測校正）が無いと
+  gate は構造だけ運用できるが強度の根拠を持たない — 測定 tranche で
+  reference hardware 校正を実測するまで calibrated 値を claim しない
+"), (:adr/deciders (vector "Jun Kawasaki")), (:adr/date "2026-09-05"), (:adr/measured
+"{:hakobi {:pin 8953f24b38e6 :verdicts 6 :tests {:assertions 61 :failures 0}} :nexus-x402 {:sellers 3 :live true :keyless-facilitator true} :inga {:storage-role :inga.retrieval :delivery-role :proposed} :vdt-standard {:draft draft-bakshi-vdt-verifiable-delay-token-00 :published 2026-01}}"), (:adr/title
+"ADR-2609051659: hakobi 統合面 — kotobase datom projection / x402 verified-claim settlement / inga :delivery role"), (:adr/source-format "edn"), (:db/id -1)))

@@ -1,0 +1,125 @@
+;; ADR-2608310700 — com-junkawasaki/root. EDN tx-data (ADR-2607171600): read with
+;; (d/transact conn (edn/read-string (slurp "90-docs/adr/2608310700-....edn")))
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608310700-the-game-dev-detector-offered-eleven-games-it-could-not-fix")
+  (:adr/title "The game-dev detector put eleven unfixable games at the head of its candidate list")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-31")
+  (:adr/related (vector "adr-2608136000-six-questions-before-believing-a-green"
+                "network-isekai/adr-0084-the-touch-recipe-does-not-reach-an-action-only-game"
+                "network-isekai/adr-0085-the-itonami-depot-loop-shares-one-touch-shape"
+                "network-isekai/adr-0086-care-coordination-and-the-gate-that-measured-two-teleports"))
+  (:adr/body
+  "CONTEXT
+
+`scripts/isekai-game-dev-tick.cljs` is the measuring half of the isekai game-production
+loop: it is deterministic, has no model in it, and the loop consumes its candidate
+top-down. Its `mobile-input-gap` scan is two string conditions on the guest — logic.cljc
+mentions `key-pressed?` and never mentions `(axis ` — which is a correct description of
+a guest that a thumb cannot reach, because kami.input's pointer handlers call only
+`on-axes`/`on-pointer` and `on-action` fires from `keydown`/`keyup` alone.
+
+It is not a description of a guest that a thumb COULD reach if someone edited it. Those
+are different questions, and the detector answered only the first while the loop read
+the answer as the second.
+
+network-isekai's ADR-0084 measured the difference on 2026-08-30 and recorded closing it
+under NOT DONE: 'the action-only games remain unreachable by touch and should be
+reported as such rather than offered as stick candidates.' The detector was not changed.
+Today's tick offered `gftd/ghosthacker-duet` — the same game ADR-0084 was written about,
+a rhythm loop whose entire input is `:actions {:hit #{\" \"}}`, whose scene declares
+`:axes {}` and whose `:world :player-speed` is 0.0.
+
+This is the shape ADR-2608136000 question 4 names: 'can the output tell skipped from
+passed?' Here it is 'can the output tell needs-the-recipe from cannot-have-it?' It could
+not — both were the same row, and alphabetical ordering put every unfixable one first
+(`gftd/ghosthacker-*` and `gftd/quantum-excitation` sort before `itonami/*`).
+
+The cost was recurring, not hypothetical. The three iterations that produced ADR-0084,
+0085 and 0086 each read past the same block by hand before starting work. The trap is
+live for a fresh-context agent: the skill's recipe applied to a rhythm chart has only
+two outcomes, inventing on-screen buttons (art direction, which ADR-0083 and ADR-0084
+both declined) or spending the round re-deriving ADR-0084.
+
+DECISION 1 — the detector decides reachability from the scene, mirroring kami.input.
+
+`touch-reachability` reads scene.edn with the EDN reader and reproduces the condition
+under which `kami.input/sticks` returns no stick at all (measured at source today,
+orgs/kotoba-lang/host src/kami/input.cljc L50-58): a stick exists if `:sticks` is
+declared, or `:stick` is present, or both \"MoveX\" and \"MoveY\" are keys of `:axes`.
+Otherwise the pointer emits nothing and no amount of guest editing reaches it.
+
+  :both / :declared / :incomplete  -> candidate. `:incomplete` (one axis, so no stick
+      is produced) is the drive shape ADR-0083 fixed by declaring the other axis; it is
+      reachable, just not by the guest half alone.
+  :none        -> reported as `:touch-unreachable`, never offered.
+  :unmeasured  -> reported separately.
+
+Candidates are ordered both < declared < incomplete, under the existing owner-reported
+precedence, so the shape with the most worked examples comes first.
+
+DECISION 2 — the unreachable games are reported every tick, not dropped.
+
+`:touch-unreachable` carries the count, the game list and why. Filtering them into
+silence would trade one false statement ('these need a stick') for another ('no game is
+unplayable by touch'). The gap is real and stays visible; what changed is that the loop
+is no longer told to close it by editing a game. Closing it needs a pointer-to-action
+path in kami.input — a kotoba-lang/host change plus a pin advance, which ADR-0084
+already declined to land from inside a game-production iteration for the same reason it
+is declined here: it would land an input primitive with no owner.
+
+DECISION 3 — a scene that could not be read is not a scene with no axes.
+
+An unreadable or unparseable scene returns `:unmeasured` with the reason
+(`:scene-unreadable` / `:scene-parse-error` / `:scene-not-a-map`), not `:none`. Folding
+it into `:none` would drop a game out of the candidate list for a reason that was never
+measured — the first of ADR-2608136000's six questions, in the direction that hides work
+rather than inventing it.
+
+EVIDENCE
+
+Both directions measured against a synthetic repo (`/tmp/igd-probe`) driven through the
+real script by `COM_JUNKAWASAKI_ROOT`, with eight games hand-built to sit one per
+verdict. Post-fix, each row lands in its bucket for the reason it names:
+
+  t/both          -> :both, candidate
+  t/declared      -> :declared, candidate (`:axes {}` plus an explicit `:sticks`)
+  t/incomplete    -> :incomplete, candidate, `:declared-axes [\"MoveX\"]`
+  t/none          -> :touch-unreachable, not a candidate
+  t/badscene      -> :unmeasured :scene-parse-error
+  t/nofile        -> :unmeasured :scene-unreadable
+  t/reads-axis    -> absent (reads `(axis `)
+  t/no-keypressed -> absent (no `key-pressed?`)
+
+Pre-fix, the same eight games produce six undifferentiated rows and the offered
+candidate is `t/badscene` — a game whose scene could not be parsed at all. That is the
+strongest statement of the defect: the instrument's first recommendation was a game it
+had failed to read.
+
+On the real repo the candidate moves from `gftd/ghosthacker-duet` to
+`itonami/carpet-care`, and 11 games move to `:touch-unreachable`. The split is exact —
+11 rows declare no axes and all have `:player-speed 0.0`; 7 declare both MoveX and
+MoveY; no row is `:incomplete` or `:unmeasured` today.
+
+CORRECTION TO ADR-0084
+
+ADR-0084 counted '12 games ... the 11 ghosthacker titles and gftd/quantum-excitation'.
+Measured today there are 10 ghosthacker titles, so the action-only class is 11, not 12,
+and its own two figures did not agree with each other (11 + 1 = 12 was also reported
+alongside a 21-game total that only reconciles at 11). Its 21-game total is consistent
+with 11 action-only plus 10 steering (goriketsu and nine itonami titles), of which three
+have since been fixed, leaving today's 18. The reasoning ADR-0084 recorded is unaffected;
+the count is corrected here rather than in that ADR because the arithmetic is the only
+part that moved and the ADR's own decisions still stand as written.
+
+NOT DONE
+
+- No pointer-to-action path in kami.input. The 11 action-only games are still unplayable
+  by touch; this change makes the loop say so instead of pointing at them.
+- No game changed in this iteration. The production increment this round is the
+  instrument, not a title. `itonami/carpet-care` is the next candidate and was not
+  touched.
+- The `isekai-game-dev` skill's prose escape hatch ('if the target cannot be mapped to
+  two axes, write the reason and take the next game') is left in place deliberately. It
+  now covers the residual case the detector cannot see: a game that declares both axes
+  and still has no direction to steer.")))

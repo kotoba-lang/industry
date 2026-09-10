@@ -1,0 +1,142 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608232400-shomen-teigen-hikyaku-analog-requirement-stack")
+  (:adr/title "ADR-2608232400: 紙・印紙・出頭に残る法務省手続きを、判断（shomen）・提言（teigen）・繋ぎ（hikyaku）の 3 repo に分けて起こす")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-23")
+  (:adr/related (vector "adr-2605312400" "adr-2605312030" "adr-2608239100" "adr-2608040100"))
+  (:adr/body "# ADR-2608232400: 紙・印紙・出頭に残る法務省手続きを、判断・提言・繋ぎの 3 repo に分けて起こす
+
+**Status**: accepted
+**Date**: 2026-08-23
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー質問（2026-08-23）「cloud-itonami で法務省の手続きが収入印紙などをいまだに必要とする
+ことを課題として、法的に基づいた電子政府システムの実装 repo、アドボカシー・pubcome などで
+法制度の変更を要請する actor / bots / repo、それまでの繋ぎとして収入印紙の購入・送付も含めた
+封入・送付の human computing な SaaS は設計実装されているか」。
+
+west 4,234 project を `repo-search` / `concept-lookup` で引き、cloud-itonami の全 checkout を
+本文 grep し、未 checkout の repo は GitHub API で README を読んで突き合わせた結果:
+
+- **①電子政府実装**: 素材は在るが問いを立てた repo は無い。`cloud-itonami-iso3166-jpn-moj`
+  （法務省向けコンプライアンス事業 blueprint）、`toritsugi`（行政手続きコンシェルジュ、
+  法務局の商業登記 entry は `unverified-seed`・R0）、`tetsuzuki`（手続きの期限と審査）、
+  `jp.go.e-gov.elaws`（法令全文 9,523 件）、`open-jpn-gov`（e-Gov 法令 API proxy、未 deploy）、
+  `org-jpki`（JPKI 署名の検証側のみ）。`収入印紙` を本文に持つファイルは cloud-itonami 全体で
+  **3 つ**で、いずれも費用の記載（saisei の手数料、danjo の国税カタログ、lby の文字列）。
+  90-docs/adr に `印紙` `意見公募` `パブコメ` は 0 件。
+- **②アドボカシー**: `cloud-itonami/moushibumi`（申文）が在る —— 請願・陳情・パブコメ
+  （行政手続法 §39）の**市民本人**の声。registry に `jp-egov-public-comment` を持つ。
+  ただし R0 scaffold（cell 非実行・提出なし）で、G9 が非党派・非商業・paid-lobbying 禁止、
+  G15 が本人提出を既定とする。**事業者自身の名で自分の規制負担について提出する actor は無い。**
+- **③繋ぎの human computing**: 無い。`insatsu`（印刷・郵送 routing）は「印刷本体・郵便投函・
+  決済は regulated acts なのでこの repo に無い」と自ら書き、install path も DID も死んでいる
+  （2026-08-14 実測）。`yuubin`（Web ゆうびん投函）は 2026-04-20 に自動化を断念し未配信。
+  `isic-5310` は郵便事業者側の blueprint。`kadode` は退職代行の使者で手続き文書ではない。
+
+**3 つとも「問い」として束ねた repo が無く、在る部品は R0 か未配信**だった。
+
+## Decision
+
+**3 repo を起こし、責任を「判断・提言・繋ぎ」に分ける。** 1 repo にしない理由は、3 つの
+出力が同じ入力（手続き 1 件の法的状態）から出るが、所有者・確度の要件・外向きの effect が
+全部違うからである。
+
+| repo | 面 | 何を持つか | effect |
+|---|---|---|---|
+| `kotoba-lang/shomen`（書面） | library | 閉じた語彙・entry の形・決定核（`route` / `advocacy` / `interim`）・seed 10 件・正直な coverage | 無し（純関数） |
+| `cloud-itonami/teigen`（提言） | role（actor） | 経路登録簿・決定論的起草・governor G1–G10・`state + event → next-state + effects` | `[:submit/live …]`（governor `:allow` のときだけ） |
+| `cloud-itonami/hikyaku`（飛脚） | role（actor） | 民訴費用法の算式と券種・手順書・governor G1–G8・証拠つき状態機械・明細 | `[:workforce/assign …]`（人が作業し証拠を返す） |
+
+### 1. 判断は 3 軸を混ぜない（shomen）
+
+「何が analog か」（書面・押印・**収入印紙**・出頭・原本添付・公証）、「誰がそう言っているか」
+（法律・政令・省令・通達運用）、「電子の道はどこまで開いているか」（施行済み・成立済み未施行・
+法は許すが行政が用意していない・法自身が閉じている・**未調査**）を別々の閉じた語彙で持つ。
+
+- **収入印紙を「書面・押印・対面」と別に数える。** 政府の押印見直しの 3 分類に印紙は無く、
+  申請はオンラインで出せるのに手数料だけ印紙のまま、という手続き（在留資格）が残っている。
+  同じ列に入れると「電子化済み」に見える。
+- **法令の階層が提言の宛先を決める。** 残る analog 制約の最重階層が法律なら国会（請願・
+  規制改革要望）、政令・省令なら大臣（意見公募・規制改革要望）、運用なら行政機関。
+- **`:unknown` は `:not-permitted` に畳まない。** 測っていない手続きを同じ値で返せば、提言
+  actor は調べていない法令に向けて改正要望を書く。`:unverified` は提言も繋ぎも拒否する。
+
+### 2. 提言は事業者自身の声（teigen）。moushibumi と重ねない
+
+moushibumi は市民本人の声で、G9 が paid-lobbying を禁じる。teigen は actor を運用する
+事業者**自身**の規制負担についてだけ提出する（G1: principal = operator）。どちらも「他人の
+代わりに政府へ意見を出す」ことはしない —— 違うのは誰の声かだけ。請願は紹介議員を要するので
+teigen からは出さない（`:handled-by :moushibumi`）。
+
+- 起草は**決定論的**で LLM を使わない。本文の根拠は entry の根拠からしか来ず、G6 が
+  「citations が本文にあるか」と「citations が entry と一致するか」を両方見る。**起草側が
+  条文を創作すると提出は止まる**（テストで壊す方向を確認済み）。
+- live 提出は `:maintainer-verified` 以上の entry からだけ（G3）。seed は dry-run まで。
+- 事業者がある経路を**初めて**使う live 提出は人間の署名待ち（G10、`:hold`）。standing
+  authorization は outbound の実行を agent 判断で許すが、政府への事業者名義の初回提出は
+  署名を経る設計にした。2 回目以降は governor `:allow` で agent 判断。
+
+### 3. 繋ぎは使者であって代理ではない（hikyaku）
+
+文書を作らない・直さない・署名も押印もしない・代理で申請しない。買う・貼る・封をする・出す・
+受領証を残す —— 事実行為だけ（行政書士法 §19・司法書士法 §73・弁護士法 §72 の境界、G2）。
+
+- **受理官署が消印する印紙だけ貼る**（裁判所・登記・入管）。本人が消印する課税文書の印紙は
+  貼らない（G6）。訴状の印紙を申立人が消印すると再納付になる —— `cancel-by` を entry の形に
+  入れたのはそのため（shomen の `conform :full` は印紙の手続きに `:fee/cancel-by` を要求する）。
+- **証拠の無い step は終わらない。順番は飛ばせない。** 領収の写真 hash・券種・貼付ページの
+  写真 hash・封入前の写真 hash・追跡番号・受領証の CID。「やった」という申告は証拠にならない。
+- **seed の額で印紙を買わない**（G5）。entry が verified でなければ本人の額の確認を要求する。
+- **印紙の額面は立替であって売上ではない**（G10）。明細で手間賃と別行。
+- 出頭・押印・公証が残る手続きは繋ぎ自体が成立しない（shomen `:delegable? false`）。本人が行く。
+- `:electronic-now` の手続きは電子の道を案内して断る（G4）。繋ぎは紙を温存するためのものではない。
+
+### 4. seed 時点の所見
+
+shomen の 10 件（全件 `:unverified-seed`）: `:electronic-now` 4 / `:ask-ministry` 2 /
+`:ask-administration` 1 / `:electronic-soon` 1 / `:unverified` 2。
+
+**法務省所管で「法律自身が紙・印紙を要求し電子を閉じている」手続きは seed では見つからなかった。**
+残る制約は省令（帰化の書面・出頭）・政令（在留資格の手数料 = 収入印紙）・運用の階層にあり、
+法律が印紙と書く場合も省令で電子納付に道を開いている（不動産登記法 §119 ⑤）。つまり提言の
+宛先の多くは国会ではなく大臣と行政機関で、経路は意見公募と規制改革ホットラインになる。
+`:ask-legislature` の実例が無いのは「無い」ではなく「見つけていない」である。
+
+訴えの提起（令和 4 年法 48 号の電子申立て・電子納付）と公正証書（令和 5 年法 53 号の電子
+公正証書）は**施行済みかを測っていない**ので `:unknown` のまま分類を拒否している。
+
+## Consequences
+
+- 名前は 3 つとも metaphor（書面・提言・飛脚）で、ADR-2608040100 のとおり README 冒頭で
+  名乗り、`manifest/concept-vocabulary.edn` に `:analog-procedure-requirement` として登録した
+  （印紙 / 収入印紙 / 電子政府 / パブコメ / 意見公募 / 封入 / 郵送 / 使者 で引ける。
+  この 3 語は 2026-08-23 の `concept-lookup` で「語彙に無い」と返っていた）。
+- 依存は一方向: teigen / hikyaku → shomen。shomen は依存ゼロ。
+- runtime は nbb 第一（`run_tests.cljs`）。shomen 21 tests / 61 assertions、teigen 10 / 42、
+  hikyaku 9 / 65。各 governor は落ちる方向をテストで見せている。
+- `shomen.classify` は `.kotoba` 決定核に切り出せる形（スカラと keyword のみ）だが、今は
+  `.cljc` 1 実装。切り出すときは mirror を作らず `.cljc` 側を消して KIR を実行する
+  （ADR-2608239100 の形）。
+- **R0 で無いもの**: teigen の live 提出 host（フォーム送信）、hikyaku の workforce 配信 host
+  （`workforce_provision` への接続）、両者の台帳永続化（kotobase への append）、意見公募案件の
+  自動検出、sealed envelope の実装。いずれも effect の受け手であり、決定核は揃っている。
+- **次の一手**: shomen の seed を一次資料で `:maintainer-verified` に上げる（特に在留資格の
+  手数料の納付経路と、訴え提起の電子納付の施行日）。verified になった entry から teigen の
+  dry-run を回し、初回 live は人間が署名する。
+
+## Alternatives
+
+- **moushibumi を拡張して事業者提出も担わせる**: G9（非商業・paid-lobbying 禁止）と G15
+  （本人提出）が市民の声のために設計されており、事業者の規制負担の提出を同じ actor に載せると
+  「誰の声か」が本文から読めなくなる。分けた。
+- **insatsu / yuubin を繋ぎに使う**: どちらも物理行為を持たないと自ら書き、かつ未配信。
+  hikyaku は物理行為の**証拠**を持つ層で、印刷は insatsu の前段として残す。
+- **1 repo に束ねる**: 所有者（library / 事業者 actor / 作業者 actor）と effect が違う。
+  分けた方が governor の線が読める。
+
+## 改訂履歴
+
+- 2026-08-23 起票。3 repo を GitHub に作成・push・west 登録。")))

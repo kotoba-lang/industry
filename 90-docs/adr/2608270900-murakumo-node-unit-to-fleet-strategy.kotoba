@@ -1,0 +1,174 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608270900-murakumo-node-unit-to-fleet-strategy")
+  (:adr/title "murakumo Node の単位は「10万円未満の1台」— ハードは配置手段、1→1,000台の control plane が本体")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/tags "murakumo, murakumo-node, sku-a, onprem, lp, fleet, control-plane, pricing, tax, appliance, aiueos, enrolment, strategy")
+  (:adr/body
+  "## 決定
+
+**murakumo Node の単位は『取得価額 10 万円未満の 1 台』であり、事業はその 1 台を
+1,000 台まで同じ操作で広げる control plane にある。ハードウェアは利益源ではなく
+配置手段とする。**
+
+1. **LP は理想の状態を書き、実装をそこへ寄せる**（オーナー指示 2026-08-27）。
+   実装の現在地を LP の天井にしない。
+2. **対象はオフィスまで広げる。自宅は入れない**（オーナー確認 2026-08-27）。
+   自宅を入れると消費者取引になり、特商法の記載義務・返品・サポート期待値が
+   変わる。LP だけ変えると `legal/tokushoho.md` と規約との間に齟齬が出る。
+3. **『電源と LAN をつなぐだけ』は今日から書ける。**
+   `cloud-murakumo` の `docs/adr-node-boot-media-and-storage-lifecycle.md`
+   （2026-08-26、オーナー指示で accepted）Decision #2 が『セットアップの簡便さは、
+   出荷前に内蔵 SSD へ完成 image を書き込むことで実現する。購入者の作業は電源と
+   LAN の接続を基本とし』と決めており、**現在の出荷がその状態であることを
+   オーナーが確認した（2026-08-27）**。
+4. **『AI 専用機』は aiueos を待たない。** image の appliance 化で届く。
+5. **『AI 専用 OS』は aiueos の実機 boot が緑になるまで公開面に書かない。**
+6. **1,000 台の税務単位判定は、公開面に載せる前に税理士の確認を取る。**
+
+## 訂正 — 実装の天井を LP の天井にしていた
+
+2026-08-27 の最初の回答で、私は『AI 専用 OS は aiueos の実機 boot を待たないと
+書けない』と述べた。**これは誤りである。** 実装の現在地を、書いてよいことの
+上限として扱っていた。ADR-2608261200（rule-kaizen）が名指ししている形と同型で、
+**ある日の実装天井を『こう書くもの』として固定していた。**
+
+正しい切り方は 2 段ある:
+
+- **AI 専用機**（appliance）—— 汎用 OS の管理面・更新面・攻撃面を持たない
+  単一用途の機械。boot media ADR の Decision #5 が既に *read-only root /
+  RAM overlay / swap 無効 / A-B image* という語彙を持っており、それを完成 image に
+  当てれば届く。**aiueos を待つ必要はない。**
+- **AI 専用 OS** —— カーネルから専用である、という最上位の名乗り。これは aiueos。
+
+**手前の段があることに気づかず、最上位の段だけを見て『書けない』と言っていた。**
+
+## なぜ 99,900 円が閾値なのか（安さではない）
+
+同じ数字の上に 3 つの閾値が重なる。これが戦略の全部である。
+
+| 閾値 | 内容 | 数千万円の GPU サーバーとの差 |
+|---|---|---|
+| 税 | 取得価額 10 万円未満 → 少額減価償却資産（法令 133）→ 事業供用年度に全額損金。**判定は 1 台ごと** | 中小企業経営強化税制の**認定**が要る |
+| 決裁 | 多くの企業の稟議閾値の下。1,000 台は『1 億円の設備投資』ではなく反復購買として通りうる | 同じ金額でも**通る窓口が違う** |
+| 故障ドメイン | 1,000 台 = 1,000 個。1 台落ちて 0.1%。交換はカード決済 1 回 | 故障ドメインが **1 つ**。交換は調達サイクル |
+
+**最優先の 1 問（未確認）**: 1,000 台を 1 つのシステムとして購入したとき、
+『1 単位』判定が維持されるか。令 133 は年間上限を持たないが、単位判定と、
+措法 67 の 5（30 万円未満・**年 300 万円上限**）との切り分けを含めて、
+**顧問税理士の確認が要る。** ここが通れば『まとめ買いしても 1 台ごとに全額損金』
+という、GPU サーバーが構造的に言えない訴求が立つ。**戦略のレバーがこの 1 点に
+集中している。**
+
+⚠ **確認が取れるまで、この訴求を公開面に書かない。** LP は既に『税務助言では
+ありません／対象可否は顧問税理士・会計士へ』を持っており、その規律を崩さない。
+
+## なぜハードで儲けないのが正しいか
+
+BTO 上位機の実測（`cloud-murakumo` の `docs/gtm/node-32-arc-b70-bom-2026-08-18.md`、
+測定日 2026-08-18。**この値は測定であって定数ではない**）:
+
+売価 399,900 / BOM 336,040 / 粗利 63,860（16.0%）。BOM 外費用（決済・国内送料・
+組立・24h burn-in・保証引当）45,000 を引いて **純利 18,860（4.7%）**。
+
+**4.7% はハードを事業にできる数字ではない。だから事業はハードではない。**
+1,000 台を置くことは、**顧客の中に 1,000 ノードの fleet を作ること**であり、
+それを 1 つに畳む control plane が murakumo である。ハードは cost-plus の配置手段。
+
+## すでに在るもの（構想ではなく本番）
+
+- **`kotoba-lang/murakumo` は fleet control plane として稼働中。**
+  `fleet.edn` にノードが登録され、Tailscale SSH で全ノードに到達して 1 つの
+  ビューに畳む。現在のノード数は `fleet.edn` を引くこと（**ここに数を書かない**
+  —— 書けば定数として引用される）。
+- **自社の CI/CD がこの fleet の上で回っている**（`scripts/fleet-ci/`。
+  GitHub Actions は ADR-2607300900 で撤去済み）。**自分たちの開発がこの仕組みに
+  依存している** —— これが最も強い dogfooding の証拠である。
+- **1,000 台の enrolment 機構は設計済み。** `cloud-murakumo` の `docs/devices.md` が
+  『aiueos boxes that arrive from the factory and are claimed by scanning their
+  label』と書いており、`grant.enroll`（`kotoba-lang/grant`）が claim state machine と
+  QR encoding と全 deny reason を所有する。
+- DID/CID identity・policy records・直接 QUIC 経路（Tailscale 依存を外す overlay を構築中）。
+
+## 理想の製品定義（LP の目標状態）
+
+**murakumo Node は AI 専用機である。汎用 PC ではない。**
+
+1. 電源と LAN をつなぐと、そこが推論の置き場所になる
+2. データは箱から出ない（構造的に）
+3. 汎用 OS の管理面・更新面・攻撃面を持たない、単一用途の機械として振る舞う
+4. **1 台でも 1,000 台でも操作は変わらない**
+
+不変条件 4 が守れないなら 1,000 台は売れない。台数に比例して人手が要るなら、
+それは 1,000 台の商品ではなく 1 台の商品を 1,000 回売っているだけである。
+
+## offer の形
+
+| 台数 | 買い手 | 操作 | murakumo の役割 |
+|---|---|---|---|
+| 1 | オフィス | 電源 + LAN | 不要 |
+| 10 | 部門 | 同じ。QR で claim | 1 つのビュー |
+| 1,000 | 全社 | 同じ。人手は台数に比例しない | **これが本体** |
+
+## 理想と実際の差分
+
+| 理想 | 2026-08-27 の現在地 | 埋める工事 |
+|---|---|---|
+| 電源と LAN だけ | **真**（出荷前 image 書込み済み。オーナー確認） | 無し。LP へ |
+| オフィス設置 | **真**（対象確定） | 無し。LP へ |
+| 初回の操作面 | **未測定** | 実機で 1 回見る。見るまで LP に書かない |
+| AI 専用機 | 完成 image は汎用 OS ベース | image の appliance 化（read-only root / A-B 更新 / 汎用デスクトップを出さない） |
+| AI 専用 OS | aiueos は実機 boot が **UNVERIFIED**。NVMe / USB / PCI は QEMU 上の reference C のみ、scheduler・ring 3・syscall は未達。README が自ら『Parity with Linux, Windows or macOS is not claimed』と書いている | aiueos の実機 boot |
+| 複数台 / fleet | SKU A は `:hardware/fleet-participation? false` | 複数台 SKU + enrolment を SKU A に開く |
+| 1,000 台の税務 | **未確認** | 税理士に 1 問 |
+
+## 順序
+
+1. ~~**今日** —— 設置節（電源 + LAN）と、対象へのオフィス追加を `/onprem` に載せる~~
+   **✅ 着地済み**（2026-08-27、cloud-murakumo `f0c3728`）。あわせて `/onprem` を
+   Apple の製品 LP の文法へ組み直し（`61bc1f4`）、copy lock を 3 分類へ再分類し
+   （`549d2aa`、ADR-2608271600）、**marketing 6 面すべて**を同じ系に乗せた
+   （`f129844` / `fc6f69b` / `0b7c4c5`）。本番反映済み。
+2. **今週** —— 税理士に 1 問（1,000 台の単位判定）。ここが全体を決める。**未着手**
+3. **今月** —— image の appliance 化 → 『AI 専用機』が言えるようになる
+4. **次** —— 複数台 SKU + QR enrolment 開放 → 1 → 1,000 の offer が実在する
+5. **長期** —— aiueos 実機 boot → 『AI 専用 OS』が言えるようになる
+
+## この面が答えていなかったこと（実測 2026-08-27）
+
+`/onprem` の HTML を語で数えた:
+
+`OS` 0 回 ／ `推論サーバ` 0 回 ／ `自宅` 0 回 ／ `オフィス` 0 回 ／
+`繋ぐ`・`接続`・`セットアップ`・`起動`・`インストール` すべて 0 回。
+
+`サーバー` の 4 回は全部『即時償却 GPU サーバー』—— LP が 11 回の否定文で
+**切り離している側**の語である。`電源` の唯一の出現は仕様表の
+『120W AC アダプター』。`Windows` の 1 回は『Windows 11 Pro 対応はメーカー
+公開仕様です』で、**AI 専用機とは逆を向いている**（appliance 化のとき、
+この行も同時に直す必要がある —— 1 箇所だけ直すと齟齬が残る）。
+
+価格・税・売主・購入経路には全部答えていながら、**箱を開けてから動くまでが
+1 行も無い面**になっていた。`docs/gtm/onprem-copy-coa-2026-08-23.md` が同じ
+診断を先に出している —— 否定的な認識論 23 回に対して『測った』1 回、
+Doubt : Interest が 5 : 1。
+
+## 未確認のまま残すもの
+
+- **1,000 台の税務単位判定**（税理士）
+- **初回の操作面**（実機）—— ADR が保証しているのは『買い手の作業は電源と LAN』
+  までで、その先の画面は別の主張である。**埋めたくなったら、まず実機で見ること。**
+- **appliance 化した image が実機で通るか** —— boot media ADR の Decision #7 が
+  『冷間起動 100 回、停電復帰 100 回、image rollback、24 時間の書込負荷を実機で測る。
+  推測だけで出荷しない』と定めている
+
+## 参照
+
+- `cloud-murakumo` `docs/adr-node-boot-media-and-storage-lifecycle.md`（2026-08-26 accepted）
+- `cloud-murakumo` `docs/devices.md` / `kotoba-lang/grant` の `grant.enroll`
+- `cloud-murakumo` `docs/gtm/onprem-copy-coa-2026-08-23.md`
+- `cloud-murakumo` `docs/gtm/sku-a-tax-positioning-2026-08-23.md`
+- `kotoba-lang/aiueos` README の実測表
+- ADR-2607300900（CI/CD は murakumo fleet）
+- ADR-2608261200（rule-kaizen —— 実装天井を規則にしない）")))

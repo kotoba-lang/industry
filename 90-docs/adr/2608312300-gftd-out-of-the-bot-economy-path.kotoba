@@ -1,0 +1,222 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608312300-gftd-out-of-the-bot-economy-path")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "gftd-out-of-the-bot-economy-path")
+  (:adr/title "ADR-2608312300: BOT / KUMO / YATA の経路から gftd を外す —— ただし『外す』は文字列置換ではない。live な cookie 名・secret 名・ホスト名を機械的に消すと本番が落ちる")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+
+  (:adr/repos
+  (vector "com-junkawasaki/root"
+   "orgs/kotoba-lang/murakumo"
+   "orgs/network-awai/cloud-murakumo"
+   "orgs/network-awai/net-kotobase"
+   "orgs/network-awai/nexus-x402"
+   "orgs/cloud-itonami/app-credits"))
+
+  (:adr/authoritative_for
+  (vector "オーナー指示（2026-08-31）「では実際に統合を進めて、ただ gftd は外していって」の適用範囲 —— BOT / KUMO / YATA の経済圏に gftd を新たに結線しないこと"
+   "ADR-2608311800 の未決 1（mainnet の GCC をどうするか）への答え: 選択肢 (c)『BOT の前身として位置づけ直す』を却下する。GCC は BOT の経路に載せない"
+   "『gftd を外す』を文字列の一括置換として実行してはならないこと。live な cookie 名 gftd_session / secret 名 GFTD_STRIPE_WEBHOOK_SECRET / ホスト gftd.ai・gftd.co.jp が同じ grep に当たる"
+   "実際に外す 4 対象と、その順序（D3）"
+   "ADR-2608291009 実装順 step 2（KUMO の hold / capture / release）が landed したこと、および step 1（YATA の原価）が未測定でブロックされていること"))
+
+  (:adr/amends
+  (vector "90-docs/adr/2608311800-bot-token-issues-on-base.edn —— 未決 1 に答える（GCC は BOT の前身にしない）"
+   "90-docs/adr/2608291009-bot-kumo-yata-three-unit-economy.edn —— 実装順 step 2 を landed として記録し、step 1 のブロック理由を確定する"))
+
+  (:adr/related
+  (vector "90-docs/adr/2607242100-cloud-itonami-awai-network-operator-change.edn（Stripe merchant of record が Gftd Japan のままという既知 gap）"
+   "90-docs/adr/2607320500-legal-structure-three-roles-no-foundation-no-custody.edn（法人は 2 つ。Gftd Japan は収納代行・インフラ vendor であって Service operator ではない）"
+   "90-docs/adr/2608026100-murakumo-credits-as-unit-of-account-opaque-backend.edn（hold/capture/release の欠落を最初に名指しした ADR）"
+   "**既存の gftd 除去トラック** —— superproject の PR #2826（codex/remove-gftd-bots-pin-clean、merged）と kotoba-lang/murakumo の codex/remove-gftd-runtime-wave2-20260827（main の 1 commit 先、tools/qa のみ）。**本 ADR はそれらと競合する波ではなく、方向の決定とガードレールである。** 実際に文字列や runtime を外す作業はそのトラックで行い、D2 の『触ってはならないもの』を必ず先に読むこと"))
+
+  (:adr/measured
+  (vector "ADR-2608291009 が受け皿として挙げる 10 repo に gftdcojp org の repo は 1 つも無い。統合経路は repo の単位では既に gftd を含まない"
+   "その 10 repo の中の gftd 参照は合計 401 ファイル。内訳（多い順）: net-kotobase 294 / cloud-murakumo 82 / nexus-x402 13 / murakumo 10 / treasury 2 / inga 2 / kotobase-storage 0 / kura-bugyo 0 / credits 0 / ws-valueflo-vocabulary 0"
+   "参照の種類別（実測、上位）: gftd.ai 243（net-kotobase）/ Gftd Japan 114 + 66 / gftd.co.jp 82 / gftdcojp 81+43+25+10 / gftd_session 41+15 / GFTD_STRIPE_WEBHOOK_SECRET / ~/.gftd。**live な cookie 名・secret binding 名・本番ホスト名が同じ grep に含まれる**"
+   "B2 の bucket は 3 つとも gftd 名: gftdcojp-m365-annex / ai-gftd-cdn / ai-gftd-datasets（後者 2 つは 1Password vault gftdcojp と kagi compartment gftdcojp）"
+   "mainnet の GCC 0x799d24a6FFBb758C6E2Ed8f981822A17Eaa5F30B は name が Gftd Computing Credits、供給 10,000,006.711595 のうち 10,000,000 を junbi Safe が保有、Uniswap v3 プールは 3 fee tier とも不在、upgradeable ではない"
+   "gftd 期の on-chain stack は private geth（chainId 260425）と anvil（1337）にある: GCCStablecoin / MurakumoEscrow / ClaimStakeEscrow / AgentRuntimeLeaseEscrow / GftdActorRegistry / GftdAgentRegistry / GftdRootIdentityRegistry / MurakumoAgentBridge / ContributionRoyaltyRegistry。deploy は 2026-04"
+   "murakumo.infer.credits に hold / capture / release を追加して merge した（kotoba-lang/murakumo eb5e5d4b86c4、west pin 1ceaa08a8c04）。33 tests / 163 assertions、負のコントロール 3 本とも、壊した主張を名乗るテストが赤くなることを確認"
+   "既存欠陥の発見: balances は JSON 形（文字列キー）の feed を畳めない。(balances [{run/shares {alice 500.0}} {run/spend {alice 120.0}}]) が {head 0.0, :treasury 0.0} を返し、残高も spend も消える。同じ feed を refundable は正しく読む。**hold 以前から在る非対称であり、今回入れたものではない**"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-31）: 「では実際に統合を進めて、ただ gftd は外していって」。
+
+前段は ADR-2608291009 の実装順を実際に進めること。後段は、その過程で gftd を外していくこと。
+
+**後段を素直に読むと事故になる。** 統合経路の 10 repo に gftd は 401 ファイル現れるが、
+その中身を数えると **gftd.ai（本番ホスト）243 / gftd_session（live cookie 名）56 /
+GFTD_STRIPE_WEBHOOK_SECRET（live な Worker secret の binding 名）** が含まれる。
+`sed -i s/gftd//g` に相当する操作は、**セッションを全部無効化し、Stripe webhook の
+検証を落とし、本番ホストの参照を壊す。**
+
+したがって本 ADR の中心は「何を外すか」ではなく **「外す」が何を意味しないか**を
+先に固定することである。")
+
+  (:adr/decision
+  "### D1. mainnet の GCC は BOT の前身にしない（ADR-2608311800 未決 1 への答え）
+
+同 ADR は 3 択を開いていた —— (a) 放置 (b) 退役 (c) BOT の前身として位置づけ直す。
+**(c) を却下する。**
+
+理由は名前ではなく系譜である。GCC は `name` が **Gftd Computing Credits** で、
+owner / masterMinter / blacklister は junbi Safe だが、**単位としては gftd 期の
+計算クレジット**である。BOT の裏付けは「外部が実際に決済した収入」（ADR-2608291009 D4）で、
+GCC の 10,000,000 は**収入の裏付けを持たない事前 mint** である。
+これを BOT の前身にすると、**BOT の最初の 1000 万個が pre-mine になる** ——
+ADR-2607030030 の「労働裏付け発行・pre-mine 無し」を、名前の付け替えで回避することになる。
+
+**(a) 放置と (b) 退役の選択は owner に残す。** どちらも本 ADR の範囲外である:
+
+- burn は Safe の署名を要し、CLAUDE.md 安全床②（資金の売買・送金・変換・trade をしない）に当たる
+- **どちらを選んでも BOT の設計は変わらない。** GCC は upgradeable でないので Base へは
+  移せず、BOT は Base に新規で出る。つまり (a) と (b) の差は BOT ではなく GCC の後始末だけ
+
+本 ADR が固定するのは **『GCC は BOT の経路に載らない』** という 1 点である。
+
+### D2. 『外す』を文字列置換として実行しない —— 触ってはならないものの名指し
+
+**次の 3 類は、gftd を含んでいても改名しない。** 改名は本番の停止であって統合ではない。
+
+| 類 | 例 | 改名すると何が起きるか |
+|---|---|---|
+| live な cookie 名 | `gftd_session`（56 箇所） | 全セッションが即時無効になる |
+| live な secret binding 名 | `GFTD_STRIPE_WEBHOOK_SECRET` | Stripe webhook の署名検証が落ちる |
+| 本番ホスト名 | `gftd.ai`（243）/ `gftd.co.jp`（82） | 参照が 404 になる。DNS とデプロイ先の話であって文字列の話ではない |
+
+**これらは『gftd という会社が経済圏に入っている』ことを意味しない。** 識別子であって
+参加者ではない。改名したいなら、それは **DNS 移行 / secret のローテーション /
+セッション移行**という別の作業であり、1 つずつ ADR を切って段階的に行う。
+
+⚠ **`~/.gftd/` も改名しない。** fleet-ci の署名鍵・repo-bots の state・
+launchd の plist が参照するローカルパスで、会社とは無関係の運用ディレクトリである。
+
+### D3. 実際に外すのは 4 つ。順序つき
+
+| # | 対象 | 状態 | 誰の領域 |
+|---|---|---|---|
+| 1 | **新規に gftd 名を作らない。** BOT / KUMO / YATA の識別子・bucket・env・contract 名に gftd を入れない | **本 ADR から発効。以後の規則** | agent |
+| 2 | **収入の着地点。** Stripe merchant of record が Gftd Japan のまま（ADR-2607242100 の既知 gap）。BOT 経済の収入は AWAI / junbi に着かねばならない —— 着かないなら『外部が決済した収入』が gftd の口座を経由することになり、D4 の裏付けが 1 段濁る | **未解消** | owner（口座の re-paper） |
+| 3 | **YATA の原価根拠。** B2 の bucket は 3 つとも gftd 名（`gftdcojp-m365-annex` / `ai-gftd-cdn` / `ai-gftd-datasets`）。**YATA の保管面は新しい bucket で建てる** —— 既存 3 つは媒体資産・M365 アーカイブ用であって保管商品の原価根拠ではない | 未着手 | agent（bucket 作成は owner 承認済みの標準作業） |
+| 4 | **gftd 期の on-chain stack。** private geth（chainId 260425）の GCCStablecoin / MurakumoEscrow / ClaimStakeEscrow / AgentRuntimeLeaseEscrow / Gftd*Registry 群は **BOT の経路に載せない**。参照実装としては読んでよい | **本 ADR から発効** | agent |
+
+**1 と 4 は今日から効く規則である。2 と 3 は作業であり、2 は owner を要する。**
+
+### D4. 統合の現在地 —— step 2 が landed、step 1 はブロック
+
+ADR-2608291009 の実装順に対して:
+
+| step | 内容 | 状態 |
+|---|---|---|
+| 1 | YATA の目盛りと原価を測る | **ブロック。B2 の実請求は console でしか読めず、agent からは未測定** |
+| 2 | KUMO に hold / capture / release を入れる | **landed**（murakumo eb5e5d4b86c4、pin 1ceaa08a8c04） |
+| 3 | YATA を x402 に載せる | step 1 待ち |
+| 4 | D5 の損益を 41 の governed actor に回す | step 1 と 2 の両方を要する（費用側が step 1、hold が step 2） |
+| 5 | acceptance density を上げる | 未着手。**BOT より前に来る** |
+| 6 | BOT の発行体を確定 | owner + 弁護士 |
+
+**step 1 が『安い』でも『高い』でもなく未測定である**ことを、そのまま記録する。
+B2 の rate card は公開されているが、ADR-2608291009 D6 は **live の請求から採れ**と
+書いている。rate card の計算を実請求として提示しない。
+
+### D5. step 2 で何を入れたか（要点だけ。詳細は commit）
+
+`hold` は `spend` と同じ向きに debit する。したがって `balances` の折り畳んだ数は
+今までどおり「いま使える credits」を意味し、`ledger-violations` の overdraft 検査が
+hold にもそのまま効く。**`balances` の戻り値の形は変えていない** ——
+その docstring が「既に書かれた feed を遡って読み替えることになる」として禁じている。
+
+`capture` は held と captured を 1 つの map に持つ。`:run/transfer` が
+from / to / credits を 1 map に持つのと同じ理由で、**途中で切れた feed に対しても
+fold が価値を失わず、発明もしない**。差額はその場で口座に戻る。
+
+`outstanding-hold` が hold を消費する唯一の場所で、`refundable` の 3 つの検査を写している
+（実在するか / 既に capture・release されていないか / 額は台帳から採る）。")
+
+  (:adr/implementation
+  (vector "landed: kotoba-lang/murakumo eb5e5d4b86c4（hold / capture / release + 33 tests / 163 assertions）"
+   "landed: west pin murakumo 0f80b773→eb5e5d4b（superproject 1ceaa08a8c04、ahead=2 behind=0 をサーバ側検証）"
+   "landed: 本 ADR"
+   "not-done-deliberately: mainnet GCC の burn / 退役。Safe 署名を要し安全床②に当たる。D1 のとおり (a)/(b) の選択は owner"
+   "not-done-deliberately: gftd を含む識別子の一括改名。D2 のとおり本番を落とす"
+   "not-done-deliberately: YATA 用 bucket の作成。step 1 の原価が未測定のまま bucket だけ作っても、掲示価格を決められない"))
+
+  (:adr/known-gaps
+  (vector "**本 ADR を書く前に、既存の gftd 除去トラックを引かなかった。** 起草後に worktree 一覧で codex/remove-gftd-runtime-wave2-20260827 に気づき、そこから PR #2826 に辿った。CLAUDE.md の『無いと結論する前に索引を引く』は repo にも作業トラックにも当たる —— 方向を決める ADR を書く前に、同じ方向で既に走っているものを引くべきだった。内容は競合しないが、参照が無ければ次に読む者が重複して波を立てる"
+   "**`balances` が JSON 形の feed を畳めない（既存欠陥、今回の発見）。** 文字列キーの事象は `balances-step` の cond をすべて外れて `:else` に落ち、**settle 済み run として読み替えられる**。実測: (balances [{run/shares {alice 500.0}} {run/spend {alice 120.0}}]) → {head 0.0, :treasury 0.0}。残高も spend も消え、代わりに head と treasury の行が生える。同じ feed を `refundable` は正しく読む。つまり **ledger の検査が読めた feed が、ledger の fold では別物になる**。murakumo の test に `ledger-checks-read-json-feeds-but-the-fold-does-not` として現在の契約を固定した。直すのは `balances` の意味を変える別の変更"
+   "**murakumo の `-M:test` がこの環境で起動しない。** `babashka/http-client` が classpath に無く、`kotoba.lang.http.host.babashka` のロードで落ちる。**私の branch でも無改変の main でも同じ**なので既存の環境 gap だが、結果として step 2 の検証は当該 namespace を直接ロードして行った（33 tests / 163 assertions）。repo 全体の suite は今日この機械では緑にできない"
+   "YATA の原価が未測定（D4 step 1）。B2 の請求は web console にしか無く、agent は読めない。usage（GB 数）は scoped key で測れるが、それは請求ではない"
+   "Stripe merchant of record が Gftd Japan のまま（D3-2）。BOT 経済の収入経路がここを通る限り、『外部が決済した収入』の着地点が gftd 側にある"
+   "mainnet GCC の処分が未決（D1）。放置と退役のどちらでも BOT の設計は変わらないが、10,000,000 GCC が junbi Safe に載ったままである事実は残る"))
+
+  (:adr/open-decisions
+  (vector "mainnet GCC を放置するか退役させるか（D1 の (a) と (b)）。owner"
+   "Stripe merchant of record の re-paper（D3-2）。owner"
+   "YATA 用 B2 bucket の名前。gftd を含めないことは D3-1 で決まったが、何にするかは未定"
+   "`balances` の JSON 非対称を直すか。直すと既に書かれた feed の解釈が変わるので、変更の blast radius を測ってから"))
+
+  (:adr/body
+  "# ADR-2608312300: gftd を BOT 経路から外す
+
+## 一行で
+
+**外すのは系譜であって文字列ではない。** GCC を BOT の前身にしないことと、
+`gftd_session` を改名しないことは、同じ 1 つの決定の裏表である。
+
+## 一番危ないのは、指示を素直に実行すること
+
+「gftd は外していって」を grep して置換すると、当たるものの上位 3 つは
+**本番ホスト（gftd.ai、243 箇所）・live なセッション cookie（gftd_session、56 箇所）・
+Stripe webhook の secret binding 名**である。どれも「gftd という会社が経済圏に
+入っている」ことを意味しない —— **識別子であって参加者ではない。**
+
+だから本 ADR は、外す対象（D3 の 4 つ）より先に、**触ってはならないもの**（D2）を書く。
+
+## GCC を BOT の前身にしない理由は、名前ではない
+
+名前（Gftd Computing Credits）は分かりやすい入口だが、決め手ではない。決め手は
+**10,000,000 GCC が収入の裏付けを持たない事前 mint** であることである。
+
+ADR-2608291009 D4 は BOT の発行を「外部が実際に決済した収入」だけに縛った。
+それは同 ADR が測った **1,958 対 2**（bot の数 対 値札の数）への直接の答えで、
+「bot が働いた」ことでは 1 個も増えない、という不変条件だった。
+
+GCC を BOT の前身に読み替えると、**その不変条件が最初の 1000 万個について破れる。**
+ADR-2607030030 の「pre-mine 無し」を、名前の付け替えで回避することになる。
+
+**GCC をどうするか（放置か退役か）は、BOT の設計に影響しない。** GCC は
+upgradeable ではないので Base へ移せず、BOT はどのみち Base に新規で出る。
+だから本 ADR はそこを owner に残し、**BOT の経路に載せない**という 1 点だけ決めた。
+
+## 統合は 1 歩進んだ。ただし律速は動いていない
+
+step 2（KUMO の hold / capture / release）が landed した。async job が
+**走る前に課金される**形は消え、実消費が見積より小さいときの差額は同じ 1 事象の中で戻る。
+
+しかし step 1（YATA の原価）は **B2 の実請求が agent から読めない**ので止まっている。
+rate card は公開されているが、ADR-2608291009 D6 は live の請求から採れと書いていて、
+**その差を埋めるために公開価格を実測として提示することはしない。**
+
+そして step 5（acceptance density）は BOT より前に来る、という順序も動いていない。
+ADR-2607299900 §5 の恒久ルール —— token は capital を連れてくるが settlement demand は
+連れてこない —— は今日も有効である。
+
+## 途中で 1 つ、既存の欠陥を踏んだ
+
+hold の test を書いていて、`balances` が **JSON 形の feed を畳めない**ことが分かった。
+文字列キーの事象は `balances-step` の cond をすべて外れて `:else` に落ち、
+**settle 済み run として読み替えられる** —— 残高も spend も消え、代わりに
+head と treasury の行が生える。
+
+同じ feed を `refundable` は正しく読む。つまり **台帳の検査が読めた feed が、
+台帳の fold では別物になる。**
+
+これは hold 以前から在る。今回入れたものではない（無改変の main で再現する）。
+直すのは `balances` の意味を変える別の変更なので、**現在の契約を test で固定して
+先に進めた** —— 次に読む者が同じところで驚かないように。")))

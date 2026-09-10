@@ -1,0 +1,100 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608300300-worker-wasm-migration-needs-three-capabilities")
+  (:adr/title "ADR-2608300300: Worker を JVM から外すのに足りないのは 3 つ —— 暗号 capability・clock の wasm-aot・大きなバイト列の面")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-30")
+  (:adr/deciders "Jun Kawasaki")
+  (:adr/doc-type "adr")
+  (:adr/topic "kotoba compile path / capability kits")
+  (:adr/last-verified "2026-08-30")
+  (:adr/repos (vector "kotoba-lang/amu" "net-kotobase/control-plane" "net-kotobase/cypher" "net-kotobase/lake"))
+  (:adr/related (vector "adr-2608300200-ayatori-serves-the-production-query-bridge" "ADR-2607279200" "ADR-2607198300"))
+  (:adr/body "# ADR-2608300300: Worker を JVM から外すのに足りない 3 つ
+
+**Status**: accepted
+**Date**: 2026-08-30
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-08-30）「jvm 依存をなくして amu, kotoba compile 経路のみに」。
+
+きっかけは容量である。実測 2026-08-30、この 1 台（10 コア）で **load average 513**、
+java 14 本 / node 99 本 / Claude セッション 8 本。走っていた java を親プロセスで辿ると
+**`scripts/resource-guard.mjs` の下に居たのは 1 本だけ**で、残りは `clojure -M gate.clj` /
+`-A:test` / `-Sdeps` / `kirloop.clj` / launchd 常駐だった。
+
+**guard は壊れていない。guard の規則が「build コマンド名の列挙」**（shadow-cljs / vite /
+next / cargo / wash）**なので、実際に CPU を焼いている JVM の test・gate・loop が全部
+その列挙の外にいる。** 列挙を足すのは追いかけっこで、JVM を起こさない経路を既定にする方が効く。
+
+**amu は native compiler であって JVM に依存しない**（オーナー指摘）。`bin/amu` は
+native/wasm target を nbb で実行し、`spawn(\"clojure\", …)` に落ちるのはそれ以外の
+target のときだけ。したがって「Worker を `.kotoba` + `--target wasm32-browser` に移せば
+ビルドから JVM が消える」——**移せるなら**。
+
+⚠ **最初この判定を誤った。** 読んだのが `orgs/kotoba-lang/amu` の checkout で、それは
+**pin より 139 commit 遅れていた**（pin 自体は tip だった）。古い tree では kit の
+`:wasm-aot` がほぼ全部 pending に見え、「amu も部分的に JVM」と誤読した。
+**capability の現在地を訊くときは checkout ではなく `kotoba-lang/main` を読む。**
+
+## 実測（amu `0df9d99`、2026-08-30）
+
+capability kit は 11、宣言されている capability は **18**（id 4〜26、19〜23 は欠番）。
+
+`:wasm-aot`（= `wasm32-browser-kotoba-v1` + `kotoba:typed/cap-call`）が `:implemented`:
+**dataspace-v1 / http-ingress-v1 / http-v1 / llm-v1 / log-v1 / state-v1 / storage-v1 / ui-v1**（8）。
+`:pending`: clock-v1 / stream-ingress-v1。stream-object-v1 は語彙が別
+（`:frontend` / `:wit-03` / `:restricted-esm` / `:jvm-host`）で **`:wasm-aot` キーを持たない**。
+
+## Decision — 今 Worker は移せない。塞ぐのは Worker ではなく次の 3 つ
+
+`net-kotobase` の Worker 群（protocols-worker / apex / cypher / lake）を対象に、
+必要なものと在るものを突き合わせた結果、欠けているのは 3 つで、どれも Worker 側の
+書き方では回避できない。
+
+### 穴 1 — 暗号の capability が 1 つも無い
+
+18 の capability に **hash も署名も乱数も無い**。Worker は CACAO 検証（Ed25519）、
+AWS SigV4 検証（HMAC-SHA256）、CID 計算（SHA-256）を全部やる。**これが最大の穴**で、
+これが無い限りどの Worker も移せない。
+
+（`capability-hash-sha256` / `capability-identity-sign` / `capability-identity-verify`
+という **repo は存在する**。kit として amu に載っていないだけなので、ゼロから設計する
+話ではない。）
+
+### 穴 2 — clock-v1 の `:wasm-aot` が pending
+
+`:clock/now`（id 7）は `:wasm32-kotoba-v1` では `:implemented` だが `:wasm-aot` は
+`:pending`。**面が違う。** SigV4 の日付・skew 検査と CACAO の失効判定に要る。
+（kit の `:native-aot-blocked-by` は native の話で、wasm-aot の理由ではない。）
+
+### 穴 3 — 大きなバイト列を運ぶ面が wasm-aot で qualified でない
+
+`http-ingress-v1` の天井は **body 64 KiB / headers 32 / path 4096 B**、
+`storage-v1` は **value 64 KiB かつ `:value :string`**（バイト列ではない）。
+s3 / ipfs / blob の面は MB 単位のバイナリを運ぶので、この 2 つには載らない。
+
+正しい受け皿は **`stream-object-v1`**（`:object/get-stream` 14 / `:object/put-block` 15 /
+`:object/compare-and-set-ref` 16 —— R2 の形そのもの、CAS 付き）だが、この kit は
+**`:wasm-aot` の qualification を持たない**（`:restricted-esm` は `:pending`）。
+
+## Consequences
+
+- **順序は「Worker を移す」ではなく「3 つを塞ぐ」。** 穴 1 → 穴 2 → 穴 3 の順に leverage が高い。
+  穴 1 だけでも塞げば、暗号を要さない小さい Worker から移せる。
+- **cljs の Worker が残る限り shadow-cljs = JVM は消えない。** 移行が終わるまでの間、
+  `.cljs` Worker のビルドは JVM を起こす。それは移行の前提であって違反ではない。
+- **guard の列挙は当座の緩和にはなる**（`clojure` / `clj` を対象に足す）が、
+  本則ではない。**本則は JVM を起こす経路を既定から外すこと。**
+- 本 ADR は可否を測っただけで、**3 つの穴を塞ぐ設計は決めていない。** それぞれ別 ADR。
+
+## 測り方（次に誰かが訊いたとき）
+
+```
+nbb --classpath \".:scripts/nbb_compat\" -e '…'   # kit の :qualification を reader で読む
+```
+**grep で代替しない**（行が折り返して静かに切れる）。**checkout ではなく `kotoba-lang/main`
+を読む**（この ADR の誤読はそれが原因）。**値をこの ADR に書き写して定数にしない** ——
+`:pending` は日付付きで動く。
+")))

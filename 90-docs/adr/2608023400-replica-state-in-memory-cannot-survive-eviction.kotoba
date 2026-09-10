@@ -1,0 +1,63 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608023400-replica-state-in-memory-cannot-survive-eviction")
+  (:adr/title "adr-2608023400: genesis の deadlock と、鍵より先に着いた message と、in-memory な replica state — deploy 済み chain が height 1 を越えられない理由")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "validator-state-persistence")
+  (:adr/authoritative-for
+  (vector "engi.replica の clock 起動条件"
+   "deploy 済み validator が height 1 を越えられない理由"))
+  (:adr/related (vector "adr-2608023300-the-alarm-was-firing-the-whole-time"))
+  (:adr/evidence
+  (vector "https://github.com/kotoba-lang/engi/commit/c9f30f5b8981fbc4743a2cacb2dff57a29a6b5a3"
+   "https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"))
+  (:adr/body
+  "# ADR-2608023400: in-memory な replica state は eviction を越えられない
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 直した 2 つ（どちらも本物のバグ）
+
+### ① genesis の deadlock — `engi.replica`
+
+`pm/initial` は deadline を 0 にし、`on-tick` はそれを「まだ時計が無い＝timeout しない」と読んでいた。
+
+**証明書を一度も見ていない replica は deadline を得ず、timeout せず、new-view を送らず、したがって証明書を得ない。**
+
+**1 プロセスでは決して現れない** —— 投票は 1 ミリ秒で届き、最初の証明書は何かが timeout する遥か前にできるので、**その状態に誰も留まらない。**
+
+HTTP 上では **genesis で 1 票落ちれば chain は永久に height 1**。**症状は「不在」として現れた** —— alarm 262 回、peer fetch 786 回、**送信 message ゼロ**。**言うことが無い replica は何も throw しない。**
+
+### ② 鍵より先に着いた message — validator
+
+**送信者の鍵を知る前に着いた message は検証できず、捨てられた** —— そして**捨てられた message は再送されない**（送信者は失われたことを知らない）。
+
+鍵は tick の先頭で学んでいたので、**tick と tick の間に着いた投票は全部捨てられ**、HTTP ではそれが**大半**。これだけで votes は 1 → 3 になった。
+
+## 直っていないもの（上の 2 つとは別物）
+
+**投票 3、bucket 3。** **各 replica が「違う height-1 block」に投票している** —— **どの 2 票も同じ決定に対するものではなく、quorum は永久に形成されない。**
+
+**replica は boot ごとに genesis から作り直され、Durable Object は日常的に evict される。** w2 が height 1 の leader で、**戻ってくるたびに height 0 に戻り、新しい timestamp の別 block を提案する。** 網は**両立しない height-1 提案を溜め続ける。**
+
+**1 プロセスではこれは起こりえない —— 何も再起動しない。** harness が繰り返し 123 block まで走る一方で、**deploy された方は 1 block を越えられない**理由がこれ。
+
+**chain・pacemaker state・machine を永続化して boot 時に replay する必要がある** —— このリポジトリの sequencer が既に transaction log でやっていること。**次の作業であり、やっていない。**
+
+## Consequences
+
+- (+) 2 つの本物のバグが直った（うち 1 つは engi 本体の liveness）。
+- (+) 「なぜ deploy だけが壊れるか」が**構造的に**特定された。
+- (−) **deploy 済み chain は height 1 のまま。** 永続化が入るまで動かない。
+- (−) 鍵配布は TOFU、transaction 認証は未接続、terminal は単一 sequencer を向いたまま。
+
+engi 202 tests / 1123 assertions。in-process harness は 123 block・全 replica 一致で pass。
+")))

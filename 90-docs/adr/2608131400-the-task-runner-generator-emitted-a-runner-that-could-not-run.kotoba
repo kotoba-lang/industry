@@ -1,0 +1,82 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608131400")
+  (:adr/title "task runner の生成器が、走らない runner を 40 repo に配っていた")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-13")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/body
+  "ADR-2608130600（nbb は `(binding [*out* *err*] (println …))` を尊重しない）の
+監査で、`scripts/bb_edn_to_nbb_tasks.cljs` の 3 箇所がその dead idiom を
+**生成物の文字列リテラルの中に**持っていることが分かった。つまり生成器が欠陥を
+子リポへ複製していた。**実測: `orgs/` 配下の `scripts/run-task.cljs` は 40 本あり、
+40 本すべてが持っていた。**
+
+直しにいって、もっと悪いものが 2 つ出た。
+
+## 1. shell タスクが 1 本も走らない
+
+`babashka.process/shell` は **argv でも、1 本の文字列でも**受ける。後者は自分で
+tokenize する。変換元の bb.edn では `(shell \"cmd arg\")` の綴りが圧倒的に多い。
+
+生成器は `(mapv str args)` で写すだけなので、これが `:cmd [\"echo hi\"]` になる。
+生成される runner は `:shell false` で spawn し `(first argv)` を実行ファイル名に
+使う。**`echo hi` という名前のバイナリを探しにいく。**
+
+## 2. しかもそれが、何も言わずに失敗する
+
+`spawnSync` は実行ファイルが無いとき `status: nil` を返し、runner は
+`(or (.-status r) 1)` と書いている。`.error` は捨てられ、`stdio` は `inherit` なので
+**書く子プロセスがそもそも居ない**。結果:
+
+    $ nbb scripts/run-task.cljs test   # (shell \"echo HELLO-FROM-TASK\")
+    (exit 1)                            # ← stdout も stderr も 0 バイト
+
+**正しいタスクと、実行不能なタスクが、区別できない。** 同日に監査した launchd の
+無言 no-op（`spawnSync` の cwd が存在せず status が nil、戻り値を見ない）と
+**同じ形**である。片方は「健全に見える週次ジョブ」、こちらは「走らない task runner」。
+
+## なぜ気付かれなかったか
+
+実 repo の `tasks.edn` は**手で直されている**。murakumo のファイルは冒頭で自ら
+`hand-maintained since` と名乗り、中身は `[\"nbb\" \"--classpath\" \"src\" …]` と
+正しく分割されている。**生成器の出力を人間が毎回直していたので、生成器が壊れている
+ことが表に出なかった。**
+
+## 直したもの（生成器 1 ファイル）
+
+- **`tokenize`** を足し、空白を含む単一文字列の shell フォームだけを argv へ分割する。
+  引用符（`\"` と `'`）を尊重する。**シェルではない** —— glob も置換もパイプも扱わない
+  （runner がシェルを使わないので、それらは元々変換を生き延びていない）。
+- **`sh` テンプレート**が `.error` と `.signal` を報告するようにした。起動できなかった
+  のか、シグナルで殺されたのか、本当に非ゼロで終わったのかを名指しする。
+- dead idiom 3 箇所を `js/console.error` にした。
+
+## 実測（同じ fixture、before / after）
+
+| task | before | after |
+|---|---|---|
+| `(shell \"echo HELLO-FROM-TASK\")` | exit 1、両ストリーム 0 バイト | `HELLO-FROM-TASK` / exit 0 |
+| `(shell \"echo \\\"two words\\\" tail\")` | — | `two words tail`（引用が 1 引数として保存） |
+| `(shell \"echo\" \"already\" \"argv\")` | 正常 | 正常（回帰なし） |
+| 存在しないバイナリ | exit 1、無言 | stderr に `could not start [...] -- spawnSync ... ENOENT` / exit 1 |
+| 未知の task 名 | 診断が **stdout** | stderr のみ / exit 2 |
+
+## 既存 40 本は直していない
+
+生成器を直しても、既に配られた 40 本の `run-task.cljs` は変わらない。**一括で
+40 repo に PR を出すことはしなかった** —— それらは既に手で直されて動いており、
+dead idiom が発火するのは未知の task 名を打ったときだけで、そのとき失うのは
+「診断がどちらのストリームに出るか」でしかない。**修正の価値より、40 repo 同時変更を
+検証しないことの危険が上回る。**
+
+縛りが効くのはこれから生成される repo である。**再生成した repo は runner ごと
+新しくなる** —— 生成器が両方のファイルを一緒に書くので、`tasks.edn` の新しい形と
+runner の新しい `sh` が食い違うことはない。
+
+## 一般化
+
+**生成器の欠陥は、生成物の数だけ複製される。** 検査は生成物ではなく生成器に当てる
+必要があるが、今回それを見つけたのは生成物側を grep したからだった。40/40 という
+比率がそれを示している —— 1 本でも例外があれば「手で入れた欠陥」と読めたが、
+全数一致は出所が 1 つであることの証拠になる。")))

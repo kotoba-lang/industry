@@ -1,0 +1,111 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608300200-ayatori-serves-the-production-query-bridge")
+  (:adr/title "ADR-2608300200: 本番 query bridge の供給元を kotobase-query から ayatori に移す —— 所有権の移動であって、接続された read path の証拠ではない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-30")
+  (:adr/deciders "Jun Kawasaki")
+  (:adr/doc-type "adr")
+  (:adr/topic "kotobase query plane")
+  (:adr/last-verified "2026-08-30")
+  (:adr/repos (vector "net-kotobase/control-plane" "net-kotobase/cypher" "net-kotobase/lake" "kotoba-lang/ayatori" "kotoba-lang/kotobase-query"))
+  (:adr/related (vector "adr-2608039975-query-surfaces-are-not-deployed-and-the-live-one-goes-through-datalog" "ADR-2608110600" "ADR-2607172300"))
+  (:adr/body "# ADR-2608300200: 本番 query bridge の供給元を ayatori にする
+
+**Status**: accepted
+**Date**: 2026-08-30
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー質問（2026-08-29）「今の kotobase.net は passkey の認証をベースにデータの
+暗号化・復号ができて、ipld, ipni をベースに carv2 で query が ayatori で最適化されて、
+その上で datomic, datalog, sparql, sql などの query ができるようになっている?」。
+
+実測すると、4 つの主張のうち成立していたのは query surface 群だけで、残り 3 つは
+成立していなかった。本 ADR はそのうち **ayatori** の部分だけを決める（passkey 由来の
+暗号化と CARv2 は別問題で、ここでは決めない）。
+
+### 実測（2026-08-29〜30）
+
+- kotobase.net の marketing ページ自身が
+  `\"Pinned for integration; not on the production request path\"` と表示していた。
+  **公開ページの方が正しかった。**
+- `kotobase-query` を classpath に載せている deploy shell は 3 つ:
+  `net-kotobase/cypher` / `net-kotobase/lake` /
+  `net-kotobase/control-plane/protocols-worker`。
+- **`kotobase-query` は `manifest/west.yml` に 1 件も登録されていない**（実測 0 件）。
+  3 つの本番 shell がその checkout を `../../kotoba-lang/kotobase-query/src` として
+  参照しているのに、`west update` はそれを作らない。**fresh clone はこの 3 worker を
+  ビルドできなかった。**
+- `ayatori` は west 登録済み（pin `d50ff25`）。
+- `ayatori` は `kotobase.query.bridge` と `kotobase.query.agent` の**両方を同梱**する。
+  bridge は kotobase-query@dcc5ab5 と **docstring 1 行を除いて byte 同一**、agent は
+  完全に同一（実測 2026-08-29）。
+- `ayatori.query` は 14 個の def がすべて `kotobase.query.bridge` への alias。
+
+## Decision
+
+### D1. 3 つの本番 shell の classpath を kotobase-query → ayatori に移す
+
+`shadow-cljs.edn` の source-path 1 行と、protocols-worker の
+`upstream-lock.json` の 1 entry。これで **west に登録されていない repo を本番の
+ビルド経路から外す**ことが同時に達成される。
+
+### D2. deploy shell 自身の require は `ayatori.query` にする
+
+shell は新しい caller なので新しい名前を取る。4 つの surface repo
+（`org-w3-sparql-protocol` / `org-opencypher-cypher` /
+`org-apache-tinkerpop-gremlin` / `org-graphql-http`）は自分の repo の中で
+`kotobase.query.bridge` を名指ししたままにする —— ayatori がその ns を配るので
+解決は壊れない。**4 repo の書き換えはこの ADR の範囲外**。
+
+### D3. これは所有権の移動であって、接続された read path の証拠ではない
+
+`ayatori.query` は alias namespace なので、**計算内容は 1 バイトも変わらない**。
+したがって次を主張してはならない:
+
+- IPNI provider discovery が request path で走るようになった → **走らない**
+  （`ayatori.discovery` は `ayatori.query` から到達不能）
+- 検証済み remote block read が入った → **入らない**（`ayatori.remote` も同様）
+- CARv2 pack で query が最適化された → **されない**。枝刈りをしているのは
+  `arrangement` の 4 covering index と `prolly-tree` であって CARv2 ではない。
+  deploy 済み worker に CARv2 のコードは 0 件。
+
+**「pin した」「lock に名前が載った」「ベンチが通った」はどれも
+「本番 request を処理している」の証拠にならない** —— これは marketing ページの
+`mut` 注記が既に書いていたことで、今回はその注記の側が守られた。
+
+### D4. 公開ページの主張を実態に合わせる（英日そろえて）
+
+`marketing_pages.cljc` と `site_i18n.cljc` の 6 文字列。**片方だけ直すと
+日本語ページが旧主張のまま残る**（i18n は英語原文をキーにするので、英語だけ
+変えると翻訳が外れて英語が出る＝静かな不整合）。
+
+## Consequences
+
+- ADR-2608039975 の「6 surface は deploy shell が 1 つも無い」は**もはや偽**で、
+  同 ADR に 2026-08-30 の訂正を入れた。**id は identity なので変えない。**
+  D1（IVM 接続を今やらない）は有効なまま —— trigger は「materialize scan が実測で
+  レイテンシ予算を超えたとき」で、alias 経由に変えても scan は同じものが走る。
+- `kotobase-query` repo は退役方向。ただし 4 surface repo が ns 名を名指ししている
+  間は削除しない。**west 未登録のまま放置されていたことが、そもそも「誰も
+  fresh clone でビルドしていない」ことの証拠**でもある。
+
+## 測定で踏んだ罠（2 件、記録）
+
+1. **`timeout 100 grep -rln ... orgs/` が exit 124 で殺され、0 件を返した。**
+   「他の deploy shell は無い」と読むところだった。`> file; echo EXIT=$?` で
+   採り直したら 3 件あった。CLAUDE.md「測れなかった検査が、測って問題が
+   無かった検査と同じ値を返す」の実例。
+2. **`401` を「未 deploy」と読まない。** sparql/cypher/gremlin/graphql は
+   `401 www-authenticate: Bearer` を返す＝**稼働していて認証を要求している**。
+   ADR-2608039975 が「live ではない」と書いた時点との差はここにある。
+
+## 検証
+
+- ビルド: 3 shell を実際に `shadow-cljs release` で通す（resource-guard 経由）。
+- ayatori 側で `kotobase.query.bridge` / `kotobase.query.agent` が解決することは
+  コンパイルが通ること自体が示す（未解決 ns は shadow-cljs のエラー）。
+- deploy 後に 4 host が引き続き `401 www-authenticate: Bearer` を返すこと、
+  `datomic.kotobase.net/` が 23 パスを返すことを実測する。
+")))

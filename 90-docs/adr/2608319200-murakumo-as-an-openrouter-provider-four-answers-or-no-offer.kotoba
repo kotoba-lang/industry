@@ -1,0 +1,193 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608319200-murakumo-as-an-openrouter-provider-four-answers-or-no-offer")
+  (:adr/title "ADR-2608319200: murakumo を OpenRouter の hosting provider にする — 4 つの答えが揃った model だけを売る（申請は未提出）")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-31")
+  (:adr/last-verified "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "inference-provider")
+  (:adr/repos (vector "orgs/network-awai/cloud-murakumo-api"
+              "orgs/network-awai/cloud-murakumo"
+              "orgs/kotoba-lang/murakumo"))
+  (:adr/related (vector "2608026500" "2607030030" "2607173100" "2608201400" "2608136000"))
+  (:adr/evidence
+  (vector "2026-08-31: openrouter.ai/providers/apply の 4 要件を取得。バックログと proprietary-model 優先の明記あり"
+   "2026-08-31: api.murakumo.cloud/v1/chat/completions を匿名で叩き、non-stream/stream 両方に usage があることを実測"
+   "2026-08-31: N=1/2/4 の同時 128-token completion で aggregate 19.84 / 29.20 / 35.56 tok/s を実測"
+   "2026-08-31: murakumo.cloud/legal/privacy.md が 200 で返ることを実測（/privacy と /privacy-policy は 404）"
+   "2026-08-31: cost/openai-resp->run と cost/stream-run のフィールドに message content が無いことをソースで確認"
+   "2026-08-31: slow.cljc :job/request が :messages を保持し default-ttl-ms が 7 日であることをソースで確認"
+   "2026-08-31: provider-catalog の 3 方向 break test（datacenter 既定化 / stale 理由の畳み込み / capacity を飽和点に）が全部その理由で落ちることを実測"
+   "2026-08-31: verify-inference-data-policy.cljs の 4 方向 break test（ring / TTL / :messages / ソース欠損）が exit 1/1/1/2 で分かれることを実測"
+   "2026-08-31: clj->js が namespaced keyword を潰して datacenter provenance を消していたことを preview で発見し、回帰テストを追加"
+   "2026-08-31: npm test 268 tests / 1391 assertions 0 failures、npm run build と wrangler deploy --dry-run 成功"
+   "2026-08-31: api.murakumo.cloud に deploy 済み（version 3a5d06ff）。live の /v1/models で murakumo-main のみ is_ready true、残る 5 hosted は 4 理由すべてを列挙して withheld、relay 2 件は無改変を確認"
+   "2026-08-31: provenance 7 key が live JSON に全部残っていることを確認（clj->js 衝突の回帰確認）"
+   "2026-08-31: 別セッションが c485b76 で readiness.cljc を governed artifact 無しで landed させており main が deploy 不能だった。artifact を refresh して 4925a3d で復旧、npm test 270/1400 green"
+   "2026-08-31 未完: murakumo.cloud サイトの再デプロイが kagi の OS-Keychain unlock 待ちで止まっており、/legal/privacy.md は旧版（Last updated 2026-08-30）のまま。正本 (cloud-murakumo-app 1c08443) と配信コピー (cloud-murakumo 24d11cd) は main に landed。--bootstrap（lease 無し deploy）は使わなかった"
+   "2026-08-31 PR 棚卸し: 開いていた 8 本を merge 2 / close 4 / reland 2 で処理。superseded 3 本（api#181/#182/#183）は content containment で『main が既に持っている、または後から逆に決めている』ことを示した —— #182 を merge すると hosted-model-ids が 4→2 に縮み、#181 は context を 65536→32768 に、#183 は pool 順の Xavier を last から second に戻す"
+   "2026-08-31 cloud-murakumo#126 reland: site 半分を cloud-murakumo-app d8001cc、worker 半分を cloud-murakumo c65b0c0 へ分割着地（08-31 の分割で site source が別 repo に移っていた）。501→401 の break で site_worker_speech_test が『actual: 401, expected: 501』と名指しで赤、復元で緑"
+   "2026-08-31 break の測り方を 1 度誤った: speech-path? を切っても resolve-route が :kind :speech を同じ handler へ dispatch するため観測が変わらず、『テストが判別しない』ように見えた。壊し方が無効だっただけで、両方が通る handle-speech! を壊して測り直した"
+   "2026-08-31 test/llms_public_api_test.mjs が 08-31 の分割以来 dead だった（旧パスの site/docs.cljc を読んで ENOENT）。その手前で throw するので llms.txt が docs から乖離しないことを守る assertion が全部到達不能。パスを直し、削って赤・戻して緑を確認"
+   "2026-08-31 api#190 の blocker を解消: debit-credits? が mk1 の scope を読むようにした（cloud-murakumo-api 785da4b、deploy version ff3eaa81）。identity-from-authorize が :sub/:scope を捨てていたため課金判定が operator の bot と支払う他人を構造的に区別できなかった。scope-allows? は使わない（\"all\" が免除を得てしまう）・scope 欠落は課金・免除は mk1 限定。break 3 方向すべて名指しで赤、271 tests / 1412 assertions 緑、OPERATOR_RELAY_IN_BUNDLE=1"
+   "2026-08-31 未完: murakumo.cloud サイトの再デプロイは kagi の OS-Keychain unlock 待ちのまま。着地済みの音声 501 contract と privacy §6a は、その 1 回の deploy で同時に公開される"))
+  (:adr/body
+  "murakumo.cloud を OpenRouter の hosting provider として登録する前に、先方が課している
+4 つの要件のうち機械で答えられるものを実装した。申請自体はまだ出していない
+（オーナー指示 2026-08-31「今はまだ申請は不要」）。
+
+## 先方の要件と、実測した現在地（2026-08-31）
+
+openrouter.ai/providers/apply が掲げる 4 要件:
+
+1. OpenAI 互換 /chat/completions — streaming 対応、stream / non-stream の両方で usage を返すこと
+2. /models — pricing・context length・max output tokens・feature support・datacenter locations
+3. 月次インボイスまたは auto top-up での自動支払い受領
+4. 公開プライバシーポリシー — 保持期間、prompt を log するか、学習に使うかの明示
+
+実測すると 1 は既に満たしていた（匿名リクエストで両方確認。非 stream は
+usage.total_tokens:25、stream は最終チャンクに usage + [DONE]）。4 は半分満たして
+いた —— murakumo.cloud/privacy は 404 だが murakumo.cloud/legal/privacy.md は 200 で
+返る。ただし文書は DRAFT で、retention と学習利用はどちらも [CONFIRM] プレース
+ホルダのままだった。2 は満たしていない。3 は未測定。
+
+注意: 最初の報告で「プライバシーポリシーが無い」と書いたのは誤り。/privacy と
+/privacy-policy の 2 パスだけを叩いて 404 を不在と読んだ。実際の公開パスは
+/legal/privacy.md で、legal/README.md にそう書いてある。一覧 1 本の不在を「無い」と
+読まない（CLAUDE.md）の、URL 版。
+
+## 決定 1: provider document は「4 つの答え」を全部持つ model だけを載せる
+
+/v1/models は今まで「model に何を書けるか」だけを答えていた。aggregator はそこに
+4 つ足して訊く —— どこで動くか / いくらか / どれだけ速いか / どう量子化されて
+いるか。どれも、答えられなかった場合と答えて問題が無かった場合が同じ形で出る
+（CLAUDE.md が名指しする欠陥クラス）。
+
+そこで local-murakumo.provider-catalog は 1 つの規則だけを持つ:
+
+  datacenter / price / capacity / quantization の 4 つすべてに、このファイルの外に
+  ある出所から答えられる model だけが offer に載る。1 つでも欠けたら is_ready false
+  と、欠けている答えの名前を出す。既定値で埋めない。
+
+構造的に落ちるものが 3 種類ある。どれも誰かが覚えておく規則ではない:
+
+- relay id（z-ai/… qwen/…）—— murakumo が aggregator から買っている model。これを
+  aggregator に売り返すと、operator が operator に配信するために operator が課金
+  される routing loop になる。owned_by で構造的に除外される
+- 第三者クラウド origin（RunPod pod）—— region が env var で決まるので JP を
+  名乗れない。datacenter 未宣言 → 非 offer
+- 未値付けの id —— murakumo.infer.prices が text で公開しているのは murakumo-main
+  1 件だけ。他は実在して呼べるが、値段を誰も決めていない
+
+結果、今日 offer に載るのは murakumo-main 1 件。これは実態と一致している。
+
+## 決定 2: 価格は prices.edn 由来のみ。2 つ目の表を作らない
+
+murakumo.infer.prices（resources/murakumo/prices.edn、ADR-2608026500）が正本。
+peg（$1 = 100 credits、ADR-2607030030）も registry から読む。$0.10/Mtok in /
+$0.40/Mtok out → per-token USD 文字列 0.0000001 / 0.0000004（JSON float の往復で
+価格が静かに別の数になるため文字列）。
+
+registry が stale（:verified-at + :staleness-days 超過）なら全 model を withhold
+する。prices/assert-fresh! の拒否をここで握り潰さない。
+
+理由ラベルは 3 つに分けた: :price-registry-unavailable（ファイルが読めない）/
+:price-registry-stale（原価の再検証が期限切れ）/ :no-published-price（値段が
+決まっていない）。1 つに畳むと、読めないファイルに値段を書きに行く人が出る。
+
+## 決定 3: capacity は日本サーバの実測から、飽和点より下に置く
+
+オーナー指示「capacity は日本 server を使う前提で」。
+
+2026-08-31、api.murakumo.cloud/v1/chat/completions に N 本同時の 128-token
+completion を投げ、first dispatch から last response までの wall clock で実測:
+
+  N=1  19.84 tok/s aggregate  (19.84 per stream)
+  N=2  29.20 tok/s aggregate  (14.60 per stream)
+  N=4  35.56 tok/s aggregate  ( 8.89 per stream)
+
+end-to-end で測るのは意図的 —— Worker hop・tunnel・queueing を含み、それが caller が
+実際に受け取る値。llama-server 自身の decode timing はこれより高く、約束する数と
+しては誤り。
+
+宣言値は 1,800 output tokens/分・並列 4 で、N=4 実測（2,133 tok/分）より下。飽和点で
+約束したレートは、同じマシンで他の何かが動いた瞬間に外れ、外れたレートは 5xx に
+なり、5xx が aggregator の採点対象になる。
+
+## 決定 4: プライバシーポリシーに「コードから読み出した」節を足す
+
+legal/privacy.md に 6a. Inference API を追加。文書の他の部分は counsel 待ちの
+draft だが、6a はデプロイ済みソースから読み出した事実で、各主張が根拠のコードを
+名指しする。同期経路と非同期経路を分けたのがこの節の要点:
+
+- 同期（/v1/chat/completions /v1/messages /v1/grok-bots/responses）—— 書かれるのは
+  run 行 1 件だけで、その構成子は cost/openai-resp->run と cost/stream-run。
+  フィールドは origin node id・timestamp・rank 数・tok/s・elapsed 秒・completion
+  token 数・prompt token 数・cached token 数・x-murakumo-app 由来のラベル。message
+  content は無い。ring は 200 件（cost/max-runs）。保持しないので学習にも使えない
+- 非同期（/v1/slow/messages）—— prompt を保存する。後から worker が読む必要が
+  あるので構造的にそうなる。:job/request が model / messages / system / max_tokens /
+  temperature / stop_sequences / chat_template_kwargs を保持し、submit から 7 日で
+  expire（slow/default-ttl-ms）。入力上限 200,000 文字（max-input-chars）
+- relay —— 第三者 aggregator に転送されるので、先方の retention 条項も適用される
+
+「token 数を保存する」と「prompt を保存する」が同じ文で書かれることがあるので、
+count は content ではないと明記した。
+
+## 決定 5: 6a が古くならないよう gate を置く
+
+コードを引用した文書はコードが動いた瞬間に嘘になり、嘘になったことは見た目に
+出ない（配信され続け、引用され続ける）。scripts/verify-inference-data-policy.cljs が
+6a の 4 主張を literal で pin し、deploy 済みソースと突き合わせる。
+
+  exit 0  4 件すべて検査して成立
+  exit 1  主張が偽 —— コードが動いたので文書を動かす
+  exit 2  検査できなかった —— pass ではない（Refusing to report a pass）
+
+4 方向の break test で確認済み（ring 200→5000 / TTL 7d→90d / run 行に :messages
+追加 / ソースファイル欠損）。それぞれ自分が名乗った理由で落ちる。
+
+## 実装中に見つけた欠陥（この ADR の主張の一部）
+
+provider document を最初に preview したとき、:datacenter/source と
+:quantization/source を namespaced keyword で持っていた。clj->js は namespace を
+捨てるので両方 source になり、datacenter の provenance が JSON から静かに消えて
+いた。コードを読む限りは両方あるように見える。unqualified な名前に直し、衝突を
+検出する回帰テストを足した。
+
+## 次の一手 —— 本当のブロッカーは書類ではなく容量
+
+申請ページ自身が「provider 申請のバックログが大量にあり、自社独自モデルを持つ
+provider を優先している」「既存ネットワークの穴を埋める provider を優先する」と
+書いている。murakumo が serve しているのは open-weight の Qwen 系なので、この
+優先順位では後ろになる。
+
+それ以上に効くのが容量。1,800 output tokens/分は定常的な caller 約 1 人分で、
+OpenRouter の稼働率基準は「成功リクエスト ÷ 全リクエスト（ユーザ起因エラー除く）」、
+95%+ で通常ルーティング、80-94% で降格、80% 未満は fallback のみ。この容量に
+OpenRouter のトラフィックを向けると即座に飽和し、採点が始まった瞬間に最下位帯に入る。
+
+したがって申請前に決めるべきは書類ではなく次の 3 つ:
+
+1. 容量をどこまで上げるか（現在の律速は分散 RPC ring の decode で、slot を 4 に
+   上げると first byte が 120 秒以内に出ないことが実測されている）
+2. 負荷時に 429 を早く返すか（現在は capacity admission が 503 model_unavailable を
+   返す。503 は稼働率の分母で失敗として数えられる。429 は rate limit であって失敗
+   ではない —— この違いが採点を分ける）
+3. 月次インボイスの受領経路（要件 3、未測定）
+
+## まだ未確認のもの（正直に）
+
+- pricing と capacity の正確なネストは先方の OpenAPI 3.1 schema と突き合わせて
+  いない。schema を読むには申請を開く必要がある。フィールド名は公開ドキュメント
+  由来で、下にある事実（価格・レート・所在・量子化）はネストの形に依存しない。
+  provider-catalog/schema-version の docstring に明記した
+- 要件 3（自動支払い）は未測定。「無い」ではなく測っていない
+- zdr: true は同期経路についての主張。generation pipeline（画像・動画・3D・音声）は
+  content-addressed object を保存するので、この主張の対象外（6a に明記）
+")))

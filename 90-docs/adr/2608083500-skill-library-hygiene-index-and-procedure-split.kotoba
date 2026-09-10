@@ -1,0 +1,156 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608083500")
+  (:adr/doc_type "adr")
+  (:adr/topic "skill-library-hygiene-index-and-procedure-split")
+  (:adr/title "skill は「指す先が実在すること」で価値が決まる —— 腐った参照を実測で直し、カタログを索引に割り、常時ロードから手順を外す")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-08")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authoritative_for
+  (vector "`.claude/skills/` の 13 skill の役割分担と、loop skill / runbook / 索引の区別"
+   "skill が名指しするパス・依存座標が実在するかを検査する手順"
+   "大きなカタログ型 skill を索引 + references/ に割る基準"
+   "CLAUDE.md（常時ロード）と skill（オンデマンド）の間で、規則と手順をどちらに置くか"))
+  (:adr/supersedes (vector))
+  (:adr/body
+  "# Context
+
+「今の skill は適切か、整えられているか」という問いから始まった監査。
+`.claude/skills/` は 12 skill・2,174 行あり、7 月に作った 8 本（静的 runbook）と
+8 月に作った 4 本（loop skill）に分かれていた。
+
+**形は良かった。** loop skill 4 本は同じ骨格を共有していて —— 機械が測って判定し
+（決定論の tick）、skill は着地だけ引き受け、ledger に 1 行残す —— しかも
+「探索と判定はやり直さない（周ごとに基準が揺れるのを防ぐため）」という理由まで
+書いてあった。実測インシデントが日付つきで埋まっている点も、skill 集にいちばん
+欠けがちなものが在るということだった。
+
+**壊れていたのは中身の鮮度である。** skill が名指しするパスと依存座標を実測で
+突き合わせたところ、解決しないものが 4 件あった。
+
+# Decision
+
+## D1. skill の価値は「指す先が実在すること」で決まる。定期的に実測で検査する
+
+skill は「次にこれをやる人が読む手順」なので、**指す先が消えていたらその skill は
+無いのと同じか、それより悪い**（誤った場所へ確信を持って導く）。
+
+実測で見つかった 4 件と、それぞれの質:
+
+| skill | 症状 | 質 |
+|---|---|---|
+| `build-actor` | 依存座標 `io.github.com-junkawasaki/langgraph-clj {:local/root \"../../com-junkawasaki/langgraph-clj\"}` が解決しない。実在は `io.github.kotoba-lang/langgraph {:local/root \"../../kotoba-lang/langgraph\"}` | **最も重い。新規 actor すべての種**なので、CLAUDE.md 自身が 2026-07-10 に禁じた `-clj` 名を配り続けていた。同じファイルの 3 行上（langchain-store）は既に新しい形で、**片方だけ更新されていた** |
+| `computer-use` | 「`:dev:examples` を使うな」が**反転**していた | パスの誤りより悪い。**正しく見える禁止事項**は正しい手順を避け続けさせる。しかも根拠（「実際の checkout は com-junkawasaki にある」）自体が偽で、結論が今も正しいか読み手が判断できない |
+| `secrets-location-map` | 実行可能な参照 4 箇所が旧 org（cloud-itonami / cloud-murakumo → network-awai、shiropico → com-junkawasaki） | 「ゼロから探さなくて済むように」が存在理由の skill で、**誤ったパスはその理由を打ち消す唯一の欠陥** |
+
+検査手順（再実行可能）:
+
+```bash
+grep -ohE 'orgs/[a-z-]+/[A-Za-z0-9_.-]+' .claude/skills/*/SKILL.md \\
+  | sed 's/[.,)`]*$//' | sort -u \\
+  | while read p; do [ -e \"$p\" ] || echo \"MISS $p\"; done
+```
+
+**日付つき履歴記述の中の旧パスは直さない。** 「Real incident (2026-07-25) に
+`orgs/gftdcojp/cloud-itonami` が…」は当時の事実として正しく読める。直すのは
+**これから実行される参照**だけ。この区別が付かないと、経緯の抹消になる。
+
+## D2. 依存座標を「古いから」と掃除しない
+
+`cloud-itonami/deps.edn` には旧 artifact ID `io.github.com-junkawasaki/langgraph-clj`
+が `:local/root` 新パス付きで残っている。**これは消すと全 alias の classpath 構築が
+落ちる** —— 依存の一部がその ID で宣言しており、tools.deps は同一 lib を別 ID・別
+coordinate 種別で掴むと解決できない。shallowest 宣言として意図的に残してある。
+
+D1 の修正を見た次の人が確実にやりたくなる「掃除」なので、`build-actor` に注記を
+足した。**新しい actor は旧 ID を持ち込まない、既存の旧 ID は掃除もしない。**
+
+## D3. カタログ型 skill は索引 + `references/` に割る
+
+`secrets-location-map` は 730 行・skill 全体の 34% を 1 本で占め、**日付順**に
+20 節が並んでいた。skill は SKILL.md 全体が毎回コンテキストに載るので、B2 の鍵
+ひとつ確認するのに Murakumo のトークン 6 種と Apple の署名事情まで払っていた。
+
+**並べ替えの軸を「発見した日付」から「探すときに思い浮かべる系」へ変える。**
+日付順は書く側の都合で、引く側は「B2 の鍵は?」「Murakumo のどのトークン?」と考える。
+
+SKILL.md（81 行）= 不変条件 + 系への routing だけ。実体は 9 ファイル:
+`backblaze-b2` / `cloudflare` / `kagi-vault` / `murakumo` / `identity-seeds` /
+`email-and-dns` / `kotobase` / `third-party-api` / `mobile-publishing`。
+
+**Murakumo は 1 ファイルに集約した。** `MURAKUMO_SERVICE_TOKEN` が 2 つの Worker で
+別値、`MURAKUMO_TOKEN_SECRET` が 3 つの面で別物なので、**離れて置くと取り違える**。
+分割の軸は「行数を均す」ではなく「取り違えるものを隣に置く」。
+
+索引に上げたのは、どのファイルを読む前にも効く 4 つだけ:
+`KAGI_HOME=$HOME/.kagi` を付ける / **ここに記載がある = 実在する ではない**
+（記載と実態が乖離していた事例が確認できただけで 4 件）/ 資格情報が見つからない
+ことを「データが無い」と読み替えない（ep01 の資産を一度 lost と誤結論した実害、
+ADR-2607252000）/ 総当たり列挙をしない（安全床⑦）。
+
+## D4. 常時ロードには規則を、オンデマンドには手順を
+
+CLAUDE.md は**毎セッション必ず払うコスト**、skill は**関係あるときだけ払うコスト**。
+west の pin 操作はこのリポジトリで最も罠が多い手続きなのに、hook が違反を止める
+だけで、**必要なときに手順を教えるものが無かった** —— 手順が常時ロードされる側に
+あり、必要な人に届く側に無いという配置が逆だった。
+
+skill `west-pin-advance` を起こし、CLAUDE.md を 96 行削った（1716 → 1620）。
+
+**移すのは手順（表・コマンド・インシデントの経緯・理由）だけで、規則と禁止は
+1 つも移さない。** skill を呼ばない agent にも効き続ける必要があるため、
+CLAUDE.md 側に短い形で全部残す:
+引数なし `west update` を既定にしない / `xargs` 必須 / `west update` は pin 鮮度を
+答えない / `kagami sync` の前に reconcile / manifest 書き込みを共有 checkout で
+やらない / worktree は superproject の外 + `west init` / single-entry commit が
+唯一の正経路 / wholesale 再生成禁止 / pin 検証の 3 条件 / 未 push HEAD の pin 化禁止。
+
+# Verification
+
+**内容保存を機械で確かめた**（skill を割る・移すという操作は、体裁が整うほど
+欠落が見えなくなるため）。
+
+- **D3**: 元の 660 内容行のうち **654 行がバイト同一**。差分 6 行はファイルを跨いで
+  壊れた「下記/上記」を明示参照に直したぶん（mk1 の節が murakumo.md 冒頭へ移り
+  向きが反転した 2 箇所を含む）。抜けた行がすべて空行であることも確認。
+- **D4**: 削除 121 行のうち **93 行が skill にバイト同一**。残り 28 行は節見出しの
+  改称・壊れた相互参照の修正・pin 検証 bullet の番号付き節への組み直しに分類でき、
+  それ以外が無いことを 1 行ずつ確認。さらに `WEST_PIN_VERIFY_SKIP` /
+  `no-verify-remote` / `90852b86` / `root-west-pin-policy` / `west-pin-verify-guard` /
+  `WEST_TOPDIR` / 各 ADR 番号を grep して固有の事実の残存を確認。
+- **`computer-use` の反転**は実測で確定した:
+  `clojure -Spath -A:dev:examples` が `orgs/kotoba-lang/langgraph/src` と
+  `…/langchain/src` を classpath に載せる。
+- skill が名指しする 8 スクリプト（`gen-west-manifest` / `advance-pins` /
+  `verify-west-pins` / `west-triple-sync` / `fleet-sync-tick` / `west_annex` /
+  `kagami.cljs` / `west-pin-verify-guard`）の実在を確認。
+
+**やっていない検査**: skill の内容そのものを実行して確かめてはいない
+（`west-pin-advance` の手順を実際に pin 前進で回していない）。移設した文章の
+保存性は確かめたが、**元の文章が今も正しいかは検査していない** —— D1 が示した
+とおり、それは別の問い。
+
+# Consequences
+
+- skill が 12 → 13 になった。CLAUDE.md は 1620 行。
+- **`secrets-location-map` を引くコストが 730 行 → 81 + 1 ファイル**になった。
+  代償: 新しい secret を足すとき「どの系か」を決める必要がある（従来は末尾に
+  追記するだけだった）。系が無ければ新しい reference ファイルを作り索引に 1 行足す。
+- **D1 の検査は自動化していない。** fleet gate 化する余地はあるが、
+  「日付つき履歴記述の中の旧パスは直さない」という判断が要るので、
+  機械が落とせるのは MISS の列挙までで、直すかどうかは人か agent が決める。
+
+# 未解決（次の反復へ）
+
+1. **`robotaxi-actor` が実在を確認できない。** ディスクに無く、west.yml の 4,138
+   project に無く、gftdcojp / kotoba-lang / cloud-itonami / network-awai /
+   com-junkawasaki の 5 org で 404。`build-actor` と **CLAUDE.md 自身**が
+   「既存 3 例」の 1 つとして挙げている。消すか、別名を突き止めるか、判断材料が
+   足りないので残した。
+2. **`gftd-talent-actor` が west 未登録。** `orgs/gftdcojp/gftd-talent-actor` に
+   実在し deps.edn も現行形なのに manifest に無い。orphan repo なので
+   skill `git-cleanup-conflict` の発火条件。
+3. **`git worktree remove` が `'<path>/.git' is not a .git file` で拒否する。**
+   `/tmp` 配下の worktree 3 つすべてで再現。`git worktree add` は `.git` を
+   gitdir 1 行のファイルとして作るが、何かが symlink に置き換えている。回避手順は
+   `west-pin-advance` に記録したが、**置き換えている主体は特定していない。**")))

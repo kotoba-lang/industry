@@ -1,0 +1,80 @@
+(vector (map (:db/id -1),
+  (:adr/id "adr-2607201800-local-manimani-fleet-ingest-all-repos"),
+  (:adr/title "ADR-2607201800: local-manimani が com-junkawasaki 配下の全 orgs/repo を取り込む設計（3層 registry / observation / agent-loop の分離）"),
+  (:adr/status "accepted"),
+  (:adr/doc_type "adr"),
+  (:adr/topic "local-manimani-fleet-ingest"),
+  (:adr/date "2026-07-20"),
+  (:adr/last_verified "2026-07-20"),
+  (:adr/source-format "edn"),
+  (:adr/authoritative true),
+  (:adr/deciders (vector "Jun Kawasaki")),
+  (:adr/authoritative_for
+  (vector "local-manimani(orgs/gftdcojp/local-manimani-cdci) の repo fleet ingest スコープ"
+   "manifest/repos.edn 全件を local-manimani の registry/observation 対象にする方法"
+   "fleet_ingest_cli.clj の repo 選択元を repo-loops.edn から分離する設計"
+   "/api/repos のページング欠如の是正方針"
+   "config/repo-loops.edn(Tier2 agent loop) を全件自動投入しないというガードレール"
+   "west.yml groups(:datalad/:archived) 除外基準の Tier1 への適用")),
+  (:adr/related
+  (vector "orgs/gftdcojp/local-manimani-cdci/docs/adr/0041-west-fleet-github-kotobase-agent-control-plane.md"
+   "orgs/gftdcojp/local-manimani-cdci/src/manimani/west_registry.clj"
+   "orgs/gftdcojp/local-manimani-cdci/src/manimani/fleet_ingest_cli.clj"
+   "orgs/gftdcojp/local-manimani-cdci/src/manimani/repo_loop_scheduler.clj"
+   "orgs/gftdcojp/local-manimani-cdci/src/manimani/repo_loop.clj"
+   "orgs/gftdcojp/local-manimani-cdci/config/repo-loops.edn"
+   "orgs/gftdcojp/local-manimani-cdci/config/repo-agent-loop.edn"
+   "orgs/gftdcojp/local-manimani-cdci/data/providers.edn"
+   "orgs/gftdcojp/local-manimani-cdci/data/cdci-policy.edn"
+   "orgs/gftdcojp/local-manimani-cdci/server/src/index.ts"
+   "manifest/repos.edn"
+   "manifest/west.yml"
+   ".manimani/fleet-ingest-cursors.edn"
+   ".manimani/repo-loop-checkpoints.edn")),
+  (:adr/supersedes (vector)),
+  (:adr/superseded_by (vector)),
+  (:adr/problem
+  "local-manimani-cdci には west fleet 取り込みの骨格が既にあり、west_registry.clj は manifest/west.yml
+  の全 project(2026-07-20 実測 2935 件: kotoba-lang 1587 / cloud-itonami 1046 / etzhayyim 185 /
+  gftdcojp 80 / com-junkawasaki 28 / jk-luxury 3、うちローカル checkout 実在は約2051件)を読める。
+  しかし実際に消費している経路は2つとも config/repo-loops.edn の手動キュレーション :loops
+  (現状 gftdcojp/local-manimani と kotoba-lang/calendar の2 repo のみ)を repo 選択の唯一の入口に
+  している: (1) fleet_ingest_cli.clj の snapshot!(read-only な git revision/status digest 取得)は
+  本来 LoopSpec のスケジュール/retry/provider情報を必要としないのに repo-loops.edn 経由でしか
+  対象を選べない (2) repo_loop_scheduler.clj の tick!(LLM agent loop 実行、issue/PR 作成を伴う
+  external-send)も同じ catalog を使う。この2つを同じキュレーションリストに相乗りさせているため、
+  「com-junkawasaki 配下の orgs/repo を全て取り込む」を素朴に実装しようとすると repo-loops.edn に
+  2935件の LoopSpec を追加する誤った設計に流れやすい。これは ADR-0041(orgs/gftdcojp/
+  local-manimani-cdci/docs/adr/0041、2026-07-20 accepted)が明示的に禁じている
+  (「全2,000超repoを常時clone、poll、LLM投入しない」)。加えて server/src/index.ts の /api/repos は
+  .slice(0,100) で切り捨てており、west_registry が持つ全件情報が UI から実質見えない。"),
+  (:adr/decision
+  "「全て取り込む」を ADR-0041 の路線に沿って3層に分離し、各層のコストと承認要件を明確にする。
+  Tier0(registry, 既存)= manifest/repos.edn が正本、west.yml 生成、west_registry.clj が全件読み取り
+  — 変更は /api/repos のページング/facet 追加のみ(挙動変更なし、即着手可)。
+  Tier1(fleet-wide observation, 新規)= fleet_ingest_cli.clj の repo 選択元を repo-loops.edn から
+  west/projects 直読みへ分離し、ローカル checkout が存在し west.yml の groups に :datalad/:archived
+  を含まない repo(west 自身の既定 group-filter [-datalad -archived] と同じ基準)を既定対象にする。
+  2000件超を毎tick同期実行しないようローテーション窓
+  (例: 1時間tickごとに1/12ずつ、12時間で一周)を設ける。効果は read-only
+  (west/scan, git/status)のみで、LLM 呼び出し・外部送信は発生させない。
+  Tier2(agent loop, 既存を維持)= config/repo-loops.edn は人間が選んだ repo だけを載せる
+  allow-list のまま据え置く。全件自動投入は行わない。Tier1 の観測結果から repo を昇格させたい
+  場合は、当該 repo だけを最小 diff で repo-loops.edn に追記する generator CLI を人間がレビュー
+  した上で実行する(gen-west-manifest.cljs --entry と同型のワークフロー)。
+  provider の subscription quota(data/providers.edn)と cdci-policy.edn の
+  :scheduled-execution :deny / human-approval 要件は Tier2 にのみ適用され続け、
+  Tier0/Tier1 の拡張では一切変更しない。"),
+  (:adr/consequences
+  (vector "/api/repos は全2935件をページング/検索/facet(org, group, checkout有無)付きで返せるようになる"
+   "fleet_ingest_cli.clj の read-only observation はローカル checkout 済み repo(約2051件)全体に
+   ローテーション窓つきで拡大する。config/repo-loops.edn には手を入れない"
+   ".manimani/fleet-ingest-cursors.edn は最終的に約2000エントリまで増える(atomic write のまま
+   単一小さな EDN ファイルなので運用上問題ない)"
+   "config/repo-loops.edn(Tier2)は今回のスコープでは変更しない。全件自動enrollは行わない"
+   "provider quota・cdci-policy.edn の deny-by-default gate は変更なし。LLM 実行や issue/PR
+   自動作成のコスト・リスクは今回の変更で増加しない"
+   "実装は (1) server/src/index.ts /api/repos のページング化 (2) fleet_ingest_cli.clj の
+   repo 選択元を west/projects へ切り替え+group除外+ローテーション窓 の2ステップに分割して進める")),
+  (:adr/body
+  "# ADR-2607201800: local-manimani が com-junkawasaki 配下の全 orgs/repo を取り込む設計\n\n## Status\naccepted — 2026-07-20\n\n## Context\nlocal-manimani-cdci には west fleet 取り込みの骨格が既にあり、`west_registry.clj` は\n`manifest/west.yml` の全 project(2026-07-20 実測 2935 件、うちローカル checkout 実在は約2051件)\nを読める。しかし実際に消費している2経路(`fleet_ingest_cli.clj` の read-only observation と\n`repo_loop_scheduler.clj` の LLM agent loop 実行)がどちらも `config/repo-loops.edn` の\n手動キュレーション `:loops`(現状2 repoのみ)を repo 選択の唯一の入口にしている。この2つは\nコストとリスクが全く違う(前者は read-only digest 取得、後者は issue/PR 作成を伴う\nexternal-send)にもかかわらず同じリストに相乗りしており、「全て取り込む」を素朴に実装すると\nADR-0041 が明示的に禁じる「全2,000超repoを常時clone/poll/LLM投入」に流れやすい。\n加えて `/api/repos` は `.slice(0,100)` で切り捨てており、west_registry が持つ全件情報が\nUI から実質見えない。\n\n## Decision\n「全て取り込む」を3層に分離する。\n\n### Tier0 — Registry(既存、UI修正のみ)\n`manifest/repos.edn` が正本、`manifest/west.yml` が生成物、`west_registry.clj` が全件読み取り。\n変更は `/api/repos` のページング(`?page=`/`?pageSize=`)と facet(org / group=heavy,datalad,archived\n/ ローカルcheckout有無)の追加のみ。挙動変更なし、コストゼロ、即着手可。\n\n### Tier1 — Fleet-wide observation(新規、fleet_ingest_cli を repo-loops.edn から分離)\n`fleet_ingest_cli.clj` の `snapshot!` は `git rev-parse` / `git status --porcelain` の\nread-only digest 取得であり、本来 LoopSpec(schedule/retry/provider)は不要。repo 選択元を\n`(:loops catalog)` ではなく `west/projects` 直読みに変更し、既定でローカル checkout が存在し\nwest.yml の groups に `datalad`/`archived` を含まない repo 全件を対象にする(west 自身の既定\n`group-filter: [-datalad -archived]` と同じ基準)。2000件超を毎tick同期\n実行しないよう、ローテーション窓(例: 1時間tickごとに1/12ずつ、12時間で一周)を導入する。\nこれにより「変更があった repo の digest 差分」が fleet 全体から Inbox/Work board へ流れるように\nなるが、LLM 呼び出し・外部送信は一切発生しない(効果は既存の read-only 集合\n`west/scan`, `git/status` のままで変わらない)。\n\n### Tier2 — Agent loop(既存を維持、opt-inのまま)\n`config/repo-loops.edn` は人間が選んだ repo だけを載せる allow-list のまま据え置く。\n2935件ぶんの LoopSpec を自動生成しない。Tier1 の観測結果から repo を Tier2 に昇格したい場合は、\n当該 repo だけを最小 diff で repo-loops.edn に追記する generator CLI を用意し、必ず人間がレビュー\nしてから実行する(`gen-west-manifest.cljs --entry` と同型のワークフロー)。\n`data/providers.edn` の subscription quota と `data/cdci-policy.edn` の\n`:scheduled-execution :deny` / human-approval 要件は Tier2 にのみ適用され続け、\nTier0/Tier1 の拡張では一切変更しない。\n\n## Non-goals\n- repo-loops.edn へ2935件の LoopSpec を追加すること\n- スケジュール実行からの issue/PR 自動作成\n- Tier1 による未 checkout repo の新規 clone/fetch(既存 checkout への読み取りのみ)\n\n## Implementation plan\n1. `server/src/index.ts` `/api/repos`: real pagination + facet filters に置き換える。\n2. `fleet_ingest_cli.clj`: repo 選択関数を `west/projects` 直読みに変更、group 除外条件を追加、\n   ローテーション窓(env `MANIMANI_FLEET_INGEST_SHARD` 等)を追加する。\n3. `.manimani/fleet-ingest-cursors.edn` が約2000エントリまで増えることを確認する\n   (既存の atomic write パターンのまま、単一小EDNファイルなので問題ない)。\n4. (follow-up, 別スコープ) Tier1→Tier2 昇格用の generator CLI。\n\n## Rollout\nTier0 → Tier1 の順に実装・検証する。Tier2 は今回のスコープに含めない。\n")))

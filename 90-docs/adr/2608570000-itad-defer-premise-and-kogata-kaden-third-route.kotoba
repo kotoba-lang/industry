@@ -1,0 +1,170 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608570000-itad-defer-premise-and-kogata-kaden-third-route")
+  (:adr/title "ADR-2608570000: itad.gftd.ai を外部連携前提で運転し、小型家電リサイクル法13条を第3の経路として記録する")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/topic "itad-licensing")
+  (:adr/date "2026-08-04")
+  (:adr/last_verified "2026-08-04")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "gftdcojp/itad の許認可 gate（resources/itad.edn :licence-gate と src/ai_gftd_itad/licence.cljc）"
+   "itad が自社名義の許認可を取得せずに事業を進める形の可否と、その成立条件"
+   "cloud-itonami-licensed-operator に収録した小型家電リサイクル法13条の位置づけ"))
+
+  (:adr/context
+  "問い（オーナー、2026-08-04）:「itad.gftd.ai は産業廃棄物の免許がなくても古物商だけで
+   進めることはできる？または外部連携前提も可能?」
+
+   直前の現在地は ADR-2607141446 系で、`resources/itad.edn` の `:licence-gate` が
+   `:transport` / `:disposal` / `:resale` を 1 次元の `:open? false` で閉じていた。
+   閉じている理由は「自社が許認可を取得していない」の一点で、**委託でなら今日できる
+   仕事まで止まっていた**。LP は「許可を持つ処理業者と連携して適法に実施します」と
+   既に書いていたのに、gate はその経路を判定として持っていなかった。
+
+   調査で分かったこと（すべて条文原文まで確認）:
+
+   (a) **古物商だけで進める形は成立する。** 廃掃法14条1項但書と2条の構造上、買い取った
+       時点で有価物なら産業廃棄物ではなく廃掃法が及ばない。ただし総合判断説の下で、
+       1円買取＋高額な処分費・逆有償・買取価格 < 運搬費といった形は崩れる。つまり
+       これは『産廃免許が要らない設計』ではなく『産廃にならない設計を維持し続ける
+       運用義務』であり、`kotoba-lang/kyoninka` の `:haikibutsu-gaitousei`
+       （status `:open`、行政書士確認事項）が未決のまま前提にはできない。
+
+   (b) **外部連携（defer）も成立し、条件には実定法の明文根拠がある。**
+       `cloud-itonami-licensed-operator` の `:route/defer` は3 sector とも
+       `:conditional` で、廃掃法施行令6条の2 の 1号・2号（委託しようとする産廃の運搬
+       ／処分がその事業の範囲に含まれる）が `:req/scope-covers` そのもの、4号
+       （委託契約は書面により行い）が `:req/written-contract` そのもの。
+
+   (c) **どちらでもない第3の経路が実在した。** 小型家電リサイクル法（平成24年法律
+       第57号）13条は、廃掃法の**外から**14条1項・6項そのものを外す。1項は認定事業者
+       本人、3項は認定計画に10条2項6号の実施者として記載された委託先。この経路は
+       `:principal` / `:defer` の 2 択が『その業法の中だけを見ている』ために見えて
+       いなかった。")
+
+  (:adr/decision
+  "1. **itad の運転方針を `:defer`（外部連携前提）にする。** 自社で産廃許可を取るのを
+      待たず、許可を持つ事業者に委託し、自社は回収手配・データ消去・トレーサビリティ・
+      証明書発行の ops 層に徹する。古物商許可の取得は並行して進めるが、事業の前提には
+      置かない（`:resale` の `:principal` だけは先に開けにいく）。
+
+   2. **gate を行為 × 経路の 2 次元にする。** 1 行為につき `:principal`（自社が名義人）と
+      `:defer`（委託）を持ち、優先順位は principal → defer で固定。委託を『許可を取らずに
+      済ませる裏口』として先に試させない。
+
+   3. **経路の開閉をデータに書かない、導出する。** `:principal` は許可証の実在
+      （`:licence-held?` **かつ**許可番号）から、`:defer` は `:partners` の実レコードから
+      `ai-gftd-itad.licence` が導く。`{:open? true}` を手で書ける場所を残さない。
+
+   4. **方針の決定は何も開けない。** `:partners` が空の間、`:transport` と `:disposal` は
+      `:no-partner-record` で閉じたまま。委託先を 1 件登録して初めて両方が `:defer` で
+      開く。委託先の検査は全項目 fail closed（記録の無い事実は違反）。
+
+   5. **委託は取得ではない。** `:defer` で開いても `blocked-licence-names` から消えず、
+      LP は「当社は保有せず（許可業者へ委託）」と表示する。`seo/licence-claims` を
+      opt-in（`:held? true`）へ反転させ、JSON-LD の `hasCredential` に未取得の許可が
+      出ない構造にする。
+
+   6. **小型家電リサイクル法13条を条文つきで収録し、候補として記録する。**
+      `cloud-itonami-licensed-operator` の産廃2 sector に `:licence/exemptions` として
+      `:kogata-kaden-nintei`（13条1項）と `:kogata-kaden-jutaku`（13条3項）を、
+      itad 側に `:route-candidates`（`:candidate/status :statute-read`）を置く。
+      **verdict は動かさない** —— 認定を受けていない者に13条は効かない。")
+
+  (:adr/consequences
+  "**開いたもの**: 訪問集荷・物理破壊・廃棄証明書は、委託先レコードが 1 件入った瞬間に
+   通るようになった（実測: 検証用レコードを入れると `:transport` と `:disposal` が
+   同時に `:defer` で開き、写しと `gate/plan` の判定が一致することを確認）。以前は
+   自社が許可を取るまで動かなかった。
+
+   **閉じたまま**: `:partners` が空なので、現時点で funnel は以前と同じ挙動をする。
+   変わったのは『なぜ閉じているか』で、`:licence-not-held` から `:no-partner-record`
+   になった —— 次の一手が「許可を申請する」から「委託先を確定する」に変わる。
+
+   **証明書の設計に効くこと**: 産廃ルートに乗せた場合、法定の証明書はマニフェスト
+   （廃掃法12条の3、条文は未取得＝known-gap）であって自社発行の `GFTD-ITAD-*` では
+   ない。証明書は付加価値（改ざん不能な検証ハッシュ）として並立させる整理が要る。
+
+   **未解決のまま残るもの**:
+   - 廃棄物該当性（`kyoninka` `:haikibutsu-gaitousei`）—— これが決まらないと、
+     経路A（古物商のみ）に舵を切れるかも、`:erasure` が本当に許認可不要かも確定しない
+   - 小型家電の認定基準（法10条3項が委ねる主務省令）が未取得
+   - 施行令1条柱書き『一般消費者が通常生活の用に供する』の解釈 —— PC は6号に列挙
+     されているが、法人専用機（サーバー・業務用機器）が類型として外れるかは条文だけ
+     では決まらない
+   - 貨物自動車運送事業法（有価物を有償で運ぶ場合）が licensed-operator に未収載
+
+   **一般化できる知見**: 許認可の判定を『取れているか』の 1 次元で持つと、取得待ちが
+   事業全体の停止として現れる。効くのは (行為 × 経路) の 2 次元で、しかも**経路の
+   開閉は宣言ではなく実レコードから導出すべき**である。方針として外部連携を採ることと、
+   委託先が実在することは別の事実で、前者で後者を代替させない。")
+
+  (:adr/evidence
+  "**cloud-itonami/cloud-itonami-licensed-operator** — `d4816ea376c3`（main）
+   `09f3757` feat(catalog): 小型家電リサイクル法13条 — 廃掃法14条を外から外す第3の経路
+   79 tests / 1,213 assertions green、`clojure -M:lint` errors 0 / warnings 0。
+   収録ルール（すべて `:primary-source-read`、e-Gov 法令 API から原文取得）:
+     jpn.kogata-kaden-13     法13条1項・3項
+     jpn.kogata-kaden-10     法10条（認定・計画記載事項。2項6号が3項の受け皿）
+     jpn.kogata-kaden-rei-1  施行令1条（6号 PC / 7号 記憶装置 / 9号 表示装置）
+   カタログは 27件（法域×業種）・54の異なるルール（49 が条文原文の読了、5 が公式ページ）。
+   新規テスト3件が「特例を収録しても verdict は動かない」「対象範囲を過大主張しない」
+   「gap を名指ししている」を固定する。
+
+   **gftdcojp/itad** — `c3233cb0f29b`（main）
+   `ee76dd8` feat(licence): 外部連携前提へ — 行為 × 経路の 2 次元 gate と第3経路の記録
+   82 tests / 301 assertions（JVM）、32 tests / 99 assertions（nbb）green。
+   `scripts/check-licence-gate.cljs` が①経路の verdict ②委託先検査の写しと本物の一致
+   （合成レコード6種 + 登録済み全件）の 2 層で一致を確認。dist 再生成済み。
+
+   **副次的に直したもの（どちらも黙って壊れていた）**:
+   - `resources/itad.edn` は純 EDN なので `(str \"a\" \"b\")` はリストとして読まれ、
+     `(str \"a\" \"b\")` という文字列のまま LP と JSON-LD に出荷される。この編集で実際に
+     やったので、EDN 内の未評価リスト/シンボルを走査して落とすテストを追加した。
+   - `web/generate.cljs` が repo path を `orgs/gftdcojp/ai-gftd-itad` 決め打ちで持って
+     おり、2026-08 の `itad` への改名以降 superproject root から実行すると落ちていた。
+
+   **この ADR 自体がクエリ面に載ることを確認済み**:
+     nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+       '[:find ?id ?topic :where [?e \"adr/id\" ?id] [?e \"adr/topic\" ?topic]
+                                 [(= ?topic \"itad-licensing\")]]'
+     => [[\"2608570000-itad-defer-premise-and-kogata-kaden-third-route\" \"itad-licensing\"]]
+   stderr は空（ローダが黙って skip した dataset は無い）。
+
+   **ただし所要時間に注意（2026-08-04 実測）**: `edn-query.cljs` は `count` すら
+   110 秒で返らず、この query は 400 秒でも足りず 1,800 秒の予算で完走した。しかも
+   `... | tail -n` に通すと**パイプ最後尾の `tail` の exit 0 が返る**ため、
+   `timeout` の 124 が隠れて『成功したが出力が空』に見える。実際この ADR の検証で
+   4 回続けて空を掴み、一度は『クエリ面に載るか未検証』と報告している。
+   クエリ面を叩くときは (a) 分単位の予算を取る (b) exit code を見たいならパイプに
+   通さない。")
+
+  (:adr/alternatives
+  "**経路A（古物商のみ）に全振りする** —— 産廃免許を完全に回避でき、取得コストも
+   19,000円と安い。採らなかったのは、廃棄物該当性が未決のまま買取スキームを事業の
+   唯一の前提にすると、逆有償と評価された瞬間に無許可営業になるため。古物商許可の
+   取得自体は進めるので、この選択肢は閉じていない（`:resale` の `:principal` を開ける）。
+
+   **小型家電リサイクル法の認定を先に取りにいく** —— 構造的には一番強い（全国が認定
+   1本、収運と処分が同時、施設を持たなくても申請可）。採らなかったのは、認定基準が
+   主務省令にあり未取得で、適合可否を判断する材料が今日は無いため。`:route-candidates`
+   として記録し、行政書士確認に合流させる。
+
+   **licensed-operator に第3の route key を足す** —— `:route/principal` /
+   `:route/defer` に並ぶ third route を作る案。採らなかったのは、13条の条見出し自体が
+   「認定事業者等に係る廃棄物処理法の特例」であり、既存の `:licence/exemptions`
+   （`:own-waste-self-transport` / `:moppara-recycling`）と構造が同じだから。
+   gate.cljc と全テストに手を入れずに正しく表現できる。
+
+   **`:licence-gate` に `{:open? true}` を書いて委託前提で開ける** —— 一番安い。
+   採らなかったのは、それが**実体の無い許可を主張する形**そのものだから。委託先が
+   実在しないうちに開けると、集荷日を確定して顧客に約束したあとで実施できないことが
+   分かる。")
+
+  (:adr/supersedes (vector))
+  (:adr/related
+  (vector "2607141446-itad-lp-and-ledger"
+   "cloud-itonami-licensed-operator README（許可を『取る』でも『委譲する』でもない第3の経路）"
+   "kotoba-lang/kyoninka :itad-sanpai :legal-questions（廃棄物該当性・運送委託・区域）"))))

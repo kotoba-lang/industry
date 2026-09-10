@@ -1,0 +1,227 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607319000-murakumo-operator-awai-and-crypto-value-accrual-comparison")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-07-31")
+  (:adr/last_verified "2026-07-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2607319000: murakumo.cloud の運営母体を AWAI Network, L.L.C. として固定する（運営 ≠ custody を明示）— および 10 暗号資産の value-accrual 実測比較")
+  (:adr/topic "murakumo-operator-awai-and-crypto-value-accrual")
+  (:adr/repos (vector "orgs/network-awai/cloud-murakumo" "orgs/kotoba-lang/dynamics" "orgs/kotoba-lang/loop-system-dynamics"))
+
+  (:adr/authoritative_for
+  (vector "murakumo.cloud / cloud-murakumo の運営母体は AWAI Network, L.L.C.（Delaware LLC、file 10704996、2026-07-20 設立）であること。経済圏 ADR（2607995000 / 2607299900）は custody と charter を語るが、murakumo 自身の運営者を名指ししていなかった"
+   "運営母体の変更は custody の変更ではないという区別。chain 軸 custody（etzhayyim junbi Safe、`MURAKUMO_TREASURY_ADDR` = 0xA00366234D29d4F882088048c0B2fa0dB7302D4E）は etzhayyim のまま維持する"
+   "value-accrual cohort（10 entity、`dynamics.core/loop-archetypes`）の測定定義: :fees-1y-usd / :holders-revenue-1y-usd / :holders-share-of-fees を単一 source・単一日付で揃えること"
+   "『token は capital を連れてくるが settlement demand は連れてこない』（ADR-2607299900 §5）の定量的裏付け — burn/BME 系 sink の実測 base rate は $2-3M/yr であること"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends
+  (vector "90-docs/adr/2607995000（`:junbi` の記述に運営者が含意されていた点を明示的に分離。膜規則・custody は不変）"
+   "90-docs/adr/2607299900（Decision 4「発行体は運営者と同一にしない」の運営者側を AWAI Network として確定。etzhayyim を chain 軸に残すことでこの分離が保たれることを記録）"))
+
+  (:adr/related
+  (vector "90-docs/adr/2607242100-cloud-itonami-awai-network-operator-change.edn（先行する同型の operator change。cloud-itonami: Gftd Japan K.K. → AWAI Network, L.L.C.）"
+   "90-docs/adr/2607289800-app-aozora-awai-network-operator-change.edn（同型、app-aozora）"
+   "90-docs/adr/2607269500-two-entity-hiring-structure-us-first.edn（二法人構造）"
+   "90-docs/adr/2607300100-x402-credits-acceptance-session-and-duplicated-truth-defect-class.edn（『同じ真実が2箇所にある』欠陥クラス。本 ADR の MCC 発見も同クラス）"
+   "90-docs/adr/2607259800-token-economy-and-monetary-system-dynamics.edn（catalog 方法論の正本）"
+   "orgs/kotoba-lang/dynamics `src/dynamics/core.cljc`（value-accrual cohort の実装。merge 99a76b41）"))
+
+  (:adr/problem
+  "オーナー指示（2026-07-31）2件:
+
+1. 「今回の murakumo.cloud の運営母体を etzhayyim から awai networks にして」
+2. 「他の暗号資産などを分析比較してみて, ethereum, tron, solana, hyperliquid, monero, uniswap, icp, render, filecoin, gnosis, etc...」
+
+背景は同日の先行する質問「これを blockchain token economy として投資性があるようには設計可能? または transaction 手数料を 運営が持つようになっている?」であり、2 は 1 の帰結を測るためのものである。
+
+**問題の所在は、どちらも『答えが既に一部存在するのに、正本がどこにも無い』ことだった。**
+
+- 運営母体: `orgs/network-awai/cloud-murakumo` の `legal/` と `public/legal/` は **既に AWAI Network, L.L.C. を Service operator として宣言済み**であり、`https://murakumo.cloud/legal/terms.md` として **live で公開されている**（実測 2026-07-31、HTTP 200）。しかし経済圏 ADR（2607995000 / 2607299900）は custody（etzhayyim junbi Safe）と charter（etzhayyim no-own-token）を語るだけで、**murakumo の運営者を名指しした ADR が存在しなかった**。結果として「運営母体は etzhayyim」という読みが成立し得る状態だった。
+- 暗号資産比較: `dynamics.core/loop-archetypes` には Bitcoin / Ethereum-ESP / Helium / Bittensor / Render / Akash / io.net が **成長ループ**として既に入っていたが、**『ユーザーが払った額のうちいくらが token 保有者に届くか』の測定が1件も無かった**。そのため「投資性は設計可能か」は機構の物語でしか論じられず、機構は 16 倍と 2,626 倍を区別しない。")
+
+  (:adr/decision
+  "### 1. murakumo.cloud の運営母体は AWAI Network, L.L.C. である
+
+- 法人名: **AWAI Network, L.L.C.**（Delaware LLC、file number **10704996**、2026-07-20 設立、registered agent: Legalinc Corporate Services Inc.）
+- Gftd Japan 株式会社 は **infrastructure vendor** であって service operator ではない（`public/legal/company.md` の Operating relationship 節が既にそう書いている）
+- これは新しい変更ではなく、**既に真である事実に ADR 面の正本を与える決定**である。`legal/` `public/legal/` とも main 上で AWAI Network を宣言しており、live でも同じものが配信されている
+
+### 2. 運営母体の変更は custody の変更ではない（本 ADR の中心）
+
+**chain 軸 custody は etzhayyim junbi Safe のまま維持する。** `MURAKUMO_TREASURY_ADDR` = `0xA00366234D29d4F882088048c0B2fa0dB7302D4E` は変更しない。
+
+理由は事務ではなく設計である:
+
+- **ADR-2607299900 Decision 4 が『発行体は運営者と同一にしない』を要求している。** 比較した5例すべて（Filecoin / Livepeer / Akash 等）が発行体と運営者を分離しており、米国法人では Howey の common enterprise + efforts of others が同一主体に揃うのが最も厳しい姿勢だからである。
+- ~~運営者が AWAI Network になった今、**etzhayyim を chain 軸に残すことがその分離そのものになる**~~ **← 誤り。2026-07-31 にオーナーが訂正: etzhayyim の法人格は AWAI Network, L.L.C. である（米国法人）。**
+- **訂正（2026-07-31、ADR-2607320500 §1 で正本化）**: etzhayyim は独立した法人ではなく AWAI Network, L.L.C. の内部の機能名である。したがって **operator と chain custodian は同一の法人**であり、**ADR-2607299900 Decision 4 が要求する『発行体 ≠ 運営者』の分離は現時点で存在しない。** 本 ADR の初稿は dual-axis doctrine の「chain 軸 / fiat 軸」を**法人の分離**と読み違えていた —— あれは1法人内の**機能の分離**である。
+- したがって「運営母体の変更で分離が具体化した」という初稿の結論は成り立たない。正しくは **分離は最初から無く、作るなら新設が唯一の道である**（ADR-2607320500 §2 はそれでもなお「今は作らない」と決めている）。
+- **この訂正は custody 方針を変えない。** `MURAKUMO_TREASURY_ADDR` は AWAI 自身の treasury であり、**自社の売上を自社が受け取ることは custody ではない**（custody とは他者の資金を預かること）。他者資金に触れない設計は ADR-2607320500 §3 が担う。
+- なお Safe の署名者・threshold の変更は資金を動かす操作であり、CLAUDE.md 安全床②により agent は実行しない。Ethereum 2-of-3 / Base 1-of-1 の非対称（ADR-2607300100 §4）を揃える作業は引き続き owner 側の in-flight 項目である。
+
+### 3. value-accrual cohort — 10 entity を同一 source・同一日付で測る
+
+`dynamics.core/loop-archetypes` に 9 entity を追加し、既存の `:ethereum-network-fee-loop` に同じ triple を後付けした（計 10）。全数値は **DefiLlama `/overview/fees`（dailyFees / dailyRevenue / dailyHoldersRevenue、trailing 1y）と CoinGecko `/coins/markets`（snapshot 2026-07-31T06:09:30Z）を 2026-07-31 に1回読んだもの**である。日付を跨いで混ぜると比率が比較不能になるため、テストが全 entry の source に `2026-07-31` を要求する。
+
+| entity | fees 1y | holders 1y | 保有者取り分 | mcap | mcap/holders |
+|---|---|---|---|---|---|
+| Tron | $398.20M | $398.20M | **100.0%** | $31.18B | **78x** |
+| Filecoin | $2.45M | $2.45M | 100.0% | $580M | 237x |
+| ICP | $2.07M | $2.60M | 125.9%※ | $1.15B | — |
+| Render BME | $2.28M | $2.16M | 95.0% | $730M | 337x |
+| Hyperliquid | $1,020.70M | **$779.20M** | 76.3% | $12.31B | **15.8x**（FDV 71x） |
+| Ethereum | $252.93M | $87.58M | 34.6% | $229.97B | 2,626x |
+| Solana | $273.43M | $32.26M | 11.8% | $43.06B | 1,335x |
+| Uniswap (V2+V3+V4) | $850.35M | $28.32M | 3.3% | $2.82B | 100x |
+| Gnosis | $0.12M | $0 | 0.0% | $280M | — |
+| Monero | $1.38M | $0 | 0.0%（設計上） | $6.65B | — |
+
+※ ICP のみ holders revenue が fees を上回る（比 1.259）。**1.0 に丸めず実測のまま記録する** — ADR-2607259800 の「異常は報告し、正規化しない」規則。本 ADR 作業の初稿は実際に 1.0 に丸めており、同時に追加した整合性テストがそれを検出した。
+
+cohort 合計: fees **$2.80B** / holders **$1.33B**（47.5%）。うち **Hyperliquid 単独が保有者還流の 58.5%** を占め、残り9件の合計は $553.59M。
+
+### 4. この比較から murakumo 設計に効く4点
+
+1. **「運営が手数料を持つ」と「token が手数料を捕まえる」は同じ1ドルの取り合いである。** Uniswap が最も鮮明で、$850M/yr の手数料のうち保有者に届くのは 3.3%、最新 V4 は 0% — 残りは **流動性供給者（＝供給side）**に行く。murakumo が credits を fleet ノードに払う構造は、これと同じ選択を既にしている。**供給者に払うと決めた時点で、token は残余請求権ではないと決めている。** さらに Uniswap Labs の interface fee $20.4M/yr は**会社の収益**として別計上されており、「プロトコル層で取らない代わりに会社がインターフェース層で取る」形が実在する。これは murakumo の現状（x402 の $0.01/req が 100% 運営 treasury 行き）の、値段の付いた先例である。
+2. **BME の実測 base rate は $2.3M/yr である。** ADR-2607299900 sink (a) が採用すると宣言した Burn-Mint Equilibrium を、実 GPU 需要・8年のブランド・Blender Foundation チャネルを持つ Render が回した結果が fees $2.28M/yr・保有者還流 95%・時価総額 $730M。ICP のサイクル burn $2.60M、Filecoin $2.45M と合わせ、**成熟した分散コンピュート/ストレージ経済の保有者還流はいずれも $2-3M/yr の狭い帯に収まる**。GPU 推論 token の現実的な比較対象は Ethereum の $88M でも Hyperliquid の $779M でもなく、この帯である。
+3. **fee capture は可能で、しかも最大レバーになりうる。** Hyperliquid は $779M/yr を保有者に還流させており、これは他9件の合計 $554M を上回る。循環時価総額に対して 15.8 倍と cohort 最安でもある。**「burn/buyback だけで token を投資対象にできるか」への答えは実証的に yes** — ただし (a) FDV 基準では 71 倍で流通は 22% にすぎず差分は将来の希薄化、(b) 原資は perp 出来高という crypto で最も循環的な収益であり年金ではない。
+4. **しかし accrual は需要の乗数であって代替ではない。** Monero は保有者還流 **ゼロ**、恒久 tail emission（burn どころか永久希薄化）で時価総額 $6.65B — Render の9倍、Filecoin の11倍、Gnosis の24倍。Gnosis は fees $123K/yr・還流 0 で $280M。**accrual 機構を持つ3件が、持たない2件より安い。** 誰も供給していない用途の独占は、コモディティ用途の上に載せた精巧な sink に勝つ。ADR-2607299900 §5 の「token は capital を連れてくるが settlement demand は連れてこない」は、この2行で定量的に裏付けられた。")
+
+  (:adr/finding
+  "{:id :mcc-terms-contradicts-token-policy-adr
+    :severity :high
+    :class \"ADR-2607300100 の『同じ真実が2箇所にある』欠陥クラス — 今回は legal 面と ADR 面を跨いだ\"
+    :what \"live 公開中の https://murakumo.cloud/legal/terms.md（Last updated 2026-07-23）が MCC (Murakumo Compute Credit) を既存のプロダクト要素として記述しており、その記述が ADR-2607299900（2026-07-29 accepted）の token 設計と矛盾する\"
+    :terms-says \"'MCC is a transferable utility token whose protocol use is purchasing Murakumo inference. MCC provides no equity, revenue share, ownership, governance, treasury claim, guaranteed market value, fiat redemption or operator buyback.'\"
+    :adr-says \"ADR-2607299900 Decision 3 sink (c): 'treasury release governance を stake 加重に（kekkai の allow/deny 記録に投票を接続）' — すなわち token 保有者による governance\"
+    :contradiction \"governance の1点で正面から矛盾する。terms は MCC が governance を一切与えないと公に宣言し、ADR は stake 加重 governance を3つの必須 sink の1つに数えている。sink (a)（受領 TOKEN の burn）は公開市場買い戻しではないので 'no operator buyback' とは必ずしも矛盾しない — この点は過大に主張しない\"
+    :second-order \"ADR-2607299900 は『実際にはまだ何も発行していない … contract も配布も上場も無い』『token の具体設計（供給量・初期配布・emission・上場方針）は本 ADR に無い』と書くが、その6日前に公開された terms は MCC を transferable utility token として既に特徴づけている。ADR 面は token を未着手と認識し、legal 面は公開済みの製品記述を持っていた\"
+    :not-fixed-here \"terms.md を agent 判断で編集しない。当該文書自身が 'Governing law: [COUNSEL CONFIRMATION REQUIRED]' を掲げる未確定の法的文書であり、公開済みの token 性質の記述を書き換えるのは owner + 弁護士の領域である（ADR-2607299900 の :not-done-deliberately と同じ線引き）\"
+    :resolution-options [\"(a) sink (c) を落とす — terms の 'no governance' を維持し、treasury governance を stake 加重にしない\"
+                         \"(b) terms を改める — MCC に governance を持たせる。ただし governance 付与は Howey の efforts of others 側に寄る変更であり、ADR-2607299900 :open-decisions :us-regulatory の項目が重くなる\"
+                         \"(c) MCC と ADR-2607299900 の TOKEN が別物であることを明記する — 現状どちらの文書もそう書いておらず、読者は同一と読む\"]
+    :owner \"owner + 弁護士\"}")
+
+  (:adr/implementation
+  "{:done
+    [{:repo \"orgs/kotoba-lang/dynamics\" :merge \"99a76b41\" :branch-commit \"89fbd51\"
+      :what \"value-accrual cohort 9 entity 追加 + :ethereum-network-fee-loop への triple 後付け（計10）。整合性テスト（全 entry が 2026-07-31 を cite し、stated share が実測2値から再計算できることを assert）\"
+      :verified \"nbb dynamics.core-test: 25 tests / 340 assertions, 0 failures\"
+      :also \"compare-archetypes-partitions テストの脆い assertion を修正 — :speculative-crypto-derivatives を rank 1 に固定していたため、より速いループ（:solana-fee-loop、400ms slot）の正当な追加で壊れた。catalog の docstring が『archetype の追加は map の追加』を約束している以上、正当な追加で落ちるテストは誤ったものを見ている。順序不変条件を assert する形に置換\"}]
+    :not-done-deliberately
+    [{:what \"MURAKUMO_TREASURY_ADDR / junbi Safe の custody 移管\"
+      :why \"Decision 2 のとおり設計上 etzhayyim に残すのが正しく、かつ資金移動は CLAUDE.md 安全床②により agent は実行しない\"}
+     {:what \"public/legal/terms.md の MCC 条項の修正\"
+      :why \":adr/finding :not-fixed-here のとおり owner + 弁護士の領域\"}
+     {:what \"cloud-murakumo repo への変更\"
+      :why \"main 上で legal/ も public/legal/ も既に AWAI Network を宣言しており、変更すべき箇所が無かった（下記 :correction 参照）\"}]
+    :next
+    [{:step 1 :what \"MCC 矛盾の解決（resolution-options a/b/c のいずれか）\" :blocked-by \"owner + 弁護士\"}
+     {:step 2 :what \"acceptance density の実配線 — ADR-2607299900 step 2 のまま未着手。本 ADR の比較はこれを動かさない\" :blocked-by nil}
+     {:step 3 :what \"Safe threshold の非対称解消（Ethereum 2-of-3 / Base 1-of-1）\" :blocked-by \"owner\"}]}")
+
+  (:adr/correction
+  "{:what \"本 ADR の作業中、agent は『cloud-murakumo の legal/ が Gftd Japan、public/legal/ が AWAI Network を宣言しており duplicated truth の欠陥がある』と報告したが、これは誤りだった\"
+    :actual \"origin/main から切った fresh worktree で確認したところ legal/ と public/legal/ の terms/privacy/company は 3ファイルとも byte 単位で IDENTICAL であり、両方とも AWAI Network, L.L.C. を宣言している。west pin も main と identical（ahead 0 / behind 0）\"
+    :root-cause \"agent が読んでいた orgs/network-awai/cloud-murakumo のローカル checkout が commit 2a040a2 で origin/main より古かった。CLAUDE.md が繰り返し警告している pin 鮮度の問題そのもので、west update を先に回していれば発生しなかった\"
+    :lesson \"『2箇所が食い違っている』と報告する前に、片方が古い checkout でないことを確かめる。ADR-2607300100 が定義した duplicated-truth 欠陥クラスは実在するが、それを探しに行くと stale checkout が同じ見た目をする。fresh worktree での確認を判定条件に含める\"}")
+
+  (:adr/known-gaps
+  "[{:gap \"cohort は 10 entity で、指示にあった 'etc...' の残りは未収録\"
+     :note \"Bitcoin は既存の :bitcoin-pow-mining として catalog にあるが value-accrual triple は未付与（DefiLlama 実測 fees $91.01M / revenue $0 — PoW なので保有者還流は構造的に 0）。Livepeer・Helium・Akash・Bittensor も triple 未付与\"}
+    {:gap \"holders-revenue の定義は DefiLlama の分類に依存しており、各プロトコルの実装を独立検証していない\"
+     :note \"burn と buyback と staking 配当を1つの数字に畳んでいる。機構の差は :value-accrual キーワードで区別できるが、金額の内訳までは追っていない\"}
+    {:gap \"trailing 1y は1時点のスナップショットであり時系列ではない\"
+     :note \"Hyperliquid の $779M は perp 出来高由来で最も循環的。年次推移を取れば cohort の順位は変わりうる。:note に明記済みだが数値としては未取得\"}
+    {:gap \"mcap-per-holders-revenue は倍率であって valuation ではない\"
+     :note \"割安・割高の主張ではない。機構だけでは 16 倍と 2,626 倍を区別できないことを示すために置いている\"}
+    {:gap \"dynamics の全テストスイートはこの workspace で実行できない\"
+     :note \"dsl-core の kotoba.dsl.problem → problem.kotoba 移行で nbb から require 不能（ADR-2607259800 follow-up 5 の既知問題）。本変更が触る dynamics.core-test のみ実行した\"}]")
+
+  (:adr/body
+  "# ADR-2607319000: 運営母体 = AWAI Network / 暗号資産 10 件の value-accrual 実測比較
+
+## 一行で
+
+**運営母体の変更は、token 政策が要求していた分離を壊すのではなく、初めて具体化する。** そして「投資性は設計可能か」は、機構ではなく実測で答えるべき問いだった — 答えは yes（Hyperliquid $779M/yr、循環時価総額の 15.8 倍）だが、murakumo が採用を宣言した機構（Render BME）の実測値は **$2.3M/yr** である。
+
+## 運営 ≠ custody
+
+オーナー指示は「運営母体を etzhayyim から awai networks に」だった。実際に調べると、**法的な運営者はもともと etzhayyim ではなかった** — `legal/` も live の `murakumo.cloud/legal/terms.md` も既に AWAI Network, L.L.C. を Service operator と宣言している。etzhayyim が持っていたのは別の2つの役割である:
+
+```
+運営者   AWAI Network, L.L.C.     ← 既に真。本 ADR が正本を与える
+custody  etzhayyim junbi Safe     ← ★同じ AWAI Network, L.L.C.（下記の訂正）
+charter  etzhayyim no-own-token   ← token 1点は既に解除済み（ADR-2607299900 §1）
+```
+
+### 訂正（2026-07-31、オーナー確認）— 分離は存在しなかった
+
+初稿はここで「**custody を AWAI に寄せないことが ADR-2607299900 Decision 4 の分離そのものになる**」と書いた。**これは誤りである。**
+
+オーナー確認（2026-07-31）: **etzhayyim の法人格は AWAI Network, L.L.C.（米国法人）である。** etzhayyim は独立した法人ではなく、AWAI 内部の機能名・プロジェクト名である。
+
+したがって:
+
+- **operator と chain custodian は同一の法人**であり、**Decision 4 が要求する『発行体 ≠ 運営者』の分離は現時点で存在しない。**
+- 初稿は dual-axis doctrine の「chain 軸 / fiat 軸」を**法人の分離**と読み違えた。あれは1法人内の**機能の分離**である。この読み違いは、法人番号を持つ ①（Delaware file 10704996）② （法人番号 1011101086505）に対して ③ だけ登記情報が無いという、初稿自身が §5 相当で気付いていた非対称の説明にもなっていた —— **③ に登記情報が無かったのは、③ が別法人ではなかったからである。**
+- 正しい結論は「運営母体の変更で分離が具体化した」ではなく、**分離は最初から無く、作るなら新設が唯一の道**である。ADR-2607320500 §2 はそれを踏まえてなお「今は作らない」と決めている。
+
+**この訂正は custody 方針を変えない。** `MURAKUMO_TREASURY_ADDR` は AWAI 自身の treasury であり、**自社の売上を自社が受け取ることは custody ではない**（custody とは他者の資金を預かること）。他者資金に触れない設計は ADR-2607320500 §3 が担う。
+
+## 測って分かった4つのこと
+
+### 1. 同じ1ドルを二度使えない
+
+Uniswap は $850M/yr の手数料を流しながら、UNI 保有者に届くのは 3.3%、V4 に至っては 0%。手数料は消えていない — **流動性供給者**に行っている。murakumo が credits を fleet ノードに払う構造はこれと同型で、**供給者に払うと決めた時点で token は残余請求権ではないと決めている。**
+
+そして Uniswap Labs の interface fee $20.4M/yr が別計上で存在する。プロトコル層で取らない代わりに、運営会社がインターフェース層で取る。**これは murakumo の現状（x402 の $0.01/req が 100% 運営 treasury 行き）に、既に値段が付いた先例である。**
+
+### 2. BME の base rate は $2.3M/yr
+
+ADR-2607299900 sink (a) が採用すると宣言した Burn-Mint Equilibrium は、Render が実 GPU 需要・8年のブランド・Blender Foundation チャネルを持って回している。結果は fees $2.28M/yr、保有者還流 95%、時価総額 $730M。
+
+ICP のサイクル burn $2.60M、Filecoin $2.45M と合わせて、**成熟した分散コンピュート/ストレージ経済の保有者還流はいずれも $2-3M/yr の帯に収まる**。BME は行儀のよい分配機構であり、そして $2.3M を分配した。
+
+### 3. fee capture は実証的に可能
+
+Hyperliquid は $779M/yr を保有者に還流させ、これは他9件の合計 $554M を上回る。循環時価総額 15.8 倍は cohort 最安。**「burn/buyback だけで token を投資対象にできるか」は yes** である。ただし FDV 基準では 71 倍（流通 22%、差分は将来の希薄化）で、原資は perp 出来高という最も循環的な収益である。
+
+### 4. しかし accrual は需要の乗数であって代替ではない
+
+| | 保有者還流 | 時価総額 |
+|---|---|---|
+| Monero | **$0**（設計上、しかも恒久 tail emission） | **$6.65B** |
+| Gnosis | **$0** | $280M |
+| Render | $2.16M（95%） | $730M |
+| Filecoin | $2.45M（100%） | $580M |
+| ICP | $2.60M | $1.15B |
+
+**accrual 機構を持つ3件が、持たない2件より安い。** Monero の価値は誰も供給していない用途の独占から来ており、キャッシュフローへの請求権から来ていない。
+
+ADR-2607299900 §5 の「token は capital を連れてくるが settlement demand は連れてこない」は、この表で定量的に裏付けられた。**sink は掛け算であって足し算ではない。** murakumo の現在の settled volume は 0 なので、どの sink も 0 を掛ける。
+
+## 見つけた矛盾（未解決、owner + 弁護士）
+
+live の terms.md は MCC について **'provides no ... governance ...'** と公に宣言しているが、ADR-2607299900 の sink (c) は **stake 加重 treasury governance** である。正面から矛盾する。
+
+加えて、ADR は「まだ何も発行していない・具体設計は無い」と書くが、その6日前に公開された terms は MCC を transferable utility token として既に特徴づけている。**ADR 面は token を未着手と認識し、legal 面は公開済みの製品記述を持っていた。** ADR-2607300100 が命名した「同じ真実が2箇所にある」欠陥クラスが、今度は legal 面と ADR 面を跨いで現れた形である。
+
+terms.md は agent 判断で編集しない — 当該文書自身が `[COUNSEL CONFIRMATION REQUIRED]` を掲げており、公開済みの token 性質の記述の変更は owner + 弁護士の領域である。
+
+## 自己訂正
+
+作業中に「`legal/` と `public/legal/` が食い違っている」と報告したが**誤りだった**。origin/main から切った fresh worktree で 3ファイルとも byte 一致を確認した。原因は agent が読んでいたローカル checkout が古かったこと（commit 2a040a2）で、CLAUDE.md が繰り返し警告している pin 鮮度の問題そのものである。
+
+**教訓**: duplicated-truth 欠陥は実在するが、それを探しに行くと stale checkout が同じ見た目をする。「2箇所が食い違っている」と報告する前に、片方が古い checkout でないことを fresh worktree で確かめる。
+
+## 測定の規律
+
+cohort の全数値は **単一 source・単一日付**（DefiLlama trailing 1y + CoinGecko snapshot、いずれも 2026-07-31 読み取り）である。日付を跨ぐと比率が比較不能になるため、テストが全 entry の `:source` に `2026-07-31` を要求する。
+
+ICP のみ holders revenue が fees を上回る（比 1.259）。**1.0 に丸めていない** — ADR-2607259800 の「異常は報告し、正規化しない」規則による。本 ADR 作業の初稿は実際に 1.0 に丸めており、同時に追加した整合性テストがそれを検出した。規則を書いた本人が規則を破り、テストが捕まえた形なので、そのまま記録に残す。")))

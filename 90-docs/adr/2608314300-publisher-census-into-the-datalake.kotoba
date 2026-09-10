@@ -1,0 +1,191 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608314300-publisher-census-into-the-datalake")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "publisher-census-datalake")
+  (:adr/title "ADR-2608314300: 世界の発行者 27,307 ホストを datalake へ —— ブログ 13,319 / social 10,012 / メディア 1,730 / 掲示板 306。account 174,592 行は意図的に載せない。企業側は既存 exporter が持っている")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-31")
+  (:adr/last_verified "2026-08-31")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/global-accounts-datoms"))
+
+  (:adr/authoritative_for
+  (vector "発行者センサス（ブログ / social / メディア / 掲示板）を R2 Data Catalog へ渡す exporter が `scripts/publisher-census-datalake-export.cljs` であること"
+   "載せる粒度は **service（ホスト）**であり、**account 行 174,592 件は載せない**こと"
+   "software → category の写像は**宣言された語彙**であって導出ではないこと。語彙に無いものは `unknown` であり、いちばん近い箱に入れないこと"
+   "`:service/source` の 2 系統（`:self-reported` / `:observed`）を合算した数を『発行者の数』として出さないこと"
+   "企業（LEI）は既存の `scripts/lei-datalake-export.cljs` が持っており、重複させないこと"
+   "**この機械では datalake の load 側が走らない**（pyarrow / pyiceberg 未導入、PEP 668）。これは全 feeder 共通の環境 gap であり、この exporter 固有の欠陥ではないこと"))
+
+  (:adr/related
+  (vector "90-docs/adr/2608300900-datalake-stack-gap-audit.edn（Parquet+snappy / Iceberg 統計 / Avro。形式側）"
+   "90-docs/adr/2608314000-itonami-bot-profile-is-the-price-book.edn（直前。事業成長の文脈）"))
+
+  (:adr/measured
+  (vector "**27,307 service** を 2 ファイルから読んだ。`nodeinfo/services.edn` 26,406（すべて `:self-reported`）と `directory.plc/services.edn` 901（すべて `:observed`、software は nil）"
+   "分類: **blog 13,319 / social 10,012 / media 1,730 / forum 306 / events 232 / books 80 / unknown 1,628（6.0%）**"
+   "`:service/software` は **344 種**。上位 30 で 25,642（97.1%）を占め、tail 764 は意図的に unknown へ落ちる"
+   "出力: `publisher_service.json` 27,307 行 / 10.0 MB、`publisher_category.json` 35 行（語彙そのもの）、`publisher_coverage.json` 1 行、`publishers.spec.json`"
+   "loader の spec 受理を実測: `datalake-sync.py --dry-run` が `SPEC 3 tables namespace=cloud_itonami` と `SCANNED 27307 publisher_service` を出した"
+   "その先で `ModuleNotFoundError: No module named 'pyarrow'`。`pyiceberg` も未導入。`python3 -m pip install --user pyarrow` は **PEP 668 で拒否**される（`--break-system-packages` は user の Python を壊す risk があるので使わない）"
+   "**この gap は全 datalake feeder 共通**である。lei / watchlist / hyakka / sukashi の tick も同じ `python3 scripts/datalake-sync.py` を呼ぶ"
+   "負のコントロール: `--repo /tmp/does-not-exist` で **exit 2 / REFUSED**、空の export を 1 バイトも書かない"))
+
+  (:adr/problem
+  "オーナー指示（2026-08-31）「企業、ブロガー、メディア、掲示板などを r2 datacatalog,
+cloud-itonami-datalake に集めて」。
+
+書き始める前に索引を引いた結果:
+
+- **形式側は揃っていた**（ADR-2608300900）—— Parquet + snappy、Iceberg manifest の統計、
+  Avro writer、S3 SigV4 + conditional-put
+- **経路も揃っていた** —— `datalake-sync.py` と、`<source>-datalake-export.cljs` +
+  `-tick.cljs` の型。`hyakka` / `hirameki` / `sukashi` / `ses-mail` / `dns-resolver` が既に居る
+- **企業も揃っていた** —— `scripts/lei-datalake-export.cljs` と `datalake-specs/lei.json`
+- **materials も揃っていた** —— `kotoba-lang/global-accounts-datoms` が
+  27,307 の service を domain / software / protocol / 規模つきで持っている
+
+**足りなかったのは、発行者を lake へ渡す exporter 1 本だけだった。**")
+
+  (:adr/decision
+  "### D1. 粒度は service（ホスト）。account 行は載せない
+
+CLAUDE.md が repo-wide mandatory として書いている:
+
+> account 行 174,592 件はこの面に載せない —— account が join できる先は
+> `:service/host` → `:service/domain` だけで、その join は service さえ在れば成立する。
+> 個人識別子を全 query の作業集合に常駐させない。
+
+**同じ理由が lake にも当たる。** service は組織の metadata（どのホストが、どの実装で、
+どれだけの規模で発行しているか）で、account は個人である。**問いに答えるのに要るのは
+前者だけ**なので、後者を運ばない。
+
+`publisher_coverage` はその除外を列として持つ —— 黙って落とすと、次に読む人が
+『account も入っているはず』と思って探すことになる。
+
+### D2. 分類は語彙であって導出ではない
+
+software から category への写像は repo の中身から出てこない。
+`concept-vocabulary.edn` が『端末 と terminal は同じ』を手で持つのと同じ理由で、
+exporter が**宣言**する。
+
+```
+blog    wordpress / ghost / writefreely / plume / sutty-distributed-press / micro.blog
+social  mastodon / gotosocial / misskey / pleroma / akkoma / sharkey / friendica / snac …
+forum   lemmy / piefed / kbin / mbin
+media   peertube / owncast / pixelfed / funkwhale / castopod
+events  gancio / mobilizon        books  bookwyrm
+```
+
+**語彙に無い software は `unknown` であって、いちばん近い箱に入れない。**
+344 種のうち語彙が触れるのは 35 種で、残りは 1,628 host（6.0%）—— その数は
+coverage 表にも stdout にも出る。**未分類を 0 に見せない。**
+
+**語彙そのものを `publisher_category` として lake に載せる。** category 列だけを
+載せると、なぜその箱なのかが lake の外に残り、監査できない。
+
+### D3. `:service/source` を潰さない
+
+CLAUDE.md が明記しているとおり、同じ列に見えて出所が違う 2 系統が在る:
+
+| source | 何か | software |
+|---|---|---|
+| `:self-reported` | NodeInfo。ホストが自分で名乗った | 在る（26,406） |
+| `:observed` | PDS をアカウント側から数えた | **nil**（901） |
+
+**合算した 27,307 を『発行者の数』として出さない。** source を列として残し、
+coverage が内訳を持つ。observed の 901 が software を持たないので全部 unknown に
+落ちるのも、隠さずそのまま出る。
+
+### D4. 企業は重複させない
+
+`scripts/lei-datalake-export.cljs` と `datalake-specs/lei.json` が既に
+`lei_facts` / `lei_entity` を出している。**同じものを 2 本目の exporter で出さない** ——
+2 つのコピーは必ずずれる。
+
+### D5. spec はデータの隣に書く
+
+`watchlist-datalake-export.cljs` が採った形に倣う。`lei.json` の `_comment` が自分で
+そう書いている —— 『exporter とその spec は、片方がもう片方を書くならずれようがない』。")
+
+  (:adr/implementation
+  (vector "landed: scripts/publisher-census-datalake-export.cljs —— 27,307 service を 3 表 + spec として出す"
+   "verified: 出力 JSON は妥当で行数一致（service 27,307 / category 35 / coverage 1）"
+   "verified: loader が spec を受理し 27,307 行を scan した（SPEC 3 tables / SCANNED 27307）"
+   "verified: 負のコントロール —— corpus 不在で exit 2、空の export を書かない"
+   "not-done: 実際の Iceberg commit。pyarrow / pyiceberg がこの機械に無く、PEP 668 が user install を拒否する。**全 feeder 共通の gap**"
+   "not-done-deliberately: tick script（変更検知 + loader 呼び出し）。loader が走らない機械で tick を landing させると、一度も緑にならない機構を足すことになる"))
+
+  (:adr/known-gaps
+  (vector "**load 側がこの機械で走らない。** pyarrow / pyiceberg 未導入、PEP 668 が `--user` install を拒否。venv を作る手もあるが、既存 tick は bare `python3` を呼ぶので venv では経路が合わない。**この exporter 固有ではなく全 feeder 共通**"
+   "**tick が無い**ので、これは今のところ手で回す exporter であって常駐 feeder ではない"
+   "**語彙が触れるのは 344 種中 35 種**。unknown 1,628（6.0%）。tail をどこまで語彙に入れるかは、分類の目的が決まってからでよい"
+   "`:observed` の 901 は software を持たないので全部 unknown に落ちる。ATProto の PDS であることは `:service/directory` から分かるが、category には反映していない —— 反映すると『software から分類する』という語彙の規則が 1 箇所だけ破れる"
+   "**規模の列（local_posts / users_total 等）は self-reported である。** ホストが自分で名乗った値で、検証していない"))
+
+  (:adr/open-decisions
+  (vector "tick を書くか（loader が走る機械が要る）"
+   "unknown 1,628 のうち、語彙に足す価値がある software はどれか"))
+
+  (:adr/body
+  "# ADR-2608314300: 発行者センサスを lake へ
+
+## 一行で
+
+**足りなかったのは exporter 1 本だけだった。** 形式も経路も企業側も materials も、
+既に揃っていた。
+
+## 出た数
+
+```
+27,307 service   （self-reported 26,406 / observed 901）
+
+  blog     13,319   wordpress 6,544 / ghost 6,288 / writefreely 439 …
+  social   10,012   mastodon 5,694 / gotosocial 1,436 / misskey 772 …
+  media     1,730   peertube 1,093 / owncast 177 / pixelfed 436 …
+  forum       306   lemmy 247 / piefed 43 …
+  events      232   books 80
+  unknown   1,628   （6.0%）語彙に無い software。近い箱に入れていない
+```
+
+## 3 つ、意図的にやらなかったこと
+
+**1. account 174,592 行を載せない。** CLAUDE.md が「account が join できる先は
+`:service/host` → `:service/domain` だけで、その join は service さえ在れば成立する」と
+書いている。**問いに答えるのに要るのは service だけ**なので、個人識別子を運ばない。
+除外したことは coverage 表に列として書いてある —— 黙って落とすと、次に読む人が探す。
+
+**2. 未分類を近い箱に入れない。** 344 種の software のうち語彙が触れるのは 35 種。
+残り 1,628 host は `unknown` で、その数は表にも stdout にも出る。
+分類率を上げるためにいちばん近い箱へ寄せると、**表は綺麗になって答えは嘘になる。**
+
+**3. 企業を 2 本目の exporter で出さない。** `lei-datalake-export.cljs` が既に
+`lei_facts` / `lei_entity` を出している。2 つのコピーは必ずずれる。
+
+## source を潰さない
+
+`:self-reported`（NodeInfo、ホストの自己申告）と `:observed`（PDS をアカウント側から
+数えたもの）は同じ列に見えて出所が違う、と CLAUDE.md が名指ししている。
+**合算した 27,307 を『発行者の数』として出さない。** source は列で残る。
+
+observed の 901 が software を持たず全部 unknown に落ちるのも、そのまま出る ——
+directory から ATProto だと分かるが、そこで補うと『software から分類する』という
+語彙の規則が 1 箇所だけ破れる。
+
+## 載せられていない
+
+**この機械では datalake の load 側が走らない。** pyarrow も pyiceberg も入っておらず、
+`pip install --user` は PEP 668 が拒否する（`--break-system-packages` は user の Python を
+壊す risk があるので使わない）。
+
+**これはこの exporter の欠陥ではない** —— lei / watchlist / hyakka / sukashi の tick も
+同じ `python3 scripts/datalake-sync.py` を呼ぶので、**全 feeder が同じ場所で止まる。**
+
+だから tick も書かなかった。loader が走らない機械で tick を landing させると、
+**一度も緑にならない機構**を足すことになる。
+
+検証できたのはここまで: 出力 JSON は妥当で行数一致、loader は spec を受理して
+27,307 行を scan した、corpus 不在では exit 2 で空の export を書かない。")))

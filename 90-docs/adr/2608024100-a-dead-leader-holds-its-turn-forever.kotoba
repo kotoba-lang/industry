@@ -1,0 +1,62 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608024100-a-dead-leader-holds-its-turn-forever")
+  (:adr/title "adr-2608024100: 潰れた leader が永久に自分の番を握る — 4 分の 1 の故障に耐えるはずのプロトコルが耐えなかった。そして私は動いていた chain を止めた")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-leadership-and-catch-up")
+  (:adr/authoritative-for
+  (vector "engi の leader 選出鍵（height）と、その既知の限界"
+   "deploy 済み chain の現在の稼働状態（停止中）"))
+  (:adr/related (vector "adr-2608024000-the-terminal-reads-the-bft-chain"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi/commit/590dadf95300891ab588bfad58fba6c36b11db49"))
+  (:adr/body
+  "# ADR-2608024100: 潰れた leader が永久に自分の番を握る
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## `/reset` —— 落ちた replica を作れるようにした
+
+`engi.sync` は「離れていた replica が peer から何を信じてよいか」を決めるが、**deploy 済みの replica を離脱させる手段が無かった。** **このシステムで未検証だった経路は、ことごとく壊れていた。**
+
+## 発見 ①: wipe された replica は復帰しない
+
+w3 を genesis に戻し、**3 分間 height 0 のまま**、他は先へ進んだ。sync-request の経路は `engi.replica` にあり `engi.sync` は返ってきたものを検証する —— **その間のどこかが動いていない。再現手段ができた。**
+
+## 発見 ②: 潰れた leader が永久に自分の番を握る
+
+**残り 3 者は「w3 が leader を務めるはずの height」で止まった。**
+
+leader は **height** で選ばれ、**leader が落ちている間 height は進まない**ので、**番は決して移らない。** **quorum 3-of-4 の 4 validator が、1 故障に耐えなかった。**
+
+`engi.pacemaker/leader-for-view` が正しい鍵で、**その docstring 自身がそう書いている。** だが**それに切り替えたら chain は height 1 で止まった** —— **view 鍵の leadership は replica が view について合意していることを要求し、ここには収束させるものが無い。** 各自が「自分の view の leader」になり、**chain の leader は誰も居なくなる。**
+
+bootstrap は別途悪化させた: view 鍵だと**view がずれるにつれ各 replica が順に「自分の view の leader」になり、それぞれ自分の genesis child を提案**して、**replica の数だけ height 1 の block に票が割れる。**
+
+**結論: 「height、既知の耐障害性の穴つき」を、「view、既知の liveness 失敗つき」より採った。** 正しい修正は**収束する view 同期**で、**書かれていない。** **動く方を選ぶことと、それが正しいと思うことは別。**
+
+## そして私は chain を止めた
+
+**version 27 では height 100 超で走っていた。同じ engi commit を pin した今、走っていない。理由は分からない。**
+
+**分からない理由は、観測と観測の間に 5 つのことを変え、戻そうとしてさらに 5 つ変えたから。**
+
+**このファイルは既に同じ間違いを 2 回記録している** —— 発火していた時計に scheduling 修正を 3 回、transaction 認証の deploy で 5 編集同時。**今回が一番高くついた。**
+
+## Consequences
+
+- (−) **deploy 済み chain は停止中。**
+- (−) catch-up は動かない（再現手段はできた）。
+- (−) 1 故障に耐えない（原因は特定済み、修正は view 同期待ち）。
+- (+) `/reset` があるので、この 2 つは今後いつでも再現できる。
+- (+) 限界が test と docstring に書かれ、記憶ではなくなった。
+
+engi 211 tests / 1140 assertions、parity 不変、in-process harness は pass。
+")))

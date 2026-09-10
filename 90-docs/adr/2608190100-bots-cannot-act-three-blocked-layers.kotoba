@@ -1,0 +1,86 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608190100-bots-cannot-act-three-blocked-layers")
+  (:adr/title "Bots が動けない理由は 3 層に分かれていて、直せたのは一番下だけ")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/body
+  "## 何を測ったか
+
+cleanup から始めて『bots は自律的にサービス・ビジネスを運用しているか』を実測した。
+答えは **設計は完成していて、実行が 3 層で止まっている**。
+
+    層              状態                       塞いでいるもの
+    ─────────────────────────────────────────────────────────
+    dispatch        稼働（1周1role・最大6並列）  —（本セッションで復旧）
+    実行 (codex)    枠切れ、2026-08-21 11:46 迄  課金
+    メール送受信    0/94                        アカウント接続 + Passkey
+    tenant 接続     1 件 pending                Passkey 承認
+
+設計側は既に在る。bot は 94 体、全部 enabled、90 体が resident-job を持ち、
+admitted-tools も入っている。事業 13、role 51、グループ 8。role は何を人間に
+委ねるかまで宣言済み（`funds.move` 13 件と `trade.execute` 8 件が blocked、
+`mail.send` 21・`spend.commit` 23・`customer.contact` 20 が approval-required）。
+足りないのは意思決定の仕組みではなく、**実行する手段**だった。
+
+## 直したもの（すべて実測で確認）
+
+1. **`itonami.mail-drain` が 3 週間死んでいた。** exit 78。plist の
+   `WorkingDirectory` が `orgs/gftdcojp/cloud-itonami` を指していたが、この repo は
+   `network-awai` へ org 移動しており移動元は存在しない。launchd が chdir に失敗し、
+   スクリプトは 1 行も実行されていなかった。証拠はログの最終書き込みが Jul 28 で、
+   kickstart しても新しい行が出ないこと。実在パスに直して exit 0 になり、
+   即座に `route-in 未処理: 1 件` を検出した —— **受信メールが 1 通 3 週間滞留していた**。
+
+2. **`yakuwari.publish` が exit 127。** plist に PATH が無く、nbb（node スクリプト）が
+   `node` を見つけられなかった。ログは `env: node: No such file or directory` だけ。
+   PATH と HOME を足して復旧。これは読み取り専用の投影なので安全側の修正。
+
+3. **`yakuwari.tick` を再開し、そして再び止めた。** 08-16 に無効化されていた理由は
+   最後まで分からなかった（ログにエラー 0、当時の 2 run は sync したら両方 succeeded）。
+   再開すると dispatch は正常に回ったが、実行が全て `:exit 1`。原因は
+   **codex の利用枠切れ**（`You've hit your usage limit … try again at Aug 21st`）。
+   再開後 50 分で空の worktree が 8 個増え、8/21 まで放置すると約 500 個積み上がる
+   ため停止した。plist は `.disabled-20260819-codex-quota` として理由を名前に残した。
+
+4. **bot の未着地成果を救出。** 12 worktree のうち 2 つに実物があった。
+   cloud-itonami director の `director_evidence.cljc` + テスト + runner 登録、
+   sales の購買判断ブリーフ 4,734 bytes。3 日間どのブランチにも remote にも無く、
+   `git checkout` 一発の距離だった。1670 tests / 16780 assertions で検証し
+   （3 failures は bot が触らない `repository_test.cljc` の既存不具合）、
+   `network-awai/cloud-itonami#528` として着地。
+
+## 分かったこと —— 判断は書けても残らない
+
+kaiyu-kaizen loop は台帳に追記するだけで commit しない設計だった。08-18 に書いた
+`:woke` 2 行が stash に退避されたまま 1 日以上どこにも存在せず、`:issue-id` で
+突き合わせて初めて失われかけていると分かった。`scripts/ledger-land.cljs` を足し、
+loop が自分の書いた行を GitHub API で origin/main に着地させるようにした
+（root#2378）。空入力は exit 2、既着地は exit 0、着地不能は **exit 3**
+（0 でも 1 でもない）で、失敗が成功に見えない。
+
+## 測り方で 3 回間違えた —— 同じ形なので記録する
+
+いずれも **切り詰めた出力を答えとして読んだ**もの。
+
+- `grep … | head -8` でテストの一致に埋もれ、`scheduler.py:508` の本番呼び出しを
+  見落として『executions は test からしか呼ばれない』と報告しかけた
+- root の `~/.hermes/cron/executions.db` を見て『台帳が壊れている』と報告した。
+  実際は profile ごとに分かれており kotobase-po に 56 行あった
+- env 無しで `awai sync` を叩いて `tamaki-not-found` を得て、それを tick の
+  停止理由だと報告しかけた。plist は `AWAI_WORKSPACE` を superproject に設定しており
+  tamaki はそこに在る。正しい env では 2 run とも succeeded だった
+
+## 残っている判断（すべてオーナー操作）
+
+1. **codex の枠**（8/21 11:46 復旧）。買うか、runner を claude/cursor に振り替えるか。
+   `fleet.edn` の `:runners` は role ごとに重み付きなので振り替えは設定変更で済む
+2. **tenant 接続 `tc-9ec4f60c` の Passkey 承認**（読み取り 4 capability のみ）
+3. **メール用アカウント接続**。`provision-mailbox!` は受信先アカウントを 1 つ要求し、
+   `send-mail!` は `writes?` を要求する。94 bot 全部が `accounts: []` なので
+   `mailbox-ready?` 0/94・`writes?` 2/94。推奨は awai の 11 事業 × director の 11 体から
+
+## 触れていないこと
+
+`.cpcache` を committed している 632 repo と、純粋な削除集合 8 repo。どちらも
+fleet 規模の untrack 判断が要り、cleanup が自律に適用してよい種類ではない。")
+  (:adr/tags (vector "bots" "autonomy" "cloud-itonami" "yakuwari" "mail" "codex" "measurement"))))

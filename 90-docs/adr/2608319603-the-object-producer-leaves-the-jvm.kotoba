@@ -1,0 +1,107 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608319603-the-object-producer-leaves-the-jvm-and-two-routes-see-what-one-cannot")
+  (:adr/title "object producer が JVM を離れる — そして 2 つの経路だけが見えるもの: elf64 twin の fuel tier が食い違い、shipped object が .cljc を正しいと決めた")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-31")
+  (:adr/deciders "owner")
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/amu" "kotoba-lang/kotoba-native" "kotoba-lang/aiueos"))
+  (:adr/related (vector "adr-2608319602-one-namespace-two-files-one-of-them-dead" "adr-2608319601-the-jvm-free-project-linker-was-one-printer" "adr-2608136000-six-questions" "kotoba-native-ADR-0036" "aiueos-ADR-0129" "aiueos-ADR-0130"))
+  (:adr/body "## Decision
+
+`amu compile --target x86_64-aiueos-kernel-v1 --output foo.o --jvm-free`
+produces the aiueos kernel object. The JDK-free native driver gained the one
+step it lacked: packaging a sealed artifact into its ELF64 or PE32+ container.
+
+## Why it was missing
+
+Not capability. `kotoba.compiler.nbb.cli` sealed a `:kotoba.kexe/v1` artifact
+and wrote it out as EDN; the JVM CLI does one thing more for the aiueos target
+profiles, handing that same artifact to a packager and writing THOSE bytes to
+`--output`. Both packagers (`kotoba.native.elf64`,
+`kotoba.compiler.packaging.pe32plus`) are portable `.cljc` that load unchanged
+under nbb -- measured before writing anything -- and all four aiueos targets
+reach the same two ISA emitters as the plain native targets.
+
+They stayed off the route because admitting them without a packager would have
+written artifact EDN to a path named `.o` and reported `:ok true`.
+
+## What having two routes found
+
+Comparing the two routes' output across all 66 aiueos objects found a defect
+neither route could see alone.
+
+`package-kernel-object`'s per-object FUEL tier table had drifted between the
+`elf64` twins, the same way the entry table had before `db7b711`. The `.clj` the
+JVM loads had four tier arms; the `.cljc` nbb loads had six. Missing:
+`ecdsa-fuel?` and `dhcp-fuel?`. So the JVM packager gave
+`aiueos-ecdsa-p256-sha256-verify` 250,000,000 instead of 2,147,483,647, and both
+DHCP objects the 1,024 default instead of 65,536 -- 64x less.
+
+The shipped objects settle which file was right: at file offset 75 all three
+carry the `.cljc` values. The JVM twin was stale, and rebuilding those objects
+through it would have weakened them quietly -- a tight fuel bound fails as a
+prologue `ud2`, surfacing as an unexpected vector 6 that reads as a protocol
+bug.
+
+**This is the shape ADR-2608319602 describes, one level deeper.** That ADR
+counts namespaces where one file shadows another. This is a pair where BOTH
+files are loaded -- each by its own runtime -- and they disagree. No single
+runtime can call both packagers, so no test inside either one can compare them.
+A second route is not only a way to stop depending on the JVM; it is the only
+instrument that can see this class at all.
+
+Fixed in kotoba-native `0daafbf`, with the tier comparison added to
+`elf64_twin_parity_test` (shown failing with `fuel tier only in .cljc:
+(\\\"dhcp\\\" \\\"ecdsa\\\")` when the fix is reverted).
+
+## The one thing that is not equivalent
+
+Of the four aiueos containers, the kernel object, the CPL3 user image, the UEFI
+application and the AArch64 kernel image are byte-identical across both routes.
+The x86-64 kernel IMAGE is not: 65,904 bytes against 110,872, because
+kotoba-native ADR-0036 deliberately keeps the live-boot GDT/TSS shim in the JVM
+twin only.
+
+That container is refused on the JVM-free route, naming the measurement and the
+ADR. `--jvm-free` is valuable because it refuses rather than falling back;
+serving a materially different image under it would spend exactly the property
+that makes it evidence.
+
+## Evidence
+
+All 66 aiueos kernel objects: 66 match, 0 differ, 0 could-not-run, 0 failed, 0
+reached a JVM, 0 needed a retry -- the whole inventory reproduced byte-for-byte
+with `clojure`, `java`, `javac` and `clj` replaced by stubs that exit 77. The
+receipt carries the digest of the compiler tree it measured, taken before the
+first compile and again after the last, and equal.
+
+`os/aiueos/scripts/verify-jvm-free-object-parity.cljs` compiles every kernel
+source both ways in one pass and compares digests directly. The JVM-free side is
+not asked to be JVM-free, it is prevented: `clojure`, `java`, `javac` and `clj`
+on its PATH are stubs that exit 77 and say so, and reaching one is its own
+verdict. Without that the run would measure the flag's intent rather than its
+effect -- and a silent fallback would report a clean parity, since a JVM-built
+object matches a JVM-built object.
+
+## Two discarded runs
+
+Contaminated: the compiler worktree was edited mid-run, so two comparisons were
+between two different compilers. Same failure as aiueos ADR-0129, same session,
+same hand -- remembering it did not prevent it. The script now digests the
+compiler's `src`, `bin` and `deps-lock.edn` before and after, and refuses with
+its own exit code when they differ.
+
+Misclassified: `ipv4-checksum` was reported FAILED when the JVM frontend had
+failed to LOAD at load average 76. It compiles and matches alone. Retry and a
+distinct `:could-not-run` verdict existed in `measure-object-producer.cljs` and
+were not carried into the new script, which is how a tool written to find that
+exact defect shipped with it.
+
+## Not done
+
+`package-aiueos-boot` still runs on the JVM. Its only JVM-specific line is a
+`Files/readAllBytes`; the packager it calls is the same portable `pe32plus`.
+
+No object is linked into `KERNEL.ELF` by any of this. The advance aiueos
+ADR-0129 measured is still deferred and still wants boot evidence. This changes
+who can produce an object, not which objects ship.")))

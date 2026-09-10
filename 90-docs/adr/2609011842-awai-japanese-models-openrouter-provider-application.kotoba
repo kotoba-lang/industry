@@ -1,0 +1,109 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609011842-awai-japanese-models-openrouter-provider-application")
+  (:adr/title "awai.network の日本語独自モデルを murakumo.cloud provider として OpenRouter に申請する")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-09-01")
+  (:adr/last-verified "2026-09-01")
+  (:adr/last_verified "2026-09-01")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "awai-openrouter-original-japanese-models")
+  (:adr/repos (vector "orgs/network-awai/cloud-murakumo-api"
+              "orgs/network-awai/cloud-murakumo"))
+  (:adr/authoritative-for
+  (vector "モデル開発主体を awai.network、OpenRouter 上の inference provider を murakumo.cloud とすること"
+   "Basho の予定 base を Qwen/Qwen3.8-Flash-Next、Hokusai の予定 base を MiniMaxAI/MiniMax-H3 と記録すること"
+   "独自データセットによる fine-tune 後の成果物だけを独自モデルとして申請すること"
+   "Baseten と Together を hosting 候補とし、OpenRouter provider onboarding を経て公開すること"
+   "性能、価格、権利、データ方針、稼働率が未検証の間は申請を submit しないこと"))
+  (:adr/related
+  (vector "adr-2608302100-itonami-bots-openrouter-flash-x402-credits"
+   "adr-2608300200-murakumo-is-the-portal-itonami-is-the-agent"))
+  (:adr/evidence
+  (vector "2026-09-01 direct smoke: Baseten custom deployment 3mzdox9w / woop12v は served model name basho で応答した。ただし実体は RedHatAI/Qwen3.5-9B-FP8-dynamic であり、Basho 製品モデルの証明ではない"
+   "2026-09-01 console readback: Baseten basho は inactive、active deployments 0、replicas 0 of 1、current usage $0.68 this period、remaining credits $0.71。scale-down delay は 900 秒から 0 秒へ更新し、min replicas 0 / max 1 のまま。停止・再起動は不要"
+   "2026-09-01 console readback: Together custom models は 0、dedicated Endpoints は 0。通常 upload の compatible base list には Qwen3.8 27B はあるが Qwen3.8 Flash/Next と GLM 5.3 Flash はなく、Dedicated Containers は Contact Sales gated。停止対象なし"
+   "2026-09-01 console readback: Hugging Face awai-network Dedicated Endpoints は 0 items。GLM-5.3-Flash catalog form は RTX PRO 6000 Blackwell 96 GB x1 を $2.75/h と表示するが Incompatible Hardware。Private と min 0 / max 1 scale-to-zero は選べるが deploy は未実行"
+   "2026-09-01 OpenRouter BYOK UI: Baseten と Together の接続テストは既存 catalog model z-ai/glm-5.3-flash で成功した。BYOK は custom model id の登録ではない"
+   "2026-09-01 OpenRouter API: 未登録 id awai-network/basho は HTTP 400 invalid model ID。provider/catalog onboarding が必要"
+   "2026-09-01 Hugging Face: private empty repository awai-network/basho は存在するが endpoint と fine-tuned artifact は未作成"
+   "Qwen official Hugging Face card: Qwen/Qwen3.8-Flash-Next は 180B image-text-to-text model。FP8 variant も公式公開"
+   "MiniMax official Hugging Face card: MiniMaxAI/MiniMax-H3 は 33B audio-video generation system"
+   "OpenRouter live catalog 2026-09-01: minimax/h3 は video generation model として掲載され、from $0.13/second と表示"
+   "OpenRouter docs: video generation は async POST /api/v1/videos、job polling、content download、optional webhook。generate_audio と reference inputs を capability として宣言できる"
+   "OpenRouter provider docs: chat は streaming /chat/completions と usage、video は /videos job contract。共通して model catalog、価格、capacity、data policy、稼働監視が onboarding 要件"
+   "Baseten docs: custom deployment は min_replica 0 で scale-to-zero、長時間処理は async request queue と webhook を利用可能"
+   "Together docs: standard custom model upload は text generation / embedding と dedicated endpoint が対象。Dedicated Container Inference は video workload、Queue API、min_replicas 0 を扱えるが sales enablement が必要"
+   "cloud-murakumo source readback 2026-09-01: /api/v1/generation job facade、MiniMax-H3 ComfyUI graph、async artifact pipeline、OpenAI /v1/videos backend adapter が既に存在"
+   "2026-09-01 production: cloud-murakumo-api PR #194 は main へ merge 済み（3e91b9f507006493c71135d50be3ffcc4c52391e）。Cloudflare version a9066a0a-c55a-4ebb-a690-d9de1eda7dde を api.murakumo.cloud に deploy。awai-network/basho は backend 未準備のため /v1/models へ未掲載、live request は HTTP 503 self_model_backend_unavailable で fail-closed"
+   "2026-09-01 production: cloud-murakumo PR #159 は main へ merge 済み（683cb6ed6eded3114be0b797eb259316e6f77e6b）、生成成果物 PR #160 も merge 済み（af0b6cb1d489e4babfe3a158af3e176f18c6136f）。owner 承認後に lease-free bootstrap を実行し Cloudflare version 1b398be7-53e0-4683-9d75-009394080ed6 を murakumo.cloud へ deploy。/api/v1/videos は live で token 無しを HTTP 401 にし、Hokusai は pending 表示のまま。fine-tuned backend は未配線"
+   "2026-09-01 production: network-awai-apex PR #1 は main へ merge 済み（174492d8186d62ae728c0f4f630a4af94fcf2310）。Cloudflare version 45d9a3bb-bff4-4a72-b06f-08b9aa629564 を awai.network に deployし、murakumo-main の実生成を確認。Basho/Hokusai cutover 設定は readiness 未達のため未設定"))
+  (:adr/body
+  "# awai.network の日本語独自モデルを murakumo.cloud provider として OpenRouter に申請する
+
+**Status**: accepted / 2026-09-01 / owner decision。これは名称・責任分界・申請ゲートの決定であり、学習済みモデル、公開 endpoint、OpenRouter 掲載済み状態を意味しない。
+
+## Context
+
+awai.network は日本語に最適化した独自モデルを開発し、murakumo.cloud を inference provider として OpenRouter に掲載したい。計画上のモデルは `awai-network/basho` と `awai-network/hokusai`。hosting 候補は Baseten と Together である。
+
+2026-09-01 の smoke test は経路の一部だけを証明した。Baseten の custom deployment は任意の served name `basho` で直接応答したが、実体は安価な Qwen3.5-9B FP8 test model だった。OpenRouter BYOK は Baseten / Together の既存 catalog model への接続に成功しただけで、`awai-network/basho` を OpenRouter catalog に登録しなかった。実際に未登録 id を呼ぶと HTTP 400 `invalid model ID` になった。
+
+## Decision
+
+1. **役割を分離する。**
+   - developer / model publisher: `awai.network`
+   - inference provider: `murakumo.cloud`
+   - infrastructure vendors: Baseten and Together
+   - public model ids（希望）: `awai-network/basho`, `awai-network/hokusai`
+
+2. **独自モデルの定義。** upstream model の単純 rename や再配布を独自モデルと呼ばない。awai.network が権利を確認した独自 dataset で fine-tune し、model card、dataset lineage、eval、安全性評価、base-model attribution を揃えた artifact だけを `Basho` / `Hokusai` として申請する。
+
+3. **Basho.** **API base は `zai-org/GLM-5.3`（2026-09-02 オーナー決定、ADR-2609021200 で改訂）。** Baseten Model APIs / Together とも serverless（従量課金、$1.40 / $4.40 per Mtok in/out）で同一 id を提供しており、murakumo gateway は Baseten → Together の順で route し、**月額 20 万円（pinned 160 JPY/USD で 1,250 USD）の予算を gateway が強制**する（超過は 503 `self_model_monthly_budget_exhausted`）。専用 GPU 常駐は 753B-A40B で 8×H100 以上を要し予算に収まらないので採らない —— 「常駐」は shared serverless catalog（idle 0 / cold start 無し）+ 予算上限を意味する。この upstream base を `awai-network/basho` id で serve するのは **murakumo 内部 route** であって、fine-tune 前に OpenRouter へ Basho として advertise しない。旧記述（2026-09-01）: planned base は `Qwen/Qwen3.8-Flash-Next` —— これは fine-tune 用 base の計画で、artifact としては別に残る。公式 card 上は 180B image-text-to-text model で、FP8 variant もある。現在の `basho-fp8-test` は Qwen3.5-9B の infrastructure smoke なので Basho 製品 checkpoint として扱わない。
+
+4. **Hokusai.** planned base は `MiniMaxAI/MiniMax-H3`。`awai-network/hokusai` は chat model ではなく、native audio を含む asynchronous video generation model として申請する。OpenRouter 自身が `minimax/h3` を video model として掲載しているため modality mismatch はない。public contract は `POST /api/v1/videos` → job id / polling URL → status → content download とし、対応する reference inputs、duration、resolution、aspect ratio、`generate_audio` を capability として宣言する。
+
+5. **hosting.** 検証時の primary は Baseten、Together は access と同一 artifact の検証後に fallback とする。Baseten は現アカウントで custom deployment と scale-to-zero が利用できる一方、Together は対象 base の通常 custom upload と arbitrary Dedicated Container が現時点で利用できないためである。Basho は同一 checkpoint を両社に置き、TTFT、tokens/s、稼働率、失敗率、実効 $/Mtok を測る。Hokusai は video-second、queue wait、生成時間、成功率、artifact readback、実効 $/second を測る。GA 前に再測定して順序を確定する。Hugging Face private repository は artifact registry 候補であり、現時点では OpenRouter provider endpoint と見なさない。
+
+6. **serverless / scale-to-zero.** 検証段階の既定は idle GPU cost 0 とする。
+   - Baseten Basho: custom engine、`min_replica=0`。cold start を明示する。
+   - Baseten Hokusai: custom model code + async request queue/webhook、`min_replica=0`。
+   - Together Basho: standard custom-model dedicated endpoint は通常 `min_replicas>=1` で、真の scale-to-zero ではない。検証終了時に stop して課金を止める。Together serverless catalog の upstream model は prototype にだけ使い、fine-tuned Basho の証明にしない。
+   - Together Hokusai: standard model upload は video を受けない。Dedicated Container Inference + Sprocket/Queue API を使い、`min_replicas=0` とする。利用には Together sales enablement が必要。
+
+7. **murakumo provider boundary.** client と OpenRouter には vendor URL を公開しない。murakumo.cloud が `awai-network/basho` を `/chat/completions`、`awai-network/hokusai` を `/videos` で受け、内部 routing table が Baseten/Together の immutable artifact revision と endpoint を選ぶ。health/capacity が検証できない backend は選ばず、別 vendor への fallback は同一 artifact revision と互換 capability が確認された場合だけ許す。credential は vendor ごとの Worker/runner secret とし、request/response/log へ出さない。
+
+   既存の `murakumo.cloud/api/v1/generation` と job/artifact pipeline は Hokusai の内部正本として再利用し、OpenRouter 互換 `/api/v1/videos` adapter をその前面に置く。二つの独立 queue や artifact ledger を作らない。
+
+8. **OpenRouter onboarding.** BYOK は利用者のキーを既存 provider に渡す機能で、custom model registration ではない。murakumo.cloud は provider application を行い、Basho の streaming `/chat/completions` と usage、Hokusai の async `/videos` job lifecycle と artifact delivery、model catalog、token/second pricing、capacity、data retention/training policy、health/uptime を提示する。OpenRouter が publisher namespace と provider display/slug を承認して初めて公開 id を advertised する。
+
+9. **submit gate.** 次が揃うまで外部申請は draft のままにする。
+   - fine-tuned checkpoint の content id / revision と private artifact readback
+   - upstream と dataset の商用利用・派生物配布の権利確認
+   - model card と日本語 eval、安全性 eval、tool/JSON/vision compatibility matrix
+   - Baseten / Together 上の同一 artifact に対する direct positive/negative smoke
+   - murakumo.cloud の Basho production endpoint、auth、rate limits、streaming、token usage accounting
+   - murakumo.cloud の Hokusai submit/poll/content/webhook、duration/format/audio usage accounting
+   - Basho の価格、context length、TTFT、tokens/s、capacity TPM、95% 以上の uptime 証跡
+   - Hokusai の $/second、queue wait、generation latency、success rate、capacity、artifact retention 証跡
+   - prompt logging、retention、training reuse、ZDR の明示
+
+## Consequences
+
+- 日本発・日本語特化という説明は、独自 dataset と評価結果で裏付ける。未学習の時点では `in development` と記載する。
+- Baseten/Together の deployment name は内部名であり、OpenRouter model id を自動決定しない。
+- Basho と Hokusai は同じ API へ押し込まない。前者は同期/streaming chat、後者は非同期 media job である。
+- upstream 名を隠さない。model card と申請に base model、license、fine-tune method を記載する。
+- 申請前の GPU endpoint は検証時だけ起動し、終了後は scale-to-zero / inactive を確認する。
+- OpenRouter catalog 掲載、provider 承認、課金開始、production live はそれぞれ別の証拠で判定する。
+
+## Deployment contract
+
+Model routes, vendor endpoint settings, secret names, scale-to-zero behavior, and fail-closed readiness gates are recorded in `90-docs/deployment/awai-murakumo-basho-hokusai-routing.edn`. The front doors are active where deployed, but neither model may be advertised or routed to paid inference until every readiness gate is evidenced.
+
+## Application artifact
+
+Paste-ready draft と owner-fill gate は `90-docs/business/openrouter/awai-murakumo-provider-application.edn` を authoritative draft とする。")))

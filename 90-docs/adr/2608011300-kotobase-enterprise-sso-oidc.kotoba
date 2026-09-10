@@ -1,0 +1,145 @@
+(vector (map (:db/id -1),
+  (:adr/id "adr-2608011300-kotobase-enterprise-sso-oidc"),
+  (:adr/title "ADR-2608011300: enterprise SSO は OIDC で作る — edge に JWT 検証が無かったのが本当の穴で、SAML は先送りする"),
+  (:adr/status "accepted"),
+  (:adr/doc_type "adr"),
+  (:adr/date "2026-08-01"),
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)")),
+  (:adr/topic "kotobase-enterprise-sso-oidc"),
+  (:adr/related (vector "adr-2608011200-kotobase-tenant-audit-log-and-admin-console"
+                "adr-2607301000-kotobase-enterprise-plane-hardening")),
+  (:adr/supersedes (vector)),
+  (:adr/superseded_by (vector)),
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/oidc" "network-awai/net-kotobase")),
+  (:adr/authoritative true),
+  (:adr/authoritative_for (vector "kotobase の enterprise SSO を OIDC で実装し SAML を先送りする決定と、その理由"
+                          "oidc.adapters.jwt-edge の存在理由と、jwt-claims を JVM/edge で共有する規律"
+                          "SSO をテナント設定にすると ID token の署名検証が必要になる理由(Google 経路では不要な理由と対にして)"
+                          "email ドメインでルーティングし、完全一致・継承なしとする決定")),
+  (:adr/last_verified "2026-08-01"),
+  (:adr/source-format "edn-only (ADR-2607171600)"),
+  (:adr/primary-sources (vector "kotoba-lang/oidc ca66e36 — jwt-claims / jwt-edge / jwt-rsa refactor"
+                        "network-awai/net-kotobase 3f2c8d7 (authn.sso) / 33dab9c (authn.sso-flow + routes + page)"
+                        "authn Worker Version 2bbb1175-8cf3-4275-b268-0f8d54f29296、live 実測 2026-08-01"
+                        "west pin 前進 3adbaa3 (oidc 2d3ca2b->ca66e36, net-kotobase 35cef4a->33dab9c)")),
+  (:adr/known-gaps (vector "実 IdP(Okta / Entra ID)での動作は未検証。アプリ登録と client secret 発行は owner 作業で、それ無しには end-to-end の証明ができない。スタブ IdP は『こちらが想定する IdP』であって本物ではなく、discovery ドキュメントの実際の形やクレームの癖は分からない。"
+                   "SAML は未実装(意図的な先送り、下記 D5)。"
+                   "SCIM プロビジョニングは未実装。"
+                   "kotoba-lang/authentication の deps.edn が pin する oidc は依然 jwt-edge 以前。net-kotobase 側は直接 pin で回避しているが、authentication 自身の pin 前進は別 follow-up。"
+                   "JWKS キャッシュは isolate 内で TTL 10 分。cold isolate では都度取得になり、IdP 不達時は 503 を返す(古い鍵で通し続けない)。"
+                   "座席/ロール(RBAC)は未実装。SSO で入った利用者の権限は既存のテナント境界のまま。")),
+  (:adr/verification "kotoba-lang/oidc: clojure -M:test → 22 tests / 70 assertions, 0 failures。nbb -m oidc.adapters.jwt-edge-test → 実 RSA 鍵で 10 checks, 0 failed。net-kotobase/authn: clojure -M:test → 14 tests / 129 assertions, 0 failures。nbb -m sso-flow-smoke → スタブ IdP 相手に 15 checks, 0 failed。live(伝播安定後に 5 回連続で確認): /v1/sso/start は 302 で『single sign-on is not configured for that domain』、/v1/sso/callback は 302 で『this sign-in link has expired or was already used』、/sign-in・/health・/passkey.js は 200、kotobase.net/admin の hand-off は 302 のまま。"),
+  (:adr/body
+  "## Context
+
+ADR-2608011200 は「enterprise で残る最大のブロッカーは SSO」と結論した。着手して
+分かったのは、**SSO はゼロからではなかった**ということと、**本当の穴は別の場所に
+あった**ということである。
+
+既に在ったもの: `kotoba-lang/oidc` と `kotoba-lang/saml`(protocol 層)、そして
+`authn.oauth` の認可コードフロー + PKCE + state の単回消費(Durable Object 内 atomic)。
+
+無かったもの: **edge で ID token を検証する手段**。`oidc.adapters.jwt-rsa` は
+`java.security` を import するので Cloudflare Worker では動かない。企業 SSO は
+ID token の検証が全てなので、これは「SSO が原理的に成立しない」という意味だった。
+
+## Decision
+
+### D1. 判定は共有し、暗号だけを分ける
+
+`oidc.adapters.jwt-claims`(新規 `.cljc`)に『どの JWK が署名したか』『claim は
+受理できるか』『alg は実装済みか』を置き、JVM(`jwt-rsa`)と edge(`jwt-edge`)の
+**両方がそれを呼ぶ**。
+
+**`claim-error` が 2 本あることは重複ではなく、最初の乖離を待っている
+セキュリティバグである。** 片方に clock skew 許容が入る/`nbf` 検査をやめる/
+配列 `aud` の扱いが変わる、その日から**片方のデプロイでだけ通るトークン**が
+生まれる。しかも**テストがあるのは JVM 側**なので、穴が開くのは必ず edge 側になる。
+
+`jwt-rsa` は自前の `claim-error` / `matching-jwk` / `split-jwt` /
+`audience-match?` を削除して共有版に載せ替えた。
+
+### D2. seam は `IJwksVerifier` にしない
+
+あの protocol の `verify-jwt!` は結果を返すが、`crypto.subtle.verify` は Promise を
+返し、isolate はブロックできない。**protocol を reify して同期のふりをするより、
+`verify-rs256!` が Promise を返す別の面にした。** 結果の語彙(`:unsupported-algorithm`
+`:missing-jwk` `:invalid-signature` `:invalid-jwt` + claim キーワード)は `jwt-rsa` と
+完全一致させてあるので、片方を扱える呼び出し側はもう片方も扱える。
+
+### D3. テナント設定の SSO では ID token の署名検証が要る(Google 経路では要らない)
+
+OIDC §3.1.3.7 は「token endpoint から TLS で直接受け取ったトークン」の署名検証省略を
+認めている。Google 経路(`authn.oauth`)がそれを行っていないのは**正しい** ——
+エンドポイントがコード内の定数なので『答えた相手』と『issuer』が構造的に同一だから。
+
+**テナントが設定する IdP ではそれが成り立たない。** issuer と token_endpoint が
+別主体を指す設定は、答えた相手の自己申告を信じることになる。issuer が公開する
+JWKS で検証すると、トークンが**答えた相手ではなく issuer に**結びつく。これが
+`jwt-edge` を作った理由そのものである。
+
+### D4. email ドメインでルーティングし、完全一致・継承なし
+
+**ユーザーを引かない。**『誰か言え、こちらで照合する』方式は、サインインボックスを
+**アカウント存在オラクル**に変える。ドメイン方式が漏らすのは「どのドメインが SSO を
+使っているか」だけで、それは相手の IdP のログイン画面が既に公開している事実である。
+
+ワイルドカードも親ドメイン継承も無い: `evil-example.com` が `example.com` の IdP に
+届いてはならず、`mail.example.com` は誰かが登録するまで別ドメインである。
+**サブドメイン継承は、顧客の DNS が完璧に保たれていない瞬間から乗っ取りと区別が
+つかなくなる**種類の利便性である。テストで 4 種の類似ドメインを固定した。
+
+### D5. SAML は先送りする(実装しないことの決定)
+
+`kotoba-lang/saml` の XML パーサとメタデータ処理も JVM 専用で、Worker には
+DOMParser が無い。**XML 正規化 + XML dsig を edge で自作するのは、実装が最も
+セキュリティバグを産む領域**である。Okta・Entra ID・Google Workspace はいずれも
+OIDC を話すので、OIDC で企業要件は満たせる。SAML は「レガシー要件として実際に
+来たとき」に別スコープで切る。**半端に検証した SAML を出すことは、出さないことより
+悪い。**
+
+### D6. 半端な設定はボタンを出さない。エラーは固定文字列だけ
+
+接続は `SSO_CONNECTIONS`(JSON 配列)、secret は接続ごとに
+`SSO_CLIENT_SECRET_<DOMAIN>`。**secret が、運用者がチケットに貼りうる値の中に
+入らないようにするため。** 必須項目欠け・非 https エンドポイント・secret 不在の
+接続はレジストリに入らず、`registry-problems` が理由を報告する(運用者が書いた
+ままの綴りで —— 正規化した名前で報告すると自分の設定ファイル内で探せない)。
+
+画面に出るエラーは `authn.worker` の allowlist にある**固定文字列のみ**。あの
+allowlist は、query パラメータから echo した文字列で**本物のオリジン上に偽の
+『アカウントがロックされました。この番号へ電話を』を出せてしまう**ことを防ぐために
+ある —— エスケープはスクリプト注入を止めるが、ソーシャルエンジニアリングは止めない。
+可変部分は `:detail` に置き、レンダリングしない。
+
+### D7. `profile` は未検証アドレスを持たない
+
+IdP が `email_verified` を主張した時だけ `:email` が存在する。フラグを添えるのでは
+なく**キーごと存在しない** —— 呼び出し側が誤用できないようにするため。
+`authentication.identity` が provider 主張の email について既に定めている規則の適用。
+
+### D8. 実 IdP が無いなら、スタブ IdP を立てて配線を証明する
+
+実 Okta/Entra テナントはここからは作れず、待てば配線が未検証のまま残る。そこで
+**テスト自身を IdP にした** —— RSA 鍵を生成し、JWKS を出し、ID token を発行し、
+`authn.oauth` が既に用意していた注入可能な exchange seam でフローを駆動する。
+
+15 checks: 往復完走・`return_to` 保持・**state 単回性(リプレイは 401)**・
+nonce/issuer/audience/期限/subject の各拒否・**secret が URL に出ないこと**。
+
+**これが証明しないこと**: 実際の Okta / Entra が期待どおり振る舞うこと。スタブは
+『こちらが想定する IdP』であって本物ではない。gap として明記する。
+
+## Consequences
+
+- SSO 経路が本番に載った(authn Worker `2bbb1175`)。**ただし `SSO_CONNECTIONS` が
+  未設定の間は完全に no-op** で、passkey / メール / did:key の各経路は無傷。
+- owner 作業が 1 件残る: **IdP のアプリ登録と secret 投入**。
+  Redirect URI `https://authn.kotobase.net/v1/sso/callback`、
+  authorization code + PKCE(S256)、scope `openid email profile`、
+  client auth `client_secret_post`。
+- ADR-2608011200 が挙げた enterprise ブロッカーのうち **SSO が『実装済み・未接続』
+  に進んだ**。`docs/ENTERPRISE-READINESS.md`(別セッション作)の
+  『SSO/SCIM は未達』は **今日時点では依然正確** —— 接続が済むまで書き換えない。
+- 残るブロッカーは SCIM・座席/ロール(RBAC)・99.999% SLA の裏付け。
+")))

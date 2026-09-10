@@ -1,0 +1,120 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608161600")
+  (:adr/title "IPFS/IPLD/IPNS に Storj Uplink 相当の client 暗号 spec は無い。object は envelope、session は org-signal、mailbox は IPLD+IPNS")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-16")
+  (:adr/last_verified "2026-08-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "client-held-confidentiality-over-ipld")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/repos (vector "orgs/kotoba-lang/kotoba-protocol"
+              "orgs/kotoba-lang/envelope"
+              "orgs/kotoba-lang/org-signal"
+              "orgs/kotoba-lang/pqh"
+              "orgs/kotoba-lang/noise"
+              "orgs/kotoba-lang/tech-ipfs-specs-ipns"))
+  (:adr/related (vector "90-docs/adr/2608070400-kotobase-client-held-security-and-searchable-encryption-tiers.edn"
+                "90-docs/adr/2608145200-protocol-planes-two-link-kinds.edn"
+                "90-docs/adr/2608145800-protocol-remaining-maturity-loop.edn"
+                "90-docs/adr/2607263000-kotobase-net-e2ee-mail-drive.edn"))
+  (:adr/authoritative_for
+  (vector "IPFS/IPLD/IPNS コア仕様に Storj Uplink 相当の統一 client 暗号は無い"
+   "機密性は 9 つ目の通信面ではない。content-protocol の object 形 + client-held（ADR-2608070400）"
+   "object-at-rest は envelope、1:1 E2EE は org-signal、hop は noise。混ぜない"
+   "DAG-JOSE は draft コンテナであって ratchet ではない"
+   "IPNS は prekey bundle / mailbox head の真正性。秘匿性は持たない"
+   "one-time prekey の単回取得を純粋な IPFS/IPNS だけで保証しない"
+   "convergent 暗号を使わない"
+   "代数の正本は kotoba.protocol.sealed。crypto runtime は protocol に入れない"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:source/dataset "adr")
+  (:adr/body
+  "オーナー問い（2026-08-16）: IPFS / IPLD / IPNS に Storj のような client 暗号 spec はあるか。Signal 型メッセージはどう構成するか。
+
+## Status
+accepted — 2026-08-16。実装は `kotoba-lang/kotoba-protocol` の `kotoba.protocol.sealed`。
+crypto は既存の `envelope` / `org-signal` / `noise` が所有する。protocol は hash しない。
+
+## 答え
+
+無い。IPFS は libp2p 通信を暗号化するが、保存コンテンツは暗号化しない。CID を知る人は
+誰でも取得でき、DHT には PeerID・CID・提供ノードが露出する。IPLD の DAG-JOSE は
+JWS/JWE コンテナの Draft であり、鍵交換・端末追加・forward secrecy・ratchet・失効を
+定義しない。IPNS は署名付き可変ポインタであり、暗号化仕様ではない。
+
+Storj Uplink 相当（client が content key を持ち、wrap だけを共有する）は workspace では
+既に `kotoba-lang/envelope` である。`io-storj` は Gateway-MT の S3 面であって
+Uplink 暗号ではない。
+
+## 2 つの construction。混ぜない
+
+| 種別 | 実装 | 保護 | FS | IPFS コア spec か |
+|---|---|---|---|---|
+| `:object` | envelope | 保存時。1 content key、多数 wrap | 無し | 否 |
+| `:session` | org-signal | 送信者→受信者。X3DH + Double Ratchet | 有り | 否 |
+| `:hop` | noise | 隣接 peer | hop のみ | libp2p のみ |
+| `:ipns` | tech-ipfs-specs-ipns | ポインタの真正性。秘匿性なし | n/a | 是 |
+| `:dag-jose` | Draft | コンテナ | 無し。ratchet ではない | draft only |
+
+Signal 暗号文を object CID の下に置くのは **合成**。envelope を per-message
+ratchet として使う、または Noise を E2EE と数えるのは `:construction-mismatch`。
+E2EE は content-protocol の object 形。session 面は mux / Noise / Yamux / head
+であって、そこへ Signal を載せない（9 面目を足さない。ADR-2608145800 の stop を維持）。
+
+## Signal 型メッセージの構成
+
+```text
+IPNS(user)
+  └─ 公開 prekey bundle の CID
+       ├─ identity public key
+       ├─ signed prekey
+       ├─ 任意の PQ prekey（無ければ hybrid に昇格しない）
+       └─ 署名
+
+X3DH（今日の org-signal） / PQXDH（org-signal の named gap）
+  └─ 初期共有秘密
+
+Double Ratchet
+  └─ メッセージごとに異なる鍵
+
+sealed-message
+  ├─ header / ciphertext
+  └─ attachments: CID + wrapped file key + digest + size
+       ↓
+object CID（暗号文の identity）
+       ↓
+mailbox append-only CID log → IPNS head
+```
+
+添付はセッションでファイル全体を再暗号化するより、新鮮な file key で封緘して
+IPFS に置き、鍵だけを Signal メッセージに載せる。`:plaintext` を attachment に
+置くと `:plaintext-in-attachment`。
+
+オフライン配送は IPFS が queue ではないので mailbox が要る。受領後も暗号文の
+完全削除は保証しない。
+
+## 禁じること
+
+1. 決定論的 / convergent 暗号（同じ平文 → 同じ CID）。ADR-2608070400 D5。
+2. IPNS 鍵・PeerID 鍵・Signal identity 鍵の同一 secret（`:key-role-collision`）。
+3. one-time prekey の単回取得を IPFS/IPNS だけで保証したと名乗ること。
+4. GossipSub の共有鍵暗号を鍵配送未定義のまま使うこと。payload は Signal/MLS で
+   先に封緘する。
+5. DAG-JOSE を ratchet と呼ぶこと。
+6. protocol に Web Crypto / JCA を入れること。注入 hasher のみ。
+
+## 置かないもの（named gap）
+
+- org-signal の PQXDH（今日は X3DH。envelope.kem が object wrap の ML-KEM を持つ）。
+- IETF MLS（グループ。sender-keys は org-signal に既にある）。
+- OPK 単回消費サービス / 合意台帳。
+- 9 つ目の通信面。
+- DAG-JOSE origin repo。コンテナが要るときは envelope を使う。
+
+## 改訂履歴
+
+2026-08-16: accepted。`kotoba.protocol.sealed` が代数。")))

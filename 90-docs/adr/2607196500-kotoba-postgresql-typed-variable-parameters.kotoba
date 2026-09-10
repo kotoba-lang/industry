@@ -1,0 +1,74 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607196500-kotoba-postgresql-typed-variable-parameters")
+  (:adr/title "ADR-2607196500: Typed bounded variable PostgreSQL parameters")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19")
+  (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for (vector "PostgreSQL typed variable parameter boundary"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/pg_typed_prepared_consumer.kotoba"
+   "orgs/kotoba-lang/kototama/src/kototama/linker.clj"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"
+   "orgs/kotoba-lang/kotoba-lang/lang/transport-component-abi.edn"))
+  (:adr/supersedes (vector "adr-2607196400-kotoba-postgresql-prepared-statements"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:operations (vector "pg_prepare_typed" "pg_execute_params"))
+   (:limits (map (:parameter-count 16) (:parameter-bytes-each 1024)
+            (:encoded-bind-bytes 4096) (:type-oids 16)))
+   (:formats (set :text :binary :null))
+   (:validation (vector :format-count :format-code :parameter-count :length-prefix
+                :text-nul-rejection :exact-end :result-format-count))
+   (:memory-separation (map (:sql-and-parameters true) (:provider-revalidation true)))
+   (:released-server (map (:product :postgresql) (:version "14.19")
+                     (:parameter-count 3) (:type-oid 23)
+                     (:formats (vector :text :null :binary))
+                     (:success-row "42") (:reused true)
+                     (:injection-separation-sqlstate "22P02")))
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:postgresql-interop")
+     (:result "typed OIDs; text/NULL/binary parameters; reuse; SQLSTATE 22P02; exit 0"))
+    (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:test")
+     (:result "bounded malformed format/count/length/OID negatives; exit 0"))))))
+  (:adr/body
+  "# ADR-2607196500: Typed bounded variable PostgreSQL parameters
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+Prepared statements may declare up to sixteen PostgreSQL parameter type OIDs
+through `pg_prepare_typed`. `pg_execute_params` accepts a bounded Bind fragment
+in a memory range independent from statement SQL. The `.kotoba` provider
+revalidates format count and codes, parameter count, every signed length,
+NULL representation, per-value and aggregate limits, text NUL exclusion,
+result format count and exact buffer exhaustion before any transport write.
+
+Text and binary values are supported per parameter. NULL is represented only
+by PostgreSQL's four-byte `-1` length. The consumer cannot use the fragment to
+select a statement, portal, result format, endpoint or arbitrary frontend
+message; the provider supplies those fields and emits one Bind, Execute and
+Sync sequence on the existing affine channel.
+
+## Evidence
+
+Released PostgreSQL 14.19 qualification declares three `int4` OIDs and executes
+one text value, one NULL and one binary int4 value, obtaining `42`. It then
+requires `22P02` for SQL-looking text supplied as a parameter, successfully
+reuses the statement with text values and closes it. Malformed counts, unknown
+formats, truncation, oversized values and mismatched OID lists fail closed.
+
+This closes variable-count, NULL, binary-format and explicit-OID support for
+the bounded prepared-statement slice. Portals/cursors, batching/pipelining,
+COPY, pooling, rotation, compatibility matrices and soak remain open.")))

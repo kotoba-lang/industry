@@ -1,0 +1,168 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800005700-native-http-ingress-is-blocked-by-a-four-entry-allowlist")
+  (:adr/title "native な HTTP サービスは capability 4 件の許可リストで塞がっている —— murakumo API を Node も JVM も CLJS も無しで建てるには、kotoba-kir の native-provider-contract? に 17/18 を足し、native の HTTP provider を書くしかない")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/repos (vector "com-junkawasaki/root"
+              "kotoba-lang/amu"
+              "kotoba-lang/kotoba-kir"
+              "kotoba-lang/kotoba-native"
+              "network-awai/cloud-murakumo-api"))
+  (:adr/related (vector "adr-2608760000-jvm-free-multi-route-http-service-host"
+                "adr-2608170300-murakumo-worker-jvm-free-kotoba-bot-policy-session-closure"
+                "adr-2608319200-murakumo-as-an-openrouter-provider-four-answers-or-no-offer"
+                "adr-2608136000-six-questions-before-trusting-green"))
+  (:adr/body
+  "## Context
+
+オーナー指示（2026-09-01）は 3 段で狭まった —— 「jvm 依存しないようにして」→
+「cljs 依存もなしにできるのでは? amu は typed eval も含めて native build に
+対応していたはず」→「node にも依存しない。amu, native に依存したい」。
+
+対象は `network-awai/cloud-murakumo-api`（`api.murakumo.cloud` を出す
+Cloudflare Worker、`worker.cljs` は 228,399 bytes）。
+
+**オーナーの読みは compiler については正しい。** 本 ADR が記録するのは、
+詰まっているのが compiler ではなく **capability の許可リストと host** だという
+測定である。
+
+## 測定 1 —— amu の native build は本当に JVM を起こさない
+
+`JAVA_HOME=/nonexistent` で:
+
+| 対象 | 結果 |
+|---|---|
+| `amu check <ingress module> --jvm-free` | **`:ok true`**。effects `#{[:cap/call :http/accept] [:cap/call :http/reply]}`、admission `:admitted? true` |
+| `amu compile plain.kotoba --target wasm32 --jvm-free` | **exit 0、296 bytes を出力** |
+
+`typed-cap-call`（オーナーの言う typed eval）は frontend と admission を
+通る。**ここは主張どおり動く。**
+
+## 測定 2 —— native の許可リストは 4 件で、HTTP は入っていない
+
+`kotoba-lang/kotoba-kir` の `src/kotoba/kir.cljc`:
+
+```
+(defn- native-provider-contract? [cap-id request-type result-type]
+  (or (and (= 7  cap-id) ... clock ...)
+      (and (= 24 cap-id) ... dataspace ...)
+      (and (= 9  cap-id) ... ui-commit ...)
+      (and (= 10 cap-id) ... ui-event ...)))
+```
+
+`http/accept` は **id 17**、`http/reply` は **id 18**（`http-ingress-v1.edn`
+の `:capabilities`）。**どちらも列挙に無い。**
+
+kit の qualification 表とこれは一致する（2026-09-01、amu tip `27d82d85` で読み直し）:
+
+| kit | cap id | `:native-aot` |
+|---|---|---|
+| `dataspace-v1` | 24 | `:implemented` |
+| `ui-v1` | 9 / 10 | `:implemented` |
+| **`http-ingress-v1`** | **17 / 18** | **`:pending`** |
+| `http-v1` / `storage-v1` / `state-v1` / `llm-v1` / `log-v1` | —— | `:pending` |
+
+**`:pending` は「誰も試していない」ではなく、構造的な拒否である。** native
+backend は 64bit ワードに収まる値しか運ばず（`native-word-value-type?`）、
+HTTP の `[:record … [:headers [:set [:record …]]]]` はそこに入らない。
+
+## 測定 3 —— wasm の `:implemented` は workerd に対する保証ではない
+
+`http-ingress-v1` の `:wasm-aot :implemented` を裏付けている
+`test/kotoba/compiler/http_ingress_wasm_aot_qualification_test.clj` は、
+**wasmtime + WebAssembly Component Model** に対して測っている —— WIT
+インタフェース `kotoba:application/http-ingress@1`、`cm32p2|` 名前空間、
+手書き WAT の inject driver。**workerd はコンポーネントを host しない。**
+
+`:implemented` を「Cloudflare Worker で動く」と読むと外す。qualification は
+**測った host に対する主張**であって、任意の host に対する主張ではない。
+
+## 測定 4 —— Node を外す既存経路も build 時 JDK を要する
+
+adr-2608760000 が `runtime/http-service.mjs`（multi-route、JVM-free な HTTP
+host）を landed させているが、同 ADR 自身がこう書いている:
+
+> `--target js` … The compiler still needs a JDK to produce the artifact —
+> a build-time tool dependency, explicitly outside ADR-2607198300's
+> 「no JVM at runtime」rule
+
+つまり **runtime の JVM は消えるが build の JDK は残り、host は Node である。**
+同 ADR は `kotoba-lang/kotobase-server` について
+「this workspace's own flagship production server has NOT achieved a
+JVM/Rust-free replacement either」とも書いている。**同じ壁の手前に 2 つ居る。**
+
+## 現在地（3 経路とも届かない）
+
+| | build 時 JVM | runtime | host |
+|---|---|---|---|
+| `--target wasm32*` | **不要** | 不要 | ingress は wasmtime + component model。workerd 用が無い |
+| `--target js`（restricted ESM） | **必要（JDK）** | 不要 | `http-service.mjs` = **Node** |
+| 現行 CLJS Worker | refresh 時のみ | 不要 | workerd。**実際に動いている** |
+
+**murakumo API を native バイナリにすることは今日できない。**
+
+## Decision
+
+**D1. 「native な HTTP サービス」を upstream の課題として起票する。**
+設定変更ではなく `kotoba-kir` + `kotoba-native` + provider の実装であり、
+必要なものは 4 つ:
+
+1. `native-provider-contract?` に cap 17 / 18 を追加する
+2. HTTP の record 型を native の値表現に載せる（`native-word-value-type?` が
+   今は通さない。`:document` が pair(offset,length) として入ったのと同型の
+   拡張が要る）
+3. **native の HTTP provider** —— ソケットを触る層。CLAUDE.md が許す唯一の
+   非 cljc の形、すなわち `tools/kexe_loader.c` と同じ「判断を含まない機構」
+   として書く。admission と routing の判断は Kotoba object に残す
+4. conformance vectors と両方向テスト（拒否が自分の名乗った理由で起きること）
+
+**D2. それが landed するまで、murakumo API は現行 CLJS Worker のままにする。**
+adr-2608170300 のモデル（routine は JVM-free、artifact refresh だけが意図的な
+JVM 操作）は有効であり、今日 JVM が起きたのは**私が CLJS を編集したから**
+であって構造の欠陥ではない。
+
+**D3. `:implemented` を host 非依存の保証として引用しない。** qualification は
+測った host に対する主張である。Cloudflare Worker / workerd に移す判断をする
+前に、その target の host が実在するかを別に確かめる。
+
+**D4. 移行単位は Q9 のまま whole component。** 純関数だけを `.kotoba` へ移す
+「決定核 fallback」は移行進捗にも旧 source 削除の証拠にもならない
+（ADR-2608301500 系の Q9 決定）。本 ADR はその規則を緩めない。
+
+## 付随して見つけた欠陥 2 件
+
+**(a) 落とせない形に対して typed な拒否ではなく `:internal-error` を返す。**
+inline の `[:record …]` を持つ ingress モジュールを `--target wasm32` に渡すと
+`{:ok false :error :internal :message \"internal compiler error\"}`（exit 70）
+になる。qualification テストは `ref-ify` で `[:ref name]` + schema 表に変換
+してから渡しており、**私のモジュールが誤った形だった** —— が、まともな拒否
+なら 1 回で気づけた。`plain.kotoba` は同じ target で exit 0 なので、環境でも
+JVM-free 経路でもない。
+
+**(b) `kotoba/inference_timeout_core.kotoba` は誰も呼ばない写しである。**
+`kotoba_runtime.js` が export しているのは grok bot の 2 関数だけで、
+consumer は `src/grok_bot_runtime.js`。inference-timeout は export されて
+いない。そしてそのモジュール自身がこう書いている ——
+「the CLJS authority had grown a 4 ms allowance and a 90-second floor while
+**this mirror** still carried the older 45-second floor … the two decisions had
+**silently diverged**」。**呼ばれない写しは、ずれても誰も気づかない。**
+呼ぶか消すかを決める。
+
+## Consequences
+
+(+) 「native にする」が塞がっている理由が、推測ではなく行番号で残った。
+    次に同じ問いが出たとき、kit 表を見て `:pending` の意味を誤読せずに済む。
+
+(+) 4 件の許可リストという形が記録された。**dataspace と ui は通っている**
+    ので、native provider を足す道筋自体は実在する（新規の機構ではない）。
+
+(-) murakumo API の native 化は当面できない。オーナーの目標は正しいが、
+    今期の作業ではない。
+
+(?) `clock-v1` は cap id 7 が許可リストに在るのに kit の `:native-aot` は
+    `:pending` だった。表と gate が食い違っており、どちらが古いか未確認。
+
+(?) 本 ADR は amu tip `27d82d85` で測った。許可リストは変わりうるので、
+    次に読む者は **値を引用せず gate をその場で読む**こと。")))

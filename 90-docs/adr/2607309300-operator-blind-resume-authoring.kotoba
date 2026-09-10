@@ -1,0 +1,175 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607309300")
+  (:adr/title "運営者が読めない履歴書作成 — 封筒面と cohort 面に割り、同意は CACAO、ブラウザ暗号は kagi を noble で")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/deciders "Jun Kawasaki")
+  (:adr/body
+"# ADR-2607309300: 運営者が読めない履歴書作成
+
+**Status**: accepted · **Date**: 2026-07-30 · **Deciders**: Jun Kawasaki
+
+## Context
+
+「今の cloud-itonami に yagish のような履歴書作成 repo・サービスは設計・公開されて
+いるか」という問いから始まった。答えは **無い**。`履歴書` / `職務経歴書` /
+resume-builder を cloud-itonami 配下と 90-docs/adr で grep してヒットゼロ。
+
+隣接するものは全部「事業者側」か「意図的に PII を持たない」側だった:
+
+- `cloud-itonami-isic-7810` — 職業紹介事業者 actor(candidacy intake → 規制審査 →
+  matching → placement)。GitHub Pages で公開済み。
+- `cloud-itonami-isic-6399` — 求人ボード。ADR-2607269500 で実際に AWAI 名義の募集を掲載。
+- `cloud-itonami-isic-7820/-7830` — 労働者派遣 / HR・payroll。
+- `cloud-itonami/recruit` — 求人アグリゲータ。actor-manifest に「応募者 PII を保持しない、
+  候補者マッチングは talent へ委譲」と明記。
+- `etzhayyim/com-etzhayyim-talent` — 本人が自分の ISCO-08 プロフィールを登録する
+  cohort-first レジストリ。
+
+つまり **求職者本人が書類を作って出す面が丸ごと空いていた**。
+
+続けてオーナーが設計を指定した: 中央管理せず、Proton のように暗号化して運営者が
+読めず、user 同士の同意(VC? OAuth?)で流通し、kagi/kagitaba を使い、それぞれのデータは
+Datomic query できる形にし、storage/compute コストは crypto で払わせる。
+
+## Decision
+
+### 1. client 側暗号だけでは足りない。面を割る
+
+CACAO と暗号は別の性質を担う。CACAO は**権限**、暗号は**機密**。どちらも単独では
+**失効**と**クエリ可能性**を与えない —— 一度渡した平文は取り返せないし、暗号文は
+join できない。
+
+したがって「サーバに読ませない」と「Datalog でクエリする」を同じ datom に同時には
+成立させない。**何をクエリしたいかを先に決めて、それだけを非識別な射影として平文で
+書く。識別する中身は封緘して blob に置く。**
+
+これは新案ではなく、workspace に既に 2 つの実装がある: `kagi`(ADR-0001 decision 3:
+暗号文 blob は SealedBlockStore、index/ACL/grant/envelope/version は Datomic graph、
+台帳はハッシュ鎖)と `talent`(cohort は graph、PII は ciphertext)。
+`cloud-itonami-rirekisho` が 3 つ目。
+
+`kotobase` の join はちょうど ref 1 本しか届かない(repo-wide mandatory rule)ので、
+2 面を跨ぐ分析は N クエリ + マージになる。これを README に明記する(黙ったシャーディング
+の禁止)。
+
+### 2. 同意は CACAO。VC は使わない
+
+W3C Verifiable Credentials の実装がこの workspace に無い(`org-w3-did` はあるが
+VC data model / SD-JWT / BBS+ の選択的開示は無い)。一方
+`org-chainagnostic-cacao` は実装済みで、保有者自身のランタイムで mint でき、
+`resources` に権限を書け、期限を持つ。VC でやりたかったこと(自己主権・検証者が
+サーバに問い合わせず検証・必要な項目だけ)は CACAO の resources で満たせる。
+
+開示 grant は欄名を resource URI に並べる:
+`rirekisho://disclose/<rid>?fields=history,name&purpose=...`
+検証側は CACAO を検証するだけで範囲を知れる(別途 ACL を引かない)。
+
+grant には purpose と有界な期限を必須にし、失効は hard retract(フラグを立てない)。
+`revoke` の戻り値は「既に復号された平文は取り消せない」と明示する ——
+暗号は機密性を与えるが失効は与えない、という事実を UI 文言で誤魔化さない。
+
+### 3. 履歴書 1 通 = 1 nekko RID
+
+Radicle 相当は `kotoba-lang/kotoba-rad`(2026-07-16 に `nekko` へ rename)に既にある:
+RID = genesis block の CID、hash-chain identity journal、delegate 集合の畳み込み。
+版が signed ref になるので、企業が受け取った履歴書の改竄を本人の鍵で検証でき、
+ホスト(我々)が消えても identity が残る。**未実装**(現状 `:rid` は文字列)。
+
+### 4. ブラウザ暗号は kagi を noble で満たす。Rust も async も要らない
+
+これが最大の障害だった: kagi は `.clj` 30 / `.cljc` 7 で `kagi.crypto` の docstring
+自体が「(JVM)」と宣言しており、ブラウザで動かなかった。当初は「WebCrypto Provider を
+新規に書き、PQC は当面古典に縮退」と見立てたが、調査で **2 点とも不要**と判明した:
+
+- `org-signal` に既にテスト済みのブラウザ暗号がある(`@noble/curves` ベースの
+  x25519/hkdf/ratchet/x3dh/group)。
+- `@noble/*` は純 JS の**同期**実装なので、org-signal が JVM/CLJS を async に
+  分けた理由(「Web Crypto に同期 API が無い」)がここには当たらない。
+- `@noble/post-quantum` に ML-KEM-768(FIPS 203) / ML-DSA-65(FIPS 204) があるので
+  **hybrid を縮退させる必要も無い**。repo-wide の新規 Rust 禁止とも衝突しない。
+
+実装(kotoba-lang/kagi `78df12da`):
+`kagi.crypto` を `.cljc` 化し、Provider プロトコルと provider 越しの可搬ヘルパを
+CLJS から見えるようにして、JCA 実装は 1 つの `#?(:clj (do ...))` に収めた。既存 JVM
+consumer は ns も var も変わらない。ブラウザ実装は `kagi.crypto.noble`。
+
+**相互運用が本質的な難所だった。** JCA は X.509/PKCS#8 の DER 符号化を graph に載せ、
+KEM combiner はその符号化済みバイト列を transcript にハッシュするので、raw な noble
+鍵をそのまま使うと**黙って別の共有秘密を導出する**。`wrap-der`/`unwrap-der` が
+6 種の固定長 prefix(JDK 24 の実出力から採取)を付け外しし、prefix 不一致は throw する。
+`combine-kem-shared` を可搬側に出して JVM 実装をそこへ委譲させ、2 つの transcript が
+「似ている」のではなく同一コードになるようにした。
+
+検証は**両方向**を実ベクタで行った(片方向だけだと、ブラウザが自分だけ読める独自
+符号化を書いていても気づけない):
+JVM 133 tests/576 assertions、CLJS 9 tests/13 assertions(JVM が封緘した item を開き、
+JVM が切った share を受け取り、JVM の hybrid 署名を検証、HKDF/Argon2id はバイト一致)、
+逆方向 3 tests。
+
+### 5. 課金は nexus-x402 の prepaid quota
+
+`https://x402.nexus` は稼働中で kotobase は既に seller 登録済み。新規に課金基盤は
+作らない。ただし on-chain verify は Base の JSON-RPC なので **blob の byte 単位課金には
+粒度が粗すぎる**。prepaid quota(一度払って N MB·month + M 回開示)を買い、その quota を
+**CACAO の `resources` に焼き込む** —— CACAO が権限と支払い証明を同時に運び、面が増えない。
+**未実装。**
+
+## 実装した範囲
+
+- `kotoba-lang/kagi` `78df12da` — `.cljc` 化 + `kagi.crypto.noble` + 双方向 interop テスト。
+- `kotoba-lang/org-signal` `7b4f84af` — `package.json` が `\"curves\"`(無関係な
+  アニメーション easing ライブラリ)を宣言しており `@noble/curves` の scope が落ちていた。
+  この CLJS テストハーネスは一度も解決できたことがなかった。修正後 23 tests/44 assertions が
+  初めて実際に走った。
+- `cloud-itonami/cloud-itonami-rirekisho` `1dd5c55d` — 値モデルと不変条件。
+  28 tests/62 assertions、lint 0 warnings。west 登録済み。
+
+### 様式の正本は JIS ではない
+
+履歴書の様式例は **JIS Z 8303 から 2020-07 の改正で削除された**(きっかけは LGBT
+当事者団体による性別欄削除の要請)。2021-04-16 に厚生労働省が差し替えの様式例を公表。
+`rirekisho.model` はこれを**表示ではなく型で**実装する:
+
+- 性別は `[男・女]` の列挙ではなく自由記述の任意欄(`nil` 可)。「選択肢を用意しない」
+  ことが変更理由そのものだったため。
+- 2021 様式例が設けなかった 4 欄(通勤時間 / 扶養家族数 / 配偶者 / 配偶者の扶養義務)は
+  **書き込むと refuse する**。「既定で空欄」はテンプレートを 1 つ足せば復活する。
+
+### talent の invariant を強くした
+
+talent は「識別項目は `signal:v1:` 暗号文のみ」という同じ規則を持つが、実装は
+**プレフィックス文字列の検査**で `\"signal:v1:\" + 平文` を通してしまう(暗号化自体は
+呼び出し側任せ)。`rirekisho.envelope` は封筒を作れる関数を `seal` 1 本に絞り、
+`persistable?` は「その値が seal の出力そのものか」を見て、未知の鍵も拒否する。
+
+cohort 面は k 未満を**丸めずに落とし**(丸めた数は差分攻撃で戻せる)、落とした件数を
+返し(黙って減らすと「全部載っている」と読める)、メンバー一覧を持たない。
+
+## まだ無いもの（正直に）
+
+- UI(入力フォーム・印刷レイアウト)、`職務経歴書`、nekko RID 配線、x402 課金。
+- **封筒面の保存先は kagi 側で解決済み**(2026-07-30、kotoba-lang/kagi `d0c71a58`)。
+  `kagi.store/object-sealed-block-store` が `{:get-object :put-object :exists?}` を取り、
+  `storj.store/store-fns` 経由で **Storj Gateway-MT と Backblaze B2** に着地する
+  (B2 は S3 互換面なので endpoint 違いだけ)。kagi は io-storj に依存しない
+  (4 関数を受け取るだけ、依存するのは配線するアプリ側)。検証はネットワークに出ず、
+  `storj.protocols/IHttp` に偽 S3 を差して**本物の** `storj.core` に署名・URL 組み立て・
+  応答解釈をさせる 161 tests/641 assertions。
+  残るのは `cloud-itonami-rirekisho` 側にその 4 関数を受け取る口が無いこと。
+- **IPFS は未対応**(kagi 側も)。immutable な content addressing は「キーを上書きしない」
+  の前提が S3 系と別物なので、同じアダプタには載らない。
+- 実装中に判明: `SealedBlockStore` の docstring は長く「content-addressed」と称して
+  いたが、実際に届く id は `kagi.operation` が作る `cid:<item-id>:v<version>` という
+  **パス**で、バイト列を検証できるハッシュではない。検証できないものを検証すると
+  謳う代わりに docstring を訂正し、「1 キー = 1 版」を上書き拒否で守る形にした。
+
+## Consequences
+
+- ブラウザで client-side E2E が可能になったのは kagi の全 consumer に効く(rirekisho
+  専用の成果ではない)。
+- DER prefix 定数は JDK 24 の出力に依存する。JDK が符号化を変えれば interop テストが
+  落ちる —— 落ちるのが正しい(黙って別の秘密を導出するより)。
+- `--entry` での west.yml 再生成は最小 diff にならなかった(無関係な pin 2 件と別 entry を
+  巻き込んだ)ため、west.yml は当該 entry のみ手挿入し `verify-west-pins --only` で
+  サーバ側到達性を確認した。この挙動は別途追う。")))

@@ -1,0 +1,133 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609091500-hermes-fleet-day-budget-and-the-meter-that-refuses-to-guess")
+  (:adr/title "hermes fleet の 1 日予算 —— per-run cap と cadence は見積り、保証は credits を読む governor だけ")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-09")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/last-verified "2026-09-09")
+  (:adr/authoritative true)
+  (:adr/topic "hermes-fleet-api-budget")
+  (:source/dataset "adr")
+  (:adr/authoritative_for "hermes cron fleet の 1 日あたり API 予算、その適用（per-run cap / cadence）と governor（manifest/hermes-budget-policy.edn + scripts/hermes-budget-guard.cljs）")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/related "adr-2609061600-hermes-fleet-deepseek-v4-flash-provider-baidu-qianfan-only adr-2608313500-itonami-and-hermes-on-one-model-order-glm-flash-first adr-2607173100-fleet-main-model-switchability adr-2609081800-the-order-to-kbb-only-and-the-cycle-that-precedes-it")
+  (:adr/body
+  "# ADR-2609091500: hermes fleet の 1 日予算 —— 上限は見積りではなく、推測を拒むメーターで持つ
+
+**Status**: accepted
+**Date**: 2026-09-09
+**Deciders**: Jun Kawasaki（「今の hermes bot profile で api 価格が1日50ドルぐらいで収まるように cron job を設計したい」→「①cap + ②cadence を今すぐ当てる」→「governer も入れて, 保証も入れていって」）
+
+## 一行で
+
+**hermes cron fleet は $528/day 燃えていて、口座には $40 しか残っていなかった。**
+per-run cap（232 config）と cadence（248 job）を当て、その上に credits を読む
+governor を置いた。**前 2 つは見積りで、保証は 3 つ目だけである。**
+
+## 測った現在地（2026-09-09、2 出所を突き合わせ）
+
+| 面 | 実測 | 出所 |
+|---|---|---|
+| 燃焼率 | **$0.367/min = $528/day**（20 分窓。分ごとは $0.07〜$0.905 のバースト） | OpenRouter `/api/v1/credits` の `total_usage` 差分 |
+| 残高 | `total_credits` 2376 / `total_usage` 2331.7 → **$44** | 同上 |
+| トークン | 09-08 に prompt **5,918M** / completion 35.8M / **3,490 fires** | 167 本の `usage_audit.jsonl`（default + profile 166） |
+| blended 単価 | **≈ $0.092 / 1M prompt token** | 上の 2 つが独立に一致（lifetime $2,333 ÷ 24,762M） |
+| 集中 | 50% が 14 job、80% が 36 job | 同上 |
+| 分布 | fire の **8%（>5M tok）が mass の 62%**。中央値 0.22M、p99 18.2M、最大 343M | 同上 |
+| 原因 | profile 231 本のうち **229 本が `agent.max_turns: null` / `run_budget_seconds: null`** | config.yaml の走査 |
+
+**$50/day ÷ $0.092/M ≒ 540M prompt/day。**5,169M/day からは 12 分の 1 で、
+cap だけでも cadence だけでも届かない（cap 1M/fire 単独で 36%、cadence 単独では
+太った run が残る）。
+
+## 決定
+
+### ① per-run cap（fleet 全体、適用済み）
+
+232 本すべての `config.yaml` に `agent.max_turns: 25` と
+`agent.run_budget_seconds: 600`。値は duration↔prompt の相関から選んだ
+（600s バケットの中央値 0.90M / 平均 1.53M）。
+
+⚠ **`run_budget_seconds` はソフトである。**`conversation_loop.py:116` を読んで
+確認した —— 80% で「まとめに入れ」という通知を注入するだけで run を止めない。
+止めるのは `max_turns` の側なので両方入れてある。config cache は mtime+size キー
+（`config.py:2117`）なので gateway の再起動は要らない。
+
+### ② cadence（248 job、適用済み）
+
+k=0.106 で一律に間引き（`*/15`→4h、毎時→6〜8h）。分オフセットは元の値を保って
+stagger を壊さない。見積り **3,388→453 fires/day、5,169M→429M prompt/day ≒ $39/day**。
+
+### ③ governor（着地済み、これだけが保証）
+
+- `manifest/hermes-budget-policy.edn` —— $50/day、段は 60%/80%/100% で tier 3/2/1。
+  **tier は「止めると空く額」順であって価値の順ではない**（価値の signal が無い）。
+  **名簿に無い job は tier 3 = 最初に切る**（名指しされていない出費は許可された出費ではない）。
+- `scripts/hermes-budget-guard.cljs` + launchd `com.gftd.hermes-budget-guard`（5 分毎）。
+  **token からドルを推定しない** —— 単価は動くが credits は事実を答える。
+
+## 8 問に対して実際に踏んだ分岐（劇場にしないため）
+
+| 問 | 制御 | 結果 |
+|---|---|---|
+| 測れなかったとき何を返すか | keychain service 不明 | `REFUSED` / **exit 2**、予算判定を印字しない |
+| 同上 | credits URL 404 | `UNREADABLE` / `STREAK 1/3` / **exit 2** |
+| 実行できないときの既定 | streak を 2 に seed して 3 回目 | `ESCALATED-TO-PAUSE-ALL 294 job(s)` / exit 2 |
+| 境界に入力があるか | `>=` を `>` に変異させたコピー | **ちょうど 3 件だけ赤**（0.60 / 0.80 / 1.00）。他は緑 |
+| 個数か boolean か | self-check | `SELF-CHECK-FAILURES 0` / `CASES 18`、**個数**を返す |
+| 段が実際に効くか | ratio 0.7034 / 5089 | `LEVEL 3`→74 job / `LEVEL 1`→294 job |
+| 作った物を動かしたか | 実 job 1 本 | `scheduled/True → paused/False → scheduled/True`（jobs.json をディスクから読んで確認） |
+| その緑は仕事をした緑か | `--dry-run` | state.json の md5 不変・ledger 行数不変で確認 |
+
+適用そのものも同じ規律で確かめた: config 232 本は**書いた後に読み戻して 2 値を
+assert**、schedule 248 本は**CLI の返事ではなく全 profile の jobs.json を突き合わせて
+mismatch 0 / missing 0**。編集後の `next_run_at` は 1 時間以内が 12 本（以前は毎分）。
+
+## 現在地と、まだ言えないこと
+
+| | |
+|---|---|
+| 適用前 | **$528/day** |
+| 適用後 22 分窓 | **$238/day**（2.2 倍減） |
+| 設計値 | $39/day |
+
+**設計値に届いたとは言えない。**理由の切り分けは未了で、候補は 3 つ:
+(1) 変更前に始まった長い run が drain 中（最長 2.6h のものが 04:52 に終了）
+(2) **cron 以外が同じ key を使っている**（gateway 5 本 + 対話セッション）——
+①② は cron にしか当たっていない
+(3) cadence の効果は 1 周期回らないと出ない。
+**24 時間回して初めて比較できる。**
+
+## gap / resume point
+
+1. **24h 後に `$/day` を測り直す**（`~/.gftd/hermes-budget-guard/usage.ledger.jsonl`
+   の日次差分）。設計値 $39 との差が (1)(2)(3) のどれかを、cron 側 token
+   （`usage_audit.jsonl`）と credits の差で切り分ける。
+2. **governor は cron しか止められない。** 手段が `hermes cron pause` しかないため。
+   gateway 側にも上限が要るなら別の口が要る。
+3. **初日の SPEND は当日全部ではない。** baseline は観測開始（14:10 JST）で、
+   それ以前は再構成できない。state に `baseline-source` として出所を書いてある。
+   丸 1 日の判定は 2026-09-10 0:00 JST から。
+4. **編集していない job が 589 fires/day 分ある。** 09-06〜08 の窓でトークンを 1 つも
+   使っていない job（script-only / no_agent 系）。**「使っていない」と「壊れていて
+   呼べていない」は出力が同じ**なので無料と決めつけていない。直ったら燃え始める。
+5. **deepseek の Baidu 固定（ADR-2609061600）は 29 provider 中で高い側**（$0.14/$0.28）。
+   OpenInference は $0.05/$0.16。オーナー判断の pin なので触っていないが、効く 2 つ目のレバー。
+6. **tier の順序は消費順であって価値順ではない。** オーナーが並べ替えるべき箇所。
+7. **口座残高。** 2026-09-09 14:14 JST 時点で $24.95。$50/day 運用なら月 $1,500 の前提。
+8. **`com.gftd.cloudflare-cost-guard` は launchd に在るがスクリプトが無い**
+   （`~/.gftd/cloudflare-cost-guard.cljs` が存在せず exit 1）。今回の guard は
+   同じ形にしていないが、あちらは別途。
+
+## kbb ではなく nbb で書いた理由（規則違反を明示する）
+
+新規運用 tooling は kbb-first（オーナー指示 2026-09-07）。**そこから外れている。**
+引用ではなくこの機械で測った: `orgs/kotoba-lang/kotoba/bin/kbb` は起動しない
+（`Could not find namespace: kotoba.lang.text`）。加えて ADR-2609081800 が
+guest に出力路が無いこと（0c）と native に process spawn provider が無いこと（1a）を
+測っており、この guard は印字とプロセス起動の両方を要する。**0b/0c が landed したら移す。**
+")))

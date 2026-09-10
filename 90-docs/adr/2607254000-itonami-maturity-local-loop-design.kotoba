@@ -1,0 +1,74 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607254000-itonami-maturity-local-loop-design")
+  (:adr/doc_type "adr")
+  (:adr/topic "itonami-maturity-local-loop-design")
+  (:adr/title "ADR-2607254000: cloud-itonami 成熟度/coverage 向上ループのローカル常駐設計 — 自動化して安全な層と、agent 判断を要する層の境界")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-25")
+  (:adr/last_verified "2026-07-25")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative_for
+  (vector "cloud-itonami fleet の maturity/coverage 向上ループをローカル常駐化する際の層分け（何を無人で回してよく、何を agent 判断に残すか）の正本"
+   "欠陥クラス検出器の置き場所（loop-* ではなく measurement 側）の決定"
+   "citation ingest を無人自動化しない理由と、その代わりに自動化する範囲"))
+  (:adr/related
+  (vector "adr-2607203000-system-dynamics-all-entities"
+   "adr-2607172900-itonami-qwen36-standing-runner"
+   "adr-2607173100-murakumo-main-alias"
+   "adr-2607173000-nbb-only-script-host"
+   "adr-2607124500-bmc-existing-shared-system-check"
+   "adr-2607011345-west-topdir-agent-worktree"))
+
+  (:adr/decision
+  "1. 新しい loop-* リポジトリを作らない。kotoba-lang/loop-system-dynamics を拡張する（既に scripts/itonami-fleet-audit.cljs を消費し、cloud_itonami_leverage / cloud_itonami_live_diff / cloud_itonami_age_lag_monitor という cloud-itonami 向け observer と append-only ledger を持つ）。loop-ux-kaizen の repository-rules.edn taxonomy に従い、loop-* は observe/evaluate/decide/act/record-evidence の順序と evidence を所有するが domain scoring truth を所有しない。
+   2. 欠陥クラス検出器は loop-* ではなく measurement 側（scripts/itonami-fleet-audit.cljs）に置く。これが domain scoring truth であり、既に per-repo signal + derived judgment + EDN 出力という正しい形を持つ。scratchpad の ad-hoc スクリプトを正本にしない。
+   3. ローカル常駐は launchd + nbb tick + ~/.gftd/ の確立パターンに従う（先例: com.gftd.itonami-qwen36-tick / run-itonami-qwen36-tick.cljs、ADR-2607172900）。bb は使わない（ADR-2607173000）。
+   4. 自動化の層を3つに分け、Tier をまたいで昇格させない。Tier 1 のみ無人着地を許す。
+   5. Tier 1 の無人着地は qwen36 tick と同じ不変条件に従う: 捏造ゼロ / append-only ledger / main 直 push 禁止（branch → gh api merges）/ force-push 禁止 / superproject 本体 checkout 不触（sibling worktree で完結）/ dirty な子リポは skip。
+   6. gate の数値を緩める変更、および「設計上 citation を持てない」と宣言済みリポの gap を埋める変更は、Tier に関係なく無人実行しない。")
+
+  (:adr/artifacts
+  (vector "scripts/itonami-fleet-audit.cljs — 欠陥クラス検出器の追加先（measurement 正本）"
+   "~/.gftd/run-itonami-maturity-tick.cljs — 未実装。Tier 1 を回す nbb tick"
+   "~/Library/LaunchAgents/com.gftd.itonami-maturity-tick.plist — 未実装"
+   "kotoba-lang/loop-system-dynamics — ranking と ledger の既存所有者、拡張先"
+   "manifest/itonami-fleet-audit.edn — 毎 tick 再生成される measurement 出力"))
+
+  (:adr/body
+  "## なぜこの ADR が必要か\n\n2026-07-25、`/loop 30min 成熟度とcoverageを向上` を 9 イテレーション回した結果、\nこのループが実際に何を見つけるのかが実測で分かった。見つかったものは\n「citation の欠落」より「出典なしで書かれた値の誤り」が圧倒的に多く、しかも\nその一部は governed actor の live gate を無効化していた。この経験を踏まえずに\n「無人で回るループ」を作ると、最も価値のあった判断（出典に当たる・単位を疑う・\n緩める方向には動かさない）が抜け落ちた自動化になる。この ADR はその境界を\n設計として固定する。\n\n## 9 イテレーションの実測（設計の根拠）\n\n閉じた citation gap: isic-1010 / 1020 / 1050 / 1101 / 1200 / 6201。\nそのほぼ全件で、citation を足す作業の副産物として実際の欠陥が出た。\n\n- 当局名の誤り 4 件: `:eu-fsanz`（FSANZ は豪NZ の機関）、\n  `EMSA/TPDA`（EMSA は欧州海事安全庁）、`JT/財務省`（JT は製造業者）、\n  `EFSA` → 実体は Reg. 853/2004。\n- 存在しない法令番号 1 件: EU「Spirit Regulation 1601/2009」。\n- 単位の誤り 3 件: histamine の mg/100g と ppm の併記（10 倍）、\n  proof と %ABV の混在、殺菌保持時間 30 秒 vs 30 分（60 倍）。\n- 法定より緩い閾値 2 件: JP 冷蔵 5.0℃（告示は 4℃）、\n  US ABV 許容差 0.5（27 CFR 5.65(c) は 0.3）。\n- live gate の無効化 2 件: isic-3520/3530 で catalog が keyword `:JPN`、\n  subject が文字列 `\"JPN\"` → `get-in` が nil → `(every? f nil)` が true。\n  ガス/蒸気の provision/suspend を守る HARD gate が全 subject で no-op。\n  既存テストはこのバグのおかげで緑だった（直した瞬間に 3 件落ちた）。\n- 埋めてはいけない gap 1 件: isic-4912 は ADR-0002 で捏造 catalog を撤去済み。\n  audit の gap 報告は正しい measurement だが、埋める行為が ADR 違反になる。\n\n機械的欠陥の fleet 全体走査（1223 リポ）:\n\n- `.cpcache/` commit: 122 リポ / 648 ファイル。ff-merge を実際に壊す。\n  106 リポ / 539 ファイルを untrack 済み、16 リポは dirty で skip。\n- 未知法域 fail-open: 12 検出 → 10 が真、うち governor 配線は 2（修正済み）。\n- `clojure.set` 未 require: **走査の誤検出**。70 件と報告したが真は 1 件。\n  ns フォームを「最初の空行まで」で切っていたため、複数段落 docstring を持つ\n  ファイルで `:require` に到達していなかった。\n\n## Tier 分け\n\n### Tier 1 — 無人で回してよい（決定論的検出 + 決定論的変換 + 決定論的検証）\n\n検出も修正も判断を含まず、成功判定がテスト/lint で機械的に取れるもの。\n\n- `.cpcache/` 等の生成物 untrack（残 16 リポ、dirty 解消後）\n- docstring 位置ミス（引数ベクタの後に置かれた文字列 → 破棄される）\n- 未使用 require / 未使用束縛の整理\n- `clojure.set` 等の require 漏れ（`.cljc` portability）\n- 未知法域で vacuous pass する述語の fail-closed 化（残 8 リポ）\n  — ただし型一致の確認込みで、gate 挙動が変わる場合は Tier 2 に落とす\n\n着地手順は qwen36 tick と同一: sibling worktree → 変更 → テスト+lint →\nbranch push → `gh api merges` → 子リポ同期 → `--entry` 単一 pin 前進。\ndirty な子リポは触らない。\n\n### Tier 2 — LLM/agent が下書きし、着地は gate する\n\n出典に当たる判断が必要で、成功判定が機械的に取れないもの。\n\n- citation ingest（残 36 リポ）。tick が自動でできるのは「候補一次資料の\n  取得 + 該当条項の抽出 + 差分の提案」まで。**着地は自動化しない。**\n  理由は実測にある: WebFetch の要約は EU 853/2004 の「3℃ for offal and\n  7℃ for other meat」という 1 つの節を 2 つに割って返した。raw markup へ\n  再照合しなければ、逐語と称する不正確な引用が commit されていた。\n  この再照合ステップは「要約を疑う」判断であり、単発の completion に\n  委ねられない。\n- 取得できなかった値の扱い。EU の殺菌温度・時間定義は fetch した\n  853/2004 本文に無かった。正しい振る舞いは「主張しない」であり、\n  `:pasteurization-figures-cited? false` として未引用と報告した。\n  自動化は「無ければ埋める」方向に倒れやすく、これは真逆。\n\n### Tier 3 — 無人実行しない（Tier 昇格も禁止）\n\n- live gate の数値を**緩める**変更。研究結果を安全ゲートの緩和に使わない\n  （safety-monotone）。実例: EU carcase 7℃ が判明しても操作値 3℃ を維持、\n  vodka/gin の法域混在 ABV 表を書き換えない。\n- 「設計上 citation を持てない」と宣言済みリポの gap 埋め（isic-4912）。\n- 他者の未コミット WIP に触れる操作。dirty skip は Tier 1 でも不変条件。\n- 履歴書き換え / force-push / 公開リポ化。\n\n## measurement 側に足すもの\n\n`scripts/itonami-fleet-audit.cljs` は既に per-repo signal と derived judgment\nを持ち `:declared-internal-only` の前例もあるので、欠陥クラスを signal として\n足すのが最小手数。足す検出器と、その実装上の注意:\n\n- committed-generated-files（`.cpcache` / `target` 等）\n- vacuous-evidence-gate（`(every? f nil)` / `(subset? #{} x)` が unknown\n  jurisdiction で true になる形）+ **catalog キー型とデータキー型の一致検査**\n  （これが isic-3520/3530 の dead gate を見つけた実質的な検出条件）\n- misplaced-docstring\n- unresolved-namespace（**ns フォームは括弧対応で取り出す**。空行で切ると\n  69/70 が誤検出になる — 実測済み）\n\n検出器は「疑いの提示」までを責務とし、真偽判定は Tier に応じて自動/agent に\n振り分ける。誤検出率が非ゼロであることを設計前提に置く（今回 B クラスは\n98.6% が誤検出だった）。\n\n## act の出力\n\ntick の `act` は「ranked worklist + evidence」を出す。Tier 1 は同 tick 内で\n着地させ、Tier 2/3 は worklist に残す。ranking は loop-system-dynamics の\n既存 leverage ranking（dynamics に委譲）に乗せる — 新しい scoring を持たない。\n\n## 未実装（この ADR は設計のみ）\n\ntick スクリプトと LaunchAgent は未実装。実装前に、この ADR の Tier 境界と\nqwen36 tick の不変条件をスクリプト冒頭のコメントに転記すること（先例と同じ\n様式）。\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+第1回実行の評価: Tier 1 tick を4回走らせ、3リポ/3サイトを無人着地。設計段階では見えなかった欠陥3件が実行で判明し、すべて fail-closed で止まった（不正な commit・push はゼロ）
+
+## 実行記録（2026-07-25、ledger は ~/.gftd/itonami-maturity-tick.ledger.edn）
+
+run 1: 5件検出 / 0着地。decide の `and` が最後の値（seq）を返し group-by のキーが true/false にならず、全リポが両バケットから落ちた。無害。
+run 2: 5件検出 / 0着地。worktree を <base>/wt に作ったため `../../kotoba-lang/*` の sibling deps が解決せず、全リポが「テストが既に赤い」と誤判定された。**push はゼロ** — ガードレールが意図どおり fail-closed した。
+run 3: 5件検出 / **3着地**（isic-1020 / 869 / 879、各1サイト）。変更前後でテスト緑を確認、branch → server-side merge、pin 到達性検証 OK。
+run 4: **2件検出**（着地した3件が消えたことで実効を確認）/ 0着地。ラベルを :skipped-no-test-harness に修正済み。
+
+## 実行して初めて分かった設計欠陥3件
+
+1. **pin 書き込みが pin 退行を起こしかけた（最重要）**: tick が `gen-west-manifest.cljs --entry` を共有 checkout 上で実行していたが、superproject の local main は origin より遅れている（owner の未 push commit を抱える）。そのため isic-1020 の pin が 8299d812 → **012e3f15 へ巻き戻る** diff が生成された。tick からは west.yml を書かせず、GitHub API で到達性検証のみ行う `verify-pin!` に変更。west.yml の commit は origin/main ベースで tick の外に置く。
+2. **「赤い」と「ハーネスが無い」の混同**: `:dev` alias が無いリポは `clojure -M:dev:test` が REPL に落ちるだけで、テスト失敗ではない。3値（:green / :red / :no-harness）に分離。
+3. `and` の戻り値を `boolean` で包んでいなかった（run 1 の原因）。
+
+## Tier 境界が実測で load-bearing だったこと
+
+検出20サイトのうち17サイトが isic-563 / isic-949 の2リポに集中しており、**この2リポはテストも lint も fleet 標準コマンドで起動できない**（949 は :dev も :lint も無し、563 は存在しない clj-kondo バージョンを pin し :main-opts も無し）。docstring 欠陥がそこに溜まっていた理由がこれで、修復には依存関係の判断が必要なので Tier 2。設計時の Tier 境界は理論ではなく即座に効いた。
+
+## 検出器の精度
+
+20/20 が真陽性。clj-kondo が 0 件と報告した2リポは「コードが綺麗」ではなく「lint が走っていない」ためで、走査はその診断まで到達した。B クラス（clojure.set）で 98.6% 誤検出だった反省から、今回は着手前に clj-kondo と突き合わせて検証した。
+
+## ledger 追記そのもので踏んだ並行性の罠
+
+この評価を最初に追記したとき、ローカルの adr-ledger.edn が origin より7行古く（ローカル max seq 67 / origin 75）、stale な seq 68 で追記していた。そのまま commit すれば他セッションの7イベントを落としていた。append スクリプトの排他ロックは同一 filesystem の同時追記しか守らないので、**追記の前に origin から同期する**必要がある。origin に同期し直して再追記した。
+
+## 収束についての正直な限界
+
+Tier 1 のみのループは**既知の欠陥を残した不動点に収束する**。この class は残り2リポで恒久的に Tier 1 では動かせず、以後の tick はこの class について永久に idle する。agent がハーネスを修復するまで前進しない。LaunchAgent com.gftd.itonami-maturity-tick を 6時間間隔で load 済み。
+")))

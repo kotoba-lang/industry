@@ -1,0 +1,79 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608196900")
+  (:adr/title "the floor's premise was falsified three days after it was written: 16 appviews migrated off Svelte")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/tags "detectors evidence-floor calibration co-scientist")
+  (:adr/body
+  "## The question left open yesterday
+
+ADR-2608196800 fixed the tick so a refusal is no longer recorded as a clean sweep,
+and deliberately did **not** touch the floor that was causing the refusal:
+
+    Do not lower the floor to make the check answerable -- that is the instinct
+    this floor exists to defeat. The question to answer first is why the input
+    shrank.
+
+This is that answer.
+
+## Why the input shrank
+
+Comparing the repositories named in the baseline finding set against the
+repositories carrying a candidate page today: **16 in the baseline have no page
+now.** They are not missing checkouts. `cloud-itonami/aidesk` `c44f316`, dated
+today:
+
+    refactor: migrate the appview from TypeScript/Svelte to ClojureScript
+
+    wrangler.jsonc's main pointed at svelte/.svelte-kit/cloudflare/_worker.js --
+    a SvelteKit build output absent from the tree -- while the file that read
+    like the application ... was referenced by no code at all
+
+`svelte/src/routes/+page.svelte` no longer exists in those repositories, so they
+stopped being candidates. Candidates fell from ~164 to 142, under the floor of 150,
+and the detector refused.
+
+## The sentence that was wrong
+
+The floor carried its own justification, written 2026-08-16:
+
+    Candidates only fall when the input is actually missing, which is the thing
+    worth refusing on.
+
+Three days. The paragraph directly above it anticipates *deleting the dead summary
+object* as a legitimate repair that must not trigger a refusal -- and then misses
+the same repair one level up: **deleting the page that carried it.**
+
+## Change
+
+The floor is now sized against the threat it names -- an un-populated `orgs/`, a
+wrong `--root`, a tree that never got checked out -- and not against attrition of
+Svelte appviews, which is a population that should be free to fall to zero.
+**150 -> 50**: well below anything ever measured (225 pages on 2026-08-16, 142
+candidates today) and far above what a mis-rooted run finds, which is none.
+
+A line is also printed for the count that actually moved:
+
+    svelte-dirs-without-a-page=68 (migrated away, or never had one -- NOT missing input)
+
+so the next reader can tell a migration from a missing checkout without repeating
+the archaeology this took.
+
+## Both directions
+
+    the real tree        exit 1, 296 findings   (it was refusing entirely -- these were invisible)
+    --root <empty dir>   exit 2, CANNOT ANSWER: no +page.svelte under .../orgs
+
+296 rather than the baseline's 337 is the 16 migrated repositories, correctly gone.
+
+## What this pair of ADRs says together
+
+Yesterday: a refusal that the registry could not hear. Today: a refusal that was
+correct machinery reacting to a stale premise. **Both were right locally and wrong
+in composition** -- and the second one had its premise written down in the file, in
+prose, next to the constant, which is the best case for catching it and still took
+a day and an outside question.
+
+A floor is a claim about the world. It should say what it is defending against, and
+be sized against that -- not against the population that happened to exist the
+afternoon it was written.")))

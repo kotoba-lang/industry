@@ -1,0 +1,53 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607241100-kotoba-stack-topology-and-design-cleanup")
+  (:adr/title "ADR-2607241100: kotoba スタック正準トポロジー（deps.edn 実測）と設計クリーンアップ決定 — 各 repo mirror ADR の正本")
+  (:adr/status "accepted")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/authoritative-for "kotoba stack (kotoba / compiler / kototama / aiueos / kotobase) の依存トポロジー不変条件と、2026-07-24 設計レビューで採択したクリーンアップ項目の割り当て")
+  (:adr/topic "kotoba-stack-topology-design-cleanup")
+  (:adr/related "adr-2607202200-kotoba-sovereign-source-and-cljc-fleet-migration, adr-2607252500-kotoba-wasm-component-first-execution-boundary, adr-2607182200 (dual Chicory paths), adr-2607032500 (kotoba:kotobase = Clojure:Datomic), adr-2607050900 (naming audit), adr-2607102200 (no -clj suffix)")
+  (:adr/last-verified "2026-07-24")
+  (:adr/body "## Context
+
+2026-07-24、kotoba-lang の 5 中核 repo（kotoba / compiler / kototama / aiueos / kotobase）を一次資料（README・deps.edn・maturity ladder・安全性 ADR・実コード）で調査し、fleet migration セッション（ADR-2607202200）で実測した compiler バグ 5 件（kotoba-lang/compiler#206 の 4 sub-finding + #225 silent miscompile）・命名混乱・parity 債務を踏まえた設計レビューを実施した。本 ADR はその成果を 2 つ記録する: (1) deps.edn 実測に基づく正準依存トポロジーと方向不変条件、(2) 採択したクリーンアップ決定の repo 別割り当て。各 repo に mirror ADR を配置済みで、本 ADR がその正本である。
+
+## Canonical topology (deps.edn 実測、2026-07-24)
+
+shared leaves: security / ed25519 / datom / cacao / did / kotoba-core-contracts / kotoba-selfhost-contracts / kotoba-lang (contract+CLI)
+
+- compiler: 依存は security + kotoba-script(JS backend pin) のみ。スタック内最底辺。
+- kotoba: compiler, kotoba-lang, contracts x2, datom, cacao, did, ed25519, chicory に依存。言語 substrate。
+- kototama: aiueos, ed25519, chicory に依存。kototama→aiueos の deps.edn エッジは意図的（aiueos decides, kototama enforces / ADR-2607022700 が依存方向として実装されている）。
+- aiueos: security + chicory のみ。kernel は compiler の emit 成果物（x86_64-aiueos-kernel-v1 / user-v1 freestanding ELF、fail-closed 検証）を消費する artifact エッジであり、library エッジではない。
+- kotobase: runtime 依存は security のみ。kotoba への依存は :integration test alias に限定。kotoba : kotobase = Clojure : Datomic（ADR-2607032500）を deps 実測でも遵守。
+
+## 方向不変条件（MUST NOT エッジ）
+
+1. compiler は kotoba / kototama / aiueos / kotobase に依存してはならない（foundation）。
+2. aiueos は kotoba / kototama / kotobase に依存してはならない（broker の独立監査可能性）。enforcement 層が aiueos を import する、逆は無い。
+3. kotoba は kotobase / kototama / aiueos に依存してはならない。
+4. kotobase は kotoba に依存する、逆は無い。kotobase 系 repo が kotoba や compiler の依存 closure に現れてはならない。
+5. aiueos↔compiler の境界は verified bytes（artifact）であり library link ではない。
+
+## Decisions（クリーンアップ項目と割り当て）
+
+D1 [compiler, 最重要] admission gate と backend の能力面を単一ソース化する。実測: 5 f64 引数（gate 通過→WebAssembly.compile 失敗）、素の :option-i64（gate 通過→typed lowering 失敗）、[:option :f64]（gate 拒否だが他 payload は対応）、cross-file :require の :f64 戻り値（project link 失敗）、self-shadowing let（JS へ silent miscompile、#225）— すべて admitted-but-not-lowerable クラス。対策: 各 backend が対応 op/型を宣言データとして持ち、admission gate はそこから導出。admitted surface から差分実行 conformance（全ターゲットで実行し結果一致）を生成。KIR 同一性検査は必要条件であって十分条件ではない（#225 は同一 KIR で誤プログラム）。mirror: compiler docs/adr/0074。
+
+D2 [compiler] 等値演算の 3 分裂（= / string=? / f64-eq）を frontend の monomorphic 型ディスパッチで = に統一。安全性不変、書き味のみ向上。mirror: compiler ADR-0074 Decision 2。
+
+D3 [contracts + kototama + aiueos + compiler] capability 語彙の 4 重表現（compiler import 表 / kototama HostCaps / aiueos grant 名 / 手書き adapter）を canonical typed capability-descriptor schema（application-profile completion gate 項目 1）から生成する形に統一。現状 aiueos_adapter のカバーは 3 capability のみで残りは caller 手組み HostCaps — aiueos decides の穴。mirror: kototama docs/0009 Decision 2、aiueos 90-docs/adr/0015 Decision 2。
+
+D4 [kototama + wasm-webcomponent] 新規 actor:host import は同一 wave で browser parity を着地させるか明示 waiver + maturity.md parity 表更新を必須にする（completion gate 6 の CI 強制）。既存 5 import 債務（http-fetch / cbor-encode / json-encode / json-extract-field / http-post-headers、9/14）は本規則下で burn down し grandfather しない。mirror: kototama docs/0009 Decision 1。
+
+D5 [org 全体の命名] 『README に免責 disambiguation 節が要る時点で命名の失敗』を基準に: kotobase 系は kotobase-* prefix に収束、kotoba-client は plane を表す別名へ、kotodama は role-bearing 名へ rename または吸収。kotoba→kotoba-lang の言語正本移行を完了宣言し、kotoba repo 内の stale な帰属記述を修正（compiler README が下流で訂正している状態を解消）。kami-engine 分割は日程化するか常設 caveat を撤去。mirror: kotoba docs/ADR-stack-topology-and-design-cleanup.md、kotobase docs/ADR-stack-topology.md。
+
+D6 [aiueos + root] C 境界の正直な再定義。実測: os/aiueos/kernel の C/asm は約 5,000 行超（pci.c 1178 / main.c 690 / scheduler.c 570 / syscall.c 501 等）で『crt0 相当シムのみ』という従来表現と乖離。実際の境界は『C は機構のみ、判断（SHA-256 / RSA-2048 検証・ELF/catalog/journal admission・capability 発行/委譲/世代付き失効・dispatch 計画）はすべて compiler-emit Kotoba』であり、これを正式な境界として採択。あわせて ADR-2607198300 の『native backend は kgraph 未対応』は stale — compiler の x86_64/aarch64 backend は kgraph-assert!/get/count/entity-at を実装済みで native_executor_test の kgraph pilot が実 kexe loader 実行で証明している。本 ADR 起票と同時に adr-ledger へ amend を追記。mirror: aiueos 90-docs/adr/0015。
+
+D7 [小粒] (a) kototama.tender と kotoba.wasm-exec の二重 Chicory 実装は実装でなく fixture を共有（2 実装 1 oracle 化、ADR-2607182200 の正当化を完成させる）。(b) kexe_loader.c / _windows.c の検証ロジックを aiueos kernel 同様 compiler-emit Kotoba object へ移し C は mmap/W^X のみに縮小。(c) consumer 側 :kotoba alias の :replace-paths/:replace-deps ハックを不要にする classpath 走査の堅牢化。(d) fleet-db dual-write（Phase 1.5）の完了で pin 退行系運用ガードの維持コストを解消。
+
+## 実装状況
+
+本 ADR は決定の記録であり、D1-D7 は follow-up 実装項目。mirror ADR は 5 repo に同日着地（compiler PR #257 / kototama PR #53 / aiueos PR #129 / kotoba PR #422 / kotobase PR #18、各 README に Stack topology 節を追加）。優先順位は D1 > D3 > D4（安全性主張の信頼性と capability 貫通の穴）、D2/D5 は低労力高効果、D6 は文書の正直さの回復。")))

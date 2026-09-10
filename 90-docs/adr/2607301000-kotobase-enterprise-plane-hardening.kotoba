@@ -1,0 +1,71 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607301000")
+  (:adr/title "kotobase の enterprise 面: 読み取り認可は既にあった、KMS は kagi、break-glass は残して区別可能にする")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/context
+  "オーナーの問い: 『今の kotobase datomic を分散、ipfs にこだわらない前提で、もっとも安全かつ enterprise use でも安心できる設計にするにはどうしたらいいか』。
+
+  最初に出した分析は 4 つの欠落を挙げたが、**そのうち 2 つは誤りだった**。grep の語彙が狭く、既にあるものを見落としていた。読んで確定した現状は次のとおりで、良く出来ている:
+
+  - **読み取り認可は存在する** — `kotobase.authorized-query`。guest はデータのみを渡し connection も evaluator も渡さない、injected policy compiler が projection と scope を決める、単一 immutable basis、`:scope` に tenant/resources/purpose/basis が必須、clause 32 / limit 1000 の上限、そして受理判定で reject する。目的制限 (`:purpose`) まで入っている。
+  - **query receipt も存在する** — `receipt-projection`。content-addressed で、CID は host の canonical codec が供給する (ad-hoc な print を hash しない)。
+  - **crypto-shred も存在する** — `transparency-log` に `:crypto-shred` 判定と legal hold。
+  - **effect の強制 durable audit も存在する** — `admission` は `:audit/durable? true` が返るまで effect thunk を走らせない。
+
+  したがってこれは『enterprise 設計を新しく作る』話ではなく、既にある設計の欠けた点を埋める話だった。")
+  (:adr/decision
+  "実測で欠けていた 3 点のうち 2 点を実装し、方針判断 3 点を決めた。
+
+  **実装 (kotoba-lang/kotobase f4541f8)**
+
+  1. `kotobase.classification` — attribute ごとの分類。schema だけでは強制できない 2 規則を持つ: 未分類 attribute は読めない (`:internal` を既定にしない — 既定値は、誰も決めていないのに personal data が間違った class を得る経路である)、`:internal` より上は値を chain に inline で置けない (chain は retract した fact を意図的に保持する〔ADR-2607071610〕ので inline の本文は永久に消せない。鍵は破棄できる、datom は破棄できない)。
+  2. `execute!` が receipt sink を必須にした。`admission` は audit が durable と言うまで effect を走らせるので『誰が何をしたか』は答えられたが、同じ要求が読み取り側に無く『誰が何を見たか』が答えられなかった。durable と言わなければ rows を withhold する。
+  3. `kotobase.erasure` — erasure scope を鍵に束ねる。**erasure は発明していない**: kagi が unlock → VMK → compartment key → per-item DEK → AES-256-GCM の鍵階層と、`:destroyed` が `:revoked` / `:decrypt-or-verify-only` からのみ到達可能な NIST 型 state machine を既に持つ。plane が足すのは『消えたから無い』と『壊れているから無い』の区別だけで、前者は記録付きの履行済み義務、後者は障害である。`:destroyed`→`:erased` (address と時刻を持つ)、`:revoked`→`:withheld` (失効した鍵はまだ存在するので erased と呼ぶのはコンプライアンス記録上の虚偽)、鍵 id 無し→`:invalid`。`erasure-plan` は鍵 id を返すだけで破棄しない — query path から鍵を壊せる plane は証拠を消せる plane である。
+  4. `kotobase.guarded` — gate を通らない読み取り経路を閉じた。`authorized-query` は良い gate なのに呼び出し元が自分の test だけだった。policy・完全分類 schema・grant・receipt sink の 4 つを同時に要求する。`kotobase.core` は壊していない (q/query/pull を gate 必須にすると workspace の全 consumer が同時に壊れ、誰も完走できない移行は安全な経路が実務で迂回される原因になる) — 代わりに unguarded な surface を 1 箇所で宣言し、test が `kotobase.core` の実 publics に縛る。
+  5. IPFS を core から締め出す test。**測ったら既に構造的に外れていた** (core/engine/peer の src に参照 0、adapter への依存 0)。外れていなかったのは claim の方で、README が architectural に読める書き方をしていた。
+
+  **kotoba-lang/kotobase-protocols-worker 3c2f10a**
+
+  6. `write-authority` が値を返す。3 つの write 経路 (operator の Bearer、SigV4、per-DID CACAO) が boolean に潰れており、**break-glass で行われた書き込みが顧客自身の DID が許可したものと記録上区別できなかった**。監査が実際に聞くのは『非常用資格が使われたか』で、boolean では答えられない。`cacao-authorized?` も issuer DID を返すようにした。
+  7. suite が完走できるようにした。`novelty-folds-past-the-threshold` が終わらず、後続 2 test が一度も走らず、default node mode では無関係な unobserved rejection で process が早く死ぬので**無限に走る test が速い失敗に見えていた**。締切をループの中で見る (`Promise.race` は敗者が走り続けるので効かない — 敗者が CPU を使う本体だから)。6 tests → 28 tests。
+
+  **方針判断**
+
+  - **受理判定は一般化しない。** 任意 Datalog の静的 scope 判定は難しく、実際の enterprise 製品は parameterised query の whitelist から始める。既存の上限をそのまま尊重した。
+  - **KMS は kagi / kagitaba。** cloud KMS より目的に合っており、鍵階層・governor・append-only 台帳が揃っている。plane は crypto を持たず host-injected。
+  - **break-glass token は残す。ただし区別可能にする。** operator が tenant から締め出されたら入る手段が必要で、それが無いシステムはもっと悪い手段を即席で作る。消すべきものではなく、見えなくてよいものでもない。到達範囲は `break-glass-surfaces :all` という書かれた値にした (**範囲は変えていない** — 沈黙から推論しなくてよくなっただけ)。")
+  (:adr/consequences
+  "検証: kotobase 80 tests / 2543 assertions・0 failures。kotobase-protocols-worker は clean build から 28 tests / 84 assertions / 1 failure (bound された fold test のみ、意図通り)。`core-test` は JVM と cljs の両方で通り、authority の 2 kind を同じ値に潰すと両 runtime の同じ箇所で落ちる。新しい check はすべて壊して落ちることを確認済み。
+
+  **kagitaba との重複を訂正した。** `kagitaba.field/classification` が先にあり、同じ label (`:internal`/`:restricted`) と同じ規則 (機微な値は graph が届く平文に置かない) を持っていた。label が同じ意味であることを明記し、軸が違うこと (kagitaba は field 値型、こちらは datom attribute) を書き、重なりを test で縛った。kagitaba は依存ではないので値を restate しており、**restate した定数は copy で、copy には原本に縛るものが必要**である。fail-closed の仕方が違うのも意図的で、kagitaba は未知の field 型を `:restricted` に落とす (置くべき値があるので)、こちらは未分類 attribute を拒否する (query gate は serve を断れるが storage layer は store を断れない)。
+
+  **未証明の最適化を 1 件破棄した。** fold path のコストを module block cache で取れると考えたが、3 回ずつ測ると 26-30 write に対して 27-33 write で範囲が重なった。単発比較で『47% 改善』と述べたのは誤りで、分散の方が効果より大きい。コードは捨て測定だけ残した — 新しく書いたブロックは誰かが 1 回読むまで module cache に入らないので、書き込みごとに生成したブロック数分の restart を払い続ける。残るコストは `f` を再開せず再実行することに内在し、必要なのは #13 の prefix pruning か resumable trampoline のどちらかで、cache ではない。
+
+  **閉じていない穴** (優先順): ① `authorized-query` は `kotobase.guarded` 経由で使えるようになったが、**plane の既存読み取り経路を全部 gate に通す配線は未実施** — architectural な変更なので一方的にやっていない。② 読み取り認可を plane の前のどこに置くか (write の CACAO は流用できない)。③ 本文 grant の発行者と監査。④ メタデータ面そのものへのアクセス制御 — 誰が誰といつ通信したかは内容に劣らず機密である。⑤ fold path の性能 (#13、仮説 1 つ潰した状態)。⑥ default node mode で process を殺す unobserved rejection の発生源 (worker-test 側と推定、未特定)。")
+  (:adr/body
+  "## 一文で言うと
+
+  事実の面が 1 つだけあり、それ以外は全部その射影か門である。
+
+  ```
+  書ける真実          chain (署名付き append-only、1 ref = 1 writer)
+  読める唯一の経路    query gate (deny-by-default、capability scoped)
+  内容                値ではなく address (:personal 以上は強制)
+  忘却                鍵の破棄 (不変性と両立)
+  主張                すべて同じ repo で機械検査
+  ```
+
+  ## ref はセキュリティ境界ではない、が plane にはそれ以外の境界が無い
+
+  Datalog join は ref 1 本しか届かない (ADR-260726-kotobase-query-plane-is-one-ref)。**ref は問い合わせ到達範囲の境界であって認可の境界ではない**が、`authorized-query` を通らない読み取りにとっては ref が唯一の境界になる。だから join 要件と機密要件は正面から対立する: ref を機密境界に使うのは粗すぎ join を失い、単一 ref に本文まで載せると ref アクセスがそのまま通信の閲覧権になる。
+
+  解は決定 4 (ADR-2607300600) と同じ: **識別子で join し、本文は載せない**。ref が漏れたときに出るのはメタデータであり通信内容ではなく、blob を落とせば削除が成立する。`classification` の 2 つ目の規則がこれを願望から強制に変える。
+
+  ## 消去と不変が対立しなくなる場所
+
+  設計が整うのは、対立していた 2 つの要求が同じ構造の別の側面になるときである。今は『監査のために全部残す』と『求められたら消す』が正面衝突していて、どちらかを諦める設計にしかならない。鍵を消去単位にすると chain は何も失わず (hash が残る)、内容は本当に消える。kagi の `key-registry` が `:destroyed` を `:revoked` からのみ到達可能にしているので、生きた鍵をうっかり壊すこともできない。
+
+  ## このセッションが繰り返した型
+
+  誰も検査していない主張は、既に真でなくなっている。今回それが当たったもの: 呼び出し元が自分の test だけの gate、boolean に潰れた 3 つの authority、architectural に読める IPFS の位置づけ、kagitaba と二重定義した語彙、そして自分が書いた『47% 改善』。")))

@@ -1,0 +1,341 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608300200-murakumo-is-the-portal-itonami-is-the-agent")
+  (:adr/title "murakumo.cloud は portal、itonami.cloud は agent —— Nous Research と Hermes の関係に揃える。closed model は OpenRouter 経由で murakumo の rail に載せる")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-30")
+  (:adr/last-verified "2026-08-30")
+  (:adr/last_verified "2026-08-30")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "murakumo-itonami-product-relationship")
+  (:adr/repos
+  (vector "orgs/network-awai/local-murakumo"
+   "orgs/network-awai/cloud-murakumo"
+   "orgs/network-awai/cloud-itonami"
+   "orgs/kotoba-lang/langchain"))
+  (:adr/authoritative-for
+  (vector "murakumo と itonami の役割分担を Nous Portal : Hermes Agent の形に固定すること"
+   "murakumo が自前で重みを持たない model（closed model）を relay してよい条件"
+   "publisher-namespaced model id（provider/model）が external を意味するという命名規則"
+   "external model が anonymous から到達できないこと（operator の残高保護）"))
+  (:adr/related
+  (vector "adr-2608251016-hermes-murakumo-public-api"
+   "adr-2607173100"
+   "adr-2608281000-kotobase-murakumo-itonami-shutdown-resilience-roadmap"
+   "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+   "adr-2608291057-murakumo-model-api-authentication-boundary"))
+  (:adr/evidence
+  (vector "live 2026-08-30: GET https://murakumo.cloud/ 200、h1 は『AI を、所有できるインターネットへ。』、strap は WEB3-NATIVE AI COMPUTE / x402 · USDC · Base / DID · CIDv1"
+   "live 2026-08-30: Base の treasury `0xA00366…D4E` は **contract が deploy 済み**（`eth_getCode` が Safe proxy の bytecode を返す）で、USDC を **10.21** 保持している。`x402_offer.cljc` の docstring にある『Base に contract が無いので送られた USDC は使えない』は**古い**"
+   "cloud-murakumo/src/cloud_murakumo/x402_offer.cljc の `bundle-output-tokens` = 25,000 は 1,000,000 ÷ 40 で、40 credits/Mtok-out は **murakumo-main の掲示価格**（murakumo/resources/prices.edn）。つまり x402 の $0.01 が買う量は fleet 自前モデルの価格から導かれている"
+   "live 2026-08-30 —— **今日の production は黙って差し替えている**: POST https://api.murakumo.cloud/v1/chat/completions に model=anthropic/claude-sonnet-4.6 を送ると HTTP 200 が返り、応答の model は murakumo-main、system_fingerprint は b9334-192d8ae8b（llama.cpp）。Claude を頼んで Qwen が答えており、呼び出し元にはその事実がどこにも出ない"
+   "live 2026-08-30: GET https://api.murakumo.cloud/v1/models 200 —— 6 件すべて owned_by=murakumo の bare id（murakumo-main, murakumo-edge, qwen3.8-27b-*）。publisher-namespaced id は 0 件"
+   "live 2026-08-30: GET https://api.murakumo.cloud/infer/models/murakumo-main → alias-for=qwen3.8-27b, status=serving, context=262144"
+   "live 2026-08-30: GET https://itonami.cloud/ 200、lead は『model inference is delegated to Murakumo』、4 層は Kotoba=safe execution / Kotobase=durable state / Murakumo=AI inference / cloud-itonami=governed operations"
+   "orgs/kotoba-lang/langchain/src/langchain/model.cljc の anthropic-url は https://api.anthropic.com/v1/messages —— actor が握る既定の seam は murakumo ではなく vendor 直結"
+   "orgs/cloud-itonami 配下で api.murakumo.cloud を参照する repo は 25。governor.cljc を持つ repo は 1,108 —— 委譲は宣言されているが大半の actor は mock-advisor のまま"
+   "orgs/network-awai/cloud-murakumo/src/cloud_murakumo/storefront.cljc に月額 SKU が既にある（Starter $15 / Plus $49 / Ultra $129 / Team $79）が、monthly credits も rollover も持たない"
+   "orgs/network-awai/local-murakumo/src/local_murakumo/plan_admission.cljc —— plan は units-per-week / units-per-5h / concurrency のレート上限で、SKU は呼び出し側が渡す。公開された plan catalog は無い"
+   "orgs/gftdcojp/apps-gftdcojp/50-infra/cloudflare/workers/llm-openrouter-proxy/ に OpenRouter proxy が既存。ただし wrangler.jsonc の routes は空で、llm.gftd.ai は cloudflared tunnel の CNAME"
+   "https://hermes-agent.nousresearch.com/docs/integrations/nous-portal —— Hermes は provider: nous / base_url: https://inference-api.nousresearch.com/v1、model は anthropic/claude-sonnet-4.6 のような publisher slug、auth は OAuth refresh token から per-request の短命 JWT"))
+  (:adr/body
+  "# murakumo.cloud は portal、itonami.cloud は agent
+
+**Status**: accepted / 2026-08-30 / オーナー指示「murakumo.cloud, itonami.cloud を Nous Research と hermes agent の関係のように整えて, murakumo 側に web3 first で openrouter backed に oss じゃない model も対応するようにして, nous plus みたいに」
+
+## Context
+
+この 2 つのホストは既にほぼ正しい形をしていた。足りなかったのは 3 点で、どれも
+『設計が無い』ではなく『片側だけ実装されている』という形をしている。
+
+### 対応関係（実測して確かめた）
+
+| Nous | ここ | 現在地 |
+|---|---|---|
+| Nous Research —— 研究所。open weights を publish する | murakumo —— 10 ノードの fleet、model-hosting（R2 + D1）、DID / CIDv1 で publish | 実装済み |
+| Nous Portal —— `inference-api.nousresearch.com/v1`、300+ model、credits、Plus/Super/Ultra、Tool Gateway | `api.murakumo.cloud/v1` —— OpenAI 互換、credits fold、plan、x402、passkey→Biscuit | **model は自前の 6 件だけ** |
+| Hermes Agent —— self-hosted。1 アカウントで portal に繋ぐ | cloud-itonami —— governed actor。既に api.murakumo.cloud を見ている | **library の既定は vendor 直結** |
+| Hermes Cloud —— always-on hosting | itonami の常駐 bot / actor fleet | 部分的 |
+
+Nous 側の auth は OAuth refresh token から per-request の短命 JWT を作る。murakumo の
+passkey → 15 分 scoped Biscuit は**同じ形で、より強い**（root seed も passkey custody
+key も inference worker が持たない）。ここは既に足りている。
+
+### 足りなかった 3 点
+
+1. **murakumo は自分が重みを持つ model にしか答えられなかった。** `/v1/models` は
+   6 件すべて `owned_by: murakumo` の bare id。frontier model が要る呼び出し元は
+   vendor の key に戻るしかなく、その瞬間 murakumo の 3 つの rail —— identity
+   （passkey / CACAO / SIWE）、payment（x402 / credits）、metering（`cost` の run 記録）
+   —— の**外**に出る。
+2. **itonami の『inference is delegated to Murakumo』は 25 / 1,108 でしか真でない。**
+   共有 seam である `langchain.model` の既定 URL は `api.anthropic.com` である。
+   landing page の主張と library の既定値が食い違っている。
+3. **月額 SKU はあるが Nous Plus の中身が無い。** Starter/Plus/Ultra/Team は
+   storefront に実在するが、monthly credits も rollover も持たず、載っている model は
+   fleet の OSS 6 件だけ。Nous Plus の価値は $20 で $22 分の credits と 300+ model と
+   Tool Gateway が付くことであって、tier 名ではない。
+
+## Decision
+
+### 1. 役割を固定する。murakumo は itonami の下位部品ではない
+
+itonami.cloud の現行コピーは murakumo を『the compute plane. It holds no authority to
+approve anything』と書く。統制の記述としては正しいが、**製品としての従属を含意する**。
+Nous Research は Hermes の compute plane ではなく、Hermes が繋ぐ先の研究所である。
+
+したがって murakumo は **それ自体で完結した portal** として提示する —— 自分の open
+model を publish し、他者の closed model を relay し、web3 の rail で課金する。
+itonami はその **first-party agent** であって、唯一の顧客ではない。
+
+### 2. `provider/model` は external を意味する（命名規則）
+
+murakumo が hosting する model id は bare（`murakumo-main`、`qwen3.8-27b`）。
+publisher で namespace された id は、murakumo が重みを持たない model を意味する
+（`anthropic/claude-sonnet-4.6`、`openai/gpt-5.5-pro`）。
+
+これは OpenRouter の規約であり、Nous Portal が Hermes に見せている形でもある。
+だから allowlist が要らない —— 維持すべき表が無く、fleet が登録してきた id は
+全部 bare なので衝突もしない。**OpenRouter や Nous Portal を向いている client は
+base URL を 1 つ変えるだけで model 文字列をそのまま使える。**
+
+`murakumo/` `local/` `fleet/` は予約する。自分を指す名前が外へ出てはいけない。
+
+### 3. external model は anonymous から到達できない
+
+`/v1/chat/completions` は anonymous を 16,384 token まで通す。それが許せるのは
+**operator が既に所有しているハードウェアの上で動くから**である。external model は
+1 token ごとに operator の OpenRouter 残高を減らすので、anonymous が届く経路は
+『見知らぬ他人が operator の金を使う』ことを意味する。
+
+- 支払える identity —— passkey session / Biscuit / CACAO / mk1 / 決済済み x402 / 共有 token
+- それ以外 —— **402**（401 ではない。request は well-formed で、資源に価格が付いている）
+
+402 の本文は使える rail を列挙する。rail を名指さない 402 は行き止まりである。
+
+### 4. 2 つの失敗は別の顔をする
+
+- gateway が未設定 → **503**
+- 呼び出し元が払っていない / 名乗っていない → **402**
+
+**どちらも fleet model へ fallback しない。** `anthropic/claude-*` に Qwen で答えるのは
+呼び出し元が頼んだものの黙った差し替えであり、下流の誰にも見えない。CLAUDE.md の
+『測れなかった検査が、測って問題が無かった検査と同じ値を返す』の model 版である。
+
+**これは仮想の危険ではない —— 今日の production がまさにそれをしている。** 2026-08-30、
+live の `POST /v1/chat/completions` に `model=anthropic/claude-sonnet-4.6` を送ると
+**HTTP 200** が返り、応答の `model` は `murakumo-main`、`system_fingerprint` は
+`b9334-…`（llama.cpp）である。`resolve-endpoint` の `:else` が未知の id を
+default endpoint に落とすので、**Claude を頼んだ呼び出し元に Qwen が答え、
+その事実は応答のどこにも出ない**（`model` フィールドを読み比べない限り）。
+この変更が 402/503 を返すようにするのは、機能を塞ぐためではなく、
+**既に起きている嘘を止めるため**である。
+
+### 5. relay する model は、価格を付けるまで売らない（2026-08-30 追記）
+
+オーナー指示「x402 課金をちゃんと統合して」を実装して分かったこと。
+
+`x402_offer.cljc` は x402 の 1 リクエストを **25,000 出力トークン**で打ち切る。その数は
+`1,000,000 ÷ 40` で、40 credits/Mtok-out は **murakumo-main の掲示価格**である。
+docstring 自身が「超えた分は原価割れになる」と上限の理由を書いている。
+
+**この導出は、モデルが murakumo-main でなくなった瞬間に黙って成り立たなくなる。**
+上流で桁違いの単価が付く frontier model に同じ $0.01 を当てると、同じ 25,000 トークンが
+operator の上流アカウントに他人の価格で請求される。
+
+したがって:
+
+- **`:x402-settled` を `paying-identities` に入れない。** あの集合は『後から請求できて
+  失効させられる principal』であり、settled な x402 は **定額前払い**で、何を買えたかは
+  どのモデルに使ったかで決まる。`prepaid-allowance` がそれを計算する
+  （$15/Mtok-out のモデルなら $0.01 = **666** トークンであって 25,000 ではない）。
+  端数は **切り捨て** —— 切り上げは operator が差額を払うことになる。
+- **価格は prepaid だけでなく全 rail で必須。** x402 だけを縛りたくなるが、
+  `/v1/chat/completions` にも `/v1/messages` にも**リクエスト単位の課金は 1 つも
+  走っていない** —— 身元のある呼び出し元は*身元がある*だけで*課金されていない*。
+  価格の無い relay モデルは operator から要求者への**上限の無い移転**で、
+  要求者が誰かはその上限を決めない。価格を付けることが operator の『これを売る』
+  という意思表示なので、未価格は **503**（呼び出し元が何を払っても解決しない）。
+- したがって実際のスイッチは `MURAKUMO_EXTERNAL_PRICES` であって API キーではない。
+  **キーだけでは何も売られない。**
+
+⚠ **未解決の穴を明記する。** cloud-murakumo の x402 gate は
+`murakumo.cloud/x402/v1/chat/completions` に居て、決済後に shared token で
+api.murakumo.cloud へ proxy する。**したがって settled な x402 呼び出しは
+local-murakumo には `:shared-token` として届き、prepaid の上限は適用されない。**
+モデルに価格を付けた時点で、$0.01 の支払いが公開上限 16,384 トークンを引ける。
+塞ぐには cloud-murakumo が (a) namespaced model を prepaid rail で拒否するか
+(b) 決済額を転送する必要がある。**それまでは、x402 proxy が live な状態で
+external model に価格を付けると、flat bundle の値段で売ることになる。**
+
+`chat-completions-route` は prepaid の上限を**わざと参照していない** —— その分岐は
+この Worker に届かないので、nil しか返せない呼び出しを書けば『効いていない検査』を
+1 つ増やすことになる（ADR-2608136000 の 4 問目）。コメントで穴を名指しするに留めた。
+
+### 5. web3 first —— card は代替であって前提ではない
+
+external model の課金も既存の rail に載る。x402（Base / USDC、seller `murakumo` は
+x402.nexus に登録済み）と credits fold が第一で、Stripe は既にある月額の受け皿として
+残る。**新しい決済経路を作らない。**
+
+## Implemented（2026-08-30）
+
+`orgs/network-awai/local-murakumo`:
+
+- `src/local_murakumo/external_models.cljc` —— 純 `.cljc` の判定層。
+  `external-model-id?` / `provider-slug` / `chat-endpoint` / `gateway-origin?` /
+  `configured?` / `advertised-models` / `admit`。env も header も読まない
+  （`messages-auth` / `write-gate` と同じ分割）。
+- `test/local_murakumo/external_models_test.cljc` —— 14 test / 83 assertion。
+  **deny は status ではなく code を assert する** —— 『自分が名乗っている理由で
+  拒否したことがあるか』（ADR-2608136000 の 6 問目）。503 と 402 が互いの入力で
+  到達できないことを個別に検査する。
+- `worker.cljs` —— `resolve-endpoint` に external 分岐、`inference-headers` に
+  gateway credential（**configured base で一致判定する**ので、base を動かすと鍵も
+  一緒に動き、所有 VPC origin に鍵が渡ることが構造的に起きない）、
+  `chat-completions-route` 冒頭に admission、`/v1/models` に curated external。
+
+env（3 つとも optional、未設定は 503 であって fallback ではない）:
+`MURAKUMO_OPENROUTER_API_KEY` / `MURAKUMO_OPENROUTER_BASE` / `MURAKUMO_EXTERNAL_MODELS`。
+
+`/v1/models` の external 側に `context_window` を書かない —— この Worker は測って
+いない。測っていない数を測った数と同じ顔で publish しない。gateway は列挙されて
+いない publisher slug も受けるので、この list は『動くものの上限』ではなく
+『advertise してよいと判断したもの』である。
+
+## Verification
+
+| 何 | 結果 |
+|---|---|
+| `nbb --classpath src:test` で external-models-test | 14 tests / 83 assertions / 0 failures |
+| 負の対照: `paying-identities` に `:anonymous` を足す | **7 failures**、うち 3 test は anonymous 保護を名指すもののみ。exit 0 → 1 |
+| 復元後の再実行 | 83 assertions / 0 failures、`git status` は新規 2 ファイルのみ |
+| paren balance（worker.cljs、文字列・char・コメントを解釈するトークナイザ） | balanced |
+
+⚠ **baseline の全 suite は元から赤い。** 共有 checkout で `npm run test:cljs` は
+`@noble/hashes/sha2.js` が無くて落ちる（node_modules 未インストール）。
+だから『suite が緑』はこの変更の証拠に使えない。使ったのは対象 namespace の
+直接実行と、上の負の対照である。
+
+## Not done —— 意図的に残したもの
+
+1. **governed release artifact を更新していない。** `npm run build` は shadow-cljs を
+   呼ばず、`release/cljs/manifest.json` の sourceDigest を検査して pre-built を展開
+   する。artifact を切り直すと、この変更と一緒に **3 つの sibling の drift**
+   （`murakumo` 4eb071a→573639a、`org-chainagnostic-cacao` 2f74d25→cd98347、
+   `cloud-murakumo` bbf0899→68d7d28）が同じ bundle に入る。それらは測っていない。
+   **したがって deploy していない。** artifact refresh は shadow-cljs.edn が言うとおり
+   clean な west workspace で行う独立した手順であり、その時に 3 件を別途確認する。
+2. **plan SKU に monthly credits と rollover を入れていない。** これは値段の決定で
+   あって、agent が単独で決めるものではない。形だけ記す —— Nous は
+   Plus $20→$22 credits（rollover $10）/ Super $100→$110（$50）/ Ultra $200→$220（$100）。
+   既存の Starter $15 / Plus $49 / Ultra $129 / Team $79 にどの credits を載せるかは
+   オーナー判断。
+3. **`langchain.model` の既定を murakumo に向けていない。** 1,108 repo が握る seam の
+   既定値を変えるのは、この ADR より広い blast radius を持つ。ただし **landing page が
+   主張していることと library の既定値が食い違っている**という事実はここに記録した。
+   次の一手はこれである。
+4. **copy を書き換えていない。** murakumo.cloud は既に web3-native を名乗っており、
+   external model が live になるまで『300+ models』とは書けない。順序は
+   実装 → deploy → copy であって逆ではない。
+
+## Landing (closing, 2026-08-30)
+
+**deploy 済み。** `local-murakumo` Version `b5532d28-b111-48a2-ae1c-b15453560e17`、
+`api.murakumo.cloud` / `app.itonami.cloud`。
+
+| repo | main の commit | pin |
+|---|---|---|
+| `com-junkawasaki/root` | `3ea7502` / `9c6bbf9` / `99f9eaa` | — |
+| `network-awai/local-murakumo` | `02549a5` | `134afdb` |
+| `kotoba-lang/langchain` | `a46c87c` | `fb05d4b` |
+| `cloud-itonami/mangaka` | `72f13e5` | `3f57c46` |
+| `network-awai/local-manimani` | `73bd195` | `4144166` |
+
+**live で確かめた前後**（同じリクエスト、deploy を挟んで）:
+
+| | before | after |
+|---|---|---|
+| `model=anthropic/claude-sonnet-4.6` | **HTTP 200**、応答 `model: murakumo-main`（Qwen が Claude として答えていた） | **HTTP 503** `external_models_unavailable` |
+| `model=murakumo-main` | 200 | 200（`content: 'pong'`、退行なし） |
+| `/health` | ok | ok |
+
+**検証**: external-models 26 test / 134 assertion、langchain.model 7 test / 22 assertion、
+既存 device-p256 2 test / 13 assertion（merge 後も緑）。負の対照 4 本 ——
+`:anonymous` を paying set に足す / `:inert` を paying にする / x402 を blanket に戻す /
+未価格を通す —— いずれもその性質を名指す test だけが赤くなり、exit code も動いた。
+⚠ **全 suite は baseline から赤い**（`@noble/hashes/sha2.js` 未インストール）ので
+証拠に使っていない。使ったのは対象 ns の直接実行と負の対照。
+
+**governed artifact**: `shadow-cljs release worker ui` を外部 west workspace で実行し、
+`scripts/package-release.mjs` が deploy ファイルを再現することを確認。sibling pin 3 件
+（murakumo / org-chainagnostic-cacao / cloud-murakumo）が動いていたが、**local-murakumo の
+require closure に 1 ファイルも入らないことを実測してから**取り込んだ（closure は
+`cacao.edge.verify` / `cloud-murakumo.{token,trust}` / `murakumo.infer.{credits,prices,windows}` /
+`murakumo.kotoba.oracle` の推移閉包 6 ファイル）。途中で main が K16 device receipt を
+landing させたため、**artifact を作り直してから** merge した —— 先に作った artifact を
+出していれば、source には残っているその変更を bundle の中だけで巻き戻していた。
+
+## 未解決 —— 次に誰かが拾うところ
+
+1. **external model はまだ 1 つも売られていない。** `MURAKUMO_OPENROUTER_API_KEY` と
+   `MURAKUMO_EXTERNAL_PRICES` の両方が未設定で、どちらも owner の領域
+   （前者は credential、後者は値付け）。両方入れるまで 503 のまま。**これは
+   未完成ではなく設計どおりの fail-closed。**
+2. **x402 の穴（上記 決定 5 の ⚠）。** cloud-murakumo が shared token で proxy するので
+   settled な支払いが `:shared-token` として届き、prepaid の上限が効かない。
+   価格を付けるより先にここを塞ぐ。
+3. **KUMO / FVM は着手していない。** owner 指示「KUMO Token も fvm 相当で」は
+   ADR-2608291009 D1/D3（KUMO は非取引の労圏単位、取引可能なのは BOT）と
+   ADR-2608057000（Filecoin は信頼性を理由に anchor 先として却下）の両方と衝突する。
+   **どちらも owner 自身の決定なので、解釈を勝手に選ばずに質問として残した。**
+   2026-08-30 の会話で owner から「en, engi の取引不可というのは今は適切なの、
+   holochain はどうしている?」という先行する問いが出た。**答えは既にこの workspace の
+   ADR の中にある**（ADR-2607259800 決定 1）:
+
+   > Holochain がその実例である。EN は HoloFuel と同じ設計を独立に導出したもので、
+   > Holochain は $20.4M を2018年に調達しながら 2026年時点で HoloFuel 本体が未ローンチ。
+   > **設計が同じなら成長曲線も同じになる。**
+
+   外部を実測して、この自己予測は当たっている: HOT→HoloFuel の 1:1 交換は
+   **2018 ICO から 8 年たった 2026-07 時点でまだ開いていない**（Holo Ltd 自身は換金を
+   運営せず「licensed third-party」に委ねると明記）。HoloFuel は reputation/capacity で
+   上下限を切った相互信用で「hosting のための通貨であって holding のためではない」。
+   Sardex は euro と相互に交換不可・利子 0・域内限定のまま機能しており、
+   **非交換性は制約ではなく機構**である（obligation-clearing と併用で域内純債務 ~50% 減）。
+
+   **したがって「非取引は今も適切か」への答えは『適切だが、それは効いている制約ではない』。**
+   実測（2026-08-30）: EN の実口座 **0**、bond した外部 witness **0**、実転送は
+   operator が作った使い捨て鍵どうしの **2〜3 件**、`example-journal.edn` は自ら
+   `SYNTHETIC CORPUS … Do not cite balances here as measurements` と書いている。
+   `engi-node` は live だが `peer-count 0` の devnet。交換可能にしてもこの数字は動かない
+   —— 動かすのは受容密度で、それは ADR-2607259800 が自分で score 3.00 を付けた
+   follow-up `broker-actor-for-credit-imbalance`（WIR/Sardex の主要な死因＝
+   **恒常的な純債権者が使い道を持てない**への対処）が担当する未着手項目である。
+
+   ⚠ **その調査で見つかった実際の欠陥（この ADR の範囲外だが記録する）**: 信用限度の
+   モデルが 2 つに割れている。`cloud-itonami/credits` は**独立保証人の中央値**で決め、
+   保証が無ければ既定 0（負残高不可＝fail-closed）。一方 `kotoba-lang/engi` は
+   genesis に**自己申告**した `:engi/credit-limit` を使う —— **信用の出所が無い**。
+   HoloFuel は reputation/capacity で縛る。相互信用で限度の裏付けが自己申告なのは、
+   net-zero 規律ではなく段階を踏んだ無制限発行になる。どちらを正本にするか未決。
+4. **artifact refresh の手順はスクリプト化してあるが landing していない**
+   （session scratchpad の `refresh-manifest.mjs`）。`release/cljs/README.md` の手順を
+   1 コマンドにし、動いた sibling pin を差分表示する。**landing するなら nbb で書き直す**
+   （このワークスペースは新規 `.mjs` を禁じている）。
+5. **`langchain.model` の既定変更で 6 つの example がまだ `:api-key` を `:url` 無しで
+   渡している**（computer-use ×2 / godaddy-dns / langgraph ×2、および同 repo の 1 件は修正済み）。
+   production ではないが、読まれるコードなので `anthropic-direct-url` を足す。
+
+## Consequences
+
+- murakumo は自前の OSS model を publish する研究所であり続けながら、closed model の
+  gateway にもなる。**両方が同じ identity / payment / metering を通る。**
+- itonami が frontier model を要求しても rail の外に出ない。
+- `app.itonami.cloud` は現在 local-murakumo が応答しており、`itonami-fleet-dispatch`
+  の 1,200 actor router は route を取れていない（実測 2026-08-30）。この ADR は
+  それを直さないが、agent 面の住所として記録しておく。
+")))

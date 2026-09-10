@@ -1,0 +1,33 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607176000-kotobase-protocols-v0-2-sigv4-git-cid")
+  (:adr/doc_type "adr")
+  (:adr/title "ADR-2607176000: kotobase-protocols v0.2 — S3 SigV4 認可・git HTTP write（実 clone 可能）・real CIDv1 mint")
+  (:adr/topic "kotobase-protocols-v0-2-sigv4-git-cid")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-17")
+  (:adr/last_verified "2026-07-17")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "s3.kotobase.net の write 認可に AWS SigV4（header 方式）を追加（Bearer WRITE_TOKEN と併存、どちらか通れば可）。credential は Worker secret S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY"
+   "git.kotobase.net の write surface（PUT refs/HEAD/loose-objects）と、そこへ seed した repo が git dumb-HTTP で実 clone 可能であること（ADR-2607171700 not-decided の git surface 実投入を解決）"
+   "POST /ipfs による real CIDv1 発行: sha2-256 → multihash → CIDv1(raw 0x55, base32)。ADR-2607171700 の『fingerprint は CID ではない』follow-up を raw codec について解決（ETag は依然 fingerprint のまま、用途が別）"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "90-docs/adr/2607171700-kotobase-storage-protocol-layers.edn"
+   "90-docs/adr/2607174500-kotobase-protocols-worker-deploy.edn"
+   "90-docs/adr/2607072000-gftdcojp-net-kotobase-ipfs-gateway-split.edn"
+   "orgs/kotoba-lang/kotobase-protocols (lib v0.2, pin b992ea5)"
+   "orgs/kotoba-lang/kotobase-protocols-worker (shell v0.2, pin 15d1b4c)"))
+  (:adr/problem
+  "ADR-2607174500 デプロイ後、ADR-2607171700 の残 not-decided（S3 SigV4 互換 auth、git surface への実 repo 投入、real CID）が未着手だった。pure/同期の library handler に SigV4（HMAC 連鎖 = host crypto 必須）や binary body（git loose object の zlib bytes、ipfs の任意 content）をどう通すかの設計が要る。")
+  (:adr/decision
+  "純粋層と host 層の分割を保ったまま v0.2 を追加。①SigV4: canonical-request / string-to-sign 生成は純粋（kotobase-protocols-worker.sigv4、nbb でテスト）、HMAC-SHA256 連鎖と payload sha256 は Worker が WebCrypto で実行し RAW payload に対して署名照合。x-amz-content-sha256 が UNSIGNED-PAYLOAD 以外なら実 body hash と一致も要求。②binary body: library は response に :body-encoding :base64 を立て、request は x-kotobase-body: base64 / block は :encoding \"base64\" で base64 マーク。Worker が境界で ArrayBuffer ⇄ base64 変換（handler は文字列のまま純粋を維持）。git seeder（bin/seed_git.cljs、nbb）が local repo の全 object を zlib loose object 化 → base64 → PUT。③real CID: kotobase.protocols.cid が multihash/CIDv1/multibase-base32 の framing を純粋に行い（digest は host 注入）、Worker の POST /ipfs が sha256(raw body) → cidv1-raw-sha256 → base64 block 保存 → {cid} を返す。")
+  (:adr/consequences
+  (vector "実測 e2e（2026-07-17、本番 s3./git.kotobase.net + workers.dev）: (a) curl --aws-sigv4 PUT → 200・読み戻し一致、wrong secret → 401。(b) git seeder で kotoba-lang/kotobase-protocols を 49 objects/2 refs seed → 素の `git clone https://git.kotobase.net/kotoba-lang/kotobase-protocols` が成功（smart→dumb 自動フォールバック、HEAD b992ea5 一致、23 files checkout）。git の clone 時 sha1 検証を通過 = loose-object エンコードがバイト正確。(c) POST /ipfs 'hello world' → bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e（標準 IPFS CID と一致）→ GET /ipfs/{cid} で本文取得"
+   "テスト: lib 29 tests/113 assertions、shell 8 tests/30 assertions、いずれも nbb green。shadow-cljs release 0 warnings"
+   "secrets: S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY / WRITE_TOKEN を Worker secret 投入、operator copy は macOS Keychain service cf:kotobase-protocols-worker（値は ADR に書かない、secrets-location-map 参照）"
+   "v0.2 の残る限界（follow-up）: SigV4 は header 方式のみ（presigned query URL・chunked payload 未対応）。git surface は dumb-HTTP read + HTTP seed のみ（smart upload-pack / push protocol は無し、seed は運用スクリプト経由）。CID は raw codec のみ（dag-cbor/dag-json や大容量の CAR/chunking は未対応）。単一 R2 object state の scale 上限（ADR-2607174500）は不変。tenant 別 CACAO 認可も引き続き follow-up（現状 shared credential）"))
+  (:adr/body
+  "# ADR-2607176000: kotobase-protocols v0.2\n\n## Status\naccepted — 2026-07-17（実装・デプロイ・e2e 検証済み）\n\n## Decision\n純粋 library / host shell の分割を保ったまま3機能追加:\n- **S3 SigV4**: 文字列生成は純粋（sigv4.cljc）、HMAC 連鎖は WebCrypto。Bearer と併存。\n- **git HTTP write + 実 clone**: PUT refs/HEAD/objects（write-auth gated）、x-kotobase-body: base64 で binary、bin/seed_git.cljs で local repo を投入 → dumb-HTTP clone 可能。\n- **real CIDv1**: cid.cljc が multihash/base32 framing（digest 注入）、POST /ipfs が sha256→CID→block。\n\n## Verification（実測 2026-07-17）\n- curl --aws-sigv4 PUT 200 / wrong-secret 401\n- git clone https://git.kotobase.net/kotoba-lang/kotobase-protocols 成功（HEAD b992ea5、23 files、sha1 検証通過）\n- POST /ipfs 'hello world' → bafkreifzjut…（標準 CID 一致）→ GET 取得\n- lib 29/113・shell 8/30 nbb green、release 0 warnings\n")))

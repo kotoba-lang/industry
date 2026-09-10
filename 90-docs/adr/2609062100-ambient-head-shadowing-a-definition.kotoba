@@ -1,0 +1,123 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609062100-ambient-head-shadowing-a-definition")
+  (:adr/title "A language head that silently wins over a definition already using that name")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/related (vector "ADR-544 kotoba-lang docs/adr/ADR-kotoba-pure-s-expression-core-and-cljk-surface.md"
+                "adr-2608650000-kotoba-two-kinds-of-cannot-write"
+                "adr-2608136000-six-questions-before-writing-a-check"))
+  (:adr/body
+  "## The shape
+
+Twice in one day, in unrelated parts of kotoba, a language head took a name a
+module had already defined, and won silently. Neither had a gate. Both were
+found by measuring a claim someone had written, not by a check firing.
+
+### 1. `ref` (kotoba-sema a2f86f87, closed 04e0c79c)
+
+ADR-544's pure S-expression core spells a definition reference `(ref name)`.
+`ref` is ALSO Clojure's STM constructor, which `lang/surface-status.edn`
+`:no-ambient-mutation` forbids on the `:authority` shielding axis and
+`lang/guest-grammar.edn` lists in `:forbidden-heads` beside `dosync`,
+`locking`, `volatile!`, `var` and `binding`.
+
+The pure-head rewrite runs BEFORE `:forbidden-heads` is consulted, so
+admitting `ref` took that refusal away without saying so. Measured:
+`(let [r (ref n)] n)` was ADMITTED at a2f86f87 where a2f86f87~2 refused it
+`:kotoba.error/ambient-forbidden`.
+
+Closed by narrowing the pure reading to the one shape the two readings do not
+share -- STM's `(ref x)` takes an initial VALUE, ADR-544's `(ref name)` names
+a DEFINITION -- so `(ref name)` is admitted only for a name the module's own
+top level defines, and every other shape gets the security code back.
+
+### 2. `mapv` (kotoba-sema, closed 3378b1d3)
+
+`mapv` and `filterv` are surface aliases of `map`/`filter` in the frontend.
+NEITHER is declared by the grammar authority: not in `lang/guest-grammar.edn`
+`:sugar`, not in `:admitted-builtins`. They rewrote unconditionally, so
+`lang/stdlib/core.kotoba`'s own `mapv` -- written over pair chains, with a
+comment right above it explaining that the `map` head refuses a stored
+callback -- was overridden by an alias demanding `vector-i64`.
+
+Cost: 772 errors in `kotoba.lang.stdlib-core-oracle-test`, which was 772 of
+the 786 red items in the whole kotoba-lang suite. All of them were ONE
+refusal re-reported per assertion, because that namespace shares a single
+`delay` and one broken form fails every test in it.
+
+`lang/conformance/stdlib/manifest.edn` records measurements that test produced
+on 2026-09-02, so it passed then. A regression, not a designed gap.
+
+## What separates the two cases, and the rule that follows
+
+`ref` is a DECLARED head whose other reading is forbidden. `mapv` is an
+UNDECLARED alias. They need opposite treatments, and the language already has
+both mechanisms -- it just had not applied either:
+
+- The frontend's `reserved-function-names` refuses `(defn take ...)`,
+  `(defn count ...)`, `(defn get ...)` outright. That is the right answer for
+  a head the authority declares.
+- An alias the authority does NOT declare has no claim on the name at all,
+  and must yield to a definition the module actually makes.
+
+`mapv` was in neither camp: not reserved, and not yielding. Measured
+2026-09-06, it was the ONLY name where a built-in beat a user definition --
+`keep`, `remove`, `sort`, `distinct`, `interpose`, `partition`, `juxt2` and
+`frequencies` all already resolved to the module's own function, and the
+identical body renamed to `mapv2` compiled and ran.
+
+**Rule.** Before adding a head to the admitted set, ask whether any module
+already defines that name, and whether the name means something else in the
+language. If it is declared, reserve it so a definition is refused. If it is
+not declared, it must lose to a definition. Silence is the defect in both
+directions.
+
+`grammar_authority_test/no-pure-head-collides-with-a-security-surface-unrecorded`
+gates the first half for the pure heads: every head that also appears in a
+security surface or in `:forbidden-heads` must carry a `:spelling-collision`
+record. Adding `app` to `:forbidden-heads` turns it red. The second half --
+undeclared aliases -- is gated by
+`kotoba.compiler.mapv-alias-shadowing-test`, which pins both directions with
+a control, because without the control both assertions pass for a build that
+simply deleted the alias.
+
+## A second finding, about measuring rather than about the language
+
+Three suites in this family resolve evidence out of SIBLING checkouts through
+env-overridable roots that default to `../<repo>`:
+
+  kotoba-lang  q1-claims-are-auditable, q3-consumers-embed-the-canonical-grammar-without-drift
+               KOTOBA_QUALIFICATION_ROOT / KOTOBA_COMPILER_QUALIFICATION_ROOT /
+               KOTOBA_SEMA_QUALIFICATION_ROOT / KOTOBA_CORE_CONTRACTS_QUALIFICATION_ROOT
+  kotoba       q8-report-is-machine-checkable-and-does-not-overclaim
+               KOTOBA_LANG_AUTHORITY_ROOT / KOTOBA_COMPILER_EVIDENCE_ROOT / KOTOTAMA_EVIDENCE_ROOT
+  kotoba       the-two-authority-cases-run-to-their-expected-values
+               KOTOBA_LANG_AUTHORITY_ROOT, whose default is the CI path /tmp/kotoba-lang-dd8b
+
+In a worktree without those siblings, each reports a repository that is merely
+ABSENT as one that is WRONG. That is the inverse of the usual hazard -- it
+fails closed rather than passing -- but it makes the suites unreadable outside
+the west layout, and it cost two wrong readings in this session before the
+pattern was recognised.
+
+**Measure both sides of a comparison in the same layout, with the roots set,
+or the number is about the layout and not about the tree.** Every commit in
+this session records which roots were set.
+
+## Status after this session
+
+  kotoba-lang  399 tests / 3467 assertions / 0 failures / 0 errors
+  kotoba       797 tests / 9906 assertions / 0 failures / 0 errors
+  kotoba-sema  JVM 412 / 2138 / 0 / 0; nbb 257 / 1203 / 0 / 0
+  grammar      16 tests / 496 assertions / 0 failures / 0 errors
+
+ADR-544 step 1 is complete: all seven pure heads (lam app ref perform rel
+query handle) are lowered by the frontend and admitted by the authority, with
+the bytes carried to all five vendored copies and the digest advanced in three
+repositories together.
+
+Step 2 -- `.cljk` and pure `.kotoba` minting IDENTICAL Definition CIDs -- is
+NOT done and is not claimed. The concrete gap is measured: `(app (lam [x] (+ x
+1)) n)` and `(let [g (fn [x] (+ x 1))] (g n))` compile to the same wasm32
+bytes and both answer 3, but their :hir-sha256 and :kir-sha256 differ, because
+the synthetic binder is not the author's `g`. That needs alpha-normalisation.")))

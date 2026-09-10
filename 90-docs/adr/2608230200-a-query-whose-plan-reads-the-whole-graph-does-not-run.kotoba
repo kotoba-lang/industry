@@ -1,0 +1,165 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608230200-a-query-whose-plan-reads-the-whole-graph-does-not-run")
+  (:adr/title "ADR-2608230200: 読み計画が全グラフを読む query は実行できない —— materialize の天井と、読む前の入場判定")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-23")
+  (:adr/last-verified "2026-08-23")
+  (:adr/last_verified "2026-08-23")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotobase-query-plane")
+  (:adr/repos (vector "orgs/kotoba-lang/kotobase-server"
+              "orgs/kotoba-lang/kotobase-query"
+              "orgs/network-awai/net-kotobase"))
+  (:adr/authoritative-for
+  (vector "「materialize を禁止する」を実行可能な形に落とした結果 —— 呼び出しの削除ではなく、無制限にやることの禁止"
+   "kotobase.server.admission が何を拒否し、何を通し、なぜ unknown を拒否側に倒すか"
+   "静的入場判定と over-budget の非対称（計画は範囲の大きさを言わない）"
+   "gate が呼ばれた場所にしか効かないことと、verify-unbounded-query-paths がその穴を実際に見つけた記録"))
+  (:adr/related
+  (vector "adr-2608230100-reasoning-runs-on-the-index-plane-and-the-live-surfaces-do-not"
+   "adr-2608039975-query-surfaces-are-not-deployed-and-the-live-one-goes-through-datalog"
+   "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
+   "adr-2607172300-kotobase-query-protocol-extension"))
+  (:adr/evidence
+  (vector "kotoba-lang/kotobase-query dcc5ab5 -- 63 tests / 131 assertions, 0 failures; lint clean"
+   "kotoba-lang/kotobase-server 36a2aa9 -- 170 tests / 642 assertions, 0 failures on shadow-cljs :node-test"
+   "com-junkawasaki/root scripts/verify-unbounded-query-paths.cljs -- 37,256 files in 12s; 4 findings before the gate landed, 2 after, both :accepted"
+   "discrimination: opening the admission gate turns 12 assertions red; removing materialize's abort turns 5 red; adding a visible? parameter trips the retargeted arity guard"))
+  (:adr/body
+  "# ADR-2608230200: 読み計画が全グラフを読む query は実行できない
+
+**Status**: accepted
+**Date**: 2026-08-23
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-08-23）「materialize = 全 collection の full scan を全体的に禁止、
+また他にも負荷が高い query はそもそも実行できないようにしてほしい」。
+
+ADR-2608230100 の follow-up 1 が「live 4 面の data model 判断」を残していたが、
+オーナーの指示はそれより広い ——「高負荷 query は実行できないようにする」。
+
+## 禁止の意味を、実行可能な形に落とす
+
+**「materialize を禁止する」を「materialize を呼べなくする」と読むと、hostname を
+持つ live 4 面が即座に停止する。** ADR-2608230100 で測ったとおり、protocols-worker は
+document を datom として持つので、あの surface は materialize 以外の方法で答えられない。
+呼び出しを削除することは、機能を削除することと同義である。
+
+**したがって禁止するのは「無制限にやること」であって「やること」ではない。**
+2 つの実装に分けた:
+
+| | どこ | 何を |
+|---|---|---|
+| **上限** | `kotobase.query.bridge/materialize` | scan を走らせながら数え、天井を越えた瞬間に throw |
+| **入場** | `kotobase.server.admission` | 読み計画が prefix を束縛しない query を、読む前に拒否 |
+
+## 決定
+
+### D1. materialize は天井を持ち、report ではなく abort する
+
+`default-max-datoms` 200,000。**ソースの中の数値**であって環境変数ではない ——
+上げるのは誰かがレビューする編集になる。
+
+**数えるのは scan の最中で、完成した db に対してではない。** 後者は caller が保持する
+メモリを縛るだけで、scan 代は全額払い終わっている。counting adapter 越しに 400 document
+分の store を渡し、`-get` が 400 回未満で止まることを assert してある。
+
+`-list` は collection ごとに全額払う。これを縛るには件数を答えられる store API が要り、
+`kotobase.store/IStore` は持っていない。**後から発見されるのではなく、ここに書いておく。**
+
+既存の `materialize-must-never-take-visible` guard がこの変更を捕まえた —— それが
+あの guard の仕事である。ただし機構が `max arity = 2` だったので、**不変条件と引数の数が
+同じ文になっていた**。天井は全ての principal にとって同じ値なので memo の健全性
+（1 つの db が全 caller にとって正しい）を壊せない。arglists を**名前で** pin し直した:
+新しい引数はどれも引っかかり、失敗が「どれが増えたか」を言うようになった。
+`visible?` を足して赤くなることを確認済み。
+
+### D2. 読み計画が prefix を束縛しない query は、読む前に拒否する
+
+`kotobase.server.datom-plan` の 6 行のうち 2 行は prefix を持たない:
+
+    [_ _ o]  -> :eavt []   -- :vaet が覆うのは ref 値であってリテラルではない
+    [_ _ _]  -> :eavt []   -- full scan, as asked
+
+**rule body も数える。これが要点の大半である。** `owl.rules/triple-rules` の base case は
+文字どおり `[?s ?p ?o]` で、`:where` が完全に束縛されている query に全走査を密輸できる。
+しかも rule の中の方が悪い —— fixpoint は毎 round その clause を訊き直す。
+拒否は rule を名指しする（`[:rules owl-triple]`）。
+
+**deny by default。** 認識できない clause 形は通さず拒否する。unknown を allow にする
+gate は「検査して束縛されていた」と「判定できなかった」に同じ verdict を返す ——
+このリポジトリは同じ日に、自分の deploy script でその実例を持っている
+（読めなかった provenance 応答が、不一致と同じ `false` を返していた）。
+読まないことが証明できる形（predicate clause、rule invocation）は「何も読まない」
+として通す。
+
+**変数 attribute は、subject も未束縛のときだけ拒否する。** `[\"e1\" ?attr ?v]` は
+`:eavt [s]` で完全に束縛されており、これを拒否するのは gate が planner の持たない規則を
+発明することになる。
+
+### D3. 静的と動的は別物で、非対称を書く
+
+静的半分は block を 1 つも取る前に走る（拒否された query で `get-fn` 呼び出しが 0 で
+あることを assert してある —— 先に読む gate は何も節約していない）。
+
+動的半分 `over-budget` は prefetch が実際に返したものに当たる。**束縛された述語は
+「範囲読み」であることしか言わず、その範囲が小さいことは言わない。** 計画からは分からない。
+したがってこちらが縛るのはメモリと実行であって、最初の読みは「計画が表面上無制限だった
+場合」にしか縛らない。
+
+### D4. gate は呼ばれた場所にしか効かない。だから検出器を置く
+
+**同じ時間内に実際に起きた。** `admission` は `do-q` と
+`run-indexed-compiled-graph-query` を gate して着地したが、**`graph.sparql` が実際に
+到達するのは `sparql-protocol/do-sparql`** で、そこは `ps/source-for` を自分で呼んでおり
+どちらも通らない。`SELECT * WHERE { ?s ?p ?o }` は merge 1 回分の間、network から
+実行可能なままだった。
+
+`scripts/verify-unbounded-query-paths.cljs` が**実 repo に対する最初の run でこれを
+報告し**、gate が着地した次の run で消えた。**fixture ではなくこの workspace 自身の
+コードに対して、両方向を出した。**
+
+規則は 3 つで、どれも「このファイルは materialize と書いてある」ではない:
+
+- `ungated-source` —— `kotobase.server.pattern-source` を require し `source-for` を
+  呼び、`kotobase.server.admission` に一度も触れない
+- `unbounded-scan` —— `{:index … :components []}` を手書きして `hot-datoms` に渡す
+- `raised-ceiling` —— `materialize` の天井引数が `default-max-datoms` より大きい
+  （**小さい方を渡すのはこの arity の目的**であって finding ではない）
+
+**`bridge/db-for` を呼ぶこと自体は意図的に finding にしない。** 内側から縛られており、
+6 つの surface repo を毎日報告すれば上の 3 規則が埋もれる。
+
+最初の版は裸の名前 `source-for` に一致して htmldom / bitcoin node / character creator を
+報告した（どれも datom を見たことがない）。namespace の require も要求してノイズ床が 0 に
+なった。`:components []` 規則は narrow するまで `datom-plan` 自身の docstring の表に
+一致していた。
+
+## Consequences
+
+- (+) **全走査は無制限には行われない** —— 読む前に拒否されるか、天井で abort する。
+- (+) live な `graph.sparql` / `graph.query` / `datomic.q` の 3 面すべてに gate が在る。
+- (+) 新しい surface が gate 無しで着地すると、検出器が翌 tick で言う。
+- (−) **`over-budget` は最初の読みを縛らない**（計画が表面上有界だった場合）。
+  縛るには範囲読みに件数上限を持てる store API が要り、`hot-datoms` は持っていない。
+- (−) **materialize の `-list` は全額のまま。** 同じ API の穴。
+- (−) 既に無制限な query を投げていた client は `QueryRefused` を受け取る。
+  `:refusals` に理由が全部入っており、最初の 1 件ではない —— 1 つ直して次を発見するのは
+  同じ往復を 2 回やることだから。
+
+## Follow-ups
+
+1. **範囲読みに件数上限を渡せる store API。** これが `over-budget` の非対称と
+   materialize の `-list` の両方を閉じる、唯一の変更。
+2. live 4 面（sparql./cypher./gremlin./graphql.kotobase.net）の data model 判断は
+   ADR-2608230100 のまま未決。今回入ったのは天井であって、index 面への移行ではない。
+3. fixpoint の derivation 数そのものには予算が無い（`datalog.core` の 10,000 反復は
+   防御的な cap であって policy ではない）。束縛された述語で始まる rule が大量の
+   tuple を導出する経路は、`over-budget` が source 側でしか止めない。
+")))

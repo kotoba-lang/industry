@@ -1,0 +1,83 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608196500")
+  (:adr/title "the fix in ADR-2608196300 broke its dependent; exit 3 now means 'proceed, there was nothing to verify'")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/tags "detectors exit-codes kip regression co-scientist")
+  (:adr/body
+  "## What happened
+
+ADR-2608196300 changed `verify-kip-quorum.cljs` to exit **3** instead of 0 when no
+KIP is `:final`. `verify-kip-coverage.cljs` shells out to it and required exit 0,
+bailing with 2 otherwise -- so the change turned its dependent into a refusal:
+
+    QUORUM-VERIFY  could-not-run  (exit 3)
+    the quorum behind :final could not be confirmed, so no KIP may be counted
+    as covering anything.
+
+**I introduced that regression and did not look for a dependent before landing.**
+One `grep -rln verify-kip-quorum scripts/` would have found it; the caller is
+seven lines of prose away from the file I edited, and its comment says outright
+that it shells out rather than reimplementing.
+
+## Why proceeding is correct, not lenient
+
+The bail exists so a `:final` keyword somebody typed cannot cover a surface
+without the signatures behind it. But when **no** KIP is `:final`, the set of
+covering KIPs is empty and nothing is counted as covering anything **either way**
+-- the conclusion is identical. Refusing there converts *there is nothing to
+confirm* into *we could not confirm*: the same collapse of two states that
+ADR-2608196300 fixed one script upstream, in the opposite direction.
+
+So exit 3 now proceeds, and `QUORUM-VERIFY` reports
+`nothing-to-verify:no-final-kip-requires-a-quorum`. Exits 1, 2 and `:absent` still
+bail. A `:final` KIP on a track the process authority exempts from quorum also
+lands on 3 and still covers its surfaces -- that exemption is the authority's
+rule, not a hole.
+
+## Both directions, in one tree
+
+    verify-kip-quorum stubbed to exit 1 -> QUORUM-VERIFY FAIL, bail 2   (unchanged)
+    the real verifier, exit 3           -> nothing-to-verify, proceeds:
+                                          SCANNED-KIPS 2, SCANNED-SURFACES 7
+
+Past the gate, kip-coverage reaches its **own** honest refusal -- *a check that is
+not in force has not checked anything* (KIP-0001 is not Final). That is the
+verdict the early bail was hiding.
+
+## A near-miss worth writing down
+
+Setting up the stub run needed `orgs/kotoba-lang/{kip,kagami}` inside the
+worktree, so I symlinked them and then cleaned up with `rm -rf <worktree>/orgs`.
+`orgs/` **already existed there**: the superproject tracks **229,346 files under
+`orgs/`** across 75 paths, and I deleted all of them. `git status` caught it and
+`git checkout -- orgs` restored everything; nothing was committed and the shared
+checkout was never touched.
+
+**Rule: remove exactly what you created, never its parent.** The two symlinks were
+the two things to delete. And run `git status` after cleanup steps, not only after
+edits -- the danger here was in the teardown, which is the part that feels like it
+cannot go wrong.
+
+## Measured aside, and a wrong reading of it corrected
+
+That 229,346 is worth knowing: `orgs/` is described as west-managed and outside
+root's tree, and for west-registered repos it is -- but 75 paths are committed
+directly into root, including `orgs/personal/drive`, `orgs/personal/takeout`,
+`orgs/personal/media` and several `*-assets` directories.
+
+**My first reading of that was wrong and is corrected here.** I wrote that this
+looked like the large-binary policy being violated. It is the opposite: measured
+with `git ls-files -s`, those paths are ~99% mode 120000 -- **git-annex pointers,
+not blobs**:
+
+    orgs/personal/drive       27,236 tracked   27,221 annex symlinks
+    orgs/personal/takeout    189,651 tracked  187,456 annex symlinks
+    orgs/personal/media          623 tracked      622 annex symlinks
+    mangaka-ghosthacker-assets   956 tracked      838 annex symlinks
+
+That is exactly what skill `large-binary-datalad` prescribes. `git-annex` said so
+itself during the commit for this ADR (*content availability has changed … run
+git-annex restage*) and I filed the ADR before reading it. The count of tracked
+paths says nothing about bytes in history; **`git ls-files` counts entries, and an
+annex pointer is an entry.** Nothing to act on.")))

@@ -1,0 +1,131 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607269500-remaining-gaps-verdicts")
+  (:adr/doc_type "adr")
+  (:adr/topic "remaining-gaps-verdicts")
+  (:adr/title "ADR-2607269500: 2026-07-26 の gap 掃除 — 何を直し、何を「直さない」と決め、何がオーナー待ちか")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-26")
+  (:adr/last_verified "2026-07-26")
+  (:adr/deciders (vector "Jun Kawasaki (+ Claude)"))
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "git.kotobase.net の所有権: データを持つ kotoba-lang/kotobase-protocols の kotobase-git worker が持つ。net-kotobase/protocols-worker README の『4 hostname の唯一の deploy owner』は git.kotobase.net については誤り"
+   "90-docs 配下の parse 不能 EDN 20 件の扱い: 自動修復しない。閉じ括弧を EOF に足せば parse は通るが構造が黙って変わるため"
+   "fleet-ci の Radicle 反映で issue に label を付けない理由（seed を delegate にしない）"
+   "bulk landing で残った review PR の判定規則: PR が触るファイルを default branch が branch point 以降に触っていなければ巻き戻しは起こり得ないので merge してよい"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "adr-2607255500-fleet-ci-tip-driven-murakumo-cdci"
+   "adr-2607178000-fleet-ci-murakumo-standing-runner"
+   "adr-2607259600（Radicle 運用形。passphrase の記載漏れはここで解消）"
+   "adr-2607252200（Radicle 実登録 pilot）"
+   "adr-2607173000（bb を script host から退役）"
+   "adr-2607171600（90-docs は EDN only）"
+   "adr-2607022900（west pin のサーバ側検証）"))
+  (:adr/artifacts
+  (vector "manifest/west.yml: 重複 project 名 30 件を解消（PR #1352）。west list が 3,760 projects を返すことを実測"
+   "fleet-ci: git+SSH transport（PR #1336）、pathspec 修正（#1343）、依存 shipping（#1346）、loopback capability（#1347）"
+   "kotoba-lang/nekko#4（rename 完了、72 tests）、kotoba-lang/bonsai#6（arrangement pin 前進、56 tests）"
+   "bulk landing の残り: SAFE 17 本 merge、CONFLICTRISK 9 本に triage コメント、nekko#3 は superseded として close"))
+  (:adr/decision-summary
+  "west.yml の重複名 30 件（west が manifest を一切ロードできない状態）を解消し、fleet-ci を token 無しで launchd から動く形にし、赤かった 2 gate を green にした。直さないと決めたもの: 90-docs の壊れた EDN 20 件の自動修復、Radicle issue の label、seed の delegate 化。オーナー待ち: GitHub Actions の課金、端末 A への到達性。")
+  (:adr/source-format "edn")
+  (:adr/body "# ADR-2607269500: 残り gap の判定
+
+**Status**: accepted / **Date**: 2026-07-26
+
+一日分の gap 掃除で「直した / 直さないと決めた / オーナー待ち」を分けて記録する。
+判定そのものが成果物なので、直せなかったものも理由付きでここに残す。
+
+## 直したもの
+
+| gap | 実態 | 状態 |
+|---|---|---|
+| **west.yml の重複 project 名 30 件** | `west` が manifest を**一切ロードできない**。`west list` / `west update` が全滅。fleet-ci は独自パーサなので気付けなかった | PR #1352。`west list` = 3,760 projects |
+| fleet-ci が launchd で動かない | `gh` が Keychain を読めず匿名に落ち、private repo が 404。**間欠的に**毎 tick skip | 入力経路を git+SSH に全面移行（#1336） |
+| gate 入力が superproject で timeout | tree 全展開 + `find` で 230,000 ファイルを 2 回歩いていた | `git ls-tree` + `git archive <sha> -- <literal paths>`（#1343） |
+| ノードに外向き HTTPS が無い | `:git/sha` 依存を解決できず、**依存を更新すると CI が壊れる** | operator が mirror から `~/.gitlibs` へ直接配る（#1346） |
+| zebulun が loopback TCP を張れない | ローカル server を立てるテストが軒並み落ち、**ノードの故障をテスト失敗と誤読**していた | probe が capability として検出（#1347）。当該ノードは `:caps #{}` |
+| nekko / bonsai の gate が赤 | どちらも**テストが 1 件も走っていなかった**（rename 残骸 / pin 遅れ） | 15/15 green |
+| Radicle 反映が no-op | COB は署名が要り、passphrase が kagi に無かった | 実在の保管場所から kagi へ。実際に落ちた gate で issue 生成を確認 |
+
+## 直さないと決めたもの
+
+### 1. `90-docs` の parse 不能 EDN 20 件を自動修復しない
+
+`90-docs/deployment/` 11 件・`90-docs/gates/` 8 件・直下 1 件が EDN として読めない
+（2026-08 付けの計画文書群で、ADR-2607171600 の EDN-only 規約より前の遺物）。
+
+自動修復を実装して走らせ、**8 件が「parse が通る」状態になったが、差分を読んで撤回した**。
+不一致の閉じ括弧を EOF に足す修復は parse を通すだけで、**入れ子構造を黙って
+書き換える**（例: `\"…\"]}]` → `\"…\"]}}}}]`）。「読めるようになった」を
+成功条件にしたのが誤りで、これは他所で自分が批判している false-pass と同型だった。
+
+正しい解決は 2 つに 1 つで、どちらも人の判断が要る:
+- **データとして直す** — 各文書の意図した構造を理解して手で修復する
+- **文書として扱う** — data のふりをやめる。誰も consume していないので実害は
+  「queryable plane に載らない」だけ
+
+gate の範囲は `90-docs/adr`（1,561 件、全部 parse 可能）のまま。範囲は
+`gates.edn` に理由付きで書いてある。
+
+### 2. Radicle issue に label を付けない
+
+`rad issue open --labels` は `not authorized to apply Label` で落ちる。label の
+適用は repo の delegate 権限を要求し、seed(gad) は delegate ではない。
+
+直すには seed を delegate にする必要があるが、**ADR-2607259600 の運用形は
+「端末 = delegate / seed = ミラー」の分離が要点**で、issue に飾りを付けるために
+seed へ canonical branch の書き換え権を渡すのは割に合わない。分類は issue 本文の
+`marker:` 行が担う。
+
+### 3. `git.kotobase.net` は kotobase-git worker が持つ
+
+2 つの repo が同じ custom domain を wrangler config で claim している:
+`gftdcojp/net-kotobase` の `protocols-worker`（README で「4 つの公開 hostname の
+唯一の deploy owner」と宣言）と、`kotoba-lang/kotobase-protocols` 自身の
+`kotobase-git` worker。
+
+**実データを持っているのは後者**（D1 `kotobase-git`: 28 repos / 23 refs /
+203 objects / 19 heads、fabric-witness の 2026-07-17 分）。実際、protocols-worker を
+deploy した際に hostname が移り、それらが全部 `404 repository not found` に
+なった。kotobase-git を再 deploy して復旧済み。
+
+したがって **protocols-worker README の当該不変条件は git.kotobase.net については
+誤り**であり、claim は protocols-worker 側から外してある。`kotoba-lang/*/wrangler.*`
+に public route を置くなという規則自体は他の hostname については有効。
+
+## オーナー待ち（agent 側では完了できない）
+
+- **GitHub Actions の課金停止** — `com-junkawasaki` と `gftdcojp` でジョブが
+  起動しない（`recent account payments have failed`）。`kotoba-lang` は正常なので
+  アカウント単位。fleet-ci が代替経路になったが、Actions 側の workflow は
+  2,389 子リポ / 2,580 ファイルが現役のまま。
+- **端末 A (25mbair) に到達できない** — hostname が解決しない。この端末の
+  node passphrase だけ secrets-location-map に未記載のまま。
+- **`org-spirit-in-physics-comics` の RID 欠け** — 登録には working copy が要り、
+  1.6GB（assets）でローカルに checkout されておらず、一貫した登録元である端末 A にも
+  届かない。3,622 件中 1 件。
+
+## 積み残し（別の変更として切り出すべきもの）
+
+- **bonsai の git remote-helper を nbb へ移植**。`bin/git-remote-kotoba` と 2 つの
+  adapter は `#!/usr/bin/env bb` で、ADR-2607173000（bb を script host から退役）に
+  反する。CI を通すために JVM ノード 6 台へ `bb` を入れたのは応急処置。移植は機械的
+  ではない — `load-file`/`requiring-resolve` で `src/bonsai/remote_helper.clj` を
+  読み込み、git と upload-pack の間で生バイトストリームを中継している。
+- **bulk landing の review PR 9 本**。`main` が同じファイルを触っているので
+  巻き戻しの可能性がある。各 PR に「どのファイルが両側で動いたか / base から
+  main が何 commit 進んだか / mergeable」を書いた triage コメントを付けてある。
+  判定規則は「PR が触るファイルを default branch が branch point 以降に触って
+  いなければ巻き戻しは起こり得ない」で、それを満たした 17 本は merge 済み。
+
+## 判定規則として残すもの
+
+**`:review` クラスの PR を「stale base だから触らない」で止めない。** runbook が
+auto-merge を禁じる理由は「stale base が main を黙って巻き戻す」ことなので、
+**PR が触るファイルの集合と、branch point 以降に default branch が触った
+ファイルの集合が交わらない**ことを PR ごとに実測すれば、その条件は成立しない。
+今回 27 本中 17 本がこれを満たし、残り 9 本（+ superseded 1 本）だけが本当に
+人の判断を要した。")))

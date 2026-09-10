@@ -1,0 +1,247 @@
+(vector (map (:db/id -1)
+  (:source/dataset "adr")
+  (:adr/id "adr-2608220100-capability-grants-are-addressed-and-the-address-is-checked")
+  (:adr/doc_type "adr")
+  (:adr/title "identity は解決せず受け取る —— capability grant を addressed にし、その宛先を検査する")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-22")
+  (:adr/topic "identity")
+  (:adr/authoritative_for "kotoba に identity を入れるときの形（受け取る / 解決しない）と、capability-semantics 経路の holder 束縛")
+  (:adr/repos (vector "kotoba-lang/org-biscuitsec" "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2608120400-authority-kernel-principal-intent-decision-receipt"
+                "adr-2608200400-bots-get-a-did-and-authority-as-a-biscuit"
+                "adr-2608200400-did-primitive-identity-reexamination"
+                "adr-2608197300-hermes-did-identity-at-startup"
+                "ADR-2608159400"
+                "ADR-2608160200"
+                "ADR-2608136000"))
+  (:adr/body "## 決定
+
+**kotoba に identity を入れる。ただし言語が identity を *解決* するのではなく、
+*受け取る* 形にする。**
+
+言語内に resolver を置くと identity の評価が effect になり、ADR-2608160200 の
+Execution CID memo 規則（effect set が空か完全 replay 可能なときだけ memo key に
+してよい）に抵触する。principal を **実行の入力**にすれば Execution CID に含まれ、
+決定性も memo 可能性も保たれる。Move の `signer` が取っている形で、VM しか構築
+できない値を entry point の引数として渡す。
+
+**identity を permission の決定に使わない。** 使うのは次の 3 つだけ:
+
+| 用途 | 場所 |
+|---|---|
+| designation（誰に権限を渡すか） | grant の宛先（biscuit の `[holder ...]`） |
+| accountability（誰の権限で何が起きたか） | receipt |
+| introduction（三者間 handoff・再接続） | OCapN netlayer / handoff certificate |
+
+呼び出し地点で「誰が呼んだか」を問うと confused deputy が戻る。問うのは
+「capability を提示したか」だけにする。
+
+## identity は 3 面あり、2 面は既に配線済みだった
+
+| 層 | 鍵 | 実装 | guest / decision に届くか |
+|---|---|---|---|
+| netlayer / vat | onion / TLS / Ed25519 | `kotoba.lang.captp-runtime` + `ocapn-handoff` | 届く |
+| 実行インスタンス | executor key | `kotoba.compiler.receipt` の `:executor` | 届く |
+| **principal（人 / bot / org）** | did:key | biscuit `:subject`、`:cap/holder` | **届いていなかった** |
+
+## 実測して見つけた欠陥（2026-08-22）
+
+`:cap/holder` は `lang/capability-semantics.edn` の `:identity-keys` に入っている。
+座席は在った。**しかし誰も座っていなかった。**
+
+| 場所 | 実際の挙動 |
+|---|---|
+| `biscuit.effective/authorize` | `:cap/holder (:cap/holder requested)` —— **呼び出し側の自己申告をそのまま capability に複写**。何とも比較しない |
+| `biscuit.kotoba/->delegated` | 読む fact は `[cap ...]` と `[before ...]` のみ。**`[holder ...]` を読まない** |
+| `biscuit.authority/->grant` | holder を読むが `(some ...)` = **最初の 1 件**。この repo 内でその値を読む箇所は 0 件 |
+| `authority/grant.cljc:109` | holder を持つ grant だけ束縛。nil なら bearer（これは正しい設計） |
+
+**decider が 2 つあった。** `authority/chain-authorize` は holder を見て、
+capability-semantics 経路は見ていない。ADR-2608200400 が『決定器は増やさない』と
+書いた当のところで、片方だけ質問を落としていた。
+
+`[holder ...]` を読まないことは中立ではない。**それは唯一「読まないと権限が広がる」
+fact** で、落とすと addressed token が bearer token に戻り、そのうえ
+`:cap/holder` が request から埋まるので、**主張する側と検査する側が同じ側**になる。
+
+## やったこと
+
+1. `->delegated` が `[holder <principal>]` を読む。
+2. `authorize` が `:holder`（**認証済み** principal。認証は既存の場所＝
+   `interop_profiles` の offline did:key / VC / UCAN、CACAO、passkey で済ませ、
+   その封じた結果を受け取る）を取り、`(:cap/holder requested)` は**入口で捨てる**。
+   - addressed な grant を addressee 以外が使う -> `:wrong-holder`
+   - addressed な grant を principal 無しで使う -> `:holder-required`
+   - unaddressed（bearer）は合法だが、`:policy/require-holder true` で拒否できる
+     -> `:unbound-grant`。`:policy/forbid-wildcard` と同じ形（lattice は許すが
+     deployment が断る）
+3. **有効な holder は最後の fact**（最初ではない）。`authority.grant/meet` が
+   『the holder is the child's: a delegation ends at whoever holds the leaf』と
+   書いており、最初を採ると**後続 block の再宛先付けが黙って無効になる** ——
+   親が token を持ち続け、委譲された子は何も得ない。`biscuit.authority/->grant`
+   も同じ規則に揃えた。
+4. receipt が **allowed / denied 両方**で `:receipt/holder` と
+   `:receipt/holder-binding` を持つ。`:unauthenticated`（principal が渡されなかった）
+   と `:bearer`（渡されたが grant が要求しなかった）は**別の値**にした ——
+   ADR-2608136000 の『飛ばした と 合格した が出力で区別できるか』。
+
+**decider は増やしていない。** `authority/grant.cljc` が既に持っている質問を、
+持っていなかった経路にも置いただけ。
+
+## 検査
+
+nbb 1.5.212 / node v22.22.2。baseline 71 tests / 172 assertions -> **77 / 202 / 0 failures**。
+
+**4 回の break/unbreak で、壊したものと報告された失敗が一致することを確認した**
+（ADR-2608136000 の警告どおり、壊し方を間違えた赤は成功した実演に見える）:
+
+| 壊し方 | 赤くなったもの |
+|---|---|
+| `:cap/holder` を requested から複写に戻す | 意図した 2 test |
+| `->delegated` の holder を last -> first | `a-delegation-ends-at-the-leaf` |
+| `->delegated` が holder fact を読まない | 3 test / 5 assertion |
+| `->grant` の holder を last -> first | `a-delegation-ends-at-whoever-holds-the-leaf` |
+
+測っていないもの（pass として数えない）: JVM `:test` alias と clj-kondo
+（この環境に clojure CLI が無い）、murakumo fleet 上での実行、実 Ed25519 での
+holder 束縛（本スイートの署名は決定論的スタンドイン）。
+詳細は `90-docs/evidence/260822-biscuit-holder-binding.edn`。
+
+## 着地の現在地（正直に）
+
+**`kotoba-lang/org-biscuitsec` には push できていない。** この remote session は
+`com-junkawasaki` だけが attach されており、`add_repo` の cross-tier add が
+拒否された（`cross-tier adds are not supported in v1`）。commit は patch として
+`90-docs/evidence/patches/260822-org-biscuitsec-holder-binding.patch` に置いた
+（base `039378d4b6fcebacc6fa54a1dfdbc8a12f2b3530`）。適用:
+
+```
+git -C orgs/kotoba-lang/org-biscuitsec am \\
+  90-docs/evidence/patches/260822-org-biscuitsec-holder-binding.patch
+```
+
+## 参考にした言語と、借りたもの
+
+| 言語 | 借りたもの |
+|---|---|
+| **Move** | `signer` —— runtime しか構築できない型を entry 引数で渡す。identity を解決せず受け取るのはこれ |
+| **E (Kernel-E)** | designation と permission の分離。呼び出し地点で誰かを問わない |
+| **Spritely Goblins / OCapN** | identity は node / instance / principal の 3 層で、node の identity は netlayer の仕事（= host boundary）|
+| **DAML** | `signatory` —— authority を値の存在条件にする。kotobase の datom 面への次の適用先 |
+| **biscuit（自前）** | attenuation が offline で、検証に秘密が要らない |
+
+**真似しないもの**: Solidity の `msg.sender` / `tx.origin`（ambient identity）、
+Cedar / RBAC（決定を再中央集権化し、decider が 3 つになる）。
+
+## まだやっていないこと（優先順）
+
+1. **`:principal` を guest grammar に入れる。** 型契約は 2026-08-22 に landed
+   （下記『3 件目』）。**残りは backend と grammar** —— 1 ワードの opaque handle
+   （`:document` / vector と同じ形）にすれば native の admission gate を通る。
+   ゲストにできることは比較・`:cap/holder` への設置・受け渡しの 3 つだけとし、
+   **文字列化させない**（させると guest 内で ACL 文字列マッチが始まる）。
+   Execution CID に含める。
+2. ~~**sealer / unsealer（brand pair）。**~~ **2026-08-22 に実装。**
+   `kotoba-lang/kotoba-lang` の `kotoba.lang.sealer`（純粋・依存ゼロ・registry なし）。
+   下記『2 件目に landed したもの』を参照。
+3. **ゲスト側 attenuation。** bot が自分より狭い slice を他へ渡せない
+   （ADR-2608200400 が『次の決定であって漏れではない』と書いた穴）。
+4. **amu の run receipt v2 `:authority-decision` に principal を通す。** 現在
+   `:authority-decision` を供給するものが無く、実質 v1 しか出ていない。
+5. `lang/capability-semantics.edn` の `:receipt-requirements` に
+   `:receipt/holder` を昇格させるか（今回は追加キーに留め、言語側の floor を
+   動かしていない）。
+
+## 2 件目に landed したもの —— sealer / unsealer（2026-08-22）
+
+**『identity が要る』case の相当部分は、identity を問うていない。**問うているのは
+*これは自分が発行したものか*（provenance）であって *あなたは誰か*（identity）ではない。
+identity で答えると principal・proof・registry・比較が要るが、brand なら
+**object identity だけ**で答えられて、しかも**純粋**である —— seal は effect を持たず、
+何も参照せず、引数の外に届かない。識別子を解決して何かを決める設計はその決定を
+effect にするが（ADR-2608160200 の memo 規則）、brand にはその代償が無い。
+**だから brand で足りる分を identity に払わない。**
+
+`brand-pair` が 2 つの値を返すのは、その分割が機構そのものだから —— sealer を
+渡すことは『この brand に値を入れてよい』だけを渡し、他は何も渡さない。
+label は receipt 用で**比較しない**（同じ label の 2 pair は無関係）。
+`unseal` は throw せず `{:ok? false :reason ...}` を返し（`:explicit-errors` 不変条件）、
+理由は閉じた集合（`:not-sealed` = 手製の偽物、`:wrong-brand` = 他 brand の本物、
+`:not-an-unsealer`）。
+
+検査: sealer-test 単体 **9 tests / 35 assertions / 0 failures**。全スイートは
+本変更の有無で **249 -> 258 tests / 1364 -> 1399 assertions**、失敗は**両方で同一の
+5 FAIL + 3 ERROR**（すべてこの環境に無い兄弟 checkout `../kotoba/...` 参照で、
+repo 自身の `:ocapn-test` alias コメントが予告している drift）。`-M:lint` は
+errors 0、本変更が持ち込んだ警告 1 件は受け入れず直した。
+break/unbreak を 3 回（label 比較に戻す / sealer を受け付ける / `:not-sealed` を
+`:wrong-brand` に畳む）——すべて意図したテストだけが赤くなった。
+
+**まだ使っていない。** 道具を置いただけで、既存の capability 経路で identity 比較を
+brand に置き換えた実例は 0 件。guest への露出も無い（`:principal` 型と同じ工事）。
+詳細は `90-docs/evidence/260822-kotoba-lang-sealer-brand-pairs.edn`。
+
+### 測定が私自身の過大主張を捕まえた
+
+初版の docstring は『sealer を unsealer に広げる公開コンストラクタは無い』と書いていた。
+それを実演するために書いたテストが**落ちた** —— `deftype` はどのプラットフォームでも
+public な `->Unsealer` を生成し、型に付けた `^:private` はそれを抑止しない。
+主張の側を狭い真の性質（**export するもので brand core を渡すものは無い**）に
+書き換え、interop 表面は contract test で名指しした。
+
+## 3 件目に landed したもの —— `:principal` が言語 core に入った（2026-08-22）
+
+**`kotoba.lang.type-system` は `[:cap kind resource]`（不透明な capability。
+パラメータに在ると `implied-effects` が対応する effect を signature に強制する）
+を既に持っていたが、『この実行は誰として走っているか』を言う型が無かった。**
+だから必要とした消費者は全員 string に手を伸ばし、**string は主張である。**
+
+`:principal` を **opaque type** として足した。primitive にしなかったのは意図的で、
+**primitive は全部リテラルで書けるから** —— 書ける principal は、与えられた
+principal ではなく**名乗った** principal である。
+
+そこから 2 つの性質が出て、どちらも記述ではなく assertion にした:
+
+- **principal は authority ではない。** `implied-effects` は `:cap` しか読まないので
+  `:principal` パラメータは effect を 1 つも強制しない。誰が呼んでいるかを
+  知らされることは、それ自体では何も許可しない。**そこから通してよいかを決めるのが
+  ambient authority の誤り**であり、この言語がしないと決めたことである。
+- **signature は、与えられていない principal を作れない。** 返り値が `:principal` に
+  触れているのにパラメータが触れていなければ `:principal/minted` で拒否する。
+  **深さを問わない** —— `[:option :principal]` / `[:result :principal E]` /
+  `[:vector :principal]` / `[:map K :principal]`。**包むことは洗浄ではない。**
+  受け渡しは通る（そこでは principal がパラメータから入ってきている）。
+  Move はこれを VM から得る（`signer` を構築できる唯一の存在が VM）。型契約は
+  provenance をそのようには強制できないので、**見える部分＝signature の形**を強制する。
+
+`lang/surface-status.edn` に `:no-ambient-authority` の隣の
+`:intentional-security-constraint` invariant として記録した。
+
+**⚠ 入ったのは型契約だけである。** entry 自身が
+`:backends #{}` / `:not-implemented #{:guest-grammar :kir :wasm32 :restricted-esm :native}`
+と申告している —— **`:principal` 値を表現する backend は 1 つも無く、grammar に
+principal を束縛する構文も無い。したがって今日 `.kotoba` のソースに principal は
+書けない。**
+
+検査: 単体 **5 tests / 26 assertions / 0 failures**。全スイート
+**258 → 263 tests / 1399 → 1425 assertions**、失敗は前後で同一の 5 FAIL + 3 ERROR。
+lint errors 0、新規警告なし。break/unbreak 4 回（mint 規則を外す / 再帰をやめる /
+primitive に入れる / effect を含意させる）——すべて意図したテストだけが赤くなった。
+
+### 生成物の gate が 1 度正しく赤くなった
+
+surface-status.edn に invariant を足した時点で `on-disk-matrix-matches-regenerated`
+が落ちた。`docs/lang/surface-matrix.md` は surface-status.edn の射影なので、
+**生成物が stale になったことを gate が捕まえた**。再生成して解消（差分 1 行）。
+落ちるべき時に落ちる gate の実例として記録する。
+
+## この ADR 自身が、記録した class の欠陥で 1 度落ちた
+
+docstring を heredoc で書いた際、`\\\"` が Python 側で解決されてファイル上は
+**裸の引用符**になり、Clojure の docstring がそこで終わって
+`did:key:zAlice` がシンボルとして読まれた。**コンパイルは通り、テスト実行時に
+`did:key:zAlice is not ISeqable` で落ちた。** CLAUDE.md の『EDN 文書を heredoc で
+書いたら reader を通してから commit する』が、EDN だけでなく **Clojure の
+docstring にも同じ形で当たる**。")
+))

@@ -1,0 +1,44 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607197100-kami-mackie-touch-imsc-ruby")
+  (:adr/title "KAMI respects Mackie fader touch ownership and preserves IMSC ruby")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607197000-kami-mackie-bank-imsc-layout"))
+  (:adr/decision
+  (map (:daw (map (:fader-touch (map (:input-notes :note-0x68-through-0x6F)
+                       (:addressing :bank-relative-eight-strip)
+                       (:pressed :suppress-motor-feedback)
+                       (:released :return-project-authoritative-gain)))
+         (:touch-runtime (map (:authority :ephemeral-device-state)
+                         (:clear-on (vector :bank-change :project-load :package-load :recovery))))))
+   (:nle (map (:ruby (map (:model :bounded-caption-ruby-runs)
+                (:run-keys (vector :ruby/base :ruby/text))
+                (:maximum-runs 32)
+                (:maximum-code-units-per-field 64)))
+         (:import (map (:container :tts/ruby-container)
+                  (:body-text :exclude-ruby-annotation)))
+         (:preview :measured-horizontal-annotation-over-base)
+         (:export :structured-tts-ruby-container-base-text)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "third-party plugin SDK/isolation" "Mackie channel labels/time display" "certified hardware profiles" "surround/Atmos"))
+    (:nle (vector "continuous/interpolated TTML animation" "advanced language-aware line breaking" "external notification delivery" "translation memory" "OCIO/ICC/HDR"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "a81acc0"))
+   (:nle-commits (vector "3bf09bd"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#29" "kotoba-lang/kami-app-nle#29"))
+   (:evidence
+   (vector "DAW passes 35 tests and 156 assertions; NLE passes 36 tests and 178 assertions."
+    "Both guarded production releases generated non-empty optimized main.js artifacts."
+    "Chrome Web MIDI E2E observed no motor message while strip 1 was touched and exact [224,127,127] authoritative gain feedback on release."
+    "Chrome imported ruby caption body この漢字です without annotation contamination and persisted base 漢字 plus annotation かんじ in project EDN."
+    "After approval, Chrome exported matching structured tts:ruby container/base/text spans."
+    "Both browser consoles had zero errors; Chrome closed in finally and both local servers were stopped."))))
+  (:adr/consequences
+  (vector "A Mackie motorized fader no longer fights the operator while touched and resynchronizes deterministically on release."
+   "Japanese ruby survives IMSC ingest, project persistence, horizontal preview and production caption delivery."
+   "Scribble-strip/time display, language-aware line breaking, continuous animation and third-party audio plugin isolation remain explicit gaps."))
+  (:adr/source-format "edn")))

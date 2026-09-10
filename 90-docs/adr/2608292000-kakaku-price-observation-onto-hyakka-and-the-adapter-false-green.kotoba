@@ -1,0 +1,192 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608292000-kakaku-price-observation-onto-hyakka-and-the-adapter-false-green")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "kakaku-price-observation-onto-hyakka")
+  (:adr/title "kakaku を wiki.kotobase.net に載せる前に、adapter の false green を潰す —— ref 1 本 join の出所は kotobase engine であって IPLD / IPNI ではない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-29")
+  (:adr/last-verified "2026-08-29")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/decision-summary
+  (vector "D1: kakaku の autorun adapter を文字列 key に揃え、seed-default を contracts/kotoba/seed.edn にする"
+   "D2: heartbeat-persists に seed から導出した spread の assertion を足し、到達性 assertion を導出より前に置く"
+   "D3: golden CID を be5e5aa2… に再 pin し、pin し直してよいのは出力を検めた後だけと注記する"
+   "D4: manifest/observatories.edn の kakaku は repo 側 fix の着地後に :produces-datoms へ上げる。fix 前に manifest だけ直すと全ゼロ観測で :produces-datoms が満たされ false green になる（fix は同日 main へ着地したので同時に上げた。--log は明示必須）"
+   "D5: hyakka に載せるとき identity は claim graph の 1 ref、offer 時系列は同じ ref に入れない（ADR-2607311100 D7 の datom 予算）"
+   "D6: source class は merchant 自身の一次情報に限る。他社の価格比較サイトからの取り込みは policy 上通らない"
+   "D7: ref が 1 本しか join できないのは kotobase engine の Database record が ref-name をスカラーで持つためで、IPLD / IPNI の制約ではない"))
+  (:adr/evidence
+  (vector "cloud-itonami/kakaku 5737104 を JVM 21 / Clojure CLI 1.12.0.1530 で実行（2026-08-29）"
+   "修正前: exit 1, kakaku/kotoba/seed.edn (No such file or directory) — 記録済み :blocked-by と一致"
+   "seed パスのみ与えた場合: exit 0 / 16 datoms / spread 0 / cheapest none — chain OK の false green"
+   "修正後: exit 0 / 26 datoms / spread 700 / notable true / cheapest a_com / dearest b_com / chain OK"
+   "test-autorun 6 tests 29 assertions 0-fail、全 8 namespace 63 tests 313 assertions 0-fail"
+   "破壊試験: adapter のみ revert で (pos? (count offers)) が (not (pos? 0)) で落ちる（名乗った理由で落ちる）"
+   "clojure -M:test は 9 tests / 174 assertions しか実行しない（cognitect test-runner の .*-test$ pattern）"
+   "kotobase-engine src/kotobase/engine.clj: Database record の ref-name はスカラー、query の inputs は値であって db source ではない"
+   "cloud-itonami/kakaku PR #2 → main merge e7ad201（2026-08-29）。merge 後の main を独立 checkout して再実測: 3 offers / spread 700 / notable true / 26 datoms / chain OK、63 tests 313 assertions 0-fail、実行後の checkout clean"
+   "network-awai/app-hyakka は Claude GitHub App の repository selection に無く session を起こせない（github_repo_access_denied）。list_repos で network-awai から見えるのは loop-yakuwari のみ"))
+  (:adr/body
+  "# ADR-2608292000: kakaku を wiki.kotobase.net に載せる前に、adapter の false green を潰す
+
+**Status**: accepted / **Date**: 2026-08-29
+
+## Context
+
+オーナーの問い（2026-08-29）「Cloud Itonami で kakaku.com のようなものはある? データ自体は
+wiki.kotobase.net で持って biscuit で扱うような設計にしたい」。
+
+**在る。** `cloud-itonami/kakaku` は canonical product / merchant registry / offer /
+priceHistory / matchCandidate を持ち、lexicon に `compareOffers` `ingestOfferFromUrl`
+`getPriceHistory` `listSelectorRevisions` まで揃っている。周辺に `meyasu`（価格スプレッド ×
+供給レジリエンス）、`mitooshi`（確率予測）、`app-hakken`（ブランド品 vs OEM）、
+`gtin` / `cloud-itonami-gtin-catalog`（商品マスタ正準化）が在る。
+
+ただし deploy はされておらず（appview-catalog / endpoint-health / surface 索引のいずれにも
+ホスト無し）、`manifest/observatories.edn` の判定は `:known-broken`、データ面は kotobase では
+なく **ローカルの kotoba Datom log** である。
+
+## 実測して見つかった 2 つの欠陥（2026-08-29、JVM 実行で確認）
+
+記録されていた `:blocked-by` は seed のパスだけを言っていた。**それは 2 つのうち軽い方**で、
+しかも**それだけを直すと observatory が false green になる**。
+
+### 欠陥 1 — seed のパスが解決しない（記録済み・再現済み）
+
+`autorun.clj` の `seed-default` は `*file*` から導出していたが、`*file*` は classpath 相対
+なので `kakaku/kotoba/seed.edn` になる。seed の実体は `contracts/kotoba/seed.edn`
+（`test_autorun.clj` は最初から正しい方を使っている）。既定引数での起動はすべて
+FileNotFoundException で死んでいた。記録されていた文字列と 1 文字違わず再現した。
+
+### 欠陥 2 — state adapter の key 形が handler と食い違い、観測が全部ゼロになる
+
+`kakaku.methods.agent` は**入口も出口も一貫して文字列 key** である
+（`(get state 'offers' [])` / `(get offer 'price' 0)`、返り値も `{'spread' …}`）。
+一方 `autorun/build-state` は keyword key を渡し、`observation-datoms` は keyword key で
+読み返していた。結果:
+
+- 全 handler が空入力ブランチに落ちる
+- `observation-datoms` の `(or … 0)` / `(or … 0.0)` / `(or … none)` が nil を全部吸う
+- **exit 0・16 datoms・commit-DAG chain OK** で完走する
+
+seed には 3 件の offer（landed 3200 / 3900 / 3500）が入っており、spread は 700、
+cheapest は a_com、dearest は b_com、spread-fraction 0.2188（`NOTABLE-SPREAD-FRACTION`
+0.15 超なので notable）である。**それが全部 0 と none として永続化されていた。**
+CLAUDE.md「検査を書く前・緑を信じる前の 6 問」の 1 番（入力が無いとき pass を返す）そのもの。
+
+### 欠陥 2 は既にテストに写っていた
+
+`test_autorun.clj` は 2026-07-08 に **この退行を観測した上で assertion の側を緩めていた**:
+
+- `spread` の assertion が `>= 0` になっており、0 を通す
+- tamper テストのコメントが「seed の offers が変わったので spread は今 0、以前は 700」と
+  書いている。**seed は変わっていない** —— いま計算しても 700 が出る。壊れたのは adapter。
+- golden CID がその壊れた出力に対して再 pin されていた（`b826321f…`）
+
+**ゼロに落ちた値は、assertion を書き直す対象ではなく診断する対象である。**
+
+## Decision
+
+- **D1**: 欠陥 1・2 を `cloud-itonami/kakaku` 側で直す。`build-state` は文字列 key を出し、
+  `observation-datoms` は文字列 key で読む。`seed-default` は `contracts/kotoba/seed.edn`。
+- **D2**: `heartbeat-persists` に**seed から導出した**期待値の assertion を足す
+  （magic number を焼かない。seed が変われば期待値も動く）。到達性の assertion を
+  導出より**前**に置く —— 後ろに置くと `(apply max '())` の ArityException になり、
+  **自分が名乗っている理由で落ちない赤**になる（実測して直した）。
+- **D3**: golden CID を `be5e5aa2…` に再 pin する。**golden は見せられたものを pin する
+  だけなので、pin し直してよいのは出力を検めた後だけ**という注記を残す。
+- **D4**: `manifest/observatories.edn` の kakaku entry は **`:expect :known-broken` のまま
+  据え置き**、`:blocked-by` に 2 欠陥の診断を書く。`--seed` / `--log` を渡す修正だけを
+  先に入れると `:produces-datoms` が**全ゼロの観測で満たされる** —— manifest 側だけの
+  修正は false green を作る。repo 側の fix が着地してから両方を同時に動かす。
+- **D5**: hyakka に載せるときの面の切り方は、identity（product / merchant / 現在の最安）を
+  claim graph の 1 ref に、**offer 時系列は同じ ref に入れない**。ADR-2607311100 D7 が
+  拡大前に 10M / 100M datom の receipt を要求しており、offer 時系列が最初にそこへ当たる。
+  分けるなら「この境界を跨ぐ分析は N クエリ + マージになる」と名指しで書く。
+- **D6**: source class は merchant 自身の listing / API（一次情報）に限る。**他社の価格比較
+  サイトからの取り込みは policy 上通らない** —— ADR-2608152600 が Steam の
+  `feeds=` 取りこぼしで実測したのと同型の罠が、価格でもそのまま起きる。
+
+## ref が 1 本しか join できないのは IPLD / IPNI の制約ではない
+
+オーナーの問い（同日）への答え。**kotobase の database API の形**である。
+
+`kotobase-engine` の `src/kotobase/engine.clj` を読むと:
+
+- `Database` は record で、`ref-name` を**スカラーで 1 つ**持つ（既定 `main`）
+- `head` はその 1 本の ref を読んで commit CID を 1 つ返す
+- `q` / `query` / `pull` / `datoms` は `(db-value database)` から得た**1 つの db value**に
+  対して評価される。`query` の 3 引数版の `inputs` は値であって、2 本目の db source では
+  ない
+
+したがって 2 つ目のデータ集合は**値として materialize して inputs で渡す**しかなく、それが
+CLAUDE.md の言う「N クエリ + マージ」である。
+
+- **IPLD の制約ではない**。block は content-addressed で大域に参照可能で、ある commit が
+  別の commit の CID を link することを IPLD は何も妨げない。
+- **IPNI の制約でもない**。IPNI は「どの provider がその CID を持つか」を答える索引で、
+  query engine の作業集合の話をしていない。
+- 制約は **Datalog の `$` に束ねられる db value が 1 つ**という 1 点に尽きる。だから
+  ADR-260726 の結論（一緒に query したいものは同じ ref に置く / 分けるなら失われる join を
+  名指しする）は変わらないが、**理由を content addressing に帰属させない**。
+
+## 実測（2026-08-29、JVM 21 / Clojure CLI 1.12.0.1530）
+
+| | 修正前 | 修正後 |
+|---|---|---|
+| 既定引数の `-main` | exit 1、`kakaku/kotoba/seed.edn (No such file or directory)` | exit 0 |
+| 1 cycle の観測 | 3 offers / spread 0 / notable false / **16 datoms** | 3 offers / **spread 700** / **notable true** / **26 datoms** |
+| cheapest / dearest | none / none | a_com / b_com |
+| chain | OK | OK |
+| `test-autorun` | 6 tests / 27 assertions 0-fail（緩めた assertion で） | 6 tests / **29 assertions** 0-fail |
+| 全 8 namespace | — | **63 tests / 313 assertions 0-fail** |
+
+破壊試験: adapter だけを元に戻すと `(pos? (count offers))` が `(not (pos? 0))` で落ち、
+golden CID も旧値に戻って落ちる。**両方向を出した。**
+
+## 併せて見つかった、この repo の外にも効く欠陥
+
+**`clojure -M:test` は 8 test namespace のうち 1 つしか実行しない。** cognitect
+test-runner の既定 pattern は `.*-test$` で、この repo の test namespace は
+`kakaku.methods.test-autorun` のように **`test-` 前置**である。マッチするのは
+`kakaku.murakumo-test` だけなので、`clojure -M:test` は **9 tests / 174 assertions** を
+0-fail で報告して終わる —— 実際には **63 tests / 313 assertions** ある。
+`bb.edn` の `test` task は 8 つ全部を明示列挙していたので、**bb 退役（ADR-2607173000）の
+巻き添えで検査の 85% が黙って消えた**。`:test` alias に `:main-opts` の
+`-r` / `-n` を足すか、namespace を `*-test` に改名する必要がある（この ADR では直していない）。
+
+## 着地状況
+
+- **repo 側の fix は着地した**（2026-08-29）。`cloud-itonami/kakaku` PR #2 →
+  merge `e7ad201`。診断したセッションは `com-junkawasaki` tier に attach されていて
+  push できなかったので（`add_repo` の push 要求は cross-tier で拒否）、その repo を
+  初期 source にした別セッションを起こして着地させた。merge 後の main を独立に
+  checkout して再実測し、同じ golden CID `be5e5aa2…` が出ることを確認している
+  （2 コンテナ・2 セッションで独立に一致）。
+- **`manifest/observatories.edn` も同時に上げた** —— `:known-broken` →
+  `:produces-datoms`、`:args` に `--cycles 1 --log ${REPO}/data/kakaku.datoms.kotoba.edn`。
+  `--log` は省略できない: `log-default` は `seed-default` と同じ `*file*` 由来の理由で
+  `<repo>/kakaku/data/…` という入れ子に書き、`.gitignore` は
+  `data/kakaku.datoms.kotoba.edn` しか無視しないので checkout が汚れる。
+  `log-default` 自体は blast radius が別（`kotoba.clj` にあり他からも使われる）なので
+  この波では直していない。
+- **hyakka connector（第 2 段）は未着手で、理由は当初の想定と違った。** private で
+  clone できないことではなく、**`network-awai/app-hyakka` が Claude GitHub App の
+  repository selection に入っていない**（`github_repo_access_denied`）。実測: この
+  account から network-awai org で許可されているのは `loop-yakuwari` 1 本だけ。
+  org 設定で `app-hyakka` を追加すれば、そこを初期 source にしたセッションを起こせる。
+- **kakaku の seed を hyakka の claim にしてはならない。** `contracts/kotoba/seed.edn` は
+  冒頭に `G10: illustrative, NOT live retailer data` と書かれた例示データで、merchant の
+  ドメインが `a.example` / `b.example` / `c.example` である。ADR-2607311100 D3（出典必須）を
+  満たさない。往復の疎通確認に使いたくなるが、使ってよいのは unit test の fixture までで、
+  hyakka の第 1 tick は merchant 自身の一次情報を要する。
+
+## 関連
+
+adr-2607311100-hyakka-knowledge-wiki-on-kotobase / adr-260726-kotobase-query-plane-is-one-ref /
+adr-2608180200-biscuit-as-delegation-center / adr-2608152600-hyakka-game-corpus-steam-source-class-enforcement /
+adr-2608136000-five-questions-before-trusting-green / adr-2608291500-hermes-bots-aozora-accounts-blocked-by-biscuit-cutover
+")
+))

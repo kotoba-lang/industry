@@ -1,0 +1,61 @@
+(vector (map (:db/id -1)
+  (:adr/id "2607198900")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/status :accepted)
+  (:adr/title "kotoba-lang/face-match: deliberate R0 contract boundary, no comparison algorithm")
+  (:adr/scope (vector :kotoba-lang/face-match))
+  (:adr/related (vector "orgs/kotoba-lang/ekyc" "orgs/kotoba-lang/mrz" "orgs/kotoba-lang/face-liveness"))
+  (:adr/context
+  "Phase D of the eKYC/AML vendor plan approved earlier this session
+   (following Phase A kotoba-lang/mrz ADR-2607198200, Phase B
+   kotoba-lang/watchlist-screen ADR-2607198500, Phase C
+   kotoba-lang/face-liveness ADR-2607198700). ekyc.model/checks includes
+   :face-match as a requestable check kind. Comparing a selfie photo
+   against a document photo is the hardest of the four Phase A-D
+   components to responsibly build from scratch: it needs a real
+   face-embedding model with a real, measured false-accept/false-reject
+   rate. Unlike kotoba-lang/mrz's decode/checksum core (a public,
+   deterministic standard) or kotoba-lang/watchlist-screen's data (real,
+   freely-licensed government lists), there is no comparably legitimate
+   from-scratch path here: no benchmark/validation dataset exists in this
+   workspace, no vision-workload precedent exists in kotoba-lang/inference
+   (torch+num, LLM-shaped only, explicitly rejecting ONNX/TF.js/WebNN per
+   its own README), and hand-porting a face-embedding model's weights
+   without real evaluation would produce a component that LOOKS like it
+   verifies identity while offering no real, measured assurance -- worse
+   than not having the check, because it creates false confidence in
+   exactly the domain (identity fraud) this whole effort exists to guard
+   against.")
+  (:adr/decision
+  "Add kotoba-lang/face-match as a DELIBERATE R0 stub, not a placeholder
+   awaiting later work in this session:
+
+   - face-match.ports/IFaceMatcher -- the injection seam, mirroring
+     mrz.ports/IZoneOcr and face-liveness.ports/ILandmarkTracker's own
+     host-injection shape. No implementation anywhere in this org.
+   - face-match.model -- result record, :non-adjudicating true always.
+   - face-match.core/match -- ALWAYS returns {:status :review :reason
+     :not-implemented} when called with no matcher (the only way this org
+     invokes it today, and the only way it can be invoked until the
+     Re-evaluation conditions below are met). If a real IFaceMatcher is
+     someday injected and returns a real outcome, that outcome surfaces;
+     if injected but returns nil (couldn't attempt a comparison), this
+     still falls back to :review, never a guess -- same fail-closed
+     discipline as watchlist.adapters.aml-port / aml.adapters.etzhayyim.
+
+   MATURITY.md documents explicit re-evaluation conditions (a genuinely
+   open-licensed benchmarked model + real evaluation data + an org
+   decision to extend torch+num into a real vision workload) that must ALL
+   hold before this repo gains a real algorithm -- not a unilateral
+   engineering decision to add one later.
+
+   6 tests / 16 assertions covering all three paths (no matcher,
+   matcher-returns-nil, matcher-returns-real-outcome). clj-kondo: 0
+   errors, 0 warnings.")
+  (:adr/consequences
+  (vector "Every :face-match check in the eKYC/AML pipeline (the planned kotoba-lang/ekyc-native-provider, Phase E) routes to human/manual review by construction -- there is no code path that can auto-approve or auto-reject a face-match check today, because none exists."
+   "This is the one component of the Phase A-D engine set that ships with zero real detection capability, by design -- distinct from mrz (real decode/checksum + honestly-scoped-experimental optical) and face-liveness (real EAR/MAR/yaw algorithm, just no bundled detector). A reader of MATURITY.md cannot mistake face-match's R0 for the same kind of gap as the others' R1."
+   "If this org later wants real face-match capability, the path is explicit and gated (see Re-evaluation conditions), not something a future session should casually add without real benchmark data."))
+  (:adr/references (vector 2607198200 2607198500 2607198700))))

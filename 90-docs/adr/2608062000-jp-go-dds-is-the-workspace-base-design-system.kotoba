@@ -1,0 +1,148 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608062000-jp-go-dds-is-the-workspace-base-design-system")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-08-05")
+  (:adr/last_verified "2026-08-06")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2608062000: workspace の基本 design system は `jp-go-digital-design-system`（DADS）であって liquid-glass ではない。`--hig-*` トークン契約は bridge-css で生かしたまま基盤だけ差し替える —— app CSS を 1 行も変えずに 3 本を移した")
+  (:adr/topic "jp-go-dds-is-the-workspace-base-design-system")
+  (:adr/repos (vector "orgs/kotoba-lang/jp-go-digital-design-system"
+              "orgs/kotoba-lang/kami-genko"
+              "orgs/kotoba-lang/kami-app-daw"
+              "orgs/kotoba-lang/kami-app-nle"
+              "orgs/kotoba-lang/shitsuke"
+              "com-junkawasaki/root (CLAUDE.md, .claude/skills/kotoba-uiux)"))
+
+  (:adr/authoritative_for
+  (vector "新規 UI の基盤は `kotoba-lang/jp-go-digital-design-system`（デジタル庁デザインシステム = DADS）。`kotoba-ui` / `liquid-glass-ui` は legacy であって既定ではない"
+   "app が require するのは `jp-go-dds.core` / `jp-go-dds.page` / `jp-go-dds.tokens` の 3 つ"
+   "`--hig-*` トークン契約は廃止しない。`tokens/bridge-css` が全 `--hig-*` を DADS primitive の上に再定義するので、契約で書かれた view / SVG / CSS は無改造で追従する"
+   "既存 kotoba-ui 消費者を一括改修しない（オーナー判断）。基盤宣言 + 今回の 3 本の移行までがスコープ"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related (vector "adr-2607261600-cloud-itonami-jp-go-dds-adoption"
+                "adr-2607301400-kotoba-lang-pages-apps-dads-uiux"
+                "adr-2607321000-gftd-apex-uiux-on-jp-go-dds"
+                "adr-2607309900-three-public-sites-on-dads"
+                "adr-2608062100-tenant-org-id-is-a-reverse-domain-proven-by-dns"))
+
+  (:adr/body
+  "## 決定
+
+**この workspace の基本 design system は `jp-go-digital-design-system`（DADS）であり、
+`liquid-glass-ui` / `kotoba-ui` ではない。**（オーナー指示 2026-08-05:
+「liquid-glass じゃなくて, repo wide に jp-go-dds を基本 design system に」）
+
+正本は `CLAUDE.md` の「UI/UX 標準」節と skill `kotoba-uiux`。両方をこの決定に書き換え済み。
+
+## 宣言は事実の後追いであって、事実の先取りではない
+
+宣言する前に実測した:
+
+| 基盤 | repo 数 |
+|---|---|
+| jp-go-dds (DADS) を既に使っている | **170** |
+| kotoba-ui / liquid-glass を使っている | **12** |
+
+つまり「基本」を宣言する行為が変えたのは、**既定がどちらか曖昧だった状態**であって
+実装の分布ではない。個別採用の ADR は既に 4 本ある（ADR-2607261600 が cloud-itonami の
+5 面、ADR-2607301400 が kotoba-lang の Pages アプリ 34 repo、ADR-2607321000 が gftd apex、
+ADR-2607309900 が公開 3 サイト）。**欠けていたのは横断の宣言だけ**で、本 ADR がそれを埋める。
+
+## 移行が安いのは、契約が基盤と別物だったから
+
+`--hig-*` は Apple HIG 由来の semantic token 契約で、`shitsuke.hig` が発行し
+liquid-glass が消費していた。ここで捨てずに済んだのは、**契約とその実装が分離していた**
+ため:
+
+```clojure
+(tokens/bridge-css)   ; 全 --hig-* を DADS primitive の上に再定義する
+```
+
+結果として **kami-genko / kami-app-daw / kami-app-nle は app CSS を 1 行も変えずに
+基盤を移した**。移行作業の実体は「view が require する ns を差し替える」ことと、
+bridge が埋めていなかった穴を埋めることだけだった。
+
+**この性質は偶然ではなく、今後も守る対象**である。app が `--hig-*` 契約で書いてある限り
+基盤は差し替え可能で、app が DADS primitive を直接叩き始めた瞬間にその性質は失われる。
+だから CLAUDE.md の規則は「`dads-*` コンポーネント自体を触る時以外は primitive を
+直接書かない」を含む。
+
+## 今回埋めた穴
+
+### bridge-css が `--hig-*` 契約の一部しか張っていなかった
+
+3 本を移して初めて分かった。`jp-go-dds.tokens/hig->dads` に不足していたもの:
+
+- 4pt グリッド（spacing スケール全域）
+- radius スケール
+- text size 11 段
+- 残りのパレット族（cyan / purple / pink→magenta / yellow / gray）
+- `--hig-font-mono` → `var(--font-family-mono)`
+
+**張っていない token は「壊れる」のではなく「未定義に落ちて静かに効かなくなる」**ので、
+移行してみるまで見えなかった。ADR-2607300400（undefined CSS tokens）と同じ失敗の形。
+
+### shitsuke の component が `:attrs` を黙って捨てていた
+
+`ui/button` / `ui/select` / `ui/badge` が `:attrs` と `:on-click` を受け取っておきながら
+出力に載せていなかった。呼び出し側からは**エラーにならず、ただ効かない**。上流
+（`kotoba-lang/shitsuke`）で `:attrs` passthrough を足して修復。
+
+その修復で二次バグも出した: 「component 側が勝つ」マージにしたため、component が生成した
+nil が呼び出し側の `:disabled` を上書きした。**nil-aware なマージに直した**
+（`c0c156c4fd76`）。
+
+## やらないこと
+
+- **既存 kotoba-ui 消費者 12 repo の一括改修はしない**（オーナー判断: 「基盤宣言 +
+  今回の3本を移行」）。動いているものを宣言のために書き換えない。
+- **kotoba-ui / liquid-glass-ui を削除しない。** legacy として文書化する。12 repo が
+  依存しており、`--hig-*` 契約の発行元でもある。
+- **`--hig-*` 契約を廃止しない。** 廃止すると 170 repo 側ではなく契約で書かれた
+  view/SVG が壊れる。bridge があれば両立する。
+
+## 検証
+
+- kami-genko / daw / nle: JVM テスト + headless Chromium harness（実ブラウザで
+  act 経路・レンダリング・ツール切替を確認）
+- design-quality スコア **100.00**
+- app CSS 差分 **0 行**（3 本とも）
+
+## 未着手 / gap
+
+- kotoba-ui 消費者 12 repo は kotoba-ui のまま（意図的。移行の予定は無い）
+- `ongakuka` は今回スコープ外（オーナー判断）
+- shitsuke の他 component にも同じ `:attrs` 取りこぼしが残っている可能性がある。
+  今回直したのは button / select / badge の 3 つで、**全 component を機械的に
+  検査してはいない**")
+
+  (:adr/gaps
+  "[{:gap/id \"kotoba-ui-consumers-not-migrated\"
+    :gap/status \"accepted-by-design\"
+    :gap/detail \"kotoba-ui / liquid-glass を使う 12 repo は移行しない。オーナー判断でスコープ外。legacy として文書化済み\"}
+   {:gap/id \"shitsuke-attrs-passthrough-not-audited-exhaustively\"
+    :gap/status \"open\"
+    :gap/detail \"button / select / badge の :attrs 取りこぼしを個別に直したが、全 component を機械検査していない。同型のバグは呼び出し側からエラーにならず静かに効かないので、grep でなく test で塞ぐべき\"
+    :gap/next-step \"orgs/kotoba-lang/shitsuke で :attrs を受ける全 component を列挙し、attrs が出力に現れることを 1 本のテストで固定する\"}
+   {:gap/id \"ongakuka-out-of-scope\"
+    :gap/status \"deferred\"
+    :gap/detail \"オーナー判断で今回対象外\"}]")
+
+  (:adr/verification
+  "[{:check \"kami-genko / kami-app-daw / kami-app-nle: JVM テスト + headless Chromium harness\" :result \"pass\"}
+   {:check \"design-quality score\" :result \"100.00\"}
+   {:check \"app CSS 差分\" :result \"0 行（3 本とも。基盤差し替えが app に漏れていないことの証拠）\"}
+   {:check \"基盤分布の実測\" :result \"DADS 170 repo / kotoba-ui 12 repo\"}]")
+
+  (:adr/landed
+  "[{:repo \"orgs/kotoba-lang/jp-go-digital-design-system\" :commit \"cc8f4849af5d\" :what \"bridge: --hig-* 契約の残りを DADS primitive に張る\"}
+   {:repo \"orgs/kotoba-lang/shitsuke\" :commit \"c0c156c4fd76\" :what \"components: :attrs passthrough と nil-aware マージ\"}
+   {:repo \"orgs/kotoba-lang/kami-genko\" :commit \"578daea80ea5\" :what \"genko を DADS へ + sites プレーンで公開\"}
+   {:repo \"orgs/kotoba-lang/kami-app-daw\" :commit \"7c460494337a\" :what \"KAMI DAW を DADS へ + sites プレーンで公開\"}
+   {:repo \"orgs/kotoba-lang/kami-app-nle\" :commit \"b78ec3066247\" :what \"KAMI NLE を DADS へ + sites プレーンで公開\"}
+   {:repo \"com-junkawasaki/root\" :what \"CLAUDE.md の UI/UX 節 と skill kotoba-uiux を基盤宣言に書き換え\"}]")))

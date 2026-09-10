@@ -1,0 +1,190 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2607276000")
+  (:adr/title "kotobase datom 面の安定化 — 契約を実行可能にし、承認待ちを可視化する")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-27")
+  (:adr/tags (vector "kotobase" "cacao" "conformance" "marketplace" "incident" "closing"))
+  (:adr/supersedes "")
+  (:adr/body
+  "## 現在地（一行）
+
+kotobase の CACAO 契約**と**リクエスト形状の契約が `cacao.conformance` として
+**実行可能**になり、任意のデプロイに向けて走らせられる。marketplace 7 actor は
+復旧して読み書き・`/escalations`・`/ledger` とも稼働中。
+
+## 何が起きたか
+
+2 日で **5 つ**の障害が起き、**すべて同じ症状（裸の 401、または黙って空）** だった。
+
+| # | 原因 | 発見経緯 |
+|---|---|---|
+| 1 | kagi の `iat` にナノ秒（`(str (Instant/now))`） | `kagi push` が数ヶ月死んでいた |
+| 2 | エッジが CACAO の検証を開始（ADR-2607279500） | 旧形を出す全 client が同時に停止 |
+| 3 | capability 語彙が 2 系統（`datom:read` vs `graph:query`） | marketplace 全読みが 401 |
+| 4 | read が `db_name` を送らず CID だけを送る | `UnknownGraphCid` を client が**空結果**に潰し、データが消えたように見えた |
+| 5 | **apex 経路の署名が base64url、検証側は base64** | 7 actor が 1 日 401。payload は working token と完全一致 |
+
+**5 番目の見つけ方**: 推測を 4 回外した後、worker に自分が発行した CACAO を返させ、
+JVM 側の既知良品と 1 フィールドずつ突き合わせた。header・iss・aud・domain・iat・exp・
+statement・resources がすべて一致し、**違いは `sig ok?` の true/false だけ**だった。
+`v1-cacao` は既に `:sig-encoding :base64` を渡していた（kotobase-client #12）のに、
+**apex 経路だけが base64url 既定のまま取り残されていた** — エッジがヘッダを信用する
+だけだった間は表面化しない。
+
+**共通の構造**: client と server の契約が実行可能な形でどこにも書かれておらず、
+破れたことが本番でしか分からず、しかも全部同じに見える。
+
+決定的な観測: `proxy.cljc:193` の `(.catch (fn [_] nil))`。エッジは
+`invalid CACAO iat` / `CACAO graph scope does not include issuer DID` /
+`CACAO nonce replay` という**正確な理由を計算してから捨てている**。4 つの別々の原因が
+外からは 1 ビットにしか見えない。
+
+## 決定
+
+### 1. 契約を実行可能にする（`cacao.conformance`、実装済み）
+
+規則ごとに **1 箇所だけ** valid と違う CACAO を発行する。2 箇所違うと拒否が
+どの規則を破ったか名指さなくなるため。transport は注入で、live・ローカル worker・
+スタブに同じスイートを当てられる。
+
+**3 件は `:unknown` = 測定であって失敗ではない。** `xrpc-vocabulary-only` と
+`d1-vocabulary-only` は鏡像で、その答えが**どちらのバックエンドが応答しているか**を
+示す — 他のどの観測でも見えない。
+
+`capability-vocabularies` は、無かったせいで障害になった表そのもの
+（1 つの権限に 2 つの名前、対応表なし）。
+
+### 2. apex 規則を共有ライブラリ 1 箇所に（実装済み）
+
+`cacao.core/mint-kotobase-apex` が graph scope / caip122 / ISO 秒 / nonce を所有し、
+**違反は mint 時点で throw する**。apex の拒否は理由を持たないので、理由は mint 側で
+作るしかない。kagi のローカルコピーは削除（ADR-2607268000 の適用）。
+
+### 3. 承認待ちを可視化する（実装済み）
+
+marketplace の全 actor は高リスク操作を escalate するが、**それを読む経路が無かった**。
+actor は正しく判断を拒否し、人間はそれが起きたことを見られなかった。
+`marketplace.edge/ledger-routes` が `/escalations`（未解決のみ）と `/ledger` を
+1 実装で提供し、7 actor が 1 行ずつ委譲する。
+
+`fact-ref` が必要だったのは actor ごとに subject の名前が違うため（`edge/run` は
+`:ref`、order の独自ランナーは `:order-id`）。`:ref` だけで突き合わせると
+**何もマッチせず待ち行列が空に見える** — エラーより悪い「やることなし」に読める。
+
+## live 適合性実行の結果（kotobase.net、2026-07-28）
+
+```
+valid                        accept    ok
+missing-pin-capability       reject    ok
+graph-scope-is-a-cid         reject    ok
+iat-with-fractional-seconds  reject    ok
+iat-as-epoch-seconds         reject    ok
+expired                      reject    ok
+eip4361-header               reject    measured
+xrpc-vocabulary-only         reject    measured
+d1-vocabulary-only           accept    measured
+both-vocabularies            accept    ok
+signature-base64url          reject    measured
+signature-base64             accept    ok
+tampered-signature           reject    ok
+ref-literal                  accept    ok
+ref-cid-with-db-name         accept    ok
+ref-cid-only                 404 UnknownGraphCid       measured
+pattern-wildcard-subject     accept    ok
+pattern-bound-subject        400 InvalidDatomicRequest measured
+pattern-bound-subject-only   400 InvalidDatomicRequest measured
+
+12 checked, 12 agree, 0 disagree, 7 measured
+rejections carry NO reason — every cause looks identical from outside
+```
+
+**リクエスト形状も契約として測る。** 原因 4・5 のうち 4 は CACAO ではなく body の
+問題で、同じ構造（黙って変わり、不透明に返り、呼び手が普通に見えるものへ吸収する）
+だったので同じスイートに入れた。リクエスト形状のケースは**自前の有効な CACAO を持つ**
+— 差分が body にある以上、auth が疑いようのない状態でなければ拒否が形状について
+何も語らない。
+
+`ref-cid-only` と bound-subject は**測定**である。CID 単独が解決するかはバックエンドの
+選択だが、**譲れないのは呼び手が「解決不能」と「空」を区別できること**。bound-subject の
+後退は読み取り量としてしか現れず、請求か timeout が来るまで誰も気づかない。
+
+## スイートが著者を 3 回捕まえた
+
+1. `signature-base64` が DISAGREE — ケースが単一差分でなく、符号化に加えて read
+   capability を落としていた。他の全ケースについてスイート自身のテストが主張している
+   規律を、私が適用しなくなった唯一の場所を機構が見つけた。
+2. リクエスト形状のケースに CACAO を付け忘れ、6 件全部が reject。1 時間前に手で 200 を
+   確認した 3 項目が DISAGREE で返ってきた。
+3. `report` が未定義の `pad` を参照。`format` は JVM 専用でこれは `.cljc` — Node
+   ランナーでも同じレポートが出る必要がある（誰でもデプロイに向けて撃てることが要点）。
+
+## 復旧（2026-07-28）
+
+原因 3・4・5 をすべて修正して 7 actor を再デプロイし、**読み・書き・ガバナ拒否・
+`/escalations` のすべてが稼働**することを実測した（buyer 登録が 3 triples commit、
+未登録買い手は `buyer-unknown` で拒否、7/7 が `/escalations` に応答）。
+
+- **署名符号化**: apex 経路も `:sig-encoding :base64`（原因 5）。`v1-cacao` は既に
+  そうしていた（kotobase-client #12）のに apex 経路だけ取り残されていた。
+- **read が ref 名を送る**: `q`/`datoms`/`pull` に `db_name` を追加（原因 4）。
+- **404 を空に潰さない**: `UnknownGraphCid` 等は伝播させる。**読めないストアが空の
+  ストアに見えてはいけない** — 空のデータベースは日常的に見るものなので誰も違和感を
+  持たず、これがデータ喪失に見えた直接の原因だった。
+- **`load-one` の退避（残る後退）**: ブリッジは bound subject を拒否する（400
+  `InvalidDatomicRequest`）ので、kind 単位読み + client 側フィルタにした。
+  **読み取り精度の実質的な後退**であり、graph 全走査には戻っていない（kind 1 属性で
+  区切られたまま）が、買い手 1 件の要求で全買い手が流れる。ブリッジが bound subject を
+  受けるようになれば 1 クエリに戻り、`marketplace.edge` の他は何も変わらない。
+
+## 検証（全て 2026-07-28 実測）
+
+| repo | tests | assertions |
+|---|---|---|
+| org-chainagnostic-cacao | 59 | 224 |
+| marketplace | 152 | 642 |
+| kagi | 124 | 559 |
+| marketplace-order | 46 | 123 |
+| marketplace-onboarding | 37 | 129 |
+| marketplace-listing | 32 | 90 |
+| marketplace-settlement | 46 | 134 |
+| marketplace-fulfillment | 22 | 64 |
+| marketplace-crossborder | 35 | 132 |
+| marketplace-returns | 21 | 54 |
+| **計** | **568** | **2,151** |
+
+全て 0 failures / 0 errors。`kotobase-client` は test suite を持たない（下記 gap）。
+
+live 実測: 7 actor すべてが `/escalations` に応答、buyer 登録が commit、ガバナが
+未登録買い手を拒否。kagi は push/pull/sync が往復、端末登録が実 vault のコピーで
+wrap-count 1→2 かつ passphrase 無しで secret 読み出しバイト一致。
+
+## 旧データについて（喪失ではない）
+
+移行前の注文・credential・台帳は CID アドレスの旧バックエンドにある。D1 は同じ ref を
+別アドレスで扱うため現経路から見えないだけ。`kagi push` が `UnknownGraphCid` を返すのは
+同じ事実の別の言い方。**「資格情報が見つからないときにデータが無いと結論しない」**
+（秘密情報マップに記録された過去の実事故の教訓）に従い、喪失とは言わない。
+
+## 次に効くもの（未実装、優先順）
+
+1. **エッジが理由コードを返す。** 理由は既に計算済みで捨てているだけ
+   （`proxy/resolve-viewer` の `(.catch (fn [_] nil))`）。5 つの原因が全部同じ 401 に
+   見えた根本。`conformance` の `reason-visible?` が毎回 false を報告し続けており、
+   理由が出れば**そのまま回帰テストになる**。
+2. **`ref-cid-only` がバックエンド側でも空に見えないこと** — client 側は修正済み。
+3. **bound-subject の受理**（`load-one` の精度回復）。
+4. **conformance を net-kotobase / kotobase-client / kagi の CI に入れる。**
+5. kagi: 同期衝突が `seq` の last-writer-wins（item 単位マージが要る）/ VMK rotation
+   未実装のため `revoke` は access-list 変更止まり / 自己発行 CACAO 経路は未統合。
+6. marketplace: buyer surface が live カタログと切れている / durable store の契約
+   テストが 7 分の 2 / `:all` クエリが件数で区切られていない / 冪等性が発注だけ。
+7. `kotobase-client` に test suite が無い。**5 番目の原因はここに 1 行のテストが
+   あれば出荷前に止まっていた。**
+
+## オーナー判断が要るもの
+
+- 既存 datom をどうするか（pod へ戻す / 移行する / 直 D1 へ切替）。
+- kagi の Shamir share 発行と 2 台目での `unlock-enable-keychain`（passphrase 入力と
+  share の物理保管は agent が代行すべきでない）。
+- 裁定の受け皿となる人間プロセス（誰が・どの権限で・どの SLA で）。")
+  ))

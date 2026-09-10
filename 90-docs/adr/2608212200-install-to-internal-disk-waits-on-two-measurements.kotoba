@@ -1,0 +1,138 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608212200-install-to-internal-disk-waits-on-two-measurements")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "install-persistence")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-21")
+  (:adr/last_verified "2026-08-21")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/repos (vector "orgs/kotoba-lang/aiueos"))
+  (:adr/authoritative-for
+  (vector "cloud-premised な aiueos が removable-media-only に留まる決定と、内蔵ディスク install を取るための証拠要件の正本"
+   "内蔵ディスクに置いてよいものの上限（cache と sealed state であって authority ではない）の正本"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related (vector "adr-2608212300-the-aiueos-cloud-round-trip-authority-pointer"
+                "adr-2608212100-where-did-identity-lives-machine-account-service"
+                "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+                "ADR-2608136000"))
+  (:adr/title "ADR-2608212200: 内蔵ディスク install は 2 つの測定を待つ —— 物理機で 1 度 boot すること、そして 4 つの生存物が 1 度ネットワークから戻ること")
+  (:adr/body "# 決定
+
+**removable-media-only を維持する。`os/aiueos/scripts/flash-usb.cljs` は内蔵ディスクと
+パーティションを拒み続ける。**
+
+そして aiueos ADR-0041 が Non-decisions に置いた「install-to-internal-disk」を、
+**設計論ではなく 2 つの測定に条件づける。** どちらも今日満たされていない。
+
+## 現在地（aiueos `origin/main` f99a8e0、2026-08-21）
+
+ADR-0041 が自分で書いている:
+
+- release image は 64 MiB の GPT raw disk（protective MBR + FAT32 ESP +
+  独立した FAT16 recovery ESP + aiuefs data partition）。
+- `flash-usb.cljs` は **removable device にしか書かない**。内蔵ディスクも
+  パーティションも設計として拒否する。**書いたバイトを読み返す** ——
+  安い flash は保存していない書き込みを ack するから。
+- USB boot が証明されているのは **transport equivalence** による ——
+  同じ image を `disk` と `usb` で boot して **byte-identical な aiueos evidence**
+  （33 行一致、boot path `PciRoot(0x0)/Pci(0x2,0x0)/USB(0x0,0x0)`）が出ること。
+- **その evidence は OVMF-under-QEMU だけ。物理機はこの image を 1 度も boot して
+  いない。**
+- したがって今日の「boot install」は **スティックに焼いて、それで起動する**であって
+  「この機械に install する」ではない。
+
+ADR-0041 は同時に、**persistence への引力は本物だ**とも書いている —— OTA の
+update class と enrolment receipt は、どちらも reboot を越えて残る state を前提に
+している。
+
+## 決定
+
+1. **removable-only を維持する。** `flash-usb.cljs` の拒否は緩めない。
+   拒否を緩める変更は、この ADR に反対する ADR を伴わなければならない。
+
+2. **内蔵ディスク install を取るための前提条件は 2 つで、どちらも測定である。**
+
+   **前提 1 —— 物理機が 1 台、この image で boot する。**
+   OVMF/QEMU の transport equivalence は良い証拠だが、それが答えているのは
+   「同じ image が 2 つの transport で同じ evidence を出す」であって
+   「実 firmware がこの image を受け取る」ではない。**一度も物理 boot して
+   いない image に対する install path は、install ではなく設計である。**
+   ここで測るべきは equivalence の再演ではなく、**別の firmware 実装**が
+   同じ 33 行を出すこと。
+
+   **前提 2 —— 4 つの生存物が、1 度ネットワークから戻る。**
+   ADR-0041 は、ネットワーク無しで生き延びなければならないものを 4 つ挙げている:
+   **鍵素材・enrolment receipt・audit chain head・最後に admit した catalog。**
+   そして root ADR-2608039000 の削除テストを自分に当てている ——
+   **local storage を消して、再 enrol した機械が戻ってこなければ、それは
+   local premise であって独自の ADR が要る。**
+
+   **今日そのテストは 1 度も走っていない。** aiueos は `kotobase.net` にも
+   `api.murakumo.cloud` にも接触したことがない（ADR-0041 の Consequences、
+   および ADR-2608212300 の測定）。つまり 4 つのうち **1 つも、どこからも
+   再取得されたことがない。**
+
+   **順序が効く理由はここ。** round trip が存在しないうちに内蔵ディスクへ
+   永続化すると、**どれが cache でどれが premise かを知らないまま、全部を
+   耐久化する**ことになる。そして耐久化されたものは、後から premise だったと
+   分かっても剥がせない —— 既にそこにある state に依存するコードが書かれる。
+   **install は premise を固定する操作である。固定する前に、何が premise かを
+   測る。**
+
+3. **取るときの形は A/B パーティションになる。理由を先に書いておく。**
+   これは予約ではなく、**既に landed している 2 つの不変条件の帰結**である ——
+   `aiueos.ota` の update admission と、anchor set の overlap rotation
+   （ADR-0045: 通常の回転は必ず overlap する、全 anchor の同時入れ替えは
+   一方通行の扉）。どちらも **今日効いている良い方を捨てずに次を置く**という
+   形をしており、**A/B はその storage 上の表現である。** 新しい原理を持ち込む
+   必要はない。逆に、A/B にしない install（in-place 上書き）を選ぶなら、
+   その 2 つの不変条件に反する理由が要る。
+
+4. **内蔵ディスクに置いてよいものの上限を、install より先に決めておく。**
+   ADR-0041 決定 2 のとおり、local storage は **cache + ネットワーク無しで
+   生き延びなければならない sealed state** であって authority ではない。
+   したがって:
+
+   - **4 つの生存物が disk 上で authoritative になってはならない。**
+     モデルは ADR-0065 / ADR-0046 の anchor 配布がすでに示している ——
+     **image が最初の pin を運び、disk が現在の pin を持ち、disk が唯一の
+     複製になることはない。**
+   - **disk 上に、消したら戻らないものを作らない。** 削除テストは install
+     の後も当て続ける対象であって、install で卒業する検査ではない。
+
+5. **install は deployment profile と直交しない。** `:sensitive-local` /
+   `:regulated` は anchors 無しで boot しない（ADR-0065）。内蔵ディスクに
+   anchor set が載ったとき、**image 由来の pin と disk 由来の pin の
+   どちらが勝つか**を書かずに install を landing させない —— 書かなければ
+   実装ごとに違う答えが出て、しかも両方 boot する。
+
+## 決定しないこと
+
+- **パーティション配置・ロールバック段数・recovery ESP を A/B で二重化するか。**
+  前提 1 と 2 が満たされてから、そのときの evidence の上で決める。
+- **install が `:research` からの離脱を含意するか。**
+- **install 元。** 今日の image はスティックから焼かれる。内蔵ディスクへの
+  install が「起動中の USB から」なのか「ネットワークから」なのかは、
+  前提 2 が閉じたときに初めて意味を持つ問い（後者は step 1〜5 を要する）。
+- **既存の aiuefs data partition を install 後も残すか。**
+
+## 帰結・反証条件
+
+- **この ADR は ADR-0041 の Non-decision を閉じない。条件付きにする。**
+  ADR-0041 は「別 ADR がその証拠と共に決める」と書いた。これがその別 ADR で、
+  **証拠を名指しした**段階にある。
+- **前提 2 が先に閉じる見込みが高い**（hosted profile の round trip、
+  ADR-2608212300）。閉じたら、4 つの生存物それぞれについて
+  **どこから戻ったか**を記録する —— 4 つまとめて「戻った」にしない。
+  1 つでも戻らなければ、それが local premise であり、install の設計は
+  そこを中心に決まる。
+- **反証条件**: 物理機が boot しない、あるいは boot して evidence が
+  33 行と一致しないと分かったら、前提 1 は「未達」ではなく **image 側の欠陥**
+  であり、install の話ではなくなる。
+- ⚠ 本文中の数（64 MiB、33 行、4 つの生存物、step 1〜5）は **2026-08-21 に
+  aiueos `origin/main` f99a8e0 の ADR-0041 から読んだ値**であって恒久ではない。
+  引用するときは読み直す。
+")))

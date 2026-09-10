@@ -1,0 +1,190 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608182000")
+  (:adr/title "取得は本物だったが、動かす仕組みが無かった — press 収集の配線")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-18")
+  (:adr/last_verified "2026-08-18")
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/related (vector "ADR-2608110200" "ADR-2608131100" "ADR-2608136000" "ADR-2608180800" "ADR-2608111721"))
+  (:adr/authoritative_for (vector "kouhou の定期実行" "newsfeed ingest の custody" "press 収集経路の現在地"))
+  (:adr/body "# ADR-2608182000: 取得は本物だったが、動かす仕組みが無かった — press 収集の配線
+
+**Status**: accepted
+**Date**: 2026-08-18
+**Deciders**: Jun Kawasaki（「今の gbiz からの情報の取得状況, また press release の収集などの状況は?」→ 調査 → 「next」）
+
+## Context
+
+問いに答えるために測ったら、**3 つの収集経路のうち動いていたのは 1 つだけ**で、
+その 1 つも custody が壊れていた。
+
+| 経路 | 実測（2026-08-18 調査時点） |
+|---|---|
+| `cloud-itonami/kouhou`（官公庁 press、53 verified source） | **2026-08-11 の 1 パスのみ**。7 日停止 |
+| `kotoba-lang/newsfeed`（launchd 毎日 05:23） | 走っている。ただし **git を一度も push しておらず、annex の実体も手元 1 本** |
+| `ai.gftd.recruit.press-signals`（launchd 6 時間毎） | **148 回連続で MODULE_NOT_FOUND** |
+
+**どれも「失敗」として見えていなかった。** kouhou は誰も起動していないだけ、
+newsfeed は WARN を出しながら exit 0、press-signals は /tmp のログにだけ落ちていた。
+
+## Decision
+
+### 1. kouhou を配線した（`scripts/kouhou-ingest.cljs` + `com.gftd.kouhou-ingest`）
+
+毎日 06:41（newsfeed 05:23 / fleet-ci-sweep 04:17 からずらす — 同時刻だと
+どちらの負荷か切り分けられない）。**publish は off に固定**（phase 0 = observe）。
+外向きの発信を無人の定期実行に混ぜない。
+
+ADR-2608110200 は ingest と store を landing させ、`manifest/observatories.edn` は
+「ここを毎時に足すかは別判断なので、**まだ足していない**」と正直に書いていた。
+その正直な注記が 7 日分の官公庁 press を落とした。**可能性の記録のまま置かない。**
+
+不変条件は、このワークスペースが既に記録している失敗から取った:
+
+- **custody は `checkpresentkey` の exit code で確かめる。`whereis` は使わない** ——
+  ADR-2608131100 の 10 object は location log が「3 copies」と言い、remote には
+  1 つも無かった。
+- **「測れなかった」は exit 2**（ADR-2608136000）。checkout が無い / 乖離している /
+  data・raw の外に他人の未コミット変更がある、は clean な run ではない。
+- **archive 0 件・remote 0 本・未 push は、いずれも FAIL。** 1 件も集めない
+  press collector は「静かな日」ではない。
+
+### 2. newsfeed の custody を直した
+
+- `datalad push --to b2` は special remote に git を押そうとして**常に失敗**する。
+  WARN が流れるだけだった。`git annex copy --to b2` は一度で通る。
+- 検証が `whereis`（主張）だった。exit code に変えた。
+- **git を一度も push していなかった。** west の checkout は detached HEAD なので、
+  日次 ingest の commit は branch に載らない —— **4 commit・数週間分の台帳履歴が、
+  この機械にしか無かった。** `HEAD:main` で押すようにし、**commit が remote に
+  載らなかった run は FAIL** にした。
+
+### 3. press-signals は撤去した（`~/Library/LaunchAgents.disabled/` へ退避）
+
+148 回連続失敗の原因は west 移行前のパス（`~/gftdcojp/...`）1 文字列。だが:
+Postgres sink（127.0.0.1:14566）は**listen していない**、script を持つ repo は
+**west.yml に未登録**（shallow、50 graft）。**パスを直せば「収集しているように
+見える job」が復活するだけ**で、収集は復活しない。直すなら repo の登録が先。
+
+## Verification（すべてこのセッションの実測）
+
+**kouhou 初回（手動）:**
+```
+53 sources, 35 committed, 3 held, 0 published, 15 with errors
+persisted: 38 feeds under raw
+custody (VERIFIED by exit code, of 93 keys): kotobase=93, b2=93
+push main ok / push git-annex ok
+```
+`published 0` は成功である（phase 0 で回したので、そう出るのが正しい）。
+
+**newsfeed（修正後に実行）:**
+```
+fetched 1576 → 121 new （台帳 2428 -> 2549）
+custody: b2 VERIFIED present
+push main ok / push git-annex ok
+```
+実行前は `WARN push --to b2 が失敗` + git push なし。
+
+**読んでいたら見つからなかった 2 つのバグ**（どちらも実行して出た）:
+
+1. **branch 名の門で job が一度も起動しなかった** —— west の checkout は
+   **detached HEAD が正常**（pin の commit を直接見る）。最初の実装は
+   `UNABLE branch が main ではない (HEAD)` を返して終わった。見るべきは
+   「誰かの枝の上に居るか」であって branch 名ではない。
+2. **`git status --porcelain` は新しいディレクトリを 1 行に畳む** ——
+   38 本の feed を新規 `raw/<日>/` に書いた run が **「archived: 1 feed」** と
+   報告した。床（0 件なら fail）は通るので**検査は落ちず、数だけが嘘**になる。
+   `--untracked-files=all` で数える。
+
+## Consequences
+
+- 官公庁 press は明日 06:41 から毎日入る。**published は 0 のまま** —— app-aozora への
+  発信を無人にするのは別の判断で、ここではしていない。
+- newsfeed の台帳は 2 箇所（GitHub の git 履歴 + B2 の annex 実体）に載った。
+- **gBizINFO はこの ADR の対象外**。今も恒常取得は無く、2026-08-18 に 1,014 社を
+  1 回 enrich しただけ（ADR-2608180800）。補助金・調達・届出・財務は未取得のまま。
+- **launchd 経由でも 1 度完走を確認した**（自分の shell からだけでなく）:
+  `custody (VERIFIED by exit code, of 95 keys): kotobase=95, b2=95` / `push main ok`。
+- ✅ **連続実行が壊れる件は原因が判明した（2026-08-19）。** 「原因は未特定 —— throttling か
+  timeout か負荷」と書いていたが、**3 つとも違った。** 理由を捨てずに 1 度出したら即座に
+  分かった: `raw/2026-08-19/<source>.xml (Permission denied)`。
+
+  **annex は commit した内容を読み取り専用の symlink にする。** だから同じ UTC 日の
+  2 回目は、その日に既に archive した全 source で書き込みに失敗する —— 53/53 error、
+  persisted 0。日次 run は UTC 日をまたぐので単独では踏まないが、手で回した瞬間・
+  retry した瞬間に全滅する。無人の 2 回が「51 with errors」だったのは、私が同じ UTC 日に
+  何度も回していたから。
+
+  直したのは 3 点（`scripts/kouhou-ingest.cljs`）: ①その日の raw だけ `datalad unlock`
+  してから走る（再実行が冪等）②error の理由をヒストグラムで出す（本文を切らない ——
+  `(` で切ると `raw/…/x.xml (Permission denied)` が「パスが理由」に見える）③半分以上
+  落ちた run は非ゼロで終わる。修正後の同日再実行: **53 sources / 46 committed / 3 held /
+  4 errors**。
+
+  **教訓: 数だけ記録して本文を捨てた検査は、原因を永久に隠す** —— ADR-2608136000 の
+  「受け取ったエラー本文を捨てていないか」がそのまま出た。
+- **残る error は 4 件**（2026-08-19 実測、fetch 修正後）: connect timeout 2 と
+  TLS 2（証明書失効・未知の CA）。**後者はこちらから直せないし、直してはいけない** ——
+  press release を取るために証明書検証を切る取引はしない。
+- **launchd job は 1 台の機械に載っている。** この laptop が止まれば収集も止まる。
+  fleet へ移すかは未決（murakumo の常駐枠は `:slot/attested` が要る —— 書き込み鍵を
+  持つので 1 台固定、ADR-2608111721）。
+
+
+## 追記（同日）: 配線した翌時間に、その収集が何を落としているかを測った
+
+「53 sources, 15 with errors」を毎回出していたので、source ごとに測った。
+**registry は健康だった** —— 普通の client には 53 中 49 が feed を返す。
+落としていたのはこちらで、11 件のうち 9 件は 3 つの原因に集約された。
+
+### 1. User-Agent に bot と書いてあった
+
+alemarahenglish.af に対して 1 変数ずつ測ると:
+
+```
+kouhou/1.0                                     -> 200, 10 items
+kouhou/1.0 (+https://itonami.cloud)            -> 200
+kouhou/1.0 (+https://github.com/.../kouhou)    -> 200
+kouhou/1.0 (public-interest info curator bot)  -> 403
+```
+
+**その部分文字列だけがトリガー**で、旧 UA は `... curator bot, ...` で終わっていた。
+「bare/no-UA を拒む政府サイトがあるから」という理由で選ばれた UA が、
+**それ自体が毎日 1 source に拒まれる理由**になっていた。
+
+**線は引いた**: browser 文字列でも通る（実測）が使わない。これは自動 client であり、
+そう名乗る。正直な識別子を全部拒む source は、拒否として記録する。
+
+### 2. Accept-Encoding を送らず、gunzip もしていなかった
+
+ケニアとソロモン諸島は **gzip を advertise しない request に 403、するものに 200** を返す。
+UN press は無条件に gzip し content-encoding を付けない —— body は binary のまま
+parser に届き `feed parsed to zero items` として出ていた。**transport の問題に対する
+format の判定**で、だから誰にも見えなかった。
+
+magic byte の比較は最初**間違えていた**（Java の byte は符号付きなので 0x8b は -117、
+`-0x1f` は何にも一致しない）。**test が捕まえた**ので、これは出荷されたバグではなく
+直ったバグの記録になっている。
+
+### 3. 9 source が feed ではなく redirect に pin されていた
+
+plain-http の 9 entry は全部 redirect の先でしか feed に届かず、うち 2 件
+（セルビア・サモア）は JDK client が chain を落として **301 ページを feed として**
+返していた。実測した「items を返す address」に pin し直し、host が変わった 3 件は
+`:host` も動かした —— **stale な :host は governor に source-not-in-registry で
+拒否させる**ので、直した fetch が新しい拒否に化けるところだった。
+
+### 結果と、原因でなかったもの
+
+**42 → 47 / 53。** 残り 6: 負荷で run ごとに動く timeout 4 と、TLS 2
+（証明書失効・未知の CA）。後者は**こちらから直せないし、直してはいけない** ——
+press release を取るために証明書検証を切る取引はしない。
+
+**timeout は測って、触らなかった**: 53 source を 10s と 25s で回してどちらも
+48 成功・error 集合も同一。**HttpClient を 1 個再利用**する案も測って無効果。
+**両方とも「明らかな直し方」で、両方とも間違いだった。**
+
+実装: `cloud-itonami/kouhou` `d34b2aa`。回帰を止める test を 2 本足し、
+どちらも壊して**対応する test だけ**が落ちることを確認した。")))

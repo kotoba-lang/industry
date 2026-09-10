@@ -1,0 +1,330 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608139600")
+  (:adr/title "fleet の推論は LaunchDaemon で常駐する — LaunchAgent は誰もログインしないので永久に起動しない")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-13")
+  (:adr/last-verified "2026-08-15")
+  (:adr/addendum-2026-08-15-ha-closeout
+  (map (:inventory (map (:online 11) (:expected 11) (:source "live /ready hwmetrics")))
+   (:inference-ring (map (:mac-workers 9)
+                    (:head "gad")
+                    (:participants 10)
+                    (:excluded (vector "zebulun"))
+                    (:exclude-reason "online inventory but unreachable from the RPC head")
+                    (:parallel-request-slots 2)))
+   (:recovery (map (:fault "SIGSTOP one live RPC worker")
+              (:watchdog-detect-to-model-loaded-seconds 69)
+              (:fault-to-model-loaded-seconds 128)
+              (:post-recovery-concurrent-requests 2)))
+   (:public-routing (map (:primary "https://infer.murakumo.cloud/v1/chat/completions")
+                    (:fallbacks (vector "https://qwen-gad.gftd.ai/v1/chat/completions"
+                                "https://gemma-fleet.gftd.ai/v1/chat/completions"))
+                    (:fallback-on "transport failure or 5xx only")
+                    (:streaming-verified true)))
+   (:security (map (:registry-put-auth-required true)
+              (:unauthenticated-status 401)))
+   (:merged (map (:murakumo (vector "kotoba-lang/murakumo#305" "kotoba-lang/murakumo#306"))
+            (:api (vector "network-awai/local-murakumo#132" "network-awai/local-murakumo#133"))
+            (:root (vector "com-junkawasaki/root#2207" "com-junkawasaki/root#2209"))
+            (:murakumo-pin "76207e62593a623dec256285803459199f3f2a92")
+            (:local-murakumo-pin "30cf0242c538adc59d22fdf3bd734333651d48b3")
+            (:worker-version "55b2dee5-bf55-4c36-9e9a-a7e0daf8fbfe")))))
+  (:adr/addendum-2026-08-15-long-stability
+  (map (:measured-at "2026-08-15T02:42:51Z")
+   (:public-ready (map (:http-status 200)
+                  (:fleet-online 11)
+                  (:fleet-expected 11)
+                  (:inference-endpoints-healthy 3)
+                  (:request-slots-configured 2)
+                  (:request-slots-available 2)))
+   (:capacity (map (:inventory-nodes 11)
+              (:ring-participants 10)
+              (:ring-mac-workers 9)
+              (:ring-heads 1)
+              (:excluded-online-nodes (vector "zebulun"))
+              (:nominal-ring-cpu-threads 122)
+              (:ring-memory-gib 190.687)
+              (:ring-free-memory-gib 80.348)
+              (:ring-free-disk-gib 599.746)
+              (:context-tokens-total 524288)
+              (:context-tokens-per-slot 262144)
+              (:single-slot-decode-tokens-per-second 11.699329)
+              (:two-slot-decode-tokens-per-second (vector 7.729759 7.465963))
+              (:two-slot-aggregate-decode-tokens-per-second 15.195722)
+              (:benchmark-completion-tokens-per-request 256)))
+   (:incident (map (:started-at "2026-08-15T02:37:13Z")
+              (:watchdog-probe-timed-out-at "2026-08-15T02:37:49Z")
+              (:service-restored-at "2026-08-15T02:38:07Z")
+              (:root-cause "a healthy long decode serialized /slots beyond the watchdog's ten-second deadline")
+              (:impact "watchdog cancelled the live request and unnecessarily rebuilt the full RPC ring")
+              (:fallback-observed true)))
+   (:stabilization (map (:busy-connection-fence true)
+                   (:post-probe-arrival-race-check true)
+                   (:idle-probes-required 2)
+                   (:confirmation-delay-seconds 5)
+                   (:soak-ledger "/var/lib/murakumo/ring-watchdog-events.log")
+                   (:ledger-retention-weeks 12)
+                   (:canonical-ci "fleet-ci/murakumo/murakumo")
+                   (:github-actions-authoritative false)
+                   (:murakumo-pr "kotoba-lang/murakumo#307")
+                   (:murakumo-main "5f392e0ce5f31a692c1b8a046570fa64e2467e3b")
+                   (:deployed-at "2026-08-15T02:59:22Z")
+                   (:live-busy-fence (map (:request-seconds 79.067474)
+                                     (:http-status 200)
+                                     (:busy-ledger-events 3)
+                                     (:pid-before 3494325)
+                                     (:pid-after 3494325)
+                                     (:systemd-restarts 0)
+                                     (:idle-health-after true)))))
+   (:qualification (map (:status "soak-started")
+                   (:soak-started-at "2026-08-15T03:06:31Z")
+                   (:signed-main-tip-receipts 1)
+                   (:required-distinct-main-tip-receipts 3)
+                   (:required-soak-seconds 604800)
+                   (:first-main-tip-receipt "34c2bc19458e8ebcfa8315b0f0aa38c661bd3800f21ac11a2f8cee4f2384ac5a")
+                   (:first-main-tip-receipt-at "2026-08-15T04:13:45.385Z")
+                   (:first-main-tip-receipt-outcome "pass")
+                   (:first-main-tip-receipt-check "test-murakumo-5f392e0-murakumo-judah")
+                   (:first-main-tip-receipt-signer "did:key:z6MkjyhVmg5Nfyv9hHN2RAtUe1mM4M5CZitpoHRZpiwhSjwG")
+                   (:note "point-in-time capacity and fault recovery are measured; long-term stability is not yet claimed")))
+   (:session-closeout (map (:observed-at "2026-08-15T04:44:32.183Z")
+                      (:public-ready-http-status 200)
+                      (:fleet-online 11)
+                      (:fleet-expected 11)
+                      (:inference-endpoints-healthy 3)
+                      (:inference-endpoints-configured 3)
+                      (:request-slots-available 2)
+                      (:request-slots-configured 2)
+                      (:ring-active-state "active")
+                      (:ring-main-pid 3494325)
+                      (:ring-active-since "2026-08-15T02:59:22Z")
+                      (:systemd-restarts 0)
+                      (:watchdog-ledger-events (map (:healthy 165) (:busy 15) (:rebuilding 0)))
+                      (:qualification-remains "soak-started")
+                      (:signed-main-tip-receipts 1)
+                      (:next-gate "two more distinct main-tip receipts and 604800 seconds since soak start")
+                      (:earliest-qualification-at "2026-08-22T03:06:31Z")))))
+  (:adr/repo "scripts/fleet-ci")
+  (:adr/supersedes "")
+  (:adr/superseded-by "")
+  (:adr/body
+  "## Context
+
+murakumo mac mini fleet 10 台に Qwen3.6-35B-A3B（UD-IQ2_XXS、10.8 GB）を配備した
+あと、オーナー指示（2026-08-13）「プリストをロードして再起動耐性を付ける作業」と
+「不要なものを除去」「30日ルールかつ, キャッシュは 50gb イカに」。
+
+## Decision 1 — 常駐は LaunchDaemon。LaunchAgent は使わない
+
+**`~/Library/LaunchAgents/` はこの fleet では永久にロードされない。**
+
+実測 2026-08-13、10 台すべてで:
+
+| 観測 | 値 |
+|---|---|
+| `who` | **空**（コンソールに誰もログインしていない） |
+| `loginwindow` / `SecurityAgent` | 稼働 = **ログイン画面で待機中** |
+| `autoLoginUser` | 未設定 |
+| `launchctl list` の fleet ジョブ | **0**（50 件は Apple のシステムエージェント） |
+
+LaunchAgent はユーザの GUI ログイン時にロードされる。ログインが起きないので、
+9 台に置かれていた `ai.gftd.ollama.<node>.plist`（mtime 2026-04-21）は
+**4 か月間ただの 1 度も起動していない。** `launchctl bootstrap gui/$(id -u)` は
+`125: Domain does not support specified action` で拒否される（SSH セッションから
+GUI ドメインに入れない）。
+
+したがって **`/Library/LaunchDaemons/`（ログイン不要・起動時実行）が唯一の経路**。
+既に動いている先例がこの fleet 内にある —— zebulun の `com.murakumo.cljc-isic-6492`
+が 36 日連続稼働しており、これを雛形にした。
+
+導入した `com.murakumo.ollama.plist`（9 台。benjamin は既存の
+`ai.gftd.ollama.benjamin` が同じ形で存在したのでそれを残した）:
+
+- `UserName` でノードのユーザとして実行（root で走らせない）
+- **`EnvironmentVariables` に `HOME` を明示** —— 無いと ollama がモデル置き場を
+  見失う。daemon は login shell を通らないので `~/.zshenv` も読まれない
+- `RunAtLoad` + `KeepAlive` + `ThrottleInterval 10`
+- 起動対象は既存の `~/.gftd/ollama-start.sh`（チューニング済み env の正本）
+
+**検証（10/10）**: 実行ユーザ = ノードのユーザ / `HOME` 正 /
+`OLLAMA_NUM_PARALLEL=4` / **`kill -9` から自動復帰** / API 200。
+落ちない検査は劇場なので、監視が効くことを殺して確かめた。
+
+副産物: 棚卸しで **judah / zebulun / asher が `OLLAMA_NUM_PARALLEL=1` のまま**
+だったのを発見して 4 に揃えた（judah は稼働中の 8 台に含まれており実害があった）。
+
+## Decision 2 — HuggingFace キャッシュは「30 日読まれなければ落とす、上限 50 GB」
+
+対象は `~/.cache/huggingface` 全体。判定は **atime（実際の読み出し）**であって
+mtime ではない。
+
+**mtime は「取得した日」であって使った日ではない。** 初回の手作業でここを取り違え、
+「30 日以内に使用」と報告したものが実際には「30 日以内にダウンロード」だった。
+fleet の volume は atime を実際に更新することを 10/10 ノードで確認済みなので、
+読み出しを直接測れる。
+
+適用結果（2026-08-13、**約 352 GB 回収**）:
+
+| ノード | キャッシュ | 空き |
+|---|---|---|
+| zebulun | 56.5 → 0.01 GB | 34 → 89 GB |
+| levi | 57.2 → 0.6 GB | 31 → 86 GB |
+| dan | 63.5 → 7.1 GB | 29 → 83 GB |
+| asher | 58.9 → 6.5 GB | 26 → 77 GB |
+| issachar | 67.9 → 13.0 GB | **11 → 64 GB** |
+| naphtali | 45.6 → 6.9 GB | **16 → 52 GB** |
+| simeon | 43.6 → 13.8 GB | 48 → 76 GB |
+| benjamin | 29.3 → 16.6 GB | 44 → 56 GB |
+| judah | 6.8 → 6.5 GB | 50 → 51 GB |
+| joseph | 13.2 → 13.0 GB（削除 0） | 50 GB |
+
+30 日以内に読まれたもの（`RealVisXL_V5.0`・`noobai-XL` 系・`gemma-4-e2b-it-4bit`
+等の画像生成モデル）は全て残っている。30 日ルールだけで全ノードが 50 GB を
+下回ったので、上限による追加削除は発生しなかった。
+
+**恒久化は `scripts/fleet-hf-cache-prune.cljs`（nbb）。** 手でやった 1 回は policy
+ではない —— キャッシュは翌日から再び太る。既定は `--check`（報告のみ）で、
+`--apply` で実行。`--days` / `--cap-gb` で調整。
+
+### 実測した罠（script に畳み込んである）
+
+1. **キャッシュに root 所有のファイルが混じる**（過去に root が取得した分）。
+   ユーザ権限の `rm -rf` が `Directory not empty` / `Permission denied` で落ちる。
+   失敗したものだけ `sudo -n` で再試行する
+2. **モデルは `hub/models--*` の外にも置かれる**（実測: `wai-real-cn-v10` が
+   26.5 GB で `~/.cache/huggingface/` 直下）
+3. **remote は `sh -s` に stdin で渡す。** ログインシェルが zsh のノードで
+   `hub/models--*` が 0 件だと `no matches found` で**エラー終了する**
+
+## Root cause — zebulun / asher が推論できないのはエフェメラルポートの枯渇
+
+この 2 台は当初「ループバックが壊れている」「ネットワークが 443 を遮断している」
+と別々の障害に見えたが、**単一の原因**だった。
+
+| ノード | 保持中 TCP ソケット | エフェメラル範囲（16,384）に対して |
+|---|---|---|
+| 正常な 8 台 | 0〜12 | 0% |
+| zebulun | 16,362 | **99%** |
+| asher | 16,550 | **101%** |
+
+`connect()` が接続元ポートを 1 つも割り当てられず `EADDRNOTAVAIL` で失敗する。
+これが**外向き 443 の失敗**と**ループバックの失敗**の両方の正体。ollama は
+llama-server を `127.0.0.1` に固定して接続するので、**モデルのロード自体は毎回
+成功しているのに**（ログに `model loaded` が出る）到達できず 300 秒で諦めていた。
+
+内訳は TIME_WAIT 14,323 + LAST_ACK 2,039（zebulun）。`net.inet.tcp.msl` は
+15,000 ms なので寿命は 30 秒のはずだが、**60 秒待っても 1 個も解放されない**。
+接続嵐は既に止まっており、カーネルのソケット状態が固着している。
+**再起動以外に修復手段がない。**
+
+`scripts/fleet-ci/nodes.edn` は既に zebulun を `:loopback? false` と記録していた
+—— probe は見えていたが、その値を誰も推論不能の説明に使っていなかった。
+
+**現在地: 8/10 台が稼働（32.0〜34.0 t/s、合計約 260 t/s）。** zebulun / asher は
+再起動待ち。再起動すれば +64 t/s で約 320 t/s になる。
+
+**再起動の前提条件は満たした** —— LaunchDaemon 化により ollama は再起動後に自力で
+戻る。ただし両ノードには他の長期プロセス（`serve.py` 65 日 / `bb -m tomoshibi.daemon`
+31 日）があり、こちらは復帰手段が未確認。`nbb server.cljs` は LaunchDaemon 管理下
+なので自動復帰する。
+
+## Consequences — 測れなかったことを緑にしない（ADR-2608136000 の再演）
+
+この 1 セッションで、**測れなかった検査が測って問題が無かった検査と同じ値を返した**
+事例が 5 件出た。全て自分の測定側であって対象側ではない。
+
+1. `IFS=$\"\\t\"` はタブではなくリテラル文字列。目録の照合に失敗して
+   **残存 6 件を「0 件」と報告した**
+2. zsh のグロブが 0 件一致でエラー終了。3 ノードで**「違反 0」ではなく
+   「答えられなかった」**を緑と読んだ
+3. `nbb ... | tail` の `$?` は `tail` の終了コード。exit code の検証が
+   **3 方向とも 0 に見えた**（実際は 1 / 2 / 0 で正しかった）
+4. `curl -m 60` のタイムアウトが ollama のロードを中断させ、
+   `client connection closed before llama-server finished loading` を誘発した
+   —— **測定側が現象を作っていた**
+5. asher の「30.9 t/s」を報告したが、測り直すと 309 秒でタイムアウトした。
+   **9 台稼働という報告は誤りで、正しくは 8 台**
+
+対策として `fleet-hf-cache-prune.cljs` は:
+
+- ノードごとに **`scanned=` を必ず出す**（0 件走査の clean と本当の clean を区別）
+- **atime が更新されないノードでは答えを出さず exit 2**（0 でも 1 でもない）
+- 測定に失敗したノードがあれば `REFUSING to report a pass` と言って **exit 2**
+- **manifest は削除の *後* に書く。** 手作業版は前に書いていたので、rm が
+  Permission denied で落ちた 6 件を「削除済み」と記録していた
+
+landing 前に両方向を実演済み: `--days 0` で違反を出して exit 1、到達不能ホストで
+exit 2、正常で exit 0。
+
+## Addendum — 2026-08-15: llama.cpp RPC 推論面の HA closeout
+
+この ADR の LaunchDaemon 原則を、Ollama の常駐だけでなく公開 API が使う
+llama.cpp RPC ring へ適用した。**在庫、推論参加、request 並列度は別の値**として扱う。
+
+| 面 | live 実測 |
+|---|---|
+| fleet 在庫 | `/ready` hwmetrics で **11/11 online** |
+| 1 推論へ参加する ring | **9 Mac worker + gad head = 10 participants** |
+| 除外 | zebulun は online 在庫だが RPC head から到達不能。plan 時点で fail-closed 除外 |
+| request 並列度 | llama-server `/slots` が **2 configured / 2 available** |
+
+### 常駐・復旧
+
+- 9 Mac worker は system LaunchDaemon `com.murakumo.rpc-worker`。
+  `RunAtLoad` + `KeepAlive` で、GUI login に依存しない
+- head だけが持つ Ed25519 key から worker を再起動できる。ただし
+  `authorized_keys` は `restrict` と固定 `launchctl kickstart` command で拘束し、
+  shell・port forwarding・caller 指定 command は許さない
+- head systemd unit は全 endpoint の bounded preflight と 5 秒の protocol settle を通す。
+  TCP LISTEN だけを model ready と誤認しない
+- watchdog は distributed probe failure 時に head を止め、全 worker を固定 command で
+  再起動し、全 endpoint ready + settle 後に head を戻す
+
+落ちない検査を green にしないため、Benjamin の live RPC process を `SIGSTOP` した。
+direct distributed request は 20 秒で timeout。watchdog は異常を検知して全 worker と
+head を再構成し、**watchdog 検知から model loaded まで約 69 秒、fault 注入から約
+128 秒**で復旧した。worker PID は全て更新され、post-recovery の 2 concurrent request
+は両方 200。これは process が存在し socket が LISTEN していても応答しない故障を含む。
+
+### 公開 API、fallback、streaming、queue
+
+`api.murakumo.cloud` の model 省略／`murakumo-main` は
+`https://infer.murakumo.cloud/v1/chat/completions` を primary とし、上記 10-participant
+ring へ送る。`qwen-gad` と `gemma-fleet` は transport failure または 5xx の時だけ使う
+owned fallback で、正常時の分散推論を黙って standalone に置換しない。
+`qwen3.6-35b-a3b` は vision-capable standalone として explicit endpoint を保つ。
+
+公開 model 省略経路へ同時に 2 request を投入し、両方が Qwen-AgentWorld の同じ
+distributed model 実体から 200 を返した。streaming は同じ primary/fallback 契約で
+終端 `[DONE]` まで確認。poll 型 `/infer/queue` の enqueue/claim/result 面は維持され、
+closeout 時点の unclaimed job は 0。したがって「10 台」は request 数ではなく
+1 request の分散参加数であり、現在の同時 request capacity は 2 である。
+
+### control-plane write の HA 境界
+
+closeout 中に `/infer/models/:id` と `/infer/plans/:id` の PUT が未認証であることを発見。
+第三者が endpoint や plan を変更できるのは availability defect なので、Worker entry と
+CLJS route の両方で service bearer を必須にした。本番で unauthenticated PUT = 401、
+probe record = 404 を確認。model registry は live topology に合わせて
+`murakumo-main -> qwen-agentworld-35b-a3b`、primary = `infer.murakumo.cloud`、
+qwen3.6 = `qwen-gad.gftd.ai` へ修正した。
+
+実装は `kotoba-lang/murakumo` PR #305/#306、公開 routing と write auth は
+`network-awai/local-murakumo` PR #132/#133、west/genpon は root PR #2207/#2209 で
+merge 済み。pin は murakumo `76207e62`、local-murakumo `30cf0242`。
+テストは murakumo narrow 16 tests / 67 assertions、full 655 tests / 6727 assertions
+（別 witness の既知 flaky 1 件は targeted rerun で pass）、local-murakumo
+154 tests / 814 assertions、release build と Wrangler dry-run。本番 Worker version は
+`55b2dee5-bf55-4c36-9e9a-a7e0daf8fbfe`。
+
+## Follow-ups after HA closeout
+
+- **解消**: asher は 9 Mac RPC worker の一員として live 推論へ復帰した
+- **残存**: zebulun は 11 台の online inventory には含むが、RPC head からの到達性を
+  回復するまでは inference ring に入れない。11 台 ring と呼ばない
+- **残存**: port 枯渇の発生源は未確定。再発時に source process/socket owner を捕捉する
+- **残存**: `fleet-hf-cache-prune.cljs --check` の定期実行（現状は手動）
+- 使わなくなった LaunchAgent 18 個は各ノードの
+  `~/.gftd/launchagents-retired-2026-08-13/` に退避済み
+- この closeout は fault-injection と point-in-time live verification。長期 soak 完了を
+  意味しない")))

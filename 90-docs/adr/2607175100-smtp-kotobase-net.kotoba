@@ -1,0 +1,231 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607175100-smtp-kotobase-net")
+  (:adr/title "ADR-2607175100: smtp.kotobase.net — kotobase-native mail submission + inbound")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-17")
+  (:adr/last-verified "2026-07-17")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "smtp-kotobase-net")
+  (:adr/authoritative-for (vector "smtp.kotobase.net hostname meaning (HTTPS submission + future RFC5321)"
+                          "mail.kotobase.net as the RFC5322 envelope domain for kotobase tenants"
+                          "relationship to mailer.gftd.ai (org agent default remains; product surface is kotobase)"
+                          "XRPC NSIDs ai.gftd.apps.kotobase.mail.*"
+                          "tenant graph kotobase/db/<did>/mail-v1 schema (:mail.* attributes)"
+                          "provider boundary: Resend (Phase 1) / host SMTP (Phase 2) via mailer.core"
+                          "Cloudflare Email Routing inbound path into mail.ingestInbound"))
+  (:adr/related (vector "adr-2606301200-kotoba-mail-mailer"
+                "adr-2606010500-workspace-compat-datomic-schema"
+                "adr-2605141800-gftd-email-wire-protocol"
+                "adr-2605141900-mailer-gewp-implementation"
+                "adr-2607072330-web-geo-datalog-search"
+                "adr-2607130700-kotoba-lang-mail-archive-datomic-datascript-parity"
+                "orgs/gftdcojp/net-kotobase"
+                "orgs/kotoba-lang/mail"
+                "orgs/kotoba-lang/mailer"
+                "orgs/kotoba-lang/org-ietf-smtp"))
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/body "
+# ADR-2607175100: smtp.kotobase.net — kotobase-native mail
+
+**Status**: accepted (design + Phase-1 integration landed)
+**Date**: 2026-07-17
+**Deciders**: Jun Kawasaki
+**Scope**: `gftdcojp/net-kotobase` product surface; DNS on `kotobase.net` zone;
+substrate reuse of `kotoba-lang/mail` + `kotoba-lang/mailer` contracts.
+
+## Context
+
+Portfolio already has:
+
+| Surface | Role |
+|---|---|
+| `mailer.gftd.ai` + Resend + CF Email Routing | **Org-internal** agent/app email (`*@mailer.gftd.ai`) |
+| `kotoba-lang/mail` / `mailer` | Portable model + provider-request projection (no sockets) |
+| `org-ietf-smtp` | RFC 5321 **client** (submission to a remote MTA) |
+| workspace-compat (drive/docs/sheets/calendar) | Dual Google/MS skins; mailer is overlay not a new store |
+| `kotobase.net` | Graph BaaS — storage/auth/quota, **not** previously an MTA |
+
+Missing: a **product multi-tenant** mail edge on the kotobase domain so tenants
+and actors can send/receive under kotobase DNS identity, with durable
+inbound/outbound facts in their own kotoba graphs — without making
+`mailer.gftd.ai` the only path, and without pretending CF Workers can listen
+on TCP 25/465/587.
+
+## Decision
+
+### D1 — Hostnames
+
+| Hostname | Role |
+|---|---|
+| **`smtp.kotobase.net`** | **Service host**: HTTPS XRPC submission API (Phase 1 primary). Phase 2 may also advertise RFC 5321 submission (port 587) on a non-Worker backend that fronts the same pipeline. |
+| **`mail.kotobase.net`** | **Envelope domain**: default `From` / inbound addresses (`local@mail.kotobase.net`). MX → Cloudflare Email Routing → mail edge Worker. SPF/DKIM/DMARC live here. |
+| `kotobase.net` apex | Unchanged graph BaaS; does **not** terminate SMTP. |
+
+`smtp.kotobase.net` is **not** a claim that Workers speak SMTP wire protocol on
+port 25. It is the **submission service name** (industry-common: `smtp.*` for
+API/relay brands). Phase 1 transport is HTTPS. Phase 2 can add a real MTA
+behind the same hostname without changing the XRPC contract.
+
+### D2 — Relationship to `mailer.gftd.ai`
+
+| | `mailer.gftd.ai` | `smtp.kotobase.net` |
+|---|---|---|
+| Audience | gftdcojp / etzhayyim **org agents** | **kotobase tenants** (product) |
+| Default policy | Primary for `*@mailer.gftd.ai` org mail | Primary for `*@mail.kotobase.net` tenant mail |
+| Store | PDS / emailBinding / existing relay | tenant graph `mail-v1` on kotobase |
+| Auth | magatama / admin tokens | kotobase viewer + tenant CACAO |
+
+No forced cutover. Org runbooks keep `mailer.gftd.ai`. Product docs and
+workspace-compat mailer overlay point at kotobase mail NSIDs.
+
+### D3 — Data plane (dedicated tenant graph)
+
+Same scaling lesson as ADR-2606010500 / web+geo:
+
+- Graph: `kotobase/db/<tenant-did>/mail-v1` (well-known `db_name` = `\"mail-v1\"`)
+- Attributes (edge schema install vector):
+  - `:mail.msg/id` (unique identity)
+  - `:mail.msg/direction` (`\"inbound\"` | `\"outbound\"`)
+  - `:mail.msg/message-id` (RFC Message-ID when known)
+  - `:mail.msg/from` / `:mail.msg/to` / `:mail.msg/cc` / `:mail.msg/subject`
+  - `:mail.msg/text` / `:mail.msg/html` (size-capped)
+  - `:mail.msg/status` (`draft` | `queued` | `sent` | `failed` | `received` | `held`)
+  - `:mail.msg/provider` / `:mail.msg/provider-id`
+  - `:mail.msg/spf` / `:mail.msg/dkim` / `:mail.msg/dmarc` (inbound auth)
+  - `:mail.msg/received-at` / `:mail.msg/sent-at`
+  - `:mail.msg/owner` (tenant DID)
+  - `:mail.bind/email` (unique) + `:mail.bind/did` + `:mail.bind/direction` + `:mail.bind/verified`
+- Wire model for effects stays aligned with `mail.message` / `mail.inbound` /
+  `mail.receipt` (ADR-2606301200). Edge may re-encode rather than depend on
+  the JVM classpath of those libs inside the Worker.
+
+### D4 — XRPC surface (`ai.gftd.apps.kotobase.mail.*`)
+
+| NSID suffix | Kind | Behavior |
+|---|---|---|
+| `mail.send` | procedure (write) | Validate → optional approval gate → `mailer` provider request → host execute (Resend) → persist outbound + receipt |
+| `mail.bind` | procedure (write) | Bind `local@mail.kotobase.net` (or verified custom domain later) to caller DID |
+| `mail.ingestInbound` | procedure (write, edge/service-auth) | CF Email Worker → normalize → SPF/DKIM flags → tenant graph append |
+| `mail.list` | procedure (read) | Datalog list over `mail-v1` (direction/status filters) |
+
+Auth for `mail.send` / `mail.bind` / `mail.list`: same viewer resolution as
+`web.ingest` / `geo.ingest` (JWT or CACAO). `mail.ingestInbound` uses a
+service credential (Worker-to-Worker / admin) — not end-user bearer.
+
+### D5 — Provider boundary (Phase 1 / 2)
+
+```text
+Phase 1 (now):
+  mail.send
+    → validate + bind check
+    → mailer request shape (:resend HTTP POST https://api.resend.com/emails)
+    → edge net/fetch with secrets/get:resend-api-key (RESEND_API_KEY)
+    → receipt → datomic.transact on mail-v1
+
+  inbound:
+    MX mail.kotobase.net → CF Email Routing
+      → account email() Worker (net-kotobase-mail or email-relay sibling)
+      → mail.ingestInbound → mail-v1
+
+Phase 2 (optional):
+  Real RFC 5321 submission listener (non-Worker host) on smtp.kotobase.net:587
+    AUTH maps API key / CACAO → same mail.send pipeline
+  Optional SES / self-hosted MTA as alternate mailer provider
+```
+
+Cloudflare Workers **cannot** accept SMTP on 25/465/587. Phase 2 is an
+explicit non-Worker deploy; Phase 1 does not block product use.
+
+### D6 — Address policy
+
+- Default mailbox domain: `mail.kotobase.net`.
+- `from` on `mail.send` must be a **bound** address for the caller DID
+  (`mail.bind` with `verified=true`), or an allowlisted platform address for
+  operators.
+- Local-part rules: `[a-z0-9][a-z0-9._-]{0,63}` (no leading `.`, no `..`).
+- Custom domains (tenant brings MX/SPF to their zone) are a follow-up; schema
+  leaves room via bind records with non-`mail.kotobase.net` emails.
+
+### D7 — GEWP
+
+GEWP (ADR-2605141800) remains the **agent wire format** for structured
+agent↔agent mail. `smtp.kotobase.net` accepts plain human mail and may
+**pass through** a GEWP MIME part when present (`application/vnd.gewp+json`)
+as attachment/metadata on the stored entity — Core Conformant parsing is
+not required for Phase 1 human mail.
+
+### D8 — DNS (kotobase.net zone)
+
+```text
+; submission API (Phase 1 HTTPS)
+smtp.kotobase.net.     CNAME/Custom Domain → net-kotobase Worker
+                       (or dedicated net-kotobase-smtp route)
+
+; envelope domain
+mail.kotobase.net.     MX 10  <cloudflare-email-routing>
+mail.kotobase.net.     TXT    \"v=spf1 include:resend.com -all\"
+resend._domainkey.mail.kotobase.net.  CNAME  <resend DKIM>
+_dmarc.mail.kotobase.net. TXT \"v=DMARC1; p=quarantine; rua=mailto:dmarc@mail.kotobase.net\"
+```
+
+Exact Resend DNS targets come from the Resend dashboard at provision time;
+ADR freezes **names and roles**, not Resend's rotating CNAME values.
+
+### D9 — Non-goals (this ADR)
+
+- Full Google Workspace / M365 UI replacement.
+- IMAP/JMAP server on kotobase (clients use API / future gateway).
+- Replacing `mailer.gftd.ai` for org-internal agents.
+- Running a public open relay (AUTH + bind + quota required).
+- Force-push / rewriting historical M365 archives.
+
+## Consequences
+
+- kotobase tenants get a first-class mail product edge on the same domain
+  family as graph storage.
+- Outbound durability is content-addressed in the tenant graph (audit/query).
+- `mailer.gftd.ai` stays the org default; product and org paths diverge cleanly.
+- Phase 1 ships without waiting for a TCP MTA; Phase 2 can add real SMTP
+  submission without renaming the service.
+
+## Implementation map
+
+| Artifact | Location |
+|---|---|
+| This ADR (superproject) | `90-docs/adr/2607175100-smtp-kotobase-net.edn` |
+| Repo-local ADR | `orgs/gftdcojp/net-kotobase/docs/adr/2607175100-smtp-kotobase-net.md` |
+| Pure domain | `clj-edge/src/kotobase/mail.cljc` |
+| Handlers | `clj-edge/src/kotobase/domain_search.cljc` (+ worker NSID wiring) |
+| Lexicons | `contracts/lexicons/ai/gftd/apps/kotobase/mail/*.json` |
+| Schema | `kotobase.schema/mail-v1-schema` |
+| Substrate (unchanged) | `kotoba-lang/mail`, `kotoba-lang/mailer` |
+
+## Status of landings
+
+- Design: accepted (this ADR).
+- Phase-1 code: pure core + lexicons + worker NSID hooks + tests in
+  `net-kotobase` branch `agent/smtp-kotobase`.
+- Live DNS / Resend domain verify / CF Email Routing catch-all: **operator
+  provision step** (not auto-applied by code merge).
+")
+  (:adr/implementation "{:branch \"agent/smtp-kotobase\"
+                        :repo \"gftdcojp/net-kotobase\"
+                        :phase1 [:mail.cljc :lexicons :schema :worker-nsids :tests]
+                        :operator [:dns-mail-domain :resend-domain :cf-email-routing]
+                        :phase2 [:rfc5321-submission-listener]}")
+  (:adr/phases "{:phase-1 {:status \"landed-code\"
+                          :items [\"kotobase.mail pure core\"
+                                  \"mail-v1 schema\"
+                                  \"mail.send/bind/ingestInbound/list lexicons\"
+                                  \"worker NSID wiring\"]}
+                :operator {:status \"pending\"
+                           :items [\"Resend domain mail.kotobase.net\"
+                                   \"MX + SPF + DKIM + DMARC\"
+                                   \"CF Email Routing → ingestInbound\"]}
+                :phase-2 {:status \"planned\"
+                          :items [\"RFC5321 submission on :587 non-Worker\"]}}")))

@@ -1,0 +1,81 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608021430-engi-certificates-carry-signatures")
+  (:adr/title "adr-2608021430: 証明書に署名を載せる — 名前の quorum は quorum ではない。集約は連結で行い、その代償を測って記録する")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-certificates-carry-signatures")
+  (:adr/authoritative-for
+  (vector "engi の証明書署名と検証"
+   "vote 署名 payload の構成"
+   "署名集約の方式選択とその代償"))
+  (:adr/related
+  (vector "adr-2608020930-engi-catch-up-sync"
+   "adr-2608021130-engi-wire-codec-total-decode-and-identifier-mangling"
+   "adr-2608021330-engi-inbound-half-and-worker-measurement"
+   "adr-2608020230-torihiki-authentication-is-consensus-state"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi"))
+  (:adr/body
+  "# ADR-2608021430: 証明書に署名を載せる
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+#7 の最後の実装項目として**署名集約**に着手したところ、その手前に**より基本的な穴**があった。
+
+**証明書は署名を 1 つも運んでいなかった。**
+
+`engi.consensus/qc` は**相異なる witness を数える**だけで、docstring は「vote は呼び出し側で署名検証済みで届く」と言う。**その契約は、replica が自分で受け取った vote を集める場面でしか成立しない。** sync 経路では成立しえない——**見知らぬ相手のブロックに入っている証明書は、この replica が vote として見たことが一度も無い。**
+
+結果: `engi.sync` は、**証明書が quorum 人分の witness を「名指し」してさえいれば** segment を受理していた。**peer は投票していない witness を 3 人並べた捏造履歴を渡せば、全検査を通過できた。** commit rule は健全で、**それが検査している対象が健全でなかった。**
+
+## Decision
+
+### 1. 証明書は witness ごとに署名を運ぶ
+
+payload は **chain id・view・height・block hash・witness** を覆う。それぞれが load-bearing で、理由は `torihiki.auth`（ADR-2608020230）と同じ:
+
+- chain id が無ければ **testnet の署名が mainnet の vote を認可する**
+- view が無ければ **ある view の署名が別の view を証明する**
+- witness が無ければ **他人の署名として再生できる**
+
+### 2. **検証済み**署名の quorum を要求する
+
+名前の quorum ＋「いくつかの署名」ではない。**分けて数えると、5 人を名指しして 1 人分だけ署名した証明書が両方の検査を通る。**
+
+### 3. sync の verifier は optional
+
+replica が**自分で検査済みの履歴を replay する**ときに再検証させない——torihiki の `apply-block` が live 適用と replay を分けるのと同じ区別。
+
+### 4. 集約は**連結**で行う。BLS は採らない
+
+**一証明書一署名（BLS）には pairing-friendly curve が要り、WebCrypto は持っていない。**
+
+curve 実装を足すことは、**このシステムで最も security-critical な算術を手書きコードに置く**ことを意味する。しかも本プロジェクトの transport 選択（ADR-2608021030）の論拠は「**platform が既に提供しているものの上で動くこと**」だった。それと矛盾する。
+
+**代償は隠さず測る。** `signature-bytes` を公開し、テストが線形増加を assert する。**validator 100 で証明書は署名 100 個**——これはこのシステムが到達していない規模での**帯域の問題**であり、**正しさの問題ではない。** 効いてきたときの正解は curve であって近道ではない。
+
+## Consequences
+
+- (+) **sync が捏造履歴を受理しなくなった。** #7 で最も深刻な穴が塞がった。
+- (+) 署名が wire を渡り、渡った先で検証できることをテストで固定（**輸送後に検査できない証明書は証明書ではない**）。
+- (−) **実鍵が繋がっていない。** テストは stand-in signer で配線を証明しているだけ。`witness-quorum` の署名器との接続は未実施。
+- (−) **証明書サイズが validator 数に線形。** 明示的な選択で、測定可能にしてある。
+- (−) `engi.consensus/qc` の docstring の「呼び出し側で検証済み」は**依然として local 収集経路の記述**として残る。sync 経路がそれに依存しなくなっただけ。
+
+## テストの期待値をまた 1 つ間違えた
+
+「quorum 2」を試そうとしたが、**`quorum-size` は常に奇数**で 2 は到達不能、かつ **quorum 未満の証明書は `qc` が nil を返すので作れない。** 存在する場合（形成時より大きい quorum に照らす）を試すよう書き直した。**コードは正しく、テストが間違っていた**——このセッションで 5 度目。
+
+## 残りギャップ
+
+1〜6 完了。**7 は pacemaker・sync・wire・driver・受理側・署名が完了**、実鍵の接続とブラウザ実測が残り。8 bridge・監査。
+")))

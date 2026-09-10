@@ -1,0 +1,316 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607266000-kotoba-stack-responsibility-split-t0-t3")
+  (:adr/title "ADR-2607266000: kotoba/compiler/kototama/aiueos の過積載を T0-T6 の責任 tier に分解する")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-26")
+  (:adr/last-verified "2026-07-26")
+  (:adr/last_verified "2026-07-26")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-stack-responsibility-split-t0-t3")
+  (:adr/authoritative-for
+  (vector "kotoba stack の責任 tier (T0 契約 / T1 言語 / T2 生成 / T3 実行 / T4 権限 / T5 機構 / T6 配置) の定義"
+   "T0-T6 の責任 repo 群の所有範囲と依存方向"
+   "Rust の位置づけ (host adapter として可、core 依存経路には含めない)"
+   "Phase A (抽出・公開・登録) と Phase B (consumer flip・元 repo からの削除) の境界"
+   "この規模の横断分割を並行セッション環境で安全に行うための運用条件 (G-M..G-P)"))
+  (:adr/related
+  (vector "adr-2607252500-kotoba-wasm-component-first-execution-boundary"
+   "adr-2607022400-kototama-unikernel-tender-runtime-vocabulary"
+   "adr-2607241100-kotoba-stack-topology-and-design-cleanup"
+   "kotoba-lang/aiueos 90-docs/adr/0013-native-os-ownership-and-boot"
+   "kotoba-lang/aiueos 90-docs/adr/0011-link-time-capability-enforcement"))
+  (:adr/body
+  "# ADR-2607266000: kotoba stack の責任分解 (T0-T3)
+
+**Status**: accepted
+**Date**: 2026-07-26
+
+## Context
+
+`kotoba` / `compiler` / `kototama` / `aiueos` の 4 repo が、実際には 14 前後の
+責任を抱えており、しかも**宣言と実装が逆流**していた。実測 (2026-07-26):
+
+- `compiler` (24,133 行) に **実行系** (`native_executor.clj` 635)、**provider 群**
+  (`provider/` 12 ファイル 2,248 行 — clock/http/llm/log/state/storage/ui とその
+  transport)、**packaging** (`packaging/elf64.clj` 425)、**検証器**
+  (`verifier.cljc` 669) が同居していた。検証器が被検証物と同じ repo にあるため、
+  自己検証にしかなっていなかった。
+- `kototama` に **fleet 制御** (`fleet_exec` 743 + `fleet_store` 410 +
+  `fleet.cljc` 345 = 1,498 行) と **PostgreSQL pool** (433) が同居。canonical な
+  役割表 (`kototama/README.md`) は 'murakumo = cluster control plane' と書いて
+  いるのに、fleet の実装は kototama にあった。
+- `kotoba` (言語 apex を宣言) の `src/kotoba/` 41 ファイルのうち、言語コアは 5 程度で、
+  残りは supply-chain 統治 8 / codebase actor 8 / storage・mesh 5 / adapter 7 /
+  `cap_table` 等。
+- `aiueos` が判断 (policy/broker) と機構 (kernel C 約 5,000 行) を兼ねていた。
+
+さらに、中間表現 (KIR) が `compiler` の内部にあるため **backend を分離できず**、
+ADR-2607252500 が要求する 'Component は契約面 / native は実行面' の二面出力を
+生成者の外から検証する手段が構造的に存在しなかった。
+
+## Decision
+
+### 1. 責任を 7 tier に定義する
+
+| tier | 権限軸 | 問い |
+|---|---|---|
+| T0 | 契約 Contract | 独立リリース間で同じ意味を持つデータは何か |
+| T1 | 言語 Semantics | 言語とは何か |
+| T2 | 生成 Production | 意味を成果物にどう落とすか |
+| T3 | 実行 Execution | 成果物をどう走らせるか |
+| T4 | 権限 Authority | 何を許すか |
+| T5 | 機構 Mechanism | ハードウェアを誰が握るか |
+| T6 | 配置 Placement | どこで走らせるか |
+
+T4 は既存 `kotoba-lang/security` (effect/capability/key-lifecycle/evidence-plane/
+supply-chain) と `ed25519` と `aiueos` で足りるため**新規 repo を作らない**。
+T5 は本 ADR の対象外 (aiueos ADR-0013 の bare-metal profile が扱う)。
+T6 は新規 `kotoba-lang/fleet` が reusable placement library / CLI / packaging を所有する。
+`murakumo` は binary・配置設定・ops 面、`kototama` は T3 実行（host / 実行時 link）
+のままとする。Solo5 由来の *tender* は役割語であって製品名ではない
+（ADR-2608139980）。`tender-native` / `tender-component` は kototama の宿であり、
+独立した存在ではない。
+
+### 2. T0-T3 で 11 repo を切り出す (Phase A 完了)
+
+| repo | tier | 行数 | 抽出元 |
+|---|---|---|---|
+| `kotoba-kir` | T0 | 3,562 | compiler: ir/value/target/decimal/xml/compatibility/admission/cljs-i64 |
+| `artifact` | T0 | 338 | compiler: artifact/runtime-identity |
+| `kgraph` | T1 | 83 | kotoba: kgraph |
+| `grammar` | T1 | 163 | kotoba+compiler: guest-grammar |
+| `kotoba-wasm` | T2 | 2,661 | compiler: backend/wasm, wasm-typed, canonical-abi, wasm-tools |
+| `kotoba-native` | T2 | 1,961 | compiler: backend/x86_64, aarch64, packaging/elf64 |
+| `kotoba-component` | T2 | 3,664 | compiler: component-core/composition/admission/artifact/wit |
+| `kotoba-verifier` | T2 | 669 | compiler: verifier + signing |
+| `tender-native` | T3 | 635 | compiler: native-executor |
+| `provider` | T3 | 2,248 | compiler: provider/ 12 ファイル |
+| `provider-postgres` | T3 | 433 | kototama: postgresql-pool-provider |
+
+計 **16,417 行**。既存 `kotoba-script` が T2 の script backend、`security` が T4 で
+あることを確認済みのため、その 2 つは新規作成していない (重複回避)。
+
+### 3. 分解の原則
+
+1. **中間表現を独立させる** — `kotoba-kir`。これが無いと backend を分離できず、
+   二面出力の同値性を外部検証できない。分解の要石。
+2. **生成者と検証者を分ける** — `compiler` != `kotoba-verifier`。
+   同一 repo の自己検証は検証ではない。
+3. **契約は実装を持たない** — `abi` / `kotoba-kir` / `artifact`。
+4. **機構と判断を分ける** — ADR-2607252500 決定 2 が既定 (T5、本 ADR 対象外)。
+5. **provider を消費者側に置かない** — compiler に HTTP/LLM/storage、kototama に
+   Postgres があるのは逆流。
+
+### 4. Rust の位置づけ
+
+Rust は **host adapter の一つとしては許容**する。ただし **kotoba の core を
+Rust 必須にしない / core の依存経路に含めない**。この制約により、`kototama` の
+Component host として `tender-component/native/component-host` が所有し、
+core 経路に取り込まない。Wasm engine を core に埋める設計 (D1 Wasmtime JIT /
+D2 Wasmtime AOT) はこの制約下では主経路にできず、**同一 KIR から Component (契約面)
+と native (実行面) を出す二面出力**が主経路になる。ADR-2607252500 決定 4 の
+'native AOT は boot/firmware/kernel/engine/driver に限る' との整合は、二面出力の
+native 側が『application を native ABI/OS syscall に直結する経路』ではなく
+『micro-TCB が管理する同じ capability 境界の内側の実行形式』である、という解釈に
+拠る。この解釈は ADR-2607252500 の but 節へ反映済み (G-A)。
+
+### 5. Phase A と Phase B を分ける
+
+- **Phase A (本 ADR で完了)**: 新 repo に抽出コードを配置、ns を remap、依存を
+  pinned `:git/sha` で配線、GitHub 公開、west 登録。**元 repo からは削除しない**
+  ため既存ビルドは壊れない。
+- **Phase B**: consumer を新 repo 依存に切り替え、元コードを削除。各 repo の
+  test green を通過条件とする。`compiler` / `kotoba` / `kototama` / T6 `fleet`
+  は完了。
+
+## Namespace remap
+
+抽出に伴い ns を移動した。cross-reference は全ファイルに一括適用済み。
+
+```text
+kotoba.compiler.ir                    -> kotoba.kir
+kotoba.compiler.value                 -> kotoba.kir.value
+kotoba.compiler.target                -> kotoba.kir.target
+kotoba.compiler.decimal               -> kotoba.kir.decimal
+kotoba.compiler.xml                   -> kotoba.kir.xml
+kotoba.compiler.compatibility         -> kotoba.kir.compatibility
+kotoba.compiler.admission             -> kotoba.kir.admission
+kotoba.compiler.cljs-i64              -> kotoba.kir.cljs-i64
+kotoba.compiler.artifact              -> kotoba.artifact.core
+kotoba.compiler.runtime-identity      -> kotoba.artifact.runtime-identity
+kotoba.compiler.signing               -> kotoba.verifier.signing
+kotoba.compiler.backend.wasm          -> kotoba.wasm.core
+kotoba.compiler.backend.wasm-typed    -> kotoba.wasm.typed
+kotoba.compiler.canonical-abi         -> kotoba.wasm.canonical-abi
+kotoba.compiler.wasm-tools            -> kotoba.wasm.tools
+kotoba.compiler.backend.x86-64        -> kotoba.native.x86-64
+kotoba.compiler.backend.aarch64       -> kotoba.native.aarch64
+kotoba.compiler.packaging.elf64       -> kotoba.native.elf64
+kotoba.compiler.component-*           -> kotoba.component.*
+kotoba.compiler.verifier              -> kotoba.verifier
+kotoba.compiler.native-executor       -> kototama.native.executor
+kotoba.compiler.provider.*            -> provider.*
+kototama.postgresql-pool-provider     -> provider.postgres.pool
+kotoba.guest-grammar                  -> kotoba.grammar
+```
+
+## Dependency graph
+
+```text
+T0 contract:
+  kotoba-core-contracts <- grammar
+  security <- kotoba-kir <- artifact
+
+T1 language/library:
+  datom <- kgraph
+  dag-cbor / artifact / rad / sqlite <- codebase
+  kotoba-lang <- compiler
+
+T2 production:
+  kotoba-kir <- kotoba-wasm <- kotoba-component
+  kotoba-kir / artifact <- kotoba-native
+  kotoba-kir / artifact / both backend surfaces <- kotoba-verifier
+  contracts / language libraries / backends / verifier <- compiler
+
+T3 execution:
+  compiler / language libraries / assurance <- kotoba
+  kotoba + selfhost <- mesh
+  kotoba-kir <- provider
+  kototama / assurance <- provider-transport
+  kototama / kotoba-kir <- provider-postgres
+  kotoba-kir / artifact <- tender-native
+  kototama <- tender-component
+
+T6 placement:
+  kototama / security <- fleet
+```
+
+矢印は dependency -> consumer。生成者と検証者は分離し、provider は tender の ABI を
+消費できるが tender は provider を同梱しない。全 production git edge の宣言一致、
+role 方向、非循環性を 21-repo gate が検証する。
+
+## Consequences
+
+- (+) KIR が compiler の外に出たため、backend の emission を独立に再導出して
+  比較できる (`kotoba-verifier`)。二面出力の同値性検証が構造的に可能になった。
+- (+) compiler から 2,248 行の provider と 635 行の実行系が出たため、
+  'compiler が何であるか' が行数の上でも説明可能になった。
+- (+) 21 repo が `resources/repository-rules.edn` で実際の production git 依存を
+  完全宣言し、role 方向と非循環性を superproject CI で強制する。
+- (+) west 登録は元の 11 repo に `fleet` / `codebase` / `mesh` /
+  `provider-transport` / `tender-component` を加えた 16 repo になった。
+- (+) provider が特定 tender の ABI を消費する依存は許可する一方、tender から
+  provider を同梱する逆方向は全て除去した。
+
+## Phase B (2026-07-26)
+
+| repo | 内容 | 結果 |
+|---|---|---|
+| `compiler` | owner repo を pinned dep として消費。owner の単体テスト 6 群も移設し、provider と native tender は test / optional execution plugin 化 | **完了** — 543 tests / 5037 assertions / 0 failures |
+| `kotoba` | grammar に加え assurance / semantic codebase / mesh を `security` / `codebase` / `mesh` へ移設。`cap_table` と host adapter は実行責任として残置 | **完了** — 397 tests / 8116 assertions / 0 failures |
+| `kototama` | PostgreSQL / transport provider、fleet、Wasmtime + jco Component tender を分離。Rust / npm を core 依存経路から除去 | **完了** — 154 tests / 530 assertions / 0 failures、TCB 32 -> 23、external surface 10 -> 8 |
+| `fleet` | T6 の 4 ns + 3 test namespace + CLI + systemd packaging を新 repo へ移設。persisted key `:kototama.fleet/*` は checkpoint 互換のため維持 | **完了** — 35 tests / 136 assertions / 0 failures、R3 gate 11/11、staging smoke green |
+| 新 owner | `security` / `codebase` / `mesh` / `provider-transport` / `tender-component` が実装・テスト・qualification を所有 | **完了** — security 210/1063、codebase 21/152、mesh 8/23、transport 5/19、Component Clojure + Rust + Chromium 全 green |
+| west pin | 全変更 child と新規 4 repo を immutable main SHA で登録 | **完了** — root の pin gate と role gate を通過 |
+
+Phase B の途中で 2 つの実問題が出た。どちらも「読んで判断」では見つからず、
+実際にテストを走らせて初めて出た。
+
+1. **最初の抽出元が間違っていた。** 共有 west checkout
+   (`orgs/kotoba-lang/compiler`) は evidence branch `agent/nested-record-ref-v1`
+   に居座っており、main より `component_core` で -427 行、`composition` で -53 行、
+   `backend/wasm` で -59 行、`canonical-abi` で -2 行 古かった。これは
+   ADR-2607252500 が「merge すると起きる」と警告した退行そのもの。各 repo の
+   `origin/main` から pristine worktree を切って全 11 repo を再抽出し直した。
+2. **上流が動き続ける。** 再抽出後、compiler main に #283
+   (heterogeneous scalar union decoding) が着地し、削除対象 3 ファイルを変更した。
+   削除を維持したまま `kotoba-wasm` / `kotoba-component` へ forward-port して解決。
+   分割は一度やれば終わりではなく、**着地までの時間が短いほど port コストが低い**。
+
+### T6 (fleet) の決着
+
+当初案の `murakumo` 移設は棄却し、新規 `kotoba-lang/fleet` に分離した。
+`murakumo` には Clojure src tree がなく、binary / 配置設定 / ops 面へ
+placement library を同梱する理由がないためである。
+
+循環を避けるため依存方向は **`fleet -> kototama` の一方向**とし、fleet 4 ns は
+`fleet.core` / `fleet.store` / `fleet.exec` / `fleet.fence` へ remap、10 個の
+fleet CLI command と systemd packaging も `fleet` 側へ移した。kototama は R3 を
+自 repo の成熟度として宣言せず、外部 placement gate を参照する。
+
+既存 checkpoint の wire compatibility のため persisted EDN key
+`:kototama.fleet/*` は rename しない。repo basename `fleet` は
+`cloud-itonami/fleet` と west 上で衝突するため、west entry 名だけ
+`kotoba-lang-fleet` とする。
+
+## Gap ledger (2026-07-26)
+
+### 解決済み
+
+| id | gap | 決着 |
+|---|---|---|
+| G-A | ADR-2607252500 決定 4 の but 節 | 追記済み。KIR 二面出力は「application を native ABI に直結」に当たらない (native 面も micro-TCB の capability 境界の内側) |
+| G-B | Phase B: consumer flip と元コード削除 | `compiler` / `kotoba` / `kototama` / T6 `fleet` まで完了 |
+| G-C | `provider-postgres` -> `kototama.tender` | **逆流ではなかった。** 実物は `tender/host-fn` に加え `ValType/I32` も直接使う Chicory tender 専用プラグイン。特定 tender の ABI に対して書かれた host adapter がその tender に依存するのは構造上正しい。**間違っていたのは逆方向 — tender がプラグインを同梱していたこと**で、それを外して解消 |
+| G-D | fleet 分離 (T6) | 新規 `kotoba-lang/fleet` に決着。`fleet -> kototama` の一方向依存、4 ns + 3 test ns + 10 CLI command + packaging を移設。checkpoint key は互換維持。transport / Component tender の分離も含め kototama TCB 32 -> 23 |
+| G-F | `kotoba.kir.xml` (224) と `kotoba-lang/xml` repo の重複判定 | **非重複。** `kotoba.kir.xml` は `kotoba.kir.value` を require する KIR 値の emitter、`xml/src/xml/core.cljc` (40 行) は Hiccup -> XML emitter で別物。ただし名前が紛らわしいので将来 rename 候補 |
+| G-G | 各 repo の `clojure -M:test` | 11/11 green。**これを実際に走らせたことが 4 件の実バグを検出した** — `artifact` <-> `kotoba-verifier` の循環、`kgraph` の未宣言 `datom` 依存、component/provider の resource 3 セット欠落、ハイフン入り repo 名でのテスト ns/パス不整合。いずれもコードを読むだけでは出なかった |
+
+### 追加 gap の決着
+
+| id | gap | 決着 |
+|---|---|---|
+| G-E | `kotoba` の非言語コード | assurance は `security`、semantic identity / local store は新規 `codebase`、mesh runtime は新規 `mesh` へ移設。`cap_table` は capability host の実行機構、git / rad / DID adapter は host 境界なので `kotoba` に残す |
+| G-H | taxonomy の CI gate | 21 repo の宣言と production git deps の完全一致、role 方向、非循環性を `verify-repository-roles.cljs` と GitHub Actions で強制。compiler と kotoba 自身も対象 |
+| G-J | 二面出力の同値性 vector | `kotoba-verifier` が KIR SHA-256 / exports / effects / admission と native artifact integrity を独立検証する `dual-surface-v1` vector を所有 |
+| G-K | `kototama` の残プラグイン | transport は新規 `provider-transport`、Wasmtime / jco / Rust host / browser qualification は新規 `tender-component` へ移設。kototama core は Rust / npm 非依存 |
+| G-L | owner test の残置 | KIR / Canonical ABI / Wasm tools / Component heap / WIT / capability Component の 6 群を owner repo へ移設。compiler には compiler namespace を通る統合テストだけを残した |
+| G-I | T5 (aiueos-kernel / aiueos-boot / virtio) | 対象外 (aiueos ADR-0013 の bare-metal profile が扱う)。未解決 gap には数えない |
+
+### 運用上の gap (この分割作業そのものから判明)
+
+分割の技術的内容とは別に、**この規模の横断作業を安全に行う運用が整っていない**ことが
+実地で判明した。同種の作業を次に行う人が同じ事故を踏まないよう記録する。
+
+| id | 事象 | 対策 |
+|---|---|---|
+| **G-M** | **共有 west checkout が別セッションのブランチに居座る。** 最初の抽出が `orgs/kotoba-lang/compiler` (evidence branch 上) を読んでしまい、main より 427 行古いコードを 11 repo に配ってしまった | `cross-repo-change-guard.cljs start` が linked worktree、clean tracked state、HEAD = fresh origin/main を全対象 repo で検証し、共有 checkout からの開始を拒否する |
+| **G-N** | **superproject の manifest 編集が並行セッションに消される。** `repos.edn` の登録が別セッションの main 同期で 2 度失われた | guard が root と child の開始 SHA を snapshot。manifest conflict は行単位でなく登録 path の意味的 union として解決し、verify 前に上流移動を検出する |
+| **G-O** | **west-pin-verify guard が無関係な push を止める。** child push が他セッション由来の pin 差分で拒否された | `west_pin_guard_policy.cljs` が push range に west blob の変更がある場合だけ pin verify を要求。無関係 push / 同一 blob / changed blob の 3 vector を CI で固定し、skip 運用を廃止 |
+| **G-P** | **上流が動き続けるため分割は一度で終わらない。** compiler main の追加着地で forward-port が必要になった | guard の verify が root / 全 child を再-fetch し、snapshot から動いた対象を fail。今回も compiler の上流移動を検出し、最新 pristine base へ再適用してから着地した |
+
+## Maintenance point — 次に触る人へ
+
+1. 横断変更の前に `cross-repo-change-guard.cljs start`、pin / PR 作成前に
+   `verify` を必ず通す。共有 west checkout は抽出元にしない。
+2. 新 repo または production git dep を加えたら `repository-rules.edn` と
+   21-repo gate を同じ PR で更新する。
+3. 実装・単体テスト・qualification は owner repo に置き、consumer には
+   integration / conformance だけを残す。履歴は現状表へ追記せず git に持たせる。
+
+## 2026-08-13 — 製品名の現在地（ADR-2608139980）
+
+repo 分割と依存方向はこの ADR のまま。変わったのは名乗りだけ。
+
+- T3 の存在名は **kototama**。`tender-*` は kototama の宿（GitHub 名は歴史的 alias）。
+- T2 backend（`kotoba-wasm` / `kotoba-native` / `kotoba-script` / `kotoba-component`）
+  は **amu の綾**。存在名を持たない。
+- linker は二つ: プロジェクト閉グラフは amu、実行時 import 結合は kototama。
+- IR / verifier / provider / abi は吸収しない。
+
+## References
+
+- ADR-2607252500 (Wasm Component-first、aiueos 二層化。本 ADR は T0-T3 側の実装。
+  決定 4 に本 ADR 由来の but 節を追記済み)
+- ADR-2607022400 (Solo5 tender 語彙。Mewz 却下理由が AOT に当たらない点は
+  ADR-2607252500 が実質的に上書き済み。製品名としての tender は
+  ADR-2608139980 が外す)
+- ADR-2608139980 (amu は編む、kototama は結ぶ)
+- aiueos ADR-0011 (link-time capability enforcement — 未 grant の import は
+  リンク不能。二面出力の native 側でも同じ機構が構造的に効く)
+- `kotoba-lang/kotoba-script` (先行事例: KIR のみを受理し言語意味論を持たない backend)
+")))

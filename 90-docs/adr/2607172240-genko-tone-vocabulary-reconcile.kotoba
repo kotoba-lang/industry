@@ -1,0 +1,56 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607172240-genko-tone-vocabulary-reconcile")
+  (:adr/title "ADR-2607172240: genko :tone → :gh.manga/tone 永続化(語彙は既に部分集合、リマップ不要と判明)")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-17")
+  (:adr/last_verified "2026-07-17")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "genko-tone-vocabulary-reconcile")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related (vector "adr-2607172210" "adr-2607141700"))
+  (:adr/body "## Context
+
+ADR-2607172210(genko :rect 永続化)は『:tone は genko の tone->expression
+語彙(:dot/:hatching/:gradient)と :gh.manga/tone の kami.mangaka.page
+tone-bg! 語彙の対応が未検証のため、語彙 reconcile を follow-up とし投影を
+見送る』としていた。
+
+調査の結果: kami.mangaka.page の tone-bg!(JVM/Java2D レンダラ)が
+サポートする語彙は :focus-lines / :radial-burst / :flash / :vignette-dark
+/ :gradient / :dot / :hatching / :crowd-silhouette(+ no-op の :none /
+:flat-white)。一方 genko の tone->expression
+(`{\"dot\" :dot \"line\" :hatching \"cross\" :hatching \"grad\" :gradient}`)
+が出力しうる値は :dot / :hatching / :gradient の3つのみ — これは
+tone-bg! 語彙の**真部分集合そのもの**だった。genko-embed のトーンパターン
+選択肢(dot/line/cross/grad)自体が最初から tone-bg! の一部にしか
+マップされていなかったので、実は reconcile すべき不一致は存在しなかった。
+manga-viewer(CSS composed-page)側もこの3値すべてを CSS gradient として
+実装済み(:crowd-silhouette だけが『安価な CSS 等価物が無い』として
+意図的に未実装 — ADR-2607141700 addendum 4 で既知)。
+
+## Decision
+
+`genko_tx.cljc` の `merge-page-panels` に :gh.manga/tone の投影を追加。
+`page->storyboard` が panel map の `:tone` キーで既に供給していた値を、
+既存の :visual/:imageUrl/:rect と全く同じ optional-assoc パターンで
+matched/appended panel の両方へ通すだけ(リマップ関数は書いていない —
+書く必要が無かった)。
+
+## Consequences
+
+- genko で描いたトーン(dot/線/クロス/グラデーション)が studio preview /
+  publish まで生き残る。ADR-2607141700 系の残ギャップがまた1つ解消。
+- :crowd-silhouette は genko 側にそもそも対応する tone-node パターンが
+  無いため、この投影経路からは到達しない(既知の制約、変更なし)。
+- 検証: yoro-ui.studio.genko-tx-test 11 tests / 78 assertions /
+  0 failures(nbb。dot→:dot、cross→:hatching、grad→:gradient、
+  tone ノード無しは :gh.manga/tone 自体が付かないことを個別確認)。")
+  (:adr/authoritative_for
+  (vector "genko の tone->expression 語彙(:dot/:hatching/:gradient)は :gh.manga/tone の kami.mangaka.page tone-bg! 語彙の部分集合であり、両者間にリマップは不要 — 値をそのまま通す"
+   "genko_tx.cljc の merge-page-panels は :gh.manga/tone を page->storyboard の :tone キーから optional-assoc(存在すれば投影、無ければ何も足さない)で projects する — :rect/:visual/:imageUrl と同じパターン"
+   ":crowd-silhouette は genko の tone-node からは到達不可能(genko-embed 側に対応パターンが無い、ADR-2607141700 addendum 4 の既知の制約のまま)"))
+  (:adr/artifacts "{:app-aozora \"gftdcojp/app-aozora@4929ff83 (merge of agent/genko-tone-projection)\"}")))

@@ -1,0 +1,110 @@
+(vector 
+ (map (:db/id -1)
+  (:adr/id "2607182400")
+  (:adr/title "cloud-itonami-lei-update-routine: automated hourly LEI collection via murakumo + itonami-actor")
+  (:adr/status "accepted")
+  (:adr/decided "2026-07-18")
+  (:adr/body "## Summary
+
+Formalize LEI collection as a scheduled cloud routine on murakumo.cloud:
+- **Frequency**: Hourly (or daily, TBD by ops)
+- **Pattern**: cloud-itonami actor (Advisor⊣Governor) orchestrates bin/collect.bb
+- **Integration**: GLEIF API + ToS fetch + LEI repo scaffold + progress.edn ledger
+- **Output**: cloud-itonami-lei-* repos pushed to GitHub + IPNS graph updated
+
+## Design
+
+### 1. Fleet Registration (manifest/fleet-db.edn)
+
+Register new cell entry:
+```edn
+{:cell/id \"itonami-lei-update-hourly\"
+ :cell/type :cloud-routine
+ :cell/actor \"cloud-itonami-isic-8291\"
+ :cell/frequency \"0 * * * *\" ;; hourly
+ :cell/entrypoint \"bin/collect.bb\"
+ :cell/args \"--scope all\"
+ :cell/environment {:SUPERPROJECT_ROOT \".\"
+                    :MURAKUMO_CELL \"itonami-lei-update-hourly\"}
+ :cell/lease {:ttl 3600 :max-retries 2}
+ :cell/governor :enabled}
+```
+
+### 2. Cloud Routine Wrapper (bin/collect-routine.clj)
+
+Orchestrator that:
+- Reads progress.edn from S3 / git (worktree side-effect isolation)
+- Calls `(op/build db {:op :disclosure/discover-candidates ...})`
+- Invokes bin/collect.bb for execution
+- Captures output → append-only ledger (manifest/fleet-db.ledger.edn)
+- Reports: ✅ X repos created, ⚠ Y JS-rendered-SPA failures, ❌ Z network errors
+
+### 3. IPNS Graph Publication
+
+After successful collection:
+- Derive isic-8291's CACAO did:key graph
+- Publish to IPNS (via murakumo-supplied kotobase-llm cell)
+- Write root hash to kotobase.net discovery surface
+
+### 4. Governance Model
+
+- **Proposal**: bin/collect.bb scans progress.edn, generates batch `{:vertical :candidates}`
+- **Governor approval**: 6-stage gate (source-basis, scope, licensed-disclosure, relationship, high-stakes, outcome)
+- **Commitment**: Batch scaffold + push + ledger append (atomic per batch)
+- **Audit trail**: Each collection tick logged in append-only `fleet-db.ledger.edn`
+
+## Scope & Limitations
+
+### Scope
+- **New capacity**: Automated discovery for new verticals (if owner declares new scope: COFOG / UNSPSC / etc.)
+- **Retry queue**: JS-rendered-SPA failures collected in `retry-js-rendered.edn`; manual chrome-automation separate
+
+### Honest Limitations
+- **JS-rendered ToS**: HTTP fetch cannot execute JavaScript. SPA pages fail with 403/empty-body; queued for later.
+- **Rate limiting**: GLEIF API throttled; collect.bb respects backoff (hardcoded delay between requests)
+- **Idempotency**: LEI repo already exists → skip scaffold, re-verify ToS doc count (no duplicate repos)
+
+## Verification
+
+- **Unit test**: `test/dossier/discover_candidates_integration_test.clj` (existing, validates StateGraph)
+- **E2E dry-run**: `bb bin/collect.bb --dry-run --scope=isic` (scaffold generation, no push)
+- **Smoke**: Deploy to murakumo with 1-hour lease, monitor first tick for:
+  - Proposal generated ✅
+  - Governor approved ✅
+  - Repos created + pushed ✅
+  - Progress ledger appended ✅
+  - IPNS graph updated ✅
+
+## Sequence
+
+1. **[Next iteration]** Register `itonami-lei-update-hourly` in fleet-db.edn
+2. **[Next iteration]** Write `bin/collect-routine.clj` wrapper (Governor orchestration)
+3. **[Next iteration]** Deploy to murakumo cell (test with short TTL first)
+4. **[Parallel]** Seed IPNS publish routine via murakumo-supplied kotobase-llm
+5. **[Monitor]** Observe 3–5 ticks; log any failures to retry queue
+
+## Related
+
+- **ADR-2607182300** — Part C LEI discovery automation (skeleton → full implementation done)
+- **ADR-2607110300** — Progress tracker + methodology (baseline, ISIC/ISCO complete)
+- **ADR-2607150100** — Registry lookups are deterministic, NOT governor-gated
+- **ADR-2607110400** — Governor 6-stage pipeline (reused here)
+- **ADR-2605192200** — Charter Rider (Actor identity, CACAO, transparent force)
+
+## Implementation Notes
+
+- Use existing `bin/collect.bb` as the execution engine (no new script needed)
+- Wrapper `bin/collect-routine.clj` handles: progress I/O, error classification, ledger append
+- Murakumo cell provides: lease/retry/heartbeat infrastructure + DNS failover
+- IPNS publish: route via existing kotobase-llm (ADR-2607110300 D6 forward reference)
+
+## Success Criteria
+
+- ✅ First automated tick completes without human intervention
+- ✅ Progress.edn ledger appends with 1 commit per tick (immutable)
+- ✅ No repo duplicates on retry/re-run
+- ✅ JS-rendered-SPA failures properly classified + queued for retry
+- ✅ IPNS graph updated with new isic-8291 did:key + member attestations")
+  (:adr/links (vector "adr-2607182300" "adr-2607110300" "adr-2607150100" "adr-2607110400"))
+  (:adr/tags (vector "automation" "murakumo" "fleet" "lea-collection" "routine")))
+)

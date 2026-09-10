@@ -1,0 +1,107 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609010700-the-first-origin-built-without-a-jvm-and-what-it-refuses-to-sell")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "dougaka-origin-kotoba-build")
+  (:adr/title "dougaka.itonami.cloud —— JVM を 1 回も通さずに建った最初の origin と、それが売らないと決めたもの")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/last_verified "2026-09-01")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:source/dataset "adr")
+
+  (:adr/repos
+  (vector "orgs/cloud-itonami/ai-gftd-dougaka"
+   "orgs/cloud-itonami/ai-gftd-dougaka-actor"
+   "com-junkawasaki/root"))
+
+  (:adr/authoritative_for
+  (vector "dougaka の公開 origin が dougaka.itonami.cloud であること（gftd.ai は prune。オーナー指示 2026-09-01）"
+   "この origin の build 経路が amu compile --target wasm32-browser であり、shadow-cljs / JVM を通らないこと"
+   "広告は :plan/request-shaped? かつ :plan/served? の plan に限ること —— 値段が付いていることと origin が答えられることは別"
+   "render を Kotoba へ移すのが Q9 whole-component migration であり、その blocker が stdlib 到達であること"))
+
+  (:adr/related
+  (vector "adr-2608312900-bots-get-a-purse-the-credits-rail-is-the-one-they-can-drive"
+   "adr-2608312300-gftd-out-of-the-bot-economy-path（gftd を外す。live なものは改名しないというガード）"
+   "adr-2608110200（価格は data、gate は宣言）"
+   "adr-2608039990（価格の写しが二重化した事故）"
+   "adr-2607173000（script host は nbb / kbb。JVM と bb は最後の手段）"))
+
+  (:adr/measured
+  (vector "live 2026-09-01: GET https://dougaka.itonami.cloud/xrpc/cloud.itonami.apps.dougaka.health → 200、impl=kotoba-wasm32-browser。GET /.well-known/x402 → 200（wasm guest が計算した文字列）。POST /xrpc/…render → 501。worker itonami-dougaka version cb78c2b0"
+   "**JVM-free の証明**: java / javac / clojure / clj を「実行すると 1 で終わる stub」に差し替えて PATH の先頭に置き、amu compile --target wasm32-browser が exit 0 で .wasm を出すことを確認。stub は 1 度も呼ばれていない"
+   "**対照**: 同じ worker の ClojureScript 版は shadow-cljs（= JVM）を要し、load average 628・build lock 待ち 5 本の下で 40 分待って BUILD_TIMEOUT。待たされたのは運ではなく道具の選択の結果"
+   "amu の browser host は Cloudflare Worker を明示的に想定している（Workers は実行時 WebAssembly.compile を拒むので bundler 経由で Module を渡す、と自分のコメントに 2026-08-31 実測として書いてある）"
+   "host の契約で読まずに踏んだもの 4 つ: main の export が必須／main は引数ゼロ／他の export は instance.exports から呼ぶ／Node の Buffer は拒否され Uint8Array は通る"
+   "Kotoba 側で確認した境界: string-concat は通る（JSON body を組める）。reduce は在るが fn は (fn [acc x] single-expr) 限定。異種 vector は bounded 型が要る"
+   "douga.ffmpeg/build-render-plan は 524 行、reduce/map/filter/str を 49 箇所で使う。単一ファイル guest は stdlib を引けない（--prelude は CLJS backend しか読まない）ので、今日は移せない"
+   "wrangler の罠 2 つ: npx --yes wrangler@4 deploy --dry-run はこのマシンで deploy@latest を install しようとする（CLAUDE.md 記載の npx flag bug）／rules に CompiledWasm を宣言すると内蔵の **/*.wasm ルールを足すのではなく塞ぐ"))
+
+  (:adr/decision
+  "### D1. origin は dougaka.itonami.cloud。gftd.ai は prune する
+
+オーナー指示（2026-09-01）。**一括置換はしていない** —— ADR-2608312300 D2 のガードどおり、
+live な cookie 名・secret binding・serving host は改名しない。dougaka の gftd 参照は
+**全部死んでいた**（dougaka.gftd.ai は 000、DNS 無し、worker の main が指すファイルも不在）
+ので、改名は移行であって障害ではなかった。
+
+触らなかったもの: **magatama の @context**（live 200 かつ cloud-itonami の
+magatama.jsonld 10 個が共有。1 個だけ変えると語彙が分岐する）と **repo / worker 名**
+（west entry と GitHub redirect に及ぶので 1 件ずつ ADR を切る）。
+
+### D2. build は amu。shadow-cljs を通さない
+
+オーナー指示（2026-09-01）「clojure じゃなくて kotoba build, compile first」。
+
+`npm run build` は「price book から offer を生成 → amu compile --target wasm32-browser →
+amu の browser host を west checkout から取得」の 3 手で、**JVM を 1 回も起こさない**。
+ClojureScript 版はこのディレクトリから削除した。
+
+worker entry だけが `.mjs` である。**そこに logic は無い** —— HTTP の入出力と guest の
+instantiate だけで、amu 自身の dom-driver.mjs と同じ host/guest の分割。計算は
+`kotoba/offer.kotoba` が持つ。
+
+### D3. 広告するのは serve できるものだけ
+
+document に載るのは `:plan/request-shaped?` **かつ** `:plan/served?` の plan。
+今日は **0 件**である。`nexus.apply` はこの document を `:sells-nothing` で拒否し、
+**その拒否が正しい答え**なので `/apply` は叩いていない。
+
+載せれば murakumo の 2026-07-31 の事故の再演になる —— 広告し、買い手が払い、
+検証も通り、そして upstream が無いと答えた。あの 1 件が `sells?` を生ませた。
+これはその 1 段手前の同じガードである。
+
+501 の body は blocker と、それがどこに記録されているかを名指しする。
+404 ではない理由: route は実在し、price book に値も付いている。404 は
+「そんなものは無かった」と言ってしまう。")
+
+  (:adr/consequences
+  "**閉じた gate**: origin（live）/ availability（実測として）。
+
+**開いている gate**:
+
+1. **output-license** —— 条項は書けて上流 7 モデルも実測済みだが
+   `:licence/status :proposed`。agent が測って起草したもので、資格のある人の
+   レビューを受けていない。**法務の gate は agent が倒してよい種類ではない。**
+2. **mainnet-denomination** —— 意図的に未達。全 plan が base-sepolia 建てで、
+   忘れても本物の価値を稼ぎ始めない。
+3. **serve できる SKU** —— render の Q9 whole-component migration。blocker は
+   stdlib 到達（`--module-lock` の JVM-free 化）で、これは amu 側の仕事。
+
+**resume point**: 次に価格が意味を持つのは render が Kotoba で動く日。
+それまで origin は health と（空の）offer を返し続ける。dougaka 側で待つ以外に
+できることは無い —— 待っているものが amu#709 周辺の JVM-free project linker だと
+分かっていることが、この closing の成果である。
+
+**bot の float は依然として無い**（ADR-2608312900 / ADR-2608314100）。
+資金経路は 3 つあり、うち trial は無認証で誰でも引けるが、自社 bot が外部向け
+promo を引くのは裏付けの無い自己発行なので引かないと決めた。")
+
+  (:adr/evidence
+  (vector "cloud-itonami/ai-gftd-dougaka e3aff7e3（origin。deploy version cb78c2b0）"
+   "cloud-itonami/ai-gftd-dougaka-actor 8b491fd5（actor.edn / pricing.edn / licence.edn / availability.edn）"
+   "com-junkawasaki/root 26500943（XMILE の単位経済モデル）+ d17bf327（mint surface ADR）"
+   "west pin 4d4288f8（dougaka 2 件）"
+   "同日に着地した関連: kotoba-lang/pay d9e9f5ce / network-awai/nexus-x402 712a97cf / network-awai/cloud-murakumo aa277402 / net-kotobase/control-plane fd37bf4d / kotoba-lang/org-chainagnostic-cacao 2327183e / network-awai/cloud-murakumo-api abdb7d9e"))))

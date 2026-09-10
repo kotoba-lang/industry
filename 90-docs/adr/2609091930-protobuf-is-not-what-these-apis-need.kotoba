@@ -1,0 +1,85 @@
+(vector (map (:db/id -1) (:adr/id "adr-2609091930-protobuf-is-not-what-these-apis-need") (:adr/title "protobuf はこの 3 つの API 面には入れない（実測: 圧縮後 1%）") (:adr/status "accepted") (:adr/date "2026-09-09") (:adr/body "# 調査結果
+
+「今の api は protobuf に対応している?」への答えは **していない**。そのうえで
+「どこに入れると意味があるか」を実測した。結論は **これらの API 面には入れない**。
+
+## 現在地（実測 2026-09-09）
+
+| 面 | 実体 | 形式 |
+|---|---|---|
+| `app.itonami.cloud/api/*` | Cloudflare Pages Functions（素の JS） | JSON のみ |
+| desktop app `/api/*` | JVM Clojure | JSON + `application/edn` + `application/x-ndjson` + `application/octet-stream` |
+| Pages Functions → 推論 | `api.murakumo.cloud/v1/chat/completions` | OpenAI 互換 JSON（こちらの一存で変えられない） |
+| MCP | JSON-RPC | 仕様がそう決めている |
+
+workspace に protobuf は在る。`kotoba-lang/dev-protobuf` の `protobuf.wire` が
+`cloud-itonami-app/src/cloud/itonami/app/latest.clj` で使われている —— ただし
+**IPNS Record の符号化にだけ**で、これは IPFS 仕様が protobuf を要求するから。
+gRPC も Connect も `application/x-protobuf` も、どちらの app にも無い。
+
+## サイズは採用理由にならない（実測）
+
+realistic な payload で JSON と protobuf を比べた。**live host は
+`content-encoding: br` を返す** —— つまり実際に線を流れるのは圧縮後のバイト
+なので、公平な比較は「両方圧縮」である。
+
+| payload | json | json+gzip | protobuf raw | protobuf+gzip |
+|---|---|---|---|---|
+| 会話 32 通（可変テキスト） | 19,154 B | 4,974 B | 18,289 B | 4,923 B |
+| trajectory 12 step | 2,457 B | 565 B | 770 B | 425 B |
+
+- **会話では 1%。** 中身が UTF-8 テキストなので、バイトはテキストそのもの。
+  protobuf は field 名を消すが、テキストは縮めない。
+- **trajectory では 26%（149 B）。** ここは数値・enum・digest なので varint が
+  効く —— protobuf が最も得意な形。それでも絶対値は 149 バイト。
+- **非圧縮 protobuf は json+gzip より大きい**（会話で 3.7 倍）。「binary だから
+  小さい」は、transport が既に圧縮している面では成り立たない。
+
+再現: `nbb --classpath orgs/kotoba-lang/dev-protobuf/src:<text> <script>`。
+数値ではなく手順を残す —— 日付付きで書いた値は日付を落として引用される。
+
+## サイズ以外の理由も、この 3 面では立たない
+
+- **型付き schema が欲しい** → workspace の答えは既に **IPLD / DAG-CBOR**
+  （CLAUDE.md の L0/L1、`io-ipld`）。しかも `network-awai/cloud-itonami` は
+  `src/cloud_itonami/edge/cbor.cljc` として **CBOR の edge 実装を既に持っている**
+  （CACAO と WebAuthn が使っている）。protobuf を足すと、application payload の
+  binary 形式が 2 つになる。
+- **`dev-protobuf` は wire format だけ。** README が明言している ——
+  `.proto` parser も descriptor set も codegen も無い。gRPC / Connect は
+  service 定義を要求するので、そこは新規に作ることになる。
+- **runtime が届かない。** Pages Functions は素の JS で、`.cljc` を読む
+  build step を持たない（それを持つのは shadow-cljs で組む `workers/grok-bots`
+  だけ）。この面に protobuf を入れるなら JS 実装を別に抱えることになる。
+- **一番向いている境界が live ではない。** app → bot runner の
+  `/v1/agent/turn` は session 全体を運ぶので schema が効く形だが、
+  `ITONAMI_AGENT_HOST` は docs にしか現れない。本番は Worker 内の
+  `infer()` を通る。**動いていない経路にプロトコルを足すことになる。**
+
+## 決定
+
+**この 3 面に protobuf を入れない。** 入れるのは、外部仕様が protobuf を
+要求する場所だけ —— 今それは IPNS Record と Kademlia DHT で、両方とも既に
+`protobuf.wire` が担っている。
+
+## それでも protobuf が正解になる条件（先に満たすもの）
+
+次のどれかが**実際に起きたら**この決定を見直す。推測で先回りしない。
+
+1. **`ITONAMI_AGENT_HOST` の runner が本番で稼働する。** そのとき初めて
+   「こちらが両端を持つ内部 RPC」が実在し、session の形に schema を与える
+   価値が出る。それまでは書いても誰も通らない。
+2. **こちらが所有しない第三者が client を書く。** 今 client は自分の cljs app
+   と自分の CLI だけで、どちらも JSON で足りている。
+3. **外部仕様が protobuf を要求する新しい面を実装する。** その場合は
+   `protobuf.wire` に EDN schema を 1 つ足すだけで済む —— これが
+   `dev-protobuf` が codegen を持たない理由そのもの。
+
+## 記録しておく実測（再実行を省くため）
+
+- `app.itonami.cloud` は `content-encoding: br` を返す（2026-09-09 実測）。
+  圧縮を前提にしない payload 比較はこの面では誤答になる。
+- `dev-protobuf` の契約で効くもの: unknown field が byte 単位で残る、
+  encoding が決定的（field 番号昇順・不在 field は出さない）。署名付き
+  message を扱うならこの 2 つが本体で、サイズは副次的。
+")))

@@ -1,0 +1,74 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608101100-murakumo-model-hosting-trust-operations")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "murakumo.cloud model hosting Phase 4 — isolated load checks, real fleet rollout, and trust operations")
+  (:adr/topic "murakumo-model-hosting-trust-operations")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-10")
+  (:adr/last-verified "2026-08-10")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "murakumo.cloud hosted model dynamic-scan boundary"
+   "hosted GGUF promotion into the Murakumo fleet"
+   "model copyright, license, malware, CSAM, takedown, legal-hold, and appeal workflow"))
+
+  (:adr/decision-summary
+  (vector "D1: A static-clean revision remains quarantined until a networkless, read-only, no-new-privileges scanner returns a passing receipt after a real bounded load"
+   "D2: Approved GGUF promotion is pull-based and reaches the fleet SSoT canary asher; it requires checksum, disk-headroom, inference-health, persistent-service, and rollback evidence before deployed"
+   "D3: Scanner and fleet bearer authority is separate from user JWT, publisher, and moderator authority"
+   "D4: Trust cases and appeals are typed, actor-attributed, evidence-linked, and human-decided; ordinary reports never become automatic legal judgments"
+   "D5: The production boundary is cloud-murakumo merge 100e632e1845335676b3430b68daa6248414616a, D1 migration 0005, Worker version 5e13d584-9977-4861-bbf9-5b71535a3cc9, and two live operator LaunchAgents"))
+
+  (:adr/verify
+  (vector "curl https://murakumo.cloud/api/v1/model-hosting | jq .phase_4"
+   "wrangler d1 migrations list murakumo-model-registry --remote"
+   "launchctl print gui/$(id -u)/cloud.murakumo.model-scanner"
+   "launchctl print gui/$(id -u)/cloud.murakumo.model-fleet"
+   "ssh asher '/opt/homebrew/bin/llama-cli --version'"))
+
+  (:adr/body
+  "# Context
+
+Phase 2/3 supplied public repositories, revisions, cards, licenses, provenance,
+private/gated access, community objects, static quarantine and governed promotion.
+Three operational gaps remained: there was no real fleet target, no dynamic model
+load boundary, and no dedicated copyright/license/takedown/appeal workflow.
+
+# Decision
+
+Uploaded bytes never execute in the Cloudflare Worker. Static-clean revisions enter
+a pull queue. A pinned Linux container loads safetensors, ONNX or GGUF without a
+network and with a read-only root, dropped capabilities and bounded resources. ONNX
+and GGUF execute bounded inference; any load, inference or finite-output failure is
+fail-closed.
+
+Approved GGUF revisions enter a second pull queue. The operator verifies the file
+again, transfers it to `asher`, starts a loopback-only canary, performs at least 20
+real probes, and only then installs the fixed root-owned LaunchDaemon. The prior
+revision target is retained for rollback. Repository metadata cannot supply argv or
+commands. ONNX and safetensors remain scan-supported but deployment-unsupported.
+
+Trust operations use typed cases, append-only actor events, emergency containment,
+legal hold and owner appeal. Malware/CSAM reports receive emergency priority, but an
+ordinary reporter cannot quarantine content. Copyright/license/privacy claims need
+a good-faith declaration and human adjudication. An accepted appeal does not restore
+content without a separate moderator restore decision.
+
+# Evidence
+
+`cloud-murakumo` PR #50 merged as `100e632`. A live 64,488,992-byte tiny GGUF passed
+transfer checksum, load, canary inference, persistent production inference and
+rollback on `asher`; the smoke service and weights were removed afterward. The
+scanner container passed safetensors and ONNX repeatable tests and a live GGUF load.
+D1 migration 0005 and Worker version `5e13d584-9977-4861-bbf9-5b71535a3cc9` are live.
+Both operator pollers are running with a Keychain-held operations token.
+
+# Remaining boundaries
+
+Private/gated bytes are access-controlled, not encrypted. There is no ONNX or
+safetensors fleet deployment adapter, cross-region replication, jurisdiction-specific
+mandatory-reporting integration, or automatic legal ownership determination.")
+))

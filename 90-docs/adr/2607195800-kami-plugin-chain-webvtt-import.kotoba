@@ -1,0 +1,50 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607195800-kami-plugin-chain-webvtt-import")
+  (:adr/title "KAMI makes plugin chains editable and WebVTT bidirectional")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607195700-kami-plugin-automation-caption-localization"))
+  (:adr/decision
+  (map (:daw (map (:chain-authority :project/plugins)
+         (:order-semantics :vector-order)
+         (:editing-operations (vector :move-up :move-down :bypass :remove))
+         (:boundary-policy :no-op)
+         (:render-consumers (vector :realtime-playback :master-wav :normalized-master-wav :track-stems :stem-bundle))))
+   (:nle (map (:caption-authority :project/captions)
+         (:import-format :webvtt)
+         (:time-conversion :project-frame-rounded)
+         (:accepted-header (vector :utf8-bom :webvtt-description :header-metadata))
+         (:ignored-blocks (vector :note :style :region))
+         (:cue-support (vector :optional-id :timing-settings :multiline-text))
+         (:import-language-authority :caption/language)
+         (:replacement-policy :target-language-only)
+         (:other-language-policy :preserve)
+         (:generated-id "vtt:{language}:{index}")))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "third-party plugin discovery/SDK, signed distribution and processor isolation" "parallel plugin routing" "surround/Atmos"))
+    (:nle (vector "translation memory and review workflow" "full WebVTT region/style rendering" "TTML/IMSC" "OCIO/ICC/HDR" "MOV/MXF/IMF"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "2d282b26d6de59df51beb48712070bbb153136cf"))
+   (:nle-commits (vector "8bcec2dd7a4b6b52e110376f04c383fc672010ab"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#15" "kotoba-lang/kami-app-nle#15"))
+   (:evidence
+   (vector "DAW passes 23 tests and 90 assertions; NLE passes 24 tests and 109 assertions."
+    "Both guarded shadow-cljs production releases completed with zero compiler warnings; NLE was rebuilt after BOM/NOTE parser review fixes."
+    "Chrome instantiated compressor then saturator in realtime and in each of three offline stem graphs, exactly matching the reordered project vector."
+    "After project-authoritative saturator removal, the next realtime graph instantiated only compressor."
+    "The chain stem package contained project.edn, stems.edn and three 882044-byte WAV files."
+    "Chrome imported an external two-cue Japanese WebVTT, preserved an English project cue, burned in only Japanese and exported two normalized Japanese cues without English leakage."
+    "Production capture consumed the same decoded canvas; external ffprobe identified 320x180 VP8 plus 48 kHz two-channel Opus."
+    "Automated Chrome and both local servers were closed after verification."
+    "Both application PRs were reviewed and merged."
+    "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN assertions verify accepted status, supersedes and both current authorities."))))
+  (:adr/consequences
+  (vector "Plugin order and membership can be revised without rebuilding a project and stay identical across listening and delivery."
+   "WebVTT is now a bidirectional caption interchange rather than export-only output."
+   "Importing one localization cannot erase captions belonging to another language."
+   "Parallel audio routing and full styled WebVTT region semantics remain explicit commercial-product gaps."))
+  (:adr/source-format "edn")))

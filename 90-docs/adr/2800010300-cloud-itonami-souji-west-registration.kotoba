@@ -1,0 +1,48 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2800010300-cloud-itonami-souji-west-registration")
+  (:adr/title "cloud-itonami/cloud-itonami-souji を west manifest に登録する —— physical AI のお掃除ロボ設計 repo(design-only)")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-01")
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/repos (vector "com-junkawasaki/root"
+              "cloud-itonami/cloud-itonami-souji"))
+  (:adr/related (vector "adr-2607173200-github-local-west-triple-sync"
+                "adr-2800010200-cloud-itonami-carrier-west-registration"))
+  (:adr/body
+  "## Context
+
+cloud-itonami の souji(掃除)系 bot 群が owner 指示で physical AI の
+お掃除ロボ**設計** repo を立ち上げた
+(https://github.com/cloud-itonami/cloud-itonami-souji, R0 scaffold:
+README / blueprint.edn / deps.edn / src+test, 7 tests / 16 assertions,
+main af0b67d)。
+
+**design-only であることが安全性の要点**: 実機を動かす op は存在せず、
+安全ゲートは恒久構造不変条件(テストで pin される不変条件)として
+表現される。つまりこの repo は West 登録されても実行面のリスクを
+持ち込まない — 持ち込むのは fresh checkout での availability だけ。
+
+GitHub repo は存在するが west manifest に未登録 →
+fresh checkout breaker (local-root-broken) の種火。ADR-2607173200 の
+triple-sync 正経路で登録する。
+
+## Decision
+
+cloud-itonami-carrier (ADR-2800010200) と同一手順:
+
+1. `west-triple-sync apply --names orgs/cloud-itonami/cloud-itonami-souji`
+   — GitHub repo 実在確認 (:yes)、local clone、repos.edn
+   :extra-projects への path 追加、gen-west-manifest --entry
+   (最小 diff、pin af0b67dae7e は main から到達可能)。
+2. project name = cloud-itonami-souji / path =
+   orgs/cloud-itonami/cloud-itonami-souji / groups [cloud-itonami]。
+3. 完了ゲート: west-orphan-audit --blocking exit 0、
+   verify-west-pins OK、子 checkout は pin と一致、
+   子テスト 7/16/0 をローカルで再現。
+
+## Consequences
+
+- west paths は 4320 → 4321。
+- 登録は可用性の変更のみで、実行面(実機 op)は design-only により
+  存在しない。安全ゲートは repo 内の構造不変条件テストが正本。")))

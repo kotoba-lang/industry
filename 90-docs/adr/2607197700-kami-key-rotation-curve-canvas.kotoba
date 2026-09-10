@@ -1,0 +1,34 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607197700-kami-key-rotation-curve-canvas")
+  (:adr/title "KAMI rotates publisher keys and pointer-edits caption curves")
+  (:adr/date "2026-07-19") (:adr/status "accepted") (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607197600-kami-publisher-trust-keyframe-editor"))
+  (:adr/decision
+  (map (:daw (map (:publisher-key-rotation
+         (map (:precondition :current-fingerprint-match)
+          (:replacement :new-sha-256-fingerprint)
+          (:audit (vector :retired-fingerprint :retired-at))
+          (:conflict-policy :no-change)))))
+   (:nle (map (:curve-canvas
+         (map (:technology :svg) (:input :pointer)
+          (:selection :nearest-control-handle)
+          (:coordinates :bounded-normalized)
+          (:invariant :x1-less-than-or-equal-x2)
+          (:commit :validated-project-animation-edit)))))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:daw (vector "certificate authority and revocation distribution" "surround/Atmos"))
+    (:nle (vector "tangent modes and snapping" "OCIO/ICC/HDR" "MOV/MXF/IMF"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "1b8f2c9")) (:nle-commits (vector "d1df4f4"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#35" "kotoba-lang/kami-app-nle#35"))
+   (:evidence
+   (vector "DAW passes 40 tests and 189 assertions; both guarded optimized builds generated artifacts."
+    "Chrome verified signed trust, key rotation, retired-key audit history, pointer curve editing and EDN persistence."
+    "All six browser assertions passed with zero console errors."))))
+  (:adr/consequences
+  (vector "Publisher keys can rotate without silently discarding audit history."
+   "Caption curves support direct visual pointer editing."
+   "Distributed revocation, tangent modes and high-end delivery remain explicit gaps."))
+  (:adr/source-format "edn")))

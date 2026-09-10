@@ -1,0 +1,248 @@
+(vector (map (:db/id -1)
+  (:adr/id "2608080200")
+  (:adr/doc_type "adr")
+  (:adr/topic "github-pages-publish-without-actions")
+  (:adr/title "止まった CI は赤くならない — GitHub Pages は gh-pages branch へ push して配信する。kami-app-nle / kami-app-daw の github.io は DADS 移行後 3 日間、移行前の artifact を配信し続けていた")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-08")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5 (Claude Code)"))
+  (:adr/authoritative_for
+  (vector "GitHub Actions を撤去した repo で GitHub Pages をどう配信するか（gh-pages branch + build_type legacy）"
+   "publish script が満たすべき条件（origin/main を包含した checkout からのみ、生成物の存在検査）"
+   "`build_type: workflow` + Actions 無効 という組み合わせが「静かに古い artifact を配信し続ける」ことの記録"
+   "同型の危険を持つ repo の見分け方"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "2607300900" "2608080100" "2608060000" "2607252000"))
+  (:adr/repos (vector "com-junkawasaki/root"
+              "kotoba-lang/kami-app-nle"
+              "kotoba-lang/kami-app-daw"
+              "com-junkawasaki/webmaster"))
+  (:adr/body
+  "## Context
+
+`https://kotoba-lang.github.io/kami-app-nle/` と `.../kami-app-daw/` は、
+2026-08-08 の時点で **DADS 移行前の liquid-glass ページを配信していた**。
+両 repo の `main` は 2026-08-05 に jp-go-dds へ移っており（`--hig-*` bridge の
+上に app CSS を無改造で載せる形）、`public/index.html` は生成済みで正しかった。
+それでも live は古かった。
+
+理由は「失敗した」ではなく「**走らなかった**」:
+
+| 事実 | 時刻 |
+|---|---|
+| Pages workflow の最後の成功 | 2026-08-04 02:46Z |
+| GitHub Actions を repo 単位で無効化（ADR-2607300900） | 2026-08-04〜 |
+| DADS 移行が main に着地 | 2026-08-05 |
+
+`actions/permissions` は `{\"enabled\": false}`、Pages の設定は
+`{\"build_type\": \"workflow\", \"status\": null}`。**workflow が起動しないので
+job は赤くならず、Pages は最後に成功した artifact をそのまま配信し続ける。**
+ADR-2607300900 は「動いていない CI より無い CI の方がよい」と書いているが、
+そのとき撤去したのは *検査* の経路だった —— **配信の経路も同じ穴を持っていた**。
+
+同時に見つかった付随の欠陥（同じ原因の別の面）: `public/user-test-dashboard.html`
+は DADS 移行から取り残され、移行が削除した `liquid-glass.css` を `<link>` した
+ままだった（= スタイルシート 404、無スタイルで配信）。さらに `dashboard.cljs` の
+`init!` が `head.innerHTML` を代入しており、DADS ページは CSS を**インライン**で
+持つので、たとえ link が解決しても **mount 時に design system を消していた**。
+`<noscript>` は JavaScript で挿入されていた —— それを読む唯一の読者には届かない。
+
+## Decision
+
+### 1. Pages は branch から配信する（runner を経路から外す）
+
+各 repo に **`scripts/publish-pages.cljs`（nbb）** を置く。build 済み `public/` を
+`refs/heads/gh-pages` の **root tree** として commit し push する。Pages 側は
+`build_type: legacy` / `source: {branch: gh-pages, path: /}`。**runner が経路に
+居ないので、runner が止まっても配信が古くならない。**
+
+- commit は throwaway index に対する plumbing（`add -f` → `write-tree` →
+  `commit-tree`）で組む。作業 tree に触るのは `public/.nojekyll` だけ。
+- `.nojekyll` は必須（branch source は既定で Jekyll を通し、認識できない
+  ファイルを落とす）。
+
+### 2. publish は `origin/main` を包含した checkout からしか通さない
+
+**deploy には fast-forward 検査が無い —— 最後に実行した人が勝つ。** 古い
+checkout から出荷すると、その間に着地した変更を黙って巻き戻す（kotobase.net、
+2026-07-25: signup funnel の修正が 11 分後に古い checkout から巻き戻され、
+誰も気付かなかった）。script は `merge-base --is-ancestor origin/main HEAD` を
+検査し、通らなければ **書かずに exit 非 0**。
+
+生成物の存在も検査する（`index.html` / `404.html` / `js/main.js`）—— 空の
+`public/` を「合格」として配信しないため。
+
+### 3. workflow ファイルは残す（消せない）
+
+`.github/workflows/pages.yml` は tree に残り inert。**削除には `workflow`
+OAuth scope が要り、このワークスペースの token は持っていない**（push も
+Contents API も通らず、後者は 403 でなく **404** を返すので「repo が無い」と
+誤読しやすい。ADR-2607300900 に既出）。
+
+### 4. Pages の設定変更は script がやらない（報告する）
+
+`publish-pages.cljs` は Pages の設定を読んで、`legacy gh-pages` でなければ
+**必要な 1 回きりのコマンドを表示する**。live な公開インフラの設定を script が
+黙って書き換えない。
+
+## Consequences
+
+- **同型の危険を持つ repo は他にもある。** 見分け方:
+  `gh api repos/<org>/<repo>/pages --jq .build_type` が `workflow` で、かつ
+  `gh api repos/<org>/<repo>/actions/permissions --jq .enabled` が `false` の
+  repo は、**live が main と一致している保証が無い**。この 2 本の組み合わせが
+  そのまま検出条件になる（本 ADR の副産物）。**測った結果は下記「fleet の実測」。**
+- Pages の `status` は `null` のまま（legacy build の記録が
+  `pages/builds/latest` に現れないことがある）。**live の HTML を実際に fetch
+  して確かめる**のが唯一の確認方法。この作業では両 site を fetch し、さらに
+  browser harness を live URL に対して実行した（24/24）。
+- 検査は fleet gate（`scripts/fleet-ci/gates.edn`）へ寄せる余地がある。今回は
+  publish 経路だけを直した。
+
+## 実測
+
+- 修復前の live: `<link rel=\"stylesheet\" href=\"liquid-glass.css\">` を持つ
+  646 バイトの文書。修復後: DADS を inline で持つ 121 KB の文書。
+- 併せて直した欠陥: dashboard の 3 点（deleted stylesheet / `head.innerHTML` /
+  JS で挿入される `<noscript>`）、session 集計が常に 0/0/0 だった件
+  （`(= :task-result (:kind ev))` を JSON 由来の文字列に当てていた）、
+  両文書の favicon 404（DADS 移行で accent が消え、`jp-go-dds.page` は icon を
+  出さない。色は `dark/resolve-dark` で vendored palette から解決し、literal を
+  書かない）。
+- 検証: nle 47 tests / 249 assertions、daw 46 / 230、browser harness 17/17
+  （local と live の両方）、design-quality 100.00 × 4 文書。
+  その後 ADR-2608080100（single-page app 化）で harness は 24/24 に増えた。
+
+## fleet の実測（2026-08-08、closing 時に測った）
+
+上の検出条件を、**checkout 済みで Pages workflow を持つ 45 repo**に当てた
+（`find orgs -maxdepth 6 -path '*/.github/workflows/*.yml' | xargs grep -l
+'deploy-pages\\|upload-pages-artifact'`）。
+
+| | 件数 |
+|---|---|
+| Pages workflow を持つ（checkout 済み） | 45 |
+| Pages 未設定（= 危険なし） | 9 |
+| `legacy`（= branch 配信。既に安全） | 13 |
+| **`workflow` + Actions 無効（構造的に脆い）** | **23** |
+| **うち live が実際に main より遅れている** | **3** |
+
+**「脆い」と「遅れている」は別**である。23 のうち 20 は、最後の成功 run が
+main tip 以降なので **live は今のところ main と一致している** —— 次の commit が
+配信されないだけ。実際に遅れているのは 3 件だけだった:
+
+| repo | 遅れ | 最後の成功 run | 現在 |
+|---|---|---|---|
+| `kotoba-lang/kotoba` | **7 commit** | 2026-08-04T17:49Z | 未修復 |
+| `kotoba-lang/kotoba-lang` | **2 commit** | 2026-08-05T04:20Z | 未修復 |
+| `com-junkawasaki/webmaster` | **3 commit**（下記訂正） | 2026-06-29T10:17Z | **修復済み 2026-08-13** |
+
+kami-app-nle / kami-app-daw が目に見えたのは、遅れが 3 日 + design system 移行
+という**内容の大きな差**だったから。1〜7 commit の遅れは同じ仕組みで起きていても
+気付かれない。
+
+**⚠ webmaster の行は初出時に誤っていた**（2026-08-13 に実測して訂正）。「1 commit /
+最後の成功 2026-08-02T00:54Z」と書いていたが、実際は **3 commit 遅れ**で、
+`deploy.yml` の最後の**成功** run は **2026-06-29T10:17Z**（`2b070b1`）だった。
+8 月に走った 2 本（2026-07-24 / 08-04）は**失敗**であって成功ではなく、
+`?status=success` を付けずに run 一覧の先頭を読むと、この 2 つを最後の配信と
+読み違える。**成功 run を数えるときは `?status=success` で絞る。**
+
+修復の順序は次のとおり（他 2 件も同じ）:
+
+1. `scripts/publish-pages.cljs` を置く（nle/daw/webmaster のものが雛形）
+2. build して `gh-pages` へ push
+3. `gh api -X PUT repos/<slug>/pages -f build_type=legacy
+   -f 'source[branch]=gh-pages' -f 'source[path]=/'` で 1 回切り替え
+4. **live の HTML を fetch して確かめる**（下記のとおり API では確かめられない）
+
+再測定:
+
+```bash
+find orgs -maxdepth 6 -path '*/.github/workflows/*.yml' -print0 |
+  xargs -0 grep -l 'deploy-pages\\|upload-pages-artifact' |
+  sed 's|/.github/workflows/.*||' | sed 's|^orgs/||' | sort -u |
+  while read -r s; do
+      bt=$(gh api \"repos/$s/pages\" --jq .build_type 2>/dev/null) || continue
+      en=$(gh api \"repos/$s/actions/permissions\" --jq .enabled)
+      [ \"$bt\" = workflow ] && [ \"$en\" = false ] && echo \"$s\"
+    done
+```
+
+**カバレッジの限界**: 検出対象は **checkout 済みの repo だけ**。west.yml は
+4,138 project を管理しており、未 checkout の repo はこの `find` に映らない
+（CLAUDE.md「無い」と結論する前に検索する、と同じ穴）。全 fleet を測るには
+GitHub 側から列挙する必要がある —— していない。
+
+## 着地（closing、2026-08-08）
+
+| 面 | commit | 状態 |
+|---|---|---|
+| `kotoba-lang/kami-app-nle` main | `8b20e8e` | merged |
+| `kotoba-lang/kami-app-daw` main | `6d189b8` | merged |
+| `kami-app-nle` gh-pages | `07f20d0`（source `8b20e8e`） | live・24/24 |
+| `kami-app-daw` gh-pages | `277243d`（source `6d189b8`） | live・24/24 |
+| `com-junkawasaki/root`（規則 + 本 ADR） | `d45bd4b` → main | merged |
+| west pin 前進 | `963e1ef` / `34f34eb` → 更に SPA 分 | merged |
+
+**この closing 節を書くときに踏んだ罠**（EDN 文書面の話なので残す）: shell の
+行継続 `\\` を `:adr/body` の中に書くと、EDN reader が
+`Unsupported escape character: \\` で落ち、**ファイルごと load されなくなる**。
+そして `edn-query` はそのとき当該ファイルを名指しせず、単に結果が空になる
+（`docs-edn-only.cljs verify` は unparseable を数えるが、query 側は黙る）。
+`:adr/body` にシェルを載せるときは行末 `\\` を使わず、`|` で改行する
+（shell はパイプ末尾でも継続する）。**書いたあと必ず read-string を通すこと。**
+
+**gh-pages は 2 回 push している。** 1 回目（`0d818e1` / `e547111`）は
+source commit を **SPA 化前の main**（`f2dc809` / `e17c85c`）と記録していた ——
+publish を commit より先にやったため。内容は正しかった（live で 24/24 を確認済み）
+が、**provenance が嘘になる**（main は SPA、gh-pages は「SPA 前の commit から
+作った」と書いてある）。closing で main から再 build して push し直し、
+`pages: publish 8b20e8e` / `6d189b8` になっている。**publish は commit と merge の
+後にやること** —— publish script は `origin/main` の包含は検査するが、
+「今の HEAD が push 済みか」は検査しない（そこは穴として残っている）。
+
+## 3 件目の適用 — `com-junkawasaki/webmaster`（2026-08-13）
+
+上の表の 3 件目を、記事 1 本を公開しようとして踏んだ形で修復した。
+
+| 面 | commit | 状態 |
+|---|---|---|
+| `com-junkawasaki/webmaster` main | `acd5990` | merged |
+| `webmaster` gh-pages | `5ad2dfb`（source `acd5990`） | live |
+| Pages 設定 | `legacy` / `gh-pages` / `/`、CNAME `junkawasaki.com` | 切替済み |
+
+**故障は 2 つ積み重なっていた。片方だけ直しても公開されない。**
+
+1. Actions が repo 単位で無効 → workflow が起動しない（本 ADR の主題）
+2. `@astrojs/mdx` が `^7.0.3` に上がっていたが peer は `astro ^7.0.0`、この app は
+   `astro ^5.13.11`。**lockfile は据え置かれていた**ので、CI 既定の frozen-lockfile
+   で `pnpm install` が落ちる
+
+2 の方が「本物の壊れ」で、1 が無ければ赤くなって気付けたはずのものである。
+**起動しない CI は、その下にある本物の失敗も隠す。** 実際 8/4 の run は
+`pnpm install` step で落ちており、これが最後に「走れた」記録だった。
+修復は specifier を `^4.3.6`（lockfile と一致）へ戻すだけで済んだ。
+
+**`pages/builds/latest` は live になった後も 404 を返し続ける。** 本 ADR は既に
+「legacy build の記録が現れないことがある」と書いているが、webmaster では
+**site が確実に新しい内容を配信している状態で 404** だった。したがって:
+
+- `pages/builds/latest` の 404 は「ビルドされていない」の証拠に**ならない**
+- publish の確認手段は **live の HTML を fetch すること 1 つだけ**
+- `status` も `null` のままで、これも確認に使えない
+
+**押した順序と、その帰結を分けて記録する。** 今回は push → source 切替 の順で、
+site は切替の約 2 分後に新しい内容を返した。その間に `POST /pages/builds` も
+1 回叩いている（`queued` が返った）。**どちらが配信を起こしたかは切り分けて
+いない** —— builds API が何も記録しないので、事後に区別する手段が無い。
+「POST が必要だった」と書けるだけの根拠は無いので書かない。次に測るなら、
+切替だけを行って POST を叩かずに live を見る。
+
+**`required` の中身は site の routing に合わせる。** webmaster は
+`prefixDefaultLocale: true` なので **root の `index.html` は `/en/` への
+リダイレクトでしかない** —— これだけを検査すると、他が空のビルドが合格する。
+実際の検査は `index.html` / `en/index.html` / `ja/index.html` / `CNAME` の 4 つ
+（`CNAME` を落とすとカスタムドメインが外れる。`apps/astro/public/CNAME` から
+`dist/` へ入る）。**生成物の床は「1 個あるか」ではなく「その site を site たら
+しめているものが全部あるか」で引く。**")))

@@ -1,0 +1,599 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608311600-one-auth-design-across-six-apexes")
+  (:adr/title "ADR-2608311600: 6 apex に対する 1 つの認証・権限設計 — 実測 36.67/100、同じ finding が 6 面全部に在る")
+  (:adr/status "accepted")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-31")
+  (:adr/last-verified "2026-09-01")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "cross-apex-auth-integration")
+  (:adr/repos (vector "orgs/cloud-itonami/app-auth"
+              "orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/network-awai/cloud-murakumo"
+              "orgs/net-kotobase/control-plane"
+              "orgs/network-awai/nexus-x402"
+              "orgs/network-awai/network-isekai"
+              "orgs/network-awai/app-aozora-engine"))
+  (:adr/authoritative-for
+  (vector "ADR-2608039950 (identity 面) と ADR-2608291700 (capability 面) を 1 つの設計として述べること"
+   "その設計への適合を 6 apex 横断で測る 5 不変条件と、その計器 (90-docs/auth_plane_integration)"
+   "2026-08-31 時点の 6 apex 適合度と、その測り方"
+   "RP ID を 1 つに寄せない (passkey は RP-scoped のまま) という決定"))
+  (:adr/related
+  (vector "2608039950"
+   "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes"
+   "adr-2608180200-biscuit-as-delegation-center"
+   "adr-2608155000-authority-capability-lattice"
+   "2608120100"
+   "2608110100"))
+  (:adr/evidence
+  (vector "90-docs/auth_plane_integration/probe-2026-08-31.edn — overall 36.67, 6 apexes, 22 findings, 0 unmeasured"
+   "selftest.cljs — 6/6 checks, exit 0"
+   "auth.itonami.cloud /v1/passkey/login/options -> 200 challenge, rpId=itonami.cloud"
+   "auth.murakumo.cloud -> 200 rpId=auth.murakumo.cloud / auth.kotobase.net -> 200 rpId=auth.kotobase.net / auth.kotoba.cloud -> 200 rpId=auth.kotoba.cloud"
+   "auth.itonami.cloud /v1/biscuit/token -> 404 (mint 不在)。murakumo/kotobase/kotoba.cloud -> 403 same-origin"
+   "auth.aozora.app /api/passkey/login/begin -> 503 AuthNotConfigured PDS_JWT_SECRET unset。/v1/passkey/login/options -> 404"
+   "auth.x402.nexus / auth.isekai.network -> curl exit 6 (NXDOMAIN)"
+   "6 apex とも Authorization: Biscuit を付けた応答が付けないものと正規化後バイト同一"
+   "pds.aozora.app /xrpc/com.atproto.server.getSession -> HTTP 200 body AuthMissing"
+   "cloud-itonami-app services/app-edge/wrangler.jsonc に routes 記述なし"
+   "deploy 2026-08-31: kotobase-protocols-worker version 44e201d8-1c85-405e-af59-118a7737a7f6, control-plane adc2b753 — sparql/gremlin/graphql が Biscuit を読む (201 tests, 0 failures)"
+   "control 実行 (rung 除去): 落ちたのは acceptance test 1 本のみ。refusal test 6 本と header-changes-answer test は緑のまま"
+   "deploy 2026-08-31 その2: net-kotobase gateway version 19c9271e, control-plane 5e3b2976 — xrpc 401 が presented/details を名乗る (536 tests, 0 failures)"
+   "再測定 2026-08-31 08:11Z: overall 40.00, kotobase.net 100.00 (4/4 plane)"
+   "deploy 2026-08-31 その3: itonami-app-auth version 188053db, app-auth 795edbf4 — /v1/biscuit/token を kotobase-authn へ転送 (worker smoke 全 pass, 新規 13 check)"
+   "転送が本物である証拠: 同じ偽 bearer に対し auth.itonami.cloud と auth.kotobase.net が同一の 401 not authorized を返す"
+   "app-aozora-auth の wrangler secret list は空。PDS_JWT_SECRET は app-aozora-pds のみが持つ"
+   "再測定 2026-08-31 09:48Z: overall 45.83, itonami.cloud 65.00"
+   "verify-credential-consumers: 4,329 repo 横断で /rpc/verify-operator の外部 consumer は 0、verify-inference は 8、verify-session は 6"
+   "cloud-murakumo-api branch agent/operator-biscuit-consumer c990fb6 — 277 tests/1432 assertions 0 failures、governed artifact refresh 待ちで未 merge"
+   "deploy 2026-08-31: app-aozora-auth 9883c91a (44 tests/143 assertions) と nexus-x402 7679d61e (89 tests/383 assertions)、いずれも control で判別を確認"
+   "auth.aozora.app / auth.kotoba.cloud / auth.itonami.cloud が同一 credential に同一の 401 not authorized を返す"
+   "再測定 2026-08-31 11:57Z: overall 52.50、x402.nexus 35.00、aozora.app 35.00"
+   "deploy 2026-08-31: nexus-x402 953f290b — admin が kotoba://can/data:write の Biscuit を公開鍵で検証 (97 tests/404 assertions、control で acceptance が落ちることを確認)"
+   "vendoring 6 ファイルは commit 前に宣言 pin と byte 比較。最初の試行は 6 中 2 が pin-dishonest だった"
+   "再測定 2026-08-31 12:43Z（軸追加で分母 1.10 に変更、前後は別スケール）: overall 50.76、x402.nexus 40.91"
+   "deploy 2026-08-31: nexus-x402 c2354717 — /v1/biscuit/token を kotobase-authn へ転送 (101 tests/412 assertions)"
+   "再測定 2026-08-31 13:10Z: overall 53.79、x402.nexus 59.09。6 apex 中 5 が同じ issuer で mint する"
+   "isekai.network は Cloudflare Pages + .mjs Functions、identity はブラウザ自己発行 did:key — 配線ではなく判断が要る"
+   "audit/coverage は初回実行で controllers-are-rp-scoped の軸欠落を検出。probe は rpId を初版から記録していたが採点していなかった"
+   "再測定 2026-08-31 14:01Z（分母 1.20）: overall 53.47。rp-scoped は itonami/murakumo/kotobase が true"
+   "kotobase.biscuit-grant は net-kotobase/control-plane の shared/src に 1 ファイルだけ存在する — deployable の中に閉じた唯一の verifier"))
+  (:adr/body
+  "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
+
+**Status**: accepted / **Date**: 2026-08-31
+**Deciders**: Jun Kawasaki（オーナー指示「では設計統合」）
+
+## 1. なぜ「統合」なのか — 新しい決定ではない
+
+設計は既に 2 本ある。
+
+- **ADR-2608039950**（2026-08-03）— authority は 1 つ、apex は多数。新しい identity を作らない
+- **ADR-2608291700**（2026-08-29）— passkey と smart contract が認証し、Biscuit が権限を持つ
+
+前者は **identity の面**を、後者は **capability の面**を決めた。**両者を並べて 1 つとして
+述べた文書は無く、両者が同時に成り立っているかを測る計器も無かった。**
+
+だから統合とは新しい設計を書くことではない。**2 本の accepted な決定を 1 つの検査可能な
+形にまとめ、6 つの apex 全部に当てて測ること**である。
+
+## 2. 統合された設計 — 3 つの面と 1 つの決定器
+
+| 面 | 何を持つか | 正本 |
+|---|---|---|
+| **principal** | 人 1 人 = 1 つの安定 principal（`did:web:kotobase.net:tenant:<user>`） | ADR-2608039950 決定 1 |
+| **controller** | passkey（RP-scoped）/ SIWE + ERC-4337 smart account / did:key。**複数持てる。どれも principal ではない** | ADR-0082（cloud-itonami-app）、ADR-2608039950 |
+| **capability** | Biscuit v3。scheme は `<apex>://can/<action>` | ADR-2608180200 / 2608261300 / 2608280230 |
+| **決定器** | `kotoba-lang/authority` の `covers?` / `meet` **1 本** | ADR-2608155000 |
+
+CACAO は session の起点と署名済み artifact に残り、**delegation からは降りたまま**。
+email OTP / SSO は補助経路として残す（基盤から降ろすが消さない）。
+
+### 決定: RP ID を 1 つに寄せない
+
+実測で **4 つの RP** が在る（`itonami.cloud` / `auth.murakumo.cloud` / `auth.kotobase.net` /
+`auth.kotoba.cloud`）。**これは違反ではない。** passkey は RP-scoped であることが phishing
+境界そのもので、domain-free にすればその境界を失う（ADR-0082）。**跨ぐのは principal で
+あって credential ではない。**
+
+違反は RP が 4 つあることではなく、**それらが同じ principal に結ばれていないこと**である。
+
+### 5 つの不変条件（検査されるのはこれ）
+
+| # | 不変条件 | 重み |
+|---|---|---|
+| 1 | `controller-live` — その apex で passkey ceremony が実際に取れる | 0.25 |
+| 2 | `one-authority` — その ceremony は共有 authn の契約であって 2 つ目の実装ではない | 0.20 |
+| 3 | `capability-issuance` — その apex が Biscuit を mint でき、cross-origin を弾く | 0.20 |
+| 4 | `plane-reads-capability` — data plane が Biscuit header を読む | 0.20 |
+| 5 | `refusal-names-credential` / `auth-failure-status` — 拒否が credential class を名乗り、401/403 を使う | 0.10 / 0.05 |
+
+## 3. 現在地 — 実測 2026-08-31
+
+```
+overall        36.67 / 100   (6 apexes, 22 findings, 0 unmeasured)
+
+  kotobase.net     80.00
+  murakumo.cloud   80.00
+  itonami.cloud    45.00
+  x402.nexus       15.00
+  aozora.app        0.00
+  isekai.network    0.00
+```
+
+**同じ 1 つの finding が 6 apex 全部に在る。** `plane-reads-capability` —— **どの apex の
+data plane も `Authorization: Biscuit` を読んでいない。** header を付けた応答が付けない
+ものと（timestamp を正規化した後）バイト同一である。ADR-2608291700 が kotobase の
+4 つの query 面について記録したことは、**6 apex 全体の性質だった。**
+
+## 4. 測って初めて分かったこと — 3 件、どれも tree の記述と食い違う
+
+1. **aozora.app の passkey は 503 で止まっている。** `/api/passkey/login/begin` が
+   `AuthNotConfigured: PDS_JWT_SECRET unset` を返す。コードは完成しており ADR-2608120100 も
+   accepted だが、**live では ceremony が 1 度も完了できない。** しかも path が共有契約と
+   違う（`/api/passkey/login/begin` vs `/v1/passkey/login/options`）—— **2 つ目の実装**で
+   ある。コードが在ることと ceremony が取れることは別の事実で、前者を読んでも後者は分から
+   ない（auth-duplication-census が 2026-08-03 に記録したのと同じ形）。
+2. **itonami.cloud は Biscuit を mint できない。** `/v1/biscuit/token` が 404。passkey の面は
+   6 apex で最も進んでいる（rpId = `itonami.cloud`、ERC-4337 smart account まで実装・test
+   済み）のに、**capability の面だけが繋がっていない。**
+3. **cloud-itonami-app の edge は route を持たない。** `services/app-edge/wrangler.jsonc` に
+   routes の記述が無く、`app.itonami.cloud` は fleet dispatch、`itonami.cloud/api/*` は
+   landing worker が全部拾う。**passkey から smart account までの実装は公開面に出ていない。**
+
+## 5. 順序（この順でしかやらない）
+
+1. **`plane-reads-capability` を 6 面に配線する。** 共有 verifier は
+   `shared/kotobase/biscuit_grant.cljc` に既に在る（ADR-2608262600 D4）。
+   **2 つ目の verifier を書かない。** 安い順: kotobase 4 query 面 → murakumo `/v1/cdci/*`
+   → aozora pds → x402 admin。
+2. **itonami に `/v1/biscuit/token` を出す。** passkey が最も進んだ apex が capability を
+   持てないのは、統合の最短の穴。
+3. **aozora の passkey を共有契約に寄せる。** `PDS_JWT_SECRET` を入れて 503 を解くのは 1 手
+   だが、**それは 2 つ目の実装を生かす手**である。先に `auth.aozora.app` を共有 authn worker
+   の route にできるかを見る（ADR-2608039950 決定 3 が言う custom domain 1 行）。
+4. **x402.nexus と isekai.network に principal を接続する。** どちらも今日は設計の外に居る。
+   x402 の `Bearer ADMIN_TOKEN` は murakumo の共有秘密と同じ形（**誰も名乗らない**）。
+   isekai の self-minted did:key は controller として**正しい形**なので、捨てずに principal に結ぶ。
+5. **auth 失敗が 200 を返す面を直す。** `pds.aozora.app` は `AuthMissing` を **HTTP 200** で
+   返す。status で分岐する client は成功として扱う。
+
+**1 と 5 はコード、2 と 3 は配線、4 はオーナー判断。**
+
+## 6. 計器
+
+```
+nbb --classpath 90-docs 90-docs/auth_plane_integration/run.cljs
+nbb --classpath 90-docs 90-docs/auth_plane_integration/selftest.cljs
+```
+
+exit は 3 値: **0 = 全軸測れて finding 無し / 1 = 全軸測れて finding あり /
+2 = 測れなかった軸がある（完全なスコアの報告を拒否する）**。
+
+selftest は 6/6 green で、次を実演する: 今日の面は空虚に緑ではない（22 finding）/
+緑が到達可能（100.00）/ 赤が到達可能（0.00）/ **1 軸を直すと finding が 1 つだけ、
+名指しした 1 つだけ消える** / 測れなかった軸は nil であって 0 ではない /
+**HTTP 200 の本文は refusal ではない**。
+
+最後の 1 つは、この計器自身が 2026-08-31 に踏んだ欠陥を pin したもの。`itonami.cloud` の
+**認証されていない 200 landing JSON** が `authority` という語を含むために
+`refusal-names-credential` を true にしていた —— **拒否していない応答を、拒否が理由を
+名乗った証拠として数えていた。**
+
+**この計器は 90-docs/kotobase_auth_maturity と別物である。** あちらは 1 つの apex の面が
+どれだけ成熟しているかを深く測る。こちらは **apex 同士が一致しているか**を測る。
+片方で 100、もう片方で 0 は両立する（自前の立派な認証面を持ち、誰とも共有していない apex）。
+
+**⚠ この ADR に実測値を書き足さないこと。** §3 の表は 2026-08-31 の値であり、引用する側は
+日付を落とす。現在地は probe を回して得る。
+
+## 6.5 着地記録（2026-08-31）
+
+**§5 の 1 は kotobase の query 3 面で着地・本番稼働。** `kotobase-protocols-worker`
+version `44e201d8-1c85-405e-af59-118a7737a7f6`、control-plane `adc2b753`。
+`sparql` / `gremlin` / `graphql` が `Authorization: Biscuit` を読むようになり、
+`www-authenticate` が `Biscuit, Bearer` に、拒否は `presented Biscuit rejected:
+malformed-token` のように**理由を名乗る**。第 2 の verifier は書いていない
+（`kotobase.biscuit-grant` に委譲）。201 tests / 1121 assertions、0 failures。
+
+**残るのは datom 面**（`kotobase.net/xrpc/…datomic.q`、別 Worker）。probe の
+`:raw/planes-reading` が `3/4` と記録する。axis は 4 面すべてが読むまで false の
+ままで、これは正しい —— **一部の面だけが読む apex は、まだ終わっていない。**
+
+### 着地の途中で分かった 2 つのこと
+
+1. **計器が apex ごとに plane を 1 本しか測っていなかった。** deploy 後に probe を
+   回して「変わらない」と出たが、**原因は変更ではなく計器**で、kotobase について
+   訊いていた 1 本は datom 面（別 Worker）だった。**1 面を測った答えが apex の答えと
+   して引用される。** 現在は listed plane 全部を測り、全部が読むまで true にしない。
+   plane を足すことはスコアを下げることはあっても上げることはない。
+2. **§7 の懸念が実演で確認された。** rung を外した control 実行で、**落ちたのは
+   acceptance test 1 本だけ**だった —— 「header を付けると答えが変わる」テストは
+   **rung が無くても緑のまま**（401 の本文を組む側が独立に理由を書くため）。
+   つまり probe の `plane-reads-capability` が true になっても、**それは surface が
+   credential を正しく読んで通す証拠にはならない。** 6 つの refusal test も
+   溶接された扉に対して全部緑だった。**判別しているのは acceptance だけ。**
+
+## 6.6 着地記録 その 2（2026-08-31）
+
+**§5 の 1 が kotobase の 4 面すべてで完了し、2 も着地。kotobase.net は 100.00。**
+overall 36.67 → **40.00**。最初に完全適合した apex。
+
+- `net-kotobase` gateway version `19c9271e-d1a6-43d9-8b7d-1dccb080ec35`
+  （control-plane `5e3b2976`）—— xrpc の 401 が **提示なし / 形式不正 /
+  形式は正しいが拒否**の 3 つを区別する。536 tests, 2604 assertions, 0 failures。
+- **なぜ well-formed な credential が落ちたかは言わない。** その理由は authn にあり、
+  gateway を 2 つ目の policy engine にしない。未認証の呼び手に `expired` と
+  `not yours` を区別して見せるのは別種の漏洩である。
+
+### axis を改名した —— `refusal-distinguishes-credential`
+
+**`plane-reads-capability` は測れないことを名乗っていた。** gateway は最初から
+Biscuit を読んで authn へ転送していた（`^Biscuit [A-Za-z0-9_-]{80,8192}$`）。
+測れていたのは**拒否が提示された credential を提示なしと区別するか**である。
+**機構の名前を付けた axis は、その機構についての証拠として引用される。**
+
+同時に、probe が送っていた `Biscuit EnwAAA` は **6 文字**で、gateway も murakumo も
+80 文字以上を要求していた —— **考慮される大きさに届かない入力は判別できず、
+しかも finding に見える向きに壊れる。** 200 文字に直した（直しても datom 面の
+結果は変わらず、欠陥は本物だった）。
+
+datom 面 / IPLD / IPNI の設計判定は **ADR-2608311800**。
+
+## 6.7 配線（2026-08-31）— §5 の 2 と 5 が着地、3 は 1 つの秘密で止まっている
+
+**overall 45.83。itonami.cloud 45.00 → 65.00。**
+
+### §5-2 着地: `auth.itonami.cloud/v1/biscuit/token`（version `188053db`）
+
+**mint ではなく転送。** root seed は `kotobase-authn` だけが持つ（ADR-2608261300）ので、
+service binding で転送し、拒否も含めて答えをそのまま返す。**2 つ目の issuer を作らない。**
+
+実測で転送が本物であることを確認: 同じ偽 bearer に対して `auth.itonami.cloud` と
+`auth.kotobase.net` が**同一の `{error: not authorized}` 401** を返す ——
+ローカルの stub ではなく issuer の principal 検査まで到達している。credential 無しは
+issuer 自身の **403 same-origin**（以前は 404）。
+
+**Cookie は転送しない。** authn の session cookie は `gftd_session` で自分の apex に
+scope されており、こちらの session は itonami のもの。**一方の apex の session 名を
+他方の名前空間で解釈させるのは、この設計全体が避けている confused deputy の形。**
+戻りの `set-cookie` も落とす。どちらも smoke test が assert する（コメントの主張ではない）。
+
+**隠さずに書く**: itonami の passkey session だけでは今日 mint できない。service account
+と bearer 保持者はできる（authn の handler が *a live human session or service-account
+bootstrap secret* を受け、CSRF guard が Authorization 提示者を免除する）。**principal の
+接続は ADR-0082 の controller の問いで、proxy では解けない** —— WebAuthn credential は
+RP-scoped なので、転送で他 apex の ceremony が有効になることはない。
+
+### §5-3 は **1 つの秘密**で止まっている（aozora）
+
+`app-aozora-auth` は **secret を 1 つも持たずに deploy されている**（`wrangler secret
+list` → `[]`）。必要な `PDS_JWT_SECRET` は `app-aozora-pds` が持ち、**設計上読めない**。
+リポジトリ自身が場所と手順を書いている（`auth/README.md`、vault item
+`aozora PDS_JWT_SECRET`）。
+
+**新しい値を生成して解決しない。** 同 README が「rotation は両 Worker で同時に」と
+書いており、片側だけ違う値にすると in-flight session が静かに壊れる ——
+**503 より悪い**。`op read` は 1 件狙い撃ちで試して無音で失敗した（CLAUDE.md が記録する
+interactive unlock timeout）。**繰り返し叩けば owner に unlock prompt を連発するので、
+1 回で止めた。**
+
+⚠ **path を共有契約に寄せる／秘密の gate を緩める、のどちらもしなかった。**
+どちらも `controller-live` / `one-authority` を緑にするが、**sign-in は壊れたまま**に
+なる —— 計器だけが動いて製品が動かない、この ADR が禁じている形そのもの。
+
+**解除条件**: `auth/` で `npx wrangler secret put PDS_JWT_SECRET`（pds と同じ値）。owner 操作。
+
+### 配線の途中で踏んだ欠陥 2 件（どちらも「静かに何もしなかった」形）
+
+1. **`:require` の挿入が黙って失敗した。** assert を付けない文字列置換を、**main より
+   9 commit 遅れた checkout** から読んだ内容に対して当てた。anchor が存在せず置換は
+   0 件、そして **`shadow-cljs release worker` は exit 0 で成功した** ——
+   `No such namespace: issuer` を警告しながら、存在しない global への呼び出し
+   `issuer.Ac(b,a)` を出力して。**本番の最初のリクエストで ReferenceError になる。**
+2. **その guard として入れた `:warnings-as-errors true` が効かなかった。**
+   トップレベルと build map の両方で試し、**両方とも欠陥を再投入して確かめた** ——
+   build は同じ 2 警告で exit 0 のまま。**commit していない。落ちることを示せない
+   guard は、誰も持っていない保護として読まれる。**
+
+捕まえたのは `test/worker_smoke.cljs`（**built artifact** を走らせて
+`issuer is not defined` で abort）。危険は次に人が立つ場所、`shadow-cljs.edn` に記録した。
+
+## 6.8 murakumo — 書いたが出荷していない（2026-08-31）
+
+**ADR-2608291200 は半分しか着地していなかった。** authn は operator credential
+（`mro_`、`murakumo://can/operator:<action>`、15 分、caller ごと）を mint し、検証 RPC
+`/rpc/verify-operator` まで持ち、`api.murakumo.cloud` には `AUTHN_SERVICE` binding も
+在る。**それを呼ぶコードが 1 つも無かった。**
+
+実測: **checkout 済み 4,329 repo を横断して、issuer 自身の repo の外に呼び手ゼロ。**
+credential は発行され、検証でき、期限が切れ、**何も authorize していなかった** ——
+その間、置き換えるはずだった共有秘密が `/v1/kotobase/database-restore` の唯一の鍵の
+まま（1 本の文字列、全 operator プロセスが保持、`=` で比較、監査で誰も名乗らず、
+2026-08-29 以降**誰も読めない**）。
+
+**どちらの半分も間違っていない。繋がっているかを誰も問わなかった** ——
+そして**存在しない consumer はどこにもエラーを出さない。**
+
+配線は書き、テストも通した（277 tests / 1432 assertions、新規 5 件含む、0 failures）。
+**branch `agent/operator-biscuit-consumer`（`c990fb6`）に保全し、merge していない。**
+
+**出荷しない理由**: この repo の `npm run build` は**コンパイルしない**。hash 固定の
+committed artifact を展開して source digest を assert するので、**source を 1 文字
+変えると `release/cljs/manifest.json` を refresh するまで全員のビルドが壊れる。**
+`shadow-cljs.edn` 自身が refresh 条件を *in a clean west workspace*、13 の sibling
+pin つきと書いている。実測: 共有 checkout は `release/cljs/ui.js.gz` が**未コミットで
+dirty**、artifact の最終 refresh は 68 分前 —— **別セッションがまさにその artifact を
+触っている。** 検証していない workspace から refresh すれば、**コンパイルした対象と
+違う依存 pin を記録する governance record** ができる。
+
+⚠ **前ターンの「ZERO callers」は `cloud-murakumo-api` 1 repo だけを見た主張だった。**
+fleet 全体で測り直して結論は変わらなかったが、**測った範囲は変わった** ——
+下記の計器がそれを毎回測る。
+
+## 6.9 計器 3 本目 — `verify-credential-consumers`
+
+**issuer が晒す検証 endpoint のうち、workspace の誰も呼んでいないものを報告する。**
+endpoint の一覧は issuer の source から**読む**（手書きの表は、新しい credential class
+が増えた日にそれを隠す方向に古びる）。
+
+**この検出器自身が 2 回壊れていた。両方とも直してある。**
+
+1. 3 endpoint それぞれで全 tree を歩き、**9 分で終わらなかった。** コストは walk なので
+   1 回だけ歩いて bucket する。
+2. **issuer の source ファイルだけを除外していた。** そのせいで
+   `/rpc/verify-operator` に consumer が 3 件あるように見えた —— **自分の ADR、自分の
+   README、自分のコンパイル済み bundle。** そして `clean` と報告した。
+   **consumer とは他人のこと**なので issuer repo 全体を除外する。
+   **この欠陥は finding を隠す方向に壊れていた**ので、控えの合成ツリーには
+   「数えてはいけない issuer 内の言及」を必ず含める。
+
+## 6.10 aozora と x402（2026-08-31）— overall 52.50
+
+**aozora.app 15.00 → 35.00 / x402.nexus 15.00 → 35.00。**
+
+### aozora: 秘密が要る修理と、要らない修理は別だった
+
+`app-aozora-auth` version `9883c91a`。**`/v1/biscuit/token` を kotobase-authn へ転送。**
+壊れていたのは 2 つで、**片方だけが秘密を必要としていた** —— ceremony は
+`PDS_JWT_SECRET` 待ちのまま（意図的に据え置き。新しい値を生成すると PDS 側の
+in-flight session が静かに壊れる）だが、**capability の発行は秘密を 1 つも要らなかった。**
+
+実測: **3 apex が同じ credential に同一の答えを返す。**
+
+```
+auth.aozora.app    {error: not authorized} 401
+auth.kotoba.cloud  {error: not authorized} 401
+auth.itonami.cloud {error: not authorized} 401
+```
+
+**Cookie は転送しない / 戻りの set-cookie は落とす。** control（cookie を転送集合に
+足す）で `the-cookie-is-not-forwarded-to-the-issuer` **だけ**が落ちることを確認済み。
+
+### x402: 拒否が提示されたものを名乗る
+
+`nexus-x402` version `7679d61e`。`{error: unauthorized}` 1 種類だった応答が、
+**none / bearer / biscuit / cacao / unknown-scheme** を区別する。**なぜ落ちたかは
+言わない** —— 共有 admin 秘密が 1 本の面で `wrong token` と `not configured` を
+分ければ、未認証の呼び手にこの deployment を教えることになる。
+
+**Biscuit は「まだ受け付けない」と明言する。** 沈黙は拒否されたトークンと同じ顔をする。
+
+### §5-4 が配線だけでは終わらない構造的な理由
+
+**x402 に mint だけ足すことは、しなかった。** それは自分で
+**未消費 credential**（§6.8 の欠陥）を作る手である。受け取りが先。
+
+受け取りには verifier が要る。そして fleet 唯一の実装 —— **自分の docstring が
+*one implementation, two deployables* と書いている `kotobase.biscuit-grant`** ——
+は **`net-kotobase/control-plane` という deployable の中**にあり、
+`shared/src/kotobase/` に**ただ 1 ファイル**として置かれている。
+
+**3 つ目の consumer は、他プロダクトの repo に source 依存するか、2 つ目の verifier を
+書くかしかない。誰もどちらもしていない。**
+
+**これが観測されたパターンの説明である**: itonami と aozora は issuer へ**転送**し、
+murakumo と x402 は**何も受け取らない** —— 設計ではなく **packaging** がそうさせている。
+解くには verifier を library repo へ出す必要があり、それは repo の決定であって配線ではない。
+
+### 今回踏んだ計測側の欠陥 2 件
+
+1. **zsh の単語分割で `-H` が渡っていなかった。** `${h:+-H $h}` の形（引数を変数で組む書き方）は zsh で 1 語になる
+   （CLAUDE.md が `west update $NAMES` で記録しているのと同じ罠）。**動いている deploy を
+   壊れていると報告する 1 歩手前だった** —— header を 1 つずつ独立の引数で渡して測り直した。
+2. **x402 の新しい build script はこのマシンで動かない。** 別セッションが同日 main に
+   入れた `npx --yes shadow-cljs release worker` が `release@latest` を install しようとして
+   失敗する —— CLAUDE.md が 2026-08-10 に実測記録している `npx --yes <pkg> <flag>` の欠陥。
+   shadow-cljs は devDependency に在るので `--no-install` なら通る。**他セッションの
+   進行中の変更なので直していない。報告に留める。**
+
+## 6.11 x402 が Biscuit を受け取る（2026-08-31）— そして計器が見ていなかったもの
+
+`nexus-x402` version `953f290b`。**admin 面が `kotoba://can/data:write` を持つ Biscuit を
+受理する。検証はここで、公開鍵で行う** —— この Worker は mint できない credential を
+検査でき、盗む価値のあるものを持たない。共有 `ADMIN_TOKEN` は**外していない**
+（外すのは rotation で、コピーを持つ無人の呼び手は頼んでいない）。
+
+新しい scope は作らず `data:write` を再利用した —— gateway が archive PUT で同じ選択を
+した理由がそのまま当てはまる: 発明すれば既存 role が「role が既にできると言っていること」
+をできなくなり、しかも **issuer 側の変更が先に要る**。
+
+### 前提だった構造的欠陥は、別セッションが解いていた
+
+§6.10 で「`biscuit-grant` が deployable の中に閉じている」と書いた当日、**別セッションが
+それを `kotoba-lang/grant` へ移していた**（`b2340fdd`「the reader moves to the decision
+plane」）。私は org-biscuitsec へ移す作業を始めていて、**途中で気づいて破棄した。**
+
+x402 はこの repo の規約どおり **vendoring** で取り込む（nexus の CI は west workspace 無しで
+この repo だけを checkout するため）。6 ファイル・約 1,500 行、`clojure.string` 以外の依存なし。
+
+⚠ **最初の vendoring は 6 中 2 が pin-dishonest だった。** west pin に居る working tree から
+コピーして、ヘッダには upstream head を宣言していた。`verify-vendored-copies.cljs` が
+**「stale より悪い」**と呼ぶ形（ヘッダが唯一の provenance なのに、それが嘘）。
+全部 `git show <pin>:<path>` から取り直し、**commit 前に 6 本とも byte 比較した。**
+
+### 計器が、設計の中心的主張を見ていなかった
+
+**x402 が Biscuit を検証し始めても、スコアは 1 ポイントも動かなかった。**
+軸は issuance と拒否の形しか見ておらず、**受け取り側について何も測っていなかった。**
+
+`refusal-advertises-capability`（0.10）を足した。**名前は見えるものに合わせている** ——
+credential を持たない probe は受理を観測できず、観測できるのは**その面が capability を
+受け取ると言っているか**だけ。同じ file の前の軸を、まさにこの誤りで改名したばかりである。
+
+⚠ **軸を足すと分母が変わる。** 52.50 → 50.76 は退行ではなく**別の物差し**。
+**前後の数値を trend として並べないこと。**
+
+```
+kotobase.net 100.00 / murakumo.cloud 72.73 / itonami.cloud 59.09
+x402.nexus 40.91 / aozora.app 31.82 / isekai.network 0.00   (overall 50.76)
+```
+
+## 6.12 x402 が発行もする（2026-08-31）— overall 53.79、6 apex 中 5 が同じ issuer
+
+`nexus-x402` version `c2354717`。`POST /v1/biscuit/token` を kotobase-authn へ転送。
+**受理できるようになった後に足した。順序が要点である** —— consumer の無い mint は、
+存在し、検証でき、期限が切れ、**何も authorize しない credential** である
+（§6.8 で api.murakumo.cloud に見つけたもの）。**先に発行していれば、それを知りながら
+作ったことになる。**
+
+この apex は今、**できる場所でそれぞれの半分をやっている**: 検証は**ここ**で公開根拠で
+（秘密が要らない）、発行は**転送**で（root seed は kotobase-authn だけが持つ）。
+
+```
+kotobase.net 100.00 / murakumo.cloud 72.73 / itonami.cloud 59.09
+x402.nexus 59.09 / aozora.app 31.82 / isekai.network 0.00   (overall 53.79)
+```
+
+### 計器がまた自分の仮定を報告していた
+
+**mint を足してもスコアは動かなかった。** probe は mint を `auth.<apex>` にしか
+探しておらず、x402 は auth サブドメインを持たず apex 自身に置いたからである。
+**多くの apex がたまたま置く場所だけを見る軸は、自分の仮定を報告する。**
+両方を見るようにした（一律。auth host が既に guarded mint を返すならそちらを採る）。
+
+これで**今日 3 度目**である —— 軸が機構の名前を名乗っていた / 受け取り側を測っていなかった /
+配置の一形態しか見ていなかった。**計器の欠陥はどれも、測られる側ではなく測る側にあった。**
+
+### isekai.network が 0.00 である理由（実測）
+
+**放置ではない。** `isekai.network` は **Cloudflare Pages**（静的 + `functions/` の
+Pages Functions、すべて `.mjs`/`.js`）で、identity は README のとおり
+**ブラウザが自己発行する did:key（Ed25519、非抽出、IndexedDB）** —— *設計として*
+client-side である。auth ホストも session も無い。
+
+したがってここは**配線ではなく判断**が要る:
+
+1. isekai に server-side の authority 面を持たせるか（Pages Functions なら可能）
+2. 自己発行 did:key を principal の controller として結ぶか（ADR-0082 の controller 問題）
+3. 新規コードは `.mjs` になる —— CLAUDE.md は新規 `.mjs` を禁じている。**この repo の
+   既存 Functions は全部 `.mjs` なので、規約どうしが正面衝突する。**
+
+3 点ともオーナー判断であり、勝手に決めない。
+
+## 6.13 不変条件を軸から独立に宣言する（2026-08-31）
+
+**今日の計器の欠陥は 3 つとも、測られる側ではなく測る側にあった。** 根は 1 つで、
+**軸を「probe で測りやすいもの」から作った**こと。設計の主張は散文の中にしか無く、
+軸と突き合わせるものが存在しなかった。
+
+`audit/invariants` を足した —— **設計が何を主張するかを、観測可能性と無関係に**書く。
+軸は `:invariant` を宣言し、`coverage` が 3 つに分ける:
+
+- **covered** — 軸がある
+- **unobservable** — 軸を持てない理由が宣言してある（例: `one-decider` は
+  「どの実装が決めたか」が応答に出ない。**省かずに宣言する** —— 省いたことが、
+  受け取り側を半日見えなくした当のもの）
+- **SILENT** — 軸も理由も無い。**これが欠陥**で、run は exit 2 で拒否する
+
+逆向きも見る: **どの不変条件にも属さない軸（ORPHAN）も拒否**する。
+誰も頼んでいない測定は、誰も行動できない測定である。
+
+**coverage は初回実行で本物の穴を 1 つ出した。** `controllers-are-rp-scoped`
+（ADR-0082）に軸が無く、しかも**観測可能**だった —— ceremony は自分の `rpId` を返す。
+probe は**初版からその値を記録していて、何も採点していなかった。**
+`controller-is-rp-scoped` を足した（rpId がその apex の名前か: 他 apex の rpId を配る面は、
+訪問者に**他人の扉の credential** を渡している）。
+
+**coverage は毎回、スコアより先に印字する。** 不完全な軸の集合から出た数より、
+軸が届く範囲と届かない範囲の一覧の方が価値がある。後ろに置けば誰も読まない。
+
+⚠ 軸が増えて分母は 1.20。**53.79 → 53.47 は別スケール**であり退行ではない。
+
+## 6.14 closing — 2026-09-01 01:50Z の現在地と再開点
+
+**overall 53.47 / 100**（分母 1.20。8/31 の数値と直接は比べない —— 途中で軸を 2 本足した）。
+
+```
+kotobase.net 100.00 / murakumo.cloud 75.00 / itonami.cloud 62.50
+x402.nexus 54.17 / aozora.app 29.17 / isekai.network 0.00
+```
+
+### 本番に載ったもの（実測で確認済み）
+
+| Worker | version | 何が変わったか |
+|---|---|---|
+| `kotobase-protocols-worker` | `44e201d8` | sparql/gremlin/graphql が Biscuit を読む |
+| `net-kotobase`（gateway） | `19c9271e` | xrpc 401 が 提示なし/形式不正/拒否 を区別 |
+| `app-aozora-pds` | `7bdc34b7` | 認証失敗が 200 から 401 へ |
+| `itonami-app-auth` | `188053db` | `/v1/biscuit/token` を issuer へ転送 |
+| `app-aozora-auth` | `9883c91a` | 同上 |
+| `nexus-x402` | `c2354717` | Biscuit を公開鍵で**受理**し、mint は転送 |
+
+### ⚠ main に在るが本番に出ていないもの
+
+**`cloud-murakumo-api` `e2e944d7`** —— operator Biscuit の consumer と governed artifact
+refresh は main に着地し検証も通ったが、**出荷していない**。
+
+**Cloudflare の OAuth token が `2026-08-31T22:01:50Z` に期限切れ**で、wrangler 3 バージョン
+（4.103 / 4.107 / 4.123）すべてが `not authenticated` を返す。`refresh_token` は config に
+在るが自動更新が効いていない。**このマシンからの出荷は全 Worker で止まっている。**
+
+再開は owner の `wrangler login`（ブラウザ対話）のあと、その repo の `npm run deploy`。
+
+### 残る blocker（すべて owner の判断か鍵）
+
+1. **出荷全般** — OAuth 期限切れ（上記）
+2. **aozora の ceremony** — `auth/` で `PDS_JWT_SECRET` を pds と同じ値で設定する。
+   **新しい値を生成すると pds の in-flight session が静かに壊れる。**
+3. **isekai.network** — 6.12 の 3 判断（server-side authority を持たせるか /
+   自己発行 did:key を controller にするか / 新規 `.mjs` の規約衝突）
+
+### 計器（着地済み、`manifest/orgs-detectors.edn` に登録、計 56）
+
+| detector | 何を比べるか |
+|---|---|
+| `verify-ipni-publisher-record` | 記録 と live head の署名者・cid.contact・実配信 |
+| `verify-shadow-cljs-provider-paths` | source-path に載せた lib と その lib 自身の依存 |
+| `verify-credential-consumers` | issuer が晒す検証 endpoint と それを呼ぶ者 |
+| `verify-shared-library-consumption` | 各 build が共有ライブラリに**届くか**、どの経路で |
+
+再測定は `90-docs/auth_plane_integration/run.cljs`（exit 0/1/2）と同 `selftest.cljs`（6/6）。
+
+### 次の一手（出荷を要さない）
+
+`verify-shadow-cljs-provider-paths` が報告した**ビルド不能 8 件のうち直したのは 3 件**
+（control-plane protocols-worker / aozora / murakumo）。**残り 5 件**は出荷を伴わずに
+直せる。同 script を `--findings orgs` で回せば現在地が出る。
+
+## 7. やっていないこと（正直に）
+
+- **§5-3 は owner の 1 操作待ち**（`wrangler secret put PDS_JWT_SECRET`）。
+- **murakumo は governed artifact の refresh 待ち**（branch は保全済み、merge していない）。
+- **isekai.network は 0.00 のまま。** 自己発行 did:key を controller として principal に
+  結ぶ**設計判断**が要る（proxy では解けない）。
+- **isekai.network は 3 つのオーナー判断待ち**（§6.12）。
+- **murakumo と itonami と aozora は capability を advertise していない** ——
+  受理していないので、それが正直な状態。
+- **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
+  **正当な Biscuit が実際に通ることは測っていない。**
+- **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの
+  `Biscuit EnwAAA` を付けて答えが変わるかを見る。**false は強い証拠**だが、
+  **true は正しく読んでいる証拠にならない** —— §6.5 の 2 で実演済み。
+- **fleet gate にしていない。** 外向き HTTPS を要求し、ノードの egress は一様ではない。
+  常駐させるなら operator ホスト 1 台に置く。
+- **itonami の checkout は最後に fetch した main より 57 commit 遅れている。**
+  §4 の 3 番目（app-edge に route が無い）は、その遅れた tree に対する観測である。")))

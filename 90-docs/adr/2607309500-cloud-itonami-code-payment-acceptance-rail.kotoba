@@ -1,0 +1,181 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607309500-cloud-itonami-code-payment-acceptance-rail")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/topic "itonami-code-payment-acceptance-rail")
+  (:adr/title "ADR-2607309500: コード決済（PayPay 型 QR/バーコード決済）は acceptance rail として設計する — payout rail に足すのは「コンパイルが通る間違い」")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-30")
+  (:adr/last-verified "2026-07-30")
+  (:adr/last_verified "2026-07-30")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative-for
+  (vector "cloud-itonami / kotoba-lang fleet における コード決済（QR・バーコード決済）のデータモデルの正本 — marketplace.acceptance に置き、marketplace.settlement/payout-rails には入れない決定"
+   "コード決済の payout leg を :bank-transfer とする決定（PSP は1つの加盟店銀行口座に入金するので per-seller payout destination になり得ない）の正本"
+   "capture を PSP 起源の attestation（webhook / api-query）だけに限定し、買い手提示の決済完了画面を :buyer-presented-evidence として名指しで拒否する決定の正本"
+   "このレールが custodial であること（:accept/operator-custodial? true）を全 request に明示し、収納代行 / 資金移動業の問いを実装前に立てさせる決定の正本"
+   ":mpm-static（金額が code に束縛されない）と :mpm-dynamic / :cpm（束縛される）を分け、static の不足額は捕捉して :short として報告し settlement に release しない決定の正本"
+   "期限判定を attestation の :psp/attested-at で行う（処理時刻の clock ではない）決定の正本"
+   "返金を元 PSP 取引に対して行い :refund/rail を書き換えない決定の正本"
+   "settleops.rail が :code-payment を :not-a-payout-rail として名指しで拒否する決定（:unknown-rail に落とすと「表に足せば直る」と誤読される）の正本"
+   "PSP ベンダ固有 API client をこの層に置かない決定（ADR-2606302300 の layer test に従い vendor repo 側の責務）の正本"))
+  (:adr/related "adr-2607300900-cloud-itonami-payment-settlement-funding-balance, adr-2606302300-org-taxonomy-4-orgs, adr-2607264000-marketplace-settlement, adr-2607252053-statement-fetch-credential-free-browser-retrieval")
+  (:adr/body "
+# ADR-2607309500: コード決済は acceptance rail として設計する
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（+ Claude。オーナー質問『今の cloud-itonami に paypay の
+ような qr コード決済は設計、統合されている?』→ 調査 → 『ok, do it』に基づき実行）
+
+## Context — 調査の答えは『無い』だった
+
+fleet 全体を調べた結果、**コード決済（QR / バーコード決済）はどこにも設計されて
+いなかった**。`PayPay` の一致はすべて **PayPay銀行**（bank）であって QR ウォレット
+ではない:
+
+- `cloud-itonami-app` の `paypay_bank.clj` は PayPay銀行が送る『【残高不足】引落予定の
+  ご案内』メールの **read-only パーサ**。docstring 自身が、銀行の直 API には申請・
+  約7営業日・**電子決済等代行業者**登録が要ると書いている。
+- `authority/payment.clj`（ADR-2607300900）は governed settlement **RECORD** であって
+  送金しない。口座番号は last4 + SHA-256 digest のみ。
+- `settleops.rail`（`cloud-itonami-marketplace-settlement`）の rail 表は
+  `:x402`（:direct-split）/ `:stripe`（:transfer）/ `:bank-transfer`（:transfer）の3本のみ。
+- `cloud-itonami-isic-6619` は **card** transaction processing の actor（カード。QR ではない）。
+- EMVCo / JPQR / CPM / MPM / コード決済 の文字列は cloud-itonami のコード・blueprint に
+  存在しない（一致は第三者 ToS アーカイブ `tos.journal.edn` の本文だけ）。
+
+## Decision
+
+### D1. 置き場所は acceptance 側であり、payout rail ではない
+
+当初の見立ては『`settleops` に `:code-payment` を kind `:transfer` で足す』だったが、
+実装前に `marketplace.settlement` を読んで**それが間違いだと分かった**。
+`payout-rails` は「プラットフォーム → 売り手」の向きを記述する集合で、
+`payout-destination` は per-seller の宛先である。**コード決済 PSP は1つの加盟店
+銀行口座に入金する**ので、per-seller の payout destination には原理的になれない。
+`payout-rails` に足せば**コンパイルは通って本番で壊れる** — `settleops.rail` が
+既に記録している『存在しない x402 の POST /transfer を発明する』のと同じ失敗である。
+
+よって買い手 → プラットフォームの leg を新 namespace **`marketplace.acceptance`**
+（`kotoba-lang/marketplace`）に置き、`acceptance-rails` は `payout-rails` とは
+**別の集合**とする。`payout-leg-rail` が帰結を述べる: **コード決済の売り手取り分は
+`:bank-transfer` で出る**。
+
+### D2. このレールは custodial であり、x402 はそうではない
+
+x402 は `:direct-split` で、買い手が各売り手の treasury に直接支払い operator は
+経路に入らない。**コード決済はそれができない** — PSP は加盟店1者しか知らず、
+支払時点で分割できない。したがって売り手の金は operator を通過する。これを
+`:accept/operator-custodial? true` として**全 request に明示**する。
+
+これは様式の問題ではなく規制事実である: 買い手の金を集めて売り手に渡すのは
+**収納代行**の領域であり、構造によっては**資金決済法上の資金移動業**に当たる。
+library はこの旗を立てるだけで、ある deployment が実施してよいかは判断しない
+（判断しないことを明示する）。
+
+### D3. 買い手の決済完了画面は支払いの証拠ではない
+
+偽造した**決済完了画面**の提示はこのレールに対する標準的な攻撃である。よって
+`capture` は `attestation-sources`（PSP が送った webhook / 加盟店の照会に対する
+PSP の回答）だけを受け、買い手提示（`:buyer-screen` / `:buyer-screenshot` /
+`:buyer-claim`）を **`:buyer-presented-evidence` として名指しで拒否**する。
+未知の source は既定で通さない（`:unattested-source`）。
+
+### D4. :mpm-static は金額を束縛しない
+
+- `:mpm-static` — 貼ってある固定コード。**金額を持たない**ので買い手が入力する。
+- `:mpm-dynamic` / `:cpm` — 金額が code に束縛される。かつ一回性なので
+  **expiry 必須**（無ければ `:missing-expiry` で拒否。placard だけが免除）。
+
+束縛されている場合の金額不一致は `:bound-amount-mismatch` で**拒否**。static の
+不足は**捕捉して `:short` として報告**し、`releasable-to-settlement?` は false に
+する（不足払いの注文で売り手に満額払うのは operator の自腹）。**超過も報告する**
+（`:over`。黙って受けると返金義務のある金を持つ）。
+
+### D5. 期限は『いつ支払われたか』で判定する
+
+`capture-errors` の期限判定は attestation 自身の `:psp/attested-at` を使い、
+処理時刻の clock は使わない。webhook の処理が遅れたかどうかで成否が変わるのは
+誤りで、締切に間に合った支払いは遅く処理しても間に合っている。
+
+### D6. 返金は元 PSP 取引に対して行う
+
+`refund-instruction` は `:refund/rail` を**元の acceptance rail のまま**にし、
+`:refund/original-transaction` を必須にする。銀行振込での場外返金は、PSP 側の
+記録が『買い手は支払った』のままで返金の記録がどこにも無い状態を作る。
+無記名の返金は拒否（`requested-by` 必須。`resolve-dispute` と同じ規律）。
+
+### D7. settleops は名指しで拒否する
+
+`settleops.rail/non-payout-rails` に `:code-payment` を置き、
+`:not-a-payout-rail` として拒否する。`:unknown-rail` に落とすと**次に見た人が
+「表に足せば直る」と合理的に誤読する**が、それが正にこの拒否が止めたい間違い
+である。真に未知の rail は従来どおり `:unknown-rail`。`:unknown-instruction-kind`
+は併記しない（第1の error の帰結であり、原因の隣に帰結を並べると診断が埋まる）。
+
+### D8. PSP ベンダ client はここに置かない
+
+`:accept/psp` は **deployment が渡す名前**で、library は存在だけを検査しどの
+ベンダかは検査しない。ベンダ固有 API client（PayPay / 楽天ペイ / au PAY …）は
+ADR-2606302300 の layer test を落ちるので kotoba-lang capability library では
+なく vendor repo の責務である。**clock も network もこの namespace に無い。**
+
+## 実装と着地
+
+- `kotoba-lang/marketplace` main **`ea26053`**: `src/marketplace/acceptance.cljc`
+  + `test/marketplace/acceptance_test.cljc`（17 deftest）+ README。
+  検証: `clojure -M:test` **169 tests / 719 assertions / 0 failures**、
+  `clojure -M:lint` **0 errors / 0 warnings**。
+- `cloud-itonami/cloud-itonami-marketplace-settlement` main **`db97e15`**:
+  `:not-a-payout-rail` 拒否 + marketplace pin 前進（`2bdd9b6` → `ea26053`）+
+  README の rail 表に第3行。検証: `clojure -M:test` **48 tests / 143 assertions /
+  0 failures**（2 新規 deftest）、`clojure -M:lint` **0 errors / 0 warnings**。
+- superproject: `manifest/west.yml` の2 entry のみを GitHub API single-entry commit で
+  前進（**`88da2174`**。marketplace `8094c50` → `ea26053`、settlement
+  `5c85e1e` → `db97e15`）。両方とも push 前に GitHub API で
+  `status: ahead` / `behind_by: 0` を確認済み。
+- いずれも sibling worktree（superproject 外）→ branch push → `gh api .../merges` の
+  サーバ側マージ。rebase / force-push なし。
+
+## 意図的に実装していないこと
+
+1. **PSP client が無い** — D8。実際に PayPay と喋る何かは vendor repo 側であり、
+   加盟店契約と PSP の審査が前提。この ADR はそこに踏み込まない。
+2. **ライセンスは取得していない** — D2 の旗が立つだけ。収納代行 / 資金移動業の
+   判断は owner の意思決定であって library の出力ではない。
+3. ~~**escrow への配線がまだ無い**~~ — **2026-07-30 に解消（ADR-2607309800）**。
+   custodial flow では PSP attest 済み capture が store に無い限り escrow を開くことも
+   release を承認することもできない（HARD check 7）。
+4. **`cloud-itonami-app` は無変更**（現在も維持）— payment authority は settlement
+   RECORD のままでよく、コード決済のために app に credential を持たせる変更は一切
+   していない（ADR-2607300900 の到達上限をそのまま維持）。
+5. ~~**actor の operation graph に phase を足していない**~~ — **2026-07-30〜31 に解消**。
+   `:record-payment-capture`（ADR-2607309800）と `:propose-refund`（ADR-2607309960）を
+   op として追加。いずれも always-escalate でどの phase でも auto 禁止。HTTP surface
+   （`POST /captures` `POST /refunds` `GET /acceptances`）は ADR-2607310200 で追加し
+   本番 deploy 済み。
+
+**この節で「未実装」と書いたもののうち、現在も未実装なのは 1・2・4 だけ。** 3・5 は
+後続 ADR で解消済みであり、ここを根拠に「受入は library の純関数だけ」と引用しないこと。
+
+## Alternatives considered
+
+- **`payout-rails` に `:code-payment` を足す（当初案）。** D1 のとおり、PSP は
+  per-seller に払えないのでコンパイルが通って本番で壊れる。却下。
+- **acceptance を `settlement.cljc` に同居させる。** payout の集合と acceptance の
+  集合が同じ名前空間にあると、次の人が同じ集合に足す。**別 namespace + 別集合**に
+  したのは物理的に取り違えにくくするため。
+- **`:qr-payment` という名前。** バーコード（CPM）も含むので **コード決済** =
+  `:code-payment` を採る。
+- **PSP を allowlist にする（`currency-exponents` と同型）。** fail-closed の作法
+  としては一貫するが、kotoba-lang の汎用 library にベンダ名が入る。deployment が
+  名前を渡す形にした。
+- **static コードの不足を拒否する。** 買い手は既に払っているので、拒否すると
+  『金は受け取ったがどの状態でもない』が生まれる。**捕捉して :short と報告**し、
+  release だけ止めるのが正しい。
+- **買い手の完了画面を『補助的な証拠』として受ける。** 偽造が容易な入力を
+  『補助的』と呼ぶと、PSP が沈黙している時にそれが唯一の証拠になる。拒否。
+")))

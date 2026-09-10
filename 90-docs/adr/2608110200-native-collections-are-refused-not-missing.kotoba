@@ -1,0 +1,137 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608110200-native-collections-are-refused-not-missing")
+  (:adr/title "ADR-2608110200: native は collection を「取れない」のではなく、caller が作った handle に export 境界を越えさせない — fold の決定は遷移であって loop ではない")
+  (:adr/status "accepted, implemented")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-11")
+  (:adr/last-verified "2026-08-11")
+  (:adr/last_verified "2026-08-11")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "native-collection-boundary-and-step-folds")
+  (:adr/tags "kotoba, native, kexe, capability, safety-boundary, selfhost, effect-inference")
+  (:adr/related (vector "adr-2608110100-selfhost-analyzer-was-removed-not-progressing"
+                "adr-2608650000-kotoba-permanent-vs-temporary-constraints"
+                "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"))
+  (:adr/supersedes "")
+  (:adr/superseded_by "")
+  (:adr/authoritative true)
+  (:adr/authoritative-for
+  (vector "native が collection について実際に持っているもの / 拒否しているもの / その理由"
+   "caller-supplied な列を guest に渡す設計を採らない決定"
+   "fold を Kotoba の決定にする正しい形（step 関数）"))
+  (:adr/body
+  "# ADR-2608110200: native は collection を「取れない」のではない
+
+**Status**: accepted, implemented
+**Date**: 2026-08-11
+
+## Context
+
+ADR-2608110100 は effect inference の traversal を host に残し、理由を
+**「native gate が collection を取るまで」**と書いた。この記述で言語側を更新しようとして
+実測した結果、**その帰属は二重に間違っていた**。
+
+## 実測（2026-08-11、amu 76d4d90 / kotoba-kir 6ac32ba）
+
+### 1. native は既に collection を持っている
+
+| 型 | 実装 | 上限 |
+|---|---|---|
+| `:vector-i64` / `:vector-f64` | `kotoba-native`（ADR 0212 / compiler#529、16 signed-kexe cases） | handles 4096 / arena 65536 words / 単一 vector 16384 items |
+| `:string-index`（string → i64） | `kotoba/native/string_index.cljc` | 128 entries / 65536 key bytes |
+
+「native に collection が無い」は端的に誤り。
+
+### 2. 拒否されているのは export 境界の通過であり、それは安全性質
+
+`kotoba-kir` の `native-private-handle-type?` はこの 3 型を**内部呼び出し境界でのみ**
+許し、export では拒否する。理由は `string_index.cljc` が自ら書いている:
+
+> No string-index handle may cross a kexe export boundary. This therefore needs
+> neither a new host callback nor a context ABI bump.
+
+`kir.cljc` 側も同じ:
+
+> Native vectors and string indexes are context-owned handles. They are one
+> machine word at an internal call boundary, but they are not a host ABI: an
+> external caller cannot construct, validate, inspect, or release one through
+> a kexe export.
+
+**これは未実装ではなく拒否である。** ADR-2608650000 の分類でいえば
+`:intentional-security-constraint` 側であり、`:not-yet-implemented` ではない。
+
+⚠ **結果側だけは 2026-08-12 に片方向で開いた**（本 ADR の翌日、`kotoba-kir`
+`1bbdb09`）。`native-export-copy-result-type?`（`kir.cljc:389-392`、KEXE export copy
+ABI v1）が `:vector-i64` / `:vector-f64` を admit する。ただし唯一の呼び出し元
+（`kir.cljc:768-771`）が `(empty? params)` かつ非 entry を要求するので、copy ABI export は
+**0 引数**でなければならない。`:string-index` に wire 形は無く、**引数側は今も拒否される**
+—— 下の決定 1（export 境界を広げない）はそのまま有効である。
+
+### 3. そもそも native 固有の制約ではなかった
+
+**どの backend にも「列」の parameter 型が無い**（実測）:
+
+- `reduce` は `:vector-i64` 限定 — 文字列の列に対して
+  `expression type mismatch: expected vector-i64, got i64`
+- pair-chain を型付き parameter で受けられない —
+  `typed parameters require alternating name/type pairs`
+
+つまり `:compiler` / `:kotoba-wasm` / `:kotoba-cljs` でも同じく書けない。
+**native を名指ししたのは誤診**だった。
+
+## Decision
+
+### 1. export 境界を広げない
+
+caller-supplied な collection を guest に渡せるようにする改修は**採らない**。
+それは load-bearing な安全性質を壊し、しかも**本当の障壁ですらない**。
+
+将来どうしても必要になった場合に要るのは gate の 1 行ではなく、
+**caller が構築・検証・検査・解放できる handle の host ABI**（+ verifier + loader）で、
+multi-repo かつ owner 判断を要する。gate 編集で到達できる場所ではない。
+
+### 2. fold の決定は遷移であって loop ではない
+
+```clojure
+(defn infer-step [acc :i64 op :string] :i64
+  (effect-union acc (effect-bit op)))
+```
+
+これで **inference の決定内容は全て Kotoba 側にある**。host に残るのは `reduce` だけで、
+それは op を誤分類することも、違う bit を割り当てることも、union を間違えることも
+できない —— **どれもやっていない**から。
+
+以前の形（host が `effect-bit` と `effect-union` を別々に呼ぶ）は、
+**その 2 つを呼ぶ順序が host 著作**だった。分類して結果を捨てる fold も、
+分類前に union する fold も、host 側では型が通る。step 呼び出し 1 つにその継ぎ目は無い。
+
+### 3. word-typed であることは代償ではなく利得
+
+`:i64` と `:string` はどちらも native 許容なので、**inference は native ISA に載る**。
+vector parameter にしていたら、この形が既に持っているものを買い戻すために
+native qualification を手放すことになっていた。
+
+## Evidence
+
+- **amu#583**（merged `8ff1030`）: native conformance case
+  `:native-step-fold-classify`。`clojure -M:native-conformance` **17/17 pass、
+  target `:aarch64-kotoba-v1`**。union を `+` に変えると冪等性が壊れて
+  `expect 5, result 6` で落ちることを着地前に確認。
+- **kotoba-selfhost-contracts#5**: `infer-step` + analyzer の rewire。
+  host の `reduce` が artifact の step と一致することをテストが縛る。
+- `capability_admission_core.kotoba` は `--target x86_64` で**コンパイルが通る**
+  （gate 通過の証拠）。
+
+## Consequences
+
+- **ADR-2608110100 の「native gate が collection を取るまで」という記述は誤り**として
+  訂正した。coverage.edn `:selfhost` の `:blocked-on :native-gate-collections` も同様。
+- effect inference は **host に残った mechanism が `reduce` だけ**になった。
+  「traversal が host」という記述は、これ以降「loop が host」を意味する。
+- **この誤診のパターンを記録する**: 「X が無いから Y ができない」と書く前に、
+  ① X は本当に無いのか ② 無いのは X か、それとも X の**特定の使い方**か
+  ③ そもそも Y に X が要るのか —— を分ける。今回は 3 つとも外れていた。
+  これは ADR-2608110100 が記録した「後退が記録されなかった」とは別種の誤りで、
+  **障壁の帰属を測らずに書いた**ことによる。")))

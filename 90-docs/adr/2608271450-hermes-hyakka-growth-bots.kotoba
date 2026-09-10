@@ -1,0 +1,152 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608271450-hermes-hyakka-growth-bots")
+  (:adr/title "wiki.kotobase.net の成長 bot — Hermes を入れ、murakumo public API に繋ぎ、提案は模型が、判定は gate が持つ")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-27")
+  (:adr/tags (vector "hermes" "murakumo" "hyakka" "wiki" "bots" "ontology"))
+  (:adr/related (vector "adr-2608251016-hermes-murakumo-public-api" "2608197300" "adr-2608136000" "adr-2607173100" "adr-2607311100-hyakka-knowledge-wiki-on-kotobase"))
+  (:adr/body "## Context
+
+Owner asked for Hermes agent bots, running on the murakumo.cloud API, to grow the
+articles and the ontology of `wiki.kotobase.net` (`network-awai/app-hyakka`).
+
+Two things were true before any bot existed, and only one of them was visible.
+
+**Hermes was not installed on this machine.** ADR-2608251016 and ADR-2608197300
+describe a `~/.hermes` in detail, but that is a different host; here `~/.hermes`
+did not exist and `hermes` was not on PATH.
+
+**The wiki's own LLM extraction had been dead for weeks.** `config/knowledge-ingest.edn`
+pointed `:llm` at `https://infer.murakumo.cloud/v1/chat/completions` with the model
+pinned to `qwen3.6-35b-a3b`. Measured 2026-08-27: that endpoint answers
+`401 Invalid API Key` without `MURAKUMO_PROXY_TOKEN`, which this host does not hold,
+and the fleet no longer serves that model id. Every receipt on disk carried
+`:rejected [{:reason \\\"LLM extraction rejected: murakumo HTTP 401\\\"}]`.
+
+The second one is the interesting one, because of how it hid. The deterministic
+connectors — DNS, RDAP, LEI blueprints, Steam, NVD — kept succeeding. Each tick
+exited 0. `wiki.kotobase.net/health` kept climbing (758 items / 6,038 raw claims /
+50 attributes at the time of measurement). So *extraction is broken* and *the wiki
+is growing* looked exactly alike from outside, for weeks. This is the shape
+ADR-2608136000 is about, arriving through a pinned model id rather than through a
+check that could not run.
+
+## Decision
+
+### 1. The wiki's LLM path goes through the public API, on the alias
+
+`api.murakumo.cloud/v1` + `murakumo-main`, not `infer.murakumo.cloud` + a concrete
+model id. Same move ADR-2608251016 made for Hermes' own primary, for the same
+reason: the alias is one PUT away from a model swap and every consumer follows on
+its next tick (ADR-2607173100), whereas a pinned id turns a fleet change into a
+401.
+
+Landed: network-awai/app-hyakka#2, merged as `0b347bea`.
+
+### 2. The bots propose; deterministic gates decide
+
+A model asked *what is this wiki missing?* will answer — fluently, from nothing.
+It will name sources that read like real URLs and properties that read like real
+gaps, and neither failure is visible in a diff. So the model is never asked that
+question with nothing in front of it, and never gets the last word:
+
+    hyakka_evidence.py -> measurements -> bot proposes -> verify_source_proposal.cljs -> PR
+      (no decisions)                      (murakumo)          (decides)
+
+Two nbb tools landed in app-hyakka (merged as `f6df6e0f`):
+
+- `scripts/wiki_growth_evidence.cljs` — reads the ingest config, the receipts the
+  resident already wrote, and the live health endpoint. This is the bot's prompt.
+- `scripts/verify_source_proposal.cljs` — the gate. A proposed **source** must
+  fetch (status, bytes, content-type, measured at verification time) and its
+  source classes must be admissible under the corpus policy it names. A proposed
+  **property** must be corroborated by receipts already on disk: some extraction,
+  against some archived source, must actually have tried to assert it and been
+  refused.
+
+That second rule is load-bearing. The ontology can only grow where the corpus
+already pushed against its own edges, so a property nobody has ever tried to state
+cannot be added by asking for it. The gate recomputes the tally itself and ignores
+whatever number the proposal claims.
+
+Neither tool re-implements admission: corpus policy comes from
+`hyakka.corpus.registry`, class admission from `hyakka.ingest`, and the valid
+connector kinds are parsed out of `collect!` rather than copied — a kind added
+there and not here fails loudly instead of a valid proposal being rejected for
+naming a kind that exists.
+
+### 3. Exit 2 means could-not-answer, and is reached with process.exit
+
+Both tools reserve 2 for refusal. Setting `exitCode` and throwing reports **1**
+under nbb, which is the code this family uses for *measured, and found something* —
+so the refusal has to call `process.exit` directly or it is indistinguishable from
+a finding. This was caught by testing the refusal path, not by reading the code.
+
+### 4. The evidence shim exits 0 even when it refuses
+
+Hermes injects a cron `--script`'s stdout into the prompt. An empty report reaches
+the model as *nothing is missing* — the one answer that must never be produced by
+failure. So `hyakka_evidence.py` prints a REFUSED banner and still exits 0: the bot
+must **run and be told it is blind**, not be silently skipped.
+
+## What landed
+
+| | |
+|---|---|
+| Hermes | v0.20.5 (upstream `29033a3f`), `~/.hermes/hermes-agent`, venv on Python 3.13 |
+| model | `model.provider: custom`, `model.base_url: https://api.murakumo.cloud/v1`, `model.default: murakumo-main` — no API key needed |
+| gateway | LaunchAgent `ai.hermes.gateway`, installed and running |
+| bots | `hyakka-source-scout` (`c7ba9d90b765`, `20 9 * * *`), `hyakka-ontology-scout` (`cbdbe776008b`, `20 21 * * *`) |
+| worktree | `~/.gftd/worktrees/hyakka-growth-bot`, detached, re-synced to `origin/main` every run |
+| versioned copy | `scripts/hermes-hyakka-bots/` — shim, both prompts, README |
+
+The schedules are twelve hours apart deliberately: Hermes serialises cron jobs that
+declare a `workdir` behind one lock, and these two share theirs.
+
+The bot worktree lives under `~/.gftd/worktrees/`, not `/tmp`, because app-hyakka's
+`deps.edn` carries `../../kotoba-lang/kotobase-client/src` and `~/.gftd/kotoba-lang`
+is what resolves it. In a flat `/tmp` worktree the test build fails with
+`The required namespace \\\"kotobase.client\\\" is not available` — a failure a naive
+check reads as *the tests ran*. That is exactly what happened here on the first
+attempt, and it is why the suite was re-run under a corrected layout.
+
+## Verification
+
+| what | result |
+|---|---|
+| `infer.murakumo.cloud` + `qwen3.6-35b-a3b` | HTTP 401 `Invalid API Key` |
+| `api.murakumo.cloud/v1` + `murakumo-main` | HTTP 200 |
+| ingest tick, before | `:entity-count 23, :rejected-count 1` (`murakumo HTTP 401`) |
+| ingest tick, after (`--only culture-japan`) | `rejected 0`; ledger carries `:extractor \\\"murakumo-edn\\\"` `:model \\\"murakumo-main\\\"` |
+| `npm test` (app-hyakka) | 100 tests, 1,404 assertions, 0 failures, 0 errors |
+| evidence collector | healthy tree 0 (`SCANNED 90`) · no receipts 2 · no config 2 |
+| proposal gate | live CC0 source 0 · duplicate id / dead URL / forbidden class / unknown kind / already-admitted property / bad shape / uncorroborated property 1 (6 of 6 rejected, each naming the rule it checks) · empty proposal 2 · property proposal with no receipts 2 |
+| Hermes reaching murakumo | `hermes chat -q` returned the requested token |
+| Hermes running shell | `hermes chat --yolo` executed `git rev-parse` and returned the sha |
+| gateway | `cron status` — running, 2 active jobs |
+
+## Known blocked, not caused here
+
+`hyakka-kotobase-seed` is absent from kagi on this host, so `publish-kotobase!`
+throws every tick and 263 ledgers have accumulated unpublished to the Kotobase datom
+plane. This is already recorded — ADR-2608152330, ADR-2608152700, and the
+secrets-location-map, which measured it again the same morning. It needs
+`KAGI_HOME=$HOME/.kagi kagi add hyakka-kotobase-seed` with the owner's seed and was
+not attempted here: guessing at a vault is exactly what the safety floor forbids.
+
+Note what this does and does not block. The public catalogue path — ledger to
+`catalog.cljc` to the Worker — is unaffected, so new claims still reach
+`wiki.kotobase.net`. What is stopped is the Kotobase ref, which is where the
+cross-corpus Datalog joins live.
+
+## Not done
+
+- The ontology bot will do nothing until the signal fills. It was `none 0` at
+  landing, which is correct and expected: the signal only fills once extraction is
+  reaching the vocabulary's edge, and extraction had been returning 401 for weeks.
+  The first non-empty signal is the real test of that bot.
+- No fleet gate registers either tool. Both read `orgs/`-external state (the live
+  health endpoint) and one needs the receipts tree, so the `root-permit-index`
+  failure mode applies.
+- The `:llm` block is the only pinned model id that was found and fixed. Other
+  consumers were not swept.\n\n## Closing (2026-08-27)\n\n### The first bot run produced a real PR\n\n`hyakka-source-scout` ran 35 minutes, 23 murakumo calls, and opened\napp-hyakka#3 (Wikidata Tokyo Q1490 + Mount Fuji Q39231), merged as\n`69cbe3b9`. Verified independently rather than on the bot's word:\n\n| its claim | check |\n|---|---|\n| gate exit 0, 2 sources, 0 rejected | re-ran the same proposal post-merge: exit 1, both rejected as duplicates — the gate reads live config and the edit landed |\n| Q1490 = Tokyo, Q39231 = Mount Fuji | fetched both: `Tokyo / 東京都`, `Mount Fuji / 富士山` |\n| config-only | diff touches `config/knowledge-ingest.edn` alone |\n| suite green | 100 tests, **1412** assertions (up from 1404), 0 failures — the +8 is `every-configured-source-is-admissible` actually judging the new entries rather than skipping them |\n\nIt handled the failure the gate cannot catch: a wrong Q-id returns HTTP 200\npointing at a different thing, so it resolved ids through Wikidata's search API\ninstead of guessing. And it **declined to propose any ontology change**, because\nthe signal measured 0 corroborated refusals — the behaviour the design exists\nfor.\n\nThe run was killed by ENOSPC before writing its final report\n(`sqlite3.OperationalError: unable to open database file`). The PR survived.\n\n### Production LLM extraction confirmed\n\nThe resident adopted the fix and extracted real claims through `murakumo-main`:\n\n    prop/display-name      \"Tokyo\"\n    prop/last-modified-at  \"2026-08-17T12:58:44Z\"\n    extractor: murakumo-edn\n\n⚠ The tick before this one returned `rejected-count: 0` with\n`llm-model: murakumo-main` and proved nothing — only the four deterministic\nconnectors had run. An LLM-backed source had to be forced to exercise the path.\n**The original bug's own shape, one level up, nearly reported as its fix.**\n\n### Also landed this session\n\n- `scripts/fleet-ci/prune-cache.cljs` (`3b34ad38`) — the fleet-ci ship cache had\n  grown to 184 GB / 17,370 tarballs with no eviction anywhere, and filled the\n  volume. Swept 145.3 GB; disk 99% → 84%. See that commit for why deleting is\n  safe by construction.\n- west pins advanced twice: `252e8586`, `d9aa8160`.\n\n### Open\n\n- **ADR-2608271900** — murakumo `/ready` reports a dead node online, placement\n  keeps assigning to it, and no CI receipt can be signed while it does. This\n  blocks verifying the cache sweep against the pre-sweep gate baseline, which\n  therefore stands as **inconclusive, not clean**.\n- `hyakka-kotobase-seed` still absent from kagi; 264 ledgers unpublished to the\n  datom plane. Owner action.\n- `ensure-tree!` writes its tarball to the exact path `full-tarball!` ships from\n  and then unlinks it, and unlinks before checking `tar`'s exit code. Latent:\n  `ensure-tree!` runs only for `kagami` today.\n- The ontology bot has not yet had a non-empty signal. Its first one is the real\n  test of that half.")))

@@ -1,0 +1,97 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607260100-code-graph-extraction-from-kotobase")
+  (:adr/doc_type "adr")
+  (:adr/topic "code-graph-extraction-from-kotobase")
+  (:adr/title "ADR-2607260100: code_graph を kotoba-lang/kotobase から kotoba-lang/code-graph へ抽出（ADR-2607201600 M6 決定 6 の実施）")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-26")
+  (:adr/last_verified "2026-07-26")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/authoritative_for
+  (vector "kotoba-lang/code-graph repo の存在理由・スコープ・namespace 規約の正本"
+   "code_graph を kotobase 解体に巻き込まず先に退避するという決定の実施記録"
+   "抽出時の namespace rename（kotobase.code-graph → code-graph.core / kotobase.code-graph-async → code-graph.async）"))
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/related
+  (vector "adr-2607201600-kotobase-merkle-lsm-istore-retirement"
+   "adr-2607250100-kotobase-maturity-bar-vs-production-databases"
+   "adr-2607032500-kotoba-kotobase-clojure-datomic-relationship"))
+  (:adr/decision-summary
+  "{:repo \"kotoba-lang/code-graph\", :visibility :public, :from \"kotoba-lang/kotobase\", :baseline \"142f3f7ef8208a270e21d9cce748ceffe5c1ab7d (origin/main)\", :moved-loc 1204, :src-loc 809, :ns-rename {\"kotobase.code-graph\" \"code-graph.core\", \"kotobase.code-graph-async\" \"code-graph.async\"}, :gates {:security-adoption :pass, :jvm-tests 16, :jvm-assertions 58, :failures 0}}")
+  (:adr/body
+  "# Context
+
+ADR-2607201600（kotobase Merkle-LSM / IStore retirement）の M6 方針 決定 6 で、
+`code_graph` を kotobase 解体に巻き込まず先に別 repo へ退避すると決めた。本 ADR は
+その実施記録である。
+
+退避の理由は 2026-07-25 の実測にある。`kotoba-lang/kotobase` は 1,707 LOC で、その
+README 自身が「This repo is kotobase's client seam — the IStore port」と述べており
+datom engine ではない。M6 が要求する datom client は既に `kotoba-lang/kotobase-client`
+として live であるため、kotobase は datom client へ再構成せず**解体**する。一方
+`code_graph`（808 LOC、repo の 47%）は**廃止対象の IStore 中核とは無関係**であり、
+解体に巻き込む理由がない。
+
+# Decision
+
+`kotoba-lang/code-graph`（public、kotoba-lang org 既定）を新設し、以下を移す。
+
+- `src/kotobase/code_graph.cljc`（668 LOC）→ `src/code_graph/core.cljc`
+- `src/kotobase/code_graph_async.cljc`（141 LOC）→ `src/code_graph/async.cljc`
+- `test/kotobase/code_graph_test.cljc` → `test/code_graph/core_test.cljc`
+- `test/kotobase/code_graph_async_test.clj` → `test/code_graph/async_test.clj`
+- `test/kotobase/code_graph_async_node.cljs` → `test/code_graph/async_node.cljs`
+
+計 1,204 LOC。抽出元は **`origin/main` の `142f3f7`**（landed 状態）。
+
+## namespace rename
+
+`kotobase.code-graph` → `code-graph.core`、`kotobase.code-graph-async` →
+`code-graph.async`。抽出の目的が kotobase からの decoupling である以上、repo 名
+`code-graph` の中で `kotobase.*` ns を保つのは名前上の再結合になるため改名する。
+
+**改名の安全性は実測で確認済み**: fleet 全体で `kotobase.code-graph` を参照している
+のは docstring のみで、実コード（`:require`）からの参照はゼロだった
+（`kotoba/semantic_code.cljc` L523・`kotobase/d1.cljs` L5・
+`kotobase/retention_qualification.clj` L4 の 3 件、いずれも文中言及）。
+
+## 残る IStore 依存（正直な記録）
+
+**この抽出は IStore 依存を解消しない。** `code-graph.core` は `kotobase.store`
+（injected seam）、`code-graph.async` は `kotobase.local`（pure oracle）に依存し続け、
+テストは `kotobase.kotobase` も使う。つまり新 repo は **16 番目の IStore consumer** に
+なる。
+
+抽出の効果は依存の**可視化**である: 廃止対象 repo の内部結合だったものが、repo 境界を
+またぐ明示的な依存になり、IStore freeze gate（`.github/workflows/istore-freeze-check.yml`）
+の対象になる。`code-graph` は ADR-2607201600 M6 の移行対象リスト（docs+streams 混在
+wave）に載る。
+
+# Gates（2026-07-26 実測）
+
+- `clojure -M -m kotoba.security.adoption` → `:pass`（`:consumer/id :code-graph`）。
+  `security-adoption.edn` は entrypoint を `code-graph.core [kotoba.security.effect]`、
+  sensitive-operation を `code-graph.core/revoke-pin!` として新 ns で再宣言。
+- `clojure -M:test` → 16 tests / 58 assertions / 0 failures / 0 errors。
+
+# Consequences
+
+- (+) 解体対象 repo から 47% が退避し、kotobase に残るのは IStore 中核 527 LOC +
+  security/qualification 約 335 LOC になる。M6 の削除対象が明確になった。
+- (+) code_graph の IStore 依存が gate に見えるようになった（従来は repo 内部で不可視）。
+- (−) 抽出直後は kotobase 側にも同じコードが残る**二重状態**である。kotobase 側からの
+  削除は M6 解体の一部として行う（本 ADR のスコープ外）。それまで両者が乖離しうる。
+- (−) 抽出時点で、共有 checkout の未 push ブランチ `agent/persist-execution-identities`
+  が `code_graph.cljc` に未着地の変更（+5/-6 行、関数追加なし）を持っていた。抽出元は
+  landed 状態の `origin/main` にしたため、この差分は**新 repo に反映されていない**。
+  当該ブランチが着地したら `code-graph.core` へ replay する必要がある。
+
+# References
+
+- ADR-2607201600（M6 方針 決定 6 — 本 ADR の親決定）
+- `kotoba-lang/kotobase` README（「client seam — the IStore port」の自己記述）
+- `kotoba-lang/kotobase-client`（既存の datom client、M6 が要求する client の実体）
+")))

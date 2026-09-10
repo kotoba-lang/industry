@@ -1,0 +1,120 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2607275000")
+  (:adr/title "kagi の端末登録（VMK を hybrid KEM で新端末へ）と、apex CACAO の乖離修正")
+  (:adr/status "accepted")
+  (:adr/date "2026-07-27")
+  (:adr/tags (vector "kagi" "secrets" "cacao" "kotobase" "pqc" "device-enrollment"))
+  (:adr/supersedes "")
+  (:adr/body
+  "## 現在地（一行）
+
+kagi は暗号化 vault を kotobase.net へ同期でき（`push`/`pull`/`sync`）、2 台目の
+Mac は **master passphrase を渡されずに** vault を開けるようになった
+（`kagi device request|grant|accept`）。marketplace の共有 seed は kagi の
+compartment `personal` に `itonami-marketplace-kotobase-seed` として保管済み。
+
+## 発端
+
+marketplace の共有 Ed25519 seed が**セッション用スクラッチパッドの 1 ファイルに
+しか存在しない**状態だった。Cloudflare の secret は書けても読めないので、その
+ファイルが消えれば 7 actor の graph に二度と到達できない。保管先を決めるために
+「Apple Keychain は複数 Apple ID / 複数端末で共有できるか」を調べたのが起点。
+
+## 判明したこと（Keychain）
+
+- **iCloud Keychain は macOS ユーザ 1 つにつき Apple Account 1 つ**に紐づく。
+  別 Apple ID の macOS ユーザ同士は互いに見えない。「メディアと購入」用の
+  第 2 Apple ID はキーチェーンを同期しない。
+- **`security add-generic-password` には synchronizable フラグが無い**
+  （実測: `-a -c -C -D -G -j -l -s -p -w -X -A -T -U` のみ）。CLI が書くのは
+  ファイルベースの `login.keychain-db` で、**同じ Apple ID の 2 台でも同期しない**。
+- Apple ID を跨げる正規機構は **共有パスワードグループ**（macOS 15+/iOS 18+）
+  だが、`security` から読めないので agent / CI からは使えない。
+- 結論: **「agent が非対話で読めて、かつ端末を跨げる」保管先は Keychain には無い。**
+
+## 決定
+
+1. **marketplace の共有 seed は kagi（compartment `personal`）を正本にする。**
+   1Password 複製ではなく `kagi push` による同期を選ぶ（PQC・台帳・非対話読み出しが
+   全部乗るため）。**1Password に置くべきは seed ではなく kagi の recovery
+   passphrase** —— 単一障害点を分ける。
+
+2. **`kagi device request|grant|accept` を実装する。**
+   A が VMK を B の hybrid 公開鍵（X25519 + ML-KEM-768）へ封入し、B は自分の
+   秘密鍵で復元してから**自端末の OS-keychain wrap を作る**。以後 grant は不要。
+   既存の `crypto/share-dek` / `accept-share`（item 共有と同じ primitive）を
+   DEK でなく VMK に適用しただけで、**新しい鍵階層は作っていない**。
+
+3. **`--fingerprint` を必須引数にする。** 中間者を防ぐ唯一の手段は「A が B の
+   *本物の* 公開鍵に封入すること」であり、request を無検査で `grant` に流す
+   運用者はすり替えに気付けない。警告を印字するのではなく**拒否**する。
+   `:fingerprint-missing`（手順を飛ばした）と `:fingerprint-mismatch`
+   （実施して失敗した＝攻撃の可能性）は**別コード**にする。
+
+4. **grant は短命（既定 15 分）。** chat ログに残った grant は、端末鍵を併せ持つ
+   者への vault 丸ごとの立ち offer になる —— しかもその端末鍵は、まだ登録に
+   値するほど信用されていないマシンの上にある。
+
+## apex CACAO の 3 つの乖離（`kagi push` が一度も動いていなかった原因）
+
+net-kotobase の `kotobase.edge-cacao/validate-cacao` を読んで特定した。
+
+1. **graph scope が無い。** apex は `kotoba://can/kotobase:pin` に加えて
+   `kotoba://graph/<issuer-did>` を要求する（**graph CID ではなく DID**）。
+2. **`h` ヘッダが無い。** 「apex は `h` を要らない」というコメントは cutover 前の
+   pod の話で、現行 apex は `{\"t\":\"caip122\"}` を取る。
+3. **本命: `iat` の形式。** `parse-utc-seconds` は
+   `^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$` に**しか**マッチしない
+   （epoch 秒も小数部も不可）。`(str (Instant/now))` はナノ秒が非ゼロなら
+   小数部を出すので、**大半の mint が弾かれ、たまたま秒ちょうどに落ちたものだけ
+   通っていた**。断続的な認証失敗は全滅より悪い —— ネットワークの揺らぎに見える。
+
+**この 3 つはすべて「自前 CACAO 実装のコピーが乖離した」結果**であり、
+ADR-2607268000 が「~25 repo が keep-in-sync コメント付きで複製し、それでも乖離した」
+として禁じたパターンそのもの。各規則をテストで固定した上で、
+`kotoba-lang/org-chainagnostic-cacao` への移行を follow-up として残す。
+
+## 実測（2026-07-27）
+
+- `kagi push`: 暗号化 vault 2,082,003 bytes、seq 1。`pull` はバイト一致で往復。
+- 端末登録: **実 vault のコピー**に対して request → grant → accept を実行し
+  wrap-count 1 → 2、その端末が `KAGI_MASTER` 無しで実 secret を読み出し、
+  元の値とバイト一致。実 vault は wrap-count 1 のまま無傷であることを確認済み。
+- 拒否: fingerprint 未指定・不一致の両方が CLI で発火。
+- grant 実物に `:kem-ct {:x .. :pq ..}`（hybrid の両半分）があり、平文の鍵素材は無い。
+- テスト: kagi 78 tests / 408 assertions、0 failures。
+
+## 残っているギャップ（正直に）
+
+- **`revoke` は access-list の変更であって、既得 VMK の取り消しではない。**
+  真の revocation は VMK rotation + 残端末への再 wrap で、kagi は未実装
+  （`rotate` は item DEK の回転）。紛失端末は vault 侵害として扱い secret を rotate する。
+- **同期の衝突は `:kagi.vault/seq` の last-writer-wins。** 2 台で同時に別 item を
+  足すと片方が失われる。item 単位マージが要る。
+- ~~`cacao.clj` は依然ローカルコピー~~ **解消（同日）。下記「共有ライブラリへの移行」。**
+- **`recovery create` による Shamir share 発行と、実 2 台目での
+  `unlock-enable-keychain` はオーナーの手元操作**（passphrase 入力と share の
+  物理保管）—— agent が代行すべきものではない。
+
+## 共有ライブラリへの移行（同日、追記）
+
+apex の受理規則を **`org-chainagnostic-cacao` の `cacao.core/mint-kotobase-apex`**
+に集約し、kagi はそれを呼ぶだけにした。コピーにパッチを当てるのではなくコピーを
+消したのが本来の修正であり、ADR-2607268000 の直接の適用である。
+
+**設計上の要点: 違反は mint 時点で throw する。** apex の拒否は理由を持たない
+（署名不正・未知 DID・nonce 再利用・時刻形式のすべてが同じ 401）ので、**理由は
+mint 側で作るしかない**。`mint-kotobase-apex` は graph scope・caip122・
+ISO 秒精度・nonce のいずれかが欠ければ、フィールド名を名指しした例外を投げる。
+
+`mint` には `:header-type`（既定 `eip4361`）を足しただけで、既存 consumer は
+バイト単位で不変（テストで固定）。
+
+**意図的に移行していないもの**: kagi の自己発行 `mint`/`verify` と、その下の
+SIWE/CBOR ヘルパ。これらは kagi が mint も verify も行うので、乖離しても
+自己整合的であり、「理由を言わない他人のサービスからの黙った 401」にはならない。
+リスクの質が違うため別 follow-up とする。
+
+実測: 共有ライブラリ経由で `kagi push` が seq 2、`sync` が往復。
+kagi 78 tests / 408 assertions、cacao 43 tests / 171 assertions、いずれも 0 failures。")
+  ))

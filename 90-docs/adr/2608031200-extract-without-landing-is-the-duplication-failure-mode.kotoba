@@ -1,0 +1,161 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608031200-extract-without-landing-is-the-duplication-failure-mode")
+  (:adr/doc-type "adr")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "ADR-2608031200: 抽出したまま着地させないことが、この workspace の複製failure mode — datalog では 24 時間以内に実害が出た")
+  (:adr/topic "extract-without-landing-is-the-duplication-failure-mode")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/last_verified "2026-08-03")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "repo 分割作業の完了条件（新 repo の作成ではなく、原本の削除と consumer の repoint までが 1 単位）"
+   "複製が同一であることの検査手段（テストの緑ではなく、定義レベルの機械差分）"
+   "west 登録が「使われている」を意味しないこと、および consumer-less audit の必要性"
+   "kotobase スタックの分割で次に切るべき場所と、その前に決めるべき所有権"))
+
+  (:adr/related
+  (vector "adr-2607312100-kotobase-layering-block-ref-split-signed-head"
+   "adr-2608012800-kotobase-layer-decomposition-execution"
+   "adr-2608021000-namidb-comparison-and-the-read-path-trampoline"
+   "adr-260726-kotobase-query-plane-is-one-ref"))
+
+  (:adr/decision-summary
+  (vector "D1: 抽出 PR の完了条件は「新 repo が push され west に載ったこと」ではなく「原本が消え、consumer が repoint され、テスト件数の差分が厳密に一致すること」とする"
+   "D2: 複製が同一である証拠にテストの緑を使わない。定義レベルの機械差分を取る（今回それで 9 件の欠落を検出し、修正後に完全一致を確認した）"
+   "D3: west 登録済みだが inbound consumer が 0 の repo を検出する consumer-less audit を持つ（west-orphan-audit の逆向き）"
+   "D4: 抽出元 SHA を新 repo に記録する運用は既にあるので、着地時にその SHA と現 HEAD の差分を必ず見る"
+   "D5: kotobase-peer の残る分割（object-store 切り出し）に着手する前に atomic-publication の所属を決める。決めずに切ると L10→L6 の逆流依存が生まれる"))
+
+  (:adr/artifact
+  (vector "kotoba-lang/merkle-lsm の分割着地: kotobase-peer b9ac18de（原本 2 ns + 3 test ns 削除、全 referrer を repoint）／ root bdffc71e（west pin）"
+   "kotoba-lang/datalog の revert 追随: datalog 9db84106（ordered-driver 系 3 def と q の ordered 分岐、index/values-for-predicate、limit_pushdown_test を削除）／ root 456be319（west pin）"
+   "検証 kotobase-peer: clojure -M:test 227 tests / 675 assertions 0 failures（分割前 271/840、merkle-lsm 側 44/165 — 差分が厳密に一致）"
+   "検証 kotobase-peer: npm run test:cljs 230 tests / 926 assertions 0 failures（repo 境界を実際に跨ぐ object-store-worker-test を含む）"
+   "検証 datalog: clojure -M:test 79 tests / 127 assertions 0 failures、clojure -M:lint 0 errors / 0 warnings、arrangement.datalog と定義レベルで完全一致"
+   "後続（別セッション）: arrangement 096523fb で arrangement.datalog を compatibility shim 化 — query layer の複製は解消済み"))
+
+  (:adr/verify
+  (vector "gh api repos/kotoba-lang/datalog/compare/9db84106...main --jq '{status,ahead_by,behind_by}'  ; behind_by 0 を確認"
+   "gh api repos/kotoba-lang/kotobase-peer/compare/b9ac18de...main --jq '{status,ahead_by,behind_by}' ; behind_by 0 を確認"
+   "comm -3 <(defs of arrangement.datalog) <(defs of datalog.core)  ; 空であること"))
+
+  (:adr/body
+  "# Context
+
+「依存を最適化し、責任が集中している repo・重複実装・分離が不適切な repo を分離せよ」という
+オーナー指示で 26 repo の require を実測した。**repo 間の依存はほぼ正しく下向きで、循環も逆流も
+無かった。** `io-ipld` は base32 を再実装せず `io-multiformats` を compose しており、
+`kotobase-storage-*` は全て `kotobase-storage` だけを見る。設計は効いている。
+
+破れは 2 か所にあった。**repo の内側**（`object_store/worker.cljs` 6,096 行 / 212 defn に
+9 つの関心事、`core.cljc` 2,862 行に 2 つの製品）と、**分割の途中で止まっていること**である。
+本 ADR が記録するのは後者で、前者の切り口は ADR-2608012800 が既に測っている。
+
+# 発見: 「抽出したが着地させていない」
+
+実測時点で 3 本が同じ状態にあった——**新 repo が作られ、push され、west にも登録され、
+しかし原本が本体に残ったまま consumer がゼロ**。west に載っているので棚卸しでは完了に見える。
+
+| 抽出済み lib | 原本の所在 | 新 lib の consumer |
+|---|---|---|
+| `merkle-lsm` (1,495 行) | kotobase-peer に残存 | ゼロ |
+| `datalog` (766 行) | `arrangement.datalog` (831 行) が残存 | datom-model のみ |
+| `datom-model` (815 行) | `kotobase-peer/core.cljc` L114–918 が残存 | ゼロ |
+
+**この状態は分割前より悪い。** 複製が 2 つあり、どちらも「正しい方」に見えるからである。
+
+# 実害: datalog は 24 時間以内に、逆向きに 2 回乖離した
+
+    08-01  datalog を arrangement から抽出          → 以後 arrangement だけ 20 commit 進む
+    08-02  arrangement に limit pushdown が入る      (7de7a4c)
+    08-02  datalog を c09ce59f から再抽出            → pushdown 込みで追いつく
+    08-02  arrangement が pushdown を revert         (a98588c)「correct but slower」
+           ↑ この revert が抽出側に追随しなかった    → datalog だけが劣化版を出荷し続けた
+    08-02  本 ADR のセッションで revert を追随       (datalog 9db84106)
+
+revert の理由が重要である。**ordering clause から drive すると、driver に依存しない残りの
+clause まで値グループごとに再評価される。** LDBC IC02 では `[?person \"knows\" ?friend]` の
+882 行が date グループごとに 7,355 回再導出され——7,355 件の join を避けるために 650 万行の
+純粋な反復——harness が CPU ~4〜5 分から 15 分超になって kill された。
+
+**そして等価性テストは今も全部通る。** テストが見ていたのは正しさ（driven な答え = undriven な
+答え）で、壊れたのはコストだった。40 人の fixture では distinct 値が少なすぎて病理が現れない。
+
+# Decision
+
+## D1. 抽出の完了条件は「原本が消えていること」
+
+新 repo の作成は作業の半分でしかない。**原本を削除し、consumer を repoint し、
+テスト件数の差分が厳密に一致することまでが 1 つの作業単位**である。
+merkle-lsm の着地ではこれを実際に確認した: 分割前 271 tests / 840 assertions、
+分割後 227/675、merkle-lsm 側 44/165 — 271-44=227、840-165=675 で厳密に一致する。
+一致しなければ、どこかで test が落ちたか二重に数えている。
+
+## D2. 「テストが緑」を同一性の証拠に使わない
+
+劣化版の datalog は**全テストが通ったまま**劣化版だった。複製が同じであることを確かめる
+安い手段は**定義レベルの機械差分**である:
+
+    comm -3 <(grep -oE '^\\(def[a-z-]* (\\^:private )?[a-z0-9*!?<>=+-]+' A | sed -E '...' | sort -u) \\
+            <(同じものを B について)
+
+本セッションではこれで 9 件の欠落（`hash-join-row-budget` / `broad-pattern` /
+`bound-positions` / `hash-join-rows` / `form-lvars` / `prune-bindings` / `order-spec` /
+`compare-rows` / `order+limit`）を検出し、修正後に完全一致を確認した。
+
+## D3. consumer-less audit を持つ
+
+`west-orphan-audit` は「west に載っていない repo」を探す。必要なのはその逆向き——
+**west に載っているが inbound consumer が 0 の repo**。今回の 3 件はどれもこれで機械的に
+見つかった。
+
+## D4. 着地時に抽出元 SHA との差分を見る
+
+抽出元 SHA を新 repo に記録する運用は既にある（merkle-lsm の
+`Extracted verbatim from kotobase-peer @780b2216`、datalog の `Base: arrangement c09ce59f`）。
+足りないのは**着地時にその SHA と現 HEAD の差分を見る**ことだけで、今回の revert は
+まさにその差分（c09ce59f…a98588c ＝ 1 commit）を見れば機械的に見つかった。
+
+## D5. object-store を切る前に atomic-publication の所属を決める
+
+`kotobase-peer` に残る最大の集中は `object_store/worker.cljs`（6,096 行）で、
+これは `kotobase-peer.core` を一切 require していない（逆も同じ）。切り出しは機械的だが、
+**`atomic_publication`（168 行）だけが worker と `datalog_materialization` の両方から
+使われる唯一の共有点**であり、素直に切ると L10 が L6 に依存する逆流が生まれる。
+`atomic-publication` は L8（materialized-view 側）の住人とし、両者がそこを見る形にする。
+**これを決めずに切ってはならない。**
+
+# 現在地（2026-08-03）
+
+- `merkle-lsm` — 着地済み。複製なし。
+- `datalog` — 乖離を止めたのち、別セッションが `arrangement.datalog` を
+  compatibility shim 化（arrangement 096523fb）。**複製は解消**。shim の削除は
+  consumer（`kotobase-peer` / `kotobase-query` / `loop-system-dynamics`）が
+  `datalog.core` を直接 require してからの follow-up。
+- `datom-model` — **未着地**。`kotobase-peer/core.cljc` L114–918 に原本が残る。
+  抽出が新しく（08-02）まだ完全な部分集合なので、**今が最も安い**。
+  ただし `datom-model` は `ref?` と `render-value` を必須の注入引数にしており、
+  `kotobase-peer` 側は `ipld.core/link?` と `#(pr-str (arrangement.core/link->edn %))` を
+  既定にしていた。着地時にこの 2 つを明示的に渡す必要がある（drop-in ではない）。
+
+# Consequences
+
+- 分割作業は「repo を作る」より「原本を消す」ほうが本体である、と読み替わる。
+  前者だけを完了として数える運用が、この 3 件を生んだ。
+- 並行セッションが同じ分解に着手している間は、**着手前に対象 repo の HEAD を再確認する**。
+  本セッション中に datalog は 2 回、kotobase-peer は 1 回、他セッションによって前進した。
+- 性能 regression は「テストを増やす」では防げない場合がある。今回の defect は
+  correctness test が全部通る状態で存在した。実データ規模のベンチが唯一の検出手段だった。
+
+# Non-goals
+
+- `object_store/worker.cljs` 内部の 9 関心事への再分割（切り出し後の follow-up）
+- `kotobase-storage/object_id` と `kotobase-client/cid` の base32 実装統合——
+  この 2 つは zero-dep / cljs-only という明示的な理由と oracle テストを持つ意図的な複製で、
+  根拠が無いのは `kotoba-annex/cid` の 1 本だけ（ADR-2608012600 が既に指摘済み）
+")))

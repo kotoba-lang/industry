@@ -1,0 +1,88 @@
+(vector (map (:db/id -1)
+  (:adr/id "ADR-2608196600")
+  (:adr/title "49 of 73 shadow-source-path findings were conditional on taking the fix they suggested")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-19")
+  (:adr/tags "detectors shadow-cljs false-positives source-paths co-scientist")
+  (:adr/body
+  "## How this started
+
+Iteration 28 began by reading the live detector state and finding one entry with
+a `SCANNED	0`-shaped problem of its own: `verify-source-path-pins` was
+`:inconclusive` at 328 ms, `:last-exit 2`, from a run at 19:39 while the shared
+checkout was still behind main. Re-run today it is healthy -- `ok exit 1 14s 217
+finding(s) scanned=383` -- and the live state has been refreshed. Reading its
+output turned up a finding keyed `orgs/orgs/kotoba-lang`, with the segment `orgs`
+twice.
+
+## The real defect that key pointed at
+
+`orgs/etzhayyim/com-etzhayyim-app-explorer/shadow-cljs.edn` declared
+`\"../../orgs/kotoba-lang/kotodama/src\"`. From that directory `../../` is already
+`orgs/`, so the path resolved to `orgs/orgs/kotoba-lang/kotodama/src` -- a
+directory that does not exist. **Spelled correctly it still would not have
+worked**: `kotodama/src` holds `kotodama/*.cljc` and has no `kotoba/datom.cljc`.
+`kotoba.datom` lives in `kotoba-lang/kotoba-datom`, and **five files require it**
+(`chain/datom.cljs`, `chain/agent.cljs`, three tests). This build could not
+compile.
+
+Fixed in `etzhayyim/com-etzhayyim-app-explorer` (`e899b55c`), west pin advanced
+(`ded147787d0`). Measured on a sandbox tree with the same scanner both times:
+before, 9 unresolved namespaces including `kotoba.datom`; after, 8, with
+`kotoba.datom` gone.
+
+## The trap in the suggestion
+
+The scanner also suggested adding `\"../../kotoba-lang/dom-gpu/src\"` to resolve
+`reagent.core`. **Taking that suggestion would have silently replaced this app's
+renderer.** `dom-gpu/src/reagent/core.cljc` is a compatibility shim -- *\"Existing
+CLJS code can require [reagent.core :as r] and target the virtual DOM substrate
+instead of React/browser DOM\"* -- and source-paths win over jars, so the app's
+declared `reagent 1.2.0` dependency would have been shadowed by a WASM-backed
+namespace of the same name. The fix hint is a **candidate**, not a prescription.
+
+## What the experiment showed
+
+Same repo, same narrow fix, same scanner, one variable -- whether an unrelated
+repo exists elsewhere in the tree:
+
+    dom-gpu present in the tree  ->  exit 1, 8 unresolved (3 of them kotoba.wasm.*)
+    dom-gpu absent from the tree ->  exit 0, \"all resolve\"
+
+The walk deliberately continues **through** a namespace the workspace can provide
+(the code says so: otherwise the tool reports one link per run and the user
+rediscovers the cascade by hand). The consequence, unstated until now, is that
+the unresolved list includes namespaces that only become required **if you take
+the suggestion** -- and those entries have no `:blamed` requirer, which the code
+itself calls the tell: *\"an unresolved name with no requirer would mean the walk,
+not the build, is wrong.\"*
+
+## Change
+
+Split by that same test, in the prose and in the FINDING lines:
+
+- a namespace some file in the repo requires -> `fail`, unchanged wording
+- a namespace nothing in the repo requires  -> `warn`, and the detail says it was
+  reached through a candidate and becomes required only if the path is added
+
+Measured across the whole tree: **73 findings, all `fail`, became 24 `fail` and 49
+`warn` -- 67% were conditional.** Finding keys are byte-identical, so no NEW or
+RESOLVED churn in `manifest/orgs-detectors-state.edn`; only the severity and the
+sentence change.
+
+## Known limitation, measured and not fixed
+
+The scanner does not read `:dependencies`, so a namespace provided by a jar is
+reported as unresolved whenever some repo in the workspace happens to ship a file
+of the same name. `reagent.core` and `re-frame.core` remain `fail` for this app
+even though `reagent 1.2.0` and `re-frame 1.4.3` are declared -- they keep their
+`:blamed` requirer, so the blame test cannot separate them. Fixing that means
+mapping dependency coordinates to namespace prefixes; not attempted here.
+
+## Not claimed
+
+The app was **not compiled**. It has no `node_modules`, `shadow-cljs` is not
+installed globally, and a build is a serialized heavyweight operation under the
+resource governor. The evidence for the fix is the scanner's before/after on a
+sandbox tree plus a complete accounting of all 9 namespaces: 1 fixed by the new
+source-path, 5 from declared `:dependencies`, 3 phantoms that this ADR reclassifies.")))

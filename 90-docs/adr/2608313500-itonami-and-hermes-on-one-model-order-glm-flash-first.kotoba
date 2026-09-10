@@ -1,0 +1,112 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608313500-itonami-and-hermes-on-one-model-order-glm-flash-first")
+  (:adr/title "itonami bots と hermes agent bots を 1 つの model 順序に揃えた —— glm-5.3-flash 一次。N=24 で 100% 対 91.7%、費用 3 分の 1")
+  (:adr/status :accepted)
+  (:adr/date "2026-08-31")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/last-verified "2026-08-31")
+  (:adr/authoritative true)
+  (:adr/topic "bot-model-routing")
+  (:source/dataset "adr")
+  (:adr/authoritative_for "itonami bots / hermes agent bots の model 順序と、その根拠になった実測")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2608302100-itonami-bots-openrouter-flash-x402-credits"
+                "adr-2608311100-relay-credit-metering-and-the-operator-identity-that-blocked-it"
+                "adr-2608312800-the-hermes-turn-loop-in-kotoba-and-the-itonami-bots-that-were-never-installed"
+                "adr-2608311900-the-bridge-told-callers-their-own-tools-were-broken"))
+  (:adr/body "## 決定
+
+**itonami bots と hermes agent bots を同じ model 順序に揃えた** ——
+`z-ai/glm-5.3-flash` を一次、`qwen/qwen3.8-flash` を fallback、local claude-bridge
+を最後尾。ADR-2608302100 が itonami に対して選んだ順序が正しく、hermes 側
+（ADR-2608311100 が qwen 一次にした）をそちらへ寄せた。
+
+## 実測 —— OpenRouter に直接、N=24 ずつ
+
+両 id の実 upstream に当てて relay の挙動と切り分けた。同一プロンプト、
+`max_tokens=512`、2 バッチ × 12。
+
+| model | usable | 内訳 | latency median | reasoning tokens median | 24 call の実費 |
+|---|---|---|---|---|---|
+| **`z-ai/glm-5.3-flash`** | **24/24 (100%)** | 200×24 | 1.44s | 19 | **$0.00023** |
+| `qwen/qwen3.8-flash` | 22/24 (91.7%) | 200×22, **429×2** | 1.11s | 38 | $0.00070（**3.0 倍**） |
+
+429 の本文は `Provider returned error` で、ADR-2608311100 が実測した
+「qwen3.8-flash の upstream は OpenRouter 上に Alibaba 1 本きり、共有プールが
+間欠的に 429 を返す」と一致する。**1 バッチ目で 2 件、2 バッチ目で 0 件** ——
+間欠であることも再現した。
+
+glm は latency 中央値でわずかに遅い（1.44s vs 1.11s）が、**成功率と費用の
+両方で勝つ**。ADR-2608311100 の「10 run で 9 qwen / 1 glm / 0 bridge」は
+*どのレーンが応じたか*の測定であって、glm の成功率と費用は測っていない。
+ここで足したのはその 2 つで、どちらも glm に振れた。
+
+## ⚠ 最初の測定は私の設定の産物だった
+
+1 回目は `max_tokens=24` で回し、**glm 5/12・qwen 0/12** という結果を得た。
+これを「qwen が壊れている」と報告しかけた。生の応答を見て分かったのは:
+
+    finish_reason: length
+    completion_tokens_details: {reasoning_tokens: 24}
+    content: ''
+
+**両方とも reasoning model で、24 トークンの予算を推論が全部使い切っていた。**
+qwen は 24/24 を推論に使って content が空、glm は 21 使って \"Tokyo\" を絞り出した。
+つまり 1 回目が測っていたのは**モデルの品質ではなく私の max_tokens** である。
+`max_tokens=512` で測り直したのが上の表。
+
+**モデルを比べるときは `finish_reason` と `reasoning_tokens` を見る。**
+空の content は「答えられなかった」に見えて「予算が尽きた」であることがある。
+
+## itonami bots を実際に稼働させた
+
+ADR-2608312800 で「名簿だけが在って install されていない」と測ったものを install した
+（README の手順どおり）:
+
+    ~/.hermes/scripts/itonami_evidence.py
+    ~/.hermes/scripts/itonami-ingest-scout.prompt.md      cron 40 11 * * *
+    ~/.hermes/scripts/itonami-coverage-scout.prompt.md    cron 40 23 * * *
+    ~/.gftd/worktrees/itonami-growth-bot                  detached at origin/main
+
+evidence script は単体で 7,488 バイトの実測を返す（候補 repo・軸・headroom・
+未着地 branch の有無まで。`datoms-age-days 1 stale? true` と自分の鮮度も申告する）。
+
+### 最初の run が露わにした model bug —— 今朝直した bridge と同じクラス
+
+README の install 行は `--model murakumo-main --provider custom` だが、
+**`custom` に base_url が付かないので `murakumo-main` が OpenRouter へ送られた**:
+
+    Could not determine context length for model 'murakumo-main'
+      (base_url=https://openrouter.ai/api/v1) — falling back to 256,000 tokens
+    API call failed (attempt 1/3) error_type=BadRequestError
+
+ADR-2608311900 で直した「一方の provider の model 名を別の provider に送る」
+と同型である。**あちらは caller に嘘の答えを返し、こちらは BadRequest を返した。**
+両 job を `z-ai/glm-5.3-flash` / `openrouter` に固定して解消した ——
+実測の勝者であり、fleet の揃え先でもある。
+
+### 稼働の証拠
+
+cron job と同じ入力（evidence 7,488 B + prompt 6,657 B = 14,146 B）を
+そのまま与えて走らせたところ、**11 メッセージ / 5 tool call** の session を残した
+（`20260831_133521_77acb7`、model `z-ai/glm-5.3-flash`）。
+最初の試行が 0 バイトで終わったのは **私が 115 秒で切ったから**であって、
+bot の失敗ではない。
+
+## 未着地
+
+- **scheduler 経由の完走はまだ観測できていない。** 13:28 の run は
+  `unknown` で終わった —— *「scheduler がこの実行の owner の終了後に再起動した。
+  副作用が走ったかは不明」*。`cron run` で予約しても 300 秒では次の tick に
+  乗らなかった。自然な発火は ingest が毎日 11:40、coverage が 23:40 なので、
+  **coverage の今夜の run が最初の scheduler 完走の観測点**になる。
+- **`itonami-canvas-watch` は disable のまま。** 3 本（itonami-po /
+  kotobase-po / murakumo-po）が 2026-08-31 09:51:58 に 1 秒以内でまとめて
+  止められており、**理由がどこにも記録されていない**。健全なまま切られた
+  （最後の run は 3 本とも `completed`）ので、意図的な判断を記録なしに
+  巻き戻さない。戻すかはオーナー判断。
+- **これらの bot は free-model rotation に載っていない**（README が明記）。
+  `refresh_free_model.py` は `HYAKKA_BOT_NAMES` からしか対象を解決しない。
+  glm-flash は有料なので、**走るたびに実費が出る**（実測 1 call $0.00001 前後）。
+")))

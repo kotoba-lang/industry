@@ -1,0 +1,78 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607196400-kotoba-postgresql-prepared-statements")
+  (:adr/title "ADR-2607196400: Bounded PostgreSQL named prepared statements")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-07-19")
+  (:adr/last-verified "2026-07-19")
+  (:adr/last_verified "2026-07-19")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "repo-wide-cljc-to-kotoba-source-migration")
+  (:adr/authoritative-for (vector "PostgreSQL prepared-statement component boundary"))
+  (:adr/related
+  (vector "orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/pg_prepared_consumer.kotoba"
+   "orgs/kotoba-lang/kototama/src/kototama/linker.clj"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"
+   "orgs/kotoba-lang/kotoba-lang/lang/transport-component-abi.edn"))
+  (:adr/supersedes (vector "adr-2607196300-kotoba-postgresql-opaque-cancellation"))
+  (:adr/superseded-by (vector))
+  (:adr/decision-summary
+  (map (:operations (vector "pg_prepare" "pg_execute_params2" "pg_close_statement"))
+   (:statement (map (:kind :named) (:max-name-bytes 63) (:nul-rejected true)))
+   (:parameters (map (:count 2) (:format :text) (:max-bytes-each 1024)
+                (:separate-component-memory-ranges true) (:nul-rejected true)))
+   (:response (map (:max-bytes 2048) (:ready-for-query-required true)
+              (:metadata (vector :result-kind :transaction-status :sqlstate-5))))
+   (:lifecycle (vector :prepare :execute :execute :close))
+   (:released-server (map (:product :postgresql) (:version "14.19")
+                     (:statement "select $1::int4 + $2::int4")
+                     (:success-row "42") (:successful-executions 2)
+                     (:injection-separation-sqlstate "22P02")))
+   (:executable-evidence
+   (vector (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:postgresql-interop")
+     (:result "named prepare; two successful reuses; SQLSTATE 22P02 separation; close; exit 0"))
+    (map (:cwd "orgs/kotoba-lang/kotoba")
+     (:command "targeted kotoba.transport-component-test")
+     (:result "10 tests, 49 assertions; provider and prepared consumer compile; exit 0"))
+    (map (:cwd "orgs/kotoba-lang/kototama")
+     (:command "clojure -M:test")
+     (:result "121 tests, 459 assertions; bounded negative fixtures; exit 0"))))))
+  (:adr/body
+  "# ADR-2607196400: Bounded PostgreSQL named prepared statements
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+The database provider exports named Parse/Describe, two-parameter Bind/Execute,
+and named Close as high-level component operations. The consumer supplies each
+parameter through an independent bounded memory range; parameter bytes are
+never concatenated into SQL text. Statement names, query text and text
+parameters reject NUL and enforce fixed byte ceilings before transport I/O.
+
+All three operations consume a bounded response ending in ReadyForQuery and
+return seven bytes of typed metadata: result kind, transaction status and a
+five-byte SQLSTATE. Protocol errors such as a parameter type mismatch remain
+structured database results; malformed frames, duplicate success tags,
+truncation and missing ReadyForQuery fail closed as transport errors.
+
+The operations remain component/database capabilities. They expose neither a
+raw socket nor implicit connection authority and are linked between isolated
+Wasm memories with explicit copy-in/copy-out ranges.
+
+## Evidence
+
+Released PostgreSQL 14.19 qualification prepares
+`select $1::int4 + $2::int4`, executes it twice with distinct parameters and
+observes `42`, attempts `1;select 99` as a parameter and requires SQLSTATE
+`22P02`, then successfully reuses and explicitly closes the named statement.
+
+This closes the bounded named prepared-statement prototype. Variable parameter
+counts and binary formats, portals/cursors, batching/pipelining, pooling,
+credential/certificate rotation, version/cloud matrices and soak remain open.")))

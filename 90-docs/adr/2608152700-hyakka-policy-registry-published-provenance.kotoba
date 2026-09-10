@@ -1,0 +1,149 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608152700-hyakka-policy-registry-published-provenance")
+  (:adr/doc_type "adr")
+  (:adr/topic "hyakka-policy-registry-published-provenance")
+  (:adr/title "ADR-2608152700: corpus ごとの方針を1つの registry に集約し、wiki に公開し、主張ごとに更新者とモデルを記録する")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-15")
+  (:adr/last_verified "2026-08-15")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/authoritative true)
+  (:adr/source-format "edn")
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector "adr-2608152600-hyakka-game-corpus-steam-source-class-enforcement"))
+  (:adr/related
+  (vector "adr-2607311100-hyakka-knowledge-wiki-on-kotobase"
+   "adr-2608152500-hyakka-nvd-vulnerability-corpus"
+   "adr-2608152600-hyakka-game-corpus-steam-source-class-enforcement"
+   "adr-2608136000-five-questions-before-trusting-green"))
+
+  (:adr/evidence
+  (vector "network-awai/app-hyakka 6944079（main、agent/policy-provenance-surface を 2 回に分けて merge）"
+   "com-junkawasaki/root 6ab2410（west pin 9d44dc4 → ae584ee）"
+   "src/hyakka/corpus/registry.cljc（policy 解決 + 語彙 union + connector→class 表）"
+   "test/hyakka/policy_test.cljs（81 tests / 619 assertions 全緑）"
+   "https://wiki.kotobase.net/policy（3 corpus 全部、各々が『台帳記録版』か『組み込み既定』かを明示）"
+   "https://wiki.kotobase.net/item/world%2Fvulnerability%2Fcve-2021-4034（更新者 / 抽出 / モデル / 出典クラス）"
+   "wrangler Version ID 3f69e4dc-3bcb-4d61-9fd9-596e95fe30e3（本番 deploy 済み）"
+   "実 tick: corpus entity 2 件、source-class 'official-api official-patch-notes'、qualifiers に connector と code-revision"))
+
+  (:adr/body
+"# ADR-2608152700: 方針を1本化し、公開し、主張ごとに出所を書く
+
+## Context
+
+ADR-2608152600 で game policy は検査されるようになったが、3 つ壊れていた。
+
+1. **connector が『自分を裁く方針』を渡していた。** `collect-steam!` は
+   `game/policy` を `admit-source-classes!` に手渡していた。自分の裁判官を指名できる
+   connector は寛容な方を指名できる。**検査に見えて自己認証である。**
+2. **3 corpus のうち 2 つに方針が無かった。** 常駐が書く claim は CVE も Steam も
+   全部 `world-knowledge` に落ちていたが、その corpus には policy も coverage も
+   corpus entity も無い。**唯一存在した方針は、何も書かれていない corpus のものだった。**
+3. **どれも公開されていなかった。** サイトは値と出典を出すが、何を拒否するか・誰が
+   書いたか・何が生成したかを言わない。**全項目が機械生成の面で。**
+
+## Decision
+
+### 1. `hyakka.corpus.registry` が方針を解決する。connector は宣言しない
+
+source が設定で `:corpus` と（任意 URL を向ける `:web-document` だけ）
+`:source-classes` を宣言し、他の connector kind は
+`registry/connector-source-classes` で class に対応づける。`policy-for` は
+**未登録 corpus で例外を投げる** —— `nil` は admission にとって「無制限」と読めるので、
+`:corpus` の打ち間違い 1 つでその corpus の規則が全部黙って無効になる。
+
+class 表がデータなので、**出荷している設定全体を、tick を走らせずに全方針に対して
+検査できる**。この順序が肝心で、**fetch こそが方針の規制対象**だから、
+「取りに行って初めて不許可と分かる」では遅い。
+
+### 2. 3 corpus すべてに方針と、正直な coverage
+
+| corpus | 許可 | LLM の散文抽出 |
+|---|---|---|
+| `world-knowledge` | authoritative-registry / official-api / first-party-site / owner-verified / community-curated-permissive | 可（証拠は保存バイト列の逐語部分文字列） |
+| `game-kouryaku` | official-patch-notes / official-api / first-party-site / owner-verified / community-datamine-permissive | 不可 |
+| `vulnerability` | authoritative-registry | 不可 |
+
+3 つとも `:third-party-wiki-prose` `:user-generated` `:press-aggregation` を禁止。
+`:llm-extraction?` は**省略せず必ず書く** —— 書かなければ、次の connector を書く者に
+とっては「許可」と読める。
+
+coverage は**足りないもの**を書く。ゲーム corpus は攻略グラフ本体が空であることを記録する。
+
+corpus entity は毎 tick 台帳へ書くので、サイトが表示する方針は run が judged された
+方針そのものになる。
+
+### 3. ライセンスと出典クラスを別の列に持つ
+
+`:source/license` は「このバイト列を再配布してよいか」、`:source/source-class` は
+「それを知りうる立場の者が言ったか」。**1 つの欄にまとめることが、CC BY-SA の攻略 wiki を
+適格に見せる。**
+
+### 4. 主張ごとの出所を、公開する
+
+`:claim/asserted-by` と qualifiers の `:extractor` `:model` `:connector`
+`:code-revision` を、全項目ページの全行に表示する。
+
+**`:model nil` は省略せず主張する。**「モデルを使っていない」と「モデルを記録し忘れた」は、
+**似て見えてはいけない対**そのもの（ADR-2608136000 と同型を、gate ではなく provenance に適用）。
+`:code-revision` は、値が動いたときに「写像が変わった」と「上流が変わった」を
+区別可能に保つために要る。
+
+## Consequences
+
+81 tests / 619 assertions。**壊して確かめた**: `steam-games` を `vulnerability`
+corpus に向けると静的検査が赤くなり、**どの source のどの class かを名指しする**
+（「設定のどこかが変」では候補が 9 つ残る）。
+
+**設計のバグを 1 つ、テストが捕まえた。** 最初の実装は台帳に記録された corpus だけを
+描画していたので、ADR 0005 適用後の最初の tick 直後に `game-kouryaku` と
+`vulnerability` は出て、**既存 claim のほぼ全部が属する `world-knowledge` が消えた** ——
+しかも消えたことをページは言わなかった。現在は登録済み corpus の**和**を描画し、
+各節が「台帳記録版」か「組み込み既定」かを明示する。**corpus を黙って落とすページは、
+既定であることを認めるページより悪い。**
+
+本番反映済み（Version ID 3f69e4dc）。live 実測: world-knowledge 765 主張（組み込み既定）/
+game-kouryaku 16（台帳記録版）/ vulnerability 90（台帳記録版）。
+
+## 残件
+
+- **Kotobase への projection は止まったまま**（`hyakka-kotobase-seed` が kagi から消えた。
+  ADR-2608152500 の残件、secrets-location-map に 4 例目として記録済み）。
+  **wiki は台帳から生成した catalog を配るので、この件と独立して動く** —— 今回の公開も
+  seed 無しで完了した。止まっているのは datom 面への projection だけ。
+- ADR 0005 以前に書かれた claim は `:claim/corpus \"world-knowledge\"` のままで
+  `:connector` も `:code-revision` も持たない。**推測で埋めず「未記録」と表示する。**
+## セッション終了時の実測（2026-08-15T14:04Z、closing）
+
+次の agent が会話履歴なしで再開できる現在地。**再導出しないこと。**
+
+| 項目 | 値 |
+|---|---|
+| `network-awai/app-hyakka` main | `6944079` |
+| west pin | 同一（`commits since pin: 0`） |
+| live catalog（`/health`） | `sha256:f3008d31…` = main の `catalog.cljc` と一致 |
+| 常駐 | `com.network-awai.hyakka-knowledge-ingest`（毎時、last exit **1**） |
+| 全 9 connector | 直近 tick で成功（`knowledge/state.edn` に実 timestamp） |
+| Kotobase 未 projection | **4 ledger**（12:57 / 13:00 / 13:29 / 13:39） |
+
+**唯一のブロッカー**: `kagi get hyakka-kotobase-seed` → `no such item`。
+常駐は毎時 ingest → B2 upload → ledger を main へ merge まで**成功**し、
+`publish-kotobase!` で落ちる。deploy はその後ろにあるので走らない。
+
+**最初にやること**: seed を復元する（他人が復元するまで待つ以外に代替は無い ——
+別 seed は別 DID = 別グラフで、`:apex` が graph scope == issuer DID を要求するため
+既存 `hyakka` ref に書けない）。復元後は常駐が未 projection 4 本を自動で追いつかせ、
+その tick の deploy で `/policy` の `world-knowledge` が
+「組み込み既定」→「台帳記録版」に変わる。
+
+**seed が無くても壊れていないもの**: wiki は台帳から生成した catalog を配るので、
+収集・公開・方針表示・provenance 表示は動いている。止まっているのは datom 面への
+projection だけ。**「サイトが古い」と「収集が止まっている」を混同しないこと。**
+
+- 並行して別セッションが `hyakka.corpus`（Wikidata の content-addressed 索引）を landing
+  させたため、registry は `hyakka.corpus.registry` に置いた。**同名 namespace の 2 ファイルは
+  大きな音を立てない** —— ClojureScript は `.cljs` を優先し、もう一方は読まれなくなるだけで、
+  ビルドは緑のまま registry が消える。
+")))

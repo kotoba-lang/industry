@@ -1,0 +1,50 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609021200-itonami-cloud-agent-basho-glm53-serverless-budget")
+  (:adr/title "itonami.cloud は murakumo の WASM lattice 上の cloud-agent として動き、Basho = GLM-5.3 serverless（月額 20 万円上限）と Hokusai を使う")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-02")
+  (:adr/related (vector "adr-2609011842-awai-japanese-models-openrouter-provider-application"
+                "ADR-2608111721" "ADR-2607173100" "ADR-2608130100" "ADR-2608080100"))
+  (:adr/body "# itonami.cloud は murakumo の WASM lattice 上の cloud-agent として動き、Basho = GLM-5.3 serverless（月額 20 万円上限）と Hokusai を使う
+
+**Status**: accepted / 2026-09-02 / owner instruction「itonami.cloud を local-agent ではなく cloud-agent として murakumo.cloud を使って機能するように整えて. api は glm 5.3 で baseten or together backed で serverless が可能な方で. basho, hokusai モデルを利用. basho に関しては常駐しても月額 20 万円を超えない構成に」+ 同日の訂正「murakumo は wasm cloud 的に動く設計になっていなかったっけ」。
+
+## Context（実測 2026-09-02）
+
+- **local-agent の現在地**: itonami.cloud の agent（Goals / Assignments / approvals の authority = cloud-itonami-app の JVM resident）はオーナーの Mac の LaunchAgent（`~/.gftd/bin/itonami-app-resident.cljs`）で動き、`127.0.0.1:1338` に bind する。公開ホスト（app. / hooks. / mcp. / bots.）は Cloudflare Worker だが、resident はその Mac が眠ると消える。
+- **murakumo は WASM cloud である**: `kotoba-lang/murakumo` は「Control plane for the kotoba WASM lattice/mesh across the Mac-mini fleet」。libp2p gossipsub の lattice ノード（`kotoba-server`）が content-addressed WASM component を auction で配置し、`on-http` / `on-tick` / `on-kse` を発火し、`kqe-assert!` を Datom log に永続化する。desired state は wadm 相当の `murakumo.app.edn`。既に **kenchi**（valuation record を on-mesh で serve、ingest は off-mesh）と **minidrama**（profile + heartbeat を on-mesh、governed pipeline は off-mesh）が同じ分業で置かれ、2026-07-07 に asher で live probe 済み。
+- **lattice の現在地**（`nbb scripts/run-task.cljs ops status`）: 12 ノード中 9 到達、`kotoba-server` up は levi / joseph / dan（wasm executor ready）、8 台 peer、LaunchAgent loaded 0、hosted CID は dan に 2。
+- **fleet ノードに JVM は無い**（judah / simeon / asher で `java` 不在、Clojure CLI はある）。JVM resident をノードに置く案は substrate が違う。
+- **GLM-5.3 の提供状況**: Baseten Model APIs も Together も `zai-org/GLM-5.3` を serverless（従量課金）で提供。list price は両社 $1.40 / $4.40 per Mtok in/out（Baseten cache in $0.14、Together $0.26）。GLM-5.3 は 753B-A40B で、専用常駐 replica は 8×H100 ≈ $52/h → 月 $38k 超。USD/JPY ≈ 160（2026-09-01）なので 20 万円 ≈ $1,250/月。
+- **awai-network/basho / hokusai** は ADR-2609011842 の fail-closed front door として murakumo gateway に merge 済み（vendor backend 未接続）。
+- **`capability-llm-infer`** の provider status は `contract-only` —— WASM guest はまだ model を呼ぶ権限を admit されない。
+- **この Mac の `~/.local/bin/kotoba`** は削除済みの `/tmp` バイナリを指しており、`kotoba app deploy` は今日は実行できない。
+- **Baseten / Together の API 鍵はこの workspace のどこにも無い**（secrets-location-map、Worker secrets、Keychain の targeted lookup、`~/.trussrc` は auth_type のみ）。
+
+## Decision
+
+1. **cloud-agent = lattice app。** `cloud-itonami-app/mesh/itonami.app.edn` が ON-MESH surface を宣言する: `agent-profile`（on-http `/mesh/http/itonami/profile`、agent の identity record = residency / ingress / murakumo 経由で話す model）と `agent-heartbeat`（on-tick 5 分、resident-liveness datom）。どちらも resident が assert した fact を serve / attest するだけで判断しない。`kotoba-lang/murakumo` の `murakumo.app.edn` に `itonami-agent`（replicas 2、JP edge tribe）として登録し、`:cid` は初回 deploy まで書かない（reconcile は `:needs-build` と報告する）。itonami.cloud の存在と生存が lattice に hosted され、auction で配置され、content-addressed で、オーナーの端末を含むどの 1 台にも依存しない —— これが cloud-agent の定義。
+2. **JVM resident は off-mesh authority のまま**（Goals / Assignments / grants / approvals / replay / Bot turn）。理由は好みではなく capability: turn には `llm/infer` が要り、admit された guest provider がまだ無い。provider が入ったら turn loop を第 3 の component として on-mesh に移し、manifest の形は変えない。itonami.cloud を serve する resident は `profiles/itonami.edn`（`:residency {:plane :cloud}`）で走り、workspace は status rail に「cloud-agent · murakumo.cloud」を示す（process は内側から区別できないので設定から出す）。
+3. **Chat = Basho、API base = GLM-5.3、serverless のみ。** 両 vendor とも serverless なので「serverless が可能な方」= 両方。順序は Baseten → Together（gateway が既に pin。cache in 価格が低い）。専用 replica は使わない。「常駐しても 20 万円を超えない」= shared serverless catalog（idle 0 / cold start 無し）+ **gateway の月額予算**。`MURAKUMO_BASHO_MONTHLY_BUDGET_JPY=200000`、`MURAKUMO_BASHO_JPY_PER_USD=160`（pinned、日付付き）、in/out 価格 var から USD micros 上限（1,250,000,000）を導き、request ごとに `spent + reserve > cap` なら 503 `self_model_monthly_budget_exhausted`。予算が未設定なら unlimited ではなく deny（`self_model_budget_unconfigured`）。ledger は kotobase stream `self-model.vendor-spend`（read-then-append なので overshoot は並行数 × reservation。vendor 側の spend limit が第 2 の床）。app 側 fallback は `awai-network/basho → z-ai/glm-5.3-flash`（同じ api.murakumo.cloud、served model で label）。upstream base を Basho id で serve するのは **内部 route** で、fine-tune 前に OpenRouter へ Basho として advertise しない。
+4. **Video = Hokusai。** cloud-itonami-app の Bot に `video_generate` / `video_status`（`cloud.itonami.app.media-tools`）を足し、murakumo の `POST /api/v1/videos` 契約に同じ provider record・同じ admission で当てる。capability policy に `:media.video` を持つ Bot だけに出し、`video_generate` は write（omakase でなければ approval hold）。Hokusai backend は revision attest まで fail-closed で、503 はそのまま Bot に届く。
+5. **鍵は 1 本ずつ。** resident は `MURAKUMO_API_KEY` だけ、vendor 鍵は gateway の Worker secret だけ。
+6. **8-bit mode は appearance であって第 2 の UI ではない**（cloud-itonami-app ADR-0091）。`.workspace[data-appearance=\"8bit\"]` 1 属性 + 1 stylesheet layer、palette は itonami.cloud cockpit の 8-BIT MODE floor と同じ 16 色。
+
+## 着地（2026-09-02）
+
+- cloud-itonami-app: **PR #266 merged → main `510f212`**（オーナー指示「review and merge」2026-09-02。code review で CONFIRMED 9 件 —— video_generate が write 未分類 / job id が path に生で入る / typed 拒否が turn を落とす / 私製 HTTP が timeout を internal error に誤分類 / gateway body が描画されない / residency nil で render 落ち / NaN が range を通る / CSS selector が実在しない要素を指す / palette 主張の未計測 —— を `f57e0cc` で全部修正してから merge。retry storm 指摘は live body の `invalid_request_error` type で既に非再試行だったが、code で pin して固定）。west pin は `803c60c`、共有 checkout も `510f212` に同期済み。JVM suite 2,234 tests / 13,307 assertions。残る赤は **bundle lock**（source 変更で `cloud.itonami.app.bundle put` の republish が要る。`KOTOBASE_ARCHIVE_TOKEN` は kagi で `no such item`、既知 item は取れるので名前が変わっている —— **main 上で未解決の 1 件**、`bundle_test` 2 + `graph_test` 1）と既存の bulky_waste_http_test。launcher_test（worktree の相対 path）と bulky_waste_http_test（rescued merge 由来）は本 branch 以前から赤い。portable cljs suite は main でも `kotoba.kir` 不在で落ちる（既存）。8-bit mode は preview resident（:1339）を headless Chrome で撮って目視確認、`?appearance=light` の JS 経路は `--dump-dom` で `data-appearance` が light になることを確認。
+- cloud-murakumo-api: 予算上限は **main `d8c59af`** に着地し、**version `b29c3111` を api.murakumo.cloud に deploy 済み**。smoke: `awai-network/basho` 匿名 → 503 `self_model_backend_unavailable`、`/v1/models` は basho を載せない、`GET /v1/self-models/basho/budget` は匿名 402 / resident 鍵で 200（month 2026-09 / cap-jpy 200000 / cap-usd-micros 1250000000 / spent-usd-micros 0 / calls 0）。`MURAKUMO_BASHO_ARTIFACT_REVISION` は HF `zai-org/GLM-5.3` の sha `187fb9ff…`。**vendor 鍵は未 provision** なので generation は live でない。west pin は `8d6a876` で前進。
+- kotoba-lang/murakumo: `murakumo.app.edn` に `itonami-agent` 登録（main `2a8bdcd`）→ **同日 placement 済み**（main `c6a190e` で CID 記録、pin `b1e7109`）。手順: levi の `~/.murakumo/bin/kotoba`（server と同じ 06-27 build）を pin し、`kotoba app deploy --publish` を levi:8077 経由で流し（token 不要）、block は operator op-token（`murakumo.identity/op-token`、DID はノードの公開 `KOTOBA_AGENT_DID`）で levi / dan / joseph に `block put`。`POST /mesh/http/itonami/profile` は 3 台とも HTTP 200 で identity record（JSON）を返す。block put 前は 502 `component unavailable`（README が警告する route-without-block）。**実測で見つけた runtime の欠陥**: kotoba-server 0.1.0 の `invoke_trigger`（net_actor.rs）は全 trigger に空 snapshot を渡すので、component 内の `kqe-query`（predicate filter、Datalog ではない）は何も返せない。v1/v2 は実行されて 200 / content-length 0 —— kenchi / minidrama の「HTTP 200」も同型。v3 は record を定数として返し（配置された artifact = record）、`kqe-assert!` の書き込み（quad store に永続化）は残す。agent-profile `bafyreig5thbb7i5i56l5m5ym7bp44ez3jvweblqeay3uiwliqkbr54wbxi` / agent-heartbeat `bafyreicp5ashj2ewjjmpmkvs7swdzz4ajol6etmwnk7n7hlartc47g2kr4`。ローカル resident（`cloud.itonami.app.local`）は `510f212` の tree で再起動済み（8-bit toggle と basho routing が live）。
+- root: deployment contract v4、ADR-2609011842 の Basho 節改訂、本 ADR（merge `132c117`）。
+
+## 次の一手（順に）
+
+1. `wrangler secret put MURAKUMO_BASHO_BASETEN_API_KEY`（cloud-murakumo-api）→ direct smoke → `MURAKUMO_BASHO_BASETEN_REVISION`（= artifact revision）と `_READY=true` を attest → `GET /v1/self-models/basho/budget` が月と残額を返すことを確認。
+2. `kotoba` CLI を復旧し `murakumo deploy <cloud-itonami-app>/mesh/itonami.app.edn dan`、representative CID を `murakumo.app.edn` に記録、`POST /mesh/http/itonami/profile` を probe。
+3. `capability-llm-infer` に provider が入ったら turn loop を on-mesh へ。
+
+## Consequences
+
+- itonami.cloud の「常駐」はもう 1 台の Mac の生存ではなく lattice の配置で語られる。
+- Basho の月額は上限で語れる（超えると止まる、黙って超えない）。
+- 「murakumo に JVM resident を置く」設計は本 ADR で明示的に却下（substrate が違う）。")))

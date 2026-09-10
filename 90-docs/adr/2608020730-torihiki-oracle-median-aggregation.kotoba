@@ -1,0 +1,85 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608020730-torihiki-oracle-median-aggregation")
+  (:adr/title "ADR-2608020730: oracle は median 集約にする — 平均は嘘の量だけ動き、median は少数派では動かない。stale な oracle は清算を止める")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "torihiki-oracle-median-aggregation")
+  (:adr/authoritative-for
+  (vector "oracle 価格の集約方法と publisher 権限"
+   "quorum 未達・stale 時の挙動"
+   "stale な oracle と清算の関係"))
+  (:adr/related
+  (vector "adr-2608012330-torihiki-mark-price-not-last-print"
+   "adr-2608020630-torihiki-margin-tiers-and-open-interest-cap"
+   "adr-2608020230-torihiki-authentication-is-consensus-state"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/torihiki"))
+  (:adr/body
+  "# ADR-2608020730: oracle の median 集約
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ギャップ #6。ADR-2608012330 で mark を oracle に錨で留めたのは、薄い板で他人を清算されないため。**しかしその防御は oracle の強さまでしかない。**
+
+`:oracle` は「合意済みの価格」を運ぶ tx で、**送れる者が mark を動かせた。穴は 1 層下に押し込まれただけで、塞がっていなかった。**
+
+## Decision
+
+### 1. median。平均ではない
+
+**平均は、publisher が嘘をつく気のある量だけ結果を動かす**——誤差が嘘に比例する。**median は、少数派がどれだけ極端な値を出しても結果を 1 も動かせない。** これが欲しい性質。
+
+実測: 5 publisher 中 2 人が 999999 と 1 を出しても、公表価格は変わらない。
+
+### 2. 偶数個は下側中央値。順序は全順序
+
+`fresh` は price → publisher でソートする。**中央値は位置で読むので、順序が全順序でないと偶数個のとき validator が別の publisher の値を選びうる。**
+
+どちらの中央を採るかはほぼ重要でないが、**明文化されていることは重要**。
+
+### 3. quorum 未達なら「価格が無い」。悪い価格ではない
+
+**システムが保証できない価格は、価格が無いことより悪い**——下流（mark・証拠金・清算）はそれを保証済みとして扱うから。
+
+最後に分かっている価格は保持するが、**stale と旗を立てる。**
+
+### 4. stale な oracle は清算を止める
+
+**誰も現在保証していない価格で他人の建玉を閉じるのは不可逆。** 待つのは可逆。フィード停止中に不良債権が育つコストは、こちらの方が小さい。
+
+### 5. publisher がいるなら直接設定は閉じる
+
+両方の扉を開けたままにすると**集約が飾りになる**——攻撃者は集約しない方の扉を使うだけ。
+
+### 6. publisher の入れ替えはここでやらない
+
+genesis で設定し、このエンジンは変更しない。**ローテーションは統治の問題で、下手に答える（現 publisher 集合が自分たちを縮小投票できる等）のは、ここで答えないより悪い。**
+
+## Consequences
+
+- (+) 単独 publisher が mark を動かせなくなった。#1 の防御の根が塞がった。
+- (+) submission が state root に入るので、sequencer が 1 件足し引きして mark を動かせない。
+- (−) **publisher の入れ替え手段が無い。** 鍵を失った publisher は quorum を永久に消費する。
+- (−) **publisher の不正に罰が無い。** `deviation` は監視信号として提供するが強制しない——真の乖離時に正直な publisher を罰することになるため。
+- (−) quorum / max-age は選定値で実運用較正をしていない。
+- (−) stale 中は清算が止まるので、**長い停止は不良債権を溜める。** 上限も緊急手段も無い。
+- (−) devnet（publisher 未設定）は従来どおり直接設定で動く。**本番でそれを閉じ忘れると全部無意味**なので、`market-info` に publisher 数を出して見えるようにした。
+
+## テストの期待値を 1 つ間違えた
+
+4 値の下側中央値は 2 番目であって 1 番目ではない。**コードは正しく、テストが間違っていた**——このセッションで 3 度目。
+
+## 残りギャップ
+
+1〜6 完了。**7 engi 合意層**、8 bridge・監査。
+未了: wallet 接続、端末からの発注、WebSocket、node snapshot、TWAP/scale/chase/trailing stop、resting reduce-only、publisher ローテーション。
+")))

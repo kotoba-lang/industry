@@ -1,0 +1,54 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608241235-session-close-guest-gpu-two-adr-0094")
+  (:adr/title "ADR-2608241235: closing — guest gpu-two (0094) landed; Desktop still partial; /goal not complete")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-24")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/related (vector "adr-2608221625-aiueos-chromeos-cloud-desktop"
+                "kotoba-lang/aiueos ADR-0093"
+                "kotoba-lang/aiueos ADR-0094"))
+  (:adr/body
+  "# 何が着地したか
+
+| repo | commit | 内容 |
+|---|---|---|
+| kotoba-lang/aiueos | e158913a | Merge agent/aiueos-guest-gpu-two: two virtio-gpu 2D resources when Kotoba `kotoba_aiueos_wm_hit` admits n=2 (ADR-0094). PR #152. Feature branch deleted. |
+
+superproject: `nbb scripts/west-pin-put.cljs aiueos e158913a6b42` → root `c0d342ce0f2`.
+
+# 何をこの Mac で再実行して確かめたか
+
+- `clojure -M:test -n aiueos.compositor-test` — 31 tests, 0 failures.
+- `clojure -M:compositor guest-gpu-two` — `AIUEOS_COMPOSITOR_GUEST_GPU_TWO_OK` leftover `[]`; serial `AIUEOS_GUEST_GPU_TWO_OK resources=2 flush=2 kotoba-n=2`.
+- `clojure -M:compositor gpu` — still green (`CREATE`/`FLUSH` resource=1); does not require `GUEST_GPU_TWO_OK`.
+
+# root ADR-2608221625 / Desktop の現在地（2026-08-24）
+
+**成立していない。** README Desktop は **partial** のまま。
+
+| 面 | 状態 |
+|---|---|
+| P0–P1, P1b, P1c | green on origin/main（prior slices） |
+| P2 HTTP+CID, CertVerify | green on QEMU UEFI |
+| P3 guest, P4 operator | prior landings |
+| Compositor hosted WM/IME/kanji/kami | ADR-0085–0089 |
+| Guest IME/WM/paint/input/gpu-two | ADR-0090–0094 green on this Mac |
+| **P5 実機 boot** | **UNVERIFIED** — QEMU ≠ P5 |
+| kotobase PUT / CACAO | 401 / vault gap（prior session-close と同型） |
+| chain-to-anchor | P2 leftover after CertVerify |
+
+**Named Desktop leftover after ADR-0094:** permission broker, native component runtime, **one virtio-gpu scanout**（resource は 2 枚だが SET_SCANOUT は 0 のみ）, P5 UNVERIFIED.
+
+C は resource count を hardcode しない。`kotoba_aiueos_wm_hit(2,2,100,80)==2` が count 決定。新 Kotoba export なし。
+
+# 次セッションの第一候補
+
+1. **one SET_SCANOUT** — scanout 1 へ resource 2 を bind する slice（leftover `:one-scanout`）。
+2. **P5** — 実機で boot するまで UNVERIFIED のまま `/goal` を complete しない。
+3. **permission broker / native Phase 6 compositor** — `:native-compositor-absent` の残り。
+
+# 閉じていない契約
+
+- `/goal`（Chrome OS 型クラウドデスクトップ成立）は **complete しない**。
+- Compositor / kami-engine の「完成 desktop」は P5 と broker/runtime が残る限り UNVERIFIED。
+")))

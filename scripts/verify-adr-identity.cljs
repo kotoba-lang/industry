@@ -48,6 +48,11 @@
 ;; usage: nbb scripts/verify-adr-identity.cljs [--dir 90-docs/adr] [--min 500]
 
 (require '[clojure.string :as str])
+;; The Kotoba ADL decoder, from the notation's owner rather than a local copy.
+;; Needs orgs/kotoba-lang/kotoba/src on the classpath:
+;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kotoba/src" \
+;;       scripts/verify-adr-identity.cljs
+(require '[kotoba.adl :as adl])
 
 (def fs (js/require "node:fs"))
 
@@ -80,7 +85,21 @@
 (defn- read-adr [dir f]
   (let [p (str dir "/" f)]
     (try
-      (let [tx (cljs.reader/read-string (.readFileSync fs p "utf8"))
+      (let [raw (cljs.reader/read-string (.readFileSync fs p "utf8"))
+            ;; A .kotoba document is S-expressions, so the reader hands back the
+            ;; NOTATION -- nested lists -- not the value. `(filter :adr/id ...)`
+            ;; over notation finds no maps and returns empty, so the file would
+            ;; contribute no ADR and no error. Decode first.
+            ;;
+            ;; Decoded through `kotoba.adl`, the notation's owner, rather than a
+            ;; local copy. Two copies of this walk already exist -- one in
+            ;; manifest/edn-query.cljs and one in the docs-edn-check gate -- and
+            ;; a third is the shape this workspace has paid for before, where an
+            ;; algorithm lived in two places with neither one the authority.
+            ;; `read-all` returns every top-level form, so a document is its
+            ;; first. Verified 2026-09-10 with a negative control: an edited
+            ;; value stops round-tripping.
+            tx (if (str/ends-with? p ".kotoba") (first (adl/read-all (.readFileSync fs p "utf8"))) raw)
             e (first (filter :adr/id tx))]
         ;; `:adr/id` を **string に寄せて** 比較する。manifest/schema.edn 自身が
         ;; 「:adr/id は string または long」と注記しており、実測で 2 件が数値宣言
@@ -96,7 +115,15 @@
         ;; 記述している。別ディレクトリを見ているときはその表を適用しない。
         corpus? (str/ends-with? (str/replace dir #"/+$" "") "90-docs/adr")
         min-adrs (js/parseInt (or (get flags "--min") "500"))
-        files (sort (filter #(str/ends-with? % ".edn") (js->clj (.readdirSync fs dir))))
+        ;; Either notation. One extension no longer tells you what a file holds
+        ;; (ADR-2609101300), and this enumeration filtering on ".edn" alone is
+        ;; how a converted corpus would go quiet: every ADR would leave the
+        ;; scan, `adrs` would shrink toward zero, and the identity check would
+        ;; pass by having nothing to compare. `--min` is the floor that turns
+        ;; that into a refusal, but the enumeration is what should not lose the
+        ;; files in the first place.
+        files (sort (filter #(or (str/ends-with? % ".edn") (str/ends-with? % ".kotoba"))
+                            (js->clj (.readdirSync fs dir))))
         adrs (keep #(read-adr dir %) files)]
     (when (< (count adrs) min-adrs)
       (println (str "FAIL ADR が " (count adrs) " 件しか読めない (--min " min-adrs ")。"

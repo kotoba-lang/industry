@@ -1,0 +1,464 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608040100-fleet-sync-topology-content-addressed-vs-west")
+  (:adr/title "ADR-2608040100: 4,000 repo × 並行 agent の同期開発 — west/git の何が壊れているかを実測し、bonsai/nekko/kagami/inga と nix・unison 的設計を system dynamics でスコアする")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-03")
+  (:adr/last-verified "2026-08-03")
+  (:adr/last_verified "2026-08-03")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "fleet-sync-topology")
+  (:adr/repos (vector "orgs/kotoba-lang/loop-system-dynamics" "orgs/kotoba-lang/dynamics"
+              "orgs/kotoba-lang/bonsai" "orgs/kotoba-lang/nekko" "orgs/kotoba-lang/kagami"))
+  (:adr/authoritative-for
+  (vector "並行 agent フリートの同期問題の現在地（2026-08-03 実測値）と、その支配ループの同定"
+   "この分析の改善指標が :period-ratio（repair 周期 / drift 周期）であり、reinforcing loop の structural-strength ではないこと"
+   "radicle 面を配線する前提の可視性監査結果（private 露出ゼロ）と、残るブロッカー"
+   "content-addressed / nix 的 / unison 的設計がこの問題のどこを直し、どこを直さないかの境界"
+   "miki は repo ではなく予約語であるという訂正"
+   "同期設計の介入候補の Meadows leverage ランキングと、ランキングだけでは隠れる測定済み倍率"
+   "面（plane）を増やす前に満たすべき条件"))
+  (:adr/related
+  (vector "adr-2607160005-kotoba-fleet-agent-vcs-west-successor"
+   "adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs"
+   "adr-2607161801-kotoba-vcs-suite-tree-motif-naming"
+   "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+   "adr-2608039700-agent-loop-git-datalad-source-kotobase-query-projection"
+   "adr-2608012050-nix-shaped-supply-chain-properties-aiueos"
+   "adr-2607203000-system-dynamics-no-entity-out-of-scope"
+   "adr-2607300900-github-actions-removal"
+   "adr-2607258000-west-yml-emptied-twice-by-a-registration-path"))
+  (:adr/evidence
+  (vector "kotoba-lang/loop-system-dynamics@21c4f3d src/loop_system_dynamics/fleet_sync_topology.cljs + resources/{fleet-sync-topology-seed,fleet-sync-probe}.edn + reports/fleet-sync-topology.md + ledger/fleet-sync-topology-ledger.edn"
+   "com-junkawasaki/root@1589c03 scripts/fleet-sync-probe.cljs (standing measurement)"
+   "com-junkawasaki/root@086838e manifest/fleet-db.edn + ledger — fleet reconcile, 1,329 events"
+   "manifest/west.yml 2026-08-03: 4,063 entries"
+   "~/.radicle/storage 2026-08-03: 3,677 repos, rad node status -> stopped"
+   "git log --since=2026-07-04 -- manifest/west.yml | wc -l -> 5,181"))
+  (:adr/decision-summary "{:dominant-loop :sync-cost-avoidance, :drift-period-days 9.25, :repair-period-days 8.0, :period-ratio 0.865, :planes 4, :live-planes 3, :pairwise-obligations 6, :reconcilers-existing 4, :reconcilers-scheduled 0, :standing-check-coverage 11/15, :fleet-refresh-period-days 15.5, :working-set-refresh-period-days 1.0, :measured-improvement 15.5, :head-vs-pin-diverged {:2026-07-29 287 :2026-08-03 203}, :radicle-divergence-pct 10.4, :radicle-private-exposure 0, :radicle-blocked-on :owner-rad-auth, :top-3 [:drop-the-world-copy-goal :manifest-as-datom-db-not-yaml :per-writer-namespaces], :moved [[:manifest-as-datom-db-not-yaml 0.45 0.50] [:retire-or-wire-the-dead-plane 0.9 0.5]], :content-addressing-fixes :objects-not-refs, :ref-plane-answer {:single-machine :per-writer-namespaces, :multi-machine :inga-quorum}, :miki :reserved-word-not-a-repo}")
+  (:adr/body
+  "# ADR-2608040100: 並行 agent フリートの同期問題を実測し、content-addressed 設計を採点する
+
+**Status**: accepted
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki（問い:「複数端末・agent で west/github/rad を使って並行開発しているが pin が古い・WIP が残る。bonsai や nekko、miki、kotoba-lang の nix, unison 的な設計、ネットワークの同期性を使って git/west より効果的な同期開発は可能か。system dynamics で設計してスコアにして」）
+
+## Context
+
+### 訂正 0 — miki という repo は存在しない
+
+`miki`（幹）は ADR-2607161801 の木モチーフ対応表の **予約語**であり、実装は無い。
+同 ADR の addendum が同日に git スロットを部位（miki）でなく主体・行為から採ることを
+決め、**`bonsai`（盆栽）に確定**している。`grep 'name: mik' manifest/west.yml` は
+`com-etzhayyim-app-omikuji` / `com-etzhayyim-mikurabe`（無関係）しか返さない。
+以後 miki を実在コンポーネントとして参照しない。
+
+### 実測（2026-08-03、オーナー workstation。全数値は seed に command 付きで記録）
+
+**面（plane）— 「コードはどこにあるか」を主張する表現の数: 4**
+
+| plane | 役割 | live? | 実測 |
+|---|---|---|---|
+| local worktrees | orgs/<org>/<repo> の実体 | ✅ | 3,600 checkout（west entry 4,056 中） |
+| GitHub + west.yml | 今日の正本 | ✅ | 4,063 entries、30日で 5,181 commit（173/day、ピーク 430） |
+| radicle storage | per-writer namespace + sigrefs | ❌ | 3,677 repo。`rad node status` = stopped、子 checkout に rad remote 無し |
+| fleet-db（kagami） | CLAUDE.md が west.yml の上流と宣言 | ❌ | fleet-db.edn は 2026-07-26 で停止 = west.yml **1,355 commit 遅れ** |
+
+4 面 → **対整合義務は P(P-1)/2 = 6**。うち **live な reconciler を持つのは 1 つだけ**
+（west.yml ↔ GitHub refs、`west-pin-verify-guard` が pin を *変更する* 書き込み時だけ発火）。
+radicle ↔ 何か、fleet-db ↔ 何か、は **ゼロ**。
+
+**stock（滞留）**
+
+- HEAD == pin: 3,229 / 3,600。**HEAD ≠ pin: 370** — うち local-ahead 51、local-behind 78、
+  **ローカルで前後関係すら判定できない 254**（pin の commit をその checkout が持っていない）。
+- pin が upstream より遅れ: 77 repo / 比較可能 1,626、計 448 commit（中央値 2、p90 12、
+  最大 108 = `root` 自身）。**これは下限**: 3,600 中 1,626 しか origin ref を持たず、
+  10 日 fetch していない checkout はそれ以降の commit を見られない。
+- 未コミット WIP: 293 tracked file / 28 repo、untracked のみ 44 repo、stash 4、
+  未 push commit 123 / 10 repo。
+
+**rate（時計）**
+
+- **最終 fetch からの経過: 中央値 10.3 日**、p90 16.0 日、最大 38.3 日。
+  直近 24h に fetch されたのは **120 repo（3.5%）**、一度も fetch していない 203。
+- 派生量: **fleet refresh period = 3,600 / 120 = 30.0 日** — 観測されたスループットで
+  全 repo を 1 周するのに要する時間。
+- 並列 `fleet sync` は測定済み 4.8×（10 repo, --jobs 8 で 6.0s vs 29.0s、ADR-2607160005）。
+
+**radicle 面の漂流（実測）**: 500 repo 無作為抽出で、radicle の canonical
+`refs/heads/main` が **live な local HEAD と一致 384 / west pin と一致 26 /
+どちらでもない 90（18.0%）**。identity COB は 2026-07-25 に 492 件が一括生成
+（＝bulk import であって日常利用ではない）。**node 停止のまま 9 日で 18% 漂流した。**
+
+## 支配ループ（`dynamics.core/loop-structural-strength`、実測 cycle time）
+
+| loop | kind | 観測周期 | instrumentation | structural strength |
+|---|---|---|---|---|
+| **sync-cost-avoidance** | reinforcing | **10.3 日** | 0.50 | **20.20** |
+| plane-multiplication | reinforcing | 9.0 日 | 0.25 | 12.77 |
+| manifest-contention | reinforcing | **:unmeasured** | 0.67 | **:uncomputable** |
+
+- **R1 sync-cost-avoidance（支配的）**: 実体化 repo 数 ↑ → 全体 sync の wall-clock ↑ →
+  sync 頻度 ↓ → repo ごとの陳腐化 ↑ → 次の sync が dirty-skip / 判定不能 pin に当たる
+  確率 ↑ → さらに回避。**周期 10.3 日は推定ではなく、FETCH_HEAD の中央値そのもの。**
+  回避側の friction はほぼゼロ（何もしないのは無料で、west の dirty-skip は無言）。
+- **R2 plane-multiplication**: 面を足す → 対整合義務が P² で増える → 新しい対に live な
+  reconciler を作らない → 漂流 → 信用されなくなる → 次の要求はまた別の面で満たされる。
+  radicle がこの 1 周を 9 日で完走した実例。
+- **R3 manifest-contention**: 4,063 entry の生成 YAML が唯一の書き込み口。
+  **cycle time は観測されたことが無いので :unmeasured**（single-entry PUT の 409 を
+  どこにも記録していない）。ライブラリは正しく nil を返す。**書き込み圧だけは実測: 173/day、
+  ピーク 430/day、そしてこの経路は west.yml を二度空にしている（ADR-2607258000）。**
+
+## 核心的診断 — pin が古いのは事故ではなく定常状態
+
+`fleet refresh period = 実体化 repo 数 / fetch スループット`。両辺とも実測値で、
+今日は **3,600 / 120 = 30 日**。一方 manifest への書き込みは **173/day**。
+**世界が変わる速さが、世界のコピーが学習する速さを一桁上回っている。**
+その差が pin lag・判定不能 pin・stale checkout として現れる。個々の事故ではない。
+
+そして維持している 3,600 checkout のうち、直近 24h に触られたのは **120（3.3%）**。
+**O(N) の同期コストを O(0.03N) の利用のために払っている。**
+
+## content-addressed 設計は何を直し、何を直さないか
+
+**直す（object 面）**: 識別子が内容のハッシュなら、転送は「持っていない CID を取る」に
+縮退する。冪等・順序非依存・退行不能で、`(forced update)` の偽陽性も ancestry 誤判定も
+構造的に起きない。bonsai がこの層を実装済み（byte-exact な git loose/pack/idx interop、
+`git-remote-kotoba` まで）。
+
+**直さない（ref 面）**: **可変ポインタは content addressing では消えない。**
+これは kotoba 固有の話ではなく:
+- **unison** は定義を content-addressed にするが、**namespace head は可変**で
+  Unison Share がそれを直列化する。
+- **nix** も derivation は hash だが、`flake.lock` / channel は**可変ポインタ**であり、
+  更新は誰かが決めて書く。
+- 本 workspace の `kotoba.semantic-code` も同型で、**local kernel は実装済み・
+  ネットワークは無い**（gap ADR 2026-07-23 が「deployed codebase network を主張するな」と
+  明示）。
+
+したがって **ref 面には別の答えが要る**。選択肢は 2 つしかない:
+
+1. **衝突を表現不能にする（per-writer namespace）** — 各 agent は
+   `refs/namespaces/<did>/…` にしか書けず、共有可変 ref が存在しない。canonical は
+   (namespaces × delegates × threshold) の**純関数**として全ノードが同一計算する。
+   nekko が実装済みで、**radicle が既にこの形で 3,677 repo をこのマシン上に切っている**。
+   ただし実測 500 repo 中 499 が **writer 1 名** — 形はあるが 2 名同時を通したことが無い。
+2. **合意する（inga、2f+1 quorum）** — chained HotStuff 3,166 行が実在し動く
+   （ADR-2608038000）。ただし repo の ref には未接続で、**writer が複数マシンに跨って
+   初めて必要**になる。1 台なら 1 で足りる。
+
+**「ネットワークの同期性」への直接の答え**: gossip / CRDT は *object* の伝播を
+無調整で収束させられるが、*ref の前進* は合意問題であって収束問題ではない。
+先に 1（分割して衝突を消す）、必要になってから 2（合意）。順序を逆にすると、
+使わない合意層の運用コストを先払いすることになる。
+
+## nix の本当の教訓は hash ではない
+
+nix が効いているのは content addressing それ自体ではなく、
+**derivation が要求するまで何も実体化しない**という点。
+これを本フリートに写すと `working-set materialisation`（ADR-2607160005 Plane 3）になり、
+**唯一、観測済みボトルネックに測定された倍率を持つ介入**になる:
+
+    refresh period = 実体化数 / スループット
+    今日:      3,600 / 120 = 30.0 日
+    working set: 120 / 120 =  1.0 日     ← スループットは変えずに 30×
+
+30× は**下限**である。今日の 120 repo/day というスループット自体が「全体 sync が高い」
+ことによる回避の結果であり、sync が全体走査でなくなれば上がる。
+
+## スコア（Meadows band × tractability、`dynamics.core/rank-interventions`）
+
+| # | 介入 | band | tract. | score |
+|---|---|---|---|---|
+| 1 | **drop-the-world-copy-goal**（目標を「全 repo を実体化して整合させる」から「task の依存閉包だけを hash で実体化する」に変える） | A | 0.40 | **4.00** |
+| 2 | **manifest-as-datom-db-not-yaml**（fleet-db を正本、west.yml を projection に） | B | 0.45 | 3.15 |
+| 3 | **per-writer-namespaces**（nekko / radicle 形。衝突を表現不能に） | C | 0.60 | 3.00 |
+| 4 | canonical-ref-as-pure-function | B | 0.40 | 2.80 |
+| 5 | **retire-or-wire-the-dead-plane**（radicle を起動するか消すか、どちらか） | D | 0.90 | 2.70 |
+| 6 | parallel-fleet-sync（実装済み・測定済み 4.8×） | D | 0.90 | 2.70 |
+| 7 | capability-gated-canonical-writes | B | 0.35 | 2.45 |
+| 8 | consensus-ref-plane（inga） | B | 0.30 | 2.10 |
+| 9 | **working-set-materialisation**（1 の機構。測定済み 30×） | D | 0.50 | 1.50 |
+| 10 | content-addressed-object-plane（bonsai） | D | 0.50 | 1.50 |
+| 11 | semantic-cid-definitions（unison 相当） | A | 0.15 | 1.50 |
+| 12 | raise-sync-frequency（対照群: ただ頻繁に回す） | E | 0.90 | 0.90 |
+
+tractability は全て seed の `:capability-inventory` の実状態に紐付けてあり、
+「望む答えが勝つように」付けていない（例: fleet-db は Phase 0 が bijective 検証済みでも、
+Phase 1 未着地 + 吸収 CI 撤去 + 1,355 commit 遅れなので 0.45 に留める＝再開であって継続ではない）。
+
+**ランキングだけを見ると隠れる緊張**: 最高 leverage（band A の目標変更）と、
+唯一の**測定済み倍率**（band D のその機構、30×）は別の行にある。
+`dynamics.core` が base-score と yield を別軸に保っているのはこのためで、
+順位表だけ出すと 30× が消える。
+
+## Decision
+
+1. **面を増やす前に、live な reconciler を持てるかを先に決める。**
+   「新しい面を足す」は今後、その面と既存面の対に**機械的な reconciler を同時に作る**
+   ことを条件とする。作らないなら足さない。radicle が 9 日で 18% 漂流したのは能力の
+   問題ではなく、reconciler が無い面を足したからである。
+2. **radicle 面を決着させる（最も安い実効手）**: node を起動して子 checkout に rad
+   remote を与えるか、`~/.radicle/storage` を破棄するか。**書きっぱなしの 3,677 repo を
+   放置しない。**（破棄は他者データの破壊ではなく自機のミラーだが、実行前に owner 確認を取る。）
+3. **working-set materialisation を実装する**（ADR-2607160005 Plane 3 の再起動）。
+   目標を「世界のコピーを整合させる」から「閉包を要求時に hash で実体化する」に変える。
+   これが 1 位（目標）と 9 位（機構）の実体であり、30× の出所。
+4. **fleet-db を正本に戻す（Phase 1: signed pin）**。west.yml を projection に降格し、
+   pin 前進を entity への署名付き tx にする。4,063 entry の共有ファイルへの
+   173 commit/day という書き込み圧は、DB なら競合ですらない。
+5. **per-writer namespace を 2 writer で実証する**。形は既にあるが 1 名しか通っていない。
+   実証されるまで「衝突は構造的に起きない」と主張しない。
+6. **inga はマシン跨ぎになるまで保留**。実在し動くが、1 台のフリートには 5 で足りる。
+7. **`kotoba.semantic-code`（unison 相当）はこの問題への解ではない**。あれは
+   *code identity* の話で、ここで測っているのは *repo fleet coordination*。混同しない
+   （band A だが tractability 0.15 で 11 位なのはそのため）。
+
+## 実施と再測定（同日 2026-08-03、第2サイクル）
+
+上記は「回避を測っただけ」で終わらせず、同日に**整理を実行して測り直した**。
+
+### 何をしたか
+
+| 実行 | 効果 | evidence |
+|---|---|---|
+| `fleet reconcile`（kagami、正規の吸収経路。ledger 手編集ではない） | fleet-db の遅れ **1,355 commit → 0**。pin 629 変更 / 499 追加 / 201 削除 → **1,329 件の attributed ledger event**。直後の `--check` は clean | main `086838e` |
+| `scripts/cleanup-land.cljs --apply`（未 commit ファイルを持つ 4 repo） | cloud-itonami-app の `:additive` 3 file を merge（PR #33）、`:review` 11 file は draft PR #34。com-etzhayyim-fuchi は既着地。kawaraban 54 file → draft PR #26、etzhayyim/root 36 file → draft PR #3376。**`:review` クラスは runbook 通り一切 auto-merge していない**（stale base が main を巻き戻すため） | 各 repo の `.git/stash-archive-20260803` |
+| `scripts/fleet-sync-probe.cljs` を新規に書き、モデルの入力にした | 「一度だけ走る測定は standing check ではない」— seed の数値半分が**再生成可能**になった。loop driver の standing check 被覆 **11/15** | main `1589c03` |
+| radicle 面の可視性監査（配線の前提） | 3,677 repo 中 **3,676 が public visibility、GitHub 側が private の repo に対応するものは 0 件** → 配線しても露出は増えない | 各 repo の `refs/rad/id` identity document を直読 |
+
+### 再測定（同じ probe、post-action）
+
+| 指標 | 第1サイクル | 第2サイクル |
+|---|---|---|
+| 実体化 checkout | 3,600 | 3,649 |
+| HEAD ≠ pin | 370（10.28%） | **203（5.56%）** |
+| うち前後判定不能 | 254 | **141** |
+| fetch 経過 中央値 | 10.3 日 | **9.25 日** |
+| 直近24h に fetch | 120 | **235** |
+| fleet refresh period | 30.0 日 | **15.5 日** |
+| radicle 漂流 | 18.0% | **10.4%** |
+| live plane | 2 / 4 | **3 / 4** |
+| reconciler | 存在 1 / 6 対 | **存在 4 / 6 対、scheduled 0** |
+
+**この差分の一部は測定手法の違いであって成果ではない。** 第1サイクルは手で叩いた probe、
+第2サイクルは script（radicle 抽出も乱数→決定的 stride に変わっている）。さらに、
+survey / land 経路自体が fetch を行うため、**判定不能だった pin が解決可能になった分**が
+含まれる。**modelはこの2つを分離できると主張しない**（`:repair-vs-method-attribution` として
+未測定に明記）。
+
+### 改善指標を差し替えた — reinforcing loop の strength は使わない
+
+`loop-structural-strength` の instrumentation 係数は「そのループの駆動 conversion が
+測られているか」を問う。**成長ループなら「運転者が調整できる」を意味するが、病理ループでは
+「病理が可視である」しか意味しない。** よって病理を測ると計算上の strength は**上がる**。
+これを指標にすると**目を逸らすことが報酬になる**。
+
+`dynamics.core` の式は（ADR-2607203000 の要求どおり）一律に適用し続けるが、改善指標は:
+
+1. **測定された stock**（下がったか下がっていないか）、および
+2. **`:period-ratio` = balancing loop の観測周期 / 支配的 reinforcing loop の観測周期**。
+
+第2サイクル: **8.0 日 / 9.25 日 = 0.865**。1.0 を下回った＝**修復1周のほうが漂流1周より速い**。
+両項とも観測値であり、判断値ではない。
+
+新設した balancing loop **`detection-and-repair`**（周期 8.0 日 = fleet-db reconcile の
+実測間隔）が、これまでモデルに存在しなかった「押し返す側」である。strength は 3.88 で、
+支配的 reinforcing loop（31.9）の 1/8 —— **理由は構造的**で、修復1回が次の修復を安くも
+確実にもしない（self-funding 0.1）ため。
+
+### tractability が動いた 2 行 —— 片方は下がった
+
+- `manifest-as-datom-db-not-yaml` **0.45 → 0.50**: 吸収経路が主張でなく実行済みになった。
+- `retire-or-wire-the-dead-plane` **0.9 → 0.5**: これが正直な側。可視性監査は通ったが、
+  **`rad node start` はこの機の radicle identity（alias `junkawasaki`、
+  `did:key:z6MkpPKis…`）の passphrase を要求し、それは kagi にも macOS Keychain にも
+  無い**（狙い撃ちで確認）。「決定 + コマンド1本」だと思っていたものが「決定 + コマンド1本 +
+  誰も保管していない credential」だった。**上がるだけのランキングは測定されていない。**
+
+### 残ったブロッカー（オーナー操作が要る 1 件）
+
+```bash
+rad auth      # この機の radicle 鍵を unlock（agent は安全床①により passphrase を入力しない）
+# 以後 agent 側で非対話に使えるよう、kagi compartment personal に
+# radicle-junkawasaki-passphrase として保存する
+```
+
+これが済めば `rad node start` → 子 checkout への rad remote 付与まで agent 側で実行でき、
+plane 3 が live になる（露出リスクは監査済みでゼロ）。
+
+### 次サイクルで最初に効くのは「scheduled 0」
+
+reconciler は 6 対中 4 対に**存在する**が、**scheduled は 0**。全部が「人が打ったときだけ」
+走る。GitHub Actions は 2026-07-30 に撤去済み（ADR-2607300900）なので、置き場所は
+murakumo fleet の tick か claude routine のどちらか —— これは能力の不足ではなく**置き場所の
+決定**である。ここを埋めると `:period-ratio` は測定のたびに下がる方向に動く。
+
+## 訂正（2026-08-04）— radicle 面の「漂流」は向きを取り違えていた
+
+**この ADR が 2 サイクルとも報告した radicle の漂流率（18.0% → 10.4%）は、向きを持たない
+分類だった。** probe は「rad の canonical が live な local HEAD とも west pin とも一致しない」
+を `:matches-neither` の 1 バケツにまとめ、それを「radicle 面が漂流した」と読んでいた。
+実際には 3 つの別物が混ざっている: ①rad が古い ②**local checkout が古い** ③判定不能。
+
+**きっかけ**: `kotoba-lang/kagami` を手で見たら rad が `d258b7b`、local checkout が
+4 commit 遅れの `cb09b93` だった。`git fetch && git merge --ff-only` したら local が
+`d258b7b` に追いつき、「漂流」が消えた —— **漂流していたのは rad ではなく手元だった。**
+
+**556 repo で向きを測り直した結果（2026-08-04）**:
+
+| 分類 | 件数 | 比率 | 意味 |
+|---|---|---|---|
+| equal | 477 | **85.8%** | 一致 |
+| rad-commit-absent-locally | 56 | 10.1% | local clone が rad の commit を持たない（判定不能。多くは local が未 fetch） |
+| **rad-ahead** | 21 | **3.8%** | **local checkout が古い** |
+| **rad-behind** | 1 | **0.2%** | **rad が古い（本当の rad 漂流はこれだけ）** |
+| diverged | 1 | 0.2% | 分岐 |
+
+**したがって「radicle 面は書きっぱなしで漂流している」という本 ADR の記述は誤り。**
+rad-behind は 556 中 **1 件**。むしろ **rad の方が local checkout より新しい**ケースが
+20 倍多い。実際、この機の radicle storage は今も他セッションによって更新されている
+（直近 12 時間で 8〜9 repo。例: `kobo` が 2026-08-04 04:09）。plane-multiplication ループの
+「新しい面を足すと漂流する」の**旗艦事例としては成立しない**。
+
+**支配ループの読みへの影響**: sync-cost-avoidance（local checkout が上流から取り残される）
+の方が、測り直すたびに強く出る。`:not-relatable` 141 件も `rad-commit-absent-locally`
+10.1% も、どちらも**同じ 1 つの症状 —— 手元が fetch していない —— の別々の見え方**である。
+
+**probe を直した**: `scripts/fleet-sync-probe.cljs` の `probe-rad` は rid ごとに
+その repo 自身の checkout と ancestry 比較し、`:rad-behind` / `:rad-ahead` /
+`:rad-commit-absent-locally` / `:diverged` / `:equal` に分ける。`:divergence-pct` という
+向きの無い指標は廃止し、`:rad-behind-pct`（面が古い）と `:rad-ahead-pct`（手元が古い）を
+別々に出す。**向きを持たない指標は、誤った側を非難する。**
+
+## 訂正（2026-08-04）— radicle node のブロッカーの正確な形
+
+オーナーが `rad auth` を実行し、`✓ Radicle key already in ssh-agent` を確認した
+（fingerprint は `rad self` の鍵と一致）。それでも **`rad node start` は依然として
+passphrase を要求する** —— node daemon は鍵ファイル自体を読むので ssh-agent では代替できない
+（error は `RAD_PASSPHRASE` を示唆）。
+
+正確なブロッカーは「鍵が使えない」ではなく **「node 起動に要る passphrase がどこにも
+保管されていない」**。ssh-agent 経由の git レベルの rad 操作（`git push rad`）は今日でも動く
+——ただし `.claude/hooks/git-push-main-sync-guard.cljs` が正しく効き、**origin/main より
+遅れた checkout からの rad push はブロックされる**（kagami で実測。rad の canonical を
+手元の古い状態で退行させることを防いだ）。
+
+**残る owner 操作**: `RAD_PASSPHRASE` を kagi compartment `personal` に
+`radicle-junkawasaki-passphrase` として保管する（そうすれば agent 側で非対話に node を
+起動できる）。安全床①により agent は passphrase を推測も入力もしない。
+
+## Closing record（2026-08-04）— 着地物・検証・resume point
+
+### main に着地したもの（すべて `origin/main` から到達可能であることを確認済み）
+
+`com-junkawasaki/root`:
+
+| commit | 内容 |
+|---|---|
+| `8a6b4de` / `48235c9` / `97dd458` | 本 ADR（初版 → 第2サイクル → 向きの訂正） |
+| `11b0b1c` / `37c4d81` | ADR-2608040200（CID ネイティブ同期設計 → P0 実測追記） |
+| `086838e` | fleet-db reconcile（629 changed / 499 added / 201 removed → 1,329 ledger event） |
+| `3294564` | closing reconcile（34 changed / 19 added → 53 event） |
+| `1589c03` / `62e68e6` | `scripts/fleet-sync-probe.cljs`（新規 → 方向つき分類に修正） |
+| `7c5896a` / `593c05a` | `scripts/fleet-sync-tick.cljs` + launchd plist |
+| `ede2efb` / `5518de6` / `4751ff4` / `f7bd5c9` | west pin 前進 4 件（すべて `west-pin-put.cljs` のサーバ側検証を通過） |
+
+子リポ（いずれも `main` と `identical` を確認）:
+- `kotoba-lang/loop-system-dynamics@2b46de2` — モデル v1 → v2（生成 probe 入力・balancing loop・period-ratio）→ 向きの訂正
+- `kotoba-lang/prolly-tree@1e9b401` — `prolly-tree.diff`（27 tests / 2,151 assertions green）
+
+### 検証（実行したもの・件数・結果）
+
+- `clojure -M:test`（prolly-tree、resource-guard 経由）: **27 tests / 2,151 assertions / 0 failures**
+- `fleet reconcile --check`: 両サイクルとも absorb 直後に **clean**
+- `west-pin-put.cljs`: 4 件すべて reachable-from-main / ahead / behind=0
+- `scripts/fleet-sync-probe.cljs`: 6-entry の縮小 manifest で end-to-end 検証 → 4,063 entry のフル実行で完走
+- `com.gftd.fleet-sync-tick`: launchd 下で kickstart 実行し drift 検出を確認（毎時稼働中）
+- **未実行**: モデルの再実行はフル probe の後には行っていない（`resources/fleet-sync-probe.edn` は第2サイクル時点のスナップショット。次サイクルで差し替える）
+
+### handoff 時点の実測（2026-08-04 08:42、フル probe）
+
+```edn
+{:west-entries 4063 :materialised 3649 :unmaterialised 408
+ :head-vs-pin {:equal 3444 :local-ahead 37 :local-behind 30 :not-relatable 138 :diverged-total 205}
+ :pin-behind-origin {:repos 88 :of-comparable 1680 :commits 607 :max 108}
+ :fetch-staleness {:median-days 9.64 :p90-days 16.44 :fetched-last-24h 238 :never-fetched 197}
+ :radicle {:sampled 500 :equal 402 :rad-ahead 14 :rad-behind 2 :diverged 1
+           :rad-commit-absent-locally 41 :no-local-checkout 40}
+ :wip {:tracked-dirty-files 295 :tracked-dirty-repos 29 :untracked-repos 45
+       :stashes 4 :unpushed-commits 124 :unpushed-repos 9}}
+```
+
+fleet-db は closing reconcile 直後で drift 0。**検出は毎時走るが吸収は走らない**ので、
+次に見るときには再び drift しているのが正常。
+
+### 保全した owner WIP（触っていない）
+
+- draft PR 3 本（**merge しない**、`:review` クラス）: `cloud-itonami/cloud-itonami-app#34`（11 file）、
+  `etzhayyim/com-etzhayyim-kawaraban#26`（54 file）、`etzhayyim/root#3376`（36 file）。
+  各 repo の `.git/stash-archive-20260803/` に archive 済み。ローカル working tree は無削除。
+- 他セッションの worktree 7 本・`gap/adr-correct`（origin/main から 6 ahead / 85+ behind）は未着手。
+  この乖離は本セッションの成果物を一切載せていない（全て origin/main 由来の経路で着地させた）。
+
+### resume point — 次の agent が最初に打つコマンド
+
+```bash
+# 1) 現在地を測る（~10 分）
+FLEET_ROOT=$PWD nbb scripts/fleet-sync-probe.cljs --rad-sample 500 --edn ~/.gftd/fleet-sync/probe-$(date +%F).edn
+
+# 2) 溜まった drift を吸収する（検出は毎時走っている。ledger を見れば量が分かる）
+tail -5 ~/.gftd/fleet-sync/ledger.edn
+#   → DRIFT なら origin/main の sparse worktree で:
+#     nbb <kagami>/bin/fleet.cljs reconcile --db manifest/fleet-db.edn --west manifest/west.yml
+```
+
+### 未着手（優先順）
+
+1. **probe mode をスケジュールする** — `com.gftd.fleet-sync-tick` は `check` のみ。
+   6 時間間隔の 2 本目の plist を足せば `:period-ratio` が毎回更新される。1 回 ~10 分の IO なので、
+   このマシンの並行セッション負荷を見てから決める（能力ではなく運用判断）。
+2. **radicle node の passphrase** — owner が `RAD_PASSPHRASE` を kagi
+   `personal/radicle-junkawasaki-passphrase` に保管すれば、以後 agent が非対話に node を起動できる。
+3. **ADR-2608040200 の P1** — `fleet head` の署名対象を fleet-db.edn の SHA-256 から
+   prolly-tree の root CID に差し替える（`prolly-tree.diff` は着地済みなので前提は揃っている）。
+4. **モデルの次サイクル** — `resources/fleet-sync-probe.edn` をフル probe の出力で差し替えて再実行。
+
+## What this ADR does NOT decide
+
+- git / GitHub の廃止（ADR-2607160005 と同じく interop projection として維持）。
+- radicle-the-software の採用（移植するのは namespace / sigref / canonical=純関数 の 3 概念）。
+- CRDT / operation-log merge（引き続き研究項目）。
+- DataLad + B2 の大容量経路（不変）。
+- 各実装の着手順の最終確定 — 上記 1–7 は leverage 順の推奨であって工程表ではない。
+
+## Consequences
+
+- 「pin が古い」を事故として個別対処するのをやめる。**周期 10.3 日・refresh period 30 日という
+  定常状態の症状**として扱い、実体化数を減らす方向で解く。
+- 面の数が設計変数になる。増やすたびに P(P-1)/2 の義務が増え、reconciler 無しの面は
+  9 日で漂流する（実測）ことを前提に判断する。
+- content addressing に object 面の期待だけを置き、ref 面の期待を置かない。
+  ref 面の答えは per-writer namespace（今）と inga（後）である。
+- この分析自体が再実行可能である: seed の各値に取得コマンドが書かれており、
+  `bin/run_fleet_sync_topology.cljs` が report と ledger を再生成する。
+  **次に測るとき、この 12 個の数字が動いたかどうかで施策の効果が判定できる。**
+
+## Verification
+
+- モデル: `kotoba-lang/loop-system-dynamics@9a5713d`
+  （`src/loop_system_dynamics/fleet_sync_topology.cljs`、
+  `resources/fleet-sync-topology-seed.edn`、`reports/fleet-sync-topology.md`、
+  `ledger/fleet-sync-topology-ledger.edn`）。main に merge 済み。
+- 実行: `nbb --classpath 'src:bin:<dynamics>/src:<org-oasis-open-xmile>/src' bin/run_fleet_sync_topology.cljs`。
+- XMILE の projection は**自分の fitting point を再現することを検証してから**前方値を出す
+  （t=9 でモデル 90 / 実測 90、reproduces? true）。再現しなければ finding ではなく
+  モデルの誤りとして報告する設計にしてある。
+- 未測定は未測定として名指ししてある: agent-edit→landed の latency、manifest の
+  409 競合率、同時 agent 数、マシン跨ぎの drift。**これらをゼロとして扱っていない。**
+")))

@@ -1,0 +1,69 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608291500-hermes-bots-aozora-accounts-blocked-by-biscuit-cutover")
+  (:adr/title "ADR-2608291500: Hermes bot ごとの aozora.app アカウント — did:key+CACAO で登録し、operator Biscuit で datom 面を開通して全 bot が自律投稿（稼働中）")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-29")
+  (:adr/body "# ADR-2608291500: Hermes bots の aozora.app アカウントと、それを開通させた operator Biscuit
+
+**この ADR は当初『BLOCKED』を記録したが、同日 option A を実装して解決した。以下は最新状態。**
+
+## オーナー指示（2026-08-29）
+
+「今の cloud-itonami, bots, itonami cli で オントロジーを wiki.kotobase.net に保存していく bots はある? また bots がそれぞれ aozora.app でもアカウントを web3, passkey smartcontract ベースで 自律的に情報の更新投稿もするように整えて.」→ 続けて「最適化してください, A」。
+
+前半: **在る** —— `scripts/hermes-hyakka-bots/hyakka-ontology-scout`（毎30分、corpus が語れず拒否された property だけを ontology 提案）+ `hyakka-source-scout`。同型で itonami/kotoba-migration/vuln/osm coverage bots。roster の正本は `~/.hermes/cron/jobs.json`。
+
+## 実装（web3 identity 面）
+
+### bot 側 — `scripts/hermes-bots-aozora/`（root に merge 済み）
+
+- `aozora_core.cljc` / `register.cljs` / `pulse.cljs` / `aozora_pulse.py`。各 Hermes cron job に aozora.app アカウント（Ed25519 seed → did:key、自己鋳造 CACAO でセッション）を与え、日次で jobs.json の実測値だけを投稿する決定論 receipt。roster は jobs.json から導出（two-name-horizon 対策）。seed は login Keychain `aozora.app/actor-seed/<handle>`。
+- Hermes no-agent job `bots-aozora-pulse`（毎日 09:50）をインストール済み。
+
+### kotobase-client — `:biscuit-fn` auth profile（kotoba-lang/kotobase-client main に merge、a1ec074）
+
+datom 面が Biscuit 必須化（net-kotobase ADR-2608280230）したため、CACAO 一辺倒だった client に **opt-in の `:biscuit-fn (db_name → Promise<token>)`** を追加。存在時は `Authorization: Biscuit` を送り、edge が `kotobase/db/<tenant>/<db_name>` を導出する。既定の CACAO 経路は不変（84 tests / 266 assertions green、うち 2 件が新規 Biscuit ケース）。
+
+### PDS — `aozora.pds.operator-biscuit`（network-awai/app-aozora-engine main に merge、d9c2976、deploy 済み version b30b88c5）
+
+- authn の service-account secret（Worker secret `AOZORA_OPERATOR_SA_TOKEN`）を短命 Biscuit に交換し、per db_name でキャッシュ。
+- secret が設定されると per-actor db は off（tenant Biscuit は 1 グラフしか所有できない）。operator-db クライアント全経路（router/client-from-env・per-actor appview・getrepo read+write・import-graph）が `:biscuit-fn` を通る。router / getrepo が独立に計算していた `per-actor?` も Biscuit 時 false に。
+
+### operator の provision（authn 上）
+
+SIWE（EOA sign-in、node で secp256k1 + EIP-191）→ tenant `t_929a4e84…`（DID `did:web:kotobase.net:tenant:t_929a4e84e1b24defac1b01ff`）→ editor service account（data:read+write）。custody: kagi（compartment gftdcojp）`aozora-pds-biscuit-sa-token` / `aozora-pds-operator-owner-wallet`。tenant id は Worker var（公開値）。
+
+## 実測結果（2026-08-29、deploy 後）
+
+| 面 | 切替前 | 切替後 |
+|---|---|---|
+| `resolveHandle` / `describeRepo` | 502（handle registry 401） | **200** |
+| bots の `createRecord` | 500（transact 401）9/9 | **posted** 全 bot、at:// URI 返却 |
+| operator graph（yoro-social-v2）の datom | — | **156**（profile+post 永続化を実測） |
+
+Biscuit 経路は raw fetch・kotobase-client・PDS の 3 段で live 検証済み。**bots は aozora.app に自律投稿している。**
+
+## read-projection の by-handle 読み戻し（解決済み、2026-08-29）
+
+当初の follow-up は解決した。真因は 2 つで、どちらも fold/index ではなかった:
+
+1. **handle→did:key が束ねられていなかった** —— createSession はどの did:key でも成功する（自己主権）ので、resolveHandle の 200 は「その handle が自分を指す」証明にならず、登録行が無いと `did:web:<handle>` に fallback していた。投稿は did:key でキーされるので by-handle で引くと空。→ **bot 側の register.cljs で `updateHandle` を呼び handle を did:key に束ねる**（session DID と解決 DID を比較し、異なれば bind）。全 12 bot 適用済み。
+2. **read 経路が handle を did に解決していなかった** —— `list-records` が渡された repo 文字列（handle）をそのまま `:yoro.post/author` キーに使っていた。→ **repo が `did:` 以外なら resolve-handle で did に解決してから引く**（getRecord は list-records 経由なので同時に解決。describeRepo は元々解決済み）。
+3. **AppView worker も CACAO で読んでいて datoms 401** —— `client-from-env` を operator Biscuit に配線し `AOZORA_OPERATOR_SA_TOKEN` を付与。
+
+実測（deploy 後）: `listRecords` / `getRecord` / `describeRepo` が全 bot で handle 読み戻し可、AppView の `getProfile` / `getAuthorFeed` も 200（プロフィール + フィード返却）。**AVET インデックス自体は最初から機能していた**（誤診を避けるため記録）—— 空だったのは DID 不一致であってインデックス未 fold ではない。
+
+## 残 follow-up（bot 経路外）
+
+- **install_schema**: env でなく admin opts 駆動なので Biscuit 未配線（bot 経路外）。admin 経路を使うなら env 版に寄せる。
+- **fold**: `:graph` 直指定で db_name を送らないため biscuit-fn が既定 db に落ちる。passive fold cron が担うので bot 投稿には不要。必要になったら fold も db_name 経路にする。
+- **tsumugu_relay**（外部フィード ingest）の make-client は未配線。bot 読み書き経路外。
+
+## passkey / smart contract（誇張しない）
+
+- passkey は aozora では**人間の儀式**（`auth.aozora.app`、WebAuthn→session JWT）。bot に効くのは passkey-PRF の seed wrap（ADR-2607022330、未実装 follow-up）。
+- smart contract は `kotoba-lang/base-l2`（ERC-4337）と `cloud-itonami-app/smart_account.cljc` が実在するが **aozora auth 統合はゼロ**（実測）。bot MST root の Base anchor は別決定として起こす。
+
+## 関連
+
+ADR-2607031400 / ADR-2607161930（先例）、ADR-2607032700（per-actor rollout）、ADR-2608150100（aozora D1 退役・data loss）、net-kotobase/control-plane ADR-2608261300 / ADR-2608280230（Biscuit primary / required 切替）。")))

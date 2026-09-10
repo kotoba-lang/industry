@@ -1,0 +1,56 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608024700-a-certificate-must-remember-each-signatures-view")
+  (:adr/title "adr-2608024700: 証明書は各署名の view を覚えていなければならない — 正しい修正だったが、十分ではなかった")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "engi-per-witness-views")
+  (:adr/authoritative-for
+  (vector "証明書が witness ごとの view を運ぶこと"
+   "ADR-2608024600 の結論の訂正"))
+  (:adr/related (vector "adr-2608024600-every-stall-has-been-an-absence"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/engi/commit/5bd2e131838becf442affe634e22ee64b681b6b3"))
+  (:adr/body
+  "# ADR-2608024700: 証明書は各署名の view を覚えていなければならない
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 欠陥
+
+`vote-payload` は **view を覆う**。だから **view 16 で署名された票と view 51 で署名された票は、別の payload** を持つ。
+
+**証明書は view を 1 つしか覚えておらず、全 witness の payload をそれで再構成していた** —— **検証できる署名は多くとも 1 つ。** 残りは失敗し、証明書は `:below-quorum` で拒否され、**その block を必要としていた replica は、それを入れるための検査に拒否される。**
+
+**票が同じ view で投じられるようにして直すことはできない。** replica は独立に timeout するので、**1 つの block への票が実際に異なる view で投じられる**（deploy 済み chain で 16, 16, 51）。**証明書がどれかを覚えるしかない。**
+
+`:engi.qc/views` が witness → view を運び、**wire も越える** —— **それを持たずに到着した証明書は、署名を再構成する唯一の手掛かりを失っている。**
+
+**view を記録するのは、実際にそれを持つ票だけ。** 0 を既定にすると「view 0 で署名された」と**主張する**ことになり、それは「知らない」とは別の主張で、**fallback を消して view 無しの票から作られた証明書を全部検証不能にした**（既存 test 8 件がそれを捕まえた）。
+
+## そして十分ではなかった
+
+**deploy 済みの停止は解消しなかった。** 修正を積んだ新しい object でも **`below-quorum` は出続けている。**
+
+## ADR-2608024600 の結論を訂正する
+
+計器は `below-quorum` と言い、**私はそれを「鍵の可用性」と読み、TOFU が critical path 上にあると書いた。鍵は問題なかった。**
+
+次に「payload の view」と読んだ —— **それは本物の欠陥で、直った** —— **それでもまだ `below-quorum` と言っている。**
+
+**残りは未読。** **3 度目の推測をするより、そう言う方がよい。**
+
+## Consequences
+
+- (+) 本物の欠陥が 1 つ直った（異なる view の署名を持つ証明書が検証できる）。
+- (+) 前の ADR の誤った結論が訂正された（TOFU は critical path 上に無い）。
+- (−) **deploy 済み chain は依然停止。`below-quorum` の残る原因は不明。**
+
+engi 224 tests / 1164 assertions、parity 不変、in-process harness は pass。
+")))

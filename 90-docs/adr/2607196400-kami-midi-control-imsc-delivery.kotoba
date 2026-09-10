@@ -1,0 +1,55 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607196400-kami-midi-control-imsc-delivery")
+  (:adr/title "KAMI adds MIDI control and IMSC caption delivery")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607196300-kami-automation-thinning-review-notifications"))
+  (:adr/decision
+  (map (:daw (map (:midi-mapping-authority :project/midi-mappings)
+         (:mapping-fields (vector :midi/id :midi/channel :midi/cc :target/type :target/plugin-id))
+         (:target :plugin/mix)
+         (:channel-range (vector 1 16))
+         (:cc-range (vector 0 127))
+         (:value-normalization :divide-by-127)
+         (:channel-cc-policy :unique-and-reassign-on-conflict)
+         (:automation-consumer (vector :read :touch :latch :write :trim))
+         (:plugin-removal-policy :cascade-mappings)
+         (:runtime-lifecycle (vector :bind-inputs :rebind-on-state-change :detach-on-unload))))
+   (:nle (map (:caption-delivery-authority :project/captions)
+         (:imsc-version :imsc-1.2-text)
+         (:profile-signaling :ttp/contentProfiles)
+         (:profile-designator "http://www.w3.org/ns/ttml/profile/imsc1.2/text")
+         (:delivery-policy :approved-only)
+         (:time-authority (vector :ttp/timeBase-media :ttp/frameRate))
+         (:style-authority (vector :caption/position :caption/align :caption/font-scale))
+         (:text-policy (vector :xml-escaped :multiline-br))
+         (:cue-id-policy :unique-ncname)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "third-party plugin SDK/isolation" "Mackie/HUI feedback" "surround/Atmos"))
+    (:nle (vector "IMSC import" "external notification delivery" "translation memory" "OCIO/ICC/HDR"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "01c6a66cbb45adc40ad4be23a1c1453e47fc7545"))
+   (:nle-commits (vector "23442bbbaa188a39cbd6e3199e885bb6d5a9aad3"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#22" "kotoba-lang/kami-app-nle#22"))
+   (:evidence
+   (vector "DAW passes 30 tests and 124 assertions after plugin-removal cascade review; NLE passes 31 tests and 157 assertions after NCName hardening."
+    "Both guarded shadow-cljs production releases completed with zero compiler warnings and were rerun after final source hardening."
+    "Chrome mock Web MIDI connected one input and delivered channel 1 CC 74 value 64."
+    "Downloaded DAW EDN persisted channel 1, CC 74, normalized value 64/127 and Touch automation at musical tick 1440."
+    "Chrome exported one approved caption with IMSC 1.2 content profile signaling and correctly escaped XML text."
+    "Browser DOMParser returned zero parser errors and one TTML namespace p element."
+    "Initial xmllint review found colon-bearing application cue IDs invalid for xml:id NCName; indexed NCName normalization repaired it."
+    "Final xmllint --noout completed without warnings and XPath counted one TTML cue."
+    "W3C IMSC 1.2 Recommendation was used as primary authority for ttp:contentProfiles and the text profile designator."
+    "Automated Chrome and both local servers were closed after verification."
+    "Both application PRs were reviewed and merged."))))
+  (:adr/consequences
+  (vector "Commodity MIDI controllers can drive wet mix through the same bounded automation contract as pointer gestures."
+   "Caption delivery now includes interoperable W3C IMSC 1.2 text output in addition to WebVTT and production burn-in."
+   "External XML validation is part of the evidence because well-formed parsing alone does not enforce xml:id NCName constraints."
+   "Bidirectional hardware feedback and IMSC import remain explicit commercial-product gaps."))
+  (:adr/source-format "edn")))

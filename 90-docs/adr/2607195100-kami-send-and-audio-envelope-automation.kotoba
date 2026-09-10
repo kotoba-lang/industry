@@ -1,0 +1,48 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607195100-kami-send-and-audio-envelope-automation")
+  (:adr/title "KAMI adds DAW send automation and NLE audio envelopes")
+  (:adr/date "2026-07-19")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607184900-kami-bus-automation-independent-audio"))
+  (:adr/decision
+  (map (:daw (map (:send-automation-authority :track/send-automation)
+         (:point-schema (vector :automation/tick :automation/send))
+         (:ordering :ascending-tick)
+         (:send-range (vector 0 1))
+         (:schedulers (vector :realtime-audio-context :offline-audio-context))
+         (:consumers (vector :playback :master-wav :normalized-master-wav :track-stems))))
+   (:nle (map (:fade-authority (vector :clip/fade-in-sec :clip/fade-out-sec))
+         (:gain-automation-authority :clip/audio-gain-automation)
+         (:point-schema (vector :automation/sec :automation/gain))
+         (:gain-range (vector 0 2))
+         (:timeline-authority :audio-segments)
+         (:schedulers (vector :preview-from-current-playhead :production-export-from-timeline-zero))
+         (:processing-order (vector :clip-three-band-eq :clip-gain-automation :clip-fade-envelope :master-three-band-eq :master-gain))
+         (:overlap-policy :mix-concurrent-buffer-sources)
+         (:fade-overlap-policy :piecewise-linear-envelope-with-intersection)))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates
+   (map (:shared (vector "persistent directory grants" "streaming package I/O above 512 MiB"))
+    (:daw (vector "plugin hosting" "effect-parameter automation" "certified broadcast loudness conformance" "bundled multichannel stems"))
+    (:nle (vector "delivery loudness" "color management" "persistent/background proxy jobs" "additional containers" "hardware encoder control"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "e0d35baf0706c41d74b0f250f58b8a45a3a79d32"))
+   (:nle-commits (vector "523f7ff21219cb78d1edd6aa30adca8eb9429c17"))
+   (:pull-requests (vector "kotoba-lang/kami-app-daw#8" "kotoba-lang/kami-app-nle#8"))
+   (:evidence
+   (vector "DAW passes 16 tests and 62 assertions; NLE passes 18 tests and 72 assertions, including sorted and bounded automation, fade interpolation and validation."
+    "Both shadow-cljs production releases completed through the repository resource guard with zero compiler warnings."
+    "DAW Chrome observed eight AudioParam ramps including the configured 0.8 delay-send endpoint and persisted :track/send-automation in recovery EDN."
+    "NLE Chrome decoded two PCM WAV assets, scheduled two overlapping AudioBufferSources, observed five gain/fade AudioParam ramps, and persisted fades plus :clip/audio-gain-automation in recovery EDN."
+    "Browser verification exposed and then verified the repair of a UI-to-core automation point schema mismatch."
+    "Automated Chrome contexts and local HTTP servers were closed after verification."
+    "Both application pull requests were reviewed and squash-merged."
+    "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN parsing verified accepted status, supersedes authority and both automation authority keys."))))
+  (:adr/consequences
+  (vector "DAW delay-send movement now remains identical between realtime playback and offline renders."
+   "NLE audio-only clips can fade, automate gain and overlap to form sample-timed crossfades in preview and production export."
+   "Project EDN remains the authority for both applications' new automation state."
+   "Plugin/effect automation, delivery loudness, color management and broader delivery formats remain later production work."))
+  (:adr/source-format "edn")))

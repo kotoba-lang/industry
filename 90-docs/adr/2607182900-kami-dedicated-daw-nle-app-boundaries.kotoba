@@ -1,0 +1,34 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607182900-kami-dedicated-daw-nle-app-boundaries")
+  (:adr/title "KAMI media authoring uses dedicated DAW and NLE application repositories")
+  (:adr/date "2026-07-18")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607182600-kami-media-project-integrated-composer"))
+  (:adr/related (vector "adr-2607121400-kami-ongaku-eizo-commercial-grade-cljs-stack"))
+  (:adr/decision
+  (map (:music-app "kotoba-lang/kami-app-daw")
+   (:video-app "kotoba-lang/kami-app-nle")
+   (:three-d-app "kotoba-lang/kami-creative-studio")
+   (:music-ownership "DAW owns tempo/tick transport, music tracks and clips, gain, mute/solo and music-project EDN UX.")
+   (:video-ownership "NLE owns frame/timecode transport, video/audio lanes, trim/move/split and video-project EDN UX.")
+   (:three-d-ownership "Creative Studio owns 3D/VRM/model/motion authoring and must not be the canonical music or video editor.")
+   (:binding-rule "A future shared audiovisual binding may reference both project documents, but it must not collapse the two application ownership boundaries.")
+   (:maturity (map (:kami-app-daw :遊行) (:kami-app-nle :遊行)))
+   (:non-claims (vector "production audio graph playback" "media decoding and effects" "production render/export"))))
+  (:adr/implementation
+  (map (:repositories (vector "https://github.com/kotoba-lang/kami-app-daw"
+                  "https://github.com/kotoba-lang/kami-app-nle"))
+   (:pages (vector "https://kotoba-lang.github.io/kami-app-daw/"
+           "https://kotoba-lang.github.io/kami-app-nle/"))
+   (:contracts (vector "kami.ongaku-project/v1" "kami.eizo-project/v1"))
+   (:evidence (vector "Both repositories: clojure -M:test exits 0"
+              "Both repositories include guarded shadow-cljs production release and GitHub Pages workflow"
+              "DAW pure tests cover tick transport, duration, clip move and validation"
+              "NLE pure tests cover timecode, duration, split and validation"))))
+  (:adr/consequences
+  (vector "The L5 future placeholders in ADR-2607121400 now resolve to separate public application repositories."
+   "The integrated Composer surface in kami-creative-studio is historical implementation evidence, not current application ownership authority."
+   "Shared synchronization remains a library-level concern and cannot make the 3D Studio the canonical DAW or NLE."))
+  (:adr/source-format "edn")))

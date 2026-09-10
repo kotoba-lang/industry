@@ -1,0 +1,138 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608292330-kotoba-json-scalar-field-extractor")
+  (:adr/title "ADR-2608292330: kotoba-lang/json に .kotoba の scalar field extractor を landing する — guest 内 JSON 検査の第 1 slice")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-29")
+  (:adr/last-verified "2026-08-29")
+  (:adr/last_verified "2026-08-29")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-json-kotoba-port")
+  (:adr/repos (vector "orgs/kotoba-lang/json" "orgs/kotoba-lang/amu" "orgs/kotoba-lang/kotoba-sema" "orgs/kotoba-lang/kotoba-kir" "orgs/kotoba-lang/kotoba-script"))
+  (:adr/related (vector "adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"
+                "adr-2607279200"
+                "adr-2608136000-checks-that-could-not-answer"
+                "adr-2608261100"))
+  (:adr/body "## 何を決めたか
+
+`kotoba-lang/json` に **`kotoba/json_scalar.kotoba`** を landing した。export は
+`json-string-field` 1 本だけで、**top-level object member の string 値を guest の中で読む**。
+`decode` の移植ではない。
+
+`amu/runtime/http-service.mjs` の header が自分でこの穴を名指ししている:
+
+> No structural JSON parsing *inside* the guest. The body crosses the boundary
+> as a validated-syntactically-JSON `:string`; a guest that wants to inspect
+> fields must do its own string work (or, once `kotoba-lang/json` has a
+> `.kotoba` port, use that).
+
+その文の裏にある製品要求は「guest が request body の 1 field を見る」であって、
+任意 JSON 値の構築ではない。だから slice をそこで切った。
+
+## 能力の実測（推測していない）
+
+**`amu check` は 31 秒で、しかも本当に discriminate する。** 負の対照を先に取った:
+存在しない head `string-zzz-not-a-real-builtin` は exit 65 /
+`:kotoba.error/subset-reject` / `operation has no admitted lowering` を返す。
+この対照を取る前の `:ok true` は「admitted」の証拠にならない（ADR-2608136000 の 6 問目）。
+
+測った結果、**この slice に必要なものは全部在った**:
+
+| 使ったもの | 状態 |
+|---|---|
+| `string-code-point-at (s, byte-offset) -> :i64` | 在る。**単一 code point を整数で取り出す道はこれ**（`kotoba-sema` frontend.cljc の string 表） |
+| `string-substring (s, start, end)` | 在る。**(start, len) ではなく half-open の UTF-8 byte offset** |
+| `string-byte-length` / `string=?` / `string-concat` | 在る |
+| `loop` / `recur` / `cond` / `and` / `or` / `not=` | 在る |
+| `[:option T]`（`option-some-of` 等） | 在る。`:option-flow` は `:jvm-kir` `:js` `:wasm` を含む |
+
+**この 5 つの string op だけで書いた**のは偶然ではない。`string-byte-length` /
+`string=?` / `string-concat` / `string-substring` / `string-code-point-at` は
+**native ABI の callback slot そのもの**で、全 backend で qualified な唯一の slice。
+`string-contains?` / `string-replace-all` / `string-split-count` /
+`string-fold-case` は CLJS backend に無いので意図的に避けた。
+
+## 書けなかった 3 つ。どれも安全制約ではない
+
+`lang/surface-status.edn` の `:dispositions` は 4 値で、
+`:classification-rule` の `:default-for-missing` は **`:not-yet-implemented`**、
+その意味を同ファイルが *\"Not a safety prohibition; representation, bounded
+semantics, conformance, or backend parity is unfinished.\"* と定義している。
+下の 3 つはどれも同ファイルに entry が無いので、この既定値に落ちる —— つまり
+**安全上の禁止ではなく未実装**である。
+
+| 書けなかったもの | どう測ったか |
+|---|---|
+| `\\uXXXX` の decode | code point から文字を作る constructor が frontend の string 表に無い。`string-from-i64` は**10 進数を描画する**のであって文字を作らない |
+| `\\b` / `\\f` の literal | **`.kotoba` source に書けない。** `amu check` で実測: `\"\\b\"` / `\"\\f\"` を含むファイルは read phase で `:kotoba/source-read-failed`。同じ probe で `\"\\n\"` `\"\\t\"` `\"\\r\"` `\"\\\"\"` `\"\\\\\"` は全て通る |
+| 全 `decode`（再帰的 JSON 値） | `surface-status.edn` の再帰値は `:implemented-partial` で implementation が `#{:compiler :kotoba-wasm :kotoba-cljs}` —— **native が無い** |
+
+**この 3 つは「間違った答え」ではなく none を返す。** JSON の 8 escape のうち
+decode するのは 6 つ（`\\\" \\\\ \\/ \\n \\r \\t`）で、残り 3 つは値ごと拒否する。
+
+## fuel が入力長の天井を決める。host の値であって language の値ではない
+
+`kotoba-script` の `default-fuel` は **512**、課金は **function ENTRY ごと**で、
+docstring が自分の既定を *\"returns at n=510, traps at n=600\"* と実測している。
+この scan は code point ごとに関数に入るので、**入力 1 byte ≒ fuel 1**。
+
+`--fuel` は compile 時に artifact へ焼かれるので、64 KiB の body を見たい host は
+`--fuel 200000` 程度で compile する。docstring 自身が
+*\"the value has to be the host's to choose\"* と書いている。
+
+これは `amu test` にも効いた —— harness は**1 file の全 case を単一 instance に対して**
+走らせるので、**23 case を 1 file に置くと `:js` と `:wasm` で 12 個目以降が全部 trap し、
+`:jvm-kir` では 23 個とも通る**（実測 2026-08-29、47/69）。同じ source が backend によって
+違う結果を出したのではなく、**共有 fuel を使い切っただけ**。この誤読を避けるため
+case を batch に分けた。
+
+## 何を landing したか
+
+- `kotoba/json_scalar.kotoba` — library。export は `json-string-field` のみ。
+  **`:effects #{}`**（capability ゼロ）で、これは `http-service.mjs` が guest module に
+  要求する条件そのもの（`requiredCapabilities.length !== 0` なら refuse）。
+- `test/kotoba/scalar_cases_{a,b}.kotoba-part` — 23 case。
+- `scripts/kotoba_test.cljs` — batch を library に splice して **公式の `amu test`** に渡す。
+  library 側に test export を残さないため（host が import する artifact に test を混ぜない）。
+
+**実測: 23 case × 3 target = 69 row、全部 pass、exit 0。**
+
+## 落ちることを確かめた
+
+`cp-width` を「どの code point も 1 byte」に壊して同じ suite を回した。結果:
+
+```
+scalar_cases_a.kotoba-part: 11 cases, 33 rows PASS
+scalar_cases_b.kotoba-part: 12 cases, 36 rows FAIL
+  [test-utf8-skip@:jvm-kir test-utf8-value@:jvm-kir
+   test-utf8-skip@:js      test-utf8-value@:js
+   test-utf8-skip@:wasm    test-utf8-value@:wasm]
+kotoba-test: FAILED (23 cases, 69 rows)
+```
+
+**壊した箇所と報告された箇所が一致している** —— 落ちたのは UTF-8 の 2 case だけで、
+ASCII だけの batch A は 11 case とも緑のまま。`cp-width` が支配するのは正確にそこ
+（ADR-2608136000: 壊し方を間違えた赤は「成功した実演」に見える）。
+
+**この実演の途中で、報告器自身の欠陥が 1 つ見つかった。** 最初の runner は失敗した row を
+**値で** target 表から探しており、target 違いの row が等しい map になりうるため
+**同じ target を重複して報告し、残りを黙って落としていた** —— 1 回目の break run は
+`:jvm-kir` と `:js` しか挙げず、`:wasm` が消えていた。target を明示して畳む形に直したら
+上の 6 行（3 target 全部）が出た。**赤くはなっていたので、この欠陥は「赤が出ているか」
+だけを見ていたら見つからない。**
+
+evidence floor も入れてある: runner は 3 target 全部が報告し、case 数 × 3 の row が
+揃ったときにだけ合格を出す。**走れなかったときは exit 2** で、1（落ちた）とも
+0（通った）とも違う値を返す。
+
+## 次の slice
+
+`http-service.mjs` の guest から実際に body を読むには、この module を
+`--target js --fuel <body bytes>` で compile し、sha256 を pin して route に bind する。
+**それは amu 側の変更なのでここではやっていない**（並行 session が同 repo を触っている）。
+その次が `\\uXXXX` —— code point → string constructor が入るか、128 文字の literal table を
+index する（`css_core.kotoba` の `digit-char` が既にこの手を使っている）かのどちらか。
+")))

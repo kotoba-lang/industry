@@ -1,0 +1,117 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608250200-the-second-runtime-was-never-asked")
+  (:adr/title "`.cljc` が主張していた 2 つ目の runtime は、ほとんど一度も問われていなかった")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-25")
+  (:adr/related (vector "adr-2608730000" "adr-2608136000" "adr-2608250100"))
+  (:adr/body
+  "## このセッションが測ったこと
+
+ADR-2608730000 は「`.cljc` は 2 つの runtime を主張するのに、テストは片方で
+しか走らない」という形を名指しした。このセッションはその形を **repo 単位で**
+追い、3 つの detector と 12 repo の修正に落とした。
+
+一貫して同じ署名が出た:
+
+> **ClojureScript で赤、JVM で緑のまま。**
+
+修正を戻すたびに、この形が再現した。JVM の suite は 1 度もこの class を
+見なかった。
+
+## landed した detector
+
+| # | id | 何を測るか | 現在地 |
+|---|---|---|---|
+| 36 | `verify-cljs-runner-exit-signal` | 呼び手に届かない cljs runner の失敗信号 | 33 checkable / **0** |
+| 37 | `verify-cljs-shift-width` | ClojureScript が実行するコードの shift ≥ 32 | **11**（開始 23）+ SHIFT-LEFT-31 が 2（報告のみ） |
+| 38 | `verify-cljs-inexact-integers` | ClojureScript が表現できない整数リテラル | **24**（開始 36） |
+
+3 つとも `manifest/orgs-detectors.edn` 登録済み。#37 と #38 は**先に Python
+実装を書いて finding 集合が一致することを確認**してから nbb に移した。
+
+## 見つけた欠陥の class（すべて実測、すべて JVM では緑）
+
+**1. 失敗信号が呼び手に届かない（30 repo / 32 file）**
+`cljs.main ... -m <runner>` は -main を node の REPL 環境で評価するので、
+呼び手が待つ driver はテストが何をしても 0 で終わる。`:end-run-tests` で
+立てていた `js/process.exitCode` はそこに届かない。**30 repo の
+「PRIMARY automated quality gate」が `1 failures` を印字して成功を返して
+いた。** compile して素の node で走らせる形に変え、`*main-cli-fn*` を与えた
+（これが無いと bundle は全 namespace を読み込んでテストを 1 本も走らせず
+0 で終わり、出力でも exit code でも clean run と区別できない）。
+
+**2. shift 数が mod 32 で潰れる**
+境界は 32 ではなく **31**（`(bit-shift-left 1 31)` は符号ビットで負）。
+- `kotoba.kir.cljs-i64/ashr` — 除数が 2^shift、shift≥32 で全部誤り。呼び手が
+  sleb128 1 つ（7 ビットずつ）だったので誰も訊いていなかった
+- `amu` `pe32plus/read-le` — ELF の 64bit フィールドの上位 4 バイトが下位に
+  畳まれ、**admission check が fail-open**（256 TiB の kernel を nbb が受理し
+  26 KB の boot image を出した）
+- `kotoba-object` `little-endian` — PE image-base の width 8 で byte 4..7 が
+  byte 0..3 の繰り返し。**兄弟の elf64 / macho64 は 2026-08-20 に直っており、
+  pe32plus だけが取り残されていた**
+- `aiueos` `features-version-1` — VIRTIO_F_VERSION_1（bit 32）が cljs で **1**、
+  feature bit 0 と衝突
+- `av1` `uvlc` — spec の 2^32-1 が **0**、writer の上限判定が `(>= value 0)`
+- `opus` — codebook の clamp が 2^40 のはずが **256**、overflow guard が
+  `(> v -2147483648)` で常に真 → **全 band の pulse が 0**
+- `map` `f64-bits->double` の `:cljs` 枝 —— **ClojureScript のために在る枝が
+  ClojureScript で壊れていた**。tile の 3.14 が 4.29e+86
+
+**3. 64bit 整数リテラルが読まれた瞬間に丸まる**
+`unchecked-multiply` は cljs.core に在るが wrap しない。PCG/LCG を `.cljc` に
+書き写した箇所で、**shift だけ直すと乗算が壊れたままファイルが可搬に見える
+ようになる** —— #38 を #37 と別にした理由。
+- `yield/monte-carlo` — docstring が自分で「JVM `unchecked-*` ops on `long`」と
+  書いている `.cljc`。`[0,1)` を返すはずの関数が数十億を返していた
+- `org-ros` cdr — **16bit の往復すら壊れていた**（-30000 → -30720）。docstring が
+  「2^53 まで厳密で十分」と述べ、**その下の式が負の n に 2^64 を足していた**
+- `si` / `signal-integrity` — `eye_diagram` は元から正しい（LCG を全部
+  `#?(:clj ...)` で包み cljs には xorshift32）。漏れは constants の cljs 写しで、
+  **誰も読んでいないので無害だった —— 不発弾が無害なのと同じ意味で**
+
+**4. 検査するためにある値を検査できていない**
+`amu` の `windows-profile-conformance` は i64 MIN/MAX を**数値として**比べて
+いた。2^63 付近の double の刻みは 2048 なので、**MAX に対して MAX-1 を返す
+loader が適合と報告される**。兄弟の `conformance.cljs` は最初から文字列で
+比べている。
+
+## 手順として効いたこと
+
+- **仮説を測定が 2 回否定した。** ①`yield` が load しない理由を「単一
+  セグメント名」と考えた → `yield2` も `harvest` も load した（`yield` は
+  JavaScript の予約語）②「MAX-1 を期待値に入れれば新旧で差が出る」→
+  両方 exit 0 で、そこで初めて `when win32` に気づいた。**仮説どおりの結果が
+  出ていたら、飛ばされている事実を見逃していた**
+- **自分の期待値を 5 回、テストが捕まえた**（2^32+1、max i64>>56、
+  0x400000 のバイト位置、31·2^32+0xdeadbeef、32bit 高位ワードが 2^53 超）
+- **自分の測定器を 3 回捕まえた**: `xargs` のバッチで集計行が最後の 1 回分
+  だけ / macOS の `xargs -a` が無く stderr を捨てていた / 大きさで判定して
+  10^18 と -2^63（どちらも厳密）を報告
+- **runner を書き直すとき exitCode の行を落とした** —— 30 repo で直した
+  まさにその欠陥。mutation テストが即座に出した
+
+## 残っている問い（正直に）
+
+- **直したのは「走らせたときに嘘をつかないこと」であって「走っていること」
+  ではない。** 30 repo の cljs runner を起動する経路は superproject の
+  `scripts/` にも `fleet-ci/gates.edn` にも無い。fleet gate に載せるなら
+  1 本 2 分の compile × 30 の placement と時間予算の話が先
+- `amu` の windows conformance の修正は **win32 でしか実行されない節**にあり、
+  比較ロジックの判別は実測したが live な Windows 実行では確認していない
+- `si` と `signal-integrity` は 6 file 中 3 つが（ns 名を除いて）バイト一致。
+  **同じ欠陥を 2 回直した。** どちらを正本にするかはオーナー判断
+- detector #37 の `SHIFTS-COMPUTED`（708）と #38 の実行時オーバーフローは
+  読んで分類できない —— **UNMEASURED であって clean ではない**
+
+## 次の一手
+
+  nbb --classpath \".:scripts/nbb_compat\" scripts/verify-cljs-inexact-integers.cljs
+  nbb --classpath \".:scripts/nbb_compat\" scripts/verify-cljs-shift-width.cljs
+
+#38 の残り 24 は `fuchi`（3 コピー）/ `game` / `kami-autodrive` の test helper /
+`junbi` / `cloud-manimani` の fixture 値。#37 の残り 11 は `kabuto`（2 コピー）/
+`noroshi/mt19937` / `engine/codegen` / `nfs/v3` / `game/terrain`。
+
+どちらも同じ手順で進む: **runner が無ければ先に置いて測る**（`map` `av1`
+`opus` `yield` `org-ros` `signal-integrity` はそれで初めて見えた）。")))

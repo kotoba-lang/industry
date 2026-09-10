@@ -1,0 +1,181 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608301500-four-checks-that-could-not-measure-and-answered-anyway")
+  (:adr/title "Checks that could not measure, and answered anyway (cleanup session 2026-08-30)")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-30")
+  (:adr/supersedes "")
+  (:adr/related "adr-2608136000-six-questions-before-writing-a-check, adr-2608230300-asking-failed-is-not-an-absent-successor, adr-2607211600-full-history-default")
+  (:adr/body
+  "## What this session did
+
+A `git cleanup conflict` pass over the superproject and its ~4,316 child checkouts,
+then a second pass that fixed a live data defect the first one surfaced. Everything
+below is landed on a default branch unless it says otherwise.
+
+The title said `Four` when this was first written. The count reached five inside the
+same day, which is the actual finding; the id keeps the original slug because an id is
+a discovery alias, not the claim.
+
+### Landed
+
+| where | what |
+|---|---|
+| root `1e0291eff6ae` | rescued a stranded fleet-ci receipt + fixed the observatory evidence drop |
+| root `da9812a13bdb` | COFOG 072 + 033 coverage entries rescued from six dead scout branches |
+| root `2b5e7dab6a51` | hourly observatory run carrying the first evidence row |
+| root `28878eefb837` | this ADR |
+| root `268a5d4b5cbf` | coverage entries stranded outside the closing bracket, + the gate |
+| `cloud-itonami/animeka#7` | 1 untracked file |
+| `cloud-itonami/eigyo-list#1` | 24 city receipt EDNs + 2 journal entries |
+| `cloud-itonami/eigyo-list#2` | the append-only journal delta (disposition recorded on the PR) |
+| `net-kotobase/control-plane#578` | 1 untracked file |
+
+Retired: 21 merged remote branches, 10 local, archived first. Preserved by publishing,
+never merged: 5 branches that existed only on this machine, one of them
+(`kotoba-lang/kotoba`, 117 local-only commits against 2 remote-only) under a new name
+because force-push is forbidden.
+
+## The finding
+
+Five separate checks could not make the measurement they claimed, and each returned
+the value that means `fine`. This is the class ADR-2608136000 names; the point here is
+that it recurred five times in one day across five unrelated tools.
+
+### 1. An observatory mitigation that never once fired
+
+`scripts/observatory-run.cljs` has returned `:signal` / `:load1-before` /
+`:load1-after` / `:timeout-ms` from `run-one` since 2026-08-13, in a commit whose own
+message is `observatory: record the load, because three timeouts today were my own
+parallelism`. `datom` was ready to write all four. The record assembled between the
+two never carried them, so `git log -S killed-by-signal` over
+`90-docs/observatory/observatory.datoms.edn` returned no commit in the file's history.
+
+It cost precisely what that commit predicted. At `2026-08-30T01:35:08.532Z` six
+observatories were written `:known-broken` / `meets-expectation false` after 603-663s
+against the registry's 600000ms timeout, at one timestamp, on one machine. One
+saturated batch, killed. In the ledger it is indistinguishable from six actors that
+regressed. Those rows were not landed. The fix carries the four fields; the next tick
+produced the first row in the file's history to have any of them: `meyasu`,
+`load1-before 400.96`.
+
+The lesson is narrower than 'add the field'. The field WAS added. Nothing ever
+asserted it arrived, so a mitigation sat inert for 17 days looking exactly like one
+that works.
+
+### 2. `west-triple-sync plan --names` reads directory names, not remotes
+
+Asked to plan registration for six paths reported as west-unregistered, the plan
+proposed three `:register` actions and three `report-skip`s reading `GitHub repo
+missing: network-awai/local-murakumo-fastmtp (use new-project-scaffold to create)`.
+
+All six already resolve to repos west carries. The two `etzhayyim` directories are
+`:renamed-upstream` (`gh api repos/<old>` redirects to `actor-kizashi` /
+`actor-ossekai`, both registered and checked out); the other four are duplicate
+checkouts of `cloud-itonami`, `local-murakumo` and `network-isekai`. Applying would
+have registered two dead names, added an entry whose `:org` is
+`network-awai-worktrees` (a local worktree directory, not a GitHub org), and followed
+that `use new-project-scaffold to create` sentence into creating three repos that
+exist -- the trap ADR-2608230300 documents by name.
+
+`west-orphan-audit` resolves the git remote and reports `true-orphan-git=0` /
+`renamed-UNVERIFIED=0`, exit 0, on the same tree. **Where the two disagree, the audit
+is right.** Nothing was registered; `manifest/` was not written.
+
+### 3. The primary-remote fallback picks the annex special remote
+
+72% of `orgs/` checkouts have no `origin`. A fallback of `git remote | head -1` picks
+`b2`, the Backblaze annex special remote, because it sorts first. Measured against
+`b2`, `gftdcojp/m365-archive`'s `agent/multi-mailbox-ingest` read ABSENT-on-remote
+when it was already on `github/`, and a branch archive came out `0 commits, 0B`
+because `$REM/main` did not resolve. Prefer `origin`, then a remote whose URL contains
+`github.com`, never a bare `head -1`.
+
+### 4. `$?` after a pipe, and a waiter that waited on itself
+
+- `timeout 110 nbb ... > log; echo EXIT=$?` correctly reported `EXIT=124`. Piped to
+  `tail` it would have reported 0. Long checks go to a file first.
+- `until ! pgrep -f 'cleanup-land.cljs'; do sleep; done` never exits: the waiter's own
+  command line contains that string. Four waiters hung on themselves before this was
+  noticed. Capture the real PID and use `kill -0`.
+
+### 5. A ledger where the reader saw 23 of 27 entities and reported success
+
+`90-docs/coverage/itonami-coverage.datoms.edn` must be one `[ {…} {…} ]` form. Two
+scout commits appended entities AFTER the closing `]` (`a16e9583eae`, whose hunk
+`@@ -294,3 @@` ends its context on the bracket, and `edf4bb2efcd`).
+`clojure.edn/read-string` returns only the first top-level form, so four entities were
+invisible to every consumer while the file continued to read cleanly.
+
+Two of the four (073, 102) were re-adds of codes already inside the vector, identical
+but for `:coverage/note` wording -- which is why only `grep` could see a `duplicate`
+and the reader could not. The other two (052 waste water management, 053 pollution
+abatement) were genuinely new and genuinely unreachable: real measurements no query
+would ever have returned.
+
+PR #2689 removed duplicates from this same file on 2026-08-21. It cleaned up without
+leaving a check, so the class came back nine days later. The scout prompt meanwhile
+promised `the gate will reject re-adding a class that now has a project`, and
+`grep -rl itonami-coverage` found no gate reading the file at all -- the promise was
+in the prompt, the check was never written.
+
+Gate `root-itonami-coverage` now counts entities two ways -- column-0 `{:db/id` in the
+text against what the reader returned -- because one count cannot distinguish `read`
+from `read all of it`. Proven five ways against the real defect: main as it stood
+(exit 1, 27 vs 23), the repaired tree (exit 0, 25/25), a duplicate inside the vector
+(exit 1, DUPLICATE, 26 in text and 26 read, so it took the duplicate branch and not
+the truncation one), absent file (exit 2), reader throws (exit 2). Exit 2 is neither
+0 nor 1 on purpose. The scout prompt now states both rules.
+
+## Adjacent, and unrelated to the class
+
+**A revert caught before it shipped.** `network-awai/cloud-murakumo` held
+`public/go.html` at +33/-224. That checkout is one commit behind, and the commit it
+lacks (`c63bfd2`, PR #148) touches that same file: the public operator and contact
+disclosure. Not landed, no PR opened, archived with the measurement.
+
+**The west-pin guard denies the whole Bash call.** It is a PreToolUse hook, not a git
+hook, so a `fetch && merge --ff-only && push` chain never runs its own sync -- the
+command is rejected before its first word and the checkout stays as stale as it was.
+`WEST_PIN_VERIFY_SKIP=1` as a command prefix cannot reach it either. The pin it
+flagged was never anything the branches did: each branch's `manifest/west.yml` was
+byte-identical to its own merge-base. Sync as a separate call, then push.
+
+**This session's archive was deleted by a concurrent session.** A
+`/fleet-refactor-wave` run computed its archive path with `rev-parse
+--git-common-dir`, which returns a RELATIVE path, so three child-repo archives landed
+in the superproject's `.git/stash-archive-20260830/`, and it then `rm -rf`'d the
+directory to undo that. Its incident README claims no content was lost; verified
+independently, that is true except for one thing. The 21 retired remote branches were
+archived with zero-byte diffs against main (their content is on main by definition),
+the six coverage-scout branches had every `:coverage/code` confirmed present on main
+before deletion, the fleet-ci receipt is on main, and the cloud-murakumo patch was
+regenerated from an untouched working tree. **Genuinely lost:** the six
+`:known-broken` observatory rows from the 01:35 killed batch, which had been
+deliberately not landed and then reverted, leaving the archive as the only copy. They
+were evidence-free verdicts about a saturated machine and the observatory re-measures
+hourly, so the loss costs a measurement nobody should have trusted. Recorded rather
+than glossed. Use `rev-parse --absolute-git-dir`, and never `rm -rf` a
+`stash-archive-*` you did not create.
+
+## Resume point
+
+- Nothing is half-finished. Superproject clean and level with `origin/main`, 0
+  stashes, 0 worktrees belonging to this session, 0 open PRs opened by it.
+  `west-orphan-audit --blocking` exits 0.
+- `root-itonami-coverage` has NOT yet run on a fleet node. By this workspace's own
+  rule a gate is not landed until it goes green there once; watch for it.
+- Watch for: every full observatory tick should now carry `:observatory/load1-before`
+  and `:timeout-ms`, and `:killed-by-signal` whenever `spawnSync` reports one. A tick
+  that writes `:known-broken` with those nil means the carrier regressed again.
+- Not done, deliberately: ~23 pushed-but-un-PR'd branches across 12 child repos, plus
+  a 34-branch farm on `network-awai/app-hyakka`. The owner chose preserve-only. The
+  runbook gates PR-opening behind `--branches`, which is opt-in.
+- Not done: the two `etzhayyim` leftover directories. The correct move is retiring the
+  stale checkouts, not registering them.
+- `90-docs/observatory/observatory.datoms.edn` goes dirty every hour. That is the
+  routine regenerating it, not leftover work; it lands by cleanup pass, not by the
+  routine.
+- `docs-edn-only verify` reports FAIL on this tree, pre-existing and unrelated:
+  `parse-errors=0`, the two `not-tx` entries are other ADRs, the driver is a stray new
+  `.md`. That same run declares 233 `.edn` present in git but absent from the sparse
+  checkout, so it is partially blind and says so.")))

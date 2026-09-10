@@ -1,0 +1,90 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609072100-closing-ipq-deployed-the-pack-answer-reversed-and-a-deploy-guard-that-cannot-pass")
+ (:adr/title "closing — IPQ と block-unavailable を本番へ、pack 判断は cold 測定で撤回、そして通れない deploy guard")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-07")
+ (:adr/related (vector "adr-2609064500-measure-the-graph-read-path-before-wiring-ipni-or-packs"
+               "adr-2609063500-ipq-is-the-name-of-the-selection-layer"
+               "adr-2609065000-the-graph-worker-is-control-plane-and-the-checkout-was-four-commits-behind"
+               "adr-2609071500-kotobase-live-acceptance-dead-on-a-credential-the-datom-plane-stopped-accepting"
+               "adr-2608136000"
+               "adr-2608160100"))
+ (:adr/body "## 何が本番に出たか
+
+| host / script | version | 何が変わったか | smoke |
+|---|---|---|---|
+| `ipfs.kotobase.net`（`net-kotobase-ipfs`） | `cf59d4c6` | IPQ の Accept ネゴシエーションが wire で効く。`Accept: application/json` は **406 `accept-not-satisfiable`**（以前は 200 + CAR） | `scripts/ipq_smoke.cljs` 全 green（replay 検証込み） |
+| `datoms.kotobase.net`（`kotobase-cf-wasm-staging`） | `6b99c4ff` | read が要求した block を取れなかったとき **503 `BlockUnavailable`** + `block_cid` + `retryable:true`。以前は 400 InternalError | transact / datoms / basisT / q すべて 200 |
+
+graph worker は repo 自身の readback で確認: `workers/tag == 8759844539a7faedfdb9d08473ffbc61e74ec2fb`。
+
+deploy 前に**自分で**測ったもの（agent の報告を根拠にしていない）: `test:cljs` 453 tests /
+1,512 assertions 0 failures / `e2e-block-unavailable` を **committed bundle に対して** 8/8 /
+`e2e-b2-smoke` は赤いが `KOTOBASE_GRAPH_BUNDLE` に修正前 bundle を渡して**同じ 66 ok 後の
+同じ失敗**を確認（既存であって回帰ではない）。
+
+## 着地したが deploy していないもの
+
+- **gateway の 401 collapse 修正**（`net-kotobase/control-plane` `164fca3a`）。edge の拒否と
+  upstream の拒否が区別できるようになる。**本番は今も旧挙動**。
+- `llms.txt` / `llms-full.txt` への IPQ 追記（`site.cljc` が compile 時に inline するので
+  次の gateway deploy で初めて出る）。
+
+## 訂正した主張（4 件）
+
+**同じ形を 3 回踏んだ —— 仕事をしなかった経路が、仕事をして問題が無かった経路と同じ値を返す。**
+
+1. **pack は節約するものを持たない → 撤回。** 暖かい isolate でしか測っていなかった。
+   fresh isolate（`epoch=1`）では object store に届く（graph 1: distinct 12 に対し b2=12）。
+   詳細と次に測るべき 2 件は ADR-2609064500 の末尾。
+2. **bundle hash が一致したから変わっていない → 撤回。** `0 compiled` の incremental build
+   だった。cold で測ると別（ipfs は cold 2 回が byte 一致、control-plane は 3 つとも不一致）。
+3. **ayatori:457 は live な bug → 撤回。** main では既に直っており pin も正しく、
+   **checkout だけが古かった**。検出器は checkout を読むので偽陽性を出した。
+4. **IPQ の応答は CARv2 → 訂正。** CARv1（先頭は `3a a2 65 72 6f 6f 74 73`、CARv2 pragma 無し）。
+   文書は最初から正しく、口頭の私だけが誤っていた。
+
+## 測って分かった構造的な事実
+
+- **`kotobase-graph-database/scripts/deploy-versioned.mjs` は成功できない。** build してから
+  tracked bundle が dirty なら拒否するが、この build は非決定的（gensym）。同一 source の
+  cold build ×2 と committed で **hash が 3 つとも違う**（長さは同一 1,375,223 byte、
+  差 16,476 byte、最初の差は `p1__34441#`）。ADR-2609065000 が記録した「本番は全部
+  `source: wrangler` の手 deploy、attested workflow の最終成功は 2026-08-28」の**理由がこれ**。
+  ⚠ 同じ日に `net-kotobase/ipfs` は cold build ×2 が byte 一致した。**determinism は repo ごと。**
+  この worktree の残骸として `wrangler.verified.jsonc`（`wrangler.jsonc` から `build` を
+  4 箇所抜いたもの）が在り、**以前のセッションも同じ guard を手で迂回していた**証拠だった。
+- **IPQ/2 の可否**: range proof は「この root に対する `scan-range` と等しい」を**追加バイト 0**
+  で正直に運べる。**完全性は運べない**（過少申告 max-key で prover が `[]` を返し verifier が
+  受理、素の scan では 4,000 行）。descriptor の `doesNotProve` は実測された境界。
+- **live acceptance 7 本が死んでいた**理由は credential class の契約変更（CACAO → Biscuit）。
+  全部生き返り、3 本は自分で再実行して確認。
+
+## 次の一手（この順で）
+
+1. **`164fca3a` を deploy する**（gateway）。今は「landed だが本番は旧挙動」。
+   ⚠ gateway も同じ build-guard 問題を持つか未測定 —— **先に cold build ×2 の hash を測る**。
+2. **L2 の残存時間と容量を測る。** pack を作るかどうかはそこで決まる。手順:
+   `orgs/net-kotobase/control-plane/authn/scripts/bench48_deploy_probe.mjs` の SIWE→Biscuit
+   flow で graph を書き、**fresh isolate（`epoch=1`）で**時間を変えて読み、`l2=` と `b2=` を採る。
+   53 秒後は 17 中 14 が L2、4 分後は L2 ゼロ、という 2 点しかまだ無い。
+3. **deploy-versioned.mjs の検査を作り直す**（オーナー判断）。生成物を commit しない /
+   正規化比較 / 振る舞いで縛る、の 3 択を ADR-2609064500 に書いた。
+4. **IPQ の announce**。次に `advertise` 付き private git snapshot が 1 本入れば閉じる。
+   検査 `verify-ipni-publisher-record --findings` は**赤のまま置いてある**（緑にする方法は
+   発行することであって検査を弱めることではない）。
+
+## 引き継ぎに要る座標
+
+- 本番 version: ipfs `cf59d4c6` / graph `6b99c4ff`（tag `87598445…`）
+- pin = checkout = main（実測）: `ipfs e00398e5` / `control-plane 87598445` /
+  `net-kotobase-engine dcb1f590` / `io-ipni-specs a46a42cc` / `prolly-tree 20a94b27` /
+  `ayatori baceead7`
+- 私の worktree・branch・stash は全部撤去済み（root の stash 0、私の `agent/*` remote branch 0）
+- **他者のものとして残してあるもの**: `net-kotobase/ipfs` PR **#59**
+  `fix/ipni-ad-dag-cbor-accept-502`（main の 1 commit 先、mergeable、`UNSTABLE`）——
+  **superseded ではない実装で、私の branch 命名規則ではないので触っていない**。
+  `control-plane` の open PR 16 本はすべて Dependabot。
+  重複 tree 4 本（`control-plane-legal-candidate` 等）のうち 2 本に他者の未コミット作業。
+")
+))

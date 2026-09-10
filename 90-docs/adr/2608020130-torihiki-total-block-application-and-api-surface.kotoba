@@ -1,0 +1,83 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608020130-torihiki-total-block-application-and-api-surface")
+  (:adr/title "ADR-2608020130: ブロック適用を全域化する — 不正な tx 1 件でチェーンが止まるのは liveness bug。併せて API 面（検証・閉じた拒否理由集合・read model）")
+  (:adr/status "accepted")
+  (:adr/doc_type "adr")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/date "2026-08-02")
+  (:adr/last-verified "2026-08-02")
+  (:adr/last_verified "2026-08-02")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "torihiki-total-block-application-and-api-surface")
+  (:adr/authoritative-for
+  (vector "torihiki の tx 検証と適用の分離"
+   "拒否理由の taxonomy と state root へのコミット"
+   "client 向け read model の所在"))
+  (:adr/related
+  (vector "adr-2608020030-torihiki-conditional-orders-and-reduce-only"
+   "adr-2608012330-torihiki-mark-price-not-last-print"
+   "adr-2608011600-torihiki-verifiable-sequencer-log-phase2"))
+  (:adr/evidence (vector "https://github.com/kotoba-lang/torihiki"))
+  (:adr/body
+  "# ADR-2608020130: ブロック適用の全域化と API 面
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ギャップ優先順 #3（API が無い）に着手したところ、設計中に**より重大な問題**が見つかった。
+
+`apply-tx :order` は価格 level がラダー外なら例外を投げていた。**ブロックの中では、これは「注文が拒否された」ではなく「チェーンが止まった」である。** 全 validator が同じ場所で停止するので、**tx を投げられる者なら誰でもタイポ 1 つでチェーンを止められた。**
+
+## Decision
+
+### 1. 検証と適用を分離し、適用を全域にする
+
+`torihiki.api/validate` が形と範囲だけを検査し、`apply-block` は検証を通ったものだけを適用する。**落ちたものは `:rejected` に記録してスキップし、決して throw しない。**
+
+これは client への礼儀ではなく **liveness** である。不正入力に礼儀正しいプログラムと、不正入力を生き延びるプロトコルは別物。
+
+### 2. 拒否は state root にコミットする
+
+**validator は「何が実行されたか」と同じだけ「何が拒否されたか」に合意しなければならない。** そうでないと sequencer が tx を静かに落として、それでも一致する root を出せる。
+
+理由コードは keyword の `clojure.core/hash` ではなく**安定した整数**にした（JVM と JS で一致する保証が無い——account id が既に避けている罠と同じ）。コードは**追記のみ**: 振り直すと過去の root が黙って全部変わる。
+
+### 3. 拒否理由は閉じた集合にする
+
+自由文字列は client が parse する文字列になり、以後の言い換えが全部 breaking change になる。さらに悪いことに、実装が内部状態をそこに載せたくなる。
+
+### 4. 検証は「払えるか」を見ない
+
+形と範囲だけ。支払能力は clearinghouse の結果であり（free collateral を超える出金は既にそこで no-op）、ここで二重に判断すると**一致させ続けるべき場所が 2 つ**になる。
+
+### 5. read model を API 側に置く
+
+`book-snapshot` / `account-state` / `market-info`。client が `:books` に手を伸ばすと slab のレイアウトに結合する——**端末が既にそれをやっていた。** `account-state` は `:free-collateral`（「これを建てられるか」に答える数）を含む。client 側で計算させると、チェーンが拒否する取引を client が提示する事故になる。
+
+## Consequences
+
+- (+) **不正 tx でチェーンが止まらない。** 50 件のゴミだけのブロックでも state を返すことをテストで固定した。
+- (+) 拒否が可視化され、index 付きで「どの tx が何故落ちたか」が分かる。
+- (+) 端末が内部に手を伸ばす必要がなくなった（移行は未実施）。
+- (−) **これは protocol であって transport ではない。** HTTP も WebSocket も無く、**注文を出す口はまだ無い**。ギャップ #3 は半分しか埋まっていない。
+- (−) 購読（板・約定の push）が無い。`fills-since` はブロック内のビューで履歴ではない。
+- (−) 認証が無い。`account` は検証されるが**誰が名乗ったかは検証されない**——署名は transport 層の仕事として未着手。
+
+## 変えなかったもの
+
+`book/place!` は自分で範囲を守り続ける。検証によってブロック経由では到達不能になったが、**直接呼ぶ側は依然守られる。** 冗長ではなく多層防御。
+
+## 残りギャップ（#3 は半分）
+
+1. ~~mark~~ 2. ~~条件付き注文 + reduce-only~~ 完了
+3. **API — protocol は完了、transport（HTTP/WS + 署名認証）は未着手**
+4. 端末の live 化（shadow-cljs）
+5. ADL 実行、段階証拠金、OI 上限
+6. oracle 集約
+7. Phase 3: engi 合意層
+8. bridge・監査
+")))

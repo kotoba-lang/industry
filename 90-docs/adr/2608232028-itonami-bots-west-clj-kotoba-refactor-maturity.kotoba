@@ -1,0 +1,133 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608232028-itonami-bots-west-clj-kotoba-refactor-maturity")
+  (:adr/title "itonami bots: west 管理 repo の CLJ→Kotoba refactor 成熟度と合格基準")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-23")
+  (:adr/supersedes (vector))
+  (:adr/superseded-by (vector))
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/authoritative_for
+  (vector "itonami bots refactor の 2026-08-23 時点の成熟度 score"
+   "専用 Git root と隔離 shell を持つ Bot による CLJ→Kotoba refactor の pilot / production 合格基準"
+   "実装済み、観測済み、未検証を混同しない判定方法"))
+  (:adr/related
+  (vector "adr-2608212400-cloud-itonami-app-native-signin-one-path"
+   "adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"
+   "ADR-2607211600"))
+  (:adr/repos (vector "orgs/cloud-itonami/cloud-itonami-app" "orgs/network-awai/itonami"))
+  (:adr/body "# ADR-2608232028: itonami bots — west 管理 repo の CLJ→Kotoba refactor 成熟度と合格基準
+
+## Status
+
+Accepted — **総合 48/100、pilot-blocked**。実装成熟度は 83/100 だが、専用 Bot の作成、隔離 shell の実証、`start` の受理、実 repo での refactor 完走が 0 件なので運用合格にはしない。
+
+## Context
+
+west で管理する多数の repo の CLJ/CLJC を Kotoba へ段階的に移すため、`cloud-itonami-app` に次の CLI surface を実装した。
+
+```text
+itonami bots refactor scan --root <west-root> --limit N
+itonami bots refactor inspect --root <west-root> --repo <name> --limit N
+itonami bots refactor start --root <west-root> --repo <name> --id <bot-id>
+```
+
+`scan` は west manifest と checkout を読み、CLJ-family / Kotoba file 数から候補を列挙する。`inspect` は 1 project の正確な checkout と最初の候補を返す。`start` は coding capability、Bot workspace と対象 west project の canonical path 一致、`:virtual-shell-ready?` を fail-closed で要求し、1 bounded slice の task を既存 Bot turn に投入する。
+
+task contract は変更前 test、thin CLJ adapter + Kotoba decision core、parity test、拒否・境界 case、変更後 test、`git diff` 確認を要求する。remote push、rebase、west pin 変更は禁止する。
+
+この ADR は「CLI が存在する」ことを「Bot が安定して移行を完遂できる」ことと同一視しない。score は仕事量ではなく、2026-08-23 時点で得られた証拠の強さを表す。
+
+## Observed evidence
+
+### Source and release
+
+- 実装は cloud-itonami-app PR #139、single-pass scan 高速化は PR #140 で main に merge 済み。feature merge は `54910b90bc9f64c2184267df9d4070277b67e032`、高速化 merge は `f5e8882be0960bf01b91b985dce05094f7359ae1`。
+- 2026-08-23 20:28 JST の cloud-itonami-app `origin/main` は `06ab7d14d86a02ebab400c71365b70755b4c266c`。superproject `origin/main` の `manifest/west.yml` も同 SHA を指す。
+- resident checkout `/Users/junkawasaki/.cloud-itonami/app` は `f5e8882...` で、`origin/main` より 2 commit behind。feature は含むが、resident と配布正本の完全一致は未達である。
+
+### Deterministic and real-workspace checks
+
+- focused test: 13 tests / 39 assertions / 0 failures / 0 errors。
+- cloud-itonami-app full suite: 1810 tests / 10721 assertions / 0 failures / 0 errors。
+- 変更 file の lint: 0 errors / 0 warnings。repo-wide lint には既存 browser CLJS issue があり、この feature の合格証拠には数えない。
+- 広すぎる既存 Bot を `itonami` project に使う試行は `workspace-mismatch` で拒否された。fail-open せず止まることを実観測した。
+- 実 west root の `itonami` inspect は CLJ-family 12、Kotoba 0 を返し、`src/itonami/phase.cljc`、`src/itonami/sim.cljc`、`src/itonami/kotoba.clj` などを候補として列挙した。
+- 実 west root scan は single-pass 化前の約 110 秒から、変更後 30.206 秒 end-to-end へ短縮した。JVM/CLI startup が約 20 秒、直接 source enumeration は約 4.4 秒。実結果上位は cloud-itonami 688/31、control-plane 420/0、etzhayyim/root 410/0、cloud-itonami-app 392/16、network-isekai 293/0（CLJ-family/Kotoba）。
+
+### Not yet observed
+
+- `itonami` checkout だけを workspace として持つ coding Bot の human surface からの作成: 0 件。
+- その Bot の隔離 shell readiness の実環境検証: 0 件。
+- `itonami bots refactor start` の受理: 0 件。
+- Bot による CLJ→Kotoba bounded slice の完走: 0 件。
+- parity / negative case / post-change suite / bounded diff を含む実 migration receipt: 0 件。
+- scanner または admission guard を意図的に壊して test が赤になる mutation evidence: 0 件。
+
+## Score model
+
+成熟度は実装 `I`、運用 `O`、証拠 `E` の 3 面で採点し、`M = round(0.40I + 0.35O + 0.25E)` とする。critical gate の赤は加重点で相殺しない。
+
+| 面 | score | 根拠 |
+|---|---:|---|
+| Implementation `I` | 83/100 | scan/inspect/start、canonical workspace admission、coding capability、isolated-shell guard、bounded task contract、docs、single-pass 性能改善は実装済み。mutation proof と実 migration のフィードバックは未実装 |
+| Operational `O` | 10/100 | source/main と west pin は整合。ただし resident は 2 commit behind。専用 Bot、隔離 shell、start accepted、完走はいずれも未観測 |
+| Evidence `E` | 45/100 | focused/full tests、実 root scan/inspect、workspace mismatch rejection は観測済み。mutation、実 refactor outcome、反復性 sample は 0 |
+| Weighted maturity `M` | **48/100** | `round(0.40*83 + 0.35*10 + 0.25*45) = 48` |
+
+判定 tier:
+
+- 0–39: design/prototype
+- 40–59: pilot-blocked
+- 60–79: pilot-ready（critical gate が全て green の場合のみ）
+- 80–89: limited-production-ready（下記 production sample を満たす場合のみ）
+- 90–100: proven
+
+従って現在は **pilot-blocked**。CLI を手動で調査に使うことはできるが、自律的な fleet refactor を開始してよい状態ではない。
+
+## Decision — fail-closed gates
+
+### Pilot PASS
+
+次を同一 version / 同一 resident で全て満たした時だけ pilot-ready とする。
+
+1. human surface から coding capability と `itonami` project の exact canonical workspace を持つ Bot を作る。private memory、wallet、外部 service grant を暗黙継承しない。
+2. Bot 詳細で isolated shell readiness が green になり、home、別 west project、ambient secret、外向き network の拒否 probe を実測する。
+3. `itonami bots refactor start --repo itonami --id <id>` が受理され、run ID、Bot ID、project path、base SHA、task digest を持つ durable receipt を残す。
+4. 最小 1 file の decision logic を Kotoba core へ移し、CLJ/CLJC は thin adapter とする。公開 API と既存挙動を保つ。
+5. pre-change suite green、old/new parity green、最低 1 件の rejection/boundary case green、post-change suite green。
+6. `git diff` が対象 repo 内の 1 bounded slice に収まり、remote push、rebase、west pin、別 project の変更が 0。
+7. scanner か admission guard の 1 箇所を一時的に壊し、対応 test が red になり、復元後 green になる mutation receipt を残す。
+8. resident SHA が cloud-itonami-app `origin/main` と一致する。
+
+この 8 gate は、weighted score が 80 を超えても 1 件欠ければ FAIL。
+
+### Limited production PASS
+
+pilot PASS 後、同一 major contract で 5 repo 以上・20 bounded migrations 以上を評価する。次を全て要求する。
+
+- end-to-end success 90%以上。timeout、approval待ち、guard rejection も分母に含める。
+- workspace escape、cross-repo write、remote push、rebase、unauthorized pin change は 0 件。
+- pre/post suite green 95%以上。失敗 run は作業 tree を clean または明示的に隔離し、回復不能残骸 0 件。
+- parity fixture の一致 95%以上、negative/boundary case 付与 100%。
+- human review で semantic regression 0、thin-adapter 原則違反 0、根拠のない Kotoba 化 0。
+- p90 completion 20 分以内（human approval 時間を別計測）、30分超 stale-running 0。
+- 全 run に base/result SHA、diff digest、test receipt、Bot/shell identity、停止理由を保存する。
+
+## Consequences
+
+- 直近の次工程は機能追加ではなく、exact Bot の human provisioning、隔離 probe、1件の `itonami` pilot 完走である。
+- 実装 score と運用 score を分離するため、test green や PR merge だけで「Bot refactor が動いた」と表現しない。
+- 最大 context や model 速度は補助特性であり、workspace admission、bounded diff、parity、negative case、receipt の gate を置き換えない。
+- resident drift は feature の存在を否定しないが、再現可能な運用証拠を弱める。pilot 前に default branch と一致させる。
+- production 判定は成功例だけを分母にせず、拒否、timeout、失敗、残骸も含む end-to-end quality で行う。
+
+## References
+
+- cloud-itonami-app PR #139: https://github.com/cloud-itonami/cloud-itonami-app/pull/139
+- cloud-itonami-app PR #140: https://github.com/cloud-itonami/cloud-itonami-app/pull/140
+- `src/cloud/itonami/app/west_kotoba_refactor.clj`
+- `src/cloud/itonami/app/cli.clj`
+- `test/cloud/itonami/app/west_kotoba_refactor_test.clj`
+")))

@@ -1,0 +1,112 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608239100-amu-native-vmm-foreign-guest-decisions")
+  (:adr/title "ADR-2608239100: amu 上で他の環境を動かす VM は、判断を Kotoba に置き、機構は aiueos.hvt に残す")
+  (:adr/status "accepted")
+  (:adr/date "2026-08-23")
+  (:adr/body "# ADR-2608239100: amu 上で「他の環境」を動かすための VM は、判断を Kotoba に置き、機構は aiueos.hvt に残す
+
+**Status**: accepted
+**Date**: 2026-08-23
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー質問（2026-08-23）「今の kotoba lang, aiueos に amu をベースにした、他の環境を
+動かす vm repo はある? amu 上での virtualbox みたいなもの」。west 4,233 project を検索
+した結果、専用 repo は無く、monitor 側の実装は `kotoba-lang/aiueos` の中に 2 つあった。
+
+- `aiueos.vm`（249 行）— QEMU の argv を組んで起動するだけ。monitor は QEMU。
+- `aiueos.hvt`（943 行）— self-owned VMM。Linux KVM を `java.lang.foreign` で直叩きし、
+  VM 生成・guest RAM map・vcpu 実行・exit 処理を自分で持つ（ADR-0014 option C）。
+  V1 で virtio-mmio device model と virtqueue tx/rx まで landed。guest は 5 本の
+  `.kotoba` を amu が `aarch64-aiueos-kernel-v1` target で bare-metal ELF に落としたもの。
+
+つまり「VirtualBox 相当」に一番近いものは既に在り、足りないのは hypervisor ではない。
+**足りているのは機構で、足りていないのは判断である** — 自分で書いていない kernel image を
+受け入れてよいか、blob をどこに置くか、その address がどのデバイスか、その HVC がどの
+PSCI 呼び出しか。これは aiueos ADR-0015 が C から追い出した種類の仕事そのもの。
+
+`aiueos.hvt` の tender 自体は JVM + FFM であり amu 製ではない。オーナーの言う
+「amu をベースにした」を満たす経路は 2 つあり、片方は非目標である。
+
+- (i) userspace VMM の判断を Kotoba で書き、host の KVM/HVF に乗る — 実現可能
+- (ii) aiueos 自身が EL2/VMX を持ち type-1 hypervisor になる — ADR-0014 が firm non-goal
+  とし、aiueos の kernel execution は ring 3 / scheduler がまだ not yet
+
+## Decision
+
+**(i) を採る。新規 repo `kotoba-lang/vmm` を起こし、monitor の判断核を `.kotoba` で持つ。**
+
+1. **repo は分ける。** aiueos は deps.edn が security + Chicory だけという invariant を
+   持つ capability broker であり、I/O も policy も持たない boot-protocol 判断の library は
+   別の product。依存は一方向 — aiueos がこれを consume してよく、逆は無い。
+
+2. **判断は `.kotoba`、機構は `aiueos.hvt`。** ioctl / mmap / byte 移動 / KVM_RUN は
+   機構として hvt に残す。image の admission、layout の決定、address の分類、PSCI の
+   dispatch は判断であり compile する。
+
+3. **ship するのは artifact であって compiler ではない。** runtime 依存は
+   `kotoba.kir`（`resources/vmm/oracle/*.kir.edn` を実行）、amu は test-only。
+   source と artifact が乖離したら落ちる freshness gate を置く — さもなければ
+   `.kotoba` は documentation になり、host は古い判断を実行し続け、**他の test は
+   全部 artifact を実行しているので緑のまま**になる。
+
+4. **実装は 1 つだけ。** host namespace は KIR を実行する。host 側の都合で規則を
+   書き直さない（mirror は、この分割が消そうとしている失敗であって作る物ではない）。
+
+5. **非目標は ADR-0014 のまま。** type-1 hypervisor を作らない。QEMU の device zoo に
+   並ばない。`aiueos.virtio` の複製を作らない。
+
+## M0 — 2026-08-23 landed（実測）
+
+`kotoba-lang/vmm` に 2 つの決定核。12 test / 64 assertion 緑。
+
+- `kotoba/arm64_boot_core.kotoba` — Linux `Documentation/arch/arm64/booting.rst` を
+  段階的 admission として。Image header（magic / image_size / text_offset / flags bit0）、
+  2 MiB aligned base、2 MiB 以内かつ kernel base から 512 MiB 以内の DTB、initrd、
+  entry contract（x0 = DTB、x1..x3 = 0、PC = image start）。
+- `kotoba/exit_core.kotoba` — virt address map を data として。PL011 と 32 台の
+  virtio-mmio、access size、window straddle、PSCI function id。
+
+**実測で分かったこと（設計に効いた）**:
+
+- `rem` はこの target に admitted lowering が無い。quot と乗算で書く。
+- ABI の `max-parameters` は 5。8 引数の `admit-boot` は通らないので、header /
+  kernel / dtb / initrd の 4 段に割った。**結果的にその方が良い形**だった — 各段が
+  自分に必要な事実だけを名乗る。
+- KIR interpreter に host から record を渡す経路は無い（murakumo の parity test が
+  record を Kotoba 側で組み立てているのはそのため）。export は scalar 引数にする。
+- `[:result T E]` は interpreter から `[ok? payload]` の vector で返る。
+
+**両方向を確かめてから landed とした**（CLAUDE.md「落ちない gate は劇場」）:
+reason literal を 1 つ改名して regenerate しない状態では freshness gate が落ち、
+regenerate すると**その literal を pin している 2 つの assertion だけ**が落ちた。
+壊したものと報告されたものが一致している。
+
+## 正直な現在地
+
+**まだ 1 つも OS を起動していない。** `aiueos.hvt` にこの core を呼ぶ call site は無く、
+この repo の何も `/dev/kvm` に当たっていない。FDT（devicetree）の byte 構築も無い。
+README と repo ADR-0001 にそう書いてある。
+
+## Milestones
+
+- **M1** — FDT 構築核（header / string block / node layout / `/memory` /
+  `/chosen` の bootargs と `linux,initrd-*` / virtio-mmio node）。
+- **M2** — `aiueos.hvt` が自前の定数ではなくこの core を呼び、実際の arm64 Linux
+  kernel が virtio console まで到達する。**gate は guest 自身の `/proc/version` を
+  載せた receipt**。基盤は ADR-0014 V0 と同じ Lima vz nested-virt 越しの aarch64
+  Linux `/dev/kvm`（この Mac の macOS/HVF は V2）。
+- **M3** — macOS/HVF backend。`com.apple.security.hypervisor` entitlement が gate。
+- **M4** — x86_64。long mode entry、Linux boot protocol の boot_params、e820。
+
+**主張が真になるのは M2 である。** それまでこの repo は、誰も起動していない guest に
+ついて正しく判断しているだけであり、その旨を README が述べる。
+
+## References
+
+- aiueos ADR-0014（self-owned VMM / hvt tender、option C V0 landed 2026-07-17）、
+  ADR-0015（decision-free C mechanism boundary）、ADR-0011（hosted-Linux PID-1 profile）
+- root ADR-2607022400（tender / guest 語彙、Solo5 split）、ADR-2607241100（機構と判断の分離）
+- root ADR-2608136000（測れなかった検査が、測って問題が無かった検査と同じ値を返す）
+")))

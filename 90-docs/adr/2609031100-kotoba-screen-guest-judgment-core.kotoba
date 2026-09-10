@@ -1,0 +1,175 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609031100-kotoba-screen-guest-judgment-core")
+  (:adr/topic "kotoba-screen-guest")
+  (:adr/status "accepted")
+  (:adr/title "ADR-2609031100: kotoba-lang/screen — 画面認識・操作・状況把握の判断核を Kotoba guest として実装する")
+  (:adr/body "# ADR-2609031100: kotoba-lang/screen — 画面の判断核を Kotoba guest として実装する
+
+**Status**: accepted (2026-09-03)
+**Deciders**: Jun Kawasaki (owner 指示「これらを kotoba lang org repo で kotoba言語, kotoba compile, amu native で lib 設計実装」)
+
+## Context
+
+cloud-itonami resident (cloud-itonami-app) が持つ 3 つの画面系能力の現在地を 2026-09-03 に実測した:
+
+1. **Computer Use (focus-free 操作)** — `agent_control.clj` に computer tools 7 本
+   (tree/menu/screenshot/press/menu_press/set_value/scroll) が実装済み。
+   しかし machine gate (`computer-available?`) が CuaDriver 未導入で false、
+   全 125 bot の `:bot/computer?` grant が false。**実装は在るが発火条件が 2 段とも空**。
+2. **Chronicle (rolling screen context / \"appshots 的\" 状況把握)** —
+   360 frame ローリング + tesseract OCR 5.5.1。`screen-context-enabled? true` だが
+   `:chronicle/permission-required` が state に記録され、最新 frame が 2026-08-31 で停止。
+   さらに**構造的制約**: screen OCR / operation memory は local provider のときだけ
+   bot の context に暗黙供給され、cloud model には渡さない設計 (bots.clj 3240 行付近)。
+3. **分離 browser** — 94/125 bot が `browser-ready? true`。browser_snapshot で
+   accessibility tree を読める。こちらは生きている。
+
+これらの**判断部分**(tree digest の一致検証、frame の差分・重複判定、スナップショットの
+正規化と射影、操作意図の妥当性検査)は cloud-itonami-app の JVM 内に埋め込まれており、
+**kotoba-lang の再利用 lib としては存在しない**。
+
+既存資産の棚卸し (repo-search + concept-lookup 実測):
+
+| 既存 | 内容 | 本件との境界 |
+|---|---|---|
+| `kotoba-lang/computer-use` | Anthropic computer-use スタイルの **agent ループ** (.cljc、langgraph-clj ベース、IComputer protocol + backend 10 種、macOS backend は cliclick/osascript) | agent loop と host 実装を所有。**判断核の言語面は持たない** |
+| `kotoba-lang/kuro` / `kobo` | terminal model/workbench (純 .cljc + nbb host) | 画面系ではない |
+| `kotoba-lang/utsushi` | 時間メディアの filtergraph (cljc + EDN) | 動画 codec 面。画面把握ではない |
+| cloud-itonami-app `chronicle.clj` | frame capture + OCR + context 供給 | **実装は app 固有**。判断核が JVM に閉じている |
+| aiueos ADR-0007 (2606290740) | computer-use を能力隔離 surface で実施 (computer-virtual/vm/host) | host 側隔離の正本。guest 側判断核は別件 |
+
+ Kotoba 言語側の現在地 (実測):
+- amu `check`/`compile` --jvm-free が動く (x86_64/aarch64 native backend 実在、
+  native_executor_test が実プロセス実行を証明済み)。
+- capability catalog (lang/capability-catalog.edn) に **screen 系 capability は 1 つも無い**
+  (grep 0 件実測)。:clock/now (wire id 7) 等の前例がある。
+- `[:map :i64 :i64]` + `assoc`/`count`/`get` は stdlib/core.kotoba で wasm32 実証済みだが、
+  **単一ファイル route では typed-map の lowering が拒否される** (kb_map3 実測:
+  \"operation has no admitted lowering\")。multi-file project route (--source-path) 経由が正経路。
+- 文字列 builtin は string-length/string=/string-concat/string-substring のみ (grammar 実測)。
+  正規表現・数値→文字列は無い。
+
+## Decision
+
+### 1. 新規 west project `kotoba-lang/screen` を起こす
+
+名前は family 面 (`kotoba-` は org セグメントが既に担うので裸の `screen`)。
+4 面規則 (ADR-2608040100) では role 面でも origin 面でもない**再利用ライブラリ = subject/family 面**。
+既存 family の形が elision に優先し、`kotoba-lang` org 配下の短名 lib の慣行
+(kuro/kobo/noise/mesh) と同じ形。
+
+### 2. 層の分離 — utsushi と同じ哲学
+
+| 層 | 哲学 | 実体 |
+|---|---|---|
+| ① 判断核 (純 guest) | **`.kotoba` 正本**。画面モデル・差分・digest・意図検査。effect ゼロ | `screen.model` / `screen.diff` / `screen.intent` |
+| ② 能力シーム | capability 宣言のみ。host が実装を注入 | `:host/screen-observe` / `:host/screen-act` |
+| ③ host provider | macOS CuaDriver / aiueos computer-virtual / mock | **本 repo に書かない**。cloud-itonami-app / aiueos 側 |
+
+**libavcodec を .kotoba で書き直さない (utsushi) と同じ線**: screencapture・OCR・
+accessibility tree 収集・入力合成を guest に持ち込まない。guest は
+「host が渡した有界データへの判断」だけを行う。
+
+### 3. Kotoba 言語での書き方 — capability 2 本を catalog に追加
+
+`lang/capability-catalog.edn` に wire id 31/32 で追加:
+
+```edn
+ :screen/observe
+ {:source-operation screen/observe :effect :screen/observe :compiler-wire-id 31
+  :source-status :friendly-qualified}
+ :screen/act
+ {:source-operation screen/act :effect :screen/act
+  :compiler-wire-id 32
+  :source-status :friendly-qualified}
+```
+
+- **observe と act を分ける**のは stream/accept と stream/send (wire id 25/26) と同じ分離:
+  「画面を見る」権限は「操作する」権限を含まない。
+- source は `(:capabilities #{:screen/observe})` + `(screen/observe request)` の friendly 形。
+  数値 wire ID は wire ABI であって source 語彙ではない (ADR-2607279200 §2)。
+- act は **expect digest を必須引数**にする。cloud-itonami-app の computer tools と同じ
+  fail-closed: guest が読んだ tree の digest を quote し忘れた操作は型で書けない。
+
+### 4. 判断核の API (`.kotoba`、effect ゼロ)
+
+```
+screen.model — スナップショット値の正規化
+  normalize-node    : ノード (ref, role, label, rect, digest) の整形・有界化
+  rect-overlap?     : 矩形交差判定 (命中検査)
+  rect-center       : 矩形中心
+  point-in-rect?    : 点在判定
+  tree-depth        : 入れ子の深さ (有界検査)
+  count-nodes       : ノード数 (quota 検査)
+
+screen.diff — 状況把握 (chronicle の判断部分の汎用化)
+  text-digest-equal?  : 前回 frame と同一か (chronicle の duplicate? 判定に対応)
+  frame-changed?      : OCR テキスト digest + アプリ名で差分判定
+  window-title-matches? : 対象アプリの同定
+
+screen.intent — 操作意図の検査 (computer tool の guest 側前置検査)
+  valid-press?        : ref 形式 (@a12) と expect digest の有無を検査
+  valid-set-value?    : 書き込み先 ref + expect + 有界テキスト長
+  valid-scroll?       : 方向 enum と expect
+  action-summary      : 承認カード用の 1 行サマリ (approval-summary の判断部分)
+```
+
+正規表現が無い言語制約は `string-contains?`/`string-length` で代替する
+(css の .kotoba 移植で実測済みの同じ制約)。
+
+### 5. 最初の垂直 slice — mock host で e2e
+
+```
+host (nbb/Node, 本 repo 同梱の mock) が仮想画面の tree/frame を用意
+  → guest (.kotoba compile、:js-kotoba-v1 または x86_64 native) が
+    observe request を受けて tree を正規化・digest 化
+    → intent 検査を通した press を host に返す
+    → host が tree digest を検証して受理/拒否
+```
+
+host 側 mock は computer-use の `mock-computer` (仮想スクリーン、決定的レンダリング) の
+データ形状を借りる。**本 repo は mock host まで**。実 host (CuaDriver / aiueos computer-virtual)
+への配線は cloud-itonami-app / aiueos 側の follow-up。
+
+### 6. 検証ゲート (Q9 準拠)
+
+- `amu check` / `amu compile --jvm-free` で **x86_64 native を出して走らせる**
+  (kexe loader 経由の実プロセス実行)。
+- oracle は content-addressed golden vector (期待値を fixture に焼く) +
+  nbb で回す .cljc oracle (kuro の parity 規律と同じ)。
+- `java`/`javac`/`clojure`/`clj` を build/acceptance で使わない。
+
+## Non-goals
+
+- OCR・screencapture・accessibility 収集の guest 実装 (host capability の責務)
+- agent loop (computer-use repo の責務)
+- macOS 以外の host 実装 (provider は利用側)
+- chronicle の置き換え (cloud-itonami-app 固有の capture scheduler はそのまま)
+
+## Consequences
+
+- (+) 画面系の「判断」が Kotoba guest として content-addressed になり、
+  定義 CID で消費者 (cloud-itonami-app / kobo / aiueos) が同一判断核を pin できる。
+- (+) observe/act の権限分離と expect digest が言語の capability モデルに乗るため、
+  「読んだ tree と違うものを操作する」コードが**コンパイルできなくなる**のではなく
+  **走らせられない**形で fail-closed する。
+- (−) typed-map の lowering が project route 専用という現在地により、
+  多ファイル構成が必須になる (単一ファイルで完結しない)。
+- (−) capability catalog への追加 (wire id 31/32) は kotoba-lang/kotoba-lang への
+  変更を伴う。wire id は stable に保つ (catalog の invariant)。
+- (中立) chronicle の停止 (permission-required) は本 ADR では直さない。
+  直すなら cloud-itonami-app 側の Screen Recording 再許可。
+
+## References
+
+- 実測 (2026-09-03): cloud-itonami-app `bots.clj` / `agent_control.clj` / `desktop.clj` /
+  `chronicle.clj`、`itonami bots list` (125 bots、computer? 0 / browser? 94)、
+  chronicle frame 318 枚・最新 2026-08-31、CuaDriver 未導入、
+  amu check/compile --jvm-free 動作、capability catalog screen 0 件
+- `kotoba-lang/computer-use` ADR-0001 (IComputer + backend)
+- `kotoba-lang/utsushi` CLAUDE.md (層分離の哲学)
+- aiueos ADR-0007 (computer surface 隔離) / ADR-2606290740
+- kuro CLAUDE.md (parity 規律) / css の .kotoba 移植 (言語制約の代替パターン)
+")
+  (:adr/authoritative true)
+  (:adr/repo "kotoba-lang/screen")))

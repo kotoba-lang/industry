@@ -1,0 +1,227 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2608010500-closing-x402-payment-plane-session")
+  (:adr/doc_type "adr")
+  (:adr/source-format "edn")
+  (:adr/authoritative true)
+  (:adr/status "accepted")
+  (:adr/date "2026-08-01")
+  (:adr/last_verified "2026-08-01")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/title "ADR-2608010500: closing — x402 決済面が本番で閉じた（初の有料推論・リプレイ防止・RPC 非依存検証）、および法的構成・運営母体の確定")
+  (:adr/topic "closing-x402-payment-plane")
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/network-awai/cloud-murakumo" "orgs/kotoba-lang/pay"
+              "orgs/kotoba-lang/treasury" "orgs/kotoba-lang/dynamics" "orgs/kotoba-lang/murakumo"))
+
+  (:adr/authoritative_for
+  (vector "本セッション（2026-07-31〜08-01）の着地点と残ギャップの正本。次の agent が会話履歴なしで再開するための resume point"
+   "x402 決済面の現在地: 有料推論が本番で通り、リプレイが本番で止まり、Worker から RPC に到達できない状態でも検証が通る"
+   "murakumo.cloud の運営母体・法的構成の確定（AWAI Network, L.L.C. 単独運営、財団を作らない、custody を設計で回避）"
+   "**支払い1件は需要ではない**という読み方の固定 — 買い手 = operator であり acceptance density は動いていない"))
+
+  (:adr/supersedes (vector))
+  (:adr/superseded_by (vector))
+  (:adr/amends (vector))
+
+  (:adr/related
+  (vector "90-docs/adr/2607319000（運営者 = AWAI Network / value-accrual cohort。誤りを訂正済み）"
+   "90-docs/adr/2607319500（Aethir 型 developer compute 設計、proposed）"
+   "90-docs/adr/2607319800（D3 実装 + kotoba-lang 層別実現可能性検証）"
+   "90-docs/adr/2607320000（参加導線 4 つの扉、proposed）"
+   "90-docs/adr/2607320500（法的構成の決定）"
+   "90-docs/adr/2608010000（不変ストア上の可変 state — 訂正と設計）"))
+
+  (:adr/problem
+  "オーナー指示 `closing`（2026-08-01）。本セッションは murakumo.cloud のトークンエコノミー調査から始まり、実際に $0.10 を送金して有料推論を通すところまで到達した。着地点・検証結果・残ギャップ・再開手順を1箇所に固定する。")
+
+  (:adr/decision
+  "### 1. x402 決済面は本番で閉じた
+
+**実測（2026-08-01、production）:**
+
+```
+支払い    0x50c58ac4…54b7cec  100,000 USDC micros ($0.10) on Base
+配信      10 回（$0.01 × 10）
+11 回目   402 \"payment already redeemed: payment-exhausted\"
+RPC       Worker からは全公開エンドポイントに到達不能のまま
+```
+
+**RPC が全滅した状態で 10 回配信できたことが、view 経路が実際に効いている証拠である。**
+
+### 2. 直した欠陥（すべて実支払いを通そうとして発見）
+
+| # | 欠陥 | 直し方 |
+|---|---|---|
+| 1 | 検証失敗の理由が6種類とも `settlement-unverified` に潰れていた | `authorize` の `:detail` を出す（`16c6f6a`） |
+| 2 | **売っている resource が配信不能だった** — `/x402/v1/messages` は anthropic に解決するがその upstream は未設定 | 広告を `/x402/v1/chat/completions` へ（`4347e6c`） |
+| 3 | 未設定 upstream が **paid path で 500** | machine-readable な 503 に |
+| 4 | **リプレイ防止が存在しない** — 同じ txHash で無限に配信できた | 消費「額」を KV に記録（`ed53329`） |
+| 5 | RPC 障害が `:tx-not-found` として payer に届いていた | `:rpc-unavailable` を分離し 503 に（`3826dc9`） |
+| 6 | 検証が毎回 RPC に依存 | 検証済み receipt を CID 相当の鍵で memo 化 |
+
+**2 が最も重い**: murakumo は、自分が配信できない唯一の resource を広告し、値付けし、支払いを受け取っていた。
+
+### 3. リプレイ防止はフラグではなく「消費額」
+
+$0.10 を $0.01 の請求に対して払った買い手は **10 回分の権利がある**。x402 にお釣りは無く、売り手だけが残額を履行できるので、**フラグ方式は $0.09 の没収**になる。
+
+不変条件（テストで固定）: 拒否は budget を消費しない / 予約してから配信（逆順だと書き込み失敗が無限の無料利用）/ KV 未設定も KV エラーも 402（fail closed）/ 非整数・負・nil は強制変換せず拒否。
+
+**正直な限界（コードに明記）**: Workers KV に CAS が無いので、同一 txHash の同時提示は両方通りうる。露出は (並列度 × 単価) であって無限ではない。厳密解は txHash を鍵にした Durable Object 直列化器。
+
+### 4. 不変ストア上の可変 state — agent の誤りを訂正
+
+agent は「IPFS/B2 に可変 state は構造的に載らない」と書いた。**誤り。** kotobase の Merkle-LSM が R2 上で 10M scale で動いており（ADR-2607211343）、ADR-2607310900 が content-addressed memo を実測付きで確立していた。**自分のリポジトリに答えがあるものを不可能と断じた。**
+
+正しい分解: **可変なのは root ポインタ1つだけ**、他は不変セグメント、派生物は (root-CID, view) 鍵。更新を「編集」でなく「新しい root」で表現するので、**無効化の経路が存在しない**（head が変われば別の鍵）。
+
+撤回しない部分: 素朴な 1:1 マッピングは成立しない。ブロック生成も対象外。
+
+### 5. 法的構成
+
+- **運営母体 = AWAI Network, L.L.C.**（Delaware, file 10704996）。**etzhayyim は法人ではなく AWAI 内部の機能名**（オーナー確認）。したがって **ADR-2607299900 が要求する『発行体 ≠ 運営者』の分離は現在存在しない** —— 満たすには新設が唯一の道
+- **日本法人は murakumo.cloud / kotobase.net と無関係**（オーナー指示）。legal 文書から除去済み
+- **財団を作らない**。Aethir 型（保有者還流 $0）にそもそも発行体は要らない
+- **custody を設計で回避**: protocol fee は invoice、bond は取らない。オーナー要件「資産預かりたくないけど手数料は欲しい」を満たす唯一の形。回収の梃子は資金でなく **registry からの一時停止（役務の停止）**
+
+### 6. ingest は fleet 経路（A 案）で常駐稼働
+
+`com.gftd.murakumo-x402-ingest`（60秒間隔、`exit 0`）。Worker の egress は公開 RPC に弾かれるが**フリートからは通る**ため。fleet-ci が同じ形で 235 receipt の実績を持つ系にジョブを1本足した形。
+
+トークンは **mode 600 ファイル**から読む（**launchd 下では kagi が Keychain unlock を出せず timeout する** — fleet-ci が先に踏んだ壁）。plist は world-readable なので値を書かない。")
+
+  (:adr/verification
+  "{:production
+    [{:what \"paid inference end-to-end\" :result \"HTTP 200, X-PAYMENT-RESPONSE 付き、Qwen3.6-35B-A3B が応答\"}
+     {:what \"replay bound\" :result \"10 served / 11th 402 payment-exhausted\"}
+     {:what \"RPC-independent verification\" :result \"公開 RPC 全滅下で 10 回配信\"}
+     {:what \"ingest push\" :result \"{:accepted 1 :rejected 0} http=200\"}
+     {:what \"launchd runner\" :result \"runs=2, last exit code = 0\"}]
+    :test-suites
+    [{:repo \"kotoba-lang/pay\" :result \"52 tests / 275 assertions, 0 failures; clj-kondo 0/0\"}
+     {:repo \"kotoba-lang/treasury\" :result \"18 tests / 67 assertions, 0 failures; clj-kondo 0/0\"}
+     {:repo \"kotoba-lang/murakumo\" :result \"31 tests / 143 assertions, 0 failures（変更前 21/103）\"}
+     {:repo \"kotoba-lang/dynamics\" :result \"25 tests / 340 assertions, 0 failures\"}
+     {:repo \"cloud-murakumo\" :result \"npm run release 4 builds 0 warnings; test:billing passed（毎 deploy 前）\"}]
+    :not-run
+    [{:what \"dynamics の全テストスイート\" :why \"dsl-core の kotoba.dsl.problem → problem.kotoba 移行で nbb から require 不能（ADR-2607259800 follow-up 5 の既知問題、本変更と無関係）。dynamics.core-test のみ実行\"}
+     {:what \"treasury の materialized view を production Worker 経路で\" :why \"Worker はまだ verify-from-view を呼んでいない。ingest が書いた KV レコードを既存の cached-onchain が読む形で成立しており、view 関数自体の production 呼び出し元は無い\"}]}")
+
+  (:adr/known-gaps
+  "[{:gap \"acceptance density は動いていない。x402 settled は 1 だが買い手 = operator\"
+     :priority 1
+     :note \"**これは需要ではない。** ADR-2607300100 が同じ罠を記録している（本番で指標を検証する行為が指標を動かした）。この 1 件を外部需要として読まないこと\"}
+    {:gap \"operator self-payment としてのラベルが未記録\"
+     :priority 1
+     :note \"上記と対。台帳上でこの支払いが operator 自身のものだと後から判別できる必要がある\"}
+    {:gap \"Base Safe が 1-of-1 のまま（Ethereum は 2-of-3）\"
+     :priority 2
+     :note \"オーナー保留。x402 は Base で quote されるので収益を受けるのは弱い方。残高 USDC 0.1 / ETH 0.001。owner が addOwnerWithThreshold(0x7198b8e6…, 2) と (0x5c7aee90…, 2) を実行する\"}
+    {:gap \"MURAKUMO_BASE_RPC 未設定（keyed RPC が無い）\"
+     :priority 2
+     :note \"fleet ingest で回るので急ぎではないが、:not-in-view の即時フォールバックには効く。アカウント登録は owner 作業（安全床①）。kagi item 名は murakumo-base-rpc-url、投入は scripts/provision-rpc-key.cljs set\"}
+    {:gap \"KV に CAS が無く、同一 txHash の同時提示で二重配信しうる\"
+     :priority 2
+     :note \"露出は (並列度 × 単価)。厳密解は txHash を鍵にした Durable Object 直列化器\"}
+    {:gap \"MCC の terms と ADR-2607299900 の矛盾（governance）が未解決\"
+     :priority 2
+     :note \"live の terms.md が MCC を 'provides no governance' と公に記述する一方、sink (c) は stake 加重 governance。owner + 弁護士\"}
+    {:gap \"参加導線（ADR-2607320000）は proposed のまま。did:key 生成が壊れている\"
+     :priority 1
+     :note \"ブラウザ生成の did:key は base64 切り詰めで、失敗時 fallback はタイムスタンプ（鍵素材ゼロ）。既存 45 ノードは全部これ。/join /signup /pricing /store は 404\"}
+    {:gap \"ADR-2607319500 D5（分配 5%→20%）は proposed のまま\"
+     :priority 3
+     :note \"invoice 実装は記録された料率で請求するので、default-protocol-fee-bps は 500 のまま変えていない\"}
+    {:gap \"cloud-murakumo は pay / treasury を vendoring しており drift する\"
+     :priority 3
+     :note \"facilitator.cljc と treasury/core.cljc は今回 re-vendor 済み。pay/x402.cljc と pay/core.cljc は古い pin のまま\"}]")
+
+  (:adr/handoff
+  "{:default-branch-commits
+    {\"com-junkawasaki/root\" \"4589a2fe（west pin 前進）。ADR: 2607319000 / 2607319500 / 2607319800 / 2607320000 / 2607320500 / 2608010000 / 本 ADR\"
+     \"network-awai/cloud-murakumo\" \"b3ce5cf8\"
+     \"kotoba-lang/pay\" \"889eb0da\"
+     \"kotoba-lang/treasury\" \"9bf899da\"
+     \"kotoba-lang/dynamics\" \"99a76b41\"
+     \"kotoba-lang/murakumo\" \"e8af1e66（その後 a8331f92 まで他セッションが前進）\"}
+    :west-pins \"全て default branch tip と一致（behind_by=0 をサーバ側検証済み）\"
+    :standing-runner \"com.gftd.murakumo-x402-ingest（60s）。log: ~/.gftd/murakumo-x402-ingest.log\"
+    :next-commands
+    [\"# 残高と view の現在地\"
+     \"cd orgs/network-awai/cloud-murakumo && nbb --classpath src scripts/x402-ingest.cljs --lookback 3000\"
+     \"# 常駐ジョブの健全性\"
+     \"tail -5 ~/.gftd/murakumo-x402-ingest.log; launchctl print gui/$(id -u)/com.gftd.murakumo-x402-ingest | grep 'last exit'\"
+     \"# 有料経路の再検証（残 9 回分ある）\"
+     \"nbb scripts/x402_dogfood.cljs verify --tx 0x50c58ac4… --from 0xe255D685…\"]
+    :preserved-others-wip
+    [{:what \"superproject のローカル未 push commit 1 件\" :which \"da145a31659 'register cloud-itonami/shirohan'\"
+      :note \"他セッションの作業。触っていない。origin/main より 83 behind / 1 ahead の状態\"}
+     {:what \"cloud-murakumo の stash 1 件\" :which \"stash@{0} 'local build output before ff to b3ce5cf'\"
+      :note \"ff を通すため退避した生成物 5 件（public/legal/*.md, public/mobile/js/main.js, public/mobile/sw/service-worker.js）。**drop していない**\"}
+     {:what \"kotoba-lang/murakumo の open PR #194\" :which \"codex/kototama-component-deploy\"
+      :note \"別セッション（codex）。触っていない\"}
+     {:what \"多数の agent/* remote branch\" :note \"root 26本 / murakumo 30本 / cloud-murakumo 7本 等はすべて他セッションのもの。自分の 6 本のみ削除した\"}
+     {:what \"orgs/kotoba-lang/pay のローカル未コミット変更\" :which \"src/pay/x402.cljc, test/pay/x402_test.cljc\"
+      :note \"他セッションの WIP。破棄せず、pay 側の確認は remote ref から読んだ\"}]
+    :my-cleanup \"worktree 0 / 自分の local branch 0 / 自分の merged remote branch 6 本削除済み\"}")
+
+  (:adr/agent-corrections
+  "[{:what \"『etzhayyim を chain 軸に残すことが発行体と運営者の分離になる』\"
+     :correction \"誤り。etzhayyim は AWAI Network, L.L.C. 自身であり、分離は存在しない。ADR-2607319000 / 2607320500 で訂正済み\"}
+    {:what \"『IPFS/B2 に可変 state は構造的に載らない』\"
+     :correction \"誤り。kotobase の Merkle-LSM が R2 上で既に解いている。ADR-2608010000 で訂正・設計済み\"}
+    {:what \"『legal/ と public/legal/ が食い違っている』\"
+     :correction \"誤り。ローカル checkout が 128 commits 古かっただけ。fresh worktree で byte 一致を確認\"}
+    {:what \"legal/ を『serve されない複製』として削除し npm run prep を壊した\"
+     :correction \"prep が legal/*.md を public/legal/ にコピーする = legal/ が SOURCE だった。復旧し、方向を README に明記。grep が \\\"legal/ 形式しか見ておらず cp legal/terms.md を取りこぼした — 判断が運悪く外れたのではなく確認方法が誤っていた\"}
+    {:what \"ICP の holders/fees 比を 1.0 に丸めた\"
+     :correction \"実測 1.259。同時に追加した整合性テストが検出。ADR-2607259800 の『異常は報告し正規化しない』に反していた\"}]")
+
+  (:adr/body
+  "# ADR-2608010500: closing — x402 決済面が閉じた
+
+## 一行で
+
+**$0.10 の実支払いで有料推論が本番で通り、リプレイが止まり、そして RPC が全滅した状態でも検証が通るようになった。** その過程で 6 件の本番欠陥が見つかり、全部直した。
+
+## 何が本当に起きたか
+
+調査（トークンエコノミーの設計を読む）から始まり、実際に金を動かして初めて分かったことが多い:
+
+```
+07-31  x402 offer は live、しかし誰も払ったことがなかった
+       → $0.10 を送金
+       → 402 settlement-unverified   … 理由が分からない（6原因が1文字列に潰れていた）
+       → :detail を出す
+       → 500 Worker threw exception  … 売っている resource が配信不能だった
+       → 広告先を配信可能な path へ
+       → 200 ✅ 初の有料推論
+       → 同じ tx で2回目も 200      … リプレイ防止が存在しなかった
+       → 消費額を記録
+08-01  → RPC が Worker から全滅      … payer に「あなたの取引は存在しない」と言っていた
+       → :rpc-unavailable を分離、view を導入、fleet ingest を常駐化
+       → RPC 全滅のまま 10 回配信 → 11 回目 402 ✅
+```
+
+**机上では1つも見つからなかった。全部、実際に払ってみて出た。**
+
+## 最も重い発見
+
+**murakumo は、自分が配信できない唯一の resource を広告し、値付けし、支払いを受け取っていた。**
+
+`/x402/v1/messages` は anthropic プロバイダに解決するが、この deployment に anthropic upstream は無い（`/api/v1` はずっと `\"anthropic\": null` と言っていた）。買い手の USDC は serve より前に確定するので、失敗様式は「払う → 検証通過 → 500 → 役務なし → 返金経路なし」だった。
+
+## リプレイ防止をフラグにしなかった理由
+
+$0.10 を $0.01 の請求に払った買い手は 10 回分の権利がある。x402 にお釣りは無く、**売り手だけが残額を履行できる**。フラグ方式は $0.09 の没収である。
+
+## 訂正した自分の誤り
+
+このセッションで agent は5回、断定して間違えた（詳細は `:adr/agent-corrections`）。特に2件は**自分のリポジトリに答えがあるものを「不可能」「食い違っている」と断じた**もので、どちらも指摘を受けて訂正した。
+
+`npm run prep` を壊した件は、grep が `\"legal/` 形式しか見ておらず `cp legal/terms.md` を取りこぼしたことが原因で、**判断が運悪く外れたのではなく確認方法が誤っていた**。
+
+## 次の agent へ
+
+**最優先は acceptance density**。x402 settled は 1 になったが、買い手は operator 自身である。**これは需要ではない。** ADR-2607300100 が同じ罠を記録している —— 本番で指標を検証する行為が、その指標を動かした。
+
+次点は **参加導線**（ADR-2607320000）。`/join` `/signup` `/pricing` `/store` は全部 404 で、トップページのリンクは CSS 1本のみ。バックエンドは揃っているのに入口が無い。ただしその前に **did:key 生成が壊れている**（base64 切り詰め、失敗時 fallback はタイムスタンプで鍵素材ゼロ、既存 45 ノードは全部これ）ので、口座を直すのが先である。")))

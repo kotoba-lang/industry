@@ -1,0 +1,35 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2607183500-kami-media-recording-production-audio-mix")
+  (:adr/title "KAMI media applications add project recording and production audio mixing")
+  (:adr/date "2026-07-18")
+  (:adr/status "accepted")
+  (:adr/authoritative true)
+  (:adr/topic "kotoba-lang-media-authoring")
+  (:adr/supersedes (vector "adr-2607183400-kami-media-bus-send-cross-dissolve"))
+  (:adr/decision
+  (map (:daw (map (:recording (map (:capture :get-user-media)
+                     (:encoding :media-recorder)
+                     (:decode :audio-buffer)
+                     (:project-result :new-clip-at-current-tick)))
+         (:authority "A completed microphone take receives an asset id and clip id and is scheduled by the same realtime and OfflineAudioContext paths as imported media.")))
+   (:nle (map (:audio-mix (map (:clip-gain-range (vector 0 2))
+                     (:master-gain-range (vector 0 1.5))
+                     (:meter :dbfs)
+                     (:export :media-recorder-stream)))
+         (:authority "Per-clip gain is emitted by render-segments; clip gains, dissolve ramps and master gain precede the analyser and production export destination.")))
+   (:maturity (map (:kami-app-daw :逍遥) (:kami-app-nle :逍遥)))
+   (:remaining-commercial-gates (map (:daw (vector "punch-in and loop recording" "input monitoring" "plugin hosting" "LUFS/true-peak" "stem bundle"))
+                                (:nle (vector "pointer trim gestures" "proxy/cache" "color management" "multitrack audio EQ" "loudness and codec presets"))))))
+  (:adr/implementation
+  (map (:daw-commits (vector "cdb09ee"))
+   (:nle-commits (vector "68eaa66"))
+   (:evidence (vector "DAW and NLE CLJC suites each pass 5 tests and 14 assertions, including recorded clip construction and render-segment audio gain authority."
+              "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+              "DAW Chrome with a fake microphone captured 1.4 seconds, decoded the take, increased visible Recorded take clips from zero to one, and exported a 441044-byte master without console errors."
+              "NLE Chrome set clip gain 0.25 and master gain 0.5, measured a -27.05 dBFS peak, and exported a 173633-byte WebM without console errors."
+              "Both GitHub Pages workflows completed project checks, production release compilation and deployment successfully."))))
+  (:adr/consequences
+  (vector "DAW basic recording is no longer a commercial gap, although professional punch, comping and monitoring workflows remain open."
+   "NLE source audio level and master metering are production behavior rather than decorative controls."
+   "The maturity label remains unchanged because the remaining professional workflow and delivery gaps are still material."))
+  (:adr/source-format "edn")))

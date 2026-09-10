@@ -1,0 +1,156 @@
+(vector (map (:db/id -1)
+ (:adr/id "adr-2609105000-closing-the-artifact-and-the-gate")
+ (:adr/title "closing 2026-09-10: what built-rust-raw names, com-aave at 10 of 12, and the resume point")
+ (:adr/status "accepted")
+ (:adr/date "2026-09-10")
+ (:adr/related (vector "adr-2609102000-the-first-jvm-free-whole-component"
+               "adr-2609103000-what-built-rust-raw-names"
+               "adr-2609104500-com-aave-q9-gate-ten-of-twelve"))
+ (:adr/body "**This is the current resume point.** ADR-2609102000 carried the previous one;
+its own resume section has been updated in place and now points here.
+
+## What landed, and where
+
+Everything below is on the relevant `main`, verified by ancestry rather than
+by having pushed it:
+
+    root         24f2067   what built-rust-raw names (+ orgs-detectors repair)
+    root         4fcfd70   com-aave's Q9 gate, 4 of 12 to 10 of 12
+    root         4c8e0e4   west pin com-aave ce72cba -> e08071a
+    com-aave     e08071a   nbb reads nbb.edn, so the coordinate goes there
+
+No pull requests were left open. Every branch and worktree this session created
+was removed.
+
+## 1. built-rust-raw: answered by reproduction
+
+ADR-2609102000 listed three candidates and called it an owner decision. It is
+the first -- **a real artifact built elsewhere** -- and it was measured:
+
+    rebuilt with rustc 1.96.0     2118 bytes  ==  declared 2118
+    computed bafkreidytpismfkcitfathhfhibefvg6o4tgseipdd6tcvwstayenaitye
+    declared bafkreidytpismfkcitfathhfhibefvg6o4tgseipdd6tcvwstayenaitye
+
+The unmodified control produced a **different** CID, which is the only reason
+the agreement is evidence and not an echo.
+
+What it names: one 101-line `no_std` Rust crate in
+`kotoba-lang/cleanroom-browser-runtime/wasm-rs`, built 1,000 times, whose only
+per-actor input is a 3-line `actor_meta.rs`. **999 distinct CIDs are not 999
+distinct programs.** The artifact exports 9 functions over an untyped
+`Vec<Vec<u8>>`; the manifests declare 20 REST routes and 20 MCP tools. The
+404s are a declared-unfinished IPFS pin step, stated in the generating ADR's
+own Remaining line -- not loss, not corruption, not a Kotoba problem.
+
+## 2. com-aave: 4 of 12 to 10 of 12
+
+Six verifications landed. `whole-public-surface` is 33/34 with one declared,
+unreachable omission (`as-float`; aave's schema has zero float fields), and is
+recorded as a stated exception rather than scored green.
+**`consumer-resolution` is the only item left.**
+
+The headline measurement: **`amu` and the public `kotoba` CLI produce
+byte-identical artifacts** -- 22,078 bytes, identical provenance record, the
+publication record differing only in the output filename it was told to use.
+
+## Verification actually run, with counts
+
+    rust builds (control + aave)             2   both validated by wasm-tools
+    amu compile                              4   run1, run2, mutant, equivalence
+    kotoba -M compile                        1
+    capability policies exercised            4   both, clock-only, entropy-only, none
+    com-aave repository tests                6 tests / 98 assertions / 0 failures
+    kotobase bytes-plane probes              2   aave 404, control 200, same run
+    verify-adr-identity                      exit 0 (twice)
+    java/javac/clojure/clj invocations       0 in every measurement reported as
+                                               JVM-free -- and 4 when the trap
+                                               deliberately fired
+
+**Not green, and not mine:** `docs-edn-check --strict-keys` still exits 1. Two
+causes. `STRANGLER-FIG-MONTH1-DEPLOYMENT-SUMMARY.edn` has an unmatched
+delimiter -- pre-existing, untouched. And 806 `.edn` are in git but outside the
+sparse cone of a docs worktree, where the gate correctly refuses to report a
+pass on files it could not read. The third cause was
+`manifest/orgs-detectors.edn`, and that one **is** fixed.
+
+## New defects found, none of them fixed
+
+These came out of the trap and the controls, and each is a separate change:
+
+1. **The public `kotoba` CLI starts a JVM.** `check --source-path`, `inspect`
+   and `definition-cids` shell out to `clojure -M:run`. The contract says
+   `:public-cli {:jvm-launcher-forbidden true}`. `amu --jvm-free` fails closed
+   as specified; the `kotoba` driver has no such flag on these paths.
+2. **`kotoba -M check` on a relative path** reports `input could not be read`
+   -- the identical message a genuinely missing file produces. This produced a
+   wrong reading mid-session that would have declared the whole contract
+   blocked.
+3. **The contract documents an invocation that does not run.**
+   `:public-cli :source-check` reads `kotoba check --safe <entry>`; the CLI
+   requires the `-M` boundary and has no `--safe`.
+4. **`:kotoba/admission-denied` does not name which effect was denied.** With
+   two capabilities that is a short search. It will not stay short.
+5. **`manifest/orgs-detectors.edn` had two unescaped quotes** that closed
+   `:verify-itonami-run-path`'s `:why` early, leaving four symbol keys and a
+   truncated string that read clean. Fixed here; the class is the one this
+   workspace keeps rediscovering.
+
+## Resume point, in priority order
+
+1. **`consumer-resolution` for com-aave** -- the last of the twelve. Note what
+   ADR-2609103000 established: there is no working incumbent artifact and no
+   external consumer of `aave.main`, so nothing is being regressed. Removing
+   the obstacle is not the same as doing the work.
+2. **The four malformed `ns` forms** (kouhou, shinshi-growth-actor, tashikame,
+   wt-kouhou). Deliberately left unfixed until a detector existed;
+   `scripts/verify-ns-form-loadable.cljs` exists now. Untouched this session.
+3. **The public CLI's JVM fallback (defect 1 above).** It sits directly under
+   `kotoba only`: half the contract's build path is not JVM-free, and nothing
+   was measuring it because nobody ran the public CLI under a trap.
+4. **`jvm-build` 452 if the goal is repository count; `jvm-source` 207 if the
+   goal is the language.** Unchanged from the previous resume point. They are
+   different goals and the owner has said both. **`jvm-runtime-deps` is still
+   the wrong axis** -- it removes third-party JVM libraries, not the JVM.
+
+## Owner decisions still open, none of which an agent should take
+
+- **Whether 1,000 manifests may keep advertising capabilities their artifacts
+  do not implement.** This is the substantive finding of ADR-2609103000 and a
+  truthfulness question about published manifests, not a build question.
+- **Whether to pin that corpus as-is.** The bytes reproduce on demand, so
+  pinning is cheap -- but it makes 1,000 stubs retrievable at addresses whose
+  manifests overstate them. Deliberately not done here.
+- **Rust provenance against ADR-2607072000**, which says Rust is not written in
+  kotoba-lang. The crate producing all 1,000 artifacts lives there today.
+- **Whether com-aave's `.nbb/` cache should be committed.** Untracked and
+  unignored. Committing it makes the JVM-free test path work on a cold
+  checkout; the directory is hash-named per resolved dependency set.
+- Carried forward, unchanged: who consumes
+  `did:web:etzhayyim.com:actor:aave-compat`; whether `weight-kototama`'s stored
+  snapshot prefixes may be re-addressed; whether wave-1's 20 pilots are
+  re-qualified or retired.
+
+## Left alone deliberately, belonging to other sessions
+
+Reported rather than cleaned, per the rule that a closing session tidies only
+its own work:
+
+    15 codex/* worktrees + branches      register-*, chicory-*, migrate-nbb-edn,
+                                         kotoba-native-commands, spotwork-extract
+    3 stashes                            rule-kaizen x2, kaizen ledger WIP
+    3 non-codex worktrees                itonami-growth-bot, wt-hp, wt-tsukuru-scout
+    orgs/kotoba-lang/amu                 2 modified docs files, 37 behind its pin
+    orgs/kotoba-lang/kotoba-lang         commits on bot/migrate-ledger-tick68
+
+The superproject checkout is on a **detached HEAD, 25 behind origin/main**. It
+was already detached at session start and is the shared integration checkout,
+where the standing rule forbids branch switching. Left as found.
+
+## Reproduce
+
+Both prior ADRs carry their own reproduce sections and they still hold. The one
+thing worth repeating because it cost time: **the trap must be proven to fire
+before an empty trace means anything**, and in this session it fired twice on
+paths nobody predicted -- the public CLI, and nbb's own dependency resolution
+shelling out to babashka. A trace never tripped is indistinguishable from a
+trace that cannot trip.")))
