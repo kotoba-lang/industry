@@ -75,6 +75,18 @@
    :status :unverified
    :security-policy "SECURITY.md"
    :evidence "Web3/Passkey popup entry; exact origin, window and random state checked before PDS token verification. Built with zero warnings; live login unverified."}
+  {:project "cloud-murakumo-app"
+   :path "orgs/network-awai/cloud-murakumo-app"
+   :role :client
+   :surface "murakumo.cloud/fleet/ — the operator console"
+   :active-methods #{:siwe-erc1271 :webauthn-passkey :siwe-erc191}
+   :default-method :siwe-erc1271
+   :delegates-to "net-kotobase/authn (auth.kotoba.cloud)"
+   :status :unverified
+   :verification-status :source-only
+   :security-policy "SECURITY.md"
+   :evidence "2026-09-10 registered on the owner instruction to replace API-key management with a WebAuthn-owned smart account. `cloud-murakumo.fleet-auth` is SOURCE ONLY: 6 tests / 20 assertions, every refusal branch pinned to its own sentence, and login separated from authorization (:read needs a session, :bind and :evict need a proof under 300s). NO LIVE CEREMONY HAS BEEN RUN and no route is deployed -- this is a policy surface declared before deploy as the policy requires, not a working login. An API key is explicitly not an admitted method here; MURAKUMO_TOKEN_SECRET continues to issue keys for MACHINE calls to api.murakumo.cloud, which is a different question and is untouched."}
+
   {:project "app-auth"
    :path "orgs/cloud-itonami/app-auth"
    :role :authority
