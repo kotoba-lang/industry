@@ -1157,7 +1157,32 @@
      :find "{:surface :thick :elevation :flat}"
      :replace "{:surface :thick :elevation #?(:clj :flat :cljs :raised)}"
      :cmd ["nbb" "test/appkit/cljs_runner.cljs"]
-     :must-fail ["desktop-panel-defaults-test" "default-opts-are-published-contract-test"]}]}
+     :must-fail ["desktop-panel-defaults-test" "default-opts-are-published-contract-test"]}
+
+    ;; --- runner: それ自身が起動できること（2026-09-10 追加）------------------
+    ;; 上の 3 件は「cljs で走らせれば捕まる」形だが、**runner 自身が起動しない**
+    ;; 形は誰も見ていなかった。runner は classpath を自分で解決するので素の
+    ;; `nbb <script>` で起動される —— つまり runner の ns が require できるのは
+    ;; **nbb が同梱している namespace だけ**である。被検体の側にこの制約は無い
+    ;; （appkit.core-test は runner が解決した classpath に載るので
+    ;; kotoba.lang.text を自由に require してよい）。
+    ;;
+    ;; 実測 2026-09-10、origin/main (4cf2199) がまさにこの形で壊れていた:
+    ;; 機械的な clojure.string -> kotoba.lang.text 置換 (74ad15c) が runner にも
+    ;; 当たり、`Could not find namespace: kotoba.lang.text` で **test を 1 本も
+    ;; load せずに死んでいた**。その間 `clojure -M:test` は 16 tests / 31
+    ;; assertions / exit 0 のままで、cljs の半分が暗転したことを何も言わなかった。
+    ;; runner は構造上 **自分の require を検査できない**（1 つでも解決できなければ
+    ;; そのファイルの中身は 1 行も走らない）ので、検査は JVM 側に置く。
+    ;; `cljs-runner-is-bare-launchable-test` は nbb の同梱集合を列挙せず
+    ;; **素の `nbb -e` に訊いて測る** —— 同梱集合は nbb 側が動かすものなので、
+    ;; 手で書いた一覧は黙って腐る。
+    {:id :appkit/runner-requires-a-classpath-namespace
+     :why "runner が素の `nbb <script>` で起動できること。classpath 上にしか無い namespace を runner の ns に足すと、cljs suite は 1 本も走らないまま消える —— そして JVM suite は緑のままなので、repo が出す信号は全部『問題なし』と言う。これは仮想の壊し方ではなく origin/main で実際に起きていた形そのもの"
+     :file "test/appkit/cljs_runner.cljs"
+     :find "            [clojure.string :as str]))"
+     :replace "            [kotoba.lang.text :as str]))"
+     :must-fail ["cljs-runner-is-bare-launchable-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
