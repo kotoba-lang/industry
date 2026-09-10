@@ -51,36 +51,39 @@
 ;; one of two slots; 2048 is ~140s. Nothing else in this file matters as
 ;; much: a 429 storm is mostly one long request holding a slot.
 ;;
-;; `context_length 65536`, and this number is NOT a free choice -- it is a
-;; floor imposed from the other side. Hermes refuses to start an agent whose
-;; window is under 64,000 (agent/model_metadata.py MINIMUM_CONTEXT_LENGTH,
-;; enforced in agent_init.py::_enforce_minimum_context, waived only for
-;; lmstudio) because its own system prompt plus tool schemas are a large
-;; fixed prefix. The first cutover set 16384 -- b70's live slot-context --
-;; and every agent job then died before its first turn with
+;; `context_length 262144` -- the model's own maximum, which is
+;; Qwen3.8-27B's `n_ctx_train`, and what gad's two slots actually serve
+;; (`--ctx-size 524288 --parallel 2`, read live off /props on 2026-09-10).
+;;
+;; Two floors meet here and both were measured, not reasoned about.
+;;
+;; From ABOVE: 262144 is a real ceiling, not a round number. Probing gad
+;; with `--ctx-size 1048576` on llama.cpp b9334 does NOT get capped -- it
+;; warns `n_ctx_seq (1048576) > n_ctx_train (262144) -- possible training
+;; context overflow` and then tries, and the allocation kills the device:
+;; `vk::Queue::submit: ErrorDeviceLost`. So 1M is the PLATFORM ceiling
+;; (cloud-murakumo-api's PLATFORM_TOKEN_LIMIT), reachable only by models
+;; that genuinely have a 1M window. This one does not.
+;;
+;; From BELOW: hermes refuses to start an agent whose window is under
+;; 64,000 (agent/model_metadata.py MINIMUM_CONTEXT_LENGTH, enforced in
+;; agent_init.py::_enforce_minimum_context, waived only for lmstudio),
+;; because its own system prompt plus tool schemas are a large fixed prefix
+;; -- 4,459 tokens with 19 tools before a single conversation turn. The
+;; first cutover set 16384, b70's live slot-context, and every agent job
+;; died before its first turn with
 ;;
 ;;   ValueError: Model murakumo-main has a context window of 16,384 tokens,
 ;;   which is below the minimum 64,000 required by Hermes Agent.
 ;;
-;; That was found by RUNNING a job, not by reading the file back: the
-;; rehearsal on a copied ~/.hermes produced byte-correct YAML for a value
-;; the agent rejects at startup.
+;; found by RUNNING a job, not by reading the file back: the rehearsal on a
+;; copied ~/.hermes produced byte-correct YAML for a value hermes rejects.
 ;;
-;; So 65536 is the smallest value Hermes will accept. It is honest about
-;; what the fleet CAN serve only while a >=64K head is up. Measured
-;; 2026-09-10: capacity-members are gad 262144, b70 16384, xavier 8192, and
-;; /ready reported `pool-available {gad 0, b70 2, xavier 1}` with `degraded
-;; ["fleet-incomplete" "primary-unavailable"]` -- i.e. the ONLY head that
-;; clears Hermes's floor was down. While that holds, a request whose prompt
-;; passes b70's window comes back
-;;
-;;   HTTP 400 "Input reserve exceeds this model's serving context window."
-;;
-;; measured, fast, and NOT a failover reason in hermes
-;; (agent_runtime_helpers.py maps 402/429/401, not 400), so it is a hard
-;; error rather than a walk down the fallback chain. Do not read the 65536
-;; here as a claim that 64K is available; it is the floor Hermes demands,
-;; and `--verify` measures whether any head actually clears it.
+;; ⚠ Do not lower this to the narrowest head's window. The murakumo pool
+;; routes by fit and EXCLUDES heads a request cannot fit, so the admitted
+;; window belongs to the widest head in the pool, not the narrowest --
+;; cloud-murakumo-api's own DEFAULTS say so at `murakumo-main`. b70 (16384)
+;; and xavier (8192) take what fits them; gad takes the rest.
 ;;
 ;; `cron.max_parallel_jobs 6`, where the default is UNBOUNDED. Measured from
 ;; 19,033 execution rows: median run 133s, mean 398s. 770 runs/day x 398s =
@@ -92,7 +95,7 @@
 ;; (cron/scheduler.py::_resolve_max_parallel_workers) and the pool is
 ;; module-global across every multiplexed profile, so this cap is GLOBAL.
 ;;
-;; ## What the endpoint could NOT do, measured 2026-09-10
+;; ## The outage this uncovered, and what fixed it (2026-09-10)
 ;;
 ;; The cutover landed and then a real job was run, which is the only step
 ;; that answers this. It failed twice, each time for a reason no amount of
@@ -105,28 +108,34 @@
 ;;
 ;; 2. With that fixed, the request reached the endpoint and came back
 ;;    `502 murakumo fleet unreachable: Error: connection_refused` in 0.2s.
-;;    Replaying Hermes's exact body with curl reproduced it, so it is the
-;;    request, not the client. Bisecting a synthetic prompt found a sharp,
-;;    repeatable boundary:
+;;    Replaying Hermes's exact body with curl reproduced it, so it was the
+;;    request and not the client. Bisecting a synthetic prompt found a
+;;    sharp, repeatable boundary:
 ;;
 ;;      3,018 prompt tokens (15,115 body bytes)   HTTP 200
-;;      ~3,200 prompt tokens (15,615 body bytes)  HTTP 502, no route-head header
+;;      ~3,200 prompt tokens (15,615 body bytes)  HTTP 502, no route-head
 ;;
-;;    The 502 carries no `x-murakumo-route-head` at all -- the router picked
-;;    no head. Above ~288k chars the gateway rejects cleanly with `400 Input
-;;    reserve exceeds this model's serving context window`; the band between
-;;    is where it forwards to nothing.
+;;    No `x-murakumo-route-head` on the 502 at all: the router picked NO
+;;    head. That is the tell. cloud-murakumo-api routes by fit and excludes
+;;    heads a request cannot fit, so with the only wide head out of the pool
+;;    every request above b70's window matched nothing.
 ;;
-;;    Hermes's MINIMUM request -- system prompt plus 19 tool schemas, before
-;;    a single conversation turn -- measured 4,459 tokens. That is above the
-;;    ceiling. So while this holds, api.murakumo.cloud cannot serve a Hermes
-;;    agent at all, and no setting in this file changes that. 17 of the 234
-;;    enabled jobs are `no_agent` scripts and never call an LLM; the other
-;;    217 all send that prefix.
+;;    ROOT CAUSE, on the head itself: `murakumo-ring.service` on gad --
+;;    `-c 524288 --parallel 2` on :8090, which the Worker's VPC service
+;;    reaches -- was `enabled` but in `failed` state. Its last STOP timed
+;;    out, systemd SIGKILLed it (`Result=timeout`, `status=9/KILL`), and
+;;    `Restart=on-failure` does not recover a unit that failed while
+;;    stopping. Nothing restarted it. `systemctl reset-failed` + `start`
+;;    brought back two 262144-token slots, and the same 16,000-char request
+;;    that had been 502ing returned 200 `x-murakumo-served-head: gad`, as
+;;    did a 60,000-char one at 12,022 prompt tokens.
 ;;
-;;    `--verify` measures this rather than restating it: it reports which
-;;    heads clear Hermes's floor, and it says NONE while gad (262144) is at
-;;    zero free slots.
+;;    ⚠ `/ready` answered `ok: true` throughout, with the outage demoted to
+;;    `degraded: ["primary-unavailable"]` inside the payload. A monitor
+;;    reading `.ok` saw green for the entire time the primary head was dead.
+;;    That is why this went unnoticed, and it is the reason `--verify` here
+;;    reports the heads and their windows rather than the endpoint's own
+;;    verdict about itself.
 ;;
 ;; ## The refusal
 ;;
@@ -161,7 +170,7 @@
    :provider          "murakumo"
    :model             "murakumo-main"
    :max-tokens        2048
-   :context-length    65536
+   :context-length    262144
    :stale-timeout     600
    :request-timeout   900
    :max-parallel-jobs 6})
@@ -210,10 +219,20 @@
   "Heads that are BOTH serving and wide enough for Hermes.
 
   Width comes from /v1/models `murakumo.capacity-members` (each head's own
-  /slots, read server-side); liveness from /ready `pool-available`, the count
-  of free slots per head. A wide head with no free slot is not an answer, and
-  neither is a live head that is too narrow -- so this intersects them rather
-  than trusting either alone."
+  /slots, read server-side). Membership comes from /ready `pool-available`,
+  whose KEYS are the heads the router will consider and whose VALUES are the
+  free slots on each right now.
+
+  Membership is the key, not the value. The first version required
+  `free > 0`, which reported NONE against a pool whose 262144-token head was
+  present, healthy and serving -- it was merely BUSY at the instant of the
+  probe. `busy` and `absent` are different answers and a check that returns
+  the same value for both is the failure this whole file is about: gad at
+  `free 0` because two real requests were decoding on it read identically to
+  gad dead, which is the state that actually caused the outage.
+
+  So: a head clears the floor when it is IN the pool and wide enough. `free`
+  is reported alongside, never used to exclude."
   [models ready]
   (let [main (first (filter #(= "murakumo-main" (:id %)) (:data models)))
         members (get-in main [:murakumo :capacity-members])
@@ -221,9 +240,9 @@
     (vec (for [m members
                :let [head (:head m)
                      ctx (or (:context m) 0)
-                     free (get pool (keyword head))]
-               :when (and (>= ctx hermes-minimum-context) (pos? (or free 0)))]
-           {:head head :context ctx :free free}))))
+                     k (keyword head)]
+               :when (and (>= ctx hermes-minimum-context) (contains? pool k))]
+           {:head head :context ctx :free (get pool k)}))))
 
 (defn usable?
   "Can the bots actually use what came back. Both halves are load-bearing:
@@ -494,13 +513,39 @@
        (map #(path/join % "cron" "jobs.json"))
        (filter fs/existsSync)))
 
+(defn needs-config?
+  "A profile directory this script must render a config.yaml for.
+
+  Existing configs, obviously -- but ALSO a profile that has enabled cron
+  jobs and no config at all. Measured 2026-09-10: `suji-anatomy` was such a
+  profile, and its job failed with
+
+    blocked for safety: base_url 'https://api.murakumo.cloud/v1' is not
+    allowed for provider 'murakumo'
+
+  because hermes only lets a NAMED provider carry a base_url override when
+  that provider is DECLARED in the config the job runs under
+  (tools/cronjob_job_args.py). With no config.yaml the declaration is absent,
+  so the guard fails closed -- correctly. The first version of this script
+  rewrote only configs that already existed, which silently skipped exactly
+  the profiles where the pin needs the declaration most.
+
+  Profiles with no config AND no enabled jobs are left alone: writing a
+  config into `.deleted` or a docs directory would invent a bot."
+  [d]
+  (or (fs/existsSync (path/join d "config.yaml"))
+      (let [jf (path/join d "cron" "jobs.json")]
+        (and (fs/existsSync jf)
+             (boolean (some :enabled (:jobs (read-jobs jf))))))))
+
 (defn survey
   "What the fleet names right now. Counts; judges nothing."
   []
   (let [confs (for [d (profile-dirs)
                     :let [p (path/join d "config.yaml")]
-                    :when (fs/existsSync p)]
+                    :when (needs-config? d)]
                 {:profile (path/basename d) :path p
+                 :absent (not (fs/existsSync p))
                  :model (yaml-scalar (slurp* p) "model" "default")
                  :base-url (yaml-scalar (slurp* p) "model" "base_url")})
         jobs (for [p (job-files)
@@ -529,6 +574,12 @@
         {:id "root-model" :level :fail :n 1
          :text (str "~/.hermes/config.yaml names model.default " (pr-str root-model)
                     ", not " (:model contract) ". The gateway process reads this one.")})
+      (let [absent (filter :absent configs)]
+        (when (seq absent)
+          {:id "profile-without-config" :level :fail :n (count absent)
+           :text (str (count absent) " profile(s) run enabled cron jobs with NO config.yaml, so the "
+                      "murakumo provider is undeclared there and hermes blocks the base_url "
+                      "override as unsafe: " (str/join ", " (map :profile absent)))}))
       (when (seq bad-conf)
         {:id "unservable-model-config" :level :fail :n (count bad-conf)
          :text (str (count bad-conf) " profile config(s) name a model api.murakumo.cloud "
@@ -602,7 +653,7 @@
   (let [root (write-config! (path/join home "config.yaml") true)
         confs (doall (for [d (profile-dirs)
                            :let [p (path/join d "config.yaml")]
-                           :when (fs/existsSync p)]
+                           :when (needs-config? d)]
                        (write-config! p false)))
         jobs (doall (map write-jobs! (job-files)))]
     {:root root
@@ -686,6 +737,23 @@
                 :configs [{:profile "a" :model "murakumo-main"}]
                 :jobs [{:profile "a" :name "j" :model "murakumo-main" :enabled true}]}]
       (is "findings/clean" (count (findings-of good)) 0))
+
+    ;; a profile that runs jobs with no config.yaml is a FAIL, not a skip.
+    ;; hermes only honours a base_url override for a NAMED provider that is
+    ;; DECLARED in the config the job runs under; with no config there is no
+    ;; declaration and the job is blocked for safety. Measured on
+    ;; suji-anatomy 2026-09-10.
+    (let [s {:root-model "murakumo-main"
+             :configs [{:profile "suji-anatomy" :model "murakumo-main" :absent true}]
+             :jobs []}
+          f (findings-of s)]
+      (is "findings/absent-config" (some #(= "profile-without-config" (:id %)) f) true)
+      (is "findings/absent-is-fail"
+          (:level (first (filter #(= "profile-without-config" (:id %)) f))) :fail))
+    (let [s {:root-model "murakumo-main"
+             :configs [{:profile "ok" :model "murakumo-main" :absent false}]
+             :jobs []}]
+      (is "findings/present-config-clean" (count (findings-of s)) 0))
     ;; a DISABLED job on a dead model is not a finding -- it is not running
     (let [s {:root-model "murakumo-main" :configs []
              :jobs [{:profile "a" :name "j" :model "z-ai/glm-5.3-flash" :enabled false}]}]
@@ -721,16 +789,22 @@
                           :murakumo {:capacity-members [{:head "gad" :context 262144}
                                                         {:head "b70" :context 16384}
                                                         {:head "xavier" :context 8192}]}}]}]
-      ;; wide head present but no free slot: not an answer. This is the
-      ;; shape measured on 2026-09-10.
+      ;; BUSY is not ABSENT. gad at free 0 while decoding two real requests
+      ;; must still count as clearing the floor -- the first version of this
+      ;; returned [] here and reported NONE against a healthy pool.
       (is "floor/wide-but-busy"
-          (heads-clearing-floor models {:inference {:pool-available {:gad 0 :b70 2 :xavier 1}}}) [])
-      ;; live heads but all too narrow: also not an answer
+          (mapv :head (heads-clearing-floor models {:inference {:pool-available {:gad 0 :b70 2 :xavier 1}}}))
+          ["gad"])
+      ;; ABSENT is absent: gad not a key at all means the router will not
+      ;; consider it, which is the state that caused the outage.
+      (is "floor/absent"
+          (heads-clearing-floor models {:inference {:pool-available {:b70 2 :xavier 1}}}) [])
+      ;; a head in the pool but too narrow never clears it
       (is "floor/live-but-narrow"
           (heads-clearing-floor models {:inference {:pool-available {:b70 2 :xavier 1}}}) [])
-      ;; both at once is the only pass
-      (is "floor/wide-and-free"
-          (mapv :head (heads-clearing-floor models {:inference {:pool-available {:gad 2 :b70 2}}})) ["gad"]))
+      ;; free is reported, not used to exclude
+      (is "floor/reports-free"
+          (:free (first (heads-clearing-floor models {:inference {:pool-available {:gad 0}}}))) 0))
 
     (is "probe/usable-yes"  (usable? {:status 200} "get_weather") true)
     (is "probe/usable-no-tool" (usable? {:status 200} nil) false)
@@ -743,7 +817,7 @@
       (do (println "SELF-TEST FAILURES\t" (count @fails))
           (doseq [f @fails] (println "  " f))
           (js/process.exit 1))
-      (do (println "SELF-TEST\tok\t37 assertions")
+      (do (println "SELF-TEST\tok\t41 assertions")
           (js/process.exit 0)))))
 
 ;; ── report ───────────────────────────────────────────────────────────────
@@ -770,20 +844,26 @@
                     "  served-by=" (pr-str (:served-by p))
                     "  tool_call=" (pr-str (:tool-call p))))
       (println (str "    usable for bots           " (:usable p)))
-      (println (str "    heads >= hermes 64K floor " (if (seq (:wide-heads p))
-                                                       (str/join ", " (map #(str (:head %) " ctx=" (:context %)
-                                                                                 " free=" (:free %)) (:wide-heads p)))
-                                                       "NONE")))
+      (println (str "    heads >= hermes 64K floor "
+                    (if (seq (:wide-heads p))
+                      (str/join ", " (map #(str (:head %) " ctx=" (:context %)
+                                                " free=" (:free %)
+                                                (when (zero? (or (:free %) 0)) " (busy, not absent)"))
+                                          (:wide-heads p)))
+                      "NONE IN THE POOL")))
       (when (empty? (:wide-heads p))
         (println)
-        (println "    ! Hermes will not start an agent under a 64,000-token window")
-        (println "      (MINIMUM_CONTEXT_LENGTH, agent/agent_init.py). No serving head")
-        (println "      clears it right now, so a run whose prompt passes the serving")
-        (println "      head's real window comes back HTTP 400 \"Input reserve exceeds")
-        (println "      this model's serving context window\" -- and 400 is not a")
-        (println "      failover reason in hermes, so it does not walk the fallback")
-        (println "      chain. Short runs work; long ones do not. The fix is upstream:")
-        (println "      a wide head back in the pool (gad is 262144, measured 0 free)."))
+        (println "    ! No head in the pool clears hermes's 64,000-token floor")
+        (println "      (MINIMUM_CONTEXT_LENGTH, agent/agent_init.py), so every agent")
+        (println "      job dies before its first turn. The pool routes by fit and")
+        (println "      excludes heads a request cannot fit, so requests above the")
+        (println "      narrow heads' window match NO head and come back 502 with no")
+        (println "      x-murakumo-route-head at all.")
+        (println "      Check gad first — measured 2026-09-10, murakumo-ring.service")
+        (println "      was `enabled` but `failed` after its STOP timed out, and")
+        (println "      Restart=on-failure does not recover that. On the head:")
+        (println "        systemctl reset-failed murakumo-ring && systemctl start murakumo-ring")
+        (println "      /ready says ok:true while this is true — do not read .ok."))
       (println))
     (if (seq fs)
       (doseq [f fs]
