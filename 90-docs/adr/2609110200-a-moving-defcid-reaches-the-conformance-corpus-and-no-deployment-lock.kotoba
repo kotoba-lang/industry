@@ -1,0 +1,95 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609110200-a-moving-defcid-reaches-the-conformance-corpus-and-no-deployment-lock")
+  (:adr/topic "gap-02-defcid-blast-radius")
+  (:adr/title "A moving DefCID reaches the language conformance corpus and no deployment lock")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang" "kotoba-lang/osaho"))
+  (:adr/related (vector "adr-2609110100-payload-v3-has-no-representation-blocker-only-a-conversion-contract"
+                "adr-2609076000-kir-is-an-ipld-codec-schema-and-adl"))
+  (:adr/body
+  "## Context
+
+This is the second half of gap 02. The first half established that payload v3 is
+POSSIBLE: every tag osaho's normalize emits round-trips through kotoba.value.v1,
+so nothing waits on io-ipld. What remained was whether v3 is AFFORDABLE, and
+that is a question about how far a moving DefCID reaches.
+
+## Measurement
+
+A DefCID is `mf/cidv1-dag-cbor` of the canonical typed KIR, so on disk it is a
+`bafyrei...` base32 string. Counting that PREFIX would be the wrong measurement:
+every dag-cbor CID shares it, so app CIDs and graph CIDs would be counted as
+DefCIDs. The discriminator is the KEY -- `:definition-cid` and
+`:dep/definition-cids`.
+
+    find orgs -mindepth 3 -maxdepth 10 \\( -name '*.edn' -o -name '*.kotoba' \\) \\
+      -not -path '*/node_modules/*' -not -path '*/.git/*' -print0 \\
+      | xargs -0 grep -lE ':(dep/)?definition-cids?\\s'
+
+## Result: the reach is the conformance corpus, and it stops there
+
+70 files pin a DefCID key, across nine repositories once `lang-pure-wt` is
+recognised as a worktree duplicate of `kotoba-lang` rather than a tenth. They
+sit in `lang/code-identity-conformance/{negative,positive}`,
+`lang/package-conformance/{negative,positive}`, `lang/`,
+`resources/kotoba/lang/` and `resources/kotoba/lang/wasm-packages`.
+
+**Zero of the 70 is a deployment lock, an app manifest, or a capability
+manifest.** That was checked directly rather than inferred: a separate scan
+found 608 such files (523 kotoba.app.edn, 61 capability.edn, 22 kotoba.lock.edn,
+2 sources.lock.edn) and none of them names a DefCID key, while the same grep
+FIRES on osaho's frozen vectors and extracts exactly its ten. A zero that has
+not been controlled is not a measurement, and this one is.
+
+Two of the filenames are `contract-lock.edn` and
+`invalid_definition_cid_lock.edn`. They are named lock and they are NOT locks --
+they are conformance fixtures under `lang/package-conformance/`. The lock reader
+in osaho does support `:dep/definition-cids`, so the FORMAT can pin a DefCID;
+what the measurement says is that no lock on disk currently does.
+
+## The count is a range, and the range is the honest answer
+
+13 distinct DefCIDs sit on a `definition-cid` line. 25 distinct CID literals
+appear in the files that pin DefCIDs. The gap is not noise: `:dep/definition-cids`
+is a VECTOR and may span lines, so a same-line extractor cannot see its
+continuations. The control -- the same extractor against the frozen vectors --
+yields exactly ten, which is the number that file pins.
+
+So the pinned population is between 13 and 25 and the difference is multi-line
+vectors. Reporting one of those two as the count would be presenting an
+artefact of the regex as a property of the corpus. It does not change the
+decision, so it is left as a range.
+
+Separately, the three copies of `code-identity-vectors.edn` -- the authority in
+kotoba-lang, the copy in osaho, and the one in the lang-pure-wt worktree -- pin
+ten DefCIDs each and agree on the identical set (one shasum across all three).
+
+## Consequence: v3 is affordable, and the reason is structural
+
+A payload v3 moves every DefCID. The measurement says what that invalidates: a
+conformance corpus that exists in order to be regenerated. The vectors file
+states its own regeneration rule -- a changed identity means either a real
+semantic change, in which case bump `:payload-version` and regenerate, or a bug.
+v3 is exactly the first case.
+
+Nothing deployed pins a DefCID today, so v3 does not invalidate a lock anyone is
+running. Combined with the first half, both objections to v3 are now answered by
+measurement rather than by argument: it is not blocked upstream, and it does not
+break deployments.
+
+**This ADR still does not promote io-ipld to :deps.** It removes the second of
+the two reasons for hesitating. The remaining work is the conversion contract
+itself -- the tag alphabet, the number wrappers, the map ordering -- which is
+where the design decisions actually are.
+
+## A method note worth keeping
+
+The first version of the file scan used `-maxdepth 6`, and it silently missed
+osaho's own copy of the frozen vectors at depth 7. The undercount was caught only
+because a narrower scan for one known filename returned two copies where three
+were expected. Re-run at depth 10 the DefCID site count went from 56 to 70: the
+depth limit had been hiding a fifth of the answer, and nothing in the output said
+so. A bounded scan reports its bound as if it were the world.")))
