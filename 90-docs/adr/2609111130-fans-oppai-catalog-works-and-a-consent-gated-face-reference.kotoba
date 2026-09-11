@@ -96,6 +96,36 @@ app state が 4 回の crossing を越えることを assert する（ADR-260808
 4. **faceid mode の live render** と、frame 2 枚の同一人物性チェック（insightface は gad に入った）。
 5. `seedance` の既存 failure。
 
+## 運営 bot（2026-09-11、同日追記）
+
+`network-awai/loop-yakuwari` に `:oppai-fans` を登録した（8 startup role + custom kind
+`trust-safety`。sales / kaizen-analyst は理由付きで absent）。`workforce_provision` で
+Cloud Itonami の workforce は 147 → 156 bot、9 体とも resident job が 15 分 cadence で
+scheduled。**ただし初回 turn は失敗した**（`murakumo-main: provider/http-error 502 →
+z-ai/glm-5.3-flash: 402`）。原因は profile ではなく fleet 側で、oppai-fans 固有ではない
+（同時刻に 117 bot が overdue-two-cadences）:
+
+- `api.murakumo.cloud` は `bytes + max_tokens > 15360` の request を b70（slot 16384、
+  `--parallel 2`）に載せず gad へ回す（`readiness/b70-request-eligible?`）。resident の
+  workforce は `:max-output-tokens 16384` なので**全 turn が gad 行き**。
+- gad の chat origin `murakumo-ring.service`（llama-server :8090、20 GB）は
+  **2026-09-10 02:06 UTC に root session から停止されたまま**（watchdog は inactive を
+  「意図的」と読んで rebuild しない）。同時刻に memory pressure と comfyui-034 restart。
+  gad は 46 GB のうち 34 GB を 3 つの ComfyUI instance が使っており、ring を戻すと
+  今日測った顔参照 render（12 分）がさらに遅くなる。
+- 再現: `max_tokens` 15000 → 200、15500 → 502 `murakumo fleet unreachable:
+  connection_refused`（2026-09-11 02:50 UTC）。
+
+決めるのはオーナー: (a) gad の ring を戻す（LLM と ComfyUI の同居 = 両方遅い）、
+(b) resident の `:max-output-tokens` を b70 に収まる値（≈8192 以下）へ下げる（2026-08-29
+の「出力上限は model 最大まで」指示の反転）、(c) b70 を `--parallel 1` に戻して slot を
+32k にする。どれも fleet の決定で、この ADR は測定だけを置く。
+
+同日、`.cljk` 一斉改名で loop-yakuwari の `bin/awai.cljs` が消え、provisioner が
+「registry is not checked out」で止まっていた（10:37 JST 以降）。`bin/awai.cljs` を
+loader（root の `scripts/cljk-classpath.cljs` 経由で `bin/awai.cljk` を exec）として
+復元し、provision が通るようになった。
+
 ## 露出した secret
 
 作業中に gad の `/etc/murakumo-generation.env` を redaction 込みで表示した際、`SEEDANCE_API_KEY` の行が
