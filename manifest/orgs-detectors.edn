@@ -4350,4 +4350,29 @@
               with zero findings, all four witnesses holding one block at 5616. A detector that
               has only ever been red is not yet evidence of anything."}
 
+  {:id       :verify-no-clojure-extensions
+   :title    ".clj / .cljs / .cljc back on a pinned tree after the .cljk rename"
+   :why      "adr-2609111500 renamed 34,445 Clojure files to .cljk on 2026-09-11. Within
+              hours two repositories had .cljs on main again (cloud-itonami-assoc-9411-col-andi,
+              loop-yakuwari): branches cut before the rename kept landing after it, and nothing
+              refused them. The extension is now a branding claim about the corpus; a claim
+              with no detector decays at the rate other sessions merge old branches."
+   :argv     ["nbb" "{{repo}}/scripts/verify-no-clojure-extensions.cljk"
+              "--west" "{{root}}/manifest/west.yml" "--root" "{{root}}"
+              "--allow" "kotoba-lang/org-babashka-nbb"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 3600000
+   :timeout-ms  900000
+   :writes   :none
+   :measured "Landed 2026-09-11. Discriminated with a different INPUT, not a different code
+              path: against the pre-rename west.yml (1acf42384cf) it reports 4,097 projects /
+              37,664 files; against the current one, 1 project (fleet-manifest, pin behind a
+              clean tip -- advanced the same hour) and then 0. ABSENT 5 (pin not local) are
+              printed and never counted clean. --allow carries exactly one written exception:
+              org-babashka-nbb, the nbb fork that resolves .cljk for the rest of the workspace
+              (ADR-2609111700); the batch renamed it and the rename was reverted the same hour
+              because shadow-cljs builds it from .cljs."}
+
 ]}
