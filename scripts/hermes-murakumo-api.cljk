@@ -272,12 +272,59 @@
 ;;                    does not apply; 4096 is what an answer with a short
 ;;                    <think> needs at reasoning_effort "low" (the gateway
 ;;                    defaults that; the checkpoint honours only low/high).
+;;
+;; ⚠ `providers.<name>.stale_timeout_seconds` is DEAD for a named provider.
+;; Measured 2026-09-11, the day after the number above was written. Hermes
+;; resolves both timeouts through `agent.provider`, and for a `providers:`
+;; entry that is not a built-in the runtime id is the literal "custom"
+;; (every log line says `provider=custom`), so the lookup reads
+;; `providers.custom`, finds nothing, and falls back to the env default:
+;;
+;;   hermes_cli/timeouts.py  _configured_timeout(provider_id="custom", ...)
+;;   agent/chat_completion_helpers.py  _configured_stale_base
+;;     -> env_float("HERMES_STREAM_STALE_TIMEOUT", 180.0)
+;;
+;;   $ HERMES_HOME=~/.hermes/profiles/glm53-cyber venv/bin/python -c '
+;;     from hermes_cli.timeouts import get_provider_stale_timeout as s
+;;     print(s("murakumo","glm-..."), s("custom","glm-..."))'
+;;   2400.0 None
+;;
+;; and the run that showed it, on THIS profile, against a cold origin:
+;;
+;;   13:53:56  conversation turn ... provider=custom
+;;   13:56:57  Stream stale for 180s (threshold 180s) ... Killing connection.
+;;   13:59:59  Stream stale for 180s (threshold 180s) ... Killing connection.
+;;   13:59:59  Fallback activated: glm-5.3-flash-cybersecurity-w4a16
+;;               -> z-ai/glm-5.3-flash (openrouter-free)
+;;   13:59:59  HTTP 401: Missing Authentication header       <- what the user sees
+;;
+;; Three consequences, in order of cost. (1) The 2,400 s the ADR sized was
+;; never in force; the 12:28 run that "verified" the profile hit a warm
+;; origin (first token at 40 s) and could not have told. (2) The same is
+;; true of the fleet contract's 600/900 below -- every profile has been
+;; running hermes's 180 s default since the cutover. Left as is here: that
+;; is a fleet-wide change and its effect is unmeasured. (3) Once the client
+;; gives up, the gateway stops polling the origin; the origin's
+;; `scaledown_window=120` then reaps the container MID-LOAD, so the next
+;; call restarts the 20-25 min cold start from zero. Through hermes the
+;; model could never become warm.
+;;
+;; The lever hermes actually reads is the env var, and a profile's `.env`
+;; is loaded with override=True before the agent starts
+;; (hermes_cli/env_loader.py `load_hermes_dotenv`; `os.getenv` in
+;; utils.env_float). So the override carries `:env`, rendered into
+;; `<profile>/.env` by --apply and checked by --verify. HERMES_STREAM_READ_
+;; TIMEOUT needs no entry: at its 120 s default hermes raises the socket
+;; read timeout to the stale value (`_stream_timeouts`). The YAML keys are
+;; still written -- they are the declared intent and the day hermes reads
+;; them they take over -- but they are not what holds the connection.
 (def profile-overrides
   {"glm53-cyber" {:model "glm-5.3-flash-cybersecurity-w4a16"
                   :context-length 131072
                   :max-tokens 4096
                   :stale-timeout 2400
-                  :request-timeout 2400}})
+                  :request-timeout 2400
+                  :env {"HERMES_STREAM_STALE_TIMEOUT" 2400}}})
 
 (defn contract-for
   "The effective contract for one profile directory name. The root config
@@ -579,6 +626,46 @@
     (str (when root? root-header)
          (str/join "\n" (remove nil? (concat kept (map new missing)))) "\n"))))
 
+;; ── .env: the timeouts hermes actually reads ─────────────────────────────
+;; See the note above profile-overrides. A profile's `.env` is a 0600
+;; secrets file that hermes loads with override=True; the managed keys are
+;; set in place or appended under one marker line, every other line is
+;; carried verbatim, and the file is never created for a profile whose
+;; contract has no :env.
+
+(def env-line-re #"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+
+(def env-managed-marker
+  "# managed by scripts/hermes-murakumo-api.cljk -- change :env in profile-overrides, not this line")
+
+(defn rewrite-env
+  "`env` text with every key of `vars` set: an existing `KEY=` line is
+  replaced where it stands, a missing one is appended under the marker.
+  Lines for other keys, comments and blanks are carried verbatim."
+  [env vars]
+  (let [vars (into {} (map (fn [[k v]] [k (str v)]) vars))
+        lines (if (str/blank? (or env "")) [] (vec (str/split-lines env)))
+        key-of #(second (re-matches env-line-re %))
+        present (set (keep key-of lines))
+        replaced (mapv #(let [k (key-of %)] (if (and k (contains? vars k)) (str k "=" (get vars k)) %)) lines)
+        missing (remove present (sort (keys vars)))
+        tail (when (seq missing)
+               (concat (when-not (some #(= env-managed-marker %) lines) [env-managed-marker])
+                       (map #(str % "=" (get vars %)) missing)))]
+    (str (str/join "\n" (concat replaced tail)) "\n")))
+
+(defn read-env-vars
+  "KEY=value pairs of one `.env`, as strings. Absent file -> {}."
+  [p]
+  (into {} (keep #(when-let [m (re-matches env-line-re %)] [(second m) (nth m 2)])
+                 (str/split-lines (or (slurp* p) "")))))
+
+(defn env-vars-of
+  "What a profile's `.env` must carry: the :env of its contract, values as
+  strings. Empty for every profile without an override."
+  [profile]
+  (into {} (map (fn [[k v]] [k (str v)]) (:env (contract-for profile)))))
+
 ;; ── the fleet on disk ────────────────────────────────────────────────────
 
 ;; Two cron jobs run `refresh_free_model.py`, which asks
@@ -678,14 +765,22 @@
                 :model (:model j) :provider (:provider j) :base-url (:base_url j)
                 :enabled (:enabled j) :status (:last_status j) :resolver (resolver-job? j)
                 :streak (or (:failure_streak j) 0)})
+        ;; only profiles whose contract carries :env are surveyed; the rest
+        ;; have nothing to carry and nothing to be wrong about
+        envs (for [d (profile-dirs)
+                   :let [want (env-vars-of (path/basename d))]
+                   :when (seq want)]
+               {:profile (path/basename d) :path (path/join d ".env")
+                :want want :have (select-keys (read-env-vars (path/join d ".env")) (keys want))})
         root-yaml (slurp* (path/join home "config.yaml"))]
     {:root-model (yaml-scalar root-yaml "model" "default")
      :root-base  (yaml-scalar root-yaml "model" "base_url")
      :configs (vec confs)
-     :jobs (vec jobs)}))
+     :jobs (vec jobs)
+     :envs (vec envs)}))
 
 (defn findings-of [s]
-  (let [{:keys [root-model configs jobs]} s
+  (let [{:keys [root-model configs jobs envs]} s
         ;; a profile is judged against ITS contract (profile-overrides), and
         ;; the expectation is derived from the profile name here so a survey
         ;; row that never carried one still gets the right answer
@@ -693,10 +788,21 @@
         off-conf (remove #(= (:model %) (expected %)) configs)
         bad-conf (filter #(unservable-models (:model %)) configs)
         off-job  (filter :enabled (remove #(= (:model %) (expected %)) jobs))
-        bad-job  (filter #(unservable-models (:model %)) (filter :enabled jobs))]
+        bad-job  (filter #(unservable-models (:model %)) (filter :enabled jobs))
+        off-env  (remove #(= (:have %) (:want %)) envs)]
     (remove
      nil?
-     [(when (not= root-model (:model contract))
+     [(when (seq off-env)
+        ;; the YAML timeout is dead for a named provider (see profile-overrides),
+        ;; so without this line the profile runs at hermes's 180 s default and
+        ;; a cold origin is unreachable through it
+        {:id "profile-env-timeout" :level :fail :n (count off-env)
+         :text (str (count off-env) " profile(s) do not carry the env timeout their contract "
+                    "names in .env (the YAML stale_timeout_seconds is not what hermes reads): "
+                    (str/join ", " (map #(str (:profile %) " want " (pr-str (:want %))
+                                              " have " (pr-str (:have %)))
+                                        off-env)))})
+      (when (not= root-model (:model contract))
         {:id "root-model" :level :fail :n 1
          :text (str "~/.hermes/config.yaml names model.default " (pr-str root-model)
                     ", not " (:model contract) ". The gateway process reads this one.")})
@@ -748,6 +854,22 @@
       {:path p :changed false}
       (do (backup! p) (spit* p after) {:path p :changed true}))))
 
+(defn write-env! [d]
+  (let [p (path/join d ".env")
+        vars (env-vars-of (path/basename d))]
+    (if (empty? vars)
+      {:path p :changed false}
+      (let [before (slurp* p)
+            after  (rewrite-env before vars)]
+        (if (= before after)
+          {:path p :changed false}
+          (let [b (backup! p)]
+            (spit* p after)
+            ;; secrets file: the mode must not depend on what copyFileSync
+            ;; or the umask happened to do
+            (doseq [f [p b] :when (fs/existsSync f)] (fs/chmodSync f 8r600))
+            {:path p :changed true}))))))
+
 (defn write-jobs!
   "Repin every job in one profile's jobs.json.
 
@@ -785,10 +907,12 @@
                            :let [p (path/join d "config.yaml")]
                            :when (needs-config? d)]
                        (write-config! p false (contract-for (path/basename d)))))
-        jobs (doall (map write-jobs! (job-files)))]
+        jobs (doall (map write-jobs! (job-files)))
+        envs (doall (map write-env! (profile-dirs)))]
     {:root root
      :configs-changed (count (filter :changed confs))
      :configs-total (count confs)
+     :envs-changed (count (filter :changed envs))
      :jobs-files-changed (count (filter :changed jobs))
      :jobs-repinned (reduce + 0 (keep :repinned jobs))
      :jobs-disabled (reduce + 0 (keep :disabled jobs))
@@ -800,7 +924,9 @@
 
 (defn self-test []
   (let [fails (atom [])
+        ran (atom 0)
         is (fn [name got want]
+             (swap! ran inc)
              (when-not (= got want)
                (swap! fails conj (str name ": got " (pr-str got) " want " (pr-str want)))))]
 
@@ -865,6 +991,36 @@
       (is "override/aux-never-cyber" (str/includes? out "model: glm-5.3-flash-cybersecurity-w4a16\n  web_extract") false)
       (is "override/idempotent" (rewrite-yaml out false c) out)
       (is "override/not-unservable" (boolean (unservable-models (:model c))) false))
+    ;; the env timeout: written for the override profile, never for others,
+    ;; and the .env edit keeps every line it does not own
+    (is "env/override-has" (env-vars-of "glm53-cyber") {"HERMES_STREAM_STALE_TIMEOUT" "2400"})
+    (is "env/plain-has-none" (env-vars-of "amu") {})
+    (let [before "# Per-profile secrets\nOPENROUTER_API_KEY=sk-x\n"
+          out (rewrite-env before (env-vars-of "glm53-cyber"))]
+      (is "env/appends" (str/includes? out "\nHERMES_STREAM_STALE_TIMEOUT=2400\n") true)
+      (is "env/marker" (str/includes? out env-managed-marker) true)
+      (is "env/keeps-secret" (str/includes? out "OPENROUTER_API_KEY=sk-x\n") true)
+      (is "env/keeps-comment" (str/starts-with? out "# Per-profile secrets\n") true)
+      (is "env/idempotent" (rewrite-env out (env-vars-of "glm53-cyber")) out)
+      ;; a stale value is replaced where it stands, not appended a second time
+      (let [again (rewrite-env "HERMES_STREAM_STALE_TIMEOUT=180\nX=1\n" (env-vars-of "glm53-cyber"))]
+        (is "env/replaces-in-place" again "HERMES_STREAM_STALE_TIMEOUT=2400\nX=1\n")))
+    (is "env/absent-file" (rewrite-env nil {"A" 1}) (str env-managed-marker "\nA=1\n"))
+    ;; and --verify fails while the line is missing or wrong, not only absent:
+    ;; 180 in the file is exactly the value that reproduces the outage
+    (let [f (findings-of {:root-model (:model contract) :configs [] :jobs []
+                          :envs [{:profile "glm53-cyber" :want {"HERMES_STREAM_STALE_TIMEOUT" "2400"}
+                                  :have {"HERMES_STREAM_STALE_TIMEOUT" "180"}}]})]
+      (is "env/findings-wrong-value" (:level (first (filter #(= "profile-env-timeout" (:id %)) f))) :fail))
+    (let [f (findings-of {:root-model (:model contract) :configs [] :jobs []
+                          :envs [{:profile "glm53-cyber" :want {"HERMES_STREAM_STALE_TIMEOUT" "2400"}
+                                  :have {}}]})]
+      (is "env/findings-missing" (some #(= "profile-env-timeout" (:id %)) f) true))
+    (let [f (findings-of {:root-model (:model contract) :configs [] :jobs []
+                          :envs [{:profile "glm53-cyber" :want {"HERMES_STREAM_STALE_TIMEOUT" "2400"}
+                                  :have {"HERMES_STREAM_STALE_TIMEOUT" "2400"}}]})]
+      (is "env/findings-clean" (count f) 0))
+
     (is "override/absent-is-contract" (contract-for "amu") contract)
     (is "override/absent-renders-same"
         (rewrite-yaml "model:\n  default: old\n" false (contract-for "amu"))
@@ -976,7 +1132,7 @@
       (do (println "SELF-TEST FAILURES\t" (count @fails))
           (doseq [f @fails] (println "  " f))
           (js/process.exit 1))
-      (do (println "SELF-TEST\tok\t41 assertions")
+      (do (println (str "SELF-TEST\tok\t" @ran " assertions"))
           (js/process.exit 0)))))
 
 ;; ── report ───────────────────────────────────────────────────────────────
@@ -1067,7 +1223,7 @@
         (js/process.exit 2))
 
       (if findings?
-        (do (println (str "SCANNED\t" (+ (count (:configs s)) (count (:jobs s)))))
+        (do (println (str "SCANNED\t" (+ (count (:configs s)) (count (:jobs s)) (count (:envs s)))))
             (doseq [f fs] (println (str (name (:level f)) "\t" (:id f) "\t" (:n f) "\t" (:text f)))))
         (print-report s p fs))
 
@@ -1076,6 +1232,8 @@
           (println "APPLIED")
           (println (str "  ~/.hermes/config.yaml       " (if (:changed (:root r)) "rewritten" "already conformant")))
           (println (str "  profile configs             " (:configs-changed r) " / " (:configs-total r) " rewritten"))
+          (println (str "  profile .env timeouts       " (:envs-changed r) " rewritten"
+                        " (the stale timeout hermes actually reads; see profile-overrides)"))
           (println (str "  cron jobs repinned          " (:jobs-repinned r) " / " (:jobs-total r)
                         " in " (:jobs-files-changed r) " file(s)"))
           (println (str "  free-model resolver jobs    " (:jobs-disabled r) " disabled"
