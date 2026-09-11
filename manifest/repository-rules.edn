@@ -566,13 +566,22 @@
    ;; 500 with an HTML body -- an answer that is none of this surface's named
    ;; refusals. `selection`'s catch maps five ex-data types onto statuses and
    ;; re-throws the rest, while its own docstring says it maps EVERY failure.
+   ;; Closed 2026-09-11. The design question answered itself: io-ipld's
+   ;; `get-verified-block` had already decided that a codec it cannot
+   ;; re-address is refused BY NAME, and had been raising
+   ;; `:ipld/unsupported-codec` since the sha ipq already pinned as a floor.
+   ;; Nothing was listening. The re-throw in the default branch was the defect,
+   ;; not the missing codec case.
    :policy/known-defect
    {:surface "https://ipfs.kotobase.net/ipq/v1"
     :trigger :root-block-codec-dag-json
     :symptom "HTTP 500, Cloudflare 1101 Worker threw exception"
     :root-cause "kotobase.protocols.ipq/selection default branch (throw e)"
-    :decision-needed "support dag-json, or refuse it by name -- either way the re-throw goes"
-    :fixed false}
+    :resolution {:unsupported-codec 501 :unknown-failure 500
+                 :message-not-carried "an unknown exception's string is the one nothing has vetted"}
+    :landed {:kotobase-protocol-ipq "5a6bbdb6" :net-kotobase-ipfs "80212f0a"}
+    :verified-live "2026-09-11"
+    :fixed true}
    :policy/gate nil
    :policy/why-no-gate "no predicate enumerates the ways an ontology could reach an evaluator other than the two doors; a gate that has never been shown to fail is theatre, so build the third door first and watch it redden"
    :policy/measured-on "2026-09-10"

@@ -18,7 +18,8 @@
     (:route "nbb, one shadow-cljs release bundle, wrangler dev (workerd), one live HTTPS origin")
     (:machine "10 cpus, loadavg 13.0-29.2 during the runs")
     (:evidence "90-docs/query-plane/2026-09-10-query-plane-followups.edn")
-    (:not-measured (vector "a pack actually placed" "the engine compiled" "whether dag-json should be supported"))))
+    (:not-measured (vector "a pack actually placed" "the engine compiled"
+                    "whether dag-json should ever be SUPPORTED rather than refused -- refusing it is what landed"))))
   (:adr/body "## Context
 
 ADR-2609109800 は次の 3 つを名指しで残した。オーナーが逆順（3 → 2 → 1）で
@@ -81,12 +82,64 @@ Worker の中で throw すると Cloudflare の 500 になるので、
 `root-not-held` / `selector-required` / `missing-block` / `resource-limit`）の
 どれでもない答えが返る。
 
-### 決定 Q3b: 欠陥として記録し、ここでは直さない
+### 決定 Q3b: 名前を付けて拒否する。**2026-09-11 に修正し、本番で確かめた**
 
-直す形が 2 つあり、その選択は測定ではなく設計判断だから ——
-①dag-json を支持する（`ipld.dag-json` は実在する）②名前を付けて拒否する。
-**どちらにせよ default 節の `(throw e)` は残せない。**
-live な共有 surface への変更なので、次の一手として出す。
+直す形は 2 つあった —— ①dag-json を支持する ②名前を付けて拒否する。
+**選んだのは②で、その判断は既に io-ipld が下していた** ——
+`get-verified-block` の docstring はこう書いている:
+*A codec this cannot re-address is still refused, and by name. dag-pb needs a
+different hash construction and a different decoder, so verifying it here
+would be guessing.* したがって設計判断は新しく要らず、**IPQ はその判断を
+受け取り損ねていただけ**だった。
+
+しかも io-ipld は**既に名前付きの `:ipld/unsupported-codec` を投げていた**
+（ipq が floor として pin している `2200e3c0` 以降）。**聞いていた側が居なかった。**
+
+    :ipld/unsupported-codec -> 501 codec-not-supported
+    それ以外の未知の type  -> 500 unhandled（ex-data の type を載せる。message は載せない）
+
+**501 の理由**: 4xx ではない（CID は妥当で block は在る。同じ CID を
+`/ipni/v1/ad/` は 200 で返す）。502 でもない（この file が 502 を使うのは
+store が復号できないものを返したとき。block は正常）。**この profile が
+その codec の検証を実装していない**、というのが 501 の意味である。
+**detail は supported set を ex-data から引用する** —— どの codec かを
+知っているのは io-ipld であり、ここに一覧を書けば 2 つ目の出所になる。
+
+**default 節が本体の欠陥だった。** 未知の type は Worker を例外として抜け、
+caller には edge の HTML が返る —— この surface の refusal が 1 つも入っていない
+答えである。今は名前と status を持ち、ex-data の type が一緒に運ばれる。
+**message は運ばない** —— 他の refusal はこの file 自身が上げた message を
+引用しているが、未知の例外はその文字列を誰も検査していない唯一の場合だから。
+
+**両方向を landing の前に見せた**: 分岐を戻すと 4 本のうちちょうど 3 本が
+error になり、**dag-cbor の兄弟を引く control は緑のまま**（fixture が
+何でも拒否しているのではないことの証明）。nbb と JVM の両方で
+19 tests / 109 assertions、clj-kondo 0 errors。
+
+**artifact を実際に検査してから deploy した** —— 164 tests / 631 assertions が
+緑、解決された classpath が `5a6bbdb6` を名指していること、そして
+`out/worker.js` が新しい refusal を実際に含むこと。
+**build が通ったことは、fix が成果物に入っている証拠ではない。**
+
+**本番実測 2026-09-11**（deploy 後）:
+
+    dag-json root, matcher   501  error=codec-not-supported
+                                  detail=baguqeera… declares codec 297;
+                                         this profile verifies (85 113)
+    depth 14 / 15 / 16       501  同じ refusal。以前は Cloudflare の HTML 500
+    depth 13（control）       200 blocks=13
+    bad selector（control）   400 selector-not-dag-cbor
+    root not held（control）  404 root-not-held
+
+85 = 0x55 raw、113 = 0x71 dag-cbor。**caller はどの CID がどの codec で拒否
+されたかを読める。**
+
+着地: `kotoba-lang/kotobase-protocol-ipq` `5a6bbdb6` / `net-kotobase/ipfs`
+`80212f0a`、west pin は両方前進済み（`6c85f47e` / `b5791039`）。
+
+⚠ **測定の天井は動いていない。** depth >= 14 は今も traverse できない ——
+その codec は本当に検証できないからで、**変わったのは答え方だけ**である。
+Q3 の 9 点の fit はそのまま生きる。
 
 ## Q2 —— digest の値は runtime のものではなく interpreter のものだった
 
