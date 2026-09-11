@@ -12965,4 +12965,145 @@
      :file "run_tests.kotoba"
      :find "(io/file \"test\")"
      :replace "(io/file \"test-nonexistent\")"
-     :must-fail ["refusing to report a pass"]}]}]}
+     :must-fail ["refusing to report a pass"]}]}
+
+  {:repo "orgs/cloud-itonami/hikari"
+   :label "hikari 光 —— microgrid / panel-install の構造 gate、swing-equation の物理、決定核、descriptor 5 面一致"
+   ;; energy actor。runnable core は hikari.methods.microgrid（islanded microgrid の
+   ;; droop + secondary-PI、ROCOF relay）と hikari.methods.panel-install（Otete arm の
+   ;; IK + safety envelope）で、どちらも substrate の構造 gate（N1 civilian /
+   ;; G15-G7 no-server-key / G8 witness quorum）を**呼んでから**動く。cell state
+   ;; machine はその verdict を読んで dry-run record を出す。
+   ;;
+   ;; 2026-09-11 まで、この repo の 11 本の cljc suite は standalone 移行（2026-07-18）
+   ;; 以来 1 度も走っていなかった —— runner が monorepo の bb.edn を `cd ../..` で
+   ;; 探しに行き、`Could not locate hikari/methods/test_microgrid.bb` で止まっていた
+   ;; （origin/main d52cceb、exit 1、test 0 本）。source は src/hikari/**、test は
+   ;; test/hikari/** に移し、runner は `nbb run_tests.cljs`（nbb.edn が :paths と
+   ;; kotoba.lang.text の座標を持つ）。0 本の run は exit 2（REFUSED）で green-marker は出ない。
+   ;;
+   ;; 面は 4 つ。① gate が本当に拒否すること ② **呼び出し側が gate を呼んでいること**
+   ;; （gate が完璧でも、呼ばれなければ何も守らない）③ 物理が数として合うこと
+   ;; （H を落としても『どこかに settle する』ので outcome test は緑のまま）
+   ;; ④ descriptor の縫い目（cells/*.edn ↔ agent ↔ manifest ↔ lex ↔ wire）。
+   ;; 16 件とも 2026-09-11 に着地前の copy で手で当て、名指しの test だけが赤くなるのを見た。
+   :cmd ["nbb" "run_tests.cljs"]
+   :green-marker "hikari suite: all green"
+   :mutations
+   [;; ── ② 呼び出し側が gate を呼ぶのをやめる ──
+    {:id :hikari/microgrid-stops-consulting-the-civilian-gate
+     :why "**本題。** commission-microgrid から assert-civilian の 1 行を消すと、\"weapon\" の use で島運転の acceptance test が走り dispatch record まで進む。substrate の gate 自体は無傷なので gate の unit test は全部緑のまま"
+     :file "src/hikari/methods/microgrid.cljc"
+     :find "  (sub/assert-civilian use PERMITTED-USES) ; N1 gate before any actuation modelling\n"
+     :replace ""
+     :must-fail ["test-non-civilian-use-refused" "test-grid-edge-non-civilian-use-raises"]}
+
+    {:id :hikari/panel-install-stops-consulting-the-civilian-gate
+     :why "同型、panel-install 側。plan-panel-install の N1 呼び出しを消すと \"interdiction\" の use で arm motion が計画される"
+     :file "src/hikari/methods/panel_install.cljc"
+     :find "  (sub/assert-civilian use PERMITTED-USES)                ; N1\n"
+     :replace ""
+     :must-fail ["test-non-civilian-use-refused"]}
+
+    ;; ── ① gate 自体が緩む ──
+    {:id :hikari/server-signature-accepted
+     :why "no-server-key（G15/G7）の前半を外す形。platform が署名した actuation が member 署名と同じ経路で通る —— 『platform は鍵を持たない』が構造でなく慣習になる"
+     :file "src/hikari/methods/substrate.cljc"
+     :find "   (when (and (some? server-sig) (not= server-sig \"\"))"
+     :replace "   (when (and false (some? server-sig) (not= server-sig \"\"))"
+     :must-fail ["test-server-signature-refused" "test-grid-edge-server-signature-refused"]}
+
+    {:id :hikari/witness-quorum-drops-to-one
+     :why "G8 witness quorum は『2 体の独立した robot DID』。1 に下げると 1 体の自己証言で install job が commit される。境界ちょうど（witness 1 体）の入力が両 suite に在るので赤くなる"
+     :file "src/hikari/methods/substrate.cljc"
+     :find "(def MIN-WITNESS-SIGS 2)"
+     :replace "(def MIN-WITNESS-SIGS 1)"
+     :must-fail ["test-witness-quorum-below-two-recorded-not-raised" "test-install-witness-below-quorum-blocks-commit"]}
+
+    {:id :hikari/human-proximity-ceiling-ignored
+     :why "check-trajectory が human-present を見ずに常に max-joint-speed を ceiling にする形。人が cell に居ても arm が全速で動く。人が居ない側の入力は全部そのまま通るので、human-present true の対照が無ければ緑のまま"
+     :file "src/hikari/methods/substrate.cljc"
+     :find "   (let [ceiling (if human-present (:human-proximity-speed env) (:max-joint-speed env))"
+     :replace "   (let [ceiling (:max-joint-speed env)"
+     :must-fail ["test-human-proximity-forces-slower-envelope"]}
+
+    {:id :hikari/rocof-trip-threshold-relaxed
+     :why "anti-islanding relay の閾値を 10 倍に緩める。islanding-scale の transient（+80 kW）が trip しなくなる。normal step 側は元々 trip しないので、trip する側の入力が無ければ緑のまま"
+     :file "src/hikari/methods/microgrid.cljc"
+     :find "(def ROCOF-TRIP-HZ-PER-S 2.0)"
+     :replace "(def ROCOF-TRIP-HZ-PER-S 20.0)"
+     :must-fail ["test-islanding-scale-step-trips-rocof" "a-large-imbalance-exceeds-the-anti-islanding-trip"]}
+
+    ;; ── ③ 物理が数として合わなくなる ──
+    {:id :hikari/swing-equation-drops-the-2h
+     :why "2H·df/dt の 2 を落とす形。周波数は依然として 50 Hz に戻り settle するので outcome test（test-microgrid）は緑のまま —— 初期 ROCOF が 2 倍になったことは analytical test だけが数として捕まえる"
+     :file "src/hikari/methods/microgrid.cljc"
+     :find "                         (* 2.0 inertia-h))"
+     :replace "                         inertia-h)"
+     :must-fail ["initial-rocof-matches-swing-equation" "matches-the-plant-models-realized-t0-slope"]}
+
+    {:id :hikari/ik-elbow-mirror-collapses
+     :why "ik2 が elbow-up/down を無視して常に同じ枝を返す形。FK∘IK の roundtrip は両方成立するので workspace grid の test は緑のまま —— 2 解が同一になったことだけが赤くなる"
+     :file "src/hikari/methods/substrate.cljc"
+     :find "             sin-q1 (if elbow-up (- sin-q1) sin-q1)"
+     :replace "             sin-q1 (- sin-q1)"
+     :must-fail ["elbow-solutions-are-distinct-mirrors-to-the-same-point"]}
+
+    ;; ── 決定核（settlement） ──
+    {:id :hikari/tithe-drops-to-zero
+     :why "G7 tithe 10% を 0 にする形。operatorPayout = gross になり Public Fund への split が消える"
+     :file "src/hikari/methods/agent.cljc"
+     :find "(def TITHE-BPS 1000)"
+     :replace "(def TITHE-BPS 0)"
+     :must-fail ["test-settlement-tithe-split"]}
+
+    {:id :hikari/settlement-state-inverted
+     :why "intent/executed を取り違える形。署名の無い settlement が executed、署名付きが intent になる —— 両方向の test が在るので反転はどちらも赤くなる"
+     :file "src/hikari/methods/agent.cljc"
+     :find "      :state               (if buyer-sig-ref \"executed\" \"intent\")"
+     :replace "      :state               (if buyer-sig-ref \"intent\" \"executed\")"
+     :must-fail ["test-settlement-tithe-split" "test-settlement-executed-only-with-sig"]}
+
+    ;; ── state machine が verdict を読むのをやめる ──
+    {:id :hikari/grid-edge-commits-without-restored-frequency
+     :why "commit_dispatch が acceptance test の verdict を無視する形。frequency が戻らなかった commissioning がそのまま dispatch record になる"
+     :file "src/hikari/cells/grid_edge/state_machine.cljc"
+     :find "      (when-not (get cs \"freq_restored\")"
+     :replace "      (when-not (or true (get cs \"freq_restored\"))"
+     :must-fail ["test-grid-edge-unrestored-frequency-blocks-dispatch"]}
+
+    {:id :hikari/install-commits-despite-envelope-violation
+     :why "commit_job が planner の envelope verdict を無視する形。joint-rate ceiling を破る trajectory が job として commit される"
+     :file "src/hikari/cells/solar_pv_install/state_machine.cljc"
+     :find "    (when-not (get cs \"envelope_ok\")"
+     :replace "    (when-not (or true (get cs \"envelope_ok\"))"
+     :must-fail ["test-install-envelope-violation-blocks-commit"]}
+
+    ;; ── ④ descriptor の縫い目 ──
+    {:id :hikari/cell-handler-renamed-only-in-the-descriptor
+     :why "cells/*.edn 側だけ handler を改名する形。EDN としては valid のまま、配備が実行時に初めて『関数が無い』で落ちる（yoro-supply と同型）"
+     :file "cells/grid_edge.edn"
+     :find ":cell/handler \"handle_grid_edge\""
+     :replace ":cell/handler \"handle_grid_dispatch\""
+     :must-fail ["every-cell-handler-exists-in-the-agent"]}
+
+    {:id :hikari/boundary-drops-a-cell
+     :why "hikari.murakumo/cell-specs の key を 1 つ改名する形。murakumo_test は cell-specs を introspect するので緑のまま —— manifest が宣言する cell が all-cell-plans から静かに消えたことは 4 面一致だけが捕まえる"
+     :file "src/hikari/murakumo.cljc"
+     :find "  :consumption_audit {:legacy-cell \"consumption-audit\""
+     :replace "  :consumption_review {:legacy-cell \"consumption-audit\""
+     :must-fail ["cell-ids-agree-across-the-four-facets"]}
+
+    {:id :hikari/wire-lexicon-not-reprojected
+     :why "lex/*.edn（canonical）の :required を編集して lexicons/**/*.json（wire）を再投影しない形。wire は古い schema を配り続ける"
+     :file "lex/installAttestation.edn"
+     :find ":required [\\\"installId\\\" \\\"vendor\\\" \\\"sourcing\\\"]"
+     :replace ":required [\\\"installId\\\" \\\"vendor\\\"]"
+     :must-fail ["wire-lexicons-are-the-projection-of-the-canonical-edn"]}
+
+    {:id :hikari/constitutional-gate-text-loses-its-invariant
+     :why "manifest.jsonld の G8 本文から rare-earth を落とす形。gates map は 14 個のままなので件数 test は緑 —— constitutionalInvariants が名指す語が gate 本文に無いことだけが赤くなる"
+     :file "manifest.jsonld"
+     :find "\"G8\": \"NO RARE-EARTH PERMANENT MAGNETS"
+     :replace "\"G8\": \"NO PERMANENT MAGNETS"
+     :must-fail ["constitutional-invariants-name-declared-gates-with-matching-text"]}]}]}
