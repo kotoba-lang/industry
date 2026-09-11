@@ -58,15 +58,23 @@ description: JVM / Clojure に依存している toolchain（amu・kotoba-sema�
    手順 1 を再実行して `selfhost-distance.edn` を更新して commit。
    **件数が動かなかった反復は失敗として記録する**（緑でも赤でもなく「変わらなかった」）。
 
-## 壁の順番（2026-09-11 の測定で見えている分。数は測り直す）
+## 壁の順番（2026-09-11 夜、amu 79e07a5a / 210 source で測り直した分。数は毎回測り直す）
 
-| 壁 | 種別 | 手 |
-|---|---|---|
-| `:export` vector 必須（83） | 実装状態（dual-runtime を壊す） | ns attr-map `{:kotoba/export […]}`（反復 1） |
-| reader: `#?` 条件付き読み（13 + map 奇数 21 の多く） | 実装状態 | reader が `:kotoba` / `:default` 分岐を選ぶ。ADR が要る（どの feature を真とするか） |
-| reader: `#js` `#"…"` `#'` dispatch（36） | 半分は性質（interop は恒久禁止） | `#js` は host 側に残す / `#"…"` は `bounded_regex` へ |
-| `:require` の `:refer` / `:import`（12 + 7） | 実装状態 | alias-only へ source を直す（`:import` は interop = 性質） |
-| 単一ファイル harness（70） | harness | 壁ではない。project route で測る |
+同日中に突破済み（compiler 側）: ns attr-map `{:kotoba/export …}` / reader の `#_` `#?@` `#:ns{}` `\uXXXX`
+`'form` `\c` `0N` `1.5M` 9+ 要素 int set、`#"…"` `#js` は tagged form として**読んで**選ばれたら名指し拒否 /
+`:refer` / `:refer-clojure` no-op / docstring bound 64 KiB / keyword-key map literal の値型混在 → closed record /
+`into` の 1 段 transducer / `#=` の拒否を reader dispatch へ。read gate は 103/178 → 201/210。
+
+| 壁 | 件数 | 種別 | 手 |
+|---|---|---|---|
+| `:export` 未宣言 | 58 | source | `scripts/annotate-kotoba-export.cljk`（amu）を未 annotate の repo / pin hold（io-ipld, json）に当てる |
+| `qualified call is not an admitted exported import` | 24 | source | `(:require …)` が `#?@(:clj … :cljs …)` の中で `:kotoba` 枝が無い → `:kotoba` 枝を書く |
+| `:import` / host module string require | 23 + 17 | 性質 | host 層を module 分割（capability import） |
+| missing module（`clojure.set` `clojure.walk` …） | 22 | 言語 stdlib | `kotoba-lang/lang/compat/clojure/*.kotoba` に**厳密同値**だけ足す（近似を本名で置かない） |
+| reader（`:clj` 専用 key で奇数になる map 等） | 19 | source | `:kotoba` 枝 |
+| `def` の非定数（純粋式） | 9 | 実装状態 | compile-time folding（反復進行中） |
+| `ex-info` 呼び出し | 5 | 性質（untracked control effect） | 境界を `[:result T E]` に |
+| `record-get … got :i64`（keyword→record table の動的 key lookup） | 2+ | 実装状態 | `def` table を `[:map :keyword R]` に型付ける経路 |
 
 ## JVM tool の側（compiler の外）
 
