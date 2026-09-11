@@ -29,9 +29,12 @@
 ;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --check
 ;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --live kouhou
 ;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --due
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --no-land
 ;;
 ;;   --check  走らせない。登録簿の整合（west.yml に在るか / checkout が在るか）だけ見る
 ;;   --live   :live-alias を持つ actor を実 fetch/publish モードで走らせる（明示 opt-in）
+;;   --no-land スナップショットを origin/main へ着地させない（既定は着地する。
+;;            書いた者が着地させる —— 下の snapshot-land 呼び出しを参照）。
 ;;   --due    **各 actor 固有の間隔**を過ぎたものだけ走らせる（ADR-2608082600）。
 ;;            毎時これを叩けば、kawaraban は毎時・inochi は 4.8 日ごとに回る。
 ;;            間隔は 90-docs/system-dynamics/observatory-cadence.datoms.edn（生成物）
@@ -85,6 +88,9 @@
 
 (def check-only? (flag? "--check"))
 (def due-only? (flag? "--due"))
+;; --no-land: スナップショットを書いたあと origin/main へ着地させない（手元で
+;; 観測だけしたいとき）。既定は着地する —— 下の「書いた者が着地させる」を参照。
+(def no-land? (flag? "--no-land"))
 (def only (when-let [v (opt "--only")] (set (str/split v #","))))
 (def live (when-let [v (opt "--live")] (set (str/split v #","))))
 
@@ -576,6 +582,36 @@
     (println (str "\n  → " (:ledger registry)
                   "（更新 " (count ran) " / 前回の観測を保持 " (count carried)
                   (when (seq never) (str " / 未観測 " (count never))) "）"))))
+
+;; ── 書いた者が着地させる ─────────────────────────────────────────────────
+;; この tick は launchd から共有 checkout（superproject root）に対して毎時走り、
+;; 上の spit は **tracked な生成物を上書きして commit しない**。結果、この machine の
+;; 全 session が `merge --ff-only` のたびにこの dirty file を避け、cleanup が 1 日に
+;; 2 回それを「着地」させ、その 30 分後に次の tick がまた dirty にしていた
+;; （f578dce7008 / bb88b69e692 / 6221ee1108f、2026-09-10〜11）。`:ledger-blocker`
+;; （manifest/cleanup-workflow.edn）と同じ形で、直し方も同じ: bmc-tick が
+;; ledger-land を呼ぶのと同じ位置で、ここが snapshot-land を呼ぶ。
+;;
+;; 経路は GitHub API の server-side single commit（CAS、force しない）で、共有
+;; checkout の branch 状態に依存しない。スナップショットなので union ではなく
+;; 「最新の bytes で置き換える」が正しく、競合しても次の tick がまた最新を書く。
+;; 着地失敗は tick を落とさない（file は working tree に残り、次の tick か cleanup
+;; が拾う）が、`LAND` 行に exit を別に印字して「着地できなかった」を成功と区別する。
+;; 実行できなかった（kbb が無い等）も同じ行に出す —— 沈黙を緑にしない。
+(when (and (not check-only?) (not partial-run?) (not no-land?))
+  (let [r (.spawnSync cp "kbb"
+                      (clj->js ["--backend" "sci" (abs "scripts" "snapshot-land.cljk")
+                                "com-junkawasaki/root" (:ledger registry) ledger-path
+                                (str "--message=observatory: land the tick's regenerated snapshot ("
+                                     (count ran) " actor(s) re-observed at " now ")")])
+                      (clj->js {:cwd root :encoding "utf8" :timeout 300000}))
+        status (if (nil? (.-status r)) 124 (.-status r))
+        out (str/trim (str (or (.-stdout r) "")))]
+    (println (str "  LAND " (case status 0 "ok" 3 "UNLANDED" 124 "TIMEOUT" "FAILED")
+                  " exit=" status
+                  (when (seq out) (str " — " (last (str/split-lines out))))
+                  (when-not (zero? status)
+                    (str "\n       " (str/trim (str (or (.-stderr r) "")))))))))
 
 ;; ── まとめ ──────────────────────────────────────────────────────────────
 (println (str "\n  登録 " (count obs)
