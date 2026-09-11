@@ -1,0 +1,70 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609121100-singleton-counterparts-held-directly-in-the-hot-index")
+  (:adr/topic "datom-plane-hot-index-representation")
+  (:adr/title "hot db の index は counterpart が 1 つのあいだ値を直接持つ —— 99.5% が singleton set で、1 つ 160 B、full SF1 の 10.9 GB のうち 6.4 GB がそれ（提案）")
+  (:adr/status "proposed")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/datalog" "kotoba-lang/arrangement" "kotoba-lang/kotobase-peer" "kotoba-lang/ayatori"))
+  (:adr/related (vector "adr-2609121000-ldbc-snb-interactive-world-no1-over-the-network-is-the-benchmark"
+                "adr-2608160100-block-car-pack-object"
+                "adr-2608039970-the-base-is-the-datom-plane-not-datalog"
+                "adr-2809041200-rule-is-property-or-implementation-state"))
+  (:adr/validation (map
+    (:kind "measured on the fleet host simeon (ayatori co-scientist iterations 24-29); the decision itself is not taken here")
+    (:evidence "orgs/kotoba-lang/ayatori bench/coscientist-iteration-27.edn (bytes per quad by attribute group), -28.edn (interning refuted), -29.edn (node count and the price of a singleton set)")
+    (:acceptance-if-adopted "kotoba-lang/datalog suite, kotoba-lang/kotobase-peer suite, the 1,082-parameter both-ways gate of kotobase-peer.ldbc-snb-net, and the Neo4j all-parameter pairing -- answers byte-identical before and after")))
+  (:adr/body "## Context
+
+LDBC SNB Interactive を benchmark にした loop（ADR-2609121000）が、rung を SF1 部分集合から
+SF1 本体（20.6M quad）へ上げたところで memory の壁に当たった（iteration 26）: 16 GiB の
+fleet host で used heap 10.9 GB、macOS が 8 GB の swap file を作り、SUT は paging を測る
+状態になった。壁の中身を 3 反復で測った:
+
+- iteration 27: attribute group ごとの live heap は quad あたり 450–640 B（plain knows だけ
+  230）。content 文字列は自 group の 478 B のうち約 70 B。**値ではなく構造**。
+- iteration 28: 全 `:s` `:o` を 1 table で intern しても 588 MB → 634 MB で**減らない**
+  （table の分だけ増える）。index は既に同じ String object を共有している。
+- iteration 29: index の node を数えた。
+
+    index   inner maps   sets       elements   singletons   share
+    eavt       502,357   1,652,749  2,004,832  1,643,941    0.995
+    aevt            23   1,652,749  2,004,832  1,643,941    0.995
+    avet            23     438,655  2,004,832    193,999    0.442
+
+    map entry が singleton PersistentHashSet を持つ   211 B
+    同じ entry が値を直接持つ                            51 B
+    set であることの代償                               160 B
+
+  部分集合（830 MB）のうち **557 MB**、full SF1（10.9 GB）のうち **約 6.4 GB** が
+  「1 要素の set」の代償である。
+
+## Proposal（決定はオーナー）
+
+`datalog.index` の hot db で、(entity, attribute) と (attribute, entity) と (attribute, value)
+の counterpart を、**1 つのあいだは値を直接持ち、2 つ目が入った時点で set に昇格する**。
+
+- **性質は変えない**: datom model の attribute は集合値のまま。変えるのは表現。
+- **読む側の seam は 2 択**: (a) `entity-attrs` / `by-predicate` / `by-predicate-value` が従来どおり
+  set を返す（singleton は読むときに `#{v}` を作る —— 読みごとの allocation、書き込みは軽い）、
+  (b) bare 値も返しうる contract に変え、読み手 3 箇所（`datalog.query/query-seq`、
+  `kotobase-peer.core` の `datoms` / `entity` / `pull`、harness）を直す。**(b) を推す** ——
+  read path に allocation を足すのは、この plane の read が hot だから。
+- `assert-quad` / `retract-quad` / transient 版（`assert-quads!`）の `upd` / `rm` が昇格と降格を持つ。
+- 期待値: full SF1 が **約 4.5 GB** で 16 GiB の fleet host に resident、SF3（約 60M quad）が
+  32 GB 機に載る。SF30 は別 plane（ADR-2608160100 の pack / columnar）のまま。
+
+## Consequences
+
+- 受け入れ条件は既存の 3 suite と両経路 gate、Neo4j pairing で**答えが byte 同一**であること。
+- 不採用なら、SF1 本体の行は 32 GB 機（S18）でしか取れず、M3 の次段は persisted plane 直行になる。
+- これは「ある日の実装状態」であって性質ではない（ADR-2809041200）。set 値の default 表現が
+  cardinality-one の graph に合わないというのが実測で、規則ではない。
+
+## What this is not
+
+- Datalog / dialect の変更ではない。query の書き方は 1 文字も変わらない。
+- persisted plane の設計ではない。hot db の in-memory 表現だけ。
+")
+  (:adr/consequences "採用なら kotoba-lang/datalog に表現を実装し、3 suite と gate を通し、simeon で full SF1 の行を取る。不採用なら S18（32 GB 機）か persisted plane。")))
