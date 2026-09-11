@@ -1,6 +1,6 @@
 # ISIC Coverage (generated)
 
-**Generated from `resources/kotoba/industry/registry.edn` by `nbb scripts/gen-industry-docs.cljs`. Do not hand-edit -- rerun the script after the registry changes.**
+**Generated from `resources/kotoba/industry/registry.edn` by `nbb scripts/gen-industry-docs.cljk`. Do not hand-edit -- rerun the script after the registry changes.**
 
 ## Summary
 

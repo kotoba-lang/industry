@@ -1,5 +1,5 @@
 ;; One mutation per invariant. `:find` must occur EXACTLY ONCE in `:file` —
-;; `tools/mutate.cljs` refuses otherwise, because a mutation that landed in a
+;; `tools/mutate.cljk` refuses otherwise, because a mutation that landed in a
 ;; comment or a second call site produces a red suite that proves nothing.
 ;;
 ;; ## SCOPE
@@ -17,7 +17,7 @@
 ;; invariants are measured" and NOT "this library is measured".
 ;;
 ;; ⚠ These mutations drive `clojure -M:test`. The `:cljs` half is exercised
-;; by `test/run_portable.cljs`, which this harness does not run — a mutation
+;; by `test/run_portable.cljk`, which this harness does not run — a mutation
 ;; that broke only a `:cljs` branch would survive here. Both were run by
 ;; hand; see the conversion commit message for the counts.
 ;;
@@ -51,32 +51,32 @@
 ;; removed in `kotoba-lang/technology` and `kotoba-lang/iso3166`.
 [{:id :the-projection-cannot-drift-unnoticed
   :invariant "the generated namespace matches the EDN a human edits"
-  :file "src/kotoba/industry/embedded.cljc"
+  :file "src/kotoba/industry/embedded.cljk"
   :find "Community Monetary Intermediation"
   :replace "Community Monetary Intermediation DRIFTED"}
 
  {:id :the-drift-check-refuses-when-it-cannot-read
   :invariant "a check that could not run must not report a pass"
-  :file "test/kotoba/industry_test.cljc"
+  :file "test/kotoba/industry_test.cljk"
   :find "#?(:clj (try (slurp path) (catch Exception _ nil))"
   :replace "#?(:clj (try (slurp (str path \".missing\")) (catch Exception _ nil))"}
 
  {:id :by-id-does-not-invent-an-empty-index
   :invariant "(into {} …) over nil yields {} — an index over no data"
-  :file "src/kotoba/industry.cljc"
+  :file "src/kotoba/industry.cljk"
   :find "  ([reg] (when-let [inds (industries reg)]\n           (into {} (map (juxt :id identity)) inds))))"
   :replace "  ([reg] (into {} (map (juxt :id identity)) (industries reg))))"}
 
  {:id :by-id-is-keyed-on-the-isic-class
   :invariant "the index key is :id and not some other field"
-  :file "src/kotoba/industry.cljc"
+  :file "src/kotoba/industry.cljk"
   :find "(map (juxt :id identity)) inds)"
   :replace "(map (juxt :name identity)) inds)"}
 
  ;; ⚠ RETARGETED, with the reason. The first form of this mutation replaced
  ;; `embedded/registry-data` with `{}`. It is caught — run by hand it gives
  ;; `Ran 50 tests containing 519 assertions. 434 failures` — but the HARNESS
- ;; cannot score it: `tools/mutate.cljs` runs `clojure -M:test` under Node's
+ ;; cannot score it: `tools/mutate.cljk` runs `clojure -M:test` under Node's
  ;; `execSync`, whose default `maxBuffer` is 1 MB, and 434 clojure.test
  ;; failure reports exceed that. Node then kills the child with SIGTERM, and
  ;; the harness — correctly, given what it can see — treats a signalled child
@@ -87,18 +87,18 @@
  ;; recorded above instead of being silently dropped.
  {:id :the-registry-is-the-projection-unaltered
   :invariant "the library returns the projection as it is, not a doctored copy"
-  :file "src/kotoba/industry.cljc"
+  :file "src/kotoba/industry.cljk"
   :find "  embedded/registry-data)"
   :replace "  (dissoc embedded/registry-data :kotoba.registry/id))"}
 
  {:id :the-backlog-partitions-required-from-optional
   :invariant "an unprovided OPTIONAL technology is not reported as required"
-  :file "src/kotoba/industry.cljc"
+  :file "src/kotoba/industry.cljk"
   :find "    :optional (:unknown (technology/resolve-stack (optional-technologies reg isic)))}))"
   :replace "    :optional (:unknown (technology/resolve-stack (required-technologies reg isic)))}))"}
 
  {:id :maturity-defaults-to-spec
   :invariant "an entry with no evidence of a repo is :spec, not a tier up"
-  :file "src/kotoba/industry.cljc"
+  :file "src/kotoba/industry.cljk"
   :find "        :else                    :spec)))"
   :replace "        :else                    :blueprint)))"}]
