@@ -67,27 +67,31 @@ description: JVM / Clojure に依存している toolchain（amu・kotoba-sema�
    手順 1 を再実行して `selfhost-distance.edn` を更新して commit。
    **件数が動かなかった反復は失敗として記録する**（緑でも赤でもなく「変わらなかった」）。
 
-## 壁の順番（2026-09-12 01:40、amu 10469db0 / 225 source。数は毎回測り直す）
+## 壁の順番（2026-09-12 03:40、amu b6052761 / 225 source、測定 17。数は毎回測り直す）
 
-12 時間で compiler 側に入った突破: ns attr-map / reader 3 段（`#_` `#?@` `#:ns{}` `\uXXXX` `'` `\c` `0N` `1.5M` 9+ int set、
-`#"…"` `#js` は tagged で読んで名指し拒否、`#=` は dispatch で拒否）/ `:refer` / `:refer-clojure` no-op / docstring 64 KiB /
-keyword-map → closed record / `into` transducer / `def` の compile-time folding / `clojure.core/` prefix / string literal 64 KiB /
-`clojure.set` template + default binding / `kotoba.lang.text` forwarding compat（`replace` 新規）/ `.kotoba` twin が `.cljk` を shadow /
-variadic defn（sema 着地、amu pin 待ち）。source 側: `:kotoba/export` を amu + sema + 依存 25 repo、amu deps.edn に明示 floor。
-read gate 103/178 → 214/225。project route の admit はまだ 0。
+前段（〜01:40）の突破は `git log` の測定 1〜13 に在る。02:00〜03:40 に入ったもの: reader `\b` `\f`（sema d17a490）/
+amu `cli.cljk` の括弧過多（ce8d7236 混入、JVM は `.cljk` を読めないので Kotoba reader だけが検出）/ missing module の名指し
+（amu 5d8e23e4）/ `kotoba.lang.coll` guest twin（kotoba-lang 75bb3c13、set 4 名 + superset?）/ **defn / defn- / fn の implicit
+body sequencing**（authority 89e26ec7、sema b82c7bb3、digest 5b8af0f9、wasm32 で実測）/ 空 body 拒否文が `#?(:clj …)` 専用
+body を名指し（sema 99f03fc8）。read gate 214 → 215。project route の admit はまだ 0。
+
+**読み方の罠（測定 17 で踏んだ）**: 壁の件数は「その拒否文で止まった module 数」であって、その形の出現数ではない。
+body sequencing は corpus の 272 defn に効くが、histogram では 14 → 13 しか動かなかった —— 残り 13 は「複数式」ではなく
+**`#?(:clj …)` だけの body が空として読まれた**もので、拒否文が同じだった。**壁を選ぶ前に、その拒否文を出している source の
+形を reader で数える**（scratchpad の `multi-body.cljk` / `empty-body.cljk` の形）。
 
 | 壁 | 件数 | 種別 | 手 |
 |---|---|---|---|
-| reader（依存の中の `:clj` 専用 key map、`\c`） | 43 | source | `:kotoba` 枝 |
-| missing module（`clojure.walk` `clojure.pprint` …） | 28 | 言語 compat | `lang/compat/clojure/walk.kotoba`（厳密同値のみ） |
-| variadic `defn` | 18 | 実装状態 | fn profile の静的特殊化を defn へ（sema 00e68a3） |
-| `:import` / host string require | 14 + 16 | 性質 | host 層を分割 |
-| 複数式 body（`function must contain one result expression`） | 14 | grammar 決定（explicit `do`） | ADR: `fn`/`defn` の implicit do を admit するか |
-| `map-indexed` | 9 | stdlib gap | `loop` + `vector-at` lowering（進行中） |
-| map callback の destructuring `[[k v]]` | 9 | 値モデル | vector-i64 source に位置が無い —— pair source を持つか source 側 |
-| qualified call（`#?@` require の `:kotoba` 枝欠落 / absent compat 名） | 9 | source | `:kotoba` 枝 |
-| `ex-info` | 5 | 性質 | `[:result T E]` |
-
+| reader（依存の中の `#?(:clj …)` が map 値位置で奇数） | 27 | 性質（features `#{:kotoba}`）→ source | 8 file / 7 repo に `:default` 節（進行中、amu dep pin 6 本） |
+| `:import` / host string require | 14 + 16 | 性質 | host 層を分割（capability import） |
+| missing `clojure.walk` / `clojure.edn` | 15 / 8 | 言語 compat | `lang/compat/clojure/walk.kotoba`（`:document` 上の厳密同値、進行中）/ `clojure.edn` は `document-read` の twin 候補 |
+| 空 body = `#?(:clj …)` 専用 body | 13 | 性質 → source | `:default` 節（io-ipld / edn / abi / artifact / dev-protobuf の host bytes 関数）|
+| `#"…"` regex literal | 9 | 性質 | source 側で `kotoba.string` へ |
+| map callback の destructuring `[[k v]]` / vector-i64 got string | 9 / 9 | 値モデル | pair source / 型注釈 |
+| qualified call | 9 | source | `:kotoba` 枝 / absent compat 名 |
+| `some` = Clojure の述語 vs Kotoba の option 構築子 | 8 | 名前衝突（性質） | 拒否文に衝突を名指し + source 側 |
+| `\c` char literal | 7 | 性質 | byte 整数へ |
+| `ex-info` / `(atom …)` in def / hetero vector index | 5 / 5 / 5 | 性質 | `[:result T E]` / capability / literal index |
 ## JVM tool の側（compiler の外）
 
 | tool | JVM に残る理由 | Kotoba 化の入口 |
