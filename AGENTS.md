@@ -645,7 +645,9 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   「pull して」は 3 つの別物を含む —— (1) superproject を origin/main に合わせる
   (2) pin を各 repo の default branch tip に進める (3) checkout を pin に合わせる。
   **(2) を落とすと、(1) と (3) をいくら回しても workspace は古いまま止まる。**
-  前進の経路は `scripts/west-pin-put.cljk` / `west-pin-put-batch.cljs`。
+  前進の経路は `scripts/west-pin-put.cljk` / `west-pin-put-batch.cljs`、**千本単位なら
+  `west-pin-put-bulk.cljk`**（同じ 3 検査を GraphQL 50 repo/query で行い、409 は差分だけ再検証。
+  実測 2026-09-11: 3,907 pin を 1 commit・約 4 分。batch は同じ量で 5,000/h を食い潰した）。
   進めない理由があるなら pin の隣か commit message に書く ——
   **黙って遅れているのと、理由があって留めているのは、出力から区別できなければならない。**
   ⚠ これは「引数なしの `west update` を回せ」という意味ではない。

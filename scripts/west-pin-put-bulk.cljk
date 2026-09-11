@@ -1,0 +1,196 @@
+;; scripts/west-pin-put-bulk.cljk — advance MANY west.yml pins in one server-side
+;; commit, with the SAME three checks as scripts/west-pin-put.cljk, but with the
+;; verification cost that thousands of entries actually need.
+;;
+;; Why this exists (measured 2026-09-11, adr-2609112000, 4,039 pins to move):
+;; west-pin-put-batch spends 3 REST calls per entry (default branch, compare
+;; against it, compare old->new) and, on a 409 from a concurrent west.yml
+;; writer, RE-VERIFIES EVERY ENTRY. A 1,100-entry tranche cost 3,300 calls per
+;; attempt; the first 409 doubled it past the 5,000/h core bucket, and the
+;; second pass came back "default branch unresolved" for 1,011 entries -- the
+;; REST bucket was empty, which the exempt `rate_limit` endpoint did not say.
+;; 91 pins were written. At that rate 4,000 pins is a working day of retries.
+;;
+;; What changes, and what does not:
+;;
+;;   check 1  new pin reachable from the upstream default branch   -- kept.
+;;            Asked of GitHub, via GraphQL: `defaultBranchRef.compare(headRef:
+;;            <new>)` is IDENTICAL or BEHIND. 50 repositories per query, cost 1
+;;            point each from a bucket the REST calls do not share.
+;;   check 2  tip's old pin -> new pin is a clean forward move      -- kept.
+;;            Asked of GitHub in the same query: when the new pin IS the tip,
+;;            `compare(headRef: <old>)` BEHIND proves old is an ancestor of new.
+;;            When the new pin is itself behind the tip (someone pushed after
+;;            the merge) that inference does not hold, and that minority is
+;;            asked with the REST compare exactly as the batch script does.
+;;   check 3  one blob-SHA precondition for the whole write         -- kept.
+;;            On 409 the tip is re-read and ONLY entries whose tip pin changed
+;;            are re-verified (an entry that another writer already moved to
+;;            our sha becomes "already at that pin" for free).
+;;
+;; Nothing local is trusted for ancestry: the checkout is not consulted at all.
+;; Exit 0 = wrote (or nothing to write); 2 = could not answer (tip unreadable,
+;; GraphQL refused); 1 = write failed after retries.
+;;
+;;   PINS=pins.tsv [DRY=1] [MSG="west: …"] \
+;;     kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-bulk.cljk
+;;   pins.tsv: <west-entry-name>\t<40-hex sha>\t<owner/repo>
+(ns west-pin-put-bulk
+  (:require ["fs" :as fs] ["child_process" :as cp] [clojure.string :as str]))
+
+(def repo "com-junkawasaki/root")
+(def path "manifest/west.yml")
+(def pins-file (.-PINS js/process.env))
+(def dry? (= "1" (.-DRY js/process.env)))
+(def msg (let [m (.-MSG js/process.env)] (when-not (str/blank? m) m)))
+
+(defn sh [cmd & [input]]
+  (try {:out (str (.execSync cp cmd (clj->js (cond-> {:encoding "utf8" :maxBuffer 64000000 :stdio ["pipe" "pipe" "pipe"]}
+                                                input (assoc :input input))))) :exit 0}
+       (catch :default e {:out (str (or (.-stdout e) "") (or (.-stderr e) "")) :exit (or (.-status e) 1)})))
+
+(def rows
+  (->> (str/split-lines (fs/readFileSync pins-file "utf8"))
+       (remove str/blank?)
+       (map #(str/split % #"\t"))
+       (filter #(and (= 3 (count %)) (re-matches #"[0-9a-f]{40}" (second %))))))
+
+(defn tip
+  "west.yml at the tip, or exit 2. Same guard as the batch script: a secondary
+  rate limit answers with a JSON body where west.yml should be."
+  []
+  (let [blob (str/trim (:out (sh (str "gh api repos/" repo "/contents/manifest --jq '.[] | select(.name==\"west.yml\") | .sha'"))))
+        text (:out (sh (str "gh api repos/" repo "/contents/" path " -H 'Accept: application/vnd.github.raw'")))]
+    (when (or (str/blank? text) (< (count text) 1000) (not (str/includes? text "manifest:"))
+              (str/includes? (subs text 0 (min 400 (count text))) "\"message\":"))
+      (println "REFUSED: could not read manifest/west.yml at tip (" (count text) "bytes ). Not writing; entries were not looked at.")
+      (js/process.exit 2))
+    (when (str/blank? blob) (println "REFUSED: could not read the west.yml blob sha at tip.") (js/process.exit 2))
+    {:blob blob :text text}))
+
+(defn revision-line-index
+  "Index of the `revision:` line of PROJECT `- name: <entry>` (some over every
+  match: a remote block can share the name and has no revision line)."
+  [lines entry]
+  (let [starts (keep-indexed (fn [i l] (when (= (str/trim l) (str "- name: " entry)) i)) lines)]
+    (some (fn [start]
+            (first (keep (fn [j] (when (and (< j (count lines)) (str/starts-with? (str/trim (nth lines j)) "revision:")) j))
+                         (range (inc start) (min (count lines) (+ start 8))))))
+          starts)))
+
+;; ---- GraphQL --------------------------------------------------------------
+
+(defn- gql-chunk
+  "[{:entry :slug :sha :cur}] -> {entry {:default :tip :new-status :cur-status}} or ::refused"
+  [items]
+  (let [q (str "query { rateLimit { cost remaining } "
+               (str/join " "
+                         (map-indexed (fn [i {:keys [slug sha cur]}]
+                                        (let [[o n] (str/split slug #"/" 2)]
+                                          (str "r" i ": repository(owner:" (pr-str o) ", name:" (pr-str n) ") { defaultBranchRef { name target { oid } "
+                                               "new: compare(headRef:" (pr-str sha) ") { status behindBy } "
+                                               "old: compare(headRef:" (pr-str cur) ") { status behindBy } } }")))
+                                      items))
+               " }")
+        body (js/JSON.stringify #js {:query q})
+        r (sh "gh api graphql --input -" body)
+        parsed (try (js->clj (js/JSON.parse (:out r)) :keywordize-keys true) (catch :default _ nil))]
+    (if-not (map? (:data parsed))
+      (do (println "  ! GraphQL did not answer:" (subs (:out r) 0 (min 200 (count (:out r))))) ::refused)
+      (into {} (map-indexed (fn [i {:keys [entry]}]
+                              (let [d (get-in parsed [:data (keyword (str "r" i)) :defaultBranchRef])]
+                                [entry (when d {:default (:name d) :tip (get-in d [:target :oid])
+                                                :new-status (get-in d [:new :status]) :cur-status (get-in d [:old :status])})]))
+                            items)))))
+
+(defn- rest-forward? [slug cur sha]
+  (= "ahead 0" (str/trim (:out (sh (str "gh api repos/" slug "/compare/" cur "..." sha " --jq '.status + \" \" + (.behind_by|tostring)'"))))))
+
+(defn- gql-chunk*
+  "gql-chunk with bisection: one unknown sha makes GitHub fail the WHOLE query
+  (measured 2026-09-11: a nonexistent headRef answers `Something went wrong`
+  for all 50 aliases), so a refused chunk is split until the offending entry
+  stands alone and is recorded as unresolved instead of refusing the run."
+  [items]
+  (let [a (gql-chunk items)]
+    (cond (not= a ::refused) a
+          (= 1 (count items)) {(:entry (first items)) nil}
+          :else (let [[l r] (split-at (quot (count items) 2) items)]
+                  (merge (gql-chunk* l) (gql-chunk* r))))))
+
+(defn verify-all
+  "items -> {entry {:ok bool :why str}}"
+  [items]
+  (let [answers (reduce (fn [acc chunk] (merge acc (gql-chunk* chunk))) {} (partition-all 50 items))]
+    (if (= answers ::refused)
+      ::refused
+      (into {}
+            (for [{:keys [entry slug sha cur]} items
+                  :let [{:keys [default tip new-status cur-status] :as a} (get answers entry)]]
+              [entry
+               (cond
+                 (nil? a) {:ok false :why "repository or default branch unresolved"}
+                 (not (contains? #{"IDENTICAL" "BEHIND"} new-status))
+                 {:ok false :why (str "not reachable from default branch " (pr-str default) " (status " new-status ")")}
+                 (and (= new-status "IDENTICAL") (= cur-status "BEHIND")) {:ok true}
+                 (and (= new-status "IDENTICAL") (= cur-status "IDENTICAL")) {:ok false :why "already at that pin (tip moved under us)"}
+                 (rest-forward? slug cur sha) {:ok true}
+                 :else {:ok false :why (str "not a clean forward move (old " cur-status " tip, new " new-status " tip; REST compare not ahead/0)")})])))))
+
+;; ---- main loop ------------------------------------------------------------
+
+(defn plan [lines]
+  (for [[entry sha slug] rows
+        :let [idx (revision-line-index lines entry)
+              cur (when idx (str/replace (str/trim (nth lines idx)) "revision: " ""))]]
+    (cond (nil? idx) {:entry entry :ok false :why "no revision line at tip"}
+          (= cur sha) {:entry entry :ok false :why "already at that pin"}
+          :else {:entry entry :sha sha :slug slug :idx idx :cur cur :pending true})))
+
+(loop [attempt 0 verified {}]
+  (let [{:keys [blob text]} (tip)
+        lines (vec (str/split-lines text))
+        planned (plan lines)
+        ;; re-verify when the tip pin moved, and always when the last answer was
+        ;; "unresolved" (a network blip must not be cached as a verdict)
+        need (filter (fn [p] (and (:pending p)
+                                  (or (not= (get-in verified [(:entry p) :cur]) (:cur p))
+                                      (= "repository or default branch unresolved" (get-in verified [(:entry p) :why])))))
+                     planned)
+        _ (println (str "attempt " (inc attempt) ": " (count rows) " rows, " (count (filter :pending planned)) " to move, " (count need) " to verify"))
+        fresh (if (seq need) (verify-all need) {})
+        _ (when (= fresh ::refused) (println "REFUSED: GraphQL verification did not answer; nothing written.") (js/process.exit 2))
+        verified (merge verified (into {} (for [p need] [(:entry p) (assoc (get fresh (:entry p)) :cur (:cur p))])))
+        decided (map (fn [p] (if (:pending p) (merge p (dissoc (get verified (:entry p)) :cur)) p)) planned)
+        good (filter :ok decided)
+        need-set (set (map :entry need))
+        unresolved (count (filter #(and (need-set (:entry %)) (= "repository or default branch unresolved" (:why %))) decided))]
+    (doseq [{:keys [entry ok why]} decided :when (not ok)] (println (str "  drop " entry ": " why)))
+    ;; more unresolved than resolved is an outage or a rate limit, not 2,000
+    ;; repositories that vanished: refuse to answer rather than write a fragment.
+    (when (and (pos? (count need)) (> unresolved (quot (count need) 2)))
+      (println (str "REFUSED: " unresolved " of " (count need) " entries came back unresolved; GraphQL is not answering. Nothing written."))
+      (js/process.exit 2))
+    (println (str "  " (count good) " of " (count rows) " entr(ies) verified"))
+    (cond
+      (empty? good) (println "nothing to write")
+      dry? (println "DRY: would write" (count good) "pins")
+      :else
+      (let [out-lines (reduce (fn [ls {:keys [idx sha]}]
+                                (assoc ls idx (str/replace (nth ls idx) #"revision: [0-9a-f]+" (str "revision: " sha))))
+                              lines good)
+            out (str (str/join "\n" out-lines) (if (str/ends-with? text "\n") "\n" ""))
+            changed (count (filter true? (map not= lines out-lines)))]
+        (if (not= changed (count good))
+          (println (str "REFUSING: planned " (count good) " edits but " changed " lines differ"))
+          (let [payload {:message (or msg (str "west: advance " (count good) " pin(s)"))
+                         :content (.toString (js/Buffer.from out "utf8") "base64") :sha blob :branch "main"}
+                pf (str "/tmp/west-pin-bulk-payload-" (.-pid js/process) ".json")]
+            (fs/writeFileSync pf (js/JSON.stringify (clj->js payload)) "utf8")
+            (let [r (sh (str "gh api -X PUT repos/" repo "/contents/" path " --input " pf " --jq .commit.sha"))]
+              (cond
+                (re-matches #"[0-9a-f]{40}" (str/trim (:out r)))
+                (println (str "committed " (str/trim (:out r)) " (" (count good) " pins)"))
+                (< attempt 20)
+                (do (println (str "  409/conflict, re-reading tip (attempt " (inc attempt) ")")) (recur (inc attempt) verified))
+                :else (do (println (str "FAILED after retries: " (str/trim (:out r)))) (js/process.exit 1))))))))))

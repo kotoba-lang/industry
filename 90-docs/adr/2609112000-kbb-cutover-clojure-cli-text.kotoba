@@ -108,20 +108,36 @@ kbb-cutover: keep — この文書は旧綴りを意図して引用する。rewr
 - 子 repo の `.github/workflows/*.yml` は SSH remote の repo では書き換わり、https remote の
   repo では（scope 拒否を受けて）除外に切り替えたので **混在**する。どちらも走らない file。
 
-## 結果（2026-09-11。fleet の数は run 完了時に更新する —— 実行中の値を書かない）
+## 結果（2026-09-11 実測、同日中に完了）
 
 - **kotoba-lang/kotoba**: `bin/kbb_deps.cljk` + `bin/kbb` routing + `test/kotoba/kbb_deps_test.cljk`
-  （19 assertions、両方向。未宣言 alias の拒否を warn に変えると 1 FAIL で赤）。main `535daf68`、
-  west pin 前進済み。
+  （19 assertions、両方向。未宣言 alias の拒否を warn に変えると 1 FAIL で赤）。main `535daf68`、west pin 前進済み。
 - **root（com-junkawasaki/root）**: `5cf1b1986fb` — 2,552 file / 5,885 hit、kept 224 行
   （うち 120 は `cloud-itonami-actor-substrate-ledger.edn` の `:evidence` 行、39 は `manifest/fleet-ci.edn`）、
   skipped 7（lock 2 + ledger 5）。`gen-agents-md --check` は置換後も up to date。
-- **fleet**: 6 shard で実行中（state: 各 repo 1 file）。集計コマンド:
-  `cat <state-dir>/*.edn | kbb --backend sci -e '…(frequencies (map :status …))'`。
-  最初の 260 repo で merged 219 / no-op 33 / refused 8（archived 2、`workflow` scope 6 → 除外規則を
-  足して再実行）。完了後にここへ merged / no-op / pr-open / refused の 4 数と、archived repo の
-  扱い、pin 前進の数、detector の post-cutover 値を書く。
-- **測っていないもの**: 置換後の build / test / gate / bot の緑赤（owner 決定で fix-forward）。
-  fleet ノードでの `kbb` 起動。launchd plist（git 外）の `nbb …cljk` 起動行は別途書き換えて
-  `launchctl print` で reload を確認する（ADR-2609111500 と同じ手順）。
+- **fleet（west 4,867 project、org-babashka-nbb を除く）**: **merged 4,039 / no-op 822 / refused 4**
+  （refused は GitHub に存在しない stale entry `com-junkawasaki/com-junkawasaki-{hataori,amu,tamaki,ayatori}` のみ）。
+  **18,350 file / 37,418 hit**、pattern-literal として残した行 956、skipped file 2,365（lock / `.github/workflows` / ledger）。
+  archived 13 repo は unarchive → 置換 → re-archive（rename と同じ）。`kotoba-lang/amu` は protected branch
+  （PR + 2 check 必須。check は rename 以来赤）を `enforce_admins` を一時外して admin merge し直後に復元（`3222b35d`）。
+  GitHub が `Server Error` を返した 2 repo は再確認で main に載っており、branch を消して `:merged` に訂正。
+  初回 260 repo で `workflow` scope 拒否 41 件 → `.github/workflows/` を除外規則に足して shard を再起動（state で済んだ repo は `:already`）。
+- **pin 前進**: **3,907 pin を 1 commit `fa2c3bc4`**（`scripts/west-pin-put-bulk.cljk`、約 4 分、GraphQL 2 attempt）。
+  残り 132 = 「already at that pin」183 と重なる部分を除き、他 session / bot が先に tip へ進めていて
+  **我々の merge を既に含む** 80 件（`old IDENTICAL/BEHIND tip, new BEHIND tip`）—— 退行ではない。
+  ⚠ **`west-pin-put-batch` はこの量で使えなかった**: entry ごと REST 3 call、409 のたび全件再検証で、
+  1,100 本の tranche が 5,000/h を食い潰して 91 本しか書けず、`gh api rate_limit` は限度超過中も満杯を報告した
+  （実 call の `X-Ratelimit-Remaining` ヘッダは 0）。bulk 版は同じ 3 検査を GraphQL
+  `defaultBranchRef.compare(headRef:)` 50 repo/query に畳み、409 後は tip pin が動いた entry だけ再検証する。
+  負制御: 現 pin の親（退行）は `not a clean forward move`、存在しない sha は chunk を bisect して
+  `unresolved` で drop（1 つの不正 sha が query 全体を `Something went wrong` にするため）。
+- **launchd**: 47 plist を `kbb --backend sci` に切替（`*.pre-kbb-20260911` に退避）、bootout/bootstrap、
+  `launchctl print` で 47 本すべて新定義。`/opt/homebrew/bin/nbb` は stock 1.4.208 で `.cljk` の require を
+  解決できないので、これらの job は rename 以来止まっていた。stale な `.cljs` path（`~/.gftd/…` 含む）は
+  rename 由来で今回は触っていない（`bin/collector.cljs` → `.cljk` の 1 件だけ直した）。
+- **detector**: `verify-no-clojure-cli` は 4 project の west.yml で pre-cutover pin 3 finding / 74 file、
+  ALLOWED 1（org-babashka-nbb 29 file）。全 west に対する post-cutover 値は checkout の `west update` 後に測る
+  （merge commit は checkout に無いので、それまでは ABSENT として数える）。`verify-nbb-declaration-visible`
+  は `#!/usr/bin/env kbb` / `"kbb --backend sci <file>"` の綴りを足した（足さなければ置換で黙って clean になっていた）。
+- **測っていないもの**: 置換後の build / test / gate / bot の緑赤（owner 決定で fix-forward）。fleet ノードでの `kbb` 起動。
 ") ))
