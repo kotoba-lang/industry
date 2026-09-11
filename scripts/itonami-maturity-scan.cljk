@@ -206,7 +206,37 @@
 ;; ---------------------------------------------------------------- evidence
 
 ;; 計数対象の言語。**この集合の外で書かれた実装は、7 軸のどれにも現れない。**
-(def src-ext #{"cljc" "cljs" "clj" "kotoba"})
+(def src-ext #{"cljc" "cljs" "clj" "cljk" "kotoba"})
+
+;; `cljk` は ADR-2609111500（2026-09-11、owner 指示）で `.clj` / `.cljs` / `.cljc` を
+;; **一括改名**した先の拡張子。改名は blob を 1 バイトも動かさない（100% rename）が、
+;; この集合に無い拡張子は 7 軸のどれにも現れない —— `.kotoba` の改名で 2 度踏んだ
+;; 形（下の fact-file / component の注記）を 3 度目に踏んだ。実測 2026-09-11、
+;; cloud-itonami/danjo の改名 commit 77c6fd9（親 2c3d3fb に対する 33 file の
+;; 100% rename）を、この集合に `cljk` が無いまま測ると:
+;;
+;;     2c3d3fb (.cljc)  :src/file-count 1  :src/bytes 5530  :uncounted/test-file-count 16  :uncounted/test-bytes 70490
+;;     77c6fd9 (.cljk)  :src/file-count 0  :src/bytes 0     :uncounted/test-file-count 0   :uncounted/test-bytes 0
+;;
+;; `cljk` を足すと 77c6fd9 は 1 / 5530 / 16 / 70491 に戻り（+1 byte は renamer が
+;; text blob 内の path 文字列を書き換えた分）、2c3d3fb の値は 1 byte も動かない。
+;;
+;; **0 は「実装が無い」と全く同じ値**なので、改名の波が checkout に届いた repo から
+;; 順に substrate / test / governed が消え、この loop はそこへ『足せ』という手を
+;; 配り続ける。足したものも数えられない。
+;;
+;; 同名衝突（`foo.clj` と `foo.cljs` が同居した 44 件）は `foo.clj.cljk` /
+;; `foo.cljs.cljk` になる（ADR の 4 点目）。`ext-of` は最後の拡張子を取るので
+;; src/test の計数はそのままで正しいが、**basename を規約で同定する正規表現**
+;; （fact-file / component）は `governor.clj.cljk` を `governor\.(…)$` で
+;; 取れない。衝突形を拡張子の値域そのものに足す —— `.clj.edn` のような
+;; 存在しない形まで許す「任意の platform segment」にはしない。
+(def cljk-collision-forms #{"clj.cljk" "cljs.cljk"})
+
+(defn- ext-alt
+  "拡張子集合を `\\.(a|b|c)$` の形にする。`.` は必ず escape する（衝突形が持つ）。"
+  [exts]
+  (str "\\.(" (str/join "|" (map #(str/replace % "." "\\.") (sort exts))) ")$"))
 
 ;; 実 URL 引用を数えにいくファイル（axis-ingest）。**拡張子の値域は `src-ext`
 ;; ＋ `edn`**（catalog は source としても data としても書かれる）。ここを別の列
@@ -224,8 +254,8 @@
 (def fact-file-ext (conj src-ext "edn"))
 
 (def fact-file-re
-  (re-pattern (str "(?i)(^|/)(facts|catalog|jurisdictions?)\\.("
-                   (str/join "|" (sort fact-file-ext)) ")$")))
+  (re-pattern (str "(?i)(^|/)(facts|catalog|jurisdictions?)"
+                   (ext-alt (into fact-file-ext cljk-collision-forms)))))
 
 ;; プログラムのソースだと言い切れる拡張子（データ・文書・設定は入れない）。
 ;; **スコアには一切入らない。** これは「この instrument はこの repo を読めて
@@ -264,16 +294,17 @@
 ;; `component/count / 7` なので、改名した actor は「Governor を持たない
 ;; actor」として測られ、この loop はそこへ『部品を足せ』という手を配り続ける
 ;; —— 足した部品も同じ理由で数えられないので、上げようのない軸である。
-(def component-ext-alt (str/join "|" (sort src-ext)))
+(def component-ext-alt (ext-alt (into src-ext cljk-collision-forms)))
 
 (def component-patterns
-  {:operation  (re-pattern (str "(?i)(^|/)operation[s]?\\.(" component-ext-alt ")$"))
-   :governor   (re-pattern (str "(?i)(^|/)(governor|policy)\\.(" component-ext-alt ")$"))
-   :store      (re-pattern (str "(?i)(^|/)store\\.(" component-ext-alt ")$"))
-   :phase      (re-pattern (str "(?i)(^|/)phase\\.(" component-ext-alt ")$"))
-   :sim        (re-pattern (str "(?i)(^|/)sim\\.(" component-ext-alt ")$"))
-   :facts      (re-pattern (str "(?i)(^|/)facts\\.(" component-ext-alt ")$"))
-   :ledger     (re-pattern (str "(?i)(^|/)ledger\\.(" component-ext-alt ")$"))})
+  (let [ext component-ext-alt]
+    {:operation  (re-pattern (str "(?i)(^|/)operation[s]?" ext))
+     :governor   (re-pattern (str "(?i)(^|/)(governor|policy)" ext))
+     :store      (re-pattern (str "(?i)(^|/)store" ext))
+     :phase      (re-pattern (str "(?i)(^|/)phase" ext))
+     :sim        (re-pattern (str "(?i)(^|/)sim" ext))
+     :facts      (re-pattern (str "(?i)(^|/)facts" ext))
+     :ledger     (re-pattern (str "(?i)(^|/)ledger" ext))}))
 
 (defn- collect [org repo]
   (let [rel  (str "orgs/" org "/" repo)
