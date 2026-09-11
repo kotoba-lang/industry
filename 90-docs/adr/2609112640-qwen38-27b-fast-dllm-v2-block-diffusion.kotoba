@@ -36,9 +36,9 @@
 
   6. リスク（順位付き）: (i) 48/64 層 causal のままで block 内並列がどれだけ効くか —— 未知。論文の 2.5 倍は全層双方向の数字。3b で決着。(ii) llama.cpp 側の工数が学習より大きい可能性。上流に無い機能なので自前 fork 維持。ggml の DeltaNet op に state checkpoint / seq copy がどこまで在るかは未確認。(iii) 27B の必要 token 数と LoRA 可否 —— 未測定。(iv) vision と thinking mode の退行 —— text-only 学習なので両方未測定として出す。(v) unsloth Dynamic quant は再現不可。")
   (:adr/consequences
-  "小 model の学習 pilot を外したので、27B 以外に学習 GPU を使わない。新規部分の検査は 3a（等価性）と 3b（段階 checkpoint）に集約され、両方とも『落ちる条件』を literal で先に持つ。本 ADR は計画であり、着地したものは無い。Phase の各成果は本 ADR の :adr/body ではなく、この ADR を :adr/related に持つ後続 ADR と、新 repo の README / infer.edn の entry に載せる。数値の推定（所要 GPU 時間、必要 token 数、期待 speedup）は意図して書いていない —— 測ってから書く（ADR-2809041200）。")
+  "小 model の学習 pilot を外したので、27B 以外に学習 GPU を使わない。新規部分の検査は 3a（等価性）と 3b（段階 checkpoint）に集約され、両方とも『落ちる条件』を literal で先に持つ。着地済み（2026-09-12）: repo kotoba-lang/dllm-qwen38（west 登録、pin 400236b8）に 3a の state fork と等価性テストが在る。残り（3b 以降）は未着地。Phase の各成果は本 ADR の :adr/body ではなく、この ADR を :adr/related に持つ後続 ADR と、新 repo の README / infer.edn の entry に載せる。数値の推定（所要 GPU 時間、必要 token 数、期待 speedup）は意図して書いていない —— 測ってから書く（ADR-2809041200）。")
   (:adr/verification
-  "2026-09-11 に確かめた事実: 論文の recipe と数値は arXiv 本文から、Qwen3.8-27B の層構成と heads は Qwen の model card から、llama.cpp diffusion example の対応範囲（Dream / LLaDA / RND1、CLI のみ）は examples/diffusion/README から、fleet の既存 Qwen3.8-27B entry 2 件と node 構成は orgs/kotoba-lang/murakumo/infer.edn と fleet.edn から読んだ。未確認: ggml の Gated DeltaNet op の state checkpoint 可否、fla の per-chunk 状態の露出方法、Nemotron dataset の現行 license 表記、Qwen3.8-27B が [MASK] に使える未使用 vocab row の有無。")
+  "2026-09-11 に確かめた事実: 論文の recipe と数値は arXiv 本文から、Qwen3.8-27B の層構成と heads は Qwen の model card から、llama.cpp diffusion example の対応範囲（Dream / LLaDA / RND1、CLI のみ）は examples/diffusion/README から、fleet の既存 Qwen3.8-27B entry 2 件と node 構成は orgs/kotoba-lang/murakumo/infer.edn と fleet.edn から読んだ。2026-09-12 に 3a を実行した（kotoba-lang/dllm-qwen38、reports/）: state fork の候補実装 vs 無改変 HF model を block ごとに block-causal 4D mask で回した oracle。tiny random Qwen3.5 config（8 層）で logits 最大差 8.3e-7、Qwen/Qwen3.5-0.8B（24 層 = DeltaNet 18 + attention 6、L=128、fp32 CPU）で 7.1e-5（tol 1e-3）、x_t block k-1 と x_0 block k の摂動に対する差 0、x_0 block k-1 の摂動で 4.5。意図的な 3 つの欠陥（concat-causal-gdn / mask-leak / no-conv-prefix）は 17.1 / 6.1 / 3.7 で全部赤 —— 検査は落ちることを確かめてある。0.8B の tokenizer は 248,077 entry、embedding は 248,320 行で空き 243 行（[MASK] に embedding resize は不要 —— ただし 27B の tokenizer 長は未測定）。未確認のまま: 27B 自身での 3a（bf16 55.6 GB、--layers 8 --device cuda が想定の走らせ方）、ggml の Gated DeltaNet op の state checkpoint 可否、fla kernel と reference path の一致、bf16 での tolerance、Nemotron dataset の現行 license 表記。")
   (:adr/body
   "# ADR-2609112640: Qwen3.8-27B を Fast-dLLM v2 の block diffusion に適応する
 
@@ -50,4 +50,5 @@
   - 新規部分は Gated DeltaNet 48/64 層だけ。state fork で論文の mask と等価な可視性を再帰で実現し、双方向性は attention 16 層が担う。
   - 小 model の学習 pilot は gate にしない（非対称な検査）。等価性テスト + 27B の段階 checkpoint（0.3B token で GSM8K subset -5pt が止め時）で risk を取る。
   - llama.cpp は block diffusion も hybrid も未対応。diffusion-cli -> llama-server の順に自前で足す。
-  - 推定値は書かない。1% run で測って外挿する。")))
+  - 推定値は書かない。1% run で測って外挿する。
+  - 2026-09-12: 3a 着地（kotoba-lang/dllm-qwen38）。0.8B で 5/5 check・3/3 fault 検出。27B での 3a は未実行。")))
