@@ -655,6 +655,32 @@
     :ceiling-lifted {:io-ipld "9bf07ce7" :kotobase-protocol-ipq "08e0021d"
                      :net-kotobase-ipfs "a6d722b3" :verified-live "2026-09-11"
                      :reachable-blocks {:before 13 :after 32}}}
+   ;; 2026-09-11, owner instruction: the benchmark for this plane's
+   ;; co-scientist loop is LDBC SNB Interactive, the target is the audited
+   ;; world No.1, and every scored number crosses a network hop. The judge
+   ;; is kotoba-lang/ayatori bench/benchmark.edn (:ldbc-snb-interactive-
+   ;; network-v2); the SUT and driver are in kotoba-lang/kotobase-peer.
+   ;; The target below is a date-stamped reading of ldbcouncil.org, not a
+   ;; constant: re-read it before quoting it (ADR-2609121000).
+   :policy/benchmark {:id :ldbc-snb-interactive-network-v2
+                      :judge "orgs/kotoba-lang/ayatori/bench/benchmark.edn"
+                      :scoreboard "orgs/kotoba-lang/ayatori/bench/scoreboard.edn"
+                      :workload "LDBC SNB Interactive v1"
+                      :metric :throughput-ops-per-second
+                      :validity "95% of operations start within 1 s of schedule; 0 failed operations; answers agree with the reference"
+                      :network-rule "driver and SUT are different processes joined by TCP/HTTP; origins :loopback :cross-host :live are separate columns"
+                      :target {:read-on "2026-09-11"
+                               :source "https://ldbcouncil.org/benchmarks/snb/interactive/"
+                               :system "Graph Engine Service 3.1.0, Huawei Cloud, 2025-12-01"
+                               :peak-ops-s 139411.14
+                               :by-sf {:sf100 129089.68 :sf300 139411.14 :sf1000 125872.54}}
+                      :sut "kotobase-peer.ldbc-snb-net"
+                      :driver "kotobase-peer bench/ldbc_snb_driver.cljk"
+                      :first-row {:iteration 13 :origin :loopback :rung :sf1-subset-35k-posts
+                                  :throughput-ops-s 7.76 :empty-share 0.52
+                                  :receipt "orgs/kotoba-lang/kotobase-peer/bench/results/2026-09-11-ldbc-snb-network-loopback-sf1-subset.edn"}
+                      :ldbc-score? false
+                      :hardware-rescaling :refused}
    :policy/gate nil
    :policy/why-no-gate "no predicate enumerates the ways an ontology could reach an evaluator other than the two doors; a gate that has never been shown to fail is theatre, so build the third door first and watch it redden"
    :policy/measured-on "2026-09-10"
