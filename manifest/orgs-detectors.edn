@@ -4409,4 +4409,29 @@
               fifth was this very entry's :title carrying the needle it hunts (self-reference;
               reworded). Both directions have now been seen on the real tree."}
 
+  {:id       :verify-kbb-rewrite-path-literals
+   :title    "a bulk nbb->kbb text rewrite that landed inside a path or a package name"
+   :why      "Twice on 2026-09-11 a rewrite of nbb invocations to `kbb --backend sci` also
+              rewrote string literals that were never invocations: the directory name in
+              (path/join ... \"compiler\" \"nbb\" \"wasm_cli.cljk\") (kotoba-lang 0955316) and
+              the \"test\" \"nbb\" launcher paths of 18 amu scripts (amu 374800f7), plus the
+              npx package name. Every victim exited ENOENT on a directory that does not
+              exist, and the self-host measurement recorded 181 nil refusals as if the
+              compiler had answered. Argv uses of kbb are what the rewrite was for and are
+              not findings; path components and package names are."
+   :argv     ["nbb" "{{repo}}/scripts/verify-kbb-rewrite-path-literals.cljk"
+              "--root" "{{root}}" "--west" "{{root}}/manifest/west.yml"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 3600000
+   :timeout-ms  1800000
+   :writes   :none
+   :measured "Landed 2026-09-11. Discriminated on a synthetic file holding the three victim
+              shapes (path/join component, launcher path, npx package) and two legitimate
+              argv spawns of kbb: 3 findings, the argv lines not among them, a comment
+              quoting the spelling not among them. On kotoba-lang at the victim commit
+              0955316 the detector reports exactly the path/join line. First full sweep:
+              SCANNED 34698 files, 0 findings (both victims had been repaired by hand)."}
+
 ]}
