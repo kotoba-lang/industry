@@ -1,0 +1,107 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111000-fans-oppai-catalog-works-and-a-consent-gated-face-reference")
+  (:adr/topic "fans-oppai")
+  (:adr/title "oppai.fans を civitai / tensorhub 型へ —— モデルカタログ・作品棚・本人の顔だけを使える顔参照。任意写真の faceswap は作らない")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "network-awai/net-oppai-gen" "kotoba-lang/murakumo"))
+  (:adr/related (vector "adr-2608080100-single-page-app"
+                "adr-2607173100-murakumo-main-alias"
+                "adr-2609070400-human-authentication-web3-first"
+                "adr-2608159100-live-service-durable-plane-kotobase"))
+  (:adr/validation (map
+    (:tests "net-oppai-gen: nbb 64 tests / 371 assertions (was 41 / 162, and red on main since the kotoba.lang.text move). murakumo: generation_api_image_test 11 (was 5; every suite failed at import on main — resource-classes.edn path — now fixed). E2E: 29 checks static / 30 against wrangler dev, 0 failures.")
+    (:discriminated "the face test goes red when the KSampler model edge is not rerouted through the IP-Adapter; the guard tests pin every refusal to its own sentence; the challenge window and the data-URI cap each have their boundary case.")
+    (:live "gad, 2026-09-11 01:41-01:55 UTC: type image + input.face (plus-face, weight 0.85, waiREALMIX_v11 832x1216 22 steps) — identity carried (haircut, face shape) into a new scene; 12 min under APU memory contention (SDXL loaded partially, tiled VAE), the same job warm and uncontended is ~1 min. faceid mode advertised, not yet rendered live.")
+    (:machine "gad: Radeon 8060S APU, ROCm 7.13, three ComfyUI instances resident (8188 / 8191 / 8192) sharing memory")))
+  (:adr/body "## 文脈
+
+`oppai.fans` は既に live だった（`network-awai/net-oppai-gen`: age gate、チャット、画像、動画、DADS）。
+オーナー指示は「civitai / tensorhub を参考に NSFW をメインにした画像・動画生成・faceswap を murakumo.cloud 基盤で」。
+索引を引いた結果、ゼロから起こさず既存を拡張した（CLAUDE.md「既存を見つけたら使う」）。
+
+## 決定
+
+### 1. faceswap は作らない。顔参照は「本人の顔だけ」の同意儀式に束縛する
+
+任意の写真の顔を性的画像に載せる機能は、非同意の性的ディープフェイクの製造装置であり、多くの法域で違法・実害が明確。
+**これは機能の欠落ではなく境界である。** 代わりに:
+
+- 登録できる顔は、いま、このカメラの前にいる本人の顔だけ。**ファイル入力は無い**（E2E がそれを検査する）。
+- サーバが single-use・60 秒の nonce と向き/表情のお題を出し、2 枚（正面・お題）撮って、明示的な同意にチェックして登録する。
+  `oppai.gen.guard/validate-enrolment` が pure に検査し、Worker はそれをそのまま enforce する。
+- 登録は HttpOnly cookie → KV（`OPPAI_KV`、7 日 TTL、DELETE 可）。**セッションでも identity でもない** ——
+  `manifest/human-authentication-policy.edn` に `:migration-gap`（login 無し）として登録した。
+- **ブラウザは `input.face` を送れない**（400）。`input.face_ref true` を送り、Worker が登録済み frame を差し替える。
+  したがってこのサイト経由で fleet に届く顔は儀式を通ったものだけ。
+- fleet 側は pixel 貼り付け（ReActor 型）ではなく **IP-Adapter による identity 条件付け**
+  （`PLUS FACE (portraits)` / `FACEID PLUS V2`）。生成物の capability に `face-reference:<mode>` が付く。
+- UI は「これは同意の儀式であって本人確認ではありません」と明記する。liveness のお題は
+  録画済み映像への防御であって、本人性の証明ではない。証明にしたければ本人確認（KYC）が要り、それは別の決定。
+
+### 2. 画像生成は browser 直の同期 endpoint から、token-gated の job API へ移す
+
+従来は `api.murakumo.cloud/v1/images/generations` を browser が直接叩いていた（Worker の 100 秒天井を避けるため）。
+job API（submit → poll → artifact）には天井が無く、同じノードの同じ ComfyUI であり、**顔を運べる唯一の経路**
+（無認証の公開 endpoint に顔を載せない）。モデル一覧も一緒に移した —— fleet 全体の `/infer/model-map` は
+別 mini（zebulun）のディスクを報告し、gad に無い `waiIllustriousSDXL_v150` を選ばせて 502 になっていた。
+`GET /v1/generation/image-models` を murakumo generation API に足し、**そのノードの ComfyUI が今持つ
+チェックポイント**を答えさせる（`/object_info/CheckpointLoaderSimple`、60 秒 cache、静的表は名前付き fallback）。
+
+### 3. R18 境界はサーバ側に 2 重で置く
+
+- 未成年を名指す語（日英・略語、`guard/minor-terms`）を含む prompt は Worker が拒否する。
+- 全 image job の negative prompt に `guard/minor-negative` を必ず追記する。
+- カタログの preset は全て成人を明示し、テストがそれを検査する。
+
+### 4. カタログは編集物、搭載状況は実行時の事実
+
+`oppai.gen.catalog` のカード（base / style / 到達度 / 書き方 / preset）は人が書く。available かどうかは
+ノードに訊く。3 値（available / not on this node / could not ask）で、**未搭載は隠さず表示する**。
+
+### 5. 作品棚はこの端末の localStorage。公開ギャラリーではない
+
+live service の durable plane は kotobase.net（ADR-2608159100）だが、datom plane は Biscuit 必須で
+tenant record + service account を要し、人間の enrolment を含む。**今日は載せていない。**
+棚は UI 上で「この端末の中にだけ」と言う。公開ギャラリーを作る日は identity（下の gap）と同じ段。
+
+### 6. 単一ページ。view は data、nav は fragment への実 link
+
+`oppai.gen.route` の表が正。`#image #douga #face #models #works #chat`。E2E は window の marker と
+app state が 4 回の crossing を越えることを assert する（ADR-2608080100）。
+
+## murakumo 側で直したもの（ついでではなく、無いと動かない）
+
+- gad で 2026-08-29 から root 所有で手当てされ、repo に無かった版（data-URI keyframe）を先に着地させた。
+- **ComfyUI の実行キャッシュ**: 同一グラフ（同 prompt・同 seed）の再実行は全ノード cached で history の
+  `outputs` が空になり、job API が「no images」で失敗していた（再生成・retry は必ず失敗する潜在バグ）。
+  SaveImage の prefix に job id を入れて保存ノードだけ必ず走らせる。
+- image job の期限 300 秒 → `MURAKUMO_IMAGE_DEADLINE_S`（既定 1200）。cold load 385 秒、contended な
+  顔参照 12 分を実測。ComfyUI が完走する job を先に失敗させると render が捨てられる。
+- 4 つの `generation_api_*_test` は main で import 時に落ちていた（resource-classes.edn を script の隣から読む）。
+  seedance に既存 failure 1 件（video admission 順）が残る。未着手。
+
+## 測定と残っている gap（優先順）
+
+1. **gad の APU メモリ競合**: ComfyUI が 3 instance 常駐し、顔参照の render で SDXL が partial load、
+   VAE が tiled に落ち、縞が出る。image job は resource class を取らないので sibling を yield させない。
+   `waiREALMIX_v11` の出力が bf16 VAE で色調が崩れる疑い（job1 の source が washed out）。
+   → resource class を image にも与えるか、image 用の VAE を明示する。**測ってから。**
+2. **identity（SIWE + Passkey）**: `org-chainagnostic-cacao` の `siwe.core`/`siwe.edge` と `kotoba-lang/webauthn` が在る。
+   顔の enrolment は identity に束縛する方向（逆ではない）。
+3. **公開ギャラリー / クレジット**: kotobase tenant + Biscuit、x402/USDC（`kotoba-lang/pay` / `nexus-x402`）。
+   Stripe は NSFW を扱わないので候補にしない。
+4. **faceid mode の live render** と、frame 2 枚の同一人物性チェック（insightface は gad に入った）。
+5. `seedance` の既存 failure。
+
+## 露出した secret
+
+作業中に gad の `/etc/murakumo-generation.env` を redaction 込みで表示した際、`SEEDANCE_API_KEY` の行が
+パターンから漏れて session transcript に出た。**ローテーションを勧める**（fal.ai の key）。値はどの repo にも書いていない。
+
+## 改訂履歴
+
+- 2026-09-11: 起草。"))
+)
