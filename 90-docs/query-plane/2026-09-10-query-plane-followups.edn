@@ -71,6 +71,25 @@
   :per-block-is-per-round-trip "31 KB の chunk を含む行でも per-block は動かない"
   :extrapolation-not-measurement "maxBlocks 256 x 109 ms = 約 28 s。完走するかは未測定"}
 
+ :q3d-pack-price
+ {:measured "2026-09-11"
+  :mechanism "net-kotobase/ipfs 23046cad kotobase-ipfs.pack: root-keyed CARv2 read whole on the first miss, in the same wait as the root block"
+  :pack {:builder "90-docs/query-plane/pack_reachable.cljs"
+         :blocks 32 :car-v1-bytes 38066 :car-v2-bytes 39427 :index-bytes 1310
+         :key "packs/by-root/bafyreid4qinuqf6iugjpvjwcma7iuhbf37vrxgmvyku6rkl3vm3hsnfmda.car"}
+  :bench "90-docs/query-plane/bench_ipq_pack_price.cljs"
+  :reps 7 :client-loadavg-range [62.24 91.88]
+  :rows [{:case "packed, every link" :blocks 32 :fetches 1 :pack "hit" :p50 206.2 :p90 477.8 :io-ms 102 :io-share 0.495}
+         {:case "unpacked, every link" :blocks 30 :fetches 30 :pack "miss" :p50 3276.7 :p90 3391.2 :io-ms 3021 :io-share 0.922}
+         {:case "packed, matcher" :blocks 1 :fetches 1 :pack "hit" :p50 122.8 :p90 126.3 :io-ms 103 :io-share 0.839}
+         {:case "unpacked, matcher" :blocks 1 :fetches 1 :pack "miss" :p50 111.6 :p90 239.4 :io-ms 96 :io-share 0.860}]
+  :ratios {:wall 15.9 :io 29.6 :fetches "30 -> 1"}
+  :prize-realised {:saved-ms 3071 :upper-bound-ms 3270 :fraction 0.94}
+  :pack-own-price {:matcher-delta-ms 11.2 :note "39 KB read for 562 B answered"}
+  :per-request-not-per-byte "R2 read of 39 KB and of 562 B both ~100 ms io"
+  :not-the-same-graph "unpacked root is the head's PreviousID and reaches 30 blocks, not 32"
+  :controls {:corrupted-frame-in-pack "502 cid-mismatch (test)" :no-pack "per-block path unchanged, x-ipq-pack miss (test + live)"}}
+
  :q2-digest-runtime
  {:bench "90-docs/query-plane/bench_digest_runtimes.cljs"
   :harness "90-docs/query-plane/digest-runtime/ （shadow-cljs :target :esm。out/ と node_modules は生成物）"

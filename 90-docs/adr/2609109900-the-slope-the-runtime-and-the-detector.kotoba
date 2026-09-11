@@ -2,15 +2,15 @@
   (:adr/doc_type "adr")
   (:adr/id "adr-2609109900-the-slope-the-runtime-and-the-detector")
   (:adr/topic "query-plane-followups")
-  (:adr/title "傾き・runtime・検出器 —— pack の取り分は測れ、天井は production の 500 で、それを超えたら chain は 13 本ではなく 16 本あった")
+  (:adr/title "傾き・runtime・検出器 —— 天井を超えたら chain は 16 本あり、pack を置いたら賞金の 94% が実現した")
   (:adr/status "accepted")
   (:adr/date "2026-09-10")
   (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotobase-protocol-ipq"
                 "kotoba-lang/io-ipld" "kotoba-lang/ayatori" "net-kotobase/ipfs"))
   (:adr/landed (map (:io-ipld "9bf07ce7") (:kotobase-protocol-ipq "08e0021d")
-                    (:net-kotobase-ipfs "a6d722b3")
-                    (:west-pins (vector "5eb33947" "795fb7b2" "68d3ecd1"))))
+                    (:net-kotobase-ipfs "23046cad")
+                    (:west-pins (vector "5eb33947" "795fb7b2" "68d3ecd1" "80072736"))))
   (:adr/related (vector "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
                 "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
                 "adr-2608160100-block-car-pack-object"
@@ -21,8 +21,9 @@
     (:route "nbb, one shadow-cljs release bundle, wrangler dev (workerd), one live HTTPS origin")
     (:machine "10 cpus, loadavg 13.0-29.2 during the runs")
     (:evidence "90-docs/query-plane/2026-09-10-query-plane-followups.edn")
-    (:not-measured (vector "a pack actually placed" "the engine compiled"
-                    "whether maxBlocks 256 completes at all -- 28s is an extrapolation"))))
+    (:not-measured (vector "a range read through the index" "the engine compiled"
+                    "whether maxBlocks 256 completes at all -- 28s is an extrapolation"
+                    "who writes packs, and when"))))
   (:adr/body "## Context
 
 ADR-2609109800 は次の 3 つを名指しで残した。オーナーが逆順（3 → 2 → 1）で
@@ -280,10 +281,59 @@ Entries も辿ると head から届く全 block は 32。
 （132.5 → 101.6/109.4）—— cost が client ではなく origin の backend read に
 在ることの傍証だが、日をまたいだ 2 点なので**結論にはしない。**
 
+## Q3d —— pack の価格を測った（2026-09-11）。賞金の 94% が実現した
+
+Q3c は「(N-1) x 109 ms は上限、range read の価格は未測定」で終わっていた。測った。
+
+**機構**（`net-kotobase/ipfs` `23046cad`、`kotobase-ipfs.pack`）: root を key にした
+CARv2 pack `packs/by-root/<cid>.car` を、trampoline の**最初の miss で root block と
+同じ wait で**読む（直列にすると pack の無い traversal 全部に 1 round trip が
+乗る）。pack が在れば全 block を cache に入れ、handler は 1 回だけ再走する。
+**信用は買わない** —— block は同じ handler が再 hash するので、pack の中の
+壊れた frame は `cid-mismatch` であって答えではない（test で control 済み）。
+**range read ではなく whole read** —— pack が取れる saving の上限を先に測る。
+**catalog は引かない** —— ADR-2608160100 の catalog（datom 面）が一般解で、
+root 名の R2 lookup は round trip を足さずに「1 read 対 N」だけを問う近道。
+
+新しい header 2 つが主張を観測可能にする: `x-ipq-pack`（hit/miss）と
+`x-ipq-io-ms`（await した R2 時間の合計 —— Worker の Date.now は CPU では
+進まないが await した I/O では進む）。
+
+**pack**: head から届く 32 block を IPQ 自身の CARv1 応答から取り（1 block ずつ
+再 hash）、`v2/pack` で 39,427 bytes の CARv2（index 1,310 bytes = 32 x 40 + 30、
+ADR-2608160100 の実測どおり）。`pack_reachable.cljs`。R2 に置いた。
+
+**本番実測**（`bench_ipq_pack_price.cljs`、reps 7、client の load 62〜92）:
+
+    case                          blocks  fetches  pack     p50     io-ms  io/wall
+    packed,   every link              32        1   hit    206.2      102    49.5%
+    unpacked, every link              30       30   miss  3276.7     3021    92.2%
+    packed,   matcher (1 block)        1        1   hit    122.8      103    83.9%
+    unpacked, matcher (1 block)        1        1   miss   111.6       96    86.0%
+
+- **15.9 倍の wall、29.6 倍の I/O、30 -> 1 fetch。**
+- **unpacked の io/wall = 92%** —— per-block コストは R2 の I/O そのもので、
+  pack が消せる。残り 8% が re-walk。
+- **R2 の 1 read は 39 KB でも 562 B でも約 100 ms** —— latency は request 単位で
+  bytes 単位ではない。pack の論拠がこの 1 行に在る。
+- **実現した saving**: 3277 - 206 = 3071 ms。Q3c の上限 30 x 109 = 3270 ms の **94%**。
+- **pack の価格**: 1 block の matcher が 39 KB を読んで 562 B を返す。**+11 ms（約 10%）**。
+  払う価値があるかは表が知らせる判断で、表が下す判断ではない。
+
+⚠ unpacked root は head の PreviousID なので**同じ graph ではない**（2 block 少ない）。
+表に書いてあるとおりで、一致する root を選んで隠していない。
+
+⚠ pack は root に紐づく不変の object なので、IPNI head が進めば**新 head には
+pack が無い**（旧 root には残る）。書き手が pack を作る運用は決めていない ——
+これは ADR-2608160100 の catalog + 「write 側で read-locality を作る」の話で、
+この ADR は価格を測っただけ。
+
 ## 測っていないこと（clean ではなく未測定）
 
 - **maxBlocks 256 が実際に完走するか。** 上の 28 秒は外挿。
-- **pack を実際に置いた場合の range read コスト。** 賞金は測ったが、価格は測っていない。
+- **range read（index 経由の部分読み）の価格。** whole read で上限を測った。部分読みは
+  pack が大きく traversal が小さいときに効く形で、`v2/locate` は在るが reader が無い。
+- **pack を誰がいつ書くか。** 運用も catalog も決めていない。
 - **engine をコンパイルした場合の速度。** digest だけ 3 面で測った。
 - **dag-json を支持すべきか拒否すべきか。** 設計判断であって測定ではない。
 - **19 findings のうち実際に key 参照をしているものが何件か。** shape であって verdict ではない。

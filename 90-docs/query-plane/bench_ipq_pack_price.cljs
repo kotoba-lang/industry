@@ -1,0 +1,135 @@
+;; The price of a pack, measured -- not the size of the prize.
+;;
+;; ADR-2609109900 Q3c ended with "(N-1) x 109 ms is the upper bound; the
+;; price of the range read is NOT measured". This measures it. The Worker now
+;; reads a CARv2 pack keyed by the root on its first miss
+;; (`kotobase-ipfs.pack`, net-kotobase/ipfs), and reports on every 200:
+;;
+;;   x-ipq-fetches   R2 reads the traversal needed
+;;   x-ipq-io-ms     the sum of awaited R2 time (Date.now advances across
+;;                   awaited I/O in a Worker, not across CPU)
+;;   x-ipq-pack      hit | miss
+;;
+;; So this bench can put four things on one table that yesterday's could not:
+;; the same traversal with and without a pack, and the I/O share of each.
+;;
+;; The two roots are the IPNI head (packed, by 90-docs/query-plane/
+;; pack_reachable.cljs) and its PreviousID (not packed). They are not the same
+;; graph -- the second reaches two blocks fewer -- and that is stated on the
+;; table rather than hidden by picking a root that happens to match.
+;;
+;; The fourth row is the cost a pack ADDS: a one-block matcher on a packed root
+;; reads the whole 39 KB pack to answer with 562 bytes. Whether that is a price
+;; worth paying is a decision the table informs and does not make.
+;;
+;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_ipq_pack_price.cljs
+
+(ns bench-ipq-pack-price
+  (:require [ipld.selector :as sel]
+            [ipld.core :as ipld]
+            ["os" :as os]))
+
+(def origin "https://ipfs.kotobase.net")
+(def indexer "https://ipni.kotobase.net")
+(def reps 7)
+
+(defn- b64url [bytes]
+  (-> (.toString (js/Buffer.from (js/Uint8Array. (clj->js (vec bytes)))) "base64")
+      (.replace (js/RegExp. "\\+" "g") "-")
+      (.replace (js/RegExp. "/" "g") "_")
+      (.replace (js/RegExp. "=+$") "")))
+
+(def everything
+  {:selector :explore-recursive :limit {:mode :depth :depth 32}
+   :sequence {:selector :explore-all :next {:selector :explore-recursive-edge}}})
+(def matcher {:selector :matcher})
+
+(defn- percentile [xs p]
+  (let [v (vec (sort xs))]
+    (nth v (min (dec (count v)) (js/Math.floor (* p (count v)))))))
+
+(defn- one [url]
+  (let [t0 (js/performance.now)]
+    (-> (js/fetch url)
+        (.then (fn [r]
+                 (-> (.arrayBuffer r)
+                     (.then (fn [buf]
+                              (let [h (fn [k] (.get (.-headers r) k))]
+                                {:ms (- (js/performance.now) t0)
+                                 :status (.-status r)
+                                 :bytes (.-byteLength buf)
+                                 :blocks (js/parseInt (or (h "x-ipq-blocks") "0"))
+                                 :fetches (js/parseInt (or (h "x-ipq-fetches") "0"))
+                                 :io-ms (js/parseInt (or (h "x-ipq-io-ms") "0"))
+                                 :pack (or (h "x-ipq-pack") "-")})))))))))
+
+(defn- serial [url n acc]
+  (if (zero? n)
+    (js/Promise.resolve acc)
+    (-> (one url) (.then (fn [r] (serial url (dec n) (conj acc r)))))))
+
+(defn- fmt [x] (.toFixed x 1))
+
+(defn- row [label root selector]
+  (let [url (str origin "/ipq/v1/selection/" root "?selector=" (b64url (sel/encode selector)))]
+    (-> (serial url reps [])
+        (.then (fn [rs]
+                 (let [f (first rs)
+                       p50 (percentile (map :ms rs) 0.5)
+                       io (percentile (map :io-ms rs) 0.5)]
+                   (println (str (.padEnd label 30)
+                                 (.padStart (str (:status f)) 5)
+                                 (.padStart (str (:blocks f)) 8)
+                                 (.padStart (str (:fetches f)) 9)
+                                 (.padStart (:pack f) 6)
+                                 (.padStart (str (:bytes f)) 8)
+                                 (.padStart (fmt p50) 10)
+                                 (.padStart (fmt (percentile (map :ms rs) 0.9)) 9)
+                                 (.padStart (str io) 8)
+                                 (.padStart (str (fmt (* 100 (/ io p50))) "%") 8)))
+                   {:label label :p50 p50 :io io :blocks (:blocks f) :fetches (:fetches f)}))))))
+
+(defn- previous-of [root]
+  (-> (js/fetch (str indexer "/ipni/v1/ad/" root))
+      (.then #(.arrayBuffer %))
+      (.then (fn [buf] (:cid (get (ipld/decode (js/Uint8Array. buf)) "PreviousID"))))))
+
+(defn- summary [[a b c d]]
+  (println)
+  (println (str "pack vs per-block on the deep traversal: "
+                (fmt (/ (:p50 b) (:p50 a))) "x wall, "
+                (fmt (/ (:io b) (max 1 (:io a)))) "x I/O, "
+                (:fetches b) " -> " (:fetches a) " fetches"))
+  (println "per-block cost is I/O: io/wall on the unpacked row is the share a pack can remove")
+  (println (str "the pack's own price: a one-block matcher costs "
+                (fmt (:p50 c)) " ms packed vs " (fmt (:p50 d)) " ms unpacked"
+                " -- the pack is read whole for one block")))
+
+(defn- rows [head prev]
+  (-> (row "packed, every link" head everything)
+      (.then (fn [a] (-> (row "unpacked, every link" prev everything)
+                         (.then (fn [b] [a b])))))
+      (.then (fn [ab] (-> (row "packed, matcher (1 block)" head matcher)
+                          (.then (fn [c] (conj ab c))))))
+      (.then (fn [abc] (-> (row "unpacked, matcher (1 block)" prev matcher)
+                           (.then (fn [d] (conj abc d))))))))
+
+(defn -main []
+  (println (str "load " (pr-str (mapv #(.toFixed % 2) (os/loadavg))) "  reps " reps))
+  (println)
+  (-> (js/fetch (str indexer "/ipni/v1/head"))
+      (.then #(.json %))
+      (.then (fn [j]
+               (let [head (get-in (js->clj j) ["head" "/"])]
+                 (-> (previous-of head)
+                     (.then (fn [prev]
+                              (println "packed root   " head)
+                              (println "unpacked root " prev "(its PreviousID; reaches two blocks fewer)")
+                              (println)
+                              (println (str "case                          status  blocks  fetches  pack"
+                                            "   bytes       p50      p90   io-ms  io/wall"))
+                              (rows head prev)))
+                     (.then summary)))))
+      (.catch (fn [e] (println "PROBE FAILED" (str e))))))
+
+(-main)
