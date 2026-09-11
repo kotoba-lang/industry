@@ -50,7 +50,19 @@ residents）が「テーマごとに Durable Object の *インスタンス* を
 見つけた形そのものなので、**測れなかったことを ok に畳まない**:
 
 - checkout が無い bot は「違反 0 件」ではなく `:unmeasured`
-- upstream を解決できない branch の `:landed` も `:unmeasured`（ok ではない）
+- upstream を解決できない branch の `:landed` は remote-tracking branch に訊き、それも
+  答えなければ `:unmeasured`（ok ではない）
+- ⚠ **remote-tracking branch に無いことは remote に無いことではない。** `west update` は
+  `refs/west/*` に fetch して `manifest-rev` を置くだけで `refs/remotes/<org>/main` を
+  動かさないので、pin を進めて sync した直後の checkout は GitHub の main に居ながら
+  `branch -r --contains HEAD` が空になる（実測 2026-09-11、`kotoba-lang/com-slack`:
+  HEAD = west pin = `gh api .../branches/main` の三点一致で「どの remote branch にも
+  無い」と報告、bulk pin 前進の後で `:landed` が 778 → 1,735 体に膨れた）。そこで
+  **HEAD が west.yml の pin ちょうどなら `:ok`** —— pin は upstream default branch から
+  到達可能な commit しか書けない（ADR-2607022900、hook と gate が書き込み時に GitHub に
+  訊く）ので、到達性をここで測り直さない。pin と違う detached commit は今までどおり
+  `:broken`（fixture 3 方向で実測: HEAD = pin かつ remote-tracking 無し → ok /
+  local-only commit → broken / west.yml の pin が別 sha → broken）
 - 上流 default branch との遅れ（pin 鮮度）は network が要るので**ここでは測らない**。
   測っていないものを、測ったように見せない
 
