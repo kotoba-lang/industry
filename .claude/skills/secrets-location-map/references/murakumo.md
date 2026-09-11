@@ -126,6 +126,40 @@
   署名が検証できること**。最後の 1 つだけが、あの ADR が記録した「それらしく見えて
   署名できない識別子」を捕まえられる。
 
+## murakumo.cloud devices console admin token (2026-09-11)
+
+- **`MURAKUMO_DEVICES_ADMIN_TOKEN`（kagi vault、`KAGI_HOME=$HOME/.kagi`）** —
+  Worker `murakumo-cloud`（= `murakumo.cloud`）の `POST /api/devices/register`
+  の Bearer。device を devices テーブルに入れる唯一の経路で、`owner` を付けて
+  登録すると `state` が `claimed` になる。
+- **なぜ要るか。** node agent の heartbeat（`POST /api/devices/:did/heartbeat`）は
+  `cloud_murakumo/devices.cljc` の `accept-heartbeat` を通り、**行が無ければ
+  `:unknown-device`、`state` が `:claimed` でなければ `:not-claimed`** で拒否する。
+  device 側が持っているのは claim ceremony の後半（challenge を待って署名する）
+  だけで、行を作るのは operator。だから新しいノードは登録するまで 409 を返し続ける。
+
+  ```bash
+  KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get MURAKUMO_DEVICES_ADMIN_TOKEN
+  # token は argv に置かない（ps に出る）。curl なら -K の config file 経由:
+  #   printf 'header = "authorization: Bearer %s"\n' "$TOK" > cfg
+  curl -sS -X POST https://murakumo.cloud/api/devices/register -K cfg \
+    -H 'content-type: application/json' \
+    -d '{"did":"did:key:…","kind":"aiueos","name":"…","model":"…",
+         "owner":"did:web:kotobase.net:tenant:…","roles":["compute"]}'
+  ```
+
+- ⚠ **この索引に無いことは、vault に無いことではない。** 2026-09-11、この項目が
+  無かったために「どこにも記録されていない」と報告しかけた。索引の該当ファイルを
+  grep しただけで、**vault 自身を既知の識別子で引いていなかった**。引いたら在った
+  （exit 0、43 byte）。この索引冒頭の「記述は実在の証明ではない」の**逆向き**で、
+  同じだけ危ない: **不在の記述も不在の証明ではない。** 名前が分かっているなら
+  `kagi get <NAME>` を 1 件撃つ方が、索引を読むより速くて確実。
+- ⚠ **`ON CONFLICT(did) DO UPDATE` は owner と state を更新しない**（`kind` `name`
+  `model` `labels` `roles` だけ）。既存 device に対して再 register しても所有権は
+  動かない。
+- ⚠ **`MURAKUMO_DEVICES_COLLECTOR_TOKEN` は別物**（`POST /api/devices/snapshot`、
+  `deploy/devices/push-snapshot.cljs` が読む）。
+
 ## api.murakumo.cloud ノード面 service token (ADR-2608031000、2026-08-03)
 
 - ⚠ **2026-09-08 再実測: まだ存在しない**（`no such item:
