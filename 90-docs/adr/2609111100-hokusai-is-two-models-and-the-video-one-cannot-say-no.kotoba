@@ -1,0 +1,102 @@
+(vector
+ (map
+  (:adr/id "adr-2609111100-hokusai-is-two-models-and-the-video-one-cannot-say-no")
+  (:adr/title "hokusai is two models under one name, and the video one cannot follow a negative instruction")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609102000-hokusai-is-a-name-the-fleet-owns"
+                        "adr-2609111000-shinshi-club-runs-on-four-planes-and-three-were-silent"
+                        "adr-2609092400-murakumo-public-examples-hanzo-confidential-admission"))
+  (:adr/body "
+## The instruction
+
+Owner, 2026-09-11: 「今の murakumo.cloud の hokusai モデルを作って, シーンも生成して」,
+then 「両方」 (image and video), then 「生成したら公開も合わせて進めて」.
+
+## What hokusai was, measured before touching anything
+
+| name | what it is | state at 01:10Z |
+|---|---|---|
+| `awai-network/hokusai` (ADR-2609102000, 09-10) | image name → `waiREALMIX_v11` on gad ComfyUI `:8188`, `POST /v1/images/generations` | live: 200, 512×512 PNG, 9.2 s. **`GET /infer/models/awai-network/hokusai` → `no such model`** — it existed only as a rewrite in the gateway's JS entry |
+| `hokusai` (KV entry, verified 09-04) | video: MiniMax H3 / 10Eros-Max TURBO-hybrid beta4 int8 on gad ComfyUI-h3 `:8191` | live, 48 GB VRAM |
+| `manifest/awai-model-seed.edn :hokusai` (Codex seed, 09-08) | video, `:trained-artifact nil`, six eval prompts | seed only |
+
+Two live models share the name; the seed describes a third state (trained) that
+does not exist. This ADR does not merge them — it makes each one legible.
+
+## Image: catalog entry + shinshi scenes (done, public)
+
+- `PUT /infer/models/awai-network/hokusai` with kind, checkpoint, endpoint,
+  sizes, `free: true`, the smoke measurement, and a note saying it is NOT the
+  video `hokusai`. `status-evidence` reads `fresh`. Written with the fleet's
+  service bearer read from a node's `~/.murakumo/edge/join.env` — the value
+  kagi does not hold (secrets map, still true today).
+- `scripts/shinshi-cast-bots/generate.cljs image` now names the model
+  (`SHINSHI_IMAGE_MODEL`, default `awai-network/hokusai`) and prints it in
+  its receipt (root #3092). 12/12 cast members received one scene; each is
+  served at `shinshi.club/b/<sha256>` with the served bytes hashing to the
+  receipt, and registered in D1 `scene` (botan-amano-noir: 0 → 1).
+
+## Video: six eval scenes on the serving checkpoint (done, public)
+
+Graph: gad's smoke-verified `t2v_api.json`, beta4 int8 unet, 768×512,
+144 frames requested (158 delivered = 6.58 s @ 24 fps; the rubrics are written
+for 6 s), 8 steps (the TURBO setting `eros-smoke.json` used). Sequential, one
+job at a time, GPU 100% for the run.
+
+    clip   elapsed   rubric   what it missed
+    h-e01  1240 s    2/5      a hand; printed text on the cup
+    h-e02  1160 s    4/5      a character already written on the paper
+    h-e03  1100 s    2/5      a person appears and speaks; a road, not a garden
+    h-e04  1180 s    1/5      >3 lanterns; the PROMPT printed on the lanterns; audio
+    h-e05  1140 s    2/5      ripples before 4 s and many; audio (not silent)
+    h-e06  1100 s    2/4      background light never changes; audio
+
+13 of 29 rubric items. The scores are one operator's read of frames at
+0.5 / 3.0 / 5.8 s plus `volumedetect`; they are not a model judge, and every
+clip is public with its score in the title so anyone can disagree against
+the bytes. Full receipts: `manifest/awai-model-seed.edn` `:hokusai :eval-runs`.
+
+**The finding that matters is the pattern, not the average.** Every clip
+that lost a point lost it on a NEGATIVE instruction — 無人 / 文字なし /
+音楽なし / 無音 / 一つだけ — and in three of six the model rendered the
+prompt's own words as text inside the picture (紙, 提灯が三つ, 湯). The
+positive content (steam, brush, rain, lanterns, leaf, cup) is there in all
+six. Whatever training the seed imagines, it has to teach 'not', and the eval
+set already measures exactly that.
+
+## Publication: the examples plane carries video without a Worker change
+
+murakumo.cloud's public-examples plane (ADR-2609092400) serves an approved
+row's `mime_type` from R2 as-is, so `video/mp4` rows are served with the
+same no-store / nosniff / sandbox headers as PNG. The operator half the
+Worker deliberately lacks is now `cloud-murakumo/scripts/publish-artifact.cljk`
+(#185; landed as `.cljs`, renamed by the cljk wave minutes later): sha256 →
+R2 put under `preview-artifacts/v1/<uuid>` → D1 `pending` → the doc's exact
+UPDATE bound to `status='pending'` → read-back through the public URL that
+must hash to the stored digest before it says `published`. Six rows, six
+sha256 matches, consent version `operator-eval-v1` (no third-party input
+existed to consent).
+
+Not done, on purpose:
+- inline `<video>` on the homepage card (the site script inlines `image`
+  only; other kinds get title + link). `cloud-murakumo-site` renamed to
+  `.cljk` the same hour; whether `clojure -M:site` still renders it is a
+  separate measurement, so the data-plane publish shipped without it.
+- byte-range serving. The Worker streams the object whole; Safari may
+  refuse progressive mp4 without `Range`. Chrome/Firefox play it.
+- training. `:trained-artifact` stays nil; this run is the untrained baseline
+  the seed lacked.
+
+## Seen while doing this, not fixed here
+
+- The `.cljk` rename wave (root `780284efa66`, 987 files at 12:02 JST) renamed
+  `scripts/nbb_compat.cljs` too. nbb resolves a required namespace to
+  `.cljs`/`.cljc` only, so **the 60 root scripts that `(require
+  '[scripts.nbb-compat])` now fail at load** — `root-worktree`, `west-pin-put`
+  among them (measured 03:15Z; `west-pin-put` had worked at 02:47Z, before
+  the rename). This ADR's worktree was cut by hand with `git worktree add`
+  + cone sparse-checkout for that reason.
+- `network-awai/hokusai` also exists in the catalog (org spelled the other
+  way round). Left alone.
+")))

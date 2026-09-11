@@ -71,6 +71,40 @@
             :rubric ["3.5kg" "不要な説明なし"]}]}
   :hokusai {:modality :video :base "MiniMaxAI/MiniMax-H3"
             :trained-artifact nil :training-clips []
+            ;; 2026-09-11: the six :eval prompts below were run, untrained, on
+            ;; the fleet's serving checkpoint (KV `hokusai`: 10Eros-Max
+            ;; TURBO-hybrid beta4 int8, gad ComfyUI-h3 :8191) at 768x512,
+            ;; 144 requested frames (158 delivered, 6.58 s @ 24 fps), 8 steps.
+            ;; Rubric scores are one operator's visual + volumedetect read of
+            ;; the clip, not a model judge. Every clip is public on
+            ;; murakumo.cloud's examples plane with the same score in its
+            ;; title, so a reader can disagree with the score against the bytes.
+            ;; Root ADR-2609111100 holds the measurement and what it means.
+            :eval-runs
+            [{:run "2026-09-11-gad-baseline" :date "2026-09-11" :trained-artifact nil
+              :serving "10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot" :node "gad" :size "768x512" :steps 8
+              :results
+              [{:id "h-e01" :elapsed-s 1240.2 :rubric-met 2 :rubric-total 5
+                :missed ["a hand appears" "printed text on the cup"]
+                :artifact "https://murakumo.cloud/api/v1/artifacts/53e10953-3e08-46b7-9b6a-ae729ea62037"
+                :sha256 "8af79b37d93324510c674da9858b9c7419c170121eb797c3dc23efe3ff95941a"}
+               {:id "h-e02" :elapsed-s 1160.1 :rubric-met 4 :rubric-total 5
+                :missed ["a character is already written on the paper"]
+                :artifact "https://murakumo.cloud/api/v1/artifacts/ec72074d-aeef-4011-b284-49ef3dda9c8d"
+                :sha256 "b97800c30bd0843b0a8e4d14270937d526d5e5d4de99ea824c9aa9d5d5300c26"}
+               {:id "h-e03" :elapsed-s 1100.1 :rubric-met 2 :rubric-total 5
+                :missed ["a person appears and speaks" "a road, not a garden"]
+                :artifact "https://murakumo.cloud/api/v1/artifacts/d52dba4b-2ab6-4469-8e72-ff1c78255e82"
+                :sha256 "c458d913d8f7b5259bdb479449a922bb3a1c5eb8ce9205c1619b103c601e141c"}
+               {:id "h-e04" :elapsed-s 1180.1 :rubric-met 1 :rubric-total 5
+                :missed ["more than three lanterns" "the prompt is printed on the lanterns" "audio present (mean -15.4 dB)"]
+                :artifact "https://murakumo.cloud/api/v1/artifacts/500512e0-4b10-4483-a333-74b06102b030"}
+               {:id "h-e05" :elapsed-s 1140.2 :rubric-met 2 :rubric-total 5
+                :missed ["ripples before 4 s and many" "audio present (mean -19.3 dB), not silent"]
+                :artifact "https://murakumo.cloud/api/v1/artifacts/37e19506-5c26-4dba-b88b-7b7ded0fff16"}
+               {:id "h-e06" :elapsed-s 1100.1 :rubric-met 2 :rubric-total 4
+                :missed ["background light does not change" "audio present (mean -14.0 dB)"]
+                :artifact "https://murakumo.cloud/api/v1/artifacts/b7778044-f579-4da9-867f-9e646ff6eabd"}]}]
             :eval
             [{:id "h-e01" :family "tea-pause"
               :prompt "固定カメラの6秒映像。無人の卓上に湯呑みが一つ。最初の2秒は動きがなく、その後、湯気がゆっくり立つ。会話と音楽はなし。"
