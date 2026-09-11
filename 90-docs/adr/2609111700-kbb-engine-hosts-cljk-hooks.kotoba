@@ -124,7 +124,7 @@ docs-edn-check の唯一の FAIL `STRANGLER-FIG-MONTH1-DEPLOYMENT-SUMMARY.edn` �
 次の 1 手（優先順）:
 
 1. `scripts/fleet-ci/tick.cljk` が起動する `nbb` を `orgs/kotoba-lang/kotoba/bin/kbb --backend sci` に替え、
-   `gates.edn` の `:script "gates/*.cljs"` 158 参照を `.cljk` に直す（今は gate script の path が改名前のまま）。
+   `gates.edn` の `:script` に残る `gates/*.cljs` 158 参照を `.cljk` に直す（今は gate script の path が改名前のまま）。
    確かめ方: 1 gate を手元で `kbb --backend sci scripts/fleet-ci/gates/<g>.cljk <dir>` で走らせて exit を見る。
 2. launchd plist 49 本の `nbb` 起動を kbb に替え、`launchctl print gui/$UID/<label>` で reload を確認する
    （ADR-2609111500 後続 / `~/.gftd` 移行の実測どおり、一覧に戻ったことは reload の証拠ではない）。
