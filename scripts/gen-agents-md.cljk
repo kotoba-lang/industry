@@ -10,7 +10,8 @@
 ;; exit code:
 ;;   0  生成した / --check で一致
 ;;   1  --check で不一致（再生成が要る）
-;;   2  REFUSED — 置換表が期待どおりに当たらなかった。**答えを出さずに止まる**
+;;   2  REFUSED — 置換表が期待どおりに当たらなかった、または生成物が max-chars を超えた。
+;;      **答えを出さずに止まる**
 ;;
 ;; 置換は「期待した文字列が期待した回数だけ在る」ことを先に確かめ、1 つでも
 ;; 食い違えば exit 2 で拒否する。黙って違う置換をするより、答えないほうがよい
@@ -43,26 +44,20 @@
 (def substitutions
   [[1 "# CLAUDE.md"
       "# AGENTS.md"]
-   ;; agent の名前（節の見出しと本文）
-   [1 "## Claude Code の Agent 委譲 — fork は調査専用、実行系は fresh agent + worktree 隔離（2026-07-12）"
-      "## Codex の Agent 委譲 — fork は調査専用、実行系は fresh agent + worktree 隔離（2026-07-12）"]
-   ;; この文書自身への自己参照
-   [1 "（この CLAUDE.md 含む）"          "（この AGENTS.md 含む）"]
-   [1 "この CLAUDE.md は既に"            "この AGENTS.md は既に"]
-   [1 "CLAUDE.md には既に「既存を確認せよ」が" "AGENTS.md には既に「既存を確認せよ」が"]
-   [1 "CLAUDE.md が禁じている rebase か"  "AGENTS.md が禁じている rebase か"]
-   [1 "この CLAUDE.md 自身が fleet-ci の節でそう警告している"
-      "この AGENTS.md 自身が fleet-ci の節でそう警告している"]
-   [1 "この CLAUDE.md が\n   fleet-ci 節で繰り返し警告しているとおり"
-      "この AGENTS.md が\n   fleet-ci 節で繰り返し警告しているとおり"]
-   [1 "**この CLAUDE.md 自身が「一括正規表現の書き換えが"
-      "**この AGENTS.md 自身が「一括正規表現の書き換えが"]])
+   ;; この文書自身への自己参照（Agent 委譲節）。
+   ;; 「`CLAUDE.md` が正本、`AGENTS.md` は生成物」の一文は事実の記述なので置換しない。
+   [1 "（この CLAUDE.md 含む）"          "（この AGENTS.md 含む）"]])
+
+;; AGENTS.md を読む側の上限（2026-09-11 実測: `Context file AGENTS.md TRUNCATED: 115347 chars
+;; exceeds limit of 31457`）。超えた生成物は**切り詰められて読まれる** —— 末尾の規則が黙って
+;; 消える形なので、超えたら書かずに exit 2 で止まる（ADR-2609112300）。
+;; 単位は文字数（bytes ではない）。
+(def max-chars 31457)
 
 (defn- refuse! [msg]
   (binding [*print-fn* *print-err-fn*]
     (println (str "REFUSED: " msg))
-    (println "置換表が source と食い違っている。答えを出さずに止まる。")
-    (println "CLAUDE.md を直したなら scripts/gen-agents-md.cljk の substitutions も直す。"))
+    (println "答えを出さずに止まる。"))
   (js/process.exit 2))
 
 (defn generate [src]
@@ -70,8 +65,9 @@
             (let [n (count (str/split acc (re-pattern (str/replace find #"([.*+?^${}()|\[\]\\])" "\\$1"))))
                   actual (dec n)]
               (when (not= actual expected)
-                (refuse! (str "期待 " expected " 回 / 実際 " actual " 回 — "
-                              (subs find 0 (min 60 (count find))))))
+                (refuse! (str "置換表が source と食い違っている: 期待 " expected " 回 / 実際 " actual " 回 — "
+                              (subs find 0 (min 60 (count find)))
+                              "。CLAUDE.md を直したなら scripts/gen-agents-md.cljk の substitutions も直す")))
               (str/replace acc find replace)))
           src
           substitutions))
@@ -80,6 +76,9 @@
   (let [args (set (js->clj (.slice (.-argv js/process) 2)))
         src (str (.readFileSync fs source "utf8"))
         out (str header "\n" (generate src))]
+    (when (> (count out) max-chars)
+      (refuse! (str "生成物が " (count out) " 字で上限 " max-chars " 字を超える —— "
+                    "CLAUDE.md を不変条件だけに絞り、手順・実測は skill へ移す（ADR-2609112300）")))
     ;; 置換が実在しない path を **持ち込んで** いないことを確かめる（過去の事故）。
     ;; source に既に在る出現は数えない —— この文書はその事故自体を記述しており、
     ;; 文字列としての `.Codex/` は正当に登場する。増えたときだけ拒否する。

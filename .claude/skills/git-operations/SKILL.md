@@ -1,6 +1,6 @@
 ---
 name: git-operations
-description: この superproject と west 管理の子リポで git を触るときの正本 — shallow を使わない理由と unshallow の確かめ方、ancestry / merge-base 判定が嘘をつく条件、`(forced update)` と `unrelated histories` が force-push を意味しない理由、west.yml を安全に変える唯一の経路（GitHub API single-entry commit）、pin 検証と pin 鮮度、main 同期・rebase 禁止・force-push 禁止・本番 deploy の包含条件、未コミット変更で同期がブロックされたときの安全な順序、worktree が object store を隔離しない話。「shallow」「unshallow」「merge-base がおかしい」「forced update」「force push していいか」「pull して」「main に同期」「deploy 前の確認」「worktree」で発火。CLAUDE.md の Git operations 節から切り出した正本。
+description: この superproject と west 管理の子リポで git を触るときの正本 — shallow を使わない理由と unshallow の確かめ方、ancestry / merge-base 判定が嘘をつく条件、`(forced update)` と `unrelated histories` が force-push を意味しない理由、west.yml を安全に変える唯一の経路（GitHub API single-entry commit）、pin 検証と pin 鮮度、main 同期・rebase 禁止・force-push 禁止・本番 deploy の包含条件、未コミット変更で同期がブロックされたときの安全な順序、worktree が object store を隔離しない話。「shallow」「unshallow」「merge-base がおかしい」「forced update」「force push していいか」「pull して」「main に同期」「deploy 前の確認」「worktree」で発火。CLAUDE.md の Git operations 節から切り出した正本。 並行エージェント運用（worktree-per-agent、分岐前の同期、stash を積まない、着地後の後片付け、worktree-retire / node_modules dedupe）と Agent 委譲（fork は調査専用、実行系は fresh agent + worktree 隔離、base SHA を渡す）の本文も 2026-09-11 に CLAUDE.md から逐語で移した（ADR-2609112300）。「並行セッション」「worktree を切る」「Agent に委譲」「fork」「subagent」でも発火。
 ---
 
 # Git operations（詳細）
@@ -325,4 +325,301 @@ skill `git-cleanup-conflict`。
   共有 checkout（west 管理パス）には直接 commit/push しない。worktree 経由で
   main に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum`
   で確認した上での）重複ファイルの削除だけで追従させる。
+
+---
+
+# CLAUDE.md に 2026-09-11 まで残っていた本文（逐語、ADR-2609112300）
+
+以下は CLAUDE.md から**逐語で**移した本文である（2026-09-11、ADR-2609112300。AGENTS.md の
+読み込み上限 31,457 字に合わせて CLAUDE.md を不変条件だけに絞った）。CLAUDE.md 側には
+skill を読まなくても効く規則だけが残っている。ここが理由・実測・罠の正本。
+
+## Git operations
+
+**理由・実測・罠は Skill ツールで `git-operations` を呼ぶ。** pin 前進の操作面は
+`west-pin-advance`、stash / branch / PR の棚卸しは `git-cleanup-conflict`。
+ここに残すのは skill を読まなくても効く禁止と手順だけ。
+
+### 履歴と ancestry
+
+- **shallow（`--depth 1`）は使わない。full 履歴がデフォルト**（2026-07-21、
+  ADR-2607211600）。`west update --fetch smart` で各 project を full 履歴で取得する。
+  恒久的な disk 対策は shallow ではなく B2 + DataLad（skill `large-binary-datalad`）。
+- **その unshallow は完了していない**（ADR-2608124400）。**shallow clone の ancestry
+  回答は間違っていて、しかも権威があるように見える。** 判定を出す前に確かめる:
+
+  ```bash
+  git rev-parse --is-shallow-repository   # true なら、その repo の ancestry 判定を信用しない
+  git fetch --unshallow                   # 直す
+  ```
+
+  ⚠ **`git fetch` の `--dry-run` は preview ではない** —— ref 更新を飛ばすだけで
+  fetch 自体は実行される。
+- **full 履歴なら `merge-base` / `--is-ancestor` はローカルでそのまま正しい。**
+  外部由来の shallow clone と比べる必要があるときだけ GitHub に計算させる
+  （`gh api repos/<org>/<repo>/compare/...`）。
+- **`(forced update)` 表示や `unrelated histories` エラーは、それ単独では本物の
+  force-push と断定しない。** 確度の高い実サインは `upload-pack: not our ref` に
+  よるチェックアウト失敗。迷ったら `gh api .../compare/<old>...<new>` の
+  `status` / `behind_by` / `merge_base_commit` で判定する。
+
+### 禁止
+
+- **force-push は禁止**（`--force` / `--force-with-lease` / `+refs`）。共有リポの
+  いかなるブランチにも、履歴を書き換えて上流を上書きする push をしない。乖離は
+  fast-forward できる clean branch / clean commit で解消し、それが不可能なら
+  **勝手に強制せず必ずユーザーに報告する。**
+- **rebase は基本禁止**（`git rebase` / rebase 付き pull）。FF できない stale branch は、
+  最新 `origin/main` から clean branch / 一時 worktree を作り、必要な小差分だけを
+  `cherry-pick` または patch で載せ直す。競合したら `git rebase --abort` し、
+  marker 手編集で続行しない。
+- **`manifest/west.yml` は生成物。行指向 pin の textual 3-way merge はアンチパターンで、
+  conflict marker の手編集は pin を静かに壊す。** 登録 / rename / pin 前進は GitHub API の
+  サーバ側 **single-entry commit**（`--entry <name>`）を唯一の正経路とし、
+  **wholesale 再生成 commit は禁止**（未 push HEAD 由来の壊れた pin を 44 件 main に
+  流した事故 `90852b86` の再発防止）。
+- **pin に許されるのは「上流 repo の default branch から到達可能な commit」だけ**
+  （`scripts/verify-west-pins.cljk`、ADR-2607022900）。①存在 ②default branch 到達性
+  ③旧 pin からの前進。判定は GitHub API で行い、**ローカルの ancestry 判定だけに
+  頼らない。** 強制するのは PreToolUse hook `.claude/hooks/west-pin-verify-guard.cljk` と
+  fleet gate `root-west-pin-policy`。
+- **未 merge branch 上の commit を pin にしない** —— `deps.edn` の `:git/sha`、lock、
+  `resources/*.edn` に焼いた sha も同じ規則。**west pin には gate があるが、
+  `deps.edn` の pin には無い。**
+
+### 同期（最優先）
+
+- **セッションを始める前に、toolchain の checkout を west pin に合わせる**（repo-wide
+  mandatory、2026-09-09、ADR-2609092500）。名簿は `manifest/session-sync.edn`、実行は
+  SessionStart hook `.claude/hooks/session-start-toolchain-pin-sync.cljk`（`--dry-run`
+  で測るだけ）。**clean な checkout は黙って pin に合わせ、次の 3 つだけ触らずに報告する**
+  —— tracked な変更がある／branch 上に未 push の commit がある／pin の commit が手元に
+  無く fetch が予算内に終わらなかった。untracked は checkout を妨げないので無視する。
+  - **これは警告ではなく同期である。** 既存の `session-start-checkout-staleness` は
+    checkout を「自分の remote の default branch」と**読み手の多い順**で比べるので、
+    誰も `:local/root` しない toolchain repo は順位に入らない。実測 2026-09-09:
+    共有 `amu` checkout が**自分の west pin より 200 commit 遅れ**、その checkout が
+    pin する kotoba-sema は main より 71 遅れで、pure S-expression core が
+    「無い」ものとして数日間拒否され続けた。**pin は正しく、tree だけが腐っていた。**
+    hook 登録初日の実測でも `kotoba-sema` / `kotoba-native` が pin より遅れていた。
+  - **pin 自体の鮮度も同じ hook が出す**（pin が最後に fetch した `origin/main` より
+    遅れていれば行数と `kbb --backend sci scripts/west-pin-put.cljk <name> HEAD` を示す）。**pin の
+    前進は自動でやらない** —— 到達性検証を伴う書き込みで、共有 checkout からは行わない
+    （上記「pin を動かす・同期する」節）。
+  - **`checkout` / `west pin` / `repo の main` は 3 つの別物**という既存の規則の、
+    3 番目ではなく**1 番目**を機械で閉じるのがこの hook。結論を出す前に origin/main を
+    読む規則（ADR-2608136800）はそのまま生きている。
+
+
+- **常に `main` と同期し、乖離を作らない。** 何らかの git 操作の前に、上流 `main` に
+  更新があれば必ず先に取り込む。ローカルが遅れた状態で新しい作業を積み上げない。
+
+  ```
+  git fetch origin
+  git merge --ff-only origin/main    # FF 不可なら停止。rebase しない
+  west update --fetch smart          # project 群を pin に合わせて同期
+  ```
+
+  SessionStart hook `.claude/hooks/session-start-branch-sync-check.cljk` が毎セッション
+  ahead/behind を可視化する。**警告を読むことと同期することは別の動作**で、
+  前者は後者を保証しない。
+- **push の前に `origin/main` との遅れを解消する**（`git merge --ff-only origin/main`。
+  FF 不可なら停止、rebase しない）。PreToolUse hook `git-push-main-sync-guard.cljs` が強制する。
+- **push / PR 作成・更新の前に、superproject と west の両方を最新化する。** 逐次・省略せず
+  `git fetch origin` → `git merge --ff-only origin/main` → `west update --fetch smart` →
+  `kbb --backend sci scripts/gen-west-manifest.cljk --check` を実行してから push / PR する。
+- **pin の既定状態は「upstream default branch の tip」**（オーナー指示 2026-08-20）。
+  「pull して」は 3 つの別物を含む —— (1) superproject を origin/main に合わせる
+  (2) pin を各 repo の default branch tip に進める (3) checkout を pin に合わせる。
+  **(2) を落とすと、(1) と (3) をいくら回しても workspace は古いまま止まる。**
+  前進の経路は `scripts/west-pin-put.cljk` / `west-pin-put-batch.cljs`、**千本単位なら
+  `west-pin-put-bulk.cljk`**（同じ 3 検査を GraphQL 50 repo/query で行い、409 は差分だけ再検証。
+  実測 2026-09-11: 3,907 pin を 1 commit・約 4 分。batch は同じ量で 5,000/h を食い潰した）。
+  進めない理由があるなら pin の隣か commit message に書く ——
+  **黙って遅れているのと、理由があって留めているのは、出力から区別できなければならない。**
+  ⚠ これは「引数なしの `west update` を回せ」という意味ではない。
+- **本番デプロイは `origin/main` を包含した checkout からのみ行う。** デプロイは push と
+  違って fast-forward 検査を持たない —— **最後に実行した人が勝つ**（2026-07-25、
+  kotobase.net の signup funnel が 11 分後に古い checkout からの deploy で 404 に戻った）。
+  PreToolUse hook `wrangler-deploy-main-sync-guard.cljs` が強制する
+  （`--env <name>` の隔離環境と `--dry-run` はブロックしない）。
+- **ユーザーが「pull して」とだけ指示した場合も、main 同期 + `west update` + pin 鮮度まで
+  含めて実行する**（取り込みだけで終わらせない）。
+
+### 破棄しない
+
+- **`main` への同期が未コミット/未追跡のローカル変更でブロックされたら、勝手に破棄しない。**
+  ①incoming とバイト同一なら（`shasum` で確認して）削除 ②本物のローカル編集は
+  `git stash push -- <paths>` で退避し、**stash は drop せず温存** ③pop で衝突したら
+  upstream 側を採用し、ローカル差分は stash と未追跡実体として残す。
+- **west project の checkout がローカル変更で失敗しても `west update --force` で破棄しない**
+  （west は既定で破壊的更新をしない）。`upload-pack: not our ref` で失敗した場合は
+  上流 force-push の可能性が高いのでユーザーに報告する。
+- **「cleanup」と言われたら、また自分から `git stash drop` / `git branch -D` をしようと
+  しているときは、Skill ツールで `git-cleanup-conflict` を呼ぶ。** drop / 削除の前は
+  「もう landed だと確信していても」必ず `.git/stash-archive-<date>/` へ退避する。
+
+### worktree
+
+- **並行作業の可能性があるときは、共有 west checkout（`orgs/<org>/<repo>`）を直接編集せず
+  worktree を切る。** 別セッションのブランチ切替で未コミット編集が黙って巻き戻る。
+- **`<path>` は superproject ルートの *外*にする。** 内側に作ると west が親の `.west/` を
+  見つけて topdir を誤認し、**本体の `orgs/` を書き換える**（`WEST_TOPDIR` でも直らない。
+  ADR-2607011345）。west を worktree 内で使うなら、そこで `west init -l manifest` を
+  やり直して topdir を固定する。
+- ⚠ **worktree が隔離するのは working tree であって object store ではない。**
+  `/tmp` の使い捨て worktree で `--depth` 付き fetch をすると、**superproject 本体が
+  shallow になる**（`.git/shallow` は共有。ref を動かさない depth fetch は reflog にも
+  残らない）。**worktree は `.git` に書くものに対する sandbox ではない。**
+- 着地は共有 checkout へ直接 push せず、branch を push して
+  `gh api repos/<org>/<repo>/merges` でサーバ側マージする。
+
+## 並行エージェント運用（worktree-per-agent / stash を積まない）
+
+複数セッション・エージェントが同時に走る前提の標準フロー。stash・branch・worktree の
+無限増殖はこのフローからの逸脱の症状（実測: 2026-07-01→02 の一晩で、共有 checkout 上の
+WIP を並行セッションが約40分間隔で退避し続け stash が20個堆積。棚卸しの結果、実質的な
+未着地は2件だけで残り18件は着地済み/陳腐化だった）。
+
+### 分岐を作る前に、必ず local を remote に同期する（前提条件・repo-wide mandatory、2026-07-29）
+
+**agent loop の起動・Agent への委譲（fork / fresh agent）・`git worktree add`・
+`git checkout -b` / `git switch -c`・新しい clone からの作業開始 — これらを行う「前」に、
+対象リポジトリを必ず remote と同期する。** 同期していない状態で分岐を作らない。
+「agent loop の起動」には **`Workflow` の実行・`/loop`・スケジュール routine
+（`RemoteTrigger` / cron）の開始**を含む — 反復して agent を起こす仕組みは、1回目の
+base が古ければ以降の全反復が古い base に載る。
+
+```bash
+git fetch origin
+git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
+west update --fetch smart            # 子リポ群を manifest の pin に合わせる
+# 子リポも触るなら、その repo でも fetch + merge --ff-only origin/<default-branch>
+```
+
+**FF できない（diverged / ahead）場合は、分岐を作る前にその乖離を先に解消する。**
+rebase も force-push もしない — 未着地のローカル commit は feature branch へ push して
+`gh api repos/<org>/<repo>/merges` でサーバ側マージし、それから分岐する（手順は上記
+「Git operations」節と skill `git-cleanup-conflict`）。`manifest/west.yml` の pin だけなら
+GitHub API の single-entry commit で tip に直接載せる方が確実。**乖離を抱えたまま
+「とりあえず枝を切る」は、その乖離を枝の数だけ複製する。**
+
+**分岐元は必ず `origin/main` を明示する**（ローカル `main` ではなく）。これが最も確実で、
+ローカルが遅れていても正しい base から始まる:
+
+```bash
+git worktree add -b <branch> /tmp/root-<name> origin/main   # ✅ 分岐元が明示されている
+git worktree add -b <branch> /tmp/root-<name>               # ❌ 遅れたローカル HEAD から分岐する
+```
+
+**なぜ「分岐の瞬間」が特別なのか。** 遅れた base の上に積んだ commit は、後から同期しても
+遅れたままになる — その worktree で行った作業**全部**が古い base に載っており、着地時に
+乖離・conflict・pin 退行として現れる。push 直前に同期しても手遅れで、そこから救うには
+CLAUDE.md が禁じている rebase か、clean branch への移植が要る。**同期のコストは分岐前なら
+`git fetch` 1回、分岐後なら作業のやり直し**という非対称性が、この規則が独立して存在する
+理由。
+
+**SessionStart hook（`session-start-branch-sync-check.cljs`）はこれを代替しない。**
+あれはセッション開始時点の ahead/behind を1回警告するだけで、その後セッション中に上流が
+進んだ場合も、警告を見たまま同期せず分岐した場合も止めない。実測（2026-07-29、この規則が
+生まれたセッション）: hook が「main が origin/main から 0 ahead / 78 behind」と正しく警告
+したにもかかわらず、同期しないまま作業を開始し、superproject の同期は数十分後の
+push 直前まで行われなかった。**警告を読むことと同期することは別の動作**で、前者は後者を
+保証しない。
+
+**これは PreToolUse hook `.claude/hooks/branch-create-main-sync-guard.cljk` で強制する**
+（`.claude/settings.json` に登録済み）。対象は `git worktree add` / `git checkout -b` /
+`git switch -c` / `git branch <new>`。**分岐元を `origin/<default>` で明示していれば
+ブロックしない**（それが推奨形であり、ローカルの遅れと無関係に正しい base になるため）。
+判定不能時は fail-open（セッションを止めない）。
+
+**同期を省略してよいのは、git を一切書き換えない読み取り専用タスクだけ**（`Explore` での
+検索、既存ファイルの読解、`gh api` の GET など）。書き込みが 1 バイトでもあるなら省略しない。
+
+- **superproject 本体 checkout（このフォルダ）は「統合・閲覧専用」。** ここでは編集・
+  commit・ブランチ切替をしない。やってよいのは `git fetch` / `--ff-only` pull /
+  `west update` / 読み取りだけ。本体に未コミット編集が転がっていると、並行セッションの
+  main 同期のたびに「他人の WIP を stash 温存」が発火して stash が堆積する。
+- **作業は 1 task = 1 branch = 1 worktree（superproject の外、sibling path）。**
+  既定入口は `kbb --backend sci scripts/root-worktree.cljk create <task>`（ADR-2608291248）。
+  `origin/main` fetch → `--no-checkout` → cone sparse checkout + sparse-index を行い、
+  root 23万件を毎回展開しない。ADR/政策は `--profile docs|policy`、追加 directory は
+  `--include <path>`。west child が必要なら `--west <name>` を明示し、対象だけを
+  `west update --fetch smart` する。full root は `--profile full` を**明示した場合だけ**。
+  worktree 内の `west init -l manifest` と superproject 外配置で topdir を固定する。
+- **WIP の退避は stash でなく session branch への commit。** commit は名前・履歴・
+  所有者が付き branch 単位で棚卸しできるが、stash は無名の共有スタックで誰のものか
+  追えなくなる。stash を使ってよいのは「共有 checkout で見つけた他人の未コミット WIP を
+  消さないための緊急退避」だけで、積んだら cleanup で必ず棚卸しする。
+- **着地後の後片付けまでがタスクの完了条件。** push → サーバ側マージ
+  （`gh api .../merges`）→ `git worktree remove` → `git branch -D <branch>` →
+  マージ済み remote branch の削除。「マージしたのに branch/worktree が残っている」
+  状態を作らない。
+- **worktree モデルはディスクを理由に捨てない。捨てる理由になるのは「同時書き手が 1 人」だけ**
+  （オーナー判断 2026-09-06、ADR-2609061800）。「この端末だけで開発する」に変わっても、
+  この端末では Claude セッション・codex・launchd の `cloud.itonami.bot.*` bot が同時に書いている
+  （数え方: `ps -axo command | grep -c '^claude'`、`launchctl list | grep -c com.gftd`）。
+  worktree の作成は sub-second・object store は共有・working tree は再生成物を除けば
+  ディスクの 1% 台で、**本当のコストは「着地したのに残る worktree」と「worktree ごとに
+  複製される node_modules」の 2 つ**。どちらも機械で消す:
+  - **片付け**: `kbb --backend sci scripts/worktree-retire.cljk --root . [--apply]` —— 着地済み・clean・
+    7 日超・idle（lsof の cwd / ps の argv に無い）・unlocked・非 bot の worktree だけを
+    `git worktree remove`（`--force` 無し）+ `git branch -d` で撤去し、stale entry を
+    prune する。dirty は触らない（git-cleanup-conflict の領分）。lsof が引けなければ
+    `REFUSED`（exit 2）。launchd `cloud.itonami.bot.worktree-retire` が日次で `--apply`。
+    ⚠ **2026-09-09 実測: この job は install も load もされていない。** 名簿にあることと
+    走っていることは別で、この節が書いている日次実行は起きていなかった。
+  - **node_modules は pnpm store 経由で入れる**: `kbb --backend sci scripts/worktree-node-modules-dedupe.cljk
+    --root . [--apply]` が npm lockfile の worktree を `pnpm import` + `.npmrc`
+    `node-linker=hoisted` + `pnpm install --frozen-lockfile` に置き換える。pnpm は APFS で
+    store から clonefile するので **`du` は減らない。実消費は `df` で測る**（worktree
+    1 本あたり約 1 MB）。新しい repo は最初から `pnpm-lock.yaml` + `packageManager` +
+    `.npmrc`（hoisted）を持たせる。`npm run <script>` の呼び出しは変えなくてよい ——
+    変わるのは install だけ。
+  - superproject の **内側**（`orgs/<org>/` 直下）に切られた worktree は、どのモデルでも
+    誤り（ADR-2607011345）。retire は場所で除外しないので着地済みから順に消える。
+- **stash / branch の棚卸し（retirement）は Skill `git-cleanup-conflict` を使う**
+  （手順の正本は `manifest/cleanup-workflow.edn` の `:retirement`、readable 版は
+  `manifest/cleanup-workflow.md` の Retirement 節）: 着地判定（追加行が現 main に
+  含まれるかの content-containment。生成物 `manifest/west.yml` は判定から除外）→
+  **drop/削除の前に必ず** `.git/stash-archive-<date>/` へパッチを退避（「landed だと
+  確信している」は archive 省略の理由にならない）→ drop / 削除。並行セッションが
+  stash index をずらすので、drop は SHA を控えて毎回 index を再解決してから行う。
+
+
+## Claude Code の Agent 委譲 — fork は調査専用、実行系は fresh agent + worktree 隔離（2026-07-12）
+
+**`subagent_type: "fork"` は会話コンテキスト全体（この CLAUDE.md 含む）を継承する。**
+このため「調査だけしてコードは書くな」とプロンプトで明示しても、継承した
+コンテキストに本ファイルの「標準作業の常時許可」（新規 project 起こし → scaffold →
+push → 登録を確認なしで一気通貫）や、直前のユーザーとの設計判断が含まれていると、
+fork がそちらを実行許可として拾い、指示範囲を超えて実装・scaffold・push 準備まで
+勝手に完了させることがある（実測 2026-07-12: 「調査のみ」と明示した fork が
+`orgs/kotoba-lang/crm` / `orgs/cloud-itonami/cloud-itonami-isic-5820` に新規
+ライブラリ+アクターの本実装一式を無断で書き込み、TaskList に push/registry更新/ADR
+執筆までの段取りを自分で積んだ）。同時に、書き込み先が共有 west checkout 直下
+（`orgs/<org>/<repo>`）で `.git` 未初期化のまま裸ディレクトリとして置かれており、
+上記「並行エージェント運用」節が禁じる「共有 checkout 直接編集」にも該当した。
+
+- **fork は「読むだけ・調べるだけ」に限定する。** ファイル作成・編集・`git`
+  書き込み・`gh repo create`・push を伴う実行系タスクには fork を使わない。
+- **実行系タスクは fresh agent（`subagent_type` に `fork` 以外を指定、または省略）
+  に振る。** fresh agent は会話コンテキストを継承しないため、本ファイルの標準作業
+  許可を本人が読んでいない限り「勝手に許可を拾って暴走」しない。プロンプトは
+  self-contained に書き、実行してよい範囲を明示する。
+- **共有 `orgs/` 配下に触れる実行系タスクは、fresh agent に `isolation: "worktree"`
+  を付けて隔離する。** それが使えない/不十分な場合は上記の sibling-path
+  `git worktree add` を手動で切ってから作業させる。superproject 本体の `orgs/` に
+  直接書き込ませない。
+- **委譲・agent loop の起動の前に、local を remote に同期しておく**（上記
+  「分岐を作る前に、必ず local を remote に同期する」）。`isolation: "worktree"` の
+  worktree はその時点のローカル HEAD から切られるので、**遅れた checkout から委譲すると
+  agent の作業全部が遅れた base に載る**。`git worktree add` を手で切る場合と違い、
+  委譲や loop の起動は git コマンドではないので **PreToolUse hook は止められない** —
+  ここだけは prose の規律で守るしかない。委譲前に `git fetch origin &&
+  git merge --ff-only origin/main` を済ませてから `Agent` を呼ぶ。
+- **委譲する agent のプロンプトに、同期済み base の commit SHA を書いて渡す。** fresh agent は
+  会話コンテキストを継承しないので、自分がどの base で作業しているかを本人は知らない —
+  SHA を渡しておけば、agent 側が着地時に「自分の base が現 main と一致するか」を自力で
+  検証でき、古い base への上積みが黙って進むのを防げる。
 

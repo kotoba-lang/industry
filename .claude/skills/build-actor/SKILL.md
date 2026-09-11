@@ -1,6 +1,6 @@
 ---
 name: build-actor
-description: Pattern and conventions for building a new "actor" in this workspace (an LLM/advisor node contained behind an independent Governor, langgraph-clj StateGraph, append-only audit ledger, west/RAD registration), plus the CACAO self-mint auth convention actors use to authenticate to kotoba-server. Use when creating or extending an actor-pattern repo, or asked about the Actors pattern.
+description: Pattern and conventions for building a new "actor" in this workspace (an LLM/advisor node contained behind an independent Governor, langgraph-clj StateGraph, append-only audit ledger, west/RAD registration), plus the CACAO self-mint auth convention actors use to authenticate to kotoba-server. Use when creating or extending an actor-pattern repo, or asked about the Actors pattern. Also holds the LLM model-selection rule (never hardcode a concrete model id; resolve the `murakumo-main` alias from murakumo KV, env override → alias → endpoint-only fallback; ADR-2607173100) — trigger on "model id", "murakumo-main", "どのモデル", "LLM を呼ぶ". Moved verbatim from CLAUDE.md on 2026-09-11 (ADR-2609112300).
 ---
 
 ## Actors（langgraph-clj StateGraph アクター）
@@ -107,3 +107,38 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   コミットしない）**。鍵由来 IPNS 名は `ipns.core`（`k51qzi5uqu5d…`）。
   `kotoba-store {:identity me}` で graph 既定＝鍵由来 IPNS ＋ 自己 mint。
   設定参照は `manifest/repos.edn` の `:kotoba`。
+
+---
+
+# CLAUDE.md に 2026-09-11 まで残っていた本文（逐語、ADR-2609112300）
+
+以下は CLAUDE.md から**逐語で**移した本文である（2026-09-11、ADR-2609112300。AGENTS.md の
+読み込み上限 31,457 字に合わせて CLAUDE.md を不変条件だけに絞った）。CLAUDE.md 側には
+skill を読まなくても効く規則だけが残っている。ここが理由・実測・罠の正本。
+
+## Actors（langgraph-clj StateGraph アクター）
+
+新しい actor（LLM/研究モデルを独立 Governor で封じ込め、langgraph-clj
+StateGraph + append-only 監査台帳で動かすパターン）を作るとき、また
+kotoba-server（kotobase.net）向けの CACAO 自己発行の実装規約は skill
+`build-actor` を参照。既存3例: **robotaxi-actor**（AR1 ⊣ SafetyGovernor）/
+**gftd-talent-actor**（HR-LLM ⊣ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣
+CertGovernor）。
+
+
+
+## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
+
+- **モデルは能力がすぐ入れ替わる。concrete な model id（`qwen3.6-35b-a3b` 等）を
+  コード・スクリプト・routine prompt・設定の既定値にハードコードしない。**
+- fleet main の SSoT は murakumo KV の alias entry **`murakumo-main`**:
+  `GET https://api.murakumo.cloud/infer/models/murakumo-main` → `{endpoint, alias-for}`。
+  `api.murakumo.cloud/v1/messages` へは `model="murakumo-main"` を送ってよい（worker が KV で解決）。
+  **モデル切替 = この 1 entry の PUT（+ 対象モデルの serve）** — 全 consumer が次回実行から追従する。
+- 新しい LLM 統合の解決順: ①env/引数 override → ②`murakumo-main` alias 解決 → ③fallback は
+  「endpoint のみ」を焼く（endpoint 先の serving モデルに従う = 切替に追従。model 名は焼かない）。
+- 2026-07-17 現在の main: qwen3.6-35b-a3b（**gemma4-26b は deprecated** — オーナー指示。
+  `gemma-gad.gftd.ai` / `gemma-fleet.gftd.ai` は legacy hostname alias として main モデルを配信）。
+  実装例: `70-tools/bmc` の `GFTD_LLM_*`（ADR-2607172700/2800）、
+  `~/.itonami/run-itonami-qwen36-tick.cljs`（ADR-2607172900、alias 解決 + endpoint-only fallback）。
+

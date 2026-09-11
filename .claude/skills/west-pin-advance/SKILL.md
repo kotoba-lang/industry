@@ -1,6 +1,6 @@
 ---
 name: west-pin-advance
-description: west manifest（manifest/west.yml）の pin を前進させる・repo を登録/改名する・local checkout を pin に合わせる・GitHub と local と west.yml の三点ずれを直すときの手順。生成物である west.yml を安全に変える唯一の経路（GitHub API single-entry commit）と、pin 退行・全 project 更新・topdir 誤認・`--entry` の所要時間・`--check` が常に STALE・`repos.edn` の 1 行 conflict という 6 つの実測済みの罠を含む。repo 新規登録の repos.edn 側の編集（`:extra-projects` への conj）もここ。「pin を進める」「west に登録」「west update」「pin がずれている」「manifest を再生成」で発火。west を動かす worktree の作り方もここ。
+description: west manifest（manifest/west.yml）の pin を前進させる・repo を登録/改名する・local checkout を pin に合わせる・GitHub と local と west.yml の三点ずれを直すときの手順。生成物である west.yml を安全に変える唯一の経路（GitHub API single-entry commit）と、pin 退行・全 project 更新・topdir 誤認・`--entry` の所要時間・`--check` が常に STALE・`repos.edn` の 1 行 conflict という 6 つの実測済みの罠を含む。repo 新規登録の repos.edn 側の編集（`:extra-projects` への conj）もここ。「pin を進める」「west に登録」「west update」「pin がずれている」「manifest を再生成」で発火。west を動かす worktree の作り方もここ。 リポジトリ構成（west manifest が正、DataLad dataset、`west update` の既定と xargs）と genpon（`manifest/fleet-db.edn`、`kagami reconcile` / `sync` / `pin-advance`、署名鍵）の本文も 2026-09-11 に CLAUDE.md から逐語で移した（ADR-2609112300）。「genpon」「fleet-db」「kagami」「reconcile」でも発火。
 ---
 
 # west の pin を動かす
@@ -341,3 +341,117 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   printf 'gitdir: <superproject>/.git/worktrees/<name>\n' > <path>/.git
   git worktree remove <path>
   ```
+
+---
+
+# CLAUDE.md に 2026-09-11 まで残っていた本文（逐語、ADR-2609112300）
+
+以下は CLAUDE.md から**逐語で**移した本文である（2026-09-11、ADR-2609112300。AGENTS.md の
+読み込み上限 31,457 字に合わせて CLAUDE.md を不変条件だけに絞った）。CLAUDE.md 側には
+skill を読まなくても効く規則だけが残っている。ここが理由・実測・罠の正本。
+
+## リポジトリ構成（west manifest が正）
+
+このリポジトリは superproject だが、**子リポ群は git submodule ではなく
+[west](https://docs.zephyrproject.org/latest/develop/west/) manifest
+（`manifest/west.yml`）で管理する。** plain な submodule は廃止済み（gitlink は
+撤去・`.gitmodules` は無い）。source of truth は **`manifest/repos.edn`**（ポリシー）
+で、`manifest/west.yml` は `scripts/gen-west-manifest.cljk` が生成する（手書き禁止）。
+
+- 取得/同期は `git submodule update` ではなく **`west update`** を使う。
+- 各 project は `manifest/west.yml` の `path:`（= 旧 submodule と同一パス
+  `orgs/<org>/<repo>`）に展開される。topdir は superproject ルート。
+- 大容量データの **DataLad dataset（`m365-archive`）だけは west project にしつつ
+  git-annex + Backblaze B2 で実体を扱う**（`userdata.datalad: true` / `datalad`
+  グループに隔離し既定では取得しない）。取得/破棄は `kbb --backend sci manifest/west_annex.cljk annex-get` /
+  `kbb --backend sci manifest/west_annex.cljk annex-drop`。詳細は `manifest/README.md`。
+
+```bash
+# 初回
+west init -l manifest
+# 取得/同期（full history がデフォルト。shallow は使わない — ADR-2607211600）
+# ⚠ 引数なしの `west update` は west.yml の全 project を歩く。既定にしない（下記）
+west update --fetch smart <name> [<name> ...]
+# DataLad の実体だけ別途（B2 creds は環境変数）
+west update --group-filter +datalad m365-archive && kbb --backend sci manifest/west_annex.cljk annex-get
+# pin を進めたら manifest 再生成（手書き禁止 / CI は --check）
+kbb --backend sci scripts/gen-west-manifest.cljk
+```
+
+### pin を動かす・同期する・worktree で west を回す → skill `west-pin-advance`
+
+**pin の前進、repo の登録/改名、local を pin に合わせる同期、三点ずれの解消、
+west を動かす worktree の作り方は、Skill ツールで `west-pin-advance` を呼ぶ。**
+手順・使うスクリプト・実測済みの罠はそこが正本。
+
+ここで守るべき規則だけ再掲する（skill を読まなくても効く）:
+
+- **引数なしの `west update` を既定にしない。** west.yml の全 project を歩き、pin と
+  一致している checkout でも git を起動する。**何 project かは数えてから言う**
+  —— `grep -c '^    - name: ' manifest/west.yml`。この数は毎週動くので、ここに
+  書いた値は書いた翌週には嘘になる（この節は 2026-09-06 まで 4,100 / 4,124 /
+  4,200 / 4,000 / 4,050 という 5 つの違う定数を同時に載せていた）。
+  全体を回すのは初回 clone と、pin が大量に動いた後だけ。**複数 project を渡すときは `xargs` が必須**
+  （zsh は単語分割しないので `west update $NAMES` は 1 個の project 名になり、
+  `printf ... | west update` は**引数ゼロ = 全 project 更新**になる）。
+- **`west update` は pin 鮮度を答えない。** west.yml に既に書かれた pin へ
+  checkout を合わせるだけで、GitHub 側の新しい commit は見ない。
+- **`kagami sync` の前に `kagami reconcile` を通す。** 遅れた原本 (genpon / fleet-db.edn) に対して
+  sync すると checkout が pin より**後ろへ**動く。reconcile の入力 west.yml は
+  必ず `origin/main` のものにする。
+- **manifest の書き込み（reconcile / sync / pin 前進）を共有 checkout でやらない。**
+  worktree で走らせて branch で着地させる。
+- **west を動かす worktree は superproject ルートの *外* に作り、その中で
+  `west init -l manifest` をやり直して topdir を固定する。** superproject 配下に
+  作ると west が本体の `.west/` を見つけて topdir を誤認し、**本体の `orgs/` を
+  書き換える**（`WEST_TOPDIR` でも直らない）。
+
+
+
+## genpon（原本）— pin 登録簿 / west 後継 VCS プレーン（ADR-2607160005、2026-07-16）
+
+- **話される名前は原本 (genpon)。** on-disk は `manifest/fleet-db.edn`
+  （+ append-only `fleet-db.ledger.edn`）。west.yml はその写し（kagami が映す）。
+  ファイル名と `:fleet/repos` は据え置き（ADR-2608147300）。Phase 1.5 dual-write
+  吸収期。pin 前進の推奨経路は署名付き
+  `kagami pin-advance` / quorum `kagami govern`（実装:
+  **`orgs/kotoba-lang/kagami`**、policy は `manifest/fleet-keys.edn`）。
+  ⚠ **この repo は 2026-08 以前に `kotoba-fleet-vcs` から `kagami`（鏡）に改名されている。**
+  旧名は GitHub リダイレクトで生きているが west には `kagami` として登録されており、
+  旧名のパスでは checkout が存在せず CLI を駆動できない（実測 2026-08-05: この
+  誤りで「fleet CLI が無い」と誤診した）。**名前が機能を示さない repo は README
+  冒頭で名乗る**という規則（下記「無い」と言う前に索引を引く）の実例。
+  なお `kotoba-lang/kotoba-fleet` は**別物**（並列 agent の fleet-coordination
+  substrate、ADR-2606302000）で、fleet-db とは無関係。
+  **署名鍵は kagi（compartment `personal`、OS-Keychain unlock）にあり、
+  `--kagi fleet-owner-key`（pin）/ `--gov-kagi fleet-gov1,fleet-gov2`
+  （govern）/ `--kagi fleet-owner-root`（head）で読む**（PEM ファイル指定は
+  `--key`。1Password は使わない — op CLI が interactive auth timeout）。
+  `FLEET_ROOT=<superproject root>` を渡すと kagi bin を解決できる。
+  従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効。
+  **API single-entry で west.yml に書いたあと、フラグ無しの `kagami reconcile` で
+  fleet-db に吸収する**のが Phase 1.5 の正規手順:
+
+  ```bash
+  # 吸収（書き込む）。--check は検査のみ、--enforce* は「拒否」スイッチで書き込み
+  # スコープではない（実測 2026-08-05: --enforce-repos に自分の変更を渡して
+  # FLIP VIOLATION を食らった。scope 外の drift はどのみち吸収される）
+  kbb --backend sci --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
+    reconcile --db manifest/fleet-db.edn --west manifest/west.yml
+  ```
+
+  ⚠ **reconcile の入力 west.yml は必ず `origin/main` のものにする。** reconcile は
+  fleet-db を west.yml に**一致させる**だけで pin の向きを検査しない。ローカルの
+  west.yml が main より遅れていると、その退行を fleet-db に焼き込む（実測
+  2026-08-05: ローカルの `io-libp2p` が main より 2 commit 遅れており、警告を
+  見ながら実行して退行を書き込んだ。`git show origin/main:manifest/west.yml` を
+  一時ファイルに出して入力にし直した）。**吸収前に、変更される pin が全て
+  fast-forward か `gh api compare` で確認する**（53 件を確認した実績）。
+  **その書き込みを fleet-db に自動吸収していた CI は無くなった**（2026-07-30、
+  ADR-2607300900 で GitHub Actions を撤去。`fleet-projection-verify.yml` は
+  murakumo fleet 側に未 port）。当面 `kagami reconcile` は手で回す。**fleet-db / ledger /
+  fleet-head.edn を手編集しない**（ledger は追記のみ、head は署名付き）。
+- 並列 sync: `kbb --backend sci --classpath orgs/kotoba-lang/kagami/src \
+  orgs/kotoba-lang/kagami/bin/kagami.cljs sync --db manifest/fleet-db.edn \
+  --workspace <dir> --names a,b --jobs 8`（pin SHA 直接 fetch、dirty skip）。
+

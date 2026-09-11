@@ -1,6 +1,6 @@
 ---
 name: large-binary-datalad
-description: How to handle large binaries (model weights, wasm, video, image datasets) in this superproject via DataLad + git-annex + Backblaze B2, instead of committing them to git history, and why shallow clones were retired in favour of it. Use when adding, reasoning about, or asked about large binary/dataset data in this workspace.
+description: How to handle large binaries (model weights, wasm, video, image datasets) in this superproject via DataLad + git-annex + Backblaze B2, instead of committing them to git history, and why shallow clones were retired in favour of it. Use when adding, reasoning about, or asked about large binary/dataset data in this workspace. The CLAUDE.md section on large binaries was moved here verbatim on 2026-09-11 (ADR-2609112300).
 ---
 
 ## 大容量バイナリの扱い（B2 + DataLad、最優先）
@@ -82,3 +82,23 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   `kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk --names <dataset>`。
   off-machine コピーの無い annex ファイルがあれば exit 1、標本を remote から fsck する。
   ADR-2607252000（「バックアップがあると書いてあったのに実体が無かった」）の再発防止。
+
+---
+
+# CLAUDE.md に 2026-09-11 まで残っていた本文（逐語、ADR-2609112300）
+
+以下は CLAUDE.md から**逐語で**移した本文である（2026-09-11、ADR-2609112300。AGENTS.md の
+読み込み上限 31,457 字に合わせて CLAUDE.md を不変条件だけに絞った）。CLAUDE.md 側には
+skill を読まなくても効く規則だけが残っている。ここが理由・実測・罠の正本。
+
+## 大容量バイナリの扱い（B2 + DataLad）
+
+モデル重み/wasm/動画/画像データセット等の大容量バイナリを git 履歴に直接
+コミットしない方針、DataLad + git-annex + Backblaze B2 special remote での
+扱いは skill `large-binary-datalad` を参照（最優先事項）。**既存の重い project
+の shallow 運用は 2026-07-21 に廃止した**（ADR-2607211600）。**ただし実際の
+unshallow は未完了で、重い repo が shallow のまま残っている**（ADR-2608124400。
+上記「Git operations」節の確認手順を参照）。
+disk/帯域を抑えたい大容量バイナリは shallow ではなく B2 + DataLad へ移行する
+（`m365-archive` が先行例）。
+
