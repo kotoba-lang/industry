@@ -25,7 +25,7 @@ dashboard, a remote, a Worker and another actor, none of whom hold a secret.
 ## Why there is no cryptography in the Python
 
 There is one authorization decider in this workspace and it is not here
-(ADR-2608197300 §3). `verify_token` shells out to `scripts/identity-verify.cljs`,
+(ADR-2608197300 §3). `verify_token` shells out to `scripts/identity-verify.cljk`,
 which runs `biscuit.token/verify` → `biscuit.kotoba/->delegated` →
 `authority.chain/authorize` → `identity.startup/resolve-state`. A Python
 reimplementation would be a second decider: two answers that agree until the

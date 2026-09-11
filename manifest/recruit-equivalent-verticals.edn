@@ -8,7 +8,7 @@
 ;; ここに在るのは **政策**（どの営みを、どの順で、どの repo の上に建てるか）で
 ;; あって観測ではない。`manifest/concept-vocabulary.edn` と同じ扱い —— repo の
 ;; 中身から導出できないので手で書く。導出できる値（順位・被覆・現在地）は
-;; ここに持たず `scripts/recruit-vertical-tick.cljs` が毎回計算する。
+;; ここに持たず `scripts/recruit-vertical-tick.cljk` が毎回計算する。
 ;;
 ;; ## 順位は市場規模で決まる。その市場規模は 1 つの出所から採る
 ;;
@@ -249,7 +249,7 @@
  ;;
  ;; 正本は network-awai/app-hyakka の knowledge/ledger/**/*.datoms.edn（append-only）。
  ;; この registry は claim を**書かない** —— 何を claim として出すかの契約だけを持つ。
- ;; 射影（5 表）は scripts/hyakka-datalake-export.cljs が既に持っている。
+ ;; 射影（5 表）は scripts/hyakka-datalake-export.cljk が既に持っている。
  :registry/hyakka
  {:ledger-root  "knowledge/ledger"
   :repo         "orgs/network-awai/app-hyakka"

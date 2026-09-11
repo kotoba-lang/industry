@@ -54,7 +54,7 @@ break-test を通すことで、着地の質を保つ。
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin
-nbb scripts/repo-search.cljs koukyou-chotatsu chotatsu
+nbb scripts/repo-search.cljk koukyou-chotatsu chotatsu
 ```
 
 `orgs/network-awai/app-hyakka` を最新化する（west pin 経由、または直接 fetch）。
@@ -208,7 +208,7 @@ hyakka の ledger は継続的に伸びるためこれが既定の再同期経�
 ```bash
 cd /Users/junkawasaki/github/com-junkawasaki
 git fetch -q origin && git status -sb   # main が遅れていないか
-nbb scripts/west-pin-put.cljs app-hyakka HEAD --message "pin: advance app-hyakka to <一言>"
+nbb scripts/west-pin-put.cljk app-hyakka HEAD --message "pin: advance app-hyakka to <一言>"
 ```
 
 ### 11. 後片付け

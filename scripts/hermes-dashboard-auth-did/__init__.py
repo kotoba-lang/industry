@@ -16,7 +16,7 @@ another actor, none of whom have to be given a secret.
 
 There is exactly one authorization decider in this workspace and it is not
 here (ADR-2608197300 §3). `verify_token` shells out to
-`scripts/identity-verify.cljs`, which runs the chain the ADR fixes:
+`scripts/identity-verify.cljk`, which runs the chain the ADR fixes:
 
     biscuit.token/verify        -- is the chain signed from the root key
     biscuit.kotoba/->delegated  -- what does it grant, after attenuation
@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 
 LAST_SKIP_REASON: Optional[str] = None
 
-#: The classpath `scripts/identity-verify.cljs` documents, relative to the
+#: The classpath `scripts/identity-verify.cljk` documents, relative to the
 #: workspace root. `org-biscuitsec/test` is on it because that repo holds no
 #: crypto by design and injects real Ed25519 from its test tree; `dev-protobuf`
 #: is there for the wire decoder that reads tokens minted by other biscuit
@@ -90,7 +90,7 @@ _CLASSPATH_PARTS = (
     "orgs/kotoba-lang/dev-protobuf/src",
 )
 
-_VERIFIER = "scripts/identity-verify.cljs"
+_VERIFIER = "scripts/identity-verify.cljk"
 
 #: A bearer token reaches the verifier by being spliced into an EDN document,
 #: so its character set has to be one that cannot close a string or open a
@@ -102,7 +102,7 @@ _HEX32 = re.compile(r"^[0-9a-fA-F]{64}$")
 
 _TIMEOUT_SECONDS = 20
 
-# Exit codes of scripts/identity-verify.cljs. Named because a bare 3 in an
+# Exit codes of scripts/identity-verify.cljk. Named because a bare 3 in an
 # `elif` is the kind of thing that gets "simplified" into an else branch.
 _EXIT_OK = 0
 _EXIT_DENIED = 1

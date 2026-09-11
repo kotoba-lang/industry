@@ -150,9 +150,9 @@ cljc (staging):     5% (3 nodes, new)
 
 ### Configuration Files
 ```
-deploy/month-1-staging-deployment.cljs     — Provisioning orchestration
-deploy/parity-checker-service.cljs         — Parity validation service
-deploy/rollback-automation.cljs            — Autonomous rollback engine
+deploy/month-1-staging-deployment.cljk     — Provisioning orchestration
+deploy/parity-checker-service.cljk         — Parity validation service
+deploy/rollback-automation.cljk            — Autonomous rollback engine
 deploy/slo-dashboard-config.edn            — Prometheus/Grafana config
 deploy/MONTH-1-OPERATIONS-GUIDE.md         — Operational procedures
 ```
@@ -188,10 +188,10 @@ deploy/deploy.edn                          — Deployment state manifest
 ## Next Steps
 
 ### Immediate (Week 1)
-- [ ] Verify node health: `nbb deploy/month-1-staging-deployment.cljs health`
-- [ ] Start parity checker: `nbb deploy/parity-checker-service.cljs ...`
-- [ ] Start rollback monitor: `nbb deploy/rollback-automation.cljs monitor`
-- [ ] Enable 5% canary: `nbb deploy/month-1-staging-deployment.cljs canary-start`
+- [ ] Verify node health: `nbb deploy/month-1-staging-deployment.cljk health`
+- [ ] Start parity checker: `nbb deploy/parity-checker-service.cljk ...`
+- [ ] Start rollback monitor: `nbb deploy/rollback-automation.cljk monitor`
+- [ ] Enable 5% canary: `nbb deploy/month-1-staging-deployment.cljk canary-start`
 - [ ] Access SLO dashboard for live monitoring
 - [ ] Daily review of parity logs and metrics
 

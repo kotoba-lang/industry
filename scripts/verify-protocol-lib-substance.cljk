@@ -1,0 +1,329 @@
+(ns verify-protocol-lib-substance
+  "A repo can be named after a wire protocol and never touch a byte.
+
+  `orgs/kotoba-lang/com-modbus-tcp` says, in its own README, that it is a
+  \"clean-room API-compatible implementation of the modbus_tcp deep system
+  protocol\". Its entire source is 182 lines of `(def entity-specs [...])` +
+  `(def routes ...)` producing `POST /v1/requests`, `GET /v1/responses/{id}`,
+  and so on -- a generic CRUD-over-HTTP facade. It contains zero bitwise or
+  byte operations. It does not implement Modbus. Sitting one directory over,
+  `orgs/kotoba-lang/org-modbus` is 558 lines across pdu.cljc/crc.cljc/
+  rtu.cljc/tcp.cljc with 77 bitwise/byte operations -- a real wire codec for
+  the same protocol.
+
+  Nothing in this workspace's existing indices can tell these two repos
+  apart: same naming convention, same west manifest shape, same concept
+  index, and the maturity scorer (`scripts/repo-maturity.cljk`) scores on
+  total bytes + scaffold-marker hits, so `com-modbus-tcp` comes back CLEAN
+  (`scaffold-marker-hits 0`) -- the instrument that is supposed to catch
+  scaffolding cannot see this particular scaffold, because it doesn't look
+  like a TODO or a stub, it looks like a complete, if generic, actor.
+
+  This is not one mistake. `orgs/kotoba-lang/` carries roughly a thousand
+  `com-*` repos generated from the same template (`src/<name>/main.cljc`,
+  `entity-specs` + `routes` + `/v1/*`), and the audit that produced this
+  script found the template's entity vocabulary was itself copy-pasted
+  across unrelated domains: `com-nmea2000-marine` (a marine CAN protocol)
+  carries the entity list `Vehicle, Signal, ChargeSession, Connector, Trip,
+  Command` -- an EV-charging (OCPP) schema -- and 47 payment-rail repos
+  (`com-fedwire`, `com-zengin-system`, `com-sepa-ct`, `com-chips-clearing`,
+  `com-ach-network`, ...) all share Stripe's own object model verbatim:
+  `Charge, Customer, PaymentIntent, PaymentMethod, Payout, Refund`.
+
+  ## The rule
+
+  A repo is a CANDIDATE (`rest-facade`) when some file under its `src/` tree
+  defines `entity-specs`, defines `routes`, and mentions a `/v1/` path --
+  the fingerprint of this specific generator, found by scanning content, not
+  by matching a filename (`main.cljc` is what the generator happens to call
+  it; a repo that used a different filename for the same shape should not
+  slip past on a technicality).
+
+  A candidate CLAIMS to be a protocol/format/codec library when its own
+  README (or, failing that, its own top-of-file docstring) says so, in its
+  own words, within the first ~1000 characters: `protocol`, `codec`, `wire
+  format`, `binary format`. This is not a domain-vocabulary guess by this
+  script -- it is what the repo's own generated description already
+  declares itself to be (\"...implementation of the modbus_tcp deep system
+  protocol...\" / \"...fedwire legacy/deep financial protocol...\"), lifted
+  verbatim. A REST wrapper around Stripe's own API legitimately says
+  \"platform\", not \"protocol\", and is deliberately not in this set --
+  see the false-positive-control note below.
+
+  A claiming candidate is a FINDING when the byte/bit-operation count across
+  its whole `src/` tree (not just the facade file -- a repo could
+  legitimately keep wire logic in a sibling file while `main.cljc` is a thin
+  REST shell over it) is zero (`protocol-facade-no-wire-code`, error) or
+  merely 1-2 (`protocol-facade-thin-wire-code`, warn -- present for
+  completeness; measured 2026-08-29 on a 1-in-5 sample of
+  `orgs/kotoba-lang/com-*`, this bucket was empty: the generator produces
+  either a pure facade or nothing in this shape, not a thin middle).
+
+  Supporting, not decisive, evidence attached to each finding: how many
+  OTHER scanned repos share this repo's exact entity-name signature. High
+  sharing is evidence of template generation independent of domain; the
+  `com-modbus-tcp` case shows sharing is not required for the finding to be
+  correct -- its own entity names (`MbapHeader`, `Request`, `Response`,
+  `ExceptionResponse`) are Modbus-flavoured and mostly unshared, and it is
+  still a finding, because the decisive signal is the zero byte operations,
+  not the entity names.
+
+  ## What this deliberately does NOT flag, and why
+
+  A repo with the `entity-specs`/`routes`/`/v1/` shape that does NOT claim
+  protocol/codec/format in its own words is not flagged. A REST API client
+  for a genuine REST platform (payment gateway dashboards, SaaS CRUD APIs)
+  legitimately has routes, entities and zero bitwise operations -- that is
+  what a correct implementation of a REST platform looks like. This script
+  cannot and does not try to tell 'com-somesaas is a correct REST facade'
+  from 'com-somesaas is an incorrect REST facade of a REST platform that
+  actually needed more logic' -- that question is out of scope. It only
+  catches the narrower, machine-checkable claim: 'this repo says of ITSELF
+  that it is a protocol/codec/format, and then contains no code that
+  encodes or decodes anything'.
+
+  A repo that claims protocol/codec/format but does NOT have the
+  entity-specs/routes/v1 facade shape is not flagged, even with zero
+  bitwise operations -- e.g. a pure spec/reference-data repo with no code at
+  all is a different, legitimate defect class (missing implementation, not
+  a facade masquerading as an implementation) and is out of scope here.
+
+  ## What this cannot answer
+
+  Entity-signature sharing counts are bounded by what is actually checked
+  out on this machine (`orgs/` is a cone-mode sparse checkout of a ~4,260
+  repo west manifest; most entries are not present on disk and cannot be
+  read at all -- see CLAUDE.md, 'sparse cone'). A reported sharing count of
+  N means 'N others among what I could read', never 'N total in the
+  workspace' -- the true count is >= N, never assumed <=. Registered repos
+  that are not checked out are counted as UNVERIFIED, never as clean, and
+  are reported separately from repos this script actually opened and read."
+  (:require ["fs" :as fs] ["path" :as p] [clojure.string :as str]))
+
+(def argv (vec (drop 2 (.-argv js/process))))
+(defn flag [n] (some #{n} argv))
+(defn opt [n d] (let [i (.indexOf argv n)] (if (neg? i) d (get argv (inc i) d))))
+(def root (opt "--root" "."))
+(def findings? (flag "--findings"))
+(def json? (flag "--json"))
+
+(defn ls [d] (try (vec (.readdirSync fs d)) (catch :default _ ::error)))
+(defn dir? [f] (try (.isDirectory (.statSync fs f)) (catch :default _ false)))
+(defn slurp* [f] (try (.readFileSync fs f "utf8") (catch :default e [::error (.-message e)])))
+(defn ok? [x] (not (and (vector? x) (= ::error (first x)))))
+
+;; Directories not authored by this repo, or not source: build output,
+;; caches, vendored trees, scratch.
+(def skip-dir
+  #"/(node_modules|\.git|\.shadow-cljs|\.cache|target|dist|build|out|coverage|vendor|_archive|_working)(/|$)")
+
+(def src-ext #"\.(cljc|clj|cljs)$")
+
+(defn walk [d depth acc]
+  (if (or (> depth 5) (re-find skip-dir (str d "/")) (>= (count acc) 400))
+    acc
+    (let [entries (ls d)]
+      (if (= entries ::error)
+        acc
+        (reduce (fn [a e]
+                  (let [f (p/join d e)]
+                    (cond
+                      (dir? f) (walk f (inc depth) a)
+                      (re-find src-ext f) (conj a f)
+                      :else a)))
+                acc entries)))))
+
+;; --- signals -------------------------------------------------------------
+
+(def entity-re #":entity\s+\"([^\"]+)\"")
+(def routes-def-re #"\(def\s+routes\b")
+(def bitop-re #"\b(bit-and|bit-or|bit-xor|bit-shift-left|bit-shift-right|unsigned-bit-shift-right|unchecked-byte|byte-array)\b")
+(def claim-re #"(?i)(protocol|codec|wire[- ]format|binary[- ]format)")
+
+(defn entities-in [text]
+  (into (sorted-set) (map second) (re-seq entity-re text)))
+
+(defn bitop-count [text] (count (re-seq bitop-re text)))
+
+(defn line-count [text] (count (str/split-lines text)))
+
+(defn claim-snippet
+  "First claim-bearing sentence-ish fragment from the given text, or nil."
+  [text]
+  (when-let [m (re-find claim-re text)]
+    (let [kw (if (string? m) m (first m))
+          i (.indexOf text kw)
+          start (max 0 (- i 60))
+          end (min (count text) (+ i 40))]
+      (-> (subs text start end) str/trim (str/replace #"\s+" " ")))))
+
+;; --- west registry ---------------------------------------------------------
+
+(defn west-paths []
+  (let [y (slurp* (p/join root "manifest" "west.yml"))]
+    (when (ok? y)
+      (into #{} (map second) (re-seq #"(?m)^\s*path:\s*(\S+)\s*$" y)))))
+
+;; --- per-repo scan -----------------------------------------------------
+
+(defn scan-repo
+  "Returns nil on unreadable repo dir, else a map describing what was found.
+  Never returns a false 'clean' for something that could not be read --
+  unreadability is reported by the caller as a distinct bucket."
+  [rel abs]
+  (let [src (p/join abs "src")]
+    (if-not (dir? src)
+      {:repo rel :status :not-facade-shape :reason "no src/ directory"}
+      (let [files (walk src 0 [])]
+        (if (empty? files)
+          {:repo rel :status :not-facade-shape :reason "src/ has no .cljc/.clj/.cljs files"}
+          (let [contents (keep (fn [f] (let [c (slurp* f)] (when (ok? c) [f c]))) files)
+                unread (- (count files) (count contents))
+                blob (str/join "\n" (map second contents))
+                entities (entities-in blob)
+                routes? (boolean (re-find routes-def-re blob))
+                v1? (str/includes? blob "/v1/")
+                facade? (and (seq entities) routes? v1?)]
+            (if-not facade?
+              (cond-> {:repo rel :status :not-facade-shape}
+                (pos? unread) (assoc :unread-files unread))
+              (let [test-dir (p/join abs "test")
+                    test-files (if (dir? test-dir) (walk test-dir 0 []) [])
+                    test-blob (->> test-files
+                                   (keep (fn [f] (let [c (slurp* f)] (when (ok? c) c))))
+                                   (str/join "\n"))
+                    readme (p/join abs "README.md")
+                    readme-text (let [c (slurp* readme)] (when (ok? c) c))
+                    doc-text (subs blob 0 (min (count blob) 800))
+                    [claim? claim-src claim-text]
+                    (cond
+                      (and readme-text (re-find claim-re (subs readme-text 0 (min (count readme-text) 1000))))
+                      [true :readme (claim-snippet (subs readme-text 0 (min (count readme-text) 1000)))]
+
+                      (re-find claim-re doc-text)
+                      [true :docstring (claim-snippet doc-text)]
+
+                      :else [false nil nil])]
+                {:repo rel
+                 :status :facade
+                 :files (count contents)
+                 :unread-files unread
+                 :lines (reduce + (map (comp line-count second) contents))
+                 :entities entities
+                 :signature (str/join "," entities)
+                 :bitops (bitop-count blob)
+                 :test-bitops (bitop-count test-blob)
+                 :claims? claim?
+                 :claim-source claim-src
+                 :claim-text claim-text}))))))))
+
+;; --- main ----------------------------------------------------------------
+
+(defn -main []
+  (let [registered (west-paths)
+        orgs-dir (p/join root "orgs")]
+    (when-not registered
+      (println "REFUSED\tno manifest/west.yml under" root
+                "-- cannot tell a registered checkout from a stale/unregistered one")
+      (.exit js/process 2))
+    (when-not (dir? orgs-dir)
+      (println "REFUSED\tno orgs/ under" root "-- nothing to scan")
+      (.exit js/process 2))
+    (let [org-registered (into #{} (filter #(str/starts-with? % "orgs/")) registered)
+          org-entries (ls orgs-dir)
+          checked-out (if (= org-entries ::error)
+                        []
+                        (for [o org-entries :when (dir? (p/join orgs-dir o))
+                              r (let [e (ls (p/join orgs-dir o))] (if (= e ::error) [] e))
+                              :let [rel (str "orgs/" o "/" r)]
+                              :when (and (contains? org-registered rel) (dir? (p/join root rel)))]
+                          rel))
+          unverified (- (count org-registered) (count checked-out))
+          scan-results (mapv (fn [rel] (scan-repo rel (p/join root rel))) checked-out)
+          scanned (count scan-results)]
+      (when (zero? scanned)
+        (println "REFUSED\tzero registered orgs/ checkouts were present on disk to scan"
+                  "-- a run that examines nothing has not measured the rule")
+        (.exit js/process 2))
+      (let [unread-repos (filter #(and (= :not-facade-shape (:status %))
+                                        (nil? (:reason %))
+                                        (pos? (:unread-files % 0)))
+                                  scan-results)
+            not-facade (filter #(= :not-facade-shape (:status %)) scan-results)
+            facade (filter #(= :facade (:status %)) scan-results)
+            facade-no-claim (remove :claims? facade)
+            claiming (filter :claims? facade)
+            errors (filter #(zero? (:bitops %)) claiming)
+            thin (filter #(<= 1 (:bitops %) 2) claiming)
+            clean-claiming (filter #(> (:bitops %) 2) claiming)
+            ;; entity-signature sharing, scoped to what was actually read.
+            sig->repos (reduce (fn [m {:keys [repo signature]}]
+                                  (if (str/blank? signature) m
+                                      (update m signature (fnil conj []) repo)))
+                                {} facade)
+            sharing-detail (fn [{:keys [repo signature]}]
+                              (let [siblings (remove #{repo} (get sig->repos signature []))]
+                                {:count (count siblings) :examples (vec (take 3 siblings))}))
+            finding-line (fn [severity key detail] (str "FINDING\t" severity "\t" key "\t" detail))
+            findings
+            (concat
+              (for [{:keys [repo bitops lines files test-bitops claim-source claim-text] :as row} errors]
+                (let [{:keys [count examples]} (sharing-detail row)]
+                  (finding-line
+                    "error" (str "protocol-facade-no-wire-code:" repo)
+                    (str "claims protocol/codec/format (" (name claim-source) ": \"" claim-text "\"); "
+                         "entity-specs+routes+/v1/ REST-facade shape (" files " file(s), " lines " lines); "
+                         "0 bit/byte operations across the whole src/ tree"
+                         (when (pos? test-bitops) (str " (tests have " test-bitops " though)"))
+                         "; entity-signature \"" (:signature row) "\" shared with " count " other scanned repo(s)"
+                         (when (seq examples) (str " e.g. " (str/join " " examples)))
+                         "."))))
+              (for [{:keys [repo bitops lines files claim-source claim-text] :as row} thin]
+                (let [{:keys [count examples]} (sharing-detail row)]
+                  (finding-line
+                    "warn" (str "protocol-facade-thin-wire-code:" repo)
+                    (str "claims protocol/codec/format (" (name claim-source) ": \"" claim-text "\"); "
+                         "entity-specs+routes+/v1/ REST-facade shape (" files " file(s), " lines " lines); "
+                         "only " bitops " bit/byte operation(s) across the whole src/ tree; "
+                         "entity-signature shared with " count " other scanned repo(s)"
+                         (when (seq examples) (str " e.g. " (str/join " " examples)))
+                         "."))))
+              )]
+        (if json?
+          (println (.stringify js/JSON
+                                (clj->js {:scanned scanned
+                                          :registered-under-orgs (count org-registered)
+                                          :checked-out (count checked-out)
+                                          :unverified-not-checked-out unverified
+                                          :not-facade-shape (count not-facade)
+                                          :unreadable-files (count unread-repos)
+                                          :facade-total (count facade)
+                                          :facade-no-protocol-claim (count facade-no-claim)
+                                          :facade-claims-protocol (count claiming)
+                                          :facade-claims-clean (count clean-claiming)
+                                          :findings-error (count errors)
+                                          :findings-warn (count thin)
+                                          :error-repos (mapv :repo errors)
+                                          :warn-repos (mapv :repo thin)})
+                                nil 2))
+          (do
+            (when findings?
+              (doseq [l findings] (println l)))
+            (println (str "SCANNED\t" scanned
+                          "\tregistered orgs/ checkouts present on disk and readable, of "
+                          (count org-registered) " registered under orgs/ ("
+                          unverified " not checked out -> UNVERIFIED, not scanned)"))
+            (println (str "not-facade-shape=" (count not-facade)
+                          " facade-no-protocol-claim=" (count facade-no-claim)
+                          " facade-claims-protocol=" (count claiming)
+                          " (clean=" (count clean-claiming)
+                          " thin=" (count thin) " no-wire-code=" (count errors) ")"))
+            (println (str "protocol-facade-no-wire-code=" (count errors)
+                          " protocol-facade-thin-wire-code=" (count thin)))
+            (when (pos? unverified)
+              (println (str "UNVERIFIED\t" unverified
+                            "\tregistered checkouts not present on disk (sparse checkout) -- "
+                            "not examined, not reported clean")))))
+        (.exit js/process (if (or (seq errors) (seq thin)) 1 0))))))
+
+(-main)

@@ -6,7 +6,7 @@
 ;; :lake/sha256 で参照する（ADR-2608039970「分けるのは bytes」）。
 ;;
 ;; manifest 自体の再生成:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/gen-lake-manifest.cljs \
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/gen-lake-manifest.cljk \
 ;;     --input 90-docs/system-dynamics/itonami-maturity.datoms.edn \
 ;;     --dataset itonami-maturity
 ;; --check で canonical 一致を検査できる（決定的: 時刻も乱数も使わない）。
@@ -23,7 +23,7 @@
  :projection/contracts
  {:schema/path "manifest/projection-schemas/itonami-maturity-lake.edn"
   :schema/sha256 "3b7bc55c726600a825acdb4b66c44a8704a9e747ef7e1460902016798c8e9a18"
-  :loader/path "manifest/project-edn.cljs"
+  :loader/path "manifest/project-edn.cljk"
   :loader/sha256 "88fe9455809e8d3e5df69141ae7c6a4055b900cb3629b01281f5c0aae521cd6b"}
  :projection/rebuild
  {:loader/id :canonical-edn-v1

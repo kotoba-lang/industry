@@ -26,11 +26,11 @@ companion 面が既に持っており、ここが持つのは定期の情報発�
 R=$PWD K=$PWD/orgs/kotoba-lang
 CP="$R/scripts/shinshi-cast-bots:$K/org-chainagnostic-cacao/src:$K/authority/src:$K/org-ietf-ed25519/src:$K/org-ietf-cbor/src:$K/text/src"
 
-nbb --classpath "$R/scripts/shinshi-cast-bots" scripts/shinshi-cast-bots/roster.cljs
-nbb --classpath "$CP" scripts/shinshi-cast-bots/register.cljs           # 全員
-nbb --classpath "$CP" scripts/shinshi-cast-bots/post.cljs [--slug s] [--dry-run] [--skip-aozora] [--skip-llm]
-nbb --classpath "$R/scripts/shinshi-cast-bots" scripts/shinshi-cast-bots/produce.cljs [--count N] [--dry-run]
-nbb --classpath "$R/scripts/shinshi-cast-bots" scripts/shinshi-cast-bots/generate.cljs image <slug> --apply
+nbb --classpath "$R/scripts/shinshi-cast-bots" scripts/shinshi-cast-bots/roster.cljk
+nbb --classpath "$CP" scripts/shinshi-cast-bots/register.cljk           # 全員
+nbb --classpath "$CP" scripts/shinshi-cast-bots/post.cljk [--slug s] [--dry-run] [--skip-aozora] [--skip-llm]
+nbb --classpath "$R/scripts/shinshi-cast-bots" scripts/shinshi-cast-bots/produce.cljk [--count N] [--dry-run]
+nbb --classpath "$R/scripts/shinshi-cast-bots" scripts/shinshi-cast-bots/generate.cljk image <slug> --apply
 ```
 
 D1 は appview（`orgs/network-awai/club-shinshi-app/appview/ai-gftd-wasm-shinshi-sh1n5h1x`）

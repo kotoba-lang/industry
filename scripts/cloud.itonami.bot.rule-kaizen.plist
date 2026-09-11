@@ -7,7 +7,7 @@
 
   <!-- ローカル Claude loop（superproject ADR-2608261200）。姉妹の
        cloud.itonami.bot.adr-inventory と同じ 2 段構え:
-         1) scripts/rule-kaizen-tick.cljs が候補を測る（決定論）
+         1) scripts/rule-kaizen-tick.cljk が候補を測る（決定論）
          2) 候補があるときだけ claude -p /rule-kaizen を起こす
 
        1 反復 = 1 finding。決定の中身を疑う仕事なので毎日 1 件。
@@ -15,7 +15,7 @@
        止め方:
          launchctl bootout gui/$(id -u)/cloud.itonami.bot.rule-kaizen
        候補だけ見る（モデルを起こさない）:
-         nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen-loop.cljs --dry-run
+         nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen-loop.cljk --dry-run
 
        この plist の着地だけでは LaunchAgents へ bootstrap しない。 -->
 
@@ -24,7 +24,7 @@
     <string>/opt/homebrew/bin/nbb</string>
     <string>--classpath</string>
     <string>.:scripts/nbb_compat</string>
-    <string>scripts/rule-kaizen-loop.cljs</string>
+    <string>scripts/rule-kaizen-loop.cljk</string>
   </array>
 
   <key>WorkingDirectory</key>

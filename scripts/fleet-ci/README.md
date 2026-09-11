@@ -63,20 +63,20 @@ receipt を組み立てる `kagami` 側の仕事であってここではない�
 
 ```bash
 # 今何が回るのか（API を叩くだけ、gate は走らせない）
-nbb scripts/fleet-ci/tick.cljs --plan
+nbb scripts/fleet-ci/tick.cljk --plan
 
 # runner 自身の副作用なし回帰テスト
-FLEET_CI_LIBRARY_MODE=1 nbb --classpath scripts/fleet-ci scripts/fleet-ci/tick-unit-test.cljs
+FLEET_CI_LIBRARY_MODE=1 nbb --classpath scripts/fleet-ci scripts/fleet-ci/tick-unit-test.cljk
 
 # 1 repo だけ手で回す（変化が無くても回る。landing/status/CD はしない）
-nbb scripts/fleet-ci/tick.cljs --only kagitaba --dry-run
+nbb scripts/fleet-ci/tick.cljk --only kagitaba --dry-run
 
 # 全部強制的に回す（landing/status/CD あり）
-nbb scripts/fleet-ci/tick.cljs --all
+nbb scripts/fleet-ci/tick.cljk --all
 
 # ノードを増やした / provision した後
-nbb scripts/fleet-ci/provision.cljs --from-nodes --need jvm
-nbb scripts/fleet-ci/probe.cljs
+nbb scripts/fleet-ci/provision.cljk --from-nodes --need jvm
+nbb scripts/fleet-ci/probe.cljk
 
 # 常駐（5 分間隔）
 cp scripts/fleet-ci/cloud.itonami.bot.fleet-ci-tip-tick.plist ~/Library/LaunchAgents/
@@ -96,10 +96,10 @@ append-only ledger instead of materializing the full superproject tree.
 この 4 ノードは probe の capability が空で、fleet の実行プールから外れていた。
 
 ```bash
-nbb scripts/fleet-ci/sweep.cljs                 # dry-run（既定）。何を消すかだけ出す
-nbb scripts/fleet-ci/sweep.cljs --apply         # 実際に消す
-nbb scripts/fleet-ci/sweep.cljs --all           # low-water(20GiB) を無視して全ノード
-nbb scripts/fleet-ci/sweep.cljs --only dan,levi # ノードを絞る
+nbb scripts/fleet-ci/sweep.cljk                 # dry-run（既定）。何を消すかだけ出す
+nbb scripts/fleet-ci/sweep.cljk --apply         # 実際に消す
+nbb scripts/fleet-ci/sweep.cljk --all           # low-water(20GiB) を無視して全ノード
+nbb scripts/fleet-ci/sweep.cljk --only dan,levi # ノードを絞る
 ```
 
 対象は `sweep.edn` の **allowlist**。`~/.ollama/models`（21G/ノードの実データ）や
@@ -144,7 +144,7 @@ nbb scripts/fleet-ci/sweep.cljs --only dan,levi # ノードを絞る
 4. **署名鍵は弱権限のまま。** `fleet-agents.edn` に enroll した `fleet-ci/*` grant のみ。
    `fleet-keys.edn` には入れない（pin 前進も governance quorum も持たない）。
    **machine ごとに別 identity を enroll する（鍵をコピーしない）。**
-5. **pin 前進は必ずサーバ側検証を通す。** `scripts/verify-west-pins.cljs`
+5. **pin 前進は必ずサーバ側検証を通す。** `scripts/verify-west-pins.cljk`
    （存在 + default branch 到達性 + 前進のみ）→ branch + contents PUT + server-side merge。
    直接 main に push しない。west.yml は当該 entry の revision 1 行だけ書き換える。
 6. **台帳は append-only。** `manifest/fleet-ci.edn` は追記のみ（既存行を書き換えない）。
@@ -181,7 +181,7 @@ mkdir -p -m 700 ~/.itonami/fleet-ci-gh-tokens
 pbpaste > ~/.itonami/fleet-ci-gh-tokens/com-junkawasaki && chmod 600 ~/.itonami/fleet-ci-gh-tokens/com-junkawasaki
 pbpaste > ~/.itonami/fleet-ci-gh-tokens/kotoba-lang     && chmod 600 ~/.itonami/fleet-ci-gh-tokens/kotoba-lang
 # 効いているか（launchd と同じ経路を対話セッションで確認）
-FLEET_CI_GH_TOKEN_DIR=~/.itonami/fleet-ci-gh-tokens nbb scripts/fleet-ci/tick.cljs --plan
+FLEET_CI_GH_TOKEN_DIR=~/.itonami/fleet-ci-gh-tokens nbb scripts/fleet-ci/tick.cljk --plan
 ```
 
 pin を進められるのは **root の Contents: write** だけで、子 repo 側は status 以外書けない

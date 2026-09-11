@@ -55,7 +55,7 @@ in the file shows the shape.
   returns only the first — so the entry parses, the file looks fine, and no
   consumer ever sees it. Measured 2026-08-30: two runs appended past the `]` and
   four entries went invisible, two of which were re-adds of codes already in the
-  file. `scripts/fleet-ci/gates/itonami-coverage-check.cljs` now counts entities
+  file. `scripts/fleet-ci/gates/itonami-coverage-check.cljk` now counts entities
   two ways and fails on the mismatch.
 - **Read the codes already in the file and skip any you would re-add.** A second
   entry for a code that is already present is a duplicate even when you reword
@@ -108,7 +108,7 @@ of them have no project.
 4. Run the gate, from the bot worktree:
 
      nbb --classpath "$HOME/github/com-junkawasaki:$HOME/github/com-junkawasaki/scripts/nbb_compat" \
-       "$HOME/github/com-junkawasaki/scripts/itonami-verify-proposal.cljs" \
+       "$HOME/github/com-junkawasaki/scripts/itonami-verify-proposal.cljk" \
        --root "$HOME/github/com-junkawasaki" --proposal /tmp/itonami-proposal.edn
 
    exit 0 accepted · exit 1 rejected, reasons printed · exit 2 REFUSED — stop,

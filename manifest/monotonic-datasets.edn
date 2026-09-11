@@ -13,7 +13,7 @@
 ;; ## 何を宣言するか
 ;;
 ;; 蓄積が意味を持つデータ（観測・台帳・カタログ）について、「この属性の distinct 値は
-;; 減らない」と書く。減ったら `scripts/dataset-monotonic-check.cljs` が落ちる。
+;; 減らない」と書く。減ったら `scripts/dataset-monotonic-check.cljk` が落ちる。
 ;;
 ;; ⚠ **append-only の宣言ではない。** 同じ日を測り直して行が置き換わるのは正常。
 ;; 禁じているのは **distinct な軸の値が消えること**（観測した日が無かったことになる）。

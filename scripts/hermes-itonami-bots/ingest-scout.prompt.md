@@ -108,7 +108,7 @@ host assumptions passes while checking nothing.
 
 8. Run the gate, from the superproject:
 
-     nbb --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljs \
+     nbb --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljk \
        --proposal /tmp/itonami-proposal.edn --repo /tmp/<repo>
 
    exit 0 — accepted.

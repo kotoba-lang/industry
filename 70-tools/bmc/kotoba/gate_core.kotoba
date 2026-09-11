@@ -5,7 +5,7 @@
 ;;
 ;; 「測った値と閾値と演算子から、その仮説が validated / measuring / blocked の
 ;; どれなのか」と「その状態を**もう一度提案してよいか**」だけ。参照実装は
-;; `70-tools/bmc/src/gftd/gate.cljc` の同名関数で、両者の完全一致を fleet gate
+;; `70-tools/bmc/src/gftd/gate.cljk` の同名関数で、両者の完全一致を fleet gate
 ;; `root-gate-core` が毎回見る（ADR-2608159300）。**食い違ったらこの kernel が
 ;; 正しく、cljc を直す**
 ;; （`scripts/kotoba/fabric_actor_core.kotoba` / `manifest/org-id.kotoba` と同じ分担）。

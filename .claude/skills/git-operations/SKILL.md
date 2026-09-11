@@ -96,12 +96,12 @@ skill `git-cleanup-conflict`。
   commit は禁止**（1 件の登録のつもりが未 push HEAD 由来の壊れた pin を 44 件
   main に流した実事故 `90852b86` の再発防止）。
 
-- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す**（`scripts/verify-west-pins.cljs`、
+- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す**（`scripts/verify-west-pins.cljk`、
   ADR-2607022900）。pin に許されるのは「上流 repo の default branch から到達可能な
   commit」だけ — ①存在（未 push のローカル HEAD の pin 化は禁止）②default branch
   到達性 ③旧 pin からの前進（behind = 静かな pin 退行）。判定は GitHub API で行い、
   **ローカルの ancestry 判定だけに頼らない**。強制するのは PreToolUse hook
-  `.claude/hooks/west-pin-verify-guard.cljs` と murakumo fleet の
+  `.claude/hooks/west-pin-verify-guard.cljk` と murakumo fleet の
   `root-west-pin-policy` gate。
 
 - **`git push` / `git pull` / `west update` の前に、manifest の pin が upstream
@@ -122,8 +122,8 @@ skill `git-cleanup-conflict`。
   「pull」は 3 つの別物を含む: (1) superproject を origin/main に合わせる
   (2) pin を各 repo の default branch tip に進める (3) checkout を pin に合わせる。
   (2) を落とすと、(1) と (3) をいくら回しても workspace は古いまま止まる。
-- **前進の経路は変わらない** —— `scripts/west-pin-put.cljs <entry> HEAD`（1 件）か
-  `scripts/west-pin-put-batch.cljs`（多件、1 commit に束ねる）。どちらも
+- **前進の経路は変わらない** —— `scripts/west-pin-put.cljk <entry> HEAD`（1 件）か
+  `scripts/west-pin-put-batch.cljk`（多件、1 commit に束ねる）。どちらも
   (1) default branch 到達性 (2) 旧 pin からの前進 (3) blob SHA precondition を
   **entry ごとに**検査する。速いから検査を省く、はしない。
 - **repo の中の pin も同じ規則に従う。** `deps.edn` の `:git/sha`、lock ファイル、
@@ -155,7 +155,7 @@ skill `git-cleanup-conflict`。
   ```
 
   **これは prose instruction だけに頼らず、SessionStart hook
-  （`.claude/hooks/session-start-branch-sync-check.cljs`、`.claude/settings.json`
+  （`.claude/hooks/session-start-branch-sync-check.cljk`、`.claude/settings.json`
   に登録済み）で毎セッション開始時に自動チェックする。** 実測インシデント
   （2026-07-20）: `agent/pin-docs-edn-only` ブランチが誰も気づかないまま
   `origin/main` から 848 commits ahead / 1607 commits behind まで積み上がった
@@ -179,7 +179,7 @@ skill `git-cleanup-conflict`。
   git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
   ```
 
-  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.cljs`（nbb）で強制される
+  これは PreToolUse フック `.claude/hooks/git-push-main-sync-guard.cljk`（nbb）で強制される
   （遅れた状態の `git push` は deny され、同期を促すメッセージが返る）。フックは
   破壊的な自動マージはしない（判定と指示のみ、fail-open）。
 
@@ -235,7 +235,7 @@ skill `git-cleanup-conflict`。
   git fetch origin && git merge --ff-only origin/main   # FF 不可なら乖離。rebase しない
   ```
 
-  これは PreToolUse フック `.claude/hooks/wrangler-deploy-main-sync-guard.cljs`
+  これは PreToolUse フック `.claude/hooks/wrangler-deploy-main-sync-guard.cljk`
   （nbb、`.claude/settings.json` に登録済み）で強制される。`wrangler deploy` /
   `wrangler versions deploy` / `npm|pnpm|yarn run deploy` を対象に、checkout が
   `origin/main` より遅れていれば deny する。**隔離環境（`--env <name>`：
@@ -251,7 +251,7 @@ skill `git-cleanup-conflict`。
   git fetch origin                                 # origin/main 他を取得
   git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら停止。rebase しない）
   west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
-  nbb scripts/gen-west-manifest.cljs --check          # west.yml が canonical か（生成器と一致か）確認
+  nbb scripts/gen-west-manifest.cljk --check          # west.yml が canonical か（生成器と一致か）確認
   ```
 
   これらを飛ばして push/PR すると、main 乖離・west.yml の pin 退行・子リポの

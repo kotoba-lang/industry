@@ -38,7 +38,7 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 70-tools/bmc/bin/gftd allocate md                     # portfolio-allocation.edn 再生成
 70-tools/bmc/bin/gftd allocate write                  # 配分結果を governor 経由で ledger へ記録（任意）
 70-tools/bmc/bin/gftd ledger show --tail 20
-nbb 70-tools/bmc/run-tests.cljs                       # tests
+nbb 70-tools/bmc/run-tests.cljk                       # tests
 ```
 
 スコア（ADR-2607021700）: BMC 成熟度 = completeness/hypothesis/validation
@@ -63,7 +63,7 @@ repo root 以外から動かすときは `COM_JUNKAWASAKI_ROOT=<superproject roo
   hyp 遷移 / etzhayyim 非営利不変条件 などを拒否）。可決・拒否とも ledger に積む
 - **persist** — ① local SSoT `90-docs/business/canvas-ledger.edn` へ append
   ② **net-kotobase dual-write**（best-effort、CACAO via
-  `70-tools/bmc/bin/kotobase-dual-write.cljs` + `kotobase-client`、db
+  `70-tools/bmc/bin/kotobase-dual-write.cljk` + `kotobase-client`、db
   `portfolio-bmc-ledger`）。`--no-kotobase` / `BMC_KOTOBASE_DUAL_WRITE=0` で無効。
   identity: `70-tools/bmc/.bmc-kotobase-identity.hex`（gitignore、初回 mint）
 - 1 run = 1 tick（有界）。`react loop` は budget（`--max-ticks`）内で dry まで反復する
@@ -91,20 +91,20 @@ ADR-2607021600）。
 ## 実測収集（collect.cljs, ADR-2607021800）
 
 ```bash
-nbb 70-tools/bmc/collect.cljs      # Cloudflare/Stripe/health → 90-docs/business/metrics/*.edn
+nbb 70-tools/bmc/collect.cljk      # Cloudflare/Stripe/health → 90-docs/business/metrics/*.edn
 # creds: env CF_API_TOKEN / STRIPE_SECRET_KEY → Keychain gftd.cf / 1Password
 ```
 
 `collect.cljs` requires `gftd.traffic` (see below), so it needs `70-tools/bmc/src`
 on the nbb classpath. The superproject root `nbb.edn` already lists it
 (`{:paths ["." "scripts/nbb_compat" "70-tools/bmc/src" "70-tools/bmc/test"]}`),
-so invoking `nbb 70-tools/bmc/collect.cljs` from the **superproject root** works
+so invoking `nbb 70-tools/bmc/collect.cljk` from the **superproject root** works
 with no extra flags. If you invoke it from anywhere else (a different cwd, a
 cron wrapper, a LaunchAgent `WorkingDirectory` that isn't the repo root), pass
 the classpath explicitly:
 
 ```bash
-nbb --classpath "70-tools/bmc/src:70-tools/bmc/test:." 70-tools/bmc/collect.cljs
+nbb --classpath "70-tools/bmc/src:70-tools/bmc/test:." 70-tools/bmc/collect.cljk
 ```
 
 business を回す 1 運転 = `collect.cljs` → 各 product `react loop` → `canvas md --all` → `score md` → commit。
@@ -115,7 +115,7 @@ business を回す 1 運転 = `collect.cljs` → 各 product `react loop` → `c
 とスキャナ probe (4xx/5xx) をまず分離する。それだけでは不十分な product
 （network-isekai — Cloudflare Pages が unmatched path にも 2xx/3xx を返すため、
 2xx/3xx bucket 自体が `/mailer.php` 等の bot probe で汚染される）向けに、
-`70-tools/bmc/src/gftd/traffic.cljc` の `classify-path` が第二段の分類を行う:
+`70-tools/bmc/src/gftd/traffic.cljk` の `classify-path` が第二段の分類を行う:
 
 - **`:channel`** — `channel-allowlist`（product ごとの既知 real route）に一致 → top-paths に採用。
 - **`:probe`** — `probe-path-re`（product-agnostic スキャナ signature、`.php`/`wp-admin`/`.git`/`Dockerfile` 等）に一致 → top-paths から除外、率だけ計上。

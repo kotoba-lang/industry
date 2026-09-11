@@ -1,0 +1,103 @@
+#!/usr/bin/env nbb
+;; The whole scoped-purchase chain, against a live 402, without paying.
+;;
+;;   CP=$(printf %s: \
+;;     orgs/kotoba-lang/org-biscuitsec/src orgs/kotoba-lang/pay/src \
+;;     orgs/kotoba-lang/org-ietf-ed25519/src orgs/kotoba-lang/org-nist-sha2/src \
+;;     orgs/kotoba-lang/org-ietf-x25519/src orgs/kotoba-lang/dev-protobuf/src \
+;;     orgs/kotoba-lang/authority/src)
+;;   nbb --classpath "$CP" scripts/x402-scoped-buy-proof.cljk
+;;
+;; Exit 0 when the chain decided, 2 when it could not -- an unreachable
+;; facilitator, a surface that stopped selling, or a narrowing that did not
+;; survive. It never exits 1, because there is no finding here: either the
+;; chain composes or the run could not tell.
+;;
+;; ## Why a script and not a test
+;;
+;; Six pieces landed on 2026-08-31 and each has its own unit tests. Those tests
+;; prove the pieces; they do not prove they compose. This runs the actual chain
+;;
+;;   mint -> attenuate with a bound -> verify -> derive the spend policy
+;;        -> decide against a challenge the production facilitator just served
+;;
+;; and it uses the real challenge rather than a fixture, because a fixture is
+;; the seller as we imagine it.
+;;
+;; ## It does not pay
+;;
+;; It stops at the decision. Signing a transfer is a movement of money, and the
+;; point here is that the DECISION is correct and constrained -- which is the
+;; part a bot would get wrong on its own.
+(ns x402-scoped-buy-proof
+  (:require [biscuit.wire :as w]
+            [ed25519.sign :as ed]
+            [pay.x402-buyer :as buyer]))
+
+(def challenge-url "https://x402.nexus/gateway/hanmoto/x402/counts")
+(def usdc "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
+(def treasury "0xA00366234D29d4F882088048c0B2fa0dB7302D4E")
+
+(defn- refuse! [msg]
+  (.write (.-stderr js/process) (str "REFUSING: " msg "\n"))
+  (.exit js/process 2))
+
+(defn- seed [n] (vec (repeat 32 n)))
+(defn- kp [n] (let [s (seed n) sk (ed/secret-key! s)] {:seed s :sk sk :pub (:public sk)}))
+(defn- sign-with-map [sk payload] (ed/sign sk payload))
+(defn- sign-with-seed [s payload] (ed/sign (ed/secret-key! (vec s)) payload))
+
+(defn -main []
+  (let [root (kp 3) k1 (kp 7) holder (kp 11)
+        ;; 1. the issuer grants a ceiling of 2000 base units on Base USDC
+        minted (w/encode-authority-token
+                {:facts [[(symbol "max-amount") 2000]
+                         [(symbol "network") "base"]
+                         [(symbol "asset") usdc]
+                         [(symbol "pay-to") treasury]
+                         [(symbol "scheme") "exact"]
+                         [(symbol "scheme") "transaction"]]
+                 :root-private-key (:sk root)
+                 :next-secret (:seed k1) :next-public-key (:pub k1)
+                 :sign-fn sign-with-map})
+        ;; 2. the holder narrows it to 1000, using nothing of the issuer's
+        narrowed (w/append-block minted
+                                 {:facts [[(symbol "max-amount") 1000]]
+                                  :next-secret (:seed holder)
+                                  :next-public-key (:pub holder)
+                                  :sign-fn sign-with-seed})
+        t (w/decode-token narrowed)
+        v (w/verify t (:pub root) (fn [pk payload sig] (ed/verify pk payload sig)))]
+    (when-not (:ok? v) (refuse! (str "the chain did not verify: " (pr-str v))))
+    (let [m (w/token->model t)
+          blocks (mapv :block/facts (:biscuit/blocks m))
+          policy (buyer/policy-from-facts blocks)]
+      (println (str "VERIFIED\t" (:blocks v) " blocks against the issuer public key"))
+      (println (str "POLICY\tmax-amount " (:max-amount policy)
+                    "\tnetworks " (pr-str (:networks policy))))
+      (when-not (= 1000 (:max-amount policy))
+        (refuse! (str "the narrowing did not survive the round trip: " (pr-str policy))))
+      (-> (js/fetch challenge-url)
+          (.then (fn [r]
+                   (if (= 402 (.-status r))
+                     (.json r)
+                     (refuse! (str challenge-url " answered " (.-status r)
+                                   " -- a proof against a surface that is not selling proves nothing")))))
+          (.then (fn [j]
+                   (let [ch (js->clj j :keywordize-keys true)
+                         plan (buyer/plan ch policy)
+                         tight (buyer/plan ch (assoc policy :max-amount 500))
+                         none (buyer/plan ch nil)]
+                     (println (str "CHALLENGE\t" (count (:accepts ch)) " offer(s) from the live facilitator"))
+                     (println (str "DECIDED\t" (if (buyer/payable? plan)
+                                                 (str "would pay " (get-in plan [:pay :amount])
+                                                      " on " (get-in plan [:pay :network]))
+                                                 (str "refused: " (:refuse plan)))))
+                     (println (str "CAP 500\t" (:refuse tight) "\t(the same challenge, a tighter token)"))
+                     (println (str "NO TOKEN\t" (:refuse none) "\t(silence is not permission)"))
+                     (when-not (buyer/payable? plan)
+                       (refuse! "the granted policy could not pay the live challenge"))
+                     (println "\nNOT PAID. The chain decided; moving money is the operator step."))))
+          (.catch (fn [e] (refuse! (str "could not reach the facilitator: " (.-message e)))))))))
+
+(-main)

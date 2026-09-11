@@ -165,7 +165,7 @@ cp scripts/hermes-clojure-stdlib-migration-bots/clojure_stdlib_migration_evidenc
    ~/.hermes/scripts/
 cp scripts/hermes-clojure-stdlib-migration-bots/clojure-stdlib-migration-scout.prompt.md \
    ~/.hermes/scripts/clojure-stdlib-migration-scout.prompt.md
-cp scripts/hermes-clojure-stdlib-migration-bots/verify-clojure-stdlib-migration.cljs \
+cp scripts/hermes-clojure-stdlib-migration-bots/verify-clojure-stdlib-migration.cljk \
    ~/.hermes/scripts/
 
 # candidates.cljs itself is NOT copied anywhere -- clojure_stdlib_migration_evidence.py

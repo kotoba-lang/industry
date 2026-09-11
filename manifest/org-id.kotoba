@@ -7,7 +7,7 @@
 ;;
 ;; 導出は一方向（domain -> prefix）だけ。id からドメインを逆算しない。
 ;;
-;; **正規化の順序が契約である。** `scripts/org_id_derivation.cljs` は同じ順序を
+;; **正規化の順序が契約である。** `scripts/org_id_derivation.cljk` は同じ順序を
 ;; 同じ入力に対して行い、fleet gate `root-org-id-derivation` が両者の一致を
 ;; **記録済みドメイン + 敵対的な入力列**に対して見る。順序を変えるなら両方同時に。
 ;;

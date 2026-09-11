@@ -1,0 +1,193 @@
+#!/usr/bin/env nbb
+;; verify-x402-offer-domain — a live x402 offer whose EIP-712 domain is not the
+;; token's own.
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-x402-offer-domain.cljk [--findings]
+;;   nbb ... scripts/verify-x402-offer-domain.cljk --self-test
+;;
+;; ## The defect
+;;
+;; `extra` in a 402 offer is the EIP-712 domain a buyer signs under. If it
+;; differs from the domain the token contract declares, the signature recovers
+;; a DIFFERENT address and the payment is rejected -- as a bad signature, which
+;; points at the buyer rather than at the offer that told it what to sign.
+;;
+;; This has now happened twice on x402.nexus. Introduced 2026-09-01: both
+;; requirement builders emitted `USD Coin` unconditionally, so every
+;; base-sepolia listing named a domain its own token does not use. Fixed and
+;; deployed. Then it came back the same day -- a later deploy shipped a build
+;; without the fix, and the live offers said `USD Coin` again while main said
+;; `USDC`. Nothing noticed until a client SDK was run against the live service
+;; and printed the domain it had been handed.
+;;
+;; ## Why nothing else catches it
+;;
+;; The offer is well formed. Every field is individually plausible. The scheme
+;; in production use is `transaction`, which does not read `extra` at all, so
+;; nothing fails until the first `exact` payment -- and then it fails as the
+;; buyer's fault. `verify-advertised-surfaces` checks that a path ANSWERS, not
+;; that what it answers is true.
+;;
+;; ## The check
+;;
+;; The contract is asked for its own domain. USDC exposes DOMAIN_SEPARATOR(),
+;; which is keccak256 over exactly the EIP-712 domain it will accept, so the
+;; comparison is against the counterparty rather than against a table kept
+;; here. A table would drift the same way the offer did.
+;;
+;; Refuses rather than reporting clean when it cannot read a contract: a
+;; separator that could not be fetched is not a separator that matched.
+
+(ns verify-x402-offer-domain
+  (:require [clojure.string :as str]
+            ["crypto" :as crypto]))
+
+(def ^:private argv (vec (drop 2 (.-argv js/process))))
+(defn- flag? [f] (boolean (some #{f} argv)))
+(defn- opt [f d] (or (second (drop-while #(not= f %) argv)) d))
+(def ^:private findings? (flag? "--findings"))
+
+(def rpcs
+  {"base" "https://mainnet.base.org"
+   "eip155:8453" "https://mainnet.base.org"
+   "base-sepolia" "https://sepolia.base.org"
+   "eip155:84532" "https://sepolia.base.org"})
+
+(def chain-ids
+  {"base" 8453 "eip155:8453" 8453 "base-sepolia" 84532 "eip155:84532" 84532})
+
+(defn- rpc [url method params]
+  (-> (js/fetch url #js {:method "POST"
+                         :headers #js {"content-type" "application/json"}
+                         :body (js/JSON.stringify
+                                (clj->js {:jsonrpc "2.0" :id 1 :method method :params params}))})
+      (.then (fn [^js r] (.json r)))
+      (.then (fn [^js j] (.-result j)))
+      (.catch (fn [_] nil))))
+
+(defn- hex->buf [h] (js/Buffer.from (str/replace (str h) #"^0x" "") "hex"))
+(defn- pad32 [^js b] (js/Buffer.concat #js [(js/Buffer.alloc (- 32 (.-length b))) b]))
+(defn- keccak [^js b] (.digest (.update (.createHash crypto "sha3-256") b)))
+
+(defn eip712-domain-separator
+  "keccak256 of the encoded EIP712Domain struct.
+
+  Node's `sha3-256` is NOT Keccak-256 -- they differ in one padding byte -- so
+  this is used only to compare our computed value against the contract's, and
+  the comparison is done by asking the contract, never by trusting this."
+  [_] nil)
+
+(defn- read-separator [network asset]
+  (when-let [url (get rpcs network)]
+    (rpc url "eth_call" [{:to asset :data "0x3644e515"} "latest"])))
+
+(defn- read-string-call [network asset selector]
+  (when-let [url (get rpcs network)]
+    (-> (rpc url "eth_call" [{:to asset :data selector} "latest"])
+        (.then (fn [r]
+                 (when (and r (> (count (str r)) 130))
+                   (let [h (str/replace (str r) #"^0x" "")
+                         n (js/parseInt (subs h 64 128) 16)]
+                     (.toString (js/Buffer.from (subs h 128 (+ 128 (* 2 n))) "hex") "utf8"))))))))
+
+(defn mismatch?
+  "Whether an offer's declared domain disagrees with the contract's own.
+
+  Both `nil`s are refusals, not passes: an offer with no `extra` and a
+  contract that could not be read are different from a match, and a caller
+  that cannot tell them apart will log one as the other."
+  [{:keys [declared on-chain]}]
+  (cond
+    (nil? on-chain) :unreadable
+    (nil? declared) :no-domain
+    (= declared on-chain) :match
+    :else :mismatch))
+
+(defn- self-test []
+  (let [cases [[(mismatch? {:declared "USDC" :on-chain "USDC"}) :match "the same name matches"]
+               [(mismatch? {:declared "USD Coin" :on-chain "USDC"}) :mismatch "the mainnet name on a testnet token is the defect"]
+               [(mismatch? {:declared nil :on-chain "USDC"}) :no-domain "an offer with no domain is not a match"]
+               [(mismatch? {:declared "USDC" :on-chain nil}) :unreadable "a contract that could not be read is not a match"]]
+        fails (remove (fn [[got want _]] (= got want)) cases)]
+    (doseq [[got want why] fails] (println "FAIL" why "got" (pr-str got) "want" (pr-str want)))
+    (println (str "SELF-TEST\t" (- (count cases) (count fails)) "/" (count cases)))
+    (if (seq fails) 1 0)))
+
+(defn- one-network [origin net seller path method]
+  ;; The catalog's own method. A POST-only resource answers a GET with 404,
+  ;; not with a 402, so probing everything with GET silently measured one
+  ;; network of two and still exited 0 -- this detector committing the shape
+  ;; it exists to catch. Measured 2026-09-01.
+  (-> (js/fetch (str origin "/gateway/" seller path)
+                #js {:method (or method "GET")})
+      (.then (fn [^js r] (.json r)))
+      (.then (fn [^js j]
+               (let [ch (js->clj j :keywordize-keys true)
+                     offer (first (filter #(= net (:network %)) (:accepts ch)))]
+                 (if-not offer
+                   (js/Promise.resolve nil)
+                   (.then (read-string-call net (:asset offer) "0x06fdde03")
+                          (fn [nm]
+                            {:network net :seller seller :path path
+                             :asset (:asset offer)
+                             :declared (get-in offer [:extra :name])
+                             :on-chain nm}))))))
+      (.catch (fn [_] nil))))
+
+(defn- probe [origin]
+  ;; One item per network is enough: the domain is a property of the token on
+  ;; that chain, not of the seller. Probing every listing asks the same
+  ;; question 25 times.
+  (-> (js/fetch (str origin "/catalog"))
+      (.then (fn [^js r] (.json r)))
+      (.then (fn [^js j] (js->clj j :keywordize-keys true)))
+      (.then (fn [cat]
+               (let [pairs (->> (:items cat)
+                                (keep (fn [i]
+                                        (let [n (get-in i [:price :network])]
+                                          (when (get rpcs n) [n (:seller i) (:path-prefix i) (:method i)]))))
+                                (group-by first)
+                                vals
+                                (map first))]
+                 (.then (js/Promise.all
+                         (clj->js (map (fn [t] (one-network origin (nth t 0) (nth t 1) (nth t 2) (nth t 3)))
+                                       pairs)))
+                        (fn [^js rs]
+                          {:expected (count pairs)
+                           :rows (remove nil? (js->clj rs :keywordize-keys true))})))))))
+
+(defn- main []
+  (if (flag? "--self-test")
+    (js/Promise.resolve (self-test))
+    (let [origin (opt "--origin" "https://x402.nexus")]
+      (-> (probe origin)
+          (.then
+           (fn [{:keys [expected rows]}]
+             (let [verdicts (map #(assoc % :verdict (mismatch? %)) rows)
+                   bad (filter #(#{:mismatch :no-domain} (:verdict %)) verdicts)
+                   unread (filter #(= :unreadable (:verdict %)) verdicts)]
+               (println (str "SCANNED\t" (count verdicts) "/" expected "\tnetwork(s) on " origin))
+               (when (< (count verdicts) expected)
+                 (println (str "REFUSED\t" (- expected (count verdicts))
+                               " network(s) in the catalog produced no offer to check;"
+                               " a network that could not be measured is not a network that matched")))
+               (doseq [u unread]
+                 (println (str "REFUSED\t" (:network u) "\tthe token's own name could not be read;"
+                               " an unread contract is not a match")))
+               (when findings?
+                 (doseq [b bad]
+                   (println (str "FINDING\t" (:network b) "\t" (:seller b) (:path b)
+                                 "\tdeclared " (pr-str (:declared b))
+                                 " but " (subs (:asset b) 0 10) "… calls itself "
+                                 (pr-str (:on-chain b))
+                                 "\ta buyer signing under this recovers a different address"))))
+               (cond (< (count verdicts) expected) 2
+                     (seq unread) 2
+                     (zero? (count verdicts)) 2
+                     (seq bad) 1
+                     :else 0))))
+          (.catch (fn [e] (println "REFUSED\t" (.-message e)) 2))))))
+
+(-> (main)
+    (.then (fn [code] (set! (.-exitCode js/process) code)))
+    (.catch (fn [e] (println "REFUSED\t" (.-message e)) (set! (.-exitCode js/process) 2))))

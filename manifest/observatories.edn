@@ -25,7 +25,7 @@
 ;;
 ;; 各 actor の **正本はその repo 自身**（charter / gate / schema）。ここが持つのは
 ;; superproject 側の運用知識だけ —— どの runtime で、どの main を、どの引数で叩けば
-;; 実際に動くか。newsfeed（ADR-2608031900）が `scripts/newsfeed-ingest.cljs` に
+;; 実際に動くか。newsfeed（ADR-2608031900）が `scripts/newsfeed-ingest.cljk` に
 ;; 運用を置いたのと同じ境界。
 ;;
 ;; **:args に絶対パスを明示するのが要点。** shionome / mitooshi は既定のパス解決が
@@ -77,9 +77,9 @@
 ;;
 ;; ## 実行
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --only watari
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --check   ; 走らせない
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --only watari
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --check   ; 走らせない
 
 {:policy "observatory-run/v1"
  :adr "ADR-2608081200"
@@ -268,7 +268,7 @@
    ;; raw/ に取得した feed 本体（annex → s3.kotobase.net）を書いて、**app-aozora には
    ;; 何も送らない**。つまり「無人で取り込むが無人で発信はしない」が初めて表現できる。
    ;; 2026-08-18: **配線した。** launchd `com.gftd.kouhou-ingest` が毎日 06:41 に
-   ;; `scripts/kouhou-ingest.cljs` を回す（phase 0 固定、publish はしない）。
+   ;; `scripts/kouhou-ingest.cljk` を回す（phase 0 固定、publish はしない）。
    ;; 上の「まだ足していない」は 7 日間 1 件も取り込まれない状態を作ったので、
    ;; 可能性の記録のまま置かないことにした。script は custody を location log
    ;; ではなく exit code で確かめ、archive 0 件・remote 0 本・未 push のいずれでも
@@ -610,7 +610,7 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
 
               2026-08-10 の第 6 波（query 面への接続、pin c0942d76）:
               **5 波にわたり全 datom が :source/dataset \"hayari\" を付けて
-              manifest/edn-query.cljs への所属を主張していたが、edn-query.cljs には
+              manifest/edn-query.cljk への所属を主張していたが、edn-query.cljs には
               hayari が 1 件も無かった** —— 観測本体は .gitignore 対象なので面が読む
               ものが存在せず、README も ADR も実行できない join を説明していた。
               commit できる大きさの半分 data/hayari-summary.edn（(国,日) ごとに 1 entity
@@ -671,8 +671,8 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
  ;; kotoba-lang/chie を**手で**拾ったもの。網羅は証明していない。
  ;; 新しい候補を探すときは:
  ;;
- ;;   nbb scripts/repo-search.cljs 観測 observatory ingest 収集
- ;;   nbb scripts/concept-lookup.cljs observatory
+ ;;   nbb scripts/repo-search.cljk 観測 observatory ingest 収集
+ ;;   nbb scripts/concept-lookup.cljk observatory
  ;;
  ;; を引いてから足す。「登録簿に無い = 存在しない」と結論しないこと。
  :inventory-note

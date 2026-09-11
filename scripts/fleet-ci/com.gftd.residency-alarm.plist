@@ -5,8 +5,8 @@
      XML コメントは `-` 2 連を含められない（XML 1.0 §2.5）。**以下、長オプションは
      先頭の `-` 2 つを省いて書く** —— `check` は実際には `-` 2 つ + `check`。
 
-     判定は `scripts/residency-collect.cljs check`、通知は
-     `scripts/fleet-ci/residency-alarm.cljs`。閾値と drift の定義は collector 側
+     判定は `scripts/residency-collect.cljk check`、通知は
+     `scripts/fleet-ci/residency-alarm.cljk`。閾値と drift の定義は collector 側
      だけにある（2 箇所にあって片方だけ直る、を避ける）。
 
      なぜ fleet gate ではなく operator の常駐か: drift の片側は `launchctl list`、
@@ -29,7 +29,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>cd "$HOME/github/com-junkawasaki" &amp;&amp; exec /opt/homebrew/bin/nbb --classpath scripts/fleet-ci scripts/fleet-ci/residency-alarm.cljs</string>
+    <string>cd "$HOME/github/com-junkawasaki" &amp;&amp; exec /opt/homebrew/bin/nbb --classpath scripts/fleet-ci scripts/fleet-ci/residency-alarm.cljk</string>
   </array>
   <key>StartInterval</key><integer>21600</integer>
   <key>RunAtLoad</key><true/>

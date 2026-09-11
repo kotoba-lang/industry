@@ -1,0 +1,263 @@
+#!/usr/bin/env nbb
+;; verify-cljs-runner-exit-signal.cljs -- ClojureScript test runners whose
+;; failure signal cannot be read by the command that runs them.
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-cljs-runner-exit-signal.cljk \
+;;     [--findings] [--root <dir>]
+;;
+;; ## What it is about
+;;
+;; A family of actor repos ships a `portable_cljs_test_runner.cljc` that calls
+;; itself "PRIMARY automated quality gate", and signals failure like this:
+;;
+;;   #?(:cljs
+;;      (defmethod t/report [:cljs.test/default :end-run-tests] [m]
+;;        (when-not (t/successful? m)
+;;          (set! (.-exitCode js/process) 1))))
+;;
+;; and documents this invocation:
+;;
+;;   clojure -Sdeps '{:paths ["src" "test"]}' \
+;;     -M:dev:cljs -m cljs.main --target node \
+;;     -m <the-runner-ns>
+;;
+;; Those two do not compose. `cljs.main ... -m <ns>` evaluates -main inside a
+;; node REPL environment; the process a caller waits on is the driver, and it
+;; exits 0 whatever the tests did. `js/process.exitCode` set from inside that
+;; environment never reaches it, and `js/process.exit` hangs the driver rather
+;; than propagating.
+;;
+;; MEASURED 2026-08-25 in cloud-itonami-isic-6492, both directions:
+;;
+;;   -m form,   one assertion deliberately broken -> "1 failures", exit 0
+;;   -m form,   unmodified                        -> "0 failures", exit 0
+;;   compiled,  one assertion broken in an async
+;;              callback (lands after run-tests
+;;              has already returned)             -> "1 failures", exit 1
+;;   compiled,  unmodified                        -> "0 failures", exit 0
+;;
+;; So this is the ADR-2608136000 shape at its purest: a check that could not
+;; report failure returning the same value as a check that passed. A caller
+;; that runs the documented command and tests `$?` is reading nothing.
+;;
+;; ## What the fix looks like (this is what the detector wants to see)
+;;
+;;   clojure -Sdeps '{:paths ["src" "test"]}' -M:dev:cljs -m cljs.main \
+;;     --target node --output-dir target/node-out \
+;;     --output-to target/portable-tests.cjs -c <the-runner-ns>
+;;   echo '{"type":"commonjs"}' > target/node-out/package.json
+;;   node target/portable-tests.cjs
+;;
+;; plus `#?(:cljs (set! *main-cli-fn* -main))` in the runner. Both halves are
+;; load-bearing and each fails silently on its own:
+;;
+;;   - without `*main-cli-fn*`, the bundle loads every namespace, runs no test
+;;     and exits 0 -- measured, and indistinguishable from a clean run in both
+;;     the output and the exit code;
+;;   - without the package.json marker, node reads Closure's emitted .js as ESM
+;;     (these repos' package.json says `"type": "module"`) and dies on
+;;     `require`, which at least is loud.
+;;
+;; ## Scope, and why a repo is IN it
+;;
+;; Only runners that SET `js/process.exitCode` AND document how they are meant
+;; to be invoked are in scope. Setting the exit code is the file claiming to
+;; have a failure signal; documenting the command is what makes the claim
+;; checkable from the file alone. A runner that documents nothing is invoked
+;; from somewhere else -- a gate, a package.json script, plain `nbb <file>` --
+;; and under nbb the exit code works, so there is nothing to report.
+;;
+;; ## This is static, and says so
+;;
+;; The dynamic proof above costs a two-minute cljs compile per repo. This
+;; detector does not re-run it; it reads what each runner claims and how it is
+;; documented to be invoked. So it answers "does this runner's failure signal
+;; have a path to its caller", not "did the tests pass".
+;;
+;; Not a fleet gate: it reads west-managed checkouts under orgs/, which the
+;; fleet does not ship (the root-permit-index shape).
+;;
+;; ## exit codes
+;;
+;;   0  every in-scope runner's failure signal can reach its caller
+;;   1  at least one cannot
+;;   2  COULD NOT ANSWER -- no checkout was readable, or nothing was scanned
+
+(ns verify-cljs-runner-exit-signal
+  (:require ["fs" :as fs]
+            ["path" :as path]
+            [clojure.string :as str]))
+
+(def ^:private argv (vec (drop 2 (js->clj (.-argv js/process)))))
+(def ^:private findings-mode? (some #{"--findings"} argv))
+
+(defn- arg-after [flag]
+  (let [i (.indexOf argv flag)]
+    (when (>= i 0) (get argv (inc i)))))
+
+(def ^:private root
+  (or (arg-after "--root")
+      (.cwd js/process)))
+
+;; ---------------------------------------------------------------------------
+;; discovery
+;; ---------------------------------------------------------------------------
+
+(def ^:private skip-dirs
+  #{"node_modules" "target" "out" ".git" ".shadow-cljs" ".cpcache" ".cljs_node_repl"})
+
+(defn- walk-test-files
+  "Every .cljc/.cljs under a `test/` directory of `dir`, bounded in depth."
+  [dir depth]
+  (if (neg? depth)
+    []
+    (let [entries (try (js->clj (fs/readdirSync dir #js {:withFileTypes true}))
+                       (catch :default _ nil))]
+      (if (nil? entries)
+        []
+        (mapcat
+          (fn [e]
+            (let [nm (.-name e)
+                  p (path/join dir nm)]
+              (cond
+                (skip-dirs nm) []
+                (.isDirectory e) (walk-test-files p (dec depth))
+                (and (.isFile e)
+                     (or (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))
+                     (str/includes? (str/replace p "\\" "/") "/test/")) [p]
+                :else [])))
+          entries)))))
+
+(defn- repo-dirs
+  "orgs/<org>/<repo> directories that exist on disk."
+  []
+  (let [orgs (path/join root "orgs")
+        orgnames (try (vec (js->clj (fs/readdirSync orgs)))
+                      (catch :default _ []))]
+    (vec
+      (mapcat
+        (fn [org]
+          (let [od (path/join orgs org)]
+            (when (try (.isDirectory (fs/statSync od)) (catch :default _ false))
+              (keep (fn [r]
+                      (let [rd (path/join od r)]
+                        (when (try (.isDirectory (fs/statSync rd)) (catch :default _ false))
+                          rd)))
+                    (try (js->clj (fs/readdirSync od)) (catch :default _ []))))))
+        orgnames))))
+
+;; ---------------------------------------------------------------------------
+;; the two questions asked of a runner
+;; ---------------------------------------------------------------------------
+
+(defn- claims-exit-signal?
+  "Does this file set js/process.exitCode -- i.e. claim to signal failure?"
+  [src]
+  (and (str/includes? src "exitCode")
+       (str/includes? src "js/process")))
+
+(defn- repl-eval-invocation
+  "The `-m cljs.main ... -m <ns>` form: cljs.main is asked to RUN a namespace.
+  Returns the namespace it names, or nil.
+
+  `-m cljs.main` itself does not count -- the second `-m` is the one that
+  selects the REPL-eval path. Matching is on the raw text of the documented
+  command, wherever it appears in the file (these runners document it in the
+  ns docstring)."
+  [src]
+  (let [;; every `-m <thing>` in the file, in order
+        ms (map second (re-seq #"-m\s+([A-Za-z][A-Za-z0-9_.\-]*)" src))
+        after-cljs-main (drop-while #(not= % "cljs.main") ms)]
+    (first (remove #{"cljs.main"} (rest after-cljs-main)))))
+
+(defn- compiled-invocation?
+  "Does the file document the compile form instead: `-c <ns>` / `--compile`?"
+  [src]
+  (boolean (or (re-find #"(?m)^.*\s-c\s+[A-Za-z][A-Za-z0-9_.\-]*" src)
+               (str/includes? src "--compile"))))
+
+(defn- sets-main-cli-fn? [src]
+  (str/includes? src "*main-cli-fn*"))
+
+(defn- classify
+  "nil when the runner is fine, otherwise [kind detail]."
+  [src]
+  (let [repl-ns (repl-eval-invocation src)
+        compiled? (compiled-invocation? src)]
+    (cond
+      ;; documented as `cljs.main ... -m <runner>`: the exit code cannot travel
+      (and repl-ns (not compiled?))
+      [:repl-eval-swallows-exit
+       (str "documented as `cljs.main ... -m " repl-ns
+            "`, which evaluates -main in a node REPL env; the exitCode this "
+            "runner sets cannot reach the caller")]
+
+      ;; documented as compiled, but the bundle would call no -main
+      (and compiled? (not (sets-main-cli-fn? src)))
+      [:compiled-without-main-cli-fn
+       (str "documented as a compiled node bundle, but does not set "
+            "*main-cli-fn*; the bundle loads every namespace, runs no test, "
+            "and exits 0")]
+
+      ;; A runner that documents no invocation is NOT a finding. Most runners
+      ;; in this workspace are nbb scripts run as `nbb test/run_portable.cljs`
+      ;; from a gate or a package.json script; nbb executes the file directly,
+      ;; so `js/process.exitCode` reaches the caller and nothing is wrong.
+      ;; Silence about how to invoke a file is not a broken failure signal.
+      ;; The first pass at this detector had such a class and it produced 380
+      ;; findings, none of them defects -- measured 2026-08-25.
+      :else nil)))
+
+;; ---------------------------------------------------------------------------
+;; run
+;; ---------------------------------------------------------------------------
+
+(defn -main []
+  (let [repos (repo-dirs)]
+    (when (zero? (count repos))
+      (println "REFUSING: no orgs/<org>/<repo> checkout was readable under" root)
+      (println "This detector cannot answer, which is not the same as clean.")
+      (.exit js/process 2))
+    (let [files (mapcat #(walk-test-files % 6) repos)
+          scanned (atom 0)
+          claims-signal (atom 0)
+          checkable (atom 0)
+          findings (atom [])]
+      (doseq [f files]
+        (when-let [src (try (fs/readFileSync f "utf8") (catch :default _ nil))]
+          (swap! scanned inc)
+          (when (claims-exit-signal? src)
+            (swap! claims-signal inc)
+            (when (or (repl-eval-invocation src) (compiled-invocation? src))
+              (swap! checkable inc))
+            (when-let [[kind detail] (classify src)]
+              (swap! findings conj
+                     {:id (str (name kind) ":" (str/replace f (str root "/") ""))
+                      :file (str/replace f (str root "/") "")
+                      :kind kind
+                      :detail detail})))))
+      (when (zero? @scanned)
+        (println "REFUSING: scanned 0 files. The checkouts are present but no")
+        (println "test source was readable. Refusing to report a pass.")
+        (.exit js/process 2))
+      (println (str "SCANNED\t" @scanned))
+      (println (str "CLAIMS-SIGNAL\t" @claims-signal
+                    "\t(files that set js/process.exitCode)"))
+      (println (str "CHECKABLE\t" @checkable
+                    "\t(of those, the ones that also document an invocation;"
+                    " the rest are invoked from elsewhere and are UNMEASURED"
+                    " here, not clean)"))
+      (println (str "FINDINGS\t" (count @findings)))
+      (if findings-mode?
+        (doseq [{:keys [id detail]} (sort-by :id @findings)]
+          (println (str "FINDING\t" id "\t" detail)))
+        (doseq [{:keys [file kind]} (sort-by :file @findings)]
+          (println (str "  " (name kind) "  " file))))
+      (when (zero? @checkable)
+        (println)
+        (println "NOTE: no runner in these checkouts both claims a failure")
+        (println "signal and documents how it is invoked. That is a coverage")
+        (println "statement, not a clean bill of health."))
+      (.exit js/process (if (seq @findings) 1 0)))))
+
+(-main)

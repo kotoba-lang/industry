@@ -1,0 +1,332 @@
+#!/usr/bin/env nbb
+;; Cross-host tender comparison on fixed kototama fixtures.
+;; Emits kotoba.tender-comparison/v1 JSON.
+;;
+;; Usage:
+;;   nbb scripts/tender-comparison.cljk [--kototama PATH] [--runs N] [--calls N] [--warmup N] [--output PATH]
+
+(ns tender-comparison
+  (:require ["node:child_process" :as cp]
+            ["node:fs" :as fs]
+            ["node:os" :as os]
+            ["node:path" :as path]
+            [clojure.string :as str]))
+
+(def here (path/dirname *file*))
+(def root (path/resolve here ".."))
+(def args (vec *command-line-args*))
+
+(defn opt [name fallback]
+  (let [i (.indexOf args name)]
+    (if (neg? i) fallback (nth args (inc i) fallback))))
+
+(defn bounded-integer [value name maximum]
+  (let [parsed (js/parseInt (str value) 10)]
+    (when (or (not (js/Number.isSafeInteger parsed))
+              (< parsed 1)
+              (> parsed maximum))
+      (throw (js/Error. (str name " must be an integer from 1 through " maximum))))
+    parsed))
+
+(defn percentile [values fraction]
+  (let [ordered (.sort (js/Array.from values) #(compare %1 %2))
+        idx (- (js/Math.ceil (* (.-length ordered) fraction)) 1)]
+    (aget ordered idx)))
+
+(defn summary [values]
+  #js {:minimum (apply min values)
+       :median (percentile values 0.5)
+       :p95 (percentile values 0.95)
+       :maximum (apply max values)})
+
+(defn output [command args & [cwd]]
+  (let [r (cp/spawnSync command (clj->js args)
+                         #js {:cwd cwd :encoding "utf8" :timeout 30000})]
+    (when (zero? (or (.-status r) 1))
+      (str/trim (or (.-stdout r) "")))))
+
+(defn hrtime-bigint []
+  ((.-bigint js/process.hrtime)))
+
+(defn execute [command args & [{:keys [cwd env timeout]}]]
+  (let [started (hrtime-bigint)
+        r (cp/spawnSync command (clj->js args)
+                        #js {:cwd cwd
+                             :encoding "utf8"
+                             :env (js/Object.assign #js {} js/process.env (clj->js (or env {})))
+                             :maxBuffer (* 32 1024 1024)
+                             :timeout (or timeout 300000)})]
+    (when (.-error r) (throw (.-error r)))
+    (when-not (zero? (or (.-status r) 1))
+      (throw (js/Error.
+              (str command " " (str/join " " args)
+                   " failed (" (.-status r) ")\n"
+                   (or (.-stdout r) "") (or (.-stderr r) "")))))
+    #js {:stdout (or (.-stdout r) "")
+         :stderr (or (.-stderr r) "")
+         :wallMilliseconds (/ (js/Number (- (hrtime-bigint) started)) 1e6)}))
+
+(defn parse-json-sample [stdout expected]
+  (let [lines (.split stdout #"\r?\n")
+        line (->> (range (.-length lines))
+                  (map #(aget lines %))
+                  (map str/trim)
+                  (filter #(str/starts-with? % "{"))
+                  last)]
+    (when-not line (throw (js/Error. "no sample line in stdout")))
+    (let [sample (js/JSON.parse line)]
+      (when-not (= "kotoba.tender-sample/v1" (.-format sample))
+        (throw (js/Error. "bad format")))
+      (when-not (= expected (js/parseInt (str (.-result sample)) 10))
+        (throw (js/Error. (str "result " (.-result sample) " != " expected))))
+      sample)))
+
+(defn host-metric-median [fact host metric]
+  (.-median (aget (aget (.-hosts fact) host) metric)))
+
+(defn wasm-numeric-result [value]
+  (js/Number value))
+
+(defn node-steady-sample [wasm-path expected warmup calls]
+  (let [wasm (fs/readFileSync wasm-path)]
+    (-> (.instantiate js/WebAssembly wasm (clj->js {}))
+        (.then
+         (fn [result]
+           (let [instance (.-instance result)
+                 guest-main (aget (.-exports instance) "main")]
+             (when-not (instance? js/Function guest-main)
+               (throw (js/Error. "guest missing main export")))
+             (let [total (+ warmup calls 1)]
+               (when (> total 500)
+                 (throw
+                  (js/Error.
+                   (str "guest would exceed amu wasm32 instance invocation budget ("
+                        total " > 500); lower --warmup/--calls"))))
+               (dotimes [_ warmup]
+                 (let [v (wasm-numeric-result (guest-main))]
+                   (when-not (= expected v)
+                     (throw (js/Error. (str "warmup result " v " != " expected))))))
+               (let [started (hrtime-bigint)
+                     result
+                     (loop [i 0 acc 0]
+                       (if (< i calls)
+                         (recur (inc i) (wasm-numeric-result (guest-main)))
+                         acc))]
+                 (when-not (= expected result)
+                   (throw (js/Error. (str "result " result " != " expected))))
+                 (let [elapsed (js/Number (- (hrtime-bigint) started))]
+                   #js {:format "kotoba.tender-sample/v1"
+                        :host "node-webassembly"
+                        :calls calls
+                        :warmupCalls warmup
+                        :elapsedNanoseconds elapsed
+                        :result result
+                        :nanosecondsPerInvocation (/ elapsed calls)})))))))))
+
+(defn node-steady-runs [wasm-path expected warmup calls runs]
+  (letfn [(step [run samples]
+            (if (< run runs)
+              (.then (node-steady-sample wasm-path expected warmup calls)
+                     (fn [sample]
+                       (.push samples sample)
+                       (step (inc run) samples)))
+              (js/Promise.resolve samples)))]
+    (step 0 #js [])))
+
+(defn chicory-single-invocation [kototama-root wasm-rel expected]
+  (let [{:keys [wallMilliseconds stdout]}
+        (js->clj (execute "clojure" ["-M:cli" "run" wasm-rel]
+                          {:cwd kototama-root :timeout 600000})
+                 :keywordize-keys true)]
+    (when-not (str/includes? stdout ":ok? true")
+      (throw (js/Error. "chicory CLI run failed")))
+    (when-not (or (str/includes? stdout (str ":result " expected))
+                  (str/includes? stdout (str ":result " expected ",")))
+      (throw (js/Error. (str "chicory result not " expected " in stdout"))))
+    #js {:wallMilliseconds wallMilliseconds}))
+
+(defn chicory-steady-sample [kototama-root wasm-abs expected warmup calls steady-script]
+  (let [{:keys [stdout]}
+        (js->clj (execute "clojure" ["-M" steady-script wasm-abs (str warmup) (str calls)]
+                          {:cwd kototama-root :timeout 600000})
+                 :keywordize-keys true)
+        sample (parse-json-sample stdout expected)]
+    (js/Object.assign sample
+                      #js {:nanosecondsPerInvocation (/ (.-elapsedNanoseconds sample) (.-calls sample))})))
+
+(defn wasmtime-single-invocation [wasm-abs expected]
+  (let [{:keys [wallMilliseconds stdout]}
+        (js->clj (execute "wasmtime" ["run" "--invoke" "main" wasm-abs]
+                          {:timeout 120000})
+                 :keywordize-keys true)
+        trimmed (last (.split (str/trim stdout) #"\r?\n"))]
+    (when-not (= expected (js/parseInt trimmed 10))
+      (throw (js/Error. (str "wasmtime result " trimmed " != " expected))))
+    #js {:wallMilliseconds wallMilliseconds}))
+
+(def guest-defs
+  [{:id "kotoba-compiled-fact"
+    :rel "test/kototama/fixtures/kotoba-compiled-fact.wasm"
+    :expected 120
+    :imports 0}
+   {:id "kotoba-compiled-peak-cells"
+    :rel "test/kototama/fixtures/kotoba-compiled-peak-cells.wasm"
+    :expected 240
+    :imports 0}
+   {:id "amu-compiled-i64-main"
+    :rel "test/kototama/fixtures/amu-compiled-i64-main.wasm"
+    :expected 42
+    :imports 0}])
+
+(defn guest-report [guest wasm-abs node-samples chicory-single chicory-steady wasmtime-single]
+  (let [expected (:expected guest)
+        wasm-rel (:rel guest)
+        node-ns (.map node-samples #(.-nanosecondsPerInvocation %))
+        chicory-ns (.map chicory-steady #(.-nanosecondsPerInvocation %))
+        node-summary (summary node-ns)
+        chicory-summary (summary chicory-ns)
+        chicory-single-ms (.map chicory-single #(.-wallMilliseconds %))
+        hosts #js {"node-webassembly"
+                   #js {:role "browser-engine-parity (V8/Wasm in Node)"
+                        :steadyStateNanosecondsPerInvocation node-summary
+                        :samples node-samples}
+                   "chicory-jvm"
+                   #js {:role "kototama.tender R1 (JVM/Chicory)"
+                        :singleInvocationWallMilliseconds (summary chicory-single-ms)
+                        :steadyStateNanosecondsPerInvocation chicory-summary
+                        :samples (.map chicory-steady
+                                       (fn [sample]
+                                         #js {:calls (.-calls sample)
+                                              :warmupCalls (.-warmupCalls sample)
+                                              :elapsedNanoseconds (.-elapsedNanoseconds sample)
+                                              :nanosecondsPerInvocation (.-nanosecondsPerInvocation sample)
+                                              :result (.-result sample)}))}}]
+    (when wasmtime-single
+      (aset hosts "wasmtime-cli"
+            #js {:role "external Wasm engine (process-per-invocation)"
+                 :singleInvocationWallMilliseconds
+                 (summary (.map wasmtime-single #(.-wallMilliseconds %)))
+                 :note "wasmtime run spawns a fresh process each sample; not comparable to in-process steady state"
+                 :samples wasmtime-single}))
+    #js {:fixture wasm-rel
+         :expectedResult expected
+         :importCount (:imports guest)
+         :bytes (.-size (.statSync fs wasm-abs))
+         :hosts hosts
+         :ratios
+         #js {:chicorySteadyVsNodeMedian (/ (.-median chicory-summary) (.-median node-summary))
+              :chicorySingleVsWasmtimeMedian
+              (when wasmtime-single
+                (let [w (summary (.map wasmtime-single #(.-wallMilliseconds %)))]
+                  (/ (.-median (summary chicory-single-ms)) (.-median w))))}}))
+
+(defn run-guest [guest {:keys [kototama-root runs calls warmup steady-script wasmtime?]}]
+  (let [wasm-abs (path/join kototama-root (:rel guest))
+        wasm-rel (:rel guest)
+        expected (:expected guest)
+        guest-id (:id guest)]
+    (.statSync fs wasm-abs)
+    (-> (node-steady-runs wasm-abs expected warmup calls runs)
+        (.then
+         (fn [node-samples]
+           (let [chicory-single #js []
+                 chicory-steady #js []]
+             (dotimes [_ runs]
+               (.push chicory-single (chicory-single-invocation kototama-root wasm-rel expected))
+               (.push chicory-steady
+                      (chicory-steady-sample kototama-root wasm-abs expected warmup calls steady-script)))
+             (let [wasmtime-single
+                   (when wasmtime?
+                     (let [samples #js []]
+                       (dotimes [_ runs]
+                         (.push samples (wasmtime-single-invocation wasm-abs expected)))
+                       samples))]
+               #js {:guest-id guest-id
+                    :report (guest-report guest wasm-abs node-samples chicory-single chicory-steady
+                                          wasmtime-single)})))))))
+
+(defn run-all-guests [opts]
+  (letfn [(step [defs guests]
+            (if (seq defs)
+              (.then (run-guest (first defs) opts)
+                     (fn [result]
+                       (aset guests (aget result "guest-id") (aget result "report"))
+                       (step (rest defs) guests)))
+              (js/Promise.resolve guests)))]
+    (step guest-defs #js {})))
+
+(defn -main []
+  (let [kototama-root (path/resolve (opt "--kototama" (path/join root "orgs/kotoba-lang/kototama")))
+        runs (bounded-integer (opt "--runs" "3") "--runs" 20)
+        calls (bounded-integer (opt "--calls" "400") "--calls" 500)
+        warmup (bounded-integer (opt "--warmup" "50") "--warmup" 450)
+        output-path (opt "--output" nil)
+        steady-script (path/resolve here "tender-chicory-steady.clj")
+        skipped-hosts #js {}
+        wasmtime? (boolean (output "wasmtime" ["--version"]))
+        _ (when-not wasmtime? (aset skipped-hosts "wasmtime-cli" "toolchain not installed"))
+        host-load (or (output "sysctl" ["-n" "vm.loadavg"])
+                      (output "uptime" [])
+                      nil)
+        opts {:kototama-root kototama-root
+              :runs runs
+              :calls calls
+              :warmup warmup
+              :steady-script steady-script
+              :wasmtime? wasmtime?}]
+    (-> (run-all-guests opts)
+        (.then
+         (fn [report-guests]
+           (let [fact (aget report-guests "kotoba-compiled-fact")
+                 fact-node-median (host-metric-median fact "node-webassembly" "steadyStateNanosecondsPerInvocation")
+                 fact-chicory-median (host-metric-median fact "chicory-jvm" "steadyStateNanosecondsPerInvocation")
+                 host-ids (if wasmtime?
+                            #js ["node-webassembly" "chicory-jvm" "wasmtime-cli"]
+                            #js ["node-webassembly" "chicory-jvm"])
+                 report
+                 #js {:format "kotoba.tender-comparison/v1"
+                      :contract
+                      #js {:guests #js ["kotoba-compiled-fact" "kotoba-compiled-peak-cells" "amu-compiled-i64-main"]
+                           :hosts host-ids
+                           :runs runs
+                           :calls calls
+                           :warmupCalls warmup
+                           :timing
+                           #js {:nodeWebassembly "in-process WebAssembly.instantiate; reused instance; main() loop after warmup (≤500 invocations/instance for amu fuel budget)"
+                                :chicoryJvmSingle "subprocess clojure -M:cli run (includes JVM cold start + Chicory instantiate per sample)"
+                                :chicoryJvmSteady "single JVM; tender/open-session reused; main() loop after warmup"
+                                :wasmtimeCli "subprocess wasmtime run --invoke main per sample"}
+                           :safety "host-free guests only (zero imports); fuel metering active on Chicory path"}
+                      :environment
+                      #js {:capturedAt (.toISOString (js/Date.))
+                           :platform js/process.platform
+                           :architecture js/process.arch
+                           :cpu (or (.-model (aget (os/cpus) 0)) nil)
+                           :logicalCpus (.-length (os/cpus))
+                           :totalMemoryBytes (os/totalmem)
+                           :node js/process.version
+                           :loadavg host-load
+                           :clojure (output "clojure" ["-Sdescribe"] kototama-root)
+                           :wasmtime (output "wasmtime" ["--version"])
+                           :kototamaRoot kototama-root
+                           :kototamaCommit (output "git" ["-C" kototama-root "rev-parse" "HEAD"])}
+                      :skippedHosts skipped-hosts
+                      :guests report-guests
+                      :headline
+                      #js {:guest "kotoba-compiled-fact"
+                           :nodeWebassemblyNanosecondsPerInvocationMedian fact-node-median
+                           :chicoryJvmSteadyNanosecondsPerInvocationMedian fact-chicory-median
+                           :chicorySlowdownVsNodeSteady (/ fact-chicory-median fact-node-median)
+                           :chicoryJvmSingleInvocationWallMsMedian
+                           (host-metric-median fact "chicory-jvm" "singleInvocationWallMilliseconds")}}
+                 encoded (str (js/JSON.stringify report nil 2) "\n")]
+             (when output-path
+               (fs/writeFileSync (path/resolve output-path) encoded))
+             (js/process.stdout.write encoded))))
+        (.catch
+         (fn [e]
+           (binding [*out* js/process.stderr]
+             (println (or (.-message e) e)))
+           (js/process.exit 1))))))
+
+(-main)

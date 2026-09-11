@@ -1,7 +1,7 @@
 ;; lei-candidates.edn — acquisition work list for the cloud-itonami-lei catalog.
 ;;
 ;; Adding a company is adding ONE map to this vector. Nothing else in the
-;; pipeline needs to change: scripts/lei-acquire.cljs verifies every entry
+;; pipeline needs to change: scripts/lei-acquire.cljk verifies every entry
 ;; against GLEIF, so a wrong name or a wrong country here fails loudly as a
 ;; lookup miss rather than entering the catalog unverified.
 ;;
@@ -120,7 +120,7 @@
 
 
 
- ;; ── discovery で追加（scripts/lei-discover-candidates.cljs）──
+ ;; ── discovery で追加（scripts/lei-discover-candidates.cljk）──
  ;; Wikidata で売上順に選び、GLEIF で LEI と登記名を裏取り済み。
  ;; :site は付けていない — lei-acquire が公式サイトを検証して埋める。
  {:name "شركة ابوظبي لطاقة المستقبل - ش م خ - مصدر" :country "AE" :lei "213800BBECR1I9FTPZ70" :site "http://www.masdar.ae/"}

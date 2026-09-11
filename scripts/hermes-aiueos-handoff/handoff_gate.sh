@@ -7,7 +7,7 @@ set -u
 REPO="${HANDOFF_REPO:-kotoba-lang/aiueos}"
 BRANCH="${HANDOFF_BRANCH:-codex/pure-native-k16}"
 ADR_ID="adr-2609031030-aiueos-k16-pure-kotoba-physical-tcp-handoff"
-N=$(nbb --classpath ".:scripts/nbb_compat" scripts/verify-west-pins.cljs --dir "$(pwd)" >/dev/null 2>&1 && echo OK || echo FAIL)
+N=$(nbb --classpath ".:scripts/nbb_compat" scripts/verify-west-pins.cljk --dir "$(pwd)" >/dev/null 2>&1 && echo OK || echo FAIL)
 
 ghq() { gh "$@" 2>/dev/null; }
 

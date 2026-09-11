@@ -39,7 +39,7 @@ ledger 半分だけを無効化したあとも生きている）。
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin
-nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory-tick.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory-tick.cljk
 ```
 
 `:outcome :insufficient-scan` が出たら **何もせず終わる**。sparse checkout から
@@ -132,7 +132,7 @@ git diff --stat
 git diff -U0 | head -80
 
 # (c) 同じ finding が先頭から消える（残件数は減らなくてよい。別 kind が残る）
-COM_JUNKAWASAKI_ROOT="$PWD" nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory.cljs
+COM_JUNKAWASAKI_ROOT="$PWD" nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory.cljk
 ```
 
 (c) で **同じ path の同じ kind がまだ先頭**なら、直っていない。着地させない。

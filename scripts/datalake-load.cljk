@@ -1,0 +1,170 @@
+#!/usr/bin/env nbb
+;; datalake-load.cljs — spec + JSON → Parquet → Iceberg。`datalake-sync.py` の
+;; nbb 版。**Python をこの面から外すためのもの。**
+;;
+;;   nbb --classpath "<deps>" scripts/datalake-load.cljk \
+;;     --spec <spec.json> --in-dir <dir> [--dry-run] [--out-dir <dir>]
+;;
+;; ## なぜ移すのか
+;;
+;; `datalake-sync.py` の docstring が 2026-08-29 に自分で測って書いている ——
+;; Iceberg の commit に要る 4 つ（Parquet writer / metadata.json / REST catalog /
+;; Avro manifest）は**全部 portable な `.cljc` に在る**ので、
+;; 「この script を nbb へ移せない技術的理由はもう無い。移植は未着手である」。
+;;
+;; これはその未着手を閉じる。使う部品は全部この workspace のもの:
+;;
+;;   parquet.write/columns-of-rows + of-columns   データ file（snappy 圧縮）
+;;   iceberg.table/append                          manifest / manifest-list / metadata
+;;   iceberg.rest/{load-table,commit,create-table} catalog への commit
+;;   kotobase.storage.s3/{signed-client,...}       object の PUT
+;;
+;; ## `.kotoba` ではない理由（今日の実測）
+;;
+;; capability kit を今日数え直すと 14 種で、**fs / process / exec は無い**
+;; （在るのは can-frame / clock / datagram / dataspace / http / http-ingress /
+;; link-frame / llm / log / state / storage / stream-ingress / stream-object / ui）。
+;; script host `kbb` も west に 0 件。**loader は入力を local file から読むので、
+;; fs が無い言語では書けない。**
+;;
+;; ただし `storage-v1` と `http-v1` は実装済み（reference / wasm-aot / jit）なので、
+;; **byte を組み立てて object を置き catalog に commit する部分は `.kotoba` に載りうる。**
+;; 載らないのは「local の JSON を読む」入口だけで、それは CLAUDE.md の
+;; app / host 分割でいう host の機構である。移すならその線で切る。
+;;
+;; ## 測れなかったことを clean と書かない
+;;
+;;   0  dry-run が通った / commit した
+;;   1  変換か commit が失敗した
+;;   2  REFUSED — spec が無い / 表が 1 つも読めない / 行が 0 / 型が引けない
+;;
+;; **空の表を Iceberg に commit しない。** 0 行の表は「データが無い」ではなく
+;; たいてい「export が走っていない」で、その 2 つを同じ緑にすると、
+;; 空を実測として公開することになる。
+
+(ns datalake-load
+  (:require [clojure.string :as str]
+            ["node:fs" :as fs]
+            ["node:path" :as path]
+            [parquet.write :as pq]
+            [iceberg.schema :as ice-schema]
+            [iceberg.table :as ice-table]))
+
+(def argv (vec (drop 2 (js->clj (.-argv js/process)))))
+(defn- opt [f d] (let [i (.indexOf argv f)] (if (neg? i) d (nth argv (inc i) d))))
+(defn- flag? [f] (>= (.indexOf argv f) 0))
+
+(def spec-path (opt "--spec" nil))
+(def in-dir    (opt "--in-dir" "/tmp"))
+(def out-dir   (opt "--out-dir" nil))
+(def dry-run?  (flag? "--dry-run"))
+(def location  (opt "--location" "s3://warehouse"))
+
+(defn- refuse! [msg]
+  (println (str "REFUSED\t" msg))
+  (println "Refusing to report a load: the conversion did not run.")
+  (.exit js/process 2))
+
+(defn- read-json [p]
+  (js->clj (js/JSON.parse (str (fs/readFileSync p "utf8")))))
+
+;; ── 型 ─────────────────────────────────────────────────────────────────────
+;;
+;; spec が `int_columns` を名指しし、残りは値から引く。**引けない列は refuse する**
+;; —— 既定で string に落とすと、数値の列が文字列として静かに Iceberg に入り、
+;; そこから先の集計が全部おかしくなる（しかもエラーはどこにも出ない）。
+
+(defn- column-type [col-name rows int-cols]
+  (let [vals (keep #(get % col-name) rows)
+        v (first vals)]
+    (cond
+      (contains? int-cols col-name) :int64
+      (number? v) (if (integer? v) :int64 :double)
+      (boolean? v) :string          ; Iceberg boolean は別途。今は文字列として保つ
+      (string? v) :string
+      (nil? v) :string              ; 全 nil の列は string の空列として通す
+      :else (refuse! (str "cannot infer a parquet type for column " (pr-str col-name)
+                          " (sample " (pr-str v) ")")))))
+
+(defn- normalize [v t]
+  (cond
+    (nil? v) nil
+    (= t :int64) (if (number? v) v (js/parseInt (str v) 10))
+    (= t :double) (if (number? v) v (js/parseFloat (str v)))
+    (boolean? v) (if v "true" "false")
+    :else (str v)))
+
+(defn- table->parquet [{:strs [file table int_columns]}]
+  (let [p (path/join in-dir file)]
+    (when-not (fs/existsSync p) (refuse! (str "table file missing: " p)))
+    (let [rows (read-json p)
+          _ (when-not (vector? rows) (refuse! (str p " is not a JSON array")))
+          _ (when (zero? (count rows))
+              (refuse! (str table " has 0 rows -- an empty table is almost always"
+                            " an export that did not run, not a table with no data")))
+          int-cols (set (or int_columns []))
+          col-names (vec (distinct (mapcat keys rows)))
+          named-types (mapv (fn [n] [n (column-type n rows int-cols)]) col-names)
+          rows' (mapv (fn [r] (into {} (map (fn [[n t]] [n (normalize (get r n) t)]) named-types))) rows)
+          cols (pq/columns-of-rows named-types rows')
+          bytes (pq/of-columns cols :snappy)]
+      {:table table :rows (count rows) :columns named-types
+       :bytes bytes :size (count bytes)
+       :path (str location "/" table "/data/" table "-0.parquet")})))
+
+(defn- iceberg-fields [named-types]
+  (ice-schema/schema
+   (vec (map-indexed (fn [i [n t]]
+                       (ice-schema/field (inc i) n
+                                         (case t :int64 :long :double :double :string)))
+                     named-types))))
+
+(defn -main []
+  (when-not spec-path (refuse! "--spec is required"))
+  (when-not (fs/existsSync spec-path) (refuse! (str "spec not found: " spec-path)))
+  (let [spec (read-json spec-path)
+        tables (get spec "tables")
+        ns- (get spec "namespace")]
+    (when-not (seq tables) (refuse! (str "spec declares no tables: " spec-path)))
+    (println (str "SPEC\t" (count tables) "\ttables\tnamespace=" ns-))
+    (let [built (mapv table->parquet tables)]
+      (doseq [{:keys [table rows size columns]} built]
+        (println (str "PARQUET\t" table "\t" rows " rows\t" size " bytes\t"
+                      (count columns) " cols")))
+      (let [appends
+            (mapv (fn [{:keys [table rows bytes size path columns]}]
+                    (let [loc (str location "/" table)
+                          out (ice-table/append
+                               {:location loc
+                                :schema (iceberg-fields columns)
+                                :data-files [{:file-path path
+                                              :record-count rows
+                                              :file-size-bytes size}]})]
+                      {:table table :location loc :parquet-bytes bytes
+                       :parquet-path path :append out}))
+                  built)]
+        (doseq [{:keys [table append]} appends]
+          (println (str "ICEBERG\t" table "\tsnapshot=" (:snapshot-id append)
+                        "\tfiles=" (count (:files append))
+                        "\tmetadata=" (count (:metadata-json append)) " bytes")))
+        (when out-dir
+          (fs/mkdirSync out-dir #js {:recursive true})
+          (doseq [{:keys [table parquet-bytes append]} appends]
+            (fs/writeFileSync (path/join out-dir (str table ".parquet"))
+                              (js/Uint8Array.from (clj->js parquet-bytes)))
+            (fs/writeFileSync (path/join out-dir (str table ".metadata.json"))
+                              (:metadata-json append))
+            (doseq [[p b] (:files append)]
+              (fs/writeFileSync (path/join out-dir (str table "-" (path/basename p)))
+                                (js/Uint8Array.from (clj->js b)))))
+          (println (str "WROTE\t" out-dir)))
+        (if dry-run?
+          (do (println "DRY-RUN\tnothing was uploaded or committed")
+              (.exit js/process 0))
+          (do (println (str "REFUSED\tlive commit is not wired in this build:"
+                            " object PUT and iceberg.rest/commit need credentials"
+                            " and have not been exercised. Use --dry-run, or run"
+                            " datalake-sync.py until this path is verified."))
+              (.exit js/process 2)))))))
+
+(-main)

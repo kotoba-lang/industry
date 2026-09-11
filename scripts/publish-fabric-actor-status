@@ -7,7 +7,7 @@
 # 2026-08-10 以降この job は 1 行も走らずに終わっていた
 # （/tmp/fabric-actor-cadence.err、NullPointerException）。nbb は deps.edn を
 # 読まないので、この障害クラスごと消える。実体は
-# scripts/publish_fabric_actor_status.cljs。
+# scripts/publish_fabric_actor_status.cljk。
 #
 # cacao 鋳造は aozora bots と同じ cljs 実装（org-chainagnostic-cacao/src の
 # cacao.core + authority + org-ietf-ed25519 + org-ietf-cbor）を使う。
@@ -15,4 +15,4 @@ set -euo pipefail
 ROOT=/Users/junkawasaki/github/com-junkawasaki
 export FABRIC_ROOT="$ROOT"
 CLASSPATH="$ROOT/scripts:$ROOT/orgs/kotoba-lang/org-chainagnostic-cacao/src:$ROOT/orgs/kotoba-lang/authority/src:$ROOT/orgs/kotoba-lang/org-ietf-ed25519/src:$ROOT/orgs/kotoba-lang/org-ietf-cbor/src"
-exec /opt/homebrew/bin/nbb --classpath "$CLASSPATH" "$ROOT/scripts/publish_fabric_actor_status.cljs"
+exec /opt/homebrew/bin/nbb --classpath "$CLASSPATH" "$ROOT/scripts/publish_fabric_actor_status.cljk"

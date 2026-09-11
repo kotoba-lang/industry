@@ -42,8 +42,8 @@ Seeds live in the login Keychain as `aozora.app/actor-seed/<name>.aozora.app`
 ```bash
 R=$PWD K=$PWD/orgs/kotoba-lang
 CP="$R/scripts/hermes-bots-aozora:$K/org-chainagnostic-cacao/src:$K/authority/src:$K/org-ietf-ed25519/src:$K/org-ietf-cbor/src"
-nbb --classpath "$CP" scripts/hermes-bots-aozora/register.cljs   # once / idempotent
-nbb --classpath "$CP" scripts/hermes-bots-aozora/pulse.cljs      # what the cron job runs
+nbb --classpath "$CP" scripts/hermes-bots-aozora/register.cljk   # once / idempotent
+nbb --classpath "$CP" scripts/hermes-bots-aozora/pulse.cljk      # what the cron job runs
 ```
 
 Install the daily pulse as a Hermes no-agent job (the script *is* the job —

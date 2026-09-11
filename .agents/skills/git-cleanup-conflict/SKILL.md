@@ -75,9 +75,9 @@ showing 0% CPU is **not** a hang.
 When the question is "which child repos still have work that hasn't landed?", run:
 
 ```bash
-nbb scripts/cleanup.cljs --unlanded      # only repos with un-landed work
-nbb scripts/cleanup.cljs                 # full survey (also lists quiet repos)
-nbb scripts/cleanup.cljs --subrepos      # superproject only (fast)
+nbb scripts/cleanup.cljk --unlanded      # only repos with un-landed work
+nbb scripts/cleanup.cljk                 # full survey (also lists quiet repos)
+nbb scripts/cleanup.cljk --subrepos      # superproject only (fast)
 ```
 
 It reports, per child repo, a **landing ladder** — left is more dangerous because git
@@ -116,15 +116,15 @@ Un-landed ≠ deployed. Even after a merge, check whether the change actually re
 production — cloud-itonami's live Pages Function had been serving a build that predated
 the merged source. `git log` says nothing about that; probe the live surface.
 
-## Landing it — `scripts/cleanup-land.cljs`
+## Landing it — `scripts/cleanup-land.cljk`
 
 Survey is read-only; this is the write side.
 
 ```bash
-nbb scripts/cleanup-land.cljs                      # dry-run plan (default)
-nbb scripts/cleanup-land.cljs --apply              # execute
-nbb scripts/cleanup-land.cljs --apply --names a,b  # limit to named repos
-nbb scripts/cleanup-land.cljs --apply --max 20     # cap; the rest is reported, not hidden
+nbb scripts/cleanup-land.cljk                      # dry-run plan (default)
+nbb scripts/cleanup-land.cljk --apply              # execute
+nbb scripts/cleanup-land.cljk --apply --names a,b  # limit to named repos
+nbb scripts/cleanup-land.cljk --apply --max 20     # cap; the rest is reported, not hidden
 ```
 
 **Never merge all UNLANDED work as one class.** Split by *whether it can break `main`*,
@@ -197,7 +197,7 @@ Check for the existing repo *before* creating one, or you mint duplicates.
 - Do not force-push shared branches. Do not rebase to resolve staleness — branch fresh
   from `origin/main` and replay/cherry-pick the needed commits instead.
 - `manifest/west.yml` is generated. Resolve `manifest/repos.edn` + generator + child
-  repo checkouts first, then regenerate (`nbb scripts/gen-west-manifest.cljs --check`) —
+  repo checkouts first, then regenerate (`nbb scripts/gen-west-manifest.cljk --check`) —
   never hand-edit conflict markers in it.
 - If `git stash pop` fails because local changes would be overwritten, that's a safe
   stop: leave the stash intact, inspect both the current diff and the stash patch
@@ -208,7 +208,7 @@ Check for the existing repo *before* creating one, or you mint duplicates.
   ADR-2607211600).
 - **Push to GitHub alone is not done.** A repo that other west projects consume via
   `:local/root` (or that belongs under `orgs/<org>/<repo>`) must also land in
-  `manifest/repos.edn` `:extra-projects` + `nbb scripts/gen-west-manifest.cljs --entry
+  `manifest/repos.edn` `:extra-projects` + `nbb scripts/gen-west-manifest.cljk --entry
   <name>` (see skill `new-project-scaffold`). Incomplete = GH-only orphan.
 
 ## West orphan inventory (mandatory on cleanup / registration-gap reports)
@@ -219,9 +219,9 @@ via `{:local/root "../../kotoba-lang/crm"}`, but **crm was never added to west**
 is often **missing from the local tree**. Fresh checkout / CI cannot resolve the dep.
 
 ```bash
-nbb scripts/west-orphan-audit.cljs              # summary + true-orphan-git sample
-nbb scripts/west-orphan-audit.cljs --blocking   # only :local/root broken edges
-nbb scripts/west-orphan-audit.cljs --all        # full lists
+nbb scripts/west-orphan-audit.cljk              # summary + true-orphan-git sample
+nbb scripts/west-orphan-audit.cljk --blocking   # only :local/root broken edges
+nbb scripts/west-orphan-audit.cljk --all        # full lists
 ```
 
 **Classify before you register or delete** (do not treat every unregistered dir as a
@@ -246,14 +246,14 @@ When the goal is not only to *detect* orphans but to **align** the three planes,
 use the dedicated workflow (ADR-2607173200):
 
 ```bash
-nbb scripts/west-triple-sync.cljs plan --scope blocking   # dry-run
-nbb scripts/west-triple-sync.cljs apply --scope blocking  # clone/register/ff/pin
-nbb scripts/west-triple-sync.cljs apply --names crm
-nbb scripts/west-triple-sync.cljs verify --scope blocking
+nbb scripts/west-triple-sync.cljk plan --scope blocking   # dry-run
+nbb scripts/west-triple-sync.cljk apply --scope blocking  # clone/register/ff/pin
+nbb scripts/west-triple-sync.cljk apply --names crm
+nbb scripts/west-triple-sync.cljk verify --scope blocking
 ```
 
 - SSoT: `manifest/west-triple-sync-workflow.edn` (+ readable `.md`)
-- Orchestrator: `scripts/west-triple-sync.cljs` (plan default; `--apply` via `apply` cmd)
+- Orchestrator: `scripts/west-triple-sync.cljk` (plan default; `--apply` via `apply` cmd)
 - Does **not** mass-clone all west projects; scopes are `blocking` | `managed` | `names`
 - Still defers dep *retarget* (old `-clj` paths) to a report — does not rewrite deps.edn
 
@@ -263,9 +263,9 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
    `git worktree list --porcelain`, `git branch --show-current`,
    `git stash list`, `git status --short --branch`,
    `gh pr list --state open --json number,title,headRefName,baseRefName,url,mergeable,statusCheckRollup`,
-   **`nbb scripts/cleanup.cljs --unlanded`** (child-repo landing ladder — untracked /
+   **`nbb scripts/cleanup.cljk --unlanded`** (child-repo landing ladder — untracked /
    unpushed / no-PR; see the UNLANDED section above),
-   **`nbb scripts/west-orphan-audit.cljs`** (and `--blocking` if any dep failure is
+   **`nbb scripts/west-orphan-audit.cljk`** (and `--blocking` if any dep failure is
    in scope).
 2. Classify each stash/branch per `:retirement :classify` in the edn (landed /
    landed-reworded / superseded / unlanded). Classify west orphans per the table above
@@ -274,17 +274,17 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
    before touching anything — see the non-negotiable rule above.
 4. Landed/superseded → drop/delete. Unlanded → rescue to a pushed branch (never back
    into a stash) in a sparse worktree outside the superproject, per `:retirement
-   :rescue`. Rootの作成入口は `nbb scripts/root-worktree.cljs create <task>
+   :rescue`. Rootの作成入口は `nbb scripts/root-worktree.cljk create <task>
    --include <path>`（ADR-2608291248）で、stale local mainとfull checkoutを避ける。
-   At fleet scale use **`nbb scripts/cleanup-land.cljs --apply`** instead of
+   At fleet scale use **`nbb scripts/cleanup-land.cljk --apply`** instead of
    doing this by hand — it archives, then lands `:additive` and opens PRs for
    `:review`/`:branches` without merging them (see the section above).
 5. Resolve any real merge conflicts by file class (`:resolve-conflicts` in the edn),
    regenerating `manifest/west.yml` rather than editing markers.
 6. For blocking orphans: finish registration (`new-project-scaffold` / `--entry`) or
    retarget deps — do not leave GH-only + `:local/root` consumers.
-7. Verify: conflict-marker search, `nbb scripts/gen-west-manifest.cljs --check`,
-   `nbb scripts/west-orphan-audit.cljs --blocking`, and any domain-specific script
+7. Verify: conflict-marker search, `nbb scripts/gen-west-manifest.cljk --check`,
+   `nbb scripts/west-orphan-audit.cljk --blocking`, and any domain-specific script
    touched by the change.
 8. Create/merge PRs when mergeable; report external CI failures (billing/spending
    limits) as external to the code.

@@ -33,7 +33,7 @@ seed が repo に無い、bb 退役の巻き添えで deps.edn に依存が宣�
 west 移行前のモノレポのパスが残っている、そもそも TypeScript でランナーが無い。
 **どれも実行して初めて分かった。** 静的検査で分かるものは 1 件も無かった。
 
-だから gate（`scripts/fleet-ci/gates/observatory-registry-check.cljs`）が検査
+だから gate（`scripts/fleet-ci/gates/observatory-registry-check.cljk`）が検査
 できるのは「登録簿が現実と整合しているか」までで、**実際に動くかは走らせないと
 分からない**。その境界を曖昧にしないこと —— **gate が green でも actor が動く
 証拠にはならない。**
@@ -45,7 +45,7 @@ west 移行前のモノレポのパスが残っている、そもそも TypeScri
 ```bash
 cd <superproject>
 git fetch origin && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --check
+nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --check
 ```
 
 `--check` は走らせずに「west.yml に登録が在るか / checkout が在るか」だけ見る。
@@ -153,7 +153,7 @@ actor には 2 種類ある:
 ### 5. 台帳を再生成する
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk
 ```
 
 **書き込みは常にマージで、実際に走った actor の行だけが差し替わる**（2026-08-08
@@ -172,7 +172,7 @@ checkout の無い環境で回すと 22 行の実測が `:absent` に化けて�
 
 ```bash
 nbb --classpath "90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src" \
-  90-docs/system-dynamics/observatory-cadence.cljs
+  90-docs/system-dynamics/observatory-cadence.cljk
 ```
 
 - **λ の 12/13 は宣言した prior であって測定値ではない。** `:change-rate-basis` を
@@ -190,7 +190,7 @@ nbb --classpath "90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-ope
 ### 6. gate を通す
 
 ```bash
-nbb scripts/fleet-ci/gates/observatory-registry-check.cljs .
+nbb scripts/fleet-ci/gates/observatory-registry-check.cljk .
 ```
 
 `OK` になること。落ちたら**登録簿を直す** —— gate を緩めない。
@@ -219,8 +219,8 @@ PR を作り、mergeable を確認して merge する。
 - **2 件以上まとめない。**
 - **`:unmeasured` を空にしただけで「全部見た」と書かない。** 22 件は 4,148
   project から手で拾った候補であって、網羅の証明ではない（`:inventory-note`）。
-  新しい候補は `nbb scripts/repo-search.cljs 観測 observatory ingest 収集` と
-  `nbb scripts/concept-lookup.cljs observatory` を引いてから足す
+  新しい候補は `nbb scripts/repo-search.cljk 観測 observatory ingest 収集` と
+  `nbb scripts/concept-lookup.cljk observatory` を引いてから足す
 - **`:live-alias` を持つ actor を勝手に live で走らせない。** kouhou と
   kawaraban は実 fetch / 実 publish の経路を別 alias に分けてある。無人の毎時
   run に外向きの副作用を混ぜない（`--live <name>` は人が明示した時だけ）

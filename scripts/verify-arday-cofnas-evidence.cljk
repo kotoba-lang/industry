@@ -1,0 +1,171 @@
+#!/usr/bin/env nbb
+;; 90-docs/knowledge/arday-cofnas-affair.datoms.edn が引いている逐語 evidence を、
+;; 一次資料へ取りに行って部分文字列一致で確かめる。manifest は
+;; 90-docs/knowledge/arday-cofnas-evidence.edn。
+;;
+;;   nbb scripts/verify-arday-cofnas-evidence.cljk
+;;
+;; exit 0  全 check が期待どおり
+;; exit 1  期待と違う check がある（原文が変わったか、こちらの記述が誤っている）
+;; exit 2  **答えられなかった** — 取得に失敗した source がある
+;;
+;; **2 を 0 と混ぜないこと。** 取りに行けなかった検証と、取りに行って問題が無かった
+;; 検証が同じ値を返すなら、ネットワークが切れているだけで緑になる（CLAUDE.md
+;; 「検査を書く前・緑を信じる前の 6 問」の 2 問目）。
+;;
+;; **これは fleet-ci gate ではない。意図的にそうしている。**
+;; (1) 実行のたびに報道サイトへ外向き HTTPS を出す。ノードの egress は一様ではなく
+;;     （CLAUDE.md の実測どおり）、落ちたときに「検査が失敗した」のか「そのノードが
+;;     外に出られない」のかが CI の赤からは読めない。
+;; (2) 原文が正当に更新されても DRIFT で赤くなる。恒久的に赤い gate は、一度も緑に
+;;     ならない gate と同じく誰も行動しないので無内容になる。
+;; 手で、あるいはこのカタログを更新するときに走らせる検証器として置いている。
+;;
+;; この検証器は :expect :absent の check を持つ。検索エンジンの要約が主張したが
+;; 一次資料に無かった文言で、**見つからないことを確かめる**行である。すべてが
+;; :present の manifest は、常に真になる assertion しか持たない。
+
+(require '[promesa.core :as p]
+         '[clojure.string :as str]
+         '[clojure.edn :as edn]
+         '["node:process" :as proc]
+         '["node:crypto" :as crypto]
+         '["node:fs" :as fs])
+
+(def manifest-path "90-docs/knowledge/arday-cofnas-evidence.edn")
+
+(defn strip-tags
+  "HTML からテキストを起こす。script/style/noscript は中身ごと落とす —— 残すと
+   JS の文字列リテラルが本文として照合対象に入り、偽の OK を出しうる。"
+  [html]
+  (-> html
+      (str/replace #"(?is)<(script|style|noscript)[^>]*>.*?</\1>" " ")
+      (str/replace #"(?s)<[^>]+>" " ")
+      (str/replace #"&nbsp;|&#160;" " ")
+      (str/replace #"&amp;" "&")
+      (str/replace #"&quot;" "\"")
+      (str/replace #"&#39;|&apos;" "'")
+      (str/replace #"&lsquo;|&rsquo;|&#8216;|&#8217;" "'")
+      (str/replace #"&ldquo;|&rdquo;|&#8220;|&#8221;" "\"")
+      (str/replace #"&mdash;|&#8212;" "—")
+      (str/replace #"\s+" " ")
+      str/trim))
+
+(defn fold-quotes
+  "曲がった引用符・ダッシュを直線形に畳む。原稿側と配信側でどちらを使うかが
+   揺れるので、その揺れを検証失敗にしない。"
+  [s]
+  (-> s
+      (str/replace #"[‘’ʼ]" "'")
+      (str/replace #"[“”]" "\"")
+      (str/replace #"[–—]" "-")))
+
+(defn sha256 [s]
+  (-> (.createHash crypto "sha256") (.update s "utf8") (.digest "hex")))
+
+(def user-agent "Mozilla/5.0 (hyakka-knowledge-ingest; +https://wiki.kotobase.net)")
+
+(defn fetch-text [url]
+  (-> (p/let [res (js/fetch url (clj->js {:redirect "follow"
+                                          :headers {"User-Agent" user-agent}}))
+              body (.text res)]
+        (if (.-ok res)
+          {:ok true :text (strip-tags body)}
+          {:ok false :why (str "HTTP " (.-status res))}))
+      (p/catch (fn [e] {:ok false :why (str "fetch failed: " (.-message e))}))))
+
+(def repin? (some #(= "--repin" %) (js->clj (.-argv proc))))
+
+(defn -main []
+  (when-not (.existsSync fs manifest-path)
+    (println "UNVERIFIED\tmanifest not found:" manifest-path)
+    (proc/exit 2))
+  (let [m (edn/read-string (.readFileSync fs manifest-path "utf8"))
+        sources (:manifest/sources m)
+        checks (:manifest/checks m)]
+    ;; evidence floor —— manifest が空でも「違反 0 件 = 合格」にしない。
+    (when (or (empty? sources) (empty? checks))
+      (println "UNVERIFIED\tmanifest has" (count sources) "sources and" (count checks)
+               "checks — refusing to report a pass on an empty manifest")
+      (proc/exit 2))
+    ;; :absent が 1 件も無い manifest は、常に真になる assertion しか持たない。
+    (when (zero? (count (filter #(= :absent (:check/expect %)) checks)))
+      (println "UNVERIFIED\tno :expect :absent check present — this manifest cannot"
+               "discriminate in both directions")
+      (proc/exit 2))
+    (p/let [fetched (p/all (map (fn [s]
+                                  (p/let [r (fetch-text (:source/url s))]
+                                    [(:source/id s) (assoc r :spec s)]))
+                                sources))]
+      (let [by-id (into {} fetched)
+            failed-fetch (remove #(:ok (val %)) by-id)
+            ;; drift は doseq の中から積むので atom で持つ。`def` にすると実行時に
+            ;; トップレベル var を作り、同一プロセスで 2 度呼ぶと前回の値が残る。
+            drifted (atom [])]
+        (doseq [[id r] by-id]
+          (if (:ok r)
+            (let [t (:text r)
+                  spec (:spec r)
+                  h (sha256 t)
+                  pinned (:source/sha256 spec)
+                  drift (and pinned
+                             (not (:source/volatile spec))
+                             (not (str/starts-with? h pinned)))]
+              (println (str "SOURCE\t" id "\tchars=" (count t) "\tsha256=" (subs h 0 16)
+                            (cond
+                              (:source/volatile spec) "\tvolatile (hash not pinned)"
+                              drift (do (swap! drifted conj id)
+                                        (str "\tDRIFT from pinned " pinned))
+                              pinned "\tmatches pin"
+                              :else ""))))
+            (println (str "SOURCE\t" id "\tUNREACHABLE\t" (:why r)))))
+        (when (seq failed-fetch)
+          (println)
+          (println (str "UNVERIFIED\t" (count failed-fetch) " of " (count sources)
+                        " sources unreachable — refusing to report a pass."))
+          (println "\tRefusing is the point: a run that could not read the sources"
+                   "must not look like a run that read them and found no problem.")
+          (proc/exit 2))
+        (when repin?
+          (println)
+          (println "REPIN\tpaste these into :manifest/sources (volatile sources take no pin):")
+          (doseq [[id r] by-id :when (:ok r)]
+            (println (str "\t" id "\t:source/captured-chars " (count (:text r))
+                          "\t:source/sha256 \"" (subs (sha256 (:text r)) 0 16) "\"")))
+          (proc/exit 0))
+        (when (seq @drifted)
+          (println)
+          (println (str "FAIL\t" (count @drifted) " source(s) drifted from their pinned"
+                        " sha256: " (str/join ", " @drifted)))
+          (println "\tThe pinned text is what the catalog was written against. If the"
+                   "source legitimately changed, re-read it, update the affected")
+          (println "\tentities, then re-pin with --repin. Do not re-pin first.")
+          (proc/exit 1))
+        (println)
+        (let [results
+              (doall
+               (for [c checks
+                     :let [src (get by-id (:check/source c))
+                           hay (fold-quotes (:text src))
+                           needle (fold-quotes (:check/verbatim c))
+                           found (str/includes? hay needle)
+                           want (= :present (:check/expect c))
+                           ok (= found want)]]
+                 (do (println (str (if ok "OK  " "FAIL") "\t"
+                                   (:check/source c) "\t"
+                                   (name (:check/expect c)) "\t"
+                                   (:check/id c) "\t"
+                                   (subs (:check/verbatim c) 0
+                                         (min 60 (count (:check/verbatim c))))))
+                     ok)))
+              bad (count (remove true? results))
+              present (count (filter #(= :present (:check/expect %)) checks))
+              absent (count (filter #(= :absent (:check/expect %)) checks))]
+          (println)
+          (println (str "SCANNED\t" (count checks) " checks (" present " present / "
+                        absent " absent) across " (count sources) " sources"))
+          (if (zero? bad)
+            (do (println "PASS\tevery check matched its expectation") (proc/exit 0))
+            (do (println (str "FAIL\t" bad " check(s) did not match")) (proc/exit 1))))))))
+
+(-main)

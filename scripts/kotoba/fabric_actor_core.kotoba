@@ -16,7 +16,7 @@
 ;; を **それぞれ独立に書いていた**。同じ判断の 2 実装が別々に直る状態で、
 ;; CLAUDE.md が名指しする mirror そのものだった（「同じ判断を 2 実装が
 ;; 別々に持ち片方だけ直る状態にしない」）。参照実装を
-;; `scripts/gftd/fabric_actor_core.cljc` に 1 本化し、その算術と文字列の
+;; `scripts/gftd/fabric_actor_core.cljk` に 1 本化し、その算術と文字列の
 ;; **正本をここに置く**。両者の完全一致は fleet gate
 ;; `root-fabric-actor-core` が毎回見る。食い違ったら **この kernel が
 ;; 正しく、cljc 側を直す**（`manifest/org-id.kotoba` と同じ分担）。

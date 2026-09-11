@@ -23,7 +23,7 @@ git log** から読む。
 ## この反復の仕事はちょうど 1 つ
 
 ```bash
-nbb scripts/isekai-game-dev-tick.cljs     # 最終行に EDN で候補が出る
+nbb scripts/isekai-game-dev-tick.cljk     # 最終行に EDN で候補が出る
 ```
 
 - `:outcome :candidate :kind :registration-gap` — `:candidate` の 1 ゲームの
@@ -136,15 +136,15 @@ origin/main から切り直して載せ直す。
 
 ```bash
 cd "$COM_JUNKAWASAKI_ROOT"    # superproject root から
-nbb scripts/west-pin-put.cljs network-isekai <merged-sha>
-nbb scripts/verify-west-pins.cljs
+nbb scripts/west-pin-put.cljk network-isekai <merged-sha>
+nbb scripts/verify-west-pins.cljk
 ```
 
 worktree と branch を消すまでが完了条件。
 
 着地したら 1 行で報告する: どのゲームの / 何を / どの増分だけ進めたか /
 証拠（merge commit SHA）。**成否は次周の tick が測る** — 自分で「登録漏れは
-消えた」と書かず、`nbb scripts/isekai-game-dev-tick.cljs` をもう一度回して
+消えた」と書かず、`nbb scripts/isekai-game-dev-tick.cljk` をもう一度回して
 その候補が消えたことを**見る**。消えていなければ直っていない。
 
 ## 絶対にやらないこと

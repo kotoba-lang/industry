@@ -1045,7 +1045,7 @@
      :must-fail ["tree-object-has-catalog-row" "coverage-count-matches-rows"]}
 
     {:id :tsukuru/allowlist-narrowed-under-the-catalog
-     :why "scripts/verify-artifact-path-policy.cljs checks the TREE against the allowlist; nothing checked the CATALOG, which is what downstream reads. Narrowing the shape leaves both rows outside policy"
+     :why "scripts/verify-artifact-path-policy.cljk checks the TREE against the allowlist; nothing checked the CATALOG, which is what downstream reads. Narrowing the shape leaves both rows outside policy"
      :file "index/policy.edn"
      :find ":regex \"^raw/cae/"
      :replace ":regex \"^raw/cae-disabled/"
@@ -2331,7 +2331,7 @@
     {:id :m365-ingest/quickstart-names-a-script-that-does-not-exist
      :why "**『踏めない手順は書かない』の番人。** 存在しない script を指す quickstart は、読んだ人が実行して初めて壊れていることが分かる —— 文書としては最後までもっともらしく読めるので、レビューでも落ちない"
      :file "docs/operator-quickstart.md"
-     :find "nbb scripts/maturity-loop/run.cljs --only m365-ingest"
+     :find "nbb scripts/maturity-loop/run.cljk --only m365-ingest"
      :replace "nbb scripts/maturity-loop/runner.cljs --only m365-ingest"
      :must-fail ["every-script-the-quickstart-names-either-exists-or-is-declared-external"]}
 
@@ -3525,7 +3525,7 @@
      :must-fail ["gitattributes-raw-largefiles-policy"]}
 
     {:id :media-corpus/backend-downgrade
-     :why "custody 検証（scripts/annex-custody-verify.cljs）は content hash に依存する。backend を MD5E に戻すと新規 add の pointer から SHA256 が消え、off-machine コピーの実在証明が黙って弱くなる —— この dataset は実際に MD5E から上げた経緯がある（.gitattributes の注記）"
+     :why "custody 検証（scripts/annex-custody-verify.cljk）は content hash に依存する。backend を MD5E に戻すと新規 add の pointer から SHA256 が消え、off-machine コピーの実在証明が黙って弱くなる —— この dataset は実際に MD5E から上げた経緯がある（.gitattributes の注記）"
      :file ".gitattributes"
      :find "* annex.backend=SHA256E"
      :replace "* annex.backend=MD5E"
@@ -7271,7 +7271,7 @@
    ;; （README がそれを既知の欠陥 4 として記録していた）、
    ;; `cljs/test/wvme/app_test.cljs` は default-db を default-db と比べている。
    ;; 後者の docstring は「wrangler.jsonc に対して
-   ;; scripts/verify-appview-page-summary.cljs が検査する不変条件」と書くが、
+   ;; scripts/verify-appview-page-summary.cljk が検査する不変条件」と書くが、
    ;; **その script は superproject に在ってこの repo には無い**。
    ;;
    ;; DID・nanoid・公開ルート 2 本・8 つの XRPC メソッド・var 名は 7 ファイルに

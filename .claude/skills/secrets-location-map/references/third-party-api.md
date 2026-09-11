@@ -26,14 +26,14 @@ HTTP 200 を返すので、認証が通ったことは口座の同定になら�
   実測 2026-08-17、`.network` ドメインは 1 つも登録できない。Telnyx へ報告済み
   （Request ID `a64cc757-97a9-9dee-8e1a-8411379cf93d`）。修正されたら口座メールを
   `j@awai.network` へ移し、この受信箱への依存を切る。
-- 取得スクリプト: `scripts/telnyx-agent-signup.cljs`（Agent Inbox の未文書 API 形と、
+- 取得スクリプト: `scripts/telnyx-agent-signup.cljk`（Agent Inbox の未文書 API 形と、
   受理された proof-of-work 構成 `sha256(challenge + ":" + nonce)` を記録してある）。
 
 #### この受信箱の読み方（web UI は無い。API 専用・読み取り専用）
 
 ```bash
-nbb scripts/telnyx-agent-signup.cljs inbox-list
-nbb scripts/telnyx-agent-signup.cljs inbox-read '<message-id>'   # 角括弧ごと渡す
+nbb scripts/telnyx-agent-signup.cljk inbox-list
+nbb scripts/telnyx-agent-signup.cljk inbox-read '<message-id>'   # 角括弧ごと渡す
 ```
 
 素で叩くなら 2 本だけ（実測 2026-08-17、これ以外は 404）:
@@ -170,7 +170,7 @@ Application ID 不要だが、gBizINFO は違う（実測 2026-08-19）。
 | kagi（compartment `personal`） | item `GBIZ_TOKEN` |
 
 **環境変数名が 2 つある。** `GBIZINFO_TOKEN`（property の collector 2 本）と
-`GBIZ_TOKEN`（`scripts/mk1-jp-lead-enrich.cljs`）。`collect_gbizinfo_zenken.cljs` は
+`GBIZ_TOKEN`（`scripts/mk1-jp-lead-enrich.cljk`）。`collect_gbizinfo_zenken.cljs` は
 両方＋Keychain を見る。新しいものを書くときは Keychain 経由にして、env は override
 としてだけ使う。
 

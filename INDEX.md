@@ -11,18 +11,18 @@
 ### Core Deployment Files (9 total)
 
 #### Infrastructure & Orchestration Scripts (3)
-1. **deploy/month-1-staging-deployment.cljs** (16 KB)
+1. **deploy/month-1-staging-deployment.cljk** (16 KB)
    - Main provisioning and control orchestration
    - Commands: `provision`, `status`, `canary-start`, `canary-pause`, `rollback`
    - Ready to execute
 
-2. **deploy/parity-checker-service.cljs** (14 KB)
+2. **deploy/parity-checker-service.cljk** (14 KB)
    - Parity validation service (long-running)
    - Compares Rust vs cljc responses (byte-exact, status, semantics)
    - Exports metrics to `metrics/parity-validation.log`
    - Ready to execute
 
-3. **deploy/rollback-automation.cljs** (13 KB)
+3. **deploy/rollback-automation.cljk** (13 KB)
    - Autonomous rollback enforcement
    - 4 automatic triggers (no approval needed)
    - Commands: `monitor`, `status`, `reset`
@@ -109,24 +109,24 @@ cat DEPLOYMENT-STATUS.md
 
 ### 3. Provision infrastructure
 ```bash
-nbb deploy/month-1-staging-deployment.cljs provision
+nbb deploy/month-1-staging-deployment.cljk provision
 ```
 
 ### 4. Enable canary traffic
 ```bash
-nbb deploy/month-1-staging-deployment.cljs canary-start
+nbb deploy/month-1-staging-deployment.cljk canary-start
 ```
 
 ### 5. Start monitoring services
 ```bash
 # Terminal 1: Parity checker
-nbb deploy/parity-checker-service.cljs \
+nbb deploy/parity-checker-service.cljk \
   --rust-pool-url http://localhost:8000 \
   --staging-pool-url http://localhost:8001 \
   --output metrics/parity-validation.log
 
 # Terminal 2: Rollback automation
-nbb deploy/rollback-automation.cljs monitor
+nbb deploy/rollback-automation.cljk monitor
 ```
 
 ### 6. View live dashboard
@@ -264,10 +264,10 @@ FINAL-DELIVERY-REPORT.txt
 
 ## Next Steps (Week 1)
 
-1. Execute provisioning: `nbb deploy/month-1-staging-deployment.cljs provision`
-2. Enable canary: `nbb deploy/month-1-staging-deployment.cljs canary-start`
-3. Start parity checker: `nbb deploy/parity-checker-service.cljs ...`
-4. Start rollback monitor: `nbb deploy/rollback-automation.cljs monitor`
+1. Execute provisioning: `nbb deploy/month-1-staging-deployment.cljk provision`
+2. Enable canary: `nbb deploy/month-1-staging-deployment.cljk canary-start`
+3. Start parity checker: `nbb deploy/parity-checker-service.cljk ...`
+4. Start rollback monitor: `nbb deploy/rollback-automation.cljk monitor`
 5. Open SLO dashboard: `http://localhost:3000/d/strangler-fig-month1`
 6. Monitor metrics daily
 7. Week 2 checkpoint: baseline locked, ready for Phase 2 approval

@@ -28,7 +28,7 @@ npx wrangler deploy            # tasuke-first-response.<account>.workers.dev
 
 ### ⚠ workers.dev だけで出すと、発端の gap は閉じない
 
-`scripts/gen-surface-index.cljs` を読んで実測した 2 点:
+`scripts/gen-surface-index.cljk` を読んで実測した 2 点:
 
 1. **索引が walk するのは `orgs/<org>/<repo>` だけ。** root の `60-apps/` は
    走査対象外なので、この設定は **tasuke へ移送するまで索引に載らない**。
@@ -45,7 +45,7 @@ deploy して host が決まったら:
 
 ```bash
 # wrangler.jsonc に routes を足してから
-nbb scripts/gen-surface-index.cljs      # superproject root で
+nbb scripts/gen-surface-index.cljk      # superproject root で
 ```
 
 ⚠ 本番 deploy の前に `git merge --ff-only origin/main` を通すこと。deploy には
