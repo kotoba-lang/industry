@@ -4377,7 +4377,7 @@
 
 
   {:id       :verify-no-clojure-cli
-   :title    "clojure -M / clj -M / bb <task> / nbb <script> / shadow-cljs back on a pinned tree after the kbb cutover"
+   :title    "Clojure-CLI / babashka / nbb / shadow-cljs invocations back on a pinned tree after the kbb cutover"
    :why      "adr-2609112000 rewrote every Clojure-CLI, babashka, nbb and shadow-cljs invocation
               in the workspace (ADR bodies included) to kbb / amu on 2026-09-11. The rename the
               day before regressed in two repositories within hours because branches cut before
@@ -4401,6 +4401,12 @@
               the post-cutover pins must report 0 (the number is recorded in the ADR, not here).
               --self adds the superproject's own tracked tree at HEAD. Reads one git grep -F and
               one git cat-file --batch per project; ~0.25 s/project measured, so the whole west
-              is minutes, hence the 6 h interval and 30 min timeout."}
+              is minutes, hence the 6 h interval and 30 min timeout.
+              Full west, post-cutover (2026-09-11 after pins fa2c3bc4): SCANNED 4,859 / FINDINGS 5
+              projects, 26 files / ABSENT 10. Four of the five were branches that landed AFTER the
+              cutover (amu ADR 0348 iterations, kotoba-lang, kototama-native, control-plane) -- the
+              regression class this detector exists for; re-run and re-pinned the same hour. The
+              fifth was this very entry's :title carrying the needle it hunts (self-reference;
+              reworded). Both directions have now been seen on the real tree."}
 
 ]}
