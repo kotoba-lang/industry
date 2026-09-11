@@ -1,0 +1,153 @@
+#!/usr/bin/env nbb
+;; verify_bot_allowances.cljs — does every bot that may SPEND actually exist?
+;;
+;;   nbb scripts/verify_bot_allowances.cljk           ; report
+;;   nbb scripts/verify_bot_allowances.cljk --check   ; exit 1 on a finding
+;;
+;; ## Why a spending registry needs a checker
+;;
+;; `manifest/bot-allowances.edn` is the only thing standing between a bot and
+;; a credits balance: an id listed there may pay, one that is not may not
+;; (`pay.x402-buyer` refuses a nil policy). A file with that job drifts in two
+;; directions and neither announces itself:
+;;
+;;   an id nothing answers to  — dead policy. It looks like coverage.
+;;   a real bot not listed     — silently cannot pay, and the failure surfaces
+;;                               much later as a bot that "stopped working".
+;;
+;; ## What this can and cannot ask
+;;
+;; A launchd id is a file on this host; a skill is a directory in the tree.
+;; Both are answerable. A Hermes job lives in Hermes's own SQLite and is NOT
+;; answerable from the tree, so it is reported UNVERIFIED — not ok. An
+;; anchor that could not be checked must not return what a checked one
+;; returns, which is the whole of root ADR-2608136000.
+;;
+;; Exit codes: 0 clean, 1 findings, 2 REFUSED (the registry itself could not be
+;; read — neither 0 nor 1, because nothing was measured).
+
+(ns verify-bot-allowances
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            ["fs" :as fs]
+            ["os" :as os]
+            ["path" :as path]))
+
+(def default-registry-file "manifest/bot-allowances.edn")
+(def skills-dir ".claude/skills")
+
+(defn- launch-agents-dir [] (path/join (os/homedir) "Library" "LaunchAgents"))
+
+(defn- exists? [p] (try (fs/existsSync p) (catch :default _ false)))
+
+(defn anchors
+  "Every anchor a bot entry declares, as [kind value]. An entry with none is a
+  finding of its own: a name with nothing behind it."
+  [entry]
+  (keep (fn [k] (when-let [v (get entry k)] [(keyword (name k)) v]))
+        [:runs-as/launchd :runs-as/skill :runs-as/hermes]))
+
+(defn check-anchor
+  "-> {:status :ok|:missing|:unverified :detail s}
+
+  A MISSING anchor and an anchor whose whole INDEX is absent are different
+  answers. Measured while writing this: run from a sparse worktree that does
+  not carry `.claude/skills`, the first version reported three real skills as
+  MISSING — the skills exist, the tree being asked did not carry them. A check
+  that cannot see its input must say so rather than fail the thing it could not
+  look at, which is the other direction of root ADR-2608136000 and the easier
+  one to get wrong, because a false MISSING looks like diligence."
+  [[kind value]]
+  (case kind
+    :launchd (let [dir (launch-agents-dir)
+                   f (path/join dir (str value ".plist"))]
+               (cond
+                 (not (exists? dir))
+                 {:status :unverified
+                  :detail (str "no " dir " on this host — launchd anchors are"
+                               " answerable only where launchd runs")}
+                 (exists? f) {:status :ok :detail f}
+                 :else {:status :missing :detail (str "no plist at " f)}))
+    :skill (let [d (path/join skills-dir value)]
+             (cond
+               (not (exists? skills-dir))
+               {:status :unverified
+                :detail (str "this tree carries no " skills-dir
+                             " (sparse checkout?) — run from the superproject root")}
+               (exists? d) {:status :ok :detail d}
+               :else {:status :missing :detail (str "no skill dir at " d)}))
+    :hermes {:status :unverified
+             :detail (str "Hermes job " (pr-str value)
+                          " — jobs live in Hermes's own SQLite, not in this tree")}
+    {:status :missing :detail (str "unknown anchor kind " (pr-str kind))}))
+
+(defn verdict
+  "One bot's verdict. `:ok` needs at least ONE anchor that answered yes; a bot
+  whose every anchor was unverifiable is `:unverified`, never `:ok`."
+  [[bot-id entry]]
+  (let [as (vec (anchors entry))
+        results (mapv (fn [a] (assoc (check-anchor a) :anchor a)) as)]
+    (cond
+      (empty? as) {:bot bot-id :status :no-anchor
+                   :detail "declares no :runs-as/* — nothing to check the name against"}
+      (some #(= :ok (:status %)) results) {:bot bot-id :status :ok :results results}
+      (some #(= :unverified (:status %)) results) {:bot bot-id :status :unverified
+                                                   :results results}
+      :else {:bot bot-id :status :missing :results results})))
+
+(defn caps-verdict
+  "A bot with no cap can spend without limit. That is a finding whether or not
+  the name resolves."
+  [[bot-id entry]]
+  (when-not (and (number? (:credits/per-call entry))
+                 (number? (:credits/per-day entry)))
+    {:bot bot-id :status :no-cap
+     :detail "needs both :credits/per-call and :credits/per-day"}))
+
+(defn -main [& argv]
+  (let [check? (some #{"--check"} argv)
+        ;; `--registry <path>` exists so this can be exercised against a
+        ;; deliberately broken registry without editing the real one. A
+        ;; checker whose only test is "run it on production data" can only
+        ;; ever show one direction.
+        registry-file (or (second (drop-while #(not= "--registry" %) argv))
+                          default-registry-file)
+        raw (try (fs/readFileSync registry-file "utf8") (catch :default _ nil))
+        reg (when raw (try (edn/read-string raw) (catch :default _ ::unreadable)))]
+    (cond
+      (nil? raw)
+      (do (println "REFUSED: cannot read" registry-file
+                   "— a registry that did not load must not report a clean fleet")
+          (js/process.exit 2))
+
+      (= ::unreadable reg)
+      (do (println "REFUSED:" registry-file "does not parse as EDN")
+          (js/process.exit 2))
+
+      :else
+      (let [bots (:allowance/bots reg)
+            vs (mapv verdict bots)
+            caps (vec (keep caps-verdict bots))
+            by (group-by :status vs)]
+        (println (str "SCANNED\t" (count bots)))
+        (doseq [v (sort-by :bot vs)]
+          (println (str (.padEnd (str/upper-case (name (:status v))) 12) " "
+                        (:bot v)
+                        (if-let [d (:detail v)] (str "  — " d) ""))))
+        (doseq [c caps] (println (str "NO-CAP       " (:bot c) "  — " (:detail c))))
+        (when (seq (:unverified by))
+          (println (str "\n" (count (:unverified by))
+                        " UNVERIFIED — an anchor this tree cannot ask about."
+                        " Not the same as ok.")))
+        (println (str "\nok=" (count (:ok by))
+                      " unverified=" (count (:unverified by))
+                      " missing=" (count (:missing by))
+                      " no-anchor=" (count (:no-anchor by))
+                      " no-cap=" (count caps)))
+        (when (zero? (count bots))
+          (println "REFUSED: the registry lists no bots at all")
+          (js/process.exit 2))
+        (when (and check? (or (seq (:missing by)) (seq (:no-anchor by)) (seq caps)))
+          (js/process.exit 1))))))
+
+(apply -main *command-line-args*)

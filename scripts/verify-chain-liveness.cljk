@@ -1,0 +1,375 @@
+#!/usr/bin/env nbb
+;; verify-chain-liveness.cljs — ask each deployed chain in
+;; `manifest/chain-deployments.edn` whether it is still MOVING, and, for a
+;; witness set, whether its witnesses are still on ONE chain.
+;;
+;; usage:
+;;   nbb scripts/verify-chain-liveness.cljk [--findings] [--root <dir>]
+;;                                          [--gap-ms N] [--fork-window N]
+;;   nbb scripts/verify-chain-liveness.cljk --self-test
+;;
+;; ## Why this exists (measured 2026-09-10)
+;;
+;; `torihiki-validator-v3` had been halted for 26 days and nothing in this
+;; workspace was in a position to say so. Its repo bot measures five floors —
+;; checkout, pinned, landed, readme, test-signal — and every one of them was
+;; green, because every one of them is a question about a git tree. The chain
+;; is not in the tree.
+;;
+;; ## Why two samples and not one
+;;
+;; A halted chain answers `/head` cheerfully. Every field is present, every
+;; witness replies, `last-error` is `null`, and `equivocators` is empty. The
+;; single-sample signals that look diagnostic are not:
+;;
+;;   - `blocked-by "no certificate for the tip"` is ALSO what a healthy replica
+;;     says in the ordinary gap between a proposal and its quorum.
+;;   - `votes-for-tip 2` of 3 is ALSO what a healthy replica says while the
+;;     third vote is in flight.
+;;
+;; What separates them is time, so this takes two samples and compares them.
+;; The discriminator is exactly the one the 26-day halt showed:
+;;
+;;     the view advances and the committed height does not.
+;;
+;; A pacemaker that keeps timing out is doing work; a chain that keeps
+;; committing is making progress; only the second is liveness. Reporting them
+;; apart also separates a halted chain from a dead one — `frozen` (neither
+;; advances) is a different call to a different person than `halted`.
+;;
+;; ## Why the fork probe starts at min(committed) + 1
+;;
+;; A split is invisible above the last common checkpoint and invisible below
+;; the last common commit. Between them is exactly one bounded window, and its
+;; floor is the lowest height any witness still calls committed. The 2-2 split
+;; measured on 2026-09-10 sat at 5616 with min(committed) = 5614, so a window
+;; of a few heights found it; the window is a parameter because a longer
+;; divergence needs a longer look, not because 8 is a fact about anything.
+;;
+;; ## What this does NOT claim
+;;
+;; A clean run means the chain advanced between two samples taken seconds
+;; apart, and that the witnesses agreed on the block CIDs in one window. It is
+;; not a safety proof, it does not verify signatures or certificates, and it
+;; cannot see a fork that has already been buried under a common checkpoint.
+;; `--self-test` states the same limit from the other side: it exercises the
+;; judgement, not the network.
+
+(ns verify-chain-liveness
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            [promesa.core :as p]
+            ["node:fs" :as fs]
+            ["node:path" :as path]))
+
+(def argv (vec *command-line-args*))
+(def flags (set argv))
+(def findings? (contains? flags "--findings"))
+(def self-test? (contains? flags "--self-test"))
+
+(defn- arg [name default]
+  (if-let [i (first (keep-indexed #(when (= %2 name) %1) argv))]
+    (or (get argv (inc i)) default)
+    default))
+
+(def root (arg "--root" "."))
+(def gap-ms (js/parseInt (arg "--gap-ms" "20000") 10))
+(def fork-window (js/parseInt (arg "--fork-window" "8") 10))
+(def http-timeout-ms (js/parseInt (arg "--http-timeout-ms" "15000") 10))
+
+;; The registry travels with THIS script, not with the orgs-bearing checkout —
+;; a detector run from a worktree must read the deployments that worktree
+;; declares, or it silently measures the wrong generation of the chain.
+(def registry (arg "--registry" (path/join root "manifest" "chain-deployments.edn")))
+
+(defn- emit! [sev k detail]
+  (when findings? (println (str "FINDING\t" sev "\t" k "\t" detail))))
+
+;; ----------------------------------------------------------------- judgement
+;;
+;; Everything below `assess` is pure so that `--self-test` can exercise it
+;; against samples that no live chain has to be persuaded to produce. A
+;; boolean self-check could not tell one regression from a broken build, so
+;; the self-test compares COUNTS and the finding keys themselves.
+
+(defn- num [x] (when (number? x) x))
+
+(defn answered
+  "The witnesses that replied to BOTH samples with this deployment's own
+   chain-id. A reply from another chain is not this deployment answering."
+  [dep s1 s2]
+  (vec (for [w (:witnesses dep)
+             :let [a (get s1 w) b (get s2 w)]
+             :when (and (map? a) (map? b)
+                        (= (:chain-id a) (:chain-id dep))
+                        (= (:chain-id b) (:chain-id dep)))]
+         w)))
+
+(defn first-fork
+  "The lowest height in `blocks` where two witnesses report different block
+   CIDs, or nil. `blocks` is {height {witness cid-or-nil}}. A witness that has
+   no block at a height is not evidence of disagreement — it is behind."
+  [blocks]
+  (first (for [h (sort (keys blocks))
+               :let [cids (distinct (remove nil? (vals (get blocks h))))]
+               :when (> (count cids) 1)]
+           {:height h :cids (vec (sort cids))
+            :by (into (sorted-map) (get blocks h))})))
+
+(defn assess
+  "The whole judgement, over two samples and one block window.
+
+   Returns {:scanned n :findings [{:sev :key :detail}]}. `:scanned` counts the
+   witnesses that actually answered, so a run that reached nobody reports 0 and
+   the caller refuses rather than printing a clean result."
+  [dep s1 s2 blocks]
+  (let [id (name (:id dep))
+        ws (:witnesses dep)
+        ok (answered dep s1 s2)
+        missing (remove (set ok) ws)
+        fs* (atom [])]
+    (doseq [w missing]
+      (swap! fs* conj {:sev "warn" :key (str "unreachable:" id ":" w)
+                  :detail (str "witness " w " did not answer both samples as "
+                               (:chain-id dep)
+                               " — not measured, which is not the same as fine")}))
+    (if (empty? ok)
+      {:scanned 0
+       :findings (conj @fs*
+                       {:sev "high" :key (str "unmeasured:" id)
+                        :detail (str "no witness of " id " answered; liveness is unknown, not ok")})}
+      (let [adv (fn [f] (->> ok
+                             (keep (fn [w] (let [a (num (f (get s1 w)))
+                                                 b (num (f (get s2 w)))]
+                                             (when (and a b) (- b a)))))
+                             (reduce max 0)))
+            ;; A sequencer and a witness set do not answer the same question,
+            ;; and asking one the other's question is how a detector reports a
+            ;; healthy thing as broken. Measured 2026-09-10: the first live run
+            ;; of this script called `torihiki-node` FROZEN. It was not. Its
+            ;; `/head` has no `committed` and no `view` — it has `height` — so
+            ;; both deltas came out of a `nil` and landed on the same value a
+            ;; genuinely dead witness set produces.
+            ;;
+            ;; And even with the right field the question is wrong: a single
+            ;; writer with nothing to write is IDLE, which is the normal state
+            ;; of a devnet nobody is trading on. A sequencer has exactly one
+            ;; failure this sampling can see, and it is the opposite one —
+            ;; the height going BACKWARDS, which is a log that lost its tail.
+            consensus? (= :consensus (:kind dep))
+            pkey (if consensus? :committed :height)
+            d-progress (adv pkey)
+            d-view (adv :view)
+            regressed (vec (for [w ok
+                                 :let [a (num (pkey (get s1 w)))
+                                       b (num (pkey (get s2 w)))]
+                                 :when (and a b (< b a))]
+                             [w a b]))
+            heights (into (sorted-map) (for [w ok] [w (num (pkey (get s2 w)))]))
+            unreadable (vec (for [w ok :when (nil? (num (pkey (get s2 w))))] w))
+            votes (into (sorted-map) (for [w ok] [w (num (get-in (get s2 w) [:why-not-proposing :votes-for-tip]))]))
+            blocked (into (sorted-map) (for [w ok :let [b (get-in (get s2 w) [:why-not-proposing :blocked-by])] :when b] [w b]))]
+
+        ;; A field this detector cannot read is not a height of zero. Say so
+        ;; instead of folding it into a verdict.
+        (when (seq unreadable)
+          (swap! fs* conj {:sev "warn" :key (str "no-progress-field:" id)
+                           :detail (str "witness(es) " (pr-str unreadable) " answered but carry no `"
+                                        (name pkey) "` — progress is UNMEASURED for them, not zero. "
+                                        "Either the deployment changed its `/head` or this registry entry names the wrong :kind")}))
+
+        (when (seq regressed)
+          (swap! fs* conj {:sev "high" :key (str "regressed:" id)
+                           :detail (str (name pkey) " went BACKWARDS between two samples "
+                                        gap-ms " ms apart — " (pr-str regressed)
+                                        " (witness, before, after). A log does not shorten on its own")}))
+
+        ;; Only a witness set can be halted: it is halted when it is still
+        ;; doing work (the view advances) and still not deciding anything.
+        (when (and consensus? (empty? unreadable) (<= d-progress 0))
+          (if (pos? d-view)
+            (swap! fs* conj {:sev "high" :key (str "halted:" id)
+                             :detail (str "the view advanced by " d-view
+                                          " and no witness committed a block, over "
+                                          gap-ms " ms. committed=" (pr-str heights)
+                                          (when (seq votes) (str " votes-for-tip=" (pr-str votes)
+                                                                 " quorum=" (:quorum dep)))
+                                          (when (seq blocked) (str " blocked-by=" (pr-str blocked))))})
+            (swap! fs* conj {:sev "high" :key (str "frozen:" id)
+                             :detail (str "neither the view nor the committed height advanced over "
+                                          gap-ms " ms — this is not a stuck quorum, it is a set that is not running. committed="
+                                          (pr-str heights))})))
+
+        (when-let [f (first-fork blocks)]
+          (swap! fs* conj {:sev "high" :key (str "fork:" id "@" (:height f))
+                           :detail (str "witnesses report " (count (:cids f))
+                                        " different blocks at height " (:height f)
+                                        " — " (pr-str (:by f))
+                                        ". quorum is " (:quorum dep) " of " (count ws))}))
+        {:scanned (count ok) :findings @fs*}))))
+;; ---------------------------------------------------------------------- http
+
+(defn- fetch-json [url]
+  (-> (js/fetch url #js {:signal (js/AbortSignal.timeout http-timeout-ms)})
+      (.then (fn [r] (if (.-ok r) (.text r) nil)))
+      (.then (fn [t] (when (and t (str/starts-with? (str/trim t) "{"))
+                       (try (js->clj (js/JSON.parse t) :keywordize-keys true)
+                            (catch :default _ nil)))))
+      (.catch (fn [_] nil))))
+
+(defn- head-url [dep w]
+  (str (:base dep) "/head"
+       (when-let [pname (:witness-param dep)] (str "?" pname "=" w))))
+
+(defn- block-url [dep w h]
+  (str (:base dep) "/block?height=" h
+       (when-let [pname (:witness-param dep)] (str "&" pname "=" w))))
+
+(defn- sample [dep]
+  (p/let [rs (p/all (for [w (:witnesses dep)] (fetch-json (head-url dep w))))]
+    (zipmap (:witnesses dep) rs)))
+
+(defn- block-window [dep s]
+  (let [committed (keep (fn [[_ h]] (num (:committed h))) s)]
+    (if (or (empty? committed) (= :sequencer (:kind dep)))
+      (p/resolved {})
+      (let [h0 (inc (apply min committed))
+            hs (range h0 (+ h0 fork-window))]
+        (p/let [rows (p/all (for [h hs w (:witnesses dep)]
+                              (p/let [b (fetch-json (block-url dep w h))]
+                                [h w (:cid b)])))]
+          (reduce (fn [m [h w cid]] (assoc-in m [h w] cid)) (sorted-map) rows))))))
+
+(defn- check [dep]
+  (p/let [s1 (sample dep)
+          _  (p/delay gap-ms)
+          s2 (sample dep)
+          blocks (block-window dep s2)]
+    (assess dep s1 s2 blocks)))
+
+;; ----------------------------------------------------------------- self-test
+;;
+;; Both directions, and the boundary. The boundary that matters here is the
+;; comparison `committed advanced?`: an advance of exactly ONE block is the
+;; smallest healthy chain there is, and a detector whose comparison slipped to
+;; `>` would call it halted. CLAUDE.md records that inverting a comparison can
+;; leave a self-check green when nothing sits on the line.
+
+(def ^:private halted-a
+  {"w1" {:chain-id "c" :committed 5614 :view 1496198 :why-not-proposing {:votes-for-tip 2 :blocked-by "no certificate for the tip"}}
+   "w2" {:chain-id "c" :committed 5633 :view 1496198 :why-not-proposing {:votes-for-tip 2 :blocked-by "no certificate for the tip"}}})
+
+(def ^:private halted-b
+  {"w1" {:chain-id "c" :committed 5614 :view 1496323 :why-not-proposing {:votes-for-tip 2 :blocked-by "no certificate for the tip"}}
+   "w2" {:chain-id "c" :committed 5633 :view 1496323 :why-not-proposing {:votes-for-tip 2 :blocked-by "no certificate for the tip"}}})
+
+(def ^:private dep2 {:id :d :kind :consensus :chain-id "c" :witnesses ["w1" "w2"] :quorum 2})
+(def ^:private dep-seq {:id :s :kind :sequencer :chain-id "c" :witnesses ["_"] :quorum 1})
+
+(defn- keys-of [r] (set (map :key (:findings r))))
+
+(defn- cases []
+  [["halted: view moves, height does not"
+    (assess dep2 halted-a halted-b {})
+    #{"halted:d"} 2]
+
+   ["fork: two CIDs at one height"
+    (assess dep2 halted-a halted-b {5616 {"w1" "cidA" "w2" "cidB"}})
+    #{"halted:d" "fork:d@5616"} 2]
+
+   ["a witness that is merely behind is not a fork"
+    (assess dep2 halted-a halted-b {5616 {"w1" "cidA" "w2" nil}})
+    #{"halted:d"} 2]
+
+   ["healthy: both advance"
+    (assess dep2 halted-a
+            {"w1" {:chain-id "c" :committed 5620 :view 1496323}
+             "w2" {:chain-id "c" :committed 5640 :view 1496323}}
+            {})
+    #{} 2]
+
+   ["BOUNDARY: an advance of exactly one block is healthy"
+    (assess dep2
+            {"w1" {:chain-id "c" :committed 10 :view 10}
+             "w2" {:chain-id "c" :committed 10 :view 10}}
+            {"w1" {:chain-id "c" :committed 11 :view 11}
+             "w2" {:chain-id "c" :committed 10 :view 11}}
+            {})
+    #{} 2]
+
+   ["frozen: nothing advances at all"
+    (assess dep2 halted-a halted-a {})
+    #{"frozen:d"} 2]
+
+   ["unreachable witness is reported and not counted as scanned"
+    (assess dep2 (assoc halted-a "w2" nil) (assoc halted-b "w2" nil) {})
+    #{"halted:d" "unreachable:d:w2"} 1]
+
+   ["SEQUENCER: idle is not halted — one writer with nothing to write"
+    (assess dep-seq
+            {"_" {:chain-id "c" :height 62}}
+            {"_" {:chain-id "c" :height 62}}
+            {})
+    #{} 1]
+
+   ["SEQUENCER: a height that goes backwards is a log that lost its tail"
+    (assess dep-seq
+            {"_" {:chain-id "c" :height 62}}
+            {"_" {:chain-id "c" :height 40}}
+            {})
+    #{"regressed:s"} 1]
+
+   ["a missing progress field is UNMEASURED, never a verdict"
+    (assess dep2
+            {"w1" {:chain-id "c" :view 1} "w2" {:chain-id "c" :view 1}}
+            {"w1" {:chain-id "c" :view 9} "w2" {:chain-id "c" :view 9}}
+            {})
+    #{"no-progress-field:d"} 2]
+
+   ["a reply from another chain is not this deployment answering"
+    (assess dep2
+            {"w1" {:chain-id "other" :committed 1 :view 1}
+             "w2" {:chain-id "other" :committed 1 :view 1}}
+            {"w1" {:chain-id "other" :committed 9 :view 9}
+             "w2" {:chain-id "other" :committed 9 :view 9}}
+            {})
+    #{"unmeasured:d" "unreachable:d:w1" "unreachable:d:w2"} 0]])
+
+(defn- run-self-test! []
+  (let [bad (atom [])]
+    (doseq [[label r want-keys want-scanned] (cases)]
+      (when (not= (keys-of r) want-keys)
+        (swap! bad conj (str label ": keys " (pr-str (sort (keys-of r)))
+                        " wanted " (pr-str (sort want-keys)))))
+      (when (not= (:scanned r) want-scanned)
+        (swap! bad conj (str label ": scanned " (:scanned r) " wanted " want-scanned))))
+    (let [bad @bad]
+      (doseq [b bad] (println (str "SELF-TEST\tfail\t" b)))
+      ;; A count, not a boolean: one regression and a broken build must not
+      ;; print the same thing.
+      (println (str "SELF-TEST\t" (- (count (cases)) (count bad)) "/" (count (cases)) " cases"))
+      (js/process.exit (if (seq bad) 1 0)))))
+
+;; --------------------------------------------------------------------- main
+
+(defn- main []
+  (let [f registry]
+    (if-not (fs/existsSync f)
+      (do (println (str "REFUSED\tno " f " — cannot report a pass for questions it was never given"))
+          (js/process.exit 2))
+      (let [deps (:deployments (edn/read-string (fs/readFileSync f "utf8")))]
+        (if (empty? deps)
+          (do (println "REFUSED\tthe registry is empty; a detector with no targets is not a clean detector")
+              (js/process.exit 2))
+          (p/let [rs (p/all (map check deps))]
+            (let [all (mapcat :findings rs)
+                  scanned (reduce + (map :scanned rs))
+                  witnesses (reduce + (map #(count (:witnesses %)) deps))]
+              (doseq [{:keys [sev key detail]} all] (emit! sev key detail))
+              (println (str "SCANNED\t" scanned "\tof " witnesses
+                            " witnesses across " (count deps) " deployment(s)"))
+              (js/process.exit (cond (zero? scanned) 2
+                                     (seq all) 1
+                                     :else 0)))))))))
+
+(if self-test? (run-self-test!) (main))

@@ -2,15 +2,16 @@
   (:adr/doc_type "adr")
   (:adr/id "adr-2609109900-the-slope-the-runtime-and-the-detector")
   (:adr/topic "query-plane-followups")
-  (:adr/title "傾き・runtime・検出器 —— 天井を超えたら chain は 16 本あり、pack で賞金の 94%、広告する上限 256 は届くが 36 秒かかる")
+  (:adr/title "傾き・runtime・検出器 —— 天井を超えたら chain は 16 本あり、pack で賞金の 94%、上限 256 は pack 無しなら 413、102 MB の pack でも 3 round trip")
   (:adr/status "accepted")
   (:adr/date "2026-09-10")
   (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotobase-protocol-ipq"
                 "kotoba-lang/io-ipld" "kotoba-lang/ayatori" "net-kotobase/ipfs"))
-  (:adr/landed (map (:io-ipld "9bf07ce7") (:kotobase-protocol-ipq "08e0021d")
-                    (:net-kotobase-ipfs "23046cad")
-                    (:west-pins (vector "5eb33947" "795fb7b2" "68d3ecd1" "80072736"))))
+  (:adr/landed (map (:io-ipld "9bf07ce7") (:kotobase-protocol-ipq "fc276320")
+                    (:net-kotobase-ipfs "b4244342")
+                    (:west-pins (vector "5eb33947" "795fb7b2" "68d3ecd1" "80072736" "124bf516" "84056707"))
+                    (:loader "scripts/cljk-classpath.cljs")))
   (:adr/related (vector "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
                 "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
                 "adr-2608160100-block-car-pack-object"
@@ -370,9 +371,125 @@ pack 経由でしか実用的に届かない。** per-block 経路で 256 を許
 **どちらを採るかは Q3d の「pack を誰がいつ書くか」と同じ 1 つの決定**なので、
 ここでは選ばない。選ばずに置いておくことの代償は測った: 46 秒。
 
+## Q3f —— whole read は pack の大きさに依らない（4 MiB まで）。ただしその外が pack の住む場所
+
+Q3d の「range read は未測定」を測った。同じ 256 block の形で leaf の payload を変え、
+pack を 51 KB / 314 KB / 1.1 MB / 3.2 MB にして、それぞれ 1 block の matcher（pack の
+最悪: 全部読んで 1 block 使う）と 256 block の全走査を HEAD と GET で:
+
+    pack     selector          p50    io-ms      (HEAD は body 無し = Worker 側の時間)
+    51 KB    matcher GET       206      111
+    3.2 MB   matcher GET       194      122   <- 63 倍の bytes で io は +11 ms
+    3.2 MB   all 256 HEAD      864      124   <- Worker CPU（256 block の hash + CAR encode）≈ 740 ms
+    3.2 MB   all 256 GET      6776      126   <- 残りは client への 3.2 MB download（load 165 の client）
+
+**R2 の 1 read は 39 KB でも 3.2 MB でも約 120 ms** —— 予算内では whole read の代価は
+ゼロに近く、3 round trip（header / index / frame）の range reader はどのサイズでも
+それより遅い。**だから ≤ 4 MiB では range read を作らない**、が Q3f の答え。
+
+⚠ **ただし 4 MiB は traversal が読んでよい量の上限であって、pack の大きさの上限では
+ない**（オーナー指摘 2026-09-11）。compaction は個別に link された block の identity を
+動かさず location だけを束ね直す操作で、data lake の常として pack は 50〜512 MB に
+育つ。その大きさでは whole read は「遅い」ではなく**不可能**（Worker のメモリ 128 MB、
+hash 約 230 µs/KB）。そこで要るのは Parquet の footer と同じ形 ——
+**catalog（datom 面）か tail の index を先に取り、必要 frame を coalesce した 1 range で
+読む** —— で、round trip は pack の大きさに依らず 2。**その regime は未測定**で、
+上の結論は「小さい pack では whole read で足りる」に縮めて読む。
+
+## Q3g —— 2 つ目の上限を実装した。そして rename が main を壊した
+
+`kotobase-protocol-ipq` `fc276320`: `unpacked-limits`（max-blocks 32）、handler は
+`(get ctx :limits limits)` を読み、descriptor は `maxBlocksWithoutPack` を広告する。
+4 tests、両方向（ctx 読みを外すと refusal の test だけが赤）。
+
+⚠ **着地の途中で、別 session（同じ owner identity）が `.cljc/.cljs` を `.cljk` に一括
+rename していた** —— ipq / io-ipld / io-ipld-car / datalog / ayatori。引用する ADR
+`adr-2609111500-cljk-rename-all-clojure-source` は root main に無く、**renamed main は
+repo 自身の runner で `Could not find namespace`**（nbb は `[.cljs .cljc .clj]` を固定で
+探し、JVM も shadow も `.cljk` を見ない）。west pin は全部 rename 前だったので本番は無事。
+
+**オーナー判断 2026-09-11: (b) rename が正。** したがって loader を作った ——
+`scripts/cljk-classpath.cljs`。各 repo の `cljk-origin.edn`（rename が記録した元の
+拡張子）を読み、classpath の entry ごとに **repo の外**（`~/.cache/cljk-mirror/<sha1>/`）に
+元の拡張子で symlink を張り、差し替えた classpath を返す。repo の中には何も書かない
+（rename が拒否した「compatibility mirror の commit」とは別物）。
+実測: renamed ipq main が nbb 20/112、JVM 20/112 で緑。控え: unreadable な
+`cljk-origin.edn` は exit 2 REFUSED、記録の無い entry は素通し。
+⚠ **JVM runner は `-d <mirror>` が要る** —— 無いと `Ran 0 tests, 0 failures`（何も見つけず
+緑）。kondo も同じ形で `0 errors in 7ms`。両方とも踏んでから書いた。
+
+**shadow-cljs は覆えない。** deps.edn から自分で classpath を組み、差し替える hook が
+無い。**renamed な git library に依存する Worker は、今は build できない** ——
+`net-kotobase/ipfs` が ipq `fc276320` を pin した瞬間にそうなる。塞ぐ形は
+「build 前に classpath を解決 → mirror → `:source-paths` を生成した shadow-cljs.edn を
+書く」（io-ipld の `gen-shadow-cljs-edn.cljs` と同じ手）で、**未着手**。
+
+## Q3h —— 102 MB の pack を window で読んだ。round trip は pack の大きさに依らず 3
+
+オーナー指示「rename は正しいので気にせず進めて」の後、3 つを 1 つの Worker 変更で
+着地させた（`net-kotobase/ipfs` `b4244342`、west pin `84056707`、deploy 済み）:
+
+1. **shadow-cljs.edn を生成する**（`gen-shadow-cljs-edn.cljs` + `shadow-cljs.template.edn`）。
+   tools.deps の classpath を root の loader に通し、directory を `:source-paths` に書き、
+   `:deps` を外す。superproject の外では `COM_JUNKAWASAKI_ROOT` 必須で、無ければ exit 2
+   （mirror されていない path で build するより拒否）。**renamed な ipq `fc276320` を pin した
+   最初の Worker build** がこれで通った。
+2. **2 つ目の上限を shell が適用する**: pack が無い root は `ipq/unpacked-limits` の下。
+   本番実測: 256 block の fixture、pack 有り → 200 in 0.64 s（requests 2）、
+   pack を消す → **413 `resource-limit :max-blocks` in 4.5 s**（今朝は 36 s の 200）。
+   profile は `maxBlocksWithoutPack: 32` を広告している。
+3. **pack を window で読む**（`kotobase-ipfs.pack` v2）。最初の read は常に `[0, 4 MiB)` で、
+   R2 が object の全サイズを返すので、収まる pack はそのまま（1 request、Q3d と同じ）、
+   収まらない pack は head window の frame + tail の index（2 request）、以降の miss は
+   index で locate して 1 window 前方読み。**root は同じ wait で並行取得**しているので、
+   head window が root の frame の途中で切れても（41 KB の root は切れる）2 度目の miss が
+   404 にならない —— これは test が捕まえた。frame は**検証せず** cache へ渡す（handler が
+   再 hash する。ここで検証すると壊れた frame が「静かな欠落 → block plane から補填」に
+   化けて、破損が遅い答えの裏に隠れる）。`KOTOBASE_IPQ_PACK_WINDOW` で window を縮めて、
+   3 block の pack で large 経路を test した。
+
+**fixture**: root 1 + leaf 1000（各 100 KB）、**pack 102,609,973 bytes**、index 40,070 bytes。
+root と最初の 31 leaf だけを個別に `ipld/` に置き、同じ 32 block を両経路で測った。
+
+    asked  blocks  fetches  requests  pack        p50(GET)   io-ms
+    ── pack 有り（102 MB、window 読み）──
+        2       2        1         3  hit-large       973      455
+        8       8        1         3  hit-large      2347      284
+       16      16        1         3  hit-large      4075      292
+       32      32        1         3  hit-large      9471      303
+    ── pack を消した（per-block、32 block は ipld/ に在る）──
+        2       2        2         3  miss            836      316
+        8       8        8         9  miss           2921     1298
+       16      16       16        17  miss           7038     3276
+       32      32       32        33  miss          20862    13681
+
+    32 block、HEAD（body 無し = Worker 側）: packed 1.4〜1.9 s   GET: 6.3〜7.0 s
+    → I/O 0.27 s、Worker CPU 約 1.5 s、残りは client への 3.2 MB download
+
+- **round trip は pack の大きさに依らない**: 102 MB でも 3 request、io 約 300 ms。
+  Q3d の 39 KB pack と同じ桁。**4 MiB の head window が root + 約 40 leaf を運ぶ**ので、
+  32 block の traversal は 1 度も後続 miss を出さなかった（fetches 1）。
+- **per-block は 100 KB block で 1 read 約 430 ms**（40 byte block の 142 ms より高い —
+  R2 は request 単位だが bytes も無料ではない）。**io 13.7 s + 非 I/O 約 7 s** —
+  後者は trampoline の restart が **loaded 済み bytes を毎回再 hash する O(n²)**
+  で、小さい block では見えなかった第 2 のコスト。
+- **wall の残り（約 5 s）は 3.2 MB の download**で、pack の話ではない。
+
+**決定 Q3h**: compaction 後の pack に対する reader はこれである。whole read は
+window 読みの「size ≤ window」の特殊ケースとして残り、切り替え点は測って決めるものでは
+なく **object の size が答える**。**測っていない**: 1 window に収まらない traversal
+（後続 miss ごとに +1 request）、index が tail read で済まない 50 万 block 級の pack
+（catalog の領分）、write 側で locality を作る書き手。
+
 ## 測っていないこと（clean ではなく未測定）
 
-- ~~maxBlocks 256 が実際に完走するか~~ —— **完走する。36 秒。上の Q3e。**
+- ~~maxBlocks 256 が実際に完走するか~~ —— 完走する。36 秒。**そして今は 32 で 413**（Q3h）。
+- ~~50 MB 超の pack に対する range read~~ —— **102 MB で測った。3 request**（Q3h）。
+- ~~shadow-cljs で renamed git dep を build する経路~~ —— **生成した**（Q3h）。
+- **後続 miss が出る traversal**（head window に収まらない形）の request 数。
+- **trampoline の O(n²) 再 hash**（100 KB block で約 7 s）。pack 経路では消えるが、
+  per-block 経路の第 2 のコストとして名指しだけ。
+- **pack を誰がいつ書くか。** 依然として決めていない。
 - **range read（index 経由の部分読み）の価格。** whole read で上限を測った。部分読みは
   pack が大きく traversal が小さいときに効く形で、`v2/locate` は在るが reader が無い。
 - **pack を誰がいつ書くか。** 運用も catalog も決めていない。

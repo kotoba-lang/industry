@@ -83,7 +83,7 @@ migration had deleted, unstyled, for three days.
 **Check it — this is no longer prose only.** From the superproject root:
 
 ```bash
-nbb scripts/verify-single-page-app.cljs --root . --findings
+nbb scripts/verify-single-page-app.cljk --root . --findings
 ```
 
 exit 0 clean · 1 findings · **2 refused** (it could not tell a registered checkout
@@ -299,7 +299,7 @@ kotoba-lang の web / local app UI は **1 文書・1 バンドル・1 mount** �
 - **これは prose だけの規則ではなくなった。** superproject root で:
 
   ```bash
-  nbb scripts/verify-single-page-app.cljs --root . --findings   # 0=clean 1=findings 2=REFUSED
+  nbb scripts/verify-single-page-app.cljk --root . --findings   # 0=clean 1=findings 2=REFUSED
   ```
 
   `multi-document`（script を読む document が 2 枚以上）と `no-document`
@@ -396,7 +396,7 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 - **サンプルページの再生成**: `nbb --classpath "orgs/kotoba-lang/shitsuke/src:
   orgs/kotoba-lang/css/src:orgs/kotoba-lang/liquid-glass-ui/src:orgs/kotoba-lang/
   kotoba-ui/src:orgs/kotoba-lang/uikit/src:orgs/kotoba-lang/appkit/src"
-  90-docs/design-quality/samples/generate-samples.cljs`（`kototama/web/generate.cljs`
+  90-docs/design-quality/samples/generate-samples.cljk`（`kototama/web/generate.cljs`
   と同型の nbb multi-dir `--classpath` パターン。ライブラリの `.cljc` を編集も破壊も
   しない、読み取り専用の消費者として使う）。
 - **この macOS 環境でブラウザを操作するときの既知ハザード**: 多数の並行 Claude Code
@@ -436,10 +436,10 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   4ライブラリを3-judge panelが clarity/deference/depth等で軒並み4.0–5.0/5と採点した裏で、
   tap-target min-height欠如・dvhフォールバック欠如・safe-area片側未対応・theme-color
   meta欠如という4つの具体的ギャップを3体とも一つも指摘していなかった）を補う
-  **決定論的 fitness function** が `90-docs/design-quality/audit.cljc`（LLM/browser不要、
+  **決定論的 fitness function** が `90-docs/design-quality/audit.cljk`（LLM/browser不要、
   regexベース、`orgs/gftdcojp/network-isekai` の `isekai.ux.audit`／ADR-0007 からの移植）
   として存在する。Co-Scientist loop 本体（Generate→Reflect→Rank(Elo)→Evolve→Meta）は
-  `90-docs/design-quality/coscientist.cljc`（同 `isekai.ux.coscientist` 移植、
+  `90-docs/design-quality/coscientist.cljk`（同 `isekai.ux.coscientist` 移植、
   langchain-clj依存なしのoffline/heuristic版）で、`nbb` から `kaizen-cycle` を呼ぶと
   `90-docs/design-quality/coscientist/iteration-NN.edn` を生成する。この co-scientist
   パターン自体の原典は `90-docs/adr/2606141500-keiei-arbor-coscientist-engine.edn`。

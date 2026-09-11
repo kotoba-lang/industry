@@ -2,7 +2,7 @@
 
 Machine-readable: [`manifest/west-triple-sync-workflow.edn`](west-triple-sync-workflow.edn)  
 ADR: `90-docs/adr/2607173200-github-local-west-triple-sync.edn`  
-CLI: `nbb scripts/west-triple-sync.cljs`
+CLI: `nbb scripts/west-triple-sync.cljk`
 
 ## Goal
 
@@ -16,7 +16,7 @@ For a **managed** project set, keep three planes consistent and current:
 
 Completion for the scope:
 
-1. `nbb scripts/west-orphan-audit.cljs --blocking` exits 0 (for targets in scope)
+1. `nbb scripts/west-orphan-audit.cljk --blocking` exits 0 (for targets in scope)
 2. Pins for touched entries pass `verify-west-pins` (reachable from default branch; no unpushed HEAD)
 3. Every `:local/root` consumer of a managed project can resolve the directory after checkout
 
@@ -34,16 +34,16 @@ Completion for the scope:
 
 ```bash
 # Plan only (safe default)
-nbb scripts/west-triple-sync.cljs plan --scope blocking
-nbb scripts/west-triple-sync.cljs plan --names crm
+nbb scripts/west-triple-sync.cljk plan --scope blocking
+nbb scripts/west-triple-sync.cljk plan --names crm
 
 # Apply (clone / register / ff-only pull / --entry pin)
-nbb scripts/west-triple-sync.cljs apply --scope blocking
-nbb scripts/west-triple-sync.cljs apply --names crm
-nbb scripts/west-triple-sync.cljs apply --scope managed --no-pin-advance
+nbb scripts/west-triple-sync.cljk apply --scope blocking
+nbb scripts/west-triple-sync.cljk apply --names crm
+nbb scripts/west-triple-sync.cljk apply --scope managed --no-pin-advance
 
 # Verify gates
-nbb scripts/west-triple-sync.cljs verify --scope blocking
+nbb scripts/west-triple-sync.cljk verify --scope blocking
 ```
 
 ## Phase order

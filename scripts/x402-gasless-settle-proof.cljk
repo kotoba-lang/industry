@@ -1,0 +1,199 @@
+#!/usr/bin/env nbb
+;; x402-gasless-settle-proof — build, sign and price the transaction that
+;; settles an x402 `exact` payment, WITHOUT SENDING IT.
+;;
+;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/eth-crypto/src:orgs/kotoba-lang/org-ethereum-abi/src" \
+;;       scripts/x402-gasless-settle-proof.cljk [--network base-sepolia]
+;;
+;; ## Why this exists
+;;
+;; The question was whether the fleet could mine testnet gas and fund itself.
+;; It cannot, and the reason is not a permission or a missing tool: measured
+;; 2026-09-01, Base Sepolia reports difficulty 0x0 with miner
+;; 0x4200000000000000000000000000000000000011 -- the OP-Stack system address --
+;; and `eth_mining` is unimplemented. Sepolia L1 reports difficulty 0x0 too.
+;; There is no proof-of-work on either chain, so no amount of fleet CPU
+;; produces one wei there.
+;;
+;; But the x402 `exact` scheme does not ask the buyer for gas. The buyer signs
+;; an EIP-3009 `transferWithAuthorization` and the FACILITATOR submits it,
+;; paying the gas. So the economy needs gas in exactly one wallet, once --
+;; not in every agent's.
+;;
+;; This script proves the whole path is built by walking it: it reads the
+;; token's real EIP-712 domain off the chain, signs an authorization, recovers
+;; the signer from it, encodes the settlement call, signs the EIP-1559
+;; transaction that carries it, and prices that transaction against the
+;; current base fee. Then it stops. What it prints is the exact transaction
+;; the facilitator would send and the exact amount of ETH missing to send it.
+;;
+;; It never submits, and it never moves funds. The keys are generated in
+;; memory for this run and are never printed or written anywhere.
+
+(ns x402-gasless-settle-proof
+  (:require [clojure.string :as str]
+            [eth-crypto.core :as eth]
+            [ethereum.abi :as abi]
+            ["crypto" :as crypto]))
+
+(def ^:private argv (vec (drop 2 (.-argv js/process))))
+(defn- opt [f d] (or (second (drop-while #(not= f %) argv)) d))
+
+(def networks
+  {"base-sepolia" {:chain-id 84532 :rpc "https://sepolia.base.org"
+                   :usdc "0x036CbD53842c5426634e7929541eC2318f3dCF7e"}
+   "base"         {:chain-id 8453  :rpc "https://mainnet.base.org"
+                   :usdc "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}})
+
+(defn- rpc [url method params]
+  (-> (js/fetch url #js {:method "POST"
+                         :headers #js {"content-type" "application/json"}
+                         :body (js/JSON.stringify
+                                (clj->js {:jsonrpc "2.0" :id 1 :method method :params params}))})
+      (.then (fn [^js r] (.json r)))
+      (.then (fn [^js j] (js->clj j :keywordize-keys true)))))
+
+(defn- decode-string
+  "An ABI-encoded string return value. Read off the chain rather than
+  hardcoded: a domain that differs from the contract's own produces a
+  signature that recovers a different address, and hardcoding the mainnet
+  name is exactly how every base-sepolia offer in this workspace came to
+  advertise `USD Coin` for a token that calls itself `USDC`."
+  [hex]
+  (let [h (str/replace (str hex) #"^0x" "")
+        n (js/parseInt (subs h 64 128) 16)]
+    (-> (js/Buffer.from (subs h 128 (+ 128 (* 2 n))) "hex")
+        (.toString "utf8"))))
+
+(defn- read-domain [{:keys [rpc-url usdc chain-id]}]
+  (-> (js/Promise.all
+       #js [(rpc rpc-url "eth_call" [{:to usdc :data "0x06fdde03"} "latest"])
+            (rpc rpc-url "eth_call" [{:to usdc :data "0x54fd4d50"} "latest"])])
+      (.then (fn [^js rs]
+               ;; STRING keys. `encode-data` looks fields up with
+               ;; `(get data "name")` using the name from the type
+               ;; definition, so a keyword-keyed domain yields nil for every
+               ;; field -- and the digest is then self-consistent, because
+               ;; signing and recovering both use the same wrong value. The
+               ;; first run of this script printed `recovers to the buyer`
+               ;; while every domain field was nil. Only the control noticed.
+               {"name" (decode-string (:result (aget rs 0)))
+                "version" (decode-string (:result (aget rs 1)))
+                "chainId" chain-id
+                "verifyingContract" usdc}))))
+
+(def transfer-with-authorization-types
+  {"EIP712Domain" [{:name "name" :type "string"}
+                   {:name "version" :type "string"}
+                   {:name "chainId" :type "uint256"}
+                   {:name "verifyingContract" :type "address"}]
+   "TransferWithAuthorization" [{:name "from" :type "address"}
+                                {:name "to" :type "address"}
+                                {:name "value" :type "uint256"}
+                                {:name "validAfter" :type "uint256"}
+                                {:name "validBefore" :type "uint256"}
+                                {:name "nonce" :type "bytes32"}]})
+
+(defn- sig-bytes [{:keys [r s recovery-id]}]
+  (let [pad (fn [^js bi] (let [h (.toString bi 16)] (str (.repeat "0" (- 64 (count h))) h)))]
+    {:r (str "0x" (pad r)) :s (str "0x" (pad s)) :v (+ 27 recovery-id)
+     :bytes (eth/hex->bytes (str (pad r) (pad s)
+                                 (.toString (+ 27 recovery-id) 16)))}))
+
+(defn -main []
+  (let [net (opt "--network" "base-sepolia")
+        ;; NOT `rpc`. Destructuring the URL under that name shadows the
+        ;; rpc FUNCTION, and `(rpc rpc ...)` then calls a string -- which nbb
+        ;; reports as `Fa.call is not a function`, naming neither.
+        {:keys [chain-id usdc] :as cfg} (get networks net)
+        rpc-url (:rpc cfg)]
+    (when-not cfg
+      (println "REFUSED\tunknown network" net) (js/process.exit 2))
+    (-> (js/Promise.all
+         #js [(read-domain {:rpc-url rpc-url :usdc usdc :chain-id chain-id})
+              ;; The contract's OWN domain separator. Comparing against it is
+              ;; the difference between a signature that is internally
+              ;; consistent and one the token will actually accept.
+              (rpc rpc-url "eth_call" [{:to usdc :data "0x3644e515"} "latest"])])
+        (.then
+         (fn [^js pair]
+           (let [domain (aget pair 0)
+                 onchain-sep (str/lower-case (str (:result (aget pair 1))))]
+           (let [ours-sep (str "0x" (str/lower-case (eth/bytes->hex (eth/domain-separator domain))))
+                 buyer-key (.randomBytes crypto 32)
+                 payer-key (.randomBytes crypto 32)
+                 buyer (eth/address-of-privkey buyer-key)
+                 facilitator (eth/address-of-privkey payer-key)
+                 pay-to "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"
+                 now (js/Math.floor (/ (js/Date.now) 1000))
+                 msg {"from" buyer "to" pay-to "value" 1000
+                      "validAfter" 0 "validBefore" (+ now 600)
+                      "nonce" (str "0x" (.toString (.randomBytes crypto 32) "hex"))}
+                 digest (eth/eip712-digest domain transfer-with-authorization-types
+                                           "TransferWithAuthorization" msg)
+                 sg (sig-bytes (eth/secp256k1-sign buyer-key digest))
+                 recovered (eth/ecrecover-checksum digest (:bytes sg))
+                 ;; The negative control. The same message signed under the
+                 ;; mainnet domain name recovers a DIFFERENT address, which is
+                 ;; what makes a wrong `extra.name` reject every payment while
+                 ;; looking like the buyer's fault.
+                 wrong-digest (eth/eip712-digest (assoc domain "name" "USD Coin")
+                                                 transfer-with-authorization-types
+                                                 "TransferWithAuthorization" msg)
+                 wrong-recovered (eth/ecrecover-checksum
+                                  wrong-digest (:bytes (sig-bytes (eth/secp256k1-sign buyer-key digest))))
+                 selector (subs (eth/bytes->hex
+                                 (eth/keccak256
+                                  (eth/utf8 (str "transferWithAuthorization(address,address,uint256,"
+                                                 "uint256,uint256,bytes32,uint8,bytes32,bytes32)"))))
+                                0 8)
+                 calldata (abi/encode-call-hex
+                           selector
+                           ["address" "address" "uint256" "uint256" "uint256"
+                            "bytes32" "uint8" "bytes32" "bytes32"]
+                           [buyer pay-to 1000 0 (+ now 600)
+                            (get msg "nonce") (:v sg) (:r sg) (:s sg)])]
+             (println "NETWORK\t" net "\tchainId" chain-id)
+             (println "DOMAIN\t" (pr-str (select-keys domain ["name" "version"]))
+                      "\t(read from" (str (subs usdc 0 10) "…)"))
+             (println "SEPARATOR" (if (= ours-sep onchain-sep)
+                                    "matches the contract's own DOMAIN_SEPARATOR()"
+                                    (str "MISMATCH -- ours " (subs ours-sep 0 18)
+                                         "… vs contract " (subs onchain-sep 0 18) "…")))
+             (println "SIGNER\t" (if (= recovered buyer) "recovers to the buyer" "MISMATCH")
+                      "\t" buyer)
+             (println "CONTROL\t" (if (= wrong-recovered buyer) "NO CONTROL -- wrong domain still matched"
+                                      (str "a `USD Coin` domain recovers " (subs wrong-recovered 0 12)
+                                           "… instead, so the payment would be rejected as a bad signature")))
+             (println "CALLDATA" (count calldata) "hex chars")
+             (-> (js/Promise.all
+                  #js [(rpc rpc-url "eth_getTransactionCount" [facilitator "pending"])
+                       (rpc rpc-url "eth_getBlockByNumber" ["latest" false])
+                       (rpc rpc-url "eth_getBalance" [facilitator "latest"])])
+                 (.then
+                  (fn [^js rs]
+                    (let [nonce (js/parseInt (:result (aget rs 0)) 16)
+                          base-fee (js/parseInt (get-in (js->clj (aget rs 1) :keywordize-keys true)
+                                                        [:result :baseFeePerGas]) 16)
+                          bal (js/parseInt (:result (aget rs 2)) 16)
+                          gas 120000
+                          max-fee (* 2 (+ base-fee 1000000))
+                          raw (eth/sign-tx-eip1559
+                               {:chain-id chain-id :nonce nonce
+                                :max-priority-fee-per-gas 1000000
+                                :max-fee-per-gas max-fee
+                                :gas gas :to usdc :value 0 :data calldata}
+                               payer-key)
+                          cost (* gas max-fee)]
+                      (println "TX\t" (count raw) "hex chars, hash" (subs (eth/raw-tx-hash raw) 0 18) "…")
+                      (println "FEE\t" (.toFixed (/ cost 1e18) 8) "ETH at basefee" base-fee "wei")
+                      (println "WALLET\t" facilitator "holds" bal "wei")
+                      (println)
+                      (println "NOT SENT. The signed transaction above is complete and would settle a")
+                      (println "payment whose payer holds no ETH at all. The only thing this workspace")
+                      (println "cannot produce is the" (.toFixed (/ cost 1e18) 8) "ETH of gas, and it cannot be mined:")
+                      (println "this chain reports difficulty 0x0 and its blocks are produced by a sequencer.")
+                      (js/process.exit (if (and (= recovered buyer) (= ours-sep onchain-sep)) 0 1))))))))))
+        (.catch (fn [e] (println "REFUSED\t" (.-message e)) (js/process.exit 2))))))
+
+(-main)

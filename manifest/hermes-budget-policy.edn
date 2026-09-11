@@ -3,7 +3,7 @@
 ;;
 ;; これは POLICY であって METER ではない。実際の残高と消費を答えるのは
 ;; OpenRouter の /api/v1/credits で、この file は「いくらまで」と「順番」だけを持つ。
-;; 実行は scripts/hermes-budget-guard.cljs（launchd com.gftd.hermes-budget-guard、5 分毎）。
+;; 実行は scripts/hermes-budget-guard.cljk（launchd com.gftd.hermes-budget-guard、5 分毎）。
 ;;
 ;; 測って決めた数（2026-09-09）:
 ;;   blended 単価 ≈ $0.092 / 1M prompt token

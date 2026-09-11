@@ -60,7 +60,15 @@
    :post-auth-connectivity}
 
  :inventory/surfaces
- [{:project "app-aozora-engine"
+ [{:project "fans-oppai"
+   :path "orgs/network-awai/fans-oppai"
+   :role :service
+   :surface "oppai.fans — R18 generation studio (no human login yet)"
+   :active-methods #{}
+   :status :migration-gap
+   :verification-status :source-only
+   :evidence "2026-09-11: the site has NO human session and NO login route of any kind — the age gate is a localStorage flag, and the face-reference enrolment (`/api/face/*`) is a per-browser HttpOnly cookie -> KV record with a 7-day TTL, deliberately a consent ceremony bound to a browser and not an identity (it issues no session, grants nothing beyond the enrolled frame, and is labelled so in the UI). Registered before any login surface is deployed, as this policy requires. Planned first method is :siwe-erc191 via kotoba-lang/org-chainagnostic-cacao `siwe.core`/`siwe.edge` (Web3 first), then :webauthn-passkey via kotoba-lang/webauthn; neither is built (ADR-2609111130 gap table). A future gallery/credits plane must bind the face enrolment to that identity, never the reverse."}
+  {:project "app-aozora-engine"
    :path "orgs/network-awai/app-aozora-engine"
    :role :authority
    :active-methods #{:webauthn-passkey :siwe-erc191 :siwe-erc1271}

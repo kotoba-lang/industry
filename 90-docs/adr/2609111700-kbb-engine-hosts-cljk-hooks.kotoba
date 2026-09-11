@@ -1,0 +1,144 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609111700-kbb-engine-hosts-cljk-hooks")
+  (:adr/topic "cljk-rename")
+  (:adr/status "accepted")
+  (:adr/title "ADR-2609111700: hook の runtime は kbb。kbb の engine は .cljk を classpath で解決する nbb fork（org-babashka-nbb）")
+  (:adr/authoritative true)
+  (:adr/repo "com-junkawasaki/root")
+  (:adr/related ["adr-2609111500-cljk-rename-all-clojure-source" "ADR-2607173000" "ADR-2607181900" "ADR-2609051100" "ADR-2609062200"])
+  (:adr/body "# ADR-2609111700: hook の runtime は kbb。kbb の engine は `.cljk` を classpath で解決する nbb fork
+
+**Status**: accepted (2026-09-11)
+**Deciders**: Jun Kawasaki（owner 指示 2026-09-11「2 かつ nbb を kbb に」—— 提示した 2 案のうち
+「runtime 側に `.cljk` を認識させる」を採り、加えて hook の host を nbb から kbb に替える）
+**Executor**: Claude（session_01LCKnzEAgkUQg4sbEhsomG5）
+
+## 何が起きていたか（実測 2026-09-11）
+
+ADR-2609111500 の一括改名（12:02、`780284efa66`）の直後から、Bash を呼ぶたびに
+`PreToolUse:Bash hook error` が並んだ。`.claude/settings.json` の PreToolUse:Bash hook 9 本を
+同じ入力で手で叩くと **8 本が exit 1 `Could not find namespace: cheshire.core`**、通るのは
+cheshire を require しない `duplication-warn` だけ。
+
+原因は hook ではなく、hook が `require` する側にある。改名 commit は hook の本文を 1 バイトも
+変えていない（`similarity index 98%`、差分はコメント中の path 文字列だけ）し、hook を `.cljs` に
+コピーし直しても同じエラーになる。壊れたのは **`scripts/nbb_compat/cheshire/core.cljs` →
+`core.cljk`**（babashka.process / fs / curl、clojure.java.io / shell、`scripts/nbb_compat.cljs` も同じ）で、
+**nbb の namespace 解決は `.cljs` / `.cljc` / `.clj` しか探さない**（`nbb/core.cljs`
+`find-file-on-classpath` の literal。`nbb_core.js` に `.cljk` の文字列は無い）。`nbb.edn :paths` に
+`scripts/nbb_compat` が載っていても、そこに `.cljs` が無ければ見つからない。
+
+つまり非対称がある: **エントリポイントは `.cljk` でも nbb が直接ファイルを開くので動くが、
+`require` で classpath から引く名前空間は `.cljk` だと解決されない。** ADR-2609111500 はこれを
+執行前に「`.cljk` は nbb / JVM / shadow-cljs のいずれも `require` で解決しない」と正しく予告し、
+「復旧順: `scripts/nbb_compat` → hooks → gates → bots」と書いている。この ADR はその最初の 2 段。
+
+同じ改名が 3 つ目の顔でも出ていた: **kbb 自身が死んでいた。** `bin/kbb` は `exec nbb kbb_shim.cljs`
+で、そのファイルは `kbb_shim.cljk` になっており（ENOENT）、直しても shim の require が `.cljk`
+なので stock nbb では load できない。「nbb を kbb に」は、まず kbb を起こすことから始まる。
+
+## 決定
+
+1. **`.cljk` を classpath で解決する engine を持つ: `kotoba-lang/org-babashka-nbb`。**
+   babashka/nbb v1.4.208（`4fff82e`）に 1 箇所の patch —— `find-file-on-classpath` が
+   `foo.cljk` `foo.cljs.cljk` `foo.cljc.cljk` `foo.cljs` `foo.cljc` `foo.clj.cljk` `foo.clj` の順で探す
+   （改名の衝突綴り 3 つを含む）。built `lib/*.js`（2.1 MB、source map 無し）と唯一の runtime 依存
+   `import-meta-resolve` を commit してあり、**JDK も `npm install` も無い machine が west checkout
+   だけで動かせる**（clean clone で hook が exit 0 になることを測った。`lib/` だけでは
+   `ERR_MODULE_NOT_FOUND import-meta-resolve` で落ちる —— これも測ってから vendoring した）。
+   origin plane（babashka.org → `org-babashka`）。upstream の git 履歴は持たない ——
+   upstream commit が `.github/workflows/ci.yml` に触れており workspace token に `workflow` scope が
+   無く push が拒否された。この workspace は Actions を使わない（ADR-2607300900）ので `.github/` は落とす。
+   fork の `src/` は upstream の `.cljs` 綴りのまま —— build（shadow-cljs、`:structural`）は `.cljs`
+   しか読まず、これは他者の source であって Kotoba source ではない。`cljk-rename.cljk` に除外表は
+   無いので、**この repo に改名を当てない**（README に明記）。
+
+2. **`bin/kbb` はこの engine で走る。nbb on PATH には fallback しない。**
+   engine の解決は `$KBB_ENGINE`（cli.js の path）→ west sibling `../org-babashka-nbb/cli.js`。
+   どちらも無ければ両方の path を名指しして **exit 3**（黙って PATH の nbb に落ちると、
+   `.cljk` を解決できない host で hook が「走った」ことになり、誤った理由で fail-open する）。
+   shim の js 経路も `nbb` を spawn せず `argv[1]`（自分を走らせている engine）を使う。
+   実測: `--backend native` と `--backend js` の parity demo が両方 84 を返す（js は改名後
+   `Could not find namespace` で死んでいた）。
+
+3. **Clojure-shaped `.cljk` の入口は `kbb --backend sci [--classpath <cp>] <script.cljk> [args]`。**
+   `bin/kbb` が argv 先頭でこれを受けて engine に直接渡す。shim は末尾の `--backend sci` を
+   `:kbb/sci-backend-must-lead-argv` で名指しで拒否する（guest backend として扱わない）。
+   **これは Kotoba backend ではない** —— capability gate も receipt も無い SCI 評価。amu 未 admit の
+   運用面（hook / gate / bot）を whole component として移すまでの橋。
+
+4. **root の hook は全部 kbb で走る。** `.claude/settings.json` の 19 command
+   （SessionStart 7 / PreToolUse 11 / PostToolUse 1）を
+   `KBB=\"$CLAUDE_PROJECT_DIR/orgs/kotoba-lang/kotoba/bin/kbb\"; \"$KBB\" --backend sci …` に替えた。
+   `nbb` という語は settings.json から消えた。
+
+5. **root の npm 座標 `nbb` は fork の sha を指す**（`github:kotoba-lang/org-babashka-nbb#33575ae…`）。
+   `node_modules/.bin/nbb` を叩く既存経路（`package.json` scripts、`gen-west-manifest` の
+   `local-nbb`）はこれで解決する。`file:` link は fork の devDependencies（shadow-cljs 等）を lock に
+   2,248 行引き込んだので採らず、git 座標（`prepare` 無し = devDeps を入れない）にした。
+
+## この session で同時に見つけて直した、改名由来の 2 件
+
+- `scripts/gen-west-manifest.cljk` が `verify-west-pins.cljs` を探して**見つからず、WARN だけ出して
+  pin 検証を飛ばして west.yml を書いていた**。8 問の②そのもの（実行できない検査が pass と同じ値）。
+  `.cljk` に直し、無ければ **REFUSED / exit 2 で west.yml を書かない**。
+- `.claude/hooks/session-start-toolchain-pin-sync.cljk` が argv から root を選ぶとき `.cljs` だけを
+  飛ばしていたので、自分自身の path を root と読み
+  `…/session-start-toolchain-pin-sync.cljk/manifest/session-sync.edn is not readable` を毎セッション
+  出していた。`.cljk` も飛ばす。
+
+## やらなかったこと（blocked、縮めない）
+
+**hook 9 本を amu-admitted な Kotoba guest として書き直すこと**は、この ADR では `:blocked`。
+kbb の gated backend が今日 host する面（`:fs/app-data :env/read :fs/browse :proc/exec :git/run :io/write`）には
+hook が要る **stdin の読み取り・JSON の parse（`:data/json` は interpreter-only で wire id が無い）・
+exit code の指定（`main` は i64 → 0/1 のみ）・数値→文字列**が無い。「compiler が表現できないなら
+その移行は `:blocked`。小さい述語に削って gate を緑にしない」（ADR-q9-whole-component-build-migration）。
+`--backend sci` はその橋であって移行ではない —— 移行進捗を `.cljk` の拡張子でも sci で走ったことでも数えない。
+
+## 後続（この ADR が閉じない）
+
+- fleet gate（`scripts/fleet-ci/tick.cljk` が `nbb` を起動）と launchd bot（49 plist、PATH の `nbb`）は
+  この ADR では触っていない。この machine では global の `nbb`（`/opt/homebrew`）を fork に差し替える
+  ops を別途行う（git 外）。fleet node は west checkout に `org-babashka-nbb` が来た時点で
+  `kbb --backend sci` を使えるが、`tick.cljk` の起動 command を変えるまでは stock nbb のまま。
+- kbb の gated backend に stdin / `:data/json` / exit code が入ったら、hook を 1 本ずつ whole component で移す。
+
+## 現在地（closing 2026-09-11）
+
+着地済み（すべて default branch、branch / worktree は撤去済み）:
+
+- `kotoba-lang/org-babashka-nbb` main = `cdd1a57`（engine bytes は `33575ae` と同一。差は deps.edn の
+  discarded な `:local/root` 3 件の削除 —— root の `west-orphan-audit --blocking` がそれを blocking 3 件として
+  読んだ）。
+- `kotoba-lang/kotoba` main = `bc3dd64`。west pin も同じ（`b062e29`）。
+- `com-junkawasaki/root` main: hook 移行 `dcbfb8c`、org-babashka-nbb pin `234ebb4`、package-lock name `39b54e4`。
+- この machine: root `node_modules/.bin/nbb` と `/opt/homebrew/bin/nbb` は fork `1.4.208-cljk.1`（git 外。
+  戻すなら `npm i -g nbb@1.4.208`）。
+
+測って緑: settings.json の PreToolUse:Bash 9 command を verbatim で 9/9 exit 0、SessionStart 7 本全部が
+出力を返す（toolchain-pin-sync は 4 checkout を実際に同期）、branch-create guard が `git checkout -b` を含む
+Bash を実際に block、`west-orphan-audit --blocking` exit 0、`gen-agents-md --check` 0、`verify-adr-identity` OK。
+docs-edn-check の唯一の FAIL `STRANGLER-FIG-MONTH1-DEPLOYMENT-SUMMARY.edn` は origin/main 由来で今回の変更ではない。
+
+次の 1 手（優先順）:
+
+1. `scripts/fleet-ci/tick.cljk` が起動する `nbb` を `orgs/kotoba-lang/kotoba/bin/kbb --backend sci` に替え、
+   `gates.edn` の `:script` に残る `gates/*.cljs` 158 参照を `.cljk` に直す（今は gate script の path が改名前のまま）。
+   確かめ方: 1 gate を手元で `kbb --backend sci scripts/fleet-ci/gates/<g>.cljk <dir>` で走らせて exit を見る。
+2. launchd plist 49 本の `nbb` 起動を kbb に替え、`launchctl print gui/$UID/<label>` で reload を確認する
+   （ADR-2609111500 後続 / `~/.gftd` 移行の実測どおり、一覧に戻ったことは reload の証拠ではない）。
+3. kbb の gated backend に stdin / `:data/json` / exit code を capability として足してから、hook を 1 本ずつ
+   whole component で移す（`--backend sci` の橋を「移行済み」と数えない）。
+4. root `package.json` の nbb 座標を `cdd1a57` に上げる（任意。engine bytes は同一）。
+
+## 検証（両方向）
+
+同じ入力・同じ tree で:
+
+    stock nbb 1.4.208         adr-id-shape-guard.cljk  → exit 1  Could not find namespace: cheshire.core
+    org-babashka-nbb 33575ae  同じ 9 本                → exit 0（9/9）
+    kbb --backend sci         west-pin-verify-guard    → exit 0
+    kbb（engine 無し）        → exit 3、試した 2 path を名指し
+    kbb --backend native/js   demo_kbb_fs_read_native  → 84 / 84
+")))

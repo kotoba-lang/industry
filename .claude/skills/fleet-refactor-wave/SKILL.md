@@ -19,7 +19,7 @@ out されていない」は別物、CLAUDE.md「無いと結論する前に検�
 cd "$COM_JUNKAWASAKI_ROOT"
 git fetch origin -q && git merge --ff-only origin/main
 nbb --classpath ".:scripts/nbb_compat:orgs/cloud-itonami/loop-fleet-refactor-wave/src" \
-  scripts/fleet-refactor-wave-tick.cljs --limit 4
+  scripts/fleet-refactor-wave-tick.cljk --limit 4
 ```
 
 tick が **exit 2** なら測れていない。**その周は何もしない。** 候補 0 本なら
@@ -89,7 +89,7 @@ cd /tmp/<scratch>/<repo> && git checkout -b agent/<branch-suffix>
 
 **Mission A の branch 名は `agent/d1-premise-fix`、Mission B は
 `agent/kotoba-migration`** — tick の in-flight 判定がこの名前で remote branch を
-見る（`scripts/fleet-refactor-wave-tick.cljs` の `in-flight` 呼び出し）。違う
+見る（`scripts/fleet-refactor-wave-tick.cljk` の `in-flight` 呼び出し）。違う
 名前を使うと次周の tick が同じ repo を二重に選び得る。
 
 ### agent プロンプトに必ず入れるもの
@@ -118,10 +118,10 @@ agent は `manifest/west.yml` を触らない。中央でまとめて 1 commit �
 （`svelte-cljs-wave` と同じ手順）。
 
 ```bash
-# merge した repo ごとに 1 件: nbb scripts/west-pin-put.cljs <entry-name> HEAD
+# merge した repo ごとに 1 件: nbb scripts/west-pin-put.cljk <entry-name> HEAD
 # entry 名は west entry 名（通常 repo 名と同じだが、west.yml で確認する）
-nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put.cljs <name> HEAD
-# 複数まとめる場合は scripts/west-pin-put-batch.cljs（1 commit に束ねる）
+nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put.cljk <name> HEAD
+# 複数まとめる場合は scripts/west-pin-put-batch.cljk（1 commit に束ねる）
 ```
 
 SHA は **GitHub API から採る**（`gh api repos/cloud-itonami/<repo>/commits/main
@@ -142,7 +142,7 @@ project 名になり、`printf ... | west update` は**引数ゼロ = 全 projec
 
 ```bash
 nbb --classpath ".:scripts/nbb_compat:orgs/cloud-itonami/loop-fleet-refactor-wave/src" \
-  scripts/fleet-refactor-wave-tick.cljs --limit 4
+  scripts/fleet-refactor-wave-tick.cljk --limit 4
 ```
 
 pool（対象 repo 数）は変わらないが、mission-a-raw / mission-b-raw が減っている

@@ -12,7 +12,7 @@ git-annex ブランチの中に GPG 鍵 `BDAE6794050EDB62` で暗号化されて
 
 | 確認 | 結果 |
 |---|---|
-| `scripts/b2-creds.cljs` の解決 | **成功**（`AWS_ACCESS_KEY_ID` 他 5 変数） |
+| `scripts/b2-creds.cljk` の解決 | **成功**（`AWS_ACCESS_KEY_ID` 他 5 変数） |
 | 必要な GPG 秘密鍵 `BDAE6794050EDB62` | **手元に在る** |
 | pinentry-mac + gpg-agent（400 日キャッシュ） | 設定済み・起動中 |
 | 非対話コンテキストでの `gpg --decrypt` | **45 秒でハング**（GUI プロンプトが出せない） |
@@ -34,7 +34,7 @@ cd orgs/gftdcojp/m365-archive && git annex enableremote b2
 # pinentry-mac のダイアログで入力し「Save in Keychain」にチェック
 ```
 
-⚠ **`nbb manifest/west_annex.cljs annex-get` を安易に使わない** —— 引数なしで
+⚠ **`nbb manifest/west_annex.cljk annex-get` を安易に使わない** —— 引数なしで
 **全 datalad データセットを走査**し、`cloud-itonami-contact-pii` から順に
 init/enableremote を始める。1 ファイルが欲しいだけなら
 `git annex get <path>` を狙い撃ちで使う（実測 2026-08-15、これを踏んだ）。
@@ -43,7 +43,7 @@ init/enableremote を始める。1 ファイルが欲しいだけなら
   - `com-junkawasaki.b2/annex`（1Password `gftdcojp` vault）— `manifest/repos.edn`
     の `:b2 :credentials` が参照する M365 archive 用（bucket:
     `gftdcojp-m365-annex`）。Keychain 側ミラーは `security add-generic-password
-    -s b2:gftdcojp-m365-annex`（`scripts/b2-creds.cljs` が解決）。
+    -s b2:gftdcojp-m365-annex`（`scripts/b2-creds.cljk` が解決）。
   - `gftd.b2/*`（1Password `gftdcojp` vault、フィールド分割: `BUCKET_NAME` /
     `ENDPOINT` / `ENDPOINT_URL` / `REGION` / `APPLICATION_KEY_ID` /
     `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY`）— bucket `ai-gftd-cdn` 専用。
@@ -58,7 +58,7 @@ init/enableremote を始める。1 ファイルが欲しいだけなら
     capabilities は listBuckets/listFiles/readFiles/writeFiles/deleteFiles で
     **このバケットのみにスコープ済み**（2026-07-25 に Master Key で発行）。
     - **Keychain ミラー**（非対話ローカル）: service `b2:ai-gftd-datasets`、
-      account=key id / password=app key（`scripts/b2-creds.cljs` と同じ
+      account=key id / password=app key（`scripts/b2-creds.cljk` と同じ
       combined 形式）。
     - **1Password には入れていない。** `op` がこの環境で
       `account is not signed in` / `op item create` の authorization timeout に

@@ -42,7 +42,7 @@ description: cloud-itonami fleet の成熟度スコア（ADR-2608052000 の 7 �
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.cljk
 ```
 
 tick が出すもの: `lane`（substrate / breadth）・対象 repo・**目標にしてよい軸**と
@@ -72,7 +72,7 @@ git worktree add -b agent/maturity-<repo> /tmp/maturity-<repo> origin/main   # �
 
 | 軸 | やること | **必ず通す gate** |
 |---|---|---|
-| `axis-test` | その repo の不変条件を固定するテストを足す | `nbb scripts/maturity-loop/run.cljs --only <repo>` —— **実装を壊したときに赤くなること**を確かめる。落ちない gate は劇場 |
+| `axis-test` | その repo の不変条件を固定するテストを足す | `nbb scripts/maturity-loop/run.cljk --only <repo>` —— **実装を壊したときに赤くなること**を確かめる。落ちない gate は劇場 |
 | `axis-ingest` | facts/catalog に**実 URL** の引用を足す | 足した URL を実際に取得して 2xx を確認。取れないものは足さない |
 | `axis-docs` | `README` の名乗り / `docs/operator-quickstart.md` | quickstart の手順を**実際に踏む**。踏めない手順は書かない |
 | `axis-surface` | demo 生成器 / `docs/business-model.md` | 生成器を**実際に回す**。生成物は実 actor 由来であること（手打ち禁止） |
@@ -92,9 +92,9 @@ git worktree add -b agent/maturity-<repo> /tmp/maturity-<repo> origin/main   # �
 ### 5. 測り直しの反復（`:datoms-stale?` が true のとき）
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-scan.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-scan.cljk
 nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/dynamics/src:orgs/kotoba-lang/org-oasis-open-xmile/src" \
-  scripts/itonami-maturity-dynamics.cljs \
+  scripts/itonami-maturity-dynamics.cljk \
   --evidence manifest/itonami-maturity-evidence.edn \
   --taxonomy manifest/repo-taxonomy.edn \
   --out 90-docs/system-dynamics/itonami-maturity.datoms.edn
@@ -103,7 +103,7 @@ nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/dynamics/src:orgs/kotoba-
 **パリティゲートも通す**（スコア算術の正本は Kotoba カーネル、ADR-2608052000）:
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-kernel-parity.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-kernel-parity.cljk
 ```
 
 生成物を着地させて終わり。この周は lane を消費しない（軸を上げていないので）。
@@ -116,7 +116,7 @@ gh api repos/<org>/<repo>/merges -f base=main -f head=agent/maturity-<repo> -f c
 ```
 
 superproject 側で pin を進めるなら **当該 entry だけ**
-（`nbb scripts/gen-west-manifest.cljs --entry <name>`）。wholesale 再生成は禁止。
+（`nbb scripts/gen-west-manifest.cljk --entry <name>`）。wholesale 再生成は禁止。
 
 後片付けまでが完了条件: worktree 削除 → local branch 削除 → remote branch 削除。
 

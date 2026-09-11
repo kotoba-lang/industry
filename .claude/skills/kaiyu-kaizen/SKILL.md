@@ -7,7 +7,7 @@ description: 回遊（アクセス解析）の計測から出た「答えるべ�
 
 ## この skill が引き受ける範囲
 
-`scripts/kaiyu-kaizen-tick.cljs` が既に測り、`kaiyu.diagnose` が既に判定した
+`scripts/kaiyu-kaizen-tick.cljk` が既に測り、`kaiyu.diagnose` が既に判定した
 **候補 1 件**を受け取り、(a) 数字が本物か確認し、(b) 提案として着地させ、
 (c) 証跡を残す。**探索と判定はやり直さない** —— それは機械の仕事で、周ごとに
 基準が揺れるのを防ぐためにそちらに置いてある。
@@ -17,7 +17,7 @@ description: 回遊（アクセス解析）の計測から出た「答えるべ�
 
 ```bash
 nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
-    scripts/kaiyu-kaizen-tick.cljs --json
+    scripts/kaiyu-kaizen-tick.cljk --json
 ```
 
 ## 1 反復 = 1 issue

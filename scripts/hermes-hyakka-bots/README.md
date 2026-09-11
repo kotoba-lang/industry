@@ -110,10 +110,10 @@ when the classifier was broken.
 
 ```bash
 nbb --classpath scripts/hermes-hyakka-bots \
-    scripts/hermes-hyakka-bots/resolve_free_model_test.cljs   # 17 cases
-nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --list        # candidates, no key
-nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --check-config
-nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --if-stale --write --jobs a,b
+    scripts/hermes-hyakka-bots/resolve_free_model_test.cljk   # 17 cases
+nbb scripts/hermes-hyakka-bots/resolve_free_model.cljk --list        # candidates, no key
+nbb scripts/hermes-hyakka-bots/resolve_free_model.cljk --check-config
+nbb scripts/hermes-hyakka-bots/resolve_free_model.cljk --if-stale --write --jobs a,b
 ```
 
 ## Whose name is on the bill

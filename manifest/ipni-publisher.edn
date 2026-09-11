@@ -14,7 +14,7 @@
  ;; key while the head had been signed by another since 2026-08-30, and a
  ;; fourth identity was never recorded at all -- see :identity-history. The
  ;; file that exists to say which key publishes did not know which key was
- ;; publishing, and nothing compared the two. `scripts/verify-ipni-publisher-record.cljs`
+ ;; publishing, and nothing compared the two. `scripts/verify-ipni-publisher-record.cljk`
  ;; now does.
  :ipni.publisher/peer-id "12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X"
 
@@ -145,7 +145,7 @@
   :derived-identity "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
   :previously-recorded-as-held "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
   :head-signing-identity "12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X"
-  :how "scripts/ipni-advertise.cljs took the item once by its known identifier, derived the Ed25519 public key, built the identity multihash and base58btc peer-id, and printed it. The seed was never displayed."
+  :how "scripts/ipni-advertise.cljk took the item once by its known identifier, derived the Ed25519 public key, built the identity multihash and base58btc peer-id, and printed it. The seed was never displayed."
   :contradicts [:ipni.publisher/current-custody
                 "the :custody :unrecoverable on the first :identity-history entry"]
   :cause :unknown
@@ -469,9 +469,9 @@
 
  ;; ── The sample the maturity probe scores :discoverable-as-provider on ──
  ;;
- ;; Recorded here rather than written into 90-docs/ipni_maturity/probe.cljs,
+ ;; Recorded here rather than written into 90-docs/ipni_maturity/probe.cljk,
  ;; because a probe carrying its own sample is a probe whose sample nobody
- ;; re-measures. scripts/verify-ipni-publisher-record.cljs checks this one
+ ;; re-measures. scripts/verify-ipni-publisher-record.cljk checks this one
  ;; against the wire every six hours for its own reason: if the CID named here
  ;; stops resolving to a recorded identity the detector goes red, and the axis
  ;; it feeds reports :unknown rather than 0.
@@ -562,7 +562,7 @@
 
   ;; ⚠ The maturity probe cannot go green on this and be right.
   ;;
-  ;; 90-docs/ipni_maturity/probe.cljs pins `witness-cid` to THIS CID and
+  ;; 90-docs/ipni_maturity/probe.cljk pins `witness-cid` to THIS CID and
   ;; scores :discoverable-as-provider (weight 0.20) on whether cid.contact
   ;; lists kotobase for it. So the two halves of the criterion pull the
   ;; axis in opposite directions: :appears turned it green at 05:29Z, and
@@ -590,7 +590,7 @@
   ;; looks like, and verify-ipni-publisher-record.cljs already re-measures
   ;; it every six hours.
   :instrument-conflict
-  {:with "90-docs/ipni_maturity/probe.cljs `witness-cid`"
+  {:with "90-docs/ipni_maturity/probe.cljk `witness-cid`"
    :axis :discoverable-as-provider
    :measured "2026-09-01T12:24:39Z"
    :score 80.99

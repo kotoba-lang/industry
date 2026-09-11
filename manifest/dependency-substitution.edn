@@ -47,7 +47,7 @@
 ;; 1. A coordinate that appears in a kotoba-lang checkout and NOT in this
 ;;    file is a newly acquired external dependency. The cutover contract
 ;;    forbids that for JVM runtime deps; for the others it is at minimum an
-;;    undiscussed one. `scripts/verify-dependency-substitution.cljs` reports
+;;    undiscussed one. `scripts/verify-dependency-substitution.cljk` reports
 ;;    it.
 ;; 2. `:target` is a claim that can be checked. It must name a repository
 ;;    that exists, and the detector fails if it does not -- a substitution
@@ -60,7 +60,7 @@
 ;; in the ADR, but a count written here becomes a constant that gets quoted
 ;; after it stops being true -- the failure mode CLAUDE.md documents about
 ;; its own fleet-ci section. Re-measure with
-;; `scripts/verify-dependency-substitution.cljs --edn`.
+;; `scripts/verify-dependency-substitution.cljk --edn`.
 
 {:dependency-substitution/version 1
  :dependency-substitution/adr "adr-2608260200-kotoba-lang-external-dependency-substitution"
@@ -121,9 +121,9 @@
  ;; What this ledger does NOT cover, measured rather than inferred from its
  ;; own scope line. `:dependency-substitution/scope "orgs/kotoba-lang"` is
  ;; true and reads as completeness; the detector that counts the same debt
- ;; workspace-wide is `scripts/verify-jvm-dependency-surface.cljs`, and its
+ ;; workspace-wide is `scripts/verify-jvm-dependency-surface.cljk`, and its
  ;; `jvm-runtime-deps` class disagrees with this file in two ways.
- {:measured-by "nbb --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.cljs --findings orgs"
+ {:measured-by "nbb --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.cljk --findings orgs"
   :reporting-repos 75
   :in-this-ledgers-scope 18
   :outside-it 57
@@ -143,7 +143,7 @@
 
   :the-coverage-gap
   "Six coordinates carry no entry at all -- 36 declarations. Candidate targets
-   below were found with `nbb scripts/repo-search.cljs` and read out of each
+   below were found with `nbb scripts/repo-search.cljk` and read out of each
    repository's README; they are CANDIDATES, not dispositions, and are
    recorded that way deliberately. A disposition asserts that a substitution
    is the right move, which is a judgement; this is only the measurement that
@@ -196,7 +196,7 @@
    :note "Reagent's render backend. CLAUDE.md ADR-2608260900 retires .tsx/.svelte AUTHORING, not this dependency; reagent apps keep it after migration."}
   {:coordinate "react-dom" :ecosystem :npm :disposition :structural :note "As react."}
   {:coordinate "nbb" :ecosystem :npm :disposition :structural
-   :note "The sanctioned script host (ADR-2607173000). Successor is kbb, which does not exist yet."}
+   :note "The SCI-on-Node engine. Since 2026-09-11 the coordinate resolves to kotoba-lang/org-babashka-nbb (nbb 1.4.208 + .cljk classpath resolution, root ADR-2609111700); stock npm nbb cannot require a .cljk namespace and is not what `nbb` on PATH should be in this workspace. The script HOST is kbb (kotoba-lang/kotoba bin/kbb), which runs on this engine; `kbb --backend sci` is the entry for Clojure-shaped .cljk until each piece migrates as a whole component to the gated backends."}
   {:coordinate "shadow-cljs" :ecosystem :npm :disposition :structural :note "As the maven coordinate."}
 
   ;; ------------------------------------------------ frozen legacy: has a contract

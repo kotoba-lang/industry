@@ -22,7 +22,7 @@
 ;;    :bot/allowed-actions #{...}           ; #{:pointer :key :type :script} の部分集合
 ;;    :bot/budget-tokens <int>}             ; 1 session のモデル予算
 ;;
-;; 検査は scripts/cua-bots-tick.cljs（形）と lib 側 --dry-run（backend 実在 +
+;; 検査は scripts/cua-bots-tick.cljk（形）と lib 側 --dry-run（backend 実在 +
 ;; probe）。ADR: adr-2608291900-cua-bots-selectable-backend-residents。
 
 [{:bot/id "uiux-bots-page-qa"
@@ -46,7 +46,7 @@
   ;; 見る bot は、あの run を「正常」と報告する。
   :bot/backend :host-object
   :bot/target {:cwd "."
-               :cmd ["nbb" "scripts/ads-adult-preflight.cljs"]}
+               :cmd ["nbb" "scripts/ads-adult-preflight.cljk"]}
   :bot/interval-s 86400
   :bot/max-steps 4
   :bot/allowed-actions #{}

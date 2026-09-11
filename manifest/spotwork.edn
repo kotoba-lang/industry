@@ -52,14 +52,14 @@
  ;; ---------------------------------------------------------------- bot
  ;;
  ;; ローカル Claude loop。tick が候補を測り、候補がある周だけモデルを起こす。
- ;; `scripts/spotwork-match-loop.cljs` が在ることで itonami.cloud/bots/ の
- ;; 名簿（scripts/loop-status-publish.cljs の union）に載る。
+ ;; `scripts/spotwork-match-loop.cljk` が在ることで itonami.cloud/bots/ の
+ ;; 名簿（scripts/loop-status-publish.cljk の union）に載る。
  :spotwork/bot
  {:bot/id "spotwork-match"
   :bot/goal "単発シフトの求人 1 件を governed に審査して提案台帳へ着地させる。規則側に欠陥が見つかったときはそれを 1 件直す"
   :bot/skill "spotwork-match"
-  :bot/tick "scripts/spotwork-match-tick.cljs"
-  :bot/loop "scripts/spotwork-match-loop.cljs"
+  :bot/tick "scripts/spotwork-match-tick.cljk"
+  :bot/loop "scripts/spotwork-match-loop.cljk"
   :bot/ledger "~/.itonami/spotwork-match/ledger.edn"
   :bot/interval-s 21600
   ;; モデルを起こさない条件（loop が判定する）
@@ -105,7 +105,7 @@
  ;; ここに書けば日付を落として引用される —— CLAUDE.md が fleet-ci 節で
  ;; 記録している失敗の形）。
  :spotwork/status
- {:measured-by "nbb 70-tools/spotwork/run-tests.cljs（exit 0/1/2 の 3 値）"
+ {:measured-by "nbb 70-tools/spotwork/run-tests.cljk（exit 0/1/2 の 3 値）"
   :measured-what "規則カタログの整合、宣言と検査の 1 対 1、各規則が自分の名前で拒否すること、確定系が自動化されないこと"
   :live-demand :none
   :live-surface :none

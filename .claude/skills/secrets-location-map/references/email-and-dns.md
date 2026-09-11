@@ -6,7 +6,7 @@
     - フィールド: `username=API_KEY`、`hostname=https://api.resend.com`
     - 用途: Worker secret `RESEND_API_KEY`（`net-kotobase` / legacy mailer）、
       ローカル CLI、domain verify（`mail.kotobase.net` 等）
-    - 投入スクリプト: `nbb scripts/provision-resend-1password.cljs`
+    - 投入スクリプト: `nbb scripts/provision-resend-1password.cljk`
       （Keychain `gftd.resend`/`API_KEY` → op item。`--update` で上書き）
   - **Keychain ミラー**（非対話ローカル）: `service=gftd.resend` /
     `account=API_KEY` — 1Password が biometric timeout のときのフォールバック。

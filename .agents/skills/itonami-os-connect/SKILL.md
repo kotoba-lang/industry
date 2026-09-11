@@ -27,7 +27,7 @@ description: 営み OS（network-awai/cloud-itonami）に、まだ繋がって�
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljk
 ```
 
 tick が出す `:candidates` が**次の 1 本の候補**（M_own 降順、標準形適合のみ）。
@@ -153,7 +153,7 @@ gh api repos/network-awai/cloud-itonami/merges -f base=main -f head=agent/itonam
 ```
 
 superproject 側は `manifest/west.yml` の pin を **当該 entry だけ**前進させる
-（`nbb scripts/gen-west-manifest.cljs --entry cloud-itonami`。wholesale な再生成は禁止）。
+（`nbb scripts/gen-west-manifest.cljk --entry cloud-itonami`。wholesale な再生成は禁止）。
 
 ⚠ **`--entry` でも生成器が他の差分を巻き込むことがある。** `repos.edn` に別セッションが
 足した未登録 repo があると、その entry も一緒に書かれる（実測 2026-08-06:

@@ -117,6 +117,63 @@
   :extrapolation-was "28 s; measured 36.3 s p50 / 46.0 s p90 -- optimistic by 30%"
   :decision-not-taken "per-block 経路に別の実効上限を切るか、pack の書き手を決めて 256 を pack 前提にするか。Q3d の『誰が pack を書くか』と同じ 1 つの決定"}
 
+ :q3f-pack-size
+ {:measured "2026-09-11" :bench "90-docs/query-plane/bench_ipq_pack_size.cljs" :reps 5
+  :client-loadavg-range [159.62 165.12]
+  :packs [{:label "51 KB" :bytes 50717} {:label "314 KB" :bytes 313877} {:label "1.1 MB" :bytes 1097237} {:label "3.2 MB" :bytes 3186197}]
+  :rows [{:pack "51 KB" :sel "matcher GET" :p50 206 :io-ms 111} {:pack "51 KB" :sel "all 256 HEAD" :p50 263 :io-ms 108} {:pack "51 KB" :sel "all 256 GET" :p50 240 :io-ms 105}
+         {:pack "314 KB" :sel "matcher GET" :p50 150 :io-ms 103} {:pack "314 KB" :sel "all 256 HEAD" :p50 285 :io-ms 104} {:pack "314 KB" :sel "all 256 GET" :p50 693 :io-ms 106}
+         {:pack "1.1 MB" :sel "matcher GET" :p50 201 :io-ms 119} {:pack "1.1 MB" :sel "all 256 HEAD" :p50 470 :io-ms 108} {:pack "1.1 MB" :sel "all 256 GET" :p50 1796 :io-ms 110}
+         {:pack "3.2 MB" :sel "matcher GET" :p50 194 :io-ms 122} {:pack "3.2 MB" :sel "all 256 HEAD" :p50 864 :io-ms 124} {:pack "3.2 MB" :sel "all 256 GET" :p50 6776 :io-ms 126}]
+  :finding "R2 の whole read は 39 KB でも 3.2 MB でも io 約 120 ms。予算内で range reader（3 RT）は常に遅い。HEAD - io = Worker CPU（3.2 MB で約 740 ms）、GET - HEAD = client download"
+  :scope "≤ 4 MiB（traversal の byte 予算）。pack の大きさの上限ではない —— compaction 後の 50〜512 MB は未測定で、そこでは whole read は不可能"}
+
+ :q3g-unpacked-ceiling-and-the-rename
+ {:landed {:kotobase-protocol-ipq "fc276320" :west-pin "124bf516"}
+  :unpacked-limits {:max-blocks 32 :advertised-as "maxBlocksWithoutPack"}
+  :tests {:count 24 :assertions 122 :control "ctx 読みを外すと refusal の test だけ赤"}
+  :rename {:by "another session, same owner identity, 2026-09-11 11:08"
+           :repos ["kotobase-protocol-ipq" "io-ipld" "io-ipld-car" "datalog" "ayatori"]
+           :cited-adr "adr-2609111500-cljk-rename-all-clojure-source" :cited-adr-on-root-main false
+           :renamed-main-loads {:nbb false :jvm false :shadow false}
+           :west-pins-affected false
+           :owner-decision "(b) rename is authoritative"}
+  :loader {:script "scripts/cljk-classpath.cljs"
+           :mechanism "cljk-origin.edn -> symlink mirror outside the repo (~/.cache/cljk-mirror/<sha1>/) -> substituted classpath"
+           :verified {:nbb "20/112 on renamed main, 24/122 with the change" :jvm "24/122 with -d <mirror>"}
+           :controls {:unreadable-origin "exit 2 REFUSED" :no-origin "entry passed through unchanged"}
+           :traps-measured ["JVM runner without -d: Ran 0 tests, 0 failures" "clj-kondo: 0 errors in 7ms over directories it read nothing from"]
+           :not-covered "shadow-cljs (no classpath hook) -- a Worker depending on a renamed git lib cannot build"}}
+
+ :q3h-large-pack
+ {:measured "2026-09-11"
+  :landed {:net-kotobase-ipfs "b4244342" :west-pin "84056707"
+           :includes ["gen-shadow-cljs-edn.cljs + shadow-cljs.template.edn" "unpacked-limits applied in the shell" "windowed pack reader"]}
+  :live-ceiling {:profile-advertises {:maxBlocks 256 :maxBlocksWithoutPack 32}
+                 :packed-256 {:status 200 :wall-s 0.64 :fetches 1 :requests 2}
+                 :unpacked-256 {:status 413 :error "resource-limit :max-blocks" :wall-s 4.5 :was "36 s 200 this morning"}}
+  :fixture {:builder "90-docs/query-plane/build_wide_fixture.cljs <out> 1000 102400"
+            :root "bafyreid63vx4qcdahh4kgr6ueotfd2xx6ie7qafq75r4wbwhycwslciwzi"
+            :blocks 1001 :leaf-bytes 102400 :pack-bytes 102609973 :index-bytes 40070
+            :individually-in-ipld "root + first 31 leaves"}
+  :bench "90-docs/query-plane/bench_ipq_large_pack.cljs" :reps 3
+  :packed [{:blocks 2 :fetches 1 :requests 3 :p50 973 :io-ms 455}
+           {:blocks 8 :fetches 1 :requests 3 :p50 2347 :io-ms 284}
+           {:blocks 16 :fetches 1 :requests 3 :p50 4075 :io-ms 292}
+           {:blocks 32 :fetches 1 :requests 3 :p50 9471 :io-ms 303}]
+  :unpacked [{:blocks 2 :fetches 2 :requests 3 :p50 836 :io-ms 316}
+             {:blocks 8 :fetches 8 :requests 9 :p50 2921 :io-ms 1298}
+             {:blocks 16 :fetches 16 :requests 17 :p50 7038 :io-ms 3276}
+             {:blocks 32 :fetches 32 :requests 33 :p50 20862 :io-ms 13681}]
+  :decomposition-32 {:packed {:head-wall-s [1.41 1.86] :get-wall-s [6.28 7.01] :io-ms [237 305]}
+                     :says "io 0.27 s, Worker CPU ~1.5 s, the rest is the client downloading 3.2 MB"}
+  :findings ["round trips do not depend on pack size: 3 requests at 102 MB, io ~300 ms, same order as a 39 KB pack"
+             "the 4 MiB head window carried root + ~40 leaves, so 32 blocks needed no later miss"
+             "per-block at 100 KB blocks is ~430 ms per R2 read, and the trampoline re-hashes loaded bytes on every restart: ~7 s non-I/O at 32 blocks, O(n^2) in bytes"]
+  :not-measured ["a traversal that outruns the head window (each later miss = +1 request)"
+                 "a pack whose index is not a tail read (500K blocks, 20 MB index -- the catalog's regime)"
+                 "who writes packs"]}
+
  :q2-digest-runtime
  {:bench "90-docs/query-plane/bench_digest_runtimes.cljs"
   :harness "90-docs/query-plane/digest-runtime/ （shadow-cljs :target :esm。out/ と node_modules は生成物）"

@@ -1,0 +1,336 @@
+;; scripts/cljk-rename.cljk — rename every tracked `.clj` / `.cljs` / `.cljc`
+;; in a repository's upstream default branch to `.cljk`, server-side, without
+;; touching any working tree.
+;;
+;; Owner decision 2026-09-11 (ADR adr-2609111500-cljk-rename-all-clojure-source):
+;; the Clojure-shaped source of this workspace is Kotoba's `.cljk` surface, and
+;; the corpus must say so under that extension. No compatibility mirror; build
+;; breakage is fixed forward, component by component.
+;;
+;; What one repository gets, in ONE commit on a throwaway branch that is then
+;; merged server-side (CLAUDE.md: land via branch + `POST /merges`, never a
+;; direct push to a shared branch, never a force):
+;;
+;;   1. every blob whose path ends in .clj/.cljs/.cljc is re-filed under
+;;      `<stem>.cljk`. If two of the three share a stem (foo.clj + foo.cljs,
+;;      a common platform split) or the target already exists, the original
+;;      extension stays in the name: `foo.clj.cljk` / `foo.cljs.cljk`.
+;;      Blob SHAs are untouched, so git sees a 100% rename.
+;;   2. `cljk-origin.edn` at the root records, for every renamed path, the
+;;      extension it had. Without it a plain `foo.cljk` cannot say whether it
+;;      was JVM-only, JS-only or portable, and the migration needs that.
+;;   3. text blobs that name a renamed path (package.json scripts, nbb.edn,
+;;      README commands, hook configs) get that exact path string replaced.
+;;      Exact repository-relative paths only, longest first, word boundary
+;;      after -- never a bare basename, never a regex over extensions. Blobs
+;;      that are not valid UTF-8 are left alone and reported.
+;;
+;; It works from `origin/<default>` after a fetch, NOT from the checkout, so a
+;; stale or dirty checkout cannot leak into the commit. The commit is built in
+;; a temporary index (GIT_INDEX_FILE), so the shared checkout's index and
+;; working tree are never written.
+;;
+;; Every repository ends in exactly one recorded state, in <state-dir>/<slug>.edn:
+;;   :merged     commit landed on the default branch
+;;   :pr-open    merge refused (branch protection); a PR was opened instead
+;;   :no-op      nothing to rename
+;;   :refused    could not answer (no checkout, fetch failed, push failed …)
+;; :refused is never folded into :no-op. A run's summary counts each.
+;;
+;;   nbb scripts/cljk-rename.cljk --paths <file> --state <dir> [--dry-run] [--shard i/n]
+;;                                [--skip-edit <prefix>,<prefix>...]
+;;     <file>: one repository path per line (relative to cwd)
+;;     --skip-edit: paths under these prefixes are renamed if they are source
+;;       but their TEXT is never rewritten -- ADRs, ledgers and receipts record
+;;       what was true on their day (CLAUDE.md). They are listed as
+;;       [path :record-not-rewritten] in the state file, not silently passed.
+;;
+;; Rate limit: two REST calls per landed repository (merge + branch delete).
+;; The loop checks `gh api rate_limit` every 50 repositories and sleeps until
+;; reset when fewer than 120 remain -- the alternative is a wave of 403s that
+;; look like protected branches.
+
+(ns cljk-rename
+  (:require ["fs" :as fs]
+            ["path" :as path]
+            ["child_process" :as cp]
+            [clojure.string :as str]))
+
+(def adr-id "adr-2609111500-cljk-rename-all-clojure-source")
+(def branch "cljk-rename-20260911")
+(def exts [".clj" ".cljs" ".cljc"])
+(def today "2026-09-11")
+
+(defn- arg [flag] (let [a (js->clj (.-argv js/process))] (second (drop-while #(not= flag %) a))))
+(defn- flag? [f] (some #(= f %) (js->clj (.-argv js/process))))
+
+(defn- run
+  "spawnSync, returns {:status :out :err}. Never throws."
+  [cmd args & [{:keys [cwd env input]}]]
+  (let [r (cp/spawnSync cmd (clj->js args)
+                        (clj->js (cond-> {:encoding "utf8" :maxBuffer (* 512 1024 1024)}
+                                   cwd (assoc :cwd cwd)
+                                   env (assoc :env (js/Object.assign #js {} (.-env js/process) (clj->js env)))
+                                   input (assoc :input input))))]
+    {:status (.-status r) :out (or (.-stdout r) "") :err (or (.-stderr r) "")}))
+
+(defn- git [dir & args] (run "git" (concat ["-C" dir] args)))
+
+(defn- git-bytes
+  "Raw blob bytes (Buffer)."
+  [dir sha]
+  (let [r (cp/spawnSync "git" #js ["-C" dir "cat-file" "blob" sha] #js {:maxBuffer (* 512 1024 1024)})]
+    (when (zero? (.-status r)) (.-stdout r))))
+
+(defn- remote-name
+  "`origin` when present; else the first remote whose URL is on github.com.
+  West checkouts often carry the org name as their only remote."
+  [dir]
+  (let [{:keys [status out]} (git dir "remote")
+        names (when (zero? status) (remove str/blank? (str/split-lines out)))]
+    (or (some #{"origin"} names)
+        (some (fn [n] (when (str/includes? (:out (git dir "remote" "get-url" n)) "github.com") n)) names))))
+
+(defn- slug [dir]
+  (let [{:keys [status out]} (git dir "remote" "get-url" (or (remote-name dir) "origin"))]
+    (when (zero? status)
+      (some-> (re-find #"github\.com[:/]([^/]+)/([^/\s]+?)(?:\.git)?$" (str/trim out))
+              (as-> m (str (nth m 1) "/" (nth m 2)))))))
+
+(defn- default-branch [dir rn]
+  (let [strip #(str/replace (str/trim %) (re-pattern (str "^refs/remotes/" rn "/")) "")
+        {:keys [status out]} (git dir "symbolic-ref" (str "refs/remotes/" rn "/HEAD"))]
+    (if (zero? status)
+      (strip out)
+      (let [_ (git dir "remote" "set-head" rn "-a")
+            {:keys [status out]} (git dir "symbolic-ref" (str "refs/remotes/" rn "/HEAD"))]
+        (when (zero? status) (strip out))))))
+
+(defn- ls-tree [dir rev]
+  (let [{:keys [status out]} (git dir "ls-tree" "-r" "-z" rev)]
+    (when (zero? status)
+      (->> (str/split out #"\u0000")
+           (remove str/blank?)
+           (map (fn [line]
+                  (let [[meta p] (str/split line #"\t" 2)
+                        [mode type sha] (str/split meta #" ")]
+                    {:mode mode :type type :sha sha :path p})))))))
+
+(defn- ext-of [p] (some #(when (str/ends-with? p %) %) exts))
+
+(defn plan-renames
+  "[{:old :new :ext}] -- the naming rule, stated once."
+  [entries]
+  (let [blobs (filter #(= "blob" (:type %)) entries)
+        paths (set (map :path entries))
+        cands (filter #(ext-of (:path %)) blobs)
+        stem (fn [p] (subs p 0 (- (count p) (count (ext-of p)))))
+        stem-count (frequencies (map (comp stem :path) cands))]
+    (vec (for [{:keys [path] :as e} cands
+               :let [s (stem path) e* (ext-of path)
+                     plain (str s ".cljk")
+                     collide? (or (> (stem-count s) 1) (contains? paths plain))
+                     new (if collide? (str path ".cljk") plain)]]
+           (assoc e :old path :new new :ext e*)))))
+
+(defn- escape-re [s] (str/replace s #"[.*+?^${}()|\[\]\\/]" #(str "\\" %)))
+
+(defn replace-paths
+  "Exact old-path strings -> new, longest first, word boundary after."
+  [text renames]
+  (reduce (fn [t {:keys [old new]}]
+            (str/replace t (js/RegExp. (str (escape-re old) "(?![A-Za-z0-9_])") "g") new))
+          text
+          (sort-by (comp - count :old) renames)))
+
+(defn- utf8-roundtrips? [buf]
+  (let [s (.toString buf "utf8")]
+    (.equals buf (js/Buffer.from s "utf8"))))
+
+(defn- grep-referencing
+  "Tracked text blobs at rev whose content mentions any old path. Returns paths."
+  [dir rev renames]
+  (let [pat (path/join (.tmpdir (js/require "os")) (str "cljk-pat-" (.-pid js/process) ".txt"))]
+    (fs/writeFileSync pat (str/join "\n" (map :old renames)))
+    (let [{:keys [status out]} (git dir "grep" "-I" "-l" "-z" "-F" "-f" pat rev "--" ".")]
+      (fs/unlinkSync pat)
+      (if (zero? status)
+        (->> (str/split out #"\u0000") (remove str/blank?)
+             (map #(str/replace % (re-pattern (str "^" (escape-re rev) ":")) "")))
+        []))))
+
+(defn origin-edn [renames]
+  (str "{:format :kotoba.cljk-origin/v1\n"
+       " :renamed-on \"" today "\"\n"
+       " :decision \"" adr-id " (com-junkawasaki/root 90-docs/adr; owner instruction " today ")\"\n"
+       " :rule \"value = the extension the file had before the rename. A path ending in .clj.cljk or .cljs.cljk kept it in the name because both platform files existed (or the plain target was taken).\"\n"
+       " :origins\n {"
+       (str/join "\n  " (map (fn [{:keys [new ext]}] (str (pr-str new) " " (pr-str ext))) (sort-by :new renames)))
+       "}}\n"))
+
+(defn- rate-guard! []
+  (let [{:keys [status out]} (run "gh" ["api" "rate_limit" "--jq" ".resources.core | \"\\(.remaining) \\(.reset)\""])]
+    (when (zero? status)
+      (let [[rem reset] (map js/parseInt (str/split (str/trim out) #" "))]
+        (when (< rem 120)
+          (let [wait (max 5 (- reset (js/Math.floor (/ (.now js/Date) 1000))))]
+            (println "RATE\tremaining" rem "sleeping" wait "s")
+            (run "sleep" [(str (inc wait))])))))))
+
+(defn- rate-limited? [{:keys [out err]}]
+  (re-find #"(?i)secondary rate limit|abuse detection|rate limit exceeded|API rate limit" (str out err)))
+
+(defn- gh-api
+  "One REST call. A rate-limit answer is NOT an answer: sleep and retry (up to
+  12 x 90s) so it can never be recorded as a protected branch or a refusal."
+  [method endpoint fields]
+  (loop [n 0]
+    (let [r (run "gh" (concat ["api" "-X" method endpoint] (mapcat (fn [[k v]] ["-f" (str (name k) "=" v)]) fields)))]
+      (cond
+        (and (not (zero? (:status r))) (rate-limited? r) (< n 12))
+        (do (println "RATE\t" endpoint "sleeping 90s (" (inc n) "/12)")
+            (run "sleep" ["90"])
+            (recur (inc n)))
+        ;; empty body + non-zero = gh never got an HTTP answer (transport). Not a refusal.
+        (and (not (zero? (:status r))) (str/blank? (:out r)) (< n 3))
+        (do (println "TRANSIENT\t" endpoint (subs (:err r) 0 (min 120 (count (:err r)))) "retry" (inc n))
+            (run "sleep" ["10"])
+            (recur (inc n)))
+        :else r))))
+
+(defn- write-state! [state-dir slug m]
+  (fs/mkdirSync state-dir #js {:recursive true})
+  (fs/writeFileSync (path/join state-dir (str (str/replace slug "/" "__") ".edn"))
+                    (pr-str (assoc m :slug slug :at (.toISOString (js/Date.))))))
+
+(defn process-repo! [dir state-dir dry?]
+  (let [sl (or (slug dir) (str "unknown/" dir))
+        done (path/join state-dir (str (str/replace sl "/" "__") ".edn"))]
+    (cond
+      (not (fs/existsSync (path/join dir ".git")))
+      (do (write-state! state-dir sl {:status :refused :why :no-checkout :dir dir}) :refused)
+
+      (and (fs/existsSync done) (not dry?)
+           (contains? #{:merged :no-op :pr-open} (:status (cljs.reader/read-string (fs/readFileSync done "utf8")))))
+      :already
+
+      :else
+      (let [rn (or (remote-name dir) "origin")
+            f (git dir "fetch" "--quiet" rn)]
+        (if-not (zero? (:status f))
+          (do (write-state! state-dir sl {:status :refused :why :fetch-failed :err (subs (:err f) 0 (min 400 (count (:err f))))}) :refused)
+          (let [db (default-branch dir rn)
+                head (when db (str/trim (:out (git dir "rev-parse" (str rn "/" db)))))
+                entries (when head (ls-tree dir (str rn "/" db)))
+                renames (when entries (plan-renames entries))]
+            (cond
+              (nil? db) (do (write-state! state-dir sl {:status :refused :why :no-default-branch}) :refused)
+              (nil? entries) (do (write-state! state-dir sl {:status :refused :why :ls-tree-failed}) :refused)
+              (empty? renames) (do (write-state! state-dir sl {:status :no-op :head head}) :no-op)
+              :else
+              (let [rev (str rn "/" db)
+                    by-path (into {} (map (juxt :path identity) entries))
+                    ren-by-old (into {} (map (juxt :old identity) renames))
+                    referencing (grep-referencing dir rev renames)
+                    ;; blob edits: {old-path {:sha new-sha :mode}}
+                    skip-prefixes (some-> (arg "--skip-edit") (str/split #","))
+                    edits (reduce (fn [acc p]
+                                    (let [e (by-path p) buf (when-not (some #(str/starts-with? p %) skip-prefixes) (git-bytes dir (:sha e)))]
+                                      (cond
+                                        (some #(str/starts-with? p %) skip-prefixes) (update acc :skipped conj [p :record-not-rewritten])
+                                        (nil? buf) (update acc :skipped conj [p :unreadable])
+                                        (not (utf8-roundtrips? buf)) (update acc :skipped conj [p :not-utf8])
+                                        :else
+                                        (let [t (.toString buf "utf8") t* (replace-paths t renames)]
+                                          (if (= t t*) acc
+                                              (if dry?
+                                                (update acc :edited assoc p {:mode (:mode e) :sha "(dry)"})
+                                                (let [{:keys [status out]} (run "git" ["-C" dir "hash-object" "-w" "--stdin"] {:input t*})]
+                                                  (if (zero? status)
+                                                    (update acc :edited assoc p {:mode (:mode e) :sha (str/trim out)})
+                                                    (update acc :skipped conj [p :hash-object-failed])))))))))
+                                  {:edited {} :skipped []} referencing)
+                    origin-blob (when-not dry? (str/trim (:out (run "git" ["-C" dir "hash-object" "-w" "--stdin"] {:input (origin-edn renames)}))))
+                    ;; index-info lines
+                    zero-sha "0000000000000000000000000000000000000000"
+                    lines (concat
+                           (for [{:keys [old]} renames] (str "0 " zero-sha "\t" old))
+                           (for [{:keys [old new mode sha]} renames
+                                 :let [ed (get-in edits [:edited old])]]
+                             (str mode " " (if ed (:sha ed) sha) "\t" new))
+                           (for [[p {:keys [mode sha]}] (:edited edits) :when (not (ren-by-old p))]
+                             (str mode " " sha "\t" p))
+                           [(str "100644 " (or origin-blob "(dry)") "\tcljk-origin.edn")])
+                    summary {:head head :default-branch db :renamed (count renames)
+                             :collisions (count (filter #(str/ends-with? (:new %) (str (:ext %) ".cljk")) renames))
+                             :edited (count (:edited edits)) :skipped (:skipped edits)}]
+                (if dry?
+                  (do (println "DRY" sl (pr-str summary))
+                      (doseq [{:keys [old new]} (take 5 renames)] (println "   " old "->" new))
+                      (doseq [p (take 5 (keys (:edited edits)))] (println "    edit" p))
+                      :dry)
+                  (let [idx (path/join (.tmpdir (js/require "os")) (str "cljk-idx-" (.-pid js/process) "-" (str/replace sl "/" "__")))
+                        env {:GIT_INDEX_FILE idx}
+                        _ (when (fs/existsSync idx) (fs/unlinkSync idx))
+                        rt (run "git" ["-C" dir "read-tree" head] {:env env})
+                        ui (run "git" ["-C" dir "update-index" "--index-info"] {:env env :input (str (str/join "\n" lines) "\n")})
+                        wt (run "git" ["-C" dir "write-tree"] {:env env})
+                        tree (str/trim (:out wt))
+                        msg (str "cljk: rename " (count renames) " Clojure source file(s) to .cljk\n\n"
+                                 "Owner decision " today ": the Clojure-shaped source of this workspace is\n"
+                                 "Kotoba's .cljk surface. Blob contents are unchanged (pure renames);\n"
+                                 (count (:edited edits)) " text file(s) that named a renamed path were updated;\n"
+                                 "cljk-origin.edn records each file's previous extension.\n"
+                                 "No compatibility mirror -- build breakage is fixed forward.\n\n"
+                                 "ADR: " adr-id "\n\n"
+                                 "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n"
+                                 "Claude-Session: https://claude.ai/code/session_01FfwQAXFS1uuwEyTAxRttMS\n")
+                        ct (run "git" ["-C" dir "commit-tree" tree "-p" head "-m" msg])
+                        commit (str/trim (:out ct))
+                        _ (when (fs/existsSync idx) (fs/unlinkSync idx))]
+                    (if-not (and (zero? (:status rt)) (zero? (:status ui)) (zero? (:status wt)) (zero? (:status ct)))
+                      (do (write-state! state-dir sl (merge summary {:status :refused :why :commit-build-failed
+                                                                     :err (str (:err rt) (:err ui) (:err wt) (:err ct))}))
+                          :refused)
+                      (let [push (fn [] (git dir "push" "--quiet" rn (str commit ":refs/heads/" branch)))
+                            p1 (push)
+                            p (if (zero? (:status p1)) p1
+                                  (do (gh-api "DELETE" (str "repos/" sl "/git/refs/heads/" branch) {}) (push)))]
+                        (if-not (zero? (:status p))
+                          (do (write-state! state-dir sl (merge summary {:status :refused :why :push-failed :commit commit
+                                                                         :err (subs (:err p) 0 (min 400 (count (:err p))))}))
+                              :refused)
+                          (let [m (gh-api "POST" (str "repos/" sl "/merges") {:base db :head branch :commit_message (str "Merge cljk rename (" adr-id ")")})]
+                            (if (zero? (:status m))
+                              (let [msha (second (re-find #"\"sha\":\"([0-9a-f]{40})\"" (:out m)))]
+                                (gh-api "DELETE" (str "repos/" sl "/git/refs/heads/" branch) {})
+                                (write-state! state-dir sl (merge summary {:status :merged :commit commit :merge-sha (or msha commit)}))
+                                :merged)
+                              (let [pr (gh-api "POST" (str "repos/" sl "/pulls")
+                                               {:title (str "cljk: rename " (count renames) " Clojure source file(s) to .cljk")
+                                                :head branch :base db
+                                                :body (str "Owner decision " today " (" adr-id "). Merge refused server-side; see run state.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01FfwQAXFS1uuwEyTAxRttMS")})]
+                                (write-state! state-dir sl (merge summary {:status :pr-open :commit commit
+                                                                           :merge-err (subs (:out m) 0 (min 300 (count (:out m))))
+                                                                           :pr (second (re-find #"\"html_url\":\"([^\"]+/pull/\\d+)\"" (:out pr)))}))
+                                :pr-open))))))))))))))))
+
+(defn -main []
+  (let [paths-file (arg "--paths") state-dir (arg "--state") dry? (flag? "--dry-run")
+        [i n] (when-let [s (arg "--shard")] (map js/parseInt (str/split s #"/")))
+        all (->> (str/split (fs/readFileSync paths-file "utf8") #"\n") (remove str/blank?) vec)
+        mine (if i (keep-indexed (fn [k p] (when (= i (mod k n)) p)) all) all)
+        counts (atom {})]
+    (when-not (and paths-file state-dir) (println "usage: --paths <file> --state <dir> [--dry-run] [--shard i/n]") (.exit js/process 64))
+    (doseq [[k dir] (map-indexed vector mine)]
+      (when (and (not dry?) (zero? (mod k 50))) (rate-guard!))
+      (let [r (try (process-repo! dir state-dir dry?)
+                   (catch :default e
+                     (write-state! state-dir (or (slug dir) (str "unknown/" dir)) {:status :refused :why :exception :err (str e)})
+                     :refused))]
+        (swap! counts update r (fnil inc 0))
+        (println (str "[" (inc k) "/" (count mine) "]") (name r) dir)))
+    (println "SUMMARY" (pr-str @counts))
+    (.exit js/process (if (pos? (get @counts :refused 0)) 1 0))))
+
+(-main)

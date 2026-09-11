@@ -1,0 +1,156 @@
+#!/usr/bin/env nbb
+;; Amu's JVM-free wasm32 regression suite (`test/nbb/run.cljs`), run with no
+;; JVM anywhere in reach.
+;;
+;; The suite compiles every fixture under `test/nbb/fixtures` through
+;; `kotoba.sema` -> `kotoba.kir` -> `kotoba.wasm.core` and requires valid Wasm
+;; out of each one. It is the only check that exercises the path `bin/kotoba`
+;; takes for `wasm32*` targets without a JDK, and until 2026-08-24 NOTHING ran
+;; it: `grep -rn "test/nbb/run.cljk" scripts/fleet-ci/` returned nothing, and
+;; it was red on current nbb the whole time.
+;;
+;; Why it was red is worth keeping, because it is the reason this gate could
+;; not exist earlier. `lazy-sequence.kotoba` exhausted the constant oracle's
+;; host stack on nbb 1.5.212 and folded on 1.4.210 — not because of anything
+;; in that fixture, but because `kotoba.kir/eval-expr` recursed into the chosen
+;; `if` branch, so the closure `invoke` dispatcher (a linear `if` chain over
+;; every lambda in the module) cost one host frame per link. The oracle's
+;; reach depended on the size of the module. Fixed in kotoba-kir b9b2308 and
+;; kotoba-sema 58e1158; the suite is green on both nbb versions now, which is
+;; what makes gating it honest rather than theatre.
+;;
+;; Two things make this mean something rather than merely pass:
+;;
+;;   1. The classpath comes from `kotoba.compiler.nbb.classpath`, which reads
+;;      `deps-lock.edn`, NOT from `clojure -Spath`. Deriving it from the JVM
+;;      would make "runs without a JVM" untestable by construction.
+;;   2. `java`, `clojure`, `clj` and `javac` are shadowed on PATH by stubs that
+;;      exit non-zero and announce themselves.
+;;   3. The nbb version is PINNED, and here that is load-bearing rather than
+;;      tidy. Measured 2026-08-24 with this gate against amu at 0d00a71, the
+;;      commit immediately BEFORE the oracle fixes:
+;;
+;;        nbb 1.4.208   38 cases, 0 failed   exit 0
+;;        nbb 1.5.212   38 cases, 1 failed   exit 1, lazy-sequence
+;;
+;;      An unpinned gate would have reported that defect as absent on one
+;;      machine and present on another. The pin is 1.5.212 and NOT the 1.4.210
+;;      that `nbb-cross-runtime.cljs` pins: that version predates this class of
+;;      defect and cannot see it, which is precisely how it stayed invisible.
+;;      Bump this deliberately, never by ambient resolution.
+;;
+;; Exit codes are deliberately distinct so that "could not answer" never wears
+;; the same face as "passed":
+;;   0 pass · 1 suite failed · 90 required input missing · 91 cannot run
+;;   92 no summary line · 93 the suite ran no cases · 94 a JVM tool was invoked
+(ns fleet-ci.gates.amu-nbb-regression-check
+  (:require ["node:child_process" :as child]
+            ["node:fs" :as fs]
+            ["node:os" :as os]
+            ["node:path" :as path]))
+
+(def root (.resolve path (or (first *command-line-args*) ".")))
+
+(defn fail! [message code]
+  (println (str "FLEET-CI: " message))
+  (js/process.exit code))
+
+;; Evidence floor. A tree that arrived without these cannot produce a verdict,
+;; and must say so rather than reporting the clean run of an empty suite.
+(def required
+  ["test/nbb/run.cljk"
+   "test/nbb/cases.cljk"
+   "deps.edn"
+   "deps-lock.edn"
+   "src/kotoba/compiler/nbb/classpath.cljk"
+   "test/nbb/fixtures/lazy-sequence.kotoba"])
+
+(doseq [rel required]
+  (let [p (.join path root rel)]
+    (when-not (and (.existsSync fs p) (.isFile (.statSync fs p)))
+      (fail! (str "required input is missing, so no verdict is possible: " rel) 90))))
+
+;; The fixtures ARE the suite. A tree that shipped `run.cljs` and no `.kotoba`
+;; would run zero cases and exit 0, so the count is checked before the run as
+;; well as after it.
+(def fixture-dir (.join path root "test/nbb/fixtures"))
+(def fixture-count
+  (if (.existsSync fs fixture-dir)
+    (count (filter #(.endsWith % ".kotoba") (js->clj (.readdirSync fs fixture-dir))))
+    0))
+
+(when (< fixture-count 20)
+  (fail! (str "only " fixture-count " fixtures arrived; the suite would be a shadow of itself") 90))
+
+(def trap-dir
+  (.mkdtempSync fs (.join path (.tmpdir os) "amu-nbb-regression-trap-")))
+
+(doseq [tool ["java" "clojure" "clj" "javac"]]
+  (let [p (.join path trap-dir tool)]
+    (.writeFileSync fs p (str "#!/bin/sh\n"
+                              "echo 'AMU-NBB-TRAP: " tool " was invoked' >&2\n"
+                              "exit 97\n"))
+    (.chmodSync fs p 493)))
+
+(def trapped-path (str trap-dir ":" (or (.-PATH js/process.env) "")))
+
+(def nbb-version
+  "See the header: this version SEES the class of defect 1.4.x cannot."
+  "1.5.212")
+
+(defn run
+  "Run nbb at the pinned version. `npx --yes nbb@<v>` rather than whatever
+   `nbb` resolves to, so the verdict does not depend on the machine."
+  [args]
+  (.spawnSync child "npx" (clj->js (concat ["--yes" (str "nbb@" nbb-version)] args))
+              #js {:cwd root :encoding "utf8" :maxBuffer 33554432
+                   :env (js/Object.assign #js {} js/process.env #js {:PATH trapped-path})}))
+
+(def resolved
+  (run ["--classpath" "src" "-e"
+              (str "(require '[kotoba.compiler.nbb.classpath :as cp])"
+                   "(println (clojure.string/join \":\" (cp/resolve-directories \".\")))")]))
+
+(when (.-error resolved)
+  (fail! (str "cannot run nbb@" nbb-version ": " (.. resolved -error -message)) 91))
+(when-not (zero? (or (.-status resolved) 1))
+  (print (str (or (.-stdout resolved) "") (or (.-stderr resolved) "")))
+  (fail! "dependency lock did not resolve; run scripts/lock-classpath.cljk" 91))
+
+(def dep-dirs (.trim (str (or (.-stdout resolved) ""))))
+
+(when (empty? dep-dirs)
+  (fail! "dependency lock resolved to nothing, so the suite would run against an empty classpath" 90))
+
+;; `.` is on the classpath because `run.cljs` requires `test.nbb.cases` by its
+;; path-derived name, which only resolves from the repository root.
+(def result
+  (run ["--classpath" (str ".:src:test:" dep-dirs) "test/nbb/run.cljk"]))
+
+(def output (str (or (.-stdout result) "") (or (.-stderr result) "")))
+(print output)
+
+(when (.-error result)
+  (fail! (str "cannot run the regression suite: " (.. result -error -message)) 91))
+
+(when (.includes output "AMU-NBB-TRAP")
+  (fail! "a JVM tool was invoked, so this run is not evidence of a JDK-free path" 94))
+
+(def summary (re-find #"(\d+) cases, (\d+) failed" output))
+
+(when-not summary
+  (fail! "the suite returned without its summary line, so nothing here is a verdict" 92))
+
+(let [[_ cases failed] summary
+      cases (js/parseInt cases 10)
+      failed (js/parseInt failed 10)]
+  (when (zero? cases)
+    (fail! "the regression suite ran no cases" 93))
+  (when (< cases fixture-count)
+    (fail! (str "the suite reported " cases " cases but " fixture-count
+                " fixtures were shipped; something was skipped silently") 93))
+  (when-not (zero? failed)
+    (fail! (str "regression suite failed: " failed " of " cases " cases") 1))
+  (println (str "FLEET-CI: amu nbb wasm32 regression passed with no JVM -- "
+                cases " cases, " fixture-count " fixtures, nbb " nbb-version
+                ", JVM tools trapped on PATH")))

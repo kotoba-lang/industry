@@ -1,0 +1,229 @@
+#!/usr/bin/env nbb
+;; rule-kaizen — standing な言い方が、ある日の実装天井を言語にしていないか測る。
+;; ここにモデルは居ない。直す判断は skill `rule-kaizen`。
+;;
+;; 正本: ADR-2608261200。姉妹は adr-inventory（status / pointer）と
+;; docs-edn-repair（parse）。こちらは『読めるのに、現行方針として嘘をつく』。
+;;
+;; needles は `manifest/rule-snapshot-needles.edn`（手書き。corpus から導かない）。
+;;
+;; usage:
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --edn
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --self-test
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --min-listed 80
+
+(require '[clojure.edn :as edn]
+         '[clojure.string :as str])
+
+(def fs (js/require "node:fs"))
+(def path (js/require "node:path"))
+(def cp (js/require "node:child_process"))
+
+(def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT") (.cwd js/process)))
+(def edn-out? (boolean (some #{"--edn"} *command-line-args*)))
+(def self-test? (boolean (some #{"--self-test"} *command-line-args*)))
+
+(defn- arg [flag default]
+  (let [a (vec *command-line-args*)
+        i (.indexOf a flag)]
+    (if (neg? i) default (nth a (inc i)))))
+
+(defn- sh [cmd args]
+  (try
+    (let [r (.spawnSync cp cmd (clj->js args)
+                        #js {:encoding "utf8" :cwd root
+                             :maxBuffer (* 64 1024 1024)})]
+      {:code (aget r "status") :out (str (aget r "stdout")) :err (str (aget r "stderr"))})
+    (catch :default e {:code nil :out "" :err (str e)})))
+
+(defn- load-needles []
+  (let [p (.join path root "manifest/rule-snapshot-needles.edn")]
+    (edn/read-string (str (.readFileSync fs p "utf8")))))
+
+(defn- listed-paths [git-args]
+  (let [{:keys [code out err]}
+        (sh "git" (into ["ls-files" "--cached" "--others" "--exclude-standard" "--"]
+                        git-args))]
+    (if (not= 0 code)
+      {:ok? false :err (str/trim err) :paths []}
+      {:ok? true
+       :paths (->> (str/split-lines out)
+                   (map str/trim)
+                   (remove str/blank?)
+                   (remove #(str/includes? % ".datoms.edn"))
+                   (filter #(or (str/ends-with? % ".edn")
+                                (str/ends-with? % ".md")
+                                (str/ends-with? % ".mdc")
+                                (str/ends-with? % "SKILL.md")))
+                   vec)})))
+
+(defn- slurp-ok [rel]
+  (let [p (.join path root rel)]
+    (try
+      (if (.existsSync fs p)
+        {:ok? true :text (str (.readFileSync fs p "utf8"))}
+        {:ok? false :err "ENOENT"})
+      (catch :default e {:ok? false :err (str e)}))))
+
+(defn- match-all [pattern text]
+  (let [re (js/RegExp. pattern "g")]
+    (loop [acc []]
+      (let [m (.exec re text)]
+        (if m
+          (recur (conj acc {:index (.-index m) :match (aget m 0)}))
+          acc)))))
+
+(defn classify-text
+  "path は finding に載せる識別子。text に対して needles を当てる。"
+  [path text needles window]
+  (vec
+   (for [n needles
+         m (match-all (:pattern n) text)
+         :let [idx (:index m)
+               hit (:match m)
+               lo (max 0 (- idx window))
+               hi (min (count text) (+ idx (count hit) window))
+               w (subs text lo hi)
+               dem (js/RegExp. (:demurrer n))]
+         :when (not (.test dem w))]
+     {:kind (:id n)
+      :class (:class n)
+      :path path
+      :index idx
+      :match hit
+      :snippet (str/replace w #"\s+" " ")
+      :fix (:fix n)
+      :superseded-by (:superseded-by n)})))
+
+(def self-test-cases
+  [{:id :bad-command
+    :expect-kinds #{:command-strings-are-cljc}
+    :text "コマンド文字列は `.cljc` に残す。ソケットもそこ。"}
+   {:id :good-demote
+    :expect-kinds #{}
+    :text "決定 4 の『移行の単位は決定核』は、ここで降格する。"}
+   {:id :good-history
+    :expect-kinds #{}
+    :text "当時は線の形（command）を `.cljc` に残した。現行ではない。oracle であって意味の正本ではない。"}
+   {:id :bad-unit
+    :expect-kinds #{:migration-unit-is-decision-core}
+    :text "ADR-2608650000 のとおり移行の単位は決定核であって repo 全体ではない。"}
+   {:id :baked-kit
+    :expect-kinds #{:baked-kit-counts}
+    :text "全 8 capability kit（clock/http/llm）は wasm-aot pending。"}
+   {:id :bad-recursive-absent
+    :expect-kinds #{:recursive-values-still-absent}
+    :text "再帰的な値型は「まだ」無い。今日は hiccup のような任意深度の入れ子を書けない。"}
+   {:id :bad-recursive-absent-plain
+    :expect-kinds #{:recursive-values-still-absent}
+    :text "ただし再帰的な値型は無い（本質的な制約）。"}
+   {:id :good-recursive-landed
+    :expect-kinds #{}
+    :text "この節は 2026-08-08 に書き換えた。旧文は「今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない」と書いていたが、W4 は landed している。"}
+   {:id :bad-w4-wait
+    :expect-kinds #{:w4-still-pending}
+    :text "problem.kotoba は W4 を待つ側の program である。切り替えは W4 と両 renderer の qualification 後。"}
+   {:id :good-w4-landed
+    :expect-kinds #{}
+    :text "当時は W4 待ちと書いた。現行ではない。W4 は landed。待ちは native を待つ backend 未達である。"}])
+
+(defn- run-self-test [cfg]
+  (let [needles (:needles cfg)
+        window (or (:window cfg) 220)
+        results
+        (for [c self-test-cases
+              :let [found (set (map :kind (classify-text (:id c) (:text c) needles window)))
+                    ok? (= found (:expect-kinds c))]]
+          (assoc c :found found :ok? ok?))]
+    {:ok? (every? :ok? results)
+     :cases (vec results)}))
+
+(defn -main []
+  (let [cfg (load-needles)
+        min-listed (js/parseInt (arg "--min-listed" (str (:min-listed cfg))) 10)]
+    (when self-test?
+      (let [st (run-self-test cfg)]
+        (doseq [c (:cases st)]
+          (println (str (if (:ok? c) "PASS" "FAIL") "  " (name (:id c))
+                        "  expect=" (pr-str (:expect-kinds c))
+                        "  found=" (pr-str (:found c)))))
+        (js/process.exit (if (:ok? st) 0 1))))
+
+    (let [listed-all
+          (reduce
+           (fn [acc surf]
+             (let [r (listed-paths (:git-args surf))]
+               (if-not (:ok? r)
+                 (reduced {:ok? false :err (:err r) :paths []})
+                 (update acc :paths into (:paths r)))))
+           {:ok? true :paths []}
+           (:surfaces cfg))]
+      (cond
+        (not (:ok? listed-all))
+        (let [out {:outcome :insufficient-scan :reason :git-ls-files-failed
+                   :err (:err listed-all) :listed 0 :readable 0 :unread 0
+                   :finding-count 0}]
+          (if edn-out? (prn out)
+              (println "rule-kaizen: insufficient-scan git-ls-files-failed"))
+          (js/process.exit 0))
+
+        :else
+        (let [paths (->> (:paths listed-all) distinct sort vec)
+              listed (count paths)
+              reads (map (fn [p]
+                           (let [r (slurp-ok p)]
+                             (assoc r :path p)))
+                         paths)
+              unread (filterv #(not (:ok? %)) reads)
+              texts (filterv :ok? reads)
+              findings (->> texts
+                            (mapcat #(classify-text (:path %) (:text %)
+                                                    (:needles cfg)
+                                                    (or (:window cfg) 220)))
+                            (sort-by (juxt (comp name :kind) :path :index))
+                            vec)
+              unread-n (count unread)
+              outcome
+              (cond
+                (< listed min-listed) :insufficient-scan
+                (and (pos? unread-n) (empty? findings)) :insufficient-scan
+                (seq findings) :findings
+                :else :clean)
+              result {:outcome outcome
+                      :listed listed
+                      :readable (count texts)
+                      :unread unread-n
+                      :finding-count (count findings)
+                      :remaining (count findings)
+                      :by-kind (->> findings (map :kind) frequencies)
+                      :next (first findings)
+                      :note (when (pos? unread-n)
+                              (str "unread=" unread-n " (not counted as clean)"))}
+              result (cond-> result
+                       (= outcome :insufficient-scan)
+                       (assoc :reason (if (< listed min-listed)
+                                        :listed-below-floor
+                                        :unread-without-findings)
+                              :min-listed min-listed))]
+          (if edn-out?
+            (prn result)
+            (do
+              (println (str "rule-kaizen: listed " listed
+                            " / readable " (count texts)
+                            " / unread " unread-n
+                            " / findings " (count findings)
+                            " / outcome " (name outcome)))
+              (when-let [n (:note result)] (println (str "  " n)))
+              (doseq [[k c] (sort-by (comp name key) (:by-kind result))]
+                (println (str "  " (name k) "  " c)))
+              (when-let [n (:next result)]
+                (println (str "  next  " (name (:kind n)) "  " (:path n)))
+                (println (str "         " (subs (:snippet n) 0
+                                                (min 160 (count (:snippet n)))))))
+              (when (> (count findings) 1)
+                (doseq [f (take 12 (rest findings))]
+                  (println (str "  +     " (name (:kind f)) "  " (:path f)))))))
+          (js/process.exit 0))))))
+
+(-main)

@@ -1,0 +1,135 @@
+#!/usr/bin/env nbb
+;; lei-datalake-export.cljs — cloud-itonami-lei-<LEI>/facts.edn を datalake に
+;; 載せられる 2 枚の表に落とす。
+;;
+;; ## 何を読むか
+;;
+;; 読むのは **正本の facts.edn**（`scripts/lei-verify-facts.cljk` が書く tx-data、
+;; entity map のベクタ）。この script は事実を 1 つも取りに行かない —— 取得と検証は
+;; 正本の仕事で、ここは形を変えるだけ。
+;;
+;; ## なぜ 2 枚か
+;;
+;;   lei_facts   長い形。1 行 = (lei, fact_id, fact_kind, attribute, value, 出典)。
+;;               **無損失**。ベクタ値は要素ごとに 1 行（value_index つき）なので、
+;;               ISIN が 12 本ある会社は 12 行になり、数え落としが起きない。
+;;   lei_entity  広い形。1 行 = 1 社の :fact/kind :legal-entity。分析の入口。
+;;
+;; 広い方だけにすると ISIN・親子関係・reporting exception が落ちる。長い方だけに
+;; すると素の集計に毎回 pivot が要る。**どちらか一方は必ず嘘か不便になる**ので両方出す。
+;;
+;; ## なぜ 2 プロセスに分かれているか
+;;
+;; EDN を読むのは nbb（この workspace の script host）、Iceberg の commit は
+;; pyiceberg（nbb に Iceberg writer は無い）。境界はこの JSON。
+;;
+;; ## 測れなかったことを clean と書かない
+;;
+;; facts.edn が 1 つも読めなければ exit 2。読めなかったファイルは skipped として
+;; **数えて報告する** —— 黙って落とすと、行が減ったことと「その会社にデータが無い」
+;; ことが出力から区別できなくなる。
+;;
+;; Run:
+;;   nbb scripts/lei-datalake-export.cljk [--orgs-root <path>] [--out-dir <dir>]
+
+(ns lei-datalake-export
+  (:require ["fs" :as fs]
+            ["path" :as path]
+            [clojure.string :as str]
+            [cljs.reader :as edn]))
+
+(def argv (vec (drop 2 (js->clj (.-argv js/process)))))
+(defn- flag [n] (let [i (.indexOf (clj->js argv) n)]
+                  (when (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)))))
+(def orgs-dir (or (flag "--orgs-root") "orgs/cloud-itonami"))
+(def out-dir (or (flag "--out-dir") "/tmp"))
+
+(defn- repo-dirs []
+  (->> (fs/readdirSync orgs-dir)
+       (filter #(str/starts-with? % "cloud-itonami-lei-"))
+       sort vec))
+
+(defn- col-name
+  "属性 keyword を SQL で扱える列名にする。:company/legal-name -> company_legal_name。"
+  [k]
+  (-> (str (namespace k) "_" (name k))
+      (str/replace #"[^A-Za-z0-9]+" "_")
+      str/lower-case))
+
+(defn- scalar [v]
+  (cond (nil? v) nil
+        (or (string? v) (number? v) (boolean? v)) (str v)
+        (keyword? v) (name v)
+        :else (pr-str v)))
+
+(defn- long-rows
+  "1 entity -> 1 attribute 1 行（ベクタは要素ごと）。出典は entity の :source/* を継ぐ。"
+  [lei ent]
+  (let [fid (str (:fact/id ent))
+        kind (some-> (:fact/kind ent) name)
+        src (scalar (:source/url ent))
+        at (scalar (:source/retrieved-at ent))
+        status (scalar (:source/http-status ent))]
+    (for [[k v] ent
+          :when (not (#{:fact/id :fact/kind} k))
+          [i x] (map-indexed vector (if (sequential? v) v [v]))
+          :when (some? x)]
+      {"lei" lei "fact_id" fid "fact_kind" kind
+       "attribute" (col-name k) "value" (scalar x)
+       "value_index" i
+       "source_url" src "source_retrieved_at" at "source_http_status" status})))
+
+(defn- read-facts [dir]
+  (let [f (path/join orgs-dir dir "facts.edn")]
+    (when (fs/existsSync f)
+      (try
+        (let [ents (edn/read-string (fs/readFileSync f "utf8"))]
+          (if (and (sequential? ents) (every? map? ents))
+            {:ok true :entities (vec ents)}
+            {:ok false :why "top level is not a vector of entity maps"}))
+        (catch :default e {:ok false :why (str e)})))))
+
+(defn- run! []
+  (let [dirs (repo-dirs)
+        read (mapv (fn [d] [d (read-facts d)]) dirs)
+        missing (filterv (fn [[_ r]] (nil? r)) read)
+        broken (filterv (fn [[_ r]] (and r (not (:ok r)))) read)
+        good (filterv (fn [[_ r]] (and r (:ok r))) read)]
+    (println (str "SCANNED\t" (count dirs)))
+    (println (str "with-facts=" (count good)
+                  " no-facts-file=" (count missing)
+                  " unreadable=" (count broken)))
+    (doseq [[d r] broken] (println (str "  UNREADABLE " d "  " (:why r))))
+    (when (zero? (count good))
+      (println "no facts.edn was readable -- refusing to write an empty export")
+      (.exit js/process 2))
+    (let [long-rows* (vec (mapcat (fn [[d r]]
+                                    (let [lei (str/upper-case (subs d (count "cloud-itonami-lei-")))]
+                                      (mapcat #(long-rows lei %) (:entities r))))
+                                  good))
+          entity-rows (vec (keep (fn [[d r]]
+                                   (let [lei (str/upper-case (subs d (count "cloud-itonami-lei-")))]
+                                     (when-let [e (first (filter #(= :legal-entity (:fact/kind %))
+                                                                 (:entities r)))]
+                                       (into {"lei" lei}
+                                             (keep (fn [[k v]]
+                                                     (when-not (#{:fact/id :fact/kind} k)
+                                                       [(col-name k)
+                                                        (scalar (if (sequential? v)
+                                                                  (str/join "|" (map scalar v)) v))]))
+                                                   e)))))
+                                 good))
+          ;; 列を全行で揃える（Arrow は欠落を許さない）。欠けは nil = 「その会社は
+          ;; この属性を持たない」であって 0 ではない。
+          ecols (vec (sort (distinct (mapcat keys entity-rows))))
+          entity-rows (mapv (fn [r] (reduce #(assoc %1 %2 (get r %2)) {} ecols)) entity-rows)
+          lf (path/join out-dir "lei_facts.json")
+          ef (path/join out-dir "lei_entity.json")]
+      (fs/writeFileSync lf (js/JSON.stringify (clj->js long-rows*) nil 1))
+      (fs/writeFileSync ef (js/JSON.stringify (clj->js entity-rows) nil 1))
+      (println (str "wrote " lf "  rows=" (count long-rows*)))
+      (println (str "wrote " ef "  rows=" (count entity-rows) " columns=" (count ecols)))
+      (println (str "companies-without-a-legal-entity-fact="
+                    (- (count good) (count entity-rows)))))))
+
+(run!)

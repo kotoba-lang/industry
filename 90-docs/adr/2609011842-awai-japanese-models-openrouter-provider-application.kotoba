@@ -6,8 +6,8 @@
   (:adr/doc-type "adr")
   (:adr/source-format "edn")
   (:adr/date "2026-09-01")
-  (:adr/last-verified "2026-09-01")
-  (:adr/last_verified "2026-09-01")
+  (:adr/last-verified "2026-09-11")
+  (:adr/last_verified "2026-09-11")
   (:adr/authoritative true)
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/topic "awai-openrouter-original-japanese-models")
@@ -29,6 +29,12 @@
    "2026-09-01 console readback: Hugging Face awai-network Dedicated Endpoints は 0 items。GLM-5.3-Flash catalog form は RTX PRO 6000 Blackwell 96 GB x1 を $2.75/h と表示するが Incompatible Hardware。Private と min 0 / max 1 scale-to-zero は選べるが deploy は未実行"
    "2026-09-01 OpenRouter BYOK UI: Baseten と Together の接続テストは既存 catalog model z-ai/glm-5.3-flash で成功した。BYOK は custom model id の登録ではない"
    "2026-09-01 OpenRouter API: 未登録 id awai-network/basho は HTTP 400 invalid model ID。provider/catalog onboarding が必要"
+   "2026-09-11 OpenRouter management API: BYOK の Azure per-deployment config は endpoint_url の host を検証する。api.murakumo.cloud を書いた POST /api/v1/byok は HTTP 400 \"0.endpoint_url: Must be a valid Azure endpoint URL (*.azure.com)\"。guide は host 制限を書いていないが API が enforce する。BYOK guide の「it doesn't change which endpoints you're allowed to route to」のとおりで、BYOK 経由で murakumo を OpenRouter に繋ぐ道は Azure 形でも無い。BYOK guide に URL を取る provider は他に無い"
+   "2026-09-11 cloud-murakumo-api main 583799e: Azure OpenAI data-plane 形（POST /openai/deployments/{d}/chat/completions?api-version=…、api-key header）を /v1/chat/completions + model=d に書き換える facade を deploy（version 90fff380）。glm-5.3-flash-cybersecurity-w4a16 に対し live 200、x-murakumo-served-model 一致、cold wait 1,088 s。OpenRouter には使えないが Azure 形しか話せない client の入口として残す"
+   "2026-09-11 OpenRouter management API、host suffix の probe（disabled credential を作って即削除）: *.inference.ml.azure.com → 201、*.services.ai.azure.com → 201、*.azurecontainerapps.io → 400、*.azure-api.net → 400。検査は .azure.com の suffix 一致だけ。自前 checkpoint を Azure に置いて BYOK を通すなら Azure ML managed online endpoint（min instance 1、scale-to-zero 無し）しか無く、H200 は 8 GPU SKU のみ（Azure Retail Prices API 2026-09-11: ND96isr H200 v5 westus3 $84.8/h、japaneast $106/h）。オーナー判断 2026-09-11: Azure hosting は採らない。provider onboarding（§8）を前提に進める"
+   "2026-09-11 Gmail 実測: 2026-09-09 05:28 UTC に providers@openrouter.ai へ送った問い合わせ（AWAI / Murakumo — research-model listing and opt-in evaluation inquiry）は 2 秒後に 550 5.1.1 The email account that you tried to reach does not exist で bounce。未配信。その address は openrouter.ai/providers/apply の FAQ が公開しているもの（MX は Google）。support@openrouter.ai への送信記録は jun784@gmail.com に無い（j@awai.network は未確認）。正規の入口は https://openrouter.ai/how-to-list → /providers/apply/form（client-rendered、要ログイン）。resume: form から exploratory inquiry を出し直す。本文は bounce したメールをそのまま使える"
+   "2026-09-11 provider model document の現在地: GET https://api.murakumo.cloud/v1/openrouter/models は 1 model（qwen3.8-27b-throughput-b70）。glm-5.3-flash-cybersecurity-w4a16 は /v1/models には在るが provider document には無い。載せるには価格（$/Mtok in/out）と datacenter の宣言が要り、それはオーナー決定（cost basis: Modal 2x H200 warm ~$9/h、cold start 実測 1,088-1,528 s、scale-to-zero）"
+   "2026-09-11 OpenRouter management key を Keychain service gftd.openrouter / account OPENROUTER_MANAGEMENT_KEY に格納（/api/v1/byok で 200 確認）。BYOK 登録済み credential は together / baseten / modal の 3 本（modal は workspace key。OpenRouter が catalog model を Modal で serve するときの課金先であって、自前 Modal app を指すものではない）"
    "2026-09-01 Hugging Face: private empty repository awai-network/basho は存在するが endpoint と fine-tuned artifact は未作成"
    "Qwen official Hugging Face card: Qwen/Qwen3.8-Flash-Next は 180B image-text-to-text model。FP8 variant も公式公開"
    "MiniMax official Hugging Face card: MiniMaxAI/MiniMax-H3 は 33B audio-video generation system"

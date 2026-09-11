@@ -1,0 +1,210 @@
+#!/usr/bin/env nbb
+;; hyakka-catalog-freshness-check.cljs — app-hyakka の committed な生成物
+;; `src/hyakka/catalog.cljk` を、**その入力から作り直して**突き合わせる
+;; （root ADR-2608300100 決定 1 の最初の 1 工程）。
+;;
+;; ## 何を突き合わせるか
+;;
+;;   入力  knowledge/ledger/**/*.datoms.edn  +  data/*.datoms.edn
+;;   生成器 scripts/generate_catalog.cljs     （第三者依存ゼロ。node 組み込みのみ）
+;;   生成物 src/hyakka/catalog.cljk           （committed。Worker が bundle する）
+;;
+;; 生成器をノード上で実際に走らせ、出てきたファイルが commit されていたものと
+;; **byte 一致するか**を見る。**catalog は wiki.kotobase.net が serve する内容
+;; そのもの**なので、これがずれているとは「公開されている百科が、台帳が言って
+;; いる内容と違う」ということである。
+;;
+;; ⚠ **比較は byte であって、ファイルが自称する id ではない。** `:catalog-sha256`
+;; は `ledger-sha256(files)` ——**入力台帳**のダイジェストなので、catalog 本体を
+;; 手編集してその行に触れなければ、自称 id は当然一致する。この gate の初稿は
+;; 自称 id だけを比べており、docstring では手編集を捕まえると書いていた。
+;; **捕まえられなかった**（2026-08-30、両方向を実際に走らせて判明）。自称 id は
+;; 今も読むが、それは**2 つの欠陥のどちらかを名指しする**ためだけに使う
+;; （直し方が違う: 台帳が動いた / ファイルが手で編集された）。
+;;
+;; ## なぜ fleet に置くか（そして何を offload しないか）
+;;
+;; 2026-08-29 実測: この再生成が load 230 のワークステーションで 18 分以上 CPU を
+;; 奪い合って餓死し、1 tick が 2 時間を超えた。生成器は依存ゼロで入力 18MB、
+;; 必要な cap は `:node` だけ —— **credential を一切要さない**ので、不変条件3
+;; （ノードに credential を置かない）に触れずに fleet へ出せる工程である。
+;;
+;; ⚠ **これは検証であって、成果物の受け渡しではない。** gate は receipt を返す
+;; だけで artifact をローカルに戻さないので、常駐はこれまで通り deploy のために
+;; 自分でも catalog を作る。ローカルの CPU がこの gate によって減るわけではない。
+;; 減らすには「fleet が作った artifact を deploy 側が受け取る」経路が要り、それは
+;; 別の決定である。ここで得られるのは **(a) 手編集・古い catalog という欠陥クラス
+;; の検出** と **(b) この工程が本当にノードで走るかの実証**（決定 1 の前提）。
+;;
+;; ## 検査
+;;
+;;   1. 入力が実在する —— ledger が 0 件なら **合格を拒否する**。空の入力から
+;;      作った catalog は「空の catalog」と一致してしまい、緑が何も主張しない。
+;;   2. committed が読める —— bytes と `:catalog-id` の両方。取れないなら拒否
+;;      （測れなかったものを「一致」と読まない）。
+;;   3. 再生成が成功する —— 生成器が非 0 で落ちたら fail（診断は stderr を出す）。
+;;   4. **byte 一致** —— committed のファイル == 再生成したファイル。
+;;   5. evidence floor —— 走査した ledger 数が `--min` 未満なら落とす。
+;;
+;; ## exit
+;;
+;;   0  一致（緑）
+;;   1  不一致・生成失敗（赤）
+;;   2  **答えられなかった**（入力不在・生成器不在・committed 値が読めない）。
+;;      0 でも 1 でもない値なのは、「測れなかった」を「測って問題なかった」と
+;;      同じ顔にしないため（ADR-2608136000）。
+;;
+;; ## 使い方
+;;
+;;   nbb hyakka-catalog-freshness-check.cljs <repo-dir> [--min N]
+;;
+;; `<dir>` は **引数の先頭**（fleet はそう渡す。CLAUDE.md 実測済みの罠）。
+
+(ns hyakka-catalog-freshness-check
+  (:require [clojure.string :as str]
+            ["node:child_process" :as cp]
+            ["node:crypto" :as crypto]
+            ["node:fs" :as fs]
+            ["node:path" :as path]))
+
+(def args (vec *command-line-args*))
+
+;; `--min 10 .` と書かれても `"10"` を tree のパスと誤読しない。
+(def ^:private value-flags #{"--min"})
+
+(def root
+  (loop [[a & more] args prev nil]
+    (cond (nil? a) "."
+          (str/starts-with? a "--") (recur more a)
+          (contains? value-flags prev) (recur more nil)
+          :else a)))
+
+(defn- opt [flag default]
+  (let [i (.indexOf args flag)]
+    (if (neg? i) default (get args (inc i)))))
+
+(def min-ledgers (js/parseInt (opt "--min" "300")))
+
+(defn- refuse!
+  "答えられなかった。exit 2 —— 緑でも赤でもない。"
+  [& parts]
+  (println (str "REFUSED " (str/join " " (map str parts))))
+  (println "a pass here would assert nothing; this gate refuses to report one")
+  (set! (.-exitCode js/process) 2)
+  nil)
+
+(defn- ledger-files [dir]
+  (let [ledger-root (path/join dir "knowledge" "ledger")]
+    (if-not (fs/existsSync ledger-root)
+      []
+      (letfn [(walk [p]
+                (let [st (fs/statSync p)]
+                  (if (.isDirectory st)
+                    (mapcat walk (map #(path/join p %) (fs/readdirSync p)))
+                    (if (str/ends-with? p ".datoms.edn") [p] []))))]
+        (vec (walk ledger-root))))))
+
+(defn- declared-id
+  "The `:catalog-id` a catalog file declares, or nil. nil is `could not read`,
+  never `no catalog` — the caller must not collapse the two.
+
+  `:catalog-id` and not `:catalog-sha256`: the file carries both (the former
+  prefixed `sha256:`, the latter bare hex), and `:catalog-id` is the one the
+  resident's `catalogue-id`, the deploy verification and `/health` all compare.
+  Measured 2026-08-30: requiring the prefix on `:catalog-sha256` matched
+  nothing, and this gate correctly refused (exit 2) rather than reporting a
+  green it had not earned."
+  [p]
+  (when (fs/existsSync p)
+    (second (re-find #":catalog-id\s+\"(sha256:[0-9a-f]{64})\""
+                     (str (fs/readFileSync p "utf8"))))))
+
+(defn- file-sha
+  "sha256 of the file's actual bytes, or nil when it is not there.
+
+  This — not the declared id — is what the comparison turns on. Measured
+  2026-08-30: `:catalog-sha256` is `ledger-sha256(files)`, a digest of the
+  INPUT ledgers, so a hand-edit to the catalog BODY that leaves that line
+  alone reproduces its own declared id exactly and would have passed a gate
+  that compared only the declared value. The first draft of this gate claimed
+  in its own docstring to catch hand-edits and did not."
+  [p]
+  (when (fs/existsSync p)
+    (-> (crypto/createHash "sha256")
+        (.update (fs/readFileSync p))
+        (.digest "hex"))))
+
+(defn main! []
+  (let [generator (path/join root "scripts" "generate_catalog.cljk")
+        catalog (path/join root "src" "hyakka" "catalog.cljk")
+        ledgers (ledger-files root)]
+    (println (str "SCANNED\t" (count ledgers)))
+    (cond
+      (not (fs/existsSync generator))
+      (refuse! "no generator at scripts/generate_catalog.cljs —"
+               "the shipped tree does not contain what this gate runs")
+
+      (zero? (count ledgers))
+      (refuse! "no knowledge/ledger/**/*.datoms.edn in the shipped tree —"
+               "regenerating from no input would agree with an empty catalog")
+
+      :else
+      (let [committed-bytes (file-sha catalog)
+            committed-id (declared-id catalog)]
+        (if-not (and committed-bytes committed-id)
+          (refuse! "could not read the committed catalog at src/hyakka/catalog.cljk"
+                   (cond (not (fs/existsSync catalog)) "(file absent)"
+                         (nil? committed-id) "(no :catalog-id in it)"
+                         :else "(unreadable bytes)"))
+          (do
+            (println (str "committed  id " committed-id))
+            (println (str "committed  bytes sha256:" committed-bytes))
+            ;; The generator WRITES the catalog. That is fine and intended: the
+            ;; node's tree is a disposable copy, and both committed values were
+            ;; read above, before it is overwritten.
+            (let [r (.spawnSync cp "nbb" #js ["scripts/generate_catalog.cljk"]
+                                #js {:cwd root :encoding "utf8"
+                                     :maxBuffer (* 64 1024 1024)})
+                  status (if (nil? (.-status r)) 1 (.-status r))]
+              (if (pos? status)
+                (do (println "FAIL generator exited" status)
+                    (println (str/trim (str (.-stderr r) "\n" (.-stdout r))))
+                    (set! (.-exitCode js/process) 1))
+                (let [fresh-bytes (file-sha catalog)
+                      fresh-id (declared-id catalog)]
+                  (println (str "regenerated id " (or fresh-id "(unreadable)")))
+                  (println (str "regenerated bytes sha256:" (or fresh-bytes "(unreadable)")))
+                  (cond
+                    (or (nil? fresh-bytes) (nil? fresh-id))
+                    (refuse! "the generator ran but its output could not be read back")
+
+                    ;; The comparison that matters is over the BYTES. The
+                    ;; declared id is reported alongside only to name WHICH of
+                    ;; the two defects this is, because the fix differs.
+                    (not= committed-bytes fresh-bytes)
+                    (do (println "FAIL the committed catalog is not what its generator produces")
+                        (if (not= committed-id fresh-id)
+                          (do (println "  the INPUTS changed: a ledger landed without regenerating.")
+                              (println (str "    committed id   " committed-id))
+                              (println (str "    regenerated id " fresh-id)))
+                          (do (println "  the inputs are unchanged but the FILE differs:")
+                              (println "  the committed catalog was edited by hand.")
+                              (println (str "    both declare " committed-id))))
+                        (println "")
+                        (println "wiki.kotobase.net serves this file. Regenerate and commit it")
+                        (println "with the ledgers that produced it:")
+                        (println "  npm run catalog && git add src/hyakka/catalog.cljk knowledge/")
+                        (set! (.-exitCode js/process) 1))
+
+                    (< (count ledgers) min-ledgers)
+                    ;; 一致したうえで、走査が痩せていないかを見る床。
+                    ;; **`when (seq …)` の中に入れない** —— 0 件こそ床の存在理由。
+                    (do (println "FAIL only" (count ledgers) "ledgers scanned, floor is"
+                                 min-ledgers "— a pass here would assert nothing")
+                        (set! (.-exitCode js/process) 1))
+
+                    :else
+                    (println (str "OK catalog is byte-identical to what its "
+                                  (count ledgers) " ledgers generate"))))))))))))
+
+(main!)

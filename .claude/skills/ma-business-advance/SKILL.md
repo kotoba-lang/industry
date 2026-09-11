@@ -27,7 +27,7 @@ M&A マッチングは 6 repo にまたがるので、repo 単位の bot（`repo
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk
 ```
 
 - **exit 2 が返ったら何もしない。** 構成 repo の checkout が 0 本という意味なので、
@@ -56,7 +56,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljs
 
 その営みを持つ repo が fleet に無いなら、選べるのは 2 つだけ:
 
-- `nbb scripts/repo-search.cljs <語>` と `nbb scripts/concept-lookup.cljs <語>` を
+- `nbb scripts/repo-search.cljk <語>` と `nbb scripts/concept-lookup.cljk <語>` を
   引いてから、実在する近接 repo を割り当てる
 - その stage をこの事業のスコープ外と決め、`:business/stages` から外す。**その場合は
   外した理由を構成表のコメントに書く**（黙って消すと、次の反復が同じ stage を
@@ -72,7 +72,7 @@ M&A クラウドが売っているのは「買い手と売り手の突き合わ�
 
 実装は skill `build-actor` の型に揃える（Advisor ⊣ 独立 Governor、
 langgraph-clj StateGraph、append-only 監査台帳、注入境界）。標準形は
-`scripts/itonami-os-maturity-tick.cljs` の `conformance` が定義する:
+`scripts/itonami-os-maturity-tick.cljk` の `conformance` が定義する:
 
 ```
 src/<単一 ns>/phase.cljc      (def read-ops #{...}) (def write-ops #{...}) (def default-phase ...)
@@ -114,7 +114,7 @@ git worktree add -b agent/ma-<repo> /tmp/ma-<repo>/<repo> origin/main   # 子 re
 ```
 
 push → `gh api repos/<org>/<repo>/merges` でサーバ側マージ → west pin 前進
-（`scripts/west-pin-put.cljs <entry> HEAD`）→ worktree 撤去。
+（`scripts/west-pin-put.cljk <entry> HEAD`）→ worktree 撤去。
 rebase も force-push もしない。手順は skill `git-cleanup-conflict` /
 `west-pin-advance`。
 
@@ -123,9 +123,9 @@ rebase も force-push もしない。手順は skill `git-cleanup-conflict` /
 **その床だけが動いたことを見る。**
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljs --no-ledger   # 直す前
+nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk --no-ledger   # 直す前
 # ... 直す ...
-nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljs --no-ledger   # 直した後
+nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk --no-ledger   # 直した後
 ```
 
 対象の床が `broken` → `ok` に変わり、**他の床が動いていない**ことを確認する。

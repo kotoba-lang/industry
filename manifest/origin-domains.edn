@@ -60,7 +60,8 @@
  ;; against known-good names and not only against the misfiled set. If a change
  ;; to the derivation breaks these, it is wrong.
  :anchors
- {"kotoba-lang/com-stripe"                  "stripe.com"
+ {"kotoba-lang/org-babashka-nbb"            "babashka.org"
+  "kotoba-lang/com-stripe"                  "stripe.com"
   "kotoba-lang/com-docker"                  "docker.com"
   "kotoba-lang/com-arm-isa"                 "arm.com"
   "kotoba-lang/com-arm-cpu"                 "arm.com"
@@ -335,7 +336,7 @@
  ;; prints these counts on every run.
  :coverage
  {:measured-at "2026-08-05"
-  :measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+  :measured-by "nbb scripts/verify-repository-roles.cljk --name-audit"
   :workspace {:repos 4078 :origin-plane 1432 :unverified 1313}
   :recorded-here 112
   :anchors 18

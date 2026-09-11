@@ -26,14 +26,14 @@ HTTP 200 を返すので、認証が通ったことは口座の同定になら�
   実測 2026-08-17、`.network` ドメインは 1 つも登録できない。Telnyx へ報告済み
   （Request ID `a64cc757-97a9-9dee-8e1a-8411379cf93d`）。修正されたら口座メールを
   `j@awai.network` へ移し、この受信箱への依存を切る。
-- 取得スクリプト: `scripts/telnyx-agent-signup.cljs`（Agent Inbox の未文書 API 形と、
+- 取得スクリプト: `scripts/telnyx-agent-signup.cljk`（Agent Inbox の未文書 API 形と、
   受理された proof-of-work 構成 `sha256(challenge + ":" + nonce)` を記録してある）。
 
 #### この受信箱の読み方（web UI は無い。API 専用・読み取り専用）
 
 ```bash
-nbb scripts/telnyx-agent-signup.cljs inbox-list
-nbb scripts/telnyx-agent-signup.cljs inbox-read '<message-id>'   # 角括弧ごと渡す
+nbb scripts/telnyx-agent-signup.cljk inbox-list
+nbb scripts/telnyx-agent-signup.cljk inbox-read '<message-id>'   # 角括弧ごと渡す
 ```
 
 素で叩くなら 2 本だけ（実測 2026-08-17、これ以外は 404）:
@@ -170,7 +170,7 @@ Application ID 不要だが、gBizINFO は違う（実測 2026-08-19）。
 | kagi（compartment `personal`） | item `GBIZ_TOKEN` |
 
 **環境変数名が 2 つある。** `GBIZINFO_TOKEN`（property の collector 2 本）と
-`GBIZ_TOKEN`（`scripts/mk1-jp-lead-enrich.cljs`）。`collect_gbizinfo_zenken.cljs` は
+`GBIZ_TOKEN`（`scripts/mk1-jp-lead-enrich.cljk`）。`collect_gbizinfo_zenken.cljs` は
 両方＋Keychain を見る。新しいものを書くときは Keychain 経由にして、env は override
 としてだけ使う。
 
@@ -185,3 +185,13 @@ https://content.info.gbiz.go.jp/api/index.html → 利用申請 → メールで
 **失敗が 200 で返る。** トークン無しの POST は 200 と HTML（「ダウンロードには
 アクセストークンが必要です。」）を返すので、status code を成功判定に使わない。
 collector は Content-Disposition と ZIP magic を見る。
+
+## OpenRouter（account `network-awai`、支払い・BYOK・provider 申請）
+
+| 場所 | 何 |
+|---|---|
+| macOS Keychain | service `gftd.openrouter` / account `OPENROUTER_API_KEY` —— 通常の inference key（`manifest/hermes-budget-policy.edn` の `:budget/key-service` が名指す） |
+| macOS Keychain | service `gftd.openrouter` / account `OPENROUTER_MANAGEMENT_KEY` —— **management key**（2026-09-11 格納）。`/api/v1/byok` / keys / credits の管理専用で completion には使えない。作る場所は https://openrouter.ai/settings/management-keys（`/settings/keys` で作る key は `is_management_key: false`） |
+| Cloudflare Worker secret | `MURAKUMO_OPENROUTER_API_KEY`（cloud-murakumo-api）—— 値は Worker にしか無い |
+
+**どちらの key かは `GET /api/v1/key` の `is_management_key` で見分ける** —— prefix はどちらも `sk-or-v1-`。

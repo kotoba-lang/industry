@@ -6,7 +6,7 @@
 //                            both a `REFUSED <scope>-lock held by ...` line and
 //                            the legacy `... is already running ...` wording
 //                            that scripts/itonami-fleet/ship.sh and
-//                            scripts/maturity-loop/run.cljs grep for.
+//                            scripts/maturity-loop/run.cljk grep for.
 //   dead owner            -> the stale lock is reclaimed and the command runs.
 //   the command ran       -> the child's status is propagated verbatim,
 //                            signals as 128+n.
@@ -21,7 +21,7 @@
 // is now a rename of a fully populated staging directory, so a lock directory
 // never becomes observable in a half-created state.
 //
-// Proof: scripts/resource-guard-test.cljs (nbb; spawns this file for real).
+// Proof: scripts/resource-guard-test.cljk (nbb; spawns this file for real).
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -118,7 +118,7 @@ function refuse(scope, found) {
   const cwd = owner?.cwd ?? "unknown";
   const since = owner?.startedAt ?? "unknown";
   process.stderr.write(`REFUSED ${scope}-lock held by pid=${pid} cwd=${cwd} since=${since}\n`);
-  // Legacy wording. scripts/itonami-fleet/ship.sh and scripts/maturity-loop/run.cljs
+  // Legacy wording. scripts/itonami-fleet/ship.sh and scripts/maturity-loop/run.cljk
   // wait for the lock by grepping for "already running"; dropping it would turn
   // their wait into a give-up.
   process.stderr.write(

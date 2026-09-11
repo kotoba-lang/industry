@@ -4,7 +4,7 @@
   - `com-junkawasaki.b2/annex`（1Password `gftdcojp` vault）— `manifest/repos.edn`
     の `:b2 :credentials` が参照する M365 archive 用（bucket:
     `gftdcojp-m365-annex`）。Keychain 側ミラーは `security add-generic-password
-    -s b2:gftdcojp-m365-annex`（`scripts/b2-creds.cljs` が解決）。
+    -s b2:gftdcojp-m365-annex`（`scripts/b2-creds.cljk` が解決）。
   - `gftd.b2/*`（1Password `gftdcojp` vault、フィールド分割: `BUCKET_NAME` /
     `ENDPOINT` / `ENDPOINT_URL` / `REGION` / `APPLICATION_KEY_ID` /
     `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY`）— bucket `ai-gftd-cdn` 専用。
@@ -19,7 +19,7 @@
     capabilities は listBuckets/listFiles/readFiles/writeFiles/deleteFiles で
     **このバケットのみにスコープ済み**（2026-07-25 に Master Key で発行）。
     - **Keychain ミラー**（非対話ローカル）: service `b2:ai-gftd-datasets`、
-      account=key id / password=app key（`scripts/b2-creds.cljs` と同じ
+      account=key id / password=app key（`scripts/b2-creds.cljk` と同じ
       combined 形式）。
     - **1Password には入れていない。** `op` がこの環境で
       `account is not signed in` / `op item create` の authorization timeout に

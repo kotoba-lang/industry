@@ -3,7 +3,7 @@
 ;;
 ;; ## Why this is a workspace fact and not a repo's own
 ;;
-;; `scripts/itonami-receipts-export.cljs` folds the murakumo run ledger to give
+;; `scripts/itonami-receipts-export.cljk` folds the murakumo run ledger to give
 ;; each repo its measured cost. It joins on the spend account, and the ledger
 ;; keys spending by the JWT `sub` of whoever called `/infer/spend` -- a subject
 ;; that is issued out of band. Measured twice on 2026-08-31, from the spender

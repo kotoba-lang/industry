@@ -17,8 +17,8 @@ ledger（`~/.itonami/cua-bots/ledger.edn`）** から読む。
 |---|---|---|
 | **名簿**（どの bot が・何を・どの backend で） | `manifest/cua-bots.edn` | 人（policy、手書き） |
 | **実行機構**（backend registry + session） | `orgs/kotoba-lang/computer-use` の `bin/cua_bot_run.cljs` | kotoba-lang/computer-use |
-| due 判定 | `scripts/cua-bots-tick.cljs`（決定論） | superproject |
-| 常駐 | `scripts/cua-bots-loop.cljs` + `cloud.itonami.bot.cua-bots.plist`（1h） | superproject |
+| due 判定 | `scripts/cua-bots-tick.cljk`（決定論） | superproject |
+| 常駐 | `scripts/cua-bots-loop.cljk` + `cloud.itonami.bot.cua-bots.plist`（1h） | superproject |
 | receipt | `~/.itonami/cua-bots/receipts/<bot-id>/` | lib の session |
 | ledger | `~/.itonami/cua-bots/ledger.edn`（追記のみ） | loop |
 
@@ -35,7 +35,7 @@ backend は 10 種: `:macos-local` `:window-scoped` `:agent-space` `:fleet-node`
 
 ```bash
 # due を見る（決定論。モデル無し）
-nbb scripts/cua-bots-tick.cljs
+nbb scripts/cua-bots-tick.cljk
 
 # 1 体を手で回す（lib の contract そのまま）
 cd orgs/kotoba-lang/computer-use

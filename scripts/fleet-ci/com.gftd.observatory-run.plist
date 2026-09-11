@@ -65,11 +65,11 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <!-- 実体は scripts/observatory-run.cljs。plist にロジックを書かない
+    <!-- 実体は scripts/observatory-run.cljk。plist にロジックを書かない
          （launchctl は編集のたびに bootout/bootstrap が要り、直せなくなる）。
          cwd が superproject root である必要がある — 入力パスを
          git rev-parse で解決しているため。 -->
-    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --due</string>
+    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --due</string>
   </array>
 
   <!-- Hour を書かないと「毎時」になる（launchd の仕様）。起きるのは毎時だが、

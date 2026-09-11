@@ -1,0 +1,98 @@
+;; scripts/verify-no-clojure-extensions.cljk — `.clj` / `.cljs` / `.cljc` that
+;; came back after the 2026-09-11 rename to `.cljk`.
+;;
+;; ## Why this exists
+;;
+;; adr-2609111500-cljk-rename-all-clojure-source moved 34,445 tracked Clojure
+;; files across 3,723 repositories to `.cljk` in one day. Within hours two
+;; repositories had `.cljs` files on their default branch again -- not because
+;; the rename missed them, but because branches cut BEFORE the rename kept
+;; landing afterwards (cloud-itonami-assoc-9411-col-andi `scripts/*.cljs`,
+;; loop-yakuwari `bin/awai.cljs`). Nothing refused them. A rename with no
+;; detector behind it is a one-day event, not a rule.
+;;
+;; ## What it measures
+;;
+;; For every project in west.yml: the tree at the PINNED revision (the pin is
+;; the workspace's own statement of "current"; a local checkout can be on a
+;; branch, dirty, or behind). It reads `git ls-tree` of that commit in the
+;; local checkout, so it never touches the network and never writes.
+;;
+;;   FINDING  fail  clojure-ext:<org>/<repo>  <n> .clj/.cljs/.cljc file(s) at pin <sha7>: <first 3 paths>
+;;   ABSENT   <path>   no checkout, or the pinned commit is not present locally -- NOT MEASURED, not clean
+;;   SCANNED  <n>  projects
+;;
+;; Exit 0 = every measured project is clean; 1 = findings; 2 = could not answer
+;; (nothing scanned, or more absent than measured). ABSENT is never counted as
+;; clean -- that is the shape CLAUDE.md's "8 questions" exist for.
+;;
+;;   nbb scripts/verify-no-clojure-extensions.cljk [--west manifest/west.yml] [--root .]
+;;                                                 [--allow <org>/<repo>,...]
+;;
+;; --allow names third-party mirrors that keep their upstream layout on purpose
+;; and are printed as ALLOWED, never as findings. Today that is exactly one:
+;; kotoba-lang/org-babashka-nbb, the fork of nbb that IS the runtime resolving
+;; .cljk for everything else (ADR-2609111700); shadow-cljs builds it from its
+;; .cljs sources, so renaming them would unbuild the engine -- measured
+;; 2026-09-11 when the batch renamed it and the rename was reverted the same
+;; hour. An allow entry is a written decision, not a default.
+;;
+;; Discrimination is measured with a different west.yml, not a different code
+;; path: `--west <(git show <pre-rename-sha>:manifest/west.yml)` must report
+;; thousands; the current one must report zero (recorded in the ADR).
+
+(ns verify-no-clojure-extensions
+  (:require ["fs" :as fs] ["path" :as path] ["child_process" :as cp] [clojure.string :as str]))
+
+(defn- arg [flag default] (let [a (js->clj (.-argv js/process))] (or (second (drop-while #(not= flag %) a)) default)))
+
+(defn- sh [args & [cwd]]
+  (let [r (cp/spawnSync (first args) (clj->js (rest args)) (clj->js (cond-> {:encoding "utf8" :maxBuffer (* 256 1024 1024)} cwd (assoc :cwd cwd))))]
+    {:status (.-status r) :out (or (.-stdout r) "")}))
+
+(defn projects
+  "[{:name :path :revision}] from west.yml -- the three fields the scan needs.
+  Line-oriented on purpose: the file is a generated artefact with a fixed shape
+  (scripts/gen-west-manifest), and a YAML parser is a dependency this detector
+  must not need to be runnable on a bare nbb."
+  [west]
+  (loop [ls (str/split-lines (fs/readFileSync west "utf8")) cur nil acc []]
+    (if (empty? ls)
+      (cond-> acc cur (conj cur))
+      (let [l (first ls)]
+        (cond
+          (str/starts-with? l "    - name: ") (recur (rest ls) {:name (str/trim (subs l 12))} (cond-> acc cur (conj cur)))
+          (and cur (str/starts-with? l "      path: ")) (recur (rest ls) (assoc cur :path (str/trim (subs l 12))) acc)
+          (and cur (str/starts-with? l "      revision: ")) (recur (rest ls) (assoc cur :revision (str/trim (subs l 16))) acc)
+          :else (recur (rest ls) cur acc))))))
+
+(let [west (arg "--west" "manifest/west.yml")
+      root (arg "--root" ".")
+      allow (set (map #(str "orgs/" %) (remove str/blank? (str/split (arg "--allow" "") #","))))
+      ps (filter #(and (:path %) (:revision %)) (projects west))
+      results (for [{:keys [name path revision]} ps
+                    :let [dir (path/join root path)]]
+                (if-not (fs/existsSync (path/join dir ".git"))
+                  {:path path :absent :no-checkout}
+                  (let [{:keys [status out]} (sh ["git" "-C" dir "ls-tree" "-r" "--name-only" revision])]
+                    (if-not (zero? status)
+                      {:path path :absent :pin-not-local}
+                      (let [hits (filter #(re-find #"\.(clj|cljs|cljc)$" %) (str/split-lines out))]
+                        {:path path :revision revision :hits (vec hits)})))))
+      absent (filter :absent results)
+      measured (remove :absent results)
+      findings (filter #(and (seq (:hits %)) (not (allow (:path %)))) measured)
+      allowed (filter #(and (seq (:hits %)) (allow (:path %))) measured)]
+  (doseq [{:keys [path hits]} allowed] (println (str "ALLOWED\t" path "\t" (count hits) " file(s), third-party mirror kept in upstream layout")))
+  (doseq [{:keys [path absent]} absent] (println (str "ABSENT\t" path "\t" (name absent))))
+  (doseq [{:keys [path revision hits]} findings]
+    (println (str "FINDING\tfail\tclojure-ext:" (str/replace path #"^orgs/" "")
+                  "\t" (count hits) " .clj/.cljs/.cljc file(s) at pin " (subs revision 0 7) ": "
+                  (str/join ", " (take 3 hits)) (when (> (count hits) 3) " …"))))
+  (println (str "SCANNED\t" (count measured) "\tprojects"))
+  (println (str "ABSENT\t" (count absent) "\tprojects (not measured, not clean)"))
+  (println (str "FINDINGS\t" (count findings) "\tprojects\t" (reduce + (map (comp count :hits) findings)) "\tfiles"))
+  (.exit js/process (cond (zero? (count measured)) 2
+                          (> (count absent) (count measured)) 2
+                          (seq findings) 1
+                          :else 0)))

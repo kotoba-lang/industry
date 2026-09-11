@@ -58,21 +58,21 @@ query 入口を kotobase 方言（Datomic-shaped EDN Datalog）に決めたが�
 CP=".:scripts/nbb_compat:orgs/kotoba-lang/kotobase-query/src"
 
 # reference の健全性だけ（LLM を呼ばない）
-nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs \
+nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljk \
   --questions scripts/query-dialect-bench/questions.edn \
-  --plane-script scripts/query-dialect-bench/plane.cljs \
+  --plane-script scripts/query-dialect-bench/plane.cljk \
   --out /tmp/off.edn --offline
 
 # 本番（LLM を呼ぶ）
-nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs \
+nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljk \
   --questions scripts/query-dialect-bench/questions.edn \
-  --plane-script scripts/query-dialect-bench/plane.cljs \
+  --plane-script scripts/query-dialect-bench/plane.cljk \
   --out scripts/query-dialect-bench/result.edn
 ```
 
 | flag | 既定 | 意味 |
 |---|---|---|
-| `--plane-script` | `manifest/edn-query.cljs`（本番の面） | 下記のとおり実質 `plane.cljs` 一択 |
+| `--plane-script` | `manifest/edn-query.cljk`（本番の面） | 下記のとおり実質 `plane.cljs` 一択 |
 | `--limit N` | 全問 | 先頭 N 問だけ |
 | `--max-repair` | 2 | repair の回数 |
 | `--offline` | — | LLM を呼ばず reference の検証だけ |
@@ -80,7 +80,7 @@ nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs \
 
 ```bash
 # 配線（classpath が通り、schema 変換が agent の形になっているか）
-nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs --self-test
+nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljk --self-test
 
 # validator 本体の両方向 fixture —— こちらが正本。依存ゼロで回る
 cd orgs/kotoba-lang/kotobase-query && nbb --classpath src:test run-tests-pure.cljs
@@ -115,7 +115,7 @@ repo-taxonomy  manifest/repo-taxonomy.edn                    repo 3 面分類   
 参照しない。**subset であることは起動のたびに stderr で名乗る。**
 
 なぜ分けたか —— **本番の面がベンチに使えなかった**。実測 2026-08-18、
-`manifest/edn-query.cljs` はクエリ 3 本で **600 秒の timeout に到達して未完了**
+`manifest/edn-query.cljk` はクエリ 3 本で **600 秒の timeout に到達して未完了**
 （load average 246〜281 の環境）。subset 面は同じ 2 dataset を **38 秒**で組む。
 **40 分かかるベンチは二度と回らない** ——「落ちない gate は劇場」の裏返しで、
 **回せない gate も同じだけ無内容**である。
@@ -131,7 +131,7 @@ repo-taxonomy  manifest/repo-taxonomy.edn                    repo 3 面分類   
 落ち、batch ごと 90 分の推論を捨てた）。
 
 ```bash
-nbb --classpath "$CP" scripts/query-dialect-bench/grammar-agreement.cljs
+nbb --classpath "$CP" scripts/query-dialect-bench/grammar-agreement.cljk
 ```
 
 **不変条件は一致ではなく方向つき**である。validator は engine より厳しくてよい ——
@@ -286,5 +286,5 @@ ADR-2608136000 が「一度直した種類の誤りが、次の話題で再発�
 - **`scripts/model-eval`** — *どのモデルを fleet に載せるか*（速度・文脈上限・汎用
   コーディング 15 問）。こちらは *どの query surface を agent の入口にするか*。
   測る対象が違う（モデル vs surface）。truncation の扱いだけ同じ規律を共有する。
-- **`manifest/edn-query.cljs`** — 本番の query 面。ここはその面の**部分集合を**
+- **`manifest/edn-query.cljk`** — 本番の query 面。ここはその面の**部分集合を**
   ベンチ用に組み直したもので、置き換えではない。

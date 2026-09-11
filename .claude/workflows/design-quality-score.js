@@ -224,7 +224,7 @@ return {
   deferredLayers: [
     'Lighthouse (Performance/Accessibility/Best-Practices/SEO 0-100) — not run: no build/serve step wired up for these libraries.',
     'axe-core automated a11y violation scan — not run, same reason.',
-    'Vision-based LLM screenshot judging of the libraries themselves — not run by this workflow. Rendered sample-page visual scoring is a separate manual pass — see 90-docs/design-quality/samples/generate-samples.cljs and ADR-2607132300.',
+    'Vision-based LLM screenshot judging of the libraries themselves — not run by this workflow. Rendered sample-page visual scoring is a separate manual pass — see 90-docs/design-quality/samples/generate-samples.cljk and ADR-2607132300.',
     'WCAG contrast-ratio computation on actual token color pairs — not computed numerically; the llm-judge layer comments on token discipline qualitatively but does not compute exact ratios.',
   ],
 }

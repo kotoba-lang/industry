@@ -132,7 +132,7 @@
     使う側: `scripts/datalake-sync.py` が `CF_CATALOG_TOKEN` として読む
     （2026-08-26 に `lei-datalake-sync.py` から改名・一般化。表の一覧は
     `--spec` の JSON が持ち、LEI 用は `scripts/datalake-specs/lei.json`、
-    watchlist 用は `scripts/watchlist-datalake-export.cljs` が出力の隣に書く）。
+    watchlist 用は `scripts/watchlist-datalake-export.cljk` が出力の隣に書く）。
     ⚠ **R2 SQL (`wrangler r2 sql query`) はこの token では 80013 Unauthorized**
     （実測 2026-08-25）。同じ catalog の同じ表を DuckDB の iceberg extension は
     読めるので、**表が無いのではなく R2 SQL が別の権限を要る**。片方の面が

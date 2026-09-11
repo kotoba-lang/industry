@@ -124,7 +124,7 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
      checkpoint #2 を一時過大記録、amendment で訂正）。
 
 8b. **着地後の pin は batch で**。複数 repo を動かしたら
-   `PINS=pins.tsv nbb scripts/west-pin-put-batch.cljs`。
+   `PINS=pins.tsv nbb scripts/west-pin-put-batch.cljk`。
 
    **tsv の 3 列目は「説明」ではなく GitHub の `<org>/<repo>`。**
    `<west entry 名>\t<40 hex sha>\t<org/repo>`。ここを取り違えると全件 drop するが、
@@ -139,11 +139,11 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
    drop された実測がある）。
 
 8c. **着地後の常時監視**。tranche 全 repo は
-   `scripts/kotoba-wave-verify-tick.cljs`（launchd `com.kotoba.wave-verify-tick`、1h、
+   `scripts/kotoba-wave-verify-tick.cljk`（launchd `com.kotoba.wave-verify-tick`、1h、
    rotating sample）が kotoba -M check/test/compile + amu check の 4 gate で巡回する。
    REGRESSION が出たら着地済み slice の退行。
 8. **着地。** feature branch を push し `gh api .../merges` で main へ。
-   west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`（複数 repo なら 8b の batch）。
+   west pin は `nbb scripts/west-pin-put.cljk <entry> HEAD`（複数 repo なら 8b の batch）。
 
 先例: amu `examples/todo-app.kotoba`（application）、
 `kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_commands`（コマンド文字列）と

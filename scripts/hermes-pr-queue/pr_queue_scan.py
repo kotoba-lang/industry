@@ -13,7 +13,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = pathlib.Path(os.environ.get("PR_QUEUE_ROOT", "~/github/com-junkawasaki")).expanduser()
-VERSIONED = ROOT / "scripts/hermes-pr-queue/pr_queue_scan.cljs"
+VERSIONED = ROOT / "scripts/hermes-pr-queue/pr_queue_scan.cljk"
 SCAN = VERSIONED if VERSIONED.is_file() else HERE / "pr_queue_scan.cljs"
 
 

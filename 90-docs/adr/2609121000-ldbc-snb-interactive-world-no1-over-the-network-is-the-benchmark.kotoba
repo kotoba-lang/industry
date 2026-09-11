@@ -1,0 +1,147 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609121000-ldbc-snb-interactive-world-no1-over-the-network-is-the-benchmark")
+  (:adr/topic "query-plane-benchmark")
+  (:adr/title "query plane の benchmark は LDBC SNB Interactive、目標は監査済み世界 1 位、測るのは必ず network 越し —— judge v2 と最初の行（loopback、SF1 部分集合、7.76 ops/s）")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/ayatori" "kotoba-lang/kotobase-peer"))
+  (:adr/related (vector "adr-2609119000-outer-index-and-partition-aligned-packs-what-the-lakes-do"
+                "adr-2609109900-the-slope-the-runtime-and-the-detector"
+                "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
+                "adr-2608160100-block-car-pack-object"
+                "adr-2809041800-ayatori-coscientist-iteration-01-round-trips"
+                "adr-2606141500-keiei-arbor-coscientist-engine"))
+  (:adr/validation (map
+    (:kind "benchmark contract written before the first row; the row is measured by a driver in another process over TCP; the driver's four refusals were each made to fire (exit 2) before the row was taken")
+    (:judge "orgs/kotoba-lang/ayatori bench/benchmark.edn :ldbc-snb-interactive-network-v2; scoreboard append-only")
+    (:sut "kotoba-lang/kotobase-peer bench/kotobase_peer/ldbc_snb_net.cljk")
+    (:driver "kotoba-lang/kotobase-peer bench/ldbc_snb_driver.cljk")
+    (:receipt "kotoba-lang/kotobase-peer bench/results/2026-09-11-ldbc-snb-network-loopback-sf1-subset.edn")
+    (:target-read-on "2026-09-11")))
+  (:adr/body "## Context
+
+オーナー指示（2026-09-11）: 「lcdb 世界 no1 を bench にして. network over で.」
+
+その日の朝に決めた judge（ayatori `bench/benchmark.edn` v1、ADR-2609119000）は
+この workspace が自分で作った合成 corpus 上の round trip 数と byte 数だった。
+それは transport の診断としては正しいが、**外の誰とも比べられない**。同じ日の
+午後に、比べる相手を LDBC の監査済み結果表に固定し、単位を LDBC のものに変え、
+測り方を「別プロセスから network 越し」に限定した。これはその記録である。
+
+## Decision
+
+D1. **workload は LDBC SNB Interactive**（v1。監査表は v1、最新 FDR の
+    spec / auditing policies は v2.2.3）。data / parameters / update stream は
+    `datasets.ldbcouncil.org` の R2 配布（SF1 は 2026-09-11 に取得、
+    `~/.cache/ldbc-snb/sf1/`）。
+
+D2. **metric は benchmark 自身のもの** —— throughput（ops/s）。TCR で決まる
+    schedule で operation stream を流し、**95% の operation が予定時刻から
+    1 秒以内に開始**していなければその run は無効（spec の 95% on-time
+    requirement、`actual_start - scheduled_start < 1 s`）。per-operation の
+    P50/P90/P95/P99 は報告するが採点しない。
+
+D3. **network 越しでしか行を作らない。** driver と SUT は別プロセスで TCP/HTTP
+    で繋がる。in-process の関数呼び出しを nanoTime で測った値（kotobase-peer
+    `bench/results/*ldbc*` の従来の受領書。自分でそう書いている）は、この
+    benchmark の行ではない。origin は 3 つ —— `:loopback`（同一ホスト
+    127.0.0.1）、`:cross-host`（murakumo fleet の別 mac-mini）、`:live`
+    （deploy 済みの kotobase.net query surface）—— で、**別 origin の行は別の列**
+    であり 1 つの数として比べない。
+
+D4. **目標は監査済み世界 1 位。** 2026-09-11 に ldbcouncil.org の結果表を読んだ
+    値: Huawei Cloud Graph Engine Service 3.1.0（2025-12-01、審査 Dr. Benjamin
+    Steer）が SF100 129,090 / **SF300 139,411** / SF1000 125,873 ops/s。
+    SUT は 1 node（km2.40xlarge.8、Kunpeng 160 core、1280 GiB、6000 GiB NVMe、
+    C++、driver read thread 64、partition 48、Read Committed）、3 年総額
+    2,939,112 RMB。前保持者は GraphScope Flex（Alibaba、2024-05-14、SF300
+    131,264）。**hardware で正規化しない** —— 160 core 対 10 core の比は生のまま
+    書く。この値は日付付きの読み取りであって定数ではない（引用前に読み直す）。
+
+D5. **rung は SF 1 / 3 / 10 / 30 / 100 / 300 / 1000。** 監査表は SF30 から。
+    SF1 は表に無く、比べる対象ではなく、機構を見つける場所。
+
+D6. **gate**: failed operation 0、on-time ≥ 95%、答えが reference と一致
+    （kotobase-peer.ldbc-snb-bench が同一データ上で Neo4j と等しいと assert
+    している 4 read。operation を足すときは各々に reference を付ける）。さらに
+    **空の答えの割合を全行に書く** —— 空の答えは間違った理由で速い
+    （ADR-2609109900 の join hazard はそれで見つかった）。部分集合 rung は
+    official parameter を空にするので、割合が 0 でない行は部分集合だと自ら言う。
+
+D7. **growth の定義**: rung / origin / mix を固定して throughput が厳密に上がる、
+    または前回以上の throughput で rung か mix を広げる。on-time を 95% に向けて
+    削って throughput を上げるのは trade として記録する。単位が wall-clock なのは
+    benchmark がそう定めるからで、**測定時の load average を全行の隣に書く**。
+
+D8. v1（reads / bytes）は `bench/benchmark.edn` の `:superseded` に残す。
+    iteration 11 と 12 の行は v1 のまま読める。再採点はしない。
+
+## 最初の行（iteration 13、origin loopback、rung SF1 部分集合 35,000 posts）
+
+作ったもの:
+
+- `kotobase-peer.ldbc-snb-net` —— IC02 / IC07 / IC08 / IC09 を hot db から
+  JDK HttpServer（127.0.0.1）で serve。data と query は `ldbc-snb-bench` の
+  var を `ic09-diag` と同じ形で借りるので、あの namespace の Neo4j 等値 gate が
+  そのまま効く。失敗した答えは 4xx/5xx で、空の 200 にはならない。
+- `bench/ldbc_snb_driver.cljk`（nbb）—— open loop。operation k を t0 + k/rate に
+  予定し、mix を round-robin、各 op は **official substitution parameter** を
+  巡回、`--inflight` が driver thread の相当、予定と実開始の差・latency・
+  status・行数を記録、95% 規則か failed op で止まるまで rate を上げる。
+- driver の 4 つの拒否（SUT 不在 / 500 / 中身が答えでない 200 / parameter 不在）
+  を行を取る前に全部発火させた（exit 2）。3 つ目は初回に本物の欠陥を捕まえた
+  —— `not edn {{{` が symbol として読めて空の答えに数えられていた。200 を
+  答えと数えるのは map で `:rows` が vector、`:n` が整数のときだけに直した。
+
+測定（host 10 core / 32 GiB、load 12.6 / 19.2 / 21.1、他の agent が走っている）:
+
+    rate  sched  done  fail  on-time%  thru/s  delay-p95  empty  rows  ic02-p50  ic07-p50  ic08-p50  ic09-p50
+       2     40    40     0    100.00     2.0          2     22   6.3      62.8      43.2     153.3     598.8
+       4     80    80     0    100.00     3.8          1     47   5.8      34.5      20.0     244.6     710.5
+       8    160   160     0    100.00     7.8          2     83   7.0      32.6      24.8     236.4    1001.5
+      16    320   320     0     22.81    11.3       5632    139   8.2      46.1      22.3     434.7    1877.4
+
+    throughput 7.76 ops/s at rate 8   目標 139,411 に対し比 1.8e4（生）
+
+読み:
+
+- **数字は queue であって wire ではない。** rate 8 は start-delay p95 が 2 ms で
+  通り、rate 16 は p95 5.6 秒で落ち、全 op の p50 が 1.5–2 倍になる。8 並列が
+  load の高い 10 core で CPU を取り合い、IC09（p50 約 1 秒）が 4 回に 1 回
+  slot を 1 秒握る。HTTP hop はこの規模では見えない（server-ms と client
+  latency の差は数 ms）。
+- **完了した operation の半分が空。** 部分集合は最新 35,000 posts（3 年の
+  simulation の最後の約 1 か月）を保ち、official parameter の maxDate は
+  2011–2012 に散る。これは部分集合 rung で、行がそう言っている。出口は 2 つ
+  —— full SF1（同日試した: load と build は終わり、warm-up の IC09 が最高次数の
+  person について 3.1M message 上の 2-hop join を date filter の手前で
+  materialize し、hash-join に数分座った。行にはしていない）、または時間軸で
+  一様に post を sample する部分集合規則。
+- **IC08 が in-JVM の受領書の 300 倍**（236 ms 対 0.77 ms、2026-08-14）。
+  official の start person / 10 倍の部分集合 / 8 並列、の 3 つが同時に違い、
+  どれかは分けていない。network の行が見て in-process の行が見なかった 300 倍は、
+  この benchmark にオーナーが求めたものそのもの。
+
+## 次（iteration 14 の seed、順に）
+
+- S1 機構: rate 1・inflight 1 で (a) official parameter と (b) 最高次数 person を
+  同じ部分集合で走らせ、IC08 の 300 倍を person 選択 / 部分集合の大きさ / 並列度
+  に分ける。予測: 大半は start person（official の person は保持 message が
+  少なく、IC08 が replyOf を無 bound で走査する）で、直すのは planner であって
+  network ではない。
+- S2 rung: full SF1。IC09 の date filter を join の下へ押すか friend-of-friend
+  集合を先に bound して、空の割合を約 0 にし、rung を SF1 そのものにする。
+- S3 mix: short read IS1–IS7（datom 面が既に速い point lookup）を足し、mix を
+  本物に近づけて on-time 規則を LDBC らしい stream で試す。
+- iteration 12 の transport seed（H2'、bytes 上限の pack、H3）は持ち越し、
+  v2 では origin `:live` で SUT が IPLD 越しに読むときにだけ効く。
+
+## What this is not
+
+- LDBC score ではない。29 operation 中 4、自前の driver、SF1 の部分集合、update
+  無し、auditor 無し。行はそう書いている。
+- hardware 正規化した比較ではない。比は生のまま。
+")
+  (:adr/consequences "この plane の co-scientist loop（cron、30 分ごと）は以後 v2 の judge で採点する。行は scoreboard に追記のみ。目標値は日付付きの読み取りで、引用前に ldbcouncil.org を読み直す。full SF1 は IC09 の join を bound するまで rung にならない。")))

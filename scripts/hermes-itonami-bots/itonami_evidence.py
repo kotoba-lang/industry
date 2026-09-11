@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Hand the itonami growth bots their measurements.
 
-Decision-free. It runs `scripts/itonami-growth-evidence.cljs` against the
+Decision-free. It runs `scripts/itonami-growth-evidence.cljk` against the
 populated superproject and prints what that produced. Every rule about what
 counts as a maturity candidate or a coverage gap lives in that nbb script, the
 maturity tick it calls, and the UN mirrors those read; none of it is repeated
@@ -103,7 +103,7 @@ def main() -> None:
 
     proc = subprocess.run(
         [NBB, "--classpath", f"{READ_ROOT}:{READ_ROOT}/scripts/nbb_compat",
-         f"{READ_ROOT}/scripts/itonami-growth-evidence.cljs",
+         f"{READ_ROOT}/scripts/itonami-growth-evidence.cljk",
          "--root", READ_ROOT, "--candidates", CANDIDATES],
         cwd=READ_ROOT, capture_output=True, text=True, timeout=900)
 

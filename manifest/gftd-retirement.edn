@@ -326,7 +326,7 @@
                "kotoba-lang/lexicons-bundle drafts/from-apps-gftdcojp — 137 draft lexicons"]
    :archived-in-place ["240301-olsp-dbguide-web" "250130-riken-suggest-edit"
                        "250305-jp-gftd-le-case-kaonavi" "lf-case-lingling"]
-   :tools ["scripts/west-entry-add.cljs" "scripts/west-entry-rename.cljs" "scripts/west-entry-remove.cljs"]}
+   :tools ["scripts/west-entry-add.cljk" "scripts/west-entry-rename.cljk" "scripts/west-entry-remove.cljk"]}
 
   :not-landed
   {:apps-gftdcojp-history-rewrite
@@ -350,7 +350,7 @@
   :incidents
   [{:what "west.yml was invalid YAML on main for a few minutes"
     :cause "An insertion anchored on the last `path:` line, which belongs to the `self:` block, so the entry landed outside `projects:`. west then failed for every project with a parser error naming a line number and not the entry."
-    :fixed "Repaired, and scripts/west-entry-add.cljs now anchors on the last project's `groups:` line and parses the result before writing it."}
+    :fixed "Repaired, and scripts/west-entry-add.cljk now anchors on the last project's `groups:` line and parses the result before writing it."}
    {:what "A working mirror was destroyed by running filter-repo on a half-restored clone"
     :cause "I read `du` reporting 5.6 GB as completion. Size is not a completion signal; the restore had not written refs, and filter-repo --force on a repo with no refs cleans it to 104 KB. The waiter task I had started for exactly this reported completion AFTER I had already run the filter."
     :cost "None beyond time. GitHub was untouched and the bundle verified intact. The sequencing is now inside one script that gates on refs, HEAD and commit count."}
@@ -412,7 +412,7 @@
    :context ":org-domain records gftdcojp -> gftd.co.jp -> jp-co-gftd (compressed form). If the company is retired, the successor org login has to be the successor's reverse-DNS, and nothing in this workspace says which identity that is. 73 repositories, every west pin naming them, and every deps.edn :git/url move with it."}
   {:id :gftd-cli
    :question "gftdcojp/gftd becomes what?"
-   :context "It is the `gftd` CLI -- README: \"AI-Agent-Driven Development Platform with Autonomous Cybersecurity\". The binary name, GFTD_* env vars and 70-tools/bmc/bin/gftd.cljs all follow whatever this becomes. Role plane, but the taxonomy has no `cli-` prefix, so this is a naming decision rather than a lookup."}
+   :context "It is the `gftd` CLI -- README: \"AI-Agent-Driven Development Platform with Autonomous Cybersecurity\". The binary name, GFTD_* env vars and 70-tools/bmc/bin/gftd.cljk all follow whatever this becomes. Role plane, but the taxonomy has no `cli-` prefix, so this is a naming decision rather than a lookup."}
   {:id :apps-gftdcojp
    :question "gftdcojp/apps-gftdcojp becomes what?"
    :context "Not one subject: the checkout holds _working, 00-contracts, 50-infra. A monorepo of the org's apps. Elision alone gives `apps`, which names nothing."}

@@ -25,7 +25,7 @@
   1 ファイルを object store に置く。bundle は annex より強い性質を 1 つ持つ:
   GitHub が消えても bundle 1 つから repo 全体が復元できる。
 
-  秘密情報は plist に書かない（world-readable）。鍵は scripts/b2-creds.cljs が
+  秘密情報は plist に書かない（world-readable）。鍵は scripts/b2-creds.cljk が
   kagi / Keychain から解決する。launchd 下では kagi が Keychain unlock prompt を
   出せないので、Keychain ミラー（service b2:gftdcojp-m365-annex）が使われる。
 
@@ -47,7 +47,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" scripts/hirameki-mirror.cljs</string>
+    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" scripts/hirameki-mirror.cljk</string>
   </array>
 
   <!-- 03:53。fleet-ci-sweep (4:17) / newsfeed-ingest (5:23) / observatory-run (:11)

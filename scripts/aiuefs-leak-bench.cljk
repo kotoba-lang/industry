@@ -1,0 +1,124 @@
+#!/usr/bin/env nbb
+;; Fourth judge: how many bits about a leaf's plaintext does its SEALED LENGTH
+;; reveal?
+;;
+;; The co-scientist rank in iteration 1 initially scored "leak" by counting
+;; plaintext header fields, and on that axis the unpadded design won -- it has
+;; fewer fields. That proxy is backwards. The leak that compress-before-encrypt
+;; introduces is not a field; it is that ciphertext LENGTH becomes a function
+;; of plaintext CONTENT, and an unpadded design has the most of it while
+;; carrying the fewest fields.
+;;
+;; So measure the actual quantity. Over a real corpus, seal every leaf under
+;; each padding scheme and take the Shannon entropy of the resulting length
+;; distribution, in bits. That is, directly, how much a length observer learns.
+;;
+;;   nbb scripts/aiuefs-leak-bench.cljk --root . --out <file.edn>
+;;
+;; The number to compare against is the leak the plane has TODAY: uncompressed
+;; leaves are all one size, so today's length entropy is ~0 bits and every bit
+;; measured here is new. Reporting the saving without this column would be
+;; reporting one side of a trade.
+
+(require '[clojure.string :as str])
+
+(def fs (js/require "node:fs"))
+(def path (js/require "node:path"))
+(def zlib (js/require "node:zlib"))
+(def os (js/require "node:os"))
+
+(def EXIT-COULD-NOT-ANSWER 2)
+(def args (vec *command-line-args*))
+(defn- arg [flag d] (let [i (.indexOf (to-array args) flag)] (if (>= i 0) (nth args (inc i) d) d)))
+(def root (arg "--root" "."))
+(def out-path (arg "--out" nil))
+(def leaf-bytes (js/parseInt (arg "--leaf" "16384")))
+
+(defn- die [code & msg]
+  (binding [*out* *err*] (apply println (cons "aiuefs-leak:" msg))) (.exit js/process code))
+
+(defn- ilog2 [n] (loop [n n i -1] (if (zero? n) i (recur (bit-shift-right n 1) (inc i)))))
+(defn- padme [L] (if (< L 2) L
+                     (let [e (ilog2 L) s (inc (ilog2 (max e 1))) z (- e s)]
+                       (if (<= z 0) L (let [m (bit-shift-left 1 z)] (* m (quot (+ L m -1) m)))))))
+(defn- p2 [L] (if (< L 2) L (bit-shift-left 1 (ilog2 (dec (* 2 L))))))
+
+(defn- files-under [dir suffixes]
+  (let [acc (atom [])]
+    (letfn [(go [d] (doseq [n (sort (js->clj (.readdirSync fs d)))]
+                      (let [p (.join path d n) st (try (.statSync fs p) (catch :default _ nil))]
+                        (cond (nil? st) nil
+                              (.isDirectory st) (when-not (contains? #{".git" "node_modules"} n) (go p))
+                              (and (.isFile st) (some #(str/ends-with? p %) suffixes)
+                                   (> (.-size st) 2048)) (swap! acc conj p)))))]
+      (try (go dir) (catch :default _ nil)))
+    @acc))
+
+(defn- leaves [files]
+  (vec (mapcat (fn [f] (let [b (try (.readFileSync fs f) (catch :default _ nil))]
+                         (when b (loop [o 0 out []]
+                                   (if (>= o (.-length b)) out
+                                       (recur (+ o leaf-bytes)
+                                              (conj out (.subarray b o (min (.-length b) (+ o leaf-bytes))))))))))
+               files)))
+
+(defn- entropy-bits
+  "Shannon entropy of the observed length distribution, in bits. This is the
+   information a passive observer of sealed sizes gets per leaf."
+  [lengths]
+  (let [n (count lengths)]
+    (if (zero? n)
+      :UNMEASURED
+      (let [freqs (vals (frequencies lengths))
+            h (reduce (fn [acc c] (let [p (/ c n)] (- acc (* p (/ (js/Math.log p) (js/Math.log 2)))))) 0.0 freqs)]
+        (/ (js/Math.round (* 1000 h)) 1000.0)))))
+
+(defn -main []
+  (let [corpora [{:id :datom-catalogs :dir (.join path root "90-docs") :suffixes [".datoms.edn"]}
+                 {:id :adr-documents :dir (.join path root "90-docs" "adr") :suffixes [".edn"]}]
+        rows
+        (vec (for [{:keys [id dir suffixes]} corpora]
+               (let [files (files-under dir suffixes)
+                     ls (leaves files)]
+                 (println (str "SCANNED\t" (name id) "\tfiles\t" (count files) "\tleaves\t" (count ls)))
+                 (if (empty? ls)
+                   {:corpus id :state :UNMEASURED}
+                   (let [comp (mapv #(.-length (.deflateRawSync zlib % (js-obj "level" 6))) ls)
+                         ;; today: every leaf is sealed at its raw size. Full leaves are
+                         ;; all one length, so the entropy that exists today comes only
+                         ;; from the short final leaf of each file.
+                         today (mapv #(.-length %) ls)
+                         schemes {:today today
+                                  :compressed-unpadded comp
+                                  :compressed-padme (mapv padme comp)
+                                  :compressed-p2 (mapv p2 comp)}]
+                     {:corpus id :state :measured
+                      :files (count files) :leaves (count ls)
+                      :plaintext-bytes (reduce + 0 today)
+                      :by-scheme
+                      (into {} (for [[k v] schemes]
+                                 [k {:length-entropy-bits (entropy-bits v)
+                                     :distinct-lengths (count (distinct v))
+                                     :total-bytes (reduce + 0 v)}]))})))))]
+    (when (every? #(not= :measured (:state %)) rows)
+      (die EXIT-COULD-NOT-ANSWER "no corpus produced a leak measurement."))
+    (let [payload {:measurement :aiuefs-v4/length-leak
+                   :measured-at (.toISOString (js/Date.))
+                   :node (.-version js/process)
+                   :leaf-bytes leaf-bytes
+                   :metric "Shannon entropy of the sealed-length distribution, bits per leaf"
+                   :load1-at-measurement (first (js->clj (.loadavg os)))
+                   :corpora rows}]
+      (when out-path
+        (.mkdirSync fs (.dirname path out-path) #js {:recursive true})
+        (.writeFileSync fs out-path (with-out-str (pr payload))))
+      (println)
+      (println (str/join "\t" ["corpus" "scheme" "leak bits/leaf" "distinct lengths" "bytes"]))
+      (doseq [r rows :when (= :measured (:state r))
+              [k v] (:by-scheme r)]
+        (println (str/join "\t" [(name (:corpus r)) (name k)
+                                 (:length-entropy-bits v) (:distinct-lengths v) (:total-bytes v)])))
+      (println)
+      (println "today's row is the baseline: uncompressed leaves are all one size."))))
+
+(-main)

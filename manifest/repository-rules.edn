@@ -4,7 +4,7 @@
 ;; ("kotoba.repository-role-rules.v0") and neither had a workspace-level home:
 ;;
 ;;   - the stack-tier vocabulary's edge table lived only as a hardcoded map
-;;     inside scripts/verify-repository-roles.cljs
+;;     inside scripts/verify-repository-roles.cljk
 ;;   - the name-prefix vocabulary lived inside a leaf repo
 ;;     (kotoba-lang/loop-ux-kaizen/resources/repository-rules.edn)
 ;;
@@ -86,7 +86,7 @@
                                        :key "ipld/{cid}"
                                        :read-at ["{cid}.ipfs.itonami.cloud" "{name}.itonami.app"]}
                         :publish-writes :both
-                        :publisher "scripts/publish-document.cljs"
+                        :publisher "scripts/publish-document.cljk"
                         :origin-plane-fallback :not-implemented-by-decision}
    ;; The key signing the live advertisement chain exists only as a write-only
    ;; Worker secret. Measured 2026-09-01, manifest/ipni-publisher.edn.
@@ -95,7 +95,7 @@
                             :why-not-a-separate-worker :signing-key-is-write-only-there
                             :reads-private-bucket false}
    :policy/agent-work-plane "https://itonami.cloud"
-   :policy/verifier "scripts/verify-app-content-address.cljs"
+   :policy/verifier "scripts/verify-app-content-address.cljk"
    :policy/verifier-states #{:addressed :exempt :document-not-addressed :located :unreadable}
    :policy/finding-keys #{"located-only" "document-not-addressed"}
    :policy/requires #{:content-address-for-documents
@@ -162,9 +162,9 @@
   ;; (`verify-jvm-dependency-surface`). ADR-2608201300.
   :jvm-new-surface
   {:policy/authority "90-docs/adr/2608201300-jvm-new-surface-scaffold-guard.edn"
-   :policy/detector "scripts/verify-jvm-dependency-surface.cljs"
-   :policy/admission "scripts/jvm_new_surface_policy.cljs"
-   :policy/hook ".claude/hooks/jvm-new-surface-guard.cljs"
+   :policy/detector "scripts/verify-jvm-dependency-surface.cljk"
+   :policy/admission "scripts/jvm_new_surface_policy.cljk"
+   :policy/hook ".claude/hooks/jvm-new-surface-guard.cljk"
    :policy/forbids #{:new-production-clj
                      :new-top-level-jvm-runtime-third-party}
    :policy/allows #{:edit-existing-clj
@@ -569,7 +569,21 @@
                           ;; ceiling for roots without a pack, or decide who writes
                           ;; packs and advertise 256 on that premise. The cost of
                           ;; leaving it open is measured: 46 seconds.
-                          :ceiling-decision :open
+                          ;; Taken 2026-09-11: a second ceiling for roots without a
+                          ;; pack (kotobase-protocol-ipq fc276320, max-blocks 32,
+                          ;; published as maxBlocksWithoutPack). The shell that
+                          ;; applies it is NOT deployed yet -- see :cljk-rename.
+                          :ceiling-decision :two-ceilings
+                          :unpacked-max-blocks 32
+                          ;; Deployed 2026-09-11 (net-kotobase/ipfs b4244342) and
+                          ;; verified live: the 256-block fixture answers 200 in
+                          ;; 0.64 s with its pack and 413 in 4.5 s without it.
+                          :unpacked-ceiling-deployed true
+                          ;; Measured on a 102 MB pack: 3 R2 requests and ~300 ms
+                          ;; of I/O for a 32-block traversal, the same order as a
+                          ;; 39 KB pack. Round trips do not depend on pack size.
+                          :large-pack-reader :windowed
+                          :large-pack-requests-at-102mb 3
                           :pack-prize "(N-1) x per-block-ms, upper bound"
                           ;; Measured 2026-09-11 with a root-keyed CARv2 read whole
                           ;; on the first miss (net-kotobase/ipfs 23046cad): 30 -> 1
@@ -581,20 +595,37 @@
                           :pack-price-measured {:wall-ratio 15.9 :io-ratio 29.6
                                                 :prize-realised 0.94
                                                 :one-block-penalty-ms 11.2
-                                                :mechanism :root-keyed-whole-read
-                                                :range-read :not-measured
+                                                :mechanism :root-keyed-window-read
+                                                :range-read :measured-at-102mb
                                                 :who-writes-packs :not-decided}
                           :p50-ms {:one-block 132.0 :three-blocks 353.0}
                           :refusal-ms {:malformed-selector 14.2 :root-not-held 121.9}
                           :pack-opportunity "collapse N fetches into one range read (ADR-2608160100), whose per-chain conclusion does NOT transfer here -- measure before adopting"}
    :policy/performance-evidence "90-docs/query-plane/2026-09-10-query-plane-performance.edn"
    :policy/performance-caveat "nbb / Node 26 on a workstation at loadavg 13-22, not workerd. The ratios are the result; the milliseconds are this machine's"
+   ;; 2026-09-11: another session renamed .cljc/.cljs to .cljk across the
+   ;; kotoba-lang libraries this plane is built from; the owner decided the
+   ;; rename is authoritative. Measured: no tool loads .cljk on its own.
+   ;; `scripts/cljk-classpath.cljk` is the loader for nbb and the JVM
+   ;; (cljk-origin.edn -> symlink mirror outside the repo -> substituted
+   ;; classpath). shadow-cljs has no hook, so a Worker that pins a renamed
+   ;; library cannot build until its shadow-cljs.edn is generated from a
+   ;; mirrored classpath. Every west pin this plane deploys from is pre-rename.
+   :policy/cljk-rename {:authoritative true
+                        :loader "scripts/cljk-classpath.cljk"
+                        :loader-covers #{:nbb :jvm}
+                        :loader-does-not-cover #{:clj-kondo}
+                        ;; shadow-cljs is covered by generation, not by the
+                        ;; loader itself: net-kotobase/ipfs gen-shadow-cljs-edn.cljs
+                        ;; writes :source-paths from the mirrored classpath.
+                        :shadow-cljs :generated-config
+                        :pack-range-reader-blocked-on nil}
    ;; Landed 2026-09-10 for the entity-id hazard only. It reports a SHAPE, never
    ;; a verdict: whether a given call's references are entity ids is a property
    ;; of the data. 44,736 files, 19 findings, and both directions plus the
    ;; refusal were run before it landed.
-   :policy/detector "scripts/verify-materialized-reference-join.cljs"
-   :policy/detector-self-test "90-docs/query-plane/selftest_reference_join.cljs"
+   :policy/detector "scripts/verify-materialized-reference-join.cljk"
+   :policy/detector-self-test "90-docs/query-plane/selftest_reference_join.cljk"
    ;; Found 2026-09-10 while measuring the transfer slope, and NOT fixed here:
    ;; a dag-json root makes the IPQ worker throw, which Cloudflare renders as a
    ;; 500 with an HTML body -- an answer that is none of this surface's named
@@ -624,6 +655,32 @@
     :ceiling-lifted {:io-ipld "9bf07ce7" :kotobase-protocol-ipq "08e0021d"
                      :net-kotobase-ipfs "a6d722b3" :verified-live "2026-09-11"
                      :reachable-blocks {:before 13 :after 32}}}
+   ;; 2026-09-11, owner instruction: the benchmark for this plane's
+   ;; co-scientist loop is LDBC SNB Interactive, the target is the audited
+   ;; world No.1, and every scored number crosses a network hop. The judge
+   ;; is kotoba-lang/ayatori bench/benchmark.edn (:ldbc-snb-interactive-
+   ;; network-v2); the SUT and driver are in kotoba-lang/kotobase-peer.
+   ;; The target below is a date-stamped reading of ldbcouncil.org, not a
+   ;; constant: re-read it before quoting it (ADR-2609121000).
+   :policy/benchmark {:id :ldbc-snb-interactive-network-v2
+                      :judge "orgs/kotoba-lang/ayatori/bench/benchmark.edn"
+                      :scoreboard "orgs/kotoba-lang/ayatori/bench/scoreboard.edn"
+                      :workload "LDBC SNB Interactive v1"
+                      :metric :throughput-ops-per-second
+                      :validity "95% of operations start within 1 s of schedule; 0 failed operations; answers agree with the reference"
+                      :network-rule "driver and SUT are different processes joined by TCP/HTTP; origins :loopback :cross-host :live are separate columns"
+                      :target {:read-on "2026-09-11"
+                               :source "https://ldbcouncil.org/benchmarks/snb/interactive/"
+                               :system "Graph Engine Service 3.1.0, Huawei Cloud, 2025-12-01"
+                               :peak-ops-s 139411.14
+                               :by-sf {:sf100 129089.68 :sf300 139411.14 :sf1000 125872.54}}
+                      :sut "kotobase-peer.ldbc-snb-net"
+                      :driver "kotobase-peer bench/ldbc_snb_driver.cljk"
+                      :first-row {:iteration 13 :origin :loopback :rung :sf1-subset-35k-posts
+                                  :throughput-ops-s 7.76 :empty-share 0.52
+                                  :receipt "orgs/kotoba-lang/kotobase-peer/bench/results/2026-09-11-ldbc-snb-network-loopback-sf1-subset.edn"}
+                      :ldbc-score? false
+                      :hardware-rescaling :refused}
    :policy/gate nil
    :policy/why-no-gate "no predicate enumerates the ways an ontology could reach an evaluator other than the two doors; a gate that has never been shown to fail is theatre, so build the third door first and watch it redden"
    :policy/measured-on "2026-09-10"
@@ -639,7 +696,7 @@
                                   :optional [:must-not :depends-on]}
    :vocabulary/discriminator :name
    ;; Lifted verbatim from the `allowed-role-edges` map that was hardcoded in
-   ;; scripts/verify-repository-roles.cljs. A repo of role K may declare a
+   ;; scripts/verify-repository-roles.cljk. A repo of role K may declare a
    ;; production dependency only on repos whose role is in (get edges K).
    :vocabulary/allowed-role-edges
    {:contract  #{:contract :library :assurance}
@@ -858,7 +915,7 @@
                        :example {"http/fetch" "capability-http-fetch"
                                  "gpu/draw-frame" "capability-gpu-draw-frame"
                                  "secret/use-scram-sha256" "capability-secret-use-scram-sha256"}}
-     :verified-by "nbb scripts/verify-repository-roles.cljs --capability-audit"
+     :verified-by "nbb scripts/verify-repository-roles.cljk --capability-audit"
      ;; Recorded because it bears directly on how much the NAME is allowed to
      ;; mean: ADR-2607289500 decides that a repository name (and a Radicle RID)
      ;; is a discovery alias only, and that identity is the semantic definition
@@ -1040,7 +1097,7 @@
               terms, before any metaphor or history"}
       {:route :concept-index
        :rule "the subject is registered in manifest/concept-vocabulary.edn so
-              `nbb scripts/concept-lookup.cljs <word>` reaches it — in both
+              `nbb scripts/concept-lookup.cljk <word>` reaches it — in both
               English and Japanese"
        :authority "90-docs/adr/2608039980"}]
      :examples ["design-quality" "hinshitsu" "browser-agent" "ao"]
@@ -1365,7 +1422,7 @@
                            this entry is deleted. Not done here: that is a
                            code move across repos, not a declaration fix."}]
 
- ;; Measured 2026-07-29 by scripts/verify-repository-roles.cljs --prefix-audit.
+ ;; Measured 2026-07-29 by scripts/verify-repository-roles.cljk --prefix-audit.
  ;; Recorded as a gap rather than fabricated: these repos carry a role prefix
  ;; but ship no resources/repository-rules.edn, so nothing states which contract
  ;; they claim. Not an error — the convention simply is not adopted there yet.
@@ -1382,7 +1439,7 @@
   ;; ── measured 2026-08-04 by --name-audit (ADR-2608040100) ──────────────
   {:gap/id :origin-domain-unverified
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit"
    :gap/count 1313
    :gap/of 1432
    :gap/note "origin-plane repos with no domain recorded in manifest/origin-domains.edn.
@@ -1397,7 +1454,7 @@
 
   {:gap/id :origin-prefix-misfiled
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit"
    :gap/count 94
    :gap/of 119
    ;; ROOT CAUSE, established 2026-08-05 (ADR-2608040160): these are not N
@@ -1462,7 +1519,7 @@
   {:gap/id :capability-declaration-missing
    :gap/status :resolved-as-misdiagnosed
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --capability-audit"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --capability-audit"
    :gap/finding {:repos-in-west 57
                  :checked 57
                  :ship-capability-edn 57
@@ -1480,7 +1537,7 @@
   {:gap/id :role-prefix-outside-every-declared-rule
    :gap/status :mostly-resolved
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit + manifest/repo-taxonomy.edn"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit + manifest/repo-taxonomy.edn"
    :gap/was 196
    :gap/now 11
    :gap/resolution "185 are cloud-itonami-lei-*, now declared. The evidence
@@ -1697,7 +1754,7 @@
 
   {:gap/id :unknown-tld-is-dropped-not-surfaced
    :gap/measured-at "2026-08-15"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit, before and after declaring \"ws\""
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit, before and after declaring \"ws\""
    :gap/count 1
    :gap/adr "ADR-2608153000"
    ;; The docstring of `origin-tlds` says the observed set is deliberate because
@@ -1725,7 +1782,7 @@
 
   {:gap/id :serving-family-prefix-lacks-its-tld
    :gap/measured-at "2026-08-05"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --family-audit"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --family-audit"
    :gap/count 48
    ;; Six families serve real hosts, and none of their prefixes is the reversed
    ;; domain they serve -- every one is missing its TLD. Not renamed:
@@ -1803,7 +1860,7 @@
 
   {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit"
    :gap/count 17
    ;; Screened 2026-08-05 (ADR-2608040160) by org spread, since a product family
    ;; :must :share-one-owning-authority. Single-org candidates are plausible
@@ -1830,6 +1887,6 @@
 
   {:gap/id :forbidden-suffix-still-registered
    :gap/measured-at "2026-07-29"
-   :gap/measured-by "scripts/verify-repository-roles.cljs --prefix-audit"
+   :gap/measured-by "scripts/verify-repository-roles.cljk --prefix-audit"
    :gap/repos ["com-junkawasaki/multiformats-clj"]
    :gap/note "west.yml still registers a -clj entry, and it is a duplicate: com-junkawasaki/multiformats-clj resolves by GitHub redirect to kotoba-lang/io-multiformats, which west already registers separately at the same revision 310724803db65840f00d2d98d7887f2b6a512bd3 — so the same repository is cloned twice at two paths. Removing the stale entry changes fleet-db/west.yml pins and is deliberately left to a separate change rather than folded into this one."}]}

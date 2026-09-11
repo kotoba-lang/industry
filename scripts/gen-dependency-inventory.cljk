@@ -1,0 +1,667 @@
+#!/usr/bin/env nbb
+;; 認証スコープ内の repo の **実依存** を purl として棚卸しする。
+;;
+;; ## なぜ要るのか
+;;
+;; SOC 2 CC7.1（新たな脆弱性の検知）と ISO/IEC 27001:2022 A.8.8（技術的脆弱性の
+;; 管理）で最初に問われるのは「何を使っているか」である。
+;;
+;; ⚠ **この workspace には既に SBOM / 脆弱性照合のモデルが在る** ——
+;; `kotoba-lang/app-sbom`（component/purl・OSV からの CVE 取り込み・VulnMatch・
+;; severity 別 SLA・blast radius、1,823 行 + テスト）。**新しく作らない。**
+;; 欠けているのは (1) `sbom.etzhayyim.com` が未デプロイ、(2) 自分たちの依存を
+;; component として投入するものが無い、の 2 つで、この script は (2) を埋める。
+;;
+;; ## 正確でない version を正確なふりで出さない
+;;
+;; `package.json` の `^1.2.3` は範囲であって version ではない。OSV に範囲を投げると
+;; 「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。したがって:
+;;
+;;   - `package-lock.json` / `pnpm-lock.yaml` が在ればそちらを正とする（exact）
+;;   - 無ければ範囲を記録し `:dependency/exact? false` を立てる
+;;   - `--osv` は **exact なものだけ**を照会し、除外した数を必ず印字する
+;;
+;;   nbb scripts/gen-dependency-inventory.cljk           # 棚卸し（scope 内のみ）
+;;   nbb scripts/gen-dependency-inventory.cljk --all     # 全 repo
+;;   nbb scripts/gen-dependency-inventory.cljk --osv     # OSV.dev に照会（外部送信）
+
+(ns gen-dependency-inventory
+  (:require ["fs" :as fs]
+            ["path" :as path]
+            [clojure.edn :as edn]
+            [clojure.string :as str]))
+
+(def root (.cwd js/process))
+(def scope-file (path/join root "90-docs" "compliance" "scope.datoms.edn"))
+(def out-file (path/join root "90-docs" "compliance" "dependencies.datoms.edn"))
+
+(def named-properties
+  #{"kotobalabs.com" "kotoba-lang.org" "kotobase.net" "murakumo.cloud" "itonami.cloud"})
+
+(defn- read-safe [f]
+  (try (fs/readFileSync f "utf8") (catch :default _ nil)))
+
+(defn- read-json [f]
+  (when-let [raw (read-safe f)]
+    (try (js->clj (js/JSON.parse raw)) (catch :default _ nil))))
+
+(defn in-scope-repos
+  "compliance scope 索引から、名指しされた 5 面に資産を持つ repo を取る。
+   索引が無ければ **推測せずに nil** を返す（呼び出し側が拒否する）。"
+  []
+  (when-let [raw (read-safe scope-file)]
+    (let [ds (try (edn/read-string raw) (catch :default _ nil))]
+      (when ds
+        (->> ds
+             (remove :scope/coverage)
+             (filter #(named-properties (:scope/property %)))
+             (keep :scope/repo)
+             distinct sort vec)))))
+
+;; ── purl ───────────────────────────────────────────────────────────────────
+
+(defn- maven-purl [coord version]
+  (let [c (str coord)
+        [g a] (if (str/includes? c "/") (str/split c #"/" 2) [c c])]
+    (str "pkg:maven/" g "/" a "@" version)))
+
+(defn- github-purl [url sha]
+  (let [m (re-find #"github\.com[:/]+([^/]+)/([^/.]+)" (or url ""))]
+    (when m (str "pkg:github/" (nth m 1) "/" (nth m 2) "@" sha))))
+
+(defn- npm-purl [nm version] (str "pkg:npm/" nm "@" version))
+
+;; ── deps.edn ───────────────────────────────────────────────────────────────
+
+(defn- deps-entries
+  "deps.edn の :deps と各 alias の :extra-deps / :replace-deps を 1 本に。
+
+   **`:deps` は production、alias 側は development** として印を付けて返す。
+   両者を同じ列に混ぜると、test runner の脆弱性が本番の脆弱性と同じ緊急度で
+   並ぶ（2026-08-23 に実際にそう報告し、triage を誤った）。"
+  [m]
+  (concat (map (fn [e] [e false]) (:deps m))
+          (mapcat (fn [[_ a]] (map (fn [e] [e true])
+                                   (concat (:extra-deps a) (:replace-deps a))))
+                  (:aliases m))))
+
+(defn- from-deps-edn [file rel]
+  (when-let [m (try (edn/read-string (read-safe file)) (catch :default _ nil))]
+    (keep (fn [[[coord spec] dev?]]
+            (cond
+              (:mvn/version spec)
+              {:purl (maven-purl coord (:mvn/version spec))
+               :ecosystem :maven :name (str coord) :version (:mvn/version spec)
+               :exact? true :dev? dev? :file rel}
+
+              (:git/sha spec)
+              (when-let [p (github-purl (:git/url spec) (:git/sha spec))]
+                {:purl p :ecosystem :github :name (str coord) :version (:git/sha spec)
+                 :exact? true :dev? dev? :file rel})
+
+              ;; :local/root は同じ tree の中。第三者依存ではないので
+              ;; 脆弱性照会の対象にしないが、**数からは落とさない**。
+              (:local/root spec)
+              {:purl nil :ecosystem :internal :name (str coord) :version nil
+               :exact? true :dev? dev? :file rel}
+
+              :else nil))
+          (deps-entries m))))
+
+;; ── npm ────────────────────────────────────────────────────────────────────
+
+(defn- from-package-lock
+  "package-lock.json v2/v3 の `packages` は **確定版** を持つ。ここが最優先。
+
+   ⚠ **`node_modules/` を含む key だけを読む。** `packages` の key `\"\"` は
+   *そのプロジェクト自身* であり、workspace の member も同様に素の path を key に
+   持つ。初版は `(get v \"name\")` を無条件に採っていたので、プロジェクト自身が
+   依存として出ていた。実測 2026-08-23、全 tree 走査の『最優先』上位 2 件が
+   それだった:
+
+     orgs/cloud-itonami/cloud-itonami-isic-7210/svelte/   → `svelte@0.0.0`（勧告 8 件）
+     orgs/com-junkawasaki/webmaster/                      → `astro@0.0.1`（勧告 17 件）
+
+   どちらも npm の svelte / astro ではなく、**たまたまその名前のディレクトリ**で、
+   version 欄が無いので 0.0.0 になり、OSV の『N 未満が該当』範囲に全部当たっていた。
+   package の名前と version を、published package の名前と version と取り違えている。"
+  [file rel]
+  (when-let [m (read-json file)]
+    (keep (fn [[k v]]
+            (let [nm (when (str/includes? k "node_modules/")
+                       (or (get v "name") (last (str/split k #"node_modules/"))))
+                  ver (get v "version")]
+              (when (and nm ver (seq nm) (not (get v "link")))
+                ;; npm が既に計算した `dev` をそのまま運ぶ。ここを落とすと
+                ;; miniflare 経由の dev 依存が本番依存と区別できなくなる。
+                {:purl (npm-purl nm ver) :ecosystem :npm :name nm :version ver
+                 :exact? true :dev? (boolean (or (get v "dev") (get v "devOptional")))
+                 :file rel})))
+          (get m "packages"))))
+
+(def ^:private source-exts
+  #{".ts" ".tsx" ".js" ".jsx" ".mjs" ".cjs" ".svelte" ".vue"
+    ".cljs" ".cljc" ".clj" ".cljk" ".kotoba"})
+
+(defn- source-files
+  "repo 配下の source を集める。node_modules と生成物は除く。"
+  [repo-root]
+  (letfn [(walk [d depth]
+            (when (<= depth 5)
+              (let [ents (try (fs/readdirSync d #js {:withFileTypes true}) (catch :default _ []))]
+                (mapcat (fn [e]
+                          (let [n (.-name e) q (path/join d n)]
+                            (cond
+                              (and (.isFile e) (some #(str/ends-with? n %) source-exts)) [q]
+                              (and (.isDirectory e)
+                                   (not (str/starts-with? n "."))
+                                   (not (#{"node_modules" "dist" "target" "build" "out" "public"} n)))
+                              (walk q (inc depth))
+                              :else nil)))
+                        ents))))]
+    (vec (walk repo-root 0))))
+
+(def ^:private config-exts
+  #{".config.js" ".config.mjs" ".config.cjs" ".config.ts" ".config.json"})
+
+(defn- imported-anywhere?
+  "この repo の source が `nm` を **直接** 参照しているか。
+
+   ## 判定を広く取る理由
+
+   誤りの向きが対称でない。**『到達しうる』の偽陽性は triage が 1 件増えるだけ**
+   だが、**『未使用』の偽陰性は「削除してよい」と言うので repo を壊す。**
+   だから曖昧なら参照ありに倒す。
+
+   実測 2026-08-23、初版はここを狭く書いて **3 件すべてを誤判定した**:
+
+     postcss              `postcss.config.mjs` 経由（import 文が無い）
+     xlsx                 `[\"xlsx$default\" :as XLSX]` — shadow-cljs の `$` 接尾辞
+     @hono/node-server    `[\"@hono/node-server\" :refer [serve]]` — cljs の vector 形
+
+   初版の正規表現は `require(` / `from ` / `import ` / `[\"` を前置に要求していた。
+   cljs の `[\"name\" :as x]` は `[` の直後が名前なので `[\"` + 引用符という前置条件に
+   当たらず、`$default` は名前の直後が `/` でないので当たらなかった。
+
+   いまは **引用符で囲まれた module 指定子として名前が現れるか**だけを見る
+   （`\"name\"` / `\"name/sub\"` / `\"name$default\"`）。コメントや docstring にも
+   当たりうるが、それは安全な向きの誤りである。
+
+   加えて `*.config.*` にファイル名として現れる場合も参照とみなす —— postcss /
+   tailwind / vite の plugin はコードから import されず設定に名前が書かれる。
+
+   したがって **false は『使っていない』の証明ではなく『参照が見当たらない』**。"
+  [repo-root nm]
+  (let [esc (str/replace nm #"[.*+?^${}()|\[\]\\]" "\\$&")
+        pat (re-pattern (str "[\"']" esc "(?:[/$][^\"']*)?[\"']"))
+        files (source-files repo-root)
+        configs (filter (fn [f] (some #(str/ends-with? f %) config-exts)) files)]
+    (boolean (or (some (fn [f] (when-let [t (read-safe f)] (re-find pat t))) files)
+                 ;; 設定ファイルは名前を裸で書くことがある（plugin 名など）
+                 (some (fn [f] (when-let [t (read-safe f)] (str/includes? t nm))) configs)))))
+
+(defn- declared-directly?
+  "この repo のどれかの package.json が `nm` を直接宣言しているか。
+
+   宣言されていない = 推移依存なので、`imported-anywhere?` の答えは意味を持たない
+   （親経由で到達しうる）。両者を分けるためにここで判定する。"
+  [repo-root nm]
+  (letfn [(walk [d depth]
+            (when (<= depth 3)
+              (let [ents (try (fs/readdirSync d #js {:withFileTypes true}) (catch :default _ []))]
+                (mapcat (fn [e]
+                          (let [n (.-name e) q (path/join d n)]
+                            (cond
+                              (and (.isFile e) (= n "package.json")) [q]
+                              (and (.isDirectory e) (not (str/starts-with? n "."))
+                                   (not (#{"node_modules" "dist" "target" "build"} n)))
+                              (walk q (inc depth))
+                              :else nil)))
+                        ents))))]
+    (boolean (some (fn [f]
+                     (when-let [m (read-json f)]
+                       (some #(contains? (get m %) nm)
+                             ["dependencies" "devDependencies" "optionalDependencies"])))
+                   (walk repo-root 0)))))
+
+(defn- reachability
+  "-> :unused-direct | :direct-and-imported | :transitive | :unknown
+
+   `:transitive` は **『到達しない』ではない** —— 親が使っていれば実行時に到達する。
+   判定できないことを、判定した結果と同じ顔にしない（ADR-2608136000）。"
+  [repo nm]
+  (let [root (path/join root repo)]
+    (if-not (fs/existsSync root)
+      :unknown
+      (if (declared-directly? root nm)
+        (if (imported-anywhere? root nm) :direct-and-imported :unused-direct)
+        :transitive))))
+
+(defn- from-pnpm-lock
+  "pnpm-lock.yaml (v9) の `packages:` から確定版を取る。
+
+   なぜ足したか: このスキャナは `package-lock.json` しか読まず、**pnpm を使う
+   65 manifest を『version が範囲のまま = 未測定』として数えていた**（実測
+   2026-08-23）。lockfile が在るのに無いものとして数えるのは、
+   ADR-2608136000 が禁じている『測れなかったものを測った結果と同じ顔にする』
+   の裏返しで、こちらは *測れるものを測らずに未測定に入れて* いた。
+
+   形式は v9 で統一されている（実測: 30 ファイルすべて `lockfileVersion: '9.0'`）:
+
+     packages:
+       '@adobe/css-tools@4.4.4':
+         resolution: {...}
+
+   **name は最後の `@` で切る。** `@adobe/css-tools@4.4.4` の先頭 `@` で切ると
+   name が空になる —— OSV 照会で同じ間違いをして 1000 件の batch を落とした。
+
+   dev/production は v9 の `packages:` からは判らない（`importers:` を辿る必要が
+   ある）ので、**判らないものを production と主張しない**: `:dev? nil` を返し、
+   coverage 側で『scope 不明』として数える。"
+  [file rel]
+  (when-let [raw (read-safe file)]
+    (let [lines (str/split-lines raw)
+          start (first (keep-indexed (fn [i l] (when (= "packages:" (str/trim l)) i)) lines))]
+      (when start
+        (->> (drop (inc start) lines)
+             (take-while #(or (str/blank? %) (str/starts-with? % "  ")))
+             (keep (fn [l]
+                     (when-let [m (re-find #"^  '?([^':]+?)'?:\s*$" l)]
+                       (let [k (nth m 1)
+                             k (if-let [i (str/index-of k "(")] (subs k 0 i) k)
+                             i (.lastIndexOf k "@")]
+                         (when (pos? i)
+                           (let [nm (subs k 0 i) ver (subs k (inc i))]
+                             (when (and (seq nm) (re-matches #"[0-9][^\s]*" ver))
+                               {:purl (npm-purl nm ver) :ecosystem :npm
+                                :name nm :version ver :exact? true
+                                :dev? nil :file rel})))))))
+             vec)))))
+
+(defn- from-package-json [file rel]
+  (when-let [m (read-json file)]
+    (mapcat (fn [k]
+              (keep (fn [[nm spec]]
+                      (when (string? spec)
+                        (let [exact? (boolean (re-matches #"\d+\.\d+\.\d+.*" spec))]
+                          {:purl (when exact? (npm-purl nm spec))
+                           :ecosystem :npm :name nm :version spec
+                           :exact? exact? :dev? (= k "devDependencies") :file rel})))
+                    (get m k)))
+            ["dependencies" "devDependencies" "optionalDependencies"])))
+
+;; ── 走査 ───────────────────────────────────────────────────────────────────
+
+(def ^:private manifest-names
+  #{"deps.edn" "package.json" "package-lock.json" "pnpm-lock.yaml"})
+
+(defn- manifests [repo-root]
+  (letfn [(walk [d depth]
+            (when (<= depth 3)
+              (let [ents (try (fs/readdirSync d #js {:withFileTypes true}) (catch :default _ []))]
+                (mapcat (fn [e]
+                          (let [n (.-name e) p (path/join d n)]
+                            (cond
+                              (and (.isFile e) (manifest-names n)) [p]
+                              (and (.isDirectory e)
+                                   (not (str/starts-with? n "."))
+                                   (not (#{"node_modules" "dist" "target" "build" "out"} n)))
+                              (walk p (inc depth))
+                              :else nil)))
+                        ents))))]
+    (vec (walk repo-root 0))))
+
+(defn scan [repos]
+  (let [stats (atom {:repos 0 :manifests 0 :unreadable 0 :lock-preferred 0 :pnpm-read 0})
+        rows (atom [])]
+    (doseq [repo repos]
+      (swap! stats update :repos inc)
+      (let [ms (manifests (path/join root repo))
+            ;; 同じディレクトリに lock が在れば package.json は読まない。
+            ;; 範囲と確定版が二重に入ると、同じ依存が 2 件に見える。
+            ;; lockfile を持つディレクトリでは package.json（範囲）を読まない。
+            ;; pnpm も同じ扱いにする —— 以前は package-lock.json だけを見ており、
+            ;; pnpm の repo は lockfile が在るのに未測定に数えられていた。
+            lock-dirs (set (map path/dirname
+                                (filter #(or (str/ends-with? % "package-lock.json")
+                                             (str/ends-with? % "pnpm-lock.yaml")) ms)))]
+        (doseq [f ms
+                :let [rel (str/replace f (str root "/") "")
+                      base (path/basename f)
+                      dir (path/dirname f)]]
+          (swap! stats update :manifests inc)
+          (let [es (cond
+                     (= base "deps.edn") (from-deps-edn f rel)
+                     (= base "package-lock.json") (do (swap! stats update :lock-preferred inc)
+                                                      (from-package-lock f rel))
+                     (= base "pnpm-lock.yaml") (do (swap! stats update :lock-preferred inc)
+                                                   (swap! stats update :pnpm-read inc)
+                                                   (from-pnpm-lock f rel))
+                     (and (= base "package.json") (not (lock-dirs dir))) (from-package-json f rel)
+                     :else [])]
+            (when (and (nil? es) (not= base "package.json"))
+              (swap! stats update :unreadable inc))
+            (doseq [e (or es [])]
+              (swap! rows conj (assoc e :repo repo)))))))
+    {:rows @rows :stats @stats}))
+
+(defn ->datoms [{:keys [rows stats]} scoped?]
+  (let [uniq (->> rows
+                  ;; 同じ package が production と development の両方に現れることが
+                  ;; ある。dev? を鍵に含めないと、片方が消えて triage が狂う。
+                  (group-by (juxt :repo :ecosystem :name :version :dev?))
+                  (map (fn [[_ g]] (first g))))
+        ds (map-indexed
+            (fn [i r]
+              (cond-> {:db/id (- (inc i))
+                       :dependency/repo (:repo r)
+                       :dependency/ecosystem (:ecosystem r)
+                       :dependency/name (:name r)
+                       :dependency/exact? (:exact? r)
+                       ;; **本番に載るか、開発時だけか。** これが無いと、
+                       ;; miniflare の中の undici が本番の依存と同じ緊急度で並ぶ。
+                       :dependency/dev? (:dev? r)
+                       :source/dataset "compliance-dependencies"
+                       :source/file (:file r)}
+                (:version r) (assoc :dependency/version (:version r))
+                (:purl r)    (assoc :dependency/purl (:purl r))))
+            uniq)
+        exact (count (filter #(and (:exact? %) (:purl %)) uniq))
+        cov {:db/id (- (inc (count uniq)))
+             :dependency/coverage true
+             :source/dataset "compliance-dependencies"
+             :dependency/scope (if scoped? :named-properties :all-repos)
+             :dependency/repos-scanned (:repos stats)
+             :dependency/manifests-read (:manifests stats)
+             :dependency/manifests-unreadable (:unreadable stats)
+             :dependency/lockfiles-preferred (:lock-preferred stats)
+             :dependency/pnpm-lockfiles-read (:pnpm-read stats)
+             :dependency/rows (count uniq)
+             ;; **OSV に投げられるのは exact なものだけ。** 範囲のまま照会すると
+             ;; 「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。
+             ;; `:dev? nil` は「判らなかった」であって production ではない。
+             ;; 3 つに分けて数える —— 2 値に畳むと pnpm 由来が本番として並ぶ。
+             :dependency/production (count (filter #(false? (:dev? %)) uniq))
+             :dependency/development (count (filter #(true? (:dev? %)) uniq))
+             :dependency/scope-unknown (count (filter #(nil? (:dev? %)) uniq))
+             :dependency/queryable exact
+             :dependency/not-queryable (- (count uniq) exact)}]
+    (vec (concat ds [cov]))))
+
+;; ── OSV 照会（外部送信。既定では走らない） ─────────────────────────────────
+
+(defn- osv-skipped
+  "OSV の batch に載せられない purl を ecosystem ごとに数える。
+
+   **除外は沈黙してはならない。** `pkg:github/...` は OSV の npm/Maven 面には
+   載らないので照会されないが、初版はこれを数に出さず、`除外 55` とだけ
+   印字していた —— 実際には 199 件が照会されていなかった。
+   『飛ばした』と『合格した』が出力で区別できること（CLAUDE.md の 4 問目）。"
+  [purls]
+  (->> purls
+       (remove #(or (str/starts-with? % "pkg:npm/") (str/starts-with? % "pkg:maven/")))
+       (map #(first (str/split % #"/")))
+       frequencies))
+
+(defn osv-query! [purls]
+  (let [qs (->> purls
+                (keep (fn [p]
+                        ;; **最後の `@` で切る。** 最初の `@` で切ると、scope 付き npm
+                        ;; パッケージ（`pkg:npm/@types/node@20.1.0`）の先頭の `@` に当たり、
+                        ;; name が空・version が "types/node@20.1.0" になる。OSV はこれを
+                        ;; `invalid query` として **バッチ全体ごと** 400 で返すので、
+                        ;; 1 件の綴り違いが 1000 件の照会を黙って落とす。
+                        (let [i (.lastIndexOf p "@")
+                              base (when (pos? i) (subs p 0 i))
+                              ver (when (pos? i) (subs p (inc i)))]
+                          (when (and base ver (seq ver))
+                            (cond
+                              (str/starts-with? base "pkg:npm/")
+                              {"package" {"ecosystem" "npm" "name" (subs base 8)} "version" ver}
+                              (str/starts-with? base "pkg:maven/")
+                              {"package" {"ecosystem" "Maven"
+                                          "name" (str/replace (subs base 10) "/" ":")}
+                               "version" ver}
+                              :else nil)))))
+                vec)]
+    (if (empty? qs)
+      (js/Promise.resolve {:queried 0 :vulns [] :skipped (osv-skipped purls)})
+      ;; OSV の batch は 1000 件/回。分割して順に投げる。
+      (let [chunks (partition-all 1000 qs)]
+        (-> (js/Promise.all
+             (clj->js
+              (map (fn [c]
+                     (-> (js/fetch "https://api.osv.dev/v1/querybatch"
+                                   #js {:method "POST"
+                                        :headers #js {"content-type" "application/json"}
+                                        :body (js/JSON.stringify (clj->js {"queries" (vec c)}))})
+                         (.then (fn [r]
+                                  ;; **応答本文を捨てない。** status だけ記録する経路は、
+                                  ;; 原因が本文に書いてあっても読まない（CLAUDE.md の 3 問目）。
+                                  (if (.-ok r)
+                                    (.json r)
+                                    (-> (.text r)
+                                        (.then (fn [t]
+                                                 (throw (js/Error.
+                                                         (str "OSV HTTP " (.-status r) " — "
+                                                              (subs t 0 (min 600 (count t))))))))))))
+                         (.then (fn [j]
+                                  (map (fn [q res]
+                                         {:query q
+                                          :ids (map #(get % "id")
+                                                    (or (get (js->clj res) "vulns") []))})
+                                       c (or (get (js->clj j) "results") []))))))
+                   chunks)))
+            (.then (fn [rs]
+                     {:queried (count qs)
+                      :skipped (osv-skipped purls)
+                      :vulns (->> (apply concat (js->clj rs :keywordize-keys false))
+                                  (filter #(seq (:ids %)))
+                                  vec)})))))))
+
+;; `--selftest-reachability` — 一時ディレクトリに小さな repo を建てて 4 状態を実演する。
+;; 片方向しか出さない検査は、その判定が働いていることを示さない（CLAUDE.md
+;; 「gate は落ちることを確かめてから landed とする」の対偶）。
+(defn- selftest-reachability! []
+  (let [dir (path/join (.tmpdir (js/require "node:os")) "dep-reach-selftest")
+        w! (fn [rel content]
+             (let [f (path/join dir rel)]
+               (fs/mkdirSync (path/dirname f) #js {:recursive true})
+               (fs/writeFileSync f content)))]
+    (try (fs/rmSync dir #js {:recursive true :force true}) (catch :default _ nil))
+    ;; 2026-08-23 に実際に外した 3 形式を必ず含める。初版はこの 3 つを
+    ;; すべて `unused-direct`（= 削除してよい）と誤判定し、どれも使われていた。
+    (w! "package.json" (js/JSON.stringify
+                        (clj->js {"dependencies" {"used-pkg" "^1.0.0" "unused-pkg" "^2.0.0"
+                                                  "cljs-vector-pkg" "^1.0.0"
+                                                  "shadow-suffix-pkg" "^1.0.0"
+                                                  "config-only-pkg" "^1.0.0"}})))
+    (w! "src/app.ts" "import { thing } from \"used-pkg\";\nexport const x = thing;\n")
+    ;; cljs の vector import —— `[` の直後が名前で、初版の前置条件に当たらなかった
+    (w! "src/ns.cljs" "(ns a (:require [\"cljs-vector-pkg\" :refer [serve]]))\n")
+    ;; shadow-cljs の `$default` 接尾辞 —— 直後が `/` でないので当たらなかった
+    (w! "src/sc.cljs" "(ns b (:require [\"shadow-suffix-pkg$default\" :as X]))\n")
+    ;; 設定ファイル経由 —— import 文がそもそも無い
+    (w! "postcss.config.mjs" "export default { plugins: { \"config-only-pkg\": {} } };\n")
+    ;; 直接宣言されていない = 推移依存。import されていても :transitive のまま。
+    (w! "src/other.ts" "const y = require(\"transitive-pkg\");\n")
+    (let [rel (str/replace dir (str root "/") "")
+          ;; reachability は root 相対を取るので、絶対パスの場合はそのまま使う
+          probe (fn [nm]
+                  (if (declared-directly? dir nm)
+                    (if (imported-anywhere? dir nm) :direct-and-imported :unused-direct)
+                    :transitive))
+          r1 (probe "used-pkg") r2 (probe "unused-pkg") r3 (probe "transitive-pkg")
+          r4 (probe "cljs-vector-pkg") r5 (probe "shadow-suffix-pkg") r6 (probe "config-only-pkg")
+          missing (reachability "orgs/does-not-exist-xyz" "anything")
+          ok (and (= :direct-and-imported r1) (= :unused-direct r2)
+                  (= :transitive r3) (= :unknown missing)
+                  (= :direct-and-imported r4) (= :direct-and-imported r5)
+                  (= :direct-and-imported r6))]
+      (println "reachability selftest")
+      (println (str "  (1) 宣言あり + import あり -> " (name r1)))
+      (println (str "  (2) 宣言あり + import なし -> " (name r2) "  ← 是正は bump ではなく削除"))
+      (println (str "  (3) 宣言なし（推移依存）   -> " (name r3) "  ← 『到達しない』とは言わない"))
+      (println (str "  (4) checkout が無い         -> " (name missing) "  ← 測れていないと申告"))
+      (println (str "  (5) cljs [\"name\" :refer …]      -> " (name r4) "  ← 初版はここを外した"))
+      (println (str "  (6) shadow-cljs name$default     -> " (name r5) "  ← 初版はここを外した"))
+      (println (str "  (7) *.config.* に名前だけ         -> " (name r6) "  ← 初版はここを外した"))
+      (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
+      (try (fs/rmSync dir #js {:recursive true :force true}) (catch :default _ nil))
+      ok)))
+
+(defn -main [& args]
+  (when (some #{"--selftest-reachability"} args)
+    (js/process.exit (if (selftest-reachability!) 0 1)))
+  ;; `--probe <repo-path> <package>` — 1 件の到達性をその場で引く。
+  ;; triage の実務で「この repo でこの package は本当に使われているか」を
+  ;; 全走査なしに確かめられる必要がある（全 tree 走査は 20 分超）。
+  (when-let [i (first (keep-indexed #(when (= "--probe" %2) %1) args))]
+    (let [repo (nth args (inc i) nil) pkg (nth args (+ i 2) nil)]
+      (if (and repo pkg)
+        (do (println (str repo "  " pkg "  -> " (name (reachability repo pkg))))
+            (js/process.exit 0))
+        (do (js/console.error "usage: --probe <repo-path> <package>")
+            (js/process.exit 2)))))
+  (let [all? (some #{"--all"} args)
+        osv? (some #{"--osv"} args)
+        repos (if all?
+                (let [orgs (path/join root "orgs")]
+                  (vec (for [org (try (fs/readdirSync orgs) (catch :default _ []))
+                             repo (try (fs/readdirSync (path/join orgs org)) (catch :default _ []))]
+                         (str "orgs/" org "/" repo))))
+                (in-scope-repos))]
+    (when (empty? repos)
+      (js/console.error
+       (str "Refusing to report an inventory: 対象 repo が 0 件。"
+            (if all? " orgs/ が読めない。" (str " " scope-file " が無いか空 —— "
+                                                "先に nbb scripts/gen-compliance-scope.cljk を回す。"))))
+      (js/process.exit 2))
+    (let [{:keys [rows stats] :as res} (scan repos)]
+      (when (zero? (count rows))
+        (js/console.error (str "Refusing to report an inventory: "
+                               (:repos stats) " repo / " (:manifests stats)
+                               " manifest を見たが依存を 1 件も読めなかった"))
+        (js/process.exit 2))
+      (let [datoms (->datoms res (not all?))
+            cov (last datoms)]
+        (if osv?
+          (let [ds (butlast datoms)
+                by-purl (group-by :dependency/purl ds)]
+            (-> (osv-query! (distinct (keep :dependency/purl ds)))
+              (.then (fn [{:keys [queried vulns skipped]}]
+                       (println (str "OSV: 照会 " queried " 件"))
+                       (println (str "  照会できなかった: version が範囲のまま "
+                                     (:dependency/not-queryable cov) " 件"
+                                     (when (seq skipped)
+                                       (str " / OSV の対象 ecosystem 外 "
+                                            (reduce + (vals skipped)) " 件 "
+                                            (pr-str skipped)))))
+                       (let [hits (->> vulns
+                                       (map (fn [v]
+                                              (let [nm (get-in v [:query "package" "name"])
+                                                    ver (get-in v [:query "version"])
+                                                    eco (get-in v [:query "package" "ecosystem"])
+                                                    purl (if (= "npm" eco)
+                                                           (str "pkg:npm/" nm "@" ver)
+                                                           (str "pkg:maven/" (str/replace nm ":" "/") "@" ver))]
+                                                (let [rows (by-purl purl)
+                                                      ;; **`(remove :dependency/dev? …)` と書かない。**
+                                                      ;; `:dev? nil` は「pnpm lockfile からは判らなかった」で
+                                                      ;; あって production ではない。not で畳むと判らなかった
+                                                      ;; ものが本番として並ぶ（実測 2026-08-23: pnpm 対応を
+                                                      ;; 入れた直後に undici が誤って PRODUCTION と出た）。
+                                                      prod (filter #(false? (:dependency/dev? %)) rows)
+                                                      unk (filter #(nil? (:dependency/dev? %)) rows)]
+                                                  {:name nm :version ver :ids (:ids v)
+                                                   :production? (boolean (seq prod))
+                                                   :scope-unknown? (boolean (and (empty? prod) (seq unk)))
+                                                   :reach (let [rs (sort (distinct (map :dependency/repo rows)))]
+                                                            (into {} (map (fn [r] [r (reachability r nm)]) rs)))
+                                                   :prod-repos (sort (distinct (map :dependency/repo prod)))
+                                                   :unk-repos (sort (distinct (map :dependency/repo unk)))
+                                                   :repos (sort (distinct (map :dependency/repo rows)))}))))
+                                       (sort-by :name))]
+                         ;; **本番に載るものを先に出す。** dev 依存と同じ順に並べると
+                         ;; 読む側が緊急度を取り違える（2026-08-23 に実際に取り違えた）。
+                         (doseq [h (sort-by (juxt (complement :production?) :name) hits)]
+                           (println (str "  " (cond (:production? h) "PRODUCTION"
+                                                   (:scope-unknown? h) "scope不明  "
+                                                   :else "dev-only  ")
+                                         "  " (:name h) "@" (:version h)
+                                         "  " (str/join " " (:ids h))))
+                           (println (str "      使用 " (count (:repos h)) " repo"
+                                         (when (:production? h)
+                                           (str " / うち本番 " (count (:prod-repos h)) ": "
+                                                (str/join ", " (:prod-repos h))))
+                                         (when (:scope-unknown? h)
+                                           (str " / scope 不明 " (count (:unk-repos h)) " repo"
+                                                "（pnpm lockfile は dev/prod を言わない）"))))
+                           (doseq [[r k] (sort-by key (:reach h))]
+                             (println (str "        到達性 " (name k) "  " r
+                                           (case k
+                                             :unused-direct "  ← 直接宣言だが import 0。是正は bump ではなく削除"
+                                             :transitive    "  ← 推移依存。親経由で到達しうる（未判定）"
+                                             :unknown       "  ← checkout が無く測れていない"
+                                             ""))))
+                           ;; orgs-detector プロトコル。key は purl なので、版が上がれば
+                           ;; finding は resolve し、別の版で再発すれば別の finding になる。
+                           (when (some #{"--findings"} args)
+                             (println (str "FINDING\t" (if (:production? h) "error" "warn")
+                                           "\tvuln:pkg/" (:name h) "@" (:version h)
+                                           "\t" (str/join " " (:ids h))
+                                           " — " (cond
+                                                   (:production? h)
+                                                   (str "本番 " (count (:prod-repos h)) " repo: "
+                                                        (str/join ", " (:prod-repos h)))
+                                                   (:scope-unknown? h)
+                                                   (str "scope 不明（pnpm）" (count (:unk-repos h)) " repo")
+                                                   :else
+                                                   (str "開発時のみ、" (count (:repos h)) " repo"))
+                                           " / 到達性 "
+                                           (str/join "," (distinct (map (comp name val) (:reach h))))))))
+                         ;; 照会できなかった分も finding にする。沈黙した除外は
+                         ;; 「脆弱性が無い」と同じ顔をする。
+                         (when (and (some #{"--findings"} args)
+                                    (pos? (:dependency/not-queryable cov)))
+                           (println (str "FINDING\twarn\tvuln-unqueryable:no-purl"
+                                         "\t" (:dependency/not-queryable cov)
+                                         " 件に purl が無く照会できない（version が範囲、または :local/root の同一 tree 依存）")))
+                         (when (and (some #{"--findings"} args) (seq skipped))
+                           (println (str "FINDING\tinfo\tvuln-unqueryable:ecosystem"
+                                         "\t" (reduce + (vals skipped))
+                                         " 件が OSV の対象 ecosystem 外 " (pr-str skipped)
+                                         " — git 依存の脆弱性は別経路で見る必要がある")))
+                         (println (str "VULNERABLE\t" (count hits)))
+                         (println (str "SCANNED\t" queried)))))
+              (.catch (fn [e]
+                        ;; 応答本文を捨てない。status だけ記録する経路は原因を読まない。
+                        (js/console.error (str "OSV 照会に失敗: " (.-message e)))
+                        (js/process.exit 2)))))
+          (let [header (str ";; 認証スコープ内の依存棚卸し —— **生成物。手で編集しない**\n"
+                            ";; 再生成: nbb scripts/gen-dependency-inventory.cljk\n;;\n"
+                            ";; SOC 2 CC7.1 / ISO/IEC 27001:2022 A.8.8 の入力。\n"
+                            ";; 脆弱性照合のモデルは kotoba-lang/app-sbom に既に在る（未デプロイ）。\n"
+                            ";; ここが埋めるのは『自分たちの依存を一度も測っていない』側だけ。\n;;\n"
+                            ";; scope=" (name (:dependency/scope cov))
+                            " repos=" (:dependency/repos-scanned cov)
+                            " manifests=" (:dependency/manifests-read cov)
+                            " rows=" (:dependency/rows cov) "\n"
+                            ";; 本番=" (:dependency/production cov)
+                            " 開発時のみ=" (:dependency/development cov)
+                            " scope不明=" (:dependency/scope-unknown cov)
+                            " ← この 3 つを混ぜると triage を誤る（不明を本番に数えない）\n"
+                            ";; OSV に照会できる（version 確定）=" (:dependency/queryable cov)
+                            " / できない（範囲のまま）=" (:dependency/not-queryable cov) "\n\n")
+                body (str header (pr-str datoms) "\n")]
+            (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
+            (fs/writeFileSync out-file body)
+            (println (str "wrote " out-file))
+            (println (str "  repos=" (:dependency/repos-scanned cov)
+                          " manifests=" (:dependency/manifests-read cov)
+                          " rows=" (:dependency/rows cov)))
+            (println (str "  queryable=" (:dependency/queryable cov)
+                          " not-queryable=" (:dependency/not-queryable cov)))
+            (println (str "SCANNED\t" (:dependency/rows cov)))))))))
+
+(apply -main *command-line-args*)

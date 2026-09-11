@@ -31,7 +31,7 @@ both signals with the same discipline: a list the bot may only choose **from**.
 ## The three things this adds that the existing loop did not have
 
 **1. The tick cannot see unlanded work, and now the report can.**
-`scripts/itonami-maturity-improve-tick.cljs` ranks by leverage from the west pin
+`scripts/itonami-maturity-improve-tick.cljk` ranks by leverage from the west pin
 and the maturity datoms. Neither can see a branch that was pushed and never
 merged. Measured 2026-08-27: the tick named `cloud-itonami-iso3166-jpn-meti` and
 its `axis-ingest`, and the register it was asking for had been written the day
@@ -175,7 +175,7 @@ python3 ~/.hermes/scripts/itonami_evidence.py           # ~4 min: it runs the ti
 And to check the gate still discriminates, before trusting that it accepts:
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljs --self-test
+nbb --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljk --self-test
 ```
 
 ## What these bots are not allowed to do

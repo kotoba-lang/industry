@@ -124,7 +124,7 @@
     `EnvironmentFile=`）にあり、同日 kagi へ写した。
   - **なぜ要るか**: Radicle の COB（issue / patch）は**署名する**ので、node が
     動いているだけでは書けない。gad に ssh-agent は無いため passphrase 経路が
-    唯一の unlock 手段で、fleet-ci の Radicle 反映（`scripts/fleet-ci/tick.cljs`
+    唯一の unlock 手段で、fleet-ci の Radicle 反映（`scripts/fleet-ci/tick.cljk`
     の `:rad`）はこの item を読む。
   - ADR-2607252200 はこの置き場所を決めていたが**実際には置かれておらず**、
     両方とも `no such item` だった（ADR-2607259600 の Not done にも

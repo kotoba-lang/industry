@@ -11,7 +11,7 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 前提を 2 つだけ再掲する（これを外すと以下全部が無意味になる）:
 
 - `manifest/repos.edn` が**ポリシーの正本**、`manifest/west.yml` は
-  `scripts/gen-west-manifest.cljs` の**生成物（手書き禁止）**。
+  `scripts/gen-west-manifest.cljk` の**生成物（手書き禁止）**。
 - `manifest/fleet-db.edn` が west.yml の**上流の正本**（Phase 1.5 dual-write 吸収期）。
   west.yml はその projection。
 
@@ -21,9 +21,9 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 |---|---|
 | **local を pin に合わせる（差分だけ）** | `kagami sync --db manifest/fleet-db.edn`（kagami）。pin と一致する repo は **`:noop` で git を起動しない**、dirty は skip、pin SHA を名指しで fetch、`--jobs` で並列。⚠ **先に `kagami reconcile` を通すこと**（下記） |
 | **どの pin が remote より遅れているか** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
-| **pin を前進させる** | `nbb scripts/advance-pins.cljs <org> <list-file> --execute`（entry の revision 行だけ書換）→ `nbb scripts/verify-west-pins.cljs` |
-| **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljs plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
-| **ずれの定期検出** | `nbb scripts/fleet-sync-tick.cljs check`（検出のみ。書かない） |
+| **pin を前進させる** | `nbb scripts/advance-pins.cljk <org> <list-file> --execute`（entry の revision 行だけ書換）→ `nbb scripts/verify-west-pins.cljk` |
+| **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljk plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
+| **ずれの定期検出** | `nbb scripts/fleet-sync-tick.cljk check`（検出のみ。書かない） |
 
 ## 罠 1 — `west update` は「pin に合わせる」だけで、GitHub の新しい commit を見ない
 
@@ -32,7 +32,7 @@ pin へ checkout を合わせるだけで、GitHub 側の新しい commit を pi
 ではない（pin 自体の前進は別操作。「`west update` すれば GitHub 最新に追従する」と
 誤解しないこと）。
 
-実測（2026-07-03）: `nbb scripts/gen-west-manifest.cljs`（引数なし dry-run）で
+実測（2026-07-03）: `nbb scripts/gen-west-manifest.cljk`（引数なし dry-run）で
 kotoba-lang org 配下の character / comfyui / kami-engine / kotoba / kotobase /
 murakumo 等 多数の project で、ローカル checkout が **既存 pin より遅れている**
 状態を検出した。**気付かず push すると stale checkout と古い pin が他 clone と
@@ -47,8 +47,8 @@ gh api "repos/<org>/<repo>/compare/<pinned-sha>...<default-branch>" \
 # 2) 先行していたら該当 project の checkout を最新化
 cd orgs/<org>/<repo> && git fetch origin && git merge --ff-only origin/<default-branch>
 # 3) manifest の pin を前進（当該 entry のみ最小 diff。wholesale 再生成は禁止）
-nbb scripts/gen-west-manifest.cljs --entry <repo-name>
-nbb scripts/gen-west-manifest.cljs --check
+nbb scripts/gen-west-manifest.cljk --entry <repo-name>
+nbb scripts/gen-west-manifest.cljk --check
 ```
 
 これを終えてから本来の操作を実行する。
@@ -104,7 +104,7 @@ marker の手編集は **pin を静かに壊す**。代わりに: tip の west.y
 行だけ**編集 → blob SHA 一致で PUT（`branch=` `sha=`）。**tip がずれれば 409**
 で弾かれる（取得し直してリトライ）ので **conflict が構造的に発生しない**。
 commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を通らないので、
-落ち着いたら `nbb scripts/gen-west-manifest.cljs --check` で canonical 一致を確認。
+落ち着いたら `nbb scripts/gen-west-manifest.cljk --check` で canonical 一致を確認。
 
 やむを得ずローカル merge する場合のみ、west.yml の衝突は **marker 手編集でなく
 再生成で解決**: superset 側採用 → `west update` で子を目的 pin に揃える
@@ -114,7 +114,7 @@ commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を�
 `:manifest-workflow`。実例: PR #61/#62/#86、kenchi-actor→kenchi-clj rename
 （`34988dd`、diff は当該 entry のみ）。
 
-### pin 検証（`scripts/verify-west-pins.cljs`、ADR-2607022900）
+### pin 検証（`scripts/verify-west-pins.cljk`、ADR-2607022900）
 
 pin に許されるのは「上流 repo の default branch から到達可能な commit」だけ:
 
@@ -155,7 +155,7 @@ topdir が固定される。実測検証: ADR-2607011300。
 
 ```bash
 # ✅ 正: helper が current origin/main + external sparse worktree + targeted west を固定
-nbb scripts/root-worktree.cljs create <task> --west <必要なrepo名>
+nbb scripts/root-worktree.cljk create <task> --west <必要なrepo名>
 # 複数なら --west a,b または --west a --west b。引数ゼロ update は生成されない。
 # ❌ 誤: .Codex/worktrees/<name> 配下の worktree で west を動かす
 #        （superproject 本体を topdir と誤認し、本体の orgs/ を書き換える）
@@ -169,7 +169,7 @@ full root checkout は `--profile full` を明示した場合だけ。root側の
   子 repo remote の force-rewrite による pin 退行）。worktree 分離は作業 tree の
   WIP 衝突しか防ぐ。force-push は上流の運用で撲滅するしかない。
 - 大容量 repo は worktree ごとに重複取得される（full history 既定のため軽減策は
-  無い。恒久対応は DataLad/B2 経路への移行、`nbb manifest/west_annex.cljs
+  無い。恒久対応は DataLad/B2 経路への移行、`nbb manifest/west_annex.cljk
   annex-get`）。
 - **後片付けで `git worktree remove` が
   `'<path>/.git' is not a .git file` で拒否することがある**（2026-08-08 に

@@ -84,8 +84,8 @@ projection ではなく premise になっているので、そうしない
 （CLAUDE.md「消して再構築できるか」）。
 
 LEI については同じ正本の別の投影として D1
-（`scripts/d1-ingest-cloud-itonami-lei.cljs`）と kotobase
-（`scripts/kotobase-ingest-cloud-itonami-lei.cljs`）が既にある。この面は
+（`scripts/d1-ingest-cloud-itonami-lei.cljk`）と kotobase
+（`scripts/kotobase-ingest-cloud-itonami-lei.cljk`）が既にある。この面は
 分析クエリ（DuckDB / Spark / PyIceberg）向け。
 
 ## なぜ Python なのか（この workspace の script host は nbb）
