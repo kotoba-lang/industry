@@ -1,0 +1,53 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609112640-qwen38-27b-fast-dllm-v2-block-diffusion")
+  (:adr/title "Qwen3.8-27B を Fast-dLLM v2 の block diffusion に適応し、dLLM 版 GGUF として fleet で serve する計画 —— 新規部分は Gated DeltaNet だけで、小 model の pilot は gate にしない")
+  (:adr/status "proposed")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "ADR-2607173100" "ADR-2606272300" "ADR-2608136000" "ADR-2607211600" "ADR-2809041200"))
+  (:adr/source (vector "https://arxiv.org/abs/2509.26328" "https://github.com/NVlabs/Fast-dLLM/blob/main/v2/README.md" "https://huggingface.co/Qwen/Qwen3.8-27B" "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF" "https://github.com/ggml-org/llama.cpp/blob/master/examples/diffusion/README.md"))
+  (:adr/context
+  "依頼は『Fast-dLLM v2（arXiv 2509.26328）のアプローチで unsloth/Qwen3.8-27B-GGUF を dLLM にする』。2026-09-11 に論文本文・NVlabs の v2 README・Qwen3.8-27B の model card・llama.cpp の diffusion example・この workspace の索引（repo-search dllm diffusion gguf、concept-lookup 拡散言語モデル = 語彙無し）を当たった。索引に dLLM 系 repo は無かったが、checkout 外の repo は映らないので不在の証明ではない。
+
+  論文の recipe（実測値はすべて論文の報告）: 事前学習済み AR model に、noised 系列 x_t と clean 系列 x_0 を連結した長さ 2L の入力と complementary attention mask（x_t 内 block 対角 = block 内双方向、x_t から x_0 の先行 block への offset block-causal、x_0 内 block-causal）を掛け、masked token のみの cross-entropy を mask m と補集合 1-m の両方で取る。block size 32、sub-block 8。architecture 変更は [MASK] token embedding 1 つの追加だけ。ベースは Qwen2.5-Instruct 1.5B / 7B、データは LLaMA-Nemotron post-training dataset、7B で約 1.31B token、LR 1e-5、batch 256、64 x A100 で 8-12 時間。1.5B は約 3.15B token を要した（小さい model ほど多く要る）。推論は block 単位の AR 進行 + 確定 block の KV cache + sub-block cache + confidence 閾値 0.9 の並列 decode で、7B で AR 比 2.5 倍。公開 model は Efficient-Large-Model/Fast_dLLM_v2_7B、コードは NVlabs/Fast-dLLM の v2/（Qwen2.5 前提、他 architecture への言及なし）。
+
+  対象 model の事実: Qwen/Qwen3.8-27B は dense 27B、64 層、hidden 5120、vocab 248,320（padding 済み）、context 262,144、Apache-2.0、vision encoder 内蔵、MTP 学習済み。層構成は 16 x (3 x (Gated DeltaNet -> FFN) -> 1 x (Gated Attention -> FFN))、すなわち 64 層のうち 48 層が Gated DeltaNet（causal な線形再帰、48 V heads / 16 QK heads x 128）、16 層が Gated Attention（24 Q / 4 KV x 256）。fleet の infer.edn には既に qwen3.8-27b（lmstudio-community Q4_K_M 16.8 GB、gad）と qwen3.8-27b-gsq-iq2-xs（8.42 GB、judah 16 GB node で 7.7 tok/s 実測 2026-09-10）が登録され、llama.cpp の architecture tag は qwen35。同じ hybrid 構成の小 model は Qwen3.5-0.8B / 2B / 4B / 9B。
+
+  前提の訂正 2 点。(1) GGUF は学習の入力にならない。fine-tune は bf16 の Qwen/Qwen3.8-27B（54.7 GB、fleet 記録の source-commit 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0）にしか掛けられず、unsloth の GGUF は置き換え先である。unsloth Dynamic 3.0 の量子化レシピは非公開なので同名の量子化は再現できず、『unsloth の GGUF を dLLM にする』の実体は『同じ base から作り直した dLLM 版 GGUF』になる。(2) 論文の recipe はそのままでは当たらない。complementary mask は softmax attention の mask であり、Qwen3.8-27B の 48 層の再帰には掛からない。thinking mode / chat template / MTP / vision は工程の細部で、科学的な未知はこの 1 点だけ。
+
+  llama.cpp 側の現在地: examples/diffusion（llama-diffusion-cli）は Dream / LLaDA / RND1 の全双方向・cache 無し・CLI のみ。block diffusion も hybrid の再帰 state checkpoint も llama-server 統合も無い。fleet は llama-server 直で serve しており（ollama create は判定済みで不採用）、server に載らないと murakumo-main alias から届かない。
+
+  計算資源: fleet に学習級 GPU は無い（Mac mini 16 GB x 多数、gad = ROCm APU 51 GB、xavier = Jetson AGX Xavier 32 GB）。学習は外部調達になる。")
+  (:adr/decision
+  "1. 出発点は Qwen/Qwen3.8-27B bf16。unsloth/Qwen3.8-27B-GGUF は最終形の置き換え先で、dLLM 版 GGUF は自分で convert_hf_to_gguf.py -> imatrix -> llama-quantize で作る。Q4_K_M（gad、既存 16.8 GB と同格）と IQ2_XS 予算（16 GB node、既存 GSQ 8.42 GB と同格）の 2 本。unsloth の名前で呼ばない。
+
+  2. hybrid 対応の設計は state fork。pass 1 で clean x_0 を流し各 block 境界の再帰 state S_k を取り出す（fla の chunk kernel が持つ per-chunk 状態 h を露出するか、block size を chunk size に揃える）。pass 2 で noised block k を initial_state = S_(k-1) から独立系列として流す（fla の varlen cu_seqlens + initial_state）。これで『x_t の block k は clean な block < k だけを見る』が再帰層でも成立し、x_t 同士の汚染が無い。block 内の DeltaNet は causal のまま、双方向性は 16 層の attention 層だけが担う（半双方向 block diffusion）。attention 層は論文の mask をそのまま。MTP head は捨てる。vision encoder は凍結して text-only で学習する（mmproj 経由の vision 品質は未測定として出す）。推論側は確定 prefix = attention KV cache + DeltaNet state checkpoint、block 内の各 denoising step は checkpoint から 32 token を流し直す。
+
+  3. 小 model（Qwen3.5-0.8B 等）での学習 pilot を Go/No-Go の gate にしない。理由は非対称: 論文自身が 1.5B に 7B の 2.4 倍の token を要したと報告しており、小 model での失敗は 27B の失敗の証拠にならず、成功だけが肯定的証拠になる。片側しか効かない検査は gate にしない（ADR-2608136000 の第 5 問）。NVlabs の Qwen2.5 での成功が担保しないのは Gated DeltaNet だけで、その risk は次の 3 つで 27B のまま取る。
+
+  3a. 等価性テスト（scale 非依存、学習不要）: state fork が論文の 2L 連結 mask と同じ可視性を満たすことを、27B の先頭数層を切り出して 1 GPU 上で logits 一致により検証する。これをやらないと DeltaNet 層で x_t -> x_0 の漏れが黙って学習に入る（loss は普通に下がるので気付けない）。
+
+  3b. 27B 自身を段階的に pilot にする: 0.13B（1%）-> 0.3B -> 0.6B -> 1.3B token の checkpoint ごとに、block 内並列 decode の品質（GSM8K subset）と閾値 0.9 での実 wall-clock 速度を測る。止め時の literal: 0.3B token 時点で AR 版 Qwen3.8-27B に対し GSM8K subset が -5pt 以内に入っていなければ設計（半双方向）を疑い、続行しない。捨てる GPU 時間の上限は段階幅で bounded。
+
+  3c. llama.cpp 側は学習を待たない: decoder の機構（state checkpoint / KV block cache / sub-block 閾値 / [MASK] token）は未学習の 27B でも PyTorch 参照実装との temp-0 token 一致で検証できる。秒で回る dev fixture として Qwen3.5-0.8B の AR GGUF を使うのは可 —— それは runtime 開発用であって学習 pilot ではない。
+
+  4. 工程: Phase 1 データ（LLaMA-Nemotron post-training dataset を Qwen3.8 の chat template で thinking / 非 thinking 両方に整形、置き場は orgs/cloud-itonami/llm-dataset の DataLad + git-annex + B2、license CC-BY-4.0 を dataset manifest に記録）。Phase 2 学習（外部 GPU を direct-first で調達、比較単位は 経路 x 構成 x 時間 x 時点、cloud-murakumo scheduler の hourly-cost と承認 gate に載せる。full-FT か LoRA かは 3a/3b の最初の段階で決める —— LoRA で AR->dLLM 適応が足りるかは論文に無い = 未測定。所要時間の推定は書かない: 1% run で tok/s を測って外挿する）。Phase 3 PyTorch 参照 decoder を固定し temp-0 の token 列を golden として保存。Phase 4 llama.cpp: [MASK] を added-token 経路で vocab へ、qwen35 向け block-diffusion decode、diffusion-cli -> llama-server の順、量子化 2 本、infer.edn への登録は :model/kv を scripts/model-kv-geometry.cljk で実測してから。Phase 5 検証: golden との token 一致数（boolean にしない）、論文と同じ 7 benchmark（HumanEval / MBPP / GSM8K / MATH / IFEval / MMLU / GPQA）を AR 版と同一量子化で比較、同一 node（judah / gad）で AR 版と dLLM 版の tok/s を閾値 0.7 / 0.9 / 0.95 x 3 run、block cache を意図的に壊した copy で品質が落ちることを 1 度確認する（落ちない検査は劇場）。
+
+  5. 着地先は subject 面の bare 名の新 repo 1 つ（候補 kotoba-lang/dllm-qwen38。学習コード + llama.cpp patch + eval）。Python / C++ は学習・runtime の都合として『判断を含まない機構層』に置き、scaffold と登録は standing authorization の範囲で行う。checkpoint と GGUF は DataLad へ、git に直接置かない。
+
+  6. リスク（順位付き）: (i) 48/64 層 causal のままで block 内並列がどれだけ効くか —— 未知。論文の 2.5 倍は全層双方向の数字。3b で決着。(ii) llama.cpp 側の工数が学習より大きい可能性。上流に無い機能なので自前 fork 維持。ggml の DeltaNet op に state checkpoint / seq copy がどこまで在るかは未確認。(iii) 27B の必要 token 数と LoRA 可否 —— 未測定。(iv) vision と thinking mode の退行 —— text-only 学習なので両方未測定として出す。(v) unsloth Dynamic quant は再現不可。")
+  (:adr/consequences
+  "小 model の学習 pilot を外したので、27B 以外に学習 GPU を使わない。新規部分の検査は 3a（等価性）と 3b（段階 checkpoint）に集約され、両方とも『落ちる条件』を literal で先に持つ。本 ADR は計画であり、着地したものは無い。Phase の各成果は本 ADR の :adr/body ではなく、この ADR を :adr/related に持つ後続 ADR と、新 repo の README / infer.edn の entry に載せる。数値の推定（所要 GPU 時間、必要 token 数、期待 speedup）は意図して書いていない —— 測ってから書く（ADR-2809041200）。")
+  (:adr/verification
+  "2026-09-11 に確かめた事実: 論文の recipe と数値は arXiv 本文から、Qwen3.8-27B の層構成と heads は Qwen の model card から、llama.cpp diffusion example の対応範囲（Dream / LLaDA / RND1、CLI のみ）は examples/diffusion/README から、fleet の既存 Qwen3.8-27B entry 2 件と node 構成は orgs/kotoba-lang/murakumo/infer.edn と fleet.edn から読んだ。未確認: ggml の Gated DeltaNet op の state checkpoint 可否、fla の per-chunk 状態の露出方法、Nemotron dataset の現行 license 表記、Qwen3.8-27B が [MASK] に使える未使用 vocab row の有無。")
+  (:adr/body
+  "# ADR-2609112640: Qwen3.8-27B を Fast-dLLM v2 の block diffusion に適応する
+
+  Status: proposed / Date: 2026-09-11
+
+  正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification の各属性。要旨だけここに置く。
+
+  - 出発点は Qwen/Qwen3.8-27B bf16。GGUF は学習できない。dLLM 版 GGUF は自作。
+  - 新規部分は Gated DeltaNet 48/64 層だけ。state fork で論文の mask と等価な可視性を再帰で実現し、双方向性は attention 16 層が担う。
+  - 小 model の学習 pilot は gate にしない（非対称な検査）。等価性テスト + 27B の段階 checkpoint（0.3B token で GSM8K subset -5pt が止め時）で risk を取る。
+  - llama.cpp は block diffusion も hybrid も未対応。diffusion-cli -> llama-server の順に自前で足す。
+  - 推定値は書かない。1% run で測って外挿する。")))
