@@ -20,7 +20,7 @@
 ;; A file is reported only when nbb must resolve the namespace from a project
 ;; file: an ENTRY POINT invoked as a bare `nbb <file>`, with no --classpath.
 ;;
-;;   * `#!/usr/bin/env nbb` in line 1, or
+;;   * `#!/usr/bin/env nbb` or `#!/usr/bin/env kbb` in line 1, or
 ;;   * named by a package.json script as `nbb <file>` with no `--classpath`.
 ;;
 ;; A file invoked as `kbb --backend sci --classpath src:test <file>` is NOT reported: the
@@ -110,7 +110,7 @@
   which is indistinguishable from a clean tree."
   (delay
     (let [out (sh (str "grep -rl --include='*.cljs' --include='*.cljk' --exclude-dir=node_modules"
-                       " --exclude-dir=.git -e '^#!/usr/bin/env nbb' "
+                       " --exclude-dir=.git -e '^#!/usr/bin/env nbb' -e '^#!/usr/bin/env kbb' "
                        (or only orgs) " 2>/dev/null"))]
       (when (nil? out)
         (println (str "REFUSING: could not search " (or only orgs) " for nbb entry points."))
@@ -147,7 +147,10 @@
           shebangs (remove documented? (get @shebang-index repo []))
           pkg      (slurp* (.join path-mod repo "package.json"))
           scripted (when pkg
-                     (->> (re-seq #"\"nbb ((?!--classpath)[^\"]*?\.(?:cljs|cljk))" pkg)
+                     ;; `nbb <file>` and, since the kbb cutover (adr-2609112000), its two
+                     ;; spellings `kbb --backend sci <file>` and `kbb <file>` -- the same
+                     ;; engine, the same bare entry point, the same missing declaration.
+                     (->> (re-seq #"\"(?:nbb|kbb --backend sci|kbb) ((?!--classpath)(?!-M)[^\"]*?\.(?:cljs|cljk))" pkg)
                           (map (comp #(.join path-mod repo %) s/trim second))
                           (filter #(try (.isFile (.statSync fs %)) (catch :default _ false)))))]
       (distinct (concat shebangs (or scripted []))))))
