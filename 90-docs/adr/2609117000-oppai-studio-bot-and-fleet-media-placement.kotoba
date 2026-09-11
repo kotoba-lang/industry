@@ -1,0 +1,139 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609117000-oppai-studio-bot-and-fleet-media-placement")
+  (:adr/topic "fans-oppai")
+  (:adr/title "oppai.fans の studio bot と、murakumo fleet 11 台の media 配置 —— 16 GiB mini は text 推論から外れ、画像・音声・動画を 24 時間回す")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "network-awai/fans-oppai" "kotoba-lang/murakumo"))
+  (:adr/related (vector "adr-2609111130-fans-oppai-catalog-works-and-a-consent-gated-face-reference"
+                "adr-2607173100-murakumo-main-alias"
+                "adr-2608136000-eight-questions"))
+  (:adr/validation (map
+    (:tests "fans-oppai: nbb 87 tests / 1181 assertions (was 69 / 389); bot_test pins boundary, determinism, placement, quality floors with their boundary cases. murakumo: fleet one_model + topology 26 tests / 73 assertions on a JVM mirror (was 22 / 61; the repo's own JVM entry cannot load .cljk today). verify-one-model-per-node: 12 nodes ok, discriminated both ways (undefined checkpoint -> exit 1, unknown plane -> exit 1).")
+    (:live "2026-09-11 08:41-09:00 UTC: cutover applied on all 10 minis (8 conformant :media, 2 :audio with the plane MISSING by design — CLI per job). First real ticks: 10 SDXL images queued on 5 minis, 4 collected as :pass (1.2-1.3 MB PNG, 832x1216 / 896x1152 / 1024x1024, mean luma 118-180); 8 Qwen3-TTS lines :pass on judah + levi; LTX t2v x4, SVD i2v x2, 10Eros x2 queued. SDXL 26 steps = 165 s on a cold 16 GiB M4 (5.4 s/it); Qwen3-TTS 4.4 s line in 8 s cold.")
+    (:discriminated "cutover plan mode reported REFUSED on 4 nodes before the sh -s fix and DRIFT 10 after; apply re-measured 8 conformant. The tick's first dry-run left its lock (process.exit skips finally) — caught on the second run, fixed. Node's encoding=buffer was rejected — caught by the first tts fetch, fixed.")))
+  (:adr/body "## 文脈
+
+オーナー指示（2026-09-11）: oppai.fans の画像生成を NSFW 語（ahegao / bukkake を含む）込みで
+回す bot profile を作り、murakumo.cloud のノードを使い倒す設計にする。16 GiB Mac mini が
+遊んでいるので、画像・音声・動画生成で 11 台を 24 時間最大効率で働かせる。16 GiB mini は
+text 生成系モデルを inference から外してよい。waiREALMIX / H3 Eros / waiREALCN / Qwen audio
+をバランスよく配置する。
+
+索引を引いた結果、ゼロから起こしたものは無い:
+
+- `network-awai/fans-oppai` が oppai.fans の live な Worker + SPA で、R18 境界
+  （`oppai.gen.guard`: minor-terms 拒否 + 全 job への minor-negative）を既に持つ。
+- `kotoba-lang/murakumo` が fleet の宣言（`fleet.edn` `:node/serves`）、one-model-per-node
+  規則（ADR-260910）、測定（`murakumo.fleet.one-model`）、reconciler
+  （`murakumo edge topology --apply`）を既に持つ。
+- gad の generation API（`scripts/hunyuan3d-generation-api`）が 10Eros-Max（MiniMax-H3 の
+  TURBO-hybrid finetune、成人向け動画モデル）を `VIDEO_MODELS` に既に持ち、2026-08-26 に
+  実測済み。
+
+## 測ったこと（設計の前に）
+
+`GET api.murakumo.cloud/nodes`（hwmetrics）: fleet は **gad（47 GiB Linux APU、head）+
+10 台の M4 16 GiB mini** = 11 台。全 mini は GPU 10-14% で遊んでいた。各 mini の ComfyUI
+`/history` は **0 件** —— media plane は一度も render していなかった（ADR-260910 の観測の
+再確認）。
+
+各 mini の checkpoint（ssh + `/object_info`）: waiREALMIX = benjamin / simeon / dan、
+Illustrious+animagine = zebulun、ltxv 0.9.6 distilled = issachar / levi / naphtali、
+svd_xt = asher、joseph = 無し、judah = ComfyUI 無し。gad = waiREALMIX / waiREALCN /
+Illustrious / animagine / ltx-2.3 + UNET に 10Eros_Max ×2 / minimax_h3 / music3 / wan2.2。
+
+**H3 Eros は mini に載らない。** 10Eros_Max の UNET は int8 で 20.98 GB（stat）、text encoder は
+32B nvfp4。16 GiB にはどの量子化でも入らない。したがって「H3 を mini に配置」は原理的に
+不可能で、gad 専用 lane になる。これは実装状態ではなく容量の性質。
+
+**Qwen audio は fleet のどこにも無かった。** Qwen3-TTS（HF API 200 で確認:
+`Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice`、MLX 変換 `mlx-community/…-bf16`）を mlx-audio
+で mini に載せ、実測してから宣言した（levi: 4.4 s の日本語台詞を 8 s、24 kHz mono、
+rms 1269 = 無音でない）。`mlx_audio.server` は `webrtcvad` 未導入で起動しないので、
+今日は CLI per job（モデルは毎回ロード、8 s に含まれる）。
+
+## 決定
+
+### 1. 配置 —— 1 台 1 model、lane で並べる
+
+| node | plane | model | lane |
+|---|---|---|---|
+| benjamin, simeon | media | waiREALMIX_v11 | `:real-mix` |
+| dan, joseph | media | waiREALCN_v150（gad から LAN 経由で複製、6,938,040,682 B 一致） | `:real-cn` |
+| zebulun | media | waiIllustriousSDXL_v150 | `:anime` |
+| naphtali, issachar | media | ltxv-2b-0.9.6-distilled | `:video-ltx` |
+| asher | media | svd_xt | `:video-svd`（pass した静止画の i2v） |
+| judah, levi | audio | qwen3-tts（mlx-audio） | `:voice` |
+| gad | media（宣言済み例外） | 10eros-max + wai-realmix-v11（顔参照） | `:eros-h3` |
+
+正本は `kotoba-lang/murakumo` の `fleet.edn` `:node/serves`。gad だけが
+`:node/serves-exception`（3 つの ComfyUI instance が 51 GB APU を分け合う）を持つ。
+`scripts/verify-one-model-per-node.cljk` は map 形 `{:plane :model}` を読めるように
+なった —— それまで reconciler が読む宣言形式を checker が `unrecognised` と報告しており、
+**同じ tree の中で checker と reader が語彙を違えていた**。
+
+### 2. text 推論は 10 台の mini から退避した
+
+`scripts/fleet-media-cutover.cljk`（kbb）が `:node/serves` を読み、宣言されていない plane
+（text = llama-server + edge-join / model-join、ring-member = rpc-server、ad-hoc = ollama）の
+launchd job を bootout し plist を `evicted-by-murakumo/` に退避、それでも生きている
+process を kill して再測定する。結果 **8 台 conformant、2 台（judah / levi）は audio plane が
+MISSING** —— CLI per job なので常駐 process が無く、reconciler はこれを MISSING と言う。
+それは正しい報告で、mlx_audio.server を常駐させたら消える。
+
+この cutover で消えたもの: `murakumo-edge`（Ornith 9B）の edge 6 台、`murakumo-27b`
+（issachar）、hermes cluster の qwen38 GSQ（judah / dan）、gad の RPC ring 用 rpc-server 9 台。
+**`murakumo-edge` alias は member 0 になった**（api.murakumo.cloud の `/v1/models` には残る）。
+hermes gateway（この Mac）は `murakumo-main` を使っていて影響なし。戻すのは plist 1 つの `mv`。
+
+### 3. bot profile —— 語彙は明示的、境界は「誰か」
+
+`fans-oppai/bots/oppai-studio.edn`。lane / policy / banks / schedule / output。
+
+- **adult marker は必須 bank。** 全 prompt が `adult woman` 等の marker を verbatim に持ち、
+  持たない prompt は compose が throw する。
+- **forbidden は語彙側で検査する。** `validate-profile` が bank の全 entry を
+  `guard/minor?` と `:forbidden`（非同意・暴力・獣姦・実在人物・家族関係・学生表象）で
+  検査し、1 件でも当たれば profile は bot ではない（exit 2）。単語は whole-token（`dog` は
+  `doggystyle` に当たらない）、句は substring。
+- **explicit な act bank**（ahegao / bukkake / paizuri / fellatio / creampie …）はこのサイトの
+  目的そのもので、境界は「どこまで明示的か」ではなく「成人・架空・同意」。
+- **決定論。** (profile, lane, n) → seed → prompt。receipt から再導出できる。
+- **品質は床。** `bot/quality` は bytes / 辺 / 秒の床で :pass / :fail / :unmeasured を返し、
+  未測定は pass にならない。
+- **昇格は人。** 生成物は `~/.itonami/oppai-studio/out/` の候補で、`catalog/public-works`
+  への掲載は `:promote :manual`。
+
+### 4. 経路 —— token を使わず、ssh loopback
+
+shinshi-catalog-video と同じ理由で `generation.murakumo.cloud`（課金面）は使わない。
+mini は ssh → `localhost:8188`（ComfyUI）、audio は ssh → mlx-audio CLI、gad の 10Eros は
+ssh → gad 自身の `127.0.0.1:8081`（generation API）で、token は gad の ssh session 内で
+env file から読み **この Mac に渡らない**。
+
+## 実測（2026-09-11、初回。ここに書いた値は当日の値）
+
+- SDXL 832×1216 / 26 steps、16 GiB M4、cold: **165 s / 枚**（5.4 s/it、`Unloaded partially`
+  を含む）。5 台で 1 時間 ≈ 100 枚強。
+- Qwen3-TTS 1.7B bf16、CLI cold: 4.4 s の台詞を 8 s。
+- 初回 tick で 11 台全部に job が載った（画像 10、音声 8 pass、LTX 4、SVD 2、10Eros 2）。
+
+## やらなかったこと・残る gap
+
+- **mlx_audio.server の常駐**（`webrtcvad` 依存）—— audio plane が MISSING と報告され続ける。
+- **murakumo edge topology --apply への fold-back。** cutover script は evict-script /
+  discover-script の写しで、JVM CLI が `.cljk` を load できるようになったら統合する。
+- **`:model/replicas :all-edge-nodes`** は今日も infer.edn に残り、checker が CONTRADICTION
+  として報告する（別の決定）。
+- **kotobase への永続化。** 生成物は operator Mac のローカル。live service の durable plane
+  規則（ADR-2608159100）は publish 時に適用し、候補段階では適用しない。
+- **fleet gate 無し。** bot の test は fans-oppai の `npm test` で回るが、fleet の
+  `gates.edn` には載せていない（gate を足すなら落ちることを先に見せる）。
+
+## 改訂履歴
+
+- 2026-09-11: 起草。"))
+)
