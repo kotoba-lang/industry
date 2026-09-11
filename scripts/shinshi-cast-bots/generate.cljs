@@ -38,6 +38,12 @@
 (def murakumo-base
   (or (aget (.-env js/process) "MURAKUMO_API_BASE") "https://api.murakumo.cloud"))
 (def gad (or (aget (.-env js/process) "SHINSHI_GAD") "gad@100.82.98.110"))
+;; Which image name the fleet renders a scene with. `awai-network/hokusai` is a
+;; name this fleet OWNS (root ADR-2609102000) -- an alias like murakumo-main,
+;; not a checkpoint id -- so naming it here does not pin a model; the gateway
+;; decides what hokusai resolves to. Override per run with SHINSHI_IMAGE_MODEL.
+(def image-model
+  (or (aget (.-env js/process) "SHINSHI_IMAGE_MODEL") "awai-network/hokusai"))
 
 (defn- sh [cmd args opts]
   (let [r (cp/spawnSync cmd (clj->js args)
@@ -110,7 +116,8 @@
                                 :headers {"content-type" "application/json"
                                           "x-api-key" (aget (.-env js/process) "MURAKUMO_API_KEY")}
                                 :body (js/JSON.stringify
-                                       (clj->js {:prompt (:promptStyle p)
+                                       (clj->js {:model image-model
+                                                 :prompt (:promptStyle p)
                                                  :size "512x768"}))}))
             (.then (fn [resp]
                      (.then (.text resp)
@@ -129,7 +136,8 @@
                                           file (scratch-file ".png")]
                                       (fs/writeFileSync file buf)
                                       (println (str "generated\t" file "\tsha256=" sha
-                                                    "\tbytes=" (.-length buf)))
+                                                    "\tbytes=" (.-length buf)
+                                                    "\tmodel=" image-model))
                                       (when (flag? "--apply")
                                         (when-let [url (upload! file sha)]
                                           (when (register-scene! slug sha)
