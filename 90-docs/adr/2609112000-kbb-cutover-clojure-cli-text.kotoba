@@ -135,9 +135,15 @@ kbb-cutover: keep — この文書は旧綴りを意図して引用する。rewr
   `launchctl print` で 47 本すべて新定義。`/opt/homebrew/bin/nbb` は stock 1.4.208 で `.cljk` の require を
   解決できないので、これらの job は rename 以来止まっていた。stale な `.cljs` path（`~/.gftd/…` 含む）は
   rename 由来で今回は触っていない（`bin/collector.cljs` → `.cljk` の 1 件だけ直した）。
-- **detector**: `verify-no-clojure-cli` は 4 project の west.yml で pre-cutover pin 3 finding / 74 file、
-  ALLOWED 1（org-babashka-nbb 29 file）。全 west に対する post-cutover 値は checkout の `west update` 後に測る
-  （merge commit は checkout に無いので、それまでは ABSENT として数える）。`verify-nbb-declaration-visible`
+- **west update**: 4,039 checkout のうち **4,021 を新 pin に同期**。拒否 4（`amu` / `com-junkawasaki-time` /
+  `giemon` / `net-kotobase-docs` —— ローカル変更あり、破棄せず）、`app-drive` 1（checkout の remote が消えている）。
+- **detector（post-cutover、全 west + root `--self`、pin fa2c3bc4 の後）**: **SCANNED 4,859 / FINDINGS 5 project 26 file /
+  ABSENT 10**（stale entry 4 + 他 session が進めた pin が手元に無い 6）。5 件の内訳: **4 件は cutover の後に
+  着地した branch**（amu の ADR 0348 iteration 2・3 で 19 file、kotoba-lang 2、kototama-native 2、control-plane 2）——
+  rename の翌日に起きたのと同じ regression class で、detector が存在する理由そのもの。同じ時間に driver を再実行
+  （amu は再度 admin merge `29502e5b`）、pin を `b1b82a42` で前進。**残る 1 件は detector 自身の登録 `:title` が
+  needle（`clojure -M`）を持っていた**自己参照 —— 言い換えて解消。pre-cutover の 4 project 検証（3 finding / 74 file）と
+  合わせ、実 tree で両方向を見た。`verify-nbb-declaration-visible`
   は `#!/usr/bin/env kbb` / `"kbb --backend sci <file>"` の綴りを足した（足さなければ置換で黙って clean になっていた）。
 - **測っていないもの**: 置換後の build / test / gate / bot の緑赤（owner 決定で fix-forward）。fleet ノードでの `kbb` 起動。
 ") ))
