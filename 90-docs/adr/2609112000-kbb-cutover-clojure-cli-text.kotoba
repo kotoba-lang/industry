@@ -1,0 +1,127 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609112000-kbb-cutover-clojure-cli-text")
+  (:adr/topic "cljk-rename")
+  (:adr/status "accepted")
+  (:adr/title "ADR-2609112000: Clojure CLI / bb / nbb / shadow-cljs の起動文字列を workspace 全体で kbb / amu に機械置換し、kbb が deps.edn の alias を解決する")
+  (:adr/authoritative true)
+  (:adr/repo "com-junkawasaki/root")
+  (:adr/related ["adr-2609111500-cljk-rename-all-clojure-source" "adr-2609111700-kbb-engine-hosts-cljk-hooks" "ADR-2607173000" "ADR-2607181900" "ADR-2607300900"])
+  (:adr/body "# ADR-2609112000: Clojure CLI / bb / nbb / shadow-cljs の起動文字列を workspace 全体で kbb / amu に機械置換し、kbb が deps.edn の alias を解決する
+
+kbb-cutover: keep — この文書は旧綴りを意図して引用する。rewriter と detector はこの literal を見て file を丸ごと残す。
+
+**Status**: accepted (2026-09-11)
+**Deciders**: Jun Kawasaki（owner 指示 2026-09-11「今の repo ないで clojure -M など, clojure を前提にしている repo, md, adr などはどれぐらいある? 全て機械的に kotoba に切り替えて」。4 択で選んだ: 置換先 = `kbb -M:<alias>` + kbb に alias 解決を足す / ADR 本文の記録も全部書き換える / `nbb x.cljk` も含める（→ `kbb --backend sci`）/ shadow-cljs も kotoba に）
+**Executor**: Claude（session_01JVx3D3QpgSHNgJBLe35yyx）
+
+## 測定（2026-09-11、置換前、checkout に対する rg。lock / node_modules / .git 除外）
+
+| 何 | 件数 |
+|---|---|
+| `clojure -M…` | 20,908 行 / 10,991 file |
+| `clojure -S…` / `-X` / `-A` / `-T`、`clj -M` | 908 / 161 / 192 / 14 / 176 行 |
+| `bb test` / `bb run` / `#!/usr/bin/env bb` | 1,371 / 667 / 973 行 |
+| `#!/usr/bin/env nbb` | 2,575 file |
+| `shadow-cljs release\\|compile\\|watch` | 2,018 行 / 1,138 file |
+| `lein` | 20 行 |
+| hit を持つ repo（orgs/） | 3,547 |
+| ADR（`90-docs/adr/*.kotoba`） | 1,149 file |
+| `.md` | 5,667 file |
+| `deps.edn` を持つ repo / `bb.edn` / `shadow-cljs.edn` | 4,195 / 146 / 251 |
+
+支配的な形は deps.edn の alias 呼び出し: `clojure -M:dev:run` 2,757 / `-M:lint` 2,570 / `-M:dev:test` 1,785 / `-M:test` 約 6,000 / `-M:dev:render-html` 1,173 / `-M:run` 774 / `-M:compositor` 608。
+`bb test` を README に持つ repo 97 のうち 78 が deps.edn に `:test` alias を持つ（`bb <task>` → `kbb -M:<task>` の根拠）。
+
+## 決定
+
+1. **置換先は 1 つの実在する口に揃える。** Clojure-shaped `.cljk` を動かす kotoba 側の口は
+   `kbb`（`kotoba-lang/kotoba` `bin/kbb`、engine は `org-babashka-nbb`、ADR-2609111700）。
+   そこに **deps.edn の alias 解決を足した**（`bin/kbb_deps.cljk`、kotoba-lang/kotoba
+   `821977f8` → `535daf68`）: `:paths` / `:extra-paths` / `:local/root`（再帰）/ `:main-opts` /
+   `:exec-fn` + `:exec-args` / `-Sdeps` merge / `-Spath` / `-Saliases`。Maven / git 座標は
+   解決しない（engine が `nbb.edn` の `:deps` を読む）。JVM test runner
+   （cognitect.test-runner / kaocha / eftest）を名指す alias は kbb 自身の `cljs.test` 走査に
+   置換され、**stderr でそう言う**。答えられないものは名指しで拒否: 未宣言 alias・`-Stree`・
+   classpath だけの alias = exit 64、`deps.edn` 無し = 66。`bin/kbb` は argv の形
+   （`-M*|-A*|-X*|-T*|-S*|-m|-e|-i|-f|-cp|*.cljk`）でこの door へ振り、`--backend sci` と
+   `.kotoba` guest の経路は不変。
+2. **置換規則は token-anchored で、1 つの namespace に置く**（`scripts/kbb_cutover_rules.cljk`）:
+   `clojure -M…|-X|-A|-T|-S…|-J…` → `kbb …`（flag は保つ）/ `clj -M…` → `kbb -M…` /
+   `#!/usr/bin/env {bb,nbb,clojure,clj}` → `#!/usr/bin/env kbb` / `bb <file>.clj*` → `kbb <file>.cljk` /
+   `bb <task>`（**command position のみ**: 行頭・backtick・引用符・`(`・`&&`・`;`・`|` の後）→
+   `kbb -M:<task>`、bb builtin（version / help / repl / uberjar …）は残す / `bb tasks` → `kbb -Saliases` /
+   `lein test|run` → `kbb -M:test|run` / `[npx ]nbb <flag|file.clj*>` → `kbb --backend sci …` /
+   EDN・JSON の argv token `\"nbb\" \"x.cljk\"` → `\"kbb\" \"--backend\" \"sci\" \"x.cljk\"`、`\"clojure\" \"-M…\"` → `\"kbb\" \"-M…\"` /
+   `[npx ]shadow-cljs release|compile|watch` → `amu compile --target wasm32-browser`（build id は後ろに残る）。
+   触らない: `org.clojure/clojure`・`clojure -Main` のような非 flag・`nbb.edn`・`\"nbb\":` 座標・
+   `npm i nbb`・`java -jar|-cp`・`deps.edn` / `bb.edn` / `shadow-cljs.edn` というファイル名。
+3. **書き換えず、かつ列挙するもの**: UTF-8 でない blob / lock・min.js・map・log・jsonl /
+   `cljk-origin.edn` / CLAUDE.md が名指す 3 つの append-only ledger と `*.ledger.edn` /
+   `.github/workflows/*`（この workspace は Actions を走らせない。加えて https remote の
+   OAuth token に `workflow` scope が無く、含めると push 自体が拒否される —— 実測 6 repo）/
+   **code file（cljk/cljs/js/py/sh/edn/json/yaml/toml …）の中で pattern-literal の印を持つ行**
+   （`re-pattern` `#\"` `re-find` `RegExp` `includes?` `index-of` `\"rg\"` `\"grep\"` `:pattern` …）——
+   detector の needle を書き換えると detector が反転する。`[path line :pattern-line-kept]` として
+   state に残る。**旧綴りを意図して引用する file は本文に `kbb-cutover: keep` を置く**
+   （driver・rules・detector・この ADR・kotoba の `bin/kbb_deps.cljk` とその test）。
+4. **ADR 本文の「その日に実行した command の記録」も書き換える**（owner 判断）。理由は
+   corpus —— LLM が「Kotoba = clojure -M」と学習するのを止める。**したがって 2026-09-11
+   以前の ADR に `kbb -M:test` と在っても、その日に走ったのは JVM である。** 履歴は git。
+   CLAUDE.md だけは置換後に人が読み直し、偽になった 3 文（`amu test` が JVM に落ちた記録 /
+   stock nbb が `.cljk` の require を解決しない記録 / JVM suite が緑だった記録）を旧綴りの
+   literal を使わずに書き直した。
+5. **着地は rename と同じ機構**（`scripts/kbb-cutover.cljk`）: `<remote>/<default>` を fetch して
+   **その tree** に対して計画、`GIT_INDEX_FILE` の一時 index で commit、branch
+   `kbb-cutover-20260911` へ push → `POST /repos/{o}/{r}/merges` → branch 削除。拒否は PR。
+   各 repo は `:merged` / `:pr-open` / `:no-op` / `:refused` のちょうど 1 つ。self-test は
+   48 fixture（両方向・境界: `clojure -Main` は触らない、`the bb binary` は触らない、
+   `abb test` は触らない、`[\"nbb\" \"--version\"]` は触らない、idempotent）と
+   「driver と rules は自分自身を書き換えない」。
+6. **検出器** `scripts/verify-no-clojure-cli.cljk`（`manifest/orgs-detectors.edn`
+   `:verify-no-clojure-cli`、6 h、`--self` で root 自身も）。finding の定義は
+   「rules の `rewrite-text` が変える file」そのもの —— rewriter と detector が別の正規表現表を
+   持って drift する形を構造的に消す。pin された tree を読む（checkout ではない）。
+   `--allow kotoba-lang/org-babashka-nbb`（nbb 自身の docs）。fleet gate にはしていない ——
+   fleet ノードに `kbb` が無い（下記）。
+7. **`kbb` は PATH に要る。** この機械は `/opt/homebrew/bin/kbb` → `orgs/kotoba-lang/kotoba/bin/kbb`
+   の symlink（engine は west 兄弟から解決。無ければ exit 3 で 2 つの path を名指す）。
+   **murakumo fleet ノードにはまだ無い** —— gates.edn / detector の `kbb` 起動はそこでは
+   fix-forward。install は同じ symlink 1 本（kotoba checkout が在るノードなら）。
+
+## 執行者が事前に報告し、owner が承知のうえで決めた代償
+
+- **`kbb -M:test` が緑であることは JVM suite が緑であることではない。** JVM 専用 ns
+  （`java.io.File`、`format`、Chicory …）は engine で `Unable to resolve` で落ち、理由が出る。
+  実測: `kotoba-lang/text` は `-n kotoba.lang.text-test` で 32 tests / 250 assertions 緑、
+  alias 全体は `format` で赤。`kotoba-lang/kotoba` の `:test` alias は自前 runner
+  `kotoba.test-runner` を名指すので置換されず、engine 上で `java.io.File` に当たって赤。
+- `bb test:actors` のような colon 付き task は `kbb -M:test:actors` になり、これは alias
+  **2 つ**（`:test` と `:actors`）の意味になる。bb task 1 つとは違う。該当 repo は
+  `kbb: alias [:actors] is not declared` で名指しで落ちる。
+- `shadow-cljs release <id>` → `amu compile --target wasm32-browser <id>` は引数が 1:1 でない。
+  `<id>` は positional に残るので amu は file として拒否する。移行は component 単位で別 wave。
+- code file の comment / docstring も書き換わる。「`clojure -Spath` に fall back する（JDK 要）」
+  という amu の comment は「`kbb -Spath` に fall back」になり、amu の実装（`spawn(\"clojure\")`、
+  token が別なので不変）とは食い違う。**comment を読んで実装を推定しない**（既存規則）。
+- `.mcp.json` の `exec clojure -M:mcp` も `exec kbb -M:mcp` になった（cloud-itonami-app の
+  MCP server。この session では元々 CONNECTION_CLOSED）。
+- 子 repo の `.github/workflows/*.yml` は SSH remote の repo では書き換わり、https remote の
+  repo では（scope 拒否を受けて）除外に切り替えたので **混在**する。どちらも走らない file。
+
+## 結果（2026-09-11。fleet の数は run 完了時に更新する —— 実行中の値を書かない）
+
+- **kotoba-lang/kotoba**: `bin/kbb_deps.cljk` + `bin/kbb` routing + `test/kotoba/kbb_deps_test.cljk`
+  （19 assertions、両方向。未宣言 alias の拒否を warn に変えると 1 FAIL で赤）。main `535daf68`、
+  west pin 前進済み。
+- **root（com-junkawasaki/root）**: `5cf1b1986fb` — 2,552 file / 5,885 hit、kept 224 行
+  （うち 120 は `cloud-itonami-actor-substrate-ledger.edn` の `:evidence` 行、39 は `manifest/fleet-ci.edn`）、
+  skipped 7（lock 2 + ledger 5）。`gen-agents-md --check` は置換後も up to date。
+- **fleet**: 6 shard で実行中（state: 各 repo 1 file）。集計コマンド:
+  `cat <state-dir>/*.edn | kbb --backend sci -e '…(frequencies (map :status …))'`。
+  最初の 260 repo で merged 219 / no-op 33 / refused 8（archived 2、`workflow` scope 6 → 除外規則を
+  足して再実行）。完了後にここへ merged / no-op / pr-open / refused の 4 数と、archived repo の
+  扱い、pin 前進の数、detector の post-cutover 値を書く。
+- **測っていないもの**: 置換後の build / test / gate / bot の緑赤（owner 決定で fix-forward）。
+  fleet ノードでの `kbb` 起動。launchd plist（git 外）の `nbb …cljk` 起動行は別途書き換えて
+  `launchctl print` で reload を確認する（ADR-2609111500 と同じ手順）。
+") ))

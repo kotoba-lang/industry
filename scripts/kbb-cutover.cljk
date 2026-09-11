@@ -1,0 +1,354 @@
+;; scripts/kbb-cutover.cljk — rewrite every Clojure-CLI / babashka / nbb /
+;; shadow-cljs invocation in a repository's upstream default branch to its
+;; kbb / amu spelling, server-side, without touching any working tree.
+;;
+;; Owner decision 2026-09-11 (adr-2609112000-kbb-cutover-clojure-cli-text):
+;; the corpus must not say `clojure -M…` where it means "run this repo's
+;; test alias". After the .cljk rename (adr-2609111500) that string named a
+;; JVM that could no longer see the sources anyway; now `kbb -M:<alias>`
+;; (kotoba-lang/kotoba bin/kbb_deps.cljk) resolves the same deps.edn alias
+;; onto the JVM-free engine. Same terms as the rename: no mirror, everything
+;; at once, ADRs included (history is git's), fix-forward.
+;;
+;; The rules, token-anchored (never a bare regex over a word inside a word):
+;;
+;;   #!/usr/bin/env {bb,nbb,clojure,clj}        -> #!/usr/bin/env kbb
+;;   clojure -M…  | -X | -A | -T | -S… | -J…  -> kbb -M… | …      (flag kept)
+;;   clj -M… | -X | -A | -T                     -> kbb -M… | …
+;;   bb <file>.clj*                             -> kbb <file>.cljk
+;;   bb -e… | -m… | -f… | --main | -cp | --classpath -> kbb …
+;;   bb tasks…                                  -> kbb -Saliases
+;;   bb run <task> | bb <task>                  -> kbb -M:<task>   (command position only)
+;;   lein test… | lein run…                     -> kbb -M:test | kbb -M:run
+;;   [npx ]nbb <flags…|file.clj*>               -> kbb --backend sci <flags…|file.cljk>
+;;   "nbb" "…"  /  "clojure" "-M…"  (EDN/JSON argv tokens) -> "kbb" "--backend" "sci" "…" / "kbb" "-M…"
+;;   [npx ]shadow-cljs release|compile|watch…   -> amu compile --target wasm32-browser
+;;
+;; `bb <task>` in prose ("the bb binary") is the one rule that could fire on
+;; English, so it only fires in command position: line start (after an
+;; optional prompt/bullet), or after a backtick, quote, paren, `&&`, `;`,
+;; `|`. Tasks that are babashka builtins (version, help, repl, uberjar, …)
+;; are left and listed.
+;;
+;; What is never rewritten, and is LISTED rather than silently passed:
+;;   - blobs that are not valid UTF-8; lock files; minified/map/log files;
+;;     cljk-origin.edn; the three append-only ledgers CLAUDE.md names.
+;;   - in CODE files (cljk/cljs/js/mjs/py/sh/edn/json/yaml/toml …) a LINE
+;;     that also carries a pattern-literal marker (re-pattern, #", re-find,
+;;     RegExp, includes?, index-of, "rg", "grep", :pattern …). Rewriting the
+;;     needle of a detector inverts the detector (CLAUDE.md: "検索対象の部分
+;;     文字列を含む名前に改名した"). Those lines are reported as
+;;     [path line :pattern-line-kept].
+;;   - `java -jar` / `java -cp`, `bb.edn`, `deps.edn`, `shadow-cljs.edn` file
+;;     names, `nbb.edn`, `"nbb":` package coordinates, `npm i nbb`.
+;;   - `.github/workflows/*` (not run here; and un-pushable over https without
+;;     the `workflow` OAuth scope).
+;;
+;; Landing is the rename's: fetch `<remote>/<default>`, plan against THAT
+;; tree, build the commit in a temporary index, push a throwaway branch,
+;; `POST /repos/{o}/{r}/merges`, delete the branch; `:pr-open` when the merge
+;; is refused; every repo ends in exactly one of
+;; :merged / :pr-open / :no-op / :refused in <state-dir>/<slug>.edn.
+;;
+;;   kbb --backend sci --classpath scripts scripts/kbb-cutover.cljk --paths <file> --state <dir> [--dry-run] [--shard i/n]
+;;   kbb --backend sci --classpath scripts scripts/kbb-cutover.cljk --self-test   ; the rule fixtures, both directions
+;;   kbb --backend sci --classpath scripts scripts/kbb-cutover.cljk --file <path> ; print the rewritten text of one file (no write)
+
+(ns kbb-cutover
+  ;; kbb-cutover: keep  -- the header above quotes old spellings; the fleet pass
+  ;; must leave this file whole (self-test proves it). Run with
+  ;; `kbb --backend sci --classpath scripts scripts/kbb-cutover.cljk …` so the
+  ;; shared rules namespace resolves.
+  (:require ["fs" :as fs]
+            ["path" :as path]
+            ["child_process" :as cp]
+            [clojure.string :as str]
+            [kbb-cutover-rules :refer [rewrite-line rewrite-text skip-file? keep-marker fixtures]]))
+
+(def adr-id "adr-2609112000-kbb-cutover-clojure-cli-text")
+(def branch "kbb-cutover-20260911")
+(def today "2026-09-11")
+
+(defn- arg [flag] (let [a (js->clj (.-argv js/process))] (second (drop-while #(not= flag %) a))))
+(defn- flag? [f] (some #(= f %) (js->clj (.-argv js/process))))
+
+;; ---------------------------------------------------------------------------
+;; The rules live in scripts/kbb_cutover_rules.cljk (shared with the detector)
+;; ---------------------------------------------------------------------------
+
+;; ---------------------------------------------------------------------------
+;; Self-test: both directions, and the boundaries
+;; ---------------------------------------------------------------------------
+
+(defn self-test! []
+  (let [fails (remove nil? (for [[in exp] fixtures]
+                             (let [got (rewrite-line in)]
+                               (when (not= got exp) [in exp got]))))
+        ;; code-line boundary: the same command inside a pattern literal is kept
+        kept-case (rewrite-text "scripts/detector.cljk" "(def needle (re-pattern \"clojure -M:test\"))\n(shell \"clojure -M:test\")\n")
+        doc-case (rewrite-text "README.md" "run `clojure -M:test` (grep for it)\n")
+        marker-case (rewrite-text "x.md" (str "run `clojure -M:test`\n<!-- " keep-marker " -->\n"))
+        self-case (rewrite-text "scripts/kbb-cutover.cljk" (fs/readFileSync "scripts/kbb-cutover.cljk" "utf8"))
+        rules-case (rewrite-text "scripts/kbb_cutover_rules.cljk" (fs/readFileSync "scripts/kbb_cutover_rules.cljk" "utf8"))]
+    (doseq [[in exp got] fails] (println "FAIL" (pr-str in) "\n  want" (pr-str exp) "\n  got " (pr-str got)))
+    (when-not (= 1 (:hits kept-case) 1 (count (:kept kept-case)))
+      (println "FAIL code-line boundary:" (pr-str kept-case)))
+    (when-not (and (= 1 (:hits doc-case)) (empty? (:kept doc-case)))
+      (println "FAIL doc line with a marker word must still be rewritten:" (pr-str doc-case)))
+    (when (:changed? marker-case) (println "FAIL keep-marker file must not change"))
+    (when (:changed? rules-case) (println "FAIL the rules file must not rewrite itself"))
+    (when (:changed? self-case) (println "FAIL this script must not rewrite itself:" (pr-str (take 5 (filter (fn [[a b]] (not= a b)) (map vector (.split (fs/readFileSync "scripts/kbb-cutover.cljk" "utf8") "\n") (.split (:text self-case) "\n")))))))
+    (let [n (+ (count fails)
+               (if (:changed? marker-case) 1 0)
+               (if (:changed? self-case) 1 0)
+               (if (:changed? rules-case) 1 0)
+               (if (= 1 (:hits kept-case) 1 (count (:kept kept-case))) 0 1)
+               (if (and (= 1 (:hits doc-case)) (empty? (:kept doc-case))) 0 1))]
+      (println (str "SELF-TEST\t" (count fixtures) " fixtures, " n " failure(s)"))
+      (.exit js/process (if (zero? n) 0 1)))))
+
+;; ---------------------------------------------------------------------------
+;; git plumbing (from scripts/cljk-rename.cljk)
+;; ---------------------------------------------------------------------------
+
+(defn- run [cmd args & [{:keys [cwd env input]}]]
+  (let [r (cp/spawnSync cmd (clj->js args)
+                        (clj->js (cond-> {:encoding "utf8" :maxBuffer (* 512 1024 1024)}
+                                   cwd (assoc :cwd cwd)
+                                   env (assoc :env (js/Object.assign #js {} (.-env js/process) (clj->js env)))
+                                   input (assoc :input input))))]
+    {:status (.-status r) :out (or (.-stdout r) "") :err (or (.-stderr r) "")}))
+
+(defn- git [dir & args] (run "git" (concat ["-C" dir] args)))
+
+(defn- git-bytes [dir sha]
+  (let [r (cp/spawnSync "git" #js ["-C" dir "cat-file" "blob" sha] #js {:maxBuffer (* 512 1024 1024)})]
+    (when (zero? (.-status r)) (.-stdout r))))
+
+(defn- remote-name [dir]
+  (let [{:keys [status out]} (git dir "remote")
+        names (when (zero? status) (remove str/blank? (str/split-lines out)))]
+    (or (some #{"origin"} names)
+        (some (fn [n] (when (str/includes? (:out (git dir "remote" "get-url" n)) "github.com") n)) names))))
+
+(defn- slug [dir]
+  (let [{:keys [status out]} (git dir "remote" "get-url" (or (remote-name dir) "origin"))]
+    (when (zero? status)
+      (some-> (re-find #"github\.com[:/]([^/]+)/([^/\s]+?)(?:\.git)?$" (str/trim out))
+              (as-> m (str (nth m 1) "/" (nth m 2)))))))
+
+(defn- default-branch [dir rn]
+  (let [strip #(str/replace (str/trim %) (re-pattern (str "^refs/remotes/" rn "/")) "")
+        {:keys [status out]} (git dir "symbolic-ref" (str "refs/remotes/" rn "/HEAD"))]
+    (if (zero? status)
+      (strip out)
+      (let [_ (git dir "remote" "set-head" rn "-a")
+            {:keys [status out]} (git dir "symbolic-ref" (str "refs/remotes/" rn "/HEAD"))]
+        (when (zero? status) (strip out))))))
+
+(defn- ls-tree-map
+  "path -> {:mode :sha} for blobs at rev."
+  [dir rev]
+  (let [{:keys [status out]} (git dir "ls-tree" "-r" "-z" rev)]
+    (when (zero? status)
+      (->> (str/split out #"\u0000")
+           (remove str/blank?)
+           (keep (fn [line]
+                   (let [[meta p] (str/split line #"\t" 2)
+                         [mode type sha] (str/split meta #" ")]
+                     (when (= type "blob") [p {:mode mode :sha sha}]))))
+           (into {})))))
+
+(def candidate-needles
+  ["clojure -" "clj -" "bb " "nbb " "\"nbb\"" "\"clojure\"" "shadow-cljs " "lein " "env bb" "env nbb" "env clojure" "env clj"])
+
+(defn- candidates
+  "Tracked text blobs at rev whose content contains any needle. Fixed strings,
+  so this is only a superset; the rules decide."
+  [dir rev]
+  (let [pat (path/join (.tmpdir (js/require "os")) (str "kbbc-pat-" (.-pid js/process) ".txt"))]
+    (fs/writeFileSync pat (str/join "\n" candidate-needles))
+    (let [{:keys [status out]} (git dir "grep" "-I" "-l" "-z" "-F" "-f" pat rev "--" ".")]
+      (fs/unlinkSync pat)
+      (if (zero? status)
+        (->> (str/split out #"\u0000") (remove str/blank?)
+             (map #(subs % (inc (count rev)))))
+        []))))
+
+(defn- utf8-roundtrips? [buf]
+  (.equals buf (js/Buffer.from (.toString buf "utf8") "utf8")))
+
+(defn- rate-guard! []
+  (let [{:keys [status out]} (run "gh" ["api" "rate_limit" "--jq" ".resources.core | \"\\(.remaining) \\(.reset)\""])]
+    (when (zero? status)
+      (let [[rem reset] (map js/parseInt (str/split (str/trim out) #" "))]
+        (when (< rem 120)
+          (let [wait (max 5 (- reset (js/Math.floor (/ (.now js/Date) 1000))))]
+            (println "RATE\tremaining" rem "sleeping" wait "s")
+            (run "sleep" [(str (inc wait))])))))))
+
+(defn- rate-limited? [{:keys [out err]}]
+  (re-find #"(?i)secondary rate limit|abuse detection|rate limit exceeded|API rate limit" (str out err)))
+
+(defn- gh-api [method endpoint fields]
+  (loop [n 0]
+    (let [r (run "gh" (concat ["api" "-X" method endpoint] (mapcat (fn [[k v]] ["-f" (str (name k) "=" v)]) fields)))]
+      (cond
+        (and (not (zero? (:status r))) (rate-limited? r) (< n 12))
+        (do (println "RATE\t" endpoint "sleeping 90s (" (inc n) "/12)") (run "sleep" ["90"]) (recur (inc n)))
+        (and (not (zero? (:status r))) (str/blank? (:out r)) (< n 3))
+        (do (println "TRANSIENT\t" endpoint (subs (:err r) 0 (min 120 (count (:err r)))) "retry" (inc n))
+            (run "sleep" ["10"]) (recur (inc n)))
+        :else r))))
+
+(defn- write-state! [state-dir slug m]
+  (fs/mkdirSync state-dir #js {:recursive true})
+  (fs/writeFileSync (path/join state-dir (str (str/replace slug "/" "__") ".edn"))
+                    (pr-str (assoc m :slug slug :at (.toISOString (js/Date.))))))
+
+;; ---------------------------------------------------------------------------
+;; One repository
+;; ---------------------------------------------------------------------------
+
+(defn plan-edits
+  "-> {:edits {path {:mode :text}} :kept [[path line reason]] :skipped [[path reason]] :hits n}"
+  [dir rev tree cands dry?]
+  (reduce (fn [acc p]
+            (let [e (tree p)]
+              (cond
+                (nil? e) acc
+                (skip-file? p) (update acc :skipped conj [p :record-not-rewritten])
+                :else
+                (let [buf (git-bytes dir (:sha e))]
+                  (cond
+                    (nil? buf) (update acc :skipped conj [p :unreadable])
+                    (not (utf8-roundtrips? buf)) (update acc :skipped conj [p :not-utf8])
+                    :else
+                    (let [{:keys [text changed? kept hits]} (rewrite-text p (.toString buf "utf8"))
+                          acc (update acc :kept into (map (fn [[ln why]] [p ln why]) kept))]
+                      (if-not changed? acc
+                              (-> acc
+                                  (update :hits + hits)
+                                  (update :edits assoc p {:mode (:mode e) :text text})))))))))
+          {:edits {} :kept [] :skipped [] :hits 0}
+          cands))
+
+(defn process-repo! [dir state-dir dry?]
+  (let [sl (or (slug dir) (str "unknown/" dir))
+        done (path/join state-dir (str (str/replace sl "/" "__") ".edn"))]
+    (cond
+      (not (fs/existsSync (path/join dir ".git")))
+      (do (write-state! state-dir sl {:status :refused :why :no-checkout :dir dir}) :refused)
+
+      (and (fs/existsSync done) (not dry?)
+           (contains? #{:merged :no-op :pr-open} (:status (cljs.reader/read-string (fs/readFileSync done "utf8")))))
+      :already
+
+      :else
+      (let [rn (or (remote-name dir) "origin")
+            f (git dir "fetch" "--quiet" rn)]
+        (if-not (zero? (:status f))
+          (do (write-state! state-dir sl {:status :refused :why :fetch-failed :err (subs (:err f) 0 (min 400 (count (:err f))))}) :refused)
+          (let [db (default-branch dir rn)
+                rev (when db (str rn "/" db))
+                head (when db (str/trim (:out (git dir "rev-parse" rev))))
+                tree (when head (ls-tree-map dir rev))]
+            (cond
+              (nil? db) (do (write-state! state-dir sl {:status :refused :why :no-default-branch}) :refused)
+              (nil? tree) (do (write-state! state-dir sl {:status :refused :why :ls-tree-failed}) :refused)
+              :else
+              (let [cands (candidates dir rev)
+                    {:keys [edits kept skipped hits]} (plan-edits dir rev tree cands dry?)
+                    summary {:head head :default-branch db :candidates (count cands)
+                             :edited (count edits) :hits hits :kept (count kept) :skipped skipped
+                             :kept-lines (vec (take 200 kept))}]
+                (cond
+                  (empty? edits)
+                  (do (write-state! state-dir sl (assoc summary :status :no-op)) :no-op)
+
+                  dry?
+                  (do (write-state! state-dir sl (assoc summary :status :dry :files (vec (sort (keys edits)))))
+                      (println "DRY" sl (pr-str (dissoc summary :kept-lines :skipped)))
+                      (doseq [p (take 8 (keys edits))] (println "    edit" p))
+                      (doseq [k (take 5 kept)] (println "    kept" (pr-str k)))
+                      :dry)
+
+                  :else
+                  (let [blobs (into {} (for [[p {:keys [mode text]}] edits]
+                                         (let [{:keys [status out]} (run "git" ["-C" dir "hash-object" "-w" "--stdin"] {:input text})]
+                                           [p (when (zero? status) {:mode mode :sha (str/trim out)})])))
+                        lines (for [[p {:keys [mode sha]}] blobs :when sha] (str mode " " sha "\t" p))
+                        idx (path/join (.tmpdir (js/require "os")) (str "kbbc-idx-" (.-pid js/process) "-" (str/replace sl "/" "__")))
+                        env {:GIT_INDEX_FILE idx}
+                        _ (when (fs/existsSync idx) (fs/unlinkSync idx))
+                        rt (run "git" ["-C" dir "read-tree" head] {:env env})
+                        ui (run "git" ["-C" dir "update-index" "--index-info"] {:env env :input (str (str/join "\n" lines) "\n")})
+                        wt (run "git" ["-C" dir "write-tree"] {:env env})
+                        t (str/trim (:out wt))
+                        msg (str "kbb: rewrite " hits " Clojure-CLI/bb/nbb/shadow-cljs invocation(s) in " (count edits) " file(s) to kbb/amu\n\n"
+                                 "Owner decision " today ": `clojure -M:<alias>` / `clj -M` / `bb <task>` /\n"
+                                 "`nbb <script>` become `kbb …` (kotoba-lang/kotoba bin/kbb_deps.cljk resolves\n"
+                                 "deps.edn aliases onto the JVM-free engine); `shadow-cljs release|compile|watch`\n"
+                                 "becomes `amu compile --target wasm32-browser`. Text only; no mirror; fix-forward.\n"
+                                 (when (seq kept) (str (count kept) " pattern-literal line(s) in code were left as needles (see run state).\n"))
+                                 "\nADR: " adr-id "\n\n"
+                                 "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n"
+                                 "Claude-Session: https://claude.ai/code/session_01JVx3D3QpgSHNgJBLe35yyx\n")
+                        ct (run "git" ["-C" dir "commit-tree" t "-p" head "-m" msg])
+                        commit (str/trim (:out ct))
+                        _ (when (fs/existsSync idx) (fs/unlinkSync idx))]
+                    (if-not (and (zero? (:status rt)) (zero? (:status ui)) (zero? (:status wt)) (zero? (:status ct)) (every? some? (vals blobs)))
+                      (do (write-state! state-dir sl (merge summary {:status :refused :why :commit-build-failed
+                                                                     :err (str (:err rt) (:err ui) (:err wt) (:err ct))}))
+                          :refused)
+                      (let [push (fn [] (git dir "push" "--quiet" rn (str commit ":refs/heads/" branch)))
+                            p1 (push)
+                            p (if (zero? (:status p1)) p1
+                                  (do (gh-api "DELETE" (str "repos/" sl "/git/refs/heads/" branch) {}) (push)))]
+                        (if-not (zero? (:status p))
+                          (do (write-state! state-dir sl (merge summary {:status :refused :why :push-failed :commit commit
+                                                                         :err (subs (:err p) 0 (min 400 (count (:err p))))}))
+                              :refused)
+                          (let [m (gh-api "POST" (str "repos/" sl "/merges") {:base db :head branch :commit_message (str "Merge kbb cutover (" adr-id ")")})]
+                            (if (zero? (:status m))
+                              (let [msha (second (re-find #"\"sha\":\"([0-9a-f]{40})\"" (:out m)))]
+                                (gh-api "DELETE" (str "repos/" sl "/git/refs/heads/" branch) {})
+                                (write-state! state-dir sl (merge summary {:status :merged :commit commit :merge-sha (or msha commit)}))
+                                :merged)
+                              (let [pr (gh-api "POST" (str "repos/" sl "/pulls")
+                                               {:title (str "kbb: rewrite " hits " Clojure-CLI/bb/nbb invocation(s) to kbb")
+                                                :head branch :base db
+                                                :body (str "Owner decision " today " (" adr-id "). Merge refused server-side; see run state.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01JVx3D3QpgSHNgJBLe35yyx")})]
+                                (write-state! state-dir sl (merge summary {:status :pr-open :commit commit
+                                                                           :merge-err (subs (:out m) 0 (min 300 (count (:out m))))
+                                                                           :pr (second (re-find #"\"html_url\":\"([^\"]+/pull/\\d+)\"" (:out pr)))}))
+                                :pr-open))))))))))))))))
+
+(defn -main []
+  (cond
+    (flag? "--self-test") (self-test!)
+
+    (arg "--file")
+    (let [p (arg "--file") {:keys [text hits kept]} (rewrite-text p (fs/readFileSync p "utf8"))]
+      (binding [*print-fn* *print-err-fn*] (println "HITS" hits "KEPT" (pr-str kept)))
+      (print text))
+
+    :else
+    (let [paths-file (arg "--paths") state-dir (arg "--state") dry? (flag? "--dry-run")
+          [i n] (when-let [s (arg "--shard")] (map js/parseInt (str/split s #"/")))
+          all (->> (str/split (fs/readFileSync paths-file "utf8") #"\n") (remove str/blank?) vec)
+          mine (if i (keep-indexed (fn [k p] (when (= i (mod k n)) p)) all) all)
+          counts (atom {})]
+      (when-not (and paths-file state-dir) (println "usage: --paths <file> --state <dir> [--dry-run] [--shard i/n] | --self-test | --file <p>") (.exit js/process 64))
+      (doseq [[k dir] (map-indexed vector mine)]
+        (when (and (not dry?) (zero? (mod k 50))) (rate-guard!))
+        (let [r (try (process-repo! dir state-dir dry?)
+                     (catch :default e
+                       (write-state! state-dir (or (slug dir) (str "unknown/" dir)) {:status :refused :why :exception :err (str e)})
+                       :refused))]
+          (swap! counts update r (fnil inc 0))
+          (println (str "[" (inc k) "/" (count mine) "]") (name r) dir)))
+      (println "SUMMARY" (pr-str @counts))
+      (.exit js/process (if (pos? (get @counts :refused 0)) 1 0)))))
+
+(-main)
