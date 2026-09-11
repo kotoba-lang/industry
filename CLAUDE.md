@@ -443,7 +443,7 @@ Skill ツールで `fleet-ci-gates` を呼ぶ。** ここに残すのは skill �
 **禁じたい経路は「無い」ではなく「拒否して記録する」**（PATH の先頭に stub を置き、
 呼ばれたら log に追記して非ゼロで終わる。そして**その log が空でないことを 1 度は
 見せる** —— 実測 2026-09-06、JVM-free 経路の検証で `amu test` だけが
-`kbb -M:run` に落ちて trace を踏み、それが「trace が何かを検出できる」ことの
+JVM 経路（当時の `clojure` CLI の `-M:run`）に落ちて trace を踏み、それが「trace が何かを検出できる」ことの
 証拠になった。踏まれたことのない trace は、常に空な trace と区別できない）。
 
 ⚠ **この class を最も安く作れるのは shell である。`$?` は pipe の「最後の」
@@ -2083,7 +2083,7 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
   新規に `bb.edn` / `#!/usr/bin/env bb` を置かない。
 - **`.cljk` を `require` で解決できるのは kbb の engine だけ**（repo-wide mandatory、
   2026-09-11、ADR-2609111700）。stock nbb の classpath 探索は `.cljs` `.cljc` `.clj` 固定で、
-  `kbb --backend sci x.cljk` は動くが `x.cljk` が `require` する `.cljk` は `Could not find namespace` になる
+  stock nbb は `x.cljk` を直接なら実行できるが、`x.cljk` が `require` する `.cljk` は `Could not find namespace` になる
   （改名当日、root の PreToolUse hook 9 本中 8 本がこれで落ちた）。engine は
   `kotoba-lang/org-babashka-nbb`（nbb 1.4.208 + 探索順に `.cljk` と衝突綴りを足した fork。
   built `lib/` を commit 済みで JDK も `npm install` も要らない）。**Clojure-shaped `.cljk`
@@ -2093,12 +2093,37 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
   この fork の sha を指す。`--backend sci` は gate も receipt も無い橋であって移行ではない ——
   hook の Kotoba guest 化は stdin / `:data/json` / exit code が gated backend に無いため
   `:blocked`（縮めない）。
+- **Clojure CLI / babashka / nbb / shadow-cljs の起動文字列を書かない — 呼び方は `kbb`**
+  （repo-wide mandatory、2026-09-11、ADR-2609112000。オーナー指示「全て機械的に kotoba に切り替えて」）。
+  workspace 全体（ADR 本文を含む）の `clojure`/`clj` CLI の `-M:<alias>`、`bb <task>`、
+  `nbb <script>`、`shadow-cljs` の release / compile / watch は同日に **`kbb -M:<alias>` /
+  `kbb --backend sci <script>` / `amu compile --target wasm32-browser`** へ機械置換した
+  （driver `scripts/kbb-cutover.cljk`、規則の正本 `scripts/kbb_cutover_rules.cljk`）。
+  - **`kbb -M:<alias>` は deps.edn の alias を engine 上で解決する**（`kotoba-lang/kotoba`
+    `bin/kbb_deps.cljk`: `:paths` / `:extra-paths` / `:local/root`（再帰）/ `:main-opts` /
+    `:exec-fn` / `-Sdeps`）。Maven / git 座標は解決しない（engine が `nbb.edn` を読む）。
+    JVM test runner を名指す alias は `cljs.test` の走査に**置換され、stderr でそう言う**。
+    答えられないものは名指しで拒否する: 未宣言 alias / `-Stree` = exit 64、`deps.edn` 無し = 66。
+    **`kbb -M:test` が緑なことは JVM suite が緑なことではない** —— JVM 専用の ns は engine で
+    落ち、その理由が出力に載る。
+  - **`kbb` は PATH に要る**（この機械は `/opt/homebrew/bin/kbb` → `orgs/kotoba-lang/kotoba/bin/kbb`
+    の symlink。engine は west 兄弟 `org-babashka-nbb`、無ければ exit 3）。fleet ノードには
+    まだ無い —— gate の `kbb` 起動は fix-forward（ADR に記録）。
+  - **検出器は `scripts/verify-no-clojure-cli.cljk`**（`manifest/orgs-detectors.edn` の
+    `:verify-no-clojure-cli`）。finding の定義は「rewriter の `rewrite-text` が変える file」
+    そのもので、rewriter が意図して残す行（detector の needle、`.github/workflows/`、
+    lock、ledger）は finding にならない。**古い綴りを意図して引用する file は、本文に
+    literal `kbb-cutover` + `: keep` を 1 行置く**（driver・rules・この ADR がそう）。
+  - **置換は text であって移行ではない。** `.cljk` の中身は Clojure-shaped のままで、
+    `amu` の admit とは別の話（ADR-2609111500 の「拡張子で移行進捗を数えない」と同じ）。
+    ADR 本文中の「その日に実行した command の記録」も書き換えた（オーナー判断 2026-09-11、
+    履歴は git）—— 2026-09-11 以前の ADR に `kbb -M:test` と在っても、当日走ったのは JVM である。
 - **`#?(:kototama ...)` / `#?(:clojurewasm ...)` は存在しない reader-conditional。**
   書くと黙って dead branch になる。
 - **`.cljs` の依存宣言は `nbb.edn` に置く。nbb は `deps.edn` も `bb.edn` も読まない**
   （repo-wide mandatory、2026-09-09、ADR-2609093000）。coordinate を `deps.edn` にだけ
   書いた repo は移行できていない —— **壊れていて、しかも全ての道具が成功を報告する**
-  （実測: `DEPS added deps.edn` → `REWROTE 6 files` → `kbb -M:test` 緑 →
+  （実測: `DEPS added deps.edn` → `REWROTE 6 files` → JVM suite（当時の `clojure` CLI `-M:test`）緑 →
   `kbb --backend sci tools/gen-tmlanguage.cljk` が `Could not find namespace`。JVM suite は
   `deps.edn` を読み `.cljs` を一度も load しないので緑のまま）。
   ⚠ **`:deps` の座標を解決するとき、nbb は babashka を呼ぶ**（2026-09-10 実測）。

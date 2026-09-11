@@ -1,0 +1,156 @@
+;; scripts/kbb_cutover_rules.cljk — the rewrite rules shared by the driver
+;; (scripts/kbb-cutover.cljk) and the detector (scripts/verify-no-clojure-cli.cljk),
+;; so "what the cutover rewrites" and "what the detector reports" are the same
+;; function by construction rather than two regex tables that drift.
+;;
+;; kbb-cutover: keep  -- this file quotes every old spelling in its rules and
+;; fixtures; the fleet pass must leave it whole (the driver's self-test proves it).
+;;
+;; See the driver's header for the rule table in prose. `rewrite-text` is the
+;; contract: (rewrite-text path text) -> {:text :changed? :kept :hits}. A
+;; finding, for the detector, is exactly a file for which :changed? is true.
+(ns kbb-cutover-rules
+  (:require ["path" :as path]
+            [clojure.string :as str]))
+
+(def code-exts
+  #{"cljk" "cljs" "clj" "cljc" "js" "mjs" "cjs" "ts" "tsx" "py" "rb" "sh" "bash" "zsh"
+    "edn" "json" "jsonc" "yaml" "yml" "toml" "plist" "tmpl" "template" "service"})
+
+(def pattern-marker
+  ;; a code line carrying one of these is a needle, not a command
+  (js/RegExp. "re-pattern|#\"|re-find|re-seq|re-matches|RegExp|includes\\?|index-of|\\.includes\\(|\\.indexOf\\(|\\.test\\(|\\.match\\(|\"rg\"|\"grep\"|\\brg -|\\bgrep -|:pattern|:needle|:evidence|\\bregex\\b|\\bre-\\w+ " ""))
+
+(def bb-builtins
+  #{"version" "help" "repl" "nrepl-server" "socket-repl" "uberjar" "uberscript" "prepare"
+    "print-deps" "describe" "doc" "clojure" "run" "tasks"})
+
+(def ^:private lb "(?<![\\w./-])")                      ; not inside a word or a path
+(def ^:private cmd-lb "(?<=^\\s*(?:\\$ |- |\\* |> |#\\s)?|[`\"'(]|&& |; |\\| )") ; command position
+(def ^:private tok-end "(?=[\\s'\"`)\\]};|&<>]|$)")
+
+(def rules
+  ;; [name regex replacement-fn-or-string]  — order matters
+  [[:shebang        (js/RegExp. "^#!/usr/bin/env (?:-S )?(?:bb|nbb|clojure|clj)(?=\\s|$)") "#!/usr/bin/env kbb"]
+   [:clojure-flag   (js/RegExp. (str lb "clojure(?= -(?:[MXAT](?:[:\\s'\"`)\\]}]|$)|S[a-z]+(?:[\\s'\"`)\\]}]|$)|J\\S))") "g") "kbb"]
+   [:clj-flag       (js/RegExp. (str lb "clj(?= -[MXAT](?:[:\\s'\"`)\\]}]|$))") "g") "kbb"]
+   [:lein           (js/RegExp. (str lb "lein (test|run)" tok-end) "g") "kbb -M:$1"]
+   [:bb-file        (js/RegExp. (str lb "bb ((?:\\.{0,2}/)?[\\w./-]*\\.)(?:clj|cljs|cljc|cljk)(?![\\w])") "g") "kbb $1cljk"]
+   [:bb-flag        (js/RegExp. (str lb "bb (?=(?:-e|-m|-f|--main|-cp|--classpath)" tok-end ")") "g") "kbb "]
+   [:bb-tasks       (js/RegExp. (str lb "bb tasks" tok-end) "g") "kbb -Saliases"]
+   [:bb-run-task    (js/RegExp. (str cmd-lb "bb run ([a-z][\\w:-]*)" tok-end) "g") "kbb -M:$1"]
+   [:bb-task        (js/RegExp. (str cmd-lb "bb ([a-z][\\w:-]*)" tok-end) "g")
+    (fn [m task] (if (contains? bb-builtins task) m (str "kbb -M:" task)))]
+   [:shadow         (js/RegExp. (str lb "(?:npx )?shadow-cljs (?:release|compile|watch)(?![\\w-])") "g") "amu compile --target wasm32-browser"]
+   [:nbb-file       (js/RegExp. (str lb "(?:npx )?nbb ((?:\\.{0,2}/)?[\\w./-]*\\.)(?:clj|cljs|cljc|cljk)(?![\\w])") "g") "kbb --backend sci $1cljk"]
+   [:nbb-flag       (js/RegExp. (str lb "(?:npx )?nbb (?=(?:--classpath|-cp|-e|-m|--main|--config)" tok-end ")") "g") "kbb --backend sci "]
+   [:nbb-token      (js/RegExp. "\"nbb\"(\\s*,?\\s*)\"(?=(?:--classpath|-cp|-e|-m|--main|--config)\"|[^\"]*\\.cljk\")" "g") "\"kbb\"$1\"--backend\"$1\"sci\"$1\""]
+   [:clojure-token  (js/RegExp. "\"clojure\"(\\s*,?\\s*)\"(?=-(?:[MXAT][:\"]|S[a-z]|J))" "g") "\"kbb\"$1\""]])
+
+(defn rewrite-line [line]
+  (reduce (fn [l [_ re rep]]
+            (if (fn? rep)
+              (.replace l re (fn [& args] (apply rep (take 2 args))))
+              (.replace l re rep)))
+          line rules))
+
+(defn- ext-of [p]
+  (let [b (path/basename p) i (.lastIndexOf b ".")]
+    (when (pos? i) (subs b (inc i)))))
+
+(def never-rewrite
+  ;; exact basenames / suffixes that are records or machine output
+  #{"cljk-origin.edn" "package-lock.json" "pnpm-lock.yaml" "yarn.lock" "canvas-ledger.edn"
+    "design-quality-ledger.edn" "fleet-db.ledger.edn"})
+
+(defn skip-file? [p]
+  (let [b (path/basename p)]
+    (or (contains? never-rewrite b)
+        ;; GitHub Actions workflows: the workspace does not run them
+        ;; (ADR-2607300900) and an Actions runner has no kbb; besides, an
+        ;; https remote's OAuth token lacks the `workflow` scope, so a push
+        ;; carrying one is rejected outright (measured 2026-09-11 on
+        ;; cloud-itonami-assoc-*: 6 repos refused for this alone).
+        (str/starts-with? p ".github/workflows/")
+        (str/ends-with? b ".lock")
+        (str/ends-with? b ".min.js")
+        (str/ends-with? b ".map")
+        (str/ends-with? b ".log")
+        (str/ends-with? b ".jsonl")
+        (str/ends-with? b ".ledger.edn"))))
+
+(def keep-marker
+  ;; A file that carries this literal anywhere is left whole and listed as
+  ;; [path :keep-marker]: the rewriter, the detector, the ADR that quotes the
+  ;; old spellings on purpose. This file carries it in its ns comment.
+  (str "kbb-cutover" ": keep"))
+
+(defn rewrite-text
+  "-> {:text :changed? :kept [[line-no reason] ...] :hits n}"
+  [p text]
+  (if (str/includes? text keep-marker)
+    {:text text :changed? false :kept [[0 :keep-marker]] :hits 0}
+  (let [code? (contains? code-exts (ext-of p))
+        lines (.split text "\n")
+        out (js/Array.)
+        kept (atom [])
+        hits (atom 0)]
+    (doseq [[i l] (map-indexed vector lines)]
+      (let [l* (rewrite-line l)]
+        (cond
+          (= l l*) (.push out l)
+          (and code? (.test pattern-marker l)) (do (swap! kept conj [(inc i) :pattern-line-kept]) (.push out l))
+          :else (do (swap! hits inc) (.push out l*)))))
+    {:text (.join out "\n") :changed? (pos? @hits) :kept @kept :hits @hits})))
+
+(def fixtures
+  ;; [input expected]  — expected = input means "must NOT change"
+  [["    clojure -M:test" "    kbb -M:test"]
+   ["$ clojure -M:dev:run --port 8080" "$ kbb -M:dev:run --port 8080"]
+   ["`clojure -M -m foo.core`" "`kbb -M -m foo.core`"]
+   ["clojure -Sdeps '{:deps {}}' -M -e '(+ 1 2)'" "kbb -Sdeps '{:deps {}}' -M -e '(+ 1 2)'"]
+   ["CP=$(clojure -Spath -M:test)" "CP=$(kbb -Spath -M:test)"]
+   ["clj -M:test" "kbb -M:test"]
+   ["clj -X:deps prep" "kbb -X:deps prep"]
+   ["org.clojure/clojure -M" "org.clojure/clojure -M"]          ; inside a coordinate: no
+   ["clojure -Main" "clojure -Main"]                              ; not a flag: no
+   ["clojure.core/str -M" "clojure.core/str -M"]
+   ["the clojure -M route" "the kbb -M route"]
+   ["#!/usr/bin/env bb" "#!/usr/bin/env kbb"]
+   ["#!/usr/bin/env nbb" "#!/usr/bin/env kbb"]
+   ["#!/usr/bin/env -S nbb --classpath src" "#!/usr/bin/env kbb --classpath src"]
+   ["bb test" "kbb -M:test"]
+   ["  bb test:actors" "  kbb -M:test:actors"]
+   ["`bb runner`" "`kbb -M:runner`"]
+   ["\"test\": \"bb test\"" "\"test\": \"kbb -M:test\""]
+   ["(shell \"bb test\")" "(shell \"kbb -M:test\")"]
+   ["bb run_tests.clj" "kbb run_tests.cljk"]
+   ["bb scripts/x.cljs --flag" "kbb scripts/x.cljk --flag"]
+   ["bb -e '(+ 1 2)'" "kbb -e '(+ 1 2)'"]
+   ["bb tasks" "kbb -Saliases"]
+   ["bb run test" "kbb -M:test"]
+   ["bb uberjar out.jar" "bb uberjar out.jar"]                     ; builtin: kept
+   ["the bb binary is small" "the bb binary is small"]             ; prose: kept
+   ["a bb script" "a bb script"]
+   ["abb test" "abb test"]
+   ["lein test" "kbb -M:test"]
+   ["lein uberjar" "lein uberjar"]
+   ["nbb scripts/x.cljk --check" "kbb --backend sci scripts/x.cljk --check"]
+   ["nbb scripts/x.cljs" "kbb --backend sci scripts/x.cljk"]
+   ["nbb --classpath \".:scripts/nbb_compat\" scripts/x.cljk" "kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/x.cljk"]
+   ["npx nbb -e '(prn 1)'" "kbb --backend sci -e '(prn 1)'"]
+   ["nbb.edn" "nbb.edn"]
+   ["npm i -g nbb" "npm i -g nbb"]
+   ["\"nbb\": \"git+https://…\"" "\"nbb\": \"git+https://…\""]
+   ["[\"nbb\" \"scripts/x.cljk\" \"--root\"]" "[\"kbb\" \"--backend\" \"sci\" \"scripts/x.cljk\" \"--root\"]"]
+   ["[\"nbb\", \"scripts/x.cljk\"]" "[\"kbb\", \"--backend\", \"sci\", \"scripts/x.cljk\"]"]
+   ["[\"nbb\" \"--classpath\" \"src\" \"x.cljk\"]" "[\"kbb\" \"--backend\" \"sci\" \"--classpath\" \"src\" \"x.cljk\"]"]
+   ["[\"clojure\" \"-M:test\"]" "[\"kbb\" \"-M:test\"]"]
+   ["[\"nbb\" \"--version\"]" "[\"nbb\" \"--version\"]"]          ; not a script/flag we route: kept
+   ["shadow-cljs release app" "amu compile --target wasm32-browser app"]
+   ["npx shadow-cljs watch :app" "amu compile --target wasm32-browser :app"]
+   ["shadow-cljs.edn" "shadow-cljs.edn"]
+   ["shadow-cljs server" "shadow-cljs server"]
+   ["java -jar x.jar" "java -jar x.jar"]
+   ["kbb -M:test" "kbb -M:test"]])                                 ; idempotent
+

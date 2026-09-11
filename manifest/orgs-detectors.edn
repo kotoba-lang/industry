@@ -4375,4 +4375,32 @@
               (ADR-2609111700); the batch renamed it and the rename was reverted the same hour
               because shadow-cljs builds it from .cljs."}
 
+
+  {:id       :verify-no-clojure-cli
+   :title    "clojure -M / clj -M / bb <task> / nbb <script> / shadow-cljs back on a pinned tree after the kbb cutover"
+   :why      "adr-2609112000 rewrote every Clojure-CLI, babashka, nbb and shadow-cljs invocation
+              in the workspace (ADR bodies included) to kbb / amu on 2026-09-11. The rename the
+              day before regressed in two repositories within hours because branches cut before
+              it kept landing after it. The invocation string is now a claim about the corpus;
+              a claim with no detector decays at the rate other sessions merge old branches.
+              A finding is exactly a file the cutover's own rewrite-text would change, so the
+              detector cannot disagree with the rewriter about what counts."
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}/scripts"
+              "{{repo}}/scripts/verify-no-clojure-cli.cljk"
+              "--west" "{{root}}/manifest/west.yml" "--root" "{{root}}" "--self"
+              "--allow" "kotoba-lang/org-babashka-nbb"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000
+   :timeout-ms  1800000
+   :writes   :none
+   :measured "Landed 2026-09-11. Discriminated with a different INPUT: a 4-project west.yml with
+              three projects still at their pre-cutover pins reports 3 findings / 74 files and
+              1 ALLOWED (org-babashka-nbb, 29 files -- nbb's own docs); the same detector against
+              the post-cutover pins must report 0 (the number is recorded in the ADR, not here).
+              --self adds the superproject's own tracked tree at HEAD. Reads one git grep -F and
+              one git cat-file --batch per project; ~0.25 s/project measured, so the whole west
+              is minutes, hence the 6 h interval and 30 min timeout."}
+
 ]}
