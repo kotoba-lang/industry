@@ -3171,14 +3171,17 @@
   {:repo "orgs/cloud-itonami/yoro-supply"
    :label "yoro-supply actor descriptor —— manifest ↔ cells ↔ lex ↔ deploy ↔ agent の 5 面一致 + 決定核"
    ;; manifest.edn は :actor/cells と :actor/lex を宣言し、cells/*.edn は
-   ;; :cell/handler で py/agent.cljc の関数を名指しし、deploy/app-aozora.edn は
+   ;; :cell/handler で py/agent.kotoba の関数を名指しし、deploy/app-aozora.edn は
    ;; cell 由来の capability-allowlist を配る。2026-08-22 までこの 5 面の一致を
    ;; 検査するものが無かった（cargo / airshed と同じ「descriptor が静かに割れる」
-   ;; 入口）。規則は src/etzhayyim/yoro_supply/contract.cljc の純粋関数、fixture
+   ;; 入口）。規則は src/etzhayyim/yoro_supply/contract.kotoba の純粋関数、fixture
    ;; （contract_test）で落ちることを見せてから実ファイル（repo_test）に当てる。
-   ;; 決定核（G1 SBT gate / G7 tithe 10% / G7+G11 intent 停止）は py/agent.cljc を
+   ;; 決定核（G1 SBT gate / G7 tithe 10% / G7+G11 intent 停止）は py/agent.kotoba を
    ;; nbb で実 load して実挙動で固定。全て 2026-08-22 に実際に赤くなるところを見た。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   ;; 2026-09-10 の一括改名で source は全部 .kotoba になり、runner は require では
+   ;; なく nbb.core/load-file の path で読む（yoro-supply の docs/adr/0001）。
+   ;; --classpath は要らない。0 本の run は exit 2（REFUSED）で、green-marker は出ない。
+   :cmd ["nbb" "run_tests.kotoba"]
    :green-marker "yoro-supply actor contract: all green"
    :mutations
    [{:id :yoro-supply/deploy-did-drifts
@@ -3218,28 +3221,28 @@
 
     {:id :yoro-supply/tithe-shrinks
      :why "G7 tithe 10%。TITHE_BPS を 1 桁削る編集は diff 上 2 文字で、settlement は valid な形のまま Public Fund への 10% が 1% になる"
-     :file "py/agent.cljc"
+     :file "py/agent.kotoba"
      :find "(def TITHE_BPS 1000)"
      :replace "(def TITHE_BPS 100)"
      :must-fail ["settlement-splits-exactly-ten-percent-tithe"]}
 
     {:id :yoro-supply/settlement-executes-without-signature
      :why "G7+G11。署名なし settlement を executed に『改善』すると、member 署名 + operator gate を待つという README の宣言が嘘になる —— intent 停止は仕様であって未実装ではない"
-     :file "py/agent.cljc"
+     :file "py/agent.kotoba"
      :find "\"state\" (if member-sig-ref \"executed\" \"intent\")"
      :replace "\"state\" \"executed\""
      :must-fail ["settlement-stops-at-intent-without-member-signature"]}
 
     {:id :yoro-supply/sbt-gate-goes-blind
      :why "G1 consent-bound。eligibility 判定を素通りにすると、SBT を持たない DID の発注が placed になる —— member = ordering principal という前提が壊れる"
-     :file "py/agent.cljc"
+     :file "py/agent.kotoba"
      :find "(if (not (get elig \"eligible\"))"
      :replace "(if false"
      :must-fail ["a-stranger-without-sbt-cannot-place-an-order"]}
 
     {:id :yoro-supply/rule-code-goes-blind
      :why "**規則コード側を撃つ。** check-handlers の :when に false を挟むと、実ファイルは緑のままなので repo_test は何も言わない —— fixture テストだけがこれを捕まえる。データを撃つ 8 件が守るのは descriptor と決定核、これが守るのは規則そのもの"
-     :file "src/etzhayyim/yoro_supply/contract.cljc"
+     :file "src/etzhayyim/yoro_supply/contract.kotoba"
      :find ":when (and f (not (contains? defn-names f)))]"
      :replace ":when (and f false (not (contains? defn-names f)))]"
      :must-fail ["a-cell-handler-missing-from-the-agent-is-a-violation"]}]}
