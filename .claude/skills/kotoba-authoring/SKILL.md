@@ -1,6 +1,6 @@
 ---
 name: kotoba-authoring
-description: "`.kotoba` / `.cljk` を書く・読む・移行する・その天井を判定するときの正本。runtime 優先順位（kotoba wasm → clojurewasm → cljs → nbb →（降格）JVM/bb）、Rust/sh/.mjs を新規に書かない規則、legacy emitter ではなく amu compile 経路を使う理由と実測済みブロッカー、`.kotoba` で「書けない」の恒久（安全設計）と一時（backend 未達）の分類法、native AOT の現在地の読み方、design system 5 repo の移行順、JVM-free acceptance（Q9）。「kotoba を書く」「cljk」「amu compile」「kotoba wasm」「capability kit」「native backend」「kbb」「.kotoba に移行」「この機能は kotoba にあるか」で発火。CLAUDE.md の runtime 節から切り出した正本。"
+description: "`.kotoba` / `.cljk` を書く・読む・移行する・その天井を判定するときの正本。runtime 優先順位（kotoba wasm → clojurewasm → cljs → nbb →（降格）JVM/bb）、Rust/sh/.mjs を新規に書かない規則、legacy emitter ではなく amu compile 経路を使う理由と実測済みブロッカー、`.kotoba` で「書けない」の恒久（安全設計）と一時（backend 未達）の分類法、native AOT の現在地の読み方、design system 5 repo の移行順、JVM-free acceptance（Q9）。「kotoba を書く」「cljk」「amu compile」「kotoba wasm」「capability kit」「native backend」「kbb」「.kotoba に移行」「この機能は kotoba にあるか」で発火。CLAUDE.md の runtime 節から切り出した正本。 2026-09-11 に CLAUDE.md の runtime 6 節（優先順位・kbb・nbb.edn・compile 経路・恒久/一時・whole-component・design system 5 repo・JVM-free）と repo-wide resource governor（resource-guard.mjs、`find .` / `du` 禁止、browser cleanup は CPU を回収しない）の本文を逐語で移した（ADR-2609112300）。「resource-guard」「build lock」「同時 build」でも発火。"
 ---
 
 # `.kotoba` を書く
@@ -744,3 +744,245 @@ verified native Kotoba CLI と Amu `--jvm-free` を使い、compiler、test、or
   `native_executor_test.clj` の kgraph-native-customer-pilot が実 kexe loader
   実行で証明している。この capability gap を理由に native 経路を避けない。
   詳細・調査経緯は ADR-2607198300 / ADR-2607198200 / ADR-2607241100 を参照。
+
+---
+
+# CLAUDE.md に 2026-09-11 まで残っていた本文（逐語、ADR-2609112300）
+
+以下は CLAUDE.md から**逐語で**移した本文である（2026-09-11、ADR-2609112300。AGENTS.md の
+読み込み上限 31,457 字に合わせて CLAUDE.md を不変条件だけに絞った）。CLAUDE.md 側には
+skill を読まなくても効く規則だけが残っている。ここが理由・実測・罠の正本。
+
+## repo-wide resource governor（mandatory）
+
+`orgs/` / `projects/` を含む workspace 全体で、高負荷 build は同時 1 本に制限する。
+`amu compile --target wasm32-browser` / `vite build` / `next build` / `cargo build` / `wash build` 等を
+直接起動せず、必ず次を使う（deploy は scope `deploy`）:
+
+```bash
+node /Users/junkawasaki/github/com-junkawasaki/scripts/resource-guard.mjs run build -- <command>
+```
+
+lock は PID・cwd・開始時刻を保持し、live owner がいる二本目を exit 2 で拒否し、
+dead owner の stale lock だけを回収する。**superproject root で無制限な `find .` / `du` を
+実行しない。**
+
+⚠ **`npm run browser:cleanup` が回収するのは disk であって CPU ではない。** 実装
+（`resource-guard.mjs` の `cleanupBrowser`）は `os.tmpdir()` 直下の `agent-browser-*`
+**ディレクトリを `fs.rmSync` するだけ**で、**プロセスは 1 つも殺さない**。
+**close し損ねた browser は、cleanup を何度回しても回り続ける**（実測 2026-08-13:
+このマシンの probe browser は `~/.agent-browser/browsers/` に profile を持つので、
+cleanup は**何も見つけずに成功する**）。CPU を食っている probe は `ps` で実測してから
+扱い、親が生きているものは勝手に kill せずオーナーに報告する。
+
+⚠ **この macOS では多数の並行セッションが OS フォーカスを奪い合う。** ブラウザ / GUI を
+操作する前に skill `computer-use` を読む。
+
+## `.cljc` / `.kotoba` ランタイム優先順位（repo-wide mandatory）
+
+**詳細・実測・現在地の読み方は Skill ツールで `kotoba-authoring` を呼ぶ。**
+`.kotoba` / `.cljk` を書く前、その天井を判定する前、移行する前に読む。
+ここに残すのは skill を読まなくても効く不変条件だけ。
+
+- **第一の runtime の順序は `kotoba wasm runtime` > `clojurewasm` > `ClojureScript` >
+  `nbb`。`JVM` と `bb` はその下（どちらも最後の手段。2026-07-10 オーナー指示）。**
+  reader-conditional・依存選定・テストの正本もこの順に合わせる。上位で動くものを
+  JVM / bb 前提で書かない。JVM / bb にしか無い経路は「互換 (compat) 層」として
+  隔離し、設計の前提にしない。
+- **Rust を新規に書かない**（2026-07-10 オーナー指示）。既存 Rust エンジンが露出済みの
+  WASM/JS 境界を呼ぶのはよいが、描画要件を満たすために新しい crate を起こさない。
+  満たせないならスコープを絞るか、ADR 化してオーナー判断を仰ぐ。
+- **`.sh` を新規に書かない**（2026-07-14 オーナー指示）。**生 JS の `.mjs`/`.cjs` も
+  新規に書かない** —— Node 側の検証/テストハーネスも nbb（`.cljs`）で書く。
+- **新規の運用 tooling は kbb-first**（owner 指示 2026-09-07）。手順は skill
+  `nbb-to-kbb-migration`。nbb は既存資産の実行環境として残るが、新規 script host
+  としては使わない。**`bb` は script host としても退役**（ADR-2607173000）——
+  新規に `bb.edn` / `#!/usr/bin/env bb` を置かない。
+- **`.cljk` を `require` で解決できるのは kbb の engine だけ**（repo-wide mandatory、
+  2026-09-11、ADR-2609111700）。stock nbb の classpath 探索は `.cljs` `.cljc` `.clj` 固定で、
+  stock nbb は `x.cljk` を直接なら実行できるが、`x.cljk` が `require` する `.cljk` は `Could not find namespace` になる
+  （改名当日、root の PreToolUse hook 9 本中 8 本がこれで落ちた）。engine は
+  `kotoba-lang/org-babashka-nbb`（nbb 1.4.208 + 探索順に `.cljk` と衝突綴りを足した fork。
+  built `lib/` を commit 済みで JDK も `npm install` も要らない）。**Clojure-shaped `.cljk`
+  の script host は `bin/kbb --backend sci [--classpath <cp>] <script.cljk>`** で、root の
+  `.claude/settings.json` の hook は全部これで走る。`bin/kbb` は engine が無ければ
+  PATH の `nbb` に**落ちずに exit 3** で 2 つの path を名指しする。root の npm 座標 `nbb` も
+  この fork の sha を指す。`--backend sci` は gate も receipt も無い橋であって移行ではない ——
+  hook の Kotoba guest 化は stdin / `:data/json` / exit code が gated backend に無いため
+  `:blocked`（縮めない）。
+- **Clojure CLI / babashka / nbb / shadow-cljs の起動文字列を書かない — 呼び方は `kbb`**
+  （repo-wide mandatory、2026-09-11、ADR-2609112000。オーナー指示「全て機械的に kotoba に切り替えて」）。
+  workspace 全体（ADR 本文を含む）の `clojure`/`clj` CLI の `-M:<alias>`、`bb <task>`、
+  `nbb <script>`、`shadow-cljs` の release / compile / watch は同日に **`kbb -M:<alias>` /
+  `kbb --backend sci <script>` / `amu compile --target wasm32-browser`** へ機械置換した
+  （driver `scripts/kbb-cutover.cljk`、規則の正本 `scripts/kbb_cutover_rules.cljk`）。
+  - **`kbb -M:<alias>` は deps.edn の alias を engine 上で解決する**（`kotoba-lang/kotoba`
+    `bin/kbb_deps.cljk`: `:paths` / `:extra-paths` / `:local/root`（再帰）/ `:main-opts` /
+    `:exec-fn` / `-Sdeps`）。Maven / git 座標は解決しない（engine が `nbb.edn` を読む）。
+    JVM test runner を名指す alias は `cljs.test` の走査に**置換され、stderr でそう言う**。
+    答えられないものは名指しで拒否する: 未宣言 alias / `-Stree` = exit 64、`deps.edn` 無し = 66。
+    **`kbb -M:test` が緑なことは JVM suite が緑なことではない** —— JVM 専用の ns は engine で
+    落ち、その理由が出力に載る。
+  - **`kbb` は PATH に要る**（この機械は `/opt/homebrew/bin/kbb` → `orgs/kotoba-lang/kotoba/bin/kbb`
+    の symlink。engine は west 兄弟 `org-babashka-nbb`、無ければ exit 3）。fleet ノードには
+    まだ無い —— gate の `kbb` 起動は fix-forward（ADR に記録）。
+  - **検出器は `scripts/verify-no-clojure-cli.cljk`**（`manifest/orgs-detectors.edn` の
+    `:verify-no-clojure-cli`）。finding の定義は「rewriter の `rewrite-text` が変える file」
+    そのもので、rewriter が意図して残す行（detector の needle、`.github/workflows/`、
+    lock、ledger）は finding にならない。**古い綴りを意図して引用する file は、本文に
+    literal `kbb-cutover` + `: keep` を 1 行置く**（driver・rules・この ADR がそう）。
+  - **置換は text であって移行ではない。** `.cljk` の中身は Clojure-shaped のままで、
+    `amu` の admit とは別の話（ADR-2609111500 の「拡張子で移行進捗を数えない」と同じ）。
+    ADR 本文中の「その日に実行した command の記録」も書き換えた（オーナー判断 2026-09-11、
+    履歴は git）—— 2026-09-11 以前の ADR に `kbb -M:test` と在っても、当日走ったのは JVM である。
+- **`#?(:kototama ...)` / `#?(:clojurewasm ...)` は存在しない reader-conditional。**
+  書くと黙って dead branch になる。
+- **`.cljs` の依存宣言は `nbb.edn` に置く。nbb は `deps.edn` も `bb.edn` も読まない**
+  （repo-wide mandatory、2026-09-09、ADR-2609093000）。coordinate を `deps.edn` にだけ
+  書いた repo は移行できていない —— **壊れていて、しかも全ての道具が成功を報告する**
+  （実測: `DEPS added deps.edn` → `REWROTE 6 files` → JVM suite（当時の `clojure` CLI `-M:test`）緑 →
+  `kbb --backend sci tools/gen-tmlanguage.cljk` が `Could not find namespace`。JVM suite は
+  `deps.edn` を読み `.cljs` を一度も load しないので緑のまま）。
+  ⚠ **`:deps` の座標を解決するとき、nbb は babashka を呼ぶ**（2026-09-10 実測）。
+  `nbb-deps.jar` を `bb ... uberjar` で組むので、**bb が無い機械では cold cache の
+  1 回目が失敗する**。この workspace は bb を script host として退役させており
+  （ADR-2607173000）、GitHub-hosted runner にも入っていない:
+
+  ```
+  bb 有り・cold   exit 0（.nbb/.cache/<hash>/ を 8 ファイル作る）
+  bb 無し・cold   exit 1  /bin/sh: 1: bb: not found
+  bb 無し・warm   exit 0  ← cache さえ在れば bb は要らない
+  ```
+
+  **この机の上では見えない** —— 手元には bb が入っている。実際に音を立てたのは
+  CI で、`kotoba-lang/amu#916` の `server-kind` が 88 秒の success から 15 秒の
+  failure に変わった（cache を「再生成できる scratch」として消した直後）。
+  **`<hash>` は解決済み依存集合に対する hash なので、deps が動くたびに新しい
+  ディレクトリが要る** —— だから `.nbb/` を ignore すると、その日は通って
+  **次の依存更新で CI が壊れる**。
+  実測 2026-09-10: `nbb.edn` に `:deps` を書いた repo は **234 件**（`nbb.edn` を
+  持つ 1,369 件のうち）。その全部が壊れているという意味ではない —— CI で nbb を
+  走らせるか、bb が在るかで決まる。**「cold cache かつ bb 無し」で走る経路が
+  在るかを、repo ごとに測ってから ignore する。**
+
+  **sha も `:paths` も隣の project file から複写する** —— project file が coordinate を
+  名指していなければ sha を選ばずに拒否する。推測した `:paths` は、正しく見えて何も
+  解決しない宣言そのもの。検出は `scripts/verify-nbb-declaration-visible.cljk`
+  （`manifest/orgs-detectors.edn`）で、**数えるのは bare な `nbb <file>` の entry point だけ**
+  （`kbb --backend sci --classpath …` で起動されるファイルは invocation 側で宣言している）。
+- **Kotoba は safe application language**（ADR-2607201300）。`kotoba/pure` /
+  `cell` / `app` / `host` の 4 profile を区別し、新規アプリの product logic・
+  workflow・UI reducer・state machine・actor behavior は capability が実装済みなら
+  `kotoba/app` を第一候補にする。**安全性の境界は purity ではなく ambient authority の
+  排除。** narrow-slice / general-application exclusion（ADR-2607141900 ほか）は
+  superseded であり、active policy として引用しない。
+
+
+## `.kotoba` を書くときは `compile` 経路（amu）を使う（repo-wide mandatory、2026-07-27）
+
+**方向の正本は ADR-2607279200 と `orgs/kotoba-lang/kotoba-lang/docs/kotoba-centered-migration-plan.md`。
+source-surface の唯一の authority は `orgs/kotoba-lang/kotoba-lang/lang/guest-grammar.edn`**
+（`compiler/frontend.cljc` が受理することと authority が認めることは別物）。
+
+- **新規の `.kotoba` は `amu compile` 経路で書く。legacy emitter（`kotoba wasm emit` /
+  `kotoba cljs emit`）を使わない。** legacy の制約（単一ファイル・127 バイト文字列
+  上限・貧弱な型）を「Kotoba 言語の限界」と誤認しない。
+- ⚠ **compiler repo は `kotoba-lang/compiler` から `kotoba-lang/amu` に改名済み**
+  （west entry は撤去済み）。読むのも走らせるのも `orgs/kotoba-lang/amu`。CLI の front は
+  `bin/amu`。native backend は `kotoba-native`、KIR は `kotoba-kir`、restricted-ESM
+  emitter は `kotoba-script`、実行/runtime linking は `kototama` に分かれている
+  （ADR-2608139980 の 綾 分割）—— **amu に無いからといって「無い」と結論しない。**
+- **ブラウザ / Worker の既定 target は `wasm32-browser`**（`bin/amu` はこれを nbb で
+  走らせる = JVM を起こさない）。JVM が現れるのは `cljs-browser` に落ちたときだけ。
+- **capability kit の qualification・admission gate の型集合・stdlib の中身・ADR 番号を
+  この文書に書き写さない。** 正本は
+  `amu/resources/kotoba/lang/capability-kits/*.edn` の `:qualification`、
+  `amu/resources/kotoba/lang/capability-catalog.edn`、`kotoba-kir` の
+  `only-native-word-typed-features?`、`kotoba-lang/lang/stdlib/core.kotoba`。
+  **その場で読む**（読み方は skill）。grep は行の折り返しで静かに切れるので使わない。
+- **「その capability は在るか」と「その backend で動くか」は別々に引く** ——
+  前者は capability-catalog、後者は kit の `:qualification`。
+
+
+## `.kotoba` で「書けない」は 2 種類ある — 恒久と一時を混ぜない（repo-wide mandatory、2026-08-08、ADR-2608650000）
+
+**「`.kotoba` でこれは書けない」と結論する前に、それが恒久の安全設計なのか、
+backend がまだ追いついていないだけなのかを必ず分類してから書く。** 分類を書かなければ
+読み手は全部を恒久だと読み、**backend が追いついた後もその自己制限を守り続ける。**
+
+分類は推測しない。言語側が仕様として持っている:
+`kotoba-lang/kotoba-lang` の `lang/surface-status.edn` の **`:disposition`**
+（`:intentional-security-constraint` / `:intentional-semantic-simplification` /
+`:implemented-partial` / `:not-yet-implemented`）と、`amu` の
+`resources/kotoba/lang/application-language.edn` の **`:backend-qualification :rule`**
+—— *An unavailable backend is an implementation gap, not a reason to remove a specified
+safe language feature.*
+
+- **恒久として引き受けるのは 2 つだけ**: ①**untracked control effect の禁止**
+  （境界で返すのは `[:result T E]`。恒久なのは「追跡されない制御効果」の禁止であって
+  `throw` という語の禁止ではない —— `throw` / `try` は既に admitted で、契約は
+  `lang/abort-ability.edn`）②**bool は数ではなく型**。
+- **eval / interop / defmacro は恒久**（definition CID と静的検査可能性そのものが
+  要求する）。ただし **typed eval は別物** —— CID を名指しする有界な拡張は仕様済み。
+  記法禁止には shielding axis が付いており（adr-2608301500）、**definition CID と
+  grant 交差 dispatch で防げる害には記法禁止を恒久としない。**
+- **それ以外は一時制約として書く。** map / set / closure / HOF / 異種ベクタ /
+  再帰値 / `defrecord` / `defprotocol` / `defmulti` / local `atom` は landed。
+  **「native に無い」は、それ自体では言語の設計判断の証拠にならない** ——
+  backend ごとの現在地は skill のコマンドで**その場で測る**（2026-09-06 に、ここの
+  古い一句「native では無い」が実害を出した。ADR-2609062400）。
+- **一時制約に沿って書いたコードは、その旨と撤去条件をモジュールのヘッダに書く。**
+  書かなければ、後から読む者はそれを恒久の様式として模倣する。
+- **移行の単位は component 全体**（2026-08-30、`kotoba-lang/docs/adr/ADR-q9-whole-component-build-migration.md`）。
+  機械正本は `kotoba-lang/lang/q9-migration.edn` **version 3** で、そこに
+  `:migration-unit :whole-component` と **`:decision-only-slices-allowed false`** が
+  書かれている。`.kotoba` / `.cljk` の deploy 可能な entry 1 本が、閉じた推移
+  source 集合と宣言された public surface を持ち、**置き換える component の
+  public export をすべて実装するか、versioned な API 決定で明示的に外す**。
+  - ⚠ **ここは 2026-09-09 に訂正した。** それまで「単位は `kotoba/app` の
+    vertical slice（1 判断表ではない）」と書き、ADR-2608261100 を引いていた。
+    **その ADR は上の ADR が名指しで supersede している** —— 「function-only or
+    decision-only shadow is **compiler research, not a migration**, and cannot
+    authorize consumer cutover」。訂正は kotoba-lang 側の docs と機械正本には
+    2026-08-30 に入っていたが、**root の ADR は `accepted` のまま、この文書は
+    古い単位を引き続き指していた**（10 日間）。この文書自身が繰り返し警告して
+    いる形 —— 古い規則は破られると音がしないので、そのまま設計を縛る。
+  - **機構が host に在ることは、business component を Clojure に残す理由に
+    ならない。** filesystem / socket / clock / randomness / crypto / process /
+    host handle は **宣言された capability import** として渡る
+    (`:native-functionality-crosses :declared-capability-import`、
+    `:ambient-authority-forbidden true`)。HTTP と database のロジックも
+    移行対象（`:http-and-database-logic-may-migrate true`）。
+  - **compiler が表現できないなら、その移行は `:blocked`。** 小さい述語に
+    削って gate を緑にしない —— *the component is not reduced to a smaller
+    predicate to make the gate green*。欠落は language surface plan に足す。
+  - 現在地は機械正本が持つ（`:current-decision`）。2026-08-30 時点で
+    `:whole-component-wave-1-authorized-in-progress` / 次の一手は
+    **wave-1 の pilot を whole-component build として再 qualify すること**。
+    ⚠ **その値をここに書き写さない** —— 毎日動く。
+
+
+## design system 5 repo は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
+
+`css` / `html` / `shitsuke` / `liquid-glass-ui` / `kotoba-ui` を「`.cljc` のまま維持する層」と
+扱わない。**移行順序は依存順に厳守**（`css` → `html` → `shitsuke` → `liquid-glass-ui` →
+`kotoba-ui`）。逆順・同時並行は依存を壊す。**移行途中のリポジトリを app から直接
+require しない**（skill `kotoba-uiux` の既存ルールが移行完了までそのまま有効）。
+**string-only SSR を最終 API にしない**（ADR-2607279200 Delivery #6）。
+
+
+## kotoba の実行は最終的に JVM/Node/Rust を経由しない（ADR-2607198300、2026-07-19）
+
+配布される実行成果物が JVM/Chicory ホスト・JS エンジンホスト・新規 Rust 実行エンジンの
+いずれにも依存してはならない。**Q9 source migration は build/acceptance も JVM-free**
+（verified native Kotoba CLI と `amu --jvm-free`。`java` / `javac` / `clojure` / `clj` を
+deny/trace し、未対応 target は fallback せず block する）。
+
+- **Rust は書かない**（ADR-2607072000: kotoba-lang 全体で「Rust が必要な実装は全て cljc」）。
+- **許容される非 cljc は「判断を含まない機構 (mechanism) 層」だけ**（ADR-2607241100 D6）。
+  実例 `aiueos`: C はレジスタ / MMIO / GDT / ページング等の機構のみを所有し、判断
+  （署名検証・admission・capability 発行/失効・dispatch 計画）は compiler-emit の
+  `.kotoba` object。**新しい admission / validation 経路を C に足さない。**
+- **ネイティブ AOT backend は既に実在する**（`kotoba-native` の `x86_64.cljc` /
+  `aarch64.cljc`、ホストは amu の `tools/kexe_loader.c`）。**新しいネイティブ実行経路を
+  探す前にこれを確認する（ゼロから設計しない）。**

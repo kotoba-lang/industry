@@ -1,6 +1,6 @@
 ---
 name: kotoba-uiux
-description: Build web / local-app UI in cljc on this workspace's BASE design system, jp-go-dds (デジタル庁デザインシステム), with the shared --hig-* token contract bridged onto it. Also covers the legacy kotoba-ui/liquid-glass stack, which remains only where it has not been migrated. Use whenever you are about to write ANY frontend/UI/page/site code in this monorepo — a new site, a new app screen, a redesign, a landing page, an admin console, or when the user says a design is "いまいち/not refined/ダサい". Read this BEFORE writing the first line of HTML/CSS/hiccup. Also use when reviewing UI code for design-system conformance.
+description: Build web / local-app UI in cljc on this workspace's BASE design system, jp-go-dds (デジタル庁デザインシステム), with the shared --hig-* token contract bridged onto it. Also covers the legacy kotoba-ui/liquid-glass stack, which remains only where it has not been migrated. Use whenever you are about to write ANY frontend/UI/page/site code in this monorepo — a new site, a new app screen, a redesign, a landing page, an admin console, or when the user says a design is "いまいち/not refined/ダサい". Read this BEFORE writing the first line of HTML/CSS/hiccup. Also use when reviewing UI code for design-system conformance. Also the home of the 3D rule (all 3D goes through kami-engine: WebGPU+WGSL first, WebGL 2.0 fallback, no Three.js/Babylon/CSS pseudo-3D, completion = real-browser E2E) — trigger on "3D", "kami-engine", "WebGPU", "WebGL", "Three.js", "viewport". The UI/UX and 3D sections were moved here verbatim from CLAUDE.md on 2026-09-11 (ADR-2609112300).
 ---
 
 # kotoba-uiux — the paved road to refined UI
@@ -447,4 +447,101 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   `orgs/gftdcojp/network-isekai` の `90-docs/coscientist/` と `ADR-0007` 系（同type の
   ADRが `ai-gftd-shinshi`/`ai-gftd-yukkuri`/`ai-gftd-apps-gftdcojp` 等にも複数存在、
   `grep -rl coscientist 90-docs/adr` で一覧できる）を確認し、ゼロから設計しない。**
+
+---
+
+# CLAUDE.md に 2026-09-11 まで残っていた本文（逐語、ADR-2609112300）
+
+以下は CLAUDE.md から**逐語で**移した本文である（2026-09-11、ADR-2609112300。AGENTS.md の
+読み込み上限 31,457 字に合わせて CLAUDE.md を不変条件だけに絞った）。CLAUDE.md 側には
+skill を読まなくても効く規則だけが残っている。ここが理由・実測・罠の正本。
+
+## UI/UX 標準 — 基本 design system は `jp-go-dds`（repo-wide mandatory、2026-08-05）
+
+**web / local app の UI を書き始める前に、Skill ツールで `kotoba-uiux` を呼ぶ。**
+実測・トークン表・component の過不足・legacy スタックの規約・品質計測
+（design-quality-score / co-scientist kaizen loop）はそこが正本。ここに残すのは
+skill を読まなくても効く不変条件だけ。
+
+- **新規 UI の基盤は `kotoba-lang/jp-go-digital-design-system`（DADS）であって
+  liquid-glass ではない**（オーナー判断 2026-08-05）。`jp-go-dds.core` /
+  `jp-go-dds.page` / `jp-go-dds.tokens` を使う。
+- **`--hig-*` トークン契約はそのまま生きる**（`tokens/bridge-css` が DADS primitive の
+  上に再定義する）。**契約で書かれた view / CSS は無改造で追従するので、`dads-*` を
+  触る時以外は DADS primitive ではなく `var(--hig-*)` を書き続ける。**
+  ⚠ **DADS 基盤の app の下に `shitsuke.hig` は居ない** —— bridge に無いトークンは
+  **何にも解決しない**（黙って消える）。足りなければ上流の `hig->dads` に足す。
+  **app CSS で再導出しない**（2 つ目の app が再導出した瞬間に契約は壊れる）。
+  **bridge が今いくつ運ぶかをこの文書に書かない** —— reader で数える（コマンドは skill）。
+- **UI は single-page app で建てる**（repo-wide mandatory、2026-08-08、ADR-2608080100）。
+  **1 文書・1 バンドル・1 mount。** 画面の移動は state の変更であって location の変更
+  ではない。**view は data として持ち、nav をそこから生成する**（dispatch に足して nav に
+  足し忘れた view は「live に見える dead code」になる）。addressability は fragment
+  （hash）が既定で、pushState は server rewrite が実在することを確かめてから。静的
+  ホストには `404.html` を置くが、未知のパス全部を `./` へ rewrite しない（無限
+  リダイレクト）。**「document を読み込んでいない」ことは機械で確かめる** ——
+  ソースからは観測できない。検査は superproject root で:
+
+  ```bash
+  kbb --backend sci scripts/verify-single-page-app.cljk --root . --findings   # 0=clean 1=findings 2=REFUSED
+  ```
+
+  例外は SSR/OG が要る公開ページ（ADR-2606290000）と、生きた credential の隣にある
+  local 面（ADR-2608231200。`kagi ui` は bundle を 1 本も出さない —— **これを
+  「SPA 化し忘れ」として直さない**）。
+- **「見られる」ことは規則の半分**（オーナー指示 2026-08-26）。UI はコンパイルが
+  通った時点では終わっていない —— 人が開ける address が 1 つあって、そこに見えて、
+  初めて終わり。document を 1 枚も出さない app と 2 枚出す app は同じ失敗の裏表。
+- **Svelte / React で UI を著述しない**（repo-wide mandatory、2026-08-26、ADR-2608260900。
+  オーナー指示）。新しい `.svelte` / `.tsx` / `.jsx` を書かない。UI は `.cljc` / `.cljs`、
+  状態は **reagent + re-frame**（`shitsuke.re-frame.core` / `shitsuke.reagent.core` の
+  host seam が既に在る）、見た目は **`jp-go-dds`**。
+  ⚠ **これは `react` / `react-dom` を package.json から剥がす指示ではない** ——
+  reagent / re-frame は React を描画バックエンドに使う。退役するのは**著述面
+  （ソースファイルの拡張子）**であって依存ではない。**依存だけを見て「React repo」と
+  数えない。**
+- **`/design-sync`（claude.ai/design 同期）はこの workspace で実行しない** ——
+  あれは React design system 専用で、ここには React の design system が無く、今後も
+  作らないと決めた。**退役させると決めたスタックを、bridge を書いて固定化しない。**
+- **legacy（kotoba-ui / liquid-glass）は未移行 repo でのみ正。新規 UI をこれで始めない。**
+
+
+## 3D はすべて kami-engine を使う（repo-wide mandatory rule、2026-07-10）
+
+- **この workspace 内の 3D は、用途（modeling / animation / CAD / BIM / sculpt /
+  visualization / game）を問わず、必ず canonical な kami-engine stack を使う。**
+  `kami-app-*` は UI と操作 orchestration を所有し、形状・scene・animation・simulation・
+  picking・render の正本を app 内に複製しない。責任境界の authoritative source は
+  `90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.edn`。
+- **domain / guest** は `kami-engine-*` の portable `.cljc` または `.kotoba` を正本にし、
+  EDN command / scene / render-IR を境界にする。browser の guest 実行は
+  `wasm-webcomponent`（`kotoba wasm emit` の実 WASM）を使う。app 固有の geometry
+  algorithm を生 JavaScript / TypeScript / Rust で並行実装しない。
+- **GPU / viewport** は **WebGPU + WGSL first、WebGL 2.0 + GLSL ES 3.00 fallback**
+  とする。WebGPU は `webgpu`（`kami.webgpu` / `kami.webgpu.mesh`）→
+  `org-w3-webgpu`、WebGL 2.0 は `webgl`（`kami.webgl`）を使い、どちらも同じ
+  canonical EDN render-IR を消費する。WebGL 2.0 は共通描画 subset のfallbackであり、
+  WebGPU固有のcompute/storage機能を擬似実装しない。
+  生 `navigator.gpu` / WebGL context、shader、buffer、pipeline を各 app に複製しない。
+  native でも同じ EDN / WIT contract と canonical wgpu executor を使い、別 renderer を
+  作らない。
+- **UI chrome は `kotoba-lang/html` + `kotoba-lang/css`**（共通 component が必要なら
+  `kotoba-ui` / `uikit` / `appkit`）で構成する。panel、toolbar、menu、timeline、outliner、
+  inspector、shortcut profile は HTML/CSS でよいが、3D viewport の authoritative
+  rendering / hit-test / geometry state は WebGPU または WebGL 2.0 とし、DOM、SVG、CSS 3D、
+  Canvas 2D を使わない。
+  これらは非3D overlay、diagram、thumbnail、明示された degraded fallback に限る。
+- **禁止**: Three.js / Babylon.js 等を app ごとの第2エンジンとして導入すること、CSS
+  transform の疑似3D、静止画だけの「3D tool」、app 内の独自 mesh/scene renderer、
+  screenshot だけを根拠に実装済みとすること。import/export は `org-openusd`、
+  `org-khronos-gltf`、`org-vrmc-vrm` 等の canonical spec repo を通し、独自 codec を
+  app に生やさない。
+- **完了条件**: engine の topology / scene / animation data assertion、WASM guest と
+  host contract の parity、実ブラウザの WebGPU E2E（macOS runner では Metal backend）、
+  WebGL 2.0 fallback E2E、Pages smoke test を通す。WebGPU unavailable 時は capability 判定で
+  WebGL 2.0 に落とし、両方 unavailable の時だけ明示的 degraded state にする。新規 app は
+  少なくとも create/edit/undo-redo/save-export の domain round-trip を実データで証明する。
+- 例外は、対象 repo・期間・理由・代替の authority・撤去条件を記した accepted ADR が
+  ある場合だけ許す。temporary fallback は UI 上とコード上の両方で
+  `non-authoritative` と明示し、恒久実装へ昇格させない。
 

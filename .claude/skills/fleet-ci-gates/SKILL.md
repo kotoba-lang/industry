@@ -225,3 +225,46 @@ landing 前の break/unbreak は手元か stub に対して行われており、
 固定する）に寄せるか、`orgs/` が実在する場所で回す。**入力が無い gate は、
 落ちているのではなく問いを立てられていない。**
 
+---
+
+# CLAUDE.md に 2026-09-11 まで残っていた本文（逐語、ADR-2609112300）
+
+以下は CLAUDE.md から**逐語で**移した本文である（2026-09-11、ADR-2609112300。AGENTS.md の
+読み込み上限 31,457 字に合わせて CLAUDE.md を不変条件だけに絞った）。CLAUDE.md 側には
+skill を読まなくても効く規則だけが残っている。ここが理由・実測・罠の正本。
+
+## CI/CD は murakumo fleet。GitHub Actions を使わない（repo-wide mandatory、2026-08-05、ADR-2607300900）
+
+**オーナー指示（2026-08-05）「github は使わない、murakumo.cloud の cdci, workflow を使う」。**
+このワークスペースの CI/CD の正本は **`scripts/fleet-ci/`（murakumo mac-mini fleet）**であり、
+GitHub Actions ではない。
+
+**gate の書き方・種別・罠・placement・job 配分・Actions の状態と課金の測り方は、
+Skill ツールで `fleet-ci-gates` を呼ぶ。** ここに残すのは skill を読まなくても効く規則だけ。
+
+- **新しい `.github/workflows/*.yml` を書かない。** 検査を足したいなら
+  `scripts/fleet-ci/gates.edn` に 1 行足す（gate 本体は `scripts/fleet-ci/gates/*.cljs`）。
+  「Actions が今は動いているから」は理由にならない —— **止まったのは org 単位**で、
+  動いている org も同じ理由で止まりうる。tree の側は fleet gate
+  `root-no-github-workflows` が保つ。
+- **「この workspace では Actions は動いていない」を前提に手順を選ばない。**
+  状態は `GET /repos/{o}/{r}/actions/permissions` に訊くまで **UNVERIFIED** であって
+  `disabled` ではない（403 も 404 も network error も、無効と同じ形で返ってくる）。
+  workflow ファイルの有無からも推測しない —— `.github/` を 1 ファイルも持たない repo が
+  registered workflow を持つことがある。実測 2026-09-06、`kotoba-lang/amu` は
+  `{"enabled":true}` を返し、13 job が実走し、main は PR + 2 status check を要求していた。
+- **なぜ「動いていない CI」より「無い CI」の方がよいか。** 2026-07-30、課金停止で
+  **job が起動しなくなった** —— 落ちるのではなく走らないので、**repo は green に見えたまま
+  何も検査されていなかった。**
+- **gate は「落ちること」を確かめてから landed とする。** 対象を 1 箇所壊したコピーで
+  exit 1 になり、無改変で exit 0 になることを実際に見る。**落ちない gate は劇場。**
+  対偶も成り立つ —— **一度も緑にならない gate も、誰も行動できないという意味で同じだけ無内容**
+  なので、**「fleet で 1 度緑になる」までは landed としない**（手元で discriminate することと、
+  ノードの配られた tree で discriminate することは別の主張）。
+- **直したら pin も前進させる。** 子リポの main を直しても、west pin が手前にあると
+  gate は古い tip を見続ける。修正 → `advance-pins.cljs` → `verify-west-pins.cljs` までが 1 組。
+- **`manifest/fleet-ci.edn` の fail を見て、いきなり直しにいかない**（ADR-2608102000）。
+  receipt は `test-<gate>-<sha7>-murakumo-<node>` で**その sha 時点の判定**でしかない。
+  現 tip と比べ、ローカル実行の引数順（`<dir>` は**先頭**）と `:include-ext` の絞り込みを
+  当ててから診断する。**「ローカルで赤」は「fleet で赤」ではないし、その逆も成り立たない。**
+
