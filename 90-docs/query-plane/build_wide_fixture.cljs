@@ -21,13 +21,16 @@
             ["fs" :as fs]
             ["path" :as path]))
 
-(defn -main [out-dir leaves]
+(defn -main [out-dir leaves pad]
   (let [n (js/parseInt (or leaves "255") 10)
+        pad (js/parseInt (or pad "0") 10)
+        padding (apply str (repeat pad "x"))
         store (atom {})
         put! (fn [cid bytes] (swap! store assoc cid bytes) cid)
         leaf-cids (mapv (fn [i]
-                          (ipld/put-node! put! {"i" i "kind" "wide-fixture-leaf"
-                                                "note" "ADR-2609109900 Q3e: maxBlocks 256 measurement"}))
+                          (ipld/put-node! put! (cond-> {"i" i "kind" "wide-fixture-leaf"
+                                                        "note" "ADR-2609109900 Q3e: maxBlocks 256 measurement"}
+                                                 (pos? pad) (assoc "pad" padding))))
                         (range n))
         root (ipld/put-node! put! {"kind" "wide-fixture-root"
                                    "leaves" (mapv ipld/link leaf-cids)})
@@ -49,4 +52,4 @@
       (println "index bytes " (- (.-length (:bytes packed)) (:index-offset packed)))
       (println "read-all    " (count (:blocks (v2/read-all (:bytes packed)))) "blocks"))))
 
-(-main (or (first *command-line-args*) "/tmp/wide") (second *command-line-args*))
+(-main (or (first *command-line-args*) "/tmp/wide") (second *command-line-args*) (nth *command-line-args* 2 nil))
