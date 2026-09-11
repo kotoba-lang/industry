@@ -34,8 +34,14 @@
   :control "同じ CID を /ipni/v1/ad/{cid} で引くと 200（652 bytes）。store は持っている"
   :root-cause "kotobase.protocols.ipq/selection の catch が :type ごとの case で、default が (throw e)。docstring は「every failure onto a status that means something different」と言っているが、default 節がそれをしていない"
   :expected "名前付きの refusal（この surface は selector-not-dag-cbor / root-not-held / selector-required を既に持つ）。dag-json を支持するかどうかは別の設計判断"
-  :fixed? false
-  :why-not-fixed "live な共有 surface への変更で、かつ「dag-json を支持する」か「名前を付けて拒否する」かは設計判断。記録して次の一手として出す"}
+  :fixed? true
+  :fixed-on "2026-09-11"
+  :fix "名前を付けて拒否する（②）。io-ipld の get-verified-block が既に :ipld/unsupported-codec を投げており、支持しない判断もその docstring が下していた。IPQ は聞いていなかっただけ"
+  :statuses {:ipld/unsupported-codec 501 :anything-else 500}
+  :landed {:kotobase-protocol-ipq "5a6bbdb6" :net-kotobase-ipfs "80212f0a"
+           :west-pins ["6c85f47e" "b5791039"]}
+  :verified-live "2026-09-11: dag-json root と depth 14/15/16 が 501 codec-not-supported、control は depth 13 -> 200 / bad selector -> 400 / root not held -> 404"
+  :ceiling-unchanged "depth >= 14 は今も traverse できない。変わったのは答え方だけで、Q3 の 9 点の fit はそのまま生きる"}
 
  :q2-digest-runtime
  {:bench "90-docs/query-plane/bench_digest_runtimes.cljs"
