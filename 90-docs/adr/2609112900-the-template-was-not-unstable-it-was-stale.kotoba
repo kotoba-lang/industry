@@ -1,0 +1,89 @@
+(vector
+ (map
+  (:adr/id "adr-2609112900-the-template-was-not-unstable-it-was-stale")
+  (:adr/title "The template was not unstable, it was stale")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112700-a-refusal-scoped-wider-than-its-reason"))
+  (:adr/body "
+## The item
+
+Ranked as the layer-0 bottleneck: the generator's template was not a fixed
+point of its own generator. It had the most downstream, because every
+future block regeneration would keep skipping it.
+
+## The framing was wrong, and the measurement says so
+
+I described it as a structural instability. It is not. gen(gen(x)) = gen(x)
+-- measured by feeding the regenerated component back in as the template
+and getting byte-identical output. The generator is idempotent.
+
+What was actually true is duller and more dangerous: the template was
+STALE. Two fixes had landed and reached all nineteen other repositories,
+and the twentieth -- the one the defective text had come from -- never
+received them, because nothing regenerates the template.
+
+Measured, before and after, on the component compiled to aarch64-macos and
+executed:
+
+    oracle-filters   5,5,5,5,5,5   ->  5,5,0,1,0,5
+    oracle-handlers  sel6 400      ->  sel6 200
+                     sel13 7       ->  sel13 727477728
+
+Those are exactly the two defect signatures repaired across the cohort in
+the two preceding iterations. The template had both.
+
+## Why updating it is safe
+
+Generating com-agones from the old template and from the regenerated one
+produces byte-identical output. The regions that differ between the two
+templates are precisely the blocks the generator rewrites anyway, so the
+template's content there never reaches a downstream repository.
+
+That control had to be run before landing. Without it the change could
+have altered nineteen components through a path nobody was looking at.
+
+## The part that is not a fix
+
+com-abb-robotics has a hand-written harness, and it compares filters and
+handlers with its own literals over its own seeded rows.
+
+Handler selector 6 previously DISAGREED with it -- harness 200, component
+400. It now agrees. The harness was right and the component wrong, and the
+disagreement had been sitting there.
+
+Filter agreement improves from three of six to four of six. Selectors 1
+and 2 still differ, and they are not comparable by construction: the
+harness asks for a name that three of its rows carry, the component asks
+for a value that all five of its rows carry. Different questions over
+different seeds. Reporting that as parity would be false, and aligning
+them means converging the hand-written harness, which is a separate
+decision.
+
+## What stops it recurring
+
+A check, because the one-time regeneration fixes today and not the next
+time a block is added -- which is exactly how this happened.
+
+    nbb scripts/verify-template-fixed-point.cljs <com-abb-robotics checkout>
+
+    stale template   exit 1  STALE, first differing line and both lengths
+    regenerated      exit 0  FIXED-POINT
+    no argument      exit 2  REFUSED
+
+All three exercised. It reports the FIRST differing line rather than a
+count of positionally-unequal lines: that count reads as a magnitude and
+is an artefact of the comparison, measuring 89 here for a diff that was 23
+added and 7 removed. It regenerates into a copy, because a check that
+mutates its subject cannot be run twice.
+
+## What this changes about the ordering
+
+The reverse-topological ordering put this first on the strength of its
+downstream edges. That was right, but for a different reason than I gave:
+not because the template was structurally unstable, but because it was the
+one node nothing regenerates, so every fix flowing through it stops there.
+
+The edge that matters is not template -> instability. It is
+template -> nothing regenerates it.
+")))
