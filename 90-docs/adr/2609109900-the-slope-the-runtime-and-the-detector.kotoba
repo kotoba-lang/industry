@@ -8,9 +8,10 @@
   (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotobase-protocol-ipq"
                 "kotoba-lang/io-ipld" "kotoba-lang/ayatori" "net-kotobase/ipfs"))
-  (:adr/landed (map (:io-ipld "9bf07ce7") (:kotobase-protocol-ipq "08e0021d")
+  (:adr/landed (map (:io-ipld "9bf07ce7") (:kotobase-protocol-ipq "fc276320")
                     (:net-kotobase-ipfs "23046cad")
-                    (:west-pins (vector "5eb33947" "795fb7b2" "68d3ecd1" "80072736"))))
+                    (:west-pins (vector "5eb33947" "795fb7b2" "68d3ecd1" "80072736" "124bf516"))
+                    (:loader "scripts/cljk-classpath.cljs")))
   (:adr/related (vector "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
                 "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
                 "adr-2608160100-block-car-pack-object"
@@ -370,9 +371,66 @@ pack 経由でしか実用的に届かない。** per-block 経路で 256 を許
 **どちらを採るかは Q3d の「pack を誰がいつ書くか」と同じ 1 つの決定**なので、
 ここでは選ばない。選ばずに置いておくことの代償は測った: 46 秒。
 
+## Q3f —— whole read は pack の大きさに依らない（4 MiB まで）。ただしその外が pack の住む場所
+
+Q3d の「range read は未測定」を測った。同じ 256 block の形で leaf の payload を変え、
+pack を 51 KB / 314 KB / 1.1 MB / 3.2 MB にして、それぞれ 1 block の matcher（pack の
+最悪: 全部読んで 1 block 使う）と 256 block の全走査を HEAD と GET で:
+
+    pack     selector          p50    io-ms      (HEAD は body 無し = Worker 側の時間)
+    51 KB    matcher GET       206      111
+    3.2 MB   matcher GET       194      122   <- 63 倍の bytes で io は +11 ms
+    3.2 MB   all 256 HEAD      864      124   <- Worker CPU（256 block の hash + CAR encode）≈ 740 ms
+    3.2 MB   all 256 GET      6776      126   <- 残りは client への 3.2 MB download（load 165 の client）
+
+**R2 の 1 read は 39 KB でも 3.2 MB でも約 120 ms** —— 予算内では whole read の代価は
+ゼロに近く、3 round trip（header / index / frame）の range reader はどのサイズでも
+それより遅い。**だから ≤ 4 MiB では range read を作らない**、が Q3f の答え。
+
+⚠ **ただし 4 MiB は traversal が読んでよい量の上限であって、pack の大きさの上限では
+ない**（オーナー指摘 2026-09-11）。compaction は個別に link された block の identity を
+動かさず location だけを束ね直す操作で、data lake の常として pack は 50〜512 MB に
+育つ。その大きさでは whole read は「遅い」ではなく**不可能**（Worker のメモリ 128 MB、
+hash 約 230 µs/KB）。そこで要るのは Parquet の footer と同じ形 ——
+**catalog（datom 面）か tail の index を先に取り、必要 frame を coalesce した 1 range で
+読む** —— で、round trip は pack の大きさに依らず 2。**その regime は未測定**で、
+上の結論は「小さい pack では whole read で足りる」に縮めて読む。
+
+## Q3g —— 2 つ目の上限を実装した。そして rename が main を壊した
+
+`kotobase-protocol-ipq` `fc276320`: `unpacked-limits`（max-blocks 32）、handler は
+`(get ctx :limits limits)` を読み、descriptor は `maxBlocksWithoutPack` を広告する。
+4 tests、両方向（ctx 読みを外すと refusal の test だけが赤）。
+
+⚠ **着地の途中で、別 session（同じ owner identity）が `.cljc/.cljs` を `.cljk` に一括
+rename していた** —— ipq / io-ipld / io-ipld-car / datalog / ayatori。引用する ADR
+`adr-2609111500-cljk-rename-all-clojure-source` は root main に無く、**renamed main は
+repo 自身の runner で `Could not find namespace`**（nbb は `[.cljs .cljc .clj]` を固定で
+探し、JVM も shadow も `.cljk` を見ない）。west pin は全部 rename 前だったので本番は無事。
+
+**オーナー判断 2026-09-11: (b) rename が正。** したがって loader を作った ——
+`scripts/cljk-classpath.cljs`。各 repo の `cljk-origin.edn`（rename が記録した元の
+拡張子）を読み、classpath の entry ごとに **repo の外**（`~/.cache/cljk-mirror/<sha1>/`）に
+元の拡張子で symlink を張り、差し替えた classpath を返す。repo の中には何も書かない
+（rename が拒否した「compatibility mirror の commit」とは別物）。
+実測: renamed ipq main が nbb 20/112、JVM 20/112 で緑。控え: unreadable な
+`cljk-origin.edn` は exit 2 REFUSED、記録の無い entry は素通し。
+⚠ **JVM runner は `-d <mirror>` が要る** —— 無いと `Ran 0 tests, 0 failures`（何も見つけず
+緑）。kondo も同じ形で `0 errors in 7ms`。両方とも踏んでから書いた。
+
+**shadow-cljs は覆えない。** deps.edn から自分で classpath を組み、差し替える hook が
+無い。**renamed な git library に依存する Worker は、今は build できない** ——
+`net-kotobase/ipfs` が ipq `fc276320` を pin した瞬間にそうなる。塞ぐ形は
+「build 前に classpath を解決 → mirror → `:source-paths` を生成した shadow-cljs.edn を
+書く」（io-ipld の `gen-shadow-cljs-edn.cljs` と同じ手）で、**未着手**。
+
 ## 測っていないこと（clean ではなく未測定）
 
 - ~~maxBlocks 256 が実際に完走するか~~ —— **完走する。36 秒。上の Q3e。**
+- **50 MB 超の pack に対する range read**（Q3f の外側）。100 MB の pack、header → tail index →
+  coalesced range の reader、round trip 数。**これが compaction 後の実 regime。**
+- **shadow-cljs で renamed git dep を build する経路**（Q3g）。Worker の range reader は
+  これが無いと着地できない。
 - **range read（index 経由の部分読み）の価格。** whole read で上限を測った。部分読みは
   pack が大きく traversal が小さいときに効く形で、`v2/locate` は在るが reader が無い。
 - **pack を誰がいつ書くか。** 運用も catalog も決めていない。

@@ -117,6 +117,34 @@
   :extrapolation-was "28 s; measured 36.3 s p50 / 46.0 s p90 -- optimistic by 30%"
   :decision-not-taken "per-block 経路に別の実効上限を切るか、pack の書き手を決めて 256 を pack 前提にするか。Q3d の『誰が pack を書くか』と同じ 1 つの決定"}
 
+ :q3f-pack-size
+ {:measured "2026-09-11" :bench "90-docs/query-plane/bench_ipq_pack_size.cljs" :reps 5
+  :client-loadavg-range [159.62 165.12]
+  :packs [{:label "51 KB" :bytes 50717} {:label "314 KB" :bytes 313877} {:label "1.1 MB" :bytes 1097237} {:label "3.2 MB" :bytes 3186197}]
+  :rows [{:pack "51 KB" :sel "matcher GET" :p50 206 :io-ms 111} {:pack "51 KB" :sel "all 256 HEAD" :p50 263 :io-ms 108} {:pack "51 KB" :sel "all 256 GET" :p50 240 :io-ms 105}
+         {:pack "314 KB" :sel "matcher GET" :p50 150 :io-ms 103} {:pack "314 KB" :sel "all 256 HEAD" :p50 285 :io-ms 104} {:pack "314 KB" :sel "all 256 GET" :p50 693 :io-ms 106}
+         {:pack "1.1 MB" :sel "matcher GET" :p50 201 :io-ms 119} {:pack "1.1 MB" :sel "all 256 HEAD" :p50 470 :io-ms 108} {:pack "1.1 MB" :sel "all 256 GET" :p50 1796 :io-ms 110}
+         {:pack "3.2 MB" :sel "matcher GET" :p50 194 :io-ms 122} {:pack "3.2 MB" :sel "all 256 HEAD" :p50 864 :io-ms 124} {:pack "3.2 MB" :sel "all 256 GET" :p50 6776 :io-ms 126}]
+  :finding "R2 の whole read は 39 KB でも 3.2 MB でも io 約 120 ms。予算内で range reader（3 RT）は常に遅い。HEAD - io = Worker CPU（3.2 MB で約 740 ms）、GET - HEAD = client download"
+  :scope "≤ 4 MiB（traversal の byte 予算）。pack の大きさの上限ではない —— compaction 後の 50〜512 MB は未測定で、そこでは whole read は不可能"}
+
+ :q3g-unpacked-ceiling-and-the-rename
+ {:landed {:kotobase-protocol-ipq "fc276320" :west-pin "124bf516"}
+  :unpacked-limits {:max-blocks 32 :advertised-as "maxBlocksWithoutPack"}
+  :tests {:count 24 :assertions 122 :control "ctx 読みを外すと refusal の test だけ赤"}
+  :rename {:by "another session, same owner identity, 2026-09-11 11:08"
+           :repos ["kotobase-protocol-ipq" "io-ipld" "io-ipld-car" "datalog" "ayatori"]
+           :cited-adr "adr-2609111500-cljk-rename-all-clojure-source" :cited-adr-on-root-main false
+           :renamed-main-loads {:nbb false :jvm false :shadow false}
+           :west-pins-affected false
+           :owner-decision "(b) rename is authoritative"}
+  :loader {:script "scripts/cljk-classpath.cljs"
+           :mechanism "cljk-origin.edn -> symlink mirror outside the repo (~/.cache/cljk-mirror/<sha1>/) -> substituted classpath"
+           :verified {:nbb "20/112 on renamed main, 24/122 with the change" :jvm "24/122 with -d <mirror>"}
+           :controls {:unreadable-origin "exit 2 REFUSED" :no-origin "entry passed through unchanged"}
+           :traps-measured ["JVM runner without -d: Ran 0 tests, 0 failures" "clj-kondo: 0 errors in 7ms over directories it read nothing from"]
+           :not-covered "shadow-cljs (no classpath hook) -- a Worker depending on a renamed git lib cannot build"}}
+
  :q2-digest-runtime
  {:bench "90-docs/query-plane/bench_digest_runtimes.cljs"
   :harness "90-docs/query-plane/digest-runtime/ （shadow-cljs :target :esm。out/ と node_modules は生成物）"
