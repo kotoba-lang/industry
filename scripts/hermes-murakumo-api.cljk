@@ -309,15 +309,28 @@
 ;; call restarts the 20-25 min cold start from zero. Through hermes the
 ;; model could never become warm.
 ;;
-;; The lever hermes actually reads is the env var, and a profile's `.env`
-;; is loaded with override=True before the agent starts
-;; (hermes_cli/env_loader.py `load_hermes_dotenv`; `os.getenv` in
-;; utils.env_float). So the override carries `:env`, rendered into
-;; `<profile>/.env` by --apply and checked by --verify. HERMES_STREAM_READ_
-;; TIMEOUT needs no entry: at its 120 s default hermes raises the socket
-;; read timeout to the stale value (`_stream_timeouts`). The YAML keys are
-;; still written -- they are the declared intent and the day hermes reads
-;; them they take over -- but they are not what holds the connection.
+;; Two levers hermes actually reads, both rendered from the override:
+;;
+;; 1. `providers.custom.models.<model>.{stale_timeout_seconds,timeout_seconds}`
+;;    -- the lookup is keyed by the runtime id, so a `custom:` entry is where
+;;    per-MODEL values are found. Written into EVERY config
+;;    (`custom-models-block`), so `/model <override model>` inside any other
+;;    profile holds too, and that profile's murakumo-main budget is untouched.
+;;    Found after the .env fix: the owner switched models inside `itonami`
+;;    (15:06) and fell back at 180 s again -- the profile-scoped .env could
+;;    not reach that session.
+;; 2. `HERMES_STREAM_STALE_TIMEOUT` in `<profile>/.env`, loaded with
+;;    override=True before the agent starts (hermes_cli/env_loader.py;
+;;    `os.getenv` in utils.env_float). Profile-wide, so only the override
+;;    profile carries it (`:env`). Proven against a real cold start first;
+;;    kept as the floor for that profile. When both are present the config
+;;    value wins (`cfg if cfg is not None`).
+;;
+;; HERMES_STREAM_READ_TIMEOUT needs no entry: at its 120 s default hermes
+;; raises the socket read timeout to the stale value (`_stream_timeouts`).
+;; The `providers.murakumo.*` keys are still written -- they are the
+;; declared intent and the day hermes reads them they take over -- but they
+;; are not what holds the connection.
 (def profile-overrides
   {"glm53-cyber" {:model "glm-5.3-flash-cybersecurity-w4a16"
                   :context-length 131072
@@ -502,6 +515,28 @@
        indent "  X-OpenRouter-Title: \"Itonami By KotobaLabs\"\n"
        indent "  X-Title: \"Itonami By KotobaLabs\""))
 
+(defn custom-models-block
+  "`providers.custom.models.<model>` timeouts for every override model, in
+  EVERY config. Hermes looks timeouts up by the RUNTIME provider id, which
+  is the literal \"custom\" for any named provider (see profile-overrides),
+  so this is the one place a per-MODEL timeout is read from -- and it is
+  what makes `/model glm-5.3-flash-cybersecurity-w4a16` inside any other
+  profile (measured: `itonami`, 2026-09-11 15:06, fell back at 180 s) hold
+  through a cold start without touching that profile's murakumo-main
+  budget. The entry has no base_url, so hermes's provider scan skips it
+  (`_match_new_style_provider`: `if not base_url: continue`) and nothing
+  routes through it. Measured: get_provider_stale_timeout(\"custom\", m)
+  reads 2400 for the override model and None for murakumo-main."
+  []
+  (when (seq profile-overrides)
+    (str "\n  custom:\n"
+         "    models:\n"
+         (str/join "\n"
+                   (for [[_ o] (sort-by key profile-overrides)]
+                     (str "      " (:model o) ":\n"
+                          "        stale_timeout_seconds: " (:stale-timeout o) "\n"
+                          "        timeout_seconds: " (:request-timeout o)))))))
+
 (defn render-owned
   "The blocks this script owns, rendered from `contract`.
 
@@ -546,7 +581,8 @@
                    "    api_mode: chat_completions\n"
                    "    key_env: OPENROUTER_API_KEY\n"
                    "    stale_timeout_seconds: " stale-timeout "\n"
-                   (headers-block "    "))))
+                   (headers-block "    ")))
+            (custom-models-block))
        ;; Side jobs -- compression, titles, triage. Left unpinned they ride
        ;; the main provider; pinned at a head that reports is_ready false
        ;; (24 profiles were) every session emits an auxiliary failure line
@@ -1020,6 +1056,18 @@
                           :envs [{:profile "glm53-cyber" :want {"HERMES_STREAM_STALE_TIMEOUT" "2400"}
                                   :have {"HERMES_STREAM_STALE_TIMEOUT" "2400"}}]})]
       (is "env/findings-clean" (count f) 0))
+
+    ;; the per-model timeout lives under providers.custom.models in EVERY
+    ;; config, root and profile alike, and names only override models
+    (doseq [[label out] [["profile" (rewrite-yaml "model:\n  default: old\n" false)]
+                         ["root" (rewrite-yaml "model:\n  default: old\n" true)]]]
+      (is (str "custom-models/" label "-present")
+          (str/includes? out "  custom:\n    models:\n      glm-5.3-flash-cybersecurity-w4a16:\n        stale_timeout_seconds: 2400\n        timeout_seconds: 2400")
+          true)
+      (is (str "custom-models/" label "-not-main") (str/includes? out "      murakumo-main:\n") false)
+      ;; no base_url: hermes's provider scan must skip it, never route through it
+      (is (str "custom-models/" label "-no-base-url")
+          (re-find #"  custom:\n(?:    .*\n)*?    base_url" out) nil))
 
     (is "override/absent-is-contract" (contract-for "amu") contract)
     (is "override/absent-renders-same"
