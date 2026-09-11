@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Regenerate the GENERATED markdown blocks in README.md, docs/engineering.md
 ;; and docs/isic-coverage.md from resources/kotoba/industry/registry.edn, so
 ;; those docs cannot silently drift from the data file the way the old
@@ -6,7 +6,7 @@
 ;; hand-typed counts did (see 90-docs/adr ... industry-registry-cleanup, and
 ;; docs/cloud-itonami.md's own note about a prior stale-count incident).
 ;;
-;; Usage: nbb scripts/gen-industry-docs.cljk [--check]
+;; Usage: kbb --backend sci scripts/gen-industry-docs.cljk [--check]
 ;;   (no args)  -- rewrite the GENERATED blocks in place
 ;;   --check    -- exit non-zero if regenerating would change any file
 ;;                 (does not write)
@@ -21,7 +21,7 @@
             ["node:fs" :as fs]
             ["node:path" :as path]))
 
-;; Run from the repo root: `nbb scripts/gen-industry-docs.cljk [--check]`.
+;; Run from the repo root: `kbb --backend sci scripts/gen-industry-docs.cljk [--check]`.
 (defn rp [rel] (path/join "." rel))
 
 (def registry-path (rp "resources/kotoba/industry/registry.edn"))
@@ -99,7 +99,7 @@
          "\n" new-body "\n"
          (subs content end-idx))))
 
-(def readme-begin "<!-- BEGIN GENERATED ISIC BLUEPRINTS (nbb scripts/gen-industry-docs.cljk) -->")
+(def readme-begin "<!-- BEGIN GENERATED ISIC BLUEPRINTS (kbb --backend sci scripts/gen-industry-docs.cljk) -->")
 (def readme-end "<!-- END GENERATED ISIC BLUEPRINTS -->")
 
 (def readme-body
@@ -107,7 +107,7 @@
    "\nA curated highlight set (community/open-business reference blueprints, "
    "plus every implemented engineering/heavy-industry/mining ISIC entry). "
    "This block is generated from `resources/kotoba/industry/registry.edn` -- "
-   "do not hand-edit it, run `nbb scripts/gen-industry-docs.cljk` instead. "
+   "do not hand-edit it, run `kbb --backend sci scripts/gen-industry-docs.cljk` instead. "
    "The full list of all " (count implemented) " `:implemented` entries lives "
    "in [`docs/isic-coverage.md`](docs/isic-coverage.md).\n\n"
    "### Community / open-business reference blueprints\n\n"
@@ -120,13 +120,13 @@
    " implemented codes:\n\n"
    (table (map implemented-row engineering-implemented) ["ISIC" "Business" "business-id"])))
 
-(def engineering-begin "<!-- BEGIN GENERATED ENGINEERING COVERAGE (nbb scripts/gen-industry-docs.cljk) -->")
+(def engineering-begin "<!-- BEGIN GENERATED ENGINEERING COVERAGE (kbb --backend sci scripts/gen-industry-docs.cljk) -->")
 (def engineering-end "<!-- END GENERATED ENGINEERING COVERAGE -->")
 
 (def engineering-body
   (str
    "\nGenerated from `resources/kotoba/industry/registry.edn` -- do not "
-   "hand-edit, run `nbb scripts/gen-industry-docs.cljk`. All "
+   "hand-edit, run `kbb --backend sci scripts/gen-industry-docs.cljk`. All "
    (count engineering-implemented)
    " `:implemented` ISIC entries across mining/extraction (divisions 05-09) "
    "and basic metals through industrial repair/installation "
@@ -137,7 +137,7 @@
   (str
    "# ISIC Coverage (generated)\n\n"
    "**Generated from `resources/kotoba/industry/registry.edn` by "
-   "`nbb scripts/gen-industry-docs.cljk`. Do not hand-edit -- rerun the "
+   "`kbb --backend sci scripts/gen-industry-docs.cljk`. Do not hand-edit -- rerun the "
    "script after the registry changes.**\n\n"
    "## Summary\n\n"
    "| tier | count |\n|---|---|\n"

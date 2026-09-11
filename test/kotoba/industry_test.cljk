@@ -900,7 +900,7 @@
       ;; agents' individual landings); corrected to the actual final total: 181.
       ;; A second Wave-3 batch of 18 fresh-scaffold agriculture/forestry/
       ;; fishing/mining/food agents landed the same day; a post-hoc audit
-      ;; (real `clojure -M:test` runs, not agents' self-reports) found 11 of
+      ;; (real `kbb -M:test` runs, not agents' self-reports) found 11 of
       ;; the 18 were broken (missing src modules, JVM-only interop bugs,
       ;; real test failures, or unlanded registry commits) despite claiming
       ;; green -- reverted those 11 back to :spec with reasons recorded on
@@ -1100,7 +1100,7 @@
       ;; meat-processing template, and `governor.cljc` read a
       ;; `:storage-time-max-days` key those meat-domain jurisdictions
       ;; never had, throwing a NullPointerException on a real
-      ;; `:log-production-batch` proposal (baseline `clojure -M:test`:
+      ;; `:log-production-batch` proposal (baseline `kbb -M:test`:
       ;; 28 tests / 106 assertions / 4 failures / 2 errors). Rebuilt
       ;; `facts`/`store`/`advisor` with real canned/frozen/dried
       ;; fruit-and-vegetable domain content (FDA/EFSA/MHLW jurisdictions,
@@ -1278,7 +1278,7 @@
       ;; against a fresh clone. Fresh from-scratch scaffold (no prior
       ;; repo existed; the entry's old :repo/:business-id pointed at a
       ;; never-created gftdcojp/cloud-itonami-C1074 placeholder).
-      ;; Live-recomputed via a fresh `clojure -M:test` run against a
+      ;; Live-recomputed via a fresh `kbb -M:test` run against a
       ;; freshly re-fetched origin/main immediately before this edit
       ;; (concurrent-agent count-drift caution -- the pre-edit run
       ;; against this same fresh clone showed 215, i.e. another
@@ -1333,7 +1333,7 @@
       ;; re-verified against a fresh clone. Fresh from-scratch scaffold
       ;; (no prior repo existed; the entry's old :repo/:business-id
       ;; pointed at a never-created gftdcojp/cloud-itonami-C1701
-      ;; placeholder). Live-recomputed via a fresh `clojure -M:test` run
+      ;; placeholder). Live-recomputed via a fresh `kbb -M:test` run
       ;; against a freshly re-fetched origin/main immediately before this
       ;; edit (concurrent-agent count-drift caution -- not an assumed
       ;; fixed number): 217 -> 218.
@@ -1432,7 +1432,7 @@
       ;; `kotoba.industry/maturity-of` resolves via its `:implemented?`/
       ;; `:repo` fallback (see that fn's docstring). Restored to the
       ;; correct 224, re-verified live against this exact registry.edn
-      ;; via a fresh `clojure -M:test` run (see this repo's commit
+      ;; via a fresh `kbb -M:test` run (see this repo's commit
       ;; history around 2026-07-15 for the isic-3100/isic-2220
       ;; promotions this count reflects).
             ;; CORRECTIVE FIX: a prior automated edit here mistakenly matched
@@ -2053,7 +2053,7 @@
       ;; immediately via a second exact-block restore commit (2593's own
       ;; :implemented status, and this file's own `cloud-itonami-isic-
       ;; 2593` testing block above, are unaffected). Re-verified via a
-      ;; direct `clojure -M -e "(println
+      ;; direct `kbb -M -e "(println
       ;; (kotoba.industry/maturity-summary))"` call on a freshly
       ;; re-fetched origin/main tip immediately before this catch-up
       ;; edit, not assumed: still 283.
@@ -3346,7 +3346,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   fully portable .cljc with no JVM-only interop anywhere in src/
   (mock-only advisor); 58 tests / 170 assertions green (clojure
   -M:test), independently re-verified against a fresh clone; clj-kondo
-  0 errors / 0 warnings; clojure -M:run (stallops.sim demo) walked all
+  0 errors / 0 warnings; kbb -M:run (stallops.sim demo) walked all
   scenarios (phase-1 approval-gated commit, phase-3 auto-commit,
   always-escalating quality-concern flag, always-escalating over-
   threshold supply order, and all 5 HARD-hold scenarios: unregistered
@@ -3410,7 +3410,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   langgraph-clj StateGraph (intake->advise->govern->decide->commit|
   hold|request-approval) with interrupt-before #{:request-approval};
   fully portable .cljc with no JVM-only interop; 56 tests / 166
-  assertions green (clojure -M:test), independently re-verified
+  assertions green (kbb -M:test), independently re-verified
   against a fresh clone; clj-kondo 0 errors / 0 warnings; superproject
   ADR-2700004751 (com-junkawasaki/root,
   90-docs/adr/2700004751-cloud-itonami-isic-4751-textile-retail-coverage.md/.edn))
@@ -3496,7 +3496,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   escalates; real langgraph-clj StateGraph (intake->advise->govern->
   decide->commit|hold|request-approval) with interrupt-before
   #{:request-approval}; fully portable .cljc with no JVM-only interop;
-  47 tests / 133 assertions green (clojure -M:test), independently
+  47 tests / 133 assertions green (kbb -M:test), independently
   re-verified against a fresh clone; clj-kondo 0 errors / 0 warnings;
   superproject ADR-2691004723 (com-junkawasaki/root,
   90-docs/adr/2691004723-cloud-itonami-isic-4723-tobacco-retail-coverage.md/.edn))
@@ -3705,7 +3705,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   commit|hold|request-approval) with interrupt-before
   #{:request-approval} for human-in-the-loop resume, not a stub; fully
   portable .cljc with no JVM-only interop anywhere in src/ (mock-only
-  advisor); 56 tests / 166 assertions green (clojure -M:test),
+  advisor); 56 tests / 166 assertions green (kbb -M:test),
   independently re-verified against a fresh clone; clj-kondo 0 errors /
   0 warnings; registry.edn's own \"4752\" -> :implemented change
   (:name de-truncated, :repo/:business-id de-placeholdered from the
@@ -3774,7 +3774,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   (intake->advise->govern->decide->commit|hold|request-approval) with
   interrupt-before #{:request-approval} for human-in-the-loop resume, not
   a stub; fully portable .cljc with no JVM-only interop anywhere in src/
-  (mock-only advisor); 56 tests / 166 assertions green (clojure -M:test),
+  (mock-only advisor); 56 tests / 166 assertions green (kbb -M:test),
   independently re-verified against a fresh clone; clj-kondo 0 errors / 0
   warnings; registry.edn's own \"4763\" -> :implemented change (:repo/
   :business-id de-placeholdered from gftdcojp/cloud-itonami-G4763 ->
@@ -3846,9 +3846,9 @@ clone; superproject ADR-2628000000) is also :implemented"
   (intake->advise->govern->decide->commit|hold|request-approval) with
   interrupt-before #{:request-approval}; fully portable .cljc with no
   JVM-only interop anywhere in src/ (mock-only advisor); 56 tests / 166
-  assertions green (clojure -M:test), independently re-verified
+  assertions green (kbb -M:test), independently re-verified
   against a fresh clone; clj-kondo 0 errors / 0 warnings;
-  clojure -M:run (toygameops.sim demo) walked all scenarios (phase-1
+  kbb -M:run (toygameops.sim demo) walked all scenarios (phase-1
   approval-gated commit, phase-3 auto-commit, always-escalating
   safety-concern flag, always-escalating over-threshold supply order,
   and all HARD-hold scenarios: unregistered store, unverified store,
@@ -3925,7 +3925,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   escalates; real langgraph-clj StateGraph
   (intake->advise->govern->decide->commit|hold|request-approval) with
   interrupt-before #{:request-approval}; fully portable .cljc with no
-  JVM-only interop; 58 tests / 170 assertions green (clojure -M:test),
+  JVM-only interop; 58 tests / 170 assertions green (kbb -M:test),
   independently re-verified against a fresh clone; clj-kondo 0 errors /
   0 warnings; registry.edn's own \"4761\" -> :implemented change (:name
   de-truncated, :repo/:business-id de-placeholdered from
@@ -4094,7 +4094,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   fully portable .cljc with no JVM-only interop anywhere in src/
   (mock-only advisor); 58 tests / 170 assertions green (clojure
   -M:test), independently re-verified against a fresh clone; clj-kondo
-  0 errors / 0 warnings; clojure -M:run (apparelops.sim demo) walked all
+  0 errors / 0 warnings; kbb -M:run (apparelops.sim demo) walked all
   scenarios (phase-1 approval-gated commit, phase-3 auto-commit,
   always-escalating quality-concern flag, always-escalating over-
   threshold supply order, and all 5 HARD-hold scenarios: unregistered
@@ -4190,7 +4190,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   commit|hold|request-approval) with interrupt-before
   #{:request-approval} for human-in-the-loop resume, not a stub; fully
   portable .cljc with no JVM-only interop anywhere in src/ (mock-only
-  advisor); 56 tests / 166 assertions green (clojure -M:test),
+  advisor); 56 tests / 166 assertions green (kbb -M:test),
   independently re-verified against a fresh clone; clj-kondo 0 errors /
   0 warnings; registry.edn's own \"4759\" -> :implemented change
   (:name de-truncated, :repo/:business-id de-placeholdered from the
@@ -4734,7 +4734,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   not a stub; fully portable .cljc with no JVM-only interop anywhere in
   src/ (mock-only advisor); 56 tests / 166 assertions green
   (clojure -M:test), independently re-verified against a fresh clone;
-  clj-kondo 0 errors / 0 warnings; clojure -M:run
+  clj-kondo 0 errors / 0 warnings; kbb -M:run
   (industrialcleaningops.sim demo) walked all scenarios without error;
   registry.edn's own \"8129\" -> :implemented change (:repo/:business-id
   de-placeholdered from the stale gftdcojp/cloud-itonami-N8129 target to
@@ -4836,7 +4836,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   not a stub; fully portable .cljc with no JVM-only interop anywhere in
   src/ (mock-only advisor); 62 tests / 186 assertions green (clojure
   -M:test), independently re-verified against a fresh clone; clj-kondo
-  0 errors / 0 warnings; clojure -M:run (postalops.sim demo) walked all
+  0 errors / 0 warnings; kbb -M:run (postalops.sim demo) walked all
   scenarios (phase-1 approval-gated commit, phase-3 auto-commit for the
   three non-security-flag/low-cost ops, always-escalating
   security-concern flag, always-escalating over-threshold facility
@@ -4953,7 +4953,7 @@ clone; superproject ADR-2628000000) is also :implemented"
   not a stub; fully portable .cljc with no JVM-only interop anywhere in
   src/ (mock-only advisor); 56 tests / 166 assertions green (clojure
   -M:test), independently re-verified against a fresh clone; clj-kondo
-  0 errors / 0 warnings; clojure -M:run (eventops.sim demo) walked all
+  0 errors / 0 warnings; kbb -M:run (eventops.sim demo) walked all
   scenarios (phase-1 approval-gated commit, phase-3 auto-commit for the
   three non-safety/low-cost ops, always-escalating safety-concern flag,
   always-escalating over-threshold vendor order, and five HARD-hold

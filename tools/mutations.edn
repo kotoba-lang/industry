@@ -16,7 +16,7 @@
 ;; no mutations here, so a clean run of this table means "the portability
 ;; invariants are measured" and NOT "this library is measured".
 ;;
-;; ⚠ These mutations drive `clojure -M:test`. The `:cljs` half is exercised
+;; ⚠ These mutations drive `kbb -M:test`. The `:cljs` half is exercised
 ;; by `test/run_portable.cljk`, which this harness does not run — a mutation
 ;; that broke only a `:cljs` branch would survive here. Both were run by
 ;; hand; see the conversion commit message for the counts.
@@ -76,7 +76,7 @@
  ;; ⚠ RETARGETED, with the reason. The first form of this mutation replaced
  ;; `embedded/registry-data` with `{}`. It is caught — run by hand it gives
  ;; `Ran 50 tests containing 519 assertions. 434 failures` — but the HARNESS
- ;; cannot score it: `tools/mutate.cljk` runs `clojure -M:test` under Node's
+ ;; cannot score it: `tools/mutate.cljk` runs `kbb -M:test` under Node's
  ;; `execSync`, whose default `maxBuffer` is 1 MB, and 434 clojure.test
  ;; failure reports exceed that. Node then kills the child with SIGTERM, and
  ;; the harness — correctly, given what it can see — treats a signalled child
