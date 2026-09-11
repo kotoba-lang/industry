@@ -69,7 +69,7 @@ require するのはレイヤ違反 + studio bundle の不要な肥大になる�
   0..1 にちょうど収まり、内枠の外(裁ち落とし方向)に描いたコマは 0..1 を
   はみ出した値で保存される(viewer 側はそのまま overflow 描画 = bleed の
   視覚言語と一致)。
-- 検証: kami-genko `clojure -M:test` 32 tests / 221 assertions /
+- 検証: kami-genko `kbb -M:test` 32 tests / 221 assertions /
   0 failures(alias 後方互換含む)。app-aozora は
   yoro-ui.studio.genko-tx-test 10 tests / 74 assertions / 0 failures
   (nbb 実行)。⚠ app-aozora のフルスイート `npm test` は本変更と無関係に

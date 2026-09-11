@@ -32,8 +32,8 @@ HTTP 200 を返すので、認証が通ったことは口座の同定になら�
 #### この受信箱の読み方（web UI は無い。API 専用・読み取り専用）
 
 ```bash
-nbb scripts/telnyx-agent-signup.cljk inbox-list
-nbb scripts/telnyx-agent-signup.cljk inbox-read '<message-id>'   # 角括弧ごと渡す
+kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-list
+kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-read '<message-id>'   # 角括弧ごと渡す
 ```
 
 素で叩くなら 2 本だけ（実測 2026-08-17、これ以外は 404）:
@@ -121,7 +121,7 @@ curl -sS -g -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $K" \
   - **正本 = kagi item `seedance-key`（compartment `personal`）**。取得は
     `orgs/kotoba-lang/kagi/bin/kagi get seedance-key`。
   - 使うときは値を直接扱わず
-    `nbb scripts/provision-seedance-key.cljs run -- <cmd>`（`orgs/network-awai/cloud-murakumo`）
+    `kbb --backend sci scripts/provision-seedance-key.cljk run -- <cmd>`（`orgs/network-awai/cloud-murakumo`）
     経由にする。`check` / `verify`（**課金せずに** fal 側で有効性だけ確認）も同スクリプト。
   - **live の消費先**: gad の `/etc/murakumo-generation.env`（mode 600 root、
     `SEEDANCE_API_KEY=`）→ systemd `murakumo-generation.service`。ここに無いと

@@ -110,7 +110,7 @@ primitive に触れない bookkeeping を 1 本の `.cljc` にしておけば **
 
 ## 検証
 
-`nbb --classpath \"src:test\" run-tests.cljs` → 9 tests / 29 assertions、失敗 0。
+`kbb --backend sci --classpath \"src:test\" run-tests.cljs` → 9 tests / 29 assertions、失敗 0。
 
 **通ることだけでなく落ちることも確かめた**（4 通りの壊し方）:
 

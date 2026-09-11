@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns relocate-west-project
   (:require [cljs.reader :as reader]
             [clojure.string :as str]
@@ -49,7 +49,7 @@
 (let [[path from to & extra] (drop 3 (js->clj (.-argv js/process)))]
   (when (or (str/blank? path) (str/blank? from) (str/blank? to)
             (seq extra))
-    (fail! "Usage: nbb scripts/relocate-west-project.cljk REPOS.edn FROM TO"
+    (fail! "Usage: kbb --backend sci scripts/relocate-west-project.cljk REPOS.edn FROM TO"
            {:arguments [path from to]}))
   (let [tx (reader/read-string (.readFileSync fs path "utf8"))
         _ (when-not (= 1 (count tx))

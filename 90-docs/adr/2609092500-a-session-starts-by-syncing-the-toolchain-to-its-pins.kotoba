@@ -30,7 +30,7 @@ their west pins.
 
   roster     manifest/session-sync.edn
   mechanism  .claude/hooks/session-start-toolchain-pin-sync.cljs (SessionStart)
-  manual     nbb .claude/hooks/session-start-toolchain-pin-sync.cljs \"$PWD\" [--dry-run]
+  manual     kbb --backend sci .claude/hooks/session-start-toolchain-pin-sync.cljk \"$PWD\" [--dry-run]
 
 It SYNCS rather than warns. This workspace has written down twice that reading
 a warning and syncing are different actions, and this session was the proof:
@@ -46,7 +46,7 @@ Untracked files do not block a checkout and are ignored; amu carries 588.
 
 The PIN's own freshness is reported, not acted on: if a pin is behind the
 last-fetched origin/main the hook prints the count and
-`nbb scripts/west-pin-put.cljs <name> HEAD`. Advancing a pin is a write with a
+`kbb --backend sci scripts/west-pin-put.cljk <name> HEAD`. Advancing a pin is a write with a
 reachability proof behind it and is not something a session-start hook should
 do from a shared checkout.
 

@@ -24,7 +24,7 @@
    "修正後: exit 0 / 26 datoms / spread 700 / notable true / cheapest a_com / dearest b_com / chain OK"
    "test-autorun 6 tests 29 assertions 0-fail、全 8 namespace 63 tests 313 assertions 0-fail"
    "破壊試験: adapter のみ revert で (pos? (count offers)) が (not (pos? 0)) で落ちる（名乗った理由で落ちる）"
-   "clojure -M:test は 9 tests / 174 assertions しか実行しない（cognitect test-runner の .*-test$ pattern）"
+   "kbb -M:test は 9 tests / 174 assertions しか実行しない（cognitect test-runner の .*-test$ pattern）"
    "kotobase-engine src/kotobase/engine.clj: Database record の ref-name はスカラー、query の inputs は値であって db source ではない"
    "cloud-itonami/kakaku PR #2 → main merge e7ad201（2026-08-29）。merge 後の main を独立 checkout して再実測: 3 offers / spread 700 / notable true / 26 datoms / chain OK、63 tests 313 assertions 0-fail、実行後の checkout clean"
    "network-awai/app-hyakka は Claude GitHub App の repository selection に無く session を起こせない（github_repo_access_denied）。list_repos で network-awai から見えるのは loop-yakuwari のみ"))
@@ -148,10 +148,10 @@ golden CID も旧値に戻って落ちる。**両方向を出した。**
 
 ## 併せて見つかった、この repo の外にも効く欠陥
 
-**`clojure -M:test` は 8 test namespace のうち 1 つしか実行しない。** cognitect
+**`kbb -M:test` は 8 test namespace のうち 1 つしか実行しない。** cognitect
 test-runner の既定 pattern は `.*-test$` で、この repo の test namespace は
 `kakaku.methods.test-autorun` のように **`test-` 前置**である。マッチするのは
-`kakaku.murakumo-test` だけなので、`clojure -M:test` は **9 tests / 174 assertions** を
+`kakaku.murakumo-test` だけなので、`kbb -M:test` は **9 tests / 174 assertions** を
 0-fail で報告して終わる —— 実際には **63 tests / 313 assertions** ある。
 `bb.edn` の `test` task は 8 つ全部を明示列挙していたので、**bb 退役（ADR-2607173000）の
 巻き添えで検査の 85% が黙って消えた**。`:test` alias に `:main-opts` の

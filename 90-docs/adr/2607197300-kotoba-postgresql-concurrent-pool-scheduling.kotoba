@@ -30,7 +30,7 @@
                      (:fifo-waiters 2) (:query-release-race true)))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "parallel queries, FIFO waiters and query/release race; exit 0"))))))
   (:adr/body
   "# ADR-2607197300: Concurrent PostgreSQL pool scheduling

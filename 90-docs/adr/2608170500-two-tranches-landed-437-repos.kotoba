@@ -141,7 +141,7 @@ Recorded rather than worked around.")
 - 186 bb.edn files remain, of which the classifier calls 167 `:complex` — those
   need hand ports, and `emit-batch` should not be pointed at them.
 - The remaining runner work is named: 390 CLEAN-but-not-self-contained repos need a
-  classpath from `clojure -Spath`, 1,134 MIDDLE are unknown until run, 169 FLOOR
+  classpath from `kbb -Spath`, 1,134 MIDDLE are unknown until run, 169 FLOOR
   are definitely not portable, and 14 repos fail under ClojureScript for real
   (`mst` 262 errors, `glyph` 49, `katex` 37, `arxiv` 14).
 - The JVM debt proper — 954 `.clj`-source repos and 149 third-party jars — is

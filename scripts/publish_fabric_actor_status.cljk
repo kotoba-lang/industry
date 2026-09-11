@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; publish_fabric_actor_status.cljs — 週次 fabric actor pulse
 ;; （launchd com.junkawasaki.fabric-actor-cadence）。
 ;;
@@ -17,7 +17,7 @@
 ;; 読み出し・CACAO 鋳造・receipt の JSON 書き出しという effect だけ。
 ;;
 ;; 実行（launcher scripts/publish-fabric-actor-status と同じ classpath）:
-;;   nbb --classpath "scripts:orgs/kotoba-lang/org-chainagnostic-cacao/src:orgs/kotoba-lang/authority/src:orgs/kotoba-lang/org-ietf-ed25519/src:orgs/kotoba-lang/org-ietf-cbor/src" \
+;;   kbb --backend sci --classpath "scripts:orgs/kotoba-lang/org-chainagnostic-cacao/src:orgs/kotoba-lang/authority/src:orgs/kotoba-lang/org-ietf-ed25519/src:orgs/kotoba-lang/org-ietf-cbor/src" \
 ;;     scripts/publish_fabric_actor_status.cljk
 (ns publish-fabric-actor-status
   (:require [clojure.string :as str]

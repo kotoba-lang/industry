@@ -46,11 +46,11 @@ Located in the root `scripts/` directory:
 To run individual evidence collection tests:
 
 ```bash
-nbb scripts/security-gate-hsm-export-test.cljs
-nbb scripts/security-gate-paging-test.cljs
-nbb scripts/security-gate-georestores-test.cljs
-nbb scripts/security-gate-abac-audit.cljs
-nbb scripts/security-gate-audit-trail-test.cljs
+kbb --backend sci scripts/security-gate-hsm-export-test.cljk
+kbb --backend sci scripts/security-gate-paging-test.cljk
+kbb --backend sci scripts/security-gate-georestores-test.cljk
+kbb --backend sci scripts/security-gate-abac-audit.cljk
+kbb --backend sci scripts/security-gate-audit-trail-test.cljk
 ```
 
 ## Test Coverage Summary

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/fleet-refactor-wave-loop.cljk — cloud-itonami fleet refactor 波の
 ;; **ローカル Claude loop** 入口（ADR-2608290100）。LaunchAgent
 ;; cloud.itonami.bot.fleet-refactor-wave が一定間隔で起こす。
@@ -19,7 +19,7 @@
 ;;
 ;; exit 0 常に（監視 loop であって gate ではない）。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/fleet-refactor-wave-loop.cljk [--dry-run]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/fleet-refactor-wave-loop.cljk [--dry-run]
 
 (ns fleet-refactor-wave-loop
   (:require [clojure.edn :as edn]

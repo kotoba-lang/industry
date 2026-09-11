@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Does manifest/ipni-publisher.edn describe the publisher that is actually
 ;; publishing?
 ;;
-;;   nbb --classpath orgs/kotoba-lang/io-ipni-specs/src \
+;;   kbb --backend sci --classpath orgs/kotoba-lang/io-ipni-specs/src \
 ;;       scripts/verify-ipni-publisher-record.cljk [--selftest]
 ;;
 ;; The classpath is for `ipni.metadata`, which reads the advertisement's

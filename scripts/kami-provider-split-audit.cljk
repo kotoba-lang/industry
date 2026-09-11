@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
          '[clojure.edn :as edn]
          '[clojure.java.io :as io]
@@ -106,7 +106,7 @@
               (when (and (contains? materialized-kinds (:kami/kind split))
                          local-text
                          (not= expected-text local-text))
-                (err local-path "local split contract is not normalized; run nbb scripts/kami-provider-split-sync.cljk"))
+                (err local-path "local split contract is not normalized; run kbb --backend sci scripts/kami-provider-split-sync.cljk"))
               (when (and (contains? materialized-kinds (:kami/kind split))
                          (not (contains? (:repos ledger) split-to)))
                 (err ledger-path (str "ledger is missing split repo: " split-to)))

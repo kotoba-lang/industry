@@ -82,7 +82,7 @@ capability policy は **deny-by-default で `storage/*` と `clock/now` のみ�
 
 | 対象 | 実測 |
 |---|---|
-| テスト | **91 tests / 2211 assertions / 0 failures**（`npx nbb --classpath src:test:../common/src run-tests.cljs`） |
+| テスト | **91 tests / 2211 assertions / 0 failures**（`kbb --backend sci --classpath src:test:../common/src run-tests.cljs`） |
 | レベル集合 | **3/3 が greedy solver で budget 内に勝てる**（`levels.cljs --gate`） |
 | headless 実行 | kc-001 6/12 手・kc-002 14/26 手・kc-003 21/30 手で勝利、盤面を毎手表示 |
 | 決定性 | 同 seed の再実行で digest 一致 |
@@ -144,7 +144,7 @@ Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2
 
 1. `60-apps/network-isekai/games/kingdom-cascade/` を network-isekai へ移設。
 2. network-isekai 自身の `deps.edn` から KAMI stack の座標を取り、
-   shadow-cljs release を通す（**座標をここで推測して焼かない** — 間違った pin は
+   amu compile --target wasm32-browser を通す（**座標をここで推測して焼かない** — 間違った pin は
    build 時でなく実行時に落ちる）。
 3. `render_ir.cljc` を実物の `kotoba.sprite2d` に当て、key 名の drift を潰す。
 4. browser / packaged app / nbb の 3 者で `core/digest` を突き合わせる。
@@ -178,7 +178,7 @@ Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2
     (:gap/blocked-by "session の GitHub scope が com-junkawasaki/root のみ")
     (:gap/date "2026-08-08"))
    (map (:gap/id :web-build-unrun)
-    (:gap/what "shadow-cljs release 未実行。KAMI stack の依存座標は意図的に書いていない（推測した pin は実行時にしか落ちない）。")
+    (:gap/what "amu compile --target wasm32-browser 未実行。KAMI stack の依存座標は意図的に書いていない（推測した pin は実行時にしか落ちない）。")
     (:gap/blocked-by "network-isekai の deps.edn が読めない")
     (:gap/date "2026-08-08"))
    (map (:gap/id :mobile-unbuilt)
@@ -193,8 +193,8 @@ Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2
     (:gap/date "2026-08-08"))))
 
   (:adr/verification
-  (map (:command "npx nbb --classpath src:test run-tests.cljs")
+  (map (:command "kbb --backend sci --classpath src:test run-tests.cljs")
    (:result "91 tests, 2211 assertions, 0 failures, 0 errors")
-   (:level-gate "npx nbb --classpath src levels.cljs --gate -> 3/3 playable")
-   (:headless "npx nbb --classpath src play.cljs resources/levels/kc-00{1,2,3}.edn -> won")
+   (:level-gate "kbb --backend sci --classpath src levels.cljs --gate -> 3/3 playable")
+   (:headless "kbb --backend sci --classpath src play.cljs resources/levels/kc-00{1,2,3}.edn -> won")
    (:date "2026-08-08")))))

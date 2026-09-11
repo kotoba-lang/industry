@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; For each CLEAN self-contained repo from clean.tsv: fetch, extract its
 ;; default-branch tree, generate a portable nbb runner, run it with that
 ;; project's own src/test on the classpath, and record what happened.
@@ -20,7 +20,7 @@
 ;;   3. It did not check the extract's exit code, which is why (1) was invisible.
 ;;      EXTRACT-FAIL is now its own outcome.
 ;;
-;;   CLEAN_TSV=… SWEEP_WORKDIR=… nbb --classpath ".:scripts/nbb_compat" sweep-portable-runners.cljs
+;;   CLEAN_TSV=… SWEEP_WORKDIR=… kbb --backend sci --classpath ".:scripts/nbb_compat" sweep-portable-runners.cljs
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))
@@ -42,11 +42,11 @@
        ";; The portable suite on nbb — no build step, no JVM.\n"
        ";;\n"
        ";; Until this file existed, every namespace below ran under\n"
-       ";; `clojure -M:test` and nowhere else, so a defect in the ClojureScript\n"
+       ";; `kbb -M:test` and nowhere else, so a defect in the ClojureScript\n"
        ";; half of a `.cljc` was invisible here. This project needs no classpath\n"
        ";; beyond its own source:\n"
        ";;\n"
-       ";;   nbb --classpath " cp-str " " entry "\n"
+       ";;   kbb --backend sci --classpath " cp-str " " entry "\n"
        ";;\n"
        ";; Every `deftest`-bearing portable namespace has to be named here AND in\n"
        ";; the `run-tests` call: requiring a test namespace registers its vars,\n"
@@ -150,7 +150,7 @@
               :else
               (do
                 (.writeFileSync fs (.join node-path dir entry) (runner-src main-nss cpath entry) "utf8")
-                (let [{:keys [out exit]} (sh (str "timeout 240 nbb --classpath " cpath " " entry)
+                (let [{:keys [out exit]} (sh (str "timeout 240 kbb --backend sci --classpath " cpath " " entry)
                                              {:cwd dir :shell "/bin/bash"})
                       ran (second (re-find #"(Ran \d+ tests containing \d+ assertions)" out))
                       bad (second (re-find #"(\d+ failures, \d+ errors)" out))

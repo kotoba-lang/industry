@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-maturity-pin-drift.cljk — did the maturity measurement read
 ;; the trees the manifest pins?
 ;;
@@ -39,7 +39,7 @@
 ;;       because it has nothing to compare)
 ;;
 ;; usage:
-;;   nbb scripts/itonami-maturity-pin-drift.cljk
+;;   kbb --backend sci scripts/itonami-maturity-pin-drift.cljk
 ;;   … --evidence <path> --west <path> --org <prefix> --data-root <path>   (defaults below)
 ;;
 ;; --data-root is the superproject checkout whose orgs/ is populated — the same

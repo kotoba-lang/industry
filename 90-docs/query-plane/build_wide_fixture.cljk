@@ -13,7 +13,7 @@
 ;; other block: a fixture that lives at its own hash is not litter, it is a
 ;; block nobody links to.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/io-ipld-car/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/build_wide_fixture.cljs <out-dir> [leaves=255]
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/io-ipld-car/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/build_wide_fixture.cljs <out-dir> [leaves=255]
 
 (ns build-wide-fixture
   (:require [ipld.car.v2 :as v2]

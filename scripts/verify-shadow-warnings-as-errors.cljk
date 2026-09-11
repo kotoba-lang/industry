@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-shadow-warnings-as-errors
   "shadow-cljs builds that cannot fail on a broken var reference.
 
-  `shadow-cljs release` treats an undeclared or renamed var as a WARNING and
+  `amu compile --target wasm32-browser` treats an undeclared or renamed var as a WARNING and
   exits 0, having written a bundle that throws `Cannot read properties of
   undefined` on its first request. So `build exit=0` does not distinguish a
   working bundle from a broken one, and every place that treats a green build
@@ -41,7 +41,7 @@
     gh api repos/<org>/<repo>/contents/shadow-cljs.edn --jq .content | base64 -d
 
   usage:
-    nbb scripts/verify-shadow-warnings-as-errors.cljk [<root>] [--all]
+    kbb --backend sci scripts/verify-shadow-warnings-as-errors.cljk [<root>] [--all]
 
   <root> defaults to the superproject. Exit 0 clean / 1 findings /
   2 COULD NOT ANSWER."

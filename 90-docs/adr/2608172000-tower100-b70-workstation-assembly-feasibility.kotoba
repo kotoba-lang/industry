@@ -30,7 +30,7 @@
    **ただし前提が正反対である。**MK-1 は自社板金なので『部材 envelope + クリアランス規則から筐体寸法を導出』した。今回は **市販ケース**なので寸法は与えられており、逆に導出すべきは内部座標である。そして市販ケースの内寸は公表されていない —— 公表されているのは VGA 330 / CPU クーラー 190 / PSU 180 / 拡張スロット 2 という 4 つのクリアランス制限だけ。")
 
   (:adr/decision
-  "1. **組み立ては成立する。公表クリアランスに対する阻却要因 0 件。**再現は `nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src scripts/tower100-b70-cad.cljs`。
+  "1. **組み立ては成立する。公表クリアランスに対する阻却要因 0 件。**再現は `kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src scripts/tower100-b70-cad.cljs`。
 
    2. **判定を 2 段に分け、混ぜない。**[A] 公表クリアランスに対する判定(grade :spec/:datasheet)= **これが契約**。[B] 推定内部座標に対する AABB sim(grade :estimate)= 補助。市販ケースでは内部形状が非公表なので、写真から内寸を推定して AABB を作ると『実測していない数値』が『検査した』顔をする。**契約側だけが可否を決める。**
 
@@ -132,10 +132,10 @@
 
    -- 次に打つ最初の手(具体) --
    a. 再実行:
-      nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
+      kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
           scripts/tower100-b70-cad.cljs
-      nbb scripts/tower100-b70-drawing.cljs
-      nbb scripts/tower100-b70-report.cljs 90-docs/hardware/tower100-b70-report.html --standalone
+      kbb --backend sci scripts/tower100-b70-drawing.cljk
+      kbb --backend sci scripts/tower100-b70-report.cljk 90-docs/hardware/tower100-b70-report.html --standalone
    b. 用途適合の 2 件(RAM 16GB / PCIe 4.0 x16、:adr/consequences)は**発注前の判断**。
       とくに DIMM 2 枚きりなので、8GB x2 で発注すると増設が買い直しになる。
    c. 熱を決めるなら実機。CFD 経路に戻るなら kami-engine-cae-solver の OpenFOAM runner。
@@ -144,7 +144,7 @@
 
   (:adr/verification
   "再現:
-     nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
+     kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
          scripts/tower100-b70-cad.cljs
    寸法を変えるときは 90-docs/hardware/tower100-b70-parts.datoms.edn だけを直す(他は生成物)。
    第 1 引数にカタログのパスを渡すと差し替えられるが、そのときは成果物を書かない(決定16)。

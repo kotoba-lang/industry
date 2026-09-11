@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-jvm-dependency-surface — where this workspace still needs a JVM, and
 ;; what each of those places would have to become to stop needing one.
 ;;
@@ -237,7 +237,7 @@
 ;; Measured 2026-08-18 over all 2,756 `.clj` sources in registered checkouts:
 ;;
 ;;   2,165  the `(ns …)` matches the path, so the JVM can load it   -> real
-;;     218  it does not match, so `clojure -M -e "(require '…)"` answers
+;;     218  it does not match, so `kbb -M -e "(require '…)"` answers
 ;;          `Could not locate …`. 112 of those are `mesh.clj`.      -> not JVM
 ;;     373  no `(ns …)` at all; 211 are `run_tests.clj`             -> entry point
 ;;

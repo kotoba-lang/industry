@@ -42,7 +42,7 @@ description: 90-docs の中で reader を通らない EDN 文書を 1 件だけ�
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin
-nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-tick.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-tick.cljk
 ```
 
 `:outcome :insufficient-scan` が出たら **何もせず終わる**。sparse checkout から
@@ -72,8 +72,8 @@ echo node_modules >> .git/info/exclude
 ### 2. 機械で直る分は機械に任せる
 
 ```bash
-nbb scripts/diagnose-unreadable-edn.cljk <対象ファイル>          # dry-run
-nbb scripts/diagnose-unreadable-edn.cljk <対象ファイル> --write  # 条件を満たせば書く
+kbb --backend sci scripts/diagnose-unreadable-edn.cljk <対象ファイル>          # dry-run
+kbb --backend sci scripts/diagnose-unreadable-edn.cljk <対象ファイル> --write  # 条件を満たせば書く
 ```
 
 `--write` は **修復後の entity キー集合が元の外側キー集合と一致しないと書かない**。
@@ -111,7 +111,7 @@ nbb scripts/diagnose-unreadable-edn.cljk <対象ファイル> --write  # 条件�
 
 ```bash
 # (a) 読める。かつ entity のキーが全部キーワード（切れた文字列が残っていない）
-nbb -e '(def fs (js/require "node:fs"))
+kbb --backend sci -e '(def fs (js/require "node:fs"))
         (def tx (cljs.reader/read-string (.readFileSync fs "<対象>" "utf8")))
         (def e (first (filter map? tx)))
         (println "keys" (count (keys e)) "非キーワード" (count (remove keyword? (keys e))))'
@@ -121,7 +121,7 @@ git diff --stat
 git diff -U0 | grep -E "^[+-][^+-]" | head -20
 
 # (c) 面に載る。docs-edn-only の parse-errors が 1 件減ること
-nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk verify | head -1
+kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk verify | head -1
 ```
 
 **(c) を通したら `manifest/docs-edn-only.cljk` の `known-parse-errors` から

@@ -1,7 +1,7 @@
 # probes — 3D スタックの behavior probe
 
 各ファイルは `scripts/threed-maturity-audit.cljs` が
-`nbb --classpath <repo>/src <probe>.cljs` で起動する。契約は stdout に **1 行**:
+`kbb --backend sci --classpath <repo>/src <probe>.cljs` で起動する。契約は stdout に **1 行**:
 
     PROBE <axis-behavior-id> PASS|FAIL|UNMEASURABLE <detail>
 

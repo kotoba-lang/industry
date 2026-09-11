@@ -10,7 +10,7 @@
 
    ## The failure it exists for
 
-   `shadow-cljs compile` stops at `The required namespace \"x\" is not
+   `amu compile --target wasm32-browser` stops at `The required namespace \"x\" is not
    available`, exit 1, before a single test runs. If nothing runs that build,
    nothing ever says so. kotoba-lang/kotobase-worker-shell had been in this
    state long enough that its test suite had NEVER executed; restoring three

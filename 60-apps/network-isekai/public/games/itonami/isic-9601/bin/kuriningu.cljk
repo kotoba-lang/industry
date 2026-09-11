@@ -19,10 +19,10 @@
   context, bind buffers, draw, read back.
 
   Usage:
-    nbb bin/kuriningu.cljs play   [--seed N] [--district ID] [--script \"...\"] [--turns N]
+    kbb --backend sci bin/kuriningu.cljk play   [--seed N] [--district ID] [--script \"...\"] [--turns N]
                                   [--state FILE] [--dump FILE] [--format edn|json]
-    nbb bin/kuriningu.cljs street [--cleared N] [--format edn|json]
-    nbb bin/kuriningu.cljs render [--out FILE] [--width N] [--height N] [--cleared N]
+    kbb --backend sci bin/kuriningu.cljk street [--cleared N] [--format edn|json]
+    kbb --backend sci bin/kuriningu.cljk render [--out FILE] [--width N] [--height N] [--cleared N]
                                   [--state FILE] [--probe] [--backend webgl2]
 
   `--dump` / `--state` carry the ADR-2608108000 envelope (`:itonami-game/state` v1) so a
@@ -346,9 +346,9 @@
 (defn cmd-render []
   (println)
   (println "  描画は `bin/render.cljs` です:")
-  (println (bold "    nbb bin/render.cljs --view street --out preview/street.png"))
+  (println (bold "    kbb --backend sci bin/render.cljk --view street --out preview/street.png"))
   (println (dimmed "      3D 街 — engine checkout (webgpu/render) が要る"))
-  (println (bold "    nbb bin/render.cljs --view board --state FILE --out preview/board.png"))
+  (println (bold "    kbb --backend sci bin/render.cljk --view board --state FILE --out preview/board.png"))
   (println (dimmed "      店の board — window.__setState で注入して DOM を撮る (#1752); engine 不要"))
   (println))
 

@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Mechanical bb → nbb file converter (ADR-2607173000).
 ;; Best-effort rewrite of common babashka/JVM patterns to Node.
 ;;
-;;   nbb scripts/bb_to_nbb_file.cljk <path.bb> [<path2.bb> ...]
+;;   kbb --backend sci scripts/bb_to_nbb_file.cljk <path.bb> [<path2.bb> ...]
 ;;
 ;; Writes <path>.cljs alongside and leaves .bb for the caller to delete.
 (require '[clojure.string :as str]
@@ -91,7 +91,7 @@
       (str/replace #"json/generate-string" "__json-gen")
       (str/replace #"\(json/parse-string" "(__json-parse")
       (str/replace #"\(json/generate-string" "(__json-gen")
-      ;; bb runtime path refs
+      ;; kbb -M:runtime path refs
       (str/replace #"publish\.bb" "publish.cljs")
       (str/replace #"\"bb\"" "\"nbb\"")
       (str/replace #"\bbb " "nbb ")))

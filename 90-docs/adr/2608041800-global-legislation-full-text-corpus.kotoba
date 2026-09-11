@@ -220,9 +220,9 @@
    **`:jvm-test` gate にしていない理由（実測、推測ではない）**: repo 側の contract test は
    Datascript を要求し、Datascript は maven 依存。fleet のノードは tailnet だけに繋がっていて
    外向き HTTPS が無く、`~/.m2/repository/datascript/` は zebulun にも asher にも存在しない
-   （2026-08-05 に両ノードで確認）。`clojure -M:test` は依存解決で必ず落ちる。
+   （2026-08-05 に両ノードで確認）。`kbb -M:test` は依存解決で必ず落ちる。
    `ship-git-deps!` は git 依存しか運ばない。したがって Datalog を要する検査は
-   repo 側の local contract（`clojure -M test/query_contract.clj`）に残した。
+   repo 側の local contract（`kbb -M test/query_contract.clj`）に残した。
 
    **残る 1 点、正確に**: CI は `data/corpus/**` を locked source から**再導出しない**。
    それには 4 dataset の `index/` をノードに置く必要がある。sha256 は改竄を検出可能にするが、
@@ -232,7 +232,7 @@
    **再開手順**（次の agent はこれだけで続けられる）:
 
    1. gate を手で回す: `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem
-      nbb scripts/fleet-ci/tick.cljs --only global-legislation-datoms`
+      kbb --backend sci scripts/fleet-ci/tick.cljk --only global-legislation-datoms`
       （env を忘れると `no such item: fleet-agent-murakumo-ci-tip-25mbair` で死ぬ —
       署名鍵は kagi に無く PEM にだけある。常駐 plist は env を渡している）
    2. 対象を増やすなら `scripts/fleet-ci/gates.edn` に 1 行

@@ -70,7 +70,7 @@
     ゲームは camera 変換を当て推量で再導出するしかなかった)。
     push 権限が無いため commit は `sdk-patches/` に退避"
    "同じ作業中に見つけた sprite2d の既存欠陥 3 件も同じ patch で直した:
-    `clojure -M:test` が 1 assertion も走らずに落ちていた (README が案内する
+    `kbb -M:test` が 1 assertion も走らずに落ちていた (README が案内する
     コマンド) / `test/sprite2d_test.clj` が assert している JVM スタブが
     実装されていなかった / `kotoba.sprite2d.layout` は facade ではなく
     `kami` 版の完全なコピーで、layout テストは painter が使わない方を
@@ -332,7 +332,7 @@ nbb のテストも、squint 経由のブラウザプレビューも、将来の
   看板の `:text` が hit box を広げることを確認。SDK の追加を revert すると
   **コンパイルすら通らない** (`layout/pick` が無い) ので、このテストは
   SDK 側の退行ゲートでもある。
-- **sprite2d 49 テスト / 125 assertion** (JVM, `clojure -M:test`) ——
+- **sprite2d 49 テスト / 125 assertion** (JVM, `kbb -M:test`) ——
   変更前は 0 assertion (suite が起動しなかった)。
 - **balance probe** (`test/balance.cljs`) —— seed 3/7/11/99 すべてで
   丁寧なプレイが t≈700 で victory、ライフ 3 維持。雑なプレイは t≈300 で gameover。

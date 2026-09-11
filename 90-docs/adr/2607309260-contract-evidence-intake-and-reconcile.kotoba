@@ -38,7 +38,7 @@
 
 **2. 動かなかったものを直した。**
 
-- `meisai/methods/sources.cljc` が `*file*` から親を 4 段たどるところで、`require` 経由では 3 段で尽きて 4 段目が nil に対する reflection で落ち、**`methods` 名前空間が 1 つもコンパイルできなかった**。`clojure -M:test` は「11 tests, 0 failures」と報告していた —— 読み込めない名前空間についてスイートは何も言わない。nil-safe な走査 + `MEISAI_SOURCES_DIR`、加えて `:test` alias に `-r`（namespace が `test-<thing>` prefix でランナー既定の `.*-test$` に一致していなかった）。43 tests / 151 assertions（従来 11 / 39）。
+- `meisai/methods/sources.cljc` が `*file*` から親を 4 段たどるところで、`require` 経由では 3 段で尽きて 4 段目が nil に対する reflection で落ち、**`methods` 名前空間が 1 つもコンパイルできなかった**。`kbb -M:test` は「11 tests, 0 failures」と報告していた —— 読み込めない名前空間についてスイートは何も言わない。nil-safe な走査 + `MEISAI_SOURCES_DIR`、加えて `:test` alias に `-r`（namespace が `test-<thing>` prefix でランナー既定の `.*-test$` に一致していなかった）。43 tests / 151 assertions（従来 11 / 39）。
 - `kagitaba.contract/contract-section` が `:section/id` だけで照合しており、**1Password で書いた `Contract` section は id を持たないため、import した契約が `contract? false` になっていた**。金額も周期も入っているのに契約として認識されず、何もエラーにならない。id または正準 title（大文字小文字・空白無視、部分一致は不可）で照合するよう修正し、importer も 1PUX の `name` を section id として保持する。
 
 **3. 実測した到達可能性（この節が次のセッションの出発点）。**
@@ -81,7 +81,7 @@
    `cd ~/github/com-junkawasaki/orgs/gftdcojp/m365-archive && GPG_TTY=$(tty) git annex enableremote b2`
    gpg-agent の `default-cache-ttl` は 7200 秒なので、その後 2 時間は非対話で続行できる。取得は **`mail` だけに絞る**:
    `git annex get --from b2 --jobs 6 mail`（11.07 GB。`annex-get` を素で使うと 132 GB）。
-   B2 creds は `nbb --classpath \"$R:$R/scripts/nbb_compat:$R/orgs/kotoba-lang/secret-resolve/src\" scripts/b2-creds.cljs --json` で解決済み（動作確認済み）。
+   B2 creds は `kbb --backend sci --classpath \"$R:$R/scripts/nbb_compat:$R/orgs/kotoba-lang/secret-resolve/src\" scripts/b2-creds.cljs --json` で解決済み（動作確認済み）。
    恒久対応: オーナーが passphrase を kagi compartment `personal` に保存すれば以後非対話（`radicle-junkawasaki-passphrase` と同じ形）。**secrets-location-map への追記も必要**。
 3. **カード明細** — ポータルから CSV/PDF を手動ダウンロード。ingest は純関数なので agent 側で完結する。
 4. **その後**: 各契約に `merchant-descriptor` を明細から書き写し、`reconcile` を回す。`reconcile` を app の Contracts 画面に出すかは、実データの形を見てから決める。

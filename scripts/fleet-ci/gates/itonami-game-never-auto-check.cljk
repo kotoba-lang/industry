@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; itonami-game-never-auto-check.cljs — 「クリーニング営み」の主張を機械検査する。
 ;;
 ;; 対象: `60-apps/network-isekai/public/games/itonami/isic-9601/`
@@ -58,7 +58,7 @@
 ;;
 ;; ネットワーク: 不要。tree だけを読む。
 ;;
-;; 使い方: nbb itonami-game-never-auto-check.cljs <repo-tree>
+;; 使い方: kbb --backend sci itonami-game-never-auto-check.cljk <repo-tree>
 
 (ns itonami-game-never-auto-check
   (:require ["node:fs" :as fs]

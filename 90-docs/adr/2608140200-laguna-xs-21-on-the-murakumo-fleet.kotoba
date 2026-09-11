@@ -204,9 +204,9 @@ fleet 全 10 台の ollama を見たときに、ADR-2608139600 が言う
 
 ```
 ssh -N -L 11435:127.0.0.1:11434 judah &
-nbb --classpath . bench.cljs tasks <model>
-THINK=on ONLY=lru-cache,semver nbb --classpath . bench.cljs tasks <model>
-nbb --classpath . bench.cljs ctx <model>
+kbb --backend sci --classpath . bench.cljs tasks <model>
+THINK=on ONLY=lru-cache,semver kbb --backend sci --classpath . bench.cljs tasks <model>
+kbb --backend sci --classpath . bench.cljs ctx <model>
 ```
 
 本 ADR の数字は judah の `/tmp/ollama-0329`（0.32.9、ポート 11500、使い捨て）で

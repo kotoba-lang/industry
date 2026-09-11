@@ -13,7 +13,7 @@
 ;; both as EDN and requiring the same value. A rewrite that moved anything else
 ;; is refused rather than pushed.
 ;;
-;; Usage: nbb expand-sha-api.cljs <org/repo> <path> <short> <full> [--apply]
+;; Usage: kbb --backend sci expand-sha-api.cljk <org/repo> <path> <short> <full> [--apply]
 (require '[clojure.string :as s]
          '[clojure.edn :as edn])
 

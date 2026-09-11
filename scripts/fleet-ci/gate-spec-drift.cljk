@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gate-spec-drift.cljs — 「自分自身の古い版についての判定を表示している gate」を数える。
 ;;
 ;; tick の trigger は対象 repo の tip の変化だけ（:trigger :tip-change）。gate の
@@ -12,7 +12,7 @@
 ;;   (b) 「今どれが古い判定を表示しているか」を receipt を待たずに知りたいとき
 ;;
 ;; 使い方:
-;;   FLEET_CI_LIBRARY_MODE=1 nbb --classpath scripts/fleet-ci \
+;;   FLEET_CI_LIBRARY_MODE=1 kbb --backend sci --classpath scripts/fleet-ci \
 ;;     scripts/fleet-ci/gate-spec-drift.cljk [--ref origin/main] [--edn]
 ;;
 ;; 判定: gate の宣言 hash が最後に変わった commit の日時、または gate script が

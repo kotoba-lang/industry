@@ -93,7 +93,7 @@
    (map (:action "update west.yml kotobase-peer pin")
     (:current-pin "d2678b35f95c50461f2fc8a2b54826234e6cebea")
     (:verification
-    (vector "nbb scripts/gen-west-manifest.cljs --check (canonical verification)"
+    (vector "kbb --backend sci scripts/gen-west-manifest.cljk --check (canonical verification)"
      "west list -f '{name}: {revision}' | grep kotobase"
      "kotobase-peer のBlockStore README が正式に README.md に含まれている"))
     (:timing "Wave 1 final verification時に実行")))

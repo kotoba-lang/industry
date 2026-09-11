@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; dns-resolver-datalake-tick.cljs — cloud-itonami-dns-resolver's ledger ->
 ;; R2 Data Catalog (Iceberg). Same shape as hyakka-datalake-tick.cljs and
 ;; the same reason: `datalake-sync.py` does a full overwrite every run, so
@@ -7,7 +7,7 @@
 ;; commit-untracked-safe measure hyakka-datalake-tick.cljs uses) and skips
 ;; export_and_sync.cljs entirely when nothing moved since last time.
 ;;
-;;     nbb scripts/dns-resolver-datalake-tick.cljk [--force]
+;;     kbb --backend sci scripts/dns-resolver-datalake-tick.cljk [--force]
 
 (require '[clojure.string :as str]
          '["node:fs" :as fs]

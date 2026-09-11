@@ -264,7 +264,7 @@ code point の短絡比較に変えた（多バイト文字の途中を切ると
 `f137554`（advance the stack pins）が deps.edn を動かして lock を再生成していない。
 
 deps.edn 自身のコメントが「同じ commit で再生成しろ」「stale は後で見つかるエラーでは
-なく、黙って `clojure -Spath` に戻して JDK-free の性質を誰にも知らせず失う」と書いており、
+なく、黙って `kbb -Spath` に戻して JDK-free の性質を誰にも知らせず失う」と書いており、
 実際 `bin/kotoba` はその通りに fallback した（JDK が無ければそこで死ぬ）。
 fleet gate `compiler-jdk-free` はこれを見るので、走っていれば赤のはず。
 

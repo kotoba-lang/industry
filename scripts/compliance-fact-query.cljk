@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/compliance-fact-query.cljk — cross-repo compliance-fact federation
 ;; query (ADR-2607141700, "cross-repo query 層" section: interim thin
 ;; federation, NOT net-kotobase which is still L0/L1-only).
@@ -17,10 +17,10 @@
 ;; already committed.
 ;;
 ;; 使い方:
-;;   nbb scripts/compliance-fact-query.cljk count
-;;   nbb scripts/compliance-fact-query.cljk jurisdiction JPN
-;;   nbb scripts/compliance-fact-query.cljk municipality tokyo
-;;   nbb scripts/compliance-fact-query.cljk q '[:find ?url :where [?e "statute/id" "jpn.appi"] [?e "statute/url" ?url]]'
+;;   kbb --backend sci scripts/compliance-fact-query.cljk count
+;;   kbb --backend sci scripts/compliance-fact-query.cljk jurisdiction JPN
+;;   kbb --backend sci scripts/compliance-fact-query.cljk municipality tokyo
+;;   kbb --backend sci scripts/compliance-fact-query.cljk q '[:find ?url :where [?e "statute/id" "jpn.appi"] [?e "statute/url" ?url]]'
 
 (require '[scripts.nbb-compat :refer [slurp exit]]
          '[clojure.edn :as edn]
@@ -985,7 +985,7 @@
       "municipality" (print-municipality arg)
       "association" (print-association arg)
       "q" (println (pr-str (q arg)))
-      (do (println "usage: nbb scripts/compliance-fact-query.cljk [count|jurisdiction <ISO3>|municipality <slug>|association <slug>|q '<datalog>']")
+      (do (println "usage: kbb --backend sci scripts/compliance-fact-query.cljk [count|jurisdiction <ISO3>|municipality <slug>|association <slug>|q '<datalog>']")
           (exit 1)))))
 
 (apply -main *command-line-args*)

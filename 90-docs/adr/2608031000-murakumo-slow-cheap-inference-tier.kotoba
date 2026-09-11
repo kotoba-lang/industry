@@ -116,9 +116,9 @@
    - `tools/slow-worker.cljs`(新規、nbb)— `requirements` / `preflight` / `run`。
 
    **検証(2026-08-03、本番稼働中):**
-   - `clojure -M:test` 全体 137 test / 732 assertion / 0 failure 0 error、
+   - `kbb -M:test` 全体 137 test / 732 assertion / 0 failure 0 error、
      clj-kondo errors 0(新規ファイルの warning も 0)。
-   - `shadow-cljs release worker ui` 成功。
+   - `amu compile --target wasm32-browser worker ui` 成功。
    - **PR #115 / #116 / #117 を main に merge、api.murakumo.cloud へ deploy 済み**
      (Worker version `ba77d50b`)。
    - **本番でジョブ 3 件を完走**: submit(202) → heartbeat → work poll → claim(201) →
@@ -128,7 +128,7 @@
      `live? true`、`waste` は `live? false` のまま。
    - 他人の鍵での job poll は 404、鍵なし submit は 401、service token 未設定時の
      ノード面は 401(fail-closed)——いずれも本番で確認。
-   - `nbb tools/slow-worker.cljs preflight --engine waste` をこの macOS(32GB RAM、
+   - `kbb --backend sci tools/slow-worker.cljk preflight --engine waste` をこの macOS(32GB RAM、
      空き 32 GiB)で実行 → 正しく NG(swap 有効・NVMe 982 GiB 不足)を報告した。
      **このマシンでは WASTE は動かない、と正直に出ることを確認した。**
 

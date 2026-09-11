@@ -8,7 +8,7 @@
 ;;
 ;; Run (root package.json already declares "datascript" as a dependency — `npm ci` once,
 ;; same as any other nbb script in this superproject; no NODE_PATH borrowing needed):
-;;   npm ci && nbb 90-docs/repo-reality/query.cljs
+;;   npm ci && kbb --backend sci 90-docs/repo-reality/query.cljk
 
 (ns repo-reality.query
   (:require ["fs" :as fs]

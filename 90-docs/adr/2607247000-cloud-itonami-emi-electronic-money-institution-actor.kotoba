@@ -44,7 +44,7 @@
 
 ### 5. R0 成熟度境界: MemStore-only、8法域spec-basis、DatomicStore/実統合は次のシーム
 
-本actorは`cloud-itonami-isic-6910`の初期R0と同じ成熟度で公開する: 実際に動くactor loop（advisor/governor/phase/registry/store/operation）、**MemStore-only**永続化（`DatomicStore`/`langchain.db`未実装、`cloud-itonami-isic-6419`/`-6910`が既に実証した`:db-api`駆動パターンを適用できる見込みだが本ADRの対象外）、全ての破壊的/規制対象アクションを人間承認でゲート。法域spec-basisは8法域（GBR/DEU/FRA/LTU/IRL/JPN/SGP + USAの構造差異ノート——米国には連邦レベルのEMIライセンス区分自体が存在せず、州ごとのmoney transmitter免許+FinCEN MSB登録という別構造であることを`emi.facts`の当該entryに正直に明記し、存在しない「米国EMIライセンス」を捏造しない）のみ——`emi.facts/coverage`で常に正直に報告し、水増ししない。60 tests / 188 assertions green、clj-kondo clean、`clojure -M:dev:run`で intake→法域assessment→KYC→発行(承認)→保全確認(承認)→償還(承認、ウォレット解約)の一連の流れと、二重解約タッチ・未解決制裁フラグ・法域spec-basis欠如・IBAN checksum不正・金利/与信密輸試行という複数HARD holdケースを実機確認済み。
+本actorは`cloud-itonami-isic-6910`の初期R0と同じ成熟度で公開する: 実際に動くactor loop（advisor/governor/phase/registry/store/operation）、**MemStore-only**永続化（`DatomicStore`/`langchain.db`未実装、`cloud-itonami-isic-6419`/`-6910`が既に実証した`:db-api`駆動パターンを適用できる見込みだが本ADRの対象外）、全ての破壊的/規制対象アクションを人間承認でゲート。法域spec-basisは8法域（GBR/DEU/FRA/LTU/IRL/JPN/SGP + USAの構造差異ノート——米国には連邦レベルのEMIライセンス区分自体が存在せず、州ごとのmoney transmitter免許+FinCEN MSB登録という別構造であることを`emi.facts`の当該entryに正直に明記し、存在しない「米国EMIライセンス」を捏造しない）のみ——`emi.facts/coverage`で常に正直に報告し、水増ししない。60 tests / 188 assertions green、clj-kondo clean、`kbb -M:dev:run`で intake→法域assessment→KYC→発行(承認)→保全確認(承認)→償還(承認、ウォレット解約)の一連の流れと、二重解約タッチ・未解決制裁フラグ・法域spec-basis欠如・IBAN checksum不正・金利/与信密輸試行という複数HARD holdケースを実機確認済み。
 
 ### 6. 配置: `cloud-itonami` org 直下に新規 repo `cloud-itonami-emi`、manifest 登録なし
 

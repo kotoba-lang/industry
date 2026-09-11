@@ -50,7 +50,7 @@ same last-deploy-wins mechanism that took the domain in the first place.
 
 ## Verification
 
-- `npm run build` (shadow-cljs release worker) and full test suite green
+- `npm run build` (amu compile --target wasm32-browser worker) and full test suite green
   before deploy: nbb pure-logic tests (12 tests/43 assertions) + node-test
   real-crypto suite (20 tests/68 assertions, CACAO verify + datom-store
   bridge), consistent with this workspace's rule to verify build/tests
@@ -226,7 +226,7 @@ prohibited, not just documented. Work done, in order:
    `gftdcojp/net-kotobase/protocols-worker/src/kotobase_protocols_worker/
    kotobase_store.cljs` (commit `42ab365`) — this is the actual, current,
    sole `git.kotobase.net`/`s3.kotobase.net`/`atproto.kotobase.net`/
-   `pinning.kotobase.net` deploy owner. Built (`shadow-cljs release
+   `pinning.kotobase.net` deploy owner. Built (`amu compile --target wasm32-browser
    worker`, 0 warnings) and 22 existing tests (75 assertions) verified
    green BEFORE deploying, per this workspace's build-then-deploy rule.
    Deployed live via `wrangler deploy` (Version `13d55719`) — caught and
@@ -293,7 +293,7 @@ GitHub tip, not the local checkout's stale base — the local checkout was
 found to be behind `origin/main` in an unrelated project's pin at commit
 time, confirming why the tip-fetch-and-patch method rather than a local
 regenerate-and-push was correct here), verified via
-`nbb scripts/gen-west-manifest.cljs --entry kotobase-protocols-worker`
+`kbb --backend sci scripts/gen-west-manifest.cljk --entry kotobase-protocols-worker`
 (fast-forward, server-side pin verification OK).
 
 ## References

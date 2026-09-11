@@ -186,7 +186,7 @@ jsic カバレッジは 3 分の 1**）。
   したがって **「murakumo で実際に音が出た」ことは主張しない** — 検証済みなのは
   submit 経路のコードと degrade 経路の挙動まで。次の agent の resume point:
   token を発行（`murakumo.apikey`、scope `generation`）して kagi に入れ、
-  `clojure -M:produce --spec survivors-zombie-v1` を token 付きで回す。
+  `kbb -M:produce --spec survivors-zombie-v1` を token 付きで回す。
 - **付随する訂正**: maturity ledger seq 13 は「kagi はエラー文字列を stdout に
   返すのでそれがそのまま Bearer になり 401」と記録しているが、今日の実測では
   `kagi get <missing>` は **stderr に出して exit 1** を返し、
@@ -244,7 +244,7 @@ jsic カバレッジは 3 分の 1**）。
 
 1. **live fleet**: scope `generation` の token を `murakumo.apikey` で発行し
    kagi に投入 → `cd orgs/cloud-itonami/gameka/clj && MURAKUMO_GENERATION_TOKEN=…
-   clojure -M:produce --spec survivors-zombie-v1 --legs /tmp/legs.edn` で
+   kbb -M:produce --spec survivors-zombie-v1 --legs /tmp/legs.edn` で
    cue が `:murakumo` を返し kotobase に CID が載ることを実測。その後
    `loop.cljs record --channel gameka --legs /tmp/legs.edn --phase 1` が
    `:clean` になるはず（現状は `:degraded`）。
@@ -253,6 +253,6 @@ jsic カバレッジは 3 分の 1**）。
    jsic-3914 governor が build を hold する（`build_test` に pin 済み）。
 3. **registry の jsic カバレッジ**: jsic-4113 / 4721 が occupation registry に
    未登録（3 件中 1 件のみ登録済み）。
-4. **concept 索引**: 新規 2 repo は `nbb scripts/gen-concept-index.cljs` を
+4. **concept 索引**: 新規 2 repo は `kbb --backend sci scripts/gen-concept-index.cljk` を
    回すまで索引に載らない（README はあるので次回生成時に入る）。
 ")))

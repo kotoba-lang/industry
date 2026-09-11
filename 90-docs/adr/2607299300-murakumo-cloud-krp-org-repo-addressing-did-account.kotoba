@@ -100,10 +100,10 @@ atproto に組織アカウントという一級概念は無い（DID は1つの 
      \"GET /{org}/{repo}/components[/{key}]\" \"宣言済み collection / record\"}}")
 
   (:adr/verification
-  "{:offline {:runner \"clojure -M:test（JVM、cognitect test-runner）\"
+  "{:offline {:runner \"kbb -M:test（JVM、cognitect test-runner）\"
               :new-namespaces {:tests 24 :assertions 115 :failures 0 :errors 0}}
-    :compiled-artifact {:build \"shadow-cljs release worker（resource guard 経由）: 66 files, 16 compiled, 0 warnings\"
-                        :harness \"nbb --classpath test -m worker-krp-smoke（dist/worker.js を直接 import して fetch）\"
+    :compiled-artifact {:build \"amu compile --target wasm32-browser worker（resource guard 経由）: 66 files, 16 compiled, 0 warnings\"
+                        :harness \"kbb --backend sci --classpath test -m worker-krp-smoke（dist/worker.js を直接 import して fetch）\"
                         :checks 10 :failures 0
                         :includes [\"did document\" \"repository resolves（canonical + at:// record + locations）\"
                                    \"declared collection route\" \"record → AT URI\"

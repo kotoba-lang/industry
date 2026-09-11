@@ -126,7 +126,7 @@ kernel は演算子コードが 1..5 のどれでもないとき **-2** を返�
 
 ## 検証
 
-- `nbb 70-tools/bmc/run-tests.cljs` —— **移行前 49 tests / 294 assertions / 0 failures、
+- `kbb --backend sci 70-tools/bmc/run-tests.cljk` —— **移行前 49 tests / 294 assertions / 0 failures、
   移行後 50 / 312 / 0**。既存 294 は 1 つも動いていない（挙動保存）。増えた 18 は
   新しい deftest `gate-decision-core-migration` で、上表の 4 つと欠測・再提案規則を名指しで踏む。
 - fleet gate `root-gate-core` —— 無改変で **467 case / 0 failing / exit 0**。

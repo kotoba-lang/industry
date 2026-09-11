@@ -16,7 +16,7 @@ description: kotoba-lang の外部依存を manifest/dependency-substitution.edn
 ```bash
 cd "$COM_JUNKAWASAKI_ROOT"
 git fetch origin -q && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/dependency-substitution-wave-tick.cljk --limit 4
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/dependency-substitution-wave-tick.cljk --limit 4
 ```
 
 - tick **exit 2** → 測れていない。**何もしない。**
@@ -26,7 +26,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/dependency-substitution-wave-tick
 再測定の scoreboard:
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/verify-dependency-substitution.cljk --findings \
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-dependency-substitution.cljk --findings \
   | rg 'substitution-available'
 ```
 
@@ -56,9 +56,9 @@ for(const l of fs.readFileSync("manifest/west.yml","utf8").split("\n")){
 #   3 列目は説明ではなく GitHub の repo slug。取り違えると全件 drop し、
 #   しかも "not reachable from default branch" という別の問題の顔で報告される。
 #   メタ文字（`->` 等）も入れない — シェル経由で組み立てられる。
-PINS=pins.tsv DRY=1 nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
-PINS=pins.tsv     nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
-nbb --classpath ".:scripts/nbb_compat" scripts/verify-west-pins.cljk
+PINS=pins.tsv DRY=1 kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
+PINS=pins.tsv     kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-west-pins.cljk
 ```
 
 SHA は `gh api repos/kotoba-lang/<name>/commits/main --jq .sha` から取る。
@@ -68,7 +68,7 @@ SHA は `gh api repos/kotoba-lang/<name>/commits/main --jq .sha` から取る。
 ```bash
 git fetch origin -q && git merge --ff-only origin/main
 printf '%s\n' <west-name1> <west-name2> | xargs west update --fetch smart
-nbb --classpath ".:scripts/nbb_compat" scripts/verify-dependency-substitution.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-dependency-substitution.cljk
 ```
 
 ## coordinate 別の rewire 指針（ledger を読んだうえで）

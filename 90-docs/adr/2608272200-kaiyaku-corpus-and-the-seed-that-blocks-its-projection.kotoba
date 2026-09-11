@@ -167,13 +167,13 @@ KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi add hyakka-kotobase-seed
 #    期待値 did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo
 cd orgs/network-awai/app-hyakka
 HYAKKA_SEED=$(KAGI_HOME=$HOME/.kagi ../../kotoba-lang/kagi/bin/kagi get hyakka-kotobase-seed) \\
-  nbb --classpath ../../kotoba-lang/kotobase-client/src scripts/verify_identity.cljs did:key:z6MkwF7M...
+  kbb --backend sci --classpath ../../kotoba-lang/kotobase-client/src scripts/verify_identity.cljs did:key:z6MkwF7M...
 
 # 3. 通れば projection（262 file 分を追いつかせる）
 HYAKKA_SEED=... npm run publish -- --knowledge true
 
 # corpus を足す側の再実行（pdftotext 必須。無ければ exit 3 で何も書かない）
-HYAKKA_ARCHIVE_DIR=$HOME/.gftd/hyakka-archive nbb --classpath src scripts/seed_kaiyaku.cljs --dry-run
+HYAKKA_ARCHIVE_DIR=$HOME/.gftd/hyakka-archive kbb --backend sci --classpath src scripts/seed_kaiyaku.cljs --dry-run
 ```
 
 ## 参照

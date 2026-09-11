@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 新しい「面」を作ろうとしたとき、**既に在るものを見せる**（止めない）。
 ;;
 ;; ## なぜ hook なのか
@@ -112,7 +112,7 @@
              (str "⚠ 既に稼働している近い面があります（止めていません。参考です）:\n"
                   (str/join "\n" (map #(str "    " %) (distinct hits)))
                   "\n\n  索引: 90-docs/surface/surface.datoms.edn"
-                  "\n  再生成: nbb scripts/gen-surface-index.cljk"
+                  "\n  再生成: kbb --backend sci scripts/gen-surface-index.cljk"
                   "\n\n  2026-08-03、murakumo に /signup を手書きしたが"
                   " authn.kotobase.net/sign-in は既に稼働していた。"))))))
     ;; 常に通す

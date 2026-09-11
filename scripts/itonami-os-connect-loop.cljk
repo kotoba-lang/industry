@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-os-connect-loop.cljk — **ローカル Claude loop** の入口
 ;; （superproject ADR-2608070000）。LaunchAgent cloud.itonami.bot.itonami-os-connect が
 ;; 一定間隔でこれを起こす。
@@ -32,7 +32,7 @@
 ;;   - exit 0 常に（監視 loop であって gate ではない）。
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-os-connect-loop.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-os-connect-loop.cljk
 ;;   ... --dry-run    ; 測って候補を出すところまで（モデルを起こさない）
 
 (ns itonami-os-connect-loop

@@ -105,8 +105,8 @@ finality 主張の開示を拒否する。
 
 ## Consequences
 
-- (+) `clojure -M:dev:test` 51 tests / 193 assertions, 0 failures。
-  `clojure -M:lint` エラー0・警告0。
+- (+) `kbb -M:dev:test` 51 tests / 193 assertions, 0 failures。
+  `kbb -M:lint` エラー0・警告0。
 - (+) **live 検証済み（2026-07-26）**: 独立した公開エンドポイント2つ
   （publicnode / drpc）が block 25617339 のハッシュで一致 → commit、同じブロックを
   1エンドポイントだけ → corroboration-gate で hold。実 finalized head 25617272 と

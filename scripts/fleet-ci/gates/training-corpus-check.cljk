@@ -1,6 +1,6 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; training-corpus-check.cljs — com-junkawasaki/root の学習コーパス面の gate
-;; （ADR-2608056000）。ノード側で `npx nbb training-corpus-check.cljs <repo-dir>`
+;; （ADR-2608056000）。ノード側で `kbb --backend sci training-corpus-check.cljk <repo-dir>`
 ;; として走る（tick.cljs が heredoc で配って呼ぶ）。**JVM を要求しない。**
 ;;
 ;; 検査するもの:

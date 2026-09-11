@@ -28,7 +28,7 @@
 ;; Not a fleet gate: a gate ships one repo's tree, and this reads every sibling
 ;; under orgs/ to find out who names whom.
 ;;
-;; Usage: nbb verify-definition-repo-reachability.cljs [--findings] <orgs-dir>
+;; Usage: kbb --backend sci verify-definition-repo-reachability.cljk [--findings] <orgs-dir>
 (require '[clojure.string :as s])
 
 (def fs (js/require "node:fs"))

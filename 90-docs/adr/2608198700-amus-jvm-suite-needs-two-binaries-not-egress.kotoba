@@ -7,18 +7,18 @@
   (:adr/body
   "## 観測
 
-amu の fleet gate は 4 本とも `:nbb-script` で、**`clojure -M:test` は fleet で
+amu の fleet gate は 4 本とも `:nbb-script` で、**`kbb -M:test` は fleet で
 走らない**。gates.edn はその理由をこう書いていた:
 
-    browser matrix / wasm-tools / cargo / clojure -M:test は
+    browser matrix / wasm-tools / cargo / kbb -M:test は
     ノードの egress が無く載らない
 
 **実測すると誤りだった**（2026-08-20、benjamin）:
 
 | 測ったもの | 結果 |
 |---|---|
-| `clojure -Spath -M:test` | **exit 0、2.7 秒**。provider / kototama-native / kgraph を実際に clone |
-| `clojure -M:test` | **74 秒で完走**、1,099 tests |
+| `kbb -Spath -M:test` | **exit 0、2.7 秒**。provider / kototama-native / kgraph を実際に clone |
+| `kbb -M:test` | **74 秒で完走**、1,099 tests |
 | その内訳 | 0 failures / **87 errors** |
 
 依存は解決するし suite は走る。87 errors の中身は
@@ -55,7 +55,7 @@ folklore から nodes.edn の欄に移すこと。誰かが 1 台に入れれば
 `:wasm-tools` は fleet で実演できない（どのノードにも無い）ので、直接テストしない
 なら「一度も立つのを見ていない cap」を landing させることになる。
 
-`nbb scripts/fleet-ci/probe.cljs --self-test` に 6 件。両方向を確認:
+`kbb --backend sci scripts/fleet-ci/probe.cljk --self-test` に 6 件。両方向を確認:
 
 | 壊し方 | 落ちたもの |
 |---|---|

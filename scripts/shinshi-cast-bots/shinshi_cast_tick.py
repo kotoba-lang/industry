@@ -25,6 +25,6 @@ cp = ":".join([
     os.path.join(k, "text", "src"),
 ])
 r = subprocess.run(
-    ["nbb", "--classpath", cp, os.path.join(root, "scripts", "shinshi-cast-bots", "post.cljs")],
+    ["kbb", "--backend", "sci", "--classpath", cp, os.path.join(root, "scripts", "shinshi-cast-bots", "post.cljs")],
     cwd=root, timeout=1800)
 sys.exit(r.returncode)

@@ -194,7 +194,7 @@
     **rotate するときは 2 つ同時に**。片方だけ替えると、発行した鍵が検証側で全部落ちる。
     発行: tenant は `POST https://kotobase.net/api/s3-credentials`（CACAO 認証 +
     `:storage/pin` Grant）、operator は
-    `S3_ISSUER_ROOT=... nbb protocols-worker/scripts/issue-s3-credential.cljs <did> [days]`
+    `S3_ISSUER_ROOT=... kbb --backend sci protocols-worker/scripts/issue-s3-credential.cljk <did> [days]`
   - **kotobase-protocols-worker `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`**
     （s3.kotobase.net の AWS SigV4 write 認可、ADR-2607176000）: Worker secret
     投入済み（`wrangler secret list` で 2026-08-17 に両方の存在を確認）。

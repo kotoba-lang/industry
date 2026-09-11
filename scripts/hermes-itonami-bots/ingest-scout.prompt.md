@@ -92,8 +92,8 @@ host assumptions passes while checking nothing.
 5. Pace yourself. These hosts serve a bot challenge when asked too often, and a
    run that trips it establishes nothing. Serial requests, seconds apart.
 6. Write `facts.edn` and the two scripts. Run them from the clone:
-   `nbb scripts/verify-facts.cljs` must exit 0.
-   `nbb scripts/mutation-check.cljs` must report `not-caught=0`.
+   `kbb --backend sci scripts/verify-facts.cljk` must exit 0.
+   `kbb --backend sci scripts/mutation-check.cljk` must report `not-caught=0`.
 7. Write the proposal to `/tmp/itonami-proposal.edn`:
 
    {:proposal/rationale "one sentence: what this register lets the repo cite"
@@ -108,7 +108,7 @@ host assumptions passes while checking nothing.
 
 8. Run the gate, from the superproject:
 
-     nbb --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljk \
+     kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljk \
        --proposal /tmp/itonami-proposal.edn --repo /tmp/<repo>
 
    exit 0 — accepted.

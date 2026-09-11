@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/pin-tip-lag.cljk — is each WEST PIN at its upstream default-branch TIP?
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljk \
 ;;     [--root <superproject checkout>] [--limit N]
 ;;
 ;; ## The leg nothing measured
@@ -38,8 +38,8 @@
 ;; the entries that are not. So the output here is a CANDIDATE list, and the
 ;; thing that decides is the thing that writes:
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljk > pins.tsv
-;;   PINS=pins.tsv DRY=1 nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljk > pins.tsv
+;;   PINS=pins.tsv DRY=1 kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
 ;;
 ;; stdout is exactly the TSV that script eats: <west-entry-name> <tip-sha> <slug>.
 ;;

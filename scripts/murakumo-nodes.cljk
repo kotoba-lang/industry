@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; murakumo-nodes.cljs — フリート各機の**推論プロセスとメモリを 1 箇所から見る／止める／載せる**。
 ;;
-;;   nbb scripts/murakumo-nodes.cljk audit [--json]
-;;   nbb scripts/murakumo-nodes.cljk reap [--orphans] [--apply]
-;;   nbb scripts/murakumo-nodes.cljk serve <node> <model.gguf> [--mmproj F] [--ctx N] [--port N]
-;;   nbb scripts/murakumo-nodes.cljk stop <node> [--port N]
+;;   kbb --backend sci scripts/murakumo-nodes.cljk audit [--json]
+;;   kbb --backend sci scripts/murakumo-nodes.cljk reap [--orphans] [--apply]
+;;   kbb --backend sci scripts/murakumo-nodes.cljk serve <node> <model.gguf> [--mmproj F] [--ctx N] [--port N]
+;;   kbb --backend sci scripts/murakumo-nodes.cljk stop <node> [--port N]
 ;;
 ;; ## なぜ要るのか（2026-08-15 に実際に起きたこと）
 ;;

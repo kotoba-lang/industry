@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-tsukuru-factory-plane.cljk — ADR-2800003200 Phase 1 の不変条件検査
 ;;
 ;; 検査するのは「載っているか」ではなく **同意の段階が混ざっていないか**。
@@ -13,7 +13,7 @@
 ;; 畳まれても、行が落ちても、did:web が混入しても、Datalog は黙って答えを返す。
 ;; だからここで**落ちる検査**にする。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-tsukuru-factory-plane.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-tsukuru-factory-plane.cljk
 ;;   ... --findings   ; 機械可読な finding も出す（orgs-detector-tick 用）
 ;;
 ;; ## --findings が出すもの（2026-08-13）
@@ -136,7 +136,7 @@
   [queries]
   (println (str "  ... 面をロード中（1 回だけ / クエリ " (count queries) " 本）"))
   (let [t0 (js/Date.now)
-        argv (concat ["nbb" "--classpath" ".:scripts/nbb_compat" query-script "q*"] queries)
+        argv (concat ["kbb" "--backend" "sci" "--classpath" ".:scripts/nbb_compat" query-script "q*"] queries)
         {:keys [exit out err signal]}
         (apply shell/sh (concat argv [{:cwd root
                                        ;; batch: a cold plane is normal here

@@ -109,7 +109,7 @@ drafts clinical/diagnosis/treatment scope content so the governor's scope
 scan can be exercised end to end), `hospitalops.governor` (HospitalGovernor),
 `hospitalops.phase` (0→3 rollout), `hospitalops.operation` (the
 `langgraph-clj` StateGraph: intake → advise → govern → decide → commit |
-hold | request-approval), `hospitalops.sim` (demo driver, `clojure -M:run`).
+hold | request-approval), `hospitalops.sim` (demo driver, `kbb -M:run`).
 
 ## Consequences
 
@@ -124,8 +124,8 @@ hold | request-approval), `hospitalops.sim` (demo driver, `clojure -M:run`).
   pushed to `main`.
 - Test suite, run directly by this session (not agent self-report):
   **`Ran 42 tests containing 123 assertions, 0 failures, 0 errors.`**
-  (`clojure -M:test`). `clojure -M:lint`: 0 errors, 0 warnings.
-  `clojure -M:run` (`hospitalops.sim` demo) walked all scenarios
+  (`kbb -M:test`). `kbb -M:lint`: 0 errors, 0 warnings.
+  `kbb -M:run` (`hospitalops.sim` demo) walked all scenarios
   (phase-1 approval-gated commit, phase-3 auto-commit for all four
   non-safety ops, always-escalating safety-concern flag, and all four
   HARD-hold scenarios: unregistered bed, unverified bed, non-`:propose`

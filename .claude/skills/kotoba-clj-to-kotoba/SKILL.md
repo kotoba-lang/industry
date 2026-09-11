@@ -107,7 +107,7 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
    ⚠ **JVM-free を主張するなら、無いのではなく拒否して記録する。**
    `java`/`javac`/`clojure`/`clj` の stub を PATH 先頭に置き、呼ばれたら log に
    追記して非ゼロで終わらせ、log が空であることを assert する。**そして その log が
-   空でないことを 1 度は見せる**（実測: `amu test` だけが `clojure -M:run` に落ちて
+   空でないことを 1 度は見せる**（実測: `amu test` だけが `kbb -M:run` に落ちて
    踏まれていた）—— 踏まれたことのない trace は、常に空な trace と区別できない。
 
 6c. **`kotoba -M test` の契約（実測 2026-09-06、wave-1 20 repo で確立）。**
@@ -124,7 +124,7 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
      checkpoint #2 を一時過大記録、amendment で訂正）。
 
 8b. **着地後の pin は batch で**。複数 repo を動かしたら
-   `PINS=pins.tsv nbb scripts/west-pin-put-batch.cljk`。
+   `PINS=pins.tsv kbb --backend sci scripts/west-pin-put-batch.cljk`。
 
    **tsv の 3 列目は「説明」ではなく GitHub の `<org>/<repo>`。**
    `<west entry 名>\t<40 hex sha>\t<org/repo>`。ここを取り違えると全件 drop するが、
@@ -143,7 +143,7 @@ kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
    rotating sample）が kotoba -M check/test/compile + amu check の 4 gate で巡回する。
    REGRESSION が出たら着地済み slice の退行。
 8. **着地。** feature branch を push し `gh api .../merges` で main へ。
-   west pin は `nbb scripts/west-pin-put.cljk <entry> HEAD`（複数 repo なら 8b の batch）。
+   west pin は `kbb --backend sci scripts/west-pin-put.cljk <entry> HEAD`（複数 repo なら 8b の batch）。
 
 先例: amu `examples/todo-app.kotoba`（application）、
 `kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_commands`（コマンド文字列）と

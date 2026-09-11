@@ -117,12 +117,12 @@
    - 登録経路: `repos.edn :extra-projects` へ登録 →
      `gen-west-manifest.cljs --entry haishin` で **5行・当該 entry のみの最小 diff**。
      サーバ側 pin 検証 OK（『新規 entry, pin 9397c46 は main から到達可能』）。
-   - 完了ゲート `nbb scripts/west-orphan-audit.cljs --blocking` **exit 0**
+   - 完了ゲート `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` **exit 0**
      （true-orphan-git 0 / local-root-broken 0）。
 
    ## 検証（固定）
 
-   - **20 tests / 82 assertions が nbb（primary）と JVM（`clojure -M:test`）の
+   - **20 tests / 82 assertions が nbb（primary）と JVM（`kbb -M:test`）の
      両方で green。** `.cljc` 可搬性は主張でなく実測。
    - **公開後に clean clone でも再実行して green** — `git clone` した独立 checkout が
      pin と同一 SHA `9397c469` を指しており、そこで 20 tests が通ることを確認した。
@@ -190,8 +190,8 @@
    ## resume point（次の agent 向け、会話履歴なしで再開できる粒度）
 
        git clone git@github.com:kotoba-lang/haishin.git && cd haishin
-       nbb run_tests.cljs            # 20 tests / 82 assertions、green のはず
-       clojure -M:test               # JVM 側も同数 green
+       kbb --backend sci run_tests.cljk            # 20 tests / 82 assertions、green のはず
+       kbb -M:test               # JVM 側も同数 green
 
    R1 に着手するなら `src/haishin/constraints.cljc` の `targets` map だけを触る
    （他の ns は limit の値を知らない）。R2 に着手するなら sender は消費側の repo に
@@ -214,7 +214,7 @@
    - `haishin.adapt` — tamaki content contract からの変換、`:executable?` → grant
    - `haishin.core` — single entry（kotoba-ui と同じ規律）
 
-   テスト: `nbb run_tests.cljs`（primary）/ `clojure -M:test`（JVM、secondary）。
+   テスト: `kbb --backend sci run_tests.cljk`（primary）/ `kbb -M:test`（JVM、secondary）。
 
    使用例:
 

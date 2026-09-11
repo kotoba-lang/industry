@@ -193,7 +193,7 @@ loopback port はこのマシンの全プロセスから届く。
 
 このセッションで実測したもの:
 
-- **nbb（ClojureScript、第一 runtime）**: `nbb --classpath src:test dev/nbb_test.cljs`
+- **nbb（ClojureScript、第一 runtime）**: `kbb --backend sci --classpath src:test dev/nbb_test.cljs`
   で 25 tests / 106 assertions / 0 failures。exit code が green で 0・red で 1 に
   なることを、assertion をわざと壊して確認済み。
 - **JVM（互換）**: 同じ 2 suite + `core-test` + `commands-test` で

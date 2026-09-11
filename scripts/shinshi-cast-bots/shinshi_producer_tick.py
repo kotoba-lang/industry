@@ -10,7 +10,7 @@ root = os.environ.get("COM_JUNKAWASAKI_ROOT") or os.environ.get(
     # legacy; `gftd` is retired (manifest/gftd-retirement.edn)
     "GFTD_ROOT", os.path.expanduser("~/github/com-junkawasaki"))
 r = subprocess.run(
-    ["nbb", "--classpath", os.path.join(root, "scripts", "shinshi-cast-bots"),
+    ["kbb", "--backend", "sci", "--classpath", os.path.join(root, "scripts", "shinshi-cast-bots"),
      os.path.join(root, "scripts", "shinshi-cast-bots", "produce.cljs"), "--count", "12"],
     cwd=root, timeout=1800)
 sys.exit(r.returncode)

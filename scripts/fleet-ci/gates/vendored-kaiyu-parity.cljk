@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; vendored-kaiyu-parity — a vendored copy must still BE the copy.
 ;;
 ;; club-shinshi-app cannot depend on kotoba-lang/kaiyu: its CI and production
@@ -19,7 +19,7 @@
 ;; because the point is to compare against WHAT THE HEADER CLAIMS, not against
 ;; whatever happens to be checked out next to it.
 ;;
-;;   nbb vendored-kaiyu-parity.cljs [--dir <repo-root>] [--prefix <vendor dir>]
+;;   kbb --backend sci vendored-kaiyu-parity.cljk [--dir <repo-root>] [--prefix <vendor dir>]
 
 (ns vendored-kaiyu-parity
   (:require ["fs" :as fs]

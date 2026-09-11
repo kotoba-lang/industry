@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-lint-structural-warnings
   "Two clj-kondo linters that nobody runs, both of which say `the shape of
   this form is not the shape you meant`.
@@ -101,7 +101,7 @@
 
   ## How clj-kondo is invoked, and the three things that had to be measured
 
-  The alias is `clojure -M:lint`, which needs the JVM and this machine's
+  The alias is `kbb -M:lint`, which needs the JVM and this machine's
   heavily contended build lock. A `clj-kondo` binary is on PATH at the SAME
   pinned version -- `clj-kondo --version` reports `clj-kondo v2024.11.14`,
   checked at startup below and an exit-2 refusal if it does not. The binary
@@ -176,9 +176,9 @@
 
   ## Usage
 
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-lint-structural-warnings.cljk \\
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-lint-structural-warnings.cljk \\
         [--scan-root <dir>] [--repo <path>]... [--findings]
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-lint-structural-warnings.cljk --selftest
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-lint-structural-warnings.cljk --selftest
 
   `--scan-root` is where `orgs/` and `manifest/west.yml` live, so the
   detector can run from a worktree that has neither (the shape

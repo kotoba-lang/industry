@@ -127,12 +127,12 @@ ADR-2606302300 の layer test を落ちるので kotoba-lang capability library 
 
 - `kotoba-lang/marketplace` main **`ea26053`**: `src/marketplace/acceptance.cljc`
   + `test/marketplace/acceptance_test.cljc`（17 deftest）+ README。
-  検証: `clojure -M:test` **169 tests / 719 assertions / 0 failures**、
-  `clojure -M:lint` **0 errors / 0 warnings**。
+  検証: `kbb -M:test` **169 tests / 719 assertions / 0 failures**、
+  `kbb -M:lint` **0 errors / 0 warnings**。
 - `cloud-itonami/cloud-itonami-marketplace-settlement` main **`db97e15`**:
   `:not-a-payout-rail` 拒否 + marketplace pin 前進（`2bdd9b6` → `ea26053`）+
-  README の rail 表に第3行。検証: `clojure -M:test` **48 tests / 143 assertions /
-  0 failures**（2 新規 deftest）、`clojure -M:lint` **0 errors / 0 warnings**。
+  README の rail 表に第3行。検証: `kbb -M:test` **48 tests / 143 assertions /
+  0 failures**（2 新規 deftest）、`kbb -M:lint` **0 errors / 0 warnings**。
 - superproject: `manifest/west.yml` の2 entry のみを GitHub API single-entry commit で
   前進（**`88da2174`**。marketplace `8094c50` → `ea26053`、settlement
   `5c85e1e` → `db97e15`）。両方とも push 前に GitHub API で

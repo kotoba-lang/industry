@@ -141,7 +141,7 @@ kotoba-lang/kotoba c4ff5ca71f43 (PR #618). Repairs are portable `.cljc` in
 `test/kotoba/doctor_test.cljc`, 8 tests / 22 assertions, registered in
 `run-tests.cljs`. west pin 47aa4de0 -> c4ff5ca7.
 
-⚠ That runner needs the full `clojure -Spath -M:test` classpath and fails on
+⚠ That runner needs the full `kbb -Spath -M:test` classpath and fails on
 `did.core` without it -- verified identical on origin/main's own copy, so it is
 pre-existing and not this change. The new test has no external dependency and
 runs standalone.")))

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; threed-icp-drift — 売り文句と実測のずれを見つける。
 ;;
 ;; `90-docs/business/gtm-icp.datoms.edn` は手で書く文書で、
@@ -37,7 +37,7 @@
 ;; これ以上パターンを絞らない。**0 件になるまで絞る道は、何も報告しない検査で終わる。**
 ;; 1 件を基準線として置き、**2 件以上出たら何かが変わった**と読む。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/threed-icp-drift.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/threed-icp-drift.cljk
 ;;
 ;; exit 0 = 検査できた（ずれの有無は出力を読む）  3 = 答えられなかった
 

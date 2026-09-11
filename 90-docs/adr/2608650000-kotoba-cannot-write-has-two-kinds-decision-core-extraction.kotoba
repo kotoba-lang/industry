@@ -380,7 +380,7 @@ web target 以外で拒否し、`string=?` が i64 を返すため `:bool` 結�
 ```bash
 # 現在地の確認（決定核が 4 ターゲットで通ることの再現）
 cd orgs/cloud-itonami/cloud-itonami-app
-clojure -A:test -Spath > /tmp/cp.txt
+kbb -A:test -Spath > /tmp/cp.txt
 java -cp \"$(cat /tmp/cp.txt)\" clojure.main -e \\
   \"(require '[kotoba.compiler.core :as c]) \\
    (doseq [f [\\\"src/cloud/itonami/app/policy.kotoba\\\" \\

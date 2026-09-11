@@ -21,7 +21,7 @@ for cc in "$@"; do
     built=0
     for i in $(seq 1 40); do
       if node $ROOT/scripts/resource-guard.mjs run build -- \
-           clojure -M:cljs -m shadow.cljs.devtools.cli release worker > /tmp/ship-$cc.log 2>&1; then
+           kbb -M:cljs -m shadow.cljs.devtools.cli release worker > /tmp/ship-$cc.log 2>&1; then
         built=1; break
       fi
       grep -q "already running" /tmp/ship-$cc.log || break

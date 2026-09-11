@@ -266,11 +266,11 @@ west pin は両子リポの tip と一致（`9d70992` / `69b398f`）。Cloudflar
 
 | 検査 | 結果 |
 |---|---|
-| `tsukuru-actor` `clojure -M:test` | 45 tests / 681–682 assertions、0 failures。assertion 数が揺れるのは repository-contract test が**ディスク上のファイル数に比例**して assert するため（`dist/` の有無で変わる）。テスト数 45 は不変 |
+| `tsukuru-actor` `kbb -M:test` | 45 tests / 681–682 assertions、0 failures。assertion 数が揺れるのは repository-contract test が**ディスク上のファイル数に比例**して assert するため（`dist/` の有無で変わる）。テスト数 45 は不変 |
 | `verify-tsukuru-factory-plane.cljs` | PASS。3 タグを畳んだコピーと cardinality-many を外したコピーで **exit 1 を確認済み** |
 | `annex-custody-verify.cljs` | OK（2 件とも remote から fsck）。未 push ファイルで **exit 1 を確認済み** |
 | `verify-artifact-path-policy.cljs` | OK。`raw/cad/AcmeCorp-PART-4471-Rev-C.step` で **exit 1 を確認済み** |
-| Worker build | `shadow-cljs release worker` 0 warnings / 400 KB |
+| Worker build | `amu compile --target wasm32-browser worker` 0 warnings / 400 KB |
 
 **次の具体的な一手（優先順）**
 
@@ -390,7 +390,7 @@ landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
 - governor は 9 hard check + 3 escalate。credential は `:seller/id` で引く
   （factory DID と等しいと仮定すると、実在の seller で永久に満たせない check になる）。
 - production-order は**どの phase でも auto-commit しない**（governor と phase 表の二重）。
-- 検証: 35 tests / 642 assertions green（新規 23）。`shadow-cljs release worker` が
+- 検証: 35 tests / 642 assertions green（新規 23）。`amu compile --target wasm32-browser worker` が
   0 warnings で 355 KB の worker.js を生成。Worker `cloud-itonami-tsukuru` を
   Cloudflare に deploy 済み。
 

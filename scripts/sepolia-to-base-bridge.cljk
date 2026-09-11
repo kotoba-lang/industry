@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; sepolia-to-base-bridge — carry mined Sepolia ETH to Base Sepolia, where the
 ;; x402 facilitator needs it.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/eth-crypto/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/eth-crypto/src" \
 ;;       scripts/sepolia-to-base-bridge.cljk [--address 0x…] [--send]
 ;;
 ;; ## Where testnet gas actually comes from

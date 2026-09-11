@@ -6,7 +6,7 @@
 ;; at this key", and shows whether a file has one fault or several compounding
 ;; ones — which decides whether it can be repaired mechanically at all.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-depth-profile.cljk <file>...
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/docs-edn-depth-profile.cljk <file>...
 (ns docs-edn-depth-profile
   (:require ["fs" :as fs]
             [clojure.string :as str]))

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/rule-kaizen-loop.cljk — ローカル Claude loop の入口。
 ;; LaunchAgent `cloud.itonami.bot.rule-kaizen` が一定間隔でこれを起こす（未配置）。
 ;;
@@ -17,7 +17,7 @@
 ;;   - exit 0 常に。
 ;;
 ;; usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen-loop.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/rule-kaizen-loop.cljk
 ;;   ... --dry-run
 
 (require '[clojure.edn :as edn]

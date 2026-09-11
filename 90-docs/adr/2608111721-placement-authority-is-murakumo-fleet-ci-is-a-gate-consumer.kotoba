@@ -372,9 +372,9 @@ rotation ノードの宣言で 1 件検出 + exit 1。**無改変で exit 0** �
    repo 側に plist が在るのに `residency.edn` が無いのが
    `com.gftdcojp.itonami.{expiry-alert,kakuninya,mail-drain}`（`cloud-itonami/scripts/launchd/`）の 3 本、
    `com.gftd.hayari-mirror` は plist 自体がどの repo にも無いので先に house 化する。
-   検査は `nbb scripts/residency-collect.cljs . --check`。
+   検査は `kbb --backend sci scripts/residency-collect.cljk . --check`。
 2. **placement の退行検出を gate 化する。** `placement-parity.cljs --check` は実行に
-   murakumo の classpath（`clojure -Spath`）が要るので、fleet gate に載せるなら
+   murakumo の classpath（`kbb -Spath`）が要るので、fleet gate に載せるなら
    `placement.cljs` の classpath cache と同じ経路を gate 側にも与える必要がある。
    今は手で回す検査であり、常駐していない。
 3. **murakumo issue #265 の残り 2 件**（`expand`/`task-id` と `tunnel/connect-timeout-opt`）。

@@ -132,7 +132,7 @@ submission から**導出**される — 人間は主張された数字ではな
 
 ### ナビゲーションの drift（既存問題、悪化させない）
 
-`shell/sidebar` に2ルートを追加し `clojure -M:local:site` で drift の無い7ルートを
+`shell/sidebar` に2ルートを追加し `kbb -M:local:site` で drift の無い7ルートを
 再生成（各 nav 1行差分。`local/index.html`・`theme.css`・`workspace` は byte 同一）。
 `public/index.html` は手当てし、生成器出力と active マーカー以外 byte 同一であることを
 検証した。

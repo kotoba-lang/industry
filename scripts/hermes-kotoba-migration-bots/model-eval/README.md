@@ -44,19 +44,19 @@ Verdicts are deliberately distinct — `:parity-not-measured` is **not** a pass:
 
 ```sh
 # one model, the fixed 12-task set, 3 reps
-nbb eval-runner.cljs --tasks tasks.edn --models murakumo-main --reps 3 \
+kbb --backend sci eval-runner.cljk --tasks tasks.edn --models murakumo-main --reps 3 \
     --out results-qwen.edn
 
 # two models, same tasks
-nbb eval-runner.cljs --tasks tasks.edn --models murakumo-main,basho-320-18b --reps 3
+kbb --backend sci eval-runner.cljk --tasks tasks.edn --models murakumo-main,basho-320-18b --reps 3
 
 # feed compiler diagnostics back on a compile-fail (measured: does not help, see below)
-nbb eval-runner.cljs --tasks tasks.edn --models murakumo-main --reps 3 --repair 2
+kbb --backend sci eval-runner.cljk --tasks tasks.edn --models murakumo-main --reps 3 --repair 2
 
-nbb compare.cljs "repair=0" results-qwen.edn "repair=2" results-qwen-repair.edn
-nbb where.cljs results-qwen.edn      # where the token budget went
-nbb batch-test.cljs <reps> <n-filler>  # N functions in ONE call
-nbb cachetest.cljs                   # does the route reuse a prompt prefix
+kbb --backend sci compare.cljk "repair=0" results-qwen.edn "repair=2" results-qwen-repair.edn
+kbb --backend sci where.cljk results-qwen.edn      # where the token budget went
+kbb --backend sci batch-test.cljk <reps> <n-filler>  # N functions in ONE call
+kbb --backend sci cachetest.cljk                   # does the route reuse a prompt prefix
 ```
 
 `tasks.edn` is a **fixed** set, drawn from `candidates.cljs` with a throwaway

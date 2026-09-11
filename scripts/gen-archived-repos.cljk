@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/gen-archived-repos.cljk — GitHub で archived（read-only）な repo を
 ;; 掃き出して `manifest/archived-repos.edn` に書く。生成物（手編集禁止）。
 ;;
@@ -32,7 +32,7 @@
 ;;     完全な結果の顔で置くと、消えた org の archived が黙って候補に戻る。
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk
 ;;   nbb ... scripts/gen-archived-repos.cljk --orgs cloud-itonami,kotoba-lang
 ;;   nbb ... scripts/gen-archived-repos.cljk --check     # 差分があれば exit 1
 ;;
@@ -234,7 +234,7 @@
    （pprint に任せると 1 行が折り返して、1 本増えただけで全体が動く）。"
   [m]
   (str ";; manifest/archived-repos.edn — 生成物。手で編集しない。\n"
-       ";; 再生成: nbb --classpath \".:scripts/nbb_compat\" scripts/gen-archived-repos.cljk\n"
+       ";; 再生成: kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/gen-archived-repos.cljk\n"
        "{:generated-at " (pr-str (:generated-at m)) "\n"
        " :source " (pr-str (:source m)) "\n"
        " :note " (pr-str (:note m)) "\n"

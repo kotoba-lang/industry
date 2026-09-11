@@ -100,21 +100,21 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ```bash
 # 自己計測（未検証率・登記不可視率・地域偏り・ISIC 残余率・次に pin すべき org）
-nbb 90-docs/community-coverage/queries/coverage.cljs
-nbb 90-docs/community-coverage/queries/coverage.cljs unpinned
-nbb 90-docs/community-coverage/queries/coverage.cljs regions
-nbb 90-docs/community-coverage/queries/coverage.cljs integrity   # 参照整合性のみ
-nbb 90-docs/community-coverage/queries/coverage.cljs freshness   # pin 元出典の古さ
-nbb 90-docs/community-coverage/queries/coverage.cljs countries   # 国別カバレッジと不在国
-nbb 90-docs/community-coverage/queries/coverage.cljs depth       # 1 か国あたりの形態数
+kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk
+kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk unpinned
+kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk regions
+kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk integrity   # 参照整合性のみ
+kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk freshness   # pin 元出典の古さ
+kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk countries   # 国別カバレッジと不在国
+kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk depth       # 1 か国あたりの形態数
 
 # 統合クエリ面（religious-community と同じ :org/* 語彙で join 可能）
-nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
+kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
   '[:find ?reg (count ?e) :where [?e \"source/dataset\" \"community-coverage\"]
     [?e \"org/legal-registration\" ?reg]]'
 
 # community org → category → ISIC class → cloud-itonami actor repo
-nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
+kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
   '[:find ?isic (count ?o) :where
     [?o \"source/dataset\" \"community-coverage\"] [?o \"org/category\" ?cat]
     [?c \"community-category/id\" ?cat] [?c \"community-category/isic-hint\" ?isic]]'

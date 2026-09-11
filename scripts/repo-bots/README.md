@@ -4,11 +4,11 @@ west に登録された repo それぞれに、自分の現在地を測る常駐
 名簿は生成物 `manifest/repo-bots.edn`、稼働は `~/.itonami/repo-bots/state.edn`。
 
 ```bash
-nbb scripts/repo-bots/gen-registry.cljk          # 名簿を起こす（生成物）
-nbb scripts/repo-bots/gen-registry.cljk --check  # 生成器と一致するか
-nbb scripts/repo-bots/tick.cljk                  # 波 1 つ（既定 200 体）
-nbb scripts/repo-bots/tick.cljk --report         # 測らず、いまの現在地
-nbb scripts/repo-bots/tick.cljk --only kotoba-lang/amu
+kbb --backend sci scripts/repo-bots/gen-registry.cljk          # 名簿を起こす（生成物）
+kbb --backend sci scripts/repo-bots/gen-registry.cljk --check  # 生成器と一致するか
+kbb --backend sci scripts/repo-bots/tick.cljk                  # 波 1 つ（既定 200 体）
+kbb --backend sci scripts/repo-bots/tick.cljk --report         # 測らず、いまの現在地
+kbb --backend sci scripts/repo-bots/tick.cljk --only kotoba-lang/amu
 ```
 
 ## なぜ「名簿」と「稼働」を別の場所に置くか
@@ -144,10 +144,10 @@ ghost は改変前は配られ改変後は外れる / 本物は改変前後と�
 ## murakumo を繋ぐ側（提案は模型・判定は gate）
 
 ```bash
-nbb scripts/repo-bots/propose.cljk --batch 8      # 波で草稿を作る（常駐用）
-nbb scripts/repo-bots/propose.cljk --bot <id>     # 1 体だけ
-nbb scripts/repo-bots/propose.cljk --dry-run      # 模型を呼ばず証拠の量だけ見る
-nbb scripts/repo-bots/propose.cljk --bot <id> --check-draft <file>   # gate だけ通す
+kbb --backend sci scripts/repo-bots/propose.cljk --batch 8      # 波で草稿を作る（常駐用）
+kbb --backend sci scripts/repo-bots/propose.cljk --bot <id>     # 1 体だけ
+kbb --backend sci scripts/repo-bots/propose.cljk --dry-run      # 模型を呼ばず証拠の量だけ見る
+kbb --backend sci scripts/repo-bots/propose.cljk --bot <id> --check-draft <file>   # gate だけ通す
 ```
 
     tick（決定論） → 証拠（決定論） → 模型が起草 → gate（決定論） → 草稿

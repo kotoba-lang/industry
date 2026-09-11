@@ -27,10 +27,10 @@
    (:cleanup (map (:container :removed) (:maven-volume :removed) (:orbstack :stopped)))
    (:executable-evidence
    (vector (map (:environment "OrbStack Linux amd64 container")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "PostgreSQL 14.23, 15.18, 17.10; all exit 0"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "KOTOTAMA_POOL_SOAK_OPS=1000 clojure -M:postgresql-interop")
+     (:command "KOTOTAMA_POOL_SOAK_OPS=1000 kbb -M:postgresql-interop")
      (:result "3000 contended operations; exit 0"))))))
   (:adr/body
   "# ADR-2607197900: PostgreSQL Linux x86 matrix and full pool soak

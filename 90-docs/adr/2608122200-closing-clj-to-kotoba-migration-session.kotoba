@@ -166,7 +166,7 @@ pins.
 
    `test/e2e/src` is a source root by name and ships to nobody: it is reachable
    only through each repo's own `:e2e` alias, and tools.deps does not export a
-   dependency's aliases. Measured with `clojure -Spath -A:e2e` in the one repo
+   dependency's aliases. Measured with `kbb -Spath -A:e2e` in the one repo
    depending on two of the three -- neither tree appears. The three files are
    also not copies: pairwise line similarity is 0.08-0.30 and no exported var
    name overlaps. They are three different programs that share a path.
@@ -214,7 +214,7 @@ pins.
    - **A declared root must not be the declaring directory.** `:paths [\".\"]`
      is legitimate and documented where it appears: `kotoba-lang`'s own deps.edn
      has it so `io/resource` finds `lang/cli.edn`, and the 20 `games/*` ones
-     have it for `clojure -M author.clj` on files that carry no `ns` form.
+     have it for `kbb -M author.clj` on files that carry no `ns` form.
 
    All five acceptance criteria hold, and the DIVERGENT list is byte-identical
    to before -- same 8 namespaces, same owners, same shas -- while the scan grew
@@ -346,8 +346,8 @@ pins.
 
 Pin advance, for each child repo they touch:
 
-    nbb scripts/advance-pins.cljs <org> <file-with-repo-name> --execute
-    nbb scripts/verify-west-pins.cljs
+    kbb --backend sci scripts/advance-pins.cljk <org> <file-with-repo-name> --execute
+    kbb --backend sci scripts/verify-west-pins.cljk
 
 ## Open owner decisions -- recorded, not decided
 
@@ -450,7 +450,7 @@ verification of existence, default-branch reachability and forward motion, and
 advancing a pin that could not be verified would defeat the check rather than
 satisfy it. Retry when the secondary limit clears:
 
-    nbb scripts/verify-west-pins.cljs
+    kbb --backend sci scripts/verify-west-pins.cljk
 
 A guard is worth copying from that attempt. The first try interpolated `gh`'s
 403 JSON into a `perl -0pi -e` substitution as if it were a SHA. It failed only
@@ -549,8 +549,8 @@ green after.
 `kotoba-lang/sdk-py` (`01fab5c46f7`, pin at `6cd818b`) and `kotoba-lang/vpn`
 (`b9dfa224456`, pin at `3d2d269`). Advance both when the limit clears:
 
-    nbb scripts/advance-pins.cljs kotoba-lang <names-file> --execute
-    nbb scripts/verify-west-pins.cljs
+    kbb --backend sci scripts/advance-pins.cljk kotoba-lang <names-file> --execute
+    kbb --backend sci scripts/verify-west-pins.cljk
 
 **The limit is a SECONDARY rate limit, and `gh api rate_limit` does not report
 it.** Measured at close: `rate_limit` said 4,879 of 5,000 core remaining while

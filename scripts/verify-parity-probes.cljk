@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-parity-probes — a parity axis may not claim a capability is ABSENT on
 ;; the strength of a probe that could not have found it.
 ;;
@@ -38,7 +38,7 @@
 ;; absence claims, not to block on a backlog. Removing the attribute without
 ;; fixing the probe re-fails.
 ;;
-;;   nbb scripts/verify-parity-probes.cljk [path-to-ledger]
+;;   kbb --backend sci scripts/verify-parity-probes.cljk [path-to-ledger]
 
 (ns verify-parity-probes
   (:require ["fs" :as fs]
@@ -163,7 +163,7 @@
       (do (println (str "\nFAIL " (count blocking) " 件 — 探索範囲が主張を支えていない:"))
           (doseq [{:keys [id kind detail]} blocking]
             (println (str "  ✗ " id "\n      " kind "\n      " detail)))
-          (println (str "\n直し方: 能力名の同義語で `nbb scripts/repo-search.cljk <語…>` を引き、"
+          (println (str "\n直し方: 能力名の同義語で `kbb --backend sci scripts/repo-search.cljk <語…>` を引き、"
                         "その結果を probe に書く。今は未再測定だと認めるなら "
                         ":parity/probe-debt \"理由\" を足す（それも報告される）。"))
           (js/process.exit 1))

@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gen-agents-md.cljs — AGENTS.md（Codex 向け agent 指示）を CLAUDE.md から生成する。
 ;;
 ;; 正本は CLAUDE.md。AGENTS.md は生成物で、手書き禁止（west.yml と同じ規律）。
 ;; ADR-2609062600。gate は `root-agents-md-generated`。
 ;;
-;;   nbb scripts/gen-agents-md.cljk           # 生成して書き込む
-;;   nbb scripts/gen-agents-md.cljk --check   # 差分があれば exit 1（書き込まない）
+;;   kbb --backend sci scripts/gen-agents-md.cljk           # 生成して書き込む
+;;   kbb --backend sci scripts/gen-agents-md.cljk --check   # 差分があれば exit 1（書き込まない）
 ;;
 ;; exit code:
 ;;   0  生成した / --check で一致
@@ -34,7 +34,7 @@
   (str "<!-- GENERATED FILE — DO NOT EDIT.\n"
        "     正本は CLAUDE.md。ここを直しても次の生成で消える。\n"
        "     規則を足す/直すときは CLAUDE.md を編集し、\n"
-       "       nbb scripts/gen-agents-md.cljk\n"
+       "       kbb --backend sci scripts/gen-agents-md.cljk\n"
        "     を回す。検査は --check（fleet gate root-agents-md-generated）。\n"
        "     ADR-2609062600. -->\n"))
 
@@ -94,7 +94,7 @@
         (if (= cur out)
           (do (println "AGENTS.md: up to date") (js/process.exit 0))
           (do (binding [*print-fn* *print-err-fn*]
-                (println "AGENTS.md is STALE — regenerate with: nbb scripts/gen-agents-md.cljk"))
+                (println "AGENTS.md is STALE — regenerate with: kbb --backend sci scripts/gen-agents-md.cljk"))
               (js/process.exit 1))))
       (do (.writeFileSync fs target out)
           (println (str "wrote " target " (" (count (str/split-lines out)) " lines) from " source))

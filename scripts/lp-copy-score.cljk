@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lp-copy-score.cljs — LP の**コピー**を決定論的に採点する。
 ;;
 ;; `scripts/threed-maturity-audit.cljk` が「その機能は動くか」を測るのに対し、
@@ -31,8 +31,8 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb scripts/lp-copy-score.cljk <url|file> [<url|file> ...]
-;;   nbb scripts/lp-copy-score.cljk --json <url>       # 機械可読
+;;   kbb --backend sci scripts/lp-copy-score.cljk <url|file> [<url|file> ...]
+;;   kbb --backend sci scripts/lp-copy-score.cljk --json <url>       # 機械可読
 ;;
 ;; **単独のスコアは読めない。比較して読む** —— 同じ計器で 2 面以上を測り、
 ;; 差を見る。絶対値の閾値はこのファイルの外に無い。
@@ -291,7 +291,7 @@
 
 (defn -main []
   (if (empty? targets)
-    (do (println "usage: nbb scripts/lp-copy-score.cljk <url|file> [...]") (js/process.exit 2))
+    (do (println "usage: kbb --backend sci scripts/lp-copy-score.cljk <url|file> [...]") (js/process.exit 2))
     (let [rs (mapv (fn [t] (score-one t (fetch t))) targets)]
       (if (flag? "--json")
         (println (js/JSON.stringify (clj->js rs) nil 2))

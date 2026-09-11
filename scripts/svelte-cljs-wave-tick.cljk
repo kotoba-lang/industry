@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/svelte-cljs-wave-tick.cljk — Svelte → cljs 移行の候補を**測る**
 ;; （ADR-2608260900）。決定論。モデルを起こさない。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/svelte-cljs-wave-tick.cljk [--limit 4]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/svelte-cljs-wave-tick.cljk [--limit 4]
 ;;
 ;; 姉妹 tick（industry-stack-wave / itonami-os-connect）と同型で、loop は
 ;; 「候補があるときだけ」claude を起こす。手順の正本は skill `svelte-cljs-wave`

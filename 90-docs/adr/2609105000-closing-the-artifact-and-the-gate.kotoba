@@ -78,7 +78,7 @@ pass on files it could not read. The third cause was
 These came out of the trap and the controls, and each is a separate change:
 
 1. **The public `kotoba` CLI starts a JVM.** `check --source-path`, `inspect`
-   and `definition-cids` shell out to `clojure -M:run`. The contract says
+   and `definition-cids` shell out to `kbb -M:run`. The contract says
    `:public-cli {:jvm-launcher-forbidden true}`. `amu --jvm-free` fails closed
    as specified; the `kotoba` driver has no such flag on these paths.
 2. **`kotoba -M check` on a relative path** reports `input could not be read`

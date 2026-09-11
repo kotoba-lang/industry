@@ -18,9 +18,9 @@
   ```
   cd orgs/kotoba-lang/murakumo
   MURAKUMO_TOKEN_SECRET=$(kagi get MURAKUMO_API_TOKEN_SECRET) \
-    nbb --classpath src scripts/run-task.cljs token issue --sub <who> --scope chat --ttl 604800
+    kbb --backend sci --classpath src scripts/run-task.cljs token issue --sub <who> --scope chat --ttl 604800
   ```
-  MCP: `claude mcp add murakumo -- nbb --classpath "src:../org-anthropic-mcp/src" scripts/mcp-server.cljs`
+  MCP: `claude mcp add murakumo -- kbb --backend sci --classpath "src:../org-anthropic-mcp/src" scripts/mcp-server.cljs`
   → tool `murakumo.issue_api_key`（同じ env が要る）。
 - **境界**: scope は `chat|image|all` のみ、TTL は 90 日上限。**失効リストは無い**
   （ステートレス検証なので期限が失効そのもの）—— 長命鍵を作らず再発行する。
@@ -80,7 +80,7 @@
   新しい caller を追加するときは rotation せず `bin/kagi get
   MURAKUMO_GENERATION_TOKEN_SECRET` の値を該当 Pages/Worker secret に設定する。
   generation-scope の長命 token を mint するには `cloud-murakumo` で
-  `MURAKUMO_TOKEN_SECRET=$(kagi get …) clojure -M:token issue <sub> generation <ttl>`。
+  `MURAKUMO_TOKEN_SECRET=$(kagi get …) kbb -M:token issue <sub> generation <ttl>`。
   ⚠ `murakumo.cloud` site Worker（chat/inference gate）と `api.murakumo.cloud`
   （local-murakumo、`MURAKUMO_PROXY_TOKEN` 系）は**別の secret** — この item では
   ローテーションも検証もできない。
@@ -96,7 +96,7 @@
     token はこのファイル冒頭「api.murakumo.cloud mk1 capability-token 署名鍵」の
     `MURAKUMO_API_TOKEN_SECRET`（compartment `network-awai`、実在確認済み）から mint する:
     `cd orgs/kotoba-lang/murakumo && MURAKUMO_TOKEN_SECRET=$(kagi get MURAKUMO_API_TOKEN_SECRET)
-     nbb --classpath src scripts/run-task.cljs token issue --sub <who> --scope chat --ttl 604800`
+     kbb --backend sci --classpath src scripts/run-task.cljs token issue --sub <who> --scope chat --ttl 604800`
   - 実害: ADR-2608031500 の storyboard 生成でこれを踏んだ。`murakumo.cloud` gate を
     復旧したい場合は secret の再発行が要る（オーナー承認が要る操作）。
   - 以下は復旧時の参照用に残す。**現状は上記のとおり存在しない。**
@@ -111,7 +111,7 @@
   この kagi item を追加した。既存 primary 署名 token は無効化されない（rotation
   ではなく追加）。chat-scope token の mint:
   `cd orgs/network-awai/cloud-murakumo && MURAKUMO_TOKEN_SECRET=$(kagi get
-  MURAKUMO_CHAT_TOKEN_SECRET_2) clojure -M:token issue <sub> chat <ttl>`。
+  MURAKUMO_CHAT_TOKEN_SECRET_2) kbb -M:token issue <sub> chat <ttl>`。
   Worker secret `MURAKUMO_TOKEN_SECRET_2` は wrangler で投入済み（worker
   `murakumo-cloud`、redeploy を跨いで永続）。
   ✅ **2026-07-16 更新: production 反映済み**。当初は共有 checkout が GitHub main と

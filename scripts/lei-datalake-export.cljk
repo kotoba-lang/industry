@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-datalake-export.cljs — cloud-itonami-lei-<LEI>/facts.edn を datalake に
 ;; 載せられる 2 枚の表に落とす。
 ;;
@@ -30,7 +30,7 @@
 ;; ことが出力から区別できなくなる。
 ;;
 ;; Run:
-;;   nbb scripts/lei-datalake-export.cljk [--orgs-root <path>] [--out-dir <dir>]
+;;   kbb --backend sci scripts/lei-datalake-export.cljk [--orgs-root <path>] [--out-dir <dir>]
 
 (ns lei-datalake-export
   (:require ["fs" :as fs]

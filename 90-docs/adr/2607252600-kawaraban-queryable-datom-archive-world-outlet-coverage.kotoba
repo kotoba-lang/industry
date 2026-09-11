@@ -83,13 +83,13 @@
 
 `wasm_orchestrator`（launchd が回す方）と `run_live_ingest`（旧 JVM 経路）の**両方**から書く。同じ記事を同じ gate で取っている以上、どちらの orchestrator が動いたかで記事がアーカイブされたりされなかったりしてはならない。`KAWARABAN_ARTICLES_DIR=\"\"` で無効化できる。アーカイブ書き込みの失敗（full disk / read-only checkout）は publish 側を巻き添えにせず `:archive-error` として結果マップに載せる。
 
-### 3. `clojure -M:query` — DataScript datalog
+### 3. `kbb -M:query` — DataScript datalog
 
 `src/kawaraban/query.clj` + `:query` alias（`datascript/datascript`）。`schema/news.edn` を DataScript 形に変換して `data/articles/*.edn` をロードし、`count` / `coverage` / 任意の datalog を実行する。
 
 **既定で `data/seed.edn` を混ぜない。** seed は `:representative` の例示なので、実収集量を数えたいときに混ざると「7件の記事がある」が実測か例示か区別できなくなる。`--seed` で明示的に足したときだけロードし、ロード時にどちらを何件読んだか必ず stderr に出す。
 
-**nbb ではなく JVM を選んだ理由**: npm `datascript` パッケージが公開するのは datascript.js インターフェースで、属性も値も裸の文字列になる（superproject の `manifest/edn-query.cljs` 冒頭コメントが同じ制約を記録している）。それでは `:db.unique/identity` の upsert も `:mirror` / `:verified` という keyword 値も文字列に潰れ、スキーマを書いた意味が消える。この repo は既に `clojure -M:wasm-orchestrator` を launchd から回している JVM repo なので、同じ runtime の alias を1つ足すのが素直（ADR-2607173000 が退役させたのは `bb` であって、この repo 自身の既存 runtime ではない）。
+**nbb ではなく JVM を選んだ理由**: npm `datascript` パッケージが公開するのは datascript.js インターフェースで、属性も値も裸の文字列になる（superproject の `manifest/edn-query.cljs` 冒頭コメントが同じ制約を記録している）。それでは `:db.unique/identity` の upsert も `:mirror` / `:verified` という keyword 値も文字列に潰れ、スキーマを書いた意味が消える。この repo は既に `kbb -M:wasm-orchestrator` を launchd から回している JVM repo なので、同じ runtime の alias を1つ足すのが素直（ADR-2607173000 が退役させたのは `bb` であって、この repo 自身の既存 runtime ではない）。
 
 ### 4. `:news.article/sourcing` — live 取得は :verified、offline batch は :representative
 
@@ -125,7 +125,7 @@ nbb スクリプト（ADR-2607173000 の script host ルールどおり）。all
 - `:verified` は今後 `verify-feeds.cljs` だけが書く。手編集は「確認したつもり」を再導入するので禁止。
 - feed が Cloudflare 等で bot 遮断されている媒体（IMF・OHCHR・UNHCR・ILO・OECD・IAEA・PIB India・Montsame・Kan・MAP Morocco 等）は現状取得できない。これは「対象外」ではなく「未達」であり、ファイル上に `:verified false` として残る。ADR-2607203000 の repo-wide rule（entity を categorical に除外しない / 未達はカバレッジの問題であって対象外ではない）と同じ姿勢。
 - CBC（CA）は 2026-07-10 に `:verified true` だったが 2026-07-25 の測定では到達せず false に落ちた。同国は Radio-Canada が実測 OK なので CA のカバレッジ自体は維持されている。フラグが実測に追随して上下すること自体が意図した挙動。
-- テスト 81 / assertion 182 / 0 failure、`clojure -M scripts/audit.clj` は ok、lint は変更前と同一（既存 7 error / 39 warning、いずれも本 ADR が触っていないファイル）。
+- テスト 81 / assertion 182 / 0 failure、`kbb -M scripts/audit.clj` は ok、lint は変更前と同一（既存 7 error / 39 warning、いずれも本 ADR が触っていないファイル）。
 
 ## Alternatives considered
 

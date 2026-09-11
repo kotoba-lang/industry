@@ -7,11 +7,11 @@
 
 ```
 kotoba/triage_core.kotoba          ← 決定はここにしか無い
-        │ clojure -M:gen           （amu。compiler は :gen / :test にしか居ない）
+        │ kbb -M:gen           （amu。compiler は :gen / :test にしか居ない）
         ▼
 resources/tasuke_app/oracle/triage-core.kir.edn   ← 出荷される成果物
         │
-        ├── JVM   : io/resource で読む         → clojure -M:test（34 assertion）
+        ├── JVM   : io/resource で読む         → kbb -M:test（34 assertion）
         └── cljs  : kir-embed が build 時に埋込 → node test（21 assertion）+ ブラウザ
 ```
 
@@ -37,19 +37,19 @@ jp-go-dds の `kotoba_oracle.clj` は、**JVM でだけ** guest に委譲し、C
 
 ```bash
 npm install
-clojure -M:gen        # .kotoba → KIR（決定を変えたら必ず）
-clojure -M:gen-page   # public/index.html（1 文書）
-npx shadow-cljs release app
-npx nbb scripts/verify_browser.cljs   # 実ブラウザで 10 項目
+kbb -M:gen        # .kotoba → KIR（決定を変えたら必ず）
+kbb -M:gen-page   # public/index.html（1 文書）
+amu compile --target wasm32-browser app
+kbb --backend sci scripts/verify_browser.cljk   # 実ブラウザで 10 項目
 ```
 
 ## 検査（4 つ。どれも「飛ばした」と「合格した」が区別できる）
 
 | 検査 | 何を言うか |
 |---|---|
-| `clojure -M:test` | 出荷 artifact が真理値表に答える + **artifact が今の `.kotoba` と一致する**（stale artifact は永久に緑になるので、この 2 つ目が要る） |
+| `kbb -M:test` | 出荷 artifact が真理値表に答える + **artifact が今の `.kotoba` と一致する**（stale artifact は永久に緑になるので、この 2 つ目が要る） |
 | `npm run test:cljs` | **同じ artifact**を ClojureScript で実行して同じ答えが返る |
-| `npx nbb scripts/verify_browser.cljs` | guest の答えが画面に出る / view を跨いでも document を読み込まない / 跨いでも state が残る / chip が本当に塗られている |
+| `kbb --backend sci scripts/verify_browser.cljk` | guest の答えが画面に出る / view を跨いでも document を読み込まない / 跨いでも state が残る / chip が本当に塗られている |
 | 負のコントロール | 未 export の関数呼び出しが `"function is not exported"` **その理由で**拒否される（理由の literal を pin する） |
 
 書面は 7 種とも guest が本文を持つ（被害届 / 被害状況報告書 / 証拠目録 / 被害額算定書 /

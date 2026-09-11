@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; protocols-upstream-lock-check.cljs — net-kotobase/control-plane の
 ;; `protocols-worker` が、自分の upstream lock 契約をまだ満たしているか。
 ;;
-;; usage: nbb protocols-upstream-lock-check.cljs <dir> [--min-repos N]
+;; usage: kbb --backend sci protocols-upstream-lock-check.cljk <dir> [--min-repos N]
 ;;        <dir> を **先頭**に置く。多くの gate が tree を
 ;;        `(first (remove #(str/starts-with? % "--") argv))` で決めるので、
 ;;        `gate.cljs --min-repos 20 .` と書くと **"20" が tree のパスになる**
@@ -16,7 +16,7 @@
 ;; **`protocols-worker` の 120 tests は、この gate も含めて fleet では回せない。**
 ;; 2026-08-17 実測（ADR-2608170200）:
 ;;
-;;   suite       `shadow-cljs compile test && node out/node-tests.js`
+;;   suite       `amu compile --target wasm32-browser test && node out/node-tests.js`
 ;;   source-path `shadow-cljs.edn` が `../../../kotoba-lang/<repo>/src` を **26 本**
 ;;               参照する。これは west の**兄弟 project** で、repo の外に在る。
 ;;   実測        `git ls-files | grep -c kotoba-lang/` = **0**。

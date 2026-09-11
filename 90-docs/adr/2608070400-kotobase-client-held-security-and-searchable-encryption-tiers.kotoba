@@ -325,7 +325,7 @@ datom 面には market-intel / repo-taxonomy / corpus 等がある）。gate の
 
 ## 2026-08-08 closing — fleet 全体の uncommitted 調査と、そこで判明した測定上の罠
 
-`nbb scripts/cleanup.cljs --unlanded` を fleet 全体（**走査 4,158 repo**）で回した。
+`kbb --backend sci scripts/cleanup.cljk --unlanded` を fleet 全体（**走査 4,158 repo**）で回した。
 
 **素朴なスキャンは 826 repo が「uncommitted」だと言うが、その大半は偽陽性である。**
 origin/main ref を持つ 16 repo をサンプルして dirty ファイルを 1 件ずつ照合した結果:

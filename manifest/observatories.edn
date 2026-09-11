@@ -29,7 +29,7 @@
 ;; 運用を置いたのと同じ境界。
 ;;
 ;; **:args に絶対パスを明示するのが要点。** shionome / mitooshi は既定のパス解決が
-;; `*file*` 相対で、`clojure -M -m` からは解決できない（実測: shionome は
+;; `*file*` 相対で、`kbb -M -m` からは解決できない（実測: shionome は
 ;; `../data/seed-…` を探して落ち、mitooshi は `here` が null で NPE）。しかしどちらも
 ;; 第 1 引数で seed を、`--out` で出力先を受け取れる。**引数を明示すれば、repo に
 ;; 一切触らずに動く。** 直せない側（hakoniwa）は引数に関係なく `-main` の let 束縛で
@@ -77,9 +77,9 @@
 ;;
 ;; ## 実行
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --only watari
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --check   ; 走らせない
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --only watari
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --check   ; 走らせない
 
 {:policy "observatory-run/v1"
  :adr "ADR-2608081200"
@@ -234,7 +234,7 @@
    :importance 5           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "masago.methods.analyze"
    ;; **deps.edn が無い**（bb.edn だけ）。外部依存がゼロなので素の
-   ;; `clojure -M -m` で通る —— tadori / kaname のような bb 退役の巻き添えには
+   ;; `kbb -M -m` で通る —— tadori / kaname のような bb 退役の巻き添えには
    ;; なっていない。deps.edn の不在を「起動経路が無い」と読み違えないこと。
    ;;
    ;; --out を明示しないと `*file*` 相対で **src ツリーの中**
@@ -259,11 +259,11 @@
    :args []
    :produces nil
    :expect :runs-ok
-   ;; 実 fetch + 実 publish は別 alias（KOUHOU_ALLOW_LIVE_INGEST=1 clojure -M:live-ingest）。
+   ;; 実 fetch + 実 publish は別 alias（KOUHOU_ALLOW_LIVE_INGEST=1 kbb -M:live-ingest）。
    ;; **既定では起動しない** —— 外向き publish を毎時の無人 run に混ぜない。
    ;;
    ;; 2026-08-11（ADR-2608110200）: **取り込みと発信が分離された。**
-   ;; `KOUHOU_ALLOW_LIVE_INGEST=1 KOUHOU_PUBLISH=0 clojure -M:dev:live-ingest` は
+   ;; `KOUHOU_ALLOW_LIVE_INGEST=1 KOUHOU_PUBLISH=0 kbb -M:dev:live-ingest` は
    ;; phase 0（observe）で走り、data/{briefings,ledger,corpus} に canonical EDN を、
    ;; raw/ に取得した feed 本体（annex → s3.kotobase.net）を書いて、**app-aozora には
    ;; 何も送らない**。つまり「無人で取り込むが無人で発信はしない」が初めて表現できる。
@@ -493,7 +493,7 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
    ;; まさにこの形。台帳が 12h（= 3 run 分）伸びていなければ失敗させる。
    :feeder {:ledger "90-docs/observatory/hirameki-harvest.ledger.edn"
             :max-age-hours 12
-            :fed-by "com.gftd.hirameki-harvest"},, :note "収集は別コマンド: `clojure -M -m hirameki.methods.harvest --ticks N --dataset ../hirameki-patents`。autorun は観測のみで取得しない —— 1 tick 1 外部リクエストを観測ループに埋めない"}
+            :fed-by "com.gftd.hirameki-harvest"},, :note "収集は別コマンド: `kbb -M -m hirameki.methods.harvest --ticks N --dataset ../hirameki-patents`。autorun は観測のみで取得しない —— 1 tick 1 外部リクエストを観測ループに埋めない"}
   ;; ── 2026-08-10 追加 ───────────────────────────────────────────────────
   {:name "hayari" :org "cloud-itonami"
    :domain "国・地域ごとの公衆の注目と、その作品の原産国・年代（文化／メディア消費）"
@@ -671,8 +671,8 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
  ;; kotoba-lang/chie を**手で**拾ったもの。網羅は証明していない。
  ;; 新しい候補を探すときは:
  ;;
- ;;   nbb scripts/repo-search.cljk 観測 observatory ingest 収集
- ;;   nbb scripts/concept-lookup.cljk observatory
+ ;;   kbb --backend sci scripts/repo-search.cljk 観測 observatory ingest 収集
+ ;;   kbb --backend sci scripts/concept-lookup.cljk observatory
  ;;
  ;; を引いてから足す。「登録簿に無い = 存在しない」と結論しないこと。
  :inventory-note

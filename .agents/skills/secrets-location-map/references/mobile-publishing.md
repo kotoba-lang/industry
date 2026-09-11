@@ -31,7 +31,7 @@ ADR-2608072000 gap #2 はこの点で実態より悲観的に書かれていた�
   spirit-in-physics の ACTIVE な provisioning profile 6 本が依存している。
   **新しいアプリを足すのに証明書の再発行は要らない** —— bundle ID と profile を
   足すだけでよい。
-- **読み取り専用の確認**: `nbb scripts/asc-query.cljk '/v1/apps?limit=200'`
+- **読み取り専用の確認**: `kbb --backend sci scripts/asc-query.cljk '/v1/apps?limit=200'`
   （ES256 JWT を自前で mint する。key id / issuer id / `.p8` パスはスクリプト内で解決）。
 - **fastlane の設定例**: `orgs/network-awai/deai/appview/deai-cgxi8oem/mobile/ios/fastlane/`
   （Appfile / Fastfile / Matchfile）。運用 runbook は

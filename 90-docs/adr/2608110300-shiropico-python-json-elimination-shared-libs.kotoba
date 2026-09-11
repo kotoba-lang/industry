@@ -163,15 +163,15 @@ cd orgs/gftdcojp/ai-gftd-ghosthacker-shiropico && git fetch -q origin
 git ls-tree -r --name-only origin/main | grep -cE '\\.(py|json|bb|sh)$'   # -> 0
 
 # tools が動くか（credential 不要な範囲）
-nbb tools/yt/common_test.cljs        # 5 tests / 80 assertions
-nbb tools/narration_test.cljs        # 3 tests / 21 assertions
-nbb tools/youtube-publish.cljs --authorized-user /dev/null \\
+kbb --backend sci tools/yt/common_test.cljk        # 5 tests / 80 assertions
+kbb --backend sci tools/narration_test.cljk        # 3 tests / 21 assertions
+kbb --backend sci tools/youtube-publish.cljk --authorized-user /dev/null \\
     --episodes 2 --ledger /tmp/x.edn --dry-run
 
 # 共有 lib
-cd orgs/kotoba-lang/com-youtube && clojure -M:test   # JVM 15 / 54
-nbb --classpath src:test-cljs test-cljs/youtube/portable_test.cljs  # cljs 11 / 26
-cd ../douga && clojure -M:test                       # 24 / 117
+cd orgs/kotoba-lang/com-youtube && kbb -M:test   # JVM 15 / 54
+kbb --backend sci --classpath src:test-cljs test-cljs/youtube/portable_test.cljs  # cljs 11 / 26
+cd ../douga && kbb -M:test                       # 24 / 117
 ```
 
 ### 未検証（**実運用の前にここを埋めること**）

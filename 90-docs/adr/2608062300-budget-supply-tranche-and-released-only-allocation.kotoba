@@ -106,7 +106,7 @@ supply node × product の二部グラフを連結成分に分け、需要比例
   (:adr/verification
   "**実装**: `70-tools/bmc/src/gftd/allocate.cljc` に `pool-nodes` / `components` / `solve-component` / `allocate-pools` / `render-pools-table` / `render-pools-md` を追加。`gftd/cli.cljc` の `:clj` / `:cljs` 両ブランチに `pools-inputs` と `[\"allocate\" \"pools\"]` を追加。
 
-**テスト**: `70-tools/bmc/test/gftd/allocate_test.cljc` に 10 deftest を追加。スイート全体で 39 tests / 244 assertions → **49 tests / 294 assertions、0 failures**（`nbb 70-tools/bmc/run-tests.cljs`）。
+**テスト**: `70-tools/bmc/test/gftd/allocate_test.cljc` に 10 deftest を追加。スイート全体で 39 tests / 244 assertions → **49 tests / 294 assertions、0 failures**（`kbb --backend sci 70-tools/bmc/run-tests.cljk`）。
 
 **gate が落ちることを実際に確認した**（通ることだけを見て landed としない）。3 通りに壊してテストを走らせた:
 
@@ -118,7 +118,7 @@ supply node × product の二部グラフを連結成分に分け、需要比例
 
 3 通りとも元に戻して 0 failures を再確認した。
 
-**実データでの実行**（`GFTD_ROOT=<root> nbb 70-tools/bmc/bin/gftd.cljs allocate pools`）:
+**実データでの実行**（`GFTD_ROOT=<root> kbb --backend sci 70-tools/bmc/bin/gftd.cljk allocate pools`）:
 
     growth-2026H2/T1  released  allocating  300000   →  cloud-itonami
     growth-2026H2/T2  held      held        700000   →  (未宣言)

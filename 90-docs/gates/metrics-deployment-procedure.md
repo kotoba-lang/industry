@@ -92,7 +92,7 @@ This document defines the step-by-step deployment procedure for the Wave 5 M5–
    export REPO="root"
    export PROMETHEUS_URL="http://monitoring-cluster:9090"
    
-   nbb scripts/collect-build-metrics.cljs
+   kbb --backend sci scripts/collect-build-metrics.cljk
    # Expected: metrics-build.txt created with Prometheus metrics
    ```
 
@@ -104,10 +104,10 @@ This document defines the step-by-step deployment procedure for the Wave 5 M5–
 
 3. **Repeat for remaining metrics**:
    ```bash
-   nbb scripts/collect-coverage-metrics.cljs
-   nbb scripts/collect-deploy-metrics.cljs
-   nbb scripts/collect-blocker-metrics.cljs
-   nbb scripts/collect-velocity-metrics.cljs
+   kbb --backend sci scripts/collect-coverage-metrics.cljk
+   kbb --backend sci scripts/collect-deploy-metrics.cljk
+   kbb --backend sci scripts/collect-blocker-metrics.cljk
+   kbb --backend sci scripts/collect-velocity-metrics.cljk
    ```
 
 ### 1.4 Verify Data Retention Policy
@@ -299,7 +299,7 @@ du -sh /prometheus/data
 
 2. **Test weekly report generation manually**:
    ```bash
-   nbb scripts/generate-weekly-report.cljs
+   kbb --backend sci scripts/generate-weekly-report.cljk
    # Expected: weekly-metrics.json and weekly-report.md created
    ```
 

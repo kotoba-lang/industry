@@ -25,7 +25,7 @@
   (:adr/source-format "edn-only (ADR-2607171600)"),
   (:adr/landed (vector "com-junkawasaki/ghosthacker-shiropico 2d673653ef44a36d7ea8de4f3733fdc1aa467357 (producer + production-catalog + tests + PRODUCING.md)"
                "kotoba-lang/loop-ka-production dac40aaf045d91d3f38c07d17daccffa1ae61ba8 (channels.edn に :shiropico を登録)")),
-  (:adr/verification "実行して検証した(inspection ではない)。producer 単体: backend 無し -> 23 :placeholder / 61 :silent、MURAKUMO_BACKEND_URL -> :murakumo / :murakumo、COMFY_URL のみ -> :comfy / :silent、COMFY_URL + VOICE_LOCAL_CMD -> :comfy / :local。テスト 3 tests / 15 assertions green。ループ結合: nbb bin/loop.cljs observe --workspace <root> -> DUE shiropico -> episode-11 (5 of 5)、plan -> tasks.edn に murakumo task plane 用の cmd が入り、その cmd をそのまま実行して 23 shots / 61 lines・全 leg degraded を確認。content repo 同期前は同じ channel が catalog-unreadable を返し、「読めなかった」と「空だった」の区別が機能していることも確認した。"),
+  (:adr/verification "実行して検証した(inspection ではない)。producer 単体: backend 無し -> 23 :placeholder / 61 :silent、MURAKUMO_BACKEND_URL -> :murakumo / :murakumo、COMFY_URL のみ -> :comfy / :silent、COMFY_URL + VOICE_LOCAL_CMD -> :comfy / :local。テスト 3 tests / 15 assertions green。ループ結合: kbb --backend sci bin/loop.cljk observe --workspace <root> -> DUE shiropico -> episode-11 (5 of 5)、plan -> tasks.edn に murakumo task plane 用の cmd が入り、その cmd をそのまま実行して 23 shots / 61 lines・全 leg degraded を確認。content repo 同期前は同じ channel が catalog-unreadable を返し、「読めなかった」と「空だった」の区別が機能していることも確認した。"),
   (:adr/known-gaps (vector "producer は環境変数に URL があることを到達可能性とみなす。到達しない URL は served leg として報告される。murakumo task plane 上では node の :requires gate が capability を担保するが、実 probe への置き換えは未実施。"
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
@@ -61,7 +61,7 @@ README で層をこう定めている:
 > was checking whether the episode they had just built actually contained
 > anything.
 
-常駐の実体も実在する: `nbb scripts/run-task.cljs task run --tasks batch.edn`
+常駐の実体も実在する: `kbb --backend sci scripts/run-task.cljk task run --tasks batch.edn`
 (配置 → SSH 実行 → 回収 → リトライ)。`channels.edn` は既に
 `orgs/etzhayyim/...` と `orgs/cloud-itonami/...` を混在登録しており org を跨げる。
 
@@ -421,7 +421,7 @@ tick に place ステップを追加し、`LOOP_KA_PANEL_LIMIT`(既定 8)で 1 t
 
 途中で 2 つ直した:
 1. **loop-ka が印字する置き方コマンドはそのままでは動かない。**
-   `nbb ../murakumo/scripts/run-task.cljs ...` は cwd 依存で murakumo.* を解決するので
+   `kbb --backend sci ../murakumo/scripts/run-task.cljk ...` は cwd 依存で murakumo.* を解決するので
    `ENOENT: src/murakumo/task.cljs` になる。murakumo checkout を cwd にして
    tasks.edn を絶対パスで渡す必要がある。
 2. env の limit が producer に届いていなかった(`--limit` は channels.edn の argv 側で、

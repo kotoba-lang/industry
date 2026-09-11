@@ -52,7 +52,7 @@
   (:adr/verify
   (vector "cd orgs/network-awai/app-hyakka && npm test"
    "cd orgs/network-awai/app-hyakka && npm run build"
-   "cd orgs/network-awai/app-hyakka && clojure -M:test   ; cljc portability"
+   "cd orgs/network-awai/app-hyakka && kbb -M:test   ; cljc portability"
    "cd orgs/network-awai/app-hyakka && HYAKKA_SEED=<kagi> npm run probe   ; P1 join gate"
    "cacao.conformance を wiki.kotobase.net の deploy に対して実行し 0-fail"
    "curl -s https://wiki.kotobase.net/health | jq -e '.ok == true and .catalog-id == \"sha256:0f4eb289c9621cd4f30553b79ebe131874dcf7e058c6fb7e8aa899bef8efd114\"'"

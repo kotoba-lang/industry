@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns migrate-clojure-string-to-kotoba-text
   "Rewrite one repo's `.clj`/`.cljc` from clojure.string to kotoba.lang.text.
 
@@ -46,7 +46,7 @@
   It does not run the repo's tests. `--apply` prints REWROTE, never PASSED.
   Running the suite is the caller's job and the caller must say so separately.
 
-    nbb --classpath \".:scripts/nbb_compat\" scripts/migrate-clojure-string-to-kotoba-text.cljk \\
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/migrate-clojure-string-to-kotoba-text.cljk \\
         --repo <dir> --text-sha <40-hex> [--apply]"
   (:require [clojure.string :as str]
             [cljs.reader :as reader]))
@@ -62,7 +62,7 @@
 ;; Without this flag a repo whose only project file is a deps.edn gets the
 ;; coordinate written somewhere its own .cljs can never see it. Measured
 ;; 2026-09-09 on kotoba-lang/grammar: deps.edn named the dependency, the tool
-;; reported DEPS added, and `nbb tools/gen-tmlanguage.cljs` answered "Could not
+;; reported DEPS added, and `kbb --backend sci tools/gen-tmlanguage.cljk` answered "Could not
 ;; find namespace: kotoba.lang.text". Creating the file is a change to how the
 ;; repo is built, so it is opt-in rather than silent.
 (def create-nbb-edn? (some #{"--create-nbb-edn"} argv))
@@ -458,9 +458,9 @@
   nbb.edn is the same story, found when .cljs joined the migration: nbb reads
   :deps from it in the tools.deps shape, git coordinates included. Measured
   2026-09-09 rather than assumed -- an nbb.edn naming kotoba-lang/text by
-  :git/url and :git/sha resolves, and `nbb --classpath src -e \"(require ...)\"`
+  :git/url and :git/sha resolves, and `kbb --backend sci --classpath src -e \"(require ...)\"`
   against it answers from kotoba.lang.text. Twenty-four of the repositories
-  refused in the .cljs pass run their tests as `nbb --classpath src:test
+  refused in the .cljs pass run their tests as `kbb --backend sci --classpath src:test
   run_tests.cljs`, which is where nbb.edn belongs."
   [d]
   (some (fn [n]

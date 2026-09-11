@@ -204,9 +204,9 @@ west pin `63f7352d`）:
   落ちていた。`gftdcojp/tia` が同じ閉包に持つ 6 path を足した。scoped な `:live-test`
   build と `pnpm test:live` を足した（`:kotobase-test` はコンパイルできないため）。
 
-**測ったもの**: `npx shadow-cljs compile live-test && node out/live-tests.js` →
+**測ったもの**: `amu compile --target wasm32-browser live-test && node out/live-tests.js` →
 15 tests / 78 assertions / 0 failures。両方向あり: round-trip する pack の payload を
-1 byte 反転すると refuse される。`npx shadow-cljs release live` → `live/out/worker.js`
+1 byte 反転すると refuse される。`amu compile --target wasm32-browser live` → `live/out/worker.js`
 （507 KB）、`wrangler deploy --dry-run` 通過（binding は R2 `SEGMENTS` のみ）。
 **hash のコスト**（この host、load 約 130、compiled）: 1 MiB の synthetic segment で
 build+pack 2.7 s、verify+read 1.2 s。hashing は `sha2.core` の pure-cljs sha256 で、
@@ -253,7 +253,7 @@ kotobase.net の bucket にも置く経路（または drain）が要る。
 
 ```bash
 # 1. chunker が video-sized の segment で kubo と一致することを、実 segment で確かめる
-cd orgs/kotoba-lang/tech-ipfs-specs-unixfs && nbb --classpath src -e '(require (quote unixfs.file)) (println :ok)'
+cd orgs/kotoba-lang/tech-ipfs-specs-unixfs && kbb --backend sci --classpath src -e '(require (quote unixfs.file)) (println :ok)'
 # 2. aozora live の segment 命名箇所（CID 化の入口）
 grep -n \"seg_\" orgs/network-awai/app-aozora-engine/live/src/aozora/live/*.cljc
 ```

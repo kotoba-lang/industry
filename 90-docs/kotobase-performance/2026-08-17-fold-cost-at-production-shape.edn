@@ -116,7 +116,7 @@
              synthetic novelty; both are reported and they agree, which is itself the
              evidence that novelty size is not the cost driver on this graph."
    :code "The shipped `kotobase-store/fold-now!` itself, no substitutions, compiled
-          with `shadow-cljs release` -- the same :advanced optimization level the
+          with `amu compile --target wasm32-browser` -- the same :advanced optimization level the
           deployed Worker is built with. A dev-build run of the same case cost 6.72s
           vs 4.49s release, so measuring at :none would have overstated CPU by ~50%."}
 
@@ -392,7 +392,7 @@
               agent/fold-bench-20260817, commit 696d2c8). NOT deployed -- this
               adds a build target and a test-path namespace, nothing the Worker
               bundle includes."
-  :build "node scripts/resource-guard.mjs run build -- npx shadow-cljs release bench"
+  :build "node scripts/resource-guard.mjs run build -- amu compile --target wasm32-browser bench"
   :synthetic-curve
   "node --expose-gc out/fold-bench.js --snapshot 4000 --value-bytes 1300 --novelty 8"
   :production-point

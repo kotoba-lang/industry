@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; github-actions-disable-sweep.cljs — このワークスペースの全 GitHub アカウントを
 ;; 走査し、**workflow を持つ repo の GitHub Actions を無効化**する。
 ;;
@@ -19,9 +19,9 @@
 ;; 要り、これも持っていない（実測 2026-08-05）。だから repo 単位で回す。
 ;;
 ;; 使い方:
-;;   nbb scripts/github-actions-disable-sweep.cljk            # dry-run（既定）
-;;   nbb scripts/github-actions-disable-sweep.cljk --apply    # 実際に無効化
-;;   nbb scripts/github-actions-disable-sweep.cljk --apply --owner kotoba-lang
+;;   kbb --backend sci scripts/github-actions-disable-sweep.cljk            # dry-run（既定）
+;;   kbb --backend sci scripts/github-actions-disable-sweep.cljk --apply    # 実際に無効化
+;;   kbb --backend sci scripts/github-actions-disable-sweep.cljk --apply --owner kotoba-lang
 ;;
 ;; 再開可能: 走査済み repo は ~/.itonami/gh-actions-sweep-state.edn に記録され、
 ;; 再実行では skip する（rate limit で途中終了しても続きから回せる）。

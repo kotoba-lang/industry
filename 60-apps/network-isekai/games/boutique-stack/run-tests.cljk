@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Test entry point for the murakumo fleet `:nbb-test` gate.
 ;;
-;;     npx nbb --classpath src:test:../common/src run-tests.cljs
+;;     kbb --backend sci --classpath src:test:../common/src run-tests.cljs
 (ns run-tests
   (:require [clojure.test :as t]
             [isekai.games.boutique-stack.economy-test]

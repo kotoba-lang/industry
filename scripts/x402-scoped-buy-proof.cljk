@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; The whole scoped-purchase chain, against a live 402, without paying.
 ;;
 ;;   CP=$(printf %s: \
@@ -6,7 +6,7 @@
 ;;     orgs/kotoba-lang/org-ietf-ed25519/src orgs/kotoba-lang/org-nist-sha2/src \
 ;;     orgs/kotoba-lang/org-ietf-x25519/src orgs/kotoba-lang/dev-protobuf/src \
 ;;     orgs/kotoba-lang/authority/src)
-;;   nbb --classpath "$CP" scripts/x402-scoped-buy-proof.cljk
+;;   kbb --backend sci --classpath "$CP" scripts/x402-scoped-buy-proof.cljk
 ;;
 ;; Exit 0 when the chain decided, 2 when it could not -- an unreachable
 ;; facilitator, a surface that stopped selling, or a narrowing that did not

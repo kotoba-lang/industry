@@ -119,7 +119,7 @@ CLAUDE.md 側に短い形で全部残す:
   `no-verify-remote` / `90852b86` / `root-west-pin-policy` / `west-pin-verify-guard` /
   `WEST_TOPDIR` / 各 ADR 番号を grep して固有の事実の残存を確認。
 - **`computer-use` の反転**は実測で確定した:
-  `clojure -Spath -A:dev:examples` が `orgs/kotoba-lang/langgraph/src` と
+  `kbb -Spath -A:dev:examples` が `orgs/kotoba-lang/langgraph/src` と
   `…/langchain/src` を classpath に載せる。
 - skill が名指しする 8 スクリプト（`gen-west-manifest` / `advance-pins` /
   `verify-west-pins` / `west-triple-sync` / `fleet-sync-tick` / `west_annex` /

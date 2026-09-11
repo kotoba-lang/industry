@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-maturity-kernel-parity.cljk — Kotoba カーネルと cljs 参照実装の
 ;; **完全一致**ゲート。ADR-2608052000。
 ;;
@@ -13,9 +13,9 @@
 ;; スナップショットが貼ってあったため、読む側は貼られた列の方を使った）:
 ;;
 ;;   R=$HOME/github/com-junkawasaki     # orgs/ が populate されている本体 checkout
-;;   CP=$(nbb --classpath ".:scripts/nbb_compat" \
+;;   CP=$(kbb --backend sci --classpath ".:scripts/nbb_compat" \
 ;;         scripts/itonami-maturity-parity-classpath.cljk --root "$R") || true
-;;   nbb --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljk \
+;;   kbb --backend sci --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljk \
 ;;     [--evidence manifest/itonami-maturity-evidence.edn] \
 ;;     [--datoms 90-docs/system-dynamics/itonami-maturity.datoms.edn] \
 ;;     [--kernel 90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba] \

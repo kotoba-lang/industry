@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Report GitHub repositories that `manifest/west.yml` registers more than once.
 ;;
-;;   nbb scripts/verify-duplicate-registrations.cljk             ; report
-;;   nbb scripts/verify-duplicate-registrations.cljk --check     ; exit 1 if any
-;;   nbb scripts/verify-duplicate-registrations.cljk --compare   ; + pin divergence
-;;   nbb scripts/verify-duplicate-registrations.cljk --findings  ; detector protocol
-;;   nbb scripts/verify-duplicate-registrations.cljk --disk      ; old checkout scan
+;;   kbb --backend sci scripts/verify-duplicate-registrations.cljk             ; report
+;;   kbb --backend sci scripts/verify-duplicate-registrations.cljk --check     ; exit 1 if any
+;;   kbb --backend sci scripts/verify-duplicate-registrations.cljk --compare   ; + pin divergence
+;;   kbb --backend sci scripts/verify-duplicate-registrations.cljk --findings  ; detector protocol
+;;   kbb --backend sci scripts/verify-duplicate-registrations.cljk --disk      ; old checkout scan
 ;;
 ;; Run from the superproject root.
 ;;

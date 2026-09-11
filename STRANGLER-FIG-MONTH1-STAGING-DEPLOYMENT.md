@@ -17,7 +17,7 @@
 cd <superproject-root>
 
 # Deploy 3 cljc nodes in staging pool
-nbb deploy/month-1-staging-deployment.cljk provision
+kbb --backend sci deploy/month-1-staging-deployment.cljk provision
 
 # Expected output:
 #   ✓ Staging pool: staging-cljc-month1 (3 nodes)
@@ -32,17 +32,17 @@ nbb deploy/month-1-staging-deployment.cljk provision
 
 ```bash
 # Enable 5% traffic to staging
-nbb deploy/month-1-staging-deployment.cljk canary-start
+kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start
 
 # Start parity checker (validates responses)
-nbb deploy/parity-checker-service.cljk \
+kbb --backend sci deploy/parity-checker-service.cljk \
   --rust-pool-url http://localhost:8000 \
   --staging-pool-url http://localhost:8001 \
   --sample-rate 1.0 \
   --output metrics/parity-validation.log
 
 # Start rollback automation (autonomous safeguards)
-nbb deploy/rollback-automation.cljk monitor \
+kbb --backend sci deploy/rollback-automation.cljk monitor \
   --metrics-endpoint http://localhost:9090/api/v1/query \
   --check-interval-sec 30 \
   --dry-run false
@@ -69,10 +69,10 @@ http://localhost:3000/d/strangler-fig-month1
 tail -f metrics/parity-validation.log | jq '.parity-pass?'
 
 # Rollback automation status
-nbb deploy/rollback-automation.cljk status
+kbb --backend sci deploy/rollback-automation.cljk status
 
 # Deployment status
-nbb deploy/month-1-staging-deployment.cljk status
+kbb --backend sci deploy/month-1-staging-deployment.cljk status
 ```
 
 ---
@@ -263,7 +263,7 @@ tail -100 metrics/parity-validation.log | \
 
 **Quick Escalation**:
 1. Review [MONTH-1-OPERATIONS-GUIDE.md](deploy/MONTH-1-OPERATIONS-GUIDE.md)
-2. Check `nbb deploy/rollback-automation.cljk status`
+2. Check `kbb --backend sci deploy/rollback-automation.cljk status`
 3. Contact on-call ops
 4. If needed, contact Jun Kawasaki directly
 

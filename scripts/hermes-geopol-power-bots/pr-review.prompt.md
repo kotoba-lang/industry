@@ -18,7 +18,7 @@ touches `:claim/layer`, `:inference/basis`, or the epistemics schema.
    (`:observed-fact`, `:secondary-reported`, `:model-inference`,
    `:model-prediction`); no code path can rewrite `:claim/layer` upward; an
    observed-fact cannot carry inference/report attributes. Run
-   `nbb --classpath src scripts/verify_epistemics.cljs` on the PR branch.
+   `kbb --backend sci --classpath src scripts/verify_epistemics.cljs` on the PR branch.
 2. **Source labels** — new sources declare their actual class; secondary
    material is admitted as `:secondary-reported` with a publisher, never as
    fact; no search-snippet-only or generated-summary "sources".

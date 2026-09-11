@@ -244,7 +244,7 @@ product face 387 面のあと、残っていた面を全数で洗い出した(cl
 jp-go-dds.skin/dds+skin(JVM)を style に流し込む。
 
 結果: **141/141 を移行**(main へマージ済み、失敗 0)。各 repo で
-clojure -M:render-html を実走し、**style 以外の markup がバイト一致**する
+kbb -M:render-html を実走し、**style 以外の markup がバイト一致**する
 ことを検証してから commit している(落ちた repo は land していない)。
 
 当初 13 件が classpath 構築に失敗した。原因は 2 つで、いずれも解消した:

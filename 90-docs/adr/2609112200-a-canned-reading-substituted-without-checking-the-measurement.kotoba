@@ -20,7 +20,7 @@ For each generated pilot, from an origin/main worktree in the scratchpad
 
     nbb <kotoba-lang>/scripts/gen-parity-harness.cljs <worktree> <src-dir>
     cd <worktree>
-    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+    kbb --backend sci --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
     amu check   src/<src>/whole_component.kotoba --policy policy.edn
     amu compile src/<src>/whole_component.kotoba --target aarch64-macos
                 --policy policy.edn --output wc.o

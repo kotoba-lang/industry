@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; analyze-git-sovereign-dynamics.cljs — git.kotobase.net を正本にする経路の
 ;; 選択を system dynamics + XMILE で採点する。
 ;;
@@ -8,7 +8,7 @@
 ;; ものを D1 に置くな。ref 面は inga」と定めており、オーナー指示はそれを
 ;; この経路に適用したもの。したがって D1 案は**採点せず除外**する。
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/dynamics/src:orgs/kotoba-lang/org-oasis-open-xmile/src" \
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/dynamics/src:orgs/kotoba-lang/org-oasis-open-xmile/src" \
 ;;       scripts/analyze-git-sovereign-dynamics.cljk
 (ns analyze-git-sovereign-dynamics
   (:require [clojure.string :as str]

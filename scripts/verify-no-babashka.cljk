@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Inventory / gate: fail if tracked-style Babashka entrypoints remain.
 ;;
-;;   nbb scripts/verify-no-babashka.cljk              ; scan from repo root
-;;   nbb scripts/verify-no-babashka.cljk --root orgs   ; limit
-;;   nbb scripts/verify-no-babashka.cljk --allow-zero  ; report only (exit 0)
+;;   kbb --backend sci scripts/verify-no-babashka.cljk              ; scan from repo root
+;;   kbb --backend sci scripts/verify-no-babashka.cljk --root orgs   ; limit
+;;   kbb --backend sci scripts/verify-no-babashka.cljk --allow-zero  ; report only (exit 0)
 ;;
 ;; Looks for:
 ;;   - files named bb.edn

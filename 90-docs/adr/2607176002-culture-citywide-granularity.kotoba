@@ -101,13 +101,13 @@ Current country-level model treats all within-country actors as homogeneous. Thi
 
 ```bash
 # City-level queries
-nbb scripts/culture-mental-model-query.cljs city tokyo
-nbb scripts/culture-mental-model-query.cljs city mumbai region IND
-nbb scripts/culture-mental-model-query.cljs kind :communication-style city mumbai
+kbb --backend sci scripts/culture-mental-model-query.cljk city tokyo
+kbb --backend sci scripts/culture-mental-model-query.cljk city mumbai region IND
+kbb --backend sci scripts/culture-mental-model-query.cljk kind :communication-style city mumbai
 
 # Urban vs. rural comparison
-nbb scripts/culture-mental-model-query.cljs urban-rural IND
-nbb scripts/culture-mental-model-query.cljs q '[:find ?city ?title :where [?t \"trait/region\" ?r] [?r \"region/id\" \"DEU\"] [?t \"trait/city\" ?c] [?c \"city/name\" ?city] [?t \"trait/title\" ?title]]'
+kbb --backend sci scripts/culture-mental-model-query.cljk urban-rural IND
+kbb --backend sci scripts/culture-mental-model-query.cljk q '[:find ?city ?title :where [?t \"trait/region\" ?r] [?r \"region/id\" \"DEU\"] [?t \"trait/city\" ?c] [?c \"city/name\" ?city] [?t \"trait/title\" ?title]]'
 ```
 
 ## Implementation Timeline

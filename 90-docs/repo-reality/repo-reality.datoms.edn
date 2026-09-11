@@ -111,7 +111,7 @@
  {:claim/id :claim/aiueos-ci-tests-green,
   :claim/project :project/aiueos,
   :claim/source "orgs/kotoba-lang/aiueos/docs/coverage.edn:41,55 (stages :m4/:m5)",
-  :claim/text "'clojure -M:test / bb test:cljc: 190 tests, 525 assertions green (2026-07-08)' -- a dated, specific evidence citation.",
+  :claim/text "'kbb -M:test / bb test:cljc: 190 tests, 525 assertions green (2026-07-08)' -- a dated, specific evidence citation.",
   :claim/self-reported-level "",
   :claim/self-caveat false,
   :claim/axis [:axis/evidence-linkage]}
@@ -213,7 +213,7 @@
  {:claim/id :claim/aiueos-sbom-attestation-not-wired-to-release-pipeline,
   :claim/project :project/aiueos,
   :claim/source "orgs/kotoba-lang/aiueos/90-docs/adr/0017-release-attestations.md:93-98; os/aiueos/scripts/build-release-image.sh (26 lines, whole file)",
-  :claim/text "ADR-0017 states the new aiueos.sbom SBOM/provenance generator (clojure -M:attest) is implemented and tested, but its own 'Not done' section discloses: 'os/aiueos/scripts/build-release-image.sh does not yet call clojure -M:attest with the receipt's digest, and no gate requires an attestation to exist for a release.' Confirmed: build-release-image.sh (26 lines) has zero references to attest/sbom/provenance anywhere in the file -- the disclosed wiring gap matches the code exactly.",
+  :claim/text "ADR-0017 states the new aiueos.sbom SBOM/provenance generator (kbb -M:attest) is implemented and tested, but its own 'Not done' section discloses: 'os/aiueos/scripts/build-release-image.sh does not yet call kbb -M:attest with the receipt's digest, and no gate requires an attestation to exist for a release.' Confirmed: build-release-image.sh (26 lines) has zero references to attest/sbom/provenance anywhere in the file -- the disclosed wiring gap matches the code exactly.",
   :claim/self-reported-level "",
   :claim/self-caveat true,
   :claim/axis [:axis/production-readiness]}
@@ -483,7 +483,7 @@
  {:claim/id :claim/kotobase-critical-path-cljc-ci-red-bug,
   :claim/project :project/kotobase,
   :claim/source "orgs/kotoba-lang/kotobase/test/kotobase/critical_path_test.clj:1-16 (docstring)",
-  :claim/text "critical_path_test.clj's own docstring self-reports a CI-breaking bug: as a .cljc file it linted for both JVM and ClojureScript, but the file walks the source tree with clojure.java.io/file-seq/slurp, which do not exist under cljs -- so 'clojure -M:lint failed and took CI red from 2026-07-30, while the 80 tests underneath it kept passing. The extension was the bug.' Confirmed: the file is named critical_path_test.clj (not .cljc) at the current HEAD commit, whose own merge message is 'Merge agent/cljc-jvm-only-fns: critical-path is a build-time check, so it is .clj' -- the fix (renaming to .clj) is the literal tip of the repo.",
+  :claim/text "critical_path_test.clj's own docstring self-reports a CI-breaking bug: as a .cljc file it linted for both JVM and ClojureScript, but the file walks the source tree with clojure.java.io/file-seq/slurp, which do not exist under cljs -- so 'kbb -M:lint failed and took CI red from 2026-07-30, while the 80 tests underneath it kept passing. The extension was the bug.' Confirmed: the file is named critical_path_test.clj (not .cljc) at the current HEAD commit, whose own merge message is 'Merge agent/cljc-jvm-only-fns: critical-path is a build-time check, so it is .clj' -- the fix (renaming to .clj) is the literal tip of the repo.",
   :claim/self-reported-level "",
   :claim/self-caveat true,
   :claim/axis [:axis/production-readiness]}

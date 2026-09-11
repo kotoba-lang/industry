@@ -248,8 +248,8 @@ censor の裏に並ぶ**ため。
 
 | 検査 | 実測値 |
 |---|---|
-| `clojure -M:dev:test` | 31 tests / 91 assertions、0 failures |
-| `clojure -M:dev:run` | 確定 5 件 + **構造的に別々の governor hold 6 件** |
+| `kbb -M:dev:test` | 31 tests / 91 assertions、0 failures |
+| `kbb -M:dev:run` | 確定 5 件 + **構造的に別々の governor hold 6 件** |
 | 標準形適合 | 単一 ns / `phase/{read,write}-ops` / `operation/build`（langgraph）/ `store/seed-db` / `governor` / 全 `.cljc` — tick と同じ判定で適合 |
 | west 登録 | `repos.edn :extra-projects` + `--entry` の最小 diff（5 行）。`verify-west-pins` OK |
 
@@ -273,7 +273,7 @@ scaffold した 4 本は全部 `os.edn` に宣言され、面が live になっ�
 | 9601-coinlaundry | `49d9d30` | 5 / 4 / 4 / 1 | 200 |
 
 最終状態: os-registry **39 verticals・10 wiring** / sites-registry **49 site** /
-`clojure -M:test` **1,535 tests / 11,335 assertions**（失敗集合は origin/main と
+`kbb -M:test` **1,535 tests / 11,335 assertions**（失敗集合は origin/main と
 完全一致、既知 17 件のみ）。**4 本とも標準形だったので repo 側の改修はゼロ**、
 shim は 3 行ずつで済んだ（主体キーが `:subject` だから）。
 
@@ -285,17 +285,17 @@ shim は 3 行ずつで済んだ（主体キーが `:subject` だから）。
 `Unable to resolve symbol: carwashops/vertical` で落ちる。require を外す/戻すの
 両方を実行して実証し、petcare の commit（`cd25433`）で修理した。
 
-**`clojure -M:test` はこれを捕まえない。** `os_endpoints.cljc` は cljs ビルド
+**`kbb -M:test` はこれを捕まえない。** `os_endpoints.cljc` は cljs ビルド
 （`:os-api`）でしか compile されないので、JVM のテスト実行は一度も読まない。
 しかも接続作業は必ずこのファイルを触る（毎回 require が 1 本増える）ので、
 **この穴は毎反復で開く**。1,532 tests すべて green のまま main に merge された。
 
 skill `itonami-os-connect` に §4b として検査を足した（`da49839`）—— 本命は
-`resource-guard.mjs run build -- npx shadow-cljs release os-api`、guard が
+`resource-guard.mjs run build -- amu compile --target wasm32-browser os-api`、guard が
 他セッションで埋まっているとき（exit 2）の代替は nbb での load。carpet と
 coinlaundry はこの検査を着地前に通してある。
 
-（`shadow-cljs release worker` ではない —— **`:worker` という build id は存在せず**、
+（`amu compile --target wasm32-browser worker` ではない —— **`:worker` という build id は存在せず**、
 `no build with id` を「ビルドが壊れている」と誤読しやすい。これも実測で踏んだ。）
 
 ### 3j. 面に出て初めて言えるようになったこと
@@ -368,7 +368,7 @@ ADR-2607203000 の規則（**いかなる entity も categorical に除外しな
 | 生成器（実物の actor を回す） | 139 op / 132 台帳エントリ / 台帳検証 `{:ok? true, :length 132}` |
 | 9601 の内訳 | 確定 5 / 承認待ち 4 / **保留 3** / 拒否 1 |
 | 射影 2 つ | os-registry 27 verticals・9 wiring（一致）/ sites-registry 37 site（canonical） |
-| `clojure -M:test` | 1,512 tests / 10,257 assertions。**失敗集合が origin/main と完全一致**（既知 17 件: doctor / kotoba-xrpc / ops-keys。新規失敗ゼロ） |
+| `kbb -M:test` | 1,512 tests / 10,257 assertions。**失敗集合が origin/main と完全一致**（既知 17 件: doctor / kotoba-xrpc / ops-keys。新規失敗ゼロ） |
 | 公開面 | https://cloud-itonami.itonami.cloud/cloud-itonami-isic-9601/ → 200 |
 
 ### 9522 家電修理（2026-08-08、`64fa6d31`）
@@ -378,7 +378,7 @@ ADR-2607203000 の規則（**いかなる entity も categorical に除外しな
 | 生成器（実物の actor を回す） | 155 op / 147 台帳エントリ / 台帳検証 `{:ok? true, :length 147}` |
 | 9522 の内訳 | 確定 6 / 承認待ち 5 / **保留 4** / 拒否 1 |
 | 射影 2 つ | os-registry 28 verticals・9 wiring（一致）/ sites-registry 38 site（canonical） |
-| `clojure -M:test` | 1,514 tests / 10,322 assertions。**失敗集合が origin/main と完全一致**（既知 17 件。新規失敗ゼロ） |
+| `kbb -M:test` | 1,514 tests / 10,322 assertions。**失敗集合が origin/main と完全一致**（既知 17 件。新規失敗ゼロ） |
 | 公開面 | https://cloud-itonami.itonami.cloud/cloud-itonami-isic-9522/ → 200 |
 
 ### 4759 家電・家具・照明小売（2026-08-08、`39648759`）
@@ -388,7 +388,7 @@ ADR-2607203000 の規則（**いかなる entity も categorical に除外しな
 | 生成器 | 162 op / 153 台帳エントリ / 台帳検証 `{:ok? true}`。**運ぶ仕事 6 → 7**（新しい `:carry` が実際に発火した） |
 | 4759 の内訳 | 確定 3 / 承認待ち 3 / 保留 2 / 拒否 1 |
 | 射影 2 つ | os-registry 29 verticals・**10 wiring** / sites-registry 39 site |
-| `clojure -M:test` | 1,516 tests / 10,389 assertions。失敗集合が origin/main と完全一致 |
+| `kbb -M:test` | 1,516 tests / 10,389 assertions。失敗集合が origin/main と完全一致 |
 | 公開面 | https://cloud-itonami.itonami.cloud/cloud-itonami-isic-4759/ → 200 |
 
 ### 9523 / 8121 / 8129 / 9609（2026-08-08、`93aa27ec` / `2bde6840` / `745b4253` / `ad7fe2a3`）
@@ -401,7 +401,7 @@ ADR-2607203000 の規則（**いかなる entity も categorical に除外しな
 | 9609 その他個人サービス | 201 op / 188 台帳 | 4 / 3 / 3 / 1 | **クーリングオフ**（時間の経過） |
 
 最終状態: os-registry **33 verticals・10 wiring** / sites-registry **43 site** /
-`clojure -M:test` **1,520 tests / 10,663 assertions**（失敗集合は origin/main と
+`kbb -M:test` **1,520 tests / 10,663 assertions**（失敗集合は origin/main と
 完全一致、既知 17 件のみ）/ 公開面 **8 本すべて 200**。
 
 ### 預り品の形が 3 回、『その業でだけ効く検査』が 4 種類
@@ -608,7 +608,7 @@ ISIC 9609 の**分類**にはペットケアが含まれるので、「9609 が�
 | 洗車・カーペット・ペット・コインランドリーの「穴」 | **全部埋まった** |
 
 最終の面: os-registry **39 verticals・10 wiring** / sites-registry **49 site** /
-`clojure -M:test` **1,535 tests / 11,335 assertions**（失敗集合は origin/main と
+`kbb -M:test` **1,535 tests / 11,335 assertions**（失敗集合は origin/main と
 完全一致、既知 17 件のみ）。
 
 **この ADR の範囲外で残っているもの**（順序は変えない）:

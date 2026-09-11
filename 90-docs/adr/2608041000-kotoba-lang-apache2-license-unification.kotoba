@@ -241,7 +241,7 @@ ADR-2608036600 が記録した「exit 0 を信用しない」の別形で、**�
 
 `kotoba-lang/kotobase-docs`（public / Apache-2.0）を新設し 7 文書を公開。サイト側は
 `marketing_pages` / `site_page` / `signup_page` / `site_chrome` とテスト・`site-check` の
-リンク定数を差し替え、静的 HTML（`clojure -M:render-site` の生成物）を再生成して deploy。
+リンク定数を差し替え、静的 HTML（`kbb -M:render-site` の生成物）を再生成して deploy。
 **結果 0/22 dead を実測確認。**
 
 - **公開前監査**: `ENTERPRISE-READINESS.md` から Worker version UUID / CI run ID と、

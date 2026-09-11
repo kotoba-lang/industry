@@ -317,13 +317,13 @@ WebGL 経路は **naga で build 時に WGSL→GLSL 変換した生成物**（`k
 ```bash
 # T2 をブラウザで再現
 cd orgs/kotoba-lang/byoubu-gpu
-node ../../../scripts/resource-guard.mjs run build -- npx shadow-cljs compile demo
+node ../../../scripts/resource-guard.mjs run build -- amu compile --target wasm32-browser demo
 (cd public && python3 -m http.server 8793) # → window.byoubuGpu.tiers() が全 gpu
 # backdrop を 1 件足す
 #   1. byoubu/src/byoubu/catalog.cljc に map を追加
-#   2. cd byoubu && nbb --classpath src:render:../terrain/src bin/render.cljs
+#   2. cd byoubu && kbb --backend sci --classpath src:render:../terrain/src bin/render.cljs
 #   3. ブラウザで content band を実測し :byoubu/measured に記入
-#   4. nbb bin/test.cljs && clojure -M:test
+#   4. kbb --backend sci bin/test.cljk && kbb -M:test
 ```
 
 **このセッションが触っていない既存の問題（自分の作業とは無関係、未着手のまま報告）**

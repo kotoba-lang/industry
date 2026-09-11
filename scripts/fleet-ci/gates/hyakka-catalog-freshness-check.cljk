@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; hyakka-catalog-freshness-check.cljs — app-hyakka の committed な生成物
 ;; `src/hyakka/catalog.cljk` を、**その入力から作り直して**突き合わせる
 ;; （root ADR-2608300100 決定 1 の最初の 1 工程）。
@@ -56,7 +56,7 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb hyakka-catalog-freshness-check.cljs <repo-dir> [--min N]
+;;   kbb --backend sci hyakka-catalog-freshness-check.cljk <repo-dir> [--min N]
 ;;
 ;; `<dir>` は **引数の先頭**（fleet はそう渡す。CLAUDE.md 実測済みの罠）。
 

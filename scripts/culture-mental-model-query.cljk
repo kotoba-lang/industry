@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; culture-mental-model-query.cljs — Cross-cultural research generalization lookup (DataScript query tool)
 ;;
 ;; WARNING: This tool surfaces statistical cultural patterns, not universal rules.
@@ -6,11 +6,11 @@
 ;; See 90-docs/culture/culture-mental-model-ledger.edn for caveats on each entry.
 ;;
 ;; Usage:
-;;   nbb scripts/culture-mental-model-query.cljk count
-;;   nbb scripts/culture-mental-model-query.cljk region DEU
-;;   nbb scripts/culture-mental-model-query.cljk kind :communication-style
-;;   nbb scripts/culture-mental-model-query.cljk family :ok-sign
-;;   nbb scripts/culture-mental-model-query.cljk q '[:find ?id ?title :where [?e :trait/region ?r] [?r :region/id "JPN"]]'
+;;   kbb --backend sci scripts/culture-mental-model-query.cljk count
+;;   kbb --backend sci scripts/culture-mental-model-query.cljk region DEU
+;;   kbb --backend sci scripts/culture-mental-model-query.cljk kind :communication-style
+;;   kbb --backend sci scripts/culture-mental-model-query.cljk family :ok-sign
+;;   kbb --backend sci scripts/culture-mental-model-query.cljk q '[:find ?id ?title :where [?e :trait/region ?r] [?r :region/id "JPN"]]'
 
 (require '[scripts.nbb-compat :refer [slurp exit]]
          '[clojure.edn :as edn]
@@ -150,7 +150,7 @@
       "kind" (print-kind arg)
       "family" (print-family arg)
       "q" (println (pr-str (q arg)))
-      (do (println "usage: nbb scripts/culture-mental-model-query.cljk [count | region <ISO> | kind <keyword> | family <keyword> | q '<datalog-query>']")
+      (do (println "usage: kbb --backend sci scripts/culture-mental-model-query.cljk [count | region <ISO> | kind <keyword> | family <keyword> | q '<datalog-query>']")
           (exit 1)))))
 
 (apply -main *command-line-args*)

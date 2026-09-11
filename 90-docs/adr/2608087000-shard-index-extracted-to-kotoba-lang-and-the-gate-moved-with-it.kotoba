@@ -50,7 +50,7 @@
 - repo: `kotoba-lang/kotobase-shard-index`（public。kotoba-lang org の既定）
 - path: `orgs/kotoba-lang/kotobase-shard-index`
 - 登録: `manifest/repos.edn` の `:extra-projects` に 1 行 →
-  `nbb scripts/gen-west-manifest.cljs --entry kotobase-shard-index`（**west.yml の
+  `kbb --backend sci scripts/gen-west-manifest.cljk --entry kotobase-shard-index`（**west.yml の
   diff は +5 行のみ**。wholesale 再生成はしない）
 
 名前は family 面（`kotobase-`）+ subject（`shard-index`）で、既存 30 余りの
@@ -106,7 +106,7 @@ superproject の履歴から切り出す選択肢は採っていない —— �
   書き換えが効いていることの証拠であって、書き換えたという主張ではない）。
 - west 登録: `verify-west-pins: 1 件の pin 変更をすべて検証 OK`、
   `west.yml` の diff は **+5 行**。
-- 完了ゲート: `nbb scripts/west-orphan-audit.cljs --blocking` →
+- 完了ゲート: `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` →
   `true-orphan-git: 0` / `local-root-broken (blocking): 0`、exit 0。
 - **付け替えた gate を、子 repo の tree に対して実際に走らせた** —— `:cd true` 相当
   （repo ルートを引数に渡す）で `shard-index-check: OK — 一致（exactness 合格 /

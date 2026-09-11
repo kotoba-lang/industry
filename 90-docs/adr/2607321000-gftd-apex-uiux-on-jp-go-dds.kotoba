@@ -151,8 +151,8 @@ copy を直した瞬間に発覚: `parse-inline` がループを `split` の par
 
 ## Verification (2026-07-31)
 
-- `clojure -M:pin:local:test-portable` — 62 tests / 301 assertions / 0 failures
-- `shadow-cljs release app viewer pages-worker` — 0 warnings
+- `kbb -M:pin:local:test-portable` — 62 tests / 301 assertions / 0 failures
+- `amu compile --target wasm32-browser app viewer pages-worker` — 0 warnings
 - real-Chromium E2E（`scripts/verify-e2e.cljs`）— 26 checks / 0 failures。
   OS dark 下でも light、fast-typing のキーストローク欠落なし、Enter 送信、
   ストリーム完了、503 のエラーバブル、320px でドロワー開閉と横スクロール無し、

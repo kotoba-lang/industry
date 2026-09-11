@@ -28,7 +28,7 @@
      (:command "bash scripts/verify-postgresql-matrix.sh")
      (:result "PostgreSQL 14.19, 15.13, 17.9 on JDK 21/macOS arm64; pass"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "3 workers x 30 acquire/query/reset/release operations; exit 0"))))))
   (:adr/body
   "# ADR-2607197600: PostgreSQL version matrix and bounded contention soak

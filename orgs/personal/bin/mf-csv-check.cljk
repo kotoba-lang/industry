@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; --- nbb shims (auto, ADR-2607173000) ---------------------------------
 (def ^:private __fs (js/require "node:fs"))
 (def ^:private __path (js/require "node:path"))
@@ -84,8 +84,8 @@
     (spit banks-file s')))
 
 (defn ingest! []
-  (__shell {:dir (str base "/bin/datomic")} "clojure" "-M" "-m" "ingest.mf")
-  (__shell {:dir (str base "/bin/datomic")} "clojure" "-M" "-m" "warehouse.load")
+  (__shell {:dir (str base "/bin/datomic")} "kbb" "-M" "-m" "ingest.mf")
+  (__shell {:dir (str base "/bin/datomic")} "kbb" "-M" "-m" "warehouse.load")
   (let [n (count (str/split-lines (slurp (str base "/mail/mf-txns.jsonl"))))]
     (when (zero? n) (throw (ex-info "mf-txns.jsonl が空 — CSV形式を確認" {})))
     (mark-obligation-done!)

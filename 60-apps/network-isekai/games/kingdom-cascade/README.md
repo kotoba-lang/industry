@@ -16,9 +16,9 @@ artwork, level, string or specific rule is taken from any commercial game.
 ## Run it
 
 ```bash
-npx nbb --classpath src:test:../common/src run-tests.cljs   # 91 tests, 2211 assertions
-npx nbb --classpath src:../common/src play.cljs resources/levels/kc-001.edn
-npx nbb --classpath src:../common/src levels.cljs --gate           # solvability over the set
+kbb --backend sci --classpath src:test:../common/src run-tests.cljs   # 91 tests, 2211 assertions
+kbb --backend sci --classpath src:../common/src play.cljs resources/levels/kc-001.edn
+kbb --backend sci --classpath src:../common/src levels.cljs --gate           # solvability over the set
 ```
 
 `play.cljs` prints the board after every move, so the cascade rules are

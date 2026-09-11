@@ -192,8 +192,8 @@ overall         58.00 / 100   (measured weight 1.00 of 1.00)
 ## 5. 計器
 
 ```
-npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs
-npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/selftest.cljs 90-docs/kotobase_auth_maturity/probe-2026-08-29.edn
+npx --yes kbb --backend sci --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs
+npx --yes kbb --backend sci --classpath 90-docs 90-docs/kotobase_auth_maturity/selftest.cljs 90-docs/kotobase_auth_maturity/probe-2026-08-29.edn
 ```
 
 exit は 3 値: **0 = 全軸測れて finding 無し / 1 = 全軸測れて finding あり /

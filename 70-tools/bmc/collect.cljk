@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; collect.cljs — Cloudflare / Stripe / 本番 health から実測 metrics を収集し
 ;; 90-docs/business/metrics/<product>.edn に書く (ADR-2607021800)。
 ;;
@@ -581,7 +581,7 @@
         (spit (str out-dir "/" (name p) ".edn") (with-out-str (pprint/pprint m)))
         (println "wrote" (name p) "-" (:signal m))))))
 
-;; `nbb 70-tools/bmc/collect.cljk --self-test` — no token, no network.
+;; `kbb --backend sci 70-tools/bmc/collect.cljk --self-test` — no token, no network.
 ;; Guards the one distinction this collector kept getting wrong: a Cloudflare
 ;; call that FAILED must not look like a Cloudflare call that returned zero.
 (if (some #{"--self-test"} (vec *command-line-args*))

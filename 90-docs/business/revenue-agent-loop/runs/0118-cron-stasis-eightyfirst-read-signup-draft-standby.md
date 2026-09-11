@@ -10,7 +10,7 @@ returned HTTP 200 so live network confirmed; NOT a not-measured run.
 
 | Signal | Value |
 |---|---|
-| funnel-pulse (nbb kotobase_lead_loop.cljs) | EXIT=0. VISITORS=9607 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 2 :signups 0 :checkouts 0}. UNCHANGED=false EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=recorded. |
+| funnel-pulse (kbb --backend sci kotobase_lead_loop.cljk) | EXIT=0. VISITORS=9607 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 2 :signups 0 :checkouts 0}. UNCHANGED=false EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=recorded. |
 | /api/funnel | HTTP 200 (0.054s). {:visitors 9607 :signups 31 :checkouts 0 :by-source {:visitors {:openai-ads 3 :organic 8025} :signups {:organic 27 :other 1}} :x402 {:challenges 38 :submissions 4 :rejections 4 :settlements 0 :settlement-rate 0 :rejection-reasons {:malformed-header 1} :rejections-classified 1 :rejections-unexplained 3 :unmetered-twin-ratio 0 :unmetered-twin-reads 0 :unpriced-plane-reads 0 :attempt-rate 0.10526315789473684}} |
 
 This run: pulse and /api/funnel agree (9607/31/0). DELTA visitors +2 vs pulse's own last read;

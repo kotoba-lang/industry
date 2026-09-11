@@ -260,7 +260,7 @@ deploy from main would have silently reintroduced
 The actor fills one character per 30-minute tick, unattended. **90 remain**;
 the head of the queue is `emi-hoshino-fantasy`.
 
-- On gad: `nbb --classpath src:/home/gad/kotobase-client/src bin/resident.cljs --status`
+- On gad: `kbb --backend sci --classpath src:/home/gad/kotobase-client/src bin/resident.cljs --status`
   (needs `NODE_OPTIONS=--dns-result-order=ipv4first` outside the unit)
 - From anywhere: `POST https://shinshi.club/xrpc/ai.gftd.apps.shinshi.listUnfilled`
 

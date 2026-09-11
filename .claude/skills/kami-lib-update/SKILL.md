@@ -18,7 +18,7 @@ tip**」。pin が遅れているのは平常ではなく是正対象なので�
 ### 1. tick の答えを読む
 
 ```bash
-nbb scripts/kami-lib-update-tick.cljk     # 最終行に EDN
+kbb --backend sci scripts/kami-lib-update-tick.cljk     # 最終行に EDN
 ```
 
 - `:outcome :candidate` — `:lagging` の repo 列（`:entry` / `:org` / `:ahead-by`）が対象。
@@ -32,10 +32,10 @@ nbb scripts/kami-lib-update-tick.cljk     # 最終行に EDN
 
 ```bash
 # 1 件ずつ（サーバ側検証つき: default branch 到達性 / forward-only / blob precondition）
-nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put.cljk <entry> HEAD
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put.cljk <entry> HEAD
 
 # 多件を 1 commit に束ねる（TSV: <entry> <tip-sha> <slug>）
-PINS=<tsv> nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
+PINS=<tsv> kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
 ```
 
 `HEAD` は「上流 default branch の先端」の意味で、script がサーバ側で解決する。
@@ -44,7 +44,7 @@ PINS=<tsv> nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.clj
   弾かれた entry は、**理由を ledger（`~/.itonami/kami-lib-update/ledger.edn` に追記）に
   書いて置いていく**。force しない、検証を飛ばす別経路を作らない。
   未 merge branch 上の commit を pin にしない（CLAUDE.md、実測事例あり）。
-- 終わったら検証: `nbb scripts/verify-west-pins.cljk`
+- 終わったら検証: `kbb --backend sci scripts/verify-west-pins.cljk`
 
 ### 3. local checkout を pin に合わせる
 

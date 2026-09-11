@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; atproto-engagement-collect.cljs — この艦隊が atproto に書いた record への
 ;; **反応**（like / repost / reply）を測り、datom 面に落とす。
 ;;
@@ -33,7 +33,7 @@
 ;; 全数だと誤読しないようにする。
 ;;
 ;; usage:
-;;   nbb scripts/atproto-engagement-collect.cljk [--out <path>] [--dry-run]
+;;   kbb --backend sci scripts/atproto-engagement-collect.cljk [--out <path>] [--dry-run]
 
 (require '[clojure.string :as str]
          '[clojure.edn :as edn])

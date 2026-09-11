@@ -40,7 +40,7 @@
 
 (defn- spawn-render [& args]
   ;; Thin dispatcher forwards argv to render_street (camera / --dry live there).
-  (cp/spawnSync "npx" (clj->js (into ["nbb" "--classpath" cp-str "bin/render.cljs"] args))
+  (cp/spawnSync "npx" (clj->js (into ["kbb" "--backend" "sci" "--classpath" cp-str "bin/render.cljs"] args))
                 #js {:cwd here :encoding "utf8"}))
 
 (def aspect (/ 900.0 1600.0))

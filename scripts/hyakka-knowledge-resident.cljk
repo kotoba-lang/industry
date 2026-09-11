@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Resident operator for network-awai/app-hyakka's multi-domain ingest.
 ;; Credentials remain on the operator host; fleet nodes never receive B2 or
 ;; Kotobase signing keys. Raw bytes are uploaded before their Git receipt is
@@ -188,7 +188,7 @@
 (defn process-env [] (js/Object.assign #js {} js/process.env))
 
 (defn resolve-b2-env []
-  (let [out (checked ["nbb" "--classpath"
+  (let [out (checked ["kbb" "--backend" "sci" "--classpath"
                       (str root "/orgs/kotoba-lang/secret-resolve/src:"
                            root "/scripts/nbb_compat:" root)
                       (str root "/scripts/b2-creds.cljk") "--json"] {:dir root})
@@ -451,7 +451,7 @@
   [env seed]
   (let [e (js/Object.assign #js {} env)
         _ (aset e "HYAKKA_SEED" seed)
-        r (run ["nbb" "--classpath" "../../kotoba-lang/kotobase-client/src:../../kotoba-lang/org-nist-sha2/src"
+        r (run ["kbb" "--backend" "sci" "--classpath" "../../kotoba-lang/kotobase-client/src:../../kotoba-lang/org-nist-sha2/src"
                 "scripts/verify_identity.cljs" expected-tenant-did]
                {:dir worktree :env e})]
     (when-not (zero? (:exit r))
@@ -549,7 +549,7 @@
   "Rebuild the search index blocks, pin them into the local ipfs node (which
   ipfs.kotobase.net serves from), and republish the wiki's IPNS name so the
   mutable pointer lands on the new root. Best-effort per stage."
-  (checked ["nbb" "--classpath" "src:scripts" "scripts/build_index.cljs"]
+  (checked ["kbb" "--backend" "sci" "--classpath" "src:scripts" "scripts/build_index.cljs"]
            {:dir worktree :env env})
   (let [blocks-dir (str worktree "/.index-build/blocks")
         root (let [s (checked ["cat" (str worktree "/index-root.edn")] {})]
@@ -578,7 +578,7 @@
   "Refresh the R2 Data Catalog Iceberg tables from the freshly committed
   catalogue. datalake_sync.cljs resolves CF_CATALOG_TOKEN itself (env, then
   Keychain) and refuses — not fails — when it cannot run."
-  (checked ["nbb" "--classpath" "src" "scripts/datalake_sync.cljs"]
+  (checked ["kbb" "--backend" "sci" "--classpath" "src" "scripts/datalake_sync.cljs"]
            {:dir worktree :env env}))
 
 (defn- post-deploy-sinks!
@@ -667,7 +667,7 @@
               []
               (do
                 (timed! "ingest"
-                        #(checked ["nbb" "--classpath"
+                        #(checked ["kbb" "--backend" "sci" "--classpath"
                                    "src:../kotoba-lang/chain-observer/src"
                                    "scripts/resident_ingest.cljs" "--once"]
                                   {:dir worktree :env env}))

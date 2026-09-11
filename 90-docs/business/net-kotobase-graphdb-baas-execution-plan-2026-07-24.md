@@ -47,8 +47,8 @@ Run:
 
 ```text
 cd orgs/gftdcojp/net-kotobase/clj-edge
-clojure -M:economics
-clojure -M:economics-test
+kbb -M:economics
+kbb -M:economics-test
 ```
 
 The executable model reproduces 39 customers, JPY 347,800 monthly revenue, JPY
@@ -187,7 +187,7 @@ The reproducible proof command is:
 
 ```text
 cd orgs/gftdcojp/cloud-itonami
-clojure -M:dev:kotobase-dogfood <run-id>
+kbb -M:dev:kotobase-dogfood <run-id>
 ```
 
 It uses a dedicated actor and `itonami/graphdb-baas-dogfood` database, submits

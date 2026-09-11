@@ -55,7 +55,7 @@
 
 `60-apps/tasuke-app/kotoba/triage_core.kotoba` が、分類・severity・無料窓口・
 初動手順・締切・作るべき書面・復旧手順書・プラットフォーム依頼書を持つ。
-`clojure -M:gen`（amu 1e21a1f）が KIR に落とし、`resources/tasuke_app/oracle/
+`kbb -M:gen`（amu 1e21a1f）が KIR に落とし、`resources/tasuke_app/oracle/
 triage-core.kir.edn` として出荷する。JVM は `io/resource` で、ブラウザは
 build 時の macro 埋め込みで、**同じ artifact** を `kotoba.kir` インタプリタで
 実行する。**この app に規則の cljs 実装は 1 行も無い。**
@@ -101,9 +101,9 @@ cross-tier add を拒否）。そのため `60-apps/tasuke-app/` に staging す
 
 | 検査 | 結果 |
 |---|---|
-| `clojure -M:test`（JVM、出荷 artifact + 生成一致） | 15 tests / 186 assertions 緑 |
+| `kbb -M:test`（JVM、出荷 artifact + 生成一致） | 15 tests / 186 assertions 緑 |
 | `npm run test:cljs`（node、同じ artifact を cljs で実行） | 5 tests / 21 assertions 緑 |
-| `npx nbb scripts/verify_browser.cljs`（実 Chromium） | 16 項目緑 |
+| `kbb --backend sci scripts/verify_browser.cljk`（実 Chromium） | 16 項目緑 |
 | bundle / document | 564 KB / 83 KB、document は 1 枚 |
 
 両方向を出した: JVM gate は誤った severity の assertion を実際に落とし、cljs gate は

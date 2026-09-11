@@ -45,7 +45,7 @@ Adjacent finding, unchanged by this work: `codec-primitives` is video-codec (H.2
 
 7. **bonsai stops using a host codec.** `java.util.zip` is gone from its `src/` entirely: loose-object deflate/inflate and pack-entry inflate use `org-ietf-deflate`, and the pack index CRC-32 uses its checksum. The pack reader uses the codec's reported stream end for 'how many compressed bytes did this object consume', which the pack format needs because it stores no per-object length.
 
-8. **Both repos gate two runtimes.** A `.cljc` portable suite runs under `clojure -M:test` and `nbb run-tests.cljs`, and CI has a ClojureScript job. `java.util.zip` appears only in the JVM suites, as an oracle, in both directions.
+8. **Both repos gate two runtimes.** A `.cljc` portable suite runs under `kbb -M:test` and `kbb --backend sci run-tests.cljk`, and CI has a ClojureScript job. `java.util.zip` appears only in the JVM suites, as an oracle, in both directions.
 
 9. **Second wave, same session: four more formats, each its own leaf repo.** The first wave deferred these; the owner then asked for them, so they were built to the same standard — an oracle in both directions wherever a writer exists, a two-runtime gate, and refusal by name for anything unimplemented.
 
@@ -196,4 +196,4 @@ Totals across the twelve repos: 3,527 JVM assertions and 2,053 ClojureScript ass
 
 6. **One hazard the API path does not cover.** verify-west-pins does not run on a GitHub API write. A fabricated pin went onto main that way during the fifth wave (b3808a1e..., expanded by hand from a short sha, a commit that does not exist) and was corrected in the next commit. Read the full sha with `git rev-parse HEAD` or `gh api .../branches/main`; never expand a short one.
 
-7. **Two blocking :local/root orphans are open and are not from this work**: com-junkawasaki/kotodama (directory present, absent from west; consumed by apps-gftdcojp and the zendesksell compat repos) and kotoba-lang/esim (in west, no directory; consumed by cloud-itonami-app). `nbb scripts/west-orphan-audit.cljs --blocking` reproduces both.")))
+7. **Two blocking :local/root orphans are open and are not from this work**: com-junkawasaki/kotodama (directory present, absent from west; consumed by apps-gftdcojp and the zendesksell compat repos) and kotoba-lang/esim (in west, no directory; consumed by cloud-itonami-app). `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` reproduces both.")))

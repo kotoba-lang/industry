@@ -164,7 +164,7 @@ kaizen と 2 点だけ意図的に違う:
    未コミット作業**が入っている（langchain / css / mail / drive / bonsai / kototama）。
    deploy 前フックが正しくブロックした —— ここでビルドした artifact は他人の WIP を
    本番に載せることになる。**再ビルドした bundle も意図的に commit していない**
-2. その前に `shadow-cljs release edge-api` が**そもそも実行できなかった** ——
+2. その前に `amu compile --target wasm32-browser edge-api` が**そもそも実行できなかった** ——
    兄弟 repo が `isic-8291` を `:local/root` と `:git/sha` で別々に宣言しており
    tools.deps が比較できず classpath の構築ごと落ちていた（runner を変えても同じ）。
    最上位に 1 本 pin を置いて解消した
@@ -187,12 +187,12 @@ kaizen と 2 点だけ意図的に違う:
    `git -C orgs/kotoba-lang/<dep> status --porcelain`
 2. `printf '%s\n' langchain css mail drive bonsai kototama | xargs west update --fetch smart`
 3. `cd orgs/network-awai/cloud-itonami && node ../../../scripts/resource-guard.mjs run build --
-   clojure -M:cljs:local -m shadow.cljs.devtools.cli release edge-api`
+   kbb -M:cljs:local -m shadow.cljs.devtools.cli release edge-api`
    （`npx shadow-cljs` はこのマシンの npx が壊れているので使えない）
-4. `nbb scripts/verify-edge-bundle.cljs` → Pages deploy
+4. `kbb --backend sci scripts/verify-edge-bundle.cljk` → Pages deploy
 5. ingress 鍵を発行して KV `noren:cloud-itonami/loop-noren:ingress-key-sha256` に
    digest を投入、operator copy を Keychain へ
-6. `NOREN_INGRESS_KEY=… nbb --classpath $CP bin/noren.cljs tick --submit` で 1 件通す
+6. `NOREN_INGRESS_KEY=… kbb --backend sci --classpath $CP bin/noren.cljs tick --submit` で 1 件通す
    （classpath の実体は loop-noren の README。**この本文に生の二重引用符を書かない**
    —— EDN の文字列がそこで閉じ、以降の本文が黙って消える。実際にこの closing で
    1 度やった: `git diff` は +43/-3 で正常に見えるのに、reader が読む body だけが
@@ -331,7 +331,7 @@ etzhayyim actor の面には載せない。
   `import()` して handler を実際に呼び、KV binding 無しで 503 に fail closed する
   ことを確認（`verify-edge-bundle` は 7/7）
 - **JVM parity は実測**（2026-08-11、closing 時）: `noren` 17 tests / 116 assertions、
-  `loop-noren` 23 tests / 81 assertions、どちらも `clojure -M:test` で green。
+  `loop-noren` 23 tests / 81 assertions、どちらも `kbb -M:test` で green。
   loop-noren は最初 **1 本も走らなかった** —— nbb からしか使わない overpass /
   commoncrawl の checkout を `:deps` に置いたせいで JVM の classpath 解決に入り、
   その推移依存の壊れた `:local/root`（langchain-clj）で classpath 構築ごと落ちて

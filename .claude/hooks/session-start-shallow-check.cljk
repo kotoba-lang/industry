@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; SessionStart フック: この checkout(superproject root)と、その配下の
 ;; west project checkout が shallow になっていないかを毎セッション確認する。
 ;;
@@ -45,7 +45,7 @@
 ;; (何も出力せず exit 0)。sweep が予算を超えたら、そこまでの結果を
 ;; 「部分的である」と明示して報告する —— 黙って全件走査したふりをしない。
 ;;
-;; 手動実行 / テスト: `nbb .claude/hooks/session-start-shallow-check.cljk [<dir>]`
+;; 手動実行 / テスト: `kbb --backend sci .claude/hooks/session-start-shallow-check.cljk [<dir>]`
 ;; (<dir> 省略時は CLAUDE_PROJECT_DIR、それも無ければ カレント)。
 
 (require '[cheshire.core :as json]

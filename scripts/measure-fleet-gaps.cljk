@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns measure-fleet-gaps
   "Turn the fleet's open gaps from adjectives into numbers, so a ranking loop
   can rank them.
@@ -15,7 +15,7 @@
   threshold here that anyone agreed on, and inventing one would make a number
   look like a verdict.
 
-  Usage: nbb scripts/measure-fleet-gaps.cljk [--data <dir>]"
+  Usage: kbb --backend sci scripts/measure-fleet-gaps.cljk [--data <dir>]"
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             [clojure.string :as str]))

@@ -154,7 +154,7 @@
 
    ### fleet の un-landed 調査は未完
 
-   `nbb scripts/cleanup.cljs --unlanded` は 4064 プロジェクト × ブランチごとの PR 照会と
+   `kbb --backend sci scripts/cleanup.cljk --unlanded` は 4064 プロジェクト × ブランチごとの PR 照会と
    いう構造上、38 分走って出力ゼロ（I/O 律速、CPU は 2 分）で停止した。**どの子リポに
    untracked WIP が残っているか**——runbook が最も危険と位置づけるマーカー——は未確認のまま。
    2026-07-25 の cloud-itonami 事案（約 4,000 行が untracked で埋もれていた）が示すとおり
@@ -164,7 +164,7 @@
   "次に着手するなら:
 
        # 1) fleet の un-landed 調査（org 単位に分割。全 fleet 一括は 38 分で出力ゼロだった）
-       nbb scripts/cleanup.cljs --unlanded    # 要 org 分割 or 実行時間の許容
+       kbb --backend sci scripts/cleanup.cljk --unlanded    # 要 org 分割 or 実行時間の許容
 
        # 2) 残 1 件の DNM を file 単位で絞る
        gh pr view 3376 --repo etzhayyim/root --json files

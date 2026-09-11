@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; threed-maturity-audit — 3D/CAD/CAM/render スタックの決定論的 fitness function。
 ;;
 ;; 判定するのは 2 段だけで、どちらも tree から測る（LLM も、行数も、人の点数も使わない）:
@@ -12,8 +12,8 @@
 ;; behavior が落ちた軸は :hollow —— 名前だけ在って動かない。これが最悪の状態で、
 ;; grep でも行数でも LLM 採点でも緑に見える。実測 2026-08-20 に 2 件見つかった。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/threed-maturity-audit.cljk
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/threed-maturity-audit.cljk --check
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/threed-maturity-audit.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/threed-maturity-audit.cljk --check
 ;;   … --axis :kernel/fillet-chamfer     # 1 軸だけ測る
 ;;   … --no-behavior                     # marker だけ（速い。ただし :declared 止まり）
 ;;
@@ -185,7 +185,7 @@
         ;; asks the repo's own deps.edn instead. It costs one JVM start, which
         ;; is why it is opt-in rather than the default.
         resolved (when (:axis/probe-classpath-from-deps axis)
-                   (try (let [raw (str/trim (str (cp/execSync "clojure -Spath"
+                   (try (let [raw (str/trim (str (cp/execSync "kbb -Spath"
                                                                #js {:cwd repo-dir :encoding "utf8"
                                                                     :stdio #js ["ignore" "pipe" "ignore"]})))]
                           ;; `-Spath` emits the repo's OWN paths relative ("src",
@@ -317,7 +317,7 @@
                                         ":absent は走査した checkout の中に無いという意味であって、"
                                         "west 4,000+ project の中に無いという意味ではない。")}
           body (str ";; threed-parity.datoms.edn — **生成物。手で編集しない。**\n"
-                    ";; 再生成: nbb --classpath \".:scripts/nbb_compat\" scripts/threed-maturity-audit.cljk\n"
+                    ";; 再生成: kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/threed-maturity-audit.cljk\n"
                     ";; 検査:   … --check\n"
                     ";; 語彙（判断が入る唯一の場所）: 90-docs/maturity/threed-capability-axes.edn\n"
                     ";; 設計: ADR-2608200100\n;;\n"

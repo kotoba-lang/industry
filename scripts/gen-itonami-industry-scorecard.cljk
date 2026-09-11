@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gen-itonami-industry-scorecard.cljs — 産業（ISIC）単位に畳んだ成熟度・
 ;; coverage の生成物。ADR-2608052000 が repo 単位で測ったものを、公開面が
 ;; 出せる粒度（ISIC section → division → class）に折り畳む。
@@ -47,9 +47,9 @@
 ;;     平均の分母から外し、`:section/unmeasured` に件数を出す（ADR-2607203000）。
 ;;
 ;; 使い方:
-;;   nbb scripts/gen-itonami-industry-scorecard.cljk           ; 生成して書く
-;;   nbb scripts/gen-itonami-industry-scorecard.cljk --check   ; 差分があれば exit 1
-;;   nbb scripts/gen-itonami-industry-scorecard.cljk --out PATH
+;;   kbb --backend sci scripts/gen-itonami-industry-scorecard.cljk           ; 生成して書く
+;;   kbb --backend sci scripts/gen-itonami-industry-scorecard.cljk --check   ; 差分があれば exit 1
+;;   kbb --backend sci scripts/gen-itonami-industry-scorecard.cljk --out PATH
 
 (ns gen-itonami-industry-scorecard
   (:require [clojure.edn :as edn]
@@ -381,7 +381,7 @@
     (if (= current text)
       (println (str "OK " out-path " は canonical（" (count payload) " entity）"))
       (do (println (str "STALE " out-path
-                        " — nbb scripts/gen-itonami-industry-scorecard.cljk で再生成する"))
+                        " — kbb --backend sci scripts/gen-itonami-industry-scorecard.cljk で再生成する"))
           (js/process.exit 1))))
   (do (fs.mkdirSync (nodepath.dirname out-path) #js {:recursive true})
       (fs.writeFileSync out-path text)

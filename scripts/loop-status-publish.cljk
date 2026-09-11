@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/loop-status-publish.cljk — この workstation の常駐 bot 群（`cloud.itonami.bot.*`、
 ;; 現在地を itonami.cloud の公開 status page へ発行する。**決定論。モデルは
 ;; 一切呼ばない**（claude 起動も skip-permissions フラグも無い、純粋な publisher）。
@@ -62,7 +62,7 @@
 ;;                   だけで済ませない（数と理由を両方出す）
 ;;
 ;; usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/loop-status-publish.cljk [--dry-run|--self-test]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/loop-status-publish.cljk [--dry-run|--self-test]
 
 (ns loop-status-publish
   (:require [clojure.edn :as edn]

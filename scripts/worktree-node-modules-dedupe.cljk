@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/worktree-node-modules-dedupe.cljk — re-install a worktree's node_modules
 ;; through the pnpm content-addressable store so N worktrees of one repo share
 ;; one copy of every package on disk.
@@ -25,7 +25,7 @@
 ;; Never touches a worktree that is busy (process cwd inside it, or named on
 ;; a command line), locked, or whose repo cannot be found. Dry-run by default.
 ;;
-;;   nbb scripts/worktree-node-modules-dedupe.cljk [--root <dir>] [--repo orgs/<org>/<repo>] [--limit N] [--only <worktree path>] [--apply] [--force]
+;;   kbb --backend sci scripts/worktree-node-modules-dedupe.cljk [--root <dir>] [--repo orgs/<org>/<repo>] [--limit N] [--only <worktree path>] [--apply] [--force]
 ;;   exit 0 = answered, 1 = a step failed, 2 = could not answer (lsof / pnpm missing, nothing scanned)
 (require '[clojure.string :as str])
 

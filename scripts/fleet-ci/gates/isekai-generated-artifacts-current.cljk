@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; isekai-generated-artifacts-current.cljs — network-isekai の checked-in 生成物が
 ;; source と一致しているか。
 ;;
@@ -21,7 +21,7 @@
 ;; 生成ロジックを**ここに複製しない**。repo 自身の `--check` を回す —— 検査と生成が
 ;; 2 箇所に分かれた瞬間、gate が緑のまま artifact がずれる経路ができる。
 ;;
-;; ノード側: npx nbb isekai-generated-artifacts-current.cljs <dir>
+;; ノード側: kbb --backend sci isekai-generated-artifacts-current.cljk <dir>
 ;;           <dir> が第1引数（tick.cljs の :nbb-script はそう渡す）。
 
 (ns fleet-ci.gates.isekai-generated-artifacts-current

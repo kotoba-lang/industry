@@ -16,7 +16,7 @@ Sibling record for a parallel pass the same day: ADR-2608122128.
 
 ## The headline finding: the UNLANDED number was 94% noise
 
-`nbb scripts/cleanup.cljs --unlanded` reported **966 UNLANDED child repos of
+`kbb --backend sci scripts/cleanup.cljk --unlanded` reported **966 UNLANDED child repos of
 4,394 scanned**. Classifying all 768 repos carrying a `dirty=N` marker:
 
 | class | repos | meaning |
@@ -159,8 +159,8 @@ live WIP belonging to another session; archived a copy, left in place.
 ## Resume point
 
 ```bash
-nbb scripts/cleanup.cljs --unlanded          # re-survey; expect ~724 .cpcache false positives
-nbb scripts/west-orphan-audit.cljs --blocking # 1 remaining edge is the false positive above
+kbb --backend sci scripts/cleanup.cljk --unlanded          # re-survey; expect ~724 .cpcache false positives
+kbb --backend sci scripts/west-orphan-audit.cljk --blocking # 1 remaining edge is the false positive above
 ```
 
 Everything retired or rescued is under

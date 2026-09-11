@@ -105,17 +105,17 @@ npm install datascript
 cd /Users/junkawasaki/github/com-junkawasaki/90-docs/religious-community/queries
 
 # Run all queries
-nbb comparison.cljs
+kbb --backend sci comparison.cljk
 
 # Run specific query
-nbb comparison.cljs query-1   # Axis distribution
-nbb comparison.cljs query-2   # Doctrinal conflicts
-nbb comparison.cljs query-3   # Actor structure
-nbb comparison.cljs query-4   # Charter amendment authority
-nbb comparison.cljs query-5   # Lexicon language coverage
+kbb --backend sci comparison.cljk query-1   # Axis distribution
+kbb --backend sci comparison.cljk query-2   # Doctrinal conflicts
+kbb --backend sci comparison.cljk query-3   # Actor structure
+kbb --backend sci comparison.cljk query-4   # Charter amendment authority
+kbb --backend sci comparison.cljk query-5   # Lexicon language coverage
 
 # Future: CSV output
-nbb comparison.cljs query-1 --format csv > axis-comparison.csv
+kbb --backend sci comparison.cljk query-1 --format csv > axis-comparison.csv
 ```
 
 ---
@@ -288,4 +288,4 @@ Use the same 5 queries; they will automatically include new orgs.
 Refer to:
 - **Query guide**: `queries/guide.md`
 - **ADR & rationale**: `/90-docs/adr/2608180100-religious-community-mental-model-framework.edn`
-- **Run queries**: `nbb queries/comparison.cljs [query-N]`
+- **Run queries**: `kbb --backend sci queries/comparison.cljk [query-N]`

@@ -252,9 +252,9 @@
        # runtime.clj の byte-store! lowering（`git grep -n \"byte-store! (let\" src/kotoba/runtime.clj`）に
        # heap-base 以上 / global 0 未満の検査を emit する。local 確保は
        # runtime.clj:4108-4130 の let と同じ next-local / :local-types 機構に参加させる。
-       # 実行証拠: clojure -M:test（transport_component_test と real_host_providers_test が
+       # 実行証拠: kbb -M:test（transport_component_test と real_host_providers_test が
        # 574 箇所の経路を実際に通す）
 
    参考実装: `kotoba.wasm-exec/writable-output-window`（同じ規則の host 側）。
-   audit: `clojure -Sdeps '{:paths [\"src\" \"resources\" \"tools\"]}' -M -m raw-memory-audit`
+   audit: `kbb -Sdeps '{:paths [\"src\" \"resources\" \"tools\"]}' -M -m raw-memory-audit`
    （gate 自身を走らせて対象 module を列挙する。regex ではない）。")))

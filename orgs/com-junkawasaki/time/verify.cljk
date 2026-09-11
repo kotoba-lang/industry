@@ -1,6 +1,6 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify.cljs — RelationalTime 検証ハーネス（nbb。repo 規約: 検証/テストハーネスは
-;; sh でなく nbb .cljs で書く）。旧 verify.sh を置換。
+;; sh でなく kbb --backend sci .cljk で書く）。旧 verify.sh を置換。
 ;;
 ;; 手順:
 ;;   1. lake exe cache get  — mathlib prebuilt olean 取得（cold cache でのソース
@@ -16,8 +16,8 @@
 ;; すべて通った時のみ TIME_VERIFY_PASS を出力して exit 0。
 ;;
 ;; 使い方:
-;;   npx nbb verify.cljs               # フル検証
-;;   npx nbb verify.cljs --scan-only   # 手順3のみ（CI での軽量ゲート/自己テスト用）
+;;   kbb --backend sci verify.cljk               # フル検証
+;;   kbb --backend sci verify.cljk --scan-only   # 手順3のみ（CI での軽量ゲート/自己テスト用）
 
 (require '[clojure.string :as str]
          '["node:child_process" :as cp]

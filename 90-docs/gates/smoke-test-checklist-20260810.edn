@@ -70,7 +70,7 @@
    :name "Metrics Collection & Data Freshness (30 min)"
    :items
    [{:item "3.1" :task "Run build metrics collector script"
-     :check "nbb scripts/collect-build-metrics.cljs → metrics-build.txt created"
+     :check "kbb --backend sci scripts/collect-build-metrics.cljk → metrics-build.txt created"
      :owner "metrics-lead"
      :status "[ ] PASS [ ] FAIL"
      :evidence-file "metrics-build.txt"}
@@ -80,7 +80,7 @@
      :status "[ ] PASS [ ] FAIL"
      :timestamp-requirement "< 5 min old"}
     {:item "3.3" :task "Run coverage metrics collector"
-     :check "nbb scripts/collect-coverage-metrics.cljs → metrics-coverage.txt created"
+     :check "kbb --backend sci scripts/collect-coverage-metrics.cljk → metrics-coverage.txt created"
      :owner "metrics-lead"
      :status "[ ] PASS [ ] FAIL"
      :evidence-file "metrics-coverage.txt"}
@@ -90,7 +90,7 @@
      :status "[ ] PASS [ ] FAIL"
      :timestamp-requirement "< 1h old"}
     {:item "3.5" :task "Run deployment metrics collector"
-     :check "nbb scripts/collect-deploy-metrics.cljs → metrics-deployment.txt created"
+     :check "kbb --backend sci scripts/collect-deploy-metrics.cljk → metrics-deployment.txt created"
      :owner "metrics-lead"
      :status "[ ] PASS [ ] FAIL"
      :evidence-file "metrics-deployment.txt"}
@@ -99,7 +99,7 @@
      :owner "metrics-lead"
      :status "[ ] PASS [ ] FAIL"}
     {:item "3.7" :task "Run blocker metrics collector"
-     :check "nbb scripts/collect-blocker-metrics.cljs → metrics-blockers.txt created"
+     :check "kbb --backend sci scripts/collect-blocker-metrics.cljk → metrics-blockers.txt created"
      :owner "metrics-lead"
      :status "[ ] PASS [ ] FAIL"
      :evidence-file "metrics-blockers.txt"}
@@ -109,7 +109,7 @@
      :status "[ ] PASS [ ] FAIL"
      :timestamp-requirement "< 5 min old"}
     {:item "3.9" :task "Run velocity metrics collector"
-     :check "nbb scripts/collect-velocity-metrics.cljs → metrics-velocity.txt created"
+     :check "kbb --backend sci scripts/collect-velocity-metrics.cljk → metrics-velocity.txt created"
      :owner "metrics-lead"
      :status "[ ] PASS [ ] FAIL"
      :evidence-file "metrics-velocity.txt"}

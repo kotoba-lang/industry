@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-declared-artifact-present.cljk — an actor manifest that
 ;; declares an artifact CID, against whether that artifact is at the address
 ;; the manifest names.
@@ -24,7 +24,7 @@
 ;; verifies the returned bytes hash back to it, and REFUSES (exit 2) if that
 ;; fails — before any manifest is judged.
 ;;
-;;   nbb scripts/verify-declared-artifact-present.cljk [--findings] [--limit N] <dir>...
+;;   kbb --backend sci scripts/verify-declared-artifact-present.cljk [--findings] [--limit N] <dir>...
 ;;
 ;; exit 0 clean / 1 findings / 2 REFUSED (could not answer)
 

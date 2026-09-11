@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; x402_bot_pay.cljs — how an itonami CLI bot pays for inference and storage.
 ;;
 ;; ## What this closes
@@ -47,12 +47,12 @@
 ;;   CP="orgs/kotoba-lang/pay/src:orgs/kotoba-lang/org-chainagnostic-cacao/src:\
 ;; orgs/kotoba-lang/org-ietf-ed25519/src:orgs/kotoba-lang/org-ietf-cbor/src:\
 ;; orgs/kotoba-lang/authority/src:orgs/network-awai/local-murakumo/src"
-;;   nbb --classpath "$CP" scripts/x402_bot_pay.cljk account <bot-id>
-;;   nbb --classpath "$CP" scripts/x402_bot_pay.cljk policy  <bot-id>
-;;   nbb --classpath "$CP" scripts/x402_bot_pay.cljk balance <bot-id>
-;;   nbb --classpath "$CP" scripts/x402_bot_pay.cljk spent   <bot-id>
-;;   nbb --classpath "$CP" scripts/x402_bot_pay.cljk probe   <bot-id> <url> [--body '<json>']
-;;   nbb --classpath "$CP" scripts/x402_bot_pay.cljk pay     <bot-id> <url> [--body '<json>']
+;;   kbb --backend sci --classpath "$CP" scripts/x402_bot_pay.cljk account <bot-id>
+;;   kbb --backend sci --classpath "$CP" scripts/x402_bot_pay.cljk policy  <bot-id>
+;;   kbb --backend sci --classpath "$CP" scripts/x402_bot_pay.cljk balance <bot-id>
+;;   kbb --backend sci --classpath "$CP" scripts/x402_bot_pay.cljk spent   <bot-id>
+;;   kbb --backend sci --classpath "$CP" scripts/x402_bot_pay.cljk probe   <bot-id> <url> [--body '<json>']
+;;   kbb --backend sci --classpath "$CP" scripts/x402_bot_pay.cljk pay     <bot-id> <url> [--body '<json>']
 ;;
 ;; `probe` reads the challenge and prints what WOULD be paid. It mints nothing.
 

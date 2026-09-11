@@ -27,7 +27,7 @@
             (:guest-scratch :fixed-reuse)))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "KOTOTAMA_POOL_SOAK_OPS=100 clojure -M:postgresql-interop")
+     (:command "KOTOTAMA_POOL_SOAK_OPS=100 kbb -M:postgresql-interop")
      (:result "300 contended operations on PostgreSQL 17.9; exit 0"))))))
   (:adr/body
   "# ADR-2607197700: PostgreSQL cross-platform matrix and scheduled soak

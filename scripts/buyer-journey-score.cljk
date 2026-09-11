@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; buyer-journey-score.cljs — **買い手の問いに、その場で答えているか**を測る。
 ;;
 ;; `murakumo-site-scenario.cljs` は「面が自分の役割に合っているか」を測った。
@@ -28,8 +28,8 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb scripts/buyer-journey-score.cljk
-;;   nbb scripts/buyer-journey-score.cljk --json
+;;   kbb --backend sci scripts/buyer-journey-score.cljk
+;;   kbb --backend sci scripts/buyer-journey-score.cljk --json
 
 (ns buyer-journey-score
   (:require ["node:child_process" :as cp]

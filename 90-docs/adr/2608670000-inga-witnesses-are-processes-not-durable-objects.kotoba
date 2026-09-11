@@ -134,7 +134,7 @@ main に置いていない。合意ライブラリを失敗テスト付きで置
 ### resume point —— 次に打つ 1 コマンド
 
     git worktree add -b <br> /tmp/inga-fix origin/agent/sync-request-names-its-asker
-    cd /tmp/inga-fix && clojure -M:test
+    cd /tmp/inga-fix && kbb -M:test
 
 落ちる 5 件は `:to` に **String** が来て、テストの replica map（keyword 鍵）に
 別型の鍵が入るため `sort` が壊れる。**ask 側 3 経路はすべて
@@ -275,7 +275,7 @@ everything in memory is gone and only the persisted BLOCKS return*）。
 - `budget = 2 × tick`（ADR-2608048000 で landed）は健全時にしか正しくない。
   `inga-node` の既定は 8 tick で、これは inga 自身の harness が回っている比率
 - 修正の当たり所は `inga.replica` の new-view → propose 経路。**再現は 1 コマンド**:
-  `nbb --classpath \"src:../inga/src\" script/devnet.cljs`
+  `kbb --backend sci --classpath \"src:../inga/src\" script/devnet.cljs`
 
 ## 学び
 

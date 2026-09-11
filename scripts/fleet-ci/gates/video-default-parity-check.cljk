@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; video-default-parity — the :video default in the spec must be the default the
 ;; server actually uses, and it must not be a model marked broken.
 ;;
@@ -28,7 +28,7 @@
 ;; because the point is to compare against what is deployed-from, not against
 ;; whatever happens to be checked out next to it.
 ;;
-;;   nbb video-default-parity-check.cljs [--dir <repo-root>] [--ref main]
+;;   kbb --backend sci video-default-parity-check.cljk [--dir <repo-root>] [--ref main]
 
 (ns video-default-parity-check
   (:require ["fs" :as fs]

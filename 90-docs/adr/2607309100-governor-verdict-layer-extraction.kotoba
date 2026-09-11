@@ -96,7 +96,7 @@ HARD 不変条件を並べても交わらなかった:
 
 **(d) 本物の divergence は enum 方言の confidence 既定だった。** 24 件**全件**が `(or (:confidence proposal) 1.0)` — `:confidence` を持たない提案を「完全に信頼」として `:proceed` させていた。boolean 方言 346 件は全件 0.0 で、isco-5419 はそれを明示的にテストしている（『never silently treated as trustworthy』）。さらに `cloud-itonami-isco-4321` の advisor docstring は『LLM parse failures always yield :confidence 0.0 ... which forces the governor to escalate/hold』と、自分の governor と反対のことを書いていた。
 
-blast radius の実測: 24 件のいずれにもこの既定を通るテストは無く、advisor を持つ4件（1212 / 1321 / 4321 / 7126）では advisor が常に `:confidence` を明示するので、live な欠陥ではなく**未検証の潜在 hazard**。残る20件は `governor` + `store` だけの scaffold で `assess` が公開面そのもの。`assess` の signature は 24 件とも `[env proposal]`、`1.0` の出現も各1箇所と完全に一様だったため機械的な sweep が安全に成立し、**24 件すべてを 0.0 に修正して未検証だった経路にテストを追加**、各 repo で `clojure -M:test` 緑を確認してから着地させた。
+blast radius の実測: 24 件のいずれにもこの既定を通るテストは無く、advisor を持つ4件（1212 / 1321 / 4321 / 7126）では advisor が常に `:confidence` を明示するので、live な欠陥ではなく**未検証の潜在 hazard**。残る20件は `governor` + `store` だけの scaffold で `assess` が公開面そのもの。`assess` の signature は 24 件とも `[env proposal]`、`1.0` の出現も各1箇所と完全に一様だったため機械的な sweep が安全に成立し、**24 件すべてを 0.0 に修正して未検証だった経路にテストを追加**、各 repo で `kbb -M:test` 緑を確認してから着地させた。
 
 **未確認として残っているもの**: `true-orphan-git` 34 件（west 未登録の git repo）は中身を見ていない。boolean 方言の未移行 repo（342 件）に `conformance-failures` の1行テストだけを足す PR を fleet-ci の tick で自動生成することは可能だが、340 超の PR を無人で開けるのが良いかは別判断。")
 
@@ -107,7 +107,7 @@ blast radius の実測: 24 件のいずれにもこの既定を通るテスト�
    ":rule :conflict-check-not-cleared を持つ repo は cloud-itonami-isco-2611 と lawfirm の2つだけ — 法律3リポは重複していない"
    "isic 460 repo / isco 340 repo、manifest/repository-rules.edn が :sector-agent / :occupation-agent と別ロールを付与"
    "kotoba-lang/governor: 20 tests / 169 assertions green, lint warnings 0, 依存ゼロ（enum 方言追加後）"
-   "enum 方言 24 件は全件 (or (:confidence proposal) 1.0)、boolean 方言 346 件は全件 0.0 — 24 件を 0.0 に統一し、24 repo すべてで clojure -M:test 緑を確認して着地"
+   "enum 方言 24 件は全件 (or (:confidence proposal) 1.0)、boolean 方言 346 件は全件 0.0 — 24 件を 0.0 に統一し、24 repo すべてで kbb -M:test 緑を確認して着地"
    "24 件の assess signature は全件 [env proposal]、1.0 の出現も各1箇所（機械 sweep が安全に成立した根拠）"
    "24 件のいずれにも missing-confidence を通るテストは存在しなかった（修正前）"
    "最終分類: boolean 345 / enum 24 / flag-enum 1 / publication 6 = 376 全件"

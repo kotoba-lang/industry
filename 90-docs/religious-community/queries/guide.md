@@ -181,13 +181,13 @@ Linux Community                 | [:en]                 | 1000+ (code comments, 
 
 ```bash
 # Run all queries
-nbb /Users/junkawasaki/github/com-junkawasaki/90-docs/religious-community/queries/comparison.cljs
+kbb --backend sci /Users/junkawasaki/github/com-junkawasaki/90-docs/religious-community/queries/comparison.cljk
 
 # Run specific query
-nbb /Users/junkawasaki/github/com-junkawasaki/90-docs/religious-community/queries/comparison.cljs query-1
+kbb --backend sci /Users/junkawasaki/github/com-junkawasaki/90-docs/religious-community/queries/comparison.cljk query-1
 
 # Output to CSV
-nbb /Users/junkawasaki/github/com-junkawasaki/90-docs/religious-community/queries/comparison.cljs query-2 --format csv > axis-comparison.csv
+kbb --backend sci /Users/junkawasaki/github/com-junkawasaki/90-docs/religious-community/queries/comparison.cljk query-2 --format csv > axis-comparison.csv
 ```
 
 ### Manual DataScript/Datomic (if using database)

@@ -131,10 +131,10 @@ regression test で守られている** —— 算術だけではない。
 
 ## 検証
 
-- clojure -M:dev:test -> 158 tests / 612 assertions / 0 failures
+- kbb -M:dev:test -> 158 tests / 612 assertions / 0 failures
   (既存の fee-services actor の test を含む)
-- clojure -M:lint -> 0 errors / 0 warnings
-- clojure -M:dev:run-kumiai -> clean lifecycle 1 本 + HARD hold 11 種
+- kbb -M:lint -> 0 errors / 0 warnings
+- kbb -M:dev:run-kumiai -> clean lifecycle 1 本 + HARD hold 11 種
 
 **governor の全 rule と決議判定の全 rule を両方向で試験している。**
 fixture は、母数を間違えた実装・裁判所の除外決定を無視する実装・常に
@@ -270,7 +270,7 @@ bot 検出の回避はこのワークスペースの安全床が禁じている�
   (3 回のサーバ側 merge commit。547c86e6=JPN / 577b2776=DEU・ESP・FRA /
   2f0b0b13=SGP)
 - west pin 前進 = a25de73b -> 0783d41f -> 5c8e3fb5
-- clojure -M:dev:test -> 188 tests / 755 assertions / 0 failures
+- kbb -M:dev:test -> 188 tests / 755 assertions / 0 failures
 
 ### 残った gap を常駐 bot にした (2026-09-06、オーナー指示「残りの gap は hermes bot profile, cron で job に」)
 
@@ -394,7 +394,7 @@ nbb/CLJS でよいと言っているが、**検査対象のビルドに clojure 
 認めていない。`test/kotoba/parity.cljs` はそのため削除した。
 
 **この deny は飾りではない。** `amu test` を使わないのは、それが
-`clojure -M:run` に落ちるからで、**amu のサブコマンドで trace を踏むのはこれだけ**
+`kbb -M:run` に落ちるからで、**amu のサブコマンドで trace を踏むのはこれだけ**
 —— つまりこれが「trace が何かを検出できる」ことの証拠でもある。発火しない検査は、
 常に発火する検査と同じだけ無内容。
 
@@ -568,11 +568,11 @@ skill `kotoba-clj-to-kotoba` の手順 6 / 6b に反映した。
 ```bash
 cd orgs/cloud-itonami/cloud-itonami-isic-6820
 # gate: JDK を拒否した環境で build も acceptance も回す (0 pass / 1 fail / 2 測定不能)
-nbb --classpath src:scripts scripts/kotoba_native_acceptance.cljs
+kbb --backend sci --classpath src:scripts scripts/kotoba_native_acceptance.cljs
 # oracle 側 (JVM、Q9 では historical / non-gating)
-clojure -M:dev:test        # 195 tests / 783 assertions / 0 failures (closing 時に着地状態で再実行)
-clojure -M:lint            # 0 errors / 0 warnings
-clojure -M:dev:run-kumiai  # 6法域の決議要件 + 感度表 + HARD hold 11種
+kbb -M:dev:test        # 195 tests / 783 assertions / 0 failures (closing 時に着地状態で再実行)
+kbb -M:lint            # 0 errors / 0 warnings
+kbb -M:dev:run-kumiai  # 6法域の決議要件 + 感度表 + HARD hold 11種
 python3 ../../../scripts/hermes-kumiai-sources/probe_kumiai_sources.py  # 出典の現況
 ```
 

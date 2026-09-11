@@ -58,13 +58,13 @@ query 入口を kotobase 方言（Datomic-shaped EDN Datalog）に決めたが�
 CP=".:scripts/nbb_compat:orgs/kotoba-lang/kotobase-query/src"
 
 # reference の健全性だけ（LLM を呼ばない）
-nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljk \
+kbb --backend sci --classpath "$CP" scripts/query-dialect-bench/bench.cljk \
   --questions scripts/query-dialect-bench/questions.edn \
   --plane-script scripts/query-dialect-bench/plane.cljk \
   --out /tmp/off.edn --offline
 
 # 本番（LLM を呼ぶ）
-nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljk \
+kbb --backend sci --classpath "$CP" scripts/query-dialect-bench/bench.cljk \
   --questions scripts/query-dialect-bench/questions.edn \
   --plane-script scripts/query-dialect-bench/plane.cljk \
   --out scripts/query-dialect-bench/result.edn
@@ -80,10 +80,10 @@ nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljk \
 
 ```bash
 # 配線（classpath が通り、schema 変換が agent の形になっているか）
-nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljk --self-test
+kbb --backend sci --classpath "$CP" scripts/query-dialect-bench/bench.cljk --self-test
 
 # validator 本体の両方向 fixture —— こちらが正本。依存ゼロで回る
-cd orgs/kotoba-lang/kotobase-query && nbb --classpath src:test run-tests-pure.cljs
+cd orgs/kotoba-lang/kotobase-query && kbb --backend sci --classpath src:test run-tests-pure.cljs
 ```
 
 **この repo に gate は置かない。** fleet が配るのはその repo の tree だけで、
@@ -131,7 +131,7 @@ repo-taxonomy  manifest/repo-taxonomy.edn                    repo 3 面分類   
 落ち、batch ごと 90 分の推論を捨てた）。
 
 ```bash
-nbb --classpath "$CP" scripts/query-dialect-bench/grammar-agreement.cljk
+kbb --backend sci --classpath "$CP" scripts/query-dialect-bench/grammar-agreement.cljk
 ```
 
 **不変条件は一致ではなく方向つき**である。validator は engine より厳しくてよい ——

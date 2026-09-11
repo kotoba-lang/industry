@@ -14,7 +14,7 @@
                       :settlements 0 :settlement-rate 0
                       :rejection-reasons {:malformed-header 1}
                       :rejections-classified 1 :rejections-unexplained 3}}
-  :funnel-pulse "nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse → EXIT=0, recorded. DELTA vs 0039: visitors +6, signups 0, checkouts 0"
+  :funnel-pulse "kbb --backend sci 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk funnel-pulse → EXIT=0, recorded. DELTA vs 0039: visitors +6, signups 0, checkouts 0"
   :stability-checks [{:path "/" :status 200 :time-s "0.308"}
                      {:path "/signup" :status 200 :time-s "0.143"}
                      {:path "/ipld/" :status 404 :note "expected — bare prefix has no index; route requires params (same finding as 0038/0039)"}
@@ -26,7 +26,7 @@
  :cron-infra
  {:observed "job d2cfd2ba4007 last_run_at 11:41, last_status 'error': TimeoutError waiting for TERMINAL_CWD read lock after 660s (failure_streak 1). This 12:05 fire ran clean."
   :action-taken "closed the two carried-open config items from 0038/0039:
-   (a) stale `nbb scripts/kotobase_lead_loop.cljs` path in the cron prompt — scripts/ path does not exist (ls verified); fixed via `hermes cron edit d2cfd2ba4007 --prompt` to the real path 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs, and replaced the stale /ipld/ stability check with /ipld/v1 (400 = route alive). Read-back verified: has-90docs-path true, has-stale-scripts-path false, has-ipld-v1 true.
+   (a) stale `kbb --backend sci scripts/kotobase_lead_loop.cljk` path in the cron prompt — scripts/ path does not exist (ls verified); fixed via `hermes cron edit d2cfd2ba4007 --prompt` to the real path 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs, and replaced the stale /ipld/ stability check with /ipld/v1 (400 = route alive). Read-back verified: has-90docs-path true, has-stale-scripts-path false, has-ipld-v1 true.
    (b) SOUL.md stability check updated to /ipld/v1 with measured expected values."
   :not-done "workdir/schedule stagger for the TERMINAL_CWD lock timeout NOT changed — error did not reproduce this run; no measured basis to alter the schedule. Schedule stays 0,30 * * * *."}
 

@@ -156,7 +156,7 @@ STALE になるが、これは west.yml が canonical でないからではな�
 
 最初のコマンド:
 ```bash
-nbb scripts/fleet-ci/gates/manifest-reality-check.cljs .            # 0 error を確認
-nbb --classpath \".:scripts/nbb_compat\" scripts/west-orphan-audit.cljs --blocking
+kbb --backend sci scripts/fleet-ci/gates/manifest-reality-check.cljk .            # 0 error を確認
+kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/west-orphan-audit.cljs --blocking
 ```
 ")))

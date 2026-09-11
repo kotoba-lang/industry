@@ -202,7 +202,7 @@ Dependabot。
 
     cd /Users/junkawasaki/github/com-junkawasaki
     git fetch origin && git merge --ff-only origin/main
-    nbb --classpath \".:scripts/nbb_compat\" scripts/cleanup.cljs --unlanded
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/cleanup.cljs --unlanded
 
 次に着手するなら **gap 0a**（owner の一言で決まる。10.5 GB の押し先を決めるだけ）か
 **0b**（+219 行を着地させれば cloud-murakumo が pin 同期に復帰する）。

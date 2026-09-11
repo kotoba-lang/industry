@@ -188,8 +188,8 @@ platform buffer の marshalling と interpreted glue。handshake / 制御 / ssh�
 ```
 cd orgs/kotoba-lang/kekkai-node
 # classpath は src:test:../bytes/src:../noise/src:../org-ietf-dns/src:../org-ietf-turn/src
-nbb --classpath <上記> run-tests.cljs   # pure core（現状 green）
-nbb --classpath <上記> test/e2e.cljs    # relay + agent 2 台 + MagicDNS の real-socket E2E
+kbb --backend sci --classpath <上記> run-tests.cljs   # pure core（現状 green）
+kbb --backend sci --classpath <上記> test/e2e.cljs    # relay + agent 2 台 + MagicDNS の real-socket E2E
 ```
 
 1. **netmap 署名検証を agent に配線する（最優先）**: `agent/load-netmap` が

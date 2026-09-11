@@ -140,7 +140,7 @@ graph bafyreididf4yoyo4dnvo5hqomviejk7f5gy34gb7vgcy3bubmf2jivbrpi(PUT 201 / GET 
 bots の回復判定:
 
     cd ~/.cloud-itonami/current && CLOUD_ITONAMI_DATA_DIR=$HOME/.cloud-itonami/data \\
-      clojure -M:cli bots list
+      kbb -M:cli bots list
 
 `:slo :windows :hours-24 :completion-rate` を見る。目標 90%、修正前 41.4%。
 provider 由来の blocked が残っていれば `POST https://api.murakumo.cloud/v1/messages`

@@ -258,7 +258,7 @@ fleet CLI command と systemd packaging も `fleet` 側へ移した。kototama �
 | G-C | `provider-postgres` -> `kototama.tender` | **逆流ではなかった。** 実物は `tender/host-fn` に加え `ValType/I32` も直接使う Chicory tender 専用プラグイン。特定 tender の ABI に対して書かれた host adapter がその tender に依存するのは構造上正しい。**間違っていたのは逆方向 — tender がプラグインを同梱していたこと**で、それを外して解消 |
 | G-D | fleet 分離 (T6) | 新規 `kotoba-lang/fleet` に決着。`fleet -> kototama` の一方向依存、4 ns + 3 test ns + 10 CLI command + packaging を移設。checkpoint key は互換維持。transport / Component tender の分離も含め kototama TCB 32 -> 23 |
 | G-F | `kotoba.kir.xml` (224) と `kotoba-lang/xml` repo の重複判定 | **非重複。** `kotoba.kir.xml` は `kotoba.kir.value` を require する KIR 値の emitter、`xml/src/xml/core.cljc` (40 行) は Hiccup -> XML emitter で別物。ただし名前が紛らわしいので将来 rename 候補 |
-| G-G | 各 repo の `clojure -M:test` | 11/11 green。**これを実際に走らせたことが 4 件の実バグを検出した** — `artifact` <-> `kotoba-verifier` の循環、`kgraph` の未宣言 `datom` 依存、component/provider の resource 3 セット欠落、ハイフン入り repo 名でのテスト ns/パス不整合。いずれもコードを読むだけでは出なかった |
+| G-G | 各 repo の `kbb -M:test` | 11/11 green。**これを実際に走らせたことが 4 件の実バグを検出した** — `artifact` <-> `kotoba-verifier` の循環、`kgraph` の未宣言 `datom` 依存、component/provider の resource 3 セット欠落、ハイフン入り repo 名でのテスト ns/パス不整合。いずれもコードを読むだけでは出なかった |
 
 ### 追加 gap の決着
 

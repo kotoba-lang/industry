@@ -42,7 +42,7 @@ forms reports success having done nothing.
 
 Do not use, and do not work around:
 
-- `-e` / `-c` script flags (`nbb -e '...'`, `python3 -c '...'`) — put the code
+- `-e` / `-c` script flags (`kbb --backend sci -e '...'`, `python3 -c '...'`) — put the code
   in a file in the worktree and run the file.
 - heredocs that feed a script to an interpreter (`<<'EOF'`) — write the file directly.
 - recursive delete (`rm -rf`). There is no approved form of this here. If a

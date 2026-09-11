@@ -16,7 +16,7 @@ reframe などに refactor」「jp-go-dds をデフォルトの デザインシ�
 ```bash
 cd "$COM_JUNKAWASAKI_ROOT"
 git fetch origin -q && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/svelte-cljs-wave-tick.cljk --limit 4
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/svelte-cljs-wave-tick.cljk --limit 4
 ```
 
 tick が **exit 2** なら測れていない。**その周は何もしない。**
@@ -54,8 +54,8 @@ for(const l of fs.readFileSync("manifest/west.yml","utf8").split("\n")){
   else if(m=l.match(/^\s*path:\s*(\S+)/)) if(process.argv.slice(1).includes(m[1])) console.log(m[1],n);
 }' orgs/<org>/<name> ...
 
-PINS=pins.tsv DRY=1 nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
-PINS=pins.tsv     nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
+PINS=pins.tsv DRY=1 kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
+PINS=pins.tsv     kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-batch.cljk
 ```
 
 SHA は **GitHub API から採る**（`gh api repos/<org>/<repo>/commits/main --jq .sha`）。
@@ -81,8 +81,8 @@ exit 127 は「pin に合わせた」と同じ静けさで返るので、update 
 ## 4. 測り直して baseline を締める
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/verify-frontend-stack-retirement.cljk
-nbb --classpath ".:scripts/nbb_compat" scripts/verify-frontend-stack-retirement.cljk --write-baseline
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-frontend-stack-retirement.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-frontend-stack-retirement.cljk --write-baseline
 ```
 
 **baseline の締め直しは省かない。** 締めないと、移行済み repo が `.svelte` を
@@ -93,7 +93,7 @@ commit して main に載せる。
 sparse な root worktree から出す:
 
 ```bash
-nbb scripts/root-worktree.cljk create svelte-wave-baseline-<date> --profile minimal --include manifest --path /tmp/root-svelte-wave-baseline
+kbb --backend sci scripts/root-worktree.cljk create svelte-wave-baseline-<date> --profile minimal --include manifest --path /tmp/root-svelte-wave-baseline
 # --write-baseline は cwd（FLEET_ROOT）の orgs/ を走査して cwd の manifest/ に書く。
 # worktree には orgs/ が無いので、本体で書いて worktree へ copy し、本体側は checkout で戻す
 cp manifest/frontend-stack-baseline.edn /tmp/root-svelte-wave-baseline/manifest/
@@ -250,7 +250,7 @@ tick が 2 件と出したが対象 appview には 1 件で、もう 1 件は**�
    で与える。着地後の確認:
 
    ```bash
-   nbb scripts/verify-single-page-app.cljk --root . --findings
+   kbb --backend sci scripts/verify-single-page-app.cljk --root . --findings
    ```
 
    ⚠ **exit 0 を合格条件にしない。この検出器は fleet 全体を見る**ので、
@@ -297,7 +297,7 @@ background 監視に入るな」だけでは防げない**。実測 2026-09-07�
 
 ```bash
 for i in $(seq 1 9); do
-  node "$COM_JUNKAWASAKI_ROOT/scripts/resource-guard.mjs" run build -- npx shadow-cljs compile app > /tmp/x.log 2>&1
+  node "$COM_JUNKAWASAKI_ROOT/scripts/resource-guard.mjs" run build -- amu compile --target wasm32-browser app > /tmp/x.log 2>&1
   rc=$?; [ $rc -ne 2 ] && break
   echo "attempt $i: lock held, waiting 45s"; sleep 45
 done

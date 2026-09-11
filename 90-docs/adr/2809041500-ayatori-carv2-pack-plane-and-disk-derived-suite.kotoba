@@ -33,7 +33,7 @@ Landed: kotoba-lang/ayatori#15 (072f9efa) and #16 (da2cee9f). West pin advanced 
 
 Two defects were found by writing the tests rather than by reasoning. read-block destructured :block from ipld.car.v2/read-frame, which returns :bytes, so it returned nil for every block -- and the round-trip test went GREEN, because ipld.car.bytes/equal? answers true for two nils and both sides were missing. Every byte comparison now goes through a some-bytes? floor. And open-pack first reassembled a fake archive to call read-index, which re-parses the header and reads at the file-absolute :index-offset, not where the index sits in a range response; it decodes the index bytes directly now.
 
-A portability defect was found by running the other gate: the two new .cljc files used js/parseInt and unqualified clojure.string/ in code shared by both runtimes, which nbb resolves and clojure -M:test does not. Running only the runtime you are working in leaves the other gate red for a reason invisible from where you are standing.
+A portability defect was found by running the other gate: the two new .cljc files used js/parseInt and unqualified clojure.string/ in code shared by both runtimes, which nbb resolves and kbb -M:test does not. Running only the runtime you are working in leaves the other gate red for a reason invisible from where you are standing.
 
 The gates.edn table recording 'ayatori 35 / 62 ==' is annotated rather than rewritten: those numbers are provenance for why each gate was added, not a live claim, and nothing re-measures them. The == in particular was a measurement with a date that stopped being true without anything turning red.
 

@@ -66,7 +66,7 @@ header marker, and a hand-written balanced-bracket parser — any failure
 aborts the WHOLE tick, nothing written. Repo I/O originally targeted the
 GitHub REST + Git Data API (blob/tree/commit/branch/merge, atomic
 multi-file commit) — this is the part blocked on a write credential
-(the rejected PAT). Verified: shadow-cljs release build clean (0
+(the rejected PAT). Verified: amu compile --target wasm32-browser build clean (0
 warnings), `wrangler deploy --dry-run` parses config and bundles. NOT
 deployed — `wrangler.jsonc`'s `triggers.crons: [\"13 0 * * *\"]` addition
 and the GITHUB_TOKEN secret requirement are both still only on the

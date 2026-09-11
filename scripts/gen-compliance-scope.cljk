@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 認証スコープ（SOC 2 / ISO 27001 / ISMAP）の資産棚卸しを **生成** する。
 ;;
 ;; ## なぜ要るのか
@@ -28,8 +28,8 @@
 ;; 複数行のインラインテーブル配列や入れ子は読めない。読めなかった binding は
 ;; `:scope/coverage` の `:toml-partial?` で申告する。JSONC は完全に読む。
 ;;
-;;   nbb scripts/gen-compliance-scope.cljk            # 生成
-;;   nbb scripts/gen-compliance-scope.cljk --check    # 差分があれば非ゼロ終了
+;;   kbb --backend sci scripts/gen-compliance-scope.cljk            # 生成
+;;   kbb --backend sci scripts/gen-compliance-scope.cljk --check    # 差分があれば非ゼロ終了
 
 (ns gen-compliance-scope
   (:require ["fs" :as fs]
@@ -429,7 +429,7 @@
           cross (->> rows (filter #(> (count (:properties %)) 1))
                      (map #(str/join "+" (sort (:properties %)))) distinct sort)
           header (str ";; 認証スコープの資産棚卸し —— **生成物。手で編集しない**\n"
-                      ";; 再生成: nbb scripts/gen-compliance-scope.cljk\n;;\n"
+                      ";; 再生成: kbb --backend sci scripts/gen-compliance-scope.cljk\n;;\n"
                       ";; SOC 2 CC3.2/CC6.1 と ISO/IEC 27001:2022 A.5.9 が要求する資産台帳の\n"
                       ";; 機械可読な下地。`:scope/repo` は repo-taxonomy の `:repo/path` と、\n"
                       ";; `:scope/host` は surface 索引の `:surface/host` と join できる。\n;;\n"
@@ -451,7 +451,7 @@
         (let [cur (read-safe out-file)]
           (if (= cur body)
             (println (str "compliance scope: 最新\nSCANNED\t" parsed))
-            (do (js/console.error "compliance scope が古い。再生成せよ: nbb scripts/gen-compliance-scope.cljk")
+            (do (js/console.error "compliance scope が古い。再生成せよ: kbb --backend sci scripts/gen-compliance-scope.cljk")
                 (set! (.-exitCode js/process) 1))))
         (do (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
             (fs/writeFileSync out-file body)

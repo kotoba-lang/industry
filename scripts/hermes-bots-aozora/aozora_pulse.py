@@ -23,5 +23,5 @@ CLASSPATH = ":".join([
 ])
 SCRIPT = os.path.join(ROOT, "scripts", "hermes-bots-aozora", "pulse.cljs")
 
-r = subprocess.run(["nbb", "--classpath", CLASSPATH, SCRIPT], timeout=600)
+r = subprocess.run(["kbb", "--backend", "sci", "--classpath", CLASSPATH, SCRIPT], timeout=600)
 sys.exit(r.returncode)

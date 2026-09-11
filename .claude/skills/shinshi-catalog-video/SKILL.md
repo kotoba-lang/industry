@@ -25,7 +25,7 @@ description: club-shinshi の original-series キャラを 1 体だけ i2v し�
 ```bash
 nbb ~/.itonami/shinshi-catalog-video/tick.cljs --json
 # または repo 側
-nbb scripts/shinshi-catalog-video-tick.cljk --json
+kbb --backend sci scripts/shinshi-catalog-video-tick.cljk --json
 ```
 
 - `UNANSWERED=true`（D1 / ssh / Comfy 不通）→ **埋めるものが 0 と書かない。**
@@ -36,8 +36,8 @@ nbb scripts/shinshi-catalog-video-tick.cljk --json
 品質（モデル無し）:
 
 ```bash
-nbb scripts/shinshi-catalog-video-quality.cljk <file.mp4>
-nbb scripts/shinshi-catalog-video-quality.cljk --self-test
+kbb --backend sci scripts/shinshi-catalog-video-quality.cljk <file.mp4>
+kbb --backend sci scripts/shinshi-catalog-video-quality.cljk --self-test
 ```
 
 | 検査 | pass | fail | yellow |

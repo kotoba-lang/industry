@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-catch-swallow.cljs — `(catch T _ <empty-literal>)` outside a teardown,
 ;; and Python `except Exception: pass`.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-catch-swallow.cljk [<dir>] [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-catch-swallow.cljk [<dir>] [--findings]
 ;;
 ;; ## なぜ要るか
 ;;

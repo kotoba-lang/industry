@@ -40,7 +40,7 @@ org-apache-tinkerpop-gremlin, org-graphql-http, org-opencypher-cypher,
 org-w3-sparql-protocol, pay, prolly-tree, sparql。
 
 ⚠ **この表の「cljs 入口の有無」列は当てにしない。** 私の判定はファイル名の
-heuristic で、`shadow-cljs compile test` 形式（io-multiformats・org-ietf-cbor）を
+heuristic で、`amu compile --target wasm32-browser test` 形式（io-multiformats・org-ietf-cbor）を
 「無い」と誤判定した。gates.edn には既に正しく書いてあった。**棚卸しの数字より、
 gates.edn の既存注記の方が正確だった**という事実の方を記録する価値がある。
 
@@ -119,7 +119,7 @@ ClojureScript の double は overflow しないので意図したエラーを報
    言っていない」と書いた。**測った。**
 
    18 repo を JVM と nbb の両方で回し、うち **16 本を `:jvm-test` として登録**した。
-   全部 judah 上の fresh clone で `clojure -M:test` を完走させ、0 failures:
+   全部 judah 上の fresh clone で `kbb -M:test` を完走させ、0 failures:
 
    arrangement 46/207・datalog 91/163・datom 3/9・datom-source 23/74・
    graphql 20/56・kotobase 86/**2560**・kotobase-projection 48/195・
@@ -136,7 +136,7 @@ ClojureScript の double は overflow しないので意図したエラーを報
    fleet 自身の tick で緑を見る前に pin を動かす権利は与えない
    （`ws-valueflo` の entry が同じ順序を記録している）。
 
-   除外 2 本: `kotobase-client` は `:test` alias が無く（`clojure -M:test` が REPL に
+   除外 2 本: `kotobase-client` は `:test` alias が無く（`kbb -M:test` が REPL に
    なる）suite は `.cljs` なので nbb entry が要る。`chain` は既登録。
 
 ### ⚠ nbb が赤いことは、出荷先が赤いことではない
@@ -211,7 +211,7 @@ path には lock に無い repo が 6 本あり、**和は 32 本**である。
 
 | | 結果 |
 |---|---|
-| `shadow-cljs compile test`（出荷先） | **81 tests / 258 assertions、0 failures** |
+| `amu compile --target wasm32-browser test`（出荷先） | **81 tests / 258 assertions、0 failures** |
 | nbb（SCI） | 60 / 187、**9 failures + 1 error** |
 
 失敗は全部 retry / rejection 経路で、SCI が ex-info を包む挙動（同週 prolly-tree と
@@ -221,7 +221,7 @@ library から恒久的な失敗を製造する**。
 
 **本当の blocker は、この file が持っていない gate 種別である。** これらは reader
 conditional の無い `.cljs` で JVM 半分が存在しないので、`:jvm-test` は無意味、
-`:nbb-script` は誤り。要るのは自前の `npm test`（`shadow-cljs compile test` =
+`:nbb-script` は誤り。要るのは自前の `npm test`（`amu compile --target wasm32-browser test` =
 JVM ビルドで compiled artifact を作る）で、fleet-ci にそれを起動するものは無い。
 `org-ietf-cbor` の `test:cljs` も同じ形である。
 
@@ -253,8 +253,8 @@ JVM ビルドで compiled artifact を作る）で、fleet-ci にそれを起動
 
 | | 結果 |
 |---|---|
-| `nbb run-tests.cljs` | **7 failures** —— AWS 参照署名 2 本・検証経路・合成署名器 |
-| `clojure -M:test` | 32 tests / 93 assertions、**0 failures** |
+| `kbb --backend sci run-tests.cljk` | **7 failures** —— AWS 参照署名 2 本・検証経路・合成署名器 |
+| `kbb -M:test` | 32 tests / 93 assertions、**0 failures** |
 
 judah で両方向確認済み（intact `OK: 17 tests` exit 0 / 同じ 1 文字破壊で
 `FAIL: 17 tests, 7 failures` exit 1）。なお **src は 1 行も変えていない**ので、

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/west-pull-bot.cljk — the superproject's "west pull" resident bot.
 ;;
 ;; Owner direction (2026-09-03): 「必ず review and merge, また west pull を行う
@@ -32,8 +32,8 @@
 ;;   - exit 0 always when it ran (monitoring, not a gate); 2 = could not run.
 ;;
 ;; usage:
-;;   nbb scripts/west-pull-bot.cljk            # one tick
-;;   nbb scripts/west-pull-bot.cljk --dry-run  # measure + plan, no writes
+;;   kbb --backend sci scripts/west-pull-bot.cljk            # one tick
+;;   kbb --backend sci scripts/west-pull-bot.cljk --dry-run  # measure + plan, no writes
 
 (ns west-pull-bot
   (:require ["node:child_process" :as cp]

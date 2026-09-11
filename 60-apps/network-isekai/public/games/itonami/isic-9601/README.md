@@ -95,8 +95,8 @@ middle. `district/spec` carries which it is, per district, so nobody quotes the 
 evidence about a repo it never read.
 
 ```
-nbb --classpath src bin/kuriningu.cljs play --district isic-3900
-nbb --classpath src bin/kuriningu.cljs street          # all eight, with their never-auto op
+kbb --backend sci --classpath src bin/kuriningu.cljs play --district isic-3900
+kbb --backend sci --classpath src bin/kuriningu.cljs street          # all eight, with their never-auto op
 ```
 
 ## 3D is the authoritative view
@@ -484,15 +484,15 @@ npm run balance                   # what a competent run looks like across seeds
 npm run build                     # -> preview/index.html (self-contained, ~41 KB)
 
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
-  npx nbb --classpath node_modules preview/smoke.cljs   # real-browser gate
+  kbb --backend sci --classpath node_modules preview/smoke.cljs   # real-browser gate
 
 # the 3D street, against the real canonical stack (needs webgpu checked out)
 west update --fetch smart webgpu
-clojure -M:gpu-test
+kbb -M:gpu-test
 
 # the 2D fallback map (needs sprite2d checked out)
 west update --fetch smart sprite2d
-clojure -M:ir-test
+kbb -M:ir-test
 ```
 
 Open `preview/index.html` in a browser to play. Nothing is fetched at runtime.

@@ -33,9 +33,9 @@
    "scripts/fleet-ci/gates.edn (:id \"compiler-jdk-free\")"))
 
   (:adr/verify
-  (vector "npx nbb scripts/fleet-ci/gates/kotoba-compiler-jdk-free-check.cljs <compiler-checkout>   ; => OK — deps-lock fresh + resolver fail-closed + no JVM reached"
+  (vector "kbb --backend sci scripts/fleet-ci/gates/kotoba-compiler-jdk-free-check.cljk <compiler-checkout>   ; => OK — deps-lock fresh + resolver fail-closed + no JVM reached"
    ":lock/deps-digest を潰して同じ gate   ; => FLEET-CI: 2 of 3 checks failed"
-   "nbb scripts/fleet-ci/tick.cljs --only compiler --dry-run --no-pr --signer-pem ~/.gftd/fleet-ci-signer-tip.pem"))
+   "kbb --backend sci scripts/fleet-ci/tick.cljk --only compiler --dry-run --no-pr --signer-pem ~/.gftd/fleet-ci-signer-tip.pem"))
 
   (:adr/body
   "# Context
@@ -90,7 +90,7 @@ stub で覆い、marker が残っていたら fail する。「JDK 無しで通�
 ## `:cd false`
 
 green が意味するのは「JDK-free の不変条件が保たれている」だけで、compiler の CI が
-通ったことではない。browser matrix / wasm-tools / cargo / `clojure -M:test` は
+通ったことではない。browser matrix / wasm-tools / cargo / `kbb -M:test` は
 ノードに registry egress が無く載らない。**狭い slice を根拠に west pin を
 前進させない。** net-kotobase が `:cd true` なのは CI の主要部を移したからで、
 ここは違う。
@@ -118,7 +118,7 @@ green が意味するのは「JDK-free の不変条件が保たれている」�
   初回実行で捕まえた。
 - **これは edge ではなく通常の腐り方である。** 直近の `deps.edn` を触る commit の
   うち 3 本が pin 前進。そして stale な lock は `bin/kotoba` を
-  `clojure -Spath` に**黙って**落とす — つまり JDK-free という性質が、誰にも
+  `kbb -Spath` に**黙って**落とす — つまり JDK-free という性質が、誰にも
   気付かれずに消える。PR #501 で fallback を可聴にした（stderr に理由と直し方）。
   **gate が毎 tip 回ることが、この性質の唯一の保持機構になる。**
 - **感度測定**（gate が実際に落ちることの証明）: `:lock/deps-digest` を潰すと
@@ -168,7 +168,7 @@ issue 起票まで通った。** 手動経路でも判定の両側を確認済�
 
 gate は 3 回とも捕まえた（signal は効いている）。**問題は頻度である** — pin 前進が
 支配的な commit である repo で、`deps.edn` の digest に縛られた lock は fresh を
-保てない。しかも stale な lock は `bin/kotoba` を黙って `clojure -Spath` に落とす
+保てない。しかも stale な lock は `bin/kotoba` を黙って `kbb -Spath` に落とす
 ＝ JDK-free という性質が誰にも気付かれずに消える（PR #501 で可聴にした）。
 
 ADR-0202 の follow-up はこうである: closure を git だけから導出し、root の pin を
@@ -218,7 +218,7 @@ exit 90 になる。**主張としては正しい**（その branch に JDK-free
     cd orgs/kotoba-lang/aiueos
     # clojure.java.io -> node fs / java.security.MessageDigest -> node crypto を
     # reader-conditional で分岐させ、まず tcb-check を nbb で通す
-    npx nbb -e '...'   # あるいは scripts/ に nbb エントリを足す
+    kbb --backend sci -e '...'   # あるいは scripts/ に nbb エントリを足す
 
 `java.class.path`（`:tcb/classpath` の推移閉包）だけは nbb に対応物が無い。
 そこで **compiler の `deps-lock.edn` と同じ形（content-addressed closure lock）に

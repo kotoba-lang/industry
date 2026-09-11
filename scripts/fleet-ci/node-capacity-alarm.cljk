@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; node-capacity-alarm.cljs — fleet ノード側の「尽きかけ」を、尽きる前に 1 回鳴らす。
 ;;
 ;; `capacity-alarm.cljs` は *この機械* を測る（gate はノードへ tree を配るので
@@ -43,7 +43,7 @@
 ;; 実測 2026-09-10: これを測らずに simeon を `shutdown -r now` して失った。
 ;; `nodes.edn` の `:filevault?` / `:supports-authrestart?` が probe から入る。
 ;;
-;;   nbb --classpath scripts/fleet-ci scripts/fleet-ci/node-capacity-alarm.cljk \
+;;   kbb --backend sci --classpath scripts/fleet-ci scripts/fleet-ci/node-capacity-alarm.cljk \
 ;;       [--floor-gb 15] [--port-ceiling 0.75] [--hosts a,b] [--notify false] [--self-test]
 
 (ns fleet-ci.node-capacity-alarm

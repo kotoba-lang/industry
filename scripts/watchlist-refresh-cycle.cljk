@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; watchlist-refresh-cycle.cljs — 制裁リスト snapshot を上流から取り直し、
 ;; 検査を通し、着地させ、3 つの投影（git / R2 objects / Iceberg）を揃える。
 ;;
-;;   nbb scripts/watchlist-refresh-cycle.cljk [--dry-run] [--max-drop-pct 10] [--skip-datalake]
+;;   kbb --backend sci scripts/watchlist-refresh-cycle.cljk [--dry-run] [--max-drop-pct 10] [--skip-datalake]
 ;;
 ;; ## なぜ要るか
 ;;
@@ -99,7 +99,7 @@
           before (counts-in lists)
           cp-out (sh "clojure" ["-Spath"] {:cwd wt})
           classpath (str/trim (:out cp-out))]
-      (when-not (zero? (:status cp-out)) (cleanup!) (die! (str "clojure -Spath failed: " (:err cp-out))))
+      (when-not (zero? (:status cp-out)) (cleanup!) (die! (str "kbb -Spath failed: " (:err cp-out))))
 
       ;; 2. refresh from upstream
       (let [r (sh "nbb" ["-cp" classpath "scripts/refresh_lists.cljs"] {:cwd wt})]

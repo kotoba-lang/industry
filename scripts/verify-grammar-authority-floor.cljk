@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-grammar-authority-floor.cljs — a checker that reads `lang/guest-grammar.edn`
 ;; to decide what is forbidden, and still passes when the grammar is missing or
 ;; forbids nothing.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-grammar-authority-floor.cljk [<dir>] [--findings] [--child-timeout-ms N]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-grammar-authority-floor.cljk [<dir>] [--findings] [--child-timeout-ms N]
 ;;
 ;; ## なぜ要るか
 ;;
@@ -336,7 +336,7 @@
       (println (str "CHECKOUTS\t" (count checkouts) "\tcheckers=" (reduce + (map (comp count :checkers) checkouts))
                     "\tunrunnable=" (count unrunnable) "\tno-grammar-file=" (count without-grammar)))
       (doseq [{:keys [repo unrunnable]} checkouts, n unrunnable]
-        (println (str "NOTE\tunrunnable\t" (rel root repo) "/scripts/" n "\tbb script; not executed (bb is retired), counted but not measured")))
+        (println (str "NOTE\tunrunnable\t" (rel root repo) "/scripts/" n "\tbb script; not executed (kbb -M:is retired), counted but not measured")))
       (doseq [{:keys [repo checkers]} without-grammar]
         (println (str "NOTE\tno-grammar-file\t" (rel root repo) "\t" (str/join "," (map :name checkers))
                       "\tcheckout has no " grammar-basename "; a missing-grammar copy is the baseline, not a mutation")))

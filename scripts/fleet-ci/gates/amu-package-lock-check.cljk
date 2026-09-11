@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Amu's package-lock suite (`test/nbb/package_lock.cljs`), run with no JVM
 ;; anywhere in reach.
 ;;
@@ -92,7 +92,7 @@
                    :env (js/Object.assign #js {} js/process.env
                                           #js {:PATH trapped-path})}))
 
-;; The classpath comes from `deps-lock.edn`, never from `clojure -Spath`.
+;; The classpath comes from `deps-lock.edn`, never from `kbb -Spath`.
 ;; Deriving it from the JVM would make "consumable without a JVM" untestable
 ;; by construction.
 (def resolved

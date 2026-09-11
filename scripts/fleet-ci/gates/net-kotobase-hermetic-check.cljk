@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; net-kotobase-hermetic-check.cljs — network-awai/net-kotobase の hermetic gate。
 ;;
 ;; **なぜ fleet に置くか。** network-awai org の GitHub Actions は
@@ -12,7 +12,7 @@
 ;; 呼ぶ（fleet 側と repo 側で別実装を持つと、片方だけ通る状態が黙って生まれる）。
 ;;
 ;;   A. enterprise-isolation.yml 全体   node scripts/verify-tenant-isolation.mjs
-;;   B. metadata.yml 全体               bb scripts/check-metadata.cljc
+;;   B. metadata.yml 全体               kbb scripts/check-metadata.cljk
 ;;   C. worker.yml の syntax 半分       bb <script> --syntax-check（root + worker/scripts）
 ;;   D. sdk.yml の python leg           py_compile + unittest test_gremlin.py
 ;;   E. 大容量 object grant             nbb で object-grant-test（判断規則）と
@@ -43,7 +43,7 @@
 ;;   - deploy と b2-dr-drill。credential が要る = 「鍵はノードに配らない」
 ;;     （fleet-ci 不変条件 3）と両立しない。
 ;;
-;; ノード側で `npx nbb net-kotobase-hermetic-check.cljs <dir> [--min-surfaces N]
+;; ノード側で `kbb --backend sci net-kotobase-hermetic-check.cljk <dir> [--min-surfaces N]
 ;; [--min-syntax N]` として実行。
 (ns fleet-ci.gates.net-kotobase-hermetic-check
   (:require ["node:child_process" :as cp]
@@ -268,7 +268,7 @@
            "が無い — gate が対象を見失っている(レイアウト変更?)")
     (let [nss (str/join " " (map #(str "'" (second %)) suites))
           {:keys [rc out]}
-          (run "npx" ["nbb" "--classpath" "src:test" "-e"
+          (run "npx" ["kbb" "--backend" "sci" "--classpath" "src:test" "-e"
                       (str "(require '[clojure.test :as t] " nss ")"
                            " (t/run-tests " nss ")")]
                {:cwd gw-dir})

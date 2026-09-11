@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/cua-bots-loop.cljk — CUA bot（画面操作の常駐 bot）の loop 入口
 ;; （ADR-2608291900）。LaunchAgent cloud.itonami.bot.cua-bots が 1 時間ごとに起こす。
 ;;
@@ -9,7 +9,7 @@
 ;;
 ;;   1. scripts/cua-bots-tick.cljk が名簿を検査し due を測る（決定論）
 ;;   2. due な bot ごとに、computer-use checkout から CLI を回す:
-;;        nbb bin/cua_bot_run.cljs --roster <roster> --bot <id> --receipts-dir <dir>
+;;        kbb --backend sci bin/cua_bot_run.cljk --roster <roster> --bot <id> --receipts-dir <dir>
 ;;      exit 0 = done / 1 = failed / 2 = could-not-measure（3 値のまま ledger へ。
 ;;      **could-not-measure を failed にも done にも畳まない**）
 ;;
@@ -20,7 +20,7 @@
 ;;
 ;; ledger は追記のみ（1 bot 1 run = 1 行、skip も書く）。exit 0 常に。
 ;;
-;;   nbb scripts/cua-bots-loop.cljk [--dry-run]
+;;   kbb --backend sci scripts/cua-bots-loop.cljk [--dry-run]
 ;;   （--dry-run は lib CLI にもそのまま渡る = validate + probe、行動しない）
 
 (ns cua-bots-loop
@@ -100,7 +100,7 @@
       (do
         (try (.mkdirSync fs receipts-dir #js {:recursive true}) (catch :default _ nil))
         ;; 呼び出しは lib の公示 contract どおり（classpath は CLI 側が面倒を見る）:
-        ;;   nbb bin/cua_bot_run.cljs --roster … --bot … --receipts-dir … [--dry-run]
+        ;;   kbb --backend sci bin/cua_bot_run.cljk --roster … --bot … --receipts-dir … [--dry-run]
         (let [args (cond-> [lib-cli
                             "--roster" roster-file
                             "--bot" bot-id

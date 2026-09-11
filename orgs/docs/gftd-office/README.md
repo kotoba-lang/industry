@@ -23,7 +23,7 @@
 
 doc e の **Phase 0**（選択肢 1=正規化）は参照実装で実証済み:
 [`p1-gitoffice/`](./p1-gitoffice/README.md) — blob⇄要素粒度 datom 変換 + revision 橋渡し +
-issue/pr/review/comment ⇄ datoms（`nbb scripts/run-task.cljs test` → 13 tests / 40 assertions / 0 fail）。
+issue/pr/review/comment ⇄ datoms（`kbb --backend sci scripts/run-task.cljk test` → 13 tests / 40 assertions / 0 fail）。
 
 ## 実装順の推奨
 
@@ -42,7 +42,7 @@ doc a Phase 1-2 + doc b Phase 0-1 の**ロジック層**を kotoba CLJS ツリ�
 |---|---|
 | `kotoba/crates/kotoba-wasm/web/cljs/src/kotoba/office.cljc` | 組織前提オフィスの datom 変換 + `transact/commit/datomicQ` 駆動（CLJS）+ v_edn コーデック |
 | `kotoba/crates/kotoba-wasm/web/cljs/src/kotoba/cacao.cljc` | grant→CACAO payload + `siwe_message` byte 一致再現 + 注入式署名 |
-| `…/cljs/src/kotoba/office_test.clj` | bb テスト（wire round-trip + siwe byte 一致）。`nbb --classpath src -e "(require 'kotoba.office-test)(kotoba.office-test/-main)"` → 7 tests / 21 assertions / 0 fail |
+| `…/cljs/src/kotoba/office_test.clj` | bb テスト（wire round-trip + siwe byte 一致）。`kbb --backend sci --classpath src -e "(require 'kotoba.office-test)(kotoba.office-test/-main)"` → 7 tests / 21 assertions / 0 fail |
 | `…/cljs/shadow-cljs.edn` | `storeDocument`/`loadDocument`/`storeOrg`/`storeGrant`/`grantToCacaoB64` を ESM export 追加 |
 
 ### CACAO の wasm-bindgen 露出（実装・実機検証済）
@@ -155,7 +155,7 @@ pull-doc(node, {:remote …}) → model   ; CACAO read → :node/lid 復元 → 
 
 ```bash
 cd kotoba/crates/kotoba-wasm/web/cljs
-npm install && npx shadow-cljs release web   # → ../cljs-out/kotoba-node.js
+npm install && amu compile --target wasm32-browser web   # → ../cljs-out/kotoba-node.js
 # [:web] Build completed. (52 files, 9 compiled, 0 warnings, 26.8s)
 ```
 
@@ -213,11 +213,11 @@ Clojure ラッパ）で閉じた。実 Chromium を Clojure から駆動し、ko
 | `…/web/browser-e2e/office_browser_test.clj` | playwright-clj で office フローを実ブラウザ実行（`:local/root` で playwright-clj 依存）|
 
 **検証済（実 Chromium）**：
-- `clojure -M:test`（playwright-clj smoke）**ALL OK（9）** — eval/DOM/console/WebAssembly/getRandomValues。
+- `kbb -M:test`（playwright-clj smoke）**ALL OK（9）** — eval/DOM/console/WebAssembly/getRandomValues。
 - **`office_browser_test` ALL OK（14）** — secure context / `crypto.subtle` / Service Worker API /
   accountDid(z6Mk) / privateGraphId / 暗号化(signal:v1:、平文リークなし)/ 復号往復 / mintCacao /
   **mintDelegated(depth-2)** / **passkey 仮想認証器で create + get 成功** / console 捕捉。
-- 起動: `python3 -m http.server`(localhost=secure) → `KOTOBA_WEB_URL=… clojure -M:run`。
+- 起動: `python3 -m http.server`(localhost=secure) → `KOTOBA_WEB_URL=… kbb -M:run`。
 
 > これで主権オフィスのブラウザ層（WASM の ID/暗号/CACAO/委任）が**実ブラウザで動作確認済み**。
 > passkey は仮想認証器で ceremony をテストできる基盤が整い、kotoba の passkey 統合（doc b の PRF）を

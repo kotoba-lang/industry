@@ -90,8 +90,8 @@ capabilities. Text and video require separate costs and billing units.
 Development seed commands (existing corpus generator; run from root):
 
 ```sh
-nbb scripts/gen-training-corpus.cljs --awai-self-test
-nbb scripts/gen-training-corpus.cljs --awai-research-export /tmp/awai-seed-new-directory
+kbb --backend sci scripts/gen-training-corpus.cljk --awai-self-test
+kbb --backend sci scripts/gen-training-corpus.cljk --awai-research-export /tmp/awai-seed-new-directory
 ```
 
 The export writes 12 text training examples, 8 text evaluation cases, 6 video

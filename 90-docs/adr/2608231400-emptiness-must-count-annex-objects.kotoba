@@ -18,7 +18,7 @@ dirty 346 → 2、untracked 0、stash 0。pin は 4,223 のうち 4,221 が upst
 未着地作業の保全: 内容包含で測って 18,107 行 + leftover 側 98,000 行超。
 GitHub へ rescue branch として 261 本着地。push できなかった 4 本は GitHub 側が archived
 （read-only）で、bundle を作り `git bundle verify` を通してから削除した。")
-  (:adr/consequences "1. 撤去判定は `nbb scripts/checkout-holds.cljs <path> ...` を通す。目視の 4 項目に戻さない。
+  (:adr/consequences "1. 撤去判定は `kbb --backend sci scripts/checkout-holds.cljk <path> ...` を通す。目視の 4 項目に戻さない。
 2. 「何も持たない」と言う前に annex を数える。`.git/annex/objects` の走査根が無いことと
    0 件であることを区別する。
 3. `.git` を失った checkout に `git` を呼ぶと親を辿って superproject を答える。

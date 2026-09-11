@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; sweep.cljs — fleet ノードのディスクを回収する。
 ;;
 ;; 満杯のノードは gate を **走らせる前に** 殺す（tar が "No space left on device"）。
@@ -8,11 +8,11 @@
 ;; ポリシーは scripts/fleet-ci/sweep.edn（allowlist）。ノードは nodes.edn から引く。
 ;;
 ;; 使い方:
-;;   nbb scripts/fleet-ci/sweep.cljk                 ;; dry-run（既定）。何を消すかだけ出す
-;;   nbb scripts/fleet-ci/sweep.cljk --apply         ;; 実際に消す
-;;   nbb scripts/fleet-ci/sweep.cljk --all           ;; low-water を無視して全ノード
-;;   nbb scripts/fleet-ci/sweep.cljk --only dan,levi ;; ノードを絞る
-;;   nbb scripts/fleet-ci/sweep.cljk --apply --json  ;; 1 行 JSON（ログ集約用）
+;;   kbb --backend sci scripts/fleet-ci/sweep.cljk                 ;; dry-run（既定）。何を消すかだけ出す
+;;   kbb --backend sci scripts/fleet-ci/sweep.cljk --apply         ;; 実際に消す
+;;   kbb --backend sci scripts/fleet-ci/sweep.cljk --all           ;; low-water を無視して全ノード
+;;   kbb --backend sci scripts/fleet-ci/sweep.cljk --only dan,levi ;; ノードを絞る
+;;   kbb --backend sci scripts/fleet-ci/sweep.cljk --apply --json  ;; 1 行 JSON（ログ集約用）
 ;;
 ;; 不変条件は sweep.edn の冒頭に書いた。特に:
 ;;   * allowlist only（実データは「列挙されていない」ことで守られる）

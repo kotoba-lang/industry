@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; adr-inventory — 90-docs/adr の **棚卸し候補**を決定論で出す。
 ;; ここにモデルは居ない。直す判断は skill `adr-inventory`。
 ;;
@@ -32,10 +32,10 @@
 ;;     `--hygiene` で出す）
 ;;
 ;; usage:
-;;   nbb scripts/adr-inventory.cljk
-;;   nbb scripts/adr-inventory.cljk --edn          ; slim（件数 + next 1 件）
-;;   nbb scripts/adr-inventory.cljk --hygiene      ; keyword-status も出す
-;;   nbb scripts/adr-inventory.cljk --min-listed 1500
+;;   kbb --backend sci scripts/adr-inventory.cljk
+;;   kbb --backend sci scripts/adr-inventory.cljk --edn          ; slim（件数 + next 1 件）
+;;   kbb --backend sci scripts/adr-inventory.cljk --hygiene      ; keyword-status も出す
+;;   kbb --backend sci scripts/adr-inventory.cljk --min-listed 1500
 
 (require '[clojure.string :as str])
 

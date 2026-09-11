@@ -32,7 +32,7 @@
 
 - `ai-gftd-apex` は **ブラウザ専用**。`.xcodeproj` / `Info.plist` /
   `AndroidManifest.xml` / `build.gradle` / `Podfile` / `capacitor.config` /
-  `tauri.conf.json` が **1つも無い**。ビルドは `shadow-cljs release app viewer`
+  `tauri.conf.json` が **1つも無い**。ビルドは `amu compile --target wasm32-browser app viewer`
   （`:target :browser`）のみ、デプロイは Cloudflare Pages。PWA manifest も
   service worker も無い。モバイル対応と呼べるのは iOS safe-area CSS と mobile
   drawer だけで、**レスポンシブ web であってアプリではない**。
@@ -53,7 +53,7 @@
 surface.json で JVM を含まない。ADR-2607198300 は『コンパイラツール自体が JVM 上で
 動くことは問わない（gcc がどこかで動く必要があるのと同じビルド時の話）』と明示して
 いる。**規則違反なのは launcher ではなく `app run --execute` の方**（macOS では
-`KOTOBA_SHELL_ACTION_REFRESH_SECONDS` ごとに `clojure -M -e` を再実行するので JVM が
+`KOTOBA_SHELL_ACTION_REFRESH_SECONDS` ごとに `kbb -M -e` を再実行するので JVM が
 ランタイムループに居座る）。
 
 ### 想定と違った点 2 — iOS AOT スパイクは既に上流で済んでいた
@@ -173,7 +173,7 @@ chrome の ops を出すのは**存在しない合意を発明する**ことに�
 |---|---|---|---|
 | `kotoba-lang/compiler` | #290 | iOS guest trap のコンテインメント | pinned-Xcode CI で `guest trap contained as KOTOBA_IOS_GUEST_TRAP`。全 8 チェック pass |
 | `kotoba-lang/shell` | #16 | `kotoba.shell.app-event.v0` + 死んでいたテストの復活 | +7 tests / 45 assertions、失敗集合は前後で**名前まで同一**。CI pass |
-| `gftdcojp/ai-gftd-apex` | #11 | 純粋 dispatch + kotoba:dom surface | `:test-portable` 44/198 -> **51/238, 0 failures**、`shadow-cljs compile` **139 compiled / 0 warnings** |
+| `gftdcojp/ai-gftd-apex` | #11 | 純粋 dispatch + kotoba:dom surface | `:test-portable` 44/198 -> **51/238, 0 failures**、`amu compile --target wasm32-browser` **139 compiled / 0 warnings** |
 
 ## 未解決として引き渡すもの
 
@@ -198,7 +198,7 @@ chrome の ops を出すのは**存在しない合意を発明する**ことに�
 account payments have failed or your spending limit needs to be increased』*。
 `main`（`7fc5d24`）も 3 回連続で同じ失敗。**この repo は現在 CI で何も検証されていない。**
 PR #11 は `--admin` でマージし、代わりにローカルで `:test-portable` と
-`shadow-cljs compile` を実施した（後者が要 — `events.cljc` は cljs 専用で JVM スイート
+`amu compile --target wasm32-browser` を実施した（後者が要 — `events.cljc` は cljs 専用で JVM スイート
 が触れない）。
 
 ### iOS の `.app` 前景起動は未検証

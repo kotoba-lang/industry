@@ -28,13 +28,13 @@
                            (f/add-feature (f/sweep-feature 3 1 2 :new))))]
     (cond
       (not= :ok s1) (println "PROBE feature-sweep FAIL" (str "直線経路が失敗: " (pr-str straight)))
-      (not= [[-1.0 -1.0 0.0] [1.0 1.0 10.0]] (mapv #(mapv double %) (bb straight)))
+      (not= [[-1.0 -1.0 0.0] [1.0 1.0 10.0]] (mapv #(mapv double %) (kbb -M:straight)))
       (println "PROBE feature-sweep FAIL"
-               (str "直線 sweep が押し出しと一致しない bbox=" (pr-str (bb straight))))
+               (str "直線 sweep が押し出しと一致しない bbox=" (pr-str (kbb -M:straight))))
       (not= :ok s2) (println "PROBE feature-sweep FAIL" (str "L 字経路が失敗: " (pr-str corner)))
-      (not= 11.0 (double (nth (second (bb corner)) 2)))
+      (not= 11.0 (double (nth (second (kbb -M:corner)) 2)))
       (println "PROBE feature-sweep FAIL"
-               (str "角で zmax=" (nth (second (bb corner)) 2)
+               (str "角で zmax=" (nth (second (kbb -M:corner)) 2)
                     "（11.0 を期待）—— 断面が回転しておらず平行移動しかしていない"))
       (not (every? #(< -1 % (count (:positions corner))) (:indices corner)))
       (println "PROBE feature-sweep FAIL" "面が存在しない頂点を参照する")
@@ -43,6 +43,6 @@
       (not (and (= :error s4) (str/includes? closed "single OPEN chain")))
       (println "PROBE feature-sweep FAIL" (str "閉じた経路を拒否しない: " (pr-str [s4 closed])))
       :else (println "PROBE feature-sweep PASS"
-                     (str "直線=押し出し一致 / 角 zmax=" (nth (second (bb corner)) 2)
+                     (str "直線=押し出し一致 / 角 zmax=" (nth (second (kbb -M:corner)) 2)
                           "（frame 搬送）/ 斜め profile と閉経路は拒否"))))
   (catch :default ex (println "PROBE feature-sweep UNMEASURABLE" (.-message ex))))

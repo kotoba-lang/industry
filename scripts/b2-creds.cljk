@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; b2-creds.cljs — B2 (S3 互換) 認証情報を解決して出力する。
 ;; 解決ロジックは kotoba-lang/secret-resolve（orgs/kotoba-lang/secret-resolve）
 ;; に委譲する（ADR-2607161000）。以前はこのファイル自身が env→1Password→
@@ -11,9 +11,9 @@
 ;; 実値（key/secret）は出力時のみ取得し、リポジトリには一切置かない。
 ;;
 ;; 実行には secret-resolve の src を classpath に追加する必要がある:
-;;   nbb --classpath ".:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljk
-;;   nbb --classpath ".:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljk --json
-;;   eval "$(nbb --classpath \".:orgs/kotoba-lang/secret-resolve/src\" scripts/b2-creds.cljk)"
+;;   kbb --backend sci --classpath ".:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljk
+;;   kbb --backend sci --classpath ".:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljk --json
+;;   eval "$(kbb --backend sci --classpath \".:orgs/kotoba-lang/secret-resolve/src\" scripts/b2-creds.cljk)"
 (require '[scripts.nbb-compat :as compat :refer [slurp]]
          '[clojure.string :as str]
          '[clojure.edn :as edn]
@@ -77,7 +77,7 @@
   (when (seq missing)
     ;; js/console.error であって (binding [*out* *err*] (println …)) ではない。
     ;; nbb は *out* の束縛を無視して stdout に書く（ADR-2608130600、実測:
-    ;; `nbb -e '(binding [*out* *err*] (println "x"))' 2>/dev/null` が x を出す）。
+    ;; `kbb --backend sci -e '(binding [*out* *err*] (println "x"))' 2>/dev/null` が x を出す）。
     ;; このスクリプトの stdout は機械可読で、消費側は 3 本とも exit で分岐する:
     ;;   manifest/west_annex.cljk   … JSON.parse、失敗時は err を表示
     ;;   scripts/hirameki-mirror.cljk … JSON.parse、失敗時は err を receipt に書く

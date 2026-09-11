@@ -57,8 +57,8 @@ frontend は**この reader 形の shim を既に 3 箇所持っていた** —�
 
 ```
 # kotoba-sema
-clojure -M:test                                    # JVM
-CP=$(clojure -Spath -M:test); nbb --classpath \"src:test:$CP\" run-tests.cljs   # nbb
+kbb -M:test                                    # JVM
+CP=$(kbb -Spath -M:test); kbb --backend sci --classpath \"src:test:$CP\" run-tests.cljs   # nbb
 
 # amu、JVM を一切使わない経路で
 ./bin/amu check <f32 を含む .kotoba> --jvm-free
@@ -82,7 +82,7 @@ JVM 経路と bit-for-bit で一致すると書いている。**十進につい�
 そのうち片方しか走っていない —— それが上の欠陥の構造的な原因である。
 
 **追記（同日）: 着地した。** kotoba-sema PR #75、`9d87c113`。
-`clojure -Spath | grep -c tools.reader` は **1 → 0**。
+`kbb -Spath | grep -c tools.reader` は **1 → 0**。
 JVM 476/2237/0 → **480/2244/0**、nbb 356/1371/0 → **360/1377/0**。
 
 **51 という数は誤りだった。正しくは 35 である。** 51 は f32 修正の *前* の tree
@@ -132,11 +132,11 @@ known-good ではない**。沈黙が網羅に読まれないよう、そう言�
 **`amu` の top-level `:deps` にあった `org.clojure/tools.reader` は、amu 自身の
 `src/` からは 1 度も参照されていない**（2 つの `.clj` テストだけ）。ただし
 **それを `:test` alias へ移しても production classpath からは消えない** ——
-`kotoba-sema` が transitively 引くからである（`clojure -Stree` で実測、移動の前後
+`kotoba-sema` が transitively 引くからである（`kbb -Stree` で実測、移動の前後
 とも 1 件）。**この 1 件を「JVM 依存を除去した」と報告しない。** 宣言が正しくなった
 だけで、closure は変わっていない。**closure が縮むのは kotoba-sema が 1 つの reader に
 なったときで、それは同日中に着地した**（上記）。amu 側は kotoba-sema pin を
-`9d87c113` に進めた時点で `clojure -Spath` の tools.reader が 0 になるはずで、
+`9d87c113` に進めた時点で `kbb -Spath` の tools.reader が 0 になるはずで、
 **それを実測するまで「消えた」とは書かない**。
 
 さらに、テストのホスト分布そのものが同じ欠陥の面積を示している（`test/` の

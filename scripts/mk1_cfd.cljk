@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; mk1_cfd.cljs — 叢雲 MK-1 筐体の内部流を、検証済み D3Q19 LBM
 ;; (kotoba-lang/kami-engine-cfd の `kami-cfd.duct`)で解き、結果を
 ;; `90-docs/hardware/mk1-cfd.edn` に落とす。
@@ -140,7 +140,7 @@
      (println (str "wall clock " secs " s"))
      (fs/mkdirSync (path/dirname (out-path)) #js {:recursive true})
      (spit (out-path)
-           (str ";; 生成物 — 手編集しない。再生成: MK1_CFD_SMOKE=1 nbb scripts/mk1_cfd.cljk <root> (smoke) / MK1_CFD_FULL=1 でフル\n"
+           (str ";; 生成物 — 手編集しない。再生成: MK1_CFD_SMOKE=1 kbb --backend sci scripts/mk1_cfd.cljk <root> (smoke) / MK1_CFD_FULL=1 でフル\n"
                 ";; 検証: force-driven plane Poiseuille を閉形解と突き合わせ済み\n"
                 (with-out-str (cljs.pprint/pprint result))))
      (println "wrote" (out-path)))))

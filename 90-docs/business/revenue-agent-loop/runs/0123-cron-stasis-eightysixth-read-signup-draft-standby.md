@@ -12,7 +12,7 @@ not-measured run.
 
 | Signal | Value |
 |---|---|
-| funnel-pulse (nbb kotobase_lead_loop.cljs) | EXIT=0. VISITORS=9692 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 1 :signups 0 :checkouts 0}. UNCHANGED=false EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=recorded. Pulse ledger appended (as-of 2026-09-08T05:32:01+09:00). |
+| funnel-pulse (kbb --backend sci kotobase_lead_loop.cljk) | EXIT=0. VISITORS=9692 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 1 :signups 0 :checkouts 0}. UNCHANGED=false EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=recorded. Pulse ledger appended (as-of 2026-09-08T05:32:01+09:00). |
 | /api/funnel (curl, 05:32:01) | HTTP 200. visitors 9692 / signups 31 / checkouts 0. by-source visitors organic 8110 / openai-ads 3, signups organic 27 / other 1, x402 challenges 38 / submissions 4 / settlement-rate 0 / settlements 0 / unexplained 3. |
 
 This run: visitors 9692, signups pinned at 31, checkouts 0. Visitor drift vs run 0122

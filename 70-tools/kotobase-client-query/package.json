@@ -2,7 +2,7 @@
   "name": "kotobase-client-query",
   "private": true,
   "scripts": {
-    "acceptance": "shadow-cljs compile acceptance && node out/acceptance.js"
+    "acceptance": "amu compile --target wasm32-browser acceptance && node out/acceptance.js"
   },
   "devDependencies": {
     "@ipld/dag-cbor": "^9.2.7",

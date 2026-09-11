@@ -110,7 +110,7 @@ genome は double のベクタ、1 世代は `ask` → 評価 → `tell`。zero-
   "**実測した（2026-08-08、すべてこのセッション内）**
 
 *`shinka`*
-- JVM `clojure -M:test` と cljs `nbb run-tests.cljs` で**同一の namespace** を実行。25 tests / 77 assertions、両ホスト 0 failures。
+- JVM `kbb -M:test` と cljs `kbb --backend sci run-tests.cljk` で**同一の namespace** を実行。25 tests / 77 assertions、両ホスト 0 failures。
 - 落ちることを確認: `shinka.rng` の shift 定数を 13→12 に変えると**両ホストで 8 assertion が赤**、nbb は exit 1。戻すと 0。
 - RNG の JVM/cljs parity は、両ホストで実際に走らせて出力を突き合わせてからリテラルに pin した（片方の出力をコピーしていない）。
 

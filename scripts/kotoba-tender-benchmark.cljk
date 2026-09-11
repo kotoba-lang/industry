@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Capture kototama tender comparison evidence into 90-docs/performance/runs/<date>/.
 ;;
 ;; Usage (from superproject root):
-;;   nbb scripts/kotoba-tender-benchmark.cljk [--runs N] [--date YYYY-MM-DD]
+;;   kbb --backend sci scripts/kotoba-tender-benchmark.cljk [--runs N] [--date YYYY-MM-DD]
 
 (ns kotoba-tender-benchmark
   (:require ["node:child_process" :as cp]

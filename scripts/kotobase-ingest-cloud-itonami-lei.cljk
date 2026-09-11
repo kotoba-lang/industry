@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kotobase-ingest-cloud-itonami-lei.cljs — pull-based batch fold job that
 ;; closes ADR-2607072300's open "journal -> kotobase-peer fold job" gap for
 ;; the cloud-itonami-lei-* actor family (ADR-2607110300). Enumerates every
@@ -16,7 +16,7 @@
 ;;
 ;; Run (from the superproject root, after `west update kotobase-client`):
 ;;   cd orgs/kotoba-lang/kotobase-client && npm install   # once
-;;   NODE_PATH="$(pwd)/node_modules" npx nbb --classpath "src" \
+;;   NODE_PATH="$(pwd)/node_modules" kbb --backend sci --classpath "src" \
 ;;     ../../../scripts/kotobase-ingest-cloud-itonami-lei.cljk
 ;;
 ;; Identity: a fresh Ed25519 seed is generated on first run and persisted to
@@ -51,7 +51,7 @@
 ;; BUG FIX (2026-07-25): this used to be `(path/dirname (aget js/process.argv 2))`,
 ;; which assumed argv[2] is this script's own path — true for plain
 ;; `node script.js`, but NOT true for how this script is actually invoked
-;; (`nbb --classpath <cp> <script.cljs> ...`). Under nbb, process.argv is
+;; (`kbb --backend sci --classpath <cp> <script.cljs> ...`). Under nbb, process.argv is
 ;; [node, nbb-bin, "--classpath", <cp>, <script.cljs>, ...script-args], so
 ;; argv[2] is literally the string "--classpath" — `path/dirname` on that
 ;; returns "." (no path separator), silently resolving script-dir to

@@ -1,6 +1,6 @@
 ;; etzhayyim org reorg audit — repo-by-repo classification (source of truth for migration).
 ;; generated 2026-07-26 from fleet-db + GitHub READMEs + cell-prefix-routes + Agent classification.
-;; query: nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?repo ?tgt :where [?e :audit/migration-target ?tgt] [?e :audit/repo ?repo]]'
+;; query: kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?repo ?tgt :where [?e :audit/migration-target ?tgt] [?e :audit/repo ?repo]]'
 
 [
  {:db/id -2 :audit/repo "com-etzhayyim-cargo" :audit/kind "direct" :audit/category "LOGISTICS-MARITIME" :audit/migration-target "cloud-itonami" :audit/display "" :audit/description "etzhayyim actor: cargo (aozora.app) — sovereign per-actor repo pilot (ADR-2606231200)" :audit/source "gh-desc" :audit/actor-type "actor"}

@@ -117,7 +117,7 @@ worktree を別途用意 → 再ビルド → **deploy 前にローカルで gam
 ```bash
 # 1) 現在地の再確認（本番に対して、約25分）
 cd orgs/network-awai/network-isekai
-PLAYTEST_URL=https://isekai.network npx nbb scripts/isekai/playtest_headless.cljs \\
+PLAYTEST_URL=https://isekai.network kbb --backend sci scripts/isekai/playtest_headless.cljk \\
   --out build/catalog-gameplay.edn      # 期待: 29/29
 
 # 2) 優先度1: CI。オーナー判断が出ていれば gates.yml はそのまま使える

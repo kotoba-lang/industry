@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-register-manifest.cljs — register any cloud-itonami-lei-* repo that
 ;; exists on GitHub but is missing from manifest/west.yml (and repos.edn).
 ;;
@@ -19,7 +19,7 @@
 ;; a local checkout that may be stale.
 ;;
 ;; Run (from the superproject root):
-;;   nbb scripts/lei-register-manifest.cljk [--dry-run]
+;;   kbb --backend sci scripts/lei-register-manifest.cljk [--dry-run]
 
 (ns lei-register-manifest
   (:require ["child_process" :refer [execSync]]

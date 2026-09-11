@@ -119,7 +119,7 @@ remotes → projects への移動のみ。revision は 4 件とも元の値を�
    "CI: kotoba-lang/{mise,omise,okaimono,kessai} 4 本とも main で success"
    "repo-maturity composite の変化: mise 0.793→0.743→0.747 / omise 0.761→0.710 / okaimono 0.772→0.705 / kessai 0.783→0.711→0.718。stage-score は 4 本とも nil→0.400（:status-r2）、structural-score は mise 0.60→1.00、他 3 本 0.75→1.00"
    "composite を据え置くのに必要な stage は約 0.79（= R4 相当）。4 本とも本番消費者ゼロのため主張不可"
-   "pin 前進で解決していたもの: mise の LICENSE 欠如（c2f0748 で Apache-2.0 追加済み）と okaimono の `:local/root \"../html\"` 依存（ef60ec1 で git 座標化済み、それ以前はクローン単体で `clojure -M:test` が classpath エラーで起動しない）。superproject が古い pin を握っていただけだった"
+   "pin 前進で解決していたもの: mise の LICENSE 欠如（c2f0748 で Apache-2.0 追加済み）と okaimono の `:local/root \"../html\"` 依存（ef60ec1 で git 座標化済み、それ以前はクローン単体で `kbb -M:test` が classpath エラーで起動しない）。superproject が古い pin を握っていただけだった"
    "west.yml 修復の検証: 修復前は `west list` がパース失敗、修復後 4047 projects。com-instagram / com-linkedin / com-tiktok / com-vimeo-upload の 4 件が正しい revision と path を返す"
    "west pin: mise dd90197→f1bea9e→754b632 / omise 857e69f→6f00541 / okaimono 4e8611a→ddd87a7 / kessai 718726e→e4d8b84→50d8af9"))
 
@@ -152,7 +152,7 @@ remotes → projects への移動のみ。revision は 4 件とも元の値を�
    "kotoba-lang/omise main 6f00541 / kotoba-lang/okaimono main ddd87a7"
    "kotoba-lang/kessai main 50d8af9（e4d8b84 CLAUDE.md、50d8af9 :redirect rail）"
    "com-junkawasaki/root main: d95cfd3（west.yml 修復）→ e237056（EC 4 本の pin + ledger）→ dfa491a（redirect の pin + ledger）"
-   "各 repo の CLAUDE.md に R-tier の梯子と『触るときに壊してはいけない不変条件』を記載。manifest/repo-maturity.edn に 4 本の新スコアを反映（生成物、`nbb scripts/repo-maturity.cljs --only <path> --merge-existing` で再生成）"
+   "各 repo の CLAUDE.md に R-tier の梯子と『触るときに壊してはいけない不変条件』を記載。manifest/repo-maturity.edn に 4 本の新スコアを反映（生成物、`kbb --backend sci scripts/repo-maturity.cljk --only <path> --merge-existing` で再生成）"
    "本 ADR は実運用の消費者を持たない。すべての検証はライブラリのテストと lint であり、本番トラフィックによる実証は含まない。"))
 
   (:adr/body

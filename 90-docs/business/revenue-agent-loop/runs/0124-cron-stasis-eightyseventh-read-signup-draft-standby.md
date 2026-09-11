@@ -11,7 +11,7 @@ back). /api/funnel returned HTTP 200 so live network confirmed - NOT a not-measu
 
 | Signal | Value |
 |---|---|
-| funnel-pulse (nbb kotobase_lead_loop.cljs) | EXIT=0. VISITORS=9718 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 2 :signups 0 :checkouts 0}. UNCHANGED=false EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=recorded. |
+| funnel-pulse (kbb --backend sci kotobase_lead_loop.cljk) | EXIT=0. VISITORS=9718 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 2 :signups 0 :checkouts 0}. UNCHANGED=false EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=recorded. |
 | /api/funnel (curl, 06:01) | HTTP 200. visitors 9718 / signups 31 / checkouts 0. by-source visitors organic 8134 / openai-ads 3, signups organic 27 / other 1. x402 challenges 38 / submissions 4 / settlement-rate 0 / settlements 0 / rejections 4 (1 classified malformed-header, 3 unexplained) / attempt-rate 0.105. |
 
 This run: visitors 9718, signups pinned at 31, checkouts 0. Visitor drift vs run 0123

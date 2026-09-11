@@ -157,7 +157,7 @@ checkout 済み repo しか見ない。west は 4,166 project を管理してい
 
 ## Evidence
 
-- `nbb scripts/verify-namespace-collisions.cljs` 実行: 3,523 repo / 13,918 path /
+- `kbb --backend sci scripts/verify-namespace-collisions.cljk` 実行: 3,523 repo / 13,918 path /
   455 collision / 224 divergent / 27 co-classpath
 - `--check` の挙動確認: fleet で exit 1、衝突の無いツリーで exit 0
 - `kami/gpu.cljc` は `gpu`(11 defs) と SDK(3 defs) で**共有名ゼロ**、

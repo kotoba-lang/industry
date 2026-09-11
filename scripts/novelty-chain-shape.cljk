@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; novelty-chain-shape.cljs — count the NODES of a kotobase novelty chain,
 ;; classified by shape, instead of reading the O(1) `novelty-count` field.
 ;;
@@ -49,7 +49,7 @@
 ;;      scanned/expected denominator for the same reason.
 ;;
 ;; USAGE
-;;   nbb --classpath "<io-ipld>/src:<org-ietf-cbor>/src:<io-multiformats>/src" \
+;;   kbb --backend sci --classpath "<io-ipld>/src:<org-ietf-cbor>/src:<io-multiformats>/src" \
 ;;       scripts/novelty-chain-shape.cljk --wrangler-dir <dir-with-wrangler-and-node_modules>
 ;;
 ;;   NODE_PATH must point at a node_modules containing @noble/hashes

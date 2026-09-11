@@ -13,7 +13,7 @@
 ;;                    is right — this is what degrades silently over time and is exactly
 ;;                    what re-running this script periodically (method 5) is meant to catch.
 ;;
-;; Run: nbb 90-docs/repo-reality/verify_aiueos.cljs >> 90-docs/repo-reality/repo-reality-ledger.edn
+;; Run: kbb --backend sci 90-docs/repo-reality/verify_aiueos.cljk >> 90-docs/repo-reality/repo-reality-ledger.edn
 ;; (script does NOT write the file itself — caller redirects, so a dry run is just as easy
 ;; as a committing run; :eval/seq numbering assumes append to an empty/fresh section).
 
@@ -261,7 +261,7 @@
                 script-has-attest?
                 {:score 0.6 :note "os/aiueos/scripts/build-release-image.sh now references attest/sbom/provenance where it previously had none -- the disclosed wiring gap may have started closing; re-verify whether clojure -M:attest is actually invoked with the receipt's digest before raising this score to 1.0."}
                 :else
-                {:score 1.0 :note "confirmed: ADR-0017 still discloses that build-release-image.sh does not call clojure -M:attest and no gate requires an attestation for a release, and the 26-line script still has zero attest/sbom/provenance references -- the disclosed gap matches the code exactly."}))
+                {:score 1.0 :note "confirmed: ADR-0017 still discloses that build-release-image.sh does not call kbb -M:attest and no gate requires an attestation for a release, and the 26-line script still has zero attest/sbom/provenance references -- the disclosed gap matches the code exactly."}))
             {:score 0.0 :note "os/aiueos/scripts/build-release-image.sh no longer exists -- claim's cited source file is gone; re-verify."}))}
 
    {:claim :claim/aiueos-key-checkpoint-storage-evidence-is-literal-not-computed :axis :axis/evidence-linkage :layer :lint

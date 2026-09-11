@@ -22,7 +22,7 @@ branch tip / PXE artifact / wire marker の最新状態を注入する。
    IPv4 checksum 失敗 `93`、TCP checksum 失敗 `96` を**一段ずつ**復元する。
    両方同時に戻さない。reserved `93`/`96` は status map を参照。
 4. host test → QEMU → 独立 reproducible build (byte-identical) → 実機 K16、の順。
-   host test: `clojure -M:test -n aiueos.native-rtl8125-closure-test`。
+   host test: `kbb -M:test -n aiueos.native-rtl8125-closure-test`。
    pure builder env: `AIUEOS_NATIVE_K16_PREFLIGHT=1` + 4 つの `AIUEOS_*_SOURCE_PATH`
    を exact checkout へ、compiler directory を明示。
 5. 実機の証拠は screen code + wire marker の**両方**。monitor の表示だけ、

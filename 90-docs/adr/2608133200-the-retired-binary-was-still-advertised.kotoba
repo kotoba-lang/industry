@@ -14,15 +14,15 @@ retired binary does not announce anything at all — it looks like an instructio
 ## 1. cloud-murakumo's 401 named a second dead command
 
 The census recorded that murakumo.cloud's 401 told callers to run
-`bb murakumo token issue`. By the time this session looked, someone had already
+`kbb -M:murakumo token issue`. By the time this session looked, someone had already
 changed it. It had NOT been fixed:
 
   before (measured live, 2026-08-13, POST https://murakumo.cloud/api/v1/messages)
     {\"error\":{\"type\":\"unauthorized\",\"message\":\"murakumo access token
-     required — mint one with `clojure -M:token issue` (send as x-api-key or
+     required — mint one with `kbb -M:token issue` (send as x-api-key or
      Bearer)\"}}
 
-  $ clojure -M:token issue
+  $ kbb -M:token issue
     Execution error (ArityException) at cloud-murakumo.cli/-main (cli.cljc:341).
     Wrong number of args (1) passed to: cloud-murakumo.cli/cmd-token
 
@@ -35,8 +35,8 @@ first at least said `bb`, which a reader might recognise as retired.
 **A working equivalent exists**, in two forms, and both were established by
 running them rather than by reading them:
 
-  clojure -M:token issue operator all 604800   -> mk1.eyJzdWIiOiJvcGVyYXRvciIs…
-  nbb scripts/run-task.cljs token issue --sub operator --scope all --ttl 604800
+  kbb -M:token issue operator all 604800   -> mk1.eyJzdWIiOiJvcGVyYXRvciIs…
+  kbb --backend sci scripts/run-task.cljk token issue --sub operator --scope all --ttl 604800
       (in kotoba-lang/murakumo)                -> mk1.eyJzdWIiOiJvcGVyYXRvciIs…
 
 The fix is not to rewrite the message to the four-argument spelling. The
@@ -57,14 +57,14 @@ Landed as network-awai/cloud-murakumo `ffc42ea` (`cmd-token` becomes
   round trip               -> cloud-murakumo.token/verify — the SAME verifier the
                               Worker runs — accepts the CLI-minted token and
                               returns {:sub \"operator\", :scope \"all\", …}
-  clojure -M:test -n cloud-murakumo.token-test -> 3 tests / 11 assertions, 0 fail
+  kbb -M:test -n cloud-murakumo.token-test -> 3 tests / 11 assertions, 0 fail
 
 The same commit widens the 401 text to name WHERE to run it:
 
   after (in source, NOT yet deployed)
-    \"murakumo access token required — mint one with `clojure -M:token issue
+    \"murakumo access token required — mint one with `kbb -M:token issue
      [subject] [scope] [ttl-seconds]` in the cloud-murakumo checkout, or
-     `nbb scripts/run-task.cljs token issue --scope chat` in kotoba-lang/murakumo;
+     `kbb --backend sci scripts/run-task.cljk token issue --scope chat` in kotoba-lang/murakumo;
      send it as x-api-key or Bearer\"
 
 **I did not deploy.** Two reasons, in order of weight. First, it is unnecessary:
@@ -73,7 +73,7 @@ gone with no production change at all. Second, verify-then-ship could not be
 honoured cheaply — `npm run deploy` is `scripts/deploy-model-hosting-locked.mjs`,
 which takes a moderator-scoped `MURAKUMO_MODEL_HOSTING_TOKEN`, acquires a
 deployment lease against the live Worker, then runs a four-target shadow-cljs
-release plus `clojure -M:site` before `wrangler deploy`. Shipping a
+release plus `kbb -M:site` before `wrangler deploy`. Shipping a
 string-literal improvement through that, on a machine already at load 70–150, is
 risk without benefit. The message text lands with whatever deploys next; the
 half that mattered is live now. Both changed files were reader-checked
@@ -109,11 +109,11 @@ Landed as cloud-itonami/kuni-umi `97a1dd4`. bb.edn removed; both
 
 Per-task verification — each run and its output read, not merely exit 0:
 
-  nbb scripts/run-task.cljs test
+  kbb --backend sci scripts/run-task.cljk test
     -> Ran 74 tests containing 532 assertions. 0 failures, 0 errors.
        Identical to the bb baseline measured BEFORE the conversion, which is the
        point of measuring the baseline first.
-  nbb scripts/run-task.cljs seed-dry-run
+  kbb --backend sci scripts/run-task.cljk seed-dry-run
     -> parsed 4 entities (~32 datoms) from seed.edn → com.etzhayyim.kuniumi
        DRY RUN — no writes.
        seed-path resolves to <repo>/kotoba/seed.edn
@@ -133,8 +133,8 @@ drops a capability leaves the reader believing it was never there, which is the
 same defect as item 1 wearing different clothes.
 
 Where a replacement command is NAMED, it was run. That discipline paid twice:
-org-ietf-ed25519's README offered `clojure -X:test` as the alternative to
-`bb test`, and `-X` fails there (`No function found on command line or in
+org-ietf-ed25519's README offered `kbb -X:test` as the alternative to
+`kbb -M:test`, and `-X` fails there (`No function found on command line or in
 :exec-fn` — the alias supplies `:main-opts`); and its recorded transcript said
 6 tests / 31 assertions when the suite is 11 / 71.
 
@@ -149,18 +149,18 @@ CORRECTED — 20 repositories (each landed on its own main):
                                               dropped control-plane entrypoints
                                               named. Also records the item-1 fix.
   kotoba-lang/kisekae                829ea51  registry was {} — `kisekae` RESTORED
-                                              (clojure -M test/kisekae_test.clj,
+                                              (kbb -M test/kisekae_test.clj,
                                               47/47 passed) + `lint`; README's
                                               stale \"33 checks\" corrected to 47.
   kotoba-lang/kami-engine            a27ec3b  registry was {} — wit-check and
                                               adapter-check RESTORED and run (40
                                               host functions across 7 interfaces;
-                                              contracts 3). CLAUDE.md's `bb kami`
+                                              contracts 3). CLAUDE.md's `kbb -M:kami`
                                               marked unavailable.
-  kotoba-lang/org-chainagnostic-cacao 9a02c37 bin/kotoba exec'd `bb -m cacao.cli`
+  kotoba-lang/org-chainagnostic-cacao 9a02c37 bin/kotoba exec'd `kbb -m cacao.cli`
                                               with its bb.edn deleted — broken
                                               twice over. Now execs
-                                              `clojure -M -m cacao.cli`; verified
+                                              `kbb -M -m cacao.cli`; verified
                                               seed -> did:key:z6Mk… round trip.
                                               61 tests / 229 assertions.
   com-junkawasaki/org-spirit-in-physics-comics bfc1415  registry {}; all four of
@@ -169,10 +169,10 @@ CORRECTED — 20 repositories (each landed on its own main):
                                               convert. Also records that the
                                               Pages workflow is doubly inert
                                               (ADR-2607300900).
-  kotoba-lang/io-ipfs                13b40ce  {} registry; clojure -M:test = 5/11
-  kotoba-lang/org-ietf-cbor          2fd3cbe  {} registry; clojure -M:test = 11/70
+  kotoba-lang/io-ipfs                13b40ce  {} registry; kbb -M:test = 5/11
+  kotoba-lang/org-ietf-cbor          2fd3cbe  {} registry; kbb -M:test = 11/70
   kotoba-lang/org-ietf-ed25519       6117bf1  {} registry; 11/71; -X:test also dead
-  kotoba-lang/org-w3-webrtc-signaling cdcc9d1 {} registry; clojure -M:test = 6/22
+  kotoba-lang/org-w3-webrtc-signaling cdcc9d1 {} registry; kbb -M:test = 6/22
   kotoba-lang/freeboard              188d907  test+serve dropped; -M:test = 19/102;
                                               build task run; table's \"✅ bb\" -> JVM
   kotoba-lang/kami-mangaka-expression e8d578f test present; 7 tests / 104 asserts
@@ -183,16 +183,16 @@ CORRECTED — 20 repositories (each landed on its own main):
   kotoba-lang/aiueos                 b85eac3  decide and test:cljc unavailable; the
                                               5 boot/flash tasks documented
   kotoba-lang/cloud-murakumo-studio  e34063c  ui-css unavailable; test = 6/14;
-                                              bb removed from Prerequisites
+                                              kbb -M:removed from Prerequisites
   cloud-itonami/narashi              0d23c9b  test = 16/121; CLAUDE.md's
-                                              `bb actor:publish` repointed at
+                                              `kbb -M:actor:publish` repointed at
                                               etzhayyim/root's nbb task
   network-awai/network-isekai        72aca60  new Gates section; 6 named gates
                                               (dance, assets, render-site,
                                               m6-visual-gate, fork-git,
                                               fork-publish-e2e) marked unavailable
                                               out of 32 dropped
-  network-awai/local-manimani        3693a99  ~130 documented `bb runner` flags are
+  network-awai/local-manimani        3693a99  ~130 documented `kbb -M:runner` flags are
                                               ONE dropped task; a banner says so
                                               once rather than rewriting 130 lines
                                               into commands that do not run
@@ -238,7 +238,7 @@ origin/main found **five**, in three distinct shapes:
                                     -> genuinely broken, reported not fixed
   kotoba-lang/webgpu                its 1 registered task is `[\"bb\" \"--classpath\"
                                     …]`, and the task's own :doc tells the reader
-                                    to run `bb gen-compute-golden`
+                                    to run `kbb -M:gen-compute-golden`
   kotoba-lang/kami-isekai-assets    render-test is `[\"sh\" \"-c\" \"cd ../webgpu &&
                                     exec bb …\"]` — knowingly, per its comment
   etzhayyim/root                    3 of 57 (audit:test-health, test:docs-registry,

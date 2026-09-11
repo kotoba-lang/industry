@@ -242,7 +242,7 @@ S3 の最初の 1 手は publisher を直すことではなく、**検査を先�
 **足し忘れと足した結果が出力で区別できない。**
 
     # 1. 先に検査を足して、赤いことを見る
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-ipni-publisher-record.cljs
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-ipni-publisher-record.cljs
     #    → 広告の Metadata を decode し、ipni.metadata/read-ipq が :ok? true を
     #      返すことを assert する行を足す。現状の広告は
     #      transport-ipfs-gateway-http だけなので、これは赤くなる。

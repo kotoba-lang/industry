@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Fourth judge: how many bits about a leaf's plaintext does its SEALED LENGTH
 ;; reveal?
 ;;
@@ -13,7 +13,7 @@
 ;; each padding scheme and take the Shannon entropy of the resulting length
 ;; distribution, in bits. That is, directly, how much a length observer learns.
 ;;
-;;   nbb scripts/aiuefs-leak-bench.cljk --root . --out <file.edn>
+;;   kbb --backend sci scripts/aiuefs-leak-bench.cljk --root . --out <file.edn>
 ;;
 ;; The number to compare against is the leak the plane has TODAY: uncompressed
 ;; leaves are all one size, so today's length entropy is ~0 bits and every bit

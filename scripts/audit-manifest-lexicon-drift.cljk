@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; audit-manifest-lexicon-drift.cljs -- manifest が宣言した lexicon と、
 ;; flat west workspace に実在する契約 JSON との drift を測る。
 ;;
-;;   nbb scripts/audit-manifest-lexicon-drift.cljk [--strict]
+;;   kbb --backend sci scripts/audit-manifest-lexicon-drift.cljk [--strict]
 ;;
 ;; 2026-08-25 に `scripts/audit-manifest-lexicon-drift.py` から移した。Python は
 ;; CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > ClojureScript > nbb）

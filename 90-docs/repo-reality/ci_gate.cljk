@@ -5,7 +5,7 @@
 ;; appends the new run's lines to the ledger. Exits 1 iff any claim regressed, printing which
 ;; ones and why, so CI can gate on real drift instead of permanent-red-on-known-gaps.
 ;;
-;; Run: nbb 90-docs/repo-reality/ci_gate.cljs   (from the superproject root; expects
+;; Run: kbb --backend sci 90-docs/repo-reality/ci_gate.cljk   (from the superproject root; expects
 ;; orgs/kotoba-lang/{kotoba,kotoba-lang,kotobase,aiueos,kototama} checked out and
 ;; npm ci already run so ["datascript"]-adjacent deps... actually this script needs no
 ;; datascript, only the sibling verify_*.cljs scripts run as child processes.)

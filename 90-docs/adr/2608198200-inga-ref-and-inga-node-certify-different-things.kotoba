@@ -145,7 +145,7 @@ absent になり、戻すと head が戻る** こと（store は読むのでは�
    ns を require する `.cljc` は名前だけの portable** で、この ns が存在する
    理由である JVM consumer は永遠に読み込めなかった。clj-kondo が先に言った。
    format は portable な `inga_node.proof` に移し、**実際に
-   `clojure -M -e` で `(require 'inga-node.ref)` を JVM で通した**（黙っているのと
+   `kbb -M -e` で `(require 'inga-node.ref)` を JVM で通した**（黙っているのと
    読み込めるのは別）。
 2. tamper test が正規表現で proof を書き換えようとして**何にも一致していなかった**
    —— `pr-str` は名前空間を共有する map を `#:inga.qc{…}` と印字する。

@@ -44,7 +44,7 @@ kotoba shell がすでにあるので、それを使える?」
    条件分岐を 1 ファイルに入れるより分けるほうが正しい。
 2. **`mobile/` は独立プロジェクト**（`services/app-edge` と同じ理由）。アプリ本体の
    100 以上の `.clj` は ClojureScript の classpath に載せない。
-3. **view は `.cljc` で純粋**。reagent がブラウザで、`clojure -M:test` が JVM で同じ hiccup を
+3. **view は `.cljc` で純粋**。reagent がブラウザで、`kbb -M:test` が JVM で同じ hiccup を
    描く。edge の 4 列テーブルではなく**カードの列**にした —— 390pt で横スクロールが要る表は、
    運んできたデスクトップのレイアウトであってモバイルのそれではない。データはずれない
    （両方が同じ `cloud.itonami.app.fleet-core` を 1 本の API 越しに読む）。
@@ -154,15 +154,15 @@ iOS platform が入っていない（`xcodebuild: error: … iOS 26.5 is not ins
 ```bash
 # 1. バンドルを建てて検査する（dist/ は build 出力、index.html だけ committed）
 cd orgs/cloud-itonami/cloud-itonami-app/mobile
-npm install && npm run build          # index:check → dds.css → shadow-cljs release
-clojure -M:test                       # 7 tests / 24 assertions
+npm install && npm run build          # index:check → dds.css → amu compile --target wasm32-browser
+kbb -M:test                       # 7 tests / 24 assertions
 python3 -m http.server 8099 --bind 127.0.0.1 --directory dist &
-npx nbb scripts/verify-browser.cljs   # 11/11、実ブラウザ 390x844
+kbb --backend sci scripts/verify-browser.cljk   # 11/11、実ブラウザ 390x844
 
 # 2. edge 側
 cd ../services/app-edge
 npm run test                                     # fleet-core parity 14/14
-npx nbb test/worker_routes_smoke.cljs https://cloud-itonami-app-edge.04-feasts-minded.workers.dev
+kbb --backend sci test/worker_routes_smoke.cljk https://cloud-itonami-app-edge.04-feasts-minded.workers.dev
 
 # 3. native
 cd ../..

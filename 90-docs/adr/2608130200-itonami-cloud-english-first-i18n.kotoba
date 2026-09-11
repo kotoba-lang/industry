@@ -107,7 +107,7 @@ security / byoubu-ui / byoubu と際限なく伸びた）。HTML は
 しているのに、その bundle が再生成されていなかった。committed な bundle に
 その export は 0 件で、`wrangler pages deploy` が Worker のビルド段階で
 `No matching export` で落ちる。**つまり `ca80f05d` 以降に main へ入った変更は
-1 つも本番に届いていなかった。** `npx shadow-cljs release edge-api` で解消。
+1 つも本番に届いていなかった。** `amu compile --target wasm32-browser edge-api` で解消。
 
 ## 未解決の gap（オーナー判断待ち / 次の作業）
 
@@ -127,7 +127,7 @@ security / byoubu-ui / byoubu と際限なく伸びた）。HTML は
 
 ## 検査（実測、捏造なし）
 
-- `clojure -M:local:test`: **1658 tests / 16589 assertions、9 failures /
+- `kbb -M:local:test`: **1658 tests / 16589 assertions、9 failures /
   40 errors**。`origin/main` の baseline（1652 tests、9 failures / 40 errors）と
   **同一の失敗集合**で退行ゼロ。既存の失敗は runtime.cljc・doctor・company 等、
   この変更と無関係の namespace。

@@ -277,8 +277,8 @@ datom 面に載せるときの `:source/dataset` は `\"itonami-card-statement\"
 | `test/cloud/itonami/app/card_statement_test.clj`（新規、21 tests） | 下記の完了条件 |
 | `test/cloud/itonami/app/authority/payment_test.clj` | fixture に `:scheduled-debit {:funding/status :never-recorded}` を追加 |
 
-テスト: `clojure -M:test` → **969 tests / 4184 assertions / 0 failures / 0 errors**。
-`clojure -M:lint` → **errors 0**（warning 7 はすべて既存の別件:
+テスト: `kbb -M:test` → **969 tests / 4184 assertions / 0 failures / 0 errors**。
+`kbb -M:lint` → **errors 0**（warning 7 はすべて既存の別件:
 `account_link_sync` / `agent_control` の unresolved var、`mailbox_http_test` の
 missing require）。
 

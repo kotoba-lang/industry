@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; observatory-run.cljs — 領域別 observatory を実際に走らせ、何が起きたかを
 ;; query 面に載る EDN として記録する。ADR-2608081200。
 ;;
@@ -24,11 +24,11 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --only watari,sukashi
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --check
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --live kouhou
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --due
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --only watari,sukashi
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --check
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --live kouhou
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljk --due
 ;;
 ;;   --check  走らせない。登録簿の整合（west.yml に在るか / checkout が在るか）だけ見る
 ;;   --live   :live-alias を持つ actor を実 fetch/publish モードで走らせる（明示 opt-in）
@@ -551,7 +551,7 @@
                      r))]
     (spit ledger-path
           (str ";; 90-docs/observatory/observatory.datoms.edn — **生成物**。手編集禁止。\n"
-               ";; 再生成: nbb --classpath \".:scripts/nbb_compat\" scripts/observatory-run.cljk\n"
+               ";; 再生成: kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/observatory-run.cljk\n"
                ";; 登録簿（正本・手書き）: manifest/observatories.edn   設計: ADR-2608081200\n"
                ";; 間隔の計算: ADR-2608082600（observatory-cadence.datoms.edn）\n"
                ";;\n"

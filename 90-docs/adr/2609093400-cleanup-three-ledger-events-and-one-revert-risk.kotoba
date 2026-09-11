@@ -125,7 +125,7 @@ pointed the wrong way:
    discarding the only copy of anything on a judgement call is the owner's to
    make. Held in worktree `root-maturity-remeasure-mtql61p3`.
 
-4. **88 UNLANDED child repos remain.** `nbb scripts/cleanup.cljs --unlanded`
+4. **88 UNLANDED child repos remain.** `kbb --backend sci scripts/cleanup.cljk --unlanded`
    reported 88 of 4416 scanned, and the run completed (its own completion line
    was present, so it was not killed mid-scan). This session handled only the
    seven holding untracked content, which is the top of the ladder because
@@ -145,7 +145,7 @@ pointed the wrong way:
 
 ## Validation actually run
 
-- `nbb scripts/west-orphan-audit.cljs --blocking`: exit 0,
+- `kbb --backend sci scripts/west-orphan-audit.cljk --blocking`: exit 0,
   `local-root-broken 0`, `relative-paths-broken 0`, `true-orphan-git 0`,
   `renamed-UNVERIFIED 0`.
 - EDN readability of the landed ledger: 10855 lines, 0 parse failures.

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; threed-coscientist — Generate → Reflect → Rank(Elo) → Evolve → Meta を
 ;; 3D/CAD/CAM/render スタックの **実測値**に対して回す。
 ;;
@@ -10,8 +10,8 @@
 ;; 順位が出る）。ADR-2607132300 の実測 —— 3 体の LLM judge が全軸 4.0–5.0/5 と採点した
 ;; 裏で 4 つの具体的欠落を 1 つも指摘しなかった —— を繰り返さないため。
 ;;
-;;   nbb scripts/threed-coscientist.cljk            # 次の反復番号で書く
-;;   nbb scripts/threed-coscientist.cljk --n 2      # 反復番号を明示
+;;   kbb --backend sci scripts/threed-coscientist.cljk            # 次の反復番号で書く
+;;   kbb --backend sci scripts/threed-coscientist.cljk --n 2      # 反復番号を明示
 ;;
 ;; exit 3 = 測定が無い / 空（**答えられなかった**。0 でも 1 でもない）
 
@@ -188,7 +188,7 @@ hollow の実装と absent の新規構築は高リスクで、同じ反復に�
              :iteration/projected-score projected}]
     (fs/mkdirSync out-dir #js {:recursive true})
     (fs/writeFileSync (path/join out-dir (str "iteration-" (if (< n 10) (str "0" n) n) ".edn"))
-                      (str ";; 生成物。手で編集しない。再生成: nbb scripts/threed-coscientist.cljk\n"
+                      (str ";; 生成物。手で編集しない。再生成: kbb --backend sci scripts/threed-coscientist.cljk\n"
                            ";; 入力は 90-docs/maturity/threed-parity.datoms.edn（tree からの実測）。\n"
                            ";; judge は LLM ではない —— 同じ入力なら同じ順位が出る。\n\n"
                            (pr-str doc) "\n"))

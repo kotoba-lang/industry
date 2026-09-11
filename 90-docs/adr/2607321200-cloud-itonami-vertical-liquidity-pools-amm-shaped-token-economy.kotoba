@@ -189,7 +189,7 @@ kernel は既に5つある（`billing_cap` / `substance` / `phase_gate` / `polic
 
 **残る本物の gap は狭く、そして VLP に直撃する**: `business-governor` の allowlist は **x402 rail の kind に届いていない。** `billing_x402.cljc` 自身が KNOWN GAP として全文を書いている:
 
-> `business-governor` の proposal-kind allowlist は **閉じた kotoba-wasm カーネル コード**（`kernels.substance/known-kind`、code 0..5）で、`:billing.x402-rule` の code をまだ持たない。**拡張するには `.kotoba` wasm twin を触って `bb emit-kernel-wasm` を再実行する必要がある**（ADR-0018 follow-up）。それが landing するまで `:billing.x402-rule` proposal は `business-governor/censor` にも `business-loop/tick!` にも**到達しない** —— `kernels.substance` の fail-closed unknown-kind check が governor の multimethod が dispatch する前に無条件に hold する。
+> `business-governor` の proposal-kind allowlist は **閉じた kotoba-wasm カーネル コード**（`kernels.substance/known-kind`、code 0..5）で、`:billing.x402-rule` の code をまだ持たない。**拡張するには `.kotoba` wasm twin を触って `kbb -M:emit-kernel-wasm` を再実行する必要がある**（ADR-0018 follow-up）。それが landing するまで `:billing.x402-rule` proposal は `business-governor/censor` にも `business-loop/tick!` にも**到達しない** —— `kernels.substance` の fail-closed unknown-kind check が governor の multimethod が dispatch する前に無条件に hold する。
 
 **ただし無防備ではない**（前の反復の「自己統治しているだけ」という書き方は厳しすぎた）: proposal は通常の approval queue に載り、`activity/policy-risk` の unknown-policy fallback が未登録 policy を **`:destructive` risk** に解決する —— `billing.cljc` の `:financial` より**保守的**なので、**x402 rule は billing change より厳しくゲートされている。**
 
@@ -364,7 +364,7 @@ epoch を書かない」。
   あちらは全 seller を concat しており、2 seller が同じ path を課金しうるので、
   path キーの fold は別 seller の収益を静かに混ぜる
 - 検証: 47 tests / 189 assertions green、clj-kondo 0 errors、
-  `shadow-cljs release worker` 61 files / 18 compiled / 0 warnings
+  `amu compile --target wasm32-browser worker` 61 files / 18 compiled / 0 warnings
 
 **消費側は無変更で受け取る。** `billing_x402/snapshot!` は `(assoc resp :source \"x402\")`
 で応答全体を通すので、`:by-path` はそのまま cloud-itonami に届く。
@@ -621,7 +621,7 @@ step 8  curve と share の発行                                               
      {:what \"nexus-x402 に per-path 収益帰属を実装して main に着地\"
       :commits [\"network-awai/nexus-x402 5349cea (settlement-entry :path + revenue-by-path)\"
                 \"network-awai/nexus-x402 79f31ea (GET /admin/settlements/<seller> の :by-path fold)\"]
-      :verified \"47 tests / 189 assertions green、clj-kondo 0 errors、shadow-cljs release worker 0 warnings\"
+      :verified \"47 tests / 189 assertions green、clj-kondo 0 errors、amu compile --target wasm32-browser worker 0 warnings\"
       :note \"lever thread-path-into-the-settlement-entry (5.95) の実装。消費側 billing_x402/snapshot! は応答全体を通すので無変更で :by-path を受け取る\"}
      {:what \"envelope kernel — pooled capital のうち agent が焼いてよい額（θ の実装）\"
       :commits [\"network-awai/cloud-itonami b24df79a (kernels/envelope)\"
@@ -718,7 +718,7 @@ step 8  curve と share の発行                                               
     {:gap \"settlements KV は突合されない index であり ledger of record ではない\"
      :note \"ns 自身が明記。on-chain tx が source of truth だが、nexus-x402 も cloud-itonami も突合していない。LP 配当の根拠にするなら突合が要る\"}
     {:gap \"kernels の .kotoba wasm twin の再生成手順が bb に依存している\"
-     :note \"billing_x402.cljc が `bb emit-kernel-wasm` と明記。ADR-2607173000 は bb を script host として退役させ、新規 bb.edn を禁じている。x402 kind の allowlist 追加に着手する前に、この emit 手順を nbb へ移すか、既存例外として扱うかの判断が要る\"}
+     :note \"billing_x402.cljc が `kbb -M:emit-kernel-wasm` と明記。ADR-2607173000 は bb を script host として退役させ、新規 bb.edn を禁じている。x402 kind の allowlist 追加に着手する前に、この emit 手順を nbb へ移すか、既存例外として扱うかの判断が要る\"}
     {:gap \"fleet gross $513.09/yr は 984 runs/7d の線形外挿である\"
      :note \"canvas の観測で agentRuns7d は 34k → 0 → 984 と大きく振れた実績がある（0723 の launchd 停止インシデント）。点推定として扱わない\"}
     {:gap \"seat 単価 $40/月 は仮定であって実測ではない\"
@@ -741,14 +741,14 @@ step 8  curve と share の発行                                               
     {:gap \"advertiser-ops 自身の配線（store/approval-queue）は未確認\"
      :note \"ns docstring が『store/approval-queue の配線は these pure fns の上の thin follow-up』と書いており、pure 層の存在は確認したが approval queue への接続は読んでいない。business-governor が :adnet.campaign/* を委譲されている旨は advertiser_ops.cljc:27 にあるが、tick! の proposal 生成側にキャンペーン kind が載っているかは未確認\"}
     {:gap \"（解消 2026-08-01）採点が scratchpad にしか無かった\"
-     :resolved \"kotoba-lang/loop-system-dynamics の src/loop_system_dynamics/cloud_itonami_vlp_levers.cljs として着地（50ca93b / merge 6323eed）。本 ADR が引用する全スコアはこれで再現可能。実行: nbb --classpath 'src:<dynamics>/src' -e \\\"(require '[loop-system-dynamics.cloud-itonami-vlp-levers :as v]) (v/-main)\\\"\"
+     :resolved \"kotoba-lang/loop-system-dynamics の src/loop_system_dynamics/cloud_itonami_vlp_levers.cljs として着地（50ca93b / merge 6323eed）。本 ADR が引用する全スコアはこれで再現可能。実行: kbb --backend sci --classpath 'src:<dynamics>/src' -e \\\"(require '[loop-system-dynamics.cloud-itonami-vlp-levers :as v]) (v/-main)\\\"\"
      :why \"11 反復ぶん、ADR の decision 本文が引用する数字がセッション用一時ファイルにしか存在しなかった。再計算できない数字は小数点を付けた主張であって計算ではなく、ADR-2607259800 が終わらせようとした当のもの\"
      :tests \"8 tests / 102 assertions。honesty 制約を prose でなくテストで持つ: 却下項目は別キーに分離（:ranking を回す呼び出し元が却下を助言と読めない）/ 全体最高スコアが却下項目であることを assert（式は leverage を測り safety を測らない）/ 各スコアが dynamics.core の計算と一致することを assert（局所再実装の drift 防止）/ landed と designed の区別 / 0-event 上限\"}
     {:gap \"（解消 2026-07-31）seller をいくつ作るか\"
      :resolved \"価格 tier ごと（3〜5個）。registry/upsert-seller は seller キーで丸ごと置換するので 1 seller = 1 rule であり『1 seller 多 rule』は存在せず、facilitator/rule->requirements は (:usd rule) を使うので価格は rule 単位。一律価格は製品として不成立、458 seller は承認 458 回と単一 registry 配列の肥大を招くため、両極を採らず tier 分割にする。tier 内の vertical 別収益は :by-path が担う。decision §4c 参照\"}
     {:gap \"kernels/envelope に .kotoba/wasm twin が無い — 他の 5 kernel は全て持っている\"
      :cost \"完全な twin は4点セットを要する: (1) 手書きの .kotoba-bundle（baked-in case の main battery 付き）(2) scripts/split-kotoba-kernels.bb で生成する *_part_NN.kotoba (3) checked-in の wasm/kernels/*.wasm (4) kernels/wasm-host-test.cljs への登録（Node の WebAssembly.instantiate で main() を呼び .cljc の battery-pass-count と一致を assert）。この parity 検査こそが『同じ判断が wasm で走る』を検証済みの主張にしている\"
-     :blocker \"splitter が scripts/split-kotoba-kernels.bb であり、ADR-2607173000 が bb を script host として退役させている。着手前に nbb 移植か既存例外扱いかの判断が要る（x402 kind の allowlist 拡張が `bb emit-kernel-wasm` を要するのと同じ問題）\"
+     :blocker \"splitter が scripts/split-kotoba-kernels.bb であり、ADR-2607173000 が bb を script host として退役させている。着手前に nbb 移植か既存例外扱いかの判断が要る（x402 kind の allowlist 拡張が `kbb -M:emit-kernel-wasm` を要するのと同じ問題）\"
      :note \"battery と parity 検査を伴わない手書き bundle は追加しない。支出上限の未検証な第二実装は、実装が1つだけの状態より悪い —— wasm 経路が担保されていると呼び出し元に誤認させる。2026-08-01 に envelope.cljc の docstring へ同趣旨を明記した\"}
     {:gap \"tier 構成は settlements KV の欠損リスクを悪化させる\"
      :impact \"settlement が少数 key に集中するので、CAS 無し read-modify-write の last-write-wins が当たる確率が上がる。LP 配当を出すなら DO 直列化は必須の前提条件になる\"}

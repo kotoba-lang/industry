@@ -48,8 +48,8 @@ hardware-token firmware, OS Keychain, WebAuthn authenticator firmware, and physi
 From `orgs/kotoba-lang/kagi`:
 
 ```sh
-clojure -M:test
-clojure -M:lint
+kbb -M:test
+kbb -M:lint
 ```
 
 Current internal evidence is 100 kagi tests / 288 assertions, including the
@@ -101,9 +101,9 @@ The independent reviewer emits, but does not install, the signed evidence and tr
 fragments from a separately controlled kagi identity:
 
 ```sh
-clojure -M:cli security-attest independent-crypto-review \
+kbb -M:cli security-attest independent-crypto-review \
   <lowercase-sha256-of-final-report-and-reviewed-manifest> --issuer <reviewer-id>
-clojure -M:cli security-trust-root --issuer <reviewer-id>
+kbb -M:cli security-trust-root --issuer <reviewer-id>
 ```
 
 Deployment operators review and merge those fragments into separate

@@ -1,15 +1,15 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; murakumo-default-model.cljs — フリートの既定 LLM を 1 コマンドで切り替える。
 ;;
 ;; ADR-2607173100 の「モデル切替 = 1 entry の変更」を、**実際に serve している
 ;; プロセスまで含めて**成立させる。alias だけ書き換えても、その先が別のモデルを
 ;; 配っていれば嘘になる。
 ;;
-;;   nbb scripts/murakumo-default-model.cljk status
-;;   nbb scripts/murakumo-default-model.cljk list
-;;   nbb scripts/murakumo-default-model.cljk bench [--tokens 120]
-;;   nbb scripts/murakumo-default-model.cljk set <model-dir> [--distributed] [--parallel N] [--ctx N]
-;;   nbb scripts/murakumo-default-model.cljk revert
+;;   kbb --backend sci scripts/murakumo-default-model.cljk status
+;;   kbb --backend sci scripts/murakumo-default-model.cljk list
+;;   kbb --backend sci scripts/murakumo-default-model.cljk bench [--tokens 120]
+;;   kbb --backend sci scripts/murakumo-default-model.cljk set <model-dir> [--distributed] [--parallel N] [--ctx N]
+;;   kbb --backend sci scripts/murakumo-default-model.cljk revert
 ;;
 ;; `<model-dir>` は gad の `/home/gad/models/` 直下のディレクトリ名。
 ;;
@@ -305,7 +305,7 @@
                                 (println "")
                                 (println "⚠ this is" (.toFixed (* 100 (- 1 (/ (:tps r) (:tps before-m)))) 0)
                                          "% SLOWER than what it replaced. Revert with:")
-                                (println "    nbb scripts/murakumo-default-model.cljk revert"))
+                                (println "    kbb --backend sci scripts/murakumo-default-model.cljk revert"))
                               (println "")
                               (println "registry metadata was NOT updated (needs MURAKUMO_SERVICE_TOKEN).")
                               (println "run `status` to see exactly which fields now disagree.")))))))))))))))

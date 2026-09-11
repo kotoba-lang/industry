@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; rad-register.cljs — west project を **本家 Radicle(heartwood) に実登録**し、
 ;; 存在を検証できた RID だけを manifest に記録する。
 ;;
@@ -24,11 +24,11 @@
 ;; * したがって **storage の不在を根拠に manifest から RID を消してはならない。**
 ;;
 ;; ## 使い方
-;;   nbb scripts/rad-register.cljk --names kagami,langgraph        ;; 指定 project
-;;   nbb scripts/rad-register.cljk --names-file /tmp/rad-todo.txt  ;; 1行1名
-;;   nbb scripts/rad-register.cljk --org kotoba-lang --limit 50    ;; 未登録から N 件
-;;   nbb scripts/rad-register.cljk ... --dry-run                   ;; 計画だけ
-;;   nbb scripts/rad-register.cljk ... --no-land                   ;; 登録するが manifest は書かない
+;;   kbb --backend sci scripts/rad-register.cljk --names kagami,langgraph        ;; 指定 project
+;;   kbb --backend sci scripts/rad-register.cljk --names-file /tmp/rad-todo.txt  ;; 1行1名
+;;   kbb --backend sci scripts/rad-register.cljk --org kotoba-lang --limit 50    ;; 未登録から N 件
+;;   kbb --backend sci scripts/rad-register.cljk ... --dry-run                   ;; 計画だけ
+;;   kbb --backend sci scripts/rad-register.cljk ... --no-land                   ;; 登録するが manifest は書かない
 ;;
 ;; private repo は既定で対象外（ADR-2607252200）。archived も除外する。
 (ns rad-register

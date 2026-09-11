@@ -204,7 +204,7 @@ curl -sS https://murakumo.cloud/api/v1/generation/catalog | jq '.video'
 
 # 1 番（assets の gen2 除去）を進めるなら
 cd orgs/gftdcojp/ghosthacker-shiropico-assets && git log --oneline -3
-nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
   '[:find ?c :where [?e \"spec/kind\" \"ref-policy\"] [?e \"ref-policy/removed\" ?c]]'
 ```
 

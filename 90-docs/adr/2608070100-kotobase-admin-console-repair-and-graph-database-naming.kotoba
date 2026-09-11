@@ -13,7 +13,7 @@
                 "adr-260726-kotobase-query-plane-is-one-ref"
                 "adr-2607260940-d1-storage-mode-proxy-bridge"
                 "ADR-2608122300"))
-  (:adr/verification "kotobase-api-gateway-cljs: clojure -M:test 99 tests / 598 assertions / 0 failures(clean な origin/main では 4 failures —— 同じ 4 test 名。本 ADR の catalog 修正で解消)。clojure -M:site-test 37 tests / 280 assertions / 0 failures。kotobase-graph-database: npm run test:cljs 234 tests / 679 assertions / 0 failures。npx shadow-cljs release worker(両 repo) 0 warnings。新規 site test 5 本は未修正/未配線の origin/main に対して先に走らせ、chrome 系 6 assertion・query 系 7 assertion が落ちることを確認してから landed とした。live 実測 2026-08-06: graph-database.kotobase.net /_health 200 / backend.kotobase.net /_health 200 /kotobase.net /health 200 / /admin 401(未認証) / xrpc datomic.q,datomic.datoms,kg.ingest すべて 401(auth に到達 = proxy 成立、5xx ではない)。未検証: 認証済みの実画面(Chrome 拡張が未接続でオーナー確認待ち)。")
+  (:adr/verification "kotobase-api-gateway-cljs: kbb -M:test 99 tests / 598 assertions / 0 failures(clean な origin/main では 4 failures —— 同じ 4 test 名。本 ADR の catalog 修正で解消)。kbb -M:site-test 37 tests / 280 assertions / 0 failures。kotobase-graph-database: npm run test:cljs 234 tests / 679 assertions / 0 failures。amu compile --target wasm32-browser worker(両 repo) 0 warnings。新規 site test 5 本は未修正/未配線の origin/main に対して先に走らせ、chrome 系 6 assertion・query 系 7 assertion が落ちることを確認してから landed とした。live 実測 2026-08-06: graph-database.kotobase.net /_health 200 / backend.kotobase.net /_health 200 /kotobase.net /health 200 / /admin 401(未認証) / xrpc datomic.q,datomic.datoms,kg.ingest すべて 401(auth に到達 = proxy 成立、5xx ではない)。未検証: 認証済みの実画面(Chrome 拡張が未接続でオーナー確認待ち)。")
   (:adr/known-gaps (vector "認証済み /admin の実画面は未確認。ブラウザ拡張が未接続だったため未認証の probe までしか到達していない。オーナーが /admin を再読み込みして、実数が出ること・Sign out が効くこと・query が走ることを確認する必要がある。"
                         "Worker script 名 kotobase-cf-wasm-staging は改名できないまま。KOTOBA_SEED / KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY が Cloudflare の中にしか無く、kagi の両 vault に不在。解除は (1) オーナーが 3 値を kagi に保管、または (2) B2 -> R2 binding 移行(binding は資格情報を要さないので B2 の 2 件が消える。KOTOBA_SEED は残るのでこれだけでは足りない)。"
                         "query workbench が deprecated な XRPC datomic.q に載っている。Sunset は 2026-11-01。恒久解は session が CACAO を提示できる経路を作り POST /api/q へ移すこと。未着手。"
@@ -151,7 +151,7 @@ secrets-location-map に制約と解除経路を記録した。
 
 ## 副産物 — component catalog の gate が動いていなかった
 
-`clojure -M:render-components` が例外で落ち、digest 台帳を再生成できず、clean な
+`kbb -M:render-components` が例外で落ち、digest 台帳を再生成できず、clean な
 `origin/main` で `component_test` が 4 failure だった(ADR-2608011200 の verification が
 「既存 3 failure」と記録していたものの後継)。原因は `inga-replica` と
 `kotobase-index-prolly-standalone` が分類器に無く、さらに `clj-edge/` と `worker/` に

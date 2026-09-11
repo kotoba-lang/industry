@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; adr-body.cljs — ADR の :adr/body を読む/書く唯一の安全な口。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/adr-body.cljk get    <adr.edn>
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/adr-body.cljk append <adr.edn> <text-file>
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/adr-body.cljk set    <adr.edn> <text-file>
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-body.cljk get    <adr.edn>
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-body.cljk append <adr.edn> <text-file>
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-body.cljk set    <adr.edn> <text-file>
 ;;
 ;; ## なぜ要るか
 ;;

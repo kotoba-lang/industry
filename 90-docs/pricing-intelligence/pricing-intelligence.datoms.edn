@@ -12,7 +12,7 @@
 ;; "Cannot compare :k to :k" on every transact regardless of schema/data shape). Real run, from outside the
 ;; superproject tree (its root `deps.edn` is unrelated workspace-metadata EDN, not a Clojure deps manifest —
 ;; invoking `clojure` from inside the tree makes clojure.tools.deps try and fail to parse it):
-;;   cd /tmp && clojure -Sdeps '{:deps {datascript/datascript {:mvn/version "1.7.1"}}}' \
+;;   cd /tmp && kbb -Sdeps '{:deps {datascript/datascript {:mvn/version "1.7.1"}}}' \
 ;;     -M /path/to/com-junkawasaki/90-docs/pricing-intelligence/query.clj /path/to/com-junkawasaki
 ;; Result: 27 schema attrs, 116 catalog entities, 118 ledger events -> 1306 datoms transacted; example queries
 ;; below returned correct joined results (see query.clj for the full, runnable versions of both):

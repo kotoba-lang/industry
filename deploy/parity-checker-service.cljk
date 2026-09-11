@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 
 ;;; Parity Checker Service — Month 1 strangler-fig validation
 ;;; Reference: ADR-2607072100 §1.2 "Parity Validation Setup"
@@ -19,7 +19,7 @@
 ;;;  • parity.hash_mismatch_rate (%)
 ;;;
 ;;; Usage:
-;;;   nbb deploy/parity-checker-service.cljk \
+;;;   kbb --backend sci deploy/parity-checker-service.cljk \
 ;;;     --rust-pool-url http://localhost:8000 \
 ;;;     --staging-pool-url http://localhost:8001 \
 ;;;     --sample-rate 1.0 \

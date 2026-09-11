@@ -142,7 +142,7 @@ Content-Length: 6391
 
 ## RFC 8448 を oracle にした 43 vector
 
-`clojure -M -m tls.report`:
+`kbb -M -m tls.report`:
 
 ```
 RFC8448-SOURCE-SHA256      6564d1376d1ec744fc7a9993da15ebc1b9be361908b166091f47ef605c537fba
@@ -163,7 +163,7 @@ vector は RFC 本文から script が抽出する。**その script は、宣�
 
 ## suite 全体
 
-`b37f912`（当時の main tip）で `clojure -M:test`:
+`b37f912`（当時の main tip）で `kbb -M:test`:
 
 ```
 Ran 77 tests containing 538 assertions.

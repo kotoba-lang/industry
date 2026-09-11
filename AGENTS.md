@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      正本は CLAUDE.md。ここを直しても次の生成で消える。
      規則を足す/直すときは CLAUDE.md を編集し、
-       nbb scripts/gen-agents-md.cljk
+       kbb --backend sci scripts/gen-agents-md.cljk
      を回す。検査は --check（fleet gate root-agents-md-generated）。
      ADR-2609062600. -->
 
@@ -22,7 +22,7 @@
 | 大容量バイナリ | `large-binary-datalad` | 方針 |
 | secrets の在り処 | `secrets-location-map` | 参照のみ |
 
-**規則を足す・直すときはここを編集して `nbb scripts/gen-agents-md.cljk` を回す。**
+**規則を足す・直すときはここを編集して `kbb --backend sci scripts/gen-agents-md.cljk` を回す。**
 **手順や実測を足すときは skill 側に書く** —— ここに測定値を書けば、それは翌週には
 定数として引用される（この文書が繰り返し警告している形）。
 
@@ -39,8 +39,8 @@
   `orgs/<org>/<repo>`）に展開される。topdir は superproject ルート。
 - 大容量データの **DataLad dataset（`m365-archive`）だけは west project にしつつ
   git-annex + Backblaze B2 で実体を扱う**（`userdata.datalad: true` / `datalad`
-  グループに隔離し既定では取得しない）。取得/破棄は `nbb manifest/west_annex.cljk annex-get` /
-  `nbb manifest/west_annex.cljk annex-drop`。詳細は `manifest/README.md`。
+  グループに隔離し既定では取得しない）。取得/破棄は `kbb --backend sci manifest/west_annex.cljk annex-get` /
+  `kbb --backend sci manifest/west_annex.cljk annex-drop`。詳細は `manifest/README.md`。
 
 ```bash
 # 初回
@@ -49,9 +49,9 @@ west init -l manifest
 # ⚠ 引数なしの `west update` は west.yml の全 project を歩く。既定にしない（下記）
 west update --fetch smart <name> [<name> ...]
 # DataLad の実体だけ別途（B2 creds は環境変数）
-west update --group-filter +datalad m365-archive && nbb manifest/west_annex.cljk annex-get
+west update --group-filter +datalad m365-archive && kbb --backend sci manifest/west_annex.cljk annex-get
 # pin を進めたら manifest 再生成（手書き禁止 / CI は --check）
-nbb scripts/gen-west-manifest.cljk
+kbb --backend sci scripts/gen-west-manifest.cljk
 ```
 
 ### pin を動かす・同期する・worktree で west を回す → skill `west-pin-advance`
@@ -86,7 +86,7 @@ west を動かす worktree の作り方は、Skill ツールで `west-pin-advanc
 ## agent 指示は 1 本の正本から生成する — `AGENTS.md` を手で書かない（repo-wide mandatory、2026-09-06、ADR-2609062600）
 
 **`CLAUDE.md` が agent 指示の正本で、`AGENTS.md`（Codex 向け）はそこからの生成物。**
-生成は `nbb scripts/gen-agents-md.cljk`、検査は `--check`（fleet gate
+生成は `kbb --backend sci scripts/gen-agents-md.cljk`、検査は `--check`（fleet gate
 `root-agents-md-generated`）。west.yml と同じ「生成物・手書き禁止」の規律に載せる。
 
 - **規則を足す・直すときは `CLAUDE.md` を編集して生成器を回す。** `AGENTS.md` への
@@ -127,7 +127,7 @@ names remain; new west entries must use the new names only.
 
 **新しい repo に名前を付ける前に、次の順で「どの面か」を決める。**正本は
 `manifest/repository-rules.edn` の `:plane-order`、検査は
-`nbb --classpath ".:scripts/nbb_compat" scripts/verify-repository-roles.cljk --name-audit`。
+`kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-repository-roles.cljk --name-audit`。
 
 | 順 | 面 | 適用条件 | 形 |
 |---|---|---|---|
@@ -450,15 +450,15 @@ Skill ツールで `fleet-ci-gates` を呼ぶ。** ここに残すのは skill �
 **禁じたい経路は「無い」ではなく「拒否して記録する」**（PATH の先頭に stub を置き、
 呼ばれたら log に追記して非ゼロで終わる。そして**その log が空でないことを 1 度は
 見せる** —— 実測 2026-09-06、JVM-free 経路の検証で `amu test` だけが
-`clojure -M:run` に落ちて trace を踏み、それが「trace が何かを検出できる」ことの
+`kbb -M:run` に落ちて trace を踏み、それが「trace が何かを検出できる」ことの
 証拠になった。踏まれたことのない trace は、常に空な trace と区別できない）。
 
 ⚠ **この class を最も安く作れるのは shell である。`$?` は pipe の「最後の」
 コマンドの終了値**なので、次の 1 行は**検査の結果を一度も見ていない**:
 
 ```bash
-timeout 110 nbb scripts/audit.cljs | tail -12; echo EXIT=$?   # ← tail の 0
-timeout 110 nbb scripts/audit.cljs > /tmp/a.log; echo EXIT=$? # ← 検査の値
+timeout 110 kbb --backend sci scripts/audit.cljk | tail -12; echo EXIT=$?   # ← tail の 0
+timeout 110 kbb --backend sci scripts/audit.cljk > /tmp/a.log; echo EXIT=$? # ← 検査の値
 ```
 
 実測 2026-08-22: 上の形が `EXIT=0` を出したが、**監査自体は `timeout` に殺されて
@@ -528,7 +528,7 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   # 吸収（書き込む）。--check は検査のみ、--enforce* は「拒否」スイッチで書き込み
   # スコープではない（実測 2026-08-05: --enforce-repos に自分の変更を渡して
   # FLIP VIOLATION を食らった。scope 外の drift はどのみち吸収される）
-  nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
+  kbb --backend sci --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
     reconcile --db manifest/fleet-db.edn --west manifest/west.yml
   ```
 
@@ -543,7 +543,7 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   ADR-2607300900 で GitHub Actions を撤去。`fleet-projection-verify.yml` は
   murakumo fleet 側に未 port）。当面 `kagami reconcile` は手で回す。**fleet-db / ledger /
   fleet-head.edn を手編集しない**（ledger は追記のみ、head は署名付き）。
-- 並列 sync: `nbb --classpath orgs/kotoba-lang/kagami/src \
+- 並列 sync: `kbb --backend sci --classpath orgs/kotoba-lang/kagami/src \
   orgs/kotoba-lang/kagami/bin/kagami.cljs sync --db manifest/fleet-db.edn \
   --workspace <dir> --names a,b --jobs 8`（pin SHA 直接 fetch、dirty skip）。
 
@@ -616,7 +616,7 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
     「無い」ものとして数日間拒否され続けた。**pin は正しく、tree だけが腐っていた。**
     hook 登録初日の実測でも `kotoba-sema` / `kotoba-native` が pin より遅れていた。
   - **pin 自体の鮮度も同じ hook が出す**（pin が最後に fetch した `origin/main` より
-    遅れていれば行数と `nbb scripts/west-pin-put.cljk <name> HEAD` を示す）。**pin の
+    遅れていれば行数と `kbb --backend sci scripts/west-pin-put.cljk <name> HEAD` を示す）。**pin の
     前進は自動でやらない** —— 到達性検証を伴う書き込みで、共有 checkout からは行わない
     （上記「pin を動かす・同期する」節）。
   - **`checkout` / `west pin` / `repo の main` は 3 つの別物**という既存の規則の、
@@ -640,7 +640,7 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   FF 不可なら停止、rebase しない）。PreToolUse hook `git-push-main-sync-guard.cljs` が強制する。
 - **push / PR 作成・更新の前に、superproject と west の両方を最新化する。** 逐次・省略せず
   `git fetch origin` → `git merge --ff-only origin/main` → `west update --fetch smart` →
-  `nbb scripts/gen-west-manifest.cljk --check` を実行してから push / PR する。
+  `kbb --backend sci scripts/gen-west-manifest.cljk --check` を実行してから push / PR する。
 - **pin の既定状態は「upstream default branch の tip」**（オーナー指示 2026-08-20）。
   「pull して」は 3 つの別物を含む —— (1) superproject を origin/main に合わせる
   (2) pin を各 repo の default branch tip に進める (3) checkout を pin に合わせる。
@@ -705,7 +705,7 @@ DAG-CBOR のリンクは全部 CID なので `ipld/decode` が canonical 再エ�
   コードから原因を推定して 3 回とも外した（legacy catalog / shard フェッチ /
   read そのもの）。当たったのは R2 の実バイトを引いて段階ごとに測ったときだけ。
 - **検出は呼び出し側ではなく codec 側で、形に対して行う。** 検査は
-  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-codec-seq-expansion.cljk --findings orgs`
+  `kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-codec-seq-expansion.cljk --findings orgs`
   （`manifest/orgs-detectors.edn` の `:verify-codec-seq-expansion`）。捕まえるのは
   ①`mapcat` して `partition` で組み直す形 ②バイト列の等価判定のために両辺を
   persistent vector に materialise する形。**報告するのは形であって計測値ではない**
@@ -728,10 +728,10 @@ DAG-CBOR のリンクは全部 CID なので `ipld/decode` が canonical 再エ�
 映らない**。手元に無いことは存在しないことではない。
 
 ```bash
-nbb scripts/repo-search.cljk bitswap libp2p   # 名前 + checkout 済み README 冒頭
-nbb scripts/concept-lookup.cljk terminal      # 概念 → repo（順位付き・有界）
-nbb scripts/concept-lookup.cljk 端末           # 日本語でも引ける
-nbb scripts/concept-lookup.cljk               # 語彙一覧
+kbb --backend sci scripts/repo-search.cljk bitswap libp2p   # 名前 + checkout 済み README 冒頭
+kbb --backend sci scripts/concept-lookup.cljk terminal      # 概念 → repo（順位付き・有界）
+kbb --backend sci scripts/concept-lookup.cljk 端末           # 日本語でも引ける
+kbb --backend sci scripts/concept-lookup.cljk               # 語彙一覧
 ```
 
 **`repo-search` は名前と、checkout 済み repo の README 冒頭の両方に当たる** ——
@@ -745,10 +745,10 @@ library（`noise`、`codebase`、`identify`、`mesh`、`p2p` 等）はこれが�
 
 | 索引 | 何を答えるか | 生成 |
 |---|---|---|
-| `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `nbb scripts/gen-concept-index.cljk` |
-| `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `nbb scripts/gen-surface-index.cljk` |
-| `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `nbb scripts/gen-compliance-scope.cljk` |
-| `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `nbb scripts/gen-dependency-inventory.cljk` |
+| `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `kbb --backend sci scripts/gen-concept-index.cljk` |
+| `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `kbb --backend sci scripts/gen-surface-index.cljk` |
+| `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `kbb --backend sci scripts/gen-compliance-scope.cljk` |
+| `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `kbb --backend sci scripts/gen-dependency-inventory.cljk` |
 
 4 つとも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き。
 いずれも `manifest/edn-query.cljk` の datom 面に載っており、`:concept/repo` /
@@ -853,7 +853,7 @@ Worker 上の agent がそれに従って名指しの path を開くと、**集�
 そこで「無い」と結論しても「全部在る」と結論しても、どちらも誤る。
 
 実測 2026-08-28: 複数の agent が「Kubo を fleet ノードへ curl 取得」「npm の Helia」へ
-いきなり向かい、**この既存実装を見落とした**（`nbb scripts/repo-search.cljk bitswap libp2p`
+いきなり向かい、**この既存実装を見落とした**（`kbb --backend sci scripts/repo-search.cljk bitswap libp2p`
 で一発で見つかる）。既に Kubo が動いている環境との相互運用として残すのはよいが、
 **新規設計の第一候補は `io-libp2p` の native 実装。**
 
@@ -882,7 +882,7 @@ surface 索引は「どのホストがどのパスを出すか」までで、**�
 **統制の写像と SBOM の生成器**: SOC 2 TSC / ISO 27001 Annex A ↔ 手元の証拠の写像は
 `kotoba-lang/security` の `policy/control-crosswalk.edn` +
 `src/kotoba/security/crosswalk.cljc`（現在地は
-`nbb --classpath src scripts/check-crosswalk.cljs`。**設計の証拠は運用の証拠に
+`kbb --backend sci --classpath src scripts/check-crosswalk.cljs`。**設計の証拠は運用の証拠に
 ならない**という不変条件を計算器が持つ ——「写像を埋めても Type II を主張できない」）。SBOM の生成器は
 `cloud-itonami/cloud-itonami-isic-7120-cyberassurance` の `cyberassurance.sbom` ——
 ⚠ **新しく作らない**（domain は `app-sbom`、リリース成果物の仕様は `security` の
@@ -960,7 +960,7 @@ push 直前まで行われなかった。**警告を読むことと同期する�
   `west update` / 読み取りだけ。本体に未コミット編集が転がっていると、並行セッションの
   main 同期のたびに「他人の WIP を stash 温存」が発火して stash が堆積する。
 - **作業は 1 task = 1 branch = 1 worktree（superproject の外、sibling path）。**
-  既定入口は `nbb scripts/root-worktree.cljk create <task>`（ADR-2608291248）。
+  既定入口は `kbb --backend sci scripts/root-worktree.cljk create <task>`（ADR-2608291248）。
   `origin/main` fetch → `--no-checkout` → cone sparse checkout + sparse-index を行い、
   root 23万件を毎回展開しない。ADR/政策は `--profile docs|policy`、追加 directory は
   `--include <path>`。west child が必要なら `--west <name>` を明示し、対象だけを
@@ -981,14 +981,14 @@ push 直前まで行われなかった。**警告を読むことと同期する�
   worktree の作成は sub-second・object store は共有・working tree は再生成物を除けば
   ディスクの 1% 台で、**本当のコストは「着地したのに残る worktree」と「worktree ごとに
   複製される node_modules」の 2 つ**。どちらも機械で消す:
-  - **片付け**: `nbb scripts/worktree-retire.cljk --root . [--apply]` —— 着地済み・clean・
+  - **片付け**: `kbb --backend sci scripts/worktree-retire.cljk --root . [--apply]` —— 着地済み・clean・
     7 日超・idle（lsof の cwd / ps の argv に無い）・unlocked・非 bot の worktree だけを
     `git worktree remove`（`--force` 無し）+ `git branch -d` で撤去し、stale entry を
     prune する。dirty は触らない（git-cleanup-conflict の領分）。lsof が引けなければ
     `REFUSED`（exit 2）。launchd `cloud.itonami.bot.worktree-retire` が日次で `--apply`。
     ⚠ **2026-09-09 実測: この job は install も load もされていない。** 名簿にあることと
     走っていることは別で、この節が書いている日次実行は起きていなかった。
-  - **node_modules は pnpm store 経由で入れる**: `nbb scripts/worktree-node-modules-dedupe.cljk
+  - **node_modules は pnpm store 経由で入れる**: `kbb --backend sci scripts/worktree-node-modules-dedupe.cljk
     --root . [--apply]` が npm lockfile の worktree を `pnpm import` + `.npmrc`
     `node-linker=hoisted` + `pnpm install --frozen-lockfile` に置き換える。pnpm は APFS で
     store から clonefile するので **`du` は減らない。実消費は `df` で測る**（worktree
@@ -1142,7 +1142,7 @@ CertGovernor）。
   | 顔 | 何が起きるか | 防ぎ方 |
   |---|---|---|
   | **unquoted heredoc の中のバッククォート** | shell が**コマンド置換として実行**し、その語がファイルから消える。残りは完全に妥当なコードで、テストは緑のまま | heredoc は必ず `<<'EOF'` と**引用符で閉じる**。変数展開が要るときだけ開き、その塊にバッククォートを入れない |
-  | **一括正規表現の書き換えが docstring / コメントまで当たる** | 文字列の中にキーを差し込んで**その文字列を早期に閉じ**、以降がコードとして読まれる。壊れ方は当たった場所依存なので、動く例を見ても安心できない | 置換後に**必ず読み直す**（compile / reader / `bb test`）。`grep` で件数だけ数えて済ませない |
+  | **一括正規表現の書き換えが docstring / コメントまで当たる** | 文字列の中にキーを差し込んで**その文字列を早期に閉じ**、以降がコードとして読まれる。壊れ方は当たった場所依存なので、動く例を見ても安心できない | 置換後に**必ず読み直す**（compile / reader / `kbb -M:test`）。`grep` で件数だけ数えて済ませない |
   | **データファイルに Clojure の *ソース* イディオムを書く**（2026-09-08） | `.edn` の値として `(str "…" "…")` と書くと、**`edn/read-string` は throw せず**その項目を `PersistentList` として返す。ファイルは読め、件数も合い、目視でも普通に見える —— **文字列を期待している下流だけが静かに壊れる**。EDN に評価は無い、が理由 | reader を通すだけでは足りない。**読んだ値の「型」を assert する**（`string?` / `number?`）。実測: 13 tissue の出典欄がこの形で、`edn/read-string` は 13 件すべてを clean に返していた |
 
   3 つとも「書けた」と「意図どおり書けた」が出力で区別できない。**書き換えたファイルは、
@@ -1158,12 +1158,12 @@ CertGovernor）。
   実測 2026-08-19: その 7 件を解消した 1 時間後に、同じ番号で 8 件目が生まれている。
   slug を含めれば同じ番号でも id は分かれ、`:adr/related` の参照先も一意に決まる
   （既存 1,362 件が既にこの形。bare は 353 / 65）。検査は
-  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-adr-identity.cljk`、
+  `kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-adr-identity.cljk`、
   fleet gate は `root-adr-identity`。**既知の衝突 23 件は据え置きで、表を増やさない**
   —— 新しい衝突は fail させる。
 - **横断 query**:
-  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljk count`
-  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljk q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
+  `kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljk count`
+  `kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljk q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
   属性は datascript.js 向けに **裸文字列**（`"adr/id"`、コロン無し）。
 - **この面は 90-docs だけではない（2026-07-25 拡張、ADR-2607252000）。** 企業データと
   fleet 状態も同じ面に載っており、`:company/lei` を結合キーに **repo を跨いで join
@@ -1187,7 +1187,7 @@ CertGovernor）。
   `:observed`（PDS をアカウント側から数えたもの）は同じ列に見えて出所が違う。
   ```bash
   # 財務 × 法人実体 × ToS を 1 クエリで
-  nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" \
+  kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" \
     manifest/edn-query.cljk q \
     '[:find ?legal ?juris ?rev ?url :where
       [?a "company/lei" ?lei] [?a "source/dataset" "market-intel"] [?a "company/revenue-usd" ?rev]
@@ -1200,7 +1200,7 @@ CertGovernor）。
   この報告を必ず付ける。実例: tos.journal.edn の一部が source 側の破損
   （ToS 本文の未エスケープ引用符でファイルが 1 個の巨大タプルに潰れる）で 0 entity。
 - **schema**: `manifest/schema.edn`（自動生成、手編集禁止）。
-- **検証**: `nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk verify`。
+- **検証**: `kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk verify`。
 - **移行ツール**: `manifest/docs-edn-only.cljk`（`migrate` / `status` / `verify`）。
 - multi-entity catalog（`*.datoms.edn`）は複数 entity のまま、query ローダが全 entity を読む。
 - 新規 ADR は最初から `.kotoba` の S 式 tx-data で書く（`.md` も `.edn` も起こしてから変換しない）。
@@ -1281,7 +1281,7 @@ query 設計をこの前提の上に組み立てた。
    `:adr/superseded-by`、**`CLAUDE.md`（agent 指示の正本）の該当節も同じ commit で**。
    次に読む人は ADR ではなく agent 指示を見るので、片方だけ直すと誤りが残る。
    **`AGENTS.md` は `CLAUDE.md` からの生成物なので直接編集しない** —— `CLAUDE.md` を
-   直して `nbb scripts/gen-agents-md.cljk` を回す（下記「agent 指示は 1 本の正本から
+   直して `kbb --backend sci scripts/gen-agents-md.cljk` を回す（下記「agent 指示は 1 本の正本から
    生成する」節）。
 4. 反証できなかったら、**確かめた事実を規則の隣に足す**（「2026-09-04 に測って
    まだ真」）。次の人が同じ検証を繰り返さずに済む。
@@ -1504,7 +1504,7 @@ application の前提にしない。
 
 機械可読な正本は `manifest/repository-rules.edn` の
 `:workspace-policies :live-service-durable-data`。検査は
-`nbb scripts/verify-kotobase-persistence-policy.cljk`、CI/CD は murakumo fleet の
+`kbb --backend sci scripts/verify-kotobase-persistence-policy.cljk`、CI/CD は murakumo fleet の
 `root-kotobase-persistence-policy` gate。新しい service は README / ADR / config で
 Kotobase の database/ref と block codec を宣言する。
 
@@ -1838,7 +1838,7 @@ diff → verify/query → commit → review/merge → handoff/restart` という
 - protected Git ref / merge queue / single writer を当面の安定した publication として使ってよい。
   ただし分散合意とは呼ばない。分散 agreement が必要な経路は inga ref へ接続する。
 - projection を追加・変更したら
-  `nbb --classpath ".:scripts/nbb_compat" manifest/projection-verify.cljk verify <projection.edn>`
+  `kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/projection-verify.cljk verify <projection.edn>`
   をgateにする。contractはsource commit、input Git hash / annex key / CID、schema/loader hash、
   allowlist済みloader ID（contract由来のargvは禁止）、logical datom hash、任意の
   physical hash、entity countを固定する。loaderはdataset固有schemaとstable identity属性を
@@ -1921,14 +1921,14 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
   で明示的に取得する（既に含まれていれば no-op）。
 - **ツールチェーンは 2026-07-10 に babashka(bb) → nbb(cljs) へ移行済み**（commit
   `b073ea7da12`）。`bb 70-tools/bmc/collect.bb` のような古い記法は存在しない — 正しくは
-  `nbb 70-tools/bmc/collect.cljk` / `nbb 70-tools/bmc/bin/gftd.cljk <args>` /
-  `nbb 70-tools/bmc/run-tests.cljk`。稼働中の cloud routine の中にもこの移行前の古い
+  `kbb --backend sci 70-tools/bmc/collect.cljk` / `kbb --backend sci 70-tools/bmc/bin/gftd.cljk <args>` /
+  `kbb --backend sci 70-tools/bmc/run-tests.cljk`。稼働中の cloud routine の中にもこの移行前の古い
   記法が残っているものがある（`itonami-react-growth-hourly` は 2026-07-12 時点で未修正、
   follow-up）— CCR agent が実行時に自己修復して動いてしまうため気付きにくい。routine の
   prompt を編集する機会があれば直す。
 - **既存 canvas/仮説の有無は `gftd products` / `gftd canvas show --product <p>` /
   `90-docs/business/maturity-scores.edn` で確認できる**（`COM_JUNKAWASAKI_ROOT=<superproject root>
-  nbb 70-tools/bmc/bin/gftd.cljk products` 等）。登録済みなのに daily routine の
+  kbb --backend sci 70-tools/bmc/bin/gftd.cljk products` 等）。登録済みなのに daily routine の
   `--product` ループに載っていないだけ、というギャップが起点になりやすい —
   その場合は新規登録でなく routine の対象リスト追加で足りる。
 - **この共有システムのスコープは `gftdcojp` org の 11 プロダクト**（`gftd products` の
@@ -1983,7 +1983,7 @@ skill を読まなくても効く不変条件だけ。
   ソースからは観測できない。検査は superproject root で:
 
   ```bash
-  nbb scripts/verify-single-page-app.cljk --root . --findings   # 0=clean 1=findings 2=REFUSED
+  kbb --backend sci scripts/verify-single-page-app.cljk --root . --findings   # 0=clean 1=findings 2=REFUSED
   ```
 
   例外は SSR/OG が要る公開ページ（ADR-2606290000）と、生きた credential の隣にある
@@ -2008,7 +2008,7 @@ skill を読まなくても効く不変条件だけ。
 ## repo-wide resource governor（mandatory）
 
 `orgs/` / `projects/` を含む workspace 全体で、高負荷 build は同時 1 本に制限する。
-`shadow-cljs release` / `vite build` / `next build` / `cargo build` / `wash build` 等を
+`amu compile --target wasm32-browser` / `vite build` / `next build` / `cargo build` / `wash build` 等を
 直接起動せず、必ず次を使う（deploy は scope `deploy`）:
 
 ```bash
@@ -2090,7 +2090,7 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
   新規に `bb.edn` / `#!/usr/bin/env bb` を置かない。
 - **`.cljk` を `require` で解決できるのは kbb の engine だけ**（repo-wide mandatory、
   2026-09-11、ADR-2609111700）。stock nbb の classpath 探索は `.cljs` `.cljc` `.clj` 固定で、
-  `nbb x.cljk` は動くが `x.cljk` が `require` する `.cljk` は `Could not find namespace` になる
+  `kbb --backend sci x.cljk` は動くが `x.cljk` が `require` する `.cljk` は `Could not find namespace` になる
   （改名当日、root の PreToolUse hook 9 本中 8 本がこれで落ちた）。engine は
   `kotoba-lang/org-babashka-nbb`（nbb 1.4.208 + 探索順に `.cljk` と衝突綴りを足した fork。
   built `lib/` を commit 済みで JDK も `npm install` も要らない）。**Clojure-shaped `.cljk`
@@ -2105,8 +2105,8 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
 - **`.cljs` の依存宣言は `nbb.edn` に置く。nbb は `deps.edn` も `bb.edn` も読まない**
   （repo-wide mandatory、2026-09-09、ADR-2609093000）。coordinate を `deps.edn` にだけ
   書いた repo は移行できていない —— **壊れていて、しかも全ての道具が成功を報告する**
-  （実測: `DEPS added deps.edn` → `REWROTE 6 files` → `clojure -M:test` 緑 →
-  `nbb tools/gen-tmlanguage.cljs` が `Could not find namespace`。JVM suite は
+  （実測: `DEPS added deps.edn` → `REWROTE 6 files` → `kbb -M:test` 緑 →
+  `kbb --backend sci tools/gen-tmlanguage.cljk` が `Could not find namespace`。JVM suite は
   `deps.edn` を読み `.cljs` を一度も load しないので緑のまま）。
   ⚠ **`:deps` の座標を解決するとき、nbb は babashka を呼ぶ**（2026-09-10 実測）。
   `nbb-deps.jar` を `bb ... uberjar` で組むので、**bb が無い機械では cold cache の
@@ -2134,7 +2134,7 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
   名指していなければ sha を選ばずに拒否する。推測した `:paths` は、正しく見えて何も
   解決しない宣言そのもの。検出は `scripts/verify-nbb-declaration-visible.cljk`
   （`manifest/orgs-detectors.edn`）で、**数えるのは bare な `nbb <file>` の entry point だけ**
-  （`nbb --classpath …` で起動されるファイルは invocation 側で宣言している）。
+  （`kbb --backend sci --classpath …` で起動されるファイルは invocation 側で宣言している）。
 - **Kotoba は safe application language**（ADR-2607201300）。`kotoba/pure` /
   `cell` / `app` / `host` の 4 profile を区別し、新規アプリの product logic・
   workflow・UI reducer・state machine・actor behavior は capability が実装済みなら

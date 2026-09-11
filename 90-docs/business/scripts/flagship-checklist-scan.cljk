@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; flagship-checklist-scan.cljs — read-only diagnostic scanner for the cloud-itonami
 ;; flagship rollout (ADR-2607189300, Wave 5).
 ;;
@@ -77,7 +77,7 @@
 ;;                                        for the full account.
 ;;
 ;; Usage:
-;;   nbb 90-docs/business/scripts/flagship-checklist-scan.cljs \
+;;   kbb --backend sci 90-docs/business/scripts/flagship-checklist-scan.cljk \
 ;;     [--data-root <path>]   ; where orgs/, 90-docs/business/, manifest/ live to READ
 ;;                            ; from (default: cwd). Point this at the superproject's
 ;;                            ; main checkout, since that's normally where orgs/
@@ -503,7 +503,7 @@
   (str
    ";; cloud-itonami-flagship-checklist-scan.edn — GENERATED, DO NOT HAND-EDIT.\n"
    ";; Regenerate with:\n"
-   ";;   nbb 90-docs/business/scripts/flagship-checklist-scan.cljs \\\n"
+   ";;   kbb --backend sci 90-docs/business/scripts/flagship-checklist-scan.cljk \\\n"
    ";;     --data-root <superproject main checkout, where orgs/cloud-itonami is actually\n"
    ";;                  populated -- west-managed, gitignored, NOT present in a fresh\n"
    ";;                  git worktree> --west-yml <freshest manifest/west.yml you have>\n"

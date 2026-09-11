@@ -140,7 +140,7 @@ fleet-refactor-wave）と同型。
 
 ## 検証（このセッションで実測した）
 
-`nbb 70-tools/spotwork/run-tests.cljs` → **43 tests / 122 assertions, 0 fail**。
+`kbb --backend sci 70-tools/spotwork/run-tests.cljk` → **43 tests / 122 assertions, 0 fail**。
 ランナーは実行本数の床（100）を持ち、割ったら **exit 2**（0 でも 1 でもない）で
 終わる —— nbb の `clojure.test/run-tests` は summary を返さない（nil）ので、
 返り値をそのまま可否に使うと 1 本も走らなくても合格になる。

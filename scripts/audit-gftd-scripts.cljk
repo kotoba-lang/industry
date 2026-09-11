@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; ~/.itonami/ のスケジュール実行スクリプトが、この repo の accepted な規約に
 ;; 違反していないかを報告する（読み取り専用。修正はしない）。
 ;;
@@ -23,7 +23,7 @@
 ;;   3. 修正は一切しない。何を直すかは人間が決める。
 ;;
 ;; 使い方:
-;;   nbb scripts/audit-gftd-scripts.cljk
+;;   kbb --backend sci scripts/audit-gftd-scripts.cljk
 ;;   → 違反があれば exit 1（CI/hook に繋ぐ余地を残すが、本 script 自身は繋がない）
 
 (ns audit-gftd-scripts

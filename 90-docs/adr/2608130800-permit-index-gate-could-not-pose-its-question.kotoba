@@ -97,7 +97,7 @@ gate を 1 本も足さずに済む）本物の不変条件を 3 つ足せるの
 
 **答えないもの: 鮮度。** 上流 facts.cljc が動いたことは、root では検出できない。これは
 妥協ではなく、root の tree に入力が無いという事実の帰結である。鮮度は `orgs/` が実在する
-場所で `nbb --classpath \".:scripts\" scripts/gen-permit-index.cljs --check` を回す運用側の
+場所で `kbb --backend sci --classpath \".:scripts\" scripts/gen-permit-index.cljs --check` を回す運用側の
 仕事として残す。**gate は嘘をつけない範囲だけを持つ。**
 
 同型の判断が既に `root-capital-pools` の注記にある —— あちらは「projection contract で

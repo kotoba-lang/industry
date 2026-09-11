@@ -119,8 +119,8 @@ subject=`awai-apex` / scope=`generation` / ttl 90 日として mint し、Worker
 
 ## Verification (2026-07-31)
 
-- `clojure -M:local:test` — 35 tests / 124 assertions / 0 failures
-- `shadow-cljs release app worker` — 0 warnings
+- `kbb -M:local:test` — 35 tests / 124 assertions / 0 failures
+- `amu compile --target wasm32-browser app worker` — 0 warnings
 - ローカル real-Chromium（`scripts/verify-e2e.cljs`）— 19 checks / 0 failures。
   画像ピッカーが live scan で埋まること、OS dark でも light、320px で横スクロール
   無し、空プロンプトで生成ボタンが無効であること（GPU 1 分が誤クリック 1 回の

@@ -155,7 +155,7 @@
 |---|---|
 | `kotoba-lang/senkyo` | 35 tests / 327 assertions green（nbb）。JPN の戸別訪問禁止を `:always` に壊すと **5 件**落ちる |
 | `cloud-itonami-isic-9492` | 45 tests / 192 assertions green、clj-kondo 通過。governor check を外し `:material/screen` を phase 3 の auto に入れると **28 件**落ちる |
-| `cloud-itonami-isic-8411-electoral` | 33 tests / 160 assertions green、clj-kondo 0 errors / 0 warnings。`clojure -M:dev:run` で clean 3 件 + HARD hold 5 件。期限判定を `#{:past}` に縮め台帳登載を auto にすると **7 件**落ちる |
+| `cloud-itonami-isic-8411-electoral` | 33 tests / 160 assertions green、clj-kondo 0 errors / 0 warnings。`kbb -M:dev:run` で clean 3 件 + HARD hold 5 件。期限判定を `#{:past}` に縮め台帳登載を auto にすると **7 件**落ちる |
 
 3 つとも「落ちることを確かめてから landed とする」を通している。
 

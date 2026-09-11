@@ -9,7 +9,7 @@
   (:adr/body
   "## What was run
 
-`nbb scripts/verify-namespace-collisions.cljs --all`, twice on 2026-08-13
+`kbb --backend sci scripts/verify-namespace-collisions.cljk --all`, twice on 2026-08-13
 (22.8m and 14.1m wall; the spread is other agents on this machine, not the
 corpus). 4,045 checked-out repos, 5,438 declared source trees, 16,406 file
 paths in 16,374 namespaces.
@@ -175,11 +175,11 @@ owner: retire the west entry for `kotoba-lang/rdf-canon`?** No consumer moves.
 `network-awai/cloud-itonami` does the same, putting
 `../../kotoba-lang/authentication/src` straight on its `:paths`.
 
-Measured with `clojure -Spath` in `local-itonami`: `org-openid-oidc/src` is at
+Measured with `kbb -Spath` in `local-itonami`: `org-openid-oidc/src` is at
 position 8, `.gitlibs/.../kotoba-lang/oidc/.../src` at 15. org-openid-oidc
 wins. Then reproduced directly:
 
-    $ clojure -M -e \"(require 'authentication.adapters.external-factors)\"
+    $ kbb -M -e \"(require 'authentication.adapters.external-factors)\"
     Syntax error compiling at (authentication/adapters/external_factors.cljc:147:19).
     No such var: oidc/verify-once
 

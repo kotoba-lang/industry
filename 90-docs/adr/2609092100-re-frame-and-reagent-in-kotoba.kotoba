@@ -84,7 +84,7 @@ caller-supplied text is a 400.
                          (reagent_core 15, reframe_core 24)
   guest_acceptance.cljs  14 checks against the EMITTED ESM, nbb, JVM-free
   reframe_worker_...cljs 10 checks against workerd over HTTP
-  clojure -M:test        91 tests / 1158 assertions, the whole shitsuke suite
+  kbb -M:test        91 tests / 1158 assertions, the whole shitsuke suite
 
 Each of the four was broken on purpose once and the RIGHT check went red:
 `child` stopped appending (2 of 15 red, all three targets), `fx-effect`

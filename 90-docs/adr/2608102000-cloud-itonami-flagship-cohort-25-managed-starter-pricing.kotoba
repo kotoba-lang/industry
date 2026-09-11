@@ -311,7 +311,7 @@ workflow ではない** —— そこから推移的に辿れば書き忘れは�
 
 gate は使い捨て workspace に `orgs/<org>/<repo>` の形で tree を置き（`:local/root` が
 `../../<org>/<x>` と `../<x>` の 2 形なので深さ 2 が要る）、deps.edn を推移的に辿って
-足りない依存を clone し、`clojure -M:dev:render-html` を回し、実行前後の sha256 を
+足りない依存を clone し、`kbb -M:dev:render-html` を回し、実行前後の sha256 を
 突き合わせる。
 
 **実装中に踏んだ罠 2 つ（どちらも「相対パスを、それが書かれている場所から解決する」
@@ -446,14 +446,14 @@ gate を緑にするには `manifest/projection-verify.cljs` の contract 方式
 ### 次の agent への resume point
 
 1. **本番 tick を `--dry-run` 無しで通す**（landing / commit status / CD が未検証）。
-   `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem nbb scripts/fleet-ci/tick.cljs --only cloud-itonami-isic-9522`
+   `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem kbb --backend sci scripts/fleet-ci/tick.cljk --only cloud-itonami-isic-9522`
 2. **31 本を同時に回したときの負荷を測る**（maven 解決の初回が重いはず）。
-   `nbb scripts/fleet-ci/tick.cljs --all --dry-run`
+   `kbb --backend sci scripts/fleet-ci/tick.cljk --all --dry-run`
 3. **6399 / 6310 / 7810 の publisher 経路**。live データを取る再生成なので drift gate
    では表現できず、「実行して commit する」仕組みが要る。この 3 本の夜間更新は
    2026-08-04 から止まったままである。
 4. **gate を 1 本でも足したら、必ず「壊して赤くなる」ことを見てから landed とする。**
-   無改変で `nbb scripts/fleet-ci/gates/itonami-regenerate.cljs orgs/cloud-itonami/cloud-itonami-isic-9522 --org cloud-itonami` が exit 0、
+   無改変で `kbb --backend sci scripts/fleet-ci/gates/itonami-regenerate.cljk orgs/cloud-itonami/cloud-itonami-isic-9522 --org cloud-itonami` が exit 0、
    committed な生成物を 1 セル手編集した copy に対して exit 1 になることを実際に見る。
 
 **この作業では、壊れていることが 3 回とも「実行するまで見えなかった」。**

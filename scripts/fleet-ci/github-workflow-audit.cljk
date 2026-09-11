@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; github-workflow-audit.cljs — workspace 中の .github/workflows/*.yml を全部
 ;; パースして受理判定にかけ、**fleet でそのまま実行できるものが何本あるか**を
 ;; 実測する。
@@ -6,7 +6,7 @@
 ;; 設計判断のための計器であって gate ではない。「既存 workflow をそのまま
 ;; murakumo で使えるか」に対して、感想ではなく数で答えるために置く。
 ;;
-;;   nbb --classpath scripts/fleet-ci scripts/fleet-ci/github-workflow-audit.cljk
+;;   kbb --backend sci --classpath scripts/fleet-ci scripts/fleet-ci/github-workflow-audit.cljk
 ;;   ... --root orgs/kotoba-lang        # 範囲を絞る
 ;;   ... --show-unsupported 40          # 落ちた理由の内訳を出す
 (ns fleet-ci.github-workflow-audit

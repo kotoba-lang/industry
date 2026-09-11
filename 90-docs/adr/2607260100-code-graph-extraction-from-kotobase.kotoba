@@ -72,10 +72,10 @@ wave）に載る。
 
 # Gates（2026-07-26 実測）
 
-- `clojure -M -m kotoba.security.adoption` → `:pass`（`:consumer/id :code-graph`）。
+- `kbb -M -m kotoba.security.adoption` → `:pass`（`:consumer/id :code-graph`）。
   `security-adoption.edn` は entrypoint を `code-graph.core [kotoba.security.effect]`、
   sensitive-operation を `code-graph.core/revoke-pin!` として新 ns で再宣言。
-- `clojure -M:test` → 16 tests / 58 assertions / 0 failures / 0 errors。
+- `kbb -M:test` → 16 tests / 58 assertions / 0 failures / 0 errors。
 
 # Consequences
 

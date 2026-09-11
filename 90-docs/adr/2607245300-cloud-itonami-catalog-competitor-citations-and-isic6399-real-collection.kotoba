@@ -38,8 +38,8 @@ Two owner requests in one session, on the public-facing cloud-itonami surfaces:
 
 ## Verification
 
-- `clojure -M:dev:test`: 101 tests / 350 assertions, 0 failures (added `jobsearchops.ingest-test`, extended `jobsearchops.registry-test` and `jobsearchops.governor-contract-test` with RANGE-shape coverage, including 2 new end-to-end tests running a fresh RANGE-shaped posting through the real actor via `:posting/ingest` -> `:jurisdiction/assess` -> `:posting/publish`).
-- `clojure -M:lint`: 0 errors, 0 warnings.
+- `kbb -M:dev:test`: 101 tests / 350 assertions, 0 failures (added `jobsearchops.ingest-test`, extended `jobsearchops.registry-test` and `jobsearchops.governor-contract-test` with RANGE-shape coverage, including 2 new end-to-end tests running a fresh RANGE-shaped posting through the real actor via `:posting/ingest` -> `:jurisdiction/assess` -> `:posting/publish`).
+- `kbb -M:lint`: 0 errors, 0 warnings.
 - `web/verify_search.cljs` (demo-mode fixtures) and `web/verify_operator.cljs` (`postings.example.edn`, the original EXACT-shape operator path): unchanged pass, confirming backward compatibility -- demo-mode output (`live-index 2, delisted 1, held 7, ledger 22 facts`) and `postings.example.edn` output (`live-index 2, held 2`) are byte-for-byte identical to pre-change behavior.
 - Real end-to-end: 3,913 real, currently-open postings collected from 18 companies; 727 carry a genuine disclosed wage and publish through the real actor with 0 governor holds (displayed range mirrors source verbatim); the remaining 3,186 correctly stay unpublished pending wage verification. Nightly `regenerate-board` workflow confirmed green via manual `workflow_dispatch` after each of the 4 merges this ADR covers.
 

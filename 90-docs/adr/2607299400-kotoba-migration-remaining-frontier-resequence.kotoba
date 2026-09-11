@@ -1372,7 +1372,7 @@ Still open:
 
 - kotoba-lang#352 MERGED (`e2ed38cf`): **T2.3** pure-product examples living
   contract — `examples/pure-product-examples.edn` + runner
-  `clojure -M:pure-product-examples` + CI job. 4 examples / 10 KIR cases.
+  `kbb -M:pure-product-examples` + CI job. 4 examples / 10 KIR cases.
   ADR-reliability-t23. (ADR 0188 was runner-half only.)
 - west pin kotoba-lang → e2ed38cf.
 
@@ -2227,7 +2227,7 @@ Still open:
     `scram-credential-allowlist` limits
   - Restore `postgresql-interop` harness (removed ADR-2607266000 Phase B
     without replacement — residual was this hole)
-  - Proven: `clojure -M:postgresql-interop` → **SCRAM-SHA-256-PLUS ok**
+  - Proven: `kbb -M:postgresql-interop` → **SCRAM-SHA-256-PLUS ok**
     (ephemeral PG 17, TLS, tx/prepared/portal/copy/batch/pool/cancel/rotation)
   Evidence: contract+tender 81/302; live interop success.
 - west pin kototama → 000b987d.

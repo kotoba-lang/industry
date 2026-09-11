@@ -1,6 +1,6 @@
 ;; App Store Connect API 読み取り専用クエリ。
 ;; 既存の ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8 で ES256 JWT を作る。
-;; 使い方: nbb asc-query.cljs <path>   例: /v1/apps?limit=200
+;; 使い方: kbb --backend sci asc-query.cljk <path>   例: /v1/apps?limit=200
 (ns asc-query
   (:require [clojure.string :as str]
             ["crypto" :as crypto]

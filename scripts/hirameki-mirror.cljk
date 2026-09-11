@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; hirameki-mirror.cljs — 特許 corpus の**第 2 の耐久コピー**を B2 に置き、
 ;; 置いた直後に**復元して確かめる**。ADR-2608100400 の custody 穴。
 ;;
@@ -20,7 +20,7 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" \
 ;;     scripts/hirameki-mirror.cljk
 ;;   ... --dry-run     鍵の解決と bundle 作成まで（アップロードしない）
 ;;   ... --keep 10     B2 に残す世代数（既定 8）

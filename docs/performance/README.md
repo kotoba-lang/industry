@@ -20,8 +20,8 @@ npm run benchmark-compile -- --runs 5 \
   --output "$KOTOBA_ROOT/90-docs/performance/runs/$(date +%Y-%m-%d)/compile.json"
 
 # Tender comparison (needs kototama checkout)
-nbb scripts/kotoba-tender-benchmark.cljk --runs 3 --date $(date +%Y-%m-%d)
-# Worktree without orgs/: KOTOTAMA_ROOT=/path/to/kototama nbb scripts/kotoba-tender-benchmark.cljk ...
+kbb --backend sci scripts/kotoba-tender-benchmark.cljk --runs 3 --date $(date +%Y-%m-%d)
+# Worktree without orgs/: KOTOTAMA_ROOT=/path/to/kototama kbb --backend sci scripts/kotoba-tender-benchmark.cljk ...
 ```
 
 Record host load before running (`sysctl -n vm.loadavg`). Contended hosts inflate
@@ -46,9 +46,9 @@ Machine index: `90-docs/performance/performance.datoms.edn`.
 `2026-08-26-judah-quiet` JSON matches `performance.datoms.edn`. Local check:
 
 ```bash
-nbb scripts/verify-kotoba-stack-performance.cljk --root .
+kbb --backend sci scripts/verify-kotoba-stack-performance.cljk --root .
 # With amu checkout and load < 4, also re-run benchmarks:
-nbb scripts/verify-kotoba-stack-performance.cljk --root . --live
+kbb --backend sci scripts/verify-kotoba-stack-performance.cljk --root . --live
 ```
 
 Amu-local detail (methodology, kernel_wide caveats): `orgs/kotoba-lang/amu/docs/performance.md`.

@@ -49,7 +49,7 @@ Condition 1's three, with the numbers that expose them:
 is run. That is the right question for the runner and it is correctly answered:
 `org-ietf-deflate`'s runner covers all of its portable tests. But the repo also
 holds two `.clj` test namespaces, which no ClojureScript host can run, and which
-`clojure -M:test` does run. Moving that gate to `:nbb-test` would leave those two
+`kbb -M:test` does run. Moving that gate to `:nbb-test` would leave those two
 namespaces run by nobody, while the receipt still said `Ran N tests`.
 
 Condition 1 — identical `Ran N tests containing M assertions` under both runtimes —

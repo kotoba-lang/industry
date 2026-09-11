@@ -19,7 +19,7 @@
 ;; a genuinely surplus delimiter at the very end of a file is harmless and is
 ;; reported as such rather than as an error.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-locate-break.cljk <file>...
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/docs-edn-locate-break.cljk <file>...
 (ns docs-edn-locate-break
   (:require ["fs" :as fs]
             [clojure.edn :as edn]

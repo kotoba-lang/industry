@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; plane-view.cljs — 事前計算した view を読むだけの最小スクリプト。
 ;;
 ;; `manifest/edn-query.cljk view <name>` と答えは同じ。違うのは**何をコンパイル
@@ -14,8 +14,8 @@
 ;; view を作るのは refresh の仕事（`manifest/edn-query.cljk refresh`）。ここは読むだけ。
 ;;
 ;; Run:
-;;   nbb scripts/plane-view.cljk <name>
-;;   nbb scripts/plane-view.cljk --list
+;;   kbb --backend sci scripts/plane-view.cljk <name>
+;;   kbb --backend sci scripts/plane-view.cljk --list
 
 (ns plane-view
   (:require ["fs" :as fs]
@@ -36,7 +36,7 @@
               ;; backend は west 管理の orgs/kotoba-lang/datalog に在り、それが
               ;; datom.source を require する。正本は edn-query.cljs の
               ;; `classpath` var（実測 2026-09-06、ここは 2 項目を印字していた）。
-              "  build them: nbb --classpath \".:scripts/nbb_compat"
+              "  build them: kbb --backend sci --classpath \".:scripts/nbb_compat"
               ":orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src\" "
               "manifest/edn-query.cljk refresh"))
         (.exit js/process 4))

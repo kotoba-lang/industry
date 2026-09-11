@@ -35,8 +35,8 @@
    "cloud-itonami/kintai (22 tests / 68 assertions)"))
 
   (:adr/verify
-  (vector "cd orgs/kotoba-lang/{psa,shift,worklaw} && clojure -M:test && clojure -M:lint"
-   "cd orgs/cloud-itonami/{tehai,kintai} && clojure -M:test && clojure -M:lint"))
+  (vector "cd orgs/kotoba-lang/{psa,shift,worklaw} && kbb -M:test && kbb -M:lint"
+   "cd orgs/cloud-itonami/{tehai,kintai} && kbb -M:test && kbb -M:lint"))
 
   (:adr/decision-summary
   (vector "D1: library 3 本 + actor 2 本に分ける。psa（値付け）・shift（打刻機構）・worklaw（法定制限）を別 repo にし、actor は tehai（PSA）・kintai（勤怠）"

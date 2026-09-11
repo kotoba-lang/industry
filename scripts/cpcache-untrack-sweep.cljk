@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; cpcache-untrack-sweep.cljs
 ;; `.cpcache/`（Clojure の classpath キャッシュ）を child repo の tracked content
 ;; から外し、同時に `.gitignore` へ `.cpcache/` を足す。
@@ -34,10 +34,10 @@
 ;;   - working tree には一切触らない。
 ;;
 ;; usage:
-;;   nbb scripts/cpcache-untrack-sweep.cljk                 ; dry-run
-;;   nbb scripts/cpcache-untrack-sweep.cljk --execute
-;;   nbb scripts/cpcache-untrack-sweep.cljk --execute --max 5
-;;   nbb scripts/cpcache-untrack-sweep.cljk --execute --names adnet,com-bafin
+;;   kbb --backend sci scripts/cpcache-untrack-sweep.cljk                 ; dry-run
+;;   kbb --backend sci scripts/cpcache-untrack-sweep.cljk --execute
+;;   kbb --backend sci scripts/cpcache-untrack-sweep.cljk --execute --max 5
+;;   kbb --backend sci scripts/cpcache-untrack-sweep.cljk --execute --names adnet,com-bafin
 
 (require '[scripts.nbb-compat :as io :refer [sh format]]
          '[clojure.string :as str])

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/fleet-hf-cache-prune.cljk — keep every fleet node's HuggingFace cache
 ;; inside the retention policy of ADR-2608139600: **drop what has not been read
 ;; in N days (default 30), then cap the cache at G GB (default 50)**.
@@ -30,10 +30,10 @@
 ;;     （手作業版はこれで 3 ノードを取りこぼした）
 ;;
 ;; usage:
-;;   nbb scripts/fleet-hf-cache-prune.cljk --check          ;; 報告のみ（既定）
-;;   nbb scripts/fleet-hf-cache-prune.cljk --apply          ;; 実際に削除する
-;;   nbb scripts/fleet-hf-cache-prune.cljk --days 30 --cap-gb 50
-;;   nbb scripts/fleet-hf-cache-prune.cljk --hosts a,b      ;; 対象を絞る
+;;   kbb --backend sci scripts/fleet-hf-cache-prune.cljk --check          ;; 報告のみ（既定）
+;;   kbb --backend sci scripts/fleet-hf-cache-prune.cljk --apply          ;; 実際に削除する
+;;   kbb --backend sci scripts/fleet-hf-cache-prune.cljk --days 30 --cap-gb 50
+;;   kbb --backend sci scripts/fleet-hf-cache-prune.cljk --hosts a,b      ;; 対象を絞る
 ;;
 ;; exit: 0 = 全ノード policy 内 / 1 = 違反あり（--check 時）/ 2 = 測れなかった
 

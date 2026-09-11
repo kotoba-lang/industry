@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-silent-js-callbacks.cljk
 ;;
 ;; `letfn` siblings handed to a JS callback BY NAME. Under nbb/SCI the callback
@@ -20,7 +20,7 @@
 ;;          It is a portability hazard: the day the suite moves to nbb, the
 ;;          handler silently disappears rather than failing to compile.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-silent-js-callbacks.cljk [root…]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-silent-js-callbacks.cljk [root…]
 ;;   ... --self-test   run the fixtures (both directions) and stop
 ;;   ... --findings    emit FINDING<TAB>sev<TAB>key<TAB>detail lines
 ;;

@@ -158,7 +158,7 @@
    git fetch && git checkout agent/cljs-parity-harness-wip
    # guard の lock 解放を内側で待つこと。1 回試して諦めると空振りを成功と誤読する
    for i in $(seq 1 60); do out=$(node <root>/scripts/resource-guard.mjs run build -- \\
-     clojure -M:test 2>&1); echo \"$out\" | grep -q 'already running' && sleep 45 || break; done
+     kbb -M:test 2>&1); echo \"$out\" | grep -q 'already running' && sleep 45 || break; done
    ```
    **緑にしてから merge すること。** 現時点の赤は `:thread-kit` の divergence 1 件で、
    それは backend の欠陥なので register を足して消してはならない。

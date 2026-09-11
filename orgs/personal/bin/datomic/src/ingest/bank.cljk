@@ -3,7 +3,7 @@
    langgraph-clj StateGraph: fetch → parse → classify → reconcile → transact。
    Source = mail/messages/*.eml (mail-sync 済ローカル; 銀行ログインなし ADR-0015)。
    Output = mail/bank-txns.jsonl (derived, 決定的ソート; warehouse.load が txn datoms 化)。
-   Run: clojure -M -m ingest.bank"
+   Run: kbb -M -m ingest.bank"
   (:require [langgraph.graph :as g]
             [clojure.data.json :as json]
             [clojure.java.io :as io]

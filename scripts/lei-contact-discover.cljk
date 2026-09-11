@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-contact-discover.cljs — read-only discovery of a company's OWN published
 ;; general contact address / inquiry form for the cloud-itonami-lei-<LEI> repos,
 ;; written back into each repo's blueprint.edn (git stays the source of truth;
@@ -26,7 +26,7 @@
 ;; work to do is not a job for a rebuildable cache. See scripts/lei_catalog.cljk.
 ;;
 ;; Run (from the superproject root):
-;;   nbb --classpath scripts scripts/lei-contact-discover.cljk [--limit N] [--dry-run] [--concurrency N]
+;;   kbb --backend sci --classpath scripts scripts/lei-contact-discover.cljk [--limit N] [--dry-run] [--concurrency N]
 
 (ns lei-contact-discover
   (:require ["fs" :as fs]

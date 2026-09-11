@@ -34,13 +34,13 @@
                      (:injection-separation-sqlstate "22P02")))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "named prepare; two successful reuses; SQLSTATE 22P02 separation; close; exit 0"))
     (map (:cwd "orgs/kotoba-lang/kotoba")
      (:command "targeted kotoba.transport-component-test")
      (:result "10 tests, 49 assertions; provider and prepared consumer compile; exit 0"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "121 tests, 459 assertions; bounded negative fixtures; exit 0"))))))
   (:adr/body
   "# ADR-2607196400: Bounded PostgreSQL named prepared statements

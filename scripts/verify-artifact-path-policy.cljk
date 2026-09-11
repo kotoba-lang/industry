@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-artifact-path-policy.cljk — enforce a DataLad dataset's own
 ;; `index/policy.edn` allowlist of path shapes.
 ;;
@@ -15,7 +15,7 @@
 ;; declaring a policy is opt-in, breaking one is not.
 ;;
 ;; Usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-artifact-path-policy.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-artifact-path-policy.cljk
 ;;   nbb ... scripts/verify-artifact-path-policy.cljk --names tsukuru-manufacturing-artifacts
 ;;
 ;; Exit 1 if any annexed file in a policied dataset matches no allowed shape.

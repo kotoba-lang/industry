@@ -224,8 +224,8 @@ llama-server を `127.0.0.1` に固定して接続するので、**モデルの�
 再起動待ち。再起動すれば +64 t/s で約 320 t/s になる。
 
 **再起動の前提条件は満たした** —— LaunchDaemon 化により ollama は再起動後に自力で
-戻る。ただし両ノードには他の長期プロセス（`serve.py` 65 日 / `bb -m tomoshibi.daemon`
-31 日）があり、こちらは復帰手段が未確認。`nbb server.cljs` は LaunchDaemon 管理下
+戻る。ただし両ノードには他の長期プロセス（`serve.py` 65 日 / `kbb -m tomoshibi.daemon`
+31 日）があり、こちらは復帰手段が未確認。`kbb --backend sci server.cljk` は LaunchDaemon 管理下
 なので自動復帰する。
 
 ## Consequences — 測れなかったことを緑にしない（ADR-2608136000 の再演）

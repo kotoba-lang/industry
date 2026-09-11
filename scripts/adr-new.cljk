@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/adr-new.cljk — allocate an ADR id and create its file atomically.
 ;;
 ;; Why this exists: on 2026-07-25 two concurrent sessions both created an ADR
@@ -22,7 +22,7 @@
 ;; spellings the way adr-ledger-append.cljs does.
 ;;
 ;; Usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/adr-new.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-new.cljk \
 ;;     --slug my-decision-slug --title "タイトル" [--status draft] \
 ;;     [--id-style bare|prefixed] [--id 2607252100]
 ;;
@@ -107,7 +107,7 @@
       style (or (arg argv "--id-style") "bare")
       forced (arg argv "--id")]
   (when (or (str/blank? slug) (str/blank? title))
-    (die "usage: nbb scripts/adr-new.cljk --slug <slug> --title \"...\" [--status draft] [--id-style bare|prefixed] [--id <id>]"))
+    (die "usage: kbb --backend sci scripts/adr-new.cljk --slug <slug> --title \"...\" [--status draft] [--id-style bare|prefixed] [--id <id>]"))
   (when-not (#{"bare" "prefixed"} style)
     (die "--id-style must be bare or prefixed"))
   (let [taken (taken-keys)]

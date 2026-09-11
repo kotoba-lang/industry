@@ -74,7 +74,7 @@
  ;; flips: none of the four tranche statuses changed, because none was wrong.
  {:date "2026-09-09"
   :chicory-sweep-2026-09-09
-  {:command "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
+  {:command "kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
    :registered-checkouts 4780
    :files-scanned 39794
    :files-naming-chicory 25
@@ -174,7 +174,7 @@
      record has always left to its owner."}}
 
   :chicory-sweep
-  {:command "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
+  {:command "kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
    :registered-checkouts 4270
    :files-scanned 38341
    :files-naming-chicory 24
@@ -248,6 +248,6 @@
    state, not the current one; T2 remains :open, correctly."}
 
  :cutover/verification
- {:inventory "nbb --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
-  :adr-inventory "nbb --classpath '.:scripts/nbb_compat' scripts/verify-adr-freshness.cljs"
-  :adr-strict "nbb --classpath '.:scripts/nbb_compat' scripts/verify-adr-freshness.cljs --strict"}}
+ {:inventory "kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/verify-kotoba-wasm-runtime-cutover.cljs"
+  :adr-inventory "kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/verify-adr-freshness.cljs"
+  :adr-strict "kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/verify-adr-freshness.cljs --strict"}}

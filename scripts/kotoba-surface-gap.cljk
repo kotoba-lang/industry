@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; What does this .cljc call that safe Kotoba does not admit?
 ;;
 ;; Peeling one rejection at a time answers "what fails first", which is not the
@@ -7,7 +7,7 @@
 ;; vocabulary read out of the compiler's own frontend and the language
 ;; authority.
 ;;
-;;   nbb scripts/kotoba-surface-gap.cljk <file-or-dir>... \
+;;   kbb --backend sci scripts/kotoba-surface-gap.cljk <file-or-dir>... \
 ;;     --frontend <kotoba-sema>/src/kotoba/compiler/frontend.cljc \
 ;;     --grammar  <kotoba-lang>/lang/guest-grammar.edn \
 ;;     [--stdlib  <kotoba-lang>/lang/stdlib/core.kotoba]

@@ -4,7 +4,7 @@
   - **正本 = kagi item `seedance-key`（compartment `personal`）**。取得は
     `orgs/kotoba-lang/kagi/bin/kagi get seedance-key`。
   - 使うときは値を直接扱わず
-    `nbb scripts/provision-seedance-key.cljs run -- <cmd>`（`orgs/network-awai/cloud-murakumo`）
+    `kbb --backend sci scripts/provision-seedance-key.cljk run -- <cmd>`（`orgs/network-awai/cloud-murakumo`）
     経由にする。`check` / `verify`（**課金せずに** fal 側で有効性だけ確認）も同スクリプト。
   - **live の消費先**: gad の `/etc/murakumo-generation.env`（mode 600 root、
     `SEEDANCE_API_KEY=`）→ systemd `murakumo-generation.service`。ここに無いと

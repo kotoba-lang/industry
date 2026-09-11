@@ -69,7 +69,7 @@ CLAUDE.md は既に「分岐を作る前に local を remote に同期する」�
 PreToolUse hook が `git worktree add` / `checkout -b` を止める。**私はその規則を
 守っていた** —— 全ての branch は `origin/main` から明示的に切った。
 
-塞がっていないのは**検査を走らせる**経路である。`nbb scripts/foo.cljs` は git コマンド
+塞がっていないのは**検査を走らせる**経路である。`kbb --backend sci scripts/foo.cljk` は git コマンド
 ではないので hook は見ない。そして検査は「分岐」ではないので、同期の規則が自分に
 当たるとは読まれない。
 

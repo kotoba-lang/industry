@@ -1,14 +1,14 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns make-consumable
   "Make ONE kotoba-lang library consumable: name its :local/root siblings by git
   coordinate, VERIFY, then commit deps.edn on main.
 
   usage:
-    nbb scripts/make-consumable.cljk <repo>              ; dry-run (verify only)
-    nbb scripts/make-consumable.cljk <repo> --execute    ; verify, then commit
+    kbb --backend sci scripts/make-consumable.cljk <repo>              ; dry-run (verify only)
+    kbb --backend sci scripts/make-consumable.cljk <repo> --execute    ; verify, then commit
 
   VERIFICATION IS THE POINT, and it is done the way the defect is defined rather than by
-  reading the diff. `clojure -Spath` needs nothing but deps.edn, so the rewritten file is
+  reading the diff. `kbb -Spath` needs nothing but deps.edn, so the rewritten file is
   dropped into an EMPTY directory and resolved there -- which is exactly the situation a
   forker is in, and exactly the situation the workspace never reproduces. Nothing is
   committed unless that resolves.
@@ -96,7 +96,7 @@
 (def probe (str "/tmp/consumable-probe/" repo))
 (sh (str "rm -rf " probe " && mkdir -p " probe))
 (fs/writeFileSync (str probe "/deps.edn") next-text)
-(def spath (sh (str "cd " probe " && timeout 300 clojure -Spath")))
+(def spath (sh (str "cd " probe " && timeout 300 kbb -Spath")))
 
 (if-not (:ok spath)
   (do (println repo ": REFUSED — classpath does not resolve standalone")
@@ -114,7 +114,7 @@
                      "gitlibs directory, where nothing of the sort exists. This repository is published\n"
                      "to be forked, and a forker's first command failed.\n\n"
                      "Verified the way the defect is defined: deps.edn alone in an empty directory,\n"
-                     "where `clojure -Spath` now resolves. The workspace never reproduces that\n"
+                     "where `kbb -Spath` now resolves. The workspace never reproduces that\n"
                      "situation, which is why nothing here failed before.\n\n"
                      "Siblings pinned at their current default-branch HEAD.\n\n"
                      "Part of the sweep measured by scripts/consumability-audit.cljk (85 libraries).")

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; d1-ingest-cloud-itonami-lei.cljs — load every public `cloud-itonami-lei-<LEI>`
 ;; repo (blueprint.edn + 80-data/public/tos.journal.edn, the git-authoritative
 ;; source) into the Cloudflare D1 database `cloud-itonami-lei-catalog`.
@@ -19,7 +19,7 @@
 ;; cross-checked against each other while kotobase stabilises.
 ;;
 ;; Run (from the superproject root):
-;;   nbb scripts/d1-ingest-cloud-itonami-lei.cljk [--local]
+;;   kbb --backend sci scripts/d1-ingest-cloud-itonami-lei.cljk [--local]
 ;;
 ;; Idempotent: every write is an upsert on the natural key (LEI for a company,
 ;; LEI+source_url for a document), so re-running converges rather than

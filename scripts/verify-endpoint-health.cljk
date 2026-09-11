@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-endpoint-health
   "Call the endpoints this workspace promises to serve, and report what they
   actually return.
@@ -50,7 +50,7 @@
        or the controls failed. NEVER conflated with 0.
 
   usage:
-    nbb scripts/verify-endpoint-health.cljk [<root>] [--findings] [--all]
+    kbb --backend sci scripts/verify-endpoint-health.cljk [<root>] [--findings] [--all]
                                             [--only <id>] [--cheap-only]
 
     --all         ignore :every-hours and run every probe

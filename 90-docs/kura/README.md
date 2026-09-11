@@ -27,11 +27,11 @@ metadata plane exists not to be.
 
 ```bash
 # resume the ingest (skips keys already present)
-nbb --classpath "src:script:../kura/src:../erasure/src:../merkle-sum/src:../sigv4/src" \
+kbb --backend sci --classpath "src:script:../kura/src:../erasure/src:../merkle-sum/src:../sigv4/src" \
     script/ingest_shiropico.cljs
 
 # verify + repair every stored object against its receipt
-nbb --classpath "src:script:..." script/repair_shiropico.cljs
+kbb --backend sci --classpath "src:script:..." script/repair_shiropico.cljs
 ```
 
 Both read and write `/tmp/shiropico-receipts.json`, so copy this file there first.

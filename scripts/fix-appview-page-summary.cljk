@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/fix-appview-page-summary.cljk — rewrite the landing page's embedded
 ;; summary from the wrangler config it claims to report.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/fix-appview-page-summary.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/fix-appview-page-summary.cljk \
 ;;     [--root <orgs-bearing checkout>] [--only <repo path>] [--write]
 ;;
 ;; Dry-run by default. `--write` edits files and nothing else: it does not stage,

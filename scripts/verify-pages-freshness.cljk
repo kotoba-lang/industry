@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-pages-freshness.cljs — 公開されている GitHub Pages が、その repo の
 ;; default branch より何 commit 前に建てられたものかを数える。
 ;;
-;;   nbb scripts/verify-pages-freshness.cljk [--findings] [--org <name>]... [--limit N]
+;;   kbb --backend sci scripts/verify-pages-freshness.cljk [--findings] [--org <name>]... [--limit N]
 ;;
 ;; ## なぜ要るか（2026-09-08 に 1 日で 2 件、実測）
 ;;

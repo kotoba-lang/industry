@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-spec-var-claims — spec files that name a var, checked against the
 ;; branch other people actually get.
 ;;
@@ -44,7 +44,7 @@
 ;; That is how the first draft of this measurement concluded all four claims
 ;; were missing. Every pattern below is a JS regex, evaluated in-process.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-spec-var-claims.cljk [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-spec-var-claims.cljk [--findings]
 ;;
 ;; Exit: 0 clean, 1 findings, 2 could not answer (no claims parsed, or no
 ;; default ref resolvable — never reported as clean).

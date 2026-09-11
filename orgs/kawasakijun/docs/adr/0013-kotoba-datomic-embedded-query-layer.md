@@ -8,7 +8,7 @@
 
 ## Context
 
-これまで M365 事実層の L3 クエリ層は **JVM の `com.datomic/local`** で、`clojure -M:run`
+これまで M365 事実層の L3 クエリ層は **JVM の `com.datomic/local`** で、`kbb -M:run`
 の**別プロセス・オンデマンド再構築**だった。manimani(Tauri/Rust)アプリ本体は Datomic を
 一切叩かず、JSONL を Rust で直読みしていた(ADR-0012 で正直に記録済み)。
 

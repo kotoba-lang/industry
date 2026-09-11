@@ -8,7 +8,7 @@
   Invoked by `bin/render.cljs --view board`.
 
   Usage:
-    nbb bin/render.cljs --view board --state FILE [--out FILE] [--width N] [--height N]
+    kbb --backend sci bin/render.cljk --view board --state FILE [--out FILE] [--width N] [--height N]
                         [--baseline FILE] [--diff-out FILE] [--threshold N]
 
   Acceptance: the injected cash / returned / phase must appear in the HUD.
@@ -74,7 +74,7 @@
   "Ensure preview/board.html exists (no engine required)."
   []
   (println "  building preview/board.html (no WebGL engine)")
-  (cp/execSync "npx nbb preview/build_board.cljs"
+  (cp/execSync "kbb --backend sci preview/build_board.cljk"
                #js {:cwd here :stdio "inherit"}))
 
 (defn- content-type [p]

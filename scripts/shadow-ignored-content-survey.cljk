@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Survey of GITIGNORED content across the 249 shadow checkouts, and a revised
 ;; three-way ranking.
 ;;
-;;   nbb scripts/shadow-ignored-content-survey.cljk
-;;   nbb scripts/shadow-ignored-content-survey.cljk --out FILE.edn
-;;   nbb scripts/shadow-ignored-content-survey.cljk --limit 20        ; sample
-;;   nbb scripts/shadow-ignored-content-survey.cljk --root /path/to/superproject
+;;   kbb --backend sci scripts/shadow-ignored-content-survey.cljk
+;;   kbb --backend sci scripts/shadow-ignored-content-survey.cljk --out FILE.edn
+;;   kbb --backend sci scripts/shadow-ignored-content-survey.cljk --limit 20        ; sample
+;;   kbb --backend sci scripts/shadow-ignored-content-survey.cljk --root /path/to/superproject
 ;;
 ;; READ-ONLY. Every git call is `status`; nothing is fetched, written, moved or
 ;; deleted. No `--depth` fetch is issued anywhere -- a worktree shares

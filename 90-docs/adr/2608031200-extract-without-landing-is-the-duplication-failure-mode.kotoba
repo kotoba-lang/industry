@@ -34,9 +34,9 @@
   (:adr/artifact
   (vector "kotoba-lang/merkle-lsm の分割着地: kotobase-peer b9ac18de（原本 2 ns + 3 test ns 削除、全 referrer を repoint）／ root bdffc71e（west pin）"
    "kotoba-lang/datalog の revert 追随: datalog 9db84106（ordered-driver 系 3 def と q の ordered 分岐、index/values-for-predicate、limit_pushdown_test を削除）／ root 456be319（west pin）"
-   "検証 kotobase-peer: clojure -M:test 227 tests / 675 assertions 0 failures（分割前 271/840、merkle-lsm 側 44/165 — 差分が厳密に一致）"
+   "検証 kotobase-peer: kbb -M:test 227 tests / 675 assertions 0 failures（分割前 271/840、merkle-lsm 側 44/165 — 差分が厳密に一致）"
    "検証 kotobase-peer: npm run test:cljs 230 tests / 926 assertions 0 failures（repo 境界を実際に跨ぐ object-store-worker-test を含む）"
-   "検証 datalog: clojure -M:test 79 tests / 127 assertions 0 failures、clojure -M:lint 0 errors / 0 warnings、arrangement.datalog と定義レベルで完全一致"
+   "検証 datalog: kbb -M:test 79 tests / 127 assertions 0 failures、kbb -M:lint 0 errors / 0 warnings、arrangement.datalog と定義レベルで完全一致"
    "後続（別セッション）: arrangement 096523fb で arrangement.datalog を compatibility shim 化 — query layer の複製は解消済み"))
 
   (:adr/verify

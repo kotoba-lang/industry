@@ -44,15 +44,15 @@ Phase 2 (separate commits) consumes the existing solvers via :local/root instead
 ## Consequences
 
 - A single integration entry point now exists for whole-body biomechanics simulation.
-- Phase 1 is zero-dep so the tissue domain + closed-form references stand alone (CI stays simple: clojure -X:test only).
+- Phase 1 is zero-dep so the tissue domain + closed-form references stand alone (CI stays simple: kbb -X:test only).
 - Phase 2 reuses existing solver repos rather than rebuilding their numerics (consume, do not rebuild).
 - Tissue-property data is representative only; README and :source fields disclaim clinical use.
 - Phase 2 CI clones each dependency as a sibling (kotoba-lang/host ci.yml pattern).
 
 ## Verification
 
-- clojure -X:test — 15 tests / 40 assertions, 0 failures
-- clojure -M:lint — 0 errors / 0 warnings
+- kbb -X:test — 15 tests / 40 assertions, 0 failures
+- kbb -M:lint — 0 errors / 0 warnings
 - GitHub repo: https://github.com/kotoba-lang/biomech
 - west pin verification: biomech 2929c86 is reachable from kotoba-lang/biomech main (gen-west-manifest --entry biomech verified OK)
 - west.yml diff is biomech-only: 5 insertions, 0 other pin changes
@@ -61,9 +61,9 @@ Phase 2 (separate commits) consumes the existing solvers via :local/root instead
   (:adr/decision "Create kotoba-lang/biomech (public). Phase 1 zero-dep: kotoba.biomech.tissue (tissue-property data, representative literature values), kotoba.biomech.osteo (Euler-Bernoulli closed-form bone mechanics), kotoba.biomech.muscle (1-D lumped mass-spring-damper with active contractile element). Phase 2 consumes fea/kami-vehicle/kami-engine-cfd/kami-engine via :local/root. 3-D rendering stays in kami-engine (3D mandate). Tissue numbers are population-scale representative ranges with :source provenance, not patient-specific.")
   (:adr/consequences
   (vector "whole-body biomechanics now has a single integration entry point"
-   "Phase 1 zero-dep keeps CI simple (clojure -X:test only)"
+   "Phase 1 zero-dep keeps CI simple (kbb -X:test only)"
    "Phase 2 reuses existing solver numerics rather than duplicating them (consume, do not rebuild)"
    "tissue-property data is representative only; README and :source fields disclaim clinical use"
    "Phase 2 CI clones dependencies as siblings (host ci.yml pattern)"))
-  (:adr/verification "clojure -X:test: 15 tests / 40 assertions, 0 failures. clojure -M:lint: 0 errors / 0 warnings. GitHub: https://github.com/kotoba-lang/biomech. west pin 2929c86 reachable from kotoba-lang/biomech main (gen-west-manifest --entry biomech OK). west.yml diff biomech-only (5 insertions, 0 other pin changes).")
+  (:adr/verification "kbb -X:test: 15 tests / 40 assertions, 0 failures. kbb -M:lint: 0 errors / 0 warnings. GitHub: https://github.com/kotoba-lang/biomech. west pin 2929c86 reachable from kotoba-lang/biomech main (gen-west-manifest --entry biomech OK). west.yml diff biomech-only (5 insertions, 0 other pin changes).")
   (:adr/related (vector "kotoba-lang/fea" "kotoba-lang/kami-vehicle" "kotoba-lang/kami-engine-cfd" "kotoba-lang/kami-engine" "kotoba-lang/character"))))

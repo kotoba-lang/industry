@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; SessionStart フック: **セッションが読み"通す" checkout を、west pin に合わせる。**
 ;;
 ;; なぜ要るか (2026-09-09, ADR-2609092500):
@@ -36,7 +36,7 @@
 ;; stdout に書く: `.claude/settings.json` の SessionStart 登録は `2>/dev/null`
 ;;   を付けるので、stderr に書くと黙って消える。
 ;;
-;; 手動実行: `nbb .claude/hooks/session-start-toolchain-pin-sync.cljk [<root>]`
+;; 手動実行: `kbb --backend sci .claude/hooks/session-start-toolchain-pin-sync.cljk [<root>]`
 ;;           `--dry-run` を渡すと測るだけで checkout しない。
 
 (require '[clojure.string :as str])
@@ -213,7 +213,7 @@
             (doseq [r stale-pins]
               (println (str "  · " (:name r) ": the PIN is " (:stale-pin r)
                             " commit(s) behind the last-fetched origin/main"
-                            " — advance it with `nbb scripts/west-pin-put.cljk " (:name r) " HEAD`")))
+                            " — advance it with `kbb --backend sci scripts/west-pin-put.cljk " (:name r) " HEAD`")))
             (when (and (empty? synced) (empty? blocked) (empty? stale-pins))
               (println (str "toolchain pin sync: " measured " checkout(s) already at their west pin"
                             (when (= :working-tree (:source m))

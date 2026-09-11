@@ -10,8 +10,8 @@
 With `verify-appview-page-summary` answering again (ADR-2608196900) and reporting
 296 findings, the next step was the repair path the detector advertises:
 
-    nbb scripts/gen-appview-page-summary.cljs --names <repo>          ; dry run
-    nbb scripts/gen-appview-page-summary.cljs --names <repo> --apply
+    kbb --backend sci scripts/gen-appview-page-summary.cljk --names <repo>          ; dry run
+    kbb --backend sci scripts/gen-appview-page-summary.cljk --names <repo> --apply
 
 Run exactly as documented, it said:
 

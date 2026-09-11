@@ -41,7 +41,7 @@ It is not a regression and not the environment. Discriminated four ways:
 | `tiny.kotoba` -> aarch64-macos | nbb | ok |
 | `kernel_deep.kotoba` -> wasm32 | nbb | ok |
 | `kernel_deep.kotoba` -> aarch64-macos | nbb | **internal compiler error** |
-| `kernel_deep.kotoba` -> aarch64-macos | JVM (`clojure -M:run`) | ok, 6986 B kexe, 964 B extracted |
+| `kernel_deep.kotoba` -> aarch64-macos | JVM (`kbb -M:run`) | ok, 6986 B kexe, 964 B extracted |
 
 Reproduced at amu `f403ed29` (main) and at `27d69898` (iteration 31's own
 pin), on judah and on the workstation. `--jvm-free` fails identically, so

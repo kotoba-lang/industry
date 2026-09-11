@@ -1,15 +1,15 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 90-docs/aliexpress-sedori/append.cljs — append-only writer for
 ;; observations-ledger.edn (one EDN map per line, :event/seq monotonic).
 ;; Mirrors scripts/adr-ledger-append.cljs's lock + verify discipline: do NOT
 ;; hand-edit the ledger file, only append through this script.
 ;;
 ;; Usage:
-;;   nbb --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/append.cljs \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/append.cljs \
 ;;     --batch /path/to/batch.edn
 ;;   (batch.edn is a vector of event maps, no :event/seq — assigned here)
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/append.cljs --verify
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/append.cljs --verify
 ;;
 ;; How batches actually get produced (read before scheduling anything): there
 ;; is no unattended scraper feeding this. Measured 2026-07-25
@@ -194,8 +194,8 @@
       verify (verify!)
       (not (str/blank? batch)) (append-batch! batch)
       :else
-      (do (println "usage: nbb 90-docs/aliexpress-sedori/append.cljs --batch <path-to-edn-vector-of-events>")
-          (println "       nbb 90-docs/aliexpress-sedori/append.cljs --verify")
+      (do (println "usage: kbb --backend sci 90-docs/aliexpress-sedori/append.cljk --batch <path-to-edn-vector-of-events>")
+          (println "       kbb --backend sci 90-docs/aliexpress-sedori/append.cljk --verify")
           (exit 1)))))
 
 (apply -main *command-line-args*)

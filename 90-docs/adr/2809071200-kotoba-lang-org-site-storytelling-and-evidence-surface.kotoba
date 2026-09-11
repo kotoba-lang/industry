@@ -77,6 +77,6 @@ Costs accepted: the libraries page is 844 KB raw (100 KB gzipped) because the ca
    against `git -C orgs/kotoba-lang/kotoba-lang show origin/main:site/dist/index.html | shasum -a 256`.
    To rebuild the site (grammar pin must match site/dependencies.edn):
      JP_GO_DDS_ROOT=../jp-go-digital-design-system KOTOBA_GRAMMAR_ROOT=../grammar \\
-     nbb --classpath \"site/src:../grammar/src:../jp-go-digital-design-system/src:../css/src:../html/src\" site/generate.cljs
+     kbb --backend sci --classpath \"site/src:../grammar/src:../jp-go-digital-design-system/src:../css/src:../html/src\" site/generate.cljs
    To refresh the repository catalogue and push topics, follow site/README.md 'Refresh the snapshot'.
    The next honest improvement is gap 3: a kbb ops script that refreshes site/library-catalog.edn and reconciles GitHub topics, so the tag vocabulary and the org cannot drift.")))

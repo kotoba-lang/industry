@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gen-orgs-gitignore.cljs
 ;; manifest/west.yml の `path:` 群から .gitignore の生成ブロックを作る。
 ;;
@@ -20,8 +20,8 @@
 ;;   重複する行が残っても gitignore では無害）。
 ;;
 ;; 使い方:
-;;   nbb scripts/gen-orgs-gitignore.cljk            ; .gitignore を更新
-;;   nbb scripts/gen-orgs-gitignore.cljk --check    ; 差分があれば exit 1（CI 用）
+;;   kbb --backend sci scripts/gen-orgs-gitignore.cljk            ; .gitignore を更新
+;;   kbb --backend sci scripts/gen-orgs-gitignore.cljk --check    ; 差分があれば exit 1（CI 用）
 ;;
 ;; 注意: tracked file には gitignore は効かない（git の仕様）。superproject に
 ;; 誤って commit された west checkout は、この生成ブロックでは静かにならない —
@@ -48,7 +48,7 @@
    "# この対応を壊さないこと — 未登録 orphan が見えることが"
    "# scripts/west-orphan-audit.cljk と対になる検出シグナルになっている。"
    "#"
-   "# 再生成: nbb scripts/gen-orgs-gitignore.cljk（--check で CI 検証）"])
+   "# 再生成: kbb --backend sci scripts/gen-orgs-gitignore.cljk（--check で CI 検証）"])
 
 (defn west-paths
   "west.yml から `      path: orgs/...` を拾って sort-unique した seq。"
@@ -94,7 +94,7 @@
       check?
       (do (println (str "STALE: .gitignore が west.yml と一致しない（west paths "
                         (count paths) " 件）。"
-                        "`nbb scripts/gen-orgs-gitignore.cljk` で再生成せよ"))
+                        "`kbb --backend sci scripts/gen-orgs-gitignore.cljk` で再生成せよ"))
           (js/process.exit 1))
 
       :else

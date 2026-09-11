@@ -198,7 +198,7 @@ identity は repo でなく **product 単位** で `80-data/system/artificial-or
 
 ## Implementation (実測、2026-07-28 初回生成)
 
-`nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --workspace <root>`
+`kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --workspace <root>`
 — 3,817 west project (datalad 除く) を 12 秒でスキャンし 5,311 entity を生成。
 
 runtime 面 `:repo/kind`: lib 1625 / actor 1107 / absent 430 / organisation-record 323 /
@@ -252,7 +252,7 @@ west project 名のプレーンなリストを stdout に出し、`west update <
 
 投影を捨てた根拠は 3 つとも実測 (2026-07-28):
 
-1. **`nbb scripts/gen-west-manifest.cljs --check` は main 上で既に STALE。**
+1. **`kbb --backend sci scripts/gen-west-manifest.cljk --check` は main 上で既に STALE。**
    groups を足すために全体再生成すると pin が **ローカル working HEAD** から
    書き直される — CLAUDE.md が記録する『1 件の登録のつもりが壊れた pin を 44 件
    main に流した』事故 (`90852b86`) と同じ経路になる。
@@ -325,5 +325,5 @@ ISCO(person) × actor × maturity = 340、taxonomy × maturity の path 重な�
   (:adr/generator "scripts/repo-taxonomy.cljs")
   (:adr/selector "scripts/repo-taxonomy-select.cljs")
   (:adr/artifact "manifest/repo-taxonomy.edn")
-  (:adr/verify "nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>")
+  (:adr/verify "kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>")
   (:source/dataset "adr")))

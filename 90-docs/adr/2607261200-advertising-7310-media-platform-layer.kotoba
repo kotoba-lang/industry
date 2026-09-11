@@ -27,7 +27,7 @@
   (:adr/deliberately-absent (vector "https://support.google.com/adspolicy/answer/6008942 (google-ads — URL は実在確認済みだが未読のため catalog に入れない)"
                             "https://transparency.meta.com/policies/ad-standards/ (meta-ads — 同上)"
                             "Microsoft Advertising policies (同上)")),
-  (:adr/verification "clojure -M:dev:test → 57 tests / 220 assertions, 0 failures 0 errors (変更前は 30 tests / 127 assertions)。clojure -M:lint → errors 0（既存の未使用 css var 警告 1 件のみ、本変更とは無関係）。clojure -M:dev:run で媒体側 6 hold + 法域側 4 hold の実発火を確認。docs/samples/operator-console.html を再生成し 10 種の hold reason が実描画されることを確認。"),
+  (:adr/verification "kbb -M:dev:test → 57 tests / 220 assertions, 0 failures 0 errors (変更前は 30 tests / 127 assertions)。kbb -M:lint → errors 0（既存の未使用 css var 警告 1 件のみ、本変更とは無関係）。kbb -M:dev:run で媒体側 6 hold + 法域側 4 hold の実発火を確認。docs/samples/operator-console.html を再生成し 10 種の hold reason が実描画されることを確認。"),
   (:adr/body
   "## Context
 

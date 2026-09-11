@@ -27,7 +27,7 @@
      :worktree/size-note "実体はビルド成果物 — target/ 78M + mobile/ 67M"
      :worktree/state :landed
      :worktree/evidence "git rev-list --count origin/main..codex/ios-device-registration-20260908 => 0"
-     :worktree/removed-by "nbb scripts/worktree-retire.cljk --only ~/github/worktrees --min-age-days 1 --apply"
+     :worktree/removed-by "kbb --backend sci scripts/worktree-retire.cljk --only ~/github/worktrees --min-age-days 1 --apply"
      :worktree/tool-verdict "RETIRE (landed, clean, 2.1d)"
      :worktree/branch-disposition "git branch -d（ツールが安全削除）"}
 

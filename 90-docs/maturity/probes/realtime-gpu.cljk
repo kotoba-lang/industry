@@ -32,7 +32,7 @@
       (nil? receipt)
       (println "PROBE realtime-gpu UNMEASURABLE"
                (str "受領書が無いか読めない（" receipt-file "）—— "
-                    "nbb --classpath \".:scripts/nbb_compat\" scripts/threed-gpu-receipt.cljs で作る"))
+                    "kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/threed-gpu-receipt.cljs で作る"))
       (not= head (:receipt/revision receipt))
       (println "PROBE realtime-gpu UNMEASURABLE"
                (str "受領書は別の revision のもの（受領書 "

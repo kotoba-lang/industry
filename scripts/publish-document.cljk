@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Publish one app document to BOTH byte planes, and prove both of them serve it.
 ;;
-;;   nbb --classpath ".:orgs/kotoba-lang/content-address/src" \
+;;   kbb --backend sci --classpath ".:orgs/kotoba-lang/content-address/src" \
 ;;       scripts/publish-document.cljk <file> --manifest <path> [--id <id>] [--dry-run]
 ;;
 ;; There are two stores and they are not interchangeable (ADR-2609092600):
@@ -83,7 +83,7 @@
   (let [cli "orgs/kotoba-lang/content-address/bin/content_address.cljk"
         _ (when-not (.existsSync fs cli)
             (die 2 (str "UNANSWERED — kotoba-lang/content-address is not checked out at " cli)))
-        cmd (str "nbb --classpath .:orgs/kotoba-lang/content-address/src " cli
+        cmd (str "kbb --backend sci --classpath .:orgs/kotoba-lang/content-address/src " cli
                  " publish " file " --manifest " manifest-path
                  (when id (str " --id " id))
                  (when dry? " --dry-run"))

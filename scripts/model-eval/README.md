@@ -9,14 +9,14 @@ Bot全体のモデル設定を変更するものではない。出力はレビ�
 
 ```bash
 # superproject rootで実行。表示だけなら認証情報は不要。
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-plan ja 100000
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-plan ja 1000000
+kbb --backend sci --classpath scripts/model-eval scripts/model-eval/bench.cljk language-plan ja 100000
+kbb --backend sci --classpath scripts/model-eval scripts/model-eval/bench.cljk language-plan ja 1000000
 
 # 入力は文字列値だけのJSON。公開原文を20キー・1500 UTF-8バイト以下に分割する。
 # OPENROUTER_API_KEYは既存の認証環境から渡す。値をログやファイルに書かない。
-BENCH_OUT=/tmp/public-translation-receipts nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk translate ja public-source.json 1000000 --public-input
+BENCH_OUT=/tmp/public-translation-receipts kbb --backend sci --classpath scripts/model-eval scripts/model-eval/bench.cljk translate ja public-source.json 1000000 --public-input
 
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-self-test
+kbb --backend sci --classpath scripts/model-eval scripts/model-eval/bench.cljk language-self-test
 ```
 
 月間出力100万token未満は通常量、それ以上は大量生成という**運用上の初期値**。
@@ -39,7 +39,7 @@ JSON形、符号・数値・通貨・URL・placeholderの個数、最低限の�
 再検査例（HTTP成功・stop・構造/固定語すべてを要求する）:
 
 ```bash
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-check 90-docs/reports/language-models-20260909/evaluations-v2.json 90-docs/reports/language-models-20260909/sample.json
+kbb --backend sci --classpath scripts/model-eval scripts/model-eval/bench.cljk language-check 90-docs/reports/language-models-20260909/evaluations-v2.json 90-docs/reports/language-models-20260909/sample.json
 ```
 
 調査正本: `90-docs/reports/260909-language-model-cost-usage.edn`。
@@ -55,10 +55,10 @@ PASS/FAIL を取り、速度と文脈上限は ollama が返す実測値だけ�
 
 ```bash
 ssh -N -L 11435:127.0.0.1:11434 judah &
-nbb --classpath . bench.cljs speed  <model>   # decode / prefill を 3 回
-nbb --classpath . bench.cljs tasks  <model>   # 15 問を実行して pass/fail
-nbb --classpath . bench.cljs needle <model>   # 4K/16K/32K の retrieval
-nbb --classpath . bench.cljs ctx    <model>   # num_ctx を上げて GPU 常駐と実 decode
+kbb --backend sci --classpath . bench.cljs speed  <model>   # decode / prefill を 3 回
+kbb --backend sci --classpath . bench.cljs tasks  <model>   # 15 問を実行して pass/fail
+kbb --backend sci --classpath . bench.cljs needle <model>   # 4K/16K/32K の retrieval
+kbb --backend sci --classpath . bench.cljs ctx    <model>   # num_ctx を上げて GPU 常駐と実 decode
 ```
 
 | 環境変数 | 既定 | 用途 |

@@ -163,12 +163,12 @@
 
    ## 検証の再現
 
-   - wallet: `clojure -M:test`（40 tests / 103 assertions / 0 failures）
-   - kagi: `clojure -M:test`（244 tests / 888 assertions / 0 failures、exit code は
+   - wallet: `kbb -M:test`（40 tests / 103 assertions / 0 failures）
+   - kagi: `kbb -M:test`（244 tests / 888 assertions / 0 failures、exit code は
      リダイレクト後の検査コマンド自身から採取）
-   - saifu: `clojure -M:test`（23 tests / 117 assertions / 0 failures。cosmjs ベクタの
+   - saifu: `kbb -M:test`（23 tests / 117 assertions / 0 failures。cosmjs ベクタの
      再生成は test/saifu/cosmjs_oracle.cljs — nbb + npm、CI では走らない）
-   - cloud-itonami-app: `clojure -M:test`（1853 tests / 11038 assertions / 0 failures）")
+   - cloud-itonami-app: `kbb -M:test`（1853 tests / 11038 assertions / 0 failures）")
 
   (:adr/alternatives
   "**新しい wallet repo を起こす**: wallet / saifu / kagi の 3 分担が既に在り、欠けて

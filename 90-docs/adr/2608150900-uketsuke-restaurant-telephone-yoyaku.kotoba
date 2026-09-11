@@ -331,7 +331,7 @@ confirm 側は yotei に、**それぞれ独立したテストを置いた**。
 
 **動かない**: 電話が鳴ること。**残っているのはキャリア契約だけ**（アカウント・番号・
 支払い・本人確認。安全床①②によりオーナーの手が要る）と、fleet への配備
-（whisper-server 常駐化 + `clojure -M:media` を公開 ingress に載せる）。
+（whisper-server 常駐化 + `kbb -M:media` を公開 ingress に載せる）。
 
 ### 応答遅延（実測、合成音声に対する上限値）
 
@@ -460,15 +460,15 @@ WebCrypto。これは Kotoba の弱点ではなく**境界の置き方**であ�
 
 ```bash
 # 予約の経路が壊れていないこと（3 repo）
-cd orgs/cloud-itonami/yotei    && clojure -M:test      # 170 tests
-cd orgs/cloud-itonami/denwaban && clojure -M:test      # 98 tests（socket 込み）
-cd orgs/kotoba-lang/koe        && clojure -M:test      # 49 tests
+cd orgs/cloud-itonami/yotei    && kbb -M:test      # 170 tests
+cd orgs/cloud-itonami/denwaban && kbb -M:test      # 98 tests（socket 込み）
+cd orgs/kotoba-lang/koe        && kbb -M:test      # 49 tests
 
 # fleet 側の STT（levi に常駐させる）
 ssh levi 'nohup whisper-server -m ~/.whisper/models/ggml-large-v3-turbo.bin --host 127.0.0.1 --port 8178 -l ja -t 4 &'
 
 # 台詞を書き出してから socket を上げる
-cd orgs/cloud-itonami/denwaban && clojure -M:serifu resources/serifu && clojure -M:media 1344
+cd orgs/cloud-itonami/denwaban && kbb -M:serifu resources/serifu && kbb -M:media 1344
 ```
 
 ## 代替案として退けたもの

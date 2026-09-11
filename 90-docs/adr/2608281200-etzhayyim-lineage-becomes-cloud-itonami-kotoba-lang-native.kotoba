@@ -167,7 +167,7 @@ browser」)以降は**偽**。base-l2 は pre-CLJS 版を 2 ヶ月 pin し続け
   JVM 側は `(- BigInteger BigInteger)` が `clojure.lang.BigInt` に昇格し radix
   `.toString` を持たない(テストが赤で検出)
 
-検証(主張ではなく実測): `clojure -M:test` 30 tests / 106 assertions、
+検証(主張ではなく実測): `kbb -M:test` 30 tests / 106 assertions、
 `nbb` 11 tests / 64 assertions、いずれも 0 failures。cljs 側は**同じ `.cljc`
 suite を同じ viem 生成ベクタに対して**走らせている。空振りでないことも実証:
 負値 fold を壊すと 3 failures、head/tail offset を壊すと 7 failures、runner の

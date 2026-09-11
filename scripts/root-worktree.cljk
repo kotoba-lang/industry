@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; root-worktree.cljs — west-managed root の軽量 worktree を安全に作る。
 ;;
 ;; 既定は full checkout ではない。origin/main から branch を作り、root の履歴/object
@@ -9,10 +9,10 @@
 ;; は、この script からは構造的に発生しない。
 ;;
 ;; usage:
-;;   nbb scripts/root-worktree.cljk create <task> [options]
-;;   nbb scripts/root-worktree.cljk inspect <path>
-;;   nbb scripts/root-worktree.cljk remove <path>
-;;   nbb scripts/root-worktree.cljk --self-test
+;;   kbb --backend sci scripts/root-worktree.cljk create <task> [options]
+;;   kbb --backend sci scripts/root-worktree.cljk inspect <path>
+;;   kbb --backend sci scripts/root-worktree.cljk remove <path>
+;;   kbb --backend sci scripts/root-worktree.cljk --self-test
 ;;
 ;; options:
 ;;   --profile minimal|docs|policy|full   default: minimal
@@ -402,10 +402,10 @@
 
 (defn- usage! []
   (println "usage:")
-  (println "  nbb scripts/root-worktree.cljk create <task> [options]")
-  (println "  nbb scripts/root-worktree.cljk inspect <path>")
-  (println "  nbb scripts/root-worktree.cljk remove <path>")
-  (println "  nbb scripts/root-worktree.cljk --self-test"))
+  (println "  kbb --backend sci scripts/root-worktree.cljk create <task> [options]")
+  (println "  kbb --backend sci scripts/root-worktree.cljk inspect <path>")
+  (println "  kbb --backend sci scripts/root-worktree.cljk remove <path>")
+  (println "  kbb --backend sci scripts/root-worktree.cljk --self-test"))
 
 (defn -main [& args]
   (let [args (vec args)]

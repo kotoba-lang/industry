@@ -22,7 +22,7 @@ cleanup-land.cljs dry-run: 走査 4,285 checkout (うち .git がファイル 9)
 
 ## 処分した PR (fleet の DO-NOT-MERGE は 0 になった)
 
-- cloud-itonami/cloud-itonami-app#122 closed —— 現 origin/main へ実際に merge して compile した結果 3 つの欠陥。(1) kotoba.user-test / kotoba.kgraph が classpath に無い (clojure -Spath で 0 hit)、branch も足していない (2) 追加された test namespace 3 本が cloud.itonami.app.test-runner に登録されておらず、-M:test は何も走らせずに exit 1 (3) (1)(2) を patch した先で No such var: agent-control/browser-snapshot! —— git grep --all と git log -S の双方でこの var は repo のどの ref・どの commit にも定義が無く、存在するのは救出ファイルの呼び出し側 1 箇所だけ。書かれなかった関数を呼ぶ未完成 WIP。
+- cloud-itonami/cloud-itonami-app#122 closed —— 現 origin/main へ実際に merge して compile した結果 3 つの欠陥。(1) kotoba.user-test / kotoba.kgraph が classpath に無い (kbb -Spath で 0 hit)、branch も足していない (2) 追加された test namespace 3 本が cloud.itonami.app.test-runner に登録されておらず、-M:test は何も走らせずに exit 1 (3) (1)(2) を patch した先で No such var: agent-control/browser-snapshot! —— git grep --all と git log -S の双方でこの var は repo のどの ref・どの commit にも定義が無く、存在するのは救出ファイルの呼び出し側 1 箇所だけ。書かれなかった関数を呼ぶ未完成 WIP。
 - cloud-itonami/yabai-actor#7 closed —— mergeable=false/dirty。superseded ではない (main は日付が新しいのにカーソルは 6 ログとも手前) が、CT ログは公開 append-only なので再ハーベストで回復する生成データ。
 - kotoba-lang/toshokan#15 closed —— mergeable=false/dirty、45 behind、main が大半を再ハーベスト済み。
 

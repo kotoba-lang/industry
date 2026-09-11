@@ -38,7 +38,7 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 70-tools/bmc/bin/gftd allocate md                     # portfolio-allocation.edn 再生成
 70-tools/bmc/bin/gftd allocate write                  # 配分結果を governor 経由で ledger へ記録（任意）
 70-tools/bmc/bin/gftd ledger show --tail 20
-nbb 70-tools/bmc/run-tests.cljk                       # tests
+kbb --backend sci 70-tools/bmc/run-tests.cljk                       # tests
 ```
 
 スコア（ADR-2607021700）: BMC 成熟度 = completeness/hypothesis/validation
@@ -91,20 +91,20 @@ ADR-2607021600）。
 ## 実測収集（collect.cljs, ADR-2607021800）
 
 ```bash
-nbb 70-tools/bmc/collect.cljk      # Cloudflare/Stripe/health → 90-docs/business/metrics/*.edn
+kbb --backend sci 70-tools/bmc/collect.cljk      # Cloudflare/Stripe/health → 90-docs/business/metrics/*.edn
 # creds: env CF_API_TOKEN / STRIPE_SECRET_KEY → Keychain gftd.cf / 1Password
 ```
 
 `collect.cljs` requires `gftd.traffic` (see below), so it needs `70-tools/bmc/src`
 on the nbb classpath. The superproject root `nbb.edn` already lists it
 (`{:paths ["." "scripts/nbb_compat" "70-tools/bmc/src" "70-tools/bmc/test"]}`),
-so invoking `nbb 70-tools/bmc/collect.cljk` from the **superproject root** works
+so invoking `kbb --backend sci 70-tools/bmc/collect.cljk` from the **superproject root** works
 with no extra flags. If you invoke it from anywhere else (a different cwd, a
 cron wrapper, a LaunchAgent `WorkingDirectory` that isn't the repo root), pass
 the classpath explicitly:
 
 ```bash
-nbb --classpath "70-tools/bmc/src:70-tools/bmc/test:." 70-tools/bmc/collect.cljk
+kbb --backend sci --classpath "70-tools/bmc/src:70-tools/bmc/test:." 70-tools/bmc/collect.cljk
 ```
 
 business を回す 1 運転 = `collect.cljs` → 各 product `react loop` → `canvas md --all` → `score md` → commit。

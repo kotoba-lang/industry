@@ -130,8 +130,8 @@ Competition and Consumer Act 2010）を追加。**AUS には disclosure basis �
 export GOOGLE_ADS_DEVELOPER_TOKEN=... GOOGLE_ADS_ACCESS_TOKEN=... \\
        GOOGLE_ADS_CUSTOMER_ID=... GOOGLE_ADS_LOGIN_CUSTOMER_ID=...
 cd orgs/cloud-itonami/cloud-itonami-isic-7310
-clojure -M:buy --campaign campaign-10 --live      # まずこれ。実アカウント・PAUSED・課金ゼロ
-clojure -M:buy --campaign campaign-10 --live --spend --max-spend-jpy 50000
+kbb -M:buy --campaign campaign-10 --live      # まずこれ。実アカウント・PAUSED・課金ゼロ
+kbb -M:buy --campaign campaign-10 --live --spend --max-spend-jpy 50000
 ```
 
 **中段を先に回すこと。** 認証情報・2 段階作成・Governor 経路を全部通しつつ課金

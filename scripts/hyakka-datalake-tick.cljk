@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; hyakka-datalake-tick.cljs — hyakka の台帳を R2 Data Catalog に追従させる。
 ;;
-;;     nbb scripts/hyakka-datalake-tick.cljk [--force] [--out-dir <dir>]
+;;     kbb --backend sci scripts/hyakka-datalake-tick.cljk [--force] [--out-dir <dir>]
 ;;
 ;; export（EDN -> JSON）と load（JSON -> Iceberg）を順に呼ぶだけで、判断は
 ;; 2 つしか持たない。

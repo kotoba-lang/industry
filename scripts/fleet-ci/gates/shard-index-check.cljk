@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; shard-index-check.cljs — kotobase-shard-index の gate。
 ;; superproject ADR-2608071500。
 ;;
@@ -53,7 +53,7 @@
 
 (defn- run [label script extra]
   (let [r (.spawnSync cp "npx"
-                      (clj->js (concat ["nbb" "--classpath" (str tool "/src") script] extra))
+                      (clj->js (concat ["kbb" "--backend" "sci" "--classpath" (str tool "/src") script] extra))
                       #js {:encoding "utf8" :cwd dir :timeout 1500000})
         out (str (.-stdout r) (.-stderr r))]
     (println (str "--- " label " ---"))

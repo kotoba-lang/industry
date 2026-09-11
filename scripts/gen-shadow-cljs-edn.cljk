@@ -1,15 +1,15 @@
-#!/usr/bin/env nbb
-;; Generates shadow-cljs.edn :source-paths from `clojure -Spath`.
+#!/usr/bin/env kbb
+;; Generates shadow-cljs.edn :source-paths from `kbb -Spath`.
 ;; nbb port of the shared gen-shadow-cljs-edn.bb family (ADR-2607173000 Wave 1).
 ;;
-;;   nbb scripts/gen-shadow-cljs-edn.cljk          ; cwd = target repo
-;;   nbb /path/to/superproject/scripts/gen-shadow-cljs-edn.cljk
+;;   kbb --backend sci scripts/gen-shadow-cljs-edn.cljk          ; cwd = target repo
+;;   kbb --backend sci /path/to/superproject/scripts/gen-shadow-cljs-edn.cljk
 (require '[clojure.string :as str]
          '[scripts.nbb-compat :refer [slurp spit sh]])
 
 (def fs (js/require "node:fs"))
 
-(let [r (sh "clojure" "-Spath")
+(let [r (sh "kbb" "-Spath")
       cp (str/trim (or (:out r) ""))
       dirs (->> (str/split cp #":")
                 (remove str/blank?)
@@ -20,4 +20,4 @@
              " {:test {:target :node-test\n"
              "         :output-to \"out/test.js\"\n"
              "         :ns-regexp \"-test$\"}}}\n"))
-  (println "wrote shadow-cljs.edn with" (count dirs) "source dirs from clojure -Spath"))
+  (println "wrote shadow-cljs.edn with" (count dirs) "source dirs from kbb -Spath"))

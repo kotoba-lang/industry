@@ -224,7 +224,7 @@ Each stage requires **minimum 3-day stability window**:
 # Example: "@murakumo-owner approved manual rollback to 50% due to <reason>"
 
 # Execute rollback
-nbb murakumo/rollback.cljs --to-stage phase2 --reason "<business reason>"
+kbb --backend sci murakumo/rollback.cljk --to-stage phase2 --reason "<business reason>"
 # Timeline: < 5 min to complete, < 2 min for traffic to stabilize
 ```
 

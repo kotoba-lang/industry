@@ -328,18 +328,18 @@ canonical-key, block-put, block-get, head-read, head-cas
 ### Run All M2 Tests (JVM)
 ```bash
 cd orgs/kotoba-lang/kotobase-peer
-clj -M:test 2>&1 | grep -E "(deftest|PASS|FAIL)"
+kbb -M:test 2>&1 | grep -E "(deftest|PASS|FAIL)"
 ```
 
 ### Run All M2 Tests (CLJS via nbb)
 ```bash
 cd orgs/kotoba-lang/kotobase-peer
-nbb --classpath ".:test" -e "(require 'kotobase-peer.merkle-lsm-test)" 2>&1
+kbb --backend sci --classpath ".:test" -e "(require 'kotobase-peer.merkle-lsm-test)" 2>&1
 ```
 
 ### Run M2-Specific Gates Only
 ```bash
-clj -M:test -n "m2_gate" 2>&1
+kbb -M:test -n "m2_gate" 2>&1
 ```
 
 ---

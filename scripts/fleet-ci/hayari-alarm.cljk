@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; hayari の無人ループが止まったら、人に見えるところで 1 回だけ鳴らす。
 ;;
 ;; なぜ tick 側に置かないか: **死んだループは自分の死を報告できない。** 警報は
@@ -11,7 +11,7 @@
 ;; 遷移の扱い（1 回だけ鳴らす・初回の未知を健全と読まない・警報自身は常に 0）は
 ;; `transition-alarm` にある（2026-08-16 抽出）。
 ;;
-;;   nbb --classpath scripts/fleet-ci scripts/fleet-ci/hayari-alarm.cljk \
+;;   kbb --backend sci --classpath scripts/fleet-ci scripts/fleet-ci/hayari-alarm.cljk \
 ;;       [--root <superproject>] [--notify false] [--state <f>]
 
 (ns hayari-alarm

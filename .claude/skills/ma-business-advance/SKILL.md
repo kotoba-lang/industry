@@ -27,7 +27,7 @@ M&A マッチングは 6 repo にまたがるので、repo 単位の bot（`repo
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk
 ```
 
 - **exit 2 が返ったら何もしない。** 構成 repo の checkout が 0 本という意味なので、
@@ -56,7 +56,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk
 
 その営みを持つ repo が fleet に無いなら、選べるのは 2 つだけ:
 
-- `nbb scripts/repo-search.cljk <語>` と `nbb scripts/concept-lookup.cljk <語>` を
+- `kbb --backend sci scripts/repo-search.cljk <語>` と `kbb --backend sci scripts/concept-lookup.cljk <語>` を
   引いてから、実在する近接 repo を割り当てる
 - その stage をこの事業のスコープ外と決め、`:business/stages` から外す。**その場合は
   外した理由を構成表のコメントに書く**（黙って消すと、次の反復が同じ stage を
@@ -123,9 +123,9 @@ rebase も force-push もしない。手順は skill `git-cleanup-conflict` /
 **その床だけが動いたことを見る。**
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk --no-ledger   # 直す前
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk --no-ledger   # 直す前
 # ... 直す ...
-nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk --no-ledger   # 直した後
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk --no-ledger   # 直した後
 ```
 
 対象の床が `broken` → `ok` に変わり、**他の床が動いていない**ことを確認する。
@@ -137,7 +137,7 @@ nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk --no-ledger
 `(require '[<ns>.operation])` を実際に走らせる）:
 
 ```bash
-nbb --classpath "orgs/cloud-itonami/<repo>/src:<兄弟の src...>" -e "(require '[<ns>.operation])"
+kbb --backend sci --classpath "orgs/cloud-itonami/<repo>/src:<兄弟の src...>" -e "(require '[<ns>.operation])"
 ```
 
 ## やらないこと（ガードレール）

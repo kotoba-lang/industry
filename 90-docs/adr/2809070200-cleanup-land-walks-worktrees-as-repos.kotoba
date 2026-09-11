@@ -72,7 +72,7 @@ registers; failing that, the checkout whose `--git-common-dir` is its own.
 
 The plan's closing section named 99 of 119 landed repos as lacking a `west.yml`
 path and printed a ready-to-run command beginning
-`nbb scripts/west-triple-sync.cljs plan --names .cloud-itonami-app-adopt,.w5-0124,
+`kbb --backend sci scripts/west-triple-sync.cljk plan --names .cloud-itonami-app-adopt,.w5-0124,
 .w5-1040,...`.
 
 Those names are worktree directories. The orphan audit's own classification puts
@@ -91,7 +91,7 @@ cleanup-land owns was green on it. It was nevertheless BLOCKED: the required che
 `test (ubuntu-latest)` failed on all three platforms, roughly two minutes into the
 job, at this step:
 
-    Run npx nbb scripts/check-workflows.cljs
+    Run kbb --backend sci scripts/check-workflows.cljk
     workflow-lint: POSIX shell execution files found:
       docs/amufalsify-grep.sh, scripts/amufalsify-dbg-tmp.sh, ... (12 total)
 
@@ -194,7 +194,7 @@ during this one (`35300e3`, merge `1ee08f9`) by deleting the dead `:extra-paths`
 entry. Its commit message states that no code here requires an apex.* namespace.
 `orgs/network-awai/net-babiniku/scripts/provider_contract_probe.clj` line 4 still
 reads `[gftd.apex.generation-api :as apex]`, unchanged. The namespace is
-`gftd.apex.*`, not `apex.*`. So `bb provider-contracts` still cannot resolve, and
+`gftd.apex.*`, not `apex.*`. So `kbb -M:provider-contracts` still cannot resolve, and
 the audit now exits 0. The retirement claim in that message is correct; the
 namespace claim is not.")
   (:adr/consequences "WHAT IS TRUE NOW (verified at close, 2026-09-07):
@@ -203,7 +203,7 @@ namespace claim is not.")
   0 open PRs. The one stash (canvas-ledger WIP) was verified landed -- its 3 events
   byte-identical to origin/main lines 10628 and 10630, with an altered-key control
   that correctly missed -- archived, then dropped.
-- `nbb scripts/west-orphan-audit.cljs --blocking` exits 0: no blocking registration
+- `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` exits 0: no blocking registration
   gaps and no un-adjudicated candidates. Note that exit 0 here is partly the result
   of item 7's silencing, not only of item 7's repair.
 - non-draft cleanup PRs fleet-wide: 3 -> 0. Every cleanup PR that could merge
@@ -234,7 +234,7 @@ RESUME POINT, in priority order:
    skipped as worktrees, so that skipping is distinguishable from finding nothing.
    Prove it both ways as the existing gates do: a real repo still plans, a worktree
    does not, and app-hyakka's 67 candidates become reachable again.
-2. Then re-run `nbb scripts/cleanup-land.cljs` and re-read the plan. It should
+2. Then re-run `kbb --backend sci scripts/cleanup-land.cljk` and re-read the plan. It should
    shrink from 121 targets to about 25.
 3. For `:additive`, merge on the repo's required checks rather than on the
    classification (item 4).

@@ -18,7 +18,7 @@
 ;;
 ;; nbb, no JVM. Run from the superproject root:
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/ontology_entailment.cljs
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/ontology_entailment.cljs
 ;;
 ;; `datom-source` is on that path because `datalog.core` requires it; without
 ;; it nbb reports a missing namespace rather than a query answer.

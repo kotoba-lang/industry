@@ -133,7 +133,7 @@
 
    -- 固定した検証(すべて 0 failure) --
    org-iso-10303: 13 deftest / 35 assertion(nbb 実行)。幾何は全て閉形解と突き合わせ。
-   kami-engine-cfd: 9 deftest / 27 assertion(JVM clojure -M:test)。Poiseuille 相対 L2 = 1.44%。
+   kami-engine-cfd: 9 deftest / 27 assertion(JVM kbb -M:test)。Poiseuille 相対 L2 = 1.44%。
    STEP: write→read 往復で 6面/12稜線/8頂点・bbox・体積 7.838L 一致。
    mk1-cad.cljs: 内包NG 0 / 干渉 0 / 挿入不可 0 / 最悪ケース干渉 0 / ケーブル干渉 0 / 曲げ不足 0。
    CSG: 100^3 から 50x50x100 を抜いて 750,000 mm3 ちょうど。
@@ -153,14 +153,14 @@
       残り JPY 1,740,000 は gate 通過後の日本 launch(JP cert 1.03M + campaign 0.5M)に留保。
    b. gate 測定: llama.cpp SYCL/Vulkan、qwen3.6-35b-a3b Q4_K_M、単一ストリーム、>= 39.2 tok/s か。
       比較対象は同一条件の Strix Halo(gad は 70.09 tok/s)。
-   c. 設計の再現: nbb --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljs
+   c. 設計の再現: kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljs
       (寸法を変えるときは 90-docs/hardware/mk1-parts.datoms.edn だけを直す。他は生成物)。
    d. 自社推論需要の実在確認(ADR-2607269000 の状態 θ4 回避。Strix 2台を買うより先に確認した方が安い可能性)。
 
    -- 何も買っていない・何も発注していない。**この時点で外部への不可逆な支出・約束は一切ない。**")
 
   (:adr/verification
-  "再現: `nbb --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljs`。7 節(寸法導出 / feature tree / 実体化+STEP / assembly / 組み立て sim / 工程生成 / BOM 突き合わせ)を出力し、`90-docs/hardware/mk1-enclosure.step` と `90-docs/hardware/mk1-assembly.edn` を生成する。部材の正本は `90-docs/hardware/mk1-parts.datoms.edn`(手編集可、寸法はここだけを直す)。生成物 `mk1-assembly.edn` は手編集しない。
+  "再現: `kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljs`。7 節(寸法導出 / feature tree / 実体化+STEP / assembly / 組み立て sim / 工程生成 / BOM 突き合わせ)を出力し、`90-docs/hardware/mk1-enclosure.step` と `90-docs/hardware/mk1-assembly.edn` を生成する。部材の正本は `90-docs/hardware/mk1-parts.datoms.edn`(手編集可、寸法はここだけを直す)。生成物 `mk1-assembly.edn` は手編集しない。
 
    実施した検証:
    ・kernel の nbb 実行可能性 — brep.kernel / feature / assembly / tessellate / step を nbb でロードし、make-box の面数6・稜線数12・頂点数8、体積 125,000mm3(100x50x25 の厳密値)を確認。

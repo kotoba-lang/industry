@@ -40,7 +40,7 @@
 
 ### kotobase-storage — フリップしてはいけない
 
-    JVM  clojure -M:test        63 tests / 206 assertions
+    JVM  kbb -M:test        63 tests / 206 assertions
     nbb  test/run.cljs          22 oracle（async contract）
 
 **同じスイートではない。** フリップすれば検査が 63 から 22 に減る。しかも
@@ -51,7 +51,7 @@ floor（exit 93）に弾かれる。**gate を足していれば恒久的に赤�
 
 ### kotobase-storage-pack — README の主張が偽だった
 
-    JVM  clojure -M:test        35 tests / 157 assertions / 0 failures
+    JVM  kbb -M:test        35 tests / 157 assertions / 0 failures
     nbb  npm run test:nbb       33 tests /  61 assertions / **25 errors**
 
 README.md は「**Identical numbers on JVM and nbb. The suite prints them on every run.**」

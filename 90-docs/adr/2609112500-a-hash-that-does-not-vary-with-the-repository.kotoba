@@ -39,7 +39,7 @@ the regenerated block is: selector 6 is 200, and selector 13 is not 7.
 
 ## Reproduce
 
-    nbb scripts/gen-whole-component.cljs <template> <worktree> <src-dir>
+    kbb --backend sci scripts/gen-whole-component.cljk <template> <worktree> <src-dir>
     amu compile src/<src>/whole_component.kotoba --target aarch64-macos
       --policy policy.edn --output wc.o
     amu extract-native wc.o --symbol oracle-handlers --output h.bin

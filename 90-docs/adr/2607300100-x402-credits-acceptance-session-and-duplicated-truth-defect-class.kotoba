@@ -143,7 +143,7 @@
     {:gap \"net-kotobase の3件の pre-existing test failure\" :detail \"worker/js 生成物を git から外すか、テストの主張を実態に合わせるかの判断が必要\"}]")
 
   (:adr/resume-point
-  "{:next-command \"cd orgs/network-awai/cloud-murakumo && nbb --classpath test -m x402-consistency-check\"
+  "{:next-command \"cd orgs/network-awai/cloud-murakumo && kbb --backend sci --classpath test -m x402-consistency-check\"
     :expect \"0 bad / 1 warn / 2 ok。Base Safe の threshold が 2-of-3 になれば warn が消えて 0 warn になる — それが custody 修正の完了判定\"
     :then [\"api.murakumo.cloud/infer/acceptance の :independent が null 以外になったら、実際の第三者が credits を受け取ったということ。それが acceptance density の律速が解けた瞬間で、それまでは 0 が正しい表示\"
            \"x402 List / x402scan への登録（x402scan は wallet 署名が必要）\"

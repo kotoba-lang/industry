@@ -193,7 +193,7 @@ pin に載せるのは越権なので進めていない（fast-forward である
 - **残るギャップ（2026-08-09 時点、優先順）**:
   1. **murakumo access token の mint** — 唯一「今ユーザーに見えている壊れ」。両 chat
      経路が 401 のままで、babiniku の character chat も shinshi の 1:1 chat も動かない。
-     コード変更ではなく運用作業（`nbb scripts/run-task.cljs token issue --scope chat`
+     コード変更ではなく運用作業（`kbb --backend sci scripts/run-task.cljk token issue --scope chat`
      を kotoba-lang/murakumo で実行し、各 Worker の secret に bind）。
   2. **club-shinshi 側の ingress endpoint と UI** — babiniku には入れたが shinshi には
      未着手。babiniku の `functions/api/support.js` と `support-panel-view` がそのまま

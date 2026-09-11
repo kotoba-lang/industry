@@ -47,7 +47,7 @@
 
 調査手段と、それぞれが何を答えたか:
 
-- `nbb scripts/repo-search.cljs`（名前 + checkout 済み README）—— `game-play-uploader` `gameka` `games` `gameya` `media-gamers` `haishin` `com-twitch` `com-youtube` を出した。
+- `kbb --backend sci scripts/repo-search.cljk`（名前 + checkout 済み README）—— `game-play-uploader` `gameka` `games` `gameya` `media-gamers` `haishin` `com-twitch` `com-youtube` を出した。
 - `manifest/west.yml` の project 名の直接 grep —— `org-farama-gymnasium` `com-nvidia-isaac-lab` `youtube-upload` `kami-sensor-sim` を出した。**repo-search が名前だけで拾えなかったものがここに出た**（`com-nvidia-isaac-lab` は旧名 `kami-shugyo` で、名前にも README 冒頭にも『RL』『training』の語が無い）。
 - checkout 済みの README / CLAUDE.md に限定した `find | xargs grep`（orgs 全体の再帰 grep は 120 秒で返らず、背景実行しても空を返した）—— **`kotoba-lang/shell` と `kotoba-lang/hinshitsu` の iOS Simulator 面はここで初めて出た**。どちらも名前が機能を示さず（shell / 品質）、概念索引の語彙にも `ios` `simulator` `game` は無い。
 
@@ -139,7 +139,7 @@ iOS Simulator 上でなければならない理由（ネイティブ iOS ゲー�
   (:adr/verification
   "**実測した（2026-08-08）**:
 
-- `nbb scripts/repo-search.cljs` を 5 回（simulator/ios/iphone、game/play/agent、genetic/evolution/neuroevolution、stream/record/capture、実況/配信/ゲーム、shugyo/修行/reinforcement）。
+- `kbb --backend sci scripts/repo-search.cljk` を 5 回（simulator/ios/iphone、game/play/agent、genetic/evolution/neuroevolution、stream/record/capture、実況/配信/ゲーム、shugyo/修行/reinforcement）。
 - `manifest/west.yml` の 4,138 project 名を直接 grep（game|play|sim|ios|xcode|appium|emul|gym|evolu|genet|stream|obs|twitch|youtube|record|replay|bot|train）。
 - checkout 済みの README* / CLAUDE.md / MATURITY.md に対する `find -maxdepth 3|4 | xargs grep -liE`:
   - `simctl|appium|webdriveragent|xcuitest|ios simulator|iphone simulator|シミュレータ` → 8 hit。うち実体は `kotoba-lang/shell`（bridge）と `kotoba-lang/hinshitsu`（visual QA CLI）。**Appium / WebDriverAgent / XCUITest は 0 件。**

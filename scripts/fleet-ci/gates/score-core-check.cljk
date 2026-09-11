@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; score-core-check.cljs — BMC / YC 成熟度スコアの**算術の 2 実装が同じ数を出すか**
 ;; を見る（ADR-2608158000）。
 ;;
@@ -33,7 +33,7 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb score-core-check.cljs <repo-dir> [--min N] [--nbb CMD]
+;;   kbb --backend sci score-core-check.cljk <repo-dir> [--min N] [--nbb CMD]
 ;;
 ;; `<dir>` は **引数の先頭**に置く（fleet はそう渡す。CLAUDE.md の実測済みの罠）。
 

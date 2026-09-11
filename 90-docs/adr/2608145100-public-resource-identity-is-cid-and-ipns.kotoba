@@ -71,7 +71,7 @@ org/project/site UUID、worker/env 名、per-app router（`/s` `/browse` `/studi
 
 ## 検証
 
-`kotoba-protocol` の `clojure -M:test`: path 付き `ipfs://cid/index.html` は `:path-not-identity`。path 無し round-trip と gateway URL（trailing path 無し）が通る。`bundle-cid-consistent?` は従来どおり同一 CID を要求する。
+`kotoba-protocol` の `kbb -M:test`: path 付き `ipfs://cid/index.html` は `:path-not-identity`。path 無し round-trip と gateway URL（trailing path 無し）が通る。`bundle-cid-consistent?` は従来どおり同一 CID を要求する。
 
 ## 改訂履歴
 

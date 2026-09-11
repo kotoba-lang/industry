@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; placement-parity.cljs — fleet-ci の配置と murakumo.task.plan の配置を同じ batch で比べる。
 ;;
 ;; ADR-2608111721 の決定 1・2 の**切り替え条件**。「両実装に同じ batch を通して
 ;; assignments が一致することを実測してから切り替える」と ADR が決めており、
 ;; これがその実測である。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat:scripts/fleet-ci:orgs/kotoba-lang/murakumo/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:scripts/fleet-ci:orgs/kotoba-lang/murakumo/src" \
 ;;     scripts/fleet-ci/placement-parity.cljk [--check]
 ;;
 ;; ## 何を「一致」と呼ぶか

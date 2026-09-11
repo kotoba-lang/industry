@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; score-video.cljs — deterministic per-model video-output quality scorer
 ;; (ADR-2607180000). Runs ffprobe/ffmpeg over one produced .mp4, computes the
 ;; container + pixel axes declared in gen-quality.datoms.edn, normalizes each to
@@ -6,7 +6,7 @@
 ;; the caller redirects/appends into gen-quality-ledger.edn. No LLM, no browser,
 ;; no network: same class of decision-function as 90-docs/design-quality/audit.
 ;;
-;;   nbb 90-docs/gen-quality/score-video.cljs \
+;;   kbb --backend sci 90-docs/gen-quality/score-video.cljk \
 ;;       --model <model-id> --run-id <id> --file <path.mp4> [--target-dur <s>]
 ;;
 ;; Exit 2 if the file is missing/unreadable (fail-closed — never emit a fabricated
@@ -81,7 +81,7 @@
 (defn -main []
   (let [{:keys [model run-id file target-dur]} (args->map *command-line-args*)]
     (when-not (and model run-id file)
-      (println "usage: nbb score-video.cljs --model <id> --run-id <id> --file <mp4> [--target-dur <s>]")
+      (println "usage: kbb --backend sci score-video.cljk --model <id> --run-id <id> --file <mp4> [--target-dur <s>]")
       (js/process.exit 2))
     (when-not (fs/existsSync file)
       (binding [*out* *err*] (println "fail-closed: file not found:" file))

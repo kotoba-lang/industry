@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; run.cljs — 拒否が今も落ちるかを確かめる local loop。
 ;;
 ;; `mutations.edn` の各 mutation を当てて、**赤くなることを確認する**。
@@ -27,9 +27,9 @@
 ;; （このワークスペースの mandatory な資源制御）。
 ;;
 ;; 使い方:
-;;   nbb scripts/maturity-loop/run.cljk                 全 suite
-;;   nbb scripts/maturity-loop/run.cljk --only inga     repo 名で絞る
-;;   nbb scripts/maturity-loop/run.cljk --keep-worktree 失敗時に worktree を残す
+;;   kbb --backend sci scripts/maturity-loop/run.cljk                 全 suite
+;;   kbb --backend sci scripts/maturity-loop/run.cljk --only inga     repo 名で絞る
+;;   kbb --backend sci scripts/maturity-loop/run.cljk --keep-worktree 失敗時に worktree を残す
 (ns maturity-loop.run
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -193,7 +193,7 @@
   中に symlink で用意する。
 
   **これが無いと、その repo は base すら緑にならない** —— 落ちているのは実装では
-  なく、隣が居ないことである。両者は `clojure -M:test` の出力では見分けが付かない
+  なく、隣が居ないことである。両者は `kbb -M:test` の出力では見分けが付かない
   ので、**張れなかった名前は必ず報告する**（黙って進むと「変異が咬まなかった」
   ではなく「suite が測れなかった」を、同じ顔で緑にする）。
 
@@ -269,8 +269,8 @@
             (try
               (link-siblings! root dir sandbox)
               ;; **走らせ方は mutation ごとに違ってよい。** 実測 2026-08-24:
-              ;; `#?(:clj int :cljs identity)` の変異は `clojure -M:test` で
-              ;; **0 failures**、`nbb test/run_portable.cljs` で **11 failures**
+              ;; `#?(:clj int :cljs identity)` の変異は `kbb -M:test` で
+              ;; **0 failures**、`kbb --backend sci test/run_portable.cljk` で **11 failures**
               ;; だった —— JVM 側が弱いのではなく、cljs の分岐が JVM から
               ;; 構造的に見えない。suite の cmd 1 本で回すと、この class は
               ;; 全部「噛まない」として報告され、**検査の穴が実装の穴に見える**。

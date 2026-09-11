@@ -28,7 +28,7 @@
 
   (:adr/verify
   (vector "gh api repos/kotoba-lang/datalog/contents/src/datalog/core.cljc | ... | sed -n '/(:require/,/))/p'   ; storage 依存が無いこと"
-   "cd <datom-model> && clojure -Spath | tr ':' '\\n' | grep -ci 'ipld\\|multiformat\\|prolly'   ; => 0"))
+   "cd <datom-model> && kbb -Spath | tr ':' '\\n' | grep -ci 'ipld\\|multiformat\\|prolly'   ; => 0"))
 
   (:adr/body
   "# Context
@@ -59,7 +59,7 @@
 `datalog` を `arrangement` に畳むと、`datom-model` は `arrangement` に依存せざるを得ず、
 **`io-ipld` と `prolly-tree` が L5(モデル層)に引き戻される**。
 
-`datom-model` の「storage も IPLD も入らない」は `clojure -Spath` で機械検証した実測値で
+`datom-model` の「storage も IPLD も入らない」は `kbb -Spath` で機械検証した実測値で
 あって努力目標ではない。**畳む案だけが、既に得た検証済みの性質を失う。**
 
 ## 依存の向きは既にきれい（実測）

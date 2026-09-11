@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-cljs-shift-width.cljs -- bit shifts of 32 or more in code that
 ;; ClojureScript executes, where the shift count is silently taken mod 32.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-cljs-shift-width.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-cljs-shift-width.cljk \
 ;;     [--findings] [--root <dir>]
 ;;
 ;; ## What it is about

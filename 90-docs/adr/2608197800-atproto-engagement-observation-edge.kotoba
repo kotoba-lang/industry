@@ -16,7 +16,7 @@ kaizen する loop は?」（オーナー、2026-08-19）
 
 `hermes-agent` と `cloud-itonami-app` は**繋がっている**。Hermes が app の MCP server を
 子プロセスとして起動している（実測: `hermes_cli/tools/mcp_stdio_watchdog.py --ppid 86609
--- sh -c 'cd ~/.cloud-itonami/app && exec clojure -M:mcp'`）。繋がっていないのはその先。
+-- sh -c 'cd ~/.cloud-itonami/app && exec kbb -M:mcp'`）。繋がっていないのはその先。
 
 **90 体の bot 全部が同一の 8 tool しか持たない**（実測、例外ゼロ）:
 

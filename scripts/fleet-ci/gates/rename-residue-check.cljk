@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; rename-residue-check.cljs — cleanup-land の「改名残骸 gate」が生きているかを tip ごとに測る。
 ;;
 ;; **検証ロジックはここに複製しない。** 正本は repo 内の
@@ -25,7 +25,7 @@
 ;; 単に N>0 にすると、fixture repo を建てられない環境（git 不在）で pure case
 ;; だけが走り、実 git に対する判定が 1 本も動いていないのに緑になる。
 ;;
-;; ノード側で `npx nbb rename-residue-check.cljs <dir>` として実行。
+;; ノード側で `kbb --backend sci rename-residue-check.cljk <dir>` として実行。
 ;; ⚠ `<dir>` は引数の**先頭**に置く（CLAUDE.md「赤い gate を直す前に 3 つ確かめる」2）。
 ;;
 ;; ## 赤くなることの実測（2026-08-12、ADR-2608124800 項目 7）
@@ -35,7 +35,7 @@
 ;; 別に測った。以下は全部、実際に壊して実行した結果である（再現手順つき）。
 ;;
 ;; 実行形は fleet と同じ `<dir>` 先頭:
-;;   npx --yes nbb scripts/fleet-ci/gates/rename-residue-check.cljk <tree>
+;;   npx --yes kbb --backend sci scripts/fleet-ci/gates/rename-residue-check.cljk <tree>
 ;;
 ;; | 壊し方 | exit | 出力の最終行 |
 ;; |---|---|---|
@@ -94,7 +94,7 @@
 ;; ## この実測が fleet について言えないこと
 ;;
 ;; 上は**この laptop**（npm 11.12.1）での実測である。CLAUDE.md が記録しているとおり
-;; ここでは `npx --yes nbb --classpath X file.cljs` が壊れており（実測: 引数が
+;; ここでは `npx --yes kbb --backend sci --classpath X file.cljs` が壊れており（実測: 引数が
 ;; `github:scripts/…` として package 解決され `npm ERR! code 128`）、上の実行は
 ;; `--yes` を落として `nbb` を直接呼ぶ PATH shim を噛ませている。したがって
 ;; **gate の判定ロジックが赤くなること**は示せたが、**fleet ノード上で npx 経路が
@@ -133,7 +133,7 @@
 
 (def result
   (try
-    (cp/execSync "npx --yes nbb --classpath \".:scripts/nbb_compat\" scripts/rename-residue-test.cljk"
+    (cp/execSync "npx --yes kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/rename-residue-test.cljk"
                  #js {:cwd root :encoding "utf8" :stdio "pipe" :timeout 600000})
     (catch :default e
       (let [out (str (or (.-stdout e) "") (or (.-stderr e) ""))]

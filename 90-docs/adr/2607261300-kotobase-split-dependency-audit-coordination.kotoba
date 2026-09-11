@@ -116,7 +116,7 @@ push できるのは書いた本人だけであり、repo 作成はその作業�
    `git init` 直後であり、GitHub 上の同名（= kotobase-peer）とは無関係の空 scaffold である
    ことを先に認識する必要がある。
 2. `kotobase-storage` + 3 アダプタの commit → push → repo 作成 → west 登録。
-3. 完了すれば `nbb scripts/west-orphan-audit.cljs --blocking` は緑になる（現在の赤 2 件は
+3. 完了すれば `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` は緑になる（現在の赤 2 件は
    これのみに由来）。
 
 # Consequences

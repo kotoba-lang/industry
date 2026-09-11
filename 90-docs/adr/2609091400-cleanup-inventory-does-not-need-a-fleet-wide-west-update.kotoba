@@ -81,7 +81,7 @@ CLAUDE.md『規則を制約として持ち出す前に、それが性質か実�
 ## 改訂後の手順
 
 1. superproject を `git fetch origin && git merge --ff-only origin/main`
-2. `nbb scripts/checkout-staleness.cljs` で母集団をローカルに取る
+2. `kbb --backend sci scripts/checkout-staleness.cljk` で母集団をローカルに取る
    （`dirty=N (Xt/Yu)` と tracked / untracked を分けて出す。全 fleet 94 秒）
 3. **判定する repo だけ**、その repo で明示的に fetch する —— 鮮度はここでしか得られない
 4. checkout を pin に揃えたいときだけ `west update --fetch smart <name> …` を名指しで回す
@@ -114,7 +114,7 @@ CLAUDE.md『規則を制約として持ち出す前に、それが性質か実�
 
 ## 見つけたが直していないもの
 
-`nbb scripts/gen-west-manifest.cljs --check` は exit 1（STALE）で、その出力は再生成を促すが、
+`kbb --backend sci scripts/gen-west-manifest.cljk --check` は exit 1（STALE）で、その出力は再生成を促すが、
 **再生成すると 13 project が isolation を失う**（増えるものは 0）:
 
     datalad (8)   audio-actor  avatar-actor  ghosthacker-shiropico-assets

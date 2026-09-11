@@ -20,7 +20,7 @@
   (:adr/changes
   "[{:repo \"kotoba-lang/org-iso-16739\", :prs [49 50]} {:repo \"gftdcojp/cloud-itonami\", :prs [472]} {:repo \"kotoba-lang/kami-app-bim-editor\", :prs [61 62]} {:repo \"kotoba-lang/bim\", :prs [117 118 119 120 121 122 123 124]} {:repo \"kotoba-lang/kotoba-document-contracts\", :prs [3]}]")
   (:adr/not-implemented
-  "{:electrical-distribution \"uncommitted WIP; clojure -M:test stops at bim/regeneration.cljc:90 with No such namespace: mep\", :structural-shells \"plate/shell bending and nonlinear/material/geometric analysis\", :drawings \"full hidden-line removal and production sheet/detailing breadth\", :interop \"formal buildingSMART certification, wider external corpus and performance hardening\", :proprietary-formats \"native RVT/RFA round-trip\"}")
+  "{:electrical-distribution \"uncommitted WIP; kbb -M:test stops at bim/regeneration.cljc:90 with No such namespace: mep\", :structural-shells \"plate/shell bending and nonlinear/material/geometric analysis\", :drawings \"full hidden-line removal and production sheet/detailing breadth\", :interop \"formal buildingSMART certification, wider external corpus and performance hardening\", :proprietary-formats \"native RVT/RFA round-trip\"}")
   (:adr/body
   "# ADR-2607211437: kotoba BIM / Revit 相当統合設計 — IFC 共通化、解析・図面・共同編集の境界と session close
 
@@ -87,11 +87,11 @@ Implementation stops here on 2026-07-21 JST.
 - `test/bim/mep_test.cljc`
 - `test/bim/regeneration_test.cljc`
 
-The WIP includes three-phase panel balancing, radial downstream load roll-up, feeder/fault/protection analysis, and an `:electrical/distribution` regeneration artifact. It is **not completed**: `clojure -M:test` currently stops while compiling `bim/regeneration.cljc:90` with `No such namespace: mep`. No commit or PR is claimed for this WIP.
+The WIP includes three-phase panel balancing, radial downstream load roll-up, feeder/fault/protection analysis, and an `:electrical/distribution` regeneration artifact. It is **not completed**: `kbb -M:test` currently stops while compiling `bim/regeneration.cljc:90` with `No such namespace: mep`. No commit or PR is claimed for this WIP.
 
 The editor checkout also has modified generated files `public/js/app.js` and `public/js/manifest.edn`; ownership was not established in this session, so they were preserved and not included in the BIM WIP claim. The superproject root contains extensive unrelated dirty/untracked state and was likewise left untouched.
 
-Resume by inspecting the four BIM files, resolving the namespace/require boundary, running `clojure -M:test` and `clojure -M:lint`, reviewing the electrical semantics, then committing and publishing only that scoped change. Do not clean, reset, or absorb the unrelated root/editor changes without establishing ownership first.\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+Resume by inspecting the four BIM files, resolving the namespace/require boundary, running `kbb -M:test` and `kbb -M:lint`, reviewing the electrical semantics, then committing and publishing only that scoped change. Do not clean, reset, or absorb the unrelated root/editor changes without establishing ownership first.\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
 
 ### 2026-07-22 — note
 
@@ -103,7 +103,7 @@ Backfill: the prior two progress notes on this ADR (electrical-distribution WIP 
 
 ### 2026-07-22 — note
 
-Gap-order item 4 complete: all three 'newer analysis surfaces' identified at session close are now wired end-to-end through the editor. kami-app-bim-editor PR #65 (merged b21ba67) adds a closed-loop pipe network UI (four-node diamond topology) calling bim.integration/analyze-closed-authored-mep-system -- verified outside the cljs runtime via clojure -M -e against bim.mep/bim.integration directly: validates clean before/after solving, converges in 16 iterations to ~7e-14 residual, splits demand evenly across symmetric branches. Combined with electrical distribution (bim#125 + editor#63) and structural 3D-frame (bim#126 + editor#64) from earlier this session, item 4 ('wire every newer analysis/result surface end-to-end through the editor and cloud workflow') is done. Remaining ADR-2607211437 gap-order items: 2 (plate/shell FEA + design-code verification), 3 (exact hidden-line drawing removal + production documentation primitives), 5 (external IFC corpus expansion + formal buildingSMART certification process), 6 (end-to-end Revit-originated model acceptance scenario).
+Gap-order item 4 complete: all three 'newer analysis surfaces' identified at session close are now wired end-to-end through the editor. kami-app-bim-editor PR #65 (merged b21ba67) adds a closed-loop pipe network UI (four-node diamond topology) calling bim.integration/analyze-closed-authored-mep-system -- verified outside the cljs runtime via kbb -M -e against bim.mep/bim.integration directly: validates clean before/after solving, converges in 16 iterations to ~7e-14 residual, splits demand evenly across symmetric branches. Combined with electrical distribution (bim#125 + editor#63) and structural 3D-frame (bim#126 + editor#64) from earlier this session, item 4 ('wire every newer analysis/result surface end-to-end through the editor and cloud workflow') is done. Remaining ADR-2607211437 gap-order items: 2 (plate/shell FEA + design-code verification), 3 (exact hidden-line drawing removal + production documentation primitives), 5 (external IFC corpus expansion + formal buildingSMART certification process), 6 (end-to-end Revit-originated model acceptance scenario).
 
 ### 2026-07-22 — note
 

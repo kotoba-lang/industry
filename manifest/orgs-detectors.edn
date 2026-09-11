@@ -122,7 +122,7 @@
 ;;     in the tree **in full** to test for a `bb` shebang, so its cost is
 ;;     dominated by the size of the artefacts it is not looking for.
 ;;   - `verify-clj-everywhere` -- **not a detector.** It is a test-suite
-;;     orchestrator: four audits and then `clojure -M:test` in five repos. It
+;;     orchestrator: four audits and then `kbb -M:test` in five repos. It
 ;;     emits no per-finding output to key on, it resolves Maven dependencies
 ;;     over HTTPS, and it writes to `~/.m2`, so `:writes :none` would be false.
 ;;   - `verify-kotoba-pages` -- **needs a real browser.** It drives Playwright
@@ -147,16 +147,16 @@
               cloud-itonami/cybersecurity, kotoba-lang/kotoba-fleet): each printed
               'DEPS added <path>/deps.edn' and each then answered 'Could not find
               namespace: kotoba.lang.text' the first time its own entry point ran, while
-              `clojure -M:test` stayed green throughout because the JVM suite reads
+              `kbb -M:test` stayed green throughout because the JVM suite reads
               deps.edn and never loads the .cljs. Only ENTRY POINTS are reported -- a
               shebang file, or a package.json script spelled `nbb <file>` with no
-              --classpath. A file invoked as `nbb --classpath src:test <file>` declares
+              --classpath. A file invoked as `kbb --backend sci --classpath src:test <file>` declares
               its classpath at the invocation site and is not a finding; counting those
               would turn a list of broken things into a list of unusual ones (1,114 files
               rather than the 442 entry points among them). Deliberately not a fleet
               gate: it walks every west project under orgs/, and a gate ships one
               repository's tree."
-   :argv     ["nbb" "{{repo}}/scripts/verify-nbb-declaration-visible.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-nbb-declaration-visible.cljk"
               "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
@@ -167,7 +167,7 @@
    :measured "Landed 2026-09-09 with nbb itself as the oracle rather than with an
               assertion. Two synthetic projects differing only in whether nbb.edn names
               the coordinate: the detector reports exactly the one, and running each with
-              `nbb run.cljs` errors on the reported one and prints its answer on the
+              `kbb --backend sci run.cljk` errors on the reported one and prints its answer on the
               other. Three findings drawn at random from the real sweep were then run
               under nbb and all three failed to resolve a namespace. First full sweep:
               SCANNED 4786, ABSENT 61 (registered but not checked out -- not measured and
@@ -186,13 +186,13 @@
               repository depends on -- a decision per repository, not a rewrite. Sweeping
               the whole workspace rather than the refusal list found 43. Nine of those are a
               PATTERN rather than an oversight -- their run_tests.cljs is invoked as
-              `nbb --classpath src:test run_tests.cljs`, so the classpath is declared at
+              `kbb --backend sci --classpath src:test run_tests.cljs`, so the classpath is declared at
               the invocation site and the repository has nowhere for a dependency because
               it was never meant to have one -- and they are reported separately. That
               leaves 34 projects holding 204 files that no build reads. Deliberately not a fleet gate: it
               walks every west project under orgs/, and a gate ships one repository's
               tree."
-   :argv     ["nbb" "{{repo}}/scripts/verify-source-has-a-project.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-source-has-a-project.cljk"
               "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
@@ -233,7 +233,7 @@
               without that separation the answer is nine repos and the real finding is
               one. Deliberately not a fleet gate: it reads every sibling under orgs/ to
               find out who names whom, and a gate ships one repo's tree."
-   :argv     ["nbb" "{{repo}}/scripts/verify-definition-repo-reachability.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-definition-repo-reachability.cljk"
               "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
@@ -273,7 +273,7 @@
               single shipped tree holds both. Measured while writing it -- the
               first version read the contract from amu, where it does not exist,
               and the refusal path is what caught that rather than a clean 0."
-   :argv ["nbb" "{{repo}}/scripts/verify-wasm-toolchain-pin.cljk" "--findings" "--root" "{{root}}"]
+   :argv ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-wasm-toolchain-pin.cljk" "--findings" "--root" "{{root}}"]
    :cwd :root
    :findings :protocol
    :writes :none
@@ -297,7 +297,7 @@
               carries. The forced scan that fixed it took ten seconds per node and
               moved every one to 5356, so nothing was broken -- the scheduled scan
               simply had not run in three months, and only a measurement says so."
-   :argv ["nbb" "{{repo}}/scripts/verify-fleet-malware-protection.cljk" "--findings" "--root" "{{root}}"]
+   :argv ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-fleet-malware-protection.cljk" "--findings" "--root" "{{root}}"]
    :cwd :root
    :findings :protocol
    :writes :none
@@ -326,7 +326,7 @@
               inventory and the surface index while looking like it had simply not
               been deployed. This CANNOT be a fleet gate: a gate ships one repo's
               tree, and every input here lives under west-managed `orgs/`."
-   :argv     ["nbb" "{{repo}}/scripts/gen-compliance-scope.cljk" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/gen-compliance-scope.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -351,7 +351,7 @@
               plane. This CANNOT be a fleet gate: it reads every in-scope checkout
               under west-managed `orgs/`, and it needs egress to api.osv.dev, which
               CLAUDE.md records as varying per node rather than being a constant."
-   :argv     ["nbb" "{{repo}}/scripts/gen-dependency-inventory.cljk" "--osv" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/gen-dependency-inventory.cljk" "--osv" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -391,7 +391,7 @@
               detectors answering one question with different populations is one of
               them being quietly narrower, so both are admitted and the split is
               reported."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-actor-metering.cljk" "--findings" "--root" "{{root}}"]
    :cwd :root
    :findings :protocol
@@ -428,7 +428,7 @@
               in 8 more builds. This is deliberately not a fleet gate: it reads
               `orgs/` and it runs `git show <default>/main:<path>` per repo, and a
               gate ships one repo's tree with no siblings and no remotes."
-   :argv     ["nbb" "{{repo}}/scripts/verify-shadow-cljs-provider-paths.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-shadow-cljs-provider-paths.cljk"
               "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
@@ -461,7 +461,7 @@
               copy is pinned and diffable, a git dep is pinned and fails loudly, a
               source path is neither. CANNOT be a fleet gate: it reads every repo and
               runs git against each one, and a gate ships a single tree."
-   :argv     ["nbb" "{{repo}}/scripts/verify-shared-library-consumption.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-shared-library-consumption.cljk"
               "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
@@ -523,7 +523,7 @@
               rule is to record such a dependency rather than invent a
               destination for it (its migration is adr-2809070100, still
               proposed)."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-kotoba-stdlib-self-hosted.cljk" "--findings" "--root" "{{root}}"]
    :cwd :root
    :findings :protocol
@@ -575,7 +575,7 @@
               U+001C-001F. 10,115 .cljc and 4,882 .cljs lines are in that population.
               Reported at :info rather than omitted, so the number is not mistaken for
               zero by anyone reading a clean run."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-string-migration-hazards.cljk" "--findings" "--root" "{{root}}"]
    :cwd :root
    :findings :protocol
@@ -607,7 +607,7 @@
               consumer that does not exist raises no error anywhere. CANNOT be a fleet
               gate: it must read the issuer in one repo and search every other repo,
               and a gate ships one repo's tree."
-   :argv     ["nbb" "{{repo}}/scripts/verify-credential-consumers.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-credential-consumers.cljk"
               "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
@@ -653,7 +653,7 @@
    ;; --classpath is for `ipni.metadata`, which reads the advertisement's
    ;; Metadata field. Required rather than reimplemented in the script: this
    ;; workspace has already paid for two implementations of that one wire field.
-   :argv     ["nbb" "--classpath" "{{repo}}/orgs/kotoba-lang/io-ipni-specs/src"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}/orgs/kotoba-lang/io-ipni-specs/src"
               "{{repo}}/scripts/verify-ipni-publisher-record.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -720,7 +720,7 @@
    :title    "ns forms that cannot macroexpand, in files no test loads"
    :why      "2026-09-10 (ADR-2609101200): found by accident. A JSON-library swap
               checked each rewire with one line per edited namespace,
-              `clojure -M -e '(require (quote <ns>))'`, on the rule that a suite
+              `kbb -M -e '(require (quote <ns>))'`, on the rule that a suite
               which never loads the edited file returns the same green as one that
               does. Five repos were loaded that way and five failed -- none because
               of the change. Two failed at the `ns` form itself: the `(:import ...)`
@@ -733,7 +733,7 @@
               declaring a JVM dependency for a namespace that cannot load is
               carrying it for dead code, and every count of remaining JVM surface
               includes it."
-   :argv     ["nbb" "{{repo}}/scripts/verify-ns-form-loadable.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-ns-form-loadable.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -782,7 +782,7 @@
               Rust is not written in kotoba-lang. The consequence for the migration
               campaign is direct -- a consumer cannot be cut over to a Kotoba-built
               artifact while the artifact it would replace is unverified."
-   :argv     ["nbb" "{{repo}}/scripts/verify-declared-artifact-present.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-declared-artifact-present.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "CONTROL\t[1-9][0-9]*"
@@ -835,7 +835,7 @@
               This CANNOT be a fleet gate: it reads orgs/, which a gate never ships.
               It reports a SHAPE, never a timing -- the finding says `measure this`,
               and the authority on speed stays that repo's own bench."
-   :argv     ["nbb" "{{repo}}/scripts/verify-codec-seq-expansion.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-codec-seq-expansion.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -880,7 +880,7 @@
               90-docs/query-plane/selftest_reference_join.cljk, which returns a COUNT
               of failing checks and reddens 2 of 4 when the two graph shapes are made
               identical."
-   :argv     ["nbb" "{{repo}}/scripts/verify-materialized-reference-join.cljk" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-materialized-reference-join.cljk" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -920,7 +920,7 @@
               reads). It is wrong only when the VALUE is the artifact, so the finding
               says `measure which one this is`.
               This CANNOT be a fleet gate: it reads orgs/, which a gate never ships."
-   :argv     ["nbb" "{{repo}}/scripts/verify-printed-value-identity.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-printed-value-identity.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -969,7 +969,7 @@
               orgs/: a gate ships one repo's tree and orgs/ is west-managed and
               absent from it. `root-source-nul-bytes` in gates.edn covers the
               superproject tree only, and says so."
-   :argv     ["nbb" "{{repo}}/scripts/verify-source-nul-bytes.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-source-nul-bytes.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -994,7 +994,7 @@
               CANNOT be a fleet gate for orgs/: 対象の 17 repo は west 管理で、
               gate が配る 1 repo の tree には存在しない。superproject 側の
               90-docs も同じ 1 回の走査で見るので分割していない。"
-   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" ".:scripts/nbb_compat"
               "{{repo}}/scripts/verify-flattened-edn-prose.cljk" "--findings" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -1044,7 +1044,7 @@
               migrate and are excluded BY DECLARATION in the script, never silently.
               This CANNOT be a fleet gate: a gate ships one repo's tree and the whole
               measurement is over west-managed orgs/."
-   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" ".:scripts/nbb_compat"
               "{{repo}}/scripts/verify-frontend-stack-retirement.cljk"]
    :cwd      :root
    :findings :protocol
@@ -1074,7 +1074,7 @@
               the property, and it must probe with a value the model cannot produce
               without reading something -- the first attempt asked for `echo <marker>`,
               whose output is its own argument, and could not fail."
-   :argv     ["nbb" "{{repo}}/scripts/verify-bridge-guest-cannot-execute.cljk"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-bridge-guest-cannot-execute.cljk"]
    :cwd      :repo
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -1104,7 +1104,7 @@
               argument for a hook rather than a sentence. Narrow by construction: it flags a
               map literal that READS (ex-data ...) and stores no message/body/detail, so a
               constant type like {:turn/error-type :bot/cancelled} is not a finding."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-error-provenance.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1131,7 +1131,7 @@
               kotoba://graph/alice* covered kotoba://graph/alice-evil. That copy is
               fixed and nothing checks for the next one. Wiring 130 repos by hand is not
               a plan; making the fleet able to answer where the decision is made is."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-delegation-surfaces.cljk" "--check" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1187,7 +1187,7 @@
               that decide whether a payment happened -- one was missing the guard whose
               own fix comment says its absence lets an unconfirmed payment be accepted
               as confirmed. The instruction to check was addressed to a person."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-vendored-copies.cljk" "--check" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1220,7 +1220,7 @@
               uchiwake's own :representative rather than :authoritative, so a silent
               regeneration that dropped that label would turn inference into
               measurement."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-valueflows-binding.cljk" "--root" "{{root}}"
               "--findings"]
    :cwd      :repo
@@ -1252,7 +1252,7 @@
               12 checked-out repos stayed broken for 17 days with nobody noticing --
               src/ execution paths, not just tests. Nobody noticed because every CI
               looked only at its own repo: dsl-core's own tests were green."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-require-graph.cljk" "--root" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1284,7 +1284,7 @@
               Adjacent and already registered: verify-shadow-source-paths asks whether a
               declared :source-path EXISTS. This asks whether the checkout behind it is the
               pinned revision. A build can pass the first and fail this one."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-source-path-pins.cljk" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -1327,7 +1327,7 @@
               layers.edn; 7 -> 0. What this detector actually guards against is therefore two
               things, and only the first was written down: a violating :local/root edge, and an
               exemption list whose keys have drifted off the repos they exempt."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-layer-deps.cljk" "--report" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1355,7 +1355,7 @@
               ADR-2608124800 measured on root-repository-roles, where every later assertion
               had gone unexecuted since 2026-08-03 with nobody able to see it. The checks are
               independent, so they now all run."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-kotoba-host-parity.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1439,7 +1439,7 @@
               JVM/runtime dependency that the inventory does not cover -- a new one would
               land the same way, silently, because the contract is prose until something
               reads it."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-kotoba-wasm-runtime-cutover.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1468,7 +1468,7 @@
               was never installed. Registering it here gives it a home WITHOUT installing
               that plist, which also launches an autonomous model loop that commits and
               pushes; the ADR is explicit that those are different decisions."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-tsukuru-factory-plane.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1490,7 +1490,7 @@
               verify-require-graph is: 256s of CPU four times a day on a machine already at
               load 157 is a real cost, and a consent-tier partition changes on human
               timescales. It reads EDN files and spawns exactly one child,
-              `nbb manifest/edn-query.cljk q*`, which has no write call anywhere; no
+              `kbb --backend sci manifest/edn-query.cljk q*`, which has no write call anywhere; no
               network, no writes."}
 
   {:id       :verify-namespace-collisions
@@ -1507,7 +1507,7 @@
               :dep/definition-cids that stops a republish swapping a definition body.
               It cannot be a fleet gate: a gate is shipped only the target repo's own
               tree, and this question is about two trees at once."
-   :argv     ["nbb" "{{repo}}/scripts/verify-namespace-collisions.cljk" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-namespace-collisions.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -1541,7 +1541,7 @@
               It cannot be a fleet gate: it reads `orgs/` and a gate ships one
               repo's tree, so on a node it would find an empty workspace and never
               go green (ADR-2608124800)."
-   :argv     ["nbb" "{{repo}}/scripts/verify-appview-facade.cljk" "--root" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-appview-facade.cljk" "--root" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -1594,7 +1594,7 @@
               leaving it. It cannot be a fleet gate: it reads orgs/, and a gate ships
               one repo's tree, so on a node it would find an empty workspace and never
               go green (ADR-2608124800)."
-   :argv     ["nbb" "{{repo}}/scripts/verify-appview-page-summary.cljk" "--root" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-appview-page-summary.cljk" "--root" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -1657,7 +1657,7 @@
               that a regex reads identically -- two real files here are that shape.
               Cannot be a fleet gate: it reads west-managed orgs/ checkouts, and no
               single repo tree carries them."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-char-int-coercion.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1703,7 +1703,7 @@
               coordinate the workspace actually uses turns it red.
               Cannot be a fleet gate: it reads west-managed orgs/ checkouts and
               manifest/west.yml together, and no single repo tree carries both."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-dependency-substitution.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1739,7 +1739,7 @@
               .clj sources or a cheshire/http-kit dependency appears as a NEW finding the
               next tick, which is exactly the event the cutover rule forbids and which
               the four-entry inventory cannot see."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-jvm-dependency-surface.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1808,7 +1808,7 @@
               not on disk answered 0 -- the same output as a clean repo -- until that was
               made an exit-2 REFUSED. Its `--self-test` caught two real defects in it on the
               first run, both of which produce MISSING findings against a count."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-portable-source-tested-on-one-host.cljk"
               "--findings" "--max-findings" "0"]
    :cwd      :root
@@ -1838,7 +1838,7 @@
               covering a third of its suite satisfies that floor, so a gate can be moved
               to a cheaper node and silently stop testing most of its subject with an
               identical signed receipt. Measured on kotoba-lang/columnar before its
-              repair: `clojure -M:test` ran 36 tests / 117 assertions, `nbb test/run.cljs`
+              repair: `kbb -M:test` ran 36 tests / 117 assertions, `kbb --backend sci test/run.cljk`
               ran 10 / 54, and with group/group deliberately broken the partial runner
               printed `Ran 10 tests ... 0 failures` and exited 0. Nothing prints the
               number it should have reached, which is why only a detector can see it.
@@ -1848,7 +1848,7 @@
               (`:ns-regexp \"-test$\"`) and never under nbb -- while the runner's own
               docstring calls itself a genuine third platform tier. No other check in the
               workspace compares a runner against the tree it sits in."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-cljs-runner-completeness.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -1970,7 +1970,7 @@
               kotoba-lang/nekko, which this script had reported as 16 of 17 uncovered:
               three of those sixteen were running the whole time. A test namespace ending
               in a bare top-level `(run-tests)` runs ITSELF, and nekko's `test:async` npm
-              script is three separate `nbb -e \"(require '[ns])\"` invocations -- a
+              script is three separate `kbb --backend sci -e \"(require '[ns])\"` invocations -- a
               runner declared in package.json, which a source-file-only audit cannot see.
               Both are read now; nekko reports 13, and those thirteen are genuinely
               JVM-only."
@@ -1986,12 +1986,12 @@
               net-kotobase/cypher were both unable to compile at all -- each missing the
               same three :source-paths, each surfacing only after the previous was added.
               The shell's test suite had therefore NEVER executed; restoring the paths
-              turned it on at 45 tests. Nothing was red, because `shadow-cljs compile`
+              turned it on at 45 tests. Nothing was red, because `amu compile --target wasm32-browser`
               stops before a test runs and nothing was running that build. Both were
               found by hand, because they were the two repos that session happened to
               touch. This run finds 13 of 30 in the same state, including a third copy of
               that exact three-path drift in net-kotobase-enterprise-wave2."
-   :argv     ["nbb" "{{repo}}/scripts/verify-shadow-source-paths.cljk" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-shadow-source-paths.cljk" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -2034,7 +2034,7 @@
               compile -- it is one of the 13 found by :verify-shadow-source-paths.
               REPAIRING ITS SOURCE-PATHS WOULD ARM IT. One detector prints a remedy the
               other says not to apply yet, which is why both belong in one report."
-   :argv     ["nbb" "{{repo}}/scripts/verify-worker-name-collisions.cljk" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-worker-name-collisions.cljk" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -2070,7 +2070,7 @@
               orgs/kotoba-lang/kagami (did:key resolution) -- so it cannot be a fleet gate:
               fleet ships one repo's tree to a node, and neither of those would be there.
               That is what puts it here rather than in scripts/fleet-ci/gates.edn."
-   :argv     ["nbb" "--classpath"
+   :argv     ["kbb" "--backend" "sci" "--classpath"
               "{{root}}/orgs/kotoba-lang/kip/src:{{root}}/orgs/kotoba-lang/kagami/src:{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-kip-quorum.cljk"]
    :cwd      :root
@@ -2107,7 +2107,7 @@
               The judge is `content-address.core/addressed?`; this script deliberately carries
               no second copy of that decision. It reads two things under orgs/ (every app
               manifest, and the library that judges them), so it cannot be a fleet gate."
-   :argv     ["nbb" "--classpath"
+   :argv     ["kbb" "--backend" "sci" "--classpath"
               "{{repo}}:{{root}}/orgs/kotoba-lang/content-address/src:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-app-content-address.cljk"]
    :cwd      :root
@@ -2156,7 +2156,7 @@
               10 分の上限で切れた）。重なり 0 のとき datascript のスカラ集約は nil を
               返すので、数字だけを拾う parser は答えが 1 つ足りないと言って止まる ——
               nil を 0 に写しつつ、答えの個数が合わなければ exit 2。"
-   :argv ["nbb" "--classpath" ".:scripts/nbb_compat" "{{root}}/scripts/report-public-money-coverage.cljk"]
+   :argv ["kbb" "--backend" "sci" "--classpath" ".:scripts/nbb_compat" "{{root}}/scripts/report-public-money-coverage.cljk"]
    :cwd :root
    :findings :protocol
    :evidence "SCANNED\t3\troutes"
@@ -2190,7 +2190,7 @@
               htmldom, a bitcoin node and a character creator -- none of which have ever
               seen a datom. It now requires the `kotobase.server.pattern-source` REQUIRE
               as well, which is why the noise floor is 0."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-unbounded-query-paths.cljk"]
    :cwd :root
    :findings :protocol
@@ -2252,7 +2252,7 @@
                   and contributed three findings already fixed upstream -- ghosts in a tree
                   nothing ships from. Filtering by west registration took 13 to 6; the 253
                   skipped trees are printed, so the omission is visible."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-silent-js-callbacks.cljk" "--findings"]
    :cwd :root
    :findings :protocol
@@ -2294,7 +2294,7 @@
               clean. The second works,
               because a bare group forces an explicit :git/url, and is still a second
               identity for one library."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-dep-coordinate-identity.cljk" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -2353,7 +2353,7 @@
               absence as emptiness. Fixed same-day: `:unreadable` is its own class, and a
               tree where every listed file is unreadable now exits 2 instead of reporting
               a census of nothing."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-kotoba-source-census.cljk" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -2402,7 +2402,7 @@
               project and is not in any single shipped tree. Its sibling
               scripts/gen-mf-chart.cljk --check reads only root-repo files and IS gate-able;
               they are two scripts for exactly that reason."
-   :argv     ["nbb" "--classpath"
+   :argv     ["kbb" "--backend" "sci" "--classpath"
               "{{root}}/orgs/kotoba-lang/shohyo/src:{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-mf-chart.cljk" "--findings"
               "--chart" "{{repo}}/90-docs/accounting/gftd-japan-chart.edn"
@@ -2448,7 +2448,7 @@
               live host serves those exact bytes.
               Cannot be a fleet gate: it needs orgs/network-awai/cloud-itonami AND six
               west siblings on the classpath, and no single shipped tree holds them."
-   :argv     ["nbb" "{{repo}}/scripts/verify-itonami-did-webvh.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-itonami-did-webvh.cljk"
               "--root" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -2487,7 +2487,7 @@
               namespace is not on that repo's main at all. Dirty checkouts and stale
               checkouts produce the identical symptom: a name that resolves for you and
               for nobody else."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-spec-var-claims.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -2568,9 +2568,9 @@
               （誰もまだ依存していない未登録 repo）は finding にせず、CENSUS 行で
               『判定していない候補が N 件』とだけ言う —— gh 無しでは改名残骸と区別できず、
               実測 2026-08-23 では候補 43 件が 43 件とも改名残骸だった。そちらは
-              nbb scripts/west-orphan-audit.cljk --all（gh 有り）と
-              nbb scripts/west-triple-sync.cljk plan --scope orphans で人が見る。"
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              kbb --backend sci scripts/west-orphan-audit.cljk --all（gh 有り）と
+              kbb --backend sci scripts/west-triple-sync.cljk plan --scope orphans で人が見る。"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/west-orphan-audit.cljk" "--findings"]
    :cwd      :root
    :findings :protocol
@@ -2600,7 +2600,7 @@
 
   {:id       :verify-negative-zero-literals
    :title    "-0.0 written as a literal, on the runtime where that stopped meaning -0.0"
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-negative-zero-literals.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -2701,7 +2701,7 @@
 
   {:id       :verify-grammar-lowering-drift
    :title    "forms the grammar authority declares admitted, against what the compiler can lower"
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-grammar-lowering-drift.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -2746,7 +2746,7 @@
               about:
                 - No control lowered -> exit 2, `this harness is broken, not the compiler`.
                   The first version passed the probe source as a trailing argument to
-                  `nbb -e`, which nbb reads as a script path, so every control failed. The
+                  `kbb --backend sci -e`, which nbb reads as a script path, so every control failed. The
                   floor refused to report 20 harness errors as 20 drifts.
                 - A control that does not lower -> that form is UNVERIFIED, never drift.
                   Six map probes landed here first (the parameter type was
@@ -2760,7 +2760,7 @@
 
   {:id       :verify-cljs-runner-exit-signal
    :title    "ClojureScript test runners whose failure signal cannot reach the caller"
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-cljs-runner-exit-signal.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -2813,7 +2813,7 @@
 
   {:id       :verify-cljs-shift-width
    :title    "bit shifts of 32 or more in code ClojureScript runs, where the count wraps"
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-cljs-shift-width.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -2867,7 +2867,7 @@
 
   {:id       :verify-cljs-inexact-integers
    :title    "integer literals ClojureScript cannot represent, in code it executes"
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-cljs-inexact-integers.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -2944,7 +2944,7 @@
               reader-conditional-guarded `mapv int` pairs the regex only half sees.
               It cannot be a fleet gate: it reads orgs/, and a gate ships one repo's tree
               (ADR-2608124800)."
-   :argv     ["nbb" "{{repo}}/scripts/verify-cljc-runtime-parity.cljk" "--root" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-cljc-runtime-parity.cljk" "--root" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -3003,7 +3003,7 @@
               it implements a protocol only because the generator said so. The finding
               is still sound -- the repo does assert it and contains no wire code -- but
               the assertion is generated, not considered."
-   :argv     ["nbb" "{{repo}}/scripts/verify-protocol-lib-substance.cljk" "--root" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-protocol-lib-substance.cljk" "--root" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -3050,7 +3050,7 @@
               It cannot be a fleet gate: it reads orgs/, and a gate ships one repo's
               tree, so on a node it would find an empty workspace and never go green
               (ADR-2608124800)."
-   :argv     ["nbb" "{{repo}}/scripts/verify-single-page-app.cljk" "--root" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-single-page-app.cljk" "--root" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
@@ -3116,7 +3116,7 @@
               names, which is a floor and not a fix; the next redeploy that moves the
               suffix reproduces the outage exactly. This detector is what makes that
               cost one session-start line instead of a day."
-   :argv     ["nbb" "{{repo}}/scripts/verify-model-alias-admission.cljk"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-model-alias-admission.cljk"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -3149,7 +3149,7 @@
               and one, chuko-sha, on 年間商品販売額) as an INFO line rather than
               letting the mix stay silent. It also names the next vertical to build,
               which is what keeps the loop from re-deriving state each session."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/recruit-vertical-tick.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -3214,7 +3214,7 @@
               this detector exists to make. Cannot be a fleet gate: it reads
               orgs/cloud-itonami and manifest/itonami-maturity-evidence.edn, and
               no single shipped tree holds the actors."
-   :argv ["nbb" "{{repo}}/scripts/itonami-actor-pnl.cljk" "--findings" "--root" "{{root}}"]
+   :argv ["kbb" "--backend" "sci" "{{repo}}/scripts/itonami-actor-pnl.cljk" "--findings" "--root" "{{root}}"]
    :cwd :root
    :findings :protocol
    :writes :none
@@ -3256,7 +3256,7 @@
               proved the diagnosis by hand needs a Keychain read, and launchd
               cannot answer an unlock prompt (ADR-2607178000), so that half stays
               in the hand-run set rather than becoming a permanent :inconclusive."
-   :argv ["nbb" "{{repo}}/scripts/verify-hermes-agent-health.cljk" "--findings"]
+   :argv ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-hermes-agent-health.cljk" "--findings"]
    :cwd :root
    :findings :protocol
    :writes :none
@@ -3342,7 +3342,7 @@
               operator workstation, which exists in no repo tree and on no
               node. It reads no credential -- job prompts are not printed, only
               counted."
-   :argv ["nbb" "{{repo}}/scripts/verify-hermes-profile-fitness.cljk" "--findings"]
+   :argv ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-hermes-profile-fitness.cljk" "--findings"]
    :cwd :root
    :findings :protocol
    :writes :none
@@ -3394,7 +3394,7 @@
               because a table would drift exactly the way the offer did.
               Cannot be a fleet gate: it reads a live catalog and calls
               contracts over the network."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-x402-offer-domain.cljk" "--findings"]
    :cwd :root
    :findings :protocol
@@ -3447,7 +3447,7 @@
               /search and for a path nobody routed. Those paths are unmeasured,
               and the UNMEASURED lines print with or without --findings so a
               clean exit cannot be read as every promise having been checked."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-advertised-surfaces.cljk" "--findings"]
    :cwd :root
    :findings :protocol
@@ -3505,7 +3505,7 @@
               in a shipped tree. Flags only records whose OWN status is
               `serving`; an `unverified` record is already telling the truth and
               flagging it would punish the honest state."
-   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-declared-serving.cljk" "--findings"]
    :cwd :root
    :findings :protocol
@@ -3550,7 +3550,7 @@
    ;; one of the 60 detectors ran. Converted here, measured rather than guessed:
    ;; the script has zero write calls, takes 4.9 s over 1,403 package.json, and
    ;; its SCANNED line matches the evidence floor below.
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-ship-builds-first.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -3589,7 +3589,7 @@
               actors -- is right only for the enumerated ones. `tomoshibi`, the
               one keyed document today, is enumerated; that was the pattern, and
               nothing enforced it."
-   :argv     ["nbb" "{{repo}}/scripts/verify-actor-did-keys.cljk" "--findings" "{{root}}"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-actor-did-keys.cljk" "--findings" "{{root}}"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -3609,7 +3609,7 @@
               from the tree, because in both cases the alias is gone.
 
               What separates them lives in a different file. The launchd plist
-              dev.cloud-itonami.app still reads `clojure -M:server`. Production did
+              dev.cloud-itonami.app still reads `kbb -M:server`. Production did
               not notice for one reason that is not a safeguard: ~/.cloud-itonami/
               current points at a release cut BEFORE #270, so the alias the plist
               names still exists in the release it names. The next release flips
@@ -3618,7 +3618,7 @@
               stays closed.
 
               There is more than one such pointer, and they name different trees.
-              The superproject's `.mcp.json` runs `clojure -M:mcp` -- the second
+              The superproject's `.mcp.json` runs `kbb -M:mcp` -- the second
               alias #270 deleted -- in the west checkout under orgs/. That works
               today only because `west update` REFUSED to advance that checkout
               past another session's uncommitted files; the pin already points
@@ -3638,7 +3638,7 @@
               CANNOT be a fleet gate: the target is a west-managed checkout under
               orgs/, which a gate's single-repo tree does not carry. It also reads
               a plist in the operator's home, which no node has."
-   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" ".:scripts/nbb_compat"
               "{{repo}}/scripts/verify-itonami-run-path.cljk" "--findings"
               "--root" "{{root}}"]
    :cwd      :root
@@ -3656,7 +3656,7 @@
   {:id       :verify-declared-dependencies
    :title    "src requires namespaces its own deps.edn does not account for"
    :why      "A require is resolved by the classpath, and in this workspace the classpath is
-              assembled four ways -- `clojure -M:test`, a hand-written --classpath in
+              assembled four ways -- `kbb -M:test`, a hand-written --classpath in
               bin/run_tests.cljs, shadow-cljs reading :deps, and a sibling checkout that
               happens to sit next door under orgs/. Three of the four put a dependency on the
               classpath whether or not deps.edn names it, so an undeclared require resolves
@@ -3682,7 +3682,7 @@
               CANNOT be a fleet gate: resolving what a dependency PROVIDES means reading that
               repository's checkout under orgs/, and a gate ships only the target repo's own
               tree."
-   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" ".:scripts/nbb_compat"
               "{{repo}}/scripts/verify-declared-dependencies.cljk" "--findings"
               "--scan-root" "{{root}}"]
    :cwd      :root
@@ -3790,9 +3790,9 @@
               clj-kondo needs only the target repository's tree. It is here because the
               question is fleet-wide (9 sites across 4,331 paths, four of them in repositories
               nobody would have thought to add a gate to), and because no node declares
-              clj-kondo while the alias's own `clojure -M:lint` needs :jvm, which 2 of the 8
+              clj-kondo while the alias's own `kbb -M:lint` needs :jvm, which 2 of the 8
               nodes have."
-   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" ".:scripts/nbb_compat"
               "{{repo}}/scripts/verify-lint-structural-warnings.cljk" "--findings"
               "--scan-root" "{{root}}"]
    :cwd      :root
@@ -3830,7 +3830,7 @@
               repositories already have a .clj-kondo directory, and clj-kondo writes a cache
               into exactly those; and the excluded ids stay quiet on a file deliberately full
               of them.
-              The clj-kondo BINARY on PATH is used, not `clojure -M:lint`: same pinned version
+              The clj-kondo BINARY on PATH is used, not `kbb -M:lint`: same pinned version
               (checked at startup, and a mismatch or an absent binary is exit 2 before any
               sweep), ~10ms startup against the JVM's seconds, and no contention for the build
               lock. Skipping the classpath cache cannot change these two answers -- a populated
@@ -3868,7 +3868,7 @@
               境界が導出できる 2 つ**（開けない / build が完了していない）に限り、
               残りは母数と最悪値を持つ 1 行の集計 finding にした。列挙しないことと
               数えていないことは別である。"
-   :argv ["nbb" "{{repo}}/scripts/verify-pages-freshness.cljk" "--findings"]
+   :argv ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-pages-freshness.cljk" "--findings"]
    :cwd :root
    :findings :protocol
    :writes   :none
@@ -3905,7 +3905,7 @@
               evidence. This CANNOT be a fleet gate: it reads orgs/, which a gate
               never ships, since the fleet sends one repository's tree to a node.
               It reports that two sources DISAGREE, never that a repo is wrong."
-   :argv     ["nbb" "{{repo}}/scripts/verify-capability-provider-status.cljk" "{{root}}" "--findings"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-capability-provider-status.cljk" "{{root}}" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -3945,7 +3945,7 @@
               `except Exception: pass`). Teardown catches around .close/.destroy/
               .kill are excluded. Reports a SHAPE; the fix is a tagged value or a
               host-side reason ring, never removing the catch."
-   :argv     ["nbb" "{{repo}}/scripts/verify-catch-swallow.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-catch-swallow.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -3967,7 +3967,7 @@
               policy today is the dangerous case, so the finding prints
               POLICY=n LITERAL=n so agreement-by-coincidence is visible. A tree with
               no policy file is REFUSED (exit 2): no authority to compare against."
-   :argv     ["nbb" "{{repo}}/scripts/verify-fuel-literal-vs-policy.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-fuel-literal-vs-policy.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -3987,7 +3987,7 @@
               answers 'nothing wrong' when it could not look. This meta-detector runs
               every scripts/check-*.cljs and verify-*.cljs it finds against an empty
               input and REQUIRES exit 2; a 0 is a finding."
-   :argv     ["nbb" "{{repo}}/scripts/verify-checker-floors.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-checker-floors.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -4021,7 +4021,7 @@
               checkout with the class histogram. Severity warn only when a load or
               poll result is sunk. Cannot be a fleet gate: the population that
               matters is aiueos + kototama under orgs/."
-   :argv     ["nbb" "{{repo}}/scripts/verify-status-sink.cljk" "--findings" "{{root}}/orgs"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-status-sink.cljk" "--findings" "{{root}}/orgs"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -4067,7 +4067,7 @@
               clojure/clj/java/gh stubbed to exit 64, and reports exit 0 on a
               mutated copy. Cannot be a fleet gate: the checkers live in
               kotoba-lang checkouts under orgs/."
-   :argv     ["nbb" "{{repo}}/scripts/verify-grammar-authority-floor.cljk" "--findings" "{{root}}/orgs/kotoba-lang"]
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-grammar-authority-floor.cljk" "--findings" "{{root}}/orgs/kotoba-lang"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
@@ -4110,7 +4110,7 @@
               sits at the revision west.yml pins. This asks a different question of a different
               file -- whether a deps.edn's own :git/sha is reachable from the library's main at
               all. A repo can pass that one and fail this one."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-git-dep-pin-reachability.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -4180,7 +4180,7 @@
               whether the two copies still agree, because 'byte-identical today' and
               'already drifted' are different amounts of trouble and the finding should
               say which one it found."
-   :argv     ["nbb" "{{repo}}/scripts/verify-itonami-surface-split.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-itonami-surface-split.cljk"
               "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -4223,7 +4223,7 @@
               it -- so the repos most certain to be broken were the ones reported clean.
               Adjacent: verify-git-dep-pin-reachability asks whether a pin a deps.edn NAMES is
               reachable. This asks whether there is a deps.edn to name it in at all."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-kotoba-require-declarable.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -4271,7 +4271,7 @@
               Adjacent: verify-git-dep-pin-reachability asks whether a pin a deps.edn NAMES is
               reachable from its library's main. This asks whether the coordinate is an address
               at all."
-   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+   :argv     ["kbb" "--backend" "sci" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-build-input-addressing.cljk" "--findings" "--root" "{{root}}"]
    :cwd      :root
    :findings :protocol
@@ -4312,7 +4312,7 @@
               about a git tree, and the chain is not in the tree. Cannot be a fleet gate: a
               gate ships one repo's tree and no network identity, and the question here is
               about a running deployment, not a source file."
-   :argv     ["nbb" "{{repo}}/scripts/verify-chain-liveness.cljk" "--findings"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-chain-liveness.cljk" "--findings"
               "--registry" "{{repo}}/manifest/chain-deployments.edn"]
    :cwd      :root
    :findings :protocol
@@ -4357,7 +4357,7 @@
               loop-yakuwari): branches cut before the rename kept landing after it, and nothing
               refused them. The extension is now a branding claim about the corpus; a claim
               with no detector decays at the rate other sessions merge old branches."
-   :argv     ["nbb" "{{repo}}/scripts/verify-no-clojure-extensions.cljk"
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-no-clojure-extensions.cljk"
               "--west" "{{root}}/manifest/west.yml" "--root" "{{root}}"
               "--allow" "kotoba-lang/org-babashka-nbb"]
    :cwd      :root

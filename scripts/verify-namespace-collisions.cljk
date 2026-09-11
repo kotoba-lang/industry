@@ -1,13 +1,13 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; The sibling axis is `scripts/verify-namespace-twins.cljk`
 ;; (ADR-2608319602): ONE repository publishing one namespace as both
 ;; `.cljc` and `.clj`/`.cljs`, where the loader's extension priority --
 ;; not the classpath -- decides which file is dead.
 ;; Report Clojure namespaces that more than one checked-out repo ships.
 ;;
-;;   nbb scripts/verify-namespace-collisions.cljk            ; divergent only
-;;   nbb scripts/verify-namespace-collisions.cljk --all      ; identical ones too
-;;   nbb scripts/verify-namespace-collisions.cljk --check    ; exit 1 if any divergent
+;;   kbb --backend sci scripts/verify-namespace-collisions.cljk            ; divergent only
+;;   kbb --backend sci scripts/verify-namespace-collisions.cljk --all      ; identical ones too
+;;   kbb --backend sci scripts/verify-namespace-collisions.cljk --check    ; exit 1 if any divergent
 ;;
 ;; ## Why this exists
 ;;
@@ -250,7 +250,7 @@
   package tree, and both repos that say so document it: `kotoba-lang/kotoba-lang`
   keeps `.` because `kotoba.launcher` reads `lang/cli.edn` through `io/resource`
   and dropping it cost 66 load errors, and the twenty `games/*/deps.edn` under
-  `kami-genre-base-systems` keep it so `clojure -M author.clj` resolves -- those
+  `kami-genre-base-systems` keep it so `kbb -M author.clj` resolves -- those
   files carry no `ns` form at all. Honouring `.` as a namespace root instead
   re-derives every namespace WITH the real tree's own name still on the front,
   so `src/kotoba/lang/package_registry.cljc` appears beside the true
@@ -394,7 +394,7 @@
                  ;; `kami/ongaku/e2e/*` when no build can put two of those trees
                  ;; on one classpath -- each is reachable only through its own
                  ;; `:e2e` alias, and tools.deps does not export a dependency's
-                 ;; aliases. Measured with `clojure -Spath -A:e2e` in the one
+                 ;; aliases. Measured with `kbb -Spath -A:e2e` in the one
                  ;; repo depending on two of them: neither tree appears.
                  ;;
                  ;; The rule was right and the filter was the wrong shape for

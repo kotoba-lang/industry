@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; west-triple-sync.cljs — GitHub / local / west 三点同期オーケストレータ。
 ;;
 ;; ADR-2607173200 / manifest/west-triple-sync-workflow.edn
@@ -7,7 +7,7 @@
 ;; wholesale gen-west-manifest commit / force-push / dirty overwrite はしない。
 ;;
 ;; 使い方:
-;;   nbb scripts/west-triple-sync.cljk plan  [--scope blocking|managed|orphans|names] [--names a,b]
+;;   kbb --backend sci scripts/west-triple-sync.cljk plan  [--scope blocking|managed|orphans|names] [--names a,b]
 ;;
 ;;   scope:
 ;;     blocking  消費者の :local/root が壊れている辺だけ（既定）
@@ -16,8 +16,8 @@
 ;;               （2026-08-23 追加。誰もまだ依存していない登録漏れの一括経路。
 ;;                :personal / scratch / 改名残骸 / 訊けなかったものは入らない）
 ;;     names     明示指定
-;;   nbb scripts/west-triple-sync.cljk apply [--scope ...] [--names ...] [--no-pin-advance]
-;;   nbb scripts/west-triple-sync.cljk verify [--scope ...] [--names ...]
+;;   kbb --backend sci scripts/west-triple-sync.cljk apply [--scope ...] [--names ...] [--no-pin-advance]
+;;   kbb --backend sci scripts/west-triple-sync.cljk verify [--scope ...] [--names ...]
 ;;
 ;; exit 0: plan 成功 / apply+verify で scope 内 blocking 解消
 ;; exit 1: verify 失敗 or apply 中に fatal
@@ -675,7 +675,7 @@
                   (get-in plan [:orphan-counts :renamed-unverified])
                   " 件は GitHub に後継を訊けなかった候補で、どの scope にも入っていない。"))
     (println "    『未登録はこれで全部』ではない。gh が答えられる状態で audit を再実行すること:")
-    (println "      nbb scripts/west-orphan-audit.cljk --all"))
+    (println "      kbb --backend sci scripts/west-orphan-audit.cljk --all"))
   (println)
   (println "## managed")
   (doseq [p (:managed plan)]
@@ -695,7 +695,7 @@
     (doseq [r (:reports plan)]
       (println (str "  " (pr-str r)))))
   (println)
-  (println "Next: nbb scripts/west-triple-sync.cljk apply --scope"
+  (println "Next: kbb --backend sci scripts/west-triple-sync.cljk apply --scope"
            (:scope plan)
            (when (seq (keep :name (:managed plan)))
              (str "--names " (str/join "," (distinct (map :name (:managed plan))))))))

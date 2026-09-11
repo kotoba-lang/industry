@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; The pure half of scripts/x402_bot_pay.cljk: who may spend, how much is left,
 ;; and which refusal a caller is told. Everything here is a table — no seed, no
 ;; socket, no ledger file — which is the point of the payer keeping its
 ;; decisions out of its I/O.
 ;;
-;;   nbb --classpath "<pay,cacao,ed25519,cbor,authority,local-murakumo>:scripts" \
+;;   kbb --backend sci --classpath "<pay,cacao,ed25519,cbor,authority,local-murakumo>:scripts" \
 ;;       scripts/x402_bot_pay_test.cljk
 
 (ns x402-bot-pay-test

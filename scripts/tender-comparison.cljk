@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Cross-host tender comparison on fixed kototama fixtures.
 ;; Emits kotoba.tender-comparison/v1 JSON.
 ;;
 ;; Usage:
-;;   nbb scripts/tender-comparison.cljk [--kototama PATH] [--runs N] [--calls N] [--warmup N] [--output PATH]
+;;   kbb --backend sci scripts/tender-comparison.cljk [--kototama PATH] [--runs N] [--calls N] [--warmup N] [--output PATH]
 
 (ns tender-comparison
   (:require ["node:child_process" :as cp]
@@ -293,7 +293,7 @@
                            :warmupCalls warmup
                            :timing
                            #js {:nodeWebassembly "in-process WebAssembly.instantiate; reused instance; main() loop after warmup (≤500 invocations/instance for amu fuel budget)"
-                                :chicoryJvmSingle "subprocess clojure -M:cli run (includes JVM cold start + Chicory instantiate per sample)"
+                                :chicoryJvmSingle "subprocess kbb -M:cli run (includes JVM cold start + Chicory instantiate per sample)"
                                 :chicoryJvmSteady "single JVM; tender/open-session reused; main() loop after warmup"
                                 :wasmtimeCli "subprocess wasmtime run --invoke main per sample"}
                            :safety "host-free guests only (zero imports); fuel metering active on Chicory path"}

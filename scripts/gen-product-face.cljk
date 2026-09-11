@@ -16,7 +16,7 @@
 ;; 内容を変えたい場合は README/blueprint 側を直して各 repo の docs を作り直す。
 ;;
 ;; usage:
-;;   nbb --classpath "<html>/src:<css>/src:<jp-go-dds>/src" gen_product_face.cljs \
+;;   kbb --backend sci --classpath "<html>/src:<css>/src:<jp-go-dds>/src" gen_product_face.cljs \
 ;;       <orgs/cloud-itonami> <repo-name>...        # 指定 repo だけ
 ;;       <orgs/cloud-itonami> --all <list-file>     # list-file の 1行1repo
 (require '[clojure.string :as str]

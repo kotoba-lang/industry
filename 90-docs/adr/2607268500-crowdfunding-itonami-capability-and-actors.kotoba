@@ -151,7 +151,7 @@ crowdfunding プロトコルが 1 事業者の契約を焼き込んではなら�
 | `cloud-itonami-crowdfunding-payout` | 28 tests / 100 assertions / 0 failures | 0 errors 0 warnings |
 | `cloud-itonami-crowdfunding-fulfillment` | 24 tests / 81 assertions / 0 failures | 0 errors 0 warnings |
 
-5 アクターすべて `clojure -M:dev:run` のオフライン sim が実行可能で、拒否・人間承認・
+5 アクターすべて `kbb -M:dev:run` のオフライン sim が実行可能で、拒否・人間承認・
 台帳記録まで通る。
 
 ## 実装中に見つけて直したもの
@@ -208,9 +208,9 @@ etzhayyim 側の supersede 記録: `585de82` → `75d3983`。
 再開時の最初の 3 コマンド:
 
 ```bash
-cd orgs/kotoba-lang/crowdfunding && clojure -M:dev:test   # 134 tests が通ることを確認
-cd orgs/cloud-itonami/cloud-itonami-crowdfunding-fulfillment && clojure -M:dev:run
-nbb scripts/verify-west-pins.cljs --baseline origin/main --candidate manifest/west.yml --only crowdfunding,cloud-itonami-crowdfunding-fulfillment
+cd orgs/kotoba-lang/crowdfunding && kbb -M:dev:test   # 134 tests が通ることを確認
+cd orgs/cloud-itonami/cloud-itonami-crowdfunding-fulfillment && kbb -M:dev:run
+kbb --backend sci scripts/verify-west-pins.cljk --baseline origin/main --candidate manifest/west.yml --only crowdfunding,cloud-itonami-crowdfunding-fulfillment
 ```
 
 優先順位つきの次作業:
@@ -225,7 +225,7 @@ nbb scripts/verify-west-pins.cljs --baseline origin/main --candidate manifest/we
 4. **CI**（gap 2）。`:local/root` のままでは単独 checkout で解決しないので、
    monorepo 側の集約 CI か push 済み SHA での git 座標化のどちらかを選ぶ判断が要る。
 
-**運用上の注意（実測）**: `nbb scripts/gen-west-manifest.cljs --entry <name>` は
+**運用上の注意（実測）**: `kbb --backend sci scripts/gen-west-manifest.cljk --entry <name>` は
 この機で **1 回あたり 20 分以上**かかり、ローカル `repos.edn` に当該 entry が無いと
 「生成結果に entry がありません」で失敗したあと **sleep ループで固まる**（実測 30 分、
 CPU 0%）。west.yml の 1〜数 entry の更新は、`origin/main` から worktree を切って

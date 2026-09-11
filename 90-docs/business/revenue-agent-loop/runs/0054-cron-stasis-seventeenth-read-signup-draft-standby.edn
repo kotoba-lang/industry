@@ -15,7 +15,7 @@
                       :rejection-reasons {:malformed-header 1}
                       :rejections-classified 1 :rejections-unexplained 3
                       :attempt-rate 0.121}}
-  :funnel-pulse "nbb kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 11 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false, SCANNED=1. Pulse count matches live API read (4944 both)."
+  :funnel-pulse "kbb --backend sci kotobase_lead_loop.cljk funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 11 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false, SCANNED=1. Pulse count matches live API read (4944 both)."
   :stability-checks [{:path "/" :status 200 :time-s "0.071"}
                      {:path "/signup" :status 200 :time-s "0.066"}
                      {:path "/ipld/v1" :status 400 :note "expected — route alive, params required (baseline 2026-09-03)"}

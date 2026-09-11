@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; biscuit の委譲を検証し、authority に判定させ、identity.startup で起動可否を
 ;; 決める verifier（ADR-2608197300 resume point 2）。判定器は増やさない —
 ;; ここは biscuit.token/verify → biscuit.kotoba/->delegated →
@@ -6,7 +6,7 @@
 ;; 薄い口で、決定はすべて既存の library が持つ。
 ;;
 ;;   echo '{:token {...} :root-public-key [...] :requested "kotoba://graph/acme"}' \
-;;     | nbb --classpath "$CP" scripts/identity-verify.cljk
+;;     | kbb --backend sci --classpath "$CP" scripts/identity-verify.cljk
 ;;
 ;; 入力 key:
 ;;   :token           この workspace の EDN token（`biscuit/edn-v1`）

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; threed-gpu-receipt — 実ブラウザ・実 GPU の測定を 1 回走らせ、**受領書**を書く。
 ;;
 ;; なぜ probe から切り離すか: `:render/realtime-gpu` の probe は
@@ -15,7 +15,7 @@
 ;; probe は受領書を読み、**sha が現在の HEAD と違えば PASS を出さない**。
 ;; 古い受領書で緑を出すのは、測っていないものを緑にすることと同じ。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/threed-gpu-receipt.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/threed-gpu-receipt.cljk
 ;;
 ;; exit 0 = 受領書を書いた  3 = 測れなかった（ブラウザが無い等）  1 = テストが落ちた
 
@@ -91,7 +91,7 @@
         (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
         (fs/writeFileSync out-file
                           (str ";; threed-gpu-receipt — **生成物。手で編集しない。**\n"
-                               ";; 再生成: nbb --classpath \".:scripts/nbb_compat\" scripts/threed-gpu-receipt.cljk\n"
+                               ";; 再生成: kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/threed-gpu-receipt.cljk\n"
                                ";; probe は :receipt/revision が webgpu の現 HEAD と一致するときだけ\n"
                                ";; これを証拠として使う。古い受領書で緑を出さないため。\n"
                                (str (pr-str receipt) "\n")))

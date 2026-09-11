@@ -260,10 +260,10 @@ consumer のビルドで解決されない。drift 対策として cid_test に 
 
 | repo | 実行 | 結果 |
 |---|---|---|
-| tech-ipfs-specs-ipns | clojure -M:test / -M:lint | 25 tests 90 assertions 0 failures / errors 0（main は 2 errors で赤かった） |
+| tech-ipfs-specs-ipns | kbb -M:test / -M:lint | 25 tests 90 assertions 0 failures / errors 0（main は 2 errors で赤かった） |
 | kotobase-client | npm test（shadow-cljs node-test） | 70 tests 216 assertions 0 failures |
-| kotobase-storage | clojure -M:test / nbb test/run.cljs | 50 tests 171 assertions 0 failures / 非同期 oracle 2 本追加、all green |
-| inga | clojure -M:test / -M:lint | 279 tests 1303 assertions 0 failures / errors 0 |
+| kotobase-storage | kbb -M:test / kbb --backend sci test/run.cljk | 50 tests 171 assertions 0 failures / 非同期 oracle 2 本追加、all green |
+| inga | kbb -M:test / -M:lint | 279 tests 1303 assertions 0 failures / errors 0 |
 | kotobase-server | npm run test:cljs | 92 tests 408 assertions 0 failures |
 
 新規テストはすべて、修正前のソースに revert して実際に落ちることを確認した

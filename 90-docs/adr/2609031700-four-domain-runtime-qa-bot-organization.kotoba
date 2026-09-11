@@ -25,7 +25,7 @@
   (vector "manifest/endpoint-health.edn: probe 6 → 13 (7 追加, 全部 2026-09-03 の実リクエストで約束を確定してから書いた)"
    "実測 2026-09-03: :murakumo/chat-POST が 500 (error 1101, Worker threw exception) — murakumo-main alias (qwen3.8-27b) は status:serving と自己申告していたが配信は死んでいる。alias も status-evidence も stale (verified_at 2026-08-24, age 9 > max 7)"
    "実測 2026-09-03: hyakka knowledge resident は published 94 / failed 106 (半落ち)、last_error に Kotobase transact 502 CPU limit。topic resident 9 件全部が同形"
-   "nbb scripts/verify-endpoint-health.cljs . --all --cheap-only 実測: 新 probe が :itonami/hyakka-knowledge-resident を DEGRADED で検出、exit 1 (--findings で FINDING 行を出力)"
+   "kbb --backend sci scripts/verify-endpoint-health.cljk . --all --cheap-only 実測: 新 probe が :itonami/hyakka-knowledge-resident を DEGRADED で検出、exit 1 (--findings で FINDING 行を出力)"
    "nbb 形式確認実測: :json-non-empty の複数キーは ([:a] [:b]) の「パスのリスト」形。[:a :b] は 1 本のネストした walk として解釈される (既存 6 probe が単一キー形だったため今まで未発覚)"))
   (:adr/body
   "# ADR-2609031700: 4 ドメイン runtime QA bot 組織 (ito.ai 参照)
@@ -101,7 +101,7 @@ ito.ai の finding は「video / logs / repro」を添える。bot 組織の fin
 {:qa/finding-id \"...\" :qa/probe :itonami/hyakka-knowledge-resident
  :qa/observed {...statement.edn からの引用...}
  :qa/promise \"...endpoint-health.edn :note の約束...\"
- :qa/repro \"nbb scripts/verify-endpoint-health.cljs . --only <id>\"
+ :qa/repro \"kbb --backend sci scripts/verify-endpoint-health.cljk . --only <id>\"
  :qa/severity :degraded|:broken :qa/owner \"network-awai/cloud-itonami\"}
 ```
 

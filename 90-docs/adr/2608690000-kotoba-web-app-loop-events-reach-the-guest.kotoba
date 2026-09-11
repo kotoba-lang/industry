@@ -141,7 +141,7 @@ mock を実物に寄せることでしか防げない。
 - **web target は JDK を要する唯一の出荷 target。** `bin/kotoba` は wasm32 / native を
   nbb fast path に載せるが、web backend（`kotoba-lang/kotoba-script` の `src/kotoba/script.clj`）
   は JVM-only Clojure で nbb entrypoint が無く、`--target js` / `js-browser` は
-  `clojure -M:run` に落ちる。browser matrix はこの 1 artifact のためだけに JDK を要するように
+  `kbb -M:run` に落ちる。browser matrix はこの 1 artifact のためだけに JDK を要するように
   なったので、`browser-matrix.cljs` がその旨を実行時に出力する（silent cap にしない）。
   fleet gate はこの matrix を回していない（`gates.edn` の amu 節が egress 無しを理由に明記）
   ので、gate は赤くならない。

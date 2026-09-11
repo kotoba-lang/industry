@@ -10,7 +10,7 @@
    Rust は書かない(ADR-2607072000)。nbb / cljs のみ(ADR-2607173000)。
 
    実行:
-     nbb --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljk
+     kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljk
 
    **正直な能力範囲(ADR-2607255000 決定5と同じ立場)**:
    ・org-iso-10303 は 1,599 行で OCCT/Parasolid 級の production kernel ではない。
@@ -432,7 +432,7 @@
     (println (str "    バルク空気温度上昇 ΔT = " (r1 (:bulk-delta-t-k cfd)) " K"))
     (println "    ※ ΔT は CFD ではなくエネルギー保存(W/(rho*cp*Q))。**排気空気**の")
     (println "      上昇であって素子ジャンクション温度ではない(共役熱伝達は未実装)。"))
-  (println (str "    × " cfd-path " が無い。`clojure -M:run-cfd` 相当で生成してから再実行する。")))
+  (println (str "    × " cfd-path " が無い。`kbb -M:run-cfd` 相当で生成してから再実行する。")))
 
 ;; ════════════════════════════════════════════════════════════════════════════
 ;; 6. 組み立て工程 — EDN に書き出す
@@ -708,7 +708,7 @@
                     :adr ["adr-2607267000" "adr-2607268000" "adr-2607269000"]}})
 
 (def out-path "90-docs/hardware/mk1-assembly.edn")
-(fs/writeFileSync out-path (str ";; 生成物 — 手編集しない。再生成: nbb --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljk\n"
+(fs/writeFileSync out-path (str ";; 生成物 — 手編集しない。再生成: kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljk\n"
                                 (pr-str out-edn) "\n"))
 (println (str "  EDN 書き出し: " out-path))
 

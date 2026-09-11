@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Report code that can issue a WHOLE-GRAPH read: a query path that reaches the
 ;; datom plane without an admission decision, and a hand-written index read that
 ;; binds no prefix.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-unbounded-query-paths.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-unbounded-query-paths.cljk
 ;;
 ;; ## Why
 ;;

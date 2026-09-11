@@ -147,11 +147,11 @@ agent は「IPFS/B2 に可変 state は構造的に載らない」と書いた�
     :standing-runner \"com.gftd.murakumo-x402-ingest（60s）。log: ~/.gftd/murakumo-x402-ingest.log\"
     :next-commands
     [\"# 残高と view の現在地\"
-     \"cd orgs/network-awai/cloud-murakumo && nbb --classpath src scripts/x402-ingest.cljs --lookback 3000\"
+     \"cd orgs/network-awai/cloud-murakumo && kbb --backend sci --classpath src scripts/x402-ingest.cljs --lookback 3000\"
      \"# 常駐ジョブの健全性\"
      \"tail -5 ~/.gftd/murakumo-x402-ingest.log; launchctl print gui/$(id -u)/com.gftd.murakumo-x402-ingest | grep 'last exit'\"
      \"# 有料経路の再検証（残 9 回分ある）\"
-     \"nbb scripts/x402_dogfood.cljs verify --tx 0x50c58ac4… --from 0xe255D685…\"]
+     \"kbb --backend sci scripts/x402_dogfood.cljk verify --tx 0x50c58ac4… --from 0xe255D685…\"]
     :preserved-others-wip
     [{:what \"superproject のローカル未 push commit 1 件\" :which \"da145a31659 'register cloud-itonami/shirohan'\"
       :note \"他セッションの作業。触っていない。origin/main より 83 behind / 1 ahead の状態\"}

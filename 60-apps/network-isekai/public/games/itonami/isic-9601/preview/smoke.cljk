@@ -3,7 +3,7 @@
 
   Run from the repo root, after `preview/build.cljs`:
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \\
-      npx nbb --classpath 60-apps/network-isekai/public/games/itonami/isic-9601/node_modules \\
+      kbb --backend sci --classpath 60-apps/network-isekai/public/games/itonami/isic-9601/node_modules \\
       60-apps/network-isekai/public/games/itonami/isic-9601/preview/smoke.cljk
 
   It opens the built page in headless Chromium, lets the shop run, drives the

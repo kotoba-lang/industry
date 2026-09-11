@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns cachetest (:require [clojure.string :as str] ["node:child_process" :as cp]))
 (def big (str/join "\n" (repeat 40 "Kotoba is a typed s-expression language; strings use string-length, string-substring, string=?, string-concat, string-from-i64.")))
 (defn call [suffix]

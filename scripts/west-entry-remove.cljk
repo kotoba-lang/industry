@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/west-entry-remove.cljk — unregister west project entries.
 ;;
 ;; The counterpart to west-entry-rename.cljs, and the more dangerous one: a
@@ -23,7 +23,7 @@
 ;; check for absence would force the dangerous one.
 ;;
 ;;   ENTRIES=names.txt REASON="..." [DRY=1] \
-;;     nbb --classpath ".:scripts/nbb_compat" scripts/west-entry-remove.cljk
+;;     kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-entry-remove.cljk
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))

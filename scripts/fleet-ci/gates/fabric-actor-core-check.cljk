@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; fabric-actor-core-check.cljs — fabric actor の名乗り・pulse 文・終了状態の
 ;; **2 実装が同じことを言うか**を見る（ADR-2608155000）。
 ;;
@@ -24,7 +24,7 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb fabric-actor-core-check.cljs <repo-dir> [--min N]
+;;   kbb --backend sci fabric-actor-core-check.cljk <repo-dir> [--min N]
 ;;
 ;; `<dir>` は **引数の先頭**に置く（fleet はそう渡す。CLAUDE.md の実測済みの罠）。
 

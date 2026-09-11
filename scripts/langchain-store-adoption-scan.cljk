@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; langchain-store-adoption-scan.cljs — increment-3 visibility for the
 ;; store-seam commonalization (ADR-2607141600). Scans every `store.cljc`
 ;; under a root (default `orgs/cloud-itonami`) and classifies each by
@@ -16,7 +16,7 @@
 ;; Prints a summary + the hand-rolled backlog list (migration targets).
 ;; No writes; safe to run anytime.
 ;;
-;;   nbb scripts/langchain-store-adoption-scan.cljk [root-dir]
+;;   kbb --backend sci scripts/langchain-store-adoption-scan.cljk [root-dir]
 (ns langchain-store-adoption-scan
   (:require ["fs" :as fs]
             ["path" :as path]

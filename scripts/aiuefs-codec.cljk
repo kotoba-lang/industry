@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Reference implementation of `kotoba.leaf.v1` -- the sealed leaf envelope
 ;; that aiuefs-v4 stores and that ayatori reads, plus its conformance suite.
 ;;
-;;   nbb scripts/aiuefs-codec.cljk selftest
-;;   nbb scripts/aiuefs-codec.cljk vectors --out <file.edn>
+;;   kbb --backend sci scripts/aiuefs-codec.cljk selftest
+;;   kbb --backend sci scripts/aiuefs-codec.cljk vectors --out <file.edn>
 ;;
 ;; WHY AN ENVELOPE AND NOT A FLAG.
 ;;

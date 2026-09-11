@@ -915,7 +915,7 @@
                        :example {"http/fetch" "capability-http-fetch"
                                  "gpu/draw-frame" "capability-gpu-draw-frame"
                                  "secret/use-scram-sha256" "capability-secret-use-scram-sha256"}}
-     :verified-by "nbb scripts/verify-repository-roles.cljk --capability-audit"
+     :verified-by "kbb --backend sci scripts/verify-repository-roles.cljk --capability-audit"
      ;; Recorded because it bears directly on how much the NAME is allowed to
      ;; mean: ADR-2607289500 decides that a repository name (and a Radicle RID)
      ;; is a discovery alias only, and that identity is the semantic definition
@@ -1097,7 +1097,7 @@
               terms, before any metaphor or history"}
       {:route :concept-index
        :rule "the subject is registered in manifest/concept-vocabulary.edn so
-              `nbb scripts/concept-lookup.cljk <word>` reaches it — in both
+              `kbb --backend sci scripts/concept-lookup.cljk <word>` reaches it — in both
               English and Japanese"
        :authority "90-docs/adr/2608039980"}]
      :examples ["design-quality" "hinshitsu" "browser-agent" "ao"]
@@ -1439,7 +1439,7 @@
   ;; ── measured 2026-08-04 by --name-audit (ADR-2608040100) ──────────────
   {:gap/id :origin-domain-unverified
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit"
+   :gap/measured-by "kbb --backend sci scripts/verify-repository-roles.cljk --name-audit"
    :gap/count 1313
    :gap/of 1432
    :gap/note "origin-plane repos with no domain recorded in manifest/origin-domains.edn.
@@ -1454,7 +1454,7 @@
 
   {:gap/id :origin-prefix-misfiled
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit"
+   :gap/measured-by "kbb --backend sci scripts/verify-repository-roles.cljk --name-audit"
    :gap/count 94
    :gap/of 119
    ;; ROOT CAUSE, established 2026-08-05 (ADR-2608040160): these are not N
@@ -1519,7 +1519,7 @@
   {:gap/id :capability-declaration-missing
    :gap/status :resolved-as-misdiagnosed
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --capability-audit"
+   :gap/measured-by "kbb --backend sci scripts/verify-repository-roles.cljk --capability-audit"
    :gap/finding {:repos-in-west 57
                  :checked 57
                  :ship-capability-edn 57
@@ -1537,7 +1537,7 @@
   {:gap/id :role-prefix-outside-every-declared-rule
    :gap/status :mostly-resolved
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit + manifest/repo-taxonomy.edn"
+   :gap/measured-by "kbb --backend sci scripts/verify-repository-roles.cljk --name-audit + manifest/repo-taxonomy.edn"
    :gap/was 196
    :gap/now 11
    :gap/resolution "185 are cloud-itonami-lei-*, now declared. The evidence
@@ -1754,7 +1754,7 @@
 
   {:gap/id :unknown-tld-is-dropped-not-surfaced
    :gap/measured-at "2026-08-15"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit, before and after declaring \"ws\""
+   :gap/measured-by "kbb --backend sci scripts/verify-repository-roles.cljk --name-audit, before and after declaring \"ws\""
    :gap/count 1
    :gap/adr "ADR-2608153000"
    ;; The docstring of `origin-tlds` says the observed set is deliberate because
@@ -1782,7 +1782,7 @@
 
   {:gap/id :serving-family-prefix-lacks-its-tld
    :gap/measured-at "2026-08-05"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --family-audit"
+   :gap/measured-by "kbb --backend sci scripts/verify-repository-roles.cljk --family-audit"
    :gap/count 48
    ;; Six families serve real hosts, and none of their prefixes is the reversed
    ;; domain they serve -- every one is missing its TLD. Not renamed:
@@ -1860,7 +1860,7 @@
 
   {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"
-   :gap/measured-by "nbb scripts/verify-repository-roles.cljk --name-audit"
+   :gap/measured-by "kbb --backend sci scripts/verify-repository-roles.cljk --name-audit"
    :gap/count 17
    ;; Screened 2026-08-05 (ADR-2608040160) by org spread, since a product family
    ;; :must :share-one-owning-authority. Single-org candidates are plausible

@@ -358,7 +358,7 @@ A gate that cannot fail is worth nothing, so the negative paths were exercised r
 
 Not verified: node-side execution of this gate. That needs a real tick against the mac minis, which the LaunchAgent cannot do until the two PATs exist; the gate was therefore exercised locally against the same tree shape a node receives.")
   (:adr/resume
-  "1. `nbb scripts/fleet-ci/tick.cljs --only root --dry-run` — run the new gate on a real node once credentials allow, confirming the shipped-tree path matches the local run.
+  "1. `kbb --backend sci scripts/fleet-ci/tick.cljk --only root --dry-run` — run the new gate on a real node once credentials allow, confirming the shipped-tree path matches the local run.
 2. Fix `check-foundation-deps.cljs`, `90-docs/repo-reality/ci_gate.cljs`, `verify-public-runtime-owners.mjs` (all rc=1 today), then add one gates.edn line each.
 3. Switch branch protection to `fleet-ci/murakumo/*`; nothing is enforced until this is done.
 4. Owner decisions: codeql replacement, and where jupyterlite publishes.

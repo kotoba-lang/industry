@@ -154,7 +154,7 @@
         :actions
         [
           "1. SSH to murakumo-01"
-          "2. cd /opt/murakumo && nbb bin/murakumo.cljs traffic-set --cljc-percent <target-pct>"
+          "2. cd /opt/murakumo && kbb --backend sci bin/murakumo.cljk traffic-set --cljc-percent <target-pct>"
           "3. Verify output: should print 'Traffic split updated to <target-pct>%'"
           "4. Immediately check metrics dashboard: murakumo_traffic_split_cljc_percent should reflect new value within 5s"
         ]
@@ -232,7 +232,7 @@
       [
         "$ ssh murakumo-01"
         "$ cd /opt/murakumo"
-        "$ nbb bin/murakumo.cljs traffic-set --cljc-percent 15"
+        "$ kbb --backend sci bin/murakumo.cljk traffic-set --cljc-percent 15"
         "Traffic split updated to 15%"
         "$ # Monitor metrics for 30s"
         "$ # Verify p99 latency drops below 100ms"
@@ -651,12 +651,12 @@
 
       {
         :command-name "Full revert to 100% Rust"
-        :command "ssh murakumo-01 && cd /opt/murakumo && nbb bin/murakumo.cljs traffic-set --cljc-percent 0"
+        :command "ssh murakumo-01 && cd /opt/murakumo && kbb --backend sci bin/murakumo.cljk traffic-set --cljc-percent 0"
       }
 
       {
         :command-name "Step-back rollback (e.g., 50% → 25%)"
-        :command "ssh murakumo-01 && nbb bin/murakumo.cljs traffic-set --cljc-percent 25"
+        :command "ssh murakumo-01 && kbb --backend sci bin/murakumo.cljk traffic-set --cljc-percent 25"
       }
 
       {

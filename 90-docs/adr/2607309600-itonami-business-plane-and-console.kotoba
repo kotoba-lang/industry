@@ -268,7 +268,7 @@ app ADR-0001（jp-go-digital-design-system 採用）を踏襲し、`dds/*` +
 
 **catalog: 1,213 → 1,215 actors、10 → 77 callable**（`itonami-fleet-dispatch`
 経由の 67 + 自前 address を持つ既存 10）。cloud-itonami-app `5d023ad`。
-`clojure -M:test` 781 tests / 3442 assertions, 0 failures 0 errors。
+`kbb -M:test` 781 tests / 3442 assertions, 0 failures 0 errors。
 
 そこに至るのに必要だった前提（上記「lag が 2 層ある」）:
 
@@ -323,9 +323,9 @@ view は入っていない。
 
 ### 検証
 
-`clojure -M:test` 471 tests / 1987 assertions、0 failures 0 errors
+`kbb -M:test` 471 tests / 1987 assertions、0 failures 0 errors
 （うち business 系 20 test — entity・face state・tenant 分離・書き込み面の固定と、
-実 HTTP での route/status/CSRF）。`clojure -M:lint` errors 0（warning 11 件は
+実 HTTP での route/status/CSRF）。`kbb -M:lint` errors 0（warning 11 件は
 すべて既存で、追加分は 0）。`page-html` を実 render（299 KB）して Portfolio の
 markup を確認し、inline JS を `node --check` で構文検査。
 
@@ -392,8 +392,8 @@ Canvas 面を出すのに 1 つ足りなかった: **fold 済み canvas がデ�
 
 ### 検証
 
-`clojure -M:test` 496 tests / 2090 assertions, 0 failures 0 errors
-（canvas 系 18 test を追加）。`clojure -M:lint` errors 0（warning 12 件はすべて既存で、
+`kbb -M:test` 496 tests / 2090 assertions, 0 failures 0 errors
+（canvas 系 18 test を追加）。`kbb -M:lint` errors 0（warning 12 件はすべて既存で、
 追加分は 0）。`page-html` を実 render し inline JS を `node --check` で構文検査。
 上流は `nbb run-tests` 36 tests / 220 assertions, 0 failures。投影が datom 面に load され、**仮説 × block の join が通ること**を
 実クエリで確認（12 product × 9 block）。
@@ -456,10 +456,10 @@ DADS が light 固定なので範囲外（ADR-2607262000）。
 
 ### 検証
 
-`clojure -M:test` 525 tests / 2209 assertions, 0 failures 0 errors
+`kbb -M:test` 525 tests / 2209 assertions, 0 failures 0 errors
 （loops 系 13 test を追加。実 XMILE を実 engine で走らせ、`Backlog` が
 28→26→24→22→20 と Euler 積分されることまで assert している）。
-`clojure -M:lint` errors 0 / 自分のファイルの warning 0。`page-html` を実 render し、
+`kbb -M:lint` errors 0 / 自分のファイルの warning 0。`page-html` を実 render し、
 inline JS を `node --check`、app CSS に raw hex が無いことも確認。
 
 ## Phase 4 — 着地したもの（2026-07-30）。これで Phase 1–4 が全部揃った
@@ -515,9 +515,9 @@ fabricated defaults**」と約束しており、実際そうなっている: **`
 
 ### 検証
 
-`clojure -M:test` **566 tests / 2393 assertions, 0 failures 0 errors**
+`kbb -M:test` **566 tests / 2393 assertions, 0 failures 0 errors**
 （repos 系 8 + metrics 系 9 test を追加、origin/main マージ後の再実行）。
-`clojure -M:lint` errors 0 / 自分のファイルの warning 0。`page-html` を実 render し
+`kbb -M:lint` errors 0 / 自分のファイルの warning 0。`page-html` を実 render し
 inline JS を `node --check`、app CSS に raw hex 0 件。
 
 ### Phase 1–4 の到達点と、残っている穴
@@ -623,11 +623,11 @@ app 側の記録は `docs/adr/0008-business-is-the-join-of-five-planes.md`。
 
 ### 検証（測った値のみ。推定は書かない）
 
-- app: `clojure -M:test` **804 tests / 3546 assertions, 0 failures 0 errors**
-  （着地 commit `1878f99`、merge `281dadd` 時点）。`clojure -M:lint` errors 0、
+- app: `kbb -M:test` **804 tests / 3546 assertions, 0 failures 0 errors**
+  （着地 commit `1878f99`、merge `281dadd` 時点）。`kbb -M:lint` errors 0、
   自作ファイルの warning 0。`page-html` を実 render し inline JS を `node --check`、
   app CSS に raw hex 0 件。
-- superproject: `nbb 70-tools/bmc/run-tests.cljs` **39 tests / 244 assertions,
+- superproject: `kbb --backend sci 70-tools/bmc/run-tests.cljk` **39 tests / 244 assertions,
   0 failures**。生成投影が datom 面に load され join が通ることを実クエリで確認。
 - XMILE モデルは保存則（total = 5 + 0.1t）を全 91 step で 1e-9 以内、`loops/model`
   経由の end-to-end も確認。
@@ -655,10 +655,10 @@ git fetch origin && git merge --ff-only origin/main
 cd orgs/cloud-itonami/cloud-itonami-app   # ※ 共有 checkout は他セッションの WIP で dirty。
                                           #   触らず、作業は origin/main から worktree を切る
 # 2) 緑であることを確認（これが再開の基準線）
-node scripts/resource-guard.mjs run build -- clojure -M:test
+node scripts/resource-guard.mjs run build -- kbb -M:test
 # 3) 投影が古ければ superproject 側で再生成
-nbb 70-tools/bmc/bin/gftd.cljs canvas datoms --all
-nbb 70-tools/bmc/bin/gftd.cljs score datoms
+kbb --backend sci 70-tools/bmc/bin/gftd.cljk canvas datoms --all
+kbb --backend sci 70-tools/bmc/bin/gftd.cljk score datoms
 ```
 
 ### この plane で 3 回起きた欠陥（次の実装者へ）

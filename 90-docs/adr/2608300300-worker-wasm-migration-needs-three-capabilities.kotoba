@@ -21,7 +21,7 @@
 
 きっかけは容量である。実測 2026-08-30、この 1 台（10 コア）で **load average 513**、
 java 14 本 / node 99 本 / Claude セッション 8 本。走っていた java を親プロセスで辿ると
-**`scripts/resource-guard.mjs` の下に居たのは 1 本だけ**で、残りは `clojure -M gate.clj` /
+**`scripts/resource-guard.mjs` の下に居たのは 1 本だけ**で、残りは `kbb -M gate.clj` /
 `-A:test` / `-Sdeps` / `kirloop.clj` / launchd 常駐だった。
 
 **guard は壊れていない。guard の規則が「build コマンド名の列挙」**（shadow-cljs / vite /
@@ -92,7 +92,7 @@ s3 / ipfs / blob の面は MB 単位のバイナリを運ぶので、この 2 �
 ## 測り方（次に誰かが訊いたとき）
 
 ```
-nbb --classpath \".:scripts/nbb_compat\" -e '…'   # kit の :qualification を reader で読む
+kbb --backend sci --classpath \".:scripts/nbb_compat\" -e '…'   # kit の :qualification を reader で読む
 ```
 **grep で代替しない**（行が折り返して静かに切れる）。**checkout ではなく `kotoba-lang/main`
 を読む**（この ADR の誤読はそれが原因）。**値をこの ADR に書き写して定数にしない** ——

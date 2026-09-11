@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; How does each build get the shared library it requires — and can it get it
 ;; at all?
 ;;
-;;   nbb scripts/verify-shared-library-consumption.cljk [--findings] [<orgs dir>]
+;;   kbb --backend sci scripts/verify-shared-library-consumption.cljk [--findings] [<orgs dir>]
 ;;
 ;; Measured 2026-08-31 (root ADR-2608311600): `kotobase.biscuit-grant` moved out
 ;; of net-kotobase/control-plane into kotoba-lang/grant. The API gateway

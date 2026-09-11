@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/fleet-sync-tick.cljk — the fleet's synchronisation DETECTION on a schedule.
 ;;
 ;; ADR-2608040100 measured that of the six pairwise consistency obligations between
@@ -20,9 +20,9 @@
 ;; than no detector, so this one fails loudly and records the failure as an event.
 ;;
 ;; usage:
-;;   nbb scripts/fleet-sync-tick.cljk check     ;; fleet-db <-> west.yml drift, against main
-;;   nbb scripts/fleet-sync-tick.cljk probe     ;; full fleet sync probe (slow, ~5 min)
-;;   nbb scripts/fleet-sync-tick.cljk both
+;;   kbb --backend sci scripts/fleet-sync-tick.cljk check     ;; fleet-db <-> west.yml drift, against main
+;;   kbb --backend sci scripts/fleet-sync-tick.cljk probe     ;; full fleet sync probe (slow, ~5 min)
+;;   kbb --backend sci scripts/fleet-sync-tick.cljk both
 ;;
 ;; Every run appends exactly one EDN map to ~/.itonami/fleet-sync/ledger.edn — including
 ;; runs that fail. That file is a time series: it is what lets the next reading say
@@ -137,7 +137,7 @@
                               (when (= :unparseable (:status d))
                                 {:stderr (subs (str (:err r)) 0 300)})
                               (when (= :drift (:status d))
-                                {:action-required "nbb .../fleet.cljs reconcile --db manifest/fleet-db.edn --west manifest/west.yml (absorb), then land manifest/fleet-db.edn + .ledger.edn on main"})))))
+                                {:action-required "kbb --backend sci .../fleet.cljk reconcile --db manifest/fleet-db.edn --west manifest/west.yml (absorb), then land manifest/fleet-db.edn + .ledger.edn on main"})))))
     (try (fs/rmSync tmp #js {:recursive true :force true}) (catch :default _))))
 
 ;; ---------------------------------------------------------------------------

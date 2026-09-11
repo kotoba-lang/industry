@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/west-entry-add.cljk — register one repository in manifest/west.yml.
 ;;
 ;; The third of the trio: rename moves an entry, remove unregisters one, this
@@ -18,7 +18,7 @@
 ;; refuses if it cannot find one, and PARSES THE RESULT BEFORE WRITING IT.
 ;;
 ;;   ENTRY=<name> ORG=<org> SHA=<40-hex> GROUP=<west group> \
-;;     nbb --classpath ".:scripts/nbb_compat" scripts/west-entry-add.cljk
+;;     kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-entry-add.cljk
 (require '["fs" :as fs] '["child_process" :as cp] '[clojure.string :as str])
 (def repo "com-junkawasaki/root") (def path "manifest/west.yml")
 (defn sh [c] (try {:out (str (.execSync cp c #js {:encoding "utf8" :maxBuffer 64000000 :stdio #js ["pipe" "pipe" "pipe"]})) :exit 0}

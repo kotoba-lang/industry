@@ -262,7 +262,7 @@ Severity: CRITICAL
 Message: "Auto-rollback triggered: [reason]"
 
 # Log event:
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "automatic-rollback" \
   --trigger "[reason]" \
   --from-pct [current] \

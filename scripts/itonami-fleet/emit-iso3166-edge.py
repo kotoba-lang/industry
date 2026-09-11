@@ -150,7 +150,7 @@ PKG = '''\
   "name": "%(repo)s",
   "private": true,
   "comment": "shadow-cljs compiles src/marketentry/edge/worker.cljs -> dist/worker.js, the kotobase host for the %(CC)s market-entry actor.",
-  "scripts": { "build": "shadow-cljs release worker" },
+  "scripts": { "build": "amu compile --target wasm32-browser worker" },
   "devDependencies": {
     "@noble/hashes": "^2.2.0",
     "shadow-cljs": "^2.28.20",

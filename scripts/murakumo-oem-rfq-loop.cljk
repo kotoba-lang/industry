@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/murakumo-oem-rfq-loop.cljk — 受信 tick のあとに、未処理の業者返信が
 ;; あるときだけ claude を起こす。候補が無ければモデルは呼ばない。
 ;;
 ;; usage:
-;;   nbb scripts/murakumo-oem-rfq-loop.cljk
+;;   kbb --backend sci scripts/murakumo-oem-rfq-loop.cljk
 ;;
 ;; launchd: scripts/cloud.itonami.bot.murakumo-oem-rfq.plist (4h)
 

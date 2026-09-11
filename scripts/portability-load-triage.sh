@@ -73,7 +73,7 @@ done <<< "$files"
 
 cp=""
 if [ -f "$d/deps.edn" ]; then
-  cp=$(cd "$d" && timeout 120 clojure -Spath -M:test 2>/dev/null || timeout 120 clojure -Spath 2>/dev/null)
+  cp=$(cd "$d" && timeout 120 kbb -Spath -M:test 2>/dev/null || timeout 120 kbb -Spath 2>/dev/null)
 fi
 
 # npm deps, when the repo has them. Without this the load stops at the first
@@ -92,7 +92,7 @@ fi
 
 reqs=""
 for ns in $nss; do reqs="$reqs (quote $ns)"; done
-out=$(cd "$tmp" && timeout 90 nbb --classpath "src:$cp" -e "(require$reqs) (println \"LOADED-OK\")" 2>&1)
+out=$(cd "$tmp" && timeout 90 kbb --backend sci --classpath "src:$cp" -e "(require$reqs) (println \"LOADED-OK\")" 2>&1)
 if echo "$out" | grep -q "LOADED-OK"; then
   echo -e "LOADS\t-\t$rel"
 elif echo "$out" | grep -qE "Cannot find module|ERR_MODULE_NOT_FOUND"; then

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Validate kotoba.repository-role-rules.v0 per-repo declarations against the
 ;; workspace authority (manifest/repository-rules.edn) and against real
 ;; production git dependencies.  Test-only dependencies are intentionally
@@ -20,9 +20,9 @@
 ;; manifest rather than by reading resources/repository-rules.edn.
 ;;
 ;; Usage:
-;;   nbb scripts/verify-repository-roles.cljk <repo-dir>...
-;;   nbb scripts/verify-repository-roles.cljk --prefix-audit [--west <west.yml>] [--workspace <dir>]
-;;   nbb scripts/verify-repository-roles.cljk --name-audit [--west <west.yml>] [--org <org>]
+;;   kbb --backend sci scripts/verify-repository-roles.cljk <repo-dir>...
+;;   kbb --backend sci scripts/verify-repository-roles.cljk --prefix-audit [--west <west.yml>] [--workspace <dir>]
+;;   kbb --backend sci scripts/verify-repository-roles.cljk --name-audit [--west <west.yml>] [--org <org>]
 
 (require '[clojure.edn :as edn]
          '[clojure.set :as set]
@@ -300,7 +300,7 @@
           (empty? actual)
           (println (str "NOTE " repo " declares :authority-library "
                         authority-library " — deps.edn declares no git deps"
-                        " (nbb --classpath repo?), claim unverified here"))
+                        " (kbb --backend sci --classpath repo?), claim unverified here"))
 
           (not (contains? actual authority-library))
           (fail! "declared :authority-library is not a production dependency"
@@ -639,9 +639,9 @@
 (let [args (vec *command-line-args*)]
   (cond
     (empty? args)
-    (do (println "Usage: nbb scripts/verify-repository-roles.cljk <repo-dir>...")
-        (println "       nbb scripts/verify-repository-roles.cljk --prefix-audit [--west <west.yml>]")
-        (println "       nbb scripts/verify-repository-roles.cljk --name-audit [--west <west.yml>] [--org <org>]")
+    (do (println "Usage: kbb --backend sci scripts/verify-repository-roles.cljk <repo-dir>...")
+        (println "       kbb --backend sci scripts/verify-repository-roles.cljk --prefix-audit [--west <west.yml>]")
+        (println "       kbb --backend sci scripts/verify-repository-roles.cljk --name-audit [--west <west.yml>] [--org <org>]")
         (compat/exit 2))
 
     (some #{"--family-audit"} args)

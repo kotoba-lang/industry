@@ -144,9 +144,9 @@ governor は既存ポジションを合算するので注文分割で回避で�
 
 # Verification (実測、2026-08-03)
 
-- `clojure -M:dev:test` — 57 tests / **368 assertions / 0 failures / 0 errors**
-- `clojure -M:lint` (clj-kondo) — **0 errors / 0 warnings**
-- `clojure -M:dev:run` — 完全な取引を通す: 家庭 prosumer が保育園へ 2000 Wh を
+- `kbb -M:dev:test` — 57 tests / **368 assertions / 0 failures / 0 errors**
+- `kbb -M:lint` (clj-kondo) — **0 errors / 0 warnings**
+- `kbb -M:dev:run` — 完全な取引を通す: 家庭 prosumer が保育園へ 2000 Wh を
   maker 価格 25 JPY/kWh で売却 (買い手は 26 JPY/kWh を提示したが maker price rule で
   25 で約定) = ちょうど 50.00 JPY、計量値は売り手が 50 Wh 不足 (imbalance -50 Wh)、
   interval 精算まで到達。その後 7 種の HARD hold (spec-basis 無し / 売却権限無し /

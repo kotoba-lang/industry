@@ -109,24 +109,24 @@ cat DEPLOYMENT-STATUS.md
 
 ### 3. Provision infrastructure
 ```bash
-nbb deploy/month-1-staging-deployment.cljk provision
+kbb --backend sci deploy/month-1-staging-deployment.cljk provision
 ```
 
 ### 4. Enable canary traffic
 ```bash
-nbb deploy/month-1-staging-deployment.cljk canary-start
+kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start
 ```
 
 ### 5. Start monitoring services
 ```bash
 # Terminal 1: Parity checker
-nbb deploy/parity-checker-service.cljk \
+kbb --backend sci deploy/parity-checker-service.cljk \
   --rust-pool-url http://localhost:8000 \
   --staging-pool-url http://localhost:8001 \
   --output metrics/parity-validation.log
 
 # Terminal 2: Rollback automation
-nbb deploy/rollback-automation.cljk monitor
+kbb --backend sci deploy/rollback-automation.cljk monitor
 ```
 
 ### 6. View live dashboard
@@ -264,10 +264,10 @@ FINAL-DELIVERY-REPORT.txt
 
 ## Next Steps (Week 1)
 
-1. Execute provisioning: `nbb deploy/month-1-staging-deployment.cljk provision`
-2. Enable canary: `nbb deploy/month-1-staging-deployment.cljk canary-start`
-3. Start parity checker: `nbb deploy/parity-checker-service.cljk ...`
-4. Start rollback monitor: `nbb deploy/rollback-automation.cljk monitor`
+1. Execute provisioning: `kbb --backend sci deploy/month-1-staging-deployment.cljk provision`
+2. Enable canary: `kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start`
+3. Start parity checker: `kbb --backend sci deploy/parity-checker-service.cljk ...`
+4. Start rollback monitor: `kbb --backend sci deploy/rollback-automation.cljk monitor`
 5. Open SLO dashboard: `http://localhost:3000/d/strangler-fig-month1`
 6. Monitor metrics daily
 7. Week 2 checkpoint: baseline locked, ready for Phase 2 approval

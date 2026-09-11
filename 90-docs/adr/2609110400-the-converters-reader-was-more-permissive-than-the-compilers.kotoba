@@ -22,7 +22,7 @@ the converter was willing to rename files the compiler cannot read.
 it is more permissive. Reproduce with a five-line probe against the reader
 directly:
 
-    nbb --classpath <kotoba>/src probe.cljs
+    kbb --backend sci --classpath <kotoba>/src probe.cljs
       shebang     read-cst ACCEPTS
       // lines    read-cst ACCEPTS
       regex #\"    read-cst ACCEPTS

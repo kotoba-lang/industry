@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns checkout-holds
   "checkout が「何を持っているか」を 5 項目で答える。撤去してよいかの判定に使う。
 
@@ -13,7 +13,7 @@
   「HEAD が読める＝生きている」ように見えた。ここでは `.git` の不在を
   NO_GIT / exit 2 で返し、EMPTY(0) とも HOLDS(1) とも別の値にする。
 
-  usage: nbb scripts/checkout-holds.cljk <path> [<path> ...]
+  usage: kbb --backend sci scripts/checkout-holds.cljk <path> [<path> ...]
   exit  0 = 全部 EMPTY / 1 = HOLDS が在る / 2 = 判定できないものが在る"
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -61,7 +61,7 @@
 
 (let [args (vec *command-line-args*)]
   (if (empty? args)
-    (do (println "usage: nbb scripts/checkout-holds.cljk <path> [<path> ...]") (js/process.exit 64))
+    (do (println "usage: kbb --backend sci scripts/checkout-holds.cljk <path> [<path> ...]") (js/process.exit 64))
     (let [rs (map holds args)]
       (doseq [{:keys [path verdict branches untracked dirty stashes annex]} rs]
         (println (str (name verdict) "\t" path

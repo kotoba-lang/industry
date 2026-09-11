@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; report-public-money-coverage.cljs — 「国から金を受けた会社」を答える 3 経路が、
 ;; **同じ番号集合に対してどれだけ違う会社を見ているか**を毎回測り直す。
 ;;
@@ -13,7 +13,7 @@
 ;; 測った日の値であって定数ではない（gBizINFO の調達は 308,661 行のうち 186 行しか
 ;; 我々の番号に当たっていない、という当てはまり方の問題）。だから script にしてある。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/report-public-money-coverage.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/report-public-money-coverage.cljk
 
 (require '[clojure.string :as str])
 (def cp (js/require "node:child_process"))

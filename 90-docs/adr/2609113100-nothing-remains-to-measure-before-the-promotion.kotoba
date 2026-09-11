@@ -29,7 +29,7 @@ halves of that were checked rather than read:
 So on cutover the corpus costs one command, not a hand edit.
 
     cd <kotoba-lang worktree>
-    clojure -M -e (load-file scripts/gen_code_identity_fixtures.clj)
+    kbb -M -e (load-file scripts/gen_code_identity_fixtures.clj)
     git status --porcelain   # empty today
 
 ## The v3 path stopped at bytes
@@ -61,7 +61,7 @@ them and is seen, rather than landing quietly and moving every identity in
 the workspace on cutover.
 
     cd <osaho worktree>
-    clojure -M:test -n kotoba.kir.payload-v3-unwrap-test
+    kbb -M:test -n kotoba.kir.payload-v3-unwrap-test
 
 ## Seen red, and the first attempt did not reach them
 

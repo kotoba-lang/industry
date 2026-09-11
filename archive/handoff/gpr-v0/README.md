@@ -48,7 +48,7 @@ bare 名。設計の根拠は superproject の **ADR-2608750000**。
 ## 測ったこと / 測っていないこと
 
 ```
-npx --yes nbb run-tests.cljs     # 23 tests / 48 assertions
+npx --yes kbb --backend sci run-tests.cljk     # 23 tests / 48 assertions
 ```
 
 **測った**（実行して両方向を見た）:

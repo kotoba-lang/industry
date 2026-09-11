@@ -206,10 +206,10 @@
    the owner, not a measurement."]
 
  :reproduce
- {:blocks "cd protocols-worker && nbb scripts/fetch-graph-blocks.cljs /tmp/kb-blocks kotobase-protocols-v2
+ {:blocks "cd protocols-worker && kbb --backend sci scripts/fetch-graph-blocks.cljk /tmp/kb-blocks kotobase-protocols-v2
            (read-only `wrangler r2 object get`; prints the head CID. The blocks are
            NOT committed -- they carry production payloads.)"
-  :build "node scripts/resource-guard.mjs run build -- npx shadow-cljs release hydrate-bench"
+  :build "node scripts/resource-guard.mjs run build -- amu compile --target wasm32-browser hydrate-bench"
   :run "node --expose-gc --max-old-space-size=8192 out/hydrate-phase-bench.js
         --blocks /tmp/kb-blocks --head <chain-cid> --graph kotobase-protocols-v2"
   :workerd "npx wrangler tail kotobase-protocols-worker --format json, then

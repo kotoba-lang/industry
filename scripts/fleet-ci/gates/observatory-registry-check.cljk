@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; observatory-registry-check.cljs — ADR-2608081200 の機械検査。
 ;;
 ;; 展開済みの superproject tree を受け取り、`manifest/observatories.edn`（登録簿・
@@ -38,7 +38,7 @@
 ;;
 ;; ネットワーク: 不要。実行: 不要（登録簿の静的検査のみ）。
 ;;
-;; 実行: `npx nbb observatory-registry-check.cljs <dir> [--min 10]`
+;; 実行: `kbb --backend sci observatory-registry-check.cljk <dir> [--min 10]`
 ;;
 ;; ─────────────────────────────────────────────────────────────────────────
 ;; ## この gate が両方向に動くことの証明（2026-08-12）
@@ -61,7 +61,7 @@
 ;;           意図的に文書化された要件を違反として報告していた
 ;;   - 2 件: 不変条件 11 は真だが、**主張していた害が実測で偽だった**（下の 11 節）
 ;;
-;; ### 実測（`nbb gates/observatory-registry-discriminate.cljs <tree>`）
+;; ### 実測（`kbb --backend sci gates/observatory-registry-discriminate.cljk <tree>`）
 ;;
 ;;   baseline（無改変）                                    exit=0
 ;;   inv 1  :runtime を落とす                              exit=1 → 戻して exit=0

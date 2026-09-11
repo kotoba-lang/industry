@@ -223,7 +223,7 @@ ssh gad 'sudo journalctl --since \"-2h\" | grep \"systemctl stop comfyui-h3\"'
 curl -sS -H \"authorization: Bearer <token>\" http://127.0.0.1:18081/healthz | jq '{resourceClasses, queueDepth}'
 # 章の続き（ssh -L 18081/18191 が要る。p.10 と p.1 以外の 19 ページ）
 cd orgs/com-junkawasaki/org-spirit-in-physics-comics
-nbb --classpath \"scripts:../../kotoba-lang/kami-mangaka-page/src:../../kotoba-lang/kami-genko/src\" \\
+kbb --backend sci --classpath \"scripts:../../kotoba-lang/kami-mangaka-page/src:../../kotoba-lang/kami-genko/src\" \\
     scripts/manga/run.cljs volumes/vol01-water-city/chapter01 1 4 2 5 6 …
 ```
 

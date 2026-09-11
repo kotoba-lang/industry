@@ -216,13 +216,13 @@ Comprehensive rollback strategy and validated testing results:
 ```bash
 ssh murakumo-01
 cd /opt/murakumo
-nbb bin/murakumo.cljs traffic-set --cljc-percent 0
+kbb --backend sci bin/murakumo.cljk traffic-set --cljc-percent 0
 ```
 
 **Step-back Rollback (e.g., 50% → 25%):**
 ```bash
 ssh murakumo-01
-nbb bin/murakumo.cljs traffic-set --cljc-percent 25
+kbb --backend sci bin/murakumo.cljk traffic-set --cljc-percent 25
 ```
 
 **Graceful Drain:**

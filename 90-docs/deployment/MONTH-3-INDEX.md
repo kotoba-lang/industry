@@ -62,7 +62,7 @@
 **Usage**:
 ```bash
 # Append new events during execution:
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "traffic-ramp-step-2" \
   --from-pct 75 --to-pct 90 \
   --timestamp "2026-09-21T16:00:00Z"

@@ -1,7 +1,7 @@
 # Run 0184 - kotobase-stab loop - 2026-09-11 JST (cron tick, ~05:07 UTC start)
 
 ## Measured (live)
-- nbb kotobase_lead_loop.cljk funnel-pulse (workdir com-junkawasaki, EXIT=0):
+- kbb --backend sci kotobase_lead_loop.cljk funnel-pulse (workdir com-junkawasaki, EXIT=0):
   SCANNED 1; VISITORS 12105; SIGNUPS 34; CHECKOUTS 0;
   DELTA {:visitors 109, :signups 1, :checkouts 0}; UNCHANGED false;
   EXTERNAL-FUNNEL-CHANGE false; SCORE unchanged; RESULT recorded.

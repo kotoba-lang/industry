@@ -60,7 +60,7 @@ west revision に pin されたローカル checkout には**たった今書い�
   キャッシュ」のための 185 fetch でしかない。
 - **`scripts/d1-ingest-cloud-itonami-lei.cljs` は残す。** SQL view が欲しい人のために
   あり、この経路から外れただけ。D1 は消しても `d1-ingest` で戻る（削除テストは変わらず合格）。
-- consumer は `nbb --classpath scripts ...` で動かす必要がある（共有 ns の読み込みのため）。
+- consumer は `kbb --backend sci --classpath scripts ...` で動かす必要がある（共有 ns の読み込みのため）。
   loop の `act` が組み立てるコマンド文字列と `deploy/` の runner を更新済み。
 - 関連するが**別の規則**: ADR-2608039000 の「blockchain / 分散型経路に D1 を前提に
   しない」は分散性を主張する経路が対象で、この catalog は該当しない。本 ADR が縛るのは

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 90-docs/system-dynamics/bot-kumo-yata-membrane.cljs
 ;;
 ;; ADR-2608291009 の再現スクリプト。BOT / KUMO / YATA の膜表と発行規則を
@@ -9,7 +9,7 @@
 ;; 誰も気づけなかった。表を data にしておけば、新しい流れを足すときに
 ;; この検査が先に落ちる。
 ;;
-;; 実行:  nbb 90-docs/system-dynamics/bot-kumo-yata-membrane.cljs
+;; 実行:  kbb --backend sci 90-docs/system-dynamics/bot-kumo-yata-membrane.cljk
 ;; exit:  0 = 全不変条件が成立 / 1 = 違反あり / 2 = 検査自体が実行できなかった
 ;;
 ;; ⚠ この script は「設計が一貫しているか」だけを答える。

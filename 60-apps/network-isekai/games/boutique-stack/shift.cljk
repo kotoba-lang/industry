@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Runs a shop through a shift and reports how it played. This is the balance
 ;; tool and the CI gate; it is the shop equivalent of the other game's
 ;; `levels.cljs`.
 ;;
-;;     npx nbb --classpath src:../common/src shift.cljs
-;;     npx nbb --classpath src:../common/src shift.cljs --gate
-;;     npx nbb --classpath src:../common/src shift.cljs resources/shops/bs-flagship.edn --minutes 30
+;;     kbb --backend sci --classpath src:../common/src shift.cljs
+;;     kbb --backend sci --classpath src:../common/src shift.cljs --gate
+;;     kbb --backend sci --classpath src:../common/src shift.cljs resources/shops/bs-flagship.edn --minutes 30
 ;;
 ;; The gate fails on a shop that does not validate, that a competent manager
 ;; cannot play to its last department, that loses more customers than it

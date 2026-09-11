@@ -166,9 +166,9 @@ repo 移動で黙って 0 件になる — 実際に market-intel でそれが�
      wc -l ~/.cache/gleif/shard-0.edn   # 3,391,414（manifest 1 行 + 3,391,413 社）
      mv ~/.cache/gleif/shard-0.edn ~/.cache/gleif/gleif-lei-corpus-20260801.edn
      cd orgs/kotoba-lang/property
-     nbb -cp src scripts/query_gleif_corpus.cljs --corpus <corpus> \\
+     kbb --backend sci -cp src scripts/query_gleif_corpus.cljs --corpus <corpus> \\
        --jurisdiction JP --status ISSUED          # 先に件数を測る
-     nbb -cp src scripts/project_gleif_corpus.cljs --corpus <corpus> \\
+     kbb --backend sci -cp src scripts/project_gleif_corpus.cljs --corpus <corpus> \\
        --jurisdiction JP --status ISSUED --out data/gleif-lei-jp.datoms.edn
      ```
      **面への追加コストを測ってから入れること**: このローダは entity あたり

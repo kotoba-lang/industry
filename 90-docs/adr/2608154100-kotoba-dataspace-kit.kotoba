@@ -52,7 +52,7 @@ dataspace 協調の proving slice を 1 本着地させる。
 10. **vat の対応物:** kototama tender / reference runtime が single-turn
     scheduler。guest に unbounded concurrency は無い
     （`future`/`agent`/`send` は `:intentional-security-constraint`）。
-11. **置き場:** 新規 GitHub repo は作らない。`nbb scripts/concept-lookup.cljs
+11. **置き場:** 新規 GitHub repo は作らない。`kbb --backend sci scripts/concept-lookup.cljk
     dataspace|syndicate` は語彙に無く、`repo-search` も dataspace kit を
     返さなかった。実装は既存 `kotoba-lang/compiler`（kit + reference host +
     tests）と `kotoba-lang/kotoba-lang`（catalog / semantics / cap values）。
@@ -177,11 +177,11 @@ dataspace 協調の proving slice を 1 本着地させる。
 
 ## テストの回し方と結果（2026-08-15 実測）
 
-compiler（対象 ns だけ。フル `clojure -M:test` は native/wasm を含むのでこの slice では回していない）:
+compiler（対象 ns だけ。フル `kbb -M:test` は native/wasm を含むのでこの slice では回していない）:
 
 ```
 cd /tmp/kotoba-compiler-dataspace
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-match-test)
             (quote kotoba.compiler.dataspace-provider-test))
@@ -201,7 +201,7 @@ kotoba-lang:
 
 ```
 cd /tmp/kotoba-lang-dataspace
-clojure -M:test -n kotoba.lang.dataspace-cap-test -n kotoba.lang.capability-catalog-test
+kbb -M:test -n kotoba.lang.dataspace-cap-test -n kotoba.lang.capability-catalog-test
 ```
 
 結果: **6 tests / 17 assertions、0 fail / 0 error。**
@@ -211,16 +211,16 @@ gap 2（host を provider へ、2026-08-15）:
 provider（cognitect test-runner、対象 ns）:
 ```
 cd /tmp/provider-dataspace-host
-clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+kbb -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 ```
 結果: **13 tests / 36 assertions、0 fail / 0 error。**
 両方向: `:default` tagged-literal 拒否を外すと `tagged-cap-literal-cannot-mint-authority` が `:edn-invalid` になって落ちる。戻すと緑。
 `dataspace-qualifies-alone-without-joining-the-9-kit-set` は capability-count 1 の単独 suite と、inventory に `:dataspace` が無いことを同時に見る。
 
-amu（`clojure -M:test -n` は無視される。clojure.main で対象 ns）:
+amu（`kbb -M:test -n` は無視される。clojure.main で対象 ns）:
 ```
 cd /tmp/amu-dataspace-host
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-match-test)
             (quote kotoba.compiler.dataspace-provider-test)
@@ -237,28 +237,28 @@ gap 3+4（2026-08-15）:
 provider:
 ```
 cd /tmp/provider-dataspace-gaps
-clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+kbb -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 ```
 結果: **17 tests / 53 assertions、0 fail / 0 error。**
 
 kotoba-sema:
 ```
 cd /tmp/kotoba-sema-dataspace-gaps
-clojure -M:test -n kotoba.sema-test
+kbb -M:test -n kotoba.sema-test
 ```
 結果: **17 tests / 94 assertions、0 fail / 0 error。**
 
 kotoba-component:
 ```
 cd /tmp/kotoba-component-dataspace-gaps
-clojure -M:test -n kotoba.component-wit-test
+kbb -M:test -n kotoba.component-wit-test
 ```
 結果: **8 tests / 42 assertions、0 fail / 0 error。**
 
-amu（`clojure -M:test -n` は無視される）:
+amu（`kbb -M:test -n` は無視される）:
 ```
 cd /tmp/amu-dataspace-gaps
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-provider-test)
             (quote kotoba.compiler.provider-conformance-test)
@@ -277,7 +277,7 @@ gap 6（2026-08-15）:
 provider:
 ```
 cd /tmp/provider-dataspace-kgraph
-clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+kbb -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 ```
 結果: **21 tests / 61 assertions、0 fail / 0 error。**
 両方向: kgraph store の facet-leave から owned retract を外すと
@@ -285,10 +285,10 @@ clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 `store-that-drops-facet-leave-retracts-fails-closed` は facet-leave で assertion を
 root に戻す store を `not (facet-leave-retracts?)` で拒否。
 
-amu（`clojure -M:test -n` は無視される）:
+amu（`kbb -M:test -n` は無視される）:
 ```
 cd /tmp/amu-dataspace-kgraph
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-provider-test)
             (quote kotoba.compiler.dataspace-match-test)
@@ -325,7 +325,7 @@ java -cp \"$CP\" clojure.main -e \\
 provider:
 ```
 cd /tmp/provider-dataspace-next
-clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+kbb -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 ```
 結果: **25 tests / 81 assertions、0 fail / 0 error。**
 両方向: enqueue を外すと observer の次の observe の `:notices` が `[]` になり 4 fail。戻すと緑。
@@ -333,16 +333,16 @@ clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 kotoba-sema:
 ```
 cd /tmp/kotoba-sema-dataspace-next
-clojure -M:test -n kotoba.sema-test
+kbb -M:test -n kotoba.sema-test
 ```
 結果: **18 tests / 100 assertions、0 fail / 0 error。**
 両方向: `:matches` から `:notices` を外すと
 `dataspace-source-forms-lower-to-one-typed-effect-kernel` が落ちる。戻すと緑。
 
-amu（`clojure -M:test -n` は無視される）:
+amu（`kbb -M:test -n` は無視される）:
 ```
 cd /tmp/amu-dataspace-next
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-provider-test)
             (quote kotoba.compiler.dataspace-match-test)
@@ -387,10 +387,10 @@ java -cp \"$CP\" clojure.main -e \\
 
 ## テストの回し方と結果（2026-08-17 実測、wasm-aot）
 
-amu（`clojure -M:test -n` は無視される）:
+amu（`kbb -M:test -n` は無視される）:
 ```
 cd /tmp/amu-dataspace-wasm-aot
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-wasm-aot-test)
             (quote kotoba.compiler.wasm32-kotoba-v1-qualification-test)
@@ -432,10 +432,10 @@ capability-count 10。`:wasm32-kotoba-v1` は dataspace でも pending。clock �
 
 ## テストの回し方と結果（2026-08-17 実測、sugar observe! notices）
 
-amu（`clojure -M:test -n` は無視される）:
+amu（`kbb -M:test -n` は無視される）:
 ```
 cd /tmp/amu-dataspace-sema-notices
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-provider-test)
             (quote kotoba.compiler.dataspace-match-test)
@@ -499,15 +499,15 @@ sugar guest の `:matches` から `:notices` が消え、
 provider:
 ```
 cd /tmp/provider-dataspace-replay-20260817
-clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+kbb -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 ```
 結果: **27 tests / 90 assertions、0 fail / 0 error。**
 両方向: first observe の current-set を `[]` に戻すと 4 fail。戻すと緑。
 
-amu（`clojure -M:test -n` は無視される）:
+amu（`kbb -M:test -n` は無視される）:
 ```
 cd /tmp/amu-dataspace-replay-20260817
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-provider-test)
             (quote kotoba.compiler.dataspace-match-test)
@@ -549,15 +549,15 @@ java -cp \"$CP\" clojure.main -e \\
 provider:
 ```
 cd /tmp/provider-dataspace-retract-20260817
-clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+kbb -M:test -n provider.dataspace-test -n provider.dataspace-match-test
 ```
 結果: **33 tests / 105 assertions、0 fail / 0 error。**
 両方向: retract enqueue を落とすと 4 fail。戻すと緑。
 
-amu（`clojure -M:test -n` は無視される）:
+amu（`kbb -M:test -n` は無視される）:
 ```
 cd /tmp/amu-dataspace-retract-20260817
-CP=$(clojure -Spath -A:test)
+CP=$(kbb -Spath -A:test)
 java -cp \"$CP\" clojure.main -e \\
   '(require (quote kotoba.compiler.dataspace-provider-test)
             (quote kotoba.compiler.dataspace-match-test)
@@ -629,10 +629,10 @@ retract *request* に見える。validator が `checked_pair_get` で terminator
 
 ### テスト（2026-08-17 実測、この workstation は aarch64）
 
-amu（`clojure -M:test -n` は無視される。`:test` alias は full runner）:
+amu（`kbb -M:test -n` は無視される。`:test` alias は full runner）:
 ```
 cd /tmp/amu-dataspace-native-20260817
-clojure -Sdeps '{:aliases {:focus {:extra-paths [\"test\"] :extra-deps {io.github.kotoba-lang/provider {:git/url \"https://github.com/kotoba-lang/provider.git\" :git/sha \"9d6c59ac4dbe891de1044fcc8d564447a6aa5c70\"} io.github.kotoba-lang/kototama-native {:git/url \"https://github.com/kotoba-lang/kototama-native.git\" :git/sha \"0cf9f4d896798843d5bb5c0482c89631e78fec73\"}}}}}' \\
+kbb -Sdeps '{:aliases {:focus {:extra-paths [\"test\"] :extra-deps {io.github.kotoba-lang/provider {:git/url \"https://github.com/kotoba-lang/provider.git\" :git/sha \"9d6c59ac4dbe891de1044fcc8d564447a6aa5c70\"} io.github.kotoba-lang/kototama-native {:git/url \"https://github.com/kotoba-lang/kototama-native.git\" :git/sha \"0cf9f4d896798843d5bb5c0482c89631e78fec73\"}}}}}' \\
   -M:focus -e '(require (quote clojure.test) (quote kotoba.compiler.dataspace-native-aot-test) (quote kotoba.compiler.dataspace-jit-test)) (clojure.test/run-tests (quote kotoba.compiler.dataspace-native-aot-test) (quote kotoba.compiler.dataspace-jit-test))'
 ```
 結果: **4 tests / 6 assertions、0 fail / 0 error。** native 127。jit `127n`。

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; dynamics-score-core-check.cljs — system dynamics のスコア算術の**2 実装が
 ;; 同じ数を出すか**を見る（root ADR-2608189500）。score-core-check.cljs と同じ形。
 ;;
@@ -37,7 +37,7 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb dynamics-score-core-check.cljs <repo-dir> [--min N]
+;;   kbb --backend sci dynamics-score-core-check.cljk <repo-dir> [--min N]
 ;;
 ;; `<dir>` は **引数の先頭**に置く（fleet はそう渡す。CLAUDE.md の実測済みの罠）。
 

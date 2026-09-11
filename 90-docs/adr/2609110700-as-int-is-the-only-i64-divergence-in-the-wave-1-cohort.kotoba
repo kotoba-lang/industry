@@ -32,7 +32,7 @@ Three pilots have a whole-component build. For each of
     KEXE_FUEL=100000000 kexe-loader n.bin <offset> 1 aarch64 7,23 <selector>
 
     # the oracle
-    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+    kbb --backend sci --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
 
 Then compare SELECTOR BY SELECTOR, matching on the label the harness printed
 rather than by column position. That detail is not pedantry: the first attempt

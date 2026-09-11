@@ -252,7 +252,7 @@ adjacency か fixpoint 評価の改善という別の作業。
   1 クエリ / immutable snapshot にスコープする（block cache の安全性は
   こちらには継承されない。テストで staleness を固定してある）。
 
-**実測**（`clojure -M:cache-bench`、再帰クエリ）:
+**実測**（`kbb -M:cache-bench`、再帰クエリ）:
 
 | composition | k=40 | k=80 | k=160 |
 |---|---|---|---|

@@ -83,7 +83,7 @@ sparse であっても数百 MB を要求し、途中で ENOSPC を踏むと**�
 west.yml の pin 前進は checkout を必要としない正経路がある:
 
 ```bash
-nbb scripts/west-pin-put.cljs <entry> <sha>
+kbb --backend sci scripts/west-pin-put.cljk <entry> <sha>
 ```
 
 これは tip から west.yml を読み、fast-forward を GitHub の compare API で検証し、

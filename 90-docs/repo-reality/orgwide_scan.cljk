@@ -5,9 +5,9 @@
 ;; instead of :eval/claim.
 ;;
 ;; Usage:
-;;   nbb 90-docs/repo-reality/orgwide_scan.cljs <repo1> <repo2> ...   (explicit list, for validation)
-;;   nbb 90-docs/repo-reality/orgwide_scan.cljs --all                (fetch full org repo list, then scan)
-;;   nbb 90-docs/repo-reality/orgwide_scan.cljs --all --limit 30     (fetch full list, scan first N -- for dry runs)
+;;   kbb --backend sci 90-docs/repo-reality/orgwide_scan.cljk <repo1> <repo2> ...   (explicit list, for validation)
+;;   kbb --backend sci 90-docs/repo-reality/orgwide_scan.cljk --all                (fetch full org repo list, then scan)
+;;   kbb --backend sci 90-docs/repo-reality/orgwide_scan.cljk --all --limit 30     (fetch full list, scan first N -- for dry runs)
 ;;
 ;; Requires `gh` CLI authenticated (shells out via child_process, same as this session's manual
 ;; API calls) — no HTTP client dependency needed. Output: ledger event lines to stdout (redirect
@@ -164,7 +164,7 @@
         repos (cond
                 all? (let [rs (repo-list)] (if limit (take limit rs) rs))
                 (seq explicit) explicit
-                :else (do (println "Usage: nbb orgwide_scan.cljs <repo1> <repo2> ... | --all [--limit N]")
+                :else (do (println "Usage: kbb --backend sci orgwide_scan.cljk <repo1> <repo2> ... | --all [--limit N]")
                           (.exit js/process 1)))
         run-id (str "repo-reality-orgwide-" (str/replace (.toISOString (js/Date.)) #"[-:]|\.\d+Z$" ""))
         now (.toISOString (js/Date.))

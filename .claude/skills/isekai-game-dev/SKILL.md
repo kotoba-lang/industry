@@ -23,7 +23,7 @@ git log** から読む。
 ## この反復の仕事はちょうど 1 つ
 
 ```bash
-nbb scripts/isekai-game-dev-tick.cljk     # 最終行に EDN で候補が出る
+kbb --backend sci scripts/isekai-game-dev-tick.cljk     # 最終行に EDN で候補が出る
 ```
 
 - `:outcome :candidate :kind :registration-gap` — `:candidate` の 1 ゲームの
@@ -111,7 +111,7 @@ diff は最小に。**art direction は変えない。**
 ## 記録
 
 - 判断を伴ったら ADR を 1 本、`.edn` tx-data で書き、
-  `nbb scripts/isekai/adr_edn_check.cljs` を通す（heredoc で書かない — Write tool）。
+  `kbb --backend sci scripts/isekai/adr_edn_check.cljk` を通す（heredoc で書かない — Write tool）。
 - **捏造しない。** 測っていない値を書かない。動作確認していないものを
   :playable と申告しない。
 - **art direction は owner の判断**（ADR-0075 / 0078 の系譜）。declared な何かを
@@ -136,15 +136,15 @@ origin/main から切り直して載せ直す。
 
 ```bash
 cd "$COM_JUNKAWASAKI_ROOT"    # superproject root から
-nbb scripts/west-pin-put.cljk network-isekai <merged-sha>
-nbb scripts/verify-west-pins.cljk
+kbb --backend sci scripts/west-pin-put.cljk network-isekai <merged-sha>
+kbb --backend sci scripts/verify-west-pins.cljk
 ```
 
 worktree と branch を消すまでが完了条件。
 
 着地したら 1 行で報告する: どのゲームの / 何を / どの増分だけ進めたか /
 証拠（merge commit SHA）。**成否は次周の tick が測る** — 自分で「登録漏れは
-消えた」と書かず、`nbb scripts/isekai-game-dev-tick.cljk` をもう一度回して
+消えた」と書かず、`kbb --backend sci scripts/isekai-game-dev-tick.cljk` をもう一度回して
 その候補が消えたことを**見る**。消えていなければ直っていない。
 
 ## 絶対にやらないこと

@@ -1,5 +1,5 @@
-#!/usr/bin/env nbb
-;; nbb run-tests.cljs — 70-tools/bmc test runner
+#!/usr/bin/env kbb
+;; kbb --backend sci run-tests.cljk — 70-tools/bmc test runner
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
          '[babashka.fs :as fs])
 (def here (fs/parent (fs/real-path *file*)))

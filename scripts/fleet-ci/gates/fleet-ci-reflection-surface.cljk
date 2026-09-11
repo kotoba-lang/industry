@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; fleet-ci-reflection-surface.cljs — a gate whose failure reaches nobody.
 ;;
 ;; WHERE A RED GATE SURFACES. fleet-ci writes a signed receipt to manifest/fleet-ci.edn and,
@@ -21,7 +21,7 @@
 ;; the verify-* detectors, and it is chosen over a hard failure for the documented reason
 ;; that a gate which is permanently red is as uninformative as one that never fails.
 ;;
-;; Node side: npx nbb fleet-ci-reflection-surface.cljs <dir>
+;; Node side: kbb --backend sci fleet-ci-reflection-surface.cljk <dir>
 ;;            <dir> first — tick.cljs passes the extracted tree as argument one.
 
 (ns fleet-ci.gates.fleet-ci-reflection-surface

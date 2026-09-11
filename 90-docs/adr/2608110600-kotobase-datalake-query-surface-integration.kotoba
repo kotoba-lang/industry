@@ -85,11 +85,11 @@
    "【2026-08-17】compiled Worker を実チェーン + 実 pyarrow ファイルで駆動（test/worker_e2e_check.cljs）: GET /sparql?cid=…&query=SELECT ?row WHERE { ?row <urn:kotobase:price> 120 } => 200 application/sparql-results+json、rounds 4、ranges [0 4] [2419 2427] [897 2419] [319 412]、1,627 / 2,427 バイト、bindings 1 件 urn:kotobase:obj:bafkreiadsbmm…#row4。**同期版の実測（4 rounds / 1,627 バイト）が非同期ホスト上でそのまま再現した**"
    "【2026-08-17】gate: 主張を持たない valid signer は 404 NoSuchObject で **0 バイト**、存在しない cid も **同一 body**。?tenant= で保有者名を名乗っても 401 / 404 のまま（この 2 checks は後から足した — 最初の版は credential 経路を壊しても全部 green だった）"
    "【2026-08-17】両方向: read-range をオブジェクト全体に広げると答えは 200 のまま正しく、落ちるのは 2 つだけ（fetched less than the object :: 2427 of 2427 / more than one round :: 1）。catalog-docs の keyword 正規化を外すと JVM 側が落ちる"
-   "【2026-08-17】JVM: net-kotobase/lake `clojure -M:test` => 14 tests / 47 assertions、0 failures"
+   "【2026-08-17】JVM: net-kotobase/lake `kbb -M:test` => 14 tests / 47 assertions、0 failures"
    "【2026-08-17】live: 実 deploy へ新規 mint した CACAO で 4 回問い合わせ => 404 NoSuchObject、5547 / 6531 / 8893 / 9475 ms。**時間はすべて共有 graph の hydrate**（catalog collection は空）。scan は range 4 本"
    "【2026-08-17】kotoba-lang/kotobase-peer main（= 旧 west pin 2ed76f5e）が **read できなかった**: `require` は Syntax error、shadow-cljs は EOF while reading。f084cca が 1 個の閉じ括弧を落としていた。f077d947 で修正・merge、west pin 前進済み（cad6367cdee）"
    "fleet gate 登録前の実測（実ノードへ配って実行）: columnar 36/115・org-apache-parquet 34/163・org-apache-arrow 40/130・org-apache-avro 14/32・kotobase-lake 76/257・org-ietf-csv 10/38 = 210 tests / 735 assertions、0 failure"
-   "net-kotobase-lake: clojure -M:test => Ran 4 tests containing 15 assertions, 0 failures 0 errors（JVM、実 pyarrow fixture）"
+   "net-kotobase-lake: kbb -M:test => Ran 4 tests containing 15 assertions, 0 failures 0 errors（JVM、実 pyarrow fixture）"
    "async parity: nbb で resolve-async を実 Promise 4 本に対して実行 => rounds 4 / bytes 1627 / rows 1 / chunks 1 read 2 skipped、resolve-sync と一致"
    "trampoline の実レンジ: [0 4]（先頭 PAR1）/ [2419 2427]（8 バイト tail）/ [897 2419]（footer）/ [319 412]（column chunk 1 本）"
    "west pin: verify-west-pins が新規 entry 9d6909a8a163 を main から到達可能と判定"
@@ -308,9 +308,9 @@ principal を持たない PUT（catalog に何も書かない）が、書いた 
 走る。**テストが落ちるのではなく、名前空間が load できない**:
 
 ```
-clojure -M -e \"(require '[kotobase-peer.core])\"
+kbb -M -e \"(require '[kotobase-peer.core])\"
   => Syntax error reading source at (kotobase_peer/core.cljc:1895:32).
-shadow-cljs release
+amu compile --target wasm32-browser
   => kotobase_peer/core.cljc [line 2917, col 1] EOF while reading.
 ```
 
@@ -319,7 +319,7 @@ shadow-cljs release
 lake Worker のビルドがそれを踏んだ。`f077d947` で修正して merge、pin 前進済み。
 
 **paren の不均衡が main に届いたこと自体が要点**である。この repo に
-`clojure -M:test` を回す gate が在れば、見逃しようがない —— 失敗は read 時、
+`kbb -M:test` を回す gate が在れば、見逃しようがない —— 失敗は read 時、
 どのテストが走るより前に起きる。なお同 commit の `prolly-tree` bump
 （`05e3bff` → `da30b75`）は projection/views テストに 5 件の error を持ち込んで
 おり（`ipld: Data Model map keys must be strings`）、これは paren 修正とは別件。
@@ -337,7 +337,7 @@ lake Worker のビルドがそれを踏んだ。`f077d947` で修正して merge
 ## CI 空白の解消（ADR-2608054000 P4 のうち format library 分）
 
 6 repo を `scripts/fleet-ci/gates.edn` に `:jvm-test` として登録した。ADR-2608054000 が
-保留していた理由は「`clojure -M:test` が要求する maven 上の Clojure core がノードで
+保留していた理由は「`kbb -M:test` が要求する maven 上の Clojure core がノードで
 解決するか未確認」で、**実測して解消した**: 6 repo を実ノードに配って走らせ
 **210 tests / 735 assertions** が green。
 
@@ -375,7 +375,7 @@ CLAUDE.md が「wholesale 再生成 commit は禁止」と名指ししている�
   "0. **本番 ingest を通せるようにするには 2 つ揃える必要がある（片方だけでは開かない）。**
       ①`CACAO_OPERATOR_DIDS` に DID を置く —— **権限の判断なのでここでは決めない。**
       ②本番の bytes を lake が range できる場所に置く —— 現在 B2、lake は R2 のみ。
-      進捗は `nbb scripts/lake-ingest-probe.cljs --ingest https://s3.kotobase.net …`
+      進捗は `kbb --backend sci scripts/lake-ingest-probe.cljk --ingest https://s3.kotobase.net …`
       で毎回測れる（①未解決なら PUT 401 で exit 2、②未解決なら
       `ObjectBytesNotFound` で exit 2、両方解ければ PASS）。
    1. ✅ **catalog document を書く経路は出来て、実データで gate が開いた**
@@ -389,7 +389,7 @@ CLAUDE.md が「wholesale 再生成 commit は禁止」と名指ししている�
       比例しない。決める前に、その ref で何と join したいかを名指しすること。
    3. **`kotoba-lang/kotobase-peer` に `:jvm-test` gate を足す。** 2026-08-17 に
       main が read すらできない状態で 1 日置かれ、この family の Worker が全部
-      ビルド不能だった。`clojure -M:test` を回す gate なら見逃しようがない
+      ビルド不能だった。`kbb -M:test` を回す gate なら見逃しようがない
       （失敗は read 時、どのテストより前）。同じ commit が持ち込んだ
       projection/views の 5 error も別途。
    4. **`test/worker_e2e_check.cljs` と `test/async_parity_check.cljs` を

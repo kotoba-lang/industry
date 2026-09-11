@@ -72,7 +72,7 @@ Recorded here; not fixed in this iteration.
 
 ## Reproduce
 
-    nbb scripts/gen-whole-component.cljs <template> <worktree> <src-dir>
+    kbb --backend sci scripts/gen-whole-component.cljk <template> <worktree> <src-dir>
 
 A ref-less repository now prints DROPPED-BLOCKS and SKIPPED-TOKENS and
 writes; a ref-having one prints neither and is byte-for-byte idempotent.

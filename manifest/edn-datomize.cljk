@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; manifest/edn-datomize.cljk — EDN → Datomic/Datascript tx-data 変換ツール。
 ;;
 ;; 「datomic/datascript query 可能」の定義: ファイルのトップレベルが
@@ -15,8 +15,8 @@
 ;; 両対応、:db.install/_attribute 等の Datomic 固有キーは使わない）。
 ;;
 ;; 使い方:
-;;   nbb manifest/edn-datomize.cljk wrap-map <path> <ns>     — map 1個のファイルを変換
-;;   nbb manifest/edn-datomize.cljk wrap-map-glob <parent-dir> <filename> <ns>
+;;   kbb --backend sci manifest/edn-datomize.cljk wrap-map <path> <ns>     — map 1個のファイルを変換
+;;   kbb --backend sci manifest/edn-datomize.cljk wrap-map-glob <parent-dir> <filename> <ns>
 ;;                                                            — <parent-dir> 直下の
 ;;                                                              各子ディレクトリにある
 ;;                                                              <filename>（同一 ns の
@@ -24,7 +24,7 @@
 ;;                                                              例: 380個の
 ;;                                                              cloud-itonami-*/blueprint.edn
 ;;                                                              を一度に変換する。
-;;   nbb manifest/edn-datomize.cljk tx-entities <in-path> <out-path>
+;;   kbb --backend sci manifest/edn-datomize.cljk tx-entities <in-path> <out-path>
 ;;                                                            — 既に名前空間付きキーを
 ;;                                                              持つフラット map のベクタ
 ;;                                                              （:db/id 無し）を in-path
@@ -37,8 +37,8 @@
 ;;                                                              1リポジトリ1エンティティ）
 ;;                                                              をまとめて transact 可能に
 ;;                                                              する用途。
-;;   nbb manifest/edn-datomize.cljk adr-dir  <dir>            — ADR frontmatter/body を変換
-;;   nbb manifest/edn-datomize.cljk adr-file <path>           — ADR 1ファイルを変換
+;;   kbb --backend sci manifest/edn-datomize.cljk adr-dir  <dir>            — ADR frontmatter/body を変換
+;;   kbb --backend sci manifest/edn-datomize.cljk adr-file <path>           — ADR 1ファイルを変換
 
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format relative-path]]
          '[clojure.edn :as edn]
@@ -296,7 +296,7 @@
                    (adr-file! (io/file root a) report)
                    (merge-schema! (:attrs @report))
                    (println @report))
-      (do (println "usage: nbb manifest/edn-datomize.cljk [wrap-map <path> <ns> | wrap-map-glob <parent-dir> <filename> <ns> | tx-entities <in-path> <out-path> | adr-dir <dir> | adr-file <path>]")
+      (do (println "usage: kbb --backend sci manifest/edn-datomize.cljk [wrap-map <path> <ns> | wrap-map-glob <parent-dir> <filename> <ns> | tx-entities <in-path> <out-path> | adr-dir <dir> | adr-file <path>]")
           (scripts.nbb-compat/exit 1)))))
 
 (apply -main *command-line-args*)

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-itonami-coverage.cljs — 90-docs/coverage/itonami-coverage.datoms.edn の形を検査する。
 ;;
 ;; なぜ要るか（実測 2026-08-30）。この台帳は `[ {…} {…} ]` という **1 個の** top-level
@@ -16,7 +16,7 @@
 ;;   2. :coverage/code の重複が無いこと
 ;;   3. 各 entity が :db/id と :source/dataset "itonami-coverage" を持つこと
 ;;
-;; usage:  nbb --classpath ".:scripts/nbb_compat" scripts/fleet-ci/gates/itonami-coverage-check.cljk [<root-dir>]
+;; usage:  kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/fleet-ci/gates/itonami-coverage-check.cljk [<root-dir>]
 ;;   ⚠ <root-dir> は **引数の先頭**（fleet gate はそう渡す。--flag は無視する）
 ;;
 ;; exit: 0=clean  1=findings  2=答えられなかった（0 でも 1 でもない値にする。

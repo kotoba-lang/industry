@@ -2,7 +2,7 @@
   "pl/mf-csv-ingest — MoneyForward ME 入出金CSV → txn 構造化 (facts/pipelines.edn alt-source)。
    本人手番: MF管理画面 → 家計簿/入出金 → CSVエクスポート → orgs/personal/inbox/mf-cashflow.csv
    (認証は本人 = :no 境界。私はファイルが置かれたら取込むだけ)。
-   Run: clojure -M -m ingest.mf [csv-path]
+   Run: kbb -M -m ingest.mf [csv-path]
    Output: mail/mf-txns.jsonl (derived; warehouse.load が txn datoms 化, bank-txns より優先)"
   (:require [clojure.data.csv :as csv]
             [clojure.data.json :as json]

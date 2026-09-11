@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Vast.ai 調達計測ハーネス
 ;;
 ;; ## なぜこれが要るのか
@@ -29,9 +29,9 @@
 ;; ## 使い方
 ;;
 ;;   export VAST_API_KEY=...          # 鍵はリポジトリに置かない
-;;   nbb 90-docs/procurement/vast-measure.cljs offers "RTX 4090"
-;;   nbb 90-docs/procurement/vast-measure.cljs orphans [--destroy]
-;;   nbb 90-docs/procurement/vast-measure.cljs measure "RTX 4090"
+;;   kbb --backend sci 90-docs/procurement/vast-measure.cljk offers "RTX 4090"
+;;   kbb --backend sci 90-docs/procurement/vast-measure.cljk orphans [--destroy]
+;;   kbb --backend sci 90-docs/procurement/vast-measure.cljk measure "RTX 4090"
 
 (ns vast-measure
   (:require [clojure.string :as str]
@@ -379,7 +379,7 @@
            (println "usage: offers <gpu> | orphans [--destroy] | measure <gpu> [image] [minutes]")))
         (.catch (fn [e]
                   (js/console.error "ERROR:" (ex-message e) (pr-str (ex-data e)))
-                  (js/console.error "取り残し確認: nbb 90-docs/procurement/vast-measure.cljs orphans")
+                  (js/console.error "取り残し確認: kbb --backend sci 90-docs/procurement/vast-measure.cljk orphans")
                   (fail! 1))))))
 
 (apply -main *command-line-args*)

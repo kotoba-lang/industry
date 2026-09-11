@@ -36,7 +36,7 @@ datomic 連携なども考慮に, kotoba 言語を前提に」
 
 ## 既存資産の確認（作る前に索引を引いた）
 
-`nbb scripts/repo-search.cljs` と concept 索引で、次が**既に在る**ことを確認してから
+`kbb --backend sci scripts/repo-search.cljk` と concept 索引で、次が**既に在る**ことを確認してから
 着手した。ゼロから書いたのは計測と結線だけである。
 
 | 既存 | 何を持っているか |
@@ -95,7 +95,7 @@ datomic 連携なども考慮に, kotoba 言語を前提に」
 
 **具体例 — `cloud-itonami/patent`**: 36 ファイル、`lg/clj/lg_patent/**.cljc` の
 LangGraph graph 群と Python 版、`kotoba/src` の TS registry、`kotoba/test` の
-vitest。`bb test` を実際に回すと **38 tests / 78 assertions / 0 failures** で緑。
+vitest。`kbb -M:test` を実際に回すと **38 tests / 78 assertions / 0 failures** で緑。
 それを計器は **substrate 0bp / test 0bp** と測る。
 
 **これは規約違反ではなく盲点である。** この ADR は `src/**` `test/**` と書くだけで、
@@ -446,7 +446,7 @@ langgraph に gain 22 を出す一方で動的側が breadth-first を勝たせ�
 \"itonami-maturity\"` として `manifest/edn-query.cljs` の index 面に登録した。
 `:repo/path` が repo-taxonomy の `:repo/path` と同形なので join できる。
 
-    nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
       '[:find ?p ?kind ?own ?gain :where
         [?e \"source/dataset\" \"itonami-maturity\"] [?e \"repo/path\" ?p]
         [?e \"leverage/fleet-gain\" ?gain] [?e \"maturity/own-bp\" ?own]
@@ -487,18 +487,18 @@ fleet-summary は未 checkout / tombstone 件数も申告する — スコアが
 ## 再現手順
 
     # 1) 観測（本体 checkout を data-root に。west 管理の orgs/ は worktree に無い）
-    nbb scripts/itonami-maturity-scan.cljs --data-root <superproject main checkout>
+    kbb --backend sci scripts/itonami-maturity-scan.cljk --data-root <superproject main checkout>
 
     # 2) スコア + 依存伝播 + leverage + XMILE
-    nbb --classpath \"<dynamics/src>:<org-oasis-open-xmile/src>\" \\
+    kbb --backend sci --classpath \"<dynamics/src>:<org-oasis-open-xmile/src>\" \\
       scripts/itonami-maturity-dynamics.cljs --top 30
 
     # 3) Kotoba カーネルとの完全一致ゲート（全 repo。2026-08-05 実測 1,808/1,808 PASS）
-    nbb --classpath \"<kotoba-lang/compiler/src>\" \\
+    kbb --backend sci --classpath \"<kotoba-lang/compiler/src>\" \\
       scripts/itonami-maturity-kernel-parity.cljs --batch 300
 
     # 個別 repo の内訳を見る
-    nbb --classpath \"...\" scripts/itonami-maturity-dynamics.cljs --top 0 \\
+    kbb --backend sci --classpath \"...\" scripts/itonami-maturity-dynamics.cljs --top 0 \\
       --explain orgs/cloud-itonami/cloud-itonami-isic-6310
 
 ## 改訂履歴

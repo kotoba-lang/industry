@@ -37,7 +37,7 @@
 ;;   :refused    could not answer (no checkout, fetch failed, push failed …)
 ;; :refused is never folded into :no-op. A run's summary counts each.
 ;;
-;;   nbb scripts/cljk-rename.cljk --paths <file> --state <dir> [--dry-run] [--shard i/n]
+;;   kbb --backend sci scripts/cljk-rename.cljk --paths <file> --state <dir> [--dry-run] [--shard i/n]
 ;;                                [--skip-edit <prefix>,<prefix>...]
 ;;     <file>: one repository path per line (relative to cwd)
 ;;     --skip-edit: paths under these prefixes are renamed if they are source

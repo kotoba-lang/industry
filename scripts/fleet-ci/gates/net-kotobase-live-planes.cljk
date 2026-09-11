@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; net-kotobase-live-planes.cljs — kotobase.net の**本番の面**が実際に答えるか。
 ;;
 ;; **なぜ要るか。** 2026-08-11、`/api/*` の全 8 経路と `/pins` が 502 を返し、
@@ -27,7 +27,7 @@
 ;; テナントとして成立する（= 権限昇格にならない / 既存テナントに触れない）。
 ;; npm 依存も持たない: ed25519 は node:crypto、CBOR は下の最小実装。
 ;;
-;; usage: nbb net-kotobase-live-planes.cljs [<dir>] [--base https://kotobase.net]
+;; usage: kbb --backend sci net-kotobase-live-planes.cljk [<dir>] [--base https://kotobase.net]
 ;;   <dir> は使わない（fleet が第1引数に tree を渡す規約に合わせて受けるだけ）。
 (ns fleet-ci.gates.net-kotobase-live-planes
   (:require ["node:crypto" :as crypto]

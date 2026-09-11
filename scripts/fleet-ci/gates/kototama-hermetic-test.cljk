@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kototama-hermetic-test.cljs — kototama の、この repo だけで検査できる部分の gate。
 ;;
 ;; **なぜ `:jvm-test` ではないのか。** kototama の `:test` alias は
 ;; `:local/root "../kotoba"` などを解決する。west 配置の workstation では正しく、
 ;; fleet ノードでは**不可能**である —— fleet が配るのはその repo の tree だけで、
-;; sibling は入らない。だから `clojure -M:test` を回す gate は、コードではなく
+;; sibling は入らない。だから `kbb -M:test` を回す gate は、コードではなく
 ;; classpath について落ち続ける。
 ;;
 ;; 代わりに repo 側が `:test-hermetic` を宣言し（namespace を明示列挙 —— runner の
@@ -50,7 +50,7 @@
 ;;
 ;; ネットワーク: 要る（test-runner と io-multiformats を解決する）。
 ;;
-;; ノード側で `npx nbb kototama-hermetic-test.cljs <dir> --min 20` として実行。
+;; ノード側で `kbb --backend sci kototama-hermetic-test.cljk <dir> --min 20` として実行。
 ;; ⚠ `<dir>` は引数の**先頭**に置く（CLAUDE.md「赤い gate を直す前に 3 つ確かめる」2）。
 (ns fleet-ci.gates.kototama-hermetic-test
   (:require ["node:child_process" :as cp]

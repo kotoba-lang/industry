@@ -159,7 +159,7 @@
                since 2026-08-02 without ever crossing its fold threshold. Nothing
                in the code got slower. Calling growth-toward-a-threshold a
                regression points the next reader at the wrong file."}
-  {:what "This session's first `nbb scripts/repo-search.cljs graphsync` returned 0
+  {:what "This session's first `kbb --backend sci scripts/repo-search.cljk graphsync` returned 0
           and I nearly reported GraphSync as absent."
    :why-wrong "repo-search matches repo NAMES plus the READMEs of CHECKED-OUT repos,
                and west checkouts sit at pins. kotoba-lang/p2p's main has seven
@@ -205,7 +205,7 @@
          (KOTOBASE_FOLD_THRESHOLD overrides). The inline fold-if-due! stays at 64 as
          the no-ExecutionContext backstop."
   :verification
-  {:build "shadow-cljs release, 172 files, 0 warnings"
+  {:build "amu compile --target wasm32-browser, 172 files, 0 warnings"
    :tests "102 tests / 694 assertions, 0 failures (baseline before the change: 95 / 669)"
    :upstream-lock "protocols upstream lock OK (25 exact revisions)"
    :discrimination

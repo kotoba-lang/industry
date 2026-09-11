@@ -14,7 +14,7 @@
 ;; **ノードに credential を置かない不変条件 3 を保ったまま**警報が置ける
 ;; —— hayari は public repo なので、この gate は認証を一切要さない。
 ;;
-;; ノード側で `npx nbb hayari-tick-alive.cljs <dir> [--max-age-hours N]
+;; ノード側で `kbb --backend sci hayari-tick-alive.cljk <dir> [--max-age-hours N]
 ;; [--max-failures N]` として実行。
 
 (ns fleet-ci.gates.hayari-tick-alive

@@ -93,7 +93,7 @@ in ADR-2606302300 itself, so `iut-lean` has a taxonomy-consistent home.
 4. **Manifest registration**: `orgs/com-junkawasaki/iut-lean` was added to
    `:manifest.repos/extra-projects` in `manifest/repos.edn`, and
    `manifest/west.yml` was regenerated for this single entry via
-   `nbb scripts/gen-west-manifest.cljs --entry iut-lean` (minimal
+   `kbb --backend sci scripts/gen-west-manifest.cljk --entry iut-lean` (minimal
    single-entry diff, not a wholesale regeneration), pinning to the pushed
    `main` HEAD of the new repo.
 

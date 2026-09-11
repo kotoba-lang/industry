@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-ledger-seq-collision — two different events must not share one
 ;; :event/seq, because seq is the identity the kotobase projection upserts on.
 ;;
-;;   nbb scripts/verify-ledger-seq-collision.cljk             # ratchet
-;;   nbb scripts/verify-ledger-seq-collision.cljk --list      # + name them
-;;   nbb scripts/verify-ledger-seq-collision.cljk --write-baseline
-;;   nbb scripts/verify-ledger-seq-collision.cljk --self-test
+;;   kbb --backend sci scripts/verify-ledger-seq-collision.cljk             # ratchet
+;;   kbb --backend sci scripts/verify-ledger-seq-collision.cljk --list      # + name them
+;;   kbb --backend sci scripts/verify-ledger-seq-collision.cljk --write-baseline
+;;   kbb --backend sci scripts/verify-ledger-seq-collision.cljk --self-test
 ;;
 ;; ## Why this exists
 ;;

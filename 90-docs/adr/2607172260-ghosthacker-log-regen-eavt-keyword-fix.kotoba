@@ -52,7 +52,7 @@ ADR-2607172230 は『ghosthacker-manga-log.edn は消費者なしのため再生
    ゲートで JVM 専用のため、そのラッパーは使わず `manga/work->tx` →
    `manga/tx->eavt` → `datom/make-tx` → `datom/tx->edn-line` を直接呼び
    `fs/writeFileSync` で書き出した)。副検証として同じ入力を JVM
-   (`clojure -M -e`)でも一度生成し、CID・バイト数(1090909)が
+   (`kbb -M -e`)でも一度生成し、CID・バイト数(1090909)が
    完全一致することを確認 — `kotoba.datom` の『host 間 byte-compatible』
    という docstring の主張を実測で裏付けた。
 

@@ -158,11 +158,11 @@
 
        # capability の内容は生成物。手で書き換えない
        git clone git@github.com:kotoba-lang/capability-social-publish.git
-       clojure -M:test        # 1 test — manifest が core contract に適合するか
+       kbb -M:test        # 1 test — manifest が core contract に適合するか
 
        # client は4本とも同じ形
        for r in com-instagram com-tiktok com-linkedin com-vimeo-upload; do
-         git clone git@github.com:kotoba-lang/$r.git && (cd $r && nbb run_tests.cljs)
+         git clone git@github.com:kotoba-lang/$r.git && (cd $r && kbb --backend sci run_tests.cljk)
        done
 
    次にやるべきは **sender の配線**（R2）。haishin の `:youtube/videos-insert` などの
@@ -180,7 +180,7 @@
    - `src/kotoba/core/capability_repository.cljc` の `capability-effects` /
      `approval-required-capabilities` / `radicle-rids`
    - `test/kotoba/core/contracts_test.cljc` の catalog 件数と golden import order
-   - 生成: `CAPABILITY_CORE_CONTRACTS_SHA=<landed sha> clojure -M -m scaffold-capability-repos <dir>`
+   - 生成: `CAPABILITY_CORE_CONTRACTS_SHA=<landed sha> kbb -M -m scaffold-capability-repos <dir>`
 
    順序は相互依存で強制される: **west 登録 → RID（rad-register は landing repo の tip から
    west.yml を読む） → core-contracts 着地（RID が無いと catalog validation が落ちる） →

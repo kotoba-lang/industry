@@ -26,7 +26,7 @@ wave-of \"8151\"` resolves to wave 3, confirmed against a fresh clone).
 resume of prior partial work.
 
 The `kotoba-lang/occupation` registry's live `{:id \"8151\" ...}` entry
-was verified against a fresh clone before any work began (`clojure -M
+was verified against a fresh clone before any work began (`kbb -M
 -e \"(require 'kotoba.occupation) (println (kotoba.occupation/get-
 occupation \\\"8151\\\"))\"` from a checkout with the `kotoba-lang/
 technology` sibling present at the correct `../technology` relative
@@ -205,19 +205,19 @@ scope rule. Green on first run.
   every other Wave3-batch sibling deftest in that file), is left
   exactly as found rather than fought over -- a later agent landing
   last in the batch, or a dedicated resync pass, is expected to true it
-  up. Confirmed by fresh-clone re-run: `clojure -M:test` in
+  up. Confirmed by fresh-clone re-run: `kbb -M:test` in
   `kotoba-lang/occupation` reports 101 tests / 1209 assertions with
   exactly 2 failures, both on the stale aggregate `:spec`/`:implemented`
   exact-count assertions (not on this occupation's own dedicated
   deftest, which passes in isolation: 1 test / 3 assertions, 0
-  failures, 0 errors, run standalone via `clojure -M:test --var
+  failures, 0 errors, run standalone via `kbb -M:test --var
   kotoba.occupation-test/fibre-preparing-spinning-winding-machine-
   operators-8151-implemented`).
-- Full `cloud-itonami-isco-8151` test suite (`clojure -M:test`): 33
+- Full `cloud-itonami-isco-8151` test suite (`kbb -M:test`): 33
   tests, 71 assertions, 0 failures, 0 errors -- raw output captured in
   this ADR's `:test/counts` and independently re-verified against a
   brand-new fresh clone of the pushed repository (not just the local
-  working copy). `clj-kondo` (`clojure -M:lint`): 0 errors, 0 warnings.
+  working copy). `clj-kondo` (`kbb -M:lint`): 0 errors, 0 warnings.
   No mojibake in the Japanese violation-detail strings (only the
   expected em-dash and Japanese text found in a fresh-clone byte scan).
 - No `manifest/west.yml` changes -- this actor is registered purely via

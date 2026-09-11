@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; west-orphan-audit.cljs — local orgs/*/* vs west.yml / :local/root 依存の orphan 検出。
 ;;
 ;; 背景 (2026-07-17 実測):
@@ -37,11 +37,11 @@
 ;;                              **orphan ではない。登録も退役もこの行に対して行わない。**
 ;;
 ;; 使い方:
-;;   nbb scripts/west-orphan-audit.cljk              ; 人間可読サマリ
-;;   nbb scripts/west-orphan-audit.cljk --all        ; 全件列挙
-;;   nbb scripts/west-orphan-audit.cljk --blocking   ; :local-root-broken のみ
-;;   nbb scripts/west-orphan-audit.cljk --edn        ; 機械可読 EDN
-;;   nbb scripts/west-orphan-audit.cljk --findings   ; detector protocol（gh を呼ばない）
+;;   kbb --backend sci scripts/west-orphan-audit.cljk              ; 人間可読サマリ
+;;   kbb --backend sci scripts/west-orphan-audit.cljk --all        ; 全件列挙
+;;   kbb --backend sci scripts/west-orphan-audit.cljk --blocking   ; :local-root-broken のみ
+;;   kbb --backend sci scripts/west-orphan-audit.cljk --edn        ; 機械可読 EDN
+;;   kbb --backend sci scripts/west-orphan-audit.cljk --findings   ; detector protocol（gh を呼ばない）
 ;;
 ;; --findings は manifest/orgs-detectors.edn の :verify-west-registration-gap が使う。
 ;; FINDING/SCANNED/CENSUS 行だけを出し、**gh を要する判定はしない**（レジストリの

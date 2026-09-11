@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns endpoint-health-resident
   "One tick of the resident: probe, accumulate, and say what may honestly be
   said about each endpoint over the trailing window.
@@ -46,7 +46,7 @@
   a mirror that refreshes when that machine is live loses nothing.
 
   usage:
-    nbb --classpath <uptime>/src scripts/endpoint-health-resident.cljk \\
+    kbb --backend sci --classpath <uptime>/src scripts/endpoint-health-resident.cljk \\
         [--root <workspace>] [--home <dir>] [--window-hours 24] [--cheap-only]"
   (:require ["fs" :as fs]
             ["path" :as path]

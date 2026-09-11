@@ -246,7 +246,7 @@ These conditions require **owner decision** (murakumo-owner or platform-lead app
 # Slack: @murakumo-owner approved manual rollback to Phase 2
 # Reason: kgraph query semantics mismatch in drama-profile component
 
-nbb murakumo/rollback.cljs \
+kbb --backend sci murakumo/rollback.cljk \
   --to-stage phase2 \
   --reason "application-level kgraph fix needed" \
   --owner-approval "2026-09-11 11:00 JST (@murakumo-owner Slack approval)"
@@ -273,7 +273,7 @@ nbb murakumo/rollback.cljs \
 # Reason: Acceptable variance during ramp, GC tuning underway
 
 # Update monitoring alert threshold
-nbb murakumo/update-slo.cljs --metric p99-latency --new-threshold 110ms
+kbb --backend sci murakumo/update-slo.cljk --metric p99-latency --new-threshold 110ms
 ```
 
 **Timeline**: < 2 min to adjust alert threshold
@@ -296,7 +296,7 @@ nbb murakumo/update-slo.cljs --metric p99-latency --new-threshold 110ms
 # Reason: Critical production issue in Rust fleet (details: ...)
 # Pause duration: < 24 hours, resume 2026-09-12 or 2026-09-13
 
-nbb murakumo/pause-canary.cljs \
+kbb --backend sci murakumo/pause-canary.cljk \
   --reason "production-issue-rust-fleet" \
   --owner-approval "2026-09-11 (@platform-lead Slack approval)"
   
@@ -324,7 +324,7 @@ nbb murakumo/pause-canary.cljs \
 # Reason: On-call engineer unavailable, insufficient staffing
 # New start date: 2026-09-12 (or 2026-09-13)
 
-nbb murakumo/delay-canary.cljs \
+kbb --backend sci murakumo/delay-canary.cljk \
   --new-start-date "2026-09-12" \
   --reason "team-readiness-gap" \
   --owner-approval "2026-09-11 (@murakumo-owner Slack approval)"
@@ -601,21 +601,21 @@ After traffic is reverted to Rust:
 ### Command: Set Traffic Split
 
 ```bash
-nbb murakumo/rollback.cljs --to-stage phase2
+kbb --backend sci murakumo/rollback.cljk --to-stage phase2
 # Output: Traffic split updated: 50% cljc, 50% Rust
 ```
 
 ### Command: Full Emergency Revert
 
 ```bash
-nbb murakumo/rollback.cljs --to-stage full-rust --emergency
+kbb --backend sci murakumo/rollback.cljk --to-stage full-rust --emergency
 # Output: Full revert executed (0% cljc, 100% Rust), PagerDuty alert fired
 ```
 
 ### Command: Graceful Drain Cancellation
 
 ```bash
-nbb murakumo/rollback.cljs --cancel-graceful-drain --restore-rust-pool
+kbb --backend sci murakumo/rollback.cljk --cancel-graceful-drain --restore-rust-pool
 # Output: Rust graceful drain cancelled, nodes restored to active state
 ```
 

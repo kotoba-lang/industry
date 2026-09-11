@@ -7,7 +7,7 @@
    『測っていないものを測ったように見せない』ことを主題にしているのに、
    報告書がそれを破ったら意味が無い。
 
-   実行: nbb scripts/tower100-b70-report.cljk <out.html> [--standalone]
+   実行: kbb --backend sci scripts/tower100-b70-report.cljk <out.html> [--standalone]
 
    **既定は Artifact 用の *断片*** —— publish 時に doctype / head / body の
    skeleton が被せられるので、こちらで書くと二重になる。
@@ -356,12 +356,12 @@ footer .mono{font-size:12px}
 <section>
   <h2><span class=\"idx\">07</span>再現</h2>
   <pre><code># 検査（寸法を変えるときは部材カタログだけを直す。他は生成物）
-nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
+kbb --backend sci --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
     scripts/tower100-b70-cad.cljk
 
 # 三面図 → このページ
-nbb scripts/tower100-b70-drawing.cljk
-nbb scripts/tower100-b70-report.cljk out.html</code></pre>
+kbb --backend sci scripts/tower100-b70-drawing.cljk
+kbb --backend sci scripts/tower100-b70-report.cljk out.html</code></pre>
   <p class=\"lede\">正本は <code>90-docs/hardware/tower100-b70-parts.datoms.edn</code>。
   STEP（ISO 10303-21）は <code>tower100-b70-chassis.step</code> に出力され、read-step で往復も通る。
   幾何は org-iso-10303 の brep kernel、CFD は kami-engine-cfd を読み取り専用で使っている。</p>

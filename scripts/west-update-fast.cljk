@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; west-update-fast.cljs — the same end state as `west update --fetch smart`
 ;; (all active projects at their manifest pin), without walking every project
 ;; through west's own per-project machinery.
@@ -44,7 +44,7 @@
 ;;      same as "there was nothing to do" without saying so
 ;;
 ;; Run:
-;;   nbb scripts/west-update-fast.cljk [--jobs N] [--dry-run] [--concurrency C]
+;;   kbb --backend sci scripts/west-update-fast.cljk [--jobs N] [--dry-run] [--concurrency C]
 ;;
 ;; exit 0  every stale/missing project's west update shard exited 0
 ;;         (including the case where the stale+missing set was empty)

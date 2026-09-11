@@ -35,11 +35,11 @@ backend は 10 種: `:macos-local` `:window-scoped` `:agent-space` `:fleet-node`
 
 ```bash
 # due を見る（決定論。モデル無し）
-nbb scripts/cua-bots-tick.cljk
+kbb --backend sci scripts/cua-bots-tick.cljk
 
 # 1 体を手で回す（lib の contract そのまま）
 cd orgs/kotoba-lang/computer-use
-nbb bin/cua_bot_run.cljs \
+kbb --backend sci bin/cua_bot_run.cljk \
   --roster "$COM_JUNKAWASAKI_ROOT/manifest/cua-bots.edn" \
   --bot <bot-id> \
   --receipts-dir ~/.itonami/cua-bots/receipts/<bot-id> \
@@ -63,7 +63,7 @@ loop 側の ledger も同じ 3 値 + `:not-measured :why :lib-missing/:cli-missi
   itonami.cloud/bots/ の 3 セクション（Grok runtime / workstation loops / hyakka）が
   live データで描画されているかの目視相当 QA。
 - `isekai-touch-qa`（`:host-object`、actions `#{}`）— jintori の touch 経路。
-  いまは network-isekai の決定論 gate `nbb scripts/run-task.cljs jintori-touch`
+  いまは network-isekai の決定論 gate `kbb --backend sci scripts/run-task.cljk jintori-touch`
   （`scripts/tasks.edn` の `:jintori-touch`、exit 2 を自分で申告する gate）を
   対象にしている。実 touch drag を駆動できる backend が qualify したら、
   `:bot/backend` の 1 keyword を書き換えて昇格する。

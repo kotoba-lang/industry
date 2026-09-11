@@ -222,10 +222,10 @@ Eight benchmark functions with p50/p95/p99 latency measurements:
 ```bash
 # Default scale (local testing)
 cd orgs/kotoba-lang/kotobase-peer
-clojure -X:bench:m456
+kbb -X:bench:m456
 
 # Production scale with environment overrides
-M4_RUN_COUNT=1000 M5_ROW_COUNT=1000000 M6_REQUEST_COUNT=100000 clojure -X:bench:m456
+M4_RUN_COUNT=1000 M5_ROW_COUNT=1000000 M6_REQUEST_COUNT=100000 kbb -X:bench:m456
 ```
 
 **Output Format:** Each benchmark returns `{:operation :metric :p50-ms :p95-ms :p99-ms :avg-ms ...}`
@@ -277,15 +277,15 @@ cd orgs/kotoba-lang/kotobase-peer
 
 # M4 Baselines
 M4_RUN_COUNT=100 M4_BLOCK_COUNT=10000 M4_PIN_COUNT=100 \
-clojure -X:bench:m456 > bench-m4-baseline-$(date +%Y%m%d).txt
+kbb -X:bench:m456 > bench-m4-baseline-$(date +%Y%m%d).txt
 
 # M5 Baselines
 M5_ROW_COUNT=100000 M5_INDEX_COUNT=4 M5_DATOM_COUNT=1000 \
-clojure -X:bench:m456 > bench-m5-baseline-$(date +%Y%m%d).txt
+kbb -X:bench:m456 > bench-m5-baseline-$(date +%Y%m%d).txt
 
 # M6 Baselines
 M6_REQUEST_COUNT=10000 M6_OP_COUNT=10000 \
-clojure -X:bench:m456 > bench-m6-baseline-$(date +%Y%m%d).txt
+kbb -X:bench:m456 > bench-m6-baseline-$(date +%Y%m%d).txt
 ```
 
 **Acceptance Criteria:**

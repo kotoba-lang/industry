@@ -16,7 +16,7 @@
 ;; Run twice: with the pack present (hit-large), and with the pack deleted
 ;; and the same 32 blocks present as individual objects (miss, per-block).
 ;;
-;;   nbb --classpath "..." 90-docs/query-plane/bench_ipq_large_pack.cljs <root> <label> [reps=3]
+;;   kbb --backend sci --classpath "..." 90-docs/query-plane/bench_ipq_large_pack.cljs <root> <label> [reps=3]
 (ns bench-ipq-large-pack
   (:require [ipld.selector :as sel]
             ["os" :as os]))

@@ -70,7 +70,7 @@ def run_gate():
     """The acceptance script's own verdict. Its exit code is the answer;
     stdout carries the evidence lines it prints."""
     try:
-        r = subprocess.run(["nbb", "--classpath", CLASSPATH, GATE],
+        r = subprocess.run(["kbb", "--backend", "sci", "--classpath", CLASSPATH, GATE],
                            cwd=CHILD, capture_output=True, text=True, timeout=1800)
     except FileNotFoundError:
         cannot("nbb is not on PATH")

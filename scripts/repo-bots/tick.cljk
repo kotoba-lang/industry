@@ -1,12 +1,12 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/repo-bots/tick.cljk — 名簿の bot を、最後に測った順から有界な波で
 ;; 起こして 1 周させる。
 ;;
-;;   nbb scripts/repo-bots/tick.cljk                 ; 既定の波（200 体）
-;;   nbb scripts/repo-bots/tick.cljk --wave 500
-;;   nbb scripts/repo-bots/tick.cljk --only kotoba-lang/amu
-;;   nbb scripts/repo-bots/tick.cljk --report        ; 測らず、いまの state を読む
-;;   nbb scripts/repo-bots/tick.cljk --state /tmp/x.edn --ledger /tmp/x.ledger.edn
+;;   kbb --backend sci scripts/repo-bots/tick.cljk                 ; 既定の波（200 体）
+;;   kbb --backend sci scripts/repo-bots/tick.cljk --wave 500
+;;   kbb --backend sci scripts/repo-bots/tick.cljk --only kotoba-lang/amu
+;;   kbb --backend sci scripts/repo-bots/tick.cljk --report        ; 測らず、いまの state を読む
+;;   kbb --backend sci scripts/repo-bots/tick.cljk --state /tmp/x.edn --ledger /tmp/x.ledger.edn
 ;;
 ;; ## 何を測るか（全部ローカル。network を引かない）
 ;;
@@ -507,7 +507,7 @@
       (cond
         (nil? d)   (println "ROSTER-DRIFT\tUNMEASURED —— west.yml が読めない")
         (seq parts) (println (str "ROSTER-DRIFT\t" (str/join " / " parts)
-                                  "\t再生成: nbb scripts/repo-bots/gen-registry.cljk"))))
+                                  "\t再生成: kbb --backend sci scripts/repo-bots/gen-registry.cljk"))))
     (println (str "TICKED\t" ticked "\t(never " never ")"
                   (when (pos? orphans) (str "\tORPHAN " orphans " —— 名簿から消えた repo の state 行"))))
     (println (str "MEASURED\t" measured "\tUNMEASURED\t" unmeasured))
@@ -750,7 +750,7 @@
 (let [registry (read-edn registry-file)]
   (if-not (seq registry)
     (do (println "REFUSED\t名簿が読めない:" registry-file)
-        (println "  生成: nbb scripts/repo-bots/gen-registry.cljk")
+        (println "  生成: kbb --backend sci scripts/repo-bots/gen-registry.cljk")
         (js/process.exit 2))
     (let [prev (or (read-edn state-file) {:schema 1 :bots {}})]
       (cond
@@ -798,7 +798,7 @@
             (binding [*print-fn* *print-err-fn*]
               (println (str "NOTE\t名簿に無い bot の finding を " orphaned
                             " 件外した —— どう直しても RESOLVED にならない。"
-                            " 一覧: nbb scripts/repo-bots/tick.cljk --report"))))
+                            " 一覧: kbb --backend sci scripts/repo-bots/tick.cljk --report"))))
           (when (pos? stale-pin)
             ;; 数だけ返して黙らない。ghost は state に残ったままなので、
             ;; 消し方（測り直し）を stderr に出す（stdout は EDN 1 行のまま）。

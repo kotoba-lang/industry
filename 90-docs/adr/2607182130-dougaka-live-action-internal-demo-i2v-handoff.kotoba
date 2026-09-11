@@ -67,7 +67,7 @@ LTX-2.3である。既存`animeka.murakumo-video`契約はPOST generation → jo
 1. 1Password desktop integrationまたはKagi unlockを復旧し、署名secretを値を
    表示しない形で`MURAKUMO_TOKEN_SECRET`へ注入する。
 2. dirtyな共有`cloud-murakumo` checkoutを編集せず、既存CLIだけを実行:
-   `clojure -M:token issue dougaka-internal-demo generation 7776000`。
+   `kbb -M:token issue dougaka-internal-demo generation 7776000`。
 3. tokenを`DOUGAKA_GENERATION_TOKEN`等へ安全に保存し、stdout/logへ残さない。
 4. 各ローカルPNGをgeneration backendがfetch可能な非公開・期限付きURLへ置く。
    internal demoなのでaozora public postを作成してはならない。

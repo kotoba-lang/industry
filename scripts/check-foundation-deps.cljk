@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; check-foundation-deps.cljs — kotobase/kotoba foundation の deps.edn pin drift を
 ;; サーバ側(GitHub API)で検出する。
 ;;
@@ -21,8 +21,8 @@
 ;; 頼らない(CLAUDE.md「マージ / ancestry 判定」節、verify-west-pins.cljs と同方針)。
 ;;
 ;; 使い方:
-;;   nbb scripts/check-foundation-deps.cljk              ; 既定の foundation 集合を検査
-;;   nbb scripts/check-foundation-deps.cljk r1 r2 ...     ; repo を明示指定
+;;   kbb --backend sci scripts/check-foundation-deps.cljk              ; 既定の foundation 集合を検査
+;;   kbb --backend sci scripts/check-foundation-deps.cljk r1 r2 ...     ; repo を明示指定
 ;;   ORG=kotoba-lang で org 上書き(既定 kotoba-lang)
 ;;
 ;; exit 0: drift なし(全 pin == dep HEAD)

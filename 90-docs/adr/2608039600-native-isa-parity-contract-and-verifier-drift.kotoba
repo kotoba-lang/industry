@@ -169,7 +169,7 @@ operator だけがこの一覧に属する。**
 |---|---|
 | kotoba-native | 25 tests / 1,904 assertions |
 | compiler (pin 前進後、override 無し) | **785 tests / 6,294 assertions、0 failures** — `native-executor-test` / `verifier-profile-test` を含む |
-| `clojure -M:native-conformance` | 5/5 (`aarch64-kotoba-v1`) |
+| `kbb -M:native-conformance` | 5/5 (`aarch64-kotoba-v1`) |
 | 差分ネイティブ実行 | `bit-and`/`bit-or`/`bit-xor` とその合成が実 AArch64 プロセスで正しい値を返す。未修正版は NPE |
 | JVM vs nbb | 3 operator すべて両 ISA でバイト単位一致 |
 
@@ -643,7 +643,7 @@ keyword 演算のこれ) ので、自分で 3 例目を残さない。
 
 **検証**: compiler `885 tests / 6,761 assertions / 0 failures`、
 kotoba-native `43 / 2,052 / 0`、共有 ISA 表は両 ISA で `137 assertions / 0`。
-再実行は対象 repo で `clojure -M:test`。
+再実行は対象 repo で `kbb -M:test`。
 
 ### 残っているもの (優先順)
 

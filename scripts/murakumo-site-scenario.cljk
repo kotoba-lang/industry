@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; murakumo-site-scenario.cljs — murakumo.cloud を **面の集合**として測る。
 ;;
 ;; `lp-copy-score.cljs` が 1 面のコピーを測るのに対し、ここは
@@ -24,8 +24,8 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb scripts/murakumo-site-scenario.cljk            # 本番を測る
-;;   nbb scripts/murakumo-site-scenario.cljk --json
+;;   kbb --backend sci scripts/murakumo-site-scenario.cljk            # 本番を測る
+;;   kbb --backend sci scripts/murakumo-site-scenario.cljk --json
 ;;
 ;; **この値は売上ではない。** 面の形しか見ていない。購入は Stripe の checkout
 ;; 件数、集客は実問い合わせ件数でしか測れない。
@@ -97,7 +97,7 @@
 (defn- score-surfaces []
   (let [urls (map #(str base (:path %)) surfaces)
         out (str (cp/execSync
-                  (str "nbb scripts/lp-copy-score.cljk --json "
+                  (str "kbb --backend sci scripts/lp-copy-score.cljk --json "
                        (str/join " " (map pr-str urls)))
                   #js {:encoding "utf8" :maxBuffer 40000000}))
         parsed (js->clj (js/JSON.parse out) :keywordize-keys true)]

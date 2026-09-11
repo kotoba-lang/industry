@@ -1,14 +1,14 @@
-#!/usr/bin/env nbb
-;; Promote tasks-complex.edn require/-main forms into tasks.edn as nbb -m commands.
+#!/usr/bin/env kbb
+;; Promote tasks-complex.edn require/-main forms into tasks.edn as kbb --backend sci -m commands.
 ;;
-;;   nbb scripts/wire_tasks_complex.cljk --repo /path/to/repo
+;;   kbb --backend sci scripts/wire_tasks_complex.cljk --repo /path/to/repo
 ;;
 ;; Patterns handled:
 ;;   (do (require 'foo.bar) (apply (resolve 'foo.bar/-main) *command-line-args*))
 ;;   (do (require 'foo.bar) (apply (resolve 'foo.bar/-some-fn) *command-line-args*))
 ;;
 ;; Emits:
-;;   nbb --classpath <from nbb.edn paths> -e "(require 'ns) (apply (resolve 'ns/fn) *command-line-args*)"
+;;   kbb --backend sci --classpath <from nbb.edn paths> -e "(require 'ns) (apply (resolve 'ns/fn) *command-line-args*)"
 ;; Shell forms with {:dir ...} python kept in complex.
 ;; Remaining unpromoted stay in tasks-complex.edn.
 (require '[clojure.edn :as edn]
@@ -44,8 +44,8 @@
             ;; if var is ns/-main, prefer -m
             main? (str/ends-with? var-name "/-main")]
         (if main?
-          {:cmd ["nbb" "--classpath" cp "-m" ns-name] :pass-args? true}
-          {:cmd ["nbb" "--classpath" cp "-e"
+          {:cmd ["kbb" "--backend" "sci" "--classpath" cp "-m" ns-name] :pass-args? true}
+          {:cmd ["kbb" "--backend" "sci" "--classpath" cp "-e"
                  (str "(require '" ns-name ") "
                       "(apply (resolve '" var-name ") "
                       "*command-line-args*)")]
@@ -76,7 +76,7 @@
             (swap! remaining assoc k v))))
       (let [new-tasks (merge tasks @promoted)]
         (spit tasks-path
-              (str ";; tasks.edn — shell + nbb -m promotions (ADR-2607173000)\n"
+              (str ";; tasks.edn — shell + kbb --backend sci -m promotions (ADR-2607173000)\n"
                    (pr-str new-tasks) "\n"))
         (spit complex-path
               (str ";; tasks-complex.edn — remaining hand-port (ADR-2607173000)\n"

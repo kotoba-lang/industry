@@ -193,9 +193,9 @@ service entry を消す / `complete-sale` は客が居なければ売上を計�
     (:gap/date "2026-08-08"))))
 
   (:adr/verification
-  (map (:command "npx nbb --classpath src:test:../common/src run-tests.cljs")
+  (map (:command "kbb --backend sci --classpath src:test:../common/src run-tests.cljs")
    (:result "57 tests, 153 assertions, 0 failures, 0 errors")
-   (:balance-gate "npx nbb --classpath src:../common/src shift.cljs --gate -> 1/1 shops playable")
+   (:balance-gate "kbb --backend sci --classpath src:../common/src shift.cljs --gate -> 1/1 shops playable")
    (:sibling-suite "kingdom-cascade: 91 tests, 2211 assertions, 0 failures (golden digests unchanged after the rng move)")
    (:measured-shift "677 served / 25 lost (3%) / revenue 67052 / outerwear at minute 10 / shoes at minute 15")
    (:date "2026-08-08")))))

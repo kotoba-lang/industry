@@ -34,7 +34,7 @@ compiles to the SAME wasm32-browser bytes as the two hand-written modules
 
 On the same day, kotoba-lang, kotoba-sema and grammar renamed every Clojure
 source to `.cljk` (adr-2609111500). Measured by the wave agent: bare
-`clojure -M:test` runs **0 tests** on all three and bare `nbb run-tests…`
+`kbb -M:test` runs **0 tests** on all three and bare `nbb run-tests…`
 fails `Could not find namespace` — pre-existing on their mains, and the only
 way to measure the suites above was a symlink mirror built outside the repos.
 

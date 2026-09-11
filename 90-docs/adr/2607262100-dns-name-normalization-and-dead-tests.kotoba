@@ -9,7 +9,7 @@
 
 gftd.co.jp を cloud-itonami の最初のテナントにするため、所有確認 TXT
 `_itonami-verification.gftd.co.jp` を **1件だけ、経路全体の検証として**
-実配置した（`clojure -M:dns-verify gftd.co.jp --execute`）。狙いはレコードを
+実配置した（`kbb -M:dns-verify gftd.co.jp --execute`）。狙いはレコードを
 置くことそのものではなく、別々に作った継ぎ目が繋がっているかの証明:
 
     /api/onboarding/challenge   置くべき値（live）
@@ -74,7 +74,7 @@ zone に着地していた。**皮肉なことに、壊れた書き込みが壊�
 `domain-test` / `dns-ops-test` / `domain-reverify-test` /
 `organization-domain-multi-test` / `enterprise-onboarding-test` はいずれも
 **未登録**だった。ファイルは存在し、契約テストとして書かれていたのに、
-`clojure -M:test` では一度も走っていない。
+`kbb -M:test` では一度も走っていない。
 
 これが欠陥1が live zone まで到達した理由である。「テストがある」ことと
 「テストが走っている」ことの差が、そのまま本番 DNS への距離になっていた。

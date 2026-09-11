@@ -156,7 +156,7 @@ Deutsche Bahn AG の LEI 配下に書き込んだ。実在するページ、正�
   機微である。現在は **`HMAC-SHA256(k, LEI)`**。鍵は age identity から導出するので
   第二の秘密が増えない: **復号できる者だけが所在を特定でき、repo access だけの者は
   どちらもできない。** 引くのは
-  `nbb --classpath scripts scripts/lei-profile-enrich.cljs --read <LEI>`（identity 必須）。
+  `kbb --backend sci --classpath scripts scripts/lei-profile-enrich.cljs --read <LEI>`（identity 必須）。
   検索可能な索引は意図的に持たない。
 - それでも残る露出: record の**個数**・サイズ・更新時刻・author は見える
   （`policy.edn :policy/metadata-exposure`）。

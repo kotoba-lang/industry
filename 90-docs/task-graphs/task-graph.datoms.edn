@@ -47,7 +47,7 @@
   :task/external-gate false
   :task/status :completed
   :task/status-at "2026-08-26T00:00:00.000Z"
-  :task/status-note "kotoba-lang/grammar に着地済み。repo 名は kotoba-syntax ではない — ADR-2607266000 の責務分割で grammar authority (resources/kotoba/lang/guest-grammar.edn) を持つ repo が既に切り出されており、TextMate は同じ catalog の projection として syntaxes/kotoba.tmLanguage.json に生成される (tools/gen-tmlanguage.cljs、--check が drift を拒否)。source.clojure の別名にしていないのは、:forbidden-heads の 31 head を invalid.illegal.forbidden-head.kotoba に scope して no-ambient-authority 不変条件をエディタ側に見せるため。linguist 提出キット (linguist/PULL_REQUEST.md, languages.yml.entry, samples.edn) も同 repo にある。2026-08-26 実測: clojure -M:test は 12 tests / 113 assertions / 0 failures、gen-embedded --check と gen-tmlanguage --check はいずれも exit 0"}
+  :task/status-note "kotoba-lang/grammar に着地済み。repo 名は kotoba-syntax ではない — ADR-2607266000 の責務分割で grammar authority (resources/kotoba/lang/guest-grammar.edn) を持つ repo が既に切り出されており、TextMate は同じ catalog の projection として syntaxes/kotoba.tmLanguage.json に生成される (tools/gen-tmlanguage.cljs、--check が drift を拒否)。source.clojure の別名にしていないのは、:forbidden-heads の 31 head を invalid.illegal.forbidden-head.kotoba に scope して no-ambient-authority 不変条件をエディタ側に見せるため。linguist 提出キット (linguist/PULL_REQUEST.md, languages.yml.entry, samples.edn) も同 repo にある。2026-08-26 実測: kbb -M:test は 12 tests / 113 assertions / 0 failures、gen-embedded --check と gen-tmlanguage --check はいずれも exit 0"}
 
  {:db/id -4
   :task/id "E-editor-extension"
@@ -446,7 +446,7 @@
   - **bridge が 1 回だけ発行** —— $100,000、bridge account 24577304073637 の署名
   - 2 回目は 409 `already-funded`
   - **4 replica すべてが同じ残高**に合意
-  - `nbb script/verify.cljs`（実ブラウザ、本番）: **pass**。faucet が user の nonce を消費しなくなったのも正しい帰結 —— あれは bridge の tx。
+  - `kbb --backend sci script/verify.cljk`（実ブラウザ、本番）: **pass**。faucet が user の nonce を消費しなくなったのも正しい帰結 —— あれは bridge の tx。
 
   ## 残り
 
@@ -544,8 +544,8 @@
   ## 検証
 
   - design-quality audit（決定論、HIG/WCAG）: **100.00 / min 95 PASS**
-  - `nbb script/verify.cljs`（実ブラウザ、本番）: **pass** —— faucet で collateral $0 → $100,000、post-only chip の `data-tk-on` が立ち、BUY が nonce 3 まで進んだ
-  - `nbb script/verify_chart.cljs`（同）: **pass** —— chart panel が svg を出すか理由を述べ、焼いた hex 色は無し
+  - `kbb --backend sci script/verify.cljk`（実ブラウザ、本番）: **pass** —— faucet で collateral $0 → $100,000、post-only chip の `data-tk-on` が立ち、BUY が nonce 3 まで進んだ
+  - `kbb --backend sci script/verify_chart.cljk`（同）: **pass** —— chart panel が svg を出すか理由を述べ、焼いた hex 色は無し
   - 本番 HTML 実測: DADS dark primitive あり、3 token とも解決、accent は `#3DD8B6` のまま
 
   ## 残り

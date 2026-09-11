@@ -11,7 +11,7 @@ with exit 0 and signals captured via file-redirect (curl/nbb wrote to files, rea
 
 | Signal | Value |
 |---|---|
-| funnel-pulse (nbb kotobase_lead_loop.cljs, 06:30:15) | EXIT=0. VISITORS=9731 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 0 :signups 0 :checkouts 0}. UNCHANGED=true EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=unchanged. |
+| funnel-pulse (kbb --backend sci kotobase_lead_loop.cljk, 06:30:15) | EXIT=0. VISITORS=9731 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 0 :signups 0 :checkouts 0}. UNCHANGED=true EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=unchanged. |
 | /api/funnel (curl, 06:30:1x) | HTTP 200, 0.072s. visitors 9731 / signups 31 / checkouts 0. by-source visitors organic 8148 / openai-ads 3, signups organic 27 / other 1. x402 challenges 38 / submissions 4 / settlement-rate 0 / settlements 0 / rejections 4 (1 classified malformed-header, 3 unexplained) / attempt-rate 0.105. |
 
 Window drift vs run 0124: visitors 9718 -> 9731 (+13, since run 0124's 06:01 pulse);

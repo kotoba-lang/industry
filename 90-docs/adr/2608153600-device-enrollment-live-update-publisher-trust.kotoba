@@ -118,9 +118,9 @@
   "却下: (a) **QR に共有秘密を入れ、それを知っていることを claim の条件にする** — ラベルは静的で撮影可能なので、その秘密は恒久的に漏れている。窓で縛る方が強い。(b) **鍵を工場で生成して端末に焼く** — 単純だが秘密鍵が端末外に存在した瞬間があり、『顧客の機械』という主張と緊張する。工場鍵は*出自の証明*にだけ使い、運用鍵は端末で生む。(c) **`:tofu` を隠して一律『検証済み』と表示する** — 2 つの等級を混ぜると、attestation を実装する動機が消える。(d) **カーネルの live patch で無停止を名乗る** — 目標に置かない。A/B + 数秒の再起動と component の live 差し替えで、この製品の要求は満たせる。(e) **『署名付きなら OTA してよい』とする** — 署名は鍵が盗まれた後も検証が通る。失効が無い配布経路は、事故が起きてから直せない。(f) **失効リストを独自形式で作る** — `org-w3-vc-bitstring-status-list` が在る（`.cljc` 実装、実在を確認済み）。(g) **TUF ではない独自の役割名を付ける** — 脅威モデルが同じなのに名前を変えると、既知の解の再利用が新案の即興に見える。")
 
   (:adr/verification
-  "着地: `kotoba-lang/aiueos` commit `4cbeae4`（merge、branch `agent/fleet-onboarding-20260815`）。west pin を `bc56825` で `c62d0e4` → `4cbeae4` に前進（`nbb scripts/west-pin-put.cljs aiueos 4cbeae4…`、tip 検証つき single-entry commit。`reachable from main: identical` / `ahead=2 behind=0`）。
+  "着地: `kotoba-lang/aiueos` commit `4cbeae4`（merge、branch `agent/fleet-onboarding-20260815`）。west pin を `bc56825` で `c62d0e4` → `4cbeae4` に前進（`kbb --backend sci scripts/west-pin-put.cljk aiueos 4cbeae4…`、tip 検証つき single-entry commit。`reachable from main: identical` / `ahead=2 behind=0`）。
 
-   実行した検証: `clojure -M:test -n aiueos.enroll-test -n aiueos.update-test -n aiueos.publisher-test` → **Ran 28 tests containing 84 assertions. 0 failures, 0 errors.**
+   実行した検証: `kbb -M:test -n aiueos.enroll-test -n aiueos.update-test -n aiueos.publisher-test` → **Ran 28 tests containing 84 assertions. 0 failures, 0 errors.**
 
    **両方向を見せた**（片方向だけの gate は劇場、CLAUDE.md）:
    - `aiueos.publisher/revoked?` の『bitmap 外は失効』を『失効していない』に壊す → `an-index-the-bitmap-does-not-cover-is-revoked` が 2 assertion 落ちる。復元して緑。

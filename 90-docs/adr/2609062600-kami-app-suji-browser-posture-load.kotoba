@@ -66,11 +66,11 @@ cljs 側は `(/ (Math/round (* v 10^n)) 10^n)` で丸める前に掛けるので
 
 | 対象 | 手段 | 結果 |
 |---|---|---|
-| suji / JVM | `clojure -M:test` | 79 tests / 1177 assertions |
-| suji / cljs | `nbb --classpath src:test scripts/nbb_test.cljs` | 63 tests / 225 assertions |
-| suji / lint | `clojure -M:lint` | 0 errors(baseline は 7) |
-| app | `clojure -M:test` | 10 tests / 86 assertions |
-| app / lint | `clojure -M:lint` | 0 errors / 0 warnings |
+| suji / JVM | `kbb -M:test` | 79 tests / 1177 assertions |
+| suji / cljs | `kbb --backend sci --classpath src:test scripts/nbb_test.cljs` | 63 tests / 225 assertions |
+| suji / lint | `kbb -M:lint` | 0 errors(baseline は 7) |
+| app | `kbb -M:test` | 10 tests / 86 assertions |
+| app / lint | `kbb -M:lint` | 0 errors / 0 warnings |
 | app / 実ブラウザ | `scripts/verify-browser.cljs` | 8 checks(ローカルと**公開 URL の両方**) |
 
 break/unbreak を 2 件実施:
@@ -183,10 +183,10 @@ reagent の tracker（ratom・listener・reload guard）も文字単位で同一
 
 | | | |
 |---|---|---|
-| suji / JVM | `clojure -M:test` | 100 tests / 1273 assertions |
-| suji / cljs | `nbb scripts/nbb_test.cljs` | 84 tests / 321 assertions |
+| suji / JVM | `kbb -M:test` | 100 tests / 1273 assertions |
+| suji / cljs | `kbb --backend sci scripts/nbb_test.cljk` | 84 tests / 321 assertions |
 | route | JVM と cljs 両方 | 6 tests / 36 assertions |
-| kami-app-suji | `clojure -M:test` | 14 tests / 114 assertions |
+| kami-app-suji | `kbb -M:test` | 14 tests / 114 assertions |
 | kami-app-suji / 実ブラウザ | ローカルと公開 URL | **13 checks** |
 | kami-app-daw / -nle | 実ブラウザ | routing の検査は全通過 |
 | lint（4 repo） | | 0 errors |
@@ -601,7 +601,7 @@ active set は毎反復の乗数から読む（推測して直す組合せ探索
 
 ### `kotoba-lang/biomech` を名指していなかった
 
-同じ日、`nbb scripts/concept-lookup.cljs 筋` が『語彙に無い概念です』と返したので
+同じ日、`kbb --backend sci scripts/concept-lookup.cljk 筋` が『語彙に無い概念です』と返したので
 `manifest/concept-vocabulary.edn` に entry を足し、索引を回し直したら
 **`kotoba-lang/biomech`** が 3 件目として出た —— 組織スケールの生体力学
 （tissue 材料定数・梁・FEM・softbody・血行）で、活性化動特性と遠心性増強と

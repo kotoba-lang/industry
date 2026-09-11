@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Entry point for the cross-apex auth integration measurement.
 ;;
-;;   nbb --classpath 90-docs 90-docs/auth_plane_integration/run.cljs [--out FILE]
-;;   nbb --classpath 90-docs 90-docs/auth_plane_integration/run.cljs --probe stored.edn
+;;   kbb --backend sci --classpath 90-docs 90-docs/auth_plane_integration/run.cljs [--out FILE]
+;;   kbb --backend sci --classpath 90-docs 90-docs/auth_plane_integration/run.cljs --probe stored.edn
 ;;
 ;; --probe scores a stored measurement without touching the network. That is
 ;; what makes the judge testable: the same axes can be shown to go red and

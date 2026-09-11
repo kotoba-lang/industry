@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns where (:require [cljs.reader :as edn] ["node:fs" :as fs]))
 (def d (edn/read-string (.readFileSync fs (first *command-line-args*) "utf8")))
 (def rs (:results d))

@@ -119,7 +119,7 @@ reference implementation）が `fleet-core.cljc` を委譲したが、それを 
 `366d88b` で実測:
 
 ```
-npx shadow-cljs release entry
+amu compile --target wasm32-browser entry
   => The required namespace \"kotoba.kir\" is not available
 ```
 
@@ -177,7 +177,7 @@ ADR-2608120200 が言う「走っていない検査は緑でも赤でもない�
 
 - cljs consumer が在るなら、**出荷成果物を interpreter 経由で実際に実行する
   cljs 側の gate**。calendar の `scripts/cljs-boundary-check.cljs` が実例で、
-  interpreter を `clojure -Spath` で解決するので**pin から drift できない**。
+  interpreter を `kbb -Spath` で解決するので**pin から drift できない**。
 - cljs consumer が無いなら、**無いと書く。** JVM only であることは欠陥ではないが、
   黙っていると JVM suite が全 runtime の証拠に見える。`crdt` の README は
   「この repo に ClojureScript の test 経路は 1 本も無い」と書いて着地した。
@@ -430,7 +430,7 @@ interpreter を載せられるか）。ADR-2608112100 は 1 面目だけを書�
 |---|---|---|
 | `com-cloudflare` | **はい**（Worker） | 破れ。閉じた `eafc65a` |
 | `cloud-itonami-app` | **はい**（app-edge Worker） | 破れ（build 不能 + 黙った誤答）。閉じた `33c2a43` |
-| `com-etzhayyim-kawaraban` | **いいえ** | 対象外。core は `.wasm` を `kototama.tender`（JVM/Chicory）が実行。launchd が nbb を起動するが、それは `clojure -M:wasm-orchestrator` を呼ぶだけの scheduler で、guest 値は cljs 境界を渡らない |
+| `com-etzhayyim-kawaraban` | **いいえ** | 対象外。core は `.wasm` を `kototama.tender`（JVM/Chicory）が実行。launchd が nbb を起動するが、それは `kbb -M:wasm-orchestrator` を呼ぶだけの scheduler で、guest 値は cljs 境界を渡らない |
 | `aiueos` | **いいえ** | 対象外。78 core が `.o` になり kernel ELF に link される。`.cljs` は build / flash / QEMU smoke script |
 
 **「無い」と書けたことが 2 件ある** —— これは欠陥が無かったという結果であって、
@@ -440,7 +440,7 @@ interpreter を載せられるか）。ADR-2608112100 は 1 面目だけを書�
 
 - **`murakumo`**: `deps.edn` が `d58972da`、**`nbb.edn` が `7ad08c4e`** を pin して
   いた —— **同じ artifact を 2 つの reader が読み、古い方に例の `(integer? start)`
-  が在る**。`nbb src/murakumo/task.cljs plan` は ns load で落ちていた。1 行の収束で
+  が在る**。`kbb --backend sci src/murakumo/task.cljk plan` は ns load で落ちていた。1 行の収束で
   CLI が動くようになった（`af55e45`、PR #292。`test` check は SUCCESS）
 - **`kura`**: pin `fa2fbb58` は古い guard を持ち、`signing-tail` は nbb で実際に
   落ちる —— **が seam から到達しない**。到達する 2 つはどちらも `signing-bytes` の

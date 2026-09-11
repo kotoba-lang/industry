@@ -160,9 +160,9 @@ build 経路を 1 つの変更に混ぜないためであって、「まだ小�
 
 ## 検証
 
-- `clojure -M:test` — **63 tests / 189 assertions, 0 failures**（変更前は 18 / 55）
+- `kbb -M:test` — **63 tests / 189 assertions, 0 failures**（変更前は 18 / 55）
 - `npm run test:host`（nbb, 実ファイルシステム・実 HTTP）— **44 tests / 124 assertions, 0 failures**
-- `clojure -M:lint` — 0 errors / 0 warnings
+- `kbb -M:lint` — 0 errors / 0 warnings
 - design-quality gate（ADR-2607132300）— 木のみ / 編集中の両方で **>= 95**
 - console を端から端まで駆動: `--mode terminal-build` で起動 → `/toggle src` →
   `/open src/a.clj` → 画面に `src/a.clj:1:1` の未閉じ括弧診断 → `/save` → ディスク上の

@@ -9,13 +9,13 @@ datom ⇄ ドキュメント/組織/権限 の双方向変換を round-trip テ�
 |---|---|
 | `office.cljc` | スキーマ登録(`schema`) + 変換関数（doc / org(+DID) / grant ⇔ datoms） |
 | `office_test.clj` | round-trip テスト + 「所有=木 / アクセス=DAG」不変条件チェック |
-| `bb.edn` | `nbb scripts/run-task.cljs test` タスク |
+| `bb.edn` | `kbb --backend sci scripts/run-task.cljk test` タスク |
 
 ## 実行
 
 ```bash
 cd docs/gftd-office/p0
-nbb scripts/run-task.cljs test
+kbb --backend sci scripts/run-task.cljk test
 # Ran 5 tests containing 10 assertions. 0 failures, 0 errors.
 ```
 

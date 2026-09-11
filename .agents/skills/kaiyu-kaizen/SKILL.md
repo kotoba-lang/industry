@@ -16,7 +16,7 @@ description: 回遊（アクセス解析）の計測から出た「答えるべ�
 ときは自分で 1 周測る:
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
+kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
     scripts/kaiyu-kaizen-tick.cljk --json
 ```
 

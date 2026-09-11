@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/ipni-maturity-loop.cljk — the IPNI maturity growth loop.
 ;; LaunchAgent cloud.itonami.bot.ipni-maturity wakes it. Sibling of
 ;; itonami-maturity-improve-loop.cljs and built to the same two-stage shape:
@@ -31,7 +31,7 @@
 ;; exit 0 always.
 ;;
 ;; Usage:
-;;   nbb --classpath ".:90-docs:scripts/nbb_compat" scripts/ipni-maturity-loop.cljk
+;;   kbb --backend sci --classpath ".:90-docs:scripts/nbb_compat" scripts/ipni-maturity-loop.cljk
 ;;   ... --dry-run        ; measure and decide, never wake
 ;;   ... --probe FILE     ; score a recorded probe instead of measuring live
 ;;                          (this is how the wake path is tested -- see below)

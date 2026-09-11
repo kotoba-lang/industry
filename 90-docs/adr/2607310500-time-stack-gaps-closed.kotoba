@@ -38,10 +38,10 @@
    "cloud-itonami/kintai 6d9a506 (45 tests / 147 assertions)"))
 
   (:adr/verify
-  (vector "各 repo で clojure -M:test && clojure -M:lint（計 290 tests / 905 assertions）"
-   "nbb --classpath ../../kotoba-lang/activity/src tools/collect-vcs.cljs --worker w-1 --repo <repo> --since '1 day ago'"
-   "nbb --classpath ../../kotoba-lang/activity/src tools/collect-calendar.cljs --worker w-1 --ics <file>"
-   "node scripts/resource-guard.mjs run build -- clojure -M:cljs -m cljs.main --target node -c <actor>.edge.endpoints"))
+  (vector "各 repo で kbb -M:test && kbb -M:lint（計 290 tests / 905 assertions）"
+   "kbb --backend sci --classpath ../../kotoba-lang/activity/src tools/collect-vcs.cljs --worker w-1 --repo <repo> --since '1 day ago'"
+   "kbb --backend sci --classpath ../../kotoba-lang/activity/src tools/collect-calendar.cljs --worker w-1 --ics <file>"
+   "node scripts/resource-guard.mjs run build -- kbb -M:cljs -m cljs.main --target node -c <actor>.edge.endpoints"))
 
   (:adr/decision-summary
   (vector "D1: worklaw に window（:day/:week/:month/:year/:rolling-months）を導入し、期間より長い window の rule は評価せず理由付きで報告する"
@@ -221,7 +221,7 @@ clone list も同時に直す。**
 - **edge の store は per-request `MemStore`**。Pages Function は stateless なので、
   永続 backend を env から組む配線が要る（Store protocol seam があるので constructor
   の差し替えで済む）。
-- **`shadow-cljs release edge-api` は未実行**。`:cljs` 分岐が実 CACAO 依存込みで
+- **`amu compile --target wasm32-browser edge-api` は未実行**。`:cljs` 分岐が実 CACAO 依存込みで
   ClojureScript compile を通ることは確認したが、esm bundle の生成と実 deploy は
   していない。wrangler.jsonc / package.json / shim は配置済み。
 - **worklaw の法域はまだ 6 level**。JP の変形労働時間制・4週4日変形休日制、FR の

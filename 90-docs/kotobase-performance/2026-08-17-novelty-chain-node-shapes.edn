@@ -241,7 +241,7 @@
    legacy single-entry nodes, and a graph that has never folded would."]
 
  :reproduce
- {:cmd "NODE_PATH=<worker>/node_modules nbb --classpath \"<io-ipld>/src:<org-ietf-cbor>/src:<io-multiformats>/src\" scripts/novelty-chain-shape.cljs --wrangler-dir <worker-dir>"
+ {:cmd "NODE_PATH=<worker>/node_modules kbb --backend sci --classpath \"<io-ipld>/src:<org-ietf-cbor>/src:<io-multiformats>/src\" scripts/novelty-chain-shape.cljs --wrangler-dir <worker-dir>"
   :flags {"--graph" "default kotobase-protocols-v2"
           "--chain-cid" "walk a historical commit instead of the live head"
           "--scan-commits N" "bounded backwards scan for the last fold boundary"

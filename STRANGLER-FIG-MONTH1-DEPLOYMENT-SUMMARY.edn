@@ -197,7 +197,7 @@
  {:infrastructure
   [{:item "3 staging cljc nodes registered"
     :status "provisioned"
-    :verification "nbb deploy/month-1-staging-deployment.cljk status"}
+    :verification "kbb --backend sci deploy/month-1-staging-deployment.cljk status"}
    {:item "drama-profile compiled to WASM"
     :status "ready"
     :verification "test/kotoba/mesh_drama_profile_test.clj"}
@@ -211,12 +211,12 @@
     :verification "murakumo route-dispatch config"}
    {:item "Murakumo dispatch layer integration"
     :status "ready"
-    :verification "nbb deploy/month-1-staging-deployment.cljk canary-start"}]
+    :verification "kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start"}]
 
   :parity-validation
   [{:item "Parity checker service"
     :status "ready-to-run"
-    :verification "nbb deploy/parity-checker-service.cljk ..."}
+    :verification "kbb --backend sci deploy/parity-checker-service.cljk ..."}
    {:item "Request/response logging"
     :status "ready"
     :verification "metrics/parity-validation.log"}]
@@ -232,7 +232,7 @@
   :rollback-automation
   [{:item "5 autonomous triggers configured"
     :status "ready-to-monitor"
-    :verification "nbb deploy/rollback-automation.cljk monitor"}
+    :verification "kbb --backend sci deploy/rollback-automation.cljk monitor"}
    {:item "Audit logging enabled"
     :status "ready"
     :verification "metrics/rollback-audit.log"}]}
@@ -272,7 +272,7 @@
  :monitoring-access
  {:slo-dashboard "http://localhost:3000/d/strangler-fig-month1"
   :parity-log-realtime "tail -f metrics/parity-validation.log"
-  :rollback-status-check "nbb deploy/rollback-automation.cljk status"
+  :rollback-status-check "kbb --backend sci deploy/rollback-automation.cljk status"
   :metrics-query-endpoint "http://localhost:9090/api/v1/query"
   :audit-trail "metrics/rollback-audit.log"}
 
@@ -339,7 +339,7 @@
  :success-metrics
  {:deployment-success
   {:item "3 staging nodes running, healthy"
-   :verification "nbb deploy/month-1-staging-deployment.cljk health"
+   :verification "kbb --backend sci deploy/month-1-staging-deployment.cljk health"
    :status "ready"}
 
   :canary-success

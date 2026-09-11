@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; block-sizing-pad-alignment-check.cljs — ADR-2608070400 D6 の機械検査。
 ;;
 ;; 展開済みの `kotoba-lang/kotobase-peer` tree を受け取り、
@@ -38,7 +38,7 @@
 ;;
 ;; ネットワーク: 不要。
 ;;
-;; 実行: `npx nbb block-sizing-pad-alignment-check.cljs <dir> [--buckets 1024,4096,16384,65536] [--max-overhead 25]`
+;; 実行: `kbb --backend sci block-sizing-pad-alignment-check.cljk <dir> [--buckets 1024,4096,16384,65536] [--max-overhead 25]`
 
 (ns fleet-ci.gates.block-sizing-pad-alignment-check
   (:require ["node:fs" :as fs]

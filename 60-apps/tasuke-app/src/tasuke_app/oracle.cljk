@@ -36,7 +36,7 @@
   #?(:clj (let [path "tasuke_app/oracle/triage-core.kir.edn"]
             (if-let [url (io/resource path)]
               (edn/read-string (slurp url))
-              (throw (ex-info "shipped decision core is missing — run `clojure -M:gen`"
+              (throw (ex-info "shipped decision core is missing — run `kbb -M:gen`"
                               {:path path}))))
      :cljs (embed/embedded-kir)))
 

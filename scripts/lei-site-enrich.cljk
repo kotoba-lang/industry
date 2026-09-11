@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-site-enrich.cljs — real, provenance-tracked official-website
 ;; enrichment for the cloud-itonami-lei-<LEI> archive repos
 ;; (ADR-2607110300). For each repo: read its blueprint.edn's
@@ -18,7 +18,7 @@
 ;; (ADR-2607110300), so no new discovery/collection step is needed here.
 ;;
 ;; Run:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/lei-site-enrich.cljk [--limit N] [--dry-run]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/lei-site-enrich.cljk [--limit N] [--dry-run]
 (require '[scripts.nbb-compat :refer [slurp spit sh]]
          '[clojure.string :as str]
          '[clojure.edn :as edn])

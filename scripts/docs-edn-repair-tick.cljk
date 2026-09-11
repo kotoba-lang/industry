@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/docs-edn-repair-tick.cljk — 90-docs のうち **reader を通らない文書**を
 ;; 測る決定論的 tick。ここにモデルは居ない。
 ;;
@@ -30,7 +30,7 @@
 ;;   - exit 0 常に（監視 tick であって gate ではない）。
 ;;
 ;; usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-tick.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-tick.cljk
 ;;   ... --min-edn N   ; 走査の床（既定 1500）
 
 (require '[clojure.string :as str])

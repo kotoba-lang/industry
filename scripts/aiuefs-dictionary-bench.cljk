@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Third judge for the aiuefs-v4 co-scientist loop: does a SHARED DICTIONARY
 ;; pay, and by how much, on held-out leaves?
 ;;
@@ -10,7 +10,7 @@
 ;; just another block, named by its own CID, so "which dictionary" has an
 ;; answer that verifies like everything else.
 ;;
-;;   nbb scripts/aiuefs-dictionary-bench.cljk --root . --out <file.edn>
+;;   kbb --backend sci scripts/aiuefs-dictionary-bench.cljk --root . --out <file.edn>
 ;;
 ;; HOLD-OUT IS THE POINT. Leaves are split by index: every `--holdout-every`th
 ;; leaf is measured, the rest may train. A dictionary measured on its own

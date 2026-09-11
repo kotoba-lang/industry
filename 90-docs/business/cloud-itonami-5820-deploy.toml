@@ -6,7 +6,7 @@
 name          = "cloud-itonami-isic-5820"
 domain        = "CRM / RevOps-LLM actor (Salesforce-replace, ISIC 5820)"
 runtime       = "jvm-clojure"
-entrypoint    = "clojure -M:dev:serve"
+entrypoint    = "kbb -M:dev:serve"
 http_port     = 8582
 api_token_ref = "kagi:ISIC5820_API_TOKEN (compartment=gftdcojp, read at launch — never baked)"
 store_file    = "~/.gftd/itonami-5820-store.edn   # durable FileStore (survives restarts)"

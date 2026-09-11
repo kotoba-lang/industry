@@ -117,15 +117,15 @@ question, defer\".
   genuine source can be verified within the iteration's time budget, skip
   the repo rather than invent one.
 - **Independently re-verify, don't trust self-report.** Run the target
-  repo's own test suite (`clojure -M:test`) before AND conceptually after
-  the change; re-run `nbb scripts/itonami-fleet-audit.cljs` after a batch
+  repo's own test suite (`kbb -M:test`) before AND conceptually after
+  the change; re-run `kbb --backend sci scripts/itonami-fleet-audit.cljk` after a batch
   to confirm the signal actually moved, rather than assuming it did.
 - **Land through the standard actor-repo git flow**, since west-managed
   checkouts under `orgs/cloud-itonami/` are pinned/detached HEAD, not a
   branch: commit on a throwaway branch in the child repo's own checkout,
   push, server-side-merge via `gh api repos/<org>/<repo>/merges`, delete the
   branch, advance the `manifest/west.yml` pin via
-  `nbb scripts/gen-west-manifest.cljs --entry <repo>` (the canonical
+  `kbb --backend sci scripts/gen-west-manifest.cljk --entry <repo>` (the canonical
   single-entry route — never hand-edit `west.yml`).
 - **This is a this-session-only dynamic `/loop`** — it stops when the
   session closes (owner declined a cloud `/schedule` cron for this one).
@@ -163,13 +163,13 @@ delinquency supply suspension. Added a dedicated
 `germany-jurisdiction-requirements` test mirroring the existing
 `japan-jurisdiction-requirements` one.
 
-Verification: `clojure -M:test` run in the actual repo checkout before and
+Verification: `kbb -M:test` run in the actual repo checkout before and
 after (21 tests / 66 assertions, 0 failures both times — the new test is
 counted in that total). Landed via throwaway branch
 `itonami-loop/isic-3520-deu-gas-facts` → push → server-side merge
 (`gh api .../merges`, commit `e8964cb030a6`) → branch deleted →
 `manifest/west.yml` pin advanced `9f2c825a0137` → `e8964cb030a6` via
-`nbb scripts/gen-west-manifest.cljs --entry cloud-itonami-isic-3520`
+`kbb --backend sci scripts/gen-west-manifest.cljk --entry cloud-itonami-isic-3520`
 (fast-forward, verified).
 
 Not done this iteration: no stub-scaffold repo attempted (axis 2 of the

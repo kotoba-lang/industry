@@ -68,7 +68,7 @@ PHASE 1.3 — Canary Traffic Routing (Week 1)
 [✓] Traffic split configuration
     Current: 95% Rust (prod) | 5% cljc (staging)
     Status: Ready to enable
-    Control: `nbb deploy/month-1-staging-deployment.cljk canary-start`
+    Control: `kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start`
 
 [✓] Murakumo integration
     Route dispatcher: murakumo.route-dispatch/drama-profile-canary
@@ -192,21 +192,21 @@ EXECUTABLE SCRIPTS (6 files)
 1. deploy/month-1-staging-deployment.cljk
    - Main orchestration script
    - Commands: provision, status, canary-start, canary-pause, rollback
-   - Usage: nbb deploy/month-1-staging-deployment.cljk <command>
+   - Usage: kbb --backend sci deploy/month-1-staging-deployment.cljk <command>
    - Status: ✓ Ready to execute
 
 2. deploy/parity-checker-service.cljk
    - Parity validation service (long-running)
    - Compares Rust vs cljc responses (byte-exact)
    - Exports metrics to parity-validation.log
-   - Usage: nbb deploy/parity-checker-service.cljk <args>
+   - Usage: kbb --backend sci deploy/parity-checker-service.cljk <args>
    - Status: ✓ Ready to execute
 
 3. deploy/rollback-automation.cljk
    - Autonomous rollback enforcement
    - Monitors 4 triggers, executes revert if breached
    - Commands: monitor, status, reset
-   - Usage: nbb deploy/rollback-automation.cljk <command>
+   - Usage: kbb --backend sci deploy/rollback-automation.cljk <command>
    - Status: ✓ Ready to execute
 
 CONFIGURATION FILES (3 files)
@@ -258,14 +258,14 @@ MONTH 1 TIMELINE
 WEEK 1: Infrastructure & Baseline Setup (2026-07-20 to 2026-07-26)
 ───────────────────────────────────────────────────────────────────────────
 Day 1–2: Provision infrastructure
-  ✓ nbb deploy/month-1-staging-deployment.cljk provision
+  ✓ kbb --backend sci deploy/month-1-staging-deployment.cljk provision
   ✓ Verify node health
   ✓ Register HTTP routes
 
 Day 3–4: Start canary & monitoring
-  ✓ Enable 5% traffic: nbb deploy/month-1-staging-deployment.cljk canary-start
-  ✓ Start parity checker: nbb deploy/parity-checker-service.cljk ...
-  ✓ Start rollback monitor: nbb deploy/rollback-automation.cljk monitor
+  ✓ Enable 5% traffic: kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start
+  ✓ Start parity checker: kbb --backend sci deploy/parity-checker-service.cljk ...
+  ✓ Start rollback monitor: kbb --backend sci deploy/rollback-automation.cljk monitor
 
 Day 5–7: Baseline stabilization
   ✓ Monitor parity validation & SLO dashboard
@@ -377,10 +377,10 @@ Real-time parity validation:
   tail -f metrics/parity-validation.log | jq '.parity-pass?'
 
 Rollback automation status:
-  nbb deploy/rollback-automation.cljk status
+  kbb --backend sci deploy/rollback-automation.cljk status
 
 Deployment status:
-  nbb deploy/month-1-staging-deployment.cljk status
+  kbb --backend sci deploy/month-1-staging-deployment.cljk status
 
 METRICS LOGS
 ──────────────────────────────────────────────────────────────────────────
@@ -422,7 +422,7 @@ SUCCESS CRITERIA & VERIFICATION
 DEPLOYMENT SUCCESS (Week 1 exit criteria)
 ───────────────────────────────────────────────────────────────────────────
 [✓] 3 staging nodes running, healthy
-    Command: nbb deploy/month-1-staging-deployment.cljk health
+    Command: kbb --backend sci deploy/month-1-staging-deployment.cljk health
     Verification: All 3 nodes return HTTP 200 /health
 
 [✓] 5% traffic routed to staging without errors
@@ -434,7 +434,7 @@ DEPLOYMENT SUCCESS (Week 1 exit criteria)
     Verification: New entries appended continuously
 
 [✓] Rollback automation armed and monitoring
-    Command: nbb deploy/rollback-automation.cljk status
+    Command: kbb --backend sci deploy/rollback-automation.cljk status
     Verification: 4 triggers configured, 0 false positives
 
 [✓] SLO dashboard accessible and updating
@@ -508,7 +508,7 @@ Escalation: Contact owner if critical issue
 
 Quick Escalation Path:
   1. Review MONTH-1-OPERATIONS-GUIDE.md
-  2. Check `nbb deploy/rollback-automation.cljk status`
+  2. Check `kbb --backend sci deploy/rollback-automation.cljk status`
   3. Contact on-call ops
   4. If critical, contact Jun Kawasaki directly
 

@@ -104,7 +104,7 @@ ADR-2608121000 が「pin 不一致」と記録した `nexus-x402/src/pay/x402.cl
 チェーンは空配列ではなく primary 1 本を返す / 未知チェーンは既定チェーンへ解決）を
 テストで固定した。
 
-- 検証: `clojure -M:test` **18 tests / 67 assertions → 20 tests / 73 assertions、
+- 検証: `kbb -M:test` **18 tests / 67 assertions → 20 tests / 73 assertions、
   0 failures 0 errors**。
 - **その 2 テストが本当に落ちることを確認した**: `:rpcs` の 3 エントリを消すと
   **2 failures**。落ちない gate は劇場なので実際に壊して見た。
@@ -116,9 +116,9 @@ ADR-2608121000 が「pin 不一致」と記録した `nexus-x402/src/pay/x402.cl
 取った commit を書いた**（本文を新しくして pin を古いまま残すのは、まさにこの欠陥の
 再生産になる）。
 
-- 検証: `clojure -M:test` **52 tests / 212 assertions、0 failures 0 errors** ——
+- 検証: `kbb -M:test` **52 tests / 212 assertions、0 failures 0 errors** ——
   変更前と変更後の**両方**を同じ worktree で走らせて同一。
-- 検証: `npx shadow-cljs release worker` **exit 0、warning 4 件で前後同数**
+- 検証: `amu compile --target wasm32-browser worker` **exit 0、warning 4 件で前後同数**
   （すべて既存の `nexus/worker.cljs` の `:redef-in-file`。今回触っていない）。
   artifact **323787 → 324730 bytes**。
 - `:wrong-asset` の欠落はここでは**潜在**だった: `verdict` は `receipt->onchain` だけを
@@ -153,12 +153,12 @@ nil なので `verify-payment` は **`:wrong-asset` を返す**。そして `:wr
 コントラクトアドレスに一致させてから `:asset` を置く）からレコードを導出するように
 なったとき**であって、それは**今回やっていない**（未解決項目）。
 
-- 検証: `npm test`（shadow-cljs compile test + node）
+- 検証: `npm test`（amu compile --target wasm32-browser test + node）
   **148 tests / 3304 assertions → 149 tests / 3312 assertions、0 failures 0 errors**。
 - **新しいテストが劇場でないことを確認した**: `pay-run-onchain` から `:asset` キーを
   消すと **4 failures**、うち 1 つはまさに「`:asset` を送らない verifier でも confirm
   する」という滞留ケース。
-- 検証: `npx shadow-cljs release worker` **Build completed、warning 79 件で前後同数**
+- 検証: `amu compile --target wasm32-browser worker` **Build completed、warning 79 件で前後同数**
   （すべて既存、触った namespace には無い）。artifact **1583545 → 1595472 bytes**。
 - テストは `pay-run-onchain` を**実際に呼ぶ**（形を書き写さない）。
   **テストが被検査対象の写しを自分で持つのは、誰も diff しない vendored copy と
@@ -172,7 +172,7 @@ nil なので `verify-payment` は **`:wrong-asset` を返す**。そして `:wr
 ので、その助言に晒される読者そのものである。ヘッダに `e860f9d` を書いた。
 
 - 検証: `npm test` **2 tests / 8 assertions、0 failures 0 errors**（前後同一）。
-- 検証: `npx shadow-cljs release worker` **exit 0、0 warnings、124126 bytes**。
+- 検証: `amu compile --target wasm32-browser worker` **exit 0、0 warnings、124126 bytes**。
 - **正直に言うと 2 tests は薄い。** adserver の smoke test は今回触った経路を
   実質検査していない。`receipt->onchain` が byte 単位で無変更であることが、
   ここでの主たる根拠である。
@@ -239,7 +239,7 @@ gate に載せるなら先に、良性を宣言する手段（copy 側のヘッ�
 
 ## Evidence
 
-- 検出器: `nbb scripts/verify-vendored-copies.cljs --diff`（baseline 2026-08-13:
+- 検出器: `kbb --backend sci scripts/verify-vendored-copies.cljk --diff`（baseline 2026-08-13:
   34 走査 / 21 current / 13 stale / 0 pin 不一致）。
 - 各件は検出器の要約ではなく**実 diff**で読んだ
   （`git -C orgs/<org>/<lib> show <rev>:src/<path>` と `diff -u`）。

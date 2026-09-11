@@ -95,7 +95,7 @@
   (:adr/consequences
   "## 検証（landed tip `8b748ce` で実行）
 
-   `clojure -M:test` → **182 tests / 1249 assertions / 0 failures**
+   `kbb -M:test` → **182 tests / 1249 assertions / 0 failures**
    （pinned wasmtime 47.0.3 を `.tools/wasmtime/wasmtime` に置いた worktree）。
 
    **落ちることを確かめた対照（4 種、すべて実測）**:
@@ -121,7 +121,7 @@
    ## 次の agent へ
 
    **すぐ確認できるコマンド**（`.tools/wasmtime` に 43+ を置いてから）:
-   `cd orgs/kotoba-lang/kotoba-component && clojure -M:test -n kotoba.async-abi-prerequisite-test`
+   `cd orgs/kotoba-lang/kotoba-component && kbb -M:test -n kotoba.async-abi-prerequisite-test`
 
    **残っている宿題（優先順）**:
 

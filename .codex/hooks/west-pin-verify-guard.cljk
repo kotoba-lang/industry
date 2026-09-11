@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; PreToolUse(Bash) ガード: manifest/west.yml の pin 変更を main に載せる前に
 ;; サーバ側検証(scripts/verify-west-pins.cljk)を強制する(ADR-2607022900)。
 ;;
@@ -105,7 +105,7 @@
                       "gh api PUT が同じコマンドに入っていると、hook は「まだ無いファイル」か "
                       "「前回の残骸」しか見られません。payload 生成と PUT を**別の呼び出しに"
                       "分けて**ください。\n\n"
-                      "推奨: nbb scripts/west-pin-put.cljk <entry> <sha> "
+                      "推奨: kbb --backend sci scripts/west-pin-put.cljk <entry> <sha> "
                       "(tip から読んだ pin に対して検証し、同じ blob SHA を precondition に書く)"))
 
           :unknown (allow!)   ; payload path が無い形(inline / $VAR / wrapper)は従来どおり fail-open

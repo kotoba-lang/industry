@@ -16,9 +16,9 @@ declares it, `world` refuses to route an agent into a locked zone, and
 ## Run it
 
 ```bash
-npx nbb --classpath src:test:../common/src run-tests.cljs   # 57 tests, 153 assertions
-npx nbb --classpath src:../common/src shift.cljs            # balance report
-npx nbb --classpath src:../common/src shift.cljs --gate     # non-zero on a broken shop
+kbb --backend sci --classpath src:test:../common/src run-tests.cljs   # 57 tests, 153 assertions
+kbb --backend sci --classpath src:../common/src shift.cljs            # balance report
+kbb --backend sci --classpath src:../common/src shift.cljs --gate     # non-zero on a broken shop
 ```
 
 A 20-minute shift of the flagship shop, played by the built-in manager:

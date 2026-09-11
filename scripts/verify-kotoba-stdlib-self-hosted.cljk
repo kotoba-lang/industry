@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-kotoba-stdlib-self-hosted
   "Which kotoba stdlib repos still reach for a clojure.* namespace.
 
@@ -41,7 +41,7 @@
 
   Exit: 0 clean, 1 findings, 2 REFUSED (could not measure).
 
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-kotoba-stdlib-self-hosted.cljk [--findings] [--root DIR]"
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-kotoba-stdlib-self-hosted.cljk [--findings] [--root DIR]"
   (:require [clojure.string :as str]))
 
 (def fs (js/require "node:fs"))

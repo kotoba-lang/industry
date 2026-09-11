@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gtm-target-list.cljs — 90-docs/business/gtm-icp.datoms.edn の ICP を
 ;; cloud-itonami-lei catalog に当てて、実際に出る対象企業を返す。
 ;;
@@ -9,7 +9,7 @@
 ;; 78 社と答えた時点で、git には既に 84 社あった）。
 ;;
 ;; 実行には scripts を classpath に置く:
-;;   nbb --classpath scripts scripts/gtm-target-list.cljk --icp <id>
+;;   kbb --backend sci --classpath scripts scripts/gtm-target-list.cljk --icp <id>
 ;;
 ;; ## この出力が「何であって、何でないか」
 ;;
@@ -32,8 +32,8 @@
 ;; 判断を、リストが出てしまったという既成事実で追い越さないため。
 ;;
 ;; 実行（superproject root から）:
-;;   nbb scripts/gtm-target-list.cljk --icp murakumo-eu [--out <file.edn>]
-;;   nbb scripts/gtm-target-list.cljk --list
+;;   kbb --backend sci scripts/gtm-target-list.cljk --icp murakumo-eu [--out <file.edn>]
+;;   kbb --backend sci scripts/gtm-target-list.cljk --list
 
 (ns gtm-target-list
   (:require ["fs" :as fs]
@@ -130,7 +130,7 @@
     (let [id (flag "--icp")
           icp (first (filter #(= id (:icp/id %)) (load-icps)))]
       (cond
-        (nil? id) (do (println "usage: nbb scripts/gtm-target-list.cljk --icp <id> [--out <file>]")
+        (nil? id) (do (println "usage: kbb --backend sci scripts/gtm-target-list.cljk --icp <id> [--out <file>]")
                       (println) (print-list) (.exit js/process 2))
         (nil? icp) (do (println "no such ICP:" id) (print-list) (.exit js/process 2))
         :else

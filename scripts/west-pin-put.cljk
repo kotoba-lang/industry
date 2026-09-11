@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/west-pin-put.cljk — manifest/west.yml の pin を1件、**サーバ側**で安全に前進させる。
 ;;
 ;; CLAUDE.md は west.yml の pin 前進を「GitHub API の single-entry commit が唯一の正経路」
@@ -18,9 +18,9 @@
 ;;   3. blob SHA precondition（間に誰かが west.yml を書いていたら 409 で落ちる）
 ;;
 ;; usage:
-;;   nbb scripts/west-pin-put.cljk <entry-name> <new-sha> [--message "..."] [--dry-run]
-;;   nbb scripts/west-pin-put.cljk <entry-name> HEAD          ; 上流 default branch の先端へ
-;;   nbb scripts/west-pin-put.cljk --self-test
+;;   kbb --backend sci scripts/west-pin-put.cljk <entry-name> <new-sha> [--message "..."] [--dry-run]
+;;   kbb --backend sci scripts/west-pin-put.cljk <entry-name> HEAD          ; 上流 default branch の先端へ
+;;   kbb --backend sci scripts/west-pin-put.cljk --self-test
 ;;
 ;; 退行や到達不能を検出したら**書かずに exit 非0**する。--dry-run は検証だけ行う。
 
@@ -296,7 +296,7 @@
 
 (let [[entry new-arg] (:positional opts)]
   (when (or (nil? entry) (nil? new-arg))
-    (println "usage: nbb scripts/west-pin-put.cljk <entry-name> <new-sha|HEAD> [--message \"…\"] [--dry-run]")
+    (println "usage: kbb --backend sci scripts/west-pin-put.cljk <entry-name> <new-sha|HEAD> [--message \"…\"] [--dry-run]")
     (io/exit 2))
 
   ;; 1. Read the TIP -- both the content and the blob SHA -- in one place, so the

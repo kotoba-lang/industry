@@ -19,7 +19,7 @@
    "返金 instruction を store が「保存済み capture + 承認者名」から導出する決定（proposal は order/amount/reason のみ運ぶ、無記名の返金は一切書かない）の正本"
    ":propose-refund を release と同じ phase 3 でのみ writable とし、どの phase でも auto にしない決定の正本"
    "marketplace / cloud-itonami-marketplace-settlement の .cljc スイートを shadow-cljs :node-test で ClojureScript でも実行する決定、および governor_test を .clj → .cljc に移す決定の正本"
-   "shadow-cljs の :deps :aliases に :test を渡さない（:main-opts が clojure -A に届いて build が壊れる）ため :cljs-test alias を置く決定の正本"))
+   "shadow-cljs の :deps :aliases に :test を渡さない（:main-opts が kbb -A に届いて build が壊れる）ため :cljs-test alias を置く決定の正本"))
   (:adr/related "adr-2607309800-settlement-funds-gate-unpaid-order-could-be-released, adr-2607309500-cloud-itonami-code-payment-acceptance-rail, adr-2607300900-github-actions-is-not-executing-move-ci-to-murakumo-fleet")
   (:adr/body "
 # ADR-2607309960: 返金と cljs ランタイム parity
@@ -77,7 +77,7 @@ auto にしない。** どちらも不可逆な外向きの資金移動で、「
 
 両 repo とも `marketplace.edge` / `settleops.edge.worker` 以外は全て `.cljc` で、
 CLAUDE.md の runtime 優先順位は **ClojureScript > JVM**。にもかかわらず、スイートを
-走らせていたのは `clojure -M:test` だけだった。**portable は検査されていない主張**
+走らせていたのは `kbb -M:test` だけだった。**portable は検査されていない主張**
 だった。
 
 ### Decision
@@ -90,7 +90,7 @@ namespace であり、かつ**拒否が最も重要な** namespace だった。g
 スイートは actor の portability を証明しない。
 
 **D9. `:cljs-test` deps alias を置く。** shadow-cljs は `:deps {:aliases [...]}` を
-`clojure -A` に渡すので、既存の `:test` alias の `:main-opts` が**別の main に届いて**
+`kbb -A` に渡すので、既存の `:test` alias の `:main-opts` が**別の main に届いて**
 `Unknown option: --npm` で build が死ぬ。実測した落とし穴なので alias を分ける。
 
 ### 結果（実測）

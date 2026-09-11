@@ -53,7 +53,7 @@ Annex I service 1（現金入出金）は本 R0 では独立opとして分離せ
 
 ### 5. R0 成熟度境界: MemStore-only、9法域spec-basis、DatomicStore/実オープンバンキング統合は次のシーム
 
-本actorは`cloud-itonami-isic-6910`の初期R0と同じ成熟度で公開する: 実際に動くactor loop（advisor/governor/phase/registry/store/operation）、**MemStore-only**永続化（`DatomicStore`/`langchain.db`未実装、`cloud-itonami-isic-6419`/`-6910`が既に実証した`:db-api`駆動パターンを適用できる見込みだが本ADRの対象外）、全ての破壊的/規制対象アクションを人間承認でゲート。法域spec-basisは9法域（DEU/FRA/IRL/NLD/LTU/GBR/JPN/SGP/USA-NY/BRA）のみ——`pi.facts/coverage`で常に正直に報告し、水増ししない。50 tests / 180 assertions green、clj-kondo clean、`clojure -M:dev:run`で intake→AML/KYC→制裁スクリーニング→PIS同意登録→PISチャネル決済実行(承認)→送金実行(承認)の一連の流れと、二重実行・未解決制裁フラグ・法域spec-basis欠如・IBAN checksum不正・PIS同意欠如の複数HARD holdケース（1リクエストで複数違反が同時収集されることも確認）を実機確認済み。
+本actorは`cloud-itonami-isic-6910`の初期R0と同じ成熟度で公開する: 実際に動くactor loop（advisor/governor/phase/registry/store/operation）、**MemStore-only**永続化（`DatomicStore`/`langchain.db`未実装、`cloud-itonami-isic-6419`/`-6910`が既に実証した`:db-api`駆動パターンを適用できる見込みだが本ADRの対象外）、全ての破壊的/規制対象アクションを人間承認でゲート。法域spec-basisは9法域（DEU/FRA/IRL/NLD/LTU/GBR/JPN/SGP/USA-NY/BRA）のみ——`pi.facts/coverage`で常に正直に報告し、水増ししない。50 tests / 180 assertions green、clj-kondo clean、`kbb -M:dev:run`で intake→AML/KYC→制裁スクリーニング→PIS同意登録→PISチャネル決済実行(承認)→送金実行(承認)の一連の流れと、二重実行・未解決制裁フラグ・法域spec-basis欠如・IBAN checksum不正・PIS同意欠如の複数HARD holdケース（1リクエストで複数違反が同時収集されることも確認）を実機確認済み。
 
 ### 6. 配置: `cloud-itonami` org 直下に新規 repo `cloud-itonami-pi`、manifest 登録なし
 

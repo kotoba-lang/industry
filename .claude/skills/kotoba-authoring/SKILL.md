@@ -304,7 +304,7 @@ target に落ちたときだけで、**それは amu の経路ではない**。
 - **JVM を起こさないことは好みではなく容量の問題である。** 実測 2026-08-30、この 1 台
   （10 コア）で **load average 513**、java 14 本 / node 99 本 / Claude セッション 8 本。
   走っていた java を親プロセスで辿ると **`scripts/resource-guard.mjs` の下に居たのは 1 本だけ**で、
-  残りは `clojure -M` / `-A:test` / `-Sdeps` / launchd 常駐だった。guard が壊れているのではなく、
+  残りは `kbb -M` / `-A:test` / `-Sdeps` / launchd 常駐だった。guard が壊れているのではなく、
   **guard の対象が「build コマンド名の列挙」（shadow-cljs / vite / next / cargo / wash）なので、
   実際に CPU を食っている JVM の test / gate / loop が全部その列挙の外にある**。
   列挙を足すより、**JVM を起こさない経路を既定にする方が効く。**
@@ -360,7 +360,7 @@ target に落ちたときだけで、**それは amu の経路ではない**。
    **値は kit ごとに違う**ので「N kit とも同じ」という形の要約を作らない。
 
    ```bash
-   nbb --classpath ".:scripts/nbb_compat" -e '
+   kbb --backend sci --classpath ".:scripts/nbb_compat" -e '
    (ns x (:require [clojure.edn :as edn] ["fs" :as fs] ["path" :as p]))
    (def dir "orgs/kotoba-lang/amu/resources/kotoba/lang/capability-kits")
    (doseq [f (sort (fs/readdirSync dir))]

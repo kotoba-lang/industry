@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kotoba-compiler-jdk-free-check.cljs — kotoba-lang/amu の hermetic gate。
 ;;
 ;; **なぜ fleet に置くか。** 2 つの理由が重なっている。
@@ -32,7 +32,7 @@
 ;;     `rev-parse HEAD` 照合（= content address の確認そのもの）が成立しない。
 ;;     **その照合を CI の都合で緩めない。** `--hermetic-only` が明示的に除外し、
 ;;     除外した事実を出力に残す。
-;;   - `clojure -M:test` / `npm ci` / browser matrix / wasm-tools / cargo を要する
+;;   - `kbb -M:test` / `npm ci` / browser matrix / wasm-tools / cargo を要する
 ;;     Amu CI の大半。ノードに registry egress が無い。
 ;;   - `bin/kotoba` の dispatch shell 自体。`<root>/node_modules/nbb/cli.js` を
 ;;     spawn するが tarball は `git archive` なので node_modules が無い。
@@ -41,7 +41,7 @@
 ;; **したがって green の意味は「JDK-free 解決の不変条件が保たれている」であって
 ;; 「Amu の CI が通った」ではない。**
 ;;
-;; ノード側で `npx nbb kotoba-compiler-jdk-free-check.cljs <dir>` として実行。
+;; ノード側で `kbb --backend sci kotoba-compiler-jdk-free-check.cljk <dir>` として実行。
 
 (ns fleet-ci.gates.kotoba-compiler-jdk-free-check
   (:require ["node:child_process" :as cp]
@@ -107,7 +107,7 @@
 ;; `clojure` と `java` を exit 127 の stub で覆い、**呼ばれたら記録する**。
 ;; 「JVM が無くても通った」だけでは弱い — 通ったうえで JVM 経路に一度も
 ;; 落ちていないことまで見る。stale な lock は `bin/kotoba` を
-;; `clojure -Spath` に落とすので、その退行がまさにこの marker に出る。
+;; `kbb -Spath` に落とすので、その退行がまさにこの marker に出る。
 
 (def shadow-dir (fs/mkdtempSync (path/join (os/tmpdir) "fleet-nojvm-")))
 (def marker (path/join shadow-dir "invoked.log"))
@@ -131,12 +131,12 @@
 ;; ---------------------------------------------------------------------------
 ;; A. lock が deps.edn と一致する（JDK-free 経路が生きているかどうかの本体）
 ;;
-;; ここが落ちているとき `bin/kotoba` は黙って `clojure -Spath` に落ちる
+;; ここが落ちているとき `bin/kotoba` は黙って `kbb -Spath` に落ちる
 ;; （= JDK 依存が復活する）。実測 2026-08-03: #500 が merge された時点で
 ;; 既に stale だった（open 中に deps.edn の pin が 2 本進んだ）。
 ;; **pin が動く頻度からして、これは edge ではなく通常の腐り方である。**
 
-(let [{:keys [rc out]} (run "npx" ["--yes" "nbb" "--classpath" "src"
+(let [{:keys [rc out]} (run "npx" ["--yes" "kbb" "--backend" "sci" "--classpath" "src"
                                    "-e" (str "(require '[kotoba.compiler.nbb.classpath :as c])"
                                              "(println (if (= (c/deps-digest \".\")"
                                              " (:lock/deps-digest (c/read-lock \".\")))"
@@ -148,7 +148,7 @@
     (str/includes? out "LOCK-STALE")
     (fail! "lock-freshness"
            "deps-lock.edn does not match deps.edn — the JDK-free path is dead"
-           "(regenerate: nbb scripts/lock-classpath.cljk)")
+           "(regenerate: kbb --backend sci scripts/lock-classpath.cljk)")
     :else (fail! "lock-freshness" "no verdict from the resolver:" (tail out 8))))
 
 ;; ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@
 ;; （ノードは github.com に届かない）。除外は出力に残るので、
 ;; 「全部走った」と「一部を飛ばした」が受領書の上で区別できる。
 
-(let [{:keys [rc out]} (run "npx" ["--yes" "nbb" "--classpath" "src"
+(let [{:keys [rc out]} (run "npx" ["--yes" "kbb" "--backend" "sci" "--classpath" "src"
                                    "test/nbb/classpath.cljk" "--hermetic-only"]
                             {:cwd root :env no-jvm-env})
       passes (count (re-seq #"(?m)^PASS " out))

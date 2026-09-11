@@ -51,8 +51,8 @@ CLAUDE.md も skill `west-pin-advance` も、答え方として
 書く側である。** stdout はそのまま `PINS=` に食わせられる TSV にしてある。
 
 ```
-nbb --classpath \".:scripts/nbb_compat\" scripts/pin-tip-lag.cljs > pins.tsv
-PINS=pins.tsv DRY=1 nbb --classpath \".:scripts/nbb_compat\" scripts/west-pin-put-batch.cljs
+kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/pin-tip-lag.cljs > pins.tsv
+PINS=pins.tsv DRY=1 kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/west-pin-put-batch.cljs
 ```
 
 2 つに分けたのは、重複を避けるためだけではない。**測る側が向きも決めると、

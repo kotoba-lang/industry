@@ -166,8 +166,8 @@ data plane も `Authorization: Biscuit` を読んでいない。** header を付
 ## 6. 計器
 
 ```
-nbb --classpath 90-docs 90-docs/auth_plane_integration/run.cljs
-nbb --classpath 90-docs 90-docs/auth_plane_integration/selftest.cljs
+kbb --backend sci --classpath 90-docs 90-docs/auth_plane_integration/run.cljs
+kbb --backend sci --classpath 90-docs 90-docs/auth_plane_integration/selftest.cljs
 ```
 
 exit は 3 値: **0 = 全軸測れて finding 無し / 1 = 全軸測れて finding あり /
@@ -291,7 +291,7 @@ interactive unlock timeout）。**繰り返し叩けば owner に unlock prompt 
 
 1. **`:require` の挿入が黙って失敗した。** assert を付けない文字列置換を、**main より
    9 commit 遅れた checkout** から読んだ内容に対して当てた。anchor が存在せず置換は
-   0 件、そして **`shadow-cljs release worker` は exit 0 で成功した** ——
+   0 件、そして **`amu compile --target wasm32-browser worker` は exit 0 で成功した** ——
    `No such namespace: issuer` を警告しながら、存在しない global への呼び出し
    `issuer.Ac(b,a)` を出力して。**本番の最初のリクエストで ReferenceError になる。**
 2. **その guard として入れた `:warnings-as-errors true` が効かなかった。**
@@ -405,7 +405,7 @@ murakumo と x402 は**何も受け取らない** —— 設計ではなく **pa
    （CLAUDE.md が `west update $NAMES` で記録しているのと同じ罠）。**動いている deploy を
    壊れていると報告する 1 歩手前だった** —— header を 1 つずつ独立の引数で渡して測り直した。
 2. **x402 の新しい build script はこのマシンで動かない。** 別セッションが同日 main に
-   入れた `npx --yes shadow-cljs release worker` が `release@latest` を install しようとして
+   入れた `npx --yes amu compile --target wasm32-browser worker` が `release@latest` を install しようとして
    失敗する —— CLAUDE.md が 2026-08-10 に実測記録している `npx --yes <pkg> <flag>` の欠陥。
    shadow-cljs は devDependency に在るので `--no-install` なら通る。**他セッションの
    進行中の変更なので直していない。報告に留める。**

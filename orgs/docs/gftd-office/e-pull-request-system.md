@@ -409,11 +409,11 @@ PR に出す。`:policy/require-ci` で必須化。
 
 | Phase | 内容 | 完了条件 |
 |---|---|---|
-| 0 ✅ | スキーマ確定（§2）+ **blob⇄要素粒度 datom 正規化**（§13 選択肢1）+ revision 橋渡し + pr/issue/review/comment ⇄ datom 変換器（`p1-gitoffice/gitoffice.cljc`） | **完了**: `bb test` → 13 tests / 40 assertions / 0 fail（round-trip + idempotent + stale-review 判定） |
-| 1 ✅ | differ（§3, docs+sheets）+ CommitDag merge-base/LCA（`gitdiff.cljc`） | **完了**: `bb test` → +7 tests / 22 assertions。add/remove/move/modified（属性 delta 付）+ DAG LCA（merge commit / criss-cross / disjoint） |
-| 2 ◐ | branch ref + PR 作成 + 差分ビュー（docs）。**正規化/差分/マージ/gate を kotoba CLJS + 既存アプリ edge に移植済** | **移植完了**: ① kotoba CLJS（`kotoba.gitoffice/gitdiff/gitmerge/gitpolicy` + `gitoffice-node` interop）`shadow-cljs release` **0 warnings** + bb 36 tests、ESM export（`storeDocumentBody`/`storeWorkbookGrid`/`evaluateMerge`）② 既存 docs/sheets アプリの edge adapter（`gitoffice_normalize.py`）pytest 12 + 既存回帰なし。PR 作成 UI / 差分ビューは残 |
-| 3 ✅ | 3-way merger（§4）+ 衝突表現 + 解決 API（`gitmerge.cljc`）。解決 UI は別途 | **完了**: `bb test` → +8 tests / 25 assertions。属性レベル自動マージ / 同一属性・delete-modify 衝突検出 / **fractional index で並行挿入が非衝突**を実証 |
-| 4 ◐ | レビュー（要素アンカーコメント + 承認 VC）+ **merge policy gate**（`gitpolicy.cljc`） | **gate ロジック完了**: `bb test` → +8 tests / 28 assertions（必須承認・stale 失効・必須レビュアー・required CI・land-pr）。UI と VC 署名は Phase 2 と併せて移植時 |
+| 0 ✅ | スキーマ確定（§2）+ **blob⇄要素粒度 datom 正規化**（§13 選択肢1）+ revision 橋渡し + pr/issue/review/comment ⇄ datom 変換器（`p1-gitoffice/gitoffice.cljc`） | **完了**: `kbb -M:test` → 13 tests / 40 assertions / 0 fail（round-trip + idempotent + stale-review 判定） |
+| 1 ✅ | differ（§3, docs+sheets）+ CommitDag merge-base/LCA（`gitdiff.cljc`） | **完了**: `kbb -M:test` → +7 tests / 22 assertions。add/remove/move/modified（属性 delta 付）+ DAG LCA（merge commit / criss-cross / disjoint） |
+| 2 ◐ | branch ref + PR 作成 + 差分ビュー（docs）。**正規化/差分/マージ/gate を kotoba CLJS + 既存アプリ edge に移植済** | **移植完了**: ① kotoba CLJS（`kotoba.gitoffice/gitdiff/gitmerge/gitpolicy` + `gitoffice-node` interop）`amu compile --target wasm32-browser` **0 warnings** + bb 36 tests、ESM export（`storeDocumentBody`/`storeWorkbookGrid`/`evaluateMerge`）② 既存 docs/sheets アプリの edge adapter（`gitoffice_normalize.py`）pytest 12 + 既存回帰なし。PR 作成 UI / 差分ビューは残 |
+| 3 ✅ | 3-way merger（§4）+ 衝突表現 + 解決 API（`gitmerge.cljc`）。解決 UI は別途 | **完了**: `kbb -M:test` → +8 tests / 25 assertions。属性レベル自動マージ / 同一属性・delete-modify 衝突検出 / **fractional index で並行挿入が非衝突**を実証 |
+| 4 ◐ | レビュー（要素アンカーコメント + 承認 VC）+ **merge policy gate**（`gitpolicy.cljc`） | **gate ロジック完了**: `kbb -M:test` → +8 tests / 28 assertions（必須承認・stale 失効・必須レビュアー・required CI・land-pr）。UI と VC 署名は Phase 2 と併せて移植時 |
 | 5 | sheets 差分/マージ（セル単位 + derives-from 波及表示） | セル衝突のみ CONFLICT、波及セルを併記 |
 | 6 | slides 差分/マージ（svgraph SVG オーバーレイ視覚差分） | シェイプ add/remove/move を視覚表示・属性マージ |
 | 7 | 文書 CI（§8）を merge gate に（coverage / no-refuted / MECE） | 必須 CI 失敗で merge block |

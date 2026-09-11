@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; docs-reality-tick.cljs — docs-audit bot の monitor。1 tick 分の測定だけを行い、
 ;; 判断はしない。ADR-2609072600。
 ;;
@@ -7,7 +7,7 @@
 ;;     同期できなかった / 検査が答えを拒否した場合は SYNC= / *-REFUSED を出す。
 ;;   - 件数を必ず出す（boolean は 1 件の退行と壊れた測定を区別できない）。
 ;;
-;;   nbb scripts/docs-reality-tick.cljk [--root <dir>]
+;;   kbb --backend sci scripts/docs-reality-tick.cljk [--root <dir>]
 
 (require '[clojure.string :as str])
 

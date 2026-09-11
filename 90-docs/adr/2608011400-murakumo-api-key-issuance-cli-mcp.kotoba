@@ -14,7 +14,7 @@
 
 - `murakumo.apikey` —— `mk1` capability token（HMAC-SHA256、`sub`/`scope`/`iat`/`exp`）の
   単一実装。CLI と MCP が同じ ns を使うので互いにずれない。
-- CLI: `nbb scripts/run-task.cljs token issue --sub … --scope … --ttl …`
+- CLI: `kbb --backend sci scripts/run-task.cljk token issue --sub … --scope … --ttl …`
 - MCP: `scripts/mcp-server.cljs`（`murakumo.issue_api_key` / `murakumo.verify_api_key`）
 - 境界: 秘密鍵必須・scope 許可リスト（chat|image|all）・TTL 90 日上限
 - `murakumo.apikey-parity-test` が `cloud-murakumo.token` とのバイト一致を保証
@@ -70,7 +70,7 @@ cloud-murakumo の依存木ごと引き込み、この repo が既に `:local/ro
 
 ### 5. 401 に『どうすれば直るか』を書く
 
-旧 401 は `bb murakumo token issue` を案内していたが、その command は babashka 退役
+旧 401 は `kbb -M:murakumo token issue` を案内していたが、その command は babashka 退役
 （ADR-2607173000）以来動かない。直し方として成立していない案内を返し続けるくらい
 なら返さない方がまだ良い。新しい 401 は実際に動く CLI と MCP tool 名を出し、
 scope 不足・期限切れ・鍵未設定を**区別して**返す。
@@ -84,7 +84,7 @@ scope 不足・期限切れ・鍵未設定を**区別して**返す。
 - **`MURAKUMO_TOKEN_SECRET` が未設定の間、挙動は今日と 1 バイトも変わらない。**
   有効化はオペレータが Worker secret に発行時と同じ値を設定した時点。
 - 検証: 86 tests / 453 assertions（うち mk1 判定 10 test を新規追加）、
-  `shadow-cljs release worker` green、**実際に起動した worker への E2E** ——
+  `amu compile --target wasm32-browser worker` green、**実際に起動した worker への E2E** ——
   CLI 発行の scope=chat が Bearer / x-api-key の両方で 200（モデルまで到達）、
   scope=image は理由付きで 401、共有トークンのみの設定では従来どおり 200、
   鍵未設定時の mk1 は `mk1 tokens are not accepted here` で 401。

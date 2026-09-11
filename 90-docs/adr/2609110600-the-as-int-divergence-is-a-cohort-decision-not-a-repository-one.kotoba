@@ -29,14 +29,14 @@ textually identical across all 20. The machine record is
 Per pilot, the `:cljs` branch:
 
     cd orgs/kotoba-lang/<pilot>
-    nbb --classpath src:<kotoba-lang/text>/src -e \\
+    kbb --backend sci --classpath src:<kotoba-lang/text>/src -e \\
       '(require (quote [<ns>.main :as m]))
        (println (m/as-int \"12abc\") (m/as-int \" 42 \"))'
     -> 12 42
 
 The `:clj` branch is the same expression under a JVM:
 
-    clojure -M -e '(require (quote [clojure.string :as s]))
+    kbb -M -e '(require (quote [clojure.string :as s]))
       (defn as-int [v] (cond (number? v) (long v)
         (string? v) (try (Long/parseLong (s/trim v)) (catch Exception _ 0)) :else 0))
       (println (as-int \"12abc\") (as-int \" 42 \"))'

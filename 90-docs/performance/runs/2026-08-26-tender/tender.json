@@ -16,7 +16,7 @@
     "warmupCalls": 50,
     "timing": {
       "nodeWebassembly": "in-process WebAssembly.instantiate; reused instance; main() loop after warmup (≤500 invocations/instance for amu fuel budget)",
-      "chicoryJvmSingle": "subprocess clojure -M:cli run (includes JVM cold start + Chicory instantiate per sample)",
+      "chicoryJvmSingle": "subprocess kbb -M:cli run (includes JVM cold start + Chicory instantiate per sample)",
       "chicoryJvmSteady": "single JVM; tender/open-session reused; main() loop after warmup",
       "wasmtimeCli": "subprocess wasmtime run --invoke main per sample"
     },

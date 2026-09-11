@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/shinshi-catalog-video-tick.cljk — 次に埋める original-series 1 体と
 ;; gad ComfyUI の空きを測る。モデルは居ない。
 ;;
@@ -9,8 +9,8 @@
 ;;   - murakumo generation は使わない。スコアは上げない（dogfood catalog）。
 ;;
 ;; usage:
-;;   nbb scripts/shinshi-catalog-video-tick.cljk
-;;   nbb scripts/shinshi-catalog-video-tick.cljk --json
+;;   kbb --backend sci scripts/shinshi-catalog-video-tick.cljk
+;;   kbb --backend sci scripts/shinshi-catalog-video-tick.cljk --json
 
 (require '[clojure.string :as str])
 

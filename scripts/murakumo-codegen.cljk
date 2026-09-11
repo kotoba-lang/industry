@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; murakumo-codegen.cljs — murakumo fleet の LLM に**並列に**下書きを書かせる。
 ;;
 ;; ADR-2607173100 に従い、**concrete な model id を焼かない**。解決順は
@@ -9,9 +9,9 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb scripts/murakumo-codegen.cljk --jobs-file jobs.edn [--jobs N] [--max-tokens N]
-;;   nbb scripts/murakumo-codegen.cljk --prompt-file p.txt --out draft.kotoba
-;;   nbb scripts/murakumo-codegen.cljk --probe          # 疎通と実効 tok/s だけ測る
+;;   kbb --backend sci scripts/murakumo-codegen.cljk --jobs-file jobs.edn [--jobs N] [--max-tokens N]
+;;   kbb --backend sci scripts/murakumo-codegen.cljk --prompt-file p.txt --out draft.kotoba
+;;   kbb --backend sci scripts/murakumo-codegen.cljk --probe          # 疎通と実効 tok/s だけ測る
 ;;
 ;; jobs.edn は job の vector:
 ;;   [{:id "score-core" :out "/tmp/score_core.kotoba"

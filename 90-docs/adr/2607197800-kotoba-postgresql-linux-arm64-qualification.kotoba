@@ -25,7 +25,7 @@
              (:orbstack :returned-to-stopped)))
    (:executable-evidence
    (vector (map (:environment "OrbStack Linux arm64 container")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "PostgreSQL 15.18 / Temurin 21.0.11; exit 0"))))))
   (:adr/body
   "# ADR-2607197800: PostgreSQL Linux arm64 qualification

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 「この workspace に X はあるか」に**有界な答え**を返す索引を生成する。
 ;;
 ;; ## なぜ要るのか
@@ -30,9 +30,9 @@
 ;; 引いて出なかったことが「存在しない」の証拠に使われるので、どれだけ見て
 ;; いないかを言えないと索引は嘘をつく。
 ;;
-;;   nbb scripts/gen-concept-index.cljk                      # 生成
-;;   nbb scripts/gen-concept-index.cljk --check              # 差分があれば非ゼロ終了
-;;   nbb scripts/gen-concept-index.cljk --scan-root <path>   # orgs/ を別 checkout から読む
+;;   kbb --backend sci scripts/gen-concept-index.cljk                      # 生成
+;;   kbb --backend sci scripts/gen-concept-index.cljk --check              # 差分があれば非ゼロ終了
+;;   kbb --backend sci scripts/gen-concept-index.cljk --scan-root <path>   # orgs/ を別 checkout から読む
 ;;
 ;; ## `--check` を CI gate にしない
 ;;
@@ -226,9 +226,9 @@
 
 (defn render [scanned datoms]
   (str ";; 概念の索引 —— **生成物。手で編集しない**\n"
-       ";; 再生成: nbb scripts/gen-concept-index.cljk\n"
+       ";; 再生成: kbb --backend sci scripts/gen-concept-index.cljk\n"
        ";; 語彙:   manifest/concept-vocabulary.edn（こちらは手書き）\n"
-       ";; 検索:   nbb scripts/concept-lookup.cljk <語>\n;;\n"
+       ";; 検索:   kbb --backend sci scripts/concept-lookup.cljk <語>\n;;\n"
        ";; 2026-08-03、『kotoba-lang に terminal, console はあるか』に「無い」と\n"
        ";; 答えた。kuro / kobo / ADR-2606301000 は 2026-06-30 から在った。grep は\n"
        ";; README に当たっていたが、4,050 repo 分の出力を head -40 で切っていた。\n"
@@ -278,7 +278,7 @@
     (if (some #{"--check"} args)
       (if (= out (read-safe out-file))
         (println "concept index: up to date")
-        (do (println "concept index: STALE — rerun nbb scripts/gen-concept-index.cljk")
+        (do (println "concept index: STALE — rerun kbb --backend sci scripts/gen-concept-index.cljk")
             (set! (.-exitCode js/process) 1)))
       (if-let [refusal (evidence-floor scanned (read-safe out-file)
                                     (boolean (some #{"--allow-shrink"} args)))]

@@ -1,11 +1,11 @@
 ;; scripts/hermes-murakumo-api.cljk — point the Hermes profile bot fleet at
 ;; api.murakumo.cloud, and hold it at a shape the endpoint can actually serve.
 ;;
-;;   nbb scripts/hermes-murakumo-api.cljk              # report; writes nothing
-;;   nbb scripts/hermes-murakumo-api.cljk --apply      # write ~/.hermes
-;;   nbb scripts/hermes-murakumo-api.cljk --verify     # conformance + live probe
-;;   nbb scripts/hermes-murakumo-api.cljk --findings   # detector protocol
-;;   nbb scripts/hermes-murakumo-api.cljk --self-test
+;;   kbb --backend sci scripts/hermes-murakumo-api.cljk              # report; writes nothing
+;;   kbb --backend sci scripts/hermes-murakumo-api.cljk --apply      # write ~/.hermes
+;;   kbb --backend sci scripts/hermes-murakumo-api.cljk --verify     # conformance + live probe
+;;   kbb --backend sci scripts/hermes-murakumo-api.cljk --findings   # detector protocol
+;;   kbb --backend sci scripts/hermes-murakumo-api.cljk --self-test
 ;;
 ;; Exit codes: 0 conformant / 1 findings / 2 COULD-NOT-MEASURE (never a pass).
 ;;

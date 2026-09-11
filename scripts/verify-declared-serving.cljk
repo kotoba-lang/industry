@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-declared-serving — a model catalog that says `serving` about an
 ;; endpoint that does not answer.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-declared-serving.cljk [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-declared-serving.cljk [--findings]
 ;;   nbb ... scripts/verify-declared-serving.cljk --self-test
 ;;   nbb ... scripts/verify-declared-serving.cljk --catalog <url> --timeout-ms 8000
 ;;

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/industry-stack-wave-tick.cljk — industry-stack wave の**測定**入口
 ;; （ADR-2608090800）。loop が毎サイクル先に走らせ、次 wave の候補を機械的に出す。
 ;;
@@ -8,7 +8,7 @@
 ;;   3. プールが枯れたら候補 0（モデルを起こさない）
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/industry-stack-wave-tick.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/industry-stack-wave-tick.cljk
 ;;   nbb ... scripts/industry-stack-wave-tick.cljk --limit 24
 
 (ns industry-stack-wave-tick

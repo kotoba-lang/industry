@@ -161,10 +161,10 @@ itonami.cloud は 200、app・auth とも 200。
 
 ```bash
 # 常駐 agent が起動できる状態か（1=起動不能あり / 2=測れなかった）
-nbb scripts/verify-launchd-agents.cljs --findings
+kbb --backend sci scripts/verify-launchd-agents.cljk --findings
 
 # 売り物の主張と実際の差（6 findings が残っているはず）
-nbb orgs/network-awai/cloud-murakumo/scripts/offer-drift-collect.cljs
+kbb --backend sci orgs/network-awai/cloud-murakumo/scripts/offer-drift-collect.cljk
 
 # 推論の可用性（ホストの load を一緒に見ること。負荷 100 超では別物を測る）
 sysctl -n vm.loadavg

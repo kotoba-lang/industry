@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-bridge-guest-cannot-execute — the claude-bridge guest must not be
 ;; able to run anything.
 ;;
-;;   nbb scripts/verify-bridge-guest-cannot-execute.cljk            # static
-;;   nbb scripts/verify-bridge-guest-cannot-execute.cljk --live     # + real call
-;;   nbb scripts/verify-bridge-guest-cannot-execute.cljk --self-test
+;;   kbb --backend sci scripts/verify-bridge-guest-cannot-execute.cljk            # static
+;;   kbb --backend sci scripts/verify-bridge-guest-cannot-execute.cljk --live     # + real call
+;;   kbb --backend sci scripts/verify-bridge-guest-cannot-execute.cljk --self-test
 ;;
 ;; ## Why this exists
 ;;

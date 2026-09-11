@@ -2,7 +2,7 @@
   "CLI acceptance for #1749 — dump/load/dump, script replay, version error, render world.
 
   Run from the package root:
-    npx nbb --classpath src bin/accept_state.cljs
+    kbb --backend sci --classpath src bin/accept_state.cljs
 
   Exercises the real `bin/kuriningu.cljs` entry points (not only the library)."
   (:require ["node:fs" :as fs]
@@ -18,7 +18,7 @@
 (def failures (atom 0))
 
 (defn- sh [args]
-  (let [r (cp/spawnSync "npx" (clj->js (into ["nbb" "--classpath" "src"] args))
+  (let [r (cp/spawnSync "npx" (clj->js (into ["kbb" "--backend" "sci" "--classpath" "src"] args))
                         #js {:cwd here :encoding "utf8"})]
     {:status (.-status r)
      :stdout (or (.-stdout r) "")

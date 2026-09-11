@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Every place that decides a `kotoba://` authority, and how it decides.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-delegation-surfaces.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-delegation-surfaces.cljk
 ;;   ... --check      exit 1 if any repo decides authority without the lattice
 ;;   ... --findings   emit FINDING<TAB>sev<TAB>key<TAB>detail lines
 ;;   ... --self-test  prove the matchers discriminate AND the walk arrives

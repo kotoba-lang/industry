@@ -3,9 +3,9 @@
 ;;
 ;; 出力は 1 行 1 EDN の追記ログ。途中で落ちても、そこまでの実測は残る。
 ;;
-;;   nbb bench.cljs speed  <model>
-;;   nbb bench.cljs tasks  <model>
-;;   nbb bench.cljs needle <model>
+;;   kbb --backend sci bench.cljk speed  <model>
+;;   kbb --backend sci bench.cljk tasks  <model>
+;;   kbb --backend sci bench.cljk needle <model>
 ;;
 ;; 「答えられなかった」を「合格」と同じ形で出さないこと (CLAUDE.md, ADR-2608136000)。
 ;; だから結果は :pass / :fail / :error の 3 値で、:error は集計で分けて数える。

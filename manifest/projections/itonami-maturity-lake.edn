@@ -6,7 +6,7 @@
 ;; :lake/sha256 で参照する（ADR-2608039970「分けるのは bytes」）。
 ;;
 ;; manifest 自体の再生成:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/gen-lake-manifest.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/gen-lake-manifest.cljk \
 ;;     --input 90-docs/system-dynamics/itonami-maturity.datoms.edn \
 ;;     --dataset itonami-maturity
 ;; --check で canonical 一致を検査できる（決定的: 時刻も乱数も使わない）。

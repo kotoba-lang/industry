@@ -39,10 +39,10 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "released PostgreSQL TLS/SCRAM/query interoperability: ok; mechanism SCRAM-SHA-256-PLUS; exit 0"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test -n kototama.tender-test")
+     (:command "kbb -M:test -n kototama.tender-test")
      (:result "base and PLUS GS2/channel-binding construction, protocol negatives, and TLS session tests pass"))))))
   (:adr/body
   "# ADR-2607196000: Kotoba PostgreSQL SCRAM-SHA-256-PLUS channel binding

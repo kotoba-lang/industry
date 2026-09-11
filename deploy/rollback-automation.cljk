@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 
 ;;; Automatic Rollback Automation — strangler-fig Month 1
 ;;; Reference: ADR-2607072100 §3.3 "Rollback Triggers"
@@ -16,7 +16,7 @@
 ;;;  • Performance budget miss → escalate SLO or continue
 ;;;
 ;;; Usage:
-;;;   nbb deploy/rollback-automation.cljk \
+;;;   kbb --backend sci deploy/rollback-automation.cljk \
 ;;;     --metrics-endpoint http://localhost:9090/api/v1/query \
 ;;;     --murakumo-control-url http://localhost:9000 \
 ;;;     --dry-run true
@@ -324,14 +324,14 @@
                   (js/setInterval #() 60000))
       (do
         (println "Usage:")
-        (println "  nbb deploy/rollback-automation.cljk monitor")
+        (println "  kbb --backend sci deploy/rollback-automation.cljk monitor")
         (println "    [--metrics-endpoint URL]")
         (println "    [--murakumo-control-url URL]")
         (println "    [--check-interval-sec N]")
         (println "    [--dry-run true|false]")
         (println "")
-        (println "  nbb deploy/rollback-automation.cljk status")
-        (println "  nbb deploy/rollback-automation.cljk reset")
+        (println "  kbb --backend sci deploy/rollback-automation.cljk status")
+        (println "  kbb --backend sci deploy/rollback-automation.cljk reset")
         (System/exit 1)))))
 
 (apply -main *command-line-args*)

@@ -33,10 +33,10 @@
                      (:command-complete true) (:explicit-close true)))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "named portal fetch 2+1; suspended then complete; explicit close; exit 0"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "bounded portal tags and linker memory ranges; exit 0"))))))
   (:adr/body
   "# ADR-2607196600: Bounded PostgreSQL named portals

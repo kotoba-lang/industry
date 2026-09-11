@@ -22,7 +22,7 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   参照先は `manifest/repos.edn` の `:b2 :credentials`）。**実行には
   `orgs/kotoba-lang/secret-resolve/src` を classpath に足す**（無いと
   `Could not find namespace: secret-resolve.resolver` で落ちる。2026-08-05 実測）:
-  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljk`。`op`(1Password CLI) /
+  `kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljk`。`op`(1Password CLI) /
   `security`(Keychain) / 環境変数のどれでも同じコマンドで動く。**秘密情報は
   リポジトリに一切コミットしない**（EDN に置くのは `op://` パスや Keychain service 名
   といった非機密の参照先だけ）。CI では `B2_KEY_ID/B2_APP_KEY/B2_BUCKET` を env で渡す。
@@ -31,7 +31,7 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   に登録した project は `manifest/west.yml` で `userdata.datalad: true` + `datalad`
   グループ（既定 `group-filter` の `-datalad` で off）になる。git/annex スケルトンの
   取得は `west update --group-filter +datalad <name>`、実体の取得/破棄は west 拡張
-  コマンド `nbb manifest/west_annex.cljk annex-get` / `nbb manifest/west_annex.cljk annex-drop`（B2 special remote を環境変数の
+  コマンド `kbb --backend sci manifest/west_annex.cljk annex-get` / `kbb --backend sci manifest/west_annex.cljk annex-drop`（B2 special remote を環境変数の
   creds で有効化して get/drop）。実装は `manifest/west_annex.cljk`。
 
 - ⚠ **shallow（clone-depth: 1）はもう使わない。2026-07-21 に撤回済み**
@@ -60,7 +60,7 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   落ちれば両方消えるので、それは 2 ではない。
 
   ```bash
-  nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk --sample 0
+  kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk --sample 0
   #   … providers=1 (s3.us-west-004.backblazeb2.com)  ← 既定は報告のみ
   nbb … scripts/annex-custody-verify.cljk --require-providers 2   # 満たさなければ exit 1
   ```
@@ -79,6 +79,6 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   同じ prefix で置いている）。
 
 - **custody は主張ではなく検査で示す**:
-  `nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk --names <dataset>`。
+  `kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk --names <dataset>`。
   off-machine コピーの無い annex ファイルがあれば exit 1、標本を remote から fsck する。
   ADR-2607252000（「バックアップがあると書いてあったのに実体が無かった」）の再発防止。

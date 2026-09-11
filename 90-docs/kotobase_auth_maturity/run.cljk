@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Entry point for the kotobase auth/authz maturity measurement.
 ;;
-;;   npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs [--out FILE]
-;;   npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs --probe stored.edn
+;;   npx --yes kbb --backend sci --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs [--out FILE]
+;;   npx --yes kbb --backend sci --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs --probe stored.edn
 ;;
 ;; --probe scores a stored measurement without touching the network. That is
 ;; what makes this judge testable: the same axes can be shown to go red and

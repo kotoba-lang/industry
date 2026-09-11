@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/repo-bots/propose.cljk — 床を割っている bot 1 体について、murakumo に
 ;; 提案文を書かせ、**決定論的な gate が受理/却下を決める**。
 ;;
-;;   nbb scripts/repo-bots/propose.cljk              ; --next の 1 件
-;;   nbb scripts/repo-bots/propose.cljk --bot kotoba-lang/amu
-;;   nbb scripts/repo-bots/propose.cljk --batch 20   ; 波で回す（常駐用）
-;;   nbb scripts/repo-bots/propose.cljk --dry-run    ; 模型を呼ばず証拠だけ出す
+;;   kbb --backend sci scripts/repo-bots/propose.cljk              ; --next の 1 件
+;;   kbb --backend sci scripts/repo-bots/propose.cljk --bot kotoba-lang/amu
+;;   kbb --backend sci scripts/repo-bots/propose.cljk --batch 20   ; 波で回す（常駐用）
+;;   kbb --backend sci scripts/repo-bots/propose.cljk --dry-run    ; 模型を呼ばず証拠だけ出す
 ;;
 ;; ## 模型が触れるのは提案文だけ
 ;;

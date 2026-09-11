@@ -210,7 +210,7 @@ env（3 つとも optional、未設定は 503 であって fallback ではない
 
 | 何 | 結果 |
 |---|---|
-| `nbb --classpath src:test` で external-models-test | 14 tests / 83 assertions / 0 failures |
+| `kbb --backend sci --classpath src:test` で external-models-test | 14 tests / 83 assertions / 0 failures |
 | 負の対照: `paying-identities` に `:anonymous` を足す | **7 failures**、うち 3 test は anonymous 保護を名指すもののみ。exit 0 → 1 |
 | 復元後の再実行 | 83 assertions / 0 failures、`git status` は新規 2 ファイルのみ |
 | paren balance（worker.cljs、文字列・char・コメントを解釈するトークナイザ） | balanced |
@@ -270,7 +270,7 @@ env（3 つとも optional、未設定は 503 であって fallback ではない
 ⚠ **全 suite は baseline から赤い**（`@noble/hashes/sha2.js` 未インストール）ので
 証拠に使っていない。使ったのは対象 ns の直接実行と負の対照。
 
-**governed artifact**: `shadow-cljs release worker ui` を外部 west workspace で実行し、
+**governed artifact**: `amu compile --target wasm32-browser worker ui` を外部 west workspace で実行し、
 `scripts/package-release.mjs` が deploy ファイルを再現することを確認。sibling pin 3 件
 （murakumo / org-chainagnostic-cacao / cloud-murakumo）が動いていたが、**local-murakumo の
 require closure に 1 ファイルも入らないことを実測してから**取り込んだ（closure は

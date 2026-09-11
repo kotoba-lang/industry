@@ -39,7 +39,7 @@ itonami CLI を設計し直す。どうするか。
   JVM 版 kotoba (orgs/kotoba-lang/agent — AgentRun / turn_loop を
   hermes から transcription 済み) とは別レイヤで、 CLI はクライアント。
 - workspace 慣習: west superproject + leaf repo、ADR は EDN、
-  test は clojure -M:test (2291 tests / 13862 assertions)。
+  test は kbb -M:test (2291 tests / 13862 assertions)。
 
 ## Decision
 
@@ -121,10 +121,10 @@ agent/itonami-harness-plugins → サーバ側マージ)。
 - 実機: /skin kawaii で prompt が you ♡ に切り替わる (live
   re-provide、remount 無し)。/skin (引数無し) が現 skin を表示。
   /plugins が mount tree を表示。--dump-config exit 0。
-- suite: nbb test/itonami_harness_nbb.cljs 11 tests / 26 assertions,
+- suite: kbb --backend sci test/itonami_harness_nbb.cljk 11 tests / 26 assertions,
   0 failures (dispatch 意味論・mount/unmount 可逆性・inject/二重mount
   拒否・theme re-provide・dump-config shape)。既存
-  nbb test/itonami_client_nbb.cljs 9/9 PASS。JVM full suite 2291
+  kbb --backend sci test/itonami_client_nbb.cljk 9/9 PASS。JVM full suite 2291
   tests / 13872 assertions, 0 failures。
 - リリース (symlink flip / resident install 更新) は未実施 — 次の
   release 手順で載る。

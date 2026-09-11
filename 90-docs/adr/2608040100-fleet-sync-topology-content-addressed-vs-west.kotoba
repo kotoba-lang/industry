@@ -375,7 +375,7 @@ passphrase を要求する** —— node daemon は鍵ファイル自体を読�
 
 ### 検証（実行したもの・件数・結果）
 
-- `clojure -M:test`（prolly-tree、resource-guard 経由）: **27 tests / 2,151 assertions / 0 failures**
+- `kbb -M:test`（prolly-tree、resource-guard 経由）: **27 tests / 2,151 assertions / 0 failures**
 - `fleet reconcile --check`: 両サイクルとも absorb 直後に **clean**
 - `west-pin-put.cljs`: 4 件すべて reachable-from-main / ahead / behind=0
 - `scripts/fleet-sync-probe.cljs`: 6-entry の縮小 manifest で end-to-end 検証 → 4,063 entry のフル実行で完走
@@ -410,7 +410,7 @@ fleet-db は closing reconcile 直後で drift 0。**検出は毎時走るが吸
 
 ```bash
 # 1) 現在地を測る（~10 分）
-FLEET_ROOT=$PWD nbb scripts/fleet-sync-probe.cljs --rad-sample 500 --edn ~/.gftd/fleet-sync/probe-$(date +%F).edn
+FLEET_ROOT=$PWD kbb --backend sci scripts/fleet-sync-probe.cljk --rad-sample 500 --edn ~/.gftd/fleet-sync/probe-$(date +%F).edn
 
 # 2) 溜まった drift を吸収する（検出は毎時走っている。ledger を見れば量が分かる）
 tail -5 ~/.gftd/fleet-sync/ledger.edn
@@ -455,7 +455,7 @@ tail -5 ~/.gftd/fleet-sync/ledger.edn
   （`src/loop_system_dynamics/fleet_sync_topology.cljs`、
   `resources/fleet-sync-topology-seed.edn`、`reports/fleet-sync-topology.md`、
   `ledger/fleet-sync-topology-ledger.edn`）。main に merge 済み。
-- 実行: `nbb --classpath 'src:bin:<dynamics>/src:<org-oasis-open-xmile>/src' bin/run_fleet_sync_topology.cljs`。
+- 実行: `kbb --backend sci --classpath 'src:bin:<dynamics>/src:<org-oasis-open-xmile>/src' bin/run_fleet_sync_topology.cljs`。
 - XMILE の projection は**自分の fitting point を再現することを検証してから**前方値を出す
   （t=9 でモデル 90 / 実測 90、reproduces? true）。再現しなければ finding ではなく
   モデルの誤りとして報告する設計にしてある。

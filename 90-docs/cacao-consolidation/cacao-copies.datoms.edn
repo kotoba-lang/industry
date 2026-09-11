@@ -14,7 +14,7 @@
 ;; cannot.
 ;;
 ;; Regenerate the body with the grep in ADR-2607268000. Query it with:
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
 ;;     '[:find ?repo ?lines :where
 ;;       [?e "source/dataset" "cacao-duplication-census"]
 ;;       [?e "cacao.copy/repo" ?repo] [?e "cacao.copy/lines" ?lines]]'

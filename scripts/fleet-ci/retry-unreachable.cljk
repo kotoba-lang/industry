@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; retry-unreachable.cljs — 「機械に届かなかった」だけを理由に赤で固定された
 ;; 台帳エントリを剥がし、次の tick に判定し直させる。
 ;;
@@ -17,10 +17,10 @@
 ;;
 ;; 既定は dry-run。--execute で書く。
 ;;
-;;   nbb scripts/fleet-ci/retry-unreachable.cljk
-;;   nbb scripts/fleet-ci/retry-unreachable.cljk --execute
-;;   nbb scripts/fleet-ci/retry-unreachable.cljk --execute --wait 1800
-;;   nbb scripts/fleet-ci/retry-unreachable.cljk --self-test
+;;   kbb --backend sci scripts/fleet-ci/retry-unreachable.cljk
+;;   kbb --backend sci scripts/fleet-ci/retry-unreachable.cljk --execute
+;;   kbb --backend sci scripts/fleet-ci/retry-unreachable.cljk --execute --wait 1800
+;;   kbb --backend sci scripts/fleet-ci/retry-unreachable.cljk --self-test
 ;;
 ;; **--wait が要るのは、窓が短いから。** 実測 2026-08-19: tick は約 21 分周期で、
 ;; 1 プロセスがそのうち十数分を占有する（batch を組む前の tip 解決が長い）。

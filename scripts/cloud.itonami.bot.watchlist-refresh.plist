@@ -20,8 +20,8 @@
     launchctl bootout gui/$(id -u)/cloud.itonami.bot.watchlist-refresh
 
   手で 1 回:
-    nbb scripts/watchlist-refresh-cycle.cljk --dry-run    # 取得・ratchet・両 suite まで
-    nbb scripts/watchlist-refresh-cycle.cljk              # 着地と publish まで
+    kbb --backend sci scripts/watchlist-refresh-cycle.cljk --dry-run    # 取得・ratchet・両 suite まで
+    kbb --backend sci scripts/watchlist-refresh-cycle.cljk              # 着地と publish まで
 
   credential: git push は SSH remote（鍵は Keychain）、R2 は wrangler の OAuth
   session、Iceberg は Keychain `gftd.cf` / `API_TOKEN`。

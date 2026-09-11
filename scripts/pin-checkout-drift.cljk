@@ -7,7 +7,7 @@
 ;; pin measures already-landed work as absent. `ahead` is normal for actors that
 ;; commit on their own (yabai-actor ct-watch et al) — HEAD is the truth there.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/pin-checkout-drift.cljk --root <dir>
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/pin-checkout-drift.cljk --root <dir>
 ;;
 ;; Exit code is always 0: this is a report, not a gate.
 

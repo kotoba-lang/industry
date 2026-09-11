@@ -20,7 +20,7 @@ The generator never got that far.
 
 ## What happened
 
-    nbb gen-whole-component.cljs <template> <repo> aave
+    kbb --backend sci gen-whole-component.cljk <template> <repo> aave
     Error: No item 0 in vector of length 0
 
 All four aave specs are `:refs {}`. `ref-row` indexed the empty ref-field vector
@@ -55,9 +55,9 @@ a derived test from an invented one.**
 ## Reproduce
 
     # refuses, exit 2, writes nothing
-    nbb gen-whole-component.cljs <template> <com-aave> aave
+    kbb --backend sci gen-whole-component.cljk <template> <com-aave> aave
     # still generates, exit 0
-    nbb gen-whole-component.cljs <template> <com-accela> accela
+    kbb --backend sci gen-whole-component.cljk <template> <com-accela> accela
 
 ⚠ Read those exit codes from a file, not through a pipe. Measured again in this
 iteration: `... | tail -3; echo exit=$?` printed `exit=0` for the refusing run,

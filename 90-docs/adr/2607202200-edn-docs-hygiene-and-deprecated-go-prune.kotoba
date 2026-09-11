@@ -21,7 +21,7 @@
                   (:parse-errors-after 0)
                   (:not-tx-after 0)
                   (:markdown-path-reference-files-after 0)))))
-  (:adr/verification "nbb --classpath .:scripts/nbb_compat manifest/docs-edn-only.cljs verify: OK — md=0, parse-errors=0, not-tx=0, path-md-refs=0, source-format-residue=0.")
+  (:adr/verification "kbb --backend sci --classpath .:scripts/nbb_compat manifest/docs-edn-only.cljs verify: OK — md=0, parse-errors=0, not-tx=0, path-md-refs=0, source-format-residue=0.")
   (:adr/consequences (vector "The historical archive no longer contains Go module metadata."
                      "90-docs has one canonical serialization and no Markdown ADR source files."
                      "The verifier rejects partially identified single-ADR transaction vectors instead of checking only their first entity."))

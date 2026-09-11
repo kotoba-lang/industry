@@ -105,7 +105,7 @@ gate から落ちる。だから `temperature` / `top_p` の clamp を
 
 ## 実測（2026-08-13）
 
-- `clojure -M:test` — 57 tests / 361 assertions / 0 failures（kernel parity 込み）
+- `kbb -M:test` — 57 tests / 361 assertions / 0 failures（kernel parity 込み）
 - Kotoba の `dot` が `ops/dot-values` と 5 corpus（長さ 1〜40、負値・分数込み）で一致
 - `inv-rms` が `ops/rms-normalize-values` の scale と 3 corpus で一致
 - 空入力は NaN でなく 0.0（層をまたいで静かに伝播する NaN を作らない）

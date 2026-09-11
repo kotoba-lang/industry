@@ -78,7 +78,7 @@ L4 attention manimani + living actions                            (人間が見�
 
 ## スケール方針
 
-- ingest は ADR-0009 の launchd 日次 + CID 重複排除のまま。datom 化はバッチ(`clojure -M -m warehouse.load`)で冪等再構築。
+- ingest は ADR-0009 の launchd 日次 + CID 重複排除のまま。datom 化はバッチ(`kbb -M -m warehouse.load`)で冪等再構築。
 - Datomic Local (:mem) は ~10^6 datoms まで現実的。超えたら :storage-dir をディスクに切替→年次パーティション。エンジン交換(datahike/datascript/XTDB)は schema.edn が宣言的である限り低コスト。
 - known_issues の解消を L1 ルール化: txn dedup-key = (date, vendor, amount, account)、loan は明細から再計算。
 

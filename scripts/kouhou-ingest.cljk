@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kouhou-ingest.cljs — 官公庁・公益 press の日次 ingest を回し、その日の
 ;; briefing / ledger / corpus receipt を git に、取得した feed 本体を annex の
 ;; 2 つの off-machine remote に載せる（ADR-2608110200）。
@@ -116,7 +116,7 @@
 
 (def run-out (atom ""))
 
-(let [{:keys [exit out err]} (run ["clojure" "-M:dev:live-ingest"] {:dir ds :env env})
+(let [{:keys [exit out err]} (run ["kbb" "-M:dev:live-ingest"] {:dir ds :env env})
       summary (filter #(or (str/starts-with? % "=== ")
                            (str/includes? % "sources,")
                            (str/starts-with? % "persisted:"))

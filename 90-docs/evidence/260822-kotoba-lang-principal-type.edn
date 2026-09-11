@@ -24,7 +24,7 @@
   ⚠ ただし**一度だけ本変更由来の赤が出た**: surface-status.edn に invariant を
   足した時点で `on-disk-matrix-matches-regenerated` が落ちた。
   docs/lang/surface-matrix.md は surface-status.edn の射影で、生成物が stale に
-  なったことを gate が正しく捕まえた。`clojure -M -m kotoba.lang.surface-matrix`
+  なったことを gate が正しく捕まえた。`kbb -M -m kotoba.lang.surface-matrix`
   で再生成して解消（差分 1 行）。**gate が働いた例として残す。**"
   :evidence/lint "clojure -M:lint = errors 0 / warnings 22（sealer 修正後と同数。新規警告なし）"
   :evidence/discrimination

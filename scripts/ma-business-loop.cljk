@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/ma-business-loop.cljk — M&A マッチング事業 loop の入口。
 ;; LaunchAgent `cloud.itonami.bot.ma-business-advance` が一定間隔でこれを起こす。
 ;;
@@ -19,8 +19,8 @@
 ;;   - exit 0 常に。
 ;;
 ;; usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-loop.cljk
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-loop.cljk --dry-run
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/ma-business-loop.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/ma-business-loop.cljk --dry-run
 
 (require '[clojure.edn :as edn]
          '[clojure.string :as str])

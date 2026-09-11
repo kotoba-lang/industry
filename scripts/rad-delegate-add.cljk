@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; rad-delegate-add.cljs — 既存の Radicle repo に **別端末の identity を delegate として追加**する
 ;; （端末ごとに identity を持ち、repo の delegates に両方を入れて threshold は 1 のまま）。
 ;;
@@ -16,13 +16,13 @@
 ;;
 ;; ## 使い方
 ;;   # 端末 A（現 delegate）で: 端末 B の DID を全 repo に追加
-;;   nbb scripts/rad-delegate-add.cljk --did did:key:z6Mk...B
+;;   kbb --backend sci scripts/rad-delegate-add.cljk --did did:key:z6Mk...B
 ;;   # 対象を絞る / 件数を刻む / 下見
-;;   nbb scripts/rad-delegate-add.cljk --did <DID> --limit 50
-;;   nbb scripts/rad-delegate-add.cljk --did <DID> --rids rad:zAAA,rad:zBBB
-;;   nbb scripts/rad-delegate-add.cljk --did <DID> --dry-run
+;;   kbb --backend sci scripts/rad-delegate-add.cljk --did <DID> --limit 50
+;;   kbb --backend sci scripts/rad-delegate-add.cljk --did <DID> --rids rad:zAAA,rad:zBBB
+;;   kbb --backend sci scripts/rad-delegate-add.cljk --did <DID> --dry-run
 ;;   # 別ホスト（ssh 到達可能で、そのホストが delegate 鍵を持つ場合）
-;;   nbb scripts/rad-delegate-add.cljk --did <DID> --host 25mbair
+;;   kbb --backend sci scripts/rad-delegate-add.cljk --did <DID> --host 25mbair
 ;;
 ;; 冪等: 既に delegate に入っている repo は skip する。
 ;; 追加後に delegates を読み直して**実際に入ったことを確認**してから成功と数える。

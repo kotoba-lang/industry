@@ -10,7 +10,7 @@ that no test requires, and that do not load at all.
 
 Removing `org.clojure/data.json` from repos where it was the only JVM runtime
 dependency, each rewire was checked with one line per edited namespace,
-`clojure -M -e '(require (quote <ns>))'`, because a suite that never loads the
+`kbb -M -e '(require (quote <ns>))'`, because a suite that never loads the
 edited file returns the same green as one that does.
 
 Five repos were loaded that way. **Five failed**, and none of the failures were
@@ -22,7 +22,7 @@ caused by the change -- each fails identically on unmodified main:
     kouhou          src/kouhou/aozora.clj      Syntax error macroexpanding clojure.core/ns
     animeka-actor   src/animekaza/engine.clj   HttpClient etc. used with no (:import ...)
 
-The fifth is the sharpest case. **animeka-actor's `clojure -M:test` runs ZERO
+The fifth is the sharpest case. **animeka-actor's `kbb -M:test` runs ZERO
 tests**, before and after any change, because `animekaza.produce` reaches
 `animekaza.deploy` which requires the undeclared `kotoba.net.jvm-host`. A suite
 that executes nothing is not red in any way anybody watches -- it reports
@@ -92,7 +92,7 @@ defect, and the two together are silent.
 
 The check is one line and needs no test to be written:
 
-    clojure -M -e '(require (quote <ns>))'
+    kbb -M -e '(require (quote <ns>))'
 
 Two rules follow.
 

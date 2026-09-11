@@ -84,7 +84,7 @@ episodes/ep1-komawari-redesign が手書き rows-of-beats 形式(:beat/weight /
   968 panels with komawari :rect』。")
   (:adr/authoritative_for
   (vector "ghosthacker → aozora export の beat 導出規則: :shot→:beat/weight(Full Page=splash / Wide系=large / Insert・ECU=small / 他=medium)、:gh/pageLayout :gh/category→:beat/intensity(impact・climax=impact / action=tension、ページ最強 beat 1つのみ、tie は最後=ページめくり側)、:beat/vector=定数20°(設計値)、rows=splash・large 単独 tier + 残り2個ずつ"
-   "exporter の実行には kami.mangaka.komawari が classpath に必須(nbb は実行時 resolve 不可のため optional dep にできない): npx nbb --classpath ../../kotoba-lang/kami-mangaka-page/src scripts/export-aozora-manga-work.cljs"
+   "exporter の実行には kami.mangaka.komawari が classpath に必須(nbb は実行時 resolve 不可のため optional dep にできない): kbb --backend sci --classpath ../../kotoba-lang/kami-mangaka-page/src scripts/export-aozora-manga-work.cljs"
    "governor を通らないページは幾何なしでフォールバック export する(半端な rect を出さない)"
    "シアー行の全パネルは \"sheared-impact\"/\"sheared-tension\" タグを持ち、governor は行の intensity で tilt を cap し、同一シアー行ペアの bbox 重なりを overlap 検査から除外する — generator 出力は常に自分の governor を通る"
    "public/kotoba/ghosthacker-manga-tx.edn / ghosthacker-manga-log.edn は ghosthacker の resources/aozora-manga-work.edn から aozora.appview.manga(work->tx / tx->eavt)で再生成する生成物(手編集しない)。log の再生成手順とその過程で発見・修正した entity->eavt のキーワード値バグは ADR-2607172260 が正本"))

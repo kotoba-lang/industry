@@ -98,7 +98,7 @@ It is not. On `columnar`, `test/run.cljs` and `test/columnar/cljs_runner.cljs` e
 required ONE of the suite's three test namespaces:
 
 ```
-JVM  (clojure -M:test)         Ran 36 tests containing 117 assertions
+JVM  (kbb -M:test)         Ran 36 tests containing 117 assertions
 nbb  (test/run.cljs)           Ran 10 tests containing  54 assertions
 ```
 
@@ -138,7 +138,7 @@ Refused, with the reason recorded in `gates.edn` so it is not re-derived:
   this half covers the async/Worker path the JVM cannot reach. It prints no `Ran N tests`
   line at all, so the gate's own floor (exit 93) would reject it. Both halves are real
   coverage; dropping either loses tests.
-- **`io-multiformats`, `org-ietf-cbor`** — their cljs half is `shadow-cljs compile`,
+- **`io-multiformats`, `org-ietf-cbor`** — their cljs half is `amu compile --target wasm32-browser`,
   itself a JVM build. No nbb entry exists.
 - **`chain`, `io-ipld`, `io-ipld-car`, `nekko`, `org-apache-avro`, `kotobase-lake`,
   `tech-ipfs-specs-ipns`, `sakkyokuka`** — zero `.clj`, but the test path needs sibling

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-profile-enrich.cljs — read-only discovery of a company's OWN published
 ;; switchboard number, registered address, register number, and (separately)
 ;; its legally-disclosed representative, for the cloud-itonami-lei-<LEI> repos.
@@ -40,7 +40,7 @@
 ;; "nobody publishes this" from "not looked at yet".
 ;;
 ;; Run (from the superproject root):
-;;   nbb scripts/lei-profile-enrich.cljk [--limit N] [--dry-run] [--concurrency N]
+;;   kbb --backend sci scripts/lei-profile-enrich.cljk [--limit N] [--dry-run] [--concurrency N]
 
 (ns lei-profile-enrich
   (:require ["fs" :as fs]

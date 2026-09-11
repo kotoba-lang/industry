@@ -11,7 +11,7 @@
 ;; in the slope:
 ;;
 ;;   interpreted   nbb / SCI, this process
-;;   compiled      the shadow-cljs release bundle, this process (Node)
+;;   compiled      the amu compile --target wasm32-browser bundle, this process (Node)
 ;;   workerd       the same bundle, under `wrangler dev`
 ;;
 ;; ## Why the slope rather than a stopwatch
@@ -32,7 +32,7 @@
 ;;
 ;; Then, from the superproject root:
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_digest_runtimes.cljs
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_digest_runtimes.cljs
 ;;
 ;; The bench starts its own server, writes a three-line default-export shim to
 ;; a temporary directory and spawns `wrangler dev` over it, then shuts both

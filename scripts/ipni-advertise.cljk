@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Publish one IPNI advertisement for content this operator holds, and prove
 ;; the indexer can reach it.
 ;;
 ;;   NODE_PATH=orgs/kotoba-lang/io-ipld/node_modules \
-;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/io-multiformats/src:\
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/io-multiformats/src:\
 ;;   orgs/kotoba-lang/io-ipni-specs/src:orgs/kotoba-lang/org-ietf-ed25519/src" \
 ;;     scripts/ipni-advertise.cljk <content-cid>... [--execute]
 ;;       [--is-rm] [--previous <ad-cid>] [--detached-head] [--ephemeral-detached]

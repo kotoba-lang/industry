@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; probe-kotoba-cljc-batch.cljs — canonical compile probes を **amu CLI** で回す。
 ;;
 ;; 2026-08-30: JVM 版 (`probe-kotoba-cljc-batch.clj`, kotoba.compiler.core 直呼び +
@@ -14,7 +14,7 @@
 ;;  amu が wasm artifact を出すので web/wasm の差は backend 指定だけ）。
 ;;
 ;; Run:
-;;   nbb --classpath "scripts" scripts/probe-kotoba-cljc-batch.cljk <tasks.json> <out.json>
+;;   kbb --backend sci --classpath "scripts" scripts/probe-kotoba-cljc-batch.cljk <tasks.json> <out.json>
 ;;   （AMU_BIN で amu の場所を上書きできる。既定 orgs/kotoba-lang/amu/bin/amu）
 (ns probe-kotoba-cljc-batch
   (:require [clojure.string :as str]

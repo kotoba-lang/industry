@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; itonami-regenerate.cljs — cloud-itonami actor の demo を **実 actor で再生成し、
 ;; committed 済みの生成物と一致するか**を見る fleet gate。
 ;;
@@ -30,7 +30,7 @@
 ;;   1. 使い捨て workspace に `orgs/<org>/<repo>` の形で tree を置く
 ;;      （`:local/root` が `../../kotoba-lang/x` と `../x` の 2 形なので深さ 2 が要る）
 ;;   2. deps.edn の `:local/root` を**推移的に**辿り、足りない依存を clone する
-;;   3. 再生成コマンド（既定 `clojure -M:dev:render-html`）を repo 直下で走らせる
+;;   3. 再生成コマンド（既定 `kbb -M:dev:render-html`）を repo 直下で走らせる
 ;;   4. 実行前後の sha256 を突き合わせ、**committed 済みの生成物が動いたら落とす**
 ;;
 ;; 4 が要点。committed 済みの値を読むだけの経路では、**内部整合を保ったまま
@@ -39,7 +39,7 @@
 ;;
 ;; ## 使い方
 ;;
-;;   npx nbb itonami-regenerate.cljs <repo-dir> --org <org> [--cmd "clojure -M:dev:render-html"]
+;;   kbb --backend sci itonami-regenerate.cljk <repo-dir> --org <org> [--cmd "kbb -M:dev:render-html"]
 ;;
 ;; gate 登録は :script-args ["--org" "cloud-itonami"]。
 
@@ -60,7 +60,7 @@
 
 (def root (.resolve path (or (first (remove #(str/starts-with? % "--") args)) ".")))
 (def org (flag "--org" nil))
-(def regen-cmd (flag "--cmd" "clojure -M:dev:render-html"))
+(def regen-cmd (flag "--cmd" "kbb -M:dev:render-html"))
 
 (defn- die! [code & msg]
   (println (str "FLEET-CI: " (str/join " " msg)))
@@ -169,7 +169,7 @@
 ;;
 ;; ⚠ 実測 2026-08-10、実ノード asher: `clojure` は PATH に在る（/opt/homebrew/bin）が
 ;; `JAVA_HOME` は未設定で、`/usr/bin/java` は JDK 未導入時の stub なので
-;; `clojure -M:...` が **The operation couldn't be completed. Unable to locate a
+;; `kbb -M:...` が **The operation couldn't be completed. Unable to locate a
 ;; Java Runtime.** で即死する。手元の macOS では JDK が既定で引けるので**この差は
 ;; ローカル検証では出ない** —— gate をローカルで 25/25 通してから実ノードで落ちた。
 ;; `gates/github_workflow_run.cljs` は同じ理由で最初からこれを export していた。

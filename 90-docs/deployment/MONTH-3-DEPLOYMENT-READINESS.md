@@ -152,7 +152,7 @@ cp metrics/month-2-slo-validation.json metrics/month-3-baseline.json
 cp metrics/month-2-parity-validation.edn metrics/month-3-baseline-parity.edn
 
 # 2. Prepare Month 3 execution logs
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "month-3-go-decision" \
   --decision "approved" \
   --timestamp "2026-09-08T12:00:00Z"
@@ -170,7 +170,7 @@ git commit -m "Month 3 Strangler-Fig: GO decision signed off (2026-09-08)"
 
 ```bash
 # 1. Document NO-GO reason
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "month-3-nogo-decision" \
   --reason "[fill in reason]" \
   --timestamp "2026-09-08T12:00:00Z"

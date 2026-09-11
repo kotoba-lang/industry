@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; hirameki-datalake-export.cljs — 公開特許 corpus を datalake に載せられる
 ;; 4 枚の表に落とす。
 ;;
@@ -40,7 +40,7 @@
 ;; pyiceberg（nbb に Avro manifest / metadata.json の writer は無い）。
 ;; 境界はこの JSON と、隣に書く spec。
 ;;
-;;     nbb scripts/hirameki-datalake-export.cljk [--repo <path>] [--out-dir <dir>]
+;;     kbb --backend sci scripts/hirameki-datalake-export.cljk [--repo <path>] [--out-dir <dir>]
 ;;     python3 scripts/datalake-sync.py --spec /tmp/hirameki.spec.json --in-dir /tmp
 ;;
 ;; exit: 0 載せられる JSON を書いた / 2 REFUSED（読めなかった。空ではない）

@@ -33,7 +33,7 @@ cheshire を require しない `duplication-warn` だけ。
 執行前に「`.cljk` は nbb / JVM / shadow-cljs のいずれも `require` で解決しない」と正しく予告し、
 「復旧順: `scripts/nbb_compat` → hooks → gates → bots」と書いている。この ADR はその最初の 2 段。
 
-同じ改名が 3 つ目の顔でも出ていた: **kbb 自身が死んでいた。** `bin/kbb` は `exec nbb kbb_shim.cljs`
+同じ改名が 3 つ目の顔でも出ていた: **kbb 自身が死んでいた。** `bin/kbb` は `exec kbb --backend sci kbb_shim.cljk`
 で、そのファイルは `kbb_shim.cljk` になっており（ENOENT）、直しても shim の require が `.cljk`
 なので stock nbb では load できない。「nbb を kbb に」は、まず kbb を起こすことから始まる。
 

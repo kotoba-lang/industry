@@ -29,7 +29,7 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "109 tests, 360 assertions, 0 failures; Kotoba DB consumer/provider frame exchange over native TLS"))
     (map (:cwd "orgs/kotoba-lang/kotoba")
      (:command "targeted kotoba.transport-component-test")

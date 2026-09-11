@@ -124,7 +124,7 @@
 
 **この作業中に見つけた、本 ADR とは無関係の既存の欠陥（2件）**
 
-1. **main が deploy 不能だった。** `e2753812`（Entra federation）が `functions/api/auth/entra/start.js` を足したのに `functions/edge/auth-core.js` を再ビルドしておらず、wrangler が `No matching export in \"edge/auth-core.js\" for import \"authEntraStartOnRequestPost\"` で落ちる。`shadow-cljs release auth-api` で再ビルドして着地させた。**GitHub Actions の deploy workflow は 2026-08-03 以降 job が起動していない**（network-awai org の課金停止）ので、誰も気付いていなかった。
+1. **main が deploy 不能だった。** `e2753812`（Entra federation）が `functions/api/auth/entra/start.js` を足したのに `functions/edge/auth-core.js` を再ビルドしておらず、wrangler が `No matching export in \"edge/auth-core.js\" for import \"authEntraStartOnRequestPost\"` で落ちる。`amu compile --target wasm32-browser auth-api` で再ビルドして着地させた。**GitHub Actions の deploy workflow は 2026-08-03 以降 job が起動していない**（network-awai org の課金停止）ので、誰も気付いていなかった。
 2. **shirohan の公開物が再ビルドできない。** source repo `cloud-itonami/shirohan` の手元 checkout に `curve.cljc` / `color.cljc` / `cut.cljc` が無く、`git fetch origin` も通らない（リモートに到達できない）。生成器は依存順に 1 ファイルずつコピーするので、`geom.cljs` だけ差し替わった**半端な公開物**が残った —— `origin/main` の版に戻してから着地させた。**このため shirohan の公開ページだけ旧クローム（相対リンク）のままで、org ホストではナビが 404 になる。** `:status` を `live` にする前に解消すること。
 
 **着地とデプロイ**
@@ -275,7 +275,7 @@ rules 1-8 は不変（第1パスセグメントを `{repo}` と読むだけ）�
 ## resume point
 
     cd /Users/junkawasaki/github/com-junkawasaki
-    npx nbb scripts/fleet-ci/gates/cloud-itonami-sites-check.cljs orgs/network-awai/cloud-itonami
+    kbb --backend sci scripts/fleet-ci/gates/cloud-itonami-sites-check.cljk orgs/network-awai/cloud-itonami
     curl -sI https://cloud-itonami.itonami.cloud/ | head -1
     curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://itonami.cloud/cloud-itonami/")
 

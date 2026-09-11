@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; rename-residue-test.cljs — proof for scripts/rename_residue.cljk.
 ;;
-;;   nbb scripts/rename-residue-test.cljk
+;;   kbb --backend sci scripts/rename-residue-test.cljk
 ;;       fixture repo built from scratch + pure classify cases. Offline, no network.
 ;;
-;;   nbb scripts/rename-residue-test.cljk --repo <dir> --base <ref> --paths a,b,c
+;;   kbb --backend sci scripts/rename-residue-test.cljk --repo <dir> --base <ref> --paths a,b,c
 ;;       run the scanner against a real checkout. Used to replay the
 ;;       net-kotobase/control-plane incident against the actual repository;
 ;;       see the :residue-gate section of manifest/cleanup-workflow.edn.

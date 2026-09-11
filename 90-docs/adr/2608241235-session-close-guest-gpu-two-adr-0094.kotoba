@@ -14,13 +14,13 @@
 |---|---|---|
 | kotoba-lang/aiueos | e158913a | Merge agent/aiueos-guest-gpu-two: two virtio-gpu 2D resources when Kotoba `kotoba_aiueos_wm_hit` admits n=2 (ADR-0094). PR #152. Feature branch deleted. |
 
-superproject: `nbb scripts/west-pin-put.cljs aiueos e158913a6b42` → root `c0d342ce0f2`.
+superproject: `kbb --backend sci scripts/west-pin-put.cljk aiueos e158913a6b42` → root `c0d342ce0f2`.
 
 # 何をこの Mac で再実行して確かめたか
 
-- `clojure -M:test -n aiueos.compositor-test` — 31 tests, 0 failures.
-- `clojure -M:compositor guest-gpu-two` — `AIUEOS_COMPOSITOR_GUEST_GPU_TWO_OK` leftover `[]`; serial `AIUEOS_GUEST_GPU_TWO_OK resources=2 flush=2 kotoba-n=2`.
-- `clojure -M:compositor gpu` — still green (`CREATE`/`FLUSH` resource=1); does not require `GUEST_GPU_TWO_OK`.
+- `kbb -M:test -n aiueos.compositor-test` — 31 tests, 0 failures.
+- `kbb -M:compositor guest-gpu-two` — `AIUEOS_COMPOSITOR_GUEST_GPU_TWO_OK` leftover `[]`; serial `AIUEOS_GUEST_GPU_TWO_OK resources=2 flush=2 kotoba-n=2`.
+- `kbb -M:compositor gpu` — still green (`CREATE`/`FLUSH` resource=1); does not require `GUEST_GPU_TWO_OK`.
 
 # root ADR-2608221625 / Desktop の現在地（2026-08-24）
 

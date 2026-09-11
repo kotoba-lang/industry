@@ -150,6 +150,6 @@ west pin: 7774a93 に前進。worktree / branch はすべて削除済み。
 
 ## 次の agent がまず打つもの
 
-    nbb scripts/watchlist-refresh-cycle.cljs --dry-run
-    nbb scripts/fleet-ci/gates/snapshot-freshness-check.cljs orgs/kotoba-lang/watchlist-screen --sub resources/watchlist/lists --max-age-days 21 --min 3
+    kbb --backend sci scripts/watchlist-refresh-cycle.cljk --dry-run
+    kbb --backend sci scripts/fleet-ci/gates/snapshot-freshness-check.cljk orgs/kotoba-lang/watchlist-screen --sub resources/watchlist/lists --max-age-days 21 --min 3
 ")))

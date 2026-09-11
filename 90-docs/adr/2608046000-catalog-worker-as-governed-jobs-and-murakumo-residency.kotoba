@@ -32,7 +32,7 @@ lane `:catalog`、3 kind。**risk tier の割り当てがこの設計の要点**
 
 **旧タイマーが無人で撃っていたのは 3 つ目**である。この反転を直すのが目的。
 
-CLI: `clojure -M:ops-catalog propose|pending|merge|run|run-dry <ops-repo.edn>`。
+CLI: `kbb -M:ops-catalog propose|pending|merge|run|run-dry <ops-repo.edn>`。
 
 handler は superproject の nbb スクリプトに **shell out** する。再実装しない ——
 あれが検証済みの経路（捏造しない・bot 検出を回避しない・person 面を public に
@@ -109,7 +109,7 @@ CLI にも実走で 2 つ出た: (1) 0 署名層なのに merge が seed-spec �
 `merge refused: risk tier :personal-data requires 1 signature(s)` で止まる。
 その job は現在も**署名待ちで queue に残っている**（`data/ops-repo.edn` に commit 済み）。
 
-`clojure -M -e` で `cloud-itonami.ops-catalog` を require し、ns 読み込みを確認。
+`kbb -M -e` で `cloud-itonami.ops-catalog` を require し、ns 読み込みを確認。
 **この actor の test suite は走らせていない** —— 実走で 3 欠陥を出したので優先度は
 そちらに割いた。suite 未実行は次の担当への申し送り事項である。
 

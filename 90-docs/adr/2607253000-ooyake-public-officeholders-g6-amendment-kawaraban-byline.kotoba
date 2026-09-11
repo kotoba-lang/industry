@@ -83,7 +83,7 @@ ADR-2607252600 が残した穴。`data/outlets/allowlist.edn` は policy ファ�
 
 `query/load-db` が allowlist を**その場で射影**する（生成ファイルを挟まない＝2つ目の写しが無い＝ずれない）。lexicon フィールドは `:news.outlet/*`、kawaraban 固有の取得ポリシー（feed-url / verified / note）は `:kawaraban.ingest/*` に分ける——後者は「その媒体がどういう存在か」ではなく「kawaraban がどう取りに行くか」なので、AT-Proto に publish される outlet record に混ぜない。
 
-新しい `clojure -M:query outlets` は 国 × 種別 × feed 実測の表を出す。記事アーカイブがまだ空でも「どこから取りに行けるか」は今日答えられる（実測: 120 outlets / 77 feed-verified / 50カ国）。
+新しい `kbb -M:query outlets` は 国 × 種別 × feed 実測の表を出す。記事アーカイブがまだ空でも「どこから取りに行けるか」は今日答えられる（実測: 120 outlets / 77 feed-verified / 50カ国）。
 
 ### 6. kawaraban — 公表された byline を記録する
 

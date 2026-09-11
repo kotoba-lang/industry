@@ -31,7 +31,7 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test -n kototama.tender-test")
+     (:command "kbb -M:test -n kototama.tender-test")
      (:result "44 tests, 142 assertions, 0 failures; TLS/SCRAM/query E2E passed"))
     (map (:cwd "orgs/kotoba-lang/kotoba")
      (:command "targeted clojure.test: transport-component-test and wasm-map-keyword-test")

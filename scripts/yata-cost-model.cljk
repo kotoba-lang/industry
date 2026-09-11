@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; yata-cost-model.cljs — YATA（保管の計量単位）の原価と掲示価格を計算する。
 ;;
 ;; ADR-2608312900 の計算器。**この数字は再計算できなければならない** ——
 ;; ADR-2607321200 の known-gap「採点が scratchpad にしか無かった」と同じ轍を
 ;; 踏まないために、掲示価格を主張する側がここに在る。
 ;;
-;;   nbb scripts/yata-cost-model.cljk
+;;   kbb --backend sci scripts/yata-cost-model.cljk
 ;;
 ;; 入力はすべて `inputs` に出所つきで置く。導出値は 1 つも手で持たない。
 ;; レートを測り直したら `inputs` だけを直す —— 表は全部そこから出る。

@@ -114,7 +114,7 @@ session. Repairing it means deciding what each half-written entry was meant
 to be — authoring the ingest config, not repairing syntax — and belongs to
 whoever owns it.
 
-Next step: `cd orgs/network-awai/app-hyakka && clojure -M scripts/read_check.clj`
+Next step: `cd orgs/network-awai/app-hyakka && kbb -M scripts/read_check.clj`
 names it. Decide per truncated entry: complete it from its own kind's
 convention, or drop it (it has never taken effect — the config has been
 unreadable, so the resident has not run with it).
@@ -141,10 +141,10 @@ GHSA-8cpq-38p9-67gx, GHSA-pv5w-4p9q-p3v2, GHSA-wmrf-hv6w-mr66.
 
 ### G5. The SessionStart detector hook prints a command that does not exist.
 
-It prints `nbb --classpath \".:scripts/nbb_compat\" scripts/dependency-vulnerabilities.cljs`.
+It prints `kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/dependency-vulnerabilities.cljs`.
 That file is not in the repo and not on origin/main. The real detector, per
 `manifest/orgs-detectors.edn` `:dependency-vulnerabilities` `:argv`, is
-`nbb scripts/gen-dependency-inventory.cljs --osv --findings`. Every other
+`kbb --backend sci scripts/gen-dependency-inventory.cljk --osv --findings`. Every other
 detector line in that hook should be checked the same way.
 
 ## Corrections made during the session

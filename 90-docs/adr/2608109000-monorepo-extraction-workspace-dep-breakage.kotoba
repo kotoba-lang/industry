@@ -103,6 +103,6 @@ org 単位で止まっていた時期と重なるため（ADR-2607300900）。
 ## 付随して直したもの
 
 `npx shadow-cljs` が `npm ERR! cb.apply is not a function` で起動しない。
-shadow-cljs は clojure CLI 経由（`clojure -M:cljs -m shadow.cljs.devtools.cli
+shadow-cljs は clojure CLI 経由（`kbb -M:cljs -m shadow.cljs.devtools.cli
 release worker`）で動くので、`package.json` の script と `wrangler.jsonc` の
 `build.command` の両方をその形にした。")))

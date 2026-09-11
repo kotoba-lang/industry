@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Amu's JVM-free wasm32 regression suite (`test/nbb/run.cljs`), run with no
 ;; JVM anywhere in reach.
 ;;
@@ -22,7 +22,7 @@
 ;; Two things make this mean something rather than merely pass:
 ;;
 ;;   1. The classpath comes from `kotoba.compiler.nbb.classpath`, which reads
-;;      `deps-lock.edn`, NOT from `clojure -Spath`. Deriving it from the JVM
+;;      `deps-lock.edn`, NOT from `kbb -Spath`. Deriving it from the JVM
 ;;      would make "runs without a JVM" untestable by construction.
 ;;   2. `java`, `clojure`, `clj` and `javac` are shadowed on PATH by stubs that
 ;;      exit non-zero and announce themselves.

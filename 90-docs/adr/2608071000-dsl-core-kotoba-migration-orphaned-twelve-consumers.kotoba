@@ -66,7 +66,7 @@ west manifest は 4,131 project を持ち大半は checkout されていない�
 
 `loop-system-dynamics/src/loop_system_dynamics/fleet_registration_xmile.cljs`（`src/`、test ではない）が `xmile.validate` を require しており、`cloud_itonami_xmile` 等 6 本の XMILE モデルがそこに委譲している。実測:
 
-    nbb --classpath \"loop-system-dynamics/src:...\" -e \"(require '[loop-system-dynamics.cloud-itonami-xmile])\"
+    kbb --backend sci --classpath \"loop-system-dynamics/src:...\" -e \"(require '[loop-system-dynamics.cloud-itonami-xmile])\"
     → Error: Could not find namespace: kotoba.dsl.problem
 
 ### なぜ 17 日間気付かれなかったか
@@ -184,13 +184,13 @@ native 経路が W4 待ちである以上（当時 2026-08-07 の切り方。現
 - `gh api repos/kotoba-lang/dsl-core/compare/9132f2b…main` → `ahead_by 2 / behind_by 0`。その main の `git ls-tree -r --name-only` も `src/kotoba/dsl/problem.kotoba` のみ —— **上流でも直っていない。**
 - `grep -rln 'kotoba.dsl.problem' --include='*.cljc' --include='*.cljs' --include='*.clj'` → 12 repo（一覧は context 節）。
 - 呼び出し数は `grep -rhoE '\\(problem/[a-z?-]+'` で計測（`:problem/code` のようなキーワードリテラルを除外するため `(` を含めた。除外前は 63 件の `problem/code` 等が混じって見えた）。
-- 実行経路の破損: `nbb --classpath '…' -e \"(require '[loop-system-dynamics.cloud-itonami-xmile])\"` → `Could not find namespace: kotoba.dsl.problem`。
-- 復元の代償: dsl-core の worktree で `src/kotoba/dsl/problem.cljc` を復元し `clojure -M:test` を実行 → `production-source-authority` が `(not (= [\"src/kotoba/dsl/problem.kotoba\"] [\"src/kotoba/dsl/problem.cljc\" \"src/kotoba/dsl/problem.kotoba\"]))` で落ちることを確認。**この worktree は landing せずに撤去した。**
+- 実行経路の破損: `kbb --backend sci --classpath '…' -e \"(require '[loop-system-dynamics.cloud-itonami-xmile])\"` → `Could not find namespace: kotoba.dsl.problem`。
+- 復元の代償: dsl-core の worktree で `src/kotoba/dsl/problem.cljc` を復元し `kbb -M:test` を実行 → `production-source-authority` が `(not (= [\"src/kotoba/dsl/problem.kotoba\"] [\"src/kotoba/dsl/problem.cljc\" \"src/kotoba/dsl/problem.kotoba\"]))` で落ちることを確認。**この worktree は landing せずに撤去した。**
 - css の先例: `kotoba-lang/css` に `src/css/core.cljc` / `src/css/utility.cljc` / `src/kotoba/css.cljc` が現存し、`.kotoba` は `css/kotoba/css_core.kotoba` / `css_document.kotoba` に分離、`deps.edn` に『kotoba-lang/compiler is a TEST-ONLY dependency, for the parity gate』とある。
 
 ### native 経路の実現可能性（2026-08-07 追記、オーナーが方向を決めた後に測った）
 
-- `nbb scripts/repo-search.cljs kotoba-native native` → `kotoba-lang/kotoba-native`（backend）と `kotoba-lang/tender-native`（`kototama.native.executor`）。どちらも checkout 済みで実在する。ADR-2607266000 で core repo から分割されたもの。
+- `kbb --backend sci scripts/repo-search.cljk kotoba-native native` → `kotoba-lang/kotoba-native`（backend）と `kotoba-lang/tender-native`（`kototama.native.executor`）。どちらも checkout 済みで実在する。ADR-2607266000 で core repo から分割されたもの。
 - `tender-native/src/kototama/native/executor.clj` の `execute` は署名済み artifact を検証し、admission policy を通し、measure した loader で実行する。**capability gate は実在する。**
 - 型の実測は `grep -c` を `src/kotoba/native/x86_64.cljc` に当てて数えた: `:record` 25 / `:string` 10 / `:i64` 5 / `:bool` 4 / `:keyword` 1 / `:option` 1 / `:result` 2、**`:vector` `:set` `:map` `:list` `:variant` `:document` はいずれも 0**。
 - 演算子の実測は `problem.kotoba` が使う 10 個を backend src に当てた: `keyword-from-string` 5 / `string-concat` 12、**残り 8 個（`document-map` `document-vector` `document-keyword` `document-count` `document-contains` `document-vector-conj` `required-at` `required-document`）はすべて 0**。

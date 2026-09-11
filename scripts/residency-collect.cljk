@@ -1,12 +1,12 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; residency-collect.cljs — 常駐の宣言と、実際に動いているものを突き合わせる。
 ;;
 ;; ADR-2608111721 決定 6 の collector。**各 repo が `residency.edn` で自分の常駐を
 ;; 宣言し、ここは集めて実機と比べるだけ。** 起動方法をここに書かない。
 ;;
-;;   nbb scripts/residency-collect.cljk            # 報告
-;;   nbb scripts/residency-collect.cljk --check    # drift があれば exit 1（gate 用）
-;;   nbb scripts/residency-collect.cljk --edn      # 機械可読
+;;   kbb --backend sci scripts/residency-collect.cljk            # 報告
+;;   kbb --backend sci scripts/residency-collect.cljk --check    # drift があれば exit 1（gate 用）
+;;   kbb --backend sci scripts/residency-collect.cljk --edn      # 機械可読
 ;;
 ;; ## なぜ「宣言」と「実機」を両方見るのか
 ;;

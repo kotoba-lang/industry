@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; yui-weekly.cljs — yui (結) weekly resident: one observe → evaluate →
 ;; decide → act → record cycle, self-contained (no chat context needed).
 ;;
@@ -15,7 +15,7 @@
 ;; rankings are ranks, never headcount forecasts.
 ;;
 ;; Run (superproject root):
-;;   nbb --classpath "scripts:scripts/nbb_compat" scripts/yui-weekly.cljk
+;;   kbb --backend sci --classpath "scripts:scripts/nbb_compat" scripts/yui-weekly.cljk
 ;; Env: SD_OUT to redirect report dir (default 90-docs/system-dynamics/yui).
 
 (require '[clojure.string :as str]

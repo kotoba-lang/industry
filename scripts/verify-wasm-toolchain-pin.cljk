@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-wasm-toolchain-pin.cljs — amu が固定した Wasm toolchain の version と、
 ;; fleet のノードが実際に持っている version を突き合わせる。
 ;;
 ;; usage:
-;;   nbb scripts/verify-wasm-toolchain-pin.cljk [--findings] [--root <dir>]
-;;   nbb scripts/verify-wasm-toolchain-pin.cljk --self-test
+;;   kbb --backend sci scripts/verify-wasm-toolchain-pin.cljk [--findings] [--root <dir>]
+;;   kbb --backend sci scripts/verify-wasm-toolchain-pin.cljk --self-test
 ;;
 ;; **なぜ要るか。** amu は `component-model-v1.edn` の
 ;; `[:spec-baseline :wasi :toolchain]` で toolchain を pin し、他の version を

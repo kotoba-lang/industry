@@ -53,7 +53,7 @@
 ## Pre-Activation Checklist (by 2026-08-01 08:00 JST)
 
 - [ ] **Exec lead assignment confirmed** (real or interim)
-- [ ] **Manifest canonical verified** (run: `nbb scripts/gen-west-manifest.cljs --check`)
+- [ ] **Manifest canonical verified** (run: `kbb --backend sci scripts/gen-west-manifest.cljk --check`)
 - [ ] **Email templates reviewed** (no [TBD] in 6 templates)
 - [ ] **Contact distribution lists confirmed** (all 8 recipients validated)
 - [ ] **SMTP/email path tested** (send test email)

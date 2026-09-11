@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 起動時 identity の決定経路を、実 Ed25519 で端から端まで走らせる（ADR-2608197300）。
 ;;
-;;   nbb --classpath \
+;;   kbb --backend sci --classpath \
 ;;     "orgs/kotoba-lang/org-biscuitsec/src:orgs/kotoba-lang/org-biscuitsec/test:\
 ;; orgs/kotoba-lang/authority/src:orgs/kotoba-lang/org-w3-did/src:\
 ;; orgs/kotoba-lang/identity/src" \

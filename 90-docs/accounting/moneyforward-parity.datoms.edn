@@ -3,7 +3,7 @@
 ;; 再測定: この面は live な MF Cloud Accounting API（読み取りスコープの MCP）
 ;;         から取る。credential が要るので生成器は置いていない。取り直したら
 ;;         :mf.snapshot/measured-at と件数を必ず一緒に動かす。
-;; 検査:   nbb --classpath ".:scripts/nbb_compat" scripts/verify-moneyforward-parity.cljs
+;; 検査:   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-moneyforward-parity.cljs
 ;;
 ;; ## なぜこの面が要るのか
 ;;

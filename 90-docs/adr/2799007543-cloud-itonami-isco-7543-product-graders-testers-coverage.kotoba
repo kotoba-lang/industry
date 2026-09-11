@@ -54,7 +54,7 @@ already landed 60 occupations across the 71xx/72xx/73xx/74xx/75xx
 trades (Wave0/1/2 100% complete).
 
 The `kotoba-lang/occupation` registry's live `{:id \"7543\" ...}` entry
-was verified against a fresh clone before any work began (`clojure -M
+was verified against a fresh clone before any work began (`kbb -M
 -e \"(require 'kotoba.occupation) (println (kotoba.occupation/get-
 occupation \\\"7543\\\"))\"` from a checkout with the `kotoba-lang/
 technology` sibling present at the correct `../technology` relative
@@ -267,7 +267,7 @@ regardless of disposition path.
   landing concurrently this batch) was added asserting `7543`'s
   maturity/repo/business-id, rather than touching the fragile
   aggregate `maturity-tier` deftest.
-- Full test suite (`clojure -M:test`): 29 tests, 64 assertions, 0
+- Full test suite (`kbb -M:test`): 29 tests, 64 assertions, 0
   failures, 0 errors -- raw output captured in this ADR's
   `:test/counts` and in the task report, independently re-verified
   against a brand-new fresh clone of the pushed repository (not just

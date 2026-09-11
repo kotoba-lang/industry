@@ -147,13 +147,13 @@ external には**構造的に将来も API が無い**——警察は endpoint �
   `src/kakekomi/core.cljc`（純関数、fs も clock も持たない）+ `data/` 5 ファイル
   = 67 entity（42 法域 / 9 犯罪類型 playbook / 8 領事手続き / 5 保険要件 /
   3 coverage）+ `resources/repository-rules.edn` + `docs/adr/0001-architecture.md`。
-  test: `nbb --classpath src:test run-tests.cljs` → **15 tests / 205 assertions,
+  test: `kbb --backend sci --classpath src:test run-tests.cljs` → **15 tests / 205 assertions,
   0 failures**（script host は nbb。bb は使わない — ADR-2607173000）。
 - **`gftdcojp/cloud-kyusai`** 拡張。merge commit `330ad55`。referral-targets に
   物理犯罪 4 target、`intake!` に `:crime-type` / `:jurisdiction`（任意、既存の
   cyber 経路は無変更）、`travel-referral-sequence`、`corpus-sources`。
   `kotoba/referral_target.kotoba` と `scripts/test-kotoba-referral.mjs` も同期。
-  test: `clojure -M:test` → **16 tests / 101 assertions, 0 failures**。
+  test: `kbb -M:test` → **16 tests / 101 assertions, 0 failures**。
   `docs/adr/0002-physical-crime-abroad.md`。
 - **west 登録**: `repos.edn :extra-projects` に追加 →
   `gen-west-manifest.cljs --entry kakekomi --entry cloud-kyusai`
@@ -224,9 +224,9 @@ external には**構造的に将来も API が無い**——警察は endpoint �
 4. 日本国籍者以外の領事手続き。`:consular/nationality` で分岐できる形にはしてあるが
    データが無い。
 5. 検証コマンド:
-   `nbb --classpath src:test run-tests.cljs`（kakekomi、15 tests / 205 assertions）/
-   `clojure -M:test`（cloud-kyusai、16 tests / 101 assertions）/
-   `nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find (count ?e) . :where [?e \"source/dataset\" \"kakekomi\"]]'` → 67。
+   `kbb --backend sci --classpath src:test run-tests.cljs`（kakekomi、15 tests / 205 assertions）/
+   `kbb -M:test`（cloud-kyusai、16 tests / 101 assertions）/
+   `kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find (count ?e) . :where [?e \"source/dataset\" \"kakekomi\"]]'` → 67。
 
 ## Rejected alternatives
 

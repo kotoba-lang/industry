@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Disposition report for SHADOW CHECKOUTS: directories under `orgs/` that hold
 ;; a git checkout `manifest/west.yml` does not declare.
 ;;
-;;   nbb scripts/shadow-checkout-disposition.cljk                  ; report
-;;   nbb scripts/shadow-checkout-disposition.cljk --out FILE.edn   ; + datoms
-;;   nbb scripts/shadow-checkout-disposition.cljk --no-du          ; skip disk cost
-;;   nbb scripts/shadow-checkout-disposition.cljk --limit 20       ; smoke test
+;;   kbb --backend sci scripts/shadow-checkout-disposition.cljk                  ; report
+;;   kbb --backend sci scripts/shadow-checkout-disposition.cljk --out FILE.edn   ; + datoms
+;;   kbb --backend sci scripts/shadow-checkout-disposition.cljk --no-du          ; skip disk cost
+;;   kbb --backend sci scripts/shadow-checkout-disposition.cljk --limit 20       ; smoke test
 ;;
 ;; Run from the superproject root. THIS SCRIPT NEVER WRITES TO A CHECKOUT.
 ;; Every git call it makes is a read: rev-parse, status, stash list, worktree

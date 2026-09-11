@@ -1,12 +1,12 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-chain-liveness.cljs — ask each deployed chain in
 ;; `manifest/chain-deployments.edn` whether it is still MOVING, and, for a
 ;; witness set, whether its witnesses are still on ONE chain.
 ;;
 ;; usage:
-;;   nbb scripts/verify-chain-liveness.cljk [--findings] [--root <dir>]
+;;   kbb --backend sci scripts/verify-chain-liveness.cljk [--findings] [--root <dir>]
 ;;                                          [--gap-ms N] [--fork-window N]
-;;   nbb scripts/verify-chain-liveness.cljk --self-test
+;;   kbb --backend sci scripts/verify-chain-liveness.cljk --self-test
 ;;
 ;; ## Why this exists (measured 2026-09-10)
 ;;

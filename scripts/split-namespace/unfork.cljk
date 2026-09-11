@@ -20,7 +20,7 @@
 ;; workspace uses reify: 46,357 files scanned, 69 reify, zero extend-type,
 ;; extend-protocol or extend. That is why this is a repair rather than a trade.
 ;;
-;; Usage: nbb unfork.cljs <source-file> <graph-file> <repos-tsv> <target-ns>
+;; Usage: kbb --backend sci unfork.cljk <source-file> <graph-file> <repos-tsv> <target-ns>
 (require '[clojure.string :as s])
 (def fs (js/require "node:fs"))
 (def src-path (nth *command-line-args* 0))

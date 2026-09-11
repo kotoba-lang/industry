@@ -14,7 +14,7 @@
 ;; `:uncomputable-until-measured` と同じ規律 —— 評価できない条件を黙って落とすと、
 ;; 「ICP に適合した 8 社」が「国と連絡先だけ合っていた 8 社」であることが消える。
 ;;
-;; 適用: nbb scripts/gtm-target-list.cljs --icp <icp/id>
+;; 適用: kbb --backend sci scripts/gtm-target-list.cljk --icp <icp/id>
 ;; query: [:find ?p ?c :where [?e "source/dataset" "gtm-icp"] [?e "icp/product" ?p]
 ;;                            [?e "icp/status" ?c]]
 
