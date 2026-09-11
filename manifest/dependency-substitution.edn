@@ -196,7 +196,7 @@
    :note "Reagent's render backend. CLAUDE.md ADR-2608260900 retires .tsx/.svelte AUTHORING, not this dependency; reagent apps keep it after migration."}
   {:coordinate "react-dom" :ecosystem :npm :disposition :structural :note "As react."}
   {:coordinate "nbb" :ecosystem :npm :disposition :structural
-   :note "The sanctioned script host (ADR-2607173000). Successor is kbb, which does not exist yet."}
+   :note "The SCI-on-Node engine. Since 2026-09-11 the coordinate resolves to kotoba-lang/org-babashka-nbb (nbb 1.4.208 + .cljk classpath resolution, root ADR-2609111700); stock npm nbb cannot require a .cljk namespace and is not what `nbb` on PATH should be in this workspace. The script HOST is kbb (kotoba-lang/kotoba bin/kbb), which runs on this engine; `kbb --backend sci` is the entry for Clojure-shaped .cljk until each piece migrates as a whole component to the gated backends."}
   {:coordinate "shadow-cljs" :ecosystem :npm :disposition :structural :note "As the maven coordinate."}
 
   ;; ------------------------------------------------ frozen legacy: has a contract

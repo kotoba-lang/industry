@@ -50,9 +50,16 @@
 
 ;; nbb's argv carries the SCRIPT path too, so an argument scan that only skips
 ;; flags picks the script as the root. Measured twice in one day on two other
-;; scripts; the failure surfaces two steps later as "not readable".
+;; scripts; the failure surfaces two steps later as "not readable" -- and a
+;; third time on 2026-09-11, when the rename to .cljk (ADR-2609111500) made
+;; this very file fail the `.cljs` test and report
+;; `…/session-start-toolchain-pin-sync.cljk/manifest/session-sync.edn is not
+;; readable` at every session start. Skip both spellings.
 (def root
-  (or (first (remove (fn [a] (or (str/starts-with? a "--") (str/ends-with? a ".cljs"))) argv))
+  (or (first (remove (fn [a] (or (str/starts-with? a "--")
+                                 (str/ends-with? a ".cljs")
+                                 (str/ends-with? a ".cljk")))
+                     argv))
       (.-CLAUDE_PROJECT_DIR js/process.env)
       (.cwd js/process)))
 
