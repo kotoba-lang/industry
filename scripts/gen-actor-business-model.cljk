@@ -9,8 +9,8 @@
 ;; the actor's own blueprint.edn rather than invented.
 ;;
 ;; Usage (from anywhere):
-;;   nbb scripts/gen-actor-business-model.cljs <path-to-actor-repo>
-;;   nbb scripts/gen-actor-business-model.cljs <path-to-actor-repo> --check   ;; exit non-zero if the file would change (no write)
+;;   nbb scripts/gen-actor-business-model.cljk <path-to-actor-repo>
+;;   nbb scripts/gen-actor-business-model.cljk <path-to-actor-repo> --check   ;; exit non-zero if the file would change (no write)
 ;;
 ;; The actor repo must contain blueprint.edn; docs/business-model.md is
 ;; (over)written. The operating-states come from this repo's registry.edn
@@ -25,7 +25,7 @@
 (def check? (contains? (set (map str *command-line-args*)) "--check"))
 
 (when (str/blank? actor-dir)
-  (do (println "usage: nbb scripts/gen-actor-business-model.cljs <path-to-actor-repo> [--check]")
+  (do (println "usage: nbb scripts/gen-actor-business-model.cljk <path-to-actor-repo> [--check]")
       (js/process.exit 2)))
 
 (def actor-dir-abs (path/resolve actor-dir))
@@ -72,7 +72,7 @@
    "> business models; fleet actors carry this generated baseline. Unit-economics\n"
    "> figures below are illustrative and **not yet measured at fleet scale** — a\n"
    "> shape, not a reported metric. Regenerate with\n"
-   "> `nbb scripts/gen-actor-business-model.cljs <repo>` in `kotoba-lang/industry`.\n\n"
+   "> `nbb scripts/gen-actor-business-model.cljk <repo>` in `kotoba-lang/industry`.\n\n"
    "## Classification\n"
    "- Repository: `cloud-itonami-isic-" isic "` ([github.com/cloud-itonami/cloud-itonami-isic-" isic "](https://github.com/cloud-itonami/cloud-itonami-isic-" isic "))\n"
    "- ISIC Rev.5: `" isic "` — " name- "\n"
