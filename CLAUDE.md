@@ -2081,6 +2081,18 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
   `nbb-to-kbb-migration`。nbb は既存資産の実行環境として残るが、新規 script host
   としては使わない。**`bb` は script host としても退役**（ADR-2607173000）——
   新規に `bb.edn` / `#!/usr/bin/env bb` を置かない。
+- **`.cljk` を `require` で解決できるのは kbb の engine だけ**（repo-wide mandatory、
+  2026-09-11、ADR-2609111700）。stock nbb の classpath 探索は `.cljs` `.cljc` `.clj` 固定で、
+  `nbb x.cljk` は動くが `x.cljk` が `require` する `.cljk` は `Could not find namespace` になる
+  （改名当日、root の PreToolUse hook 9 本中 8 本がこれで落ちた）。engine は
+  `kotoba-lang/org-babashka-nbb`（nbb 1.4.208 + 探索順に `.cljk` と衝突綴りを足した fork。
+  built `lib/` を commit 済みで JDK も `npm install` も要らない）。**Clojure-shaped `.cljk`
+  の script host は `bin/kbb --backend sci [--classpath <cp>] <script.cljk>`** で、root の
+  `.claude/settings.json` の hook は全部これで走る。`bin/kbb` は engine が無ければ
+  PATH の `nbb` に**落ちずに exit 3** で 2 つの path を名指しする。root の npm 座標 `nbb` も
+  この fork の sha を指す。`--backend sci` は gate も receipt も無い橋であって移行ではない ——
+  hook の Kotoba guest 化は stdin / `:data/json` / exit code が gated backend に無いため
+  `:blocked`（縮めない）。
 - **`#?(:kototama ...)` / `#?(:clojurewasm ...)` は存在しない reader-conditional。**
   書くと黙って dead branch になる。
 - **`.cljs` の依存宣言は `nbb.edn` に置く。nbb は `deps.edn` も `bb.edn` も読まない**

@@ -370,9 +370,15 @@
 
 (defn- verify-remote! [content entry-names]
   (let [self    (scripts.nbb-compat/get-property "babashka.file")
-        vscript (io/file (scripts.nbb-compat/parent-path self) "verify-west-pins.cljs")]
+        ;; .cljk since ADR-2609111500. Between the rename and 2026-09-11 this
+        ;; looked for the .cljs name, found nothing and SKIPPED verification with
+        ;; only a WARN -- an --entry run wrote a pin no server-side check had
+        ;; seen (CLAUDE.md 8 問 ②: could-not-run must not look like passed).
+        vscript (io/file (scripts.nbb-compat/parent-path self) "verify-west-pins.cljk")]
     (if-not (.exists vscript)
-      (binding [*out* *err*] (println "WARN: verify-west-pins.cljs が無いため pin 検証をスキップ"))
+      (do (binding [*out* *err*]
+            (println "REFUSED: scripts/verify-west-pins.cljk が無いので pin 検証ができない (west.yml は書かない)"))
+          (js/process.exit 2))
       ;; mkdtempSync でユニークな tmp dir を切る — Date.now() ms 分解能だけだと、この
       ;; リポの並行 agent 運用下では同一 ms 内の2回起動が同一パスへ衝突しうる。
       (let [node-fs  (js/require "node:fs")
