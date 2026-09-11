@@ -1,0 +1,183 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609113000-the-language-level-findings-were-two-causes-not-thirteen-defects")
+  (:adr/topic "q9-language-level-findings")
+  (:adr/title "The thirteen language-level findings were two causes: one compiler gap, and a library with no type")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-sema"
+                      "kotoba-lang/kotoba-lang" "kotoba-lang/amu"))
+  (:adr/related (vector "adr-2609110500-the-q9-procedures-other-half-a-doctor-that-fixes-forward"
+                        "adr-2609101900-q9-rename-reverted-pending-admission"))
+  (:adr/body
+  "## Context
+
+Owner instruction 2026-09-11: fix the language-level defects.
+
+`kotoba doctor` had reduced the Q9 wave-1 corpus -- twenty reverted
+repositories, 29 files renamed to .kotoba -- from one repeated admission
+message to thirteen `:kotoba.error/*` findings. Those thirteen were the
+instruction's subject.
+
+## They were not thirteen defects
+
+Counted by cause rather than by file: **eight distinct defects in nine files**,
+and four of the thirteen findings were ONE declaration. `datom.source` is
+required by datalog.index, datalog.query and datom.source.adjacency, so its
+single refusal was reported four times -- amu names the ENTRY it was asked
+about, not the module that failed.
+
+Then the eight split cleanly in two, and the split is the whole finding:
+
+| cause | findings | disposition |
+|---|---|---|
+| a protocol may not carry documentation | 4 | compiler gap -- **fixed** |
+| kotoba.set has no type | 9 | **blocked**, recorded |
+
+## The compiler gap
+
+`ns` and `defn` both admit a docstring under `max-*-docstring-chars`.
+`defprotocol` and `definterface` did not: a leading string sat in the first
+METHOD position and a trailing one after a parameter vector, and both were
+measured against a shape wanting exactly `(name [params])`.
+
+    (defprotocol IP (-scan [this pattern]))                 exit 0
+    (defprotocol IP \"the one operation\" (-scan [this p]))   exit 65
+    (defprotocol IP (-scan [this pattern] \"method doc\"))     exit 65
+
+both refused with `defprotocol requires unique bounded (method [this ...])
+signatures` -- a sentence about signatures, raised by a string that is not
+one, which sends the reader to the parameter vectors.
+
+This was worth fixing rather than working around because the only way past it
+was to DELETE the text. `IPatternSource`'s docstring states the three
+invariants every implementation must satisfy. A migration that requires
+deleting the contract in order to compile is narrowing the component, which is
+exactly what ADR-q9 forbids. Nothing in the bounded closed-world dispatch
+profile depended on a docstring's absence: documentation does not reach
+dispatch.
+
+Landed: kotoba-sema 8b288047, both docstrings bounded by the same limit
+`defn` applies. Re-measured through amu at the advanced pin, all four modules
+move past that class.
+
+## The library with no type
+
+The other nine are `kotoba.set` and its eleven sibling repositories, and they
+are `:blocked`. **There is no type variable anywhere in this surface.** A
+parameter is annotated with a concrete value type or it defaults to `:i64`:
+
+    (defn f [s] (count s))
+      refused -- count requires a bounded vector, a typed set or a canonical
+      typed map; got :i64
+
+    (defn f [s1 [:set :i64] s2 [:set :i64]] :bool (<= (count s1) (count s2)))
+      admitted
+
+So the blocker is the TYPE and not the shape of the code -- and supplying the
+type is exactly what narrows. Measured on the callers: the same functions
+carry three element types inside ONE program. `datalog.core` uses
+`set/difference` over sets of logic variables (symbols) AND over sets of
+result tuples; `kotobase.datom-plan` does `(reduce set/union #{} quad-sets)`
+over sets of quad maps. Monomorphising needs one copy per element type, and
+`datalog.core` passes `set/union` as a VALUE to `merge-with`, where there is
+no call site to monomorphise at.
+
+A second blocker is recorded separately and marked intentional:
+`max-typed-set-items` is 32 and `:set-literal :language-semantics` is
+`:bounded-unique-typed-set` -- the declared design, not a gap. A semi-naive
+datalog fixpoint's candidate sets are result sets. Kept apart so a reader does
+not expect these modules to migrate the day element-type polymorphism lands.
+
+Recorded in `kotoba-lang/lang/surface-status.edn` `:other-gaps
+:element-type-polymorphism` and `lang/q9-migration.edn` `:blocked-components`.
+
+## Three things that looked like blockers and were spellings
+
+Each was measured, and each would have been reported as a language gap by
+anyone reading the refusal:
+
+- **variadic**: `&` is refused only INSIDE a multi-arity declaration. A single
+  variadic clause is admitted, so `union`/`difference`/`intersection` could
+  keep their whole arity surface in one clause.
+- **`every?`**: not an admitted head, but a typed set is walkable with
+  `typed-set-nth` and `typed-set-count`.
+- **`(set ...)`**: not a builtin. `into` is.
+
+None of them is why those modules are blocked. Recorded so the next reader
+does not spend the measurement again -- and because a gap list padded with
+spellings makes the real blocker harder to see.
+
+## What the fix uncovered, one defect behind
+
+Admitting the protocol docstring moved `datom.source` from
+`:kotoba.error/protocol-declaration` to `:kotoba.error/record-declaration`.
+The new refusal is `(defrecord ^:no-doc SeqSource [quads] ...)` -- and the
+inline protocol implementations in that same form are ADMITTED. Only the
+name's metadata is not.
+
+Measured: **the compiler's source reader does not implement metadata at all.**
+`^` and the form after it are read as ordinary list elements, so every element
+after the head shifts by two. Four heads, four misleading messages:
+
+    (defn ^:private h [x :i64] :i64 x)
+      \"function parameters must be a vector\"   form=h
+    (def k ^:no-doc 1)
+      \"constant must contain exactly one literal value\"
+    (defrecord ^:no-doc Sq [side])
+      \"defrecord requires a bounded name and field vector\"
+    (defprotocol ^:no-doc IP (area [this]))
+      \"defprotocol requires unique bounded (method [this ...]) signatures\"
+
+Not one names metadata. A reader handed the first will look at `[x]`, which is
+a vector; the name position holds the metadata and `h` has become the
+parameters. Only the `form` in the ex-data shows the shift.
+
+**Recorded, not fixed, and the reason matters.** This is NOT the same fix as
+the docstring. A docstring carries no meaning a declaration depends on.
+`^:private` does: `:public?` is decided by the head alone (`defn` public,
+`defn-` private), so a reader that merely discarded metadata would turn every
+`^:private` function into an EXPORTED one. Silently widening a module's public
+surface is the failure Q9's whole-component rule exists to prevent. That owes
+a reader change AND a decision about who honours `:private` -- a focused pass,
+not a rider on a pin advance.
+
+## The fifth repository
+
+Advancing amu's kotoba-sema pin surfaced a stale assertion in amu:
+`i64-bitwise-test/shift-count-admission-is-fail-closed` required a NON-LITERAL
+shift count to be rejected, and kotoba-sema `03e7a6e` -- inside the advanced
+range -- admits it.
+
+That commit names four repositories. **amu is a fifth place the old rule was
+asserted, and nothing reported it**, because a consumer's stale assertion only
+fails when its pin moves. This is the same shape CLAUDE.md records about
+foundation-library pins: a fix in main does not arrive until someone names the
+new sha, and neither does a contradiction.
+
+The test was updated rather than the admission reverted, because the language
+decided it and fail-closed was preserved by MOVING where it is enforced: an
+out-of-range literal is still a compile-time refusal, and a computed count
+carries a backend range guard. The test's own note already said the old rule
+was \"an admission choice, not a safety requirement\".
+
+## Landed
+
+- kotoba-sema **8b288047** -- protocol and method docstrings admitted, bounded.
+  Suites: nbb 370/1413 and JVM 490/2280, both 0 failures. Five mutations;
+  four caught by exactly the test that names the behaviour, and the fifth
+  recorded as NOT a behaviour change rather than as a missing control.
+- kotoba-lang **6579c98a** -- both gaps recorded with their measurements, and
+  the three spellings recorded as not-blockers.
+- amu **PR #930** -- pin 0470c524 -> 8b288047 and the fifth-repository test.
+  Suite 1390/10448, 0 failures (10446 with 1 failure before the test update).
+- west pins advanced: kotoba-sema, kotoba-lang.
+
+## What did not move
+
+**Admission on that corpus is still 0 of 29.** One class closed and became its
+successor; nine files are blocked on a language gap that is now written down
+instead of being rediscovered. The corpus did not get closer to compiling --
+it got closer to being correctly described, which is the precondition for
+deciding what to do about it.")))
