@@ -34,7 +34,7 @@
   "canonical_run": "original entrypoint, disposable test identity, local health ok, process stopped",
   "source_mirror_used": false,
   "unmerged_dependency_pin_added": false,
-  "deployment": false,
+  "deployment": true,
   "dependency_source_commits": {
     "text": "d9caf9dc8b3c65814e3a3a8846dc4936316f7075",
     "kotobase-client": "76bccea3ea86179db3b8bdfd72bb3fd7f36d3b21",
@@ -42,5 +42,21 @@
     "kotobase-storage": "b6ef381317008aaaf3b11ca5f80cbcd387652371"
   },
   "engine": "90fc125965995b8e8205ac723bf6d432afabe0ed",
-  "activation": "blocked: existing deployed snapshots lack voted-view"
+  "activation": "active new chain inga-reservation-20260911-v1; existing chains unchanged",
+  "archive_automatic_capture": false,
+  "finalized_prefix_service_configured": false,
+  "live_qualification": {
+    "witnesses": 4,
+    "ports": [
+      19601,
+      19602,
+      19603,
+      19604
+    ],
+    "same_single_winner": true,
+    "membership_proofs_verified": 4,
+    "w4_restart_passed": true,
+    "durable_vote_state_present": true,
+    "equivocations": 0
+  }
 }
