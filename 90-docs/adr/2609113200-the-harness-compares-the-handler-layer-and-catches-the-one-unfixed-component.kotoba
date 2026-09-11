@@ -1,0 +1,89 @@
+(vector
+ (map
+  (:adr/id "adr-2609113200-the-harness-compares-the-handler-layer-and-catches-the-one-unfixed-component")
+  (:adr/title "The harness compares the handler layer, and catches the one unfixed component")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112500-a-hash-that-does-not-vary-with-the-repository" "adr-2609113000-a-fix-whose-value-does-not-move"))
+  (:adr/body "
+## What landed
+
+The parity harness now compares the handler layer, which it had never
+done -- the component's oracle-handlers was fixed several iterations ago,
+but the harness only compared routes, coercions, the entity table and the
+store layer, so nothing checked the handlers against the CLJC oracle.
+
+Thirteen selectors are derivable and are compared: statuses 0-9 and counts
+10-12. The two hash-valued selectors stay out for the reason the store
+hashes do -- reproducing the component's JSON rendering on the Clojure side
+is constructing the answer. Only STATUS and COUNT are read from each
+handler result, because the CLJC oracle mints ids with randomness and
+stamps clock values, so bodies are not comparable.
+
+Fifteen of the sixteen generated-harness repositories agree 13/13, seven
+distinct values: 201,400,400,200,200,404,200,404,200,404,1,3,2.
+
+## The sixteenth caught a real defect
+
+com-airbus-analytx DISAGREES: harness 200, native 400 on selector 6. Its
+component is hand-adapted, was excluded from the oracle-handlers rollout,
+and still updates a field it does not declare. The harness, on its first
+run comparing handlers, immediately flagged the one component that never
+got the fix.
+
+That is the harness working, not failing. Its harness is NOT landed --
+a harness that ships red is a broken gate. Recorded as a blocker: the fix
+is to give com-airbus-analytx's component the handler treatment, which is
+a hand-adapted-component decision, not a generator change.
+
+## Seen red
+
+Disabling required-field rejection in handle-create moves selector 1 from
+400 to 201, and the harness reports the mismatch rather than passing.
+
+## Reproduce
+
+    nbb <kotoba-lang>/scripts/gen-parity-harness.cljs <repo-worktree> <src-dir>
+    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs   # emits handlers 0-12
+    amu compile ... --output wc.o
+    amu extract-native wc.o --symbol oracle-handlers --output h.bin
+    for s in 0 1 2 3 4 5 6 7 8 9 10 11 12; do
+      KEXE_FUEL=100000000 ./kexe-loader h.bin <offset> 1 aarch64 <caps> $s
+    done
+
+## An incident worth recording: an uncommitted generator edit was lost
+
+The generator patch was verified by hand (com-agones, 13/13) while the
+edit sat uncommitted in a scratchpad worktree. Between that verification
+and the rollout, a concurrent git operation reset the worktree to HEAD and
+the edit was gone -- silently. The rollout then ran the REVERTED generator
+and produced harnesses with no handler block, which showed up as empty
+cljs rows against non-empty native, i.e. a mismatch that looked like a
+parity failure and was actually a missing generator.
+
+The worktree was the right tool and did not prevent this: what a worktree
+isolates is the working tree, and an uncommitted change in it is still
+just an uncommitted change. The fix was to commit the generator edit
+BEFORE rolling out, so no reset can discard it. Recorded because the
+failure presented as a data mismatch and the cause was a lost file.
+
+## Resume point
+
+Landed this session, both tracks:
+
+  (A) the ten v3 DefCIDs pinned; every readiness fact for the io-ipld
+      promotion is now measured. The promotion itself -- the decision --
+      is the only remaining step and is not an agent call.
+  (B) template regenerated and checked; the store other-entity fixed with
+      a second evidence floor; the handler layer now compared, 15 of 16.
+
+Next, in reverse-topological order:
+
+  - com-airbus-analytx: give its hand-adapted component the handler fix so
+    its harness can land, or record it as a permanent hand-port with its
+    own harness. It is the last generated-harness repo without the handler
+    comparison.
+  - the pagination layer, read but not yet generated or compared.
+  - the four hand-written harnesses (aadhaar, aave, abb-robotics, accela)
+    remain un-converged; converging them is a separate decision.
+")))
