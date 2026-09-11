@@ -257,14 +257,16 @@
 ;; Every number was measured on 2026-09-11, not read off a config:
 ;;   context 131072   vLLM --max-model-len on the origin (the gateway's
 ;;                    token budget agrees; 262144 would be refused there).
-;;   timeouts 1800 s  the origin is scale-to-zero and a cold start is ~1,190 s
-;;                    from first request to first token (195 GB of weights
-;;                    staged to NVMe, loaded, 51 CUDA graphs captured). The
-;;                    gateway holds the request through that, so the CLIENT
-;;                    must too: at the contract's 900 s a cold request dies
-;;                    at the client after the GPU has been paid for 15 min.
-;;                    stale_timeout is the same number for the same reason --
-;;                    not one byte arrives until the model is up.
+;;   timeouts 2400 s  the origin is scale-to-zero and a cold start measured
+;;                    1,187 s and 1,528 s on the same day (195 GB of weights
+;;                    staged to NVMe, loaded, 51 CUDA graphs captured; the
+;;                    spread is host variance). The gateway holds the request
+;;                    for up to 2,400 s (its coldStartBudgetMs), so the CLIENT
+;;                    must hold at least as long: at the contract's 900 s a
+;;                    cold request dies at the client after the GPU has been
+;;                    paid for 15 min. stale_timeout is the same number for
+;;                    the same reason -- not one byte arrives until the model
+;;                    is up.
 ;;   max_tokens 4096  the origin runs 128 sequences on 2x H200, not two
 ;;                    slots on a mac mini, so the contract's 2048 slot-guard
 ;;                    does not apply; 4096 is what an answer with a short
@@ -274,8 +276,8 @@
   {"glm53-cyber" {:model "glm-5.3-flash-cybersecurity-w4a16"
                   :context-length 131072
                   :max-tokens 4096
-                  :stale-timeout 1800
-                  :request-timeout 1800}})
+                  :stale-timeout 2400
+                  :request-timeout 2400}})
 
 (defn contract-for
   "The effective contract for one profile directory name. The root config
@@ -855,8 +857,8 @@
       (is "override/primary" (yaml-scalar out "model" "default") "glm-5.3-flash-cybersecurity-w4a16")
       (is "override/context" (str/includes? out "context_length: 131072") true)
       (is "override/max-tokens" (str/includes? out "max_tokens: 4096") true)
-      (is "override/request-timeout" (str/includes? out "request_timeout_seconds: 1800") true)
-      (is "override/stale-timeout" (str/includes? out "stale_timeout_seconds: 1800") true)
+      (is "override/request-timeout" (str/includes? out "request_timeout_seconds: 2400") true)
+      (is "override/stale-timeout" (str/includes? out "stale_timeout_seconds: 2400") true)
       (is "override/aux-stays-on-contract"
           (str/includes? out (str "compression:\n    base_url: " (:base-url contract) "\n    model: " (:model contract)))
           true)
