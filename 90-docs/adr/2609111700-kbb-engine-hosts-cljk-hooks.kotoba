@@ -104,6 +104,34 @@ exit code の指定（`main` は i64 → 0/1 のみ）・数値→文字列**が
   `kbb --backend sci` を使えるが、`tick.cljk` の起動 command を変えるまでは stock nbb のまま。
 - kbb の gated backend に stdin / `:data/json` / exit code が入ったら、hook を 1 本ずつ whole component で移す。
 
+## 現在地（closing 2026-09-11）
+
+着地済み（すべて default branch、branch / worktree は撤去済み）:
+
+- `kotoba-lang/org-babashka-nbb` main = `cdd1a57`（engine bytes は `33575ae` と同一。差は deps.edn の
+  discarded な `:local/root` 3 件の削除 —— root の `west-orphan-audit --blocking` がそれを blocking 3 件として
+  読んだ）。
+- `kotoba-lang/kotoba` main = `bc3dd64`。west pin も同じ（`b062e29`）。
+- `com-junkawasaki/root` main: hook 移行 `dcbfb8c`、org-babashka-nbb pin `234ebb4`、package-lock name `39b54e4`。
+- この machine: root `node_modules/.bin/nbb` と `/opt/homebrew/bin/nbb` は fork `1.4.208-cljk.1`（git 外。
+  戻すなら `npm i -g nbb@1.4.208`）。
+
+測って緑: settings.json の PreToolUse:Bash 9 command を verbatim で 9/9 exit 0、SessionStart 7 本全部が
+出力を返す（toolchain-pin-sync は 4 checkout を実際に同期）、branch-create guard が `git checkout -b` を含む
+Bash を実際に block、`west-orphan-audit --blocking` exit 0、`gen-agents-md --check` 0、`verify-adr-identity` OK。
+docs-edn-check の唯一の FAIL `STRANGLER-FIG-MONTH1-DEPLOYMENT-SUMMARY.edn` は origin/main 由来で今回の変更ではない。
+
+次の 1 手（優先順）:
+
+1. `scripts/fleet-ci/tick.cljk` が起動する `nbb` を `orgs/kotoba-lang/kotoba/bin/kbb --backend sci` に替え、
+   `gates.edn` の `:script "gates/*.cljs"` 158 参照を `.cljk` に直す（今は gate script の path が改名前のまま）。
+   確かめ方: 1 gate を手元で `kbb --backend sci scripts/fleet-ci/gates/<g>.cljk <dir>` で走らせて exit を見る。
+2. launchd plist 49 本の `nbb` 起動を kbb に替え、`launchctl print gui/$UID/<label>` で reload を確認する
+   （ADR-2609111500 後続 / `~/.gftd` 移行の実測どおり、一覧に戻ったことは reload の証拠ではない）。
+3. kbb の gated backend に stdin / `:data/json` / exit code を capability として足してから、hook を 1 本ずつ
+   whole component で移す（`--backend sci` の橋を「移行済み」と数えない）。
+4. root `package.json` の nbb 座標を `cdd1a57` に上げる（任意。engine bytes は同一）。
+
 ## 検証（両方向）
 
 同じ入力・同じ tree で:
