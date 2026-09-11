@@ -2,12 +2,15 @@
   (:adr/doc_type "adr")
   (:adr/id "adr-2609109900-the-slope-the-runtime-and-the-detector")
   (:adr/topic "query-plane-followups")
-  (:adr/title "傾き・runtime・検出器 —— pack の取り分は測れたが天井は production の 500 で、digest の値は runtime ではなく interpreter のものだった")
+  (:adr/title "傾き・runtime・検出器 —— pack の取り分は測れ、天井は production の 500 で、それを超えたら chain は 13 本ではなく 16 本あった")
   (:adr/status "accepted")
   (:adr/date "2026-09-10")
   (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotobase-protocol-ipq"
                 "kotoba-lang/io-ipld" "kotoba-lang/ayatori" "net-kotobase/ipfs"))
+  (:adr/landed (map (:io-ipld "9bf07ce7") (:kotobase-protocol-ipq "08e0021d")
+                    (:net-kotobase-ipfs "a6d722b3")
+                    (:west-pins (vector "5eb33947" "795fb7b2" "68d3ecd1"))))
   (:adr/related (vector "adr-2609109800-what-the-ontology-costs-and-which-door-to-use"
                 "adr-2609109700-query-plane-on-kotoba-form-ontology-dialects-and-network-roles"
                 "adr-2608160100-block-car-pack-object"
@@ -19,7 +22,7 @@
     (:machine "10 cpus, loadavg 13.0-29.2 during the runs")
     (:evidence "90-docs/query-plane/2026-09-10-query-plane-followups.edn")
     (:not-measured (vector "a pack actually placed" "the engine compiled"
-                    "whether dag-json should ever be SUPPORTED rather than refused -- refusing it is what landed"))))
+                    "whether maxBlocks 256 completes at all -- 28s is an extrapolation"))))
   (:adr/body "## Context
 
 ADR-2609109800 は次の 3 つを名指しで残した。オーナーが逆順（3 → 2 → 1）で
@@ -137,9 +140,9 @@ error になり、**dag-cbor の兄弟を引く control は緑のまま**（fixt
 着地: `kotoba-lang/kotobase-protocol-ipq` `5a6bbdb6` / `net-kotobase/ipfs`
 `80212f0a`、west pin は両方前進済み（`6c85f47e` / `b5791039`）。
 
-⚠ **測定の天井は動いていない。** depth >= 14 は今も traverse できない ——
-その codec は本当に検証できないからで、**変わったのは答え方だけ**である。
-Q3 の 9 点の fit はそのまま生きる。
+⚠ ~~測定の天井は動いていない~~ —— **動かした（2026-09-11、下の Q3c）。**
+上の 501 は「その codec は検証できない」を根拠にしていたが、**測ると根拠の
+半分が偽だった。** 501 の分岐は dag-pb のために残る。
 
 ## Q2 —— digest の値は runtime のものではなく interpreter のものだった
 
@@ -216,8 +219,70 @@ runtime 側の証明は `90-docs/query-plane/selftest_reference_join.cljs`。
 **`main` は boolean ではなく失敗数を返す。** 2 つの graph 形を同一にすると
 4 checks 中 2 が FAIL して exit 1 になる。
 
+## Q3c —— 天井を超えた（2026-09-11）。拒否の根拠は半分だけ真だった
+
+io-ipld の `readdressable-codec?` は dag-cbor と raw だけを認め、理由を
+「他の codec は hash construction が違うかもしれない」と書いていた。
+**測ると偽である。** CIDv1 は `version ++ codec ++ multihash(block bytes)` で、
+codec は prefix のラベル、digest は bytes に対するもの —— どの codec でも同じ。
+本番の dag-json 広告 652 bytes を**宣言された codec で**再計算すると CID が
+一致し、dag-cbor で再計算すると一致しない（control）。
+
+**再アドレスは codec に依存していなかった。依存していたのは decode で、
+2 つが 1 つの拒否として扱われていた。**
+
+そして io-ipld の `ipld.dag-json` の namespace docstring は最初から
+*decoding re-encodes and refuses bytes that are not canonical* と書いていた ——
+**decoder は存在しなかった。** 書いた（`9bf07ce7`）:
+
+- **同じ第三者の広告に、byte 同一の round trip で pin する。** 読んで、書き戻し、
+  bytes が等しく CID が served のものと一致することを要求する。この repo の中で
+  構築によってそれを一致させる手段は無い。
+- scanner は strict でよい —— `decode` が read したものを re-encode して
+  不一致を拒否するので、canonical form 以外は round trip が弾く。
+- **最初の round trip は 652 bytes を 1,039 bytes に膨らませた。**
+  `base64-decode` が vector を返し、`data-model/kind` が vector を list と
+  読むので、byte string が JSON の数値配列として書き戻されていた。
+  round trip が在ったから refusal になった —— 無ければ黙って別の文書だった。
+- JVM の `Long/parseLong` の overflow は名前の無い例外で抜けていた。
+  JVM suite が捕まえ、両 host で `:integer-not-representable` に揃えた。
+
+**両方向**: codec の集合を戻すと、それに依存する 3 本（verify / tampered-mismatch /
+traversal）だけが赤くなり、decoder の 7 本は緑のまま。nbb と shadow-cljs で
+150 tests / 5,653 assertions、JVM で 177 / 5,818、clj-kondo 0 errors。
+ipq は floor を `9bf07ce7` に進め、**昨日 501 を pin していた 2 本が今日は 200 を
+pin する**（dag-pb が 501 の経路を生かす）。deploy shell は両方の pin を一緒に進めた
+（片方だけだと tools.deps が古い io-ipld を選び、fix が届かない）。
+
+**本番実測 2026-09-11（deploy 後）**:
+
+    depth 13   200  blocks=13      depth 14   200  blocks=14   <- 昨日 500、今朝 501
+    depth 16   200  blocks=16      depth 24+  200  blocks=16   <- chain の本当の終わり
+    every link depth 32  200  blocks=32                       <- 昨日 501
+
+**chain は 13 本ではなく 16 本あった** —— 天井が最後の 3 本を隠していた。
+Entries も辿ると head から届く全 block は 32。
+
+### 伸びた fit
+
+    PreviousID chain（8 点、1..15 block）  固定 19.2 ms + 101.6 ms/block   r² 0.9999
+    every link      （9 点、1..32 block）  固定 -24 ms  + 109.4 ms/block   r² 0.9993
+
+2 系列が独立に同じ傾きを出す。**固定費は事実上ゼロで、コストは全部 round trip。**
+1 block が 31 KB の chunk でも per-block は動かない（bytes ではなく fetch 数）。
+
+⚠ **外挿だが書いておく価値がある**: profile は `maxBlocks 256` を広告しているが、
+109 ms/block なら 256 block は **約 28 秒** —— Worker が完走できる保証は無い。
+**広告している上限を transport が届けられるかは未測定**で、これは
+「advertised limit ≠ deliverable limit」という別の finding の候補である。
+
+⚠ **今日の load は 27〜72 だった**（昨日 13〜22）。per-block はむしろ**下がった**
+（132.5 → 101.6/109.4）—— cost が client ではなく origin の backend read に
+在ることの傍証だが、日をまたいだ 2 点なので**結論にはしない。**
+
 ## 測っていないこと（clean ではなく未測定）
 
+- **maxBlocks 256 が実際に完走するか。** 上の 28 秒は外挿。
 - **pack を実際に置いた場合の range read コスト。** 賞金は測ったが、価格は測っていない。
 - **engine をコンパイルした場合の速度。** digest だけ 3 面で測った。
 - **dag-json を支持すべきか拒否すべきか。** 設計判断であって測定ではない。

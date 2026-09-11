@@ -545,10 +545,19 @@
    ;; Measured 2026-09-10 over the IPNI advertisement chain, 9 points, r^2 0.9978.
    ;; The prize a pack could take is (N-1) x per-block; the intercept is the
    ;; floor it cannot.
+   ;; Re-measured 2026-09-11 to 32 blocks after the dag-json ceiling was
+   ;; lifted; two independent series agree and the fixed cost is within noise
+   ;; of zero. The cost is round trips, not bytes: a 31 KB chunk moves the
+   ;; per-block figure by nothing.
    :policy/transfer-cost {:fetches-per-block 1
-                          :per-block-ms 132.5
-                          :fixed-ms 21.1
-                          :r-squared 0.9978
+                          :per-block-ms {:chain-series 101.6 :every-link-series 109.4
+                                         :first-measurement-2026-09-10 132.5}
+                          :fixed-ms {:chain-series 19.2 :every-link-series -24.2}
+                          :r-squared {:chain-series 0.9999 :every-link-series 0.9993}
+                          :max-blocks-measured 32
+                          :advertised-max-blocks 256
+                          :advertised-max-at-measured-rate-ms 28000
+                          :advertised-max-deliverable :not-measured
                           :pack-prize "(N-1) x per-block-ms, upper bound; the price of a range read is NOT measured"
                           :p50-ms {:one-block 132.0 :three-blocks 353.0}
                           :refusal-ms {:malformed-selector 14.2 :root-not-held 121.9}
@@ -581,7 +590,15 @@
                  :message-not-carried "an unknown exception's string is the one nothing has vetted"}
     :landed {:kotobase-protocol-ipq "5a6bbdb6" :net-kotobase-ipfs "80212f0a"}
     :verified-live "2026-09-11"
-    :fixed true}
+    :fixed true
+    ;; And then the ceiling itself, the same day: the refusal's stated ground
+    ;; (a foreign codec might hash differently) was measured false -- a CIDv1
+    ;; digests the bytes under every codec -- and what dag-json lacked was a
+    ;; decoder. io-ipld 9bf07ce7 has one, pinned to a third-party block by
+    ;; byte-identical round trip. The chain was 16 blocks, not 13.
+    :ceiling-lifted {:io-ipld "9bf07ce7" :kotobase-protocol-ipq "08e0021d"
+                     :net-kotobase-ipfs "a6d722b3" :verified-live "2026-09-11"
+                     :reachable-blocks {:before 13 :after 32}}}
    :policy/gate nil
    :policy/why-no-gate "no predicate enumerates the ways an ontology could reach an evaluator other than the two doors; a gate that has never been shown to fail is theatre, so build the third door first and watch it redden"
    :policy/measured-on "2026-09-10"

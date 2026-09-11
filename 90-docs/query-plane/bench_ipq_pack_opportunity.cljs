@@ -26,7 +26,15 @@
 (def origin "https://ipfs.kotobase.net")
 (def indexer "https://ipni.kotobase.net")
 (def reps 7)
-(def depths [0 1 2 4 6 8 10 12 13 14])
+
+;; 2026-09-10: the chain refused at depth 14, where its codec switches to
+;; dag-json, so the fit stopped at 13 blocks. 2026-09-11: io-ipld decodes
+;; dag-json, the surface crosses into it, and the chain turns out to END at
+;; 16 advertisements -- the ceiling was hiding the last three. Following the
+;; Entries link as well reaches every block the head can, 32 of them.
+(def series
+  [{:label "PreviousID chain" :depths [0 1 2 4 8 12 14 15] :selector :chain}
+   {:label "every link"       :depths [0 1 2 4 8 12 16 24 31] :selector :everything}])
 
 (defn- chain-selector
   "Walk `PreviousID` to `depth`. Depth 0 is the head advertisement alone."
@@ -35,6 +43,17 @@
    :limit {:mode :depth :depth depth}
    :sequence {:selector :explore-fields
               :fields {"PreviousID" {:selector :explore-recursive-edge}}}})
+
+(defn- everything-selector
+  "Every link from every node, to `depth`: advertisements AND their entry
+  chunks. This is the whole graph the head can reach."
+  [depth]
+  {:selector :explore-recursive
+   :limit {:mode :depth :depth depth}
+   :sequence {:selector :explore-all :next {:selector :explore-recursive-edge}}})
+
+(defn- selector-for [kind depth]
+  (case kind :chain (chain-selector depth) :everything (everything-selector depth)))
 
 (defn- b64url [bytes]
   (-> (.toString (js/Buffer.from (js/Uint8Array. (clj->js (vec bytes)))) "base64")
@@ -83,9 +102,9 @@
                               points))]
     [intercept slope (- 1 (/ ss-res ss-tot))]))
 
-(defn- measure-depth [root depth]
+(defn- measure-depth [root kind depth]
   (let [url (str origin "/ipq/v1/selection/" root
-                 "?selector=" (b64url (sel/encode (chain-selector depth))))]
+                 "?selector=" (b64url (sel/encode (selector-for kind depth))))]
     (-> (serial url reps [])
         (.then (fn [rs]
                  (let [f (first rs) ms (map :ms rs)]
@@ -106,13 +125,13 @@
                 (.padStart (fmt (:min r)) 9)
                 (.padStart (if (pos? (:blocks r)) (fmt (/ (:p50 r) (:blocks r))) "-") 11))))
 
-(defn- walk [root ds acc]
+(defn- walk [root kind ds acc]
   (if (empty? ds)
     (js/Promise.resolve acc)
-    (-> (measure-depth root (first ds))
-        (.then (fn [r] (print-row r) (walk root (rest ds) (conj acc r)))))))
+    (-> (measure-depth root kind (first ds))
+        (.then (fn [r] (print-row r) (walk root kind (rest ds) (conj acc r)))))))
 
-(defn- summarize [rows]
+(defn- summarize [label rows]
   (let [ok (filterv #(and (= 200 (:status %)) (pos? (:blocks %))) rows)
         broken (filterv #(not= 200 (:status %)) rows)
         [intercept slope r2] (regress (mapv (fn [r] [(:blocks r) (:p50 r)]) ok))
@@ -138,6 +157,14 @@
     (println "of the store and is NOT measured here. This bounds the saving.")
     (println "The intercept is the floor a pack cannot remove.")))
 
+(defn- run-series [root {:keys [label depths selector]}]
+  (println)
+  (println (str "== " label))
+  (println (str "depth  status  blocks fetches   f=b        bytes"
+                "      p50      p90      min   ms/block"))
+  (-> (walk root selector depths [])
+      (.then (fn [rows] (summarize label rows) rows))))
+
 (defn -main []
   (println (str "load " (pr-str (mapv #(.toFixed % 2) (os/loadavg)))
                 "  reps " reps "  origin " origin))
@@ -148,11 +175,9 @@
                (let [root (get-in (js->clj j) ["head" "/"])]
                  (println (str "root " root
                                " (live IPNI signed head, not a pinned constant)"))
-                 (println)
-                 (println (str "depth  status  blocks fetches   f=b        bytes"
-                               "      p50      p90      min   ms/block"))
-                 (walk root depths []))))
-      (.then summarize)
+                 (reduce (fn [chain s] (.then chain (fn [_] (run-series root s))))
+                         (js/Promise.resolve nil)
+                         series))))
       (.catch (fn [e] (println "PROBE FAILED" (str e))))))
 
 (-main)

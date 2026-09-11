@@ -41,7 +41,35 @@
   :landed {:kotobase-protocol-ipq "5a6bbdb6" :net-kotobase-ipfs "80212f0a"
            :west-pins ["6c85f47e" "b5791039"]}
   :verified-live "2026-09-11: dag-json root と depth 14/15/16 が 501 codec-not-supported、control は depth 13 -> 200 / bad selector -> 400 / root not held -> 404"
-  :ceiling-unchanged "depth >= 14 は今も traverse できない。変わったのは答え方だけで、Q3 の 9 点の fit はそのまま生きる"}
+  :ceiling-unchanged "（2026-09-11 朝の記述）depth >= 14 は今も traverse できない —— 同日午後に :q3c-ceiling-lifted で超えた"}
+
+ :q3c-ceiling-lifted
+ {:measured "2026-09-11"
+  :what "dag-json が decode できるようになり、chain の 14 本目を越えた"
+  :ground "re-addressing は codec 非依存（本番 652 bytes を宣言 codec で再計算 -> CID 一致、dag-cbor で再計算 -> 不一致）。依存するのは decode だけ"
+  :landed {:io-ipld "9bf07ce7" :kotobase-protocol-ipq "08e0021d" :net-kotobase-ipfs "a6d722b3"
+           :west-pins ["5eb33947" "795fb7b2" "68d3ecd1"]}
+  :decoder-pinned-to "第三者の広告（served / served-cid）の byte 同一 round trip"
+  :first-round-trip-bug "652 bytes -> 1,039: base64-decode の vector が list として書き戻された。round trip が無ければ黙って別の文書"
+  :live {:depth-13 {:status 200 :blocks 13} :depth-14 {:status 200 :blocks 14}
+         :depth-16 {:status 200 :blocks 16} :depth-24-plus {:status 200 :blocks 16 :note "chain の終わり"}
+         :every-link-depth-32 {:status 200 :blocks 32}}
+  :chain-length-actual 16 :chain-length-visible-yesterday 13
+  :bench "90-docs/query-plane/bench_ipq_pack_opportunity.cljs"
+  :loadavg-range [27.35 72.80]
+  :series
+  [{:label "PreviousID chain" :points 8 :max-blocks 15
+    :rows [{:blocks 1 :p50 118.9} {:blocks 1 :p50 112.8} {:blocks 2 :p50 227.1} {:blocks 4 :p50 427.6}
+           {:blocks 8 :p50 836.8} {:blocks 12 :p50 1249.4} {:blocks 14 :p50 1440.3} {:blocks 15 :p50 1534.4}]
+    :fit {:intercept-ms 19.2 :per-block-ms 101.6 :r-squared 0.9999}}
+   {:label "every link" :points 9 :max-blocks 32
+    :rows [{:blocks 1 :p50 115.2} {:blocks 1 :p50 113.0} {:blocks 3 :p50 319.9} {:blocks 7 :p50 716.6}
+           {:blocks 15 :p50 1528.8} {:blocks 23 :p50 2471.8} {:blocks 31 :p50 3391.8 :bytes 37950}
+           {:blocks 32 :p50 3479.6} {:blocks 32 :p50 3504.6}]
+    :fit {:intercept-ms -24.2 :per-block-ms 109.4 :r-squared 0.9993}}]
+  :fetches-equals-blocks true
+  :per-block-is-per-round-trip "31 KB の chunk を含む行でも per-block は動かない"
+  :extrapolation-not-measurement "maxBlocks 256 x 109 ms = 約 28 s。完走するかは未測定"}
 
  :q2-digest-runtime
  {:bench "90-docs/query-plane/bench_digest_runtimes.cljs"
