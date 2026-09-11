@@ -8,7 +8,7 @@
             ["node:path" :as path]))
 
 (def root (.resolve path (or (first *command-line-args*) ".")))
-(def verifier (.join path root "scripts" "windows-loader-cross-compile.cljs"))
+(def verifier (.join path root "scripts" "windows-loader-cross-compile.cljk"))
 (def source (.join path root "tools" "kexe_loader_windows.c"))
 
 (defn fail! [message code]

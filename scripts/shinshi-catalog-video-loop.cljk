@@ -25,12 +25,17 @@
   (.dirname path (or (second (js->clj (.-argv process)))
                      (.cwd process))))
 (defn- resolve-sib [name]
+  ;; Repo names are `.cljk` since the 2026-09-11 rename (root ADR
+  ;; adr-2609111500); a deployed copy under ledger-dir keeps whatever short
+  ;; name it was installed with, so both spellings of the short name are tried.
   (let [short (case name
-                "shinshi-catalog-video-tick.cljs" "tick.cljs"
-                "shinshi-catalog-video-loop.cljs" "loop.cljs"
-                "shinshi-catalog-video-quality.cljs" "quality.cljs"
+                "shinshi-catalog-video-tick.cljk" "tick.cljs"
+                "shinshi-catalog-video-loop.cljk" "loop.cljs"
+                "shinshi-catalog-video-quality.cljk" "quality.cljs"
                 name)
-        local (.join path ledger-dir short)
+        local (let [a (.join path ledger-dir (str/replace short #"\.cljs$" ".cljk"))
+                    b (.join path ledger-dir short)]
+                (if (.existsSync fs a) a b))
         local-long (.join path ledger-dir name)
         sib (.join path this-dir name)
         repo (.join path root "scripts" name)]
@@ -38,8 +43,8 @@
           (.existsSync fs local-long) local-long
           (.existsSync fs sib) sib
           :else repo)))
-(def tick-path (resolve-sib "shinshi-catalog-video-tick.cljs"))
-(def quality-path (resolve-sib "shinshi-catalog-video-quality.cljs"))
+(def tick-path (resolve-sib "shinshi-catalog-video-tick.cljk"))
+(def quality-path (resolve-sib "shinshi-catalog-video-quality.cljk"))
 (def wan-path (resolve-sib "shinshi-wan-i2v-once.py"))
 (def ledger-path (.join path ledger-dir "loop.ledger.edn"))
 (def lock-path (.join path ledger-dir "lock"))

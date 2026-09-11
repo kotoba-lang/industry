@@ -168,7 +168,7 @@
                                (if (or (contains? skip nm) (str/starts-with? nm "."))
                                  acc
                                  (walk full acc))
-                               (or (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))
+                               (or (str/ends-with? nm ".cljk") (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))
                                (conj acc full)
                                :else acc)))
                          acc entries)))
@@ -178,7 +178,7 @@
                                 (walk d acc)
                                 acc)))
                           [] west-paths)
-        r (.spawnSync cp "git" #js ["ls-files" "--" "*.cljc" "*.cljs"]
+        r (.spawnSync cp "git" #js ["ls-files" "--" "*.cljc" "*.cljs" "*.cljk"]
                       #js {:cwd root :maxBuffer 400000000 :encoding "utf8"})
         ;; Skip this file. Its `positives` vector holds the pattern as data,
         ;; and string-state alone does not settle it: a fixture is a string
@@ -187,7 +187,7 @@
         ;; worth suppressing by rule. A detector reporting its own test data
         ;; is noise every run, so it is excluded by name rather than by
         ;; inference.
-        self (.join path root "scripts" "verify-char-int-coercion.cljs")
+        self (.join path root "scripts" "verify-char-int-coercion.cljk")
         from-root (when (zero? (.-status r))
                     (->> (str/split-lines (str (.-stdout r)))
                          (remove str/blank?)

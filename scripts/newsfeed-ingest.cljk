@@ -124,7 +124,7 @@
 (def before (line-count ledger))
 
 ;; ── 2) ingest ─────────────────────────────────────────────────────────────
-(let [{:keys [exit out err]} (run ["nbb" "--classpath" "src:resources" "bin/ingest.cljs"]
+(let [{:keys [exit out err]} (run ["nbb" "--classpath" "src:resources" "bin/ingest.cljk"]
                                   {:dir ds :env env})]
   (println (str/join "\n" (map #(str "  " %) (take-last 6 (remove str/blank? (str/split-lines out))))))
   (when (pos? exit)

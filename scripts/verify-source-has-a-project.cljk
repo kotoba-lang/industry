@@ -91,7 +91,7 @@
           {} paths))
 
 (def src-counts
-  (let [out (sh (str "find " (or only orgs) " -type f \\( -name '*.clj' -o -name '*.cljc' \\)"
+  (let [out (sh (str "find " (or only orgs) " -type f \\( -name '*.clj' -o -name '*.cljc' -o -name '*.cljk' \\)"
                      " -not -path '*/node_modules/*' -not -path '*/.git/*' 2>/dev/null"))]
     (when (nil? out)
       (println "REFUSING: could not list Clojure source under " orgs ".")

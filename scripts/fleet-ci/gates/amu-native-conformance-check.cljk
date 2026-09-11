@@ -12,8 +12,8 @@
   (println (str "FLEET-CI: " (str/join " " message)))
   (js/process.exit code))
 
-(doseq [relative ["bin/kotoba" "scripts/jdk-free-native-conformance.cljs"
-                  "scripts/windows-profile-conformance.cljs"
+(doseq [relative ["bin/kotoba" "scripts/jdk-free-native-conformance.cljk"
+                  "scripts/windows-profile-conformance.cljk"
                   "examples/structured.kotoba" "examples/nested-record.kotoba"
                   "examples/held-operations.kotoba"
                   "tools/kexe_loader.c"]]
@@ -74,13 +74,13 @@
       (die! 1 label "exited" code))
     output))
 
-(let [native-output (run-script! "scripts/jdk-free-native-conformance.cljs"
+(let [native-output (run-script! "scripts/jdk-free-native-conformance.cljk"
                                  "native conformance")]
   (when-not (re-find #"jdk-free-native: sealed (aarch64|x86_64) scalar, aggregate-variant, callable, bounded-apply artifacts independently extracted and executed under W\^X loader"
                      native-output)
     (die! 1 "native conformance emitted no held-operation runtime verdict")))
 
-(let [windows-output (run-script! "scripts/windows-profile-conformance.cljs"
+(let [windows-output (run-script! "scripts/windows-profile-conformance.cljk"
                                   "Windows profile conformance")]
   (when-not (re-find #"windows-profile: recursive-record (aarch64|x86_64) Windows KEXE verified"
                      windows-output)

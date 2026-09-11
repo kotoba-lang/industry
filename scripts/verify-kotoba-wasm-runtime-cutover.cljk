@@ -120,7 +120,8 @@
         skip-dir #"/(node_modules|\.git|target|out|dist|build|\.cpcache|\.gitlibs)(/|$)"
         interesting? (fn [f] (or (str/ends-with? f "deps.edn")
                                  (str/ends-with? f ".clj")
-                                 (str/ends-with? f ".cljc")))
+                                 (str/ends-with? f ".cljc")
+                                 (str/ends-with? f ".cljk")))
         ;; A directory holding its own `.git` is a DIFFERENT repository -- a
         ;; nested clone or a worktree someone left inside a checkout. Its files
         ;; are not the registered repo's files and must not be attributed to

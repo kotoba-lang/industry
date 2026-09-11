@@ -64,7 +64,7 @@
 (def path (js/require "node:path"))
 (def cp (js/require "node:child_process"))
 
-(def source-exts #{".clj" ".cljc" ".cljs"})
+(def source-exts #{".clj" ".cljc" ".cljs" ".cljk"})
 (def source-roots ["src" "test"])
 
 ;; require 先が外部（maven / npm / 言語組み込み）だと分かっている接頭辞。ここに
@@ -153,7 +153,7 @@
    誤検出の方が gate にとって致命的**である —— 狼少年になった gate は読まれなくなる。"
   [root]
   (let [orgs (.join path root "orgs")
-        {:keys [out]} (sh "grep" ["-roE" "--include=*.clj" "--include=*.cljc" "--include=*.cljs"
+        {:keys [out]} (sh "grep" ["-roE" "--include=*.clj" "--include=*.cljc" "--include=*.cljs" "--include=*.cljk"
                                   "--exclude-dir=node_modules" "--exclude-dir=.git"
                                   "--exclude-dir=target"
                                   (str "\\[[a-z][a-zA-Z0-9.*+!_'?<>=-]*\\.[a-zA-Z0-9.*+!_'?<>=-]+"

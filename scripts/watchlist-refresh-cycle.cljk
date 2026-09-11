@@ -163,7 +163,7 @@
               (when-not (zero? (:status m)) (cleanup!) (die! (str "merge failed: " (:err m))))
               (record! "commit" true (str "merged " (subs (str/trim (:out m)) 0 12)))
               ;; 6. the pin, or the fleet gate keeps reading the old tip
-              (let [pin (sh "nbb" [(path/join root "scripts" "west-pin-put.cljs")
+              (let [pin (sh "nbb" [(path/join root "scripts" "west-pin-put.cljk")
                                    "watchlist-screen" (str/trim (:out m))] {:cwd root})]
                 (record! "west-pin" (zero? (:status pin))
                          (str/trim (or (last (remove str/blank? (str/split-lines (:out pin)))) (:err pin))))))))
@@ -182,7 +182,7 @@
         (record! "iceberg" true "skipped by --skip-datalake")
         (let [out (fs/mkdtempSync (path/join (os/tmpdir) "watchlist-dl-"))
               e (sh "nbb" ["-cp" (path/join wt "src")
-                           (path/join root "scripts" "watchlist-datalake-export.cljs")
+                           (path/join root "scripts" "watchlist-datalake-export.cljk")
                            "--repo" wt "--out-dir" out] {:cwd root})]
           (if-not (zero? (:status e))
             (record! "iceberg" false (str "export failed: " (:err e)))

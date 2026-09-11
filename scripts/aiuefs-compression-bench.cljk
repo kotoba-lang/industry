@@ -139,7 +139,7 @@
                    (fn [p st] (and (str/ends-with? p ".datoms.edn") (> (.-size st) 512))) 200)}
      {:id :source-cljc
       :plane "code plane: the .cljc this fleet ships"
-      :files (walk orgs (fn [p st] (and (or (str/ends-with? p ".cljc") (str/ends-with? p ".cljs"))
+      :files (walk orgs (fn [p st] (and (or (str/ends-with? p ".cljk") (str/ends-with? p ".cljc") (str/ends-with? p ".cljs"))
                                         (> (.-size st) 512))) 400)}
      {:id :kernel-objects
       :plane "app plane: compiled artefacts (aiuefs-v3 app extents)"

@@ -33,7 +33,7 @@
 (def src-dir (or (first (remove #(str/starts-with? % "--") argv)) "."))
 ;; 検査対象の gate は **その tree のもの**を使う（harness と gate が別 tree を
 ;; 見ていると、緑の証明が別物の証明になる）。
-(def gate (.join path src-dir "scripts" "fleet-ci" "gates" "observatory-registry-check.cljs"))
+(def gate (.join path src-dir "scripts" "fleet-ci" "gates" "observatory-registry-check.cljk"))
 
 (defn- j [& xs] (apply (.-join path) (clj->js xs)))
 (defn- rd [f] (.readFileSync fs f "utf8"))

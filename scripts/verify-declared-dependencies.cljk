@@ -379,7 +379,7 @@
         (swap! errs conj {:dir dir :err (.-message e)})
         []))))
 
-(def source-ext #{".clj" ".cljc" ".cljs"})
+(def source-ext #{".clj" ".cljc" ".cljs" ".cljk"})
 (defn- source? [f] (contains? source-ext (p/extname f)))
 
 (defn path->ns
@@ -388,7 +388,7 @@
   disagrees with its path does not provide what its `ns` form claims."
   [rel]
   (-> rel
-      (str/replace #"\.(clj|cljc|cljs)$" "")
+      (str/replace #"\.(clj|cljc|cljs|cljk)$" "")
       (str/replace "_" "-")
       (str/replace "/" ".")))
 

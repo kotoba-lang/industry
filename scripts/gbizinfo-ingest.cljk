@@ -88,7 +88,7 @@
       (set (map second (re-seq #":source/content-sha256 \"([0-9a-f]{64})\""
                                (.readFileSync fs f "utf8")))))))
 
-(let [{:keys [exit out err]} (run ["nbb" "-cp" "src" "scripts/collect_gbizinfo_zenken.cljs"
+(let [{:keys [exit out err]} (run ["nbb" "-cp" "src" "scripts/collect_gbizinfo_zenken.cljk"
                                    "--numbers" numbers-file
                                    "--summarise" gov-file
                                    "--archive-to" raw-dir

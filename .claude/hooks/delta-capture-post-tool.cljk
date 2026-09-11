@@ -26,7 +26,7 @@
             ti (.-tool_input in)
             root (or (.-cwd in) (js/process.cwd))
             delta-src (path/join root "orgs/kotoba-lang/kotoba-delta/src")
-            delta-cli (path/join root "orgs/kotoba-lang/kotoba-delta/bin/delta.cljs")
+            delta-cli (path/join root "orgs/kotoba-lang/kotoba-delta/bin/delta.cljk")
             log (or (.-DELTA_LOG env) (path/join root ".claude/delta-ops.edn"))
             file (when ti (.-file_path ti))
             rel (when file (path/relative root file))]

@@ -185,8 +185,8 @@
         {:present?     true
          :truncated?   truncated?
          :file-count   (count files)
-         :governor?    (has? #(re-matches #"governor\.clj[cs]?" (base %)))
-         :advisor?     (has? #(re-matches #"advisor\.clj[cs]?" (base %)))
+         :governor?    (has? #(re-matches #"governor\.(clj[cs]?|cljk)" (base %)))
+         :advisor?     (has? #(re-matches #"advisor\.(clj[cs]?|cljk)" (base %)))
          :actor-edn?   (root-file? "actor.edn")
          :identity-edn? (root-file? "identity.edn")
          :blueprint    bp
@@ -219,9 +219,9 @@
          ;; ADR-2607289700 D1 の organism 2 条件を、宣言ではなく実装の証拠として測る。
          ;; (a) 自分で起きる: heartbeat または resident loop
          ;; (b) 自分の did で対外発話する: did 宣言 + 実際に外へ出す実装
-         :resident-loop? (has? #(re-find #"(?i)(^|/)(loop|tick|scheduler|cron|daemon)\.(clj[cs]?|kotoba)$" %))
+         :resident-loop? (has? #(re-find #"(?i)(^|/)(loop|tick|scheduler|cron|daemon)\.(clj[cs]?|cljk|kotoba)$" %))
          :did-declared?  (boolean (and readme (re-find #"did:(web|key):" readme)))
-         :publish-impl?  (has? #(re-find #"(?i)(^|/)(publisher|aozora|cacao|pds)\.(clj[cs]?|kotoba)$" %))
+         :publish-impl?  (has? #(re-find #"(?i)(^|/)(publisher|aozora|cacao|pds)\.(clj[cs]?|cljk|kotoba)$" %))
          :organism-doc? (boolean (and readme (re-find organism-re readme)))}))))
 
 ;; ---- runtime 面: kind + traits ---------------------------------------------

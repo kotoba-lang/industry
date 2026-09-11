@@ -279,7 +279,7 @@
         payload (pr-str {:nodes (mapv ->mk-node nodes) :tasks tasks :opts {}})
         {:keys [exit out]} (spawn-fn "nbb"
                                      ["--classpath" cp
-                                      (path/join root "scripts" "fleet-ci" "placement-shim.cljs")
+                                      (path/join root "scripts" "fleet-ci" "placement-shim.cljk")
                                       "--resources" (path/join root murakumo-rel "resources")]
                                      {:cwd root :input payload})
         edn (when (zero? (or exit 1))

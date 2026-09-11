@@ -134,7 +134,7 @@
        ext))
 
 (defn expected-ns-files [ns-sym]
-  (map #(ns->path ns-sym %) [".cljc" ".clj"]))
+  (map #(ns->path ns-sym %) [".cljk" ".cljc" ".clj"]))
 
 (defn declares-ns? [repo rel-path ns-sym]
   (let [file (io/file root repo rel-path)]
@@ -507,7 +507,7 @@
                      repos))
              batches))))
 
-(def test-source-exts #{".clj" ".cljc"})
+(def test-source-exts #{".clj" ".cljc" ".cljk"})
 
 (defn test-source-files [repo]
   (->> (list-files repo)
@@ -516,7 +516,7 @@
        sort
        vec))
 
-(def split-source-exts #{".clj" ".cljc"})
+(def split-source-exts #{".clj" ".cljc" ".cljk"})
 
 (defn src-source-files [repo]
   (->> (list-files repo)
@@ -557,7 +557,7 @@
                       :message "ledger :test-paths contains stale or non-test files"
                       :files (vec stale)))])))
 
-(def source-like-exts #{".clj" ".cljc" ".cljs" ".edn" ".kotoba" ".rs" ".js" ".mjs" ".cjs" ".ts" ".tsx" ".jsx"})
+(def source-like-exts #{".clj" ".cljc" ".cljs" ".cljk" ".edn" ".kotoba" ".rs" ".js" ".mjs" ".cjs" ".ts" ".tsx" ".jsx"})
 
 (def webgpu-source-prefixes
   ["orgs/kotoba-lang/webgpu/src/"

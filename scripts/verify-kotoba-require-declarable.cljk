@@ -129,7 +129,7 @@
 
 (defn -main []
   (let [out (rg "-n" "--no-heading" "--no-messages"
-                "-g" "*.clj" "-g" "*.cljc" "-g" "*.cljs"
+                "-g" "*.clj" "-g" "*.cljc" "-g" "*.cljs" "-g" "*.cljk"
                 "--glob" "!node_modules" "--glob" "!target" "--glob" "!out" "--glob" "!dist"
                 "-e" "kotoba\\.lang\\.[a-z-]+" "orgs")]
     (when (nil? out)

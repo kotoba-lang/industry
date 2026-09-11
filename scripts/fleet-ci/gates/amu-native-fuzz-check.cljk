@@ -15,7 +15,7 @@
   (js/process.exit code))
 
 (def required
-  ["scripts/fuzz-native.cljs"
+  ["scripts/fuzz-native.cljk"
    "fuzz/baselines/native-parser.edn"
    "fuzz/corpus/parser"
    "tools/kexe_loader.c"
@@ -42,7 +42,7 @@
         (:loader-source-sha256 baseline) "actual" loader-sha))
 
 (let [result (cp/spawnSync
-              "npx" #js ["--yes" "nbb" "scripts/fuzz-native.cljs"]
+              "npx" #js ["--yes" "nbb" "scripts/fuzz-native.cljk"]
               #js {:cwd root :encoding "utf8" :maxBuffer 33554432
                    :env (js/Object.assign #js {} js/process.env
                                           #js {"KOTOBA_NATIVE_FUZZ_RUNS" "20000"

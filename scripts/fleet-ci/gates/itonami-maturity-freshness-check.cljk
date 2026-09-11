@@ -36,8 +36,8 @@
   (println (str "FLEET-CI: " (str/join " " msg)))
   (js/process.exit code))
 
-(def policy-test (path/join root "scripts" "itonami-maturity-freshness-test.cljs"))
-(def policy-ns (path/join root "scripts" "itonami_maturity_freshness.cljs"))
+(def policy-test (path/join root "scripts" "itonami-maturity-freshness-test.cljk"))
+(def policy-ns (path/join root "scripts" "itonami_maturity_freshness.cljk"))
 (def compat-dir (path/join root "scripts" "nbb_compat"))
 
 ;; 展開失敗による false-pass を構造的に防ぐ（不変条件 2）。90 は

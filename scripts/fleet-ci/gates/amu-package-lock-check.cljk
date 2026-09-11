@@ -40,11 +40,11 @@
 ;; namespace the suite cannot build a fixture, and without the consumer there
 ;; is nothing to check it against.
 (def required
-  ["test/nbb/package_lock.cljs"
-   "src/kotoba/compiler/nbb/package_lock.cljs"
-   "src/kotoba/compiler/nbb/package_authoring.cljs"
-   "src/kotoba/compiler/nbb/project_source.cljs"
-   "src/kotoba/compiler/nbb/classpath.cljs"
+  ["test/nbb/package_lock.cljk"
+   "src/kotoba/compiler/nbb/package_lock.cljk"
+   "src/kotoba/compiler/nbb/package_authoring.cljk"
+   "src/kotoba/compiler/nbb/project_source.cljk"
+   "src/kotoba/compiler/nbb/classpath.cljk"
    "deps.edn"
    "deps-lock.edn"])
 
@@ -112,7 +112,7 @@
   (fail! "dependency lock resolved to nothing, so the suite would run against an empty classpath" 90))
 
 (def result (run ["--classpath" (str ".:src:test:" dep-dirs)
-                  "test/nbb/package_lock.cljs"]))
+                  "test/nbb/package_lock.cljk"]))
 
 (def output (str (or (.-stdout result) "") (or (.-stderr result) "")))
 (print output)

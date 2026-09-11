@@ -40,7 +40,7 @@
 (def findings? (some #{"--findings"} argv))
 (def root (.cwd js/process))
 (def sources ["orgs/kotoba-lang/kotoba-lang/lang/host-parity.edn"
-              "orgs/kotoba-lang/kototama/src/kototama/contract.cljc"
+              "orgs/kotoba-lang/kototama/src/kototama/contract.cljk"
               "orgs/kotoba-lang/wasm-webcomponent/src/actor-host.js"])
 (defn text [relative] (.readFileSync fs (str root "/" relative) "utf8"))
 

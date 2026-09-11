@@ -67,7 +67,7 @@
   (try
     (let [r (.spawnSync cp "rg"
                         (clj->js (concat ["-n" "--no-heading" "--no-messages"
-                                          "-g" "*.clj" "-g" "*.cljc" "-g" "*.cljs"
+                                          "-g" "*.clj" "-g" "*.cljc" "-g" "*.cljs" "-g" "*.cljk"
                                           "--glob" "!node_modules" "--glob" "!target"
                                           "--glob" "!out" "--glob" "!dist"
                                           "-e" pattern]

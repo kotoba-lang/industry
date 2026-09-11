@@ -107,7 +107,7 @@
        (keys routing)))
     (catch :default _ {})))
 
-(def clj-file-regex #"\.(clj|cljc|cljs)$")
+(def clj-file-regex #"\.(clj|cljc|cljs|cljk)$")
 
 (defn- walk-stack [stack out]
   (while (seq @stack)

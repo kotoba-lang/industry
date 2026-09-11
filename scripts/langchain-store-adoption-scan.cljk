@@ -31,7 +31,7 @@
                    (cond
                      (nil? st) []
                      (.isDirectory st) (walk-store-files full)
-                     (str/ends-with? e "store.cljc") [full]
+                     (or (str/ends-with? e "store.cljc") (str/ends-with? e "store.cljk")) [full]
                      :else []))))))
 
 (defn- classify [file]

@@ -89,7 +89,7 @@
 (def def-repos
   (vec (for [d all-dirs
              :let [src (.join path-mod root d "src")
-                   files (filter #(re-find #"\.clj[cs]?$" %) (walk src))
+                   files (filter #(re-find #"\.(clj[cs]?|cljk)$" %) (walk src))
                    f (first files)
                    txt (or (slurp* f) "")
                    m (re-find #"Split out of ([a-z][a-zA-Z0-9._*<>=-]*) on" txt)
@@ -119,7 +119,7 @@
   (let [acc (atom #{})]
     (doseq [d all-dirs
             :let [src (.join path-mod root d "src")
-                  files (filter #(re-find #"\.clj[cs]?$" %) (walk src))
+                  files (filter #(re-find #"\.(clj[cs]?|cljk)$" %) (walk src))
                   f (first (filter #(s/includes? (or (slurp* %) "")
                                                  "Assembled from one repo per definition")
                                    files))]
@@ -136,7 +136,7 @@
   (into {} (for [ns (distinct (map :source-ns def-repos))
                  :let [rel (str (s/replace (s/replace ns "." "/") "-" "_"))
                        cands (for [d all-dirs
-                                   e [".cljc" ".clj" ".cljs"]]
+                                   e [".cljk" ".cljc" ".clj" ".cljs"]]
                                (.join path-mod root d "src" (str rel e)))]]
              [ns (or (first (filter exists? cands)) nil)])))
 
@@ -183,7 +183,7 @@
 (println (str "SCANNED\t" @scanned "\tdefinition repos across "
               (count (distinct (map :source-ns def-repos))) " source namespaces"))
 (let [provided (set (for [{:keys [repo]} def-repos
-                         f (filter #(re-find #"\.clj[cs]?$" %)
+                         f (filter #(re-find #"\.(clj[cs]?|cljk)$" %)
                                    (walk (.join path-mod root repo "src")))
                          :let [ns (second (re-find #"\(ns\s+([a-z][a-zA-Z0-9._*<>=-]*)"
                                                    (or (slurp* f) "")))]

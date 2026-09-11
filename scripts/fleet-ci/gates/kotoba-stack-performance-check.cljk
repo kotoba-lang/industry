@@ -7,7 +7,7 @@
 
 (def args (vec *command-line-args*))
 (def root (path/resolve (or (first (remove #(str/starts-with? % "--") args)) ".")))
-(def verifier (path/join root "scripts" "verify-kotoba-stack-performance.cljs"))
+(def verifier (path/join root "scripts" "verify-kotoba-stack-performance.cljk"))
 (defn die! [code msg] (println (str "FLEET-CI: " msg)) (js/process.exit code))
 
 (doseq [p ["scripts/verify-kotoba-stack-performance.cljk"

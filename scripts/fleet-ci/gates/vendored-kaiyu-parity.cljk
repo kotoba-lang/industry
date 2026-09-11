@@ -63,7 +63,7 @@
     (when-not (fs/existsSync dir)
       (fail! (str "vendor directory not found: " dir)
              "If the vendored copy was removed on purpose, remove this gate in the same commit."))
-    (let [files (->> (fs/readdirSync dir) (js->clj) (filter #(str/ends-with? % ".cljc")) sort vec)]
+    (let [files (->> (fs/readdirSync dir) (js->clj) (filter #(or (str/ends-with? % ".cljc") (str/ends-with? % ".cljk"))) sort vec)]
       (when (empty? files)
         (fail! (str "no .cljc files under " dir)
                "An empty vendor directory passes every content check trivially; that is why this is a failure."))

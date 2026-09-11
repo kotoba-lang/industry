@@ -70,7 +70,7 @@
   (boolean (re-find #"(?i)(migration\.edn|svelte/)" (or script-text ""))))
 
 (defn- kotoba-twin-exists? [clj-relative-path kotoba-relative-paths]
-  (let [stem (some-> clj-relative-path (str/replace #"\.cljc?$" ""))]
+  (let [stem (some-> clj-relative-path (str/replace #"\.(cljc?|cljk)$" ""))]
     (boolean (some #(str/includes? % stem) kotoba-relative-paths))))
 
 (defn- host-mechanism-signal? [source-text]
@@ -86,7 +86,7 @@
    'small and empty of decisions'; requiring defn-count>=1 (below) and rejecting
    runner basenames here both do."
   [path source-text]
-  (or (boolean (re-find #"(?i)(run[_-]?tests?|test[_-]?runner|runner)\.(clj|cljc)$" (or path "")))
+  (or (boolean (re-find #"(?i)(run[_-]?tests?|test[_-]?runner|runner)\.(clj|cljc|cljk)$" (or path "")))
       (boolean (re-find #"clojure\.test/run-tests|cljs\.test/run-tests" (or source-text "")))))
 
 (defn- host-boundary-path?
@@ -227,7 +227,7 @@
                    "-o" "-name" "test" "-o" "-name" ".shadow-cljs" "-o" "-path" "*/.claude/worktrees/*"
                    ")" "-prune" "-o"
                    "(" "-name" "*.clj" "-o" "-name" "*.cljc" "-o" "-name" "*.kotoba"
-                   "-o" "-name" "*.cljs" "-o" "-name" "wrangler.jsonc" "-o" "-name" "wrangler.toml"
+                   "-o" "-name" "*.cljs" "-o" "-name" "*.cljk" "-o" "-name" "wrangler.jsonc" "-o" "-name" "wrangler.toml"
                    "-o" "-name" "wrangler.json" "-o" "-name" "README.md" "-o" "-name" "README.edn"
                    ")" "-type" "f" "-print"]]
     (try
@@ -368,7 +368,7 @@
                      wrangler-files (filter #(re-find #"wrangler\.(jsonc|toml|json)$" %) files)
                      wrangler-text (apply str (keep read-file wrangler-files))]
                  (when (and (decentralization-claim? readme) (d1-binding? wrangler-text))
-                   (let [src-files (filter #(re-find #"\.(clj|cljc|cljs)$" %) files)
+                   (let [src-files (filter #(re-find #"\.(clj|cljc|cljs|cljk)$" %) files)
                          source-text (apply str (keep read-file src-files))]
                      (when (mission-a-candidate? {:readme-text readme
                                                   :wrangler-text wrangler-text
@@ -383,10 +383,10 @@
   [by-repo]
   (->> by-repo
        (mapcat (fn [[repo-name files]]
-                 (let [scripts (filter #(and (re-find #"\.cljs$" %) (re-find #"/(docs|scripts)/" %)) files)
+                 (let [scripts (filter #(and (re-find #"\.(cljs|cljk)$" %) (re-find #"/(docs|scripts)/" %)) files)
                        custody? (some #(custody-gated? (read-file %)) scripts)]
                    (when-not custody?
-                     (let [clj-files (filter #(re-find #"\.(clj|cljc)$" %) files)
+                     (let [clj-files (filter #(re-find #"\.(clj|cljc|cljk)$" %) files)
                            kotoba-files (filter #(re-find #"\.kotoba$" %) files)]
                        (->> clj-files
                             (keep (fn [f]

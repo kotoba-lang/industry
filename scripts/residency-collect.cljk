@@ -127,7 +127,7 @@
 (defn- operator-hosts
   "probe.cljs の operator-hosts。source が正本で、nodes.edn は生成物。"
   [root]
-  (let [s (slurp* (path/join root "scripts" "fleet-ci" "probe.cljs"))]
+  (let [s (slurp* (path/join root "scripts" "fleet-ci" "probe.cljk"))]
     (if-let [m (re-find #"(?s)\(def operator-hosts.*?#\{([^}]*)\}\)" (str s))]
       (set (map #(str/replace % "\"" "") (re-seq #"\"[^\"]+\"" (nth m 1))))
       #{})))

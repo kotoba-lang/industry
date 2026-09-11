@@ -202,7 +202,7 @@
         ranked (d/rank-interventions (map d/leverage-score interventions))
         doc {:xmile/header {:xmile/name "ci-plane-choice"
                             :xmile/vendor "com-junkawasaki/root"
-                            :xmile/product "analyze-ci-plane-dynamics.cljs"}
+                            :xmile/product "analyze-ci-plane-dynamics.cljk"}
              :xmile/sim-specs (:xmile/sim-specs (:fleet-ci-today models))
              :xmile/models (vec (vals models))}
         out {:analysis/as-of "2026-08-05"

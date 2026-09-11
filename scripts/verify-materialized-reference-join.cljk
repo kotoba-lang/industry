@@ -43,7 +43,7 @@
             ["path" :as path]
             [clojure.string :as str]))
 
-(def source-ext #{".clj" ".cljc" ".cljs"})
+(def source-ext #{".clj" ".cljc" ".cljs" ".cljk"})
 
 ;; Both halves must be present for the hazard to exist. `materialize` alone is
 ;; a plain document query, and `:rules` alone may be running over a graph this

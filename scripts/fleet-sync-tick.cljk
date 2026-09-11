@@ -148,7 +148,7 @@
   (ensure-dir! out-dir)
   (let [dated (path/join out-dir (str "probe-" (subs (now) 0 10) ".edn"))
         latest (path/join out-dir "probe-latest.edn")
-        r (sh "nbb" [(path/join root "scripts" "fleet-sync-probe.cljs") "--edn" dated])]
+        r (sh "nbb" [(path/join root "scripts" "fleet-sync-probe.cljk") "--edn" dated])]
     (if-not (and (:ok? r) (fs/existsSync dated))
       (append-event! {:tick :probe :status :failed :stderr (subs (str (:err r)) 0 300)})
       (let [edn (str (fs/readFileSync dated "utf8"))

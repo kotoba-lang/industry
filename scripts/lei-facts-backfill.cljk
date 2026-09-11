@@ -41,7 +41,7 @@
 (def offset (or (some-> (flag "--offset") js/parseInt) 0))
 (def orgs-dir (or (flag "--orgs-root") "orgs/cloud-itonami"))
 (def root-dir (or (flag "--root") (.cwd js/process)))
-(def generator (path/join root-dir "scripts" "lei-verify-facts.cljs"))
+(def generator (path/join root-dir "scripts" "lei-verify-facts.cljk"))
 
 (defn- sh [cmd args opts]
   (try {:ok true :out (.toString (execFileSync cmd (clj->js args)

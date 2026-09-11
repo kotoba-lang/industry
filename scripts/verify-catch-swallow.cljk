@@ -43,7 +43,7 @@
          '["node:path" :as path]
          '[clojure.string :as str])
 
-(def clj-ext #{".clj" ".cljc" ".cljs"})
+(def clj-ext #{".clj" ".cljc" ".cljs" ".cljk"})
 (def py-ext #{".py"})
 
 (def teardown-tokens
@@ -200,7 +200,7 @@
    除外はこの 1 ファイル名だけ（他の検出器の fixture は本文が literal でないか、
    teardown を含む形にしてある）。"
   [p]
-  (= "verify-catch-swallow.cljs" (path/basename p)))
+  (contains? #{"verify-catch-swallow.cljk" "verify-catch-swallow.cljs"} (path/basename p)))
 
 (defn- finding! [severity key detail]
   (println (str "FINDING\t" severity "\t" key "\t" detail)))

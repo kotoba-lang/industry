@@ -292,7 +292,7 @@
   (let [dir (str root "/orgs/kotoba-lang/kyoninka/src/kyoninka")]
     (when (.existsSync fs dir)
       (vec (for [f (ls dir)
-                 :when (str/ends-with? f ".cljc")
+                 :when (or (str/ends-with? f ".cljk") (str/ends-with? f ".cljc"))
                  :let [src (slurp* (str dir "/" f))
                        p (when src (lit/read-def-literal src "procedure"))]
                  :when (and (map? p) (not (lit/error? p)) (:procedure/id p))]

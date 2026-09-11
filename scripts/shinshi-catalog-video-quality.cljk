@@ -24,7 +24,9 @@
 (defn- parse-args [all]
   (let [self? (fn [s]
                 (let [b (.basename path (str s))]
-                  (or (contains? #{"shinshi-catalog-video-quality.cljs" "quality.cljs"} b)
+                  (or (contains? #{"shinshi-catalog-video-quality.cljk" "quality.cljk"
+                                   "shinshi-catalog-video-quality.cljs" "quality.cljs"} b)
+                      (str/ends-with? b ".cljk")
                       (str/ends-with? b ".cljs"))))
         i (last (keep-indexed (fn [idx s] (when (self? s) idx)) all))]
     (vec (drop (inc (or i 1)) all))))
@@ -169,7 +171,8 @@
       (when-not (= ["/tmp/a.mp4" "--json"] got)
         (println (str "SELF-TEST FAIL: argv " script " -> " (pr-str got)))
         (.exit process 1))
-      (when (str/ends-with? (str (first (remove #(str/starts-with? % "--") got))) ".cljs")
+      (when (let [a (str (first (remove #(str/starts-with? % "--") got)))]
+              (or (str/ends-with? a ".cljk") (str/ends-with? a ".cljs")))
         (println "SELF-TEST FAIL: file-arg resolved to the script itself")
         (.exit process 1)))))
 

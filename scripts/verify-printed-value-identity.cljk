@@ -58,7 +58,7 @@
          '["node:path" :as path]
          '[clojure.string :as str])
 
-(def source-ext #{".clj" ".cljc" ".cljs"})
+(def source-ext #{".clj" ".cljc" ".cljs" ".cljk"})
 
 (def printers
   "値をテキストにする呼び出し。`str` は入れない —— 文字列連結が大半で、

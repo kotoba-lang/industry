@@ -69,7 +69,7 @@
   (let [r (sh ["grep" "-rl" "--binary-files=without-match"
                "--exclude-dir=node_modules" "--exclude-dir=.git"
                "--exclude-dir=dist" "--exclude-dir=out" "--exclude-dir=release"
-               "--exclude-dir=target" "--include=*.cljc" "--include=*.cljs"
+               "--exclude-dir=target" "--include=*.cljc" "--include=*.cljs" "--include=*.cljk"
                "--" nsname orgs])]
     (when (grep-ok? r) (vec (remove str/blank? (str/split-lines (:out r)))))))
 
@@ -135,9 +135,10 @@
             tree (sh ["git" "-C" home "ls-tree" "-r" "--name-only" ref "--"
                       (rel (path/join build "src"))])
             vendored (when (zero? (:status tree))
-                       (first (filter #(str/ends-with?
-                                        % (str (str/replace ns #"[.-]" {"." "/" "-" "_"}) ".cljc"))
-                                      (str/split-lines (:out tree)))))]
+                       (let [stem (str/replace ns #"[.-]" {"." "/" "-" "_"})]
+                         (first (filter #(or (str/ends-with? % (str stem ".cljc"))
+                                             (str/ends-with? % (str stem ".cljk")))
+                                        (str/split-lines (:out tree))))))]
         (let [lag (behind? home ref)
               note (if lag (str " [checkout is " lag " behind " ref "]") "")]
           (cond

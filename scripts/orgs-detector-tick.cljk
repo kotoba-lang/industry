@@ -434,7 +434,7 @@
 
 (defn -main []
   (when (flag "--self-test") (self-test))
-  (let [self (or (first (filter #(str/ends-with? (str %) "orgs-detector-tick.cljs")
+  (let [self (or (first (filter #(or (str/ends-with? (str %) "orgs-detector-tick.cljk") (str/ends-with? (str %) "orgs-detector-tick.cljs"))
                                 (js->clj js/process.argv)))
                  ".")
         repo (or (opt "--repo") (.resolve path (.dirname path self) ".."))

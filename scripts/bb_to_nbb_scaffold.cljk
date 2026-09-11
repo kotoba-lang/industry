@@ -247,11 +247,11 @@
 
 ;; Only auto-run when this file is the entry script (not when required as a lib).
 (when (and (string? *file*)
-           (or (str/ends-with? *file* "bb_to_nbb_scaffold.cljs")
+           (or (or (str/ends-with? *file* "bb_to_nbb_scaffold.cljk") (str/ends-with? *file* "bb_to_nbb_scaffold.cljs"))
                (str/ends-with? *file* "bb-to-nbb-scaffold")))
   (apply -main
          (let [args (vec *command-line-args*)
                script? (when (seq args)
-                         (or (str/ends-with? (first args) "bb_to_nbb_scaffold.cljs")
+                         (or (or (str/ends-with? (first args) "bb_to_nbb_scaffold.cljk") (str/ends-with? (first args) "bb_to_nbb_scaffold.cljs"))
                              (str/ends-with? (first args) "bb-to-nbb-scaffold")))]
            (if script? (rest args) args))))

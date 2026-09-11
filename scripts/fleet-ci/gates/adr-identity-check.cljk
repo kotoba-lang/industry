@@ -62,7 +62,7 @@
   (println (str "FLEET-CI: " (str/join " " msg)))
   (js/process.exit code))
 
-(def verifier (path/join root "scripts" "verify-adr-identity.cljs"))
+(def verifier (path/join root "scripts" "verify-adr-identity.cljk"))
 (def adr-dir (path/join root "90-docs" "adr"))
 
 ;; The ADR corpus is Kotoba ADL now, so the verifier decodes with kotoba.adl.

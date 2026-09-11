@@ -97,7 +97,7 @@
   (let [corpora
         [{:id :datom-catalogs :dir (.join path root "90-docs") :suffixes [".datoms.edn"]}
          {:id :adr-documents :dir (.join path root "90-docs" "adr") :suffixes [".edn"]}
-         {:id :source-cljc :dir (.join path root "orgs" "kotoba-lang") :suffixes [".cljc" ".cljs"]}]
+         {:id :source-cljc :dir (.join path root "orgs" "kotoba-lang") :suffixes [".cljk" ".cljc" ".cljs"]}]
         results
         (vec
          (for [{:keys [id dir suffixes]} corpora]

@@ -68,7 +68,7 @@
     (let [repo-bytes (fs/readFileSync log-path "utf8")
           verify (try
                    (cp/execFileSync "nbb" #js ["--classpath" classpath
-                                               "bin/didwebvh.cljs" "verify"]
+                                               "bin/didwebvh.cljk" "verify"]
                                     #js {:cwd repo :encoding "utf8"
                                          :stdio #js ["ignore" "pipe" "pipe"]})
                    (catch :default e

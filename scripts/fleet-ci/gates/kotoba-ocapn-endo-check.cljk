@@ -32,8 +32,8 @@
       (fail! (str "missing success marker: " expected)))))
 
 (doseq [required ["package.json" "package-lock.json"
-                  "scripts/endo_handoff_interop.cljs"
-                  "scripts/endo_captp_live.cljs"]]
+                  "scripts/endo_handoff_interop.cljk"
+                  "scripts/endo_captp_live.cljk"]]
   (when-not (.existsSync fs (path/join root required))
     (fail! (str required " missing from shipped tree"))))
 

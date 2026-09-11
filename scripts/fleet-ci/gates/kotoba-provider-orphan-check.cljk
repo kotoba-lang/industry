@@ -105,7 +105,7 @@
 (def min-files (js/parseInt (flag-value "--min" "1") 10))
 (def roots (let [r (flag-values "--root")] (if (seq r) r ["src"])))
 (def allowed (set (flag-values "--allow")))
-(def source-exts [".clj" ".cljc" ".cljs"])
+(def source-exts [".clj" ".cljc" ".cljs" ".cljk"])
 
 (defn- fail! [code msg]
   (println (str "FLEET-CI: " msg))

@@ -145,7 +145,7 @@
   (.on (.-stdin js/process) \"end\" #(emit @buf)))
 ")
 
-(def ^:private bridge-path (path/join (.cwd js/process) "scripts" "claude-bridge.cljs"))
+(def ^:private bridge-path (path/join (.cwd js/process) "scripts" "claude-bridge.cljk"))
 
 (defn- die [code msg]
   (.error js/console msg)

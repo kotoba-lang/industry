@@ -47,8 +47,20 @@
 
 (defn log! [& xs] (println (str/join " " (map str xs))))
 
-(defn- exists? [p] (try (.existsSync fs p) (catch :default _ false)))
-(defn- slurp* [p] (try (str (.readFileSync fs p "utf8")) (catch :default _ nil)))
+(defn- cljk-twin
+  "The `.cljk` name of a `.clj` / `.cljc` / `.cljs` path (nil otherwise). Every
+  tracked Clojure source was renamed to `.cljk` on 2026-09-11 (root ADR
+  adr-2609111500); the shape names below are kept as written and tried at
+  the new extension when the old one is absent."
+  [p]
+  (when-let [m (re-find #"^(.*)\.clj[cs]?$" (str p))] (str (nth m 1) ".cljk")))
+(defn- exists? [p] (try (or (.existsSync fs p)
+                            (boolean (some->> (cljk-twin p) (.existsSync fs))))
+                        (catch :default _ false)))
+(defn- slurp* [p] (try (str (.readFileSync fs p "utf8"))
+                       (catch :default _
+                         (when-let [t (cljk-twin p)]
+                           (try (str (.readFileSync fs t "utf8")) (catch :default _ nil))))))
 
 (defn- sh
   "走らせる。**投げない** —— probe が落ちても tick 全体を道連れにせず
@@ -135,7 +147,7 @@
   (let [dir (str root "/orgs/" (:org v) "/" (:repo v) "/src")]
     (if-not (exists? dir)
       {:checkout :absent :files :unknown}
-      (let [{:keys [code out]} (sh "find" [dir "-name" "*.clj"])]
+      (let [{:keys [code out]} (sh "find" [dir "(" "-name" "*.clj" "-o" "-name" "*.cljk" ")"])]
         (if (not= 0 code)
           {:checkout :present :files :unknown}
           {:checkout :present
@@ -219,8 +231,8 @@
             store (slurp* (str base "store.cljc"))
             gov? (exists? (str base "governor.cljc"))
             core-clj (->> (try (vec (.readdirSync fs base)) (catch :default _ []))
-                          (filter #(and (str/ends-with? % ".clj")
-                                        (not= "render_html.clj" %)))
+                          (filter #(and (or (str/ends-with? % ".clj") (str/ends-with? % ".cljk"))
+                                        (not (#{"render_html.clj" "render_html.cljk"} %))))
                           vec)
             ops (let [r (parse-op-set phase "(def read-ops")
                       w (parse-op-set phase "(def write-ops")]
@@ -596,7 +608,7 @@
                   (= :present checkout)
                   (true? (:standard? shape))
                   (vector? files)
-                  (every? #{"render_html.clj"} files))
+                  (every? #{"render_html.clj" "render_html.cljk"} files))
              :ops-declared (count declared)
              :ops-match (cond
                           (nil? actual) :unknown

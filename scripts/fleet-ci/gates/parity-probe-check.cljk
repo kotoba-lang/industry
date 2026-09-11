@@ -35,7 +35,7 @@
                              (remove #{min-probed} args)))
               "."))
 
-(def verifier (path/join root "scripts" "verify-parity-probes.cljs"))
+(def verifier (path/join root "scripts" "verify-parity-probes.cljk"))
 (def ledger (path/join root "90-docs" "maturity" "engine-parity.datoms.edn"))
 
 (when-not (fs/existsSync verifier)

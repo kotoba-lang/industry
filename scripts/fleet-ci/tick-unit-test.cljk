@@ -349,7 +349,9 @@
       "and an entry west does not know, with no :org, yields nil rather than a bad key"))
 
 (def ^:private windows-gate-paths
-  ["scripts/windows-loader-cross-compile.cljs" "tools/kexe_loader_windows.c"])
+  ;; `.cljk` since the 2026-09-11 rename (root ADR adr-2609111500); gates.edn
+  ;; and the wrapper name the same file, and the test below pins all three.
+  ["scripts/windows-loader-cross-compile.cljk" "tools/kexe_loader_windows.c"])
 
 (defn- filter-with
   "Runs `filtered-tarball!` over a fixture tree, returning the rejection message
@@ -390,9 +392,9 @@
   ;; branch predating the gate; reading it sends you to lower :min-files, which
   ;; is the wrong repair -- the branch is what is stale.
   (let [message (filter-with pr547-tree
-                             {:include-ext [".c" ".cljs"] :min-files 70
+                             {:include-ext [".c" ".cljs" ".cljk"] :min-files 70
                               :require-paths windows-gate-paths})]
-    (is (str/includes? message "scripts/windows-loader-cross-compile.cljs")
+    (is (str/includes? message "scripts/windows-loader-cross-compile.cljk")
         "the refusal names the file the gate runs")
     (is (str/includes? message "cannot answer here")
         "and says the gate cannot answer, rather than implying a trivial pass")
@@ -404,23 +406,23 @@
 (deftest a-named-input-the-filter-drops-names-the-filter
   ;; The other cause, with a different repair. This is the 2026-07-29 root
   ;; incident's shape: the file is in the tree, :include-ext does not ship it.
-  (let [message (filter-with (into pr547-tree ["scripts/windows-loader-cross-compile.cljs"])
+  (let [message (filter-with (into pr547-tree ["scripts/windows-loader-cross-compile.cljk"])
                              {:include-ext [".c"] :min-files 1
                               :require-paths windows-gate-paths})]
-    (is (str/includes? message "scripts/windows-loader-cross-compile.cljs"))
+    (is (str/includes? message "scripts/windows-loader-cross-compile.cljk"))
     (is (str/includes? message "widen :include-ext")
         "tree-present-but-unshipped points at the filter, not at the branch")))
 
 (deftest the-count-floor-still-answers-when-no-named-input-is-missing
   ;; :require-paths must not replace the count floor -- a filter that collapses
   ;; is still the hazard the floor was written for.
-  (let [tree (into pr547-tree ["scripts/windows-loader-cross-compile.cljs"])
-        message (filter-with tree {:include-ext [".c" ".cljs"] :min-files 5000
+  (let [tree (into pr547-tree ["scripts/windows-loader-cross-compile.cljk"])
+        message (filter-with tree {:include-ext [".c" ".cljs" ".cljk"] :min-files 5000
                                    :require-paths windows-gate-paths})]
     (is (str/includes? message "expected >= 5000")
         "with every named input present, the count floor is what speaks"))
-  (is (= :built (filter-with (into pr547-tree ["scripts/windows-loader-cross-compile.cljs"])
-                             {:include-ext [".c" ".cljs"] :min-files 5
+  (is (= :built (filter-with (into pr547-tree ["scripts/windows-loader-cross-compile.cljk"])
+                             {:include-ext [".c" ".cljs" ".cljk"] :min-files 5
                               :require-paths windows-gate-paths}))
       "and a tree that satisfies both is built"))
 

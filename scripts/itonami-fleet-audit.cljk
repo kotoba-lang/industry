@@ -214,7 +214,7 @@
 (defn find-facts-file [dir]
   (let [src (io/file dir "src")]
     (when (.exists src)
-      (first (filter #(and (.isFile %) (= "facts.cljc" (.getName %))) (file-seq src))))))
+      (first (filter #(and (.isFile %) (#{"facts.cljc" "facts.cljk"} (.getName %))) (file-seq src))))))
 
 (def jurisdiction-re #"\"[A-Z]{3}\"\s*\{")
 
@@ -317,14 +317,14 @@
     (count (re-seq spec-basis-citation-re (slurp f)))))
 
 (def component-patterns
-  {:governor #"governor\.cljc$"
-   :store #"store\.cljc$"
-   :phase #"phase\.cljc$"
-   :sim #"sim\.cljc$"
-   :registry #"registry\.cljc$"
-   :operation #"operation\.cljc$"
-   :facts #"facts\.cljc$"
-   :advisor #"(llm|advisor)\.cljc$"})
+  {:governor #"governor\.(cljc|cljk)$"
+   :store #"store\.(cljc|cljk)$"
+   :phase #"phase\.(cljc|cljk)$"
+   :sim #"sim\.(cljc|cljk)$"
+   :registry #"registry\.(cljc|cljk)$"
+   :operation #"operation\.(cljc|cljk)$"
+   :facts #"facts\.(cljc|cljk)$"
+   :advisor #"(llm|advisor)\.(cljc|cljk)$"})
 
 (defn components [dir]
   (let [src (io/file dir "src")]
@@ -401,7 +401,10 @@
    facts.cljc with 6 genuine https://www.osha.gov citations on that exact
    file shape, proving the mixed-pattern genre does eventually grow real
    citations, unlike isco/gtin's 4-file shape which never has)."
-  #{"governor.cljc" "store.cljc" "advisor.cljc" "actor.cljc"})
+  #{"governor.cljc" "store.cljc" "advisor.cljc" "actor.cljc"
+    ;; the same four at the extension every tracked source carries since
+    ;; 2026-09-11 (root ADR adr-2609111500)
+    "governor.cljk" "store.cljk" "advisor.cljk" "actor.cljk"})
 
 (defn actor-blueprint-components
   "Which of the 4 actor-blueprint component files (see
@@ -422,8 +425,10 @@
    floor for cloud-itonami-gtin-issuance/-verification (2026-07-23, see
    `actor-blueprint-file-names`)."
   [blueprint-components]
-  (and (contains? blueprint-components "governor.cljc")
-       (contains? blueprint-components "store.cljc")))
+  (and (or (contains? blueprint-components "governor.cljc")
+           (contains? blueprint-components "governor.cljk"))
+       (or (contains? blueprint-components "store.cljc")
+           (contains? blueprint-components "store.cljk"))))
 
 (defn plain-library-structure?
   "true when the repo has real (non-stub) src/ content but NONE of the

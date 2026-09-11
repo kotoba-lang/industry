@@ -44,14 +44,14 @@
          '[clojure.edn :as edn]
          '[clojure.string :as str])
 
-(def source-ext #{".clj" ".cljc" ".cljs" ".sh" ".mjs" ".js" ".py" ".bb"})
+(def source-ext #{".clj" ".cljc" ".cljs" ".cljk" ".sh" ".mjs" ".js" ".py" ".bb"})
 
 (defn policy-file? [p]
   (let [n (path/basename p)]
     (and (str/includes? n "fuel-policy") (str/ends-with? n ".edn"))))
 
 (def comment-prefix
-  {".clj" ";" ".cljc" ";" ".cljs" ";" ".bb" ";" ".sh" "#" ".py" "#" ".mjs" "//" ".js" "//"})
+  {".clj" ";" ".cljc" ";" ".cljs" ";" ".cljk" ";" ".bb" ";" ".sh" "#" ".py" "#" ".mjs" "//" ".js" "//"})
 
 ;; ── 形の判定（純関数。self-check がこれを直接叩く） ────────────────────────
 

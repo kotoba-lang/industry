@@ -91,7 +91,7 @@
                       (skip-dirs nm) []
                       (.isDirectory e) (walk p (dec depth))
                       (and (.isFile e)
-                           (or (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))) [p]
+                           (or (str/ends-with? nm ".cljk") (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))) [p]
                       :else [])))
                 entries)))))
 
@@ -218,7 +218,7 @@
 (defn- scan-file [file]
   (when-let [raw (try (fs/readFileSync file "utf8") (catch :default _ nil))]
     (let [blanked (cond-> raw
-                    (str/ends-with? file ".cljc") blank-clj-branches
+                    (or (str/ends-with? file ".cljc") (str/ends-with? file ".cljk")) blank-clj-branches
                     true blank-strings-and-comments)
           hits (atom [])
           examined (atom 0)]

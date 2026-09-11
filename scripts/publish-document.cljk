@@ -42,7 +42,7 @@
   (if (seq *command-line-args*)
     (vec *command-line-args*)
     (let [argv (vec (js->clj (.-argv js/process)))
-          i (first (keep-indexed (fn [i v] (when (str/ends-with? v "publish-document.cljs") i)) argv))]
+          i (first (keep-indexed (fn [i v] (when (or (str/ends-with? v "publish-document.cljk") (str/ends-with? v "publish-document.cljs")) i)) argv))]
       (if (some? i) (subvec argv (inc i)) []))))
 
 (def args (script-args))
@@ -80,7 +80,7 @@
     (die 2 (str "UNANSWERED — no directory to run wrangler from: " wrangler-dir)))
 
   ;; ---- 1. archive plane (B2), through the existing CLI -------------------
-  (let [cli "orgs/kotoba-lang/content-address/bin/content_address.cljs"
+  (let [cli "orgs/kotoba-lang/content-address/bin/content_address.cljk"
         _ (when-not (.existsSync fs cli)
             (die 2 (str "UNANSWERED — kotoba-lang/content-address is not checked out at " cli)))
         cmd (str "nbb --classpath .:orgs/kotoba-lang/content-address/src " cli

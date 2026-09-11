@@ -171,7 +171,7 @@
 ;; positional parsing can be disturbed by it.
 (def findings? (some #{"--findings"} argv))
 
-(def source-extensions #{".clj" ".cljc" ".cljs"})
+(def source-extensions #{".clj" ".cljc" ".cljs" ".cljk"})
 
 (defn- source-file? [name]
   (some #(str/ends-with? name %) source-extensions))

@@ -41,8 +41,11 @@
 (def lib-root (.resolve path here ".."))
 
 (defn- try-load-cljc [name]
-  (let [p (.join path lib-root "kototama" (str name ".cljc"))]
-    (when (exists? p)
+  (let [p (->> [".cljk" ".cljc"]
+               (map #(.join path lib-root "kototama" (str name %)))
+               (filter exists?)
+               first)]
+    (when p
       ;; nbb cannot load-file arbitrary cljc with java interop; require if on classpath
       p)))
 

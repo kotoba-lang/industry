@@ -84,7 +84,7 @@
 (defn -main []
   (.mkdirSync fs home #js {:recursive true})
   (let [obs-tmp (.join path home "last-run.observations.edn")
-        cmd (str "nbb " (.join path root "scripts" "verify-endpoint-health.cljs")
+        cmd (str "nbb " (.join path root "scripts" "verify-endpoint-health.cljk")
                  " " root " --all --edn " obs-tmp
                  (when cheap-only? " --cheap-only"))
         res (try (.execSync cp cmd #js {:encoding "utf8" :stdio "pipe"

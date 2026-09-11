@@ -88,10 +88,10 @@
                      (cond (= e ".git") []
                            (= e "test") []
                            (.isDirectory (fs/statSync c)) (clj-files c)
-                           (re-find #"\.clj[cs]?$" e) [c]
+                           (re-find #"\.(clj[cs]?|cljk)$" e) [c]
                            :else []))))
          vec)
-    (re-find #"\.clj[cs]?$" p) [p]
+    (re-find #"\.(clj[cs]?|cljk)$" p) [p]
     :else []))
 
 (def ^:private def-re #"(?m)^\(def[a-z]*\s+([A-Za-z0-9*!?<>+=_.'/-]+)")
@@ -124,7 +124,7 @@
 (defn- test-file-count [repo-dir]
   (let [t (path/join repo-dir "test")]
     (if (exists? t)
-      (count (filter #(re-find #"\.clj[cs]?$" %)
+      (count (filter #(re-find #"\.(clj[cs]?|cljk)$" %)
                      (loop [dirs [t] acc []]
                        (if (empty? dirs) acc
                            (let [d (first dirs)
@@ -141,8 +141,11 @@
    契約に合わない出力・非ゼロの load エラーは **FAIL ではなく UNMEASURABLE**
    として扱い、stderr 本文を detail に残す（受け取ったエラー本文を捨てない）。"
   [id cp-dirs]
-  (let [f (path/join probe-dir (str (name id) ".cljs"))]
-    (if-not (exists? f)
+  (let [f (->> [".cljk" ".cljs"]
+               (map #(path/join probe-dir (str (name id) %)))
+               (filter exists?)
+               first)]
+    (if-not f
       {:probe/status :no-probe :probe/detail "probe file not written yet"}
       (let [r (cp/spawnSync "nbb" (clj->js (concat ["--classpath" (str/join ":" cp-dirs)] [f]))
                             #js {:encoding "utf8" :cwd root :timeout 600000})

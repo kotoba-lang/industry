@@ -129,6 +129,6 @@
                   (.exit js/process 1))))))
 
 ;; script 実行のときだけ走る（require では走らない — PDS への登録を誤発火させない）。
-(when (some #(str/ends-with? (str %) "register_fabric_actors.cljs")
+(when (some #(or (str/ends-with? (str %) "register_fabric_actors.cljk") (str/ends-with? (str %) "register_fabric_actors.cljs"))
             (js->clj js/process.argv))
   (-main))

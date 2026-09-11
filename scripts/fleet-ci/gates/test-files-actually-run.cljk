@@ -61,7 +61,7 @@
 (def scan-dir (path/join root sub))
 
 (def skip-dirs #{"node_modules" ".git" "target" ".shadow-cljs" "out" "dist"})
-(def test-ext [".clj" ".cljc" ".cljs"])
+(def test-ext [".clj" ".cljc" ".cljs" ".cljk"])
 
 (defn- source-files [dir]
   (let [out (atom [])]

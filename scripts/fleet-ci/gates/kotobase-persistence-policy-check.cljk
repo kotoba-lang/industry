@@ -7,7 +7,7 @@
 
 (def args (vec *command-line-args*))
 (def root (path/resolve (or (first (remove #(str/starts-with? % "--") args)) ".")))
-(def verifier (path/join root "scripts" "verify-kotobase-persistence-policy.cljs"))
+(def verifier (path/join root "scripts" "verify-kotobase-persistence-policy.cljk"))
 (defn die! [code msg] (println (str "FLEET-CI: " msg)) (js/process.exit code))
 (when-not (fs/existsSync verifier)
   (die! 90 "kotobase persistence verifier missing after extract"))
