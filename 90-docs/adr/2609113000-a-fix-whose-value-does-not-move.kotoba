@@ -1,0 +1,82 @@
+(vector
+ (map
+  (:adr/id "adr-2609113000-a-fix-whose-value-does-not-move")
+  (:adr/title "A fix whose value does not move")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/related (vector "adr-2609112900-the-template-was-not-unstable-it-was-stale"))
+  (:adr/body "
+## The item
+
+The remaining layer-0 entry: oracle-store's last selector queried BOM in
+the three ref-less repositories, an entity none of them declares.
+
+## Why it was invisible
+
+That selector asks whether a DIFFERENT entity holds none of the seeded
+rows. It reaches the entity through the template's BOM, substituted to the
+target's ref entity -- and a repository where no spec declares a ref has
+no ref entity, so the token was dropped and the template's name stood.
+
+It answered 0. The harness answers 0 too, because a real other entity
+holds no rows. So the store layer measured five of five agreeing when it
+landed, and the agreement was real -- but the two sides agreed for
+different reasons, and this side was testing the weaker thing: that an
+unknown entity is empty, rather than that the store partitions by entity.
+
+## The fix is not visible in the value
+
+Selector 7 was 0 and is 0. Selector 0 is 3, which is what shows the root
+does hold rows, so the pair means something.
+
+What changed is what the 0 MEANS. That is worth stating plainly because it
+determines what can serve as evidence: not the number, which does not
+move, but the entity name in the source and a check that refuses the old
+form. A fix whose value does not move needs the check to come with it, or
+there is nothing to see.
+
+    com-aftership  BOM -> Checkpoint
+    com-adyen      BOM -> Amount
+    com-airtable   BOM -> Table
+
+The replacement is the harness's own rule -- the first spec that is not
+the root. Root was already derived identically on both sides (the first
+spec with no refs), so the two now ask about the same entity rather than
+two entities that merely both happen to be empty.
+
+## The first floor could not see this, so there is a second
+
+The stem check looks for the abbrobot stem and the two ref field names. A
+template ENTITY that survives is none of those: BOM is not abbrobot. Every
+check in the generator passed those three components.
+
+The new floor refuses when a canon entity appears in a component that does
+not declare it. Seen red by reverting only the fallback and keeping the
+floor -- exactly the state that shipped -- which refuses and names BOM.
+
+Its candidate set is the canon's three entities, and that is a recorded
+limit rather than a silent one. Taking every capitalised quoted string out
+of the template was tried first and is too broad: it flags GET, POST,
+DELETE, TRUE and Yes, which are HTTP methods and parse fixtures. A fourth
+template entity surviving would still pass, which is the same limit the
+stem comment already describes.
+
+## Two corrections to my own scan
+
+A first pass compared each component's selector-7 entity against the first
+spec that is not the first spec, and reported four repositories as
+querying the wrong entity. That was wrong: the generator picks root as the
+first spec with NO REFS, not the first spec. com-8th-wall's root is Device
+-- the last of its six -- so the entity it queries is a correct non-root
+one, and so are the other three. Only the three BOM cases were real.
+
+The floor pattern was also wrong twice before it was right, and both times
+it named things that are not entities. Recorded because the failure mode
+is the same each time: a pattern broad enough to catch the case is broad
+enough to catch much else, and the output looks like a finding.
+
+## Controls
+
+A ref-having repository is byte-identical under the patched generator and
+prints no new line. The template remains a fixed point.
+")))
