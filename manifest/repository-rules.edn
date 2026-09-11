@@ -575,7 +575,15 @@
                           ;; applies it is NOT deployed yet -- see :cljk-rename.
                           :ceiling-decision :two-ceilings
                           :unpacked-max-blocks 32
-                          :unpacked-ceiling-deployed false
+                          ;; Deployed 2026-09-11 (net-kotobase/ipfs b4244342) and
+                          ;; verified live: the 256-block fixture answers 200 in
+                          ;; 0.64 s with its pack and 413 in 4.5 s without it.
+                          :unpacked-ceiling-deployed true
+                          ;; Measured on a 102 MB pack: 3 R2 requests and ~300 ms
+                          ;; of I/O for a 32-block traversal, the same order as a
+                          ;; 39 KB pack. Round trips do not depend on pack size.
+                          :large-pack-reader :windowed
+                          :large-pack-requests-at-102mb 3
                           :pack-prize "(N-1) x per-block-ms, upper bound"
                           ;; Measured 2026-09-11 with a root-keyed CARv2 read whole
                           ;; on the first miss (net-kotobase/ipfs 23046cad): 30 -> 1
@@ -587,8 +595,8 @@
                           :pack-price-measured {:wall-ratio 15.9 :io-ratio 29.6
                                                 :prize-realised 0.94
                                                 :one-block-penalty-ms 11.2
-                                                :mechanism :root-keyed-whole-read
-                                                :range-read :not-measured
+                                                :mechanism :root-keyed-window-read
+                                                :range-read :measured-at-102mb
                                                 :who-writes-packs :not-decided}
                           :p50-ms {:one-block 132.0 :three-blocks 353.0}
                           :refusal-ms {:malformed-selector 14.2 :root-not-held 121.9}
@@ -606,8 +614,12 @@
    :policy/cljk-rename {:authoritative true
                         :loader "scripts/cljk-classpath.cljs"
                         :loader-covers #{:nbb :jvm}
-                        :loader-does-not-cover #{:shadow-cljs :clj-kondo}
-                        :pack-range-reader-blocked-on :shadow-cljs}
+                        :loader-does-not-cover #{:clj-kondo}
+                        ;; shadow-cljs is covered by generation, not by the
+                        ;; loader itself: net-kotobase/ipfs gen-shadow-cljs-edn.cljs
+                        ;; writes :source-paths from the mirrored classpath.
+                        :shadow-cljs :generated-config
+                        :pack-range-reader-blocked-on nil}
    ;; Landed 2026-09-10 for the entity-id hazard only. It reports a SHAPE, never
    ;; a verdict: whether a given call's references are entity ids is a property
    ;; of the data. 44,736 files, 19 findings, and both directions plus the
