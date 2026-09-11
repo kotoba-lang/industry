@@ -3,19 +3,75 @@
   (:adr/id "adr-2609113100-element-type-polymorphism-option-c-measured-clear")
   (:adr/topic "element-type-polymorphism-design")
   (:adr/title "Element-type polymorphism: three designs, option C measured clear, and the three gaps none of them closes")
-  (:adr/status "proposed")
+  (:adr/status "accepted")
   (:adr/date "2026-09-11")
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/kotoba-lang" "kotoba-lang/kotoba-sema" "kotoba-lang/amu"))
   (:adr/related (vector "adr-2609113000-the-language-level-findings-were-two-causes-not-thirteen-defects"))
   (:adr/body
-  "## Status: proposed — this is the owner's decision
+  "## Status: accepted 2026-09-11 — owner chose C and its spelling (\"1, 2, 3\")
 
-Owner instruction 2026-09-11: solve the language gaps, using subagents.
-Two agents ran in parallel: one implemented the reader fix (landed), one
-investigated the polymorphism design read-only. This ADR carries the design
-and the experiment; the DECISION it asks for is a language-surface change
-(`guest-grammar.edn`), which is not mine to make unilaterally.
+Owner instruction 2026-09-11: solve the language gaps, using subagents. This
+ADR was written as `proposed` with the design and the experiment; the owner
+then accepted option C with the spelling as written, in three steps: (1) the
+grammar authority, (2) the vendor wave, (3) amu PR #932 and its pin.
+
+## What landed for C
+
+| step | repo | sha | what |
+|---|---|---|---|
+| 1 | kotoba-lang | 9c2bb949 | `guest-grammar.edn :core-form-shapes :ns` (all five clauses; `:params` new) and `:require-spec` (`:with`); `:admission-limits :max-template-parameters 8`; `surface-status :other-gaps :module-type-parameters` (`:implemented-partial`, `:implementation #{:compiler}`); digest 515bbc7d → **10ff0062** |
+| 2 | kotoba-sema | e7570df5 | copy at 10ff0062; suites unchanged (nbb 388/1512/0, JVM 508/2379/0) |
+| 2 | grammar | 9fe856e3 | copy at 10ff0062; `embedded` regenerated, `--check` clean |
+| 2 | kotoba-lang | 1e011395 | sema and grammar deferrals removed; **kotoba's two kept**, see below |
+| 3 | amu | **5cc4d826** | PR #932 merged: `module-info` admits `(:params …)` / `:with`, `link-source` keys `[namespace binding]`, one instantiation per distinct binding, refusals by name |
+
+Re-measured at amu main 5cc4d826 after the merge: the template program links,
+compiles to the SAME wasm32-browser bytes as the two hand-written modules
+(sha256 d5f18eca…), and `main` answers 5. west pins advanced for all four.
+
+## What did not close, and why — the `.cljk` rename
+
+On the same day, kotoba-lang, kotoba-sema and grammar renamed every Clojure
+source to `.cljk` (adr-2609111500). Measured by the wave agent: bare
+`clojure -M:test` runs **0 tests** on all three and bare `nbb run-tests…`
+fails `Could not find namespace` — pre-existing on their mains, and the only
+way to measure the suites above was a symlink mirror built outside the repos.
+
+The consequence for this wave is concrete. **kotoba's two grammar copies are
+still at 515bbc7d and recorded as deferred.** kotoba's byte-identity tests
+hash every guest-grammar on its classpath, INCLUDING the pinned kotoba-sema
+copy; the only kotoba-sema commits at 10ff0062 are post-rename, and tools.deps
+cannot load them (`Could not locate kotoba/sema.clj or kotoba/sema.cljc`).
+Both variants were measured: sema pin left behind → `the classpath carries 2
+different guest grammars`; sema pin advanced → the suite cannot load. The
+prepared state is pushed as `wip/gg-wave-module-type-parameters-BLOCKED`
+(e899e8cf) and its commit message says RED. Closing needs a `.cljk` loader on
+the tools.deps classpath, or a JVM-loadable kotoba-sema at 10ff0062.
+
+The same constraint holds amu: its kotoba-sema pin stays at 5065a9c4
+(pre-rename, grammar at 515bbc7d) — a CONSISTENT lag, which is exactly the
+state amu's own vendor test was designed to permit — until sema is loadable
+again. `kotoba adl convert` + `kotoba doctor` therefore run against a
+compiler that admits `(:params …)` but whose grammar copy predates it; this
+is the shape ADR-2609101900 recorded at the repo level, now at the toolchain
+level: **a rename does not fail, and the consumer goes blind.**
+
+Fleet checker after the wave (`check-vendored-copies-fleet`, 12/12 compared):
+guest-grammar in-sync at kotoba-lang / kotoba-sema / grammar, kotoba ×2
+DEFERRED; two remaining findings are capability-catalog drift (amu d1452d3a,
+kotoba-sema 15149f7e vs authority 9dec1e18 — the authority moved one comment
+line in the rename commit). Not this wave's file; not deferred here.
+
+## The doctor tally at amu main, for the record
+
+Same 29-file corpus, all three kotoba-sema fixes reaching it: the
+datom-source cluster has walked protocol-declaration → record-declaration →
+`protocol-method: must contain one result expression` (the honest sentence);
+the other classes are unchanged and still 0 of 29 admitted. `kotoba.set` is
+now UNBLOCKED at the language level by this ADR's spelling — its twelve
+repositories can be written once as templates — and remains blocked by the
+32-item typed-set bound for datalog-sized relations, as recorded.
 
 ## What landed today (accepted, not proposed)
 
