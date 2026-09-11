@@ -1,10 +1,10 @@
 #!/usr/bin/env nbb
 ;; Evidence-floor helpers for kotobase.net lead automations.
 ;;
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs next-form
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs reply-scan --unanswered gmail-unauthenticated
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs reply-scan --scanned N [--matches-edn EDN]
+;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk funnel-pulse
+;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk next-form
+;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk reply-scan --unanswered gmail-unauthenticated
+;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk reply-scan --scanned N [--matches-edn EDN]
 ;;
 ;; Never sends forms, never opens a browser, never raises a score, and never
 ;; treats scanned=0 / fetch-fail / missing files as CLEAN.
@@ -13,7 +13,13 @@
 
 (ns kotobase-lead-loop
   (:require [clojure.edn :as edn]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            ;; The metrics files this loop appends to moved from .edn to .kotoba
+            ;; (Kotoba ADL) in ADR-2609101300 wave 1. Resolved from the root
+            ;; nbb.edn :paths ("scripts/kotoba_adl"), so the bare invocation
+            ;; `nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk`
+            ;; from the superproject root keeps working.
+            [kotoba.adl :as adl]))
 
 (def fs (js/require "node:fs"))
 (def path (js/require "node:path"))
@@ -62,13 +68,30 @@
 (defn- read-edn [p]
   (edn/read-string (slurp-utf8 p)))
 
+;; One record per line, in the notation the file's extension names. Writing
+;; EDN text to a path that ends in .kotoba (or vice versa) is exactly the
+;; defect wave 1 left behind: after the rename this loop kept appending to the
+;; dead .edn path, recreating it untracked in the shared checkout, and nine
+;; pulses lived on one machine until cleanup 2026-09-11 re-encoded them.
+(defn- kotoba-path? [p] (str/ends-with? p ".kotoba"))
+
+(defn- read-data [p]
+  (adl/read-file p))
+
+(defn- read-line-value [p line]
+  (if (kotoba-path? p) (adl/read-string line) (edn/read-string line)))
+
 (defn- pr-edn [x]
   (binding [*print-namespace-maps* false]
     (pr-str x)))
 
 (defn- append-edn-line [p m]
-  (let [line (str (pr-edn m) "\n")
-        prev (when (.existsSync fs p) (slurp-utf8 p))]
+  (let [edn-text (pr-edn m)
+        line (str (if (kotoba-path? p) (adl/edn->adl edn-text) edn-text) "\n")
+        prev (when (.existsSync fs p) (slurp-utf8 p))
+        prev (if (and prev (not (str/blank? prev)) (not (str/ends-with? prev "\n")))
+               (str prev "\n")
+               prev)]
     (spit-utf8 p (str prev line))))
 
 (defn- last-edn-line [p]
@@ -77,7 +100,7 @@
                      (remove str/blank?)
                      (remove #(str/starts-with? % ";")))]
       (when (seq lines)
-        (edn/read-string (last lines))))))
+        (read-line-value p (last lines))))))
 
 (defn- print-kv [k v]
   (println (str k "\t" v)))
@@ -135,7 +158,7 @@
       (.then
        (fn [res]
          (let [pulse-path (.join path root "90-docs" "business"
-                                 "metrics" "net-kotobase-funnel-pulses.edn")
+                                 "metrics" "net-kotobase-funnel-pulses.kotoba")
                as-of (now-iso)]
            (cond
              (or (not (:ok res)) (nil? (:status res)))
@@ -180,10 +203,10 @@
                    (print-kv "RESULT" "unanswered")
                    (.exit process 2))
                  (let [metrics-path (.join path root "90-docs" "business"
-                                          "metrics" "net-kotobase.edn")
+                                          "metrics" "net-kotobase.kotoba")
                        prev (last-edn-line pulse-path)
                        snapshot (when (.existsSync fs metrics-path)
-                                  (:funnel (read-edn metrics-path)))
+                                  (:funnel (read-data metrics-path)))
                        prev-f (or (:funnel prev) snapshot)
                        delta {:visitors (- (:visitors parsed) (or (:visitors prev-f) (:visitors parsed)))
                               :signups (- (:signups parsed) (or (:signups prev-f) (:signups parsed)))
@@ -307,7 +330,7 @@
 (defn- cmd-reply-scan [root opts]
   (let [as-of (now-iso)
         pulse-path (.join path root "90-docs" "business"
-                          "metrics" "net-kotobase-reply-scans.edn")
+                          "metrics" "net-kotobase-reply-scans.kotoba")
         unanswered (:unanswered opts)
         scanned (:scanned opts)]
     (cond
@@ -356,7 +379,7 @@
         (.exit process 0)))))
 
 (defn- usage []
-  (die 1 "usage: nbb kotobase_lead_loop.cljs funnel-pulse|next-form|reply-scan [flags]"))
+  (die 1 "usage: nbb kotobase_lead_loop.cljk funnel-pulse|next-form|reply-scan [flags]"))
 
 (defn -main [& argv]
   (let [root (find-root)

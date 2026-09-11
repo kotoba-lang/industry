@@ -25,5 +25,10 @@
 ;; 例: 90-docs/pricing-intelligence/query.cljk の使い方は同ファイルの冒頭コメント参照。
 ;; この形なら依存解決は起きず、ノード（tarball 配布に orgs/ が無い場合でも
 ;; ship-git-deps! が ~/.gitlibs に置いた tree）で完結する。
-{:paths ["." "scripts/nbb_compat" "scripts/fleet-ci" "70-tools/bmc/src" "70-tools/bmc/test"
+;; `scripts/kotoba_adl` は vendored な `kotoba.adl`（.edn ↔ .kotoba の codec、
+;; `scripts/verify-vendored-adl.cljk` が上流と同一であることを検査する）。
+;; 90-docs/business/metrics が .kotoba に移った（ADR-2609101300 wave 1）ので、
+;; そこへ追記する loop（`90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk`、
+;; hermes cron が root から bare `nbb <file>` で起動）がここから解決する。
+{:paths ["." "scripts/nbb_compat" "scripts/fleet-ci" "scripts/kotoba_adl" "70-tools/bmc/src" "70-tools/bmc/test"
          "70-tools/spotwork/src" "70-tools/spotwork/test"]}
