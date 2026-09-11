@@ -569,7 +569,13 @@
                           ;; ceiling for roots without a pack, or decide who writes
                           ;; packs and advertise 256 on that premise. The cost of
                           ;; leaving it open is measured: 46 seconds.
-                          :ceiling-decision :open
+                          ;; Taken 2026-09-11: a second ceiling for roots without a
+                          ;; pack (kotobase-protocol-ipq fc276320, max-blocks 32,
+                          ;; published as maxBlocksWithoutPack). The shell that
+                          ;; applies it is NOT deployed yet -- see :cljk-rename.
+                          :ceiling-decision :two-ceilings
+                          :unpacked-max-blocks 32
+                          :unpacked-ceiling-deployed false
                           :pack-prize "(N-1) x per-block-ms, upper bound"
                           ;; Measured 2026-09-11 with a root-keyed CARv2 read whole
                           ;; on the first miss (net-kotobase/ipfs 23046cad): 30 -> 1
@@ -589,6 +595,19 @@
                           :pack-opportunity "collapse N fetches into one range read (ADR-2608160100), whose per-chain conclusion does NOT transfer here -- measure before adopting"}
    :policy/performance-evidence "90-docs/query-plane/2026-09-10-query-plane-performance.edn"
    :policy/performance-caveat "nbb / Node 26 on a workstation at loadavg 13-22, not workerd. The ratios are the result; the milliseconds are this machine's"
+   ;; 2026-09-11: another session renamed .cljc/.cljs to .cljk across the
+   ;; kotoba-lang libraries this plane is built from; the owner decided the
+   ;; rename is authoritative. Measured: no tool loads .cljk on its own.
+   ;; `scripts/cljk-classpath.cljs` is the loader for nbb and the JVM
+   ;; (cljk-origin.edn -> symlink mirror outside the repo -> substituted
+   ;; classpath). shadow-cljs has no hook, so a Worker that pins a renamed
+   ;; library cannot build until its shadow-cljs.edn is generated from a
+   ;; mirrored classpath. Every west pin this plane deploys from is pre-rename.
+   :policy/cljk-rename {:authoritative true
+                        :loader "scripts/cljk-classpath.cljs"
+                        :loader-covers #{:nbb :jvm}
+                        :loader-does-not-cover #{:shadow-cljs :clj-kondo}
+                        :pack-range-reader-blocked-on :shadow-cljs}
    ;; Landed 2026-09-10 for the entity-id hazard only. It reports a SHAPE, never
    ;; a verdict: whether a given call's references are entity ids is a property
    ;; of the data. 44,736 files, 19 findings, and both directions plus the
