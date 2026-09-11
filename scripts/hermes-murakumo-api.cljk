@@ -337,7 +337,21 @@
                   :max-tokens 4096
                   :stale-timeout 2400
                   :request-timeout 2400
-                  :env {"HERMES_STREAM_STALE_TIMEOUT" 2400}}})
+                  :env {"HERMES_STREAM_STALE_TIMEOUT" 2400}}
+   ;; qwen38-cyber -- dealignai/Qwen3.8-Flash-Next-CYBERSECURITY-NVFP4 on one
+   ;; B200 with a GPU memory snapshot (kotoba-lang/murakumo ADR-260911b).
+   ;; Measured 2026-09-11 through api.murakumo.cloud: warm ~1 s; cold from a
+   ;; reaped container 176-190 s (Modal restores 127 GiB, then vLLM wakes in
+   ;; 4 s); the first 2-3 cold starts after a redeploy 960-1,600 s (one
+   ;; snapshot per worker type). The gateway holds a request up to 2,000 s
+   ;; for that last case, so the client must hold at least as long -- the
+   ;; owner accepted the 3 min (2026-09-11) over a warm replica at ~$6.3/h.
+   "qwen38-cyber" {:model "qwen3.8-flash-next-cybersecurity-nvfp4"
+                   :context-length 131072
+                   :max-tokens 4096
+                   :stale-timeout 2000
+                   :request-timeout 2000
+                   :env {"HERMES_STREAM_STALE_TIMEOUT" 2000}}})
 
 (defn contract-for
   "The effective contract for one profile directory name. The root config
@@ -1065,6 +1079,7 @@
           (str/includes? out "  custom:\n    models:\n      glm-5.3-flash-cybersecurity-w4a16:\n        stale_timeout_seconds: 2400\n        timeout_seconds: 2400")
           true)
       (is (str "custom-models/" label "-not-main") (str/includes? out "      murakumo-main:\n") false)
+      (is (str "custom-models/" label "-qwen") (str/includes? out "      qwen3.8-flash-next-cybersecurity-nvfp4:\n        stale_timeout_seconds: 2000\n") true)
       ;; no base_url: hermes's provider scan must skip it, never route through it
       (is (str "custom-models/" label "-no-base-url")
           (re-find #"  custom:\n(?:    .*\n)*?    base_url" out) nil))
