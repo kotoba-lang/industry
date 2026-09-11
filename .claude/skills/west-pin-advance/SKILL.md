@@ -24,6 +24,7 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 | **どの pin が remote より遅れているか（1 件）** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
 | **どの pin が remote より遅れているか（fleet 全体）** | `kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljk > pins.tsv`（GraphQL batch。stdout はそのまま `PINS=` に渡せる TSV）。**測れなかった batch は exit 2** で clean と区別する。向きは分類しないので、決めるのは `west-pin-put-batch.cljs` 側 |
 | **pin を前進させる** | `kbb --backend sci scripts/advance-pins.cljk <org> <list-file> --execute`（entry の revision 行だけ書換）→ `kbb --backend sci scripts/verify-west-pins.cljk` |
+| **pin を千本単位で前進させる** | `PINS=pins.tsv MSG="west: …" kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put-bulk.cljk`（同じ 3 検査。到達性と forward は GraphQL `defaultBranchRef.compare(headRef:)` を 50 repo/query、REST は 409 後の差分と minority の compare だけ。実測 2026-09-11: 3,907 pin を 1 commit・約 4 分。**`west-pin-put-batch` は entry ごと REST 3 call + 409 で全件再検証**なので 1,100 本で 5,000/h を食い潰し 91 本しか書けなかった。⚠ `gh api rate_limit` は限度超過中でも満杯を報告する —— 実 call の `X-Ratelimit-Remaining` ヘッダで見る） |
 | **GitHub / local / west.yml の三点ずれ** | `kbb --backend sci scripts/west-triple-sync.cljk plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
 | **ずれの定期検出** | `kbb --backend sci scripts/fleet-sync-tick.cljk check`（検出のみ。書かない） |
 
