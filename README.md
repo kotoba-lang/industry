@@ -25,9 +25,9 @@ business model to an executable operating stack.
 
 ## Current ISIC Blueprints
 
-<!-- BEGIN GENERATED ISIC BLUEPRINTS (nbb scripts/gen-industry-docs.cljk) -->
+<!-- BEGIN GENERATED ISIC BLUEPRINTS (kbb --backend sci scripts/gen-industry-docs.cljk) -->
 
-A curated highlight set (community/open-business reference blueprints, plus every implemented engineering/heavy-industry/mining ISIC entry). This block is generated from `resources/kotoba/industry/registry.edn` -- do not hand-edit it, run `nbb scripts/gen-industry-docs.cljk` instead. The full list of all 347 `:implemented` entries lives in [`docs/isic-coverage.md`](docs/isic-coverage.md).
+A curated highlight set (community/open-business reference blueprints, plus every implemented engineering/heavy-industry/mining ISIC entry). This block is generated from `resources/kotoba/industry/registry.edn` -- do not hand-edit it, run `kbb --backend sci scripts/gen-industry-docs.cljk` instead. The full list of all 347 `:implemented` entries lives in [`docs/isic-coverage.md`](docs/isic-coverage.md).
 
 ### Community / open-business reference blueprints
 
@@ -152,13 +152,13 @@ other in the workspace, so it is compiled in instead.
 ## Test
 
 ```bash
-clojure -M:test                       # JVM
+kbb -M:test                       # JVM
 
 # ClojureScript, no build step. <technology/src> is the checkout of
 # kotoba-lang/technology named in deps.edn.
-nbb --classpath src:test:<technology/src> test/run_portable.cljk
+kbb --backend sci --classpath src:test:<technology/src> test/run_portable.cljk
 
-nbb tools/gen-embedded.cljk           # after editing the EDN
-nbb tools/gen-embedded.cljk --check   # exit 1 if the projection is stale
-nbb tools/mutate.cljk                 # prove the suite can fail
+kbb --backend sci tools/gen-embedded.cljk           # after editing the EDN
+kbb --backend sci tools/gen-embedded.cljk --check   # exit 1 if the projection is stale
+kbb --backend sci tools/mutate.cljk                 # prove the suite can fail
 ```

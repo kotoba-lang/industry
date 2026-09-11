@@ -27,9 +27,9 @@ Aircraft and aerospace manufacturing enablement:
 
 ## Full coverage
 
-<!-- BEGIN GENERATED ENGINEERING COVERAGE (nbb scripts/gen-industry-docs.cljk) -->
+<!-- BEGIN GENERATED ENGINEERING COVERAGE (kbb --backend sci scripts/gen-industry-docs.cljk) -->
 
-Generated from `resources/kotoba/industry/registry.edn` -- do not hand-edit, run `nbb scripts/gen-industry-docs.cljk`. All 69 `:implemented` ISIC entries across mining/extraction (divisions 05-09) and basic metals through industrial repair/installation (divisions 24-33):
+Generated from `resources/kotoba/industry/registry.edn` -- do not hand-edit, run `kbb --backend sci scripts/gen-industry-docs.cljk`. All 69 `:implemented` ISIC entries across mining/extraction (divisions 05-09) and basic metals through industrial repair/installation (divisions 24-33):
 
 | ISIC | Business | business-id |
 |---|---|---|
