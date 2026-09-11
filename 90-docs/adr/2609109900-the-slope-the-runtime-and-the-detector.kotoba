@@ -2,7 +2,7 @@
   (:adr/doc_type "adr")
   (:adr/id "adr-2609109900-the-slope-the-runtime-and-the-detector")
   (:adr/topic "query-plane-followups")
-  (:adr/title "傾き・runtime・検出器 —— 天井を超えたら chain は 16 本あり、pack を置いたら賞金の 94% が実現した")
+  (:adr/title "傾き・runtime・検出器 —— 天井を超えたら chain は 16 本あり、pack で賞金の 94%、広告する上限 256 は届くが 36 秒かかる")
   (:adr/status "accepted")
   (:adr/date "2026-09-10")
   (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
@@ -22,8 +22,7 @@
     (:machine "10 cpus, loadavg 13.0-29.2 during the runs")
     (:evidence "90-docs/query-plane/2026-09-10-query-plane-followups.edn")
     (:not-measured (vector "a range read through the index" "the engine compiled"
-                    "whether maxBlocks 256 completes at all -- 28s is an extrapolation"
-                    "who writes packs, and when"))))
+                    "who writes packs, and when -- and therefore which of the two ceilings to advertise"))))
   (:adr/body "## Context
 
 ADR-2609109800 は次の 3 つを名指しで残した。オーナーが逆順（3 → 2 → 1）で
@@ -328,9 +327,52 @@ pack が無い**（旧 root には残る）。書き手が pack を作る運用�
 これは ADR-2608160100 の catalog + 「write 側で read-locality を作る」の話で、
 この ADR は価格を測っただけ。
 
+## Q3e —— 広告している上限は届く。ただし 36 秒で（2026-09-11）
+
+3 回の ADR 更新で「約 28 秒は外挿」と持ち越してきた問いを、上限の幅の DAG を
+作って測った。`build_wide_fixture.cljs`: root 1 + leaf 255 の dag-cbor、
+256 block 全部を R2 に置き（content-addressed なので fixture は litter ではなく
+誰も link しない block）、同じ root の CARv2 pack（50,717 bytes、index 10,270 =
+256 x 40 + 30）も置いた。`explore-range` で leaf を k 本だけ歩くので、
+**1 つの root から 32 / 64 / 128 / 256 の曲線が両方の経路で引ける** ——
+同じ graph、同じ block、同じ root。Q3d の表が主張できなかった対称性である。
+pack の object を消して測り、戻して測った。
+
+    asked   status  fetches  pack     p50      p90    io-ms   io/wall   ms/blk
+    ── pack を消した（per-block 経路）──
+       32      200       32  miss    4160     6616     3877     93%      130
+       64      200       64  miss    8795    11122     8429     96%      137
+      128      200      128  miss   18360    23690    17927     98%      143
+      256      200      256  miss   36333    45981    35582     98%      142
+    ── pack を置いた ──
+       32      200        1   hit     299      747      128              9
+       64      200        1   hit     243      250      111              4
+      128      200        1   hit     349      445      186              3
+      256      200        1   hit     338      390      119              1
+
+**答え: 届く。3/3 完走した。ただし p50 36.3 秒、p90 46.0 秒。** Worker の限界には
+当たらなかった（subrequest 256、CPU は I/O 待ちなので使っていない）が、
+**46 秒待てる caller は居ない** —— 「advertised limit は deliverable」と
+「advertised limit は usable」は別の主張で、後者は per-block 経路では偽である。
+
+- **28 秒の外挿は楽観だった。** 256 では 142 ms/block —— 32 block の 109 より高い。
+  io-ms が 98% なので re-walk ではなく R2 側の値で、日をまたいだ変動の範囲。
+- **pack なら 256 block が 338 ms、1 fetch。107 倍。** ms/block は 1。
+  上限の幅で pack を読んでも whole read 1 回（51 KB）で足りる。
+- **per-block 経路の io/wall は幅とともに 93% -> 98% に上がる**: 幅が広いほど
+  コストは純粋に R2 の round trip になり、pack が消せる割合が上がる。
+
+**決定として書けること**: profile が 256 を広告し続けるなら、**その幅の traversal は
+pack 経由でしか実用的に届かない。** per-block 経路で 256 を許すのは 46 秒の request を
+許すことで、それは「上限」ではなく「制限が無いこと」の別名である。
+選択肢は 2 つ —— (a) pack の無い root には per-block の実効上限（例: 32 = 4 秒）を
+別に切る (b) pack の書き手を決めて、広告する上限は pack を前提にする。
+**どちらを採るかは Q3d の「pack を誰がいつ書くか」と同じ 1 つの決定**なので、
+ここでは選ばない。選ばずに置いておくことの代償は測った: 46 秒。
+
 ## 測っていないこと（clean ではなく未測定）
 
-- **maxBlocks 256 が実際に完走するか。** 上の 28 秒は外挿。
+- ~~maxBlocks 256 が実際に完走するか~~ —— **完走する。36 秒。上の Q3e。**
 - **range read（index 経由の部分読み）の価格。** whole read で上限を測った。部分読みは
   pack が大きく traversal が小さいときに効く形で、`v2/locate` は在るが reader が無い。
 - **pack を誰がいつ書くか。** 運用も catalog も決めていない。
