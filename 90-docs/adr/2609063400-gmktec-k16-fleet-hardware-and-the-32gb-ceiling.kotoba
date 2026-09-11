@@ -79,7 +79,15 @@ TP の話であり、EP には当たらない。
 forward 回数が AR 1146 に対し block=4 で 492 ——**2.36 分の 1**。単機では速さだが、
 **分散では同期往復がそのまま 2.36 分の 1 になる。**
 
-## 律速はメモリではなく OS である
+## 律速はメモリではなく OS である —— ⚠ 2026-09-11 に前提が変わった
+
+**この節が書かれた 09-06 時点では真だったが、09-11 の実測で K16（`aiueos-node`、
+100.66.205.17）は Ubuntu 24.04 / kernel 6.8 で稼働し、tailscale に居る**
+（`tailscale nc` 経由の ssh で到達。MagicDNS は引けない）。**PyTorch も ROCm も
+まだ無い**ので「torch が存在しない」は今も真だが、理由は OS ではなく未導入。
+同日に測った未測定項目 1 の答え: **VRAM 5 GiB（BIOS UMA）+ GTT 13 GiB = GPU から
+見える 18 GiB**。`gfx_target_version 100305`（gfx1035）を kfd が報告する。
+`/` は 98 G の LV で残 9 GB、VG に 374 G 未割当。以下は 09-06 時点の記述。
 
 上の計算は「K16 が PyTorch を動かせる」ことを前提にしているが、**それは今日
 成り立っていない。**
@@ -96,7 +104,8 @@ forward 回数が AR 1146 に対し block=4 で 492 ——**2.36 分の 1**。�
 ## 未測定（仮定として使わないこと）
 
 1. **iGPU は LPDDR5 を CPU と共有する。** 32GB のうち何 GiB を VRAM として
-   切れるかは未測定。gad の gfx1151 が 48 GiB を carve-out できたことを
+   切れるかは未測定。→ **2026-09-11 実測: 5 GiB VRAM + 13 GiB GTT（既定）。**
+   kernel の `amdgpu.gttsize` と BIOS UMA で広げられる範囲は未測定。gad の gfx1151 が 48 GiB を carve-out できたことを
    K16 に外挿してはならない。**上の 16.3 GiB が入るかは、この値が決める。**
 2. **Radeon 680M は gfx1035（RDNA2）** で、gad の gfx1151 とは世代が違う。
    ROCm と torch がどこまで動くかは未測定。

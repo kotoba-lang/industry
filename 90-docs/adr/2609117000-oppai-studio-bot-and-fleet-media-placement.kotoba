@@ -133,7 +133,35 @@ env file から読み **この Mac に渡らない**。
 - **fleet gate 無し。** bot の test は fans-oppai の `npm test` で回るが、fleet の
   `gates.edn` には載せていない（gate を足すなら落ちることを先に見せる）。
 
+## 稼働率（2026-09-11、loop 起動から 3 時間の実測）
+
+receipts 422、全部 pass、**144 件/時**（画像 ≈ 78、LTX ≈ 36、10Eros ≈ 12、音声 ≈ 30）。
+mini の GPU busy は ComfyUI の execution_start / success から算出して **57〜69%**、
+gad は瞬間値 100%（v034 の CPU 累計 ≈ 66%）、judah / levi は **≈ 5%**（TTS が 8 s/本）。
+遊びの正体は tick の粒度: 5 分 × cap 2 = 312 s 分しか積まず、1 job 156 s なので次の
+tick までに queue が空く。**上げるなら `:per-node-queue-max 2 → 4`**（1 行）。
+オーナー判断「ひとまず今の状態で ok」により据え置き。数値は当日の値で、今日の値は
+`kbb --backend sci … oppai_studio_tick.cljs --report` が持つ。
+
+## H3 Eros を他の箱へ、という問いへの答え（2026-09-11）
+
+- **32 GB 機**: 段階ピークは TE 15 GB → UNET 20 GB(+activation) → VAE 5 GB
+  （gad の v034 ログ実測）。数字上は入るが常駐不可・geometry 固定・wired 上限変更が要る。
+- **K16（aiueos-node、7735HS / 680M gfx1035 / 32 GB）**: ADR-2609063400 の
+  「AIUEOS で tailnet 不在」は古く、**Ubuntu 24.04 で tailscale に居る**（同日実測）。
+  ただし GPU に見えるのは **VRAM 5 GiB + GTT 13 GiB = 18 GiB** で UNET 段が入らない。
+  `amdgpu.gttsize` と BIOS UMA で 25〜29 GB まで届く可能性はあるが未測定。ROCm も
+  torch も無く、`/` は 98 G の LV で残 9 GB（VG に 374 G 未割当）。gfx1035 で
+  `comfy_kitchen` の int8 / nvfp4 が走るかは未測定。**10Eros は gad に置いたまま**。
+
+## resume point
+
+- loop は `network.awai.bot.oppai-studio`（kbb 版 plist、pin cd5646dc 時点の checkout）。
+  次の一手は稼働率を上げるなら `:per-node-queue-max 4`、K16 を測るなら
+  `lvextend` → `amdgpu.gttsize=24576` → torch-rocm probe の順（本文の順序）。
+- 受け入れていない: SVD-XT（16 GiB では 1 step 215〜280 s）、mlx_audio.server 常駐。
+
 ## 改訂履歴
 
-- 2026-09-11: 起草。"))
+- 2026-09-11: 起草。同日、稼働率 3 時間分と K16 / 32 GB の回答、resume point を追記。"))
 )
