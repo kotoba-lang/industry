@@ -45,6 +45,10 @@
           packed (v2/pack {:roots [root] :blocks ordered})
           out (path/join packs-dir (str root ".car"))]
       (fs/writeFileSync out (js/Buffer.from (:bytes packed)))
+      ;; The link order is what explore-range walks, so a partial upload for
+      ;; the per-block comparison needs to know which leaves come first.
+      (fs/writeFileSync (path/join out-dir "manifest.edn")
+                        (pr-str {:root root :leaves leaf-cids :pad pad}))
       (println "root        " root)
       (println "blocks      " (count @store) "(1 root +" n "leaves)")
       (println "root bytes  " (.-length (get @store root)))
