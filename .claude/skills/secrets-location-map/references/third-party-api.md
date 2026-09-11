@@ -185,3 +185,13 @@ https://content.info.gbiz.go.jp/api/index.html → 利用申請 → メールで
 **失敗が 200 で返る。** トークン無しの POST は 200 と HTML（「ダウンロードには
 アクセストークンが必要です。」）を返すので、status code を成功判定に使わない。
 collector は Content-Disposition と ZIP magic を見る。
+
+## OpenRouter（account `network-awai`、支払い・BYOK・provider 申請）
+
+| 場所 | 何 |
+|---|---|
+| macOS Keychain | service `gftd.openrouter` / account `OPENROUTER_API_KEY` —— 通常の inference key（`manifest/hermes-budget-policy.edn` の `:budget/key-service` が名指す） |
+| macOS Keychain | service `gftd.openrouter` / account `OPENROUTER_MANAGEMENT_KEY` —— **management key**（2026-09-11 格納）。`/api/v1/byok` / keys / credits の管理専用で completion には使えない。作る場所は https://openrouter.ai/settings/management-keys（`/settings/keys` で作る key は `is_management_key: false`） |
+| Cloudflare Worker secret | `MURAKUMO_OPENROUTER_API_KEY`（cloud-murakumo-api）—— 値は Worker にしか無い |
+
+**どちらの key かは `GET /api/v1/key` の `is_management_key` で見分ける** —— prefix はどちらも `sk-or-v1-`。
