@@ -6,8 +6,8 @@
   (:adr/doc-type "adr")
   (:adr/source-format "edn")
   (:adr/date "2026-09-01")
-  (:adr/last-verified "2026-09-01")
-  (:adr/last_verified "2026-09-01")
+  (:adr/last-verified "2026-09-11")
+  (:adr/last_verified "2026-09-11")
   (:adr/authoritative true)
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/topic "awai-openrouter-original-japanese-models")
@@ -29,6 +29,8 @@
    "2026-09-01 console readback: Hugging Face awai-network Dedicated Endpoints は 0 items。GLM-5.3-Flash catalog form は RTX PRO 6000 Blackwell 96 GB x1 を $2.75/h と表示するが Incompatible Hardware。Private と min 0 / max 1 scale-to-zero は選べるが deploy は未実行"
    "2026-09-01 OpenRouter BYOK UI: Baseten と Together の接続テストは既存 catalog model z-ai/glm-5.3-flash で成功した。BYOK は custom model id の登録ではない"
    "2026-09-01 OpenRouter API: 未登録 id awai-network/basho は HTTP 400 invalid model ID。provider/catalog onboarding が必要"
+   "2026-09-11 OpenRouter management API: BYOK の Azure per-deployment config は endpoint_url の host を検証する。api.murakumo.cloud を書いた POST /api/v1/byok は HTTP 400 \"0.endpoint_url: Must be a valid Azure endpoint URL (*.azure.com)\"。guide は host 制限を書いていないが API が enforce する。BYOK guide の「it doesn't change which endpoints you're allowed to route to」のとおりで、BYOK 経由で murakumo を OpenRouter に繋ぐ道は Azure 形でも無い。BYOK guide に URL を取る provider は他に無い"
+   "2026-09-11 cloud-murakumo-api main 583799e: Azure OpenAI data-plane 形（POST /openai/deployments/{d}/chat/completions?api-version=…、api-key header）を /v1/chat/completions + model=d に書き換える facade を deploy（version 90fff380）。glm-5.3-flash-cybersecurity-w4a16 に対し live 200、x-murakumo-served-model 一致、cold wait 1,088 s。OpenRouter には使えないが Azure 形しか話せない client の入口として残す"
    "2026-09-01 Hugging Face: private empty repository awai-network/basho は存在するが endpoint と fine-tuned artifact は未作成"
    "Qwen official Hugging Face card: Qwen/Qwen3.8-Flash-Next は 180B image-text-to-text model。FP8 variant も公式公開"
    "MiniMax official Hugging Face card: MiniMaxAI/MiniMax-H3 は 33B audio-video generation system"
