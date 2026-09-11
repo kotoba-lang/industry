@@ -30,9 +30,18 @@ description: JVM / Clojure に依存している toolchain（amu・kotoba-sema�
 1. **測る。** kotoba-lang の worktree で:
    ```bash
    R=/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang
-   cd $R/amu && kbb --backend sci --classpath "<kotoba-lang wt>/src:<kotoba-lang wt>/scripts:$R/text/src:$R/kotoba-sema/src:$R/amu/src" \
-     <kotoba-lang wt>/scripts/measure-selfhost-distance.cljk --amu $R/amu --output <kotoba-lang wt>/lang/selfhost-distance.edn
+   A=<amu worktree at origin/main, node_modules symlinked from $R/amu>
+   cd $A && nbb --classpath "<kotoba-lang wt>/src:<kotoba-lang wt>/scripts:$R/text/src:$R/kotoba-sema/src:$A/src" \
+     <kotoba-lang wt>/scripts/measure-selfhost-distance.cljk --amu $A \
+     --compat <kotoba-lang wt>/lang/compat --output <kotoba-lang wt>/lang/selfhost-distance.edn
    ```
+   ⚠ `--compat` は**絶対 path で必ず渡す**。cwd 相対の既定が amu の cwd から解決されて
+   「project path is not readable」を 225 件、*拒否の顔で*出した（2026-09-11、9 回目）。
+   script は今は compat root 不在で refuse するが、refuse は測定ではない。
+   ⚠ `--amu` は**共有 checkout ではなく worktree**。共有 amu checkout は bot が commit を積んで
+   pin から外れており、古い sema を classpath に載せたまま測った回がある（4 回目）。
+   ⚠ この block の `nbb` を `kbb --backend sci` に**書き換えない**。measure script は nbb で動く
+   運用 tool で、一括書き換えが 3 回この loop の測定を壊した（detector: `verify-kbb-rewrite-path-literals`）。
    読むのは **`:project-check-gate :by-message`**（single-file の
    `:namespace-require-needs-project` は harness であって言語の壁ではない）。
    ⚠ `:passed 0` は「何も admit されない」であって「測れなかった」ではない ——
@@ -58,23 +67,26 @@ description: JVM / Clojure に依存している toolchain（amu・kotoba-sema�
    手順 1 を再実行して `selfhost-distance.edn` を更新して commit。
    **件数が動かなかった反復は失敗として記録する**（緑でも赤でもなく「変わらなかった」）。
 
-## 壁の順番（2026-09-11 夜、amu 79e07a5a / 210 source で測り直した分。数は毎回測り直す）
+## 壁の順番（2026-09-12 01:40、amu 10469db0 / 225 source。数は毎回測り直す）
 
-同日中に突破済み（compiler 側）: ns attr-map `{:kotoba/export …}` / reader の `#_` `#?@` `#:ns{}` `\uXXXX`
-`'form` `\c` `0N` `1.5M` 9+ 要素 int set、`#"…"` `#js` は tagged form として**読んで**選ばれたら名指し拒否 /
-`:refer` / `:refer-clojure` no-op / docstring bound 64 KiB / keyword-key map literal の値型混在 → closed record /
-`into` の 1 段 transducer / `#=` の拒否を reader dispatch へ。read gate は 103/178 → 201/210。
+12 時間で compiler 側に入った突破: ns attr-map / reader 3 段（`#_` `#?@` `#:ns{}` `\uXXXX` `'` `\c` `0N` `1.5M` 9+ int set、
+`#"…"` `#js` は tagged で読んで名指し拒否、`#=` は dispatch で拒否）/ `:refer` / `:refer-clojure` no-op / docstring 64 KiB /
+keyword-map → closed record / `into` transducer / `def` の compile-time folding / `clojure.core/` prefix / string literal 64 KiB /
+`clojure.set` template + default binding / `kotoba.lang.text` forwarding compat（`replace` 新規）/ `.kotoba` twin が `.cljk` を shadow /
+variadic defn（sema 着地、amu pin 待ち）。source 側: `:kotoba/export` を amu + sema + 依存 25 repo、amu deps.edn に明示 floor。
+read gate 103/178 → 214/225。project route の admit はまだ 0。
 
 | 壁 | 件数 | 種別 | 手 |
 |---|---|---|---|
-| `:export` 未宣言 | 58 | source | `scripts/annotate-kotoba-export.cljk`（amu）を未 annotate の repo / pin hold（io-ipld, json）に当てる |
-| `qualified call is not an admitted exported import` | 24 | source | `(:require …)` が `#?@(:clj … :cljs …)` の中で `:kotoba` 枝が無い → `:kotoba` 枝を書く |
-| `:import` / host module string require | 23 + 17 | 性質 | host 層を module 分割（capability import） |
-| missing module（`clojure.set` `clojure.walk` …） | 22 | 言語 stdlib | `kotoba-lang/lang/compat/clojure/*.kotoba` に**厳密同値**だけ足す（近似を本名で置かない） |
-| reader（`:clj` 専用 key で奇数になる map 等） | 19 | source | `:kotoba` 枝 |
-| `def` の非定数（純粋式） | 9 | 実装状態 | compile-time folding（反復進行中） |
-| `ex-info` 呼び出し | 5 | 性質（untracked control effect） | 境界を `[:result T E]` に |
-| `record-get … got :i64`（keyword→record table の動的 key lookup） | 2+ | 実装状態 | `def` table を `[:map :keyword R]` に型付ける経路 |
+| reader（依存の中の `:clj` 専用 key map、`\c`） | 43 | source | `:kotoba` 枝 |
+| missing module（`clojure.walk` `clojure.pprint` …） | 28 | 言語 compat | `lang/compat/clojure/walk.kotoba`（厳密同値のみ） |
+| variadic `defn` | 18 | 実装状態 | fn profile の静的特殊化を defn へ（sema 00e68a3） |
+| `:import` / host string require | 14 + 16 | 性質 | host 層を分割 |
+| 複数式 body（`function must contain one result expression`） | 14 | grammar 決定（explicit `do`） | ADR: `fn`/`defn` の implicit do を admit するか |
+| `map-indexed` | 9 | stdlib gap | `loop` + `vector-at` lowering（進行中） |
+| map callback の destructuring `[[k v]]` | 9 | 値モデル | vector-i64 source に位置が無い —— pair source を持つか source 側 |
+| qualified call（`#?@` require の `:kotoba` 枝欠落 / absent compat 名） | 9 | source | `:kotoba` 枝 |
+| `ex-info` | 5 | 性質 | `[:result T E]` |
 
 ## JVM tool の側（compiler の外）
 
