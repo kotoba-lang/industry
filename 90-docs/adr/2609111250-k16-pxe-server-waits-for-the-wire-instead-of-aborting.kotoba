@@ -1,0 +1,43 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111250-k16-pxe-server-waits-for-the-wire-instead-of-aborting")
+  (:adr/topic "k16-pxe-launchd")
+  (:adr/title "k16 PXE server は線が無いとき待つ —— ENXIO を 4 thread で同時に踏んで finalize 中に abort していた launchd job（86 run・crash report 22 件）の修正")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "kotoba-lang/aiueos" "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2609111500-cljk-rename-all-clojure-source"
+                "adr-2608136000-eight-questions-before-trusting-green"))
+  (:adr/validation (map
+    (:kind "both directions under the launchd environment with en15 absent: origin/main ba10659 exits 134 with the same Fatal Python error; the fix prints one AIUEOS_PXE_INTERFACE_ABSENT line and waits (killed at 4 s, exit 124). --selftest exit 0; the two-poll boundary moved to 3 makes it exit 1. Reloaded job: runs = 1, never exited, last crash report predates the reload.")
+    (:landed "kotoba-lang/aiueos main 2de9a1a6 (merge of c5e7a017); west pin advanced on root main a30420ef (single-entry PUT, blob-sha precondition, verified ahead 2 / behind 0 from the pin the tip held: ba10659)")
+    (:not-measured "the serve path with the adapter present -- en15 and en8 were both absent for the whole session, so the wait -> serve transition has only the selftest (injected index) behind it")))
+  (:adr/body "## 何が起きたか
+
+launchd job `com.gftd.k16-murakumo-node`（`os/aiueos/tools/k16-pxe-server.py`）が 30 秒ごとに SIGABRT で落ちていた。Python 3.14.6、`_Py_Finalize → flush_std_files → _enter_buffered_busy → _Py_FatalErrorFormat`。runs = 86、`~/Library/Logs/DiagnosticReports/Python-*.ips` が 22 件。
+
+根は crash ではなく **PXE 側の USB アダプタ `en15` が抜けていた**こと。`bind_interface()` の `socket.if_nametoindex(\"en15\")` が ENXIO（Device not configured）を返し、dhcp（main thread）・tftp・http・netlog（daemon thread 3 本）が同時にそれを踏む。main が例外で抜けて finalize に入る間に daemon thread がまだ traceback を stderr に書いており、stderr の BufferedWriter のロックが取れずに abort した。**22 件の crash report のどれも「アダプタが無い」とは言っていない** —— report が指すのは finalize の race で、原因はその 2 層下の syscall に在った。
+
+## 決定
+
+1. **listener を起動する前に線を待つ。** `wait_for_interfaces([INTERFACE])` が `AIUEOS_PXE_INTERFACE_ABSENT interface=en15 poll_seconds=10 hint=plug-the-adapter` を 1 行出し、10 秒ごとに `if_nametoindex` を引き直し、線が戻れば `INTERFACE_PRESENT waited_polls=N` を出して起動する。launchd job としては「落ちて 30 秒後に再試行」ではなく「載ったまま待つ」が正しい形 —— KeepAlive の再起動は状態を持たず、何を待っているかを誰にも言わない。
+2. **bus3（`en8`）は待たない。** relay は既存の refuse-by-name 経路（`AIUEOS_BUS3_RELAY_REFUSED`）を持つ。relay が落ちていることを、生きている線での board の boot を止める理由にしない。
+3. **listener が例外で抜けたら process ごと落とす。** `serve_plane(name, target)` が traceback と `AIUEOS_PXE_PLANE_DOWN plane=… exit=70` を出して `os._exit(70)`。TFTP だけ死んで他のログが健康に見える deaf な server を残さず、KeepAlive に丸ごと戻させる。`os._exit` は finalize（今回 abort した場所）を通らない —— traceback を書き終えた thread に flush するものは残っていない。
+4. **selftest は両方向 + 境界 + 実 syscall の control。** `lo0` は index を返し、架空の名前 `aiueos-no-such-wire0` は `None`（main が gate に使う同じ関数で）。absent×2 → present で sleep がちょうど 2 回 `[0.25, 0.25]`。境界を 3 に変えると赤になることを確かめた。壊れた plane は `exit` を 1 回だけ呼び、正常に返る plane は呼ばない。
+
+## 測定
+
+| | 結果 |
+|---|---|
+| origin/main `ba10659` を plist と同じ env で実行 | exit 134、同じ `Fatal Python error: _enter_buffered_busy` |
+| 修正版を同じ env で実行 | ABSENT 1 行を出して待ち続ける（4 秒で kill、124） |
+| `--selftest` | 0 / 境界を壊した copy は 1（AssertionError 1 件） |
+| bootout → bootstrap 後 | runs = 1、last exit code = (never exited)。最新 crash report は reload 前の 12:52:05 のまま |
+
+**測っていないもの**: アダプタを挿したときの wait → serve の遷移。セッション中 `en15` も `en8` も存在しなかったので、そこは injected index の selftest しか通っていない。挿した直後の `server.log` に `AIUEOS_PXE_INTERFACE_PRESENT` と `AIUEOS_PXE_TFTP_READY` が続けて出ることが次の 1 測定。
+
+## 着地の経路で見えたこと（触っていない 2 件）
+
+- **`scripts/west-pin-put.cljk` は動かない。** `.cljk` rename（ADR-2609111500）の後、nbb は `require` で `.cljk` を解決しないので `scripts.nbb-compat` が見つからない。owner 判断は「互換 mirror を作らず fix-forward」なので、pin 前進は同じ 3 検証（default branch 到達性・tip が実際に持つ pin からの fast-forward・blob SHA precondition）を `gh api` で手で組み、single-entry PUT で着地させた。⚠ **west.yml は 1 MB を超えるので contents API は本文を返さない** —— `git/blobs/<sha>` で読む。ローカルの west.yml は tip より遅れていた（aiueos pin が `7d2f2b7` vs tip `ba10659`）ので、tip から読んだことが効いた。
+- **plist は `~/.gftd/k16/...` を指し、`~/.gftd` は `~/.itonami-fleet` への symlink（9/8）。** CLAUDE.md は「`~/.gftd` はもう存在しない・実体は `~/.itonami`」と書くが、`~/.itonami/k16` は無い。どちらかが古い。この ADR はどちらも書き換えない。")))
