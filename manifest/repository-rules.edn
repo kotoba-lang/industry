@@ -60,6 +60,21 @@
    ;; A name with a dot cannot be one DNS label, so it cannot be an entry
    ;; host; such a site stays on a path plane. Measured constraint, not style.
    :policy/entry-name-constraint :single-dns-label
+   ;; Owner accepted 2026-09-11: public user sites are a separate namespace,
+   ;; not labels assigned beside first-party apps. This records the destination;
+   ;; it does not provision DNS, TLS, registration, or authorization.
+   :policy/public-sites
+   {:authority "90-docs/adr/2609112200-free-sites-namespace.kotoba"
+    :entry "https://{name}.sites.itonami.app/"
+    :dnslink-record "_dnslink.{name}.sites.itonami.app"
+    :name-constraint :single-dns-label
+    :control-origin "https://kotoba.cloud"
+    :storage-origin "https://kotobase.net"
+    :agent-work-origin "https://itonami.cloud"
+    :first-party-entry "https://{name}.itonami.app/"
+    :public-registration-status :not-open
+    :namespace-delegation :not-offered
+    :availability-claim :verified-receipt-required}
    ;; A :document is ONE self-contained file. A page that fetches its runtime
    ;; by relative path is right for a directory served over HTTP and wrong for
    ;; a content address -- an address that cannot be fetched and run on its own
