@@ -87,21 +87,21 @@
 ;; ── 1. the projection matches the workspace ───────────────────────────────
 
 (defn check-projection! []
-  (run-generator "itonami-valueflows-bind.cljs" projection "binding"))
+  (run-generator "itonami-valueflows-bind.cljk" projection "binding"))
 
 (defn check-resource-projection! []
-  (run-generator "uchiwake-valueflows-resources.cljs" resource-projection "resources"))
+  (run-generator "uchiwake-valueflows-resources.cljk" resource-projection "resources"))
 
 (defn check-recipe-projection! []
   ;; The only projection with quantities, so the only one the algorithms can run
   ;; on. A silent regeneration that changed a mass would change an explosion.
-  (run-generator "uchiwake-valueflows-recipes.cljs" recipe-projection "recipes"))
+  (run-generator "uchiwake-valueflows-recipes.cljk" recipe-projection "recipes"))
 
 (defn check-cost-projection! []
   ;; The cost basis derived from the pinned prices. --check is deterministic: it
   ;; reads the committed observation file and never touches the network, so a
   ;; FRED outage cannot make this red and a stale price cannot make it green.
-  (run-generator "commodity-prices.cljs" cost-projection "costs"))
+  (run-generator "commodity-prices.cljk" cost-projection "costs"))
 
 (defn check-price-observations! []
   ;; The prices are PINNED, and the pin is what makes the cost projection

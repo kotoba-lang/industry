@@ -148,7 +148,7 @@
 ;; the authority and this shells out to it, the same way the fleet gates call
 ;; the checker they wrap rather than restating it. Two implementations of one
 ;; check is how a state where only one of them passes gets created quietly.
-(def ^:private quorum-script (io/file root "scripts" "verify-kip-quorum.cljs"))
+(def ^:private quorum-script (io/file root "scripts" "verify-kip-quorum.cljk"))
 
 (def quorum-check
   (if-not (.exists quorum-script)

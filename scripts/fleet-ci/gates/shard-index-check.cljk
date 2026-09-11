@@ -42,7 +42,7 @@
   ;; 2026-08-06 に `/opt/homebrew/bin/nbb` を tree 根と誤解した実例がある）。
   (let [argv (vec (js->clj js/process.argv))
         i (first (keep-indexed
-                  (fn [i a] (when (str/ends-with? (str a) "shard-index-check.cljs") i))
+                  (fn [i a] (when (or (str/ends-with? (str a) "shard-index-check.cljk") (str/ends-with? (str a) "shard-index-check.cljs")) i))
                   argv))]
     (or (when i (get argv (inc i))) ".")))
 
@@ -61,19 +61,19 @@
     {:out out :status (.-status r)}))
 
 (defn -main []
-  (doseq [f [(str tool "/test/run_tests.cljs")
-             (str tool "/bench/check_budget.cljs")
+  (doseq [f [(str tool "/test/run_tests.cljk")
+             (str tool "/bench/check_budget.cljk")
              (str tool "/bench/budget.edn")]]
     (when-not (.existsSync fs (str dir "/" f))
       (println "shard-index-check: 必要なファイルが無い（" f "）— tree が不完全")
       (js/process.exit 1)))
 
-  (let [t (run "correctness" (str tool "/test/run_tests.cljs") [])
+  (let [t (run "correctness" (str tool "/test/run_tests.cljk") [])
         ;; 「failed: 0」が出ていることを積極的に確認する。exit 0 かつ無出力を
         ;; 合格にしない。
         t-ok? (and (str/includes? (:out t) "failed: 0")
                    (not (str/includes? (:out t) "FAIL:")))
-        b (run "get budget" (str tool "/bench/check_budget.cljs") [])
+        b (run "get budget" (str tool "/bench/check_budget.cljk") [])
         b-ok? (and (str/includes? (:out b) "OK: within budget")
                    (not= 1 (:status b)))]
     (cond

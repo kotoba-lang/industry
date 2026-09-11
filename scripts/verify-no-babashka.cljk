@@ -118,6 +118,6 @@
 (apply -main
        (let [args (vec *command-line-args*)
              script? (when (seq args)
-                       (or (str/ends-with? (first args) "verify-no-babashka.cljs")
+                       (or (or (str/ends-with? (first args) "verify-no-babashka.cljk") (str/ends-with? (first args) "verify-no-babashka.cljs"))
                            (str/ends-with? (first args) "verify-no-babashka")))]
          (if script? (rest args) args)))

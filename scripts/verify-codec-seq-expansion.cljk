@@ -54,7 +54,7 @@
          '["node:path" :as path]
          '[clojure.string :as str])
 
-(def source-ext #{".clj" ".cljc" ".cljs"})
+(def source-ext #{".clj" ".cljc" ".cljs" ".cljk"})
 
 (def codec-ns-hint
   "codec 形とみなす namespace / ファイル名の断片。ここを広げるほど偽陽性が増える

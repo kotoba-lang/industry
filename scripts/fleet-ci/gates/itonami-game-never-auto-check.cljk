@@ -102,7 +102,7 @@
                           (re-seq #":[a-z0-9-]+" (nth m 1)))))
         (re-seq #":auto\s+#\{([^}]*)\}" phase-text)))
 
-(when-let [d (slurp* "district.cljc")]
+(when-let [d (slurp* "district.cljk")]
   ;; The board's phase table is built in `spec`. Two things must hold in that source:
   ;; `:auto` comes from `auto-keys`, and `auto-keys` comes from `:auto-at-3`. Anything
   ;; else — a literal set, a union, the writes set — would widen what runs unattended.
@@ -137,7 +137,7 @@
                :why (second (re-find #":never-auto-why \"([^\"]*)\"" c))}))
           chunks)))
 
-(when-let [world (slurp* "world.cljc")]
+(when-let [world (slurp* "world.cljk")]
   (let [ds (districts world)]
     (if (empty? ds)
       (fail! "world.cljc: no districts parsed — the gate cannot see the invariant")

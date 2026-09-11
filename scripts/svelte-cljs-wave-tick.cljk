@@ -260,7 +260,7 @@
                         (clj->js
                          ["-c"
                           (str "find " (path.join root repo)
-                               " \\( -path '*/docs/*.cljs' -o -path '*/scripts/*.cljs' \\)"
+                               " \\( -path '*/docs/*.cljs' -o -path '*/scripts/*.cljs' -o -path '*/docs/*.cljk' -o -path '*/scripts/*.cljk' \\)"
                                " -not -path '*/node_modules/*' 2>/dev/null"
                                " | xargs grep -l -e 'migration\\.edn' -e 'svelte/' 2>/dev/null"
                                " | head -1")])

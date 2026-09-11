@@ -43,7 +43,7 @@
          '["node:child_process" :as cp]
          '[clojure.string :as str])
 
-(def source-ext #{".clj" ".cljc" ".cljs" ".kotoba" ".edn" ".md" ".yml" ".yaml" ".json"})
+(def source-ext #{".clj" ".cljc" ".cljs" ".cljk" ".kotoba" ".edn" ".md" ".yml" ".yaml" ".json"})
 
 (def allowed
   "NUL を含んでよいと判断済みのパス接尾辞と、その理由。
@@ -52,7 +52,16 @@
   {"src/kotoba/native/elf64.clj"
    "ELF64 emitter: NUL は生成するバイナリヘッダそのもの"
    "src/kotoba/compiler/packaging/elf64.clj"
-   "同上（compiler 側の ELF64 packaging）"})
+   "同上（compiler 側の ELF64 packaging）"
+   ;; The same two files at the names the 2026-09-11 rename gave them (root
+   ;; ADR adr-2609111500). kotoba-native's emitter had a .clj/.cljc twin, so
+   ;; the renamer kept the old extension in the name: `elf64.clj.cljk`.
+   "src/kotoba/native/elf64.clj.cljk"
+   "ELF64 emitter（rename 後の名前。twin なので旧拡張子が名前に残る）"
+   "src/kotoba/native/elf64.cljk"
+   "ELF64 emitter（rename 後の名前）"
+   "src/kotoba/compiler/packaging/elf64.cljk"
+   "同上（compiler 側の ELF64 packaging、rename 後の名前）"})
 
 (defn- has-nul?
   "`p` のバイト列に NUL が含まれるか。読めなければ nil。

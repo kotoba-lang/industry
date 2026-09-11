@@ -36,7 +36,7 @@
 
 (def root (or (first (remove #(str/starts-with? % "--") args)) "."))
 
-(def verifier (path/join root "scripts" "verify-capital-pools.cljs"))
+(def verifier (path/join root "scripts" "verify-capital-pools.cljk"))
 (def supply (path/join root "90-docs" "business" "budget-supply.edn"))
 (def pools (path/join root "90-docs" "business" "capital-pools.edn"))
 

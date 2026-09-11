@@ -27,7 +27,7 @@
 ;;
 ;; **なのでここは問いを変える。** バンドルを*作る*には JVM が要るが、
 ;; **作られたものが古いかどうかを見るのに JVM は要らない** —— sha256 で足りる。
-;; 検査ロジックは repo 自身の `scripts/bundle-manifest.cljs` をそのまま呼ぶ
+;; 検査ロジックは repo 自身の `scripts/bundle-manifest.cljk` をそのまま呼ぶ
 ;; （gate 側に複製しない）。
 ;;
 ;; **この gate が答えない問い**（黙って落とさず書く）: コードが正しいか。
@@ -51,12 +51,12 @@
 
 (defn -main []
   (println (str "net-kotobase-bundle-freshness :: " tree))
-  (let [script (path/join tree "scripts" "bundle-manifest.cljs")
+  (let [script (path/join tree "scripts" "bundle-manifest.cljk")
         bundle (path/join tree "kotobase-api-gateway" "js" "kotobase-worker.js")]
     ;; The verifier and the artifact both have to be in the shipped tree. A gate
     ;; whose input is absent has not asked its question — it must not pass.
     (when-not (fs/existsSync script)
-      (die! 90 (str "FLEET-CI: missing after extract: scripts/bundle-manifest.cljs"
+      (die! 90 (str "FLEET-CI: missing after extract: scripts/bundle-manifest.cljk"
                     " — refusing to report a pass")))
     (when-not (fs/existsSync bundle)
       (die! 90 "FLEET-CI: missing after extract: kotobase-api-gateway/js/kotobase-worker.js"))

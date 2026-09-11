@@ -104,14 +104,14 @@
     (if (str/blank? dirty)
       {:ok? true :skipped? true
        :detail "対象外 — この tree は manifest を触っていない（子の pin 鮮度は closing の担当ではない）"}
-      (script-check "gen-west-manifest.cljs" ["--check"]))))
+      (script-check "gen-west-manifest.cljk" ["--check"]))))
 
 (def checks
   (cond-> [["main 同期"            check-main-sync]
-           ["west 登録漏れ"        #(script-check "west-orphan-audit.cljs" ["--blocking"])]
-           ["ADR/EDN の切断"       #(script-check "fleet-ci/gates/docs-edn-truncation-check.cljs"
+           ["west 登録漏れ"        #(script-check "west-orphan-audit.cljk" ["--blocking"])]
+           ["ADR/EDN の切断"       #(script-check "fleet-ci/gates/docs-edn-truncation-check.cljk"
                                                   ["--root" root])]
-           ["データセットの縮小"   #(script-check "dataset-monotonic-check.cljs"
+           ["データセットの縮小"   #(script-check "dataset-monotonic-check.cljk"
                                                   ["--root" root "--decl" (path/join self-dir ".." "manifest" "monotonic-datasets.edn")])]]
     (not quick?)
     (conj ["west.yml が canonical" check-west-canonical])))

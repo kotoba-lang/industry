@@ -70,7 +70,7 @@
   (println "FAIL --buckets is not a comma-separated list of integers:" buckets-arg)
   (js/process.exit 1))
 
-(def src (path/join root "src" "kotobase_peer" "block_sizing.cljc"))
+(def src (path/join root "src" "kotobase_peer" "block_sizing.cljk"))
 
 (when-not (fs/existsSync src)
   (println "FAIL block sizing source not in the shipped tree:" src)

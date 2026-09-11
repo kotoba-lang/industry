@@ -54,7 +54,7 @@
 ;; ---------------------------------------------------------------- reading
 
 (defn clj-source? [p]
-  (some #(str/ends-with? p %) [".clj" ".cljc"]))
+  (some #(str/ends-with? p %) [".clj" ".cljc" ".cljk"]))
 
 (defn walk
   "Every .clj/.cljc under dir. Skips the usual generated/vendored trees, and

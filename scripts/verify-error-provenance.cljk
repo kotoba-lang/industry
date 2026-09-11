@@ -130,7 +130,7 @@
   (try
     (let [out (.toString (cp/execSync
                           (str "git -c core.fsmonitor=false -C " root
-                               " ls-files -- '*.clj' '*.cljc' '*.cljs'")
+                               " ls-files -- '*.clj' '*.cljc' '*.cljs' '*.cljk'")
                           #js {:maxBuffer (* 64 1024 1024)
                                :stdio #js ["pipe" "pipe" "pipe"]}))]
       {:files (->> (str/split-lines out)

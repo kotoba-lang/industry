@@ -57,7 +57,7 @@
 
 ;; --------------------------------------------------------------------------
 
-(defn- cljish? [f] (some (fn [e] (.endsWith f e)) [".clj" ".cljc" ".cljs"]))
+(defn- cljish? [f] (some (fn [e] (.endsWith f e)) [".clj" ".cljc" ".cljs" ".cljk"]))
 
 (defn- walk [dir]
   (if-not (fs/existsSync dir)

@@ -261,7 +261,7 @@
 (let [argv (js->clj js/process.argv)
       idx (first (keep-indexed
                   (fn [i a]
-                    (when (str/ends-with? (str a) "jvm_new_surface_policy.cljs") i))
+                    (when (or (str/ends-with? (str a) "jvm_new_surface_policy.cljk") (str/ends-with? (str a) "jvm_new_surface_policy.cljs")) i))
                   argv))]
   (when idx
     (apply -main (drop (inc idx) argv))))

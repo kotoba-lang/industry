@@ -68,13 +68,13 @@
                        :else []))))
          vec)))
 
-(def cljs-exts #{".cljs" ".cljc" ".clj"})
+(def cljs-exts #{".cljs" ".cljc" ".clj" ".cljk"})
 
 (defn- path->ns
   "src/a_b/c.cljs relative to its source-path -> a-b.c"
   [source-path file]
   (-> (.relative path source-path file)
-      (str/replace #"\.(cljs|cljc|clj)$" "")
+      (str/replace #"\.(cljk|cljs|cljc|clj)$" "")
       (str/replace "\\" "/")
       (str/replace "/" ".")
       (str/replace "_" "-")))

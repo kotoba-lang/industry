@@ -972,8 +972,23 @@
          "echo \"$out\" | grep -qE 'Ran 0 tests' && fail 'zero tests ran' 94"
          "echo \"FLEET-CI-EXIT: $code\""]
         :nbb-test
-        [(str "test -f " (or entry "run-tests.cljs")
-              " || fail 'test entry missing after extract' 90")
+        [;; The runner's extension. Every child repository renamed its
+         ;; `.cljs` runner to `.cljk` on 2026-09-11 (root ADR
+         ;; adr-2609111500), so the default and the declared `:entry` are
+         ;; tried as written first, then with the other extension —
+         ;; third-party mirrors kept the old layout, and a gates.edn entry
+         ;; written before the rename still names `.cljs`. Which one was
+         ;; found is printed so the receipt says which file ran; only when
+         ;; neither exists does the gate fail with 90.
+         (let [e (or entry "run-tests.cljk")
+               alt (cond (str/ends-with? e ".cljk") (str (subs e 0 (- (count e) 5)) ".cljs")
+                         (str/ends-with? e ".cljs") (str (subs e 0 (- (count e) 5)) ".cljk")
+                         :else e)]
+           (str "entry=" (pr-str e) "; if [ -f \"$entry\" ]; then :;"
+                " elif [ -f " (pr-str alt) " ]; then entry=" (pr-str alt) ";"
+                " else fail 'test entry missing after extract (tried "
+                e " and " alt ")' 90; fi;"
+                " echo \"FLEET-CI: test entry $entry\""))
          ;; npm deps, when the repo has them. Measured 2026-08-18: of the eight
          ;; repos this gate kind can newly take, four need `npm install` and four
          ;; do not — io-ipld-car reached `Cannot find module '@noble/hashes/sha2.js'`
@@ -981,7 +996,7 @@
          ;; entirely when there is no package.json.
          "if [ -f package.json ]; then npm install --silent >/dev/null 2>&1 || fail 'npm install failed' 95; fi"
          (str "out=$(npx --yes nbb --classpath " (or classpath "src:test") " "
-              (or entry "run-tests.cljs") " 2>&1); code=$?")
+              "\"$entry\" 2>&1); code=$?")
          "echo \"$out\" | tail -25"
          ;; Keep the count IN the receipt, as the last line before the exit
          ;; marker. `tail -25` puts it wherever the suite happened to print it,
@@ -1673,7 +1688,7 @@
               candf (path/join tmp "cand.yml")]
           (fs/writeFileSync basef cur)
           (fs/writeFileSync candf cand)
-          (let [{:keys [exit out]} (sh "npx" ["nbb" (path/join root "scripts" "verify-west-pins.cljs")
+          (let [{:keys [exit out]} (sh "npx" ["nbb" (path/join root "scripts" "verify-west-pins.cljk")
                                               "--baseline" basef "--candidate" candf
                                               "--only" nm "--dir" root]
                                        {:timeout 300000})]
@@ -1871,11 +1886,11 @@
             ;;
             ;; 名前を 1 つに決め打ちしない。tip の kagami を使う設計なので、**上流の
             ;; 改名は「起こりうること」であって例外ではない。**
-            fleet-bin (or (->> ["kagami.cljs" "fleet.cljs"]
+            fleet-bin (or (->> ["kagami.cljk" "kagami.cljs" "fleet.cljs"]
                                (map #(path/join kagami-dir "bin" %))
                                (filter #(fs/existsSync %))
                                first)
-                          (die (str "kagami tree has neither bin/kagami.cljs nor bin/fleet.cljs"
+                          (die (str "kagami tree has none of bin/kagami.cljk, bin/kagami.cljs, bin/fleet.cljs"
                                     " (looked in " kagami-dir "/bin) — the CLI entrypoint was"
                                     " renamed again; add the new name here")))
             tmp (fs/mkdtempSync (path/join (os/tmpdir) "fleet-ci-tick-"))

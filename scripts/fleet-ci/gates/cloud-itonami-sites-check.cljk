@@ -88,7 +88,7 @@
 ;; 混ぜて gate を永久に赤くした実測 2026-07-31 の教訓）。ノードで走らせること
 ;; 自体が、その不変条件の検査になっている。
 
-(let [{:keys [rc out]} (run "npx" ["nbb" "scripts/generate-sites-registry.cljs" "--check"])
+(let [{:keys [rc out]} (run "npx" ["nbb" "scripts/generate-sites-registry.cljk" "--check"])
       m (re-find #"OK: sites registry is canonical \((\d+) site\(s\), (\d+) reserved" (str out))]
   (cond
     (str/includes? (str out) "STALE")
@@ -118,7 +118,7 @@
 ;; ---------------------------------------------------------------------------
 ;; B. ビルド済みバンドルを実際に import して呼ぶ
 
-(let [{:keys [rc out]} (run "npx" ["nbb" "scripts/verify-sites-bundle.cljs"])
+(let [{:keys [rc out]} (run "npx" ["nbb" "scripts/verify-sites-bundle.cljk"])
       ok-count (count (re-seq #"(?m)^\s+ok\s" (str out)))
       failed (re-find #"FAILED \((\d+)\)" (str out))]
   (println "B bundle:" ok-count "checks ok, rc=" rc)
@@ -158,7 +158,7 @@
 ;; `Set-Cookie` は無い。**つまりこれは「今は無い」を守るための回帰ガード**であって、
 ;; 既存の違反を数えるものではない。入り込んだ瞬間にここで落ちる。
 
-(let [{:keys [rc out]} (run "grep" ["-rniE" "set-?cookie" "--include=*.cljc" "--include=*.cljs"
+(let [{:keys [rc out]} (run "grep" ["-rniE" "set-?cookie" "--include=*.cljc" "--include=*.cljs" "--include=*.cljk"
                                     "--include=*.js" "src" "functions"])
       ;; grep は不一致で rc=1。それは「違反ゼロ」であって失敗ではない。
       lines (if (= 1 rc) [] (remove str/blank? (str/split-lines (str out))))
@@ -190,7 +190,7 @@
 ;; （apex は HTML のまま / `/api/*` の JSON は無傷 / `/api/*` の html-leak は 502 のまま）
 ;; で、guard を足したことで別の surface を壊していないことを見ている。減ったら落とす。
 
-(let [{:keys [rc out]} (run "npx" ["nbb" "test/well_known_guard_test.cljs"])
+(let [{:keys [rc out]} (run "npx" ["nbb" "test/well_known_guard_test.cljk"])
       ok-count (count (re-seq #"(?m)^ok\s" (str out)))
       failed (re-find #"(\d+) FAILED" (str out))]
   (println "D well-known:" ok-count "checks ok, rc=" rc)

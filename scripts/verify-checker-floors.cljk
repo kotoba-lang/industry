@@ -57,7 +57,7 @@
          '["node:child_process" :as cp]
          '[clojure.string :as str])
 
-(def checker-re #"^(check|verify)-.*\.cljs$")
+(def checker-re #"^(check|verify)-.*\.(cljs|cljk)$")
 
 (def stubbed-bins
   "呼ばれたら記録して exit 64 する実行ファイル名。JVM 起動と GitHub API を検査器の

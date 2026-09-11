@@ -52,7 +52,14 @@
 (def args (vec *command-line-args*))
 (def root (or (first (remove #(str/starts-with? % "--") args)) "."))
 (def entry
-  (or (second (drop-while #(not= "--entry" %) args)) "run-tests.cljs"))
+  ;; Default runner: `.cljk` since the 2026-09-11 rename (root ADR
+  ;; adr-2609111500), falling back to the `.cljs` name third-party mirrors
+  ;; still carry. An explicit `--entry` is taken as written.
+  (or (second (drop-while #(not= "--entry" %) args))
+      (if (and (not (fs/existsSync (path/join root "run-tests.cljk")))
+               (fs/existsSync (path/join root "run-tests.cljs")))
+        "run-tests.cljs"
+        "run-tests.cljk")))
 
 (def nbb-version
   "See the header. A custom protocol in a deftype needs at least 1.4.210.

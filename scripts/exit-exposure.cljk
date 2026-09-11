@@ -45,13 +45,15 @@
             (when (str/includes? src "System/exit")
               {:ns (ns-name-of src)
                :guardable? (boolean (re-find #"\^:dynamic\s+\*exit\*" src))})))
-        (files-under (path/join repo "src") ".clj")))
+        (concat (files-under (path/join repo "src") ".cljk")
+                (files-under (path/join repo "src") ".clj"))))
 
 (defn- required-namespaces [repo]
   (into #{}
         (mapcat (fn [f] (re-seq #"[a-zA-Z][a-zA-Z0-9_.\-]*\.[a-zA-Z0-9_.\-]+"
                                 (slurp* f)))
-                (concat (files-under (path/join repo "test") ".clj")
+                (concat (files-under (path/join repo "test") ".cljk")
+                        (files-under (path/join repo "test") ".clj")
                         (files-under (path/join repo "test") ".cljc")))))
 
 (defn -main []

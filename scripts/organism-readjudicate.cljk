@@ -107,11 +107,11 @@
 ;; ディレクトリを src/ に限定しない。実測: network-isekai は backend/、
 ;; club-shinshi は 20-actors/ 配下に実装を置く monorepo 形で、src/ 限定だと
 ;; 構造的に false negative になる。
-(def loop-file-re #"(?i)(^|/)(loop|tick|scheduler|cron|daemon)\.(clj[cs]?|kotoba)$")
+(def loop-file-re #"(?i)(^|/)(loop|tick|scheduler|cron|daemon)\.(clj[cs]?|cljk|kotoba)$")
 
 ;; D1 の「自分の did で対外発話する」— did 宣言と、実際に外へ出す実装の両方。
 (def did-re #"did:(web|key):")
-(def publish-file-re #"(?i)(^|/)(publisher|aozora|cacao|pds)\.(clj[cs]?|kotoba)$")
+(def publish-file-re #"(?i)(^|/)(publisher|aozora|cacao|pds)\.(clj[cs]?|cljk|kotoba)$")
 
 ;; ADR-2606281500 = 種をまく doctrine（publication is AUTONOMOUS BY DEFAULT）。
 ;; 「organism」という語を使わずに自律性を宣言している repo を拾う。
@@ -139,7 +139,7 @@
          :organism-phrase? (boolean (re-find organism-re docs))
          :autonomy-doctrine? (boolean (re-find autonomy-doctrine-re docs))
          ;; 参考: 既存分類器が使う証拠
-         :governor? (has? #(re-matches #"governor\.clj[cs]?" (base %)))
+         :governor? (has? #(re-matches #"governor\.(clj[cs]?|cljk)" (base %)))
          :readme-md? (exists? (str root "/README.md"))}))))
 
 ;; ---- 判定（自動確定しない。3 段階のラベルだけ付ける）------------------------

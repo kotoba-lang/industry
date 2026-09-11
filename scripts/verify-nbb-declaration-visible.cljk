@@ -109,7 +109,7 @@
   -- and the sibling detector that did the same thing produced no output at all,
   which is indistinguishable from a clean tree."
   (delay
-    (let [out (sh (str "grep -rl --include='*.cljs' --exclude-dir=node_modules"
+    (let [out (sh (str "grep -rl --include='*.cljs' --include='*.cljk' --exclude-dir=node_modules"
                        " --exclude-dir=.git -e '^#!/usr/bin/env nbb' "
                        (or only orgs) " 2>/dev/null"))]
       (when (nil? out)
@@ -141,13 +141,13 @@
           documented (let [txt (apply str (keep (fn [f] (slurp* (.join path-mod repo f)))
                                                 ["README.md" "README.edn" "package.json"
                                                  "docs/operator-quickstart.md"]))]
-                       (set (map second (re-seq #"--classpath\s+\S+\s+(\S+\.cljs)" txt))))
+                       (set (map second (re-seq #"--classpath\s+\S+\s+(\S+\.(?:cljs|cljk))" txt))))
           documented? (fn [f] (let [rel (s/replace f (re-pattern (str "^" repo "/")) "")]
                                 (contains? documented rel)))
           shebangs (remove documented? (get @shebang-index repo []))
           pkg      (slurp* (.join path-mod repo "package.json"))
           scripted (when pkg
-                     (->> (re-seq #"\"nbb ((?!--classpath)[^\"]*?\.cljs)" pkg)
+                     (->> (re-seq #"\"nbb ((?!--classpath)[^\"]*?\.(?:cljs|cljk))" pkg)
                           (map (comp #(.join path-mod repo %) s/trim second))
                           (filter #(try (.isFile (.statSync fs %)) (catch :default _ false)))))]
       (distinct (concat shebangs (or scripted []))))))
@@ -179,7 +179,7 @@
                                                         (catch :default _ nil))))]
                            (some (fn [pp]
                                    (some #(file? (.join path-mod p pp (str rel %)))
-                                         [".cljc" ".cljs" ".clj"]))
+                                         [".cljk" ".cljc" ".cljs" ".clj"]))
                                  (or ps []))))
                 needs (->> (external-requires src)
                            (remove owned?)
@@ -200,10 +200,10 @@
                             (seq (for [ns (external-requires src)
                                        :let [rel (s/replace (s/replace ns "." "/") "-" "_")
                                              at-root (some #(file? (.join path-mod p (str rel %)))
-                                                           [".cljc" ".cljs" ".clj"])
+                                                           [".cljk" ".cljc" ".cljs" ".clj"])
                                              under (some (fn [pp]
                                                            (some #(file? (.join path-mod p pp (str rel %)))
-                                                                 [".cljc" ".cljs" ".clj"]))
+                                                                 [".cljk" ".cljc" ".cljs" ".clj"]))
                                                          np-paths)]
                                        :when (and at-root (not under))]
                                    ns)))

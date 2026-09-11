@@ -39,7 +39,7 @@
   "拡張子の allowlist。ここに無いものは開かない —— `.pem` / `.json` / `.edn` /
    `.log` が同じディレクトリに同居しているため、denylist ではなく allowlist に
    する（新しい秘密の拡張子が増えても既定で読まれない）。"
-  #{".cljs" ".sh"})
+  #{".cljk" ".cljs" ".sh"})
 
 (def rules
   "各規則は accepted な ADR を1つ指す。`:match?` は1行を受け取り真偽を返す純関数。"

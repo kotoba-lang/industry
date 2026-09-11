@@ -6,7 +6,7 @@
 (def os (js/require "node:os"))
 (def path (js/require "node:path"))
 (def root (-> (sh "git" "rev-parse" "--show-toplevel") :out str/trim))
-(def generator (.join path root "scripts" "gen-west-manifest.cljs"))
+(def generator (.join path root "scripts" "gen-west-manifest.cljk"))
 (def nbb (let [local (.join path root "node_modules" ".bin" "nbb")]
            (if (.existsSync fs local) local "nbb")))
 

@@ -16,7 +16,7 @@
 
 (defn source-counts [repo]
   (let [source-root (full (str "orgs/kotoba-lang/" repo "/src"))
-        counts (atom {:clj 0 :cljc 0 :cljs 0 :kotoba 0})]
+        counts (atom {:clj 0 :cljc 0 :cljs 0 :cljk 0 :kotoba 0})]
     (letfn [(walk [dir]
               (when (.existsSync fs dir)
                 (doseq [entry (.readdirSync fs dir #js {:withFileTypes true})]
@@ -24,7 +24,7 @@
                     (if (.isDirectory entry)
                       (walk p)
                       (when-let [kind ({".clj" :clj ".cljc" :cljc
-                                        ".cljs" :cljs ".kotoba" :kotoba}
+                                        ".cljs" :cljs ".cljk" :cljk ".kotoba" :kotoba}
                                        (.extname path p))]
                         (swap! counts update kind inc)))))))]
       (walk source-root))
@@ -84,11 +84,11 @@
         (catch :default e
           (fail! errors "deps.edn cannot be parsed"
                  {:repo repo :error (.-message e)}))))
-    (let [{:keys [clj cljc cljs kotoba] :as counts} (source-counts repo)]
+    (let [{:keys [clj cljc cljs cljk kotoba] :as counts} (source-counts repo)]
       (when (and (= authority :kotoba) (zero? kotoba))
         (fail! errors "Kotoba-authoritative library has no production .kotoba source"
                {:repo repo :counts counts}))
-      (when (and (contains? #{:cljc-oracle :mixed} authority) (zero? (+ clj cljc cljs)))
+      (when (and (contains? #{:cljc-oracle :mixed} authority) (zero? (+ clj cljc cljs cljk)))
         (fail! errors "oracle/mixed library has no compatibility source"
                {:repo repo :counts counts}))
       (when-not (= status :sovereign)

@@ -272,10 +272,10 @@
                 (let [names (->> (array-seq (fs/readdirSync sd #js {:withFileTypes true}))
                                  (filter #(.isFile %)) (map #(.-name %)) sort)
                       hits (for [n names
-                                 :when (re-find #"\.(cljs|bb|clj)$" n)
+                                 :when (re-find #"\.(cljs|cljk|bb|clj)$" n)
                                  :let [src (try (fs/readFileSync (path/join sd n) "utf8") (catch :default _ ""))]
                                  :when (code-reads-grammar? src)]
-                             {:name n :decider? (forbid-decider? src) :runnable? (str/ends-with? n ".cljs")})]
+                             {:name n :decider? (forbid-decider? src) :runnable? (or (str/ends-with? n ".cljs") (str/ends-with? n ".cljk"))})]
                   (when (seq hits)
                     {:repo repo
                      :checkers (vec (filter :runnable? hits))

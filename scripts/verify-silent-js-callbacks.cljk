@@ -37,7 +37,7 @@
   run, where the detector took its own path as a root, scanned one file, and
   reported findings in its own fixture strings. Locate the script instead."
   (let [a (vec js/process.argv)
-        i (first (keep-indexed (fn [i v] (when (str/ends-with? v "verify-silent-js-callbacks.cljs") i)) a))]
+        i (first (keep-indexed (fn [i v] (when (or (str/ends-with? v "verify-silent-js-callbacks.cljk") (str/ends-with? v "verify-silent-js-callbacks.cljs")) i)) a))]
     (vec (drop (inc (or i 2)) a))))
 (def flags (set (filter #(str/starts-with? % "--") argv)))
 (def roots (let [r (vec (remove #(str/starts-with? % "--") argv))]
@@ -213,7 +213,7 @@
     []
     (let [st (fs/statSync dir)]
       (cond
-        (.isFile st) (if (re-find #"\.clj[sc]$" dir) [dir] [])
+        (.isFile st) (if (re-find #"\.(clj[sc]|cljk)$" dir) [dir] [])
         (.isDirectory st)
         (cond
           (contains? #{".git" "node_modules" ".shadow-cljs" "target" ".cpcache" ".datalad" "out"}
@@ -235,7 +235,11 @@
   a hazard, and it is a fact on disk rather than a judgement."
   [repo]
   (boolean (some #(fs/existsSync (p/join repo %))
-                 ["run-nbb-tests.cljs" "test/run_portable.cljs" "run-tests.cljs"])))
+                 ;; `.cljk` first (every tracked runner was renamed 2026-09-11,
+                 ;; root ADR adr-2609111500); the `.cljs` names are the layout
+                 ;; third-party mirrors still carry.
+                 ["run-nbb-tests.cljk" "test/run_portable.cljk" "run-tests.cljk"
+                  "run-nbb-tests.cljs" "test/run_portable.cljs" "run-tests.cljs"])))
 
 (when self-test? (run-self-test!) (js/process.exit 0))
 

@@ -83,8 +83,8 @@
 (def required-paths
   ["deps.edn"
    "deps-lock.edn"
-   "src/kotoba/compiler/nbb/classpath.cljs"
-   "test/nbb/classpath.cljs"])
+   "src/kotoba/compiler/nbb/classpath.cljk"
+   "test/nbb/classpath.cljk"])
 
 (doseq [p required-paths]
   (when-not (fs/existsSync (path/join root p))
@@ -159,7 +159,7 @@
 ;; 「全部走った」と「一部を飛ばした」が受領書の上で区別できる。
 
 (let [{:keys [rc out]} (run "npx" ["--yes" "nbb" "--classpath" "src"
-                                   "test/nbb/classpath.cljs" "--hermetic-only"]
+                                   "test/nbb/classpath.cljk" "--hermetic-only"]
                             {:cwd root :env no-jvm-env})
       passes (count (re-seq #"(?m)^PASS " out))
       skips (count (re-seq #"(?m)^SKIP " out))]

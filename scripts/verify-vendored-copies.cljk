@@ -105,7 +105,7 @@
        (catch :default _ nil)))
 
 (defn- source-file? [n]
-  (some #(str/ends-with? n %) [".clj" ".cljc" ".cljs"]))
+  (some #(str/ends-with? n %) [".clj" ".cljc" ".cljs" ".cljk"]))
 
 (defn- walk [dir]
   (letfn [(step [cur acc]

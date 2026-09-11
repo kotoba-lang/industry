@@ -133,7 +133,11 @@
            (filter #(.isDirectory %))
            (map #(.-name %))
            (filter (fn [d]
-                     (every? #(.existsSync fs (.join path src d %)) need-files)))
+                     ;; `.cljk` first: every tracked source was renamed on 2026-09-11
+                     ;; (root ADR adr-2609111500); the `.cljc` name is the pre-rename layout.
+                     (every? #(or (.existsSync fs (.join path src d (str/replace % #"\.cljc$" ".cljk")))
+                                  (.existsSync fs (.join path src d %)))
+                             need-files)))
            first)
       (catch :default _ nil))))
 
@@ -142,7 +146,8 @@
     (and (= 0 code) (seq (str/trim out)))))
 
 (defn- render-path? [n]
-  (or (str/ends-with? n "render_html.clj")
+  (or (str/ends-with? n "render_html.cljk")
+      (str/ends-with? n "render_html.clj")
       (str/ends-with? n "render_html.cljc")))
 
 (defn- has-render-in-worktree? [repo-path]

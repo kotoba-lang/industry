@@ -5,7 +5,7 @@
 ;; ループとは別のプロセスから出る必要がある。したがってこれは operator 側
 ;; （人が座っているマシン）に常駐し、ループが走るノードには置かない。
 ;;
-;; 判定ロジックは複製しない —— gates/hayari-tick-alive.cljs を **そのまま呼んで
+;; 判定ロジックは複製しない —— gates/hayari-tick-alive.cljk を **そのまま呼んで
 ;; exit code を見る**。閾値が 2 箇所にあると、片方だけ直された時に静かに食い違う。
 ;;
 ;; 遷移の扱い（1 回だけ鳴らす・初回の未知を健全と読まない・警報自身は常に 0）は
@@ -28,7 +28,7 @@
 (def notify? (not= "false" (flag "--notify" "true")))
 (def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp") ".itonami" "hayari-alarm-state.edn")))
 
-(def gate   (path/join root "scripts" "fleet-ci" "gates" "hayari-tick-alive.cljs"))
+(def gate   (path/join root "scripts" "fleet-ci" "gates" "hayari-tick-alive.cljk"))
 (def target (path/join root "orgs" "cloud-itonami" "hayari"))
 
 (defn check []

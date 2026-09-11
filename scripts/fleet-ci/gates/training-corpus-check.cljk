@@ -53,7 +53,7 @@
 
 (def corpus-path (path/join root "90-docs" "corpus" "corpus.datoms.edn"))
 (def policy-path (path/join root "manifest" "corpus-policy.edn"))
-(def generator-path (path/join root "scripts" "gen-training-corpus.cljs"))
+(def generator-path (path/join root "scripts" "gen-training-corpus.cljk"))
 
 (doseq [p [corpus-path policy-path generator-path]]
   (when-not (fs/existsSync p)

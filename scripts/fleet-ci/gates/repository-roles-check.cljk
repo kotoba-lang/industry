@@ -43,7 +43,7 @@
   (js/process.exit code))
 
 (def authority-file (path/join root "manifest" "repository-rules.edn"))
-(def verifier (path/join root "scripts" "verify-repository-roles.cljs"))
+(def verifier (path/join root "scripts" "verify-repository-roles.cljk"))
 
 (when-not (fs/existsSync authority-file)
   (die! 90 "authority not found:" authority-file

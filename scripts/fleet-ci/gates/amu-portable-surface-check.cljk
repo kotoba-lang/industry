@@ -36,12 +36,12 @@
 ;; Evidence floor.  A tree that arrived without these cannot produce a verdict,
 ;; and must say so rather than reporting the clean run of an empty suite.
 (def required
-  ["run-portable-surface.cljs"
+  ["run-portable-surface.cljk"
    "deps.edn"
    "deps-lock.edn"
-   "src/kotoba/compiler/nbb/classpath.cljs"
-   "src/kotoba/compiler/ios_aot.cljc"
-   "test/kotoba/compiler/portable_surface_test.cljc"
+   "src/kotoba/compiler/nbb/classpath.cljk"
+   "src/kotoba/compiler/ios_aot.cljk"
+   "test/kotoba/compiler/portable_surface_test.cljk"
    "test/fixtures/ios-aot-artifact.edn"])
 
 (doseq [rel required]
@@ -89,7 +89,7 @@
   (fail! "dependency lock resolved to nothing, so the suite would run against an empty classpath" 90))
 
 (def result
-  (run "nbb" ["--classpath" (str "src:test:" dep-dirs) "run-portable-surface.cljs"]))
+  (run "nbb" ["--classpath" (str "src:test:" dep-dirs) "run-portable-surface.cljk"]))
 
 (def output (str (or (.-stdout result) "") (or (.-stderr result) "")))
 (print output)

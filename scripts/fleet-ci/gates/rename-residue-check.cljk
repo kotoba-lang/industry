@@ -118,8 +118,8 @@
 ;; 緑にならないよう、床を fixture を含む本数に置く。
 (def min-cases 21)
 
-(def test-entry (path/join root "scripts" "rename-residue-test.cljs"))
-(def gate-ns (path/join root "scripts" "rename_residue.cljs"))
+(def test-entry (path/join root "scripts" "rename-residue-test.cljk"))
+(def gate-ns (path/join root "scripts" "rename_residue.cljk"))
 (def compat-dir (path/join root "scripts" "nbb_compat"))
 
 ;; 展開失敗による false-pass を構造的に防ぐ。90 は「tree が期待どおり届いていない」

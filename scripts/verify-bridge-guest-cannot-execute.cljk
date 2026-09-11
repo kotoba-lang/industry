@@ -50,7 +50,7 @@
 (defn flag? [n] (some #(= n %) argv))
 
 (def bridge-path
-  (path/join (.cwd js/process) "scripts" "claude-bridge.cljs"))
+  (path/join (.cwd js/process) "scripts" "claude-bridge.cljk"))
 
 (def endpoint
   (or (some->> argv (drop-while #(not= "--endpoint" %)) second)

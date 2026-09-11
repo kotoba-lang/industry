@@ -22,7 +22,9 @@
 (def argv
   (let [all (vec (js->clj (.-argv process)))
         i (last (keep-indexed (fn [idx s]
-                                (when (str/ends-with? (str (.basename path (str s))) ".cljs") idx))
+                                (when (let [b (str (.basename path (str s)))]
+                                        (or (str/ends-with? b ".cljk") (str/ends-with? b ".cljs")))
+                                  idx))
                               all))]
     (vec (drop (inc (or i 1)) all))))
 
@@ -47,10 +49,11 @@
 (def ledger-path (.join path ledger-dir "loop.ledger.edn"))
 (def root (or (.-COM_JUNKAWASAKI_ROOT js/process.env) (.cwd process)))
 (def quality-path
-  (let [local (.join path ledger-dir "quality.cljs")]
-    (if (.existsSync fs local)
-      local
-      (.join path root "scripts" "shinshi-catalog-video-quality.cljs"))))
+  (let [local (first (filter #(.existsSync fs %)
+                             [(.join path ledger-dir "quality.cljk")
+                              (.join path ledger-dir "quality.cljs")]))]
+    (or local
+        (.join path root "scripts" "shinshi-catalog-video-quality.cljk"))))
 (def appview
   (or (.-SHINSHI_APPVIEW js/process.env)
       "/Users/junkawasaki/github/com-junkawasaki/orgs/network-awai/club-shinshi-app/appview/ai-gftd-wasm-shinshi-sh1n5h1x"))

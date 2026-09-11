@@ -65,7 +65,7 @@
                                               "js" ".shadow-cljs" ".cpcache" "dist"} nm)))
                        (walk p (inc depth))
 
-                       (and (.isFile e) (re-find #"\.clj[cs]?$" nm)) [p]
+                       (and (.isFile e) (re-find #"\.(clj[cs]?|cljk)$" nm)) [p]
                        :else [])))
                  entries))))]
     (walk dir 0)))

@@ -1,13 +1,13 @@
 #!/usr/bin/env nbb
 ;; hyakka-catalog-freshness-check.cljs — app-hyakka の committed な生成物
-;; `src/hyakka/catalog.cljc` を、**その入力から作り直して**突き合わせる
+;; `src/hyakka/catalog.cljk` を、**その入力から作り直して**突き合わせる
 ;; （root ADR-2608300100 決定 1 の最初の 1 工程）。
 ;;
 ;; ## 何を突き合わせるか
 ;;
 ;;   入力  knowledge/ledger/**/*.datoms.edn  +  data/*.datoms.edn
 ;;   生成器 scripts/generate_catalog.cljs     （第三者依存ゼロ。node 組み込みのみ）
-;;   生成物 src/hyakka/catalog.cljc           （committed。Worker が bundle する）
+;;   生成物 src/hyakka/catalog.cljk           （committed。Worker が bundle する）
 ;;
 ;; 生成器をノード上で実際に走らせ、出てきたファイルが commit されていたものと
 ;; **byte 一致するか**を見る。**catalog は wiki.kotobase.net が serve する内容
@@ -135,8 +135,8 @@
         (.digest "hex"))))
 
 (defn main! []
-  (let [generator (path/join root "scripts" "generate_catalog.cljs")
-        catalog (path/join root "src" "hyakka" "catalog.cljc")
+  (let [generator (path/join root "scripts" "generate_catalog.cljk")
+        catalog (path/join root "src" "hyakka" "catalog.cljk")
         ledgers (ledger-files root)]
     (println (str "SCANNED\t" (count ledgers)))
     (cond
@@ -152,7 +152,7 @@
       (let [committed-bytes (file-sha catalog)
             committed-id (declared-id catalog)]
         (if-not (and committed-bytes committed-id)
-          (refuse! "could not read the committed catalog at src/hyakka/catalog.cljc"
+          (refuse! "could not read the committed catalog at src/hyakka/catalog.cljk"
                    (cond (not (fs/existsSync catalog)) "(file absent)"
                          (nil? committed-id) "(no :catalog-id in it)"
                          :else "(unreadable bytes)"))
@@ -162,7 +162,7 @@
             ;; The generator WRITES the catalog. That is fine and intended: the
             ;; node's tree is a disposable copy, and both committed values were
             ;; read above, before it is overwritten.
-            (let [r (.spawnSync cp "nbb" #js ["scripts/generate_catalog.cljs"]
+            (let [r (.spawnSync cp "nbb" #js ["scripts/generate_catalog.cljk"]
                                 #js {:cwd root :encoding "utf8"
                                      :maxBuffer (* 64 1024 1024)})
                   status (if (nil? (.-status r)) 1 (.-status r))]
@@ -193,7 +193,7 @@
                         (println "")
                         (println "wiki.kotobase.net serves this file. Regenerate and commit it")
                         (println "with the ledgers that produced it:")
-                        (println "  npm run catalog && git add src/hyakka/catalog.cljc knowledge/")
+                        (println "  npm run catalog && git add src/hyakka/catalog.cljk knowledge/")
                         (set! (.-exitCode js/process) 1))
 
                     (< (count ledgers) min-ledgers)

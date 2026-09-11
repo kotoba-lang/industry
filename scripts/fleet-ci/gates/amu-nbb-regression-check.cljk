@@ -6,7 +6,7 @@
 ;; `kotoba.sema` -> `kotoba.kir` -> `kotoba.wasm.core` and requires valid Wasm
 ;; out of each one. It is the only check that exercises the path `bin/kotoba`
 ;; takes for `wasm32*` targets without a JDK, and until 2026-08-24 NOTHING ran
-;; it: `grep -rn "test/nbb/run.cljs" scripts/fleet-ci/` returned nothing, and
+;; it: `grep -rn "test/nbb/run.cljk" scripts/fleet-ci/` returned nothing, and
 ;; it was red on current nbb the whole time.
 ;;
 ;; Why it was red is worth keeping, because it is the reason this gate could
@@ -58,11 +58,11 @@
 ;; Evidence floor. A tree that arrived without these cannot produce a verdict,
 ;; and must say so rather than reporting the clean run of an empty suite.
 (def required
-  ["test/nbb/run.cljs"
-   "test/nbb/cases.cljs"
+  ["test/nbb/run.cljk"
+   "test/nbb/cases.cljk"
    "deps.edn"
    "deps-lock.edn"
-   "src/kotoba/compiler/nbb/classpath.cljs"
+   "src/kotoba/compiler/nbb/classpath.cljk"
    "test/nbb/fixtures/lazy-sequence.kotoba"])
 
 (doseq [rel required]
@@ -125,7 +125,7 @@
 ;; `.` is on the classpath because `run.cljs` requires `test.nbb.cases` by its
 ;; path-derived name, which only resolves from the repository root.
 (def result
-  (run ["--classpath" (str ".:src:test:" dep-dirs) "test/nbb/run.cljs"]))
+  (run ["--classpath" (str ".:src:test:" dep-dirs) "test/nbb/run.cljk"]))
 
 (def output (str (or (.-stdout result) "") (or (.-stderr result) "")))
 (print output)

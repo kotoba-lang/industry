@@ -677,7 +677,7 @@
   "Namespace symbol -> the source paths it could live at in this repo."
   [ns-sym]
   (let [rel (-> (str ns-sym) (str/replace "-" "_") (str/replace "." "/"))]
-    (for [root ["src/" "test/" ""] ext [".clj" ".cljc" ".cljs"]]
+    (for [root ["src/" "test/" ""] ext [".cljk" ".clj" ".cljc" ".cljs"]]
       (str root rel ext))))
 
 (defn- read-repo-source
@@ -833,7 +833,7 @@
 (defn- source-stem
   "path -> [stem ext] for Clojure sources, else nil."
   [path]
-  (when-let [m (re-find #"^(.*)\.(clj|cljs|cljc)$" path)]
+  (when-let [m (re-find #"^(.*)\.(cljk|clj|cljs|cljc)$" path)]
     [(nth m 1) (nth m 2)]))
 
 (defn- shadowing-twin
@@ -1041,7 +1041,7 @@
   a repo whose suite silently stopped compiling; a 1% cost of silently discarded
   work would not be."
   [dir base additive]
-  (let [clj? #(re-find #"\.clj[cs]?$" %)
+  (let [clj? #(re-find #"\.(clj[cs]?|cljk)$" %)
         cands (filter clj? additive)]
     (if (empty? cands)
       [additive [] {:scanned 0}]

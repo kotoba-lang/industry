@@ -188,7 +188,7 @@
   [text]
   (->> (re-seq #"`([^`\n]{2,80})`" text)
        (map second)
-       (filter #(re-find #"\.(cljc?|cljs|edn|json|md|yml|yaml|js|mjs|ts|tsx|toml|kotoba|wat|wasm|clj)$" %))
+       (filter #(re-find #"\.(cljc?|cljs|cljk|edn|json|md|yml|yaml|js|mjs|ts|tsx|toml|kotoba|wat|wasm|clj)$" %))
        ;; glob は「この 1 本が在る」という主張ではないので、実在検査の対象にしない。
        ;; 実測 2026-08-27: `*.edn` と書いた草稿を「実在しないパス」として却下していた。
        ;; **本物でない理由で落とす gate は、本物の理由で落としたときも信用されなくなる。**

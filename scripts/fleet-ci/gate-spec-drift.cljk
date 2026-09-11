@@ -2,7 +2,7 @@
 ;; gate-spec-drift.cljs — 「自分自身の古い版についての判定を表示している gate」を数える。
 ;;
 ;; tick の trigger は対象 repo の tip の変化だけ（:trigger :tip-change）。gate の
-;; **宣言**（gates.edn の 1 entry）や **script**（gates/*.cljs）を直しても、対象 repo が
+;; **宣言**（gates.edn の 1 entry）や **script**（gates/*.cljk）を直しても、対象 repo が
 ;; 休んでいれば tick はその gate を回さない。直った gate が直る前の赤を表示し続け、
 ;; それが古い判定であることを言うものが無い —— これがその母集団を出す道具。
 ;;
@@ -87,7 +87,7 @@
 
 (defn last-script-change []
   (into {} (for [f (fs/readdirSync (path/join here "gates"))
-                 :when (str/ends-with? f ".cljs")
+                 :when (or (str/ends-with? f ".cljk") (str/ends-with? f ".cljs"))
                  :let [p (str "scripts/fleet-ci/gates/" f)
                        out (str/trim (:out (git "log" "-1" "--format=%cI" ref "--" p)))]
                  :when (seq out)]

@@ -7,7 +7,7 @@
 
 (def args (vec *command-line-args*))
 (def root (path/resolve (or (first (remove #(str/starts-with? % "--") args)) ".")))
-(def verifier (path/join root "scripts" "verify-cryptographic-boundaries.cljs"))
+(def verifier (path/join root "scripts" "verify-cryptographic-boundaries.cljk"))
 (def inventory (path/join root "security" "cryptographic-boundaries.edn"))
 
 (defn- die! [code message]

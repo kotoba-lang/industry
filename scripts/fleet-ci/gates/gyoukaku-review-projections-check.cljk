@@ -36,7 +36,7 @@
   (println (str "FLEET-CI: " (str/join " " msg)))
   (js/process.exit code))
 
-(def verifier (path/join root "scripts" "verify-projections.cljs"))
+(def verifier (path/join root "scripts" "verify-projections.cljk"))
 (def data-dir (path/join root "data"))
 
 ;; 展開失敗による false-pass を構造的に防ぐ。90 は「tree が期待どおり届いて

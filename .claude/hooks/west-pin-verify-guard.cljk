@@ -68,9 +68,9 @@
 (def payload-origin (atom nil))
 
 (defn- verify!
-  "verify-west-pins.cljs を実行し、exit 1 なら deny。それ以外は allow 側に倒す。"
+  "verify-west-pins.cljk を実行し、exit 1 なら deny。それ以外は allow 側に倒す。"
   [top & extra-args]
-  (let [vscript (io/file top "scripts" "verify-west-pins.cljs")]
+  (let [vscript (io/file top "scripts" "verify-west-pins.cljk")]
     (when-not (.exists vscript) (allow!))
     ;; **`--classpath` explicitly.** Without it nbb resolves `scripts.nbb-compat`
     ;; against its own cwd, which is not necessarily `top`, and the require simply
@@ -148,7 +148,7 @@
               (let [tmp-dir (.mkdtempSync node-fs (.join node-path (.tmpdir node-os) "west-put-"))
                     tmp     (.join node-path tmp-dir "candidate.yml")
                     top     (or (some-> (compat/getenv "CLAUDE_PROJECT_DIR")
-                                        (#(when (.exists (io/file % "scripts" "verify-west-pins.cljs")) %)))
+                                        (#(when (.exists (io/file % "scripts" "verify-west-pins.cljk")) %)))
                                 (let [t (:out (git "." "rev-parse" "--show-toplevel"))]
                                   (when-not (str/blank? t) t))
                                 ".")]

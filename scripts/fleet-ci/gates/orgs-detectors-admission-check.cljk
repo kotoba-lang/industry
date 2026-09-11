@@ -25,7 +25,7 @@
 (def tree (or (first (remove #(str/starts-with? % "--") (vec *command-line-args*))) "."))
 
 (defn -main []
-  (let [tick (p/join tree "scripts" "orgs-detector-tick.cljs")
+  (let [tick (p/join tree "scripts" "orgs-detector-tick.cljk")
         registry (p/join tree "manifest" "orgs-detectors.edn")]
     ;; Refuse rather than pass when the inputs are not here. A gate that
     ;; reports clean because it could not find the file it checks is the

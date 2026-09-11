@@ -313,7 +313,7 @@
 (defn- main! []
   (let [src      (path/join root "kotoba" "dynamics_score_core.kotoba")
         artifact (path/join root "kotoba" "dynamics_score_core.mjs")
-        cljc     (path/join root "src" "dynamics" "core.cljc")]
+        cljc     (path/join root "src" "dynamics" "core.cljk")]
     (cond
       (not (fs/existsSync src))      (do (fail! "missing" src) (set! (.-exitCode js/process) 1))
       (not (fs/existsSync artifact)) (do (fail! "missing" artifact) (set! (.-exitCode js/process) 1))

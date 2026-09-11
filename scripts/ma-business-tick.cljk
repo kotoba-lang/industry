@@ -70,8 +70,20 @@
   [s n]
   (let [s (str s)] (if (< (count s) n) (str s (apply str (repeat (- n (count s)) " "))) s)))
 
-(defn- exists? [p] (try (.existsSync fs p) (catch :default _ false)))
-(defn- slurp* [p] (try (str (.readFileSync fs p "utf8")) (catch :default _ nil)))
+(defn- cljk-twin
+  "The `.cljk` name of a `.clj` / `.cljc` / `.cljs` path (nil otherwise). Every
+  tracked Clojure source was renamed to `.cljk` on 2026-09-11 (root ADR
+  adr-2609111500); the shape names below are kept as written and tried at
+  the new extension when the old one is absent."
+  [p]
+  (when-let [m (re-find #"^(.*)\.clj[cs]?$" (str p))] (str (nth m 1) ".cljk")))
+(defn- exists? [p] (try (or (.existsSync fs p)
+                            (boolean (some->> (cljk-twin p) (.existsSync fs))))
+                        (catch :default _ false)))
+(defn- slurp* [p] (try (str (.readFileSync fs p "utf8"))
+                       (catch :default _
+                         (when-let [t (cljk-twin p)]
+                           (try (str (.readFileSync fs t "utf8")) (catch :default _ nil))))))
 (defn- ls* [p] (try (vec (.readdirSync fs p)) (catch :default _ nil)))
 
 (defn- sh
@@ -115,8 +127,8 @@
                 store (slurp* (str base "store.cljc"))
                 gov? (exists? (str base "governor.cljc"))
                 core-clj (->> (or (ls* base) [])
-                              (filter #(and (str/ends-with? % ".clj")
-                                            (not= "render_html.clj" %)))
+                              (filter #(and (or (str/ends-with? % ".clj") (str/ends-with? % ".cljk"))
+                                            (not (#{"render_html.clj" "render_html.cljk"} %))))
                               vec)
                 why (cond
                       (not (op-set? phase)) :no-phase-op-sets

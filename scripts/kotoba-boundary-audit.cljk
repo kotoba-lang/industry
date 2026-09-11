@@ -132,14 +132,14 @@
                                               (not (compat-shim (rel %)))
                                               (not (primitive-route (rel %)))
                                               (not (str/includes? (rel %) "/py/src/kotodama/primitives/"))
-                                              (re-find #"\.(clj|cljc|cljs|py|ts|js|json|edn|md)$" (.getName %))
+                                              (re-find #"\.(clj|cljc|cljs|cljk|py|ts|js|json|edn|md)$" (.getName %))
                                               (re-find #"(?i)atproto|com\.atproto|xrpc|PDS" (slurp %)))))
         hosting-files (map (fn [f] {:kind :hosting :path (rel f) :target (get-in cfg [:owners :hosting])})
                            (files-under legacy-root
                                         #(and (not (under-legacy-cells? %))
                                               (not (compat-shim (rel %)))
                                               (not (primitive-route (rel %)))
-                                              (re-find #"\.(clj|cljc|cljs|py|ts|js|json|edn|md|toml)$" (.getName %))
+                                              (re-find #"\.(clj|cljc|cljs|cljk|py|ts|js|json|edn|md|toml)$" (.getName %))
                                               (re-find #"(?i)murakumo|host-sdk|hosting|gateway|fleet" (slurp %)))))]
     ;; Priority matters: cell-directory ownership beats file scans; primitives
     ;; are classified once before broader AT Protocol/hosting text scans.

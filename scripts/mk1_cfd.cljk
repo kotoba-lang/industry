@@ -146,6 +146,6 @@
      (println "wrote" (out-path)))))
 
 (let [argv (js->clj js/process.argv)
-      idx (first (keep-indexed (fn [i a] (when (str/ends-with? (str a) "mk1_cfd.cljs") i)) argv))]
+      idx (first (keep-indexed (fn [i a] (when (or (str/ends-with? (str a) "mk1_cfd.cljk") (str/ends-with? (str a) "mk1_cfd.cljs")) i)) argv))]
   (when idx
     (apply -main (drop (inc idx) argv))))

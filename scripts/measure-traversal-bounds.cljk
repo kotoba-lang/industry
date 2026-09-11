@@ -126,10 +126,10 @@
   (println "  Exercising the seam says what the function does. This says which")
   (println "  door the deployed read path walks through. Anchors are exact and")
   (println "  the section refuses if one is not found exactly once.")
-  (let [sites [["orgs/kotoba-lang/arrangement/src/arrangement/core.cljc"
+  (let [sites [["orgs/kotoba-lang/arrangement/src/arrangement/core.cljk"
                 "(pt/scan-prefix get-fn root-cid \"\")"
                 "snapshot hydrate — empty prefix, no limit, decrypts every leaf"]
-               ["orgs/kotoba-lang/arrangement/src/arrangement/source.cljc"
+               ["orgs/kotoba-lang/arrangement/src/arrangement/source.cljk"
                 "(pt/scan-prefix get-fn root (key-prefix blind-fn values))"
                 "pattern read — key-range pruned, still no limit"]]]
     (doseq [[path anchor why] sites]

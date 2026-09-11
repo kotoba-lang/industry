@@ -207,7 +207,7 @@
                                  {} hi)}))))))
 
 (defn src-op-kind [root]
-  (let [p (path/join root "orgs/kotoba-lang/kotoba/src/kotoba/runtime.clj")
+  (let [p (path/join root "orgs/kotoba-lang/kotoba/src/kotoba/runtime.cljk")
         t (form-map-text p "(def op->kind" "{'")]
     (if-not t
       (nope (str "could not locate op->kind map in " p))
@@ -220,7 +220,7 @@
         (catch :default e (nope (str "op->kind unparseable in " p " (" (.-message e) ")")))))))
 
 (defn src-real-ops [root]
-  (let [p (path/join root "orgs/kotoba-lang/kotoba/src/kotoba/wasm_exec.clj")
+  (let [p (path/join root "orgs/kotoba-lang/kotoba/src/kotoba/wasm_exec.cljk")
         t (form-map-text p "(defn real-op-effects" "{'")]
     (if-not t
       (nope (str "could not locate real-op-effects map in " p))
@@ -232,7 +232,7 @@
           (ok {:path p :data ops}))))))
 
 (defn src-effects [root]
-  (let [p (path/join root "orgs/kotoba-lang/kotoba-lang/src/kotoba/lang/capability_values.cljc")
+  (let [p (path/join root "orgs/kotoba-lang/kotoba-lang/src/kotoba/lang/capability_values.cljk")
         t (form-map-text p "(def effect-for-kind" "{")]
     (if-not t
       (nope (str "could not locate effect-for-kind map in " p))
@@ -244,7 +244,7 @@
         (catch :default e (nope (str "effect-for-kind unparseable in " p " (" (.-message e) ")")))))))
 
 (defn src-tender [root]
-  (let [p (path/join root "orgs/kotoba-lang/kototama/src/kototama/tender.clj")
+  (let [p (path/join root "orgs/kotoba-lang/kototama/src/kototama/tender.cljk")
         t (form-map-text p "fn-by-id" "{")]
     (if-not t
       (nope (str "could not locate fn-by-id map in " p))
@@ -263,7 +263,7 @@
     (catch :default e (nope (str what " unparseable in " p " (" (.-message e) ")")))))
 
 (defn src-browser [root]
-  (let [p (path/join root "orgs/kotoba-lang/kototama/src/kototama/browser.cljc")
+  (let [p (path/join root "orgs/kotoba-lang/kototama/src/kototama/browser.cljk")
         t (form-map-text p "(def host-impl" "{")]
     (if-not t
       (nope (str "could not locate host-impl map in " p))

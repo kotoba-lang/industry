@@ -118,14 +118,14 @@
                     (cond
                       (and (.isDirectory e) (not (#{"node_modules" ".git" ".nbb"} (.-name e))))
                       (walk p (inc depth))
-                      (re-find #"\.clj[cs]?$" (.-name e)) (swap! out conj p))))))]
+                      (re-find #"\.(clj[cs]?|cljk)$" (.-name e)) (swap! out conj p))))))]
       (walk dir 0))
     @out))
 
 (defn- meter-ns? [p]
   ;; ns 名の**末尾セグメント**で見る。`usage` を含む語がどこかに在ることではない
   ;; —— それが 9 という数を出して、証拠ではなかったもの。
-  (boolean (re-find #"/(usage|meter|metering|metrics|billing)(_[a-z]+)?\.clj[cs]?$" p)))
+  (boolean (re-find #"/(usage|meter|metering|metrics|billing)(_[a-z]+)?\.(clj[cs]?|cljk)$" p)))
 
 (def ^:private shape
   ;; 参照実装 authn.usage の 3 要素。名前ではなく役割で探す。

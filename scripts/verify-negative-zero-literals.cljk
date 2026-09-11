@@ -268,7 +268,7 @@
           (js/process.exit 2))
       results
       (vec (for [d dirs
-                 :let [listing (sh "git ls-files '*.cljc' '*.cljs'" d)]
+                 :let [listing (sh "git ls-files '*.cljc' '*.cljs' '*.cljk'" d)]
                  :when listing
                  f (remove str/blank? (str/split-lines listing))
                  :let [p (path/join d f)

@@ -20,8 +20,8 @@
 (def root (or (first *command-line-args*) "."))
 
 (def pairs
-  [["orgs/kotoba-lang/kotoba/src/kotoba/adl.cljc"        "scripts/kotoba_adl/kotoba/adl.cljk"]
-   ["orgs/kotoba-lang/kotoba/src/kotoba/adl/reader.cljc" "scripts/kotoba_adl/kotoba/adl/reader.cljk"]])
+  [["orgs/kotoba-lang/kotoba/src/kotoba/adl.cljk"        "scripts/kotoba_adl/kotoba/adl.cljk"]
+   ["orgs/kotoba-lang/kotoba/src/kotoba/adl/reader.cljk" "scripts/kotoba_adl/kotoba/adl/reader.cljk"]])
 
 (defn- body
   "The code, with any leading provenance comment removed. Upstream and the

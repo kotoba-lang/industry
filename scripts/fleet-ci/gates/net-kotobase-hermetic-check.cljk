@@ -153,7 +153,7 @@
             "— check-metadata enumerates files with `git ls-files`, so without it"
             "the check silently inspects nothing"))))
 
-(let [{:keys [rc out]} (run "bb" ["scripts/check-metadata.cljc"] {:cwd root})
+(let [{:keys [rc out]} (run "bb" ["scripts/check-metadata.cljk"] {:cwd root})
       lines (count (remove str/blank? (str/split-lines (str out))))]
   (println "B metadata:" lines "checks reported")
   (cond
@@ -184,17 +184,17 @@
 ;; step も同じ意味しか持っていなかった（この gate はそれを忠実に移しただけで、
 ;; 強くはしていない）。
 (def syntax-skip
-  {"scripts/check-metadata.cljc" "no --syntax-check flag (covered bare in check B)"
-   "scripts/cognitect-wire-check.cljc" "nbb script, needs kotobase-api-gateway-cljs/src on the classpath"
-   "kotobase-api-gateway/scripts/testnet-secrets.cljc" "secrets helper, requires arguments"})
+  {"scripts/check-metadata.cljk" "no --syntax-check flag (covered bare in check B)"
+   "scripts/cognitect-wire-check.cljk" "nbb script, needs kotobase-api-gateway-cljs/src on the classpath"
+   "kotobase-api-gateway/scripts/testnet-secrets.cljk" "secrets helper, requires arguments"})
 
 (def syntax-candidates
   (vec (concat
         (for [f (sort (fs/readdirSync root-scripts-dir))
-              :when (str/ends-with? f ".cljc")]
+              :when (or (str/ends-with? f ".cljc") (str/ends-with? f ".cljk"))]
           {:cwd root :rel (str "scripts/" f) :key (str "scripts/" f)})
         (for [f (sort (fs/readdirSync worker-scripts-dir))
-              :when (str/ends-with? f ".cljc")]
+              :when (or (str/ends-with? f ".cljc") (str/ends-with? f ".cljk"))]
           {:cwd (path/join root "kotobase-api-gateway") :rel (str "scripts/" f)
            :key (str "kotobase-api-gateway/scripts/" f)}))))
 
@@ -256,12 +256,12 @@
 ;; 場所である。
 
 (let [gw-dir (path/join root "kotobase-api-gateway-cljs")
-      suites [["object_grant_test.cljc" "kotobase.object-grant-test"]
+      suites [["object_grant_test.cljk" "kotobase.object-grant-test"]
               ;; The shell as well as the decision. The route is where the
               ;; capability is bound to the URL and where a refusal must reach
               ;; neither the presigner nor the recorder — properties the pure
               ;; layer cannot have, because it performs nothing.
-              ["object_grant_route_test.cljs" "kotobase.object-grant-route-test"]]
+              ["object_grant_route_test.cljk" "kotobase.object-grant-route-test"]]
       missing (remove #(fs/existsSync (path/join gw-dir "test" "kotobase" (first %))) suites)]
   (if (seq missing)
     (fail! "object-grant" (str/join ", " (map first missing))
@@ -307,7 +307,7 @@
 ;; ノードは npm を回せないので、**実際に走る唯一の場所がここ**である。
 
 (let [target (path/join root "protocols-worker" "src" "kotobase_protocols_worker"
-                        "kotobase_store.cljs")
+                        "kotobase_store.cljk")
       heads ["(eng/hot-datoms" "(eng/fold!"]
       arglist (fn [src start]
                 (loop [i start depth 0]

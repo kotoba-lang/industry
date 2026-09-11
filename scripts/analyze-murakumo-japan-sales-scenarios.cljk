@@ -177,7 +177,7 @@
 
 (def argv
   (let [args (vec (drop 2 (js->clj js/process.argv)))]
-    (if (and (seq args) (str/ends-with? (str (first args)) ".cljs"))
+    (if (and (seq args) (or (str/ends-with? (str (first args)) ".cljk") (str/ends-with? (str (first args)) ".cljs")))
       (vec (rest args))
       args)))
 

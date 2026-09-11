@@ -46,7 +46,9 @@
 ;; to check -- measured 2026-08-13, that made the gate report `top level is
 ;; function(...)` about itself.
 (def argv (let [a (vec (drop 2 (js->clj js/process.argv)))]
-            (if (and (seq a) (str/ends-with? (str (first a)) ".cljs")) (vec (rest a)) a)))
+            (if (and (seq a) (or (str/ends-with? (str (first a)) ".cljk")
+                                 (str/ends-with? (str (first a)) ".cljs")))
+              (vec (rest a)) a)))
 (defn- flag? [f] (some #{f} argv))
 (defn- opt [f d] (let [i (.indexOf argv f)] (if (neg? i) d (get argv (inc i) d))))
 

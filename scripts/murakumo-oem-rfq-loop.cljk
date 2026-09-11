@@ -25,11 +25,16 @@
   (.dirname path (or (second (js->clj (.-argv process)))
                      (.cwd process))))
 (def tick-path
-  (let [sib (.join path this-dir "murakumo-oem-rfq-tick.cljs")
-        local (.join path ledger-dir "tick.cljs")
-        repo (.join path root "scripts" "murakumo-oem-rfq-tick.cljs")]
+  ;; The repo copy is `.cljk` since the 2026-09-11 rename (root ADR
+  ;; adr-2609111500); a deployed copy under ledger-dir keeps whatever name it
+  ;; was installed with, so both short spellings are tried there.
+  (let [sib (.join path this-dir "murakumo-oem-rfq-tick.cljk")
+        local (first (filter #(.existsSync fs %)
+                             [(.join path ledger-dir "tick.cljk")
+                              (.join path ledger-dir "tick.cljs")]))
+        repo (.join path root "scripts" "murakumo-oem-rfq-tick.cljk")]
     (cond
-      (.existsSync fs local) local
+      local local
       (.existsSync fs sib) sib
       :else repo)))
 (def ledger-path (.join path ledger-dir "loop.ledger.edn"))

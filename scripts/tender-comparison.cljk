@@ -261,7 +261,7 @@
         calls (bounded-integer (opt "--calls" "400") "--calls" 500)
         warmup (bounded-integer (opt "--warmup" "50") "--warmup" 450)
         output-path (opt "--output" nil)
-        steady-script (path/resolve here "tender-chicory-steady.clj")
+        steady-script (path/resolve here "tender-chicory-steady.cljk")
         skipped-hosts #js {}
         wasmtime? (boolean (output "wasmtime" ["--version"]))
         _ (when-not wasmtime? (aset skipped-hosts "wasmtime-cli" "toolchain not installed"))

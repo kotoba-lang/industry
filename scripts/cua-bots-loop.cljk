@@ -40,7 +40,7 @@
 (def lock-file (str home "/.itonami/cua-bots.lock"))
 (def roster-file (str root "/manifest/cua-bots.edn"))
 (def lib-dir (str root "/orgs/kotoba-lang/computer-use"))
-(def lib-cli "bin/cua_bot_run.cljs")
+(def lib-cli "bin/cua_bot_run.cljk")
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
 
 (defn log! [& xs]

@@ -123,7 +123,7 @@
                 (skip-dirs nm) []
                 (.isDirectory e) (walk-test-files p (dec depth))
                 (and (.isFile e)
-                     (or (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))
+                     (or (str/ends-with? nm ".cljk") (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))
                      (str/includes? (str/replace p "\\" "/") "/test/")) [p]
                 :else [])))
           entries)))))

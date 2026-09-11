@@ -164,11 +164,11 @@
 (def line-matcher (re-pattern line-ere))
 (def file-matcher (re-pattern "defn-?\\s+covers\\?|defn-?\\s+covered\\?"))
 
-(def source-pathspec ["*.clj" "*.cljc" "*.cljs"])
+(def source-pathspec ["*.clj" "*.cljc" "*.cljs" "*.cljk"])
 
 (defn- test-path? [f]
   (or (re-find #"(^|/)tests?/" f)
-      (re-find #"_test\.clj[cs]?$" f)))
+      (re-find #"_test\.(clj[cs]?|cljk)$" f)))
 
 ;; ---------------------------------------------------------------- the walk
 

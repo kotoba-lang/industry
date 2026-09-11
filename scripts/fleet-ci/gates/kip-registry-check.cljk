@@ -41,10 +41,10 @@
 ;; defence against a false pass from a truncated extract: :include-ext filters
 ;; the tarball, and a filter that drops these files would otherwise leave a gate
 ;; that checks nothing and says so in no way at all.
-(doseq [[p what] [["scripts/check-kips.cljs" "the checker"]
+(doseq [[p what] [["scripts/check-kips.cljk" "the checker"]
                   ["lang/kip-process.edn" "the process authority"]
-                  ["src/kotoba/kip/core.cljc" "the core namespace"]
-                  ["src/kotoba/kip/registry.cljc" "the registry namespace"]
+                  ["src/kotoba/kip/core.cljk" "the core namespace"]
+                  ["src/kotoba/kip/registry.cljk" "the registry namespace"]
                   ["kips" "the registry directory"]]]
   (when-not (fs/existsSync (path/join root p))
     (die! 90 p "missing after extract —" what "is not in the shipped tree")))
