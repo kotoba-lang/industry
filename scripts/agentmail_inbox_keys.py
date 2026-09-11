@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Create one inbox-scoped AgentMail API key per inbox and store it in the
-macOS Keychain. Modeled on scripts/agentmail-inbox-create.cljs rules:
+macOS Keychain. Modeled on scripts/agentmail-inbox-create.cljk rules:
  - the key is returned ONCE; never printed
  - `security add-generic-password -w` with no value reads the secret TWICE
    from stdin — feed it twice or the stored password is silently EMPTY

@@ -9,14 +9,14 @@ Bot全体のモデル設定を変更するものではない。出力はレビ�
 
 ```bash
 # superproject rootで実行。表示だけなら認証情報は不要。
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-plan ja 100000
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-plan ja 1000000
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-plan ja 100000
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-plan ja 1000000
 
 # 入力は文字列値だけのJSON。公開原文を20キー・1500 UTF-8バイト以下に分割する。
 # OPENROUTER_API_KEYは既存の認証環境から渡す。値をログやファイルに書かない。
-BENCH_OUT=/tmp/public-translation-receipts nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs translate ja public-source.json 1000000 --public-input
+BENCH_OUT=/tmp/public-translation-receipts nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk translate ja public-source.json 1000000 --public-input
 
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-self-test
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-self-test
 ```
 
 月間出力100万token未満は通常量、それ以上は大量生成という**運用上の初期値**。
@@ -39,7 +39,7 @@ JSON形、符号・数値・通貨・URL・placeholderの個数、最低限の�
 再検査例（HTTP成功・stop・構造/固定語すべてを要求する）:
 
 ```bash
-nbb --classpath scripts/model-eval scripts/model-eval/bench.cljs language-check 90-docs/reports/language-models-20260909/evaluations-v2.json 90-docs/reports/language-models-20260909/sample.json
+nbb --classpath scripts/model-eval scripts/model-eval/bench.cljk language-check 90-docs/reports/language-models-20260909/evaluations-v2.json 90-docs/reports/language-models-20260909/sample.json
 ```
 
 調査正本: `90-docs/reports/260909-language-model-cost-usage.edn`。

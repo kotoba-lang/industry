@@ -4,7 +4,7 @@
 <dict>
   <key>Label</key>
   <string>cloud.itonami.bot.fleet-ci-cache-prune</string>
-  <!-- scripts/fleet-ci/prune-cache.cljs existed and worked, but nothing ever
+  <!-- scripts/fleet-ci/prune-cache.cljk existed and worked, but nothing ever
        ran it: measured 2026-09-08 the cache had reached 41 GB on a volume with
        669 MB free. The script keeps every sha west.yml pins, and a wrong
        delete costs one `git archive` — so the failure mode of running it too
@@ -13,7 +13,7 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/nbb</string>
-    <string>scripts/fleet-ci/prune-cache.cljs</string>
+    <string>scripts/fleet-ci/prune-cache.cljk</string>
     <string>--max-age-days</string>
     <string>3</string>
     <string>--apply</string>

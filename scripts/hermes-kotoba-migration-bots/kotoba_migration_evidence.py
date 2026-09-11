@@ -2,7 +2,7 @@
 """Hand the kotoba-migration-scout bot its one candidate for this run.
 
 Decision-free, like hyakka_evidence.py and itonami_evidence.py: this runs
-`scripts/hermes-kotoba-migration-bots/candidates.cljs` against the populated
+`scripts/hermes-kotoba-migration-bots/candidates.cljk` against the populated
 superproject and prints what that produced. Every rule about what counts as a
 candidate — already migrated, host-mechanism path, too big, already proposed
 — lives in that script; none of it is repeated here.
@@ -72,7 +72,7 @@ def main() -> None:
     os.makedirs(RUN_PARENT, exist_ok=True)
 
     proc = subprocess.run(
-        [NBB, f"{READ_ROOT}/scripts/hermes-kotoba-migration-bots/candidates.cljs",
+        [NBB, f"{READ_ROOT}/scripts/hermes-kotoba-migration-bots/candidates.cljk",
          "--root", READ_ROOT, "--top", "1"],
         cwd=READ_ROOT, capture_output=True, text=True, timeout=600)
 

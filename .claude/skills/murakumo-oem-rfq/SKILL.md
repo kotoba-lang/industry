@@ -30,7 +30,7 @@ description: Mouse / Sycom への murakumo OEM RFQ の業者返信を 1 通だ�
 ```bash
 nbb ~/.itonami/murakumo-oem-rfq/tick.cljs --json
 # または repo 側
-nbb scripts/murakumo-oem-rfq-tick.cljs --json
+nbb scripts/murakumo-oem-rfq-tick.cljk --json
 ```
 
 - `UNANSWERED=true` / `reason=resend-key-missing` → **返信 0 と書かない。** 鍵が無い。Cursor なら Resend MCP `list-received-emails` と Gmail `search_threads` で測る。launchd は `~/.itonami/resend-api-key`（mode 600）か keychain `gftd.resend`/`API_KEY` が要る。

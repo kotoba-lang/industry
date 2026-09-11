@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-toolchain-pin-sync.cljs\" \"$CLAUDE_PROJECT_DIR\" 2>/dev/null || true",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-toolchain-pin-sync.cljk\" \"$CLAUDE_PROJECT_DIR\" 2>/dev/null || true",
             "timeout": 60,
             "statusMessage": "Syncing toolchain checkouts to their west pins…"
           }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-branch-sync-check.cljs\" 2>/dev/null || true",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-branch-sync-check.cljk\" 2>/dev/null || true",
             "timeout": 20,
             "statusMessage": "Checking branch sync with origin/main…"
           }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-spec-inventory.cljs\" 2>/dev/null || true",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-spec-inventory.cljk\" 2>/dev/null || true",
             "timeout": 20,
             "statusMessage": "Listing external-spec repos in the workspace…"
           }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-shallow-check.cljs\" 2>/dev/null || true",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-shallow-check.cljk\" 2>/dev/null || true",
             "timeout": 20,
             "statusMessage": "Checking this checkout and orgs/ are not shallow…"
           }
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-orgs-detectors.cljs\" 2>/dev/null || true",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-orgs-detectors.cljk\" 2>/dev/null || true",
             "timeout": 20,
             "statusMessage": "Reporting orgs-dependent detectors (new / resolved / standing)…"
           }
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-checkout-staleness.cljs\" 2>/dev/null || true",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-checkout-staleness.cljk\" 2>/dev/null || true",
             "timeout": 25,
             "statusMessage": "Measuring how stale the checkouts something actually reads are…"
           }
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-repo-bots.cljs\" 2>/dev/null || true",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-repo-bots.cljk\" 2>/dev/null || true",
             "timeout": 20,
             "statusMessage": "Reporting the per-repo resident bots (roster, unticked, growth)…"
           }
@@ -79,55 +79,55 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-push-main-sync-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-push-main-sync-guard.cljk\"",
             "timeout": 30,
             "statusMessage": "Checking branch is in sync with main before push…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/west-pin-verify-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/west-pin-verify-guard.cljk\"",
             "timeout": 90,
             "statusMessage": "Verifying west.yml pins against upstream (server-side)…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-pull-west-sync-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/git-pull-west-sync-guard.cljk\"",
             "timeout": 15,
             "statusMessage": "Checking git pull uses depth+west-update sequence…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/wrangler-deploy-main-sync-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/wrangler-deploy-main-sync-guard.cljk\"",
             "timeout": 45,
             "statusMessage": "Checking the deploy source contains origin/main…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/deploy-local-root-pin-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/deploy-local-root-pin-guard.cljk\"",
             "timeout": 60,
             "statusMessage": "Checking :local/root deps match their west pins before deploy…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/branch-create-main-sync-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/branch-create-main-sync-guard.cljk\"",
             "timeout": 30,
             "statusMessage": "Checking the checkout is in sync before creating a branch…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/docs-edn-parse-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/docs-edn-parse-guard.cljk\"",
             "timeout": 20,
             "statusMessage": "Checking changed 90-docs EDN parses…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/adr-id-shape-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/adr-id-shape-guard.cljk\"",
             "timeout": 20,
             "statusMessage": "Checking new ADR :adr/id shape…"
           },
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/jvm-new-surface-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/jvm-new-surface-guard.cljk\"",
             "timeout": 25,
             "statusMessage": "Checking scaffold/deps do not grow JVM runtime surface…"
           }
@@ -138,7 +138,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/jvm-new-surface-guard.cljs\"",
+            "command": "NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" --classpath \"$CLAUDE_PROJECT_DIR:$CLAUDE_PROJECT_DIR/scripts:$CLAUDE_PROJECT_DIR/scripts/nbb_compat\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/jvm-new-surface-guard.cljk\"",
             "timeout": 25,
             "statusMessage": "Checking Write/Edit does not add production .clj or JVM runtime deps…"
           }
@@ -149,7 +149,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "nbb /Users/junkawasaki/github/com-junkawasaki/.claude/hooks/duplication-warn.cljs"
+            "command": "nbb /Users/junkawasaki/github/com-junkawasaki/.claude/hooks/duplication-warn.cljk"
           }
         ]
       }
@@ -160,7 +160,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ \"$DELTA_CAPTURE\" = \"1\" ] || exit 0; NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/delta-capture-post-tool.cljs\" || true",
+            "command": "[ \"$DELTA_CAPTURE\" = \"1\" ] || exit 0; NBB=\"$CLAUDE_PROJECT_DIR/node_modules/.bin/nbb\"; [ -x \"$NBB\" ] || NBB=nbb; \"$NBB\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/delta-capture-post-tool.cljk\" || true",
             "timeout": 30,
             "statusMessage": "Recording edit into kotoba-delta op-log…"
           }

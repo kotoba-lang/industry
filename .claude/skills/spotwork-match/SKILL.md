@@ -16,7 +16,7 @@ description: スキマバイト（単発シフト）の求人を 1 件だけ gov
 ## この反復の仕事はちょうど 1 つ
 
 ```bash
-nbb scripts/spotwork-match-tick.cljs     # 最終行に EDN で候補が出る
+nbb scripts/spotwork-match-tick.cljk     # 最終行に EDN で候補が出る
 ```
 
 - `:outcome :candidate :kind :catalog-defect` — 規則カタログが壊れている
@@ -35,7 +35,7 @@ nbb scripts/spotwork-match-tick.cljs     # 最終行に EDN で候補が出る
 **提案 1 行を自分で組み立てないこと。** 生成は決定論の emitter が持つ:
 
 ```bash
-nbb scripts/spotwork-match-tick.cljs --emit <offer-id>   # 1 行の EDN が出る
+nbb scripts/spotwork-match-tick.cljk --emit <offer-id>   # 1 行の EDN が出る
 ```
 
 この行をそのまま `80-data/spotwork/proposals.ledger.edn` の末尾に**追記**する
@@ -85,8 +85,8 @@ tick の `:floors` には bot が直せないものが並ぶ:
 ## 検証
 
 ```bash
-nbb 70-tools/spotwork/run-tests.cljs   # exit 0 / 1 / 2（2 = 本数が床を割った）
-nbb scripts/spotwork-match-tick.cljs   # exit 0 / 2
+nbb 70-tools/spotwork/run-tests.cljk   # exit 0 / 1 / 2（2 = 本数が床を割った）
+nbb scripts/spotwork-match-tick.cljk   # exit 0 / 2
 ```
 
 規則を触った周は、**壊して落ちることを実際に見る**。1 箇所壊した状態で
@@ -105,6 +105,6 @@ nbb scripts/spotwork-match-tick.cljs   # exit 0 / 2
 
 ## 着地
 
-1. `nbb 70-tools/spotwork/run-tests.cljs` が exit 0
-2. `nbb scripts/spotwork-match-tick.cljs` が exit 0（次周の候補が 1 つ減っている）
+1. `nbb 70-tools/spotwork/run-tests.cljk` が exit 0
+2. `nbb scripts/spotwork-match-tick.cljk` が exit 0（次周の候補が 1 つ減っている）
 3. commit → push → PR（root の既定 branch 運用に従う）

@@ -138,8 +138,8 @@ Nexstar・Simon Property・Avis Budget・Xero・ONEOK が net −3 以下で、�
 ```bash
 # モデル
 nbb --classpath "90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src" \
-  90-docs/system-dynamics/money-stink.cljs
+  90-docs/system-dynamics/money-stink.cljk
 
 # 実在企業の観測
-nbb 90-docs/system-dynamics/tos-alignment-scan.cljs
+nbb 90-docs/system-dynamics/tos-alignment-scan.cljk
 ```

@@ -26,7 +26,7 @@ print(f"root={ROOT}")
 
 # 1) fresh full run (all probes, cheap only) — the live promise check
 print("\n== fresh verify-endpoint-health (--all --cheap-only) ==")
-out = run(["nbb", "scripts/verify-endpoint-health.cljs", ".", "--all", "--cheap-only", "--findings"])
+out = run(["nbb", "scripts/verify-endpoint-health.cljk", ".", "--all", "--cheap-only", "--findings"])
 print(out[-3000:] if out else "(no output)")
 if "SCRIPT-ERROR" in out or "REFUSING" in out:
     print("REFUSED: probe run failed; the bot must not propose findings today")
@@ -45,7 +45,7 @@ if os.path.exists(STATEMENT):
         n_inc = inc.count(":incident/") // 2 if inc else 0
         print(f"  {target:45s} {status:12s} ratio={ratio} incidents={n_inc}")
 else:
-    print(f"  (statement not synced at {STATEMENT} — run scripts/endpoint-health-pull.cljs)")
+    print(f"  (statement not synced at {STATEMENT} — run scripts/endpoint-health-pull.cljk)")
 
 # 3) the one-line contract for the judge
 print("\n== judge contract ==")
@@ -53,6 +53,6 @@ print("Probe rows above are MEASUREMENTS. A probe row marked DEGRADED,")
 print("ANSWERED-BADLY or UNANSWERED is the only thing you may turn into a finding.")
 print("Findings go to 90-docs/qa/<date>-<probe-id>.edn with: probe id, observed")
 print("values quoted from this report, the promise (manifest :note), a one-command")
-print("repro (nbb scripts/verify-endpoint-health.cljs . --only <id>), severity, owner.")
+print("repro (nbb scripts/verify-endpoint-health.cljk . --only <id>), severity, owner.")
 print("Never propose a finding you cannot quote from this output. Zero bad rows")
 print("=> write nothing, report 'all promises held', and stop.")

@@ -68,11 +68,11 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <!-- 実体は scripts/hirameki-harvest.cljs。plist にロジックを書かない
+    <!-- 実体は scripts/hirameki-harvest.cljk。plist にロジックを書かない
          （launchctl は編集のたびに bootout/bootstrap が要り、直せなくなる）。
          cwd が superproject root である必要がある（入力パスを git rev-parse で
          解決しているため）。 -->
-    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljs --ticks 20</string>
+    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk --ticks 20</string>
   </array>
 
   <key>StartCalendarInterval</key>

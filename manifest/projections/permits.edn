@@ -17,7 +17,7 @@
 ;;             旧 gate `root-permit-index` はそれを立てようとして 259 tip 連続で
 ;;             赤かった（しかも「射影が正本とズレている」という、壊れていない
 ;;             不変条件の名前で報告していた）。鮮度は `orgs/` が実在する場所で
-;;             `nbb --classpath ".:scripts" scripts/gen-permit-index.cljs --check`
+;;             `nbb --classpath ".:scripts" scripts/gen-permit-index.cljk --check`
 ;;             を回す運用側の仕事として残す。
 {:projection/version 2
  :projection/id "permits"
@@ -32,7 +32,7 @@
  :projection/contracts
  {:schema/path "manifest/projection-schemas/permits.edn"
   :schema/sha256 "7646b496f2237d60f5fe4dac1c050ea5cbbc231806565aae13a306965e6ad021"
-  :loader/path "manifest/project-edn.cljs"
+  :loader/path "manifest/project-edn.cljk"
   :loader/sha256 "88fe9455809e8d3e5df69141ae7c6a4055b900cb3629b01281f5c0aae521cd6b"}
  :projection/rebuild
  {:loader/id :canonical-edn-v1

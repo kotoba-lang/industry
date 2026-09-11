@@ -38,7 +38,7 @@ adr-inventory は status と pointer を棚卸しする。**決定の中身が�
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin
-nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen-tick.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen-tick.cljk
 ```
 
 `:outcome :insufficient-scan` が出たら **何もせず終わる**。sparse checkout から
@@ -76,8 +76,8 @@ EDN は Write / StrReplace で書く。shell heredoc の `\"` で書かない。
 ### 3. 検証して着地
 
 ```bash
-COM_JUNKAWASAKI_ROOT="$PWD" nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljs --self-test
-COM_JUNKAWASAKI_ROOT="$PWD" nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljs --edn
+COM_JUNKAWASAKI_ROOT="$PWD" nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --self-test
+COM_JUNKAWASAKI_ROOT="$PWD" nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --edn
 ```
 
 直したファイルが `:next` に再掲されないこと。self-test が緑であること。

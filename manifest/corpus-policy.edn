@@ -7,7 +7,7 @@
 ;;   - consent scope（誰に見せてよい本文か）
 ;;   - bytes plane の宛先（DataLad dataset）
 ;;
-;; **スコアそのもの・索引・shard は生成物**（`scripts/gen-training-corpus.cljs`）。
+;; **スコアそのもの・索引・shard は生成物**（`scripts/gen-training-corpus.cljk`）。
 ;; 手で書かない。手書きの索引は必ず腐る（`gen-concept-index.cljs` と同じ理由）。
 ;;
 ;; ## なぜ LLM judge を使わないか
@@ -165,7 +165,7 @@
  ;; ---------------------------------------------------------------------------
  ;; bytes plane。**shard は git に入れない**（ADR-2608039700: large EDN shard は annex）。
  ;; ここが宛先の宣言で、実際に custody があるかは**この面が申告しない** ——
- ;; 証明は `scripts/annex-custody-verify.cljs`（off-machine copy の存在 +
+ ;; 証明は `scripts/annex-custody-verify.cljk`（off-machine copy の存在 +
  ;; remote から読み戻しての checksum）だけが持つ。索引は自分の保管を自称しない。
  ;;
  ;; **宛先は com-junkawasaki 自前の dataset**（オーナー判断 2026-08-05）。当初は
@@ -183,7 +183,7 @@
   :build/out-dir ".corpus-shards"}
 
  ;; ---------------------------------------------------------------------------
- ;; query plane への露出。`manifest/edn-query.cljs` がこの値で datom に印を付ける。
+ ;; query plane への露出。`manifest/edn-query.cljk` がこの値で datom に印を付ける。
  :query
  {:source/dataset "training-corpus"
   :join-keys [{:key :corpus/adr-id :joins "adr/id"}

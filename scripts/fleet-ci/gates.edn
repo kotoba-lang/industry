@@ -152,7 +152,7 @@
  ;;
  ;;   4. The runner covers the whole suite:
  ;;        nbb --classpath ".:scripts/nbb_compat" \
- ;;          scripts/verify-cljs-runner-completeness.cljs --repo orgs/<org>/<name>
+ ;;          scripts/verify-cljs-runner-completeness.cljk --repo orgs/<org>/<name>
  ;;      reports it complete. Condition 1 catches this today only because someone
  ;;      thought to run both sides and compare; the detector is what makes it hold
  ;;      after the flip, when nothing runs `clojure -M:test` any more and there is
@@ -431,7 +431,7 @@
   ;; file not containing `foo` does. Every search-based conclusion about that
   ;; file is void, and nothing says so.
   ;;
-  ;; Measured that day, twice, by different routes: `scripts/fleet-ci/tick.cljs`
+  ;; Measured that day, twice, by different routes: `scripts/fleet-ci/tick.cljk`
   ;; (three searches came back empty and were read as `no such code`), and
   ;; `network-awai/net-isekai-gen/src/isekai_gen/cid.clj`, where a scan
   ;; reported `no JVM interop` for a file importing
@@ -488,12 +488,12 @@
   ;; credential 無しのノードから見える。
   ;;
   ;; 検証ロジックは gate に持たせない。正本は
-  ;; `scripts/verify-no-github-workflows.cljs`（source-nul-bytes と同じ委譲形）。
+  ;; `scripts/verify-no-github-workflows.cljk`（source-nul-bytes と同じ委譲形）。
   ;;
   ;; **緑の意味を広げないこと。** この gate が言うのは「この tree は GitHub に
   ;; workflow を渡していない」だけで、「Actions が無効である」ではない。GitHub 側の
   ;; 設定と Dependabot はノードから引けないので、verifier が出力に NOT-CHECKED として
-  ;; 明記する。そちらは operator 側の `scripts/github-actions-billable-audit.cljs`
+  ;; 明記する。そちらは operator 側の `scripts/github-actions-billable-audit.cljk`
   ;; が持つ（credential を要する = ノードに置かない、の不変条件どおり）。
   ;;
   ;; 床は件数ではなく錨 `manifest/west.yml`。この repo が自分で持つ yaml は 5 本しか
@@ -513,7 +513,7 @@
    :script "gates/github-workflows-absent-check.cljs"
    :include-ext [".kotoba" ".yml" ".yaml" ".cljs"]
    :min-files 400
-   :require-paths ["scripts/verify-no-github-workflows.cljs" "manifest/west.yml"]
+   :require-paths ["scripts/verify-no-github-workflows.cljk" "manifest/west.yml"]
    :cd false}
   ;; AGENTS.md は CLAUDE.md からの生成物（ADR-2609062600）。2 つの agent 指示を
   ;; 手で二重管理していた間、30 日で片側 52 commit / 60 日で逆側 9 commit が相手に
@@ -528,7 +528,7 @@
    :script "gates/agents-md-generated-check.cljs"
    :include-ext [".kotoba" ".md" ".cljs"]
    :min-files 1200
-   :require-paths ["CLAUDE.md" "AGENTS.md" "scripts/gen-agents-md.cljs"]
+   :require-paths ["CLAUDE.md" "AGENTS.md" "scripts/gen-agents-md.cljk"]
    :cd false}
   ;; Human authentication policy is authority-scoped, not a repository-wide
   ;; keyword ban. External OAuth/OIDC/SAML/Email/SMS mirrors and protocol
@@ -1435,7 +1435,7 @@
   ;; **構造的な障害なしに今日 gate にできる**数少ない verifier として最上位。
   ;;
   ;; :include-ext は検査対象（ADR = .edn）と **検出器自身（.cljs）の両方**が要る。
-  ;; gate はロジックを複製せず scripts/verify-adr-identity.cljs を呼ぶので、
+  ;; gate はロジックを複製せず scripts/verify-adr-identity.cljk を呼ぶので、
   ;; .cljs が無い tree では正本に届かない（gate 側が存在を確認して exit 90）。
   ;;
   ;; :min-files 1500 は「絞り込みが壊れて 90-docs/adr が落ちた tree を検査して
@@ -1495,7 +1495,7 @@
   ;; せよ」が 2 箇所あるので、**足りないのは規則ではなく機械検査**。
   ;;
   ;; :include-ext に **.cljs が要る** — この gate は検証ロジックを複製せず
-  ;; scripts/verify-parity-probes.cljs をノード上で呼ぶので、それが tree に無いと
+  ;; scripts/verify-parity-probes.cljk をノード上で呼ぶので、それが tree に無いと
   ;; 動かない（gate 側が存在を確認して FAIL する）。
   ;; :min-files は「絞り込みが壊れて 0 件 → trivially pass」を防ぐ床で、gate に渡す
   ;; --min（probe を持つ軸の下限）と二重に掛ける。
@@ -1514,7 +1514,7 @@
   ;; しない）。この不変条件を fleet 側にも置くのは、Actions が課金停止で
   ;; 止まった実績があるため — 同じ理由で上の docs-edn gate が置かれている。
   ;;
-  ;; :include-ext に ".cljs" が要る。verifier 本体（scripts/verify-repository-roles.cljs）
+  ;; :include-ext に ".cljs" が要る。verifier 本体（scripts/verify-repository-roles.cljk）
   ;; と compat shim（scripts/nbb_compat*）をノードへ送るため。2,100 ファイル程度で
   ;; argv 上限 20,000 に対して充分収まる。
   ;;
@@ -1603,7 +1603,7 @@
   ;;
   ;; 逆順導出は 3 箇所に在った: `:org-domain` の手書き `:reversed` 列、
   ;; `verify-repository-roles.cljs` の `domain->prefix`、cloud-itonami の受付。
-  ;; 2 つ目は `scripts/org_id_derivation.cljs` に括り出し、正本を
+  ;; 2 つ目は `scripts/org_id_derivation.cljk` に括り出し、正本を
   ;; `manifest/org-id.kotoba`（`kotoba/pure`、capability 0）に置いた。
   ;;
   ;; gate は規則を実装しない（3 箇所を 4 箇所にするだけなので）。突き合わせるのは:
@@ -1710,7 +1710,7 @@
   ;;
   ;; Deliberately NOT covering "did a normative surface change without a KIP" —
   ;; that needs another repo's git history plus this registry, and a fleet gate
-  ;; gets one tree. It lives at scripts/verify-kip-coverage.cljs, operator-side.
+  ;; gets one tree. It lives at scripts/verify-kip-coverage.cljk, operator-side.
   ;; root-permit-index is what happens otherwise: ~300 runs, never green,
   ;; because its input is not in the tree it is handed.
   ;;
@@ -1823,7 +1823,7 @@
   ;; entity 数）は projection contract に移した:
   ;;   manifest/projections/permits.edn → 既存の `root-projection-rebuild` が回す
   ;; 鮮度（上流 facts.cljc への追随）は `orgs/` が実在する場所で
-  ;;   nbb --classpath ".:scripts" scripts/gen-permit-index.cljs --check
+  ;;   nbb --classpath ".:scripts" scripts/gen-permit-index.cljk --check
   ;; を回す運用側の仕事として残す。gate は嘘をつけない範囲だけを持つ。
 
   ;; 「クリーニング営み」(ISIC 9601 idle tycoon) の主張の機械検査。
@@ -1896,7 +1896,7 @@
   ;;    （0 pass / 274 fail、ADR-2608124800）、break/unbreak の記録も無かった ——
   ;;    つまり **どちらの向きにも discriminate することが示されていなかった**。
   ;;    現在は 16 ケースの機械証明がある:
-  ;;      nbb scripts/fleet-ci/gates/observatory-registry-discriminate.cljs .
+  ;;      nbb scripts/fleet-ci/gates/observatory-registry-discriminate.cljk .
   ;;    検査を足したらケースも足す。落ちない gate は劇場。
   {:name "root" :id "root-observatory-registry" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/observatory-registry-check.cljs" :script-args ["--min" "10"]
@@ -1960,7 +1960,7 @@
 
   ;; fabric actor（`*-organism.aozora.app`）が外へ出す文字列と終了状態の 2 実装。
   ;; ADR-2608155000。正本は `scripts/kotoba/fabric_actor_core.kotoba`（kotoba/pure、
-  ;; capability 0）、参照は `scripts/gftd/fabric_actor_core.cljc`、それを JVM の
+  ;; capability 0）、参照は `scripts/gftd/fabric_actor_core.cljk`、それを JVM の
   ;; `register_fabric_actors.clj` と `publish_fabric_actor_status.clj` が読む。
   ;;
   ;; 移行前は 2 本の .clj が product 一覧・handle・Keychain service 名・exit 規則を
@@ -1991,7 +1991,7 @@
   ;;
   ;; **:include-ext に `.cljs` が要る**（3 本とも。実測 2026-08-15）。参照実装が
   ;; `gftd.canvas` を経由して `scripts.nbb-compat` を require するので、
-  ;; `scripts/nbb_compat.cljs` が配られないと gate は `Could not find namespace` で
+  ;; `scripts/nbb_compat.cljk` が配られないと gate は `Could not find namespace` で
   ;; **赤**になる —— 沈黙ではなく赤なので「実行できないとき pass を返さない」側だが、
   ;; 原因を取り違えないようここに書いておく。fabric-actor-core が `.cljs` 無しで
   ;; 足りるのは、あれの参照が canvas を通らないからで、規則の違いではない。
@@ -2237,7 +2237,7 @@
   ;; Pinned quiet-host kotoba stack performance evidence (ADR-2608260800).
   ;; Verifies performance.datoms.edn, judah-quiet JSON, host-meta load < 4,
   ;; and datoms/json metric agreement. Does not re-run amu on fleet (orgs/ is
-  ;; not shipped); live regression is `scripts/verify-kotoba-stack-performance.cljs --live`.
+  ;; not shipped); live regression is `scripts/verify-kotoba-stack-performance.cljk --live`.
   {:name "root" :id "root-kotoba-stack-performance" :org "com-junkawasaki"
    :gate :nbb-script :script "gates/kotoba-stack-performance-check.cljs"
    :include-ext [".kotoba" ".edn" ".cljs" ".json" ".md"] :min-files 10 :cd false}

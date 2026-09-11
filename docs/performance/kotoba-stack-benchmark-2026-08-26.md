@@ -148,7 +148,7 @@ Evidence: `90-docs/performance/runs/2026-08-26-judah-quiet-tender/tender.json` (
 
 ```bash
 west update --fetch smart kototama   # if orgs/ missing in worktree
-nbb scripts/kotoba-tender-benchmark.cljs --runs 7 --date 2026-08-26-judah-quiet
+nbb scripts/kotoba-tender-benchmark.cljk --runs 7 --date 2026-08-26-judah-quiet
 ```
 
 | Path | Role | Performance posture |

@@ -4,7 +4,7 @@
 ;; root と murakumo は集めるだけ。** root がよその repo の起動方法を知っている状態
 ;; （ADR-2800002700 が Consequences で自ら反省した層違反）をここで解く。
 ;;
-;; 集計と突き合わせ: `nbb scripts/residency-collect.cljs`（`--check` で gate 化）。
+;; 集計と突き合わせ: `nbb scripts/residency-collect.cljk`（`--check` で gate 化）。
 ;;
 ;; ## 形
 ;;
@@ -25,7 +25,7 @@
 ;; ## `:slot` を間違えないこと
 ;;
 ;; `:attested` = 書き込み鍵を持つ。**そのホストは fleet の gate rotation から外す**
-;; （`scripts/fleet-ci/probe.cljs` の `operator-hosts`）。collector がこの不整合を
+;; （`scripts/fleet-ci/probe.cljk` の `operator-hosts`）。collector がこの不整合を
 ;; 検査する —— 鍵を持つマシンで repo から送られてきた gate コードを実行しない、が
 ;; fleet の不変条件 3 の趣旨。
 
@@ -38,7 +38,7 @@
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 300}
-   :run ["nbb" "scripts/fleet-ci/tick.cljs"]
+   :run ["nbb" "scripts/fleet-ci/tick.cljk"]
    :plist "scripts/fleet-ci/cloud.itonami.bot.fleet-ci-tip-tick.plist"
    :credentials [:github-token :fleet-ci-signer :fleet-ssh]
    :health {:kind :ledger :path "manifest/fleet-ci.edn"}
@@ -50,7 +50,7 @@
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 86400}
-   :run ["nbb" "scripts/fleet-ci/sweep.cljs" "--apply"]
+   :run ["nbb" "scripts/fleet-ci/sweep.cljk" "--apply"]
    :plist "scripts/fleet-ci/cloud.itonami.bot.fleet-ci-sweep.plist"
    :credentials [:fleet-ssh]
    :health nil
@@ -62,7 +62,7 @@
    :slot :anonymous
    :host :operator
    :cadence {:interval-seconds 3600}
-   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/hayari-alarm.cljs"]
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/hayari-alarm.cljk"]
    :plist "scripts/fleet-ci/com.gftd.hayari-alarm.plist"
    :credentials []
    :health nil
@@ -74,7 +74,7 @@
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 21600}
-   :run ["nbb" "--classpath" ".:scripts/nbb_compat" "scripts/hirameki-harvest.cljs" "--ticks" "20"]
+   :run ["nbb" "--classpath" ".:scripts/nbb_compat" "scripts/hirameki-harvest.cljk" "--ticks" "20"]
    :plist "scripts/fleet-ci/com.gftd.hirameki-harvest.plist"
    :credentials [:github-token]
    :health nil
@@ -86,7 +86,7 @@
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 21600}
-   :run ["nbb" "--classpath" ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" "scripts/hirameki-mirror.cljs"]
+   :run ["nbb" "--classpath" ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" "scripts/hirameki-mirror.cljk"]
    :plist "scripts/fleet-ci/com.gftd.hirameki-mirror.plist"
    :credentials [:github-token :secret-resolve]
    :health nil
@@ -97,7 +97,7 @@
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 3600}
-   :run ["nbb" "--classpath" ".:scripts/nbb_compat" "scripts/observatory-run.cljs" "--due"]
+   :run ["nbb" "--classpath" ".:scripts/nbb_compat" "scripts/observatory-run.cljk" "--due"]
    :plist "scripts/fleet-ci/com.gftd.observatory-run.plist"
    :credentials [:github-token]
    :health {:kind :ledger :path "manifest/observatories.edn"}
@@ -108,7 +108,7 @@
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 3600}
-   :run ["nbb" "scripts/newsfeed-ingest.cljs"]
+   :run ["nbb" "scripts/newsfeed-ingest.cljk"]
    :plist "scripts/fleet-ci/cloud.itonami.bot.newsfeed-ingest.plist"
    :credentials [:github-token :b2]
    :health nil
@@ -120,7 +120,7 @@
    :slot :attested
    :host :operator
    :cadence {:interval-seconds 3600}
-   :run ["nbb" "scripts/hyakka-knowledge-resident.cljs"]
+   :run ["nbb" "scripts/hyakka-knowledge-resident.cljk"]
    :plist "scripts/com.network-awai.hyakka-knowledge-ingest.plist"
    :credentials [:github-token :b2 :kagi/hyakka-kotobase-seed :cloudflare]
    :health {:kind :http
@@ -134,7 +134,7 @@
    :slot :anonymous
    :host :operator
    :cadence {:interval-seconds 3600}
-   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/capacity-alarm.cljs"]
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/capacity-alarm.cljk"]
    :plist "scripts/fleet-ci/cloud.itonami.bot.capacity-alarm.plist"
    :credentials []
    :health {:kind :state-file :path "~/.itonami/capacity-alarm-state.edn"}
@@ -146,7 +146,7 @@
    :slot :anonymous
    :host :operator
    :cadence {:interval-seconds 21600}
-   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/residency-alarm.cljs"]
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/residency-alarm.cljk"]
    :plist "scripts/fleet-ci/com.gftd.residency-alarm.plist"
    :credentials []
    :health {:kind :state-file :path "~/.itonami/residency-alarm-state.edn"}

@@ -67,7 +67,7 @@
     書いている。** 1 行目で止めたのが原因。
   - 現在 `hyakka-kotobase-seed` には非 64-hex の説明文字列を入れて塞いである
     （kagi に削除コマンドが無いため）。v2 復元時はそのまま上書きすればよい。
-- 🛡 **構造的な防止を入れた。** `scripts/hyakka-knowledge-resident.cljs` が publish の
+- 🛡 **構造的な防止を入れた。** `scripts/hyakka-knowledge-resident.cljk` が publish の
   前に `scripts/verify_identity.cljs` で **derive した DID を
   `did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo` と突き合わせる**。
   不一致なら publish せず理由を出して SKIP（公開カタログの deploy は独立して続く）。
@@ -141,7 +141,7 @@
     その時点では読めていた。**03:00 と 12:56 の間に失われた**（原因未特定。
     vault の総当たり列挙はしていない —— 安全床⑦）。
   - **記録上の所在**: ADR-2607311100 と
-    `scripts/hyakka-knowledge-resident.cljs` の `kotobase-seed` が
+    `scripts/hyakka-knowledge-resident.cljk` の `kotobase-seed` が
     ともに item 名 `hyakka-kotobase-seed`、compartment `personal` と書いている。
     名前の食い違いではない。
   - **新しい seed を作っても代わりにならない**（marketplace と同じ理由）。
@@ -238,7 +238,7 @@
     `EnvironmentFile=`）にあり、同日 kagi へ写した。
   - **なぜ要るか**: Radicle の COB（issue / patch）は**署名する**ので、node が
     動いているだけでは書けない。gad に ssh-agent は無いため passphrase 経路が
-    唯一の unlock 手段で、fleet-ci の Radicle 反映（`scripts/fleet-ci/tick.cljs`
+    唯一の unlock 手段で、fleet-ci の Radicle 反映（`scripts/fleet-ci/tick.cljk`
     の `:rad`）はこの item を読む。
   - ADR-2607252200 はこの置き場所を決めていたが**実際には置かれておらず**、
     両方とも `no such item` だった（ADR-2607259600 の Not done にも

@@ -1,0 +1,186 @@
+#!/usr/bin/env nbb
+;; verify-actor-metering.cljs — governed actor が「次元を持つ使用イベント」を
+;; 記録する形を持っているか。ADR-2608314000 の known-gap の上流。
+;;
+;;   nbb scripts/verify-actor-metering.cljk [--root <path>] [--findings]
+;;
+;; ## なぜ要るか
+;;
+;; `itonami-actor-pnl.cljs` の offer ladder は 31 actor 全部を `no-offer` に置いた。
+;; その上流に何が居るかを、ADR-2608314000 はこう書いた ——
+;; **計測していない actor に価格表は書けない**。`pricing/problems` が、誰も数えて
+;; いない次元を引用する invoice を拒否するからである。
+;;
+;; そして同 ADR は『計測の有無は未測定』とも書いた。`src` に `usage|meter` の
+;; **文字列**を含むのが 31 中 9 だが、文字列一致は meter の証拠ではない
+;; （コメントにも当たる）。これはその 9 を数え直す。
+;;
+;; ## 何をもって「計器」とするか —— 発明せず、参照実装から採る
+;;
+;; `authn.usage`（ADR-2608110200、この workspace で唯一 price book を支えている計器）が
+;; 持っているもの:
+;;
+;;   month-of / scope        期間と顧客で切る
+;;   mau-key / count-key     **重複排除できるキー**
+;;   report                  期間ぶんを数える
+;;
+;; そして docstring が核心を言っている ——
+;; 『**価格は後から決められる。計測されなかった月は後から計測できない。**
+;;   重複排除は、後からログから復元できない部分である』。
+;;
+;; だからこの検出器が探すのは「usage という語」ではなく **その 3 つの形**:
+;; 期間・キー・集計。
+;;
+;; ## この検出器が測れないこと（重要）
+;;
+;; **形が在ることと、走って記録が在ることは別である。** 静的に読めるのは前者だけで、
+;; 『この actor は先月を計測した』は repo からは分からない。
+;;
+;; だから結果は `:meter-shaped` であって `:metered` ではない。**その 2 つを同じ語で
+;; 呼ばない** —— 呼んだ瞬間、形だけの ns が「計測済み」として数えられる。
+;;
+;;   0  clean（形を持つ actor が居て、持たない actor も名指しできた）
+;;   1  findings
+;;   2  REFUSED — orgs tree が無い / actor が 1 体も admit できない
+
+(ns verify-actor-metering
+  (:require [clojure.string :as str]
+            [clojure.edn :as edn]
+            ["node:fs" :as fs]
+            ["node:path" :as path]))
+
+(def argv (vec (drop 2 (js->clj (.-argv js/process)))))
+(defn- opt [f d] (let [i (.indexOf argv f)] (if (neg? i) d (nth argv (inc i) d))))
+(defn- flag? [f] (>= (.indexOf argv f) 0))
+
+(def root (opt "--root" "."))
+(def findings? (flag? "--findings"))
+
+(defn- refuse! [msg]
+  (println (str "REFUSED\t" msg))
+  (println "Refusing to report a pass: the measurement did not run.")
+  (.exit js/process 2))
+
+(defn- slurp* [p] (str (fs/readFileSync p "utf8")))
+
+;; ── 母集団 —— actor.edn が「主体を名指しする map」である repo だけ ──────────
+;;
+;; `itonami-actor-pnl.cljs` が測ったとおり、`actor.edn` という名前のファイルには
+;; Datomic の schema（#:db{} の vector）も混ざる。schema は主体を名指ししない。
+
+(defn- manifest-convention
+  "`actor.edn` が主体を名指しする map なら、その様式を返す。schema や壊れた
+   ファイルには nil。
+
+   **様式は 1 つではない。** 実測 2026-08-31、31 件のうち
+
+     23  bare        `:did` / `:handle`
+      6  ns-prefixed `:actor/did` / `:actor/handle`（EDN-datomize fanout 後の形）
+      1  `:bundle` / `:did`
+      1  `:actor` / `:stages`
+
+   最初この関数は `:actor/` だけを見て **31 中 6 しか admit しなかった**。
+   `itonami-actor-pnl.cljs` は 31 を admit するので、2 つの検出器が別々の母集団を
+   報告することになっていた —— 同じ問いに 2 つの数が出るのは、片方が黙って
+   狭いからである。両方を受ける。"
+  [p]
+  (try
+    (let [d (edn/read-string (slurp* p))
+          m (if (vector? d) (first d) d)]
+      (when (map? m)
+        (let [ks (set (map str (keys m)))]
+          (cond
+            (some #(str/starts-with? % ":actor/") ks) :ns-prefixed
+            (contains? ks ":did") :bare
+            (contains? ks ":actor") :nested
+            :else nil))))
+    (catch :default _ nil)))
+
+(defn- actor-manifest? [p] (some? (manifest-convention p)))
+
+(defn- actor-repos []
+  (let [base (path/join root "orgs" "cloud-itonami")]
+    (when-not (fs/existsSync base) (refuse! (str "no orgs tree at " base)))
+    (->> (fs/readdirSync base)
+         (map #(path/join base %))
+         (filter #(fs/existsSync (path/join % "actor.edn")))
+         (filter #(actor-manifest? (path/join % "actor.edn")))
+         vec)))
+
+;; ── 計器の形 ────────────────────────────────────────────────────────────────
+
+(defn- cljs-files [dir]
+  (let [out (atom [])]
+    (letfn [(walk [d depth]
+              (when (and (< depth 8) (fs/existsSync d))
+                (doseq [e (fs/readdirSync d #js {:withFileTypes true})]
+                  (let [p (path/join d (.-name e))]
+                    (cond
+                      (and (.isDirectory e) (not (#{"node_modules" ".git" ".nbb"} (.-name e))))
+                      (walk p (inc depth))
+                      (re-find #"\.clj[cs]?$" (.-name e)) (swap! out conj p))))))]
+      (walk dir 0))
+    @out))
+
+(defn- meter-ns? [p]
+  ;; ns 名の**末尾セグメント**で見る。`usage` を含む語がどこかに在ることではない
+  ;; —— それが 9 という数を出して、証拠ではなかったもの。
+  (boolean (re-find #"/(usage|meter|metering|metrics|billing)(_[a-z]+)?\.clj[cs]?$" p)))
+
+(def ^:private shape
+  ;; 参照実装 authn.usage の 3 要素。名前ではなく役割で探す。
+  {:period #"\(defn-?\s+[a-z0-9!?*<>-]*(month|day|period|window)"
+   :key    #"\(defn-?\s+[a-z0-9!?*<>-]*key"
+   :report #"\(defn-?\s+[a-z0-9!?*<>-]*(report|count|summar|total)"})
+
+(defn- shape-of [src]
+  (into {} (map (fn [[k re]] [k (boolean (re-find re src))]) shape)))
+
+(defn- classify [dir]
+  (let [files (filter meter-ns? (cljs-files (path/join dir "src")))]
+    (if (empty? files)
+      {:state :no-meter-ns :files [] :shape nil}
+      (let [merged (reduce (fn [a f] (merge-with #(or %1 %2) a (shape-of (slurp* f))))
+                           {:period false :key false :report false} files)]
+        {:state (if (every? true? (vals merged)) :meter-shaped :partial)
+         :files (mapv #(str/replace % (str root "/") "") files)
+         :shape merged}))))
+
+(defn -main []
+  (let [repos (actor-repos)]
+    (when (zero? (count repos)) (refuse! "no admissible actor manifest found"))
+    (let [rows (mapv (fn [d] (merge {:repo (path/basename d)} (classify d))) repos)
+          by (group-by :state rows)
+          n #(count (get by % []))]
+      (println (str "SCANNED\t" (count rows) "\tactors (actor.edn が主体を名指しする map であるものだけ)"))
+      (println (str "CONVENTIONS\t"
+                    (pr-str (frequencies (map #(manifest-convention
+                                                (path/join root "orgs" "cloud-itonami"
+                                                           (:repo %) "actor.edn")) rows)))
+                    "\t← actor.edn の様式は 1 つではない"))
+      (println)
+      (println "METER SHAPE（参照実装 authn.usage の 3 要素: 期間 / 重複排除キー / 集計）")
+      (println (str "  meter-shaped  " (n :meter-shaped) "\t3 要素とも在る"))
+      (println (str "  partial       " (n :partial) "\tmeter らしき ns は在るが要素が欠ける"))
+      (println (str "  no-meter-ns   " (n :no-meter-ns) "\tそもそも計器の ns が無い"))
+      (doseq [r (get by :partial)]
+        (println (str "    " (.padEnd (:repo r) 22)
+                      (pr-str (into {} (remove (comp true? val) (:shape r))))
+                      "  ← 欠けている要素")))
+      (doseq [r (get by :meter-shaped)]
+        (println (str "    " (.padEnd (:repo r) 22) (str/join ", " (:files r)))))
+      (println)
+      ;; **形と実績を同じ語で呼ばない。**
+      (println "UNMEASURED\tこの検出器は『計器の形』しか見ない。")
+      (println "          \t走っているか / 先月を実際に記録したかは repo から分からない。")
+      (println "          \tauthn.usage 自身が言うとおり『計測されなかった月は後から計測できない』ので、")
+      (println "          \t形が在ることを『計測済み』として数えない。")
+      (when findings?
+        (println)
+        (doseq [r (get by :no-meter-ns)]
+          (println (str "FINDING\twarn\tactor-has-no-meter\t" (:repo r)
+                        "\tno usage/meter namespace: a price book cannot name a dimension"
+                        " nobody counts (ADR-2608110200)"))))
+      (.exit js/process (if (pos? (n :no-meter-ns)) 1 0)))))
+
+(-main)

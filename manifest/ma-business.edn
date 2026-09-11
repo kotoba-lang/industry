@@ -15,7 +15,7 @@
 ;;
 ;; `manifest/observatories.edn` 冒頭と `scripts/repo-bots/README.md` が記録した失敗と
 ;; 同じ形を避ける —— **名簿には charter しか書かない。**
-;; 各 repo が実際にどうなっているかは `scripts/ma-business-tick.cljs` だけが答える。
+;; 各 repo が実際にどうなっているかは `scripts/ma-business-tick.cljk` だけが答える。
 ;; ここに書いた `:stage/owner` は「そこが持つべき」であって「そこが持っている」ではない。
 ;;
 ;; ## 実測（2026-08-29、shallow clone を直接読んだ）
@@ -27,7 +27,7 @@
 ;; advisory ではない。`ma` の表は名前だけの対応で、実体を一度も見ていない。
 ;; ここでは **実際に読んだ src の主題**を書く（:repo/subject）。
 ;;
-;; 検査: nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljs
+;; 検査: nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk
 ;; ADR: adr-2608291400-ma-matching-business-composite
 
 {:business/id "ma-matching"

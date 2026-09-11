@@ -10,7 +10,7 @@ description: 90-docs の中で reader を通らない EDN 文書を 1 件だけ�
 
 ## 何をする反復か
 
-`90-docs/` の文書は datom 面（`manifest/edn-query.cljs`）の入力である。reader を
+`90-docs/` の文書は datom 面（`manifest/edn-query.cljk`）の入力である。reader を
 通らない文書は **存在するのに、どの query にも出てこない** —— 消えたのではなく、
 見えない。この反復の仕事はちょうど 1 つ:
 
@@ -22,12 +22,12 @@ description: 90-docs の中で reader を通らない EDN 文書を 1 件だけ�
 ## この仕事が機械化されていない理由（先に読む）
 
 2026-08-08 に 2 通りの機械修復を試して、7 件とも同じ所で止まった。
-`manifest/docs-edn-only.cljs` の `known-parse-errors` 注記によれば、**それ以前にも
+`manifest/docs-edn-only.cljk` の `known-parse-errors` 注記によれば、**それ以前にも
 別のセッションが同じ 2 つの手当てを試して同じ所で止まっている**。
 
 壊れ方は 2 つ重なっている:
 
-1. **サブマップの閉じ括弧が無い**（機械的に直る。`scripts/diagnose-unreadable-edn.cljs`
+1. **サブマップの閉じ括弧が無い**（機械的に直る。`scripts/diagnose-unreadable-edn.cljk`
    の `--write` がやる）
 2. **「map の並び」が vector で包まれていない** —— 値の位置に map が 2 つ裸で並ぶ。
    括弧を閉じると今度は `Map literal contains duplicate keys: :time :output …`
@@ -42,7 +42,7 @@ description: 90-docs の中で reader を通らない EDN 文書を 1 件だけ�
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin
-nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-tick.cljs
+nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-tick.cljk
 ```
 
 `:outcome :insufficient-scan` が出たら **何もせず終わる**。sparse checkout から
@@ -72,8 +72,8 @@ echo node_modules >> .git/info/exclude
 ### 2. 機械で直る分は機械に任せる
 
 ```bash
-nbb scripts/diagnose-unreadable-edn.cljs <対象ファイル>          # dry-run
-nbb scripts/diagnose-unreadable-edn.cljs <対象ファイル> --write  # 条件を満たせば書く
+nbb scripts/diagnose-unreadable-edn.cljk <対象ファイル>          # dry-run
+nbb scripts/diagnose-unreadable-edn.cljk <対象ファイル> --write  # 条件を満たせば書く
 ```
 
 `--write` は **修復後の entity キー集合が元の外側キー集合と一致しないと書かない**。
@@ -121,10 +121,10 @@ git diff --stat
 git diff -U0 | grep -E "^[+-][^+-]" | head -20
 
 # (c) 面に載る。docs-edn-only の parse-errors が 1 件減ること
-nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljs verify | head -1
+nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk verify | head -1
 ```
 
-**(c) を通したら `manifest/docs-edn-only.cljs` の `known-parse-errors` から
+**(c) を通したら `manifest/docs-edn-only.cljk` の `known-parse-errors` から
 その 1 行を消す。**同じ commit で消す —— 直したのに baseline に残すと、次の run が
 `BASELINE IS STALE` で落ちる（これは仕様であって不具合ではない）。
 

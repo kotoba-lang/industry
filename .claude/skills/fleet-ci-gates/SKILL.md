@@ -23,7 +23,7 @@ GitHub Actions ではない。
   「Actions が今は動いているから」は理由にならない — **止まったのは org 単位**で、
   動いている org も同じ理由で止まりうる。
 - **Actions は repo 単位で無効化「した」——それは掃除の記録であって、今の状態ではない**
-  （`scripts/github-actions-disable-sweep.cljs`）。無効化された repo では workflow ファイル
+  （`scripts/github-actions-disable-sweep.cljk`）。無効化された repo では workflow ファイル
   自体は残るが inert。
   ⚠ **2026-09-06 訂正: 旧文は現在形で「無効化してある」と書いており、それが偽になる repo が
   ある。** 実測: `kotoba-lang/amu` は `GET /repos/kotoba-lang/amu/actions/permissions` が
@@ -68,9 +68,9 @@ GitHub Actions ではない。
 - **課金を言うときは `/actions/runs/{id}/timing` の `billable` を引く。**
   壁時計は課金ではない（実測: 30〜45 分回る run の `billable.total_ms` が 0）。
   引いていないなら「未測定」と書く。
-- 道具の分担: 現在地を測るのは `scripts/github-actions-billable-audit.cljs`
+- 道具の分担: 現在地を測るのは `scripts/github-actions-billable-audit.cljk`
   （対象は `--repo` / `--owner` で明示。引数なしで全アカウントを歩かない）、
-  止めるのは `scripts/github-actions-disable-sweep.cljs`。tree の側は fleet gate
+  止めるのは `scripts/github-actions-disable-sweep.cljk`。tree の側は fleet gate
   `root-no-github-workflows` が保つ —— ただし**その緑が言うのは「この tree は
   GitHub に workflow を渡していない」だけ**で、GitHub 側の設定は credential を
   要するのでノードでは引けない。
@@ -221,7 +221,7 @@ landing 前の break/unbreak は手元か stub に対して行われており、
 `root-permit-index` の生成器 `gen-permit-index.cljs` は `<root>/orgs/cloud-itonami` を
 読むが、`git ls-files orgs/cloud-itonami` は **0 件**（west 管理で repo 外）。
 つまりこの gate は **root repo をどう直しても fleet 上では緑にならない**。
-射影を検査したいなら `manifest/projection-verify.cljs` の contract（入力 hash を
+射影を検査したいなら `manifest/projection-verify.cljk` の contract（入力 hash を
 固定する）に寄せるか、`orgs/` が実在する場所で回す。**入力が無い gate は、
 落ちているのではなく問いを立てられていない。**
 

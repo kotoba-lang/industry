@@ -65,7 +65,7 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   同じ actor identity を登録するまでを完了条件にする。west は `manifest/repos.edn` を
   SSoT とし、GitHub API の単一 entry クリーン commit で登録 / pin 前進する
   （`manifest/west.yml` は生成物、手書き禁止）。diff は当該 entry のみ、
-  `nbb scripts/gen-west-manifest.cljs --check` と **pin == repo HEAD** を確認。RAD は
+  `nbb scripts/gen-west-manifest.cljk --check` と **pin == repo HEAD** を確認。RAD は
   etzhayyim/root の `80-data/kotoba-rad/{name}.identity.journal.edn`（または同等の
   RAD identity ledger）に `:rad/repo "github.com/etzhayyim/com-etzhayyim-{name}"`、
   `:rad/did-web "did:web:etzhayyim.github.io:com-etzhayyim-{name}"`、署名 /

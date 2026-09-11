@@ -14,15 +14,15 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   ```bash
   B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... \
   B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
-    scripts/datalad-b2-init.cljs <dataset-dir> [remote-name]
+    scripts/datalad-b2-init.cljk <dataset-dir> [remote-name]
   # 以後: datalad save → datalad push --to b2 → datalad drop / datalad get
   ```
 
-  B2 認証は **`scripts/b2-creds.cljs`** が解決する（既定の順 env→1Password→Keychain。
+  B2 認証は **`scripts/b2-creds.cljk`** が解決する（既定の順 env→1Password→Keychain。
   参照先は `manifest/repos.edn` の `:b2 :credentials`）。**実行には
   `orgs/kotoba-lang/secret-resolve/src` を classpath に足す**（無いと
   `Could not find namespace: secret-resolve.resolver` で落ちる。2026-08-05 実測）:
-  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljs`。`op`(1Password CLI) /
+  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" scripts/b2-creds.cljk`。`op`(1Password CLI) /
   `security`(Keychain) / 環境変数のどれでも同じコマンドで動く。**秘密情報は
   リポジトリに一切コミットしない**（EDN に置くのは `op://` パスや Keychain service 名
   といった非機密の参照先だけ）。CI では `B2_KEY_ID/B2_APP_KEY/B2_BUCKET` を env で渡す。
@@ -31,8 +31,8 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   に登録した project は `manifest/west.yml` で `userdata.datalad: true` + `datalad`
   グループ（既定 `group-filter` の `-datalad` で off）になる。git/annex スケルトンの
   取得は `west update --group-filter +datalad <name>`、実体の取得/破棄は west 拡張
-  コマンド `nbb manifest/west_annex.cljs annex-get` / `nbb manifest/west_annex.cljs annex-drop`（B2 special remote を環境変数の
-  creds で有効化して get/drop）。実装は `manifest/west_annex.cljs`。
+  コマンド `nbb manifest/west_annex.cljk annex-get` / `nbb manifest/west_annex.cljk annex-drop`（B2 special remote を環境変数の
+  creds で有効化して get/drop）。実装は `manifest/west_annex.cljk`。
 
 - ⚠ **shallow（clone-depth: 1）はもう使わない。2026-07-21 に撤回済み**
   （ADR-2607211600、CLAUDE.md「Git operations」）。この節はかつて「重い project は
@@ -48,7 +48,7 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   「Could only verify the existence of 1 out of 2 necessary copies」で拒否され、
   **手元のバイトを落として clone を軽くするというこの経路の目的が成立しない**。
   numcopies を 1 に下げれば drop は通るが、それは保証を弱めて通しただけ。
-  `scripts/datalad-b2-init.cljs <dir> <remote-name>` を別 bucket / 別鍵の env で
+  `scripts/datalad-b2-init.cljk <dir> <remote-name>` を別 bucket / 別鍵の env で
   2 回実行して 2 本目を足すのが正しい（同一プロバイダでも bucket 削除と鍵 1 本の
   侵害には耐える。**プロバイダ障害には耐えない**ので、そう書く）。
 
@@ -60,9 +60,9 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   落ちれば両方消えるので、それは 2 ではない。
 
   ```bash
-  nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljs --sample 0
+  nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk --sample 0
   #   … providers=1 (s3.us-west-004.backblazeb2.com)  ← 既定は報告のみ
-  nbb … scripts/annex-custody-verify.cljs --require-providers 2   # 満たさなければ exit 1
+  nbb … scripts/annex-custody-verify.cljk --require-providers 2   # 満たさなければ exit 1
   ```
 
   **既定を fail にしていない**のは、今の構成（同一プロバイダの 2 bucket）は
@@ -79,6 +79,6 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   同じ prefix で置いている）。
 
 - **custody は主張ではなく検査で示す**:
-  `nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljs --names <dataset>`。
+  `nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk --names <dataset>`。
   off-machine コピーの無い annex ファイルがあれば exit 1、標本を remote から fsck する。
   ADR-2607252000（「バックアップがあると書いてあったのに実体が無かった」）の再発防止。

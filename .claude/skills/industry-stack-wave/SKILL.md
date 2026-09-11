@@ -26,7 +26,7 @@ cd ~/github/com-junkawasaki
 git fetch origin
 # 共有 checkout は書き換えない。分岐していないかだけ見る
 git merge-base --is-ancestor HEAD origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/industry-stack-wave-tick.cljs --limit 20
+nbb --classpath ".:scripts/nbb_compat" scripts/industry-stack-wave-tick.cljk --limit 20
 ```
 
 tick の ledger 最終行 `~/.itonami/industry-stack-wave-tick.ledger.edn` の
@@ -150,8 +150,8 @@ gh api repos/cloud-itonami/<repo>/merges \
 
 # west pins（entry 群だけ）
 # list-file に repo name を並べて:
-nbb scripts/advance-pins.cljs cloud-itonami /tmp/waveN-pins.txt --execute
-nbb scripts/verify-west-pins.cljs --only <comma-names>
+nbb scripts/advance-pins.cljk cloud-itonami /tmp/waveN-pins.txt --execute
+nbb scripts/verify-west-pins.cljk --only <comma-names>
 ```
 
 superproject で pin + ledger を branch に載せ、server-side merge で main へ。

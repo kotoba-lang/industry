@@ -1,6 +1,6 @@
 ;; manifest/projection-schemas/permits.edn — ADR-2608130800 の projection contract が
-;; 固定する属性スキーマ。`manifest/project-edn.cljs` は **schema に無い属性を拒否する**
-;; ので、生成器（scripts/gen-permit-index.cljs）が新しい属性を出したら contract 検証が
+;; 固定する属性スキーマ。`manifest/project-edn.cljk` は **schema に無い属性を拒否する**
+;; ので、生成器（scripts/gen-permit-index.cljk）が新しい属性を出したら contract 検証が
 ;; 落ちる（＝スキーマの黙った拡張ができない）。
 ;;
 ;; 5 種類の entity が同じ面に載る。共通の identity は `:permits/entity-id`:

@@ -1,0 +1,153 @@
+#!/usr/bin/env nbb
+;; jp-lp-craft-score.cljs — 日本語 LP の**文体**を測る。
+;;
+;; `lp-copy-score.cljs` が「何を言っているか」（否定の密度・register・CTA）を
+;; 測るのに対し、ここは「**どう書かれているか**」を測る。
+;;
+;; ## なぜ別の計器が要るのか
+;;
+;; 実測 2026-08-23、`/onprem` は否定率も buyer reach も直したのに
+;; 「日本語として LP に見えない」と言われた。測ったら、
+;; **文長中央値 19 字・読点 0.3/文・体言止め 18%** で、
+;; 競合（54 字 / 1.0 / 9%）と桁が違った。**内容ではなく文体の問題**で、
+;; 前の計器はそこを一切見ていなかった。
+;;
+;; ## 何を測るか、そして**測れないもの**
+;;
+;;   文長の中央値・四分位   刻んでいるか、繋いでいるか
+;;   読点/文               節を繋いでいるか
+;;   体言止め率            名詞で切り上げる癖（多いと箇条書きの調子になる）
+;;   漢字率                硬さ
+;;   一人称/二人称の有無    読み手に話しかけているか
+;;   キャッチ長（h1）
+;;
+;; **これは craft の代理指標であって craft ではない。** 数値が競合と揃っても
+;; 良い文章とは限らない —— 長く書けば中央値は上がるし、読点は足せる。
+;; **この計器で「良い」は証明できない。「刻みすぎ」は検出できる。**
+;;
+;; ## ラベル・見出しは文ではない
+;;
+;; ナビ・ボタン・表のセル・見出しは短くて正しいので、**文長の分布に混ぜると
+;; 中央値が下がる**。`--body-only` は `<p>` の中だけを見る（既定は全文）。
+;; 両方を出して差を見るのが正しい読み方 —— 差が大きい面は
+;; **本文が薄くてラベルが多い**。
+;;
+;; ## 使い方
+;;
+;;   nbb scripts/jp-lp-craft-score.cljk <url|file> [...]
+;;   nbb scripts/jp-lp-craft-score.cljk --json --body-only <url>
+
+(ns jp-lp-craft-score
+  (:require ["node:child_process" :as cp]
+            ["node:fs" :as fs]
+            [clojure.string :as str]))
+
+(def args (vec *command-line-args*))
+(defn- flag? [n] (some #(= n %) args))
+(def targets (vec (remove #(str/starts-with? % "--") args)))
+
+(defn- fetch [t]
+  (if (str/starts-with? t "http")
+    (try (str (cp/execSync (str "curl -sS -L --max-time 30 -A "
+                                (pr-str "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36")
+                                " " (pr-str t))
+                          #js {:encoding "utf8" :maxBuffer 40000000}))
+         (catch :default _ nil))
+    (try (str (fs/readFileSync t "utf8")) (catch :default _ nil))))
+
+(defn- strip [h]
+  (-> h
+      (str/replace #"(?s)<script.*?</script>" " ")
+      (str/replace #"(?s)<style.*?</style>" " ")
+      (str/replace #"(?s)<nav.*?</nav>" " ")
+      (str/replace #"(?s)<head.*?</head>" " ")))
+
+(defn- unent [t]
+  (-> t (str/replace #"&nbsp;" " ") (str/replace #"&amp;" "&")
+      (str/replace #"&quot;" "\"") (str/replace #"&#39;" "'")
+      (str/replace #"&lt;" "<") (str/replace #"&gt;" ">")))
+
+(defn- plain [h]
+  (-> (strip h) (str/replace #"<[^>]+>" " ") unent (str/replace #"\s+" " ") str/trim))
+
+(defn- body-text
+  "`<p>` の中だけ。**ラベルと見出しを除いた地の文。**"
+  [h]
+  (->> (re-seq #"(?s)<p\b[^>]*>(.*?)</p>" (strip h))
+       (map second)
+       (map #(-> % (str/replace #"<[^>]+>" " ") unent (str/replace #"\s+" " ") str/trim))
+       (remove str/blank?)
+       (str/join "。")))
+
+(defn- sentences [t]
+  (->> (str/split t #"[。！？\.\!\?]") (map str/trim) (remove #(< (count %) 4)) vec))
+
+(defn- median [xs] (if (empty? xs) 0 (nth (sort xs) (quot (count xs) 2))))
+(defn- quartile [xs q] (if (empty? xs) 0 (nth (sort xs) (min (dec (count xs)) (int (* q (count xs)))))))
+(defn- r1 [x] (js/Number (.toFixed x 1)))
+
+(def ^:private jp-re #"[぀-ヿ一-龯]")
+
+(defn score [label html body-only?]
+  (let [full (plain html)
+        t (if body-only? (body-text html) full)
+        n-jp (count (re-seq jp-re full))
+        ja? (> (/ n-jp (max 1 (count full))) 0.12)
+        sents (sentences t)
+        lens (mapv count sents)
+        kanji (count (re-seq #"[一-龯]" t))
+        kana (count (re-seq #"[぀-ヿ]" t))
+        taigen (count (filter #(re-find #"[一-龯゠-ヿ]$" %) sents))
+        h1 (some-> (re-find #"(?s)<h1[^>]*>(.*?)</h1>" html) second
+                   (str/replace #"<[^>]+>" "") unent str/trim)
+        you (count (re-seq #"あなた|ご自身|御社|貴社|皆さま|皆様" t))
+        we (count (re-seq #"当社|弊社|私たち|わたしたち" t))]
+    (cond
+      (nil? html) {:target label :unmeasurable "取得できなかった（HTTP か DNS）"}
+      (< (count full) 400) {:target label :unmeasurable (str "本文 " (count full) " 字 —— client 描画か取得失敗")}
+      (not ja?) {:target label :unmeasurable (str "日本語比率 "
+                                                  (int (* 100 (/ n-jp (max 1 (count full)))))
+                                                  "% —— この計器は日本語専用")}
+      (< (count sents) 12) {:target label :unmeasurable (str "文が " (count sents) " 件 —— 分布を出せない")}
+      :else
+      {:target label
+       :chars (count t) :sentences (count sents)
+       :len-q1 (quartile lens 0.25) :len-med (median lens) :len-q3 (quartile lens 0.75)
+       :comma-per-sentence (r1 (/ (count (re-seq #"、" t)) (count sents)))
+       :taigen-pct (r1 (* 100.0 (/ taigen (count sents))))
+       :kanji-pct (r1 (* 100.0 (/ kanji (max 1 (+ kanji kana)))))
+       :h1 h1 :h1-len (count (or h1 ""))
+       :second-person you :first-person we})))
+
+(defn- row [r]
+  (if-let [u (:unmeasurable r)]
+    (println (str (.padEnd (:target r) 30) "UNMEASURABLE  " u))
+    (println (str (.padEnd (:target r) 30)
+                  (.padStart (str (:len-q1 r) "/" (:len-med r) "/" (:len-q3 r)) 11)
+                  (.padStart (str (:comma-per-sentence r)) 6)
+                  (.padStart (str (:taigen-pct r) "%") 8)
+                  (.padStart (str (:kanji-pct r) "%") 8)
+                  (.padStart (str (:h1-len r)) 5)
+                  (.padStart (str (:second-person r) "/" (:first-person r)) 8)
+                  "  " (subs (str (:h1 r)) 0 (min 22 (count (str (:h1 r)))))))))
+
+(defn -main []
+  (if (empty? targets)
+    (do (println "usage: nbb scripts/jp-lp-craft-score.cljk <url|file> [...]") (js/process.exit 2))
+    (let [b? (flag? "--body-only")
+          rs (mapv (fn [t] (score t (fetch t) b?)) targets)]
+      (if (flag? "--json")
+        (println (js/JSON.stringify (clj->js rs) nil 2))
+        (do
+          (println (str "jp-lp-craft-score —— 日本語 LP の**文体**（決定論的。"
+                        (if b? "地の文 <p> のみ" "全文") "）\n"))
+          (println (str (.padEnd "target" 30) (.padStart "文長 Q1/中/Q3" 11)
+                        (.padStart "読点" 6) (.padStart "体言止" 8)
+                        (.padStart "漢字" 8) (.padStart "h1" 5)
+                        (.padStart "二/一人称" 8) "  h1"))
+          (doseq [r rs] (row r))
+          (println "\n**これは craft の代理指標であって craft ではない。**")
+          (println "長く書けば中央値は上がる。この計器で「良い」は証明できない —— 検出できるのは「刻みすぎ」。")))))
+  nil)
+
+(-main)

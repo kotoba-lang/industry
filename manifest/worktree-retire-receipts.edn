@@ -1,7 +1,7 @@
 ;; 退役させた worktree の証跡。CLAUDE.md「並行エージェント運用」/ ADR-2609061800 の
 ;; 「着地後の後片付けまでが完了条件」を、片付けた側が後から証明できるようにする台帳。
 ;;
-;; scripts/worktree-retire.cljs は landed/clean/old/idle/unlocked を判定して自動で
+;; scripts/worktree-retire.cljk は landed/clean/old/idle/unlocked を判定して自動で
 ;; retire するが、判定は **default branch への到達性** しか見ない。default branch に
 ;; 未着地でも同一内容が別の remote branch に存在する worktree は `keep (unlanded)` と
 ;; 報告されて残り続ける。その 1 件を人が消したなら、なぜ安全だったのかはここに残す。
@@ -27,7 +27,7 @@
      :worktree/size-note "実体はビルド成果物 — target/ 78M + mobile/ 67M"
      :worktree/state :landed
      :worktree/evidence "git rev-list --count origin/main..codex/ios-device-registration-20260908 => 0"
-     :worktree/removed-by "nbb scripts/worktree-retire.cljs --only ~/github/worktrees --min-age-days 1 --apply"
+     :worktree/removed-by "nbb scripts/worktree-retire.cljk --only ~/github/worktrees --min-age-days 1 --apply"
      :worktree/tool-verdict "RETIRE (landed, clean, 2.1d)"
      :worktree/branch-disposition "git branch -d（ツールが安全削除）"}
 
@@ -112,7 +112,7 @@
 
    :retire/west-adopted-method
    "west update は project 名を明示して実行した。引数なしの `west update` は宣言済み
-    全 project を取りに行くため、scripts/root-worktree.cljs が構造的に禁じている。"
+    全 project を取りに行くため、scripts/root-worktree.cljk が構造的に禁じている。"
 
    :retire/worktrees
    [{:worktree/path "/Users/junkawasaki/github/codex-cosmos-h3-record"

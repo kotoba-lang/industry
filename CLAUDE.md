@@ -15,7 +15,7 @@
 | 大容量バイナリ | `large-binary-datalad` | 方針 |
 | secrets の在り処 | `secrets-location-map` | 参照のみ |
 
-**規則を足す・直すときはここを編集して `nbb scripts/gen-agents-md.cljs` を回す。**
+**規則を足す・直すときはここを編集して `nbb scripts/gen-agents-md.cljk` を回す。**
 **手順や実測を足すときは skill 側に書く** —— ここに測定値を書けば、それは翌週には
 定数として引用される（この文書が繰り返し警告している形）。
 
@@ -25,15 +25,15 @@
 [west](https://docs.zephyrproject.org/latest/develop/west/) manifest
 （`manifest/west.yml`）で管理する。** plain な submodule は廃止済み（gitlink は
 撤去・`.gitmodules` は無い）。source of truth は **`manifest/repos.edn`**（ポリシー）
-で、`manifest/west.yml` は `scripts/gen-west-manifest.cljs` が生成する（手書き禁止）。
+で、`manifest/west.yml` は `scripts/gen-west-manifest.cljk` が生成する（手書き禁止）。
 
 - 取得/同期は `git submodule update` ではなく **`west update`** を使う。
 - 各 project は `manifest/west.yml` の `path:`（= 旧 submodule と同一パス
   `orgs/<org>/<repo>`）に展開される。topdir は superproject ルート。
 - 大容量データの **DataLad dataset（`m365-archive`）だけは west project にしつつ
   git-annex + Backblaze B2 で実体を扱う**（`userdata.datalad: true` / `datalad`
-  グループに隔離し既定では取得しない）。取得/破棄は `nbb manifest/west_annex.cljs annex-get` /
-  `nbb manifest/west_annex.cljs annex-drop`。詳細は `manifest/README.md`。
+  グループに隔離し既定では取得しない）。取得/破棄は `nbb manifest/west_annex.cljk annex-get` /
+  `nbb manifest/west_annex.cljk annex-drop`。詳細は `manifest/README.md`。
 
 ```bash
 # 初回
@@ -42,9 +42,9 @@ west init -l manifest
 # ⚠ 引数なしの `west update` は west.yml の全 project を歩く。既定にしない（下記）
 west update --fetch smart <name> [<name> ...]
 # DataLad の実体だけ別途（B2 creds は環境変数）
-west update --group-filter +datalad m365-archive && nbb manifest/west_annex.cljs annex-get
+west update --group-filter +datalad m365-archive && nbb manifest/west_annex.cljk annex-get
 # pin を進めたら manifest 再生成（手書き禁止 / CI は --check）
-nbb scripts/gen-west-manifest.cljs
+nbb scripts/gen-west-manifest.cljk
 ```
 
 ### pin を動かす・同期する・worktree で west を回す → skill `west-pin-advance`
@@ -79,7 +79,7 @@ west を動かす worktree の作り方は、Skill ツールで `west-pin-advanc
 ## agent 指示は 1 本の正本から生成する — `AGENTS.md` を手で書かない（repo-wide mandatory、2026-09-06、ADR-2609062600）
 
 **`CLAUDE.md` が agent 指示の正本で、`AGENTS.md`（Codex 向け）はそこからの生成物。**
-生成は `nbb scripts/gen-agents-md.cljs`、検査は `--check`（fleet gate
+生成は `nbb scripts/gen-agents-md.cljk`、検査は `--check`（fleet gate
 `root-agents-md-generated`）。west.yml と同じ「生成物・手書き禁止」の規律に載せる。
 
 - **規則を足す・直すときは `CLAUDE.md` を編集して生成器を回す。** `AGENTS.md` への
@@ -120,7 +120,7 @@ names remain; new west entries must use the new names only.
 
 **新しい repo に名前を付ける前に、次の順で「どの面か」を決める。**正本は
 `manifest/repository-rules.edn` の `:plane-order`、検査は
-`nbb --classpath ".:scripts/nbb_compat" scripts/verify-repository-roles.cljs --name-audit`。
+`nbb --classpath ".:scripts/nbb_compat" scripts/verify-repository-roles.cljk --name-audit`。
 
 | 順 | 面 | 適用条件 | 形 |
 |---|---|---|---|
@@ -585,9 +585,9 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   **wholesale 再生成 commit は禁止**（未 push HEAD 由来の壊れた pin を 44 件 main に
   流した事故 `90852b86` の再発防止）。
 - **pin に許されるのは「上流 repo の default branch から到達可能な commit」だけ**
-  （`scripts/verify-west-pins.cljs`、ADR-2607022900）。①存在 ②default branch 到達性
+  （`scripts/verify-west-pins.cljk`、ADR-2607022900）。①存在 ②default branch 到達性
   ③旧 pin からの前進。判定は GitHub API で行い、**ローカルの ancestry 判定だけに
-  頼らない。** 強制するのは PreToolUse hook `.claude/hooks/west-pin-verify-guard.cljs` と
+  頼らない。** 強制するのは PreToolUse hook `.claude/hooks/west-pin-verify-guard.cljk` と
   fleet gate `root-west-pin-policy`。
 - **未 merge branch 上の commit を pin にしない** —— `deps.edn` の `:git/sha`、lock、
   `resources/*.edn` に焼いた sha も同じ規則。**west pin には gate があるが、
@@ -597,7 +597,7 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
 
 - **セッションを始める前に、toolchain の checkout を west pin に合わせる**（repo-wide
   mandatory、2026-09-09、ADR-2609092500）。名簿は `manifest/session-sync.edn`、実行は
-  SessionStart hook `.claude/hooks/session-start-toolchain-pin-sync.cljs`（`--dry-run`
+  SessionStart hook `.claude/hooks/session-start-toolchain-pin-sync.cljk`（`--dry-run`
   で測るだけ）。**clean な checkout は黙って pin に合わせ、次の 3 つだけ触らずに報告する**
   —— tracked な変更がある／branch 上に未 push の commit がある／pin の commit が手元に
   無く fetch が予算内に終わらなかった。untracked は checkout を妨げないので無視する。
@@ -609,7 +609,7 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
     「無い」ものとして数日間拒否され続けた。**pin は正しく、tree だけが腐っていた。**
     hook 登録初日の実測でも `kotoba-sema` / `kotoba-native` が pin より遅れていた。
   - **pin 自体の鮮度も同じ hook が出す**（pin が最後に fetch した `origin/main` より
-    遅れていれば行数と `nbb scripts/west-pin-put.cljs <name> HEAD` を示す）。**pin の
+    遅れていれば行数と `nbb scripts/west-pin-put.cljk <name> HEAD` を示す）。**pin の
     前進は自動でやらない** —— 到達性検証を伴う書き込みで、共有 checkout からは行わない
     （上記「pin を動かす・同期する」節）。
   - **`checkout` / `west pin` / `repo の main` は 3 つの別物**という既存の規則の、
@@ -626,19 +626,19 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   west update --fetch smart          # project 群を pin に合わせて同期
   ```
 
-  SessionStart hook `.claude/hooks/session-start-branch-sync-check.cljs` が毎セッション
+  SessionStart hook `.claude/hooks/session-start-branch-sync-check.cljk` が毎セッション
   ahead/behind を可視化する。**警告を読むことと同期することは別の動作**で、
   前者は後者を保証しない。
 - **push の前に `origin/main` との遅れを解消する**（`git merge --ff-only origin/main`。
   FF 不可なら停止、rebase しない）。PreToolUse hook `git-push-main-sync-guard.cljs` が強制する。
 - **push / PR 作成・更新の前に、superproject と west の両方を最新化する。** 逐次・省略せず
   `git fetch origin` → `git merge --ff-only origin/main` → `west update --fetch smart` →
-  `nbb scripts/gen-west-manifest.cljs --check` を実行してから push / PR する。
+  `nbb scripts/gen-west-manifest.cljk --check` を実行してから push / PR する。
 - **pin の既定状態は「upstream default branch の tip」**（オーナー指示 2026-08-20）。
   「pull して」は 3 つの別物を含む —— (1) superproject を origin/main に合わせる
   (2) pin を各 repo の default branch tip に進める (3) checkout を pin に合わせる。
   **(2) を落とすと、(1) と (3) をいくら回しても workspace は古いまま止まる。**
-  前進の経路は `scripts/west-pin-put.cljs` / `west-pin-put-batch.cljs`。
+  前進の経路は `scripts/west-pin-put.cljk` / `west-pin-put-batch.cljs`。
   進めない理由があるなら pin の隣か commit message に書く ——
   **黙って遅れているのと、理由があって留めているのは、出力から区別できなければならない。**
   ⚠ これは「引数なしの `west update` を回せ」という意味ではない。
@@ -698,7 +698,7 @@ DAG-CBOR のリンクは全部 CID なので `ipld/decode` が canonical 再エ�
   コードから原因を推定して 3 回とも外した（legacy catalog / shard フェッチ /
   read そのもの）。当たったのは R2 の実バイトを引いて段階ごとに測ったときだけ。
 - **検出は呼び出し側ではなく codec 側で、形に対して行う。** 検査は
-  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-codec-seq-expansion.cljs --findings orgs`
+  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-codec-seq-expansion.cljk --findings orgs`
   （`manifest/orgs-detectors.edn` の `:verify-codec-seq-expansion`）。捕まえるのは
   ①`mapcat` して `partition` で組み直す形 ②バイト列の等価判定のために両辺を
   persistent vector に materialise する形。**報告するのは形であって計測値ではない**
@@ -721,10 +721,10 @@ DAG-CBOR のリンクは全部 CID なので `ipld/decode` が canonical 再エ�
 映らない**。手元に無いことは存在しないことではない。
 
 ```bash
-nbb scripts/repo-search.cljs bitswap libp2p   # 名前 + checkout 済み README 冒頭
-nbb scripts/concept-lookup.cljs terminal      # 概念 → repo（順位付き・有界）
-nbb scripts/concept-lookup.cljs 端末           # 日本語でも引ける
-nbb scripts/concept-lookup.cljs               # 語彙一覧
+nbb scripts/repo-search.cljk bitswap libp2p   # 名前 + checkout 済み README 冒頭
+nbb scripts/concept-lookup.cljk terminal      # 概念 → repo（順位付き・有界）
+nbb scripts/concept-lookup.cljk 端末           # 日本語でも引ける
+nbb scripts/concept-lookup.cljk               # 語彙一覧
 ```
 
 **`repo-search` は名前と、checkout 済み repo の README 冒頭の両方に当たる** ——
@@ -738,13 +738,13 @@ library（`noise`、`codebase`、`identify`、`mesh`、`p2p` 等）はこれが�
 
 | 索引 | 何を答えるか | 生成 |
 |---|---|---|
-| `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `nbb scripts/gen-concept-index.cljs` |
-| `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `nbb scripts/gen-surface-index.cljs` |
-| `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `nbb scripts/gen-compliance-scope.cljs` |
-| `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `nbb scripts/gen-dependency-inventory.cljs` |
+| `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `nbb scripts/gen-concept-index.cljk` |
+| `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `nbb scripts/gen-surface-index.cljk` |
+| `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `nbb scripts/gen-compliance-scope.cljk` |
+| `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `nbb scripts/gen-dependency-inventory.cljk` |
 
 4 つとも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き。
-いずれも `manifest/edn-query.cljs` の datom 面に載っており、`:concept/repo` /
+いずれも `manifest/edn-query.cljk` の datom 面に載っており、`:concept/repo` /
 `:surface/repo` / `:scope/repo` / `:dependency/repo` は `repo-taxonomy` の `:repo/path` と
 join できる。**セッション開始時に外部仕様ミラー repo の一覧**（`io-`/`org-`/`tech-`/`dev-`/
 `capability-` 接頭辞）が SessionStart hook `session-start-spec-inventory.cljs` で自動提示
@@ -846,7 +846,7 @@ Worker 上の agent がそれに従って名指しの path を開くと、**集�
 そこで「無い」と結論しても「全部在る」と結論しても、どちらも誤る。
 
 実測 2026-08-28: 複数の agent が「Kubo を fleet ノードへ curl 取得」「npm の Helia」へ
-いきなり向かい、**この既存実装を見落とした**（`nbb scripts/repo-search.cljs bitswap libp2p`
+いきなり向かい、**この既存実装を見落とした**（`nbb scripts/repo-search.cljk bitswap libp2p`
 で一発で見つかる）。既に Kubo が動いている環境との相互運用として残すのはよいが、
 **新規設計の第一候補は `io-libp2p` の native 実装。**
 
@@ -939,7 +939,7 @@ CLAUDE.md が禁じている rebase か、clean branch への移植が要る。*
 push 直前まで行われなかった。**警告を読むことと同期することは別の動作**で、前者は後者を
 保証しない。
 
-**これは PreToolUse hook `.claude/hooks/branch-create-main-sync-guard.cljs` で強制する**
+**これは PreToolUse hook `.claude/hooks/branch-create-main-sync-guard.cljk` で強制する**
 （`.claude/settings.json` に登録済み）。対象は `git worktree add` / `git checkout -b` /
 `git switch -c` / `git branch <new>`。**分岐元を `origin/<default>` で明示していれば
 ブロックしない**（それが推奨形であり、ローカルの遅れと無関係に正しい base になるため）。
@@ -953,7 +953,7 @@ push 直前まで行われなかった。**警告を読むことと同期する�
   `west update` / 読み取りだけ。本体に未コミット編集が転がっていると、並行セッションの
   main 同期のたびに「他人の WIP を stash 温存」が発火して stash が堆積する。
 - **作業は 1 task = 1 branch = 1 worktree（superproject の外、sibling path）。**
-  既定入口は `nbb scripts/root-worktree.cljs create <task>`（ADR-2608291248）。
+  既定入口は `nbb scripts/root-worktree.cljk create <task>`（ADR-2608291248）。
   `origin/main` fetch → `--no-checkout` → cone sparse checkout + sparse-index を行い、
   root 23万件を毎回展開しない。ADR/政策は `--profile docs|policy`、追加 directory は
   `--include <path>`。west child が必要なら `--west <name>` を明示し、対象だけを
@@ -974,14 +974,14 @@ push 直前まで行われなかった。**警告を読むことと同期する�
   worktree の作成は sub-second・object store は共有・working tree は再生成物を除けば
   ディスクの 1% 台で、**本当のコストは「着地したのに残る worktree」と「worktree ごとに
   複製される node_modules」の 2 つ**。どちらも機械で消す:
-  - **片付け**: `nbb scripts/worktree-retire.cljs --root . [--apply]` —— 着地済み・clean・
+  - **片付け**: `nbb scripts/worktree-retire.cljk --root . [--apply]` —— 着地済み・clean・
     7 日超・idle（lsof の cwd / ps の argv に無い）・unlocked・非 bot の worktree だけを
     `git worktree remove`（`--force` 無し）+ `git branch -d` で撤去し、stale entry を
     prune する。dirty は触らない（git-cleanup-conflict の領分）。lsof が引けなければ
     `REFUSED`（exit 2）。launchd `cloud.itonami.bot.worktree-retire` が日次で `--apply`。
     ⚠ **2026-09-09 実測: この job は install も load もされていない。** 名簿にあることと
     走っていることは別で、この節が書いている日次実行は起きていなかった。
-  - **node_modules は pnpm store 経由で入れる**: `nbb scripts/worktree-node-modules-dedupe.cljs
+  - **node_modules は pnpm store 経由で入れる**: `nbb scripts/worktree-node-modules-dedupe.cljk
     --root . [--apply]` が npm lockfile の worktree を `pnpm import` + `.npmrc`
     `node-linker=hoisted` + `pnpm install --frozen-lockfile` に置き換える。pnpm は APFS で
     store から clonefile するので **`du` は減らない。実消費は `df` で測る**（worktree
@@ -1096,7 +1096,7 @@ CertGovernor）。
   各 ADR は S 式の tx-data
   `(vector (map (:db/id -1) (:adr/id ...) (:adr/title ...) (:adr/status ...) (:adr/body ...)))`。
   `.kotoba` のデータファイルは S 式なので `cljs.reader` がそのまま読む。
-  入れ子 map/vector は `pr-str` した string blob（`manifest/edn-datomize.cljs` と同型）。
+  入れ子 map/vector は `pr-str` した string blob（`manifest/edn-datomize.cljk` と同型）。
   ⚠ **この節は 2026-07-17 に `.edn` only として書かれ、tree に追い越された。**
   実測 2026-09-10: ADR 面は **2,884 件すべて `.kotoba`**。⚠ **その数時間後に `.edn` の ADR が 1 件着地した**
   （`2609101900-q9-rename-reverted-pending-admission.edn`）—— 下の `adr-new.cljs` の
@@ -1106,9 +1106,9 @@ CertGovernor）。
   `.md` も 88 件残っている。gate `docs-edn-check` は `.edn` と `.kotoba` の両方を受ける。
   **「ADR は kotoba」と「90-docs は kotoba」を混同しない** —— 後者を書けば 617 件が
   一夜で違反になる。
-  ⚠ **`scripts/adr-new.cljs` は `.edn` と bare な数値 id を出す。** どちらもこの節と
+  ⚠ **`scripts/adr-new.cljk` は `.edn` と bare な数値 id を出す。** どちらもこの節と
   下の `:adr/id` slug 規則に反するので、使ったら拡張子と id を直してから commit する。
-  ⚠ **`manifest/docs-edn-only.cljs` のヘッダは今も「正本は `*.edn`」と書いている。**
+  ⚠ **`manifest/docs-edn-only.cljk` のヘッダは今も「正本は `*.edn`」と書いている。**
   移行ツールとしては生きているが、その一文は現在地ではない。
 - **`.kotoba` / `.edn` 文書を heredoc で書いたら、reader を通してから commit する。`read-string`
   が throw しないことは無傷を意味しない。** shell heredoc の中の `\"` はファイル上で
@@ -1151,12 +1151,12 @@ CertGovernor）。
   実測 2026-08-19: その 7 件を解消した 1 時間後に、同じ番号で 8 件目が生まれている。
   slug を含めれば同じ番号でも id は分かれ、`:adr/related` の参照先も一意に決まる
   （既存 1,362 件が既にこの形。bare は 353 / 65）。検査は
-  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-adr-identity.cljs`、
+  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-adr-identity.cljk`、
   fleet gate は `root-adr-identity`。**既知の衝突 23 件は据え置きで、表を増やさない**
   —— 新しい衝突は fail させる。
 - **横断 query**:
-  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljs count`
-  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
+  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljk count`
+  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljk q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
   属性は datascript.js 向けに **裸文字列**（`"adr/id"`、コロン無し）。
 - **この面は 90-docs だけではない（2026-07-25 拡張、ADR-2607252000）。** 企業データと
   fleet 状態も同じ面に載っており、`:company/lei` を結合キーに **repo を跨いで join
@@ -1181,7 +1181,7 @@ CertGovernor）。
   ```bash
   # 財務 × 法人実体 × ToS を 1 クエリで
   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" \
-    manifest/edn-query.cljs q \
+    manifest/edn-query.cljk q \
     '[:find ?legal ?juris ?rev ?url :where
       [?a "company/lei" ?lei] [?a "source/dataset" "market-intel"] [?a "company/revenue-usd" ?rev]
       [?b "company/lei" ?lei] [?b "company/legal-name" ?legal] [?b "company/jurisdiction" ?juris]
@@ -1193,8 +1193,8 @@ CertGovernor）。
   この報告を必ず付ける。実例: tos.journal.edn の一部が source 側の破損
   （ToS 本文の未エスケープ引用符でファイルが 1 個の巨大タプルに潰れる）で 0 entity。
 - **schema**: `manifest/schema.edn`（自動生成、手編集禁止）。
-- **検証**: `nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljs verify`。
-- **移行ツール**: `manifest/docs-edn-only.cljs`（`migrate` / `status` / `verify`）。
+- **検証**: `nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk verify`。
+- **移行ツール**: `manifest/docs-edn-only.cljk`（`migrate` / `status` / `verify`）。
 - multi-entity catalog（`*.datoms.edn`）は複数 entity のまま、query ローダが全 entity を読む。
 - 新規 ADR は最初から `.kotoba` の S 式 tx-data で書く（`.md` も `.edn` も起こしてから変換しない）。
 - **文書は「最新状態のみ」を表す。履歴は git に任せる**（オーナー判断 2026-07-25、
@@ -1204,9 +1204,9 @@ CertGovernor）。
   子リポの `docs/*.md` にも適用される。**append-only の「追記して既存行は触らない」
   運用はしない。** 何がいつ変わったかは `git log -p <file>` / `git blame` が持つ。
   - **旧方式は撤去済み**: `90-docs/adr-ledger/adr-ledger.edn` と
-    `scripts/adr-ledger-append.cljs`、`90-docs/task-graphs/task-graph-ledger.edn` と
+    `scripts/adr-ledger-append.cljk`、`90-docs/task-graphs/task-graph-ledger.edn` と
     `scripts/task-graph-ledger-append.cljs` は削除した。既存 76 件の ADR amendment は
-    `scripts/fold-adr-ledger.cljs` で各 ADR の `:adr/body` 末尾「## 改訂履歴」節へ
+    `scripts/fold-adr-ledger.cljk` で各 ADR の `:adr/body` 末尾「## 改訂履歴」節へ
     統合済み。**これらのスクリプトを再導入しない**。ADR-2607181900 の ledger 部分と
     ADR-2607173000 decision item 6、ADR-2607202800 の ledger 半分を supersede する。
   - **書き換えの作法**: 決定を反転させるときは古い記述を黙って消さず、`:adr/status` を
@@ -1274,7 +1274,7 @@ query 設計をこの前提の上に組み立てた。
    `:adr/superseded-by`、**`CLAUDE.md`（agent 指示の正本）の該当節も同じ commit で**。
    次に読む人は ADR ではなく agent 指示を見るので、片方だけ直すと誤りが残る。
    **`AGENTS.md` は `CLAUDE.md` からの生成物なので直接編集しない** —— `CLAUDE.md` を
-   直して `nbb scripts/gen-agents-md.cljs` を回す（下記「agent 指示は 1 本の正本から
+   直して `nbb scripts/gen-agents-md.cljk` を回す（下記「agent 指示は 1 本の正本から
    生成する」節）。
 4. 反証できなかったら、**確かめた事実を規則の隣に足す**（「2026-09-04 に測って
    まだ真」）。次の人が同じ検証を繰り返さずに済む。
@@ -1299,7 +1299,7 @@ query 設計をこの前提の上に組み立てた。
 ## app の面は 4 つで、混ぜない —— identity / naming / location / kind（repo-wide mandatory、2026-09-09、ADR-2609092600）
 
 **正本は ADR-2609092600、機械可読は `manifest/repository-rules.edn` の
-`:workspace-policies :app-plane`、検査は `scripts/verify-app-content-address.cljs`。**
+`:workspace-policies :app-plane`、検査は `scripts/verify-app-content-address.cljk`。**
 ここに残すのは、それらを読まなくても効く不変条件だけ。
 
     identity  ipfs://{cid}                      不変。app が記録する唯一のアドレス
@@ -1328,7 +1328,7 @@ query 設計をこの前提の上に組み立てた。
 - **CDN から取りに行く document に CID を付けない。** 自己完結ではないので、その CID は
   app が何を実行するかを覆っていない。逃げ道は `--vendor <url>=<path>=<sha256>` 1 つだけで、
   **digest が一致したときにだけ**ローカルの同一バイト列に差し替える。
-- **publish は 2 面に書く。`scripts/publish-document.cljs` を使う。**
+- **publish は 2 面に書く。`scripts/publish-document.cljk` を使う。**
   `PUT /ipfs/{cid}` が書くのは **B2**（IPNI の広告が retrieval address として名指す面）、
   app を配る origin plane が読むのは **R2 の `ipld/{cid}`**。片方だけに置いた document は
   bytes plane で 200、web plane で 502 になる。**`content-address publish` を単体で
@@ -1497,7 +1497,7 @@ application の前提にしない。
 
 機械可読な正本は `manifest/repository-rules.edn` の
 `:workspace-policies :live-service-durable-data`。検査は
-`nbb scripts/verify-kotobase-persistence-policy.cljs`、CI/CD は murakumo fleet の
+`nbb scripts/verify-kotobase-persistence-policy.cljk`、CI/CD は murakumo fleet の
 `root-kotobase-persistence-policy` gate。新しい service は README / ADR / config で
 Kotobase の database/ref と block codec を宣言する。
 
@@ -1831,12 +1831,12 @@ diff → verify/query → commit → review/merge → handoff/restart` という
 - protected Git ref / merge queue / single writer を当面の安定した publication として使ってよい。
   ただし分散合意とは呼ばない。分散 agreement が必要な経路は inga ref へ接続する。
 - projection を追加・変更したら
-  `nbb --classpath ".:scripts/nbb_compat" manifest/projection-verify.cljs verify <projection.edn>`
+  `nbb --classpath ".:scripts/nbb_compat" manifest/projection-verify.cljk verify <projection.edn>`
   をgateにする。contractはsource commit、input Git hash / annex key / CID、schema/loader hash、
   allowlist済みloader ID（contract由来のargvは禁止）、logical datom hash、任意の
   physical hash、entity countを固定する。loaderはdataset固有schemaとstable identity属性を
   実際に検証し、出力先は`.projection-cache/<projection-id>.edn`だけを宣言できる。custody確認は別途
-  `scripts/annex-custody-verify.cljs` が担い、identity検証とavailability検証を混ぜない。
+  `scripts/annex-custody-verify.cljk` が担い、identity検証とavailability検証を混ぜない。
 
 ## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
 
@@ -1914,14 +1914,14 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
   で明示的に取得する（既に含まれていれば no-op）。
 - **ツールチェーンは 2026-07-10 に babashka(bb) → nbb(cljs) へ移行済み**（commit
   `b073ea7da12`）。`bb 70-tools/bmc/collect.bb` のような古い記法は存在しない — 正しくは
-  `nbb 70-tools/bmc/collect.cljs` / `nbb 70-tools/bmc/bin/gftd.cljs <args>` /
-  `nbb 70-tools/bmc/run-tests.cljs`。稼働中の cloud routine の中にもこの移行前の古い
+  `nbb 70-tools/bmc/collect.cljk` / `nbb 70-tools/bmc/bin/gftd.cljk <args>` /
+  `nbb 70-tools/bmc/run-tests.cljk`。稼働中の cloud routine の中にもこの移行前の古い
   記法が残っているものがある（`itonami-react-growth-hourly` は 2026-07-12 時点で未修正、
   follow-up）— CCR agent が実行時に自己修復して動いてしまうため気付きにくい。routine の
   prompt を編集する機会があれば直す。
 - **既存 canvas/仮説の有無は `gftd products` / `gftd canvas show --product <p>` /
   `90-docs/business/maturity-scores.edn` で確認できる**（`COM_JUNKAWASAKI_ROOT=<superproject root>
-  nbb 70-tools/bmc/bin/gftd.cljs products` 等）。登録済みなのに daily routine の
+  nbb 70-tools/bmc/bin/gftd.cljk products` 等）。登録済みなのに daily routine の
   `--product` ループに載っていないだけ、というギャップが起点になりやすい —
   その場合は新規登録でなく routine の対象リスト追加で足りる。
 - **この共有システムのスコープは `gftdcojp` org の 11 プロダクト**（`gftd products` の
@@ -1976,7 +1976,7 @@ skill を読まなくても効く不変条件だけ。
   ソースからは観測できない。検査は superproject root で:
 
   ```bash
-  nbb scripts/verify-single-page-app.cljs --root . --findings   # 0=clean 1=findings 2=REFUSED
+  nbb scripts/verify-single-page-app.cljk --root . --findings   # 0=clean 1=findings 2=REFUSED
   ```
 
   例外は SSR/OG が要る公開ページ（ADR-2606290000）と、生きた credential の隣にある
@@ -2113,7 +2113,7 @@ cleanup は**何も見つけずに成功する**）。CPU を食っている pro
 
   **sha も `:paths` も隣の project file から複写する** —— project file が coordinate を
   名指していなければ sha を選ばずに拒否する。推測した `:paths` は、正しく見えて何も
-  解決しない宣言そのもの。検出は `scripts/verify-nbb-declaration-visible.cljs`
+  解決しない宣言そのもの。検出は `scripts/verify-nbb-declaration-visible.cljk`
   （`manifest/orgs-detectors.edn`）で、**数えるのは bare な `nbb <file>` の entry point だけ**
   （`nbb --classpath …` で起動されるファイルは invocation 側で宣言している）。
 - **Kotoba は safe application language**（ADR-2607201300）。`kotoba/pure` /

@@ -55,7 +55,7 @@
 
  :deployed-services
  {:parity-checker
-  {:script "deploy/parity-checker-service.cljs"
+  {:script "deploy/parity-checker-service.cljk"
    :purpose "Compare Rust vs cljc responses (bit-exact, semantic)"
    :capabilities
    ["hash-based-comparison"
@@ -73,7 +73,7 @@
    :status "ready-to-run"}
 
   :rollback-automation
-  {:script "deploy/rollback-automation.cljs"
+  {:script "deploy/rollback-automation.cljk"
    :purpose "Autonomous SLO enforcement with automatic revert"
    :triggers
    [{:id "latency-regression"
@@ -168,12 +168,12 @@
 
  :deployment-artifacts
  {:deployment-scripts
-  [{:file "deploy/month-1-staging-deployment.cljs"
+  [{:file "deploy/month-1-staging-deployment.cljk"
     :purpose "Main orchestration: provision, status, canary control, rollback"
     :entry-points ["provision" "status" "canary-start" "canary-pause" "rollback"]}
-   {:file "deploy/parity-checker-service.cljs"
+   {:file "deploy/parity-checker-service.cljk"
     :purpose "Parity validation service (long-running)"}
-   {:file "deploy/rollback-automation.cljs"
+   {:file "deploy/rollback-automation.cljk"
     :purpose "Autonomous rollback enforcement"}]
 
   :configuration-files
@@ -197,7 +197,7 @@
  {:infrastructure
   [{:item "3 staging cljc nodes registered"
     :status "provisioned"
-    :verification "nbb deploy/month-1-staging-deployment.cljs status"}
+    :verification "nbb deploy/month-1-staging-deployment.cljk status"}
    {:item "drama-profile compiled to WASM"
     :status "ready"
     :verification "test/kotoba/mesh_drama_profile_test.clj"}
@@ -211,12 +211,12 @@
     :verification "murakumo route-dispatch config"}
    {:item "Murakumo dispatch layer integration"
     :status "ready"
-    :verification "nbb deploy/month-1-staging-deployment.cljs canary-start"}]
+    :verification "nbb deploy/month-1-staging-deployment.cljk canary-start"}]
 
   :parity-validation
   [{:item "Parity checker service"
     :status "ready-to-run"
-    :verification "nbb deploy/parity-checker-service.cljs ..."}
+    :verification "nbb deploy/parity-checker-service.cljk ..."}
    {:item "Request/response logging"
     :status "ready"
     :verification "metrics/parity-validation.log"}]
@@ -232,7 +232,7 @@
   :rollback-automation
   [{:item "5 autonomous triggers configured"
     :status "ready-to-monitor"
-    :verification "nbb deploy/rollback-automation.cljs monitor"}
+    :verification "nbb deploy/rollback-automation.cljk monitor"}
    {:item "Audit logging enabled"
     :status "ready"
     :verification "metrics/rollback-audit.log"}]}
@@ -272,7 +272,7 @@
  :monitoring-access
  {:slo-dashboard "http://localhost:3000/d/strangler-fig-month1"
   :parity-log-realtime "tail -f metrics/parity-validation.log"
-  :rollback-status-check "nbb deploy/rollback-automation.cljs status"
+  :rollback-status-check "nbb deploy/rollback-automation.cljk status"
   :metrics-query-endpoint "http://localhost:9090/api/v1/query"
   :audit-trail "metrics/rollback-audit.log"}
 
@@ -339,7 +339,7 @@
  :success-metrics
  {:deployment-success
   {:item "3 staging nodes running, healthy"
-   :verification "nbb deploy/month-1-staging-deployment.cljs health"
+   :verification "nbb deploy/month-1-staging-deployment.cljk health"
    :status "ready"}
 
   :canary-success

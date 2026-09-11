@@ -5,9 +5,9 @@
 テストが無い」という具体的な TODO として報告する。
 
 ```bash
-nbb scripts/maturity-loop/run.cljs                  # 全 suite
-nbb scripts/maturity-loop/run.cljs --only inga      # repo 名で絞る
-nbb scripts/maturity-loop/run.cljs --keep-worktree  # 調査用に worktree を残す
+nbb scripts/maturity-loop/run.cljk                  # 全 suite
+nbb scripts/maturity-loop/run.cljk --only inga      # repo 名で絞る
+nbb scripts/maturity-loop/run.cljk --keep-worktree  # 調査用に worktree を残す
 ```
 
 ## なぜ要るか

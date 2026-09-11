@@ -24,8 +24,8 @@ cron `script:` に付いており、その stdout が agent prompt に注入さ�
 queue を探さない — 測られたものを処理する。
 
 ```bash
-nbb scripts/hermes-pr-queue/pr_queue_scan.cljs            # 既定: 7 org, cap 5, work 25
-nbb scripts/hermes-pr-queue/pr_queue_scan.cljs --author any --orgs kotoba-lang --work 10
+nbb scripts/hermes-pr-queue/pr_queue_scan.cljk            # 既定: 7 org, cap 5, work 25
+nbb scripts/hermes-pr-queue/pr_queue_scan.cljk --author any --orgs kotoba-lang --work 10
 python3 scripts/hermes-pr-queue/pr_queue_scan.py          # cron runner が使う経路（.py 経由で nbb を起動）
 ```
 

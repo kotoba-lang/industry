@@ -1,0 +1,280 @@
+#!/usr/bin/env nbb
+;; verify-flattened-edn-prose.cljs — EDN 文字列に入った散文が「行構造を失った」
+;; ことの検出。
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-flattened-edn-prose.cljk [--findings] [<root>...]
+;;
+;; ## なぜ要るか —— 実測 2026-09-01
+;;
+;; ADR-2608311750 の `:adr/body` が 1 回の書き込みで **1061 行から 39 行**に
+;; 潰れた。潰したのは shell の補間ではない（引用ヒアドキュメント `<<'PY'` を
+;; 使っており補間は起きていない）。原因は **手書きの EDN 文字列 unescaper**:
+;;
+;;     if s[i]=='\\': out.append(s[i+1]); i+=2     # \n -> 文字 n
+;;
+;; `\X -> X` は `\\` と `\"` には正しく、`\n` に対しては**改行を文字 n に
+;; する**。ファイル上の 1061 個の `\n` エスケープが全部 `n` になり、本文は
+;; 1 行になった。**それでも EDN としては妥当**なので:
+;;
+;;   - `docs-edn-check --strict-keys` は緑のまま（parse も key 位置も無傷）
+;;   - reader は値を返す
+;;   - 文書は破壊されている
+;;
+;; これは「測れなかった検査が、測って問題が無かった検査と同じ値を返す」
+;; （ADR-2608136000）の一種で、**検査は走っていた。走っていた検査が、
+;; 走っていない検査と同じ緑を返していた。**発見されたのは偶然で、別 agent の
+;; 通りすがりの指摘による。
+;;
+;; ## 何を見ているか —— 片方ずつでは効かない 2 条件の積
+;;
+;; 実測で候補を 3 つ潰してから、この 2 つに落ち着いた:
+;;
+;;   ✗ 見出しが行頭に無い            2484 本中 1361 本を誤検出
+;;   ✗ 行密度だけ                    小さい本文で誤検出（正しい本文 2 本が
+;;                                   破損本文より低密度: 0.56 / 1.24 対 0.83）
+;;   ✗ 旧本文が新本文の接頭辞か      **その場書き換えで発火する** —— この
+;;                                   workspace が明示的に許可している編集
+;;                                   （文書は現在値、履歴は git）。実測: 別
+;;                                   agent の `未測定` -> `測定済み` で発火
+;;
+;;   ✓ 行密度の崩壊 AND 行頭トークンの `n` 接着の**密度**
+;;
+;; 2 つ目が本命で、**この壊れ方そのものの指紋**である。潰れた本文では、
+;; もと改行だった位置に文字 `n` が残るので、行頭にしか立てないトークン
+;; （`## ` `- ` `1. ` `| ` 段落先頭のコードフェンス）が `n` に前置される
+;; —— `...ですn## Context`。散文中の自然な `n##` はまず出ない。
+;;
+;; ## 測った限界（この検出器自身について、正直に）
+;;
+;;   - workspace 全体（superproject の 90-docs + orgs/ の 17 repo）の散文本文
+;;     **4,623 本**に対して誤検出 0。指紋だけなら 46 本、行密度だけなら小さい
+;;     本文で誤検出、指紋を**絶対数**で見ると 536KB の無傷な索引が誤検出する。
+;;     3 つとも実際に測って落とした閾値であって、目分量ではない。
+;;   - 真陽性は **1 件**（`2c19126f` の `2608311750`、glued=260 / nl-per-1k=0.83）。
+;;     正しい本文の最大は glued=7、最小密度は同サイズ帯で 3.59。
+;;   - **1 例でしか真陽性を測っていない。** この壊れ方は今のところ 1 回しか
+;;     起きていないので、閾値は 1 つの実例と 2393 の陰性から引いた。別種の
+;;     潰れ方（`\t` を食う、CRLF 化、JSON 経由の往復）は**見ない**。
+;;   - `:adr/body` 形の**長い散文文字列だけ**を見る。短い説明文字列が潰れても
+;;     この検出器は黙る。
+;;   - **見出しも箇条書きも表も持たない素の段落だけの本文が潰れても黙る。**
+;;     指紋は「行頭にしか立てないトークン」に依存しているので、行頭トークンが
+;;     無い散文には指紋が残らない。この workspace の ADR 本文は構造化された
+;;     markdown なので実害は小さいが、**カバレッジの穴であって不在の証明では
+;;     ない**。
+;;   - `pr-str` した入れ子 map/vector（datom 規約の string blob）は**除外する**。
+;;     1 行なのが正しいため。除外せずに測って誤検出 3 件を出したので、
+;;     推測ではなく実測に基づく除外である。
+;;
+;; ## exit code は三値
+;;
+;;   0  走査して、潰れた本文は無かった
+;;   1  潰れた本文があった
+;;   2  **答えられなかった** —— 自己検証に失敗した、または走査対象が 0 件だった
+;;
+;; ## これは後から見つける。書く前になくすのは `scripts/adr-body.cljk`
+;;
+;; この検出器は 6h 間隔で main の上を見る。同じ穴を**書く前に**塞ぐのが
+;; `adr-body.cljs` で、reader で読み `pr-str` で書き、書いた直後に読み直して
+;; 照合する。worker が escape を一度も書かないので、この壊れ方が起こらない。
+;; 二つのうち予防の方が価値が高い —— 検出器の発見は最短でも 6h 遅れ、
+;; しかも 2026-09-01 現在 detector home 自体が admission 失敗で停止している。
+
+(ns verify-flattened-edn-prose
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            ["fs" :as fs]
+            ["path" :as path]))
+
+;; ---------------------------------------------------------------- thresholds
+
+(def ^:const min-body-chars
+  "散文としての行構造を論じられる下限。これ未満は見ない（短い文字列が 1 行
+  なのは正常であって破損ではない）。"
+  1000)
+
+(def ^:const min-glued
+  "指紋の絶対下限。小さい本文が 1〜2 件の偶然で比率だけ超えるのを防ぐ床。"
+  3)
+
+(def ^:const min-glued-per-1k
+  "指紋の**密度**下限。絶対数ではいけない —— 実測 2026-09-01:
+  `etzhayyim/root/90-docs/adr/README.edn` は 536,082 字の**無傷の**索引で、
+  偶然の `n* ` を 6 件持つ。絶対床 3 ではこれが誤検出になった。
+  密度で見ると 0.011/1k 対 破損本文 5.525/1k で 490 倍離れる。
+  実測: workspace 全体の散文本文 4,623 本の最大が 1.448/1k。
+  3.0 はその間で、どちらの側にも 2 倍以上の余裕がある。"
+  3.0)
+
+(def ^:const max-newlines-per-1k
+  "行密度の床。実測: 破損本文 0.83、同サイズ帯の正しい本文の最小 3.59。
+  2.0 はその間で、どちらの側にも 2 倍以上の余裕がある。"
+  2.0)
+
+(def glued-line-start
+  "行頭にしか立てない markdown トークンが文字 `n` に接着している数。
+  これが `\\n` を文字 n として食った書き込みの指紋。"
+  #"n(?:#{1,4} |[-*] |\d+\. |\| |``)")
+
+;; ---------------------------------------------------------------- measurement
+
+(defn newlines-per-1k [body]
+  (* 1000 (/ (count (re-seq #"\n" body)) (max 1 (count body)))))
+
+(defn glued-count [body]
+  (count (re-seq glued-line-start body)))
+
+(defn serialized-blob?
+  "`pr-str` した入れ子 map/vector。ADR の datom 規約がこの形を要求しており
+  （CLAUDE.md「入れ子 map/vector は pr-str した string blob」）、**1 行なのが
+  正しい**。散文と同じ床で測ると全部が『潰れている』になる。
+  実測 2026-09-01: これを除外せずに走らせて誤検出 3 件。"
+  [body]
+  (let [t (str/triml body)]
+    ;; `#` 単体を blob 印にしてはならない —— `## 見出し` で始まる散文が
+    ;; 丸ごと除外される。selftest がこれを起動前に捕まえた（2 件目）。
+    (or (contains? #{"{" "[" "("} (subs t 0 1))
+        (str/starts-with? t "#{"))))
+
+(defn flattened?
+  "2 条件の積。片方だけでは実測で誤検出する（ヘッダ参照）。"
+  [body]
+  (and (>= (count body) min-body-chars)
+       (not (serialized-blob? body))
+       (< (newlines-per-1k body) max-newlines-per-1k)
+       (>= (glued-count body) min-glued)
+       (>= (* 1000 (/ (glued-count body) (count body))) min-glued-per-1k)))
+
+;; ------------------------------------------------------------------ selftest
+;; nul-bytes 検出器と同じ規律: 既知の不良と既知の正常の両方に正しく答えられる
+;; ことを毎回示してから走る。regex が静かに当たらなくなる形の故障を、
+;; 「0 件 = clean」として報告しないため。
+
+;; 1000 字を超えていること自体が selftest の一部である —— 初回の実行で
+;; known-bad が min-body-chars を下回っており、検出器は「既知の不良を
+;; 検出できない」と正しく申告して起動を拒否した。
+(def ^:private known-good
+  (str "## Context\n\n" (str/join "" (repeat 120 "これは普通の散文である。\n"))
+       "\n## Decision\n\n- 箇条書き\n- もう一つ\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"))
+
+(def ^:private known-bad
+  (str/replace known-good "\n" "n"))
+
+(defn- selftest! []
+  (let [good-ok (not (flattened? known-good))
+        bad-ok  (flattened? known-bad)]
+    (when-not (and good-ok bad-ok)
+      (println "SCANNED\t0")
+      (println (str "Refusing to report a pass: selftest failed"
+                    " (known-good clean? " good-ok
+                    ", known-bad detected? " bad-ok ")"))
+      (js/process.exit 2))))
+
+;; -------------------------------------------------------------------- walking
+
+(defn- dir? [p] (try (.isDirectory (.statSync fs p)) (catch :default _ false)))
+
+(def ^:private skip-dirs
+  #{".git" "node_modules" ".shadow-cljs" "target" ".cpcache" ".claude"})
+
+(defn- edn-files
+  "<root> 配下の 90-docs/**/*.edn。ADR 形の散文はそこにしか無いことを実測して
+  いる（superproject の :adr/body 2484 本のうち 2484 本が 90-docs/adr、
+  orgs/ 側は 17 repo が 90-docs/adr を持つ）。"
+  [root]
+  (let [out (atom [])]
+    (letfn [(walk [d depth]
+              (when (< depth 12)
+                (doseq [e (try (.readdirSync fs d) (catch :default _ []))]
+                  (let [p (path/join d e)]
+                    (cond
+                      (contains? skip-dirs e) nil
+                      (dir? p) (walk p (inc depth))
+                      (.endsWith e ".edn") (swap! out conj p))))))]
+      (doseq [d (concat (when (dir? (path/join root "90-docs"))
+                          [(path/join root "90-docs")])
+                        ;; orgs/<org>/<repo>/90-docs — west 管理なので fleet
+                        ;; gate では見えない。だからここに居る。
+                        (for [org (try (.readdirSync fs (path/join root "orgs"))
+                                       (catch :default _ []))
+                              repo (try (.readdirSync fs (path/join root "orgs" org))
+                                        (catch :default _ []))
+                              :let [d (path/join root "orgs" org repo "90-docs")]
+                              :when (dir? d)]
+                          d))]
+        (walk d 0)))
+    @out))
+
+(defn- bodies
+  "1 ファイルの中の、散文とみなせる長い文字列すべて。`:adr/body` に限定しない
+  —— 同じ潰れ方は同じ形のどのキーにも起こる。"
+  [file]
+  (try
+    (let [v (edn/read-string (.readFileSync fs file "utf8"))
+          out (atom [])]
+      (letfn [(walk [x]
+                (cond
+                  (map? x) (doseq [[k v] x]
+                             (when (and (string? v) (>= (count v) min-body-chars))
+                               (swap! out conj [k v]))
+                             (walk v))
+                  (coll? x) (doseq [i x] (walk i))))]
+        (walk v))
+      @out)
+    (catch :default _ nil)))                ; 読めない EDN は docs-edn-check の担当
+
+;; ---------------------------------------------------------------------- main
+
+(defn- finding! [severity key detail]
+  (println (str "FINDING\t" severity "\t" key "\t" detail)))
+
+(defn -main [& args]
+  (selftest!)
+  (let [findings? (some #{"--findings"} args)
+        roots (let [r (remove #(str/starts-with? % "--") args)]
+                (if (seq r) (vec r) ["."]))
+        files (mapcat edn-files roots)
+        scanned (atom 0)
+        unreadable (atom 0)
+        hits (atom [])]
+    (doseq [f files]
+      (if-let [bs (bodies f)]
+        (doseq [[k body] bs]
+          (swap! scanned inc)
+          (when (flattened? body)
+            (swap! hits conj
+                   {:file f :key k :chars (count body)
+                    :density (newlines-per-1k body) :glued (glued-count body)})))
+        (swap! unreadable inc)))
+    (println (str "SCANNED\t" @scanned))
+    (when (pos? @unreadable)
+      ;; 読めなかったものを 0 件として数えない（CLAUDE.md の edn= 規律）。
+      (println (str "UNREADABLE-EDN\t" @unreadable
+                    "\t(docs-edn-check の担当。ここでは未測定として申告する)")))
+    (cond
+      (zero? @scanned)
+      (do (println "Refusing to report a pass: scanned 0 prose bodies.")
+          (js/process.exit 2))
+
+      (seq @hits)
+      (do
+        (doseq [h (sort-by :file @hits)]
+          (let [key (str (:file h) "::" (:key h))
+                detail (str "行構造が失われている: " (:chars h) " 字に対し改行 "
+                            (.toFixed (:density h) 2) "/1k 字"
+                            "（床 " max-newlines-per-1k "）、行頭トークンの n 接着 "
+                            (:glued h) " 箇所 = "
+                            (.toFixed (* 1000 (/ (:glued h) (:chars h))) 2) "/1k 字"
+                            "（床 " min-glued-per-1k "）。"
+                            "手書きの EDN unescaper が \\n を文字 n として食った形。"
+                            "scripts/adr-body.cljk を通して読み書きすること（手で escape を書かない）。")]
+            (if findings?
+              (finding! "error" key detail)
+              (println (str "FLATTENED\t" key "\t" detail)))))
+        (js/process.exit 1))
+
+      :else
+      (do (println (str "OK — " @scanned " 本の散文本文はすべて行構造を保っている"))
+          (js/process.exit 0)))))
+
+(apply -main *command-line-args*)

@@ -1,7 +1,7 @@
 ;; BMC / YC 成熟度スコアの **算術の正本**（ADR-2607021700 の rubric、移行は
 ;; ADR-2608158000）。`kotoba/pure` プロファイル — capability ゼロ、effect ゼロ。
 ;;
-;; 参照実装は `70-tools/bmc/src/gftd/score.cljc` の同名関数群で、CLI・render・
+;; 参照実装は `70-tools/bmc/src/gftd/score.cljk` の同名関数群で、CLI・render・
 ;; allocate はそこを読む。両者が全 case で 1 の位まで一致することを fleet gate
 ;; `root-score-core` が毎回見る。**食い違ったらこの kernel が正しく、cljc を直す。**
 ;;

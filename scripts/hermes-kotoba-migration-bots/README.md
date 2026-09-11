@@ -153,7 +153,7 @@ cp scripts/hermes-kotoba-migration-bots/kotoba_migration_evidence.py \
    ~/.hermes/scripts/
 cp scripts/hermes-kotoba-migration-bots/kotoba-migration-scout.prompt.md \
    ~/.hermes/scripts/kotoba-migration-scout.prompt.md
-cp scripts/hermes-kotoba-migration-bots/verify-kotoba-migration.cljs \
+cp scripts/hermes-kotoba-migration-bots/verify-kotoba-migration.cljk \
    ~/.hermes/scripts/
 cp scripts/hermes-kotoba-migration-bots/kotoba_cli_build_evidence.py \
    ~/.hermes/scripts/
