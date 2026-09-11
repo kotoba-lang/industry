@@ -24,7 +24,7 @@ companion 面が既に持っており、ここが持つのは定期の情報発�
 
 ```bash
 R=$PWD K=$PWD/orgs/kotoba-lang
-CP="$R/scripts/shinshi-cast-bots:$K/org-chainagnostic-cacao/src:$K/authority/src:$K/org-ietf-ed25519/src:$K/org-ietf-cbor/src"
+CP="$R/scripts/shinshi-cast-bots:$K/org-chainagnostic-cacao/src:$K/authority/src:$K/org-ietf-ed25519/src:$K/org-ietf-cbor/src:$K/text/src"
 
 nbb --classpath "$R/scripts/shinshi-cast-bots" scripts/shinshi-cast-bots/roster.cljs
 nbb --classpath "$CP" scripts/shinshi-cast-bots/register.cljs           # 全員
