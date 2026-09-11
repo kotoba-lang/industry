@@ -556,8 +556,20 @@
                           :r-squared {:chain-series 0.9999 :every-link-series 0.9993}
                           :max-blocks-measured 32
                           :advertised-max-blocks 256
-                          :advertised-max-at-measured-rate-ms 28000
-                          :advertised-max-deliverable :not-measured
+                          ;; Measured 2026-09-11 on a 256-block fixture, same root
+                          ;; both ways: deliverable (3/3 complete) and not usable
+                          ;; unpacked -- 36.3 s p50, 46.0 s p90, 98% of it R2 I/O.
+                          ;; Packed: 338 ms, one fetch. The 28 s extrapolation was
+                          ;; optimistic by 30%.
+                          :advertised-max-deliverable true
+                          :advertised-max-unpacked-ms {:p50 36333 :p90 45981}
+                          :advertised-max-packed-ms {:p50 338 :p90 390}
+                          :advertised-max-usable-unpacked false
+                          ;; One decision, not yet taken: cut a separate effective
+                          ;; ceiling for roots without a pack, or decide who writes
+                          ;; packs and advertise 256 on that premise. The cost of
+                          ;; leaving it open is measured: 46 seconds.
+                          :ceiling-decision :open
                           :pack-prize "(N-1) x per-block-ms, upper bound"
                           ;; Measured 2026-09-11 with a root-keyed CARv2 read whole
                           ;; on the first miss (net-kotobase/ipfs 23046cad): 30 -> 1

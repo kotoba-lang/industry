@@ -90,6 +90,33 @@
   :not-the-same-graph "unpacked root is the head's PreviousID and reaches 30 blocks, not 32"
   :controls {:corrupted-frame-in-pack "502 cid-mismatch (test)" :no-pack "per-block path unchanged, x-ipq-pack miss (test + live)"}}
 
+ :q3e-advertised-ceiling
+ {:measured "2026-09-11"
+  :question "maxBlocks 256 は届くか。届くなら何秒か。pack ならいくらか"
+  :fixture {:builder "90-docs/query-plane/build_wide_fixture.cljs"
+            :root "bafyreibk63jgcejweghwmcqxdc73ve4bcd6eowi4geqbwvhbbcxaftt5fq"
+            :shape "1 dag-cbor root + 255 dag-cbor leaves, all 256 in R2 ipld/, pack in packs/by-root/"
+            :pack-bytes 50717 :index-bytes 10270}
+  :bench "90-docs/query-plane/bench_ipq_ceiling.cljs"
+  :method "同じ root、explore-range で leaf k 本。pack object を消して測り、戻して測った。client timeout 90 s。reps 3"
+  :unpacked {:client-loadavg [41.84 24.76 23.70]
+             :rows [{:blocks 32 :fetches 32 :p50 4160 :p90 6616 :io-ms 3877 :ok "3/3"}
+                    {:blocks 64 :fetches 64 :p50 8795 :p90 11122 :io-ms 8429 :ok "3/3"}
+                    {:blocks 128 :fetches 128 :p50 18360 :p90 23690 :io-ms 17927 :ok "3/3"}
+                    {:blocks 256 :fetches 256 :p50 36333 :p90 45981 :io-ms 35582 :ok "3/3"}]
+             :ms-per-block-at-256 142 :io-share-at-256 0.98}
+  :packed {:client-loadavg [22.16 20.17 22.10]
+           :rows [{:blocks 32 :fetches 1 :p50 299 :p90 747 :io-ms 128 :ok "3/3"}
+                  {:blocks 64 :fetches 1 :p50 243 :p90 250 :io-ms 111 :ok "3/3"}
+                  {:blocks 128 :fetches 1 :p50 349 :p90 445 :io-ms 186 :ok "3/3"}
+                  {:blocks 256 :fetches 1 :p50 338 :p90 390 :io-ms 119 :ok "3/3"}]
+           :ms-per-block-at-256 1.3}
+  :deliverable? true
+  :usable-unpacked? false
+  :ratio-at-256 {:wall 107.5 :fetches "256 -> 1"}
+  :extrapolation-was "28 s; measured 36.3 s p50 / 46.0 s p90 -- optimistic by 30%"
+  :decision-not-taken "per-block 経路に別の実効上限を切るか、pack の書き手を決めて 256 を pack 前提にするか。Q3d の『誰が pack を書くか』と同じ 1 つの決定"}
+
  :q2-digest-runtime
  {:bench "90-docs/query-plane/bench_digest_runtimes.cljs"
   :harness "90-docs/query-plane/digest-runtime/ （shadow-cljs :target :esm。out/ と node_modules は生成物）"
