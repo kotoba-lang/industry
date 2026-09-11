@@ -5192,3 +5192,14 @@ hyakka-wiki-index.key
 /engine-clone/
 /kotoba-verify/
 /kotoba-cli-build-verifier-runs/
+
+# `orgs/kotoba-lang/logs/` is a Hermes CLI log directory (agent.log / errors.log:
+# `hermes_cli.plugins: Plugin '…' registered …`) that a profile writes into the
+# superproject's orgs/kotoba-lang/ as its cwd. It reached `main` inside a pin-advance
+# commit (984b37a1ec6 swept it in with two probe files), and cleanup then re-landed its
+# growth twice in one day (f578dce7008, bb88b69e692) because every hermes run left the
+# shared checkout dirty on a tracked file — the `:ledger-blocker` shape, for a log.
+# Untracked on 2026-09-11 (the files stay on disk; history keeps the bytes) and ignored
+# here. Gated per `:ignore-rule-gate` against the BASE tree (`git ls-tree -r origin/main`,
+# 235,387 paths): this rule matches exactly the two files being untracked and nothing else.
+/orgs/kotoba-lang/logs/
