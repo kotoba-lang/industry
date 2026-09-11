@@ -1,0 +1,116 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609119000-outer-index-and-partition-aligned-packs-what-the-lakes-do")
+  (:adr/topic "pack-index-and-the-lake-formats")
+  (:adr/title "外の index は commit 時に writer が書き、pack は index の単位に揃える —— Parquet / Arrow / Iceberg / Paimon / RisingWave の分業をこの物理層に写像し、co-scientist で測る")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/ayatori" "kotoba-lang/arrangement"
+                "kotoba-lang/io-ipld-car" "net-kotobase/ipfs"))
+  (:adr/related (vector "adr-2608160100-block-car-pack-object"
+                "adr-2609109900-the-slope-the-runtime-and-the-detector"
+                "adr-2809041800-ayatori-coscientist-iteration-01-round-trips"
+                "adr-2809051000-ayatori-coscientist-iteration-02-async-block-source"
+                "adr-2606141500-keiei-arbor-coscientist-engine"
+                "adr-2607132300-design-quality-score"))
+  (:adr/validation (map
+    (:kind "design analysis with predictions stated BEFORE measurement; the measurement is ayatori co-scientist iteration 11")
+    (:judge "orgs/kotoba-lang/ayatori bench/fitness -- round trips and bytes, never wall clock; two arms must return the same rows or the harness exits 2")
+    (:read-not-measured (vector "Parquet page index" "Iceberg manifest stats" "Paimon LSM levels" "Hummock meta service" "Delta / Hudi / ORC / Lance" ))))
+  (:adr/body "## Context
+
+オーナーの問い（2026-09-11）: 「手前に index を作っておく、index ごとに pack も作っておく、
+などは？ Arrow / Parquet / Iceberg / Paimon / RisingWave などの手法を分析比較すると」。
+
+直前の実測（ADR-2609109900 Q3h）: 102 MB の CARv2 pack を 4 MiB の window で読むと
+32 block の traversal が **3 request** で済み、round trip は pack の大きさに依らなかった。
+効いた理由は **root-first で書いたから** head window が root と最初の約 40 leaf を運んだ
+ことで、それは write 側で locality を作った結果である。data lake 系はそれを体系化して
+20 年やっている。ここに写像する。
+
+## 比較 —— index はどこに、いつ、何を持つか
+
+    system       index の場所                       作る時点     読みの単位          持つもの                   compaction
+    Parquet      file 末尾 footer + page index      write 時     row group/chunk/page offset + min/max/null, bloom  無し（上位 table format）
+    Arrow IPC    file 末尾 footer                   write 時     record batch       offset のみ                無し（in-memory/交換）
+    ORC          stripe index + footer              write 時     stripe / row index  min/max, bloom             無し
+    Iceberg      別 file の manifest tree           commit 時    data file          file ごとの column stats   bin-pack rewrite, z-order
+    Delta        transaction log + checkpoint       commit 時    data file          file stats, deletion vec   OPTIMIZE, z-order
+    Hudi         timeline + metadata table          commit 時    file group         record-level index まで    CoW/MoR, clustering
+    Paimon       manifest tree + bucket ごとの LSM   commit 時    sorted run         key range, bloom, del vec  LSM leveled
+    RisingWave   meta service が LSM version を集中  commit 時    SST の block       key range(外)+offset(内)   compactor が別 service
+    ここ（今）    CARv2 tail index + root 名の R2 key  pack 時      frame              multihash -> offset のみ   無し
+
+共通形は 1 つ:
+
+    外の index（どの file か）  ->  内の index（file のどこか）  ->  range read（隣接なら coalesce）
+    commit 時に writer が書く      file 末尾に在る                1 回
+
+**外の index は read 時に発見するものではなく、commit 時に writer が書くもの** —— 表の
+左 2 列を全 system が同じ答えで埋めている。今日の実装は「内」だけで、「外」は root の
+名前で R2 を叩く退化形である。
+
+## 写像
+
+    lake                        ここ                                    状態
+    immutable data file         CARv2 pack                              在る（CID。lake より強い不変性）
+    file 内 footer              CARv2 tail index                        在る（stats を入れる場所が規格に無い）
+    metadata pointer/snapshot   IPNS head / commit CID                  在る
+    manifest tree/meta service  datom 面の pack catalog（ADR-2608160100）  書き手が居ない
+    partition/bucket/key range  prolly-tree の subtree / root から届く DAG 在るが pack に揃えていない
+    LSM L0                      novelty pack（ADR-2608160100 の window W）   決定済み、未実装
+    compactor                   loop / bot                              無し
+    block cache                 trampoline の request 内 cache          request を跨がない
+
+**datom 面には partition が既に在る**: `arrangement` の prolly tree は content-defined split の
+Merkle B-tree で、内部 node がそのまま index、leaf の並びが sorted run —— LSM の run と
+構造的に同じもの。「index ごとに pack」は **1 内部 node の下の sibling leaf 群 = 1 pack**
+に対応する。
+
+## 各手法から取るもの・取らないもの
+
+- **Iceberg**: stats を manifest に持って data を読まずに prune する。CARv2 index には
+  stats の場所が無いので **stats は catalog（datom 面）に** —— Iceberg も stats は Parquet
+  footer ではなく manifest に持つ。同じ分業。
+- **Paimon / Hummock**: compaction は bin-pack ではなく **LSM**。novelty chain は append が
+  多く小さい。catalog の entry swap が compaction を安全にし、ここでは新しい catalog root の
+  CID を commit するだけなので atomic は構造から出る。
+- **RisingWave**: compactor を query path から分離（別 service = ここでは loop）。meta を
+  1 箇所で version 管理（= kotobase の datom 面）。
+- **Arrow**: 取らない。in-memory / 交換の層で、ここでは decode 済み node と arrangement の
+  4 index の位置。pack の問いではない。
+- **Parquet の page index**: 内の index に stats を足すのは規格外なので**やらない**。
+  2 つの index に同じ事実を持たせない（catalog は projection、消しても pack から再構築できる）。
+
+## 仮説 —— 測る前に書く（co-scientist の規律）
+
+judge は ayatori の `bench/fitness`: round trip と bytes を数え、wall clock は使わず、
+2 つの arm が同じ行を返さなければ exit 2。iteration 03 の価格モデルは
+`per-object = 2N`、`packed = 3P + N`（catalog P + open 2P + block ごとに 1 range）。
+
+**H1（coalesce / window）** `ayatori.pack/read-block` を「located frame から read-ahead
+分を 1 range で読み、その中の whole frame を全部 cache に入れる」に変える。
+- **H1a 予測（hash 順の pack）**: reads は変わらない（window が運ぶのは無関係な frame）、
+  bytes は増える。**locality が無ければ window は純粋な over-fetch。**
+- **H1b 予測（root-first / BFS 順の pack）**: N の項が「連続 run の数」に落ちる。
+  fitness の形（N=6, P=1 の single pack）で reads 6 -> 2〜3。
+
+**H2（partition-aligned pack）** prolly の内部 node ごとに sibling を 1 pack に。
+range query の P が depth（3）から `1 + 触った leaf 区間数` に。H1b の順序付けの
+一般形であり、fitness では BFS 順がその近似になる。
+
+**H3（catalog の stats で prune）** catalog entry に key range を持たせ、交差しない pack を
+開かない。point lookup の P が 1 に。
+
+**H4（LSM）** L0 = novelty pack、上位は key range で merge。read amplification =
+L0 の run 数 + 1（Paimon の実測が示す L0 の敵）。
+
+この iteration で測るのは H1a / H1b。H2〜H4 は seed として残す。
+**予測が外れたらそれを記録する** —— iteration 01 が H1 を「部分的に反証」した形で。
+
+## 結果
+
+ayatori `bench/coscientist-iteration-11.edn` が持つ。この ADR には写さない ——
+数値は測った日のものであり、次の iteration が動かす。
+")))
