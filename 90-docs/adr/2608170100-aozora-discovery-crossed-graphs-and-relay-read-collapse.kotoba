@@ -344,7 +344,7 @@ curl -sS -X POST https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.datoms 
 curl -sS 'https://appview.aozora.app/xrpc/com.etzhayyim.yoro.feed.getDiscoverFeed?limit=5'
 
 # appview の test（:kotobase-test はこの pin で壊れている）
-cd <app-aozora-engine> && npx shadow-cljs compile appview-test && node out/appview-tests.js
+cd <app-aozora-engine> && amu compile --target wasm32-browser appview-test && node out/appview-tests.js
 
 # --- 診断に使った観測（2026-08-17） ---
 

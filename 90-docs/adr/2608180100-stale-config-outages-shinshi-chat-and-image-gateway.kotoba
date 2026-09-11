@@ -200,7 +200,7 @@ ADR.
   cap thinking. That ADR also records the authority change that lets a corrected
   registry reach running Bots without a browser.
 - The receipt mirror is refreshed by hand
-  (`nbb scripts/endpoint-health-pull.cljs`). Nothing schedules it. Bots only run
+  (`kbb --backend sci scripts/endpoint-health-pull.cljk`). Nothing schedules it. Bots only run
   while the workspace machine is live, so the window this misses is small, but a
   reader who ignores `:mirror-age-minutes` will still mistake a stale mirror for
   a quiet fleet.")))

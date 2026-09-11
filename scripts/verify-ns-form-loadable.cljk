@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-ns-form-loadable.cljk — `ns` forms that cannot macroexpand,
 ;; in files no test loads.
 ;;
 ;; ADR-2609101200. Found by accident while swapping a JSON library: every rewire
-;; was checked with one line per edited namespace, `clojure -M -e '(require
+;; was checked with one line per edited namespace, `kbb -M -e '(require
 ;; (quote <ns>))'`, and five repos were loaded that way. Five failed, none
 ;; because of the change. Two of the five failed at the `ns` form itself:
 ;;
@@ -28,7 +28,7 @@
 ;; is malformed in the way we can see without one", which is a smaller claim
 ;; than "these namespaces load".
 ;;
-;;   nbb scripts/verify-ns-form-loadable.cljk [--findings] <dir>...
+;;   kbb --backend sci scripts/verify-ns-form-loadable.cljk [--findings] <dir>...
 ;;
 ;; exit 0 clean / 1 findings / 2 REFUSED (could not answer)
 

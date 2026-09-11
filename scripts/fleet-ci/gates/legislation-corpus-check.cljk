@@ -1,14 +1,14 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; legislation-corpus-check.cljs — etzhayyim/global-legislation-datoms の gate。
 ;;
-;; ノード側で `npx nbb legislation-corpus-check.cljs <repo-dir>` として走る
+;; ノード側で `kbb --backend sci legislation-corpus-check.cljk <repo-dir>` として走る
 ;; （tick.cljs が heredoc で配って呼ぶ）。**JVM を要求しない。**
 ;;
 ;; なぜ JVM gate ではないか（実測 2026-08-05、推測ではない）:
 ;; この repo の contract test は Datascript を要求し、Datascript は maven 依存。
 ;; fleet のノードは tailnet だけに繋がっていて外向き HTTPS が無く、
 ;; `~/.m2/repository/datascript/` は zebulun にも asher にも存在しない。
-;; したがって :jvm-test は `clojure -M:test` の依存解決で必ず落ちる。
+;; したがって :jvm-test は `kbb -M:test` の依存解決で必ず落ちる。
 ;; ここは Datalog エンジン抜きで成立する不変条件だけを検査する。
 ;;
 ;; 検査するもの:

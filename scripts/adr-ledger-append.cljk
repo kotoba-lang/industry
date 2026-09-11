@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/adr-ledger-append.cljk — append-only amendment log for accepted
 ;; 90-docs/adr/*.edn entries.
 ;;
@@ -27,14 +27,14 @@
 ;; takeover so a crashed process can't wedge future appends forever.
 ;;
 ;; Usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/adr-ledger-append.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-ledger-append.cljk \
 ;;     --adr 2607173000 --type amend \
 ;;     --summary "short one-line summary" \
 ;;     --body "longer free-text note (optional)" \
 ;;     --related 2607181900,2607100100 \
 ;;     --actor "Jun Kawasaki"
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/adr-ledger-append.cljk --verify
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-ledger-append.cljk --verify
 ;;     — checks :event/seq is unique+monotonic and every :adr/id referenced
 ;;       by an event actually exists under 90-docs/adr/*.edn. exit 1 on
 ;;       failure.
@@ -276,8 +276,8 @@
       verify (verify!)
 
       (or (str/blank? adr) (str/blank? type) (str/blank? summary))
-      (do (println "usage: nbb scripts/adr-ledger-append.cljk --adr <id> --type <amend|status-change|supersede|note> --summary \"...\" [--body \"...\"] [--related id1,id2] [--actor \"...\"]")
-          (println "       nbb scripts/adr-ledger-append.cljk --verify")
+      (do (println "usage: kbb --backend sci scripts/adr-ledger-append.cljk --adr <id> --type <amend|status-change|supersede|note> --summary \"...\" [--body \"...\"] [--related id1,id2] [--actor \"...\"]")
+          (println "       kbb --backend sci scripts/adr-ledger-append.cljk --verify")
           (exit 1))
 
       :else (append-event! opts))))

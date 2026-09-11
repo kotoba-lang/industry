@@ -19,7 +19,7 @@ cd langchain-store
 **JVM:**
 
 ```bash
-clojure -M:ci:test
+kbb -M:ci:test
 ```
 
 ```
@@ -32,7 +32,7 @@ Ran 13 tests containing 40 assertions.
 **ClojureScript（README が primary gate と呼んでいる方）:**
 
 ```bash
-clojure -Sdeps '{:paths ["src" "test"]}' -M:cljs \
+kbb -Sdeps '{:paths ["src" "test"]}' -M:cljs \
   -m cljs.main --target node -m langchain-store.cljs-runner
 ```
 
@@ -48,7 +48,7 @@ Ran 13 tests containing 40 assertions.
 > （`kotoba-lang/langchain`）を指しているので、cljs のコマンドは alias 無しでも
 > 解決する（実測）。`:ci` が差し替えるのは **pin だけ**で、sibling checkout の
 > 無い環境で main tip に合わせるためにある。monorepo の中に居るなら素の
-> `clojure -M:test` でよい。
+> `kbb -M:test` でよい。
 
 初回は maven の解決で数分かかる。2 回目以降は数秒。
 
@@ -56,7 +56,7 @@ Ran 13 tests containing 40 assertions.
 
 ## 2. 消費者として使う（10 行）
 
-`/tmp/smoke.clj` に置いて `clojure -M:ci -e '(load-file "/tmp/smoke.clj")'`:
+`/tmp/smoke.clj` に置いて `kbb -M:ci -e '(load-file "/tmp/smoke.clj")'`:
 
 ```clojure
 (require '[langchain.db :as d] '[langchain-store.core :as ls])
@@ -165,4 +165,4 @@ README の "Things this library deliberately does not do" の運用上の要点:
 | 更新したのに古い値が返る | §3。`identity-schema` を通していない |
 | `append-blob!` で前の値が消えた | §2。同じ seq に 2 度書いている |
 | `pull->map` が `ArityException` | 引数は 3 つ（`spec` `id-key` `pulled`） |
-| 初回の `clojure -M:ci:test` が数分止まる | maven の初回解決。2 回目以降は数秒 |
+| 初回の `kbb -M:ci:test` が数分止まる | maven の初回解決。2 回目以降は数秒 |

@@ -35,10 +35,10 @@
                      (:third-item-ignored-until-sync true) (:recovered true)))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "2-item single-Sync success; mid-batch 22012; recovery; exit 0"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "descriptor count/truncation/limit negative fixtures; exit 0"))))))
   (:adr/body
   "# ADR-2607196800: Bounded PostgreSQL extended batch pipeline

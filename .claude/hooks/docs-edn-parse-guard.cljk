@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; PreToolUse(Bash) ガード: `git commit` / `git push` の前に、変更された
 ;; `90-docs/**/*.edn` をパースし、**このコミットで新たに壊れた**ものがあれば deny する。
 ;;
@@ -142,7 +142,7 @@
                                   (str "  " path "\n    " problem)))
                  "\n\nよくある原因は 1 つです: 文字列の本文に生の `\"` を書いたこと。"
                  "`\\\"` にエスケープしてください（例: `\"#ffffff\"` → `\\\"#ffffff\\\"`）。\n"
-                 "確認: nbb --classpath \".:scripts/nbb_compat\" manifest/docs-edn-only.cljk verify\n"
+                 "確認: kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/docs-edn-only.cljk verify\n"
                  "既存の壊れたファイル（known-parse-errors の 7 件）は対象外です ── "
                  "止めているのは『今日新たに壊れたもの』だけです。"))))
       (allow!)))

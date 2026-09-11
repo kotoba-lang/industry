@@ -37,7 +37,7 @@
                      (:session-state "I")))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "opaque one-shot cancellation; SQLSTATE 57014; exit 0"))))))
   (:adr/body
   "# ADR-2607196300: Opaque one-shot PostgreSQL cancellation authority

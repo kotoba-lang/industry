@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; babashka-facade-check.cljs — fail if a repo still advertises the retired `bb` binary.
 ;;
 ;; ADR-2607173000 retired babashka as this workspace's script host. ADR-2608131600's census
@@ -23,7 +23,7 @@
 ;; Also fails on a surviving bb.edn or *.bb in the tree, since those are the same claim in a
 ;; different file.
 ;;
-;; Run on a node as: npx nbb babashka-facade-check.cljs <dir> [--min-tasks N]
+;; Run on a node as: kbb --backend sci babashka-facade-check.cljk <dir> [--min-tasks N]
 ;; <dir> FIRST — several gates take the tree as the first non-flag argument and this one matches
 ;; that convention deliberately (ADR-2608102000 records three gates misdiagnosed as broken because
 ;; a flag was read as the tree path).

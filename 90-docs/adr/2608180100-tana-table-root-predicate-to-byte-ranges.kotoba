@@ -165,7 +165,7 @@ Iceberg の manifest-list / manifest 分割と同じ形に、同じ圧力から�
 
 ## 検証
 
-- `clojure -M:test` と `npm run test:nbb` — **36 tests / 1,093 assertions、両方 green**、
+- `kbb -M:test` と `npm run test:nbb` — **36 tests / 1,093 assertions、両方 green**、
   かつ**ノード `levi` でも green**（`test-tana-…-murakumo-levi`、receipt `76d8591167ea`）。
 - **8 つの実欠陥で赤にし、戻して緑に戻ることを実際に見た**: 統計不在が skip を許す
   （2 failures）/ `:trust` が既定値に落ちる（1）/ range が 1 byte 長い（1）/

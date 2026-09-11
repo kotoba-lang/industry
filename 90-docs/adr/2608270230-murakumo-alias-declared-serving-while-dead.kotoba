@@ -147,7 +147,7 @@ ring (8090) は 8 件。ring の性能は 12.83 -> 12.49 tok/s で有意差な�
    (bb4b6db7) と同型の問題で、前例は昨日 landed 済み。これが開けば下記 3 も片付く。
 3. alias の context 262144 -> 524288、qwen3.8-27b の registry 登録 (現在 404)。
 4. 現在地の確認コマンド:
-   `nbb scripts/murakumo-default-model.cljs status`
+   `kbb --backend sci scripts/murakumo-default-model.cljk status`
    (exit 0=一致 / 2=測れなかった。2 なら出力に応答した model 名が出る)
 
 ## この session で landed したもの

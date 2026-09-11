@@ -22,7 +22,7 @@
 (deftest artifact-is-current
   (testing "the shipped KIR is what the source compiles to now"
     (is (= (gen/compile-kir) o/triage-core)
-        "artifact drifted from kotoba/triage_core.kotoba — run `clojure -M:gen`")))
+        "artifact drifted from kotoba/triage_core.kotoba — run `kbb -M:gen`")))
 
 (deftest classifies-the-report
   (testing "the takeover stem catches 乗っ取られた, which 乗っ取り does not"

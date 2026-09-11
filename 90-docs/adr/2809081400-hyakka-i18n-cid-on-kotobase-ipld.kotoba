@@ -174,9 +174,9 @@
 
   | slice | repo / PR | 内容 | 検証 |
   |---|---|---|---|
-  | a + b | kotoba-lang/i18n-cid PR#1 | `i18n-cid.pin`（IPFS PSA `/pins`）+ `i18n-cid.pack`（CARv2） | clojure -M:test 13/45 |
+  | a + b | kotoba-lang/i18n-cid PR#1 | `i18n-cid.pin`（IPFS PSA `/pins`）+ `i18n-cid.pack`（CARv2） | kbb -M:test 13/45 |
   | c | network-awai/app-hyakka PR#860 | `hyakka.i18n` + `hyakka.i18n.admit`（UI 文言・ラベル → lake admit） | nbb 8/44（実 snapshot round-trip） |
-  | d | cloud-itonami/cloud-itonami-translation PR#2 | `translation.publish`（governor 検品 → i18n-cid block → IPFS pin → lake） | clojure -M:test 36/110 |
+  | d | cloud-itonami/cloud-itonami-translation PR#2 | `translation.publish`（governor 検品 → i18n-cid block → IPFS pin → lake） | kbb -M:test 36/110 |
 
   **etzhayyim 参照はこの統合の成果物（ADR・コード）からすべて除去**し、翻訳生成・検品側を
   cloud-itonami-translation（itonami 配下、既存）に一本化した。外部翻訳ベンダ API に直結せず
@@ -187,7 +187,7 @@
 
   ## 残る検証（未完了、正直に記録）
 
-  - **app-hyakka の shadow-cljs フルビルド（`shadow-cljs release worker`）のみ未検証**。
+  - **app-hyakka の shadow-cljs フルビルド（`amu compile --target wasm32-browser worker`）のみ未検証**。
     この統合の実装環境（/tmp worktree）では `.kotoba`（hyakka.article 等）の amu/kbb 事前
     コンパイル + deps.edn の west 相対パス（`../../kotoba-lang/*`）が解決できず落ちる。
     これは slice c と無関係の環境制約（slice c が無い main でも同じ）。

@@ -6,7 +6,7 @@
 ;; tick.cljs が選ぶ）。
 ;;
 ;; :gate kinds
-;;   :jvm-test   deps.edn の :test alias（cognitect test-runner）を clojure -M:test で回す
+;;   :jvm-test   deps.edn の :test alias（cognitect test-runner）を kbb -M:test で回す
 ;;               → node cap :jvm 必須
 ;;   :nbb-test   nbb のテストエントリを回す（:classpath / :entry）
 ;;               → node cap :node 必須
@@ -116,7 +116,7 @@
  ;;
  ;; Admission for a flip is therefore four measurements, not one:
  ;;   1. `Ran N tests containing M assertions` is IDENTICAL under
- ;;      `clojure -M:test` and under `nbb --classpath <cp> <entry>`.
+ ;;      `kbb -M:test` and under `kbb --backend sci --classpath <cp> <entry>`.
  ;;   2. The nbb entry exits non-zero with the subject broken and zero with it
  ;;      intact -- and the reported failure is the thing that was broken.
  ;;   3. deps.edn has no cross-repo dep the test path needs: the gate ships one
@@ -151,11 +151,11 @@
  ;;     sakkyokuka                     6 / 15
  ;;
  ;;   4. The runner covers the whole suite:
- ;;        nbb --classpath ".:scripts/nbb_compat" \
+ ;;        kbb --backend sci --classpath ".:scripts/nbb_compat" \
  ;;          scripts/verify-cljs-runner-completeness.cljk --repo orgs/<org>/<name>
  ;;      reports it complete. Condition 1 catches this today only because someone
  ;;      thought to run both sides and compare; the detector is what makes it hold
- ;;      after the flip, when nothing runs `clojure -M:test` any more and there is
+ ;;      after the flip, when nothing runs `kbb -M:test` any more and there is
  ;;      no second number to compare against. Measured 2026-08-17: 22 of the 201
  ;;      repos with a ClojureScript runner do not pass it.
  ;;
@@ -170,7 +170,7 @@
  ;;                     prints no `Ran N tests` line at all (the gate's own
  ;;                     floor, exit 93, would reject it). Both halves are real
  ;;                     coverage; dropping either loses tests.
- ;;   org-ietf-cbor     its cljs half is `shadow-cljs compile` -- a JVM build.
+ ;;   org-ietf-cbor     its cljs half is `amu compile --target wasm32-browser` -- a JVM build.
  ;;                     No nbb entry exists yet.
  ;;   io-multiformats   NOT flipped, and it does not need to be: it has TWO
  ;;                     entries now, `:jvm-test` here and the
@@ -201,15 +201,15 @@
   ;; dougaka actor (cloud-itonami). Base deps resolve with git alone since
   ;; 1a17b37 (langgraph pinned by sha; :dev keeps the sibling override), which
   ;; is what let it in — measured 2026-08-23 from a sibling-less clone:
-  ;; `clojure -M:test` → Ran 38 tests containing 278 assertions. No ffmpeg in
+  ;; `kbb -M:test` → Ran 38 tests containing 278 assertions. No ffmpeg in
   ;; this suite. The engine (ai-gftd-dougaka) is NOT here: its deps.edn sits
   ;; under clj/ and its suite runs ffmpeg, which no node cap declares.
   {:name "ai-gftd-dougaka-actor" :gate :jvm-test :cd false}
   ;; user-test carried an untracked .github/workflows/ci.yml in the shared
-  ;; checkout -- `clojure -M:test` + `-M:lint` on push. Actions are retired
+  ;; checkout -- `kbb -M:test` + `-M:lint` on push. Actions are retired
   ;; repo-wide (ADR-2607300900) and disabled per repo, so that file was inert
   ;; intent, not CI. Registered here instead. Measured 2026-08-19 before
-  ;; landing: `clojure -M:test` prints "Ran 8 tests containing 19 assertions.
+  ;; landing: `kbb -M:test` prints "Ran 8 tests containing 19 assertions.
   ;; 0 failures, 0 errors." and exits 0, which is the :jvm-test contract.
   {:name "user-test" :gate :jvm-test :cd true}
   {:name "org-ietf-ed25519" :gate :jvm-test :cd true}
@@ -259,7 +259,7 @@
   ;;
   ;; Verified by hand on this machine before switching: with
   ;; `src:test:$HOME/.gitlibs/libs/<lib>/<sha>/src…` and npm deps installed, the
-  ;; suite is 16 tests / 54 assertions, 0 failures — the same as `clojure -M:test`.
+  ;; suite is 16 tests / 54 assertions, 0 failures — the same as `kbb -M:test`.
   ;; NOT verified on a node; that is what this canary is for.
   ;;
   ;; If it goes red: revert this entry to `:gate :jvm-test :cd true` and read the
@@ -317,7 +317,7 @@
   ;; assertions, 0 failures, measured 2026-09-06.
   {:name "org-signal" :gate :jvm-test :cd true}
   ;; kotoba-lang/security is deliberately NOT here yet, and the reason is a
-  ;; measurement rather than an oversight. `clojure -M:test` is 230 tests /
+  ;; measurement rather than an oversight. `kbb -M:test` is 230 tests /
   ;; 1128 assertions with ONE failure -- `release-ready-holds-in-a-real-workspace`
   ;; in release_supply_chain_test.clj, where five products report
   ;; :supply-chain/dependency-digest -- and it exits 1, so this gate would be
@@ -347,8 +347,8 @@
   ;; through amu and runs it on the KIR interpreter, so this entry is also the
   ;; only continuous check that the port still reproduces the evaluator.
   ;;
-  ;; Measured here 2026-08-18 before landing: `clojure -M:test` 0 failures /
-  ;; 0 errors, `clojure -M:lint` 0 errors / 0 warnings, and the gate shown red
+  ;; Measured here 2026-08-18 before landing: `kbb -M:test` 0 failures /
+  ;; 0 errors, `kbb -M:lint` 0 errors / 0 warnings, and the gate shown red
   ;; twice on deliberate breaks with the failure naming what was broken.
   ;;
   ;; NOT yet observed green on a node -- that is what this entry is for, and
@@ -417,7 +417,7 @@
    :min-files 140 :cd true}
   ;; ---- the accounting plane (ADR-2608171800) --------------------------
   ;;
-  ;; Four iterations of work landed here checked only by `clojure -M:test` on
+  ;; Four iterations of work landed here checked only by `kbb -M:test` on
   ;; one workstation. CLAUDE.md's rule is that a gate is not landed until it
   ;; has gone green on the fleet once, and none of these had ever run there.
   ;;
@@ -674,7 +674,7 @@
   ;; an extension filter that dropped it would leave the decoder untested while
   ;; the gate stayed green. Verified against the shipped tree rather than the
   ;; working copy -- `git archive HEAD | tar -x` into a clean directory, then
-  ;; `clojure -M:test`: 12 tests, 39 assertions, 0 failures. Breaking the
+  ;; `kbb -M:test`: 12 tests, 39 assertions, 0 failures. Breaking the
   ;; encoder's chunk-type bytes in that same tree gives 9 errors, so the gate
   ;; discriminates in the tree the fleet actually ships.
   {:name "org-w3-png" :gate :jvm-test :cd true}
@@ -695,7 +695,7 @@
   ;; dev-protobuf is :nbb-test, and the three admissions at the head of :repos
   ;; were measured 2026-08-17 rather than assumed:
   ;;   1. `Ran 18 tests containing 66 assertions` -- IDENTICAL under
-  ;;      `clojure -M:test` and `nbb --classpath src:test test/run.cljs`
+  ;;      `kbb -M:test` and `kbb --backend sci --classpath src:test test/run.cljs`
   ;;   2. removing the varint guard exits 1 and names the two tests about it;
   ;;      restoring it exits 0
   ;;   3. deps.edn is `{}` -- zero dependencies, so a one-repo tree is enough
@@ -741,7 +741,7 @@
   ;; measured. These sixteen are the measurement.
   ;;
   ;; Every one was run to completion on judah, from a fresh clone, with
-  ;; `clojure -M:test` and its own deps resolved on the node:
+  ;; `kbb -M:test` and its own deps resolved on the node:
   ;;
   ;;   arrangement            46 tests /  207 assertions    ayatori               35 /   62
   ;;   datalog                91 /  163                     gremlin               23 /   37
@@ -768,7 +768,7 @@
   ;; being seen green on a real node through the scheduler.
   ;;
   ;; Two of the 26 are deliberately absent:
-  ;;   kotobase-client  no `:test` alias at all -- `clojure -M:test` opens a
+  ;;   kotobase-client  no `:test` alias at all -- `kbb -M:test` opens a
   ;;                    REPL. Its suite is `.cljs`, so it needs an nbb entry
   ;;                    and an `:nbb-script` gate, not this.
   ;;   chain            already gated above.
@@ -850,7 +850,7 @@
   ;; replaced with a double: a double would have proved projection against a
   ;; model of a store instead of the store). Conflicts went to zero, and the
   ;; gate script now reports 34 tests / 130 assertions with no CONFLICT line --
-  ;; the same counts `clojure -M:test` reports.
+  ;; the same counts `kbb -M:test` reports.
   {:name "kotobase-projection" :id "nbb-cross-runtime-kotobase-projection"
    :gate :nbb-script :script "gates/nbb-cross-runtime.cljk" :ship-git-deps true
    :include-ext [".kotoba" ".cljs" ".cljc" ".clj" ".edn" ".json" ".cljk"] :min-files 5 :cd true}
@@ -1062,7 +1062,7 @@
   ;;
   ;; That made it measurable, and the measurement says nbb must not gate it:
   ;;
-  ;;   shadow-cljs compile test  81 tests / 258 assertions, 0 failures
+  ;;   amu compile --target wasm32-browser test  81 tests / 258 assertions, 0 failures
   ;;   nbb                       60 / 187, 9 failures + 1 error
   ;;
   ;; Compiled ClojureScript is what it ships to (the aozora Workers,
@@ -1075,7 +1075,7 @@
   ;; **The real blocker is a gate type this file does not have.** These two
   ;; repos are `.cljs` with no reader conditionals and no JVM half, so
   ;; `:jvm-test` is meaningless and `:nbb-script` is wrong. What they need is
-  ;; their own `npm test` -- `shadow-cljs compile test && node out/…` -- which
+  ;; their own `npm test` -- `amu compile --target wasm32-browser test && node out/…` -- which
   ;; is a JVM build producing a compiled artifact, and nothing in fleet-ci
   ;; invokes that today. org-ietf-cbor's `test:cljs` is the same shape.
   ;;
@@ -1112,7 +1112,7 @@
   ;; This repo ships COMPILED artifacts (resources/kotoba/selfhost/oracle/*.kir.edn)
   ;; that production loads, and the source they came from (kotoba/*.kotoba). The
   ;; failure that only a gate can catch is drift between the two: editing a
-  ;; .kotoba and forgetting `clojure -M:test:gen` leaves production executing the
+  ;; .kotoba and forgetting `kbb -M:test:gen` leaves production executing the
   ;; OLD decision while every source-compiling test still passes. Locally that
   ;; needs someone to remember; here it does not.
   ;;
@@ -1130,7 +1130,7 @@
   ;; Exactly the same drift shape as kotoba-selfhost-contracts above, for the
   ;; same reason: production loads resources/kotodama/oracle/*.kir.edn and the
   ;; source it came from is kotoba/*_core.kotoba. Editing a core and forgetting
-  ;; `clojure -M:test:gen` leaves the server executing the OLD decision while
+  ;; `kbb -M:test:gen` leaves the server executing the OLD decision while
   ;; the semantics tests — which read the shipped artifact — keep passing. That
   ;; specific failure is invisible to every test except the authority check, and
   ;; the authority check only runs if something runs it.
@@ -1205,7 +1205,7 @@
   ;; 差を見ているので、条件4 だけを見て候補を選ばないこと。
   ;;
   ;; 実測（2026-08-18、いずれも ongaku の checkout で）:
-  ;;   clojure -M:test              Ran 30 tests containing 111 assertions, 0 failures
+  ;;   kbb -M:test              Ran 30 tests containing 111 assertions, 0 failures
   ;;   nbb … test/run_portable.cljs Ran 30 tests containing 111 assertions, 0 failures
   ;;   territory-covers? の every? を some に変えると 2 failures / exit 1、
   ;;   無改変で exit 0。
@@ -1402,7 +1402,7 @@
   ;;
   ;; 走ることは **fleet が配る形そのもので** 確認済み（推測ではない）:
   ;; `git archive origin/main | tar -x` した tree —— `.git` も `orgs/` も無い ——
-  ;; で `clojure -M:test` が 2,189 tests / 12,993 assertions を走らせ、worktree で
+  ;; で `kbb -M:test` が 2,189 tests / 12,993 assertions を走らせ、worktree で
   ;; 走らせたときと **同一の結果**（13 failures, 0 errors）を返した。つまり
   ;; `.git` にも sibling にも依存していない。:test alias の :local/root は :dev
   ;; だけに閉じている（"Release and CI never use this"）。
@@ -1823,7 +1823,7 @@
   ;; entity 数）は projection contract に移した:
   ;;   manifest/projections/permits.edn → 既存の `root-projection-rebuild` が回す
   ;; 鮮度（上流 facts.cljc への追随）は `orgs/` が実在する場所で
-  ;;   nbb --classpath ".:scripts" scripts/gen-permit-index.cljk --check
+  ;;   kbb --backend sci --classpath ".:scripts" scripts/gen-permit-index.cljk --check
   ;; を回す運用側の仕事として残す。gate は嘘をつけない範囲だけを持つ。
 
   ;; 「クリーニング営み」(ISIC 9601 idle tycoon) の主張の機械検査。
@@ -1896,7 +1896,7 @@
   ;;    （0 pass / 274 fail、ADR-2608124800）、break/unbreak の記録も無かった ——
   ;;    つまり **どちらの向きにも discriminate することが示されていなかった**。
   ;;    現在は 16 ケースの機械証明がある:
-  ;;      nbb scripts/fleet-ci/gates/observatory-registry-discriminate.cljk .
+  ;;      kbb --backend sci scripts/fleet-ci/gates/observatory-registry-discriminate.cljk .
   ;;    検査を足したらケースも足す。落ちない gate は劇場。
   {:name "root" :id "root-observatory-registry" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/observatory-registry-check.cljk" :script-args ["--min" "10"]
@@ -2276,7 +2276,7 @@
   ;; protocols-worker（kotobase.net の protocol 面）の upstream lock 契約。
   ;;
   ;; **この repo の 120 tests は fleet では回せない。** 実測 2026-08-17（ADR-2608170200）:
-  ;; suite は `shadow-cljs compile test && node out/node-tests.js` で、`shadow-cljs.edn` が
+  ;; suite は `amu compile --target wasm32-browser test && node out/node-tests.js` で、`shadow-cljs.edn` が
   ;; `../../../kotoba-lang/<repo>/src` を **26 本**参照する。これは west の兄弟 project で
   ;; repo の外に在り、`git ls-files | grep -c kotoba-lang/` = **0**。fleet が配るのは
   ;; 対象 repo の tree だけで、運ぶ機構も無い（`ship-git-deps!` は deps.edn の `:git/sha`
@@ -2383,7 +2383,7 @@
   ;; で呼ぶだけ。gate 側にロジックを複製しない。**JVM を PATH から隠して回し、
   ;; stub が 1 度でも呼ばれたら fail する** — 「JDK 無しで通った」だけでなく
   ;; 「JVM 経路に一度も落ちなかった」まで見る。stale な lock は `bin/kotoba` を
-  ;; `clojure -Spath` に落とすので、その退行がここに出る（実測: PR #500 が
+  ;; `kbb -Spath` に落とすので、その退行がここに出る（実測: PR #500 が
   ;; merge された時点で既に stale だった。open 中に deps.edn の pin が 2 本進んだ
   ;; ためで、**pin が動く頻度からしてこれは通常の腐り方**）。
   ;;
@@ -2394,9 +2394,9 @@
   ;; ⚠ **その理由を「ノードの egress が無い」と書いていたが、実測で誤り。**
   ;; 2026-08-20 に benjamin で測った:
   ;;
-  ;;   clojure -Spath -M:test   exit 0, 2.7s（provider / kototama-native /
+  ;;   kbb -Spath -M:test   exit 0, 2.7s（provider / kototama-native /
   ;;                            kgraph を実際に clone している）
-  ;;   clojure -M:test          74s で完走、1,099 tests / 87 errors
+  ;;   kbb -M:test          74s で完走、1,099 tests / 87 errors
   ;;
   ;; **依存は解決するし suite は走る。** 87 errors の内訳は
   ;; `Cannot run program "wasm-tools"` 82 件と `"wasmtime"` 2 件、残り 3 件が
@@ -2439,7 +2439,7 @@
   ;; 未実行分岐に `.getBytes` を戻しても portable suite は緑のままだった）。
   ;;
   ;; :cap :node —— 兄弟の `amu-native-conformance` が `:cap :jvm` を要るのは
-  ;; `bin/kotoba` が lock を解けないとき `clojure -Spath` に落ちるからで、
+  ;; `bin/kotoba` が lock を解けないとき `kbb -Spath` に落ちるからで、
   ;; :jvm は実質「clojure CLI があるか」。この gate はその fallback を持たず、
   ;; `kotoba.compiler.nbb.classpath/resolve-directories` を直接呼んで解けなければ
   ;; exit 91 で終わる。**JVM から classpath を得たら「JVM 無しで動く」は
@@ -2570,7 +2570,7 @@
   ;; java and Xcode CLT. The ONLY difference is `clojure` — MISSING on naphtali,
   ;; dan and issachar. probe.cljs computes jvm? as (javahome AND clojure), so
   ;; :jvm is exactly "has the clojure CLI", which is why the split is clean.
-  ;; bin/kotoba falls back to `clojure -Spath` when it cannot resolve deps from
+  ;; bin/kotoba falls back to `kbb -Spath` when it cannot resolve deps from
   ;; the lock — the fallback this gate's own header describes — and that fallback
   ;; is what is absent there.
   ;;
@@ -2593,7 +2593,7 @@
   ;; amu の JVM suite。**これが green になって初めて、native の 20 case が
   ;; gate される** —— それまで fleet が見ていた native は
   ;; `jdk-free-native-conformance.cljs` の 3 source だけで、
-  ;; `lang-native-conformance` の 20 case は「誰かが手元で `clojure -M:test` を
+  ;; `lang-native-conformance` の 20 case は「誰かが手元で `kbb -M:test` を
   ;; 打ったときだけ」走っていた。
   ;;
   ;; :cap :wasm-tools —— 今日これを持つのは benjamin 1 台だけ。少なく見えるが
@@ -2617,7 +2617,7 @@
   ;; あって pin を進める根拠ではない（それは 4 gate 全体の話）。
   ;;
   ;; tarball は full（1.0MB、上限 200MB）。deps はノードが自力で解決する
-  ;; （`clojure -Spath -M:test` が provider / kototama-native / kgraph を
+  ;; （`kbb -Spath -M:test` が provider / kototama-native / kgraph を
   ;; clone するのを実測済み）ので :ship-git-deps は要らない。
   {:name "amu" :id "amu-jvm-test" :gate :jvm-test :cap :wasm-tools :cd false}
 
@@ -2792,7 +2792,7 @@
   ;; 200 を返す（誤前提の出所は fleet-ci README の、zebulun 1 台に対する 2026-07-26 の
   ;; 実測）。したがって :jvm-test へ移すことは**可能**。
   ;; それでもこの gate を残す理由は別にある: sha256 照合・シャード件数・辺の向きは
-  ;; Datascript を起動しなくても検査でき、`clojure -M:test` より速く、
+  ;; Datascript を起動しなくても検査でき、`kbb -M:test` より速く、
   ;; **手編集されたシャード**という Actions では捕まえられなかった事象を捕まえる。
   ;; Datascript に実際に載ることの検査は repo 側の local contract が持っている。
   ;;
@@ -2940,7 +2940,7 @@
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".kotoba" ".cljk"]
    :min-files 5 :cd true}
   ;; org-ietf-cbor's SECOND gate. Its `package.json` had a `test:cljs`, and it
-  ;; is `shadow-cljs compile test` -- a JVM build nothing here can invoke.
+  ;; is `amu compile --target wasm32-browser test` -- a JVM build nothing here can invoke.
   ;;
   ;; This one guards a written-down invariant rather than a suspected bug.
   ;; `cbor/core` already knows the hazard four other repos were found carrying
@@ -2986,7 +2986,7 @@
   ;;
   ;; ノード側で実測（2026-08-12 の receipt が残した /tmp/fleet-ci-ws-ymPrc3、
   ;; simeon）: 配られた tree は 11 ファイルで `src/` が存在せず、
-  ;; `clojure -M:test` が `src/association_facts.kotoba (No such file or
+  ;; `kbb -M:test` が `src/association_facts.kotoba (No such file or
   ;; directory)` で落ちていた。`:min-files 5` は yml+edn で満たされるので床にも
   ;; 掛からない。
   ;;
@@ -3042,7 +3042,7 @@
   ;; 13 failures on exactly three nodes and not one pass there; 51 passes on the
   ;; other six. Confirmed over ssh rather than inferred: `command -v clojure`
   ;; is MISSING on dan, issachar and naphtali and present on the rest. This
-  ;; gate's regeneration command is `clojure -M:dev:render-html`, so on those
+  ;; gate's regeneration command is `kbb -M:dev:render-html`, so on those
   ;; three it cannot run at all -- `bash: line 4: clojure: command not found`.
   ;;
   ;; This is the same defect gates.edn already records for
@@ -3265,7 +3265,7 @@
   ;; main へ入った 11 merge（GROUP BY / evolve / Parquet writer / snapshot /
   ;; compaction / N-Triples ほか）は自動検査を一度も受けていない。
   ;;
-  ;; ADR が保留した理由は「`clojure -M:test` が要求する maven 上の Clojure core が
+  ;; ADR が保留した理由は「`kbb -M:test` が要求する maven 上の Clojure core が
   ;; ノードで解決するか未確認」だった。**2026-08-11 に実測して解消した** —
   ;; 6 repo すべてを実ノードへ配って走らせ、210 tests / 735 assertions が green:
   ;;   columnar 36/115 ・ org-apache-parquet 34/163 ・ org-apache-arrow 40/130
@@ -3644,7 +3644,7 @@
    :include-ext [".kotoba" ".cljs" ".cljc" ".edn" ".mjs" ".png" ".cljk"] :min-files 300 :cd false}
 
   ;; 2) テストを定義して一度も実行しないファイル。
-  ;;    `clojure -M test/royale_world_streaming_test.clj` は何も出力せず exit 0 で
+  ;;    `kbb -M test/royale_world_streaming_test.clj` は何も出力せず exit 0 で
   ;;    終わっていた —— footer が無いので load され、deftest は定義され、1本も走らない。
   ;;    **合格と観測上まったく同じ。** 28 ファイル中 4 本がこの状態で、うち 1 本は
   ;;    36 日前から壊れていた。
@@ -3848,7 +3848,7 @@
   ;; **0** on ClojureScript, where `\;` reads as the one-character string.
   ;; Every VFIO ioctl number silently lost its type field --
   ;; VFIO_GET_API_VERSION came out 100 instead of 15204 -- and nothing threw.
-  ;; Verified independently here before landing: `nbb -e "(let [c \;] (int c))"`
+  ;; Verified independently here before landing: `kbb --backend sci -e "(let [c \;] (int c))"`
   ;; prints 0.
   ;;
   ;; `:cd false`, like every other gate landed today, even though this one has

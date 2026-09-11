@@ -4,7 +4,7 @@
 ;; scripts/verify-west-pins.cljk を通すこと(この script は検証をしない)。
 ;;
 ;; usage:
-;;   nbb scripts/advance-pins.cljk <org> <list-file> [--execute]
+;;   kbb --backend sci scripts/advance-pins.cljk <org> <list-file> [--execute]
 ;; --execute が無ければ dry-run(何件動くかだけ表示)。
 (require '[clojure.string :as str]
          '["fs" :as fs]

@@ -78,7 +78,7 @@ decode すると 510）。`fixed32` も上位 octet が 0x80 以上だと負値�
 `dev-protobuf` の呼び手（ipns / kad-dht）は **Cloudflare Worker と browser で動く**。
 つまり ClojureScript が実際の deploy 先である。にもかかわらず:
 
-- README のテスト手順は `clojure -M:test` **のみ**
+- README のテスト手順は `kbb -M:test` **のみ**
 - GitHub Actions は workspace 方針で無効（ADR-2607300900）。最後の run は 2026-08-04
 - **murakumo fleet gate は無し**
 

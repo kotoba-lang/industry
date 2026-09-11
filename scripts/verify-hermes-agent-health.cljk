@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-hermes-agent-health — a bot fleet whose credentials died, reported by
 ;; nobody, for two days.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-hermes-agent-health.cljk [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-hermes-agent-health.cljk [--findings]
 ;;   nbb ... scripts/verify-hermes-agent-health.cljk --self-test
 ;;   nbb ... scripts/verify-hermes-agent-health.cljk --home <dir>     ; fixtures
 ;;

@@ -1,7 +1,7 @@
 ;; Report every 90-docs EDN file that fails to parse, with its reader error.
 ;; docs-edn-only.cljs verify caps its listing at 20; this prints all of them so a
 ;; repair pass can work through the whole set.
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-parse-report.cljk [--count]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/docs-edn-parse-report.cljk [--count]
 (ns docs-edn-parse-report
   (:require ["fs" :as fs]
             ["path" :as path]

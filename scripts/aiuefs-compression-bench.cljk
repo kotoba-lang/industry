@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; The deterministic judge for the aiuefs-v4 co-scientist loop.
 ;;
 ;; It answers ONE question the workspace has never measured: the storage plane
@@ -12,7 +12,7 @@
 ;; across the leaf sizes the physical plane actually uses, and prices the
 ;; security tax that compress-before-encrypt owes (length leakage -> padding).
 ;;
-;;   nbb scripts/aiuefs-compression-bench.cljk --root . --out <file.edn>
+;;   kbb --backend sci scripts/aiuefs-compression-bench.cljk --root . --out <file.edn>
 ;;
 ;; Evidence floor (CLAUDE.md "6 questions"): it prints SCANNED<TAB>n for every
 ;; corpus, refuses to report a result when a corpus scanned zero files, and

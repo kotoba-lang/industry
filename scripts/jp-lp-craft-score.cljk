@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; jp-lp-craft-score.cljs — 日本語 LP の**文体**を測る。
 ;;
 ;; `lp-copy-score.cljs` が「何を言っているか」（否定の密度・register・CTA）を
@@ -34,8 +34,8 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb scripts/jp-lp-craft-score.cljk <url|file> [...]
-;;   nbb scripts/jp-lp-craft-score.cljk --json --body-only <url>
+;;   kbb --backend sci scripts/jp-lp-craft-score.cljk <url|file> [...]
+;;   kbb --backend sci scripts/jp-lp-craft-score.cljk --json --body-only <url>
 
 (ns jp-lp-craft-score
   (:require ["node:child_process" :as cp]
@@ -133,7 +133,7 @@
 
 (defn -main []
   (if (empty? targets)
-    (do (println "usage: nbb scripts/jp-lp-craft-score.cljk <url|file> [...]") (js/process.exit 2))
+    (do (println "usage: kbb --backend sci scripts/jp-lp-craft-score.cljk <url|file> [...]") (js/process.exit 2))
     (let [b? (flag? "--body-only")
           rs (mapv (fn [t] (score t (fetch t) b?)) targets)]
       (if (flag? "--json")

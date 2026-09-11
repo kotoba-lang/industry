@@ -139,7 +139,7 @@ Next、(2) 触ってよい境界、(3) capability CID 契約、を 1 文書に�
 6. **Generated repos は contract-only**  
    実装 Wasm component（digest + signature）が無い限り provider-status は
    `contract-only`。scaffold:  
-   `clojure -M -m scaffold-capability-repos /abs/out [--update]`  
+   `kbb -M -m scaffold-capability-repos /abs/out [--update]`  
    既存 dir の上書きは `--update` のみ。
 
 7. **数値 wire id**  

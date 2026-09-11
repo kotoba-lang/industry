@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gen-lake-manifest.cljs — columnar lake over a datom-plane dataset.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/gen-lake-manifest.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/gen-lake-manifest.cljk \
 ;;       --input 90-docs/system-dynamics/itonami-maturity.datoms.edn \
 ;;       --dataset itonami-maturity \
 ;;       --out-dir 90-docs/lake \
@@ -154,7 +154,7 @@
                  :lake/path (:path c)
                  :lake/sha256 (:sha256 c)}))))
         header (str ";; " out-dir "/" dataset "-lake.datoms.edn — GENERATED, DO NOT HAND-EDIT.\n"
-                    ";; Regenerate: nbb --classpath \".:scripts/nbb_compat\" scripts/gen-lake-manifest.cljk \\\n"
+                    ";; Regenerate: kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/gen-lake-manifest.cljk \\\n"
                     ";;   --input " input " --dataset " dataset "\n"
                     ";;\n"
                     ";; columnar lake の manifest。**値は入っていない** —— 値は\n"

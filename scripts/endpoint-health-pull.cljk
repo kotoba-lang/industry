@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns endpoint-health-pull
   "Bring the resident's statement back to where a Bot can read it.
 
@@ -20,7 +20,7 @@
   is the whole subject of ADR-2608180100.
 
   usage:
-    nbb scripts/endpoint-health-pull.cljk [--host gad@100.82.98.110]
+    kbb --backend sci scripts/endpoint-health-pull.cljk [--host gad@100.82.98.110]
                                           [--remote-home /var/lib/endpoint-health]
                                           [--out <path>]"
   (:require ["child_process" :as cp]
@@ -67,7 +67,7 @@
                    :not-available (mapv :availability/target bad)
                    :statements stmts}]
       (.mkdirSync fs (.dirname path out) #js {:recursive true})
-      (.writeFileSync fs out (str ";; 生成物。手で編集しない —— nbb scripts/endpoint-health-pull.cljk\n"
+      (.writeFileSync fs out (str ";; 生成物。手で編集しない —— kbb --backend sci scripts/endpoint-health-pull.cljk\n"
                                   ";; :measured-at と :pulled-at は別物。差が開いていたら\n"
                                   ";; それは『静かなフリート』ではなく『古い鏡』である。\n"
                                   (pr-str receipt) "\n"))

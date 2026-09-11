@@ -20,7 +20,7 @@ Total Upload: 0.31 KiB
 credential のある session / 手元で:
 
 ```bash
-npm install && npx shadow-cljs release app && clojure -M:gen-page
+npm install && amu compile --target wasm32-browser app && kbb -M:gen-page
 npx wrangler deploy            # tasuke-first-response.<account>.workers.dev
 ```
 
@@ -45,7 +45,7 @@ deploy して host が決まったら:
 
 ```bash
 # wrangler.jsonc に routes を足してから
-nbb scripts/gen-surface-index.cljk      # superproject root で
+kbb --backend sci scripts/gen-surface-index.cljk      # superproject root で
 ```
 
 ⚠ 本番 deploy の前に `git merge --ff-only origin/main` を通すこと。deploy には

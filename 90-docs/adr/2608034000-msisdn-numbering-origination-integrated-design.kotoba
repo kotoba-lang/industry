@@ -261,10 +261,10 @@ ADR-2607300300 と同じ規律で明示する:
 
 | 対象 | コマンド | 結果 |
 |---|---|---|
-| kotoba-lang/phone | `clojure -M:test` | **40 tests / 177 assertions、0 failures 0 errors**（追加前は 41 assertions） |
-| kotoba-lang/phone | `clojure -M:lint` | errors 0 / warnings 3 — 全て既存（`ui.cljc` の unused binding、`export_test` の未使用 refer 2件） |
-| cloud-itonami-app | `clojure -M:test` | **929 tests / 4015 assertions、0 failures 0 errors** |
-| cloud-itonami-app | `clojure -M:lint` | errors 0 / warnings 7 — 全て既存（known-broken namespace 由来） |
+| kotoba-lang/phone | `kbb -M:test` | **40 tests / 177 assertions、0 failures 0 errors**（追加前は 41 assertions） |
+| kotoba-lang/phone | `kbb -M:lint` | errors 0 / warnings 3 — 全て既存（`ui.cljc` の unused binding、`export_test` の未使用 refer 2件） |
+| cloud-itonami-app | `kbb -M:test` | **929 tests / 4015 assertions、0 failures 0 errors** |
+| cloud-itonami-app | `kbb -M:lint` | errors 0 / warnings 7 — 全て既存（known-broken namespace 由来） |
 | west pin | `scripts/west-pin-put.cljs` | phone `4e9e01f→9626a93`（ahead 2 / behind 0）、app `46a17f4→d876ff5`（ahead 10 / behind 0）。両者とも上流 main と identical |
 
 **実行していないもの（正直に）**:
@@ -273,7 +273,7 @@ ADR-2607300300 と同じ規律で明示する:
   **JVM でしか回していない**。移植性のために `nth` を使わず `str/index-of` +
   `subs` で桁を扱う等の配慮はしてあるが、それを確かめる runner が repo に無い
   （既存の `kotoba.phone` / `esim` / `card` も同じ状態）。
-- **`nbb scripts/gen-west-manifest.cljs --check`**。ローカル checkout が pin より
+- **`kbb --backend sci scripts/gen-west-manifest.cljk --check`**。ローカル checkout が pin より
   古い（phone は detached `f176f08`、app は別ブランチ + 未コミット変更）ため、
   生成器はこの変更と無関係な差分を大量に出す。**pin の正しさは
   `west-pin-put.cljs` のサーバ側検証（default branch 到達性 + 旧 pin から純前進 +

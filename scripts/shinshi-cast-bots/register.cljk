@@ -22,7 +22,7 @@
    Run from the superproject root:
      R=$PWD K=$PWD/orgs/kotoba-lang
      CP=\"$R/scripts/shinshi-cast-bots:$K/org-chainagnostic-cacao/src:$K/authority/src:$K/org-ietf-ed25519/src:$K/org-ietf-cbor/src\"
-     nbb --classpath \"$CP\" scripts/shinshi-cast-bots/register.cljk [slug ...]
+     kbb --backend sci --classpath \"$CP\" scripts/shinshi-cast-bots/register.cljk [slug ...]
 
    Exit: see cast-core — upstream rejection prints BLOCKED and does not
    count as a local failure."

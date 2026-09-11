@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/docs-edn-repair-loop.cljk — **ローカル Claude loop** の入口。
 ;; LaunchAgent `cloud.itonami.bot.docs-edn-repair` が一定間隔でこれを起こす。
 ;;
@@ -33,7 +33,7 @@
 ;;   - exit 0 常に（監視 loop であって gate ではない）。
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-loop.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/docs-edn-repair-loop.cljk
 ;;   ... --dry-run    ; 測って候補を出すところまで（モデルを起こさない）
 
 (require '[clojure.edn :as edn]

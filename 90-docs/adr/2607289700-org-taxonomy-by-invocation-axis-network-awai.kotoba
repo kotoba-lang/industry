@@ -741,7 +741,7 @@ Phase 4 に着手する前に潰すべきものとして記録する。**移送�
 おらず、**再生成すると 9 つの dataset から `datalad: true` / `annex-remote: b2` が黙って
 落ちる**状態だった (`west_annex.cljs` の annex-get/drop 対象から外れる)。
 
-結果、`nbb scripts/gen-west-manifest.cljs --check` が **`west.yml is up to date`** になった。
+結果、`kbb --backend sci scripts/gen-west-manifest.cljk --check` が **`west.yml is up to date`** になった。
 ADR-2607289600 D9 が STALE と記録して以来はじめて通った。残っていた 45 行の drift は
 `userdata:` 内の行順と末尾改行だけだったので、値を変えずに generator の出力順へ正規化した
 (9 block)。
@@ -1113,6 +1113,6 @@ consumer 0 件なので移送の影響は無い。名前は据え置き (どの 
    "D8: kotoba-lang 1763 と cloud-itonami の taxonomy 系 1388 は軸に適合済みで触らない。taxonomy prefix(isic-/isco-/lei-…)は分類標準コードであり identity を持つので prefix 廃止の対象外"
    "D9: 4 phase で実行。network-awai を埋める → adult → prefix 廃止 → etzhayyim。west.yml は single-entry commit"))
 
-  (:adr/verify "nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>")
+  (:adr/verify "kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>")
   (:adr/artifact "manifest/repo-taxonomy.edn")
   (:source/dataset "adr")))

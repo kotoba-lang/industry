@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; itonami-app-resident — the launchd job `cloud.itonami.app.local` runs THIS,
 ;; and this runs the JVM server. The plist's WorkingDirectory is the app
-;; checkout, so `clojure -M:server` and the default data dir (`./data`) both
+;; checkout, so `kbb -M:server` and the default data dir (`./data`) both
 ;; resolve from there.
 ;;
 ;; ## Why it exists again, and why it is HERE

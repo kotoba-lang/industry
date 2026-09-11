@@ -63,20 +63,20 @@ receipt を組み立てる `kagami` 側の仕事であってここではない�
 
 ```bash
 # 今何が回るのか（API を叩くだけ、gate は走らせない）
-nbb scripts/fleet-ci/tick.cljk --plan
+kbb --backend sci scripts/fleet-ci/tick.cljk --plan
 
 # runner 自身の副作用なし回帰テスト
-FLEET_CI_LIBRARY_MODE=1 nbb --classpath scripts/fleet-ci scripts/fleet-ci/tick-unit-test.cljk
+FLEET_CI_LIBRARY_MODE=1 kbb --backend sci --classpath scripts/fleet-ci scripts/fleet-ci/tick-unit-test.cljk
 
 # 1 repo だけ手で回す（変化が無くても回る。landing/status/CD はしない）
-nbb scripts/fleet-ci/tick.cljk --only kagitaba --dry-run
+kbb --backend sci scripts/fleet-ci/tick.cljk --only kagitaba --dry-run
 
 # 全部強制的に回す（landing/status/CD あり）
-nbb scripts/fleet-ci/tick.cljk --all
+kbb --backend sci scripts/fleet-ci/tick.cljk --all
 
 # ノードを増やした / provision した後
-nbb scripts/fleet-ci/provision.cljk --from-nodes --need jvm
-nbb scripts/fleet-ci/probe.cljk
+kbb --backend sci scripts/fleet-ci/provision.cljk --from-nodes --need jvm
+kbb --backend sci scripts/fleet-ci/probe.cljk
 
 # 常駐（5 分間隔）
 cp scripts/fleet-ci/cloud.itonami.bot.fleet-ci-tip-tick.plist ~/Library/LaunchAgents/
@@ -96,10 +96,10 @@ append-only ledger instead of materializing the full superproject tree.
 この 4 ノードは probe の capability が空で、fleet の実行プールから外れていた。
 
 ```bash
-nbb scripts/fleet-ci/sweep.cljk                 # dry-run（既定）。何を消すかだけ出す
-nbb scripts/fleet-ci/sweep.cljk --apply         # 実際に消す
-nbb scripts/fleet-ci/sweep.cljk --all           # low-water(20GiB) を無視して全ノード
-nbb scripts/fleet-ci/sweep.cljk --only dan,levi # ノードを絞る
+kbb --backend sci scripts/fleet-ci/sweep.cljk                 # dry-run（既定）。何を消すかだけ出す
+kbb --backend sci scripts/fleet-ci/sweep.cljk --apply         # 実際に消す
+kbb --backend sci scripts/fleet-ci/sweep.cljk --all           # low-water(20GiB) を無視して全ノード
+kbb --backend sci scripts/fleet-ci/sweep.cljk --only dan,levi # ノードを絞る
 ```
 
 対象は `sweep.edn` の **allowlist**。`~/.ollama/models`（21G/ノードの実データ）や
@@ -126,7 +126,7 @@ nbb scripts/fleet-ci/sweep.cljk --only dan,levi # ノードを絞る
 {:name "<west project name>" :gate :jvm-test :cd true}
 ```
 
-- `:gate :jvm-test` — `deps.edn` の `:test` alias を `clojure -M:test` で回す（node cap `:jvm`）
+- `:gate :jvm-test` — `deps.edn` の `:test` alias を `kbb -M:test` で回す（node cap `:jvm`）
 - `:gate :nbb-test` — `:entry` / `:classpath` を nbb で回す（node cap `:node`）
 - `:gate :nbb-script` — `gates/*.cljs` を配って repo tree に対して回す（node cap `:node`）
 - `:cd true` — green かつ pin が遅れていれば **west pin を自動前進**（外したい repo は false）
@@ -181,7 +181,7 @@ mkdir -p -m 700 ~/.itonami/fleet-ci-gh-tokens
 pbpaste > ~/.itonami/fleet-ci-gh-tokens/com-junkawasaki && chmod 600 ~/.itonami/fleet-ci-gh-tokens/com-junkawasaki
 pbpaste > ~/.itonami/fleet-ci-gh-tokens/kotoba-lang     && chmod 600 ~/.itonami/fleet-ci-gh-tokens/kotoba-lang
 # 効いているか（launchd と同じ経路を対話セッションで確認）
-FLEET_CI_GH_TOKEN_DIR=~/.itonami/fleet-ci-gh-tokens nbb scripts/fleet-ci/tick.cljk --plan
+FLEET_CI_GH_TOKEN_DIR=~/.itonami/fleet-ci-gh-tokens kbb --backend sci scripts/fleet-ci/tick.cljk --plan
 ```
 
 pin を進められるのは **root の Contents: write** だけで、子 repo 側は status 以外書けない

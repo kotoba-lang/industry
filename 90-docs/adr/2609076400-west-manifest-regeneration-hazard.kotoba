@@ -5,7 +5,7 @@
   (:adr/date "2026-09-07")
   (:adr/body "## What was measured
 
-`nbb scripts/gen-west-manifest.cljs --check` exits 1: the committed
+`kbb --backend sci scripts/gen-west-manifest.cljk --check` exits 1: the committed
 `manifest/west.yml` is not what the generator produces today.
 
 Measured 2026-09-07 by copying west.yml aside, regenerating, diffing per entry,
@@ -65,7 +65,7 @@ is that five repositories leave the `archived` group and re-enter the default
 
 ## The standing instruction still holds, for a different reason
 
-CLAUDE.md's layout quickstart shows the bare `nbb scripts/gen-west-manifest.cljs`;
+CLAUDE.md's layout quickstart shows the bare `kbb --backend sci scripts/gen-west-manifest.cljk`;
 its Git-operations section forbids wholesale regeneration commits, after the
 incident where one registration flushed 44 broken pins to main. That prohibition
 is about **pins**, and this drift touches none — but a 67-entry bulk change is

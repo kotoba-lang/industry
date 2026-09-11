@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Copy the DADS stylesheet out of the west checkout into public/.
 ;;
 ;; Not committed: a copy of `dds.css` inside this game is a fork of the
@@ -6,7 +6,7 @@
 ;; do not have to make one. This is a build step, the way jp-go-dds itself
 ;; vendors from upstream.
 ;;
-;;     npx nbb vendor.cljs        # before `npx shadow-cljs release app`
+;;     kbb --backend sci vendor.cljk        # before `amu compile --target wasm32-browser app`
 (ns vendor
   (:require ["fs" :as fs]
             ["path" :as path]))

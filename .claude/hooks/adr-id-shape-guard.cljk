@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; PreToolUse(Bash) ガード: `git commit` / `git push` の前に、この変更で
 ;; **新しく現れた** ADR の `:adr/id` を見て、bare な番号形（`2608190100` /
 ;; `ADR-2608190100`）なら deny する。
@@ -104,7 +104,7 @@
                "5 時間で 3 件です。slug を含めれば同じ番号でも id は分かれ、\n"
                ":adr/related の参照先も一意に決まります（既存 1,362 件がこの形）。\n\n"
                "直し方: :adr/id \"adr-<番号>-<ファイル名の slug 部分>\"\n"
-               "確認: nbb --classpath \".:scripts/nbb_compat\" scripts/verify-adr-identity.cljk\n\n"
+               "確認: kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-adr-identity.cljk\n\n"
                "既存の bare な ADR を編集しただけなら止めません ── 止めているのは\n"
                "『今日新しく増えた bare な id』だけです。"))))
     (allow!))

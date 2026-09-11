@@ -47,9 +47,9 @@ CLI パイプラインは**そのまま通る**。`kotoba-selfhost-contracts` �
 amu で native にして実行し、正しい答えが返ることを確認した:
 
 ```
-clojure -M:native-run compile <core>.kotoba --target aarch64 --output x.kexe   # 2m09s（JVM 起動込み）
-clojure -M:native-run keygen / public-key / trust-key / measure-runtime / trust-runtime / sign
-clojure -M:native-run run x.signed.kexe --entry 'non-executable-form?' ...
+kbb -M:native-run compile <core>.kotoba --target aarch64 --output x.kexe   # 2m09s（JVM 起動込み）
+kbb -M:native-run keygen / public-key / trust-key / measure-runtime / trust-runtime / sign
+kbb -M:native-run run x.signed.kexe --entry 'non-executable-form?' ...
 #=> {:ok true :status :ok :result {... :result true}}    ns→true, alias→true, defn→false
 ```
 
@@ -215,8 +215,8 @@ CLAUDE.md の「GitHub Actions は repo 単位で無効化してある」は org
 - `kotoba-lang/tender-native` `1915ee1`（merge。`ab76044` = prepare/invoke、
   `9114591` = loader source）: 13 tests / 105 assertions、変異 2 件で落ちることを確認
 - `kotoba-lang/kotoba-selfhost-contracts` `007c87f`（merge #6）:
-  `clojure -M:test` 34 tests / 284,730 assertions、
-  `clojure -M:test:native` **5 tests / 578 assertions, 0 failures**（aarch64-macos、2m17s）
+  `kbb -M:test` 34 tests / 284,730 assertions、
+  `kbb -M:test:native` **5 tests / 578 assertions, 0 failures**（aarch64-macos、2m17s）
 - `com-junkawasaki/root` `e2e078f`: west pin 前進（2 件とも fast-forward 検証済み）
 - `kotoba-lang/murakumo` PR #289 `8711e19`: 35 cores / 722 exports / 1,312 calls、
   0 disagreements。変異（native の string 結果を摂動）で 1,312 中 794 が不一致として

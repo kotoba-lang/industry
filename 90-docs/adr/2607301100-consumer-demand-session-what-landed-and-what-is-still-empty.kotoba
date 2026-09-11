@@ -149,7 +149,7 @@
 
   1. **catalog --check を CI に載せる**（最小・最も再発防止価値が高い）。今は誰も
      実行していないため、artifact と入力の乖離は静かに再発する。
-     検証: `nbb scripts/gen-itonami-fleet-catalog.cljs --check`（現在 exit 0、
+     検証: `kbb --backend sci scripts/gen-itonami-fleet-catalog.cljk --check`（現在 exit 0、
      `catalog OK — 1212 actors, 10 callable`）。orphan endpoint も exit 1 になる。
   2. **query 面 MCP を client に登録して実運用に晒す**。
      `{\"command\": \"nbb\", \"args\": [\"--classpath\", \".:scripts/nbb_compat\",

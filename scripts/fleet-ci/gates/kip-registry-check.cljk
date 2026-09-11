@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kip-registry-check.cljs — registry integrity for kotoba-lang/kip.
 ;;
 ;; **The checking logic is not duplicated here.** The authority is the repo's own
@@ -21,7 +21,7 @@
 ;; been green — not because anything is broken, but because it was never able to
 ;; ask its question.
 ;;
-;; Node-side: `npx nbb kip-registry-check.cljs <dir>`. <dir> is the FIRST
+;; Node-side: `kbb --backend sci kip-registry-check.cljk <dir>`. <dir> is the FIRST
 ;; positional argument.
 
 (ns fleet-ci.gates.kip-registry-check
@@ -51,7 +51,7 @@
 
 (def result
   (try
-    {:out (cp/execSync "npx --yes nbb --classpath src scripts/check-kips.cljs ."
+    {:out (cp/execSync "npx --yes kbb --backend sci --classpath src scripts/check-kips.cljs ."
                        #js {:cwd root :encoding "utf8" :stdio "pipe" :timeout 600000})
      :code 0}
     (catch :default e

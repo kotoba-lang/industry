@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kotoba-oracle-cljs.cljs — run a repo's ClojureScript oracle gate on a fleet
 ;; node, and refuse to report a pass it cannot see evidence for.
 ;;
@@ -31,7 +31,7 @@
 ;;
 ;; ## Usage
 ;;
-;;   npx nbb kotoba-oracle-cljs.cljs <repo-dir> --entry <path> [--min N] [--nbb CMD]
+;;   kbb --backend sci kotoba-oracle-cljs.cljk <repo-dir> --entry <path> [--min N] [--nbb CMD]
 ;;
 ;; `--entry` is the repo's own gate, run as-is: this script contributes the
 ;; classpath and the verdict, never the assertions. `--min` is the floor on how

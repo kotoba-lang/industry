@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-grammar-lowering-drift.cljs -- forms the grammar authority declares
 ;; admitted, against what the compiler can actually lower.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-grammar-lowering-drift.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-grammar-lowering-drift.cljk \
 ;;     [--findings] [--root <dir>]
 ;;
 ;; ## What it is about
@@ -216,7 +216,7 @@
   (cannot-answer! "the grammar authority declares no sugar, which cannot be right"))
 
 ;; The compiler's classpath, resolved WITHOUT a JVM, the same way `bin/amu`
-;; does it. Deriving it from `clojure -Spath` would make this detector need a
+;; does it. Deriving it from `kbb -Spath` would make this detector need a
 ;; JDK to ask a question about a JDK-free path.
 (def classpath
   (let [r (sh "nbb" ["--classpath" "src" "scripts/print-classpath.cljs"] amu-dir)]
@@ -229,7 +229,7 @@
       (str/join ":" (concat ["src"] dirs)))))
 
 (def ^:private source-file
-  "The probe source goes through a FILE, not a command-line argument: `nbb -e`
+  "The probe source goes through a FILE, not a command-line argument: `kbb --backend sci -e`
    treats a trailing argument as a script path to run, so passing the program
    that way made every control fail to lower. The first version of this
    detector did exactly that, and its own floor caught it -- it refused to

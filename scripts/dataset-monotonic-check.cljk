@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; commit 済みデータが縮んでいないかを検査する。
 ;;
-;;   nbb scripts/dataset-monotonic-check.cljk [--root .] [--against <ref>]
+;;   kbb --backend sci scripts/dataset-monotonic-check.cljk [--root .] [--against <ref>]
 ;;
 ;; 宣言は manifest/monotonic-datasets.edn。そこに書いた軸の distinct 値が
 ;; baseline より減っていたら落ちる。

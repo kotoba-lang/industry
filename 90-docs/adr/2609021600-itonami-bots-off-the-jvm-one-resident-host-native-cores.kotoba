@@ -49,8 +49,8 @@ ADR-2608313200（2026-08-31）と本日 2026-09-02 の再測定。**同じ仕事
 
 | 経路 | 一発起動の床（peak RSS / wall） | 常駐 |
 |---|---|---|
-| itonami CLI（`clojure -M:cli`、JVM） | 648〜801 MB / 7.7〜11 s | server は JVM 1 本。task ごとに JVM を起こし 0〜4.2 GB に振れる |
-| nbb（`nbb -e`） | 78 MB / 1.6 s | —（この設計の常駐 host 候補） |
+| itonami CLI（`kbb -M:cli`、JVM） | 648〜801 MB / 7.7〜11 s | server は JVM 1 本。task ごとに JVM を起こし 0〜4.2 GB に振れる |
+| nbb（`kbb --backend sci -e`） | 78 MB / 1.6 s | —（この設計の常駐 host 候補） |
 | node（`node -e`） | 46 MB / 0.3 s | — |
 | Hermes CLI（CPython） | 35〜37 MB / 0.1〜0.6 s | gateway が 38〜45 profile を多重化、30 process / 約 1.8 GB 固定（08-31） |
 | amu native kexe（判断核 1 export） | 4 MB / 0.01 s（うち C loader 1.26 MB） | 存在しない |
@@ -109,7 +109,7 @@ turn ごとに instance を作り直す（fuel は instance 生涯で使い切�
 
 ### D3. CLI は client。spawn しない（= 1）
 
-- `bin/itonami` は nbb の **HTTP / unix socket client** になり、`clojure -M:cli` を spawn しない。server が居なければ **JVM を起こさず**、専用の exit code（`resident-absent`、0 でも 1 でもない値）で launchd の起動コマンドを印字して終わる。「測れなかった」と「失敗した」を分ける規則（ADR-2608136000）をここにも当てる。
+- `bin/itonami` は nbb の **HTTP / unix socket client** になり、`kbb -M:cli` を spawn しない。server が居なければ **JVM を起こさず**、専用の exit code（`resident-absent`、0 でも 1 でもない値）で launchd の起動コマンドを印字して終わる。「測れなかった」と「失敗した」を分ける規則（ADR-2608136000）をここにも当てる。
 - `itonami up` は `launchctl kickstart` の薄い wrapper。spawn ではない。
 - `bin/itonami-mcp` は同じ client を stdio に載せる。
 - 床の目標は nbb / node の床（本日 78 MB / 1.6 s、46 MB / 0.3 s）。**native client は今日は作れない** —— http の `:native-aot` が pending で、socket を持つ native guest が存在しない。作れるようになったら D4 の末尾で扱う。
@@ -213,7 +213,7 @@ nbb host に差し替えている。
 
 ### 危険 —— main からリリースを切らない
 
-launchd の `dev.cloud-itonami.app` は今も `clojure -M:server` を実行する。main には
+launchd の `dev.cloud-itonami.app` は今も `kbb -M:server` を実行する。main には
 その alias が無い。本番が気づいていないのは安全機構ではなく、`~/.cloud-itonami/current`
 が #270 より前のリリース（f9138fbd）を指しているからにすぎない。**次のリリースで
 それが反転する。** 解決できない launch command は大きな音を立てない —— launchd の
@@ -272,7 +272,7 @@ mtime を hash する inventory では live な Hermes home に対して optimis
 
 ### suite を通して分かった 2 件（どちらも #270 の側で、私の変更とは無関係）
 
-`clojure -M:test` を通した: **2,243 tests / 13,361 assertions、14 failures / 1 error**。
+`kbb -M:test` を通した: **2,243 tests / 13,361 assertions、14 failures / 1 error**。
 失敗は 4 つの namespace に集中しており、そのどれも私が触った 3 file
 （hermes_migration.clj / hermes_migration_test.clj / test_runner.clj）に依存しない。
 **clean main で走らせ直してはいないので、「既存」は diff から見た判断であって測定ではない。**
@@ -282,7 +282,7 @@ mtime を hash する inventory では live な Hermes home に対して optimis
 - **`replacement-launchers-are-not-clojure-wraps` は、自分の説明文で落ちている。**
   `(not (str/includes? itonami \"spawnSync\"))` を assert するが、
   `bin/itonami` に `spawnSync` が現れるのは 4 行目のコメント 1 箇所だけ ——
-  `This used to spawnSync clojure -M:cli` という履歴の説明である。**呼び出しは 1 つも
+  `This used to spawnSync kbb -M:cli` という履歴の説明である。**呼び出しは 1 つも
   無い。** つまりこの control は、自分が名乗っている理由（launcher が clojure の
   wrapper であること）とは別の理由で赤くなっている。CLAUDE.md の 6 問目
   （その検査は、自分が名乗っている理由で拒否したことがあるか）に該当する。
@@ -327,7 +327,7 @@ mtime を hash する inventory では live な Hermes home に対して optimis
 command は成功**という向きである。CLAUDE.md の Q9 は「各 target は verified native
 `kotoba check` / `kotoba compile` を通すこと」を要求しているので、**native の check を
 素直に配線すると、その gate は検査せずに緑になる。** adapter matrix の
-「check は M2 実装済み」は host が `:compiler-cli`（invoke は `clojure -M:run`）の
+「check は M2 実装済み」は host が `:compiler-cli`（invoke は `kbb -M:run`）の
 場合の話で、native ではない。
 
 したがって寄せたのは **compile だけ**である。
@@ -570,8 +570,8 @@ app の suite は front end 作業の前が 17 failures / 2 errors だった。*
 
 1. front end を試す: `nbb <app>/bin/itonami status` / `bots list` / `commands`
 2. いまの現在地（緑でも『古い tree を指しているから緑』でありうる）:
-   `nbb --classpath \".:scripts/nbb_compat\" scripts/verify-itonami-run-path.cljs --root .`
-3. emit parity: `AMU=<amu pin>/bin/amu nbb --classpath bin:test <app>/test/emit_parity_nbb.cljs`
+   `kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-itonami-run-path.cljs --root .`
+3. emit parity: `AMU=<amu pin>/bin/amu kbb --backend sci --classpath bin:test <app>/test/emit_parity_nbb.cljs`
 
 ### 触っていないもの / 保全したもの
 

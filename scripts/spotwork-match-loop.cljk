@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/spotwork-match-loop.cljk — スキマバイト突合 bot の **ローカル Claude
 ;; loop** 入口（ADR-2608292100）。LaunchAgent cloud.itonami.bot.spotwork-match が
 ;; 6 時間ごとに起こす想定。
@@ -23,7 +23,7 @@
 ;; ledger は追記のみ。成否は次周の tick が測る（自分で成功と書かない）。
 ;; exit 0 常に（監視 loop であって gate ではない）。
 ;;
-;;   nbb scripts/spotwork-match-loop.cljk [--dry-run]
+;;   kbb --backend sci scripts/spotwork-match-loop.cljk [--dry-run]
 
 (ns spotwork-match-loop
   (:require [clojure.edn :as edn]

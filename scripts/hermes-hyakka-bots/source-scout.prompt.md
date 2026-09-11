@@ -48,7 +48,7 @@ then sourced claims, then items people can query.
 
 6. Run the gate, from the worktree:
 
-     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn
+     kbb --backend sci --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn
 
    exit 0 — every item passed.
    exit 1 — some were rejected; the reason is printed under each.
@@ -61,7 +61,7 @@ then sourced claims, then items people can query.
    - `git checkout -b bot/source-scout-$(date +%Y%m%d-%H%M)`
    - add the accepted maps to `:sources` in `config/knowledge-ingest.edn`,
      keeping the file's existing formatting and comment style
-   - `nbb --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`
+   - `kbb --backend sci --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`
      must still exit 0 (the config still reads)
    - commit, push, and `gh pr create` against `main`. Put the full gate output
      in the PR body, including anything it rejected and why.
@@ -83,7 +83,7 @@ prompt. The model reached for them on its own.
 
 Do not use, and do not work around:
 
-- `-e` / `-c` script flags (`nbb -e '...'`, `python3 -c '...'`) — put the code
+- `-e` / `-c` script flags (`kbb --backend sci -e '...'`, `python3 -c '...'`) — put the code
   in a file in the worktree and run the file. 8 of the 12 denials were this.
 - heredocs that feed a script to an interpreter (`<<'EOF'`) — same fix. Note
   this is independent of the EDN-heredoc corruption the superproject CLAUDE.md

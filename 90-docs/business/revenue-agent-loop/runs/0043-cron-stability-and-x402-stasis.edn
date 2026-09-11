@@ -16,7 +16,7 @@
                       :rejections-classified 1 :rejections-unexplained 3
                       :unmetered-twin-ratio 0 :unmetered-twin-reads 0
                       :unpriced-plane-reads 0 :attempt-rate 0.121}}
-  :funnel-pulse "nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 3 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false. SCANNED=1"
+  :funnel-pulse "kbb --backend sci 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 3 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false. SCANNED=1"
   :stability-checks [{:path "/" :status 200 :time-s "0.090"}
                      {:path "/signup" :status 200 :time-s "0.326"}
                      {:path "/ipld/v1" :status 400 :time-s "0.053" :note "expected — route alive, rejects missing params (baseline 2026-09-03)"}

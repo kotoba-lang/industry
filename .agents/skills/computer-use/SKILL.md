@@ -75,14 +75,14 @@ macOS alert.
 
 ```bash
 cd orgs/kotoba-lang/computer-use
-clojure -M:dev:examples -m <example-ns>   # local checkouts, no network
-clojure -M:examples -m <example-ns>       # :git/sha coordinates, needs network
+kbb -M:dev:examples -m <example-ns>   # local checkouts, no network
+kbb -M:examples -m <example-ns>       # :git/sha coordinates, needs network
 ```
 
 `:dev` overrides `io.github.kotoba-lang/langgraph` and `…/langchain` to
 `../langgraph` / `../langchain` — sibling paths under `orgs/kotoba-lang/`,
 where both checkouts actually live, so `:dev:examples` resolves offline.
-Verified 2026-08-08: `clojure -Spath -A:dev:examples` puts
+Verified 2026-08-08: `kbb -Spath -A:dev:examples` puts
 `orgs/kotoba-lang/langgraph/src` and `…/langchain/src` on the classpath.
 
 Without `:dev`, `:examples` resolves langgraph by `:git/sha` over the network.

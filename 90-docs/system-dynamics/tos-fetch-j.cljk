@@ -4,7 +4,7 @@
 ;;   対象一覧（URL つき）・取得コード・派生した検出結果だけ。本文が要るなら
 ;;   これを実行して再取得する。
 ;;
-;; usage: nbb 90-docs/system-dynamics/tos-fetch-j.cljs <出力ディレクトリ>
+;; usage: kbb --backend sci 90-docs/system-dynamics/tos-fetch-j.cljk <出力ディレクトリ>
 
 (require '[clojure.string :as str])
 (def fs (js/require "fs"))

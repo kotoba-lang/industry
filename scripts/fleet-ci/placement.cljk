@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; placement.cljs — fleet-ci の配置。**移行期の実装**。
 ;;
 ;; ## この file が在る理由
@@ -12,7 +12,7 @@
 ;; library として require できず、比較しようがなかった** —— だから配置だけをここへ
 ;; 出した。これは切り替えの前提であって、それ自体が目的ではない。
 ;;
-;; 比較: `nbb scripts/fleet-ci/placement-parity.cljk`
+;; 比較: `kbb --backend sci scripts/fleet-ci/placement-parity.cljk`
 ;;
 ;; ## LPT は murakumo に移っても失われない
 ;;
@@ -189,7 +189,7 @@
   (path/join (os/homedir) ".itonami" "murakumo-classpath.edn"))
 
 (defn absolutize-classpath
-  "`clojure -Spath` が返す相対 entry を、その command を実行した checkout 基準の
+  "`kbb -Spath` が返す相対 entry を、その command を実行した checkout 基準の
   絶対 path にする。placement shim は superproject root を cwd にして起動するため、
   `src` のような相対 entry をそのまま渡すと murakumo namespace を読めない。"
   [base cp]
@@ -210,7 +210,7 @@
     [:v2 (path/resolve root) (.-mtimeMs st) (.-size st)]))
 
 (defn murakumo-classpath
-  "murakumo の解決済み classpath。`clojure -Spath` は実測で約 10 秒かかるので、
+  "murakumo の解決済み classpath。`kbb -Spath` は実測で約 10 秒かかるので、
   **checkout root + deps.edn の mtime+size をキーに cache する** —— tick は 5 分
   ごとに走るので毎回解決させない。root または deps.edn が変われば作り直す。
 
@@ -269,7 +269,7 @@
         cp (murakumo-classpath root spawn-fn)
         _ (when-not cp
             (throw (ex-info "murakumo の classpath を解決できない — placement authority に届かない"
-                            {:root root :hint "clojure -Spath が orgs/kotoba-lang/murakumo で通るか"})))
+                            {:root root :hint "kbb -Spath が orgs/kotoba-lang/murakumo で通るか"})))
         by-id (into {} (map (fn [w] [(str (or (:id w) (:name w))) w])) work)
         tasks (vec (sort-by (juxt (comp - :cost) :id)
                             (for [w work]

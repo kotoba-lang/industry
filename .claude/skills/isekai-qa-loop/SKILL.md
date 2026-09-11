@@ -39,7 +39,7 @@ git fetch origin && git log --oneline -1 origin/main
 
 # gameplay: 本番に対して実 Chrome + 実キーイベント + ECS tick（42 本中 30 本 steerable、約 12 分）
 PLAYTEST_URL=https://isekai.network \
-  nbb scripts/isekai/playtest_headless.cljs --out /tmp/qa-gameplay-$(date +%Y%m%d).edn
+  kbb --backend sci scripts/isekai/playtest_headless.cljk --out /tmp/qa-gameplay-$(date +%Y%m%d).edn
 ```
 
 出力の読み方:
@@ -64,7 +64,7 @@ exit 1 になることを実際に見てから**（`gftd/waves` の spawner を�
 # 本番の実レンダリング（loading を抜け、640x360 以上に 3% 以上の非黒 pixel、error overlay 無し）
 ISEKAI_M6_VISUAL_URL='https://isekai.network/play?game=gftd/palisade' \
 ISEKAI_M6_VISUAL_OUT=/tmp/qa-visual-$(date +%Y%m%d) \
-  clojure -M:m6-visual -m isekai.m6-visual-gate
+  kbb -M:m6-visual -m isekai.m6-visual-gate
 ```
 
 より深い視覚評価が要るなら **playtest co-scientist**（実 Chromium プレイスルー →
@@ -73,7 +73,7 @@ ISEKAI_M6_VISUAL_OUT=/tmp/qa-visual-$(date +%Y%m%d) \
 
 ```bash
 MURAKUMO_CLAUDE_TOKEN=$(kagi get MURAKUMO_CRITIC_TOKEN) \
-  nbb scripts/run_playtest_coscientist.cljs --game gftd/palisade --rounds 2
+  kbb --backend sci scripts/run_playtest_coscientist.cljk --game gftd/palisade --rounds 2
 ```
 
 ⚠ **critic token が取れない機では vision critic が静かに offline heuristic に劣化する**
@@ -88,9 +88,9 @@ champion を実機 iPhone Simulator で検証してフレームを記録する**
 ゲームが既に polling している key map を書く。
 
 ```bash
-nbb --classpath src:../shinka/src -m loop-game-autoplay.train \
+kbb --backend sci --classpath src:../shinka/src -m loop-game-autoplay.train \
     --game <path-or-url> --generations 12 --population 24 --episode-ms 60000 --seeds 3
-nbb --classpath src:../shinka/src:../hinshitsu/src -m loop-game-autoplay.qualify \
+kbb --backend sci --classpath src:../shinka/src:../hinshitsu/src -m loop-game-autoplay.qualify \
     --champion target/run-champion.edn --seed 1
 ```
 
@@ -100,7 +100,7 @@ autoplay は **60 秒級のエピソードを何世代も回して「遊べる�
 
 この項は 2026-08-08 の追記である。初版はこの repo の存在を確認せずに書かれた ——
 「無いと結論する前に検索する」を skill の著者自身が守れていなかった。
-`nbb scripts/repo-search.cljk <語>` は 4,140 repo を引く。**手元に無いことは存在しない
+`kbb --backend sci scripts/repo-search.cljk <語>` は 4,140 repo を引く。**手元に無いことは存在しない
 ことではない。**
 
 ### 3. 欠陥を 1 件選んで直す
@@ -133,7 +133,7 @@ autoplay は **60 秒級のエピソードを何世代も回して「遊べる�
 ### 5. 記録する
 
 - evidence EDN を `90-docs/evidence/` に置く（`catalog-gameplay-<date>.edn` の形）
-- 判断を伴ったら ADR を 1 本（`.edn` tx-data、`nbb scripts/isekai/adr_edn_check.cljs` を通す）
+- 判断を伴ったら ADR を 1 本（`.edn` tx-data、`kbb --backend sci scripts/isekai/adr_edn_check.cljk` を通す）
 - **数えた分母を偽らない。** 対象外にしたものは理由つきで報告する（`out-of-reach` の作法）
 
 ## 絶対にやらないこと

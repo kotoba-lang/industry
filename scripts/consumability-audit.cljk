@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns consumability-audit
   "Can each kotoba-lang library build a classpath outside this workspace?
 
@@ -21,7 +21,7 @@
     :clean             neither
 
   usage:
-    nbb scripts/consumability-audit.cljk <out.edn> [start] [limit]
+    kbb --backend sci scripts/consumability-audit.cljk <out.edn> [start] [limit]
 
   Measured 2026-07-31 over 1,927 kotoba-lang projects in west.yml:
     clean 1629 | deps-local-root 85 | alias-local-root 74 | no deps.edn 137 | unparseable 2"

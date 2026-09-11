@@ -144,7 +144,7 @@ ADR-2607173100 のとおり `murakumo-main` alias 経由で呼び出し側が行
 \"refactor: split Datomic host provider\"）が `fresh-conn` を
 `kotoba.plm.db` から `kotoba.plm.db-host` へ移したが、cloud-itonami 側は
 テスト 1 ns しか追従しておらず、**`cloud-itonami.ops` を読む JVM 経路
-（= `clojure -M:test` 全体）が pin 済みの checkout に対してコンパイル不能**
+（= `kbb -M:test` 全体）が pin 済みの checkout に対してコンパイル不能**
 だった。4 ファイル 5 箇所を移行。
 
 修復後の全 suite は 1078 test / 7653 assertion で 9 failures / 13 errors。

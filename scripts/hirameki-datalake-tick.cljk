@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; hirameki-datalake-tick.cljs — 公開特許 corpus を R2 Data Catalog に追従させる。
 ;;
-;;     nbb scripts/hirameki-datalake-tick.cljk [--force] [--repo <path>] [--out-dir <dir>]
+;;     kbb --backend sci scripts/hirameki-datalake-tick.cljk [--force] [--repo <path>] [--out-dir <dir>]
 ;;
 ;; export（EDN -> JSON）と load（JSON -> Iceberg）を順に呼ぶだけで、判断は
 ;; 2 つしか持たない。hyakka-datalake-tick.cljs と同型。

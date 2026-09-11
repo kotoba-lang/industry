@@ -6,7 +6,7 @@
     - フィールド: `username=API_KEY`、`hostname=https://api.resend.com`
     - 用途: Worker secret `RESEND_API_KEY`（`net-kotobase` / legacy mailer）、
       ローカル CLI、domain verify（`mail.kotobase.net` 等）
-    - 投入スクリプト: `nbb scripts/provision-resend-1password.cljk`
+    - 投入スクリプト: `kbb --backend sci scripts/provision-resend-1password.cljk`
       （Keychain `gftd.resend`/`API_KEY` → op item。`--update` で上書き）
   - **Keychain ミラー**（非対話ローカル）: `service=gftd.resend` /
     `account=API_KEY` — 1Password が biometric timeout のときのフォールバック。
@@ -30,7 +30,7 @@
     token（`gftd.cf`）ではこのゾーンに書けない。**
   - 消費側: `cloud-itonami.dns-provider`（`GODADDY_API_KEY` /
     `GODADDY_API_SECRET` を env で受ける。secret に触れる唯一の場所）。
-    検証ハーネス: `clojure -M:dns-verify gftd.co.jp [--execute]`。
+    検証ハーネス: `kbb -M:dns-verify gftd.co.jp [--execute]`。
   - **`op run` は使わない — interactive auth timeout に当たる**（本 repo 既知）。
     `op read` で環境変数に注入する。
   - **`op` の "account is not signed in" は行き止まりではない**（2026-07-26 実測）:

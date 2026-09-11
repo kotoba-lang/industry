@@ -79,7 +79,7 @@ cljs では record のフィールドが optimizer にリネームされるた�
 a1348e3361f50ac2320e21f740cd9415c41ce9f7af27371b5272e58cb440d964
 ```
 
-`clojure -M:parity` と nbb の 2 コマンドが同じ root を出すことが条件。ADR-2608011600 が「cljs 側の replay は動くはずであって動かしたではない」と記録していたギャップを、証拠で埋めた。**`slab` か `book` を触ったら必ず回す。**
+`kbb -M:parity` と nbb の 2 コマンドが同じ root を出すことが条件。ADR-2608011600 が「cljs 側の replay は動くはずであって動かしたではない」と記録していたギャップを、証拠で埋めた。**`slab` か `book` を触ったら必ず回す。**
 
 ### 4. 取引端末 `kotoba-lang/torihiki-terminal` を公開した
 

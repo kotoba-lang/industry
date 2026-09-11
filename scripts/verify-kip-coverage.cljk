@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-kip-coverage.cljs — did each change to a normative surface go through
 ;; a Final KIP?
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-kip-coverage.cljk [flags]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-kip-coverage.cljk [flags]
 ;;
 ;;     --since <rev>        compare <rev>..HEAD in each owning repo.
 ;;                          Default: that repo's remote default branch.

@@ -12,7 +12,7 @@
 
 ## 実測
 
-    $ nbb -e '(binding [*out* *err*] (println \"VIA-BINDING\"))' 2>/dev/null
+    $ kbb --backend sci -e '(binding [*out* *err*] (println \"VIA-BINDING\"))' 2>/dev/null
     VIA-BINDING
 
 **stderr を捨てているのに出る。** JVM Clojure なら正しいこのイディオムを、nbb は

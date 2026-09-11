@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/annex-custody-verify.cljk — proves that annexed content is actually
 ;; held somewhere other than this machine, and that the remote copy can really
 ;; be read back.
@@ -30,7 +30,7 @@
 ;; unavailable in some of this repo's script hosts.
 ;;
 ;; Usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljk
 ;;   nbb ... scripts/annex-custody-verify.cljk --names shiropico,m365-archive
 ;;   nbb ... scripts/annex-custody-verify.cljk --sample 3     ; fsck 3 files/repo (0 = skip fsck)
 ;;   nbb ... scripts/annex-custody-verify.cljk --report out.edn
@@ -108,7 +108,7 @@
     (let [script (str root "/scripts/b2-creds.cljk")
           cp (str root ":" root "/scripts/nbb_compat:"
                   root "/orgs/kotoba-lang/secret-resolve/src")
-          {:keys [exit out]} (sh "nbb" "--classpath" cp script "--json")]
+          {:keys [exit out]} (sh "kbb" "--backend" "sci" "--classpath" cp script "--json")]
       (if (zero? exit)
         (try (js->clj (.parse js/JSON out)) (catch :default _ {}))
         {}))))

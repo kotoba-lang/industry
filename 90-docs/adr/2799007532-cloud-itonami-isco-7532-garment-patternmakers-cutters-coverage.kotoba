@@ -71,7 +71,7 @@ live git-trees listing immediately before this ADR, 65 sibling
 this same batch, so exact totals move faster than any single snapshot).
 
 The `kotoba-lang/occupation` registry's live `{:id 7532 ...}` entry
-was verified against a fresh clone before any work began (`clojure -M
+was verified against a fresh clone before any work began (`kbb -M
 -e \"(require 'kotoba.occupation) (println
 (kotoba.occupation/get-occupation \\\"7532\\\"))\"` from a checkout with
 the `kotoba-lang/technology` sibling present at the correct
@@ -262,7 +262,7 @@ regardless of disposition path.
   count bumped accordingly (recomputed live from the registry via
   `kotoba.occupation/maturity-summary`, not assumed, immediately
   before the edit).
-- Full test suite (`clojure -M:test`): 25 tests, 55 assertions, 0
+- Full test suite (`kbb -M:test`): 25 tests, 55 assertions, 0
   failures, 0 errors -- raw output captured in this ADR's
   `:test/counts` and in the task report, independently re-verified
   against a brand-new fresh clone of the pushed repository (not just

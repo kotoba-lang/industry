@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/tsukuru-maturity-tick.cljk — ADR-2800003200 の残 gap を継続測定する
 ;; ローカル loop。LaunchAgent cloud.itonami.bot.tsukuru-maturity-tick が起動する。
 ;;
@@ -28,7 +28,7 @@
 ;;   - 秘密の値をログにも ledger にも書かない（在否だけ）。
 ;;
 ;; ## 使い方
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/tsukuru-maturity-tick.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/tsukuru-maturity-tick.cljk
 ;;   nbb ... scripts/tsukuru-maturity-tick.cljk --skip-slow   ; 面のロードを飛ばす
 ;;
 ;; exit 0 常に（監視ループであって gate ではない。gate は個々の verify スクリプト）。

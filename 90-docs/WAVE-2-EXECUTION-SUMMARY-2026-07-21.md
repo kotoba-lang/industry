@@ -117,7 +117,7 @@ Wave 2 (quad-store/commit-dag integration + Gap-1 resolution) has been formally 
 - **Status:** ⚠️ Pending (wave-1 pin verification before main merge)
 - **Action Required:** Sync manifest pins with origin/main before PR to main
 - **Timeline:** After Wave 1 verification (2026-07-25) and before PR (target 2026-07-26)
-- **Command:** `nbb scripts/gen-west-manifest.cljs --check` (once pins are canonical)
+- **Command:** `kbb --backend sci scripts/gen-west-manifest.cljk --check` (once pins are canonical)
 
 ### Next Steps Before Main Merge
 1. ✅ Wave 1 verification complete (2026-07-25)

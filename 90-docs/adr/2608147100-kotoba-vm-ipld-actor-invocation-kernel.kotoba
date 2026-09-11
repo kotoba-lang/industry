@@ -34,7 +34,7 @@ This ADR lands that kernel as kotoba-lang/kotoba-vm.
 
 6. **Do not put this kernel on the kotobase query/index hot path.** ADR-2608610000 measured that a prolly-tree transaction through an FVM-style host/guest boundary is tens of crossings and a half-megabyte copy. This kernel runs committed messages.
 
-7. **Do not depend on actual Filecoin.** Production `:deps` is `{io-ipld}`. `io-filecoin`, `cloud-filecoin`, Lotus, builtin-actors, ref-fvm, FIL gas, HAMT, EVM, PoRep/PoSt are other repos or rejected mechanisms. A gate (`vm_deps_test`) fails if a Filecoin coordinate appears in deps.edn or `clojure -Stree`. Concept-vocabulary spellings (`fvm`, `filecoin vm`) are index aliases, not a dependency.
+7. **Do not depend on actual Filecoin.** Production `:deps` is `{io-ipld}`. `io-filecoin`, `cloud-filecoin`, Lotus, builtin-actors, ref-fvm, FIL gas, HAMT, EVM, PoRep/PoSt are other repos or rejected mechanisms. A gate (`vm_deps_test`) fails if a Filecoin coordinate appears in deps.edn or `kbb -Stree`. Concept-vocabulary spellings (`fvm`, `filecoin vm`) are index aliases, not a dependency.
 
 8. **The inga bind is a test extra-dep, not a production import.** `inga.state/machine` with `:invoke-fn (kotoba.vm/invoke-fn …)` is constructed in `test/kotoba/vm_inga_bind_test.clj`. kotoba-vm `src/` does not require inga. inga `src/` does not require kotoba-vm (inga's own runtime-deps gate already forbids interpreters). A VM that imports consensus becomes that consensus layer's VM.
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/repo-bots/drain-loop.cljk — repo 常駐 bot の findings を 1 件ずつ
 ;; 塞ぎにいくローカル Claude loop の入口。
 ;; LaunchAgent `cloud.itonami.bot.repo-bot-drain` が一定間隔でこれを起こす。
@@ -19,8 +19,8 @@
 ;;   - exit 0 常に。
 ;;
 ;; usage:
-;;   nbb scripts/repo-bots/drain-loop.cljk
-;;   nbb scripts/repo-bots/drain-loop.cljk --dry-run
+;;   kbb --backend sci scripts/repo-bots/drain-loop.cljk
+;;   kbb --backend sci scripts/repo-bots/drain-loop.cljk --dry-run
 
 (require '[clojure.edn :as edn]
          '[clojure.string :as str])

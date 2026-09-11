@@ -69,26 +69,26 @@ child repo の取得は別々に選べる。全 root tree と全 west project �
 root script / manifest task:
 
 ```bash
-nbb scripts/root-worktree.cljs create <task>
+kbb --backend sci scripts/root-worktree.cljk create <task>
 ```
 
 ADR / policy task:
 
 ```bash
-nbb scripts/root-worktree.cljs create <task> --profile docs
-nbb scripts/root-worktree.cljs create <task> --profile policy --include 90-docs/design-quality
+kbb --backend sci scripts/root-worktree.cljk create <task> --profile docs
+kbb --backend sci scripts/root-worktree.cljk create <task> --profile policy --include 90-docs/design-quality
 ```
 
 west child を必要とする task:
 
 ```bash
-nbb scripts/root-worktree.cljs create <task> --west <project-name>
+kbb --backend sci scripts/root-worktree.cljk create <task> --west <project-name>
 ```
 
 clean worktreeの終了:
 
 ```bash
-nbb scripts/root-worktree.cljs remove <helper-printed-exact-path>
+kbb --backend sci scripts/root-worktree.cljk remove <helper-printed-exact-path>
 ```
 
 task branchはworktreeと一緒に削除しない。branch retirementはgit-cleanup-conflictの

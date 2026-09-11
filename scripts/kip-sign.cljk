@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kip-sign.cljs — sign a KIP for admission to :final.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/kip/src:orgs/kotoba-lang/kagami/src" \
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/kip/src:orgs/kotoba-lang/kagami/src" \
 ;;       scripts/kip-sign.cljk --kip kip-0001 (--kagi <name> | --key <pem>) [--write]
 ;;
 ;; Prints the signature entry. With --write it splices it into the KIP's
@@ -158,6 +158,6 @@
     (fs/writeFileSync kip-file replaced)
     (println)
     (println (str "wrote " (path/relative root kip-file) " — " (count updated) " signature(s)"))
-    (println "Now run: nbb --classpath \"orgs/kotoba-lang/kip/src:orgs/kotoba-lang/kagami/src\" \\")
+    (println "Now run: kbb --backend sci --classpath \"orgs/kotoba-lang/kip/src:orgs/kotoba-lang/kagami/src\" \\")
     (println "           scripts/verify-kip-quorum.cljk --all --kip" kip-id)
     (println "Only set :kip/status :final once that says ADMIT.")))

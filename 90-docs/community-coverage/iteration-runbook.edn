@@ -39,10 +39,10 @@ west は使わない（`west init` 不要 / `manifest/west.yml` に触らない 
 
 1. **現在地を測る**（必ず最初に。数字は ADR に書き写す）
    ```sh
-   nbb 90-docs/community-coverage/queries/coverage.cljs            # 全体
-   nbb 90-docs/community-coverage/queries/coverage.cljs regions    # 地域偏り
-   nbb 90-docs/community-coverage/queries/coverage.cljs unpinned   # pin 待ちキュー
-   nbb 90-docs/community-coverage/queries/coverage.cljs integrity  # 参照整合性
+   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk            # 全体
+   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk regions    # 地域偏り
+   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk unpinned   # pin 待ちキュー
+   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk integrity  # 参照整合性
    ```
 2. **穴を選ぶ**。優先順は ①地域偏りの補正（regions の下位: oceania / middle-east /
    southeast-asia / south-america / africa）②未収録の形態 ③未 pin の大物。
@@ -62,8 +62,8 @@ west は使わない（`west init` 不要 / `manifest/west.yml` に触らない 
    未 pin 数 / basis 数）を実測値に差し替える。新しい構造的発見があれば `### N.` を足す。
 6. **検証**（clean になるまで commit しない）
    ```sh
-   nbb 90-docs/community-coverage/queries/coverage.cljs integrity   # 'clean —' が出ること
-   nbb --classpath '.:scripts/nbb_compat' manifest/edn-query.cljs count   # ADR が parse できること
+   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk integrity   # 'clean —' が出ること
+   kbb --backend sci --classpath '.:scripts/nbb_compat' manifest/edn-query.cljs count   # ADR が parse できること
    ```
 7. **commit → branch → サーバ側マージ**（rebase / force-push は禁止）
    ```sh
@@ -127,8 +127,8 @@ bin/tamaki loop list ; bin/tamaki loop status
    tamaki 自身が作る actor worktree で恒常的に dirty なため、cycle は
    `Cycle requires a clean working tree` で必ず中断する。専用 worktree が必須。
 3. **未解決のブロッカー: kotoba-code の shell allowlist に `nbb` が無い**
-   （`src/kotoba_code/host.clj` の `allowed-shell?` は `clojure -M:test` /
-   `bb test` / `git status|diff|show` / `rg` / `ls` / `pwd` / `find .` のみ）。
+   （`src/kotoba_code/host.clj` の `allowed-shell?` は `kbb -M:test` /
+   `kbb -M:test` / `git status|diff|show` / `rg` / `ls` / `pwd` / `find .` のみ）。
    実行すると actor は自前の worktree を作り runbook を読むところまで進むが、
    **coverage reporter も integrity check も DENIED になり、検証してから commit する
    という本 runbook の前提が満たせない。** さらに kotoba-code には git-commit tool が

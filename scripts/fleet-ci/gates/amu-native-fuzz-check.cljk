@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns fleet-ci.gates.amu-native-fuzz-check
   (:require [cljs.reader :as reader]
             [clojure.string :as str]
@@ -42,7 +42,7 @@
         (:loader-source-sha256 baseline) "actual" loader-sha))
 
 (let [result (cp/spawnSync
-              "npx" #js ["--yes" "nbb" "scripts/fuzz-native.cljk"]
+              "npx" #js ["--yes" "kbb" "--backend" "sci" "scripts/fuzz-native.cljk"]
               #js {:cwd root :encoding "utf8" :maxBuffer 33554432
                    :env (js/Object.assign #js {} js/process.env
                                           #js {"KOTOBA_NATIVE_FUZZ_RUNS" "20000"

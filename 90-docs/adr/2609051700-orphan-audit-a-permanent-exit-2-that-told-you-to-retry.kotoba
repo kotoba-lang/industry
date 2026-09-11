@@ -5,7 +5,7 @@
   (:adr/date "2026-09-05")
   (:adr/related (vector "ADR-2608230300" "ADR-2608136000"))
   (:adr/context
-  "Found during a cleanup pass. `nbb scripts/west-orphan-audit.cljs` exited 2 with: GitHub に後継を訊けなかった候補が 1 件 … gh が答えられる状態で再実行すること. gh was working; every other lookup in the same run answered.
+  "Found during a cleanup pass. `kbb --backend sci scripts/west-orphan-audit.cljk` exited 2 with: GitHub に後継を訊けなかった候補が 1 件 … gh が答えられる状態で再実行すること. gh was working; every other lookup in the same run answered.
 
 The candidate was orgs/kotoba-cli-verify-120601/repo, whose origin is a local filesystem path left by the kotoba-cli build verifier (/Users/…/runs/kotoba-cli-build-verifier/cloud-murakumo-20260903-115727/repo). `canonical-slug` correctly reported that this is not a github.com URL, but the caller wrapped every unverified result as `(assoc … :kind :ask-failed)`, so a remote that is structurally unaskable was counted as a transient gh failure.
 

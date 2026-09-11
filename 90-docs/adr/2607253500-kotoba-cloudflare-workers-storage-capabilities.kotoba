@@ -120,8 +120,8 @@ guest には新しい import も handle も `env` も渡らない。**漏らせ�
 # Evidence
 
 - `npm test`（nbb）: 42 tests / 221 assertions, 0 failures
-- `clojure -M:test`（JVM、同一 `.cljc` core）: 34 tests / 191 assertions, 0 failures
-- `clojure -M:lint`（clj-kondo）: 0 errors, 0 warnings
+- `kbb -M:test`（JVM、同一 `.cljc` core）: 34 tests / 191 assertions, 0 failures
+- `kbb -M:lint`（clj-kondo）: 0 errors, 0 warnings
 - conformance: admission gate が生成しうる denial reason 23 種すべてに到達する fixture を持ち、`every-declared-denial-reason-is-reachable` が集合一致を検証する（列挙されているが到達不能な reason は「誰も形を確認していない gate 分岐」なので許さない）
 - provider: stub binding（実 workerd と同じ shape 判別メンバを持つ）に対し、拒否された batch が **何も実行しない**こと、binding 不在が silent skip ではなく `:failed` になること、D1 が policy 側 SQL を実行し guest は params しか渡していないことを検証済み
 

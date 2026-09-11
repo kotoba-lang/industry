@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; cleanup.cljs — worktree / branch / stash 調査 → PR候補 → merge-2-main の読取専用 survey。
 ;;
 ;; オーナー指示を恒常化する:「subfolder 含め git worktree list / branch / stash list し、
@@ -9,11 +9,11 @@
 ;;   manifest は API single-entry・main 常に同期優先）。
 ;;
 ;; 使い方:
-;;   nbb scripts/cleanup.cljk            ; survey のみ（dry-run・既定）
-;;   nbb scripts/cleanup.cljk --apply    ; 孤児 PR を close する安全処置のみ実行
-;;   nbb scripts/cleanup.cljk --merge    ; MERGEABLE な PR を gh pr merge --merge（main 同期を先に）
-;;   nbb scripts/cleanup.cljk --subrepos ; 子リポ survey を省略（superproject のみ）
-;;   nbb scripts/cleanup.cljk --unlanded ; 子リポ survey を UNLANDED（要着地）だけに絞る
+;;   kbb --backend sci scripts/cleanup.cljk            ; survey のみ（dry-run・既定）
+;;   kbb --backend sci scripts/cleanup.cljk --apply    ; 孤児 PR を close する安全処置のみ実行
+;;   kbb --backend sci scripts/cleanup.cljk --merge    ; MERGEABLE な PR を gh pr merge --merge（main 同期を先に）
+;;   kbb --backend sci scripts/cleanup.cljk --subrepos ; 子リポ survey を省略（superproject のみ）
+;;   kbb --backend sci scripts/cleanup.cljk --unlanded ; 子リポ survey を UNLANDED（要着地）だけに絞る
 ;;
 ;; full history が既定（2026-07-21、ADR-2607211600 で shallow 既定は撤回済み）だが、
 ;; PR の ahead/behind・mergeable は引き続き GitHub API（server-side full history）で

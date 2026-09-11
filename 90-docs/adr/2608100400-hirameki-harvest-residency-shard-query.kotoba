@@ -274,7 +274,7 @@ main に着地済みで、pin は 3 つとも remote main と一致。
 - hirameki actor: 62 tests / 285 assertions、0 failures
 - corpus gate: 2 tests / 4 assertions、0 failures（fleet が回すのと同じ経路）
 - query-check: 8 項目 ok
-- Worker: shadow-cljs release で dist/worker.js 179 KB。**デプロイと実行は未実施**
+- Worker: amu compile --target wasm32-browser で dist/worker.js 179 KB。**デプロイと実行は未実施**
 
 すべての gate について「壊すと落ちる」ことを確認済み（corpus shard の 1 バイト改竄 /
 datoms shard 削除 / inventor 属性混入 / 台帳 21h 停止 / bundle 改竄 / router 削除 /
@@ -289,7 +289,7 @@ hirameki-patents の 2 つだけ）。このセッションで使えた token �
 全 repo 書き込みで、2 ファイルを書くために無人プロセスへ渡すには広すぎる。
 
     cd orgs/cloud-itonami/hirameki
-    clojure -M:cljs -m shadow.cljs.devtools.cli release worker
+    kbb -M:cljs -m shadow.cljs.devtools.cli release worker
     npx wrangler secret put GITHUB_TOKEN --name cloud-itonami-hirameki-harvest
     npx wrangler secret put RUN_TOKEN    --name cloud-itonami-hirameki-harvest
     npx wrangler deploy

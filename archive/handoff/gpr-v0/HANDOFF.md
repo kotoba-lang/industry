@@ -22,7 +22,7 @@ remote container は破棄されるので、作業を失わないためにここ
 
 ```bash
 cd archive/handoff/gpr-v0
-npx --yes nbb run-tests.cljs          # 23 tests / 48 assertions が緑であることを先に確認
+npx --yes kbb --backend sci run-tests.cljk          # 23 tests / 48 assertions が緑であることを先に確認
 
 git init -b main && git add -A
 git commit -m "gpr: 地中レーダーの trace → 断面 → 埋設物候補（v0）"
@@ -35,11 +35,11 @@ gh repo create kotoba-lang/gpr --public --source=. --push \
 ```bash
 # 1) manifest/repos.edn の :manifest.repos/extra-projects に "orgs/kotoba-lang/gpr" を足す
 # 2) 当該 entry のみ生成（wholesale 再生成は禁止）
-nbb scripts/gen-west-manifest.cljs --entry gpr
+kbb --backend sci scripts/gen-west-manifest.cljk --entry gpr
 # 3) pin が upstream default branch から到達可能か検査
-nbb scripts/verify-west-pins.cljs
+kbb --backend sci scripts/verify-west-pins.cljk
 # 4) 登録漏れが無いことを確認
-nbb scripts/west-orphan-audit.cljs --blocking
+kbb --backend sci scripts/west-orphan-audit.cljk --blocking
 ```
 
 登録が終わったら **この dir を削除する commit** を同じ PR に入れる。

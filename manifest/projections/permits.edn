@@ -17,7 +17,7 @@
 ;;             旧 gate `root-permit-index` はそれを立てようとして 259 tip 連続で
 ;;             赤かった（しかも「射影が正本とズレている」という、壊れていない
 ;;             不変条件の名前で報告していた）。鮮度は `orgs/` が実在する場所で
-;;             `nbb --classpath ".:scripts" scripts/gen-permit-index.cljk --check`
+;;             `kbb --backend sci --classpath ".:scripts" scripts/gen-permit-index.cljk --check`
 ;;             を回す運用側の仕事として残す。
 {:projection/version 2
  :projection/id "permits"

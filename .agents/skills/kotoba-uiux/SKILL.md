@@ -159,7 +159,7 @@ After building or changing a page, score the rendered HTML with the deterministi
 HIG/WCAG audit (`kotoba-lang/design-quality`, ADR-2607132300):
 
 ```bash
-cd orgs/kotoba-lang/design-quality && nbb -m design-quality.cli score /path/to/rendered.html --min 95
+cd orgs/kotoba-lang/design-quality && kbb --backend sci -m design-quality.cli score /path/to/rendered.html --min 95
 ```
 
 Exit 1 below `--min` — wire it as a CI gate like kotoba-ui's self-scoring test.

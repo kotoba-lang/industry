@@ -23,7 +23,7 @@
 ;; この不変条件は datom tx-data 全般に成り立つ（属性は keyword）。2,053 件の
 ;; 実測で違反は上記 1 件のみだった。
 ;;
-;; ノード側で `npx nbb docs-edn-truncation-check.cljs <dir> [--dir 90-docs/adr]`。
+;; ノード側で `kbb --backend sci docs-edn-truncation-check.cljk <dir> [--dir 90-docs/adr]`。
 
 (ns fleet-ci.gates.docs-edn-truncation-check
   (:require ["node:fs" :as fs]

@@ -76,7 +76,7 @@ console / editor と字面を共有しない。`ls | grep -i term` のような�
 6. **west 登録状況を持つ。** `:concept/registered?`。未登録 = 正本とは限らない
    作業コピーで、そこを直しても何も起きない（surface 索引が同日に実測した欠陥）。
 
-7. **引く経路は 2 つ。** `nbb scripts/concept-lookup.cljs <語>`（順位付き、綴りを
+7. **引く経路は 2 つ。** `kbb --backend sci scripts/concept-lookup.cljk <語>`（順位付き、綴りを
    いくつ引き当てたかが主 —— `kuro` は terminal/tty/pty/shell session/console の
    5 つに当たり、`console` 1 つの operator console repo より上に来る）と、
    `manifest/edn-query.cljs` の datom 面（`:source/dataset \"concept\"`、

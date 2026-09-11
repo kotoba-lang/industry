@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-shadow-source-paths
   "Namespaces a shadow-cljs build requires that NO declared source-path provides.
 
@@ -23,7 +23,7 @@
   about being one -- see :limits below.
 
   usage:
-    nbb scripts/verify-shadow-source-paths.cljk [<root>] [--all] [--json]
+    kbb --backend sci scripts/verify-shadow-source-paths.cljk [<root>] [--all] [--json]
 
   <root> defaults to the superproject. Without --all only repos declaring a
   RELATIVE sibling path (\"../\") are examined, which is where drift comes

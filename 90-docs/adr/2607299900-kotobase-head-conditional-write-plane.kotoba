@@ -252,7 +252,7 @@ enforce へ上げるなら、そう明記して上げること。
        node <root>/scripts/resource-guard.mjs run build -- npm run test:cljs
        node test/smoke-live.mjs https://kotobase-cf-wasm-testnet.aozora.app
        node test/write-bench.mjs https://kotobase-cf-wasm-testnet.aozora.app 6
-       npx nbb slo/resilience_probe.cljs https://kotobase-cf-wasm-testnet.aozora.app
+       kbb --backend sci slo/resilience_probe.cljk https://kotobase-cf-wasm-testnet.aozora.app
 
 期待値: unit 133 tests / 304 assertions / 0 failures、smoke ALL GREEN、contention は
 `final-datom-count == ok + 1`（消失ゼロ）かつ 5xx なし。write phase の内訳を見るには

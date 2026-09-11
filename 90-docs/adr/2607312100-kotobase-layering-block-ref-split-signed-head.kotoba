@@ -41,8 +41,8 @@
    "kotoba-lang/kotobase-storage-s3 4e7ff95 (race.cljs: CAS は逐次テストで資格認定できない)"))
 
   (:adr/verify
-  (vector "cd orgs/kotoba-lang/kotobase-storage-s3 && nbb --classpath 'src:test:../kotobase-storage/src' -e \"(require '[race]) (race/main)\""
-   "nbb scripts/west-orphan-audit.cljs --blocking   ; L0 repo の未登録を検出"))
+  (vector "cd orgs/kotoba-lang/kotobase-storage-s3 && kbb --backend sci --classpath 'src:test:../kotobase-storage/src' -e \"(require '[race]) (race/main)\""
+   "kbb --backend sci scripts/west-orphan-audit.cljk --blocking   ; L0 repo の未登録を検出"))
 
   (:adr/body
   "# Context

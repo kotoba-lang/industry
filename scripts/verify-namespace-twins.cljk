@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; One namespace, two files, one of them dead.
 ;;
-;;   nbb scripts/verify-namespace-twins.cljk [--findings]
+;;   kbb --backend sci scripts/verify-namespace-twins.cljk [--findings]
 ;;
 ;; Clojure resolves `.clj` before `.cljc` on the JVM and `.cljs` before `.cljc`
 ;; on ClojureScript. So a namespace that exists as both has one file that wins

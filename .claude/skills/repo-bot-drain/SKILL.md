@@ -12,7 +12,7 @@ description: repo ごとの常駐 bot（scripts/repo-bots/）が見つけた床�
 ## この反復の仕事はちょうど 1 つ
 
 ```bash
-nbb scripts/repo-bots/tick.cljk --next     # 直す 1 件が EDN で出る
+kbb --backend sci scripts/repo-bots/tick.cljk --next     # 直す 1 件が EDN で出る
 ```
 
 **無人の loop（`cloud.itonami.bot.repo-bot-drain`）は `--next-unattended` を使い、`:landed` を
@@ -24,7 +24,7 @@ nbb scripts/repo-bots/tick.cljk --next     # 直す 1 件が EDN で出る
 `{:outcome :candidate :bot "<org>/<name>" :floor <床> :since <iso> :detail "…"}`
 
 - `:outcome :not-measured` — **候補 0 件ではない。** まだ誰も測っていない。
-  `nbb scripts/repo-bots/tick.cljk --wave 200` を先に回して、この周は終わる。
+  `kbb --backend sci scripts/repo-bots/tick.cljk --wave 200` を先に回して、この周は終わる。
 - `:outcome :no-candidates` — 本当に床が塞がっている。**無い仕事を作らない。**
 
 2 件まとめない。「ついでに」他の repo を直さない —— この loop の価値は
@@ -81,7 +81,7 @@ URL が無いか / 雛形の痕跡が無いか / 床を越えているか / repo
 **草稿は下書きであって正解ではない。** 中身を読んで直す。直したら gate に通し直す:
 
 ```bash
-nbb scripts/repo-bots/propose.cljk --bot <org>/<name> --check-draft <file>
+kbb --backend sci scripts/repo-bots/propose.cljk --bot <org>/<name> --check-draft <file>
 ```
 
 草稿が無い場合（`INSUFFICIENT-EVIDENCE` で模型を呼ばなかった場合を含む）は自分で書く。
@@ -128,7 +128,7 @@ worktree は superproject ルートの**外**に作る。west を worktree 内�
 ## 終わり方
 
 1. 直したら、その bot だけ測り直して床が塞がったことを**見る**:
-   `nbb scripts/repo-bots/tick.cljk --only <org>/<name>`
+   `kbb --backend sci scripts/repo-bots/tick.cljk --only <org>/<name>`
    → `RESOLVED（塞がった床）` に出れば着地。出ないなら**直っていない**。
 2. 出なかったら、直したつもりのものと報告されたものが食い違っている。
    ここで「たぶん直った」と書かない（ADR-2608136000）。

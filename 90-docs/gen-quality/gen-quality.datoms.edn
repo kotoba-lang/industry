@@ -5,7 +5,7 @@
 ;; sibling gen-quality-ledger.edn — this file only declares schema + the :model/* and :axis/* catalog entities that
 ;; ledger events reference via :eval/model / :eval/axis. Query BOTH files together.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
 ;;     '[:find ?m ?s :where [?e "eval/axis" "axis/composite"] [?e "eval/model" ?m] [?e "eval/score" ?s]]'
 [
  ;; ── schema ─────────────────────────────────────────────────────────────────

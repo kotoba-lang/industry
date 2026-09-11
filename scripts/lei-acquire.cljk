@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-acquire.cljs — acquire new companies for the cloud-itonami-lei catalog:
 ;; verify against GLEIF, verify the official site, archive its published legal
 ;; document, scaffold the per-company repo, and push it.
@@ -17,7 +17,7 @@
 ;; in code here: BRANCH category is filtered out before scoring.
 ;;
 ;; Run (from the superproject root):
-;;   nbb scripts/lei-acquire.cljk [--dry-run] [--limit N] [--concurrency N]
+;;   kbb --backend sci scripts/lei-acquire.cljk [--dry-run] [--limit N] [--concurrency N]
 ;;
 ;; --dry-run does every verification and prints exactly what WOULD be created,
 ;; without creating a repo or pushing anything.

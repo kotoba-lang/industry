@@ -204,18 +204,18 @@
            them touches ~120 live public surfaces in one pass. Within standing
            authorization, but the blast radius is worth naming before starting rather
            than after. A bounded first batch (10 repos, verified) is the safer shape.")
-    (:command "nbb scripts/gen-appview-page-summary.cljs --names <repo> --apply"))
+    (:command "kbb --backend sci scripts/gen-appview-page-summary.cljk --names <repo> --apply"))
 
    (map (:priority 5) (:owner-blocked true) (:item "KOTOBASE_MAINTENANCE_OPERATOR_DIDS — without it no query surface except atproto can be measured or exercised."))
    (map (:priority 6) (:owner-blocked true) (:item "The 91 inline documents (85% of the seed, unreachable by s3 since 2026-08-10). h6 in the ranking; irreversible; needs a decision on whether they are still wanted."))
    (map (:priority 7) (:owner-blocked true) (:item "Which materialised view to build (h1, the top-ranked item), and the read:write ratio it depends on."))))
   (:adr/resume
-  "nbb --classpath 90-docs/kotobase-performance/src 90-docs/kotobase-performance/run.cljs
+  "kbb --backend sci --classpath 90-docs/kotobase-performance/src 90-docs/kotobase-performance/run.cljs
    — prints the current ranking from the measured baseline. Then, for h7's second
    half, the bench is:
      cd orgs/net-kotobase/control-plane/protocols-worker    (or a clone)
      ./node_modules/.bin/nbb scripts/fetch-graph-blocks.cljs /tmp/kb-blocks kotobase-protocols-v2
-     node ../../../../scripts/resource-guard.mjs run build -- npx shadow-cljs release hydrate-bench
+     node ../../../../scripts/resource-guard.mjs run build -- amu compile --target wasm32-browser hydrate-bench
      node --expose-gc --max-old-space-size=8192 out/hydrate-phase-bench.js \\
        --blocks /tmp/kb-blocks --head bafyreiehotlnqouj5u35gqh535ctxr52smxiphdjhiydtmivc2v6tqx3ye \\
        --graph kotobase-protocols-v2

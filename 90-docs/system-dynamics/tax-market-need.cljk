@@ -287,4 +287,4 @@
     (fs/writeFileSync path (xml/emit-string (doc-of scenario)))
     (println (str "\nwrote " path))))
 
-(println "\n再現: nbb --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:orgs/kotoba-lang/dynamics/src\" 90-docs/system-dynamics/tax-market-need.cljs")
+(println "\n再現: kbb --backend sci --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:orgs/kotoba-lang/dynamics/src\" 90-docs/system-dynamics/tax-market-need.cljs")

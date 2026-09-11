@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; docs-edn-check.cljs — EDN-only ドキュメント repo の gate。
 ;;
 ;; 展開済みの repo tree を受け取り、tree 内の全 *.edn が
 ;; `(edn/read-string (slurp f))` 可能であることを検証する（90-docs の EDN-only
 ;; 方針 ADR-2607171600 と同じ不変条件を、CI として repo 側にも課す）。
 ;;
-;; ノード側で `npx nbb docs-edn-check.cljs <dir>` として実行される
+;; ノード側で `kbb --backend sci docs-edn-check.cljk <dir>` として実行される
 ;; （tick.cljs が heredoc でノードに配って呼ぶ。JVM を要求しない gate）。
 ;;
 ;; exit codes（3 つとも 2026-09-10 に実測、`/tmp` の使い捨て repo で再現できる）:

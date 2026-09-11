@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; observatory-registry-discriminate.cljs
 ;; ── observatory-registry-check.cljs が **両方向に動く**ことの機械証明 ──────────
 ;;
@@ -19,7 +19,7 @@
 ;;      （別の不変条件が偶然落ちて赤くなっただけ、を弾く）
 ;;   3. 戻したコピーで exit 0
 ;;
-;; 実行: `nbb scripts/fleet-ci/gates/observatory-registry-discriminate.cljk <tree>`
+;; 実行: `kbb --backend sci scripts/fleet-ci/gates/observatory-registry-discriminate.cljk <tree>`
 ;; ネットワーク: 不要。実 tree は書き換えない（temp へ複製して壊す）。
 
 (ns fleet-ci.gates.observatory-registry-discriminate

@@ -202,7 +202,7 @@ SPA なので**初回ロード以降の遷移は pushState であり worker に�
 - `112 tests / 3157 assertions, 0 failures`
 - **gate が落ちることを確認してから landed とした**: `normalize-route` の
   whitelist を外すと 13 failures
-- `shadow-cljs release app worker` 成功、両 bundle に新コードを確認
+- `amu compile --target wasm32-browser app worker` 成功、両 bundle に新コードを確認
 - 本番 D1 に `dwell_daily` / `route_transition_daily` を作成
 - **live probe（deploy 後、shinshi.club に実際に POST）**:
 

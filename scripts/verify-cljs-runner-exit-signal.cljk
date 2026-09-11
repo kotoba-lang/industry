@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-cljs-runner-exit-signal.cljs -- ClojureScript test runners whose
 ;; failure signal cannot be read by the command that runs them.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-cljs-runner-exit-signal.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-cljs-runner-exit-signal.cljk \
 ;;     [--findings] [--root <dir>]
 ;;
 ;; ## What it is about
@@ -17,7 +17,7 @@
 ;;
 ;; and documents this invocation:
 ;;
-;;   clojure -Sdeps '{:paths ["src" "test"]}' \
+;;   kbb -Sdeps '{:paths ["src" "test"]}' \
 ;;     -M:dev:cljs -m cljs.main --target node \
 ;;     -m <the-runner-ns>
 ;;
@@ -42,7 +42,7 @@
 ;;
 ;; ## What the fix looks like (this is what the detector wants to see)
 ;;
-;;   clojure -Sdeps '{:paths ["src" "test"]}' -M:dev:cljs -m cljs.main \
+;;   kbb -Sdeps '{:paths ["src" "test"]}' -M:dev:cljs -m cljs.main \
 ;;     --target node --output-dir target/node-out \
 ;;     --output-to target/portable-tests.cjs -c <the-runner-ns>
 ;;   echo '{"type":"commonjs"}' > target/node-out/package.json
@@ -200,7 +200,7 @@
             "and exits 0")]
 
       ;; A runner that documents no invocation is NOT a finding. Most runners
-      ;; in this workspace are nbb scripts run as `nbb test/run_portable.cljs`
+      ;; in this workspace are nbb scripts run as `kbb --backend sci test/run_portable.cljk`
       ;; from a gate or a package.json script; nbb executes the file directly,
       ;; so `js/process.exitCode` reaches the caller and nothing is wrong.
       ;; Silence about how to invoke a file is not a broken failure signal.

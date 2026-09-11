@@ -49,7 +49,7 @@
            /test|spec/i and whose COMMAND runs a suite through nbb"
     :excluded-from-rule "scripts where nbb only generates config before a
                          different runner does the testing, e.g.
-                         `nbb gen-shadow-cljs-edn.cljs && shadow-cljs compile test
+                         `kbb --backend sci gen-shadow-cljs-edn.cljk && amu compile --target wasm32-browser test
                          && node out/test.js` -- there the tier is shadow-cljs,
                          not nbb (12 rows / 11 repos, listed under :excluded)"
     :repos 889 :script-rows 982}
@@ -91,7 +91,7 @@
 
   :by-cohort
   [{:cohort :inline-single-ns        :rows 830 :ran 830
-    :shape "nbb --classpath src:test -e \"(require '[clojure.test :as t] 'X.main-test) ...\""
+    :shape "kbb --backend sci --classpath src:test -e \"(require '[clojure.test :as t] 'X.main-test) ...\""
     :note "Vendor/spec mirror scaffolds where nbb is the ONLY tier. 830 of 830
            run. This is the bulk of the population and it is entirely healthy --
            which is itself the finding: the mass-generated cohort is fine, and
@@ -125,7 +125,7 @@
     :error "Could not find namespace: deflate.core"
     :cause "classpath `src:test`, but deps.edn declares two HARD git deps at
             pinned shas (org-ietf-deflate, io-ipld) and nbb.edn carries no :deps."
-    :fix "nbb --classpath \"$(clojure -Spath)\" run-tests.cljs -- the form its
+    :fix "kbb --backend sci --classpath \"$(kbb -Spath)\" run-tests.cljs -- the form its
           three sibling repos io-ipld / io-ipld-car / kotobase-storage-pack
           already use, chosen over sibling paths because deps.edn's own comment
           says the org-ietf-deflate pin is load-bearing."
@@ -159,9 +159,9 @@
 
    {:repo "cloud-itonami/oshikatsu" :script "test" :phase :spawn
     :error "exit 1, NO OUTPUT AT ALL"
-    :cause "scripts/tasks.edn held the command as one string, `[\"clojure -M:test\"]`.
+    :cause "scripts/tasks.edn held the command as one string, `[\"kbb -M:test\"]`.
             run-task.cljs execs it with spawnSync(cmd[0], cmd[1:], {shell:false}),
-            so 'clojure -M:test' -- space included -- became the executable name.
+            so 'kbb -M:test' -- space included -- became the executable name.
             ENOENT, status null, and the runner's `(or (.-status r) 1)` turns null
             into exit 1. With :stdio \"inherit\" the spawn error is never printed."
     :generator-already-fixed "scripts/bb_edn_to_nbb_tasks.cljs in the superproject
@@ -250,7 +250,7 @@
               Reproduced in two independently materialized copies: both were red
               on the first run and green on the second."
    :not-diagnosed "I did not establish the cause. The command interpolates
-                   \"$(clojure -Spath)\", so a cold dependency cache is the
+                   \"$(kbb -Spath)\", so a cold dependency cache is the
                    obvious suspect, but I did not prove it and am not asserting
                    it. Recorded as a finding, not fixed."}
   {:repo "network-awai/cloud-itonami" :script "test"
@@ -281,7 +281,7 @@
   :excluded-by-construction
   {:nbb-as-codegen-not-runner
    {:rows 12 :repos 11
-    :shape "nbb gen-shadow-cljs-edn.cljs && shadow-cljs compile test && node out/test.js"
+    :shape "kbb --backend sci gen-shadow-cljs-edn.cljk && amu compile --target wasm32-browser test && node out/test.js"
     :repos-list ["kotoba-lang/blind" "kotoba-lang/datalog" "kotoba-lang/datom-model"
                  "kotoba-lang/inga" "kotoba-lang/merkle-lsm" "kotoba-lang/arrangement"
                  "kotoba-lang/bonsai" "kotoba-lang/chain" "kotoba-lang/engi"

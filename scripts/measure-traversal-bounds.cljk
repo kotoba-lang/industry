@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/measure-traversal-bounds.cljk — where the read paths are bounded,
 ;; and where the query plane's read path is not.
 ;;
@@ -10,8 +10,8 @@
 ;; Returns a COUNT of failures. Exits 2 if its own control fails.
 ;;
 ;; Run (from the superproject root):
-;;   nbb --classpath "<workspace src dirs>" scripts/measure-traversal-bounds.cljk
-;;   nbb --classpath "..." scripts/measure-traversal-bounds.cljk --root /path/to/root
+;;   kbb --backend sci --classpath "<workspace src dirs>" scripts/measure-traversal-bounds.cljk
+;;   kbb --backend sci --classpath "..." scripts/measure-traversal-bounds.cljk --root /path/to/root
 
 (ns measure-traversal-bounds
   (:require [clojure.string :as str]

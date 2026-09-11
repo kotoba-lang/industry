@@ -275,7 +275,7 @@ whether wave-1's 20 pilots are re-qualified or retired.
     node <amu>/bin/amu compile src/aave/whole_component.kotoba \\
       --target wasm32-browser --policy <policy with :budgets {:fuel 50000000}> \\
       --jvm-free --output aave.wasm
-    nbb --classpath src q9-oracle.cljs        # the .cljc oracle
+    kbb --backend sci --classpath src q9-oracle.cljs        # the .cljc oracle
     node <compare artifact against that output>
 
 `amu` must be at its west pin with `node_modules/nbb` present; a fresh worktree

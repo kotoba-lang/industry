@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; A shadow-cljs build that puts a library on its source path but not that
 ;; library's own dependency cannot compile at all.
 ;;
-;;   nbb scripts/verify-shadow-cljs-provider-paths.cljk [--findings] [<orgs dir>]
+;;   kbb --backend sci scripts/verify-shadow-cljs-provider-paths.cljk [--findings] [<orgs dir>]
 ;;
 ;; Measured 2026-08-31: net-kotobase/control-plane's protocols-worker and
 ;; network-awai/app-aozora-engine BOTH stopped at `The required namespace

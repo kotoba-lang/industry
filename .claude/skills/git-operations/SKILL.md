@@ -251,7 +251,7 @@ skill `git-cleanup-conflict`。
   git fetch origin                                 # origin/main 他を取得
   git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら停止。rebase しない）
   west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
-  nbb scripts/gen-west-manifest.cljk --check          # west.yml が canonical か（生成器と一致か）確認
+  kbb --backend sci scripts/gen-west-manifest.cljk --check          # west.yml が canonical か（生成器と一致か）確認
   ```
 
   これらを飛ばして push/PR すると、main 乖離・west.yml の pin 退行・子リポの

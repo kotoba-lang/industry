@@ -15,7 +15,7 @@
 ;; asked, within a client timeout of 90 s. Anything else is the ceiling not
 ;; being met, and is printed as what it was rather than fitted.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_ipq_ceiling.cljs <root> <label> [reps=3]
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_ipq_ceiling.cljs <root> <label> [reps=3]
 
 (ns bench-ipq-ceiling
   (:require [ipld.selector :as sel]

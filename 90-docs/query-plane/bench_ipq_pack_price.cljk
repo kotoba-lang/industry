@@ -22,7 +22,7 @@
 ;; reads the whole 39 KB pack to answer with 562 bytes. Whether that is a price
 ;; worth paying is a decision the table informs and does not make.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_ipq_pack_price.cljs
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_ipq_pack_price.cljs
 
 (ns bench-ipq-pack-price
   (:require [ipld.selector :as sel]

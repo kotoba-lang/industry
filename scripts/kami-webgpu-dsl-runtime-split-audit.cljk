@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
          '[clojure.edn :as edn]
          '[clojure.java.io :as io]
@@ -43,17 +43,17 @@
   (reconstitute-entity (read-edn repos-path)))
 
 (def required-verification-commands
-  #{"nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --strict"
-    "nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-manifest --strict"
-    "nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --strict"
-    "nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --batch ci-only --strict"
-    "nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --batch readme-ci --strict"
-    "nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --batch source-bearing --strict"
-    "nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-progress --strict"
-    "nbb scripts/kami-webgpu-dsl-runtime-split-audit.cljk --strict --requested-tests"
-    "nbb scripts/verify-clj-everywhere.cljk"
-    "nbb scripts/kotoba-only-runtime-audit.cljk --strict"
-    "nbb scripts/kami-provider-split-audit.cljk --strict"})
+  #{"kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --strict"
+    "kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-manifest --strict"
+    "kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --strict"
+    "kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --batch ci-only --strict"
+    "kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --batch readme-ci --strict"
+    "kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-checklist --batch source-bearing --strict"
+    "kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --publish-progress --strict"
+    "kbb --backend sci scripts/kami-webgpu-dsl-runtime-split-audit.cljk --strict --requested-tests"
+    "kbb --backend sci scripts/verify-clj-everywhere.cljk"
+    "kbb --backend sci scripts/kotoba-only-runtime-audit.cljk --strict"
+    "kbb --backend sci scripts/kami-provider-split-audit.cljk --strict"})
 
 (def extra-projects
   (set (:extra-projects repos)))
@@ -402,7 +402,7 @@
          sort
          (mapv (fn [repo]
                  (merge {:repo repo
-                         :test "clojure -M:test"
+                         :test "kbb -M:test"
                          :changes (get details-by-repo repo [])}
                         (get plan-by-repo repo)))))))
 
@@ -598,11 +598,11 @@
           scripts (when pkg (js->clj (.-scripts pkg) :keywordize-keys false))]
       (cond
         (get scripts "test") ["npm" "test"]
-        (exists-rel? repo "nbb.edn") ["nbb" "-e" "(println :nbb-edn-present)"]
-        (exists-rel? repo "deps.edn") ["clojure" "-M:test"]
+        (exists-rel? repo "nbb.edn") ["kbb" "--backend" "sci" "-e" "(println :nbb-edn-present)"]
+        (exists-rel? repo "deps.edn") ["kbb" "-M:test"]
         :else nil))
-    (exists-rel? repo "nbb.edn") ["nbb" "--classpath" "src:test" "-e" "(require 'clojure.test)"]
-    (exists-rel? repo "deps.edn") ["clojure" "-M:test"]
+    (exists-rel? repo "nbb.edn") ["kbb" "--backend" "sci" "--classpath" "src:test" "-e" "(require 'clojure.test)"]
+    (exists-rel? repo "deps.edn") ["kbb" "-M:test"]
     (exists-rel? repo "bb.edn") ["bb" "test"] ; legacy residual until Wave 2/3 complete
     :else nil))
 

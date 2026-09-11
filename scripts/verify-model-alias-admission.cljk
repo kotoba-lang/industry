@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-model-alias-admission — the model an alias resolves to must be one
 ;; the app will admit.
 ;;
-;;   nbb scripts/verify-model-alias-admission.cljk             # live probe
-;;   nbb scripts/verify-model-alias-admission.cljk --self-test # both directions
+;;   kbb --backend sci scripts/verify-model-alias-admission.cljk             # live probe
+;;   kbb --backend sci scripts/verify-model-alias-admission.cljk --self-test # both directions
 ;;
 ;; ## What this would have caught, 2026-08-27
 ;;

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; capacity-alarm.cljs — この機械のディスクが尽きる前に、1 回だけ鳴らす。
 ;;
 ;; ADR-2608160300 の再発防止。2026-08-16、`/System/Volumes/Data` が 460Gi 中
@@ -16,7 +16,7 @@
 ;; `ifree` が 1.3M まで落ちていた。片方だけ見ていると「まだ空いている」と
 ;; 読んで、ファイル作成が失敗する理由が分からなくなる。
 ;;
-;;   nbb --classpath scripts/fleet-ci scripts/fleet-ci/capacity-alarm.cljk \
+;;   kbb --backend sci --classpath scripts/fleet-ci scripts/fleet-ci/capacity-alarm.cljk \
 ;;       [--floor-gb 20] [--floor-inodes 2000000] [--notify false] [--state <f>]
 
 (ns capacity-alarm

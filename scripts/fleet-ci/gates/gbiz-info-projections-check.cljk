@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gbiz-info-projections-check.cljs — the gBizINFO 全件 projections, checked on every tip.
 ;;
 ;; **検証ロジックはここに複製しない。** 正本は repo 内の
@@ -27,7 +27,7 @@
 ;; 検査器は 0 clean / 1 violations / **2 could-not-answer**（data/ が無い、
 ;; 読めない）を返す。2 を pass に丸めない。
 ;;
-;; ノード側で `npx nbb gbiz-info-projections-check.cljs <dir>` として実行。
+;; ノード側で `kbb --backend sci gbiz-info-projections-check.cljk <dir>` として実行。
 (ns fleet-ci.gates.gbiz-info-projections-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]

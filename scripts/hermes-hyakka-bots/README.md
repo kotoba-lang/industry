@@ -109,11 +109,11 @@ than copying the classifier — the first version copied it, and stayed green
 when the classifier was broken.
 
 ```bash
-nbb --classpath scripts/hermes-hyakka-bots \
+kbb --backend sci --classpath scripts/hermes-hyakka-bots \
     scripts/hermes-hyakka-bots/resolve_free_model_test.cljk   # 17 cases
-nbb scripts/hermes-hyakka-bots/resolve_free_model.cljk --list        # candidates, no key
-nbb scripts/hermes-hyakka-bots/resolve_free_model.cljk --check-config
-nbb scripts/hermes-hyakka-bots/resolve_free_model.cljk --if-stale --write --jobs a,b
+kbb --backend sci scripts/hermes-hyakka-bots/resolve_free_model.cljk --list        # candidates, no key
+kbb --backend sci scripts/hermes-hyakka-bots/resolve_free_model.cljk --check-config
+kbb --backend sci scripts/hermes-hyakka-bots/resolve_free_model.cljk --if-stale --write --jobs a,b
 ```
 
 ## Whose name is on the bill

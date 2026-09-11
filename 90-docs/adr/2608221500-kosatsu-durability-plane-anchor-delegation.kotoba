@@ -101,14 +101,14 @@ owned upstream and could grow without anything here noticing.
 
 ### D6 — the test gate was measuring 4% of itself, and that is now fixed
 
-`clojure -M:test` ran `kosatsu.murakumo-test` ALONE — 9 tests, 31 of 729
+`kbb -M:test` ran `kosatsu.murakumo-test` ALONE — 9 tests, 31 of 729
 assertions — and printed `0 failures`. The cognitect runner defaults to
 `#\".*-test$\"` and twelve of thirteen namespaces are named
 `kosatsu.methods.test-*`. The alias now passes `-d test -r \".*\"`.
 
-Fixing it surfaced two breaks that only `bb test` had hidden, both because
+Fixing it surfaced two breaks that only `kbb -M:test` had hidden, both because
 babashka is more permissive than the JVM: `cheshire` missing from the test
-classpath (bb bundles it) and three tests calling a `defn-` var directly (SCI
+classpath (kbb -M:bundles it) and three tests calling a `defn-` var directly (SCI
 does not enforce privacy). cheshire is KEPT rather than replaced: `ingest.cljc`
 ships a self-contained JSON reader on purpose, and cheshire is the independent
 writer its fixtures come from, so the reader is checked against someone else's
@@ -133,11 +133,11 @@ JSON instead of against itself.
 
 Measured 2026-08-22 at `cloud-itonami/kosatsu` 7d8ebed:
 
-- `clojure -M:test` — 173 tests / 729 assertions, 0 failures (was 9 / 31)
+- `kbb -M:test` — 173 tests / 729 assertions, 0 failures (was 9 / 31)
 - breaking the G10-anchor guard reds exactly
   `test-representative-records-are-refused-a-public-chain`; breaking the
   empty-log floor reds `test-empty-log-is-not-intact`. Both restored to green.
-- `clojure -M:lint` — 13 errors across 8 files, ALL pre-existing and in files
+- `kbb -M:lint` — 13 errors across 8 files, ALL pre-existing and in files
   this change does not touch (`src/kosatsu/mesh.clj` 3, `ingest.cljc`,
   `weave.cljc`, five test namespaces). The two new files contribute none. The
   lint gate was already red before this change and remains so; recorded in the

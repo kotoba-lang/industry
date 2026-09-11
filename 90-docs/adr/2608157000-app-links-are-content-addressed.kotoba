@@ -112,7 +112,7 @@ deployed worker は **136**（`wrangler.jsonc` 実数）。内訳:
 
 IPNS 名 `k51qzi5uqu5dhhxwqi8puzqiau2lpwkt8oh8rajqpyak21v8gpvs8qh17o89br` が
 435 app の catalog を指す（`manifest/appview-catalog.edn`、87,078 bytes、sequence 4）。
-publish は `clojure -M:catalog`（kotoba-lang/content-address）。
+publish は `kbb -M:catalog`（kotoba-lang/content-address）。
 
 **per-app 名を意図的に発行していない。** 435 名は 435 本の秘密鍵で、その規模の鍵集合は
 誰が何と言おうと**総当たりで管理される** —— 安全床⑦が禁じている形そのもの。1 鍵で catalog を
@@ -181,7 +181,7 @@ catalog 側でも 2 つ: `--out FILE` の **値**を入力 manifest として読
 現在地は毎回測る。数値を引用しない:
 
 ```bash
-nbb --classpath \".:orgs/kotoba-lang/content-address/src\" \\
+kbb --backend sci --classpath \".:orgs/kotoba-lang/content-address/src\" \\
   scripts/verify-app-content-address.cljs orgs
 # 2026-08-15: SCANNED 589 / ADDRESSED 435 / LOCATED 154 / UNREADABLE 0（exit 1）
 ```
@@ -191,9 +191,9 @@ nbb --classpath \".:orgs/kotoba-lang/content-address/src\" \\
 ```bash
 export KOTOBASE_ARCHIVE_TOKEN=$(KAGI_HOME=$HOME/.kagi FLEET_ROOT=$PWD \\
   orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN)
-nbb --classpath \".:orgs/kotoba-lang/content-address/src\" \\
+kbb --backend sci --classpath \".:orgs/kotoba-lang/content-address/src\" \\
   scripts/content-address-wave.cljs <list-file> --execute      # 省略で dry-run
-nbb scripts/advance-pins.cljs cloud-itonami <names> --execute && nbb scripts/verify-west-pins.cljs
+kbb --backend sci scripts/advance-pins.cljk cloud-itonami <names> --execute && kbb --backend sci scripts/verify-west-pins.cljk
 ```
 
 catalog を名前ごと更新する（sequence は pointer から自動で上がる）:
@@ -201,7 +201,7 @@ catalog を名前ごと更新する（sequence は pointer から自動で上が
 ```bash
 cd orgs/kotoba-lang/content-address
 CONTENT_ADDRESS_CATALOG_IPNS_SEED=$(kagi get cloud-itonami-appviews-catalog) \\
-KOTOBASE_ARCHIVE_TOKEN=… clojure -M:catalog \\
+KOTOBASE_ARCHIVE_TOKEN=… kbb -M:catalog \\
   --out <root>/manifest/appview-catalog.edn <addressed manifests...>
 ```
 

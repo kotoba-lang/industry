@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; plane-coscientist.cljs — クエリ面の速さを Co-Scientist ループで詰める。
 ;;
 ;; Generate -> Reflect -> Rank -> Evolve -> Meta。原典は
@@ -41,7 +41,7 @@
 ;; - 1 問も答えられなかった run は exit 2（0 でも 1 でもない）。
 ;;
 ;; Run:
-;;   nbb scripts/plane-coscientist.cljk [--trials N] [--out <file.edn>]
+;;   kbb --backend sci scripts/plane-coscientist.cljk [--trials N] [--out <file.edn>]
 
 (ns plane-coscientist
   (:require ["child_process" :as cp]
@@ -162,7 +162,7 @@
             (println (str "plane cache is not answering (exit " exit "): " why))
             (println "  refusing to measure -- a baseline that cannot run makes every")
             (println "  other strategy look like it disagrees with it. Refresh first:")
-            (println "    nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljk refresh")
+            (println "    kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljk refresh")
             (.exit js/process 2))
         load-start (load1)
         baseline-id :full-cache

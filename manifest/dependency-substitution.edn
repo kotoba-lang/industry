@@ -123,7 +123,7 @@
  ;; true and reads as completeness; the detector that counts the same debt
  ;; workspace-wide is `scripts/verify-jvm-dependency-surface.cljk`, and its
  ;; `jvm-runtime-deps` class disagrees with this file in two ways.
- {:measured-by "nbb --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.cljk --findings orgs"
+ {:measured-by "kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.cljk --findings orgs"
   :reporting-repos 75
   :in-this-ledgers-scope 18
   :outside-it 57
@@ -143,7 +143,7 @@
 
   :the-coverage-gap
   "Six coordinates carry no entry at all -- 36 declarations. Candidate targets
-   below were found with `nbb scripts/repo-search.cljk` and read out of each
+   below were found with `kbb --backend sci scripts/repo-search.cljk` and read out of each
    repository's README; they are CANDIDATES, not dispositions, and are
    recorded that way deliberately. A disposition asserts that a substitution
    is the right move, which is a judgement; this is only the measurement that
@@ -282,7 +282,7 @@
     one.
 
     **Check that the suite loaded the file you changed.** za-actor's
-    `clojure -M:test` returned 42 tests / 86 assertions / 0 failures and never
+    `kbb -M:test` returned 42 tests / 86 assertions / 0 failures and never
     required `za-actor.deploy`, the only file the commit touched. Forcing the
     namespace to load fails -- on unmodified main too: it requires
     `kotoba.net.jvm-host` and the repo declares nothing providing it. So that

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-west-pins.cljs — west.yml の pin 変更をサーバ側(GitHub API)で検証する。
 ;;
 ;; baseline と candidate の west.yml を比較し、revision が変わった / 新規の entry ごとに:
@@ -15,8 +15,8 @@
 ;; 頼らない(CLAUDE.md「マージ / ancestry 判定」節と同じ理由)。
 ;;
 ;; 使い方:
-;;   nbb scripts/verify-west-pins.cljk                        ; baseline=origin/main(無ければ HEAD), candidate=working tree
-;;   nbb scripts/verify-west-pins.cljk --baseline <ref|file> --candidate <ref|file> [--dir <repo>] [--only <name>]
+;;   kbb --backend sci scripts/verify-west-pins.cljk                        ; baseline=origin/main(無ければ HEAD), candidate=working tree
+;;   kbb --backend sci scripts/verify-west-pins.cljk --baseline <ref|file> --candidate <ref|file> [--dir <repo>] [--only <name>]
 ;;     <ref|file>: 実在ファイルはそのまま読む。それ以外は git show <ref>:manifest/west.yml
 ;;                 (":" を含む値は git show <値> をそのまま実行)。
 ;;     --only <name>: 検証対象をその entry 名に絞る(繰り返し/カンマ区切り可)。

@@ -5,7 +5,7 @@
   ;; `kotoba-lang/sprite2d` must be checked out at its west path:
   ;;   west update --fetch smart sprite2d
   ;; Override the coordinate when working from a clone elsewhere:
-  ;;   clojure -Sdeps '{:deps {kotoba-lang/sprite2d {:local/root "/path/to/sprite2d"}}}' -M:ir-test
+  ;;   kbb -Sdeps '{:deps {kotoba-lang/sprite2d {:local/root "/path/to/sprite2d"}}}' -M:ir-test
   :ir-test
   {:extra-paths ["test"]
    :extra-deps {kotoba-lang/sprite2d {:local/root "../../../../../../orgs/kotoba-lang/sprite2d"}

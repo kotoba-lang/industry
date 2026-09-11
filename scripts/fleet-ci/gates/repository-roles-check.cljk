@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; repository-roles-check.cljs — repository role 宣言の gate。
 ;;
 ;; 展開済みの superproject tree を受け取り、`manifest/repository-rules.edn`
@@ -16,7 +16,7 @@
 ;; **token 無し**で取る。ノードに credential を置かない不変条件を崩さない
 ;; （ノードは既に npx で npm から nbb を取っているので、外向き HTTPS は前提）。
 ;;
-;; ノード側で `npx nbb repository-roles-check.cljs <dir> [--min N]` として実行。
+;; ノード側で `kbb --backend sci repository-roles-check.cljk <dir> [--min N]` として実行。
 (ns fleet-ci.gates.repository-roles-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -116,7 +116,7 @@
     (die! 90 "only" (count @fetched) "repos materialized (<" min-repos
           ") — refusing to report pass"))
 
-  (let [r (try (cp/execFileSync "npx" (clj->js (into ["--yes" "nbb" "--classpath" root verifier]
+  (let [r (try (cp/execFileSync "npx" (clj->js (into ["--yes" "kbb" "--backend" "sci" "--classpath" root verifier]
                                                      @fetched))
                                 #js {:encoding "utf8" :cwd root :maxBuffer 33554432})
                (catch :default e

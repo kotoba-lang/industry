@@ -58,7 +58,7 @@ app にある 36 個の `*_core.kotoba` は **まさにその禁じられた dec
 Q9 の移行単位には数えられない。
 
 **app の JVM 脱出を統べているのは app 自身の `docs/adr/0079`** であり、計測器は
-`nbb scripts/jvm-exit-report.cljs`。Q9（`.cljc → .kotoba`）とは別の軸
+`kbb --backend sci scripts/jvm-exit-report.cljk`。Q9（`.cljc → .kotoba`）とは別の軸
 （`.clj → .cljs`）である。この 2 つを混同しない。
 
 ## 発端 —— 存在しない名前に 35 ファイルが移行されていた

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/repo-taxonomy-select.cljk
 ;;
 ;; ADR-2607289600 D9 の selector。`manifest/repo-taxonomy.edn` の 3 面分類で
@@ -7,7 +7,7 @@
 ;;
 ;; なぜ west groups への `kind-*` 投影ではなくこの形なのか (ADR-2607289600 D9、実測):
 ;;
-;;   1. `nbb scripts/gen-west-manifest.cljk --check` は main 上で既に STALE。
+;;   1. `kbb --backend sci scripts/gen-west-manifest.cljk --check` は main 上で既に STALE。
 ;;      groups を足すために全体再生成すると、pin が **ローカル working HEAD** から
 ;;      書き直される — CLAUDE.md が記録している「1件の登録のつもりが壊れた pin を
 ;;      44 件 main に流した」事故 (90852b86) と同じ経路になる。
@@ -21,31 +21,31 @@
 ;;   明示リストを取る。selector はそこに直接繋がり、**west.yml を 1 バイトも変えない**。
 ;;
 ;; 使い方:
-;;   nbb scripts/repo-taxonomy-select.cljk --kind actor --org cloud-itonami
-;;   nbb scripts/repo-taxonomy-select.cljk --kind actor,organism --present
-;;   nbb scripts/repo-taxonomy-select.cljk --role person --paths
-;;   nbb scripts/repo-taxonomy-select.cljk --trait deploy-target --format comma
+;;   kbb --backend sci scripts/repo-taxonomy-select.cljk --kind actor --org cloud-itonami
+;;   kbb --backend sci scripts/repo-taxonomy-select.cljk --kind actor,organism --present
+;;   kbb --backend sci scripts/repo-taxonomy-select.cljk --role person --paths
+;;   kbb --backend sci scripts/repo-taxonomy-select.cljk --trait deploy-target --format comma
 ;;
 ;; west / fleet に渡すとき (実測した罠が 2 つあるので必ずこの形で):
 ;;
 ;;   # ✅ 正: 既定の lines 出力を xargs -n で刻んで west に渡す
-;;   nbb scripts/repo-taxonomy-select.cljk --kind organism --present \
+;;   kbb --backend sci scripts/repo-taxonomy-select.cljk --kind organism --present \
 ;;     | xargs -n 500 west update --fetch smart
 ;;
 ;;   # ✅ 正: fleet sync は --names がカンマ区切りを取る
-;;   nbb scripts/repo-taxonomy-select.cljk --kind actor --org cloud-itonami --format comma \
-;;     | xargs -I{} nbb --classpath orgs/kotoba-lang/kotoba-fleet-vcs/src \
+;;   kbb --backend sci scripts/repo-taxonomy-select.cljk --kind actor --org cloud-itonami --format comma \
+;;     | xargs -I{} kbb --backend sci --classpath orgs/kotoba-lang/kotoba-fleet-vcs/src \
 ;;         orgs/kotoba-lang/kotoba-fleet-vcs/bin/fleet.cljs sync \
 ;;         --db manifest/fleet-db.edn --workspace . --names {} --jobs 8
 ;;
 ;;   # ❌ 誤: zsh は変数を単語分割しないので、全名前が 1 引数になり west が
 ;;   #       "unknown project name/path: a b c" で落ちる (CLAUDE.md 既知の罠)
-;;   NAMES=$(nbb scripts/repo-taxonomy-select.cljk --kind organism --format space)
+;;   NAMES=$(kbb --backend sci scripts/repo-taxonomy-select.cljk --kind organism --format space)
 ;;   west update $NAMES
 ;;
 ;;   # ❌ 誤: xargs の既定バッチは ARG_MAX 基準で巨大になり、1,107 名を一括で
 ;;   #       渡すと west 側が落ちる。`-n 400`〜`-n 1000` は実測で通る
-;;   nbb scripts/repo-taxonomy-select.cljk --kind actor --present | xargs west list
+;;   kbb --backend sci scripts/repo-taxonomy-select.cljk --kind actor --present | xargs west list
 ;;
 ;; フィルタ (すべて AND、値はカンマ区切りで OR):
 ;;   --kind   <k,...>   :repo/kind         actor|organism|service|app|lib|corpus|

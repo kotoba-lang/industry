@@ -279,7 +279,7 @@ claim: they close *environment* failures, and an edit to the test body is closed
 by diff review, not by the gate.
 
 **Limit of the demonstration**: it ran on this laptop, where npm 11.12.1
-misparses `npx --yes nbb --classpath X file.cljs` (measured: the argument is
+misparses `npx --yes kbb --backend sci --classpath X file.cljs` (measured: the argument is
 resolved as `github:scripts/…`, `npm ERR! code 128`), so a PATH shim calling
 `nbb` directly stood in for `npx`. It establishes that the gate's *decision
 logic* goes red and green as claimed; it does **not** establish that the npx

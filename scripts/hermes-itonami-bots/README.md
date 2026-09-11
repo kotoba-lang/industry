@@ -175,7 +175,7 @@ python3 ~/.hermes/scripts/itonami_evidence.py           # ~4 min: it runs the ti
 And to check the gate still discriminates, before trusting that it accepts:
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljk --self-test
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljk --self-test
 ```
 
 ## What these bots are not allowed to do

@@ -37,7 +37,7 @@
 ;;   not designed-then-hoped-to-fit).
 ;;
 ;; BEFORE writing scenario code: run the target repo's own `sim.cljc`
-;; (`clojure -M:dev:run`) FIRST and check it actually produces sensible
+;; (`kbb -M:dev:run`) FIRST and check it actually produces sensible
 ;; output against `store/seed-db`'s real ids. Do not assume it is
 ;; correct. isic-851's own `schoolops.sim` turned out to be a latent
 ;; bug -- copy-pasted from an unrelated eldercare/ISIC-873 actor, its
@@ -67,7 +67,7 @@
   against the same seed (verify by diffing two consecutive runs before
   shipping).
 
-  Usage: `clojure -M:dev:render-html [out-file]`
+  Usage: `kbb -M:dev:render-html [out-file]`
   (default `docs/samples/operator-console.html`)."
   (:require [clojure.string :as str]
             ;; ADAPT 1 of 4: require the target repo's own store/operation

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Rule-based inference over a MATERIALIZED document store, where a
 ;; cross-document reference by key silently answers less than it should.
 ;;
@@ -30,7 +30,7 @@
 ;; predicate below actually separates them. A detector whose failing direction
 ;; has never been run is a detector nobody has justified.
 ;;
-;;   nbb scripts/verify-materialized-reference-join.cljk --findings orgs
+;;   kbb --backend sci scripts/verify-materialized-reference-join.cljk --findings orgs
 ;; The runtime half lives next to the evidence it produced, because it needs a
 ;; classpath this detector deliberately does not have:
 ;;

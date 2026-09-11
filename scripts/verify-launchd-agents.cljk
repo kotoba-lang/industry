@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 常駐 agent が「走れる状態か」と「実際に走っているか」を別々に測る。
 ;;
 ;; ## なぜ要るか
@@ -45,7 +45,7 @@
 ;;   exit 1  起動できない agent が在る
 ;;   exit 2  測れなかった（launchctl も plist も読めない等）
 ;;
-;; usage: nbb scripts/verify-launchd-agents.cljk [--stale-days 7] [--findings]
+;; usage: kbb --backend sci scripts/verify-launchd-agents.cljk [--stale-days 7] [--findings]
 (ns verify-launchd-agents
   (:require ["fs" :as fs]
             ["path" :as path]

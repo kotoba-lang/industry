@@ -33,10 +33,10 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "released PostgreSQL TLS/SCRAM/query interoperability: ok; exit 0"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test -n kototama.tender-test")
+     (:command "kbb -M:test -n kototama.tender-test")
      (:result "scripted TLS/SCRAM/query and negative protocol tests passed"))))))
   (:adr/body
   "# ADR-2607195900: Released PostgreSQL TLS/SCRAM/query interoperability

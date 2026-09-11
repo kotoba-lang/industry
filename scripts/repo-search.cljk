@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; manifest/west.yml の 4,000+ repo を名前で検索する。
 ;;
 ;; なぜ必要か。2026-08-04 の 1 セッションで、agent(私)が「この workspace には
@@ -18,9 +18,9 @@
 ;;
 ;; そこで: **「無い」と結論する前に、これを引く。**
 ;;
-;;   nbb scripts/repo-search.cljk dht kad routing
-;;   nbb scripts/repo-search.cljk noise handshake
-;;   nbb scripts/repo-search.cljk protobuf
+;;   kbb --backend sci scripts/repo-search.cljk dht kad routing
+;;   kbb --backend sci scripts/repo-search.cljk noise handshake
+;;   kbb --backend sci scripts/repo-search.cljk protobuf
 ;;
 ;; ローカルに checkout 済みの repo は README の見出し行も一緒に出す(未 checkout
 ;; でも名前だけで当たりは付く。west は必要になるまで取得しないので、
@@ -122,7 +122,7 @@
 (defn -main [& args]
   (let [terms (map str/lower-case args)]
     (if (empty? terms)
-      (println "usage: nbb scripts/repo-search.cljk <term> [term...]")
+      (println "usage: kbb --backend sci scripts/repo-search.cljk <term> [term...]")
       (let [all (entries)
             ranked (->> all
                         (keep (fn [e]

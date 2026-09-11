@@ -18,7 +18,7 @@
 ;; everything read, one block used) and the full 256-block walk (its best
 ;; case). x-ipq-io-ms is the awaited R2 time, so transfer and decode separate.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_ipq_pack_size.cljs
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_ipq_pack_size.cljs
 
 (ns bench-ipq-pack-size
   (:require [ipld.selector :as sel]

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; SessionStart フック: **何かが実際に読んでいる checkout** が、自分の remote の
 ;; default branch からどれだけ遅れているかを、毎セッション冒頭で報告する。
 ;;
@@ -28,7 +28,7 @@
 ;;  同じ日にこの 2 つを取り違えて stderr 修正が無言で無効化された事例がある。)
 ;;
 ;; 入力: `manifest/checkout-consequence.edn`(生成物)。
-;;   生成は `nbb scripts/checkout-staleness.cljk --write-consequence`。
+;;   生成は `kbb --backend sci scripts/checkout-staleness.cljk --write-consequence`。
 ;;   **このファイルが無いときは「測れなかった」と言って exit 0 する**
 ;;   (fail-open だが、無言ではない)。初版は無言で exit 0 しており、
 ;;   **健全な session と区別が付かなかった** —— ADR-2608136000 が同じ日に
@@ -37,7 +37,7 @@
 ;;   sparse cone の中にあるのに、working tree から消えていた
 ;;   (`git status` は ` D`)。hook は何も言わず、復元したら 16 件を報告した。
 ;;
-;; 手動実行: `nbb .claude/hooks/session-start-checkout-staleness.cljk [<dir>]`
+;; 手動実行: `kbb --backend sci .claude/hooks/session-start-checkout-staleness.cljk [<dir>]`
 
 (require '[clojure.string :as str]
          '[clojure.edn :as edn])
@@ -203,7 +203,7 @@
                   "    git status --porcelain manifest/checkout-consequence.edn\n"
                   "    git checkout -- manifest/checkout-consequence.edn\n"
                   "  それでも無ければ再生成する:\n"
-                  "    nbb scripts/checkout-staleness.cljk\n")))
+                  "    kbb --backend sci scripts/checkout-staleness.cljk\n")))
 
     (let [entries (->> (:entries data)
                        (map (fn [e] {:path* (:path e) :readers (count (:readers e))}))
@@ -264,7 +264,7 @@
                       (:total s) " checkout 中 behind " (:behind s)
                       " / dirty " (:dirty s) " / 既定 branch 上で ahead " (:ahead-on-default-branch s)
                       " / shallow " (:shallow s) "。")])
-              ["  全件を測り直す: nbb scripts/checkout-staleness.cljk --write-consequence"
+              ["  全件を測り直す: kbb --backend sci scripts/checkout-staleness.cljk --write-consequence"
                "  直す: dirty/ahead は git-cleanup-conflict へ。clean で誰も読んでいないものだけ"
                "        `west update --fetch smart <name>`(拒否はしても破棄はしない)。"]))))))
   (catch :default _ nil))

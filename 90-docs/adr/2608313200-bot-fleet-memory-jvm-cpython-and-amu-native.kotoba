@@ -40,7 +40,7 @@ itonami cloud bots と hermes agent bots のメモリ消費を、**常駐**と**
 
 | 経路 | peak RSS | wall |
 |---|---|---|
-| itonami CLI（JVM / `clojure -M:cli`、`--help`） | 648 / 686 / 687 / 801 MB | 7.7–11.0 s |
+| itonami CLI（JVM / `kbb -M:cli`、`--help`） | 648 / 686 / 687 / 801 MB | 7.7–11.0 s |
 | hermes CLI（CPython、`--version`） | 34.9–35.1 MB | 0.10–0.16 s |
 | **itonami `bot_core` を amu native で実行** | **4.01–4.07 MB** | **~0.01 s** |
 | うち C loader 単体（`kexe_loader`、成果物なし） | 1.26 MB | |
@@ -85,7 +85,7 @@ task ごとに JVM を起こす設計だと、その床を task の数だけ払�
 native になる** —— 移行が止まっているのは能力ではなく配線である。
 
 ただし native になるのは *core* であって CLI ではない。`bin/itonami` は今も
-nbb → `clojure -M:cli` で JVM を起こす。CLI 全体を native にするには、core の外
+nbb → `kbb -M:cli` で JVM を起こす。CLI 全体を native にするには、core の外
 （引数解析・IO・server 接続）を host 側に置き直す作業が要る。**それはこの ADR の
 範囲外で、まだ誰もやっていない。**
 ")))

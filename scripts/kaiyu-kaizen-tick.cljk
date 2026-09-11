@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/kaiyu-kaizen-tick.cljk — 回遊の計測を読んで「今いちばん答えるべき問い」を
 ;; 1 件だけ出す。**決定論。モデルを起こさない。**
 ;;
@@ -53,7 +53,7 @@
 ;;   - exit 0 常に（監視であって gate ではない）
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
 ;;       scripts/kaiyu-kaizen-tick.cljk [--window-days 7] [--json]
 
 (require '[clojure.string :as str]

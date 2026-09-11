@@ -265,7 +265,7 @@ accelerator であり、不在は `append-novelty-index!` が既にサポート�
 
 検証: kotobase-peer **256 tests / 1028 assertions / 0 failures**（origin/main 28e018b の
 254/1019 から）。worker 側 **455 tests / 1525 assertions / 0 failures**。
-`shadow-cljs release worker` 0 warnings。
+`amu compile --target wasm32-browser worker` 0 warnings。
 
 **両方の新テストは discriminate することを確認した**（壊すとそのテストだけが、
 名乗った理由で落ちる）。特に **indexed 分岐は既存 255 tests では覆われて

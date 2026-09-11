@@ -81,7 +81,7 @@ namespace を 1 つ足し、**兄弟が未収録であることに気付かな�
 完全に見える。**
 
 しかも原因は怠慢ではなかった: `pack_catalog_test.cljc` は `:test` alias の
-`datalog` を require し、runner の classpath は `clojure -Spath`（base deps のみ）
+`datalog` を require し、runner の classpath は `kbb -Spath`（base deps のみ）
 だったので**そもそも load できなかった**。JVM は directory scan で拾うので通り、
 cljs では走らない。**runner に足すだけなら suite が壊れた。**（修正 `222bd141`:
 classpath を `-M:test` に。nbb 26 tests/123 assertions → **33/149**。）

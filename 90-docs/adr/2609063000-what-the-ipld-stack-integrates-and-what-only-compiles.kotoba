@@ -133,8 +133,8 @@ replay 検証済み）。
 値をここから引かない。
 
     grep -rhoE '\\[(ipld[^ ]*|ayatori[^ ]*|arrangement[^ ]*)' orgs/net-kotobase/control-plane/*/src
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-ipni-publisher-record.cljs
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-ipni-publisher-record.cljs
     curl -sS https://cid.contact/cid/<cid>
-    nbb scripts/concept-lookup.cljs ayatori
+    kbb --backend sci scripts/concept-lookup.cljk ayatori
 ")
 ))

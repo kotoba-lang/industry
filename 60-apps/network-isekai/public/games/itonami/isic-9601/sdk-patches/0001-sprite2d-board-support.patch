@@ -32,7 +32,7 @@ Content-Transfer-Encoding: 8bit
 
 途中で見つけた、これとは別の 3 件も直した:
 
-- **`clojure -M:test` が起動しなかった** (README が案内しているコマンド)。
+- **`kbb -M:test` が起動しなかった** (README が案内しているコマンド)。
   `kotoba.sprite2d` の `(:require [kami.sprite2d])` が無条件で、`kami.sprite2d`
   は `.cljs` のみ。JVM で ns が読めず、test runner が test/ 配下を読む時点で
   1 assertion も走らずに落ちていた。require を `#?(:cljs ...)` にした。
@@ -48,7 +48,7 @@ Content-Transfer-Encoding: 8bit
   かつ既存の layout テストはコピー側を叩いていたので、painter が実際に使う
   `kami.sprite2d.layout` の退行はテストを通過しえた。本物の facade にした。
 
-検証: `clojure -M:test` — 49 tests / 125 assertions, 0 failures。
+検証: `kbb -M:test` — 49 tests / 125 assertions, 0 failures。
 (変更前は 0 assertion。suite が起動しなかったため)
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
@@ -123,7 +123,7 @@ index 1bab958..a74a858 100644
  ## Test
  
  ```sh
- clojure -M:test
+ kbb -M:test
  ```
 +
 +Layout, bounds and picking are pure `.cljc`, so they run on the JVM with no canvas. The
@@ -364,7 +364,7 @@ index c379f55..3016e6c 100644
 +
 +   The require is `:cljs`-only because `kami.sprite2d` is a `.cljs` file — a Canvas2D
 +   painter has nothing to be on the JVM. Unconditional, it made this namespace fail to
-+   load under Clojure, which took the whole `clojure -M:test` run down with it before a
++   load under Clojure, which took the whole `kbb -M:test` run down with it before a
 +   single assertion ran (the test runner loads every namespace under `test/`, and those
 +   reach this one). The README's own test command therefore did not work. Fixed
 +   2026-08-08; the `#?(:cljs ...)` body below was always conditional, so nothing that

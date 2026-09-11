@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; adr-identity-check.cljs — `:adr/id` が 1 つの文書を指すことの gate。
 ;;
 ;; **検証ロジックはここに複製しない。** 正本は `scripts/verify-adr-identity.cljk`
@@ -41,7 +41,7 @@
 ;;
 ;; ネットワーク: 不要（tree 内の .edn を読むだけ）。
 ;;
-;; ノード側で `npx nbb adr-identity-check.cljs <dir> --min 1400` として実行。
+;; ノード側で `kbb --backend sci adr-identity-check.cljk <dir> --min 1400` として実行。
 ;; ⚠ `<dir>` は引数の**先頭**に置く（CLAUDE.md「赤い gate を直す前に 3 つ確かめる」2）。
 (ns fleet-ci.gates.adr-identity-check
   (:require ["node:child_process" :as cp]

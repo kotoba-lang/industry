@@ -144,7 +144,7 @@ D1 をストレージ）。
 
 ## 実測 / 検証
 
-`nbb --classpath src:test run-tests.cljs` → **43 tests / 130 assertions / 0 failures**。
+`kbb --backend sci --classpath src:test run-tests.cljs` → **43 tests / 130 assertions / 0 failures**。
 
 `test/tia/governor_test.cljc` は仕様書として読める形にしてある: 同名の他人はモデルが
 告発しても通報不能のまま、モデルは案件を格上げできない、免責表示のあるパロディは
@@ -380,7 +380,7 @@ Kotobase 永続化（実エンジン検証済み・単一 ref）、Cloudflare Wo
 phash+PNG 9/18、Kotobase 実エンジン統合 9/24、UI 不変条件 12/76、Worker host 25/78。
 `design-quality` 全12軸で10画面すべて 100.00（ただし rubric は「良いパターンの存在」を
 見る heuristic であって品質の証明ではない — 本文の該当節を参照）。
-`shadow-cljs release` は警告ゼロで 505 KB、`verify-bundle.cljs` PASS。
+`amu compile --target wasm32-browser` は警告ゼロで 505 KB、`verify-bundle.cljs` PASS。
 
 **未実装（優先順）**:
 1. **デプロイ** — D1 database id、R2 バケット、7つの secret、4プラットフォームの
@@ -406,7 +406,7 @@ liquid-glass-ui 側が受け取れば消える）。`kotobase-peer` の値型は
 
 ```bash
 cd orgs/gftdcojp/ai-gftd-tia && npm install
-nbb --classpath src:test run-tests.cljs          # 43/130、依存ゼロで最初に回る
+kbb --backend sci --classpath src:test run-tests.cljs          # 43/130、依存ゼロで最初に回る
 npm run build                                     # bundle + verify-bundle
 ```
 

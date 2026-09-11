@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Convert `:sci-test` bb.edn repos to an nbb test script and land it: one
 ;; worktree, one server-side merge per repo, and ONE batched pin commit at the
 ;; end.
@@ -23,7 +23,7 @@
 ;; server-side checks per entry.
 ;;
 ;;   YIELD_TSV=… WORKDIR=… LEDGER=… PINS_OUT=… [LIMIT=n] [DRY=1] \
-;;     nbb --classpath ".:scripts/nbb_compat" land-bb-to-nbb.cljs
+;;     kbb --backend sci --classpath ".:scripts/nbb_compat" land-bb-to-nbb.cljs
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))
@@ -88,7 +88,7 @@
         (let [add (sh (str "git -C " src " worktree add -q -b " branch " " wt " " rem "/" br) {})]
           (if (pos? (:exit add))
             (note! (str rel "\tFAIL\tworktree: " (str/replace (str/trim (:out add)) "\n" " ")))
-            (let [em (sh (str "nbb --classpath '.:scripts/nbb_compat'"
+            (let [em (sh (str "kbb --backend sci --classpath '.:scripts/nbb_compat'"
                               " scripts/bb_to_nbb_scaffold.cljk emit --repo " wt)
                          {:cwd root :shell "/bin/bash"})]
               (if (or (pos? (:exit em)) (not (.existsSync fs (.join node-path wt "nbb.edn"))))

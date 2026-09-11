@@ -28,15 +28,15 @@ kbb で走る  ──要る──▶  .kotoba をコンパイルするもの
 ```
 
 今日 `.kotoba` をコンパイルする経路は**すべて `.cljc` のコンパイラを Clojure host
-（JVM か nbb）で走らせている**。`bin/kbb` 自体が `nbb bin/kbb_shim.cljs` である。
+（JVM か nbb）で走らせている**。`bin/kbb` 自体が `kbb --backend sci bin/kbb_shim.cljk` である。
 
 ## 閉路 2 —— resolver（2026-09-08 実測、閉路 1 とは別）
 
 **pin を上げてもコンパイラに届かない。** `bin/kbb` は amu を
 `~/.gitlibs/libs/io.github.kotoba-lang/amu/<sha>` から解決するので、その sha の
 ディレクトリが無いと `kbb js backend cannot reach the compiler` と答える。埋めるのは
-`clojure -Spath`（= tools.deps）である。実測: kotoba の deps.edn の amu pin を上げた
-直後、gate 17 件すべてがこの理由で赤くなり、`clojure -Spath` を 1 回走らせると緑に
+`kbb -Spath`（= tools.deps）である。実測: kotoba の deps.edn の amu pin を上げた
+直後、gate 17 件すべてがこの理由で赤くなり、`kbb -Spath` を 1 回走らせると緑に
 なった。
 
 **つまり pin を 1 回動かすたびに clojure が 1 回要る。** host を native 化しても、
@@ -134,7 +134,7 @@ grep -n 'native-auto\\|js-hosted\\|interpreter-only' <kotoba>/bin/kbb_shim.cljs
 #   js -> string-too-large / native -> SIGILL
 
 # 0d と L4a: JVM 依存とテストのホスト分布
-nbb --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.cljs
+kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/verify-jvm-dependency-surface.cljs
 
 # JVM-free gate（clojure/java/clj を exit 127 の stub で潰して走る）
 nbb <kotoba>/scripts/verify-kbb-ports.cljs
@@ -192,5 +192,5 @@ amu #852 が kit 契約の側を持ってくるので、provider を足せば `k
 
 ADR-2607198300（実行成果物が JVM/Node/Rust を経由しない）の下に、**順序**を足す。
 ADR-2609081700 は「移行先が動くことを別に測る」側を決めており、この ADR はその測定が
-どの順で必要になるかを決めている。ADR-2609070200 は `clojure -M` の退役が文字通りの
+どの順で必要になるかを決めている。ADR-2609070200 は `kbb -M` の退役が文字通りの
 置換にならないことを記録しており、その理由の構造がここでいう閉路 1 である。")))

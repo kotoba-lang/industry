@@ -11,7 +11,7 @@ HTTP 200 so live network confirmed — NOT a not-measured run.
 
 | Signal | Value |
 |---|---|
-| funnel-pulse (nbb kotobase_lead_loop.cljs) | EXIT=0. VISITORS=9624 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 0 :signups 0 :checkouts 0}. UNCHANGED=true EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=unchanged. Pulse ledger appended 2026-09-08T03:38:51+09:00 {:funnel {:visitors 9624 :signups 31 :checkouts 0}}. |
+| funnel-pulse (kbb --backend sci kotobase_lead_loop.cljk) | EXIT=0. VISITORS=9624 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 0 :signups 0 :checkouts 0}. UNCHANGED=true EXTERNAL-FUNNEL-CHANGE=false SCORE=unchanged RESULT=unchanged. Pulse ledger appended 2026-09-08T03:38:51+09:00 {:funnel {:visitors 9624 :signups 31 :checkouts 0}}. |
 | /api/funnel | HTTP 200 (live network confirmed; 0.05s window; body matches the 9624/31/0 pulse read). |
 
 This run: visitors 9624, signups pinned at 31, checkouts 0. Unchanged vs the 03:38 read.

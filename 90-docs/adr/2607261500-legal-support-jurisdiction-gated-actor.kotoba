@@ -186,7 +186,7 @@ ESCALATE: 弁護士への取次ぎ / 新法域の開設 / 運営者の宣誓で�
 
 ## Verification
 
-`clojure -M:test` 51 tests / 4,391 assertions green、`clojure -M:lint` warnings 0 /
+`kbb -M:test` 51 tests / 4,391 assertions green、`kbb -M:lint` warnings 0 /
 errors 0（いずれも実走。2026-07-26）。さらに変異テスト3件で suite が実際に
 噛むことを確認した:
 
@@ -197,6 +197,6 @@ errors 0（いずれも実走。2026-07-26）。さらに変異テスト3件で 
 いずれも復元後 0 failures。
 
 `data/jurisdiction-rules.datoms.edn`（276 entity、`:source/dataset
-\"legal-jurisdiction-rules\"`）は `clojure -M:emit-datoms` の生成物で、
+\"legal-jurisdiction-rules\"`）は `kbb -M:emit-datoms` の生成物で、
 superproject の DataScript クエリ面（ADR-2607252000）に載る。`datoms-test` が
 `facts.cljc` との乖離で fail する。")))

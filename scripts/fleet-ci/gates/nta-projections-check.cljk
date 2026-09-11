@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; nta-projections-check.cljs — the committed NTA projections, checked on every tip.
 ;;
 ;; **検証ロジックはここに複製しない。** 正本は repo 内の
@@ -26,7 +26,7 @@
 ;; を返す。2 を pass に丸めない —— 「検査対象が無かった」と「検査して問題無し」が
 ;; 同じ出力になるのが、この class の欠陥そのものである。
 ;;
-;; ノード側で `npx nbb nta-projections-check.cljs <dir>` として実行。
+;; ノード側で `kbb --backend sci nta-projections-check.cljk <dir>` として実行。
 (ns fleet-ci.gates.nta-projections-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -52,7 +52,7 @@
 
 (def result
   (try
-    {:out (cp/execSync "npx --yes nbb scripts/verify-projections.cljs ."
+    {:out (cp/execSync "npx --yes kbb --backend sci scripts/verify-projections.cljk ."
                        #js {:cwd root :encoding "utf8" :stdio "pipe" :timeout 600000})
      :code 0}
     (catch :default e

@@ -116,7 +116,7 @@ native qualification を手放すことになっていた。
 ## Evidence
 
 - **amu#583**（merged `8ff1030`）: native conformance case
-  `:native-step-fold-classify`。`clojure -M:native-conformance` **17/17 pass、
+  `:native-step-fold-classify`。`kbb -M:native-conformance` **17/17 pass、
   target `:aarch64-kotoba-v1`**。union を `+` に変えると冪等性が壊れて
   `expect 5, result 6` で落ちることを着地前に確認。
 - **kotoba-selfhost-contracts#5**: `infer-step` + analyzer の rewire。

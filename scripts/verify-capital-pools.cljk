@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-capital-pools — capital-pools.edn が budget-supply.edn から**今も**
 ;; 導かれることを、committed 済みの値を読み直すのではなく再導出して照合する。
 ;;
@@ -31,7 +31,7 @@
 ;;        区別できず、行き先無しの金を静かに作る）
 ;;   8. :pool/contested-by を持つ pool は本文で警告されている
 ;;
-;; usage: nbb scripts/verify-capital-pools.cljk [--root DIR]
+;; usage: kbb --backend sci scripts/verify-capital-pools.cljk [--root DIR]
 
 (require '[clojure.edn :as edn]
          '[clojure.string :as str])

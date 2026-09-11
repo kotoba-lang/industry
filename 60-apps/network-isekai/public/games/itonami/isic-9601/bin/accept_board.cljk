@@ -2,7 +2,7 @@
   "CLI acceptance for #1752 — board screenshot via __setState + render --view board.
 
   Run from the package root:
-    npx nbb --classpath src bin/accept_board.cljs
+    kbb --backend sci --classpath src bin/accept_board.cljs
 
   Pins:
     1. play --dump produces an envelope with :shop
@@ -28,7 +28,7 @@
 (def port 8733)
 
 (defn- sh [args]
-  (let [r (cp/spawnSync "npx" (clj->js (into ["nbb" "--classpath" "src"] args))
+  (let [r (cp/spawnSync "npx" (clj->js (into ["kbb" "--backend" "sci" "--classpath" "src"] args))
                         #js {:cwd here :encoding "utf8"})]
     {:status (.-status r)
      :stdout (or (.-stdout r) "")

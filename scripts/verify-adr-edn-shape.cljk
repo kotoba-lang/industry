@@ -1,13 +1,13 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-adr-edn-shape — a commit gate for a single ADN/ADR `.edn` document.
 ;;
-;;   nbb scripts/verify-adr-edn-shape.cljk <file.edn> [--tail "final words"]
+;;   kbb --backend sci scripts/verify-adr-edn-shape.cljk <file.edn> [--tail "final words"]
 ;;
 ;; Exits 0 when the file is one entity whose keys are ALL keywords and whose
 ;; `:adr/body` ends with `--tail` verbatim. Exits 1 otherwise, printing which
 ;; assertion failed. Meant to be chained to the commit in one shell expression:
 ;;
-;;   nbb scripts/verify-adr-edn-shape.cljk f.edn --tail '...**' && git commit ...
+;;   kbb --backend sci scripts/verify-adr-edn-shape.cljk f.edn --tail '...**' && git commit ...
 ;;
 ;; ## Why keyword-ness is checked separately from parseability
 ;;
@@ -32,7 +32,7 @@
 ;; was written -- and the trailing `**` matters precisely because it is the
 ;; part an eye skips.
 ;;
-;;   nbb scripts/verify-adr-edn-shape.cljk --self-test
+;;   kbb --backend sci scripts/verify-adr-edn-shape.cljk --self-test
 
 (ns verify-adr-edn-shape
   (:require ["node:fs" :as fs]

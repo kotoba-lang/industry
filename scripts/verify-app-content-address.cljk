@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Which application manifests identify their document by content, and which
 ;; only by location?
 ;;
-;;   nbb --classpath ".:orgs/kotoba-lang/content-address/src" \
+;;   kbb --backend sci --classpath ".:orgs/kotoba-lang/content-address/src" \
 ;;       scripts/verify-app-content-address.cljk [<root>] [--list]
 ;;
 ;; ADR-2608157000. The judge is `content-address.core/addressed?` — this

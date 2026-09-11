@@ -300,7 +300,7 @@
    :removed-authority "ambient requiring-resolve of Cheshire and Babashka HTTP providers"
    :portable-boundary :static-codec-and-explicit-http-request-capability
    :host-adapter "src/tadori/host/http.clj"
-   :entrypoint "bb ingest"
+   :entrypoint "kbb -M:ingest"
    :pr "https://github.com/etzhayyim/com-etzhayyim-tadori/pull/2"
    :merge-commit "ce9507eb3394c9e37afec8f97165194721f3d2c8"
    :verification {:tests 79
@@ -342,7 +342,7 @@
    :removed-authority "ambient HTTP, server, environment, secret and runtime codec discovery"
    :portable-boundary :purpose-bound-chat-audit-and-server-capabilities
    :host-adapter "60-apps/etzhayyim-project-animeka/lg-clj/run_tests.clj"
-   :entrypoints ["bb test" "bb server"]
+   :entrypoints ["kbb -M:test" "kbb -M:server"]
    :pr "https://github.com/etzhayyim/root/pull/3142"
    :merge-commit "899433e8c40b3c1bdc927a68c2f862b05cfaeb03"
    :verification {:tests 43
@@ -368,7 +368,7 @@
    :removed-authority "ambient HTTP, server, environment, API-key, secret and runtime codec discovery"
    :portable-boundary :purpose-bound-chat-audit-and-server-capabilities
    :host-adapter "60-apps/etzhayyim-project-jukyu/lg-clj/run_tests.clj"
-   :entrypoints ["bb test" "bb server"]
+   :entrypoints ["kbb -M:test" "kbb -M:server"]
    :pr "https://github.com/etzhayyim/root/pull/3143"
    :merge-commit "a2b529e55a606b5e35272020ed21dd1d0b9f849b"
    :verification {:tests 48

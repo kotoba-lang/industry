@@ -62,7 +62,7 @@ Each day (2026-09-11 through 2026-09-17):
 murakumo/metrics-summary.sh --pool cljc --window 24h > day-N-metrics.json
 
 # 1000 UTC: Compare to baseline
-nbb manifest/metrics-compare.cljs \
+kbb --backend sci manifest/metrics-compare.cljk \
   --baseline month-2-baseline.json \
   --current day-N-metrics.json \
   --threshold-p99 100 \
@@ -131,7 +131,7 @@ murakumo/set-traffic-split.sh --cljc-percent 75 --Rust-percent 25 \
   --migration-phase 3 --step 1
 
 # Log event
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "traffic-ramp-step-1" \
   --from-pct 50 --to-pct 75 \
   --timestamp "2026-09-18T16:00:00Z"
@@ -171,7 +171,7 @@ murakumo/instance-health-check.sh --pool rust-prod | jq '.status'
 murakumo/set-traffic-split.sh --cljc-percent 90 --Rust-percent 10 \
   --migration-phase 3 --step 2
 
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "traffic-ramp-step-2" \
   --from-pct 75 --to-pct 90 \
   --timestamp "2026-09-21T16:00:00Z"
@@ -187,7 +187,7 @@ nbb manifest/fleet-ops-log.cljs \
 murakumo/set-traffic-split.sh --cljc-percent 99 --Rust-percent 1 \
   --migration-phase 3 --step 3
 
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "traffic-ramp-step-3" \
   --from-pct 90 --to-pct 99 \
   --timestamp "2026-09-25T16:00:00Z"
@@ -335,7 +335,7 @@ for node in rust-node-{1..9}; do
 done
 
 # Push to B2
-nbb manifest/b2-upload.cljs \
+kbb --backend sci manifest/b2-upload.cljk \
   --local-dir "${ARCHIVE_DIR}" \
   --b2-bucket "kotobase-archive" \
   --b2-path "rust-fleet/${ARCHIVE_DATE}/" \
@@ -356,11 +356,11 @@ sed -i '' \
   manifest/fleet-db.edn
 
 # Regenerate west.yml
-nbb scripts/gen-west-manifest.cljs --entry murakumo
-nbb scripts/gen-west-manifest.cljs --check
+kbb --backend sci scripts/gen-west-manifest.cljk --entry murakumo
+kbb --backend sci scripts/gen-west-manifest.cljk --check
 
 # Update routing config
-nbb manifest/fleet-ops-log.cljs \
+kbb --backend sci manifest/fleet-ops-log.cljk \
   --event "rust-pool-decommissioned" \
   --timestamp "2026-09-30T12:00:00Z" \
   --details "Rust fleet sunset complete. cljc-only production."

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; tick.cljs — fleet-native CI/CD の tick（murakumo mac-mini fleet を git の CD/CI にする本体）。
 ;;
 ;; ADR-2607178000 の standing runner を 4 点拡張したもの:
@@ -30,14 +30,14 @@
 ;;     tarball を **ssh stdin** でノードに流す（ノードに token を置かない）。
 ;;
 ;; 使い方:
-;;   nbb scripts/fleet-ci/tick.cljk                   ;; 通常の tick（変化した repo のみ）
-;;   nbb scripts/fleet-ci/tick.cljk --dry-run         ;; gate まで実行するが landing/rad/CD をしない
-;;   nbb scripts/fleet-ci/tick.cljk --only kagami     ;; repo を絞る（変化が無くても回す）
-;;   nbb scripts/fleet-ci/tick.cljk --all             ;; 全 repo を強制的に回す
-;;   nbb scripts/fleet-ci/tick.cljk --no-cd           ;; pin 前進（CD）だけ止める
-;;   nbb scripts/fleet-ci/tick.cljk --plan            ;; 何を回すかだけ出して終わる
-;;   nbb scripts/fleet-ci/tick.cljk --no-pr           ;; PR head の検証を止める（tip のみ）
-;;   nbb scripts/fleet-ci/tick.cljk --pr-cap 3        ;; repo あたりの PR 検証上限（既定 10）
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk                   ;; 通常の tick（変化した repo のみ）
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk --dry-run         ;; gate まで実行するが landing/rad/CD をしない
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk --only kagami     ;; repo を絞る（変化が無くても回す）
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk --all             ;; 全 repo を強制的に回す
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk --no-cd           ;; pin 前進（CD）だけ止める
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk --plan            ;; 何を回すかだけ出して終わる
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk --no-pr           ;; PR head の検証を止める（tip のみ）
+;;   kbb --backend sci scripts/fleet-ci/tick.cljk --pr-cap 3        ;; repo あたりの PR 検証上限（既定 10）
 (ns tick
   (:require ["node:child_process" :as cp]
             ["node:crypto" :as crypto]
@@ -956,7 +956,7 @@
          (str "clojure -P -M:" alias-name " >/dev/null 2>&1")
          (str "rmdir " dep-lock " 2>/dev/null || true")
          ;; **テストが実際に走ったことも assert する**: summary 行が無い / 0 件は fail。
-         (str "out=$(clojure -M:" alias-name " 2>&1); code=$?")
+         (str "out=$(kbb -M:" alias-name " 2>&1); code=$?")
          "echo \"$out\" | tail -25"
          ;; Keep the count IN the receipt, as the last line before the exit
          ;; marker. `tail -25` puts it wherever the suite happened to print it,
@@ -995,7 +995,7 @@
          ;; with every Clojure namespace already resolved. Silent, and skipped
          ;; entirely when there is no package.json.
          "if [ -f package.json ]; then npm install --silent >/dev/null 2>&1 || fail 'npm install failed' 95; fi"
-         (str "out=$(npx --yes nbb --classpath " (or classpath "src:test") " "
+         (str "out=$(npx --yes kbb --backend sci --classpath " (or classpath "src:test") " "
               "\"$entry\" 2>&1); code=$?")
          "echo \"$out\" | tail -25"
          ;; Keep the count IN the receipt, as the last line before the exit
@@ -1011,7 +1011,7 @@
          "echo \"$out\" | grep -qE 'Ran [0-9]+ tests' || fail 'no test summary in output — refusing to report a pass' 93"
          "echo \"$out\" | grep -qE 'Ran 0 tests' && fail 'zero tests ran' 94"
          "echo \"FLEET-CI-EXIT: $code\""]
-        ;; `:shadow-test` — a suite whose runner is `shadow-cljs compile … && node …`.
+        ;; `:shadow-test` — a suite whose runner is `amu compile --target wasm32-browser … && node …`.
         ;;
         ;; This is the third runtime this workspace ships to, and until now the
         ;; only one with no gate: `:jvm-test` is meaningless for a `.cljs` suite
@@ -1142,7 +1142,7 @@
 
   murakumo のノードは tailnet だけに繋がっていて、外向きの HTTPS が無い
   （実測 2026-07-26、zebulun: github.com:443 も 1.1.1.1:443 も届かない。DNS は
-  引ける）。したがって `clojure -M:test` は deps.edn の :git/sha を自力で
+  引ける）。したがって `kbb -M:test` は deps.edn の :git/sha を自力で
   取得できず、**たまたま ~/.gitlibs にキャッシュされている sha でしか動かない**。
   bonsai の pin を正しく前進させた途端 gate が落ちたのはこれで、ノードには古い
   1c2a677 しか無かった（`Error building classpath. Unable to fetch …
@@ -1237,7 +1237,7 @@
                    ;; 送るものを `git archive` の tarball から `git bundle` に
                    ;; 変えた。理由は上の present? の②で、`~/.gitlibs/libs/<lib>/<sha>`
                    ;; という path には **2 つの契約が同居している**:
-                   ;;   - tools.deps（`clojure -Spath`）は dir の存在しか見ない
+                   ;;   - tools.deps（`kbb -Spath`）は dir の存在しか見ない
                    ;;   - JDK-free resolver は `git rev-parse HEAD` が pin と
                    ;;     一致することを見る（「commit の名前が付いた dir は、
                    ;;     その commit を保持している証拠ではない」— amu の
@@ -1987,7 +1987,7 @@
                         (log "batch" bi "— all" (count rejected) "work items refused their input; nothing to run"))
                     out-file (path/join tmp (str "receipts-" bi ".edn"))
                     _ (fs/writeFileSync out-file "")
-                    args (concat ["nbb" "--classpath" (path/join kagami-dir "src") fleet-bin
+                    args (concat ["kbb" "--backend" "sci" "--classpath" (path/join kagami-dir "src") fleet-bin
                                   "ci-verify"
                                   "--db" db-file
                                   "--repos" (str/join "," (map :name prepared))

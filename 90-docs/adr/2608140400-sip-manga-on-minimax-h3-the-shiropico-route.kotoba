@@ -180,7 +180,7 @@ generation API）・**価格（prices.edn）**。同 ADR は前 2 枚を揃え�
    **API は 200 を返し、クリップも返ってくる。** 出力の絵を見るまで気づけない。
    → `assemble` が `string?` を検査して落ちるようにした。
 2. **`(.slice js/process.argv 3)` は `--classpath` で 1 つずれる。**
-   `nbb --classpath X script.cljs arg` だと **X が第 1 引数として渡り**、
+   `kbb --backend sci --classpath X script.cljs arg` だと **X が第 1 引数として渡り**、
    `ENOENT: no such file` になる。エラーの本文にクラスパス文字列が出るので
    「クラスパスが壊れている」と読める —— 実際は引数の取り方が壊れていた。
    → 引数は `*command-line-args*`（`cljs.core` にある。`nbb.core` には無い）で取る。

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; nbb-cross-runtime.cljs — run a repo's `run-tests.cljs` under nbb, with the
 ;; classpath built from its own deps.edn.
 ;;
@@ -26,7 +26,7 @@
 ;; second runtime, so nothing would have caught the next one either.
 ;;
 ;; Usage (tick.cljs ships this and calls it with the repo dir):
-;;   npx nbb nbb-cross-runtime.cljs <repo-dir> [--entry run-tests.cljs]
+;;   kbb --backend sci nbb-cross-runtime.cljk <repo-dir> [--entry run-tests.cljs]
 ;;
 ;; Exit 0 only if the suite ran, reported a summary, and had zero failures and
 ;; zero errors. A suite that runs zero tests fails: "no tests" must not read as

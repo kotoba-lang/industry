@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-frontend-stack-retirement.cljs — Svelte / React / Next.js の著述面が
 ;; 増えていないことの検査（ADR-2608260900 の ratchet）。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-frontend-stack-retirement.cljk [--write-baseline]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-frontend-stack-retirement.cljk [--write-baseline]
 ;;
 ;; ## 何を検査するか
 ;;
@@ -156,7 +156,7 @@
           write?
           (do (fs/writeFileSync baseline-path
                                 (str ";; frontend-stack baseline — ADR-2608260900\n"
-                                     ";; 生成: nbb scripts/verify-frontend-stack-retirement.cljk --write-baseline\n"
+                                     ";; 生成: kbb --backend sci scripts/verify-frontend-stack-retirement.cljk --write-baseline\n"
                                      ";; 手で編集しない。移行が進んだら再生成する（減る方向のみ）。\n"
                                      (pr-str {:total scanned :by-repo (into (sorted-map) now)}) "\n"))
               (println (str "WROTE\t" baseline-path "\ttotal=" scanned))

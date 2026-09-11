@@ -1,23 +1,23 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; provision.cljs — fleet-ci gate 実行に必要な toolchain を murakumo ノードに入れる。
 ;;
 ;; ADR-2607178000 時点では JVM gate を実行できるのが zebulun 1 台だけで、
 ;; 14 repo の gate が事実上直列だった。CI として使うにはノード側 toolchain を
 ;; 増やす必要がある — その部分だけを冪等に行う（murakumo 本体の
-;; `bb murakumo provision`（kotoba-server mesh node の設置）とは別物・非干渉。
+;; `kbb -M:murakumo provision`（kotoba-server mesh node の設置）とは別物・非干渉。
 ;; ここで入れるのは homebrew の clojure/openjdk/node/zig だけで、常駐 agent は
 ;; 一切増やさない = murakumo の「ノードには kotoba バイナリ2本以外置かない」
 ;; 方針と衝突しない）。
 ;;
 ;; 使い方:
-;;   nbb scripts/fleet-ci/provision.cljk --hosts judah,simeon --need jvm
-;;   nbb scripts/fleet-ci/provision.cljk --hosts benjamin --need jvm,node
-;;   nbb scripts/fleet-ci/provision.cljk --hosts judah,benjamin --need zig
-;;   nbb scripts/fleet-ci/provision.cljk --from-nodes --need jvm   ;; nodes.edn の
+;;   kbb --backend sci scripts/fleet-ci/provision.cljk --hosts judah,simeon --need jvm
+;;   kbb --backend sci scripts/fleet-ci/provision.cljk --hosts benjamin --need jvm,node
+;;   kbb --backend sci scripts/fleet-ci/provision.cljk --hosts judah,benjamin --need zig
+;;   kbb --backend sci scripts/fleet-ci/provision.cljk --from-nodes --need jvm   ;; nodes.edn の
 ;;       reachable かつ空き 8GB 以上で :jvm を持たないノードを対象にする
-;;   nbb scripts/fleet-ci/provision.cljk ... --dry-run
+;;   kbb --backend sci scripts/fleet-ci/provision.cljk ... --dry-run
 ;;
-;; 終わったら必ず `nbb scripts/fleet-ci/probe.cljk` を回して nodes.edn を更新する
+;; 終わったら必ず `kbb --backend sci scripts/fleet-ci/probe.cljk` を回して nodes.edn を更新する
 ;; （tick.cljs は nodes.edn しか見ない）。
 (ns fleet-ci.provision
   (:require ["node:child_process" :as cp]
@@ -127,6 +127,6 @@
                   (when (re-find #"STEP |Error|error:|javahome=|clojure=|node=|zig=|zigv=|openjdk version" l)
                     (println "   " l)))
                 (p/recur more))))
-          (p/then (fn [_] (println "\ndone — now re-run: nbb scripts/fleet-ci/probe.cljk")))))))
+          (p/then (fn [_] (println "\ndone — now re-run: kbb --backend sci scripts/fleet-ci/probe.cljk")))))))
 
 (-main)

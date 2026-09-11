@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/kotoba-wave-verify-tick.cljk — Q9 wave-1 pilot の品質検証 tick。
 ;;
 ;; EDN 読みについて: tranche 記録（lang/q9-wave1-tranche-*.edn）は kotoba EDN
@@ -6,7 +6,7 @@
 ;; clojure.edn で読む（kotoba EDN のサブセット構文のため同型読解が成立する）。
 ;; パース失敗は REFUSING (exit 2) — 読めない=測れていない、であって許可ではない。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/kotoba-wave-verify-tick.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/kotoba-wave-verify-tick.cljk \
 ;;     [--sample N] [--gate full|check-only]
 ;;
 ;; 頻度: fleet-refactor-wave-tick (1h) と同じ launchd リズムで回す。1 回の実行で

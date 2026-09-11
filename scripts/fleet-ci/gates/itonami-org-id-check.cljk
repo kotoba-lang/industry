@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; itonami-org-id-check.cljs — cloud-itonami の org id 受付が、この workspace が
 ;; 実際に使っている org 名と同じ導出をしているかを見る。
 ;;
@@ -29,7 +29,7 @@
 ;; `cloud_itonami/app/fleet.clj` が timeout/DNS/TLS を「壊れている」と区別する
 ;; のと同じ理由で、区別できないと片方がもう片方に化ける。
 ;;
-;; ノード側で `npx nbb itonami-org-id-check.cljs <dir> [--min N] [--base URL]`。
+;; ノード側で `kbb --backend sci itonami-org-id-check.cljk <dir> [--min N] [--base URL]`。
 
 (ns fleet-ci.gates.itonami-org-id-check
   (:require ["node:fs" :as fs]

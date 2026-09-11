@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns install
   "Install the endpoint-health resident on an always-on host.
 
@@ -13,7 +13,7 @@
   installed tree records the commit it came from, and `--check` reports drift.
 
   usage:
-    nbb scripts/endpoint-health-deploy/install.cljk <user@host> [--root DIR]
+    kbb --backend sci scripts/endpoint-health-deploy/install.cljk <user@host> [--root DIR]
                                                     [--home DIR] [--check]"
   (:require ["child_process" :as cp]
             ["fs" :as fs]

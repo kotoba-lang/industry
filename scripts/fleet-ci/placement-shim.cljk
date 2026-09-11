@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; placement-shim.cljs — murakumo.task.plan を「murakumo の classpath の中で」呼ぶ薄い殻。
 ;;
 ;; ADR-2608111721 決定 1: placement authority は `murakumo.task.plan`。
@@ -7,7 +7,7 @@
 ;;
 ;; `murakumo.task.plan` は `:task-plan` KIR を要求し、その KIR インタプリタ
 ;; （`kotoba.kir`）は kotoba-hir / security / io-multiformats / dag-cbor へ推移的に
-;; 依存する —— 実測で **34 の classpath entry**（`clojure -Spath`）。これを
+;; 依存する —— 実測で **34 の classpath entry**（`kbb -Spath`）。これを
 ;; `tick.cljs` 自身の classpath に載せると、**tick の起動方法が変わる**（plist も
 ;; README の手動コマンドも全部）。tick は 5 分ごとの常駐なので、そこは変えない。
 ;;
@@ -27,7 +27,7 @@
 ;; 呼び側の責任 —— ここでは並べ替えない（渡された順を尊重する）。
 ;;
 ;; 実行（classpath は呼び側が用意する。placement.cljs が cache して渡す）:
-;;   nbb --classpath "<murakumo と推移依存>" scripts/fleet-ci/placement-shim.cljk \
+;;   kbb --backend sci --classpath "<murakumo と推移依存>" scripts/fleet-ci/placement-shim.cljk \
 ;;     --resources <murakumo>/resources < in.edn
 
 (ns placement-shim

@@ -23,11 +23,11 @@
 - [ ] Health check: `curl -s http://localhost:9090/-/healthy` → 200
 - [ ] Verify targets: `curl -s http://localhost:9090/api/v1/targets` → 5 UP
 - [ ] Test 5 collectors:
-  - `nbb scripts/collect-build-metrics.cljs` ✅
-  - `nbb scripts/collect-coverage-metrics.cljs` ✅
-  - `nbb scripts/collect-deploy-metrics.cljs` ✅
-  - `nbb scripts/collect-blocker-metrics.cljs` ✅
-  - `nbb scripts/collect-velocity-metrics.cljs` ✅
+  - `kbb --backend sci scripts/collect-build-metrics.cljk` ✅
+  - `kbb --backend sci scripts/collect-coverage-metrics.cljk` ✅
+  - `kbb --backend sci scripts/collect-deploy-metrics.cljk` ✅
+  - `kbb --backend sci scripts/collect-blocker-metrics.cljk` ✅
+  - `kbb --backend sci scripts/collect-velocity-metrics.cljk` ✅
 - [ ] Verify data in Prometheus:
   ```bash
   curl -s 'http://localhost:9090/api/v1/query?query=build_duration_seconds' | jq '.data.result | length' > 0

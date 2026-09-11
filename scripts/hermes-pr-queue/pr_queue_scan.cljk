@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Decision-free measurement of the fleet's open PR queue.
 ;;
 ;; It decides nothing. It measures the queue the drain bots (pr-cleanup,
@@ -11,7 +11,7 @@
 ;; nor fail: "could not answer"), and the refusal names what failed.
 ;;
 ;; Usage:
-;;   nbb scripts/hermes-pr-queue/pr_queue_scan.cljk [--author LOGIN|any]
+;;   kbb --backend sci scripts/hermes-pr-queue/pr_queue_scan.cljk [--author LOGIN|any]
 ;;       [--orgs a,b,c] [--cap N] [--work N] [--containment N] [--include-others]
 (ns pr-queue-scan
   (:require ["child_process" :as cp]

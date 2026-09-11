@@ -107,7 +107,7 @@ of them have no project.
 
 4. Run the gate, from the bot worktree:
 
-     nbb --classpath "$HOME/github/com-junkawasaki:$HOME/github/com-junkawasaki/scripts/nbb_compat" \
+     kbb --backend sci --classpath "$HOME/github/com-junkawasaki:$HOME/github/com-junkawasaki/scripts/nbb_compat" \
        "$HOME/github/com-junkawasaki/scripts/itonami-verify-proposal.cljk" \
        --root "$HOME/github/com-junkawasaki" --proposal /tmp/itonami-proposal.edn
 
@@ -121,7 +121,7 @@ of them have no project.
    style, add `:coverage/verified-at` with today's date and
    `:source/dataset "itonami-coverage"`, then check the file still reads:
 
-     nbb --classpath ".:scripts/nbb_compat" -e '(ns c (:require [clojure.edn :as edn] ["fs" :as fs])) (println (count (edn/read-string (fs/readFileSync "90-docs/coverage/itonami-coverage.datoms.edn" "utf8"))))'
+     kbb --backend sci --classpath ".:scripts/nbb_compat" -e '(ns c (:require [clojure.edn :as edn] ["fs" :as fs])) (println (count (edn/read-string (fs/readFileSync "90-docs/coverage/itonami-coverage.datoms.edn" "utf8"))))'
 
    It must print a number. If it throws, your edit broke the EDN — fix it before
    committing. (A heredoc-written `\"` is the usual cause; the file must contain

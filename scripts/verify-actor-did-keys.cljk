@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; A key in a DID document outside the enumerated actor set.
 ;;
 ;; `etzhayyim.com` resolves `/actor/<handle>/did.json` for ANY handle -- measured
@@ -19,7 +19,7 @@
 ;; for the enumerated ones. `tomoshibi`, the single keyed document today, is in
 ;; the enumerated set; that is the pattern, and it was nowhere enforced.
 ;;
-;;   nbb scripts/verify-actor-did-keys.cljk [--findings] [<root>]
+;;   kbb --backend sci scripts/verify-actor-did-keys.cljk [--findings] [<root>]
 ;;
 ;; exit 0 clean, 1 findings, 2 could not be checked.
 

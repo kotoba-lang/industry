@@ -60,7 +60,7 @@
 
 **まだ上流に返していない ordering hazard（consumer 側で回避、要検討）。** `skin-css` は `body{padding: 2rem 1rem 4rem}` を、`a11y-css` は `padding-left/right/bottom: env(safe-area-inset-*, 0px)` を書く。この順に連結すると longhand が勝ち、**inset を持たない環境では `env()` が 0px fallback に解決して左右 padding が消える**（desktop Chrome で本文が viewport 端に貼り付くのを実測）。逆順にすると safe-area 対応を失う。nexus では `max()` で両取りして回避したが、`skin-css` + `a11y-css` を素直に連結する consumer は誰でも踏む。murakumo/kotobase は `.dds-ext-container`（padding-inline が既に inset 対応）を使っているため露出しなかった。**ライブラリ側の contract をどう直すかは別途判断が必要**（a11y-css の body 規則を捨てて container に寄せるのか、`max()` を焼くのか）。
 
-**deploy が黙って成功する経路を1つ踏んだ。** kotobase の wrangler `main` は `worker/js/kotobase-worker.js`（`shadow-cljs release **entry**` の出力）を再 export しているのに、`release worker` だけを走らせて deploy した。**deploy は成功と報告し、kotobase.net は移行前のページを配り続けた。** 生成 HTML を確認するのではなく **live HTML を確認した**ことで捕まえた（`data-appearance=\"light\"` かつ `color-scheme` meta 無しが旧 renderer の署名）。clj-edge の npm `build` が両 target を走らせるのはこのためで、片方だけ走らせてはいけない。
+**deploy が黙って成功する経路を1つ踏んだ。** kotobase の wrangler `main` は `worker/js/kotobase-worker.js`（`amu compile --target wasm32-browser **entry**` の出力）を再 export しているのに、`release worker` だけを走らせて deploy した。**deploy は成功と報告し、kotobase.net は移行前のページを配り続けた。** 生成 HTML を確認するのではなく **live HTML を確認した**ことで捕まえた（`data-appearance=\"light\"` かつ `color-scheme` meta 無しが旧 renderer の署名）。clj-edge の npm `build` が両 target を走らせるのはこのためで、片方だけ走らせてはいけない。
 
 **murakumo の PWA が offline で崩れる穴を1つ塞いだ。** `mobile_sw.cljs` は3 asset を cache していて stylesheet を含んでいなかった。link 先が `/css/theme.css` から `/css/dds.css` に変わったので、そのままなら offline install が無 style で描画される。cache list に追加し cache name を v3 へ。
 
@@ -84,14 +84,14 @@
    "kotobase の Worker bundle は release worker と release entry の**両方**を走らせてから deploy する（entry だけが wrangler main に届く）"))
 
   (:adr/evidence
-  (vector "kotobase: clojure -M:site-test 27 tests / 150 assertions green（content・全 public href・signup JS の DOM 契約・SLA を過大に言わない assertion をすべて維持）。生成4ページは 77–93KB（移行前 75–89KB）で、budget 回帰テストを追加"
+  (vector "kotobase: kbb -M:site-test 27 tests / 150 assertions green（content・全 public href・signup JS の DOM 契約・SLA を過大に言わない assertion をすべて維持）。生成4ページは 77–93KB（移行前 75–89KB）で、budget 回帰テストを追加"
    "kotobase: 移行で消した .kb-cta を kotobase.explore（Worker bundle 内で文字列組み立て、jp-go-dds を require できない）がまだ emit しており /explore の検索ボタンが無 style になるところだった。dads-button markup を literal で書き、jp-go-dds.core/button の出力と一致することを test で pin"
    "kotobase: component-test は origin/main 時点で既に3件失敗（worker-artifact-contract が worker/js/*.js の不在を期待するが commit 済み、provider-source-catalog 2件）。今回の変更とは無関係で未修正"
-   "murakumo: clojure -M:site が8ファイル再生成。shadow-cljs release app/worker/mobile/mobile-sw すべて 0 warnings。SPA は display:table（skin 修正が効いている）・legacy class 0件・577px で横スクロール無し"
-   "nexus: shadow-cljs release worker 0 warnings / 295KB。clojure -M:test 44 tests / 182 assertions green。pay ボタンが rgb(0,23,193) = #0017c1、min-height 56px。dark hex 残0"
-   "nexus: clojure -M:lint は test/nexus/apply_test.cljc に警告1件（unresolved clojure.string）—— 触っていない既存分"
-   "html: clojure -M:test 22 tests / 86 assertions green（<pre>/<textarea> の新規テスト含む）"
-   "jp-go-dds: clojure -X:test 30 tests / 255 assertions green（skin_test.cljc 新規 + core_test の table selector 更新）"
+   "murakumo: kbb -M:site が8ファイル再生成。amu compile --target wasm32-browser app/worker/mobile/mobile-sw すべて 0 warnings。SPA は display:table（skin 修正が効いている）・legacy class 0件・577px で横スクロール無し"
+   "nexus: amu compile --target wasm32-browser worker 0 warnings / 295KB。kbb -M:test 44 tests / 182 assertions green。pay ボタンが rgb(0,23,193) = #0017c1、min-height 56px。dark hex 残0"
+   "nexus: kbb -M:lint は test/nexus/apply_test.cljc に警告1件（unresolved clojure.string）—— 触っていない既存分"
+   "html: kbb -M:test 22 tests / 86 assertions green（<pre>/<textarea> の新規テスト含む）"
+   "jp-go-dds: kbb -X:test 30 tests / 255 assertions green（skin_test.cljc 新規 + core_test の table selector 更新）"
    "live 検証（deploy 後、curl で実 HTML）: kotobase / signup / admin / explore、murakumo /docs /blog/ /gpu-market /gpu/ /join/mobile、x402.nexus / /cohort —— 全て 200 かつ dads-*/dds-ext-* を含み --hig-* / kotoba-shell__ を含まない"
    "murakumo /css/theme.css は deploy 後 404（一時的に 200 を返したのは CDN cache の残り）"
    "net-kotobase は作業中に origin/main が4 commit 進み（ADR-2607301200 の P2P quota 512 MiB / 50 pins）、生成 HTML 4件が conflict。marker 手編集ではなく再生成で解決し、新 quota copy が DADS ページに届いていることを確認してから merge した"

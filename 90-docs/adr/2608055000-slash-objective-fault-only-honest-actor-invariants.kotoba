@@ -413,18 +413,18 @@ west pin 6 件は子リポの main tip と**完全一致を実測**（6/6）。`
 
 ### 検証（実行したもの・件数）
 
-- witness-quorum `clojure -M:test` 55 tests / 149 assertions, 0 failures。`-M:lint` 0/0
-- inga `clojure -M:test` 309 tests / 1,419 assertions, 0 failures。`-M:lint` 0 errors
+- witness-quorum `kbb -M:test` 55 tests / 149 assertions, 0 failures。`-M:lint` 0/0
+- inga `kbb -M:test` 309 tests / 1,419 assertions, 0 failures。`-M:lint` 0 errors
   （warning 9 件はすべて既存、test/ 内）。parity digest `power:2/1/1/1/4` が
   **JVM と nbb で一致**（適用された slash と拒否された slash の両方を含む）
 - engi-witness-escrow `forge test` 42 tests, 0 failures。`forge build` の
   unsafe-typecast warning 0
-- cloud-murakumo `clojure -M:test -n …compute-test` 6 tests / 15 assertions, 0 failures
+- cloud-murakumo `kbb -M:test -n …compute-test` 6 tests / 15 assertions, 0 failures
 - murakumo overlay-witness-* 4 ns 15 tests / 46 assertions, 0 failures（1 回目）
 
 ### 残 gap 1 — edn-query が落ちるのは corpus の型不整合（未修正・要 owner 判断）
 
-`nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q` に
+`kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q` に
 `clojure.string/includes?` を含む述語を渡すと `a.indexOf is not a function` で
 **クエリ全体が落ちる**。
 

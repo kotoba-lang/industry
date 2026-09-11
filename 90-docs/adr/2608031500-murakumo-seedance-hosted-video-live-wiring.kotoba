@@ -119,10 +119,10 @@ argv・shell history に出さない。`verify` は存在しない request id �
 | 対象 | 結果 |
 |---|---|
 | `kotoba-lang/murakumo` python | 新規 9 tests(stub fal queue で submit→poll→download 全経路、`Key` scheme、送信 body の完全一致、CDN に鍵が漏れないこと、provider 失敗が job failure になること、catalog と admission の一致、**fleet 経路の admission が hosted 分岐で壊れていないこと**)。既存 22 tests も green |
-| `cloud-murakumo` clj | `clj -M:test` 316 tests / 1271 assertions、新規 10 tests。既存 8 failures(`treasury.core-test` / `x402-offer-test`)は **origin/main の別 worktree でも同一**で本変更と無関係 |
+| `cloud-murakumo` clj | `kbb -M:test` 316 tests / 1271 assertions、新規 10 tests。既存 8 failures(`treasury.core-test` / `x402-offer-test`)は **origin/main の別 worktree でも同一**で本変更と無関係 |
 | fal のスキーマ | queue OpenAPI を両 endpoint 分取得して突き合わせ(推測ではない) |
 | **live 往復(Python / live 経路)** | **通った**(2026-08-03)。`seedance-2.0-fast` 480p / duration \"4\" / 音声なし → 878,259 バイトの mp4、160s wall。実測 4.04s / 864x496 / 音声トラック無し(mp4 box を直接読んで確認)。sha256:513a3098…4602、job 3638ba3e… |
-| **live 往復(Clojure 経路)** | **通った**(同日)。`clj -M:worker --engine seedance` で 698,174 バイト、135s wall、bafy-sha256-d0c50346…b825 |
+| **live 往復(Clojure 経路)** | **通った**(同日)。`kbb -M:worker --engine seedance` で 698,174 バイト、135s wall、bafy-sha256-d0c50346…b825 |
 | **hosted engine の NPE** | 実 job を流して初めて発覚: `backend-url` が `System/getenv(nil)` を呼び、hosted job は provider に到達する前に必ず死んでいた。テストが常に `--backend-url` を渡していたため踏まれていなかった(cloud-murakumo d8771885 で修正、回帰テスト付き) |
 
 ## 実測(2026-08-03、live)

@@ -83,7 +83,7 @@ not a representation that counsel has approved the documents.
 On 2026-07-24 the standalone pure billing suite passed:
 
 ```text
-clojure -Sdeps '{:paths ["src" "test"]}' -M -m kotobase.billing-test
+kbb -Sdeps '{:paths ["src" "test"]}' -M -m kotobase.billing-test
 Ran 4 tests containing 16 assertions.
 0 failures, 0 errors.
 ```

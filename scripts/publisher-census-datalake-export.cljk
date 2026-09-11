@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; publisher-census-datalake-export.cljs — 世界の発行者（ブログ / 媒体 / 掲示板）の
 ;; センサスを R2 Data Catalog へ渡す JSON にする。lei / watchlist / hyakka の
 ;; exporter と同型で、**spec を自分でデータの隣に書く**（loader と drift しない形）。
 ;;
-;;   nbb scripts/publisher-census-datalake-export.cljk [--repo <path>] [--out-dir <dir>]
+;;   kbb --backend sci scripts/publisher-census-datalake-export.cljk [--repo <path>] [--out-dir <dir>]
 ;;   python3 scripts/datalake-sync.py --spec <out-dir>/publishers.spec.json --in-dir <out-dir>
 ;;
 ;; ## 何を載せて、何を載せないか

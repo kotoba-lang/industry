@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 
 ;;; Month 1 Staging Deployment — strangler-fig kotoba-server cljc mesh rollout
 ;;; Reference: ADR-2607072100 Phase 1
@@ -11,10 +11,10 @@
 ;;; 5. Rollback automation
 ;;;
 ;;; Usage:
-;;;   nbb deploy/month-1-staging-deployment.cljk provision
-;;;   nbb deploy/month-1-staging-deployment.cljk canary-start
-;;;   nbb deploy/month-1-staging-deployment.cljk status
-;;;   nbb deploy/month-1-staging-deployment.cljk rollback
+;;;   kbb --backend sci deploy/month-1-staging-deployment.cljk provision
+;;;   kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start
+;;;   kbb --backend sci deploy/month-1-staging-deployment.cljk status
+;;;   kbb --backend sci deploy/month-1-staging-deployment.cljk rollback
 
 (ns month-1-staging
   (:require
@@ -376,9 +376,9 @@
     (println (str "  ✓ Rollback automation: " (count (:auto-rollback-triggers rollback)) " auto-triggers"))
     (println (str "  ✓ SLO dashboard: " (:dashboard-name dashboard)))
     (println "\nNext Steps:")
-    (println "  1. Verify node health: nbb deploy/month-1-staging-deployment.cljk health")
-    (println "  2. Start canary traffic: nbb deploy/month-1-staging-deployment.cljk canary-start")
-    (println "  3. Monitor parity: nbb deploy/month-1-staging-deployment.cljk parity-monitor")
+    (println "  1. Verify node health: kbb --backend sci deploy/month-1-staging-deployment.cljk health")
+    (println "  2. Start canary traffic: kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start")
+    (println "  3. Monitor parity: kbb --backend sci deploy/month-1-staging-deployment.cljk parity-monitor")
     (println "  4. Check SLO dashboard")
     (println "  5. Week 4: Review metrics and advance to Phase 2\n")
 
@@ -444,11 +444,11 @@
       "rollback" (rollback)
       (do
         (println "Usage:")
-        (println "  nbb deploy/month-1-staging-deployment.cljk provision")
-        (println "  nbb deploy/month-1-staging-deployment.cljk status")
-        (println "  nbb deploy/month-1-staging-deployment.cljk canary-start")
-        (println "  nbb deploy/month-1-staging-deployment.cljk canary-pause")
-        (println "  nbb deploy/month-1-staging-deployment.cljk rollback")
+        (println "  kbb --backend sci deploy/month-1-staging-deployment.cljk provision")
+        (println "  kbb --backend sci deploy/month-1-staging-deployment.cljk status")
+        (println "  kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start")
+        (println "  kbb --backend sci deploy/month-1-staging-deployment.cljk canary-pause")
+        (println "  kbb --backend sci deploy/month-1-staging-deployment.cljk rollback")
         (System/exit 1)))))
 
 (apply -main *command-line-args*)

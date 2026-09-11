@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; SessionStart フック: `scripts/orgs-detector-tick.cljk` が測った結果を、
 ;; セッション冒頭で agent の目の前に置く。
 ;;
@@ -40,7 +40,7 @@
 ;;
 ;; fail-open: 判定途中のあらゆる失敗はセッション開始をブロックしない。
 ;;
-;; 手動実行: nbb .claude/hooks/session-start-orgs-detectors.cljk [--state <path>]
+;; 手動実行: kbb --backend sci .claude/hooks/session-start-orgs-detectors.cljk [--state <path>]
 
 (require '[cheshire.core :as json]
          '[clojure.edn :as edn]
@@ -182,7 +182,7 @@
            [(str "  standing " (count standing) " 件 (最古 "
                  (ms->human (age-ms (:first-seen (second (first standing)))))
                  " 前から)。**列挙しない** —— 詳細は "
-                 "`nbb --classpath \".:scripts/nbb_compat\" scripts/"
+                 "`kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/"
                  (name id) ".cljs`")])
          (when (and (empty? new-ks) (empty? res-ks) (empty? standing) (empty? accepted))
            [(str "  clean (" (ms->human (age-ms last-run)) "前に測定"
@@ -213,7 +213,7 @@
            "うち 1 つは既に不可逆な資産喪失を出している custody を守るものでした。"
            ""
            "手で 1 回走らせる:"
-           "  nbb --classpath \".:scripts/nbb_compat\" scripts/orgs-detector-tick.cljk --force"
+           "  kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/orgs-detector-tick.cljk --force"
            "常駐させる (owner 判断): scripts/cloud.itonami.bot.orgs-detector-tick.plist の"
            "ヘッダに何がいつ走り何に触るかが書いてあります。"]))
 

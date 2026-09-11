@@ -31,7 +31,7 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "108 tests, 356 assertions, 0 failures; complete/partial/invalid Content-Length and full TLS E2E"))
     (map (:cwd "orgs/kotoba-lang/wasm-webcomponent")
      (:command "node test/verify-actor-host.mjs")

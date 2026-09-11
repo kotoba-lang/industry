@@ -13,7 +13,7 @@
 
 - **local-agent の現在地**: itonami.cloud の agent（Goals / Assignments / approvals の authority = cloud-itonami-app の JVM resident）はオーナーの Mac の LaunchAgent（`~/.gftd/bin/itonami-app-resident.cljs`）で動き、`127.0.0.1:1338` に bind する。公開ホスト（app. / hooks. / mcp. / bots.）は Cloudflare Worker だが、resident はその Mac が眠ると消える。
 - **murakumo は WASM cloud である**: `kotoba-lang/murakumo` は「Control plane for the kotoba WASM lattice/mesh across the Mac-mini fleet」。libp2p gossipsub の lattice ノード（`kotoba-server`）が content-addressed WASM component を auction で配置し、`on-http` / `on-tick` / `on-kse` を発火し、`kqe-assert!` を Datom log に永続化する。desired state は wadm 相当の `murakumo.app.edn`。既に **kenchi**（valuation record を on-mesh で serve、ingest は off-mesh）と **minidrama**（profile + heartbeat を on-mesh、governed pipeline は off-mesh）が同じ分業で置かれ、2026-07-07 に asher で live probe 済み。
-- **lattice の現在地**（`nbb scripts/run-task.cljs ops status`）: 12 ノード中 9 到達、`kotoba-server` up は levi / joseph / dan（wasm executor ready）、8 台 peer、LaunchAgent loaded 0、hosted CID は dan に 2。
+- **lattice の現在地**（`kbb --backend sci scripts/run-task.cljk ops status`）: 12 ノード中 9 到達、`kotoba-server` up は levi / joseph / dan（wasm executor ready）、8 台 peer、LaunchAgent loaded 0、hosted CID は dan に 2。
 - **fleet ノードに JVM は無い**（judah / simeon / asher で `java` 不在、Clojure CLI はある）。JVM resident をノードに置く案は substrate が違う。
 - **GLM-5.3 の提供状況**: Baseten Model APIs も Together も `zai-org/GLM-5.3` を serverless（従量課金）で提供。list price は両社 $1.40 / $4.40 per Mtok in/out（Baseten cache in $0.14、Together $0.26）。GLM-5.3 は 753B-A40B で、専用常駐 replica は 8×H100 ≈ $52/h → 月 $38k 超。USD/JPY ≈ 160（2026-09-01）なので 20 万円 ≈ $1,250/月。
 - **awai-network/basho / hokusai** は ADR-2609011842 の fail-closed front door として murakumo gateway に merge 済み（vendor backend 未接続）。

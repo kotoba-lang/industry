@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; org-id-derivation-check.cljs — reverse-DNS 導出が 1 つであることを押さえる gate。
 ;;
 ;; **なぜ要るか。** 同じ規則（registrable domain のラベル逆順）が 3 箇所に在った:
@@ -38,7 +38,7 @@
 ;; **`:reversed` を消して導出に置き換えない。** 手書きの列が残っているのは
 ;; 一致が**検査できる**からで、消すと突き合わせる相手がいなくなる。
 ;;
-;; ノード側で `npx nbb org-id-derivation-check.cljs <dir> [--min N] [--min-rules N]`。
+;; ノード側で `kbb --backend sci org-id-derivation-check.cljk <dir> [--min N] [--min-rules N]`。
 
 (ns fleet-ci.gates.org-id-derivation-check
   (:require ["node:child_process" :as cp]
@@ -133,7 +133,7 @@
                   (pr-str (vec probe)) ")"
                   " :shape (into {} (map (juxt identity (comp boolean o/registrable-shape?))) "
                   (pr-str (vec probe)) ")})")
-        r (cp/spawnSync "npx" (clj->js ["--yes" "nbb" "--classpath" "." "-e" expr])
+        r (cp/spawnSync "npx" (clj->js ["--yes" "kbb" "--backend" "sci" "--classpath" "." "-e" expr])
                         #js {:cwd root :encoding "utf8" :maxBuffer (* 32 1024 1024)})
         out (str (aget r "stdout"))
         err (str (aget r "stderr"))]

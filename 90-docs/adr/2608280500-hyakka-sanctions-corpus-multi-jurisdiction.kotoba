@@ -112,7 +112,7 @@ world/company/garantex-europe-ou は **OFAC(2回)・EU・英国(HTXの支援先�
 
 ## 検証
 
-- 各ラウンドで `npm test`（catalog 再生成 + shadow-cljs release + node
+- 各ラウンドで `npm test`（catalog 再生成 + amu compile --target wasm32-browser + node
   test runner）が **0 failure** であることを確認。最終ラウンド時点
   189 tests / 14,822 assertions（同時並行で着地した他 corpus 分の
   テストも含む合計値）。
@@ -145,7 +145,7 @@ cat orgs/network-awai/app-hyakka/knowledge/seeds/sanctions.edn
 # 再実行（PDF source が1件あるため pdftotext 必須。無ければ exit 3 で何も書かない）
 cd orgs/network-awai/app-hyakka && \\
   HYAKKA_ARCHIVE_DIR=$HOME/.gftd/hyakka-archive \\
-  nbb --classpath src scripts/seed_sanctions.cljs --dry-run
+  kbb --backend sci --classpath src scripts/seed_sanctions.cljs --dry-run
 
 # 次に拡張するなら（coverage :missing を出典に）
 #  - Huione Group 傘下コンポーネント（Haowang Guarantee 等）の個別 item 化

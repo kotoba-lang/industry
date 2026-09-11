@@ -1,15 +1,15 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; cleanup-land.cljs — scripts/cleanup.cljk が UNLANDED と判定した子リポの WIP を
 ;; 実際に着地させる（archive → commit → PR → merge）。cleanup.cljs は読取専用の
 ;; survey のままにし、書き込み側はこのスクリプトに分ける。
 ;;
 ;; 使い方:
-;;   nbb scripts/cleanup-land.cljk                     ; dry-run plan（既定）
-;;   nbb scripts/cleanup-land.cljk --apply             ; 実行
-;;   nbb scripts/cleanup-land.cljk --apply --names a,b ; 対象を限定
-;;   nbb scripts/cleanup-land.cljk --apply --max 20    ; 上限（残りは報告して打切り）
-;;   nbb scripts/cleanup-land.cljk --apply --branches  ; :branches も処理（push / PR。merge しない）
-;;   nbb scripts/cleanup-land.cljk --apply --only-branches ; :branches だけ（:review を再生成しない）
+;;   kbb --backend sci scripts/cleanup-land.cljk                     ; dry-run plan（既定）
+;;   kbb --backend sci scripts/cleanup-land.cljk --apply             ; 実行
+;;   kbb --backend sci scripts/cleanup-land.cljk --apply --names a,b ; 対象を限定
+;;   kbb --backend sci scripts/cleanup-land.cljk --apply --max 20    ; 上限（残りは報告して打切り）
+;;   kbb --backend sci scripts/cleanup-land.cljk --apply --branches  ; :branches も処理（push / PR。merge しない）
+;;   kbb --backend sci scripts/cleanup-land.cljk --apply --only-branches ; :branches だけ（:review を再生成しない）
 ;;
 ;; ── なぜ一律 merge しないか（重要） ────────────────────────────────────
 ;; UNLANDED を1種類として扱うと安全性が壊れる。危険度ではなく「main を壊しうるか」で
@@ -1987,7 +1987,7 @@
       (println "   この repo を解決できない（:local/root で参照している consumer は壊れる）。")
       (doseq [d unregistered] (println (str "     " d)))
       (println "   次の 1 手（plan が既定。apply で repos.edn + west.yml を書く）:")
-      (println (str "     nbb scripts/west-triple-sync.cljk plan --names "
+      (println (str "     kbb --backend sci scripts/west-triple-sync.cljk plan --names "
                     (str/join "," (map #(last (str/split % #"/")) unregistered))))
       (println "   ⚠ この確認が見ているのは west.yml の path: だけ。repos.edn の")
       (println "     :extra-projects に載っているかは見ていない（両方要る）。"))))

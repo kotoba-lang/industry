@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/worktree-retire.cljk — retire git worktrees whose work has already landed.
 ;;
 ;; The worktree-per-task model (CLAUDE.md「並行エージェント運用」, ADR-2609061800)
@@ -33,7 +33,7 @@
 ;; The last line is always `SCANNED <n> retired <k> kept <m> unverified <u>`;
 ;; SCANNED 0 is exit 2, not a clean pass.
 ;;
-;;   nbb scripts/worktree-retire.cljk [--root <dir>] [--min-age-days 7] [--apply] [--include-bots]
+;;   kbb --backend sci scripts/worktree-retire.cljk [--root <dir>] [--min-age-days 7] [--apply] [--include-bots]
 ;;                                    [--only <path-prefix>]
 ;;   exit 0 = answered, 1 = a retire step failed, 2 = could not answer
 (require '[clojure.string :as str])

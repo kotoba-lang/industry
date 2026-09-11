@@ -150,7 +150,7 @@ seam が成立した理由は本文の 2 点(dead require の除去と `ref?` �
 `ref?` は既定値を与えず**必須引数**にした: 既定値を発明することは呼び手のデータモデルへの
 当て推量であり、外すと逆引き index(`:ocp`)が静かに空または過剰になる。
 
-**runtime 依存は `datom-source` ただ 1 つで、機械検証済み**: `clojure -Spath` の解決結果は
+**runtime 依存は `datom-source` ただ 1 つで、機械検証済み**: `kbb -Spath` の解決結果は
 `src` + datom-source gitlib + clojure core のみ、ipld/multiformats/prolly の一致は 0 件
 (`datom-source` 自身が `:deps {}` なので、これが推移閉包の全体)。
 

@@ -198,7 +198,7 @@ repo で完結した `document` を組むので、プラットフォームが `<
 
 **ビルド**
 
-    shadow-cljs release sites-api -> functions/edge/sites-core.js 114,587B、`eval(` 0 件
+    amu compile --target wasm32-browser sites-api -> functions/edge/sites-core.js 114,587B、`eval(` 0 件
     （Cloudflare の deploy pipeline は到達不能でも eval() を含む Worker script を静的に弾く）
 
 **scittle の適合確認（推測でなく実測）**
@@ -325,7 +325,7 @@ design-quality の **CLI は core 10 軸しか出せず** `input-zoom` / `contra
 （ADR-2607300900）の話。**この repo の CI は動いており job も起動する**（実測:
 CI conclusion=success、jobs=4）。ADR の記述を別 repo に読み替えて適用していた。
 
-`ci.yml` に STRICT job `sites` を追加（`nbb scripts/run-task.cljs test-sites`）。
+`ci.yml` に STRICT job `sites` を追加（`kbb --backend sci scripts/run-task.cljk test-sites`）。
 **standalone checkout で確実に動くものだけ**入れた:
 
     sites-registry-check   レジストリ canonical（共通クローム有無の検査を含む）
@@ -396,7 +396,7 @@ Node 22（CI）で落ちる**という環境依存の偽陰性。
 ## 次の一手（resume point）
 
     cd orgs/network-awai/cloud-itonami
-    nbb scripts/verify-sites-bundle.cljs && nbb scripts/generate-sites-registry.cljs --check
+    kbb --backend sci scripts/verify-sites-bundle.cljk && kbb --backend sci scripts/generate-sites-registry.cljk --check
 
 3 番（design-quality の当て方）を決めるのが最も価値が高い。決めるまでは
 『DADS 面の品質は未計測』が正しい表明であって、スコアを出さずに良し悪しを

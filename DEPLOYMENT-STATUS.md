@@ -188,10 +188,10 @@ deploy/deploy.edn                          — Deployment state manifest
 ## Next Steps
 
 ### Immediate (Week 1)
-- [ ] Verify node health: `nbb deploy/month-1-staging-deployment.cljk health`
-- [ ] Start parity checker: `nbb deploy/parity-checker-service.cljk ...`
-- [ ] Start rollback monitor: `nbb deploy/rollback-automation.cljk monitor`
-- [ ] Enable 5% canary: `nbb deploy/month-1-staging-deployment.cljk canary-start`
+- [ ] Verify node health: `kbb --backend sci deploy/month-1-staging-deployment.cljk health`
+- [ ] Start parity checker: `kbb --backend sci deploy/parity-checker-service.cljk ...`
+- [ ] Start rollback monitor: `kbb --backend sci deploy/rollback-automation.cljk monitor`
+- [ ] Enable 5% canary: `kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start`
 - [ ] Access SLO dashboard for live monitoring
 - [ ] Daily review of parity logs and metrics
 

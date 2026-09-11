@@ -63,7 +63,7 @@ Month 1 deploys the **strangler-fig pattern** for kotoba-server migration from p
 
 ```bash
 # 1. Register 3 nodes in fleet
-nbb deploy/month-1-staging-deployment.cljk provision
+kbb --backend sci deploy/month-1-staging-deployment.cljk provision
 
 # Expected output:
 #   ✓ Staging pool: staging-cljc-month1 (3 nodes)
@@ -74,7 +74,7 @@ nbb deploy/month-1-staging-deployment.cljk provision
 #   ✓ SLO dashboard: ready
 
 # 2. Verify node health
-nbb deploy/month-1-staging-deployment.cljk health
+kbb --backend sci deploy/month-1-staging-deployment.cljk health
 
 # Expected: All 3 nodes return HTTP 200 /health
 ```
@@ -83,17 +83,17 @@ nbb deploy/month-1-staging-deployment.cljk health
 
 ```bash
 # 1. Enable 5% canary traffic
-nbb deploy/month-1-staging-deployment.cljk canary-start
+kbb --backend sci deploy/month-1-staging-deployment.cljk canary-start
 
 # 2. Start parity checker service (long-running)
-nbb deploy/parity-checker-service.cljk \
+kbb --backend sci deploy/parity-checker-service.cljk \
   --rust-pool-url http://localhost:8000 \
   --staging-pool-url http://localhost:8001 \
   --sample-rate 1.0 \
   --output metrics/parity-validation.log
 
 # 3. Start rollback automation monitor (long-running)
-nbb deploy/rollback-automation.cljk monitor \
+kbb --backend sci deploy/rollback-automation.cljk monitor \
   --metrics-endpoint http://localhost:9090/api/v1/query \
   --check-interval-sec 30 \
   --dry-run false
@@ -127,7 +127,7 @@ tail -5 metrics/parity-validation.log
 journalctl -u murakumo-staging-1 -n 100
 
 # Verify Chicory can load WASM
-nbb test-chicory-load.cljs --wasm-path bin/drama-profile.wasm
+kbb --backend sci test-chicory-load.cljk --wasm-path bin/drama-profile.wasm
 ```
 
 **Issue**: Parity divergence detected
@@ -149,7 +149,7 @@ cat metrics/parity-validation.log | \
 
 ```bash
 # Check memory usage
-nbb deploy/rollback-automation.cljk status
+kbb --backend sci deploy/rollback-automation.cljk status
 
 # Monitor GC pause times
 grep "jvm_gc_pause_ms" metrics/parity-validation.log | tail -20
@@ -186,7 +186,7 @@ grep "jvm_gc_pause_ms" metrics/parity-validation.log | tail -20
 
 ```bash
 # Run comprehensive baseline analysis
-nbb deploy/baseline-analysis.cljs \
+kbb --backend sci deploy/baseline-analysis.cljk \
   --parity-log metrics/parity-validation.log \
   --output-dir reports/
 
@@ -226,7 +226,7 @@ watch -n 60 'echo "=== DAILY STATUS ===" && \
   echo "Parity:" && \
   tail -1 metrics/parity-validation.log && \
   echo "Rollback triggers:" && \
-  nbb deploy/rollback-automation.cljk status | grep -A5 "Sustained"'
+  kbb --backend sci deploy/rollback-automation.cljk status | grep -A5 "Sustained"'
 
 # Weekly comparison (Week 3 vs Week 2):
 diff reports/metrics-baseline.edn reports/metrics-week3.edn
@@ -238,7 +238,7 @@ diff reports/metrics-baseline.edn reports/metrics-week3.edn
 
 ```bash
 # 1. Verify SLO compliance over last 7 days
-nbb deploy/phase-1-validation.cljs \
+kbb --backend sci deploy/phase-1-validation.cljk \
   --parity-log metrics/parity-validation.log \
   --metrics-window 7d
 
@@ -250,7 +250,7 @@ nbb deploy/phase-1-validation.cljs \
 #   ✓ No rollback triggers fired
 
 # 2. Generate final report
-nbb deploy/phase-1-completion-report.cljs \
+kbb --backend sci deploy/phase-1-completion-report.cljk \
   --output reports/phase-1-final.md
 ```
 
@@ -351,7 +351,7 @@ Triggered by autonomous safeguards, logged immediately:
 tail -50 metrics/rollback-audit.log
 
 # Check current rollback status
-nbb deploy/rollback-automation.cljk status
+kbb --backend sci deploy/rollback-automation.cljk status
 ```
 
 **Automatic triggers fire → revert → alert ops**:
@@ -377,7 +377,7 @@ nbb deploy/rollback-automation.cljk status
 
 ```bash
 # Request manual rollback (for debugging or business decision)
-nbb deploy/month-1-staging-deployment.cljk rollback
+kbb --backend sci deploy/month-1-staging-deployment.cljk rollback
 
 # Steps executed:
 # 1. Set cljc traffic = 0%
@@ -391,7 +391,7 @@ nbb deploy/month-1-staging-deployment.cljk rollback
 
 ```bash
 # If rollback occurred, analyze root cause
-nbb deploy/incident-analysis.cljs \
+kbb --backend sci deploy/incident-analysis.cljk \
   --rollback-trigger <trigger-id> \
   --output reports/incident-<date>.md
 
@@ -465,7 +465,7 @@ nbb deploy/incident-analysis.cljs \
 A: Automatic rollback fires (1% threshold), full revert to Rust. Owner investigates root cause. If application-level bug: fix in staging, re-validate, resume.
 
 **Q: Can we pause canary traffic for debugging?**  
-A: Yes, use `nbb deploy/month-1-staging-deployment.cljk canary-pause` for manual pause. Auto-resumes after 1 hour unless extended.
+A: Yes, use `kbb --backend sci deploy/month-1-staging-deployment.cljk canary-pause` for manual pause. Auto-resumes after 1 hour unless extended.
 
 **Q: What's the maximum acceptable latency delta (cljc vs Rust)?**  
 A: 50ms budget (cljc p99 - Rust p99 < 50ms). If sustained >50ms: investigate Chicory/WASM overhead or app logic.

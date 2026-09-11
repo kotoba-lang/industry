@@ -118,7 +118,7 @@ plist の修正は効いた —— 夜間は `run-backup.cljc` を正しく選�
 `git push … main` ではなく、その手前の ingest だった**:
 
 ```
-== bb ./bin/gpg-unlock.cljc        （成功）
+== kbb ./bin/gpg-unlock.cljk        （成功）
 == ./bin/ingest-mail.cljc          Cannot run program: Exec failed, error: 13 (Permission denied)
 ```
 
@@ -127,7 +127,7 @@ plist の修正は効いた —— 夜間は `run-backup.cljc` を正しく選�
 **違う呼び方**で起動している:
 
 ```
-(run bb ./bin/gpg-unlock.cljc)     ← bb 経由。実行ビット不要
+(run kbb ./bin/gpg-unlock.cljk)     ← bb 経由。実行ビット不要
 (run ./bin/ingest-mail.cljc)       ← 直接 exec。実行ビットが要る
 ```
 

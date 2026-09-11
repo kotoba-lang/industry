@@ -268,7 +268,7 @@ role が `:provider` でなく `:assurance` なのは `layout` (library) に依�
 
 ### 最初の qualified claim
 
-`clojure -M:bench 2000000 16 20 40` → SoA 5.562 ms 対 AoS 11.253 ms、51% 改善、
+`kbb -M:bench 2000000 16 20 40` → SoA 5.562 ms 対 AoS 11.253 ms、51% 改善、
 rel-stdev 0.017 / 0.069、**QUALIFIED**、claim 封印済み（fingerprint 1907294590、
 machine fingerprint 1533672245）、`stale-on? portable-64 => true`。
 **設計時に意図した経路が端から端まで実際に動いた**: probe → 記述子 → layout の予測
@@ -544,7 +544,7 @@ native + SIMD なら答えを出せる。**
 ### この形は再利用できる
 
 **ループはメモリが無料な所で測り、メモリはループが無料な所で測り、どちらとも
-共有しない構成を予測する。** `machine-probe` の `clojure -M:calibrate` がこれを
+共有しない構成を予測する。** `machine-probe` の `kbb -M:calibrate` がこれを
 実行する。
 
 ### 未着地の pin
@@ -913,7 +913,7 @@ block 境界に floor するので各片は aligned のまま。`:stats :splits`
 
 ### 測定を `machine-probe` に入れた (0.5.0)
 
-`clojure -M:curve` が記述子の形で出力し、その場で validate する。
+`kbb -M:curve` が記述子の形で出力し、その場で validate する。
 このマシン（JVM、256 MiB）: 128 B で 6.2 GB/s、2 KiB で 23.8、32 KiB で 10.2 —
 **3.9 倍の開き**。
 
@@ -1001,7 +1001,7 @@ stride で引く**ようにした。各 arm が使った `:stride-bytes` と
 
 ### harness は「自分の変更が無意味だった」と言える形にした
 
-`clojure -M:perarm` の判定は 3 分岐で、**そのうち 1 つは「置き換え前より悪い」**。
+`kbb -M:perarm` の判定は 3 分岐で、**そのうち 1 つは「置き換え前より悪い」**。
 自分の変更を評価する道具が、肯定しか返せない形では意味がない。
 
 
@@ -1612,7 +1612,7 @@ docstring に測定値を記録し「**アクセスパターンの順位付け�
 1. **qualified な `:tlb` fact は出ていない。** load 6.5 で 1 run 通ったが再現せず、以後 load 9〜84 で
    拒否され続けた。**基準と計測手法は整っている**（across-run gate、stagger、footprint 一定、
    sample 長）。**再開点: 機械が静かなときに `cd orgs/kotoba-lang/machine-probe &&
-   clojure -M:tlb 12 3` を、他に何も走らせずに実行する。**
+   kbb -M:tlb 12 3` を、他に何も走らせずに実行する。**
 2. **native stage 2 以降は上流ブロック。** `tender-native` (`f92f390`) の
    `kototama/native/executor.clj:539` が `(= 512 (:initial fuel))` と `(= 4096 (:capacity heap))` を
    assert しており、vector-f64 も計測ループも入口で止まる。**自分では直せない。**

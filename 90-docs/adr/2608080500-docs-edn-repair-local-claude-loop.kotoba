@@ -120,13 +120,13 @@
 - **仕事は有限だが loop は残る。** 生成器のバグ自体は直っていない（どの生成器かも特定できていない）ので、新しい破損は起こりうる。")
 
   (:adr/verification
-  "**tick**: `COM_JUNKAWASAKI_ROOT=$PWD nbb scripts/docs-edn-repair-tick.cljs` → `走査 2212 / 読めない 7 / outcome candidates`。7 件すべてが `:needs-reconstruction` で、それぞれの reader エラーが出る。
+  "**tick**: `COM_JUNKAWASAKI_ROOT=$PWD kbb --backend sci scripts/docs-edn-repair-tick.cljk` → `走査 2212 / 読めない 7 / outcome candidates`。7 件すべてが `:needs-reconstruction` で、それぞれの reader エラーが出る。
 
-**loop driver**: `nbb --classpath \".:scripts/nbb_compat\" scripts/docs-edn-repair-loop.cljs --dry-run` → 分岐チェックを通り、tick を回し、`--dry-run: 次の候補は 90-docs/gates/smoke-test-checklist-20260810.edn（needs-reconstruction）` を出してモデルを起こさずに終了。
+**loop driver**: `kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/docs-edn-repair-loop.cljs --dry-run` → 分岐チェックを通り、tick を回し、`--dry-run: 次の候補は 90-docs/gates/smoke-test-checklist-20260810.edn（needs-reconstruction）` を出してモデルを起こさずに終了。
 
 **plist**: `plutil -lint scripts/com.gftd.docs-edn-repair.plist` → OK。配置は `scripts/` 直下（`com.gftd.tsukuru-maturity-tick.plist` 等と同じ慣習）。
 
-**分類の機械可読出力**: `nbb scripts/diagnose-unreadable-edn.cljs --edn <壊れたファイル> <正常なファイル>` → `[{:status :needs-reconstruction :reason \"Map literal contains duplicate keys: …\"} {:status :already-readable}]`。
+**分類の機械可読出力**: `kbb --backend sci scripts/diagnose-unreadable-edn.cljk --edn <壊れたファイル> <正常なファイル>` → `[{:status :needs-reconstruction :reason \"Map literal contains duplicate keys: …\"} {:status :already-readable}]`。
 
 ### install と launchd 経由の実起動（2026-08-08 追記）
 
@@ -136,5 +136,5 @@
 
 **この ADR が検証していないこと（更新）**:
 
-- **1 反復の結果。** 初回反復は 2026-08-08T07:26 頃に起動し、closing 時点でまだ走っている。直ったかどうかは**次周の tick が測る**（この loop の設計どおり、自己申告の green を信用しない）。確認は `nbb --classpath \".:scripts/nbb_compat\" scripts/docs-edn-repair-tick.cljs` の `読めない N` が 7 → 6 になるか。
+- **1 反復の結果。** 初回反復は 2026-08-08T07:26 頃に起動し、closing 時点でまだ走っている。直ったかどうかは**次周の tick が測る**（この loop の設計どおり、自己申告の green を信用しない）。確認は `kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/docs-edn-repair-tick.cljs` の `読めない N` が 7 → 6 になるか。
 - **どの生成器がこれらの文書を壊したか。** 7 件は `90-docs/deployment` `gates` `migration` に散っており、共通の生成器が居るのか、同じ手癖の別々の生成なのかは分かっていない。loop はこれを直さない —— 破損した文書を拾うだけで、破損源は残る。")))

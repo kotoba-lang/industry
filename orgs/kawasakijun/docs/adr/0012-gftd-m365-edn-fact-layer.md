@@ -59,7 +59,7 @@ CRM・ファイル来歴等)。
 - (+) 「この契約の相手方 → その組織とのメール/会議履歴 → 元ファイルの CID → B2 実体」
   が単一の Datalog クエリ空間で辿れる。
 - (+) facts はすべて annex+暗号化で GitHub にはポインタのみ。再現は
-  `clone → 鍵 import → datalad get facts → clojure -M:run`。
+  `clone → 鍵 import → datalad get facts → kbb -M:run`。
 - (−) 分類・抽出はファイル名/ヘッダのルールベース。本文レベル(契約条件・金額・
   期日・対応義務)の構造化は LLM 抽出の別フェーズとして未着手。
 - (−) projects の status/depends-on、org 名の検証、取引先解決の残り 311 件は

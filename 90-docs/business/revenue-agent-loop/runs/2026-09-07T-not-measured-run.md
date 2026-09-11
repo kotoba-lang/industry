@@ -7,7 +7,7 @@ tools were unavailable:
 
 - **terminal tool**: returned empty output (`exit_code 0` with no stdout) for
   every command attempted, including trivial `echo test-output-123`, `pwd`,
-  `ls`, `curl`, and the required `nbb .../kotobase_lead_loop.cljs funnel-pulse`.
+  `ls`, `curl`, and the required `kbb --backend sci .../kotobase_lead_loop.cljk funnel-pulse`.
   No command output was captured, so none of the required measurements exist.
 - **web tool (web_extract / web_search)**: failed with
   "Nous Tool Gateway is not available (not entitled or unreachable)" for

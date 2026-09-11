@@ -22,10 +22,10 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 |---|---|
 | **local を pin に合わせる（差分だけ）** | `kagami sync --db manifest/fleet-db.edn`（kagami）。pin と一致する repo は **`:noop` で git を起動しない**、dirty は skip、pin SHA を名指しで fetch、`--jobs` で並列。⚠ **先に `kagami reconcile` を通すこと**（下記） |
 | **どの pin が remote より遅れているか（1 件）** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
-| **どの pin が remote より遅れているか（fleet 全体）** | `nbb --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljk > pins.tsv`（GraphQL batch。stdout はそのまま `PINS=` に渡せる TSV）。**測れなかった batch は exit 2** で clean と区別する。向きは分類しないので、決めるのは `west-pin-put-batch.cljs` 側 |
-| **pin を前進させる** | `nbb scripts/advance-pins.cljk <org> <list-file> --execute`（entry の revision 行だけ書換）→ `nbb scripts/verify-west-pins.cljk` |
-| **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljk plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
-| **ずれの定期検出** | `nbb scripts/fleet-sync-tick.cljk check`（検出のみ。書かない） |
+| **どの pin が remote より遅れているか（fleet 全体）** | `kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljk > pins.tsv`（GraphQL batch。stdout はそのまま `PINS=` に渡せる TSV）。**測れなかった batch は exit 2** で clean と区別する。向きは分類しないので、決めるのは `west-pin-put-batch.cljs` 側 |
+| **pin を前進させる** | `kbb --backend sci scripts/advance-pins.cljk <org> <list-file> --execute`（entry の revision 行だけ書換）→ `kbb --backend sci scripts/verify-west-pins.cljk` |
+| **GitHub / local / west.yml の三点ずれ** | `kbb --backend sci scripts/west-triple-sync.cljk plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
+| **ずれの定期検出** | `kbb --backend sci scripts/fleet-sync-tick.cljk check`（検出のみ。書かない） |
 
 ## セッション前の同期 —— checkout を pin に合わせるのは hook の仕事
 
@@ -35,8 +35,8 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 3 つは触らず理由を出す）。手で回すなら:
 
 ```bash
-nbb .claude/hooks/session-start-toolchain-pin-sync.cljk "$PWD" --dry-run  # 測るだけ
-nbb .claude/hooks/session-start-toolchain-pin-sync.cljk "$PWD"            # 合わせる
+kbb --backend sci .claude/hooks/session-start-toolchain-pin-sync.cljk "$PWD" --dry-run  # 測るだけ
+kbb --backend sci .claude/hooks/session-start-toolchain-pin-sync.cljk "$PWD"            # 合わせる
 ```
 
 **なぜ hook なのか（2026-09-09 の実測、ADR-2609092500）。** 共有 `amu` checkout が
@@ -49,7 +49,7 @@ kotoba-sema は main より 71 遅れで、pure S-expression core は数日間�
 書いている）ので、**この hook は報告ではなく同期する**。
 
 pin 自体が最後に fetch した `origin/main` より遅れていれば、行数と
-`nbb scripts/west-pin-put.cljk <name> HEAD` を出す。**pin の前進は自動でやらない** ——
+`kbb --backend sci scripts/west-pin-put.cljk <name> HEAD` を出す。**pin の前進は自動でやらない** ——
 到達性検証を伴う書き込みで、共有 checkout からは行わない（下記の正経路を使う）。
 
 ## 罠 1 — `west update` は「pin に合わせる」だけで、GitHub の新しい commit を見ない
@@ -59,7 +59,7 @@ pin へ checkout を合わせるだけで、GitHub 側の新しい commit を pi
 ではない（pin 自体の前進は別操作。「`west update` すれば GitHub 最新に追従する」と
 誤解しないこと）。
 
-実測（2026-07-03）: `nbb scripts/gen-west-manifest.cljk`（引数なし dry-run）で
+実測（2026-07-03）: `kbb --backend sci scripts/gen-west-manifest.cljk`（引数なし dry-run）で
 kotoba-lang org 配下の character / comfyui / kami-engine / kotoba / kotobase /
 murakumo 等 多数の project で、ローカル checkout が **既存 pin より遅れている**
 状態を検出した。**気付かず push すると stale checkout と古い pin が他 clone と
@@ -74,10 +74,10 @@ gh api "repos/<org>/<repo>/compare/<pinned-sha>...<default-branch>" \
 # 2) 先行していたら該当 project の checkout を最新化
 cd orgs/<org>/<repo> && git fetch origin && git merge --ff-only origin/<default-branch>
 # 3) manifest の pin を前進（当該 entry のみ最小 diff。wholesale 再生成は禁止）
-nbb scripts/gen-west-manifest.cljk --entry <repo-name>   # ⚠ 数分〜1 時間。下記「罠 4」
+kbb --backend sci scripts/gen-west-manifest.cljk --entry <repo-name>   # ⚠ 数分〜1 時間。下記「罠 4」
 # 4) 自分の変更だけを見る。--check は使わない（下記「罠 5」）
 git diff origin/main -- manifest/west.yml
-nbb scripts/verify-west-pins.cljk
+kbb --backend sci scripts/verify-west-pins.cljk
 ```
 
 これを終えてから本来の操作を実行する。
@@ -113,7 +113,7 @@ repo に `:advance` を出した。
 ```bash
 # 吸収前に必ず: 入力 west.yml は origin/main のもの、変更される pin は全て fast-forward か
 git show origin/main:manifest/west.yml > /tmp/west-main.yml
-nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
+kbb --backend sci --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
   reconcile --db manifest/fleet-db.edn --west /tmp/west-main.yml
 ```
 
@@ -149,13 +149,13 @@ worktree で走らせて branch で着地させる。
 
 ## 罠 5 — `--check` は無改変の `main` でも STALE。あなたの変更について何も答えない
 
-**`nbb scripts/gen-west-manifest.cljk --check` を「自分の変更が canonical か」の
+**`kbb --backend sci scripts/gen-west-manifest.cljk --check` を「自分の変更が canonical か」の
 確認に使わない。** 対照実験（実測 2026-08-22、`origin/main` を checkout しただけの
 worktree、`git status --porcelain` が空）:
 
 ```
-$ nbb scripts/gen-west-manifest.cljk --check
-west.yml is STALE. run: nbb scripts/gen-west-manifest.cljk
+$ kbb --backend sci scripts/gen-west-manifest.cljk --check
+west.yml is STALE. run: kbb --backend sci scripts/gen-west-manifest.cljk
 CHECK_EXIT=1
 ```
 
@@ -181,7 +181,7 @@ CHECK_EXIT=1
 
 ```bash
 git diff origin/main -- manifest/west.yml   # 自分が動かした entry だけが出る
-nbb scripts/verify-west-pins.cljk           # pin の存在・default branch 到達性・前進
+kbb --backend sci scripts/verify-west-pins.cljk           # pin の存在・default branch 到達性・前進
 ```
 
 `verify-west-pins` は生成器の中でも走る（下記「pin 検証」）ので、**pin の正しさは
@@ -206,7 +206,7 @@ nbb scripts/verify-west-pins.cljk           # pin の存在・default branch 到
 そのほうが構造的に安全である。**文字列置換や `sed` でやらない。**
 
 ```bash
-nbb -e '
+kbb --backend sci -e '
 (require (quote [cljs.reader :as reader]) (quote ["fs" :as fs]))
 (let [p "manifest/repos.edn"
       tx (reader/read-string (.readFileSync fs p "utf8"))
@@ -258,7 +258,7 @@ marker の手編集は **pin を静かに壊す**。代わりに: tip の west.y
 発生しない**（`repos.edn` には効かない —— 上記「罠 6」）。
 commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を通らないが、
 **その確認に `--check` を使わない**（無改変の main でも STALE を返す。罠 5）——
-`git diff origin/main -- manifest/west.yml` と `nbb scripts/verify-west-pins.cljk`
+`git diff origin/main -- manifest/west.yml` と `kbb --backend sci scripts/verify-west-pins.cljk`
 で見る。
 
 やむを得ずローカル merge する場合のみ、west.yml の衝突は **marker 手編集でなく
@@ -324,7 +324,7 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
   子 repo remote の force-rewrite による pin 退行）。worktree 分離は作業 tree の
   WIP 衝突しか防ぐ。force-push は上流の運用で撲滅するしかない。
 - 大容量 repo は worktree ごとに重複取得される（full history 既定のため軽減策は
-  無い。恒久対応は DataLad/B2 経路への移行、`nbb manifest/west_annex.cljk
+  無い。恒久対応は DataLad/B2 経路への移行、`kbb --backend sci manifest/west_annex.cljk
   annex-get`）。
 - **後片付けで `git worktree remove` が
   `'<path>/.git' is not a .git file` で拒否することがある**（2026-08-08 に

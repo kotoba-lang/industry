@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; clearance-policy-check.cljs — manifest/clearance.edn の機械検査。ADR-2608083000。
 ;;
 ;; ## なぜこの gate が要るか
@@ -30,7 +30,7 @@
 ;;
 ;; ネットワーク: 不要。実行: 不要（静的検査のみ）。
 ;;
-;; 実行: `npx nbb clearance-policy-check.cljs <dir>`
+;; 実行: `kbb --backend sci clearance-policy-check.cljk <dir>`
 
 (ns fleet-ci.gates.clearance-policy-check
   (:require ["node:fs" :as fs]

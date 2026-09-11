@@ -414,7 +414,7 @@ PUT grant は白紙小切手のままで、契約 suite の `bound-put-grant?` �
 #     orgs/kotoba-lang/kotobase-storage/src/kotobase/storage/object_async_contract.cljs
 # 2. B2/R2 provider に IPresignedTransfer を実装し、契約 suite を通す
 #    bound-put-grant? が green になったら G1 の半分
-cd orgs/kotoba-lang/kotobase-storage-s3 && clojure -M:test
+cd orgs/kotoba-lang/kotobase-storage-s3 && kbb -M:test
 # 3. その後 net-kotobase の route（clj-edge）。Worker なので engine には
 #    解決済みの stat/grant を渡す — kotobase-lfs の README の The engine does no I/O
 ```

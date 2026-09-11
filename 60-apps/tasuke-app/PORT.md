@@ -14,7 +14,7 @@ git proxy の cross-tier 制限で `com-junkawasaki/root` にしか push でき�
 git clone https://github.com/cloud-itonami/tasuke && cd tasuke
 git fetch <この bundle のパス> feat/first-response-app:feat/first-response-app
 git checkout feat/first-response-app
-npm install && clojure -M:test          # 21 tests / 2216 assertions
+npm install && kbb -M:test          # 21 tests / 2216 assertions
 ```
 
 bundle は base として `6c7ac667`（移送時の tasuke main）を要求する。main が進んで
@@ -63,18 +63,18 @@ bundle は base として `6c7ac667`（移送時の tasuke main）を要求す�
 
 | gate | 結果 |
 |---|---|
-| `clojure -M:test` | **21 tests / 2216 assertions** 緑（tasuke の repository contract test を含む） |
-| `shadow-cljs compile oracle-test` + node | **7 tests / 34 assertions** 緑 |
-| `nbb scripts/verify_browser.cljs` | **12 項目**緑（実 Chromium、書面 6 種のレンダリングを含む） |
+| `kbb -M:test` | **21 tests / 2216 assertions** 緑（tasuke の repository contract test を含む） |
+| `amu compile --target wasm32-browser oracle-test` + node | **7 tests / 34 assertions** 緑 |
+| `kbb --backend sci scripts/verify_browser.cljk` | **12 項目**緑（実 Chromium、書面 6 種のレンダリングを含む） |
 
-`clojure -M:gen` が tasuke の tree で出す KIR は、ここで出すものと **byte 一致**
+`kbb -M:gen` が tasuke の tree で出す KIR は、ここで出すものと **byte 一致**
 （35,204 bytes）。決定は移送で変わっていない。
 
 ## finding 4 — tasuke の JVM 側では domain suite が 1 つも走っていない
 
-`bb run_tests.clj` が列挙する 11 suite は `tasuke.methods.test-triage` のように
+`kbb run_tests.cljk` が列挙する 11 suite は `tasuke.methods.test-triage` のように
 **`test-` で始まり `-test` で終わらない**。cognitect の test-runner は既定で
-`#".*-test$"` しか拾わないので、`clojure -M:test` はそれらを**1 つも実行しない**
+`#".*-test$"` しか拾わないので、`kbb -M:test` はそれらを**1 つも実行しない**
 のに緑を返す。bb は退役済みなので、**あの suite は今どの経路でも走っていない**
 可能性が高い（この container に bb が無く、そこは未測定）。
 直し方は `-r` を渡すか ns を改名するかだが、それは移送の範囲外なので触っていない。

@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "gen": "clojure -M:gen",
-    "test:jvm": "clojure -M:test",
-    "test:cljs": "shadow-cljs compile oracle-test && node out/oracle-tests.js",
-    "build": "shadow-cljs release app",
-    "dev": "shadow-cljs watch app",
-    "deploy": "shadow-cljs release app && clojure -M:gen-page && wrangler deploy"
+    "gen": "kbb -M:gen",
+    "test:jvm": "kbb -M:test",
+    "test:cljs": "amu compile --target wasm32-browser oracle-test && node out/oracle-tests.js",
+    "build": "amu compile --target wasm32-browser app",
+    "dev": "amu compile --target wasm32-browser app",
+    "deploy": "amu compile --target wasm32-browser app && kbb -M:gen-page && wrangler deploy"
   },
   "devDependencies": {
     "nbb": "^1.5.212",

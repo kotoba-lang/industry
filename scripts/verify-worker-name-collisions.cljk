@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-worker-name-collisions
   "Cloudflare Worker names claimed by more than one wrangler config, split by
   whether the configs agree about which hostnames the Worker serves.
@@ -34,7 +34,7 @@
   them prints a remedy the other says not to apply yet.
 
   usage:
-    nbb scripts/verify-worker-name-collisions.cljk [<root>] [--findings] [--all]"
+    kbb --backend sci scripts/verify-worker-name-collisions.cljk [<root>] [--findings] [--all]"
   (:require ["fs" :as fs]
             ["path" :as path]
             [clojure.set :as set]

@@ -28,7 +28,7 @@
                    "kotoba-lang/authentication の deps.edn が pin する oidc は依然 jwt-edge 以前。net-kotobase 側は直接 pin で回避しているが、authentication 自身の pin 前進は別 follow-up。"
                    "JWKS キャッシュは isolate 内で TTL 10 分。cold isolate では都度取得になり、IdP 不達時は 503 を返す(古い鍵で通し続けない)。"
                    "座席/ロール(RBAC)は未実装。SSO で入った利用者の権限は既存のテナント境界のまま。")),
-  (:adr/verification "kotoba-lang/oidc: clojure -M:test → 22 tests / 70 assertions, 0 failures。nbb -m oidc.adapters.jwt-edge-test → 実 RSA 鍵で 10 checks, 0 failed。net-kotobase/authn: clojure -M:test → 14 tests / 129 assertions, 0 failures。nbb -m sso-flow-smoke → スタブ IdP 相手に 15 checks, 0 failed。live(伝播安定後に 5 回連続で確認): /v1/sso/start は 302 で『single sign-on is not configured for that domain』、/v1/sso/callback は 302 で『this sign-in link has expired or was already used』、/sign-in・/health・/passkey.js は 200、kotobase.net/admin の hand-off は 302 のまま。"),
+  (:adr/verification "kotoba-lang/oidc: kbb -M:test → 22 tests / 70 assertions, 0 failures。kbb --backend sci -m oidc.adapters.jwt-edge-test → 実 RSA 鍵で 10 checks, 0 failed。net-kotobase/authn: kbb -M:test → 14 tests / 129 assertions, 0 failures。kbb --backend sci -m sso-flow-smoke → スタブ IdP 相手に 15 checks, 0 failed。live(伝播安定後に 5 回連続で確認): /v1/sso/start は 302 で『single sign-on is not configured for that domain』、/v1/sso/callback は 302 で『this sign-in link has expired or was already used』、/sign-in・/health・/passkey.js は 200、kotobase.net/admin の hand-off は 302 のまま。"),
   (:adr/body
   "## Context
 

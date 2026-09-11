@@ -149,7 +149,7 @@ deploy** し、さらに `edge/sites.cljs` の projection が `:moved-to` を落
 
 - **`functions/edge/sites-core.js` は `cloud-itonami.sites` の compiled bundle** であって
   手書きではない。resolver を変えたら
-  `clojure -M:cljs:local -m shadow.cljs.devtools.cli release sites-api` が要る
+  `kbb -M:cljs:local -m shadow.cljs.devtools.cli release sites-api` が要る
 - **projection は元データの部分集合になりうる。** 面を足したら projection 側にも
   足さないと、resolver が正しくても届かない
 
@@ -185,11 +185,11 @@ deploy** し、さらに `edge/sites.cljs` の projection が `:moved-to` を落
     :gap/detail \"PSL が無いので co.jp 等の多段 suffix を厳密判定できない。形の検査までで、判定できないものは推測せず断る（fail-closed）\"}]")
 
   (:adr/verification
-  "[{:check \"門が bare nbb で起動するか（nbb scripts/generate-sites-registry.cljs --check）\"
+  "[{:check \"門が bare nbb で起動するか（kbb --backend sci scripts/generate-sites-registry.cljk --check）\"
      :result \"OK: 22 sites / 38 reserved prefixes。**landed 直後は起動していなかった** —— 2026-08-06 の closing で発見し修正\"}
    {:check \"門が実際に落ちるか（未検証の org \\\"toyota\\\" を注入）\"
      :result \"受理規則が発火して落ちる: org \\\"toyota\\\" は受理できない（missing-domain）。先に dir / chrome の検査が発火するので、それらを満たした上で確認した\"}
-   {:check \"cloud-itonami 全体テスト（clojure -M:test）\"
+   {:check \"cloud-itonami 全体テスト（kbb -M:test）\"
      :result \"1445 tests / 9487 assertions / 5 failures / 12 errors。failure は pristine な pin と同一（xrpc / doctor / ops-identity の既存 failure）で本件由来ではない\"}
    {:check \"受理規則のテストが suite で走るか\"
      :result \"両 runner に登録した（登録前は一度も走っていなかった）。1437 → 1445 tests / 9442 → 9487 assertions\"}
@@ -212,7 +212,7 @@ deploy** し、さらに `edge/sites.cljs` の projection が `:moved-to` を落
   "次の agent が最初に打つコマンド:
 
   # 1) 受理規則が生きているか（宣言の門）。**bare nbb で起動すること自体が検査対象**
-  cd orgs/network-awai/cloud-itonami && nbb scripts/generate-sites-registry.cljs --check
+  cd orgs/network-awai/cloud-itonami && kbb --backend sci scripts/generate-sites-registry.cljk --check
   #    期待: OK: sites registry is canonical (22 site(s), 38 reserved prefixes)
 
   # 2) provisioning の 2 org を live にできるか（token 次第。今は不可）

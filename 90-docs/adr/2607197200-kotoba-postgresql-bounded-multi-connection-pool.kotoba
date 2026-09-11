@@ -36,7 +36,7 @@
                      (:idle-eviction true) (:lifetime-eviction true)))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "two connections, saturation, reset, idle/lifetime eviction; exit 0"))))))
   (:adr/body
   "# ADR-2607197200: Bounded multi-connection PostgreSQL pool

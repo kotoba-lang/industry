@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/task-graph-query.cljk — pure projector over
 ;; 90-docs/task-graphs/task-graph.datoms.edn (topology + current
 ;; :task/status of each task).
@@ -21,8 +21,8 @@
 ;; it only reports readiness).
 ;;
 ;; Usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/task-graph-query.cljk status [--workflow <id>]
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/task-graph-query.cljk ready  [--workflow <id>]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/task-graph-query.cljk status [--workflow <id>]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/task-graph-query.cljk ready  [--workflow <id>]
 
 (require '[scripts.nbb-compat :refer [slurp file file-seq exit format]]
          '[clojure.edn :as edn]
@@ -95,7 +95,7 @@
         (println (format "%-28s %-12s %s" (:task/id t) (name (:task/status t)) (:task/title t))))
 
       :else
-      (do (println "usage: nbb scripts/task-graph-query.cljk <status|ready> [--workflow <workflow/id>]")
+      (do (println "usage: kbb --backend sci scripts/task-graph-query.cljk <status|ready> [--workflow <workflow/id>]")
           (exit 1)))))
 
 (apply -main *command-line-args*)

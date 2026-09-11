@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; manifest-reality-check.cljs — manifest 実態乖離の gate。
 ;;
 ;; 展開済みの superproject tree を受け取り、`manifest/west.yml` と
@@ -20,7 +20,7 @@
 ;; 5 分 tick には載せず、--with-reality を付けた日次 run でのみ有効にする。
 ;;
 ;; ノード側で:
-;;   npx nbb manifest-reality-check.cljs <superproject-dir> [--with-reality]
+;;   kbb --backend sci manifest-reality-check.cljk <superproject-dir> [--with-reality]
 (ns fleet-ci.gates.manifest-reality-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -94,7 +94,7 @@
            "      f (c/audit in)]\n"
            "  (println (pr-str {:findings f :errors (count (c/errors f))"
            " :summary (c/summary f)})))\n"))
-    (let [out (str (cp/execSync (str "npx nbb --classpath " libsrc " " runner)))
+    (let [out (str (cp/execSync (str "kbb --backend sci --classpath " libsrc " " runner)))
           {:keys [findings errors summary]} (reader/read-string (str/trim out))]
       (println "manifest-reality:" (count findings) "findings," errors "errors")
       (doseq [[k n] (sort-by (comp str key) summary)] (println "  " (pr-str k) n))

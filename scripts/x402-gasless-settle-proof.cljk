@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; x402-gasless-settle-proof — build, sign and price the transaction that
 ;; settles an x402 `exact` payment, WITHOUT SENDING IT.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/eth-crypto/src:orgs/kotoba-lang/org-ethereum-abi/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/eth-crypto/src:orgs/kotoba-lang/org-ethereum-abi/src" \
 ;;       scripts/x402-gasless-settle-proof.cljk [--network base-sepolia]
 ;;
 ;; ## Why this exists

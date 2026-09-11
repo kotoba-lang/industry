@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; test-files-actually-run.cljs — a test file that defines tests and never runs them.
 ;;
-;; WHY THIS EXISTS. Measured 2026-08-17 in network-isekai: `clojure -M
+;; WHY THIS EXISTS. Measured 2026-08-17 in network-isekai: `kbb -M
 ;; test/royale_world_streaming_test.clj` printed nothing and exited 0. The file has
-;; `deftest` forms and no `(run-tests)` at the end, so `clojure -M <file>` loads it, defines
+;; `deftest` forms and no `(run-tests)` at the end, so `kbb -M <file>` loads it, defines
 ;; the vars, runs none of them, and succeeds. **Observationally identical to passing**, and
 ;; that is the whole problem: every other test file in that directory ends with the runner,
 ;; so these were invoked the same way, reported the same way, and measured nothing.
@@ -16,7 +16,7 @@
 ;; This is root CLAUDE.md's "「飛ばした」と「合格した」が出力で区別できるか" as an
 ;; executable check.
 ;;
-;; Node side:  npx nbb test-files-actually-run.cljs <dir> [--sub test] [--min N]
+;; Node side:  kbb --backend sci test-files-actually-run.cljk <dir> [--sub test] [--min N]
 ;;             <dir> FIRST — several gates take the tree as the first non-flag argument and
 ;;             putting it after a flag makes the flag's VALUE the tree (root CLAUDE.md
 ;;             records three gates misdiagnosed that way).
@@ -95,7 +95,7 @@
                   ;; Can this file be invoked directly at all?
                   ;;
                   ;; A suite that only refers `cljs.test :refer-macros` is compiled by a
-                  ;; ClojureScript runner; `clojure -M <file>` cannot load it, so demanding a
+                  ;; ClojureScript runner; `kbb -M <file>` cannot load it, so demanding a
                   ;; `(run-tests)` footer of it is the wrong question and a footer would not
                   ;; make it run. Those are reported on their own line instead of failed.
                   ;; (`.cljc` files that reader-condition into `clojure.test` under `:clj`

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; watchlist-datalake-export.cljs — kotoba-lang/watchlist-screen の
 ;; 制裁リスト snapshot を datalake に載せられる 4 枚の表に落とす。
 ;;
@@ -47,7 +47,7 @@
 ;; **数えて報告する**。
 ;;
 ;; Run:
-;;   nbb -cp "orgs/kotoba-lang/watchlist-screen/src" \
+;;   kbb --backend sci -cp "orgs/kotoba-lang/watchlist-screen/src" \
 ;;     scripts/watchlist-datalake-export.cljk [--repo <path>] [--out-dir <dir>]
 
 (ns watchlist-datalake-export

@@ -1,16 +1,16 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Telnyx agent signup — AWAI Network, L.L.C.
 ;; Follows https://telnyx.com/agent-signup.md
 ;;
 ;; Subcommands, so this runs without a TTY (Claude Code's `!`, ssh, CI):
 ;;
-;;   nbb scripts/telnyx-agent-signup.cljk inbox-create ACCEPT   # Telnyx Agent Inbox
-;;   nbb scripts/telnyx-agent-signup.cljk challenge             # bot challenge
-;;   nbb scripts/telnyx-agent-signup.cljk signup '<answer>' ACCEPT
-;;   nbb scripts/telnyx-agent-signup.cljk inbox-wait            # poll -> key
-;;   echo '<link>' | nbb scripts/telnyx-agent-signup.cljk redeem   # manual fallback
-;;   nbb scripts/telnyx-agent-signup.cljk resend
-;;   nbb scripts/telnyx-agent-signup.cljk status
+;;   kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-create ACCEPT   # Telnyx Agent Inbox
+;;   kbb --backend sci scripts/telnyx-agent-signup.cljk challenge             # bot challenge
+;;   kbb --backend sci scripts/telnyx-agent-signup.cljk signup '<answer>' ACCEPT
+;;   kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-wait            # poll -> key
+;;   echo '<link>' | kbb --backend sci scripts/telnyx-agent-signup.cljk redeem   # manual fallback
+;;   kbb --backend sci scripts/telnyx-agent-signup.cljk resend
+;;   kbb --backend sci scripts/telnyx-agent-signup.cljk status
 ;;
 ;; The literal token ACCEPT is required on the two steps that create something
 ;; at Telnyx, so each is a deliberate act by the owner.
@@ -205,7 +205,7 @@
               (println "  account_key: stored in Keychain as" inbox-key-service
                        (str "(" (count account_key) " chars, not printed)"))
               (println "\nNext: get a bot challenge, have Claude answer it, then sign up.")
-              (println "  nbb scripts/telnyx-agent-signup.cljk challenge"))))))))
+              (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk challenge"))))))))
 
 ;; -------------------------------------------------------------- challenge
 
@@ -222,7 +222,7 @@
         (println "problem:   " (:problem d))
         (println "─────────────────────────────────")
         (println "\nPaste the problem to Claude, then:")
-        (println "  nbb scripts/telnyx-agent-signup.cljk signup '<answer>' ACCEPT")))))
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk signup '<answer>' ACCEPT")))))
 
 ;; ----------------------------------------------------------------- signup
 
@@ -263,11 +263,11 @@
             (println "✓ signup accepted —" (:text s))
             (if (get-in st [:inbox :account_id])
               (println "\nNow collect the link from the Agent Inbox:\n"
-                       "  nbb scripts/telnyx-agent-signup.cljk inbox-wait")
+                       "  kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-wait")
               (do (println "\nVerification mail sent to" email)
                   (println "⚠ Do NOT open the link in a browser — the first request")
                   (println "  to it consumes it, even one that then errors.")
-                  (println "  echo '<link>' | nbb scripts/telnyx-agent-signup.cljk redeem")))))))))
+                  (println "  echo '<link>' | kbb --backend sci scripts/telnyx-agent-signup.cljk redeem")))))))))
 
 ;; ------------------------------------------------------ redeem / inbox-wait
 
@@ -470,13 +470,13 @@
     "resend"       (cmd-resend)
     "status"       (cmd-status)
     (do (println "usage:")
-        (println "  nbb scripts/telnyx-agent-signup.cljk inbox-create ACCEPT")
-        (println "  nbb scripts/telnyx-agent-signup.cljk challenge")
-        (println "  nbb scripts/telnyx-agent-signup.cljk signup '<answer>' ACCEPT")
-        (println "  nbb scripts/telnyx-agent-signup.cljk inbox-wait")
-        (println "  nbb scripts/telnyx-agent-signup.cljk inbox-list")
-        (println "  nbb scripts/telnyx-agent-signup.cljk inbox-read '<message-id>'")
-        (println "  echo '<link>' | nbb scripts/telnyx-agent-signup.cljk redeem")
-        (println "  nbb scripts/telnyx-agent-signup.cljk resend")
-        (println "  nbb scripts/telnyx-agent-signup.cljk status")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-create ACCEPT")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk challenge")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk signup '<answer>' ACCEPT")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-wait")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-list")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk inbox-read '<message-id>'")
+        (println "  echo '<link>' | kbb --backend sci scripts/telnyx-agent-signup.cljk redeem")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk resend")
+        (println "  kbb --backend sci scripts/telnyx-agent-signup.cljk status")
         (js/process.exit 2))))

@@ -15,7 +15,7 @@
   (:adr/evidence
   (map (:repo "kotoba-lang/authority")
    (:commit "2de205a778f4744a42c609abcc70c989449c2852")
-   (:tests "37 tests / 122 assertions green (clojure -M:test, JVM); 10/10 green under ClojureScript (nbb --classpath src test/cljs_smoke.cljs)")
+   (:tests "37 tests / 122 assertions green (kbb -M:test, JVM); 10/10 green under ClojureScript (kbb --backend sci --classpath src test/cljs_smoke.cljs)")
    (:mutation-tests "2 discriminating mutations run against a broken copy; each produced exactly the intended failure and no other")
    (:integration
    (map (:cacao (map (:commit "71014021b99d34b9e90cba5d4b5ff3a261bc3f2a")
@@ -28,7 +28,7 @@
                               "334b8bc3a5c6d11d09db4161936cc874a904e10f"
                               "01e6c5acdcc918315afc84a9d2abb628aecedbca"
                               "e3d130f4ff53f4ffdd7128fe011c060639281cf5"))
-                    (:tests "cljs (shadow-cljs compile all-tests + node): 440 tests / 2128 assertions, 0 failures. JVM (clojure -M:test): 110 tests / 675 assertions, 4 failures")
+                    (:tests "cljs (amu compile --target wasm32-browser all-tests + node): 440 tests / 2128 assertions, 0 failures. JVM (kbb -M:test): 110 tests / 675 assertions, 4 failures")
                     (:known-failures "provider-source-catalog-contract x2 and worker-artifact-contract x2 are PRE-EXISTING: they need build artifacts a fresh checkout has not produced, and fail identically on a baseline run of the same worktree with these files removed. Verified, not assumed.")
                     (:mutation "graph rule stated at the leaf instead of the chain root -> a-chain-lets-alice-delegate-her-graph-to-bob failed (4 assertions), nothing else")))
     (:deploy (map (:worker "net-kotobase")
@@ -123,7 +123,7 @@
      `kotobase-api-gateway/js/` は commit された deploy artifact で、wrangler の
      `main` は `edge-app.generated.mjs` → `../js/kotobase-worker.js` を指す。
      `01e6c5ac` の時点では bundle が古く、本番は旧経路のままだった。
-     `npm run build`（`shadow-cljs release worker` + `release entry` + manifest）で
+     `npm run build`（`amu compile --target wasm32-browser worker` + `release entry` + manifest）で
      再生成し、生成物に `CACAO chain rejected` / `graph-scope-not-root-issuer` /
      `leaf-iss` / `skip-graph-rule` が入っていることを確認してから deploy した。
 
@@ -145,7 +145,7 @@
      は既に `graph-rule?` で分岐しているので、required-resource を
      `authority.scope/covered?` に載せ替えて第 3 の呼び出し口を足すだけ。
      呼び出し元は `worker.cljc` の 108 / 509 / 880（object-capability upload 等）。
-     手順: 変更 → `clojure -M:test` → `npm test`（shadow 実ビルド。resource-guard
+     手順: 変更 → `kbb -M:test` → `npm test`（shadow 実ビルド。resource-guard
      必須）→ `npm run build` で bundle 再生成 → deploy → live probe。
 
      **(2) `cacao/edge/*.cljs` に chain 検証を移植**（cloud-itonami /

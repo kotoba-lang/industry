@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/gen-permit-index.cljk — cloud-itonami の governed actor が各自の
 ;; `facts.cljc` に持っている**法規制カタログ**を 1 つの datom データセットに
 ;; 抽出する。superproject ADR-2608080000。
 ;;
-;;   nbb --classpath ".:scripts" scripts/gen-permit-index.cljk
-;;   nbb --classpath ".:scripts" scripts/gen-permit-index.cljk --check
+;;   kbb --backend sci --classpath ".:scripts" scripts/gen-permit-index.cljk
+;;   kbb --backend sci --classpath ".:scripts" scripts/gen-permit-index.cljk --check
 ;;
 ;; 出力: 90-docs/regulatory/permits.datoms.edn（`manifest/edn-query.cljk` の
 ;; index 面に `:source/dataset "permits"` として載る）
@@ -657,7 +657,7 @@
       (println "permit-index: 一致（" (count rows) "行 /" (count juris) "法域）")
 
       check?
-      (do (println "permit-index: STALE — 再生成が要る（nbb --classpath \".:scripts\" scripts/gen-permit-index.cljk）")
+      (do (println "permit-index: STALE — 再生成が要る（kbb --backend sci --classpath \".:scripts\" scripts/gen-permit-index.cljk）")
           (js/process.exit 1))
 
       :else

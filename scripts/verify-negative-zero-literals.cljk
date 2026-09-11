@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-negative-zero-literals.cljs -- `-0.0` written as a literal in
 ;; ClojureScript-reachable source.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-negative-zero-literals.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-negative-zero-literals.cljk \
 ;;     [--findings] [--root <dir>] [--repo orgs/<org>/<name>]
 ;;
 ;; ## What it is about

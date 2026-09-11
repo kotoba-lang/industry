@@ -44,7 +44,7 @@ Disabling required-field rejection in handle-create moves selector 1 from
 ## Reproduce
 
     nbb <kotoba-lang>/scripts/gen-parity-harness.cljs <repo-worktree> <src-dir>
-    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs   # emits handlers 0-12
+    kbb --backend sci --classpath src:<kotoba-lang/text>/src q9-oracle.cljs   # emits handlers 0-12
     amu compile ... --output wc.o
     amu extract-native wc.o --symbol oracle-handlers --output h.bin
     for s in 0 1 2 3 4 5 6 7 8 9 10 11 12; do

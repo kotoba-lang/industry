@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Land the phase2/phase3 religious-community generator output into
 ;; 90-docs/religious-community/ as separate, honestly-labeled EDN files.
 ;;
@@ -21,9 +21,9 @@
 ;;   4. stamps :source/dataset so provenance is queryable (ADR-2607252000).
 ;;
 ;; Usage:
-;;   nbb scripts/generate-phase2-religious-variants.cljk
-;;   nbb scripts/generate-phase3-indigenous-secular.cljk
-;;   nbb scripts/land-religious-community-phases.cljk
+;;   kbb --backend sci scripts/generate-phase2-religious-variants.cljk
+;;   kbb --backend sci scripts/generate-phase3-indigenous-secular.cljk
+;;   kbb --backend sci scripts/land-religious-community-phases.cljk
 
 (require '[clojure.edn :as edn]
          '[clojure.string :as str])

@@ -36,12 +36,12 @@ exclusion exists for.
 
 It is replaced by a measurement: parse every launchd plist, take the
 repositories named in ProgramArguments, EnvironmentVariables and
-WorkingDirectory -- chiefly as nbb --classpath orgs/<org>/<repo>/src entries --
+WorkingDirectory -- chiefly as kbb --backend sci --classpath orgs/<org>/<repo>/src entries --
 and intersect with real repository slugs. Those repositories run on a SCHEDULE,
 so renaming their sources means nbb stops resolving the namespace at the next
 tick.
 
-    nbb gen-live-exclusions.cljs sizes.tsv
+    kbb --backend sci gen-live-exclusions.cljk sizes.tsv
 
 SIZE IS THE WRONG PROXY, and this inverts the framing the investigation began
 with. Among the unprotected repositories this surfaced, jp-go-gbiz-info carries
@@ -53,8 +53,8 @@ version of this criterion; it is a different and wrong one.
 
 The evidence floor is the part that makes the answer usable:
 
-    nbb gen-live-exclusions.cljs /tmp/two-fake-slugs.tsv    -> exit 2, REFUSED
-    nbb gen-live-exclusions.cljs sizes.tsv                  -> exit 0
+    kbb --backend sci gen-live-exclusions.cljk /tmp/two-fake-slugs.tsv    -> exit 2, REFUSED
+    kbb --backend sci gen-live-exclusions.cljk sizes.tsv                  -> exit 0
 
 An unreadable set of plists returns the same empty answer as a machine with no
 scheduled jobs at all, and an empty exclusion set means rename everything. So

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-doc-reality.cljs — agent 指示（CLAUDE.md / AGENTS.md）が ADR と tree の
 ;; 実態と食い違っていないかを **決定論で** 測る。ADR-2609072600。
 ;;
@@ -6,7 +6,7 @@
 ;; 「0 findings」が「測って問題が無かった」なのか「見落とした」なのか出力から
 ;; 区別できなかった —— CLAUDE.md が repo-wide の失敗クラスとして名指ししている形。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-doc-reality.cljk [<dir>] [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-doc-reality.cljk [<dir>] [--findings]
 ;;
 ;; exit code:
 ;;   0  走査して findings 0
@@ -180,7 +180,7 @@
 (def gen-findings
   (case gen-status
     :stale [{:kind :agents-md-stale :doc "AGENTS.md" :line 1
-             :note "CLAUDE.md からの再生成が要る（nbb scripts/gen-agents-md.cljk）"}]
+             :note "CLAUDE.md からの再生成が要る（kbb --backend sci scripts/gen-agents-md.cljk）"}]
     :absent [{:kind :generator-absent :doc "AGENTS.md" :line 1
               :note (str gen " が tree に無い —— ADR-2609062600 の生成規律が外れている")}]
     []))

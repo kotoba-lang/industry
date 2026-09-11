@@ -414,7 +414,7 @@
 
   ### 副産物 —— 走らないスイートは、走ったスイートに見えない
 
-  kotoba-verifier の `clojure -M:test` は **1 日ゼロテストを報告していた**。
+  kotoba-verifier の `kbb -M:test` は **1 日ゼロテストを報告していた**。
   `verifier_f64_boundary_test` が repo 境界越しに `kotoba.kir/native-float-
   boundary-types` を読む（2 つの admission set が黙って乖離しないよう意図的に）
   のに、osaho の pin がその var の 1 commit 手前で止まっていた。namespace が

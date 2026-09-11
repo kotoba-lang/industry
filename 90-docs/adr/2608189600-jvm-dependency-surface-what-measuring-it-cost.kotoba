@@ -120,12 +120,12 @@ DEAD, all USED, all GONE. A real population is not unanimous.
   different upstreams. Now scanned (ad22b32); deliberately NOT deduplicated,
   because CLAUDE.md requires an ADR first.
 - **amu's 1,094-test suite is still ungated.** Its four fleet gates are all
-  `:nbb-script`; none runs `clojure -M:test`. The claim surface went from 3 kits
+  `:nbb-script`; none runs `kbb -M:test`. The claim surface went from 3 kits
   to 8 today, so this gap widened.
 
 ## Resume point
 
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-jvm-dependency-surface.cljs
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-jvm-dependency-surface.cljs
 
 reads 233 for `jvm-source`. That is the number to work against. The first
 concrete step is a `:jvm-test` gate for amu, because everything landed in it

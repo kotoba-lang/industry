@@ -104,14 +104,14 @@ iPhone ミラーリング（macOS 15+）はその channel である: 実機の�
   (:adr/verification
   "**実測した（2026-08-08、この ADR を書いたセッション）**:
 
-- **不在の確認**: `manifest/west.yml` の 4,150 project 名 grep（`mirror|iphone|ios|scrcpy|vnc|screencap|appium` 他）と workspace 全文の `iphone.?mirror|ミラーリング` grep → **該当 0 件**。`nbb scripts/repo-search.cljs` と `concept-lookup` も引いた（後者の語彙に `ios` / `game` は無い）。
-- **JVM テストスイート全体**: `clojure -M:test` → **30 tests / 121 assertions / 0 failures**（新規追加前の baseline は 17 / 70。本 driver が 13 tests / 51 assertions）。
-- **cljs でも走ること**: `nbb --classpath src:test` で同じ 13 tests / 51 assertions / 0 failures。pure 部分が `#?(:clj)` の上にある証拠。
+- **不在の確認**: `manifest/west.yml` の 4,150 project 名 grep（`mirror|iphone|ios|scrcpy|vnc|screencap|appium` 他）と workspace 全文の `iphone.?mirror|ミラーリング` grep → **該当 0 件**。`kbb --backend sci scripts/repo-search.cljk` と `concept-lookup` も引いた（後者の語彙に `ios` / `game` は無い）。
+- **JVM テストスイート全体**: `kbb -M:test` → **30 tests / 121 assertions / 0 failures**（新規追加前の baseline は 17 / 70。本 driver が 13 tests / 51 assertions）。
+- **cljs でも走ること**: `kbb --backend sci --classpath src:test` で同じ 13 tests / 51 assertions / 0 failures。pure 部分が `#?(:clj)` の上にある証拠。
 - **gate が落ちることを確認した**（CLAUDE.md「落ちない gate は劇場」）:
   - `model->screen` から content 原点を落とす変異 → **10 assertions 失敗**
   - `swipe-path` から中間サンプルを落とす変異 → **4 assertions 失敗**
   - 変異を戻すと 0 failures。
-- **lint**: `clojure -M:lint` → **errors 0**。新規 warning は 1 件で、`computeruse.macos` / `computeruse.android` が既に出しているのと同種（clj-kondo が `#?(:clj (do …))` の中の使用を見ない）。
+- **lint**: `kbb -M:lint` → **errors 0**。新規 warning は 1 件で、`computeruse.macos` / `computeruse.android` が既に出しているのと同種（clj-kondo が `#?(:clj (do …))` の中の使用を見ない）。
 - **`:clj` 分岐の解決**: テストが `computeruse.ios-mirroring` を require して通っているので、`#?(:clj [computeruse.macos :as macos])` の条件付き require と `macos/activate-application!` の解決は JVM 上で実際に効いている（Clojure は関数本体の未解決 var を load 時に落とす）。
 - **README の test 数**: 記載の `13 tests, 60 assertions` は**本変更以前から陳腐化していた**（実測 baseline は 17 / 70）。実測値 30 / 121 に訂正した。
 
@@ -135,10 +135,10 @@ iPhone ミラーリング（macOS 15+）はその channel である: 実機の�
 
 - push された tree を clone し、手元の検証済み commit と `git diff --stat` → **空**（tree 完全一致）。
 - 4 ファイルの sha256 が全て一致（`8726d4a2…` / `ad8d69b2…` / `ab07618c…` / `8c26325d…`）。**これは test が届かない `#?(:clj)` 内の shell-out 約 150 行も含めて保証する** —— test だけでは、あの領域の転写ずれは捕まらなかった。
-- push された tree に対して**こちらで独立に** `clojure -M:test` を回し、30 tests / 121 assertions / 0 failures を再現（子セッションの自己申告ではない）。
+- push された tree に対して**こちらで独立に** `kbb -M:test` を回し、30 tests / 121 assertions / 0 failures を再現（子セッションの自己申告ではない）。
 - upstream PR #10 の本文が『shell-out は 1 度も実行していない・実機ゲーム未プレイ・inset 26pt と model-width 480 は当て推量』を保持していることを確認。
 
-**upstream は merge 済み**（PR #10 → `kotoba-lang/computer-use` main の `172f57a`、squash）。merge 後の main の tree が手元の検証済み commit と byte 一致することを確認し（4 ファイルの sha256 全一致 + `git diff --stat` 空）、merge 後の main に対して独立に `clojure -M:test` を回して 31 tests / 124 assertions / 0 failures を再現した。west pin も `2d66086` → `172f57a` に前進済み。
+**upstream は merge 済み**（PR #10 → `kotoba-lang/computer-use` main の `172f57a`、squash）。merge 後の main の tree が手元の検証済み commit と byte 一致することを確認し（4 ファイルの sha256 全一致 + `git diff --stat` 空）、merge 後の main に対して独立に `kbb -M:test` を回して 31 tests / 124 assertions / 0 failures を再現した。west pin も `2d66086` → `172f57a` に前進済み。
 
 ## review で自分のコードに見つけた 2 件（merge 前に直した）
 

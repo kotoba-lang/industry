@@ -365,7 +365,7 @@ CLAUDE.md「7 問」の 7 問目そのもので、同じ日に 2 回出た:
 
 - **warm な isolate は block を 0 個取る。** それは「取る必要が無かった」であって
   「取るものが無い」ではない。`b2=0` を「object store に依存していない」と読んだ。
-- **`.shadow-cljs` を持つ `shadow-cljs release` は `0 compiled` で成功し、
+- **`.shadow-cljs` を持つ `amu compile --target wasm32-browser` は `0 compiled` で成功し、
   `out/worker.js` を書く。** その hash 一致を「bundle は変わっていない」と読んだ
   （cold で 2 回ビルドすると byte 一致で再現するので、**cold hash なら比較できる。
   incremental hash は何とも比較できない**）。
@@ -400,7 +400,7 @@ deploy 前に自分で測ったもの（agent の報告を鵜呑みにせず）:
     Error: refusing to deploy inputs not represented by HEAD:
      M kotobase-graph-database/js/kotobase-graph-database-worker.js
 
-script は `npm run build`（`shadow-cljs release`）を走らせてから、tracked な bundle が
+script は `npm run build`（`amu compile --target wasm32-browser`）を走らせてから、tracked な bundle が
 dirty なら拒否する。**意図は正しい**（committed 生成物が HEAD の source と対応することの
 検査）。**しかしこの build は非決定的なので、この検査は決して満たされない。**
 

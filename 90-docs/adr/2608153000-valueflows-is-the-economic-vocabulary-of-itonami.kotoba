@@ -711,7 +711,7 @@ ingest に置き換える。419 クラス）、それとも NACE 系のデータ
        cd <worktree at origin/main>
        ln -s <root>/orgs/kotoba-lang/murakumo orgs/kotoba-lang/murakumo   # placement authority
        export FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem
-       nbb scripts/fleet-ci/tick.cljs --only credits,plm,ws-valueflo-vocabulary,ws-valueflo-algorithms --no-pr
+       kbb --backend sci scripts/fleet-ci/tick.cljk --only credits,plm,ws-valueflo-vocabulary,ws-valueflo-algorithms --no-pr
 
    ⚠ `--only a,b`（カンマ）が複数指定。`--only` を繰り返すと**上書き**され最後の
    1 つだけになる。
@@ -730,7 +730,7 @@ ingest に置き換える。419 クラス）、それとも NACE 系のデータ
    不在ではない（`mapping/summary` の `:coverage-note`）。")
 
   (:adr/evidence
-  "{:repo-search \"nbb scripts/repo-search.cljs valueflows -> 0 of 4175 projects\"
+  "{:repo-search \"kbb --backend sci scripts/repo-search.cljk valueflows -> 0 of 4175 projects\"
     :grep \"rg -il 'valueflo|EconomicEvent|EconomicResource|economic-event' orgs/cloud-itonami 90-docs manifest -> 1 hit, coincidental (credits/test/credits/engi_r3_test.clj:120)\"
     :upstream-ttl {:url \"https://codeberg.org/valueflows/pages/raw/branch/main/assets/all_vf.TTL\"
                    :base \"https://w3id.org/valueflows/ont/vf\"
@@ -741,9 +741,9 @@ ingest に置き換える。419 クラス）、それとも NACE 系のデータ
     :dns \"dig +short NS valueflo.ws -> ns-5-a.gandi.net ns-50-b.gandi.net ns-84-c.gandi.net; A -> valueflows.codeberg.page\"
     :critical-path-absence \"grep -in 'critical.?path' over orgs/kotoba-lang/plm, orgs/kotoba-lang/murakumo, orgs/cloud-itonami -> only latency prose and test-coverage prose; murakumo/src/murakumo/task/plan.cljc defns are slots/admit/assign/node-score (greedy least-filled), no forward or backward pass\"
     :existing-mrp \"orgs/kotoba-lang/plm/src/kotoba/plm/mrp.cljc gross-requirements (multi-level MBOM explosion), plan, mrp-run!, plan-from-mps; cost.cljc rolled-cost; mps.cljc mps-for-item; routing.cljc work-center/operation/process-cost — all read 2026-08-15\"
-    :tests {:ws-valueflo-vocabulary \"clojure -M:test -> Ran 44 tests containing 425 assertions, 0 failures 0 errors\"
-            :ws-valueflo-algorithms \"clojure -M:test -> Ran 64 tests containing 249 assertions, 0 failures 0 errors\"}
-    :ingest-discrimination \"nbb bin/ingest.cljs --check observed at exit 0 (identical), 1 (EDN mutated), 1 (reader predicate renamed), 2 (TTL byte appended -> sha mismatch), 2 (TTL absent), then 0 again\"
+    :tests {:ws-valueflo-vocabulary \"kbb -M:test -> Ran 44 tests containing 425 assertions, 0 failures 0 errors\"
+            :ws-valueflo-algorithms \"kbb -M:test -> Ran 64 tests containing 249 assertions, 0 failures 0 errors\"}
+    :ingest-discrimination \"kbb --backend sci bin/ingest.cljk --check observed at exit 0 (identical), 1 (EDN mutated), 1 (reader predicate renamed), 2 (TTL byte appended -> sha mismatch), 2 (TTL absent), then 0 again\"
     :commits {:vocabulary \"kotoba-lang/ws-valueflo-vocabulary 1318e74 (amended for trailers)\"
               :algorithms \"kotoba-lang/ws-valueflo-algorithms 9b89a27 (amended for trailers)\"}
     :base-commit \"worktree branched from origin/main da89acc8f0b\"}")

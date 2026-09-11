@@ -29,7 +29,7 @@ tokenize する。変換元の bb.edn では `(shell \"cmd arg\")` の綴りが�
 `(or (.-status r) 1)` と書いている。`.error` は捨てられ、`stdio` は `inherit` なので
 **書く子プロセスがそもそも居ない**。結果:
 
-    $ nbb scripts/run-task.cljs test   # (shell \"echo HELLO-FROM-TASK\")
+    $ kbb --backend sci scripts/run-task.cljk test   # (shell \"echo HELLO-FROM-TASK\")
     (exit 1)                            # ← stdout も stderr も 0 バイト
 
 **正しいタスクと、実行不能なタスクが、区別できない。** 同日に監査した launchd の

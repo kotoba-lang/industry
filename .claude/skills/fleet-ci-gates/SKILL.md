@@ -201,7 +201,7 @@ sha256 と実ファイルを突き合わせる**。Actions 経路は committed �
    実測 2026-08-13: `gh-workflow-assoc-gapki` は手元の完全な tree で緑、fleet で赤。
    `:include-ext` が `.yml .edn .clj .cljc` だったのに対し、その repo の production
    source は `src/association_facts.kotoba` **1 本きり**で、ノードに配られた 11 ファイル
-   に `src/` が無かった（`clojure -M:test` が `association_facts.kotoba (No such file or
+   に `src/` が無かった（`kbb -M:test` が `association_facts.kotoba (No such file or
    directory)`）。**再現するのは tree ではなく、絞り込みの結果である。**
    ローカルで gate を回すときは `:include-ext` を当ててから回す。
 

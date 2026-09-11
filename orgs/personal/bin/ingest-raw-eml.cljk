@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; ingest-raw-eml.cljs — content-addressed ingest of TRUE RFC822 .eml files.
 ;;
 ;; Why this exists alongside bin/ingest-eml.py and bin/ingest-gmail-batch.py:
@@ -19,7 +19,7 @@
 ;; Idempotent by cid: a file whose cid is already indexed is skipped.
 ;;
 ;; Usage:
-;;   nbb bin/ingest-raw-eml.cljs --account jun784 [--thread-id T] \
+;;   kbb --backend sci bin/ingest-raw-eml.cljk --account jun784 [--thread-id T] \
 ;;       [--message-id M]... [--labels L,L,...]... <file.eml>...
 ;;   --message-id and --labels may repeat; each is applied to the .eml files
 ;;   positionally (file 1 gets the 1st, file 2 the 2nd, ...).
@@ -137,7 +137,7 @@
 (defn -main [& argv]
   (let [[opts files] (parse-args argv)]
     (when (empty? files)
-      (println "usage: nbb bin/ingest-raw-eml.cljs --account SLUG [--thread-id T] [--message-id M]... [--labels L,L]... <file.eml>...")
+      (println "usage: kbb --backend sci bin/ingest-raw-eml.cljk --account SLUG [--thread-id T] [--message-id M]... [--labels L,L]... <file.eml>...")
       (js/process.exit 2))
     (fs/mkdirSync msgdir #js {:recursive true})
     (let [seen (atom (known-cids))

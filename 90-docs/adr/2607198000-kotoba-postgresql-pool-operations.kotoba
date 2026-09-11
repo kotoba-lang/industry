@@ -31,7 +31,7 @@
                      (:graceful-drain true) (:forced-drain true)))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "stats, healthy/unhealthy probe, graceful and forced drain; exit 0"))))))
   (:adr/body
   "# ADR-2607198000: PostgreSQL pool observability, health and drain

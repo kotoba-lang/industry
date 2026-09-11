@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-source-path-pins
   "Relative :source-paths that cross into another west-managed repository and
   resolve to a revision west.yml does not pin.
@@ -45,7 +45,7 @@
   bug it was written to find.
 
   usage:
-    nbb scripts/verify-source-path-pins.cljk [<root>] [--json]"
+    kbb --backend sci scripts/verify-source-path-pins.cljk [<root>] [--json]"
   (:require ["fs" :as fs]
             ["path" :as path]
             ["child_process" :as cp]

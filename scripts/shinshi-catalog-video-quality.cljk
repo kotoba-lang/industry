@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/shinshi-catalog-video-quality.cljk — catalog i2v clip の決定論的品質。
 ;; モデルは居ない。測れなければ pass と書かない。
 ;;
@@ -7,8 +7,8 @@
 ;;   公開した 2 本 = ~184–194 KiB, luma 129 / 135, 512×768, 49 frames, ~2.04s
 ;;
 ;; usage:
-;;   nbb scripts/shinshi-catalog-video-quality.cljk <file.mp4> [--json]
-;;   nbb scripts/shinshi-catalog-video-quality.cljk --self-test
+;;   kbb --backend sci scripts/shinshi-catalog-video-quality.cljk <file.mp4> [--json]
+;;   kbb --backend sci scripts/shinshi-catalog-video-quality.cljk --self-test
 
 (require '[clojure.string :as str])
 
@@ -198,7 +198,7 @@
 (cond
   self-test? (self-test!)
   (nil? file-arg)
-  (do (println "usage: nbb scripts/shinshi-catalog-video-quality.cljk <file.mp4> [--json]")
+  (do (println "usage: kbb --backend sci scripts/shinshi-catalog-video-quality.cljk <file.mp4> [--json]")
       (.exit process 2))
   :else
   (let [m (score-file file-arg)]

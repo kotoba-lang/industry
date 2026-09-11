@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gbizinfo-ingest.cljs — gBizINFO 全件を日次で取り込み、corpus を annex の
 ;; 2 remote に預け、projection を commit する（ADR-2608190100）。
 ;; launchd の com.gftd.gbizinfo-ingest から呼ばれる。
@@ -88,7 +88,7 @@
       (set (map second (re-seq #":source/content-sha256 \"([0-9a-f]{64})\""
                                (.readFileSync fs f "utf8")))))))
 
-(let [{:keys [exit out err]} (run ["nbb" "-cp" "src" "scripts/collect_gbizinfo_zenken.cljk"
+(let [{:keys [exit out err]} (run ["kbb" "--backend" "sci" "-cp" "src" "scripts/collect_gbizinfo_zenken.cljk"
                                    "--numbers" numbers-file
                                    "--summarise" gov-file
                                    "--archive-to" raw-dir

@@ -36,7 +36,7 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "107 tests, 346 assertions, 0 failures; actual Kotoba consumer -> actual Kotoba provider -> verified native TLS HTTP GET"))
     (map (:cwd "orgs/kotoba-lang/kotoba")
      (:command "targeted kotoba.transport-component-test")

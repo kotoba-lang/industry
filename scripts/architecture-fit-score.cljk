@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Score web architectures for fit with the Kotoba language surface.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/architecture-fit-score.cljk [--findings] [--csv]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/architecture-fit-score.cljk [--findings] [--csv]
 ;;
 ;; The dataset holds FACTS in a closed vocabulary; the rubric maps each fact to
 ;; a number. This script is the only place a total exists. Nothing here reads a

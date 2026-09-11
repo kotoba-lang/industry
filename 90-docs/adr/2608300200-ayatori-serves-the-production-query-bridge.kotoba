@@ -103,7 +103,7 @@ shell は新しい caller なので新しい名前を取る。4 つの surface r
 
 ## 検証
 
-- ビルド: 3 shell を実際に `shadow-cljs release` で通す（resource-guard 経由）。
+- ビルド: 3 shell を実際に `amu compile --target wasm32-browser` で通す（resource-guard 経由）。
 - ayatori 側で `kotobase.query.bridge` / `kotobase.query.agent` が解決することは
   コンパイルが通ること自体が示す（未解決 ns は shadow-cljs のエラー）。
 - deploy 後に 4 host が引き続き `401 www-authenticate: Bearer` を返すこと、

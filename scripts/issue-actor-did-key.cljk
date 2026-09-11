@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Issue a signing key to ONE enumerated actor, and refuse the rest.
 ;;
 ;; `etzhayyim.com/actor/<handle>/did.json` resolves for any handle -- 104 named
@@ -16,7 +16,7 @@
 ;; the command to move it into kagi is printed instead. A private key committed
 ;; once is a private key forever, whatever the next commit says.
 ;;
-;;   nbb --classpath <did-src>:<ed-src> scripts/issue-actor-did-key.cljk <handle> [--root <root>] [--write]
+;;   kbb --backend sci --classpath <did-src>:<ed-src> scripts/issue-actor-did-key.cljk <handle> [--root <root>] [--write]
 ;;
 ;; Without --write it prints what it would do and changes nothing.
 ;;

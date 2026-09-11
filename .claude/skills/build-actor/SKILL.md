@@ -50,8 +50,8 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
     「触るついでに漸進移行」（一括書き換えはしない）。
 - **deps / lint / test。** `io.github.kotoba-lang/langgraph
   {:local/root "../../kotoba-lang/langgraph"}` ＋ `:dev` で langchain を
-  override（手本 `gftdcojp/gftd-talent-actor/deps.edn`）。`clojure -M:lint`（clj-kondo・errors fail）/
-  `clojure -M:dev:test`。`.cljc` は `edn`/`Exception` を `#?(:clj/:cljs)` 条件化して
+  override（手本 `gftdcojp/gftd-talent-actor/deps.edn`）。`kbb -M:lint`（clj-kondo・errors fail）/
+  `kbb -M:dev:test`。`.cljc` は `edn`/`Exception` を `#?(:clj/:cljs)` 条件化して
   JVM/cljs/WASM 可搬に保つ。
   - ⚠ **`cloud-itonami/deps.edn` に残る `io.github.com-junkawasaki/langgraph-clj`
     （旧 artifact ID・`:local/root` は新パス）を「古いから」と消さない。** 依存の一部が
@@ -65,7 +65,7 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   同じ actor identity を登録するまでを完了条件にする。west は `manifest/repos.edn` を
   SSoT とし、GitHub API の単一 entry クリーン commit で登録 / pin 前進する
   （`manifest/west.yml` は生成物、手書き禁止）。diff は当該 entry のみ、
-  `nbb scripts/gen-west-manifest.cljk --check` と **pin == repo HEAD** を確認。RAD は
+  `kbb --backend sci scripts/gen-west-manifest.cljk --check` と **pin == repo HEAD** を確認。RAD は
   etzhayyim/root の `80-data/kotoba-rad/{name}.identity.journal.edn`（または同等の
   RAD identity ledger）に `:rad/repo "github.com/etzhayyim/com-etzhayyim-{name}"`、
   `:rad/did-web "did:web:etzhayyim.github.io:com-etzhayyim-{name}"`、署名 /

@@ -100,9 +100,9 @@ primitive が無い。bounded_index.kotoba と同じ境界）。
 
 ## 5. 検証
 
-- `datom-source`: `clojure -M:test` — 23 tests / 74 assertions、0 fail。
+- `datom-source`: `kbb -M:test` — 23 tests / 74 assertions、0 fail。
   壊した outgoing-only は `:by-object` で落ちる。空 graph の hop は `#{}`。
-- `search`: `clojure -M:test` — 8 tests / 22 assertions、0 fail。
+- `search`: `kbb -M:test` — 8 tests / 22 assertions、0 fail。
   AND=OR なら `and-is-not-or` だけが落ちる。
 
 ## 6. resume

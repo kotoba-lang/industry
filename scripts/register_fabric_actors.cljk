@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; register_fabric_actors.cljs — fabric actor（`*-organism.aozora.app`）の
 ;; 初回登録（handle 取得・profile・名乗り post・Keychain へ seed 保存）。
 ;;
@@ -11,7 +11,7 @@
 ;; 鋳造・Keychain 書き込み・receipt の JSON 書き出しという effect だけ。
 ;;
 ;; 実行:
-;;   nbb --classpath "scripts:orgs/kotoba-lang/org-chainagnostic-cacao/src:orgs/kotoba-lang/authority/src:orgs/kotoba-lang/org-ietf-ed25519/src:orgs/kotoba-lang/org-ietf-cbor/src" \
+;;   kbb --backend sci --classpath "scripts:orgs/kotoba-lang/org-chainagnostic-cacao/src:orgs/kotoba-lang/authority/src:orgs/kotoba-lang/org-ietf-ed25519/src:orgs/kotoba-lang/org-ietf-cbor/src" \
 ;;     scripts/register_fabric_actors.cljk [product ...]
 (ns register-fabric-actors
   (:require [clojure.string :as str]

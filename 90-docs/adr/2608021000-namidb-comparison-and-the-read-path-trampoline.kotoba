@@ -44,7 +44,7 @@ kotobase の query surface で測る harness。
 ### 1. 実測: 逐次項は prolly-tree ではなく novelty cons-chain だった
 
 `kotobase-peer` に `bench/kotobase_peer/dag_shape_bench.clj`
-(`clojure -M:dag-shape-bench`) を追加した。production の `hydrate!` が実際に
+(`kbb -M:dag-shape-bench`) を追加した。production の `hydrate!` が実際に
 発行する読み (`doc/coll`+`doc/key`+`doc/val` を :aevt 全 prefix scan) を、
 **本物の `pt/scan-prefix` を本物の with-blocks リトライアルゴリズム**
 (throw-on-miss の sync get-fn + 頭からの再実行) の下で走らせ、逐次 round trip
@@ -119,7 +119,7 @@ novelty の **tx-block 読み** を `read-tx-block-async` へ回すが、
   `push-novelty!` は bounded な head segment に追記し、`node-entries` が旧
   単一エントリ節と新 segment の**両方**を読むので、既存 chain は書き換えずに
   segment を上に伸ばす（移行ステップ無し）。west pin `530f2d1` に入っている。
-  テスト: `clojure -M:test` 229 tests / 680 assertions / 0 failures
+  テスト: `kbb -M:test` 229 tests / 680 assertions / 0 failures
   （`kotobase-peer.novelty-segments-test` を含む）。
 
 - **実測（2026-08-07、この ADR が求めた検証）**: landed から 5 日、**変更後の
@@ -220,7 +220,7 @@ edge worker で動くこと。
 ### 5. LDBC SNB harness (公表値と同じ土俵)
 
 `kotobase-peer` に `bench/kotobase_peer/ldbc_snb_bench.clj`
-(`clojure -M:ldbc-snb-bench <dir> [posts] [samples]`) を追加した。
+(`kbb -M:ldbc-snb-bench <dir> [posts] [samples]`) を追加した。
 **実物の LDBC SNB Interactive v1 SF1** (Datagen v1.0.0、
 CsvComposite/LongDateFormatter、SURF/CWI repository。合成模造ではない) を
 読み、IC02/IC07/IC08/IC09 を kotobase の hot db と Neo4j embedded に対して
@@ -532,7 +532,7 @@ novelty 税を*読み*のたびに払うので、もっと早く fold する」�
 **再開点 (この順)**:
 1. **B-2 を静かな機械で測る**。`arrangement` を `agent/limit-pushdown-v2` に
    `:local/root` で向け、両ピンを**同一窓**で
-   `clojure -M:ldbc-snb-bench <sf1>/dynamic 3000 15`。
+   `kbb -M:ldbc-snb-bench <sf1>/dynamic 3000 15`。
    交互実行版の `:paired-ratio` を見る。IC02 が改善し IC08 が悪化しなければ
    着地、しなければ捨てる。
 2. **本番 novelty の検証** (§6-5 の反証可能な予測)。`atproto.kotobase.net/_diag/health`

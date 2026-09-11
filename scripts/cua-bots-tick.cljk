@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/cua-bots-tick.cljk — CUA bot 名簿（manifest/cua-bots.edn）の due 判定。
 ;; **決定論。モデルは居ない。** `scripts/cua-bots-loop.cljk` が毎周これを先に回す。
 ;;
@@ -22,7 +22,7 @@
 ;;   exit 2 = 名簿が測れなかった（:roster-invalid? true、:problems に理由）
 ;;
 ;; usage:
-;;   nbb scripts/cua-bots-tick.cljk [--roster <path>]
+;;   kbb --backend sci scripts/cua-bots-tick.cljk [--roster <path>]
 
 (ns cua-bots-tick
   (:require [clojure.edn :as edn]

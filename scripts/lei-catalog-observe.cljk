@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-catalog-observe.cljs — print the cloud-itonami-lei catalog's live metrics
 ;; as EDN, read from git (the blueprints), not from any SQL projection.
 ;;
@@ -10,7 +10,7 @@
 ;; without the catalog changing.
 ;;
 ;; Run (from the superproject root):
-;;   nbb --classpath scripts scripts/lei-catalog-observe.cljk
+;;   kbb --backend sci --classpath scripts scripts/lei-catalog-observe.cljk
 
 (ns lei-catalog-observe
   (:require [lei-catalog :as cat]))

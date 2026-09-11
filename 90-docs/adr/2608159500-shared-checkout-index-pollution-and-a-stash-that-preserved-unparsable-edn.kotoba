@@ -112,7 +112,7 @@ reader を通す。** file 単位の diff・行単位の containment はこれ�
 
 ## resume point
 
-1. 残る 18 件の orphan に disposition を付ける（`nbb scripts/west-orphan-audit.cljs --blocking`）。
+1. 残る 18 件の orphan に disposition を付ける（`kbb --backend sci scripts/west-orphan-audit.cljk --blocking`）。
    `orgs/com-junkawasaki/maxwell-mac/` は非 git で venv を抱えているので、まずここ。
 2. `docs/design/` の PNG 5 件を B2 + DataLad に載せるか捨てるかを決める。
 3. 上記 3 本の stale な reconcile branch を、各 session が退役させる。

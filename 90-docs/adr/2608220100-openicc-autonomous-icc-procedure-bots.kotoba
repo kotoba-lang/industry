@@ -192,13 +192,13 @@ repository, that is where it goes. The two planes may hold the same subject
 
 Measured 2026-08-22 at etzhayyim/openicc ecb48bf:
 
-- `nbb run_tests.cljs` — 55 tests, 127 assertions, 0 failures, 0 errors.
-- `clojure -M:test` — the same `.cljc` suite on the JVM, identical counts. Worth
+- `kbb --backend sci run_tests.cljk` — 55 tests, 127 assertions, 0 failures, 0 errors.
+- `kbb -M:test` — the same `.cljc` suite on the JVM, identical counts. Worth
   running both: a junk expression in the suite was passed through silently by
   nbb and caught only by the JVM's arity check.
-- `clojure -M:inga:test -d test -d test-inga` — 63 tests, 142 assertions, with
+- `kbb -M:inga:test -d test -d test-inga` — 63 tests, 142 assertions, with
   the real `inga` quorum behind the seam.
-- `clojure -M:lint` — 0 errors, 0 warnings.
+- `kbb -M:lint` — 0 errors, 0 warnings.
 - Every one of the fourteen gates is exercised in both directions: a dossier that
   passes it, and the same dossier with exactly one thing broken, asserting that
   the NAMED gate fires.

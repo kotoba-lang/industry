@@ -24,13 +24,13 @@ the same 'built but never compared' state one level up.
 
 ## Reproduce, per repository
 
-    nbb scripts/gen-parity-harness.cljs <repo-dir> <src-dir-name>
+    kbb --backend sci scripts/gen-parity-harness.cljk <repo-dir> <src-dir-name>
     amu check   src/<ns>/whole_component.kotoba --jvm-free --policy policy.edn
     amu compile src/<ns>/whole_component.kotoba --target aarch64-macos \\
                 --policy policy.edn --output a.kexe
     amu extract-native a.kexe --symbol <oracle> --output s.bin   # prints :offset
     KEXE_FUEL=100000000 kexe-loader s.bin <offset> <arity> aarch64 7,23 <selector>
-    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+    kbb --backend sci --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
 
 ## Result
 

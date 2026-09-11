@@ -93,7 +93,7 @@ silently, not to open a partial PR that pretends the rewire is complete.
 
 4. Find the repo's OWN test command (`deps.edn` `:test` alias, `bb.edn`, `package.json`
    `test` script, or README — use what's actually there; the ADR log itself notes one
-   repo's real entrypoint was babashka, not `clojure -M:test`). If there is no test
+   repo's real entrypoint was babashka, not `kbb -M:test`). If there is no test
    infrastructure at all, say so and stop.
 
 5. Run that test command AS-IS first, before touching anything, and record the test
@@ -112,7 +112,7 @@ silently, not to open a partial PR that pretends the rewire is complete.
    - do NOT touch anything else in the file beyond what the rewire requires.
 
 7. Compile/load-check if the repo has a way to do that short of running the full
-   suite (e.g. `clojure -M -e "(require '<ns>)"` or the nbb equivalent). Fix and
+   suite (e.g. `kbb -M -e "(require '<ns>)"` or the nbb equivalent). Fix and
    re-check before running the full suite.
 
 8. Run the repo's own test command again. Record the count as `:tests-after`. It
@@ -127,7 +127,7 @@ silently, not to open a partial PR that pretends the rewire is complete.
     :target-ns "<kotoba-lang target namespace>"
     :target-repo "<target-repo-basename>"
     :changed-files ["src/.../foo.clj"]
-    :test-command "clojure -M:test"
+    :test-command "kbb -M:test"
     :tests-before <N>
     :tests-after <N>}
    ```

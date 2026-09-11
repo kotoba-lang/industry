@@ -75,7 +75,7 @@
   (:adr/consequences
   "**着地**: `cloud-itonami/cloud-itonami-app` `da970edd33a9230ad2183722823cc5b230ded853` / `com-junkawasaki/root` `4ff484dae6d161a24e49fe5bd41cfd2833d08aab`（catalog generator）・`a93774cd00582da2691365e6d0f8a739095296b7`（pin 前進）。
 
-**検証**: `clojure -M:test` 442 tests / 1,865 assertions green、`clojure -M:lint` errors 0（warning 11 は `documents_test.clj` の既存分）。アプリの実マークアップ・実 CSS・実 JS に、稼働中のアプリから取得した実 API 応答を差し込んで描画確認した（Passkey gate は迂回していない）。
+**検証**: `kbb -M:test` 442 tests / 1,865 assertions green、`kbb -M:lint` errors 0（warning 11 は `documents_test.clj` の既存分）。アプリの実マークアップ・実 CSS・実 JS に、稼働中のアプリから取得した実 API 応答を差し込んで描画確認した（Passkey gate は迂回していない）。
 
 **既存テストに1度捕まった。** `core-test` の `app-css-only-references-design-system-tokens-that-exist` が、私の書いた `--color-semantic-error-4` / `--color-semantic-success-4` を「jp-go-dds が定義していないトークン」として弾いた。jp-go-dds は各 semantic 色に `-1` と `-2` しか持たない。**捏造したトークンを CI が止めた**ので `-1`/`-2` に直した。この repo の「実在するものしか使わない」規律が働いた実例として記録する。
 
@@ -96,7 +96,7 @@
     (nav-group \"WORKSPACE\")  … 8 項目 …
     (nav-group \"SETTINGS\")
 
-**`Repos` は作られず、私の `Fleet` 命名がその枠に採用された。** view panel に重複は無く（14 view、いずれも1件ずつ）、`/api/operator` 系 7 経路と両 panel は無傷。両者が混ざった main で `clojure -M:test` 512 tests / 2,156 assertions green、`clojure -M:lint` errors 0 を確認した。
+**`Repos` は作られず、私の `Fleet` 命名がその枠に採用された。** view panel に重複は無く（14 view、いずれも1件ずつ）、`/api/operator` 系 7 経路と両 panel は無傷。両者が混ざった main で `kbb -M:test` 512 tests / 2,156 assertions green、`kbb -M:lint` errors 0 を確認した。
 
 したがって本 ADR は **menu 構造と view 名について一切の authority を主張しない**——その正本は 2607309600 である。本 ADR が正本なのは operator の領域モデルと2つの honesty rail だけで、これらは 2607309600 の Business entity 設計と競合しない（あちらは BMC / system dynamics / fleet の join key、こちらは事業者の参与）。
 
@@ -115,7 +115,7 @@
    ":role facet = sector-agent 459, occupation-agent 340, jurisdiction-agent 225, association-compliance-agent 80, municipal-agent 62, classification-agent 15, continuous-orchestrator 8, marketplace-service 7"
    "deploy 経路を同梱する blueprint は 1,213 件中 11 件（:cloudflare 10 / :container 1）"
    "catalog 再生成の差分は pin 更新 82 件 + deploy-config 11 件 + 新規 loop-consumability のみ（構造比較で確認）"
-   "clojure -M:test 442 tests / 1,865 assertions green、clojure -M:lint errors 0"
+   "kbb -M:test 442 tests / 1,865 assertions green、kbb -M:lint errors 0"
    "core-test が捏造トークン --color-semantic-error-4 / --color-semantic-success-4 を検出し修正させた（jp-go-dds は -1 と -2 のみ定義）"
    "ADR-2607309600 が menu 構造と Repos view の正本。本実装の nav 平置きはそれに反していたが、2607309600 側が着地時に fleet / operator を BUSINESS 段へ統合し、Repos ではなく Fleet 命名を採用して解消した（app main 799a34d）"
-   "解消後の main で clojure -M:test 512 tests / 2,156 assertions green、lint errors 0、view panel 14 件に重複なし、/api/operator 7 経路が無傷"))))
+   "解消後の main で kbb -M:test 512 tests / 2,156 assertions green、lint errors 0、view panel 14 件に重複なし、/api/operator 7 経路が無傷"))))

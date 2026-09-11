@@ -1,7 +1,7 @@
 #!/bin/zsh
 # 週次 fabric actor pulse（launchd com.junkawasaki.fabric-actor-cadence）。
 #
-# 2026-08-30: JVM (`clojure -M -m publish-fabric-actor-status`) から nbb へ
+# 2026-08-30: JVM (`kbb -M -m publish-fabric-actor-status`) から nbb へ
 # 切替。旧経路は superproject root の deps.edn（Clojure マニフェストではない
 # workspace メタデータ）を tools.deps が読みにいって落ちていた — 実測、
 # 2026-08-10 以降この job は 1 行も走らずに終わっていた

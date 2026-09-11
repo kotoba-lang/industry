@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-dependency-substitution — every external dependency the kotoba-lang
 ;; org still has, checked against the destination `manifest/dependency-
 ;; substitution.edn` assigns it.
@@ -54,11 +54,11 @@
 ;; path. Only paths west.yml names are walked.
 ;;
 ;; usage:
-;;   nbb scripts/verify-dependency-substitution.cljk
-;;   nbb scripts/verify-dependency-substitution.cljk --findings
-;;   nbb scripts/verify-dependency-substitution.cljk --edn out.edn
-;;   nbb scripts/verify-dependency-substitution.cljk --strict     ; exit 1 on unlisted
-;;   nbb scripts/verify-dependency-substitution.cljk --self-test
+;;   kbb --backend sci scripts/verify-dependency-substitution.cljk
+;;   kbb --backend sci scripts/verify-dependency-substitution.cljk --findings
+;;   kbb --backend sci scripts/verify-dependency-substitution.cljk --edn out.edn
+;;   kbb --backend sci scripts/verify-dependency-substitution.cljk --strict     ; exit 1 on unlisted
+;;   kbb --backend sci scripts/verify-dependency-substitution.cljk --self-test
 
 (ns verify-dependency-substitution
   (:require ["node:fs" :as fs]

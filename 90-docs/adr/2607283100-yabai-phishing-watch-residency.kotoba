@@ -50,7 +50,7 @@ crt.sh は 1 ドメイン指定には正しいが（ADR-0002）、母集団供�
 ### 常駐 = LaunchAgent + `tamaki exec`（toshokan パターン）
 
 `com.etzhayyim.yabai.ct-watch-tick`（毎時）→ `~/.gftd/run-yabai-ct-watch-tick.cljs`（nbb）
-→ **`tamaki exec`** → `bb -m yabai.methods.ct-watch --live --score --commit`。
+→ **`tamaki exec`** → `kbb -m yabai.methods.ct-watch --live --score --commit`。
 
 **`tamaki loop` ではなく `tamaki exec` を使う。** loop（`loops/*.edn`）は runner
 （codex/claude/grok）を回す**モデル入り**の成熟度ループで、本 tick は決定論。混ぜると
@@ -97,7 +97,7 @@ tests                    49 tests / 10083 assertions green
 
 「成熟度を自律的に ai agent が上げるには」への答えは **tamaki が上げる側・murakumo は基盤**だが、
 機構は両方すでに動いており、足りなかったのは**数値**だった。子リポ **ADR-0005** で決定論的な
-fitness function を入れた（`bb -cp src -m yabai.methods.maturity` → `docs/maturity.edn`、
+fitness function を入れた（`kbb -cp src -m yabai.methods.maturity` → `docs/maturity.edn`、
 初回 231/1000）。floors（benign 36 件が claim ゼロ / 明白な偽装 7 件を取りこぼさない）が
 gradient（coverage 寄りの 5 次元）をゲートし、**閾値を緩める改悪は score 0** になる。
 tamaki の `loops/yabai-phishing-watch.edn` はこの score を `:loop/fitness` として名指す。
@@ -117,7 +117,7 @@ GitHub / radicle とも `e2c1d48` に揃えた。
 
 **稼働中**: `com.etzhayyim.yabai.ct-watch-tick`（毎時、最終 exit 0）·
 `dev.kotoba.tamaki.supervisor`（restart 済み、稼働中）。
-maturity は **231 → 256**（`bb -cp src -m yabai.methods.maturity`）。上がったのは
+maturity は **231 → 256**（`kbb -cp src -m yabai.methods.maturity`）。上がったのは
 infra-breadth 0.317→0.45 と observation-volume 0.111→0.132 で、tick が観測を貯めた分だけ。
 cumulative observations 63 → 104。
 
@@ -248,7 +248,7 @@ brand が生き残る場合のみに限定した（`mast-crade` のための hyp
 
 ### fan-out は「実行されたことが一度も無い」プレビューだった
 
-`--plan` が吐く task の `:cmd` は `cd <ローカル repo-root> && bb -cp src` ——このラップトップ
+`--plan` が吐く task の `:cmd` は `cd <ローカル repo-root> && kbb -cp src` ——このラップトップ
 にだけ在り、どの fleet node にも無い path。**接触した瞬間に失敗する batch のプレビュー**
 だったので、ADR-0004 以来一度も実行されていなかった。
 

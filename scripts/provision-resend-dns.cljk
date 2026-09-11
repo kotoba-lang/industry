@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; provision-resend-dns.cljs
 ;;
 ;; Reconcile Cloudflare DNS against what Resend actually requires, plus the
@@ -8,10 +8,10 @@
 ;; transcribed into this file — so a rotated DKIM key cannot silently drift.
 ;;
 ;; Usage:
-;;   nbb scripts/provision-resend-dns.cljk              # dry-run (default)
-;;   nbb scripts/provision-resend-dns.cljk --execute    # apply (creates only)
-;;   nbb scripts/provision-resend-dns.cljk --only shinshi.club[,...]
-;;   nbb scripts/provision-resend-dns.cljk --execute --update-conflicts
+;;   kbb --backend sci scripts/provision-resend-dns.cljk              # dry-run (default)
+;;   kbb --backend sci scripts/provision-resend-dns.cljk --execute    # apply (creates only)
+;;   kbb --backend sci scripts/provision-resend-dns.cljk --only shinshi.club[,...]
+;;   kbb --backend sci scripts/provision-resend-dns.cljk --execute --update-conflicts
 ;;       ^ also rewrites an already-published SPF/DMARC string to the value in
 ;;         this file. Needed to move the DMARC policy ramp (none -> quarantine
 ;;         -> reject); withheld by default because overwriting a live policy is

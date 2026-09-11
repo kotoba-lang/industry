@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/murakumo-oem-rfq-tick.cljk — Mouse / Sycom OEM RFQ の受信を測る。
 ;; モデルは居ない。候補の有無だけを JSON で返す。
 ;;
@@ -9,8 +9,8 @@
 ;;   - スコアは上げない。delivered も 0 matches も需要ではない。
 ;;
 ;; usage:
-;;   nbb scripts/murakumo-oem-rfq-tick.cljk
-;;   nbb scripts/murakumo-oem-rfq-tick.cljk --json
+;;   kbb --backend sci scripts/murakumo-oem-rfq-tick.cljk
+;;   kbb --backend sci scripts/murakumo-oem-rfq-tick.cljk --json
 ;;
 ;; Resend key（どれか 1 つ、総当たりしない）:
 ;;   env RESEND_API_KEY

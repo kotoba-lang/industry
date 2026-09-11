@@ -124,7 +124,7 @@ network-awai/cloud-murakumo (**main に merge 済み** caa290f):
 **api gateway は deploy していない。** この repo の `dist/` は
 `release/cljs` の checksum 固定 artifact から展開され、その digest は
 `src/**` を覆うので、今回の変更で routine packaging は fail closed になる。
-refresh には JVM shadow-cljs release が要る。実際に走らせて **compile は
+refresh には JVM amu compile --target wasm32-browser が要る。実際に走らせて **compile は
 成功した** (worker.js 1,183,598 bytes) が、committed の 1,142,830 bytes に
 対して 40KB 大きい —— 45 の west sibling が manifest の pin から drift して
 おり、refresh はそれらの未レビュー変更を live gateway (itonami bots が依存
@@ -136,7 +136,7 @@ workspace で manifest の pin を使え」と書いており、私は current H
 
 ## 途中で自分が出した誤診断 (記録として残す)
 
-`clojure -M:site` が `public/index.html` と `public/{en,ja}/index.html` を
+`kbb -M:site` が `public/index.html` と `public/{en,ja}/index.html` を
 再現しないと一度判定し、「言語メニューが 17 言語から 2 言語に落ちる回帰」と
 して報告しかけた。**誤りだった。**
 

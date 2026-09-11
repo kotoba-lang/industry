@@ -29,10 +29,10 @@
      (:command "targeted clojure.test: transport-component-test and wasm-map-keyword-test")
      (:result "11 tests, 61 assertions, 0 failures"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "117 tests, 394 assertions, 0 failures"))
     (map (:cwd "orgs/kotoba-lang/compiler")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "270 tests, 3239 assertions, 0 failures"))))))
   (:adr/body
   "# ADR-2607195200: Collision-free nested and branch-local Wasm allocation

@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; datalake-load.cljs — spec + JSON → Parquet → Iceberg。`datalake-sync.py` の
 ;; nbb 版。**Python をこの面から外すためのもの。**
 ;;
-;;   nbb --classpath "<deps>" scripts/datalake-load.cljk \
+;;   kbb --backend sci --classpath "<deps>" scripts/datalake-load.cljk \
 ;;     --spec <spec.json> --in-dir <dir> [--dry-run] [--out-dir <dir>]
 ;;
 ;; ## なぜ移すのか

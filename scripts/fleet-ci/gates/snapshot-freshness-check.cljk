@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; snapshot-freshness-check.cljs — committed なデータ snapshot が古くなったら赤くする gate。
 ;;
 ;; 対象は `*.manifest.edn`（`:manifest/fetched-at` を epoch ms で持つもの）。
 ;; tree 内の manifest を全部読み、`--max-age-days` を超えたものが 1 つでもあれば FAIL。
 ;;
-;;   npx nbb snapshot-freshness-check.cljs <dir> --sub <subdir> --max-age-days 21 --min 3
+;;   kbb --backend sci snapshot-freshness-check.cljk <dir> --sub <subdir> --max-age-days 21 --min 3
 ;;
 ;; ## なぜ gate なのか
 ;;

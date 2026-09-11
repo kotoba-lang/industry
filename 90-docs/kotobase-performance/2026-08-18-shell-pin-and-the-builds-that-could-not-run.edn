@@ -44,7 +44,7 @@
 
    ## Verifying the change actually reached the bundle
 
-   `read_string_literal` does not survive a shadow-cljs release build, so its
+   `read_string_literal` does not survive a amu compile --target wasm32-browser build, so its
    absence from the bundle proves nothing. The discriminator was to build the
    same worker against the OLD shell pin in a contained worktree and diff:
 

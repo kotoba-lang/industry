@@ -147,8 +147,8 @@
 
    | | |
    |---|---|
-   | `clojure -M:test` | 8 tests / **52 assertions** / 0 failures |
-   | `nbb test/worker_smoke.cljs` | **26 checks** 全通過。ビルド済み `js/auth-worker.js` を、**実物の** `AuthStore` class を Map storage で動かして検査 |
+   | `kbb -M:test` | 8 tests / **52 assertions** / 0 failures |
+   | `kbb --backend sci test/worker_smoke.cljk` | **26 checks** 全通過。ビルド済み `js/auth-worker.js` を、**実物の** `AuthStore` class を Map storage で動かして検査 |
    | `wrangler deploy --dry-run` | 370.38 KiB / gzip 70.30 KiB |
    | design-quality audit | **100.00 / 100**（min 95 gate PASS） |
    | negative check | `safe-return-to` の protocol-relative ガードを外すと open-redirect テストが実際に落ちる。戻して緑 |

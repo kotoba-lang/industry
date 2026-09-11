@@ -108,7 +108,7 @@ deny-by-default な最小権限付与、`:export` リスト（WIT world は 2 ex
 
 **実行証拠**: import した interface ごとに scalar provider component を建て、
 `wac plug` で合成し、`decide` を wasmtime で vector ごとに呼ぶ
-（`nbb scripts/verify_cert_governor_component.cljs`）。**8/8 通過**。
+（`kbb --backend sci scripts/verify_cert_governor_component.cljk`）。**8/8 通過**。
 `wasm-tools validate --features all` clean、`wasm-tools component wit` は 4 本の
 `kotoba:application/*` import のみで `kotoba:typed` / `kotoba:heap` / `wasi:` は無い。
 

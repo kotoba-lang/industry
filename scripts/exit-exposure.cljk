@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; exit-exposure.cljs — which repositories can have a test end the JVM.
 ;;
 ;; `System/exit` inside a namespace a test requires is the shape that took
@@ -8,7 +8,7 @@
 ;; is listed when a test requires a namespace whose source can exit, which is
 ;; the precondition, not proof that any test reaches it.
 ;;
-;;   nbb exit-exposure.cljs <orgs-dir>
+;;   kbb --backend sci exit-exposure.cljk <orgs-dir>
 
 (ns exit-exposure
   (:require ["node:fs" :as fs]

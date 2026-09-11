@@ -19,7 +19,7 @@
                 "adr-2608252400-the-query-was-never-what-was-slow"))
   (:adr/validation (map
     (:measured "3 follow-ups, 28 measured rows, every timing fitted with r-squared reported")
-    (:route "nbb, one shadow-cljs release bundle, wrangler dev (workerd), one live HTTPS origin")
+    (:route "nbb, one amu compile --target wasm32-browser bundle, wrangler dev (workerd), one live HTTPS origin")
     (:machine "10 cpus, loadavg 13.0-29.2 during the runs")
     (:evidence "90-docs/query-plane/2026-09-10-query-plane-followups.edn")
     (:not-measured (vector "a range read through the index" "the engine compiled"
@@ -501,15 +501,15 @@ window 読みの「size ≤ window」の特殊ケースとして残り、切り�
 
 evidence は `90-docs/query-plane/2026-09-10-query-plane-followups.edn`。
 
-    nbb --classpath \"orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_ipq_pack_opportunity.cljs
+    kbb --backend sci --classpath \"orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_ipq_pack_opportunity.cljs
 
     cd 90-docs/query-plane/digest-runtime
     ln -sfn ../../../orgs/net-kotobase/ipfs/node_modules node_modules
     node ../../../scripts/resource-guard.mjs run build -- ./node_modules/.bin/shadow-cljs release esm
-    cd - && nbb --classpath \"…\" 90-docs/query-plane/bench_digest_runtimes.cljs
+    cd - && kbb --backend sci --classpath \"…\" 90-docs/query-plane/bench_digest_runtimes.cljs
 
-    nbb scripts/verify-materialized-reference-join.cljs orgs
-    nbb --classpath \"…\" 90-docs/query-plane/selftest_reference_join.cljs
+    kbb --backend sci scripts/verify-materialized-reference-join.cljk orgs
+    kbb --backend sci --classpath \"…\" 90-docs/query-plane/selftest_reference_join.cljs
 
 **3 本とも control を持ち、その control は落ちる向きで走らせてある。**
 ")))

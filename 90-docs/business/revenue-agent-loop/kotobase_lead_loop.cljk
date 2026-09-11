@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Evidence-floor helpers for kotobase.net lead automations.
 ;;
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk funnel-pulse
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk next-form
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk reply-scan --unanswered gmail-unauthenticated
-;;   nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk reply-scan --scanned N [--matches-edn EDN]
+;;   kbb --backend sci 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk funnel-pulse
+;;   kbb --backend sci 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk next-form
+;;   kbb --backend sci 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk reply-scan --unanswered gmail-unauthenticated
+;;   kbb --backend sci 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk reply-scan --scanned N [--matches-edn EDN]
 ;;
 ;; Never sends forms, never opens a browser, never raises a score, and never
 ;; treats scanned=0 / fetch-fail / missing files as CLEAN.
@@ -17,7 +17,7 @@
             ;; The metrics files this loop appends to moved from .edn to .kotoba
             ;; (Kotoba ADL) in ADR-2609101300 wave 1. Resolved from the root
             ;; nbb.edn :paths ("scripts/kotoba_adl"), so the bare invocation
-            ;; `nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk`
+            ;; `kbb --backend sci 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljk`
             ;; from the superproject root keeps working.
             [kotoba.adl :as adl]))
 
@@ -379,7 +379,7 @@
         (.exit process 0)))))
 
 (defn- usage []
-  (die 1 "usage: nbb kotobase_lead_loop.cljk funnel-pulse|next-form|reply-scan [flags]"))
+  (die 1 "usage: kbb --backend sci kotobase_lead_loop.cljk funnel-pulse|next-form|reply-scan [flags]"))
 
 (defn -main [& argv]
   (let [root (find-root)

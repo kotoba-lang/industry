@@ -27,7 +27,7 @@ const products = [
 ];
 
 const results = [{ product: "itonami", ok: existsSync("orgs/network-awai/cloud-itonami/wasm/fabric-evidence.edn"),
-  evidence: "wasm/fabric-evidence.edn", gate: "bb test-wasm-cutover: 45 tests / 1144 assertions" }];
+  evidence: "wasm/fabric-evidence.edn", gate: "kbb -M:test-wasm-cutover: 45 tests / 1144 assertions" }];
 for (const [product, root, expected] of products) {
   const paths = ["guardian.kotoba", "kotoba.lock.edn", "host-policy.edn", "guardian.wasm", "evidence.edn"]
     .map((name) => `${root}/fabric/${name}`);

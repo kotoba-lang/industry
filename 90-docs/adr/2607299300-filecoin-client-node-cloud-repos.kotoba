@@ -405,11 +405,11 @@ write 経路を進めるなら `scripts/live.cljs` の `probe-write` が出発�
   代わりに GitHub API で直接検証した —— 3 件とも旧 pin から `ahead / behind=0`
   かつ default branch tip と `identical`。CI が戻ったら west-pin-verify に
   再確認させる。
-- `nbb scripts/gen-west-manifest.cljs --check` は STALE を報告するが、これは
+- `kbb --backend sci scripts/gen-west-manifest.cljk --check` は STALE を報告するが、これは
   **この変更の前から** STALE (他 project の local checkout が pin より進退して
   いる、CLAUDE.md の言う「pin 退行の罠」)。本 ADR の 5 entry は
   `--entry` の最小 diff で追加し、5 件とも server 側 pin 検証を通している。
-- `nbb scripts/west-orphan-audit.cljs --blocking` は exit 1。原因は
+- `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` は exit 1。原因は
   **既存の 2 件** (`orgs/gftdcojp/cloud-murakumo` consumers=10、
   `orgs/network-awai/cloud-mamori` consumers=1) で、どちらも dir 不在かつ
   west 未登録。本 ADR の 5 repo は audit に一切現れない。この 2 件の修復は
@@ -477,7 +477,7 @@ write 経路を進めるなら `scripts/live.cljs` の `probe-write` が出発�
 
 ### この family の外に残した blocking (自分の作業ではない)
 
-`nbb scripts/west-orphan-audit.cljs --blocking` は exit 1 で、原因は
+`kbb --backend sci scripts/west-orphan-audit.cljk --blocking` は exit 1 で、原因は
 `:local/root` の壊れた edge 3 件 (`gftdcojp/cloud-murakumo` consumers=10、
 `etzhayyim/com-etzhayyim-social-publication` consumers=2、
 `network-awai/cloud-mamori` consumers=1)。**いずれも本 ADR の 7 repo とは

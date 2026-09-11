@@ -137,7 +137,7 @@ Skipped on judah: Mojo, TypeScript (Node/Deno) — not on PATH.
 |---|---|---|
 | **Node WebAssembly** (V8) | **~70 ns/invocation** steady | in-process; 50 warmup + 400 timed calls |
 | **Chicory JVM** steady | **~35.8 µs/invocation** | **~513×** slower than Node steady |
-| **Chicory JVM** CLI cold | **~682 ms** wall | `clojure -M:cli run` (JVM + Chicory per sample) |
+| **Chicory JVM** CLI cold | **~682 ms** wall | `kbb -M:cli run` (JVM + Chicory per sample) |
 | **wasmtime CLI** | see per-guest tables | process-per-invocation; not steady-state comparable |
 
 Exploratory contended-host run (load **94**, laptop): Node ~106 ns, Chicory steady ~165 µs (~1554×).
@@ -148,7 +148,7 @@ Evidence: `90-docs/performance/runs/2026-08-26-judah-quiet-tender/tender.json` (
 
 ```bash
 west update --fetch smart kototama   # if orgs/ missing in worktree
-nbb scripts/kotoba-tender-benchmark.cljk --runs 7 --date 2026-08-26-judah-quiet
+kbb --backend sci scripts/kotoba-tender-benchmark.cljk --runs 7 --date 2026-08-26-judah-quiet
 ```
 
 | Path | Role | Performance posture |

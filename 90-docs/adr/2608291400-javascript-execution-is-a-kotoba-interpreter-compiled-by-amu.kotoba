@@ -173,7 +173,7 @@ export を禁じるので host は guest memory を読めない、よってこ�
 ⚠ **単発の再現を CLI で試みたが判別材料にならなかった。** 3 バージョンとも同じ
 `:error :internal` を返す（conformance kit は JVM の `lc/run-case` 経由で走る）。
 決め手は full suite の三点比較で、**1 ケースだけを速く回す手立てが無いことが、
-この種の切り分けを高くしている。** 後で `clojure -M -e \"(load-file …)\"` が
+この種の切り分けを高くしている。** 後で `kbb -M -e \"(load-file …)\"` が
 その速い経路だと分かり、そこから原因まで数分だった。
 
 ## 併せて直した browser の成熟度（別件だが同じセッションの実測）

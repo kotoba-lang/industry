@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Second judge for the aiuefs-v4 co-scientist loop: WHICH codec, at which
 ;; level, for a leaf that is compressed before it is sealed.
 ;;
@@ -9,7 +9,7 @@
 ;; verified block ayatori pulls, and the write path pays compression inside the
 ;; commit that already has to hash and seal every leaf.
 ;;
-;;   nbb scripts/aiuefs-codec-bench.cljk --root . --out <file.edn>
+;;   kbb --backend sci scripts/aiuefs-codec-bench.cljk --root . --out <file.edn>
 ;;
 ;; Reports ratio AND both throughputs per (codec, level), plus the load average
 ;; at measurement time -- this workstation runs many agents at once, so a

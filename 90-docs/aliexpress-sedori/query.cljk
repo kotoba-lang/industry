@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 90-docs/aliexpress-sedori/query.cljs — load observations-ledger.edn into a
 ;; real DataScript (npm `datascript`) db and query it. Same conversion
 ;; approach as manifest/edn-query.cljs (datascript.js uses bare-string attrs,
@@ -6,10 +6,10 @@
 ;; self-contained here since this dataset's ledger shape/paths are its own.
 ;;
 ;; Usage:
-;;   nbb --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs count
-;;   nbb --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs latest
-;;   nbb --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs candidates
-;;   nbb --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs q '[:find ?t :where [?e "product/title" ?t]]'
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs count
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs latest
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs candidates
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" 90-docs/aliexpress-sedori/query.cljs q '[:find ?t :where [?e "product/title" ?t]]'
 
 (require '[scripts.nbb-compat :refer [slurp file]]
          '[clojure.edn :as edn]
@@ -212,7 +212,7 @@
     "candidates" (cmd-candidates)
     "margin" (cmd-margin)
     "q" (cmd-q (first rest-args))
-    (do (println "usage: nbb 90-docs/aliexpress-sedori/query.cljs <count|latest|candidates|margin|q '<datalog>'>")
+    (do (println "usage: kbb --backend sci 90-docs/aliexpress-sedori/query.cljk <count|latest|candidates|margin|q '<datalog>'>")
         (.exit js/process 1))))
 
 (apply -main *command-line-args*)

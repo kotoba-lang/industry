@@ -36,11 +36,11 @@
   "{:new-repo \"kotoba-lang/kotobase-lake\", :language :cljc, :runtime-deps [\"datom-source\"], :license :apache-2.0, :namespaces [\"kotobase.lake.sniff\" \"kotobase.lake.catalog\" \"kotobase.lake.reader\"], :refusal-reasons #{:cid :size :tenant :ingested-at}, :format-refusals 0, :prefix-bytes 512, :entities {:object [:cid :size], :claim [:declared-media-type :filename :source-uri :tenant :ingest-actor :observed :sniffer-version]}, :out-of-scope [:transport :columnar :pushdown :byte-fetch]}")
 
   (:adr/verify
-  (vector "cd orgs/kotoba-lang/kotobase-lake && clojure -M:test   ; => Ran 19 tests containing 118 assertions. 0 failures, 0 errors.（JVM）"
-   "nbb --classpath \"src:test:$HOME/.gitlibs/libs/io.github.kotoba-lang/datom-source/b42f6e6f.../src\" test/run.cljs   ; => 19 tests / 118 assertions, 0 failures 0 errors（cljs 解釈）"
-   "clojure -M:cljs -m cljs.main --target node -m kotobase.lake.cljs-runner   ; => 19 tests / 118 assertions, 0 failures 0 errors（cljs コンパイル）"
-   "clojure -M:lint   ; => errors: 0, warnings: 0"
-   "nbb scripts/gen-west-manifest.cljs --entry kotobase-lake   ; => OK kotobase-lake, pin f87291d31595 は main から到達可能。diff は当該 entry のみ 5 行"
+  (vector "cd orgs/kotoba-lang/kotobase-lake && kbb -M:test   ; => Ran 19 tests containing 118 assertions. 0 failures, 0 errors.（JVM）"
+   "kbb --backend sci --classpath \"src:test:$HOME/.gitlibs/libs/io.github.kotoba-lang/datom-source/b42f6e6f.../src\" test/run.cljs   ; => 19 tests / 118 assertions, 0 failures 0 errors（cljs 解釈）"
+   "kbb -M:cljs -m cljs.main --target node -m kotobase.lake.cljs-runner   ; => 19 tests / 118 assertions, 0 failures 0 errors（cljs コンパイル）"
+   "kbb -M:lint   ; => errors: 0, warnings: 0"
+   "kbb --backend sci scripts/gen-west-manifest.cljk --entry kotobase-lake   ; => OK kotobase-lake, pin f87291d31595 は main から到達可能。diff は当該 entry のみ 5 行"
    "west.yml 全体の --check は STALE だが原因は既存の他 repo（orgs/cloud-itonami/cloud-itonami-app が pin 43942c42 に対し local HEAD a8190b01 + 未コミット変更）。local checkout 400 件を標本抽出して drift は 1 件のみ、本 ADR の変更とは無関係。wholesale 再生成はこの pin を黙って動かすので実行しない"))
 
   (:adr/body

@@ -98,7 +98,7 @@ live 検証済み: `node-edge-8` あり / `node-arc-b70` 消失 / `349800` `9980
 
 ## 検証
 
-`clojure -M:test`: **410 tests / 25,428 assertions**。storefront・terms は**一貫して
+`kbb -M:test`: **410 tests / 25,428 assertions**。storefront・terms は**一貫して
 0 failures**。
 
 ⚠ **既存失敗の集合が実行ごとに変わる。** 直前の run は 8 failures + 1 error
@@ -171,7 +171,7 @@ NVIDIA ブランド品の private-label 可否・実機 tok/s・メーカー保�
 # 1. 入金先が分離できたら 1 行変える
 #    src/cloud_murakumo/storefront.cljc の payee-matches-disclosed-seller? を true に
 cd orgs/network-awai/cloud-murakumo
-clojure -M:test -n cloud-murakumo.storefront-test -n cloud-murakumo.terms-test
+kbb -M:test -n cloud-murakumo.storefront-test -n cloud-murakumo.terms-test
 
 # 2. 共有 checkout の欠けた依存（worker のビルドが通らない）
 npm install

@@ -133,7 +133,7 @@
   "却下: (a) **DE 専用の廉価 SKU(€1,790〜€1,990)を作る** — 税制の下限が消えたことを理由に検討したが、実測で粗利 3.8%〜13.5%。**税制の下限は消えても COGS の下限が残り、そちらの方が高い。**ADR-2608153400 が JP で 299,000 円 SKU を却下したのと同じ結論に、違う経路で到達した。(b) **ドイツ専用の製品名を立てる** — fleet の在庫・保守・ファーム配布が地域の数だけ増える。違いは Paket であって SKU ではない。(c) **JP の申請伴走を翻訳して DE でも売る** — ドイツに対応する手続きが無いので、無い手続きが在るように読める。ADR-2608180400 決定11 の直接適用。(d) **税制を DE でも訴求の第 1 軸にする** — 100% bonus と同じ理由で、ドイツの 1年ルールは恒久・無上限・申請不要ゆえに**全ての機材ベンダーが同じことを言える**。差別化にならない(ADR-2608180400 決定2 の salience 0.45)。第 2 軸(締切の理由)に置く。(e) **B2C も受ける** — Widerrufsrecht 14 日が build-to-order と正面から衝突する。加えて節税訴求が意味を持たない。(f) **顧客を Importer of Record にして VAT 登録を避ける** — 年 €2,000 は浮くが、通関を顧客に押し付けた時点で『買って供用開始すれば終わり』という DE の唯一の売りが壊れる。**ただし決定4 はこれを前提にしているだけで、明示的な決定にはなっていない**(consequences に未決として記録)。(g) **USD 建てで売って EUR に翻訳し続ける** — ADR-2608153400 決定2 が JP で却下したのと同じ理由。為替のたびに棚札が動く。")
 
   (:adr/verification
-  "計算器: scripts/mk1-de-sku-model.cljs(nbb、ADR-2607173000 準拠)。`nbb scripts/mk1-de-sku-model.cljs` で DE 固有原価 / SKU 台帳(netto・brutto・COGS・粗利) / JP と DE の税効果比較 / **税制の下限が消えても COGS の下限が残ることの実測** / 固定費と損益分岐台数 / 12/31 からの Stichtag 逆算 を再現する。JP 側の棚札と COGS は ADR-2608153400 から、COGS の原型は scripts/mk1-costmodel.cljs から引き継ぐ。
+  "計算器: scripts/mk1-de-sku-model.cljs(nbb、ADR-2607173000 準拠)。`kbb --backend sci scripts/mk1-de-sku-model.cljk` で DE 固有原価 / SKU 台帳(netto・brutto・COGS・粗利) / JP と DE の税効果比較 / **税制の下限が消えても COGS の下限が残ることの実測** / 固定費と損益分岐台数 / 12/31 からの Stichtag 逆算 を再現する。JP 側の棚札と COGS は ADR-2608153400 から、COGS の原型は scripts/mk1-costmodel.cljs から引き継ぐ。
 
    供給方式の計算器: scripts/mk1-de-fulfilment-model.cljs(nbb)。A/B/C の per-unit・固定費・Stichtag・**Q4 販売日数**・分岐台数と、C2 のロイヤリティ模型(**3.5 倍の条件と、交点 8.6 台が両方赤字の領域にあること**)を再現する。**per-unit も固定費も全て ASSUMPTION であり、順位が入れ替わるかを見る模型であって金額の予測ではない。**
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-maturity-improve-loop.cljk — 成熟度を**上げる**ローカル Claude
 ;; loop の入口（superproject ADR-2608080000）。LaunchAgent
 ;; cloud.itonami.bot.itonami-maturity-improve が起こす。
@@ -25,7 +25,7 @@
 ;; exit 0 常に。
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-loop.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-loop.cljk
 ;;   ... --dry-run   ; 測って対象を出すところまで（モデルを起こさない）
 
 (ns itonami-maturity-improve-loop

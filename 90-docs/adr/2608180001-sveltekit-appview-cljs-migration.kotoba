@@ -52,7 +52,7 @@ appview が **111 本**。うち `+server.ts` を持つ 96 本を空白正規化
 
 ### 1. 『緑のビルド』は検査ではなかった（fleet 全体）
 
-`shadow-cljs release` は未定義 var の参照を **warning として扱い exit 0** を返し、
+`amu compile --target wasm32-browser` は未定義 var の参照を **warning として扱い exit 0** を返し、
 **初回リクエストで throw する bundle を出荷する**。実測（app-air-dcs）:
 同じ mutation を 2 箇所の設定で比較すると、`:compiler-options` に
 `:warnings-as-errors true` があれば exit 1 で `dist` はバイト不変、
@@ -216,7 +216,7 @@ closing 時点で結果は未着。
 - 残り: group A の約 69 本、group B の 10 本、その他 10 本、xrpc route を持たない
   15 本。
 - **build lock がスループットの唯一の上限。** agent を増やしても並列化するのは
-  コード記述・テスト・描画採点までで、`shadow-cljs release` は workspace 全体で
+  コード記述・テスト・描画採点までで、`amu compile --target wasm32-browser` は workspace 全体で
   1 本ずつしか通らない（resource-guard）。exit 2 は順番待ちであって失敗ではない。
 - 4 ホスト（appview / nanoid / mcp / dispatcher）は依然 NXDOMAIN。移行はそれを
   直さない。deploy するか retire するかは別の決定。

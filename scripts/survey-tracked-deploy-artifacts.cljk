@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; survey-tracked-deploy-artifacts.cljs
 ;;
 ;; ADR-2608134600 が club-shinshi-app で見つけた罠を fleet 全体で数える。
@@ -16,9 +16,9 @@
 ;; 既定では **local の origin/<default> tree** を読む（working tree ではない）。
 ;; --fetch を付けると対象 repo だけ `git fetch origin` してから読む。
 ;;
-;;   nbb scripts/survey-tracked-deploy-artifacts.cljk --list <file-of-config-paths> --out <edn>
-;;   nbb scripts/survey-tracked-deploy-artifacts.cljk --scan orgs --out <edn>
-;;   nbb scripts/survey-tracked-deploy-artifacts.cljk --list ... --only network-awai/club-shinshi-app
+;;   kbb --backend sci scripts/survey-tracked-deploy-artifacts.cljk --list <file-of-config-paths> --out <edn>
+;;   kbb --backend sci scripts/survey-tracked-deploy-artifacts.cljk --scan orgs --out <edn>
+;;   kbb --backend sci scripts/survey-tracked-deploy-artifacts.cljk --list ... --only network-awai/club-shinshi-app
 
 (ns survey-tracked-deploy-artifacts
   (:require [clojure.string :as str]

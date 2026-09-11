@@ -114,8 +114,8 @@ be exactly the reduction the contract forbids.
 
 ## repository-tests needed a fix, and the fix has a boundary
 
-`nbb run-tests.cljs` died with `Could not find namespace: kotoba.lang.text`
-while `clojure -M:test` was green. The coordinate was in `deps.edn` only, and
+`kbb --backend sci run-tests.cljk` died with `Could not find namespace: kotoba.lang.text`
+while `kbb -M:test` was green. The coordinate was in `deps.edn` only, and
 **nbb never reads deps.edn** (ADR-2609093000). The JVM suite reads `deps.edn`
 and never loads the `.cljs`, so **the green suite was structurally incapable
 of seeing the broken one.**
@@ -133,11 +133,11 @@ here rather than decided, since the hash moves with every dependency change.
 ## Two defects in the public CLI, found by the trap
 
 **The public `kotoba` CLI starts a JVM.** Three subcommands shell out to
-`clojure -M:run`, caught in the trace:
+`kbb -M:run`, caught in the trace:
 
-    clojure -M:run check <file> --source-path src
-    clojure -M:run inspect <file>
-    clojure -M:run definition-cids <file>
+    kbb -M:run check <file> --source-path src
+    kbb -M:run inspect <file>
+    kbb -M:run definition-cids <file>
 
 The contract says `:public-cli {... :jvm-launcher-forbidden true}` and `:amu
 {:jvm-fallback :fail-closed}`. `amu --jvm-free` fails closed as specified; the

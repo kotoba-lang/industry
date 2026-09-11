@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/fleet-refactor-wave-tick.cljk — orgs/cloud-itonami/ 向け refactor 波の
 ;; 候補を**測る**（ADR-2608290100）。決定論。モデルを起こさない。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/fleet-refactor-wave-tick.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/fleet-refactor-wave-tick.cljk \
 ;;     [--limit 4] [--mission a|b|both]
 ;;
 ;; 姉妹 tick（svelte-cljs-wave-tick.cljs）と同型。手順の正本は skill

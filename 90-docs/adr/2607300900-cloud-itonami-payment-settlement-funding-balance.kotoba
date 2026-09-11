@@ -266,7 +266,7 @@ D7 とは無関係の実バグで、D7 を入れなければ発見されない�
 
 **① テストスイートが実データを上書きしていた（`d45b76d` で修正）。**
 `config/data-dir` が `./data` に既定していたため、リポジトリのルートで
-`clojure -M:test` を走らせるとテストが**実ストアに書く**。テスト内の
+`kbb -M:test` を走らせるとテストが**実ストアに書く**。テスト内の
 `store/transact!` は18箇所あり、うち2つ（本セッションで追加した
 `payment_tools_test/seed-identity!` と既存の `core_test`）は `:identity` を
 丸ごと差し替える。実測: 本物の仮ユーザーが `{:id \"user-1\" :display-name \"Owner\"}`
@@ -355,14 +355,14 @@ credential を app に持たせない設計（読み取り専用）を維持す�
 
 ## 検証と着地
 
-- `clojure -M:test` — **360 tests / 1533 assertions / 0 failures**（merge 後の tree）。
+- `kbb -M:test` — **360 tests / 1533 assertions / 0 failures**（merge 後の tree）。
   追加: `did_test.clj`（実 CBOR COSE_Key、shape ガード到達性）、
   `data_isolation_test.clj`（スイートの書き込み先が実ストアでないこと、
   `store/state-file` が実際にその下にあること — 両者が食い違えば検査は無意味）。
   新規: `funding_test.clj`（残高 freshness の純関数、口座番号が state.edn に出ない
   ことの直接検査、organization スコープ）、`authority/payment_test.clj`（全拒否経路、
   digest material の被覆、**client が自前の残高を送っても上書きされる**こと）。
-- `clojure -M:lint` — **0 errors**（warning 8 件はすべて既存で、追加分に起因しない）。
+- `kbb -M:lint` — **0 errors**（warning 8 件はすべて既存で、追加分に起因しない）。
   MCP 面は `payment_tools_test.clj`（session 無しなら manifest に出ないこと、Passkey
   未登録 user では session が解決しないこと、revoke が即座に効くこと、承認系 tool 名が
   存在しないこと、未承認 proposal を commit できないこと）。

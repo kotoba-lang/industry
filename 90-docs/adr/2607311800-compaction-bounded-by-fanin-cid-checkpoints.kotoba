@@ -38,9 +38,9 @@
    "bench/kotobase_peer/chunk_bench.clj + deps.edn alias :chunk-bench"))
 
   (:adr/verify
-  (vector "cd orgs/kotoba-lang/kotobase-peer && clojure -M:test   ; 259 tests / 811 assertions"
-   "cd orgs/kotoba-lang/kotobase-peer && clojure -M:lint    ; 0 errors"
-   "cd orgs/kotoba-lang/kotobase-peer && clojure -M:chunk-bench 20000 80000"))
+  (vector "cd orgs/kotoba-lang/kotobase-peer && kbb -M:test   ; 259 tests / 811 assertions"
+   "cd orgs/kotoba-lang/kotobase-peer && kbb -M:lint    ; 0 errors"
+   "cd orgs/kotoba-lang/kotobase-peer && kbb -M:chunk-bench 20000 80000"))
 
   (:adr/body
   "# Context

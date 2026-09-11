@@ -3,7 +3,7 @@
 status: infrastructure_unavailable — no live measurement possible this run
 
 measurements (all NOT-MEASURED, none treated as CLEAN):
-- nbb kotobase_lead_loop.cljs funnel-pulse : not measured
+- kbb --backend sci kotobase_lead_loop.cljk funnel-pulse : not measured
   - terminal sandbox returned empty stdout/stderr for every command; could not exec nbb/curl
 - curl https://kotobase.net/api/funnel : not measured
   - web gateway unavailable: "Nous Tool Gateway is not available (not entitled or unreachable)"

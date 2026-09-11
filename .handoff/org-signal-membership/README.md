@@ -53,7 +53,7 @@ epoch 数と member 集合の上の値→値の関数で、どの `group/create-
 ## 検証
 
 ```
-nbb --classpath "src:test" run-tests.cljs
+kbb --backend sci --classpath "src:test" run-tests.cljs
 # Ran 9 tests containing 29 assertions. 0 failures, 0 errors.
 ```
 

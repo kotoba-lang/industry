@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Coverage reporter for 90-docs/community-coverage/ (ADR-2607257200).
 ;;
 ;; Answers the question the corpus exists to answer honestly: how much of it is
@@ -7,13 +7,13 @@
 ;; stays fast enough to run on every iteration.
 ;;
 ;; Usage:
-;;   nbb 90-docs/community-coverage/queries/coverage.cljs            ; full report
-;;   nbb 90-docs/community-coverage/queries/coverage.cljs unpinned   ; list unpinned orgs
-;;   nbb 90-docs/community-coverage/queries/coverage.cljs regions    ; region histogram
-;;   nbb 90-docs/community-coverage/queries/coverage.cljs integrity  ; referential checks only
-;;   nbb 90-docs/community-coverage/queries/coverage.cljs freshness  ; age of pinned sources
-;;   nbb 90-docs/community-coverage/queries/coverage.cljs countries  ; country coverage + absences
-;;   nbb 90-docs/community-coverage/queries/coverage.cljs depth      ; form families per country
+;;   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk            ; full report
+;;   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk unpinned   ; list unpinned orgs
+;;   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk regions    ; region histogram
+;;   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk integrity  ; referential checks only
+;;   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk freshness  ; age of pinned sources
+;;   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk countries  ; country coverage + absences
+;;   kbb --backend sci 90-docs/community-coverage/queries/coverage.cljk depth      ; form families per country
 ;;
 ;; The report deliberately prints the UNKNOWNS, not just the totals: a coverage
 ;; corpus that only reports its size is measuring the wrong thing.

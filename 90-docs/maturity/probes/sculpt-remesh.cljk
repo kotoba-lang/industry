@@ -16,7 +16,7 @@
                :indices (vec (drop 6 (:indices m)))}
         diag (s/topology-diagnostics holed)
         rep (s/repair-topology holed)
-        span (fn [x] (mapv - (second (bb x)) (first (bb x))))
+        span (fn [x] (mapv - (second (kbb -M:x)) (first (kbb -M:x))))
         close? (fn [a b] (every? true? (map #(< (Math/abs (- %1 %2)) 0.3) a b)))]
     (cond
       (not (< (count (:positions coarse)) (count (:positions m))))

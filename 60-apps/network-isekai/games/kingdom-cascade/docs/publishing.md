@@ -62,7 +62,7 @@ directory: guessing a version and having it resolve to something is worse
 than an obvious hole, because a wrong pin fails at runtime rather than at
 build time.
 
-    npx shadow-cljs release game
+    amu compile --target wasm32-browser game
     # → web/dist/js/main.js + index.html
 
 Renderer wiring lives entirely in
@@ -137,7 +137,7 @@ three surfaces. `digest` is a polynomial rolling hash, deliberately not
 `clojure.core/hash`, because that is free to differ between Clojure and
 ClojureScript — which would make the check silently vacuous.
 
-    npx nbb --classpath src:../common/src play.cljs resources/levels/kc-001.edn --quiet
+    kbb --backend sci --classpath src:../common/src play.cljs resources/levels/kc-001.edn --quiet
 
 Take the digest that prints and compare it with what the browser build and
 the packaged app produce for the same greedy playthrough. As of this writing

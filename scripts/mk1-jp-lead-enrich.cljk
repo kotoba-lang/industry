@@ -186,6 +186,6 @@
     "enrich"  (enrich! lim)
     "contact" (contact! lim)
     "probe"   (probe! (remove #(re-matches #"\d+" %) args))
-    (do (println "usage: nbb scripts/mk1-jp-lead-enrich.cljk <enrich|contact|probe> [limit|urls...]")
+    (do (println "usage: kbb --backend sci scripts/mk1-jp-lead-enrich.cljk <enrich|contact|probe> [limit|urls...]")
         (println "  enrich  は GBIZ_TOKEN が要る（gBizINFO の申請フォームから取得）")
         (println (str "  pool の prospect: " (count (prospects)) " 件")))))

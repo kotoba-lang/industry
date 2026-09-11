@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-maturity-freshness-test.cljk
 ;;
 ;; 成熟度向上 loop の鮮度判定の gate。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-freshness-test.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-freshness-test.cljk
 ;;
 ;; exit 0 iff 全件 OK。**落ちない gate は劇場**なので、この suite の各 case は
 ;; 「判定を 1 つ壊すと必ず赤くなる」ように選んである。特に:

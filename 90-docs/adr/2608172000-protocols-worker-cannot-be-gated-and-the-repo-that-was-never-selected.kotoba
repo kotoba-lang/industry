@@ -23,7 +23,7 @@
 
 ### 実測 1 —— suite の入力は repo の外に 26 本ある
 
-suite は `shadow-cljs compile test && node out/node-tests.js`。`shadow-cljs.edn` の
+suite は `amu compile --target wasm32-browser test && node out/node-tests.js`。`shadow-cljs.edn` の
 `:source-paths` が `../../../kotoba-lang/<repo>/src` を **26 本**参照する。これは west の
 **兄弟 project**（`orgs/kotoba-lang/*`）で、`control-plane` の tree の外に在る。
 
@@ -45,7 +45,7 @@ fleet がノードへ配るのは **対象 repo の tree だけ**である。
 
 ### 実測 3 —— ノードの形で実際にコンパイルさせた
 
-`../../../kotoba-lang` が存在し得ない深さに tip の tree を置いて `shadow-cljs compile test`:
+`../../../kotoba-lang` が存在し得ない深さに tip の tree を置いて `amu compile --target wasm32-browser test`:
 
 ```
 [:test] Compiling ...

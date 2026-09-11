@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/svelte-cljs-wave-loop.cljk — Svelte → cljs 移行波の **ローカル
 ;; Claude loop** 入口（ADR-2608260900）。LaunchAgent cloud.itonami.bot.svelte-cljs-wave
 ;; が一定間隔で起こす。
@@ -21,7 +21,7 @@
 ;;
 ;; exit 0 常に（監視 loop であって gate ではない）。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/svelte-cljs-wave-loop.cljk [--dry-run]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/svelte-cljs-wave-loop.cljk [--dry-run]
 
 (ns svelte-cljs-wave-loop
   (:require [clojure.edn :as edn]

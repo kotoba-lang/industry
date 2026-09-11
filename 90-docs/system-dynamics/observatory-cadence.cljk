@@ -50,7 +50,7 @@
 ;;
 ;; ## 実行
 ;;
-;;   nbb --classpath "90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src" \
+;;   kbb --backend sci --classpath "90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src" \
 ;;     90-docs/system-dynamics/observatory-cadence.cljs
 ;;
 ;;   SD_OUT=<dir> で出力先を変えられる（既定 90-docs/system-dynamics）。
@@ -436,7 +436,7 @@
               :source/dataset "observatory-cadence"}])]
   (.writeFileSync fs sched-out
                   (str ";; 90-docs/system-dynamics/observatory-cadence.datoms.edn — **生成物**。手編集禁止。\n"
-                       ";; 再生成: nbb --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src\" \\\n"
+                       ";; 再生成: kbb --backend sci --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src\" \\\n"
                        ";;           90-docs/system-dynamics/observatory-cadence.cljs\n"
                        ";; 入力（正本・手書き）: manifest/observatories.edn の :change-rate / :importance\n"
                        ";; 設計: ADR-2608082600   モデル: observatory-cadence.xmile\n"

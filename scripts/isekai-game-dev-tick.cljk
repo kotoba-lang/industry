@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/isekai-game-dev-tick.cljk — isekai.network のゲーム制作 bot の測定段。
 ;; **決定論。モデルは居ない。** 姉妹 `scripts/repo-bots/tick.cljk` /
 ;; `scripts/fleet-refactor-wave-tick.cljk` と同じ 2 段構えの 1 段目で、
@@ -41,7 +41,7 @@
 ;; 読むだけ。git の書き込みコマンドは 1 つも呼ばない。
 ;;
 ;; usage:
-;;   nbb scripts/isekai-game-dev-tick.cljk
+;;   kbb --backend sci scripts/isekai-game-dev-tick.cljk
 
 (ns isekai-game-dev-tick
   (:require [clojure.edn :as edn]

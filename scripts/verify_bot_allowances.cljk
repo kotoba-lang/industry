@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify_bot_allowances.cljs — does every bot that may SPEND actually exist?
 ;;
-;;   nbb scripts/verify_bot_allowances.cljk           ; report
-;;   nbb scripts/verify_bot_allowances.cljk --check   ; exit 1 on a finding
+;;   kbb --backend sci scripts/verify_bot_allowances.cljk           ; report
+;;   kbb --backend sci scripts/verify_bot_allowances.cljk --check   ; exit 1 on a finding
 ;;
 ;; ## Why a spending registry needs a checker
 ;;

@@ -16,7 +16,7 @@
 
 ADR-2607181900 は script host の優先順位を kbb → nbb と決め、ADR-2609051100 は kbb の JVM-free 化を **amu native KEXE + kexe_loader** で進めると決めた（slice 1〜4 着地、shim は並行セッションが `bin/kbb_shim.cljs` で作業中）。同 ADR の却下案 4「kbb を nbb で書き直すだけ」は、JS エンジン経由の guest が配布成果物の要件（ADR-2607198300、Node/browser host 非依存）を満たさないことが理由で、**JS backend を oracle として持つことは否定していない**。Q9 は全 public surface を nbb/CLJS・native・Wasm で照合することを求めている。
 
-一方 `amu compile --target js` は 2026-09-06 まで `clojure -M` を起こしていた。理由は emitter（`kotoba-lang/kotoba-script`）が `.clj` 1 本だったことで、コード生成に JVM は要らなかった。CLAUDE.md の表は js を「JVM / 新規で選ばない」と書いていた。
+一方 `amu compile --target js` は 2026-09-06 まで `kbb -M` を起こしていた。理由は emitter（`kotoba-lang/kotoba-script`）が `.clj` 1 本だったことで、コード生成に JVM は要らなかった。CLAUDE.md の表は js を「JVM / 新規で選ばない」と書いていた。
 
 ## Decision
 
@@ -34,7 +34,7 @@ ADR-2607181900 は script host の優先順位を kbb → nbb と決め、ADR-26
 | amu js 経路の parity | amu `npm run test-nbb-js`（PATH から JVM を隠す） | route-decide 60,283 byte 一致、SCANNED 6 failed 0 |
 | kbb js × native | kotoba `kotoba.kbb-js-test`（nbb をプロセスとして駆動） | demo_kbb_fs_read_native = **84**（native の kbb_native_test と同値）、3 tests 20 assertions 0 fail |
 | library | 同上 | fs_report = 84、env_browse_proc = 2100（entries 2 ×1000 + HOME 100 + echo exit 0） |
-| cold start | `time nbb bin/kbb_js.cljs …` | 1.7 s（JVM kbb は ADR-2609051100 の実測で 10.11 s） |
+| cold start | `time kbb --backend sci bin/kbb_js.cljk …` | 1.7 s（JVM kbb は ADR-2609051100 の実測で 10.11 s） |
 
 library を書いたことで emitter の欠陥が 2 つ見つかり、上流で直した（kotoba-script `8a55311b`）: `string-index-of` が i64 byte offset の契約に対して JS Number の code point 数を返していた（guest の `(+ i 1)` が `Cannot mix BigInt` で落ちる）、`string-split-count` が grammar には在るのに emitter に無かった。**library は backend の parity 検査器でもある。**
 
@@ -67,11 +67,11 @@ library を書いたことで emitter の欠陥が 2 つ見つかり、上流で
 
 ```bash
 # emitter parity（kotoba-script）
-npm run test-nbb ; clojure -M:test
+npm run test-nbb ; kbb -M:test
 # amu js 経路（PATH から JVM を隠して）
 npm run test-nbb-js
 # kbb js × native
-AMU_HOME=<amu checkout with node_modules> clojure -M:test   # kotoba; SKIPPED 行が出たら測れていない
-nbb bin/kbb_js.cljs src/demo_kbb_fs_read_native.kotoba --policy src/demo_kbb_fs_read_native_policy.edn
+AMU_HOME=<amu checkout with node_modules> kbb -M:test   # kotoba; SKIPPED 行が出たら測れていない
+kbb --backend sci bin/kbb_js.cljk src/demo_kbb_fs_read_native.kotoba --policy src/demo_kbb_fs_read_native_policy.edn
 ```
 ")))

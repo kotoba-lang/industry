@@ -33,7 +33,7 @@
              "src/cloud_itonami/kotoba.cljc"]
      :change :replace-core-read-string-with-portable-edn-reader
      :reader-eval-regressions 2
-     :test-command "clojure -Sdeps '{:paths [\"src\" \"resources\" \"test\"]}' -M:local -e <focused-runner>"
+     :test-command "kbb -Sdeps '{:paths [\"src\" \"resources\" \"test\"]}' -M:local -e <focused-runner>"
      :test-result {:tests 20 :assertions 80 :failures 0 :errors 0}
      :status :merged
      :pr "https://github.com/gftdcojp/cloud-itonami/pull/457"
@@ -692,7 +692,7 @@
    :migration-authorized false
    :reason "The identical CLJC facade re-exports generated GLSL ES 3.00 shader strings. Canonical authority is kami.wgsl EDN compiled through naga; GPU shader artifacts and their CLJS WebGL compatibility facade are not Kotoba guest logic."
    :canonical-boundary
-   {:source :kami-wgsl-edn :generator "bb gen-glsl"
+   {:source :kami-wgsl-edn :generator "kbb -M:gen-glsl"
     :generated-namespace "kami.webgl.glsl" :execution :gpu}
    :next-action :retain-and-regenerate-from-canonical-shader-source}
   {:root "orgs/kotoba-lang/kami-app-isekai/src/kami_app_isekai.cljc"

@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; The first tranche of ADR-2608170400 (step 1 of 3: candidates), narrowed to what can be verified without
 ;; a classpath: CLEAN repos (portable tests, no ClojureScript runner, no JVM-only
 ;; token in the tests) that ALSO have no cross-repo dependency their test path
-;; needs. Those run under `nbb --classpath src:test` with nothing else set up.
+;; needs. Those run under `kbb --backend sci --classpath src:test` with nothing else set up.
 ;;
 ;; Emits one line per repo: path, test-namespace count, then the namespaces.
 ;;
@@ -12,11 +12,11 @@
 ;; namespaces behind main (network-awai/app-hyakka, which produced a 2-of-9
 ;; runner that had to be reverted in 5416b0d).
 ;;
-;;   1. nbb --classpath ".:scripts/nbb_compat" scripts/list-portable-runner-candidates.cljk > candidates.tsv
+;;   1. kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/list-portable-runner-candidates.cljk > candidates.tsv
 ;;   2. CLEAN_TSV=candidates.tsv SWEEP_WORKDIR=/tmp/sweep \
-;;        nbb --classpath ".:scripts/nbb_compat" scripts/sweep-portable-runners.cljk > sweep.tsv
+;;        kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/sweep-portable-runners.cljk > sweep.tsv
 ;;   3. SWEEP_TSV=sweep.tsv SWEEP_WORKDIR=/tmp/sweep LEDGER=land.tsv \
-;;        nbb --classpath ".:scripts/nbb_compat" scripts/land-portable-runners.cljk
+;;        kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/land-portable-runners.cljk
 (require '[clojure.string :as str]
          '[clojure.edn :as edn])
 

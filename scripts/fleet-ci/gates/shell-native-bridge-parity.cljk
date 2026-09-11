@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; shell-native-bridge-parity.cljs — kotoba-lang/shell の gate。
 ;;
 ;; 検査する不変条件は1つ:
@@ -21,7 +21,7 @@
 ;; 片側だけ足す/消すのは、コードを読んでいる限り自然に見える変更なので、
 ;; 人間のレビューではなく機械で押さえる。
 ;;
-;; ノード側で `npx nbb shell-native-bridge-parity.cljs <dir>` として実行される。
+;; ノード側で `kbb --backend sci shell-native-bridge-parity.cljk <dir>` として実行される。
 ;;
 ;; false-pass 対策: 3ファイルのどれかが読めなければ FAIL する（tree の絞り込み
 ;; ミスで「0 command 対 0 command なので一致」と報告する事故を防ぐ）。空集合も

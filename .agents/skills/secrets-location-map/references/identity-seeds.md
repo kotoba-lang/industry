@@ -20,7 +20,7 @@
     部門長 seed(同形式)。
   - `itonami-sales-head-chain` / `itonami-billing-head-chain` /
     `itonami-keiei-head-chain` — 各部門長への CACAO 委任 chain(EDN vector、
-    **expiry 90 日 ≈ 2026-10-12。失効前に `clojure -M:ops-send mint-chain
+    **expiry 90 日 ≈ 2026-10-12。失効前に `kbb -M:ops-send mint-chain
     kagi:itonami-org-root ...` で再 mint**)。merge 時は
     `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
 

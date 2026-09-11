@@ -45,7 +45,7 @@ W(τ) = α·I(τ) + β·R(τ) + γ·O(τ)、𝒲 = ∫ w(τ) W(τ) d ln τ を�
 ## 使い方
 
 ```bash
-bb orgs/kawasakijun/pregel_planner.cljk --tau month --horizon 12
+kbb orgs/kawasakijun/pregel_planner.cljk --tau month --horizon 12
 ```
 
 出力: 各 τ の推奨アクション列、W(τ) 推移、ボトルネック vertex。

@@ -9,7 +9,7 @@ Hard boundaries:
 - Never edit the read root. Clone `https://github.com/<owner/repo>.git` into a fresh `<run-parent>/run-<timestamp>/<repo>` directory.
 - Move product build decisions, not host mechanisms. Network, filesystem, signing, packaging, firmware, OS process, and provider adapters stay host-side.
 - Use `/opt/homebrew/opt/kotoba/bin/kotoba`; `/opt/homebrew/bin/kotoba` is an obsolete 0.1.0 binary. New ordinary builds use `kotoba compile`. Do not introduce `wasm emit`, `cljs emit`, or `kotoba rad build`.
-- For JVM-free compiler execution use the printed `amu-bin` and `amu compile`. If `deps.edn` changes in Amu, regenerate `deps-lock.edn` with `nbb scripts/lock-classpath.cljk`; reject any silent `clojure -Spath` fallback.
+- For JVM-free compiler execution use the printed `amu-bin` and `amu compile`. If `deps.edn` changes in Amu, regenerate `deps-lock.edn` with `kbb --backend sci scripts/lock-classpath.cljk`; reject any silent `kbb -Spath` fallback.
 - Preserve the existing JVM command as a named oracle/fallback. Do not remove it during this run.
 - No new JVM dependencies, Chicory call sites, GitHub Actions, force pushes, or pushes to main.
 - Do not work on the frozen bootstrap quartet `kotoba`, `amu`, `kototama`, or `aiueos`; their cutover is architectural and cannot be an autonomous bulk PR.

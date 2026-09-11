@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; sukashi-datalake-export.cljs — 広告サプライチェーンの観測グラフを datalake に
 ;; 載せられる表に落とす。
 ;;
@@ -43,7 +43,7 @@
 ;; だから名前空間ごとに 1 表にでき、列は attribute 名から導出できる（手で列を
 ;; 並べた表は、上流が attribute を足した日から静かに古くなる）。
 ;;
-;;     nbb scripts/sukashi-datalake-export.cljk [--repo <path>] [--out-dir <dir>]
+;;     kbb --backend sci scripts/sukashi-datalake-export.cljk [--repo <path>] [--out-dir <dir>]
 ;;     python3 scripts/datalake-sync.py --spec /tmp/sukashi.spec.json --in-dir /tmp
 ;;
 ;; exit: 0 載せられる JSON を書いた / 2 REFUSED（読めなかった・印が無かった）

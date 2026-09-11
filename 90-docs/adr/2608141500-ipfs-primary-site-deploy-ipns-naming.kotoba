@@ -86,7 +86,7 @@ R2 `ipns/<k51>` は **protobuf `IpnsEntry`**（`ipns.record`）。Worker は名�
 
 ### 5. コマンド
 
-実装場所は `network-awai/cloud-itonami`。cloud-itonami-app の `bin/itonami sites *` はローカル下書き。portfolio `clojure -M:itonami` ではない。
+実装場所は `network-awai/cloud-itonami`。cloud-itonami-app の `bin/itonami sites *` はローカル下書き。portfolio `kbb -M:itonami` ではない。
 
 ```
 itonami deploy app/{repo} [--no-ipns]
@@ -125,7 +125,7 @@ Blocker: kagi item `itonami-site-ipns/app/shirohan` が無い。新しい seed �
 
 ```
 git worktree add -b agent/shirohan-k51-publish /tmp/cloud-itonami-k51-pub origin/main
-ITONAMI_IPFS_ROOT=/tmp/wt-ipfs-ipns-r2 nbb scripts/deploy-site.cljs app/shirohan --dry-run
+ITONAMI_IPFS_ROOT=/tmp/wt-ipfs-ipns-r2 kbb --backend sci scripts/deploy-site.cljk app/shirohan --dry-run
 ```
 
 `/tmp/wt-ipfs-ipns-r2` は他セッション。消さない。superproject `agent/shirohan-geom-live` はこの作業ではない。

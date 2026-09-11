@@ -71,7 +71,7 @@ credentials resolved by known identifier only:
 
     ANNEX_ENDPOINT=s3.us-west-004.backblazeb2.com ANNEX_BUCKET=gftdcojp-m365-annex \\
     ANNEX_FILEPREFIX=cloud-itonami-kouhou/ \\
-      nbb scripts/datalad-b2-init.cljs orgs/cloud-itonami/kouhou b2
+      kbb --backend sci scripts/datalad-b2-init.cljk orgs/cloud-itonami/kouhou b2
     git annex copy --to b2 --force raw
 
 Then, by exit code over all 48 keys:

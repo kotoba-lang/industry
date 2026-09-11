@@ -40,7 +40,7 @@ executor と同じ行列で各 instance の中心を投影し、その画素で 
 間違えても、半高さの持ち上げを忘れても、picker は「それらしい」答えを
 返し続けるので、これが無いと誤りが縁でしか出ない。
 
-なお `clojure -M:test` の全体実行は本変更の前から compute-golden-test が
+なお `kbb -M:test` の全体実行は本変更の前から compute-golden-test が
 `kami.cartpole-math` を解決できずに落ちる (別件、未修正)。
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

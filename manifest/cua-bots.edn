@@ -8,7 +8,7 @@
 ;; :bot/backend の 1 keyword を書き換えるだけ**（goal / 手順は変わらない）。
 ;;
 ;; 呼び出し規約（orgs/kotoba-lang/computer-use から）:
-;;   nbb bin/cua_bot_run.cljs --roster <このファイル> --bot <bot-id> \
+;;   kbb --backend sci bin/cua_bot_run.cljk --roster <このファイル> --bot <bot-id> \
 ;;       --receipts-dir ~/.itonami/cua-bots/receipts/<bot-id> [--dry-run]
 ;;   exit 0 = session done / 1 = failed / 2 = could-not-measure（3 値。混ぜない）
 ;;
@@ -46,7 +46,7 @@
   ;; 見る bot は、あの run を「正常」と報告する。
   :bot/backend :host-object
   :bot/target {:cwd "."
-               :cmd ["nbb" "scripts/ads-adult-preflight.cljk"]}
+               :cmd ["kbb" "--backend" "sci" "scripts/ads-adult-preflight.cljk"]}
   :bot/interval-s 86400
   :bot/max-steps 4
   :bot/allowed-actions #{}

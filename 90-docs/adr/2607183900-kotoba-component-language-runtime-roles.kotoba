@@ -965,7 +965,7 @@ emission and server-start capabilities, validates malformed/off-fleet inference
 targets before I/O, and binds them inside each request worker. Because
 ADR-2607171100 freezes new files under numbered layers, the existing host-only
 `run_tests.clj` is the test/server adapter rather than adding a component file;
-`bb server` enters through it. The suite passed 43 tests / 156 assertions,
+`kbb -M:server` enters through it. The suite passed 43 tests / 156 assertions,
 injected wire and refusal tests, host handler and real port-zero start/stop
 probes, plus hosted lint-and-test, CodeQL and layer-freeze gates. Merged paths
 are now fifty-two and the effective remaining queue is 30.
@@ -975,7 +975,7 @@ etzhayyim/root PR 3143 (`a2b529e55a606b5e35272020ed21dd1d0b9f849b`).
 Portable LLM, audit and server namespaces now receive explicit chat, audit and
 server-start capabilities; environment/API-key/secret reads and concrete HTTP
 implementations terminate in the existing host-only `run_tests.clj`, which also
-backs `bb server`. Three graph call sites pass through the checked chat boundary.
+backs `kbb -M:server`. Three graph call sites pass through the checked chat boundary.
 The suite passed 48 tests / 157 assertions, including injected URL/body/auth/
 timeout shape, missing-capability and malformed/off-fleet refusals, host handler
 and real port-zero server probes. Pre-commit, pre-push, lint-and-test, CodeQL and
@@ -1728,7 +1728,7 @@ goldens are all qualified.
 The repeated `kotoba.webgl.glsl` candidate is one identical-content cluster
 propagated across eight WebGL repositories, not eight independent language
 implementations. Each file only re-exports `kami.webgl.glsl`; that target is a
-generated GLSL ES 3.00 fallback artifact produced by `bb gen-glsl` from the
+generated GLSL ES 3.00 fallback artifact produced by `kbb -M:gen-glsl` from the
 canonical `kami.wgsl` EDN shader through naga. Shader execution belongs to the
 GPU and generation belongs to the shader toolchain. Moving this compatibility
 facade into Kotoba guest code would duplicate authority and confuse the Kami

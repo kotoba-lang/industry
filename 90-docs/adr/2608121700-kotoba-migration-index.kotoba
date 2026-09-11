@@ -142,8 +142,8 @@ twin を持たないため「どちらが走っているか」という問い自
 `cloud-itonami-isic-6310`、`gftdcojp/cloud-murakumo`、`aiueos`）。
 
 ```bash
-nbb scripts/gen-kotoba-migration-index.cljs --check    # 索引の鮮度
-nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q
+kbb --backend sci scripts/gen-kotoba-migration-index.cljk --check    # 索引の鮮度
+kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q
   '[:find ?r ?a :where [?e \"source/dataset\" \"kotoba-migration\"]
     [?e \"kotoba/stage\" \":stage/artifact-unverified\"]
     [?e \"kotoba/repo\" ?r] [?e \"kotoba/artifacts\" ?a]]'

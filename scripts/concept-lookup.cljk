@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 「この workspace に X はあるか」を**有界に**引く。
 ;;
-;;   nbb scripts/concept-lookup.cljk terminal
-;;   nbb scripts/concept-lookup.cljk 端末
-;;   nbb scripts/concept-lookup.cljk console --all
+;;   kbb --backend sci scripts/concept-lookup.cljk terminal
+;;   kbb --backend sci scripts/concept-lookup.cljk 端末
+;;   kbb --backend sci scripts/concept-lookup.cljk console --all
 ;;
 ;; grep との違いは 1 点だけ: **答えが有界で、順位が付いている**。4,050 repo に
 ;; grep をかけると出力が数百行になり、切られ、切られたことに気付かない
@@ -87,12 +87,12 @@
       (str "  ⚠ **0 件は未測定です。** この索引は生成時の語彙を記録していない"
            "（この検査より前の生成物）ので、\n"
            "     『実装が無い』のか『この概念でまだ走査していない』のか分けられません。\n"
-           "     再生成: nbb scripts/gen-concept-index.cljk")
+           "     再生成: kbb --backend sci scripts/gen-concept-index.cljk")
 
       (not (contains? v (name c)))
       (str "  ⚠ **0 件は未測定です。** この概念は索引を生成した時点の語彙に"
            "在りませんでした。\n"
-           "     再生成すると当たります: nbb scripts/gen-concept-index.cljk")
+           "     再生成すると当たります: kbb --backend sci scripts/gen-concept-index.cljk")
 
       :else
       (str "  この概念は索引の走査対象でしたが、当たった repo はありません"
@@ -113,10 +113,10 @@
         q (first (remove #(str/starts-with? % "--") args))]
     (cond
       (empty? index)
-      (println "索引が空です。nbb scripts/gen-concept-index.cljk で生成してください。")
+      (println "索引が空です。kbb --backend sci scripts/gen-concept-index.cljk で生成してください。")
 
       (nil? q)
-      (do (println "使い方: nbb scripts/concept-lookup.cljk <語> [--all]\n")
+      (do (println "使い方: kbb --backend sci scripts/concept-lookup.cljk <語> [--all]\n")
           (println "語彙（manifest/concept-vocabulary.edn）:")
           (doseq [[c {:keys [label]}] (sort-by key vocab)]
             (println (str "  " (name c) "  —  " label))))

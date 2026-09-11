@@ -10,7 +10,7 @@
                 "2607198300-kotoba-jvm-node-rust-free-execution"))
   (:adr/source-format "edn")
   (:adr/context
-  "ADR-2607181900 readiness gate 条件④ (JVM-free) が最後の未達項目。kbb は `bin/kbb = exec clojure -M -m kotoba.kbb` で cold start ~10s。実測 (2026-09-05、3 回実行の中央値、demo_kbb_fs_report + forbid-wildcard policy 付き): 10.11s (13.44 / 10.11 / 9.76)。nbb 同一 pattern は 264ms — 約 38x。先行 slice (kotoba agent/kbb-native-slice worktree) は proc-exec 専用の policy-side pre-exec + `--backend native` 経路を JVM host 層ごしに着地済みだが、CLI 起動自体が JVM なので gate 条件④には不十分。
+  "ADR-2607181900 readiness gate 条件④ (JVM-free) が最後の未達項目。kbb は `bin/kbb = exec kbb -M -m kotoba.kbb` で cold start ~10s。実測 (2026-09-05、3 回実行の中央値、demo_kbb_fs_report + forbid-wildcard policy 付き): 10.11s (13.44 / 10.11 / 9.76)。nbb 同一 pattern は 264ms — 約 38x。先行 slice (kotoba agent/kbb-native-slice worktree) は proc-exec 専用の policy-side pre-exec + `--backend native` 経路を JVM host 層ごしに着地済みだが、CLI 起動自体が JVM なので gate 条件④には不十分。
 一方 amu (orgs/kotoba-lang/amu) は真に JVM-free の native 経路を持つ: `bin/amu compile --target aarch64 --jvm-free` が nbb/Node 上で動き、生機械語 KEXE を出し、tools/kexe_loader.c が実行する (実測 capability fixture、env-read wire id 33 実行)。本 ADR は kbb bootstrap をこの経路に載せる設計を spike 実測に基づいて確定する。
 
 ## 実測 (2026-09-05、macOS arm64)
@@ -36,7 +36,7 @@ wire id 33 の lower + allow-bitmap gate + 文字列結果は **end-to-end で�
 ### ブロッカー (実測)
 1. **fs/app-data (runtime id 202) に compiler wire id が無い。** kotoba-lang capability-catalog (8d5a7b1d 系) と sema frontend (bf01d4a8) の compiler wire id は 34 (:fs/browse) まで。fs-read/fs-write は kbb JVM host では runtime id 202 (fs/app-data) で実装済みだが、native guest から呼べない。**wire id を 1 つ発番する必要がある (推奨 35 = :fs/app-data)**。capability-catalog / kotoba-sema frontend fallback / (必要なら kotoba-core-contracts 対応) の 3 点同期 pin 前進が 1 commit で要る (skill kbb-readiness-gate の手順)。
 2. loader 実 provider 未実装 (env/read は identity stub)。
-3. kbb CLI の enter 経路: `bin/kbb` が clojure -M を exec している。JVM-free にするには shim への差し替えが要る (decision 参照)。
+3. kbb CLI の enter 経路: `bin/kbb` が kbb -M を exec している。JVM-free にするには shim への差し替えが要る (decision 参照)。
 ## Decision
 
 **推奨経路: amu compile -> KEXE + kexe_loader host provider 表。** kbb bootstrap を「JVM interpreter」から「amu native AOT artifact + 測定済み loader」に差し替える。JVM interpreter の parity gate は残す (interp と native が同じ policy から同じ receipt/結果を出すこと)。先行 slice の policy-side pre-exec (proc-exec を guest 外で実行して status word に畳む) は proc-exec だけに妥当な特殊系であり、本経路では使わない。guest が capability call を保持したまま KEXE に入り、loader が provider 表で実行する方が wire id 発番 1 回で全 capability に一般化する。

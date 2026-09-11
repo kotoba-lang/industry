@@ -110,7 +110,7 @@ landing した理由が悪い —— admit チェックが `no registry ... noth
 **188 のスイートは走らせていない。** このマシンは他セッションで load 200 超が続き、
 これらのスイートは `.kotoba` を amu 経由でコンパイルする。全走したのは compiler batch で
 1 本（`annotation` 14 tests / 64 assertions、前後同一）。残りの根拠は
-`clojure -Spath -M:test` が解決すること（解決しなければ commit しない driver で強制）で、
+`kbb -Spath -M:test` が解決すること（解決しなければ commit しない driver で強制）で、
 **スイートより弱い証拠**である。tail batch は 8 件で 2→1 を個別に測っている。
 
 ## 触っていないもの

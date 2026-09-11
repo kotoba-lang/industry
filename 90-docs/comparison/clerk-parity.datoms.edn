@@ -15,7 +15,7 @@
 ;; 空でない :absent が現れたらそれは分類の誤り。
 ;;
 ;; query 例:
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
 ;;     '[:find ?f ?s :where [?e "source/dataset" "clerk-parity"]
 ;;                          [?e "parity/state" ":unwired"] [?e "parity/feature" ?f]
 ;;                          [?e "parity/substrate" ?s]]'

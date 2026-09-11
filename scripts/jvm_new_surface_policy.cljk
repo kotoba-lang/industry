@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; jvm-new-surface-policy — what may NEWLY appear in scaffold / deps edits.
 ;;
 ;; ADR-2608170200 / cutover `:new-jvm-runtime-dependencies :forbidden` already
@@ -13,7 +13,7 @@
 ;; lint/test/build tool coords) are refused.
 ;;
 ;; CLI:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/jvm_new_surface_policy.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/jvm_new_surface_policy.cljk \
 ;;     check-deps --before <old.edn> --after <new.edn>
 ;;   nbb … scripts/jvm_new_surface_policy.cljk check-clj --path <rel> [--new]
 ;;   nbb … scripts/jvm_new_surface_policy.cljk self-test

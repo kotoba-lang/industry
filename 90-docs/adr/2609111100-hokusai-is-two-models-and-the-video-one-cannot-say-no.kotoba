@@ -81,7 +81,7 @@ existed to consent).
 Not done, on purpose:
 - inline `<video>` on the homepage card (the site script inlines `image`
   only; other kinds get title + link). `cloud-murakumo-site` renamed to
-  `.cljk` the same hour; whether `clojure -M:site` still renders it is a
+  `.cljk` the same hour; whether `kbb -M:site` still renders it is a
   separate measurement, so the data-plane publish shipped without it.
 - byte-range serving. The Worker streams the object whole; Safari may
   refuse progressive mp4 without `Range`. Chrome/Firefox play it.

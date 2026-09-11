@@ -20,7 +20,7 @@
 ;; 厳しさは失敗として扱う** —— そうしないと「validator が厳しいのは仕様です」で
 ;; 何でも通ってしまう。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kotobase-query/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kotobase-query/src" \
 ;;     scripts/query-dialect-bench/grammar-agreement.cljk
 ;;
 ;; exit 0 = 一致 / 1 = ずれあり / 2 = 検査できなかった（0 でも 1 でもない）

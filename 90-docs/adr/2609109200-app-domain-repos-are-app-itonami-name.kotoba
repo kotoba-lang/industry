@@ -136,10 +136,10 @@ README と 2 つのコメントは直した（`publish-pages.cljs` は owner/rep
 org もろとも移したので、**family の形で引く検索（`kami-` prefix）からは出てこない**。
 ADR-2607102200 の責任境界そのものは動いていない —— これらは今も kami-engine stack の
 app であって、名前が role/origin 面に移っただけである。
-`nbb scripts/repo-search.cljs genko daw nle` で引ける。
+`kbb --backend sci scripts/repo-search.cljk genko daw nle` で引ける。
 
 ## 次の 1 コマンド（この面が今日も真かを測る）
 
-    nbb scripts/verify-west-pins.cljs
-    nbb --classpath \".:orgs/kotoba-lang/content-address/src\" scripts/verify-app-content-address.cljs orgs
+    kbb --backend sci scripts/verify-west-pins.cljk
+    kbb --backend sci --classpath \".:orgs/kotoba-lang/content-address/src\" scripts/verify-app-content-address.cljs orgs
 ")))

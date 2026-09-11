@@ -108,14 +108,14 @@ ADR-2607299300 が導入した `:` 区切り（org と repo を1つの rkey に�
 
   (:adr/verification
   "{:net-kotobase
-    {:offline {:runner \"clojure -M:test（clj-edge）\" :tests 45 :assertions 266
+    {:offline {:runner \"kbb -M:test（clj-edge）\" :tests 45 :assertions 266
                :new {:tests 13 :assertions 61 :failures 0}
                :pre-existing-failures {:count 3
                                        :which [\"worker-artifact-contract\" \"provider-source-catalog-contract x2\"]
                                        :cause \"worker/js/kotobase-worker.js と kotobase-core.js が git に tracked されている一方、テストは『生成物は repo から削除された』と主張している\"
                                        :confirmed-pre-existing \"同じ3件が親コミットの clean checkout でも再現（32 tests / 205 assertions, 3 failures）。本変更とは無関係\"}}
-     :build \"shadow-cljs release worker entry — worker 0 warnings / entry 12 warnings（@noble の JSDoc parse noise、既存）\"
-     :compiled-artifact {:harness \"nbb --classpath test -m org-did-route-smoke\" :checks 6 :failures 0}
+     :build \"amu compile --target wasm32-browser worker entry — worker 0 warnings / entry 12 warnings（@noble の JSDoc parse noise、既存）\"
+     :compiled-artifact {:harness \"kbb --backend sci --classpath test -m org-did-route-smoke\" :checks 6 :failures 0}
      :live-after-deploy
      {\"https://kotobase.net/org/kotoba-lang/did.json\" \"200 — id=did:web:kotobase.net:org:kotoba-lang, verificationMethod=[], capabilityInvocation=[], _meta.note に『authorizes nobody』\"
       \"https://kotobase.net/tenant/u_abc123def456/did.json\" \"200（デプロイ前は 404 — これが修正されたバグ）\"
@@ -125,7 +125,7 @@ ADR-2607299300 が導入した `:` 区切り（org と repo を1つの rkey に�
       \"https://kotobase.net/\" \"200（サイトは無傷）\"}}
     :cloud-murakumo
     {:offline {:new-namespaces {:tests 25 :assertions 146 :failures 0}}
-     :compiled-artifact {:harness \"nbb --classpath test -m worker-krp-smoke\" :checks 11 :failures 0
+     :compiled-artifact {:harness \"kbb --backend sci --classpath test -m worker-krp-smoke\" :checks 11 :failures 0
                          :includes \"『murakumo.cloud が名指しした org authority が kotobase.net で実際に解決する』の live fetch — 文字列比較ではなく apex を跨いだ実解決\"}}}")
 
   (:adr/known-gaps

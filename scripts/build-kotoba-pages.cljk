@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns build-kotoba-pages
   "kotoba-lang の GitHub Pages アプリの index.html を jp-go-dds(デジタル庁
   デザインシステム)で生成する。ADR-2607301400。
@@ -13,12 +13,12 @@
   直配信するので、生成して commit すれば CI 変更は要らない。
 
   使い方:
-    nbb scripts/build-kotoba-pages.cljk              # 全 repo を生成
-    nbb scripts/build-kotoba-pages.cljk --repo docs  # 1 repo だけ
-    nbb scripts/build-kotoba-pages.cljk --check      # 生成物が canonical か検査(CI)
+    kbb --backend sci scripts/build-kotoba-pages.cljk              # 全 repo を生成
+    kbb --backend sci scripts/build-kotoba-pages.cljk --repo docs  # 1 repo だけ
+    kbb --backend sci scripts/build-kotoba-pages.cljk --check      # 生成物が canonical か検査(CI)
 
   実行には west checkout の jp-go-dds / html / css が要る:
-    nbb --classpath \"orgs/kotoba-lang/jp-go-digital-design-system/src:orgs/kotoba-lang/html/src:orgs/kotoba-lang/css/src\" \\
+    kbb --backend sci --classpath \"orgs/kotoba-lang/jp-go-digital-design-system/src:orgs/kotoba-lang/html/src:orgs/kotoba-lang/css/src\" \\
         scripts/build-kotoba-pages.cljk"
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
@@ -189,7 +189,7 @@
             (println (if (:ok r) "  ok  " " STALE") (:repo r)))
           (when (seq bad)
             (println (str "\n" (count bad) " 件が canonical と不一致 —— "
-                          "nbb scripts/build-kotoba-pages.cljk で再生成すること"))
+                          "kbb --backend sci scripts/build-kotoba-pages.cljk で再生成すること"))
             (process/exit 1))
           (println (str "\n" (count results) " 件すべて canonical")))
         (do (doseq [r results] (println "  wrote" (:repo r) (:bytes r) "bytes"))

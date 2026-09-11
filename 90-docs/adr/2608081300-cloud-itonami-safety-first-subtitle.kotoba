@@ -70,7 +70,7 @@ app の README は「ローカルに置くのは安全であることの手段�
 ## 再生成してはならない生成 HTML（この ADR の再利用価値はここ）
 
 `cloud-itonami` は Cloudflare Pages が `public/` を **committed のまま**配信するので、
-hiccup を直しただけでは公開物が動かない。`clojure -M:local:site` で 16 route を
+hiccup を直しただけでは公開物が動かない。`kbb -M:local:site` で 16 route を
 再生成した。ただし次の 4 ファイルは**再生成してはならない**:
 
 | ファイル | 理由 |
@@ -89,7 +89,7 @@ hiccup を直しただけでは公開物が動かない。`clojure -M:local:site
 
 - **app**: `page-html` を実レンダーし、`SAFETY FIRST` / `brand__safety-mark` /
   新 meta description が出力に在り `LOCAL-FIRST` が消えていることを確認。
-- **site**: `clojure -M:local:site` が exit 0 で 12 route を出力。
+- **site**: `kbb -M:local:site` が exit 0 で 12 route を出力。
   repo 全体の grep で `business operating loop` が 0 件になったことを確認。
 - **本番**: `wrangler pages deploy public --project-name=cloud-itonami --branch=main`
   を `origin/main` を包含した worktree から実行。live の `itonami.cloud/` に

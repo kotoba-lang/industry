@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; p256-onchain-probe — can a contract on this chain verify a WebAuthn
 ;; signature yet?
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/p256-onchain-probe.cljk [--chain base-sepolia]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/p256-onchain-probe.cljk [--chain base-sepolia]
 ;;
 ;; ## Why this is a script and not a remembered fact
 ;;

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; hirameki-harvest.cljs — 特許 corpus の収集を常駐で回す運用側。ADR-2608100200。
 ;;
 ;; ## なぜ observatory-run と別なのか
@@ -39,10 +39,10 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk --ticks 40
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk --dry-run
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk --no-push
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk --ticks 40
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk --dry-run
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljk --no-push
 
 (require '[scripts.nbb-compat :as compat :refer [slurp spit sh]]
          '[clojure.edn :as edn]
@@ -234,7 +234,7 @@
                :run/gained gained :run/patents after-patents}))
       ;; publish 自身が単一ブロック超過を拒否するので、ここで CID を再検証する必要は
       ;; ないが、**検証器が通ることは確かめる** —— 拒否と検証は別のコードなので。
-      ;; **`:query` alias で呼ぶ。** verify.clj 自身の冒頭が `clojure -M:query verify.clj`
+      ;; **`:query` alias で呼ぶ。** verify.clj 自身の冒頭が `kbb -M:query verify.clj`
       ;; と書いている —— checks.clj は 2026-08-10 に datascript を require するように
       ;; なり（件数だけでなく「corpus が問いに答えるか」を検査するため）、素の `-M` は
       ;; `Could not locate datascript/core__init.class` で落ちる。それが 2026-08-10 から

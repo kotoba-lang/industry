@@ -18,7 +18,7 @@
   :is-west-pin? true
   :segmentation-commit "c8e4f96"
   :segment-size 16
-  :tests "clojure -M:test -> 229 tests / 680 assertions / 0 failures (includes kotobase-peer.novelty-segments-test)"}
+  :tests "kbb -M:test -> 229 tests / 680 assertions / 0 failures (includes kotobase-peer.novelty-segments-test)"}
  :environment
  {:machine "Linux x86_64 container (Claude Code remote), OpenJDK 21.0.10"
   :note "The product is a COUNT of round trips and decodes, not a duration, so it is
@@ -143,5 +143,5 @@
  :reproduce
  ["git clone https://github.com/kotoba-lang/kotobase-peer.git && git checkout 530f2d1"
   "apply the :patch above to bench/kotobase_peer/dag_shape_bench.clj"
-  "clojure -M:dag-shape-bench <docs> <unfolded-tx>   ;; one cell per invocation"
+  "kbb -M:dag-shape-bench <docs> <unfolded-tx>   ;; one cell per invocation"
   "cells: [1000 0] [1000 20] [1000 64] [5000 20] [5000 64] [20000 20] [20000 64]"]}

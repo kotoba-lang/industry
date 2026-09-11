@@ -53,7 +53,7 @@ machine** -- the whole `~/.cloud-itonami` tree is absent. Measured today:
 |---|---|---|
 | PATH `itonami` | the **Hermes profile wrapper** (`hermes -p itonami`), written 2026-08-30 21:32 with the batch of hermes aliases | the app CLI (`bin/itonami`); the Hermes wrapper is `hermes-itonami` |
 | `.mcp.json` | `cd $HOME/.cloud-itonami/current` -- nonexistent, hence CONNECTION_CLOSED | the west checkout; stdio `initialize` answers |
-| launchd `cloud.itonami.app.local` | `clojure -M -m cloud.itonami.app.server` with **no provider credentials** | `nbb ~/.gftd/bin/itonami-app-resident.cljs`, which exports them |
+| launchd `cloud.itonami.app.local` | `kbb -M -m cloud.itonami.app.server` with **no provider credentials** | `nbb ~/.gftd/bin/itonami-app-resident.cljs`, which exports them |
 | the checkout it all runs from | detached 105 commits behind the pin | at the pin |
 
 The third was load-bearing and silent. `cloud.itonami.app.policy/credentialed?`

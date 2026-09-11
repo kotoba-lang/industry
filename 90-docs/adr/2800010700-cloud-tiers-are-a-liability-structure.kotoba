@@ -106,7 +106,7 @@ run ledger は `:run/shares {node credits}` を持ち、**貢献ノードへの�
 ### 認証が層をまたいで流れない
 
 `POST https://api.murakumo.cloud/v1/messages` は 401 で
-`issue one with nbb scripts/run-task.cljs token issue --scope chat in
+`issue one with kbb --backend sci scripts/run-task.cljk token issue --scope chat in
 kotoba-lang/murakumo` と案内する。**murakumo は自分の API キー平面で認証し、
 kotoba.cloud の Stable Principal からは発行されない。** pin も CACAO を
 要求するが、それを kotoba.cloud が仲介する経路は無い。

@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; jvm-dependency-scan.cljs — orgs/ 配下の言語依存（clojure.* / java.* import 面）を
 ;; 測り、ADR-2609040930 の置換先表で分類する。決定論。モデルを起こさない。
 ;;
-;;   nbb scripts/jvm-dependency-scan.cljk                  # 索引を書く（生成物）
-;;   nbb scripts/jvm-dependency-scan.cljk --check          # 差分があれば非 0
-;;   nbb scripts/jvm-dependency-scan.cljk --top 20         # 上位だけ stdout に
+;;   kbb --backend sci scripts/jvm-dependency-scan.cljk                  # 索引を書く（生成物）
+;;   kbb --backend sci scripts/jvm-dependency-scan.cljk --check          # 差分があれば非 0
+;;   kbb --backend sci scripts/jvm-dependency-scan.cljk --top 20         # 上位だけ stdout に
 ;;
 ;; 出力: 90-docs/kotoba-stdlib-router/scan.edn（手で編集しない）
 ;;
@@ -222,7 +222,7 @@
           (fs/mkdirSync out-dir #js {:recursive true})
           (fs/writeFileSync out-file
                             (str ";; kotoba-stdlib-router 言語依存 scan —— **生成物。手で編集しない**\n"
-                                 ";; 再生成: nbb scripts/jvm-dependency-scan.cljk\n"
+                                 ";; 再生成: kbb --backend sci scripts/jvm-dependency-scan.cljk\n"
                                  ";; 分類:   90-docs/adr/2609040930-kotoba-stdlib-replacement-router.edn §1\n"
                                  ";;\n"
                                  ";; files: " (count files) "  repos: " (count files-by-repo)

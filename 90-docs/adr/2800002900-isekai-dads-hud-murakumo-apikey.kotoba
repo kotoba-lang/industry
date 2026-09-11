@@ -53,7 +53,7 @@
 - light 固定、`dads-*` markup、nav は `dads-utility-link`(prose 用の下線を避ける)。
 - 副産物: 生成 HTML が cljc source から drift しており、`Live` nav link・dance の
   syntax-highlight editor・studio の cohort-table が本番に出ていなかった。再生成で解消。
-- `bb render-site` が babashka 退役で動かなくなっていたため `npm run render-site`
+- `kbb -M:render-site` が babashka 退役で動かなくなっていたため `npm run render-site`
   (`:render-site` alias、`:replace-deps`)に置換。
 
 ### per-game HUD + 2 本の縦貫通 — #275 → `7e3cf77`
@@ -82,7 +82,7 @@ visual-capture gate の readback を壊さないため。
 chat モデルが `[:image {:src …}]` を挿入。EDN の構造編集は文字列操作でなくモデルに委譲)。
 
 ### API key 発行 — kotoba-lang/murakumo#267 → `6d7628e`、#270 → `070bde0`
-ゲートウェイの 401 は `bb murakumo token issue` を案内するが、**babashka 退役以降
+ゲートウェイの 401 は `kbb -M:murakumo token issue` を案内するが、**babashka 退役以降
 実行不能**(`murakumo.core` は `babashka.process` 依存の .clj、`bb.edn` は削除済み)。
 murakumo 自身の `scripts/tasks.edn` 冒頭も `token` を「runnable entrypoint が無い」
 一覧に挙げていた。cloud-murakumo 側にも `:token` alias / token サブコマンドは**無い**。
@@ -135,8 +135,8 @@ CLI と MCP は同一実装を共有し drift しない。
    (B) `ANTHROPIC_PROXY_TOKEN` 流用 — blast radius が広い。
 2. `/api/murakumo-chat` は本番で **503 fail-closed**(鍵未設定のため設計どおり)。
    1 が決まれば解ける。
-3. cloud-murakumo の 401 文言が今も `bb murakumo token issue`(実行不能)を案内している。
-   別リポなので未修正。`nbb scripts/run-task.cljs token issue` に直すべき。
+3. cloud-murakumo の 401 文言が今も `kbb -M:murakumo token issue`(実行不能)を案内している。
+   別リポなので未修正。`kbb --backend sci scripts/run-task.cljk token issue` に直すべき。
 4. 生成アートはまだどのゲームにも入っていない(経路は実証済み、投入は未実施)。
 5. 残り 39 本は共有 HUD のまま、itonami 他 7 本はリングのまま。
 6. `isekai.ui.views` / `isekai.play_ai` の kotoba-ui component ~22 箇所は未変換。

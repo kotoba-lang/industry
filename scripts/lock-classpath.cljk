@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Write `deps-lock.edn` for one project: the resolved dependency closure, with
 ;; every input addressed by content.
 ;;
@@ -27,7 +27,7 @@
 ;; ADR-2609092000. Run it whenever deps.edn changes: :lock/deps-digest binds the
 ;; two, so a consumer that checks it fails closed until this is regenerated.
 ;;
-;;   nbb scripts/lock-classpath.cljk [project-root]
+;;   kbb --backend sci scripts/lock-classpath.cljk [project-root]
 (ns lock-classpath
   (:require ["node:child_process" :as child]
             ["node:crypto" :as crypto]
@@ -90,7 +90,7 @@
         _ (when-not (.existsSync fs deps-file) (refuse! (str "no deps.edn at " root)))
         r (.spawnSync child "clojure" #js ["-Spath"] #js {:cwd root :encoding "utf8" :maxBuffer 16777216})
         _ (when-not (and (not (.-error r)) (zero? (or (.-status r) 1)))
-            (refuse! (str "clojure -Spath failed for " root "; this script needs a JDK.\n"
+            (refuse! (str "kbb -Spath failed for " root "; this script needs a JDK.\n"
                           (some-> (.-stderr r) str/trim))))
         libs-prefix (str (.join np (gitlibs-root) "libs") (.-sep np))
         m2-prefix   (str (.join np (.homedir os) ".m2" "repository") (.-sep np))
@@ -125,7 +125,7 @@
              (with-out-str
                (println "{:lock/version" lock-version)
                (println " :lock/deps-digest" (pr-str (sha256-file deps-file)))
-               (println " :lock/resolver" (pr-str "clojure -Spath (authoring time only)"))
+               (println " :lock/resolver" (pr-str "kbb -Spath (authoring time only)"))
                (println " :lock/entries")
                (println " [")
                (doseq [e gits]

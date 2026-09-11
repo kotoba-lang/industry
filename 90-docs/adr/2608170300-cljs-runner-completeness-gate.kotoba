@@ -17,7 +17,7 @@ the last group from every grouped result, the partial runner printed
 The `:nbb-test` gate's own floor only requires that SOME `Ran N tests` line appear, which
 a one-third runner satisfies. Condition 1 of that ADR -- identical counts under both
 runtimes -- catches this, but only while a human is running both sides and comparing. The
-whole point of the flip is that `clojure -M:test` stops running, and with it the second
+whole point of the flip is that `kbb -M:test` stops running, and with it the second
 number. After the flip there is nothing left to compare against.
 
 So the condition that actually has to hold is not 'the two numbers matched on the day we
@@ -92,7 +92,7 @@ version's 779 findings would have been, in the workspace's own vocabulary, theat
 | 3 | the repo is the unit | asked `etzhayyim/root`'s akashi runner to cover all 1,033 tests in that monorepo (`1074 of 1079`) | 1 huge |
 | 4 | a runner must have `(ns ...)` | declared 35 ordinary nbb scripts unmeasurable; one of them (`cloud-itonami/loop-noren`) was complete | 35 |
 | 5 | quoting is `'ns` | akashi writes `(quote ns)`, so its five genuinely-run namespaces looked unrun | 5 |
-| 6 | a runner is a source file | `nekko`'s `test:async` is three `nbb -e \"(require '[ns])\"` invocations in **package.json**, invisible to a source-only audit | 3 |
+| 6 | a runner is a source file | `nekko`'s `test:async` is three `kbb --backend sci -e \"(require '[ns])\"` invocations in **package.json**, invisible to a source-only audit | 3 |
 | 7 | a test namespace needs a runner | a namespace ending in a bare top-level `(run-tests)` runs **itself** | (same 3) |
 
 (6) and (7) came from `kotoba-lang/nekko`, reported as 16 of 17 uncovered. Three of
@@ -104,7 +104,7 @@ new clothes: **looking in one place and concluding about all of them.**
 
 `181 of 201 complete` is about the repos that HAVE a ClojureScript runner. Measured
 2026-08-17, another **2,034** hold a `deftest` in a portable file and have no
-`run-tests` call anywhere -- their portable suites run under `clojure -M:test` and
+`run-tests` call anywhere -- their portable suites run under `kbb -M:test` and
 nowhere else (spot-checked: `cloud-itonami/action-gtin-registry`, `actor-crew`,
 `actor-shukubo`). The real share of portable suites any ClojureScript host runs is
 **201 of 2,235, about 9%**. Those 2,034 are counted and printed, never emitted as

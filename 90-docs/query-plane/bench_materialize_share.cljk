@@ -10,7 +10,7 @@
 ;; query is a 100x slower request. It is not, if materialize is the larger
 ;; term. This bench puts the two on one line so the fraction is visible.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/ayatori/src:orgs/kotoba-lang/kotobase/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_materialize_share.cljs
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/ayatori/src:orgs/kotoba-lang/kotobase/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/bench_materialize_share.cljs
 
 (ns bench-materialize-share
   (:require [owl.rules :as rules]

@@ -26,7 +26,7 @@
   vendor copy も見るので無関係な checkout drift で落ちうる』と予告している事象。
   本変更由来の失敗は 0 件。"
   :evidence/lint
-  "clojure -M:lint = errors 0（gate は --fail-level error）。
+  "kbb -M:lint = errors 0（gate は --fail-level error）。
   警告は 23 -> 22。減った 1 件は本変更が持ち込んだ
   `sealer_test.clj:10 Unresolved namespace clojure.string` で、
   受け入れずに require を足して直した。残る 22 件は既存。"

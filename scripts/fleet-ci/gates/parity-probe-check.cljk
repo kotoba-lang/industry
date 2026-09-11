@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; parity-probe-check.cljs — engine parity 台帳の probe の gate。
 ;;
 ;; 展開済みの superproject tree を受け取り、`90-docs/maturity/engine-parity.datoms.edn`
@@ -16,7 +16,7 @@
 ;;
 ;; ネットワーク: 不要（tree 内の .edn を読むだけ）。
 ;;
-;; ノード側で `npx nbb parity-probe-check.cljs <dir> [--min N]` として実行。
+;; ノード側で `kbb --backend sci parity-probe-check.cljk <dir> [--min N]` として実行。
 (ns fleet-ci.gates.parity-probe-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]

@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/dependency-substitution-wave-tick.cljk — kotoba-lang 外部依存の
 ;; substitution-available 候補を**測る**（ADR-2608260200）。決定論。モデルを起こさない。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/dependency-substitution-wave-tick.cljk [--limit 4]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/dependency-substitution-wave-tick.cljk [--limit 4]
 ;;
 ;; 正本は skill `dependency-substitution-wave` と manifest/dependency-substitution.edn。
 ;; 1 波 = **1 coordinate** に揃えた repo 最大 `--limit` 本（既定 4）。

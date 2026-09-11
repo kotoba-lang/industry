@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; residency-alarm.cljs — 常駐の drift を遷移時に 1 回だけ知らせる。
 ;;
 ;; `scripts/residency-collect.cljk --check` を呼んで exit code を見るだけ。
@@ -18,7 +18,7 @@
 ;; 混ざる）の方が筋は良いが、ここを黙って変えると gate や plist が exit を見ていた
 ;; 場合に挙動が変わる。変えるなら別の変更として、見てから変える。
 ;;
-;;   nbb --classpath scripts/fleet-ci scripts/fleet-ci/residency-alarm.cljk \
+;;   kbb --backend sci --classpath scripts/fleet-ci scripts/fleet-ci/residency-alarm.cljk \
 ;;       [--root <superproject>] [--notify false] [--state <f>]
 
 (ns residency-alarm

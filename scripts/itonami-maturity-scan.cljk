@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-maturity-scan.cljk — cloud-itonami 成熟度・依存関係の一次証拠スキャナ。
 ;;
 ;; ADR-2608052000。出力は manifest/itonami-maturity-evidence.edn（生成物・手編集禁止）。
 ;;
-;;   nbb scripts/itonami-maturity-scan.cljk [--data-root <path>] [--out <path>] [--limit N]
+;;   kbb --backend sci scripts/itonami-maturity-scan.cljk [--data-root <path>] [--out <path>] [--limit N]
 ;;
 ;; --data-root は orgs/ が実際に populate されている superproject 本体 checkout。
 ;; west 管理の orgs/ は gitignore されており fresh worktree には存在しないので、
@@ -528,7 +528,7 @@
         out-path ((.-resolve npath) (.cwd js/process) (:out opts))
         header (str ";; manifest/itonami-maturity-evidence.edn — GENERATED, DO NOT HAND-EDIT.\n"
                     ";; Regenerate:\n"
-                    ";;   nbb scripts/itonami-maturity-scan.cljk --data-root <superproject main checkout>\n"
+                    ";;   kbb --backend sci scripts/itonami-maturity-scan.cljk --data-root <superproject main checkout>\n"
                     ";;\n"
                     ";; ADR-2608052000。cloud-itonami 全 repo（+ その依存先 substrate repo）の\n"
                     ";; 成熟度・依存関係の一次証拠。**観測のみ**でスコアを含まない — スコア化と\n"

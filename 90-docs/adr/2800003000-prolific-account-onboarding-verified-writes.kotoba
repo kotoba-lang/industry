@@ -153,7 +153,7 @@
 
    cd orgs/network-awai/person-awai-ryo
    export PROLIFIC_TOKEN=$(../../kotoba-lang/kagi/bin/kagi get prolific-api-token)
-   nbb scripts/onboard-prolific.cljs      # step 1-6 は ✓、step 7(入金)で停止する")
+   kbb --backend sci scripts/onboard-prolific.cljk      # step 1-6 は ✓、step 7(入金)で停止する")
 
   (:adr/body
   "## セッション中に自分が犯した誤りと、その一般化
@@ -199,5 +199,5 @@
    - API token: kagi `prolific-api-token` / personal / :api-credential
    - 参照台帳: person-awai-ryo `identity/credential-refs.edn`(`kagi add --record` が
      生成)、`identity/accounts.edn`(status/consent/残タスク)
-   - 検査: `nbb scripts/verify-accounts.cljs`(秘密の混入と参照切れを両方見る。
+   - 検査: `kbb --backend sci scripts/verify-accounts.cljk`(秘密の混入と参照切れを両方見る。
      正常系 exit 0、異常系 exit 1 を実測)")))

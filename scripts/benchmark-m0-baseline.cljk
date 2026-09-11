@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/benchmark-m0-baseline.cljk — M0 baseline benchmark for
 ;; ADR-2607201600 (kotobase Merkle-LSM — IStore retirement).
 ;;
@@ -13,7 +13,7 @@
 ;; Output: JSON baseline file for locking in 90-docs/adr/2607201600-baselines.json
 ;;
 ;; Usage:
-;;   nbb scripts/benchmark-m0-baseline.cljk --datoms 100000 --output baseline.json
+;;   kbb --backend sci scripts/benchmark-m0-baseline.cljk --datoms 100000 --output baseline.json
 
 (ns benchmark-m0-baseline
   (:require
@@ -46,7 +46,7 @@
               (recur (rest rest-args) result))
             (or (= arg "--help") (= arg "-h"))
             (do
-              (println "Usage: nbb scripts/benchmark-m0-baseline.cljk [options]")
+              (println "Usage: kbb --backend sci scripts/benchmark-m0-baseline.cljk [options]")
               (println "Options:")
               (println "  -d, --datoms DATOMS    Number of datoms to benchmark (default: 100000)")
               (println "  -o, --output OUTPUT    Output JSON file path (default: baseline.json)")

@@ -103,10 +103,10 @@ national 10 件 + bloc で到達可能な法域は計 36。全 5 大陸をカバ
 
 # Verification (実測、2026-08-03)
 
-- `clojure -M:dev:test` — 73 tests / **568 assertions / 0 failures / 0 errors**
+- `kbb -M:dev:test` — 73 tests / **568 assertions / 0 failures / 0 errors**
   (拡張前: 57 tests / 368 assertions)
-- `clojure -M:lint` — **0 errors / 0 warnings**
-- `clojure -M:dev:run` — 従来の happy path + 7 HARD hold に加え、**同一 actor・
+- `kbb -M:lint` — **0 errors / 0 warnings**
+- `kbb -M:dev:run` — 従来の happy path + 7 HARD hold に加え、**同一 actor・
   新規コード無しで 5 つの規制形態**を実演: ESP (national entry 無し → EU bloc 解決で
   EUR 板取引) / USA (`:sell-wholesale` は `:sell` ではない → hold) / KOR (`:generate`
   のみ → hold) / IND (発電非ライセンス化の下で licence 検証) / JPY 板への EUR 注文

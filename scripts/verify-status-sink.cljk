@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-status-sink.cljs — `(* 0 <call>)`: a status multiplied away to force
 ;; evaluation order, classified by what it sinks.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-status-sink.cljk [<dir>] [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-status-sink.cljk [<dir>] [--findings]
 ;;
 ;; ## なぜ要るか
 ;;

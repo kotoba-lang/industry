@@ -33,7 +33,7 @@
 | `orgs/kotoba-lang/esim` | west 登録済み・ローカル未取得 | 欠陥ではない。対応不要 |
 | `orgs/kotoba-lang/org-microsoft-riff` | 2026-07-30 に作成され push 済みだが **west 未登録**。`org-xiph-flac` が依存しており、その `org-xiph-flac` 自体も未登録だった | 両方を `repos.edn :extra-projects` と `west.yml` に登録 |
 
-`com-etzhayyim-kaiyaku` の base `:deps` は git coordinate（`com-junkawasaki/*-clj` の historical redirect 経由）で単独解決するため、影響は `:dev` alias のみだった（`clojure -Spath` で確認）。")
+`com-etzhayyim-kaiyaku` の base `:deps` は git coordinate（`com-junkawasaki/*-clj` の historical redirect 経由）で単独解決するため、影響は `:dev` alias のみだった（`kbb -Spath` で確認）。")
 
   (:adr/consequences
   "**着地**: `etzhayyim/com-etzhayyim-kaiyaku` `1e3ba50979d1d29f6a75bf95b63161980d947928` / `manifest/repos.edn` `f144d2d695c2a94e6b04461238dd50bbe6b0d52a` / `manifest/west.yml` `fa4ddfe1eb6292a05638657b1982282a68fe478c`。
@@ -60,7 +60,7 @@
   (:adr/evidence
   (vector "相対 :local/root: 2,614 箇所 / 921 repo（上位 langchain ×703, langgraph ×585, langchain-store ×313）"
    "west-orphan-audit --blocking: local-root-broken 6 件（うち実処置が必要だったのは kaiyaku の3参照と未登録2 repo のみ）"
-   "com-etzhayyim-kaiyaku: base :deps は clojure -Spath で解決成功（影響は :dev alias のみ）"
+   "com-etzhayyim-kaiyaku: base :deps は kbb -Spath で解決成功（影響は :dev alias のみ）"
    "org-xiph-flac 0647dc2 / org-microsoft-riff 1d1229d — いずれも GitHub に push 済み、west 未登録だった"
    "6件すべてを origin/main tip の内容で再判定し解消を確認"
    "自己申告の事故: 同2件の重複登録で west.yml が parse 不能になり、west list が全 fleet で停止した。west.yml 85a16b23 / repos.edn 39899a74 で復旧、west list = 3,947 project を確認"

@@ -71,7 +71,7 @@ batches 1-12 already landed: 72 occupations so far, the entire 75xx
 craft-trades range and initial 81xx mining/plant range complete).
 
 The `kotoba-lang/occupation` registry's live `{:id \"8132\" ...}` entry
-was verified against a fresh clone before any work began (`clojure -M
+was verified against a fresh clone before any work began (`kbb -M
 -e \"(require 'kotoba.occupation) (println
 (kotoba.occupation/get-occupation \\\"8132\\\"))\"` from a checkout with
 the `kotoba-lang/technology` sibling present at the correct
@@ -104,7 +104,7 @@ closed-allowlist + independently-verified-provenance safety pattern is
 `governor`/`actor` split, `langgraph.graph` StateGraph, full doc set,
 an already-landed closely-related plant-operation safety pattern) --
 cloned and read in full in this session, independently re-tested
-(fresh clone, `clojure -M:test` re-run green: 23 tests / 49
+(fresh clone, `kbb -M:test` re-run green: 23 tests / 49
 assertions, 0 failures / 0 errors, confirming its \"VERIFIED working\"
 status before mirroring).
 
@@ -259,12 +259,12 @@ regardless of disposition path.
   count bumped accordingly (recomputed live from the registry via
   `kotoba.occupation/maturity-summary`, not assumed, immediately
   before the edit).
-- Full test suite (`clojure -M:test`): 23 tests, 49 assertions, 0
+- Full test suite (`kbb -M:test`): 23 tests, 49 assertions, 0
   failures, 0 errors -- raw output captured in this ADR's
   `:test/counts` and in the task report, independently re-verified
   against a brand-new fresh clone of the pushed repository (not just
   the local working copy).
-- `clj-kondo` lint (`clojure -M:lint` -- this actor's `deps.edn`
+- `clj-kondo` lint (`kbb -M:lint` -- this actor's `deps.edn`
   defines a `:lint` alias, matching the `cloud-itonami-isco-8131`
   sibling's more current `deps.edn` pattern rather than the slightly
   older `cloud-itonami-isco-8112` reference, which lacks one): 0

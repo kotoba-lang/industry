@@ -106,8 +106,8 @@ loader が適合と報告される**。兄弟の `conformance.cljs` は最初か
 
 ## 次の一手
 
-  nbb --classpath \".:scripts/nbb_compat\" scripts/verify-cljs-inexact-integers.cljs
-  nbb --classpath \".:scripts/nbb_compat\" scripts/verify-cljs-shift-width.cljs
+  kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-cljs-inexact-integers.cljs
+  kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-cljs-shift-width.cljs
 
 #38 の残り 24 は `fuchi`（3 コピー）/ `game` / `kami-autodrive` の test helper /
 `junbi` / `cloud-manimani` の fixture 値。#37 の残り 11 は `kabuto`（2 コピー）/

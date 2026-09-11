@@ -3,7 +3,7 @@
  :receipt/what "kotobase.query.bridge/materialize -- the path the DEPLOYED query surfaces (sparql/cypher/gremlin/graphql .kotobase.net) take -- measured against database size"
  :receipt/why "ADR-2607172300 accepted the linear scan as a v0.1 limitation and made revisiting it conditional on `real query-volume evidence`. ADR-2608039975 then measured that nobody was paying for it, because the six surface repos had no deploy shell. That is no longer the shape: kotobase-protocols-worker.query mounts four of them on live hostnames, and it composes them onto `kotobase.query.bridge`. Nobody had put a number on what that costs."
  :receipt/host-load "load average 169 during the run; 3 users, many concurrent agent sessions. ABSOLUTE MILLISECONDS ARE CONTAMINATED and are not to be quoted. What survives is the SHAPE across the four sizes, all taken inside one process within seconds of each other."
- :receipt/method "clojure -M on kotoba-lang/kotobase-query's own deps (kotobase bbf57df, arrangement a5d68dc). n documents in one collection, each {:rdfs/subClassOf ... :label ...}, put through kotobase.local/local-store. One warm call before each measured call. Query is a single-clause BGP over the materialized db."
+ :receipt/method "kbb -M on kotoba-lang/kotobase-query's own deps (kotobase bbf57df, arrangement a5d68dc). n documents in one collection, each {:rdfs/subClassOf ... :label ...}, put through kotobase.local/local-store. One warm call before each measured call. Query is a single-clause BGP over the materialized db."
  :receipt/measurements
  [{:documents 500   :materialize-ms 17.0  :query-ms 31.2 :datoms 500   :note "query-ms is JIT warm-up, not a result"}
   {:documents 2000  :materialize-ms 67.1  :query-ms 0.9  :datoms 2000}

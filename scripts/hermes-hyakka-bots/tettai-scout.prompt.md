@@ -86,7 +86,7 @@ Russian operations, in the company's OWN words.
 6. Run the seed script:
 
    ```
-   nbb --classpath src scripts/seed_tettai.cljs --dry-run
+   kbb --backend sci --classpath src scripts/seed_tettai.cljs --dry-run
    ```
 
    exit 0 — every claim admitted. Continue to step 7.

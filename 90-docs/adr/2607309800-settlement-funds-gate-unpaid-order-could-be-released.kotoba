@@ -109,7 +109,7 @@ op だけを有効にした phase は「拒否しかできない phase」にな�
   コミットされず、承認後に store が**導出値**を持つ / 買い手提示の source は
   hold / 不足入金がその release を止める / proposal は自分に資金 clearance を
   買えない。
-- demo（`clojure -M:dev:run`）: 3 = `:payment-not-recorded` で拒否、
+- demo（`kbb -M:dev:run`）: 3 = `:payment-not-recorded` で拒否、
   3b = PSP attest 入金の記録（interrupted、自動コミットされない）、
   3c = 同じ release が承認を通る。
 - west pin を単一 entry の GitHub API commit で前進（**`9561cde`**）。

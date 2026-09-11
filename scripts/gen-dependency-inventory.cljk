@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 認証スコープ内の repo の **実依存** を purl として棚卸しする。
 ;;
 ;; ## なぜ要るのか
@@ -21,9 +21,9 @@
 ;;   - 無ければ範囲を記録し `:dependency/exact? false` を立てる
 ;;   - `--osv` は **exact なものだけ**を照会し、除外した数を必ず印字する
 ;;
-;;   nbb scripts/gen-dependency-inventory.cljk           # 棚卸し（scope 内のみ）
-;;   nbb scripts/gen-dependency-inventory.cljk --all     # 全 repo
-;;   nbb scripts/gen-dependency-inventory.cljk --osv     # OSV.dev に照会（外部送信）
+;;   kbb --backend sci scripts/gen-dependency-inventory.cljk           # 棚卸し（scope 内のみ）
+;;   kbb --backend sci scripts/gen-dependency-inventory.cljk --all     # 全 repo
+;;   kbb --backend sci scripts/gen-dependency-inventory.cljk --osv     # OSV.dev に照会（外部送信）
 
 (ns gen-dependency-inventory
   (:require ["fs" :as fs]
@@ -535,7 +535,7 @@
       (js/console.error
        (str "Refusing to report an inventory: 対象 repo が 0 件。"
             (if all? " orgs/ が読めない。" (str " " scope-file " が無いか空 —— "
-                                                "先に nbb scripts/gen-compliance-scope.cljk を回す。"))))
+                                                "先に kbb --backend sci scripts/gen-compliance-scope.cljk を回す。"))))
       (js/process.exit 2))
     (let [{:keys [rows stats] :as res} (scan repos)]
       (when (zero? (count rows))
@@ -639,7 +639,7 @@
                         (js/console.error (str "OSV 照会に失敗: " (.-message e)))
                         (js/process.exit 2)))))
           (let [header (str ";; 認証スコープ内の依存棚卸し —— **生成物。手で編集しない**\n"
-                            ";; 再生成: nbb scripts/gen-dependency-inventory.cljk\n;;\n"
+                            ";; 再生成: kbb --backend sci scripts/gen-dependency-inventory.cljk\n;;\n"
                             ";; SOC 2 CC7.1 / ISO/IEC 27001:2022 A.8.8 の入力。\n"
                             ";; 脆弱性照合のモデルは kotoba-lang/app-sbom に既に在る（未デプロイ）。\n"
                             ";; ここが埋めるのは『自分たちの依存を一度も測っていない』側だけ。\n;;\n"

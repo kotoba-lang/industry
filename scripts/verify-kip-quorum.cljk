@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-kip-quorum.cljs — does each :final KIP actually carry a quorum?
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/kip/src:orgs/kotoba-lang/kagami/src" \
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/kip/src:orgs/kotoba-lang/kagami/src" \
 ;;       scripts/verify-kip-quorum.cljk [--kip <id>] [--all]
 ;;
 ;; Without this, `:kip/status :final` is a string somebody typed. This is what

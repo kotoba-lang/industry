@@ -93,7 +93,7 @@ kotoba-ui のページを置くと 1 画面に 2 つのトークン体系が同�
 書き手はどちらも `shirohan` 内の依存ゼロ実装（ブラウザに載せるため。`org-iso-pdf`
 は `org-ietf-deflate` 1300 行超を ns 依存で引くが、非圧縮ストリームに deflate は
 1 バイトも要らない）。ただし**書き手を 2 つにしない**ために、読み手は kotoba-lang の
-既存実装を使う —— `clojure -M:verify` が `kasane`（PSD 文法 EDN + decode）と
+既存実装を使う —— `kbb -M:verify` が `kasane`（PSD 文法 EDN + decode）と
 `org-iso-pdf`（COS パーサ）で書き出しを読み直す。自分で書いて自分で読むと、
 仕様の誤解に気付けない。
 

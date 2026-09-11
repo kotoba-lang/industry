@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/west-entry-rename.cljk — rename west PROJECT ENTRIES to the names
 ;; their repositories already carry upstream.
 ;;
@@ -29,7 +29,7 @@
 ;; behind on `remote:` exactly the way it is behind on `name:`.
 ;;
 ;;   RENAMES=renames.tsv  # lines of: <old-entry-name>\t<new-entry-name>\t<new-org>
-;;   RENAMES=… [DRY=1] nbb --classpath ".:scripts/nbb_compat" scripts/west-entry-rename.cljk
+;;   RENAMES=… [DRY=1] kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-entry-rename.cljk
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))

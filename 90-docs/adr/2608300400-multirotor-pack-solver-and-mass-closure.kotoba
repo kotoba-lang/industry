@@ -111,7 +111,7 @@ prediction.
 | kami-engine-pack | 13 | 57 | green |
 | kami-engine-multirotor | 14 | 64 | 2 failures, both my assertions being tighter than the loop's own convergence tolerance rather than defects; they now assert what the algorithm promises |
 
-Both green under `clojure -M:dev:test` and `clojure -M:test` (the git-dep path
+Both green under `kbb -M:dev:test` and `kbb -M:test` (the git-dep path
 the fleet gate takes). clj-kondo 0 errors 0 warnings on both.
 
 Verified DISCRIMINATING by breaking each and confirming the reported failure

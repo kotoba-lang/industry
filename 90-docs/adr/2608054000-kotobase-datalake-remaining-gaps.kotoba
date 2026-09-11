@@ -45,11 +45,11 @@
   (:adr/verify
   (vector "west pin: columnar 309822ec / org-apache-arrow 955fa8f3 / org-apache-parquet 09909e19 / kotobase-lake 2746926b / org-apache-avro 9bdeeee8 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
    "org-apache-arrow: JVM 39 tests/119 assertions・nbb 34/100・clj-kondo 0 warnings（ローカル実測）。CI は writer commit 6d070313 までは全 step success を実測、それ以降は org の Actions 無効化により未実行"
-   "writer の正当性ゲート: clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
-   "org-apache-parquet: JVM 32 tests/143 assertions・nbb 29/131・clj-kondo 0 warnings（ローカル実測）。writer gate = clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir> ; => 7/7 pyarrow 受理・統計も可視。CI は 06df9fdd まで success、e28a6b3e は Actions 無効化により未実行"
+   "writer の正当性ゲート: kbb -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
+   "org-apache-parquet: JVM 32 tests/143 assertions・nbb 29/131・clj-kondo 0 warnings（ローカル実測）。writer gate = kbb -M:emit <dir> && python test/fixtures/verify_written.py <dir> ; => 7/7 pyarrow 受理・統計も可視。CI は 06df9fdd まで success、e28a6b3e は Actions 無効化により未実行"
    "columnar: 36 tests/115 assertions・clj-kondo 0 warnings（ローカル実測）。CI は d89813a3 まで success、以降は Actions 無効化により未実行"
    "kotobase-lake: 67 tests/237 assertions（JVM / nbb 両方）・clj-kondo 0 warnings（ローカル実測）"
-   "nbb scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs <tree>   ; => E object-grant: Ran 16 tests, rc=0"
+   "kbb --backend sci scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljk <tree>   ; => E object-grant: Ran 16 tests, rc=0"
    "net-kotobase の GitHub Actions は job を起動しない（ADR-2608036600）。実際に走る gate は murakumo fleet の check A-E のみ"))
 
   (:adr/body
@@ -364,7 +364,7 @@ mutation としてではなく**atomic な新 snapshot として**だけ安全�
   `docs/MURAKUMO-CI.md` に期待するテキストを『Murakumo Cloud Actions への移行』commit が
   削除している。merge 前の `981d1c68` に対して gate を走らせて確認済み。
   **runbook が今何と書くべきかを決めるのは別の判断**なので直していない
-- **`clojure -M:render-components` が pristine な main で失敗**（`unclassified provider
+- **`kbb -M:render-components` が pristine な main で失敗**（`unclassified provider
   source`）。component 成果物を再生成できない
 - **network-awai の GitHub Actions は job を起動しない**（ADR-2608036600）。したがって
   `api-gateway.yml` に足した step は発火せず、**実際に走る gate は murakumo fleet の
@@ -405,7 +405,7 @@ mutation としてではなく**atomic な新 snapshot として**だけ安全�
   - **ただし着地前に確認が要る**: fleet ノードは tailnet のみで外向き HTTPS が無く、
     `ship-git-deps!` は **git 依存しかノードへ運ばない**。この 5 repo の依存は
     すべて git（columnar / deflate / zstd / json / nquads / datom-source /
-    cognitect test-runner）だが、`clojure -M:test` 自体が要求する maven 上の
+    cognitect test-runner）だが、`kbb -M:test` 自体が要求する maven 上の
     Clojure core がノードで解決するかは**未確認**。CLAUDE.md は
     「テストがあるから jvm-test にする」ではなく先に依存が解決するか確かめよ、と
     明示している
@@ -498,10 +498,10 @@ fleet gate は未登録）。作業を積むほど未検査 commit が増える�
 
 1. まず「ノードで依存が解決するか」を確かめる（CLAUDE.md の明示要件）。
    ノードは tailnet のみ・外向き HTTPS 無し・`ship-git-deps!` は git 依存しか運ばない。
-   この 5 repo の依存は全部 git だが、`clojure -M:test` 自体が要る maven 上の
+   この 5 repo の依存は全部 git だが、`kbb -M:test` 自体が要る maven 上の
    Clojure core がノードにあるかは**未確認**。
 
-       FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem nbb scripts/fleet-ci/tick.cljs --only columnar
+       FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem kbb --backend sci scripts/fleet-ci/tick.cljk --only columnar
 
 2. 通ったら `scripts/fleet-ci/gates.edn` に `:jvm-test` を 1 行ずつ足す
    （columnar / org-apache-parquet / org-apache-arrow / org-apache-avro / kotobase-lake）。

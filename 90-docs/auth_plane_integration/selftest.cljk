@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Does the judge discriminate, or is it green because nothing looked?
 ;;
-;;   nbb --classpath 90-docs 90-docs/auth_plane_integration/selftest.cljs [probe.edn]
+;;   kbb --backend sci --classpath 90-docs 90-docs/auth_plane_integration/selftest.cljs [probe.edn]
 ;;
 ;; Six checks. The fourth is the one that matters: a negative test that only
 ;; asserts "it went red" counts a run that failed for an unrelated reason as

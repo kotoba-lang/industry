@@ -25,7 +25,7 @@
   (:adr/decision-summary
   "{:repo \"kotoba-lang/io-storj\", :namespaces [storj.gateway storj.core storj.linkshare storj.protocols], :surface [:gateway-mt-s3 :linksharing], :out-of-scope [:native-uplink :multipart-upload :acl-policy-lifecycle-cors], :deps [io.github.kotoba-lang/sigv4], :addressing :path-style, :sync-async-seam :then, :verification [:aws-published-vectors :independent-cross-check :two-runtime-parity], :live-gateway-request :never-performed}")
   (:adr/artifacts
-  "{:repo \"orgs/kotoba-lang/io-storj\", :sigv4 \"orgs/kotoba-lang/sigv4 (extracted by ADR-2607254100; storj.sigv4/storj.crypto no longer exist in this repo)\", :core \"orgs/kotoba-lang/io-storj/src/storj/core.cljc\", :cljs-parity \"orgs/kotoba-lang/io-storj/scripts/verify-cljs.cljs\", :evidence {:as-of \"2026-07-28 (local re-run at pin 2b0cbc28)\", :jvm \"23 tests / 74 assertions, 0 failures 0 errors\", :cljs \"nbb --classpath \\\"$(clojure -Spath)\\\" scripts/verify-cljs.cljs — 7 checks pass\", :note \"initial figures (36 tests/105 assertions, 15 cljs checks) covered the sigv4 code that has since moved to kotoba-lang/sigv4; that repo now reports 28 tests/82 assertions and 18 cljs checks\", :aws-vectors [\"f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41\" \"aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404\"]}}")
+  "{:repo \"orgs/kotoba-lang/io-storj\", :sigv4 \"orgs/kotoba-lang/sigv4 (extracted by ADR-2607254100; storj.sigv4/storj.crypto no longer exist in this repo)\", :core \"orgs/kotoba-lang/io-storj/src/storj/core.cljc\", :cljs-parity \"orgs/kotoba-lang/io-storj/scripts/verify-cljs.cljs\", :evidence {:as-of \"2026-07-28 (local re-run at pin 2b0cbc28)\", :jvm \"23 tests / 74 assertions, 0 failures 0 errors\", :cljs \"kbb --backend sci --classpath \\\"$(kbb -Spath)\\\" scripts/verify-cljs.cljs — 7 checks pass\", :note \"initial figures (36 tests/105 assertions, 15 cljs checks) covered the sigv4 code that has since moved to kotoba-lang/sigv4; that repo now reports 28 tests/82 assertions and 18 cljs checks\", :aws-vectors [\"f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41\" \"aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404\"]}}")
   (:adr/body
   "# Context
 
@@ -164,9 +164,9 @@ SigV4 は静かに失敗する — 1バイト違っても request は妥当に�
    証明される。
 2. **独立実装によるクロスチェック**: `core_test` / presign の期待署名は、この
    library ではなく spec から直接書いた別実装（Node `crypto`）で生成した。
-3. **2 runtime parity**: `clojure -M:test` は JVM を覆うが、WebCrypto は非同期で
+3. **2 runtime parity**: `kbb -M:test` は JVM を覆うが、WebCrypto は非同期で
    **`then` の中を別経路で通る** ため、JVM が緑でもブラウザ/Worker に出る側の
-   証拠にはならない。`nbb scripts/verify-cljs.cljs` が同じ期待値を
+   証拠にはならない。`kbb --backend sci scripts/verify-cljs.cljk` が同じ期待値を
    `crypto.subtle` 上で再実行し、byte-identical な署名を要求する。CI は両方を回す。
    さらに **negative control** を実施済み: 期待値を意図的に壊すと exit 1 で
    FAIL することを確認した（落ちない検証は検証ではない）。

@@ -20,7 +20,7 @@
     部門長 seed(同形式)。
   - `itonami-sales-head-chain` / `itonami-billing-head-chain` /
     `itonami-keiei-head-chain` — 各部門長への CACAO 委任 chain(EDN vector、
-    **expiry 90 日 ≈ 2026-10-12。失効前に `clojure -M:ops-send mint-chain
+    **expiry 90 日 ≈ 2026-10-12。失効前に `kbb -M:ops-send mint-chain
     kagi:itonami-org-root ...` で再 mint**)。merge 時は
     `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
 
@@ -398,7 +398,7 @@
   wiki.kotobase.net の content-addressed index root を名指す IPNS 鍵。
   - **IPNS name `k51qzi5uqu5djz8wrylvnm0u2mqwsvpdlqrh6jisb5ll3nsc189ul4zg1ukfld`**
     （公開値。`GET https://ipfs.kotobase.net/ipns/{name}` が署名済み record を返す）
-  - 使い方: `nbb scripts/publish-ipns.cljs --cid <root> --kagi hyakka-index-ipns
+  - 使い方: `kbb --backend sci scripts/publish-ipns.cljk --cid <root> --kagi hyakka-index-ipns
     --kagi-compartment net-kotobase --sequence <n> --put`
     （net-kotobase/ipfs。`--kagi` は 2026-09-08 に足した。値は argv にも
     シェル履歴にもファイルにも載らない）

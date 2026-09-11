@@ -114,8 +114,8 @@
   "計算器: 90-docs/system-dynamics/tax-market-need.cljs(地域別ニーズの静的分解、3シナリオ)と 90-docs/system-dynamics/tax-market-sequencing.cljs(参入順の動的模型、8シナリオ + 2 掃引)。どちらも nbb(ADR-2607173000 準拠)。
 
    再現:
-   nbb --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:orgs/kotoba-lang/dynamics/src\" 90-docs/system-dynamics/tax-market-need.cljs
-   nbb --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:orgs/kotoba-lang/dynamics/src\" 90-docs/system-dynamics/tax-market-sequencing.cljs
+   kbb --backend sci --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:orgs/kotoba-lang/dynamics/src\" 90-docs/system-dynamics/tax-market-need.cljs
+   kbb --backend sci --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:orgs/kotoba-lang/dynamics/src\" 90-docs/system-dynamics/tax-market-sequencing.cljs
 
    模型は OASIS XMILE 1.0(kotoba-lang/org-oasis-open-xmile)。国ごとに Bass 拡散を 1 本持ち、税制レバーを外部係数 p に、決算期末を PULSE(1, 決算月, 12) に、参入を STEP(1, 参入月) に、日本の学習を浸透率の飽和関数に、注意の希少性を capacity/(capacity+live-1) に、プールの焼損を参入月の一時 PULSE による pool の追加流出に入れている。**各変数の <doc> に MEASURED / PROXY / ASSUMPTION と出典を埋めてあるので、XMILE ファイル単体で出所が読める。**
 

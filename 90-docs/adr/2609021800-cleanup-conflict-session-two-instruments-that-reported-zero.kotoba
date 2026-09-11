@@ -81,13 +81,13 @@ cleanup が拾う形が繰り返されている（`be3b117` / `4bff7f0` / `feefe
 
 ## 残った gap（次の agent への resume point）
 
-**fleet 全体の未着地 survey は完了していない。** `nbb scripts/cleanup.cljs --unlanded`
+**fleet 全体の未着地 survey は完了していない。** `kbb --backend sci scripts/cleanup.cljk --unlanded`
 を回したが、closing 時点で phase 1 が 4,301 repo のうち **750 件**（約 20 分）。全走査は 2 時間規模で、
 load average が 200 超だったので完走を待たず、ここまでを記録して closing を優先した。
 途中経過は `/tmp/unlanded.log`（セッション終了後は残っていない可能性がある）。
 
 ```
-nbb scripts/cleanup.cljs --unlanded > /tmp/unlanded.log 2>&1; echo EXIT=$?
+kbb --backend sci scripts/cleanup.cljk --unlanded > /tmp/unlanded.log 2>&1; echo EXIT=$?
 ```
 
 750 件までに出た finding は 1 件だけ:

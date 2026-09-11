@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 90-docs/knowledge/arday-cofnas-affair.datoms.edn が引いている逐語 evidence を、
 ;; 一次資料へ取りに行って部分文字列一致で確かめる。manifest は
 ;; 90-docs/knowledge/arday-cofnas-evidence.edn。
 ;;
-;;   nbb scripts/verify-arday-cofnas-evidence.cljk
+;;   kbb --backend sci scripts/verify-arday-cofnas-evidence.cljk
 ;;
 ;; exit 0  全 check が期待どおり
 ;; exit 1  期待と違う check がある（原文が変わったか、こちらの記述が誤っている）

@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; kotobase-dual-write.cljs — push stamped BMC ledger events to kotobase.net
 ;; as entity maps (ADR-2607180400). Invoked by gftd.cli after local ledger
 ;; append (spawnSync, fail-open).
 ;;
 ;; Usage (from superproject root):
 ;;   NODE_PATH=orgs/kotoba-lang/kotobase-client/node_modules \
-;;   nbb --classpath "orgs/kotoba-lang/kotobase-client/src:70-tools/bmc/src:." \
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/kotobase-client/src:70-tools/bmc/src:." \
 ;;     70-tools/bmc/bin/kotobase-dual-write.cljk /tmp/events.edn
 ;;
 ;; Identity: 70-tools/bmc/.bmc-kotobase-identity.hex (gitignored). First run

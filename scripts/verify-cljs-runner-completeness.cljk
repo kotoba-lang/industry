@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-cljs-runner-completeness — ClojureScript test runners that run less
 ;; than the suite they sit in, and report the same thing a complete one does.
 ;;
@@ -8,8 +8,8 @@
 ;; runners. Both required exactly one of the three. Measured 2026-08-17, before
 ;; the repair:
 ;;
-;;   clojure -M:test          Ran 36 tests containing 117 assertions
-;;   nbb test/run.cljs        Ran 10 tests containing  54 assertions
+;;   kbb -M:test          Ran 36 tests containing 117 assertions
+;;   kbb --backend sci test/run.cljk        Ran 10 tests containing  54 assertions
 ;;
 ;; Nothing prints the number it should have reached, so the shortfall is not
 ;; visible in the output. With `group/group` altered to drop the last group from
@@ -85,7 +85,7 @@
 ;; 201 is the number of repos that HAVE a ClojureScript runner. It is not the
 ;; population of repos with portable tests: measured 2026-08-17, another **2,034**
 ;; hold a `deftest` in a `.cljc`/`.cljs` file and have no `run-tests` call
-;; anywhere, so their portable suites run under `clojure -M:test` and nowhere
+;; anywhere, so their portable suites run under `kbb -M:test` and nowhere
 ;; else. Spot-checked by hand: cloud-itonami/action-gtin-registry, actor-crew,
 ;; actor-shukubo.
 ;;
@@ -114,7 +114,7 @@
 ;; the same defect as answering one you cannot, pointed the other way.
 ;;
 ;; usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-cljs-runner-completeness.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-cljs-runner-completeness.cljk
 ;;     [--findings] [--strict] [--repo orgs/<org>/<name>] [--edn out.edn] [--verbose]
 (require '[clojure.string :as str])
 
@@ -341,7 +341,7 @@
 ;;
 ;; 2. A runner declared in `package.json` or a `deps.edn` alias rather than in a
 ;;    `.cljs` file. nekko's `test:async` script is three separate
-;;    `nbb --classpath src:test -e "(require '[nekko.keyslot-test])"`
+;;    `kbb --backend sci --classpath src:test -e "(require '[nekko.keyslot-test])"`
 ;;    invocations. Nothing in the source tree names those namespaces, so a
 ;;    file-only audit cannot see them. This is the same failure as the `_test$`
 ;;    filename rule: looking in one place and concluding about all of them.

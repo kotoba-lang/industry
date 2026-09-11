@@ -1,10 +1,10 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Which repositories carry a `.itonami/profile.edn`, and how many could not be
 ;; looked at. ADR-2609061200 D6.
 ;;
-;;   nbb scripts/repo-profiles/gen-roster.cljk           write manifest/repo-profiles.edn
-;;   nbb scripts/repo-profiles/gen-roster.cljk --check   fail if the file is stale
-;;   nbb scripts/repo-profiles/gen-roster.cljk --report   print, write nothing
+;;   kbb --backend sci scripts/repo-profiles/gen-roster.cljk           write manifest/repo-profiles.edn
+;;   kbb --backend sci scripts/repo-profiles/gen-roster.cljk --check   fail if the file is stale
+;;   kbb --backend sci scripts/repo-profiles/gen-roster.cljk --report   print, write nothing
 ;;
 ;; exit 0  answered, and every listed repository was looked at
 ;; exit 1  --check and the committed file is stale

@@ -14,7 +14,7 @@
 // instance in the street.
 //
 // What keeps this file honest is `test/parity.cljs`: the same render-IR is packed by the
-// JVM engine (`clojure -M:parity-dump`) and by this bundle, and every float is compared. A
+// JVM engine (`kbb -M:parity-dump`) and by this bundle, and every float is compared. A
 // shim with the wrong semantics changes numbers, and changed numbers fail that test. Adding
 // anything here without extending the parity dump to cover it would put us back to trusting
 // a guess.

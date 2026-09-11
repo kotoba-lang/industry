@@ -106,7 +106,7 @@ measured value is a sentence the record cannot support.
 Generation, from the superproject root, against a worktree at origin/main:
 
     git -C orgs/kotoba-lang/<repo> worktree add --detach <dir> origin/main
-    nbb orgs/kotoba-lang/kotoba-lang/scripts/gen-whole-component.cljs \\
+    kbb --backend sci orgs/kotoba-lang/kotoba-lang/scripts/gen-whole-component.cljk \\
         <template.kotoba> <dir> <src-dir-name>
 
 The template is com-abb-robotics' landed `whole_component.kotoba`. Exit 2 with

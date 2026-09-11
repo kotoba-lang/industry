@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-adr-identity — `:adr/id` が 1 つの文書を指すことを検査する。
 ;;
 ;; ## 実測した実害（2026-08-07）
 ;;
 ;; `:adr/id "2608080000"` を datom 面に問い合わせると **2 つの別々の ADR が返る**:
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljk q \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/edn-query.cljk q \
 ;;     '[:find ?id ?t :where [?e "adr/id" ?id] [?e "adr/title" ?t] [(= ?id "2608080000")]]'
 ;;   → [["2608080000" "成熟度を上げる loop —— …"]
 ;;      ["2608080000" "各国の法規制（許認可の要件）を datom 面に載せて …"]]
@@ -45,12 +45,12 @@
 ;; 入っている。ADR id の形をしたものだけを dangling と呼ぶのは、その形を定義しないと
 ;; 決まらず、**bare 数字と slug 形の 2 系統が併存している**現状では定義できない。
 ;;
-;; usage: nbb scripts/verify-adr-identity.cljk [--dir 90-docs/adr] [--min 500]
+;; usage: kbb --backend sci scripts/verify-adr-identity.cljk [--dir 90-docs/adr] [--min 500]
 
 (require '[clojure.string :as str])
 ;; The Kotoba ADL decoder, from the notation's owner rather than a local copy.
 ;; Needs orgs/kotoba-lang/kotoba/src on the classpath:
-;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kotoba/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kotoba/src" \
 ;;       scripts/verify-adr-identity.cljk
 (require '[kotoba.adl :as adl])
 

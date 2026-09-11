@@ -79,12 +79,12 @@ kami-engine は Rust コア（29 crates / ~536 .rs）の上に Clojure 著作層
 
 ローカル検証（このマシン: clojure 1.12 / bb 1.12 / java 21 / node 26）:
 
-- ✅ **純粋セッション FSM テスト**: `bb test:pure` → **5 tests / 13 assertions / 0 failures**
-- ✅ **ワールド構築**: `clojure -M:datomic:build` →
+- ✅ **純粋セッション FSM テスト**: `kbb -M:test:pure` → **5 tests / 13 assertions / 0 failures**
+- ✅ **ワールド構築**: `kbb -M:datomic:build` →
   `public/snapshot.edn`（**47 entities / 8 assets**, scene `spirit-in-physics/water-city`）生成
-- ✅ **full テストスイート**: `clojure -M:datomic:test` →
+- ✅ **full テストスイート**: `kbb -M:datomic:test` →
   **12 tests / 38 assertions / 0 failures**（session + render + store）
-- ✅ **cljs リリースビルド**: `clojure -M:shadow release app`（JVM classpath, npm 不要）→
+- ✅ **cljs リリースビルド**: `kbb -M:shadow release app`（JVM classpath, npm 不要）→
   `public/js/sip.js`（**205 KB**）+ `manifest.edn` 生成。型推論 warning 1 件
   （`kami-engine-sdk-clj/src/kami/backend/browser.cljs:33`、非致命）のみ。
   ※ `npx shadow-cljs` 経由はローカル npm 不具合（`cb.apply is not a function`）で失敗するため JVM 経由を推奨
@@ -133,7 +133,7 @@ panel 生成（108 storyboard → 実 768×1152 PNG, AnimagineXL）/ ブラウ�
 | Phase | 内容 | 主要タスク | Exit 条件 |
 |---|---|---|---|
 | **P0 ✅ 済** | clj コア基盤 | engine層 + app scaffold | session/world/render/store 緑（2026-06-27 検証済み）、cljs bundle 生成可 |
-| **P1 ✅ 済** web パリティ | プレイ可能な web | HUD `sip.ui`（純粋 FSM 駆動・DOM オーバーレイ・心音/寄り添いメーター・呼吸入力・完了画面）+ wasm 動的 import。Worker 静的配信で **sip.etzhayyim.com** へ deploy | **達成**（kami-engine PR #59 HUD / #62 deploy）。cljs build 0警告・`bb test:pure` 緑・ヘッドレス実クリックで observe→resonate→accompany→name→complete・エッジ HTTP 200。※現状 wasm 無で HUD のみ（3D 背景は後続） |
+| **P1 ✅ 済** web パリティ | プレイ可能な web | HUD `sip.ui`（純粋 FSM 駆動・DOM オーバーレイ・心音/寄り添いメーター・呼吸入力・完了画面）+ wasm 動的 import。Worker 静的配信で **sip.etzhayyim.com** へ deploy | **達成**（kami-engine PR #59 HUD / #62 deploy）。cljs build 0警告・`kbb -M:test:pure` 緑・ヘッドレス実クリックで observe→resonate→accompany→name→complete・エッジ HTTP 200。※現状 wasm 無で HUD のみ（3D 背景は後続） |
 | **P2 ✅ 実装** durable/瓶詞 | 永続・非同期協調 | web 瓶詞 UI（`sip.kotoba`, localStorage⇄kotoba 切替）+ `KotobaHttp` operator-JWT 認証 + 共有索引（kotoba Datomic XRPC, as-of）| **達成（実装・公開）** PR #63 UI / #64 認証+設計 / #67 共有索引（mock 検証）。瓶詞 UI は sip.etzhayyim.com で稼働。実サーバ E2E は kotobase.net の graph+token 待ち |
 | **P3-A ✅ 済** researcher 閲覧 | read-only ダッシュボード | participants/sessions の感情サマリ（PII 非表示・isPublic）、seed⇄kotoba 切替 | **達成・公開** sip.etzhayyim.com/researcher（PR #65、ヘッドレス検証） |
 | **P3-B 🟡 基盤済** 収集 | データ収集 | データモデル+ingest/query+テスト（PR #66）、**Datomic=kotobase.net（as-of ネイティブ・Datomic Cloud 不要; PR #69）** | 実収集は同意/IRB・Hume・kotobase の graph+token 待ち |

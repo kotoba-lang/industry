@@ -3,7 +3,7 @@
    The annexed JSONL/JSON files remain the source of truth; this DB is a
    rebuildable, queryable, NORMALIZED index (entities: org / person / account /
    txn / loan / event / action, linked by refs). Run:
-     clojure -M -m warehouse.load
+     kbb -M -m warehouse.load
    Uses an in-memory Datomic Local DB (no transactor, ephemeral, rebuilt on demand)."
   (:require [datomic.client.api :as d]
             [clojure.data.json :as json]
@@ -916,4 +916,4 @@
         (println "\n[Datalog] policy/agent-prohibited — 機械が代行不可 (安全境界の監査ファクト):")
         (doseq [[cap r] (d/q '[:find ?cap ?r :where [?c :capability/agent :no] [?c :capability/id ?cap] [?c :capability/reason ?r]] db)]
           (println (format "  🔒%-18s %s" cap r)))
-        (println "\nOK: normalized into Datomic. Rebuild anytime: clojure -M -m warehouse.load")))))
+        (println "\nOK: normalized into Datomic. Rebuild anytime: kbb -M -m warehouse.load")))))

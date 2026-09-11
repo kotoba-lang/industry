@@ -38,7 +38,7 @@ host（`ollama_server.clj`）が持つのは socket・JSON・thread・lock・時
 murakumo の dual-source パターンをそのまま採った:
 
 1. 正本: `kotoba/*_core.kotoba`
-2. 出荷物: `resources/kotodama/oracle/*.kir.edn`（`clojure -M:test:gen` で再生成）
+2. 出荷物: `resources/kotodama/oracle/*.kir.edn`（`kbb -M:test:gen` で再生成）
 3. host: `kotodama.inference.host.oracle` 経由で export を呼ぶ
 
 `kotoba-kir` は runtime 依存、**compiler（amu）は test 依存**。走っているサーバは
@@ -134,8 +134,8 @@ spawn（数十 ms）を払い、word-typed な planner は interpreter が約 2 
 
 ## 実測（2026-08-13）
 
-- `clojure -M:test` — 49 tests / 333 assertions / 0 failures
-- `clojure -M:verify-maturity` — `:maturity :ok`、新 gate `:kotoba-decision-cores`
+- `kbb -M:test` — 49 tests / 333 assertions / 0 failures
+- `kbb -M:verify-maturity` — `:maturity :ok`、新 gate `:kotoba-decision-cores`
   を required に追加
 - 3 core とも `only-native-word-typed-features?` = true、出荷 artifact == fresh compile
 
@@ -144,4 +144,4 @@ spawn（数十 ms）を払い、word-typed な planner は interpreter が約 2 
 ADR-2607279200（Kotoba 中心の移行）に沿う。当時は ADR-2607270100 の
 「決定核を切り出す」を単位として読んだ。現行は ADR-2608261100。
 ADR-2607300900（CI の正本は murakumo fleet）は変えない —— この repo の gate は
-`clojure -M:test` として fleet-ci から呼べる形のままである。")))
+`kbb -M:test` として fleet-ci から呼べる形のままである。")))

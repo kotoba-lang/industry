@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 実データの財務諸表 —— MF が出した数字と、`kotoba.shohyo` が出す数字。
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/shohyo/src:.:scripts/nbb_compat" \
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/shohyo/src:.:scripts/nbb_compat" \
 ;;       scripts/verify-mf-statements-parity.cljk [--findings]
 ;;
 ;; ## これが最初の「数字の」parity 検査

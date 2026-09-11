@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/west-pin-put-batch.cljk — advance MANY west.yml pins in one
 ;; server-side commit, with the same three checks scripts/west-pin-put.cljk makes
 ;; per entry.
@@ -23,7 +23,7 @@
 ;; downgrades the check. Nothing is written if no entry survives.
 ;;
 ;;   PINS=pins.tsv  # lines of: <west-entry-name>\t<40-hex sha>\t<repo slug>
-;;   PINS=… [DRY=1] [MSG="west: …"] nbb --classpath ".:scripts/nbb_compat" west-pin-put-batch.cljs
+;;   PINS=… [DRY=1] [MSG="west: …"] kbb --backend sci --classpath ".:scripts/nbb_compat" west-pin-put-batch.cljs
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))

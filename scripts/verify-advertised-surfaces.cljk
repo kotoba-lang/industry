@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-advertised-surfaces — a document that advertises an endpoint the
 ;; host does not actually serve.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-advertised-surfaces.cljk [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-advertised-surfaces.cljk [--findings]
 ;;   nbb ... scripts/verify-advertised-surfaces.cljk --self-test
 ;;   nbb ... scripts/verify-advertised-surfaces.cljk --host x402.nexus
 ;;

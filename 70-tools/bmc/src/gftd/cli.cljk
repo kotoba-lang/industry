@@ -736,7 +736,7 @@
                  ;; nbb-compat/sh merges options into spawnSync; set env so
                  ;; @noble/curves resolves from kotobase-client's node_modules.
                  _ (aset (.-env js/process) "NODE_PATH" node-path)
-                 r (nc/sh "nbb" "--classpath" cp helper tmp)]
+                 r (nc/sh "kbb" "--backend" "sci" "--classpath" cp helper tmp)]
              (try (.unlinkSync (js/require "node:fs") tmp) (catch :default _))
              (if (zero? (:exit r))
                (do (println "kotobase dual-write:" (str/trim (str (:out r))))

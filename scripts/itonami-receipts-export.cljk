@@ -1,7 +1,7 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Fold the two live ledgers into the receipts file `itonami-actor-pnl` reads.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-receipts-export.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-receipts-export.cljk \
 ;;     [--out manifest/itonami-receipts.edn] [--offline]
 ;;
 ;; ## Why this exists

@@ -2,14 +2,14 @@
 ;; 契約: kotoba-wasm-runtime-cutover.edn `:new-chicory-call-sites :forbidden` は
 ;; 「frozen 4 site 以外に Chicory JVM call site を増やすな」だが、**既存の測定
 ;; host も当然 JVM Chicory でなければ測定にならない**。この script は
-;; scripts/tender-comparison.cljk (nbb) が `clojure -M tender-chicory-steady.clj`
+;; scripts/tender-comparison.cljk (nbb) が `kbb -M tender-chicory-steady.clj`
 ;; として呼ぶ chicory-jvm host の定常状態 (steady-state) 計測器そのものであり、
 ;; JVM を外すと「JVM Chicory の速度」が測れなくなる = tender 比較の対照群が消える。
 ;; JVM 表面の 6→1 で残る唯一の意図的例外。対照群が不要になる（kototama tender が
 ;; 非JVM経路のみで完結する）とき、tender-comparison.cljs と一緒に引退させる。
 ;;
 ;; Steady-state Chicory tender benchmark (same JVM, reused open-session).
-;; Run from kototama checkout: clojure -M /path/to/tender-chicory-steady.clj <wasm> <warmup> <calls>
+;; Run from kototama checkout: kbb -M /path/to/tender-chicory-steady.clj <wasm> <warmup> <calls>
 (require '[clojure.java.io :as io]
          '[kototama.tender :as tender]
          '[kototama.contract :as contract])

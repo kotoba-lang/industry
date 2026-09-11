@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-no-github-workflows.cljs — この tree が GitHub に「自分で走ってよい」と
 ;; 言っていないことを確かめる。CI の正本は murakumo fleet（ADR-2607300900、
 ;; オーナー指示 2026-08-05「github は使わない、murakumo.cloud の cdci, workflow を
 ;; 使う」）であり、repo root の `.github/workflows/*.yml` は **GitHub が自分の
 ;; 判断で runner を起こす唯一の入口**なので、そこが空であることが不変条件。
 ;;
-;;   nbb scripts/verify-no-github-workflows.cljk [<dir>] [--min N]
+;;   kbb --backend sci scripts/verify-no-github-workflows.cljk [<dir>] [--min N]
 ;;
 ;; ## 三値で答える（0 と 2 を混ぜない）
 ;;

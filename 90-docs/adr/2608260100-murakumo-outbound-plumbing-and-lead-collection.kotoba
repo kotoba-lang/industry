@@ -99,8 +99,8 @@ suppressed だった。送信 API の戻り値を配信の証拠にしない。*
 
 再開コマンド:
 
-    nbb --classpath \".:scripts/nbb_compat\" scripts/annex-custody-verify.cljs
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-west-pins.cljs
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/annex-custody-verify.cljs
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-west-pins.cljs
 
 データは network-awai/cloud-murakumo（private）の docs/gtm/leads/ にある。
 coverage.md / coverage-forms.md / coverage-partner-sites.md / outbound-ops.md が
@@ -111,8 +111,8 @@ com-junkawasaki/root main f3cf321 + pin 前進 4 件。
 com-junkawasaki/jp-go-gbiz-info main 7e127c8（custody 節 + numcopies 2）。
 com-junkawasaki/org-gleif-projections main 46ad7ee（GLEIF 分母）。
 ADR: 2608251500（法域外レジストリ調査）/ 2608251700（gbiz custody 登録）/ 2608252100（EU）。")
- (:adr/verification "kotoba-lang/property: clojure -M:test 255 tests / 1124 assertions 緑、
-clojure -M:lint errors 0（warning 13 は既存の他ファイル由来）。
+ (:adr/verification "kotoba-lang/property: kbb -M:test 255 tests / 1124 assertions 緑、
+kbb -M:lint errors 0（warning 13 は既存の他ファイル由来）。
 exit code 契約を 3 経路で実測（引数不足 3 / 0 件 2 / 成功 0）。
 annex-custody-verify: projects=33 ok=13 fail=0 unverified=0 skipped=20、NOTE 0。
 verify-west-pins --only property,cloud-murakumo,jp-go-gbiz-info,org-gleif-projections: OK。

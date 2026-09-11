@@ -54,7 +54,7 @@ break-test を通すことで、着地の質を保つ。
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin
-nbb scripts/repo-search.cljk koukyou-chotatsu chotatsu
+kbb --backend sci scripts/repo-search.cljk koukyou-chotatsu chotatsu
 ```
 
 `orgs/network-awai/app-hyakka` を最新化する（west pin 経由、または直接 fetch）。
@@ -145,8 +145,8 @@ MISS が出たら evidence を実際のテキストに合わせて直す（PDF �
 ### 5. Dry-run → 実行
 
 ```bash
-HYAKKA_ARCHIVE_DIR=~/.itonami/hyakka-archive nbb --classpath src scripts/seed_<corpus>.cljs --dry-run
-HYAKKA_ARCHIVE_DIR=~/.itonami/hyakka-archive nbb --classpath src scripts/seed_<corpus>.cljs
+HYAKKA_ARCHIVE_DIR=~/.itonami/hyakka-archive kbb --backend sci --classpath src scripts/seed_<corpus>.cljs --dry-run
+HYAKKA_ARCHIVE_DIR=~/.itonami/hyakka-archive kbb --backend sci --classpath src scripts/seed_<corpus>.cljs
 ```
 
 dry-run が `admitted` を返してから実行する。evidence が 1 件でも一致しなければ
@@ -197,7 +197,7 @@ curl -sS "https://wiki.kotobase.net/item/<新しい item の id>"          # 実
 ### 9. R2 Data Catalog へ同期（`cloud-itonami-datalake`）
 
 ```bash
-nbb --classpath src scripts/datalake_sync.cljs --replace
+kbb --backend sci --classpath src scripts/datalake_sync.cljs --replace
 ```
 
 詳細は `docs/r2-data-catalog.md`。`--replace` は明示的な全表再構築で、
@@ -208,7 +208,7 @@ hyakka の ledger は継続的に伸びるためこれが既定の再同期経�
 ```bash
 cd /Users/junkawasaki/github/com-junkawasaki
 git fetch -q origin && git status -sb   # main が遅れていないか
-nbb scripts/west-pin-put.cljk app-hyakka HEAD --message "pin: advance app-hyakka to <一言>"
+kbb --backend sci scripts/west-pin-put.cljk app-hyakka HEAD --message "pin: advance app-hyakka to <一言>"
 ```
 
 ### 11. 後片付け

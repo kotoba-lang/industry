@@ -123,8 +123,8 @@ keyword を indexOf すると同一性比較になって**常に -1** を返す�
 並行 agent が走っており、CLAUDE.md が共有 checkout の直接編集を禁じているのは
 まさにこの形の事故のためなので、無人の loop には渡さない:
 
-    nbb scripts/repo-bots/tick.cljs --next              # 人が打つ。:landed を先頭に出す
-    nbb scripts/repo-bots/tick.cljs --next-unattended   # loop が打つ。:landed を外す
+    kbb --backend sci scripts/repo-bots/tick.cljk --next              # 人が打つ。:landed を先頭に出す
+    kbb --backend sci scripts/repo-bots/tick.cljk --next-unattended   # loop が打つ。:landed を外す
 
 **外したことを黙らない。** `--next-unattended` は `:held-for-a-human` として件数を
 返し、drain loop はそれをログと ledger に書く。**黙って除外する allowlist は、

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-kotoba-pages
   "生成した Pages アプリを **実ブラウザで動かして** 検証する。
 
@@ -8,7 +8,7 @@
   返して静かに終わる罠)を記録している。**『測っていない品質は演出』。**
 
   使い方:
-    nbb scripts/verify-kotoba-pages.cljk [repo ...]   # 既定は registry の全 repo"
+    kbb --backend sci scripts/verify-kotoba-pages.cljk [repo ...]   # 既定は registry の全 repo"
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             ["node:process" :as process]

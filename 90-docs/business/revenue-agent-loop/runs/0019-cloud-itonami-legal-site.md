@@ -11,7 +11,7 @@
 - Replaced the stale Trust-page claim that legal documents were drafts.
 - Aligned Terms and the operator record with ADR-2607242600.
 
-`clojure -M:local:site` completed. Generated-output inspection confirms the
+`kbb -M:local:site` completed. Generated-output inspection confirms the
 approval markers and DPA links; `git diff --check` passed.
 
 The repository test runner executed 1,077 tests / 7,650 assertions and

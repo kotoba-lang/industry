@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; yui-funnel-coverage-check.cljs — per-door machine-readable funnel surface
 ;; coverage. Evidence for ADR-2609022000's yui-h4 (publish-funnel-per-domain).
 ;;
@@ -12,8 +12,8 @@
 ;; `Could not find namespace: scripts.nbb-compat` was the gate's own dependency
 ;; failure, not a funnel regression).
 ;;
-;; Run (fleet): npx --yes nbb gate-yui-funnel.cljs <tree> [--min N]
-;;         (operator): nbb scripts/fleet-ci/gates/yui-funnel-coverage-check.cljk --min N
+;; Run (fleet): npx --yes kbb --backend sci gate-yui-funnel.cljk <tree> [--min N]
+;;         (operator): kbb --backend sci scripts/fleet-ci/gates/yui-funnel-coverage-check.cljk --min N
 ;;
 ;; Exit: 0 = machine-readable funnel doors >= --min, 1 = below / probe failure,
 ;;       2 = probe infrastructure failure.

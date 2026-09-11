@@ -144,11 +144,11 @@ source query が引けなくなる。
 
 ## 実測結果（2026-07-29）
 
-**テスト**: `nbb --classpath \"src:test\" test/run_tests.cljs` → **57 tests / 145 assertions、
+**テスト**: `kbb --backend sci --classpath \"src:test\" test/run_tests.cljs` → **57 tests / 145 assertions、
 0 failures / 0 errors**。fixture は合成（`:entry/a` / `\"Test org A\"` / 出典 `\"fixture\"`）。
 
 **E2E スモーク**: flat 射影を **npm datascript に実際にロードして Datalog を実行**した
-（superproject root、`nbb --classpath \"orgs/kotoba-lang/jiten/src\"`）。合成 corpus 2 entry →
+（superproject root、`kbb --backend sci --classpath \"orgs/kotoba-lang/jiten/src\"`）。合成 corpus 2 entry →
 11 entity。5 クエリすべてが期待どおり行を返した:
 
 | | query | 結果 |

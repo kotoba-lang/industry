@@ -32,7 +32,7 @@
    (:component-to-component-linker :pending)
    (:production-qualified false)
    (:executable-evidence
-   (vector (map (:command "clojure -M:test")
+   (vector (map (:command "kbb -M:test")
      (:cwd "orgs/kotoba-lang/kototama")
      (:result "101 tests, 319 assertions, 0 failures; real loopback TCP ping/pong through Wasm HostFunctions"))))))
   (:adr/body

@@ -33,7 +33,7 @@
                    "authn.gftd.ai は今も 301 → auth.gftd.ai → 404。kotobase.net はもう参照していないが、他に参照するものがあれば壊れている。"
                    "sign-in ページの dark mode は DADS 移行で失われた(DADS にダークパレットが無い)。復帰させるなら design system 側の課題。"
                    "west checkout が pin に追随していない状態が常態化している(本セッションで 4 回ビルドを壊した)。ルール化も自動検査も未着手。")),
-  (:adr/verification "clojure -M:test → 98 tests / 586 assertions(既存 3 failure は本 diff 非関連の component-test: uncataloged JS provider sources x2 と worker/js artifact)。clojure -M:site-test → 29 tests / 164 assertions, 0 failures。shadow-cljs release clean(undeclared-var 警告 3 件は kotobase.x402 の既存分)。live: /v1/audit は無ヘッダ/偽装 DID/不正 Bearer/不正 cookie の 4 パターンとも 401、/admin は browser 302・API 401、/ /signup /health /api/funnel は 200 のまま。authn 側: clojure -M:test → 7 tests / 60 assertions, 0 failures。design-quality の決定論的 HIG/WCAG 監査は移行後 100.00・移行前も 100.00(findings なし)。live /sign-in 200 で dads-heading x32、liquid-glass / shitsuke__ / hig- は 0 件、form action 3 本と passkey DOM 契約 4 点は保持、未置換スロットは 0 件。"),
+  (:adr/verification "kbb -M:test → 98 tests / 586 assertions(既存 3 failure は本 diff 非関連の component-test: uncataloged JS provider sources x2 と worker/js artifact)。kbb -M:site-test → 29 tests / 164 assertions, 0 failures。amu compile --target wasm32-browser clean(undeclared-var 警告 3 件は kotobase.x402 の既存分)。live: /v1/audit は無ヘッダ/偽装 DID/不正 Bearer/不正 cookie の 4 パターンとも 401、/admin は browser 302・API 401、/ /signup /health /api/funnel は 200 のまま。authn 側: kbb -M:test → 7 tests / 60 assertions, 0 failures。design-quality の決定論的 HIG/WCAG 監査は移行後 100.00・移行前も 100.00(findings なし)。live /sign-in 200 で dads-heading x32、liquid-glass / shitsuke__ / hig- は 0 件、form action 3 本と passkey DOM 契約 4 点は保持、未置換スロットは 0 件。"),
   (:adr/body
   "## Context
 
@@ -193,7 +193,7 @@ passkey 認証が丸ごと死んでいた。原文のまま戻し、再生成後
 本セッションで**同じ型のビルド破壊が 4 回**起きた。いずれも pin は正しく、
 ローカル checkout が pin と別の commit にいたことが原因である:
 
-1. `jp-go-digital-design-system` が 8 behind → `clojure -M:render-site` が
+1. `jp-go-digital-design-system` が 8 behind → `kbb -M:render-site` が
    `No such var: dds-tokens/root-css-resource` で全滅(新規 clone でもサイト再生成不能)
 2. `kotoba-ui` / `shitsuke` / `liquid-glass-ui` の checkout が pin より古い →
    再生成すると CSS が巻き戻る(`data-appearance` の dark/light ブロックが消える)寸前

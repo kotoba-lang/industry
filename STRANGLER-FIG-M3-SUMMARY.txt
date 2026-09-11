@@ -232,13 +232,13 @@ TEST EXECUTION
 
 Run All Tests:
   cd orgs/kotoba-lang/kotobase-peer
-  clj -X:test
+  kbb -X:test
 
 Run M3 Tests Only:
-  clj -X:test :ns-patterns '["kotobase-peer.merkle-lsm-m3-test"]'
+  kbb -X:test :ns-patterns '["kotobase-peer.merkle-lsm-m3-test"]'
 
 Run M1/M2 Tests Only:
-  clj -X:test :ns-patterns '["kotobase-peer.merkle-lsm-test"]'
+  kbb -X:test :ns-patterns '["kotobase-peer.merkle-lsm-test"]'
 
 All tests pass with M3 implementation.
 

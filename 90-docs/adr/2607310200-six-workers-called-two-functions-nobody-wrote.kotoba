@@ -45,7 +45,7 @@ Worker は**ビルドも deploy も通り、`/health` は 200 を返し、auth �
 
 - `GET /health` → **200**（正常に見える）
 - 未認証 `POST /plans` → **401**（auth が先に効く）
-- `shadow-cljs compile worker` → **`Use of undeclared Var marketplace.edge/run`**
+- `amu compile --target wasm32-browser worker` → **`Use of undeclared Var marketplace.edge/run`**
 
 **外から見て健康で、肝心のところが動かない Worker** という最悪の形をしていた。
 
@@ -120,9 +120,9 @@ top-up でない2件目は `:duplicate-capture` で名指し拒否、library が
   Worker の3 route、ops map の `:approved-by` stamp、store の top-up 化、
   governor の `:duplicate-capture` / `:top-up-not-derivable`。
   **JVM 126 / 489 と cljs 126 / 489 が一致**、0 failures、lint 0/0。
-  **`shadow-cljs compile worker` が 0 warnings**（修正前は undeclared var 2件）。
+  **`amu compile --target wasm32-browser worker` が 0 warnings**（修正前は undeclared var 2件）。
 - **本番 deploy 実施**（2026-07-31、standing authorization）:
-  `shadow-cljs release worker` → 0 warnings → `wrangler deploy`。
+  `amu compile --target wasm32-browser worker` → 0 warnings → `wrangler deploy`。
   Version `5028f543-730d-4f68-938a-bc142d9304d6`。deploy 後の実測:
   `/health` 200、`POST /captures` 401、`POST /refunds` 401、
   `GET /acceptances` 401（いずれも auth が効いている = route が存在する）。
@@ -143,7 +143,7 @@ top-up でない2件目は `:duplicate-capture` で名指し拒否、library が
 | crossborder | `fc0da58` | 35 / 132 | 0 warnings | `6fbd5754` |
 | fulfillment | `4b900a7` | 22 / 64 | 0 warnings | `1326026e` |
 
-全 repo で `clojure -M:lint` 0 errors / 0 warnings、deploy 後の `/health` 200。
+全 repo で `kbb -M:lint` 0 errors / 0 warnings、deploy 後の `/health` 200。
 **generic な `run` が6 actor すべてに対して正しいことを、pin を上げる前に確認した**:
 `check [request context proposal store]` / `gate [phase request disposition]` /
 `hold-fact [request context verdict]` / `verdict->disposition [verdict]` の

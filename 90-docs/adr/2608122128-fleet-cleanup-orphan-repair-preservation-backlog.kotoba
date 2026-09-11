@@ -5,7 +5,7 @@
   (:adr/date "2026-08-12")
   (:adr/deciders "Jun Kawasaki + Claude")
   (:adr/supersedes "")
-  (:adr/relates-to "skill git-cleanup-conflict; manifest/cleanup-workflow.edn :preservation-pr-disposition / :retirement / :west-orphan; ADR-2607173000 (bb retirement); ADR-2607173200 (triple-sync); com-junkawasaki/root PRs #2092 #2106; cloud-itonami/loop-noren#1; net-kotobase/commoncrawl-actor#2; kotoba-lang/loop-innen#4")
+  (:adr/relates-to "skill git-cleanup-conflict; manifest/cleanup-workflow.edn :preservation-pr-disposition / :retirement / :west-orphan; ADR-2607173000 (kbb -M:retirement); ADR-2607173200 (triple-sync); com-junkawasaki/root PRs #2092 #2106; cloud-itonami/loop-noren#1; net-kotobase/commoncrawl-actor#2; kotoba-lang/loop-innen#4")
   (:adr/body
   "# closing: fleet cleanup 2026-08-12
 
@@ -123,7 +123,7 @@ runtime entry point through a cleanup PR whose diff looked harmless.
 
 **Rule**: the disposition ladder (drift / overlap / deletions) is necessary but
 not sufficient. A policy read of the content is required before `:merge`. The
-script's idea — deriving `shadow-cljs.edn` `:source-paths` from `clojure -Spath`
+script's idea — deriving `shadow-cljs.edn` `:source-paths` from `kbb -Spath`
 rather than a hand-duplicated list — is sound and should be ported to nbb.
 
 ## Decision 6 — the disposition ladder is for snapshots; read the commits before applying it
@@ -233,9 +233,9 @@ its one substantive local edit (amu deps + test) superseded by upstream main.
 
 ## Verification actually run
 
-- `nbb scripts/west-orphan-audit.cljs --blocking` -> `local-root-broken: 0`, exit 0
-- `nbb scripts/cleanup.cljs --unlanded` -> full fleet survey, 4,141 repos, completed
-- `nbb scripts/west-pin-put.cljs` -> server-side verified both pin advances
+- `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` -> `local-root-broken: 0`, exit 0
+- `kbb --backend sci scripts/cleanup.cljk --unlanded` -> full fleet survey, 4,141 repos, completed
+- `kbb --backend sci scripts/west-pin-put.cljk` -> server-side verified both pin advances
 - conflict-marker grep over tracked superproject files -> clean
 - EDN reader check on the rewritten `commoncrawl-actor/deps.edn` before commit
 - content-containment for every retired branch and for the path-override leftover

@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; DataLad/git-annex content synchronizer for west projects.
 ;; Replaces the former Python West extension. Run directly:
-;;   nbb manifest/west_annex.cljk annex-get [project ...]
-;;   nbb manifest/west_annex.cljk annex-drop [project ...]
+;;   kbb --backend sci manifest/west_annex.cljk annex-get [project ...]
+;;   kbb --backend sci manifest/west_annex.cljk annex-drop [project ...]
 (require '[scripts.nbb-compat :refer [slurp sh exit getenv getenv-all]])
 
 (def root (clojure.string/trim (:out (sh "git" "rev-parse" "--show-toplevel"))))
@@ -51,7 +51,7 @@
     (cond
       (not (.existsSync fs script)) (fail "scripts/b2-creds.cljk がありません。")
       (not (zero? (:exit (sh "which" "nbb")))) (fail "nbb が見つかりません。")
-      :else (let [{:keys [exit out err]} (sh "nbb" "--classpath" classpath script "--json")]
+      :else (let [{:keys [exit out err]} (sh "kbb" "--backend" "sci" "--classpath" classpath script "--json")]
               (if (zero? exit)
                 (try (js->clj (.parse js/JSON out))
                      (catch :default _ (fail "b2-creds の JSON 出力を解釈できません。")))
@@ -83,7 +83,7 @@
 (defn datalad? [] (zero? (:exit (sh "which" "datalad"))))
 
 (let [[action & wanted] *command-line-args*]
-  (when-not (#{"annex-get" "annex-drop"} action) (fail "usage: nbb manifest/west_annex.cljk annex-get|annex-drop [project ...]"))
+  (when-not (#{"annex-get" "annex-drop"} action) (fail "usage: kbb --backend sci manifest/west_annex.cljk annex-get|annex-drop [project ...]"))
   (let [targets (cond->> (projects) (seq wanted) (filter #(contains? (set wanted) (:name %))))]
     (when (empty? targets) (fail "対象となる DataLad project がありません。"))
     (let [env (merge (getenv-all) (resolve-b2))

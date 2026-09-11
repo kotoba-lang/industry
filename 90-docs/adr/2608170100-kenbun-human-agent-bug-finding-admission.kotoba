@@ -139,8 +139,8 @@ role 面の repo で、prefix は `hakken` / `tehai` / `meisai` / `kago` と同�
 
 ## 検証
 
-- `clojure -M:dev:test` → **20 tests / 70 assertions / 0 failures / 0 errors**
-- `clojure -M:lint`（clj-kondo）→ **0 errors / 0 warnings**
+- `kbb -M:dev:test` → **20 tests / 70 assertions / 0 failures / 0 errors**
+- `kbb -M:lint`（clj-kondo）→ **0 errors / 0 warnings**
 - **両方向を出した。** 全 assertion が拒否する入力と受理する入力の両方を持つ
 - **landing 前に壊して確かめた。** admission の中心的主張（`:undecidable` が
   `:admitted` に畳まれない）を壊すと **7 failure**。内訳は `admit-batch` の

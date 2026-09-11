@@ -20,7 +20,7 @@
                           "ad-category 未確定を推測で埋めないという規律の first-party 適用")),
   (:adr/last_verified "2026-07-30"),
   (:adr/source-format "edn-only (ADR-2607171600)"),
-  (:adr/primary-sources (vector "cloud-itonami/cloud-itonami-isic-7310 @ 4201aee — clojure -M:dev で Campaign Governor を自社2プロダクトに対して実行した出力(2026-07-30)"
+  (:adr/primary-sources (vector "cloud-itonami/cloud-itonami-isic-7310 @ 4201aee — kbb -M:dev で Campaign Governor を自社2プロダクトに対して実行した出力(2026-07-30)"
                         "GET https://kotobase.net/api/funnel (2026-07-30 実測) — visitors 1565 / signups 3 / checkouts 0、x402 submissions 3 / rejections 3。BMC の 246 / 0 はこれに置き換わる"
                         "90-docs/business/cloud-murakumo-business-model.edn — 訪問→実推論 run 転換 1%"
                         "90-docs/business/budget-supply.edn — :supply/note が自ら placeholder と明記")),
@@ -31,7 +31,7 @@
                    "uikit の west pin が origin/main より 2 commit 遅れている(pin 鮮度の follow-up)。"
                    "kotoba-ui / shitsuke / liquid-glass-ui の *checkout* が pin より遅れていた(pin 自体は最新)。net-kotobase のサイトは別セッションが DADS(jp-go-dds)ベースへ移行し kotoba-ui 依存自体が外れたため、この skew は net-kotobase の再生成をもう塞いでいない。"
                    "(解消) signup.html の再生成保留は、別セッションの DADS 移行が私の client 側変更ごと再生成したため消えた。client 側 source 送出・return_to の query 保持とも本番配信中(2026-07-30 実測)。")),
-  (:adr/verification "cloud-itonami-isic-7310 の checkout (4201aee) に対し clojure -M:dev で自社2プロダクト x 2 category の 4 campaign を :campaign/intake -> :media-plan/verify -> :platform/verify -> :risk/screen -> :actuation/place-campaign まで通し、hold rule を実際に発火させて記録した。子リポは無変更(read-only consumer として実行)。net-kotobase 側は clojure -M:test → 73 tests / 405 assertions, 3 failures(いずれも本 diff が触らない既存失敗: uncataloged JS provider sources x2 と worker/js artifact)、kotobase.funnel-test 単独では 13 tests / 87 assertions, 0 failures。本番デプロイは repo-wide build lock が別セッションに保持されていたため未実施。"),
+  (:adr/verification "cloud-itonami-isic-7310 の checkout (4201aee) に対し kbb -M:dev で自社2プロダクト x 2 category の 4 campaign を :campaign/intake -> :media-plan/verify -> :platform/verify -> :risk/screen -> :actuation/place-campaign まで通し、hold rule を実際に発火させて記録した。子リポは無変更(read-only consumer として実行)。net-kotobase 側は kbb -M:test → 73 tests / 405 assertions, 3 failures(いずれも本 diff が触らない既存失敗: uncataloged JS provider sources x2 と worker/js artifact)、kotobase.funnel-test 単独では 13 tests / 87 assertions, 0 failures。本番デプロイは repo-wide build lock が別セッションに保持されていたため未実施。"),
   (:adr/body
   "## Context
 
@@ -289,7 +289,7 @@ US だけである。今回の2プロダクトはそこに当たらないが、�
 - 副産物として3つの既存欠陥が判明した: `kotobase.funnel-test` が一度も走って
   いなかった / `return_to` が query string を落としていた /
   jp-go-digital-design-system の checkout が pin より 8 commit 遅れていて
-  `clojure -M:render-site` が `No such var: dds-tokens/root-css-resource` で
+  `kbb -M:render-site` が `No such var: dds-tokens/root-css-resource` で
   落ちていた(checkout を pin に合わせて解消)。
 - 7310 の west pin が子リポ main より 7 commit 遅れ、uikit の pin が 2 commit
   遅れていることも判明した(いずれも別 follow-up)。

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; newsfeed-ingest.cljs — newsfeed の日次 ingest を回して台帳を B2 へ載せる
 ;; （ADR-2608031900）。launchd の cloud.itonami.bot.newsfeed-ingest から呼ばれる。
 ;;
@@ -57,7 +57,7 @@
 
 ;; ── B2 credential（値は出さない）──────────────────────────────────────────
 (def creds
-  (let [{:keys [exit out]} (run ["nbb" "--classpath"
+  (let [{:keys [exit out]} (run ["kbb" "--backend" "sci" "--classpath"
                                  (str root "/orgs/kotoba-lang/secret-resolve/src:"
                                       root "/scripts/nbb_compat:" root)
                                  (str root "/scripts/b2-creds.cljk")]
@@ -124,7 +124,7 @@
 (def before (line-count ledger))
 
 ;; ── 2) ingest ─────────────────────────────────────────────────────────────
-(let [{:keys [exit out err]} (run ["nbb" "--classpath" "src:resources" "bin/ingest.cljk"]
+(let [{:keys [exit out err]} (run ["kbb" "--backend" "sci" "--classpath" "src:resources" "bin/ingest.cljk"]
                                   {:dir ds :env env})]
   (println (str/join "\n" (map #(str "  " %) (take-last 6 (remove str/blank? (str/split-lines out))))))
   (when (pos? exit)

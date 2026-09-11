@@ -174,7 +174,7 @@ AIUEOS kernel は boot/network/memory/capability admission を所有し、infere
 1. `kotoba-lang/aiueos` を fresh clone し、まず `411b4756404c6a03c80c048725bc24b6bd400b71` を detached で読む。開発を続ける時は remote `codex/pure-native-k16` の current tip を確認し、履歴を force update しない。
 2. `os/aiueos/contracts/pure-kotoba-tcp-k16-v1.edn` と `native/rtl8125.kotoba` を読む。会話ログよりこの contract と本 ADR を優先する。
 3. Amu は `13d2f5dfe1adeaa99b7e9e6c04fcf8cb8fc15a4b`、common capability four repos は上表の exact SHA を使用する。一時パス `/private/tmp/...` は正本ではなく、session をまたいで存在を仮定しない。
-4. `clojure -M:test -n aiueos.native-rtl8125-closure-test` を通す。pure native builder は `AIUEOS_NATIVE_K16_PREFLIGHT=1` と four `AIUEOS_*_SOURCE_PATH` を exact checkout へ向け、compiler directoryを明示する。
+4. `kbb -M:test -n aiueos.native-rtl8125-closure-test` を通す。pure native builder は `AIUEOS_NATIVE_K16_PREFLIGHT=1` と four `AIUEOS_*_SOURCE_PATH` を exact checkout へ向け、compiler directoryを明示する。
 5. build receipt が no C / no CRT / imports 0 / foreign 0 を示すこと、独立 build が byte-identical であること、QEMU smoke が memory protection と ExitBootServices を通ることを確認する。
 6. 新EFIを Mac PXE directoryへ別名で置き、launcher の file と HTTP URI を同じ basenameへ更新する。service restart 後、localhost fetch の SHA が build SHA と一致するまで K16を rebootしない。旧artifactは比較用に残す。
 7. K16 reboot 後、期待 MAC `70:70:fc:0b:b6:32` の DHCP/TFTP または HTTP fetch と、新 artifact basename/hashに結び付いた wire markerだけを証拠にする。無関係 MAC の DHCP、listener ready、QEMU、EFI downloadだけでは物理 gateを通さない。

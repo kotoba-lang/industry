@@ -116,7 +116,7 @@ finding with a date rather than a surprise for the next reader.
 The schema, in an osaho worktree at origin/main (NOT the shared checkout):
 
     git -C orgs/kotoba-lang/osaho worktree add --detach <dir> origin/main
-    cd <dir> && clojure -M:test -n kotoba.kir.definition-identity-schema-test
+    cd <dir> && kbb -M:test -n kotoba.kir.definition-identity-schema-test
 
 It prints a SCANNED line carrying the block and node counts. To confirm it
 discriminates rather than merely passing, change IntNode's body from String to
@@ -155,5 +155,5 @@ form.
 - The corpus covers four families. The document forms named by ADR-2609081400
   were not measured here.
 - Neither landing is a fleet gate. The schema test runs under osaho's
-  `clojure -M:test`; the corpus runs under amu's portable nbb suite and its PR
+  `kbb -M:test`; the corpus runs under amu's portable nbb suite and its PR
   checks.")))

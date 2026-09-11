@@ -27,7 +27,7 @@ description: 営み OS（network-awai/cloud-itonami）に、まだ繋がって�
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljk
 ```
 
 tick が出す `:candidates` が**次の 1 本の候補**（M_own 降順、標準形適合のみ）。
@@ -82,9 +82,9 @@ cd /tmp/itonami-os-<repo>/orgs/network-awai/cloud-itonami && npm install
 
 ```bash
 # ① OS registry（宣言 → kernel が読む射影）
-nbb scripts/generate-os-registry.cljs && nbb scripts/generate-os-registry.cljs --check
+kbb --backend sci scripts/generate-os-registry.cljk && kbb --backend sci scripts/generate-os-registry.cljk --check
 # ② sites registry（生成した面 → edge の routing 表）
-nbb scripts/generate-sites-registry.cljs && nbb scripts/run-task.cljs sites-registry-check
+kbb --backend sci scripts/generate-sites-registry.cljk && kbb --backend sci scripts/run-task.cljk sites-registry-check
 ```
 
 **②を忘れると、面の HTML は commit されているのに誰もそこへ行けない**（実測
@@ -116,7 +116,7 @@ grep -c 'isic-<相手>/src' sites.edn   # こちらも 27
 ### 3. 実際に回す（ここを飛ばさない）
 
 ```bash
-OS_SITE_AT="<固定時刻>" nbb --classpath "<sites.edn の classpath>" scripts/generate-os-site.cljs
+OS_SITE_AT="<固定時刻>" kbb --backend sci --classpath "<sites.edn の classpath>" scripts/generate-os-site.cljs
 ```
 
 生成器は**実物の actor を回す**。次を自分の目で見る:
@@ -132,24 +132,24 @@ OS_SITE_AT="<固定時刻>" nbb --classpath "<sites.edn の classpath>" scripts/
 ### 4. テスト
 
 ```bash
-clojure -M:test        # 全体。os-test は test-runner に登録済み
+kbb -M:test        # 全体。os-test は test-runner に登録済み
 ```
 
 **失敗集合をベースラインと比べる。** 既知の失敗（doctor / kotoba-xrpc / ops-keys 系）
 は本件と無関係だが、**それを理由に新しい失敗を見逃さない**:
 
 ```bash
-clojure -M:test 2>&1 | grep -E "^(FAIL|ERROR) in" | sort > /tmp/after.txt
+kbb -M:test 2>&1 | grep -E "^(FAIL|ERROR) in" | sort > /tmp/after.txt
 diff /tmp/base.txt /tmp/after.txt   # base は origin/main の worktree で同じものを取る
 ```
 
-### 4b. **`clojure -M:test` は edge Worker 側を compile しない**（2026-08-08 実測）
+### 4b. **`kbb -M:test` は edge Worker 側を compile しない**（2026-08-08 実測）
 
 `src/cloud_itonami/edge/os_endpoints.cljc` は cljs ビルド（`:os-api`）でしか
 compile されないので、**そこに書いた require の抜けはテストが green のまま通る。**
 
 実測 2026-08-08: 4520-carwash を接続したとき `native-adapter` の case 節だけ足して
-`require` を忘れた。`clojure -M:test` は 1,532 tests すべて green で、
+`require` を忘れた。`kbb -M:test` は 1,532 tests すべて green で、
 **欠陥は main に merge された**。`cloud-itonami.edge.os-endpoints` を load すると
 `Unable to resolve symbol: carwashops/vertical` で落ちる。
 
@@ -158,14 +158,14 @@ compile されないので、**そこに書いた require の抜けはテスト�
 ```bash
 # 本命: os-api の cljs ビルド（resource-guard 経由が repo-wide の規約）
 node ~/github/com-junkawasaki/scripts/resource-guard.mjs run build -- \
-  npx shadow-cljs release os-api
+  amu compile --target wasm32-browser os-api
 
 # guard が他セッションで埋まっているとき（exit 2）の代替。これでも require 抜けは捕まる
-nbb --classpath "<sites.edn のこの vertical の classpath>" \
+kbb --backend sci --classpath "<sites.edn のこの vertical の classpath>" \
   -e '(require (quote [cloud-itonami.edge.os-endpoints])) (println "LOAD OK")'
 ```
 
-`shadow-cljs release worker` ではない —— **`:worker` という build id は存在しない**
+`amu compile --target wasm32-browser worker` ではない —— **`:worker` という build id は存在しない**
 （`shadow-cljs.edn` の build は `:os-api` `:edge-api` `:sites-api` 等）。存在しない
 id を指定すると `no build with id` で落ち、それを「ビルドが壊れている」と誤読しやすい。
 
@@ -182,7 +182,7 @@ gh api repos/network-awai/cloud-itonami/merges -f base=main -f head=agent/itonam
 ```
 
 superproject 側は `manifest/west.yml` の pin を **当該 entry だけ**前進させる
-（`nbb scripts/gen-west-manifest.cljk --entry cloud-itonami`。wholesale な再生成は禁止）。
+（`kbb --backend sci scripts/gen-west-manifest.cljk --entry cloud-itonami`。wholesale な再生成は禁止）。
 
 ⚠ **`--entry` でも生成器が他の差分を巻き込むことがある。** `repos.edn` に別セッションが
 足した未登録 repo があると、その entry も一緒に書かれる（実測 2026-08-06:

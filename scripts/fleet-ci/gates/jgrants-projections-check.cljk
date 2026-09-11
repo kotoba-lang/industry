@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; jgrants-projections-check.cljs — the jGrants subsidy catalogue, checked on every tip.
 ;;
 ;; **検証ロジックはここに複製しない。** 正本は repo 内の
@@ -21,7 +21,7 @@
 ;; 検査器は 0 clean / 1 violations / **2 could-not-answer**（data/ が無い、
 ;; 読めない）を返す。2 を pass に丸めない。
 ;;
-;; ノード側で `npx nbb jgrants-projections-check.cljs <dir>` として実行。
+;; ノード側で `kbb --backend sci jgrants-projections-check.cljk <dir>` として実行。
 (ns fleet-ci.gates.jgrants-projections-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]

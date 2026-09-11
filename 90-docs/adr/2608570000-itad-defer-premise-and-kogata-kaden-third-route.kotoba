@@ -104,7 +104,7 @@
   (:adr/evidence
   "**cloud-itonami/cloud-itonami-licensed-operator** — `d4816ea376c3`（main）
    `09f3757` feat(catalog): 小型家電リサイクル法13条 — 廃掃法14条を外から外す第3の経路
-   79 tests / 1,213 assertions green、`clojure -M:lint` errors 0 / warnings 0。
+   79 tests / 1,213 assertions green、`kbb -M:lint` errors 0 / warnings 0。
    収録ルール（すべて `:primary-source-read`、e-Gov 法令 API から原文取得）:
      jpn.kogata-kaden-13     法13条1項・3項
      jpn.kogata-kaden-10     法10条（認定・計画記載事項。2項6号が3項の受け皿）
@@ -127,7 +127,7 @@
      おり、2026-08 の `itad` への改名以降 superproject root から実行すると落ちていた。
 
    **この ADR 自体がクエリ面に載ることを確認済み**:
-     nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+     kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
        '[:find ?id ?topic :where [?e \"adr/id\" ?id] [?e \"adr/topic\" ?topic]
                                  [(= ?topic \"itad-licensing\")]]'
      => [[\"2608570000-itad-defer-premise-and-kogata-kaden-third-route\" \"itad-licensing\"]]

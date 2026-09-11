@@ -91,7 +91,7 @@ numbers this repo produced locally at the TIP with the derived classpath and
 
 To answer it deliberately rather than waiting:
 
-    nbb --classpath '.:scripts/nbb_compat' scripts/fleet-ci/tick.cljs
+    kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/fleet-ci/tick.cljs
 
 If it goes red, the entry carries its own reading: exit 95 = npm install failed on the
 node, 93/94 = no summary / zero tests, `Could not find namespace` in the output =
@@ -111,7 +111,7 @@ kotobase-protocol-core 24/97, org-apache-avro 14/32, org-apache-tinkerpop-gremli
 2. **third-party JVM jars, 149 repos.** cheshire / http-kit / ring-core / datalevin /
    transit-clj have no cljs form; each needs a real substitute decision.
 3. **390 CLEAN-but-not-self-contained repos** — the runner tranche's next slice. The
-   pipeline exists; they need a classpath built from `clojure -Spath`.
+   pipeline exists; they need a classpath built from `kbb -Spath`.
 4. **14 real REDs** — repos green on the JVM and failing under ClojureScript:
    `mst` 262 errors, `glyph` 49 failures, `katex` 37, `arxiv` 14, `org-ros` 5+10,
    `mamori` 11, `media` 5.

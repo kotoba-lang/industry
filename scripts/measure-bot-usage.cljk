@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; What the resident's Bots actually spend, so a ceiling can be chosen from a
 ;; measurement instead of a guess. ADR-2609062600 stage 1.
 ;;
-;;   nbb scripts/measure-bot-usage.cljk [--store <path to state.edn>]
+;;   kbb --backend sci scripts/measure-bot-usage.cljk [--store <path to state.edn>]
 ;;
 ;; exit 0  measured
 ;; exit 2  COULD NOT ANSWER — no store, or no turn carried a usage record

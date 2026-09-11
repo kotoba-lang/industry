@@ -56,7 +56,7 @@
   content-addressing + hydration）はこの数字に含まれない。
 - serving 面（kotobase.net backend）: repeat ~0.5s / フロア ~400ms = NRT→B2 head GET。
   peer の公表 point read 0.1-10ms に対し依然 1-2 桁劣後。価格の 4 桁優位は変わらず。
-- **バー未達（③の欠落）**: `kotobase-peer` の CI は `clojure -M:test` と `npm run test:cljs` だけで、
+- **バー未達（③の欠落）**: `kotobase-peer` の CI は `kbb -M:test` と `npm run test:cljs` だけで、
   bench も LDBC も実行しない。receipt はすべて手回し。**性能が退行しても検出する仕組みが無い。**
   これが今この軸で一番大きい穴で、数値そのものより優先度が高い。
 
@@ -98,7 +98,7 @@
   `kotobase.server.cypher/parse` に流したところ、**受理は 1 件（0.06%）**。
   別に setup クエリ 728 件があるが Cypher が read-only なので構造的に対象外。
   receipt: `kotobase-server/qualification/opencypher-tck-2026-08-04.edn`、
-  再実行は `nbb --classpath src scripts/opencypher_tck.cljs <tck/features>`。
+  再実行は `kbb --backend sci --classpath src scripts/opencypher_tck.cljs <tck/features>`。
   **これは「文法カバレッジ」であって適合率ではない**（通ったクエリが正しい結果を
   返すかは未検証）。拒否内訳の最大は `must start with MATCH` 697 /
   `subset 外の文字` 383 / `bare (var) は束縛しない` 256 / `node must close with )` 151。
@@ -168,7 +168,7 @@
     違反は deploy 前にも 11% 発生しており、新規事象ではなく頻度の変化。
   - 計測ホストの load average が 51/81/88 と異常に高い時間帯（他セッション + 本セッションの
     重いジョブ）と失敗の集中が重なる。
-  **次にやること**: 負荷の低い時間帯に `nbb slo/probe.cljs` を連続実行して違反率を取り直す。
+  **次にやること**: 負荷の低い時間帯に `kbb --backend sci slo/probe.cljk` を連続実行して違反率を取り直す。
   それでも 50% 級なら Cloudflare 側の version 差分（`c52e84a4` と前 version `b182669a`）を
   比較する。単一ホスト計測である限りこの切り分けは常に弱い —— **独立した status surface が
   無いことが、この軸の本当の gap**。

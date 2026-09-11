@@ -168,7 +168,7 @@ app 面のカバレッジ（`verify-app-content-address orgs`、**checkout を p
 
 **再現手順**（script を 1 本も要さない。archive token が戻ったら 3 を差し替える）:
 
-1. `clojure -M:cljs -m shadow.cljs.devtools.cli release app`（bim-editor だけ sibling
+1. `kbb -M:cljs -m shadow.cljs.devtools.cli release app`（bim-editor だけ sibling
    `../physics` を worktree の隣に置く必要がある）
 2. cloud-itonami の `gen-selfcontained-doc.cljs <repo>/public --out dist/<entry>.html`
    → `verify-selfcontained-doc.cljs dist/<entry>.html`（実 Chrome、file://）

@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/dependency-substitution-wave-loop.cljk — kotoba-lang 外部依存
 ;; substitution 波の **ローカル Claude loop** 入口。LaunchAgent
 ;; cloud.itonami.bot.dependency-substitution-wave が 6h ごとに起こす。
 ;;
 ;; 手順の正本は skill `dependency-substitution-wave`。**ここには書かない。**
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/dependency-substitution-wave-loop.cljk [--dry-run]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/dependency-substitution-wave-loop.cljk [--dry-run]
 
 (ns dependency-substitution-wave-loop
   (:require [clojure.edn :as edn]

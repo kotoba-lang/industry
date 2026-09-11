@@ -144,7 +144,7 @@
     FLEET_ROOT=/Users/junkawasaki/github/com-junkawasaki nbb \\
       --classpath \"src:resources:../../kotoba-lang/consumability/src\" \\
       -e \"(require '[loop-consumability.tick :as t]) (t/-main)\"
-    nbb --classpath \"src:test:resources:../../kotoba-lang/consumability/src\" test/run_tests.cljs
+    kbb --backend sci --classpath \"src:test:resources:../../kotoba-lang/consumability/src\" test/run_tests.cljs
 
   前フェーズからの未決も継続: catalog `--check` の CI 化（GitHub Actions は
   com-junkawasaki で課金停止のため fleet-ci 側に置くこと）、actor 側の実 `:contract`、

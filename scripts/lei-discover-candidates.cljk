@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-discover-candidates.cljs — 取得候補そのものを権威ソースから発見する。
 ;;
 ;; ## なぜ要るのか
@@ -40,7 +40,7 @@
 ;;
 ;; ## 使い方（superproject root から）
 ;;
-;;   nbb scripts/lei-discover-candidates.cljk [--per-country N] [--countries A,B]
+;;   kbb --backend sci scripts/lei-discover-candidates.cljk [--per-country N] [--countries A,B]
 ;;                                            [--apply]
 ;;
 ;; 既定は dry-run。`--apply` で `scripts/d1/lei-candidates.edn` に追記する

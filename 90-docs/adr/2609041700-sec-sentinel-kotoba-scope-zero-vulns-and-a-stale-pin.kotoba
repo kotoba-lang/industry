@@ -37,7 +37,7 @@ pin が 1.4.0 のまま約 1 年経過していた。GitHub Advisory に登録�
 最小 diff で出した:
 
 - PR kotoba-lang/kotoba#550 — `bot/vuln-20260904-chicory-pin`
-- 検証: `clojure -P` 解決成功 / `clojure -M:test -k wasm-exec` 745 tests /
+- 検証: `clojure -P` 解決成功 / `kbb -M:test -k wasm-exec` 745 tests /
   9,741 assertions, 0 failures, 2 errors — 変更前 baseline と完全同一
   (2 errors は /tmp conformance fixture 欠如、既存の環境起因)
 - tools.reader / tools.build / graal-build-time は OSV 該当なしなので触らない

@@ -159,7 +159,7 @@ Final verification that all Wave 2 exit criteria are met. Prepare for Wave 3 kic
   - commit-dag adapter shrunk ✓
   - consumer dual-namespace deleted ✓
   - cold-rebuild path planned ✓
-- [ ] Manifest canonical verification: `nbb scripts/gen-west-manifest.cljs --check` passing
+- [ ] Manifest canonical verification: `kbb --backend sci scripts/gen-west-manifest.cljk --check` passing
 - [ ] No regressions in kekkai/drama access control (production scenario)
 - [ ] No regressions in kototama mesh node state (fixture validation)
 - [ ] Commit all changes: PR → main

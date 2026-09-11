@@ -63,8 +63,8 @@
 ;; remove the need to measure.
 ;;
 ;; usage:
-;;   nbb scripts/kotoba-admitted-vocabulary.cljk [--grep <substring>] [--edn]
-;;   nbb scripts/kotoba-admitted-vocabulary.cljk --against <amu checkout dir>
+;;   kbb --backend sci scripts/kotoba-admitted-vocabulary.cljk [--grep <substring>] [--edn]
+;;   kbb --backend sci scripts/kotoba-admitted-vocabulary.cljk --against <amu checkout dir>
 ;;
 ;; `--against` writes one minimal probe per name below into a temp dir, runs
 ;; `bin/amu check --jvm-free` on each, and prints the four-way classification.

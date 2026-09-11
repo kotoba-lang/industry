@@ -9,7 +9,7 @@
   :worker "kotobase-protocols-worker"
   :routes ["s3" "atproto" "pinning" "sparql" "gremlin" "graphql" ".kotobase.net"]
   :source "net-kotobase/control-plane 57b1f350f"
-  :build "shadow-cljs release worker, 0 warnings; verify:waituntil OK (3 sites)"}
+  :build "amu compile --target wasm32-browser worker, 0 warnings; verify:waituntil OK (3 sites)"}
 
  :measured
  {:before {:version "120f3e08" :probe-status 501

@@ -185,9 +185,9 @@ aux    M          = base_market · (ref_price/price)^ε        ; 弾力性
   "**再現方法**（実行済み、2026-08-02）:
 
 ```bash
-nbb --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:90-docs/system-dynamics\" \\
+kbb --backend sci --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:90-docs/system-dynamics\" \\
     90-docs/system-dynamics/regret.cljs
-nbb --classpath \"orgs/kotoba-lang/dynamics/src:90-docs/system-dynamics\" \\
+kbb --backend sci --classpath \"orgs/kotoba-lang/dynamics/src:90-docs/system-dynamics\" \\
     90-docs/system-dynamics/leverage.cljs
 ```
 

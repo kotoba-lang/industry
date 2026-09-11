@@ -132,10 +132,10 @@ LEI 実体の actor 群を持ち、`:company/lei` を結合キーに market-inte
 （レジストリ未配線の運用者に pin を publish させない）。`:lei` / `:isic-code`
 は `:tier/analytics`、`:subject-name` は `:tier/audit` のみ。
 
-検証: `clojure -M:dev:test` 71 tests / 316 assertions 0 failures（着手前は
-35/141）、`:market-data` 込みで 73/323、`clojure -M:lint` errors 0 warnings 0、
-`clojure -M:dev:run` の 13 op demo が文書どおりの disposition、
-`clojure -M:dev:render-html` は 2 回連続実行で byte-identical。
+検証: `kbb -M:dev:test` 71 tests / 316 assertions 0 failures（着手前は
+35/141）、`:market-data` 込みで 73/323、`kbb -M:lint` errors 0 warnings 0、
+`kbb -M:dev:run` の 13 op demo が文書どおりの disposition、
+`kbb -M:dev:render-html` は 2 回連続実行で byte-identical。
 
 **未検証面を隠さない**: POI の ISIC コードは運用者申告であってレジストリ発行
 ではなく、解決済み LEI 記録との「矛盾」チェックにのみ使う

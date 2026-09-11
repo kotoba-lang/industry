@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-x402-offer-domain — a live x402 offer whose EIP-712 domain is not the
 ;; token's own.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-x402-offer-domain.cljk [--findings]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-x402-offer-domain.cljk [--findings]
 ;;   nbb ... scripts/verify-x402-offer-domain.cljk --self-test
 ;;
 ;; ## The defect

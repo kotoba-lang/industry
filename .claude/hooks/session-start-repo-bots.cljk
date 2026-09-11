@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; SessionStart フック: repo ごとの常駐 bot（scripts/repo-bots/）が測った現在地を、
 ;; セッション冒頭で agent の目の前に置く。
 ;;
@@ -20,7 +20,7 @@
 ;;
 ;; fail-open: 判定途中のあらゆる失敗はセッション開始をブロックしない。
 ;;
-;; 手動実行: nbb .claude/hooks/session-start-repo-bots.cljk [--state <path>]
+;; 手動実行: kbb --backend sci .claude/hooks/session-start-repo-bots.cljk [--state <path>]
 
 (require '[cheshire.core :as json]
          '[clojure.edn :as edn]
@@ -81,7 +81,7 @@
                (str "  名簿 " (count registry) " 体 / state ファイルが在りません: " state-file)
                ""
                "**報告の無い tick と、動いていない tick は外から見て同じです。**"
-               "1 回走らせる: nbb scripts/repo-bots/tick.cljk --wave 200"
+               "1 回走らせる: kbb --backend sci scripts/repo-bots/tick.cljk --wave 200"
                (str "常駐させる: cp scripts/cloud.itonami.bot.repo-bots-tick.plist ~/Library/LaunchAgents/ && "
                     "launchctl load " plist)]))
 
@@ -123,6 +123,6 @@
            (when (pos? unmeasured)
              [(str "  測れなかった bot: " unmeasured " 体（checkout が無い等。**clean ではない**）")])
            [(str "  直近 7 日の成長: 塞がった " (:cleared g7) " / 割れた " (:broke g7)
-                 "  —— 詳細は `nbb scripts/repo-bots/tick.cljk --report`")]))))))
+                 "  —— 詳細は `kbb --backend sci scripts/repo-bots/tick.cljk --report`")]))))))
   (catch :default _ nil))
 (compat/exit 0)

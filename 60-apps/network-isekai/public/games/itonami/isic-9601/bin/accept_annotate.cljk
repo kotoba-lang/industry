@@ -45,7 +45,7 @@
 (defn- ok! [label] (println "  ok  " label))
 
 (defn- spawn-render [& args]
-  (cp/spawnSync "npx" (clj->js (into ["nbb" "--classpath" cp-str "bin/render.cljs"] args))
+  (cp/spawnSync "npx" (clj->js (into ["kbb" "--backend" "sci" "--classpath" cp-str "bin/render.cljs"] args))
                 #js {:cwd here :encoding "utf8"}))
 
 (defn- last-edn

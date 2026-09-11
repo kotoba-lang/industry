@@ -39,7 +39,7 @@ ledger 半分だけを無効化したあとも生きている）。
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin
-nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory-tick.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-inventory-tick.cljk
 ```
 
 `:outcome :insufficient-scan` が出たら **何もせず終わる**。sparse checkout から
@@ -125,14 +125,14 @@ CLAUDE.md / AGENTS.md。引用が **現行方針**として読めるときだけ
 
 ```bash
 # (a) 対象ファイルが読める
-nbb -e '(println (count (keys (first (filter map? (cljs.reader/read-string (.readFileSync (js/require "node:fs") "<対象>" "utf8")))))))'
+kbb --backend sci -e '(println (count (keys (first (filter map? (cljs.reader/read-string (.readFileSync (js/require "node:fs") "<対象>" "utf8")))))))'
 
 # (b) diff が当該 1 ファイル・当該 finding の範囲だけ
 git diff --stat
 git diff -U0 | head -80
 
 # (c) 同じ finding が先頭から消える（残件数は減らなくてよい。別 kind が残る）
-COM_JUNKAWASAKI_ROOT="$PWD" nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory.cljk
+COM_JUNKAWASAKI_ROOT="$PWD" kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/adr-inventory.cljk
 ```
 
 (c) で **同じ path の同じ kind がまだ先頭**なら、直っていない。着地させない。

@@ -14,7 +14,7 @@
 ;;
 ;; **subset であることを黙らせない**: 起動時に stderr へ何を載せたかを必ず出す。
 ;;
-;; usage: nbb --classpath ".:scripts/nbb_compat" scripts/query-dialect-bench/plane.cljk 'q*' '<q1>' ...
+;; usage: kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/query-dialect-bench/plane.cljk 'q*' '<q1>' ...
 ;;        nbb ... plane.cljs count
 
 (require '[clojure.string :as str]

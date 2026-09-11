@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; manifest/spend-grants.edn -> the facts a token carries, and the policy the
 ;; buyer folds out of them.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/spend-grant-facts.cljk [--buyer dougaka]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/spend-grant-facts.cljk [--buyer dougaka]
 ;;
 ;; ## Why this is a separate step from minting
 ;;

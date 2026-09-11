@@ -128,7 +128,7 @@ Land before deploying. Both fixes are now on main.
 
 ## Resume point
 
-    nbb --classpath \".:scripts/nbb_compat\" scripts/sepolia-to-base-bridge.cljs
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/sepolia-to-base-bridge.cljs
 
 Exits 2 while unfunded and says what is needed. After a faucet draw it builds
 the deposit that carries Sepolia ETH to Base Sepolia, holding back its own

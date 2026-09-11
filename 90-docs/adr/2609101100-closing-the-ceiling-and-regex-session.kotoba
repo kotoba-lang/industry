@@ -100,7 +100,7 @@ public function in this arc with an oracle rather than a table.
 
   cd orgs/kotoba-lang/htmldom
   sed -n '222,275p' src/htmldom/core.cljc        # the contract
-  nbb docs/dom_encoding_probe.cljs               # the shape decisions, re-measured
+  kbb --backend sci docs/dom_encoding_probe.cljk               # the shape decisions, re-measured
 
 Two rules this session earned the hard way, for whoever picks it up:
 

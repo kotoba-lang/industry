@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; yorishiro-provider-vault-check.cljs — kotoba-lang/app-yorishiro の provider/ suite を
 ;; ノード上で実際に回す gate。
 ;;
@@ -34,7 +34,7 @@
 ;; 対象は provider/ に閉じる。kotoba/ を足すなら別 gate として、依存が anonymous に
 ;; 引けることを実測してから。
 ;;
-;; ノード側で `npx nbb yorishiro-provider-vault-check.cljs <dir> [--min N]`
+;; ノード側で `kbb --backend sci yorishiro-provider-vault-check.cljk <dir> [--min N]`
 ;; として実行（**<dir> は引数の先頭**。多くの gate と同じく、最初の非 --flag を
 ;; tree として取る）。
 (ns fleet-ci.gates.yorishiro-provider-vault-check

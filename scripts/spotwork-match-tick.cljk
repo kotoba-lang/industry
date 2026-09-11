@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/spotwork-match-tick.cljk — スキマバイト突合 bot の測定段。
 ;; **決定論。モデルは居ない。読むだけ（git の書き込みを 1 つも呼ばない）。**
 ;; 姉妹: scripts/isekai-game-dev-tick.cljk / scripts/repo-bots/tick.cljk。
@@ -29,8 +29,8 @@
 ;; その求人の提案 1 行を**決定論的に生成して印字する**（台帳には書かない）。
 ;; skill はこれを使う —— 提案を手で書かせない。exit 0 / 2。
 ;;
-;;   nbb scripts/spotwork-match-tick.cljk
-;;   nbb scripts/spotwork-match-tick.cljk --emit of-fixture-0001-hall-day
+;;   kbb --backend sci scripts/spotwork-match-tick.cljk
+;;   kbb --backend sci scripts/spotwork-match-tick.cljk --emit of-fixture-0001-hall-day
 
 (ns spotwork-match-tick
   (:require [clojure.edn :as edn]

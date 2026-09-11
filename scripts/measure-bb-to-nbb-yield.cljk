@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; What fraction of the `:sci-test` bb.edn population actually converts?
 ;;
 ;; `scripts/bb_to_nbb_scaffold.cljk` has classified 181 repos as :sci-test —
@@ -16,7 +16,7 @@
 ;; Read-only: it runs the emitted command against the existing checkout and
 ;; writes nothing. Nothing here touches bb.edn.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" measure-bb-to-nbb-yield.cljs
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" measure-bb-to-nbb-yield.cljs
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))
@@ -33,7 +33,7 @@
 ;; One classify pass, then one dry-run emit per repo to get the command the
 ;; converter would install.
 (def classified
-  (:out (sh (str "nbb --classpath '.:scripts/nbb_compat' scripts/bb_to_nbb_scaffold.cljk"
+  (:out (sh (str "kbb --backend sci --classpath '.:scripts/nbb_compat' scripts/bb_to_nbb_scaffold.cljk"
                  " emit-batch --class sci-test --dry-run")
             {:cwd root :shell "/bin/bash"})))
 

@@ -152,7 +152,7 @@ USDC on Base の手数料と facilitator の取り分があるので、真の原
 6. **月商 $480 は 100% 完売・値引きゼロ・全部が出力トークンという最良ケース。** 実際は入力トークンの比率が高く（chat は prompt が長い）、混合単価は $0.40 より **$0.10 寄り**になる。現実的な期待値は $480 より相当低い。")
 
   (:adr/verification
-  "**再現**: `nbb 90-docs/system-dynamics/token-price.cljs`（依存なし、2026-08-02 実行済み）。
+  "**再現**: `kbb --backend sci 90-docs/system-dynamics/token-price.cljk`（依存なし、2026-08-02 実行済み）。
 
 **コード実測**: `orgs/kotoba-lang/murakumo/kotoba/infer_credits_core.kotoba:20` に `(defn default-per-token [] :i64 1)`。`src/murakumo/infer/credits.cljc` が `(oracle/i64->host (o 'default-per-token []))` で読み、`job-cost` が `:tokens` にのみこの既定を許し、他の unit は価格キー欠落で例外を投げる。`unit-prices` に `:mtokens` は**無い**。
 

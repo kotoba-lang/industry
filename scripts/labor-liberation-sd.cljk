@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/labor-liberation-sd.cljk — 労働解放 system dynamics モデル
 ;; (90-docs/business/labor-liberation-sd-model.edn) を実 DataScript (npm datascript)
 ;; にロードし、逆トポロジーソート・解放レバレッジ・SD ループ解析を query で導出する。
@@ -7,12 +7,12 @@
 ;; と同じ制約・同じ方針（npm datascript の JS インターフェースは attr を裸文字列で扱う）。
 ;;
 ;; 使い方:
-;;   nbb scripts/labor-liberation-sd.cljk verify   ; 参照整合 + DAG 非循環の検証
-;;   nbb scripts/labor-liberation-sd.cljk layers   ; 逆トポソート層（Kahn）
-;;   nbb scripts/labor-liberation-sd.cljk rank     ; score 降順の全ノードランキング
-;;   nbb scripts/labor-liberation-sd.cljk loops    ; SD ループ（polarity / status / 断点）
-;;   nbb scripts/labor-liberation-sd.cljk plan     ; 再計算した実行順序（3 トラック）
-;;   nbb scripts/labor-liberation-sd.cljk q '[:find ?id :where [?e "node/gate" "gate.robotics"] [?e "node/id" ?id]]'
+;;   kbb --backend sci scripts/labor-liberation-sd.cljk verify   ; 参照整合 + DAG 非循環の検証
+;;   kbb --backend sci scripts/labor-liberation-sd.cljk layers   ; 逆トポソート層（Kahn）
+;;   kbb --backend sci scripts/labor-liberation-sd.cljk rank     ; score 降順の全ノードランキング
+;;   kbb --backend sci scripts/labor-liberation-sd.cljk loops    ; SD ループ（polarity / status / 断点）
+;;   kbb --backend sci scripts/labor-liberation-sd.cljk plan     ; 再計算した実行順序（3 トラック）
+;;   kbb --backend sci scripts/labor-liberation-sd.cljk q '[:find ?id :where [?e "node/gate" "gate.robotics"] [?e "node/id" ?id]]'
 
 (require '[scripts.nbb-compat :refer [slurp exit]]
          '[clojure.edn :as edn]
@@ -269,7 +269,7 @@
       "loops"  (print-loops)
       "plan"   (print-plan)
       "q"      (println (pr-str (q query-str)))
-      (do (println "usage: nbb scripts/labor-liberation-sd.cljk [verify|layers|rank|loops|plan|q '<datalog>']")
+      (do (println "usage: kbb --backend sci scripts/labor-liberation-sd.cljk [verify|layers|rank|loops|plan|q '<datalog>']")
           (exit 1)))))
 
 (apply -main *command-line-args*)

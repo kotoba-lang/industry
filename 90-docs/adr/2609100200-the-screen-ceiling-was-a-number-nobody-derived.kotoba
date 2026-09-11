@@ -84,7 +84,7 @@ controlled comparison, same probe either side: at 256, five adds then
 
 **「the local suite is green」** -- true and not sufficient. CI failed three
 `test-jdk-free-native` jobs because `deps-lock.edn` carries a hash of
-`deps.edn` and only the JVM-FREE path reads it. `clojure -M:test` resolves the
+`deps.edn` and only the JVM-FREE path reads it. `kbb -M:test` resolves the
 closure directly and never consults the lock, so local green and CI green were
 different claims about different routes.
 
@@ -177,7 +177,7 @@ the reason one of these four numbers deserved changing and another does not.
 Two failures that a local suite structurally could not see, both landed by CI:
 
   * `deps-lock.edn` carries a hash of `deps.edn` and only the JVM-FREE path
-    reads it. `clojure -M:test` resolves the closure directly, so local green
+    reads it. `kbb -M:test` resolves the closure directly, so local green
     and CI green were different claims about different routes.
   * `tests/browser/browser.spec.mjs` drives the example through a real browser
     with the same letter-key fixtures the unit test used. Only CI runs it,

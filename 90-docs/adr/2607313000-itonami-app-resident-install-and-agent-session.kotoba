@@ -32,7 +32,7 @@ workspace 側に効く帰結。
 
 常駐 job `dev.cloud-itonami.app` は **`/private/tmp/cloud-itonami-passkey.LxPMWm`**
 ——ある agent session の使い捨て worktree、branch `agent/passkey-feedback`——から
-`clojure -M:server` を起動していた（`launchctl submit` 由来で plist は無い）。帰結が 2 つ:
+`kbb -M:server` を起動していた（`launchctl submit` 由来で plist は無い）。帰結が 2 つ:
 
 - **稼働中の app は 9 view / `/api/business` は 404。** 同時刻の `origin/main` は 19 view
   （Portfolio / Canvas / Loops / Repos / Metrics / Fleet / 事業者 / Contracts …）。
@@ -62,7 +62,7 @@ identity は移設時にバイト同一で複製（`state.edn` 4,812 bytes、SHA
 
 ## CLI / MCP が session を得る経路
 
-`clojure -M:cli auth login --label <name>` が data dir の 0600 key を読み、稼働中 server に提示して
+`kbb -M:cli auth login --label <name>` が data dir の 0600 key を読み、稼働中 server に提示して
 agent session を得て Keychain に記録する。**passkey は要らない。** 根拠は「data dir を読めること」で、
 それが load-bearing だから——`state.edn` を読み書きできるプロセスは、ファイルを直接編集して
 好きな session を作れる。その上に passkey を重ねてもオーナーを拒むだけ。オーナー判断 2026-07-31。

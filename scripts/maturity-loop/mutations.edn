@@ -259,7 +259,7 @@
    ;; いた（NaN との比較は全て false なので `(> ##NaN -1e15)` が false）。docstring は
    ;; その死んだ節を「NaN を落としている節」として説明していた。節を消し、
    ;; **実際に効く方**（bounds そのもの）を壊す mutation に差し替えてある。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :tt/restoral-not-a-link-op
@@ -390,7 +390,7 @@
    ;; 1. **suite が rename 以来 1 度も走っていなかった。** 8dfad97 が
    ;;    .clj/.cljc を .kotoba へ改名し、deps.edn は cognitect.test-runner の
    ;;    ままだった。clojure.tools.namespace は .kotoba を解決しないので、
-   ;;    実測 2aa259b で `clojure -M:test` は
+   ;;    実測 2aa259b で `kbb -M:test` は
    ;;    `Ran 0 tests containing 0 assertions. 0 failures, 0 errors.` を
    ;;    **exit 0** で出した。README は「14 tests / 29 assertions green」と
    ;;    書いており、しかもそれは**正しかった** —— 何かが load しさえすれば
@@ -424,7 +424,7 @@
    ;; 登録した。うち 2 件は test ではなく **floor の拒否**を確かめるので、
    ;; :must-fail に拒否理由そのものを置いてある —— 「名乗っている理由で
    ;; 拒否したか」まで見るため（ADR-2608136000 の 6 問目）。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "netops: OK"
    :mutations
    [{:id :np/rule-checks-regated-on-add-rule
@@ -496,8 +496,8 @@
    :label "isco-3133 chemical-ops —— 一度も走っていなかった suite と、denylist だった governor"
    ;; 2026-09-11、66aeb11（.kotoba 一括改名 6355ed3 の直後）で測った状態:
    ;;
-   ;;   clojure -M:test   Ran 0 tests containing 0 assertions.   exit 0
-   ;;   clojure -M:lint   linting took 9ms, errors: 0             exit 0
+   ;;   kbb -M:test   Ran 0 tests containing 0 assertions.   exit 0
+   ;;   kbb -M:lint   linting took 9ms, errors: 0             exit 0
    ;;
    ;; どちらも 1 ファイルも読んでいない。改名前の pin b3fc906 では同じ suite が
    ;; 10 tests / 31 assertions で緑だった。走らなかった suite は、全部走って
@@ -522,7 +522,7 @@
    ;; うち 1 件（:co/canonical-dropped）は最初のテストが**噛まなかった** ——
    ;; array-map を hash-map の seq 順で組んでいたので印字順が同じで、正規化の
    ;; 有無を区別できていなかった。逆順で組み直して赤くなるのを見てから登録した。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "chemical-ops: OK"
    :mutations
    [{:id :co/vocabulary-reopened
@@ -621,8 +621,8 @@
    :label "isco-1322 mining-managers —— 配線されていなかった graph と、denylist だった governor"
    ;; 2026-09-11、acfd967（.kotoba 一括改名 639da6f の直後）で測った状態:
    ;;
-   ;;   clojure -M:test   Ran 0 tests containing 0 assertions.   exit 0
-   ;;   clojure -M:lint   linting took 9ms, errors: 0             exit 0
+   ;;   kbb -M:test   Ran 0 tests containing 0 assertions.   exit 0
+   ;;   kbb -M:lint   linting took 9ms, errors: 0             exit 0
    ;;
    ;; どちらも 1 ファイルも読んでいない。改名前の pin 18aeef6 では同じ suite が
    ;; 12 tests / 34 assertions で緑、lint は 4 warnings を出していた。
@@ -652,7 +652,7 @@
    ;; この actor の escalate-entry は 10 key で、hash の両側とも hash-map なので
    ;; 印字順が揃ってしまい、正規化の有無を区別できなかった。6 key（合計 9）の
    ;; 境界ちょうどの entry に置き換えて赤くなるのを見てから登録した。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "mining-managers: OK"
    :mutations
    [{:id :mm/vocabulary-reopened
@@ -1066,7 +1066,7 @@
    ;; assertion は prose と同じ速さで腐るから。全て 2026-08-06 に赤くなるのを見た。
    ;; 残り 12 件（2026-08-12）は quickstart とは無関係な、当時どのテストも
    ;; 見ていなかった不変条件。区切りのコメントを参照。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :langgraph/tick-not-resume-to-completion
@@ -1400,7 +1400,7 @@
    ;; である (`:local` alias で scratch worktree に差し替えて実測した:
    ;; `(def toolbar glass/panel)` で sweep だけが赤くなり `toolbar` を名指しした)。
    ;; ここに載るのは appkit 自身の tree で壊せる 6 件。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    ;; 6 件とも 2026-09-05 に赤くなるところを見た。
@@ -1529,11 +1529,11 @@
      :replace "(ui/list-view rows (merge default-panel-opts opts))"
      :must-fail ["each-wrapper-applies-its-own-published-map-test"]}
     ;; --- cljs: consumer の runtime で同じ suite が走ること（2026-09-07 追加）-----
-    ;; appkit は .cljc で consumer は browser だが、runner は `clojure -M:test` だけ
+    ;; appkit は .cljc で consumer は browser だが、runner は `kbb -M:test` だけ
     ;; だった。実測 2026-09-07、下の 3 つはどれも JVM の 16 test / 31 assertion を
     ;; 緑のまま通す —— JVM 側が弱いのではなく、cljs の分岐が JVM から構造的に
     ;; 見えない（run.cljs が per-mutation :cmd の理由として名指ししている class）。
-    ;; `nbb test/appkit/cljs_runner.cljs` は同じ appkit.core-test を cljs.test で
+    ;; `kbb --backend sci test/appkit/cljs_runner.cljk` は同じ appkit.core-test を cljs.test で
     ;; 走らせる（assertion の 2 本目の写しは無い）。:must-fail は test 名ではなく
     ;; **runner が印字する理由の literal** —— 別の理由で赤くなった実行を「噛んだ」と
     ;; 数えないため。3 本目だけは load が通るので test 名で pin する。
@@ -1570,12 +1570,12 @@
     ;; 実測 2026-09-10、origin/main (4cf2199) がまさにこの形で壊れていた:
     ;; 機械的な clojure.string -> kotoba.lang.text 置換 (74ad15c) が runner にも
     ;; 当たり、`Could not find namespace: kotoba.lang.text` で **test を 1 本も
-    ;; load せずに死んでいた**。その間 `clojure -M:test` は 16 tests / 31
+    ;; load せずに死んでいた**。その間 `kbb -M:test` は 16 tests / 31
     ;; assertions / exit 0 のままで、cljs の半分が暗転したことを何も言わなかった。
     ;; runner は構造上 **自分の require を検査できない**（1 つでも解決できなければ
     ;; そのファイルの中身は 1 行も走らない）ので、検査は JVM 側に置く。
     ;; `cljs-runner-is-bare-launchable-test` は nbb の同梱集合を列挙せず
-    ;; **素の `nbb -e` に訊いて測る** —— 同梱集合は nbb 側が動かすものなので、
+    ;; **素の `kbb --backend sci -e` に訊いて測る** —— 同梱集合は nbb 側が動かすものなので、
     ;; 手で書いた一覧は黙って腐る。
     {:id :appkit/runner-requires-a-classpath-namespace
      :why "runner が素の `nbb <script>` で起動できること。classpath 上にしか無い namespace を runner の ns に足すと、cljs suite は 1 本も走らないまま消える —— そして JVM suite は緑のままなので、repo が出す信号は全部『問題なし』と言う。これは仮想の壊し方ではなく origin/main で実際に起きていた形そのもの"
@@ -1669,7 +1669,7 @@
     ;; と、その render 段である `docs/quickstart_page.cljs` は **1 バイトも読まれて
     ;; いなかった** —— 22 tests / 53 assertions の suite に対する実測 2026-09-11:
     ;; 74ad15c と同一の clojure.string -> kotoba.lang.text 置換を quickstart 側に
-    ;; 当てると `nbb docs/quickstart_page.cljs` は exit 1 で死に、**JVM も cljs も
+    ;; 当てると `kbb --backend sci docs/quickstart_page.cljk` は exit 1 で死に、**JVM も cljs も
     ;; exit 0 のまま**だった。runner を名指しで固めたことが、その双子を無防備に
     ;; 残していた —— この repo が繰り返す非対称（panel は固く list-view が漏れる）
     ;; が docs 面に出た形。
@@ -1687,8 +1687,8 @@
     {:id :appkit/quickstart-doc-names-a-missing-script
      :why "docs が名指しする launcher が実在すること。発見が docs 側から行われる以上、docs が存在しない path を指したら誰も検査されないまま全部緑になる —— 「見つからなかった」が「問題なかった」と同じ値を返す形そのもの"
      :file "docs/operator-quickstart.md"
-     :find "nbb docs/quickstart_page.cljs"
-     :replace "nbb docs/quickstart-page.cljs"
+     :find "kbb --backend sci docs/quickstart_page.cljk"
+     :replace "kbb --backend sci docs/quickstart-page.cljk"
      :must-fail ["documented-bare-launchers-are-bare-launchable-test"]}
 
     {:id :appkit/quickstart-render-bypasses-appkit
@@ -1714,7 +1714,7 @@
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :prolly/cid-chain
@@ -1747,7 +1747,7 @@
 
   {:repo "orgs/kotoba-lang/inga"
    :label "inga two-root state + metered emission"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :inga/actors-in-root
@@ -1825,7 +1825,7 @@
    ;; 売っている .cljc 可搬性）は test/nbb_smoke.cljs が測るが、それは別の runner なので
    ;; **この suite が緑でも cljs は未測定**。social-publication のように 1 本で両方を
    ;; 回す形へ寄せるのが次の一手。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :retail/currency-raw
@@ -1885,7 +1885,7 @@
    ;; ときだけ緑マーカーを出す。実装は .cljc なので、片方でしか走らせないと
    ;; 「移植性」は主張のままになる —— codebase の f64 と同じ穴で、実際に
    ;; :portable-not-jvm-only はその穴だけを撃つ mutation である。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "social-publication: both runtimes green (nbb + JVM)"
    ;; 全て 2026-08-08 に実際に赤くなるところを見た。同時に**元の suite では
    ;; 6 件すべてが緑のまま**だったことも確認している（7 件目が撃つコードは
@@ -1968,7 +1968,7 @@
    ;;   3. descriptor 本体のデータ（actor-manifest.jsonld / .well-known/did.json）
    ;; データを撃つ mutation が噛まないなら、この suite は「自分自身のテスト」で
    ;; あって「descriptor のテスト」ではない。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "cargo descriptor: all green"
    ;; 全て 2026-08-08 に実際に赤くなるところを見た。
    :mutations
@@ -2056,7 +2056,7 @@
    ;; 守る。だから撃つ先の重心が違う: 緩む方向の mutation（明示 false を attest と
    ;; みなす / AND を OR にする / blocked なのに records を持つ / 未知 cell を
    ;; 黙って ready にする）が主で、固定値と descriptor 本体はその周辺にある。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "jp-ashiba actor: all green"
    ;; 全て 2026-08-08 に実際に赤くなるところを見た。
    :mutations
@@ -2188,7 +2188,7 @@
    ;;   - record 本体の :actorDid を呼び出し側が上書きできる（既知の gap）。
    ;;     **gap が塞がったときに赤くなる** mutation を置いて、gap 記録が
    ;;     飾りにならないようにしてある。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "m365-ingest actor: all green"
    ;; 全て 2026-08-08 に実際に赤くなるところを見た。
    :mutations
@@ -2331,8 +2331,8 @@
     {:id :m365-ingest/quickstart-names-a-script-that-does-not-exist
      :why "**『踏めない手順は書かない』の番人。** 存在しない script を指す quickstart は、読んだ人が実行して初めて壊れていることが分かる —— 文書としては最後までもっともらしく読めるので、レビューでも落ちない"
      :file "docs/operator-quickstart.md"
-     :find "nbb scripts/maturity-loop/run.cljk --only m365-ingest"
-     :replace "nbb scripts/maturity-loop/runner.cljs --only m365-ingest"
+     :find "kbb --backend sci scripts/maturity-loop/run.cljk --only m365-ingest"
+     :replace "kbb --backend sci scripts/maturity-loop/runner.cljk --only m365-ingest"
      :must-fail ["every-script-the-quickstart-names-either-exists-or-is-declared-external"]}
 
     {:id :m365-ingest/quickstart-classpath-points-at-a-missing-dir
@@ -2399,7 +2399,7 @@
    ;; だから各テストは thread を 2 本生かしたまま、**両方**について主張する:
    ;; 検査対象の 1 本と、動いてはならない 1 本。
    ;; 2026-08-27 に 5 件すべて赤くなるところを見た。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :langchain/next-idx-ignores-thread
@@ -2597,7 +2597,7 @@
    ;; **mutation が「修正」の側である**（`or` を `if-some` にする、
    ;; `count` を high-water mark にする、`pr-str` を canonical にする）。
    ;; 赤くなることで、その修正が「掃除」ではなく「互換性イベント」になる。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :langchain-store/enc-is-not-a-codec
@@ -2713,7 +2713,7 @@
    ;;   - **文書 guard の最初の版は 3 つ素通りした。** bare な数の一致・`includes?`
    ;;     の部分一致・DID の接頭辞一致。いずれも「正しい記述が別の行に残っていると
    ;;     壊れた行を見逃す」形。強化後の版を撃ち続けるために全部ここに載せる。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "marine-insurance actor: all green"
    ;; 全て 2026-08-09 に実際に赤くなるところを見た（20/20）。
    :mutations
@@ -2790,8 +2790,8 @@
     {:id :marine-insurance/quickstart-classpath-drifts
      :why "**これも最初の版が素通りした。** step 2 の classpath を `src:tests` に壊しても、step 3 に正しい行が残っているので `includes?` は真のまま。出てくる**すべての** classpath の実在を見る形に強化した"
      :file "docs/operator-quickstart.md"
-     :find "nbb --classpath src:test run_tests.cljs\n```\n\n最後の 3 行がこうなれば緑:"
-     :replace "nbb --classpath src:tests run_tests.cljs\n```\n\n最後の 3 行がこうなれば緑:"
+     :find "kbb --backend sci --classpath src:test run_tests.cljs\n```\n\n最後の 3 行がこうなれば緑:"
+     :replace "kbb --backend sci --classpath src:tests run_tests.cljs\n```\n\n最後の 3 行がこうなれば緑:"
      :must-fail ["every-nbb-classpath-in-the-docs-points-at-real-directories"]}
 
     {:id :marine-insurance/readme-swaps-a-did-for-a-lookalike
@@ -2859,7 +2859,7 @@
 
   {:repo "orgs/cloud-itonami/cloud-itonami-app"
    :label "Cloud Itonami Bot handoff isolation and paid-order fail-closed boundary"
-   :cmd ["clojure" "-Sdeps" "{:paths [\"src\" \"resources\" \"test\"]}"
+   :cmd ["kbb" "-Sdeps" "{:paths [\"src\" \"resources\" \"test\"]}"
          "-M" "-e"
          "(require 'clojure.test 'cloud.itonami.app.routines-test 'cloud.itonami.app.commerce-test)(let [r (clojure.test/run-tests 'cloud.itonami.app.routines-test 'cloud.itonami.app.commerce-test)] (shutdown-agents) (System/exit (+ (:fail r) (:error r))))"]
    :green-marker "0 failures, 0 errors"
@@ -2895,7 +2895,7 @@
    ;; あって参照整合性の破れではないので、テスト側は lstat で「dataset が宣言して
    ;; いるか」を見る。fleet の worktree でも実体は無いままなので、この suite は
    ;; `annex-get` を要求しない。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "mangaka-data corpus: all green"
    ;; 全て 2026-08-19 に実際に赤くなるところを見た。
    :mutations
@@ -3018,7 +3018,7 @@
    ;; putRecord は **rkey での upsert** なので、衝突は前のレコードを黙って消す。
    ;; 要求は 165 本出て全部 200 が返り、seed は満額の件数を報告する ——
    ;; **消えた分はどこにも数えられない**。それが :rkey-truncated が撃つ形。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "fm seed + blueprint: all green"
    ;; 9 件とも 2026-08-19 に実際に赤くなるところを見た。8 つのテストは全て
    ;; いずれかの mutation に名指しされている（名指しの無いテストを残さない）。
@@ -3115,7 +3115,7 @@
    ;; 割れる」形と同じ入口）。規則は src/etzhayyim/airshed/contract.cljc の純粋
    ;; 関数、fixture（contract_test）で落ちることを見せてから実ファイル
    ;; （repo_test）に当てる。全て 2026-08-22 に実際に赤くなるところを見た。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "airshed actor contract: all green"
    :mutations
    [{:id :airshed/deploy-did-drifts
@@ -3257,7 +3257,7 @@
    ;; 規則は src/etzhayyim/intel/contract.cljc の純粋関数、fixture（contract_test）で
    ;; 落ちることを見せてから実ファイル（repo_test）に当てる。全て 2026-08-22 に
    ;; 実際に赤くなるところを見た。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "intel contract: all green"
    :mutations
    [{:id :intel/cohort-write-goes-plaintext
@@ -3311,7 +3311,7 @@
 
   {:repo "orgs/kotoba-lang/physics"
    :label "布と粒子 —— 見た目では気づけない保存量と記帳"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :physics/xpbd-lambda-not-accumulated
@@ -3337,7 +3337,7 @@
 
   {:repo "orgs/kotoba-lang/raytrace"
    :label "デノイザとパストレーサ —— 絵では測れない主張"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :raytrace/denoise-ignores-features
@@ -3356,7 +3356,7 @@
 
   {:repo "orgs/kotoba-lang/io-alembic"
    :label "Ogawa 容器と Alembic object / property 層 —— 静かに壊れる 6 つ"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :alembic/ignores-frozen-byte
@@ -3403,7 +3403,7 @@
 
   {:repo "orgs/kotoba-lang/voxel"
    :label "VDB 木と .vdb / .nvdb 容器 —— tile と圧縮と枠"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :voxel/tile-written-without-expanding
@@ -3448,14 +3448,14 @@
      :must-fail ["the-half-float-suffix-is-a-flag-not-part-of-the-type"]}
 
     {:id :vdb-file/cljs-char-encoding
-     :why "`#?(:clj int :cljs identity)` は文字列に対して**移植的に見えて移植的でない** —— JVM では code point、cljs では 1 文字の**文字列**を返し、byte vector に入って空白として読み戻る。実測 2026-08-24: この変異で `clojure -M:test` は 0 failures、`nbb test/run_portable.cljs` は 11 failures。**JVM 側が弱いのではなく構造的に見えない**"
+     :why "`#?(:clj int :cljs identity)` は文字列に対して**移植的に見えて移植的でない** —— JVM では code point、cljs では 1 文字の**文字列**を返し、byte vector に入って空白として読み戻る。実測 2026-08-24: この変異で `kbb -M:test` は 0 failures、`kbb --backend sci test/run_portable.cljk` は 11 failures。**JVM 側が弱いのではなく構造的に見えない**"
      :file "src/voxel/vdb_file.cljc"
      :find "  (mapv #(#?(:clj int :cljs (fn [c] (.charCodeAt c 0))) %) x))"
      :replace "  (mapv #(#?(:clj int :cljs identity) %) x))"
-     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_portable.cljs"]
      :must-fail ["vdb-file-test"]}]}{:repo "orgs/kotoba-lang/org-iso-10303"
    :label "feature evaluator —— 拒否こそが実装"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :brep/fillet-returns-open-surfaces
@@ -3479,7 +3479,7 @@
 
   {:repo "orgs/kotoba-lang/kami-engine-modeling"
    :label "板金と DXF —— シャーが切る数と、黙って落ちる entity"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :sheet-metal/deduction-loses-the-factor-two
@@ -3498,7 +3498,7 @@
 
   {:repo "orgs/kotoba-lang/org-ansi-iges"
    :label "IGES —— 区切り子はファイルの中で宣言されている"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :iges/assumes-default-delimiters
@@ -3541,7 +3541,7 @@
 
   {:repo "orgs/kotoba-lang/org-iso-6983"
    :label "CAM —— 工具が届く経路は 2 つある（低いから届く、太いから届く）"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :cam/holder-not-in-the-envelope
@@ -3561,7 +3561,7 @@
 
   {:repo "orgs/kotoba-lang/kami-engine-cae-solver"
    :label "CAE の検証 —— 製造解が 2 次収束すること"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :cae/mms-polynomial-forcing-wrong
@@ -3581,7 +3581,7 @@
 
   {:repo "orgs/kotoba-lang/ocio"
    :label "色管理 —— 原色行列と色順応と伝達関数"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :ocio/adaptation-is-identity
@@ -3607,7 +3607,7 @@
 
   {:repo "orgs/kotoba-lang/kami-engine-sculpt"
    :label "スカルプト —— ブラシの減衰とマスクの保護"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :sculpt/mask-does-not-protect
@@ -3661,7 +3661,7 @@
 
   {:repo "orgs/kotoba-lang/kami-engine-animation"
    :label "アニメーション —— 補間と範囲外の扱い"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :animation/hermite-becomes-linear
@@ -3674,7 +3674,7 @@
 
   {:repo "orgs/kotoba-lang/org-iso-16739"
    :label "IFC / IDS —— XML の入口を閉じておくこと"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :ifc/xxe-doctype-allowed
@@ -3686,7 +3686,7 @@
 
   {:repo "orgs/kotoba-lang/org-khronos-gltf"
    :label "glTF —— 正規化整数アクセサの除数"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :gltf/normalized-divisor-off-by-one
@@ -3699,7 +3699,7 @@
 
   {:repo "orgs/kotoba-lang/kami-engine-cad"
    :label "CAD —— 有理曲線の分割・拘束ソルバの収束報告"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :cad/split-drops-the-weights
@@ -3725,7 +3725,7 @@
 
   {:repo "orgs/kotoba-lang/kami-engine-cfd"
    :label "CFD —— bounce-back の運動量交換と壁"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :cfd/no-momentum-exchange-at-the-body
@@ -3744,7 +3744,7 @@
 
   {:repo "orgs/kotoba-lang/org-materialx"
    :label "MaterialX —— nodedef の解決と XML の往復"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :materialx/unresolved-node-does-not-say-so
@@ -3763,7 +3763,7 @@
 
   {:repo "orgs/kotoba-lang/org-openusd"
    :label "USD —— 合成アークと variant の往復"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :usd/list-op-arcs-lose-their-form
@@ -3780,7 +3780,7 @@
    ;; 657 秒級になる。namespace を名指しして、その不変条件を検査する 1 本だけ
    ;; 走らせる —— 検査の範囲を狭めたことは `:cmd` に書いてあるので、
    ;; 「全部通った」と読み違えようがない。
-   :cmd ["clojure" "-M:test" "-n" "graph-blend-test"]
+   :cmd ["kbb" "-M:test" "-n" "graph-blend-test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :webgpu/blend-vocabulary-drifts-from-the-table
@@ -3802,7 +3802,7 @@
    ;; CLAUDE.md は前者を entry と書いている（未解決の drift。test の docstring に
    ;; 記録済み）。どちらが配備されても索引されないことだけは、向きが決まる前に
    ;; 成り立たせておく。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "managon contract: all green"
    :mutations
    [{:id :managon/noindex-removed-from-worker-html
@@ -3892,7 +3892,7 @@
 
   {:repo "orgs/cloud-itonami/ses"
    :label "ses —— L3 dispatcher の面合意と CLAUDE.md CRITICAL 安全境界"
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "ses contract: all green"
    :mutations
    [{:id :ses/hyperdrive-false-removed-from-meta
@@ -3955,7 +3955,7 @@
    :label "vehicle —— 薄い edge の面合意と、配備される XRPC 面の安全境界"
    ;; 2026-08-26 に 23 件すべて、名指しした test 名で赤くなるところを見た。
    ;; suite は npm install 無しで走る（fs 読みだけ）。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "vehicle contract: all green"
    :mutations
    [{:id :vehicle/nanoid-drifts-in-wrangler
@@ -4125,7 +4125,7 @@
    ;; （巻き添えで落ちた test は 0 件）。suite は npm install 無しで走る ——
    ;; kotoba/ の vitest は @etzhayyim/sdk を workspace:* で要求するが、この repo は
    ;; もうその monorepo に居ないので、あの suite は此処では 1 度も走らない。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "voxelforge contract: all green"
    :mutations
    [{:id :voxelforge/actor-did-drifts-in-wrangler
@@ -4380,7 +4380,7 @@
    ;; （巻き添え 0 件 / 素通り 0 件 / 別名で赤 0 件）。suite は npm install 無しで
    ;; 走る —— この repo に node_modules は 1 つも無く、`npm run typecheck` は tsc を
    ;; 解決できずに落ちる。走れない検査は走って問題が無かった検査と同じ顔をする。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "yard-ops contract: all green"
    :mutations
    [{:id :yard-ops/actor-did-drifts-in-identity
@@ -4718,7 +4718,7 @@
    ;;
    ;; ⚠ nbb の cljs.test runner は assertion が落ちても exit 0 を返す（実測）。テスト側で
    ;; counters から exit code を立てているので、この suite の :green-marker と exit は一致する。
-   :cmd ["nbb" "--classpath" "src:test" "test/gtm_data_verify_test.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/gtm_data_verify_test.cljs"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :gtm-data/external-send-not-proposed-becomes-a-blacklist
@@ -4828,7 +4828,7 @@
    ;; ⚠ nbb の cljs.test runner は assertion が落ちても exit 0 を返す（この suite で
    ;; 実測: 1 件わざと壊して runner は 1 failures を報告しつつ exit 0）。テスト側で
    ;; counters から exit code を立てているので、:green-marker と exit は一致する。
-   :cmd ["nbb" "--classpath" "src:test" "test/contact_pii_verify_test.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/contact_pii_verify_test.cljs"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :contact-pii/both-planes-not-compared
@@ -4983,7 +4983,7 @@
    ;; 間違えても、その id は解決し、tag は綴り間違いをそのまま押し、
    ;; tagged-conforms? はその source が出す**あらゆる fact に対して false** を返す
    ;; ——呼び出し側から見ると「本当に conform しない fact」と区別がつかない。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [;; ── 旧 suite を緑のまま通り抜けた 3 件 ────────────────────────────────
@@ -5056,7 +5056,7 @@
 
   {:repo "orgs/kotoba-lang/mailer"
    :label "mailer provider-request boundary"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    ;; mailer turns an approved mail/send effect into a provider request. Nothing
    ;; downstream re-derives the request, so a field lost here is lost silently:
@@ -5543,7 +5543,7 @@
    ;; business-person repo carries, from the same migration commit. Their
    ;; mutations are therefore *fixes*: they go red when somebody repairs the
    ;; defect, which is the moment the test and the mutation should both go.
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "oil-trading: all green"
    :mutations
    [{:id :oil/a-baseline-gate-is-dropped
@@ -5699,7 +5699,7 @@
    ;; commit f072718. Their mutations are therefore *fixes*: they go red when
    ;; somebody repairs the defect, which is the moment the test and the
    ;; mutation should both go.
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "oil-upstream: all green"
    :mutations
    [{:id :oilup/a-baseline-gate-is-dropped
@@ -5869,7 +5869,7 @@
    ;; namespace from `run-tests` gives exit 2 while printing "0 failures,
    ;; 0 errors", and the unmodified tree gives exit 0 with the marker. The last
    ;; is registered below, so the floor is guarded the same way the code is.
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "gov-municipality: all green"
    :mutations
    [{:id :gov/gate-check-removed
@@ -5956,10 +5956,10 @@
    ;; returns. A browser error and a harness that was never installed would then
    ;; be indistinguishable from a page that answered.
    ;;
-   ;; NOT covered here: everything reached through a real browser. `clojure -M:test`
+   ;; NOT covered here: everything reached through a real browser. `kbb -M:test`
    ;; (the smoke suite) needs an installed chromium and is red on any machine
    ;; without one, so it is not the suite this loop runs.
-   :cmd ["clojure" "-M:kotoba-test"]
+   :cmd ["kbb" "-M:kotoba-test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :playwright/clj-conversion-stops-recursing
@@ -6037,12 +6037,12 @@
    ;; claims the invariant, base green before the battery and after it.
    ;;
    ;; Two of the 29 run under nbb rather than the JVM, and neither is visible to
-   ;; `clojure -M:test`. `kotoba.logistics` says of itself that it is portable
+   ;; `kbb -M:test`. `kotoba.logistics` says of itself that it is portable
    ;; across JVM / ClojureScript / SCI / GraalVM and nothing had ever run it
    ;; anywhere but the JVM; `json-hex4` carries a comment saying it avoids
    ;; Integer interop "that would only work on :clj" and nothing checked that
    ;; either. This is the shape run.cljs already records: a `#?(:clj int :cljs
-   ;; identity)` mutation scored 0 failures under `clojure -M:test` and 11 under
+   ;; identity)` mutation scored 0 failures under `kbb -M:test` and 11 under
    ;; nbb. `kotoba.logistics.ui` is not in the nbb run -- it needs html/css as
    ;; git deps, and a runner that cannot start reports what a runner that found
    ;; nothing wrong reports.
@@ -6053,7 +6053,7 @@
    ;; exit 1 with the failing test named; the unmodified tree gives 0 with the
    ;; marker. The first version of the floor was set from the JVM totals by
    ;; mistake and refused its own green run, which is the floor working.
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :logistics/tracking-matched-as-a-substring
@@ -6247,11 +6247,11 @@
 
     ;; ── the two the JVM run cannot see ──────────────────────────────────────
     {:id :export/json-hex-cljs-branch-drops-a-digit
-     :why "a reader conditional whose :cljs branch is wrong. `clojure -M:test` takes the :clj branch and reports 0 failures for all thirty-two control characters; under nbb the top half of the C0 range comes out as \\u000X instead of \\u001X. This is the exact shape run.cljs already records for `#?(:clj int :cljs identity)` -- 0 failures on the JVM, 11 under nbb -- and the reason this repo now has a second runner at all"
+     :why "a reader conditional whose :cljs branch is wrong. `kbb -M:test` takes the :clj branch and reports 0 failures for all thirty-two control characters; under nbb the top half of the C0 range comes out as \\u000X instead of \\u001X. This is the exact shape run.cljs already records for `#?(:clj int :cljs identity)` -- 0 failures on the JVM, 11 under nbb -- and the reason this repo now has a second runner at all"
      :file "src/kotoba/logistics/export.cljc"
      :find "(apply str (for [shift [12 8 4 0]] (nth json-hex-digits (bit-and (bit-shift-right n shift) 0xf))))"
      :replace "#?(:clj (apply str (for [shift [12 8 4 0]] (nth json-hex-digits (bit-and (bit-shift-right n shift) 0xf)))) :cljs (str \"000\" (nth json-hex-digits (bit-and n 0xf))))"
-     :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+     :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
      :green-marker "logistics: all green"
      :must-fail ["the-json-export-is-readable-for-every-c0-control-character"]}
 
@@ -6260,7 +6260,7 @@
      :file "src/kotoba/logistics/export.cljc"
      :find "(apply str (for [shift [12 8 4 0]] (nth json-hex-digits (bit-and (bit-shift-right n shift) 0xf))))"
      :replace "(let [h (Integer/toHexString n)] (str (subs \"0000\" 0 (- 4 (count h))) h))"
-     :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+     :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
      :green-marker "logistics: all green"
      :must-fail ["Unable to resolve symbol: Integer/toHexString"]}
 
@@ -6269,7 +6269,7 @@
      :file "run_tests.cljs"
      :find "(t/run-tests 'kotoba.logistics-test\n             'kotoba.logistics.export-test\n             'kotoba.logistics.readback-test)"
      :replace "(t/run-tests 'kotoba.logistics-test\n             'kotoba.logistics.export-test)"
-     :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+     :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
      :green-marker "logistics: all green"
      :must-fail ["REFUSED"]}]}
     {:repo "orgs/cloud-itonami/app-tenki"
@@ -6278,7 +6278,7 @@
      ;; ビルド設定と、配信される文書と、そこへマウントするコードを繋いでいる文字列は
      ;; 2 つのファイルに重複して書かれていて、誰も突き合わせていない。
      ;;
-     ;; どの継ぎ目も壊れ方が同じである: 片側を変えると `shadow-cljs compile app` は通り、
+     ;; どの継ぎ目も壊れ方が同じである: 片側を変えると `amu compile --target wasm32-browser app` は通り、
      ;; `node out/tests.js` も `0 failures, 0 errors` を出し、**画面には何も出ない**。
      ;; CLAUDE.md が名指ししている形——測れなかった検査が、測って問題が無かった検査と
      ;; 同じ値を返す——の UI 版で、しかもこの repo は既に一度それを踏んでいる
@@ -6370,10 +6370,10 @@
       ;; `(+ 8 nil)` は JVM で NullPointerException、ClojureScript で 8。
       ;;
       ;; だから mutation の一部は **:cmd を nbb 側に差し替えて**登録している。
-      ;; :labor/guard-kept-on-jvm-dropped-on-cljs は `clojure -M:test` では
+      ;; :labor/guard-kept-on-jvm-dropped-on-cljs は `kbb -M:test` では
       ;; **緑のまま**で、portable runner だけが赤くなる —— host が 1 つしか
       ;; 無い suite が構造的に見られないものが在ることの、実演。
-      :cmd ["clojure" "-M:test"]
+      :cmd ["kbb" "-M:test"]
       :green-marker "0 failures, 0 errors."
       :mutations
       [
@@ -6388,9 +6388,9 @@
        :must-fail ["total-hours-refuses-an-entry-with-no-hours" "total-hours-refuses-a-non-numeric-hours-value"]}
 
       {:id :labor/guard-kept-on-jvm-dropped-on-cljs
-       :why "**この suite で一番大事な 1 本。`clojure -M:test` はこの変異に対して緑のまま終わる** —— reader conditional の :cljs 分岐は JVM から構造的に見えないので、host が 1 つしか無かった頃の suite はこの退行を永久に報告できなかった。二つ目の host だけが赤くなることを確かめるためにここに在る（maturity-loop の README が `#?(:clj int :cljs identity)` として記録しているのと同じ class）"
+       :why "**この suite で一番大事な 1 本。`kbb -M:test` はこの変異に対して緑のまま終わる** —— reader conditional の :cljs 分岐は JVM から構造的に見えないので、host が 1 つしか無かった頃の suite はこの退行を永久に報告できなかった。二つ目の host だけが赤くなることを確かめるためにここに在る（maturity-loop の README が `#?(:clj int :cljs identity)` として記録しているのと同じ class）"
        :file "src/kotoba/labor.cljc"
-       :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+       :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_portable.cljs"]
        :green-marker "portable-check: OK"
        :find "            (+ acc (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})))"
        :replace "            (+ acc #?(:clj (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})
@@ -6439,7 +6439,7 @@
       {:id :labor/portable-runner-quietly-covers-less
        :why "**refusal の床。exit 2 でなければならない。** 名前空間の一覧は静的に書くしかない（require はコンパイル時に解決される）ので、それは tree についての主張になる。この runner を書いている最中に実際に起きた: 一覧が kotoba.labor.portable-test を編集で失い、それでも `3/3 namespaces / portable-check: OK` と印字して 7 つ少ないテストで緑を返した。いまは一覧を disk と突き合わせ、答えられないなら 0 でも 1 でもない値で終わる"
        :file "test/run_portable.cljs"
-       :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+       :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_portable.cljs"]
        :green-marker "portable-check: OK"
        :find "    kotoba.labor.portable-test])"
        :replace "    kotoba.labor.export-test])"
@@ -6619,7 +6619,7 @@
    ;;                CLJS "1e+21" -> only the "e" test stops "1e+21.0"
    ;;
    ;; The `e` branch is UNREACHABLE on the JVM. Measured 2026-08-31: deleting it
-   ;; leaves `clojure -M:test` at 0 failures while nbb reports 1 failure in
+   ;; leaves `kbb -M:test` at 0 failures while nbb reports 1 failure in
    ;; f32-literal-coercion. Same shape as kotoba-lang/codebase's f64 decode.
    ;; `run_tests.cljs` therefore runs both halves and is the cmd here; its
    ;; marker is printed only when BOTH are green.
@@ -6678,7 +6678,7 @@
   {:repo "orgs/cloud-itonami/app-yukkuri"
    :label "app-yukkuri lg-clj —— .cljc が名乗っている可搬性を、実際に両方の runtime で確かめる"
    ;; 21 兄弟目。この repo の src は全部 `.cljc` だが、2026-09-01 まで**それを
-   ;; 読んだ runtime は 1 つしかなかった** —— `bb test` で、babashka は JVM。
+   ;; 読んだ runtime は 1 つしかなかった** —— `kbb -M:test` で、babashka は JVM。
    ;; つまり reader conditional の ClojureScript 側は一度も評価されておらず、
    ;; `lg-yukkuri.audit` は cljs では **load すらできなかった**（`json/generate-string`
    ;; が `#?(:clj ...)` の require の外で使われていた）。
@@ -6720,7 +6720,7 @@
    :green-marker "both runtimes agree"
    :mutations
    [{:id :yukkuri/lenient-json-parse-back-to-default-nil
-     :why "**この repo で最も高くついていた形。** `parse-json-object` の両方の parse を `#?(:clj ... :default nil)` に戻す。JVM では何も変わらないので `clojure -M:test` は緑のまま、ClojureScript では全 LLM 応答が『JSON が無かった』になる。返り値が『解析できなかった』と『解析したが空だった』で同じ"
+     :why "**この repo で最も高くついていた形。** `parse-json-object` の両方の parse を `#?(:clj ... :default nil)` に戻す。JVM では何も変わらないので `kbb -M:test` は緑のまま、ClojureScript では全 LLM 応答が『JSON が無かった』になる。返り値が『解析できなかった』と『解析したが空だった』で同じ"
      :file "lg-clj/src/lg_yukkuri/llm.cljc"
      :find "  (try (json/parse-string s true)\n       (catch #?(:clj Exception :cljs :default) _ nil)))"
      :replace "  #?(:clj (try (json/parse-string s true) (catch Exception _ nil)) :default nil))"
@@ -6825,7 +6825,7 @@
    ;; exit は 3 値（0 緑 / 1 不変条件が破れた / 2 証拠を集められなかった）。
    ;; 2 は landing 前に 5 経路（ファイル欠落・印字ブロックが読めない・README の
    ;; 契約見出しが消えた・モジュールが import できない・スキーマが空）で実測した。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "app-open-saas contracts: all green"
    ;; 16 件とも pin bc02c670 で実際に赤くなるところを見た。anchor は一意、噛んだ
    ;; invariant は名前まで一致、無改変で exit 0。**14 の deftest はすべて
@@ -6981,7 +6981,7 @@
    ;; migration.edn の 4 つの測定値は出所（etzhayyim/root）にしか答えが無いので、
    ;; 出所が手元に無いときは SKIPPED と印字して合格に数えない。使い捨て worktree で
    ;; 走るこの loop では 2 件が skip になり、緑マーカーはその旨を添えて出る。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "communicator contracts: all green"
    :mutations
    [{:id :communicator/proto-gains-an-enum-value
@@ -7289,7 +7289,7 @@
    ;; 9 通りに壊して 9 通りとも、名指しした test が赤くなる。**登録されて
    ;; いない = 時間をまたいで守られていない**ので、root に package.json を
    ;; 置くか harness が subdir を受け取れるようになったら登録する。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "app-wvme self-description: all green"
    :npm-install false
    ;; 12 件すべて 2026-09-02 に pin 0c498733 で実際に赤くなるところを見た。
@@ -7412,7 +7412,7 @@
    ;;
    ;; evidence floor は **それが存在する理由の場面**で確かめた —— 比較の
    ;; 両側で key を改名すると `nil = nil` が緑のまま残り、floor だけが赤くなる。
-   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "run_tests.cljs"]
    :green-marker "okaimono self-description: all green"
    :npm-install false
    :mutations
@@ -7480,7 +7480,7 @@
      :must-fail ["the-static-bundle-is-wired-end-to-end"]}
 
     {:id :okaimono/the-test-namespace-is-renamed-out-of-the-ns-regexp
-     :why "`:ns-regexp` に一致する ns が 0 個でも shadow-cljs compile test は成功し、node out/tests.js は `Ran 0 tests` と言って **exit 0** で終わる。『測っていない』が『測って問題が無かった』と同じ顔になる形（CLAUDE.md の 6 問の 1 番目）"
+     :why "`:ns-regexp` に一致する ns が 0 個でも amu compile --target wasm32-browser test は成功し、node out/tests.js は `Ran 0 tests` と言って **exit 0** で終わる。『測っていない』が『測って問題が無かった』と同じ顔になる形（CLAUDE.md の 6 問の 1 番目）"
      :file "appview/okaimono-shopping-mcp-component/cljs/test/okaimono/app_test.cljs"
      :find "(ns okaimono.app-test"
      :replace "(ns okaimono.app-spec"
@@ -7726,7 +7726,7 @@
    ;; `npx --yes vitest` が network に届く環境でしか走らない。オフラインでは
    ;; 何も検査しないまま「テストが在る」ように見えるので、その literal が
    ;; manifest と一致していることだけは、こちら側で offline に保つ。
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "graph-sos-intel actor: all green"
    :mutations
    ;; 14 件とも 2026-09-03 に赤くなるところを見た。推測で足したものは無い。
@@ -7869,7 +7869,7 @@
    ;; 同じ値を返す」の最短形。いまは `:end-run-tests` から exit を採る。下の
    ;; mutation は全部 async 経路を壊すので、runner が元の形に戻れば**どれも
    ;; 噛まなくなる** —— この 8 件が緑であること自体が runner の証明になっている。
-   :cmd ["nbb" "--classpath" "src:test" "test/run.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run.cljs"]
    :green-marker "0 failures, 0 errors"
    :mutations
    ;; 8 件とも 2026-09-03 に赤くなるところを見た。推測で足したものは無い。
@@ -7970,7 +7970,7 @@
    ;; `(is (seq (:detail violation)))` は generic fallback でも非空なので、
    ;; 固有の文言を消しても suite は緑のままだった。いまは literal を pin している。
    ;; CLAUDE.md「その検査は、自分が名乗っている理由で拒否したことがあるか」の実例。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :isco-3152/allowlist-admits-everything
@@ -8044,7 +8044,7 @@
    ;; が gate される / catalogue が lexicon から drift する）と固定値（kernel code）を足す。
    ;; 8 件とも 2026-09-06 に赤くなるのを見た。docstring を 1 語変える control は
    ;; 噛まないことも確認済み（= この 8 件が既定値ではない）。
-   :cmd ["clojure" "-Sdeps" "{:paths [\".\" \"src\" \"test\"]}" "-M" "-e" "(load-file \"run_tests.clj\")"]
+   :cmd ["kbb" "-Sdeps" "{:paths [\".\" \"src\" \"test\"]}" "-M" "-e" "(load-file \"run_tests.clj\")"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :tazuna/catalogue-opens-to-any-kind
@@ -8132,7 +8132,7 @@
    ;; **exit 2（REFUSED）**で、「読めなかった」が「読んで問題が無かった」と
    ;; 同じ値を返さないことを確かめている。
    ;;
-   ;; nbb と checkout だけで走る（lg-clj の `bb test` と違って git 依存の解決が
+   ;; nbb と checkout だけで走る（lg-clj の `kbb -M:test` と違って git 依存の解決が
    ;; 要らない）。
    :cmd ["nbb" "test/contract_test.cljs"]
    :green-marker "recap contract: OK"
@@ -8239,7 +8239,7 @@
 
 {:repo "orgs/cloud-itonami/nist"
  :label "nist actor boundary —— cell-specs を introspect する suite が構造的に見られない不変条件"
- :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+ :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
  :green-marker "nist actor contract: all green"
  :mutations
  [{:id :nist/gate-dropped
@@ -8320,7 +8320,7 @@
    ;;     blank-site-registration-does-not-establish-provenance が**緑のまま**
    ;;     だった —— request が先に落ちるので、名乗っていた rule に一度も
    ;;     到達していなかった。test を 2 本に割って rule を名指しさせた。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :isco2165/vocabulary-check-dropped
@@ -8440,7 +8440,7 @@
    ;; :by-topic-index-drift は「index 0 だけ見るテスト」なら緑のままになる形に
    ;; 絞ってある —— by-topic-count は 5 のまま、index 0 の答えも正しいまま、
    ;; governance の i=2 の 1 assertion だけが落ちる。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :jicpa/port-answers-a-superseded-edition
@@ -8507,7 +8507,7 @@
    ;; :by-topic-index-drop は「index 0 だけ見るテスト」なら緑のままになる形に
    ;; 絞ってある —— by-topic-count は 3 のまま、index 0 の答えも正しいまま、
    ;; i=1 と i=2 の 2 assertion だけが落ちる。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :aicpa/port-transcribes-a-wrong-url
@@ -8577,7 +8577,7 @@
    ;; :reserved-op から :unsupported-op に変わる。「拒否されたこと」だけを
    ;; assert する test はこの変異で**緑のまま**通る。だからこの repo の test は
    ;; 全部、名乗っている rule の literal を pin する。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :isco4225/vocabulary-check-dropped
@@ -8682,7 +8682,7 @@
    ;; rule だけが :reserved-op から :unsupported-op に変わる。
    ;; 「拒否されたこと」だけを assert する test はこの変異で**緑のまま**通る。
    ;; だからこの repo の test は全部、名乗っている rule の literal を pin する。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :isco2151/vocabulary-check-dropped
@@ -8768,7 +8768,7 @@
    ;; escalation を外すと、ledger が**実行時に** throw して
    ;; 「escalation 規則が緩んだという報告である」と名乗る。台帳の拒否が
    ;; 単体テストの中だけでなく、走っている actor の中で効いていることの実演。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :isco4312/authorisation-not-required
@@ -8839,7 +8839,7 @@
    ;; mutation が確かめるのは **目録が飾りでないこと** —— entry を消せばその操作が
    ;; 拒否され、:external-send? を倒せば人間の署名が外れる。M2 と M3 が
    ;; **この変更より前から在るテスト**を赤くするのがその証拠。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :reception/authorization-dropped
@@ -8892,7 +8892,7 @@
    ;; find/replace では表せないが、2026-09-06 に手で確認済み ——
    ;; `the-profile-source-is-readable-from-the-suites-working-directory` が
    ;; 名指しで赤くなる（入力が読めないとき pass を返さない、の実演）。
-   :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_portable.cljs"]
    :green-marker "0 failures, 0 errors"
    :mutations
    ;; 13 件とも 2026-09-06 に赤くなるところを見た。
@@ -9005,7 +9005,7 @@
    ;; switchboard.ledger がその区別を持ち、誤報する entry を **書かせない**
    ;; （fail-closed）。ここに在るのは、その拒否が今も落ちるかを繰り返し問う
    ;; ためのもの。6 件とも 2026-09-06 に赤くなるところを見た。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    ;; ── 欠陥そのものへの回帰（actor 側を landing 前に戻す）──
@@ -9079,7 +9079,7 @@
    ;; governor はそこから全部を導出する。ここに在るのは、その拒否が今も落ちる
    ;; かを繰り返し問うためのもの。**7 件とも 2026-09-07 に赤くなるところを見た**
    ;; （無改変では 36 tests / 83 assertions が緑）。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    ;; ── 欠陥そのものへの回帰（landing 前の挙動に戻す）──
@@ -9419,8 +9419,8 @@
     {:id :x402-qr-growth/readme-names-a-script-that-does-not-exist
      :why "README の Run 節は operator が実際に打つ行。script を改名して README を直し忘れると、手順の 1 行目で止まる"
      :file "README.md"
-     :find "`nbb scripts/observe.cljs`"
-     :replace "`nbb scripts/observe_live.cljs`"
+     :find "`kbb --backend sci scripts/observe.cljk`"
+     :replace "`kbb --backend sci scripts/observe_live.cljk`"
      :must-fail ["readme-commands-name-files-that-exist"]}]}
 
   {:repo "orgs/cloud-itonami/hrse"
@@ -9885,7 +9885,7 @@
    ;; 同日、7 引数のうち 6 つしか AND しない module を手で組んで置き換え、
    ;; parity test が `{:bits [1 1 1 1 1 1 0], :wasm 1, :portable 0}` ——
    ;; replay を通す binary —— を名指しするところを見た。
-   :cmd ["nbb" "--classpath" "src-cljs:test" "test/run_portable.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src-cljs:test" "test/run_portable.cljs"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :engi/replay-gate-dropped
@@ -11440,7 +11440,7 @@
   ;; うち 2 件は**規則コード側**を撃っており、それは fixture だけが捕まえる。
   {:repo "orgs/cloud-itonami/app-webpage"
    :label "app-webpage repo contract —— 8 method / nanoid / DID が 5 面で一致するか、appview は wrangler の写しか"
-   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "run_tests.cljs"]
    :green-marker "app-webpage contract: all green"
    :mutations
    [
@@ -11572,7 +11572,7 @@
    ;;
    ;; 11 件とも 2026-09-09 に、当てて赤くなるところを実際に見てから登録した。
    ;; 各 mutation は名指しの検査だけを赤にし、巻き込みは 0 件だった。
-   :cmd ["nbb" "--classpath" "test" "test/site_consistency_test.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "test/site_consistency_test.cljs"]
    :green-marker "site-consistency: OK"
    :mutations
    [{:id :pre/typo-in-a-hand-written-path
@@ -11785,7 +11785,7 @@
    ;; その検査が実データで落ちたときにしか出ない。
    ;;
    ;; 11 件とも 2026-09-09 に、当てて赤くなるところを実際に見てから登録した。
-   :cmd ["nbb" "--classpath" "test" "test/repo_consistency_test.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "test" "test/repo_consistency_test.cljs"]
    :green-marker "repo-consistency: OK"
    :mutations
    [{:id :inducer/panel-value-typo
@@ -11896,7 +11896,7 @@
    ;;
    ;; 6 件は名指しした test だけを赤くする。残り 2 件が複数本を赤くするのは、
    ;; どれも同じ 1 つの所見の言い換えだからで、「壊し方を間違えた赤」ではない。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [{:id :robotics/new-kind-not-classified-as-hardware
@@ -11971,7 +11971,7 @@
    ;; 失敗集合に居ることを見る。10 件目は捨てた —— 括弧が閉じず
    ;; `EOF while reading` になり、「ファイルがコンパイルできない」しか
    ;; 証明していなかった（構文を壊すだけの mutation は劇場）。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :transit/office-envelope-reader-stops-checking-the-family
@@ -12052,10 +12052,10 @@
    ;; から登録した（2026-09-09）。捕まえられていたのは `badge-dirty-reads-available`
    ;; だけ。8 本足して 11 件すべてが噛むところを見ている。
    ;;
-   ;; ⚠ **JVM を起こさない経路で走らせる。** `deps.edn` の `clojure -M:test` も
+   ;; ⚠ **JVM を起こさない経路で走らせる。** `deps.edn` の `kbb -M:test` も
    ;; 同じ namespace を読むが、この gate が使うのは `test/run_tests.cljs`
    ;; （nbb entry。失敗数を exit status にする）。
-   :cmd ["nbb" "--classpath" "src:test" "test/run_tests.cljs"]
+   :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_tests.cljs"]
    :green-marker "fileprovider model: OK"
    :mutations
    ;; ── バイトを失う側 ────────────────────────────────────────────────
@@ -12186,7 +12186,7 @@
    ;; 7 件とも 2026-09-10 に、当てて赤くなるところを実際に見てから登録した。
    ;; うち :rank-off-scale-is-bottom は**もっともらしい誤った修正**（尺度外を尺度の
    ;; 下端として扱う）で、record 側の要求水準が尺度外のとき何でも満たしてしまう。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :cn/retention-comparability-dropped
@@ -12294,7 +12294,7 @@
    ;;
    ;; 11 件とも 2026-09-10 に、当てて赤くなるところを実際に見てから登録した。
    ;; 予期しない test が赤くなったものは 1 件も無い。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :cn/cid-compared-to-itself
@@ -12406,7 +12406,7 @@
    ;; 拒否を 23 → 25 に**増やす**（全部を拒否するゲートは、拒否のテストを全部
    ;; 通る）。捕まえているのは clean 側の 3 scenario で、これが
    ;; ADR-2608136000 の 5 問目「両方向を出したことがあるか」そのもの。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [;; ── sim が捕まえる 6 件 + harness 自身の 1 件 ────────────────────
@@ -12419,7 +12419,7 @@
      :file "src/medsales/governor.cljc"
      :find "(op/cites-product? (:op proposal))"
      :replace "(= :approve-sale (:op proposal))"
-     :cmd ["clojure" "-M:sim"]
+     :cmd ["kbb" "-M:sim"]
      :green-marker "  PASS"
      :must-fail ["BAD bulk-order-off-label"
                  "BAD bulk-order-unlicensed-buyer"
@@ -12435,7 +12435,7 @@
      :file "src/medsales/operation.cljc"
      :find ":register-product-indication\n   {:reason"
      :replace ":register-product-indication-TYPO\n   {:reason"
-     :cmd ["clojure" "-M:sim"]
+     :cmd ["kbb" "-M:sim"]
      :green-marker "  PASS"
      :must-fail ["BAD reserved-op-register-product-indication"
                  "want=:reserved-op got=#{:undeclared-op}"]}
@@ -12446,7 +12446,7 @@
      :file "src/medsales/facts.cljc"
      :find "(and (number? c) (<= 0 c) (<= c 1))"
      :replace "(and (number? c) (<= 0 c))"
-     :cmd ["clojure" "-M:sim"]
+     :cmd ["kbb" "-M:sim"]
      :green-marker "  PASS"
      :must-fail ["BAD unusable-confidence-above-one" "actual=commit"]}
 
@@ -12458,7 +12458,7 @@
      :file "src/medsales/facts.cljc"
      :find "(not (identified? (:client-id request)))\n    [{:rule :no-client-id"
      :replace "false\n    [{:rule :no-client-id"
-     :cmd ["clojure" "-M:sim"]
+     :cmd ["kbb" "-M:sim"]
      :green-marker "  PASS"
      :must-fail ["BAD request-without-client-id"
                  "want=:no-client-id got=#{:product-wrong-client}"]}
@@ -12470,7 +12470,7 @@
      :file "src/medsales/facts.cljc"
      :find "(if-not (:restricted? product)"
      :replace "(if-not true"
-     :cmd ["clojure" "-M:sim"]
+     :cmd ["kbb" "-M:sim"]
      :green-marker "  PASS"
      :must-fail ["BAD clean-sale-unrestricted-no-buyer-licence-needed"
                  "got=#{:unlicensed-buyer}"]}
@@ -12482,7 +12482,7 @@
      :file "src/medsales/facts.cljc"
      :find "(set/difference (set claimed) (set (:approved-indications product)))"
      :replace "(set/difference (set (:approved-indications product)) (set claimed))"
-     :cmd ["clojure" "-M:sim"]
+     :cmd ["kbb" "-M:sim"]
      :green-marker "  PASS"
      :must-fail ["BAD clean-sale-claiming-no-indication" "got=#{:off-label-claim}"]}
 
@@ -12493,7 +12493,7 @@
      :file "src/medsales/sim.cljc"
      :find "(let [results (mapv run-one scenarios)"
      :replace "(let [results (mapv run-one (filterv #(= :commit (:expect %)) scenarios))"
-     :cmd ["clojure" "-M:sim"]
+     :cmd ["kbb" "-M:sim"]
      :green-marker "  PASS"
      :must-fail ["refusals=0" "REFUSING TO REPORT A PASS"]}
 
@@ -12523,7 +12523,7 @@
 
   {:repo "orgs/cloud-itonami/hagukumi"
    :label "hagukumi record-key identity —— MST の rkey を決める sanitizer と、その 5 分岐の fallback chain"
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    ;; `safe-rkey` は :mst/put-record が書かれる rkey を決める = MST 上の
    ;; **record identity** を決める。それが 1 本もテストを持たないまま、8f33084 で
@@ -12610,7 +12610,7 @@
    ;; mismatch は「多すぎる」だけを、clamp は「上限」だけを、decay は「過去」だけを、
    ;; exit-stage の除外は「キーが無い」だけを見ていた。CLAUDE.md の 5 問目
    ;;（両方向を出しても境界が無ければ演算子は見えない）の、境界ではなく**向き**の版。
-   :cmd ["clojure" "-M:test"]
+   :cmd ["kbb" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :crm/final-stage-becomes-unreachable
@@ -12685,7 +12685,7 @@
      :must-fail ["reached-counts-excludes-an-unrecognized-reached-stage-rather-than-guessing"]}
 
     {:id :crm/cent-rounding-dropped-on-cljs-only
-     :note "**この suite で一番大事な 1 本。`clojure -M:test` はこの変異に対して緑のまま終わる**
+     :note "**この suite で一番大事な 1 本。`kbb -M:test` はこの変異に対して緑のまま終わる**
             —— reader conditional の :cljs 分岐は JVM から構造的に見えないので、host が
             1 つしか無かった頃の suite はこの退行を永久に報告できなかった（labor の
             :labor/guard-kept-on-jvm-dropped-on-cljs と同じ class）。
@@ -12694,7 +12694,7 @@
             **round そのものを一度も通っていなかった**。1000.00 を 3 で割る例を足して
             初めて片側が赤くなる。『二つ目の host が在る』と『二つ目の host が見る』は別"
      :file "src/kotoba/crm/revrec.cljc"
-     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_portable.cljs"]
      :green-marker "portable-check: OK"
      :find "     :cljs (js/Math.round cents)))"
      :replace "     :cljs cents))"
@@ -12717,7 +12717,7 @@
             cljs 側が検査されている証拠にならない。半減期のちょうど半分
             （20 × 2^-0.5 = 14.142…）を足して、cljs 側でも観測できるようにした"
      :file "src/kotoba/crm/leadscore.cljc"
-     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_portable.cljs"]
      :green-marker "portable-check: OK"
      :find "  #?(:clj  (long (Math/round (double x)))\n     :cljs (js/Math.round x)))"
      :replace "  #?(:clj  (long (Math/round (double x)))\n     :cljs x))"
@@ -12730,7 +12730,7 @@
             runner は disk と突き合わせ、答えられないなら 0 でも 1 でもない値で終わる。
             実測 2026-09-10: この変異で exit 2 / `REFUSED` になることを確認した"
      :file "test/run_portable.cljs"
-     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :cmd ["kbb" "--backend" "sci" "--classpath" "src:test" "test/run_portable.cljs"]
      :green-marker "portable-check: OK"
      :find "    kotoba.crm.revrec-test])"
      :replace "    kotoba.crm.funnel-test])"
@@ -12873,7 +12873,7 @@
    ;;   2. 4f5aacb が 1 を直した**次の commit** 7f5f047 が、6 ファイルを .kotoba へ
    ;;      改名した —— 0 insertions / 0 deletions の純粋な git mv で、runner が持って
    ;;      いた 3 本の literal path は動かなかった。実測 2026-09-11、pin 77a51528:
-   ;;      `clojure -M run_tests.kotoba` は FileNotFoundException で exit 1、
+   ;;      `kbb -M run_tests.kotoba` は FileNotFoundException で exit 1、
    ;;      **走ったテストは 0**。
    ;;
    ;; しかも改名は読み方も壊していた。Clojure は `#?(...)` の可否を**ファイル名**で
@@ -12882,7 +12882,7 @@
    ;; `:read-cond :allow` で読み、plan は**列挙せず discover する**。
    ;;
    ;; 下の 9 件は 2026-09-11 に**手で当てて赤くなるところを見てから**登録した。
-   :cmd ["clojure" "-M" "run_tests.kotoba"]
+   :cmd ["kbb" "-M" "run_tests.kotoba"]
    :green-marker "0 failures, 0 errors."
    :mutations
    [;; ── runner が「何を読むつもりか」を誰も測っていなかった ─────────────
@@ -12979,7 +12979,7 @@
    ;; 以来 1 度も走っていなかった —— runner が monorepo の bb.edn を `cd ../..` で
    ;; 探しに行き、`Could not locate hikari/methods/test_microgrid.bb` で止まっていた
    ;; （origin/main d52cceb、exit 1、test 0 本）。source は src/hikari/**、test は
-   ;; test/hikari/** に移し、runner は `nbb run_tests.cljs`（nbb.edn が :paths と
+   ;; test/hikari/** に移し、runner は `kbb --backend sci run_tests.cljk`（nbb.edn が :paths と
    ;; kotoba.lang.text の座標を持つ）。0 本の run は exit 2（REFUSED）で green-marker は出ない。
    ;;
    ;; 面は 4 つ。① gate が本当に拒否すること ② **呼び出し側が gate を呼んでいること**

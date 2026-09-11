@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-appview-page-summary.cljk — does the landing page tell the truth
 ;; about the worker it is served by?
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-appview-page-summary.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-appview-page-summary.cljk \
 ;;     [--root <orgs-bearing checkout>] [--findings]
 ;;
 ;; ## What it compares
@@ -35,8 +35,8 @@
 ;; derives routeCount / routes / vars / relativePath from the nearest wrangler, so
 ;; a difference is repairable rather than only reportable:
 ;;
-;;   nbb scripts/gen-appview-page-summary.cljk --names <repo>          ; dry run
-;;   nbb scripts/gen-appview-page-summary.cljk --names <repo> --apply
+;;   kbb --backend sci scripts/gen-appview-page-summary.cljk --names <repo>          ; dry run
+;;   kbb --backend sci scripts/gen-appview-page-summary.cljk --names <repo> --apply
 ;;
 ;; Measured on the day it landed: 363 of 364 pages carrying the object differed
 ;; from their wrangler. This detector stays, because a generator that nobody runs

@@ -49,7 +49,7 @@ ADR-260726 は「一緒にクエリしたいものは同じ ref に置く」「�
 
 ## 実測（主張ではなく測定）
 
-`clojure -M:bench <writers> <writes>`（real threads / real compare-and-set / facts ≈200 固定）。
+`kbb -M:bench <writers> <writes>`（real threads / real compare-and-set / facts ≈200 固定）。
 baseline は **warm な single lane**（db をメモリに保持し、CAS に負けた時だけ読み直す = 温まった DO の姿）。stateless 版だけを相手にするのは藁人形なので、強い方を基準にした。
 
 | writers | single-cached | partitioned | deferred | batched | single の無駄 commit |

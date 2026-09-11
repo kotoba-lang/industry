@@ -197,7 +197,7 @@ sibling の pin ずれではない: `product-party` の west pin
 `git archive HEAD` で**fleet が実際に配る tree そのもの**を作り、
 sibling が 1 つも無い状態で走らせた:
 
-    $ clojure -Spath -M:kernels
+    $ kbb -Spath -M:kernels
     Error building classpath. Local lib io.github.kotoba-lang/stripe-ops not found
 
 `deps.edn` の **base `:deps` に `:local/root` が 117 件**ある（alias 側は 9 件）。

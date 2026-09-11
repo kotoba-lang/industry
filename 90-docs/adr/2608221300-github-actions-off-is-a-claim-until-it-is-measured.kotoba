@@ -149,14 +149,14 @@ after は `Refusing to report a clean sweep: 1 repo listing(s) failed` / exit 2�
 proxy が拒否するので回せない。
 
     # 1. 課金と有効/無効の現在地を、org 単位で測る
-    nbb scripts/github-actions-billable-audit.cljs --owner kotoba-lang --since 2026-07-30
-    nbb scripts/github-actions-billable-audit.cljs --owner cloud-itonami --since 2026-07-30
+    kbb --backend sci scripts/github-actions-billable-audit.cljk --owner kotoba-lang --since 2026-07-30
+    kbb --backend sci scripts/github-actions-billable-audit.cljk --owner cloud-itonami --since 2026-07-30
     #    ... etzhayyim / gftdcojp / network-awai / jk-luxury / com-junkawasaki
 
     # 2. exit 1（有効な repo がある / 課金がある）が出たら掃除機を回す。
     #    直した掃除機は、答えられなかった repo を state に書かないので再実行が効く。
-    nbb scripts/github-actions-disable-sweep.cljs --owner <org> --recheck
-    nbb scripts/github-actions-disable-sweep.cljs --owner <org> --recheck --apply
+    kbb --backend sci scripts/github-actions-disable-sweep.cljk --owner <org> --recheck
+    kbb --backend sci scripts/github-actions-disable-sweep.cljk --owner <org> --recheck --apply
 
     # 3. root の gate を fleet で 1 度緑にする（landing 条件）
     #    手元での両方向確認は済んでいる。ノードの配られた tree で緑を見るまでは

@@ -16,7 +16,7 @@ description: 回遊（アクセス解析）の計測から出た「答えるべ�
 ときは自分で 1 周測る:
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
+kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
     scripts/kaiyu-kaizen-tick.cljk --json
 ```
 
@@ -46,7 +46,7 @@ nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
    止まったように見えないまま queue に 2 通目が積まれる。
 
    ```bash
-   nbb --classpath ".:scripts/nbb_compat" -e '
+   kbb --backend sci --classpath ".:scripts/nbb_compat" -e '
    (ns g (:require [clojure.edn :as edn] ["fs" :as fs]))
    (def site "<site>")
    ;; ファイル全体を 1 度に読む。**1 行 1 form で読まない** —— 台帳には複数行に

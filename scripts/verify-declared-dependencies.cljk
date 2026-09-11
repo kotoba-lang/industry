@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns verify-declared-dependencies
   "A repository's `src/` requires namespaces its own `deps.edn` does not
   account for.
@@ -6,7 +6,7 @@
   ## The failure this exists for
 
   A require is resolved by the classpath, and in this workspace the classpath
-  is assembled four different ways -- `clojure -M:test`, a hand-written
+  is assembled four different ways -- `kbb -M:test`, a hand-written
   `--classpath` in `bin/run_tests.cljs`, shadow-cljs reading `:deps`, and a
   sibling checkout that happens to sit next door under `orgs/`. Three of those
   four put a dependency on the classpath whether or not `deps.edn` names it.
@@ -91,9 +91,9 @@
 
   ## Usage
 
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-declared-dependencies.cljk \\
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-declared-dependencies.cljk \\
         [--scan-root <dir>] [--repo <path>]... [--only <path>]... [--findings]
-    nbb --classpath \".:scripts/nbb_compat\" scripts/verify-declared-dependencies.cljk --selftest
+    kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/verify-declared-dependencies.cljk --selftest
 
   `--scan-root` is where `orgs/` lives, so the detector can run from a
   worktree that does not have it (the shape `gen-concept-index.cljs` uses).

@@ -18,7 +18,7 @@ out されていない」は別物、CLAUDE.md「無いと結論する前に検�
 ```bash
 cd "$COM_JUNKAWASAKI_ROOT"
 git fetch origin -q && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat:orgs/cloud-itonami/loop-fleet-refactor-wave/src" \
+kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/cloud-itonami/loop-fleet-refactor-wave/src" \
   scripts/fleet-refactor-wave-tick.cljk --limit 4
 ```
 
@@ -118,9 +118,9 @@ agent は `manifest/west.yml` を触らない。中央でまとめて 1 commit �
 （`svelte-cljs-wave` と同じ手順）。
 
 ```bash
-# merge した repo ごとに 1 件: nbb scripts/west-pin-put.cljk <entry-name> HEAD
+# merge した repo ごとに 1 件: kbb --backend sci scripts/west-pin-put.cljk <entry-name> HEAD
 # entry 名は west entry 名（通常 repo 名と同じだが、west.yml で確認する）
-nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-put.cljk <name> HEAD
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/west-pin-put.cljk <name> HEAD
 # 複数まとめる場合は scripts/west-pin-put-batch.cljk（1 commit に束ねる）
 ```
 
@@ -141,7 +141,7 @@ project 名になり、`printf ... | west update` は**引数ゼロ = 全 projec
 ## 4. 測り直す
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat:orgs/cloud-itonami/loop-fleet-refactor-wave/src" \
+kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/cloud-itonami/loop-fleet-refactor-wave/src" \
   scripts/fleet-refactor-wave-tick.cljk --limit 4
 ```
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-require-graph — ある repo が別の repo の namespace を消し、参照側を
 ;; 更新しないまま置き去りにした状態を検出する。
 ;;
@@ -56,7 +56,7 @@
 ;; 走査対象がゼロになる。したがって workspace script として置き、agent と手作業から
 ;; 呼ぶ。**「gate に載っている」と誤解させないため、ここに明記しておく。**
 ;;
-;; usage: nbb scripts/verify-require-graph.cljk [--root DIR] [--min-repos N]
+;; usage: kbb --backend sci scripts/verify-require-graph.cljk [--root DIR] [--min-repos N]
 
 (require '[clojure.string :as str])
 

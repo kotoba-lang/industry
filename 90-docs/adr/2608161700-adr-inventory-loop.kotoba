@@ -107,7 +107,7 @@ docs-edn-repair と同じ。間隔は **86400 秒（1 日 1 件）**。判断が
 - listed 2241 のうち unreadable は docs-edn-repair が先に拾う。この loop は読める文書だけを見る。")
 
   (:adr/verification
-  "**classifier（origin/main `17d98273f26` + 本作業、2026-08-16）**: `nbb scripts/adr-inventory.cljs`
+  "**classifier（origin/main `17d98273f26` + 本作業、2026-08-16）**: `kbb --backend sci scripts/adr-inventory.cljk`
 
     listed 2244 / readable 2238 / findings 230 / outcome candidates
       successor-unmarked 113
@@ -135,7 +135,7 @@ docs-edn-repair と同じ。間隔は **86400 秒（1 日 1 件）**。判断が
       ledger-ops-instruction 45
       cited-superseded 4
 
-  次の先頭は `2607023200-isekai-network-standalone-repo.edn`（後続 2607032400）。resume: `COM_JUNKAWASAKI_ROOT=<worktree> nbb scripts/adr-inventory.cljs --edn` の `:next`。launchd は未配置。ファイル削除はしない（git は旧版の履歴であり、path identity の代用ではない）。
+  次の先頭は `2607023200-isekai-network-standalone-repo.edn`（後続 2607032400）。resume: `COM_JUNKAWASAKI_ROOT=<worktree> kbb --backend sci scripts/adr-inventory.cljk --edn` の `:next`。launchd は未配置。ファイル削除はしない（git は旧版の履歴であり、path identity の代用ではない）。
 
   同じ一覧に `2607173000-fleet-babashka-to-nbb.edn` と `2607181900-kbb-kotoba-script-host-priority.edn` が居る。後続は ADR-2607257000 で、**ledger 半分だけ**を無効化している。ここを status superseded にすると nbb-only / kbb roadmap が死ぬ。skill の部分無効ゲートがこれを止める対象。launchd は、そこを正しく残した 1 周のあと。
 
@@ -143,7 +143,7 @@ docs-edn-repair と同じ。間隔は **86400 秒（1 日 1 件）**。判断が
 
 **tick**: slim `--edn`（1015 byte）を `edn/read-string` できる。全 candidate を載せた初回は parse が切れて偽の `:insufficient-scan` になった。
 
-**loop driver**: `COM_JUNKAWASAKI_ROOT=$PWD nbb scripts/adr-inventory-loop.cljs --dry-run` が先頭候補を出してモデルを起こさずに終わる。env 無しだと plist と同じ共有 checkout を見る。
+**loop driver**: `COM_JUNKAWASAKI_ROOT=$PWD kbb --backend sci scripts/adr-inventory-loop.cljk --dry-run` が先頭候補を出してモデルを起こさずに終わる。env 無しだと plist と同じ共有 checkout を見る。
 
 **plist**: `plutil -lint scripts/com.gftd.adr-inventory.plist`。LaunchAgents への配置は、skill が部分無効を 1 件正しく残したあと。この ADR の着地だけでは launchd を bootstrap しない。
 

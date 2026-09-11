@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Resident operator for cloud-itonami/cloud-itonami-dns-resolver.
 ;;
 ;; Runs one bounded G7-gated resolve_tick.cljs tick in a dedicated worktree
@@ -9,7 +9,7 @@
 ;; itself (source of truth) and, via a separate resident, the rebuildable
 ;; Iceberg projection.
 ;;
-;;   nbb scripts/dns-resolver-resident.cljk --source tranco|commoncrawl [--n N]
+;;   kbb --backend sci scripts/dns-resolver-resident.cljk --source tranco|commoncrawl [--n N]
 
 (require '[clojure.string :as str]
          '["node:child_process" :as cp]
@@ -109,7 +109,7 @@
       ;; tick before its own time budget even expires) — 800s covers the
       ;; 600s work budget plus fixed overhead (nbb boot, cache-file scan)
       ;; with real margin.
-      (println (checked! (into ["nbb" "--classpath" "src" "scripts/resolve_tick.cljs" "--live"] argv)
+      (println (checked! (into ["kbb" "--backend" "sci" "--classpath" "src" "scripts/resolve_tick.cljs" "--live"] argv)
                          {:timeout 800000
                           :env (js/Object.assign #js {} js/process.env
                                                  #js {"DNS_RESOLVER_OPERATOR_GATE" "open"})}))

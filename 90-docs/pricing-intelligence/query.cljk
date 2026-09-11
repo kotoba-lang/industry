@@ -10,7 +10,7 @@
 ;; keyword 属性 → "ns/name"、:db.type/ref は解決せず値一致 join。
 ;;
 ;; Run (superproject root から):
-;;   nbb --classpath "90-docs/pricing-intelligence:orgs/kotoba-lang/datalog/src" \
+;;   kbb --backend sci --classpath "90-docs/pricing-intelligence:orgs/kotoba-lang/datalog/src" \
 ;;     90-docs/pricing-intelligence/query.cljs <root>
 ;;   （<root> 既定 "."。旧 query.clj と違い superproject root の中からでも動く —
 ;;    nbb は deps.edn を読まない。）

@@ -69,7 +69,7 @@
 
 本命の三幅対は **etzhayyim** org、実装は **cloud-itonami** org。しかも
 cloud-itonami 側は COFOG（機能分類）・ISCO（職業分類）・ISIC（産業分類）に
-1 本ずつ散っている。`nbb scripts/concept-lookup.cljs 防災` は**『語彙に無い』**
+1 本ずつ散っている。`kbb --backend sci scripts/concept-lookup.cljk 防災` は**『語彙に無い』**
 と答え、`repo-search 防災 disaster` は 6 件しか出さず、そのうち本命 sonae は
 etzhayyim にある —— どちらの索引でも全体像は出ない。
 
@@ -236,7 +236,7 @@ relay 元の正本は 1 つに保つ。
 | cofog-06.3 | `leaksurvey` | 上水道（漏水調査） | 74 / 202 | `a29d4386` |
 | cofog-07.4 | `vectorsurvey` | 公衆衛生（媒介生物調査） | 76 / 209 | `cc6c582f` |
 
-4 本とも 0 failures / 0 errors、`clojure -M:lint` 0 errors 0 warnings、
+4 本とも 0 failures / 0 errors、`kbb -M:lint` 0 errors 0 warnings、
 nbb で load 可・`(op/build (seed-db))` が graph を返すことを実測。west pin
 4 件前進（`16bf3759`、diff は `+4 -4`）。
 
@@ -319,10 +319,10 @@ D3 と D4 は**面に載った**。手順ではなく結果を書く。
 公開面: https://cloud-itonami.itonami.cloud/cloud-itonami-cofog-03.2/ （200）。
 宣言は 20 → **21 本、接続済み 15 → 16 本**。
 
-**検証**: `clojure -M:test` = 1476 tests / 9855 assertions。失敗集合は
+**検証**: `kbb -M:test` = 1476 tests / 9855 assertions。失敗集合は
 `origin/main` の baseline（1473 / 9810）と **1 行も違わない**（既知 19 件:
 doctor / kotoba-xrpc / ops-keys / product-party / company 系）。上流側は
-`clojure -M:test` 81 tests / 210 assertions / 0 failures、`clojure -M:lint`
+`kbb -M:test` 81 tests / 210 assertions / 0 failures、`kbb -M:lint`
 0 errors 0 warnings —— **README の自己申告だった 81/210 を実際に走らせて確認した**。
 
 ### 設計になかった発見: `:effect :propose` を誰が宣言するか

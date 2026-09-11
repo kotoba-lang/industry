@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; `.kotoba` を持つ repo が今どの段階に居るかの索引を生成する。
 ;;
 ;; ## なぜ要るのか
@@ -29,8 +29,8 @@
 ;; checkout されていない west project は見えない。**その数を数えて記録する** ——
 ;; 索引に無いことが「移行していない」の証拠に使われるので。
 ;;
-;; 再生成: nbb scripts/gen-kotoba-migration-index.cljk
-;;         nbb scripts/gen-kotoba-migration-index.cljk --check   (差分があれば非0)
+;; 再生成: kbb --backend sci scripts/gen-kotoba-migration-index.cljk
+;;         kbb --backend sci scripts/gen-kotoba-migration-index.cljk --check   (差分があれば非0)
 
 (ns gen-kotoba-migration-index
   (:require ["fs" :as fs]
@@ -283,7 +283,7 @@
   (let [by (fn [k] (frequencies (map k rows)))
         unverified (filter #(= :stage/artifact-unverified (:stage %)) rows)]
     (str ";; .kotoba 移行の索引 —— **生成物。手で編集しない**\n"
-         ";; 再生成: nbb scripts/gen-kotoba-migration-index.cljk\n"
+         ";; 再生成: kbb --backend sci scripts/gen-kotoba-migration-index.cljk\n"
          ";; 語彙:   manifest/kotoba-migration-vocabulary.edn（こちらは手書き）\n"
          ";; 設計:   ADR-2608120200 / ADR-2608121700\n;;\n"
          ";; 2026-08-12、ADR-2608120200 は 23 repo を手で測った。同じ日に数えたら\n"
@@ -307,7 +307,7 @@
       (let [current (read-safe out-file)]
         (if (= current text)
           (println "kotoba-migration index: FRESH")
-          (do (println "kotoba-migration index: STALE — run nbb scripts/gen-kotoba-migration-index.cljk")
+          (do (println "kotoba-migration index: STALE — run kbb --backend sci scripts/gen-kotoba-migration-index.cljk")
               (js/process.exit 1))))
       (do (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
           (fs/writeFileSync out-file text)

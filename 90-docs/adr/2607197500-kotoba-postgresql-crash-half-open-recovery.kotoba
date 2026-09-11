@@ -24,7 +24,7 @@
                      (:handle-leak false)))
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "immediate crash recovery and bounded half-open proxy recovery; exit 0"))))))
   (:adr/body
   "# ADR-2607197500: PostgreSQL crash and half-open recovery

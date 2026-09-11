@@ -121,9 +121,9 @@ west pin（root `540a9a1b68d` 時点）:
   kotoba-lang   a7d0e3f8c8f9dcdbdc5755eb0468cd803c6ef32b
 
 検証（各着地時に全スイート実行）:
-  aiueos  clojure -M:test  425 tests / 1256 assertions  失敗 0
-  kotoba  clojure -M:test  526 tests / 8542 assertions  失敗 6（既存、backend-qualification-test）
-  amu     clojure -M:test  949 tests / 7486 assertions  失敗 0
+  aiueos  kbb -M:test  425 tests / 1256 assertions  失敗 0
+  kotoba  kbb -M:test  526 tests / 8542 assertions  失敗 6（既存、backend-qualification-test）
+  amu     kbb -M:test  949 tests / 7486 assertions  失敗 0
 
 新規テストはすべて『修正を外すと落ちる』ことを実測してから着地させた。
 シグネチャ変更で旧 tree が arity 例外になる場合は、シグネチャを保ったまま検査だけ外して

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; west-pin-policy-check.cljs — west pin guard の policy gate。
 ;;
 ;; GitHub Actions の west-pin-verify.yml の **1 本目の job**（policy test）を
@@ -28,7 +28,7 @@
 ;; exit 0」になる経路があるので、summary 行（`N cases OK`）の存在と N>0 を
 ;; assert する（jvm-test gate の `Ran N tests` と同じ床）。
 ;;
-;; ノード側で `npx nbb west-pin-policy-check.cljs <dir>` として実行。
+;; ノード側で `kbb --backend sci west-pin-policy-check.cljk <dir>` として実行。
 (ns fleet-ci.gates.west-pin-policy-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -54,7 +54,7 @@
 
 (def result
   (try
-    (cp/execSync "npx --yes nbb --classpath \".:scripts/nbb_compat\" scripts/west-pin-guard-policy-test.cljk"
+    (cp/execSync "npx --yes kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/west-pin-guard-policy-test.cljk"
                  #js {:cwd root :encoding "utf8" :stdio "pipe" :timeout 600000})
     (catch :default e
       ;; 落ちても出力は見せる（原因を receipt に残す）

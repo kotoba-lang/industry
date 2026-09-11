@@ -101,7 +101,7 @@
     (edn/read-string body)))
 
 (defn- spawn-render [classpath args]
-  (cp/spawnSync "npx" (clj->js (into ["nbb" "--classpath" classpath "bin/render.cljs"] args))
+  (cp/spawnSync "npx" (clj->js (into ["kbb" "--backend" "sci" "--classpath" classpath "bin/render.cljs"] args))
                 #js {:cwd here :encoding "utf8" :env (js/Object.assign
                                                       #js {}
                                                       js/process.env

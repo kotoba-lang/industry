@@ -41,7 +41,7 @@ whatever number a proposal claims — so proposing one only wastes the run.
 
 5. Run the gate from the worktree:
 
-     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-ontology-proposal.edn
+     kbb --backend sci --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-ontology-proposal.edn
 
    exit 0 accepted · exit 1 rejected (reasons printed) · exit 2 REFUSED — stop.
 

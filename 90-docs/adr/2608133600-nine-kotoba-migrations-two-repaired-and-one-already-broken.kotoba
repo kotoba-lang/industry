@@ -196,7 +196,7 @@ postfx 側の load 失敗は
 
 ## gate 出力（before → after）
 
-`nbb scripts/fleet-ci/gates/kotoba-provider-orphan-check.cljs <dir> --min 1`。
+`kbb --backend sci scripts/fleet-ci/gates/kotoba-provider-orphan-check.cljk <dir> --min 1`。
 床（90 = `.git` 無し / 91 = `--min` 未満 / 92 = `git ls-files` 失敗）はいずれも
 踏んでいない —— **before は 1、after は 0**、どちらも実際の判定である。
 
@@ -284,9 +284,9 @@ authority assertion を narrow → ADR 0001 amendment」である。
 | kotoba-lang/kami-postfx-scene | `850fd9aa` | `45de0401` |
 | kotoba-lang/webgpu | `7a0ff33f` | `771aa240` |
 
-`nbb scripts/advance-pins.cljs kotoba-lang <list> --execute` が当該 4 entry のみ書き換え
+`kbb --backend sci scripts/advance-pins.cljk kotoba-lang <list> --execute` が当該 4 entry のみ書き換え
 （`{:advanced 4, :already 0, :lookup-failed 0, :not-in-manifest 0}`）、
-`nbb scripts/verify-west-pins.cljs --only <name>` が 4 件とも fast-forward として OK。
+`kbb --backend sci scripts/verify-west-pins.cljk --only <name>` が 4 件とも fast-forward として OK。
 `manifest/west.yml` は手編集していない。
 
 ## 検証していないこと

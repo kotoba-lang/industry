@@ -88,7 +88,7 @@ compiler 2d08ec6fa42c2a041ad1000f620c72a6be8f6b8f（root def4de41）。
 **オーケストレータ側の失敗 2 件**: ①`git reset --hard origin/main` でセッション開始時から存在した `90-docs/surface/surface.datoms.edn` の未コミット変更を破棄した（CLAUDE.md は stash 退避を要求している）。生成物だったため再生成で等価な内容が戻り、実測した差分は 2 行だったが、それは事後に測った結果であって破棄時に知っていたことではない。②共有 ISA テーブルの baseline を「3 tests / 378 assertions」として agent に渡したが、これは前 agent の**未 commit 行を含む post 値**であり committed baseline（2 tests / 185）ではなかった。受け取った agent は黙って合わせず「聞いた数字と合わない、測った値を報告する」と明示した。
 
 **付随して見つかった、依頼していない欠陥 3 件**（いずれも本題の副産物）:
-①x86-64 が host-call slot へのリテラル false 引数以降を emit しない **出荷済み** miscompilation（ADR-2608060000）。②共有 ISA テーブルが固定 /tmp パスを使っており、並行実行で **loader が他 run のプログラムを exec してその行の名前で報告していた**（実際に発火。未修正 107/54 failures → 修正後 0/0 で両方向検証）。③`compiler` の `deps-lock.edn` が stale で fail-open し、`bin/kotoba` の JDK-free 経路が黙って `clojure -Spath` にフォールバックしていた（ADR-0202 が閉じたはずの穴）。")
+①x86-64 が host-call slot へのリテラル false 引数以降を emit しない **出荷済み** miscompilation（ADR-2608060000）。②共有 ISA テーブルが固定 /tmp パスを使っており、並行実行で **loader が他 run のプログラムを exec してその行の名前で報告していた**（実際に発火。未修正 107/54 failures → 修正後 0/0 で両方向検証）。③`compiler` の `deps-lock.edn` が stale で fail-open し、`bin/kotoba` の JDK-free 経路が黙って `kbb -Spath` にフォールバックしていた（ADR-0202 が閉じたはずの穴）。")
 
   (:adr/verify
   (vector "cd orgs/kotoba-lang/compiler && grep -c 'local/root' deps.edn deps-lock.edn   ; => 0（override 無し）"

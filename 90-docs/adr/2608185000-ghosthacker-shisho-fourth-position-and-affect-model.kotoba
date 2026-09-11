@@ -178,9 +178,9 @@ failure / agency）だけ。**`:exposure`（焦点人物のコマ数比）と `:
 ## 再開の一手
 
     cd orgs/com-junkawasaki/ghosthacker
-    nbb 260123-jump/scripts/verify-arc-plan.cljs      # sighting と払いの残りを見る
-    nbb 260123-jump/scripts/verify-air.cljs           # 空気感の残債を見る
-    nbb --classpath <ws>/orgs/kotoba-lang/org-oasis-open-xmile/src \\
+    kbb --backend sci 260123-jump/scripts/verify-arc-plan.cljk      # sighting と払いの残りを見る
+    kbb --backend sci 260123-jump/scripts/verify-air.cljk           # 空気感の残債を見る
+    kbb --backend sci --classpath <ws>/orgs/kotoba-lang/org-oasis-open-xmile/src \\
       260123-jump/scripts/score-affect.cljs nue monkeys-paw collected-too-much \\
       heiiki nuts-log fake-warning father-written
 

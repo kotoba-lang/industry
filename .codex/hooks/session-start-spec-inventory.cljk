@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; SessionStart フック: 「外部仕様の実装がこの workspace にあるか」を、
 ;; agent が推測する前に見せる。
 ;;
@@ -52,7 +52,7 @@
         (let [message
               (str "外部仕様ミラー repo（" (count specs) " 件 / west.yml 全 " total " 件）。\n"
                    "**「この workspace には X が無い」と結論する前に、まずここを見て、"
-                   "次に `nbb scripts/repo-search.cljk <語> [語...]` を引くこと。**\n"
+                   "次に `kbb --backend sci scripts/repo-search.cljk <語> [語...]` を引くこと。**\n"
                    "checkout されていない repo は ls にも find にも映らない —— "
                    "手元に無いことは存在しないことではない。\n\n"
                    (str/join ", " specs))]

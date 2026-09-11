@@ -60,7 +60,7 @@ cloud-itonami-app 側は projection の classpath を**手書きのリスト**�
   **名指しで拒否**する
 - error body が `:detail` / `:missing` を運ぶ（それ以外の ex-data は運ばない）
 - loop-yakuwari の `nbb.edn` が text を宣言する。この repo が README で勧めている
-  `nbb bin/awai.cljs check` が素の checkout で**起動すらできなかった**
+  `kbb --backend sci bin/awai.cljk check` が素の checkout で**起動すらできなかった**
 
 検査は `workforce_classpath_test`（12 assertion）。**通ることではなく判別することを確認した**:
 union を「宣言優先」に戻すと 3 件赤（不完全宣言のケースを含む）、nbb.edn を読まなくすると
@@ -147,7 +147,7 @@ git -C orgs/network-awai/app-hyakka log --oneline -3
 - **`invalid-input` と `context-overflow` は他の役の既存欠陥**。Domain Steward の
   `account-id is required` と、指示だけで context window を超える役が 1 つ。今回の
   変更とは無関係だが、lane の完走率をこれが押し下げている。
-- **`clojure -M:test` が cloud-itonami-app で起動しない**（`storj_test.clj:113` の
+- **`kbb -M:test` が cloud-itonami-app で起動しない**（`storj_test.clj:113` の
   `storj/build-request` が存在しない）。今回の新しい検査は runner を通さず直接走らせた。
 - **launcher と plist は version 管理に入れたが、live の plist はまだ home の path を
   指している**（`~/.gftd/bin/itonami-app-resident.cljs` は repo の

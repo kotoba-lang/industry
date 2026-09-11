@@ -26,7 +26,7 @@ cd ~/github/com-junkawasaki
 git fetch origin
 # 共有 checkout は書き換えない。分岐していないかだけ見る
 git merge-base --is-ancestor HEAD origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/industry-stack-wave-tick.cljk --limit 20
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/industry-stack-wave-tick.cljk --limit 20
 ```
 
 tick の ledger 最終行 `~/.itonami/industry-stack-wave-tick.ledger.edn` の
@@ -150,8 +150,8 @@ gh api repos/cloud-itonami/<repo>/merges \
 
 # west pins（entry 群だけ）
 # list-file に repo name を並べて:
-nbb scripts/advance-pins.cljk cloud-itonami /tmp/waveN-pins.txt --execute
-nbb scripts/verify-west-pins.cljk --only <comma-names>
+kbb --backend sci scripts/advance-pins.cljk cloud-itonami /tmp/waveN-pins.txt --execute
+kbb --backend sci scripts/verify-west-pins.cljk --only <comma-names>
 ```
 
 superproject で pin + ledger を branch に載せ、server-side merge で main へ。
@@ -162,7 +162,7 @@ merge した repo 名を `~/.itonami/industry-stack-wave-done.edn` に conj（�
 
 ```bash
 # 例: 既存 set に追加して書き戻す
-nbb -e '(require (quote [clojure.edn :as edn])) ...'
+kbb --backend sci -e '(require (quote [clojure.edn :as edn])) ...'
 ```
 
 または EDN set を手で更新。**忘れても skill が origin/main で skip するが、slot が無駄になる。**

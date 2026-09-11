@@ -36,7 +36,7 @@ lib 種別なので `business-model` / `pricing` は当たらず、実質の穴�
 
 | 節 | 確かめたこと |
 |---|---|
-| §1 | 新規 clone → `clojure -M:ci:test` = 13 tests / 40 assertions、`-M:cljs` の documented コマンドも同じ 13 件。**両方とも verbatim で通る** |
+| §1 | 新規 clone → `kbb -M:ci:test` = 13 tests / 40 assertions、`-M:cljs` の documented コマンドも同じ 13 件。**両方とも verbatim で通る** |
 | §1 注 | `:ci` 無しでも cljs は解決する（`:deps` が既に公開 URL）。`:ci` が差し替えるのは pin だけ |
 | §2 | 10 行の smoke を実行。`append-blob!` が**同じ seq を upsert する**（`{:kind :b}` が消えて `:b2` になる）ことを出力で確認 |
 | §3 | **`identity-schema` を忘れると例外も警告も無く、実体が 2 件でき、`blob-lookup` が古い方を返す**。schema 有りでは 1 件・新しい方。両方を実行して対比 |

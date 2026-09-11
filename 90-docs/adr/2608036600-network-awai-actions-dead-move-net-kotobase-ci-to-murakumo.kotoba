@@ -24,7 +24,7 @@
   (:adr/verify
   (vector "gh api 'repos/network-awai/net-kotobase/actions/runs?per_page=100' --jq '.workflow_runs[]|\"\\(.created_at) \\(.conclusion)\"' | sort | awk '$1>\"2026-08-03T01:12\"'   ; => すべて failure"
    "gh api repos/network-awai/net-kotobase/actions/runs/30779028268/jobs --jq '.jobs[]|{conclusion,steps:(.steps|length)}'   ; => failure / steps 0"
-   "nbb scripts/fleet-ci/tick.cljs --only net-kotobase --dry-run --no-pr --signer-pem ~/.gftd/fleet-ci-signer-tip.pem   ; => pass"))
+   "kbb --backend sci scripts/fleet-ci/tick.cljk --only net-kotobase --dry-run --no-pr --signer-pem ~/.gftd/fleet-ci-signer-tip.pem   ; => pass"))
 
   (:adr/body
   "# Context — Actions が「落ちている」のではなく「動いていない」
@@ -61,7 +61,7 @@ network-awai にも適用する。** ただし全部は移せないので、境�
 | # | 内容 | 置き換えた workflow |
 |---|---|---|
 | A | `node scripts/verify-tenant-isolation.mjs` | `enterprise-isolation.yml` **全体** |
-| B | `bb scripts/check-metadata.cljc` | `metadata.yml` **全体** |
+| B | `kbb scripts/check-metadata.cljk` | `metadata.yml` **全体** |
 | C | `bb <script> --syntax-check` × 21 | `worker.yml` の syntax 半分 |
 | D | `python3 -m py_compile` + `unittest test_gremlin.py` | `sdk.yml` の python leg **全体** |
 

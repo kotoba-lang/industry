@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; analyze-ci-plane-dynamics.cljs — CI プレーンの選択を system dynamics で採点する。
 ;;
 ;; 問い（オーナー、2026-08-05）「どちらが適切か、美しいかを分析, system dynamics
@@ -17,7 +17,7 @@
 ;; kotoba-lang/org-oasis-open-xmile（OASIS XMILE 1.0）に委譲する。CLAUDE.md
 ;; ADR-2607203000 の repo-wide 規則: ゼロから再発明しない。
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/dynamics/src:orgs/kotoba-lang/org-oasis-open-xmile/src" \
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/dynamics/src:orgs/kotoba-lang/org-oasis-open-xmile/src" \
 ;;       scripts/analyze-ci-plane-dynamics.cljk
 (ns analyze-ci-plane-dynamics
   (:require [clojure.string :as str]

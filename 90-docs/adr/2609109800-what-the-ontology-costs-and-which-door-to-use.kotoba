@@ -200,13 +200,13 @@ nbb は別の runtime であるだけでなく **compiler ではない**（SCI�
 evidence は `90-docs/query-plane/2026-09-10-query-plane-performance.edn`。
 bench は 4 本:
 
-    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_inference_cost.cljs
+    kbb --backend sci --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_inference_cost.cljs
 
-    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/kotobase-server/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_request_overheads.cljs
+    kbb --backend sci --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/kotobase-server/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_request_overheads.cljs
 
-    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/ayatori/src:orgs/kotoba-lang/kotobase/src:orgs/kotoba-lang/arrangement/src:orgs/kotoba-lang/prolly-tree/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_materialize_share.cljs
+    kbb --backend sci --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/ayatori/src:orgs/kotoba-lang/kotobase/src:orgs/kotoba-lang/arrangement/src:orgs/kotoba-lang/prolly-tree/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/bench_materialize_share.cljs
 
-    nbb 90-docs/query-plane/bench_ipq_latency.cljs
+    kbb --backend sci 90-docs/query-plane/bench_ipq_latency.cljk
 
 **4 本とも答えの件数を各行に出す。** 件数の列が無い性能表は、
 速い実装と何もしていない実装を区別できない —— この ADR がその実例である。

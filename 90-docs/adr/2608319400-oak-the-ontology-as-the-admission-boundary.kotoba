@@ -213,9 +213,9 @@ Everything below is on a default branch. Nothing is waiting on a review.
 
 Verification, from a fresh clone of the published pin, all JVM-free:
 
-- `nbb bin/conformance.cljs` -- 20 checks, 0 failures, on the reference
+- `kbb --backend sci bin/conformance.cljk` -- 20 checks, 0 failures, on the reference
   interpreter
-- `nbb bin/wasm-conformance.cljs` -- 11 checks, 0 failures, on the compiled
+- `kbb --backend sci bin/wasm-conformance.cljk` -- 11 checks, 0 failures, on the compiled
   module against a real dataspace
 - kotoba-kir`s own cljs suite -- 37 tests, 90 assertions, 0 failures
 - kotoba-wasm`s new cljs suite -- 2 tests, 0 failures

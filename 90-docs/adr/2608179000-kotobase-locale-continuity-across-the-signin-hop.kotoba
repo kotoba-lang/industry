@@ -55,8 +55,8 @@
     "gftd.ai: browser /signup → 301 kotobase.net/signup、did.json は resolver/browser とも 200"
     "return_to=…/ja/signup + Accept-Language: en → sign-in lang=ja"))
    (:tests
-   (map (:authn "clojure -M:test — 52 tests / 356 assertions / 0 failures")
-    (:gateway-site "clojure -M:site-test — 53 tests / 561 assertions / 1 failure（既存、下記 gaps）")
+   (map (:authn "kbb -M:test — 52 tests / 356 assertions / 0 failures")
+    (:gateway-site "kbb -M:site-test — 53 tests / 561 assertions / 1 failure（既存、下記 gaps）")
     (:authn-worker-smoke "test/apex_worker_smoke.cljs — 19/19（ビルド済みバンドルを実行）")
     (:gateway-alias-smoke "test/legacy_alias_smoke.cljs — 7/7（ビルド済みバンドルを実行）")))
    (:gates-verified-by-breaking
@@ -154,7 +154,7 @@
   2. **JS のテストで `(?s)` を使った。** Java のインラインフラグで JS には
      無く、`<style>` を剥がせないまま vendored DADS の MIT 表示
      `Copyright (c) 2025 デジタル庁` を『半端翻訳』として報告した。
-  3. **`shadow-cljs release worker` をビルドして、signup 文書が入っているのは
+  3. **`amu compile --target wasm32-browser worker` をビルドして、signup 文書が入っているのは
      `:entry` の方だと知らずにデプロイしかけた。** バンドルの中身を確認して
      いなければ、変更が入っていないものを出して成功と報告していた。
   4. **minified バンドルを `grep -c 'Max-Age=0'` で検査して 0 件を得た。**

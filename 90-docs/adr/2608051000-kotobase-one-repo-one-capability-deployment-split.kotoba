@@ -341,7 +341,7 @@
       永久に false なので token が動かず、毎ティック同じ先頭ページを list して全件 skip していた。
       修正は page-size == slice-size（コピーする分だけ list する）。条件分岐そのものを消した。"
      "**cursor が読み戻せない**: `read-state*` が parsed JSON を `(.-token v)` で読んでいた。
-      本番は `shadow-cljs release`（Closure :advanced）なので**このアクセスだけが rename され**、
+      本番は `amu compile --target wasm32-browser`（Closure :advanced）なので**このアクセスだけが rename され**、
       JSON のキーは rename されないため undefined になる。報告値（token nil → \"start\"、
       copied nil → 0）と完全に一致。修正は parsed JSON の読み取りを全て `aget` に。"))
     (:the-second-bug-is-a-class-not-an-incident

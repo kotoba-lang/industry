@@ -99,7 +99,7 @@ Worker version 9ebd5df7-e240-450e-8876-641d328f4244
 network-awai/cloud-murakumo (wiring): GET /api/v1/free/funding, scripts/free-tier-tick.cljs, com.gftd.murakumo-free-tier-tick, objectives repointed in loop-yakuwari
 Worker version 088adf46-b7e8-4f3a-bb32-b2f7cf92047c (funding endpoint live)
 Bot run: run-97fb754e-a317-4755-b313-21e2b0cae2f7 (閲覧, 2026-09-09T07:55-08:01Z)
-Reproduce: npm run test:free-tier-tick; nbb scripts/free-tier-tick.cljs; npm run test:free-tier (in orgs/network-awai/cloud-murakumo); clojure -M:test (in orgs/kotoba-lang/adnet); npx nbb bin/awai.cljs check (in orgs/network-awai/loop-yakuwari); curl -sS https://murakumo.cloud/api/v1/free/status")
+Reproduce: npm run test:free-tier-tick; kbb --backend sci scripts/free-tier-tick.cljk; npm run test:free-tier (in orgs/network-awai/cloud-murakumo); kbb -M:test (in orgs/kotoba-lang/adnet); kbb --backend sci bin/awai.cljk check (in orgs/network-awai/loop-yakuwari); curl -sS https://murakumo.cloud/api/v1/free/status")
   (:adr/body
   "See :adr/context, :adr/decision, :adr/consequences and :adr/evidence. Operational documentation is orgs/network-awai/cloud-murakumo/docs/free-tier.md; the entitlement rules are documented in kotoba-lang/adnet's README and in adnet.entitlement's namespace docstring.
 

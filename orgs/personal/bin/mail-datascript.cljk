@@ -1,11 +1,11 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; orgs/personal/bin/mail-datascript.cljk — jun784 Gmail アーカイブ
 ;; (mail/messages/index.jsonl) を実 DataScript (npm `datascript`) にロードして
 ;; query する軽量ツール。属性変換方針は manifest/edn-query.cljk と同一
 ;; （datascript.js は attribute を keyword でなく裸文字列で扱うため、この
 ;; ローダも文字列化する）。
 ;;
-;; Datomic 側 (bin/datomic/src/warehouse/load.clj, JVM `clojure -M -m
+;; Datomic 側 (bin/datomic/src/warehouse/load.clj, JVM `kbb -M -m
 ;; warehouse.load`) は email/from・to・cc を :person/email への ref として
 ;; グラフ結合するが、このローダは意図的にフラットにする（email/from・to・cc は
 ;; 単なるアドレス文字列 — datascript.js の transact データで lookup-ref を
@@ -23,8 +23,8 @@
 ;; （無くても mail query は動く）。
 ;;
 ;; 使い方 (repo root から):
-;;   npx nbb orgs/personal/bin/mail-datascript.cljk count
-;;   npx nbb orgs/personal/bin/mail-datascript.cljk q \
+;;   kbb --backend sci orgs/personal/bin/mail-datascript.cljk count
+;;   kbb --backend sci orgs/personal/bin/mail-datascript.cljk q \
 ;;     '[:find ?subj ?date :where [?e "email/from" "no-reply@mercari.jp"]
 ;;                                [?e "email/subject" ?subj] [?e "email/date" ?date]]'
 
@@ -233,7 +233,7 @@
     {:conn conn :email-count (count email-tx) :person-count (count person-tx)}))
 
 (defn- usage-exit! []
-  (println "usage: npx nbb orgs/personal/bin/mail-datascript.cljk [count | q '<datalog-query>']")
+  (println "usage: kbb --backend sci orgs/personal/bin/mail-datascript.cljk [count | q '<datalog-query>']")
   (scripts.nbb-compat/exit 1))
 
 (defn -main [& args]

@@ -1,5 +1,5 @@
 ;; manifest/archived-repos.edn — 生成物。手で編集しない。
-;; 再生成: nbb --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk
+;; 再生成: kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk
 {:generated-at "2026-09-06T23:43:18.652Z"
  :source "gh api orgs/<org>/repos?type=all --paginate"
  :note "生成物（手編集禁止）。archived な repo は測定からは外さない —— スコアと fleet 平均には従来どおり入る。これが縛るのは itonami-maturity-improve loop の候補選択だけ。"

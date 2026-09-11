@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/kaiyu-kaizen-loop.cljk — **ローカル Claude loop** の入口。
 ;; LaunchAgent `cloud.itonami.bot.kaiyu-kaizen` が一定間隔でこれを起こす。
 ;;
@@ -37,7 +37,7 @@
 ;;   - exit 0 常に（監視 loop であって gate ではない）
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
 ;;       scripts/kaiyu-kaizen-loop.cljk [--dry-run]
 
 (require '[clojure.edn :as edn]

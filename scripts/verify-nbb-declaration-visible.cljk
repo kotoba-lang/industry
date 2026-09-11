@@ -11,7 +11,7 @@
 ;;
 ;;     Error: Could not find namespace: kotoba.lang.text
 ;;
-;; the first time its own entry point was run. `clojure -M:test` was green on
+;; the first time its own entry point was run. `kbb -M:test` was green on
 ;; all three throughout, because the JVM suite reads deps.edn and never loads
 ;; the .cljs.
 ;;
@@ -23,7 +23,7 @@
 ;;   * `#!/usr/bin/env nbb` in line 1, or
 ;;   * named by a package.json script as `nbb <file>` with no `--classpath`.
 ;;
-;; A file invoked as `nbb --classpath src:test <file>` is NOT reported: the
+;; A file invoked as `kbb --backend sci --classpath src:test <file>` is NOT reported: the
 ;; classpath is supplied at the invocation site, which is a different (and
 ;; legitimate) declaration. Counting those would have turned a list of things
 ;; that are broken into a list of things that merely look unusual -- 1,114
@@ -35,7 +35,7 @@
 ;; Not a fleet gate: it reads every west project under orgs/, and a gate ships
 ;; one repository's tree.
 ;;
-;; Usage: nbb verify-nbb-declaration-visible.cljs [--findings] <orgs-dir>
+;; Usage: kbb --backend sci verify-nbb-declaration-visible.cljk [--findings] <orgs-dir>
 (require '[clojure.string :as s] '[cljs.reader :as reader])
 
 (def fs (js/require "node:fs"))
@@ -61,7 +61,7 @@
 
 ;; namespaces that only a :deps coordinate can supply. nbb ships clojure.string,
 ;; clojure.set, clojure.walk, cljs.test and the node interop; requiring one of
-;; those from a bare `nbb file.cljs` works with no project file at all.
+;; those from a bare `kbb --backend sci file.cljk` works with no project file at all.
 (def bundled
   #{"clojure.string" "clojure.set" "clojure.walk" "clojure.edn" "clojure.data"
     "clojure.test" "cljs.test" "cljs.reader" "cljs.pprint" "clojure.pprint"
@@ -128,7 +128,7 @@
   (fn [repo]
     (let [;; A SHEBANG IS NOT PROOF THAT A FILE IS RUN BARE. Two repositories
           ;; carry `#!/usr/bin/env nbb` on a script whose own README says to run
-          ;; it as `nbb --classpath <dir> <file>`, and it works that way:
+          ;; it as `kbb --backend sci --classpath <dir> <file>`, and it works that way:
           ;; kotoba-lang/global-accounts-datoms answers "policy ok: 57
           ;; attributes allowed, 0 violations" with `--classpath bin`, and
           ;; kotoba-lang/org-iso-h264 reaches its own argument check with

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; 稼働面の索引を **生成** する（手書きしない）。
 ;;
 ;; ## なぜ要るのか
@@ -22,9 +22,9 @@
 ;; 引ける datom 形）。`:surface/repo` が `repo-taxonomy` の `:repo/path` と
 ;; 同じ形なので join できる。
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/org-toml/src" \\
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/org-toml/src" \\
 ;;     scripts/gen-surface-index.cljk            # 生成
-;;   nbb --classpath "orgs/kotoba-lang/org-toml/src" \\
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/org-toml/src" \\
 ;;     scripts/gen-surface-index.cljk --check    # 差分があれば非ゼロ終了
 
 (ns gen-surface-index
@@ -229,7 +229,7 @@
   (let [rows (vec (scan))
         datoms (->datoms rows)
         header (str ";; 稼働面の索引 —— **生成物。手で編集しない**\n"
-                    ";; 再生成: nbb --classpath \"orgs/kotoba-lang/org-toml/src\" scripts/gen-surface-index.cljk\n;;\n"
+                    ";; 再生成: kbb --backend sci --classpath \"orgs/kotoba-lang/org-toml/src\" scripts/gen-surface-index.cljk\n;;\n"
                     ";; 2026-08-03 の重複（murakumo に /signup を手書きしたが\n"
                     ";; authn.kotobase.net/sign-in が既に稼働していた）を防ぐために作った。\n"
                     ";; CLAUDE.md の『作る前に確認する』が効かなかったのは意思ではなく\n"
@@ -249,7 +249,7 @@
         (if (= cur body)
           (println "surface index: 最新")
           (do (js/console.error (str "surface index が古い。再生成せよ: "
-                                 "nbb --classpath \"orgs/kotoba-lang/org-toml/src\" "
+                                 "kbb --backend sci --classpath \"orgs/kotoba-lang/org-toml/src\" "
                                  "scripts/gen-surface-index.cljk"))
               (set! (.-exitCode js/process) 1))))
       (do (fs/mkdirSync (path/dirname out-file) #js {:recursive true})

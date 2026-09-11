@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; rule-kaizen — standing な言い方が、ある日の実装天井を言語にしていないか測る。
 ;; ここにモデルは居ない。直す判断は skill `rule-kaizen`。
 ;;
@@ -8,10 +8,10 @@
 ;; needles は `manifest/rule-snapshot-needles.edn`（手書き。corpus から導かない）。
 ;;
 ;; usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --edn
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --self-test
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --min-listed 80
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --edn
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --self-test
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/rule-kaizen.cljk --min-listed 80
 
 (require '[clojure.edn :as edn]
          '[clojure.string :as str])

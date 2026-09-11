@@ -146,7 +146,7 @@ DOM storage も IndexedDB も無く、document-start 注入が照合する origi
 ## cloud-itonami-app への含意（この ADR の範囲外だが記録する）
 
 **cloud-itonami-app は依然としてモバイルに載らない。** インタフェースを JVM の
-loopback server（`clojure -M:server`、port 1338、ADR-2607313000 の常駐 install）が
+loopback server（`kbb -M:server`、port 1338、ADR-2607313000 の常駐 install）が
 提供しているため、iOS にも Android にも JVM が無いという一点で詰まる。ここで
 埋めたのは packaging と capability であって、**サーバランタイムの移植ではない**。
 
@@ -187,7 +187,7 @@ git -C orgs/kotoba-lang/shell worktree add --detach /tmp/shell-cli origin/main
 # test alias は ../../etzhayyim/tamaki を :local/root で引くので west と同じ相対配置が要る
 #   <X>/orgs/kotoba-lang/shell と <X>/orgs/etzhayyim/tamaki（dom-gpu / browser / aiueos /
 #   kototama / kotobase / hil も symlink すれば ui check / e2e stack まで通る）
-clojure -M:test    # 72 tests / 541 assertions
+kbb -M:test    # 72 tests / 541 assertions
 # bridge の実機 smoke
 ./bin/kotoba-shell app scaffold --target ios --web-dist-dir test/web/bridge-smoke ...
 # Android は JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home が要る

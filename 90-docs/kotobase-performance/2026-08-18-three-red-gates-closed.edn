@@ -55,7 +55,7 @@
 
    ## 自分が踏んだ罠
 
-   最初の `nbb scripts/bundle-manifest.cljs write` は
+   最初の `kbb --backend sci scripts/bundle-manifest.cljk write` は
    `bundle-manifest: missing kotobase-api-gateway/js/kotobase-worker.js` を返した。
    ファイルは実在し tracked だった。原因は CLAUDE.md が既に文書化している罠:
    `root` は `(first (remove #(str/starts-with? % \"--\") argv))` なので

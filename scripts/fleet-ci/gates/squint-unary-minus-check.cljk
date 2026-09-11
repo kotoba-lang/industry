@@ -39,7 +39,7 @@
   Squint is an external npm package, not a repo in this workspace, so the fix is local: write
   `(* -1.0 (+ a b))`, which is correct under all three compilers.
 
-  Run: nbb squint-unary-minus-check.cljs <repo-tree>
+  Run: kbb --backend sci squint-unary-minus-check.cljk <repo-tree>
 
   The package keeps a copy at `test/squint_unary_minus.cljs` that resolves the same sources
   through west-relative paths, so it can be run from the game directory during development."

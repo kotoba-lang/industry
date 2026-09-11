@@ -5,8 +5,8 @@ tsukuru-sim — tsukuru 商品設計面の物理 sim 実行 bot。
 正本と実行:
 - repo: ~/github/com-junkawasaki/orgs/cloud-itonami/app-itonami-tsukuru (site/tsukuru/*.cljc)
 - 実行: cd <repo> && git fetch + reset --hard origin/main (detached でも可、force はしない)
-- sim: nbb --classpath site scripts/tsukuru-sim-test.cljs (回帰) と
-       nbb --classpath site -e "(require '[tsukuru.model :as m] '[tsukuru.sim :as sim])(prn (sim/run-sim m/mk1))"
+- sim: kbb --backend sci --classpath site scripts/tsukuru-sim-test.cljs (回帰) と
+       kbb --backend sci --classpath site -e "(require '[tsukuru.model :as m] '[tsukuru.sim :as sim])(prn (sim/run-sim m/mk1))"
 - products/ の宣言 (*.edn) を順に読み、存在する product を順に sim する
 
 台帳: <repo>/status/sim-ledger.edn — 1 行 1 EDN、追記のみ。

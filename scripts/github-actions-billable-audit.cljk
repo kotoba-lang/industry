@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; github-actions-billable-audit.cljs — 「GitHub Actions を使っていない」を
 ;; **GitHub 側に訊いて**確かめる読み取り専用の計器。
 ;;
@@ -30,8 +30,8 @@
 ;;
 ;; ## 対象は明示する（全アカウントを既定にしない）
 ;;
-;;   nbb scripts/github-actions-billable-audit.cljk --repo com-junkawasaki/root
-;;   nbb scripts/github-actions-billable-audit.cljk --owner kotoba-lang --since 2026-07-30
+;;   kbb --backend sci scripts/github-actions-billable-audit.cljk --repo com-junkawasaki/root
+;;   kbb --backend sci scripts/github-actions-billable-audit.cljk --owner kotoba-lang --since 2026-07-30
 ;;   ... --max-runs 400        # 既定 200。打ち切ったら必ず出力に出す
 ;;
 ;; 引数なしで 4,000 repo を歩かない（CLAUDE.md の `west update` と同じ理由）。

@@ -17,7 +17,7 @@
 (defn read-kir []
   (if-let [url (io/resource resource-path)]
     (edn/read-string (slurp url))
-    (throw (ex-info "shipped decision core is missing — run `clojure -M:gen`"
+    (throw (ex-info "shipped decision core is missing — run `kbb -M:gen`"
                     {:path resource-path}))))
 
 (defmacro embedded-kir

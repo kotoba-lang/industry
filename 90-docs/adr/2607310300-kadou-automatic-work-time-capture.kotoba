@@ -31,9 +31,9 @@
    "superproject a5ebe67ac51 (west 登録 + 本 ADR、origin/main の祖先)"))
 
   (:adr/verify
-  (vector "cd orgs/kotoba-lang/activity && clojure -M:test && clojure -M:lint"
-   "cd orgs/cloud-itonami/kadou && clojure -M:test && clojure -M:lint"
-   "nbb --classpath ../../kotoba-lang/activity/src tools/capture.cljs --worker w-1 --interval 2 --seconds 6"))
+  (vector "cd orgs/kotoba-lang/activity && kbb -M:test && kbb -M:lint"
+   "cd orgs/cloud-itonami/kadou && kbb -M:test && kbb -M:lint"
+   "kbb --backend sci --classpath ../../kotoba-lang/activity/src tools/capture.cljs --worker w-1 --interval 2 --seconds 6"))
 
   (:adr/decision-summary
   (vector "D1: 時間の算術は kotoba-lang/activity（無依存 .cljc）に置き、governor 側で再計算する。actor は segmentation も rounding も再発明しない"
@@ -154,7 +154,7 @@ kadou に ISIC / ISCO code を付けない。ISIC / ISCO family は sector / occ
   `:ts/hours` を出すので `kotoba.labor/wages-for` がそのまま値段を付けられる。
   両者は互いに依存しない（`activity` は依存ゼロ）。
 - `.cljc` の可搬性主張が実地で確認された。同じ `kotoba.activity` を JVM
-  （clojure -M:test）と nbb（capture agent の `--classpath`）の両方で走らせた。
+  （kbb -M:test）と nbb（capture agent の `--classpath`）の両方で走らせた。
 - **taxonomy gap**: `manifest/repository-rules.edn` の `:name-prefix` 語彙は
   prefix 無しの repo を `{:role :library :execution :none}` に落とすが、kadou は
   actor で `:on-demand`。同じ誤分類は `lawfirm` / `lawyer` / `mitate` 等

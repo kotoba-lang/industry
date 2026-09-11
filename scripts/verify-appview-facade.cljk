@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-appview-facade.cljk — migrated appviews whose deployed handler
 ;; is not the file a reader opens.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-appview-facade.cljk --root <orgs-bearing checkout>
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-appview-facade.cljk --root <orgs-bearing checkout>
 ;;   ... --findings
 ;;
 ;; ## What this caught

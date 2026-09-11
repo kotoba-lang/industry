@@ -48,11 +48,11 @@
 
   ## 実行した検証（今回の closing 時点）
 
-  kotoba-lang/webauthn 5284f67: nbb ceremony smoke 26 checks 全 pass（UV=0 の登録/認証の拒否、誤記 policy でも拒否、明示 :preferred lane の受理、BE/BS の往復を実署名 assertion で確認）/ `clojure -M:test` 12 tests・18 assertions 0 failures。
+  kotoba-lang/webauthn 5284f67: nbb ceremony smoke 26 checks 全 pass（UV=0 の登録/認証の拒否、誤記 policy でも拒否、明示 :preferred lane の受理、BE/BS の往復を実署名 assertion で確認）/ `kbb -M:test` 12 tests・18 assertions 0 failures。
 
-  network-awai/cloud-itonami e262eb07: edge cljs（webauthn + endpoints + credential endpoints）43 tests・171 assertions 0 failures / portable cljs 650 tests・6060 assertions 0 failures / JVM site.signin-test 9 tests・41 assertions / edge bundle 再ビルド + `verify-edge-bundle.cljs` 7/7 import 実行可 / live UV probe（`nbb --classpath \"src:test\" test/live_uv_probe.cljs`）4 checks。
+  network-awai/cloud-itonami e262eb07: edge cljs（webauthn + endpoints + credential endpoints）43 tests・171 assertions 0 failures / portable cljs 650 tests・6060 assertions 0 failures / JVM site.signin-test 9 tests・41 assertions / edge bundle 再ビルド + `verify-edge-bundle.cljs` 7/7 import 実行可 / live UV probe（`kbb --backend sci --classpath \"src:test\" test/live_uv_probe.cljs`）4 checks。
 
-  network-awai/net-kotobase c7205f82: `clojure -M:test` 32 tests・210 assertions 0 failures / `npm run test:custody` 35 checks / `npm run test:sweep` 9 checks / live e2e passkey 13・credentials 18・email 7 checks（いずれも deploy 後、authn.kotobase.net に対して）。
+  network-awai/net-kotobase c7205f82: `kbb -M:test` 32 tests・210 assertions 0 failures / `npm run test:custody` 35 checks / `npm run test:sweep` 9 checks / live e2e passkey 13・credentials 18・email 7 checks（いずれも deploy 後、authn.kotobase.net に対して）。
 
   ## 実行していない検証（重要）
 

@@ -245,6 +245,6 @@ mapillary 8 / 32、loop 9 / 38、cloud-itonami.okugai-ops 14 / 47。
 datom 面のクエリ例（datascript.js の節順序に注意 —— 定数値の clause を先頭に
 置くと束縛が効かないことがある。属性 clause から書く）:
 
-  nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+  kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
     '[:find ?name ?url :where [?a \"agency/legal-name\" ?name]
       [?a \"agency/source-url\" ?url] [?a \"source/dataset\" \"denchu-inventory\"]]'")))

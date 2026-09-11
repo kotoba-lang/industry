@@ -214,7 +214,7 @@ resume token、重複block抑止、malicious responder negative test が必要�
    guard を消した module は *Wasm としては依然 valid* で、unit assertion が捕らえ、harness は
    1-byte 入力の index 3 でちょうど落ちる（trap しなくなる）。
 
-   ⚠ `clojure -M:test`（amu 全体）はこのマシンでは `cli-test` の
+   ⚠ `kbb -M:test`（amu 全体）はこのマシンでは `cli-test` の
    `wasm-tools version is not pinned` で exit 70 する。**無改変の origin/main が同じ test で
    同じ exit をすることを別 worktree で確認済み** —— 本 slice の regression ではない。
 2. ~~`bytes-slice(bytes, start, end) -> bytes`~~ **closed（2026-08-17、kotoba-sema #12 + amu #621）**。

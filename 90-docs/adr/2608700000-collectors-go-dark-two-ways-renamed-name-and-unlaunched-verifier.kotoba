@@ -55,8 +55,8 @@ kaname は exit 1）、`newsfeed-ingest` の B2 push 失敗、`meisai` の runs-
 ## 2. 検査器が起動しなかった — alias を落とすと「検査が通らない」でなく「検査が無い」
 
 `scripts/hirameki-harvest.cljs` と `scripts/hirameki-mirror.cljs` は corpus の
-検証器を `clojure -M verify.clj` で呼んでいた。しかし verify.clj 自身の冒頭は
-`clojure -M:query verify.clj` と書いている——checks.clj は 2026-08-10（ADR-2608100400）
+検証器を `kbb -M verify.clj` で呼んでいた。しかし verify.clj 自身の冒頭は
+`kbb -M:query verify.clj` と書いている——checks.clj は 2026-08-10（ADR-2608100400）
 に datascript を require するようになった。「バイトと CID が合うか」だけでなく
 **「corpus が問いに答えるか」**を検査するためである。
 

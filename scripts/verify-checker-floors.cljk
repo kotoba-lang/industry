@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-checker-floors.cljs — run every `scripts/check-*.cljs` / `scripts/verify-*.cljs`
 ;; in a tree against an EMPTY input and require that it refuses (exit 2).
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-checker-floors.cljk [<dir>] [--findings] [--strict] [--child-timeout-ms N]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-checker-floors.cljk [<dir>] [--findings] [--strict] [--child-timeout-ms N]
 ;;
 ;; ## なぜ要るか
 ;;

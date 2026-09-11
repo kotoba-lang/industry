@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Land the verified rows of a sweep-clean-runners run: one branch, one
 ;; server-side merge and one west pin advance per repo.
 ;;
@@ -25,7 +25,7 @@
 ;; property is kept by the tool, not stepped around.
 ;;
 ;;   SWEEP_TSV=… SWEEP_WORKDIR=… LEDGER=… [LIMIT=n] [DRY=1] \
-;;     nbb --classpath ".:scripts/nbb_compat" land-portable-runners.cljs
+;;     kbb --backend sci --classpath ".:scripts/nbb_compat" land-portable-runners.cljs
 (require '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))
@@ -101,10 +101,10 @@
               (.copyFileSync fs (.join node-path work entry) (.join node-path wt entry))
               (let [msg (str "test: run the portable suite on nbb as well as the JVM\n\n"
                              "Every `deftest`-bearing portable namespace in this project ran under\n"
-                             "`clojure -M:test` and nowhere else, so a defect in the ClojureScript half\n"
+                             "`kbb -M:test` and nowhere else, so a defect in the ClojureScript half\n"
                              "of a `.cljc` was invisible here — on a fleet whose shipped consumers are\n"
                              "Cloudflare Workers and browser bundles.\n\n"
-                             "  nbb --classpath " cpath " " entry "\n"
+                             "  kbb --backend sci --classpath " cpath " " entry "\n"
                              "  " counts ", 0 failures\n\n"
                              "Generated and verified as the first tranche of ADR-2608170400: this project\n"
                              "needs no classpath beyond its own source, so the runner is a plain nbb\n"
@@ -137,7 +137,7 @@
                                                               " | grep 'name:' | tail -1 | sed 's/.*name: //'")
                                                          {:cwd root :shell "/bin/bash"})))
                                   pin (loop [tries 0]
-                                        (let [r (sh (str "nbb --classpath '.:scripts/nbb_compat'"
+                                        (let [r (sh (str "kbb --backend sci --classpath '.:scripts/nbb_compat'"
                                                          " scripts/west-pin-put.cljk " ent " " sha
                                                          " --message 'west: advance " ent " to "
                                                          (subs sha 0 7)

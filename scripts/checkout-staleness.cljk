@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; orgs/ 配下の全 checkout について「自分の remote の default branch からどれだけ
 ;; ずれているか」を **network round trip なしで** 測る。
 ;;
@@ -46,10 +46,10 @@
 ;; `manifest/checkout-consequence.edn` に書き出す(hook はこれを読む)。
 ;;
 ;; 使い方:
-;;   nbb scripts/checkout-staleness.cljk                 # 人が読む要約
-;;   nbb scripts/checkout-staleness.cljk --edn out.edn   # 全件を EDN で
-;;   nbb scripts/checkout-staleness.cljk --write-consequence
-;;   nbb scripts/checkout-staleness.cljk --root <dir> --jobs 8 --limit 200
+;;   kbb --backend sci scripts/checkout-staleness.cljk                 # 人が読む要約
+;;   kbb --backend sci scripts/checkout-staleness.cljk --edn out.edn   # 全件を EDN で
+;;   kbb --backend sci scripts/checkout-staleness.cljk --write-consequence
+;;   kbb --backend sci scripts/checkout-staleness.cljk --root <dir> --jobs 8 --limit 200
 
 (require '[clojure.string :as str])
 

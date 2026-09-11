@@ -185,19 +185,19 @@ curve は **収益請求権**に貼る（希少で cold start がある）。**b
 
 ```bash
 # 1. VLP の現在地を1画面で読む
-nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
   '[:find ?id ?st :where [?e \"adr/id\" ?id] [?e \"adr/status\" ?st]
     [?e \"adr/topic\" \"cloud-itonami-vertical-liquidity-pools\"]]'
 
 # 2. lever ranking を再計算する（数字は全て再現可能）
-nbb --classpath \"orgs/kotoba-lang/loop-system-dynamics/src:orgs/kotoba-lang/dynamics/src\" \\
+kbb --backend sci --classpath \"orgs/kotoba-lang/loop-system-dynamics/src:orgs/kotoba-lang/dynamics/src\" \\
   -e \"(require '[loop-system-dynamics.cloud-itonami-vlp-levers :as v]) (v/-main)\"
 
 # 3. ~/.gftd の死角を点検する（現在の既知違反は .sh 3 件のみ）
-nbb scripts/audit-gftd-scripts.cljs
+kbb --backend sci scripts/audit-gftd-scripts.cljk
 
 # 4. 連鎖が動くことを確かめる（nexus-x402 の実出力に対する契約テスト）
-cd orgs/network-awai/cloud-itonami && clojure -M:test
+cd orgs/network-awai/cloud-itonami && kbb -M:test
 #    → 1337 tests / 8903 assertions。19 failures は本セッション着手前と同一の既存セット
 ```
 

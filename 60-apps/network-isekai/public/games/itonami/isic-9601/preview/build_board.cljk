@@ -2,7 +2,7 @@
   "Builds `preview/board.html` — shop board only, no WebGL engine.
 
   Run from the package root:
-    npx nbb preview/build_board.cljs
+    kbb --backend sci preview/build_board.cljk
 
   Used by `bin/render.cljs --view board`. Deliberately does not touch
   `street` / `gl` / `kami.webgpu`, so this works when

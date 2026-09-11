@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/fold-adr-ledger.cljk — ONE-SHOT migration: fold the append-only
 ;; adr-ledger back into each ADR document, so the ADR file is the single
 ;; latest-state record and git carries the history.
@@ -21,8 +21,8 @@
 ;; hand-authored formatting and comments.
 ;;
 ;; Usage:
-;;   nbb scripts/fold-adr-ledger.cljk --dry-run     # report only
-;;   nbb scripts/fold-adr-ledger.cljk               # write
+;;   kbb --backend sci scripts/fold-adr-ledger.cljk --dry-run     # report only
+;;   kbb --backend sci scripts/fold-adr-ledger.cljk               # write
 
 (ns fold-adr-ledger
   (:require ["fs" :as fs]

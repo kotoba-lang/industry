@@ -93,8 +93,8 @@ Worker 側（理由を言える）とストア側（迂回できない）の二�
 
 ## Verification
 
-- `clojure -M:test` — 14 tests / 106 assertions、0 failures
-- `nbb test/worker_smoke.cljs` — ビルド済み `js/auth-worker.js`（`wrangler deploy`
+- `kbb -M:test` — 14 tests / 106 assertions、0 failures
+- `kbb --backend sci test/worker_smoke.cljk` — ビルド済み `js/auth-worker.js`（`wrangler deploy`
   が上げる当のファイル）+ 実 `AuthStore` クラスに対して green
 - **discriminate 確認（5 箇所を故意に壊し、名指しのテストだけが赤くなることを
   実際に見た）**: ①`key-rooted?` が acr を無視 ②`routes-view` の sort 削除
@@ -144,6 +144,6 @@ grep -n 'defn ' orgs/network-awai/cloud-itonami/src/cloud_itonami/edge/email_log
 
 # 現状の再確認
 curl -sS https://auth.itonami.cloud/v1/methods | python3 -m json.tool
-cd orgs/cloud-itonami/app-auth && clojure -M:test && npm run build && npx nbb test/worker_smoke.cljs
+cd orgs/cloud-itonami/app-auth && kbb -M:test && npm run build && kbb --backend sci test/worker_smoke.cljk
 ```
 ")))

@@ -97,7 +97,7 @@ skill and ADR-2608261100. One slice per run. Small and landed beats large and st
     :kotoba-path "src/.../foo.kotoba"
     :parity-test-path "test/.../foo_parity_test.clj"
     :parity-test-ns "foo-parity-test"
-    :test-command "clojure -M:test"}
+    :test-command "kbb -M:test"}
    ```
 
 8. Run the gate:

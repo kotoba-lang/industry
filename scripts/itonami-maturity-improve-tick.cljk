@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-maturity-improve-tick.cljk — 成熟度を**上げる** loop の入力を測る
 ;; （superproject ADR-2608080000）。observe-only。
 ;;
@@ -29,7 +29,7 @@
 ;;     「この順位は作業のたびに変わる。固定リストとして扱わない」と書いている。
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.cljk
 ;;
 ;; exit 0 常に（監視であって gate ではない）。
 
@@ -259,7 +259,7 @@
 
 (def axis-policy
   {:axis-test      {:targetable? true
-                    :gate "nbb scripts/maturity-loop/run.cljk --only <repo>"
+                    :gate "kbb --backend sci scripts/maturity-loop/run.cljk --only <repo>"
                     :why "テストを足すだけならバイト数は増える。**壊して赤くなることを確かめる**のが gate（『落ちない gate は劇場』）。"}
    :axis-ingest    {:targetable? true
                     :gate "引用した URL を実際に取得して 2xx を確認する"
@@ -991,7 +991,7 @@
                      " — GitHub で read-only。push できないので候補から外した"))))
       (log! (str "⚠ archived の掃き出しが読めない（" archived-file "）。"
                  "**archived な repo が候補に混ざる** —— 指名されても push できず"
-                 "その周は空振りする。`nbb --classpath \".:scripts/nbb_compat\" "
+                 "その周は空振りする。`kbb --backend sci --classpath \".:scripts/nbb_compat\" "
                  "scripts/gen-archived-repos.cljk` で作り直す")))
     ;; 名前空間が違う掃き出しは、**読めない掃き出しより危ない** —— 読めるので
     ;; 除外は動いて見え、件数まで出る。一致しない分だけが静かに候補へ戻る。
@@ -1000,7 +1000,7 @@
                  "（:key-space " (pr-str archived-key-space) "）。"
                  "GitHub 名で書かれた集合だと、改名された repo の除外行はどの候補とも"
                  "一致せず、**除外件数は出たままその分が候補に戻る**。"
-                 "上の除外件数はこの周では信用できない —— `nbb --classpath "
+                 "上の除外件数はこの周では信用できない —— `kbb --backend sci --classpath "
                  "\".:scripts/nbb_compat\" scripts/gen-archived-repos.cljk` で作り直して"
                  "から順位を読む（marker が無いだけで中身は正しいこともある。"
                  "**その区別がこの行からは付かない、というのがこの警告の内容**）")))

@@ -70,7 +70,7 @@ original.
 - Live: AIUEOS_TLS13_LIVE=1 real TLS 1.3 handshake to api.murakumo.cloud through rewired call sites (HTTP 200) — host shims are OpenSSL, not evidence about the objects
 - NOT FLIPPED: aiueos-hkdf-sha256 does not return on native: exhausts 10,000,000 fuel and even 2,147,483,647 (ud2 in its store32 fuel guard, window literal 800), while sha256.o hashes 8,560 B in <1e7 fuel. Same 31 defns; difference = single-region cl/cs accessors (window 800) + msg-byte from ctx+192. Object removed from link; reachability test records the measurement
 - Stage 4 (handshake) blocked on that diagnosis (handshake must inline SHA-256 in the failing shape)
-- Also: verify-admissions.cljs fails with `source reader rejected input {:phase :read}` for EVERY contract at the classpath `clojure -Spath -M:test` resolves today (amu 6889fa73) — classpath needs looking at
+- Also: verify-admissions.cljs fails with `source reader rejected input {:phase :read}` for EVERY contract at the classpath `kbb -Spath -M:test` resolves today (amu 6889fa73) — classpath needs looking at
 - Evidence logs: scratchpad/wt/tls5/serial-0{0,1,2,3}-*.log
 ## F32 — LANDED (9 repos), execute-and-observe on aarch64 host bit-for-bit vs KIR oracle
 - kotoba-lang #510 ad5488af; kotoba-kir #58 373f241f; kotoba-sema #22 46405ad6; kotoba-gmir #19 11282bb3; kotoba-mir #47 be994469; kotoba-codegen #26 d450d460; kotoba-verifier #31 e857443b; kotoba-native #104 0d9cae08; amu #740 25907a65 (ADR 0292)

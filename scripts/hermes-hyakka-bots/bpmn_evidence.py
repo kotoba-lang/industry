@@ -5,11 +5,11 @@ The BPMN scout's upstream is NOT one pinned file the way ISIC's is — it is a
 set of workspace mirrors, each measured here:
 
   cloud-itonami/org-apqc-pcf   facts/catalog.edn — 17 citations behind a live
-                               fetch gate (`nbb tools/verify_citations.cljs`);
+                               fetch gate (`kbb --backend sci tools/verify_citations.cljk`);
                                OMG BPMN 2.0 URLs are the mapping target
   cloud-itonami/apqc           kotoba/apqc-pcf.kotoba.edn — 713 seed rows
                                (13 L1 :authoritative, 700 :representative),
-                               `bb kotoba/validate.clj` is its integrity gate
+                               `kbb kotoba/validate.cljk` is its integrity gate
   cloud-itonami/org-omg-bpmn   BPMN 2.0 as EDN — model/validate/xml/execute,
                                zero-dep .cljc (ADR-2606272200)
   cloud-itonami/isco           data/isco-occupations.edn — 619 nodes, but the

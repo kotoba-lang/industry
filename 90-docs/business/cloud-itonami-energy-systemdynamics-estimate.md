@@ -8,7 +8,7 @@ operations) / 3512 (community renewables operations) only — 3520 (gas)
 and 3530 (steam) are out of scope (different unit basis, would break the
 TWh-electricity comparison below).
 **Model / results**: `cloud-itonami-energy-systemdynamics-model.cljs`
-(nbb, deterministic, re-run with `nbb 90-docs/business/cloud-itonami-energy-systemdynamics-model.cljs`)
+(nbb, deterministic, re-run with `kbb --backend sci 90-docs/business/cloud-itonami-energy-systemdynamics-model.cljk`)
 → `cloud-itonami-energy-systemdynamics-results.edn` (full time series).
 **Dashboard**: interactive version of this same model, published as a
 Claude artifact (see chat).
@@ -181,6 +181,6 @@ value.
   buildout limits on new SMR/renewables capacity itself (only adoption
   of cloud-itonami's governance layer on top of assumed-available
   capacity is modeled).
-- Re-run `nbb 90-docs/business/cloud-itonami-energy-systemdynamics-model.cljs`
+- Re-run `kbb --backend sci 90-docs/business/cloud-itonami-energy-systemdynamics-model.cljk`
   to reproduce every number in this document exactly; do not hand-edit
   the tables above without re-running the script.

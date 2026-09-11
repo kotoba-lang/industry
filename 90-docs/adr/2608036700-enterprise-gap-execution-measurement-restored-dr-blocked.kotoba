@@ -187,7 +187,7 @@ launchctl print gui/$(id -u)/com.gftd.kotobase-slo-tick | grep -E 'runs|last exi
 
 # 2. fleet CI が回っているか
 tail -20 ~/.gftd/fleet-ci-tick.log
-nbb scripts/fleet-ci/tick.cljs --plan
+kbb --backend sci scripts/fleet-ci/tick.cljk --plan
 
 # 3. 次の一手（性能 gate）: LDBC を operator 側 tick にする
 #    雛形は kotobase-cf-wasm/slo/operator_tick.cljs（同じ形）

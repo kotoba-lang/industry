@@ -8,7 +8,7 @@
   (:adr/body
   "## Context
 
-固定資産台帳 / 減価償却 had ZERO repos in this workspace. `nbb scripts/repo-search.cljs 償却資産`
+固定資産台帳 / 減価償却 had ZERO repos in this workspace. `kbb --backend sci scripts/repo-search.cljk 償却資産`
 returned nothing across 4,208 west projects. Meanwhile `cloud-itonami/cloud-itonami-isco-4311`
 keeps books that will need 減価償却費 entries, and `kotoba-lang/taxlaw` already holds
 jurisdiction-keyed tax rules that this sits beside.
@@ -96,7 +96,7 @@ Recorded as `:reachable-not-read` in `:catalog/tables-reachable-not-read`, surfa
 
 ## Verification
 
-- **33 tests / 517 assertions**, identical under `clojure -M:test`, nbb, and nbb run from a
+- **33 tests / 517 assertions**, identical under `kbb -M:test`, nbb, and nbb run from a
   FOREIGN working directory (`/tmp/elsewhere-shokyaku`). Portability that can fail.
 - **15 mutations, 15 killed, 0 survived.** The first blind run (mutations written from the
   source before re-reading the suite) killed 11 and left 4. Three were real gaps and now have

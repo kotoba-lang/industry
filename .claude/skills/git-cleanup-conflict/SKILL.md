@@ -38,7 +38,7 @@ you're confident is exactly the failure mode this note exists to catch.
 
 ```bash
 git fetch origin && git merge --ff-only origin/main   # superproject only
-nbb scripts/checkout-staleness.cljk                   # dirty / behind / untracked population: 94s, zero network
+kbb --backend sci scripts/checkout-staleness.cljk                   # dirty / behind / untracked population: 94s, zero network
 # then fetch ONLY the repos you are about to judge, in that repo (this is the only source of freshness)
 ```
 
@@ -96,9 +96,9 @@ showing 0% CPU is **not** a hang.
 When the question is "which child repos still have work that hasn't landed?", run:
 
 ```bash
-nbb scripts/cleanup.cljk --unlanded      # only repos with un-landed work
-nbb scripts/cleanup.cljk                 # full survey (also lists quiet repos)
-nbb scripts/cleanup.cljk --subrepos      # superproject only (fast)
+kbb --backend sci scripts/cleanup.cljk --unlanded      # only repos with un-landed work
+kbb --backend sci scripts/cleanup.cljk                 # full survey (also lists quiet repos)
+kbb --backend sci scripts/cleanup.cljk --subrepos      # superproject only (fast)
 ```
 
 It reports, per child repo, a **landing ladder** — left is more dangerous because git
@@ -142,10 +142,10 @@ the merged source. `git log` says nothing about that; probe the live surface.
 Survey is read-only; this is the write side.
 
 ```bash
-nbb scripts/cleanup-land.cljk                      # dry-run plan (default)
-nbb scripts/cleanup-land.cljk --apply              # execute
-nbb scripts/cleanup-land.cljk --apply --names a,b  # limit to named repos
-nbb scripts/cleanup-land.cljk --apply --max 20     # cap; the rest is reported, not hidden
+kbb --backend sci scripts/cleanup-land.cljk                      # dry-run plan (default)
+kbb --backend sci scripts/cleanup-land.cljk --apply              # execute
+kbb --backend sci scripts/cleanup-land.cljk --apply --names a,b  # limit to named repos
+kbb --backend sci scripts/cleanup-land.cljk --apply --max 20     # cap; the rest is reported, not hidden
 ```
 
 **Never merge all UNLANDED work as one class.** Split by *whether it can break `main`*,
@@ -230,7 +230,7 @@ Check for the existing repo *before* creating one, or you mint duplicates.
 - Do not force-push shared branches. Do not rebase to resolve staleness — branch fresh
   from `origin/main` and replay/cherry-pick the needed commits instead.
 - `manifest/west.yml` is generated. Resolve `manifest/repos.edn` + generator + child
-  repo checkouts first, then regenerate (`nbb scripts/gen-west-manifest.cljk --check`) —
+  repo checkouts first, then regenerate (`kbb --backend sci scripts/gen-west-manifest.cljk --check`) —
   never hand-edit conflict markers in it.
 - If `git stash pop` fails because local changes would be overwritten, that's a safe
   stop: leave the stash intact, inspect both the current diff and the stash patch
@@ -241,7 +241,7 @@ Check for the existing repo *before* creating one, or you mint duplicates.
   ADR-2607211600).
 - **Push to GitHub alone is not done.** A repo that other west projects consume via
   `:local/root` (or that belongs under `orgs/<org>/<repo>`) must also land in
-  `manifest/repos.edn` `:extra-projects` + `nbb scripts/gen-west-manifest.cljk --entry
+  `manifest/repos.edn` `:extra-projects` + `kbb --backend sci scripts/gen-west-manifest.cljk --entry
   <name>` (see skill `new-project-scaffold`). Incomplete = GH-only orphan.
   **`cleanup-land.cljs` now says so in its own output**: its last section names every repo
   it touched that has no `west.yml` path and prints the `west-triple-sync` command to run
@@ -256,10 +256,10 @@ via `{:local/root "../../kotoba-lang/crm"}`, but **crm was never added to west**
 is often **missing from the local tree**. Fresh checkout / CI cannot resolve the dep.
 
 ```bash
-nbb scripts/west-orphan-audit.cljk              # summary + true-orphan-git sample
-nbb scripts/west-orphan-audit.cljk --blocking   # only :local/root broken edges
-nbb scripts/west-orphan-audit.cljk --all        # full lists
-nbb scripts/west-orphan-audit.cljk --findings   # detector protocol (gh-free); what the 6h tick runs
+kbb --backend sci scripts/west-orphan-audit.cljk              # summary + true-orphan-git sample
+kbb --backend sci scripts/west-orphan-audit.cljk --blocking   # only :local/root broken edges
+kbb --backend sci scripts/west-orphan-audit.cljk --all        # full lists
+kbb --backend sci scripts/west-orphan-audit.cljk --findings   # detector protocol (gh-free); what the 6h tick runs
 ```
 
 **exit 0 / 1 / 2 / 3 は別の答えである。** 0 = blocking なし、1 = 壊れた辺がある、
@@ -296,12 +296,12 @@ When the goal is not only to *detect* orphans but to **align** the three planes,
 use the dedicated workflow (ADR-2607173200):
 
 ```bash
-nbb scripts/west-triple-sync.cljk plan --scope blocking   # dry-run（既定 scope）
-nbb scripts/west-triple-sync.cljk plan --scope orphans    # 確かめた上で未登録の repo を一括
-nbb scripts/west-triple-sync.cljk apply --scope blocking  # clone/register/ff/pin
-nbb scripts/west-triple-sync.cljk apply --scope orphans   # repos.edn :extra-projects + --entry
-nbb scripts/west-triple-sync.cljk apply --names crm
-nbb scripts/west-triple-sync.cljk verify --scope blocking
+kbb --backend sci scripts/west-triple-sync.cljk plan --scope blocking   # dry-run（既定 scope）
+kbb --backend sci scripts/west-triple-sync.cljk plan --scope orphans    # 確かめた上で未登録の repo を一括
+kbb --backend sci scripts/west-triple-sync.cljk apply --scope blocking  # clone/register/ff/pin
+kbb --backend sci scripts/west-triple-sync.cljk apply --scope orphans   # repos.edn :extra-projects + --entry
+kbb --backend sci scripts/west-triple-sync.cljk apply --names crm
+kbb --backend sci scripts/west-triple-sync.cljk verify --scope blocking
 ```
 
 **`--scope orphans` は 2026-08-23 に追加した。** それまで一括経路は `blocking`
@@ -326,13 +326,13 @@ create`** と印字しており、その文言に従うと**既に在る repo �
 
 ## Minimum workflow
 
-1. Inventory (**local scan first — see the section above; do NOT run a fleet-wide `west update`**): `git fetch origin && git merge --ff-only origin/main`, `nbb scripts/checkout-staleness.cljk`,
+1. Inventory (**local scan first — see the section above; do NOT run a fleet-wide `west update`**): `git fetch origin && git merge --ff-only origin/main`, `kbb --backend sci scripts/checkout-staleness.cljk`,
    `git worktree list --porcelain`, `git branch --show-current`,
    `git stash list`, `git status --short --branch`,
    `gh pr list --state open --json number,title,headRefName,baseRefName,url,mergeable,statusCheckRollup`,
-   **`nbb scripts/cleanup.cljk --unlanded`** (child-repo landing ladder — untracked /
+   **`kbb --backend sci scripts/cleanup.cljk --unlanded`** (child-repo landing ladder — untracked /
    unpushed / no-PR; see the UNLANDED section above),
-   **`nbb scripts/west-orphan-audit.cljk`** (and `--blocking` if any dep failure is
+   **`kbb --backend sci scripts/west-orphan-audit.cljk`** (and `--blocking` if any dep failure is
    in scope).
 2. Classify each stash/branch per `:retirement :classify` in the edn (landed /
    landed-reworded / superseded / unlanded). Classify west orphans per the table above
@@ -341,7 +341,7 @@ create`** と印字しており、その文言に従うと**既に在る repo �
    before touching anything — see the non-negotiable rule above.
 4. Landed/superseded → drop/delete. Unlanded → rescue to a pushed branch (never back
    into a stash) in a sparse worktree outside the superproject, per `:retirement
-   :rescue`. At fleet scale use **`nbb scripts/cleanup-land.cljk --apply`** instead of
+   :rescue`. At fleet scale use **`kbb --backend sci scripts/cleanup-land.cljk --apply`** instead of
    doing this by hand — it archives, then lands `:additive` and opens PRs for
    `:review`/`:branches` without merging them (see the section above).
 5. Resolve any real merge conflicts by file class (`:resolve-conflicts` in the edn),
@@ -350,8 +350,8 @@ create`** と印字しており、その文言に従うと**既に在る repo �
    retarget deps — do not leave GH-only + `:local/root` consumers. For verified
    `:true-orphan-git` rows use the bulk path (`west-triple-sync plan --scope orphans`,
    then `apply`) instead of `--names` one at a time. Never act on `:renamed-unverified`.
-7. Verify: conflict-marker search, `nbb scripts/gen-west-manifest.cljk --check`,
-   `nbb scripts/west-orphan-audit.cljk --blocking` (**exit 2 は 0 ではない** — 判定
+7. Verify: conflict-marker search, `kbb --backend sci scripts/gen-west-manifest.cljk --check`,
+   `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` (**exit 2 は 0 ではない** — 判定
    できなかった run を完了 gate として読まない), and any domain-specific script
    touched by the change.
 8. Create/merge PRs when mergeable; report external CI failures (billing/spending

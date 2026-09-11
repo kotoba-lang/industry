@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; lei-facts-backfill.cljs — facts.edn をまだ持たない cloud-itonami-lei-* repo に、
 ;; **正本の生成器**で facts.edn を作って着地させる。
 ;;
@@ -23,7 +23,7 @@
 ;; 1 件も着地しなかった run は exit 2（0 でも 1 でもない）。
 ;;
 ;; Run (from the superproject root):
-;;   nbb scripts/lei-facts-backfill.cljk [--limit N] [--offset N] [--dry-run]
+;;   kbb --backend sci scripts/lei-facts-backfill.cljk [--limit N] [--offset N] [--dry-run]
 ;;                                       [--orgs-root <path>] [--root <superproject>]
 
 (ns lei-facts-backfill

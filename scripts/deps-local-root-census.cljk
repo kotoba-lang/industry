@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; deps-local-root-census.cljs — どの repo が fleet node 上で実際に build/test できるか。
 ;;
 ;; **問い**: murakumo fleet が node に配るのは対象 repo の tree 1 本だけ（`git archive`
@@ -8,7 +8,7 @@
 ;; （`io.github.<org>/<repo>` 形）だけで、`:local/root` は運ばない。
 ;;
 ;; **なぜ EDN を読むだけで足りないか**: 読めるのは仮説まで。実際の判定は
-;; `git archive` した bare tree の上で `clojure -Spath -M:<alias>` を回して確かめる
+;; `git archive` した bare tree の上で `kbb -Spath -M:<alias>` を回して確かめる
 ;; （ADR-2608136400 の bare-tree 検証節）。この census はその候補を絞るためのもの。
 ;;
 ;; **alias 単位で判定する**: base `:deps` の `:local/root` は、その alias が base を
@@ -16,7 +16,7 @@
 ;; base に 117 件の local root があっても、その alias だけは node で走りうる。
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/deps-local-root-census.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/deps-local-root-census.cljk \
 ;;     --root /path/to/superproject [--out census.edn] [--json] [--limit N]
 ;;
 ;; 既定の root は「この script が居る repo の 1 つ上」ではなく **cwd**。west checkout

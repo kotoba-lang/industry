@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/fleet-sync-probe.cljk — measure the fleet's synchronisation state and
 ;; emit it as the seed EDN that kotoba-lang/loop-system-dynamics'
 ;; `fleet-sync-topology` model consumes (ADR-2608040100).
@@ -19,10 +19,10 @@
 ;;   - fleet-db と west.yml の drift（`fleet reconcile --check` と同じ問い）
 ;;
 ;; usage:
-;;   nbb scripts/fleet-sync-probe.cljk                    ;; 人間向けサマリを stdout
-;;   nbb scripts/fleet-sync-probe.cljk --edn <path>       ;; seed EDN を書く
-;;   nbb scripts/fleet-sync-probe.cljk --rad-sample 500   ;; radicle 抽出数（既定 500、0 で skip）
-;;   nbb scripts/fleet-sync-probe.cljk --jobs 8
+;;   kbb --backend sci scripts/fleet-sync-probe.cljk                    ;; 人間向けサマリを stdout
+;;   kbb --backend sci scripts/fleet-sync-probe.cljk --edn <path>       ;; seed EDN を書く
+;;   kbb --backend sci scripts/fleet-sync-probe.cljk --rad-sample 500   ;; radicle 抽出数（既定 500、0 で skip）
+;;   kbb --backend sci scripts/fleet-sync-probe.cljk --jobs 8
 ;;
 ;; 出さない数値は書かない: 比較できなかった repo は分母から外し、その分母を一緒に出す。
 ;; ここが崩れると「pin は 77 件しか遅れていない」が「3,600 件中 77 件」に読めてしまう。

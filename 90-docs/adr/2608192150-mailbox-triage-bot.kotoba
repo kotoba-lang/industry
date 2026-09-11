@@ -121,8 +121,8 @@ somu@gftd.co.jp, keiri@gftd.co.jp などのメールボックスの整理振り�
 
 ```bash
 m365 login                                                   # owner、device code + MFA
-cd orgs/gftdcojp/m365-archive && nbb bin/setup-auth.cljc      # Mail.ReadWrite.Shared 同意
-nbb bin/triage-mailboxes.cljs --max 200                       # dry-run、箱ごとの件数を見る
+cd orgs/gftdcojp/m365-archive && kbb --backend sci bin/setup-auth.cljk      # Mail.ReadWrite.Shared 同意
+kbb --backend sci bin/triage-mailboxes.cljk --max 200                       # dry-run、箱ごとの件数を見る
 touch ~/.hermes/state/mailbox-triage-approved                 # 見てから承認
 ```
 

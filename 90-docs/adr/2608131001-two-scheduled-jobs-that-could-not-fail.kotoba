@@ -154,24 +154,24 @@ against the **unmodified, installed** script, and the two that matter are the tw
 code silently swallowed.
 
     # the exact path the original hardcoded -- the original's failure condition
-    $ PLAYTEST_REPO_PATH=.../orgs/gftdcojp/network-isekai-playtest nbb run-playtest-coscientist.cljs
+    $ PLAYTEST_REPO_PATH=.../orgs/gftdcojp/network-isekai-playtest kbb --backend sci run-playtest-coscientist.cljk
     [standing-playtest] FAIL(git-remote): git [\"remote\"] could not run:
       spawnSync git ENOENT (cwd=\".../orgs/gftdcojp/network-isekai-playtest\")
     EXIT: 1
 
     # directory exists, is not a git repo -> the non-zero branch
-    $ PLAYTEST_REPO_PATH=$(mktemp -d) nbb run-playtest-coscientist.cljs
+    $ PLAYTEST_REPO_PATH=$(mktemp -d) kbb --backend sci run-playtest-coscientist.cljk
     [standing-playtest] FAIL(git-remote): git [\"remote\"] exited 128 (cwd=\"/var/folders/...\")
       stderr=fatal: not a git repository (or any of the parent directories): .git
     EXIT: 1
 
     # project renamed out of the manifest -- the next org move, simulated
-    $ PLAYTEST_MANIFEST=/tmp/west-renamed.yml nbb run-playtest-coscientist.cljs
+    $ PLAYTEST_MANIFEST=/tmp/west-renamed.yml kbb --backend sci run-playtest-coscientist.cljk
     [standing-playtest] FAIL(project-not-in-manifest): no `- name: network-isekai` entry in
       /tmp/west-renamed.yml — the project was renamed or removed; this run cannot guess a path.
     EXIT: 1
 
-    $ PLAYTEST_MANIFEST=/tmp/nope.yml nbb run-playtest-coscientist.cljs
+    $ PLAYTEST_MANIFEST=/tmp/nope.yml kbb --backend sci run-playtest-coscientist.cljk
     [standing-playtest] FAIL(manifest-missing): /tmp/nope.yml does not exist
     EXIT: 1
 

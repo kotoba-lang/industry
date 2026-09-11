@@ -21,7 +21,7 @@ merge conflicts in this superproject and its `orgs/` child repos.
 
 ```bash
 git fetch origin && git merge --ff-only origin/main   # superproject を先に同期
-nbb scripts/checkout-staleness.cljk                   # dirty / behind / untracked の母集団（全 fleet 94 秒、network なし）
+kbb --backend sci scripts/checkout-staleness.cljk                   # dirty / behind / untracked の母集団（全 fleet 94 秒、network なし）
 # 判定する repo だけ、その repo で明示的に fetch する（鮮度はここでしか得られない）
 ```
 
@@ -91,7 +91,7 @@ incoming と byte-identical な掃き出しファイル（大半が `kotoba-lang
 手順:
 
 1. superproject を `git fetch origin && git merge --ff-only origin/main`
-2. `nbb scripts/checkout-staleness.cljk` で dirty / behind / untracked の母集団をローカルに取る
+2. `kbb --backend sci scripts/checkout-staleness.cljk` で dirty / behind / untracked の母集団をローカルに取る
    （`dirty=N (Xt/Yu)` と tracked / untracked を分けて出す。全 fleet 94 秒、network round trip ゼロ）
 3. untracked は `git hash-object` と pin 側 blob hash の**一致を確認したものだけ**削除。
    localchg は触らず温存。checkout を pin に揃えたいときだけ
@@ -134,9 +134,9 @@ incoming と byte-identical な掃き出しファイル（大半が `kotoba-lang
 ## UNLANDED inventory — which child repos still hold work that hasn't landed
 
 ```bash
-nbb scripts/cleanup.cljk --unlanded   # only repos with un-landed work
-nbb scripts/cleanup.cljk              # full survey (also lists quiet repos)
-nbb scripts/cleanup.cljk --subrepos   # superproject only (fast)
+kbb --backend sci scripts/cleanup.cljk --unlanded   # only repos with un-landed work
+kbb --backend sci scripts/cleanup.cljk              # full survey (also lists quiet repos)
+kbb --backend sci scripts/cleanup.cljk --subrepos   # superproject only (fast)
 ```
 
 Per child repo, a **landing ladder** — left is more dangerous because git protects it less:
@@ -219,10 +219,10 @@ landing.
 ### Landing it — `scripts/cleanup-land.cljk`
 
 ```bash
-nbb scripts/cleanup-land.cljk                      # dry-run plan (default)
-nbb scripts/cleanup-land.cljk --apply              # execute
-nbb scripts/cleanup-land.cljk --apply --names a,b  # limit to named repos
-nbb scripts/cleanup-land.cljk --apply --max 20     # cap; the rest is reported, not hidden
+kbb --backend sci scripts/cleanup-land.cljk                      # dry-run plan (default)
+kbb --backend sci scripts/cleanup-land.cljk --apply              # execute
+kbb --backend sci scripts/cleanup-land.cljk --apply --names a,b  # limit to named repos
+kbb --backend sci scripts/cleanup-land.cljk --apply --max 20     # cap; the rest is reported, not hidden
 ```
 
 Never merge all UNLANDED work as one class. Split by *whether it can break `main`*:
@@ -333,7 +333,7 @@ Proven both ways, in the real pipeline rather than in a unit test:
 ### Every filter guarded `:additive` only; `:review` was committed unchecked
 
 SSoT: `:tracked-safety-gate` in the edn. Gate: `tracked-safety-gate!` in
-`scripts/cleanup-land.cljk`. Proof: `nbb scripts/cleanup-land.cljk --selftest-tracked-gate`.
+`scripts/cleanup-land.cljk`. Proof: `kbb --backend sci scripts/cleanup-land.cljk --selftest-tracked-gate`.
 
 `plan-repo` classifies with `grouped (group-by #(classify-file dir %) untracked)` — the
 untracked set, and nothing else. `:tracked` reached `server-commit!` having passed through
@@ -382,7 +382,7 @@ clean answer.
 ### A renamed-away path is absent from `main` for exactly the reason a new path is
 
 SSoT: `:residue-gate` in the edn. Gate: `scripts/rename_residue.cljk`, entry point
-`residue-gate!` in `cleanup-land.cljs`, proof `nbb scripts/rename-residue-test.cljk`
+`residue-gate!` in `cleanup-land.cljs`, proof `kbb --backend sci scripts/rename-residue-test.cljk`
 (offline; `--repo <dir> --base <ref>` runs it against a real checkout).
 
 `:additive` merges on one argument: *no path of this name exists on the default branch, so
@@ -626,9 +626,9 @@ git -C "$d" -c core.excludesFile=/tmp/rule.excl check-ignore --no-index --stdin 
 `orgs/<org>/<repo>` can exist locally without being in west, or exist on GitHub without local/west. Mixing path-override leftovers with true orphans causes false registrations.
 
 ```bash
-nbb scripts/west-orphan-audit.cljk
-nbb scripts/west-orphan-audit.cljk --blocking
-nbb scripts/west-orphan-audit.cljk --all
+kbb --backend sci scripts/west-orphan-audit.cljk
+kbb --backend sci scripts/west-orphan-audit.cljk --blocking
+kbb --backend sci scripts/west-orphan-audit.cljk --all
 ```
 
 | Class | Action |
@@ -662,12 +662,12 @@ crm missing from west and often from the local tree → fresh checkout breaks.
 
 **Repair / keep current (three planes):** see
 [`manifest/west-triple-sync-workflow.md`](west-triple-sync-workflow.md) and
-`nbb scripts/west-triple-sync.cljk` (ADR-2607173200).
+`kbb --backend sci scripts/west-triple-sync.cljk` (ADR-2607173200).
 
 ```bash
-nbb scripts/west-triple-sync.cljk plan  --scope blocking   # 壊れた :local/root 辺（既定）
-nbb scripts/west-triple-sync.cljk plan  --scope orphans    # 確かめた上で未登録の repo（2026-08-23 追加）
-nbb scripts/west-triple-sync.cljk apply --scope orphans    # repos.edn :extra-projects + --entry
+kbb --backend sci scripts/west-triple-sync.cljk plan  --scope blocking   # 壊れた :local/root 辺（既定）
+kbb --backend sci scripts/west-triple-sync.cljk plan  --scope orphans    # 確かめた上で未登録の repo（2026-08-23 追加）
+kbb --backend sci scripts/west-triple-sync.cljk apply --scope orphans    # repos.edn :extra-projects + --entry
 ```
 
 `--scope orphans` が入るまで、**誰もまだ依存していない未登録 repo を一括で登録する経路は
@@ -686,13 +686,13 @@ scope の沈黙を「未登録は無い」と読ませないため。
 
    ```bash
    git fetch origin && git merge --ff-only origin/main
-   nbb scripts/checkout-staleness.cljk   # 母集団をローカルに（94s・network なし）。fleet 全体の west update は回さない
+   kbb --backend sci scripts/checkout-staleness.cljk   # 母集団をローカルに（94s・network なし）。fleet 全体の west update は回さない
    git worktree list --porcelain
    git branch --show-current
    git stash list
    git status --short --branch
    gh pr list --state open --json number,title,headRefName,baseRefName,url,mergeable,statusCheckRollup
-   nbb scripts/west-orphan-audit.cljk
+   kbb --backend sci scripts/west-orphan-audit.cljk
    ```
 
 2. Classify what remains:
@@ -787,7 +787,7 @@ accumulation); this section is the recovery path. Verified in practice 2026-07-0
    sparse worktree outside the superproject (full checkout is slow):
 
    ```bash
-   nbb scripts/root-worktree.cljk create stash-rescue-<date> --include <directory>
+   kbb --backend sci scripts/root-worktree.cljk create stash-rescue-<date> --include <directory>
    cd <helper-printed-exact-path>
    git apply -3 --include='<path>' <archive>/<sha>.patch   # 3-way, per rescued file
    git commit && git push origin stash-rescue-<date>        # push; merge is owner's call
@@ -814,14 +814,14 @@ git diff --stat -- <paths>
 
 Resolve by file class:
 
-- `manifest/west.yml`: resolve `manifest/repos.edn`, generator code, and child repo checkouts first; then run `nbb scripts/gen-west-manifest.cljk`.
+- `manifest/west.yml`: resolve `manifest/repos.edn`, generator code, and child repo checkouts first; then run `kbb --backend sci scripts/gen-west-manifest.cljk`.
 - EDN files: keep both logically distinct additions and validate by running the relevant babashka/Clojure reader or generator.
 - Markdown policy files: preserve current `main` policy and add only the missing procedure/reference text.
 - Stash conflicts: do not drop the stash; inspect `git stash show --stat` and `git show 'stash@{0}' -- <paths>`.
 
 ### `--check` reports STALE almost always — do not "fix" it by regenerating
 
-`nbb scripts/gen-west-manifest.cljk --check` compares `west.yml` against what a
+`kbb --backend sci scripts/gen-west-manifest.cljk --check` compares `west.yml` against what a
 **wholesale** regeneration would produce, and the generator pins from each child
 repo's *local working HEAD*. In a shared checkout that is drifted by definition.
 
@@ -855,13 +855,13 @@ After resolving:
 
 ```bash
 rg -n '<<<<<<<|=======|>>>>>>>' <changed-files> || true
-nbb scripts/gen-west-manifest.cljk --check   # informational — see above
+kbb --backend sci scripts/gen-west-manifest.cljk --check   # informational — see above
 ```
 
 Run any domain-specific verification touched by the change, for example:
 
 ```bash
-nbb scripts/kotoba-boundary-audit.cljk
+kbb --backend sci scripts/kotoba-boundary-audit.cljk
 ```
 
 ## Stash Pop Failures
@@ -893,7 +893,7 @@ git worktree list --porcelain
 git branch --show-current
 git stash list
 git status --short -- <relevant-paths>
-nbb scripts/west-orphan-audit.cljk --blocking
+kbb --backend sci scripts/west-orphan-audit.cljk --blocking
 ```
 
 Report merged PRs, closed/superseded PRs, deleted remote branches, preserved stashes,

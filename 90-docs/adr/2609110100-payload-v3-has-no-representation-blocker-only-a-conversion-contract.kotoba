@@ -43,7 +43,7 @@ The second remote is NOT called origin. west checkouts name the remote after
 the org, so `origin/main` does not resolve in io-ipld and the worktree add
 fails with `invalid reference`. Run the probe from the io-ipld worktree:
 
-    nbb --classpath src:io-multiformats/src:text/src:org-ietf-cbor/src:org-nist-sha2/src \\
+    kbb --backend sci --classpath src:io-multiformats/src:text/src:org-ietf-cbor/src:org-nist-sha2/src \\
         gap02-tag-coverage.cljs
 
 Five repositories are needed on the classpath and only one of them (text) is

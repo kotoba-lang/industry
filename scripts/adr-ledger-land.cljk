@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; adr-ledger-land.cljs — ローカルで append した adr-ledger の行を main へ着地させる。
 ;; **着地時に :event/seq を採り直す**（並行 landing による seq 衝突の構造的な対策）。
 ;;
@@ -9,8 +9,8 @@
 ;; **main の内容から max+1 を採り直してから追記する**のが正しい。
 ;;
 ;; 使い方:
-;;   nbb scripts/adr-ledger-land.cljk --adr 2607259000            ;; その ADR のローカル未着地行を landing
-;;   nbb scripts/adr-ledger-land.cljk --adr 2607259000 --dry-run
+;;   kbb --backend sci scripts/adr-ledger-land.cljk --adr 2607259000            ;; その ADR のローカル未着地行を landing
+;;   kbb --backend sci scripts/adr-ledger-land.cljk --adr 2607259000 --dry-run
 ;;
 ;; * main に既にある行は触らない（内容一致で判定）。
 ;; * 追記のみ。既存行の書き換え・削除はしない。

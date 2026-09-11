@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; net-kotobase-bundle-freshness.cljs — commit 済みの Worker バンドルが、
 ;; **その commit の source から作られたものか**。JDK を要求しない。
 ;;
@@ -34,7 +34,7 @@
 ;; テストスイートは operator 側の `npm test` のまま。merge 前に落とす目は
 ;; 現在 fleet に無い。production 側は `net-kotobase-live-planes` が見る。
 ;;
-;; usage: nbb net-kotobase-bundle-freshness.cljs <dir>
+;; usage: kbb --backend sci net-kotobase-bundle-freshness.cljk <dir>
 (ns fleet-ci.gates.net-kotobase-bundle-freshness
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]

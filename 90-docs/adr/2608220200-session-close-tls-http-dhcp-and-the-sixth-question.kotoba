@@ -23,8 +23,8 @@ superproject 側: ADR 5 本（kekkai 参加 / DID の 3 面 / internal-disk inst
 
 agent の報告を根拠にしていない。以下は closing を書いた本人が clean clone / worktree から走らせた実測である。
 
-- org-ietf-tls: `clojure -M:report` が `RFC8448-VECTORS-COMPARED 43` / `REFUSALS-EXERCISED 40` / `550 passed, 0 failed` / `OK`。`clojure -M scripts/live_kotobase.clj` が kotobase.net:443 と握手し `HTTP/1.1 200` / `Content-Length: 6391` を取得。pin を 1 桁壊すと `:peer-not-pinned` で握手が落ち、観測した鍵を報告する。
-- aiueos: `clojure -M:cloud-live check --transport own` が 5 レグすべて ADMITTED で exit 0、受領証に `:transport :own`。3 ホスト・3 pin・3 回の独立した TLS セッション。
+- org-ietf-tls: `kbb -M:report` が `RFC8448-VECTORS-COMPARED 43` / `REFUSALS-EXERCISED 40` / `550 passed, 0 failed` / `OK`。`kbb -M scripts/live_kotobase.clj` が kotobase.net:443 と握手し `HTTP/1.1 200` / `Content-Length: 6391` を取得。pin を 1 桁壊すと `:peer-not-pinned` で握手が落ち、観測した鍵を報告する。
+- aiueos: `kbb -M:cloud-live check --transport own` が 5 レグすべて ADMITTED で exit 0、受領証に `:transport :own`。3 ホスト・3 pin・3 回の独立した TLS セッション。
 - aiueos / grant のテスト数の増減は境界移動によるもので、両側を測って確認した（aiueos 341/8647、grant 422/1315、どちらも 0 failures）。
 - kotoba-native の 2 entry と aiueos 側の contract / .kotoba / .o / gate script が default branch 上に実在することを確認。
 
@@ -42,7 +42,7 @@ agent の報告を根拠にしていない。以下は closing を書いた本�
 
 # 次のセッションが最初にやること
 
-1. 走行中の agent 2 本（下記）のマージを確認し、**west pin を進める**: `nbb scripts/west-pin-put.cljs aiueos <sha>` / `... org-ietf-tls <sha>`。pin 前進は agent にやらせていない。
+1. 走行中の agent 2 本（下記）のマージを確認し、**west pin を進める**: `kbb --backend sci scripts/west-pin-put.cljk aiueos <sha>` / `... org-ietf-tls <sha>`。pin 前進は agent にやらせていない。
 2. fleet gate の最初の tick 結果を見る: `manifest/fleet-ci.edn` の `org-ietf-tls` 行。赤なら、原因は egress（maven の test-runner と git の org-ietf-x509 / org-ietf-asn1）である可能性が高い —— この fleet の egress は一様ではない。
 3. bare metal を続けるなら row 3（TCP ストリーム）。`os/aiueos/kotoba/tcp-seq-acceptable.kotoba` は RFC 9293 §3.10.7.4 として書かれ parity テストもあるが、**どの kernel も link していない**（export が allow-list に無い）。書かれていることと繋がっていることは別である。
 

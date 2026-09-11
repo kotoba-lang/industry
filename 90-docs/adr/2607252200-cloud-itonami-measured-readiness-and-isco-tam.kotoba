@@ -11,7 +11,7 @@
   (:adr/last_verified "2026-07-25")
 
   (:adr/authoritative_for
-  (vector "Readiness of a cloud-itonami sub-repo is established by EXECUTING its test suite (clojure -M:dev:test, or -M:test where no :dev alias exists), never by looking for an ':implemented' keyword in its README. The keyword heuristic was measured wrong in both directions and must not be reintroduced as a readiness signal."
+  (vector "Readiness of a cloud-itonami sub-repo is established by EXECUTING its test suite (kbb -M:dev:test, or -M:test where no :dev alias exists), never by looking for an ':implemented' keyword in its README. The keyword heuristic was measured wrong in both directions and must not be reintroduced as a readiness signal."
    "Any sweep that measures repo state must record WHICH tree it measured. Local west checkouts drift from upstream; a verdict from a stale tree is not a verdict about the repo. Where local and upstream disagree, upstream HEAD wins, because upstream is what a forker receives."
    "isco-* blueprints are scored from ILOSTAT occupation data at ISCO-08 MAJOR GROUP (1 digit) resolution only. There is no global 2- or 4-digit employment series, so repos sharing a first digit necessarily receive an identical figure and this must be labelled as a tie, not presented as per-occupation precision."
    "ISCO-08 major groups 0, 6 and 9 stay unscored. The ILO 'World' aggregate has no employment value for them in any year of the series, so no global figure exists to cite."))
@@ -89,7 +89,7 @@ own PR, left unmerged for review.
 `isic-2660` is the most consequential, and it was invisible by construction.
 `medicaldevice.phase` used `:phase/0` .. `:phase/3`; Clojure's reader requires a
 keyword name to start with a non-digit, so the file was unreadable and
-`clojure -M:dev:test` reported ZERO tests. A medical-device blueprint's governor
+`kbb -M:dev:test` reported ZERO tests. A medical-device blueprint's governor
 suite had never executed on the JVM, and zero tests is indistinguishable from
 zero failures in any summary that counts failures. Switching to the house
 convention (integer phase keys, as in `advertising.phase`) made the file readable

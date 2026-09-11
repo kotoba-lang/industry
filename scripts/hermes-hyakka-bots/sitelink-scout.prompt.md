@@ -58,7 +58,7 @@ Wikidata exposes honestly — and propose their entity JSON as sources.
 
 7. Run the gate, from the worktree:
 
-     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn
+     kbb --backend sci --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn
 
    exit 0 — every item passed. exit 1 — remove rejected entries, re-run,
    never argue with or edit the gate. exit 2 — REFUSED: stop, land nothing,
@@ -68,7 +68,7 @@ Wikidata exposes honestly — and propose their entity JSON as sources.
    - `git checkout -b bot/sitelink-scout-$(date +%Y%m%d-%H%M)`
    - add accepted maps to `:sources` in `config/knowledge-ingest.edn`,
      keeping the file's formatting and comment style
-   - `nbb --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`
+   - `kbb --backend sci --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`
      must still exit 0
    - commit, push, `gh pr create` against `main`, gate output in the body.
 9. Report in a few sentences: the sitelink threshold you used, how many
@@ -78,7 +78,7 @@ Opening no PR is a correct outcome.
 
 ## Commands the cron runtime refuses
 
-Do not use and do not work around: `-e`/`-c` script flags (`nbb -e`,
+Do not use and do not work around: `-e`/`-c` script flags (`kbb --backend sci -e`,
 `python3 -c`) — put the code in a file in the worktree and run the file;
 heredocs feeding a script to an interpreter; `rm -rf`. A denied command
 returns `exit_code: -1` with `BLOCKED` and the run continues — a bot that

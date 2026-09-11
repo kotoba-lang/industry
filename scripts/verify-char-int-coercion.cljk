@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-char-int-coercion — `int` applied to a character, in code
 ;; ClojureScript runs, where that is not a code point.
 ;;
@@ -45,8 +45,8 @@
 ;; that guesses trains people to ignore it.
 ;;
 ;; usage:
-;;   nbb scripts/verify-char-int-coercion.cljk [--findings] [--strict]
-;;   nbb scripts/verify-char-int-coercion.cljk --self-test
+;;   kbb --backend sci scripts/verify-char-int-coercion.cljk [--findings] [--strict]
+;;   kbb --backend sci scripts/verify-char-int-coercion.cljk --self-test
 
 (ns verify-char-int-coercion
   (:require ["node:fs" :as fs]

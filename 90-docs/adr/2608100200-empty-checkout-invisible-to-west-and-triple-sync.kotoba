@@ -8,7 +8,7 @@
   "## 実測（2026-08-10、再現手順つき）
 
 ```
-$ cd orgs/network-awai/network-isekai && clojure -M test/itonami_quality_test.cljc
+$ cd orgs/network-awai/network-isekai && kbb -M test/itonami_quality_test.cljc
 Error building classpath. Manifest file not found for kotoba-lang/org-threejs
 in coordinate #:local{:root \".../orgs/kotoba-lang/org-threejs\"}
 ```
@@ -34,7 +34,7 @@ pin（`31ba3565`）への checkout は上記 2 つの未追跡パスに阻まれ
 1. **west は「壊れている」と言わない。** `west update` は pin に checkout を
    合わせるだけで、合わせられなかったこと自体は流れていく。
 2. **triple-sync の blocking scope が 0 を返す。**
-   `nbb scripts/west-triple-sync.cljs plan --scope blocking` は
+   `kbb --backend sci scripts/west-triple-sync.cljk plan --scope blocking` は
    `scope=blocking managed=0 actions=0 reports=0`。ADR-2607173200 が用意した
    「fresh checkout を壊している分」の検出は、**この形を拾っていない**。
 3. **壊れているのは別の repo。** 症状が出るのは `org-threejs` を
@@ -46,7 +46,7 @@ pin（`31ba3565`）への checkout は上記 2 つの未追跡パスに阻まれ
 
 `deps.edn` に `:local/root \"../../kotoba-lang/org-threejs\"` を持つ repo の
 **JVM 経路が全部**。network-isekai では `itonami-visual` / `feed-index` /
-`lobby-catalog` / `visual` / その他 `clojure -M` 系すべて。nbb 経路
+`lobby-catalog` / `visual` / その他 `kbb -M` 系すべて。nbb 経路
 （`nbb.edn` の `:paths`）は org-threejs を含まないので影響を受けない。
 
 ## 今回やったこと / やらなかったこと

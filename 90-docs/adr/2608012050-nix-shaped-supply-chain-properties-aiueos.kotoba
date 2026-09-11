@@ -101,7 +101,7 @@ inventory version 2。各 entry は `:source` を宣言し、content で pin す
 
 変更前の inventory を新しい checker に通すと、上記 2 件がそのまま報告される（+ `:unsupported-version`）。これが「この検査は装飾ではなく荷重を受けている」ことの evidence。
 
-jar digest 検査は CI ステップも新しい環境前提も要らない — **checker を走らせる JVM が起動できている時点で jar は resolve 済み**であり、`clojure -M:test` が既に `aiueos.tcb-test` を回している。
+jar digest 検査は CI ステップも新しい環境前提も要らない — **checker を走らせる JVM が起動できている時点で jar は resolve 済み**であり、`kbb -M:test` が既に `aiueos.tcb-test` を回している。
 
 ### 2. git commit を content address として認める（caveat 付きで）
 
@@ -173,17 +173,17 @@ local build がその文書の存在意義たる性質を自称してしまう�
 **それが `:artifact-digest`（SBOM と provenance が attest した digest）と一致すること**を
 要求する。これが無いと「何かを2回再現した」が「別の何かのリリース」を満たしてしまう。
 
-CLI: `clojure -M:reproduce <source-commit> <d1> <d2> [--fresh-clone] [--hermetic]`。
+CLI: `kbb -M:reproduce <source-commit> <d1> <d2> [--fresh-clone] [--hermetic]`。
 
 ## Consequences
 
 - nix 的性質は「偶然そうなっている」から「宣言され、機械検査される contract」になった。
   性質を消す・mechanism を inventory から外す・gate も gap も無い性質を足す、はいずれも
-  `clojure -M:tcb-check` で落ちる。
+  `kbb -M:tcb-check` で落ちる。
 - inventory は両半分とも「間違っていたら落ちる記録」になった。
 - 実行時依存を 1 つでも進めるには同じ commit で inventory を更新する必要がある — 意図的な摩擦であり、`:tcb/files` が既に in-repo source に課している規律と同型。
 - `deps.edn` / `security-adoption.edn` / inventory が相互検査されるので、shared security の pin が片方だけ進む事故が構造的に起きない（直近の pin revert #138 がまさにこの状況）。
-- release artifact の SBOM / SLSA provenance（`docs/deployment-profiles.md` の `regulated`）は**実装済み**（2026-08-02、aiueos ADR-0017 / PR #141）。`aiueos.sbom` が TCB inventory から SBOM component を導出し、provenance と `regulated` evidence を署名付きで生成して `kotoba.security.supply-chain/evaluate-attestations` に食わせる。`:sbom-digest` / `:provenance-digest` / `:tcb-inventory-digest` / `:tcb-drift-check?` は test literal ではなく inventory と実文書から来る。**残る 3 点**: ①`build-release-image.sh` は まだ `clojure -M:attest` を呼ばず、attestation の存在を要求する gate も無い（pipeline 結線）②文書は EDN で in-toto/DSSE envelope ではない ③`evaluate-reproducibility` の証拠（独立ビルド 2 本の artifact digest）は未接続 — 入力（ADR-0013 の byte 比較 gate）は既にある。
+- release artifact の SBOM / SLSA provenance（`docs/deployment-profiles.md` の `regulated`）は**実装済み**（2026-08-02、aiueos ADR-0017 / PR #141）。`aiueos.sbom` が TCB inventory から SBOM component を導出し、provenance と `regulated` evidence を署名付きで生成して `kotoba.security.supply-chain/evaluate-attestations` に食わせる。`:sbom-digest` / `:provenance-digest` / `:tcb-inventory-digest` / `:tcb-drift-check?` は test literal ではなく inventory と実文書から来る。**残る 3 点**: ①`build-release-image.sh` は まだ `kbb -M:attest` を呼ばず、attestation の存在を要求する gate も無い（pipeline 結線）②文書は EDN で in-toto/DSSE envelope ではない ③`evaluate-reproducibility` の証拠（独立ビルド 2 本の artifact digest）は未接続 — 入力（ADR-0013 の byte 比較 gate）は既にある。
 
 ## 現在地 (2026-08-03) — 名指しした穴のうち、閉じたものと残ったもの
 
@@ -224,7 +224,7 @@ JDK 依存を*増やす*方向である。正しい方向は逆で、**gate 側�
 
 **第 1 歩は着地済み** — kotoba-lang/compiler ADR-0202（PR #500）: `bin/kotoba` の nbb fast path が
 JDK 無しで dependency closure を解決できるようになった。実測していた blocker は
-`clojure -Spath`（classpath 解決のためだけの JVM 呼び出し）で、失敗時に空文字を返して
+`kbb -Spath`（classpath 解決のためだけの JVM 呼び出し）で、失敗時に空文字を返して
 truncated classpath のまま進む **fail-open** でもあった。`deps-lock.edn`（content-addressed
 closure）+ git のみで再現し、pin と `rev-parse HEAD` を照合する。**parity 実測: 生成される
 `.kexe` は両 resolver で byte-identical。** これで `.kotoba` → native の compile が JDK 無しで

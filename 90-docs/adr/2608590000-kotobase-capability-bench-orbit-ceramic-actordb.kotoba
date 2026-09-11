@@ -167,8 +167,8 @@ executor の syscall コストを掛ければよい。
 ```bash
 cd orgs/kotoba-lang/kotobase/capability-bench
 npm install && npm run setup
-nbb --classpath \"$(nbb setup.cljs --print-classpath)\" verify.cljs   # 4 backend の答えが一致すること
-nbb --classpath \"$(nbb setup.cljs --print-classpath)\" run.cljs --entities 4000 --updates 200 --shards 8 --fvm
+kbb --backend sci --classpath \"$(kbb --backend sci setup.cljk --print-classpath)\" verify.cljs   # 4 backend の答えが一致すること
+kbb --backend sci --classpath \"$(kbb --backend sci setup.cljk --print-classpath)\" run.cljs --entities 4000 --updates 200 --shards 8 --fvm
 ```
 ")
 

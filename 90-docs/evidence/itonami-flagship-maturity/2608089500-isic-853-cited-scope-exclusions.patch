@@ -65,10 +65,10 @@ mutation を当てて初めて分かったので、両方直してから landed 
 
 ## 検証
 
-- `clojure -M:test` — 63 tests / 339 assertions / 0 failures
+- `kbb -M:test` — 63 tests / 339 assertions / 0 failures
   （変更前 49 / 165 / 0）
-- `clojure -M:verify-citations` — 12 引用すべてが実法令の本文に存在
-- `clojure -M:lint` — errors 0（warnings 3 は `sim.cljc` の既存分）
+- `kbb -M:verify-citations` — 12 引用すべてが実法令の本文に存在
+- `kbb -M:lint` — errors 0（warnings 3 は `sim.cljc` の既存分）
 
 README が存在しないテストファイル 2 つ（`governor_contract_test.clj`,
 `store_contract_test.clj`）を案内していたので実在の一覧に直した。
@@ -104,17 +104,17 @@ index f13ac73..8677851 100644
  - **Staged rollout** (Phase 0→3):
    - Phase 0: read-only
    - Phase 1: enrollment-appointment scheduling only (approval-gated)
-@@ -33,21 +33,31 @@ clojure -M:lint
+@@ -33,21 +33,31 @@ kbb -M:lint
  
  # Run demo
- clojure -M:run
+ kbb -M:run
 +
 +# Check every scope-exclusion citation against the e-Gov 法令検索 API
 +# (--offline checks the catalogue's shape without the network)
-+clojure -M:verify-citations
++kbb -M:verify-citations
  ```
  
-+`clojure -M:test` is offline and deterministic; `clojure -M:verify-citations`
++`kbb -M:test` is offline and deterministic; `kbb -M:verify-citations`
 +is the only entry point that uses the network.
 +
  ## Test suite
@@ -144,10 +144,10 @@ index 6612cf3..c9ce2ac 100644
 --- a/deps.edn
 +++ b/deps.edn
 @@ -15,6 +15,11 @@ io.github.kotoba-lang/langgraph
-   ;; clojure -M:dev:render-html [out-file] -> regenerate docs/samples/operator-console.html
+   ;; kbb -M:dev:render-html [out-file] -> regenerate docs/samples/operator-console.html
    ;; through the real actor (flagship checklist item 2, ADR-2607189300 pattern).
    :render-html {:main-opts ["-m" "highereds.render-html"]}
-+  ;; clojure -M:verify-citations [--offline] -> check every citation in
++  ;; kbb -M:verify-citations [--offline] -> check every citation in
 +  ;; highereds.facts against the e-Gov 法令検索 API (article-level, not HTTP
 +  ;; status -- e-Gov answers 200 for a nonexistent law id). Network-using, so
 +  ;; deliberately NOT part of :test; the unit suite stays offline.
@@ -159,7 +159,7 @@ diff --git a/docs/operator-quickstart.md b/docs/operator-quickstart.md
 index b455c6b..6a370bd 100644
 --- a/docs/operator-quickstart.md
 +++ b/docs/operator-quickstart.md
-@@ -25,7 +25,40 @@ clojure -M:test
+@@ -25,7 +25,40 @@ kbb -M:test
  
  Expect green if maturity is `implemented`. Fix failures before operating.
  
@@ -175,7 +175,7 @@ index b455c6b..6a370bd 100644
 +still resolve:
 +
 +```bash
-+clojure -M:verify-citations
++kbb -M:verify-citations
 +```
 +
 +This fetches every cited law from the e-Gov 法令検索 API and asserts that each
@@ -264,7 +264,7 @@ index 0000000..7627c47
 +  bilingual so the free-text net catches both operating languages.
 +
 +  Verification. Every citation is machine-checkable against the e-Gov API:
-+  `clojure -M:verify-citations` (see `highereds.verify-citations`) fetches
++  `kbb -M:verify-citations` (see `highereds.verify-citations`) fetches
 +  each law and asserts the cited article really exists in it. That check is
 +  a separate, network-using entry point on purpose -- the unit tests here
 +  stay offline and deterministic. **HTTP status alone is not verification**:
@@ -684,8 +684,8 @@ index 0000000..c5292b5
 +(ns highereds.verify-citations
 +  "Check every citation in `highereds.facts` against the e-Gov 法令検索 API.
 +
-+      clojure -M:verify-citations              ; verify the whole catalogue
-+      clojure -M:verify-citations --offline    ; shape only, no network
++      kbb -M:verify-citations              ; verify the whole catalogue
++      kbb -M:verify-citations --offline    ; shape only, no network
 +
 +  **Why this reads the law text and not the HTTP status.** The obvious
 +  implementation -- GET each `:citation/url` and accept 2xx -- does not work
@@ -710,7 +710,7 @@ index 0000000..c5292b5
 +  quoted prose against the current text is a larger job than this gate. The
 +  notes carry the date they were read.
 +
-+  JVM-only and deliberately outside the test suite: `clojure -M:test` must
++  JVM-only and deliberately outside the test suite: `kbb -M:test` must
 +  stay offline and deterministic. Run this gate when the catalogue changes."
 +  (:require [clojure.string :as str]
 +            [highereds.facts :as facts])
@@ -837,7 +837,7 @@ index 0000000..fc7bb58
 +
 +  These tests never touch the network. Whether the cited ARTICLES really
 +  exist in the cited LAWS is a different question, answered by
-+  `clojure -M:verify-citations` against the e-Gov API; what is pinned here is
++  `kbb -M:verify-citations` against the e-Gov API; what is pinned here is
 +  the shape of the catalogue and, most importantly, that no exclusion the
 +  governor used to enforce has quietly disappeared."
 +  (:require [clojure.string :as str]

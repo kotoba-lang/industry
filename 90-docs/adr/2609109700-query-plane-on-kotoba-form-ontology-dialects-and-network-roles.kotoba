@@ -303,13 +303,13 @@ control が 000 を返すので、上の 401 と 404 は生きた worker の応�
 evidence は `90-docs/query-plane/2026-09-10-query-plane-measurements.edn`。
 probe は 4 本、superproject root から:
 
-    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/ontology_entailment.cljs
+    kbb --backend sci --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/ontology_entailment.cljs
 
-    nbb --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/kotobase-server/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/ontology_admission.cljs
+    kbb --backend sci --classpath \"orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/kotobase-server/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/ontology_admission.cljs
 
-    nbb --classpath \"orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/selector_address.cljs
+    kbb --backend sci --classpath \"orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src\" 90-docs/query-plane/selector_address.cljs
 
-    nbb 90-docs/query-plane/ipq_live.cljs
+    kbb --backend sci 90-docs/query-plane/ipq_live.cljk
 
 **4 本とも control を持ち、その control は落ちる向きで走らせてある。**
 `datom-source` を classpath から外すと 1 本目は query の答えではなく

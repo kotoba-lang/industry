@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; itonami-maturity-freshness-check.cljs — 成熟度向上 loop の鮮度判定の gate。
 ;;
 ;; **検証ロジックはここに複製しない。** 正本は repo 内の
@@ -22,7 +22,7 @@
 ;; policy test が classpath 破壊等で「何も検証していないのに exit 0」になる経路が
 ;; あるので、summary 行（`N cases OK`）の存在と N>0 を assert する。
 ;;
-;; ノード側で `npx nbb itonami-maturity-freshness-check.cljs <dir>` として実行。
+;; ノード側で `kbb --backend sci itonami-maturity-freshness-check.cljk <dir>` として実行。
 (ns fleet-ci.gates.itonami-maturity-freshness-check
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -51,7 +51,7 @@
 
 (def result
   (try
-    (cp/execSync "npx --yes nbb --classpath \".:scripts/nbb_compat\" scripts/itonami-maturity-freshness-test.cljk"
+    (cp/execSync "npx --yes kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/itonami-maturity-freshness-test.cljk"
                  #js {:cwd root :encoding "utf8" :stdio "pipe" :timeout 600000})
     (catch :default e
       ;; 落ちても出力は見せる（原因を receipt に残す）

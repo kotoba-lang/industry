@@ -107,7 +107,7 @@
     \"marketer を inward に分類したが、対外発信を伴うので publish 帰属 (app-aozora への署名) は別途整理が要る\"]}"),
 
  (:adr/artifact "network-awai/loop-yakuwari, kotoba-lang/yakuwari-view, manifest/edn-query.cljs"),
- (:adr/verify "nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find ?biz ?role :where [?e \"source/dataset\" \"awai-yakuwari\"] [?e \"yakuwari/business\" ?biz] [?e \"yakuwari/id\" ?role]]'"),
+ (:adr/verify "kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find ?biz ?role :where [?e \"source/dataset\" \"awai-yakuwari\"] [?e \"yakuwari/business\" ?biz] [?e \"yakuwari/id\" ?role]]'"),
 
  (:adr/body
  "
@@ -279,17 +279,17 @@ markup」) 先例と同形なので、cockpit 側の既存パターンに素直�
 
 | 対象 | 実行したもの | 結果 |
 |---|---|---|
-| `kotoba-lang/yakuwari` | `npm test` / `clojure -M:test` / `clojure -M:lint` | 24 tests 61 assertions、**両 host 一致**、0 failure、lint 0 |
-| `kotoba-lang/yakuwari-view` | `npm test` / `clojure -M:test` / `clojure -M:lint` | 28 tests 57 assertions、**両 host 一致**、0 failure、lint 0 |
+| `kotoba-lang/yakuwari` | `npm test` / `kbb -M:test` / `kbb -M:lint` | 24 tests 61 assertions、**両 host 一致**、0 failure、lint 0 |
+| `kotoba-lang/yakuwari-view` | `npm test` / `kbb -M:test` / `kbb -M:lint` | 28 tests 57 assertions、**両 host 一致**、0 failure、lint 0 |
 | `network-awai/loop-yakuwari` | `npm test` | 29 tests 52 assertions、0 failure |
-| `loop-yakuwari` 実データ | `nbb bin/awai.cljs check` | `businesses 6 \\| roles 31 \\| outward 15 \\| narrowed by ceiling 0`、OK |
+| `loop-yakuwari` 実データ | `kbb --backend sci bin/awai.cljk check` | `businesses 6 \\| roles 31 \\| outward 15 \\| narrowed by ceiling 0`、OK |
 | query 面 | `edn-query.cljs count` / 2 query | `awai-yakuwari=38`（31 役割 + 6 business + 1 fleet）。roles-per-business = club-shinshi 6 + 5 業種 × 5。approval-required 横断 = 59 行 |
-| cockpit | `clojure -M -e (require …)` ×2 ns | `BOTH_NS_COMPILE_OK` |
+| cockpit | `kbb -M -e (require …)` ×2 ns | `BOTH_NS_COMPILE_OK` |
 | cockpit 成果物 | `write-public-cockpit!` → `public/index.html` を grep | 119,686 bytes、**role card 31 / group 6 / outward badge 15 / gated capability 75 / raw hex 0** — registry の 31/6/15 と一致 |
 | west pin | `verify-west-pins`（3 件） | 2 件は default branch から到達可能な新規 entry、1 件は fast-forward |
 
 **実行できなかったもの（正直に記録）**: `network-awai/cloud-itonami` の
-`clojure -M:test` は**コンパイル自体が通らない** —
+`kbb -M:test` は**コンパイル自体が通らない** —
 `bonsai/repo.cljc:41` が `arr/restore` を呼ぶが sibling の `arr` checkout に
 その var が無い。**この破損は既存で、本変更と無関係**（変更した 2 ファイルは
 どちらも bonsai を参照しない: grep 0 件）。cockpit の検証は上記の
@@ -299,8 +299,8 @@ markup」) 先例と同形なので、cockpit 側の既存パターンに素直�
 
 ```bash
 west update --fetch smart yakuwari yakuwari-view loop-yakuwari
-cd orgs/network-awai/loop-yakuwari && npm test && nbb bin/awai.cljs check
-nbb bin/awai.cljs identities        # phase 7 が作るべき 15 repo の一覧
+cd orgs/network-awai/loop-yakuwari && npm test && kbb --backend sci bin/awai.cljk check
+kbb --backend sci bin/awai.cljk identities        # phase 7 が作るべき 15 repo の一覧
 ```
 
 phase 6 / 7 の最短経路:
@@ -309,7 +309,7 @@ phase 6 / 7 の最短経路:
   `:local/root` で足し、`model/hil-queue` を DADS で描く。同 repo は既に
   `kotoba-lang/agent` と `kotoba-lang/hil` に依存しているので、承認キューの
   受け皿は既にある。共有するのは projection のみ（component は共有しない）。
-- **phase 7**: `nbb bin/awai.cljs identities` の 15 行がそのまま作るべき repo と
+- **phase 7**: `kbb --backend sci bin/awai.cljk identities` の 15 行がそのまま作るべき repo と
   mailbox。**責任命名**（`person-isekai-sales`）にしてあり、架空人物名は
   発明していない。mailbox は Cloudflare Email Routing の zone token を要する
   **owner action**。

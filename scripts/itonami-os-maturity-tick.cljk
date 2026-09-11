@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-os-maturity-tick.cljk — 営み OS（ADR-2608060000）の成熟度を
 ;; 測る。`itonami-os/maturity` loop が毎サイクルこれを先に走らせ、**状態を
 ;; 再発見せずに**次の 1 手を決めるための入力にする。
@@ -25,7 +25,7 @@
 ;;   - 秘密の値は書かない（在否だけ）。
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljk
 ;;   nbb ... scripts/itonami-os-maturity-tick.cljk --offline   ; live probe を飛ばす
 ;;
 ;; exit 0 常に（監視であって gate ではない）。

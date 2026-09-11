@@ -18,7 +18,7 @@
 │   ├── repos.edn           ← ★ source of truth（人が編集する）
 │   ├── west.yml            ← 生成物（self.path: manifest）
 │   ├── west-commands.yml   ← west 拡張コマンド登録
-│   ├── west_annex.cljs     ← `nbb manifest/west_annex.cljk`（DataLad/B2 統合）
+│   ├── west_annex.cljs     ← `kbb --backend sci manifest/west_annex.cljk`（DataLad/B2 統合）
 │   └── README.md           ← これ
 └── orgs/<org>/<repo>/      ← project 展開先（= 旧 submodule と同一パス）
 ```
@@ -44,13 +44,13 @@ Backblaze B2 に置く。git には annex キー（ポインタ）だけが入�
 # git/annex スケルトンを取得（opt-in グループ）
 west update --group-filter +datalad m365-archive
 # 実体を B2 から取得 / 破棄
-nbb manifest/west_annex.cljk annex-get   # 認証は自動解決（下記）。実体を B2 から取得
-nbb manifest/west_annex.cljk annex-drop  # ローカル実体を捨てて B2 のコピーだけ残す
+kbb --backend sci manifest/west_annex.cljk annex-get   # 認証は自動解決（下記）。実体を B2 から取得
+kbb --backend sci manifest/west_annex.cljk annex-drop  # ローカル実体を捨てて B2 のコピーだけ残す
 ```
 
 ### B2 認証の解決（env → 1Password → Keychain）
 
-`nbb manifest/west_annex.cljk annex-get|annex-drop` は `scripts/b2-creds.cljk` で B2 認証を解決する。順序と
+`kbb --backend sci manifest/west_annex.cljk annex-get|annex-drop` は `scripts/b2-creds.cljk` で B2 認証を解決する。順序と
 参照先は `manifest/repos.edn` の `:b2 :credentials`（既定
 `[:env :1password :keychain]`）。**秘密はリポジトリに置かず**、参照先（`op://` パス /
 Keychain service 名）だけを EDN に書く。初回は自分の保管先に合わせて `★` を編集する。
@@ -59,8 +59,8 @@ Keychain service 名）だけを EDN に書く。初回は自分の保管先に�
 # 1Password: op に signin 済みなら op read で解決
 # Apple Keychain: security find-generic-password で解決（macOS ローカル）
 # CI 等: B2_KEY_ID / B2_APP_KEY / B2_BUCKET を環境変数で渡せば env が最優先
-eval "$(nbb scripts/b2-creds.cljk)"     # 手元の環境に流し込む（任意）
-nbb scripts/b2-creds.cljk --json        # プログラム用（west_annex.cljs が利用）
+eval "$(kbb --backend sci scripts/b2-creds.cljk)"     # 手元の環境に流し込む（任意）
+kbb --backend sci scripts/b2-creds.cljk --json        # プログラム用（west_annex.cljs が利用）
 ```
 
 ## 日常運用
@@ -69,18 +69,18 @@ nbb scripts/b2-creds.cljk --json        # プログラム用（west_annex.cljs �
 west init -l manifest                                   # 初回（非破壊）
 west update --fetch smart <name> [<name> ...]           # 必要な project だけ
 west list ; west status
-nbb scripts/gen-west-manifest.cljk                         # pin 前進後に再生成（手書き禁止）
-nbb scripts/gen-west-manifest.cljk --check                 # CI: 乖離で exit 1
+kbb --backend sci scripts/gen-west-manifest.cljk                         # pin 前進後に再生成（手書き禁止）
+kbb --backend sci scripts/gen-west-manifest.cljk --check                 # CI: 乖離で exit 1
 ```
 
 ### task worktree（root 全23万fileを毎回展開しない）
 
 ```bash
-nbb scripts/root-worktree.cljk create <task>                         # minimal sparse root
-nbb scripts/root-worktree.cljk create <task> --profile docs          # ADRを含む
-nbb scripts/root-worktree.cljk create <task> --west <project-name>   # childを1件だけ取得
-nbb scripts/root-worktree.cljk inspect /private/tmp/root-<task>-...  # shape確認
-nbb scripts/root-worktree.cljk remove /private/tmp/root-<task>-...   # clean/ignored childを検査して除去
+kbb --backend sci scripts/root-worktree.cljk create <task>                         # minimal sparse root
+kbb --backend sci scripts/root-worktree.cljk create <task> --profile docs          # ADRを含む
+kbb --backend sci scripts/root-worktree.cljk create <task> --west <project-name>   # childを1件だけ取得
+kbb --backend sci scripts/root-worktree.cljk inspect /private/tmp/root-<task>-...  # shape確認
+kbb --backend sci scripts/root-worktree.cljk remove /private/tmp/root-<task>-...   # clean/ignored childを検査して除去
 ```
 
 既定は外部worktree + sparse-indexで、full checkoutは`--profile full`を明示した時だけ。
@@ -118,7 +118,7 @@ skill で参照する。
 
 1. その repo を作って push（origin に存在させる）。
 2. ローカルに `orgs/<org>/<repo>` として clone（または `west` で取得）。
-3. `nbb scripts/gen-west-manifest.cljk` で再生成（working HEAD を pin）。
+3. `kbb --backend sci scripts/gen-west-manifest.cljk` で再生成（working HEAD を pin）。
 4. `.gitignore` に `/orgs/<org>/<repo>/` を追加し、`manifest/west.yml` をコミット。
 
 remote(org) が新規なら `manifest/repos.edn` の `:remotes` に追記する。

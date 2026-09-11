@@ -2,7 +2,7 @@ node_modules/
 .shadow-cljs/
 .cpcache/
 out/
-# The bundle is a build product: `npx shadow-cljs release app` reproduces it from
+# The bundle is a build product: `amu compile --target wasm32-browser app` reproduces it from
 # the sources here. `public/index.html` and the KIR artifact ARE committed —
 # both are small, and both are what a reviewer needs to see to check that this
 # app ships exactly one document and exactly one copy of the decisions.

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns kotoba-provider-orphan-check
   "provider 側から `.kotoba` 移行の置き去りを検出する。`verify-require-graph` の対偶。
 
@@ -61,7 +61,7 @@
 
   ## 使い方
 
-      nbb kotoba-provider-orphan-check.cljs <dir> [--min N] [--root src] [--allow PATH]
+      kbb --backend sci kotoba-provider-orphan-check.cljk <dir> [--min N] [--root src] [--allow PATH]
 
   ⚠ `<dir>` は引数の**先頭**（CLAUDE.md「赤い gate を直す前に 3 つ確かめる」2）。
   `--root` は複数回渡せる（既定 `src`）。`--allow` は path 単位の opt-out で、

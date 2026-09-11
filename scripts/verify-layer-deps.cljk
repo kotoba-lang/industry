@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-layer-deps.cljs — ADR-2607171100 Wave 3.
 ;; manifest/layers.edn の layer taxonomy に対して 3 点を lint する:
 ;;   (a) deps.edn の :local/root エッジが layer DAG(依存方向)に違反していないか
@@ -6,9 +6,9 @@
 ;;       grandfathered/frozen 以外は violation
 ;;   (c) :local/root が workspace(orgs/)の外を指していないか
 ;;
-;; 使い方:  nbb scripts/verify-layer-deps.cljk            ; 全 org スキャン
-;;          nbb scripts/verify-layer-deps.cljk --report   ; violation でも exit 0(レポートのみ)
-;;          nbb scripts/verify-layer-deps.cljk --findings ; 機械可読な finding も出す
+;; 使い方:  kbb --backend sci scripts/verify-layer-deps.cljk            ; 全 org スキャン
+;;          kbb --backend sci scripts/verify-layer-deps.cljk --report   ; violation でも exit 0(レポートのみ)
+;;          kbb --backend sci scripts/verify-layer-deps.cljk --findings ; 機械可読な finding も出す
 ;;
 ;; layer 解決は layers.edn の :naming glob。どの glob にも合わない repo は
 ;; :layer-unknown として DAG 検査対象外(件数のみ報告)。

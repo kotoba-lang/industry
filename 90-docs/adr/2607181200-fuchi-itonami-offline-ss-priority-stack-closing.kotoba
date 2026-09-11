@@ -123,7 +123,7 @@ Compare `d6400f34...bb449edd`: status **ahead**, ahead_by **2**, behind_by **0**
 | E. scorecard / public / audit / pages plan-only | **yes** | pin lag | |
 | F. standalone layout (`methods/`→`src/fuchi/…`) | **yes** | pin lag | tip `bb449edd`; **local checkout not pulled** |
 | G. `priority_stack` SSoT + offline.edn surfaces | **no** | no | 404 on main; local WIP |
-| H. nbb land/test/publish entrypoints | **no** | no | main still has `bb.edn` / `bb test` docs |
+| H. nbb land/test/publish entrypoints | **no** | no | main still has `bb.edn` / `kbb -M:test` docs |
 | I. portable nbb suite + dual-key facts | **no** | no | must re-home onto `src/` layout |
 | J. west pin advance | **no** | **no** | still `d647f062` |
 | K. live produce / grant / loan / wrangler | **n/a refuse** | n/a | never in this closing |
@@ -136,7 +136,7 @@ Compare `d6400f34...bb449edd`: status **ahead**, ahead_by **2**, behind_by **0**
 2. **Next land path** (when terminal works; agent shell was ENOENT this session):
    - `git fetch` fuchi; reconcile local WIP onto `origin/main` (`bb449edd`, `src/fuchi/` layout) without force-push
    - port G–I files into `src/fuchi/methods/` + nbb entrypoints at repo root
-   - `nbb methods/readiness_check.cljs` → `priority_stack_smoke` → `run_tests` → `write_all`
+   - `kbb --backend sci methods/readiness_check.cljk` → `priority_stack_smoke` → `run_tests` → `write_all`
    - commit/push ff-only to `main`
    - west/fleet pin advance `com-etzhayyim-fuchi` to new tip (single-entry; verify remote)
 3. **Do not** treat local `methods/` tree as main tip after standalone migration.

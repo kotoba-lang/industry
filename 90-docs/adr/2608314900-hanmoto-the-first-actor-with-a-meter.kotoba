@@ -26,7 +26,7 @@
   (:adr/measured
   (vector "repo: `cloud-itonami/actor-hanmoto`（public）、初期 commit `642d18bf`、west 登録 `62f05f29`。**pin == repo の default branch tip** を確認"
    "完了ゲート `scripts/west-orphan-audit.cljs --blocking` **exit 0**"
-   "テスト: **14 tests / 37 assertions / 0 failures**（`clojure -M:test`）"
+   "テスト: **14 tests / 37 assertions / 0 failures**（`kbb -M:test`）"
    "metering detector: **meter-shaped 1**（31 → 0 だった集団に 1 件目）。`orgs/cloud-itonami/actor-hanmoto/src/hanmoto/usage.cljc` を名指しした"
    "**offer ladder は hanmoto を見なかった** —— no-offer は 31 のまま、合計も 31 のまま。理由は『値札が無い』ではなく **母集団が 2026-08-30T15:52Z 生成の evidence file から来ており、そこに hanmoto が居ない**（grep 0 件）から"
    "修正後: `EVIDENCE <path> <mtime>` と `POPULATION from evidence, not from the tree / on-disk=32 / in evidence=41 / UNSEEN=1` を数の前に印字。`--findings` で `evidence-behind-the-tree` が `actor-hanmoto` を名指しする"

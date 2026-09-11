@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; gen-training-corpus.cljs — この workspace の**文書を学習コーパスとして採点し、
 ;; datom として query できる面に載せる**生成器（ADR-2608056000）。
 ;;
@@ -14,9 +14,9 @@
 ;;
 ;; ## 使い方
 ;;
-;;   nbb scripts/gen-training-corpus.cljk                # 生成
-;;   nbb scripts/gen-training-corpus.cljk --check        # 差分があれば exit 1（gate 用）
-;;   nbb scripts/gen-training-corpus.cljk --shard        # 生成 + shard bytes を書き出す
+;;   kbb --backend sci scripts/gen-training-corpus.cljk                # 生成
+;;   kbb --backend sci scripts/gen-training-corpus.cljk --check        # 差分があれば exit 1（gate 用）
+;;   kbb --backend sci scripts/gen-training-corpus.cljk --shard        # 生成 + shard bytes を書き出す
 ;;
 ;; ## なぜ `--check` を gate にしてよいか（concept 索引は「するな」なのに）
 ;;
@@ -324,7 +324,7 @@
         numbered (map-indexed (fn [i e] (assoc e :db/id (- (inc i)))) entities)]
     {:docs docs :shards shards :coverage coverage
      :text (str ";; 90-docs/corpus/corpus.datoms.edn — **生成物**。手編集禁止。\n"
-                ";; 再生成: nbb scripts/gen-training-corpus.cljk\n"
+                ";; 再生成: kbb --backend sci scripts/gen-training-corpus.cljk\n"
                 ";; 正本の policy: manifest/corpus-policy.edn (" (:policy/id policy) ")\n"
                 ";; 設計: ADR-2608056000。query: :source/dataset \"training-corpus\"\n"
                 ";;\n"
@@ -409,7 +409,7 @@
                         " row(s) whose file is byte-identical to what was indexed"
                         " do not reproduce — the index was edited by hand:"))
           (doseq [id (take 10 mismatched)] (println (str "  - " id)))
-          (println "  run: nbb scripts/gen-training-corpus.cljk")
+          (println "  run: kbb --backend sci scripts/gen-training-corpus.cljk")
           (js/process.exit 1))
       (println (str "OK: all " (n :verified)
                     " verifiable row(s) reproduce exactly"
@@ -424,7 +424,7 @@
           (println "OK: 90-docs/corpus/corpus.datoms.edn is canonical"
                    (str "(" (count docs) " docs)"))
           (do (println "STALE: 90-docs/corpus/corpus.datoms.edn differs from generator output")
-              (println "  run: nbb scripts/gen-training-corpus.cljk")
+              (println "  run: kbb --backend sci scripts/gen-training-corpus.cljk")
               (js/process.exit 1))))
       (do
         (fs/mkdirSync (path/dirname out-path) #js {:recursive true})

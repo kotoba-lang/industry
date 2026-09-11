@@ -83,7 +83,7 @@ west pin の aiueos は `d0780608199724c3d26ad744ce6fd0441bd30a68`（2026-08-22�
 
 ### セッション面の置き場（新 repo を起こさない）
 
-索引と west.yml を引いた（`nbb scripts/repo-search.cljs` / `concept-lookup`）。
+索引と west.yml を引いた（`kbb --backend sci scripts/repo-search.cljk` / `concept-lookup`）。
 
 | 既存 | 実際に所有しているもの | 日次 OS 面か |
 |---|---|---|
@@ -170,13 +170,13 @@ A または B と同じ bind。bind 時の mode が **management only**（状態
 ### 実在する（測定した）
 
 - QEMU/OVMF boot。firmware → `BOOTX64.EFI` / `KERNEL.ELF`。
-- **P1** `clojure -M:session smoke` — DADS SPA から kotobase CID と murakumo-main infer。
-- **P1b** `clojure -M:phone-bind smoke` — `-display none`、GPU 装置なし、ゲストキーボードなし。
-- **P2** `clojure -M:bare-metal cloud` — ゲスト TLS 1.3 + HTTPS GET + CID。CertVerify はまだ。
-- **P3** `clojure -M:session guest` — grant 付き notes。kotobase write は `:write-unauthorized`。
-- **P4** `clojure -M:session operator` — itonami.cloud inventory。CACAO write は 401 のまま。
-- **hosted compositor** `clojure -M:compositor smoke`（aiueos ADR-0079）— `window-session-state` + `#desktop` kami viewport + QMP virtio-gpu PCI。ウィンドウマネージャではない。
-- **guest virtio-gpu 2D** `clojure -M:compositor gpu`（aiueos ADR-0084、aiueos `d0780608199724c3d26ad744ce6fd0441bd30a68`）— KERNEL.ELF serial の CREATE result=ok と FLUSH result=ok。GET_DISPLAY_INFO や query-pci だけでは緑にしない。32×32 リソース。IME も decoration も無い。
+- **P1** `kbb -M:session smoke` — DADS SPA から kotobase CID と murakumo-main infer。
+- **P1b** `kbb -M:phone-bind smoke` — `-display none`、GPU 装置なし、ゲストキーボードなし。
+- **P2** `kbb -M:bare-metal cloud` — ゲスト TLS 1.3 + HTTPS GET + CID。CertVerify はまだ。
+- **P3** `kbb -M:session guest` — grant 付き notes。kotobase write は `:write-unauthorized`。
+- **P4** `kbb -M:session operator` — itonami.cloud inventory。CACAO write は 401 のまま。
+- **hosted compositor** `kbb -M:compositor smoke`（aiueos ADR-0079）— `window-session-state` + `#desktop` kami viewport + QMP virtio-gpu PCI。ウィンドウマネージャではない。
+- **guest virtio-gpu 2D** `kbb -M:compositor gpu`（aiueos ADR-0084、aiueos `d0780608199724c3d26ad744ce6fd0441bd30a68`）— KERNEL.ELF serial の CREATE result=ok と FLUSH result=ok。GET_DISPLAY_INFO や query-pci だけでは緑にしない。32×32 リソース。IME も decoration も無い。
 
 ### 無い / UNVERIFIED（本 ADR はこれを閉じない）
 
@@ -213,7 +213,7 @@ A または B と同じ bind。bind 時の mode が **management only**（状態
 
 ### P1 — Hosted daily shell
 
-**QEMU ではない。** JVM / hosted profile が DADS SPA セッション（`apps/session`、1 文書）を boot し、そのシェルから kotobase CID を読み、murakumo infer を完了する。uncredentialed（今日の `infer.murakumo.cloud`）でも credentialed でもよいが、**シェルから**であること。`clojure -M:cloud-live check` の exit 0 は本 gate を緑にしない — それは 0073 の CLI であってセッションではない。
+**QEMU ではない。** JVM / hosted profile が DADS SPA セッション（`apps/session`、1 文書）を boot し、そのシェルから kotobase CID を読み、murakumo infer を完了する。uncredentialed（今日の `infer.murakumo.cloud`）でも credentialed でもよいが、**シェルから**であること。`kbb -M:cloud-live check` の exit 0 は本 gate を緑にしない — それは 0073 の CLI であってセッションではない。
 
 赤: 第二 HTML がシェルである。liquid-glass。fragment 無しの pushState を静的ホストに載せる。CID を読んだのがシェル外。infer がシェル外。itonami が無いことを理由に P1 を止める（P1 は consumer 切片）。
 

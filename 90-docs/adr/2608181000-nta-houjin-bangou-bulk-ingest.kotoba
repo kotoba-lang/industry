@@ -295,7 +295,7 @@ registry にも invoice registry にも事業年度は無い。**残る公開経
 
 - **`clojure.string/split` は capture group つき正規表現で挙動が違う** ——
   ClojureScript は group を出力に残し、JVM は落とす。同じコードが nbb で 153 block、
-  `clojure -M:test` で 0 を返した。split 用と capture 用でパターンを分けた。
+  `kbb -M:test` で 0 を返した。split 用と capture 用でパターンを分けた。
 - **前株と後株はどちらも普通**（株式会社本田 / トヨタＬ＆Ｆ福島株式会社）。
   末尾に錨を打った社名パターンは 153 件中 130 件を落とした。
 
@@ -1076,8 +1076,8 @@ API キーが transcript に載る。1 度目に「以後使わない」と書�
 **最初に叩くコマンド**:
 
 ```bash
-nbb --classpath \".:scripts/nbb_compat\" scripts/report-public-money-coverage.cljs
-nbb --classpath \".:scripts/nbb_compat\" scripts/annex-custody-verify.cljs
+kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/report-public-money-coverage.cljs
+kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/annex-custody-verify.cljs
 ```
 
 ## Consequences / まだ無いもの（正直に）

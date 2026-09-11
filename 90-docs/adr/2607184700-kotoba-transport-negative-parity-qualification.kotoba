@@ -31,13 +31,13 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "110 tests, 364 assertions, 0 failures"))
     (map (:cwd "orgs/kotoba-lang/wasm-webcomponent")
      (:command "npm test")
      (:result "all dependency-free native WebAssembly verification scripts pass"))
     (map (:cwd "orgs/kotoba-lang/compiler")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "270 tests, 3239 assertions, 0 failures"))))))
   (:adr/body
   "# ADR-2607184700: Transport negative matrix and high-level web runtime parity

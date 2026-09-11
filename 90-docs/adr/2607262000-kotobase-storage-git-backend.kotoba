@@ -73,7 +73,7 @@ tree の構築は scratch index（`GIT_INDEX_FILE`）と plumbing だけで行�
 
 - storage provider が6つになり、**サーバも SDK も要らない**選択肢が1つ増えた。依存は git 本体のみ（deps.edn に JDBC ドライバも AWS SDK も無い）。
 - `git push` / `git fetch` がそのまま複製プロトコルになる。history は `git log` で読める——**storage 層全体が通常のツールで検査可能なデータベース**は、JDBC URL の向こうにあるものとは運用上の性質が違う。
-- 実測: `clojure -M:test` で 10 tests / 29 assertions / 0 failures。うち1つは transact → reopen → query の往復を `kotobase-engine` 経由で回しており、**Datalog 経路は契約からの推論ではなく実行で確認**している。
+- 実測: `kbb -M:test` で 10 tests / 29 assertions / 0 failures。うち1つは transact → reopen → query の往復を `kotobase-engine` 経由で回しており、**Datalog 経路は契約からの推論ではなく実行で確認**している。
 
 ## 正直な限界
 

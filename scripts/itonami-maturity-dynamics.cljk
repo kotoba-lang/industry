@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/itonami-maturity-dynamics.cljk — cloud-itonami 成熟度スコア + 依存伝播 +
 ;; leverage 順位 + XMILE stock-flow シミュレーション。ADR-2608052000。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat:<dynamics/src>:<org-oasis-open-xmile/src>" \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat:<dynamics/src>:<org-oasis-open-xmile/src>" \
 ;;     scripts/itonami-maturity-dynamics.cljk \
 ;;     --evidence manifest/itonami-maturity-evidence.edn \
 ;;     --taxonomy manifest/repo-taxonomy.edn \

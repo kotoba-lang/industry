@@ -11,7 +11,7 @@
 |------|--------|-------|-----|-------|
 | 1. Email templates finalized | ✅ COMPLETE | Exec Lead | 2026-07-22 | 6 templates, [TBD] resolved |
 | 2. Email 1 placeholder check | ✅ COMPLETE | Exec Lead | 2026-07-22 | Pre-kickoff sync link → Email 1 send |
-| 3. Manifest canonical verify | ⏳ PENDING | Agent | 2026-07-21 | `nbb scripts/gen-west-manifest.cljs --check` |
+| 3. Manifest canonical verify | ⏳ PENDING | Agent | 2026-07-21 | `kbb --backend sci scripts/gen-west-manifest.cljk --check` |
 | 4. Execution lead assignment | ⏳ PENDING | Owner | 2026-07-22 | Interim: platform-lead@gftd.group |
 | 5. Slack channel creation | ⏳ PENDING | Platform Ops | 2026-07-31 | #prod-gates-wave5 + pins + members |
 | 6. Zoom link generation | ⏳ PENDING | Exec Lead | 2026-08-10 | Kickoff 2026-08-18 09:00 JST |
@@ -74,7 +74,7 @@
 
 - [ ] **Manifest Canonical Verification:** Run verification check
   ```bash
-  nbb scripts/gen-west-manifest.cljs --check
+  kbb --backend sci scripts/gen-west-manifest.cljk --check
   ```
 
 ### By 2026-08-10

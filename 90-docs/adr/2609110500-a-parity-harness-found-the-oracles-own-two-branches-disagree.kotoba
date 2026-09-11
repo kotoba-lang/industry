@@ -23,7 +23,7 @@ closes it.
 ## Reproduce
 
     # the CLJC side
-    nbb --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
+    kbb --backend sci --classpath src:<kotoba-lang/text>/src q9-oracle.cljs
 
     # the artifact side
     amu check   src/abb_robotics/whole_component.kotoba --jvm-free --policy policy.edn
@@ -51,7 +51,7 @@ each other on this input:
     :cljs   js/parseInt(\"12abc\", 10)      -> 12   (takes the leading digits)
     :clj    Long/parseLong(\"12abc\")       -> throws, caught, -> 0
 
-Both were RUN rather than read. `nbb` printed 12; `clojure -M -e` printed 0.
+Both were RUN rather than read. `nbb` printed 12; `kbb -M -e` printed 0.
 The component matches the `:clj` branch.
 
 So `parity with the oracle` is not a well defined property for this input. The
@@ -109,5 +109,5 @@ decision rather than a repository one.
 
 ⚠ Left in place deliberately, not cleaned: 21 `wt-*` worktrees under the
 session scratchpad from earlier agent runs. They are not this session's to
-delete; `nbb scripts/worktree-retire.cljs --root . --apply` is the sanctioned
+delete; `kbb --backend sci scripts/worktree-retire.cljk --root . --apply` is the sanctioned
 route and refuses anything dirty or in use.")))

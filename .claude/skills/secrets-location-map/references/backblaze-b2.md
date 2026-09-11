@@ -34,7 +34,7 @@ cd orgs/gftdcojp/m365-archive && git annex enableremote b2
 # pinentry-mac のダイアログで入力し「Save in Keychain」にチェック
 ```
 
-⚠ **`nbb manifest/west_annex.cljk annex-get` を安易に使わない** —— 引数なしで
+⚠ **`kbb --backend sci manifest/west_annex.cljk annex-get` を安易に使わない** —— 引数なしで
 **全 datalad データセットを走査**し、`cloud-itonami-contact-pii` から順に
 init/enableremote を始める。1 ファイルが欲しいだけなら
 `git annex get <path>` を狙い撃ちで使う（実測 2026-08-15、これを踏んだ）。

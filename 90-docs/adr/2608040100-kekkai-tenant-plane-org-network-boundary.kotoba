@@ -139,8 +139,8 @@ kekkai は `:test` alias の test-only 依存。Worker（`:edge-api`）は射影
 
 ## 検証
 
-- kekkai: `clojure -M:test` → **97 tests / 277 assertions, 0 failures 0 errors**
-  （tenant plane 以前の 68 tests も全て継続して通る）。`clojure -M:lint` clean。
+- kekkai: `kbb -M:test` → **97 tests / 277 assertions, 0 failures 0 errors**
+  （tenant plane 以前の 68 tests も全て継続して通る）。`kbb -M:lint` clean。
 - cloud-itonami: 射影 + round-trip + federation の3 ns で **47 tests / 86 assertions,
   0 failures**。PRIMARY portable cljs gate **689 tests / 6123 assertions, 0 failures**。
   PRIMARY edge cljs gate は追加 ns 1つを除き baseline と同一（既知の

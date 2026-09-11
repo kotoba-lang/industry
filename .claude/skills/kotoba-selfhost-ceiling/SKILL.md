@@ -30,7 +30,7 @@ description: JVM / Clojure に依存している toolchain（amu・kotoba-sema�
 1. **測る。** kotoba-lang の worktree で:
    ```bash
    R=/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang
-   cd $R/amu && nbb --classpath "<kotoba-lang wt>/src:<kotoba-lang wt>/scripts:$R/text/src:$R/kotoba-sema/src:$R/amu/src" \
+   cd $R/amu && kbb --backend sci --classpath "<kotoba-lang wt>/src:<kotoba-lang wt>/scripts:$R/text/src:$R/kotoba-sema/src:$R/amu/src" \
      <kotoba-lang wt>/scripts/measure-selfhost-distance.cljk --amu $R/amu --output <kotoba-lang wt>/lang/selfhost-distance.edn
    ```
    読むのは **`:project-check-gate :by-message`**（single-file の
@@ -52,7 +52,7 @@ description: JVM / Clojure に依存している toolchain（amu・kotoba-sema�
    test は nbb の suite（`run-tests.cljk`）で緑にする —— JVM suite は動かない。
 5. **実 source で証明する。** amu 自身の module を 3 本以上、新しい綴りで書いて
    `amu check --source-path … --jvm-free` が **次の壁に進む**ことと、
-   `nbb --classpath src -e "(require 'ns)"` が**まだ通る**ことの両方を見る。
+   `kbb --backend sci --classpath src -e "(require 'ns)"` が**まだ通る**ことの両方を見る。
 6. **着地 → pin → 測り直し。** branch push + `POST /merges`、
    `scripts/west-pin-put-batch.cljk`（または scratchpad の memo 化版）で pin、
    手順 1 を再実行して `selfhost-distance.edn` を更新して commit。
@@ -75,4 +75,4 @@ description: JVM / Clojure に依存している toolchain（amu・kotoba-sema�
 | kagi | JDK24 PQC provider、Java import 83 file | capability kit（keychain-text / crypto）が qualified になってから whole-component |
 | kbb | JVM bootstrap は interpreter。`--backend native` / `--backend sci` は JVM 不要 | 既に JVM-free 経路がある。bootstrap を退役させる |
 | amu | `cljs-browser` target だけ `clojure` を起こす | 新規はその target を選ばない |
-| fleet jvm-test gate | node で `clojure -M:test` | gate を nbb-test か kotoba-test に置き換える（1 gate = 1 反復） |
+| fleet jvm-test gate | node で `kbb -M:test` | gate を nbb-test か kotoba-test に置き換える（1 gate = 1 反復） |

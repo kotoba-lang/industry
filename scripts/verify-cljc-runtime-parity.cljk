@@ -3,7 +3,7 @@
   ClojureScript. Nothing enforces that claim by itself -- `.cljc` just means
   `clojure.core/read` sees `#?(:clj ...)` / `#?(:cljs ...)` branches and a
   plain top-level form runs on whichever host reads the file. A repo can
-  ship a `.cljc` library, pass `clojure -M:test` forever, and be silently
+  ship a `.cljc` library, pass `kbb -M:test` forever, and be silently
   wrong on ClojureScript in the one place JVM and JS numerics disagree:
   32-bit bitwise arithmetic.
 

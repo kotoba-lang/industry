@@ -42,7 +42,7 @@ The docs said image generation \"remains a separate product surface\" and that
 generation models \"are not listed by api.murakumo.cloud/v1/models\". Both
 became false an hour earlier when `awai-network/hokusai` was published, and
 `llms.txt` still carried the old claim -- because it is a HAND-MAINTAINED file
-beside `docs.cljc`, not generated from it. `clojure -M:site` regenerated
+beside `docs.cljc`, not generated from it. `kbb -M:site` regenerated
 `/free` and `/docs` and left `llms.txt` untouched, and only a grep of the live
 file showed it.
 
@@ -69,7 +69,7 @@ generating one from the other, or a check that fails when they disagree, would
 have caught it. Not done.
 
 **The site deploy needs a lease token that cannot be minted here.**
-`scripts/deploy-model-hosting-locked.mjs` mints it with `clojure -M:token
+`scripts/deploy-model-hosting-locked.mjs` mints it with `kbb -M:token
 issue`, which needs `MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2` in kagi
 (compartment network-awai). Measured: `kagi get` answers `no such item`, and
 it is absent from `~/.itonami/` too. The vault was not enumerated to look for

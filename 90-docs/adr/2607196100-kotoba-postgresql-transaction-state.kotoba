@@ -38,10 +38,10 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:postgresql-interop")
+     (:command "kbb -M:postgresql-interop")
      (:result "SCRAM-SHA-256-PLUS transaction recovery T/E/I; exit 0"))
     (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "121 tests, 444 assertions, zero failures/errors"))
     (map (:cwd "orgs/kotoba-lang/kotoba")
      (:command "targeted kotoba.transport-component-test")

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/cljk-classpath.cljk — make a classpath loadable after the .cljk rename.
 ;;
 ;; Owner decision 2026-09-11 (b): the .cljk rename is authoritative and build
@@ -17,9 +17,9 @@
 ;; is written, which is what keeps this a loader and not the compatibility
 ;; mirror the rename deliberately refused to commit.
 ;;
-;;   nbb scripts/cljk-classpath.cljk "$(clojure -Spath -A:test)"
-;;   nbb --classpath "$(nbb scripts/cljk-classpath.cljk "$(clojure -Spath -A:test)")" bin/run_tests.cljk
-;;   clojure -Scp "$(nbb scripts/cljk-classpath.cljk "$(clojure -Spath -A:test)")" \
+;;   kbb --backend sci scripts/cljk-classpath.cljk "$(kbb -Spath -A:test)"
+;;   kbb --backend sci --classpath "$(kbb --backend sci scripts/cljk-classpath.cljk "$(kbb -Spath -A:test)")" bin/run_tests.cljk
+;;   kbb -Scp "$(kbb --backend sci scripts/cljk-classpath.cljk "$(kbb -Spath -A:test)")" \
 ;;     -M -m cognitect.test-runner -d <the mirror printed for test/ on stderr>
 ;;
 ;; ⚠ The JVM runner needs `-d`: cognitect.test-runner discovers tests by

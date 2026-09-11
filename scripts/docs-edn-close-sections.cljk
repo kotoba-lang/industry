@@ -12,7 +12,7 @@
 ;; is present as a key on the repaired entity, so a file cannot be "fixed" into a
 ;; different shape. Anything it cannot prove, it leaves alone.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/docs-edn-close-sections.cljk [--write] <file>...
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/docs-edn-close-sections.cljk [--write] <file>...
 (ns docs-edn-close-sections
   (:require ["fs" :as fs]
             [clojure.edn :as edn]

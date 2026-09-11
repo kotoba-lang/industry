@@ -91,7 +91,7 @@ stale と同型の事故を worker 側で作り直すことになる。
 ### 5. `/models` を marketing ページとして持つ
 
 `src/cloud_murakumo/site/models.cljc` → `public/models/index.html`
-（`clojure -M:site`、DADS = jp-go-dds。この site は 2026-07-30 のオーナー判断で
+（`kbb -M:site`、DADS = jp-go-dds。この site は 2026-07-30 のオーナー判断で
 kotoba-ui でなく DADS）。**事実（モデル id・status・実測コスト・秒数・日付・
 既定）は SSoT から直接引き、英語の散文だけページが持つ。** spec の
 `:status-note` は graph をデバッグする人向けの日本語であって marketing copy では
@@ -104,7 +104,7 @@ spec と厳密一致しなければ落ちる）。
 
 ### 6. prep を通らない deploy 経路を無くす
 
-`npm run deploy` = `release`（prep 込み）→ `clojure -M:site` → `wrangler deploy`。
+`npm run deploy` = `release`（prep 込み）→ `kbb -M:site` → `wrangler deploy`。
 加えて `cloud-murakumo.generated-assets-test` が、ディスク上のコピーが既に
 ずれていれば deploy 前に落とす。生成物なので fresh clone に無いのは正常
 （落とさない）—— 危険なのは「存在して、かつ古い」状態だけ。
@@ -203,7 +203,7 @@ merge 済みの commit message は履歴書き換え禁止のため直せない 
 ```sh
 cd orgs/network-awai/cloud-murakumo
 grep -n \"seedance\" src/cloud_murakumo/engine.cljc src/cloud_murakumo/executor.clj src/cloud_murakumo/worker.cljc
-clojure -M:test -n cloud-murakumo.gen-test -n cloud-murakumo.dispatch-test
+kbb -M:test -n cloud-murakumo.gen-test -n cloud-murakumo.dispatch-test
 ```
 
 どのモデルを wire するか（特に $5〜$22 帯を入れるか）はオーナー判断待ち。

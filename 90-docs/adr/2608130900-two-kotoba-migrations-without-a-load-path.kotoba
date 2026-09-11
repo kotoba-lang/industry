@@ -138,7 +138,7 @@ container が 32 要素までしか持てない**という値の予算である�
 **11 の消費側は全て `deps.edn` で dsl-core を移行前の sha に pin していた**
 （`ac8554fe` または `9bedd2b9`、どちらも `9132f2b` の祖先）。同様に scheduler は
 async を `710e3424`（移行前）に pin している。したがって **JVM + git dep 経路では
-これらは今日も通っていた** —— `clojure -M:test` は GitHub から `.cljc` を持つ古い
+これらは今日も通っていた** —— `kbb -M:test` は GitHub から `.cljc` を持つ古い
 tree を取ってくるからである。
 
 破損していたのは (a) **ローカル checkout を classpath に載せる経路**（nbb /
@@ -206,8 +206,8 @@ supersede しない。
 | kotoba-lang/dsl-core | `08f14d07` | `7f6d44a1` |
 | kotoba-lang/async | `2b62d144` | `44848db4` |
 
-`nbb scripts/advance-pins.cljs kotoba-lang <list> --execute` で当該 entry のみ書き換え、
-`nbb scripts/verify-west-pins.cljs --only dsl-core` / `--only async` が両方とも
+`kbb --backend sci scripts/advance-pins.cljk kotoba-lang <list> --execute` で当該 entry のみ書き換え、
+`kbb --backend sci scripts/verify-west-pins.cljk --only dsl-core` / `--only async` が両方とも
 fast-forward として OK を返している。`manifest/west.yml` は手編集していない。
 
 ## 3 件目を止めるのは何か

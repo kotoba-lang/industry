@@ -138,7 +138,7 @@ west pin は 5 件とも main tip と一致。
 detector は 0 件なので、次はここではない。優先度 1 の未登録 checkout を見るなら:
 
 ```bash
-nbb scripts/west-orphan-audit.cljs --blocking
+kbb --backend sci scripts/west-orphan-audit.cljk --blocking
 ```
 
 同型の欠陥をこれから防ぐ側は landing 済み（`verify-silent-js-callbacks`、6 時間間隔）。

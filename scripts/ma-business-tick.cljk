@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/ma-business-tick.cljk — M&A マッチング事業の現在地を測る。observe-only。
 ;;
 ;; ## この tick が要る理由
@@ -30,7 +30,7 @@
 ;; **姉妹を書き換えたらここも書き換える。**
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljk
 ;;   nbb ... scripts/ma-business-tick.cljk --no-ledger    ; 測るが ledger に書かない
 ;;   COM_JUNKAWASAKI_ROOT=/tmp/fixture nbb ... scripts/ma-business-tick.cljk
 ;;

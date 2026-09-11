@@ -156,7 +156,7 @@ custom element 経由で React に bridge しても、design agent が吐くの�
 第 1 波を subagent（Sonnet）に投げて最初に着地したのが `gftdcojp/app-swe`。
 `appview/<name>/svelte/`（Vite + Svelte + TS 一式）を `appview/<name>/cljs/` に
 置き換え、**残存 `.svelte` / `.ts` / `.tsx` / `.jsx` は 0**（GitHub の tree API で
-独立に確認）。build も実測: `shadow-cljs compile app` が 111 ファイル・0 warning、
+独立に確認）。build も実測: `amu compile --target wasm32-browser app` が 111 ファイル・0 warning、
 `compile test` + `node out/tests.js` が 4 test / 8 assertion / 0 failure。
 
     appview/<name>/cljs/
@@ -364,7 +364,7 @@ marker 規則が 7 件すべてより後に書かれたため。**その 0 を�
 
 - **`wrangler deploy` / `wrangler dev` を一度も実行していない。** deploy 設定を
   直した commit には **UNVERIFIED** と書いてある。対象 host の多くは NXDOMAIN。
-- **ブラウザで開いていない。** 検証は `shadow-cljs compile app` / `compile test` /
+- **ブラウザで開いていない。** 検証は `amu compile --target wasm32-browser app` / `compile test` /
   `node out/tests.js` の 3 つで、**描画そのものは未確認**。
 - 移した `+server.ts` は**動かない**（SvelteKit を import している）。復活は
   未決の product 判断。

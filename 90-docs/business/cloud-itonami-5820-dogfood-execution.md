@@ -85,7 +85,7 @@ cd orgs/cloud-itonami/cloud-itonami-isic-5820
 export ISIC5820_API_TOKEN=$(openssl rand -hex 16)   # Generate a random token
 export ISIC5820_STORE_FILE=./cloud-itonami-deals.edn  # Persistent store
 
-clojure -M:serve   # Runs on port 8080 by default
+kbb -M:serve   # Runs on port 8080 by default
 # curl -s http://localhost:8080/health
 ```
 
@@ -378,7 +378,7 @@ Once a real free tenant agrees to paid subscription:
 
 **Before proceeding with Phase 1, owner must decide**:
 
-1. **Local dev or cloud-hosted?** (Local: `clojure -M:serve`. Cloud: Docker on Cloudflare Workers or VM)
+1. **Local dev or cloud-hosted?** (Local: `kbb -M:serve`. Cloud: Docker on Cloudflare Workers or VM)
 2. **Real model LLM or sealed mock?** (Sealed mock is sufficient for demo; real model requires `ISIC5820_MODEL_API_KEY`)
 3. **Who executes?** (Owner, product lead, or dedicated sales-ops person)
 4. **Timeline urgency**: 2-3 weeks is realistic; can accelerate to 1 week if focused sprint

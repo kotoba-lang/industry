@@ -1,6 +1,6 @@
 ;; repo-reality verify script — kotoba prototype (2026-07-15). See verify_aiueos.cljs header
 ;; for the overall method (executable claims + evidence linkage, output = ledger event lines).
-;; Run: nbb 90-docs/repo-reality/verify_kotoba.cljs >> 90-docs/repo-reality/repo-reality-ledger.edn
+;; Run: kbb --backend sci 90-docs/repo-reality/verify_kotoba.cljk >> 90-docs/repo-reality/repo-reality-ledger.edn
 
 (ns verify-kotoba
   (:require ["fs" :as fs]

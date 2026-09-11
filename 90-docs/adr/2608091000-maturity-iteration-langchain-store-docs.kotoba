@@ -33,7 +33,7 @@ skill の要求は「踏めない手順は書かない」なので、貼った�
 
 | 節 | 実測 |
 |---|---|
-| 取得とテスト | 新規 clone → `clojure -M:ci:test` = 13 tests / 40 assertions。documented な cljs コマンドも verbatim で同じ 13 件 |
+| 取得とテスト | 新規 clone → `kbb -M:ci:test` = 13 tests / 40 assertions。documented な cljs コマンドも verbatim で同じ 13 件 |
 | `:ci` の役割 | `:ci` 無しでも cljs は解決する（`:deps` が既に公開 URL を指す）。差し替えているのは **pin だけ** |
 | smoke | `append-blob!` は名前に反し **同じ seq を upsert する**（`{:kind :b}` が消えて `:b2` になる） |
 | **最大の失敗** | **`identity-schema` を忘れると、例外も警告も無く実体が 2 件でき、`blob-lookup` は古い方を返す**。schema 有りなら 1 件・新しい方。両方を実行して対比した |

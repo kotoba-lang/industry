@@ -82,7 +82,7 @@ continues the 81xx plant-and-machine-operator range
 resume of prior partial work.
 
 The `kotoba-lang/occupation` registry's live `{:id \"8155\" ...}` entry
-was verified against a fresh clone before any work began (`clojure -M
+was verified against a fresh clone before any work began (`kbb -M
 -e \"(require 'kotoba.occupation) (println (kotoba.occupation/get-
 occupation \\\"8155\\\"))\"` from a checkout with the `kotoba-lang/
 technology` sibling present at the correct `../technology` relative
@@ -119,7 +119,7 @@ The reference implementation mirrored closely for module SHAPE is
 (Metal Finishing, Plating and Coating Machine Operators -- a closely
 related chemical-processing industrial-machine safety pattern),
 independently re-cloned and read in full this session, and
-independently re-verified as green (fresh clone, `clojure -M:test`)
+independently re-verified as green (fresh clone, `kbb -M:test`)
 before being used as a template. `cloud-itonami-isco-7535` (Pelt
 Dressers, Tanners and Fellmongers -- the craft-occupation sibling of
 this same fur/leather domain, `tannerycoord.*`) was also cloned and
@@ -247,7 +247,7 @@ ever hard-trip the finalization-scope rule. Green on first run.
   `kotoba.occupation/maturity-summary` immediately before the edit,
   not assumed, to account for concurrent sibling landings in this same
   batch).
-- Full test suite (`clojure -M:test`): 34 tests, 73 assertions, 0
+- Full test suite (`kbb -M:test`): 34 tests, 73 assertions, 0
   failures, 0 errors -- raw output captured in this ADR's `:test/
   counts` and independently re-verified against a brand-new fresh
   clone of the pushed repository (not just the local working copy). No

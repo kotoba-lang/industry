@@ -12,7 +12,7 @@
 ;; is documented in the ADR rather than done here: this script never touches
 ;; the store.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/io-ipld-car/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/pack_reachable.cljs <out-dir>
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/io-ipld-car/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/pack_reachable.cljs <out-dir>
 
 (ns pack-reachable
   (:require [ipld.car :as car]

@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/verify-itonami-run-path.cljk — the run path the resident is
 ;; CONFIGURED to take, measured against the tree it would take it in.
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-itonami-run-path.cljk \
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-itonami-run-path.cljk \
 ;;     [--root <superproject checkout>] [--app <app checkout>] [--plist <path>]
 ;;     [--findings] [--self-test]
 ;;
@@ -22,7 +22,7 @@
 ;; ran on it look identical from the tree: in both cases the alias is gone. What
 ;; separates them is whether anything still answers, and that is a different
 ;; file — the launchd plist on the operator's workstation, which on that day
-;; still read `clojure -M:server`.
+;; still read `kbb -M:server`.
 ;;
 ;; Production did not notice, for one reason that is not a safeguard:
 ;; `~/.cloud-itonami/current` pointed at a release cut BEFORE #270, so the alias
@@ -35,7 +35,7 @@
 ;; There is more than one file that says how to start this app, and they name
 ;; different trees. The launchd plist names `~/.cloud-itonami/current`; the
 ;; superproject's `.mcp.json` names the west checkout under `orgs/`. Measured
-;; 2026-09-02, `.mcp.json` runs `clojure -M:mcp` -- the second alias #270
+;; 2026-09-02, `.mcp.json` runs `kbb -M:mcp` -- the second alias #270
 ;; deleted -- and it works today only because `west update` REFUSED to advance
 ;; that checkout past a dirty tree. The pin already points past it.
 ;;
@@ -131,7 +131,7 @@
 (defn classify-run-command
   "What the run command needs to exist, as data.
 
-  `:clojure-alias` — `clojure -M:server` needs `:server` in deps.edn's aliases.
+  `:clojure-alias` — `kbb -M:server` needs `:server` in deps.edn's aliases.
   `:node-script`   — `nbb … bin/x` needs the file.
   `:unknown`       — reported as such; a guess here would be a third leg that
                      silently passes."
@@ -223,7 +223,7 @@
                          " in " dir "; deps.edn declares it"))
             :else
             (broken leg :configured-launch-alias-absent
-                    (str source " runs `clojure -M:" (:alias spec) "` in " dir
+                    (str source " runs `kbb -M:" (:alias spec) "` in " dir
                          " and that deps.edn declares no such alias."
                          " The start command cannot resolve; under launchd"
                          " KeepAlive it restarts forever with the port closed,"
@@ -416,7 +416,7 @@
         p-bad (plist! (path/join tmp "bad.plist") bad
                       "/opt/homebrew/bin/clojure -M:server")
         p-nbb (plist! (path/join tmp "nbb.plist") good
-                      "nbb --classpath bin bin/host")
+                      "kbb --backend sci --classpath bin bin/host")
         p-odd (plist! (path/join tmp "odd.plist") good "/usr/bin/true")
         ;; a superproject-shaped root whose .mcp.json names the BAD tree, so the
         ;; two entry points disagree the way this machine's did on 2026-09-02
@@ -427,7 +427,7 @@
                              {"cloud-itonami-app"
                               {"command" "/bin/sh"
                                "args" ["-c" (str "cd \"" bad
-                                                "\" && exec clojure -M:mcp")]}
+                                                "\" && exec kbb -M:mcp")]}
                               "unrelated"
                               {"command" "nbb" "args" ["something/else.cljs"]}}})))
         one (fn [dir plist] (into {} (map (juxt :leg identity))

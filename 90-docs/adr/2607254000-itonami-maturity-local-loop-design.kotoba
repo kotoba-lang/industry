@@ -53,7 +53,7 @@ run 4: **2件検出**（着地した3件が消えたことで実効を確認）/
 ## 実行して初めて分かった設計欠陥3件
 
 1. **pin 書き込みが pin 退行を起こしかけた（最重要）**: tick が `gen-west-manifest.cljs --entry` を共有 checkout 上で実行していたが、superproject の local main は origin より遅れている（owner の未 push commit を抱える）。そのため isic-1020 の pin が 8299d812 → **012e3f15 へ巻き戻る** diff が生成された。tick からは west.yml を書かせず、GitHub API で到達性検証のみ行う `verify-pin!` に変更。west.yml の commit は origin/main ベースで tick の外に置く。
-2. **「赤い」と「ハーネスが無い」の混同**: `:dev` alias が無いリポは `clojure -M:dev:test` が REPL に落ちるだけで、テスト失敗ではない。3値（:green / :red / :no-harness）に分離。
+2. **「赤い」と「ハーネスが無い」の混同**: `:dev` alias が無いリポは `kbb -M:dev:test` が REPL に落ちるだけで、テスト失敗ではない。3値（:green / :red / :no-harness）に分離。
 3. `and` の戻り値を `boolean` で包んでいなかった（run 1 の原因）。
 
 ## Tier 境界が実測で load-bearing だったこと

@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/orgs-detector-tick.cljk — a home for the detectors that cannot be
 ;; fleet gates.
 ;;
@@ -96,7 +96,7 @@
 ;;
 ;; ## Usage
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/orgs-detector-tick.cljk
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/orgs-detector-tick.cljk
 ;;   ... --only verify-vendored-copies     ; one detector
 ;;   ... --force                           ; ignore :interval-ms
 ;;   ... --root /path/to/checkout/with/orgs

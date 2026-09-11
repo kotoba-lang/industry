@@ -88,9 +88,9 @@ push し直す、または別名の branch を使う。
 
 ## 検証
 
-- 実行: `nbb scripts/cleanup-land.cljs`（dry-run 2回・apply 3回）、
-  `nbb scripts/west-orphan-audit.cljs --blocking`（5回）、
-  `nbb scripts/gen-west-manifest.cljs --entry kaname`（pin 検証 OK）
+- 実行: `kbb --backend sci scripts/cleanup-land.cljk`（dry-run 2回・apply 3回）、
+  `kbb --backend sci scripts/west-orphan-audit.cljk --blocking`（5回）、
+  `kbb --backend sci scripts/gen-west-manifest.cljk --entry kaname`（pin 検証 OK）
 - before/after 実測: `animeka` `(no-remote)` → `(cloud-itonami/animeka)` + 「着地対象なし」、
   `slides` `(no-remote)` → `(kotoba-lang/slides)` + additive 4 / review 7 を新規検出
 - **単体テストは追加していない**。`cleanup-land.cljs` に既存のテストハーネスが無く、
@@ -131,11 +131,11 @@ push し直す、または別名の branch を使う。
    3. **未処理**: manimani（優先度外、`local-manimani` additive 11 + review 6。
       最後の blocking `:local/root` もこれ）、itonami 外の branch backlog 134 repo。
    4. **tooling gap**: cleanup-land に自動テストが無い。
-      `nbb scripts/cleanup-land.cljs --names <repo>` の dry-run 比較しか検証手段がない。
+      `kbb --backend sci scripts/cleanup-land.cljk --names <repo>` の dry-run 比較しか検証手段がない。
    5. **次の具体コマンド**:
-      `nbb scripts/cleanup-land.cljs --unlanded` 相当の再 survey は
-      `nbb scripts/cleanup.cljs --unlanded`、blocking 確認は
-      `nbb scripts/west-orphan-audit.cljs --blocking`。")
+      `kbb --backend sci scripts/cleanup-land.cljk --unlanded` 相当の再 survey は
+      `kbb --backend sci scripts/cleanup.cljk --unlanded`、blocking 確認は
+      `kbb --backend sci scripts/west-orphan-audit.cljk --blocking`。")
 
   (:adr/preserved-owner-wip
   "破棄したものは無い。archive は `.git/stash-archive-20260730/`（superproject）と

@@ -91,7 +91,7 @@
   "却下: (a) **B70 を2枚積む Duo SKU** — TP=4 の実測が single-user 16.3 tok/s、P2P が bus error、GPU 電力 420-632W。高くて遅くて壊れやすい。台数(MK-4 Ring)で売る方が全面的に優れる。(b) **Strix Halo(Ryzen AI MAX+ 395)ベースの箱** — 却下していない。むしろ decode の tokens/watt では現時点で圧勝(64W で 70.09 tok/s)。B70 を選ぶ理由は 608 GB/s(Strix Halo の約2.4倍)と 367 TOPS INT8 による prefill/vision/batch の天井の高さ、および 32GB 専用 VRAM が $1,126 で買えること。**decision 4 の gate が落ちたら Strix Halo に切り替えるのが正しい撤退先。** (c) **NUC 級の真の mini PC** — B70 が 267mm dual-slot なので物理的に不可能。低profile 版が出れば再評価。(d) **DDR4 プラットフォームで RAM を安くする** — DDR4 の方が更に高い(256GB kit が $3,000 超)。(e) **PSE 認証を取る** — パソコン本体は対象外なので不要。取ると $3,000-18,000 の無駄。(f) **itonami.cljc の credits 建て(1 token = 1cr、$1 = 100cr)で回収を計算する** — その建値は $10,000/Mtok に相当し市場価格(~$0.5-3/Mtok)と4桁乖離している。既存モデル内の不整合として別途起票すべきで、回収根拠には使わない。代わりに cost.cljc の ¥/Mtok gate を使った。")
 
   (:adr/verification
-  "計算器: scripts/mk1-costmodel.cljs(nbb、ADR-2607173000 準拠)。`nbb scripts/mk1-costmodel.cljs` で BOM / COGS / price ladder / 固定費 / 損益分岐 / cost gate / 回収年数 / 全SKU を再現。全入力行に :src を付け、出典のある観測値と assumption を区別している。
+  "計算器: scripts/mk1-costmodel.cljs(nbb、ADR-2607173000 準拠)。`kbb --backend sci scripts/mk1-costmodel.cljk` で BOM / COGS / price ladder / 固定費 / 損益分岐 / cost gate / 回収年数 / 全SKU を再現。全入力行に :src を付け、出典のある観測値と assumption を区別している。
 
    一次資料で確認した値(2026-07-26): B70 spec/価格/寸法/電源コネクタ(igorslab / videocardz / StorageReview / Micro Center / ASRock)、多GPU実測(Puget Systems)、DDR5/NAND 価格(dropreference / wccftech / Tom's Hardware / Newegg)、USD/JPY 163.8(Fed H.10 / tradingeconomics)、JP 電力 ¥31/kWh、VCCI 会費(vcci.jp 公式)、PSE 対象外(経産省 PSE 概要 / EIL / otomap)。
 

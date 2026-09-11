@@ -32,7 +32,7 @@ tick log から exit 90（到達不能）の行を除いて node 別に数える
 推測ではなく実測: `command -v clojure` は dan / issachar / naphtali で
 MISSING、他で present。`nodes.edn` の `:caps` も独立に同じ 3 ノードだけ
 `#{:node}`（`:jvm` 無し）としている。この gate の再生成コマンドは
-`clojure -M:dev:render-html` なので、その 3 台では走りようがない
+`kbb -M:dev:render-html` なので、その 3 台では走りようがない
 （`bash: line 4: clojure: command not found`）。
 
 ## これは 3 度目である

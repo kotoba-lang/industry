@@ -44,7 +44,7 @@ ships `.cljc` — which matters, because ClojureScript prefers `.cljs` over
 
 ## The winner is not fixed — it flips by consumer
 
-Measured with real `clojure -Spath` in `webgpu`: **extracted wins**. In isekai's
+Measured with real `kbb -Spath` in `webgpu`: **extracted wins**. In isekai's
 dependency shape: **SDK wins**, because isekai declares the SDK as a direct
 top-level `:local/root` (under both coordinate names), which sorts ahead of
 `webgpu`'s transitive gitlibs.
@@ -166,7 +166,7 @@ makes isekai's workaround permanent.
 
 ## What could not be determined
 
-- **isekai's real classpath.** `clojure -Spath` fails there: a `:local/root` for
+- **isekai's real classpath.** `kbb -Spath` fails there: a `:local/root` for
   `org-threejs` is not checked out. The isekai orderings above are from a
   reproduced dependency shape, high-confidence but **not measured on the real
   graph**. The `webgpu` orderings are real.

@@ -11,7 +11,7 @@
 
    Run from the superproject root (classpath: this dir + the four sibling
    .cljc libraries cacao.core needs — see README.md for the one-liner):
-     nbb --classpath <cp> scripts/hermes-bots-aozora/register.cljk [job-name ...]
+     kbb --backend sci --classpath <cp> scripts/hermes-bots-aozora/register.cljk [job-name ...]
    (no args = every job in ~/.hermes/cron/jobs.json, minus HERMES_AOZORA_OPT_OUT)
 
    Exit: see aozora-core — upstream rejection prints BLOCKED and

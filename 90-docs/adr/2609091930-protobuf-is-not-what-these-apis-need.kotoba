@@ -35,7 +35,7 @@ realistic な payload で JSON と protobuf を比べた。**live host は
 - **非圧縮 protobuf は json+gzip より大きい**（会話で 3.7 倍）。「binary だから
   小さい」は、transport が既に圧縮している面では成り立たない。
 
-再現: `nbb --classpath orgs/kotoba-lang/dev-protobuf/src:<text> <script>`。
+再現: `kbb --backend sci --classpath orgs/kotoba-lang/dev-protobuf/src:<text> <script>`。
 数値ではなく手順を残す —— 日付付きで書いた値は日付を落として引用される。
 
 ## サイズ以外の理由も、この 3 面では立たない

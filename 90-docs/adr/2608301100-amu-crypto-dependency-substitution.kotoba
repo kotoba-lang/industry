@@ -25,10 +25,10 @@
      "Future: org-ietf-blake2 kotoba oracles for remaining @noble/hashes subpaths; wasm crypto capability kit remains separate work."))
 
     (:verification
-    (vector "nbb scripts/verify-dependency-substitution.cljs --self-test"
-     "nbb scripts/dependency-substitution-wave-tick.cljs --limit 4"
-     "clojure -M:test in org-ietf-chacha20-poly1305 (parity test)"
-     "clojure -M:test in org-nist-sha2 hash.subpath-dispatch-kotoba-parity-test"
+    (vector "kbb --backend sci scripts/verify-dependency-substitution.cljk --self-test"
+     "kbb --backend sci scripts/dependency-substitution-wave-tick.cljk --limit 4"
+     "kbb -M:test in org-ietf-chacha20-poly1305 (parity test)"
+     "kbb -M:test in org-nist-sha2 hash.subpath-dispatch-kotoba-parity-test"
      "npm test in noise with reference provider on classpath"))
 
     (:landed-2026-08-30

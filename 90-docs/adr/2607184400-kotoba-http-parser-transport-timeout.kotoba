@@ -33,7 +33,7 @@
    (:production-qualified false)
    (:executable-evidence
    (vector (map (:cwd "orgs/kotoba-lang/kototama")
-     (:command "clojure -M:test")
+     (:command "kbb -M:test")
      (:result "108 tests, 353 assertions, 0 failures; status/header parser, malformed header rejection, and slow-peer timeout"))))))
   (:adr/body
   "# ADR-2607184400: Bounded Kotoba HTTP response parsing and native read timeout

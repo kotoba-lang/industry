@@ -10,7 +10,7 @@
 ;; error and not an empty set: the key-referenced graph returns the asserted
 ;; class and stops. One row back is what makes it look like an answer.
 ;;
-;;   nbb --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/ayatori/src:orgs/kotoba-lang/kotobase/src:orgs/kotoba-lang/arrangement/src:orgs/kotoba-lang/prolly-tree/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/selftest_reference_join.cljs
+;;   kbb --backend sci --classpath "orgs/kotoba-lang/org-w3-owl2/src:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src:orgs/kotoba-lang/ayatori/src:orgs/kotoba-lang/kotobase/src:orgs/kotoba-lang/arrangement/src:orgs/kotoba-lang/prolly-tree/src:orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/org-ietf-cbor/src:orgs/kotoba-lang/io-multiformats/src:orgs/kotoba-lang/org-nist-sha2/src:orgs/kotoba-lang/text/src" 90-docs/query-plane/selftest_reference_join.cljs
 ;;
 ;; Exit 0 when the two shapes are separated, 1 when they are not. `main`
 ;; returns a COUNT of failing checks rather than a boolean, so one regression

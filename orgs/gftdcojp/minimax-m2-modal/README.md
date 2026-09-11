@@ -8,11 +8,11 @@ under `src/minimax_m2_modal`.
 Common commands:
 
 ```sh
-clj -M:kotoba models
-clj -M:kotoba vllm minimax-m27
-LLM_URL=https://example.modal.run LLM_MODEL=MiniMaxAI/MiniMax-M2.7 LLM_KEY=... clj -M:client chat
-LLM_URL=https://example.modal.run LLM_MODEL=MiniMaxAI/MiniMax-M2.7 LLM_KEY=... clj -M:bench
-clj -M:test
+kbb -M:kotoba models
+kbb -M:kotoba vllm minimax-m27
+LLM_URL=https://example.modal.run LLM_MODEL=MiniMaxAI/MiniMax-M2.7 LLM_KEY=... kbb -M:client chat
+LLM_URL=https://example.modal.run LLM_MODEL=MiniMaxAI/MiniMax-M2.7 LLM_KEY=... kbb -M:bench
+kbb -M:test
 ```
 
 `client-main.clj` and `bench-main.clj` are the CLJ host adapters: only

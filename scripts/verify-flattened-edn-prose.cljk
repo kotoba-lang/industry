@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-flattened-edn-prose.cljs — EDN 文字列に入った散文が「行構造を失った」
 ;; ことの検出。
 ;;
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-flattened-edn-prose.cljk [--findings] [<root>...]
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/verify-flattened-edn-prose.cljk [--findings] [<root>...]
 ;;
 ;; ## なぜ要るか —— 実測 2026-09-01
 ;;

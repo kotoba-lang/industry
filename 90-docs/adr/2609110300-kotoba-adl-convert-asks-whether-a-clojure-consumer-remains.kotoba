@@ -19,7 +19,7 @@ repository classifies in seconds. The bottleneck was the SUCCESS RATE:
 `kotoba adl convert` converted nothing at all.
 
     for each of eight real target repositories:
-      cd <repo> && nbb --classpath <kotoba>/src <kotoba>/bin/kotoba_adl.cljs \\
+      cd <repo> && kbb --backend sci --classpath <kotoba>/src <kotoba>/bin/kotoba_adl.cljs \\
         convert <repo>/src
 
     SCANNED 56    WOULD-CONVERT 0    REFUSED 56 compiled-by-build-config

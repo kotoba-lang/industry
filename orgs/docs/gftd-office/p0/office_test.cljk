@@ -1,6 +1,6 @@
 (ns office-test
   "P0 round-trip tests: document / org(+DID) / grant <-> datoms, plus an access-DAG check.
-   Run:  nbb scripts/run-task.cljs test   (see scripts/tasks.edn; bb was retired by
+   Run:  kbb --backend sci scripts/run-task.cljk test   (see scripts/tasks.edn; kbb -M:was retired by
          ADR-2607173000 and this file's bb.edn went with it in ADR-2608135000)"
   (:require [office :as o]
             [clojure.test :refer [deftest is run-tests]]))

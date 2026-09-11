@@ -291,13 +291,13 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 
 | | 結果 |
 |---|---|
-| inga JVM `clojure -M:test` | 271 tests / 1275 assertions、0 failures |
+| inga JVM `kbb -M:test` | 271 tests / 1275 assertions、0 failures |
 | inga cljs `npm run test:cljs`（shadow-cljs） | 276 tests / 1525 assertions、0 failures |
-| inga `clojure -M:parity` vs nbb | digest 一致 |
-| inga `clojure -M:lint` | 0 errors / 8 warnings（8 件は engi から移動してきたコード由来） |
+| inga `kbb -M:parity` vs nbb | digest 一致 |
+| inga `kbb -M:lint` | 0 errors / 8 warnings（8 件は engi から移動してきたコード由来） |
 | `script/network.cljs`（default / `BYZANTINE_SPLIT=1`） | pass |
 | `script/torihiki-on-inga.cljs` | pass（実 WebSocket 4 replica、実鍵、全 replica 同一 root、他人の account を騙る注文は拒否） |
-| engi `clojure -M:test` | 26 tests / 93 assertions、0 failures |
+| engi `kbb -M:test` | 26 tests / 93 assertions、0 failures |
 
 **完了**: 抽出（決定 1）/ F1（`inga.state`、単体と**合意経由**の両方）/ F2（`inga.fuel` + `kotoba/fuel.kotoba` の計量算術と 120 ケース conformance）/ F3（`inga.power` + `inga.retrieval`）/ 決定 6 の**機構**（`inga.ref`、conformance suite を oracle と本物の合意の両方で通過）/ cljs 検証 / 証拠伝播 / quorum profile 宣言。
 
@@ -314,8 +314,8 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 
 ```bash
 cd orgs/kotoba-lang/inga
-clojure -M:test && npm run test:cljs        # 271/1275 と 276/1525、0 failures を期待
-nbb --classpath src:../bytes/src script/network.cljs   # pass または INCONCLUSIVE
+kbb -M:test && npm run test:cljs        # 271/1275 と 276/1525、0 failures を期待
+kbb --backend sci --classpath src:../bytes/src script/network.cljs   # pass または INCONCLUSIVE
 ```
 
 `INCONCLUSIVE` は失敗ではない —— equivocator が `min-twins-to-judge` 未満しか投票しなかった run で、catch assertion を判定しないという意味である（詳細は同 script の docstring）。

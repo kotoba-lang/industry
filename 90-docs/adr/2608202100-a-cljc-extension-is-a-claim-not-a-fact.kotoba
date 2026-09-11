@@ -111,13 +111,13 @@ artifact は JVM 無しでは検証できない** —— これは「第三者�
 
 **② 共有 checkout を読むと機械語について誤った答えが出る。** `emit-program` が
 JVM で 48 バイト・nbb で 100 バイトという「backend 乖離」を測ったが、乖離ではなく
-**2 つの別のソース**だった。`clojure -Spath` は `kotoba-native` を pin された git
+**2 つの別のソース**だった。`kbb -Spath` は `kotoba-native` を pin された git
 dep（`~/.gitlibs`）から解決し、手で組んだ nbb classpath は working checkout
 `orgs/kotoba-lang/kotoba-native` を指していた。後者は **main から 122 commit 遅れ**で、
 他セッションの dirty WIP を 6 ファイル抱えている。同一ソースなら両 runtime は
 **バイト一致**する。ADR-2608135200 と同じクラス。
 **nbb の classpath は JVM のそれから導出する** ——
-`nbb --classpath \"src:test:$(clojure -Spath -M:test)\"`。
+`kbb --backend sci --classpath \"src:test:$(kbb -Spath -M:test)\"`。
 
 ### 再開時にまず打つコマンド
 

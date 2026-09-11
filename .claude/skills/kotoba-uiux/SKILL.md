@@ -83,7 +83,7 @@ migration had deleted, unstyled, for three days.
 **Check it — this is no longer prose only.** From the superproject root:
 
 ```bash
-nbb scripts/verify-single-page-app.cljk --root . --findings
+kbb --backend sci scripts/verify-single-page-app.cljk --root . --findings
 ```
 
 exit 0 clean · 1 findings · **2 refused** (it could not tell a registered checkout
@@ -184,7 +184,7 @@ After building or changing a page, score the rendered HTML with the deterministi
 HIG/WCAG audit (`kotoba-lang/design-quality`, ADR-2607132300):
 
 ```bash
-cd orgs/kotoba-lang/design-quality && nbb -m design-quality.cli score /path/to/rendered.html --min 95
+cd orgs/kotoba-lang/design-quality && kbb --backend sci -m design-quality.cli score /path/to/rendered.html --min 95
 ```
 
 Exit 1 below `--min` — wire it as a CI gate like kotoba-ui's self-scoring test.
@@ -249,7 +249,7 @@ CLAUDE.md 側には skill を読まなくても効く不変条件だけが残っ
   app が `:app-css` で `tokens/bridge-css` を渡す）ので、そこでは**何にも解決しない**。
   カテゴリ色にこの 6 つを使っている view は移行前に確認する。
   確認コマンド（`grep` は行内 1 件しか数えないので使わない）:
-  `clojure -M -e "(require '[jp-go-dds.tokens :as t]) (println (count t/hig->dads))"`。
+  `kbb -M -e "(require '[jp-go-dds.tokens :as t]) (println (count t/hig->dads))"`。
 - **DADS は light。** `page` の `:dark? true` はこのライブラリ独自の反転層（上流には
   dark palette が無い）。暗い環境で色を見る editor 向けで、kami-app-daw / -nle が使う。
 - **DADS に無いもの**: app-shell / editor frame、segmented control、trailing slot 付き
@@ -299,7 +299,7 @@ kotoba-lang の web / local app UI は **1 文書・1 バンドル・1 mount** �
 - **これは prose だけの規則ではなくなった。** superproject root で:
 
   ```bash
-  nbb scripts/verify-single-page-app.cljk --root . --findings   # 0=clean 1=findings 2=REFUSED
+  kbb --backend sci scripts/verify-single-page-app.cljk --root . --findings   # 0=clean 1=findings 2=REFUSED
   ```
 
   `multi-document`（script を読む document が 2 枚以上）と `no-document`
@@ -393,7 +393,7 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   design-quality-score.js` に保存済み、lib score 層のみ再実行し ledger に追記する。
   sample-visual 層は現状ワークフロー化されておらず手動パス — 3-judge visual panel
   化は follow-up、ADR-2607132300 Alternatives 参照）。
-- **サンプルページの再生成**: `nbb --classpath "orgs/kotoba-lang/shitsuke/src:
+- **サンプルページの再生成**: `kbb --backend sci --classpath "orgs/kotoba-lang/shitsuke/src:
   orgs/kotoba-lang/css/src:orgs/kotoba-lang/liquid-glass-ui/src:orgs/kotoba-lang/
   kotoba-ui/src:orgs/kotoba-lang/uikit/src:orgs/kotoba-lang/appkit/src"
   90-docs/design-quality/samples/generate-samples.cljk`（`kototama/web/generate.cljs`
@@ -406,7 +406,7 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   `set URL of active tab of front window` / `target_app` screenshot の
   app-scripting 経路のみで完結させる。
 - **repo-wide resource governor（mandatory）**: `orgs/` / `projects/` を含むworkspace全体で
-  高負荷buildは同時1本に制限する。`shadow-cljs release` / `vite build` / `next build` /
+  高負荷buildは同時1本に制限する。`amu compile --target wasm32-browser` / `vite build` / `next build` /
   `cargo build` / `wash build` 等を直接起動せず、必ず
   `node /Users/junkawasaki/github/com-junkawasaki/scripts/resource-guard.mjs run build -- <command>`
   を使う。deployはscope `deploy`を使う。lockはPID・cwd・開始時刻を保持し、live ownerが

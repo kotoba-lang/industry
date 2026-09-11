@@ -30,7 +30,7 @@
 ;; Not a fleet gate: it reads every west project under orgs/, and a gate ships
 ;; one repository's tree.
 ;;
-;; Usage: nbb verify-source-has-a-project.cljs [--findings] <orgs-dir>
+;; Usage: kbb --backend sci verify-source-has-a-project.cljk [--findings] <orgs-dir>
 (require '[clojure.string :as s])
 
 (def fs (js/require "node:fs"))
@@ -128,7 +128,7 @@
 
             ;; A repository whose runner states its own classpath is not an
             ;; oversight, it is a pattern: run_tests.cljs is invoked as
-            ;; `nbb --classpath src:test run_tests.cljs`, so the classpath is
+            ;; `kbb --backend sci --classpath src:test run_tests.cljs`, so the classpath is
             ;; declared at the INVOCATION SITE and the repository has nowhere
             ;; for a dependency because it was never meant to have one. Nine of
             ;; the 43 are this. Saying only "no project file" invites the wrong

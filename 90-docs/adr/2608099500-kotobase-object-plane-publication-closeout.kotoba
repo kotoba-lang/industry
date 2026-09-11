@@ -69,7 +69,7 @@ review で blocker が見つかった場合は本 PR を merge せず修正す�
    (:targeted_edn_parse "pass")
    (:diff_check "pass")
    (:full_docs_gate
-   (map (:command "nbb --classpath .:scripts/nbb_compat manifest/docs-edn-only.cljs verify")
+   (map (:command "kbb --backend sci --classpath .:scripts/nbb_compat manifest/docs-edn-only.cljs verify")
     (:status "fail-pre-existing-baseline")
     (:summary "今回ADRを含む EDN 2023件は parse-errors=0。非zeroの理由は既存 known-md-files baseline が削除済み .md を保持、既存 path-md-refs 11件、既存 non-tx EDN 7件")
     (:change_attribution "none of the reported paths is this PR's new ADR; targeted parse and diff check pass")))

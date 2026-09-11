@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; rad-seed-mirror.cljs — 常時稼働の seed に repo を複製（seed + fetch）して可用性を確保する。
 ;;
 ;; 背景（ADR-2607259000 / ledger seq 91-99）: 3,622 repo は端末 A（25mbair、alias
@@ -8,7 +8,7 @@
 ;; 常時稼働 seed（gad）に複製を置く。RID は変わらず、二重登録も起こらない。
 ;;
 ;; 使い方:
-;;   nbb scripts/rad-seed-mirror.cljk --host gad --as-user gad \
+;;   kbb --backend sci scripts/rad-seed-mirror.cljk --host gad --as-user gad \
 ;;     --peer z6MkpPKisDoVCDsunNZTtX1eEErH8tcdeNpXrVVfDRkhsWEk@100.86.235.122:8776 \
 ;;     --limit 20                        # パイロット
 ;;   （--limit なしで manifest の全 RID。--rids a,b で個別指定。--dry-run で下見）

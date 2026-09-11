@@ -72,7 +72,7 @@
 
 **kaisya に入ったもの**: `kaisya.contract`（形と欠落の報告、要対応の並び順）/ `kaisya.console`（kotoba-ui SSR ポータル）/ `kaisya.bpmn`（BPMN → EDN 生成器）/ `kaisya.demo`（3事件のサンプル会社）/ `kaisya.render-console`。deps は kotoba-ui スタックのみ（`lawfirm` は `:test` のみ）。
 
-**検証（2026-08-01 closing 時点の最終実測、着地した pin と同一ツリーで測定）**: lawfirm `clojure -M:test` **153 tests / 612 assertions** green（着手時 81/377 から）、`clojure -M:lint` warnings 0、コンソールは design-quality の決定論的 HIG/WCAG 監査 **100.00** を維持。kaisya `clojure -M:test` **25 tests / 56 assertions** green、lint warnings 0、ポータルも **100.00**、BPMN 抽出は 3 プロセス / 58 ステップ。cloud-itonami-app `clojure -M:test` **872 tests / 3838 assertions** green（着手時 847/3770 から）、`clojure -M:lint` errors 0（warnings 9 は全て自分が触っていないファイルの既存分：account_link_sync / agent_control / mail_sync / mailbox_http_test）。
+**検証（2026-08-01 closing 時点の最終実測、着地した pin と同一ツリーで測定）**: lawfirm `kbb -M:test` **153 tests / 612 assertions** green（着手時 81/377 から）、`kbb -M:lint` warnings 0、コンソールは design-quality の決定論的 HIG/WCAG 監査 **100.00** を維持。kaisya `kbb -M:test` **25 tests / 56 assertions** green、lint warnings 0、ポータルも **100.00**、BPMN 抽出は 3 プロセス / 58 ステップ。cloud-itonami-app `kbb -M:test` **872 tests / 3838 assertions** green（着手時 847/3770 から）、`kbb -M:lint` errors 0（warnings 9 は全て自分が触っていないファイルの既存分：account_link_sync / agent_control / mail_sync / mailbox_http_test）。
 
 **着地の証跡**: 6 件の server-side merge すべてについて、テストしたブランチ先端の tree SHA と merge commit の tree SHA が一致することを確認済み（`behind_by: 0` でマージしたため merge が何も変えていない）——**テストしたツリーがそのまま main に載っている**。lawfirm `77beef5→eb81688` / `d0f4d00→4e3bc79` / `0028cc7→8889aa0`、kaisya `decf6a5→6db72ea`、app `8b6ea2b→66b3ead` / `cb0be36→eecdfdd`。
 

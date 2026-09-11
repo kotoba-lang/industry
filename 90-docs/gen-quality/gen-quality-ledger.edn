@@ -1,6 +1,6 @@
 ;; gen-quality-ledger.edn — append-only per-model video-output score events (one EDN map per line), DataScript/Datomic-transactable.
 ;; References :model/id / :axis/id declared in the sibling base file gen-quality.datoms.edn — load both when querying.
-;; Do NOT hand-edit existing lines; only append new lines from future score runs (nbb 90-docs/gen-quality/score-video.cljs ...).
+;; Do NOT hand-edit existing lines; only append new lines from future score runs (kbb --backend sci 90-docs/gen-quality/score-video.cljk ...).
 ;; :eval/layer :metric = deterministic ffprobe/ffmpeg. A :judge (3-panel visual) layer is a follow-up (ADR-2607180000 Alternatives).
 #:eval{:score 0.01, :judge "ffprobe+ffmpeg-signalstats", :run-id "gq-20260717-baseline", :at "2026-07-17T04:14:06.337Z", :file "orgs/gftdcojp/dougaka-actor/.dougaka/videos/amaoto-no-arcade/amaoto-no-arcade.mp4", :note "w=720 h=1280 fps=30 frames=1800 dur=60 vbitrate=10512 audio=true mean_ydif=0", :axis :axis/bitrate-density, :model :ffmpeg-keyframe-v0, :layer :metric}
 #:eval{:score 1, :judge "ffprobe+ffmpeg-signalstats", :run-id "gq-20260717-baseline", :at "2026-07-17T04:14:06.337Z", :file "orgs/gftdcojp/dougaka-actor/.dougaka/videos/amaoto-no-arcade/amaoto-no-arcade.mp4", :note "w=720 h=1280 fps=30 frames=1800 dur=60 vbitrate=10512 audio=true mean_ydif=0", :axis :axis/duration-fidelity, :model :ffmpeg-keyframe-v0, :layer :metric}

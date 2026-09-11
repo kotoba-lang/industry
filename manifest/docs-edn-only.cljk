@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; manifest/docs-edn-only.cljk — 90-docs を EDN-only + DataScript/datom query 可能にする移行。
 ;;
 ;; 正本方針（このスクリプトが強制する）:
@@ -11,12 +11,12 @@
 ;; 依存: manifest/edn-datomize.cljk と同じ nbb_compat classpath
 ;;
 ;; 使い方:
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk migrate
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk migrate
 ;;       — md→edn 変換 + 既存 edn に body 注入 + bare map を tx-data 化 + md 削除
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk migrate --dry-run
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk datomize-adr
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk migrate --dry-run
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk datomize-adr
 ;;       — 90-docs/adr の bare-map / frontmatter 形だけ tx-data 化（md は触らない）
-;;   nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk status
+;;   kbb --backend sci --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljk status
 ;;
 ;; 冪等: 既に tx-data で :adr/body がある edn はスキップ。md が無い場合は no-op。
 
@@ -994,7 +994,7 @@
                 :adr/problem
                 "docs/ADR が .md と .edn の二重管理になり、DataScript で横断 query できない。md-only 86 件、対になる md が本文を抱え edn に無いケース、bare map 未 tx-data が残っていた。"
                 :adr/decision
-                "90-docs（特に adr）の正本は EDN のみ。各 ADR は (d/transact conn (edn/read-string (slurp f))) 可能な [{:db/id -1 :adr/* ...}] 1 entity。入れ子は pr-str blob。query は nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljk。新規 ADR は .md を書かない。BMC 等の生成 md も EDN 投影へ寄せ、手編集 md を置かない。"
+                "90-docs（特に adr）の正本は EDN のみ。各 ADR は (d/transact conn (edn/read-string (slurp f))) 可能な [{:db/id -1 :adr/* ...}] 1 entity。入れ子は pr-str blob。query は kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljk。新規 ADR は .md を書かない。BMC 等の生成 md も EDN 投影へ寄せ、手編集 md を置かない。"
                 :adr/consequences
                 ["agent/人間は ADR を .edn で読み書きする"
                  "横断検索は datalog（edn-query.cljs q）"
@@ -1007,7 +1007,7 @@
                      "- Source of truth for `90-docs/adr` is `*.edn` tx-data only. No `*.md`.\n"
                      "- Each ADR file: `[{:db/id -1 :adr/id ... :adr/title ... :adr/status ... :adr/body ...}]`.\n"
                      "- Nested maps/vectors are stored as `pr-str` string blobs (same as edn-datomize).\n"
-                     "- Query: `nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljk count|q`.\n"
+                     "- Query: `kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljk count|q`.\n"
                      "- Schema attrs auto-merged into `manifest/schema.edn`.\n"
                      "- Migration tool: `manifest/docs-edn-only.cljk migrate`.\n"
                      "- Multi-entity catalogs (`*.datoms.edn`) remain multi-entity vectors; not single ADR docs.\n")}]
@@ -1030,7 +1030,7 @@
           (migrate-rest-of-90-docs! dry-run?)
           (status!)
           (when-not dry-run? (verify!)))
-      (do (println "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/docs-edn-only.cljk [status|verify|migrate|datomize-adr|policy] [--dry-run]")
+      (do (println "usage: kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/docs-edn-only.cljk [status|verify|migrate|datomize-adr|policy] [--dry-run]")
           (nc/exit 1)))))
 
 (apply -main *command-line-args*)

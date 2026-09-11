@@ -102,7 +102,7 @@ B4 週次で gate を読む → 次の 1 手を proposal → 人が選ぶ
 1. **actuation は誰も bot から実行しない。** 7310 の `actuation-ops`
    (`:actuation/place-campaign` / `:actuation/order-creator-tieup`) は phase 構造が
    auto から除外しており、B2 が触れるのは intake/verify/screen の準備まで。
-   実支出は `clojure -M:buy --live --spend` の owner 実行のみ (ads-operations skill)。
+   実支出は `kbb -M:buy --live --spend` の owner 実行のみ (ads-operations skill)。
 2. **承認鍵の分離。** B1 は ingress key (`202 proposed`) を持つが approve 鍵を
    持たない (loop-noren と同じ)。Business Bot の wallet は launch 署名専用で
    実行権限を持たない (実測どおり `execution_authority: false`)。

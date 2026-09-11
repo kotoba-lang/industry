@@ -20,7 +20,7 @@ surfaces, measured by real requests against what each surface promises.
  :qa/severity :degraded|:broken
  :qa/observed "<values quoted VERBATIM from the evidence output>"
  :qa/promise "<the promise, from manifest/endpoint-health.edn :note>"
- :qa/repro "cd /Users/junkawasaki/github/com-junkawasaki && nbb scripts/verify-endpoint-health.cljk . --only <id>"
+ :qa/repro "cd /Users/junkawasaki/github/com-junkawasaki && kbb --backend sci scripts/verify-endpoint-health.cljk . --only <id>"
  :qa/owner "<owner from the manifest probe>"
  :qa/status "open"}
 ```

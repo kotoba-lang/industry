@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; scripts/kami-lib-update-tick.cljk — kami family + core render/game lib の
 ;; **pin 鮮度**を測る段。決定論。モデルは居ない。
 ;; `scripts/kami-lib-update-loop.cljk` が毎周これを先に回す。
@@ -39,7 +39,7 @@
 ;; 読むだけ + cursor 書き込みのみ。git / west.yml への書き込みは無い。
 ;;
 ;; usage:
-;;   nbb scripts/kami-lib-update-tick.cljk [--limit N]
+;;   kbb --backend sci scripts/kami-lib-update-tick.cljk [--limit N]
 
 (ns kami-lib-update-tick
   (:require [clojure.edn :as edn]

@@ -93,12 +93,12 @@ fail-closed の細部:
     :deployed {:worker \"net-kotobase\" :version \"e78ba021-fd6e-46b5-beb3-ec8355cbae9d\"}}")
 
   (:adr/verification
-  "{:offline {:runner \"clojure -M:test（clj-edge）\" :tests 60 :assertions 318
+  "{:offline {:runner \"kbb -M:test（clj-edge）\" :tests 60 :assertions 318
               :new {:tests 15 :failures 0}
               :pre-existing-failures {:count 3 :which [\"worker-artifact-contract\" \"provider-source-catalog-contract x2\"]
                                       :note \"ADR-2607299500 で報告済みの既存失敗。本変更で件数も内容も変わっていない\"}}
-    :build \"shadow-cljs release worker entry — worker 0 warnings / entry 12 warnings（@noble JSDoc、既存）\"
-    :compiled-artifact {:harness \"nbb --classpath test -m org-did-route-smoke\" :checks 11 :failures 0
+    :build \"amu compile --target wasm32-browser worker entry — worker 0 warnings / entry 12 warnings（@noble JSDoc、既存）\"
+    :compiled-artifact {:harness \"kbb --backend sci --classpath test -m org-did-route-smoke\" :checks 11 :failures 0
                         :note \"in-memory KV stub を注入して enrollment の read 経路を実際に走らせている（binding 欠如で short-circuit すると全部が誤った理由で通ってしまうため）\"}
     :end-to-end {:harness \"worker/test/org_enrollment_e2e.cljs（nbb、cacao.core で実 Ed25519 CACAO を鋳造し compiled worker に POST、in-memory KV + sequencer stub で append→fold を実走）\"
                  :checks 13 :failures 0

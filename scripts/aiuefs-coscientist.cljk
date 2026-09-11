@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; The aiuefs-v4 Co-Scientist loop: Generate -> Reflect -> Rank -> Evolve -> Meta.
 ;;
 ;; Same discipline as design-quality.coscientist (ADR-2607132300, ported from
@@ -7,7 +7,7 @@
 ;; order. It is never a debate between model outputs, and it is re-runnable --
 ;; anyone can delete the iteration doc and regenerate it from the measurements.
 ;;
-;;   nbb scripts/aiuefs-coscientist.cljk --root . --out <iteration.edn>
+;;   kbb --backend sci scripts/aiuefs-coscientist.cljk --root . --out <iteration.edn>
 ;;
 ;; A hypothesis may only cite a number this loop actually measured. Anything
 ;; else is carried as :UNMEASURED and, per the ranking rule below, cannot win.

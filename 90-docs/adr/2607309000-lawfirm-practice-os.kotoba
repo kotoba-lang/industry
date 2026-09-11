@@ -46,7 +46,7 @@
   (:adr/consequences
   "**入ったもの**: `lawfirm.store`（記録層 SSoT）/ `date`（可搬な暦演算）/ `conflict`（規程27・28条の7類型）/ `deadline`（法定期間表＋期限状態）/ `trust`（預り金の分別管理）/ `partner`（資格確認・マッチング・grant・ファネル）/ `intake`（受付トリアージ）/ `advisor` / `governor`（13 HARD + 7 必須承認操作）/ `actor`（StateGraph）/ `console`（kotoba-ui SSR）/ `demo`（テストとデモページ共通の ground truth）。docs は `operator-guide.md` と `partner-recruitment.md`。
 
-**検証**: `clojure -M:test` 79 tests / 361 assertions green。`clojure -M:lint` warnings 0。`docs/samples/lawyer-console.html` は実 actor スタックを走らせた出力で、2回連続実行が byte-identical。design-quality の決定論的 HIG/WCAG 監査 **100.00 / 100**。ブラウザで実レンダリングも目視確認済み（dark mode、docket → 承認待ち → 事件詳細 → 提携の順）。
+**検証**: `kbb -M:test` 79 tests / 361 assertions green。`kbb -M:lint` warnings 0。`docs/samples/lawyer-console.html` は実 actor スタックを走らせた出力で、2回連続実行が byte-identical。design-quality の決定論的 HIG/WCAG 監査 **100.00 / 100**。ブラウザで実レンダリングも目視確認済み（dark mode、docket → 承認待ち → 事件詳細 → 提携の順）。
 
 **消したもの**: `lg-clj/`（bb ベースの Python 移植）。移植先はトリアージ分類が `lawfirm.intake`、弁護士検索と招請が `partner/candidates` と `:invite-partner-counsel`。**移植しなかったもの**は FastAPI 互換の HTTP ルーティングと http-kit サーバ（入口は cljs 側の責務。Kotoba に ingress capability が無いため）、および `signal:v1:` の base64 包み（上記5の理由で設計ごと置き換えた）。
 
@@ -68,8 +68,8 @@
   (:adr/evidence
   (vector "cloud-itonami/lawfirm 0c65a1d99dd3b4f3d71a5aa5985dc162a4c64f95 — 36 files changed, 5167 insertions, 789 deletions"
    "com-junkawasaki/root c5fac5e21ecdc9b30e178c4973406cbb2cf57b6f — manifest/west.yml single-entry pin advance"
-   "clojure -M:test: Ran 79 tests containing 361 assertions. 0 failures, 0 errors."
-   "clojure -M:lint: errors: 0, warnings: 0"
+   "kbb -M:test: Ran 79 tests containing 361 assertions. 0 failures, 0 errors."
+   "kbb -M:lint: errors: 0, warnings: 0"
    "design-quality audit: docs/samples/lawyer-console.html = 100.00 / 100 (findings: none — converged)"
-   "render determinism: two consecutive `clojure -M:render-console` runs produced byte-identical 73142-byte output"
+   "render determinism: two consecutive `kbb -M:render-console` runs produced byte-identical 73142-byte output"
    "2026-07-30 時点で lawfirm.etzhayyim.com / lawyer.etzhayyim.com / bengoshi.etzhayyim.com はいずれも DNS 解決しない（curl exit 6）"))))

@@ -177,7 +177,7 @@ com-junkawasaki の `:workspace-internal` な文書 —— **custody は所有�
 **query の実測**:
 
 ```
-nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+kbb --backend sci --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
   '[:find ?tier (count ?e) :where
     [?e \"source/dataset\" \"training-corpus\"] [?e \"corpus/tier\" ?tier]]'
 → [[\"gold\" 1115] [\"silver\" 766] [\"bronze\" 110] [\"excluded\" 14]]

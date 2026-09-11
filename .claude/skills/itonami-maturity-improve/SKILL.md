@@ -42,7 +42,7 @@ description: cloud-itonami fleet の成熟度スコア（ADR-2608052000 の 7 �
 ```bash
 cd ~/github/com-junkawasaki
 git fetch origin && git merge --ff-only origin/main
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.cljk
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.cljk
 ```
 
 tick が出すもの: `lane`（substrate / breadth）・対象 repo・**目標にしてよい軸**と
@@ -55,8 +55,8 @@ tick が出すもの: `lane`（substrate / breadth）・対象 repo・**目標�
 **tick が `⚠ archived の掃き出しが読めない` と言ったら、先にそれを作り直す。**
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk   # 約 2 分
-nbb --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk --check   # 差分だけ見る
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk   # 約 2 分
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljk --check   # 差分だけ見る
 ```
 
 archived（GitHub で read-only）な repo は **この順位の常連**になる —— archived =
@@ -90,7 +90,7 @@ git worktree add -b agent/maturity-<repo> /tmp/maturity-<repo> origin/main   # �
 
 | 軸 | やること | **必ず通す gate** |
 |---|---|---|
-| `axis-test` | その repo の不変条件を固定するテストを足す | `nbb scripts/maturity-loop/run.cljk --only <repo>` —— **実装を壊したときに赤くなること**を確かめる。落ちない gate は劇場 |
+| `axis-test` | その repo の不変条件を固定するテストを足す | `kbb --backend sci scripts/maturity-loop/run.cljk --only <repo>` —— **実装を壊したときに赤くなること**を確かめる。落ちない gate は劇場 |
 | `axis-ingest` | facts/catalog に**実 URL** の引用を足す | 足した URL を実際に取得して 2xx を確認。取れないものは足さない |
 | `axis-docs` | `README` の名乗り / `docs/operator-quickstart.md` | quickstart の手順を**実際に踏む**。踏めない手順は書かない |
 | `axis-surface` | demo 生成器 / `docs/business-model.md` | 生成器を**実際に回す**。生成物は実 actor 由来であること（手打ち禁止） |
@@ -115,9 +115,9 @@ git worktree add -b agent/maturity-<repo> /tmp/maturity-<repo> origin/main   # �
 
 ```bash
 R=$HOME/github/com-junkawasaki                      # 本体（orgs/ が populate されている）
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-scan.cljk \
+kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-scan.cljk \
   --data-root "$R" --out manifest/itonami-maturity-evidence.edn
-nbb --classpath ".:scripts/nbb_compat:$R/orgs/kotoba-lang/dynamics/src:$R/orgs/kotoba-lang/org-oasis-open-xmile/src" \
+kbb --backend sci --classpath ".:scripts/nbb_compat:$R/orgs/kotoba-lang/dynamics/src:$R/orgs/kotoba-lang/org-oasis-open-xmile/src" \
   scripts/itonami-maturity-dynamics.cljk \
   --evidence manifest/itonami-maturity-evidence.edn \
   --taxonomy manifest/repo-taxonomy.edn \
@@ -150,9 +150,9 @@ pin より前に居るのが正常で、HEAD こそ実態である。
 **`scripts/itonami-maturity-parity-classpath.cljk` に訊く**:
 
 ```bash
-CP=$(nbb --classpath ".:scripts/nbb_compat" \
+CP=$(kbb --backend sci --classpath ".:scripts/nbb_compat" \
       scripts/itonami-maturity-parity-classpath.cljk --root "$HOME/github/com-junkawasaki") || true
-nbb --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljk \
+kbb --backend sci --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljk \
   --evidence manifest/itonami-maturity-evidence.edn \
   --datoms 90-docs/system-dynamics/itonami-maturity.datoms.edn
 ```
@@ -194,7 +194,7 @@ gh api repos/<org>/<repo>/merges -f base=main -f head=agent/maturity-<repo> -f c
 ```
 
 superproject 側で pin を進めるなら **当該 entry だけ**
-（`nbb scripts/gen-west-manifest.cljk --entry <name>`）。wholesale 再生成は禁止。
+（`kbb --backend sci scripts/gen-west-manifest.cljk --entry <name>`）。wholesale 再生成は禁止。
 
 後片付けまでが完了条件: worktree 削除 → local branch 削除 → remote branch 削除。
 

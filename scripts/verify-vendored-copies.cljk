@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Perform the diff the vendored files ask for.
 ;;
-;;   nbb scripts/verify-vendored-copies.cljk           ; report
-;;   nbb scripts/verify-vendored-copies.cljk --check   ; exit 1 if any is stale
-;;   nbb scripts/verify-vendored-copies.cljk --diff    ; also show the def names
+;;   kbb --backend sci scripts/verify-vendored-copies.cljk           ; report
+;;   kbb --backend sci scripts/verify-vendored-copies.cljk --check   ; exit 1 if any is stale
+;;   kbb --backend sci scripts/verify-vendored-copies.cljk --diff    ; also show the def names
 ;;
 ;; Run from the superproject root.
 ;;

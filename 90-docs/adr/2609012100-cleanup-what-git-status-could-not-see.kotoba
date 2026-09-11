@@ -171,8 +171,8 @@ runbook の表は `:renamed-upstream` に対して **Do not re-register** と明
 ## 次の 1 手
 
 ```
-nbb scripts/cleanup.cljs --unlanded          # nopr 層の現在地を測り直す
-nbb scripts/west-orphan-audit.cljs --blocking # exit 0 を維持しているか
+kbb --backend sci scripts/cleanup.cljk --unlanded          # nopr 層の現在地を測り直す
+kbb --backend sci scripts/west-orphan-audit.cljk --blocking # exit 0 を維持しているか
 ```
 
 `:additive` に載る候補を見たら、**main に無いことを新しい仕事の証拠として

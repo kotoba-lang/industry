@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 (ns fleet-ci.gates.amu-native-conformance-check
   (:require [clojure.string :as str]
             ["node:child_process" :as cp]
@@ -25,7 +25,7 @@
 ;; tarball は `git archive` なので **node_modules が無い**。すると:
 ;;
 ;;   resolveWithLock → spawn(node, <存在しない cli.js>) → 非 0 → null
-;;   → 「deps-lock.edn is missing or stale」→ `clojure -Spath` へ fallback
+;;   → 「deps-lock.edn is missing or stale」→ `kbb -Spath` へ fallback
 ;;   → conformance script が PATH に仕込んだ exit 127 の stub に当たる
 ;;   → `error: cannot resolve Amu's dependency closure.`
 ;;
@@ -59,7 +59,7 @@
               (str/trim (str (or (.-stdout r) "") (or (.-stderr r) "")))))
       (when-not (fs/existsSync (path/join root "node_modules" "nbb" "cli.js"))
         (die! 1 "npm install succeeded but node_modules/nbb/cli.js is still absent —"
-              "bin/amu would fall back to `clojure -Spath` and report a dependency error")))))
+              "bin/amu would fall back to `kbb -Spath` and report a dependency error")))))
 
 (defn- run-script! [script label]
   (let [result (cp/spawnSync "npx" #js ["--yes" "nbb" script]

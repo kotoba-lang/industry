@@ -1,4 +1,4 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; manifest/edn-query.cljk — ADR ledger + RAD identity journal を
 ;; kotoba-lang/datalog にロードして query するツール（ADR-2608260200）。
 ;;
@@ -22,7 +22,7 @@
 ;;
 ;;   CP=".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src"
 ;;   NODE_OPTIONS=--max-old-space-size=8192 \
-;;     nbb --classpath "$CP" manifest/edn-query.cljk refresh   # 面を組んで shard に書く
+;;     kbb --backend sci --classpath "$CP" manifest/edn-query.cljk refresh   # 面を組んで shard に書く
 ;;
 ;; **面を丸ごと materialise する操作は heap を上げる。** 組むときだけの話ではない
 ;; —— 実測 2026-09-06、既定 heap では build も cache からのロードも OOM した
@@ -33,15 +33,15 @@
 ;; 逆に **dataset を名指した query は既定 heap のまま数秒で返る** —— shard を
 ;; 名指した分だけ読むので面を組まない（実測: market-intel 1 枚で 4.6 秒）。
 ;; 常用するなら、この形に寄せるのが一番効く。
-;;   nbb --classpath "$CP" manifest/edn-query.cljk count
-;;   nbb --classpath "$CP" manifest/edn-query.cljk q '[:find ?id ?status :where
+;;   kbb --backend sci --classpath "$CP" manifest/edn-query.cljk count
+;;   kbb --backend sci --classpath "$CP" manifest/edn-query.cljk q '[:find ?id ?status :where
 ;;                                   [?e "adr/id" ?id] [?e "adr/status" ?status]]'
-;;   nbb --classpath "$CP" manifest/edn-query.cljk q* '<q1>' '<q2>' ...
+;;   kbb --backend sci --classpath "$CP" manifest/edn-query.cljk q* '<q1>' '<q2>' ...
 ;;                                       # 面を 1 回だけ組んで N 本流す。結果は
 ;;                                       # 同じ順のベクタ 1 行。所要時間はロードが
 ;;                                       # 支配するので、N 本を別プロセスで叩くと
 ;;                                       # そのまま N 倍かかる
-;;   nbb --classpath "$CP" manifest/edn-query.cljk mcp   # 常駐 MCP server（stdio, JSON-RPC）
+;;   kbb --backend sci --classpath "$CP" manifest/edn-query.cljk mcp   # 常駐 MCP server（stdio, JSON-RPC）
 ;;
 ;; MCP client の設定（この面を datalog を知らなくても聞けるようにする）:
 ;;
@@ -839,7 +839,7 @@
 
    **警告は `js/console.error` で書く。`(binding [*out* *err*] (println …))`
    を使わないこと** —— nbb はこの binding を尊重せず、**stdout に出る**（実測
-   2026-08-13: `nbb -e '(binding [*out* *err*] (println \"x\"))' 2>/dev/null` が
+   2026-08-13: `kbb --backend sci -e '(binding [*out* *err*] (println \"x\"))' 2>/dev/null` が
    x を表示する）。JVM Clojure の正しいイディオムがこのランタイムでは何もしない
    ので、意図は正しいまま出力先だけが間違う。ここでそれをやると `q` / `q*` /
    `count` の**機械可読な stdout に日本語の警告文が混ざり**、消費側の
@@ -2585,7 +2585,7 @@
 ;; 8192 は「面が組めた」ことを実測した値であって、面の大きさの上界ではない。
 ;; いつか足りなくなるが、そのとき出るのは上の OOM なので、読めば分かる。
 (def ^:private refresh-command
-  (str "NODE_OPTIONS=--max-old-space-size=8192 nbb --classpath \"" classpath
+  (str "NODE_OPTIONS=--max-old-space-size=8192 kbb --backend sci --classpath \"" classpath
        "\" manifest/edn-query.cljk refresh"))
 
 (def ^:private cache-dir (io/file root ".projection-cache"))
@@ -3152,7 +3152,7 @@
         "q" (println (pr-str (timed-q db (first queries))))
         "q*" (println (pr-str (mapv (fn [x] (timed-q db x)) queries)))))
 
-    (do (println (str "usage: nbb --classpath \"" classpath "\" manifest/edn-query.cljk "
+    (do (println (str "usage: kbb --backend sci --classpath \"" classpath "\" manifest/edn-query.cljk "
                       "[refresh | count | q '<datalog-query>' | q* '<q1>' '<q2>' ... "
                       "| view <name> | mcp]"))
         (scripts.nbb-compat/exit 1))))

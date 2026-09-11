@@ -1,6 +1,6 @@
 (vector (map (:db/id -1)
   (:adr/id "adr-2609070200-clojure-m-retirement-jvm-free-build-test")
-  (:adr/title "clojure -M の退役は kotoba -M への置換ではない — JVM-free な実体は nbb と amu --jvm-free の 2 つだけ")
+  (:adr/title "kbb -M の退役は kotoba -M への置換ではない — JVM-free な実体は nbb と amu --jvm-free の 2 つだけ")
   (:adr/status "accepted")
   (:adr/date "2026-09-07")
   (:adr/supersedes "")
@@ -8,7 +8,7 @@
   (:adr/body
   "## 決定
 
-オーナー指示（2026-09-06）「clojure -M を使っている箇所を全て kotoba -M で build,
+オーナー指示（2026-09-06）「kbb -M を使っている箇所を全て kotoba -M で build,
 compile, test できるように refactor」に対し、**文字通りの置換は実行しない**。
 代わりに実行サイトを **JVM-free な実体**へ移す。ADR-2607198300 / Q9 と整合。
 
@@ -17,10 +17,10 @@ compile, test できるように refactor」に対し、**文字通りの置換�
 
 ## なぜ文字通りには実行できないか（実測、推測ではない）
 
-`bin/kotoba` は `bin/kotoba-clj` を exec し、それが `exec clojure -M -m kotoba.launcher`
+`bin/kotoba` は `bin/kotoba-clj` を exec し、それが `exec kbb -M -m kotoba.launcher`
 である。`kotoba.launcher` は `.clj` で `java.nio` / `java.security` / `java.net.http` /
 `gen-class` を持つ JVM 専用 namespace。**`kotoba` に `-M` フラグは無い。**
-つまり `clojure -M` を `kotoba -M` に置換するのは循環であって移行ではない。
+つまり `kbb -M` を `kotoba -M` に置換するのは循環であって移行ではない。
 
 `clojure` / `java` / `clj` を exit 127 の stub で隠して実測（control として素の
 `clojure -e` が 127 になることを先に確認 = 両方向に discriminate する）:
@@ -31,14 +31,14 @@ compile, test できるように refactor」に対し、**文字通りの置換�
 | `kbb --help`（2026-09-06 時点） | JVM 起動 |
 | `kbb --backend native`（同） | JVM 起動 — `--backend` はコンパイル先の指定で driver の話ではない |
 | `amu --help` | jvm-free (exit 0) |
-| `nbb -e` | jvm-free (exit 0) |
+| `kbb --backend sci -e` | jvm-free (exit 0) |
 
 ⚠ **この表は 2026-09-06 の測定値である。** 同日中に並行セッションが `bin/kbb` を
 nbb shim 化した。**現在地は毎回測ること。この表を定数として引用しない。**
 
 ## scope の実態 — 生 grep の数は 3 桁膨らんでいた
 
-`clojure -M` / `-X` の生 grep は 1,474 ファイル。うち大半は stray worktree
+`kbb -M` / `-X` の生 grep は 1,474 ファイル。うち大半は stray worktree
 （`wt-*` / `_wt-*` / `*-verify*`）の重複だった。除外後 1,138、さらに内訳:
 
 - **1,009 は `90-docs/adr/*.edn` の prose** = 実行された command の記録
@@ -58,13 +58,13 @@ jvm-build / jvm-test / jvm-lint / jvm-chicory。**件数はここに書かない
 
 | repo | 変換 | 実測 |
 |---|---|---|
-| `cloud-murakumo-mlx` | `clojure -M:test` → nbb | 4 tests / 14 assertions |
-| `yukkuri/clj` | `clojure -M:test` + npm script → nbb | 35 / 234 |
-| `yukkuri/renderer-mac` | `clojure -M:test` → nbb | 3 / 10 |
+| `cloud-murakumo-mlx` | `kbb -M:test` → nbb | 4 tests / 14 assertions |
+| `yukkuri/clj` | `kbb -M:test` + npm script → nbb | 35 / 234 |
+| `yukkuri/renderer-mac` | `kbb -M:test` → nbb | 3 / 10 |
 | `net-oppai-gen` | `npm test` + `generate-site` → nbb | 41 / 162、生成 HTML は JVM 版と byte 一致 |
-| `app-hyakka` | `clojure -M scripts/read_check.clj` → nbb | SCANNED 1516 / unreadable 0、JVM oracle と一致 |
-| `engi` | `clojure -M:cljs` → nbb | 2 / 16 |
-| `weight-oka` | `clojure -M:test` → nbb | 4 / 15 |
+| `app-hyakka` | `kbb -M scripts/read_check.clj` → nbb | SCANNED 1516 / unreadable 0、JVM oracle と一致 |
+| `engi` | `kbb -M:cljs` → nbb | 2 / 16 |
+| `weight-oka` | `kbb -M:test` → nbb | 4 / 15 |
 | `cybersecurity` | coverage report → nbb | 75 行、byte 一致（diff exit 0） |
 | `nio` | test runner の exit 経路を修正 | 下記 |
 | `kotoba` | `bin/kbb` の JVM-free dispatch | 下記 |
@@ -119,7 +119,7 @@ deps.edn と不一致 / `--fuel` を native で受け付けて無視）。
 3. **`exit 1` しか呼ばない 33 件は偶然正しいだけ。** nbb 自身の exitCode が生き残るため
    嘘はついていないが、明示チェックは常に偽の dead code であり、1 回の整理で嘘に変わる。
 4. **`ai-gftd-oshikatsu` の test task は一度も実行されていなかった。** `run-task.cljs` が
-   `shell:false` で spawn するため `[\"clojure -M:test\"]` は存在しないプログラム 1 個を
+   `shell:false` で spawn するため `[\"kbb -M:test\"]` は存在しないプログラム 1 個を
    指し、exit 1 / 出力ゼロ。**同じ argv バグをオーナーが 2026-08-13 に既に直していたが
    着地せず到達不能になっていた**（dangling commit `e16835d`）。
 5. **hermes profile `jvm-dep-migrator` は名前と中身が別物。** cron job 名は JVM 依存 Q9
