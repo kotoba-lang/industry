@@ -1,0 +1,46 @@
+{
+  "scope": "local original-path qualification on clean-rebuilt patched host; not deployment",
+  "source_commits": {
+    "inga": "817bb2b5b9f3e3be282abbfb7f01deb491c36c24",
+    "inga-node": "a6a69ae021769511c2f1a2ce3d4092b64f8cbcde"
+  },
+  "loader_conformance": {
+    "tests": 7,
+    "assertions": 23,
+    "failures": 0
+  },
+  "upstream_unit": {
+    "tests": 50,
+    "assertions": 84,
+    "failures": 0
+  },
+  "canonical_node": {
+    "tests": 33,
+    "assertions": 106,
+    "failures": 0
+  },
+  "canonical_archive": {
+    "tests": 7,
+    "assertions": 39,
+    "failures": 0
+  },
+  "canonical_reservation": {
+    "tests": 7,
+    "assertions": 45,
+    "failures": 0,
+    "configuration": "explicit source-only config; automatic dependency download excluded"
+  },
+  "canonical_ref_race": "7 witness processes; one winner, one loser; same winning CID and invalid proof rejection; exit 0",
+  "canonical_run": "original entrypoint, disposable test identity, local health ok, process stopped",
+  "source_mirror_used": false,
+  "unmerged_dependency_pin_added": false,
+  "deployment": false,
+  "dependency_source_commits": {
+    "text": "d9caf9dc8b3c65814e3a3a8846dc4936316f7075",
+    "kotobase-client": "76bccea3ea86179db3b8bdfd72bb3fd7f36d3b21",
+    "org-nist-sha2": "becdf25da4a108df310fb3e1e9db094492b6e34b",
+    "kotobase-storage": "b6ef381317008aaaf3b11ca5f80cbcd387652371"
+  },
+  "engine": "90fc125965995b8e8205ac723bf6d432afabe0ed",
+  "activation": "blocked: existing deployed snapshots lack voted-view"
+}
