@@ -25,3 +25,12 @@ Production preflight found every existing witness snapshot missing :voted-view.
 The new node correctly refuses those snapshots. Release files can be staged but
 activation must preserve the existing chain's voting history; do not fabricate a
 watermark, erase snapshots or reuse keys on a new chain without a migration plan.
+
+The owner subsequently authorized a separate new chain.
+`inga-reservation-20260911-v1` is active on judah/benjamin/simeon/joseph,
+ports 19601–19604, with independent keys/data and system LaunchDaemons running
+as each ordinary user. The existing chains are unchanged. Full peer mesh, a
+single durable winner from two smoke writers, membership-proof verification
+and w4 restart/state recovery passed. Automatic archive capture and the optional
+finalized-prefix service remain unwired; witness activation does not prove live
+Kotobase archive persistence or payment execution.
