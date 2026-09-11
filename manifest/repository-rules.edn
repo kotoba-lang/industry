@@ -558,7 +558,20 @@
                           :advertised-max-blocks 256
                           :advertised-max-at-measured-rate-ms 28000
                           :advertised-max-deliverable :not-measured
-                          :pack-prize "(N-1) x per-block-ms, upper bound; the price of a range read is NOT measured"
+                          :pack-prize "(N-1) x per-block-ms, upper bound"
+                          ;; Measured 2026-09-11 with a root-keyed CARv2 read whole
+                          ;; on the first miss (net-kotobase/ipfs 23046cad): 30 -> 1
+                          ;; fetches, 3277 -> 206 ms, 94% of the upper bound. The
+                          ;; unpacked row's I/O share is 92%, so the per-block cost
+                          ;; IS the block plane; an R2 read costs the same for 39 KB
+                          ;; as for 562 B. The pack's own price is +11 ms on a
+                          ;; one-block matcher.
+                          :pack-price-measured {:wall-ratio 15.9 :io-ratio 29.6
+                                                :prize-realised 0.94
+                                                :one-block-penalty-ms 11.2
+                                                :mechanism :root-keyed-whole-read
+                                                :range-read :not-measured
+                                                :who-writes-packs :not-decided}
                           :p50-ms {:one-block 132.0 :three-blocks 353.0}
                           :refusal-ms {:malformed-selector 14.2 :root-not-held 121.9}
                           :pack-opportunity "collapse N fetches into one range read (ADR-2608160100), whose per-chain conclusion does NOT transfer here -- measure before adopting"}
