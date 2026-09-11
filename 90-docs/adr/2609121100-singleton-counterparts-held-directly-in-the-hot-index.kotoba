@@ -2,8 +2,8 @@
   (:adr/doc_type "adr")
   (:adr/id "adr-2609121100-singleton-counterparts-held-directly-in-the-hot-index")
   (:adr/topic "datom-plane-hot-index-representation")
-  (:adr/title "hot db の index は counterpart が 1 つのあいだ値を直接持つ —— 99.5% が singleton set で、1 つ 160 B、full SF1 の 10.9 GB のうち 6.4 GB がそれ（提案）")
-  (:adr/status "proposed")
+  (:adr/title "hot db の index は counterpart が 1 つのあいだ 1 object で持つ —— 99.5% が singleton set で 1 つ 160 B; datalog 645c9e58 で full SF1 が 10.9 GB → 4.4 GB、16 GiB host に resident")
+  (:adr/status "accepted")
   (:adr/date "2026-09-11")
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/datalog" "kotoba-lang/arrangement" "kotoba-lang/kotobase-peer" "kotoba-lang/ayatori"))
@@ -12,9 +12,9 @@
                 "adr-2608039970-the-base-is-the-datom-plane-not-datalog"
                 "adr-2809041200-rule-is-property-or-implementation-state"))
   (:adr/validation (map
-    (:kind "measured on the fleet host simeon (ayatori co-scientist iterations 24-29); the decision itself is not taken here")
-    (:evidence "orgs/kotoba-lang/ayatori bench/coscientist-iteration-27.edn (bytes per quad by attribute group), -28.edn (interning refuted), -29.edn (node count and the price of a singleton set)")
-    (:acceptance-if-adopted "kotoba-lang/datalog suite, kotoba-lang/kotobase-peer suite, the 1,082-parameter both-ways gate of kotobase-peer.ldbc-snb-net, and the Neo4j all-parameter pairing -- answers byte-identical before and after")))
+    (:kind "measured on simeon (iterations 24-29) and implemented + measured on levi (iteration 34, 2026-09-11) under the owner instruction of the same day to go for the top with the co-scientist approach")
+    (:evidence "orgs/kotoba-lang/ayatori bench/coscientist-iteration-27.edn (bytes per quad), -28.edn (interning refuted), -29.edn (node count), -34.edn (landed and measured); kotobase-peer bench/results/2026-09-11-ldbc-snb-network-iteration-34-full-sf1.edn")
+    (:acceptance "datalog JVM 131/341/0 and cljs 135/352/0 (kotoba-lang/datalog 645c9e58); kotobase-peer 262/804/0 on the new pin (7be67f69); the 1,082-parameter both-ways gate 0 disagreements on the subset and on the full SF1; served latencies identical on the subset before and after. The Neo4j all-parameter pairing was not re-run in iteration 34 -- the gate that was re-run compares the two in-process paths, not Neo4j; that pairing is owed")))
   (:adr/body "## Context
 
 LDBC SNB Interactive を benchmark にした loop（ADR-2609121000）が、rung を SF1 部分集合から
@@ -40,7 +40,24 @@ fleet host で used heap 10.9 GB、macOS が 8 GB の swap file を作り、SUT 
   部分集合（830 MB）のうち **557 MB**、full SF1（10.9 GB）のうち **約 6.4 GB** が
   「1 要素の set」の代償である。
 
-## Proposal（決定はオーナー）
+## Decision（2026-09-11、iteration 34 で実装・実測。オーナー指示「首位を目標に co-scientist のアプローチで進めて」を承認として扱った —— 1 library commit・reader 0 変更・revert 1 回で戻る。反転はオーナーの一手で足りる）
+
+採ったのは下の 2 択の**どちらでもない第 3 案**: `datalog.singleton/of` —— 1 object の deftype で、
+読む側には set そのもの（`set?` `contains?` `count` `seq` `get` `conj` `disj`、実 set との `=` が
+両方向、hash 一致、`clojure.set`、`java.util.Set`）。2 つ目の値の `conj` は普通の set を返す。
+**読み手は 1 箇所も変えていない**（(a) の allocation も (b) の contract 変更も無い）。
+ClojureScript 側は `#{v}` のまま（footprint の問題は JVM の SUT のもの）。
+
+実測 2026-09-11（levi、16 GiB、-Xmx10g）:
+
+    SF1 部分集合 2,004,832 quad   used heap 726 MB → 386 MB   (362 → 192 B/quad)、gate 1,082/0 両方、latency 同一
+    SF1 本体   20,569,957 quad   used heap 4,357 MB           (10.9 GB → 4.4 GB)、gate 1,082/0、READY 3 分
+
+最初の :sf1-full 行: 8 slot、reads 128/s + stream 1,092 upd/s = 1,215.8 ops/s、on-time 100%
+（reads 192 は 91.7% で落ちる）。壁は memory から full scale の date-ordered read
+（IC02 141 ms / IC09 113 / IC07 31 / IS2 28 ms p50）へ移った。SF3 は同じ B/quad で約 13 GB。
+
+## Proposal（当初、2026-09-11 午前 —— 記録として残す）
 
 `datalog.index` の hot db で、(entity, attribute) と (attribute, entity) と (attribute, value)
 の counterpart を、**1 つのあいだは値を直接持ち、2 つ目が入った時点で set に昇格する**。
@@ -67,4 +84,4 @@ fleet host で used heap 10.9 GB、macOS が 8 GB の swap file を作り、SUT 
 - Datalog / dialect の変更ではない。query の書き方は 1 文字も変わらない。
 - persisted plane の設計ではない。hot db の in-memory 表現だけ。
 ")
-  (:adr/consequences "採用なら kotoba-lang/datalog に表現を実装し、3 suite と gate を通し、simeon で full SF1 の行を取る。不採用なら S18（32 GB 機）か persisted plane。")))
+  (:adr/consequences "採用済み: kotoba-lang/datalog 645c9e58、kotobase-peer 7be67f69（floor）。SF1 本体が 16 GiB host に resident。次の壁は full scale の date-ordered read と、SF3 の約 13 GB（persisted plane か大きい host）。Neo4j 全 parameter pairing の再実行は owed。")))
