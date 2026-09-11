@@ -1,0 +1,68 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609111410-murakumo-capacity-is-computed-from-measurements-not-tuned")
+  (:adr/topic "murakumo-capacity")
+  (:adr/title "murakumo の residency・slot 幾何・出力上限・bot cadence は測定 corpus から計算する —— 定数で調整しない")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/murakumo" "network-awai/loop-yakuwari" "network-awai/cloud-murakumo-api" "cloud-itonami/cloud-itonami-app"))
+  (:adr/related (vector "adr-2609111130-fans-oppai-catalog-works-and-a-consent-gated-face-reference"
+                "adr-2607173100-murakumo-main-alias"
+                "adr-2608136000-silence-accumulates-as-green"))
+  (:adr/validation (map
+    (:tests "kotoba-lang/murakumo: murakumo.infer.capacity-test 8 tests / 64 assertions (today's corpus numbers pinned, boundaries at the slot, the admission bound, the restart floor and the k=1 cadence); generation_api_preempt_test 5; image suite 11 green with the dispatcher in-harness. loop-yakuwari: awai check 27/162 OK, 57/183.")
+    (:live "gad 2026-09-11 03:37 UTC: ring up in 15 s at ctx 65536 x 2 / KV q8 (18.1 GB); a 64 KB bot request that had answered 502 for 25 h answered 200 in 61 s (prefill 146 tok/s, decode 3.4). Ring served 29 prompts in its first 20 min. Resident restarted with max_tokens 4096; workforce re-provisioned (156 Bots, cadence 85/340/2035).")
+    (:published "POST https://api.murakumo.cloud/infer/placement → 201, :placement/version 2 readable at GET /infer/placement")))
+  (:adr/body "## 文脈 —— 2026-09-11 に測ったこと
+
+156 体の workforce Bot の turn が 25 時間 100% 失敗していた。原因は定数が 3 つ重なった形:
+
+1. resident は `max_tokens 16384` を要求（375 run の completion 実績: p50 471 / p99 2,618 / max 3,014）。
+2. gateway の b70 admission は配備版で `bytes/2 + max_tokens ≤ 15360`（bisection で実測。source は `bytes + max_tokens`）。
+   bot request は 8.5 bytes/token（実測）なので 60 KB の request は max_tokens をいくら下げても b70 に載らない。
+3. 載らない request は gad の text ring へ回るが、ring は 9/10 02:06 に停止されたまま
+   （`-c 524288 --parallel 2` の KV cache が ComfyUI 38 GB と同居できず crash loop、watchdog は inactive を意図的と読む）。
+
+どれも「誰かが選んだ値」で、どれも測定と合っていなかった。
+
+## 決定
+
+**placement / residency / slot 幾何 / 出力上限 / cadence は、測定 corpus から pure な planner が計算し、
+その plan を fleet の placement record に publish する。手で数字を触らない。**
+
+- corpus: `kotoba-lang/murakumo` `resources/murakumo/capacity-observations.edn`。全ての値に `:how` と日付。
+- planner: `murakumo.infer.capacity`（pure、data → data）。
+  - residency: 需要密度（requests/day per GB）の greedy、memory − headroom、`:exclusive?` は常駐しない、
+    `:model/process?` は preemption 1 回あたり `restart-floor-calls`（唯一の policy 定数、50）を下回れば拒否。需要 0 は常駐しない。
+  - text: `max_tokens = 2^k ≥ 1.5 × p99 completion`（今日は 4096）。slot 幾何は served calls/day で採点し、
+    **配備中の admission 推定器**（bytes/divisor）を入力に取る。同点（1% 以内）は現状維持 —— 変更は再起動だから。
+    推定器を実測 bytes/token に合わせた場合の served を並べて出す（今日: 28% → 98%、+3,377 call/日）。
+  - workforce: 容量 = max-active × 86400/p50 × 0.7、要求 = Σ count × 1440/cadence、1 つの係数 k で優先順序を保って伸ばす。
+- record: `scripts/capacity-plan.cljk --publish` が `POST /infer/placement`（`:placement/version 2`）。
+  `resources/murakumo/capacity-plan.edn` は生成物。
+
+## 今日の plan と適用
+
+| 面 | plan | 適用 |
+|---|---|---|
+| resident | `max_tokens 4096` | `cloud-itonami-app data/config.edn`、再起動。（起動 symlink が root の `.cljk` 改名で切れていたのを修復） |
+| b70 | parallel 2 のまま、slot 16k | 変更なし（tie） |
+| gad | ring 常駐（unfit 3,449/日 ≫ floor 250）+ SDXL 8.8 GB、LTX on-demand、H3 が ring を preempt | `comfyui.service.d/capacity-plan.conf --reserve-vram 24`（38 → 8 GB）、`murakumo-ring.service.d/zz-capacity-plan.conf -c 65536 --parallel 2 KV q8_0`（drop-in は名前順で後勝ち —— `qwen38.conf` に負けて 1 度空振りした）、ring-watchdog-events.log に理由を記録 |
+| generation API | image checkpoint は `:apu/video` class を取る、`:preempts {\"minimax-h3\" [\"murakumo-ring.service\"]}` | gad に配備、mechanism は decision-free（表にある unit だけ stop → job → start、失敗は job を fail） |
+| workforce | cadence 85 / 340 / 2035 分（k = 5.7）、要求 551 run/日 ≤ 容量 695 | loop-yakuwari workforce.edn + authored 8 role、provision 済み |
+| Bot tools | product host を allowlist | `agent-control :allowed-domains`（空 = 全 probe 拒否だった）、`agent-browser` の bin link 復元 |
+
+## 残っている gap（計算が名指ししたもの）
+
+1. **gateway の admission 推定器**（`cloud-murakumo-api readiness/b70-request-eligible?`）: bytes/2 を実測 bytes/token に。
+   +3,377 call/日。今日は `.cljk` 改名で build 経路が無く未着手。着地したら ring は floor を割り、planner が再び「常駐しない」を出す —— **その時 ring を止めるのは人ではなく plan**。
+2. `invalid-input` / `not-configured` が直近 50 run の 60% 超（`domain_registrations` の account-id 欠落など）。cadence より効く。
+3. `:placement/version 2` の JSON 化で namespace が落ちる（`placement/version` → `version`）。console 側の読み手を確認。
+4. planner の scalar 式を `kotoba/infer_capacity_core` KIR に移す（sibling と同じ形、header に撤去条件）。
+5. corpus の再測定 cadence: 週 1（`gad prefill`, `bytes/token`, completion 分位）。planner は corpus が古いことを言わない —— 日付を見る。
+
+## 改訂履歴
+
+- 2026-09-11: 起草。"))
+)
