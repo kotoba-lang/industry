@@ -1,0 +1,106 @@
+(vector
+ (map
+  (:adr/id "adr-2609111000-shinshi-club-runs-on-four-planes-and-three-were-silent")
+  (:adr/title "shinshi.club runs on four bot planes, and three of them were silent")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-11")
+  ;; ADR-2609078000 (the workforce runs; next-run-at is the oldest job) lives
+  ;; in cloud-itonami-app's own 90-docs/adr, not here, so it is cited by name
+  ;; in the body and not listed as a root :adr/related.
+  (:adr/related (vector "adr-2608291800-shinshi-cast-producer-bots"
+                        "ADR-2608150200"
+                        "adr-2609091500-hermes-fleet-day-budget-and-the-meter-that-refuses-to-guess"
+                        "ADR-2608131001"))
+  (:adr/body "
+## The question
+
+Owner, 2026-09-11: 「shinshi.club を運営する itonami cloud bots は動いている?
+itonami cloud bots は cloud 上で常駐稼働できている?」 and then
+「shinshi.club が自律的に運営するように bot profiles の稼働を安定化、組織化」.
+
+The first answer needed a map, because the word `bots` names four different
+things for this one site. This ADR is that map, with what each plane was
+measured doing on 2026-09-11, and which role each plane OWNS from now on.
+
+## The four planes
+
+| plane | where it runs | what it owns | measured 2026-09-11 |
+|---|---|---|---|
+| hermes profiles `shinshi-{mktg,sales,support,eng,chat-ops}` | this Mac, hermes cron (`~/.hermes/profiles/<p>/cron/jobs.json`) | the operating roles: growth draft, monetization read, support drafts, one issue per run, chat-funnel finding | all five `completed` on their last run; `shinshi-eng` took a 402 from the OpenRouter fallback on 09-10 |
+| deterministic scripts (`scripts/shinshi-cast-bots/`) via hermes `--script` shims | this Mac, hermes cron `shinshi-cast-post` (hourly) / `shinshi-producer` (hourly) | the product speaking as itself: 12 cast posts per round, factory minting | **cast-post: 49 consecutive failures since 09-09T06 JST**, 0 posts landed 09-09 .. 09-11 against 240-276/day before; producer: completed |
+| `shinshi-video-actor` | gad, systemd timer (30 min) — ADR-2608150200 | catalog i2v clips | timer fires and exits 0 every 30 min, but **225 consecutive ticks `skipped / ledger-unanswered`: kotobase.net `/v1/q` returns 401 (`error_origin: upstream`)** since ~2026-09-06T08Z; before that `idle / catalog-full` (134 scanned, 89 published) |
+| cloud-itonami-app workforce, 12 Bots `club shinshi · <role>` | this Mac, launchd `cloud.itonami.app.local`, `127.0.0.1:1338` only | steering surface for the same roles (Sales, QA, Engineer, …) | all 12 hold a `:checkpointed` job from 09-09; 137 checkpointed jobs fleet-wide drain through `max-active 1` |
+
+None of the four runs in the cloud. `app.itonami.cloud` is a dispatch router
+Worker with no cron (ADR-2609078000 already said the two populations are
+different); the resident is this laptop. That is the answer to the second
+question: 「cloud 上で常駐稼働」 is not a state any of these are in.
+
+## What was actually broken, in order of what it cost
+
+1. **cast-post classpath.** `org-chainagnostic-cacao/src` moved from
+   `clojure.string` to `kotoba.lang.text` on 2026-09-09; the hermes shim's
+   classpath did not carry `kotoba-lang/text/src`, so every hourly round died
+   at load (`Could not find namespace: kotoba.lang.text`). Same class the
+   SessionStart detector `verify-nbb-declaration-visible` reported that
+   morning for four other entry points. Fixed here: `shinshi_cast_tick.py` and
+   the README's `CP` add `$K/text/src`; the live copy in `~/.hermes/scripts/`
+   was patched the same way and the next hourly run is the check (dry-run
+   passed 12/12 with the entry, failed at load without it).
+2. **OpenRouter balance: $4.11 of $2,396 remaining** (`/api/v1/credits`,
+   2026-09-11T00:50Z). Every fallback in every plane points at OpenRouter
+   (`z-ai/glm-5.3-flash`), so every murakumo hiccup now ends in a 402
+   (`requires more credits, or fewer max_tokens`). The budget guard
+   (ADR-2609091500) measures the DAY's spend against $50 and reads `LEVEL none`
+   — it does not read the remaining balance, so an empty account looks like a
+   quiet day. Topping up is money and therefore the owner's; the guard needs
+   a floor on `total_credits - total_usage` as a separate finding.
+3. **murakumo-main has one usable slot.** Measured 2026-09-11T00:45Z from this
+   machine: one request 200 in 23-27 s (~8 tok/s decode); two concurrent
+   requests both 502 `murakumo fleet unreachable: connection_refused` at
+   30 s. The app's `max-active 1` is therefore correct and must not be raised
+   on the alias's `parallel: 2`; the fleet-wide throughput ceiling is one LLM
+   run at a time for 147 Bots plus 248 hermes jobs.
+4. **kotobase.net rejects the video actor.** Onset coincides with the
+   2026-09-06 merge of `codex/biscuit-holder-principal` into kotobase-server
+   (a cleanup merge of a branch from 08-26). Not diagnosed further here; the
+   actor had nothing left to generate (`catalog-full`) so the cost today is
+   that the ledger is unreadable, not that clips are missing.
+5. **Domain Steward credential** (cloud-itonami-app, cross-business): the
+   account id is now in Keychain; the API token does not exist anywhere in
+   this workspace (`gftd.cf/API_TOKEN` measured revoked 2026-09-08). Owner
+   decision: issue a Registrar-scoped token, or authorize minting one with
+   the global key.
+
+## Decisions
+
+- **Role ownership is by plane, and a role has one owner.** The hermes
+  profiles own the five operating roles; the deterministic scripts own
+  cast posting and production; gad owns catalog video. The cloud-itonami-app
+  Bots for club-shinshi are the place to LOOK at and steer those roles, not a
+  second executor for them — a `club shinshi · Sales` Bot that drafts outreach
+  on the single shared slot is duplicating `shinshi-sales-tick` at 1/50th of
+  the cadence. Their cadences stay as provisioned for now; nothing here
+  disables a Bot the owner provisioned.
+- **A scheduled job's green is not the site's green.** Three of the four
+  planes reported success while doing nothing (hermes `ok` on the producer
+  beside a failing cast-post; gad `Result=success` on 225 skips; the app's
+  `running` with 116/147 jobs two cadences overdue). The measurement that
+  answers 「動いている?」 is a count on the product: cast posts per day in
+  `ai-gftd-pds-recordlog` (`rkey LIKE 'cast-%'`), clips published in the
+  actor's log, and turns completed per Bot — never the scheduler's status.
+- **Not done here, deliberately:** raising `max-active`; topping up
+  OpenRouter; minting a Cloudflare token; installing the retired Mac plist
+  for catalog video (gad owns it); changing the hourly cast cadence (chosen
+  2026-08-31, not measured here as wrong).
+
+## Resume point
+
+    # cast posts landed today (should be > 0 after the 10:00 JST round)
+    wrangler d1 execute ai-gftd-pds-recordlog --remote --json --command \\
+      \"SELECT substr(created_at,1,10) d, count(*) n FROM vertex_repo_record WHERE rkey LIKE 'cast-%' GROUP BY d ORDER BY d DESC LIMIT 3\"
+    # gad actor: first non-`skipped` KIND after the kotobase 401 is fixed
+    ssh gad@100.82.98.110 'sudo tail -400 /var/log/shinshi-video-actor.log | grep ^KIND | sort | uniq -c'
+    # OpenRouter floor
+    curl -s https://openrouter.ai/api/v1/credits -H \"Authorization: Bearer $(security find-generic-password -s gftd.openrouter -w)\"
+")))

@@ -18,6 +18,11 @@ cp = ":".join([
     os.path.join(k, "authority", "src"),
     os.path.join(k, "org-ietf-ed25519", "src"),
     os.path.join(k, "org-ietf-cbor", "src"),
+    # kotoba-lang/text: org-chainagnostic-cacao's src moved from clojure.string
+    # to kotoba.lang.text on 2026-09-09; without this entry every hourly round
+    # died at load with `Could not find namespace: kotoba.lang.text` -- 49
+    # consecutive hermes runs, 0 cast posts on shinshi.club from 09-09T06 JST.
+    os.path.join(k, "text", "src"),
 ])
 r = subprocess.run(
     ["nbb", "--classpath", cp, os.path.join(root, "scripts", "shinshi-cast-bots", "post.cljs")],
