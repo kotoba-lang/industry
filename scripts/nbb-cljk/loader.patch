@@ -1,0 +1,228 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index cb44791..9805c26 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -0,0 +1,4 @@
++## Local opt-in cljk loader patch
++
++- Resolve canonical sources through explicit repository origin manifests, including transitive require and reload. Reject unknown, ambiguous and target-incompatible candidates. Legacy execution is unchanged unless configured.
++
+diff --git a/src/nbb/api.cljs b/src/nbb/api.cljs
+index cc05a69..eff1e0a 100644
+--- a/src/nbb/api.cljs
++++ b/src/nbb/api.cljs
+@@ -43 +43,2 @@
+-                  (assoc opts :config
++                  (assoc opts :config-dir (path/dirname (path/resolve (:config opts)))
++                         :config
+diff --git a/src/nbb/core.cljs b/src/nbb/core.cljs
+index ce1f125..af37dfd 100644
+--- a/src/nbb/core.cljs
++++ b/src/nbb/core.cljs
+@@ -14,0 +15 @@
++   [nbb.cljk :as cljk]
+@@ -199,0 +201,5 @@
++(defn cljk-roots []
++  (or (get-in @opts [:config :cljk-roots])
++      (when-let [roots (.-NBB_CLJK_ROOTS (.-env process))]
++        (js->clj (js/JSON.parse roots)))))
++
+@@ -201 +207,3 @@
+-  (let [file (str/replace (str munged) #"\." "/")
++  (if-let [roots (cljk-roots)]
++    (cljk/resolve-source roots @cp/classpath-entries munged)
++    (let [file (str/replace (str munged) #"\." "/")
+@@ -209 +217 @@
+-                    files)) nil dirs)))
++                    files)) nil dirs))))
+@@ -511,0 +520,2 @@
++        _ (when-let [roots (cljk-roots)]
++            (cljk/validate-entry! roots sci-file))
+diff --git a/src/nbb/cljk.cljs b/src/nbb/cljk.cljs
+new file mode 100644
+index 0000000..fe0c636
+--- /dev/null
++++ b/src/nbb/cljk.cljs
+@@ -0,0 +1,88 @@
++(ns nbb.cljk
++  "Opt-in canonical source resolution; never rewrites source bytes."
++  (:require ["node:fs" :as fs]
++            ["node:path" :as path]
++            [clojure.string :as str]
++            [edamame.core :as reader]))
++
++(defn refuse [reason data]
++  (throw (ex-info (str "cljk: " (name reason) " " (pr-str data)) (assoc data :reason reason))))
++
++(defn inside? [root file]
++  (let [rel (path/relative root file)]
++    (and (not (path/isAbsolute rel))
++         (not= ".." rel) (not (str/starts-with? rel "../")))))
++
++(defn registry [roots]
++  (when-not (and (vector? roots) (every? string? roots))
++    (refuse :invalid-manifest {:detail :roots-must-be-vector}))
++  (mapv
++   (fn [root]
++     (when-not (path/isAbsolute root)
++       (refuse :invalid-manifest {:root root :detail :absolute-root-required}))
++     (let [root (fs/realpathSync root)
++           manifest (path/join root "cljk-origin.edn")
++           _ (when-not (inside? root (fs/realpathSync manifest))
++               (refuse :invalid-manifest {:path manifest}))
++           forms (try (reader/parse-string-all (fs/readFileSync manifest "utf8"))
++                      (catch :default _ (refuse :invalid-manifest {:path manifest})))
++           m (first forms)]
++       (when-not (and (= 1 (count forms)) (= :kotoba.cljk-origin/v1 (:format m))
++                      (map? (:origins m)))
++         (refuse :invalid-manifest {:path manifest}))
++       {:root root
++        :entries
++        (mapv (fn [[rel origin]]
++                (when-not (and (string? rel) (str/ends-with? rel ".cljk")
++                               (not (path/isAbsolute rel))
++                               (inside? root (path/resolve root rel))
++                               (contains? #{".cljs" ".cljc" ".clj"} origin))
++                  (refuse :invalid-origin {:path rel :origin origin}))
++                (let [file (path/resolve root rel)
++                      stem (subs file 0 (- (count file) 5))
++                      suffix (re-find #"\.(cljs|cljc|clj)$" stem)]
++                  (when (and suffix (not= (first suffix) origin))
++                    (refuse :invalid-origin {:path rel :origin origin}))
++                  (when-not (and (fs/existsSync file) (inside? root (fs/realpathSync file)))
++                    (refuse :invalid-manifest {:path file :detail :missing-or-escaping-source}))
++                  {:path file :origin origin
++                   :stem (if suffix (subs stem 0 (- (count stem) (count origin))) stem)}))
++              (:origins m))})) roots))
++
++(defn resolve-source [roots dirs munged]
++  ;; No cache: a reload must see the current manifest and source identity.
++  (let [repos (registry roots)
++        stem (str/replace (str munged) "." "/")]
++    (some
++     (fn [dir]
++       (let [dir (if (fs/existsSync dir) (fs/realpathSync dir) (path/resolve dir))
++             base (path/resolve dir stem)
++             owners (filter #(inside? (:root %) dir) repos)
++             _ (when (> (count owners) 1) (refuse :ambiguous-source {:path dir}))
++             entries (filter #(= base (:stem %)) (:entries (first owners)))
++             renamed (filter fs/existsSync
++                             (map #(str base %) [".cljk" ".cljs.cljk" ".cljc.cljk" ".clj.cljk"]))
++             _ (doseq [f renamed]
++                 (when-not (some #(= f (:path %)) entries)
++                   (refuse :invalid-origin {:path f})))
++             legacy (keep (fn [ext] (let [p (str base ext)]
++                                      (when (fs/existsSync p) {:path p :origin ext})))
++                          [".cljs" ".cljc" ".clj"])
++             candidates (concat entries legacy)]
++         (if (seq entries)
++           (do
++             (doseq [[_ group] (group-by :origin candidates)]
++               (when (> (count group) 1)
++                 (refuse :ambiguous-source {:paths (mapv :path group)})))
++             (or (some #(when (= ".cljs" (:origin %)) (:path %)) candidates)
++                 (some #(when (= ".cljc" (:origin %)) (:path %)) candidates)
++                 (refuse :target-incompatible {:namespace munged})))
++           (:path (first legacy))))) dirs)))
++
++(defn validate-entry! [roots file]
++  (when (str/ends-with? file ".cljk")
++    (let [file (fs/realpathSync file)
++          entries (filter #(= file (:path %)) (mapcat :entries (registry roots)))]
++      (when-not (= 1 (count entries)) (refuse :invalid-origin {:path file}))
++      (when (= ".clj" (:origin (first entries)))
++        (refuse :target-incompatible {:path file})))))
+diff --git a/test/cljk_loader_test.cljs b/test/cljk_loader_test.cljs
+new file mode 100644
+index 0000000..adfff52
+--- /dev/null
++++ b/test/cljk_loader_test.cljs
+@@ -0,0 +1,88 @@
++(ns cljk-loader-test
++  (:require [cljs.test :refer [deftest is run-tests]]
++            ["node:fs" :as fs] ["node:os" :as os]
++            ["node:path" :as path] ["node:child_process" :as cp]))
++(def host (path/resolve "cli.js"))
++(defn fixture [files origins]
++  (let [dir (fs/mkdtempSync (path/join (os/tmpdir) "nbb-cljk-test-"))]
++    (doseq [[name content] files]
++      (let [file (path/join dir name)]
++        (fs/mkdirSync (path/dirname file) #js {:recursive true})
++        (fs/writeFileSync file content)))
++    (fs/writeFileSync (path/join dir "cljk-origin.edn")
++                      (pr-str {:format :kotoba.cljk-origin/v1 :origins origins}))
++    dir))
++(defn invoke [roots dirs expr]
++  (let [env (js/Object.assign #js {} js/process.env
++                             #js {:NBB_CLJK_ROOTS (js/JSON.stringify (clj->js roots))})
++        r (cp/spawnSync js/process.execPath
++                        (clj->js (concat [host "--classpath" (.join (clj->js dirs) ":") "-e" expr]))
++                        #js {:encoding "utf8" :env env :timeout 20000})]
++    {:exit (.-status r) :text (str (.-stdout r) (.-stderr r))}))
++(deftest transitive-and-reload
++  (let [d (fixture {"a.cljk" "(ns a (:require [b :as b])) (def value b/value)"
++                    "b.cljk" "(ns b (:require [c :as c])) (def value c/value)"
++                    "c.cljk" "(ns c) (def value 42)"}
++                   {"a.cljk" ".cljs" "b.cljk" ".cljc" "c.cljk" ".cljs"})
++        r (invoke [d] [d] "(require '[a :as a]) (assert (= 42 a/value)) (println :transitive)")
++        expr (str "(require '[c :as c] '[\"node:fs\" :as fs]) (fs/writeFileSync "
++                  (pr-str (path/join d "c.cljk")) " \"(ns c) (def value 43)\")"
++                  " (require 'c :reload) (assert (= 43 c/value)) (println :reloaded)")]
++    (is (= 0 (:exit r)) (:text r))
++    (is (= 0 (:exit (invoke [d] [d] expr))))))
++(deftest platform-and-root-order
++  (let [d (fixture {"p.cljs.cljk" "(ns p) (def value :cljs)"
++                    "p.clj.cljk" "(ns p) (def value :clj)"
++                    "p.cljk" "(ns p) (def value #?(:cljs :portable :clj :wrong))"}
++                   {"p.cljs.cljk" ".cljs" "p.clj.cljk" ".clj" "p.cljk" ".cljc"})
++        e (fixture {"p.cljk" "(ns p) (def value :second)"} {"p.cljk" ".cljs"})]
++    (is (= 0 (:exit (invoke [d e] [d e] "(require '[p :as p]) (assert (= :cljs p/value))"))))
++    (fs/unlinkSync (path/join d "p.cljs.cljk"))
++    (fs/writeFileSync (path/join d "cljk-origin.edn") (pr-str {:format :kotoba.cljk-origin/v1 :origins {"p.cljk" ".cljc" "p.clj.cljk" ".clj"}}))
++    (is (= 0 (:exit (invoke [d] [d] "(require '[p :as p]) (assert (= :portable p/value))"))))))
++(deftest reject-invalid
++  (doseq [[files origins reason]
++          [[{"p.cljk" "(ns p)"} {} "invalid-origin"]
++           [{"p.cljk" "(ns p)"} {"p.cljk" ".unknown"} "invalid-origin"]
++           [{"p.cljk" "(ns p)" "p.cljs.cljk" "(ns p)"} {"p.cljk" ".cljs" "p.cljs.cljk" ".cljs"} "ambiguous-source"]
++           [{"p.cljk" "(ns p)"} {"p.cljk" ".clj"} "target-incompatible"]
++           [{"p.cljk" "(ns p)"} {"../outside.cljk" ".cljs"} "invalid-origin"]]]
++    (let [d (fixture files origins) r (invoke [d] [d] "(require 'p)")]
++      (is (not= 0 (:exit r)))
++      (is (.includes (:text r) reason) (:text r)))))
++(deftest duplicate-manifest-and-legacy
++  (let [d (fixture {"p.cljk" "(ns p)"} {"p.cljk" ".cljs"})]
++    (fs/writeFileSync (path/join d "cljk-origin.edn") "{:format :kotoba.cljk-origin/v1 :origins {\"p.cljk\" \".cljs\" \"p.cljk\" \".cljc\"}}")
++    (is (.includes (:text (invoke [d] [d] "(require 'p)")) "invalid-manifest")))
++  (let [d (fixture {"p.cljs" "(ns p) (def value 9)"} {})]
++    (is (= 0 (:exit (invoke [] [d] "(require '[p :as p]) (assert (= 9 p/value))"))))))
++(deftest manifest-reload-and-escaping-source
++  (let [d (fixture {"p.cljk" "(ns p) (def value 1)"} {"p.cljk" ".cljs"})
++        expr (str "(require 'p '[\"node:fs\" :as fs]) (fs/writeFileSync "
++                  (pr-str (path/join d "cljk-origin.edn")) " "
++                  (pr-str "{:format :kotoba.cljk-origin/v1 :origins {}}")
++                  ") (require 'p :reload)")]
++    (is (.includes (:text (invoke [d] [d] expr)) "invalid-origin")))
++  (let [d (fixture {} {}) e (fixture {"p.cljk" "(ns p)"} {"p.cljk" ".cljs"})]
++    (fs/symlinkSync (path/join e "p.cljk") (path/join d "p.cljk"))
++    (fs/writeFileSync (path/join d "cljk-origin.edn") (pr-str {:format :kotoba.cljk-origin/v1 :origins {"p.cljk" ".cljs"}}))
++    (is (.includes (:text (invoke [d] [d] "(require 'p)")) "invalid-manifest"))))
++(deftest invalid-first-root-and-source-diagnostics
++  (let [d (fixture {"p.cljk" "(ns p)"} {}) e (fixture {"p.cljk" "(ns p)"} {"p.cljk" ".cljs"})]
++    (is (.includes (:text (invoke [d e] [d e] "(require 'p)")) "invalid-origin")))
++  (let [d (fixture {"p.cljk" "(ns p) (throw (js/Error. \"canonical-source-error\"))"} {"p.cljk" ".cljs"})
++        r (invoke [d] [d] "(require 'p)")]
++    (is (not= 0 (:exit r)))
++    (is (.includes (:text r) "p.cljk"))))
++(deftest explicit-config-entrypoint
++  (let [d (fixture {"p.cljk" "(ns p) (println :config-ok)"} {"p.cljk" ".cljs"})
++        config (path/join d "nbb.edn")
++        _ (fs/writeFileSync config (pr-str {:cljk-roots [d]}))
++        r (cp/spawnSync js/process.execPath
++                        #js [host "--config" config (path/join d "p.cljk")]
++                        #js {:encoding "utf8" :timeout 20000})]
++    (is (= 0 (.-status r)) (.-stderr r))
++    (is (.includes (.-stdout r) ":config-ok"))))
++(defmethod cljs.test/report [:cljs.test/default :end-run-tests] [m]
++  (when (pos? (+ (:fail m) (:error m))) (set! (.-exitCode js/process) 1)))
++(run-tests 'cljk-loader-test)

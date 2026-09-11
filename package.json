@@ -12,7 +12,8 @@
     "fabric:fleet:witness": "node scripts/collect-fleet-witness.mjs",
     "kotoba:migration:common-libs": "nbb scripts/kotoba-cljc-common-lib-audit.cljs",
     "browser:cleanup": "node scripts/resource-guard.mjs cleanup-browser 60",
-    "test:resource-guard": "nbb scripts/resource-guard-test.cljs"
+    "test:resource-guard": "nbb scripts/resource-guard-test.cljs",
+    "nbb:cljk": "node .cache/nbb-cljk/cli.js"
   },
   "dependencies": {
     "@noble/curves": "^2.4.0",
