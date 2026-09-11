@@ -245,6 +245,46 @@
 (def contract
   (if (contains? #{"cluster" "judah"} (opt "--head" nil)) contract-cluster contract-api))
 
+;; ── Per-profile overrides ────────────────────────────────────────────────
+;; A profile whose PRIMARY is a different fleet-hosted id. Everything not
+;; named here comes from `contract`; the auxiliary lane (compression, titles,
+;; triage) always stays on the contract model -- background work never
+;; wakes a scale-to-zero GPU.
+;;
+;; glm53-cyber -- dealignai/GLM-5.3-Flash-CYBERSECURITY-W4A16 on a Modal
+;; 2x H200 origin behind api.murakumo.cloud (kotoba-lang/murakumo
+;; ADR-260911; gateway route in cloud-murakumo-api src/modal_hosted_model.js).
+;; Every number was measured on 2026-09-11, not read off a config:
+;;   context 131072   vLLM --max-model-len on the origin (the gateway's
+;;                    token budget agrees; 262144 would be refused there).
+;;   timeouts 2400 s  the origin is scale-to-zero and a cold start measured
+;;                    1,187 s and 1,528 s on the same day (195 GB of weights
+;;                    staged to NVMe, loaded, 51 CUDA graphs captured; the
+;;                    spread is host variance). The gateway holds the request
+;;                    for up to 2,400 s (its coldStartBudgetMs), so the CLIENT
+;;                    must hold at least as long: at the contract's 900 s a
+;;                    cold request dies at the client after the GPU has been
+;;                    paid for 15 min. stale_timeout is the same number for
+;;                    the same reason -- not one byte arrives until the model
+;;                    is up.
+;;   max_tokens 4096  the origin runs 128 sequences on 2x H200, not two
+;;                    slots on a mac mini, so the contract's 2048 slot-guard
+;;                    does not apply; 4096 is what an answer with a short
+;;                    <think> needs at reasoning_effort "low" (the gateway
+;;                    defaults that; the checkpoint honours only low/high).
+(def profile-overrides
+  {"glm53-cyber" {:model "glm-5.3-flash-cybersecurity-w4a16"
+                  :context-length 131072
+                  :max-tokens 4096
+                  :stale-timeout 2400
+                  :request-timeout 2400}})
+
+(defn contract-for
+  "The effective contract for one profile directory name. The root config
+  (`nil`) and every profile without an override get `contract` itself."
+  [profile]
+  (if-let [o (get profile-overrides profile)] (merge contract o) contract))
+
 ;; Models api.murakumo.cloud will NOT serve an anonymous caller. Measured
 ;; 2026-09-10; each returned 402 with `hosted_alternative: murakumo-main`.
 ;; Named literally so a config that keeps one is a finding with a reason,
@@ -423,9 +463,12 @@
   fallback lane. Profile configs get neither -- a per-profile fallback would
   be 231 independent chances to spend money that the budget guard prices as
   one account."
-  [root?]
+  ([root?] (render-owned root? contract))
+  ([root? c]
   (let [{:keys [base-url provider model max-tokens context-length
-                stale-timeout request-timeout max-parallel-jobs]} contract]
+                stale-timeout request-timeout max-parallel-jobs]} c
+        ;; the auxiliary lane never follows an override (see profile-overrides)
+        aux-model (:model contract)]
     (str/join
      "\n"
      (remove
@@ -469,7 +512,7 @@
                                "approval" "mcp" "title_generation" "triage_specifier"]]
                         (str "  " t ":\n"
                              "    base_url: " base-url "\n"
-                             "    model: " model))))
+                             "    model: " aux-model))))
        ;; EVERY config gets the lane, root and profile alike.
        ;;
        ;; A profile's config.yaml REPLACES the root's -- get_config_path() is
@@ -489,7 +532,7 @@
        (when root?
          (str "cron:\n"
               "  bot_chat_delivery_timeout_seconds: 900\n"
-              "  max_parallel_jobs: " max-parallel-jobs))]))))
+              "  max_parallel_jobs: " max-parallel-jobs))])))))
 
 (def root-header
   (str "# Managed by scripts/hermes-murakumo-api.cljk. Do not hand-edit the\n"
@@ -522,18 +565,19 @@
 (defn rewrite-yaml
   "Owned blocks replaced, unowned blocks carried through in their original
   order, owned blocks that were absent appended."
-  [yaml root?]
+  ([yaml root?] (rewrite-yaml yaml root? contract))
+  ([yaml root? c]
   (let [yaml (if root? (strip-stale-header yaml) yaml)
         blocks (top-level-blocks (or yaml ""))
         owned  (into {} (map (fn [[k _]] [k true]) (filter #(owned-keys (first %)) blocks)))
         new    (into {} (map (fn [b] [(first (str/split b #":")) b])
-                             (str/split (render-owned root?) #"\n(?=[A-Za-z_])")))
+                             (str/split (render-owned root? c) #"\n(?=[A-Za-z_])")))
         kept   (map (fn [[k text]]
                       (if (owned-keys k) (get new k) text))
                     blocks)
         missing (remove #(get owned %) (keys new))]
     (str (when root? root-header)
-         (str/join "\n" (remove nil? (concat kept (map new missing)))) "\n")))
+         (str/join "\n" (remove nil? (concat kept (map new missing)))) "\n"))))
 
 ;; ── the fleet on disk ────────────────────────────────────────────────────
 
@@ -622,12 +666,14 @@
                     :when (needs-config? d)]
                 {:profile (path/basename d) :path p
                  :absent (not (fs/existsSync p))
+                 :expected (:model (contract-for (path/basename d)))
                  :model (yaml-scalar (slurp* p) "model" "default")
                  :base-url (yaml-scalar (slurp* p) "model" "base_url")})
         jobs (for [p (job-files)
                    :let [d (read-jobs p)]
                    j (or (:jobs d) [])]
                {:path p :profile (path/basename (path/dirname (path/dirname p)))
+                :expected (:model (contract-for (path/basename (path/dirname (path/dirname p)))))
                 :id (:id j) :name (:name j)
                 :model (:model j) :provider (:provider j) :base-url (:base_url j)
                 :enabled (:enabled j) :status (:last_status j) :resolver (resolver-job? j)
@@ -640,9 +686,13 @@
 
 (defn findings-of [s]
   (let [{:keys [root-model configs jobs]} s
-        off-conf (remove #(= (:model %) (:model contract)) configs)
+        ;; a profile is judged against ITS contract (profile-overrides), and
+        ;; the expectation is derived from the profile name here so a survey
+        ;; row that never carried one still gets the right answer
+        expected #(or (:expected %) (:model (contract-for (:profile %))))
+        off-conf (remove #(= (:model %) (expected %)) configs)
         bad-conf (filter #(unservable-models (:model %)) configs)
-        off-job  (filter :enabled (remove #(= (:model %) (:model contract)) jobs))
+        off-job  (filter :enabled (remove #(= (:model %) (expected %)) jobs))
         bad-job  (filter #(unservable-models (:model %)) (filter :enabled jobs))]
     (remove
      nil?
@@ -664,7 +714,9 @@
       (when (seq off-conf)
         {:id "off-contract-config" :level :warn :n (count off-conf)
          :text (str (count off-conf) " of " (count configs)
-                    " profile config(s) do not name " (:model contract))})
+                    " profile config(s) do not name their contract model ("
+                    (:model contract) ", or the profile-overrides entry): "
+                    (str/join ", " (take 6 (map #(str (:profile %) "=" (:model %)) off-conf))))})
       (when (seq bad-job)
         {:id "unservable-model-job" :level :fail :n (count bad-job)
          :text (str (count bad-job) " enabled cron job(s) pin a model the endpoint will not serve: "
@@ -677,8 +729,9 @@
                       (str/join ", " (map #(str (:profile %) "/" (:name %)) live)))}))
       (when (seq off-job)
         {:id "off-contract-job" :level :warn :n (count off-job)
-         :text (str (count off-job) " enabled cron job(s) do not pin " (:model contract)
-                    " -- an unpinned or drifted snapshot is what makes a tick drift_skip")})])))
+         :text (str (count off-job) " enabled cron job(s) do not pin their contract model"
+                    " -- an unpinned or drifted snapshot is what makes a tick drift_skip: "
+                    (str/join ", " (take 6 (map #(str (:profile %) "/" (:name %)) off-job))))})])))
 
 ;; ── writing ──────────────────────────────────────────────────────────────
 
@@ -688,9 +741,9 @@
       (fs/copyFileSync p b))
     b))
 
-(defn write-config! [p root?]
+(defn write-config! [p root? c]
   (let [before (slurp* p)
-        after  (rewrite-yaml before root?)]
+        after  (rewrite-yaml before root? c)]
     (if (= before after)
       {:path p :changed false}
       (do (backup! p) (spit* p after) {:path p :changed true}))))
@@ -707,7 +760,8 @@
   (let [d (read-jobs p)]
     (if-not d
       {:path p :changed false :error "unreadable"}
-      (let [{:keys [provider model base-url]} contract
+      (let [{:keys [provider model base-url]}
+            (contract-for (path/basename (path/dirname (path/dirname p))))
             jobs (:jobs d)
             new  (mapv (fn [j]
                          (if (resolver-job? j)
@@ -726,11 +780,11 @@
               {:path p :changed true :repinned (- n dis) :disabled dis :jobs (count jobs)}))))))
 
 (defn apply! []
-  (let [root (write-config! (path/join home "config.yaml") true)
+  (let [root (write-config! (path/join home "config.yaml") true contract)
         confs (doall (for [d (profile-dirs)
                            :let [p (path/join d "config.yaml")]
                            :when (needs-config? d)]
-                       (write-config! p false)))
+                       (write-config! p false (contract-for (path/basename d)))))
         jobs (doall (map write-jobs! (job-files)))]
     {:root root
      :configs-changed (count (filter :changed confs))
@@ -794,6 +848,35 @@
     (let [out (rewrite-yaml "_config_version: 41\n" false)]
       (is "rewrite/appends-missing" (str/includes? out "default: murakumo-main") true)
       (is "rewrite/appends-keeps-other" (str/includes? out "_config_version: 41") true))
+
+    ;; a per-profile override changes the primary and its budget, and ONLY
+    ;; those: the auxiliary lane stays on the contract model, and a profile
+    ;; without an override renders byte-identically to before
+    (let [c (contract-for "glm53-cyber")
+          out (rewrite-yaml "model:\n  default: old\n_config_version: 41\n" false c)]
+      (is "override/primary" (yaml-scalar out "model" "default") "glm-5.3-flash-cybersecurity-w4a16")
+      (is "override/context" (str/includes? out "context_length: 131072") true)
+      (is "override/max-tokens" (str/includes? out "max_tokens: 4096") true)
+      (is "override/request-timeout" (str/includes? out "request_timeout_seconds: 2400") true)
+      (is "override/stale-timeout" (str/includes? out "stale_timeout_seconds: 2400") true)
+      (is "override/aux-stays-on-contract"
+          (str/includes? out (str "compression:\n    base_url: " (:base-url contract) "\n    model: " (:model contract)))
+          true)
+      (is "override/aux-never-cyber" (str/includes? out "model: glm-5.3-flash-cybersecurity-w4a16\n  web_extract") false)
+      (is "override/idempotent" (rewrite-yaml out false c) out)
+      (is "override/not-unservable" (boolean (unservable-models (:model c))) false))
+    (is "override/absent-is-contract" (contract-for "amu") contract)
+    (is "override/absent-renders-same"
+        (rewrite-yaml "model:\n  default: old\n" false (contract-for "amu"))
+        (rewrite-yaml "model:\n  default: old\n" false))
+    ;; findings judge a profile against ITS contract, not the global one
+    (let [f (findings-of {:root-model (:model contract)
+                          :configs [{:profile "glm53-cyber" :model "glm-5.3-flash-cybersecurity-w4a16"
+                                     :expected "glm-5.3-flash-cybersecurity-w4a16" :absent false}
+                                    {:profile "amu" :model "glm-5.3-flash-cybersecurity-w4a16"
+                                     :expected "murakumo-main" :absent false}]
+                          :jobs []})]
+      (is "override/findings-off-contract-count" (:n (first (filter #(= "off-contract-config" (:id %)) f))) 1))
 
     ;; the models the endpoint refuses are named, so a config keeping one fails
     (is "unservable/glm" (boolean (unservable-models "z-ai/glm-5.3-flash")) true)
