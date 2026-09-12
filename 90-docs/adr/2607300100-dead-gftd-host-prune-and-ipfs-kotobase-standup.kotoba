@@ -4,7 +4,7 @@
   (:adr/status "accepted")
   (:adr/authoritative true)
   (:adr/topic "infra-hostname-retirement")
-  (:adr/last_verified "2026-07-30")
+  (:adr/last_verified "2026-09-12")
   (:adr/related (vector "2607072000-gftdcojp-net-kotobase-ipfs-gateway-split"))
   (:adr/title "ADR-2607300100: retiring the dead gftd.ai hosts, and standing up ipfs.kotobase.net")
   (:adr/body "# ADR-2607300100: retiring the dead gftd.ai hosts, and standing up ipfs.kotobase.net
@@ -192,4 +192,27 @@ Then: write the ADR that `docs/ENVIRONMENT.md` requires, flip
 `KOTOBASE_B2_ARCHIVE_CIDS=1`, backfill or accept forward-only archiving, and
 set `KOTOBASE_B2_{ENDPOINT,BUCKET,KEY_ID,APP_KEY}` on `net-kotobase-ipfs` with
 a read-only key. The gateway hostname and every caller stay unchanged.
+
+## Third wave: `murakumo.gftd.ai` (2026-09-12)
+
+Same owner directive (\"murakumo.gftd.ai を prune\"), one more hostname. Unlike
+the six above it had **no DNS record at all** — the 192.0.2.1 answer comes from
+the `*.gftd.ai → 192.0.2.1` (proxied) wildcard sinkhole every retired host
+inherits (DNS queries of a record-less Workers route answer the same
+placeholder). What was still alive was a zombie: route `murakumo.gftd.ai/*` and
+script `ai-gftd-murakumo-2603241700` (same 2603241700 deployment wave as the
+retired PDS), holding a `*/5 * * * *` cron trigger whose ~1811 invocations per
+7d were pure cron burn, and bindings pointing at a host this ADR already
+retired (`mcp.gftd.ai`) plus `murakumo-serve.gftd.ai`. No manifest repo, no
+other route consuming the script. Both deleted via Cloudflare API (route id
+`b62291183c804cd7883cbcd294f6c3c2`; script with `force=true`, same cron-blocked
+delete as the wave-2 PDS). Verified after: script answers 10007, the zone has
+no murakumo route left, and the hostname answers exactly like `mcp.gftd.ai` /
+`atproto.gftd.ai`.
+
+Repo follow-up, category (a): `70-tools/bmc/collect.cljk` tracked the script as
+the `:cloud-murakumo` product's worker; removed with the reason inline. The
+1811/7d was cron burn, not product traffic — murakumo.cloud is served by
+`murakumo-llms` (the zone's only worker routes) and `api.murakumo.cloud`, both
+verified 200 after the delete. The two ADRs naming the host stay as history.
 ")))

@@ -40,7 +40,13 @@
    ;; metadata.product=cloud-murakumo が付く (cloud-murakumo fcd317d)。
    ;; stripe-summary の :murakumo-paid-charges を funnel revenue 段が読む。
    :cloud-murakumo  {:zone "9795417e38ef69e173fe37371f937f3e" :zone-name "murakumo.cloud"
-                     :workers #{"ai-gftd-murakumo-2603241700"}
+                     ;; :workers を削除 (2026-09-12): 旧 gftd.ai の
+                     ;; ai-gftd-murakumo-2603241700 を追跡対象にしていたが、
+                     ;; murakumo.gftd.ai の prune (ADR-2607300100) で Worker 自体を
+                     ;; 削除した。workers-invocations-7d の 1811 は cron 焼けであって
+                     ;; 製品 traffic ではなかった (murakumo.cloud の配信は
+                     ;; murakumo-llms と api.murakumo.cloud が担い、この Worker は
+                     ;; 載っていない)。:workers 無しの product は cloud-manimani と同型。
                      :health "https://murakumo.cloud/" :stripe true}
    :cloud-manimani  {:zone "f28dd3b902729a343d2b9d09a2c548e8" :zone-name "manimani.cloud"
                      :health "https://manimani.cloud/"}
