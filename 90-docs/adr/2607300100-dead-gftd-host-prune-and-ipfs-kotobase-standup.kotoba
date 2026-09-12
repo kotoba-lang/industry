@@ -284,14 +284,6 @@ retires any of these:
   `api.murakumo.cloud` is the live fleet surface (root answers 404, alive).
 - `ollama-tunnel.gftd.ai` CNAME → the down ollama-gftd tunnel (record from
   2026-04-15). If the tunnel returns, the hostname works again.
-- `kotobase.gftd.ai` CNAME → the down kotobase tunnel (record from 2026-06-02)
-  while a live route serves net-kotobase at the edge. The CNAME shadows the
-  route at the DNS layer: plain clients resolve the tunnel CNAME (unreachable
-  ULA) and never reach the edge, so the name is publicly unreachable today
-  even though the edge route is live. Deleting the CNAME would hand the name
-  to the proxied wildcard, whose edge IPs plus the live route would serve it —
-  but the name carries MIGRATION.md's keep-alias policy (wave-1 kept it for
-  its 200), so this needs an owner decision rather than a prune.
 - `engi` / `itad` / `kakure` Workers custom domains: edge-live, publicly
   unresolvable under the literal-answer behavior above.
 
@@ -299,4 +291,54 @@ Also not verified from here: the tunnels are locally managed
 (`remote_config: false`), so their ingress rules are not readable via the API
 — whether a down tunnel would resume serving its hostname is a fact about the
 machine, not about this account.
+
+## Fifth wave: the `kotobase.gftd.ai` CNAME (2026-09-12)
+
+Same owner directive (`kotobase.gftd.ai を prune`). One record deleted, one
+route deliberately kept — the split matters because the newest decision on
+this hostname is not this ADR's.
+
+**Deleted**: the proxied CNAME `kotobase.gftd.ai →
+fe8d39eb-07fd-4760-a8e7-0938035a0b2a.cfargotunnel.com` (record
+`88cf1e94e3714ade2cb1e1cf343dd322`, created 2026-06-02). Pre-delete GET
+confirmed the exact content, DELETE returned 200, post-GET returned
+`81044: Record does not exist`. Zone DNS records: 91 → 90. The kotobase
+tunnel itself stays (down, 0 connections — down is not retired). Zone routes
+stay at 25: `kotobase.gftd.ai/* → net-kotobase` remains.
+
+**Why the route stays**: ADR-2608179000 (2026-08-17) found the abolished host
+answering 200 with the whole site and corrected it to the documented contract
+— browsers 301 to kotobase.net while `/.well-known/did.json` keeps serving,
+because `did:web:kotobase.gftd.ai` resolves at that path and an abolished
+name still owes answers to the identities issued under it. Its gap ledger
+records the route as deliberately remaining, removal bundled with a DID
+migration plan; ADR-2608051000's removal-everything decision (owner,
+2026-08-04) is sequenced behind that plan. Re-measured live today at the
+edge, both murakumo.cloud edge addresses: did.json 200 with
+`alsoKnownAs [did:web:kotobase.net]` (the legacy document — id
+`did:web:kotobase.gftd.ai` — still served), browser navigation to /signup
+301 → kotobase.net/signup. Nothing in this wave touched the route, the
+Worker, or the repo-side legacy-DID items.
+
+**Measured before and after the delete — the fourth wave's prediction was
+wrong.** Pre-delete, plain DNS answered the proxied CNAME's literal tunnel
+chain (`<uuid>.cfargotunnel.com`, AAAA `fd10:aec2:5dae::`, no A): 000.
+Post-delete, authoritative (everton/vivienne.ns.cloudflare.com) and 1.1.1.1
+both answer `A 192.0.2.1` — the proxied wildcard record's LITERAL content
+(TEST-NET-1, unreachable), not Cloudflare edge IPs; plain curl stays 000
+(timeout), identical to pre-delete. The fourth wave predicted that deleting
+the CNAME would hand the name to the wildcard whose edge IPs plus the live
+route would restore 200 — refuted: the wildcard is itself a proxied record,
+and this zone's proxied records answer literally too. The literal-answer
+behavior now covers A, AAAA and CNAME, proxied or not. At the edge
+(`curl --resolve` to the murakumo.cloud edge addresses) /health returned 200
+on BOTH addresses before and after the delete. Net effect on clients: none —
+publicly the name was already unreachable before the delete (dead tunnel
+chain) and stays unreachable after (192.0.2.1); MIGRATION.md's keep-alias
+note (200 measured 2026-07-29, an edge-level fact per the fourth wave)
+remains true at that layer.
+
+Relative to ADR-2608051000's six-item scope, this wave completed item ⑥ (the
+CF DNS record; item ⑤ was already done earlier); items ①-④ remain gated by
+ADR-2608179000's DID migration plan and were not touched.
 ")))

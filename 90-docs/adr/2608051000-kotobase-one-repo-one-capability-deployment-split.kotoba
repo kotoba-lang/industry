@@ -192,7 +192,15 @@
      "did_document_test / public-smoke / api-compat-check / site-check の legacy-did assertion を削除"
      "kotobase.net の DID document から alsoKnownAs did:web:kotobase.gftd.ai を削除"
      "gftdcojp/ai-gftd-kotobase の KOTOBASE_ACTOR_DID を did:web:kotobase.net に変更"
-     "CF DNS から kotobase.gftd.ai を削除"))))
+     "CF DNS から kotobase.gftd.ai を削除"))
+
+    (:progress-2026-09-12
+    "CF DNS の CNAME（down tunnel 向け、record 88cf1e94e3714ade2cb1e1cf343dd322）は
+     ADR-2607300100 fifth wave（2026-09-12）で削除済み。route の削除は
+     ADR-2608179000（2026-08-17 landed fdf1045）が記録した identity 応答義務
+     ——廃止名でも /.well-known/did.json で答え続ける——により、DID の移行計画と
+     セットでなければ行えない。項目 ①〜④ はこの gate の後ろに順序づけられる
+     （⑤は ai-gftd-kotobase 側で済み、⑥はこの wave で完了）。")))
 
    (:secret-retrievability-gate
    (map (:rule
