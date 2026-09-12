@@ -215,4 +215,88 @@ the `:cloud-murakumo` product's worker; removed with the reason inline. The
 1811/7d was cron burn, not product traffic — murakumo.cloud is served by
 `murakumo-llms` (the zone's only worker routes) and `api.murakumo.cloud`, both
 verified 200 after the delete. The two ADRs naming the host stay as history.
+
+## Fourth wave: the remaining zombie routes and retired-host DNS (2026-09-12)
+
+Same owner directive extended to the whole zone: audit every gftd.ai route and
+DNS record, prune what is clearly dead, leave anything down-but-not-retired
+alone. The audit walked the zone's DNS records, Workers routes and the
+account's tunnels; it found five more zombies — null-script routes, the exact
+shape the third wave defined — and three CNAME leftovers pointing retired
+hosts at tunnels. All eight deleted via the Cloudflare API, each verified by a
+post-delete GET returning not-found.
+
+Routes deleted (script binding null; the route outlived its script):
+
+- `monitor.gftd.ai/*` — `50f59dfce26d4c69b87e8ff3c80ea2cc`
+- `jacob-status.gftd.ai/*` — `bb191ae087284180846c8a68425eec86`
+- `kotoba-backend.gftd.ai/*` — `86dc6bfddb8a4a65b89fe12cbe739bd8`
+- `explorer.gftd.ai/*` — `a40d7cecba684fb3ac6b68139505fd41`
+- `lg-manimani.gftd.ai/*` — `de68f6b8a7d946bb948e177a0e5b4201`
+
+Zone routes: 30 → 25, every remaining route script-bound (`kotobase.gftd.ai →
+net-kotobase` among them). Zone DNS records: 94 → 91.
+
+CNAME leftovers deleted (hosts the first wave retired; the DNS record was what
+survived them):
+
+- `gateway.gftd.ai` → `<uuid>.cfargotunnel.com`, record
+  `c0b4beda27c703bd3ed9197225d7083b` (created 2026-07-09). The gftd-llm
+  tunnel behind it is healthy — the host was retired, not the tunnel, so the
+  record was re-binding a retired name to a live tunnel.
+- `ipfs.gftd.ai` — record `b6cff21a756a2956195dac77b93050a8` (2026-05-28), and
+  `ipfs-origin.gftd.ai` — `c02b5837270c42735f595fea2902c6b3` (2026-04-26),
+  both to the ipfs-origin tunnel (down).
+
+**A measurement finding that recolors every curl number in this ADR**: the
+zone's authoritative nameservers answer literal record contents to the public.
+A tunnel CNAME resolves to `<uuid>.cfargotunnel.com`, which has no public A
+record and answers AAAA `fd10:aec2:5dae::` — a ULA no outside client can reach
+— and a Workers custom domain answers its literal `AAAA 100::`. Plain
+curl/dig therefore returns 000/unreachable for every gftd.ai hostname,
+including live ones, and **000 is not evidence that a route or tunnel is
+dead**. Liveness truth here is the Cloudflare API (route/script binding,
+tunnel connections) plus edge-level tests (`curl --resolve
+<host>:443:<murakumo.cloud edge IP>`), which during this wave gave
+kotobase.gftd.ai 200 (live route), engi.gftd.ai 404 at / (live custom domain),
+monitor.gftd.ai 530 (zombie since deleted). The earlier readings in this ADR
+(530/000) and the July kotobase.gftd.ai 200 are edge-level or
+client-environment artifacts, not facts about the zone.
+
+Category (a) follow-up: `orgs/com-junkawasaki/tanabe-3d/marble_pipeline.py`
+was still emitting retrieval URLs to the retired `ipfs.gftd.ai`; repointed to
+the first wave's successor `https://ipfs.kotobase.net/ipfs/<cid>`, and its
+Stage-2 permanent pin (`ai.gftd.apps.ipfsIngest.pin` through the gftd CLI)
+— aimed at the retired gftd PDS, whose lexicons answer 404 at the successor —
+now skips with that reason instead of attempting a doomed call. The one other
+reference outside ADRs,
+`90-docs/business/net-kotobase-graphdb-baas-execution-plan-2026-07-24.md`, is
+a dated measurement snapshot (530 was true when measured) and stays. The
+search covers checked-out files and the repo-search index; west repos that are
+not checked out were not searched — the honest bound of this audit.
+
+Left alone deliberately — **down is not retired**, and no owner decision
+retires any of these:
+
+- `murakumo-fleet` tunnel (0 connections), serving the fleet's litellm /
+  murakumo-serve / `murakumo-{levi,naphtali,simeon}` / dashboard / xrpc
+  `*.murakumo-internal` surface. Dark while the tunnel is down;
+  `api.murakumo.cloud` is the live fleet surface (root answers 404, alive).
+- `ollama-tunnel.gftd.ai` CNAME → the down ollama-gftd tunnel (record from
+  2026-04-15). If the tunnel returns, the hostname works again.
+- `kotobase.gftd.ai` CNAME → the down kotobase tunnel (record from 2026-06-02)
+  while a live route serves net-kotobase at the edge. The CNAME shadows the
+  route at the DNS layer: plain clients resolve the tunnel CNAME (unreachable
+  ULA) and never reach the edge, so the name is publicly unreachable today
+  even though the edge route is live. Deleting the CNAME would hand the name
+  to the proxied wildcard, whose edge IPs plus the live route would serve it —
+  but the name carries MIGRATION.md's keep-alias policy (wave-1 kept it for
+  its 200), so this needs an owner decision rather than a prune.
+- `engi` / `itad` / `kakure` Workers custom domains: edge-live, publicly
+  unresolvable under the literal-answer behavior above.
+
+Also not verified from here: the tunnels are locally managed
+(`remote_config: false`), so their ingress rules are not readable via the API
+— whether a down tunnel would resume serving its hostname is a fact about the
+machine, not about this account.
 ")))

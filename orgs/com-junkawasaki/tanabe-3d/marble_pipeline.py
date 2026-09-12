@@ -128,7 +128,8 @@ def process_scene(
     cid = add_file(splat_path)
     entry["cid"] = cid
     entry["cidv"] = 1
-    entry["ipfs_url"] = f"https://ipfs.gftd.ai/ipfs/{cid}"
+    # ipfs.gftd.ai retired (ADR-2607300100); successor gateway is ipfs.kotobase.net
+    entry["ipfs_url"] = f"https://ipfs.kotobase.net/ipfs/{cid}"
     entry["ipfs_public_url"] = f"https://ipfs.io/ipfs/{cid}"
     pin = pin_remote_gftd(cid, scene=name, source=f"marble.{model}")
     entry["remote_pin"] = pin
