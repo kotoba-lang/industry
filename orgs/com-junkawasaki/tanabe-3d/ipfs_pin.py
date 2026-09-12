@@ -1,14 +1,16 @@
-"""IPFS publish — local kubo add + gftd permanent pin XRPC.
+"""IPFS publish — local kubo add + gateway URL.
 
 Pattern per ADR-2604261936 (IPFS self-hosted Vultr+B2) + ADR-2605262200
 (animeka v9 mmaudio IPFS scene pipeline):
 
   Stage 1: local `ipfs add --cid-version 1 --pin` → CIDv1, kubo local pin
-  Stage 2: ai.gftd.apps.ipfsIngest.pin XRPC → gftd-managed Filecoin anchor
+  Stage 2: RETIRED (ADR-2607300100) — the ai.gftd.apps.ipfsIngest.pin XRPC
+    went through the gftd PDS, which that ADR retired; the lexicon answers 404
+    at the successor. pin_remote_gftd skips with that reason. A permanent-pin
+    successor (kotobase pinning) is an open decision, not wired here.
 
 Requires:
   - `ipfs` (kubo) installed locally and `ipfs daemon` running, or `ipfs init` done
-  - For Stage 2: gftd agent token (gftd auth login) — optional, skipped if unavailable
 """
 from __future__ import annotations
 
@@ -65,29 +67,15 @@ def add_dir(path: Path, *, cid_version: int = 1) -> str:
 
 
 def pin_remote_gftd(cid: str, *, scene: str, source: str = "marble-1.1") -> dict:
-    """Stage 2: ask the gftd cluster to permanently pin this CID via XRPC.
+    """Stage 2 (retired): permanent pin via the gftd PDS XRPC.
 
-    XRPC: ai.gftd.apps.ipfsIngest.pin (gftd-managed Filecoin backing)
-    Requires `gftd` CLI in PATH and `gftd auth login` already done.
-
-    Returns the XRPC response dict, or {'skipped': '<reason>'} if env is incomplete.
+    The endpoint ai.gftd.apps.ipfsIngest.pin lived on the gftd PDS, which
+    ADR-2607300100 retired — lexicons answer 404 at the successor
+    (pds.aozora.app) and the gftd CLI is retired tooling. The call is skipped
+    with that reason; entries carry {"skipped": ...} exactly as they did when
+    the CLI was missing, so callers keep working unchanged.
     """
-    gftd = shutil.which("gftd")
-    if not gftd:
-        return {"skipped": "gftd CLI not in PATH (run from gftd repo or install)"}
-    # gftd CLI conventionally accepts XRPC payload via subcommand; if not, fall
-    # back to a direct REST call. Adapt to your CLI version.
-    cmd = [
-        gftd, "xrpc", "call", "ai.gftd.apps.ipfsIngest.pin",
-        "--input", json.dumps({"cid": cid, "scene": scene, "source": source}),
-    ]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        return {"skipped": f"xrpc call failed: {r.stderr[:200]}", "cid": cid}
-    try:
-        return json.loads(r.stdout)
-    except json.JSONDecodeError:
-        return {"raw": r.stdout, "cid": cid}
+    return {"skipped": "gftd PDS retired (ADR-2607300100); permanent-pin successor is an open decision"}
 
 
 def write_manifest(out_path: Path, entries: list[dict]) -> None:
