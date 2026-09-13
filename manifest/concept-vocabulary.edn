@@ -615,4 +615,12 @@ hash してから記録する。"}
   :query-spellings ["エッジ" "apex" "workers" "serverless" "CDN edge"
                     "公開面" "公開ホスト" "hostname" "ホスト名"]
   :note "**itonami の公開エッジは cloud-itonami/cloud-itonami-apex**（2026-09-07、adr-2609076000）—— `agent.` `hooks.` `app.` `mcp.` itonami.cloud の 4 Worker が、それぞれ自分の wrangler config と依存を持ち、独立に rollback する。境界は好みで引いたのではなく、アプリツリーへの参照数を数えて出た: 4 つとも 0、`app-edge` だけ 4（`worker.cljs` が `cloud.itonami.app.fleet-core` と `.kotoba-oracle` を require）。**結合していた 1 つが、ちょうど公開ホスト名を持たない方**で、その wrangler config は「進行中の slice が live なホストを道連れにできないよう workers.dev のみ」と自分で書いている。だから `app-edge` は cloud-itonami-app に残る。⚠ **ソースを移しても Worker は移らない** —— live な 4 ホストは Cloudflare にある最後のデプロイを配信し続けるので、cutover は 1 Worker ずつ deploy して host が答えることを確かめる別作業。⚠ この概念は「エッジで動く実行面」であって、事業者の公開サイト（`:web-presence` の暖簾）とは別。"}
+
+ :ir-remocon
+ {:label "学習リモコン / IR remote control codes"
+  :spellings ["remocon" "リモコン" "学習リモコン" "ir remote" "赤外線リモコン"
+              "pronto hex" "prontohex" "NEC IR" "ir code"]
+  :note "**実装は kotoba-lang/remocon**（2026-09-13 着地）—— 赤外線リモコン信号を EDN で表す純 .cljc: raw burst（mark/space μs 列）、NEC フレーム codec（tick は burst から導出、repeat フレーム対応）、ProntoHex ↔ raw burst 変換（clock 2.41246 Hz 単位 / 414.5156us、量子化は損失ありで round trip は近似）、学習コード台帳（:source 出所必須、duplicate key 検出）。**IR ハード輸送（LED / 受信モジュール / LIRC / Broadlink）は持たない**——host-injected。com-remote は HR の clean-room actor で別物。"}
+
+}
 }
