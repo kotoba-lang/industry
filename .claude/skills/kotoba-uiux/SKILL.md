@@ -9,6 +9,8 @@ description: Build web / local-app UI in cljc on this workspace's BASE design sy
 
 Shared design rules, contracts and prototype: [kotoba-lang/cloud-kotoba-dds](https://github.com/kotoba-lang/cloud-kotoba-dds).
 
+For conversation/generation UI, reuse the `cloud-kotoba-dds.chat`, `.styles` and `.browser` APIs described in [CHAT_COMPONENTS.md](https://github.com/kotoba-lang/cloud-kotoba-dds/blob/main/CHAT_COMPONENTS.md). Pin the verified version; do not copy the composer, conversation layout or message renderer into each product. Keep authentication, model requests, persistence, billing and consent policy in the host adapter. The current API is 0.3.0-alpha, used by Murakumo; additional framework controllers remain separate work.
+
 **`cloud-kotoba-dds` prioritizes the user's task and next action.** Apply this
 rule when building or reviewing Kotoba product UI on the `jp-go-dds` foundation.
 The Murakumo conversation screen is the accepted example: composing is primary;
