@@ -7,6 +7,8 @@ description: Build web / local-app UI in cljc on this workspace's BASE design sy
 
 ## Intuitive, task-first UI (owner decision, 2026-09-13)
 
+Shared design rules, contracts and prototype: [kotoba-lang/cloud-kotoba-dds](https://github.com/kotoba-lang/cloud-kotoba-dds).
+
 **`cloud-kotoba-dds` prioritizes the user's task and next action.** Apply this
 rule when building or reviewing Kotoba product UI on the `jp-go-dds` foundation.
 The Murakumo conversation screen is the accepted example: composing is primary;
