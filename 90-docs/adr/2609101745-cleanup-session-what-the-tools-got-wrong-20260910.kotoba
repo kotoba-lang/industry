@@ -1,0 +1,136 @@
+(vector (map (:db/id -1)
+  (:adr/doc_type "adr")
+  (:adr/id "adr-2609101745-cleanup-session-what-the-tools-got-wrong-20260910")
+  (:adr/topic "cleanup-tooling-defects-measured")
+  (:adr/title "A cleanup pass over 4,506 checkouts, and the four tool defects it had to measure around")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-10")
+  (:adr/deciders (vector "Jun Kawasaki" "Claude Opus 5"))
+  (:adr/repos (vector "com-junkawasaki/root" "kotoba-lang/aiueos" "kotoba-lang/kotobase" "network-awai/loop-consumability"))
+  (:adr/related (vector "adr-2608136000-eight-questions-before-you-trust-a-green"
+                "adr-2608230300-asked-and-could-not-answer-are-not-the-same"
+                "adr-2609061800-worktree-model-is-not-abandoned-for-disk"))
+  (:adr/body
+  "## Context
+
+A `git-cleanup-conflict` pass on 2026-09-10. What is worth keeping is not the
+cleanup itself but the four places where a tool reported a clean answer it had
+not earned, and the three places where my own probes did the same. Every one of
+them was caught by an evidence floor, not by judgement.
+
+## What landed
+
+    root#3079                MERGED   three appkit cljs mutations, stranded on no branch
+    kotobase#84              MERGED   code-graph slice rescued from a 2026-07-26 stash
+    loop-consumability#6     MERGED   one uncommitted tracked change
+    aiueos#343               CLOSED   :close-stale-revert-risk, see defect 3
+    one kaiyu-kaizen event   LANDED   via ledger-land.cljs, judgement entry main lacked
+
+    local branches   22 -> 4      worktrees   21 -> 3      GitHub branches  315 -> 12
+    root stashes      1 -> 0      fleet stashes 10, unchanged and all archived
+
+## Defect 1: cleanup-land wrote a 0-byte archive
+
+`scripts/cleanup-land.cljs` archived aiueos to
+`.git/stash-archive-20260910/tracked-modifications.patch` and the file was
+**0 bytes**, for the exact 14 files it then put into a PR. Archive-before-anything
+is the non-negotiable rule in `manifest/cleanup-workflow.edn` `:retirement :archive`,
+and the run reported `archived -> <path>` either way. A real archive was written by
+hand before closing the PR.
+
+## Defect 2: west-triple-sync --names skips the rename gate
+
+`cleanup-land` prints, as its literal next step:
+
+    nbb scripts/west-triple-sync.cljs plan --names ai-gftd-dougaka-kagaku,...
+
+Running it planned `:register` for three paths. All three were wrong:
+
+    ai-gftd-dougaka-kagaku        -> GitHub redirects to cloud-itonami/dougaka-kagaku,
+                                     already in west.yml line 13418
+    ai-gftd-dougaka-kodomo        -> redirects to dougaka-kodomo, line 13423
+    control-plane-legal-candidate -> its remote IS net-kotobase/control-plane,
+                                     already registered at line 31508
+
+The same plan emitted `report-retarget` for `network-awai/net-kotobase`, which is
+the identical same-slug case, so the gate exists and `--names` bypasses it. The
+orphan audit classified the population correctly the whole time
+(`true-orphan-git: 0`, `renamed-upstream: 80`); the two answers disagreed and the
+audit was right. Following the printed instruction would have minted three
+duplicate or residue entries, which `:west-orphan` names as the one thing never
+to do.
+
+## Defect 3: a preservation PR that reverted a landed migration
+
+`aiueos#343` was opened by cleanup-land as `:review` preservation of the shared
+checkout, which is about 539 commits behind. Its diff ran backwards:
+
+    -            [kotoba.lang.text :as str]
+    +            [clojure.string :as str]
+
+main adopted `kotoba.lang.text` on 2026-09-08 in `e4187d51`. The PR would have
+undone it across 11 scripts and 3 binary objects. It also broke a check that is
+green on main:
+
+    aiueos UEFI bare-metal smoke    main success    PR failure
+    CLJC contract tests             main failure    PR failure  (pre-existing)
+
+Separating those two mattered: only the first is attributable. This is the
+`:preservation-pr-disposition` failure mode the workflow already records from
+2026-07-26, where 17 auto-merged preservation PRs deleted about 913 lines.
+
+## Defect 4: the retire job that was never installed
+
+`CLAUDE.md` states `cloud.itonami.bot.worktree-retire` runs daily. Measured: no
+plist in `~/Library/LaunchAgents`, no label in `launchctl list`, and the repo
+carries only the script. Nothing had ever retired a worktree, which is why 683
+had accumulated. This is the second time this specific claim has been measured
+false; the first is recorded in the CLAUDE.md gftd cutover section.
+
+Retirement was then blocked a second way: 13 root worktrees failed with
+`.git is not a .git file`, because git-annex converts the worktree `.git`
+into a symlink and `git worktree remove` requires a regular `gitdir:` pointer.
+Converting them back retired 13 of 13.
+
+## My own probes did the same thing three times
+
+1. `git stash show -p <sha> -- <path>` errors with `Too many revisions specified`.
+   With stderr discarded it read as zero added lines, and all 10 stashes classified
+   as `no added lines`. The archive form `git diff <sha>^ <sha>` gives 3,677.
+2. A stash-applicability probe counted conflicts. Zero conflicts is what you get
+   both when everything applies and when **nothing** applies and git rolls back.
+   Adding the apply exit code and a changed-file count reversed one verdict.
+3. `xargs -P 12` reported 2 repos with stashes; the serial re-run with a probe
+   counter found 8. Six were dropped silently.
+4. `grep '^ M'` found 0 modified files in aiueos; the 182 changes were **staged**
+   (`M `/`A `), not unstaged.
+
+In every case the fix was the same shape: print what was scanned next to what was
+found, so `found nothing` and `looked at nothing` stop being the same output.
+
+## What was deliberately not done
+
+- **3,590 fleet-db.ledger.edn events** in the `codex/spam-release-20260909`
+  worktree. All absent from main on the semantic key, but reconcile ran against
+  an 817-commit-stale base and 722 of the `:pin/new` values disagree with main's
+  current pins. Hand-editing that file is forbidden (signed VCS plane) and
+  `:pin/reconcile-legacy` belongs to `kagami reconcile`. Archived with provenance
+  under `.git/stash-archive-20260910/unlanded-ledger-events-20260910/`.
+- **9 of 10 fleet stashes.** All classified UNLANDED (1,545 added lines absent
+  from their default branches), so none was droppable; all conflict on apply, so
+  none was rescuable without hand-resolving markers over weeks-old intent.
+- **A pin regression on another session's branch.** The PreToolUse guard blocked
+  a command of mine and reported 5 regressed pins on
+  `codex/worktree-retire-receipts-20260910`. Unpushed, and its successor branch
+  carries correct pins, so it never reached main. Left alone as live work.
+
+## Resume point
+
+    nbb scripts/west-orphan-audit.cljs --blocking     # exit 0 at close
+    git -C orgs/kotoba-lang/aiueos status --porcelain # 182 staged, detached HEAD
+
+The aiueos tree still holds the 182 staged changes that produced `aiueos#343`.
+Until it is reconciled with main, the next `cleanup-land --apply` regenerates an
+equivalent revert PR. `net-kotobase` still has 30 landable files blocked on the
+slug collision with `control-plane-legal-candidate`; which copy wins is a human
+decision. Neither is a cleanup call.")))
