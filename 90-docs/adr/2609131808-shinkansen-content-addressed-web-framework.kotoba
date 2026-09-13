@@ -58,4 +58,5 @@ Consequences:
 - shitsuke への変更はしない（guest 群はそのまま）。
 - yataverse top page の手書き HTML 実装（worktree
   net-kotobase-ipfs-yataverse-index）は shinkansen の最初の消費者として置き換える。
-- 依存は htmldom / cssom / css / html（ui-substrate 群、実在実測済み）。"))
+- 依存は htmldom / cssom / css / html（ui-substrate 群、実在実測済み）。
+- bridge 着地（shinkansen afe6110、2026-09-13）: shitsuke guest（reframe_core.kotoba）と state chain を接続。25 tests / 49 assertions 0 fail。実測の罠: guest の step 契約は variadic（call 側は apply 必須）、nbb の clojure.edn/read-string は 2-arity (nil s) 不可能、shitsuke guest map のキーは :call（::call は自 ns の keyword に解決し silently miss）、test fake guest は string case でなく if-chain。")))"
