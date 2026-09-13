@@ -7,8 +7,7 @@
 (def path (js/require "node:path"))
 (def root (-> (sh "git" "rev-parse" "--show-toplevel") :out str/trim))
 (def generator (.join path root "scripts" "gen-west-manifest.cljk"))
-(def nbb (let [local (.join path root "node_modules" ".bin" "nbb")]
-           (if (.existsSync fs local) local "nbb")))
+(def nbb (or (aget js/process.env "KBB_EXECUTABLE") "kbb"))
 
 (defn run! [cwd & argv]
   (apply sh (concat argv [{:cwd cwd}])))
@@ -50,7 +49,7 @@
   (second (re-find (re-pattern (str "(?s)- name: " name ".*?revision: ([0-9a-f]+)")) content)))
 
 (defn assert! [pred message data]
-  (when-not pred (throw (ex-info message data))))
+  (when-not pred (throw (ex-info (str message " " (pr-str data)) data))))
 
 (let [fixture (.mkdtempSync fs (.join path (.tmpdir os) "gen-west-manifest-test-"))]
   (try
@@ -72,8 +71,23 @@
             west (.join path fixture "manifest" "west.yml")]
         (spit west (west-content a-old b-old))
 
+        ;; Renamed paths may temporarily lack policy entries. Never silently
+        ;; reactivate archived datasets or strip their custody metadata.
+        (doseq [replacement ["groups: [legacy-group]"
+                             "groups: [archived]\n      userdata:\n        archived: true"
+                             "groups: [datalad]\n      userdata:\n        datalad: true\n        annex-remote: b2"]]
+          (spit west (str/replace-first (west-content a-old b-old) "groups: [fixture]" replacement))
+          (let [checked (run! fixture nbb "--backend" "sci" "--classpath" root generator "--check")]
+            (assert! (zero? (:exit checked)) "committed classification was lost" checked)))
+        (spit west (str/replace (west-content a-old b-old) "\n  self:" "\n\n  self:"))
+        (let [updated (run! fixture nbb "--backend" "sci" "--classpath" root generator "--entry" "a" "--no-verify-remote")
+              checked (run! fixture nbb "--backend" "sci" "--classpath" root generator "--check")]
+          (assert! (zero? (:exit updated)) "entry update failed" updated)
+          (assert! (zero? (:exit checked)) "entry suffix whitespace was not canonical" checked))
+        (spit west (west-content a-old b-old))
+
         ;; A locally advanced child must not make canonical --check stale.
-        (let [checked (run! fixture nbb "--classpath" root generator "--check")]
+        (let [checked (run! fixture nbb "--backend" "sci" "--classpath" root generator "--check")]
           (assert! (zero? (:exit checked))
                    "--check depended on arbitrary child HEAD"
                    checked))
@@ -86,7 +100,7 @@
                    {:content content}))
 
         ;; An explicit --entry remains the sole checkout-backed pin workflow.
-        (let [advanced (run! fixture nbb "--classpath" root generator
+        (let [advanced (run! fixture nbb "--backend" "sci" "--classpath" root generator
                              "--entry" "a" "--no-verify-remote")
               content (slurp west)]
           (assert! (zero? (:exit advanced)) "--entry failed" advanced)
@@ -100,7 +114,7 @@
         ;; Moving the checkout backwards after the advance must neither regress
         ;; the pin nor create a canonical false stale.
         (git! a "checkout" "--detach" a-old)
-        (let [checked (run! fixture nbb "--classpath" root generator "--check")
+        (let [checked (run! fixture nbb "--backend" "sci" "--classpath" root generator "--check")
               content (slurp west)]
           (assert! (zero? (:exit checked))
                    "stale checkout caused false stale after pin advance"
@@ -108,7 +122,7 @@
           (assert! (= a-new (revision content "a"))
                    "stale checkout regressed the committed pin"
                    {:expected a-new :actual (revision content "a")}))
-        (let [rewritten (run! fixture nbb "--classpath" root generator
+        (let [rewritten (run! fixture nbb "--backend" "sci" "--classpath" root generator
                               "--no-verify-remote")
               content (slurp west)]
           (assert! (zero? (:exit rewritten)) "canonical rewrite failed" rewritten)

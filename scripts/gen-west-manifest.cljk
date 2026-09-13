@@ -76,6 +76,14 @@
             (swap! current assoc :path path))
           (when-let [rid (second (re-find #"^\s*rad-rid:\s*(\S+)" line))]
             (swap! current assoc :rad-rid rid))
+          (when-let [groups (second (re-find #"^\s*groups:\s*\[(.*)\]" line))]
+            (swap! current assoc :groups (mapv str/trim (str/split groups #","))))
+          (when (re-find #"^\s*datalad:\s*true\s*$" line)
+            (swap! current assoc :datalad true))
+          (when (re-find #"^\s*archived:\s*true\s*$" line)
+            (swap! current assoc :archived true))
+          (when-let [annex (second (re-find #"^\s*annex-remote:\s*(\S+)" line))]
+            (swap! current assoc :annex-remote annex))
           (when (re-find #"^\s*submodules:\s*$" line)
             (swap! current assoc :submodule-paths []))
           (when-let [submodule-path (and (contains? @current :submodule-paths)
@@ -165,8 +173,13 @@
         sha     (or (when (contains? working-entry-names wname)
                       (working-head path))
                     (:revision existing))
-        dl      (get-in cfg [:datalad path])
-        arch    (get-in cfg [:archived path])
+        ;; Like RIDs, committed classification must survive incomplete rename
+        ;; policy. An explicit policy entry (including nil) overrides fallback.
+        dl      (if (contains? (:datalad cfg) path) (get (:datalad cfg) path)
+                    (when (:datalad existing)
+                      {:group (first (:groups existing)) :annex-remote (:annex-remote existing)}))
+        arch    (if (contains? (:archived cfg) path) (get (:archived cfg) path)
+                    (when (:archived existing) {:group "archived"}))
         ;; Preserve an existing projected RID when an older repos.edn snapshot
         ;; does not contain it. Minimal --entry maintenance must never erase
         ;; unrelated identity metadata while only renaming a west project.
@@ -174,7 +187,9 @@
         groups  (cond
                   dl   [(:group dl)]
                   arch [(:group arch "archived")]
-                  :else [(org-of path)])
+                  :else (if (contains? working-entry-names wname)
+                          [(org-of path)]
+                          (or (seq (:groups existing)) [(org-of path)])))
         existing-subs (:submodule-paths existing)
         recurse (or (contains? (:force-recurse-submodules cfg) path)
                     (nested? path)
@@ -356,17 +371,16 @@
                                             (count entries))]
                                 (vec (concat (subvec entries 0 idx) [[n blk]] (subvec entries idx)))))
                             replaced (remove replaced-names names))]
-      (str (str/join "\n" (concat (:prefix ex) (mapcat second with-new) (:suffix ex))) "\n"))))
+      (str (str/join "\n" (concat (:prefix ex) (mapcat second with-new) (when (seq (:suffix ex))
+                                           (cons "" (drop-while str/blank? (:suffix ex)))))) "\n"))))
 
 ;; --- pin のサーバ側検証(scripts/verify-west-pins.cljk に委譲) ---
-(defn- nbb-bin
-  "検証の子プロセスに使う nbb を解決する。裸の \"nbb\" は PATH に無い環境
-  (repo-local install のみの checkout)で spawn が即失敗し、pin 検証が
-  常時 FAIL 扱い → west.yml を一切書けなくなる実障害があったため、
-  repo-local の node_modules/.bin/nbb を優先し、無ければ PATH に頼る。"
+(defn- kbb-bin
+  "Use the .cljk-capable engine for nested verification, including sparse checkouts."
   []
-  (let [local (io/file root "node_modules" ".bin" "nbb")]
-    (if (.exists local) (str local) "nbb")))
+  (or (aget js/process.env "KBB_EXECUTABLE")
+      (let [local (io/file root "orgs" "kotoba-lang" "kotoba" "bin" "kbb")]
+        (if (.exists local) (str local) "kbb"))))
 
 (defn- verify-remote! [content entry-names]
   (let [self    (scripts.nbb-compat/get-property "babashka.file")
@@ -391,15 +405,13 @@
           ;; --entry 指定時は検証もその entry に絞る(--only)。ローカル west.yml が
           ;; main と乖離した checkout では、絞らないと無関係 entry の大量 API 検証で
           ;; 数分単位の timeout になる(書き込むのは当該 entry だけなので検証もそこだけでよい)。
-          (let [{:keys [exit out err]} (apply sh (nbb-bin) (str vscript) "--dir" root "--candidate" (str tmp)
+          (let [{:keys [exit out err]} (apply sh (kbb-bin) "--backend" "sci" "--classpath" root (str vscript) "--dir" root "--candidate" (str tmp)
                                               (mapcat (fn [n] ["--only" n]) entry-names))]
             (print out) (binding [*out* *err*] (print err)) (flush)
-            (when (= 1 exit)
+            (when-not (zero? exit)
               (binding [*out* *err*]
-                (println "pin 検証に失敗したため west.yml は書き込みません(緊急スキップ: --no-verify-remote)。"))
-              (scripts.nbb-compat/exit 1))
-            (when (contains? #{2 3} exit)
-              (binding [*out* *err*] (println "WARN: pin 検証を実行できず fail-open で続行"))))
+                (println "REFUSED: remote pin verification failed or could not run; west.yml was not written."))
+              (scripts.nbb-compat/exit (if (pos? exit) exit 2))))
           (finally (.rmSync node-fs tmp-dir #js {:recursive true :force true})))))))
 
 (defn script-args []
