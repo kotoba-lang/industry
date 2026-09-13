@@ -1,0 +1,73 @@
+(vector (map
+  (:db/id -1)
+  (:adr/id "adr-2609131630-yataverse-mirror-bytes-plane")
+  (:adr/title "yataverse.com は kotobase.net bytes 面の分散型 mirror zone — kotobase.net は graph/ontology DB 特化")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-13")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "yataverse-mirror-bytes-plane")
+
+  (:adr/authoritative-for
+  (vector "kotobase.net と yataverse.com の役割分担（graph/ontology DB vs 分散型データレイク・データストア）"
+   "yataverse.com zone で serve してよい host の集合（bytes 面のみ・apex 無 route・web 面無し）"
+   "mirror zone の Location 付け（同一 CID・同一 R2 bucket・同一 Worker）"
+   "helper host / path redirect の行き先が helper host の属する zone に従うこと"))
+
+  (:adr/related
+  (vector "adr-2609092600-kotoba-app-four-planes-identity-naming-location-kind"
+   "adr-2608051000-kotobase-one-repo-one-capability-deployment-split"
+   "adr-2607311100-hyakka-knowledge-wiki-on-kotobase"
+   "net-kotobase/ipfs merge 096de895 (yataverse.com: second bytes plane)"))
+
+  (:adr/decision-summary
+  (vector "D1: 役割分担。kotobase.net は graph DB / ontology DB（datom plane・Datalog query・capability origin）に特化する。yataverse.com は IPLD/IPFS 中心の分散型データレイク・データストア面として同じ R2 block plane を配る"
+   "D2: identity は動かない。CID は唯一のアドレスで、yataverse.com は Location の追加である（app 4 面のうち bytes/naming が zone をまたいで増えるだけ。manifest は 1 文字も動かさない）"
+   "D3: 同一 Worker（net-kotobase-ipfs）が両 zone を配る。第二の実装は作らない — classify-host に 2 suffix を足して既存 :ipfs-bytes / :ipns-bytes kind に合流させ、retrieval・byte 検証・no-transform・range は全部既存経路を通る"
+   "D4: yataverse.com は bytes 専用。web（UnixFS/HTML）origin suffix は作らない。apex に route は無く、非 suffix host は operator host（:path-bytes）として /health・/ipni・/ipq のみ応答する"
+   "D5: helper host / path redirect の行き先は答えた host 自身の zone に従う（ipfs.yataverse.com → {cid}.ipfs.yataverse.com、ipfs.kotobase.net → {cid}.ipfs.kotobase.net、ipfs.itonami.cloud → web plane）。zone=nil は既定値を答え、既存 redirect は byte 不変"
+   "D6: zone route は wrangler で、wildcard DNS（*.ipfs / *.ipns → 100:: proxied）は zone 側手動（OAuth deploy token に DNS edit 権限は無い設計）"))
+
+  (:adr/artifact
+  (vector "net-kotobase/ipfs main 096de895（merge verified。3 commit: 81992e3 build 経路復帰 / bf2adcd yataverse bytes plane / 4031d10 redirect mirror）"
+   "test 171 tests / 674 assertions、FAIL 集合は baseline と差分 0（既知赤 = gateway_test ipni-publisher-404 の 2 assert のみ、main 由来）"
+   "deploy Version cd52b804（2026-09-13）。live 実測: ipfs.yataverse.com/ipfs/{cid} → 301 → {cid}.ipfs.yataverse.com、ipfs.kotobase.net は従来どおり"
+   "west.yml pin: ipfs → 096de895（origin/main 上で実測、upstream default branch から到達可能・前進）"
+   "package.json の test/build/typecheck を shadow-cljs 経路へ復帰 — kbb cutover 3d8ab55 が書き換えた amu compile は host module 文字列 import（@noble/* 等）を project linker が拒否するため、この repo では amu 経路が成立しない（実測: pristine tree で両書式とも :project-link-failed）"))
+
+  (:adr/body
+  "2026-09-13 オーナー指示: wiki.kotobase.net（= app-hyakka）は現場のままでよく、kotobase.net 側は
+graphdb / ontology DB に特化し、yataverse.com を IPLD / IPFS 中心の分散型データレイク・データストア
+として稼働させる。
+
+実測（2026-09-13）:
+- yataverse.com zone は既に kotobase.net と同一 NS（everton/vivienne.ns.cloudflare.com）の
+  同一 Cloudflare アカウント内に在った。A レコード無し・未 serve の空き zone。
+- bytes 面の実体は orgs/net-kotobase/ipfs（Worker net-kotobase-ipfs）が R2
+  kotobase-graph-database-production から {cid}.ipfs.kotobase.net を配っており、
+  byte 検証済み gateway・IPNI publisher・IPQ まで実在する。
+- kbb cutover（3d8ab55）が npm scripts を amu compile に書き換えた結果、この repo の
+  test/build/typecheck/deploy が全経路落ちていた。amu の project linker は
+  (:require [\"@noble/curves/ed25519\" …]) のような host module 文字列 import を
+  「import names a host module by string; a Kotoba module is a simple symbol」で拒否する。
+  pristine tree で package.json 書式と正しい project-mode 書式の両方を試して同一拒否。
+  修復は scripts を shadow-cljs 経路へ戻すこと（81992e3）。amu の制約を言語の限界と
+  誤認しないため、この実測は commit message とこの ADR に記録する。
+
+Decision（要約は :adr/decision-summary）:
+- mirror zone は「並走する第 2 の Location」であって移行ではない。既存 CID・既存 bucket・
+  既存 Worker がそのまま yataverse.com からも取れる。
+- yataverse.com に web 面を作らない判断は、データレイク用途では HTML を配る必要がなく、
+  面を混ぜない（ADR-2609092600）ため。将来 web 面が要るときは origin suffix の追加で
+  並走できる（D4 の撤去条件）。
+
+Consequences:
+- 未完了: yataverse.com zone の wildcard DNS（*.ipfs / *.ipns → 100:: proxied）は
+  dashboard 手動作成が必要（token に dns_records edit が無い）。作成前は
+  {cid}.ipfs.yataverse.com が DNS 解決しない。完了条件は実 CID での byte 比較
+  （kotobase 側 78,054B / sha256 1a10b9ce… と一致）。
+- 未完了: *.ipfs.yataverse.com の advanced certificate 要確認
+  （kotobase.net zone は ACM quota allocated=0 の実例あり）。
+- 既知赤: gateway_test ipni-publisher-404 の 2 assert（:surface / :retrieval field 期待乖離）
+  は本件と無関係の main 由来。別 PR で追跡する。"))
