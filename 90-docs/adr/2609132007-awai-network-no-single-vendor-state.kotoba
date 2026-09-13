@@ -1,0 +1,96 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609132007-awai-network-no-single-vendor-state")
+  (:adr/title "awai network 関係は D1 / Durable Object / KV を使わない・依存しない — kotoba-lang / net-kotobase は許容")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-13")
+  (:adr/last-verified "2026-09-13")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "awai-network-no-single-vendor-state")
+  (:adr/repos (vector "orgs/network-awai"))
+  (:adr/related
+  (vector "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+   "adr-2608159100-kotobase-net-default-durable-boundary"
+   "adr-2608147300-genpon-west-pin-registry"))
+
+  (:adr/authoritative-for
+  (vector "orgs/network-awai 配下（awai.network 関係）の Worker / Pages が Cloudflare D1、Durable Object、Workers KV を binding に持たないこと（coordination・cache・projection の役割も含めて全面）"
+   "例外は無い。テスト・testnet・一時環境でも新規に作らない"
+   "kotoba-lang / net-kotobase（kotobalabs 関係）は対象外で、既存規則（coordination-only、ADR-2608039000 の「消して再構築できるか」判定）がそのまま効く"
+   "この規則の検査と gate"))
+
+  (:adr/decision-summary
+  (vector "D1: オーナー指示 2026-09-13「d1, do などは使わない、依存しない様にして」+ 承認「awai network 関係では全面禁止, kotobalabs 関係では許容」。対象は orgs/network-awai 配下の全 deploy 設定"
+   "D2: 全面禁止は「分散型経路の premise 禁止」（ADR-2608039000）より強い。awai 系では cache / projection / coordination の役割にも単一ベンダ state store を使わない — 許容される役割自体を他の手段（R2 object 面への materialize、 Workers 内 in-memory / iframe cache、外部の content-addressed store）で満たす"
+   "D3: 判定基準は ADR-2608039000 を踏襲するが、awai 系では判定を狭める: 「消して再構築できるか」ではなく「binding が存在しないこと」を検査する。自己申告・役割申告は検査しない"
+   "D4: 機械可読正本は manifest/repository-rules.edn の :workspace-policies :awai-network-no-single-vendor-state。検査は scripts/verify-awai-state-store-policy.cljk（fail-closed: 設定が読めない場合も fail）、murakumo fleet gate root-awai-state-store-policy"
+   "D5: 既存 21 設定は規則上違反となる。移行は棚卸しを伴う別作業で、この ADR は現在地を実測として記録する（規則の制定と既存経路の是正は別物、ADR-2608039000 と同じ作法）"))
+
+  (:adr/body
+  "2026-09-13 オーナー指示: 「d1, do などは使わない、依存しない様にして」。
+範囲の確認に対する承認: 「awai network 関係では全面禁止, kotobalabs 関係では許容」。
+
+## Context（実測 2026-09-13）
+
+- 現行規則は 2 段階: 分散型経路では premise 禁止・「消して再構築できる」役割は許可
+  （ADR-2608039000）、live service の durable plane では DO/D1/KV は coordination-only
+  （ADR-2608159100、:policy/coordination-only #{:durable-object :d1 :kv}）。
+- orgs/network-awai 配下の wrangler 設定 **39 件**を走査し、**21 件**が D1 /
+  Durable Object / KV binding を持つ（d1 12 / DO 9 / KV 8。内訳は
+  scripts/verify-awai-state-store-policy.cljk の出力で数える）。代表的なもの:
+  cloud-murakumo / cloud-itonami（D1+KV）、app-aozora-engine auth/pds（DO）、
+  network-isekai 系（D1+DO）、cloud-murakumo-api（DO）、nexus-x402（DO+KV）。
+- kotobase 側（orgs/kotoba-lang、orgs/net-kotobase）は kotobalabs 関係として
+  対象外。既存規則のままとする。
+
+## Decision
+
+1. **orgs/network-awai 配下（awai network 関係）は D1 / Durable Object / Workers KV
+   を使わない。依存しない。** coordination、cache、projection、session、cursor、
+   single-writer の役割にも使わない（全面禁止。ADR-2608039000 の「分散型経路」
+   絞り込みを awai 系では外す）。
+2. **例外は無い。** test / testnet / 一時環境でも新規に作らない。既存の binding は
+   棚卸し（撤去 or 代替）の対象で、規則上はすべて違反として記録される。
+3. **kotobalabs 関係（orgs/kotoba-lang、orgs/net-kotobase）は対象外。**
+   coordination-only（ADR-2608159100）と「消して再構築できるか」判定
+   （ADR-2608039000）がそのまま効く。
+4. **検査は binding の存在だけを見る。** 役割の自己申告は読まない。
+   `scripts/verify-awai-state-store-policy.cljk` は orgs/network-awai 配下の
+   wrangler.jsonc / .json / .toml を走査し、`d1_databases` / `durable_objects` /
+   `kv_namespaces` を検出したら exit 1。**設定が読めない場合も fail（fail-closed）**
+   — 読めなかったことを緑にしない（8 問の 1・2）。fleet gate は
+   `root-awai-state-store-policy`。
+5. **代替手段の既定**: cache / projection → R2 object 面 + Worker 内 in-memory、
+   session / single-writer → content-addressed 面の CAS（inga 経路）か R2 の
+   object key 命名で直列化、cron cursor → R2 object key（cursor を object key に
+   持つ）。R2 binding 自体は provider であってこの規則の対象ではない。
+
+## Consequences
+
+- (+) awai 系の deploy が単一ベンダ state store に依存しない。規則は
+  binding の存在で判定でき、自己申告を要しない。
+- (+) 「分散」「decentralized」を awai 系が主張するとき、主張が規則と矛盾しない。
+- (−) **既存 20 設定は規則上違反。** 撤去・代替は棚卸しと実測を伴う別作業であり、
+  この ADR は完了を主張しない。規則の制定と経路の是正は別物
+  （ADR-2608039000 の Consequences と同じ形）。
+- (−) awai 系で single-writer / CAS が必要な経路（x402 spend meter 等）は、
+  代替手段の設計を先に済ませるまで撤去できない。**撤去が正しさを壊すなら、
+  代替を先に着地させる。**
+
+## Enforcement
+
+- `kbb --backend sci scripts/verify-awai-state-store-policy.cljk --root .`
+- fleet gate: `root-awai-state-store-policy`（scripts/fleet-ci/gates.edn +
+  gates/awai-state-store-policy-check.cljk）
+- 機械可読正本: `manifest/repository-rules.edn` の
+  `:workspace-policies :awai-network-no-single-vendor-state`
+
+## Current migration（現在地、2026-09-13 実測）
+
+規則はこの ADR で制定済み。既存 20 設定は違反のまま（未撤去）。撤去は
+1 経路ごとに「代替手段の設計 → 着地 → 撤去」の順で進め、DRAM 的な一括
+rewrite はしない。最初の対象は前提を要求しない KV cursor / cache 系
+（cloud-manimani KV、app-aozora-engine appview KV）と、DO を alarm / cursor
+のみに使っている設定から始める。D1 を ref / head の裁定に使っている設定は
+ADR-2608039000 の inga 経路へ寄せてから撤去する。")))

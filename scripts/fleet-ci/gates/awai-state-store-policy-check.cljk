@@ -1,0 +1,39 @@
+#!/usr/bin/env kbb
+(ns fleet-ci.gates.awai-state-store-policy-check
+  "orgs/network-awai 配下の D1 / Durable Object / KV binding 全面禁止
+   (ADR-2609132007) を root tree 内で落とす gate。verify スクリプトの
+   exit code と SCANNED 行を検査する — 答えを拒否された実行は緑にしない。"
+  (:require ["node:child_process" :as cp]
+            ["node:fs" :as fs]
+            ["node:path" :as path]
+            [clojure.string :as str]))
+
+(def args (vec *command-line-args*))
+(def root (path/resolve (or (first (remove #(str/starts-with? % "--") args)) ".")))
+(def verifier (path/join root "scripts" "verify-awai-state-store-policy.cljk"))
+(defn die! [code msg] (println (str "FLEET-CI: " msg)) (js/process.exit code))
+
+(when-not (fs/existsSync verifier)
+  (die! 90 "awai state-store verifier missing after extract"))
+(when-not (fs/existsSync (path/join root "orgs" "network-awai"))
+  (die! 90 "orgs/network-awai missing after extract (checkout incomplete)"))
+(when-not (fs/existsSync (path/join root "manifest" "repository-rules.edn"))
+  (die! 90 "manifest/repository-rules.edn missing after extract"))
+(when-not (fs/existsSync (path/join root
+                   "90-docs/adr/2609132007-awai-network-no-single-vendor-state.kotoba"))
+  (die! 90 "ADR-2609132007 missing after extract"))
+
+(let [r (cp/spawnSync "npx" #js ["--yes" "nbb" verifier "--root" root]
+                      #js {:encoding "utf8" :cwd root})
+      out (str (or (.-stdout r) "") (or (.-stderr r) ""))]
+  (print out)
+  ;; 検査が動いた証拠: SCANNED 行が在ること (飛ばしを緑にしない — 8 問 7)。
+  (let [m (re-find #"SCANNED\t(\d+)" out)]
+    (when-not m (die! 93 "verifier produced no SCANNED count"))
+    (when (zero? (js/parseInt (nth m 1) 10))
+      (die! 93 "verifier scanned 0 configs — that is a failed scan, not a clean pass")))
+  (when-not (zero? (or (.-status r) 1))
+    (js/process.exit (or (.-status r) 1)))
+  (when-not (str/includes? out "OK no D1 / Durable Object / KV bindings")
+    (die! 93 "verifier returned without its success receipt"))
+  (println "FLEET-CI: awai-state-store-policy OK")))
