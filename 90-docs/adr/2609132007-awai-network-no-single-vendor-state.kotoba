@@ -88,9 +88,19 @@
 
 ## Current migration（現在地、2026-09-13 実測）
 
-規則はこの ADR で制定済み。既存 20 設定は違反のまま（未撤去）。撤去は
-1 経路ごとに「代替手段の設計 → 着地 → 撤去」の順で進め、DRAM 的な一括
-rewrite はしない。最初の対象は前提を要求しない KV cursor / cache 系
+規則はこの ADR で制定済み。**初回撤去 5 件着地 (21 → 17 違反)**:
+cloud-manimani (MANIMANI_KV→R2, merge 92982f2)、app-aozora-engine appview
+(FEED_CACHE 削除, 195c274)、同 pds (CHALLENGES DO cross-binding 削除,
+0c2c17f)、network-isekai (lobby-presence DO worker 削除, 4d07c6d)、
+nexus-x402 (KV 2 本→NEXUS_R2 1 bucket, 0a48e91。baseline (KV) と FAIL
+test 名集合完全一致 = regression なし)。manimani/appview は repo archived
+で据え置き。残り 17 は medium/redesign: Pages 共有 KV (cloud-itonami 本体・
+domain-reverify・mail-inbound)、transactional D1 (isekai scores・club-shinshi
+billing・net-babiniku・fans-oppai)、exactly-once DO (auth CHALLENGES・
+murakumo-api NETWORK_QUEUE・murakumo ACTIONS_DB・nexus QR_MERCHANTS)。
+棚卸し表: 90-docs/business/network-awai-state-store-inventory.json。
+撤去は 1 経路ごとに「代替手段の設計 → 着地 → 撤去」の順で進め、DRAM 的な
+一括 rewrite はしない。最初の対象は前提を要求しない KV cursor / cache 系
 （cloud-manimani KV、app-aozora-engine appview KV）と、DO を alarm / cursor
 のみに使っている設定から始める。D1 を ref / head の裁定に使っている設定は
 ADR-2608039000 の inga 経路へ寄せてから撤去する。")))

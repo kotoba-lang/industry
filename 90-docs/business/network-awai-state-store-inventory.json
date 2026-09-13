@@ -1,0 +1,220 @@
+{
+ "repos": [
+  {
+   "path": "orgs/network-awai/app-aozora-engine/appview",
+   "bindings": "KV FEED_CACHE",
+   "purpose": "cache — tier-2 global feed cache (stale-while-revalidate) for public non-personalized /xrpc feed reads. Tier-1 = caches.default per-colo. src/aozora/appview/worker.cljk:148 (kv-ns), :165 (kv-put!), :179 (kv-get); cron warmer writes it (wrangler.jsonc crons).",
+   "blast_radius": "slow_only",
+   "replacement": "削除で済む — worker は FEED_CACHE absent を明示サポート（'optional — absent in tests and preview'）。tier-1 Cache API 残る。コールド経路は 7〜13s recompute に戻るだけ。",
+   "effort": "trivial"
+  },
+  {
+   "path": "orgs/network-awai/app-aozora-engine/auth",
+   "bindings": "DO CHALLENGES (ChallengeStore, sqlite)",
+   "purpose": "session/anti-replay — WebAuthn/passkey/wallet ticket の single-use jti 台帳。ticket は署名付き JWT で state、DO は jti 二重消費防止のみ。blockConcurrencyWhile で atomic spend、alarm で exp 後 purge。src/aozora/auth/challenge.cljk:96 (store-stub), :99 (consume!), :145 (spend!), deftype :145。使用: passkey.cljk:145/:248, wallet.cljk:53。",
+   "blast_radius": "correctness",
+   "replacement": "redesign — fail-closed な single-use 反復消費には直列化 primitive が必要。KV は compare-and-swap 無しで二重消費が可能（cloud-murakumo free_tier_http.cljk も D1 conditional UPDATE を同じ理由で選んでいる）。候補: inga (consensus plane) の ordering/state、または D1 conditional UPDATE（ただしそれ自体も撤去対象で自己矛盾）。ticket 自体は JWT なので challenge の発行は stateless 化できるが消費は stateless にできない。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/app-aozora-engine/pds",
+   "bindings": "DO CHALLENGES (script_name=app-aozora-auth, auth と同一 DO)",
+   "purpose": "session — auth Worker の ChallengeStore を跨ぎ binding（pds 側 src は .-CHALLENGES env を直接読まない; human-auth は auth.aozora.app host で処理される。binding 自体は pds デプロイの manifest として存在）。データは auth と同一（single-use jti 台帳）。",
+   "blast_radius": "none_if_unwired",
+   "replacement": "削除で済む（可能性大）— pds 側 source からは未参照（grep で src 内 CHALLENGES 参照ゼロ）。binding を外してもコードは壊れない。auth 側の撤去と同時に行うこと。",
+   "effort": "trivial"
+  },
+  {
+   "path": "orgs/network-awai/cloud-itonami/workers/domain-reverify",
+   "bindings": "KV ITONAMI_DATA (Pages 本体と同じ namespace, id e9857fe8…)",
+   "purpose": "index/cursor — organization-domains:{tenant} キーの日次 reverify 結果の読み書きのみ（cron 17 3 * * *）。workers/domain-reverify/index.js:41 (list prefix cursor), :56/:86 (get), :95/:100 (put)。",
+   "blast_radius": "correctness",
+   "replacement": "medium — 同じ KV を Pages 本体も organization-domain:* 系で読むため、単独撤去は本体の tenant domain registry と食い違う。移動先は R2 object store（Pages 本体と domain-reverify の両方を R2 read に書き換え）か kotobase.net datom plane。worker 自体は index.js 1 本で書き換え面は小さい。",
+   "effort": "medium"
+  },
+  {
+   "path": "orgs/network-awai/cloud-itonami/workers/mail-inbound",
+   "bindings": "KV ITONAMI_DATA (同一 namespace) + R2 MAIL_BLOBS (対象外)",
+   "purpose": "cursor/queue — Email Routing inbound の staging: mail-route:{addr} (route 解決), mail:inbound:{id} + mail:ledger:{id} (sealed record の work item と ledger copy; scripts/mail-drain.cljk が JVM 側で claim)。index.js:33 (route get), :101-104 (staging put)。中身は seal 済み ciphertext + envelope。",
+   "blast_radius": "data_loss",
+   "replacement": "medium — mail:inbound/mail:ledger を削ると inbound mail が消失（drain されない undelivered mail が消える）。代替: staging キーを R2 MAIL_BLOBS に寄せる（bucket は既に binding 済み、cipher 対象も R2 前例あり）。mail-route: は R2 or kotobase datom。JVM drain 側 (src/cloud_itonami/mail.cljk) の read 経路の書き換えが要る。",
+   "effort": "medium"
+  },
+  {
+   "path": "orgs/network-awai/cloud-itonami",
+   "bindings": "D1 WORKSPACE_DB (workspace-journal) + KV ITONAMI_DATA + KV BOTS_STATUS (R2/queues は対象外)",
+   "purpose": "(a) WORKSPACE_DB = transactional data: workspace_mutations journal (migrations 0001-0012: browser_sessions, human_bots, billing/spam evidence, my_bots, bot workspace files, public funding terms)。src: edge/spam.cljk:135/:153, edge/projection_outbox.cljk:160/:231/:256-311, edge/os_store.cljk, edge/lawfirm_store.cljk, edge/os_endpoints.cljk。(b) ITONAMI_DATA = index + credential + cursor の混在: permission:* (edge/directory_store.cljk:55), owner:* (edge/notify_endpoints.cljk:24), webauthn-credential:* = server-custodied Ed25519 秘密鍵の AES-GCM wrap (edge/webauthn.cljk:38/:627/:690, account_store.cljk:317), webauthn-challenge:*, organization-domain(s):*, registry:index, actor:by-did:, mailbox-key: (mail_seal.cljk:238), stripe-customer:/stripe-subscription:/hr:* (edge/billing.cljk:64-70), nudge:* (edge/nudge.cljk:57-58), workspace-outbox:/workspace-dlq: (edge/projection_outbox.cljk:31/:146), mail:inbound/mail:ledger (mail-inbound worker と共有), sales:/jobs:/entra-jwks: 等。(c) BOTS_STATUS = metrics/status: functions/api/bots-status.js:53/:97, 単一キー 'current'。",
+   "blast_radius": "data_loss",
+   "replacement": "redesign — このリポは 21 中最大。①WORKSPACE_DB: mutations journal + tenant billing/state → kotobase.net datom plane か R2+journal 化が必要で schema 設計から。②ITONAMI_DATA は性質ごとに分割判断: webauthn-credential は credential（消失=全 passkey ユーザ logout、代替なしで撤去不可→inga/kotobase への移行が redesign）、stripe-customer/subscription は transactional（消失=課金状態喪失）、organization-domains/registry:index は index（R2 で再構築可）、mail staging は cursor（R2 で可）、bots-status/metrics は metrics（消失許容）。③BOTS_STATUS は in-memory + 定期再構築 or R2 で trivial。open_business.cljk:115 は KV absent で static fallback に落ちる（graceful）が、webauthn/billing は graceful ではない。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/cloud-manimani",
+   "bindings": "KV MANIMANI_KV",
+   "purpose": "transactional data (interim) — Decision Ledger の doc (d:<coll>:<k>) と stream (s:<stream>:<seq16>)。src/cloud_manimani/kv_store.cljk:34 (make, 全 op-map)。docstring が明言: target は kotobase.net の net.kotobase.store.* XRPC だが未実装 (net-kotobase#153) のための interim。worker.cljk:9 が全 route で使用。",
+   "blast_radius": "data_loss",
+   "replacement": "kotobase.net — 正攻法は既に文書化済み（kv_store 削除 → xrpc backend に自動 fallback、routes は無変更）。blocker は net.kotobase.store.* NSID surface が kotobase.net 側に無いこと。surface が着地すれば撤去は trivial、無いまま撤去すると ledger 書き込みが全滅。",
+   "effort": "medium"
+  },
+  {
+   "path": "orgs/network-awai/cloud-murakumo",
+   "bindings": "D1 ACTIONS_DB (murakumo-actions) + D1 MODEL_REGISTRY_DB (murakumo-model-registry) + KV INFER_MEMORY_KV + KV KAIZEN_STATE (R2/queues は対象外)",
+   "purpose": "(a) ACTIONS_DB = transactional data: actions_runs/actions_jobs (0001-0002), devices/device_claims/device_heartbeats (0003, コンソール appview), siwe_challenges (0004), free_receipts/free_ledger/free_balances (0005, free tier — D1 conditional UPDATE が replay 防止の本体), free_preview_budget/lease (0006), free_video_jobs (0114)。src: free_tier_http.cljk:83, actions_http.cljk:38, siwe_auth.cljk:63, devices_http.cljk:43, preview_http.cljk:31, free_video_http.cljk:16, artifacts_http.cljk:6-35。(b) MODEL_REGISTRY_DB = index/projection — wrangler.jsonc コメント明記 'Rebuildable model search projection. The authoritative repository and revision DAG nodes live in MODEL_BLOCKS (R2), not in D1'。model_hosting_*_http.cljk。(c) INFER_MEMORY_KV = cache + cursor + transactional 混在: x402.cljk:256/:267 on-chain verify cache (verified のみ cache, 失敗は cache しない), x402.cljk:742 ingest, infer_memory.cljk:49-57 'infer-memory:{tx}' = x402 決済→推論の join record (resume-known-payment :521, fulfill-settled! :540 — これは Transactional、消失=未完了決済の join が消える), insight_http.cljk:56/:106 集計 counter (metrics, TTL 付き), ads_http.cljk ads:* (intake index), ads_review.cljk:169-215 review cursor+events (cursor), free_tier_http.cljk:84 ads:campaigns (config cache)。(d) KAIZEN_STATE = cursor + queue state: kaizen:event:{id} (site_worker.cljk:135 queue-handler, :1156 submit-result, :1798 GET events), gftd-order:{id} (site_worker.cljk:2143 Stripe hardware order)。",
+   "blast_radius": "data_loss",
+   "replacement": "redesign — ACTIONS_DB の free_receipts/free_ledger は conditional UPDATE で exactly-once を担保しており KV/削除では代替不能（撤去＝free tier の replay 脆弱化か、inga の ordering への移行）。devices は 'appview, not a premise' (0003 comment) で再構築可。MODEL_REGISTRY_DB は rebuildable projection で trivial 候補（R2 MODEL_BLOCKS から再投影）。INFER_MEMORY_KV は split: onchain cache=削除で済む（遅くなるだけ）、infer-memory join record=R2 or ACTIONS_DB へ、insight counter=metrics で消失許容、ads cursor=R2。KAIZEN_STATE の kaizen events=R2 object、gftd-order=transactional (R2+冪等 webhook retry)。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/cloud-murakumo-api",
+   "bindings": "DO NETWORK_QUEUE (NetworkQueue, sqlite)",
+   "purpose": "queue/coordination — free inference の durable FIFO with payment-proven priority。tickets テーブル (id/principal/tier/leased_until) を DO 内 sqlite に持ち、poll/lease/remove を直列化。src/network_queue.js:5-44 (class, CREATE TABLE, admission), :59-64 (queuedNetworkCompletion から get(idFromName(group)))。test/itonami_bot_runtime_do.test.js:171/:226。",
+   "blast_radius": "correctness",
+   "replacement": "redesign — 複数 isolate 間の直列 slot 割当（'shared across isolates'）が目的で、単一 isolate の in-memory では意味を失う。候補: inga (consensus/ordering plane — まさに 'Ordering, state, execution')、または DO を維持するなら ADR 違反のまま残すか優先度なしの best-effort（正しさ=公平性/上限が緩む、支払い済み priority の保証が消える）。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/club-shinshi/60-apps/ai-gftd-project-shinshi/appview/ai-gftd-wasm-shinshi-sh1n5h1x",
+   "bindings": "D1 SHINSHI_DB (ai-gftd-shinshi) + D1 RECORDLOG_DB (ai-gftd-pds-recordlog)",
+   "purpose": "(a) SHINSHI_DB = transactional data + index: d1/migrations 0011-0013 = billing_account/billing_plan/billing_subscription/billing_event/entitlement (USDC receive rail ADR-2607078100 + murakumo billing), premium_waitlist, funnel_daily, member_account/member_session (session)。旧 repo は routes/xrpc の read-only NSID (listActresses/getModelProfile/actress/scene tables) も直接読む（wrangler.jsonc コメント）。(b) RECORDLOG_DB = index — 'PDS record-log mirrors … read-only via the /_d1 recordlog_query op' (wrangler.jsonc コメント)。RisingWave decommission の代替 mirror。",
+   "blast_radius": "data_loss",
+   "replacement": "medium→redesign — billing_subscription/member_session は transactional（消失=課金・ログイン状態喪失）。funnel_daily/metrics は消失許容。RECORDLOG_DB は mirror なので origin (PDS record log) からの再構築可（index）。撤去は shinshi 全体の data plane 設計次第で、単独では不可能。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/club-shinshi-app/appview/ai-gftd-wasm-shinshi-sh1n5h1x",
+   "bindings": "D1 SHINSHI_DB (同一 database_id 6188f976…) + D1 RECORDLOG_DB (同一 74520e41…)",
+   "purpose": "club-shinshi 側と同一 DB への第二 binding（同一データ、同一判断）。本 repo は現行デプロイ (magatama-sh1n5h1x)。",
+   "blast_radius": "data_loss",
+   "replacement": "club-shinshi 側と同一の撤去計画に従う（二重计数しない）。DB 実体は 1 つ。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/club-shinshi-app/appview/shinshi-cljc",
+   "bindings": "D1 SHINSHI_DB (同一) + D1 RECORDLOG_DB (同一)",
+   "purpose": "同 DB の第三 binding（CLJC リファレンス実装, ADR-2606290000; 'D1 は既存 database_id を再利用'）。src/club_shinshi/d1.cljk:320/:339 (RECORDLOG_DB /_d1 handler), :431 (SHINSHI_DB), xrpc.cljk:40, sitemap.cljk:83/:100, api.cljk:15, assets.cljk:20/:72。",
+   "blast_radius": "data_loss",
+   "replacement": "同上（同 DB 実体）。workers_dev preview であり route 未活かしのため、この repo 単体の binding 削除自体は trivial だが DB 撤去とは別問題。",
+   "effort": "medium"
+  },
+  {
+   "path": "orgs/network-awai/fans-oppai",
+   "bindings": "D1 OPPAI_DB (oppai-feedback) + KV OPPAI_KV",
+   "purpose": "(a) OPPAI_DB = transactional data (bounded): site_errors/feedback/feedback_limits (0001, cron で 30/90 日 purge, feedback.cljk:7/:37 cleanup!)。(b) OPPAI_KV = session/anti-abuse: challenge:{nonce} (single-use, TTL 120s, worker.cljk:264/:280), face:{id} = 顔ガード enrolment (7日 TTL, :287/:300/:317, cookie oppai_face と対)。",
+   "blast_radius": "data_loss",
+   "replacement": "medium — challenge は TTL 付き single-use で in-memory では isolate 分散時に二重使用が可能（aozora ChallengeStore と同型の問題だが、guard の実害は小さい=顔ガード緩和）。face enrolment は 7 日で消える ephemeral session 相当、R2 でも代替可（or 消失許容で再登録）。feedback は bounded inbox、R2 object per message で可。全体に「消失しても reconstruct/再登録で回復」性が高い。",
+   "effort": "medium"
+  },
+  {
+   "path": "orgs/network-awai/manimani/appview/ai-gftd-wasm-manimani-m4n1m4n1",
+   "bindings": "D1 MANIMANI_DB (ai-gftd-manimani)",
+   "purpose": "transactional data (single-owner, client-side sealed) — wrangler.jsonc コメント: domain data on D1 (RW+kotoba decommission 2026-06-15)。lg-manimani pod が /_d1 endpoint 経由で書く設計。ただし svelte/ は scaffold のみ（routes/_d1/+server は未存在、README 'Scaffold command … then add the four routes'）。デプロイ実体は未完結。",
+   "blast_radius": "none_currently",
+   "replacement": "削除で済む（現状）— worker main ターゲットの build output も無く、D1 を読む source がこの checkout に存在しない。DB の中身（ai-gftd-manimani, client-side sealed）にまだ live 読み書き経路があるかは Cloudflare 側で確認が要る（他 repo から bind されていないか）。",
+   "effort": "trivial",
+   "blocker": "repo archived 2026-09-13 実測 (git push → 'This repository was archived so it is read-only') — 違反は据え置き。worktree の削除 patch は merge 不能。"
+  },
+  {
+   "path": "orgs/network-awai/net-babiniku",
+   "bindings": "D1 BROADCAST_DB (net-babiniku-broadcast)",
+   "purpose": "transactional data — migrations 0001-0020: broadcast_signal, live_reaction(+moderation), character/voice/motion/effect/sound generation jobs, character_bundle(+publication), account_identity (OIDC login: account-callback.js:34 INSERT account_identity), visit_telemetry。functions/api/ 15 ファイルが使用 (telemetry-report.js:62-73, reactions.js:180, account.js, broadcast.js, track.js 等)。",
+   "blast_radius": "data_loss",
+   "replacement": "redesign — account_identity は login 状態（消失=全ユーザのアカウント紐付け喪失）、generation jobs は進行中 work の state。telemetry/reactions は消失許容寄り。単純な代替面は無く、account/jobs を kotobase datom plane に移す再設計が要る。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/network-isekai",
+   "bindings": "D1 SCORES_DB (isekai-scores)（DO binding はコメントアウト済み, services SOCIAL_ROOMS_SERVICE は対象外）",
+   "purpose": "transactional data + index + cursor: scripts/isekai/d1-schema.sql = datoms, used_tokens, rate_limit, fork_blocks/fork_refs/fork_reports/fork_git_mirror (fork economy), player_saves(+revisions/tombstones) = セーブデータ, push_*, wallet_balances/wallet_transactions (transactional), daily_reward_claims, player_mail/mail_claims, player_ratings, matchmaking_*, matches, presence_counts。functions/api/ 27 ファイル (scores.js, fork/*, presence.js:44, liveops.js:31-43, murakumo-chat.js:102-106 rate limit 等)。",
+   "blast_radius": "data_loss",
+   "replacement": "redesign — player_saves/wallet_balances/fork_refs はユーザ data（消失=実害）。rate_limit/used_tokens は cursor（再構築可、撤去で abuse 上限がリセット）。datoms テーブルは kotoba Datalog join 前提（kotobase D1 plane の議論と接続）。全面撤去は game の進行 state を失う。",
+   "effort": "redesign"
+  },
+  {
+   "path": "orgs/network-awai/network-isekai/workers/lobby-presence",
+   "bindings": "DO LOBBY_PRESENCE (LobbyPresence)（D1 binding はコメントアウト — checker は TOML コメントもマッチするため 'd1_databases' 違反表示）",
+   "purpose": "session/metrics — in-memory Map {opaqueSessionKey→lastSeenMs}（hash のみ、DID/IP/訪問履歴は保存しないと明記）+ 20s alarm で D1 presence_counts に counter 1 本 publish（ただし D1 binding は未結線、src/index.mjs:75 env.SCORES_DB が nil なら skip）。DO storage 自体は alarm scheduling のみ。",
+   "blast_radius": "slow_only",
+   "replacement": "削除で済む（DO 部分）— window は純 in-memory、DO storage は alarm のためだけに使用。BroadcastChannel fallback が既に default 経路。DO を外すと cross-device presence counter が消えるだけで、正しさは壊れない（'no data is not zero' と正しく退化する設計）。",
+   "effort": "trivial"
+  },
+  {
+   "path": "orgs/network-awai/network-isekai/workers/social-rooms",
+   "bindings": "D1 SOCIAL_DB (isekai-scores, 本体と同一 DB) + DO SOCIAL_ROOMS (SocialRoom, sqlite)",
+   "purpose": "(a) DO = transactional data (group chat): messages/reports/rate_windows テーブルを ctx.storage.sql に持つ (src/index.mjs:47-79)。Ed25519 join 認証 (:13-23)。(b) SOCIAL_DB は membership/ safety の読み取りのみ: group_members / player_blocks / safety_sanctions (src/index.mjs:85-96 stillMember/restricted)。書き込みは Pages 本体側。",
+   "blast_radius": "data_loss",
+   "replacement": "medium — chat messages はユーザ生成 data（消失=会話履歴喪失）で R2 append-only log で移行可。SOCIAL_DB の membership 読み取りは本体の D1 撤去と連動（別個には撤去不能）。",
+   "effort": "medium"
+  },
+  {
+   "path": "orgs/network-awai/network-isekai/workers/stage-rooms",
+   "bindings": "DO STAGE_ROOMS (StageRoom, sqlite migration あるが storage 不使用)",
+   "purpose": "session (pure relay) — WebSocket presence relay、storage ゼロ ('No storage, no state beyond the live sockets', hibernatable WS)。src/index.mjs 全文確認済み（constructor は ctx のみ、CREATE TABLE なし）。",
+   "blast_radius": "none_if_unwired",
+   "replacement": "削除で済む — DO storage は使っていない。migrations の new_sqlite_classes 宣言だけが残存。ただし Cloudflare は DO クラス提供に DO を要求するため、worker 自体を退役させるか WS relay の代替（inga actor / 別 transport）が必要。本体 wrangler.toml 側 binding もコメントアウト状態で未結線。",
+   "effort": "trivial"
+  },
+  {
+   "path": "orgs/network-awai/network-isekai/workers/sekaiju",
+   "bindings": "DO SEKAIJU_ROOMS/WRITER/DUNGEONS/BOARD (4 class) + D1 DB (sekaiju-dev)",
+   "purpose": "transactional data + simulation state — wrangler.jsonc コメント明記: 'Durable Object storage is deliberately unused — ADR-0071 keeps the durable plane in one D1 database so kotobase Datalog joins reach across every entity. These objects are simulation and serialisation, not storage.' FieldRoom/Writer(250ms timer で D1 flush)/DungeonRoom/SeasonBoard(SeasonBoard のみ makeBoard() を in-memory で保持、:358-368 = 唯一の非永続 state)。D1 = kotobase_blocks/refs/auth_nonces/auth_decisions/projection/graph_cid_index (0001-0007)。src/index.mjs:76/:225/:260/:294/:393/:396/:401。",
+   "blast_radius": "data_loss",
+   "replacement": "medium — DO 4 class のうち 3 つは storage 未使用で、撤去は「worker 構造の分解」の問題（trivial 寄り）。SeasonBoard は in-memory なので消失=season 成績リセット（許容可）。D1 は kotobase_blocks 系 = kotobase datom plane の D1 mirror であり、ADR-2608039000 的には '消して再構築できるか' → origin (kotobase.net) から再投影可なら rebuildable index。",
+   "effort": "medium"
+  },
+  {
+   "path": "orgs/network-awai/nexus-x402",
+   "bindings": "DO QR_MERCHANTS (QrMerchant) + DO RESEARCH_ORDERS (ResearchOrderStore) + KV SELLERS_KV + KV SETTLEMENTS_KV",
+   "purpose": "(a) QR_MERCHANTS = transactional data — merchant-presented QR 決済の orders/payments/events テーブルを DO sqlite に持つ (src/nexus/qr/service.cljk:9-11 init!, :14-27 save! transactionSync; 'settling state is durable before external I/O. Never retry uncertain payment')。per-merchant instance (qr/http.cljk:32 getByName(merchant))。(b) RESEARCH_ORDERS = transactional data — research orders の ctx.storage put/get/claim/patch (host/research-http.mjs:5-8, claim は transaction)。host/qr-entry.mjs:13-15。(c) SELLERS_KV = index/config — 動的 seller registry、単一 JSON 配列キー 'registry' (src/nexus/registry.cljk:6, worker.cljk:196-224)。(d) SETTLEMENTS_KV = index — 'an INDEX for a consuming agent, not a ledger of record — the on-chain tx stays the source of truth' (src/nexus/settlements.cljk:2-5, worker.cljk:263-270)。read-modify-write on one key per seller。",
+   "blast_radius": "data_loss",
+   "replacement": "split — ①QR orders/payments は payment state machine（消失=未確定決済の uncertain 状態喪失。on-chain tx が SSoT なので reconciliation で復元可能ではあるが、settlement-uncertain の保持が redesign 要。inga ordering が最適合）②research orders 同様（R2 + 冪等 claim で移行可寄り）③SELLERS_KV は config index → R2 or 静的 vars 化で trivial ④SETTLEMENTS_KV は self-declared index → 削除で on-chain origin から再構築（trivial〜medium）。",
+   "effort": "redesign"
+  }
+ ],
+ "order": [
+  "1_trivial_batch: app-aozora-engine/appview FEED_CACHE / app-aozora-engine/pds CHALLENGES(cross-binding) / manimani/appview MANIMANI_DB(未完結 worker) / network-isekai/workers/lobby-presence DO+ghost D1 comment / network-isekai/workers/stage-rooms DO(storage 未使用) — 各 binding 削除 + 検査緑化",
+  "2_medium_batch: nexus-x402 SELLERS_KV+SETTLEMENTS_KV(index 化) / fans-oppai / cloud-manimani(kotobase store surface 待ち) / network-isekai/workers/sekaiju / social-rooms",
+  "3_medium_batch: cloud-itonami/workers/{domain-reverify,mail-inbound}(R2 寄せ; mail staging は先に移す) / cloud-murakumo MODEL_REGISTRY_DB(rebuildable projection) + INFER_MEMORY_KV の非 transactional key 群",
+  "4_redesign_batch: cloud-itonami WORKSPACE_DB+ITONAMI_DATA credential/billing 面 / cloud-murakumo ACTIONS_DB(free_receipts exactly-once) / cloud-murakumo-api NETWORK_QUEUE / nexus-x402 QR_MERCHANTS / network-isekai SCORES_DB / net-babiniku BROADCAST_DB / club-shinshi D1 群 / app-aozora-engine/auth CHALLENGES"
+ ],
+ "summary": "21 設定を実際に読んだ。撤去難易度は三層に分かれる。(1) trivial: 5 設定 — FEED_CACHE(abstracted, absent 対応済み)、pds CHALLENGES(pds src は未参照の cross-binding)、manimani MANIMANI_DB(worker 本体未完結)、lobby-presence(storage 不使用+D1 はコメント)、stage-rooms(storage 不使用)。(2) medium: 6 設定 — R2/再投影で置ける cursor/index/再登録可能 ephemeral (cloud-itonami 2 workers, cloud-manimani は kotobase.net store surface 着地条件付き, sekaiju, social-rooms, fans-oppai, nexus-x402 の KV 2 本)。(3) redesign: 残り — どうしても直列化/exactly-once が必要なもの (aozora auth CHALLENGES, murakumo-api NETWORK_QUEUE, murakumo ACTIONS_DB free_receipts, nexus QR_MERCHANTS) と、ユーザの transactional data を持つもの (cloud-itonami WORKSPACE_DB/ITONAMI_DATA, network-isekai SCORES_DB, net-babiniku BROADCAST_DB, club-shinshi billing/member session, murakumo infer-memory join record)。破壊判定の要点: KV は compare-and-swap が無いため single-use/exactly-once の代替にならない — これは murakumo 自身の free_tier_http.cljk と aozora challenge.cljk の docstring が明示的に理由を書いている。撤去の正本経路は「cache/index/metrics/cursor = R2 or 削除」「single-use/ordering = inga」「transactional/credential = kotobase.net datom plane」への分類で、cloud-itonami と cloud-murakumo が最大の 2 塊。checker (verify-awai-state-store-policy.cljk) は TOML のコメント行も拾う (lobby-presence の [[d1_databases]] コメントが違反表示) ので、コメント解消だけで消える違反が 1 件ある。",
+ "progress": {
+  "2026-09-13": {
+   "violations_start": 21,
+   "violations_now": 17,
+   "landed": [
+    {
+     "repo": "cloud-manimani",
+     "merge": "92982f2",
+     "change": "MANIMANI_KV → MANIMANI_R2 (r2_store.cljk op-map, key 形互換)。live deploy は bucket 作成 + KV key copy と共に次段。nbb.edn 追加、viber token 精度 fix 同梱。"
+    },
+    {
+     "repo": "app-aozora-engine (appview)",
+     "merge": "195c274",
+     "change": "FEED_CACHE KV 削除 (tier-2)。tier-1 caches.default のみ。冷 colo 初回は再計算 1 回。"
+    },
+    {
+     "repo": "app-aozora-engine (pds)",
+     "merge": "0c2c17f",
+     "change": "CHALLENGES DO cross-binding 削除 (pds src 未参照)。auth 本体は redesign。"
+    },
+    {
+     "repo": "network-isekai",
+     "merge": "4d07c6d",
+     "change": "lobby-presence standalone DO worker 削除 (未 bind、presence.js は未 bind 経路が正規)。"
+    },
+    {
+     "repo": "nexus-x402",
+     "merge": "0a48e91",
+     "change": "SELLERS_KV + SETTLEMENTS_KV → NEXUS_R2 1 bucket。key 旧 KV verbatim。baseline (KV) と FAIL test 名集合完全一致 = regression なし。DO 2 本 (QR_MERCHANTS/RESEARCH_ORDERS) は redesign で残す。"
+    }
+   ],
+   "blocked": [
+    {
+     "repo": "manimani/appview",
+     "reason": "repo archived (read-only) — 違反は据え置き"
+    }
+   ],
+   "remaining_note": "残り 17 は全て medium/redesign: Pages 共有 KV (cloud-itonami 本体, domain-reverify, mail-inbound)、transactional D1 (isekai scores, club-shinshi billing, net-babiniku, fans-oppai feedback)、exactly-once DO (auth CHALLENGES, murakumo-api NETWORK_QUEUE, murakumo ACTIONS_DB, nexus QR_MERCHANTS)。"
+  }
+ }
+}
