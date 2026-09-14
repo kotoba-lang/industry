@@ -1,0 +1,48 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609141815-search-host-move-yataverse")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "検索面の canonical host を search.kotobase.net から search.yataverse.com へ移す（旧 host は同一 Worker の legacy 301 helper）")
+  (:adr/topic "search-host-move-yataverse")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-14")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "net-kotobase/search-origin の canonical hostname（search.yataverse.com）"
+   "search.kotobase.net の役割（同一 Worker が答える legacy helper、GET/HEAD = 301・他 method = 405）"
+   "kotobase 永続化 policy の :policy/capability-origins :search の値"
+   "検索面の bot（search-kotobase-maint）・監視 job の測定先 hostname"))
+
+  (:adr/related
+  (vector "adr-2609131630-yataverse-mirror-bytes-plane"
+   "adr-2609141707-hyakka-wiki-host-move-yataverse"
+   "adr-2608170600-search-kotobase-net-google-like-origin"
+   "adr-2608159100-kotobase-net-default-durable-boundary"
+   "net-kotobase/ipfs merge 096de895 (bytes plane zone swap, PR #68)"
+   "net-kotobase/search-origin merge 68910ee (search host move, PR #7)"))
+
+  (:adr/decision-summary
+  (vector "D1': canonical host は search.yataverse.com。検索面は bytes 面（ADR-2609131630）・wiki（ADR-2609141707）に続いて yataverse datalake zone に載る。ADR-2608170600 の能力定義（独立 Worker / datom hydrate 禁止 / postings oracle）は不変で、変わるのは hostname だけ"
+   "D2': search.kotobase.net は同じ Worker に custom domain のまま残り、Worker 内 301 helper として動く。GET/HEAD は path+query 保持で canonical へ 1 hop、他 method は 405（黙って付け替えない）。ipfs#68 の helper 型と同じ"
+   "D3': storage plane（kotobase.net /ipld/:cid）は動かない。index block の durable source は Kotobase のまま（ADR-2608159100 変更なし）"
+   "D4': ingest 源の wiki snapshot URL と doc の item URL は wiki.yataverse.com を指す。ingest.py の出力は index_bundled.cljk（.cljk rename 正本）"
+   "D5': 測定（bot smoke・監視 pulse）は canonical に対して行い、legacy host には 301 検査を 1 本足す"))
+
+  (:adr/artifact
+  (vector "net-kotobase/search-origin e99a799（merge 68910ee、main 着地）: wrangler.jsonc routes 2 本 / worker.cljk legacy-redirect / ingest.py host+出力先 / build 経路修復"
+   "build 経路修復: main tip 6d48bf9 では shadow-cljs が .cljk を視えず worker build が落ちていた（実測: The required namespace ... is not available）。net-kotobase/ipfs と同じ gen-shadow-cljs-edn.cljk + shadow-cljs.template.edn（GENERATED shadow-cljs.edn は gitignore）で修復。browser jar（reagent/re-frame）は mirror が directory しか運ばないため template の :dependencies に載せた"
+   "Worker version 08bf70c3-b911-4a71-8bc0-32db885aff47（2026-09-14 deploy、search.yataverse.com + search.kotobase.net 両 custom domain）"
+   "hermes profiles: search-kotobase-maint SOUL.md + 測定 script（.bak-20260914-174921）、manager kotobase-net-gateway-pulse job を新 host 系へ"))
+
+  (:adr/verify
+  (vector "npm run build 緑（page 131 files / worker 78 files / 0 warnings）、npm test 10 tests 23 assertions 0 failures（2026-09-14 実測）"
+   "node bundle smoke: canonical 理事会 hits=3・会計検査院 hits=2（3876 docs、reason ok）、legacy /search は 301 で query 保持、legacy POST は 405、canonical / は 200"
+   "live 実測（2026-09-14）: search.yataverse.com/search?q=理事会 200 JSON hits、search.kotobase.net/search 301 -> search.yataverse.com（location header 実測）、follow で 200、POST 405"
+   "freshness: upstream（wiki.yataverse.com /_app/meta）catalog-id sha256:dfa82dcd... = local index_bundled.cljk 同値、items 3870 / docs 3876"
+   "bot 測定 script（search_kotobase_state.sh）全緑、HEAD /search の 404 は移転前から存在する oracle の GET 限定挙動で非回帰"))
+
+  (:adr/notes
+  "host は「設定」であって設計ではない（ADR-2609092600 の整理、wiki 移転 ADR-2609141707 と同じ）。search.kotobase.net の除去（routes からの削除）は全外部参照の新 host 収束を実測した後の別手続き。capability origin の :search 値は manifest/repository-rules.edn と gate（verify-kotobase-persistence-policy.cljk）をこの ADR と同じ commit で張り替える。"))
+)

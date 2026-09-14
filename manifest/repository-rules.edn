@@ -147,7 +147,10 @@
     :git "https://git.kotobase.net"
     :atproto "https://atproto.kotobase.net"
     :pinning "https://pinning.kotobase.net"
-    :search "https://search.kotobase.net"}
+    ;; search plane moved to the yataverse zone (ADR-2609141815). The old
+    ;; search.kotobase.net is NOT retired: the same Worker answers it as a
+    ;; legacy 301 helper into the canonical host.
+    :search "https://search.yataverse.com"}
    :policy/internal-capability-origins
    {:datoms "https://datoms.kotobase.net"}
    :policy/query-dialects #{:datalog :sql :cypher :sparql :graphql :gremlin}
