@@ -25,6 +25,19 @@
      delimiter（oracle/set-resource-loader! の 1 つ余分な閉じ + central-exchange!
      の 1 つ足りない閉じ）。2 箇所とも修正済み（target/ は untracked scratch で
      commit 対象外）。
+   - 2026-09-14 追補（owner「do it」wave、commit 01eb117）: hosted-first 電話入口
+     を足した。QR は **hosted 入口（auth.itonami.cloud）を encode する** — 電話は
+     rp-id "localhost" に対して WebAuthn assertion を作れない（localhost は Mac
+     しか解決しない。実測は WebAuthn rp-id の性質であって network ではない）。
+     「network over どこでも」= カメラで hosted ceremony に直接入る経路。Wave B
+     で signed-out の passkey-required? を store 条件から計算するようにした
+     （旧: authenticated? を AND に取っていたため、User あり Passkey 0 本の
+     store で entry が 1 つも出ない死止り。実測: registered? true /
+     device-passkey? false / passkey-required? false）。signin-server.cljk の
+     sci 実測: bare `.digest` thread symbol と `js/URLSearchParams` 関数呼びは
+     両方 throw、constructor dot 形と明示 interop 形が正。central-complete! は
+     userinfo profile を返すだけで claim が呼ばれていなかった（全 hosted
+     sign-in が /?auth=failed に落ちる）— central-claim-identity! を chain した。
    - 第二因は cljk-origin.edn の manifest 不整合: ①resident が require する
      target/* scratch ns が未登録 → cljk: invalid-origin。②build.cljk の登録が
      main 上の実体（build.cljc、JVM-only tools.build ns）と乖離 → cljk:
