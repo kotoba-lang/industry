@@ -1,0 +1,42 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609141707-hyakka-wiki-host-move-yataverse")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "hyakka wiki の canonical host を wiki.kotobase.net から wiki.yataverse.com へ移す（旧 host は同じ Worker が温存）")
+  (:adr/topic "hyakka-wiki-host-move-yataverse")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-14")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/authoritative-for
+  (vector "hyakka wiki の canonical hostname（wiki.yataverse.com）"
+   "移行期間中の旧 host（wiki.kotobase.net）の serv 継続と解約条件"
+   "bot fleet（hermes profiles）の保存先 URL の指す先"))
+
+  (:adr/related
+  (vector "adr-2607311100-hyakka-knowledge-wiki-on-kotobase"
+   "adr-2608159100-hyakka-persistence-boundary-kotobase"))
+
+  (:adr/decision-summary
+  (vector "D1': canonical host は wiki.yataverse.com。ADR-2607311100 D1 の deploy 境界（独立 Worker / apex 非同居 / zone 所有は net-kotobase）は不変で、変わるのは hostname だけ"
+   "D2': 移行期間中、同一 Worker が両 custom domain を serv する（host allowlist と CORS は両 host を受け、CNAME も両方接続）。旧 host の retirement は「全 writer の新 host 参照ゼロを測ってから」"
+   "D3': 旧 host 向けの recorded claim 値（csf-query の curl recipe 等）は書き換えない。記録された履歴データであり、live URL 定数だけを張り替える"
+   "D4': bot fleet の保存先（cron jobs.json / SOUL.md / yakuwari.edn / skills / 常駐 script）は新 host を指す。cron output ログと state snapshot は履歴として触らない"))
+
+  (:adr/artifact
+  (vector "network-awai/app-hyakka 02bed29b（worker host swap、main 着地）"
+   "root superproject 84dd54d3（hyakka-knowledge-resident.cljk public-health / datalake-export / arday-cofnas UA、main 着地）"
+   "app-hyakka Worker version 05a9b159-6177-4a32-a6ca-e7df6604ff8d — wiki.yataverse.com と wiki.kotobase.net の両 custom domain で live"
+   "hermes profiles: cron jobs.json 27 件 / SOUL・yakuwari・profile.yaml 67 件 / skills 70 件 / 常駐 script 20 件を新 host へ（.bak-20260914 バックアップ付き）"))
+
+  (:adr/verify
+  (vector "curl -s https://wiki.yataverse.com/health と curl -s https://wiki.kotobase.net/health が同一 catalog-id sha256:dfa82dcda778a68f... を返す（2026-09-14 実測 200/200）"
+   "新 host で POST /mcp tools/list が 4 tools（hyakka_search / hyakka_get_item / hyakka_submit_proof / hyakka_get_submission_status）を返す（実測）"
+   "新 host で hyakka_search が実行件を返し、hyakka_submit_proof が validation（lane 到達）まで応答する（実測）"
+   "profiles 内 live operative（jobs.json / SOUL / yakuwari / scripts）の wiki.kotobase.net 参照 = 0（repo 作業コピー wiki-pr-merge/{work662,workdir} を除く）"))
+
+  (:adr/notes
+  "host は「設定」であって設計ではない（ADR-2609092600 の app 4 面と同じ整理）。identity は IPFS/CID 由来のまま不変で、naming/entry の DNS label が張り替わるだけ。旧 host の除去（wrangler routes からの削除）は、全 writer の新 host 参照ゼロを実測した後の別手続きとする。"))
+)
+)

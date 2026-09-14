@@ -1,0 +1,144 @@
+[{:db/id -1
+  :adr/id "adr-2609141538-murakumo-secure-community-tee-routing"
+  :adr/title "murakumo: secure/community node tier を TEE 調達方針に接続する (community はリスク明記・非機密 workload 優先)"
+  :adr/status "accepted"
+  :adr/date "2026-09-14"
+  :adr/body "## Context
+
+オーナー決定 (2026-09-14): murakumo は将来的に **TEE を前提にした調達**を行う。
+既存の Secure/Community 2 層 (`cloud_murakumo.trust`, live) をこの調達方針に
+接続し、community node の利用時リスク開示と非機密 workload の優先処理を決める。
+
+測定済みの前提 (2026-09-14):
+
+- 層は既に live: `/infer/nodes` が `trust-tier` (awai-secure 10 / community 8 /
+  legacy 47) と `provider` (secure は `did:web:awai.network`、community は各ホスト
+  自身の `did:key`) を返す。ADR-2800010700 D1「層は価格と保証の組。新しく設計しない」
+- community node は qualification (`provider-qualification`) 通過で
+  `:node/admission :accepted` になり native-tier work を claim できる。
+  qualification は admission gate であって attestation ではない
+  (provider_qualification.cljk ns docstring)。**community node には TEE 相当が無い**
+-TEE 側の現在地: 公開面は「Not attested / 現在はハードウェア証明なし」を開示済み。
+  fail-closed は着地済み — TEE 証明 (CPU/GPU evidence + code/model 測定値 +
+  接続先の同時検証) が揃うまで機密推論は通常推論へ fallback しない
+  (cloud-murakumo-site examples.cljk `/go#trust`)。`/api/v1/attestation` 枠あり
+- Mac (Apple Silicon) に TEE 等価物は恒久的に無い。AMD 消費者 APU
+  (6600H/HS, 7735HS) も boot/OS/filesystem 設定では SEV-SNP 相当にならない
+  (RMP は BIOS/AGESA が暴露する server プラットフォーム機能)。in-use 隠蔽が
+  出来る調達対象は: NVIDIA CC 対応 GPU (H100/H200/Hopper 以降) + SEV-SNP/TDX CVM、
+  Ryzen PRO (SNP client 公表、BIOS 有効化前提)、EPYC Milan 以降
+- workload 面: `/infer/queue` の `native-tier-kinds` は
+  `host-large-model / low-latency-pipeline / media-generate / full-shard`。
+  画像・動画生成は `media-generate` (comfyui 形、`awai-network/hokusai` 等が
+  この経路)。modality は image/video/3d/music/sfx/voice/motion を指定できる
+
+## Decision
+
+### D1. TEE は secure tier の調達要件になる
+
+将来の secure node 調達 (レンタル・購入を問わず) は TEE を前提とする:
+NVIDIA Confidential Computing (Hopper 以降) + CPU TEE (SEV-SNP / TDX) の
+CVM、または quote 検証可能な同等物。**既存の secure node 10 台
+(自社 Mac mini 群) は TEE を持たないので、この調達方針の下では「TEE 前提の
+secure」と「現行 secure」は別物である。** 現行 secure node は Apple Silicon の
+ため TEE 化できない — これらは trust-tier を維持するが、TEE が要件の
+workload は載らない。TEE が要件の workload が現れた時点で attestation
+evidence (quote chain) の無い secure node に振らない経路を
+`/api/v1/attestation` の evidence で区別する。
+
+secure tier の既存の性質は維持する: provider は `did:web:awai.network`、
+admission は operator 認証必須、missing tier は secure に解決 (workload 既定
+は安全側)。community を secure に降格させない (trust/compatible? は exact
+match のまま)。
+
+### D2. community node は「機密性ゼロの workload 専用」と位置づけ、利用時リスクを明記する
+
+community node で動く推論は **TEE が無い通常メモリ上で動く**。provider DID
+が示す第三者ホスト運用者は、技術的に prompt・生成物を読める。これは
+qualify の有無とは無関係 (qualification は endpoint の応答性を測るだけ)。
+
+したがって:
+
+1. **API 利用時リスク開示**: community node で処理される request の応答に
+   リスク文を付ける。文言は「この応答は community node で処理されました。
+   入力と出力は暗号化されず、node 運用者が読める可能性があります。機密情報は
+   送らないでください。」(日英併記、文言確定は site 側で行う)。**機密を扱う
+   caller は secure 層を使う** — request 側に trust tier を指定しない caller
+   の既定は secure (trust/normalize の現行挙動) なので、community に落ちるのは
+   明示的に community を選んだ caller だけにする
+2. **画面面**: murakumo.cloud の community 導線 (free tier / community node
+   一覧) に同じリスク文を表示する。TEE status (`/go#trust`) と合わせて
+   「community = attestation 無し」と言う
+3. **workload の優先順位**: 機密情報を扱わない生成 — 画像・動画 (media-generate)、
+   音声・3D・postproc、公開データの batch 処理 — を community node に
+   優先配置する。テキスト対話・コード実行・私有データ処理は secure 優先。
+   `native-tier-kinds` のうち community が受けてよいのは
+   **media-generate / full-shard (公開データ)**、
+   host-large-model と low-latency-pipeline は secure のまま (私有 prompt が
+   平文で通る経路を community に広げない)
+
+### D3. 優先配置は claim gate の一次元として実装する
+
+`edge_queue.cljk` の claim-decision に workload kind × node tier の
+適合表を足す。実装は既存の形を踏む:
+
+- `native-tier-kinds` と同型の **community-servable kinds** を定義する
+  (`media-generate`, `full-shard` + browser-tier kinds)。この集合だけが
+  community node に claim を許す
+- caller が request で trust tier を指定できる field を queue job に足す
+  (`:input/trust-tier`、無指定は secure 既定)。community node が claim できる
+  job は「community-servable kind かつ trust-tier community 明示」に制限する
+- 逆方向 (secure node が community job を claim) は禁止しない — trust は
+  exact match のまま (compatible?) だが、**優先処理は scheduler の preference**
+  であり保証ではない。mediagen job が secure のみに溢れた時 community に
+  落とす fallback の要否は実測してから決める
+- metering/payout は既存の delivered-FLOPs 経路のまま。community 優先の
+  価格差 (community で安くする等) はこの ADR では決めない — plans
+  (`/itonami/plans`) と切り離して別に決める
+
+### D4. TEE 調達の受け皿は attestation evidence で閉じる
+
+TEE 前提調達が着地した node は、`/api/v1/attestation` に quote chain
+(NVIDIA GPU attestation + SEV-SNP/TDX quote + compose hash) を出す。
+**サイトの説明文は証拠にならない。** 利用者が自分で quote を検証できる
+経路 (検証 script の公開) を要求基準にする。quote を出せない secure node は
+「TEE が要件の workload」に対して `attested: false` として現れ、
+fail-closed の現行挙動 (通常推論への fallback 不許可) が効く。
+
+既に決まっている fail-closed との整合: TEE 証明が揃うまで機密推論は
+通常推論へ転送しない — D2/D3 の community 優先配置はこの原則の workload 側
+適用であり、矛盾しない (community 優先の対象は「機密情報を扱わない」
+workload に限定している)。
+
+### D5. 段階 (順序固定)
+
+1. **今**: D2 のリスク開示文を site と API 応答に足す (文言は site 側で確定)。
+   workload 優先は claim gate が効くまで human routing (operator が
+   mediagen 系 job を community node に置く) で運用
+2. **gateway**: D3 の claim gate 実装 (`community-servable kinds` +
+   `:input/trust-tier`)。テストは「community node が host-large-model を
+   claim できない」「trust-tier 無指定 job に community node が手を出せない」
+   の 2 つの拒否経路を pin する
+3. **調達**: TEE 対応 node 1 台 pilot (Phala/dstack or GCP TDX + NVIDIA CC
+   GPU)。quote 検証・CC on/off の tok/s 実測差分を出してから量産調達する。
+   overhead 5-15% は公称値 — 実測してから価格 tier に反映
+4. **site**: TEE status を「pilot node attested (台数・model・実測 overhead)」
+   へ更新。community node のリスク文と TEE status を同一画面に出す
+
+## Consequences
+
+- 調達基準が変わる: 今後の secure 容量確保は TEE 対応品が既定になる。
+  非対応品を買う場合は理由を ADR に書く。Apple Silicon (Mac mini) はこの
+  基準の下で恒久に non-TEE であり、Mac fleet は standard/非機密 tier として
+  継続する (D1)
+- community node の役割が明確になる: 機密ゼロ・公開系 workload の容量と、
+  node owner の収益面。第三者ホスト運用者に読めることは開示で対処する —
+  隠そうとしない (隠すと詐称になる)
+- 実装範囲: gateway に claim gate 一次元 + request field 1 個。既存
+  qualification/admission/payout は触らない。fallback の要否は実測次第
+- 秘匿が必要な caller の既定は secure のままなので、既存 caller は何も
+  変えなくても安全側に落ちる (trust/normalize の現行挙動を維持)
+- 通信面: community node を分散 Mesh で使う場合の MPC 経路
+  (BumbleBee 等、CPU で動く) はこの ADR の外。秘密分散 node として
+  community machine を使う方向は別途検討する (murakumo-confidential-inference
+  skill に記録済み)"}]

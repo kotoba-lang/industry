@@ -25,6 +25,19 @@
      delimiter（oracle/set-resource-loader! の 1 つ余分な閉じ + central-exchange!
      の 1 つ足りない閉じ）。2 箇所とも修正済み（target/ は untracked scratch で
      commit 対象外）。
+   - 2026-09-14 追補（owner「do it」wave、commit 01eb117）: hosted-first 電話入口
+     を足した。QR は **hosted 入口（auth.itonami.cloud）を encode する** — 電話は
+     rp-id "localhost" に対して WebAuthn assertion を作れない（localhost は Mac
+     しか解決しない。実測は WebAuthn rp-id の性質であって network ではない）。
+     「network over どこでも」= カメラで hosted ceremony に直接入る経路。Wave B
+     で signed-out の passkey-required? を store 条件から計算するようにした
+     （旧: authenticated? を AND に取っていたため、User あり Passkey 0 本の
+     store で entry が 1 つも出ない死止り。実測: registered? true /
+     device-passkey? false / passkey-required? false）。signin-server.cljk の
+     sci 実測: bare `.digest` thread symbol と `js/URLSearchParams` 関数呼びは
+     両方 throw、constructor dot 形と明示 interop 形が正。central-complete! は
+     userinfo profile を返すだけで claim が呼ばれていなかった（全 hosted
+     sign-in が /?auth=failed に落ちる）— central-claim-identity! を chain した。
    - 第二因は cljk-origin.edn の manifest 不整合: ①resident が require する
      target/* scratch ns が未登録 → cljk: invalid-origin。②build.cljk の登録が
      main 上の実体（build.cljc、JVM-only tools.build ns）と乖離 → cljk:
@@ -57,4 +70,33 @@
      を読み戻して確認）。
    - manifest 修正: commit 753dcf6（origin/main push、直接 FF）。
    - 実測の未実装: 414 route のうち約 4 route（sign-in 面）のみ移植。残り 410
-     route は server.cljk の完全移植 wave 待ち。"}]
+     route は server.cljk の完全移植 wave 待ち。
+   ## Addendum: handoff wake (option A, owner picked 2026-09-14 14:xx)
+
+   スマホ QR で完了した認証が local app webview に届かない問題の対処。native
+   webview の「パスキーでサインイン」は `POST /api/auth/itonami/start`
+   {handoff:true} を 1 回叩く。server は one-time handoff token を発行し、
+   authorize URL を system browser で開く。webview は `/api/auth/itonami/handoff`
+   を 2s 間隔で polling する。
+
+   - **refusal は一律 {ready? false}**（未知 token も期限切れも同じ。early poll
+     と wrong token を出力で区別しない = 8 問の 4・6）。
+   - callback が session を発行した時点で、一致する handoff を :ready true +
+     :token に束ねる。次の poll が **1 回だけ** {ready? true} + set-cookie を
+     受け取り、token は燃やす（single-use）。
+   - webview は ready を受けてから loadIdentity() を呼ぶ。system browser の
+     cookie は webview に流れないため、session cookie は poll 応答側で配る。
+
+   実測（signin-server.cljk / interaction.js 11e7cc0）:
+   - POST /start {handoff:true} → opened-externally? true + token 発行 ✓
+   - poll（pending token / 未知 token）→ {ready? false} ✓
+   - webview Playwright: クリック → 「ブラウザで認証中…」+ status 文 → poll
+     loop 稼働確認 ✓
+   - parse 罠: 文字列リテラル内の `\"` を無視する自作 balancer は偽の -1 を出す
+     （実際の reader は 719:111 の extra ) を指した）。パ paren 診断は reader
+     で行うこと。
+
+   制限: スマホで authorize を開いたまま Mac 側で完了しない場合、handoff は
+   15 分で失効する（pending は :expires-at で掃除）。QR 経由でスマホ単体で完
+   結させたい場合は central auth 側の device-link が別途要る（本 ADR の範囲外）。
+"}]
