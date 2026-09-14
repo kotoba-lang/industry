@@ -1,0 +1,56 @@
+[{:db/id -1
+  :adr/id "adr-2609141320-yataverse-real-estate-membrane-bots"
+  :adr/title "yataverse real-estate membrane: kenchi contribution ingest + georegistry ontology bot + member contribution bots"
+  :adr/status "accepted"
+  :adr/date "2026-09-14"
+  :adr/body "## Context
+
+測定 (2026-09-14, repo-search + cron jobs.json 全 profile 走査):
+
+- yataverse.com は bytes-plane 専用 (ADR-2609131630)。地図/street 面は kotobase datom
+  面 + otent (R2 Iceberg) に在るが yataverse zone には未統合。
+- kenchi (kotoba-lang/kenchi, did:web:kenchi.etzhayyim.com) は provenance-gated
+  不動産評価 actor だが、**Observation は bot が自動 ingest するだけで、外部参加者が
+  貢献する経路が無い** (ingest.cljk = operator 側 adapter 群のみ)。
+- 登記→所有→賃借のグラフ型は maps actor registry 面 (jp-moj / OwnsProperty /
+  LeasedTo edge) に在るが、資材/建設/家賃/地価/テナントを束ねる ontology bot は無い。
+- otent の bot 群 (street-imagery / street-vision / geo-ontology 等) は実在するが
+  kenchi と接続していない。
+
+## Decision
+
+3 体の Hermes bot profile + kenchi 側の 1 経路を建てる:
+
+1. **kenchi-obs-contrib** — kenchi.clj 側に member-submitted Observation 経路を
+   足す。Observation 形は既存 canonical (`{:value :kind :currency :age-days
+   :source :license :confidence}`) を保持し、`kenchi.contrib` ns (新規) が
+   attribution を stamp する。governor の N-source 独立ゲート・license 行列・
+   MRV は**変更しない** — 参加者提出は 1 ソースとして数え、単独では点推定を
+   撃てないままでよい (provenance-or-silence は膜の正本)。
+   Hermes bot profile `kenchi-obs-contrib` は ATProto (aozora PDS) 上の
+   `com.junkawasaki.kenchi.observation` レコードをポーリングし、governor
+   pre-check を通った分だけ worktree slice として propose (publish は
+   approval-required)。
+2. **yata-georeg-ontology** — 登記・建設・資材・家賃・地価・テナントを 1 ontology
+   EDN (workspace 直下, append-only 台帳ではなく最新状態) に束ねる propose-only
+   bot。source-of-truth 参照: maps actor registry 面 (jp-moj/NTA/reinfolib),
+   kenchi Observation, otent 観測。出力は `yata-georeg-ontology.edn` + 1 finding/tick。
+   hyakka (wiki.kotobase.net) への公開は proposal まで。
+3. **yata-contrib-gate** — Mapillary 型の参加者貢献ゲートを測定する bot:
+   貢献経路 (投稿→署名→governor→commit) の現在地を cron ごとに実測し、
+   無ければ gap を 1 件報告する。実装本体は 1 の kenchi.contrib。
+
+全 bot とも propose-only (yakuwari.edn で publish/merge/deploy は blocked)。
+cron は murakumo ao/kame。1 反復 = 1 finding。
+
+## Consequences
+
+- 参加者の Observation が governor を通るまでは公開面に何も現れない —
+  不正投稿は MRV 帯に落ちるだけで、フライホイール (flywheel.cljk) の
+  backtest 対象にもならない。比較対象は実測済み sales のみ。
+- 地図/streetview データセットの yataverse zone 統合はこの ADR の外
+  (Location 設定の問題 = bytes 面には CID で載る)。app-otent 地球儀との
+  join は後続 ADR。
+- pin: kenchi f3a1e29 (kbb/sci-runnable test suite, PR#2 merged)。
+"}
+]
