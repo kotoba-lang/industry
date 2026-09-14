@@ -1,0 +1,144 @@
+[{:db/id -1
+ :adr/id "adr-2609141800-fake-account-impersonation-report-app"
+ :adr/title "ADR-2609141800: kotoba.cloud に SNS 偽アカウント (なりすまし) 特定・報告の toC 面を積む — 裁定せず、証拠パッケージを作らせ、提出は本人の手で"
+ :adr/status "accepted"
+ :adr/doc_type "adr"
+ :adr/source-format "edn"
+ :adr/date "2026-09-14"
+ :adr/deciders "Jun Kawasaki"
+ :adr/topic "fake-account-impersonation-report"
+ :adr/authoritative true
+ :adr/authoritative_for
+  ["Facebook / LinkedIn / LINE のなりすましアカウントを toC ユーザが特定・証拠化・公式窓口へ報告する面の設計と置き場所"
+   "「SNS アカウントのなりすまし」と「ドメインのフィッシング (yabai)」と「B2B 監視 (app-tia)」の責務分離"
+   "本面の憲章ゲート C1–C6 (non-adjudicating / 証拠ありき / 本人境界 / 手動提出 / 偽報告対抗 / 保存最小化)"
+   "app-kotoba-cloud 内の実装配置 (gateway seam / DO / view)"]
+ :adr/related
+  ["adr-2609062700-itonami-mission-scope-and-adversary-exclusion"
+   "adr-2609141633-org-identity-verifiable-membership-and-delegation"
+   "adr-2608059100-public-internet-account-directories-corpus"
+   "adr-2607283000-yabai-phish-infra-cljc-port"
+   "adr-2608039950-ninsho-one-authority-many-apexes"
+   "adr-2607283100-yabai-phishing-watch-residency"]
+ :adr/body
+  "# ADR-2609141800: SNS 偽アカウント特定・報告の toC 面
+
+**Status**: accepted
+**Date**: 2026-09-14
+**Deciders**: Jun Kawasaki（オーナー指示 2026-09-14「kotoba.cloud の app として facebook, linkedin, line の偽アカウントを特定報告する app を toC 向けに設計, 計画」→「p0」）
+
+## Context
+
+Facebook / LinkedIn / LINE で実在の人物や事業になりすます偽アカウントは、被害者本人が
+各プラットフォームの公式通報フォームから報告するのが唯一の正規経路である。しかし:
+
+- 各社のフォームは項目が異なり、英語で書くことを求められ、証拠 (スクリーンショット・
+  URL・取得日時) を整える手順が本人に丸投げされている
+- なりすまし被害の主な受け手は個人・零細事業者で、B2B 監視システムの顧客ではない
+
+ワークスペースには既に近い 3 面があり、混ぜない線を引く:
+
+| 面 | repo | 何をやる | 本計画との関係 |
+|---|---|---|---|
+| ドメインのフィッシング判定 | `etzhayyim` yabai（ADR-2607283000） | ドメインの lexical + co-hosting 二信号判定、abuse report は DRAFT のみ | **責務分離。** 本面は「SNS アカウント」であり、ドメイン判定を要求しない。abuse 連絡先カタログ（LINE 法務・Meta phish）と draft-only 規約だけを参照 |
+| B2B 監視システムのドメインモデル | `gftdcojp/app-tia` | Owner / Seeker / Recorder / Detector / Reporter / Platformer の 6 actor | **語彙参照のみ。** TS/RisingWave 期の TRANSFORM 状態で live でなく、スコープも B2B。コードは流用しない |
+| 公開アカウント corpus | `etzhayyim/global-accounts-datoms`（ADR-2608059100） | ディレクトリの保全。**自然人への紐付け (`:prohibited-joins`) を禁止** | **保存最小化の先例。** 本面の DB も他者をクロール・照合しない |
+
+itonami の敵 exclusion（ADR-2609062700）が既に憲章の型を与えている:
+**「検証済み所見だけが敵を作る（種別 + 証拠 CID ≥ 1 + 証明者）。裸の告発は route を
+動かさず、数えて見える所に残す」「虚偽の告発それ自体が `:falsified-record`」。**
+
+## Decision
+
+### D0. 置き場所は app-kotoba-cloud 内。新 repo を起こさない
+
+Stable Principal 認証・Stripe Identity eKYC（verified 判定 365d）・
+`edge gateway → 私有 DO authority` の seam（org-gateway / research-gateway と同型）・
+DADS 単一ページの描画経路を全部再利用する。新 Worker・新 origin を作らない。
+分離が必要になるまでは `src/app_kotoba_cloud/` 内の 3 namespace + view 1 つ。
+将来の lib 抽出（`kotoba-lang/fake-report-kit`）に備え、ドラフト生成は純 cljc で書く。
+
+### D1. 憲章ゲート C1–C6
+
+- **C1 裁定しない (non-adjudicating)。** アプリは類似性スコアを「偽アカウント確定」として
+  主張しない。判定の補助は見出し・プロフィール文の字面比較など**決定論的信号の参考表示**
+  に限定する（yabai が ADR-0003 で較正した二信号の toC 版。画像照合は行わない）。
+  `:identity/non-adjudicating true` の規約（ADR-2608271800）と同じ語彙。
+- **C2 証拠ありき。** 通報パッケージには証拠 ≥1（スクリーンショット blob または URL + 取得日時）
+  を必須にする。証拠ゼロの提出は**構造的に不能**にする（バリデータで形にする）。
+- **C3 本人境界。** 代理通報できるのは「自分自身」または「自分が管理する実在人物・事業の
+  承認済みアカウント」。本人確認は既存 Stripe Identity。代理の場合は被偽装者の同意記録
+  （簡易: 同意文 + その人の公開アカウント URL からの自己言及確認）を必須に。
+  法定代理（商標・肖像）案件は v1 の範囲外で、ADR に正直に書く。
+- **C4 送信は人間のクリック。** 各プラットフォーム公式フォーム・窓口への提出は
+  ユーザが自分のブラウザで行う。アプリはドラフト生成・手順ガイド・コピー/EML エクスポート
+  まで。**自動送信レールを持たない。** これは yabai の draft-only 規約の toC 踏襲である。
+  将来 LINE 法務メールだけ mailer（Resend）による人間承認つき送信を検討するが、v1 では置かない。
+- **C5 偽報告への構造的対抗。** 同一 principal による虚偽通報は「数えて見える所に残す」
+  （ADR-2609062700 と同じ形）。争いは運用レビュー route。
+- **C6 保存最小化。** スクリーンショットは暗号化 blob（principal 持鍵）、メタデータは証拠参照のみ。
+  **自然人を join する鍵を 1 つも持たない**（ADR-2608059100 `:prohibited-joins` と同じ線）。
+  通報完了後 30 日で blob を消す（証拠参照 + ドラフト CID は残す）。通知はアプリ内のみ。
+
+### D2. データ面
+
+case レコードは schema-version 固定（OrgAuthority `kotoba-org-membership-2026-09-v1` の型）:
+
+```
+{:case/schema       \"kotoba-fake-report-case-2026-09-v1\"
+ :case/platform     :facebook | :linkedin | :line
+ :case/suspect      {:handle :url :taken-at}
+ :case/impostered   {:display-name :official-url :kind :person | :business}
+ :case/evidence     [{:cid :taken-at :kind}]   ; ≥1 (C2)
+ :case/consent      {...}                      ; 代理のときのみ (C3)
+ :case/status       :open → :submitted → :platform-acked → :resolved
+ :case/drafts       [{:platform :cid}]}         ; 生成物は不変・CID 付け
+```
+
+### D3. 実装配置
+
+```
+src/app_kotoba_cloud/fake_report_kit.cljc        純 cljc。ドラフト生成（host effects なし）
+src/app_kotoba_cloud/fake_report_authority.cljk  私有 DO（kotoba-research-authority Worker の
+                                                  第二クラス、wrangler migration v3）
+src/app_kotoba_cloud/fake_report_gateway.cljk    edge gateway（org_gateway.cljk と同一 seam:
+                                                  same-origin POST、bounded JSON、session 前提、
+                                                  eKYC 済みのみ）
+view: #fake-report（単一ページの view として追加。fragment address。ja/en）
+```
+
+- Facebook: impersonation report フォームの項目に対応した回答ドラフト + 証拠添付手順
+- LinkedIn: impersonation (Safety Center) の項目ドラフト
+- LINE: アプリ内通報手順 + 法務窓口 EML ドラフト（abuse カタログの LINE Corp 連絡先参照）。
+  **LINE はアプリ内通報優先で、EML は fallback**
+
+### D4. フェーズ
+
+| Phase | 中身 | 着地点 |
+|---|---|---|
+| 0 | 本 ADR | EDN reader 通過 + superproject commit |
+| 1 | ドラフト生成コア（純 cljc + golden テスト + C1 否定テスト） | テスト green |
+| 2 | DO + gateway（origin/refusal/negative テスト、未 eKYC 403） | `npm test` / `npm run build` green |
+| 3 | toC view（DADS、ja/en、design-quality ≥95、single-page 検査） | 検査 green |
+| 4 | 状態台帳 + 30 日 blob 消去 | 状態遷移テスト green |
+| 5 | deploy + live verify（case 作成→ドラフト→status が実経路で通る） | live readback |
+
+## Consequences
+
+- (+) 被害者本人が証拠つきの通報を、各プラットフォームの文脈に合わせて出せる。
+- (+) 自動送信を持たないため、本面が「告発の送信者」になる経路は構造的に無い。
+- (−) スコア断定をしないため、「これ本当に偽アカウント？」という判定欲求には応えられない。
+  応えるのは yabai（ドメイン側）と、各プラットフォーム自身の審査。
+- (−) 代理通報の同意が簡易であることの限界。ADR はこれを正直に書く（D1 C3）。
+- リスク: 各プラットフォームのフォーム構造は変わる。ドラフトは**データ駆動**にし、
+  項目と URL を変更容易に保つ。フォームの再現を主張しない。
+
+## Verification（Phase 完了ごとに）
+
+1. ADR reader 通過、EDN 単体
+2. golden ドラフト 3 プラットフォーム × person/business、
+   **C1 違反文言（「確定しています」等）が golden に出ないことの否定テスト**
+3. gateway の origin/refusal/negative テスト、未 eKYC で 403、証拠ゼロで提出不能（C2）
+4. design-quality score ≥95、single-page 検査（view 横断で document reload 無し）、locale smoke
+5. deploy 後 live readback（未認証 401、eKYC 済み session で実経路完走）+ run receipt
+"}]
