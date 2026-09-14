@@ -2234,6 +2234,12 @@
    :gate :nbb-script :script "gates/kotobase-persistence-policy-check.cljk"
    :include-ext [".kotoba" ".edn" ".cljs" ".md" ".cljk"] :min-files 1500 :cd false}
 
+  ;; awai network 関係の D1/DO/KV 全面禁止（ADR-2609132007）。binding の存在を
+  ;; root tree 内で落とす。fail-closed: 設定が読めない・走査件数 0 も赤。
+  {:name "root" :id "root-awai-state-store-policy" :org "com-junkawasaki"
+   :gate :nbb-script :script "gates/awai-state-store-policy-check.cljk"
+   :include-ext [".kotoba" ".edn" ".jsonc" ".json" ".toml" ".cljk"] :min-files 39 :cd false}
+
   ;; Pinned quiet-host kotoba stack performance evidence (ADR-2608260800).
   ;; Verifies performance.datoms.edn, judah-quiet JSON, host-meta load < 4,
   ;; and datoms/json metric agreement. Does not re-run amu on fleet (orgs/ is

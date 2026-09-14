@@ -50,6 +50,11 @@
               "byte range" "row group" "footer" "統計による枝刈り" "テーブル manifest"]
   :note "kotoba-lang/tana。名前が機能を示さない metaphor 名なので登録する（棚 = どの箱がどこにあるかを言うもの）。**「どのオブジェクトを読むべきか」を footer を 1 つも開かずに答える面。** 枝刈りの規則そのものは kotoba-lang/columnar（columnar.stats/skip?）が正本で、tana はそれを 2 段（chunk と manifest）に適用するだけ —— 第二の実装を持たない。format は kotoba-lang/org-apache-parquet / org-apache-arrow、catalog（何が landed したか・誰が何を主張したか、datom 面で Datalog に答える）は kotoba-lang/kotobase-lake、非同期ホストで同期スキャンを回す trampoline は net-kotobase/lake、block の置き場は kotobase-storage(-pack/-s3)。⚠ tana は format でも container でも catalog でも engine でもない —— 混同すると『小さな Parquet / 小さな Iceberg』を再発明する。ADR-2608180100。"}
 
+ :chain-amano
+ {:label "amano（天の / awai.network の分散型 p2p app-chain）"
+  :spellings ["amano" "天の" "天の川" "amano-chain" "chain amano"]
+  :note "awai.network の Sovereign App-Chain。合意は inga（HotStuff BFT / 3-chain finality）、実行は kototama（evm/v1 プロファイルによる IPLD/Receipt 駆動 EVM 互換面）、取引は torihiki（Typed-array による超高速オーダーブック・:opaque state root）、決済レールは nexus-x402（Base USDC 外部決済・非同期預託）、配信は kotobase bytes-plane（IPFS/IPNI）で構成される。名前は天の川、天、海士（境界を繋ぐ者）および awai（間）に由来するメタファ名。正本: ADR-2609141400。"}
+
  :valueflows
  {:label "Valueflows / REA（経済語彙）"
   :spellings ["valueflows" "valueflo" "valueflo.ws" "rea" "resource event agent"
@@ -615,4 +620,12 @@ hash してから記録する。"}
   :query-spellings ["エッジ" "apex" "workers" "serverless" "CDN edge"
                     "公開面" "公開ホスト" "hostname" "ホスト名"]
   :note "**itonami の公開エッジは cloud-itonami/cloud-itonami-apex**（2026-09-07、adr-2609076000）—— `agent.` `hooks.` `app.` `mcp.` itonami.cloud の 4 Worker が、それぞれ自分の wrangler config と依存を持ち、独立に rollback する。境界は好みで引いたのではなく、アプリツリーへの参照数を数えて出た: 4 つとも 0、`app-edge` だけ 4（`worker.cljs` が `cloud.itonami.app.fleet-core` と `.kotoba-oracle` を require）。**結合していた 1 つが、ちょうど公開ホスト名を持たない方**で、その wrangler config は「進行中の slice が live なホストを道連れにできないよう workers.dev のみ」と自分で書いている。だから `app-edge` は cloud-itonami-app に残る。⚠ **ソースを移しても Worker は移らない** —— live な 4 ホストは Cloudflare にある最後のデプロイを配信し続けるので、cutover は 1 Worker ずつ deploy して host が答えることを確かめる別作業。⚠ この概念は「エッジで動く実行面」であって、事業者の公開サイト（`:web-presence` の暖簾）とは別。"}
+
+ :ir-remocon
+ {:label "学習リモコン / IR remote control codes"
+  :spellings ["remocon" "リモコン" "学習リモコン" "ir remote" "赤外線リモコン"
+              "pronto hex" "prontohex" "NEC IR" "ir code"]
+  :note "**実装は kotoba-lang/remocon**（2026-09-13 着地）—— 赤外線リモコン信号を EDN で表す純 .cljc: raw burst（mark/space μs 列）、NEC フレーム codec（tick は burst から導出、repeat フレーム対応）、ProntoHex ↔ raw burst 変換（clock 2.41246 Hz 単位 / 414.5156us、量子化は損失ありで round trip は近似）、学習コード台帳（:source 出所必須、duplicate key 検出）。**IR ハード輸送（LED / 受信モジュール / LIRC / Broadlink）は持たない**——host-injected。com-remote は HR の clean-room actor で別物。"}
+
+}
 }

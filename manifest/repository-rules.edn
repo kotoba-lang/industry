@@ -172,6 +172,22 @@
    :policy/excludes #{:git-edn-source-plane :datalad-large-artifact-plane
                       :explicit-localhost :explicit-mock :explicit-testnet}}
 
+  ;; ADR-2609132007. awai network 関係（orgs/network-awai 配下）は D1 /
+  ;; Durable Object / Workers KV を使わない・依存しない。coordination / cache /
+  ;; projection の役割にも使わない（全面禁止）。検査は binding の存在だけを見る
+  ;; （役割の自己申告を読まない）。kotobalabs 関係（kotoba-lang / net-kotobase）
+  ;; は対象外 — 上の :live-service-durable-data と ADR-2608039000 の判定基準が
+  ;; そのまま効く。
+  :awai-network-no-single-vendor-state
+  {:policy/authority "90-docs/adr/2609132007-awai-network-no-single-vendor-state.kotoba"
+   :policy/scope :single-vendor-state-store
+   :policy/paths ["orgs/network-awai"]
+   :policy/forbidden-bindings #{:d1 :durable-object :kv}
+   :policy/forbids #{:d1-as-state-store :durable-object-as-anything :kv-as-anything}
+   :policy/exempts ["orgs/kotoba-lang" "orgs/net-kotobase"]
+   :policy/verify-script "scripts/verify-awai-state-store-policy.cljk"
+   :policy/fleet-gate :root-awai-state-store-policy}
+
   ;; Admission for scaffold / deps edits — growth of :jvm-runtime-deps and
   ;; production `.clj` is forbidden; standing debt is measured elsewhere
   ;; (`verify-jvm-dependency-surface`). ADR-2608201300.

@@ -284,7 +284,7 @@ manifest:
         rad-rid: rad:zCJJKo7FEwJMwGMWk4kQYVzeChTd
     - name: cloud-itonami-app
       remote: cloud-itonami
-      revision: 33037469dac1237f354c91fbe6378f19ae845de7
+      revision: 22596afb28d73494b5a5d8d647c293eb11a12fc5
       path: orgs/cloud-itonami/cloud-itonami-app
       groups: [cloud-itonami]
     - name: cloud-itonami-assoc-0126-idn-gapki
@@ -10319,7 +10319,7 @@ manifest:
       groups: [kotoba-lang]
     - name: app-kotoba-cloud
       remote: kotoba-lang
-      revision: e6ea881b52db68c9dba0dd1a2846f84583c63f7d
+      revision: fc4fbfe10c97431f9ef461652d50f00c5d19160a
       path: orgs/kotoba-lang/app-kotoba-cloud
       groups: [kotoba-lang]
     - name: async-all-terminal
@@ -10476,6 +10476,11 @@ manifest:
       remote: kotoba-lang
       revision: 6153065dbde99c2d0a67ab1a7b22b8fc8070cb15
       path: orgs/kotoba-lang/ch-iec-61850
+      groups: [kotoba-lang]
+    - name: cloud-kotoba-dds
+      remote: kotoba-lang
+      revision: 502053418e9df99f167d3da8a5953edb1a73fc7e
+      path: orgs/kotoba-lang/cloud-kotoba-dds
       groups: [kotoba-lang]
     - name: coll-assoc-some
       remote: kotoba-lang
@@ -10800,7 +10805,7 @@ manifest:
       groups: [kotoba-lang]
     - name: dllm-qwen38
       remote: kotoba-lang
-      revision: e9fb734cc3f48124033120d330ff7ab36db61485
+      revision: cbbaf1a04d8c170fdd70f8907aa84749ffc87d52
       path: orgs/kotoba-lang/dllm-qwen38
       groups: [kotoba-lang]
     - name: edn-alphanumeric
@@ -14287,7 +14292,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kotobase-block-codec
       remote: kotoba-lang
-      revision: a4f6a8aaa2e18a11047f4830c3c40f4e9be7c9a2
+      revision: 3acccdb30071928d847b99f29bb075787ae3c39a
       path: orgs/kotoba-lang/kotobase-block-codec
       groups: [kotoba-lang]
     - name: kotobase-engine-contract
@@ -14528,7 +14533,7 @@ manifest:
       groups: [network-awai]
     - name: cloud-murakumo-site
       remote: network-awai
-      revision: b807ee92c5d5cf1095ebb7ec6886a60bd65c98d5
+      revision: b060d69920d8846ed1b5d5ceebf79dc37c6723cc
       path: orgs/network-awai/cloud-murakumo-site
       groups: [network-awai]
     - name: hyakka-data
@@ -15195,10 +15200,10 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z96wr32ts4ERzVhkowoRzd98wEMF
-    - name: shinkansen
+    - name: app-shinkansen
       remote: cloud-itonami
       revision: 5bc9e0098e5cd30e45a75d27275004c32a3fc839
-      path: orgs/cloud-itonami/shinkansen
+      path: orgs/cloud-itonami/app-shinkansen
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z3RDEoEw2L6CxMZQuS2vsEAhTuGnk
@@ -17865,7 +17870,7 @@ manifest:
       groups: [net-kotobase]
     - name: fans-oppai
       remote: network-awai
-      revision: af6e55b03ae7a734b217e78ff55fd209d1839ac3
+      revision: ecd204541149ea10ec45a4b492c751bbb35a6b50
       path: orgs/network-awai/fans-oppai
       groups: [network-awai]
     - name: network-awai-apex
@@ -26644,7 +26649,7 @@ manifest:
     - name: kotoba-lang-ekyc
       remote: kotoba-lang
       repo-path: ekyc
-      revision: fefb1569fc38f62c6fb696b7d130e78267ff73f4
+      revision: 657186b94e5ad4fbbc4d7a8fcb66a04d19c40b7e
       path: orgs/kotoba-lang/ekyc
       groups: [kotoba-lang]
       userdata:
@@ -28249,7 +28254,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kotoba-lang
       remote: kotoba-lang
-      revision: feccd6b3a12cee3bf2123467dfe4c2d015fa9c08
+      revision: 4dfc33bb3f84df62f8b8067279bb18979f0df29e
       path: orgs/kotoba-lang/kotoba-lang
       groups: [kotoba-lang]
       userdata:
@@ -28400,7 +28405,7 @@ manifest:
         rad-rid: rad:zeyAE9MQ4BegngTpGrbCu2jnW1B3
     - name: kotobase-peer
       remote: kotoba-lang
-      revision: 38f7c397b50dfbe3c9e651e022e5c284c214cd08
+      revision: 7478045a840bf7f4d49a344973b936d91c76817d
       path: orgs/kotoba-lang/kotobase-peer
       groups: [kotoba-lang]
       userdata:
@@ -28468,7 +28473,7 @@ manifest:
         rad-rid: rad:ztX75banrbDkAsBBbSe9EHhKHjMS
     - name: kotobase-server
       remote: kotoba-lang
-      revision: 22e6893ce9e8a62e03f2f542f7bfb42b08d77d17
+      revision: 46b8a96010319086df5f09b3f64986879e733792
       path: orgs/kotoba-lang/kotobase-server
       groups: [kotoba-lang]
       userdata:
@@ -29570,7 +29575,7 @@ manifest:
       groups: [kotoba-lang]
     - name: org-ietf-cbor
       remote: kotoba-lang
-      revision: 4c129f8224d6ff11afa14d831671db28ed8f4d82
+      revision: e2f5550997d37f86baa5fdd3eb27382500f83b55
       path: orgs/kotoba-lang/org-ietf-cbor
       groups: [kotoba-lang]
       userdata:
@@ -29589,7 +29594,7 @@ manifest:
         rad-rid: rad:z2HuAkhEiw4mXN5ZXQsyPQtW9CQLV
     - name: org-ietf-dns
       remote: kotoba-lang
-      revision: 7daca7d00bdb5078da7c87f90333b6c42e3d2768
+      revision: 176fef7e5f9c935d774a86f8e928a6346537e383
       path: orgs/kotoba-lang/org-ietf-dns
       groups: [kotoba-lang]
       userdata:
@@ -31406,7 +31411,7 @@ manifest:
       groups: [network-awai]
     - name: app-aozora-engine
       remote: network-awai
-      revision: 2f748895e2908f840c43582c53416443be7b11d6
+      revision: 71c4a649bffac08e29eee459433ea5652228a1af
       path: orgs/network-awai/app-aozora-engine
       groups: [network-awai]
     - name: app-aozora-yoro-ui
@@ -31431,7 +31436,7 @@ manifest:
       groups: [network-awai]
     - name: cloud-itonami
       remote: network-awai
-      revision: 2d045224327e58f53e68a731291c4c14fd559b62
+      revision: c617535778052aa3676c98dd28f1d06b3965ec22
       path: orgs/network-awai/cloud-itonami
       groups: [network-awai]
     - name: cloud-manimani
@@ -31441,7 +31446,7 @@ manifest:
       groups: [network-awai]
     - name: cloud-murakumo
       remote: network-awai
-      revision: 465915263eb180bf99709f09678e16c3e5f27587
+      revision: 35892831373b2d534581782623b9fff0c6286f9b
       path: orgs/network-awai/cloud-murakumo
       groups: [network-awai]
     - name: cloud-murakumo-market-analyst
@@ -31491,7 +31496,7 @@ manifest:
       groups: [network-awai]
     - name: cloud-murakumo-api
       remote: network-awai
-      revision: ef388a4dba5897e9a9638507569ac31d85ef995e
+      revision: 920d49c2becb9d129458d34a8b33fdb779c8c0b2
       path: orgs/network-awai/cloud-murakumo-api
       groups: [network-awai]
     - name: loop-yakuwari
@@ -31517,17 +31522,17 @@ manifest:
       groups: [network-awai]
     - name: control-plane
       remote: net-kotobase
-      revision: a1b6c56dedc5c37347ff8c4231de86124d1d2cbb
+      revision: 17dda5a86c3d9d76d6d81a18fe821d876c0be8d3
       path: orgs/net-kotobase/control-plane
       groups: [net-kotobase]
     - name: ipfs
       remote: net-kotobase
-      revision: e67dedf5363330a61aada97040447f195228dead
+      revision: 71299a517439382efc49b6d54d80a0a5aa8a96dd
       path: orgs/net-kotobase/ipfs
       groups: [net-kotobase]
     - name: network-isekai
       remote: network-awai
-      revision: 8ef229c60aaee1d78facb6f1cd625c83c7c37196
+      revision: 60ac8769c5209c919a89c2fb36a19b84009ab52d
       path: orgs/network-awai/network-isekai
       groups: [network-awai]
     - name: nexus-x402
@@ -31550,6 +31555,7 @@ manifest:
       revision: d99d2c138e5056fb570ac7a718fb47d869ba42d6
       path: orgs/cloud-itonami/chain-contracts
       groups: [cloud-itonami]
+      submodules: true
     - name: cloud-murakumo-cli
       remote: network-awai
       revision: 2985ab4d26d4c7f096d0dd12a3f3d3ff5be17c7f
@@ -31587,11 +31593,13 @@ manifest:
       groups: [com-junkawasaki]
     - name: com-junkawasaki-amu
       remote: com-junkawasaki
+      repo-path: amu
       revision: cb7e88a70e1b26e95178e296b58ed8ea3291614a
       path: orgs/com-junkawasaki/amu
       groups: [com-junkawasaki]
     - name: com-junkawasaki-ayatori
       remote: com-junkawasaki
+      repo-path: ayatori
       revision: 62d74ce36a8c091cdc5eee1cc46019a06c33632b
       path: orgs/com-junkawasaki/ayatori
       groups: [com-junkawasaki]
@@ -31652,6 +31660,7 @@ manifest:
       groups: [com-junkawasaki]
     - name: com-junkawasaki-hataori
       remote: com-junkawasaki
+      repo-path: hataori
       revision: 257180f8af922056d31de2caf45549a5d3345e3f
       path: orgs/com-junkawasaki/hataori
       groups: [com-junkawasaki]
@@ -31747,11 +31756,13 @@ manifest:
       groups: [com-junkawasaki]
     - name: com-junkawasaki-tamaki
       remote: com-junkawasaki
+      repo-path: tamaki
       revision: d5ba729dee7d9ee89950488d1a57d27d7d5f7837
       path: orgs/com-junkawasaki/tamaki
       groups: [com-junkawasaki]
     - name: com-junkawasaki-time
       remote: com-junkawasaki
+      repo-path: time
       revision: b2dcb22f2bd34593b19c5c483077a00e6bfc7a53
       path: orgs/com-junkawasaki/time
       groups: [com-junkawasaki]
@@ -31820,7 +31831,16 @@ manifest:
       revision: 6cc2f27acd7ddf0f99b28203a135e618059e5222
       path: orgs/net-kotobase/delegation-rootkeys
       groups: [net-kotobase]
-
+    - name: shinkansen
+      remote: kotoba-lang
+      revision: 13ea655037b3ec6338675df3872a13116007f1b7
+      path: orgs/kotoba-lang/shinkansen
+      groups: [kotoba-lang]
+    - name: remocon
+      remote: kotoba-lang
+      revision: b0094f9c3f7eaec214a8ec4d5d23c56aa9556cdc
+      path: orgs/kotoba-lang/remocon
+      groups: [optional]
 
   self:
     path: manifest

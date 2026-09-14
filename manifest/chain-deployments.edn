@@ -41,6 +41,8 @@
 ;;                a reply from a chain with a different id is NOT this
 ;;                deployment answering, and is reported rather than believed.
 ;;   :base        origin. `/head` and `/block` hang off it.
+;;   :endpoint-path optional path for status probe (defaults to "/head", e.g. "/health")
+;;   :witness-urls map of witness name to base url for distributed multi-host deployments
 ;;   :witnesses   the names, in the order the set was defined. Single-element
 ;;                for a sequencer.
 ;;   :witness-param  query parameter naming a witness, or nil when the
@@ -67,4 +69,17 @@
    :witnesses ["_"]
    :witness-param nil
    :quorum 1
-   :note "the single-writer Durable Object sequencer. `/head` says `consensus: none` about itself. This is the deployment that actually carries an order book."}]}
+   :note "the single-writer Durable Object sequencer. `/head` says `consensus: none` about itself. This is the deployment that actually carries an order book."}
+
+  {:id :chain-amano
+   :kind :consensus
+   :chain-id "inga-reservation-20260911-v1"
+   :endpoint-path "/health"
+   :witness-urls {"w1" "http://100.113.200.45:19601"
+                  "w2" "http://100.75.169.8:19602"
+                  "w3" "http://100.81.66.86:19603"
+                  "w4" "http://100.82.123.35:19604"}
+   :witnesses ["w1" "w2" "w3" "w4"]
+   :witness-param nil
+   :quorum 3
+   :note "amano sovereign app-chain consensus substrate (inga-node multi-host resident processes across murakumo fleet mac-minis). Active reservation and ref plane."}]}

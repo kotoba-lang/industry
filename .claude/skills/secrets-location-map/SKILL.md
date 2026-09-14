@@ -27,6 +27,7 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
 | Resend、GoDaddy DNS、受信メール本文の age 鍵 | `references/email-and-dns.md` |
 | kotobase の**読み戻せない** 3 secret、`KOTOBASE_ARCHIVE_TOKEN` | `references/kotobase.md` |
 | fal.ai / Seedance、Cloudflare RealtimeKit（kaigi） | `references/third-party-api.md` |
+| Hugging Face Hub token（user `com-junkawasaki`、OAuth。Modal 側は secret `hf-token`） | `references/huggingface.md` |
 | Apple 署名 / App Store Connect、Google Play | `references/mobile-publishing.md` |
 
 item 名から引きたいときは

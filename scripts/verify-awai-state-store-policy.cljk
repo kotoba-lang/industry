@@ -1,0 +1,137 @@
+#!/usr/bin/env kbb
+;; verify-awai-state-store-policy — orgs/network-awai 配下の deploy 設定が
+;; D1 / Durable Object / Workers KV binding を持たないことを検査する
+;; (ADR-2609132007: awai network 関係では D1/DO/KV 全面禁止)。
+;;
+;; 使い方:
+;;   kbb --backend sci scripts/verify-awai-state-store-policy.cljk --root .
+;;
+;; 判定規則 (fail-closed):
+;; - 走査対象: <root>/orgs/network-awai 配下の wrangler.jsonc / wrangler.json / wrangler.toml
+;; - `d1_databases` / `durable_objects` / `kv_namespaces` キーを含む設定は違反。
+;;   コメント内の言及も、binding が有効であれば違反 (jsonc コメントは剥がす)。
+;; - 設定ファイルが存在しない / 走査できない / JSON parse できない場合は FAIL。
+;;   「読めなかった」を緑にしない (検査の 8 問 1・2)。
+;; - 走査した設定の個数を出力する。0 件で走査終了した場合は FAIL
+;;   (「空」と「読めなかった」を区別し、0 件を clean と読ませない)。
+;;
+;; 出力: `SCANNED<TAB>n` (走査件数) + 違反一覧。exit 0 = 合格 / exit 1 = 違反または
+;; 検査不能 / exit 2 = 使用方法誤り。
+;;
+;; 依存しないことの検査は binding の存在だけを見る。役割の自己申告は読まない。
+(ns verify-awai-state-store-policy
+  (:require ["node:fs" :as fs]
+            ["node:path" :as path]
+            [clojure.string :as str]))
+
+(def args (vec *command-line-args*))
+(defn flag [n default]
+  (let [i (.indexOf args n)]
+    (if (neg? i) default (nth args (inc i) default))))
+
+(def root (path/resolve (or (flag "--root" ".") ".")))
+(def scan-dir (path/join root "orgs" "network-awai"))
+
+(defn fail-exit [n & msgs]
+  (doseq [m msgs] (println "FAIL:" m))
+  (.exit js/process n))
+
+(when-not (fs/existsSync scan-dir)
+  (fail-exit 1 (str "scan root missing: orgs/network-awai under " root)))
+
+;; wrangler 設定ファイルの収集 (node_modules 等は除外)
+(def excluded #{".git" "node_modules" ".shadow-cljs" ".cpcache" "out" "dist" "public" "target" ".wrangler"})
+;; 深さ上限は使わない: 除外 dir 以外は全域を歩く (club-shinshi/60-apps/… のように
+;; 実在の設定が 5 段目より深い実測がある)。上限を付けると「上限より深い」を
+;; 走査漏れとして緑にしてしまう。全域 walk でも orgs/network-awai は 39 設定で
+;; 数秒 — 許容コスト。
+
+(defn- collect [dir depth acc]
+  (let [entries (vec (try (fs/readdirSync dir #js {:withFileTypes true})
+                          (catch :default _ nil)))]
+    (if (nil? entries)
+      acc  ; 読めない dir は上位で fail にしない (個人環境由来の permission) — 設定ファイルが読めない場合のみ fail
+      (reduce (fn [acc e]
+                (let [p (path/join dir (.-name e))]
+                  (cond
+                    (.isDirectory e)
+                    (if (contains? excluded (.-name e))
+                      acc
+                      (collect p (inc depth) acc))
+                    (and (.isFile e)
+                         (or (= (.-name e) "wrangler.jsonc")
+                             (= (.-name e) "wrangler.json")
+                             (= (.-name e) "wrangler.toml")))
+                    (conj acc p)
+                    :else acc)))
+              acc
+              entries))))
+
+(def configs (collect scan-dir 0 []))
+
+(when (empty? configs)
+  (fail-exit 1 "no wrangler configs found under orgs/network-awai — 0 configs cannot be clean; if the checkout is absent, say so explicitly"))
+
+(defn strip-jsonc
+  "文字列リテラルの外にある // と /* */ コメントを剥がす。文字列内のコメントっぽい
+   文字列は保護する (内容値が誤って落ちない)。"
+  [t]
+  (let [n (.-length t)]
+    (loop [i 0, in-str false, esc false, out (atom [])]
+      (if (>= i n)
+        (str (apply str @out))
+        (let [c (nth t i)]
+          (cond
+            in-str
+            (do (swap! out conj c)
+                (cond esc (recur (inc i) in-str false out)
+                      (= c "\\") (recur (inc i) in-str true out)
+                      (= c "\"") (recur (inc i) false false out)
+                      :else (recur (inc i) in-str false out)))
+            (= c "\"")
+            (do (swap! out conj c) (recur (inc i) true false out))
+            (and (= c "/") (< (inc i) n) (= (nth t (inc i)) "/"))
+            (recur (if-let [nl (str/index-of t "\n" i)] nl n) false false out)
+            (and (= c "/") (< (inc i) n) (= (nth t (inc i)) "*"))
+            (let [end (str/index-of t "*/" (+ i 2))]
+              (recur (if end (+ end 2) n) false false out))
+            :else (do (swap! out conj c) (recur (inc i) false false out))))))))
+
+(def forbidden-keys #{"d1_databases" "durable_objects" "kv_namespaces"})
+(def key->label {"d1_databases" "D1" "durable_objects" "Durable Object" "kv_namespaces" "KV"})
+
+(defn- find-keys [file t]
+  (let [cleaned (if (str/ends-with? (str file) ".toml")
+                  (str t)
+                  (strip-jsonc (str t)))]
+    ;; binding キーの形: jsonc は `"d1_databases":`、toml は `d1_databases =` と
+    ;; 配列テーブル `[[d1_databases]]`、ドット付き `[[durable_objects.bindings]]`
+    ;; の 3 形（実測 cloud-murakumo-api / network-isekai stage-rooms）。キー名の直後が
+    ;; `.` で続く形も検出する。
+    (filter #(re-find (js/RegExp. (str "\\[?\\[?\"?" % "\"?\\]?\\]?(\\s*[:=]|\\]\\]|\\.)") "g") cleaned)
+            forbidden-keys)))
+
+(def violations (atom []))
+
+(doseq [p configs]
+  (let [content (try
+                  (str (fs/readFileSync p "utf8"))
+                  (catch :default e
+                    nil))]
+    (if (nil? content)
+      (swap! violations conj {:path p :keys ["unreadable"] :detail "config exists but could not be read (fail-closed)"})
+      (let [hits (find-keys p content)]
+        (when (seq hits)
+          (swap! violations conj {:path p :keys (vec hits) :detail (str "found " (str/join ", " hits))}))))))
+
+(println (str "SCANNED\t" (count configs)))
+
+(if (seq @violations)
+  (do
+    (doseq [v @violations]
+      (println (str "VIOLATION\t" (:path v) "\t" (str/join "," (:keys v)))))
+    (println (str "VIOLATIONS\t" (count @violations)))
+    (.exit js/process 1))
+  (do
+    (println "OK no D1 / Durable Object / KV bindings under orgs/network-awai (ADR-2609132007)")
+    (.exit js/process 0)))

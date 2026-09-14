@@ -1,0 +1,62 @@
+(vector (map
+  (:db/id -1)
+  (:adr/id "adr-2609131808-shinkansen-content-addressed-web-framework")
+  (:adr/title "shinkansen — content-addressed web framework: view/state/tool が すべて CID で回る")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-13")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "shinkansen-content-addressed-web-framework")
+  (:adr/repos (vector "orgs/kotoba-lang/shinkansen"
+                      "orgs/kotoba-lang/shitsuke"
+                      "orgs/kotoba-lang/htmldom"
+                      "orgs/kotoba-lang/cssom"))
+
+  (:adr/authoritative-for
+  (vector "shinkansen repo の役割（新規 UI 実装はしない — 既存 3 層を content-address で繋ぐ接続層であること）"
+   "view = shitsuke/kotoba .kotoba guest、state = reframe_core.kotoba、publish = scripts/publish-document.cljk、tool = MCP の流用境界"
+   "event/js 操作を framework 層に新設しない判断（reframe_core.kotoba が db+event→db を guest で充足している）"))
+
+  (:adr/related
+  (vector "adr-2609092600-one-app-plane-identity-naming-location-kind"
+   "adr-2609131630-yataverse-mirror-bytes-plane"
+   "adr-2608260900-no-svelte-react-ui-authoring"))
+
+  (:adr/decision-summary
+  (vector "D1: 新規 repo orgs/kotoba-lang/shinkansen（public、kotoba-lang org 既定）。メタファ名 — 新幹線（高速・直線・停車駅=stop station が CID hop）。README 冒頭の名乗り + concept-vocabulary 登録を伴う"
+   "D2: framework は接続層のみ。UI 実装は shitsuke の .kotoba guest 群（reframe_core / reagent_core / hiccup_core / hig_core / tokens_core / components_core、1,684 行実在）を流用し、shinkansen は ①view document → CID publish ②db 値 → CID chain 記録 ③MCP tool 3-5 本の 3 つを足す"
+   "D3: link は CID。a href = https://{cid}.ipfs.kotobase.net/ が 1 等公民。Unison 的に: state は各 dispatch の db 値を hash→CID にして chain に積む（reframe_core.kotoba の db+event→db をそのまま使う）"
+   "D4: js 操作は framework の仕事にしない。kbb wire-ids に DOM capability は無く、js は host 側（dom-gpu renderer / browser-host.mjs）の権限。guest は inert document を返すだけ（shitsuke と同じ境界）"
+   "D5: 最初の consumer は yataverse.com の lake index（net-kotobase/ipfs worktree で着手済みの /api/v1/lake/* と top page を shinkansen 経由に置き換える）"
+   "D6: MCP tool は kotoba-server の word mcp stdio 実装の形を踏襲する"))
+
+  (:adr/body
+  "2026-09-13 オーナー指示。cidom / kageflow / tonari / mokuro / hikari の 5 候補を
+js 操作・event 操作・app 構築・IPLD/Unison 性の 4 軸で実測スコアリングした結果、
+既存基盤の実力が判明した: event は既に ABI にある（dom-gpu :dom/add-event-listener、
+hit-test + bubbling 実装済み）、re-frame 型 runtime は既に Kotoba guest として実装済み
+（shitsuke/kotoba/reframe_core.kotoba 304 行 + reagent_core.kotoba 150 行 +
+hiccup/hig/tokens/components、合計 1,684 行）。js 操作は kbb wire-ids に DOM
+capability が無いことが設計として正しい（guest は inert document を返し、js は host 権限）。
+
+よって framework の新規実装面は「3 層を CID で繋ぐ」だけに縮む:
+1. view → CID: shitsuke の .kotoba guest が返す :document を
+   scripts/publish-document.cljk（superproject scripts/ 実在、2 面書き = B2 archive +
+   R2 origin）で CID 化。identity = ipfs://{cid}、bytes/entry は Location（ADR-2609092600）。
+2. state → CID chain: reframe_core.kotoba の db+event→db の db 値ごとに
+   content-address（同じ content-address/src 経路）で CID を取り、dispatch ごとに
+   chain に積む。これが Unison 的 content addressing。
+3. MCP tools: kotoba-server word mcp stdio の形で lake_list / lake_head /
+   lake_fetch / lake_dispatch を出す。LLM agent は tool call で lake を読み、
+   UI document を取り、dispatch を投げられる。
+
+名前: shinkansen（新幹線）。同じ名前の cloud-itonami/shinkansen（JR 予約
+intelligence）は主題が別 org 別で衝突しない（同一 org 内同一主題のみ禁止）。
+
+Consequences:
+- shitsuke への変更はしない（guest 群はそのまま）。
+- yataverse top page の手書き HTML 実装（worktree
+  net-kotobase-ipfs-yataverse-index）は shinkansen の最初の消費者として置き換える。
+- 依存は htmldom / cssom / css / html（ui-substrate 群、実在実測済み）。
+- bridge 着地（shinkansen afe6110、2026-09-13）: shitsuke guest（reframe_core.kotoba）と state chain を接続。25 tests / 49 assertions 0 fail。実測の罠: guest の step 契約は variadic（call 側は apply 必須）、nbb の clojure.edn/read-string は 2-arity (nil s) 不可能、shitsuke guest map のキーは :call（::call は自 ns の keyword に解決し silently miss）、test fake guest は string case でなく if-chain。")))"

@@ -1,0 +1,60 @@
+[{:db/id -1
+  :adr/id "adr-2609141530-itonami-resident-kbb-signin-wave"
+  :adr/title "itonami resident の kbb/sci 再起動 wave: signin-server.cljk で 1338 を回し、414-route 完全移植は別 wave に切る（closing 2026-09-14a）"
+  :adr/status :accepted
+  :adr/date "2026-09-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/doc-type "adr"
+  :adr/topic "itonami-resident-kbb-signin-wave"
+  :adr/repos ["orgs/cloud-itonami/cloud-itonami-app"]
+  :adr/related ["adr-2609111500-cljk-rename-all-clojure-source"
+                "adr-2609073800-the-cli-can-get-a-passkey-session"]
+  :adr/authoritative-for ["itonami resident（launchd cloud.itonami.app.local）の現行 run path（signin-server.cljk / kbb --backend sci / 1338）"
+                          "resident 復旧 wave の完了条件と、414-route 完全移植を別 wave に切る決定"
+                          "cljk-origin.edn の target/* scratch 登録方針"]
+  :adr/body ".cljk rename (4a3a71f) 後、launchd resident の JVM run path（clojure -M:server）は
+   classpath 解決で死に、KeepAlive が crash loop を回した。2026-09-14 の wave で
+   plan A として signin-server.cljk（kbb --backend sci、nbb エンジン）を実装し、
+   本物の store（data/state.edn）に対して web.cljk のページ + Passkey sign-in
+   API 面を 1338 で出す。414 route のうち約 4 route のみ移植。残り 410 route は
+   server.cljk の完全移植 wave（別作業）に切る。
+
+   ## 実測（2026-09-14、この wave で測ったもの）
+
+   - crash loop の第一因は target/signin-server.cljk 内の 2 箇所の unmatched
+     delimiter（oracle/set-resource-loader! の 1 つ余分な閉じ + central-exchange!
+     の 1 つ足りない閉じ）。2 箇所とも修正済み（target/ は untracked scratch で
+     commit 対象外）。
+   - 第二因は cljk-origin.edn の manifest 不整合: ①resident が require する
+     target/* scratch ns が未登録 → cljk: invalid-origin。②build.cljk の登録が
+     main 上の実体（build.cljc、JVM-only tools.build ns）と乖離 → cljk:
+     invalid-origin / invalid-manifest。①は manifest に target/* を .cljc 登録
+     （commit 753dcf6、merge 済み）。②は build.cljk 登録を削除した（build.cljc は
+     suffix が .cljc なので origin .clj を持てず、JS エンジンではどうせ require
+     できない = kbb が所有しない file として未登録が正）。
+   - web.cljk の origin 問題は続く commit（a5adc33「cljk-origin: web.cljk origin
+     .clj -> .cljc」）で解消された。実測 2026-09-14: launchd resident は緑で
+     `curl http://127.0.0.1:1338/api/identity` が 200（authenticated?=false /
+     registered?=true の JSON）、`http://localhost:1338/` も 200。crash loop は停止。
+   - Hermes profile（~/.hermes/profiles/itonami）の model provider は owner 指示
+     （2026-09-14）で murakumo-main → openrouter-free（openrouter.ai/api/v1）の
+     z-ai/glm-5.3-flash に切替済み。実測: hermes chat 1 ターンが OpenRouter 経由で
+     応答（state.db session_model_usage: billing_provider=custom,
+     base_url=openrouter.ai/api/v1）。doctor の vendor-slug warn は仕様（動作に影響
+     なし）。auxiliary 系（vision/compression/skills_hub/approval/mcp/title/
+     triage/web_extract）は murakumo-main のまま残置 — 寄せるかは次の指示待ち。
+
+   ## 完了条件（この ADR が authoritative な面）
+
+   1. resident が launchd で緑: `curl http://127.0.0.1:1338/api/identity` が 200
+      を返し、target-server-live.log に crash loop が無い。
+   2. 414 route 完全移植は server.cljk のポート wave として別 ADR で完了判定する。
+
+   ## Verification
+
+   - web.cljk の io/resource 依存除去: commit 6a2779c（work-signin branch）→
+     merge 13dbc03（GitHub API /merges で着地、contents API で fs-read-text 6 箇所
+     を読み戻して確認）。
+   - manifest 修正: commit 753dcf6（origin/main push、直接 FF）。
+   - 実測の未実装: 414 route のうち約 4 route（sign-in 面）のみ移植。残り 410
+     route は server.cljk の完全移植 wave 待ち。"}]
