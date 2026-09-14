@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T01:49:07Z",
+  "generated_at": "2026-09-14T08:09:48Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -1621,6 +1621,27 @@
         },
         "script": null,
         "workdir": null
+      }
+    ],
+    "fake-report-maint": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "e5685e2d145a",
+        "name": "fake-report-maint-tick",
+        "no_agent": false,
+        "prompt": "fake-report-maint bot. SOUL.md wo yomi, ADR-2609141800 no genzaichi wo hakatte kara, tsugi no 1 hanketsu (saidai 1 PR) wo suikoku seyo. superproject /Users/junkawasaki/github/com-junkawasaki no 90-docs/adr/2609141800-*.kotoba ga seihon. WIP wo kowasanai. test midori + PR de chakuchi. dousa siteinai mono wo kansei to hokoku shinai.",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "40 2,8,14,20 * * *",
+          "expr": "40 2,8,14,20 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/fake-report"
       }
     ],
     "fleet-alloc": [
