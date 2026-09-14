@@ -4,7 +4,7 @@
 ;; Kotobase signing keys. Raw bytes are uploaded before their Git receipt is
 ;; committed, then the rebuildable EDN projection is published to Kotobase.
 ;; A tick is complete only after the matching content-addressed catalogue is
-;; deployed and verified through wiki.kotobase.net/health.
+;; deployed and verified through wiki.yataverse.com/health.
 
 (require '[cljs.reader :as edn]
          '[clojure.string :as str])
@@ -37,7 +37,7 @@
 (def expected-tenant-did "did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo")
 
 (def b2-endpoint "https://s3.us-west-004.backblazeb2.com")
-(def public-health "https://wiki.kotobase.net/health")
+(def public-health "https://wiki.yataverse.com/health")
 
 (defn run [args {:keys [dir env]}]
   (let [r (.spawnSync cp (first args) (clj->js (rest args))

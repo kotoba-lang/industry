@@ -63,7 +63,7 @@
 (defn sha256 [s]
   (-> (.createHash crypto "sha256") (.update s "utf8") (.digest "hex")))
 
-(def user-agent "Mozilla/5.0 (hyakka-knowledge-ingest; +https://wiki.kotobase.net)")
+(def user-agent "Mozilla/5.0 (hyakka-knowledge-ingest; +https://wiki.yataverse.com)")
 
 (defn fetch-text [url]
   (-> (p/let [res (js/fetch url (clj->js {:redirect "follow"
