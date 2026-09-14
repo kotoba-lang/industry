@@ -1,0 +1,64 @@
+(vector (map  (:db/id -1)
+  (:adr/id "adr-2609142000-kyber-org-ontology-bpmn-risk")
+  (:adr/title "kyber orgbrain: 法人運営オントロジー + BPMN + 決定論的リスクモデル bot")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-14")
+  (:adr/tags (vector "kyber"
+"orgbrain"
+"ontology"
+"bpmn"
+"risk"
+"governance"
+"hermes"))
+  (:adr/related (vector "adr-2609109600-industry-ontology-bpmn-bot-profile"
+"adr-2606280030"
+"adr-2609111500-cljk-rename-all-clojure-source"))
+  (:adr/body "## Context
+
+オーナー指示 (2026-09-14): kotoba.cloud の app として、オントロジーベースの BPMN で
+組織・法人の運営プロセスを全て定義する app を設計する。最初に組織の情報を収集し、
+責任と権限の定義をオントロジー化し、経営リスク・運営リスクをシミュレート・計算
+できるようにする。担当する bot profile を立てる。
+
+測定と調査:
+1. 既存資産: `kotoba-lang/kyber` (business_operating graph — intake→…→risk_constraint
+   →synthesis の LangGraph state machine、GL/AP/AR+HR+在庫 ERP SaaS)、
+   `kotoba-lang/bpmn-sdk` (BPMN 2.0 TS SDK)、`kotoba-lang/org-omg-bpmn` /
+   `org-omg-dmn` (OMG 規格 EDN レジストリ)、`kotoba-lang/ontology`。
+2. オーナー決定: 新規 repo ではなく **既存 kyber repo 内に bpmn/ontology 拡張**として
+   追加する。
+3. kbb engine 実測 (kyber worktree 2026-09-14): HEAD の run_tests.cljk は bb/kbb 両方で
+   死んでいた (cljk rename で bb は .cljk を解決できず、kbb engine は
+   babashka.classpath/http-client 非露出 + SCI が quote 内 '$' を resolve する)。
+   fix-forward: nbb.classpath / js/fetch / js/process 化 + cheshire.core と
+   langchain.db ([$]→(list '$)) の engine shim。
+
+## Decision
+
+1. **三層設計 (kyber `docs/orgbrain/DESIGN.md`)**:
+   - 第1層 ontology: `docs/orgbrain/org-ontology.schema.edn` — role (board/exec/
+     manager/staff) × authority (閉集合 6 種) × delegation chain × RACI matrix。
+   - 第2層 process: `docs/orgbrain/incorporation.bpmn.edn` — BPMN 2.0 意味論の EDN
+     ダイアグラム。各 task に :actor-role と :authority-required を紐付け、
+     第1層と照合可能。
+   - 第3層 risk: `lg/lg_kyber/graphs/org_risk.cljc` — 決定論的純関数 5 軸
+     (raci-coverage / authority-concentration / delegation-depth /
+     single-point-of-failure / approval-gap)、加重合成 composite + level
+     (low/moderate/elevated/critical)。LLM はスコアに混入しない。
+2. **憲章ゲート**: 決定論純関数 / 実在人物名を入力にしない / REFUSED banner +
+   exit 0 / wholesale 再生成禁止 / 1 tick = 1 PR / main 直 push・force-push 禁止。
+3. **検証**: `kbb --backend sci --classpath ... run_tests.cljk` = 21 tests /
+   89 assertions / 0 failures。PR: kotoba-lang/kyber#1。
+4. **bot profile**: `~/.hermes/profiles/orgbrain-maint/` (donor: fake-report-maint、
+   worktree `~/.gftd/worktrees/orgbrain`、cron 日次 04:40 JST)。反復種別は日付で
+   決定 — 偶数日 = 計測反復 (既存 schema/BPMN 整合追記のみ)、奇数日 = 拡張反復
+   (人事/財務/法務/IT/危機対応の順で未定義運営プロセスを 1 つ追加し、risk 軸が
+   計算できることを test で確認)。1 反復 = 最大 1 PR、\"opened no PR\" は正常系。
+
+## Consequences
+
+- kyber が business-operating (自社経営分析) に加え、任意の法人の組織運営を
+  オントロジー+BPMN で定義しリスクを数値化できる app 面を持つ。
+- kbb engine 移行で沈黙していた kyber の test suite が復活 (fix-forward は
+  orgbrain worktree 由来)。
+- bot は propose/拡張に制限され、deploy と台帳改変は行わない。\")))
