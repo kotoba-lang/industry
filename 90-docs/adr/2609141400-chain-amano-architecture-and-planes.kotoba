@@ -1,0 +1,83 @@
+(vector (map
+  (:db/id -1)
+  (:adr/id "adr-2609141400-chain-amano-architecture-and-planes")
+  (:adr/title "amano — awai.network の分散型 p2p app-chain: inga 合意 / kototama evm/v1 実行 / torihiki 超高速取引 / x402 決済レールの統合")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-14")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/topic "chain-amano-architecture-and-planes")
+  (:adr/repos (vector "orgs/kotoba-lang/inga"
+                      "orgs/kotoba-lang/kototama"
+                      "orgs/kotoba-lang/torihiki"
+                      "orgs/network-awai/nexus-x402"
+                      "orgs/kotoba-lang/chain"))
+
+  (:adr/authoritative-for
+  (vector "chain 名 『amano』（天の / 海士 / 間の境界を繋ぐ自律 chain）の命名と役割境界"
+          "合意・実行・取引・決済の 4 層分離アーキテクチャ（inga + kototama + torihiki + x402）"
+          "p2p transport（murakumo overlay QUIC + IPNI + trustless HTTP）の前提"
+          "x402 を合意ホットパスから除外し、外貨決済と内部合意を疎結合に保つ不変条件"))
+
+  (:adr/related
+  (vector "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+          "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+          "adr-2609132007-awai-network-no-single-vendor-state"
+          "adr-2607101100-engi-mutual-credit-kotobase-native-design"
+          "adr-2607093300-x402-payment-facilitator"))
+
+  (:adr/decision-summary
+  (vector "D1: chain 名を 『amano』（天の / 天の川 / 境界を渡すもの）と定める。awai.network の分散型インフラと自律エージェント取引を担う Sovereign App-Chain の名称とする"
+          "D2: 4 層分離アーキテクチャの採用。L1: inga（Chained HotStuff BFT + Stake-weighted Quorum）、L2: kototama（evm/v1 プロファイルによる IPLD/Receipt 駆動 EVM 互換実行面）、L3: torihiki（Typed-array による超高速板・マッチング、:opaque な state root 提出）、L0/Transport: murakumo overlay（QUIC/Noise）+ IPNI + trustless HTTP"
+          "D3: x402 決済レールとの統合境界。x402（Base USDC 等）による決済検証（keyless Base RPC）はブロック生成・マッチングのホットパスに入れない。外部資金の入出金は Escrow 契約と inga Quorum Certificate の連動で行い、取引板内部は事前預託された Grant / Balance の State Transition として決定論的に処理する"
+          "D4: 配信（Video / Content）の非 chain 化。大容量コンテンツ・動画はチェーンに乗せず、IPFS/Kotobase bytes-plane（CID 単位）と IPNI によるコンテンツ探索・分散配信に任せる。amano chain は Manifest / Metadata の CID と x402 Settlement Grant のみを確定（Commit）する"
+          "D5: 単一ベンダ・Cloudflare 依存の排除。ADR-2609132007 に従い、amano ノード・witness は D1 / Durable Object / Workers KV を前提とせず、プロセス（long-lived process）または content-addressed な分散状態（prolly-tree / CARv2 / R2/B2）により自律稼働する"))
+
+  (:adr/body
+  "## 決定
+
+**awai.network の分散型 p2p app-chain 名を 『amano』 と定め、合意（inga）・実行（kototama）・取引（torihiki）・決済（x402）・配信（kotobase bytes-plane）の 5 面を疎結合に統合する。**
+
+## 1. 命名: 『amano』
+
+- **由来**: 天の川（銀河・無数の恒星の連なり）、天（超越・主権性）、海士（境界を潜り宝を運ぶ者）、および 『あわい（間）』 と呼応する響き。
+- **位置づけ**: awai.network 経済圏における自律エージェント（AI agents）と人間をつなぐ分散型台帳・実行基盤の総称。
+
+## 2. 5 面アーキテクチャ
+
+超高速な取引性能（torihiki）と EVM 互換の汎用スマートコントラクト（kototama evm/v1）、そして外部法定通貨・USDC 決済（x402）を同時に満たすため、責務を厳格に分離する:
+
+| 面 | 担当コンポーネント | 役割・データ構造 |
+|---|---|---|
+| **L1: 合意面** | `kotoba-lang/inga` | Chained HotStuff BFT、n=3f+1 / 2f+1 Quorum Certificate、3-chain commit rule。`inga.ref` による CAS / total order 提供 |
+| **L2: 実行面** | `kotoba-lang/kototama` | `evm/v1` プロファイルによる EVM 互換実行。状態は IPLD、出力は CID アドレス化された Receipt（`kototama.execution`） |
+| **L3: 取引面** | `kotoba-lang/torihiki` | Typed-array による超高速オーダーブック・マッチングエンジン。状態は `:root-kind :opaque` として inga にダイジェストを提出 |
+| **Value: 決済面** | `network-awai/nexus-x402` | Base mainnet USDC による per-call 決済および Escrow 預託。合意外で非同期検証 |
+| **Bytes: 配信面** | `kotobase bytes plane` | 動画・画像・成果物バイナリはオンチェーンに置かず、IPFS CID + IPNI (cid.contact) + Trustless HTTP で配信 |
+
+## 3. なぜ torihiki の超高速取引に耐えられるのか
+
+1. **State Root の二重構造（Filecoin F1 の具現化）**:
+   - `inga.state` は `:root-kind` として `:cid`（IPLD/Datom 展開可能）と `:opaque`（ハッシュ値のみ）の両方を許容する。
+   - torihiki の Typed-array オーダーブックは Datom や EVM Storage Trie に変換せず、メモリ内で極限速度でマッチングを行い、ブロックごとに単一の digest を `:opaque` state root として提出する。
+   - これにより、EVM 型の複雑な状態遷移と、マイクロ秒オーダーのマッチング処理が互いの足を引っ張らずに同一の inga L1 finality を共有できる。
+
+2. **x402 の非同期化（ホットパス除外の原則）**:
+   - Web3 / RPC 経由の x402 決済（`eth_getTransactionReceipt`）をマッチングやブロック提案のループに同期挿入すると、ネットワーク遅延（数百ms）で即座にスループットが崩壊する。
+   - 外部決済は **事前預託（Collateral / Escrow）** または **Per-call の Gateway ゲート（Nexus-x402）** として切り離す。
+   - chain 上では「すでに預託された USDC / ENGI 残高の増減」のみを純粋なステートマシン遷移として処理する。
+
+## 4. p2p ネットワーク・トランスポートの構成
+
+- **Transport**: `murakumo overlay`（QUIC + Noise プロトコル）によるピアツーピア暗号化メッシュ。Tailscale 依存からの完全脱却を進める。
+- **Discovery**: IPNI（cid.contact）によるコンテンツ／ブロックの探索、および delegated kad / DHT ルーティング。
+- **Sovereign Node**: 単一ベンダ（Cloudflare DO/D1/KV）に依存しない独立プロセス（Node.js / Native Wasm）として立ち上がり、WebSocket / QUIC で inga witness mesh を構成する。
+
+## 5. 運用と Honest State（未達事項の明記）
+
+1. **Witness の経済的独立性**: 現状の inga は単一オペレータ（AWAI Network LLC）配下での CFT（Crash Fault Tolerance）であり、独立したバリデータセットとスラッシング（Escrow 契約）の実デプロイをもって初めて真の分散 BFT となる。
+2. **kototama evm/v1 の適合性試験**: プロファイル仕様は存在するが、EVM バイトコードのフル実行 conformance 実証は継続課題である。
+3. **torihiki の inga 本線接続**: 現在の devnet は single-sequencer であり、4-replica harness の本番環境への投入が必要である。
+
+以上を amano chain の設計基準（SSoT）とする。")))

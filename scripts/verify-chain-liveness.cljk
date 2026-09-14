@@ -138,9 +138,10 @@
        :findings (conj @fs*
                        {:sev "high" :key (str "unmeasured:" id)
                         :detail (str "no witness of " id " answered; liveness is unknown, not ok")})}
-      (let [adv (fn [f] (->> ok
-                             (keep (fn [w] (let [a (num (f (get s1 w)))
-                                                 b (num (f (get s2 w)))]
+      (let [getw (fn [s w] (or (get s w) (get s (keyword w))))
+            adv (fn [f] (->> ok
+                             (keep (fn [w] (let [a (num (f (getw s1 w)))
+                                                 b (num (f (getw s2 w)))]
                                              (when (and a b) (- b a)))))
                              (reduce max 0)))
             ;; A sequencer and a witness set do not answer the same question,
@@ -157,18 +158,21 @@
             ;; failure this sampling can see, and it is the opposite one —
             ;; the height going BACKWARDS, which is a log that lost its tail.
             consensus? (= :consensus (:kind dep))
-            pkey (if consensus? :committed :height)
+            pkey (cond
+                   (:endpoint-path dep) :committed-height
+                   consensus? :committed
+                   :else :height)
             d-progress (adv pkey)
             d-view (adv :view)
             regressed (vec (for [w ok
-                                 :let [a (num (pkey (get s1 w)))
-                                       b (num (pkey (get s2 w)))]
+                                 :let [a (num (pkey (getw s1 w)))
+                                       b (num (pkey (getw s2 w)))]
                                  :when (and a b (< b a))]
                              [w a b]))
-            heights (into (sorted-map) (for [w ok] [w (num (pkey (get s2 w)))]))
-            unreadable (vec (for [w ok :when (nil? (num (pkey (get s2 w))))] w))
-            votes (into (sorted-map) (for [w ok] [w (num (get-in (get s2 w) [:why-not-proposing :votes-for-tip]))]))
-            blocked (into (sorted-map) (for [w ok :let [b (get-in (get s2 w) [:why-not-proposing :blocked-by])] :when b] [w b]))]
+            heights (into (sorted-map) (for [w ok] [w (num (pkey (or (get s2 w) (get s2 (keyword w)))))]))
+            unreadable (vec (for [w ok :when (nil? (num (pkey (or (get s2 w) (get s2 (keyword w))))))] w))
+            votes (into (sorted-map) (for [w ok] [w (num (get-in (or (get s2 w) (get s2 (keyword w))) [:why-not-proposing :votes-for-tip]))]))
+            blocked (into (sorted-map) (for [w ok :let [b (get-in (or (get s2 w) (get s2 (keyword w))) [:why-not-proposing :blocked-by])] :when b] [w b]))]
 
         ;; A field this detector cannot read is not a height of zero. Say so
         ;; instead of folding it into a verdict.
@@ -218,20 +222,23 @@
       (.catch (fn [_] nil))))
 
 (defn- head-url [dep w]
-  (str (:base dep) "/head"
-       (when-let [pname (:witness-param dep)] (str "?" pname "=" w))))
+  (let [base (or (get-in dep [:witness-urls w]) (:base dep))
+        ep (or (:endpoint-path dep) "/head")]
+    (str base ep
+         (when-let [pname (:witness-param dep)] (str "?" pname "=" w)))))
 
 (defn- block-url [dep w h]
-  (str (:base dep) "/block?height=" h
-       (when-let [pname (:witness-param dep)] (str "&" pname "=" w))))
+  (let [base (or (get-in dep [:witness-urls w]) (:base dep))]
+    (str base "/block?height=" h
+         (when-let [pname (:witness-param dep)] (str "&" pname "=" w)))))
 
 (defn- sample [dep]
   (p/let [rs (p/all (for [w (:witnesses dep)] (fetch-json (head-url dep w))))]
     (zipmap (:witnesses dep) rs)))
 
 (defn- block-window [dep s]
-  (let [committed (keep (fn [[_ h]] (num (:committed h))) s)]
-    (if (or (empty? committed) (= :sequencer (:kind dep)))
+  (let [committed (keep (fn [[_ h]] (num (or (:committed h) (:committed-height h)))) s)]
+    (if (or (empty? committed) (= :sequencer (:kind dep)) (:endpoint-path dep))
       (p/resolved {})
       (let [h0 (inc (apply min committed))
             hs (range h0 (+ h0 fork-window))]
