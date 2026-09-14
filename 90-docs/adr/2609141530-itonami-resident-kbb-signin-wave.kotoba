@@ -32,12 +32,10 @@
      （commit 753dcf6、merge 済み）。②は build.cljk 登録を削除した（build.cljc は
      suffix が .cljc なので origin .clj を持てず、JS エンジンではどうせ require
      できない = kbb が所有しない file として未登録が正）。
-   - 残存 blocker（この wave の完了条件を満たさない）: signin-server.cljk は
-     cloud.itonami.app.web を require するが、web.cljk の manifest origin は
-     .clj（419 src file の大半が .clj origin）で JS エンジンから
-     target-incompatible で落ちる。resident は現在も down（launchctl last exit
-     code 1 の loop）。web.cljk が依存する src graph の origin を .cljc に寄せる
-     手術（あるいは require graph を限定する縫い方）が次 wave の最初の作業。
+   - web.cljk の origin 問題は続く commit（a5adc33「cljk-origin: web.cljk origin
+     .clj -> .cljc」）で解消された。実測 2026-09-14: launchd resident は緑で
+     `curl http://127.0.0.1:1338/api/identity` が 200（authenticated?=false /
+     registered?=true の JSON）、`http://localhost:1338/` も 200。crash loop は停止。
    - Hermes profile（~/.hermes/profiles/itonami）の model provider は owner 指示
      （2026-09-14）で murakumo-main → openrouter-free（openrouter.ai/api/v1）の
      z-ai/glm-5.3-flash に切替済み。実測: hermes chat 1 ターンが OpenRouter 経由で
@@ -58,5 +56,5 @@
      merge 13dbc03（GitHub API /merges で着地、contents API で fs-read-text 6 箇所
      を読み戻して確認）。
    - manifest 修正: commit 753dcf6（origin/main push、直接 FF）。
-   - 実測の未実装: resident は target-incompatible で down（上記 blocker）。
-     「signin-server が動いている」は今は真ではない。"}]
+   - 実測の未実装: 414 route のうち約 4 route（sign-in 面）のみ移植。残り 410
+     route は server.cljk の完全移植 wave 待ち。"}]
