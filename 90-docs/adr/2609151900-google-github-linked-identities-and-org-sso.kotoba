@@ -1,0 +1,90 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609151900-google-github-linked-identities-and-org-sso")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "kotoba.cloud の Google/GitHub は「連携 identity」、組織 SSO は「membership provisioning + authorization gate」— ADR-2609070400 の内側で実装する")
+  (:adr/topic "google-github-linked-identities-and-org-sso")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/repos (vector "orgs/net-kotobase/control-plane"
+                      "orgs/kotoba-lang/app-kotoba-cloud"))
+
+  (:adr/authoritative-for
+  (vector "auth.kotoba.cloud の /v1/link/* と /v1/org-sso/* の性質（session を発行しない）"
+   "kotoba.cloud の組織 SSO を Team / Enterprise plan に限る entitlement の形（apex が HMAC で発行、identity plane が検証）"
+   "人間認証方針 ADR-2609070400 を変えずに「Google/GitHub ログイン」「組織 SSO」というオーナー指示を満たす分解"
+   "SAML を未対応（gap）として記録すること（workspace に XML-DSig 検証器が無い）"))
+
+  (:adr/related
+  (vector "adr-2609070400-human-authentication-web3-first"
+   "adr-2609112300-claude-md-skill-delegation"))
+
+  (:adr/decision-summary
+  (vector "D1: Google / GitHub は sign-in ではなく linked identity。auth.kotoba.cloud の /v1/link/{google|github}/start|callback は、live session があればその account に provider subject を link し（link-by-proof）、無ければ 5 分・single-use・host-only の hint cookie（kb_link_hint）を残して /sign-in へ戻す。/v1/passkey/login/options は hint から allowCredentials を絞り、finish-sign-in! は本物の credential が account を証明した後に pending link を完了する。callback は gftd_session を決して set しない"
+   "D2: 組織 SSO（OIDC）は membership provisioning と authorization gate。/v1/org-sso/start は session を要求（無ければ /sign-in が先）、callback は issuer の JWKS で ID token を検証し (org, sub) を session の account に束縛して assertion を書く。role は roleMap から admin|member|billing、owner は IdP から付与しない。status.gate は open / sso-assertion-required / sso-assertion-expired"
+   "D3: entitlement。identity plane は価格を知らない。PUT|GET|DELETE /v1/org-sso/connections/:handle は owner の live session に加え、kotoba.cloud が (org, plan∈{team,enterprise}, principalId, ≤10min) に HMAC-SHA256 で署名した x-kotoba-org-entitlement を要求する。共有 secret ORG_SSO_ENTITLEMENT_SECRET が無ければ誰も設定できない（fail closed）。拒否理由は literal（entitlement-missing / entitlement-plan-not-eligible / entitlement-principal-mismatch …）"
+   "D4: apex（app-kotoba-cloud）は plan と org role を所有する。plan は ORG_PLAN_OVERRIDES（enterprise は見積のため operator が付与）→ 無ければ org owner principal の billing ledger の active platform plan（billing/active-plan、sku 未記録の grant は plan と数えない）。org authority に /sso-policy と /sso-provision を足し、org-scoped database session は ssoPolicy.enforce のとき authn の status で gate する"
+   "D5: /v1/oauth/* と /v1/sso/* の 410（control-plane ADR-2609021200）は維持。410 body が新 prefix を名指す。ADR-2609070400 は不変（オーナーが 2026-09-15 に「方針内で実装」を選択）"
+   "D6: SAML は未対応の gap として記録（org-oasis-saml は emit-only で署名検証を持たない）。対象 IdP（Google Workspace / Entra ID / Okta / OneLogin / JumpCloud）は OIDC で足りる"))
+
+  (:adr/artifact
+  (vector "net-kotobase/control-plane: authn.link / authn.org-sso / authn.org-sso-model、sign-in page の {{LINK}} slot + hint banner + allowCredentials、docs/adr/2609151900-google-github-linked-identities-and-org-sso.md、docs/ENVIRONMENT.md、CHANGELOG"
+   "test: authn/test/link_worker_smoke.cljk 34/34、authn/test/org_sso_worker_smoke.cljk 40/40（built bundle + 実 AuthnStore + did:key CACAO の実 sign-in、provider/IdP は fetch stub）。mutation: callback が gftd_session を付けると 3 check が赤（実測 2026-09-15）"
+   "authn JVM suite: clojure -M:test 64 tests / 546 assertions / 0 failures（main では 29 failures — 死んだ Base Account key と en-only の迷子 key を除去、6 文字列を 22 locale に追加）"
+   "kotoba-lang/app-kotoba-cloud: org_sso_gateway.cljk（/v1/org/sso/status|configure|remove|sync|start、/v1/account/identities[/revoke]）、/sign-in/{google|github} と /account/link/{google|github} の hand-off、org_authority /sso-policy /sso-provision、billing/active-plan、account page の 連携アカウント / 組織 SSO panel"
+   "manifest/human-authentication-policy.edn: app-kotoba-cloud と net-kotobase/control-plane の inventory に新 surface を :unverified で登録（deploy 前登録）"))
+
+  (:adr/body
+  "## Context
+
+オーナー指示（2026-09-15）:「https://kotoba.cloud/ で Google, Github ログインに対応して、
+また team, enterprise plan では組織SSO にも対応するようにして」。
+
+この指示は 2 つの standing decision と衝突していた。control-plane ADR-2609021200
+（2026-09-02、オーナー指示）は Google/GitHub sign-in・company SSO・emailed code を撤回し
+/v1/oauth/* /v1/sso/* を 410 にした。root ADR-2609070400（2026-09-07、repo-wide mandatory）は
+OAuth / OIDC / SAML / social / enterprise SSO を login / bootstrap / step-up / recovery の
+authority にしないと定めた。2026-09-15 にこの衝突を提示し、オーナーは「方針内で実装」を選んだ。
+
+## Decision
+
+「Google ログイン」を、方針が禁じる部分（provider の言葉で session を発行する）と、
+禁じていない部分（provider の言葉で *どの* account かを知り、passkey / wallet がそれを証明する；
+live session の下で provider subject を account に紐づける）に分解した。前者はやらない。
+後者が D1。
+
+「組織 SSO」を、enterprise が実際に買っているもの（IdP による provisioning / deprovisioning、
+group → role の対応、監査）と、方針が禁じるもの（IdP が session になる）に分解した。
+IdP の step は passkey / wallet の session が *在ってから* 走り、その session に assertion を
+束縛する。org resource は enforce のとき fresh assertion を要求する。これが D2。
+
+identity plane（auth.kotoba.cloud）に plan を教えない。apex が plan と org role を持ち、
+(org, plan, principal) を HMAC で署名した entitlement を付けて初めて connection が書ける。
+secret が無ければ誰も書けない。これが D3 / D4。
+
+## Consequences
+
+- session は Google / GitHub / 会社 IdP からは決して発行されない。両方の standing ADR は不変。
+- 新しい Worker 設定: GOOGLE_CLIENT_ID/SECRET、GITHUB_CLIENT_ID/SECRET（両方揃わない provider は
+  不在）、ORG_SSO_ENTITLEMENT_SECRET（両 Worker で共有）。provider 側に登録する redirect URI は
+  https://auth.kotoba.cloud/v1/link/{google,github}/callback、org IdP には
+  https://auth.kotoba.cloud/v1/org-sso/callback。
+- 未着地: 本番 secret の投入と provider 登録、live negative verification（inventory は :unverified）、
+  SAML、org billing（ADR-2609141633 §5）が landed した時点で plan の出所を owner の ledger から
+  org の ledger に移すこと。
+- 目的外の使い方への防御: link 開始 session と完了 session の一致、(org, sub) の first-wins 束縛、
+  state の single-use、role map から owner を排除、enforce を切っても assertion は事実として残る。
+
+## Verification（実測 2026-09-15）
+
+- control-plane authn: built bundle に対して link 34/34、org-sso 40/40（negative: callback の
+  set-cookie に gftd_session が無いこと、replay、cross-session、wrong nonce/issuer/aud/exp、
+  domain 外 email、Pro entitlement、別 account の同 sub、期限切れ gate、delete 後の open）。
+  mutation で赤を確認（8 問の 6）。既存 enterprise / apex / device / native-wallet smoke は不変。
+- app-kotoba-cloud: kbb -M:test は main と同じ 265 failures（site test の pre-existing、
+  theme/topbar 合流後）に対し増減なし + org-sso-gateway-test の追加分が緑。build（render +
+  amu compile + shadow）が通ること、worker-smoke は本文に記す。"))
+)
