@@ -224,8 +224,10 @@
           (println "  show <symbol> — definition snippet (file:line + context lines)")
           2))))
 
-(when-let [args (script-args)]
-  (when (seq args)
+(let [args (script-args)]
+  (if (seq args)
     (let [code (apply -main args)]
-      (when (and (number? code) (not= code 0))
-        (.exit js/process code)))))
+      (when-not (and (number? code) (zero? code))
+        (.exit js/process (if (number? code) code 0))))
+    (do (println "usage: kbb --backend sci scripts/symbol-index.cljk build|find|show [args]")
+        (.exit js/process 2))))
