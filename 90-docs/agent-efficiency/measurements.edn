@@ -51,4 +51,20 @@
              :result-size {:p50 384 :p90 2255 :p99 7823 :share-in-results-over-10k 0.11 :truncated-to-file 100}}
   :verdict :rejected-as-a-single-lever
   :reason "『長い出力』は無い: p50 384 字、10K 超の結果は全体の 11%。質量は中くらいの結果 3.5 万件の総和で、その 1/4 が file 本文の読み (sed -n / cat / Read)。これは :h32 / :h34 と『変更確認は outline の hash で』の指示が狙う場所と同じで、別 lever ではない。grep 7.7% は次の候補 (symbol-index に refs を足すか) だが、agent の grep は定義以外 (文字列・設定) が多く、先に用途を測る"
-  :stop "この loop はここで止める: 残る仮説は (a) :h34 の K4 効果 = 翌週の --since 7 を待つ (b) hermes 腕 D = 別 host。捏造した仮説で tick を埋めない"}]
+  :stop "この loop はここで止める: 残る仮説は (a) :h34 の K4 効果 = 翌週の --since 7 を待つ (b) hermes 腕 D = 別 host。捏造した仮説で tick を埋めない"}
+
+ {:id :closing-2026-09-15
+  :date "2026-09-15"
+  :landed-on-main {:adr "90-docs/adr/2609152300-agent-efficiency-goal-and-kpi.kotoba"
+                   :instrument "scripts/agent-usage-report.cljk (K1-K4, K6, 再読みの無駄)"
+                   :hook "session-start-orgs-detectors 27,205 → 10,584 字"
+                   :symbol-index "kotoba-lang/symbol-index 2fcaefc (index v3 content hash; skills/symbol-index/SKILL.md; scripts/install.cljk); west pin 72ee78e; root の scripts/symbol-index.cljk は byte 同一"
+                   :for-other-agents "hermes: ~/.hermes/skills/software-development/symbol-index/SKILL.md を install.cljk が置く (先読み `hermes chat -s symbol-index` まで)。Codex: AGENTS.md は CLAUDE.md から生成 (symbol-index の 1 行は CLAUDE.md 188 行目)。他 CLI: install.cljk が印字する 1 行を貼る"}
+  :verified {:symbol-index-tests "82 / 0" :one-call-bench "8/8 correct, 8/8 opening" :install-check "CHECKS clean problems=0"
+             :gen-agents-md "CLAUDE.md はこの closing で未変更 (--check は ADR PR 時に up to date)"}
+  :open-priority [{:p 1 :what "K4 効果の判定 (:h34 content hash + 指示)" :cmd "kbb --backend sci scripts/agent-usage-report.cljk --since 7" :compare "rr-nowrite 79% / rr-chars 6.0M (7d baseline 2026-09-15)"}
+                  {:p 2 :what "hermes 腕 D (K2 / K5)" :cmd "bench/hermes_ab.cljk D-preloaded-v14 <out.json> (hermes のある host)"}
+                  {:p 3 :what "grep 7.7% の用途を測って refs を足すか決める" :cmd "tool_result 集計 (:k4-tool-output-attribution-7d の scratch を agent-usage-report に列として足す)"}
+                  {:p 4 :what "CLAUDE.md 25,665 字の削減はオーナー判断 (重複は 2% しか無い)" :cmd nil}]
+  :preserved-not-mine "root の stash 3 件 (observatory WIP)、他 session の worktree 23 本と codex/* / bot/* branch、untracked 148 path、symbol-index の branch jv/iteration-7-kotoba-find-grep / manifest-rev。触っていない"
+  :resume "cd <superproject> && git fetch origin && git merge --ff-only origin/main && kbb --backend sci scripts/agent-usage-report.cljk --since 7"}]
