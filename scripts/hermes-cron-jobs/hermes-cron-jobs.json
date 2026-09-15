@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T01:06:24.744625+09:00",
+  "generated_at": "2026-09-16T01:17:01+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -6359,6 +6359,19 @@
         ],
         "workdir": "/Users/junkawasaki/.gftd/worktrees/akc-trail-ops",
         "deliver": "local"
+      }
+    ],
+    "social-catalog-maint": [
+      {
+        "id": "210252f7b2cb",
+        "name": "social-catalog weekly maintenance",
+        "schedule_display": "20 4 * * 3",
+        "script": "social_catalog_maint_evidence.py",
+        "model": "z-ai/glm-5.3-flash",
+        "provider": "openrouter",
+        "state": "scheduled",
+        "next_run_at": "2026-09-16T04:20:00+09:00",
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/social-catalog-maint"
       }
     ]
   },
