@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>cloud.itonami.bot.worktree-farm-retire</string>
+  <!-- scripts/worktree-retire.cljk existed and had a --only prefix built for
+       per-tick bot farms, but nothing ran it against the farm that actually
+       grows: measured 2026-09-15, ~/.cloud-itonami/awai-worktrees/awai held
+       1,432 worktrees (41 GiB) created by the awai director/sales/supporter
+       loops at roughly 200 per day, every one landed and 1,341 clean, on a
+       volume with 125 MiB free. One scoped --apply retired 1,069 of them and
+       the volume went from 10.2 to 40.9 GiB free. The retire script keeps
+       dirty, unlanded, busy and locked worktrees, so the failure mode of
+       running it often is "nothing to do", not loss. Every 6h because a day
+       of runs is ~5 GiB. The durable fix is the loop retiring its own
+       worktree at the end of a run; until it does, this tick is the floor. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/junkawasaki/.local/bin/kbb</string>
+    <string>--backend</string>
+    <string>sci</string>
+    <string>scripts/worktree-retire.cljk</string>
+    <string>--root</string>
+    <string>/Users/junkawasaki/github/com-junkawasaki</string>
+    <string>--only</string>
+    <string>/Users/junkawasaki/.cloud-itonami/awai-worktrees</string>
+    <string>--min-age-days</string>
+    <string>1</string>
+    <string>--apply</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/junkawasaki/github/com-junkawasaki</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/junkawasaki/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>21600</integer>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/junkawasaki/.itonami/worktree-farm-retire.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/junkawasaki/.itonami/worktree-farm-retire.log</string>
+</dict>
+</plist>
