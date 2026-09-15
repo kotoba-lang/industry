@@ -232,6 +232,32 @@ Exit 1 below `--min` — wire it as a CI gate like kotoba-ui's self-scoring test
 The LLM-judge layer (`.claude/workflows/design-quality-score.js`) is the
 complementary subjective arm. (Babashka/`bb` is retired; ADR-2607173000.)
 
+### shinkansen documents: the judge is `shinkansen.audit` (2026-09-15, ADR-2609151708)
+
+For a document the shinkansen framework emits (kotoba.cloud and every
+`site-layout` page), the fitness function is **`shinkansen.audit`** — 13
+deterministic axes, each seeded from a failure measured on the live
+`/account` page (a script the deploy did not ship, duplicate ids, a wall
+of "loading…" cells, three nav entries for one page, screens of nav before
+the content on a phone, a fixed sidebar with no inline anchor, headings in
+protocol language). Every finding names WHY; an axis that cannot be measured
+(no asset set, an external stylesheet nobody supplied) is `:unmeasured`,
+never a pass. The kaizen loop over it is `shinkansen.coscientist`
+(Generate → Reflect → Rank (Elo) → Evolve → Meta; `delta` is the proof).
+
+```bash
+# consumer side (app-kotoba-cloud), after npm run build:
+npm run audit:uiux                                           # floor gate: exit 0 / 1 below / 2 refused
+kbb --backend sci scripts/uiux-audit.cljk --only /account/   # one document, findings with why
+kbb --backend sci scripts/uiux-audit.cljk --iteration N      # append docs/uiux-coscientist/iteration-NN
+npm run test:account-browser                                 # the real-browser arm (390 / 768 / 1440)
+```
+
+Measured 2026-09-15: 102 documents 82.9 → 99.0, `/account` 33.3 → 100
+(live was 20.5 — `/js/session.js` was 404 in production). **When you say a
+UI got better, print the audit number and the delta; "looks better" is not
+a measurement.**
+
 ## Review checklist (when auditing UI code)
 
 - [ ] requires only kotoba-ui/appkit/uikit  - [ ] zero raw hex / px font sizes

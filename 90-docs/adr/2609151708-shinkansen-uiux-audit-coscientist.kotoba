@@ -1,0 +1,56 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609151708-shinkansen-uiux-audit-coscientist")
+  (:adr/title "shinkansen: UI/UX document 契約は fitness function、改善は co-scientist loop")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc-type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/topic "shinkansen-uiux-audit-coscientist")
+  (:adr/repos (vector "orgs/kotoba-lang/shinkansen" "orgs/kotoba-lang/app-kotoba-cloud"))
+  (:adr/related (vector "adr-2609131808-shinkansen-content-addressed-web-framework"
+                        "adr-2607132300"
+                        "adr-2606141500-keiei-arbor-coscientist-engine"
+                        "adr-2608136000"))
+
+  (:adr/context
+  "2026-09-15 オーナー指示: https://kotoba.cloud/account などの UI/UX 品質が高くないので、shinkansen framework の改善を co-scientist の approach で進める。
+
+  live page の実測 (2026-09-15、Playwright 390 / 768 / 1440 + HTML 静的解析):
+  - /js/session.js が本番で 404 (他の /js/*.js は 200)。/account は document だけ届いて hydrate せず、全 12 cell が全訪問者に対して永遠に「読み込んでいます…」。
+  - id=account-refresh ×4 / account-org-create ×2 — getElementById は最初の 1 つにしか listener を付けないので 4 つの「状態を更新」のうち 3 つは死んだ button。billing の cell は JS 側にしか id が無く一度も描画されない。
+  - sidebar の /account ×3 (接続トークン / 利用とインサイト / アカウント)、data-current ×3。
+  - 390px では nav 13 link が 1,148px 積み上がってから本文。
+  - 1440px では position:fixed の sidebar に inset-inline-start が無く body padding の内側 (x=240) に浮き、本文は body padding + main margin で 2 度押し出され、左に死んだ 15rem の溝。
+  - 見出し・label が実装語 (本人確認（カード認証 / Stripe Identity）、USERNAME、STABLE PRINCIPAL)、idle 画面に 120 字超の説明段落、disabled の primary button が理由なしに 3 つ、/ja/#… の locale 分岐 link (Worker は cookie で negotiate 済みなので 301 hop)。
+  - sidebar の (t \"ja\" \"en\") は copy MAP への (get t \"ja\" \"en\") で常に英語を返していた (ja 頁の「Get started」「Security services」)。
+
+  framework 側の実測: shinkansen.viewport (217c338) の test ns は runner に require されていたが doseq に無く 1 度も走っておらず、走らせると :no-xs-band の比較が逆 (最小 band が 480px 未満のとき flag) で落ちた。
+
+  既存の co-scientist 系 (keiei-arbor ADR-2606141500、isekai.ux ADR-0007、90-docs/design-quality/coscientist.cljk) は「測れない品質は劇場」を founding rule として持つ。design-quality の LLM 3-judge panel は同じライブラリを 4.0-5.0/5 と採点しながら tap-target / dvh / safe-area / theme-color の具体的欠落を 1 つも指摘しなかった実績がある。")
+
+  (:adr/decision
+  "1. shinkansen は UI/UX document 契約を決定論的 fitness function として持つ: src/shinkansen/audit.cljc、13 軸 (viewport / assets-resolve / unique-ids / nav-one-home / nav-before-content / skip-link / idle-pending / idle-disabled / repeated-actions / plain-labels / note-density / locale-path-links / fixed-anchor)。各軸は live で実測した失敗から起こし、finding は WHY 付きで名指しする。可視性は構造 (hidden 属性・閉じた details) で判定する。
+
+  2. fail-closed: 測れない軸 (asset set 無し、参照している外部 stylesheet 未供給) は :unmeasured に載せ平均から除外する — 0 でも 1 でもない。0 枚の audit は :empty? で clean にしない。
+
+  3. 改善は src/shinkansen/coscientist.cljc の loop で回す: Generate (finding ごとに hypothesis 1 本、owner = :consumer / :deploy / :framework) → Reflect (risk) → Rank (Elo round-robin K=32、headroom 主導・決定論的) → Evolve (low-risk consumer + 全 deploy 行を batch) → Meta (iteration 文書)。unmeasured が 1 つでもあれば converged にしない。delta が before/after の軸別測定 — roadmap は予測、delta が証明。
+
+  4. consumer (app-kotoba-cloud) は emitted document 群 + 公開 asset set + 実 stylesheet で audit し、build と publish の間に床 (--min) を gate にする (scripts/uiux-audit.cljk、exit 0/1/2)。:assets-resolve が deploy 起因の outage を止める唯一の場所。測定は docs/uiux-coscientist/iteration-NN.edn に append-only。
+
+  5. test runner の doseq に列挙されていない test ns は require されても走らない — ns を足すときは require と doseq の両方 (shinkansen test_runner に理由を明記)。
+
+  6. shinkansen の deps.edn は :local/root を持たない (消費側の git cache 相対で解決に失敗する。jp-go-dds と同じ規則)。")
+
+  (:adr/consequences
+  "iteration-01 (rubric 確定後の baseline、102 document): 82.9 / 100、/account 33.3 (session.js が在る tree)、live は 20.5。
+  iteration-02 (batch 着地後): 99.0 / 100、/account 100、閉じた軸 7 (fixed-anchor / idle-pending / nav-before-content / nav-one-home / plain-labels / skip-link / unique-ids)、開いた軸 0。実ブラウザ arm (test/account-browser.cljk): signed-out = 1 status + 1 action、signed-in = 全 cell が state に map、dup id 0、390 / 768 / 1440 で横 overflow 0、phone の nav は 52px、desktop の sidebar は inset 0・本文と重ならない。
+  gate が落ちることの確認: session.js を除くと exit 1 (99 document が asset 名で flag)、site.css を除くと exit 2 (refused)。
+
+  残り (deferred roadmap、別 owner): /billing/ の disabled control 11 と「Checking availability」×10、security catalog 頁の note-density / repeated-actions、/ja/security/ 系の locale link。kbb -M:test の site-test copy 失敗 265 件は main 既存 (触っていない)。
+
+  規則: UI の品質を語るときは shinkansen.audit の数値と delta を出す。「見た目が良くなった」は測定ではない。")
+
+  (:adr/body
+  "着地: kotoba-lang/shinkansen PR #1 (audit + coscientist + viewport 修正 + deps)、kotoba-lang/app-kotoba-cloud PR #143 (consumer gate + /account + shell)。deploy と west pin 前進は両 PR の merge 後。")
+))
