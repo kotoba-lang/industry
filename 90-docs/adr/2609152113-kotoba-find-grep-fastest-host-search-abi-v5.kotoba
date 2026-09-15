@@ -58,7 +58,24 @@
   | -i (3.3 MB) | 600 | 0.67 | - | - | 0.66 |
   疎・不在では grep -F と同等。rg との差は host 側 (pool への copy と UTF-8 検証 ~40 ms、libc memmem は memchr crate の SIMD ではない)。
 
+  ## 第 2 波 (2026-09-15/16): 他の 17 command の成熟度
+
+  まず 17 suite 全部が走れなかった (cljk rename で消えた package-command.cljs を指していた) → .cljk を AMU_HOME の kbb 経由に直し、全 17 が ABI v5 の amu で緑。次に 3.3 MB / 33 MB で system utility と比較:
+  | command | 修正前 (33 MB) | 原因 | 修正後 |
+  | sort | 200 KB (4,600 行) で SIGILL | selection sort が remainder を行ごと concat で再構築 (pool 二次) | merge sort + tail append。80K 行 1.15 s、LC_ALL=C sort と同一。33 MB は pair ceiling (4 handle × 行 × 17 level) |
+  | uniq | 800 KB で SIGILL | 出力全体を concat 蓄積 | stdout は run ごと write、OUTPUT operand は tail append。33 MB 0.58 s (uniq 0.18)。実バグ: 未終端最終行に改行を足していた (fixture a\\na が隠した) |
+  | awk | 33 MB で SIGILL (185K record) | record ごとに argv 再パース = 362 handle/record | 1 回読んで carry。33 MB SIGILL → 1.31 s (awk 1.36 s) |
+  | wc / cut / tail | 動くが 6× / 40× / ∞× 遅い | code point 走査 / 行・field ごとの cap call / 先頭からの改行数え | 未着手 |
+  | cat / head / sed | 差なし | | |
+
+  loader 側の 1 手: string-concat の TAIL APPEND (amu #995、第 1 引数が pool 末尾の最終割当なら第 2 引数だけ copy。vector-conj の in-place と同じ安全論法)。conformance examples/tail-append.kotoba で両方向 (旧 loader は trap、新は 200000)。artifact 496d498。
+
+  ## SIGILL は compiler の欠陥ではない (2026-09-16 の問い)
+
+  全 trap は loader の raise(SIGILL) = 資源 budget の fail-closed 拒否で、structured report の :heap / :string-pool がどちらかを名指す。構造的なのは runtime の値モデル (handle + append-only pool、free も GC も無い、cap call の答えが必ず intern される、5 param 上限) であって codegen ではない。線形の仕事は線形の資源で書けるが、書き方を間違えると黙って二次になり ceiling で SIGILL。ceiling を上げても入力サイズの上限は消えない。
+
   ## 次の lever (測った順、ここに数値は書かず再現手順を残す)
+  0. scoped arena reset (region): :i64 / :bool を返す body 内の handle は結果経由で escape できない。escape 経路は in-place vector store と kgraph-assert! だけで、kotoba-sema の affine 解析の延長で検出できる。入ると ceiling が入力上限でなくなる (find の降りて戻る、sort の level ごと)。ADR 1 本 + kotoba-sema + loader の mark/release 2 slot (ABI v6)。
   1. 並列 walk / 並列 search — runtime は 1 thread。fd の wall 7.4 s 対 49 s の差の全て。
   2. arena reclaim — 4 handle × entry で 64 Mi = 16 M entry が ceiling。scoped reset は :i64 結果の body なら結果経由の escape は無いが、in-place vector store と kgraph-assert! が経路として残る (別 ADR)。
   3. host 側 ASCII fold (または case-insensitive search) — grep -i の 26 pass/行。
@@ -68,7 +85,6 @@
   ## 再現
   build: amu compile <core.kotoba> --target aarch64-macos --jvm-free → extract-native → package-command.cljk --cpu-seconds 600 --wall-seconds 1800 --pairs 67108864 --string-pool 1073741824。比較: /usr/bin/time -p で user/sys、LC_ALL=C /usr/bin/find -s、grep -F、rg -F。
 
-  ## 着地状態 (2026-09-15 時点)
-  landed: kotoba-gmir 8e57296、kotoba-mir 1a6424c、kotoba-native 9a98c3e / 9a98c3e、kotoba-verifier a0d0799、artifact 2135fdd (west pin も前進)。
-  open (required status check 待ち、merge は classifier に止められた): amu #988 (#986 を包含)、org-ieee-find #1、org-ieee-grep #1 — 後 2 つは amu の --cpu-seconds と ABI v5 に依存。")
+  ## 着地状態 (2026-09-16 時点)
+  全部 landed、west pin 前進済み: kotoba-gmir 8e57296、kotoba-mir 1a6424c、kotoba-native 9a98c3e、kotoba-verifier a0d0799、artifact 496d498、amu 07849c9 (#988 + #995)、org-ieee-find 9945c82、org-ieee-grep 63b6fbc、org-ieee-{awk,uniq,sort} と suite 修復の 14 repo。未着手は wc / cut / tail の速度、grep -i の host fold、sort の host 比較、region reset。")
 ))
