@@ -1,0 +1,59 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609160044-arena-scope-region-reset-abi-v6")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "arena-scope: scalar 結果の body で確保した handle と bytes を release する region reset（context ABI v6）")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/last_verified "2026-09-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-native-runtime")
+  (:adr/repos (vector "orgs/kotoba-lang/osaho"
+              "orgs/kotoba-lang/kotoba-sema"
+              "orgs/kotoba-lang/kotoba-verifier"
+              "orgs/kotoba-lang/kotoba-gmir"
+              "orgs/kotoba-lang/kotoba-mir"
+              "orgs/kotoba-lang/kotoba-native"
+              "orgs/kotoba-lang/amu"
+              "orgs/kotoba-lang/artifact"
+              "orgs/kotoba-lang/org-ieee-find"
+              "orgs/kotoba-lang/org-ieee-grep"))
+  (:adr/related (vector "2609152113" "2609010200" "2607201300"))
+  (:adr/context
+  "オーナー指示 2026-09-16: SIGILL は『構造的にも消したほうが美しい。セキュリティ的に問題なければ決して』。
+
+  ADR-2609152113 で測った通り、command binary の SIGILL は全て loader の資源 budget 拒否で、原因は runtime の値モデル: handle は bump arena、string pool は append-only、どちらも reclaim しない。線形の仕事は線形の資源で書けるが、ceiling は入力サイズの上限のまま (find は entry あたり 4 handle、sort は 4 handle × 行 × 17 level で 33 MB を拒否)。ceiling を上げても消えない。
+
+  reclaim を入れる候補は 3 つ: (a) GC / refcount — host が handle graph を歩く。値モデルの単純さ (host が全 byte アクセスを検証する、決定的な上限) を壊す。(b) 所有権 (affine) 解析で dead handle の bytes を再利用 — kotoba-sema は vector-assoc! のためにこれを持つが string に広げると解析が大きい。(c) region: 式の評価中に確保したものを、式が終わったら全部返す。escape が無いことを型で保証できる場合だけ許す。")
+  (:adr/decision
+  "(c) を採る。KIR に head `(arena-scope body)` を 1 つ足す。
+
+  意味: body を評価し、その値を返す。body の評価中に確保された pair handle・string pool bytes・vector handle・vector item は、評価が終わった時点で全部 release される (arena の使用量が入口の mark に戻る)。kgraph の datom は release しない (i64 しか持たず、assert は観測可能な事実)。reference interpreter (osaho) では identity。
+
+  安全条件 (型で閉じる): body の型は :i64 / :bool / :f64 のいずれか。それ以外 (string / vector / string-index / record / variant / closure) は frontend と verifier が名指しで拒否する。
+
+  なぜこれで escape が無いか — handle が scope を越える経路を 1 つずつ:
+  1. 結果経由 — scalar 型なので不可。KIR の型規律に handle → i64 の cast は無い (pair-first / string-byte-length / string-index-of は数を返すのであって handle ではない。offset の数から handle は作れない: `pair` は :pair 型で :string には使えず、verifier が型を検査する)。
+  2. 外側の可変構造への格納 — vector-i64 / vector-f64 の要素は数、kgraph の datom は数、string-index の key は handle だが string-index は不変値で assoc は新しい handle を返す (それは 1 で escape できない)。vector-assoc! (in-place) は要素が数。
+  3. in-place の tail 追記 (vector-conj / string-concat の tail fast path) — 外側の handle の bytes/items の**後ろ**に書き、外側の handle の長さは変わらない。release 後、外側の handle は入口と同じ値。
+  4. capability call — host 側の効果 (write / stdout) は起きたまま。答えの intern は scope 内なので release される。
+  5. closure — scope 内で作った closure は 1 で escape できない。外側の closure を scope 内で呼ぶのは可。
+  6. LIFO — enter / leave は `arena-scope` の lowering として backend が対で emit する。KIR に raw の enter / leave は無い (verifier が拒否) ので、callee が caller の scope を leave することは構造的に起きない。host は depth 0 での leave と depth 上限 (256) 超過を trap する。
+  7. trap — process が死ぬだけで unwind は要らない。
+  8. pair_validated flag — release した index は次の pair_new が 0 に戻す (既存の挙動)。
+
+  ABI: context ABI v6。slot 224 `arena_enter`、232 `arena_leave` (arity 0、`kotoba.gmir/runtime-operation-arities`、`kotoba.mir/runtime-context-offsets`)。loader は 256 段の mark stack (pair_used / string_pool_used / vector_used / vector_item_used)。kotoba-verifier の expected-context は version 6 を名指し v5 を拒否。Windows loader も同 slot。
+
+  tail 位置: `(arena-scope e)` の e は tail call ではない (leave が後に要る)。self tail call を scope で包むと loop ではなく再帰になるので、guest は scope を『降りて戻る』単位 (find の subdirectory、grep の 1 match の report) に置く。
+
+  検査 (8 問): amu の conformance に両方向の実行 case — 同じ loop を scope 有りで 64 KiB pool で完走し、scope 無しで KEXE_TRAP。verifier は :string 型の body を理由 literal で拒否する negative test を持つ。")
+  (:adr/body
+  "## 何が変わるか
+  find: subdirectory への降下を scope で包むと、arena の使用量は tree の深さ × 1 directory の listing に落ち、entry 数に上限が無くなる。grep: 1 match の report を scope で包むと match 数に上限が無くなる。sort: merge の各 level が string を返すので scope に入れられず、このままでは変わらない (emit を level 内に入れるか、host 比較で pair を減らす)。
+
+  ## 着地順
+  root ADR → kotoba-gmir (arity) → kotoba-mir (offset) → osaho (head、interpreter は identity) → kotoba-sema (frontend: arity、型、scalar 制約の拒否) → kotoba-verifier (admit、expected-context v6) → kotoba-native (lowering: enter / body / leave) → amu (loader v6、context-abi、admission test、conformance 両方向、fuzz harness) → artifact (identity) → find / grep。各段で portable slice を測る。
+
+  ## 着地状態
+  この ADR を書いた時点 (2026-09-16) では未着地。着地したら repo と sha をここに書き換える (文書は最新状態のみ)。")
+))
