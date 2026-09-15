@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T01:17:01+09:00",
+  "generated_at": "2026-09-16T01:26:08+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -6372,6 +6372,25 @@
         "state": "scheduled",
         "next_run_at": "2026-09-16T04:20:00+09:00",
         "workdir": "/Users/junkawasaki/.gftd/worktrees/social-catalog-maint"
+      }
+    ],
+    "kotoba-vuln-eval": [
+      {
+        "id": "a742bf9b792c",
+        "name": "kotoba-vuln-eval daily vulnerability assessment",
+        "prompt": "kotoba-vuln-eval daily vulnerability assessment\n\nSOUL.md を読め (~/.hermes/profiles/kotoba-vuln-eval/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. 計測事实から評価対象を 1 領域だけ選ぶ (優先順位: behind が大きい repo > pin 停滞 repo > live 面)。\n   現在 known: ayatori pin behind≈120, amu behind≈14, kotoba pin fresh。\n   観点: パーサ安全 (再帰/reader 上限)、deps.edn git/sha ピン停滞、live 面の 404/リダイレクト/CSP。\n3. 結果は cache/metrics.json の時系列と突き合わせてレポート。app-kotoba-cloud 面の修正のみ PR 化:\n   workdir で topic branch を kotoba-lang/main から新規作成 (リモート名 kotoba-lang、origin ではない)。\n   検証 (npx shadow-cljs compile 或いは対象テスト) を通してから gh pr create --repo kotoba-lang/app-kotoba-cloud。\n   PR は docs/評価レポート/テスト追加レベルのみ。機能実装はしない。\n   自分の PR は approve できないので gh pr comment で検査記録を残し gh pr merge --merge で merge。\n4. 予算: 20 API call 以内。進捗に関わらずレポートして停止。main 直 push 禁止。1 run = 最大 1 PR。\n   「opened no PR」(評価のみ / 対象ゼロ) は正常系。\n",
+        "model": "z-ai/glm-5.3-flash",
+        "provider": "openrouter",
+        "script": "kotoba_vuln_eval_evidence.py",
+        "schedule_display": "42 4 * * *",
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/kotoba-vuln-eval",
+        "enabled_toolsets": [
+          "terminal",
+          "file",
+          "web"
+        ],
+        "max_tokens": 16384,
+        "deliver": "local"
       }
     ]
   },
