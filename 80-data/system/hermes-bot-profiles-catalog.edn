@@ -1,0 +1,51 @@
+;; 80-data/system/hermes-bot-profiles-catalog.edn — Hermes bot profile + cron 棚卸し（内部データ、非公開）。
+;; 実測: 2026-09-16 (JST)。source: ~/.hermes/profiles/<name>/config.yaml (model.default) + cron/jobs.json。
+{:catalog-version 1
+ :measured-at "2026-09-16T15:45:00+09:00"
+ :profiles [
+  {:profile "akc-blog-i18n" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "9e2c2ae32cd2" :name "akc-blog-i18n daily blog translation" :schedule "30 4 * * *"}]}
+  {:profile "akc-csf-fit-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "f7c745360a8d" :name "akc-csf-fit-ops daily evidence + iteration" :schedule "10 3 * * *"}]}
+  {:profile "akc-ctem-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "3dc594a6e90e" :name "akc-ctem-ops daily evidence + iteration" :schedule "10 2 * * *"}]}
+  {:profile "akc-dast-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "ca57c86f6b12" :name "akc-dast-ops daily evidence + iteration" :schedule "25 2 * * *"}]}
+  {:profile "akc-sast-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "d95acbd714d7" :name "akc-sast-ops daily evidence + iteration" :schedule "40 2 * * *"}]}
+  {:profile "akc-sec-observatory" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "c3d38a665cd9" :name "akc-sec-observatory daily security observatory pos" :schedule "30 2 * * *"}]}
+  {:profile "akc-trail-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "6b8b08f58b57" :name "akc-trail-ops daily security trail" :schedule "52 5 * * *"}]}
+  {:profile "akc-vm-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "0ca56e8803e4" :name "akc-vm-ops daily evidence + iteration" :schedule "55 2 * * *"}]}
+  {:profile "amu" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [[]]}
+  {:profile "branch-drain" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "86e1107fb102" :name "branch-drain tick" :schedule "every 120m"}]}
+  {:profile "crypto-catalog-maint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "4e64c5de72f7" :name "crypto-catalog weekly maintenance" :schedule "20 4 * * 1"}]}
+  {:profile "csf2-catalog" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "5edf888a691b" :name "csf2-catalog daily iteration" :schedule "40 3 * * *"}]}
+  {:profile "default" :model "claude-sonnet-5" :provider "custom (fallback http://127.0.0.1:9180/v1)" :cron [[]]}
+  {:profile "disk-maintenance" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "f4db9e7069b3" :name "mac disk maintenance" :schedule "50 * * * *"}]}
+  {:profile "fake-report-maint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "e5685e2d145a" :name "fake-report-maint-tick" :schedule "40 2,8,14,20 * * *"}]}
+  {:profile "kotoba-auth-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "aceade2482ae" :name "kotoba-auth-ops daily evidence + fix iteration" :schedule "50 3 * * *"}]}
+  {:profile "kotoba-cloud" :model "qwen3.8-flash-next-whitehacker" :provider "kotoba" :cron [[]]}
+  {:profile "kotoba-cloud-docs" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "d05e079c643c" :name "kotoba-cloud-docs weekly maintenance" :schedule "40 4 * * 2"}]}
+  {:profile "kotoba-cloud-mktg" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "1abfa4611f73" :name "kotoba-cloud-mktg daily iteration (marketing surface)" :schedule "6 6 * * *"}]}
+  {:profile "kotoba-cloud-sales" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "65eb01eb00f9" :name "kotoba-cloud-sales daily iteration (catalog data)" :schedule "18 6 * * *"}]}
+  {:profile "kotoba-pep-maint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "da76bc763e74" :name "kotoba-pep-maint weekly maintenance" :schedule "30 4 * * 4"}]}
+  {:profile "kotoba-proof-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "eb3873c027e3" :name "kotoba-proof-ops daily iteration" :schedule "20 3 * * *"}]}
+  {:profile "mhri-research" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "23bd7fe1c75d" :name "mhri-research weekly maintenance" :schedule "30 4 * * 2"}]}
+  {:profile "orgbrain-maint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "1a329082bc42" :name "orgbrain-maint daily tick" :schedule "40 4 * * *"}]}
+  {:profile "pr-drain" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "fe323bd36793" :name "pr-drain tick" :schedule "every 180m"}]}
+  {:profile "sousa-ontology" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "d834dd40d54a" :name "sousa-ontology" :schedule "0 1,7,13,19 * * *"}]}
+  {:profile "tm-awareness" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "23e86d2ba662" :name "tm-awareness daily iteration (Trend Micro catalog" :schedule "30 5 * * *"}]}
+  {:profile "tm-container-sec" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "2b9ccf09ec7c" :name "tm-container-sec daily iteration (Trend Micro cata" :schedule "12 5 * * *"}]}
+  {:profile "tm-data-sec" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "943555523447" :name "tm-data-sec daily iteration (Trend Micro catalog c" :schedule "24 5 * * *"}]}
+  {:profile "tm-ddi-xdr" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "fea10fb38ab9" :name "tm-ddi-xdr daily iteration (Trend Micro catalog co" :schedule "0 5 * * *"}]}
+  {:profile "tm-file-sec" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "179008fe75e4" :name "tm-file-sec daily iteration (Trend Micro catalog c" :schedule "6 5 * * *"}]}
+  {:profile "tm-identity-sec" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "48c65c885c88" :name "tm-identity-sec daily iteration (Trend Micro catal" :schedule "48 4 * * *"}]}
+  {:profile "tm-idp" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "1eb73b0934cb" :name "tm-idp daily iteration (Trend Micro catalog covera" :schedule "30 4 * * *"}]}
+  {:profile "tm-ot-sec" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "f1221dc75420" :name "tm-ot-sec daily iteration (Trend Micro catalog cov" :schedule "18 5 * * *"}]}
+  {:profile "tm-pwmgr" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "d827154bc341" :name "tm-pwmgr daily iteration (Trend Micro catalog cove" :schedule "36 4 * * *"}]}
+  {:profile "tm-secops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "6ecabb8c562b" :name "tm-secops daily iteration (Trend Micro catalog cov" :schedule "42 5 * * *"}]}
+  {:profile "tm-threat-intel" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "cbaa539f2938" :name "tm-threat-intel daily iteration (Trend Micro catal" :schedule "36 5 * * *"}]}
+  {:profile "tm-tippingpoint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "d25438d7be67" :name "tm-tippingpoint daily iteration (Trend Micro catal" :schedule "54 4 * * *"}]}
+  {:profile "tm-vb-cloud" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "e1b89c2715ba" :name "tm-vb-cloud daily iteration (Trend Micro catalog c" :schedule "6 4 * * *"}]}
+  {:profile "tm-vb-mac" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "9ba95cf4f67e" :name "tm-vb-mac daily iteration (Trend Micro catalog cov" :schedule "18 4 * * *"}]}
+  {:profile "tm-vb-mobile" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "fdc72072da99" :name "tm-vb-mobile daily iteration (Trend Micro catalog" :schedule "12 4 * * *"}]}
+  {:profile "tm-vbhn" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "b2758180d9cb" :name "tm-vbhn daily iteration (Trend Micro catalog cover" :schedule "24 4 * * *"}]}
+  {:profile "tm-vbts" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "69e7592db04f" :name "tm-vbts daily iteration (Trend Micro catalog cover" :schedule "0 4 * * *"}]}
+  {:profile "tm-ztsa" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "2ec0e9094af7" :name "tm-ztsa daily iteration (Trend Micro catalog cover" :schedule "42 4 * * *"}]}
+ ]
+ :counts {:profiles 44 :with-cron 41 :jobs 41}}
