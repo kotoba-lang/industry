@@ -25,7 +25,9 @@
   - 見出し・label が実装語 (本人確認（カード認証 / Stripe Identity）、USERNAME、STABLE PRINCIPAL)、idle 画面に 120 字超の説明段落、disabled の primary button が理由なしに 3 つ、/ja/#… の locale 分岐 link (Worker は cookie で negotiate 済みなので 301 hop)。
   - sidebar の (t \"ja\" \"en\") は copy MAP への (get t \"ja\" \"en\") で常に英語を返していた (ja 頁の「Get started」「Security services」)。
 
-  framework 側の実測: shinkansen.viewport (217c338) の test ns は runner に require されていたが doseq に無く 1 度も走っておらず、走らせると :no-xs-band の比較が逆 (最小 band が 480px 未満のとき flag) で落ちた。
+  framework 側の実測: shinkansen.viewport (217c338) の test ns は runner に require されていたが doseq に無く 1 度も走っておらず、走らせると :no-xs-band の比較が逆 (最小 band が 480px 未満のとき flag) で落ちた。同じ形が merge 時の routes-test / actions-test (0cd79e3) にもあり、走らせると 10 assertion 落ちた (resolve-path が全 path で root document を返す、:param が何も消費しない、test が chain の語彙に無い :prev-cid を pin)。
+
+  第 2 周 (同日、オーナー実測「/docs/ 下層で layout が崩れる・ページが見つからない」): /docs/ は 404 —— sidebar と全 docs 頁が link しながら /docs/index.html を一度も emit していなかった (framework 自身が書いた 404、75 document)。layout 崩れは abc2c4f (CSS を /css/site.css に外出し) 以降、Worker の CSP が style-src 'unsafe-inline' のままで browser が stylesheet を request すらせず、全頁が無スタイルで届いていたもの —— bytes の audit は 100 と言っていた。phone の <pre> は overflow rule の有無で切れる。
 
   既存の co-scientist 系 (keiei-arbor ADR-2606141500、isekai.ux ADR-0007、90-docs/design-quality/coscientist.cljk) は「測れない品質は劇場」を founding rule として持つ。design-quality の LLM 3-judge panel は同じライブラリを 4.0-5.0/5 と採点しながら tap-target / dvh / safe-area / theme-color の具体的欠落を 1 つも指摘しなかった実績がある。")
 
@@ -40,7 +42,13 @@
 
   5. test runner の doseq に列挙されていない test ns は require されても走らない — ns を足すときは require と doseq の両方 (shinkansen test_runner に理由を明記)。
 
-  6. shinkansen の deps.edn は :local/root を持たない (消費側の git cache 相対で解決に失敗する。jp-go-dds と同じ規則)。")
+  6. shinkansen の deps.edn は :local/root を持たない (消費側の git cache 相対で解決に失敗する。jp-go-dds と同じ規則)。
+
+  7. (第 2 周) 契約は document の bytes だけでなく「届き方」を含む。:links-resolve (same-origin の a href は :documents か :routes に解決、無ければ 0)、:csp-allows-assets (host が配る CSP を ctx :csp に渡す —— 文字列、per-route fn、または配らないことの明示 :none。style-src / script-src に 'self' が無ければ 0)、:pre-overflow。consumer は Worker の route 表を data として渡し、CSP 文字列は Worker と audit が同じ ns (app-kotoba-cloud.csp) から読む。
+
+  8. (第 2 周) 4 軸は hard: assets-resolve / links-resolve / unique-ids / csp-allows-assets に finding が 1 つでもあれば床に関係なく exit 1。1 本の dead link が 75 document で 0.66 ずつに平均されて床 80 を越えた実測がある —— 404 は劣化ではなく破損。
+
+  9. 「compile 時に防ぐ」の到達点: nav を shinkansen.routes の route tree から生成すれば document の無い node は link になり得ない (framework 側は在る)。app-kotoba-cloud はまだ route tree を宣言せず -main で file を ad hoc に書いているので、build 直後・publish 直前の audit (hard 軸) が今日の等価物。route tree への移行は次の周。kotoba deploy の admission に同じ audit を載せるのは kotoba-lang/kotoba 側の別 PR。")
 
   (:adr/consequences
   "iteration-01 (rubric 確定後の baseline、102 document): 82.9 / 100、/account 33.3 (session.js が在る tree)、live は 20.5。
@@ -49,8 +57,10 @@
 
   残り (deferred roadmap、別 owner): /billing/ の disabled control 11 と「Checking availability」×10、security catalog 頁の note-density / repeated-actions、/ja/security/ 系の locale link。kbb -M:test の site-test copy 失敗 265 件は main 既存 (触っていない)。
 
+  第 2 周: iteration-03 = 16 軸 rubric での再 baseline (102 document、92.8、/docs/ dead ×75、hard で exit 1)。iteration-04 = /docs/ landing + csp ns + hard gate 着地後 (104 document、99.2、links-resolve closed、opened 0)。live: /docs/ 200 (直後は edge cache の旧 404 が HIT、max-age=0 must-revalidate で解消)、/docs/ 下層は 390 / 1440 で sidebar shell が正しく、stylesheet は CSP を通る。gate が落ちること: public/docs/index.html を除くと exit 1、HARD links-resolve が 76 document で /docs/ を名指し。
+
   規則: UI の品質を語るときは shinkansen.audit の数値と delta を出す。「見た目が良くなった」は測定ではない。")
 
   (:adr/body
-  "着地: kotoba-lang/shinkansen PR #1 (audit + coscientist + viewport 修正 + deps)、kotoba-lang/app-kotoba-cloud PR #143 (consumer gate + /account + shell)。deploy と west pin 前進は両 PR の merge 後。")
+  "着地: kotoba-lang/shinkansen PR #1 / #2 (audit + coscientist + viewport 修正 + deps; links / csp / pre 軸)、kotoba-lang/app-kotoba-cloud PR #143 / #146 / #148 (consumer gate + /account + shell; CSP style-src 'self'; /docs/ landing + hard gate)。deploy 済み、west pin は shinkansen e085c42 / app-kotoba-cloud 1edf09a。")
 ))
