@@ -153,7 +153,25 @@ your app                   L5
    shitsuke's reagent seam. Runtime order per repo rule: kotoba wasm > clojurewasm >
    ClojureScript > nbb (JVM/bb are compat-only).
 
-## Measure it (unmeasured UI quality is theater)
+## Measure it (unmeasured UI quality is theater) — judge with BOTH arms
+
+Two complementary arms, both required (2026-09-15 working loop):
+
+**1. Deterministic audit** (HTML/CSS structure). `kbb --backend sci -m
+design-quality.cli` dies with 'Could not find namespace: kotoba.lang.text'
+— use plain `nbb` from a temp dir whose `nbb.edn` paths list design-quality's
+src AND the kotoba-lang text gitlibs src (symlink design-quality/src in).
+Pass `--extra-axes` to score 12 axes (adds input-zoom, contrast) instead of
+the default 10.
+
+**2. Vision-model pass on live screenshots** — scrolled to the actual
+component (scrollIntoView), not just the top of the page. The deterministic
+audit cannot see "the 0% bar row is indistinguishable from empty" or "the
+selection is ambiguous". Real catches from the csf2 pass: bar track
+invisible against the page background (fix: 1px separator border + 2px min
+fill), too-thin bars, a selection needing an inset accent, count columns
+needing fixed width. Ask the vision judge for specific defect LOCATIONS,
+not a score alone — scores without locations are not actionable.
 
 After building or changing a page, score the rendered HTML with the deterministic
 HIG/WCAG audit (`kotoba-lang/design-quality`, ADR-2607132300):
