@@ -1,0 +1,111 @@
+#!/usr/bin/env kbb
+;; scripts/agent-usage-report.cljk — agent 効率の KPI を Claude Code の transcript から出す
+;; (ADR-2609152300 の測定器)。hermes が無い機でも、この機で走った session はすべて
+;; ~/.claude/projects/<project>/*.jsonl に usage 付きで残っているので、そこから測る。
+;;
+;;   kbb --backend sci scripts/agent-usage-report.cljk [--since <days>] [--dir <transcripts-dir>] [--min-calls <n>] [--tsv <out>]
+;;
+;; 1 session = 1 行。列 (すべて session 合計、ADR の KPI 名):
+;;   api        API call 数 (= assistant message with usage)          → K2
+;;   ctx0       第 1 call の context (cache_read + cache_creation)      → K3 (session 開始時の注入量)
+;;   ctx-mean   cache_read / api (1 call あたり再読みする context)      → K4
+;;   in         uncached input / cread cache_read / ccreate cache_creation / out output
+;;   cost-eq    価格重み付き token (in + 0.1·cread + 1.25·ccreate + 5·out) → K1 の分子
+;;   tools      tool call 数、Read / Bash / symidx (Bash の中で symbol-index を呼んだ数)
+;;   wall-min   最初と最後の message の間
+;; 正解 (K5) は transcript からは出ない —— task ごとの bench (one_call / hermes_ab) で別に取る。
+;;
+;; evidence floor: SESSIONS<TAB>n を必ず印字し、n=0 なら REFUSE / exit 2 (測れなかったを緑にしない)。
+;; --min-calls (既定 5) 未満の session (hook だけで終わった等) は集計から外し、除外数を印字する。
+
+(require '[clojure.string :as str])
+
+(def fs (js/require "node:fs"))
+(def path (js/require "node:path"))
+(def os (js/require "node:os"))
+
+(defn- arg-after [flag]
+  (let [argv (vec (js->clj (.-argv js/process)))
+        i (.indexOf argv flag)]
+    (when (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)))))
+
+(def project-dir (or (not-empty (.-CLAUDE_PROJECT_DIR (.-env js/process))) (.cwd js/process)))
+
+(def transcripts-dir
+  (or (arg-after "--dir")
+      ;; Claude Code は project path の "/" を "-" にした dir 名を使う
+      (.join path (.homedir os) ".claude" "projects" (str/replace project-dir #"/" "-"))))
+
+(def since-days (js/parseInt (or (arg-after "--since") "30") 10))
+(def min-calls (js/parseInt (or (arg-after "--min-calls") "5") 10))
+
+(defn- session-row
+  "1 transcript → KPI 行 (map)。"
+  [file]
+  (let [lines (str/split-lines (.readFileSync fs file "utf8"))
+        acc (volatile! {:api 0 :in 0 :cread 0 :ccreate 0 :out 0 :ctx0 nil
+                        :tools 0 :read 0 :bash 0 :symidx 0 :t-first nil :t-last nil})]
+    (doseq [l lines]
+      (when-let [o (try (.parse js/JSON l) (catch :default _ nil))]
+        (let [ts (aget o "timestamp")]
+          (when ts
+            (vswap! acc (fn [a] (-> a (update :t-first #(or % ts)) (assoc :t-last ts)))))
+          (when (= "assistant" (aget o "type"))
+            (let [m (aget o "message") u (when m (aget m "usage"))]
+              (when u
+                (let [in (or (aget u "input_tokens") 0) cr (or (aget u "cache_read_input_tokens") 0)
+                      cc (or (aget u "cache_creation_input_tokens") 0) out (or (aget u "output_tokens") 0)]
+                  (vswap! acc (fn [a] (-> a (update :api inc) (update :in + in) (update :cread + cr)
+                                          (update :ccreate + cc) (update :out + out)
+                                          (update :ctx0 #(or % (+ cr cc))))))))
+              (when-let [content (when m (aget m "content"))]
+                (when (array? content)
+                  (doseq [p content]
+                    (when (= "tool_use" (aget p "type"))
+                      (let [nm (aget p "name")
+                            input (str (.stringify js/JSON (or (aget p "input") #js{})))]
+                        (vswap! acc (fn [a] (cond-> (update a :tools inc)
+                                              (= nm "Read") (update :read inc)
+                                              (= nm "Bash") (update :bash inc)
+                                              (and (= nm "Bash") (str/includes? input "symbol-index")) (update :symidx inc))))))))))))))
+    (let [{:keys [api in cread ccreate out t-first t-last] :as a} @acc
+          wall-min (when (and t-first t-last)
+                     (js/Math.round (/ (- (.getTime (js/Date. t-last)) (.getTime (js/Date. t-first))) 60000)))]
+      (assoc a :id (subs (.basename path file ".jsonl") 0 8)
+             :wall-min (or wall-min 0)
+             :ctx-mean (if (pos? api) (js/Math.round (/ cread api)) 0)
+             :cost-eq (js/Math.round (+ in (* 0.1 cread) (* 1.25 ccreate) (* 5 out)))))))
+
+(when-not (.existsSync fs transcripts-dir)
+  (println (str "REFUSE\tno transcripts dir " transcripts-dir " (set --dir or CLAUDE_PROJECT_DIR)"))
+  (.exit js/process 2))
+
+(let [cutoff (- (js/Date.now) (* since-days 24 3600 1000))
+      files (->> (js->clj (.readdirSync fs transcripts-dir))
+                 (filter #(str/ends-with? % ".jsonl"))
+                 (map #(.join path transcripts-dir %))
+                 (filter #(> (.-mtimeMs (.statSync fs %)) cutoff))
+                 sort)
+      rows-all (map session-row files)
+      rows (filter #(>= (:api %) min-calls) rows-all)
+      cols [:id :api :ctx0 :ctx-mean :in :cread :ccreate :out :cost-eq :tools :read :bash :symidx :wall-min]
+      fmt (fn [r] (str/join "\t" (map #(str (get r %)) cols)))]
+  (println (str "SESSIONS\t" (count rows) "\t(" (- (count rows-all) (count rows)) " excluded: < " min-calls " api calls; since " since-days " d; " transcripts-dir ")"))
+  (if (empty? rows)
+    (do (println "REFUSE\tno session with enough api calls to measure") (.exit js/process 2))
+    (do
+      (println (str/join "\t" (map name cols)))
+      (doseq [r rows] (println (fmt r)))
+      (let [n (count rows) sum (fn [k] (reduce + (map k rows))) mean (fn [k] (js/Math.round (/ (sum k) n)))
+            med (fn [k] (let [v (sort (map k rows))] (nth v (quot n 2))))]
+        (println (str "MEAN\t" (str/join "\t" (map #(str (mean %)) (rest cols)))))
+        (println (str "MEDIAN\t" (str/join "\t" (map #(str (med %)) (rest cols)))))
+        (println (str "K3 ctx0 (session start context, tokens): median " (med :ctx0) " mean " (mean :ctx0)))
+        (println (str "K4 ctx-mean (re-read per call): median " (med :ctx-mean)))
+        (println (str "K1 cost-eq per session: median " (med :cost-eq) "  — per api call: " (js/Math.round (/ (sum :cost-eq) (max 1 (sum :api))))))
+        (println (str "share of cache_read spent re-reading ctx0: "
+                      (js/Math.round (* 100 (/ (reduce + (map #(* (:ctx0 %) (:api %)) rows)) (max 1 (sum :cread))))) "%"))
+        (when-let [out (arg-after "--tsv")]
+          (.writeFileSync fs out (str (str/join "\t" (map name cols)) "\n" (str/join "\n" (map fmt rows)) "\n") "utf8")
+          (println (str "wrote\t" out)))
+        (.exit js/process 0)))))

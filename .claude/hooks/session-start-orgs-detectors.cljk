@@ -152,6 +152,9 @@
 
       :else
       {:loud? (or (seq new-ks) (seq res-ks) stale-run? (seq accepted-stale))
+       ;; loud の理由が stale-run だけ = scheduler が無いときは冒頭の ⚠⚠ 1 行が既に言って
+       ;; いる事実の detector 数ぶんの反復。畳む側で使う。
+       :stale-only? (and stale-run? (empty? new-ks) (empty? res-ks) (empty? accepted-stale))
        :lines
        (concat
          [head]
@@ -179,11 +182,10 @@
            [(str "  accepted " (count accepted) " 件 (既知・日付と理由と解除条件は "
                  "manifest/orgs-detectors.edn の :accepted)。**列挙しない**")])
          (when (seq standing)
+           ;; 起動文字列は末尾に 1 回だけ書く (detector ごとに 120 字繰り返さない、ADR-2609152300)
            [(str "  standing " (count standing) " 件 (最古 "
                  (ms->human (age-ms (:first-seen (second (first standing)))))
-                 " 前から)。**列挙しない** —— 詳細は "
-                 "`kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/"
-                 (name id) ".cljs`")])
+                 " 前から)。列挙しない → scripts/" (name id) ".cljs")])
          (when (and (empty? new-ks) (empty? res-ks) (empty? standing) (empty? accepted))
            [(str "  clean (" (ms->human (age-ms last-run)) "前に測定"
                  (when last-scanned (str ", scanned=" last-scanned)) ")")]))})))
@@ -222,7 +224,32 @@
                           :let [d (get-in state [:detectors (keyword (name id))])]
                           :when d]
                       (detector-report id d))
+            scheduler? (scheduler-installed?)
+            ;; scheduler が無いときの stale-run は冒頭の ⚠⚠ が原因を 1 回言うので、detector
+            ;; ごとには繰り返さない (同じ文を 25 回読ませない)
+            reports (map (fn [r] (if (and (not scheduler?) (:stale-only? r)) (assoc r :loud? false :stale-folded? true) r)) reports)
             loud? (some :loud? reports)
+            ;; ADR-2609152300 (2026-09-15): 静かな detector (clean / standing 不変 /
+            ;; accepted のみ / BASELINE) は 1 行に畳む。この hook 自身が「もう言ったことを
+            ;; 毎セッション言い直すのは、言っていないのと同じ」と書きながら、90 detector ×
+            ;; 2 行 = 27,205 字を毎 session 積んでいた (session 開始 context の 1/4)。
+            quiet (remove :loud? reports)
+            quiet-line (when (seq quiet)
+                         (let [kinds (frequencies (map (fn [r] (let [l (second (:lines r))]
+                                                                 (cond (:stale-folded? r) :stale
+                                                                       (str/starts-with? l "  clean") :clean
+                                                                       (str/starts-with? l "  standing") :standing
+                                                                       (str/starts-with? l "  BASELINE") :baseline
+                                                                       :else :other)))
+                                                       quiet))]
+                           (str "  静かな detector " (count quiet) " 件 (clean " (get kinds :clean 0)
+                                " / standing 不変 " (get kinds :standing 0)
+                                " / baseline " (get kinds :baseline 0)
+                                (when (pos? (get kinds :stale 0)) (str " / 最終 run が古いだけ (scheduler 無し、冒頭の ⚠⚠) " (get kinds :stale 0)))
+                                " / その他 " (get kinds :other 0)
+                                ") —— 列挙しない。\n"
+                                "  詳細の起動: `kbb --backend sci --classpath \".:scripts/nbb_compat\" scripts/<detector>.cljs`、"
+                                "一覧 (detector ごとの状態): ~/.itonami/orgs-detector-tick/state.edn の :detectors")))
             unrun (remove #(get-in state [:detectors (keyword (name %))]) ids)
             oldest (some->> (:detectors state) vals (keep :last-run) sort first)]
         (done!
@@ -245,6 +272,7 @@
                       "~/Library/LaunchAgents/cloud.itonami.bot.orgs-detector-tick.plist")])
               (when (seq unrun)
                 [(str "  ⚠ 未実行のまま登録されている: " (str/join ", " (map name unrun)))])
-              (mapcat :lines reports)))))))
+              (mapcat :lines (filter :loud? reports))
+              (when quiet-line [quiet-line])))))))
   (catch :default _ nil))
 (compat/exit 0)

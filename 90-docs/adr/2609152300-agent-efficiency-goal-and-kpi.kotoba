@@ -1,0 +1,69 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609152300-agent-efficiency-goal-and-kpi")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "agent 効率のゴールと KPI: 1 task を、正しさを落とさず、少ない context 再読み・API call・token で終える")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/last_verified "2026-09-15")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "agent-efficiency")
+  (:adr/repos (vector "." "orgs/kotoba-lang/symbol-index"))
+  (:adr/related (vector "2608136000" "2809041200" "2609112300"))
+  (:adr/context
+  "オーナー指示 2026-09-15: 「build の速さではなく、ai agent の cache hit / think / tool call を効率的に進め、一度の task を時間と token を減らしつつ complete 精度を高める」。symbol-index の Co-Scientist 反復 (measurements.edn :h1-:h33) は tool 側の lever を着地させたが、agent 全体の効率には正本の KPI が無く、各反復が別々の代理指標を名乗っていた。
+
+  測って分かった構造 (scripts/agent-usage-report.cljk、この superproject の直近 7 日の Claude Code session、api call ≥5 の 18 session):
+  * 1 API call が再読みする context (cache_read / api) は中央値 259K tok。token の cost は「context の長さ × API call 数」で決まり、生成 token (out) は 1 桁小さい。
+  * session 開始時の context (第 1 call の cache_read + cache_creation) は中央値 119K tok。うち超 project 側の注入は CLAUDE.md 25,665 字 + SessionStart hook 出力 (orgs-detectors 27,205 字 / spec-inventory 5,616 字 / repo-bots 1,786 字) ≒ 60K 字。
+  * session 全体の cache_read のうち **27% は session 開始 payload の再読み**。call が少ない短い session ほど比率は上がる (23 call の session で 50%)。
+  * tool call のほぼ全部が Bash (Read はほぼ 0)。1 tool call = 1 API call = context 全体の再読み 1 回。
+
+  つまり効率の主因は (a) 1 call あたりの context の長さ、(b) task あたりの call 数、(c) 開始時に積む固定 payload、の 3 つで、symbol-index が削っていた「1 query の出力 tok」は (a) の増分の一部に過ぎない。")
+  (:adr/decision
+  "## ゴール
+
+  **1 task を、正しさ (K5) を落とさずに、K1 (価格重み付き token) と K2 (API call) と K6 (wall) を減らす。** K5 を下げる改善は改善と呼ばない。
+
+  ## KPI (すべて 1 session または 1 task 単位、transcript から機械的に出す)
+
+  | KPI | 定義 | 出所 |
+  |---|---|---|
+  | K1 cost-eq | uncached_in + 0.1·cache_read + 1.25·cache_creation + 5·output (Anthropic の相対価格) | transcript usage |
+  | K2 api-calls | usage 付き assistant message の数 (≒ tool call + 1) | transcript |
+  | K3 ctx0 | 第 1 call の cache_read + cache_creation = session 開始時の context | transcript |
+  | K4 ctx-mean | cache_read / api-calls = 1 call が再読みする context | transcript |
+  | K5 correct | task の正解率 (bench では file:line ±2 等の機械判定、実 task では test 緑・着地) | one_call.cljk / hermes_ab.cljk / PR |
+  | K6 wall | 最初と最後の message の間 | transcript |
+
+  測定器は `scripts/agent-usage-report.cljk` (K1-K4, K6; evidence floor `SESSIONS<TAB>n`、0 なら REFUSE) と、task 単位の bench (`orgs/kotoba-lang/symbol-index/bench/one_call.cljk`、hermes のある機では `bench/hermes_ab.cljk`)。
+
+  ## 規則
+
+  1. **A/B は同じ task 集合で交互に取る**。単発の数字を KPI と呼ばない (共有機の load は 30-180 で動く)。
+  2. **開始 payload (K3) に足すものは、その字数と、それが防ぐ失敗の実測をセットで書く**。spec-inventory の 5,616 字は「『無い』と 3 回誤結論した実測」を根拠に残す。orgs-detectors の 27,205 字は、hook 自身が『standing は列挙しない』と宣言しながら 90 detector × 2 行を毎回出しており、根拠が無い → loud な detector だけ行にし、静かな detector は 1 行に畳む (この ADR と同じ PR で着地)。
+  3. **tool の出力は「次の 1 手が決まる最小」にする** (symbol-index :h25 :h28 :h31 の形)。1 hit の定義冒頭・repo 別件数・解釈の明示、など。
+  4. **1 call で答えられるものを 2 call にしない** (symbol-index :h24 :h28)。代理指標は one_call の opening。
+  5. **索引・cache は古くても嘘をつかない** (:h32)。鮮度の欠けは『再走査して直す』か『拒否する』で、ずれた答えを返さない。
+  6. 反復の記録は各 repo の measurements.edn (append-only) に、KPI 名で書く。
+
+  ## 着地 (2026-09-15)
+
+  * `scripts/agent-usage-report.cljk` — K1-K4, K6 を transcript から出す。baseline (直近 7 日、18 session): K3 median 119,171 / K4 median 258,729 / K1 per call 53,445 / ctx0 再読み比 27%。
+  * `.claude/hooks/session-start-orgs-detectors.cljk` — 静かな detector (clean / standing 不変 / baseline / scheduler 無しでの stale-run のみ) を 1 行に畳み、起動文字列は末尾に 1 回。同一 state (2026-09-15、90 detector) での出力: 27,205 字 → 14,895 字 (−45%)。残りは NEW / RESOLVED / inconclusive の 37 detector で、これは信号。反証: 4 detector の合成 state (new 1 / clean 1 / standing 2) で旧版は 4 head、新版は 1 head + 「静かな detector 3 件」。
+  * symbol-index 側は :h1-:h33 (measurements.edn) を本 ADR の KPI に読み替える: :h3 は K4 の増分、:h24/:h28 は K2、:h32 は K5。
+
+  ## 未着手・順位付き
+
+  1. K3: CLAUDE.md 25,665 字のうち skill に委譲済みで重複している節の削減 (gen-agents-md を通す)。
+  2. K2: agent 側の実測 (hermes 腕 D) で symbol-index :h24 :h26 :h30 :h31 :h32 を判定。
+  3. K4: 長い tool 出力 (build の 10 行、find の 40 行) を既定で短く、詳細は flag。")
+  (:adr/body
+  "## 読み方
+
+  cost-eq の重みは 2026-09 時点の Anthropic 価格の比 (input 1 / cache read 0.1 / cache write 1.25 / output 5)。価格が変われば重みを変え、過去の数字は再計算せず日付付きで残す。
+
+  ## 再現
+
+  kbb --backend sci scripts/agent-usage-report.cljk --since 7
+  kbb --backend sci orgs/kotoba-lang/symbol-index/bench/one_call.cljk"))
