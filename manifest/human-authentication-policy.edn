@@ -132,6 +132,21 @@
    :verification-status :live-partial
    :source-commit "net-kotobase/control-plane main, kotobase-authn Worker 890da019-8e98-49af-9ca7-e2500867bdea (2026-09-07)"
    :security-policy "SECURITY.md"
+   :non-authority-surfaces
+   [{:surface "GET /v1/link/{google|github}/start|callback, /v1/link/providers, /v1/link/hint[/clear] (authn.link)"
+     :class :post-auth-connectivity
+     :adr "adr-2609151900-google-github-linked-identities-and-org-sso"
+     :issues-session? false
+     :status :unverified
+     :verification-status :built-partial
+     :evidence "2026-09-15 registered BEFORE deploy. Google/GitHub are linked identities, not sign-in: with a live passkey/wallet session the callback links the provider subject to that account; without one it leaves a 5-minute single-use host-only hint so /v1/passkey/login/options can scope allowCredentials and finish-sign-in! can complete a pending link after a real credential proved the account. test/link_worker_smoke.cljk 34/34 against the built bundle with the real AuthnStore and a did:key CACAO sign-in (provider stubbed); the mutation 'callback appends gftd_session' turns 3 checks red. /v1/oauth/* stays 410. Live provider round trip NOT run (no client credentials configured yet)"}
+    {:surface "PUT|GET|DELETE /v1/org-sso/connections/:handle, GET /v1/org-sso/start|callback|status (authn.org-sso, OIDC only)"
+     :class :membership-provisioning-and-authorization-gate
+     :adr "adr-2609151900-google-github-linked-identities-and-org-sso"
+     :issues-session? false
+     :status :unverified
+     :verification-status :built-partial
+     :evidence "2026-09-15 registered BEFORE deploy. start requires a passkey/wallet session (else /sign-in first); the callback verifies the ID token against the issuer's JWKS (RS256), then issuer/audience/expiry/nonce/subject/email-domain, binds (org, sub) to the session's account first-wins, writes an assertion with the mapped role (admin|member|billing, never owner) and mints nothing; connections need the owner's session AND a kotoba.cloud-minted HMAC entitlement for plan team|enterprise. test/org_sso_worker_smoke.cljk 40/40 against the built bundle with a stub IdP (RSA key, discovery, JWKS, token endpoint). SAML is a recorded gap (no XML-DSig verifier in the workspace). Live IdP round trip NOT run"}]
    :evidence "2026-09-07 live e2e on auth.kotoba.cloud: wallet_connect EOA SIWE, passkey-owned Base Account (ERC-6492 on Base mainnet), agent registration as a key-owned Base Account and as an EOA, recovery phrase — 20/20, 12/12, 21/21. The Base Account SDK is the first way in on the page. Legacy-route closure (410) and the passkey negative suite were not re-run today; source is net-kotobase/control-plane, not this stub repository"}
 
   {:project "app-kotoba-cloud"
@@ -141,6 +156,19 @@
    :default-method :siwe-erc1271
    :status :unverified
    :security-policy "SECURITY.md"
+   :non-authority-surfaces
+   [{:surface "/sign-in/{google|github}, /account/link/{google|github} (302 to auth.kotoba.cloud /v1/link/*), /v1/account/identities[/revoke] (cookie-forwarding proxy)"
+     :class :post-auth-connectivity
+     :adr "adr-2609151900-google-github-linked-identities-and-org-sso"
+     :issues-session? false
+     :status :unverified
+     :evidence "2026-09-15 registered BEFORE deploy. The apex never sees a provider token; it only hands off and proxies the identity ledger for the account page"}
+    {:surface "/v1/org/sso/status|configure|remove|sync|start (org_sso_gateway.cljk), org authority /sso-policy /sso-provision, the ssoPolicy.enforce gate on org-scoped database sessions"
+     :class :membership-provisioning-and-authorization-gate
+     :adr "adr-2609151900-google-github-linked-identities-and-org-sso"
+     :issues-session? false
+     :status :unverified
+     :evidence "2026-09-15 registered BEFORE deploy. The apex owns plan (ORG_PLAN_OVERRIDES else the org owner's active platform plan) and org role, mints x-kotoba-org-entitlement (HMAC-SHA256, ORG_SSO_ENTITLEMENT_SECRET shared with kotobase-authn) and provisions the membership VC from a fresh assertion. org-sso-gateway-test: plan derivation (boundary both ways), handle grammar, entitlement round-trip verified with WebCrypto; npm run test:worker passed"}]
    :evidence "kotoba.cloud's primary action is 'Start with a Base Account' since 2026-09-07 and hands off to auth.kotoba.cloud/sign-in, whose methods are the authority's above; the apex issues no session itself and reads /v1/session credential-free. Live negative verification of the apex routes not re-run today"}
 
   {:project "aiueos"
