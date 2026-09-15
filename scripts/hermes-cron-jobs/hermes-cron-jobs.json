@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-15T23:40:09.758482+09:00",
+  "generated_at": "2026-09-16T00:49:05.021732+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -6280,6 +6280,66 @@
         "deliver": "local",
         "workdir": "/Users/junkawasaki/.gftd/worktrees/kotoba-proof-ops",
         "enabled": true
+      }
+    ],
+    "kotoba-cloud-mktg": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": [
+          "terminal",
+          "file",
+          "web"
+        ],
+        "id": "1abfa4611f73",
+        "name": "kotoba-cloud-mktg daily iteration (marketing surface)",
+        "no_agent": false,
+        "prompt": "kotoba-cloud-mktg daily iteration (kotoba.cloud marketing surface)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/kotoba-cloud-mktg/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. cache/metrics.json の last_deltas と SOUL の surface 一覧から lever を 1 つだけ選ぶ。\n   開始時に gh pr list --repo kotoba-lang/app-kotoba-cloud --state open を読み、in-flight PR と\n   同一領域なら「opened no PR (lever owned by in-flight PR)」と明示して停止。\n3. workdir /Users/junkawasaki/.gftd/worktrees/kotoba-cloud-mktg で topic branch を\n   kotoba-lang/main から新規作成 (リモート名 kotoba-lang。origin ではない)。\n   修正 → npm run render + 対象テスト → gh pr create --repo kotoba-lang/app-kotoba-cloud →\n   gh pr comment に検査記録 → gh pr merge --merge。push 前に git fetch kotoba-lang + rebase。\n4. 予算: 12 API call 以内。1 run = 最大 1 PR。main 直 push 禁止。進捗に関わらず予算内なら\n   レポートして停止。何もなければ「opened no PR」+理由で停止 (正常系)。",
+        "repeat": {
+          "times": null,
+          "completed": 0
+        },
+        "schedule": {
+          "kind": "cron",
+          "expr": "6 6 * * *",
+          "display": "6 6 * * *"
+        },
+        "script": "kotoba_cloud_mktg_evidence.py",
+        "skills": [
+          "symbol-index"
+        ],
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/kotoba-cloud-mktg",
+        "max_tokens": 16384
+      }
+    ],
+    "kotoba-cloud-sales": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": [
+          "terminal",
+          "file",
+          "web"
+        ],
+        "id": "65eb01eb00f9",
+        "name": "kotoba-cloud-sales daily iteration (catalog data)",
+        "no_agent": false,
+        "prompt": "kotoba-cloud-sales daily iteration (kotoba.cloud catalog data)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/kotoba-cloud-sales/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. cache/metrics.json の last_deltas と cross-source-pairs から lever を 1 つだけ選ぶ。\n   開始時に gh pr list --repo kotoba-lang/app-kotoba-cloud --state open を読み、in-flight PR と\n   同一領域なら「opened no PR (lever owned by in-flight PR)」と明示して停止。\n3. workdir /Users/junkawasaki/.gftd/worktrees/kotoba-cloud-sales で topic branch を\n   kotoba-lang/main から新規作成 (リモート名 kotoba-lang。origin ではない)。\n   該当 build/test (build:compliance-catalog / test:security-data / test:crypto-catalog 等) を\n   通してから gh pr create --repo kotoba-lang/app-kotoba-cloud →\n   gh pr comment に検査記録 → gh pr merge --merge。push 前に git fetch kotoba-lang + rebase。\n4. 予算: 12 API call 以内。1 run = 最大 1 PR。main 直 push 禁止。何もなければ\n   「opened no PR」+理由で停止 (正常系)。",
+        "repeat": {
+          "times": null,
+          "completed": 0
+        },
+        "schedule": {
+          "kind": "cron",
+          "expr": "18 6 * * *",
+          "display": "18 6 * * *"
+        },
+        "script": "kotoba_cloud_sales_evidence.py",
+        "skills": [
+          "symbol-index"
+        ],
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/kotoba-cloud-sales",
+        "max_tokens": 16384
       }
     ]
   },
