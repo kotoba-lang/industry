@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T00:49:05.021732+09:00",
+  "generated_at": "2026-09-16T00:54:55.015343+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -6340,6 +6340,25 @@
         ],
         "workdir": "/Users/junkawasaki/.gftd/worktrees/kotoba-cloud-sales",
         "max_tokens": 16384
+      }
+    ],
+    "akc-trail-ops": [
+      {
+        "id": "6b8b08f58b57",
+        "name": "akc-trail-ops daily security trail",
+        "prompt": "akc-trail-ops daily run (security trail public data). SOUL.md を読め (/Users/junkawasaki/.hermes/profiles/akc-trail-ops/SOUL.md)。要旨: (1) evidence script 出力の JSON を読む。REFUSED banner なら盲状態を報告して停止。(2) topic branch を kotoba-lang/main (リモート名 kotoba-lang) から新規作成。(3) evidence の dns/ip/kev/nvd から assets/security-data/trail/index.json をschema {version,generatedAt,dns,ip,kev,nvd,analysis} で書く/前日分とマージ (各配列 20 件以内、新しいものが先頭)。analysis は ja/en で当日の最優先パッチ対象を 1 つ、出典 URL 付きで指摘。(4) npm run render → gh pr create --repo kotoba-lang/app-kotoba-cloud → gh pr comment で検査記録 → gh pr merge --merge。(5) merge 後 fetch+checkout kotoba-lang/main → npm run deploy (失敗 1 回のみ再試行)。curl -s https://kotoba.cloud/security-data/trail/index.json で live 確認。予算 20 API call。1 run = 1 PR。main 直 push/force-push 禁止。evidence が全て空なら opened no PR で停止 (正常系)。",
+        "schedule_display": "52 5 * * *",
+        "script": "akc_trail_ops_evidence.py",
+        "model": "z-ai/glm-5.3-flash",
+        "provider": "openrouter",
+        "max_tokens": 16384,
+        "toolsets": [
+          "terminal",
+          "file",
+          "web"
+        ],
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/akc-trail-ops",
+        "deliver": "local"
       }
     ]
   },
