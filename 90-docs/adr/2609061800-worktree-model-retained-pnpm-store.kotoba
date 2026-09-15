@@ -64,6 +64,9 @@ session 由来の子リポ worktree 124 本のうち **着地済みなのに残�
 - 「この端末だけで開発する」が本当に「同時書き手 1 人」になった時点で、この決定は再評価してよい。判定は `ps` と `launchctl list` で数える（末尾）。
 - オーナー端末のセッションだけ共有 checkout を直接編集してよい、という緩和案は**採らなかった**（オーナー判断は worktree 維持）。採る場合は superproject の「閲覧専用」規則を書き換える必要があり、bot / agent 側の worktree 必須は変わらない。
 
+## 2026-09-15 追記 — 片付けを怠った farm が 1 つでディスクを埋めた
+空き 125 MiB（Data volume 460 GiB、使用 398 GiB）で測ったところ、superproject 全体は 74 GiB で主因ではなく、`~/.cloud-itonami/awai-worktrees/awai` に awai の director / sales / supporter loop が run ごとに切った**登録済み worktree 1,432 本・41 GiB**（1 日 ~200 本 × 24 MiB）が残っていた。1,432 本すべて HEAD が repo の remote main の祖先、1,341 本が clean。`scripts/worktree-retire.cljk --only ~/.cloud-itonami/awai-worktrees --min-age-days 1 --apply` で 1,069 本を退役（失敗 0、dirty 91 と 1 日未満 273 は残置）し、空きは 10.2 → 40.9 GiB。続けて `worktree-node-modules-dedupe.cljk --apply`（38 worktree、`~/.gftd/worktrees` の resident bot が npm 製 node_modules に戻っていた）で +4 GiB、最終 45.2 GiB。機構: `scripts/cloud.itonami.bot.worktree-farm-retire.plist`（6 時間ごと、同じ引数）。launchd の PATH に `/usr/sbin` が無いと script は `REFUSED: lsof unavailable` で exit 2（idle を判定できない状態で消さない）—— 両方向を確かめてから landed とした。根本修正は loop が run 末尾で自分の worktree を retire すること（cloud-itonami-app 側、未実装）。決定 2 はそのまま有効で、床が 1 つ増えた。
+
 ## 再測定（値ではなく手順を残す）
 
 ```bash
