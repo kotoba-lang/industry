@@ -4434,4 +4434,36 @@
               0955316 the detector reports exactly the path/join line. First full sweep:
               SCANNED 34698 files, 0 findings (both victims had been repaired by hand)."}
 
+
+ {:id :verify-kotoba-cloud-live
+   :title "api.kotoba.cloud as an agent uses it — measured on production with a real token"
+   :why "2026-09-15: every defect found that day was green in the unit and smoke
+              suites and red on the live surface — the edge demanded a body field the
+              console never sent (400 on every click); Stripe refused the setup session
+              for a missing success_url; every webhook delivery died on a redirect mode
+              workerd does not support (5/5 that week); a refused origin was served as a
+              200 with content null; the model's tool calls came back as XML text; the
+              first cold start became a 524 stored as failed; the free quota ran out in
+              a day. A mock cannot see any of that. This asks production the five
+              questions an agent asks (models, eligibility, one text completion, native
+              tool_calls with the origin's id, an SSE answer) with the live-probe
+              personal API token from the login keychain, and names what it gets. Cannot
+              be a fleet gate: it needs a person's token, which stays in this machine's
+              keychain, and it measures a live service, not a tree."
+   :argv     ["kbb" "--backend" "sci" "{{repo}}/scripts/verify-kotoba-cloud-live.cljk" "--findings"]
+   :cwd      :repo
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 7200000
+   :timeout-ms  900000
+   :writes   :none
+   :measured "Landed 2026-09-15. Green run: SCANNED 5, 0 findings, ~15 s warm. A bogus
+              token: FINDING status 403 twice, SCANNED 2 (the count is what ran), exit 1.
+              No keychain item: REFUSE, exit 2, no SCANNED line. With max_tokens 128 the
+              tool-call check ended in finish_reason length — the thinking model spends
+              reasoning tokens before the call — so it asks for 512. Three requests per
+              tick against the principal's 1,000/day quota; the 2 h interval spends 36/day.
+              The origin's cold start (snapshot rebuild 491 s) shows up as a `completion`
+              warn over 60 s, not as an error: the authority retries loading statuses."}
+
 ]}

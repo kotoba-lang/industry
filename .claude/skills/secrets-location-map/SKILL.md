@@ -28,6 +28,7 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
 | kotobase の**読み戻せない** 3 secret、`KOTOBASE_ARCHIVE_TOKEN` | `references/kotobase.md` |
 | fal.ai / Seedance、Cloudflare RealtimeKit（kaigi） | `references/third-party-api.md` |
 | Hugging Face Hub token（user `com-junkawasaki`、OAuth。Modal 側は secret `hf-token`） | `references/huggingface.md` |
+| kotoba.cloud の personal API token（hermes の `.env`、live probe の keychain 項目、`PAT_SIGNING_SECRET`、origin bearer の対応） | `references/kotoba-cloud.md` |
 | Apple 署名 / App Store Connect、Google Play | `references/mobile-publishing.md` |
 
 item 名から引きたいときは
