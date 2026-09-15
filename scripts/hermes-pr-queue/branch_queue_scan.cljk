@@ -1,0 +1,260 @@
+#!/usr/bin/env kbb
+;; branch_queue_scan.cljk — decision-free measurement of remote branches that have
+;; NO pull request, for the `branch-drain` hermes profile.
+;;
+;; pr_queue_scan.cljk measures the PR queue. This measures the other half the
+;; 2026-09-15 cleanup found: 2,190 unmerged remote branches across 87 repos, most
+;; with no PR at all (pushed by bots / rescues / agents and never offered for
+;; review). The drain bot must not spend its run discovering that state, so this
+;; script measures a bounded slice of repos and prints a ranked worklist.
+;;
+;; It decides nothing. Every action word below is a measured shape, not a verdict:
+;;
+;;   DELETE-LANDED      tip is an ancestor of the default branch (content on main)
+;;   CLOSE-SUPERSEDED   strict containment: every added line is on main AND no
+;;                      removed line is still on main (blob-equal / .cljk twin ok)
+;;   VERIFY-AND-MERGE   merge-tree clean, <= 10 files, 0 deletions
+;;   DRAFT-DECIDE       merge-tree clean, larger or with deletions
+;;   REPLAY-CONFLICT    merge-tree conflict; conflicting paths are listed, and
+;;                      `twin=` says whether the conflict is a .clj/.cljc/.cljs
+;;                      file whose live path on main is .cljk (rename-only)
+;;
+;; Evidence floor (CLAUDE.md, ADR-2608136000): a repo whose checkout is absent,
+;; whose remote cannot be fetched, or whose PR list could not be read is printed
+;; as ABSENT/REFUSED and never counted as "no branches". If every requested repo
+;; failed -> exit 2 (could not answer).
+;;
+;; Usage:
+;;   kbb --backend sci scripts/hermes-pr-queue/branch_queue_scan.cljk
+;;        [--roster scripts/hermes-pr-queue/branch-drain-roster.edn]
+;;        [--repos a/b,c/d] [--repos-per-run N] [--cursor-file PATH]
+;;        [--work N] [--west manifest/west.yml] [--root DIR] [--no-fetch]
+(ns branch-queue-scan
+  (:require ["child_process" :as cp] ["fs" :as fs] ["path" :as path]
+            [clojure.string :as str] [clojure.edn :as edn]))
+
+(def ^:private argv (vec (drop 2 (js->clj (.-argv js/process)))))
+(defn- flag [name default]
+  (if-let [i (first (keep-indexed #(when (= %2 (str "--" name)) %1) argv))]
+    (or (get argv (inc i)) default) default))
+(defn- flag? [name] (boolean (some #{(str "--" name)} argv)))
+
+(def ROOT        (flag "root" "."))
+(def WEST        (flag "west" (path/join ROOT "manifest/west.yml")))
+(def ROSTER      (flag "roster" (path/join ROOT "scripts/hermes-pr-queue/branch-drain-roster.edn")))
+(def REPOS-ARG   (flag "repos" nil))
+(def PER-RUN     (js/parseInt (flag "repos-per-run" "6")))
+(def WORK-LIMIT  (js/parseInt (flag "work" "30")))
+(def CURSOR      (flag "cursor-file" nil))
+(def NO-FETCH?   (flag? "no-fetch"))
+(def STALE-DAYS  60)
+
+(def failures (atom []))
+(defn- fail! [what] (swap! failures conj what) nil)
+
+(defn- sh [cmd args & [{:keys [cwd timeout]}]]
+  (try {:ok true
+        :out (cp/execFileSync cmd (clj->js args)
+               #js {:encoding "utf8" :maxBuffer 256000000 :timeout (or timeout 180000)
+                    :cwd (or cwd ".") :stdio #js ["ignore" "pipe" "pipe"]
+                    :env (js/Object.assign #js {} js/process.env #js {"GIT_TERMINAL_PROMPT" "0"})})}
+       (catch :default e
+         {:ok false :code (.-status e)
+          :err (str (or (some-> (.-stderr e) str) (.-message e)))
+          :out (str (or (some-> (.-stdout e) str) ""))})))
+(defn- git [dir & args] (sh "git" (into ["-C" dir "-c" "core.fsmonitor=false"] args)))
+(defn- git-out [dir & args] (let [r (apply git dir args)] (when (:ok r) (str/trim (:out r)))))
+
+;; ---- west.yml: slug -> checkout path ----------------------------------------
+(defn- west-map []
+  (let [y (fs/readFileSync WEST "utf8")
+        remotes (into {} (map (fn [[_ n u]] [n u])
+                              (re-seq #"- name: (\S+)\n\s+url-base: \S+github\.com[:/](\S+)" y)))]
+    (into {}
+          (for [[_ name rem _rev p url] (re-seq #"- name: (\S+)\n\s+remote: (\S+)\n\s+revision: (\S+)\n\s+path: (\S+)(?:\n\s+url: (\S+))?" y)
+                :let [org (get remotes rem rem)
+                      repo (if url (str/replace (last (str/split url #"/")) #"\.git$" "") name)]]
+            [(str org "/" repo) (path/join ROOT p)]))))
+
+;; ---- roster / cursor ---------------------------------------------------------
+(defn- roster []
+  (cond
+    REPOS-ARG (str/split REPOS-ARG #",")
+    (fs/existsSync ROSTER) (:repos (edn/read-string (fs/readFileSync ROSTER "utf8")))
+    :else []))
+
+(defn- slice [repos]
+  (if (or REPOS-ARG (nil? CURSOR))
+    (take (if REPOS-ARG (count repos) PER-RUN) repos)
+    (let [n (count repos)
+          start (if (fs/existsSync CURSOR)
+                  (or (:next (edn/read-string (fs/readFileSync CURSOR "utf8"))) 0) 0)
+          start (mod start (max n 1))
+          picked (take PER-RUN (drop start (cycle repos)))]
+      (fs/writeFileSync CURSOR (pr-str {:next (mod (+ start PER-RUN) (max n 1)) :of n
+                                        :at (.toISOString (js/Date.))}))
+      (vec (take (min PER-RUN n) picked)))))
+
+;; ---- per-repo measurement ----------------------------------------------------
+(defn- primary-remote [dir]
+  (let [rs (str/split-lines (or (git-out dir "remote") ""))
+        rs (remove str/blank? rs)]
+    (if (some #{"origin"} rs) "origin" (first rs))))
+
+(defn- open-pr-heads [slug]
+  (let [r (sh "gh" ["pr" "list" "--repo" slug "--state" "open" "--limit" "200" "--json" "headRefName"])]
+    (if (:ok r)
+      (set (map #(get % "headRefName") (js->clj (js/JSON.parse (:out r)))))
+      (do (fail! (str "gh pr list " slug " :: " (str/replace (:err r) #"\s+" " "))) nil))))
+
+(defn- default-branch [slug]
+  (let [r (sh "gh" ["api" (str "repos/" slug) "--jq" ".default_branch"])]
+    (if (:ok r) (str/trim (:out r)) (do (fail! (str "gh api repos/" slug " :: " (str/replace (:err r) #"\s+" " "))) nil))))
+
+(def ^:private comment-re #"^\s*(;;|//|#|<!--)")
+(defn- significant [lines] (filter #(and (not (str/blank? %)) (not (re-find comment-re %)) (> (count (str/trim %)) 3)) lines))
+(defn- twin-path [p] (str/replace p #"\.(clj|cljc|cljs)$" ".cljk"))
+
+(defn- blob [dir rev p] (git-out dir "rev-parse" "-q" "--verify" (str rev ":" p)))
+
+(defn- strict-contained?
+  "true | false | :large — every change already on base?"
+  [dir mb tip base files]
+  (if (> (count files) 60) :large
+    (loop [[f & more] files]
+      (if-not f true
+        (let [tb (blob dir tip f) bb (blob dir base f)
+              bb (if (and tb (nil? bb) (not= f (twin-path f))) (blob dir base (twin-path f)) bb)]
+          (cond
+            (and (nil? tb) (nil? bb)) (recur more)
+            (and tb (= tb bb)) (recur more)
+            (or (nil? tb) (nil? bb)) false
+            :else
+            (let [d (or (git-out dir "diff" "--unified=0" "--no-color" mb tip "--" f) "")
+                  ls (str/split-lines d)
+                  added (significant (map #(subs % 1) (filter #(and (str/starts-with? % "+") (not (str/starts-with? % "+++"))) ls)))
+                  removed (significant (map #(subs % 1) (filter #(and (str/starts-with? % "-") (not (str/starts-with? % "---"))) ls)))
+                  bset (set (str/split-lines (or (git-out dir "cat-file" "-p" bb) "")))]
+              (if (or (some #(not (contains? bset %)) added)
+                      (some #(contains? bset %) removed))
+                false (recur more)))))))))
+
+(defn- conflicts [dir base tip]
+  (let [r (git dir "merge-tree" "--write-tree" base tip)]
+    (case (:code r)
+      nil {:clean true}
+      1 {:clean false
+         :paths (->> (str/split-lines (:out r))
+                     (keep #(second (re-find #"^\d{6} [0-9a-f]{40} [123]\t(.+)$" %)))
+                     distinct vec)}
+      {:clean :err})))
+
+(defn- age-days [iso] (js/Math.floor (/ (- (js/Date.now) (js/Date.parse iso)) 86400000)))
+
+(defn- measure-branch [dir rem base slug b tip]
+  (let [mb (git-out dir "merge-base" tip base)]
+    (if-not mb
+      {:slug slug :branch b :tip tip :action "RECHECK" :note "no merge-base"}
+      (let [ancestor? (:ok (git dir "merge-base" "--is-ancestor" tip base))
+            date (git-out dir "log" "-1" "--format=%cI" tip)
+            age (age-days date)]
+        (if ancestor?
+          {:slug slug :branch b :tip tip :action "DELETE-LANDED" :age age}
+          (let [ns (or (git-out dir "diff" "--numstat" mb tip) "")
+                rows (keep #(let [[a d p] (str/split % #"\t" 3)] (when p [p a d])) (str/split-lines ns))
+                files (mapv first rows)
+                adds (reduce + 0 (map #(let [a (second %)] (if (= a "-") 0 (js/parseInt a))) rows))
+                dels (reduce + 0 (map #(let [d (nth % 2)] (if (= d "-") 0 (js/parseInt d))) rows))
+                ahead (js/parseInt (or (git-out dir "rev-list" "--count" (str base ".." tip)) "0"))
+                subj (or (git-out dir "log" "-1" "--format=%s" tip) "")
+                cont (strict-contained? dir mb tip base files)
+                cf (conflicts dir base tip)
+                twin? (and (seq (:paths cf))
+                           (every? (fn [p] (and (not= p (twin-path p)) (blob dir base (twin-path p)))) (:paths cf)))
+                action (cond
+                         (true? cont) "CLOSE-SUPERSEDED"
+                         (= :err (:clean cf)) "RECHECK"
+                         (false? (:clean cf)) "REPLAY-CONFLICT"
+                         (empty? files) "CLOSE-EMPTY"
+                         (and (<= (count files) 10) (zero? dels)) "VERIFY-AND-MERGE"
+                         :else "DRAFT-DECIDE")]
+            {:slug slug :branch b :tip tip :action action :age age :ahead ahead
+             :files (count files) :adds adds :dels dels :contained cont
+             :conflict-paths (:paths cf) :twin twin? :subject subj}))))))
+
+(defn- measure-repo [slug dir]
+  (cond
+    (not (and dir (fs/existsSync (path/join dir ".git"))))
+    {:slug slug :absent "no checkout"}
+    :else
+    (let [rem (primary-remote dir)]
+      (if-not rem {:slug slug :absent "no remote"}
+        (let [deflt (default-branch slug)
+              prheads (open-pr-heads slug)
+              fetched (or NO-FETCH? (:ok (git dir "fetch" "-q" "--prune" rem (str "+refs/heads/*:refs/remotes/" rem "/*"))))]
+          (cond
+            (nil? deflt) {:slug slug :absent "default branch unreadable"}
+            (nil? prheads) {:slug slug :absent "open PRs unreadable"}
+            (not fetched) (do (fail! (str "fetch " slug)) {:slug slug :absent "fetch failed"})
+            :else
+            (let [base (str "refs/remotes/" rem "/" deflt)
+                  prefix (str "refs/remotes/" rem "/")
+                  refs (str/split-lines (or (git-out dir "for-each-ref" "--format=%(refname) %(objectname)" prefix) ""))
+                  branches (for [l refs :when (not (str/blank? l))
+                                 :let [[ref tip] (str/split l #" ") b (subs ref (count prefix))]
+                                 :when (and (not= b "HEAD") (not= b deflt) (not= b "git-annex")
+                                            (not (str/starts-with? b "synced/"))
+                                            (not (contains? prheads b)))]
+                             [b tip])
+                  rows (mapv (fn [[b tip]] (measure-branch dir rem base slug b tip)) branches)]
+              {:slug slug :dir dir :remote rem :default deflt :pr-heads (count prheads) :rows rows})))))))
+
+;; ---- output ------------------------------------------------------------------
+(def rank {"DELETE-LANDED" 0 "CLOSE-SUPERSEDED" 1 "CLOSE-EMPTY" 2 "VERIFY-AND-MERGE" 3
+           "DRAFT-DECIDE" 4 "REPLAY-CONFLICT" 5 "RECHECK" 6})
+
+(defn- work-line [i r]
+  (str "WORK\t" i "\t" (:action r) "\t" (:slug r) "\t" (:branch r) "\t" (subs (:tip r) 0 10)
+       "\tage=" (:age r) "d" (when (and (:age r) (> (:age r) STALE-DAYS)) "(STALE)")
+       (when (:ahead r) (str "\tahead=" (:ahead r) "\tfiles=" (:files r) "\t+" (:adds r) "/-" (:dels r)
+                             "\tcontained=" (:contained r)
+                             (when (seq (:conflict-paths r))
+                               (str "\ttwin=" (if (:twin r) "rename-only" "no")
+                                    "\tconflicts=" (str/join "," (take 4 (:conflict-paths r)))))))
+       (when (:note r) (str "\tnote=" (:note r)))
+       (when (:subject r) (str "\tsubject=" (subs (:subject r) 0 (min 70 (count (:subject r))))))))
+
+(defn -main []
+  (println "BRANCH_QUEUE_SCAN_V1")
+  (println (str "measured_at=" (.toISOString (js/Date.))))
+  (let [wm (west-map)
+        repos (vec (slice (roster)))
+        _ (println (str "slice=" (str/join "," repos) "\tper_run=" PER-RUN))
+        results (mapv #(measure-repo % (or (get wm %)
+                                            (let [p (path/join ROOT "orgs" %)] (when (fs/existsSync (path/join p ".git")) p))))
+                      repos)
+        absent (filter :absent results)
+        ok (remove :absent results)
+        rows (mapcat :rows ok)]
+    (println (str "SCANNED\trepos=" (count repos) "\tmeasured=" (count ok) "\tabsent=" (count absent)
+                  "\tbranches=" (count rows) "\tfailed_queries=" (count @failures)))
+    (doseq [a absent] (println (str "ABSENT\t" (:slug a) "\t" (:absent a) "\t(NOT MEASURED, not clean)")))
+    (when (and (seq repos) (empty? ok))
+      (println "REFUSED\tno requested repo could be measured; this is not an empty queue")
+      (doseq [f (take 5 @failures)] (println (str "REFUSED-DETAIL\t" f)))
+      (println "END_BRANCH_QUEUE_SCAN_V1")
+      (.exit js/process 2))
+    (doseq [r ok]
+      (let [by (frequencies (map :action (:rows r)))]
+        (println (str "REPO\t" (:slug r) "\tunmerged=" (count (remove #(= "DELETE-LANDED" (:action %)) (:rows r)))
+                      "\tlanded=" (get by "DELETE-LANDED" 0) "\topen_pr_heads=" (:pr-heads r)
+                      "\t" (str/join " " (for [[k v] (sort-by (comp rank key) by)] (str k "=" v)))))))
+    (let [ranked (sort-by (juxt #(get rank (:action %) 9) #(- (or (:age %) 0))) rows)
+          shown (take WORK-LIMIT ranked)]
+      (doseq [[i r] (map-indexed vector shown)] (println (work-line (inc i) r)))
+      (when (> (count ranked) (count shown))
+        (println (str "WORK-TRUNCATED\tshown=" (count shown) "\tremaining=" (- (count ranked) (count shown))))))
+    (when (seq @failures) (doseq [f @failures] (println (str "WARN\t" f))))
+    (println "END_BRANCH_QUEUE_SCAN_V1")))
+
+(-main)
