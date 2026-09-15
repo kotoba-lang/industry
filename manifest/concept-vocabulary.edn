@@ -627,5 +627,13 @@ hash してから記録する。"}
               "pronto hex" "prontohex" "NEC IR" "ir code"]
   :note "**実装は kotoba-lang/remocon**（2026-09-13 着地）—— 赤外線リモコン信号を EDN で表す純 .cljc: raw burst（mark/space μs 列）、NEC フレーム codec（tick は burst から導出、repeat フレーム対応）、ProntoHex ↔ raw burst 変換（clock 2.41246 Hz 単位 / 414.5156us、量子化は損失ありで round trip は近似）、学習コード台帳（:source 出所必須、duplicate key 検出）。**IR ハード輸送（LED / 受信モジュール / LIRC / Broadlink）は持たない**——host-injected。com-remote は HR の clean-room actor で別物。"}
 
+ :yataverse-distribution
+ {:label "yataverse 配信面 / 地理分散レプリケーション計画"
+  :spellings ["yataverse-distribution" "geo replication" "replication planner"
+              "mirror zone" "zone round-robin" "geo-aware distribution"
+              "配信面" "レプリケーション計画" "地理分散" "最適配信"]
+  :query-spellings ["配信" "distribution" "p2p 配信" "ミラー" "地理最適"]
+  :note "**実装は kotoba-lang/yataverse-distribution**（2026-09-15 着地、ADR-2609151800）—— yataverse.com bytes 面の地理分散レプリケーション計画 repo。planner（murakumo fleet.edn の :labels {:tier :zone} inventory から zone round-robin でレプリカ配置、coverage/shortfall を正直に返す、fail-closed）+ gossip_bridge（計画を io-libp2p の kotoba.net.gossip/bitswap shape に変換。zone 別 topic、dedup は core の seen-cache 再実装しない）。**socket を開かない**——transport は murakumo overlay（ADR-2607023100 未着地）と kotobase bytes plane の仕事。全ソース .cljk（cljk-first の最初の新規 repo、cljk-origin.edn 記録）。「p2p で最適配信する project は?」への答え。"}
+
 }
 }
