@@ -1,49 +1,83 @@
-#!/usr/bin/env kbb
 ;; itonami-app-resident — the launchd job `cloud.itonami.app.local` runs THIS,
-;; and this runs the JVM server. The plist's WorkingDirectory is the app
-;; checkout, so `kbb -M:server` and the default data dir (`./data`) both
-;; resolve from there.
+;; and this runs the resident that serves http://localhost:1338: the nbb
+;; signin-server (`src/cloud/itonami/app/signin_server.cljk`) on the kbb
+;; engine. The plist's WorkingDirectory is the app checkout, so `src`, `data`
+;; and `target` resolve from there.
+;;
+;; ## What it ran before, and why that stopped (2026-09-15)
+;;
+;; Until today this spawned `clojure -M:server` -- the JVM application. The
+;; 2026-09-11 rename of every Clojure source to `.cljk` (ADR-2609111500,
+;; fix-forward, no mirror) took `cloud/itonami/app/server.clj` off the JVM's
+;; classpath, so the JVM exited 1 with `Could not locate …server.clj` and
+;; launchd (`KeepAlive`, `ThrottleInterval` 10) restarted it every ten
+;; seconds -- measured in target-server-live.log, for four days. Meanwhile
+;; 1338 was served by a signin-server somebody had started by hand from the
+;; checkout, with no supervisor: the sign-in fix of that day (app #356) needed
+;; a manual restart to reach it. This launcher now runs that server, under
+;; launchd, so a fix lands by `launchctl kickstart`.
+;;
+;; The installed plist had also drifted from the versioned one: it still ran
+;; `~/.gftd/bin/itonami-app-resident.cljs` (a symlink into this workspace)
+;; on `kbb --backend sci`; the versioned copy names this file directly.
 ;;
 ;; ## Why it exists again, and why it is HERE
 ;;
 ;; Rewritten 2026-09-09, and put under version control the same day. The
 ;; original lived only in the home directory, so its loss was invisible until
 ;; the next restart — a single point of failure with no history and no
-;; reviewer. This file is the only copy; `~/.gftd/bin/` is gone with the rest of
-;; file; the plist beside it (`scripts/cloud.itonami.app.local.plist`) points
-;; here directly, and is the copy to reinstall from.
+;; reviewer. This file is the only copy; the plist beside it
+;; (`scripts/cloud.itonami.app.local.plist`) points here directly, and is the
+;; copy to reinstall from.
 ;;
-;; What made the rewrite necessary: the original lived at `~/.gftd/bin/` (the name
-;; is retired -- manifest/gftd-retirement.edn -- but this sentence records where it
-;; actually was) and was
-;; removed by that day's home-directory migration, while the process it had
-;; started stayed alive holding a deleted file. The plist still pointed at the missing
-;; path and `KeepAlive` is true, so the app was one crash away from a respawn
-;; loop with nothing to respawn — and nothing said so, because a server that is
-;; already running looks exactly like a server that can be restarted.
+;; ## The classpath and cljk roots the server needs
 ;;
-;; ## The two secrets, and why they are read HERE rather than declared in the plist
+;; signin_server.cljk requires webauthn, cacao, kotoba-oracle (osaho,
+;; kotoba-hir, sha2), the page renderer (css, html, jp-go-dds, hanmen,
+;; cloud-kotoba-dds) and text; `scripts/nbb_compat` and `target` carry the
+;; oracle's generated pieces. The list below is what the hand-started server
+;; ran with (read off its process, 2026-09-15) -- COPIED, not derived, because
+;; nothing in the app declares it for nbb; when a require moves, this list
+;; moves with it and the server says `Could not find namespace` by name.
 ;;
-;; A launchd plist is world-readable; a value written into `EnvironmentVariables`
-;; is a credential in a file anyone can cat. These are fetched at start instead:
+;; ## Secrets, by name
 ;;
 ;;   MURAKUMO_API_KEY    ~/.itonami/itonami-murakumo-api-key (0600). A file rather
 ;;                       than kagi because launchd cannot unlock kagi.
 ;;   OPENROUTER_API_KEY  login Keychain, service `gftd.openrouter`, by exact
 ;;                       name. One known item, never an enumeration.
 ;;
-;; Both matter beyond authentication: `policy/provider-allowed?` derives
-;; `authenticated` from the variable ACTUALLY being set, so an egress provider
-;; whose variable is empty is denied before a turn starts. That is why a missing
-;; one is reported in full rather than passed over — but it is NOT fatal here.
-;; Exiting would hand `KeepAlive` a crash loop, and a server running with one
-;; provider denied is still a server; the line below is what says which.
+;; A missing one is reported in full rather than passed over — but it is NOT
+;; fatal here. Exiting would hand `KeepAlive` a crash loop, and a server
+;; running with one provider denied is still a server.
 
 (ns itonami-app-resident
   (:require ["node:child_process" :as cp]
-            ["node:fs" :as fs]))
+            ["node:fs" :as fs]
+            ["node:path" :as path]))
 
 (def workspace-root "/Users/junkawasaki/github/com-junkawasaki")
+(def app-root (path/join workspace-root "orgs" "cloud-itonami" "cloud-itonami-app"))
+(def server-file "src/cloud/itonami/app/signin_server.cljk")
+
+;; west siblings the signin-server requires (see the header)
+(def sibling-repos
+  ["osaho" "kotoba-hir" "org-nist-sha2" "css" "html" "text"
+   "fs" "fs-filesystem" "fs-async-filesystem"
+   "jp-go-digital-design-system" "hanmen" "cloud-kotoba-dds"
+   "webauthn" "org-chainagnostic-cacao"])
+
+(defn- sibling [r] (path/join workspace-root "orgs" "kotoba-lang" r))
+
+(def classpath
+  (.join (clj->js (into ["src" "target" "resources" "scripts/nbb_compat"]
+                        (map #(path/join (sibling %) "src")
+                             ;; the three fs repos are cljk roots but not on the classpath
+                             (remove #{"fs" "fs-filesystem" "fs-async-filesystem"} sibling-repos))))
+         ":"))
+
+(def cljk-roots
+  (js/JSON.stringify (clj->js (into [app-root] (map sibling sibling-repos)))))
 (def murakumo-key-file
   (str (or (aget js/process.env "HOME") "") "/.itonami/itonami-murakumo-api-key"))
 (def openrouter-keychain-service "gftd.openrouter")
@@ -89,8 +123,11 @@
           _ (aset env "CLOUD_ITONAMI_WORKSPACE_ROOT" workspace-root)
           _ (when murakumo (aset env "MURAKUMO_API_KEY" murakumo))
           _ (when openrouter (aset env "OPENROUTER_API_KEY" openrouter))
-          child (cp/spawn "clojure" #js ["-M:server"]
-                          #js {:stdio "inherit" :env env})]
+          _ (aset env "NBB_CLJK_ROOTS" cljk-roots)
+          _ (log "starting " server-file " on the kbb engine (cwd " app-root ")")
+          child (cp/spawn "/opt/homebrew/bin/kbb"
+                          #js ["--backend" "sci" "--classpath" classpath server-file]
+                          #js {:stdio "inherit" :env env :cwd app-root})]
       ;; launchd stops a job with SIGTERM. Forward it, so the server gets the
       ;; same signal it would have got directly and this wrapper is not the
       ;; reason a shutdown becomes a kill.
