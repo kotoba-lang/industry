@@ -1,0 +1,211 @@
+#!/usr/bin/env kbb
+;; verify-kotoba-cloud-live — the research API as an agent actually uses it,
+;; measured on production with a verified principal's token, every tick.
+;;
+;;   kbb --backend sci scripts/verify-kotoba-cloud-live.cljk --findings
+;;   kbb --backend sci scripts/verify-kotoba-cloud-live.cljk --findings --skip-completions
+;;
+;; ## Why (2026-09-15)
+;;
+;; Every defect found that day was green in the unit and smoke suites and red
+;; on the live surface: the edge demanded a body field the console never
+;; sent; Stripe refused the setup session for a missing success_url; every
+;; webhook delivery died on a redirect mode workerd does not support; a
+;; refused origin was served as a 200 with content null; the model's tool
+;; calls came back as XML text; the first cold start turned into a 524; and
+;; the free quota ran out in a day. None of that is visible to a mock. This
+;; detector asks the production API the five questions an agent asks, with a
+;; real personal API token, and names what it gets.
+;;
+;; ## What it measures (each is one FINDING key)
+;;
+;;   models          GET /v1/models lists the red model as served
+;;   status          GET /v1/research/status with the token answers eligible
+;;   completion      one short text completion answers 200 with text
+;;   tool-calls      a tool-equipped request answers native tool_calls whose id
+;;                   is the origin's (chatcmpl-tool-…), not the authority's
+;;                   text-recovery (call_…) — the parser at the origin regressed
+;;                   if the latter comes back
+;;   stream          stream: true answers text/event-stream with [DONE]
+;;
+;; ## Token
+;;
+;; Read from the login keychain by ONE known identifier (service
+;; `kotoba-cloud-live-probe`, account `kotoba-cloud`), issued from
+;; https://kotoba.cloud/account with the label `live-probe`; never printed,
+;; never in argv, never in a finding. secrets-location-map lists it. Without
+;; it the run is inconclusive (exit 2), never clean.
+;;
+;; ## Cost
+;;
+;; Three requests per tick against the principal's daily quota (1,000/day);
+;; with the 2-hour interval that is 36/day.
+;;
+;; ## Exit
+;;
+;;   0 nothing to report   1 findings   2 could not measure (no token, network)
+(ns verify-kotoba-cloud-live
+  (:require [clojure.string :as str]
+            ["node:child_process" :as cp]))
+
+(def argv (vec *command-line-args*))
+(def flags (set argv))
+(def findings? (contains? flags "--findings"))
+(def skip-completions? (contains? flags "--skip-completions"))
+
+(def api "https://api.kotoba.cloud")
+(def model "qwen3.8-flash-next-whitehacker")
+(def keychain-service "kotoba-cloud-live-probe")
+(def keychain-account "kotoba-cloud")
+(def request-timeout-ms 150000)
+
+(def findings (atom 0))
+(def checks (atom 0))
+(defn- check! [] (swap! checks inc))
+(defn finding! [sev k detail]
+  (swap! findings inc)
+  (when findings? (println (str "FINDING\t" sev "\t" k "\t" detail))))
+
+(defn- flag [nm]
+  (let [i (.indexOf argv nm)] (when-not (neg? i) (nth argv (inc i) nil))))
+
+(defn- token []
+  ;; `--token-env VAR` (tests: a bogus token must produce a finding, never a
+  ;; clean run). Otherwise the keychain item: `security` prints the password
+  ;; alone with -w; anything else (item not found, keychain locked) is a
+  ;; non-zero exit we treat as "no token".
+  (if-let [v (flag "--token-env")]
+    (let [t (str (aget js/process.env v))] (when (str/starts-with? t "kc_pat_") t))
+  (try (let [out (.execFileSync cp "security"
+                                #js ["find-generic-password" "-a" keychain-account "-s" keychain-service "-w"]
+                                #js {:encoding "utf8" :stdio #js ["ignore" "pipe" "ignore"]})
+             t (str/trim (str out))]
+         (when (str/starts-with? t "kc_pat_") t))
+       (catch :default _ nil))))
+
+(defn- http
+  "Promise of {:status :type :text :ms} — never throws; a failed request is
+  {:status 0 :error <name>} so the caller names it."
+  [method path token body]
+  (let [t0 (js/Date.now)
+        headers (cond-> {"content-type" "application/json"}
+                  token (assoc "authorization" (str "Bearer " token)))]
+    (-> (js/fetch (str api path)
+                  (clj->js (cond-> {:method method :headers headers
+                                    :signal (js/AbortSignal.timeout request-timeout-ms)}
+                             body (assoc :body (js/JSON.stringify (clj->js body))))))
+        (.then (fn [r] (-> (.text r)
+                           (.then (fn [txt] {:status (.-status r)
+                                             :type (or (.get (.-headers r) "content-type") "")
+                                             :text txt :ms (- (js/Date.now) t0)})))))
+        (.catch (fn [e] {:status 0 :error (str (.-name e) ": " (.-message e)) :ms (- (js/Date.now) t0)})))))
+
+(defn- json [txt] (try (js->clj (js/JSON.parse txt) :keywordize-keys true) (catch :default _ nil)))
+
+(defn- nonce [] (str (js/Date.now) "-" (.toString (js/Math.floor (* 1e6 (js/Math.random))) 36)))
+
+(defn- check-models []
+  (check!)
+  (-> (http "GET" "/v1/models" nil nil)
+      (.then (fn [{:keys [status text error]}]
+               (if (not= 200 status)
+                 (finding! "error" "models" (str "GET /v1/models " status " " (or error "")))
+                 (let [row (some #(when (= model (:id %)) %) (:data (json text)))]
+                   (cond (nil? row) (finding! "error" "models" (str model " not listed"))
+                         (not= "upstream-tested-access-gated" (:availability row))
+                         (finding! "warn" "models" (str model " availability " (:availability row))))))))))
+
+(defn- check-status [tok]
+  (check!)
+  (-> (http "GET" "/v1/research/status" tok nil)
+      (.then (fn [{:keys [status text error]}]
+               (let [d (json text)]
+                 (cond (not= 200 status)
+                       (finding! "error" "status" (str "GET /v1/research/status " status " " (or (get-in d [:error :code]) error "")))
+                       (not= "eligible" (:status d))
+                       (finding! "error" "status" (str "not eligible: " (:status d) " " (:reason d)))))
+               status))))
+
+(defn- check-completion [tok]
+  (check!)
+  (-> (http "POST" "/v1/chat/completions" tok
+            {:model model :max_tokens 16
+             :messages [{:role "user" :content (str "Reply with the single word OK. (live-probe " (nonce) ")")}]})
+      (.then (fn [{:keys [status text error ms]}]
+               (let [d (json text) content (get-in d [:choices 0 :message :content])]
+                 (cond (not= 200 status)
+                       (finding! "error" "completion" (str "POST /v1/chat/completions " status " " (or (get-in d [:error :code]) error "") " after " ms " ms"))
+                       (not (and (string? content) (re-find #"\S" content)))
+                       (finding! "error" "completion" (str "200 without text after " ms " ms"))
+                       (> ms 60000)
+                       (finding! "warn" "completion" (str "text after " ms " ms (origin cold?)"))))))))
+
+(defn- check-tool-calls [tok]
+  (check!)
+  ;; a thinking model spends reasoning tokens before the call: 128 ended in
+  ;; finish_reason length with no call (measured 2026-09-15 23:2x); 512 leaves room
+  (-> (http "POST" "/v1/chat/completions" tok
+            {:model model :max_tokens 512 :tool_choice "auto"
+             :tools [{:type "function"
+                      :function {:name "write_file" :description "Write content to a file."
+                                 :parameters {:type "object"
+                                              :properties {:path {:type "string"} :content {:type "string"}}
+                                              :required ["path" "content"]}}}]
+             :messages [{:role "user" :content (str "Create hello.txt containing exactly: hi (live-probe " (nonce) ")")}]})
+      (.then (fn [{:keys [status text error ms]}]
+               (let [d (json text)
+                     choice (get-in d [:choices 0])
+                     calls (get-in choice [:message :tool_calls])
+                     id (get-in choice [:message :tool_calls 0 :id])]
+                 (cond (not= 200 status)
+                       (finding! "error" "tool-calls" (str "POST with tools " status " " (or (get-in d [:error :code]) error "") " after " ms " ms"))
+                       (not (seq calls))
+                       (finding! "error" "tool-calls" (str "no tool_calls; finish_reason " (:finish_reason choice)
+                                                            (when (str/includes? (str (get-in choice [:message :content])) "<tool_call>") " — XML in content")))
+                       (not= "write_file" (get-in calls [0 :function :name]))
+                       (finding! "error" "tool-calls" (str "called " (get-in calls [0 :function :name]) " instead of write_file"))
+                       (str/starts-with? (str id) "call_")
+                       (finding! "warn" "tool-calls" "tool_calls recovered from text by the authority (id call_…): the origin's parser is not returning native calls")))))))
+
+(defn- check-stream [tok]
+  (check!)
+  (-> (http "POST" "/v1/chat/completions" tok
+            {:model model :max_tokens 16 :stream true
+             :messages [{:role "user" :content (str "Reply with the single word OK. (live-probe stream " (nonce) ")")}]})
+      (.then (fn [{:keys [status type text error ms]}]
+               (cond (not= 200 status)
+                     (finding! "error" "stream" (str "stream: true " status " " (or (get-in (json text) [:error :code]) error "") " after " ms " ms"))
+                     (not (str/starts-with? type "text/event-stream"))
+                     (finding! "error" "stream" (str "content-type " type))
+                     (not (str/includes? text "data: [DONE]"))
+                     (finding! "error" "stream" "no [DONE] frame"))))))
+
+(defn- main []
+  (let [tok (token)]
+    (if (nil? tok)
+      (do (println (str "REFUSE\tno token in the login keychain (service " keychain-service
+                        ", account " keychain-account "): issue one at https://kotoba.cloud/account with label live-probe and store it with `security add-generic-password -a "
+                        keychain-account " -s " keychain-service " -w <token> -U`"))
+          (js/process.exit 2))
+      (-> (check-models)
+          (.then (fn [_] (check-status tok)))
+          (.then (fn [status]
+                   (cond
+                     ;; a token the API refuses (401/403) is a measurement, not silence
+                     (contains? #{401 403} status)
+                     (do (finding! "error" "status" (str "token refused with " status " — re-issue the live-probe token")) nil)
+                     skip-completions? nil
+                     (not= 200 status) nil
+                     :else (-> (check-completion tok)
+                               (.then (fn [_] (check-tool-calls tok)))
+                               (.then (fn [_] (check-stream tok)))))))
+          (.then (fn [_]
+                   ;; the count is what RAN, so a run that stopped at a refused
+                   ;; token says 2, not 5
+                   (println (str "SCANNED\t" @checks "\tlive check(s) against " api " as the live-probe principal"))
+                   (js/process.exit (if (pos? @findings) 1 0))))
+          (.catch (fn [e]
+                    (println (str "REFUSE\tprobe crashed: " (.-message e)))
+                    (js/process.exit 2)))))))
+
+(main)
