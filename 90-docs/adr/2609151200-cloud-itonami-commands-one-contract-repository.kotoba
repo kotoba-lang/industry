@@ -1,0 +1,47 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609151200-cloud-itonami-commands-one-contract-repository")
+  (:adr/title "cloud-itonami-commands: app / cli / mobile の command surface を 1 repo にし、pin で読む — itonami の復旧と、cloud-itonami-* の共通化の測定")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/related (vector "ADR-2609112000" "ADR-2609111500" "ADR-2609075600" "ADR-2609075400" "ADR-2608136000"))
+  (:adr/context
+  "オーナー要求 2026-09-15: `itonami` を実行すると `:kbb/policy-required` で落ちる。cloud-itonami-cli を確認し、cloud-itonami-* で共通化できる部分は共通化 repo を作って共通化する。
+
+  ## 故障は 3 層（すべて再現手順付き）
+
+  1. `kotoba-lang/kotoba bin/kbb` は `#!/usr/bin/env kbb` の launcher を拡張子で振り分けていた。拡張子の無い launcher（cloud-itonami-cli `bin/itonami`、cloud-itonami/misogi `bin/misogi`、aratame）は `.kotoba` guest shim に落ち、guest ではない script に policy を要求した。再現: `cd orgs/cloud-itonami/misogi && ./bin/misogi` → `:kbb/policy-required`。
+  2. cloud-itonami-cli は 2026-09-10 の一括改名で Clojure-shaped な 18 file が `.kotoba` になっていた（2026-09-11 の `.cljk` 波は未到達）。kbb engine は `.cljk` を解決し `.kotoba` は解決しないので、launcher は自分の sibling を `require` できない。再現: `kbb --backend sci bin/itonami status` → `Could not find namespace: cloud.itonami.capital-cli`。
+  3. `kotoba.lang.text` が deps.edn にだけ宣言され、engine が読む nbb.edn に無かった（cli / app とも）。再現: `kbb -e \"(require '[kotoba.lang.text])\"` を nbb.edn の無い場所で → `Could not find namespace`。
+
+  加えて `~/.local/bin/itonami` は split 前の app 側 copy を exec しており、app / cli の 2 つの `bin/itonami` は既に食い違っていた（cli 側だけ `capital` を持つ）。
+
+  ## 共通化の測定（cloud-itonami-* 1,414 checkout、content hash で同一 file を数えた）
+
+  - app ↔ cli: `bin/itonami_{editor,harness,skills,text}`、`src/.../repo_profile` が byte 同一、`bin/itonami` と `commands` が数行差。cli が pin していた app の 3 table（commands.edn / cli-aliases.edn / defaults.edn）は 4 件中 3 件 drift（checker `verify-pinned-surface` は exit 1 と正しく答えていたが、誰も走らせていなかった）。さらに app 自身の checked-in commands.edn は server.cljk の route より 6 本古かった（414 → 420）。mobile は `:extra-paths [\"../src\" \"../resources\"]` で app の src に手を伸ばしていた。
+  - taxonomy repo 群（今回は手を付けない）: `schema/culture.edn` 245 repo で同一、`src/marketentry/operation.kotoba` 186（iso3166）、`test/marketentry/phase_test.kotoba` 183、`src/tosmonitor/*` 51（lei）、`tools/verify_citations.cljk` 28（lei）、`schema/ordinance.edn` 18+14。既存の共通化先は kotoba-lang（langchain-store / marketplace / langgraph を `:local/root`）。`repo-search.cljk marketentry tosmonitor` に共通 repo は無い。")
+  (:adr/decision
+  "## 直したもの（着地済み）
+
+  - kotoba-lang/kotoba PR #622 / #623（main 70af018、west pin 前進済み）: `bin/kbb` は拡張子の無い通常 file で 1 行目が shebang なら deps door へ、`.kotoba` は従来どおり shim へ。`kbb_deps.cljk` は script mode で「script の realpath の上にある最寄りの deps.edn」を project にする（cwd ではない）。`org.clojure/clojure` は engine 自身なので missing 警告から除外。test は両方向（旧 code で赤を確認）。
+  - cloud-itonami-cli PR #2: 18 file を `.cljk` に改名（`cljk-origin.edn` に 09-10 以前の拡張子を記録）、nbb.edn 追加、drift した 3 table を app から refresh、checker の stale な `.cljs` 自己参照を修正。`/tmp` から `itonami status` が live resident に届くことを確認。
+  - `~/.local/bin/itonami` を cloud-itonami-cli に向け直した（ADR-2609075600 が「別変更」として先送りしていた手順）。
+
+  ## 共通化 repo: `cloud-itonami/cloud-itonami-commands`（public、west 登録済み）
+
+  中身は app と front end の CONTRACT だけ: `cloud.itonami.app.commands`（何が command か・longest-prefix・path templating・flag・alias）、`cloud.itonami.app.repo-profile`、`resources/` の 3 table、`repo_profile_test` + tables test（`kbb -M:test` 32 tests / 128 assertions）。namespace 名は据え置き（consumer の `require` を動かさない）。名前は subject 面の bare 名を既存 family 形 `cloud-itonami-<subject>` に合わせたもの（`--name-audit` の elision は既存 family に優先されない、ADR-2608040170）。
+
+  依存方向: commands ← app（deps.edn `:git/sha`）、← cli（nbb.edn + deps.edn `:git/sha`）、← app/mobile（mobile/deps.edn `:git/sha`、`../src ../resources` は撤去）。commands 側は誰にも依存しない。
+
+  registry の生成者は app のまま: `dev/gen_commands.cljk` は `../cloud-itonami-commands/resources/` へ書き（`--out` で変更可）、sibling が無ければ **exit 2 で拒否**する（誰も pin しない場所へ書いた file は「再生成できた」に見えるため）。app の `commands-test` は自分の route と classpath 上の table（= pin した sha）を比べるので、route を足すと「commands で再生成 → 着地 → app / cli / mobile の sha 前進」まで赤い。これが以前は沈黙していた 1 手。
+
+  app 側の CLI copy（`bin/itonami` + 7 module + 6 nbb suite）は削除（PR #355）。`launcher_test` の 2 case は cli の suite が同じ性質を持つので落とした。
+
+  ## やらなかったこと（オーナー判断待ち）
+
+  taxonomy 群の共通化（marketentry ×186 / tosmonitor ×51 / culture schema ×245）。各 repo は README で「standalone forkable OSS business」を名乗り、抽出済みの部分は kotoba-lang の library を `:local/root` で指している。同じ形で `marketentry` / `tosmonitor` を kotoba-lang 側 library に抜くのは可能だが、237 repo の deps.edn 書換 + pin 前進の wave であり、fleet-refactor-wave / dependency-substitution-wave と同じ規模。本 ADR の範囲外として記録のみ。
+
+  ## 未測定のまま残るもの
+
+  - cloud-itonami-app の JVM suite（fleet gate `itonami-app-jvm-test`、`:cd false`、変更前から `human_work_http_test` 13 failures で赤）はローカルで走らせていない。engine で読める namespace（commands / repo-profile / route-scan）は dependency を classpath に載せて require できることを確認したが、JVM 側の `:git/sha` 解決は fleet の receipt で見る。
+  - nbb.edn の `:deps` 解決は cold cache で `bb` を 1 回呼ぶ。`bb` 無し + cold は exit 1（`bb: command not found`）を cli で実測し、README と .gitignore に書いた。")
+))
