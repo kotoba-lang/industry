@@ -19,4 +19,15 @@
   :hypothesis "hook の 90 detector × 2-3 行は、静かな detector と同一失敗の反復を畳めば信号だけ残る"
   :measured {:same-state-chars {:before 27205 :quiet-folded 14895 :bad-runs-folded 10584} :loud-detectors-remaining 14 :bad-runs-folded 23}
   :falsified-by "合成 state (new 1 / clean 1 / standing 2): 旧 4 head → 新 1 head + quiet 3。合成 state (new 1 / bad 2): 旧 3 head → 新 1 head + bad 2 (detector ごとの反復 0)"
-  :verdict :landed}]
+  :verdict :landed}
+
+ {:id :k4-reread-waste
+  :date "2026-09-15"
+  :question "オーナー指示: kotoba の Unison 的性質 (定義の content address / CID / hash) は agent loop の効率に繋がるか。まず『繋がるとしたらどこか』を測る"
+  :method "直近 20 transcript のうち file read (Read tool / Bash の cat・sed -n・head・tail) が在る 6 session。同一 path の再読みを、間に書き込み (Edit / Write / Bash の > / sed -i / perl -pi / cp / mv / python open(w)) が在ったかで分ける (basename 単位)"
+  :measured {:file-reads 419 :rereads 230 :rereads-share 0.45
+             :rereads-with-no-write-between 173 :share-of-rereads 0.75 :chars 341713
+             :per-session-chars-mean 56952 :note "≈ 17K tok / session が『変わっていない内容の読み直し』"}
+  :hypothesis-next "定義ごとの content hash (正規化した form 本文の sha256、名前に依らない Unison 型) を索引に持ち、outline / find に短い hash を出す。agent は『変わったか』を outline (1/5.7 の chars) の hash 比較で確かめ、cat し直さない。副産物: 写しの畳み (symbol-index :h29) を stem/line の推定でなく hash で正確に"
+  :risk "context compaction 後は agent の手元に旧本文が無いので、hash 一致でも読み直しが要る。読み直しを block しない (hook で拒否しない)。hash は情報として出すだけにし、置換は指示で促す"
+  :verdict :measured-only}]
