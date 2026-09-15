@@ -138,6 +138,8 @@
       ;; 走った結果を信用できない run。:ok で無いものを黙って通さない。
       (not= :ok last-status)
       {:loud? true
+       ;; 同じ失敗 (inconclusive / error / killed) が detector 数ぶん並ぶのを畳む側で使う
+       :bad-run {:status (name (or last-status :unknown)) :note (or last-note "") :age (ms->human (age-ms last-run))}
        :lines [head
                (str "  ⚠ 直近の run は " (name (or last-status :unknown))
                     " —— 結果は使えない。" (or last-note ""))
@@ -228,7 +230,19 @@
             ;; scheduler が無いときの stale-run は冒頭の ⚠⚠ が原因を 1 回言うので、detector
             ;; ごとには繰り返さない (同じ文を 25 回読ませない)
             reports (map (fn [r] (if (and (not scheduler?) (:stale-only? r)) (assoc r :loud? false :stale-folded? true) r)) reports)
-            loud? (some :loud? reports)
+            ;; 走れなかった run (inconclusive / error / killed) は detector ごとに 3 行同じ文が
+            ;; 並ぶ (実測 23 detector で 5,472 字)。理由ごとに 1 行 + 名前列に畳む。
+            bad (filter :bad-run reports)
+            reports (map (fn [r] (if (:bad-run r) (assoc r :loud? false :bad-folded? true) r)) reports)
+            bad-lines (when (seq bad)
+                        (cons (str "  ⚠ 結果が使えない run " (count bad) " 件 (前回の finding は据え置き、resolved 扱いにしない):")
+                              (for [[[status note] rs] (sort-by (comp - count val)
+                                                                (group-by (fn [r] [(get-in r [:bad-run :status])
+                                                                                   (subs (get-in r [:bad-run :note]) 0 (min 70 (count (get-in r [:bad-run :note]))))])
+                                                                          bad))]
+                                (str "    " status " ×" (count rs) " — " note (when (> (count (get-in (first rs) [:bad-run :note])) 70) "…")
+                                     ": " (str/join ", " (map #(subs (first (:lines %)) 2 (.indexOf (first (:lines %)) " — ")) rs))))))
+            loud? (or (some :loud? reports) (seq bad))
             ;; ADR-2609152300 (2026-09-15): 静かな detector (clean / standing 不変 /
             ;; accepted のみ / BASELINE) は 1 行に畳む。この hook 自身が「もう言ったことを
             ;; 毎セッション言い直すのは、言っていないのと同じ」と書きながら、90 detector ×
@@ -273,6 +287,7 @@
               (when (seq unrun)
                 [(str "  ⚠ 未実行のまま登録されている: " (str/join ", " (map name unrun)))])
               (mapcat :lines (filter :loud? reports))
+              bad-lines
               (when quiet-line [quiet-line])))))))
   (catch :default _ nil))
 (compat/exit 0)
