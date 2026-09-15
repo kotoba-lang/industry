@@ -324,6 +324,27 @@ create`** と印字しており、その文言に従うと**既に在る repo �
 - Does **not** mass-clone all west projects; scopes are `blocking` | `managed` | `names`
 - Still defers dep *retarget* (old `-clj` paths) to a report — does not rewrite deps.edn
 
+## Remote side: the drain profiles (2026-09-15)
+
+The 2026-09-15 pass measured the remote side by hand (87 repos: 3,746 remote branches, 2,190
+unmerged of which only 134 had a PR; 183 open PRs) and left two hermes profiles as the standing
+exit: `branch-drain` (branches with no PR, `scripts/hermes-pr-queue/branch_queue_scan.cljk`) and
+`pr-drain` (open PRs, `pr_queue_scan.cljk --author any`). SSoT for the rules and the measured traps
+is `:remote-drain` in `manifest/cleanup-workflow.edn`; the procedure and profile table live in
+`scripts/hermes-pr-queue/README.md`. Three rules that a bulk exit gets wrong without them:
+
+- **strict containment** — a branch is superseded only if every added line is on main AND no
+  removed line is still on main (the lenient check misjudged 18 of 288);
+- **read the diff before merging** — two "clean" branches carried wrong edits (an ADR
+  cross-reference; a bad-bot class that appends after a file's closing form);
+- **a test run that executed 0 tests is not green** — since the `.cljk` rename the JVM runner
+  reports `Ran 0 tests` and `kbb -M:test` lacks `clojure.java.io`, so code branches stop at a
+  draft PR until a runner executes them.
+
+When the survey says `nopr=<b>` for a branch that is not on GitHub, the local remote-tracking ref is
+stale (PR merged, remote branch deleted): verify with `gh api repos/<slug>/branches/<b>` before
+believing either "pushed" or "unpushed".
+
 ## Minimum workflow
 
 1. Inventory (**local scan first — see the section above; do NOT run a fleet-wide `west update`**): `git fetch origin && git merge --ff-only origin/main`, `kbb --backend sci scripts/checkout-staleness.cljk`,
