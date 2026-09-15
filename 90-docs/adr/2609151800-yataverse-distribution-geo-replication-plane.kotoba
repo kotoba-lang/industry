@@ -92,5 +92,14 @@ p2p で最適配信する」計画面は repo を持っていなかった。io-l
 - gossip dedup の双方向実測: 同一 cid の再 announce は forward 0、異なる cid は forward 1
   （8 問の 5: 境界の両側を置いた）。
 - GitHub: main 8acd1cd push 済み（API 読み戻し一致）。west: 313e10ef、verify-west-pins
-  変更 pin 無しで OK、west update 後 checkout は pin に一致。"))
+  変更 pin 無しで OK、west update 後 checkout は pin に一致。
+
+## Resume point（2026-09-15 closing）
+
+次の最初の具体的一手: murakumo overlay QUIC adapter（ADR-2607023100）を着地させ、
+yataverse.distribution.gossip-bridge の出力 shape（topic/payload/from/self →
+route-message）を transport に通す。手前の検証は repo 内で
+kbb --backend sci --classpath src:test:../io-libp2p/src test/yataverse/distribution/test_runner.cljk
+（14 tests / 51 assertions が緑の現在地）。availability proof（kotobase.peer）との
+接続はその後。実搬送が無い間、この repo の出力は計画と wire 記述にとどまる。"))
 )
