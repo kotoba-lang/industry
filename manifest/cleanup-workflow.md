@@ -914,3 +914,30 @@ true-orphan-git count, with any intentional deferrals named).
    preserved owner WIP, open PRs, worktrees, stashes, and west-orphan counts.
 
 The closing report must be sufficient for a new agent with no conversation history to resume.
+
+## remote 側の出口 — 2026-09-15 の実測と 2 つの hermes profile
+
+SSoT: `:remote-drain` in the edn。正本の手順と profile 表は `scripts/hermes-pr-queue/README.md` の 2026-09-15 節。
+
+| 面 | 実測 |
+|---|---|
+| remote branch（87 repo） | 3,746 本 = 着地済み 1,556 / 未着地 2,190。未着地で PR を持つのは 134 本だけ |
+| 未着地の内訳 | superseded 270 / clean 259 / **conflict 1,616** |
+| open PR（8 org） | 183 = mergeable 111 / conflicting 44 / unknown 28（dependabot 58、archived 31） |
+| その日の処理 | merge 6（doc/data/台帳）、close 3 PR、remote branch **1,896 本削除**（live 再検証 → 削除 → live で消滅確認、archive は `.git/stash-archive-2026-09-15/remote-*`） |
+
+**厳密 containment**: 追加行が全て main に在るだけでは superseded ではない。branch の削除行が main に残っていれば
+その削除意図は未着地（緩い判定は 288 中 18 を誤判定した）。**diff を読まずに merge しない**（ADR 0044 の
+`Extends` 書換は本文を読んで誤りと分かった。`bot: re-apply PR #N additions` 19 本は EOF 追記で EDN を壊す bad-bot）。
+
+**code branch は今 merge できない**: `.cljk` rename 以降、JVM test-runner は `Ran 0 tests` で緑、`kbb -M:test` は
+`clojure.java.io` で落ちる。実行 test 数 0 は緑ではない（8 問の 7）。それまで code は draft PR + 判定条件 comment。
+
+罠: `git fetch --prune` に部分 refspec を渡すと他の remote-tracking ref が落ちる（全 heads の refspec で fetch）/
+`cleanup.cljk` の `nopr` は PR merge 後に消えた branch の stale ref を push 済みと読む / `no-remote` は先頭 remote が
+annex special remote だと偽陽性 / `west-pin-verify-guard` hook は command 中の「git push」literal で verifier を stock nbb で
+起動して deny する（hook の壊れ、pin 退行ではない）/ hermes は CLAUDE.md を 32,000 字で切る（規則は SOUL.md へ）。
+
+出口: `~/.hermes/profiles/branch-drain`（every 2h、`branch_queue_scan.cljk` が roster を 6 repo ずつ測る）と
+`pr-drain`（every 3h、`pr_queue_scan.cljk --author any`）。1 run 最大 5 件、archive → 削除、docs/data は merge、
+code は test N>0 の緑だけ、`twin=rename-only` だけ replay、force-push / marker 手編集 / comment 無し close は禁止。
