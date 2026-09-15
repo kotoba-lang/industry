@@ -25,6 +25,15 @@ python3 scripts/hermes-cron-jobs/export_cron.py          # 再生成
 python3 scripts/hermes-cron-jobs/export_cron.py --check  # 差分検査 (CI/fleet gate にも使える)
 ```
 
+台帳は **fleet 全体で 1 本**（他端末の profile も同じファイルに載る）。exporter が見えるのは
+走らせた端末の profile だけなので、書き込みは **merge**（自端末の profile は差し替え、他は
+そのまま）、`--check` も自端末の profile だけを比べる。実測 2026-09-15: main の台帳 141 profile
+に対し local は 36、素朴な上書きなら 105 profile を消していた。
+
+job に先読みさせる `skills`（`hermes cron edit <id> --add-skill <name>`）も定義の一部として
+焼く —— 無いまま再登録すると挙動が変わる（symbol-index の実測: 先読み 8/8 正解、
+置くだけ 2/8）。
+
 `--check` が検出するのは **定義の変更だけ**。`repeat` は定義 (`times`) と
 状態 (`completed`) の両方を運ぶので、`completed` は落としてある —— 落とす前は
 **184 job のどれか 1 本が走るたびに STALE になり**、gate として使えば恒久的に

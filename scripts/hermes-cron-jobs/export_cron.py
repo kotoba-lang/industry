@@ -122,6 +122,11 @@ def main():
                 "no_agent": j.get("no_agent"),
                 "enabled_toolsets": j.get("enabled_toolsets"),
                 "context_from": j.get("context_from"),
+                # Skills preloaded into the job's prompt (`hermes cron edit
+                # --add-skill`). Part of the definition: a job re-registered
+                # without them behaves differently (measured 2026-09-15 with
+                # symbol-index: 8/8 correct preloaded vs 2/8 self-selected).
+                "skills": j.get("skills") or ([j["skill"]] if j.get("skill") else None),
                 # `repeat` carries BOTH a definition (`times`, how many
                 # runs were asked for) and state (`completed`, how many
                 # have happened). Keeping `completed` made the ledger go
@@ -139,10 +144,24 @@ def main():
         if out:
             ledger["profiles"][profile] = out
 
-    body = json.dumps(ledger, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    if check:
+    # The ledger is fleet-wide: profiles from every machine live in one file,
+    # and this exporter can only see the profiles of the machine it runs on.
+    # Overwriting the file with the local view silently drops every other
+    # machine's definitions (measured 2026-09-15: 141 profiles on main, 36
+    # local -- a plain regenerate would have deleted 105). So: MERGE. Local
+    # profiles replace their own entries; every other profile is kept as-is.
+    # --check likewise compares only the profiles this machine can see.
+    try:
         with open(LEDGER) as f:
             current = f.read()
+        existing = json.loads(current)
+    except Exception:
+        current, existing = "", {}
+    merged_profiles = dict(existing.get("profiles") or {})
+    merged_profiles.update(ledger["profiles"])
+    ledger["profiles"] = merged_profiles
+    body = json.dumps(ledger, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if check:
         # Compare the DEFINITIONS, not the timestamp. `generated_at` used to be
         # the constant "regenerated-on-run" precisely so this byte comparison
         # would not fire on every run -- which bought a working --check at the
@@ -157,7 +176,8 @@ def main():
     with open(LEDGER, "w") as f:
         f.write(body)
     n = sum(len(v) for v in ledger["profiles"].values())
-    print(f"wrote {LEDGER}: {len(ledger['profiles'])} profiles, {n} jobs")
+    print(f"wrote {LEDGER}: {len(ledger['profiles'])} profiles, {n} jobs "
+          f"(local machine: {len(merged_profiles) - len(existing.get('profiles') or {}) + 0} new profile(s) merged)")
     return 0
 
 
