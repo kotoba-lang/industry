@@ -1,0 +1,22 @@
+;; agent 効率 (ADR-2609152300) の実測台帳 (append-only)。1 entry = 1 仮説、KPI 名で書く。
+;; 再現: kbb --backend sci scripts/agent-usage-report.cljk --since 7
+[{:id :baseline-2026-09-15
+  :date "2026-09-15"
+  :method "scripts/agent-usage-report.cljk --since 7 (api call ≥5 の 18 session)"
+  :k3-ctx0-median 119171 :k4-ctx-mean-median 258729 :k1-cost-eq-per-call 53445
+  :ctx0-reread-share-of-cache-read 0.27
+  :session-start-payload-chars {:claude-md 25665 :hook-orgs-detectors 27205 :hook-spec-inventory 5616 :hook-repo-bots 1786}}
+
+ {:id :k3-1-claude-md-dedup
+  :date "2026-09-15"
+  :hypothesis "CLAUDE.md の節は skill に逐語で重複していて機械的に削れる"
+  :measured {:claude-md-chars 25665 :bullets-verbatim-in-a-skill 3 :chars 547 :share 0.02}
+  :verdict :rejected
+  :reason "2026-09-11 の移設で手順は既に skill 側。残りは不変条件で、削るのは規則の変更 (オーナー判断)"}
+
+ {:id :k3-2-orgs-detectors-fold
+  :date "2026-09-15"
+  :hypothesis "hook の 90 detector × 2-3 行は、静かな detector と同一失敗の反復を畳めば信号だけ残る"
+  :measured {:same-state-chars {:before 27205 :quiet-folded 14895 :bad-runs-folded 10584} :loud-detectors-remaining 14 :bad-runs-folded 23}
+  :falsified-by "合成 state (new 1 / clean 1 / standing 2): 旧 4 head → 新 1 head + quiet 3。合成 state (new 1 / bad 2): 旧 3 head → 新 1 head + bad 2 (detector ごとの反復 0)"
+  :verdict :landed}]
