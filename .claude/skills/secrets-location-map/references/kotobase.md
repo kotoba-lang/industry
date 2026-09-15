@@ -126,3 +126,14 @@ datom 面が Biscuit 必須（ADR-2608281200）になり CACAO 自己発行 tran
   同じ 3 item を env で読む経路へ移行予定（未完なら pending ledger は CACAO のまま 401）。
 - **`/ipld/*` の block PUT は依然 CACAO（`HYAKKA_SEED`）で Biscuit 不要** —— 401 していたのは transact だけ。
   proof/record block は移行前から R2 に着地していた。
+
+## 組織 SSO の entitlement 共有 secret と Google/GitHub の provider credential（2026-09-15、ADR-2609151900）
+
+| item | 在り処 | consumer |
+|---|---|---|
+| `ORG_SSO_ENTITLEMENT_SECRET` | kagi live vault（`KAGI_HOME=$HOME/.kagi`）compartment `net-kotobase`。48 byte random、2026-09-15 発行。**2 つの Worker が同じ値を持つ**（apex が HMAC で署名、identity plane が検証） | Worker secret として `kotobase-authn`（auth.kotoba.cloud、control-plane/authn）と `kotoba-cloud-control-plane`（kotoba.cloud、app-kotoba-cloud）に `wrangler secret put` 済み（2026-09-15）。片方だけ rotate すると組織 SSO の設定が全部 `entitlement-missing` で落ちる —— 必ず両方 |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | **未発行（2026-09-15 時点）**。発行後は kagi `net-kotobase` に同名で置く。Google Cloud Console の OAuth client（Web）、redirect URI `https://auth.kotoba.cloud/v1/link/google/callback` | Worker secret on `kotobase-authn` のみ。両方揃うまで provider は不在（`/v1/link/providers` が `[]`、ボタン非表示） |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | **未発行（2026-09-15 時点）**。GitHub OAuth App、callback `https://auth.kotoba.cloud/v1/link/github/callback` | 同上 |
+
+- 値の役割: これらは **login authority ではない**（ADR-2609070400 不変）。Google/GitHub は linked identity の識別、entitlement は「plan team/enterprise の org owner がこの connection を書いてよい」という apex の署名。
+- 組織側の IdP client secret は kagi ではなく **authn の Durable Object（`org-sso:<handle>`）**に org ごとに保存され、読み戻し API は無い（`client-secret-set` の真偽だけ返る）。
