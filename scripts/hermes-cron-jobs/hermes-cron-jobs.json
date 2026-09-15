@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-15T09:53:59Z",
+  "generated_at": "2026-09-15T23:40:09.758482+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -6261,6 +6261,25 @@
         },
         "script": null,
         "workdir": null
+      }
+    ],
+    "kotoba-proof-ops": [
+      {
+        "id": "eb3873c027e3",
+        "name": "kotoba-proof-ops daily iteration",
+        "schedule": {
+          "kind": "cron",
+          "expr": "20 3 * * *",
+          "display": "20 3 * * *"
+        },
+        "schedule_display": "20 3 * * *",
+        "script": "kotoba_proof_ops_evidence.py",
+        "model": "z-ai/glm-5.3-flash",
+        "provider": "openrouter",
+        "max_tokens": 16384,
+        "deliver": "local",
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/kotoba-proof-ops",
+        "enabled": true
       }
     ]
   },
