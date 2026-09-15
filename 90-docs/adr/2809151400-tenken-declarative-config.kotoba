@@ -1,0 +1,35 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809151400-tenken-declarative-config")
+  (:adr/title "tenken: web-service 設定のコード化と宣言的評価 — awai state-store policy 検査の一般化")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/related (vector "ADR-2609132007" "ADR-2809041200" "ADR-2608136000"))
+  (:adr/context
+  "2026-09-15 要求: IaC 的に webservice (wrangler / Cloudflare) 設定をコード化し、誤りや脆弱性対策を後で宣言的に評価したい。
+
+  実測 (2026-09-15): root の wrangler 設定は 542 件 (network-awai 配下 37 件)。同型の先行検査が実在: scripts/verify-awai-state-store-policy.cljk (kbb .cljk、137 行、fail-closed、SCANNED 行、exit 0/1/2、gate root-awai-state-store-policy)。宣言面の機械可読正本は manifest/repository-rules.edn (4 つの workspace-policy が在る)。名前について: どの面でもない (出所ドメイン無し・実行 role 無し・family 無し) → subject 面 bare 名。候補から tenken (点検) を採用。grep 実測: west.yml に tenken 0 件 (collide しない)。")
+  (:adr/decision
+  "1 repo, 4 層。declconf-proposal-20260915 の名前を tenken に置き換えて着地する。
+
+  1. tenken-model — 設定 1 件 (wrangler.json / .jsonc / .toml) を EDN に正規化。未知 shape は nil にせず UNVERIFIED と判定。
+  2. tenken-facts — 設定 1 件が policy 要求を満たすか述語化 (binding 存在・cache-addict・wildcard-binding・secret 直書き等)。
+  3. tenken-policy — 設定値の制約を宣言。fail-closed。規則の性質/実装状態を区別。
+  4. tenken-eval — 実測設定 × policy の全束を評価。判定語彙は UNSPECIFIED / SATISFIED / VIOLATED / UNVERIFIED。理由の無い合格は合格と扱わない。
+
+  検査の 8 問の原則を直接引用:
+  - 0 件走査は緑にしない (config 無い tree は clean でなく未測定)。
+  - 読めない設定 / jsonc parse 失敗は fail。
+  - 走査件数を出力する。
+  - 規則が禁止するとき、規則の literal を名指す (単に違反と出さない)。
+
+  対象は root で既に在る 542 設定。新規に設定を書かせない — 既存の wrangler 設定から policy 違反を探す検査が正本。")
+
+  (:adr/body
+  "アプローチの骨子: 542 設定を「集める」のではなく、この corpus 自体が 1 設定群であると捉える。linter/gate を既存 fleet gate に載せて、ある設定が policy 要求を満たすかを EDN で宣言的に書けるようにする。
+
+  名前: tenken (点検) — 設定・policy・評価の 3 点を「点検」する役割の語。
+
+  実装 2 段:
+  段 1 — scaffold (repo 起こし + 4 層の最小 model)
+  段 2 — 実在 542 設定 × awai-policy で走らせて、実測 VIOLATION が awai checker の現行値と一致することを確かめる。")
+))
