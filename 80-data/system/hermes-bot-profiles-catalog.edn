@@ -1,7 +1,7 @@
 ;; 80-data/system/hermes-bot-profiles-catalog.edn — Hermes bot profile + cron 棚卸し（内部データ、非公開）。
 ;; 実測: 2026-09-16 (JST)。source: ~/.hermes/profiles/<name>/config.yaml (model.default) + cron/jobs.json。
 {:catalog-version 1
- :measured-at "2026-09-16T15:45:00+09:00"
+ :measured-at "2026-09-16T01:02:00+09:00"
  :profiles [
   {:profile "akc-blog-i18n" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "9e2c2ae32cd2" :name "akc-blog-i18n daily blog translation" :schedule "30 4 * * *"}]}
   {:profile "akc-csf-fit-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "f7c745360a8d" :name "akc-csf-fit-ops daily evidence + iteration" :schedule "10 3 * * *"}]}
