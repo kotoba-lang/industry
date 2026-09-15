@@ -1,0 +1,74 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609152113-kotoba-find-grep-fastest-host-search-abi-v5")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "kotoba find / grep を最速へ: 単一 pass walk・buffered stdout・CPU/wall budget・context ABI v5 の host search")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/last_verified "2026-09-15")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-command-binaries")
+  (:adr/repos (vector "orgs/kotoba-lang/org-ieee-find"
+              "orgs/kotoba-lang/org-ieee-grep"
+              "orgs/kotoba-lang/amu"
+              "orgs/kotoba-lang/kotoba-native"
+              "orgs/kotoba-lang/kotoba-verifier"
+              "orgs/kotoba-lang/kotoba-gmir"
+              "orgs/kotoba-lang/kotoba-mir"
+              "orgs/kotoba-lang/artifact"
+              "orgs/kotoba-lang/symbol-index"))
+  (:adr/related (vector "2609010200" "2608136000" "2609051700"))
+  (:adr/context
+  "オーナー指示 2026-09-15: org-ieee-find / org-ieee-grep の kotoba 実装を、Rust 系列 (fd / ripgrep) を参考に最速へ進める。
+
+  出発点 (symbol-index measurements.edn :h19-kotoba-find、同日): find は 8,719 entry で /usr/bin/find の 5-6 倍遅く、34,803 entry の tree で 7,272 file 時点 SIGILL。grep は 3.3 MB の file で 2 MB 走査後 SIGILL (75 ns/byte)。
+
+  測って分かった原因 (規則ではなく実装状態、ADR-2809041200 の順で読んだ):
+  1. guest の walk が listing を string-index-of で 3 回歩き、pending directory を \"\\n\" 連結文字列で持って pop ごとに全体を copy していた。
+  2. string-index-of が kotoba-native の source rewrite で、haystack 1 byte あたり string-substring 1 handle (arena は reclaim しない) + host callback 3-4 回。grep が 2 MB で pair arena を使い切る直接の原因。
+  3. loader (amu tools/kexe_loader.c): wire 37 (:io/write) が call ごとに write(2)、RLIMIT_CPU 1 秒 / alarm 3 秒が literal、:fs/browse の 4,096 entry literal、pair 4 Mi / pool 256 MiB の ceiling。857,322 entry の tree はこの 4 つに順に当たった (SIGXCPU は user 0.09 s で — 秒は kernel の readdir が使った)。
+  4. loader の source sha が kotoba-lang/artifact runtime_identity.cljk に pin されており、loader を変えると measure-runtime が \"native loader source identity mismatch\" で拒否する。pin が仕事をした。")
+  (:adr/decision
+  "6 repo を 1 本の chain として前進させた。
+
+  A. amu loader (#986 → #988 に包含): wire 37 を 64 KiB buffer (満杯・wire 39 の前・完了時・trap handler で flush。wire は既に byte 数を答えているので、届かない byte の count は嘘)。KEXE_CPU_SECONDS / KEXE_WALL_SECONDS と package-command --cpu-seconds / --wall-seconds (既定は元の literal と同じ 1 / 3)。KEXE_PAIR_MAX 64 Mi、KEXE_STRING_POOL_MAX 1 GiB (address space のみ、既定 budget 不変)。browse の bound は pool budget だけ。scripts/test-package-command.cljk が 8 検査 (CPU budget は両方向、reason literal を pin。旧 loader は新挙動の 2 検査だけ落ちる)。
+
+  B. context ABI v5 (kotoba-gmir 8e57296 → kotoba-mir 1a6424c → kotoba-native 9a98c3e ADR 0082 → kotoba-verifier a0d0799 → amu #988 → artifact 2135fdd): string-index-of を context slot 216 の host 演算に (memmem、空 needle は reference interpreter と同じく trap、両 operand を handle ごとに 1 回 UTF-8 検証。有効な needle は code point 列なので byte 一致は境界一致)。string-contains? / string-replace-all はその上の rewrite。verifier の expected-context は version 5 を名指し v4 を拒否。v4 fixture 3 件を v5 で re-seal (code word は動かない)。Windows loader も同 slot (memchr + memcmp)。examples/string-index-of.kotoba を jdk-free-native-conformance が loader 上で実行 (189600。誤った host がどの数を出すかを fixture が名指す)。
+
+  C. org-ieee-find (#1): listing を 1 pass、名前は zero-copy view、その場で降りる (非 tail self-call = tree の深さ)、entry あたり 4 handle。順序は LC_ALL=C find -s と byte 同一 (fixture・34,803・857,322 entry で実測) なので suite は set に加えて SEQUENCE を比較。4,040 entry の wide 3 case を追加。旧 guest は 17 中 9 落ちる。
+
+  D. org-ieee-grep (#1): ripgrep の形 — 残り text 全体に対する 1 search で次の match へ、行頭は後方へ倍々の window で (行を跨ぐ数に依らず 2-3 call)、改行の数え上げは -n のときだけ。-v / -i は行ごと。-i は行ごとに fold (text 全体の fold は string-replace-all の concat 蓄積が quadratic で 3.3 MB で trap した、実測)。84 case + 1 divergence、うち 14 は生成した 80,000 行 3.4 MB fixture。
+
+  E. 手順上の決定: 各段を測って着地 (portable slice が測れる repo は sci で実行、JVM suite は fleet gate に委ねる)。find の scan-to を host search に替える版も測ったが user 時間は 1.56 → 1.60 s で差が無く (名前が短い)、着地しない。")
+  (:adr/body
+  "## 実測 (2026-09-15、同一機、load 60-145 のため CPU 秒が指標)
+
+  find (single thread。出力は全行で /usr/bin/find と set 同一、LC_ALL=C find -s と sequence 同一):
+  | tree | entries | kotoba find user/sys | /usr/bin/find | fd -HI (parallel) |
+  | amu | 8,719 | 0.02 / 0.09 | 0.00 / 0.11 | - |
+  | app-news | 34,803 | 0.07 / 0.49 | 0.05 / 1.4 | - |
+  | orgs/kotoba-lang | 857,322 | 1.64 / 18.5 (wall 49 s) | 1.41 / 36.5 (wall 76 s) | 1.90 / 22.7 (wall 7.4 s) |
+  CPU は find の半分以下 (dirent の d_type で stat を打たない)。wall は 1 thread の I/O 直列化で、fd の並列 walk が買う分。
+
+  grep (33 MB、grep -F と byte 同一):
+  | pattern | matches | kotoba | grep -F | rg -F | 旧 guest + v5 compiler |
+  | 不在 | 0 | 0.13 | 0.15 | 0.00 | 0.32 |
+  | SIGILL | 26,400 | 0.17 | 0.17 | 0.00 | 0.35 |
+  | e | 598,400 | 0.47 | 0.16 | 0.06 | 0.47 |
+  | -i (3.3 MB) | 600 | 0.67 | - | - | 0.66 |
+  疎・不在では grep -F と同等。rg との差は host 側 (pool への copy と UTF-8 検証 ~40 ms、libc memmem は memchr crate の SIMD ではない)。
+
+  ## 次の lever (測った順、ここに数値は書かず再現手順を残す)
+  1. 並列 walk / 並列 search — runtime は 1 thread。fd の wall 7.4 s 対 49 s の差の全て。
+  2. arena reclaim — 4 handle × entry で 64 Mi = 16 M entry が ceiling。scoped reset は :i64 結果の body なら結果経由の escape は無いが、in-place vector store と kgraph-assert! が経路として残る (別 ADR)。
+  3. host 側 ASCII fold (または case-insensitive search) — grep -i の 26 pass/行。
+  4. loader の SIMD UTF-8 検証 と memmem — 不在 needle 33 MB の 0.13 s の内訳。
+  5. find の式 (-name / -prune / -maxdepth) — symbol-index の walk 代替の残る条件。
+
+  ## 再現
+  build: amu compile <core.kotoba> --target aarch64-macos --jvm-free → extract-native → package-command.cljk --cpu-seconds 600 --wall-seconds 1800 --pairs 67108864 --string-pool 1073741824。比較: /usr/bin/time -p で user/sys、LC_ALL=C /usr/bin/find -s、grep -F、rg -F。
+
+  ## 着地状態 (2026-09-15 時点)
+  landed: kotoba-gmir 8e57296、kotoba-mir 1a6424c、kotoba-native 9a98c3e / 9a98c3e、kotoba-verifier a0d0799、artifact 2135fdd (west pin も前進)。
+  open (required status check 待ち、merge は classifier に止められた): amu #988 (#986 を包含)、org-ieee-find #1、org-ieee-grep #1 — 後 2 つは amu の --cpu-seconds と ABI v5 に依存。")
+))
