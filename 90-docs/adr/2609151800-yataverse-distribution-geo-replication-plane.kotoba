@@ -1,0 +1,96 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609151800-yataverse-distribution-geo-replication-plane")
+  (:adr/doc-type "adr")
+  (:adr/source-format "edn")
+  (:adr/title "yataverse-distribution — yataverse.com bytes 面の地理分散レプリケーション計画面と io-libp2p gossip/bitswap bridge")
+  (:adr/topic "yataverse-distribution-geo-replication-plane")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+
+  (:adr/repos (vector "orgs/kotoba-lang/yataverse-distribution"
+                      "orgs/kotoba-lang/io-libp2p"
+                      "orgs/kotoba-lang/murakumo"
+                      "orgs/net-kotobase/ipfs"))
+
+  (:adr/authoritative-for
+  (vector "yataverse 配信面のレプリケーション計画と geo ranking の正（yataverse-distribution）"
+   "配信 e2e の 5 stage 構成（origin bytes plane → yataverse mirror zone → per-replica p2p hop → IPNI discovery）。実搬送は各 stage の所有 repo が行う"
+   "新規 repo の全ソース .cljk 方式（cljk-first。cljk-origin.edn に would-be 拡張子を記録）"
+   "amano 配信面（ADR-2609141400 D4）の p2p 最適化が置かれる repo"))
+
+  (:adr/related
+  (vector "adr-2609141400-chain-amano-architecture-and-planes"
+   "adr-2609131630-yataverse-mirror-bytes-plane"
+   "adr-2607023100-murakumo-kotoba-lang-net-p2p-semantics-integration"
+   "adr-2607051410-net-kotobase-distributed-storage-mesh-design"
+   "adr-2609111500-cljk-rename-all-clojure-source"))
+
+  (:adr/decision-summary
+  (vector "D1: 新規 repo orgs/kotoba-lang/yataverse-distribution（public、family 面 — yataverse.com serving family の最初のメンバー。README 冒頭の名乗り + concept-vocabulary 登録を伴う）。役割: bytes 面の地理分散レプリケーション計画（planner）と p2p 交換への bridge"
+   "D2: planner は murakumo fleet.edn の :labels {:tier :zone} inventory を入力に zone round-robin のレプリカ配置を出す。fail-closed — factor 0/負・空 inventory・inventory 不足は throw（過少レプリケーションの計画は出荷しない）。geo ranking は haversine。座標の無い provider は黙って最下位ではなく拒否"
+   "D3: gossip_bridge は計画を kotoba.net.gossip / kotoba.net.bitswap（io-libp2p、Kubo 0.41 相互運用実測済み）の既存 shape に変換するだけ。zone 別 topic、route-message 経由の announce/relay（core の content-hash seen-cache dedup を再実装しない）、want-list は assignments から。socket は開かない — murakumo overlay QUIC adapter は ADR-2607023100（未着地）のままであることを正として置く"
+   "D4: 全ソースは .cljk（owner 指示 2026-09-15）。この repo は rename ではなく cljk-first で書かれた最初の新規 repo であり、cljk-origin.edn の :rule にその旨を記録する。test runner は kbb --backend sci で動く（JVM-free）"
+   "D5: 実搬送（Worker が bytes を流す・overlay がブロックを運ぶ）は本 repo の外。delivery-path 関数が e2e を 5 stage の data として名指し、各 stage の所有 repo を :actor で宣言する — 「記述面」と「実行面」の境界を test で pin する"))
+
+  (:adr/artifact
+  (vector "kotoba-lang/yataverse-distribution 8acd1cd（main、GitHub push 済み）: planner.cljk + gossip_bridge.cljk + test 3 ns + cljk-origin.edn + README"
+   "test: kbb --backend sci runner、14 tests / 51 assertions、0 failures 0 errors（実測 2026-09-15）"
+   "west 登録: west-entry-add 313e10ef（4876 projects、entry 一意性・path 一意性・SHA 到達可能性検証済み、verify-west-pins は変更 pin 0 で OK）"
+   "cljk-first: planner/gossip_bridge は .cljc 相当（pure）、test 群は .cljs 相当（kbb sci 専用）と cljk-origin.edn に記録"))
+
+  (:adr/body
+  "## Context
+
+amano chain（ADR-2609141400）の配信面は kotobase bytes-plane（IPFS/IPNI）と定まり、
+yataverse.com がその分散型 mirror zone である（ADR-2609131630）。ただし mirror zone が
+提供するのは HTTP gateway の第 2 の Location までで、「地理的に分散したノードへ CID を
+p2p で最適配信する」計画面は repo を持っていなかった。io-libp2p が gossip/bitswap の
+意味論を実ネットワーク相互運用込みで提供し、murakumo fleet が各ノードに
+:labels {:tier :zone} を持っている — 欠けていたのは両者を繋ぐ計画層だけだった。
+
+オーナー指示（2026-09-15）: 配信面は yataverse として調え、ソースは全て .cljk にする。
+
+## Decision
+
+新規 repo orgs/kotoba-lang/yataverse-distribution を起こす（family 面。yataverse.com は
+実在の serving zone なので family 裏付けは ADR-2609131630/2609141707/2609141815 の実績）。
+
+2 modules、両方 pure（socket を開かない）:
+
+1. yataverse.distribution.planner — レプリカ配置の計算。fleet.edn の inventory から
+   zone round-robin で assignments を組み、coverage/shortfall を honest に返す。
+   fail-closed（8 問の 1/2: 入力が無い・実行できないときは throw であって pass と同じ
+   値を返さない）。rank-providers は haversine 距離で provider を順位付けし、座標の無い
+   provider は拒否する（黙って最後に置かない）。delivery-path は e2e を data として
+   名指す: origin bytes plane → yataverse mirror zone → per-replica p2p hop → IPNI。
+2. yataverse.distribution.gossip-bridge — 計画を io-libp2p の既存意味論に変換する。
+   topic は zone 別、announce/relay は route-message そのもの（dedup は core の
+   seen-cache。再実装しない）、want-list は assignments と have-set から respond-to-want
+   へ。 murakumo overlay（QUIC）への配線は ADR-2607023100 の adapter が担う — 本 repo は
+   その shape を提供するだけで、transport は実行しない。
+
+## Consequences
+
+- (+) amano 配信面に「計画 → bridge → 既存意味論」の正経路ができ、ADR-2607023100 着地時
+  の adapter は bridge の出力 shape をそのまま消費できる。
+- (+) fleet.edn の :labels {:zone} が初めて配信計画の入力として読まれる。:unstated zone は
+  ::no-zone として保存され（topology の :unstated 規律と同じ）、drop も暗黙 default もしない。
+- (−) 実搬送はまだ無い。murakumo overlay adapter 未着地のままなので、この repo の出力は
+  計画と wire 記述であり、ブロックは運ばない。
+- (−) availability proof（kotobase.peer.availability、ADR-2607051410 landed 分）は計画に
+  未接続。レプリケーションは宣言されても継続監査されていない。
+
+## Verification（実測 2026-09-15）
+
+- kbb --backend sci --classpath src:test:../io-libp2p/src test/.../test_runner.cljk →
+  14 tests / 51 assertions / 0 failures / 0 errors。runner は明示 ns 列挙（欠けた ns は
+  見える failure になる）。
+- fail-closed 分岐の実測: factor 0 / factor -1 / 空 inventory / inventory < factor が
+  それぞれ throw することを test が pin（8 問の 6: 拒否理由の literal を regex で pin）。
+- gossip dedup の双方向実測: 同一 cid の再 announce は forward 0、異なる cid は forward 1
+  （8 問の 5: 境界の両側を置いた）。
+- GitHub: main 8acd1cd push 済み（API 読み戻し一致）。west: 313e10ef、verify-west-pins
+  変更 pin 無しで OK、west update 後 checkout は pin に一致。"))
+)
