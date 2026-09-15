@@ -87,5 +87,13 @@ ad-hoc に足され、実測 (2026-09-03) の状態がその証拠:
   (実測の誤検知 `'task_comments'` → `sk_` 部分一致を長さしきい値で排除)。
   新端末 re-register 手順は `scripts/hermes-cron-jobs/README.md`。
   稼働状態 (paused/last_run) だけは各端末ローカルのまま、という境界は
-  台帳 schema に明記済み。") )
+  台帳 schema に明記済み。
+- 2026-09-15 (3c71bc259db): **台帳は fleet 全体で 1 本、exporter は merge する。**
+  main の台帳は 141 profile、この端末の exporter が見えるのは 36 で、従来の
+  上書き export は他端末の 105 profile を消す構造だった (前回の登録は手 merge)。
+  `export_cron.py` は自端末の profile だけ差し替えて他を保ち、`--check` も
+  自端末分だけ比べる (両方向を確認: 再生成後 exit 0 / skills 1 件を空にして exit 1)。
+  job に先読みさせる `skills` も定義として焼く —— 無いまま再登録すると挙動が
+  変わる (ADR-2609151916: symbol-index 先読み 8/8 正解、置くだけ 2/8)。
+  この端末の 37 job 全部に `skills: [symbol-index]` を付けた。") )
  )

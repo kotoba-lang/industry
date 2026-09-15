@@ -1,0 +1,49 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609151916-hermes-symbol-index-preload")
+  (:adr/title "Hermes Agent への symbol-index 導入は skill の先読みまで — 置くだけでは 2/8、先読みで 8/8")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/related (vector "ADR-2609031630" "ADR-2608136000"))
+  (:adr/body
+  "## Context
+
+2026-09-15、`kotoba-lang/symbol-index`（cljk/cljc/cljs/clj/kotoba の top-level 定義 → file:line の索引）を Hermes Agent v0.21.3 に導入し、効いたかを A/B で実測した。正本の測定台帳は `orgs/kotoba-lang/symbol-index/measurements.edn` の `:iteration 5`、再現は `bench/hermes_ab.cljk`、生データは `bench/results/2026-09-15-{A,A2,B,C}.jsonl`。
+
+実測（model `z-ai/glm-5.3-flash`、定義場所を問う 8 query、各腕 n=8、正解 = grep -n で独立に確かめた basename + 行番号 ±2）:
+
+| 腕 | 正解 | total tok 平均 | API call | 壁時計 | CLI 使用 |
+|---|---|---|---|---|---|
+| A 導入前 | 4/8 | 139k | 7.4 | 254 s | 0/8 |
+| A2 AGENTS.md に『Read の前に索引を引け』の 1 行だけ | 5/8 | 109k | 5.8 | 142 s | 0/8 |
+| B skill を `~/.hermes/skills` に置いただけ | 4/8 | 87k | 5.0 | 106 s | 2/8 |
+| C skill を先読み（`-s symbol-index` / cron の `skills:`） | 8/8 | 51k | 3.0 | 26 s | 8/8 |
+
+質的な所見:
+- 導入前の誤答 4 件は全部『定義は存在しない』型の自信ある偽陰性。Hermes の `search_files` と gitignore を尊重する `rg` は `orgs/` 配下の west 子 repo（superproject 上は gitignore）を見ない。索引は見る。
+- AGENTS.md の 1 行（A2）は CLI 呼び出しを 0/8 しか生まなかった。改善分は `.kotoba-cache/symbol-index.tsv` を agent が直接 grep したことによる。
+- B で agent が CLI を選んだのは `workspace-search` skill を開いた 2 回だけ（2/2 正解）。skill の description は system prompt の索引で 57 字に切られ、`symbol-index` skill 自体を `skill_view` した run は 0。
+- Hermes の terminal tool は `$HOME` で始まる。導入前の tool は索引が無いと自動 build したので home 全体を走査して tool の 120 s timeout に当たった（`kotoba-lang/symbol-index@391707c` で修正: 索引が無ければ REFUSE exit 2、root は `SYMBOL_INDEX_ROOT` > `CLAUDE_PROJECT_DIR` > 索引を持つ祖先 dir へ walk-up）。
+- Hermes は cwd の AGENTS.md と CLAUDE.md を両方注入する。この superproject では両者がほぼ同文なので 1 call の床が約 15k tok（記録のみ、本 ADR の対象外）。
+
+## Decision
+
+1. **Hermes への skill 導入は『先読みまで』を導入と数える。** 置くだけ（B）は導入ではない。code を触る cron job には `skills: [symbol-index]` を付け（`hermes -p <profile> cron edit <id> --add-skill symbol-index`）、対話は `hermes chat -s symbol-index`。
+2. **skill の正本は `~/.hermes/shared-skills/symbol-index/SKILL.md`**、default home の `~/.hermes/skills/software-development/symbol-index` はそこへの symlink、各 profile は `skills.external_dirs: [~/.hermes/shared-skills]` で同じ 1 本を見る（profile は default home の local skill を見ない、実測）。
+3. **cron job の `skills` は定義の一部**として台帳 `scripts/hermes-cron-jobs/hermes-cron-jobs.json` に焼く（ADR-2609031630 の改訂履歴 2026-09-15 を参照）。
+4. `workspace-search` skill（agent が実測で毎回開きに行く）の Procedure に step 0 として symbol-index への pointer を置く。skill の説明文を長くしても索引で切られるので、pointer は agent が実際に読む場所に置く。
+
+## Consequences / landed
+
+- kotoba-lang/symbol-index: `391707c`（launcher の symlink 解決、no auto-build、root 発見、test +4）、`ccbeebe`（bench + measurements iteration 5）。main `7eec213`。west pin は `60a5f9e6341` で `7eec213` に前進、`orgs/kotoba-lang/symbol-index` checkout 済み。
+- この端末: 38 profile の config に `external_dirs`、37 job 全部に `skills: [symbol-index]`。cron scheduler と同じ resolver（`skill_view`、profile の HERMES_HOME）で `success: true` を確認。
+- superproject `3c71bc259db`: `export_cron.py` が `skills` を焼き、fleet 全体 1 本の台帳へ merge する（上書きなら 105 profile を消していた）。`--check` は両方向を確認（再生成後 exit 0 / skills 1 件を空にして exit 1）。
+- 費用: skill 本文は 1 call あたり +1.7k tok。実測 33 session 合計約 0.21 USD。
+
+## Gaps（優先順）
+
+1. gateway の service definition が stale（`hermes gateway status` の警告、本件と無関係の pre-existing）。profile config と jobs.json は job 起動時に読まれるので次回 run から効くが、gateway 自体の再起動は実行中 agent を殺すので owner 判断。
+2. 台帳の `--check` は他端末で走らせるとその端末の profile が未登録なら赤（従来と同じ。fleet gate には未登録）。
+3. B（自己選択）を上げる手段は未測定: skill description の 57 字制限内で trigger 語を入れる案、`workspace-search` 以外の skill にも pointer を置く案。効果は再度 n=8 で測ってから。
+4. 索引の鮮度: cron job の worktree は build が要る（単一 repo は数秒）。SKILL.md は `status` → `build` を指示するが、自動化はしていない。
+")
+))
