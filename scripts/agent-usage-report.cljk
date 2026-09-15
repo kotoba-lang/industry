@@ -12,6 +12,9 @@
 ;;   in         uncached input / cread cache_read / ccreate cache_creation / out output
 ;;   cost-eq    価格重み付き token (in + 0.1·cread + 1.25·ccreate + 5·out) → K1 の分子
 ;;   tools      tool call 数、Read / Bash / symidx (Bash の中で symbol-index を呼んだ数)
+;;   reads      file read 数 (Read tool + Bash の cat / sed -n / head / tail)、rereads = 既読 path の再読み、
+;;              rr-nowrite = そのうち間に書き込み (Edit / Write / Bash の > / sed -i / perl -pi / cp / mv) が
+;;              無いもの、rr-chars = その tool_result の chars           → K4 の無駄 (ADR :k4-reread-waste)
 ;;   wall-min   最初と最後の message の間
 ;; 正解 (K5) は transcript からは出ない —— task ごとの bench (one_call / hermes_ab) で別に取る。
 ;;
@@ -39,35 +42,75 @@
 (def since-days (js/parseInt (or (arg-after "--since") "30") 10))
 (def min-calls (js/parseInt (or (arg-after "--min-calls") "5") 10))
 
+(def ^:private src-ext "\\.(?:cljk|cljc|cljs|clj|kotoba|md|edn|yml|json)")
+(def ^:private read-re (js/RegExp. (str "(?:cat|sed -n [^ ]+|head[^|;]*?|tail[^|;]*?)\\s+([^\\s|;&>]+" src-ext ")") "g"))
+(def ^:private write-re (js/RegExp. (str "(?:>\\s*|sed -i[^ ]* .*? |perl -[a-z]*pi[^ ]* .*? |cp [^ ]+ |mv [^ ]+ )([^\\s|;&'\"]+" src-ext ")") "g"))
+(def ^:private py-write-re (js/RegExp. "p='([^']+)'" "g"))
+
+(defn- re-all [re text]
+  (set! (.-lastIndex re) 0)
+  (loop [out []] (if-let [m (.exec re text)] (recur (conj out (aget m 1))) out)))
+
 (defn- session-row
   "1 transcript → KPI 行 (map)。"
   [file]
   (let [lines (str/split-lines (.readFileSync fs file "utf8"))
         acc (volatile! {:api 0 :in 0 :cread 0 :ccreate 0 :out 0 :ctx0 nil
-                        :tools 0 :read 0 :bash 0 :symidx 0 :t-first nil :t-last nil})]
+                        :tools 0 :read 0 :bash 0 :symidx 0 :t-first nil :t-last nil
+                        :reads 0 :rereads 0 :rr-nowrite 0 :rr-chars 0})
+        pending (volatile! {})          ; tool_use id -> #{paths read}
+        last-read (volatile! {})]       ; basename -> :clean | :dirty
     (doseq [l lines]
       (when-let [o (try (.parse js/JSON l) (catch :default _ nil))]
-        (let [ts (aget o "timestamp")]
-          (when ts
-            (vswap! acc (fn [a] (-> a (update :t-first #(or % ts)) (assoc :t-last ts)))))
+        (when-let [ts (aget o "timestamp")]
+          (vswap! acc (fn [a] (-> a (update :t-first #(or % ts)) (assoc :t-last ts)))))
+        (let [m (aget o "message")
+              content (when m (aget m "content"))]
           (when (= "assistant" (aget o "type"))
-            (let [m (aget o "message") u (when m (aget m "usage"))]
-              (when u
-                (let [in (or (aget u "input_tokens") 0) cr (or (aget u "cache_read_input_tokens") 0)
-                      cc (or (aget u "cache_creation_input_tokens") 0) out (or (aget u "output_tokens") 0)]
-                  (vswap! acc (fn [a] (-> a (update :api inc) (update :in + in) (update :cread + cr)
-                                          (update :ccreate + cc) (update :out + out)
-                                          (update :ctx0 #(or % (+ cr cc))))))))
-              (when-let [content (when m (aget m "content"))]
-                (when (array? content)
-                  (doseq [p content]
-                    (when (= "tool_use" (aget p "type"))
-                      (let [nm (aget p "name")
-                            input (str (.stringify js/JSON (or (aget p "input") #js{})))]
-                        (vswap! acc (fn [a] (cond-> (update a :tools inc)
-                                              (= nm "Read") (update :read inc)
-                                              (= nm "Bash") (update :bash inc)
-                                              (and (= nm "Bash") (str/includes? input "symbol-index")) (update :symidx inc))))))))))))))
+            (when-let [u (when m (aget m "usage"))]
+              (let [in (or (aget u "input_tokens") 0) cr (or (aget u "cache_read_input_tokens") 0)
+                    cc (or (aget u "cache_creation_input_tokens") 0) out (or (aget u "output_tokens") 0)]
+                (vswap! acc (fn [a] (-> a (update :api inc) (update :in + in) (update :cread + cr)
+                                        (update :ccreate + cc) (update :out + out)
+                                        (update :ctx0 #(or % (+ cr cc))))))))
+            (when (array? content)
+              (doseq [p (array-seq content)]
+                (when (= "tool_use" (aget p "type"))
+                  (let [nm (aget p "name")
+                        inp (or (aget p "input") #js{})
+                        input (str (.stringify js/JSON inp))
+                        cmd (str (or (aget inp "command") ""))
+                        base (fn [pth] (.basename path pth))]
+                    (vswap! acc (fn [a] (cond-> (update a :tools inc)
+                                          (= nm "Read") (update :read inc)
+                                          (= nm "Bash") (update :bash inc)
+                                          (and (= nm "Bash") (str/includes? input "symbol-index")) (update :symidx inc))))
+                    ;; 書き込み: 既読 path を dirty に
+                    (doseq [w (concat (when (#{"Edit" "Write" "NotebookEdit"} nm) [(str (aget inp "file_path"))])
+                                      (when (= nm "Bash") (re-all write-re cmd))
+                                      (when (and (= nm "Bash") (str/includes? cmd "open(p,'w')")) (re-all py-write-re cmd)))]
+                      (when (contains? @last-read (base w)) (vswap! last-read assoc (base w) :dirty)))
+                    ;; 読み: 結果が返るまで pending
+                    (let [paths (cond (= nm "Read") #{(str (aget inp "file_path"))}
+                                      (= nm "Bash") (set (re-all read-re cmd))
+                                      :else #{})]
+                      (when (seq paths) (vswap! pending assoc (aget p "id") paths))))))))
+          (when (and (= "user" (aget o "type")) (array? content))
+            (doseq [p (array-seq content)]
+              (when (and (= "tool_result" (aget p "type")) (contains? @pending (aget p "tool_use_id")))
+                (let [c (aget p "content")
+                      txt (cond (string? c) c
+                                (array? c) (str/join "" (map #(or (aget % "text") "") (array-seq c)))
+                                :else "")
+                      n (count txt)]
+                  (doseq [pth (get @pending (aget p "tool_use_id"))]
+                    (let [k (.basename path pth) st (get @last-read k)]
+                      (vswap! acc update :reads inc)
+                      (when st
+                        (vswap! acc update :rereads inc)
+                        (when (= st :clean) (vswap! acc (fn [a] (-> a (update :rr-nowrite inc) (update :rr-chars + n))))))
+                      (vswap! last-read assoc k :clean)))
+                  (vswap! pending dissoc (aget p "tool_use_id")))))))))
     (let [{:keys [api in cread ccreate out t-first t-last] :as a} @acc
           wall-min (when (and t-first t-last)
                      (js/Math.round (/ (- (.getTime (js/Date. t-last)) (.getTime (js/Date. t-first))) 60000)))]
@@ -88,7 +131,7 @@
                  sort)
       rows-all (map session-row files)
       rows (filter #(>= (:api %) min-calls) rows-all)
-      cols [:id :api :ctx0 :ctx-mean :in :cread :ccreate :out :cost-eq :tools :read :bash :symidx :wall-min]
+      cols [:id :api :ctx0 :ctx-mean :in :cread :ccreate :out :cost-eq :tools :read :bash :symidx :reads :rereads :rr-nowrite :rr-chars :wall-min]
       fmt (fn [r] (str/join "\t" (map #(str (get r %)) cols)))]
   (println (str "SESSIONS\t" (count rows) "\t(" (- (count rows-all) (count rows)) " excluded: < " min-calls " api calls; since " since-days " d; " transcripts-dir ")"))
   (if (empty? rows)
@@ -103,6 +146,10 @@
         (println (str "K3 ctx0 (session start context, tokens): median " (med :ctx0) " mean " (mean :ctx0)))
         (println (str "K4 ctx-mean (re-read per call): median " (med :ctx-mean)))
         (println (str "K1 cost-eq per session: median " (med :cost-eq) "  — per api call: " (js/Math.round (/ (sum :cost-eq) (max 1 (sum :api))))))
+        (println (str "K4 re-read waste: reads " (sum :reads) ", re-reads " (sum :rereads)
+                      " (" (js/Math.round (* 100 (/ (sum :rereads) (max 1 (sum :reads))))) "%), of which no write in between "
+                      (sum :rr-nowrite) " (" (js/Math.round (* 100 (/ (sum :rr-nowrite) (max 1 (sum :rereads))))) "%), "
+                      (sum :rr-chars) " chars"))
         (println (str "share of cache_read spent re-reading ctx0: "
                       (js/Math.round (* 100 (/ (reduce + (map #(* (:ctx0 %) (:api %)) rows)) (max 1 (sum :cread))))) "%"))
         (when-let [out (arg-after "--tsv")]
