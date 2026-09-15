@@ -48,7 +48,9 @@
 
   8. (第 2 周) 4 軸は hard: assets-resolve / links-resolve / unique-ids / csp-allows-assets に finding が 1 つでもあれば床に関係なく exit 1。1 本の dead link が 75 document で 0.66 ずつに平均されて床 80 を越えた実測がある —— 404 は劣化ではなく破損。
 
-  9. 「compile 時に防ぐ」の到達点: nav を shinkansen.routes の route tree から生成すれば document の無い node は link になり得ない (framework 側は在る)。app-kotoba-cloud はまだ route tree を宣言せず -main で file を ad hoc に書いているので、build 直後・publish 直前の audit (hard 軸) が今日の等価物。route tree への移行は次の周。kotoba deploy の admission に同じ audit を載せるのは kotoba-lang/kotoba 側の別 PR。")
+  9. 「compile 時に防ぐ」の到達点: nav を shinkansen.routes の route tree から生成すれば document の無い node は link になり得ない (framework 側は在る)。app-kotoba-cloud はまだ route tree を宣言せず -main で file を ad hoc に書いているので、build 直後・publish 直前の audit (hard 軸) が今日の等価物。route tree への移行は次の周。kotoba deploy の admission に同じ audit を載せるのは kotoba-lang/kotoba 側の別 PR。
+
+  10. (第 3 周、参照 = オーナー提供の OrcaRouter console 15 画面) console の IA は data で持つ (app-kotoba-cloud.console/groups): sidebar・top bar の section・setup steps はその 1 表から生成する。console の chrome (credit chip / docs / はじめる n/N / セットアップを続ける banner / account chip) は session を 1 回読んで hydrate し、事実が判明するまで隠す。setup step は endpoint で読める 3 段 (サインイン / 本人確認 / 利用資格) のみ —— 読めない段 (最初のリクエスト) は段として出さない。/secure/ (guardrails / firewall / compliance の 3 view) と /models/ は authority が実際に評価する policy data (secure.cljk / research.cljk) から SSR し、browser は live の版と observe mode を確認するだけ。/billing/ は console 構造 (残高 tile / 月額・都度 / catalog が許可するまで button を隠す)。参照先に在って backend が無いもの (Dashboard / Requests / Logs / Insights / BYOK / Routing / Prompts / token 一覧・失効 / 取引履歴) は placeholder view を作らず、docs/uiux-coscientist/console-coverage.edn に owner 付きの gap として記録する。")
 
   (:adr/consequences
   "iteration-01 (rubric 確定後の baseline、102 document): 82.9 / 100、/account 33.3 (session.js が在る tree)、live は 20.5。
@@ -59,8 +61,10 @@
 
   第 2 周: iteration-03 = 16 軸 rubric での再 baseline (102 document、92.8、/docs/ dead ×75、hard で exit 1)。iteration-04 = /docs/ landing + csp ns + hard gate 着地後 (104 document、99.2、links-resolve closed、opened 0)。live: /docs/ 200 (直後は edge cache の旧 404 が HIT、max-age=0 must-revalidate で解消)、/docs/ 下層は 390 / 1440 で sidebar shell が正しく、stylesheet は CSP を通る。gate が落ちること: public/docs/index.html を除くと exit 1、HARD links-resolve が 76 document で /docs/ を名指し。
 
+  第 3 周 (console IA): iteration-05 = 111 document、99.8 (main の blog locale emit を merge 後 115 document、99.6)、/secure/ /models/ /billing/ は 100 (billing は 84.5 から)。console-coverage.edn の before/after: shell 7 要素 0 → 7、Guardrails / Firewall / Compliance / Models が cell や home の section から document へ、Billing が marketing shell から console へ。backend gap 8 件は据え置き (owner :backend)。実測で見つけた token 欠落: --hig-color-key-* は bridge に無く (site.css に定義 0)、sidebar の current 項目は一度も強調表示されていなかった —— tint / system-background / separator に置換。
+
   規則: UI の品質を語るときは shinkansen.audit の数値と delta を出す。「見た目が良くなった」は測定ではない。")
 
   (:adr/body
-  "着地: kotoba-lang/shinkansen PR #1 / #2 (audit + coscientist + viewport 修正 + deps; links / csp / pre 軸)、kotoba-lang/app-kotoba-cloud PR #143 / #146 / #148 (consumer gate + /account + shell; CSP style-src 'self'; /docs/ landing + hard gate)。deploy 済み、west pin は shinkansen e085c42 / app-kotoba-cloud 1edf09a。")
+  "着地: kotoba-lang/shinkansen PR #1 / #2 (audit + coscientist + viewport 修正 + deps; links / csp / pre 軸)、kotoba-lang/app-kotoba-cloud PR #143 / #146 / #148 / #168 (consumer gate + /account + shell; CSP style-src 'self'; /docs/ landing + hard gate; console IA as data + /secure/ /models/ /billing/)。deploy 済み、west pin は shinkansen e085c42 / app-kotoba-cloud bf6cbbe。")
 ))
