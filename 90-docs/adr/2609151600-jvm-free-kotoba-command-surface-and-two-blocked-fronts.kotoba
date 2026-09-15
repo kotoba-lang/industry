@@ -1,0 +1,47 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609151600-jvm-free-kotoba-command-surface-and-two-blocked-fronts")
+  (:adr/title "cloud-itonami-commands は Kotoba component（amu、JVM 無し）で cli がそれを実行する — cli 本体と taxonomy 群の Kotoba 化は測って :blocked")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/related (vector "ADR-2609151200" "ADR-2608650000" "ADR-2607279200" "ADR-2607198300" "ADR-2608136000"))
+  (:adr/context
+  "オーナー指示 2026-09-15: 「続き、また jvm 依存なし、kotoba、amu native compiler のみとなる様にして」→ 1（cloud-itonami-commands）2（cloud-itonami-cli）3（taxonomy 群の共通化）の全部。
+
+  規則: 移行単位は component 全体（q9-migration.edn v3、`:decision-only-slices-allowed false`）。compiler が表現できないなら `:blocked`、小さい述語に削って緑にしない。「native に無い」は設計判断の証拠にならず、backend ごとの現在地は 1 コマンドで測る。
+
+  ## 測った壁（amu 73ddd26、kotoba-kir 59c67e6、2026-09-15。すべて 1 file の probe で再現）
+
+  - 型付きコレクション: `[:list T]` は伸びない（`conj` は「typed set を要求」と名指しで拒否）、`map` / `filter` は vector-i64 だけ、`typed-map-keys` は wasm32 で lower しない（「unsupported typed Wasm expression」）、`string-index-of` は wasm32 で未 qualified。
+  - **native-aot（`--target aarch64-macos`）は typed collection を一切受けない**: `[:list :string]` / `[:map :i64 :i64]` / `[:map :i64 :string]` の 3 probe とも「typed values currently require the kotoba-script web target, typed Wasm target, or qualified native string/scalar-record/option-i64/result-i64 features」。scalar record（i64 + string）は compile も実行も通る。
+  - `:document`（有界 EDN 木）は wasm32 / js / KIR で使える。上限: 256 node、collection 32 item、深さ 8、文字列 64 KiB。`document-edn-read` は tagged literal と壊れた EDN で host trap（guest では捕まえられない: `try` は `#{:compiler}` のみ）。
+  - module 制約: browser host は typed literal 256 個 / module（文字列 literal も数える。300 個で「too many typed ABI literals」）、文字列 literal 合計 64 KiB / module、`case` は入れ子 `if` に脱糖され 211 節で host stack を使い切る、関数の引数は 5 個まで。
+  - `string-length` は全 backend で UTF-8 byte 長、`string-code-point-at` は code point 内 offset を拒否。
+  - fuel は compile 時に埋め込まれ instance 単位（既定 512、`--fuel` で変更）。registry 1 回走査 ≈ 2,700、最大検索 ≈ 15,000。`amu test` は 1 instance で全 test を回すので既定 fuel ではこの component を gate できない。
+  - `amu test` / `amu compile --target wasm32` / `amu check` は JVM を呼ばない: PATH に trap する `java` / `clojure` / `clj` の stub を置いて走らせ、trap は一度も発火しなかった（`:jvm-kir` は target 名であって JVM ではない）。")
+  (:adr/decision
+  "## 1. cloud-itonami-commands — 着地（main ae09ab0、west pin 前進済み）
+
+  `cloud.itonami.commands` と `cloud.itonami.repo-profile` を `.kotoba` の whole-component として書き、`amu compile --jvm-free --target wasm32 --fuel 5000000` で `dist/` に出荷（amu の browser-host.mjs を隣に置く）。
+  - 動的な値は全部 `:document`。table は 8 command ごとの EDN 文字列を access 時に読む（literal 27 + 5 + 1）。拒否は値（oracle の `:type` と data を持つ `{:error …}`）、host 効果は要求（`{:needs …}`）、command document は front end が読む projection。generated `commands.kotoba` は `.in` に両 table を splice したもので、registry と resolver は 1 artifact・1 CID。
+  - host: `cloud.itonami.kotoba-host`（nbb、機構のみ）、adapter `cloud.itonami.commands.guest` / `.repo-profile.guest` は oracle namespace と同名・同値・同 throw。
+  - gate（全部 JVM 無し）: `scripts/test_kotoba.cljk` 39/39（1 test = 1 instance）、`test/kotoba_parity_nbb.cljk` **588 checks / 0 failed**（oracle を 1 箇所壊すと 2 件赤）。parity は本物の食い違いを 2 つ拾った: cljs oracle が `*` を %2A にしていた（URLEncoder は残す。oracle 側を修正）、空白だけの検索語。
+  - deps.edn から `org.clojure/clojure`・Maven・JVM test runner を撤去。
+  - **native-aot は `:blocked`**（上の compiler 文言）。名指す gap: native-aot の typed collection（list / map）。scalar 述語に削らない。
+  - `.cljk` oracle は残す: cloud-itonami-app（JVM）と app/mobile（cljs）が require している。それらの cutover まで parity harness が縛る。
+
+  ## cli の cutover — 着地（cloud-itonami-cli main 79dfb46、pin 前進済み）
+
+  `bin/itonami` は launcher（`--print-data-dir` を自分の file で答え、2 component を instantiate してから `bin/itonami_main.cljk` を load-file）。require 1 行の置換で判断はすべて wasm。全 dispatch 経路（status / commands / unknown / host-side / missing-parameter / --help / profile explain の default・for= 選択）を実測、起動 4.7 s は前後同じ（engine の分、wasm は測定できない差）、6 suite 緑。
+
+  ## 2. cloud-itonami-cli 本体 — `:blocked`
+
+  capability-catalog に **terminal の capability が無い**（`stdin` / `tty` / `keypress` / `winsize` で 0 件。在るのは `:cli/args` `:io/write` `:env/read` `:fs/*` `:process/spawn` `:secret/get` `:http/*` `:clock/now` `:ui/next-event`）。REPL（raw mode の editor、keypress、cursor、幅測定）は component の主面なので、component 全体としては表現できない。加えて http-v1 / storage-v1 / log-v1 の kit は `:wasm32-kotoba-v1 :pending`（`:wasm-aot` と `:jit` は implemented）。名指す gap: terminal kit（keypress event / raw mode / winsize / write）と http-v1 の wasm32-kotoba-v1 qualification。one-shot の非対話部分だけを切り出すのは decision-only slice に当たるのでやらない。
+
+  ## 3. taxonomy 群（marketentry ×186 / tosmonitor ×51）— `:blocked`（依存順）
+
+  `amu check` の第一の壁は ns 形式（`:export` 必須、両 family とも）。構文の profile: langgraph.graph（230 行）は closure を map に持ち `throw` 5 / `reduce-kv` 2、checkpoint は atom + defprotocol の MemStore、marketentry.store は atom 2 / swap! 7 / defprotocol 1 / defrecord 3、marketentryllm は `#?(:clj` の LLM transport（→ `:llm/generate`、kit は `:wasm-aot` / `:jit` implemented）。**依存が `.cljc` のままの面は移行しない**規則により、先に kotoba-lang/langgraph（+ langchain-store）を Kotoba にしなければ component は閉じない。順序: langgraph → marketentry / tosmonitor の 1 本 → 237 repo の deps rewire wave。今日はここまで測って記録。
+
+  ## 残した gap（次に手を出す先）
+  - amu: `amu test --fuel` と test ごとの fresh instance（この repo は `scripts/test_kotoba.cljk` で代替）。
+  - launchd `cloud.itonami.app.local` は `~/.gftd/bin/itonami-app-resident.cljs` → JVM `clojure.main` を 10 秒ごとに起こして `server.clj が無い` で死に続けている（1338 を serve しているのは手動起動の nbb signin-server）。unload か nbb 版への付け替えが要る。")
+))
