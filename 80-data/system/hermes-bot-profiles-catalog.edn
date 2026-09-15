@@ -1,7 +1,7 @@
 ;; 80-data/system/hermes-bot-profiles-catalog.edn — Hermes bot profile + cron 棚卸し（内部データ、非公開）。
 ;; 実測: 2026-09-16 (JST)。source: ~/.hermes/profiles/<name>/config.yaml (model.default) + cron/jobs.json。
-{:catalog-version 1
- :measured-at "2026-09-16T01:02:00+09:00"
+{:catalog-version 2
+ :measured-at "2026-09-16T01:33+09:00"
  :profiles [
   {:profile "akc-blog-i18n" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "9e2c2ae32cd2" :name "akc-blog-i18n daily blog translation" :schedule "30 4 * * *"}]}
   {:profile "akc-csf-fit-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "f7c745360a8d" :name "akc-csf-fit-ops daily evidence + iteration" :schedule "10 3 * * *"}]}
@@ -25,9 +25,11 @@
   {:profile "kotoba-cloud-sales" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "65eb01eb00f9" :name "kotoba-cloud-sales daily iteration (catalog data)" :schedule "18 6 * * *"}]}
   {:profile "kotoba-pep-maint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "da76bc763e74" :name "kotoba-pep-maint weekly maintenance" :schedule "30 4 * * 4"}]}
   {:profile "kotoba-proof-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "eb3873c027e3" :name "kotoba-proof-ops daily iteration" :schedule "20 3 * * *"}]}
+  {:profile "kotoba-vuln-eval" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "a742bf9b792c" :name "kotoba-vuln-eval daily vulnerability assessment" :schedule "42 4 * * *"}]}
   {:profile "mhri-research" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "23bd7fe1c75d" :name "mhri-research weekly maintenance" :schedule "30 4 * * 2"}]}
   {:profile "orgbrain-maint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "1a329082bc42" :name "orgbrain-maint daily tick" :schedule "40 4 * * *"}]}
   {:profile "pr-drain" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "fe323bd36793" :name "pr-drain tick" :schedule "every 180m"}]}
+  {:profile "social-catalog-maint" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "210252f7b2cb" :name "social-catalog weekly maintenance" :schedule "20 4 * * 3"}]}
   {:profile "sousa-ontology" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "d834dd40d54a" :name "sousa-ontology" :schedule "0 1,7,13,19 * * *"}]}
   {:profile "tm-awareness" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "23e86d2ba662" :name "tm-awareness daily iteration (Trend Micro catalog" :schedule "30 5 * * *"}]}
   {:profile "tm-container-sec" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "2b9ccf09ec7c" :name "tm-container-sec daily iteration (Trend Micro cata" :schedule "12 5 * * *"}]}
@@ -47,5 +49,6 @@
   {:profile "tm-vbhn" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "b2758180d9cb" :name "tm-vbhn daily iteration (Trend Micro catalog cover" :schedule "24 4 * * *"}]}
   {:profile "tm-vbts" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "69e7592db04f" :name "tm-vbts daily iteration (Trend Micro catalog cover" :schedule "0 4 * * *"}]}
   {:profile "tm-ztsa" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "2ec0e9094af7" :name "tm-ztsa daily iteration (Trend Micro catalog cover" :schedule "42 4 * * *"}]}
+  {:profile "vc-fund-ops" :model "z-ai/glm-5.3-flash" :provider "openrouter" :cron [{:job-id "450adcdeeed8" :name "vc-fund-ops daily iteration (VC fund catalog cover" :schedule "50 5 * * *"}]}
  ]
- :counts {:profiles 44 :with-cron 41 :jobs 41}}
+ :counts {:profiles 47 :with-cron 44 :jobs 44}}
