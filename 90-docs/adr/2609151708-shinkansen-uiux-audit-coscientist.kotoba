@@ -7,7 +7,8 @@
   (:adr/doc-type "adr")
   (:adr/source-format "kotoba")
   (:adr/topic "shinkansen-uiux-audit-coscientist")
-  (:adr/repos (vector "orgs/kotoba-lang/shinkansen" "orgs/kotoba-lang/app-kotoba-cloud"))
+  (:adr/repos (vector "orgs/kotoba-lang/shinkansen" "orgs/kotoba-lang/app-kotoba-cloud"
+                      "orgs/kotoba-lang/cloud-kotoba-dds" "orgs/kotoba-lang/jp-go-digital-design-system"))
   (:adr/related (vector "adr-2609131808-shinkansen-content-addressed-web-framework"
                         "adr-2607132300"
                         "adr-2606141500-keiei-arbor-coscientist-engine"
@@ -50,7 +51,17 @@
 
   9. 「compile 時に防ぐ」の到達点: nav を shinkansen.routes の route tree から生成すれば document の無い node は link になり得ない (framework 側は在る)。app-kotoba-cloud はまだ route tree を宣言せず -main で file を ad hoc に書いているので、build 直後・publish 直前の audit (hard 軸) が今日の等価物。route tree への移行は次の周。kotoba deploy の admission に同じ audit を載せるのは kotoba-lang/kotoba 側の別 PR。
 
-  10. (第 3 周、参照 = オーナー提供の OrcaRouter console 15 画面) console の IA は data で持つ (app-kotoba-cloud.console/groups): sidebar・top bar の section・setup steps はその 1 表から生成する。console の chrome (credit chip / docs / はじめる n/N / セットアップを続ける banner / account chip) は session を 1 回読んで hydrate し、事実が判明するまで隠す。setup step は endpoint で読める 3 段 (サインイン / 本人確認 / 利用資格) のみ —— 読めない段 (最初のリクエスト) は段として出さない。/secure/ (guardrails / firewall / compliance の 3 view) と /models/ は authority が実際に評価する policy data (secure.cljk / research.cljk) から SSR し、browser は live の版と observe mode を確認するだけ。/billing/ は console 構造 (残高 tile / 月額・都度 / catalog が許可するまで button を隠す)。参照先に在って backend が無いもの (Dashboard / Requests / Logs / Insights / BYOK / Routing / Prompts / token 一覧・失効 / 取引履歴) は placeholder view を作らず、docs/uiux-coscientist/console-coverage.edn に owner 付きの gap として記録する。")
+  10. (第 3 周、参照 = オーナー提供の reference console 15 画面) console の IA は data で持つ (app-kotoba-cloud.console/groups): sidebar・top bar の section・setup steps はその 1 表から生成する。console の chrome (credit chip / docs / はじめる n/N / セットアップを続ける banner / account chip) は session を 1 回読んで hydrate し、事実が判明するまで隠す。setup step は endpoint で読める 3 段 (サインイン / 本人確認 / 利用資格) のみ —— 読めない段 (最初のリクエスト) は段として出さない。/secure/ (guardrails / firewall / compliance の 3 view) と /models/ は authority が実際に評価する policy data (secure.cljk / research.cljk) から SSR し、browser は live の版と observe mode を確認するだけ。/billing/ は console 構造 (残高 tile / 月額・都度 / catalog が許可するまで button を隠す)。参照先に在って backend が無いもの (Dashboard / Requests / Logs / Insights / BYOK / Routing / Prompts / token 一覧・失効 / 取引履歴) は placeholder view を作らず、docs/uiux-coscientist/console-coverage.edn に owner 付きの gap として記録する。
+
+  11. (第 4 周、オーナー指示: ロゴ・menu 縮小・言語切替 + theme toggle) 公開面の chrome は cloud-kotoba-dds の components で建てる (jp-go-dds の language-selector を :language-selector 契約で、theme-toggle は jp-go-dds.theme-toggle、dark は jp-go-dds.page の :dark-source / :dark-inline? で /css/site.css 側に 1 度だけ)。app 側 CSS は token 契約の上の geometry だけ。
+
+  12. (第 5 周、決済) 決済は本番経路 (AWAI live account、live price map、runtime portal configuration) に配線するが、BILLING_ENABLED / BILLING_METERING_READY の 2 flag はオーナーの明示判断まで倒さない —— 有料利用を計測して請求に乗せる経路 (reserve! / settle! の呼び出し元) が無いまま課金を開けない。
+
+  13. (第 5 周、locale) 公開 URL は locale-free 1 本 (shinkansen.locale)。言語切替は同じ route の ?lang=<locale> を文書相対で付け、edge がその variant を直接 (200) 配信して kb_locale を持続する。非英語 variant は <route>?lang=xx を self-canonical、hreflang / og:url も同形、x-default は locale-free。/xx/… prefix は 301 互換のみ。emit tree の /<locale>/<root> は locale/variant-roots に全部載せ、smoke が emit tree から一覧を導出して drift で落ちる (blog / apps が emit されながら配信されていなかった実測)。
+
+  14. (第 6 周、モデル) モデルは teams 1 表 (research/teams) を page・edge・authority の 3 者が読む: red = 専用推論基盤、card 本人確認 + AUP 同意 + 既存 ladder; blue = 共有推論経路、サインイン + 無料枠 + guardrails、標準 3 task のみ。edge は blue に /status hop も ladder も掛けない。鍵の無い経路は名指しで拒否し他経路へ fallback しない。公開面 (catalog / page / README / repo docs) は他社サービス名を一切書かない (オーナー指示 2026-09-15); 保存済み secret 名と動作に必要な endpoint literal だけが残る。
+
+  15. (第 7 周、chrome の層 + docs host) 文書が宣言した chrome はその層を保つ —— shinkansen.audit :chrome-layers (data-chrome=top は sticky + anchor、data-chrome=float は absolute + z-index、marker が契約で class 名ではない、menu は hidden のまま測る)。部品は cloud-kotoba-dds.shell (topbar / account-entry / css / script: 両状態を server 側で emit し browser は埋めて表示するだけ)。/docs/ は docs.kotoba.cloud: href は apex 形で 1 回だけ書き、emit する surface ごとに 1 回の walk で解決する (console/surfaces, href-for, site/surface-hrefs); 1 本の emit tree を 2 host が分け合うので audit は document ごとの :ctx (shinkansen) で自分の surface の document 集合に対して link を解決する。")
 
   (:adr/consequences
   "iteration-01 (rubric 確定後の baseline、102 document): 82.9 / 100、/account 33.3 (session.js が在る tree)、live は 20.5。
@@ -63,8 +74,12 @@
 
   第 3 周 (console IA): iteration-05 = 111 document、99.8 (main の blog locale emit を merge 後 115 document、99.6)、/secure/ /models/ /billing/ は 100 (billing は 84.5 から)。console-coverage.edn の before/after: shell 7 要素 0 → 7、Guardrails / Firewall / Compliance / Models が cell や home の section から document へ、Billing が marketing shell から console へ。backend gap 8 件は据え置き (owner :backend)。実測で見つけた token 欠落: --hig-color-key-* は bridge に無く (site.css に定義 0)、sidebar の current 項目は一度も強調表示されていなかった —— tint / system-background / separator に置換。
 
-  規則: UI の品質を語るときは shinkansen.audit の数値と delta を出す。「見た目が良くなった」は測定ではない。")
+  規則: UI の品質を語るときは shinkansen.audit の数値と delta を出す。「見た目が良くなった」は測定ではない。
+
+  第 4〜8 周 (同日): iteration-06 = 116 document、99.6 → 99.7 (locale-path-links closed、opened なし)。iteration-07 = 116 document、99.7 (chrome-layers を足した直後は landing 24 変種 + 直接 render 8 頁が 0 —— inline CSS list に shell/css が届いていないのを軸が名指し; closed、opened なし)。live: /docs/… → 301 docs.kotoba.cloud (custom domain は deploy で自動作成)、/blog/ と /apps/ が ja cookie で ja を返す (前は英語)、?lang=ja が 200 + Set-Cookie、/v1/models は 4 行 (team / route = shared|dedicated / availability) で他社名 0、blue は route-configured (鍵は BLUE_ROUTE_API_KEY として research authority に保存、値は一度も表示していない)。実ブラウザ arm: menu を開いても foot の高さ・chip 位置が不変、bar は 4000px scroll 後も top 0、Escape で focus 復帰; cloud-kotoba-dds test/shell.mjs は static 化した複製で両方向とも落ちる。kbb -M:test は main 既存の 265 件 (site-test copy) のまま; main 側 #196 由来の server-never-executes-tools 1 件は main 自体の不整合で未着手。
+
+  未測定 / 残り: blue 経路の実推論 end-to-end (署名済み session / PAT が要る); docs host では session cookie が host 単位で常にサインイン表示 (cookie Domain を .kotoba.cloud にするかはオーナー判断); 決済 2 flag; note-density 14 / repeated-actions 2 / idle-disabled 1 の deferred 軸; jp-go-dds pin (bcf5262) は main (54fe70e) より後ろ。")
 
   (:adr/body
-  "着地: kotoba-lang/shinkansen PR #1 / #2 (audit + coscientist + viewport 修正 + deps; links / csp / pre 軸)、kotoba-lang/app-kotoba-cloud PR #143 / #146 / #148 / #168 (consumer gate + /account + shell; CSP style-src 'self'; /docs/ landing + hard gate; console IA as data + /secure/ /models/ /billing/)。deploy 済み、west pin は shinkansen e085c42 / app-kotoba-cloud bf6cbbe。")
+  "着地: kotoba-lang/shinkansen PR #1 / #2 (audit + coscientist + viewport 修正 + deps; links / csp / pre 軸)、kotoba-lang/app-kotoba-cloud PR #143 / #146 / #148 / #168 (consumer gate + /account + shell; CSP style-src 'self'; /docs/ landing + hard gate; console IA as data + /secure/ /models/ /billing/)。deploy 済み、west pin は shinkansen e085c42 / app-kotoba-cloud bf6cbbe。 第 4〜8 周: app-kotoba-cloud PR #172 / #174 / #176 / #178 / #185 / #187 / #189 / #195 / #197 + docs-vendor-neutral (main cb6ed734、west pin 同)、shinkansen 9cdd89b (:chrome-layers、per-document :ctx)、cloud-kotoba-dds bc3c05c (shell 0.1.0)、jp-go-dds bcf5262 (:dark-source / :dark-inline?)。resume point: 次の最初の command は app-kotoba-cloud で `npm run build && node test/worker-smoke.mjs && npm run audit:uiux` (床 80、hard 4 軸 + chrome-layers); 次の仕事は blue 経路の e2e (PAT 発行 → /v1/chat/completions に blue id) と決済 flag の判断。")
 ))
