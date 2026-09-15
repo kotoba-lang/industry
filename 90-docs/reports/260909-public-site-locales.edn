@@ -16,7 +16,20 @@
    :cloudflare-version "d5336518-dc71-4674-8c8c-5f94027f6840"
    :verified [:all-17-public-routes :zh-alias :html-lang :rtl :browser-egyptian-arabic]
    :tests {:tests 52 :assertions 2112 :failures 0}
-   :scope "Public entry/navigation and substantive static prose. Dynamic account messages and linked legal/reference documents retain their source language; coverage inventory discloses fallback."}
+   :scope "Public entry/navigation and substantive static prose. Dynamic account messages and linked legal/reference documents retain their source language; coverage inventory discloses fallback."
+   ;; 2026-09-16 (owner direction 2026-09-15: the console must match the landing's locales)
+   :console {:status :translated
+             :surfaces ["/account" "/secure/" "/models/" "/identity/" "/security/" "/security/services/" "/security-data/" "/billing/"]
+             :chrome {:locales 22 :keys 38 :translated-by "scripts/translate-console-copy.cljk over the OpenRouter API (anthropic/claude-sonnet-5)"
+                      :authored [:en :ja] :generated 20 :review :machine-native-speaker-unverified
+                      :source "kotoba-lang/app-kotoba-cloud src/app_kotoba_cloud/console_locales.cljk"
+                      :check "kbb --backend sci scripts/translate-console-copy.cljk --check → SCANNED 760 / MISSING 0"}
+             :body {:authored [:ja :en] :other-locales :english-body-in-localized-shell
+                    :note "The console bodies (account, secure, models, security hub, services, identity) are ja / en; every other locale gets its shell in its language around an English body marked lang=en. Not counted as translated for those locales."}
+             :switch "every console document offers all 22 locales as ?lang= on the same route; the choice persists as kb_locale"
+             :commit "b613e437194255a56f6127e6f836a05721509f9d"
+             :cloudflare-version "188233e9-3473-4b3f-a938-9bfae982bd90"
+             :verified [:worker-smoke-11-variant-roots :audit-98.2 :browser-arm-390-768-1440 :chrome-indonesian-console]}}
   {:domain "murakumo.cloud" :status :verified-live
    :repo "network-awai/cloud-murakumo"
    :commit "75f62a449c3ab8c04eb97f31049abe675c40b09f"
