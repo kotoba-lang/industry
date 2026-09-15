@@ -1,0 +1,31 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609151437-amd-sev-snp-fleet-fuse-gate")
+  (:adr/title "murakumo TEE host 選定: AMD SEV/SNP は EPYC のみ — クライアント SKU は CPUID 実測で SNP 不可能を確定")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-15")
+  (:adr/related (vector "ADR-2609141538" "ADR-2809041200" "ADR-2608136000"))
+  (:adr/context
+  "2026-09-15 要求: murakumo TEE pilot (ADR-2609141538 段階3) の host 選定に先立ち、手持ち gad (Strix Halo) が SNP を持つか実測し、購入判断の基準を固定する。
+
+  実測 (gad 実機: GMKtec EVO-X2, BIOS EVO-X2 1.11 AMI 2025-10-17, Ryzen AI Max+ 395, Ubuntu 24.04 kernel 7.0.0-31): cpuid -l 0x8000001f は SME=true, SEV=false, SEV-ES=false, SEV-SNP=false, RMPQUERY=false, SEV-enabled guests=0。leaf 自体は生きており encryption bit 位置 0x33 / PA 幅縮減 2bit を報告 — AMD がこの SKU の SEV 全家系を能動的に無効化している値。PSP コントローラ 1022:17e0 は PCI に在り amdtee/fTPM は動作 (Secure Processor は生きている) が modprobe ccp 成功でも ccp_crypto: Cannot load: there are no available CCPs、/dev/sev 無し、kvm_amd の sev/sev_es/sev_snp は全て N、dmesg に SEV/TSME 起動記録ゼロ。ホスト kernel は CONFIG_KVM_AMD_SEV=y / CONFIG_AMD_MEM_ENCRYPT=y で準備済み — 落ちているのはホスト SW でなくシリコン側。
+
+  公開情報の裏付け (2026-09-15): AMD 公式 SEV 文書の対応表は EPYC 7001/7002/7003/8004/9004/9006 のみを名指し。Threadripper PRO 9000 (Zen5 HEDT) でも BIOS 設定の全組み合わせで /dev/sev が出ない実例 (level1techs 2025-08)。Ryzen PRO 6000/8040/AI 300 PRO のセキュリティ訴求は Pluton / Memory Guard / Secure Processor (fTPM) 止まりで SEV/SNP は表記なし。Ryzen AI 300 が SEV-SNP 関連脆弱性 (EntrySign 等) の対象リストに出るのは Zen5 全列挙であって SNP 実装の証拠にならない。
+
+  Intel 側 (同日調査, 公開情報): TDX host は Xeon のみ — Sapphire Rapids (一部 SKU) / Emerald Rapids / Xeon 6 Sierra Forest (E-core) / Granite Rapids (P-core)、TDX module 1.5.x / 2.0.x (Intel 公式対応 CPU 一覧 + Ubuntu TDX docs)。クライアント Core Ultra 200S (Arrow Lake) の datasheet セキュリティ項目は Intel PTT (TPM 2.0) 止まりで TDX 表記なし。Panther Lake は Silicon Security Engine (ISSEI) が SPDM 測定を持ち、Intel 自身が TDX を future platforms 用と表記 — クライアント TDX host は出ていない。")
+
+  (:adr/decision
+  "1. SNP host 調達は EPYC 7003+ のみ。AMD クライアント/HEDT (Ryzen, Ryzen PRO, Threadripper / PRO) は TEE 化対象外。PRO ラベル・世代・価格帯から SNP 可と推測しない。
+
+  2. 判定は機材購入前の cpuid -l 0x8000001f 実測のみで行う (bit1 SEV / bit4 SNP / bit28 RMPQUERY)。CPUID が false の機で BIOS・AGESA・UEFI 自作での開放を試みない — CPUID bit 自体が立たない層は OEM 設定で救えない (gad 実測)。
+
+  3. Intel TDX host 候補は Xeon (Sapphire Rapids 一部 SKU 以降、Granite Rapids / Sierra Forest 含む) に限定。クライアント Core Ultra は TDX host 候補から外す。クライアント TDX が実機で確認できた時点で再判定。
+
+  4. ADR-2609141538 段階3 の TEE pilot node 調達基準に 1-3 を反映する。quote を出せない機材は attested:false のまま fail-closed (既存実装どおり)。
+
+  5. Strix Halo (gad) は標準 tier 推論 node として使う。TEE 要件 workload は載らない (ADR-2609141538 の trust-tier 区分どおり)。")
+
+  (:adr/body
+  "規則: 実測値なしに SEV/SNP/TDX 対応を断定しない — 未測定の機は UNVERIFIED。検索での「対応」と実機で動くことを混同しない。SEV サポートは SKU 単位の fuse 戦略で決まり、世代 (Zen3+/Zen4/Zen5) からは推測できない。Ryzen PRO 6000 の SNP client 対応公表 (AMD 声明ベース) は残置するが、市販機で SNP が使えたという確認は無く、実機 CPUID が唯一の判定。
+
+  検査: この判断は検査コードを持たない調達基準。効く検査は購入前の 1 コマンド (cpuid -l 0x8000001f) と、quote を出せない node を attested:false に落とす既存 fail-closed 経路。")
+))
