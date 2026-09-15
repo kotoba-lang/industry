@@ -139,6 +139,15 @@
   (cond
     (nil? command) {:kind :unknown}
 
+    (re-find #"\bkbb\b" command)
+    (if (re-find #"-M:[A-Za-z0-9_.-]+" command)
+      (if-let [alias (second (re-find #"-M:([A-Za-z0-9_.-]+)" command))]
+        {:kind :clojure-alias :alias alias :command command}
+        {:kind :unknown :command command})
+      (if-let [script (second (re-find #"((?:[\w./-]+/)?bin/[A-Za-z0-9_.-]+)" command))]
+        {:kind :node-script :script script :command command}
+        {:kind :unknown :command command}))
+
     (re-find #"clojure\b" command)
     (if-let [alias (second (re-find #"-M:([A-Za-z0-9_.-]+)" command))]
       {:kind :clojure-alias :alias alias :command command}
