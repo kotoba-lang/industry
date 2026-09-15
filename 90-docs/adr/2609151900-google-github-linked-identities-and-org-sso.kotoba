@@ -31,7 +31,9 @@
    "D6: SAML は未対応の gap として記録（org-oasis-saml は emit-only で署名検証を持たない）。対象 IdP（Google Workspace / Entra ID / Okta / OneLogin / JumpCloud）は OIDC で足りる"))
 
   (:adr/artifact
-  (vector "net-kotobase/control-plane: authn.link / authn.org-sso / authn.org-sso-model、sign-in page の {{LINK}} slot + hint banner + allowCredentials、docs/adr/2609151900-google-github-linked-identities-and-org-sso.md、docs/ENVIRONMENT.md、CHANGELOG"
+  (vector "着地（main 到達済み、2026-09-15）: net-kotobase/control-plane PR #707 → main 5aba3520（west pin 5aba3520）。kotoba-lang/app-kotoba-cloud PR #188 → 99d4e77a、PR #190（provider 未設定ならボタン非表示）→ 401ce93d（west pin 401ce93d）。root: ADR + inventory PR #3126 → 1da136e9、secrets-location-map → bc9299d9"
+   "deploy（本番、2026-09-15）: kotobase-authn version a104ae8c-9c34-4b5d-91c5-763b7bdf829e（auth.kotoba.cloud / auth.kotobase.net / auth.murakumo.cloud）、kotoba-cloud-control-plane version 774f1692-22c7-4034-88a4-8ddaa3f81f5e（kotoba.cloud 他）。ORG_SSO_ENTITLEMENT_SECRET は kagi net-kotobase に発行し両 Worker に put 済み。GOOGLE/GITHUB の client credential は未発行 → /v1/link/providers は [] でボタンは hidden（fail closed の実測）"
+   "net-kotobase/control-plane: authn.link / authn.org-sso / authn.org-sso-model、sign-in page の {{LINK}} slot + hint banner + allowCredentials、docs/adr/2609151900-google-github-linked-identities-and-org-sso.md、docs/ENVIRONMENT.md、CHANGELOG"
    "test: authn/test/link_worker_smoke.cljk 34/34、authn/test/org_sso_worker_smoke.cljk 40/40（built bundle + 実 AuthnStore + did:key CACAO の実 sign-in、provider/IdP は fetch stub）。mutation: callback が gftd_session を付けると 3 check が赤（実測 2026-09-15）"
    "authn JVM suite: clojure -M:test 64 tests / 546 assertions / 0 failures（main では 29 failures — 死んだ Base Account key と en-only の迷子 key を除去、6 文字列を 22 locale に追加）"
    "kotoba-lang/app-kotoba-cloud: org_sso_gateway.cljk（/v1/org/sso/status|configure|remove|sync|start、/v1/account/identities[/revoke]）、/sign-in/{google|github} と /account/link/{google|github} の hand-off、org_authority /sso-policy /sso-provision、billing/active-plan、account page の 連携アカウント / 組織 SSO panel"
@@ -85,6 +87,34 @@ secret が無ければ誰も書けない。これが D3 / D4。
   domain 外 email、Pro entitlement、別 account の同 sub、期限切れ gate、delete 後の open）。
   mutation で赤を確認（8 問の 6）。既存 enterprise / apex / device / native-wallet smoke は不変。
 - app-kotoba-cloud: kbb -M:test は main と同じ 265 failures（site test の pre-existing、
-  theme/topbar 合流後）に対し増減なし + org-sso-gateway-test の追加分が緑。build（render +
-  amu compile + shadow）が通ること、worker-smoke は本文に記す。"))
+  theme/topbar 合流後）に対し増減なし + org-sso-gateway-test の追加分が緑（最終 117 tests /
+  3512 assertions）。npm run build（render + amu compile + shadow）完走、test:worker 通過、
+  audit:uiux 99.7。
+- live probe（deploy 後）: auth.kotoba.cloud /v1/oauth/google/start → 410（body が新 prefix を
+  名指す）、/v1/link/providers → []、/v1/org-sso/status → 401 sign-in-required、/link.js 200、
+  sign-in page に hint 帯あり・provider 節なし。kotoba.cloud /sign-in/google → 302 auth の
+  link start、/v1/account/link/providers → []、account page の provider ボタンは hidden。
+
+## 未実装 / gap（優先順）
+
+1. Google / GitHub の OAuth app 発行と 4 secret の put（オーナー作業。発行までボタンは出ない）。
+2. live の provider / IdP round trip の実測（inventory は :unverified のまま。Google Workspace か
+   Okta の test tenant で /v1/org-sso/start → callback → status.gate open を 1 度通す）。
+3. SAML（XML-DSig 検証器が無い。要るなら kotoba-lang に host-owned verifier を起こす別 ADR）。
+4. org billing（ADR-2609141633 §5）着地後、plan の出所を owner の ledger から org の ledger へ。
+5. admin 向け unbind API（org-sso-subject の first-wins 束縛を owner が解く経路。今は DO 直接のみ）。
+
+## Resume point（2026-09-15 closing）
+
+次の最初の具体的一手: オーナーが Google Cloud Console / GitHub で OAuth app を発行したら
+control-plane の authn/ で `wrangler secret put GOOGLE_CLIENT_ID`（同 SECRET、GITHUB も）を
+4 回、値は kagi net-kotobase に同名で置く。その後の確認は
+`curl -s https://auth.kotoba.cloud/v1/link/providers`（["google","github"] になる）と
+`curl -s https://kotoba.cloud/v1/account/link/providers`。コード側の再開検証は
+control-plane/authn で `npm run test:link && npm run test:org-sso`（built bundle が必要:
+`node scripts/with-cljk-sources.mjs npx shadow-cljs release entry`。`amu` on PATH は hermes
+shim なので本物は orgs/kotoba-lang/amu/bin/amu を直接指す）。
+手を付けていない他者 WIP: orgs/kotoba-lang/app-kotoba-cloud の checkout は
+src/app_kotoba_cloud/research_authority.cljk が未コミットで pin 401ce93d に合わせていない
+（west update が拒否、破棄していない）。"))
 )
