@@ -41,7 +41,15 @@
 
   `amu check` の第一の壁は ns 形式（`:export` 必須、両 family とも）。構文の profile: langgraph.graph（230 行）は closure を map に持ち `throw` 5 / `reduce-kv` 2、checkpoint は atom + defprotocol の MemStore、marketentry.store は atom 2 / swap! 7 / defprotocol 1 / defrecord 3、marketentryllm は `#?(:clj` の LLM transport（→ `:llm/generate`、kit は `:wasm-aot` / `:jit` implemented）。**依存が `.cljc` のままの面は移行しない**規則により、先に kotoba-lang/langgraph（+ langchain-store）を Kotoba にしなければ component は閉じない。順序: langgraph → marketentry / tosmonitor の 1 本 → 237 repo の deps rewire wave。今日はここまで測って記録。
 
-  ## 残した gap（次に手を出す先）
-  - amu: `amu test --fuel` と test ごとの fresh instance（この repo は `scripts/test_kotoba.cljk` で代替）。
-  - launchd `cloud.itonami.app.local` は `~/.gftd/bin/itonami-app-resident.cljs` → JVM `clojure.main` を 10 秒ごとに起こして `server.clj が無い` で死に続けている（1338 を serve しているのは手動起動の nbb signin-server）。unload か nbb 版への付け替えが要る。")
+  ## 同日の続き（closing 時点で着地済み）
+  - amu #987（main ad12299、pin 前進済み、amu ADR 0349）: `amu test --fuel <n>`、js/wasm probe は test ごとに fresh instance、wasm probe は id を整数で渡す（test-profile-test 自身の fixture が nbb route で赤だった）。両 component とも `amu test … --fuel 5000000` で [:jvm-kir :js :wasm] 緑（54/54、63/63）。
+  - KIR interpreter target は self-recursion 100 frame 超で `fuel-exhausted` と名乗って trap する（bisect 100/101、fuel 無関係）。component の 100 step を超えうる walk は `loop` に書き換えた（commands e6ce98e、cli 2979796）。comma list は document vector の上限 32 item。
+  - launchd `cloud.itonami.app.local` は nbb signin-server を supervise するようになった（root d7758c1: `scripts/itonami-app-resident.cljk` + plist を kbb 化、JAVA_HOME 撤去。bootout → 手動起動を停止 → bootstrap、`launchctl print` の arguments == plist、`kickstart -k` で復帰を確認）。
+
+  ## 残した gap と resume point
+  - **3（taxonomy）の unblock は kotoba-lang/langgraph の whole-component port から。** `:export` を足した probe で `amu check` が次に名指した壁: `langchain.runnable/pipe` が variadic で export 不可（「an export must have a fixed interface」）、その先に protocol `Runnable`・map に入れた closure・`throw`・checkpoint の atom store。最初の command: `orgs/kotoba-lang/langgraph` を worktree に切り、`langchain.runnable` と `langgraph.graph` に `:export` を足して `amu check src/langgraph/graph.cljk --jvm-free --source-path src --source-path ../langchain/src --source-path ../kotoba-lang/lang/compat` を回し、1 件ずつ壁を潰す。oracle parity は cloud-itonami-commands の `test/kotoba_parity_nbb.cljk` の形。
+  - cli 本体は terminal capability が catalog に無い限り `:blocked`。
+  - native-aot は typed collection が native-qualified になるまで `:blocked`。
+  - amu の GitHub Actions で `browser-matrix (windows-2025)` と `windows-arm64` は main でも赤（required check ではない）。
+  - 上流に残る amu の未対応: `amu test` は単一 module のみ（`(:require …)` する module は拒否）。")
 ))
