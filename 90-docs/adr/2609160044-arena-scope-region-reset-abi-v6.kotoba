@@ -54,6 +54,15 @@
   ## 着地順
   root ADR → kotoba-gmir (arity) → kotoba-mir (offset) → osaho (head、interpreter は identity) → kotoba-sema (frontend: arity、型、scalar 制約の拒否) → kotoba-verifier (admit、expected-context v6) → kotoba-native (lowering: enter / body / leave) → amu (loader v6、context-abi、admission test、conformance 両方向、fuzz harness) → artifact (identity) → find / grep。各段で portable slice を測る。
 
-  ## 着地状態
-  この ADR を書いた時点 (2026-09-16) では未着地。着地したら repo と sha をここに書き換える (文書は最新状態のみ)。")
+  ## 着地状態 (2026-09-16、全部 landed、west pin 前進済み)
+  kotoba-gmir 966bb4c (arity 0 × 2) → kotoba-mir b33e90d (224 / 232) → osaho 1863a8d (head、identity) → kotoba-sema 31826c1 (region-operations、scalar 型規則、理由 literal) → kotoba-native d259b18 (lowering、ADR 0083) → kotoba-verifier 8f6ee07 (shape で再導出、expected-context v6) → amu eb7389b (#997: loader v6、256 段 mark stack、conformance 両方向、fuzz は unpaired enter/leave) → artifact 5f09521 (identity) → org-ieee-find f7d3fd4 / org-ieee-grep 8963146。
+
+  ## 実測 (着地後)
+  - find: orgs/kotoba-lang 857,825 entry を **4,096 handle / 4 MiB pool** (loader の default handle 予算) で完走、user 1.16 s / sys 12.6 s / wall 26 s。unscoped は 3.9 Mi handle / 110 MiB が要り、それを触る分だけ遅かった。suite は 4,096 / 1 MiB で緑、旧 guest は同予算で 17 中 6 落ちる。
+  - grep: 33 MB / 598,400 match を **4,096 handle** で完走、出力同一、0.43 s user。-i も行ごとに fold が返るので同予算。suite は 4,096 で緑、旧 guest は大 fixture で落ちる。
+  - conformance (amu): 同じ 20,000 回 loop が default 予算で scoped 200000 / unscoped KEXE_TRAP SIGILL。
+  - sort は string を返す merge が scope に入らないので未変更 (host 比較か、level 内 emit が次)。
+
+  ## 未着手
+  guest-grammar.edn (kotoba-lang の正本) への `arena-scope` の記載と 4 copy の resync 波。frontend の nearest-name 診断にしか効かないので機能には影響しない。")
 ))
