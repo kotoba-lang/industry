@@ -1,0 +1,49 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609160028-kotoba-cloud-paid-inference-hermes-docs-closing")
+  (:adr/title "kotoba.cloud 2026-09-15: hermes provider, inference blockers, paid inference + open checkout, account in 22 locales, docs, 24 h job retention — session closing")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/related (vector "ADR-2609151916" "ADR-2607173100" "ADR-2608136000" "ADR-2609112300"))
+  (:adr/context
+  "Owner direction 2026-09-15 (one session, six asks in order): (1) a hermes profile + provider that runs qwen3.8 flash on api.kotoba.cloud with KOTOBA_API_BASE / KOTOBA_API_TOKEN; (2) resolve the blockers; (3) payments at kotoba.cloud/billing/#billing-monthly, and an e2e that credits are added and consumed; (4) docs.kotoba.cloud along docs.orcarouter.ai/introduction; (5) /account#account-panel-identity in every public locale, ?lang=en actually switching; (6) SDK pages, every error code, frameworks, data handling; then 'ok, do it' on the follow-ups (job-record retention, AUP wording, Quickstart, endpoint reference, per-model detail, CLI cheat sheet).
+
+  All code lives in orgs/kotoba-lang/app-kotoba-cloud (kotoba-lang/app-kotoba-cloud on GitHub); the hermes side in ~/.hermes. Every PR below is merged to that repo's main and both Workers (kotoba-cloud-control-plane, kotoba-research-authority) were deployed from a checkout containing origin/main; the last deploy of the session is at app-kotoba-cloud 424e96c3 (edge d8d13e78, authority c9b9d144).
+
+  Measured blockers, in the order found:
+  - api.kotoba.cloud answered 200 with content null (19:47 JST), then 502, then 403 trust-route-required while /v1/research/status said eligible the same second. The authority's Modal origin refused every red-team job: `modal-inference-unavailable {status 401, upstream 'unauthorized origin'}` — the Worker secret MODAL_INFERENCE_TOKEN did not equal the origin proxy's MURAKUMO_MODAL_ORIGIN_TOKEN (kotoba-lang/murakumo tools/modal-throughput/origin_proxy.py). The intermittent 403 was `evaluatedAt <= now` compared across two machines' clocks (DO stamp vs edge clock): status 1/30, completions 4/14 refused.
+  - The first live Checkout session presented the $20 Pro price as ¥3,221 under the AWAI account's Adaptive Pricing; a JPY invoice would never grant (billing/paid-line requires usd).
+  - /account?lang=en answered the Japanese document: 'account' sat in locale/shared-prefixes and the Worker fetched the single ja emit directly.
+  - docs pages had drifted (no SSE, no tool calls, $0.60/M rates, a provider named); the data-handling page said prompts and outputs are never kept while the authority stored every job record (prompt, answer, tool_calls, usage) with no deletion.
+  - Anthropic Messages / Responses / Gemini wires are not served (405 measured); the Claude Code integration page said 'verified'.")
+  (:adr/decision
+  "Landed (app-kotoba-cloud PRs, all merged to main, all deployed):
+  - #194 research-gateway logs a refused projection's clock lead (note-projection-refusal!); research-test on the contract main adopted. #193 (another session) carried the 5 s clock-skew tolerance itself; after deploy: status 30/30, completions 20/20 admitted.
+  - MODAL_INFERENCE_TOKEN on kotoba-research-authority set to the Modal origin bearer (relayed from the Modal secret murakumo-modal-origin into a 0600 file, verified against the origin, piped into wrangler secret put, shredded; never printed). First 200 with content 'pong' in 1.3 s.
+  - #199 paid inference: billing_binding.cljk (one derivation of the BillingAccount name for purchases and completions); research-gateway paid-admission reserves an upper bound (bytes-as-tokens + template overhead, max_tokens, billing/rates, +25 %) under the job id, the authority runs a 'paid' job outside the free daily count, settle-paid! settles from the usage receipt, answers carry billing / usage / chargedMicroUSD; 402 / 503 / metering off stay free; failed → release at zero; timed-out → hold kept for the retry that re-attaches; refused settlement → served with settlement 'pending'. GET /v1/billing/status accepts the PAT. BILLING_ENABLED / BILLING_METERING_READY = true.
+  - #200 Checkout in USD only (adaptive_pricing.enabled=false), promotion codes allowed, card only if the first invoice charges.
+  - #204 /account is a locale variant root: one emit per public locale (22), shell in that locale, body ja for :ja and English otherwise (<div lang=en>), <html lang> from the catalog, dir=rtl marked; the Worker serves it through route-static (cookie, ?lang=, Accept-Language; switch persisted; no-store + CSP kept); the account client and the setup-banner suppression key on the document, not the pathname; the billing cell renders plan + AI balance from /v1/billing/status.
+  - #206 docs: introduction at the docs root, a docs map on every page, Get an API token / Models / Reasoning / Per-request cost / Guardrails & firewall; Streaming, Tool calling, Billing, BYOK corrected.
+  - #208 docs: OpenAI SDK, Anthropic SDK and Google GenAI SDK (not served — 405 — with the two ways through), Frameworks, error-catalog (37 codes as data), Data handling in full; the Claude Code integration page moved from 'verified' to a caveat.
+  - #211 research-authority job retention: records expire 24 h after their terminal state (or creation) via the object's alarm; the AUP's local-execution point no longer says the model never emits tool calls; docs: Quickstart rewritten, Endpoint reference (19 endpoints), per-model detail on Models, CLI cheat sheet; Data handling states the 24 h.
+  - fix/smoke-projection-restamp and #215: the worker-smoke authority mock re-stamps its projections per read and its evidence windows are an hour (a run slowed by concurrent builds had answered 403 from the paid-inference block onward).
+
+  hermes (~/.hermes, not a repo): profile kotoba-cloud (config.yaml: provider kotoba, model qwen3.8-flash-next-whitehacker, max_tokens 8192, streaming off, every toolset off, tool-search off, title generation off; .env: KOTOBA_API_BASE + KOTOBA_API_TOKEN); root providers.kotoba reads the same two env names (backup config.yaml.bak-20260915-kotoba-provider). The owner's other session later issued a v2 PAT and revoked legacy tokens; the profile now carries the v2 token copied from the root .env. `hermes -p kotoba-cloud chat -Q --oneshot -q pong` answers from model=qwen3.8-flash-next-whitehacker (5.9 s).
+
+  Verification fixed per PR: research-authority-local (retention: 2 deleted, 1 kept, re-armed), research-test 9/93, worker-smoke 11 suites + the paid-inference and account-locale scenarios, account-browser (real Chrome: ja variant, English root, German shell, billing cell, layout 390/768/1440), uiux audit, 70 docs documents with every link resolved and no provider name or stale claim. `npm test` on origin/main stays red on 265 site/locale content assertions that predate this session (not fixed here).")
+  (:adr/body
+  "Remaining gaps, by priority:
+  1. Billing e2e — the purchase step needs the owner: kotoba.cloud/billing/#billing-monthly → Pro 'Select' → Stripe promotion code KOTOBAE2E0915 (AWAI live coupon ZGYXknFm, single use, 100 % forever, $0, no card) → subscribe. Then verify grantedMicroUSD 12,000,000 at GET /v1/billing/status (PAT), run one PAT completion and read billing 'paid' + spentMicroUSD delta, cancel the subscription and delete the coupon/promo (Stripe key: /tmp/live_e2e_config.json liveKey, sk_live, AWAI). The Claude Code auto-mode classifier refused to complete a live Checkout page (Real-World Transactions) — hand it to a person, do not route around.
+  2. A request identical to one settled more than 24 h earlier becomes a new job whose reservation id was already settled → paid-admission sees 'settled' ≠ 'held' and runs it on the free allowance (logged). Rare, never double-charged; a date component in the reservation id would remove it.
+  3. glm5.3-flash (red team) has no origin: listed as route-not-configured, refused by name at admission.
+  4. Cloudflare edge cache answers HIT on kotoba.cloud documents despite no-store (a cache rule); a stale document can outlive a deploy until it expires — no purge-capable token was reachable (wrangler OAuth and keychain gftd.cf both 401 on purge_cache).
+  5. ~/.local/bin/amu is the hermes profile wrapper and shadows the amu compiler; builds need a PATH shim (scratch bin/amu → orgs/kotoba-lang/amu/bin/amu) and KBB_ENGINE=orgs/kotoba-lang/org-babashka-nbb/cli.js.
+  6. Some fleet process appends fallback_providers (the local claude bridge) to every hermes profile config; a primary failure falls to Claude silently — read `model=` in the profile log when verifying kotoba.
+
+  Resume point (next agent, no history needed):
+  - cd orgs/kotoba-lang/app-kotoba-cloud && git fetch origin && git log -1 origin/main   (last known 424e96c3)
+  - curl -s -H 'Authorization: Bearer '$(grep '^KOTOBA_API_TOKEN=' ~/.hermes/.env | cut -d= -f2-) https://api.kotoba.cloud/v1/billing/status   (expect grantedMicroUSD > 0 once the owner completed the checkout)
+  - hermes -p kotoba-cloud chat -Q --oneshot -q 'pong'   (expect model=qwen3.8-flash-next-whitehacker in ~/.hermes/profiles/kotoba-cloud/logs/agent.log)
+  - docs next increments: /v1/research/* request/response reference page, SDK example per model, Errors → per-code recovery snippets.
+
+  Owner WIP preserved, not touched: orgs/kotoba-lang/app-kotoba-cloud main checkout on branch kotoba-proof-biometric-wiring with tracked changes (research_authority.cljk, test/research-kotoba-proof-e2e.mjs); ~70 other worktrees under ~/.gftd/worktrees, ~/Documents/Codex, /private/tmp; open PRs #207 #129 #106 #67 #50 #37 #36 #32 (none mine); two `wrangler tail` processes from akc-billing-v3. /tmp/live_e2e_config.json holds the AWAI live Stripe key in a mode-644 file — the owner should move it.")
+))
