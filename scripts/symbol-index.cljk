@@ -224,5 +224,8 @@
           (println "  show <symbol> — definition snippet (file:line + context lines)")
           2))))
 
-(when (seq (script-args))
-  (apply -main (script-args)))
+(when-let [args (script-args)]
+  (when (seq args)
+    (let [code (apply -main args)]
+      (when (and (number? code) (not= code 0))
+        (.exit js/process code)))))
