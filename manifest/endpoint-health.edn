@@ -197,7 +197,7 @@
    :cost :cheap
    :every-hours 1
    :expect {:status 200 :json-non-empty ([:ok] [:rpId])}
-   :owner "kotoba-lang/app-kotoba-cloud"
+   :owner "cloud-kotoba/app-kotoba-cloud"
    :note (str "kotoba.cloud の Passkey RP。landing が「Discovery and the Passkey RP "
               "are live」と約束している面。rpId が空なら RP として約束破れ。")}
 
@@ -208,5 +208,5 @@
    :cost :cheap
    :every-hours 1
    :expect {:status 200 :json-non-empty ([:ok] [:service])}
-   :owner "kotoba-lang/app-kotoba-cloud"
+   :owner "cloud-kotoba/app-kotoba-cloud"
    :note "CLI deploy が読む control plane。topology 公開の約束の入口。"}]}

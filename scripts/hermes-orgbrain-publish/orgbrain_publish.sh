@@ -12,7 +12,7 @@
 # bot only publishes what already merged to kyber main — it proposes nothing.
 set -uo pipefail
 
-REPO_DIR=/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/app-kotoba-cloud
+REPO_DIR=/Users/junkawasaki/github/com-junkawasaki/orgs/cloud-kotoba/app-kotoba-cloud
 WT="$HOME/.gftd/worktrees/orgbrain-publish/app"
 CANON=/Users/junkawasaki/github/com-junkawasaki/scripts/hermes-orgbrain-publish
 KYBER=https://github.com/kotoba-lang/kyber
@@ -82,7 +82,7 @@ if [ "$SHA" = "$PUB" ]; then
   exit 0   # silent no-op
 fi
 BR="agent/orgbrain-sync-${SHA:0:12}"
-gh pr list --repo kotoba-lang/app-kotoba-cloud --head "$BR" --state open --json number 2>/dev/null | grep -q '"number"' \
+gh pr list --repo cloud-kotoba/app-kotoba-cloud --head "$BR" --state open --json number 2>/dev/null | grep -q '"number"' \
   && { echo "orgbrain-publish: sync PR already open for ${SHA:0:12} — waiting on gates"; exit 0; }
 
 # --- rebuild catalog at the new rev (auto-discovery) ---
@@ -106,13 +106,13 @@ git diff --quiet || {
   git add -A assets/orgbrain-catalog test/orgbrain-catalog.mjs
   git commit -q -m "orgbrain: catalog sync to kyber@${SHA}"
   git push -qf kotoba-lang "$BR" || fail "push $BR"
-  gh pr create --repo kotoba-lang/app-kotoba-cloud --head "$BR" --base main \
+  gh pr create --repo cloud-kotoba/app-kotoba-cloud --head "$BR" --base main \
     --title "orgbrain: catalog sync kyber@${SHA:0:12}" \
     --body "機械同期 (orgbrain-publish bot)。kyber main ${SHA} を /org-data へ。自動発見プロセス一覧と golden はその SHA の Clojure 真値から再生成。catalog test green 確認済み。diff は assets/orgbrain-catalog/ + test/orgbrain-catalog.mjs のみ。" >/dev/null \
     || fail "PR create"
   # mechanical self-merge (ops-bots discipline): the gate IS the test run above
   sleep 3
-  gh pr merge "$BR" --repo kotoba-lang/app-kotoba-cloud --merge --admin >/dev/null 2>&1 || gh pr merge "$BR" --repo kotoba-lang/app-kotoba-cloud --merge || fail "PR merge"
+  gh pr merge "$BR" --repo cloud-kotoba/app-kotoba-cloud --merge --admin >/dev/null 2>&1 || gh pr merge "$BR" --repo cloud-kotoba/app-kotoba-cloud --merge || fail "PR merge"
   git fetch -q kotoba-lang main && git checkout -q -B publish-main kotoba-lang/main || fail "pull merged main"
 }
 

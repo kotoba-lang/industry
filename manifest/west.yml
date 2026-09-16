@@ -6,6 +6,8 @@ manifest:
   remotes:
     - name: cloud-itonami
       url-base: git@github.com:cloud-itonami
+    - name: cloud-kotoba
+      url-base: git@github.com:cloud-kotoba
     - name: com-junkawasaki
       url-base: git@github.com:com-junkawasaki
     - name: etzhayyim
@@ -24,7 +26,7 @@ manifest:
   defaults:
     revision: main
 
-  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, +cloud-itonami, +network-awai, +net-kotobase, -datalad, -archived]
+  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, +cloud-itonami, +cloud-kotoba, +network-awai, +net-kotobase, -datalad, -archived]
 
   projects:
     - name: cloud-itonami-apex
@@ -10323,10 +10325,10 @@ manifest:
       path: orgs/kotoba-lang/app-kernel-author
       groups: [kotoba-lang]
     - name: app-kotoba-cloud
-      remote: kotoba-lang
+      remote: cloud-kotoba
       revision: 67603d1244407c50a253638dbf080cff43ad9f2f
-      path: orgs/kotoba-lang/app-kotoba-cloud
-      groups: [kotoba-lang]
+      path: orgs/cloud-kotoba/app-kotoba-cloud
+      groups: [cloud-kotoba]
     - name: async-all-terminal
       remote: kotoba-lang
       revision: bd525e25e7651e9134c1aa635bd2a8087e0d63c1
@@ -10483,10 +10485,10 @@ manifest:
       path: orgs/kotoba-lang/ch-iec-61850
       groups: [kotoba-lang]
     - name: cloud-kotoba-dds
-      remote: kotoba-lang
+      remote: cloud-kotoba
       revision: 22cefcd01652a84a6b7c6bfb0ca6f0a945aa63db
-      path: orgs/kotoba-lang/cloud-kotoba-dds
-      groups: [kotoba-lang]
+      path: orgs/cloud-kotoba/cloud-kotoba-dds
+      groups: [cloud-kotoba]
     - name: coll-assoc-some
       remote: kotoba-lang
       revision: 126807ec05db450bea3b5502dfe2cbd96afbb599
