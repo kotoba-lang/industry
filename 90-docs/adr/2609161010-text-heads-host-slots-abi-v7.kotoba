@@ -1,0 +1,58 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609161010-text-heads-host-slots-abi-v7")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "string-compare / string-fold-ascii / string-find-blank / string-skip-blank を host slot にする（context ABI v7）と、loader の memmem を memchr-first にする")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/last_verified "2026-09-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-native-runtime")
+  (:adr/repos (vector "orgs/kotoba-lang/kotoba-lang"
+              "orgs/kotoba-lang/kotoba-gmir"
+              "orgs/kotoba-lang/kotoba-mir"
+              "orgs/kotoba-lang/osaho"
+              "orgs/kotoba-lang/kotoba-sema"
+              "orgs/kotoba-lang/kotoba-native"
+              "orgs/kotoba-lang/kotoba-verifier"
+              "orgs/kotoba-lang/amu"
+              "orgs/kotoba-lang/artifact"
+              "orgs/kotoba-lang/org-ieee-sort"
+              "orgs/kotoba-lang/org-ieee-grep"
+              "orgs/kotoba-lang/org-ieee-wc"
+              "orgs/kotoba-lang/org-ieee-awk"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609160044-arena-scope-region-reset-abi-v6"))
+  (:adr/body
+  "## 決定
+  ADR-2609160044 (arena-scope、ABI v6) の「sort は host 比較が次」と grep -i / wc / awk の per-code-point walk を、4 つの text head を context ABI v7 の host slot にして消す。owner 指示「1, 2, 3」(2026-09-16): (1) host byte 比較、(2) host ASCII fold と blank scan、(3) guest-grammar.edn の正本に `arena-scope` と 4 head を記載して 4 copy を resync。
+
+  | head | slot | 意味 (osaho の reference が正、loader は同じ答え) |
+  |---|---|---|
+  | `(string-compare a b)` → :i64 | 240 | -1 / 0 / 1。common prefix の byte 順、次に短い方が先。canonical UTF-8 では byte 順 = code point 順なので `LC_ALL=C` の順 |
+  | `(string-fold-ascii s)` → :string | 248 | A-Z を a-z に。1 byte → 1 byte なので fold 上の offset は原文の offset |
+  | `(string-find-blank s from)` → :i64 | 256 | FROM 以降の最初の blank (space \\t \\n \\v \\f \\r) の offset、無ければ -1。FROM は [0, len] の boundary |
+  | `(string-skip-blank s from)` → :i64 | 264 | FROM 以降の最初の non-blank の offset、無ければ len |
+
+  4 つとも operand を canonical UTF-8 として検証してから読む (他の string slot と同じ)。値の安全性は変わらない: 新しい authority は無く、guest が code point walk で得ていた答えを 1 call で得るだけ。
+
+  ## なぜ slot か
+  amu native の値モデル (pair handle + bump arena) では guest の loop 1 周が host call 1 回。33 MB の sort は比較だけで 12.5 s (system 0.38 s)、grep -i は行ごとに 26 pass の `string-replace-all`、wc / awk は code point ごとに 1 call。ADR-2609051700 の通り、基盤の定数倍は呼び出し側の profile に出ない —— `sample` で loader を測ったら memcmp が 54%: `string-index-of` の memmem shim が haystack の全 offset で memcmp を呼んでいた (Windows loader は memchr-first だった)。これも同じ波で直す。
+
+  ## 着地順
+  root ADR → kotoba-gmir (arity) → kotoba-mir (offset) → osaho (reference: utf8-compare! / fold-ascii! / utf8-find-blank! / utf8-skip-blank!) → kotoba-lang (guest-grammar.edn 正本: `:predicates` に arena-scope と 4 head) → kotoba-sema (型・arity・grammar copy resync・digest pin) → kotoba-native (offset / op) → kotoba-verifier (expected-context v7、scalar shape) → amu (loader POSIX / Windows v7、fuzz、benchmark、context-abi、admission、conformance `examples/text-slots.kotoba`、iOS fixture reseal、memmem) → artifact (identity ×2) → sort / grep / wc / awk。
+
+  ## 着地状態 (2026-09-16)
+  kotoba-gmir 2f4ee3a → kotoba-mir a51dbab → osaho 1f07f39 → kotoba-lang 9ecd9dbc (grammar digest 3e1e65d6) → kotoba-sema 4422b1f → kotoba-native dc853ff → kotoba-verifier fb402bf → amu 8a27b45 (#1001) → artifact ba2bd6e (#35 / #36: POSIX 603bde98、Windows 95095dc9) → org-ieee-sort e1c25ad / org-ieee-grep 3a1c5fd / org-ieee-wc b25246b / org-ieee-awk fff0f7d。west pin は 13 repo とも前進済み (2026-09-16、amu 867385d 〜 kotoba-lang 7b17f04)。amu CI は windows 2 job が main 7b83f1f0 と同じ理由 (`kotoba -M measure-runtime` の nbb 経路が無い、bot/maint-kotoba-measure-runtime-984 が対応中) で赤、この変更が触る 7 job は緑。
+
+  ## 実測 (CPU 秒 user、出力は system utility と byte 同一、33 MB / 769,400 行の C file)
+  - conformance: `examples/text-slots.kotoba` は head ごとに 10 進 1 桁を割り当て、間違える host が間違える operand (proper prefix、先行 blank より後の FROM、blank としての \\n、fold 下の非 ASCII) で 21337441 を loader が答える。期待値は loader の実測を file の算術と突き合わせたもの (最初の算術は 7 byte を 8 と数えていて、実測が直した)。
+  - sort: 12.5 s → **3.00 s** (system 0.36)。比較を slot にしただけでは 10.96 s で、残りは memmem。-r / -u 同一、-n は 33 MB でまだ fuel 切れ (数字ごとに 1 call; `string-skip-blank` は -n の blank ではない —— -n は space と tab しか飛ばさない、実測済み)。
+  - grep: -i は fold を file ごとに 1 回にして scan-hits を fold 上で走らせ原文から report: `-i static_ASSERT` **0.06 s** (grep -F -i 1.02)、`-i E` 614,000 行 0.25 (0.36)。absent pattern は memmem で 0.13 → **0.02** (grep -F 0.14)、dense `e` 0.47 → 0.25 (grep 0.15、rg 0.05)。
+  - wc: 単語 = skip-blank + find-blank の 2 scan、行 = region 内の 1 search: 無 flag 0.68 → **0.21** (wc 0.11)、-w 0.51 → 0.18、-l 0.20 → 0.06。host の blank 6 種は C locale の wc と同じ (6 種全部入りの file で 7 語、両方)。
+  - awk: next-blank = find-blank (\\v \\f \\r は awk の default FS ではないので読んで飛ばす、実測)、record ごとに region: `{print $2}` 1.31 → **0.32** (awk 1.11)、`{print NF}` 2.60 → 0.42、`/SIGILL/` 0.36 → 0.09、`{print}` 0.40 → 0.20、全部 4,096 handle で完走。
+  - cut: 区切りは明示 delimiter の `string-index-of` だけで blank walk が無く、memmem の改善を guest 変更なしで受ける。
+
+  ## 残る差 (次の lever)
+  sort 3.0 s の 1/3 は `string-substring` (1 行 1 level あたり 5 view)。`string-index-of` に FROM 引数が無いので search view を切っている; `string-index-of-from` slot か、split を中央から 1 search で求める (mid が code point boundary か判定する primitive が無く、`string-code-point-at` は continuation byte で trap するので今は不可) が候補。dense grep の 6 host call / 行は report の形。")
+))
