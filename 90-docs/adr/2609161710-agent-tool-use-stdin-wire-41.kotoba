@@ -1,0 +1,67 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609161710-agent-tool-use-stdin-wire-41")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "agent の tool use が実際に呼ぶ BSD command を測る —— 呼び方は pipeline の後段 (stdin) で、コストは exec 1 回の固定費。wire 41 :io/read、SIGPIPE の静かな終了、8 command の stdin、tr / basename / dirname")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/last_verified "2026-09-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-native-runtime")
+  (:adr/repos (vector "orgs/kotoba-lang/kotoba-lang"
+              "orgs/kotoba-lang/kotoba-sema"
+              "orgs/kotoba-lang/amu"
+              "orgs/kotoba-lang/artifact"
+              "orgs/kotoba-lang/org-ieee-head"
+              "orgs/kotoba-lang/org-ieee-tail"
+              "orgs/kotoba-lang/org-ieee-wc"
+              "orgs/kotoba-lang/org-ieee-cut"
+              "orgs/kotoba-lang/org-ieee-sort"
+              "orgs/kotoba-lang/org-ieee-uniq"
+              "orgs/kotoba-lang/org-ieee-grep"
+              "orgs/kotoba-lang/org-ieee-awk"
+              "orgs/kotoba-lang/org-ieee-tr"
+              "orgs/kotoba-lang/org-ieee-basename"
+              "orgs/kotoba-lang/org-ieee-dirname"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609162300-range-slots-abi-v10" "adr-2609162200-index-sort-inline-handle-ops"))
+  (:adr/body
+  "## 問い
+  owner: 「さらに進めるとしたらどういう bsd command を agent call, tool use で利用するかな?」。推測せず、この機械の agent 実行履歴を測った。
+
+  ## 測り方 (再現手順。数値は 2026-09-16 のこの機械の値であって定数ではない)
+  1. `~/.claude/projects/*/*.jsonl` (Claude Code transcript) から `jq -r 'select(.type==\"assistant\") | .message.content[]? | select(.type==\"tool_use\" and .name==\"Bash\") | .input.command'` で Bash tool_use の command を全部抜く。
+  2. 各 command を `|` `&&` `||` `;` `$(` で段に割り、段の先頭語を数える。heredoc 本文が混ざる (`defn` `let` 等) ので POSIX ユーティリティ名の allow list で絞る。`join` `seq` `split` `test` `true` は Clojure 語と衝突するので割り引く。
+  3. pipeline の 2-gram (`grep | head` 等) と、各 filter が「第 1 段」か「後段 (= stdin を読む)」かを数える。
+  4. 起動コスト: 同一バッチで `/usr/bin/true`、空の C、空の C + `sandbox_init`、BSD grep、kotoba grep を 200 回ずつ exec して us/exec を取る。loader 内の段階は instrumented copy (scratchpad) に clock_gettime の stamp を入れて読む。
+  5. Seatbelt の apply 費用: `sandbox_init` (inline SBPL) と `SANDBOX_NAMED` (system の事前コンパイル済み) と private の `sandbox_compile_string` + `sandbox_apply` を各 3 回。
+
+  ## 結果 (558 transcript、1,268,018 Bash call)
+  - 上位: echo 102,328 / grep 69,840 / head 60,222 / tail 48,459 / cat 18,129 / sed 15,484 / ls 13,396 / wc 10,504 / cut 8,320 / sort 7,837 / **tr 7,020** / cp 6,014 / awk 5,760 / printf 5,244 / rm 3,818 / find 2,621 / mkdir 2,173 / uniq 2,030 / which 1,495 / date 1,451 / pgrep 1,182 / xargs 1,032 / file 994 / diff 888 / shasum 832 / basename 760 / dirname 399。既存 20 command で上位はほぼ覆えていた。
+  - 2-gram: `grep | head` 8,593、`head | head` 5,176、`tail | tail` 4,025、`grep | grep` 3,399、`wc | tr` 2,273 (= `wc -l | tr -d ' '`)、`sort | uniq` 1,889、`head | cut` 1,481。agent は context に入る前に出力を絞るために小さい入力を大量に exec する。
+  - **stdin の位置で呼ばれる割合**: head 97% / tail 94% / cut 97% / tr 99% / sort 97% / uniq 99% / wc 84% / awk 81% / grep 67%。loader の wire は 34/35/37/38/39 だけで stdin が無く、既存 command は pipeline の第 1 段にしか置けなかった。
+  - 起動 (load avg 104 の機械、相対で読む): true 5.5 ms / 空 C 7.2 / 空 C + sandbox_init 16.3 / BSD grep 6.5 / **kotoba grep 21.8**。loader 内訳: main→fork 0.1–0.4 ms、fork→child 1–10 ms (負荷)、**sandbox_init 10–24 ms**、guest 0.2–0.5 ms。profile を `(version 1)(deny default)` に縮めても sandbox_init は 9–10 ms (SBPL コンパイラの床)。
+  - Seatbelt: `sandbox_init` 8–12 ms、`SANDBOX_NAMED` 0.15 ms、`sandbox_compile_string` 8–12 ms → 596 byte blob、`sandbox_apply` **0.065 ms** (apply 後の `open(\"/etc/passwd\")` は denied を確認)。読みの mediation: 現行 profile で fd 0 の read(2) は pipe も file も通る。
+  - `grep e big | head -1` (最頻の形) が kotoba では stderr に `KEXE_TRAP {:kind :supervisor :reason :unhandled-child-signal}`、exit 123 (BSD: 無言、141)。loader に SIGPIPE の扱いが無かった。
+
+  ## 決定 (着地済み)
+  1. **SIGPIPE は読み手が去っただけ**: supervisor は子が SIGPIPE で死んだら自分にも SIGPIPE を送り (raise が戻れば 141)、stderr は無言。amu `scripts/test-package-command.cljk` に flood guest を両方向で置き、旧 supervisor で control (123 + 旧 reason literal) を確認。
+  2. **wire 41 `:io/read`** (kotoba-lang #697 → sema #85 → amu #1012、artifact identity #43/#44)。2 形式 1 cursor: 空 request = EOF まで全部、decimal = 未読のうち最大 n byte (EOF で空文字列。`yes | head` が終わる形)。read(2) に string pool の空き末尾を渡し、kernel が 1 回コピーするだけ。pool を超える入力は短く答えず SIGILL で拒否。decimal 形式は **code point 単位** (不完全な UTF-8 末尾 ≤3 byte を次の答えに持ち越す。control: 日本語を 4 byte ずつで SIGILL)。scope 無し; grant は allow mask の bit だけ (Seatbelt は継承 fd の read を mediate しない、測定済み) なので test は同じ guest を bit あり/なしで package する。effect は `:host/io-read` として `:fs/app-data` とも `:cli/args` とも別 (tripwire で両方 assert)。
+  3. **8 command が operand 無しで stdin を読む**: head (64 KiB chunk、arena-scope で chunk ごとに回収、`yes | head -n 3` 28 ms、4 MB pool を 12.8 MB が通る)、tail / wc / cut / sort / uniq / grep / awk (whole-input 形式)。tail の改行 walk は substring per line で 4 MB が pair 予算を割ったので string-find-byte へ。grep は `-l` で `(standard input)`。
+  4. **新規 3 repo**: org-ieee-tr (translate / -d / -s / -ds、escape・range・class、set は ASCII、入力は byte 透過。45 case byte 同一 + 4 divergence。5.4 MB: `-d ' '` 0.12 s vs BSD 0.27、`'\\n' ' '` 0.07 vs 0.32)、org-ieee-basename (28 case)、org-ieee-dirname (26 case)。3 つとも slash 位置を string-find-byte で**前向きに**歩く (後ろ向きの byte 歩きは多バイト文字の continuation byte で SIGILL)。tr の教訓: (a) alphabet literal の CR は `\\r` で書く (生の CR は reader が行末に正規化する)、(b) `vector-assoc!` の linear handle は textual に数えられるので set は string、table vector は構築中 write-only / walk 中 read-only、分岐ごとに alloc。
+  5. printf 5,244 は shell builtin の呼び出しであり binary は呼ばれない → 作らない。
+
+  ## オーナー判断待ち (この ADR は決めない)
+  **起動 15 ms の 9–10 ms は Seatbelt profile の実行時コンパイル**。package 時に `sandbox_compile_string` で blob (596 byte) を埋め込み、実行時に `sandbox_apply` (0.065 ms) にすれば起動の 80–90% が消える。ただし両方 **private API** (header 無し、dlsym で解決)。安全側の設計案: blob と SBPL 文字列を両方埋め込み、apply が非 0 なら sandbox_init(文字列) に fall back; apply 後に scope 外 open の self-probe (~10 µs) を必ず行い、通れば `_exit(125)` — 今の loader は sandbox_init の rc を信じるだけなので、この probe は現状より強い。Apple が symbol を消せば package 時の link で検出される。決めるのは owner。
+
+  ## 次 (blocked と理由)
+  - xargs 1,032: process spawn の loader provider (wire 20) が無い。spawn は security surface が大きく owner 判断。
+  - shasum 832: hash provider が loader に無い (id 3 は identity stub)。
+  - date 1,451: clock は hosted_clock_v1 があるが BSD 既定書式は TZ database を要る。
+  - which 1,495: `:env/read` で PATH は読めるが EXISTS は fs-scope 内しか答えない → PATH dir を scope に含めて package する設計が要る。
+  - diff 888 / stat 267: 実装可能 (diff は Myers、stat は STAT form)。未着手。
+  - 残る per-exec 固定費: fork 1–10 ms は負荷、loader 残り ~5 ms は未分解。
+
+  ## 着地
+  amu d3082e6 (#1012) / kotoba-lang f8fb69d (#697) / kotoba-sema 043c620 (#85) / artifact d9caf57 (#43, #44) / head 4ca97e9 / tail f8a2695 / wc dae580f / cut 79d5f05 / sort 27e9a64 / uniq 5f1ebbe / grep ed74679 / awk 8090cb2 / tr a83a8ea / basename 1752776 / dirname 13cdde4。west pin は着地後に前進。")
+))
