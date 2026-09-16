@@ -82,6 +82,18 @@ with a trailing slot, an accent an app can choose. The first three are app CSS o
 token contract (see kami-genko); the fourth is the point — DADS ships デジタル庁ブルー
 and an app does not pick its own.
 
+**The behavior layer (2026-09-16, ADR-2609161900)**: DADS upstream is CSS + example
+HTML; what a dialog / menu / tab DOES lives in `jp-go-dds.behavior` — one
+dependency-free, idempotent runtime keyed by `data-behavior=dialog|menu|tabs|disclosure|
+radiogroup|toast|combobox` markers (never class names), with the layer rules in
+`behavior/css` on `--hig-z-*`. Every vendored component (40/40) has a wrapper in
+`jp-go-dds.core`; the script-driven ones carry the marker. **Do not write a per-pattern
+open/close/Escape/arrow script** — put the marker on the markup and ship
+`behavior/script` as a file (`script-src 'self'`). `shinkansen.audit :behaviors-delivered`
+measures that the runtime is shipped and the markup complete. The app-level defaults
+(tokens, chrome-css, the one stylesheet, the scripts to ship, light/dark/system on
+`shinkansen.theme`) are `cloud-kotoba-dds.theme` — start a Kotoba app document there.
+
 ## Build it as a single page (owner decision, 2026-08-08, ADR-2608080100)
 
 **kotoba-lang UI is single-page apps: one document, one bundle, one mount.** Moving
@@ -315,6 +327,13 @@ CLAUDE.md 側には skill を読まなくても効く不変条件だけが残っ
   下に `shitsuke.hig` は居ない**（`jp-go-dds.page` は bridge も HIG も自動では入れず、
   app が `:app-css` で `tokens/bridge-css` を渡す）ので、そこでは**何にも解決しない**。
   カテゴリ色にこの 6 つを使っている view は移行前に確認する。
+  **再々実測（2026-09-16、ADR-2609161900）: この穴は塞がった。bridge は 128 個** ——
+  上の 71 に、text 11 style の `font-weight` / `font-family`、`display1-3`、palette の
+  teal / mint / indigo / brown / gray2-6（DADS 最寄りの primitive）、`--hig-motion-*`、
+  `--hig-z-*`、`--hig-breakpoint-*` が加わった。出所は app.itonami.cloud（legacy HIG 層
+  込みで 117 個を宣言）と kotoba.cloud（71 個）の差集合 46 個。数字の正本は
+  `tokens/motion` / `tokens/layers` / `tokens/breakpoints` のデータで、`tokens_test` が
+  custom property と一致することを pin する。
   確認コマンド（`grep` は行内 1 件しか数えないので使わない）:
   `kbb -M -e "(require '[jp-go-dds.tokens :as t]) (println (count t/hig->dads))"`。
 - **DADS は light。** `page` の `:dark? true` はこのライブラリ独自の反転層（上流には
