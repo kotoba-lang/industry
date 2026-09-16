@@ -20,7 +20,10 @@ orgbrain-maint (LLM bot, 04:40) が kyber main に運営プロセスを 1日1本
 5. diff が `assets/orgbrain-catalog/` + `test/orgbrain-catalog.mjs` 以外に
    触れていたら abort (scope guard)
 6. PR 作成 → 自己 merge (ops-bots の機械 PR discipline; gate=上のテスト) →
-   `npm run deploy` (フルチェーン) → live readback:
+   skill 実証済みステージ順 (`npm run build && npm run audit:uiux &&
+   npm run test:worker && npx wrangler deploy --env=""` — clean checkout では
+   `npm run deploy` を使うな: test-before-build + baseline-red の JVM suite で
+   stall する) → live readback:
    `kyber.kotoba.cloud/org-data/index.json` の rev とプロセス数が一致したら
    1行レポート (stdout → cron deliver)
 

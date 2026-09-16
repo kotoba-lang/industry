@@ -116,10 +116,16 @@ git diff --quiet || {
   git fetch -q kotoba-lang main && git checkout -q -B publish-main kotoba-lang/main || fail "pull merged main"
 }
 
-# --- deploy (full repo gate chain inside npm run deploy) + live verify ---
+# --- deploy: the skill-proven stage order from a clean checkout. npm run
+# build MUST precede the gates, and package.json's `npm test` is skipped:
+# the JVM clojure suite is baseline-red on fresh checkouts (origin-selector /
+# abi assertions; skill kotoba-cloud-deploy: gate = zero NEW failures vs a
+# baseline, not a green run) so an && chain stalls there forever. The stages
+# below are the ones that gate DATA deploys. ---
 N=$(gh api "repos/kotoba-lang/kyber/git/trees/$SHA?recursive=1" --jq '.tree[] | select(.path|endswith(".bpmn.edn")) | .path' 2>/dev/null | grep -c . )
 [ "$N" -ge 2 ] || fail "process count at $SHA"
-npm run deploy > "$LOG" 2>&1 || { tail -5 "$LOG"; fail "npm run deploy (log $LOG)"; }
+{ npm run build && npm run audit:uiux && npm run test:worker && npx wrangler deploy --env=""; } > "$LOG" 2>&1 \
+  || { tail -5 "$LOG"; fail "deploy chain (log $LOG)"; }
 VER=$(grep -oE 'Version ID:\s+[0-9a-f-]{36}' "$LOG" | tail -1 | awk '{print $3}')
 for i in 1 2 3 4 5 6; do
   sleep 10
