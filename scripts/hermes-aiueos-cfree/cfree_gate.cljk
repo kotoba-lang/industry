@@ -1,0 +1,122 @@
+;; cfree_gate.cljk — aiueos C-free programme (ADR-0220) の gate 状態 signal。
+;;
+;;   kbb --backend sci scripts/hermes-aiueos-cfree/cfree_gate.cljk
+;;
+;; Hermes cron の monitor script として使う: 出力が前 tick と同一 (exact bytes) なら
+;; agent は起きない。だから **決定的・時刻自由** — timestamp / 経過時間 / 順不同の
+;; 集合を印字しない。exit は常に 0 (monitor は exit を見ない、stdout だけが状態)。
+;;
+;; 測れなかった行は UNKNOWN と出す。捏造しない。読み手 (cfree-tick.prompt.md) は
+;; UNKNOWN を "変化なし" ではなく "測れなかった" と読む。
+;;
+;; 測る対象 (すべて origin/main 側。checkout の HEAD ではない — ADR-2608136800):
+;;   1. aiueos origin/main tip
+;;   2. os/aiueos/kernel の .c/.S 目録 (file 数 / 行数)  ← 減ることが programme の進捗
+;;   3. os/aiueos/kotoba/*.kotoba の個数              ← 増えることが同上
+;;   4. 90-docs/adr の最大番号 (ADR 番号衝突検査の入力)
+;;   5. cfree / ADR-02xx / wave / kotoba を名乗る open PR
+;;   6. superproject west.yml の aiueos pin (tip と違えば pin 前進が残っている)
+(ns cfree-gate
+  (:require ["child_process" :as cp]
+            ["fs" :as fs]
+            ["path" :as path]
+            [clojure.string :as str]))
+
+(def ^:private repo (or (.-CFREE_REPO (.-env js/process)) "kotoba-lang/aiueos"))
+(def ^:private aiueos-dir
+  (or (.-CFREE_AIUEOS_DIR (.-env js/process)) (.cwd js/process)))
+(def ^:private super-dir
+  (or (.-CFREE_SUPER_DIR (.-env js/process))
+      (str (.-HOME (.-env js/process)) "/github/com-junkawasaki")))
+
+(defn- sh
+  "Run a command; nil when it fails (the caller prints UNKNOWN). stderr is
+   kept off stdout so the monitor's hash does not move with a warning."
+  [cmd args & [cwd]]
+  (try
+    (str/trimr (.toString (cp/execFileSync cmd (clj->js args)
+                                           #js {:cwd (or cwd aiueos-dir)
+                                                :stdio #js ["ignore" "pipe" "ignore"]
+                                                :timeout 60000
+                                                :maxBuffer (* 64 1024 1024)})))
+    (catch :default _ nil)))
+
+(defn- section [title] (println (str "=== " title " ===")))
+(defn- line [x] (println (if (nil? x) "UNKNOWN" x)))
+
+;; 1. tip
+(section (str "aiueos origin/main tip (" repo ")"))
+(let [tip (sh "gh" ["api" (str "repos/" repo "/branches/main") "--jq" ".commit.sha"])]
+  (line (when tip (subs tip 0 12)))
+
+  ;; The next three read the tree AT THAT TIP through the local checkout's
+  ;; object store, so `git fetch` first. A fetch that fails leaves the old
+  ;; objects; the tip printed above is what GitHub says, and if the two
+  ;; disagree the reader sees it as "tree lines UNKNOWN".
+  (sh "git" ["fetch" "-q" "origin" "main"])
+  (let [have (when tip (sh "git" ["cat-file" "-e" (str tip "^{commit}")]))
+        ref (if (and tip (some? have)) tip nil)]
+
+    ;; 2. kernel C inventory
+    (section "kernel C/asm remaining at tip (file  lines)")
+    (if-not ref
+      (line nil)
+      (let [names (sh "git" ["ls-tree" "--name-only" (str ref) "os/aiueos/kernel/"])
+            files (->> (str/split-lines (or names ""))
+                       (filter #(re-find #"\.(c|S)$" %))
+                       sort)
+            counts (for [f files]
+                     (let [body (sh "git" ["show" (str ref ":" f)])]
+                       [f (when body (count (str/split-lines body)))]))]
+        (doseq [[f n] counts] (println (str (path/basename f) "\t" (if n n "UNKNOWN"))))
+        (println (str "FILES\t" (count files)))
+        (println (str "LINES\t" (if (every? some? (map second counts))
+                                  (reduce + (map second counts))
+                                  "UNKNOWN")))))
+
+    ;; 3. kernel objects
+    (section "kotoba kernel-object sources at tip")
+    (if-not ref
+      (line nil)
+      (let [names (sh "git" ["ls-tree" "--name-only" (str ref) "os/aiueos/kotoba/"])
+            n (count (filter #(str/ends-with? % ".kotoba") (str/split-lines (or names ""))))]
+        (println (str "OBJECT_SOURCES\t" n))))
+
+    ;; 4. highest ADR number
+    (section "highest ADR number at tip (next one must be greater; check collisions before writing)")
+    (if-not ref
+      (line nil)
+      (let [names (sh "git" ["ls-tree" "--name-only" (str ref) "90-docs/adr/"])
+            nums (keep #(some-> (re-find #"/(\d{4})-" %) second js/parseInt)
+                       (str/split-lines (or names "")))]
+        (line (when (seq nums) (apply max nums)))))))
+
+;; 5. open PRs
+(section "open PRs on the programme (number title | head)")
+(let [raw (sh "gh" ["pr" "list" "--repo" repo "--state" "open" "--limit" "50"
+                    "--json" "number,title,headRefName"])
+      prs (when raw (js->clj (js/JSON.parse raw) :keywordize-keys true))
+      hit? (fn [{:keys [title headRefName]}]
+             (re-find #"(?i)cfree|c-free|ADR-02\d\d|wave|kotoba|judgment|flat.record"
+                      (str title " " headRefName)))
+      hits (->> prs (filter hit?) (sort-by :number))]
+  (cond
+    (nil? prs) (line nil)
+    (empty? hits) (println "none")
+    :else (doseq [{:keys [number title headRefName]} hits]
+            (println (str "#" number " " (subs title 0 (min 80 (count title))) " | " headRefName)))))
+
+;; 6. west pin
+(section "superproject west pin for aiueos (origin/main west.yml)")
+(let [_ (sh "git" ["fetch" "-q" "origin" "main"] super-dir)
+      yml (sh "git" ["show" "origin/main:manifest/west.yml"] super-dir)
+      lines (when yml (str/split-lines yml))
+      idx (when lines (first (keep-indexed (fn [i l] (when (re-find #"^\s+- name: aiueos$" l) i)) lines)))
+      rev (when idx (some #(second (re-find #"revision:\s*([0-9a-f]{7,40})" %))
+                          (subvec (vec lines) idx (min (count lines) (+ idx 8)))))]
+  (line (when rev (subs rev 0 (min 12 (count rev))))))
+
+(section "standing rules (ADR-0220 / aiueos CLAUDE.md)")
+(println "one tick = one step. contracts from the retired C; the native gate recompiles; the boot must fall when the object is broken.")
+(println "no force-push, no rebase; land via gh api merges; pins: kotoba-native -> amu deps.edn+lock -> superproject west pin.")
+(println "an object that links and passes its contract has not run — say so until a boot marker names it.")
