@@ -1,0 +1,60 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609162300-range-slots-abi-v10")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "string-find-byte / string-append-range を host slot にする（context ABI v10）——view を取らず handle も作らない行 walk")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/last_verified "2026-09-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-native-runtime")
+  (:adr/repos (vector "orgs/kotoba-lang/kotoba-lang"
+              "orgs/kotoba-lang/kotoba-gmir"
+              "orgs/kotoba-lang/kotoba-mir"
+              "orgs/kotoba-lang/osaho"
+              "orgs/kotoba-lang/kotoba-sema"
+              "orgs/kotoba-lang/kotoba-native"
+              "orgs/kotoba-lang/kotoba-verifier"
+              "orgs/kotoba-lang/amu"
+              "orgs/kotoba-lang/artifact"
+              "orgs/kotoba-lang/org-ieee-cut"
+              "orgs/kotoba-lang/org-ieee-uniq"
+              "orgs/kotoba-lang/org-ieee-grep"
+              "orgs/kotoba-lang/org-ieee-awk"
+              "orgs/kotoba-lang/org-ieee-wc"
+              "orgs/kotoba-lang/org-ieee-sort"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609162200-index-sort-inline-handle-ops" "adr-2609161700-line-heads-host-slots-abi-v8"))
+  (:adr/body
+  "## 決定
+  「next」(owner、ADR-2609162200 の続き)。33 MB の `cut -f2` を sample すると **44% が view の mint** (`string-substring`: 改行 needle の literal、行の view、field の view) だった。値モデルでは view = handle 1 本 + host call 1 回。view を取らず handle も作らない 2 つの head を context ABI v10 の slot にする:
+
+  | head | slot | 意味 |
+  |---|---|---|
+  | `(string-find-byte s b from)` → :i64 | 336 | FROM (boundary) 以降で ASCII byte B (0–127、なので一致は必ず boundary) を持つ最初の offset、絶対、無ければ -1。B が ASCII でなければ trap |
+  | `(string-append-range acc s start end)` → :string | 344 | ACC に S の [start, end) を追加 (両端 boundary)。view + concat の 2 call が 1 call、tail append はそのまま効く |
+
+  改行 needle が要らない (byte を渡す) ので region も要らない。cut は「区切りが ASCII 1 byte で field 番号が 13 bit に収まる」とき text 上を offset で歩き、行の view も取らない (区切りは field の直前の byte、改行は行末の byte として range で追加)。
+
+  ## 着地状態
+  kotoba-gmir 3350ad2 (#35) → kotoba-mir 944b5d3 (#70) → osaho 85ed11b (#95) → kotoba-lang e09a71f (#696、digest 8a2913b8) → kotoba-sema d46897d (#84) → kotoba-native a9f8a3c (#187) → kotoba-verifier e56795f (#62) → artifact c5862d7 / 0a3308c / 9650113 (#40–#42) → amu a09d090 (#1010) → org-ieee-cut 9b0e806 / uniq e3c9dbc / grep c0c8840 / awk 09bff57 / wc 0cbf8f6 / sort be4d910。west pin は着地後に前進。
+
+  ## fuzz が捕まえたもの
+  v10 の case が混ざって sanitized fuzz arm が本物を 1 つ: `resolve_string_bytes` が pool 上の範囲を **budget** で縛っていて、guest が `pair` で手作りした (offset, length) が「まだ書かれていない pool」に届き、`string_concat` の memcpy の src が dst (次の空き) と重なった (ASan memcpy-param-overlap)。guest 自身の arena の外には出ないが UB。両 loader で `string_pool_used` で縛るように直し、全 string slot が 1 箇所で拒否する。fuzz の効き方の実例: 新しい op が入ると同じ corpus でも op の割当が変わり、latent な経路に届く。
+
+  ## 実測 (33 MB / 769,400 行、CPU 秒 user、出力 byte 同一、default 4,096 handle)
+  | command | v9 | v10 | uutils / rg | BSD |
+  |---|---|---|---|---|
+  | cut -f2 | 0.19 | **0.13** | 0.03 | 0.04 |
+  | cut -f3- | 0.77 | **0.61** | 0.14 | — |
+  | uniq | 0.13 | **0.10** | 0.06 | 0.31 |
+  | grep e (dense) | 0.17 | **0.15** | rg 0.05 | 0.15 |
+  | awk {print $2} | 0.25 | **0.23** | — | 1.30 |
+  | wc -l | 0.05 | **0.04** | 0.00 | 0.01 |
+  | sort | 0.66 | **0.62** | 0.17 | 0.38 |
+  | sort -n | 0.87 (key を行ごとに 1 回、ADR-2609162200 の続き) | 0.86 | 0.43 | 0.79 |
+  今日の始まり (ABI v4) からは sort 2.87 → 0.62、cut 1.70 → 0.13、uniq 0.50 → 0.10。
+
+  ## 残る差
+  行ごとの host call が 4〜6 本 (search、append、batch の算術) で 1 本 ~15–30 ns; Rust は同じ仕事を inline の SIMD loop で数 ns。次の lever は loop の inline emit (今回は「検査が数命令の op だけ inline」に留めた)、または write を loader 側で行単位に batch すること。userland の 2 種類の trap signal (loader の SIGILL / kernel family の brk = SIGTRAP、kotoba-native #184 が userland にも持ち込んだ) は未解決。")
+))
