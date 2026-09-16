@@ -1747,6 +1747,26 @@
     },
     "script": "clojure_stdlib_migration_evidence.py",
     "workdir": null
+   },
+   {
+    "context_from": null,
+    "deliver": "local",
+    "enabled_toolsets": null,
+    "id": "a35f0e176e0c",
+    "name": "orgbrain-publish",
+    "no_agent": true,
+    "prompt": "(script-only mechanical sync — no agent turn expected)",
+    "repeat": {
+     "completed": 0,
+     "times": null
+    },
+    "schedule": {
+     "kind": "cron",
+     "expr": "35 5,17 * * *",
+     "display": "35 5,17 * * *"
+    },
+    "script": "orgbrain-publish.sh",
+    "workdir": null
    }
   ],
   "design-audit": [

@@ -1,0 +1,14 @@
+#!/usr/bin/env kbb
+;; Emit the org_risk report as EDN on stdout — used by the kotoba.cloud catalog
+;; sync (app-kotoba-cloud scripts/orgbrain-publish → scripts/orgbrain-golden.mjs)
+;; to regenerate the JS-port golden against the Clojure truth at a pinned kyber
+;; rev. Run from the UNPACKED kyber tree at that rev:
+;;
+;;   kbb --backend sci --classpath . golden_emit.cljk
+;;
+;; Verified 2026-09-16: reproduces the 7f6a362 golden exactly
+;; (axes 0 / 0.7142857142857144 / 1 / 1 / 0, composite 0.4928571428571429,
+;; level :moderate — matching assets/orgbrain-risk.js in app-kotoba-cloud).
+(nbb.classpath/add-classpath ".")
+(require '[lg.lg-kyber.graphs.org-risk :as r])
+(println (pr-str (r/risk-report (r/load-schema))))
