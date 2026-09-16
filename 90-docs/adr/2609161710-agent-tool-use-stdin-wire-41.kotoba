@@ -50,6 +50,7 @@
   3. **8 command が operand 無しで stdin を読む**: head (64 KiB chunk、arena-scope で chunk ごとに回収、`yes | head -n 3` 28 ms、4 MB pool を 12.8 MB が通る)、tail / wc / cut / sort / uniq / grep / awk (whole-input 形式)。tail の改行 walk は substring per line で 4 MB が pair 予算を割ったので string-find-byte へ。grep は `-l` で `(standard input)`。
   4. **新規 3 repo**: org-ieee-tr (translate / -d / -s / -ds、escape・range・class、set は ASCII、入力は byte 透過。45 case byte 同一 + 4 divergence。5.4 MB: `-d ' '` 0.12 s vs BSD 0.27、`'\\n' ' '` 0.07 vs 0.32)、org-ieee-basename (28 case)、org-ieee-dirname (26 case)。3 つとも slash 位置を string-find-byte で**前向きに**歩く (後ろ向きの byte 歩きは多バイト文字の continuation byte で SIGILL)。tr の教訓: (a) alphabet literal の CR は `\\r` で書く (生の CR は reader が行末に正規化する)、(b) `vector-assoc!` の linear handle は textual に数えられるので set は string、table vector は構築中 write-only / walk 中 read-only、分岐ごとに alloc。
   5. printf 5,244 は shell builtin の呼び出しであり binary は呼ばれない → 作らない。
+  6. (同日追記) **sed も stdin** (6,355 回、52% —— 前の表から漏れていた、cut より多い): whole-input 形式、単一入力なので末尾改行の欠落はそのまま。ついでに substitute flag の検査が無かった (`s/X/-/q` が無 flag として置換) → "" と "g" 以外は拒否 (named divergence)。**org-ieee-diff** (888 回): normal 形式 + `-q`、Myers を行 offset の上で (両 file を 1 text に連結し `string-compare-lines`)、37 case byte 同一、3,000 行の対で BSD と同じ 0.01 s。`-u` は header の mtime が TZ を要るので拒否 (divergence)、`<(…)` の 316 回は /dev/fd が scope 外。linear handle の規則は **read も数える** (読んだ vector をその path で書けない) → 行 P/C を交互、trace は write-only、`d` と capacity は row の slot と scalar で運ぶ。row の index offset が metadata slot と衝突して 1 行 file が SIGILL、trace を item 予算いっぱいに取って同一 3,000 行が alloc で trap —— どちらも suite が捕まえた。
 
   ## オーナー判断待ち (この ADR は決めない)
   **起動 15 ms の 9–10 ms は Seatbelt profile の実行時コンパイル**。package 時に `sandbox_compile_string` で blob (596 byte) を埋め込み、実行時に `sandbox_apply` (0.065 ms) にすれば起動の 80–90% が消える。ただし両方 **private API** (header 無し、dlsym で解決)。安全側の設計案: blob と SBPL 文字列を両方埋め込み、apply が非 0 なら sandbox_init(文字列) に fall back; apply 後に scope 外 open の self-probe (~10 µs) を必ず行い、通れば `_exit(125)` — 今の loader は sandbox_init の rc を信じるだけなので、この probe は現状より強い。Apple が symbol を消せば package 時の link で検出される。決めるのは owner。
@@ -59,9 +60,9 @@
   - shasum 832: hash provider が loader に無い (id 3 は identity stub)。
   - date 1,451: clock は hosted_clock_v1 があるが BSD 既定書式は TZ database を要る。
   - which 1,495: `:env/read` で PATH は読めるが EXISTS は fs-scope 内しか答えない → PATH dir を scope に含めて package する設計が要る。
-  - diff 888 / stat 267: 実装可能 (diff は Myers、stat は STAT form)。未着手。
+  - stat 267: 実装可能 (STAT form)。未着手。
   - 残る per-exec 固定費: fork 1–10 ms は負荷、loader 残り ~5 ms は未分解。
 
   ## 着地
-  amu d3082e6 (#1012) / kotoba-lang f8fb69d (#697) / kotoba-sema 043c620 (#85) / artifact d9caf57 (#43, #44) / head 4ca97e9 / tail f8a2695 / wc dae580f / cut 79d5f05 / sort 27e9a64 / uniq 5f1ebbe / grep ed74679 / awk 8090cb2 / tr a83a8ea / basename 1752776 / dirname 13cdde4。west pin は着地後に前進。")
+  amu d3082e6 (#1012) / kotoba-lang f8fb69d (#697) / kotoba-sema 043c620 (#85) / artifact d9caf57 (#43, #44) / head 4ca97e9 / tail f8a2695 / wc dae580f / cut 79d5f05 / sort 27e9a64 / uniq 5f1ebbe / grep ed74679 / awk 8090cb2 / tr a83a8ea / basename 1752776 / dirname 13cdde4 / sed 71a2d18 / diff 0e31b7c。west pin は着地後に前進。")
 ))
