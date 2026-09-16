@@ -1,0 +1,67 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609161700-line-heads-host-slots-abi-v8")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "string-index-of-from / string-compare-lines を host slot にする（context ABI v8）と、行指向 command の出力を batch する")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/last_verified "2026-09-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-native-runtime")
+  (:adr/repos (vector "orgs/kotoba-lang/kotoba-lang"
+              "orgs/kotoba-lang/kotoba-gmir"
+              "orgs/kotoba-lang/kotoba-mir"
+              "orgs/kotoba-lang/osaho"
+              "orgs/kotoba-lang/kotoba-sema"
+              "orgs/kotoba-lang/kotoba-native"
+              "orgs/kotoba-lang/kotoba-verifier"
+              "orgs/kotoba-lang/amu"
+              "orgs/kotoba-lang/artifact"
+              "orgs/kotoba-lang/org-ieee-sort"
+              "orgs/kotoba-lang/org-ieee-uniq"
+              "orgs/kotoba-lang/org-ieee-cut"
+              "orgs/kotoba-lang/org-ieee-grep"
+              "orgs/kotoba-lang/org-ieee-awk"
+              "orgs/kotoba-lang/org-ieee-wc"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609161010-text-heads-host-slots-abi-v7" "adr-2609160044-arena-scope-region-reset-abi-v6"))
+  (:adr/body
+  "## 決定
+  owner 指示「こちらも rust レベルになる様に進めて」(2026-09-16、sort 17× / uniq 10× / cut 57× vs uutils) に対して、(1) 2 つの行 head を context ABI v8 の host slot にし、(2) 行指向 command の guest を「scalar cursor + region + tail-append accumulator を KB 単位で書く」形に揃える。
+
+  | head | slot | 意味 (osaho の reference が正) |
+  |---|---|---|
+  | `(string-index-of-from s needle from)` → :i64 | 272 | FROM (boundary、[0,len]) 以降の最初の NEEDLE の **絶対** offset、無ければ -1。空 needle は string-index-of と同じく trap |
+  | `(string-compare-lines a i b j)` → :i64 | 280 | A の I から始まる行と B の J から始まる行の byte 順 -1/0/1。行は最初の改行 (含まない) か末尾まで、len は空行 |
+
+  `string-compare-lines` は **最初の 4 引数 runtime call**: kotoba-mir の `runtime-argument-registers` に 4 本目 (r8 / x4) を足し、loader の C 関数は第 5 引数で受ける。規約は読んで信じず、amu の conformance (`examples/line-slots.kotoba`、231132) が loader で実行して測る。
+
+  ## なぜ
+  測定が先: host call の床は 4 ns/call (10M 回の `string-byte-length`)、`string-substring` + region で 16 ns。行 walk の床は 78 ns/行 (改行 search 2 call + memchr)。**write (typed-cap-call) は 1 回 100 ns** で、cut / uniq / grep は 1 行 2〜3 回書いていた —— それが行指向 command の主因で、slot ではない。cut の 1.58 s は「行ごとに list を parse し直し、行を 2 回歩く」guest の形で、slot 無しで 0.19 s になった (bit set に 1 回 parse、1 pass、KB 単位の batch write)。v8 slot は search ごとの view (handle) を消し、sort の比較を in place にする。
+
+  ## 着地順
+  root ADR → kotoba-gmir (arity 3 / 4) → kotoba-mir (offset 272 / 280、runtime 引数 register 4 本目) → osaho (utf8-index-of-from! / utf8-compare-lines!) → kotoba-lang (grammar 正本 + digest pin: v7 で動かしていなかった JVM-only の pin も併せて前進) → kotoba-sema (型・arity・copy resync) → kotoba-native (offset / op) → kotoba-verifier (expected-context v8) → amu (loader POSIX / Windows v8、fuzz、benchmark、context-abi、admission、conformance、iOS fixture、write provider の snprintf 除去) → artifact (identity ×2) → cut / uniq / sort / grep / awk / wc。
+
+  ## 着地状態 (2026-09-16)
+  kotoba-gmir 790a729 (#34) → kotoba-mir fe5ce05 / 2c4793d (#68 / #69) → osaho 7dfafd7 (#92) → kotoba-lang 72648a8 (#694、digest 9e0eca1e) → kotoba-sema b8b01d0 (#83) → kotoba-native d2f1dca (#181) → kotoba-verifier 72ba0f4 (#59; 18 fail は main と同一の shift-count test) → amu AMU_SHA (#1004) → artifact 61f5d38 (#37: POSIX 2a6a5cbc / Windows d32b1a22) → org-ieee-cut CUT_SHA / uniq UNIQ_SHA / sort SORT_SHA / grep GREP_SHA / awk AWK_SHA / wc WC_SHA。west pin は着地後に前進。
+
+  ## 実測 (33 MB / 769,400 行、CPU 秒 user、出力は system utility と byte 同一、loader default 4,096 handle で完走)
+  | command | v7 | v8 + guest | uutils (Rust) | BSD |
+  |---|---|---|---|---|
+  | cut -f2 | 1.58 | **0.19** (guest の形で 0.19、v8 slot の寄与 0) | 0.03 | 0.04 |
+  | cut -f3- | — | 0.77 | 0.15 | — |
+  | uniq | 0.50 | **0.16** (-c 0.25、-d 0.09、-u 0.17、-i 0.18) | 0.06 | 0.31 |
+  | sort | 3.00 | **2.69** (-u 2.90) | 0.16 | 0.36 |
+  | grep e (598,400 hit) | 0.25 | **0.18** | rg 0.06 | 0.15 |
+  | awk {print $2} | 0.32 | **0.26** | — | 1.11 |
+  | wc | 0.21 | 0.21 | 0.11 | 0.11 |
+  uniq / cut / grep -i / awk は BSD より速く、Rust の 3〜6×。sort は 17× のまま。
+
+  ## sort が Rust に届かない理由 (測った)
+  sample: memchr (改行 search、1 行 1 level あたり 2 + split の walk 0.5) と `string-substring` (改行 needle は **literal で、評価ごとに handle 1 本** —— region を外すと 33 MB で 64 Mi handle を needle だけで使い切った、実測)。merge sort は 20 level × 769K 行 × host call ~11 回 = 175 ns/行/level。uu_sort は Vec に並べて radix/pdq で比較だけ、1 行あたり数十 ns。index sort に切り替えるには vector が 769K 要素要るが `kotoba.kir.value/vector-item-limit` は 16384 (osaho、loader の arena も 65536 word) で、上げるのは別の fail-closed 判断。上げても 1 要素 1 host call の model では n log n × 20 ns ≈ 0.4 s が床。**Rust 級にするには string 操作を host call ではなく kotoba-native が inline に emit する (bounds-checked load) しかなく、それは compiler の仕事で、この ADR の範囲外。**
+
+  ## 次の lever (優先順)
+  1. literal string の handle を評価ごとに作らない (compiler で hoist するか、loader に literal 専用 slot で memoize): 全 guest の region が減る。
+  2. `vector-item-limit` を上げて sort を index sort にする (別 ADR)。
+  3. string 操作の inline emit (kotoba-native)。")
+))
