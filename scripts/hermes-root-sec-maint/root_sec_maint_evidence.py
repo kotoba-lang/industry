@@ -53,6 +53,11 @@ CRED_NAME_RE = re.compile(
 )
 CRED_NAME_ALLOW = re.compile(r"(?i)(example|sample|template|fixture|\.md$|test/)")
 
+# This script embeds every detector regex as literal text; scanning it back is
+# a permanent self-flag. Only THIS path is exempt (a pasted key hiding here is
+# caught by PR review, not by this scan).
+SELF_EXCLUDE = ":(exclude)scripts/hermes-root-sec-maint/root_sec_maint_evidence.py"
+
 
 def run(cmd, timeout=180):
     p = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True,
@@ -92,7 +97,7 @@ def main():
 
     # 1) live secret shapes in HEAD
     rc, out, _ = run(["git", "grep", "--cached", "-I", "-l",
-                      "-f", patfile.name], timeout=600)
+                      "-f", patfile.name, "--", SELF_EXCLUDE], timeout=600)
     hits = [l for l in out.splitlines() if l.strip()]
     lines = []
     for f in hits[:10]:
