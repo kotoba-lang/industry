@@ -1,0 +1,183 @@
+;; 90-docs/business/ad-networks/overseas-publisher-onboarding.edn
+;;
+;; Overseas ad networks / portals that could put ads on our own properties
+;; (web, smartphone, games), what each one requires, and where the
+;; registration stands. Owner direction 2026-09-16: 「海外で調査、それぞれ
+;; 登録と契約を進めて」.
+;;
+;; Every :requirement carries its :evidence URL and the date it was read.
+;; :verdict compares the requirement with OUR measured numbers
+;; (90-docs/business/metrics/*.kotoba, :pageviews-7d as-of 2026-09-04,
+;; scaled x4.3 to a month) -- not with hopes. A network whose bar we are
+;; under is :not-eligible-yet, and no application is sent to it.
+;;
+;; Registration status vocabulary:
+;;   :researched              facts recorded, nothing sent
+;;   :owner-action-required   the next step needs something an agent must not
+;;                            do (safety floor: enter credentials / payment /
+;;                            tax / ID) or a decision that is the owner's
+;;   :application-sent        an application or inquiry was sent (who / when / from)
+;;   :approved / :declined    the network answered
+;;
+;; This file is the current state only (history is git). Third-party
+;; networks are leverage 0.4 in ADR-2608096000; they are FILL behind the
+;; first-party network (ads.x402.nexus, adr-2609161800), never the primary.
+
+{:schema "ad-networks.overseas-publisher-onboarding.v1"
+ :as-of "2026-09-16"
+ :owner-direction "海外で調査、それぞれ登録と契約を進めて (2026-09-16)"
+
+ :our-properties
+ ;; monthly ≈ pageviews-7d × 4.3 (30/7). Measured 2026-09-04.
+ [{:property "murakumo.cloud" :operator "AWAI Network, L.L.C." :category "AI generation tool (web); Go has adult-capable video model H3 Eros"
+   :pageviews-7d 3280 :monthly-est 14100 :adult? false :notes "AI-tool audience; not a content site"}
+  {:property "isekai.network" :operator "AWAI Network" :category "HTML5 games (public/games/gftd/*, e.g. goriketsu, at6-texan live 200)"
+   :pageviews-7d 6958 :monthly-est 29900 :adult? false :notes "portal submission is per GAME, not per site; some titles carry third-party names (e.g. castlevania) that a portal will refuse"}
+  {:property "shinshi.club" :operator "gftd" :category "adult creator platform" :pageviews-7d 4807 :monthly-est 20700 :adult? true}
+  {:property "oppai.fans" :operator "AWAI Network" :category "adult AI image/video generation" :pageviews-7d nil :monthly-est nil :adult? true :notes "not in the metrics zones yet -- unmeasured"}
+  {:property "x402.nexus / kotobase.net" :operator "AWAI Network / Kotoba" :category "crypto / agent payments" :pageviews-7d 2496 :monthly-est 10700 :adult? false}
+  {:property "app-aozora" :pageviews-7d 6734 :monthly-est 29000 :notes "listed for completeness; not an ad surface decision here"}
+  {:property "murakumo mobile" :category "PWA, not in an app store" :notes "AdMob / LevelPlay / MAX need a store app -- nothing to register yet"}]
+
+ :networks
+ [;; ── games: web portals (per-game revenue share) ─────────────────────
+  {:id :crazygames :name "CrazyGames" :region "BE/global" :surface :web-games
+   :signup "https://developer.crazygames.com/games (developer account: email + password)"
+   :requirements ["game must meet /requirements (technical, ads, quality); SDK integration"
+                  "payout via Tipalti: registration with personal/company details, address, tax form (wizard picks W-8/W-9 by entity)"]
+   :terms {:revenue-share "60% of ad revenue, 70% of IAP (2026 datapoint, third-party report)"
+           :payout "monthly or when unpaid ≥ €100; ~10th of following month; wire / ACH / eCheck / PayPal; FX fees apply"
+           :contract "click-through developer terms at account creation; no signed IO"}
+   :evidence ["https://docs.crazygames.com/payouts/ (read 2026-09-16)" "https://playgama.com/blog/business-faqs/poki-vs-crazygames-vs-gamedistribution-revenue-share/"]
+   :fit "isekai.network games -- per game, needs SDK work + quality bar"
+   :verdict :eligible-per-game
+   :status :owner-action-required
+   :blocked-on ["pick the game(s) to submit (no third-party-IP names)" "developer account credentials (agent must not enter)" "Tipalti payee entity + tax form (AWAI Network, L.L.C.?)"]}
+  {:id :poki :name "Poki" :region "NL" :surface :web-games
+   :signup "https://developers.poki.com/ 'Apply now' (game link + playtest), invite/application, not open signup"
+   :requirements ["WEB EXCLUSIVITY: the same game may not be on other web portals/aggregators (Steam / app stores / console allowed)"
+                  "Poki SDK, QA via Poki Inspector, playtests, performance review"]
+   :terms {:revenue-share "100% of revenue for traffic you bring yourself (direct/bookmarks/search/social); 50/50 for traffic Poki brings"
+           :contract "developer agreement on acceptance (not published on the guide page)"}
+   :evidence ["https://developers.poki.com/guide/working-with-poki (read 2026-09-16)"]
+   :fit "isekai.network -- exclusivity conflicts with also listing on CrazyGames/GameDistribution; choose ONE portal per game"
+   :verdict :eligible-per-game
+   :status :owner-action-required
+   :blocked-on ["exclusivity decision per game (Poki XOR other portals)" "pick the game"]}
+  {:id :gamedistribution :name "GameDistribution (Azerion)" :region "NL" :surface :web-games
+   :signup "developer account (email + password)"
+   :terms {:revenue-share "33% of net ad + IAP revenue to the developer" :payout "within 60 days of the monthly report once ≥ €100"}
+   :evidence ["https://playgama.com/blog/business-faqs/poki-vs-crazygames-vs-gamedistribution-revenue-share/ (third-party, read 2026-09-16)"]
+   :fit "widest syndication (4,000+ portals) but the lowest share; conflicts with Poki exclusivity"
+   :verdict :eligible-per-game
+   :status :owner-action-required
+   :blocked-on ["portal choice per game" "credentials + payee"]}
+  {:id :adinplay :name "AdinPlay (Venatus)" :region "NL/UK" :surface :web-games-display
+   :signup "publisher inquiry (contact form); selective, no public PV minimum"
+   :fit "display on isekai.network itself (~30k PV/mo) -- below what a selective gaming SSP usually takes; inquiry only"
+   :evidence ["https://adinplay.com/ (read 2026-09-16)" "https://blog.nitropay.com/nitro-vs-playwire-vs-venatus-which-ad-network-is-right-for-gaming-publishers/"]
+   :verdict :uncertain-inquiry
+   :status :researched}
+  {:id :playwire :name "Playwire" :region "US" :surface :web-display
+   :requirements ["≥ 100,000 monthly pageviews, majority US/CA/UK/AU/NZ, Google Analytics installed"]
+   :evidence ["https://www.playwire.com/blog/eligibility-requirements-for-working-with-the-top-ad-monetization-platforms"]
+   :verdict :not-eligible-yet :status :researched
+   :reason "every property is under 100k/mo and traffic is JP-heavy"}
+
+  ;; ── web: developer / AI-tool audiences ───────────────────────────────
+  {:id :ethicalads :name "EthicalAds (Read the Docs)" :region "US" :surface :web-display
+   :signup "form at https://www.ethicalads.io/publishers/ : name, email, site URL, monthly pageviews, audience category, notes. 'There's no contract to sign.'"
+   :requirements ["developer-focused site doing 50k+ pageviews per month" "EthicalAds must be the only ad on the page"
+                  "'AI & chatbot builders' is an explicitly listed audience"]
+   :terms {:rate "~$2.50 CPM (EU/NA traffic)" :share "70% to publisher (third-party)" :payout "min $50; PayPal / OpenCollective / GitHub Sponsors / Stripe bank transfer"
+           :contract "none to sign; publisher policy https://www.ethicalads.io/publisher-policy/"}
+   :evidence ["https://www.ethicalads.io/publishers/ (read 2026-09-16)"]
+   :fit "murakumo.cloud is the right audience, but measured ~14k PV/mo vs the 50k bar; also 'only ad on the page' conflicts with the first-party go-sidebar/go-wait slots"
+   :verdict :not-eligible-yet :status :researched
+   :reason "murakumo.cloud 3,280 PV/7d ≈ 14k/mo < 50k; would also have to remove first-party slots"}
+  {:id :carbon :name "Carbon Ads (BuySellAds)" :region "US" :surface :web-display
+   :signup "https://carbonads.com/join (application; hand-picked ~350 tech sites)"
+   :terms {:contract "custom per publisher; placement policy https://carbonads.com/placement-policy"}
+   :evidence ["https://www.carbonads.net/ (read 2026-09-16)"]
+   :verdict :uncertain-application :status :researched
+   :reason "curated; ~14k PV/mo is far below the sites they name (Bootstrap, Laravel…)"}
+  {:id :adsense :name "Google AdSense" :region "global" :surface :web-display
+   :requirements ["AI-generated content is not prohibited; low-quality content is" "adult properties are prohibited -- keep a separate account from any adult site"]
+   :evidence ["https://adsenseaudit.net/guides/adsense-ai-content-policy-2026"]
+   :fit "murakumo.cloud / isekai.network only; never the adult sites. Go's adult-capable video model (H3 Eros) is a policy risk on murakumo.cloud"
+   :verdict :eligible-with-risk :status :owner-action-required
+   :blocked-on ["Google account + payee + tax (agent must not enter)" "decide whether murakumo.cloud with H3 Eros is submittable"]}
+  {:id :raptive :name "Raptive" :region "US" :surface :web-display
+   :requirements ["≥ 25,000 monthly pageviews (since 2025-10), content sites, majority US traffic favoured"]
+   :evidence ["https://thisweekinblogging.com/mediavine-raptive-requirements/"]
+   :verdict :not-eligible-yet :status :researched :reason "isekai/aozora ~30k/mo but not content sites and JP-heavy; murakumo 14k"}
+  {:id :ezoic :name "Ezoic" :region "US" :surface :web-display
+   :requirements ["raised to 250,000 users/month in 2026-02"]
+   :evidence ["https://newormedia.com/blog/best-ad-networks-for-publishers-2026/"]
+   :verdict :not-eligible-yet :status :researched}
+
+  ;; ── web: crypto audiences (pay in crypto -- fits the USDC/x402 rail) ──
+  {:id :coinzilla :name "Coinzilla" :region "RO/EU" :surface :web-display
+   :signup "https://app.coinzilla.com/signup/ (publisher account)"
+   :terms {:model "CPM" :payout "weekly or monthly, no fee, BTC / ETH / USDT(ERC20) / SEPA / SWIFT; min ~€50 (third-party)"
+           :contract "https://coinzilla.com/terms/"}
+   :evidence ["https://coinzilla.com/publishers/ (read 2026-09-16)"]
+   :fit "x402.nexus / kotobase.net (crypto-native audience, ~11k PV/mo); no published PV minimum"
+   :verdict :eligible-unknown-bar :status :owner-action-required
+   :blocked-on ["account credentials" "payout wallet (which address receives USDT/ETH?)"]}
+  {:id :bitmedia :name "Bitmedia" :region "EE" :surface :web-display
+   :terms {:payout "min $20 to a BTC wallet; price floor per publisher"}
+   :evidence ["https://99bitcoins.com/analysis/bitcoin-ad-networks/" "https://affmaven.com/crypto-ad-networks/"]
+   :verdict :eligible-unknown-bar :status :owner-action-required
+   :blocked-on ["account credentials" "BTC payout wallet -- we hold USDC on Base, no BTC address is recorded"]}
+  {:id :a-ads :name "A-ADS (aads.com)" :region "anonymous" :surface :web-display
+   :signup "https://aads.com/ad-units/new/ -- no email, no password: an ad unit is created anonymously and paid to a crypto address"
+   :terms {:payout "BTC (Lightning) and other crypto; CPD/CPA/revenue-share" :contract "https://aads.com/terms-of-service/"}
+   :evidence ["https://aads.com/ (read 2026-09-16)"]
+   :fit "the ONE network an agent could register without credentials; but the payout address is the identity, so the wallet decision comes first"
+   :verdict :eligible-unknown-bar :status :owner-action-required
+   :blocked-on ["payout wallet decision (address = account)"]}
+
+  ;; ── adult (shinshi.club, oppai.fans) ─────────────────────────────────
+  {:id :trafficstars :name "TrafficStars" :region "CY" :surface :adult-display
+   :requirements ["no minimum traffic for publishers (third-party)" "publisher account; identity/company verification typical for adult networks"]
+   :terms {:model "CPMV (viewable impressions)" :formats "banner, native, video pre-roll, IM slider, push, pop, interstitial"}
+   :evidence ["https://www.hellclick.com/blog/best-adult-ad-networks-2026/" "https://apdigi.in/best-adult-traffic/"]
+   :verdict :eligible :status :owner-action-required
+   :blocked-on ["account credentials + operator ID/age verification (agent must not enter)" "payee entity for adult properties (gftd vs AWAI)"]}
+  {:id :trafficjunky :name "TrafficJunky (Aylo)" :region "CA" :surface :adult-display
+   :requirements ["no traffic minimum; every site manually approved"]
+   :evidence ["https://monetizepros.com/ad-network-reviews/traffic-junky-review-publishers/"]
+   :verdict :eligible :status :owner-action-required
+   :blocked-on ["account credentials + verification"]}
+  {:id :juicyads :name "JuicyAds" :region "US/CA" :surface :adult-display
+   :evidence ["https://www.mobidea.com/academy/juicyads-review/"]
+   :verdict :eligible :status :owner-action-required
+   :blocked-on ["account credentials + verification"]}
+  {:id :exoclick :name "ExoClick" :region "ES" :surface :adult-display
+   :requirements ["≥ 100k monthly visitors or 300k PV (third-party); Net-15 twice monthly, min $20"]
+   :evidence ["https://affmaven.com/exoclick-review/"]
+   :history "shinshi ran ExoClick: USD 0 / 0 imp, image delivery 522 (ADR-2608096000) -- a fill failure, not an RPM datapoint"
+   :verdict :not-eligible-yet :status :researched :reason "shinshi ~21k PV/mo < 300k"}
+
+  ;; ── smartphone (native apps) ─────────────────────────────────────────
+  {:id :admob :name "Google AdMob" :surface :mobile-app
+   :requirements ["a store-published app (AdMob mediation is the lowest-barrier start; revisit at 50k+ DAU)"]
+   :evidence ["https://apppublishpro.com/mediation-platforms-android-developers-2026/"]
+   :verdict :not-applicable-yet :status :researched :reason "murakumo mobile is a PWA, no store app"}
+  {:id :levelplay-max :name "Unity LevelPlay / AppLovin MAX" :surface :mobile-app
+   :requirements ["store app + SDK; ironSource direct demand ended 2026-04-30; rewarded video $15-40 eCPM tier-1"]
+   :evidence ["https://undrads.com/blogs/ironsource-vs-applovin-max-vs-admob"]
+   :verdict :not-applicable-yet :status :researched}]
+
+ :what-an-agent-cannot-do
+ ["enter account credentials, payment details, tax forms or identity documents into a form (安全床①)"
+  "solve or bypass a CAPTCHA on a signup form (安全床④)"
+  "choose the contracting entity / payee / payout wallet -- an owner decision (ADR-2608096000 leverage 1.4: 収納主体と PSP を一致させる is still open)"]
+
+ :next-owner-decisions
+ [{:q "contracting entity + payee for non-adult properties" :default "AWAI Network, L.L.C. (as published on murakumo.cloud/legal-company)"}
+  {:q "contracting entity + payee for adult properties (shinshi.club / oppai.fans)" :default "unknown -- gftd or AWAI"}
+  {:q "contact mailbox for registrations" :default "murakumo-cloud@agentmail.to (bot inbox: agent-readable verification mails) or an owner mailbox"}
+  {:q "which isekai game(s) go to which portal (Poki is web-exclusive)" :default "none until picked"}
+  {:q "crypto payout wallet for Coinzilla / Bitmedia / A-ADS" :default "none recorded (treasury holds USDC on Base; no BTC address)"}]}
