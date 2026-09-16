@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T16:21:24+09:00",
+  "generated_at": "2026-09-16T08:08:43.000Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -9446,6 +9446,28 @@
         ],
         "skills": [],
         "deliver": "local"
+      }
+    ],
+    "git-cleanup-ops": [
+      {
+        "id": "9d75f407c245",
+        "name": "git-cleanup-ops fleet local cleanup (runbook)",
+        "prompt": "You are git-cleanup-ops. FIRST read /Users/junkawasaki/.hermes/profiles/git-cleanup-ops/SOUL.md and obey it exactly; it is your whole charter (local-side cleanup of the com-junkawasaki west workspace per manifest/cleanup-workflow.edn). The GIT_CLEANUP_OPS_INVENTORY_V1 injected above was measured for you this run - do not re-discover the queue. Budget: finish within 25 tool calls / 30 min, then report and stop. If REFUSED-ALL: report 'measurement not possible' and stop. If REFUSED <phase>: skip that phase only. Work: at most 3 retirement items (stash/branch via git_cleanup_retire.py archive-then-drop; classification = content containment per SOUL) OR one land batch (kbb --backend sci scripts/cleanup-land.cljk --apply --names a,b,c with <=3 repos). Never fleet-wide west update. Never run git stash drop / git branch -D / rm directly (headless denies; use the retire script). The superproject dirty entries and FF-MERGE-BLOCKED are owner work: report only. routine/*, git-annex, main, worktree-in-use branches: never delete. west-orphan exit 2 = could not ask GitHub: report, do nothing. Remote PR/branch disposition belongs to pr-drain / branch-drain: do not touch. End with the SOUL report format: actions + archive paths, PR URLs, untouched WORK rows count, phases not measured, remaining stash/branch counts. 'opened no PR' is a valid outcome.",
+        "schedule": {
+          "kind": "cron",
+          "expr": "10 5 * * *",
+          "display": "10 5 * * *"
+        },
+        "provider": "kotoba",
+        "model": "qwen3.8-flash-next-whitehacker",
+        "max_tokens": 16384,
+        "toolsets": [
+          "terminal",
+          "file",
+          "web"
+        ],
+        "script": "git_cleanup_ops_evidence.py",
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki"
       }
     ]
   },
