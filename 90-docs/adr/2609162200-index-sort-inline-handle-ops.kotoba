@@ -1,0 +1,54 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609162200-index-sort-inline-handle-ops")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "vector-item-limit を 2^24 に、vector arena を packaged budget に、handle 操作を kotoba-native が inline emit する（context ABI v9）——sort を index sort にして Rust の 4× まで")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/last_verified "2026-09-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-native-runtime")
+  (:adr/repos (vector "orgs/kotoba-lang/osaho"
+              "orgs/kotoba-lang/kotoba-verifier"
+              "orgs/kotoba-lang/kotoba-native"
+              "orgs/kotoba-lang/amu"
+              "orgs/kotoba-lang/artifact"
+              "orgs/kotoba-lang/kotoba-lang"
+              "orgs/kotoba-lang/org-ieee-sort"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609161700-line-heads-host-slots-abi-v8" "adr-2609161010-text-heads-host-slots-abi-v7"))
+  (:adr/body
+  "## 決定 (owner、2026-09-16)
+  「kotoba-native が inline emit で ok, security 的に問題なければ」「vector-item-limit も security 的に問題なければ向上」。3 つを 1 波で:
+
+  1. **`vector-item-limit` 16384 → 2^24** (osaho f44b948、#93)。argument は value.cljk に: 定数は「1 つの vector の上限」で、host は自分の budget でもう 1 度縛る —— native の item arena は per-run budget (2^27 word まで)、interpreter は 1 回の確保が最大 128 MB、Wasm は copy-on-write で遅いだけ。verifier の literal bound 16384 は code size の bound (literal 1 要素 = host call 1 回の展開) なので据え置き (ccbf530)。
+  2. **loader の vector arena を packaged budget に** (amu、`--vectors --vector-items`、既定 4096 / 65536、mmap 上限 2^22 / 2^27)。surface-status の `:arena-bounds` は「landed」と書いてあったが loader は固定配列だった —— 規則と実装状態の判定 (CLAUDE.md) で loader を読み、今日実装。limit の境界は conformance が「arena を limit より 1 word 広くして 16777216 admitted / 16777217 refused」で両方向測る。
+  3. **inline emit** (kotoba-native ADR 0084、ed534e3): `pair-first / pair-second (string-byte-length) / vector-count / vector-at / vector-assoc!` を両 ISA で「range check + table read + 1 access」として emit。失敗は `udf`/`ud2` = C twin と同じ SIGILL。table には loader が起動時に 1 度書く 6 本の pointer (context ABI v9、288–328) 経由で届き、以後は誰も書かない (guest に生 store は kernel window family しか無く、それは別に admit される)。loop (search / compare / concat) は host call のまま —— loop は libc の SIMD が速い。register は runtime-call profile が clobber する x1..x3 / x0 と encoder scratch x16/x17 (r10/r11) だけ。
+
+  ## security の判定
+  host slot が守る不変条件は handle 範囲・bytes が mapping 内・boundary・validated flag の 4 つ。inline にした 5 op は table word しか読まず、必要なのは handle 範囲 (と vector の index 範囲) だけで、どちらも compare-and-branch 1 つ。動くのは「検査がどこにあるか」(監査済み C 関数 1 箇所 → 各 call site) で、その代償は codegen bug が「間違った答え」でなく「memory-safety 穴」になること。緩和: emit する byte 列を両 ISA で test に pin、ISA ごとに 1 関数で全 site が同じ列、amu の conformance が loader で **両方向** 実行 (範囲内は桁ごとの答え 4590616、範囲外の vector-at は SIGILL)。**その conformance が最初の cut の bug を捕まえた**: aarch64 で長さを x3 に load して `vector-assoc!` の値を潰していた (全 slot が 4 になる)。emit する側の test だけでは byte が「正しい」ことしか言えず、実行して初めて「clobber した」が見える。
+
+  ## 着地状態
+  osaho f44b948 (#93) → kotoba-verifier ccbf530 (#60、literal bound 据え置き) / c657b65 (#61、expected-context v9) → kotoba-native ed534e3 (#185 / #186、ADR 0084) → kotoba-lang 55f8fcd (#695、surface-status) → artifact 92c35d4 / 4082c9b (#38 / #39) → amu 456667f (#1008; #1007 は main の kotoba-native pin と衝突し #1008 に統合) → org-ieee-sort da35fad。
+
+  ## 実測 (33 MB / 769,400 行、CPU 秒 user、出力は byte 同一、loader default 4,096 handle)
+  | command | 今日の始まり | v8 | 今 (v9) | uutils / rg | BSD |
+  |---|---|---|---|---|---|
+  | sort | 2.87 | 2.69 | **0.66** | 0.17 | 0.38 |
+  | uniq | 0.50 | 0.16 | **0.13** | 0.06 | 0.31 |
+  | cut -f2 | 1.70 | 0.19 | **0.18** | 0.03 | 0.04 |
+  | grep e (dense) | 0.25 | 0.18 | **0.17** | rg 0.05 | 0.15 |
+  | wc | 0.21 | 0.21 | 0.20 | 0.10 | 0.11 |
+  | awk {print $2} | 0.32 | 0.26 | 0.25 | — | 1.30 |
+  sort の内訳 (sample): 2.69 → 1.11 (index sort、text を動かさない) → 0.77 (compare_lines を 8 byte/pass の 1 pass に: 差分 test 79,524 通り 0 mismatch、tab < newline が memcmp だけでは答えられない理由) → 0.66 (inline + 同じ string は 1 回だけ resolve)。残りは比較そのもの (15M 回 × ~7 ns) と call の周り、出力の view + append。uu_sort との差 4× は「比較を inline した memcmp で数 ns」と「radix」で、次は string 比較の inline (loop の inline は今回は見送った) か、`-n` の key を行ごとに 1 回計算する (今も 33 MB で fuel 切れ)。
+
+  ## host は 3 つある (macos-14 job が捕まえた)
+  inline 経路は「loader が起動時に pointer を書く」前提なので、context を持つ host ぜんぶが対象: POSIX loader、Windows loader、そして **静的 iOS host** (`runtime/ios/kotoba_ios_host.c`)。iOS host は context が code_length で終わっていて、inline の `string-byte-length` が 288 を読んで落ちた (CI の iOS simulator conformance)。6 本の pointer を足し (未提供 slot は NULL、vector は空 table)、Xcode 16.2 の pin でローカルでは simulator が回せないので同じ code bytes を macOS arm64 で harness に link して control: 旧 host exit 139、拡張 host `{:status :ok :result 71}`。ABI を bump するときは host を数えること。west pin は 7 repo 前進 (amu b0c74cf 〜 org-ieee-sort f578a0b)。
+
+  ## 測って学んだこと (次の人へ)
+  - write (typed-cap-call) は 1 回 ~100 ns。行指向 command は 1 行に 2〜3 回書いていた —— slot より先にここだった。
+  - literal は評価ごとに handle 1 本。region を外すと 33 MB で 64 Mi handle を needle だけで使い切る。
+  - batch の bound は byte でなく行数 (sorted C file は 1 byte 行が数千続く)。
+  - amu の executor は arena budget を渡さないので、limit の境界は conformance (env) で測る。
+  - kotoba-native の別 wave (#184、literal walk) が userland でも `brk` (SIGTRAP) で refuse するようになった。loader の refusal は SIGILL。test-package-command の probe は host slot 経由で trap する形に変えたが、userland で 2 種類の trap signal があるのは未解決の不揃い。")
+))
