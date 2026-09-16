@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-15T16:30:10Z",
+ "generated_at": "2026-09-16T10:40:39+09:00",
  "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
  "profiles": {
   "adnetwork-scout": [
@@ -6420,6 +6420,19 @@
      "symbol-index"
     ],
     "deliver": "local"
+   }
+  ],
+  "root-sec-maint": [
+   {
+    "id": "6e581642543f",
+    "name": "root-repo secops weekly maintenance",
+    "schedule_display": "23 7 * * 5",
+    "script": "root_sec_maint_evidence.py",
+    "model": "z-ai/glm-5.3-flash",
+    "provider": "openrouter",
+    "state": "scheduled",
+    "next_run_at": "2026-09-18T07:23:00+09:00",
+    "workdir": "/Users/junkawasaki/.gftd/worktrees/root-sec-maint"
    }
   ]
  },
