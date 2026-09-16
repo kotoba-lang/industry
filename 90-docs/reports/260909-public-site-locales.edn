@@ -31,7 +31,8 @@
                     :browser "the browser's strings travel in each document (#kc-copy-runtime, keyed by English); the generated maps stay server-side"
                     :check "kbb --backend sci scripts/translate-console-copy.cljk --check → SCANNED 8540 / MISSING 0"
                     :fallback "a string the map does not know reads as English; policy prose the model kept in English for some locales (e.g. pcm) is such a case"
-                    :not-translated ["the AUP's policy lists (research/acceptable-use-policy, English by design)" "docs.kotoba.cloud (a separate surface, ja / en)"]}
+                    :not-translated ["the AUP's policy lists (research/acceptable-use-policy)" "legal documents (/legal/, /legal/tokushoho/)" "docs.kotoba.cloud (a separate surface, ja / en)"]
+                    :owner-decision {:date "2026-09-16" :text "policy and legal documents may stay English only (owner: 'policy, 法的文書などは英語のみで ok')" :effect "English-only policy / legal text is not a translation gap for kotoba.cloud; the coverage inventory keeps disclosing it as fallback, per ADR-2609091700"}}
              :switch "every console document offers all 22 locales as ?lang= on the same route; the choice persists as kb_locale"
              :commit "ce66187aaa36ffd3a0d4321b605062aa071f08d6"
              :cloudflare-version "9493389d-cfaa-48b4-b1f2-3fa1efebb42b"
