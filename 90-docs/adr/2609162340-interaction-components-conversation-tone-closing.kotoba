@@ -1,0 +1,38 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609162340-interaction-components-conversation-tone-closing")
+  (:adr/title "closing: Hermes gateway (JVM-free) → cloud-kotoba-dds interaction components (waves 1–4) → conversation tone + λ toggle on kotoba.cloud — 着地と resume point")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/related (vector "ADR-2609161900" "ADR-2609151708" "ADR-2608080100" "ADR-2607173100" "ADR-2608136000"))
+  (:adr/context
+  "1 セッション（2026-09-16）で owner が順に出した指示: (1) cloud-itonami-app を Hermes agent bot の gateway に、JVM 依存なしで、動作検証まで (2) dark mode が壊れている、shinkansen 最新で、grok bots 的な角丸レイアウトを cloud-kotoba-dds に反映 (3) 言語切替 / light・dark・system の切替を統合、grok mode はテーマカラーとして除去 (4) 翻訳対応 (5) interaction を共通コンポーネント化し design-token → component → runtime に落とす (6) 1, 2, 3, 4 = composer / run stream / dialog focus return / template literal の i18n (7) kotoba.cloud のテーマ切替は kotoba-lang.org の lisp toggle、PC で分かりづらい、ChatGPT / Grok Bots のトンマナを design token で、single screen app (8) deploy。
+
+  すべて default branch に着地済み。branch 上の成功と main 上の存在は各 PR の merge sha で区別している。")
+  (:adr/decision
+  "着地（repo / PR / main sha）:
+  - kotoba-lang/shinkansen #8 301e50d: streamRun(source, …) は URL か host の fetch 関数、SSE data: 行と NDJSON 行を 1 reader で、非 2xx は body 未読で onError({status, response})。shinkansen.locale.format(pattern, params) / cljc format-message（{hole} 埋め、無い key は見える穴、数値は Intl.NumberFormat(<html lang>)）。scripts/runtime-node-check.cljk（runtime 文字列を Node で実行、SCANNED 7）。suite 121 / 403 / 0。
+  - kotoba-lang/cloud-kotoba-dds #20 af6169d（interaction 0.2.0: composer + thread runtime, tokens --ck-composer-max-height, bots/stop; 見本 audit 100.0; 実ブラウザ test/composer_thread_browser.cljk SCANNED 10）、#21 abfd938（conversation tone 0.4.0: styles/css を --ck-* の生成規則で書き直し — 線で区切らない、面の段差、radius 12/20/28/full、pill と円、composer は raised card; switch/lambda-toggle = jp-go-dds.theme-toggle の λ yin-yang を shinkansen theme 契約に; --ck-radius-md 20 / -lg 28; 未使用 --ck-surface-accent 撤去; examples/chat.html audit 100.0）、#22 22cefcd（theme/css が lambda-css を同梱）。
+  - cloud-itonami/cloud-itonami-app #365 fbdb91f: composer は composer/form + cloudKotobaComposer（Enter 改行 / ⌘⏎ + IME guard / autosize / running 状態 / Escape→stop、空 prompt で send を disabled にしない = audit :idle-disabled）、stream は cloudKotobaThread.run（shinkansen.streamRun、host fetch で CSRF retry）、bubble は .ck-bots__bubble、dialog は dds/modal-dialog + cloud-kotoba-dds.sheet on jp-go-dds.behavior（focus return は behavior 層、app の overlayOrigin/settingsOrigin 撤去）、template literal 349 個を fmt('… {hole} …') に（i18n/en/07-format.edn 323 pattern）、scripts/verify-runtime-strings.cljk（tokenizer、日本語 text の template literal で exit 1 — 0 / 直前 main 339）、render-ui-preview の regex 数（119 は artefact）を撤去。resident 1338 再 render + kickstart 済み。
+  - kotoba-lang/app-kotoba-cloud #278 22c61eab: λ toggle（header + console top bar）、履歴は全 band で drawer（data-history=drawer、console sidebar が唯一の sidebar）、model select を composer 内へ、welcome は task 質問、console chrome を --ck-* 面へ（線撤去、pill）、live bug 修正（#norbert-close 欠落 → norbert-chat.js が TypeError で停止し送信/Settings が未配線だった — live 実測）、test/norbert-chat.mjs drawer 対応。
+  - 本番: wrangler Version 3dcba5c9-fbe2-4a98-98c7-5aa526ced199（tree 56e75661 = main tip 当時）。live 検証: onsubmit function、λ 両方向、drawer、composer、1440/390、page error 0。audit:uiux 428 文書 OK・/ と /ja/ 100.0・最低 92.6・exit 0（同 tree）。
+  - west pin: shinkansen 301e50d / cloud-kotoba-dds 22cefcd / cloud-itonami-app fbdb91f / app-kotoba-cloud 22c61eab（closing 時点では別 session が 0770e2bf に前進済み、私の merge を含む）/ jp-go-digital-design-system 4a315c5（behavior 層のため）。")
+  (:adr/body
+  "検証の固定（何を測って何を測っていないか）:
+  - cloud-itonami-app: scratch signed-in resident（port 1339、data/state.edn の複製、session token seed）+ headless Chromium。signin-server は /api/bots/:id/messages/stream を持たないので stream は Playwright route intercept の実 NDJSON body で検証（delta → markdown bubble → done で run bar「完了しました。2秒 · 0 tools · 42 tokens」）。en 変種: placeholder「Ask app aozora · Customer Support」「Request accepted. 0s」。portable suite 87 / 453 / 0 failures（46 oracle error は main と同一・既存）。JVM test（appearance_test 等）は編集済み・未実行。
+  - app-kotoba-cloud: kbb -M:test は main 時点で 248 failures（landing 時代の文言 test 等）、私の tree と test 名で突き合わせて同一集合（新規 0）。そのため npm run deploy は使わず build → test:worker / test:workerd → wrangler を個別に実行。shadow-cljs（JVM）はこのホストに npm install して resource-guard 経由で実行。node_modules は ignore 済みで残置（次の ship に使える）。
+  - cloud-murakumo-site も cloud-kotoba-dds.styles/css を描く: hook 不変だがトーンは次 render から変わる。未視認。
+  - superproject 本体 checkout の ff は別 session の .git/index.lock で数回ブロック。pin は origin/main に載っている。
+
+  残存 gap（優先順）:
+  1. cloud-murakumo-site の render を見て conversation tone の崩れが無いか確認（styles/css の hook は同じ、色・線・radius が変わる）。
+  2. app-kotoba-cloud の kbb -M:test 248 failures（site_test の landing 文言・hreflang 期待）は現行 UI と乖離した test — 直すか捨てるかの判断が要る。
+  3. cloud-itonami-app の JVM suite を実行できる環境で appearance_test / core_test を回す。
+  4. kotoba.cloud 本番 audit の残り headroom: nav-one-home（82 文書、docs の重複 nav）、note-density（190 文書）。
+  5. Hermes gateway の provider: resident の murakumo key は 401（既知）。
+
+  resume の最初の command:
+    cd orgs/kotoba-lang/cloud-kotoba-dds && kbb --backend sci --classpath src:resources:test:../jp-go-digital-design-system/src:../html/src:../css/src:../text/src:../shinkansen/src:../security-toolkit/src examples/chat.cljk
+  （audit 100.0 が出れば tone の正本は生きている。次に cloud-murakumo-site を render して同じ audit を当てる。）
+
+  保全した他者 WIP: superproject の tracked 変更（orgs/kotoba-lang/state.db 等、別 session）、/Users/junkawasaki/github/_wt/{amu-*,kotoba-lang-ioread,kotoba-sema-ioread}（別 session の worktree）、90-docs/adr/2609141203-social-capital-ledger.edn（untracked、bare id、別 session）。触っていない。")
+))
