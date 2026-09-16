@@ -4,6 +4,10 @@
 # table overwrite. Safe to re-run. Canonical copy lives in the superproject
 # scripts/hermes-nvd-dataset/; cron jobs get a copy in ~/.hermes/scripts.
 set -eu
+# Never run alongside the detached full walk (double-writer races state.json)
+if pgrep -f 'fetch_nvd.py full' >/dev/null 2>&1; then
+  echo "SKIP: fetch_nvd full walk still running"; exit 0
+fi
 PY="$HOME/venvs/iceberg/bin/python"
 DIR="$HOME/github/com-junkawasaki/scripts/hermes-nvd-dataset"
 LOG="${NVD_SYNC_LOG:-$HOME/nvd-dataset/sync.log}"
