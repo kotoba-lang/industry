@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T11:57:12+09:00",
+  "generated_at": "2026-09-16T16:20:35+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -6477,7 +6477,34 @@
         "web"
       ],
       "deliver": "local"
-    }
+    },
+    "legal-catalog-ops": [
+      {
+        "id": "1bc412c12516",
+        "name": "legal-catalog-ops daily iteration (legal-data cata",
+        "prompt": "legal-catalog-ops daily iteration (legal-data catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/legal-catalog-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起点) -> build (node scripts/build-legal-catalog.mjs) -> test:legal-catalog -> render -> shadow release -> audit:uiux 検証 -> gh pr create --repo kotoba-lang/app-kotoba-cloud -> 自己検査 comment -> gh pr merge --merge まで。not mergeable なら fetch+rebase+push して再試行。何も足すことがなければ 'opened no PR' と理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/legal-catalog-ops。リモート名は kotoba-lang。20 API call 予算。",
+        "model": "qwen3.8-flash-next-whitehacker",
+        "provider": "kotoba",
+        "script": "legal_catalog_ops_evidence.py",
+        "schedule": {
+          "kind": "cron",
+          "expr": "10 7 * * *",
+          "display": "10 7 * * *"
+        },
+        "schedule_display": "10 7 * * *",
+        "enabled": true,
+        "state": "scheduled",
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/legal-catalog-ops",
+        "max_tokens": 16384,
+        "toolsets": [
+          "terminal",
+          "file",
+          "web"
+        ],
+        "skills": [],
+        "deliver": "local"
+      }
+    ]
   },
   "schema": "itonami.hermes-cron-jobs.v1"
 }
