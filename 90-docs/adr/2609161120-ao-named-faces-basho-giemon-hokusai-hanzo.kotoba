@@ -1,0 +1,80 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609161120-ao-named-faces-basho-giemon-hokusai-hanzo")
+  (:adr/title "ao の名前付き面 — ao/basho・ao/giemon・ao/hanzo（chat）と ao/hokusai（image）を公開し、routing は表の 1 行にする")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/deciders "Jun Kawasaki")
+  (:adr/related (vector "adr-2609161000-nex-mini-usagi-draft-hermes-router-restore"
+                "adr-2609102000-hokusai-is-a-name-the-fleet-owns"
+                "adr-2609092400-murakumo-public-examples-hanzo-confidential-admission"
+                "adr-2609021200-itonami-cloud-agent-basho-glm53-serverless-budget"
+                "adr-2609011842-awai-japanese-models-openrouter-provider-application"
+                "adr-2607173100"))
+  (:adr/body
+  "オーナー指示 2026-09-16「今の murakumo.cloud の model で kame, usagi がありますが,
+basho, giemon, hokusai, hanzo もたてて, それぞれ ao/basho など ao model として
+内部の model routing を整える前提で」。
+
+## 決定
+
+`ao/<name>` は organism（member model の合議）の公開名であり、model id ではない。
+4 つの名前を `network-awai/cloud-murakumo-api` の `src/ao_organism.js` の表に足し、
+**routing は表の 1 行の書き換えで変わり、公開面は動かない**ことを設計に固定した。
+
+| organism | 面 | 2026-09-16 の routing | 表に名指した本命 member（未配線） |
+|---|---|---|---|
+| `ao/basho` | 文章 | draft `murakumo-main` / review `ling-3.0-tiny` + Basho profile | `awai-network/basho`（GLM-5.3 従量 route。匿名 member call は 402） |
+| `ao/giemon` | vision / physical AI | 同上 + Giemon profile（画像 part は pool member が受ける） | `awai-network/giemon`（`GIEMON_PRIVATE` + adapter digest 検証後） |
+| `ao/hanzo` | 防御的コードレビュー | 同上 + Hanzo profile、出力 768 token 上限 | Modal cyber checkpoint（origin が `modal-http: invalid function call` を返す間は不可） |
+| `ao/hokusai` | 画像 | `aoImageOrganisms` → `awai-network/hokusai`（images route で書き換え、text route は 400 `wrong_endpoint_for_image_model`） | — |
+
+**profile** は organism の standing instruction。draft には caller の messages の前に
+system として置き（caller 自身の system は保持）、review には reviewer 節を追記する。
+usagi / kame は profile を持たず byte 単位で不変。
+
+**resolve-or-absent を守った**: 本命 member は 3 つとも 2026-09-16 に operator Mac から
+api.murakumo.cloud へ直接 probe して匿名 member call を返せないことを測ったので、表の
+comment に名指しだけして配線しない。配線したいときは `draft` を書き換える（test は
+member が登録済みであることだけを pin する）。
+
+**ao/hanzo の 768** は ADR-2609092400 §3 と site の Hanzo preview が課す上限と同じ値で、
+member の最小値より意図的に低い。test が literal で pin する（広げるのは決定であって drift ではない）。
+
+## 着地と実測
+
+- PR #269（`network-awai/cloud-murakumo-api`）、merge commit `c6b746e`（main）。
+  #268（usagi → nex-n2.5-mini、本番が先に走らせていた変更）を先に着地させてから
+  merge したので、deploy で usagi が退行していない。
+- deploy: Worker `local-murakumo` version `722cf355-f9eb-4cb3-b615-75d5b451e15e`、
+  main を包含した worktree から `npm run deploy`（resource-guard scope deploy）。
+- live 2026-09-16T02:1xZ: `GET /v1/models` に 6 organism（chat 面 5 は `profile` の
+  有無を印字、`ao/hokusai` は `/v1/images/generations` と member を印字）。
+  `POST /v1/chat/completions model=ao/hokusai` → 400 `wrong_endpoint_for_image_model`。
+  `POST /v1/images/generations model=ao/hokusai size=512x512` → 200、PNG 473,620 bytes、22.5 s。
+  `POST /v1/chat/completions model=ao/hanzo`（SQL 連結の関数、max_tokens 200）→
+  `model: ao/hanzo`、finding は evidence / impact 形式、`review_triggered true` /
+  `reviewed false`（draft が cap 付近 → review 発火 → `ling-3.0-tiny` が空 content を
+  返し draft に fallback。reasoning-first member の既知の形、`ao_completion.js` の設計どおり）。
+- test: `test/ao_organism.test.mjs` に 13 件追加（cap literal と entry 順序を壊して赤を
+  確認してから緑）。merge 後の tree で origin-auth + model-limits 114/114、
+  `npm run build`・`wrangler deploy --dry-run` clean。
+
+## 残る gap（優先順）
+
+1. `ao/hanzo` / `ao/basho` / `ao/giemon` の review member が `ling-3.0-tiny` である限り、
+   cap 付近の draft の review はほぼ空で返る（reasoning-first）。review の実効性を
+   測ってから reviewer を pool 側に入れ替えるかを決める。
+2. 本命 member の配線: `awai-network/basho` は organism の member call に identified
+   caller を渡す設計が要る（member call は caller の headers をそのまま再入させている）。
+3. `cloud-murakumo-api` main は `node_modules` を **自分自身を指す symlink として track**
+   している（commit 095ece1、2026-09-10）。本体 checkout と worktree で `npm run` が
+   `spawn ELOOP` で落ちる。別 worktree の実 install を指して回避、未修正。
+4. site（`cloud-murakumo` の `basho-preview` / `hanzo-preview` / `hokusai-preview`）は
+   まだ organism を呼んでいない。site 側の model 選択を `ao/<name>` に寄せるかは別決定。
+
+## 再開点
+
+`orgs/network-awai/cloud-murakumo-api` を main `c6b746e` 以降に合わせ、
+`node --test test/ao_organism.test.mjs` が 38 件緑であることを確認してから gap 1 を測る:
+`POST /v1/chat/completions model=ao/basho max_tokens=64` を 5 回投げ `murakumo.reviewed` の
+true の回数を数える（0/5 なら reviewer 入れ替えの根拠）。")))
