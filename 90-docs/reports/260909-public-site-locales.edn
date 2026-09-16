@@ -35,11 +35,13 @@
                     :owner-decision {:date "2026-09-16" :text "policy and legal documents may stay English only (owner: 'policy, 法的文書などは英語のみで ok')" :effect "English-only policy / legal text is not a translation gap for kotoba.cloud; the coverage inventory keeps disclosing it as fallback, per ADR-2609091700"}}
              :switch "every console document offers all 22 locales as ?lang= on the same route; the choice persists as kb_locale"
              :commit "ce66187aaa36ffd3a0d4321b605062aa071f08d6"
-             :cloudflare-version "6be60c50-8c9a-49cd-873d-b7107fbbdae0"
+             :cloudflare-version "a836d11e-fb83-4667-b9c5-22e3bc400748"
              :history [{:date "2026-09-16" :commit "b613e437194255a56f6127e6f836a05721509f9d" :cloudflare-version "188233e9-3473-4b3f-a938-9bfae982bd90" :what "chrome in 22 locales"}
                        {:date "2026-09-16" :commit "ce66187aaa36ffd3a0d4321b605062aa071f08d6" :cloudflare-version "9493389d-cfaa-48b4-b1f2-3fa1efebb42b" :what "bodies in 22 locales"}
                        {:date "2026-09-16" :cloudflare-version "902aaa22-5adc-48b4-a943-5ea4aca07440" :what "REGRESSION — another session deployed 6b7ecb7b (main before ce66187a): localized shells, English bodies, about 7 h"}
-                       {:date "2026-09-16" :commit "ce66187aaa36ffd3a0d4321b605062aa071f08d6" :cloudflare-version "6be60c50-8c9a-49cd-873d-b7107fbbdae0" :what "restored: origin/main rebuilt and redeployed"}]
+                       {:date "2026-09-16" :commit "ce66187aaa36ffd3a0d4321b605062aa071f08d6" :cloudflare-version "6be60c50-8c9a-49cd-873d-b7107fbbdae0" :what "restored: origin/main rebuilt and redeployed"}
+                       {:date "2026-09-16" :cloudflare-version "819ccd57-55a9-44c2-9f47-0833ec16e06c" :what "PARTIAL REGRESSION — another session deployed 0e349fe4 (main) with a stale browser bundle (build/shadow-src not re-synced): translated documents, English browser strings; main also failed its worker smoke (sanctions variant root)"}
+                       {:date "2026-09-16" :commit "a07d276cf19bee84582d46d52fff3b1c37ab3d2e" :cloudflare-version "a836d11e-fb83-4667-b9c5-22e3bc400748" :what "restored again: sanctions variant root landed, origin/main rebuilt with sync-shadow-src, all gates green"}]
              :verified [:worker-smoke-13-variant-roots :audit-98.1 :browser-arm-390-768-1440 :german-account-body :indonesian-models-body]}}
   {:domain "murakumo.cloud" :status :verified-live
    :repo "network-awai/cloud-murakumo"
