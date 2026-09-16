@@ -1,0 +1,29 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609161800-murakumo-inventory-from-adnetwork")
+  (:adr/title "murakumo.cloud の広告在庫は自社 ad network（ads.x402.nexus）から取得する — adserver 初 deploy と /campaigns feed")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/related (vector "adr-2607093500-adnet-first-party-ad-network" "ADR-2608096000" "adr-2609161600-go-wait-ad-boost" "ADR-2607302100" "ADR-2609111500"))
+  (:adr/context
+  "owner 指示 2026-09-16: 広告在庫を adnetwork から取得する。
+
+  実測 2026-09-16（着手前）:
+  - murakumo.cloud の placement（go-sidebar / free-tier / go-wait）は campaign を自分の env `MURAKUMO_ADS_CAMPAIGNS` か KV `ads:campaigns` から読んでいた。KV に `ads:campaigns` も `ads:listed` も無く（`ads:apply:*` 2 件と review event だけ）、在庫は 0。
+  - ADR-2607093500 が network の serving host と定めた `cloud-itonami/adserver` は一度も deploy されていない（`ads.x402.nexus` NXDOMAIN、Worker script 無し）。source は 2026-09-10 の wave で `.kotoba` に改名された Clojure-shaped file 6 本、build 行は amu に書き換えられていて組めない。
+  - cloud-itonami の adnetwork（governed campaign lifecycle）は `campaigns-json` CLI で `CAMPAIGNS_JSON` 形を出すが、live の HTTP feed は無い。committed campaign は 0。
+  - ADR-2608096000 の leverage 順は 配線 2.1 > 広告主 2.0 > 在庫 1.8。『house backfill を先に立てて配線の正しさを 0 campaign で実測する』が段 1。")
+  (:adr/decision
+  "1. `cloud-itonami/adserver` を network の serving host として `https://ads.x402.nexus` に deploy する（zone x402.nexus は network-awai account、nexus-x402 が配信）。source は `.cljk` + `cljk-origin.edn`（origin は 2026-09-10 の rename 記録から）、`scripts/cljk-mirror.cljk` + alias `:mirror` で shadow-cljs が組む。`GET /campaigns` を足す: 登録簿そのもの（public creative + bid + targeting + budget、鍵無し）。`CAMPAIGNS_JSON` が読めないときは 503 + `count null` —— 『読めない』と『0 件』は別の状態。
+  2. murakumo.cloud は登録簿を **pull** する（per-request の /serve ではない）: cron `*/5` が `<MURAKUMO_ADNETWORK_URL>/campaigns` を KV `ads:campaigns` へ同期し、毎回 `ads:campaigns:sync` に status を書く。auction（kotoba-lang/adnet）は両側で同じなので答えは network と同じで、network 不達でも last good copy が配信し、receipt の charge は同じ bid から計算できる。
+  3. 書き換えは 200 + ok + array のときだけ。非 200 / throw / 非 JSON / ok false は last good copy を残して理由（`fetch/non-200` `fetch/failed` `feed/not-json` `feed/not-ok` `feed/no-campaigns-array` `network/not-configured`）を記録する。健全な feed の `count 0` は書く（空の登録簿は事実、house copy が正直な答え）。`ads/campaigns` が拒む half-formed entry は落として数える（claimed / accepted / dropped）。
+  4. `GET /api/v1/ads/inventory`（`?refresh=1` で 5 分超なら pull）が測定状態を答える。未測定・拒否・15 分超は `measured false`、`campaigns null`（0 ではない）。
+  5. `ads-http/load-campaigns` を唯一の登録簿 reader にし（free-tier / go-wait を切替）、`/api/v1/ads/placement` も登録簿を見る: paid campaign > listing > house。同期物が無ければ従来と byte 同一（ads-test が pin）。
+  6. `scheduled-handler` は job ごとに try で起動する（実測: `run-maintenance!` は ACTIONS_DB 無しで同期 throw し、後続の sync を潰していた）。")
+  (:adr/consequences
+  "- 着地: cloud-itonami/adserver 1eda95c（初 deploy、Version dd6b44f0）、cloud-murakumo PR #221（42da693、Version e16e16f0）。west pin 2 本前進。
+  - live 実測: `ads.x402.nexus/campaigns` → `count 0`、`/serve?slot=go-wait` → house（x402 catalog promo）。murakumo `/api/v1/ads/inventory?refresh=1` → `measured true, campaigns 0, fundingSource house, source https://ads.x402.nexus/campaigns`。配線は house backfill で測れている。
+  - **登録簿が空なのは事実であって欠落ではない**: USDC で campaign を funding した advertiser が居ない。paid 在庫を載せるのは network 側の次段（cloud-itonami で governed campaign → `campaigns-json` → adserver の `CAMPAIGNS_JSON` へ publish → `/topup` で USDC 入金）であり、この ADR の範囲外。murakumo の intake（/advertise → review bot）は listing を生み、placement は network campaign の下に置く。
+  - adserver の `/event` は accrual を返すだけで永続しない（storage は follow-up のまま）。murakumo は receipt に charge を固定しているので、精算はそこから再構築できる。
+  - 検証: adserver は portable suite 2/8 + shadow node test + compiled HTTP test CHECKED 8（503→200 に壊して赤を確認）。murakumo は pure self-check 16/16 + compiled Worker CHECKED 9（network を stub）+ 既存 5 suite。
+  - 外部 ad network（web / smartphone / game）の候補調査は別途（同日の owner 依頼）。ADR-2608096000 は第三者 network を leverage 0.4 と置いており、この配線を先に立てた理由でもある。")
+  (:adr/authors (vector "Jun Kawasaki" "Claude"))))
