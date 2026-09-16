@@ -60,9 +60,9 @@
   - shasum 832: (着地 2026-09-16 夜) loader に wire 3 `:hash/sha256` の provider (FIPS 180-4、機構層の C; amu #1016 `4fb5d4d`、artifact #46 `f44e273`) —— それまで switch は identity に落ち、digest を頼んだ guest は入力をそのまま受け取っていた。test は "abc" / 空 の vector、24,576 byte を node crypto と一致、grant なし → trap、unrouted control で赤。org-ieee-shasum は `-a 256` だけ (14 case byte 同一、`-a 1` / bare は divergence)。
   - date 1,451: (着地 2026-09-16 夜) 引数つきの呼び出しは UTC が支配的 (`-u +%FT%TZ` 等) なので **UTC だけ** の org-ieee-date。clock-v1 の record codec は JVM-free の native route で admit されず command は時計を読めなかった (loader が request を echo) → wire 7 に **text 形式** ("wall" → unix ms、"monotonic" → ns、同じ grant bit、未知は trap; amu #1015 `d3e56ab`、artifact #45 `ec475bf`)。civil 変換は Hinnant の逆算 (初版は yoe の符号が逆で leap day を 1 日ずらした; suite が pin)。153 exact case (`-r SECONDS` で同じ瞬間を比較) + live 1。bare `date` (local) は TZ が無いので divergence。
   - which 1,495: `:env/read` で PATH は読めるが EXISTS は fs-scope 内しか答えない → PATH dir を scope に含めて package する設計が要る。
-  - stat 267: 実装可能 (STAT form)。未着手。
+  - stat 267: (着地 2026-09-16 夜) `-f` の %z %m %N %p %%。%m は loader に wire 35 の **MTIME form** (`<path>MTIME_SEP` → epoch 秒; amu #1017 `56eacb7`、artifact #47 `5c8e165`) —— STAT の 5 番目の field にしなかったのは org-ieee-du が 4 番目を「3 つ目の空白以降すべて」で読むため。20 case byte 同一 (mtime は utimes で固定)、`%Sm` / 既定行 / `-c` は divergence。
   - 残る per-exec 固定費: fork 1–10 ms は負荷、loader 残り ~5 ms は未分解。
 
   ## 着地
-  amu d3082e6 (#1012) / kotoba-lang f8fb69d (#697) / kotoba-sema 043c620 (#85) / artifact d9caf57 (#43, #44) / head 4ca97e9 / tail f8a2695 / wc dae580f / cut 79d5f05 / sort 27e9a64 / uniq 5f1ebbe / grep ed74679 / awk 8090cb2 / tr a83a8ea / basename 1752776 / dirname 13cdde4 / sed 71a2d18 / diff 0e31b7c / date a6a9bd1 (amu d3e56ab) / shasum 5f319f6 (amu 4fb5d4d)。west pin は着地後に前進。")
+  amu d3082e6 (#1012) / kotoba-lang f8fb69d (#697) / kotoba-sema 043c620 (#85) / artifact d9caf57 (#43, #44) / head 4ca97e9 / tail f8a2695 / wc dae580f / cut 79d5f05 / sort 27e9a64 / uniq 5f1ebbe / grep ed74679 / awk 8090cb2 / tr a83a8ea / basename 1752776 / dirname 13cdde4 / sed 71a2d18 / diff 0e31b7c / date a6a9bd1 (amu d3e56ab) / shasum 5f319f6 (amu 4fb5d4d) / stat fc97b9b (amu 56eacb7)。west pin は着地後に前進。")
 ))
