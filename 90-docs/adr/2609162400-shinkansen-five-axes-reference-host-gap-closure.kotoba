@@ -1,0 +1,63 @@
+(vector (map
+  (:db/id -1)
+  (:adr/id "adr-2609162400-shinkansen-five-axes-reference-host-gap-closure")
+  (:adr/title "shinkansen — 5 軸の直交（DID / CID / origin / grant / effect）、reference host、maturity gap の解消と「作らない」の決定")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/doc-type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/topic "shinkansen-five-axes-reference-host-gap-closure")
+  (:adr/repos (vector "orgs/kotoba-lang/shinkansen"
+                      "orgs/kotoba-lang/jp-go-digital-design-system"
+                      "orgs/cloud-kotoba/app-kotoba-cloud"
+                      "orgs/kotoba-lang/org-biscuitsec"
+                      "orgs/kotoba-lang/authority"))
+
+  (:adr/authoritative-for
+  (vector "shinkansen の dispatch は authority seam を持ち、seam が無い・答えが decision でない・否のいずれも拒否であること（binding に届いたことは authority ではない）"
+   "origin / path / hostname は authorizer の入力にならないこと（origin は containment、path は参照、URL は view）"
+   "shinkansen の framework 契約は reference host（shinkansen.host / serve）で駆動されること、maturity.cljc が declared と driven を区別して測ること"
+   "preference cookie（locale / theme）は name-origin family を跨いでよく、credential / grant は跨がないこと"
+   "作らないもの: client soft navigation、image / font 最適化、HMR（live-reload まで）、table の virtualisation"))
+
+  (:adr/related
+  (vector "adr-2609131808-shinkansen-content-addressed-web-framework"
+   "adr-2609092600-one-app-plane-identity-naming-location-kind"
+   "adr-2608180200-biscuit-as-delegation-center"
+   "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes"
+   "adr-2609161900-kotoba-uiux-behavior-layer-theme-defaults-closing"))
+
+  (:adr/decision-summary
+  (vector "D1: 1 つの request が立てる問いは 5 つで別の機構が答える —— who = DID / what = CID / where = Web origin / may = grant（Biscuit、上限であって authority ではない）/ do = effect request。どれも他の代用にならない（shinkansen SPEC §1.5）"
+   "D2: shinkansen.invoke が全 transport（HTTP / MCP / CLI）共通の envelope {:artifact :principal :grant :input {:kind :query|:action|:event}}。順序は check-envelope → effect-request → authorize → 既存の純粋 seam。authorizer が無ければ :no-authorizer、答えが :ok を持つ map でなければ :authorizer-answer-not-a-decision、否なら :denied。nil は allow に pun しない。chain entry は :principal と :receipt を記録し grant は記録しない"
+   "D3: authorizer の入力は #{:principal :artifact :grant :effect} だけ。origin / path / host は届かない。framework は Biscuit を parse せず policy を持たない（kotoba-lang/authority の束 + org-biscuitsec の biscuit.kotoba/authorize を host が束ねる。kind は effect の 1 kind に閉じる）"
+   "D4: path は name → artifact の resolver 入力であり identity でも authority でも execution semantics でもない。:ssr は query で答えの CID は描いた後に計算される。canonical は CID、URL は projection（Google に合わせない）"
+   "D5: reference host（shinkansen.host = 純関数、shinkansen.serve = node:http + dev loop）が routes → load → render → POST /invoke → chain を駆動する。ETag = CID、Link rel=canonical ipfs://、name host は no-cache。dev は live-reload のみ（hot-swap する module は無い）。失敗した rebuild は error document を 500 で出す"
+   "D6: maturity.cljc は data。:driven-by-product / :driven-by-host / :declared / :absent / :not-by-design / :unique を区別し、消費者数を実測列で持ち、test が named ns の実在を pin する"
+   "D7: origin 分離の代価 —— preference（locale / theme）は name-origin の性質。locale cookie は :domain に registrable parent を置いてよい（app-kotoba-cloud、オーナー実測 2026-09-16）。credential / grant は Domain= で配らない（grant は header）"
+   "D8: 作らない —— client soft navigation（CID を跨ぐ nav は content host では origin を跨ぐ）、image / font 最適化（:document 自己完結と衝突）、HMR（新しい document CID が在るだけ）、DADS table の virtualisation（1 page 分の行）。作る場合は accepted ADR を要する"
+   "D9: jp-go-dds.behavior 0.2.0 —— popover / tooltip / select / slider / table を足し、place() で全 float が viewport に衝突しない（flip up + clamp）。12 kind。shinkansen.audit :behaviors-delivered は同じ 12 を知る"
+   "D10: shinkansen.form —— schema は data、validate は field ごとに全 rule を名指し、field-attrs が aria-invalid / aria-describedby を出す。actions は schema map を :validate として受ける"))
+
+  (:adr/body
+  "2026-09-16 オーナーとの設計対話（docs. / apps. / console. の origin 分離 → DID + Biscuit → CID first、path は参照）を shinkansen に当てて測った。見直し前の framework は what（CID）と where（{cid}.ipfs.* / {name}.itonami.app）を持ち、who と may を持たず、自分が行う唯一の effect（chain append）に名前が無かった —— actions/dispatch は shape と宣言だけを見て、MCP lake_dispatch は event 以外を受け取らず、binding に届いたことが authority だった。これは capability-semantics の :plain-resource-is-not-authority と :missing-grant :deny を framework 自身が破る形。
+
+着地（すべて PR → server merge → west pin 前進、検証は実行して測った）:
+- kotoba-lang/shinkansen PR 9: invoke envelope + authority seam。unit 136 test。壊すと 4 落ちる
+- PR 10: verify-invoke-authority —— Ed25519 Biscuit（node:crypto）→ biscuit.kotoba/authorize → invoke → chain、16 case 両方向、理由 literal を library から pin。kind set を開くと query-only token は scope 束で別理由で止まり、literal を pin していなければ緑のままだった（8 問 6）
+- PR 11: reference host + maturity data。host-node-check 17 case over HTTP、Chrome で form → runtime → POST /invoke → /todos。走らせて見つけた床割れ: actions の runtime resolve は nbb で他 ns が state を load していないと nil（suite は緑、host で null.call）
+- PR 12: locale に :explicit / :hint / :normalize、q=0 は drop、preference cookie の :domain
+- cloud-kotoba/app-kotoba-cloud PR 294: locale.cljk が shinkansen.locale を require（再導出を廃止）。worker-smoke 30 assertion。deploy は同 repo の既存 4 failure が npm test gate を止めるため未実施
+- kotoba-lang/jp-go-digital-design-system PR 12 / 13: popover / tooltip / select / slider / table + place()。real browser 146 assertion（80 から）
+- shinkansen PR 13: shinkansen.form、audit の behaviour 契約 12 kind、maturity 行
+
+測ったこと（数値は再現手順として）: 消費者数は cloud-kotoba / net-kotobase / cloud-itonami-app / cloud-kotoba-dds を [shinkansen.<ns> の require 形で grep。19 namespace 中 5 に消費者、11 は 0 だった。reference host は 11 を :driven-by-host にするが :driven-by-product ではない —— maturity.cljc がその差を持つ。
+
+発見・未解決:
+- lang/capability-semantics.edn の閉じた :kinds に :chain/append / :app/query / :app/assert は無い。semantics の集合をそのまま渡す production authorizer は 3 つとも :unknown-kind :deny で拒否する（方向は正しい）。登録は言語側の決定
+- org-biscuitsec の npm run test:nbb は pin の綴りのままでは走らない（kotoba.lang.text と protobuf.wire が classpath に無い）
+- product が reference host を通っていない。app-kotoba-cloud（か yataverse lake index）の配信を routes → load → render → adapter に載せ POST /invoke を本番 host に置くのが次段
+- chain の hash は db 値のみ（:prev / :event / :principal は hash 外）。authorizer の署名付き receipt で閉じるか entry 全体を hash するかは未決
+- stdio process に app を attach した経路（R0 のまま）と protobuf wire を跨いだ Biscuit は未測定
+- app-kotoba-cloud の deploy は既存の 4 failure（compiled ABI artifact のローカル不在、sidebar audit floor、ontology schema doc）を fleet receipt で確かめてから")))
