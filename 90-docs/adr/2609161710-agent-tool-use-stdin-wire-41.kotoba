@@ -56,12 +56,24 @@
   **起動 15 ms の 9–10 ms は Seatbelt profile の実行時コンパイル**。package 時に `sandbox_compile_string` で blob (596 byte) を埋め込み、実行時に `sandbox_apply` (0.065 ms) にすれば起動の 80–90% が消える。ただし両方 **private API** (header 無し、dlsym で解決)。安全側の設計案: blob と SBPL 文字列を両方埋め込み、apply が非 0 なら sandbox_init(文字列) に fall back; apply 後に scope 外 open の self-probe (~10 µs) を必ず行い、通れば `_exit(125)` — 今の loader は sandbox_init の rc を信じるだけなので、この probe は現状より強い。Apple が symbol を消せば package 時の link で検出される。決めるのは owner。
 
   ## 次 (blocked と理由)
-  - xargs 1,032: process spawn の loader provider (wire 20) が無い。spawn は security surface が大きく owner 判断。
+  - xargs 1,032: process spawn の loader provider (wire 20) が無い。spawn は security surface が大きく owner 判断 —— **loop は実装せず設計だけ残す (2026-09-16 夜)**。設計案: (1) spawn できる実行体は package 時に `--exec-allow` で名指しした **絶対 path の allow-list** だけ (PATH 探索も shell も無し; `xargs cmd` の cmd は argv[0] を allow-list と突き合わせ、一致しなければ trap)。(2) 子の argv は guest が組む文字列の列、環境は loader が **PATH と LANG だけ** を渡す。(3) 子の stdin/stdout/stderr は親 (= 呼び手) のものを継承、子への pipe は作らない (`xargs -I{} cmd {}` の形は引数渡しで足りる)。(4) `-P n` は loader が同時 n 個まで fork/exec して waitpid、guest は exit status の最大を受け取る。(5) 子は Seatbelt の **外**で動く (exec は sandbox を継承しない —— これが surface の本体) ので、allow-list の実行体は事前に review されたものに限る、と package 側で明記する。(6) wire は `:process/spawn` (20) を `:string -> :string` の text 形式で: request = `argv0 \u0001 argv1 \u0001 …`、answer = exit status の decimal。(7) test-package-command は allow-list 内 / 外 / grant なしの 3 方向 + control。決めるのは owner。
   - shasum 832: (着地 2026-09-16 夜) loader に wire 3 `:hash/sha256` の provider (FIPS 180-4、機構層の C; amu #1016 `4fb5d4d`、artifact #46 `f44e273`) —— それまで switch は identity に落ち、digest を頼んだ guest は入力をそのまま受け取っていた。test は "abc" / 空 の vector、24,576 byte を node crypto と一致、grant なし → trap、unrouted control で赤。org-ieee-shasum は `-a 256` だけ (14 case byte 同一、`-a 1` / bare は divergence)。
   - date 1,451: (着地 2026-09-16 夜) 引数つきの呼び出しは UTC が支配的 (`-u +%FT%TZ` 等) なので **UTC だけ** の org-ieee-date。clock-v1 の record codec は JVM-free の native route で admit されず command は時計を読めなかった (loader が request を echo) → wire 7 に **text 形式** ("wall" → unix ms、"monotonic" → ns、同じ grant bit、未知は trap; amu #1015 `d3e56ab`、artifact #45 `ec475bf`)。civil 変換は Hinnant の逆算 (初版は yoe の符号が逆で leap day を 1 日ずらした; suite が pin)。153 exact case (`-r SECONDS` で同じ瞬間を比較) + live 1。bare `date` (local) は TZ が無いので divergence。
   - which 1,495: (着地 2026-09-16 夜) 新 wire は不要だった。scope entry を **文字どおり `$PATH`** と書くと loader が起動時に caller の PATH の directory へ展開する (amu #1021 `d85307b`、artifact #49 `7b8ba2f`; `KEXE_SCOPE_ENTRIES` 16 → 64、実測 PATH は 36 entry)。packaged command が環境を無視する唯一の意図的な例外で、stdin / /dev/fd と同じ「caller の選択」。test は PATH 上の dir の file は読め、同じ file でも PATH が名指ししなければ SIGILL (entry は PATH を許すのであって世界を許さない)。org-ieee-which は `:env/read` + EXISTS + STAT (`-a` `-s`、23 case byte 同一)。
   - stat 267: (着地 2026-09-16 夜) `-f` の %z %m %N %p %%。%m は loader に wire 35 の **MTIME form** (`<path>MTIME_SEP` → epoch 秒; amu #1017 `56eacb7`、artifact #47 `5c8e165`) —— STAT の 5 番目の field にしなかったのは org-ieee-du が 4 番目を「3 つ目の空白以降すべて」で読むため。20 case byte 同一 (mtime は utimes で固定)、`%Sm` / 既定行 / `-c` は divergence。
   - 残る per-exec 固定費: fork 1–10 ms は負荷、loader 残り ~5 ms は未分解。
+  - Seatbelt の事前コンパイル (項目 7): **loop は実装せず、上の「オーナー判断待ち」の設計のまま保留 (2026-09-16 夜)**。返答があれば: package 時に `sandbox_compile_string` (dlsym) で blob を作り header に埋め、実行時は `sandbox_apply` → 失敗なら `sandbox_init(文字列)` に fall back → どちらでも apply 後に scope 外 open の self-probe、通れば `_exit(125)`。test は probe の両方向 + blob を壊した control。
+
+  ## loop の結果 (2026-09-16 夜、ADR-2609161710 の残り項目)
+  | 項目 | 着地 |
+  |---|---|
+  | date -u | org-ieee-date `a6a9bd1`、amu #1015 `d3e56ab` (wire 7 text form)、artifact #45 |
+  | shasum -a 256 | org-ieee-shasum `5f319f6`、amu #1016 `4fb5d4d` (wire 3 provider)、artifact #46 |
+  | stat -f | org-ieee-stat `fc97b9b`、amu #1017 `56eacb7` (MTIME form)、artifact #47 |
+  | diff <(a) <(b) | org-ieee-diff #1 `0919529`、amu #1019 `583e984` (`/dev/fd` scope entry)、artifact #48 |
+  | which | org-ieee-which `3008189`、amu #1021 `d85307b` (`$PATH` scope entry)、artifact #49 |
+  | xargs / Seatbelt | 設計のみ (上)。owner の返答待ち |
+  loader の学び: (a) 型付き codec (clock-v1) は JVM-free の native route で admit されず、command に届くのは `:string -> :string` だけ —— 新しい capability を command に届けるときは text 形式を用意する。(b) scope entry の **綴りが意味を持つ** (`/dev/fd` = caller が接続した descriptor、`$PATH` = caller の PATH の directory) —— どちらも「caller の選択」を grant にする規則で、wire 41 の stdin と同じ論法。(c) STAT のような既存 form に field を足す前に消費者の parse を読む (du は 4 番目を末尾まで読む)。(d) loader を触る PR は毎回 artifact identity → amu pin → CI 50 分の順で、この夜は 5 回。
 
   ## 着地
   amu d3082e6 (#1012) / kotoba-lang f8fb69d (#697) / kotoba-sema 043c620 (#85) / artifact d9caf57 (#43, #44) / head 4ca97e9 / tail f8a2695 / wc dae580f / cut 79d5f05 / sort 27e9a64 / uniq 5f1ebbe / grep ed74679 / awk 8090cb2 / tr a83a8ea / basename 1752776 / dirname 13cdde4 / sed 71a2d18 / diff 0e31b7c / date a6a9bd1 (amu d3e56ab) / shasum 5f319f6 (amu 4fb5d4d) / stat fc97b9b (amu 56eacb7) / diff <(…) 0919529 (amu 583e984) / which 3008189 (amu d85307b)。west pin は着地後に前進。")
