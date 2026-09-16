@@ -1,0 +1,30 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609161600-go-wait-ad-boost")
+  (:adr/title "murakumo.cloud Go: 生成待ちの広告と、クリックで当日の生成枠が増える ad boost（anonymous lane）")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/related (vector "adr-2609091500-ad-funded-free-inference-on-murakumo" "ADR-2608096000" "ADR-2607302100" "ADR-2609111500"))
+  (:adr/context
+  "owner 指示 2026-09-16: murakumo.cloud は画像・動画生成を基本無料のままにし、生成待ちの間に広告を見る仕組みを挟み、広告をクリックすると『広告ブースト』で生成トークンが増えるようにする。同日、murakumo.cloud と oppai.fans を https 必須にする。
+
+  実測 2026-09-16（着手前、live）:
+  - murakumo.cloud は 2026-09-10 以来 http→301 + HSTS 済み。oppai.fans は http://oppai.fans/ と http://www.oppai.fans/ が 200 でページを返し HSTS 無し。
+  - Go（/、= public/go.html）の無料 Preview は network（IP の日替わり salted digest）ごとに画像 5 枚 / 動画 1 本 / UTC 日、広告無し（preview-http、free-video-http）。
+  - 既存の広告面は 2 つ: go-sidebar（house copy、課金なし）と free-tier（サインイン済み chat を advertiser に売る 3 段 flow、/api/v1/free/status は fundingSource house-sponsorship・advertiserFunded 0）。
+  - Worker は ADR-2609111500 の .cljk 改名以来 shadow-cljs で compile できない（clean worktree で『cloud-murakumo.site-worker is not available』）。live Worker には 09-11 以降の route が在るので誰かが手元の mirror で組んだが、repo に手段は無い。")
+  (:adr/decision
+  "1. 第 3 の面 go-wait を足す（cloud-murakumo.ads/allowed-placements）。inventory と『prompt を読まない』契約は go-sidebar / free-tier と同じ（select-placement）。
+  2. anonymous lane の上に載せる（cloud-murakumo.preview-ads / preview-ads-http）。生成は広告に依存せず、広告が出なくても基本枠はそのまま。広告が変えるのは天井だけ: 消費された click 1 回が『そのモデル・その network・当日』の枠を per-click 分だけ上げる。policy は image +2 × 3 回/日（5→11）、video +1 × 1 回/日（1→2、fleet 全体 12/日と single lease は据え置き）。
+  3. click には receipt が要る（impression 時に発行、network 束縛、単回、10 分、UPDATE … WHERE clicked_at IS NULL … RETURNING）。発行後 2 秒未満の click は 409 で receipt を burn しない。receipt 未知・他 network は同じ 404。日次 click 上限は 429。impression は 60/network/日。
+  4. 枠の判定は既存の条件付き書き込みの cap を広げるだけ（preview-http used < base+boost、free-video-http used < 1+boost）。boost の読取は失敗時 0 —— 天井は証拠でしか上がらない。sponsored（oppai.fans）lane には boost を与えない。
+  5. receipt は配信時に impression / click の charge を micros で固定する（campaign が後で変わっても、見せた時点の bid で請求）。house / listed でも boost は有効 —— 最初の広告主が来るまで機構が動かない順序（ADR-2608096000 が退ける順）を作らない。
+  6. 表示は turn の中（progress と output の間）、完了後も残す。listed/paid の href は https かつ credential 無し、house は same-origin path のみ、copy は text のみ、rel=sponsored noopener noreferrer、referrer 無し。
+  7. oppai.fans は cloud-murakumo.security-headers を移植（oppai.gen.https）: cf-visitor も見て 301（GET/HEAD）/ 308（他）、全応答に HSTS（preload 無し）。
+  8. build の fix-forward: cloud-murakumo に scripts/cljk-mirror.cljk（自 repo + :local/root 6 件の cljk-origin.edn から .cljk-build/ を派生、未記録の拡張子は exit 2）と deps.edn alias :mirror。fans-oppai の 2026-09-11 の前例と同形。撤去条件は『kbb -M:cljs が .cljk を解決した日』。")
+  (:adr/consequences
+  "- 着地: cloud-murakumo PR #220（b6e9c02）、cloud-murakumo-site bb16200、fans-oppai main 3b881c2、cloud-murakumo-app 215a536 と kotoba-lang/murakumo 1022087（cljk-origin の 1 行ずつ）。murakumo.cloud は D1 migration 0115 適用後に deploy（Version 5a8bc2a3）、live で impression→click→already-clicked→unknown→status を確認。
+  - 検証: pure 8 tests / 52 assertions（境界ちょうど: dwell 2000 ms 含む・expiry 排他・click 上限、理由 literal を pin、壊して赤を確認）、compiled Worker × 実 SQLite × 制御時計で CHECKED 13、既存 6 suite 緑、site の Playwright test に wait-ad の 2 unit と dwell 拒否→再 click を追加。
+  - oppai.fans の live は branch payments/dark-checkout（Producer bot、main より 45 先行）から deploy されている。main への着地だけでは https 必須は live にならない —— dark-checkout に main を merge して deploy するか、bot の次回 merge を待つかは owner 判断（他者 branch への push は恒久承認の外）。
+  - 測っていないもの: 広告在庫は house のみ（advertiser 0）なので click の実収益は 0。boost が fleet の image capacity（global 100/日）に与える影響は cap を据え置いたまま様子見。
+  - kbb -M:site は今も走らない（generate.cljk が JVM 専用の site.legal を require）。go.html / index.html は site.go/document を直接呼ぶ 1 回限りの script で、pin した checkout（jp-go-dds dc4602d、cloud-kotoba-dds f48ca5c）に対して bytes 同一を確かめてから再生成した。")
+  (:adr/authors (vector "Jun Kawasaki" "Claude"))))
