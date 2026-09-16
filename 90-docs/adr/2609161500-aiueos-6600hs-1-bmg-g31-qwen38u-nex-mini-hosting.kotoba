@@ -1,6 +1,6 @@
 (vector (map (:db/id -1)
   (:adr/id "adr-2609161500-aiueos-6600hs-1-bmg-g31-qwen38u-nex-mini-hosting")
-  (:adr/title "aiueos-6600hs-1 (Intel Arc BMG G31 32 GiB) を murakumo node にし、qwen3.8-27b-uncensored と nex-n2.5-mini-uncensored を同居 host して推論速度を実測 —— Qwen フル積載 tg 11.6 / Nex フル積載 tg 50.1、出荷分割は Qwen フル + Nex expert 20 層 CPU")
+  (:adr/title "aiueos-6600hs-1 (Intel Arc BMG G31 32 GiB) を murakumo node にし、qwen3.8-27b-uncensored と nex-n2.5-mini-uncensored を同居 host して推論速度を実測 —— Qwen フル積載 tg 11.6 / Nex フル積載 tg 50.1、出荷分割は Qwen フル (MTP speculative、E2E 17–18 tok/s) + Nex expert 20 層 CPU。この箱は旧 b70 head で、再インストールにより murakumo-main の head が 0 になっている")
   (:adr/status "accepted")
   (:adr/date "2026-09-16")
   (:adr/last_verified "2026-09-16")
@@ -12,7 +12,7 @@
   (:source/dataset "adr")
   (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/murakumo"))
   (:adr/authoritative_for
-(vector "aiueos-6600hs-1 の実体 (Ryzen 5 7500F + Intel Arc BMG G31 32 GiB、HWE 7.0 kernel xe + Mesa ANV Vulkan) と到達経路 (tailnet SSH root@ のみ)" "この node の 2 model 同居の分割 (Qwen フル積載 + Nex --n-cpu-moe 20) とその理由、1 node 1 model 規則の宣言済み例外" "この node の llama-bench / E2E / gateway 経由の実測値 (2026-09-16)" "gateway の soft cache-affinity が同一 prompt probe を前回 worker に返すこと"))
+(vector "aiueos-6600hs-1 の実体 (Ryzen 5 7500F + Intel Arc BMG G31 32 GiB、HWE 7.0 kernel xe + Mesa ANV Vulkan) と到達経路 (tailnet SSH root@ のみ)" "この node の 2 model 同居の分割 (Qwen フル積載 + Nex --n-cpu-moe 20) とその理由、1 node 1 model 規則の宣言済み例外" "この node の llama-bench / E2E / gateway 経由の実測値 (2026-09-16)" "gateway の soft cache-affinity が同一 prompt probe を前回 worker に返すこと" "この箱が旧 b70 head (murakumo-b70-llama.service、jun@100.119.10.43) であったこと、再インストールで murakumo-main pool の head が 0 になったこと、MTP speculative が Vulkan build + orcarouter Uncensored GGUF で効くこと (2026-09-16 後半の実測)"))
   (:adr/related
 (vector "adr-2609151900-orcarouter-uncensored-k16-xavier-hosting (同じ 2 model の k16 / xavier での host、比較値の出所)" "adr-2609161000-nex-mini-usagi-draft-hermes-router-restore (nex が名前で xavier に route される経路)" "adr-2609101000-one-node-one-model (例外宣言の規則)" "adr-2609121253-6600hs-ling-mini-qwen-coder-murakumo-bench (別箱の旧 aiueos-6600hs。本 ADR の箱は別物)"))
 
@@ -64,17 +64,26 @@ E2E llama-server ストリーミング (256 max_tokens、temp 0、同一 prompt�
 | model | TTFT (warm) | stream tok/s | 同時実行時 |
 |---|---|---|---|
 | nex-n2.5-mini-uncensored (:8090、ctx 65536、n-cpu-moe 20) | 0.40 s | **20.42** | 15.39 |
-| qwen3.8-27b-uncensored (:8097、ctx 8192、q8_0 KV、-ngl 99) | 0.47 s | **10.76** | 9.27 |
+| qwen3.8-27b-uncensored (:8097、ctx 8192、q8_0 KV、-ngl 99、speculation 無し) | 0.47 s | **10.76** | 9.27 |
+| qwen3.8-27b-uncensored (:8097、2 slot × 16384、q8_0 KV、**--spec-type draft-mtp**、出荷形) | 1.4–2.0 s | **17.2–18.0** | 12.0 (Nex と同時) / 9.0 + 8.6 (2 slot 同時) |
 
 同時実行 1 回で DeviceLost 0、両 `/health` ok。VRAM budget の残りは両常駐で 2.96 GiB。RAM は buff/cache 13 GiB (Nex の CPU expert が page cache に乗る)。
 
 gateway 経由 (`POST https://api.murakumo.cloud/v1/chat/completions`、無認証で 200): qwen38u の 400-token job が this node に落ちたとき wall **61.8 s** (node 側 `total time` 38.3 s = decode 10.77 tok/s、残り ~23 s が queue → poll → claim → result の往復)。同じ job が K16 に落ちると 175–267 s。
 
+## この箱は旧 b70 head だった (2026-09-16 後半、オーナー質問「b70 は intel b70 は活用できている?」で判明)
+
+- GPU は **Intel Arc Pro B70** (BMG G31、32 GiB)。kotoba-lang/murakumo `deploy/systemd/murakumo-b70-llama.service` は `jun@100.119.10.43` / hostname `ubuntu-server` を名指し —— **再インストール前のこの箱**。その head は SYCL build (oneAPI) で stock Qwen3.8-27B Q4_K_M を `--spec-type draft-mtp --spec-draft-n-max 3`、2 slot × 32768 で serve し、decode 16.8–28 tok/s / prefill 507–636 tok/s (provider_catalog.cljk、2026-09-07 実測)、`murakumo-main` pool の weighted-first head だった (cloud-murakumo-api `MURAKUMO_B70_PRIVATE` Workers-VPC binding、service_id `01a042a5-c867-7d90-b4fa-c63c3aa193d8`、箱上の cloudflared 専用 tunnel 経由)。
+- 再インストールで消えたもの: SYCL build / oneAPI、stock 重み、cloudflared tunnel の credential、`murakumo-b70-join` (`/etc/murakumo/b70-vllm.env`)。**live `/ready` は `pool-available {gad 0, b70 0, xavier 0}`**、`model=murakumo-main` の request は 120 s 無応答 (http 000)。gad は 09-10 に動画専用化、xavier は nex 専用なので、**`murakumo-main` は今 head ゼロ**。
+- 引き継げたもの: MTP speculative。orcarouter Uncensored GGUF にも mtp tensors が在り (`strings | grep -ci mtp` = 90)、Vulkan build で同じ flag が通る。E2E 単独 16.9 / 23.7 (draft acceptance 0.50 / 0.83)、出荷形で 17.2–18.0 tok/s。`--batch-size 4096 --ubatch-size 2048` は Nex 同居で VRAM 残 126 MiB になるので既定 (2048/512) に戻した (残 857 MiB、6,334-token prompt 後 764 MiB、prefill 322 tok/s)。
+- **やっていない (オーナー判断)**: b70 role の復元。stock Qwen3.8-27B (15.7 GiB) + Uncensored (15.65) + Nex (17.4) は 32 GiB に入らない。選択肢: (a) Nex を降ろして stock を戻す (murakumo-main 復活、nex は xavier のまま) (b) Uncensored を `qwen3.8-27b-throughput-b70` alias で murakumo-main に出す (business bot の既定が abliterated model になる) (c) このまま (murakumo-main は head ゼロのまま)。いずれも cloud-murakumo-api 側の tunnel credential 再発行 (`MURAKUMO_B70_PRIVATE` の tunnel を箱に再インストール) と `murakumo-b70-join` の復元が要る。
+- 旧 b70 と本 ADR の Vulkan の差 (未分離): prefill 507–636 (SYCL、単独) vs 407 (Vulkan、llama-bench 単独)。SYCL/oneAPI の再導入で decode がさらに伸びるかは未測定。
+
 ## 決定
 
-1. **両方を常駐させ、分割は「Qwen フル + Nex の expert 20 層を CPU」**。逆 (Nex フル + Qwen 部分) は Qwen が 3.5 tok/s に落ちる。この fleet で dense 27B を 10 tok/s 超で serve できる node はここだけなので Qwen を優先し、Nex は expert を CPU に置いても xavier より速い。1 node 1 model 規則 (adr-2609101000) の**例外として fleet.edn に `:node/serves-exception` を宣言** (`:until \"2026-12-31\"`)。Nex をフル積載 (50 tok/s) にしたければ Qwen を降ろすか、Qwen の IQ3 系 quant (K16 に stock の GSQ-RCO IQ3_XXS 10 GB はあるが Uncensored ではない) に替える —— 後者は catalog の model identity が変わるのでオーナー判断。
+1. **両方を常駐させ、分割は「Qwen フル (MTP speculative、2 slot × 16384) + Nex の expert 20 層を CPU」**。逆 (Nex フル + Qwen 部分) は Qwen が 3.5 tok/s に落ちる。この fleet で dense 27B を 10 tok/s 超で serve できる node はここだけなので Qwen を優先し、Nex は expert を CPU に置いても xavier より速い。1 node 1 model 規則 (adr-2609101000) の**例外として fleet.edn に `:node/serves-exception` を宣言** (`:until \"2026-12-31\"`)。Nex をフル積載 (50 tok/s) にしたければ Qwen を降ろすか、Qwen の IQ3 系 quant (K16 に stock の GSQ-RCO IQ3_XXS 10 GB はあるが Uncensored ではない) に替える —— 後者は catalog の model identity が変わるのでオーナー判断。
 2. **unit は k16 / xavier と同型** (`murakumo-6600hs1-{qwen38u,nex-n25-mini}-{llama,join}.service`、`server.env` の `SERVER_ARGS` が tunable、kotoba-lang/murakumo `deploy/systemd/` に写し)。join は `--poll-ms 250` (k16 は 1000)。
-3. **登録簿**: kotoba-lang/murakumo PR #395 (6ab206c0) + #396 (fdcde8cd)、west pin ddbfa419 → e275e025。fleet.edn に node entry、infer.edn の両 id に注記 (`verified-node` は k16 / xavier のまま)。
+3. **登録簿**: kotoba-lang/murakumo PR #395 (6ab206c0) + #396 (fdcde8cd) + #397 (9118df73、b70 の判明と speculative)、west pin ddbfa419 → e275e025 → 658e7b8d。fleet.edn に node entry、infer.edn の両 id に注記 (`verified-node` は k16 / xavier のまま)。
 
 ## 分かったこと (次に測る人のため)
 
@@ -85,6 +94,7 @@ gateway 経由 (`POST https://api.murakumo.cloud/v1/chat/completions`、無認�
 
 ## やっていないこと
 
+- **murakumo-main の head 復元 (b70 role)** —— 上記 3 択はオーナー判断。
 - nex の gateway routing 変更 (上記)。
 - K16 の qwen38u (2.5 tok/s) の退役。同じ queue に居るので job の半分は今も K16 に落ちる —— オーナー判断。
 - 旧 `ubuntu-server` / 旧 `aiueos-6600hs` の tailnet 登録の削除。
