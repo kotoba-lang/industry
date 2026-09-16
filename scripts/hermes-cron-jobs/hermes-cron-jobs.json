@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T08:08:43.000Z",
+  "generated_at": "2026-09-16T17:28:50+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -9207,30 +9207,29 @@
         "workdir": null
       }
     ],
-    "yabai-ops": [
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "b04249d974c2",
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "yabai-ops-tick",
-        "no_agent": false,
-        "prompt": "yabai-ops 反復: script stdout の健康レポートを読み、赤を 1 つだけ直す (1 反復 1 修正)。cron failed/unknown、throttle 超過、VERIFY-FAIL、orphan chunk、missing state file の優先順。直せないものは正直に報告。SOUL.md 準拠。",
-        "repeat": {
-          "times": null
-        },
-        "schedule": {
-          "display": "35 8 * * *",
-          "expr": "35 8 * * *",
-          "kind": "cron"
-        },
-        "script": "yabai_ops_state.sh",
-        "skills": null,
-        "workdir": null
-      }
-    ],
+    "yabai-ops": {
+      "deliver": "local",
+      "enabled": true,
+      "id": "f93c3f39b42b",
+      "max_tokens": 16384,
+      "model": "z-ai/glm-5.3-flash",
+      "name": "yabai-ops daily iteration",
+      "prompt": "yabai-ops daily iteration\n\nRead SOUL.md first (/Users/junkawasaki/.hermes/profiles/yabai-ops/SOUL.md) and follow it exactly. The evidence JSON from yabai_ops_evidence.py is at the top of this run; if it shows a REFUSED banner, report blind and stop. Step 0 resync both worktrees, then pick ONE lever (L1 catalog fix, L2 cluster discovery, L3 takedown tracking, L4 similar sweep, L5 no-PR is normal). Budget 25 API calls. All command lines pure ASCII. Never send anything external.",
+      "provider": "openrouter",
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 6 * * *",
+        "display": "30 6 * * *"
+      },
+      "script": "yabai_ops_evidence.py",
+      "state": "scheduled",
+      "toolsets": [
+        "terminal",
+        "file",
+        "web"
+      ],
+      "workdir": "/Users/junkawasaki/.gftd/worktrees/yabai-ops"
+    },
     "yabai-staging": [
       {
         "context_from": null,
