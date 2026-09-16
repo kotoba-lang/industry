@@ -81,7 +81,10 @@
          ":"))
 
 (def cljk-roots
-  (js/JSON.stringify (clj->js (into [app-root] (map sibling sibling-repos)))))
+  ;; a cljk root must carry a cljk-origin.edn manifest; shinkansen is .cljc
+  ;; only (classpath, not a root) — measured 2026-09-16: listing it here
+  ;; made the engine refuse to start (ENOENT .../shinkansen/cljk-origin.edn)
+  (js/JSON.stringify (clj->js (into [app-root] (map sibling (remove #{"shinkansen"} sibling-repos))))))
 (def murakumo-key-file
   (str (or (aget js/process.env "HOME") "") "/.itonami/itonami-murakumo-api-key"))
 (def openrouter-keychain-service "gftd.openrouter")
