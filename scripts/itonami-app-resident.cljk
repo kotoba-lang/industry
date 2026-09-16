@@ -65,6 +65,10 @@
   ["osaho" "kotoba-hir" "org-nist-sha2" "css" "html" "text"
    "fs" "fs-filesystem" "fs-async-filesystem"
    "jp-go-digital-design-system" "hanmen" "cloud-kotoba-dds"
+   ;; the browser contract web.cljk inlines (shinkansen.interaction/runtime)
+   ;; and the action vocabulary cloud-kotoba-dds.bots names — the #/bots
+   ;; rail is built on both since 2026-09-16 (cloud-itonami-app PR #361)
+   "shinkansen"
    "webauthn" "org-chainagnostic-cacao"])
 
 (defn- sibling [r] (path/join workspace-root "orgs" "kotoba-lang" r))
