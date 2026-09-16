@@ -104,6 +104,18 @@ gateway 経由 (`POST https://api.murakumo.cloud/v1/chat/completions`、無認�
 - GuC firmware は 70.44.1 (推奨 70.54.0、Ubuntu linux-firmware 20240318)。コストは未測定。
 - kotoba-lang/murakumo の `kbb -M:test` は engine 側 `No matching clause: export` で走らず (Node 26)。fleet.edn / infer.edn は nbb の `clojure.edn` reader で読めることだけ確かめた。
 
+## 検証の固定と resume point (closing、2026-09-16)
+
+着地済み (すべて default branch 上で確認): kotoba-lang/murakumo #395 6ab206c0 / #396 fdcde8cd / #397 9118df73 / #398 972ce715、west pin は a5373fc5 (west.yml `murakumo: 972ce715`、checkout 一致)。root: #3150 e9e22577 / #3152 ae7d9279 / #3154 23ddf787 (本 ADR)。
+
+実行した検証: (1) 箱上 llama-bench 6 構成 × 3 run、E2E SSE 計測 (`/home/aiueos/e2e.py`) 単独・同時・2 slot・6.3k prompt、gateway probe (qwen38u は this node に落ちることを worker_did で確認、murakumo-main は 120 s 無応答)、sha256 は両 GGUF とも出所と一致。(2) fleet.edn / infer.edn / 本 ADR は nbb `clojure.edn` reader で読み直し、`:adr/body` が String であることを assert。(3) `scripts/verify-adr-identity.cljk` OK (既知 debt 23 件据え置き)。**未実行**: kotoba-lang/murakumo の `kbb -M:test` は engine 側 `No matching clause: export` (Node 26) で走らず —— 本セッションの変更 (EDN + unit file) とは無関係の既存障害、fleet gate での緑は未確認。vision (mmproj) の image_url probe は未実施。
+
+次 agent の最初の command: `ssh root@100.98.24.37 'systemctl is-active murakumo-6600hs1-nex-n25-mini-llama murakumo-6600hs1-nex-n25-mini-join; curl -s http://127.0.0.1:8090/props | head -c 300'` → `curl -s https://api.murakumo.cloud/ready | jq .inference[\"pool-available\"]` (b70 0 のままなら murakumo-main は依然 head ゼロ)。
+
+残 gap の優先順: ① murakumo-main の head 復元 (オーナー判断: 別 node か Nex を降ろす。tunnel credential 再発行 + `murakumo-b70-join`) ② nex の gateway routing を this node (3.3 倍速) に向けるか (cloud-murakumo-api の `ao/usagi` draft、PR + deploy) ③ K16 qwen38u (2.5 tok/s) の退役判断 ④ 旧 `ubuntu-server` / 旧 `aiueos-6600hs` の tailnet 登録削除 ⑤ NVMe 未割当 ~360 GB の LVM 拡張 ⑥ GuC firmware 更新の効果測定。
+
+保全した他者 WIP: root superproject の stash@{0} と stash@{2} (observatory-collect bot の tracked 生成物 `90-docs/observatory/observatory.datoms.edn`、FF のために退避、drop していない。bot はその後自分で snapshot を commit しているので実質 superseded だが判断は bot owner)。untracked draft `90-docs/adr/2609141203-social-capital-ledger.edn` は `:adr/id` を slug 形に直しただけで本文は無変更、untracked のまま。
+
 ## やっていないこと
 
 - **murakumo-main の head 復元 (b70 role)** —— nex-only 決定後も未復元。VRAM は 9.45 GiB 空くが stock 27B (15.7 GiB) は入らないので、復元するなら Nex を降ろすか別 node。tunnel credential 再発行と `murakumo-b70-join` の復元も未着手。
