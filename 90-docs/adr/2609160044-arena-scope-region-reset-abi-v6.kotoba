@@ -63,6 +63,6 @@
   - conformance (amu): 同じ 20,000 回 loop が default 予算で scoped 200000 / unscoped KEXE_TRAP SIGILL。
   - sort は string を返す merge が scope に入らないので未変更 (host 比較か、level 内 emit が次)。
 
-  ## 未着手
-  guest-grammar.edn (kotoba-lang の正本) への `arena-scope` の記載と 4 copy の resync 波。frontend の nearest-name 診断にしか効かないので機能には影響しない。")
+  ## 後続 (2026-09-16)
+  guest-grammar.edn (kotoba-lang の正本) への `arena-scope` の記載と copy の resync は ADR-2609161010 (context ABI v7) の波で着地 (kotoba-lang 9ecd9dbc、digest 3e1e65d6、kotoba-sema 4422b1f)。sort の「host 比較」も同 ADR で着地 (`string-compare`、33 MB 12.5 s → 3.0 s)。")
 ))
