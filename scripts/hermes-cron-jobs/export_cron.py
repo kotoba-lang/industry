@@ -122,6 +122,15 @@ def main():
                 "no_agent": j.get("no_agent"),
                 "enabled_toolsets": j.get("enabled_toolsets"),
                 "context_from": j.get("context_from"),
+                # Monitor gating (`hermes cron create --monitor-script /
+                # --monitor-url`) is a definition, not state: a job
+                # re-registered without it wakes the agent on every tick
+                # instead of only when the monitor's output changes. Found
+                # 2026-09-16 when aiueos-cfree-tick exported with
+                # `"script": null` and nothing else -- the ledger could
+                # not have rebuilt the job it was describing.
+                "monitor_script": j.get("monitor_script"),
+                "monitor_url": j.get("monitor_url"),
                 # Skills preloaded into the job's prompt (`hermes cron edit
                 # --add-skill`). Part of the definition: a job re-registered
                 # without them behaves differently (measured 2026-09-15 with
