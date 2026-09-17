@@ -60,6 +60,13 @@ visibility は全て保持。GitHub は旧 slug を redirect するので、west
 
 正規入口は `graph.kotoba.cloud` (app-kotoba-cloud)。各 capability は app-kotoba-cloud の route + service binding で既存 Worker に委譲する (Worker 自体は動かさない): datomic → `/v1/datomic/*`、cypher → `/v1/cypher/*`、sparql/lake → `/v1/sparql/*`、s3 / pinning / ipni / status / witness は個別に契約を読んでから。旧 `*.kotobase.net` は **API client が POST するので 301 では壊れる** —— 消費者 (kotobase-client、actor 群、SDK) を新入口に移してから 410 にする。着地のたびに CLAUDE.md『live service の永続化境界は kotobase.net』の host 名リストを書き換え、adr-2608159100 の該当節を superseded にする。**この ADR の時点では 1 つも着地していない。**
 
+## 2026-09-17 午後の追記: org 削除と配置規則
+
+- **GitHub の org `net-kotobase` はオーナーが削除した**（`gh api orgs/net-kotobase` → 404）。旧 slug の redirect も消えたので、第 1 段の「旧 remote はそのまま動く」は**もう成り立たない**。残っていた参照は同日に直した: 共有 checkout の remote 3 本（control-plane / docs / ipfs）、`cloud-kotoba/engine` の `:git/url`（PR #5、pin を 045f84ef へ前進）、repos.edn の remotes / orgs / group-filter（PR #3184、west.yml header は `--entry cypher` で再 splice、west.yml の `net-kotobase` 言及 0）、genpon（PR #3185、reconcile 28 event）。
+- **配置規則**（オーナー指示）: OSS 系列は `kotoba-lang`（public）、business は `cloud-kotoba`（private にすべきものは private）。`cloud-kotoba/app-kotoba-cloud` は同日 private にした（git URL で引く子 repo 0、fleet gate に名指し無しを測ってから）。`cloud-kotoba-dds` と `delegation-rootkeys` は public のまま（後者は設計上 public 必須）。
+- 第 2 段は**完了**: 13 entry すべて移動、消費者 `cloud-itonami/loop-noren` を直して pin 前進、`west-orphan-audit --blocking` EXIT 0、Hermes profile 5 本の path を patch（backup `.bak-relocate-20260917`）。**未解決**: co-scientist bot 4 本（`net-kotobase-bench` / `-cosientist` / `-falsify` / `-rank`）の作業 repo が archived の `cloud-kotoba/docs`（旧 path）のまま —— retarget か停止は owner 判断。
+- 第 3 段（capability host）は未着手のまま。
+
 ## Owner override の記録
 
 CLAUDE.md「ドメイン移転で改名しない。一括改名はしない (縛るのは新規登録)」は生きている規則で、本 ADR はその**例外を 1 回だけ**宣言する (`gftd` 退役に次ぐ 2 例目)。理由: net-kotobase org は kotobase.net という製品 identity と一体で、製品面が graph.kotoba.cloud に吸収された以上、org を残すと『2 つの正本』になる。規則本文は変えない。
