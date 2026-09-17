@@ -1,0 +1,34 @@
+{:doc/id "shinshi-support-tick-20260916"
+ :doc/status "draft"
+ :doc/date "2026-09-16"
+ :doc/actor "shinshi-support cron tick"
+ :doc/type :issue-draft
+
+ ;; 実測 (本 tick, GET https://shinshi.club/api/funnel ・ GET /pay/quote?usd=0.5 ・
+ ;;  GET /.well-known/x402 (前 tick と整合のため変化時のみ再掲) ・ base.blockscout.com V2 token-transfers)
+ :observed
+ {:api-funnel "{funnel {visitors 14089 / chatters 168 / scenes 103 / quotes 0 / paying 0 / paywall 0}, window 7d, source shinshi.d1:pv_daily+chat_event_daily+pay_quote_daily+pay_run} 実測 2026-09-16"
+  :vs-20260914-tick "visitors 14089→14089 / chatters 168→168 / scenes 103→103 — rolling 7d 窓の同一値 (09-13→09-14 tick と同じく末尾日が動いていない可能性)。quotes は本 tick を含め 11 回連続の 0。paywall も 0 継続"
+  :live-rail "GET /pay/quote?usd=0.5 → 200, chain=base / custody=eoa / treasury 0xf15928…67Ac / fee $0.10 / net $0.40 / asset USDC (contract 0x8335…2913) — 09-14 実測と同一応答で rail は生きている"
+  :onchain "payTo EOA 0xf15928…67Ac: Base 上 ERC-20 token-transfers=[] (base.blockscout.com/api/v2 実測 2026-09-16, HTTP 200) — 実 USDC 受金 0 件のまま (09-09 実測以来 4 観測連続 0)"}
+
+ ;; agentChat 個別 session ログは本リポジトリに存在しない (09-09b tick で確認済み・本 tick も再確認)。
+ ;; 離脱理由は個別に未計測 — ユーザー発言ベースの返信 draft は作らない。
+ :reply-drafts []
+
+ ;; 来て止まった人のシグナル (aggregate のみ)
+ :dropoff-signals
+ ["quotes 0 が 11 回連続 (09-08 12:49 以降全 tick)。chatters 168 が chat を継続利用しているのに quote 表示が 1 回も立たない = free quota (20 msg) 枯渇が一度も観測されない → 『emitter 未配線』か『全 chatter が quota 内』。前者の可能性が高いまま未確定"
+  "paywall counter も 0 継続 — 3 段階手動 USDC フロー経由の課金表示が 1 回も無い。09-09 x402 tick の『フローが実行不可能に近い』切り分けと整合。treasury 実受金 0 件 (Blockscout 実測 2026-09-16) も裏付け"
+  "visitors 14089 (7d) に対し chatters 168 — 98.8% は chat に到達せず。age gate / login / chat 導線のどこで落ちているかは未計測 (route 遷移計器は home→login 1 件のみのまま)"
+  "funnel snapshot が 09-14 tick と完全同一値 (14089/168/103/0/0/0) — 7d rolling 窓の emitter が 2 日間更新されていない疑い。集計の鮮度そのものが未検証 (09-04 audience 実測と比べても visitors スケールが一桁違う: 371 → 14089/7d)" ]
+
+ ;; proposals — canvas-ledger 単一 writer のためここに記載のみ (書き込まない)
+ :proposals
+ ["quotes 0 11 回連続 → 09-08c の切り分け依頼 (client render fire 1 計器) を追跡維持。支払い離脱点の定量は quotes が立つまで不可能"
+  "funnel emitter 鮮度の切り分けを新規に追加提案: /api/funnel の 7d 窓が 09-14 以来同一値 — pv_daily/chat_event_daily の最終書き込み日を D1 で確認する 1 計器。数字が更新されない限り本 tick 系列は同じ snapshot を引用し続ける"
+  "09-09 x402 tick の issue draft (treasury アドレス常時表示 + wallet connect 自動送金 + claim 自動化) が唯一の action-pending 依頼 — support から補強するのみで新規 draft は作らない (同日重複はノイズ)"
+  "age gate → chat 到達の間の離脱計器 (age-gate 通過数 / chat 画面到達数) を emitter に追加提案 — chatters/visitors 98.8% 離脱を切り分ける最小計器"
+  "premium_waitlist 未実装のまま — chatters 高水準継続中の再接触手段なし (18+ age-gate 維持の前提)"]
+
+ :guard "数字は本 tick 実測 (GET /api/funnel, GET /pay/quote?usd=0.5, base.blockscout.com V2 token-transfers HTTP 200)。x402 discovery は 09-14 実測を引用。agentChat 個別 session は未計測。canvas-ledger への書き込みなし (単一 writer 維持)。送信なし。新規 reply draft なし。"}
