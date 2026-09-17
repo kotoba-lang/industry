@@ -145,6 +145,16 @@ def load_state():
     return {"done_windows": [], "watermark_modified": None}
 
 
+def parse_ts(s):
+    # NVD lastModified values come back without a timezone suffix (naive UTC).
+    # Normalise to offset-aware so comparisons with now(UTC) never TypeError.
+    if not s:
+        return None
+    if not (s.endswith("Z") or "+" in s):
+        s += "+00:00"
+    return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
 def save_state(st):
     os.makedirs(BUILD, exist_ok=True)
     tmp = STATE + ".tmp"
@@ -203,7 +213,8 @@ def walk_windows(st, mode):
         start_param = "pubStartDate"
     else:
         wm = st.get("watermark_modified")
-        start = (dt.datetime.fromisoformat(wm.replace("Z", "+00:00")) - dt.timedelta(days=2)) if wm \
+        wm_dt = parse_ts(wm)
+        start = (wm_dt - dt.timedelta(days=2)) if wm_dt \
             else dt.datetime(1999, 1, 1, tzinfo=dt.timezone.utc)
         start_param = "lastModStartDate"
         end_param = "lastModEndDate"
