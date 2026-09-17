@@ -66,16 +66,22 @@ visibility は全て保持。GitHub は旧 slug を redirect するので、west
 
 - **GitHub の org `net-kotobase` はオーナーが削除した**（`gh api orgs/net-kotobase` → 404）。旧 slug の redirect も消えたので、第 1 段の「旧 remote はそのまま動く」は**もう成り立たない**。残っていた参照は同日に直した: 共有 checkout の remote 3 本（control-plane / docs / ipfs）、`cloud-kotoba/engine` の `:git/url`（PR #5、pin を 045f84ef へ前進）、repos.edn の remotes / orgs / group-filter（PR #3184、west.yml header は `--entry cypher` で再 splice、west.yml の `net-kotobase` 言及 0）、genpon（PR #3185、reconcile 28 event）。
 - **配置規則**（オーナー指示）: OSS 系列は `kotoba-lang`（public）、business は `cloud-kotoba`（private にすべきものは private）。`cloud-kotoba/app-kotoba-cloud` は同日 private にした（git URL で引く子 repo 0、fleet gate に名指し無しを測ってから）。`cloud-kotoba-dds` と `delegation-rootkeys` は public のまま（後者は設計上 public 必須）。
-- 第 2 段は**完了**: 13 entry すべて移動、消費者 `cloud-itonami/loop-noren` を直して pin 前進、`west-orphan-audit --blocking` EXIT 0、Hermes profile 5 本の path を patch（backup `.bak-relocate-20260917`）。**未解決**: co-scientist bot 4 本（`net-kotobase-bench` / `-cosientist` / `-falsify` / `-rank`）の作業 repo が archived の `cloud-kotoba/docs`（旧 path）のまま —— retarget か停止は owner 判断。
+- 第 2 段は**完了**: 13 entry すべて移動、消費者 `cloud-itonami/loop-noren` を直して pin 前進、`west-orphan-audit --blocking` EXIT 0、Hermes profile 5 本の path を patch（backup `.bak-relocate-20260917`）。**未解決**: co-scientist bot 4 本（`net-kotobase-bench` / `-cosientist` / `-falsify` / `-rank`）の作業 repo が archived の `cloud-kotoba/kotobase-docs` のまま（workdir は改名時に `orgs/cloud-kotoba/kotobase-docs` へ追従、PR #3190）—— retarget か停止は owner 判断。
 - 第 3 段（capability host）は未着手のまま。
 
 ## Owner override の記録
 
 CLAUDE.md「ドメイン移転で改名しない。一括改名はしない (縛るのは新規登録)」は生きている規則で、本 ADR はその**例外を 1 回だけ**宣言する (`gftd` 退役に次ぐ 2 例目)。理由: net-kotobase org は kotobase.net という製品 identity と一体で、製品面が graph.kotoba.cloud に吸収された以上、org を残すと『2 つの正本』になる。規則本文は変えない。
 
+## 2 度目の改名の着地と検証（2026-09-17 午後、closing）
+
+- 着地: GitHub rename 11 本 → west.yml `a4f72baf`（`west-entry-rename.cljk`、11/11 verified）→ root PR #3190 `bb1f04e`（repos.edn / gates / 参照 / .gitignore / 本 ADR の表）→ engine-worker PR #6 `ad9d7c1`（`:git/url` と `KOTOBASE_BISCUIT_LOG_BASE`、pin `8a219a7`）→ genpon PR #3191 `e45bc7e`（reconcile 11 added / 11 removed + ff pin 2 件、再 check clean）。
+- 検証: `verify-repository-roles --name-audit --org cloud-kotoba` → family 11 / OK。`verify-west-pins` OK。11 本の pin = 上流 tip（`kotobase-docs` だけ pin `3ede3dd` < tip `f84bab1`、archived group なので据え置き）。`west update --fetch smart kotobase-control-plane` が移動後の checkout を `57b43ce8` に整列（linked worktree 9 本は `git worktree repair` 後も解決）。`west-orphan-audit --blocking` は **EXIT 2** —— 11 本に指摘なし、未判定 1 件は `orgs/net-kotobase/commoncrawl-actor`（この machine の checkout がまだ旧 path、消費者 loop-noren の checkout が pin より遅い）。旧 slug を機能的に指していた参照は engine-worker の 2 箇所だけ（他は comment）。
+- 触っていない: wrangler Worker 名（deploy identity）、各 repo README 冒頭の名乗り（`# net-kotobase-cypher` 等）、生成 snapshot（repo-taxonomy / repo-maturity / checkout-consequence / 90-docs datoms は次の再生成で追従）、`orgs/net-kotobase/` に残る `commoncrawl-actor` / `sdk`（kotoba-lang 側、未 mv）と他 session の clone 2 本。
+
 ## Resume point
 
-- 第 2 段の最初の 1 本: `cypher` (deps 0、Hermes 0)。手順は上の 1 repo = 1 手順、gate は `kbb --backend sci scripts/west-orphan-audit.cljk --blocking`。
-- 第 3 段の最初の 1 本: `cypher.kotobase.net` (401 = 生きている、契約は cloud-kotoba/cypher の README)。
+- この machine の残り: `mv orgs/net-kotobase/commoncrawl-actor orgs/kotoba-lang/commoncrawl-actor`、`mv orgs/net-kotobase/sdk orgs/kotoba-lang/kotobase-sdk`（remote URL も）、`west update --fetch smart loop-noren` → `kbb --backend sci scripts/west-orphan-audit.cljk --blocking` が EXIT 0 になること。
+- 第 3 段の最初の 1 本: `cypher.kotobase.net` (401 = 生きている、契約は cloud-kotoba/kotobase-cypher の README)。
 "
 )))
