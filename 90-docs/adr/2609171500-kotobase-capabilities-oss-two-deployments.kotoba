@@ -10,7 +10,7 @@
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/topic "kotobase-capabilities-oss-deployments")
   (:source/dataset "adr")
-  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/kotobase-protocol-core" "orgs/cloud-kotoba/control-plane" "orgs/cloud-kotoba/ipfs" "orgs/cloud-kotoba/cypher" "orgs/cloud-kotoba/lake" "orgs/kotoba-lang/app-kotoba-cloud"))
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/kotobase-protocol-core" "orgs/cloud-kotoba/kotobase-control-plane" "orgs/cloud-kotoba/kotobase-ipfs" "orgs/cloud-kotoba/kotobase-cypher" "orgs/cloud-kotoba/kotobase-lake-worker" "orgs/kotoba-lang/app-kotoba-cloud"))
   (:adr/authoritative_for
 (vector "kotoba.cloud と yataverse.com の役割分担 (何を private で運用し、何を public で運用するか) と、その線が『protocol 名』ではなく『capability 本体は OSS、deployment は 2 つ』であること" "2026-09-17 時点で capability 本体が private repo に残っている量の実測と、切り出す順序 (依存の底から)" "kotobase-protocol-core を public にする決定 (secret scan 48 blob / 0 hit、.cpcache 除去、Apache-2.0)" "adr-2609171200 §3 (kotobase.net の capability host を graph.kotoba.cloud 配下へ寄せる) を superseded にする"))
   (:adr/related
@@ -35,7 +35,7 @@
 
 | capability | OSS (kotoba-lang public) | private に残る本体 |
 |---|---|---|
-| datom 面 / graph DB | kotobase-server (21 file)、kotobase-engine-lsm、kotobase-client、kotobase-block-codec、inga、io-ipld* | `cloud-kotoba/control-plane/kotobase-graph-database` 42 file・約 14k 行 (xrpc / store / object-store / block-store / keyring / trust_assurance / trust_decision / physical-index-journal)。kotobase-server と同じ path の file は 0 |
+| datom 面 / graph DB | kotobase-server (21 file)、kotobase-engine-lsm、kotobase-client、kotobase-block-codec、inga、io-ipld* | `cloud-kotoba/kotobase-control-plane/kotobase-graph-database` 42 file・約 14k 行 (xrpc / store / object-store / block-store / keyring / trust_assurance / trust_decision / physical-index-journal)。kotobase-server と同じ path の file は 0 |
 | Cypher | org-opencypher-cypher (仕様・parser) | `control-plane/protocols-worker/query.cljk` 368 行 (cypher Worker は 43 行でそれを require) |
 | SPARQL / lake | kotobase-lake、org-w3-sparql-protocol、columnar、org-apache-arrow / -parquet | `lake` Worker 658 行 (一番 OSS に近い) |
 | s3 / pinning / IPNI / atproto / git | — | `protocols-worker` 5,576 行 (dep は text だけ)、`kotobase-protocol-core` 577 行 **(private だった)** |
