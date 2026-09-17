@@ -32,4 +32,4 @@ The operator asked for a bot profile + cron to run this loop. A new social-capit
 The bot starts before the ledger exists - its measured output is UNMEASURED evidence rows for pipeline inputs and 1 propose step per tick (ADR refinement, repo scaffold proposal, then R0 sc.core). This is intentional: a propose-only loop must not fake mint counts that cannot exist yet. When R0 sc.core lands, the same profile's evidence script gains mint/epoch-cap rows without a second bot.
 
 Traps recorded: profile-scope cron create needs env -u HERMES_HOME on later manual runs; the cron script must be a bare filename; served_profiles discovery is judged from gateway.log tick line; model drift_skip - the job snapshot must match the profile config at creation.
-"))
+")))
