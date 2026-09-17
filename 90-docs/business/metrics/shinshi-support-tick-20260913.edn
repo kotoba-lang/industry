@@ -1,0 +1,31 @@
+{:doc/id "shinshi-support-tick-20260913"
+ :doc/status "draft"
+ :doc/date "2026-09-13"
+ :doc/actor "shinshi-support cron tick"
+ :doc/type :issue-draft
+
+ ;; 実測 (本 tick, GET https://shinshi.club/api/funnel ・ GET /pay/quote?usd=0.5 ・ GET /.well-known/x402)
+ :observed
+ {:api-funnel "{funnel {visitors 14278 / chatters 175 / scenes 101 / quotes 0 / paying 0 / paywall 0}, window 7d, source shinshi.d1:pv_daily+chat_event_daily+pay_quote_daily+pay_run} 実測 2026-09-13"
+  :vs-20260912-tick "visitors 14278→14278 (同一値 — rolling 窓の移動差なし) / chatters 174→175 / scenes 120→101。quotes は 8 回連続の 0。paywall も 0 継続"
+  :live-rail "GET /pay/quote?usd=0.5 → 200, chain=base / custody=eoa / treasury 0xf15928…67Ac / fee $0.10 / net $0.40 — /.well-known/x402 と整合継続 (3 resources: premium / chat=20 msg free quota 後 / video=no free tier)"
+  :onchain "treasury 0xf15928…67Ac の Base 上 ERC-20 token-transfers 再取得は本 tick 未達 (Blockscout V2 API が 500)。前回実測 (09-12 tick): 受金 0 件 — 変化なしの可能性が高いが本 tick では UNVERIFIED として扱う"}
+
+ ;; agentChat 個別 session ログは本リポジトリに存在しない (09-09b tick で確認済み・本 tick も再確認不可)。
+ ;; 離脱理由は個別に未計測 — ユーザー発言ベースの返信 draft は作らない。
+ :reply-drafts []
+
+ ;; 来て止まった人のシグナル (aggregate のみ)
+ :dropoff-signals
+ ["quotes 0 が 8 回連続 (09-08 12:49 以降全 tick)。chatters 175 が chat を継続利用しているにもかかわらず quote 表示が 1 回も立たない = free quota (20 msg) 枯渇が一度も観測されない → 『emitter 未配線』か『全 chatter が quota 内』。前者の可能性が高いまま未確定"
+  "paywall counter も 0 継続 — 3 段階手動 USDC フロー経由の課金表示が 1 回も無い。09-09 x402 tick の『フローが実行不可能に近い』切り分けと整合"
+  "visitors ~14k (7d) に対し chatters 175 — 98.8% は chat に到達せず。age gate / login / chat 導線のどこで落ちているかは未計測 (route 遷移計器は home→login 1 件のみのまま)"]
+
+ ;; proposals — canvas-ledger 単一 writer のためここに記載のみ (書き込まない)
+ :proposals
+ ["quotes 0 8 回連続 → 09-08c の切り分け依頼 (client render fire 1 計器) を追跡維持。支払い離脱点の定量は quotes が立つまで不可能"
+  "09-09 x402 tick の issue draft (treasury アドレス常時表示 + wallet connect 自動送金 + claim 自動化) が唯一の action-pending 依頼 — support から補強するのみで新規 draft は作らない (同日重複はノイズ)"
+  "age gate → chat 到達の間の離脱計器 (age-gate 通過数 / chat 画面到達数) を emitter に追加提案 — chatters/visitors の 98.8% 離脱を切り分ける最小計器"
+  "premium_waitlist 未実装のまま — chatters 高水準継続中の再接触手段なし (18+ age-gate 維持の前提)"]
+
+ :guard "数字は本 tick 実測 (GET /api/funnel, GET /pay/quote?usd=0.5, GET /.well-known/x402)。treasury 受金は本 tick 未検証 (API 500) — 09-12 実測を引用し UNVERIFIED と明記。agentChat 個別 session は未計測。canvas-ledger への書き込みなし (単一 writer 維持)。送信なし。新規 reply draft なし。"}
