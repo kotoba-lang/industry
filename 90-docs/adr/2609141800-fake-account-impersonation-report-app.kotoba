@@ -121,7 +121,7 @@ view: #fake-report（単一ページの view として追加。fragment address�
 | 2 | DO + gateway（origin/refusal/negative テスト、未 eKYC 403） | `npm test` / `npm run build` green |
 | 3 | toC view（DADS、ja/en、design-quality ≥95、single-page 検査） | 検査 green |
 | 4 | 状態台帳 + 30 日 blob 消去 | 状態遷移テスト green |
-| 5 | deploy + live verify（case 作成→ドラフト→status が実経路で通る） | live readback |
+| 5 | deploy + live verify（case 作成→ドラフト→status が実経路で通る） | live readback — 配線は着地・edge は live、eKYC 済み session の実経路完走が未（下の「現在地」） |
 
 ## Consequences
 
@@ -141,4 +141,27 @@ view: #fake-report（単一ページの view として追加。fragment address�
 3. gateway の origin/refusal/negative テスト、未 eKYC で 403、証拠ゼロで提出不能（C2）
 4. design-quality score ≥95、single-page 検査（view 横断で document reload 無し）、locale smoke
 5. deploy 後 live readback（未認証 401、eKYC 済み session で実経路完走）+ run receipt
+
+## 現在地（2026-09-17、Phase 5 の途中）
+
+- **配線の着地**: Phase 1–4 の後に残っていた 3 つの deploy gap（authority entry `fetch!` に
+  `fake-report.internal` の hop が無い / edge に `FAKE_REPORT_AUTHORITY` service binding が無い /
+  `/ja/fake-report/` 未配信）は app-kotoba-cloud PR #269 が塞ぎ、main `a89e91da`
+  （2026-09-17 04:11 UTC）で着地。hop の先は `FAKE_REPORT_RECORDS` の `idFromName cases1`
+  **singleton**（case index と C6 alarm が per-instance のため）、認可は DO 内で per-op。
+  検証（着地後の main で実測）: `worker-smoke` の end-to-end block（edge → binding → entry →
+  実 DO、C2 の 400 invalid-case、foreign origin 403、binding 無し 503 を literal で pin）、
+  `workerd-contract` 17/17（fake-report の 405 / 401 sign-in-required / 403 origin-not-allowed）、
+  `kbb -M:test` 191 tests 0 failures。
+- **edge**: main `d7b0a28d`（⊇ a89e91da）から version `08bf2472`（04:53 UTC）、次いで
+  main `db0c3ed3`（PR #350）から `7048f731`（06:53 UTC）が deploy 済み — どちらも別セッション、
+  binding を含む。live 実測（06:40 / 06:55 UTC）: `GET /v1/fake-report/case` → 405、
+  browser Origin + JSON + cookie 無し `POST` → 401 `sign-in-required`。
+- **research authority**: live は `b0f3e042`（04:28 UTC の deploy。04:52 に `31075745` が
+  出たが ADR-2609171500 の hand-over gap で 04:58 に `b0f3e042` へ rollback）。時系列上
+  a89e91da 着地（04:11）より後の deploy なので hop を含むはずだが、**hop の存在は live で
+  未測定**（fake-report.internal は private binding で、外からは session 無しに届かない）。
+- **残り（verification 5）**: eKYC 済み session で case 作成 → draft → submit が実経路で通ること
+  と run receipt。authority を main から再 deploy する判断は ADR-2609171500 の hand-over gap
+  （owner principal の record が anonymous object に残る）と同じ決定に束ねる。
 "}]
