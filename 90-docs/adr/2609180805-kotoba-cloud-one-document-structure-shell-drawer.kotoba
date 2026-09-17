@@ -1,0 +1,60 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609180805-kotoba-cloud-one-document-structure-shell-drawer")
+  (:adr/title "kotoba.cloud の全文書を 1 つの構造 (cloud-kotoba-dds.shell/document) で emit し、shinkansen.audit :shell が測り、スマホ帯は DADS ドロワー")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-18")
+  (:adr/last_verified "2026-09-18")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-cloud-uiux-shell")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/cloud-kotoba/app-kotoba-cloud" "orgs/cloud-kotoba/cloud-kotoba-dds" "orgs/kotoba-lang/shinkansen"))
+  (:adr/authoritative_for
+(vector "kotoba.cloud の全文書（apex、console、docs、support、blog、legal、404、catalog、admin、identity、fake-report）が 1 つの body 構造 cloud-kotoba-dds.shell/document で emit されること、およびその構造をページごとに opt-in しないこと" "shinkansen.audit :shell 軸の契約（ctx :shell :app / :none / 宣言なし / 未知の 4 値の意味）と、app-kotoba-cloud の audit gate でそれが hard であること" "スマホ帯（≤48rem）の chrome: ☰ · brand · account の 1 段と DADS ドロワー、上部バーの操作がドロワー foot へ同じノードとして移ること" "上部バーの link menu に security hub が在ること、その label が :group-secure であること"))
+  (:adr/related
+(vector "adr-2609171200 (kotobase- rename closing —— 同日の直前のセッション)" "adr-2609161900 (jp-go-dds behavior layer —— ドロワーと menu の runtime はここ)" "adr-2609151708 (shinkansen.audit を judge にする)" "adr-2608080100 (UI は single-page app)" "adr-2609092600 (app の 4 面)" "cloud-kotoba/app-kotoba-cloud#351 #352 #354 #356 #361、cloud-kotoba/cloud-kotoba-dds#25 #26、kotoba-lang/shinkansen#26"))
+
+  (:adr/body
+"# ADR-2609180805: kotoba.cloud の全文書を 1 つの構造で emit する —— cloud-kotoba-dds.shell/document、shinkansen.audit :shell、スマホ帯は DADS ドロワー
+
+**Status**: accepted / 2026-09-18（着地済み、本番稼働中）。オーナー指示 2026-09-17 の連鎖: 「support.kotoba.cloud と kotoba.cloud のデザインが他のページと異なっている。console.kotoba.cloud と基本は合わせて」→「blog, legal も整えて」→「shinkansen framework で layout 構造で共通化できないの?」→「全部やる」→「まだスマホでみた時の menu の uiux がよくない。ChatGPT / OpenRouter を参考に」。
+
+## Context（実測 2026-09-17）
+
+- `app-kotoba-cloud/site.cljk` は文書の組み立て経路が 3 本あった: `site-layout` に `:sidebar? true` を書いた呼び手だけレール（29 呼び手中 15）、`page-html` + 手組み view（landing、console home）、`->page` + 手組み view（legal、tokushoho、404）。フラグを書き忘れた文書は marketing ヘッダ（wordmark + link 列 `kc-nav`）を着て剥がれた: apex、support、blog、legal、catalog 11、admin、identity、fake-report、404。
+- `shinkansen.audit` のどの chrome 軸も「宣言した chrome が層を守るか」を測り、「chrome を宣言したか」は測っていなかった。剥がれた文書は 97〜100 で通っていた（`:chrome-layers` はマーカー無しに 1.0）。
+- shinkansen は README の宣言どおり UI を再実装しない connection layer。app-shell の部品（`shell/topbar`・`account-entry`・`theme/head`・`theme/stylesheet`）は cloud-kotoba-dds が正本だが、文書 1 枚の構造を返す関数は無かった。
+- スマホ帯（≤48rem）は brand · ＋ · ≡ · account のバーの下に 2 段目のチップ列（credit / links / setup / language / theme）が並び、主要動作は「+ はじめ」に切れ、groups は bar の下に sheet で落ちていた。
+
+## Decision
+
+1. **構造は library が持つ**: `cloud-kotoba-dds.shell/document`（cloud-kotoba/cloud-kotoba-dds#25、main `b6eb5256`）が app 文書の唯一の body 構造 `skip → runtime → <main>[topbar · banner · body] → rail → footer` を emit する。app は事実（rail・bar・footer・runtime ノード・main の layout class）だけ渡す。`:rail` / `:skip` の欠落、`<nav>` でない rail は名指しで拒否。`.ck-skip` は shell/css に移った。
+2. **judge が測る**: `shinkansen.audit` に `:shell` 軸（weight 0.10、kotoba-lang/shinkansen#26、main `08737d97`）。host が `ctx {:shell :app}` を宣言した文書に `nav[data-chrome=rail]` が `<main>` の後に 1 つ・`data-chrome=top` が 1 つ在ることを測り欠けを名指す。宣言なし = `:not-applicable`（shell の無い host に free 1.0 を配らない、`:unmeasured` でもない）、`:none` = 宣言付き不適用、未知 = `:unmeasured`（拒否）。`:chrome-layers` は変えない（宣言した chrome の層の判定であって、宣言の有無は別軸）。
+3. **消費側は 1 経路**: app-kotoba-cloud（#356、main `4e1749cc`）は `site-layout` だけが emit し、`:sidebar?`・marketing `site-header`・`app-menu`・`language-links` とその CSS を削除。landing / console home / legal / tokushoho / 404 も同じ経路（crawler 向け head は `seo-head`）。`scripts/uiux-audit.cljk` と `uiux_audit_test` は `:shell :app` を宣言し **`:shell` を hard 軸**にした —— floor 80 では 0.10 の軸は見えないので、レールの無い文書は deploy できない。app menu の csf2 入口は上部バーの link menu の「セキュリティ」（`/security/` hub、ラベルは既存 key `:group-secure`）に移った。全文書が `<html dir>` を持つ。chat の workspace は `#chat-main`（`main#main` の二重は `:unique-ids` の hard 違反だった）。catalog の `h1` は line-height 1.2 を持つ（cloud-kotoba-dds#26、main `5a773212`。レールで列が狭まり折り返した見出しが自分に重なった —— 潜在バグの顕在化）。
+4. **スマホ帯はハンバーガー + ナビゲーションドロワー**（#361、main `d4525a58`）: バーは `☰ · brand · account` の 1 段。☰ は DADS `hamburger-menu-button`、ドロワーは DADS `drawer`（`<dialog>` + `jp-go-dds.behavior`: focus trap / Escape / focus return / backdrop は platform、`data-backdrop-click=close`）。レールの groups はどの帯でもその `<dialog>` の中に在り、レール帯（>48rem）では static に描いて列そのものにする。ドロワーの中身: mark + × → + はじめる → groups → foot（上部バーの link menu を行として、`#kc-drawer-tools`）。上部バーの操作（credit / setup / language / theme）は shell-browser が **同じノードを** foot へ移す（1 事実 1 home）。スマホ帯では上部バーを表示しない。2026-09-16 の sheet toggle と `mobile-nav!` は削除。docs host ではドロワー foot に docs 行を出さない（`:nav-one-home`）。`:close` を console copy に足し、20 生成 locale を translate-console-copy で再生成。
+
+## Verification（固定）
+
+- unit: `kbb -M:test` 201 tests / 0 failures（`every-document-wears-the-one-shell`: 23 emitter が `:shell` 1.0 と `:unique-ids` 1.0、旧形は名指しで拒否。`apex-and-support-wear-the-console-shell`・`blog-and-legal-wear-the-console-shell`・`the-phone-band-navigation-is-a-dads-drawer`）。新テストはそれぞれ旧コード or 壊した assertion で赤を出してから着地。
+- shinkansen: 169 tests / 682 assertions / 0（`:shell` 両方向、理由 literal 固定）。cloud-kotoba-dds `test/shell_test.cljk` 3 tests / 29 assertions / 0。
+- `npm run build` → `audit:uiux` OVERALL 98.2、HARD なし（`/` 94.7→95.0、`/blog/` 97.1→97.2、`/admin/` 95.3→95.6、console / legal / catalog 100）→ `test:worker` / `test:workerd` 緑（workerd は local proxy の一時的 Network connection lost が 1 回、再実行で緑）。
+- 実ブラウザ: playwright（Chrome）390×844 / 768 でバー 52px・横スクロール無し・上部バー非表示・ドロワー 320×844 が左端に開きフォーカスが先頭へ・foot に 4 操作; 1440 でレール従来どおり・5 操作がバーに戻る。live（console.kotoba.cloud / kotoba.cloud）で同値。
+- deploy: Version `8fbde7e1`（#351）→ `bbbf4342`（#352）→ `cfe79a23`（#354）→ `5b57c790`（#356）→ `11c68447`（#361）。全 15 custom domain。
+- west pin: shinkansen `08737d97`、cloud-kotoba-dds `5a773212`、app-kotoba-cloud は `d4525a58` の後に他セッションが `87ada81`（本 merge を包含）へ前進。
+
+## Consequences / 残る gap（優先順）
+
+1. **jp-go-dds `language-selector.js` が popup 閉時も opener にフォーカスがあると Escape を食う** → 言語を選んだ直後だけドロワーが Escape で閉じない（× と backdrop は効く）。上流 1 行（`if(popup?.hidden) return;`）+ pin bump。
+2. **ドロワー項目のアイコン**は未着手（参考画面には有り。jp-go-dds にアイコン対応表が無く 15 項目の選定が要る）。
+3. **レール（`kc-sb`）の markup / CSS は app 側のまま**。次の library 化はレール自体（brand · primary action · groups · foot · ドロワー）を `cloud-kotoba-dds.shell` に上げること。`:shell` 軸はマーカーしか見ないので library 化の前後で判定は変わらない。
+4. **catalog の到達性**: 公開文書からリンクされている catalog は csf2（hub 経由）と compliance（apps 経由）だけ。crypto / enforcement / vc / sanctions / law / sousa / orgs は URL 直打ちのみ（変更前から）。IA の課題。
+5. `test/account-browser.cljk`（deploy gate 外）: display:none の phone toggle を overlap と数える偽陽性は直したが、theme ブロックは 9/16 に消えた `#kc-theme` を期待したまま赤。
+6. `:shell` を宣言していない他の shinkansen 消費者（app-shinkansen、yamabiko 等）は判定対象外のまま。shell/document を採用する時に `ctx :shell :app` を宣言する。
+
+## Resume point
+
+1. 上流の Escape 修正: `orgs/kotoba-lang/jp-go-digital-design-system/src/jp_go_dds/behavior.cljk` の `language-selector-script` keydown で `Escape` の前に `if(popup?.hidden)return;` → test → cloud-kotoba-dds / app-kotoba-cloud の pin bump → `npm run deploy`。
+2. 確認コマンド: `cd orgs/cloud-kotoba/app-kotoba-cloud && kbb -M:test && npm run build && npm run audit:uiux`（`:shell` が hard に在ることは `scripts/uiux-audit.cljk` の `--hard` 既定で）。
+")))
