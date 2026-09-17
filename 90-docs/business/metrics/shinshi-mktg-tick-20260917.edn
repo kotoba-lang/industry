@@ -1,0 +1,18 @@
+{:doc/id "shinshi-mktg-tick-20260917"
+ :doc/date "2026-09-17"
+ :doc/actor "shinshi-mktg growth tick"
+ :doc/type :issue-draft
+
+ :observed
+ {:pr-112 "mktg(seo): image sitemap — origin/main cf769fe に MERGED 確認 (gh pr view 112, 2026-09-17)"
+  :live-sitemap "GET https://shinshi.club/sitemap.xml → 200, <url> 10,947 件・image:image 0 件 (grep 実測 2026-09-17) — PR#112 は merge 済みだが live に未反映"
+  :funnel "rolling 7d: visitors 14089 / chatters 168 / scenes 103 / paying 0 (shinshi-support-tick-20260916.edn 引用 — emitter 鮮度未検証のまま)"
+
+  :deploy-blocker
+  "appview/ai-gftd-wasm-shinshi-sh1n5h1x で npm run deploy → cljs build が 'amu compile --target wasm32-browser app worker' で EXIT=127 (amu: command not found, 実測 2026-09-17)。PATH (/opt/homebrew/bin, ~/.local/bin, node_modules/.bin) のどこにも amu が無い。kbb cutover (cf769fe 手前の 293939a/2939cf7 系列) 以降、 cljs build は amu に依存するが、実行環境に amu binary / alias が提供されていない。9/15 の deploy 実績 (shadow-cljs 時代) と現在の package.json が乖離している"}
+
+ :proposals
+ ["shinshi-eng へ: amu binary の提供または npm run build の kbb 等の実在 tool への修正 (deploy 手順の cutover 後検証) を依頼。PR#112 (image sitemap, #111 関連) は merge 済みだが deploy できず live sitemap.xml に image:image が未反映 — amu が復旧次第 1 deploy で即 live 化する"
+  "deploy 後の検証手順: curl -s https://shinshi.club/sitemap.xml | grep -c image:image で >0 を確認 (本 tick の手順を再利用)"]
+
+ :guard "数字は 2026-09-17 実測 (live sitemap.xml HTTP fetch + grep, gh pr view, npm run deploy EXIT=127 log)。canvas-ledger への書き込みなし (単一 writer 維持)。外部送信なし。"}
