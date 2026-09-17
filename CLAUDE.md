@@ -185,7 +185,7 @@ fleet-db に吸収する。**fleet-db / ledger / fleet-head.edn を手編集し�
 ## 「無い」と結論する前に、索引を引き、検索する（repo-wide mandatory）
 
 - **「X が無い」「X を作る必要がある」と結論する前に必ず索引を引く**: `kbb --backend sci scripts/repo-search.cljk <語>`（名前 + checkout 済み README 冒頭）/ `scripts/concept-lookup.cljk <概念>`（日本語可）。west.yml の 4,000 超の repo のうち checkout されていないものは `ls` / `find` / `grep -r` に映らない。**grep で代替しない**（切られたことに気付く手段が無い）。
-- **コードを Read する前に symbol 索引を引く**（skill なし・1 s・数百 tok）: `kbb --backend sci scripts/symbol-index.cljk find <sym>` → 1 hit なら snippet まで出る / `outline <file|ns>` で定義一覧（Read の 18 分の 1）/ `show <ns/sym>`。exit 0 = hit / 1 = 測って 0 件 / 2 = 拒否（`REFUSE` 行に理由、`status` → `build`）。正本 `orgs/kotoba-lang/symbol-index`、root の `scripts/symbol-index.cljk` はその写し。
+- **コードを Read する前に symbol 索引を引く**（skill なし・1 s・数百 tok）: `kbb --backend sci scripts/symbol-index.cljk find <sym>` → 1 hit なら snippet まで出る / `outline <file|ns>` で定義一覧（Read の 18 分の 1）/ `show <ns/sym>`。**定義を変える前に `find <sym> --dependents`**（参照している定義を深さ別に。alias 経由は grep に映らない）、依存先込みの identity は `closure <ns/sym>`。exit 0 = hit / 1 = 測って 0 件 / 2 = 拒否（`REFUSE` 行に理由、`status` → `build`。**索引の方が新しい拒否なら `build` せず上流の script を使う**）。正本 `orgs/kotoba-lang/symbol-index`、root の `scripts/symbol-index.cljk` はその写し（上流が進んだら写しも同期する: 写しが古いと agent は毎回拒否から復旧している実測、2026-09-17）。
 - 索引: `90-docs/concept/concept.datoms.edn`（概念 → repo）/ `surface`（ホスト → パス）/ `compliance/scope`（ワーカ → データストア）/ `compliance/dependencies`（依存）。4 つとも生成物。
 - **既存を見つけたら使う。** 「見つけたが書き直す」は accepted ADR が否定している場合を除き選択肢に入らない。
 - **索引が当たったことは動くものが在る証拠ではない**: 読む側のコードを `grep` し、実例が 1 つ在るかを見る。**索引に無いことも不在の証拠にならない。**
