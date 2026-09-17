@@ -123,14 +123,16 @@ admin.kotoba.cloud から自分の principal に実行 → 200、receipt `op-@ko
 
 ## 未測定・残る gap
 
-- **`RESEND_API_KEY` は authority Worker（`kotoba-research-authority`）に未投入（live で確認済み、上）。** 投入まで start は
-  503 `contact-mail-not-configured` を名指しで返す（console はその文を出す）。投入:
-  `op read op://gftdcojp/gftd.resend/credential | wrangler secret put RESEND_API_KEY --config wrangler.research.jsonc`
-  （op が signin できないとき keychain mirror `gftd.resend`/`API_KEY` も 2026-09-17 時点で無かった）。
-- **送信元 `no-reply@mail.kotoba.cloud` が Resend で verified かは未測定**（DNS には
-  `mail.kotoba.cloud` の MX `feedback-smtp.us-east-1.amazonses.com` と SPF `include:amazonses.com`
-  が在るが `resend._domainkey` が無い）。未 verified なら provider が 403 を返し、502
-  `contact-mail-send-failed` として見える —— 黙って成功にはならない。`CONTACT_MAIL_FROM` var で差し替える。
+- **`RESEND_API_KEY` は投入済み（2026-09-17 07:3x UTC）。** 1Password の旧 item `gftd.resend/API_KEY` の値は
+  Resend に `API key is invalid`（`GET /domains` と `POST /emails` の 2 経路）—— オーナーが `Private` /
+  「Resend API Key」に登録し直し、それを authority Worker に入れた（secrets-location-map 更新済み）。
+- **送信元は `no-reply@mail.kotobase.net`**（authority `96f676df`、main `67544ed4`）: Resend account の verified
+  11 domain に `mail.kotoba.cloud` は無く、`POST /domains` は 403 "domain limit of your plan"。plan upgrade か
+  既存 domain の削除で枠ができたら `mail.kotoba.cloud` を登録して `CONTACT_MAIL_FROM` を戻す。
+- **送信を live で測った**: オーナーの console から Resend のテスト受信箱 `delivered@resend.dev` へ →
+  「確認コードを送りました。」/ 確認待ち /「…宛に確認コードを送りました。…（残り 5 回）」/ code 欄に focus →
+  取り消す →「確認を取り消しました。」/ 未登録。**人の受信箱でコードを打って確認する段はオーナーが自分の
+  address で行う**（agent は受信箱を読めない）。
 - `account-copy-generated`（en/ja 以外の locale の機械翻訳）はこの panel の文を持たない —— 他 locale は
   英語で出る（`scripts/translate-console-copy.cljk --source account` を回せば埋まる）。
 - 通知の producer は 1 つ。billing receipt / research job 完了 / security alert は未着手（名前を
