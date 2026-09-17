@@ -168,7 +168,13 @@
      :adr "adr-2609151900-google-github-linked-identities-and-org-sso"
      :issues-session? false
      :status :unverified
-     :evidence "2026-09-15 registered BEFORE deploy. The apex owns plan (ORG_PLAN_OVERRIDES else the org owner's active platform plan) and org role, mints x-kotoba-org-entitlement (HMAC-SHA256, ORG_SSO_ENTITLEMENT_SECRET shared with kotobase-authn) and provisions the membership VC from a fresh assertion. org-sso-gateway-test: plan derivation (boundary both ways), handle grammar, entitlement round-trip verified with WebCrypto; npm run test:worker passed"}]
+     :evidence "2026-09-15 registered BEFORE deploy. The apex owns plan (ORG_PLAN_OVERRIDES else the org owner's active platform plan) and org role, mints x-kotoba-org-entitlement (HMAC-SHA256, ORG_SSO_ENTITLEMENT_SECRET shared with kotobase-authn) and provisions the membership VC from a fresh assertion. org-sso-gateway-test: plan derivation (boundary both ways), handle grammar, entitlement round-trip verified with WebCrypto; npm run test:worker passed"}
+    {:surface "/v1/account/contact (GET status), /v1/account/contact/email/{start,confirm,cancel,remove} (same-origin POST under the passkey / wallet session) — an email address registered as a NOTIFICATION channel; research authority /contact/* ops and the token-issued producer (worker.cljk route-api-token → /contact/notify)"
+     :class :post-auth-notification
+     :adr "adr-2609171500-notification-channel-email-never-a-login"
+     :issues-session? false
+     :status :unverified
+     :evidence "2026-09-17 registered BEFORE deploy (owner direction: email as a notification means, never an authentication path). The address lives on the research authority under its own DO key, never in the identity ledger, never indexed by address; proven by an 8-digit code typed into the signed-in console (SHA-256 hash stored, 15-minute expiry, 5 attempts, 1 send/minute, 5/hour); the code never travels in a link, never crosses the service binding, never reaches the browser; every mail states that email cannot sign in, reset a password or recover the account. No route reads, issues or upgrades a session. contact-test (kbb -M:test), test/contact-email.mjs and test/authority-routing.mjs on the built bundles; live negative verification of the routes not yet run"}]
    :evidence "kotoba.cloud's primary action is 'Start with a Base Account' since 2026-09-07 and hands off to auth.kotoba.cloud/sign-in, whose methods are the authority's above; the apex issues no session itself and reads /v1/session credential-free. Live negative verification of the apex routes not re-run today"}
 
   {:project "aiueos"

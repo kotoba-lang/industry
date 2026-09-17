@@ -1,0 +1,135 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609171500-notification-channel-email-never-a-login")
+  (:adr/title "通知先としての email —— passkey / DID が入口、email は「お知らせが届く場所」であって認証経路ではない（console.kotoba.cloud /account）。併せて research authority の forward が全 principal を 1 object に落としていた欠陥の修正と record の hand-over")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-17")
+  (:adr/last_verified "2026-09-17")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "notification-channel-email")
+  (:source/dataset "adr")
+  (:adr/repos (vector "orgs/cloud-kotoba/app-kotoba-cloud"))
+  (:adr/authoritative_for
+   (vector "kotoba.cloud の通知先 email が product の事実（research authority の contact key）であって identity plane の事実ではないこと、address から principal への index を作らないこと"
+           "通知先の証明が『サインイン済み画面で 8 桁コードを打つ』であり、link・session 発行・credential 置換・recovery 短縮のどれでもないこと（hash 保存、15 分、5 回、1 分 1 回 / 1 時間 5 回）"
+           "通知の producer を名前で登録すること（今日は token-issued のみ）と、fail closed の形（鍵無しは mint 前に 503）"
+           "research authority の per-principal forward が aget で principalId を引くこと、anonymous object の record を名指しされた principal へ一度だけ hand-over すること"))
+  (:adr/related
+   (vector "adr-2609070400 (Web3 first —— email は authority ではない。不変)"
+           "adr-2609151900 (Google/GitHub は連携 identity —— 同じ『authority でない面』の前例)"
+           "adr-2609171300 (live regions —— 1 object に 3,282 record が在った測定はこの forward 欠陥の結果)"
+           "app-kotoba-cloud docs/adr/2609171500-notification-channel-email-never-a-login.md (repo 側の半分)"))
+  (:adr/body
+"# ADR-2609171500: 通知先としての email —— passkey / DID が入口、email は「お知らせが届く場所」であって認証経路ではない。併せて、research authority の forward が全 principal を 1 object に落としていた欠陥
+
+**Status**: accepted / 2026-09-17 / オーナー指示「https://console.kotoba.cloud/ に passkey, did をベースにしつつ, email 登録なども通知手段として登録できるようにして。ただ email は認証経路には用いない。」
+
+## 決定
+
+1. **email address は product の事実であって identity の事実ではない。** kotoba.cloud の principal は
+   research authority（`kotoba-research-authority` Worker、principal ごとの Durable Object）の
+   `contact` key（`record` とは別 key）に 1 つの通知先 email を持てる。auth.kotoba.cloud の
+   identity ledger には置かない —— そこの `verified-email:` index は 2026-09-02 に撤去した
+   email sign-in の lookup（410、ADR 2609021200）であり、通知先を identity plane に載せることは
+   その経路を将来「復活しやすい形」で残すことになる。**address から principal への index は作らない**
+   （方向は principal → address だけ）。
+2. **証明は「サインイン済みの画面で、メールに届いた 8 桁コードを打つ」。** コードは link に載せない、
+   session を発行しない、credential を置き換えない、recovery を短縮しない。保存するのは
+   `SHA-256(challengeId \":\" code)`、期限 15 分、5 回外せば失効。送信は principal ごとに 1 分 1 回・
+   1 時間 5 回。コードは object → 同じ Worker の `fetch!`（送信側）→ メール、のみを通る。
+   service binding を越えて edge に渡らない、browser に渡らない。binding からコードを含む op
+   （`/contact/email/prepare` `/contact/delivery`）を呼ぶと 404。
+3. **すべてのメール本文が「email ではサインイン・パスワード再設定・復旧はできない」と読者の言語で述べ、
+   本当の入口（passkey / wallet）を名指しする。**
+4. **producer は名前で登録する。** 今日の producer は `token-issued`（接続トークン発行の security notice）
+   だけ。status は `notifications: [\"token-issued\"]` と「今使われている用途」を返し、誰も送らない通知を
+   約束しない。`contact/notification-mail` に無い kind は何も組み立てない（400）。送信の結果は
+   `lastDelivery` として書き戻し、console が「最後の通知」として見せる。
+5. **fail closed**: authority Worker に `RESEND_API_KEY` が無ければ **mint する前に** 503
+   `contact-mail-not-configured`。provider が拒否したら 502 `contact-mail-send-failed`、pending は
+   abandon し、その 1 分は返す。拒否はすべて literal（`contact-*`）で console が文に写す。
+6. **inventory**: `manifest/human-authentication-policy.edn` の app-kotoba-cloud に
+   `:post-auth-notification` 面として deploy 前に登録（`:issues-session? false`）。
+   ADR-2609070400 は不変。
+
+## 途中で測って直したもの —— research authority の forward
+
+`research-authority/fetch!` は per-principal DO id を `(.-principalId body)` で引いていた。
+release compiler がこの property を rename する（main 30d5123d の build で `c.Ac`。
+`test/authority-routing.mjs` の probe を main の build に当てると `idFromName` は
+`[\"anonymous\"]` を見た）。つまり **d6059ec1（2026-09-14）以降、binding 経由の全 call は
+\"anonymous\" という 1 つの object に落ちていた。** その object の `record` key は最後に書いた
+principal のもので上書きされる（eKYC 状態・scope・bearer path が引く token registry）。job と
+ledger 行もそこに積まれた（ADR-2609171300 が測った 3,282 record は 1 object の中身）。
+`test/requests-list.mjs` は既に「同じ storage に他 principal の job がある」前提で書かれていた。
+
+直し: `(aget body \"principalId\")`（edge が送った JSON の literal key）。直すと \"anonymous\" の
+record が取り残されるので、principal が自分の（空の）object に初めて触れたとき、その object が
+anonymous object に `/adopt/release` を頼む —— anonymous 側は **record がその principal を
+名指ししているときだけ、一度だけ**渡す（`releasedTo`）。頼んだ側は `adopted` marker を置き、
+二度と頼まない。job / ledger 行は移さない（履歴。Requests page は deploy 以降の call を見せる）。
+**deploy 後に起きること**: anonymous record が名指す 1 principal は eKYC・scope・token を保つ。
+そこで上書きされていた他の principal は、この変更の前から既に壊れていたのであって、白紙から始まる。
+
+## 検証（2026-09-17）
+
+- `kbb -M:test` の `contact-test`: address 文法（254/255 の境界を両方向）、throttle の境界
+  （59,999/60,000 ms、4/5 回）、projection が hash と送信ログを運ばないこと、期限が境界で
+  exclusive なこと、全メールが「認証経路ではない」と述べること、無名 producer が何も組み立てないこと。
+- `node test/contact-email.mjs`（built bundle）: object ops の拒否を literal で、Worker の送信を
+  provider mock で（メールのコードが保存された hash のもの、provider 403 で abandon、コードが
+  binding を越えない）、detached notify と receipt、edge の gate（session 無し 401、他 origin 403、
+  body 上限 413）と拒否 status の透過。`SCANNED<TAB>n` を印字。
+- `node test/authority-routing.mjs`: principal ごとの forward、一度きりの hand-over（A は継ぐ、B は
+  継がない、どちらも二度頼まない、binding は hand-over を呼べない、principal 無しの body は自分に
+  頼まない）。
+- `test/worker-smoke.mjs`: PAT 発行が `/contact/notify` hop を 1 回、kind + facts を運び token を
+  運ばないこと。
+- live の実測はこの文書の「未測定」節に。
+
+## live（2026-09-17 UTC、測ったこと）
+
+- 04:52 main `d7b0a28d` から edge `08bf2472` と research authority `31075745` を deploy。console.kotoba.cloud の
+  negative: `/v1/account/contact` 匿名 → 401 `sign-in-required`、stale cookie → 401、document に panel（en / ja）、
+  `auth.kotoba.cloud/v1/email/start` は 410 のまま。オーナーのセッションで panel は「未登録」+ address 入力。
+- **forward 修正の帰結をオーナーの principal で測った**: 自分の object は空（`record.status none`、eKYC 無し、
+  token 0 —— console は 本人確認 確認中 / 研究環境 保留）、一方 `anonymous` object の operator status は
+  `active` / eKYC `verified` / token 6 / scope 1。**hand-over は発火しなかった** —— その record はオーナーの
+  現在の principal id（`did:web:kotoba.cloud:tenant:u_8440…`）を名指ししていない。名前一致の規則が実状より厳しい
+  （record の principal id をそのまま返す route が無いので、どの綴りかは未測定）。
+- **research authority を `b0f3e042`（直前の版）へ rollback（~04:58）。** オーナーの console は
+  確認済み / 利用可能 / owned·approved / 5 本が有効 / 6 本 に戻った。edge は `08bf2472` のまま: 通知先 panel は
+  「読み込めませんでした。更新してください。」を名指しで出す（旧 authority は `/contact/status` に 404）、
+  PAT 発行の notify hop は 404 を握って無視。**main と west pin は修正と機能を持ち、authority Worker は持たない。**
+
+## 次の一手（オーナー判断）
+
+1. anonymous record を **operator 署名の op でオーナーの現在の principal に明示的に渡す**
+   （既存の `RESEARCH_OPERATOR_SECRET` 経路の `review` op に `adopt-anonymous` を足す。名前一致に頼らない、
+   監査台帳に残る）。着地後に authority を再 deploy → admin console から 1 回実行 → オーナーの object に
+   verified / scope / token 6 本が載る。他の principal が同じ record を共有していた状態は終わる。
+2. または修正を保留し（rollback のまま）、共有 object を意図的に受け入れる —— その場合 ADR にそう書く。
+   通知先機能は authority 側の op が無いので動かない。
+
+## 未測定・残る gap
+
+- **`RESEND_API_KEY` は authority Worker（`kotoba-research-authority`）に未投入。** 投入まで start は
+  503 `contact-mail-not-configured` を名指しで返す（console はその文を出す）。投入:
+  `op read op://gftdcojp/gftd.resend/credential | wrangler secret put RESEND_API_KEY --config wrangler.research.jsonc`
+  （op が signin できないとき keychain mirror `gftd.resend`/`API_KEY` も 2026-09-17 時点で無かった）。
+- **送信元 `no-reply@mail.kotoba.cloud` が Resend で verified かは未測定**（DNS には
+  `mail.kotoba.cloud` の MX `feedback-smtp.us-east-1.amazonses.com` と SPF `include:amazonses.com`
+  が在るが `resend._domainkey` が無い）。未 verified なら provider が 403 を返し、502
+  `contact-mail-send-failed` として見える —— 黙って成功にはならない。`CONTACT_MAIL_FROM` var で差し替える。
+- `account-copy-generated`（en/ja 以外の locale の機械翻訳）はこの panel の文を持たない —— 他 locale は
+  英語で出る（`scripts/translate-console-copy.cljk --source account` を回せば埋まる）。
+- 通知の producer は 1 つ。billing receipt / research job 完了 / security alert は未着手（名前を
+  `contact/notification-mail` に足してから）。
+- `test/account-browser.cljk`（実ブラウザ）は PR #326 以来 parse できていなかった（Clojure 文字列内の
+  `\\/`）。直して走らせると、この変更の block（3 状態を画面から駆動）までは緑、その後の `block shell` が
+  2026-09-16 の grouped rail に対して stale（`:scope > a` は直した、次の『sidebar children overlap (1)』は
+  rail の layout に関する主張なので手を付けず gap として残す）。
+"))
+)
