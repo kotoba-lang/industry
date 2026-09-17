@@ -64,6 +64,10 @@
   - 残る per-exec 固定費: fork 1–10 ms は負荷、loader 残り ~5 ms は未分解。
   - Seatbelt の事前コンパイル (項目 7): **loop は実装せず、上の「オーナー判断待ち」の設計のまま保留 (2026-09-16 夜)**。返答があれば: package 時に `sandbox_compile_string` (dlsym) で blob を作り header に埋め、実行時は `sandbox_apply` → 失敗なら `sandbox_init(文字列)` に fall back → どちらでも apply 後に scope 外 open の self-probe、通れば `_exit(125)`。test は probe の両方向 + blob を壊した control。
 
+  ## flag 被覆と regex (2026-09-17)
+  上位 command の flag を数えた: tail `-1` 16,939 / head `-3` 6,176 / cut `-c1-N` 5,598 / sed `-n 'N,Mp'` ≥ 12,700 / grep の結合 flag と `-o` / sort `-rn` 1,031 —— どれも「各 letter 単独は受けるが最頻の綴りが usage error」だった。着地: tail `4f9c86d`、head `5dd6798`、cut `509df42`、sort `8c4b485` (`-nu` は key だけで同一視し入力順の最初を残す、測定)、grep `e6de15d` (bitset、`-o` `-h` `-q`)、sed `808f570` (`N,Mp`、行は command ごとに出る、複数 file は 1 stream)。
+  **regex** (owner 「regex」): org-ieee-regex `59e1747` —— POSIX ERE/BRE を Thompson NFA で、**program も thread set も string** (vector の linear-handle 規則を避ける)、relative jump を長さから計算して patch 無し、`(a*)*` の ε cycle は visited に ε pc も記録して止める、leftmost-longest は開始位置ごとの anchored 走査 (region ごと)。77 case を `/usr/bin/grep -ob` と比較。grep `37f199e` が link (`--source-path`; linked-module route では capability call が関数の result 位置にしか置けない —— 測定)。性能: 1 文字 × 1 thread ≈ host call 10 回で 5.4 MB は数秒; grep は metachar 無しなら literal path、alternation の literal prefix で **prefilter** (`SIGILL|static_assert` 0.15 s vs BSD 0.13)、それ以外は全行 simulation (2–4 s)。次の lever は同じ program 上の lazy DFA (構築後は read-only の表 = linearity 規則が許す形)。sed の `/re/` と awk の `/re/` は未接続。
+
   ## loop の結果 (2026-09-16 夜、ADR-2609161710 の残り項目)
   | 項目 | 着地 |
   |---|---|
