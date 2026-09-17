@@ -1,0 +1,23 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2809180230-kinyu-open-banking-prod-gates-archived-target")
+  (:adr/title "kinyu: open-banking prod-readiness gate register seeded with 2026-09-18 measurements; propose target cloud-itonami/open-banking found ARCHIVED (read-only), so the register lands here for re-homing")
+  (:adr/status :proposed)
+  (:adr/date "2026-09-18")
+  (:adr/deciders (vector "owner"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2809080713-kinyu-core-banking-prod-gap"))
+  (:adr/context
+  "kinyu tick 2026-09-18 (observe via evidence script, exit 0, /tmp/kinyu-obs-0211.json, at 2026-09-17T17:11Z): 9 corpora all clean at heads 052b625662d2/aac9639b45d9/a7dc600f83f2/ad4a571df095/9426d63467ab/82de38e35a49/03dd964f4d76/360a394734cf/80f68e2b80d4; kotobase /health probes 200/200; datom-plane-ok? true. Per the merged seq-2 ADR resume clause, this tick seeded the prod-readiness gate register on cloud-itonami/open-banking (branch bot/kinyu-20260918-prod-gates, commit 9024f0f, file prod-readiness-gates.edn, 6 gates each with measured :prod/measure + :prod/evidence): deploy-surface open (curl https://open-banking.etzhayyim.com/ -> curl 6 Could not resolve host, 000, while worker/wrangler.jsonc declares that route with workers_dev false), d1-schema-migrations open (grep d1_databases in worker/wrangler.jsonc and xrpc-adapter/wrangler.jsonc -> 0 both; root migration.edn is a repo-extraction manifest, not a D1 migration), xrpc-routing-coverage open (no coverage register exists), form-to-banking-wiring open (no wiring proof measured), open-banking-contract-test pending-owner (kotoba/test/banking.test.ts exists; npx vitest run did not complete within the tick because of slow git-hosted deps; exit code unknown and reported as unknown), transact-plane pending-owner (401/502 owner-only re-measure, last measured 2026-09-05). Push to the corpus remote failed: git push -u cloud-itonami bot/kinyu-20260918-prod-gates -> ERROR: This repository was archived so it is read-only (fatal, exit 128). The local commit 9024f0f exists; no PR could be opened against the corpus.")
+  (:adr/decision
+  "1. Anomaly first: cloud-itonami/open-banking is archived read-only, so core-banking-prod (ranked priority 2) has no writable propose target. This ADR registers that finding and re-homes the measured gate register as data here, pending an owner decision on the writable successor (candidates: the etzhayyim/com-etzhayyim-app-open-banking mirror named in migration.edn, or un-archiving).
+  2. The gate register content (6 gates as measured above) is the standing gap diff basis for future ticks: each open gate is a ranked candidate, each tick proposes exactly one gate, measured.
+  3. propose-only preserved: no source edits, no deploys, no payment actuation, kessai :redirect untouched.")
+  (:adr/gaps
+  "1. Writable propose target for open-banking unresolved (archived read-only) — blocks every core-banking-prod gate PR.
+  2. Contract test result unknown (vitest hung on git deps; must be re-run with a longer window or vendored deps before any gate can close).
+  3. Transact-plane re-measure remains owner-only (401/502 as of 2026-09-05).
+  4. etzhayyim mirror writable-state unverified this tick.")
+  (:adr/evidence
+  "Measured 2026-09-18 02:11-02:20 JST. evidence script JSON at /tmp/kinyu-obs-0211.json (at 2026-09-17T17:11:19Z, 9 repos clean, kotobase 200/200, datom-plane-ok? true). open-banking local measurements: ls corpus (worker/xrpc-adapter/kotoba dirs), worker/wrangler.jsonc content (route open-banking.etzhayyim.com/*, workers_dev false, no d1 binding), grep -c d1_databases -> 0/0, curl exit 6 code 000, kotoba/test/banking.test.ts exists, vitest run started 02:12 JST killed at ~11 min with no completion line. Ledger findings.edn before this tick: seq 6. gh pr view 2988 -> state MERGED, mergedAt 2026-09-07T22:34:43Z.")
+  (:adr/resume
+  "Next tick: owner decision on the writable open-banking target; then re-run the contract test to a completion, then close gates one measured PR at a time against that target. Re-verify by re-running nbb ~/.hermes/profiles/kinyu/scripts/evidence.cljs and by git ls-remote on the candidate mirror.")))
