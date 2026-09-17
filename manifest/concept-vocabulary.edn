@@ -171,7 +171,7 @@ hash する証拠でなく、どれも query が評価された証拠ではな�
 ⚠ **library に landed していることと本番の請求経路に載っていることは別。**
 数え直す（値をここから引かない）:
 
-    grep -rhoE '\\[(ipld[^ ]*|ayatori[^ ]*|arrangement[^ ]*)' orgs/cloud-kotoba/control-plane/*/src
+    grep -rhoE '\\[(ipld[^ ]*|ayatori[^ ]*|arrangement[^ ]*)' orgs/cloud-kotoba/kotobase-control-plane/*/src
 
 2026-09-06 に数えたときの形: graph-database worker は `ipld.core` と
 `arrangement.core`、protocols-worker は `ipld.core` と `ayatori.query` だけで、
