@@ -1,0 +1,79 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609171700-hermes-api-kotoba-cloud-agent-contract")
+  (:adr/title "hermes ⇄ api.kotoba.cloud の agent contract —— 窓と出力予算は edge が公開し、窓超えは context_length_exceeded で答え、dedicated origin には同時 4 job しか渡さない。client 側は 114,688 / 900 s / blue route で compaction / 同じ edge に fallback")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-17")
+  (:adr/last_verified "2026-09-17")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "hermes-api-kotoba-cloud-agent-contract")
+  (:source/dataset "adr")
+  (:adr/repos (vector "orgs/cloud-kotoba/app-kotoba-cloud"))
+  (:adr/authoritative_for
+   (vector "api.kotoba.cloud の /v1/models が context_length 131072 / max_output_tokens 32768 / defaultMaxTokens 16384 を全行で公開すること、client が max_tokens を送らないときの edge 既定出力予算が 16,384 であること"
+           "窓超え（edge の 524,288 文字 ceiling も origin の context 拒否も）が code context_length_exceeded + 『maximum context length is 131072 tokens』で 400 になること、他の 4xx は invalid-research-request のままであること"
+           "replay された assistant turn の reasoning_details が admit され forward されないこと"
+           "research authority が dedicated（red）origin へ同時に渡す job を 4 件に制限し（red-max-in-flight、FIFO、running のまま待つ、permitWaitMs を台帳に出す）、blue route は gate しないこと"
+           "hermes 側の測定済み下限: context_length 114688、providers.custom の stale/request 900 s、compression.context_timeout_seconds 900、auxiliary.* に provider + key_env を明示（無いと auto = main model）、compaction は blue route、fallback は同じ edge、providers.kotoba.api は literal URL"))
+  (:adr/related
+   (vector "app-kotoba-cloud docs/adr/2609160940-hf-inference-endpoint-iq4xs.md (origin の 4 slot × 131,072、思考予算 1,024、既定出力予算の行)"
+           "app-kotoba-cloud PR #342 / #345 / #347 / #348 / #350"
+           "adr-2609171500 (research authority の forward 欠陥と hand-over —— 04:52–04:58Z の deploy/rollback で全 PAT が token-unknown になった窓)"
+           "adr-2608136000 (検査の 8 問 —— 各 pin は落ちる方向を先に見せてから着地した)"))
+  (:adr/body
+"# ADR-2609171700: hermes ⇄ api.kotoba.cloud の agent contract
+
+**Status**: accepted / 2026-09-17 / オーナー指示「api.kotoba.cloud で qwen3.8 flash next white を呼ぶ時に安定する hermes profile 側の設定、また api.kotoba.cloud 側の設定を整えて」「動作検証、安定化検証」
+
+## 測った連鎖（すべて再現手順つき）
+
+1. **hermes は max_tokens を wire に乗せない。** config の model.max_tokens は無視される（hermes-agent tests/gateway/test_output_caps_removed.py が『user config は出力 cap を課せない』と pin）。sessions DB の model_config も max_tokens null。→ edge 既定 2,048 の内側で思考 1,024 → file 書き込みの tool call が切れて malformed → hermes は Empty/malformed response で**即 fallback**。
+   再現: sqlite3 ~/.hermes/state.db 'select model_config from sessions order by started_at desc limit 3'。
+2. **fallback 先（OpenRouter）が reasoning_details を返し、hermes はそれを以後の全 assistant turn に載せて replay する**（agent/turn_context.py が意図的に保持）。edge の agent-message? はその key を知らず 400 invalid-research-request → session abort。
+   再現: ~/.hermes/sessions/request_dump_20260917_103517_947c74_*.json の messages[43]。
+3. **窓を誰も宣言していなかった。** hermes は /models 行の context_length を catalog より先に読むが edge は出していなかった → catalog が qwen3.8-flash に 1,000,000 で当たり compaction が発火しない → 138k tok で origin の 131k slot を超えて『model may stop responding』。
+   再現: grep 'catalog match' ~/.hermes/profiles/cloud-kotoba-admin-mktg/logs/agent.log。
+4. **api.kotoba.cloud は job model で応答は完了後に一括**（SSE は 1 chunk の emulation）。hermes の compaction は 120 s 進捗なしで abort（stall_interrupted）→ cooldown → context が育つ。さらに named provider は runtime で label custom に解決されるので providers.kotoba の timeout は効かず providers.custom の 600 s が効いていた。
+   再現: grep 'made no progress for 120' ~/.hermes/logs/agent.log; hermes venv で hermes_cli.runtime_provider.resolve_runtime_provider(requested='kotoba', target_model=...) の provider を見る。
+5. **auxiliary.compression に model + base_url だけ書くと hermes の resolver は auto = main model に落とす**（agent/auxiliary_client.py _resolve_task_provider_model）。同じ 98k tok / 123 msg の transcript で dedicated 経由 611 s、provider + key_env を足して blue 経由 108 s。
+6. **dedicated origin（4 slot）に何十件も同時投入されていた。** Requests 台帳 1,000 行（10:00–13:00 JST）: 失敗 17 件は全件 upstreamStatus 524 × 6 attempts = 13.5 分の dispatch 予算切れ、p50 34 s / p90 118 s / p99 625 s。running 行 43〜56 のうち 33 は isolate 再起動で死んだ run の残骸（25 分で stale）。
+   再現: console.kotoba.cloud/requests/ で fetch('/v1/requests?limit=1000') を読み status/upstreamStatus/attempts を集計。
+
+## 決定（api.kotoba.cloud 側、全部 main と本番に在る）
+
+- **/v1/models 全行に context_length 131072 / max_output_tokens 32768 / defaultMaxTokens 16384**（PR #345）。client が max_tokens を送らないときの既定出力予算は **16,384**（PR #342、2,048 から）。
+- **窓超えは context_length_exceeded** + 『this model's maximum context length is 131072 tokens』（edge の文字 ceiling、origin の context 拒否。llama-server の文言は数字を持たないので edge が補う）。ceiling 判定は per-turn shape 判定より先。他の 4xx は invalid-research-request のまま（PR #345）。
+- **assistant turn の reasoning_details を admit**（sanitize で落とす、origin へは送らない）（PR #342）。
+- **origin admission**: authority は red job を **同時 4 件**までしか origin に渡さない（red-max-in-flight、FIFO、running のまま authority 側で待つので re-attach で二重 dispatch しない、permitWaitMs を running / terminal 行と Requests 台帳に出す）。isolate 単位、blue は gate しない（PR #347 / #348）。
+- **hermes ガイド（dashboard の Connect card = /docs/integrations/hermes-agent/）は測定済み下限のみ**: literal な api URL（KOTOBA_API_BASE が /v1 付きだと /v1/v1 = 405）、.env は token だけ、context_length 114688、custom の stale/request 900、compression 900、auxiliary に provider + key_env、fallback は同じ edge、token-unknown の意味（PR #345 / #347 / #350）。
+
+## 決定（hermes 側、git 外 —— ~/.hermes/config.yaml と profiles/*/config.yaml 52 本、backup は ~/.hermes/config-backups/20260917-agent-wire/）
+
+- context_length 114688（= 131,072 − 16,384）、providers.custom.stale_timeout_seconds 900、fallback_providers は kotoba の blue（qwen/qwen3.8-flash）、dead な model.max_tokens はコメント化。（main + 50 profile。default と kotoba-cloud profile は独自 fallback なので不変）
+- main のみ: compression.context_timeout_seconds / context_total_ceiling_seconds 900、auxiliary.compression / approval / mcp / title_generation / web_extract を provider kotoba + key_env + blue model へ、providers.kotoba.api を literal URL へ、supports_reasoning true。
+- profile の compaction は local proxy（127.0.0.1:9180）向きなので触っていない。
+
+## 検証（実測）
+
+- oneshot『Reply with exactly: OK』→ OK（1 call、in 16,515 / out 19、81.7 s、飽和時）。terminal tool で uname -s → Darwin（2 calls、finish stop）。
+- 詰まっていた実 session 20260917_110041（138k tok）: 900 s 予算で compaction 137→36 msg、107k→43k を 526 s で commit。
+- 合成 98.5k tok / 123 msg transcript: hermes の ContextCompressor.compress を直接呼び、dedicated 611 s / blue 108 s で commit、summary あり。
+- gate 稼働後 8 分（13:26–13:34 JST）の台帳: 58 job / 成功 51 / 失敗 0 / attempts 1 が 50 件 / permit 待ち 8 件（1.3–24.7 s）/ latency p50 19.4 s・p90 62 s（前: p50 34・p90 118・p99 625）。
+- live 確認: /v1/models の 4 行に窓が出る、524,289 文字の body が 400 context_length_exceeded（job は作られない）、PAT 経路が registry check を通って admission に届く。
+- test: worker-smoke / support-authority / requests-list / requests-ledger / research-authority-local / research-providers 全て exit 0、JVM 188 tests 0 failures。各 pin は baseline build で名指しの理由で落ちることを先に確認（reasoning_details: 400 !== 200、既定出力: 2048 !== 16384、gate: 6 !== 4）。
+
+## 残る gap（優先順）
+
+1. **running のまま死ぬ run**: deploy / isolate 再起動で detached run が死ぬと job は 25 分（stale-run-ms）まで running。heartbeat（updatedAt）で requeue? を早めるのが次の一手。台帳の running 数はこれを含む。
+2. **容量**: 4 slot は不変。gate で失敗は消えるが混雑時は待ちが伸び、edge の 840 s を超えれば 504。次は H200 ×1 か slot 6（ADR 2609160940 の KV 試算）。
+3. **research authority の main には他 session の未リリース fix（per-principal forward + hand-over、adr-2609171500）が乗っている。** 本番 authority は b0f3e042（= 本 ADR の gate 版）に rollback 済み。**authority を main から deploy すると owner の principal が空 object に着地して全 PAT が token-unknown になる**（04:52–04:58Z に実測）。hand-over をオーナーが決めるまで authority は deploy しない。
+4. hermes 上流: reasoning_details を非 OpenRouter provider にも replay する挙動、HERMES_HOME fallback（#18594）、Max output 表示（models.dev fallback 8,192）は上流の問題。
+5. 起動中の hermes session は config を再読しない（aux route は起動時固定）。起動し直すこと。
+
+## 再開点
+
+- まず: hermes の新規 session を 1 つ起こして ~/.hermes/logs/agent.log の『Auxiliary compression: using custom (qwen/qwen3.8-flash)』と『Context compressor initialized … context_length=114688』を確認。
+- 次: console.kotoba.cloud/requests/ で 1 時間分の failed / permitWaitMs / p90 を読み、gap 1 の heartbeat に着手する（research_authority.cljk run-inference! の running 書き込みに updatedAt を刻み、requeue? を stale-run-ms ではなく last heartbeat で判定）。")
+))
