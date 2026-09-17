@@ -70,7 +70,7 @@
                           args))
       manifest-path (flag "--manifest")
       id (flag "--id")
-      wrangler-dir (or (flag "--wrangler-dir") "orgs/net-kotobase/ipfs")
+      wrangler-dir (or (flag "--wrangler-dir") "orgs/cloud-kotoba/ipfs")
       dry? (switch? "--dry-run")]
   (when-not (and file manifest-path)
     (die 2 "usage: publish-document.cljs <file> --manifest <path> [--id <id>] [--wrangler-dir <dir>] [--dry-run]"))
