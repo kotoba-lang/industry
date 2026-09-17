@@ -55,8 +55,40 @@
 
 各段の gate: 切り出した library に**その Worker が実際に require する**こと (索引が当たることは動く証拠ではない)、`west-orphan-audit --blocking` exit 0、Worker の smoke が切り出し前後で同じ結果。
 
+## 2026-09-17 午後の着地 (closing 時点)
+
+### 切り出し・de-dup
+- **`kotoba-lang/kotobase-query-surfaces`** (新規、public): protocols-worker の `query.cljk` (368 行、新しい方) を `kotobase.query.surfaces` として切り出し (名前は `kotobase-query-cypher` の予定から変えた: 中身は 4 surface の composition)。host 依存なし、5 tests / 21 assertions。west 登録 (root #3192)。
+- 実測で分かったこと: `kotobase-protocols-worker.query` の**コピーが 2 つ**あった (`kotoba-lang/kotobase-worker-shell` 280 行、control-plane 368 行、後者が RDF4J `sparql-handle` を持つ superset)。worker-shell #5 で shell 側のコピーを削除して lib を require、`ayatori` で `kotobase-query` を置換 (bridge の二重定義回避)。**53 tests / 212 assertions** が前後で同値。
+- `cloud-kotoba/kotobase-cypher` #2 で lib を require。**未着手**: control-plane `protocols-worker` の de-dup (`kotobase_store` 603 vs shell 348、`worker.cljk` 1859 vs `shell.cljk` 537)。
+
+### 公開準備 (第 1 段の拡張)
+分割 repo は**既に存在していた** (`kotobase-protocol-{core,s3,ipfs,pinning,atproto,git,ipq,issues}`、`kotobase-worker-shell`、2026-08-05 の ADR-2608051000 分割) が全部 private で、control-plane の shell は「namespace が衝突する」として facade `kotobase-protocols` (public) の方を使っていた。9 repo すべてに: 全履歴 secret scan (合計 1,700 blob / 0 hit、陽性 control 通過。**最初の走査は zsh の単語分割で無効だったので取り直した**)、Apache-2.0 LICENSE (kotobase と byte 同一)、west pin 前進 (root d053903)。`kotobase-protocol-core` は `.cpcache` (ローカル絶対 path) も untrack。**visibility の PATCH は 9 本とも owner 操作のまま** (harness が Create Public Surface で拒否)。
+
+### 切り出しより先に効いた欠陥: `.cljk` Worker は 09-11 以来 1 本も bundle を作れなかった
+`package.json` の `amu compile --target wasm32-browser <build-id>` は amu が拒否 (source file を取る)、shadow-cljs は `.cljk` を読まない (`Ran 0 tests` / `namespace not available`)。**共通の修理**: `kotoba-lang/kotobase-worker-shell/bin/shadow_shim.cljk` (worker-shell #6 / #7) — `:source-paths` 上の全 `.cljk` を `build/shadow-src/` に byte 同一で鏡像 (`x.cljk`→`x.cljc`、`x.clj.cljk`→`x.clj`、`x.cljs.cljk`→`x.cljs`; `MIRRORED<TAB>n`、n=0 拒否)、Worker は `build/shadow-src` を先頭に置き `npm run build` = shim → `shadow-cljs release <build>`。tools.deps 経由だった Worker (graph-database / inga-replica / authn) は sibling `:source-paths` に書き換え (kbb は `:local/root` しか解決しない)。
+
+| Worker | PR | 測定 (clean tree から) |
+|---|---|---|
+| kotobase-cypher | #3 | 222 mirrored、0 warnings、672,782 B、`GET /capabilities` 200 |
+| kotobase-lake-worker | #4 | 195、0 warnings、573,794 B、`GET /` 401 |
+| control-plane / kotobase-graph-database (datom 面) | #717 | 402、242 files、0 warnings、1,448,993 B、`GET /` 200。tracked bundle は Sep 14 で凍っていた |
+| control-plane / kotobase-status, mail-worker, protocols-worker | #718 | 0 / 0 / 1 warnings。protocols-worker の初ビルドが 08-18 以来の forward reference 2 件 (`parts-stream` `whole-object-specs`) を露出 → `declare` |
+| control-plane / inga-replica, authn (recovery + entry) | #719 | 0 warnings。authn は `AuthnStore` + `default` export、`GET /` 302 |
+| kotobase-search-origin | — | 自前 cljk-mirror で既に緑 |
+| control-plane / kotobase-api-gateway | — | `.cljk` の中身が JS で copy build、動く |
+
+初ビルドが露出した実バグ: worker-shell `shell.cljk` の IPFS-POST 経路で `with-retries` を 3 引数で呼んでいた (4-ary、cfg 落ち) → #6 で修正。graph-database の `:test-esm` harness は deployment 環境 (`ReadAuditUnavailable`) を要求するため**未測定**。
+
+### 他 session との並行
+別 session が同日 cloud-kotoba の repo を `kotobase-*` に改名して west を更新していたので、共有 checkout 11 dir を追従して移動・remote 更新。app-kotoba-cloud #292 (webhook principal 修正) は owner が merge 済み (9b19e13b、pin に包含)。
+
 ## Resume point
 
-第 2 段の最初の 1 本は `protocols-worker/query.cljk` (368 行、cypher Worker の唯一の依存) → `kotoba-lang/kotobase-query-cypher`。
+1. **visibility 一括** (owner): `for r in kotobase-protocol-core kotobase-protocol-s3 kotobase-protocol-ipfs kotobase-protocol-pinning kotobase-protocol-atproto kotobase-protocol-git kotobase-protocol-ipq kotobase-protocol-issues kotobase-worker-shell; do gh api -X PATCH repos/kotoba-lang/$r -f visibility=public; done`
+2. **de-dup の次の 1 本**: control-plane `protocols-worker/kotobase_store.cljk` (603) と worker-shell の同名 (348) の diff を shell に吸収 → `worker.cljk` を `shell/make-handler` の wrapper に。gate は worker-shell の 53/212 と protocols-worker の `npm run build` 0 warnings + `GET /` 401。
+3. yataverse.com 用 wrapper (network-awai) は 2 の後。
+4. `kotobase-control-plane` 共有 checkout の **stash@{0}** (他人の authn 生成物 WIP、2026-09-17 退避) は #719 で superseded の可能性が高いが drop していない。
+5. superproject 本体 checkout は別 session が `mktg-tick-20260917` branch に切り替えたまま (「本体は統合・閲覧専用」違反、PR #3196)。
 "
 )))
