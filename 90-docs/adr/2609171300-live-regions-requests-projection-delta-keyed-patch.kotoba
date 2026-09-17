@@ -1,0 +1,68 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609171300-live-regions-requests-projection-delta-keyed-patch")
+  (:adr/title "live region —— SSE / DOM 更新の設計 (shinkansen.live, SPEC §2.7): wire は cursor 付き delta frame、server は record ではなく projection を 1 操作で読む、DOM は keyed patch、最初の frame は edge が inline、hidden は paused。console.kotoba.cloud/requests/ で実装し実測で閉じた")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-17")
+  (:adr/last_verified "2026-09-17")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "shinkansen-live-regions")
+  (:source/dataset "adr")
+  (:adr/repos (vector "orgs/kotoba-lang/shinkansen" "orgs/cloud-kotoba/app-kotoba-cloud"))
+  (:adr/authoritative_for
+(vector "shinkansen.live の contract (frame の種類 snapshot / delta / heartbeat / error と cursor、reconcile、live-attrs の空間確保、snapshot-script の inline 最初 frame、runtime の状態 live / paused / stale / error / signed-out) —— 本文は shinkansen docs/SPEC.md §2.7、ここはその決定と実測の記録" "app-kotoba-cloud の Requests page が record ではなく projection (idx: 24 h 行、req: 30 日 ledger 行) を読むこと、projection の migration は idx-built marker で 1 度だけ行うこと、retention sweep は projection の最古 1,000 行を 1 操作で読み 1 分に 1 回以下で走ること" "live region の anti-pattern 5 つ (full-refetch / replace-children / walk-the-records / nothing-then-everything / rebuild-controls) と audit 軸 :live-stable"))
+  (:adr/related
+(vector "adr-2609162400 (shinkansen five axes —— 同じ framework の前日の決定)" "shinkansen PR #19 / #20 / #24 (live e2e、shinkansen.live、paused while hidden)" "app-kotoba-cloud PR #331 / #333 / #336 / #337 (live region、marker migration + one-operation sweeps、favicon + exact re-arm、one sweep a minute)" "app-kotoba-cloud PR #332 (別セッション: 30 日 request ledger —— 着地後は page が ledger を読む。本 ADR の migration はその req: 行も seed する)"))
+
+  (:adr/body
+"# ADR-2609171300: live region —— SSE / DOM 更新の設計 (shinkansen.live)
+
+**Status**: accepted / 2026-09-17 / オーナー報告「https://console.kotoba.cloud/requests/ を開いても、すぐにコンテンツが表示されない。また更新のたびに崩れる。shinkansen webframework でこういった sse, dom の更新をより最適化する設計をまとめて」。
+
+## 測った現状 (2026-09-17 午前、着手前)
+
+- `/v1/requests` は 5–18 s。research authority の Durable Object が principal の job record 2,977 本 (prompt と answer を含む数 MB の blob) を毎回 walk して行を作っていた。最初は `storage.list` で全部を一度に読み **isolate の 128 MB を超えて reset** (wrangler tail)。
+- その walk の間、同じ object への他の call (`/jobs/status` 等) が 3.5–4.9 s 待った (`blockConcurrencyWhile` + input gate)。
+- page は 15 s ごとに 195 KB を再取得し table を作り直す。scroll・selection・`<select>` の値が毎回消える。tile と table は data が来るまで `hidden`、来た瞬間に page が伸びる。
+
+## 決定 (SPEC §2.7 に本文、ここは要点)
+
+1. **wire は frame。** `snapshot {rows cursor}` → `delta {upsert remove cursor}` / `heartbeat {cursor}` / `error {reason}`。client は cursor を持って `?since=` で再接続する。SSE (`/v1/requests/stream`、5 s ごと、1 接続 5 分) と polling (`/v1/requests?since=`) は同じ frame。
+2. **server は record を読まない。** 行の projection を record の隣に書く (`idx:<createdAt13>:<jobId>`、`store-job!` が両方書く)。list は `storage.list {:prefix :reverse true :limit 500}` の **1 操作**。`since` は行の `updatedAt` で選ぶ。
+3. **DOM は keyed patch。** `shinkansen.live(mount, {key create patch view source stream …})`: key ごとに node を 1 度だけ create、変わった行だけ patch (text node のみ)、順序は insertBefore、消えた key は remove。`<select>` は option 集合が変わったときだけ組み直す (`live.options`)。
+4. **最初の frame は edge が document に inline** (`snapshot-script` → `[data-live-snapshot]`、no-store)。region は `live-attrs` で高さを先に確保する。最初の paint に行が在り、page は伸びない。
+5. **hidden は paused。** `document.hidden` の間は何も fetch せず `paused` を告げ、`visibilitychange` で見えた瞬間に cursor 付きで接続する (PR #24 —— background tab で indicator が『読み込んでいます…』のまま止まっていた)。
+6. **audit 軸 `:live-stable`**: `[data-live]` は空間を確保していること、`live:live` を定義した script が配られていること。runtime の振る舞いは `scripts/runtime-node-check.cljk` が DOM double で数える (SCANNED 14)。
+
+## 着地の途中で測って直したもの
+
+- **projection の migration が走らなかった** (PR #333): 最初の deploy は『projection が空なら build』にしていたが、deploy 後に書かれた job が先に行を置くので 3,193 本の古い record は index されず、page は 34 件と言った。marker (`idx-built`) で 1 度だけ build する。build の walk は record を読んだ瞬間に行へ落とす (record を並べて持たない)。実測: 3,282 record を 8.6 s で 1 回、以後 `/ledger/list` p50 41 ms。
+- **retention sweep が object を塞いでいた** (PR #333 / #336 / #337): record の walk が 6.8 s、job が数秒に 1 本期限切れになるので数秒に 1 回走り、`/jobs/status` が 5–7 s 待った。projection の最古 1,000 行を 1 操作で読み (expiry は JSON から直接、js->clj しない —— 1,000 行の decode が 1–3 s だった)、record と行を一緒に消し、再 arm は正確に (ledger は creation-based なので最古行の expiry がそのまま次回)、**1 分に 1 回以下**。実測: sweep 53–588 ms、`/jobs/status` p50 22 ms。
+- 別セッションの PR #332 (30 日 ledger) と merge: page は `/ledger/list` を読む。migration は req: 行も seed する。
+
+## 実測 (着地後、2026-09-17 11:2x JST)
+
+- document TTFB 365 ms (1,000 行 inline、wire 56 KB / decoded 531 KB)。
+- paused → visible → 『ライブ · 2 秒前に更新』1 秒以内。delta をまたいで最初の行は **同じ DOM node**。
+- stream: delta 108 ms、heartbeat 5 s、delta 10 s。
+
+## 検証
+
+- shinkansen: `kbb -M:test` 168 tests / 667 assertions、`runtime-node-check` SCANNED 14 (『shown で接続』は `wake()` を no-op にすると落ちる —— 確認済み)。
+- app: `npm run test:worker` (smoke / support / requests-list / requests-ledger / research-local) 緑、`kbb -M:test` 183 tests / 22,499 assertions で **1 failure は既知の別件** (contract ABI が `forge build` を要る)、`uiux-audit --min 80` exit 0 (SCANNED 567)、`test:workerd` ok。
+- 着地: shinkansen main `ff132ad3`、app-kotoba-cloud main `97b44022`。west pin は両方その sha (root `402eecf9`、`e4a6a32a`)。deploy: research `4e59f345`、edge `90e2cb98`。
+
+## 残っている gap (優先順)
+
+1. inline の最初 frame が 1,000 行 (PR #332 の `ledger-list-limit`)。TTFB は 365 ms で足りているが、document を軽くするなら inline だけ上限を置く (例: 100 行 + stream で残り)。
+2. 別セッションの ledger `handle-ledger-list` は 1,000 行を読んで window で filter する。行数が増えたら `since`/window を key 側 (`req:<createdAt>` の start) で切る。
+3. `shinkansen.live` の `paused` を他の live region (dashboard の tiles 等) が consume していない —— 使う page が増えたら状態表示を揃える。
+
+## Resume point
+
+- `orgs/cloud-kotoba/app-kotoba-cloud` main で `npm run test:worker`。live の確認は `wrangler tail kotoba-research-authority --format json` で `job-retention-sweep` の間隔 (≥ 60 s) と `/ledger/list` の wallTime を見る。
+- gap 1 に手を付けるなら `worker/route-live-document` の frame-fn に inline 用の limit を渡す (gateway `list-frame` に `:limit` を足す)。
+"
+)))
