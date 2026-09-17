@@ -1,0 +1,35 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609141203-social-capital-ledger")
+  (:adr/title "Social capital ledger for individual data contribution (propose-only)")
+  (:adr/status "draft")
+  (:adr/date "2026-09-14")
+  (:adr/last_verified "2026-09-14")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "social-capital-ledger")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/related (vector "adr-2609131630 (yataverse.com bytes plane)" "adr-2608153000 (Valueflows as canonical economic vocabulary)"))
+  (:adr/body
+"## Context
+
+Design proposal 90-docs/business/social-capital-proposal-20260914.md defines a 5-plane design (attest / verify / ledger / balance / spend surface) so that individuals contributing expertise, maps, local information, and news tips across amano, itonami, murakumo, aozora, and yataverse accumulate verifiable social capital. Existing components measured on 2026-09-14: moyoshi (network-awai/actor-moyoshi, G1-G8, mints social/mint/convening), ENGI/EN mutual credit (cloud-itonami/credits + kotoba-lang/en), inga consensus, hyakka sourced-claim plane, aozora AT Protocol plane, yataverse.com bytes plane (ADR-2609131630), resource-provider sealed read-cap pattern, Valueflows as canonical economic vocabulary (ADR-2608153000).
+
+The operator asked for a bot profile + cron to run this loop. A new social-capital ledger repo is not yet scaffolded, so the bot's first duty is: propose the ADR, scaffold the repo only after an explicit go.
+
+## Decision
+
+1. One profile-scope bot profile `social-capital` under ~/.hermes/profiles/social-capital/, cloned from murakumo config (model murakumo-main, fallback ling-3.0-tiny, openrouter-free). Its loop per tick: read proposal + this ADR, measure the contribution-pipeline inputs (hyakka claim counts, aozora feed records, yataverse lake index, moyoshi settle outputs) via a read-only evidence script, append MEASURE rows to workspace/social-capital-ledger.jsonl, and report 1 finding + next propose step.
+
+2. The bot is propose-only: it may read any plane, write only to its own workspace ledger and workspace/proposals/. It never mints, never appends to a fleet ledger, never publishes, never opens a PR without the standing new-project-scaffold authorization, and never converts sc to EN/USDC.
+
+3. Cron: one measure-and-report job daily (daily cadence matches the natural change interval of the source planes until any pipeline exists), prompt is a 3-line pointer to SOUL.md; deliver local. Session-scope was rejected because the bot needs a durable SOUL.md personality and per-profile token state.
+
+## Consequences
+
+The bot starts before the ledger exists - its measured output is UNMEASURED evidence rows for pipeline inputs and 1 propose step per tick (ADR refinement, repo scaffold proposal, then R0 sc.core). This is intentional: a propose-only loop must not fake mint counts that cannot exist yet. When R0 sc.core lands, the same profile's evidence script gains mint/epoch-cap rows without a second bot.
+
+Traps recorded: profile-scope cron create needs env -u HERMES_HOME on later manual runs; the cron script must be a bare filename; served_profiles discovery is judged from gateway.log tick line; model drift_skip - the job snapshot must match the profile config at creation.
+"))
