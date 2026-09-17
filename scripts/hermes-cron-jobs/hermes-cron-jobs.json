@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-17T16:19:44+09:00",
+  "generated_at": "2026-09-17T16:29:56+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -8333,6 +8333,19 @@
         "context_from": null,
         "monitor_script": null,
         "monitor_url": null
+      }
+    ],
+    "el-case-ops": [
+      {
+        "id": "5832d6f1ba7c",
+        "name": "el-case-ops mail-drop watchdog (EL litigation)",
+        "schedule_display": "30 6 * * *",
+        "script": "el_case_ops_evidence.py",
+        "model": null,
+        "provider": null,
+        "workdir": "/Users/junkawasaki",
+        "deliver": "local",
+        "enabled": true
       }
     ]
   },
