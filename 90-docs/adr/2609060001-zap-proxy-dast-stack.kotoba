@@ -1,0 +1,45 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609060001-zap-proxy-dast-stack")
+  (:adr/doc_type "adr")
+  (:adr/authoritative true)
+  (:adr/title "kotoba-lang/zap-proxy — OWASP ZAP 相当 DAST スタックの clean-room 実装")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-06")
+  (:adr/last_verified "2026-09-17")
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "security-dast")
+  (:adr/repos (vector "orgs/kotoba-lang/zap-proxy" "orgs/cloud-itonami/app-wvme"))
+  (:adr/body "# ADR-2609060001: kotoba-lang/zap-proxy — OWASP ZAP 相当 DAST スタックの clean-room 実装
+
+- Status: Accepted
+- Date: 2026-09-06
+- Landed 2026-09-17 by cleanup: this ADR was written as `90-docs/adr/2609060001-zap-proxy-dast-stack.edn` on branch `codex/zap-stack-2` (superproject tip 1c426590ba2) and never merged; the code on that branch was imported into its own repo `kotoba-lang/zap-proxy` (6ec1cda \"initial import from superproject 1c426590ba2\") and has since moved to kbb (0f9231b), so only the decision record was un-landed. Converted to the `.kotoba` form ADRs require; the `clojure -M:test` figure below is the 2026-09-06 measurement and is not a current instruction (test host is now `kbb -M:test`, ADR-2609112000).
+
+## Context
+
+オーナー指示 2026-09-06「https://www.zaproxy.org/ に相当する lib, app を kotoba lang org で全て設計、実装して」。先行調査の結果: (1) OWASP ZAP 相当の実装は workspace 内に 1 件も無い (repo-search + concept-lookup 実測。com-zapier は ZAPier=ワークフロー自動化で無関係)。(2) orgs/cloud-itonami/app-wvme が診断仕様 (IPA ウェブ健康診断仕様 125 項目 SPEC.tsv) と appview edge を持ち、README がスキャナ本体 (scanner/zaproxy/browserless-rs) を「別の場所に在る」と案内するが実体は未着地 — 本 ADR がその欠落を埋める。(3) 判定核を pure に置き効果を注入する seam は kotoba-lang/http (IHttp) と kotoba-lang/mesh (route.kotoba 判定核 + node.clj 効果) の先行例と同じ。
+
+## Decision
+
+1 repo に lib 6 ns + app 1 ns を同居させる (kotoba-lang/zap-proxy):
+  - kotoba.zap-proxy.core — request/response データモデル、same-origin 判定、finding 構成子 (pure .cljc)
+  - kotoba.zap-proxy.spider — same-origin クロール、リンク抽出、dedupe (fetch-fn 注入)
+  - kotoba.zap-proxy.passive — 非侵襲検査: セキュリティヘッダ / Cookie 属性 / 情報漏えい (rule 10038/10010/10027)
+  - kotoba.zap-proxy.active — 侵襲検査: SQLi/XSS/コマンドインジェクション/パストラバーサル/CRLF (rule 40018/40012/40014/40019/40016)。検出は evidence-based (error 反射・マーカー演算) のみ
+  - kotoba.zap-proxy.report — EDN 正本 + JSON rendering
+  - kotoba.zap-proxy.cli — spider→passive→(opt-in)active→report のオーケストレーション (app 層)
+  - resources/zap_proxy/rules/rules.edn — ルール登録簿 8 件、IPA 項目と OWASP WSTG を :ipa/:owasp で対応付け
+  規約: 全 ns pure .cljc、効果 (実送信) は注入された fetch-fn/send-fn に限定。OWASP ZAP 本体のコード・payload は参照せず (clean-room)、概念モデルと IPA/OWASP の診断項目のみ参照。ルール ID は ZAP 流の数値 ID 慣習に従う独自定義。
+
+## Consequences
+
+検証: clojure -M:test = 10 tests / 35 assertions / 0 failures (実測 2026-09-06)。スコープ: 防御側診断ツール。攻撃実行・破壊的 payload・認証回避は意図的に含まない。既知ギャップ: (1) JS レンダリング SPA の endpoint 発見 (browserless 相当) は別 tier。(2) MITM プロキシの実 socket 層は host 側に属し本 repo は判定核のみ。(3) app-wvme の PROJECT.jsonld が参照する NestJS/Rust スキャナ実体との統合は未着手。
+
+## References
+
+- orgs/kotoba-lang/zap-proxy
+- orgs/cloud-itonami/app-wvme/SPEC.tsv
+- kotoba-lang/http IHttp seam
+- kotoba-lang/mesh decision-core seam
+")
+))
