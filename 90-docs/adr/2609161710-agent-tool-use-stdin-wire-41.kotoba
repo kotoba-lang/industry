@@ -89,6 +89,12 @@
   sed (org-ieee-sed `fb58c99`、#6、166 → 188 cases): template の piece 間に ref field (0 = `&`、1..9 = group) を持ち、group を参照する置換だけ `rx/captures` を呼ぶ。pattern の group 数を超える `\\N` は BSD の語で拒否 (`\\1 not defined in the RE`)。BSD の error 形 `sed: 1: \"SCRIPT` + 改行 + `\": …` は**本物の改行**を含む (literal `\\n` を出していたのを訂正)。測定した 22 形 (`s/.*\"\\(.*\\)\"/\\1/`、`-n s/.*:offset \\([0-9]*\\).*/\\1/p`、`-E s/^(FAIL|ERROR) in \\(([^)]*)\\) …/\\1 \\3 \\2/`、key の redaction、camelCase 分割) が /usr/bin/sed と一致。
   未接続 (測定順): awk の変数付き状態機械 (`f=1`)・`NR` 条件・`!/RE/` (3)、grep `-o` の group (未測定)。
 
+  ## resume point (closing 2026-09-17)
+  着地済み・main 到達済み: amu fc473a8 (#1023)、artifact f0fd1f8 (#50–#53)、org-ieee-regex 7fae1b2 (#1, #2)、org-ieee-sed fb58c99 (#4, #5, #6)、org-ieee-awk f289fae (#6)。west pin は全部前進済み (root #3186 #3194 #3195 #3197)。検証: regex 120 / sed 188 / awk 145 / grep 178 (regex 7fae1b2 に対して緑) / amu test-package-command 40 (control 赤 3) / amu CI 9 job 緑 (358a07cb)。
+  次の最初の command: `cd orgs/kotoba-lang/org-ieee-sed && AMU_HOME=../amu REGEX_HOME=../org-ieee-regex kbb --backend sci test/sed_test.cljk` (AMU_HOME は amu main ≥ fc473a8 の checkout であること —— 共有 checkout が bot commit に居るときは origin/main の detached worktree を作る: `git worktree add --detach ../_wt/amu-main-ro origin/main` + node_modules / .nbb の symlink)。
+  残 gap (測定順): (1) awk の変数付き状態機械 `/RE/{f=1} f&&/RE/{print $N; exit}` と `NR>=N && NR<=M && /RE/` (5,025 本中 ~100)、(2) sed `I` flag (4)・`!/RE/` (3)、(3) grep `-o` での group 出力 (未測定)、(4) sed の行ごとの床 (BSD の ~5 倍、`-n 100,200p` 0.61 s vs 0.13 s / 769k 行 —— 測定入力は数百行なので lever ではない)、(5) xargs process/spawn provider と Seatbelt 事前コンパイルは owner 判断待ち (この ADR の上の節)。
+  owner WIP に触っていないもの: superproject 本体 checkout の main は origin/main を FF できない (他 session の tracked 変更 `90-docs/business/metrics/net-kotobase-funnel-pulses.kotoba`・`90-docs/observatory/observatory.datoms.edn`)。本体を同期したら `printf '%s\\n' org-ieee-sed org-ieee-regex org-ieee-awk amu artifact | xargs west update --fetch smart` で checkout を pin に合わせる。
+
   ## loop の結果 (2026-09-16 夜、ADR-2609161710 の残り項目)
   | 項目 | 着地 |
   |---|---|
