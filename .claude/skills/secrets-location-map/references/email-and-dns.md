@@ -15,7 +15,13 @@
     mail.itonami.cloud / mail.kotoba.cloud（6 件）。⚠ `mail.kotobase.net` を送信元にしていた経路
     （`smtp.kotobase.net` の mail.send、mail-worker の Resend Receiving）は Resend 側の domain が無いので
     動かない —— 使うなら再登録が要る。
-  - **DNS の置き方は `scripts/provision-resend-dns.cljk --only <zone> [--execute]`**（Resend の live 値から
+  - **`mail.kotoba.cloud` は送信 + 受信（Resend Receiving）とも verified**（2026-09-17）: 受信 MX
+    `inbound-smtp.ap-northeast-1.amazonaws.com`（prio 9）。受信したメールは `GET /emails/receiving?limit=…`
+    → `GET /emails/receiving/{id}`（subject / text / from / to）で読める —— **agent が受信箱を持てる**ので、
+    通知先メールの e2e（送る → 受け取る → コードを打つ）を人の受信箱なしで測れる（ADR-2609171500 で実測）。
+    account 全体の `email.received` webhook は relay.itonami.cloud / mail-ingest.kotobase.net が持ち、
+    自 domain 以外は ack して捨てる。
+  - **DNS の置き方は `scripts/provision-resend-dns.cljk --only <zone> [--execute] [--update-conflicts --update-types MX]`**（Resend の live 値から
     reconcile、dry-run 既定）。資格情報は env 優先: `RESEND_API_KEY`、Cloudflare は `CLOUDFLARE_API_TOKEN` か
     `CLOUDFLARE_EMAIL` + `CLOUDFLARE_GLOBAL_API_KEY`（kagi `CLOUDFLARE_GLOBAL_API_KEY` の `email` /
     `global-api-key`。2026-09-17 にこれで kotoba.cloud zone に 4 record を置いた）。keychain の
