@@ -1,0 +1,60 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609171000-hermes-fleet-kotoba-cloud-default-owner-coupon")
+  (:adr/title "Hermes 常駐 fleet (273 profile) の既定 provider を murakumo ao/kame (65,536 窓) から api.kotoba.cloud qwen3.8-flash-next-whitehacker (131,072 窓) に移し、無料枠 1000 req/日を超えた分は owner coupon (100% off) の $0 ultra subscription で grant した paid lane に落とす —— 決定と 2026-09-16 の実測")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-16")
+  (:adr/last_verified "2026-09-17")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "hermes-fleet-model-provider")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/app-kotoba-cloud"))
+  (:adr/authoritative_for
+(vector "~/.hermes/config.yaml と ~/.hermes/profiles/*/config.yaml の model / providers.kotoba / auxiliary の既定値 (provider kotoba、context_length 131072、max_tokens 8192、vision だけ murakumo 据え置き)" "kotoba.cloud の principal did:web:kotoba.cloud:tenant:u_8440208893f342cf9f5786dd に owner coupon SdRzJyD2 で作った $0 ultra subscription sub_1UGFv6IzvFrqWhXKOQjajvWN と、pro (sub_1UGDQxIzvFrqWhXK1PBF6ZVj) を動作検証として残す決定" "Stripe API / Dashboard から作った subscription の invoice.paid が gateway で黙って捨てられていた欠陥と、その修正 PR (cloud-kotoba/app-kotoba-cloud#292)" "2026-09-16 の実測値: 無料枠枯渇時刻、auto-recharge の実課金、job id の決定論による再接続の誤診"))
+  (:adr/related
+(vector "adr-2609161700 (app-kotoba-cloud: automatic recharge、opt-in、capped)" "adr-2609160940 (app-kotoba-cloud: red route 実体、131,072 窓の出所)" "adr-2607173100 (LLM model id をハードコードしない —— fleet main の alias murakumo-main。本 ADR の Hermes 既定はこの alias を使わず kotoba.cloud の固定 id を使う。理由は本文)"))
+
+  (:adr/body
+"# ADR-2609171000: Hermes fleet の既定を api.kotoba.cloud に、context を origin の 131,072 に合わせ、超過分は owner coupon の paid lane で賄う
+
+**Status**: accepted / 2026-09-16 / オーナー指示「api.kotoba.cloud をデフォルトにしつつ, context なども kotoba.cloud に合わせて」「私が owner なので, クーポンなどを発行して」「pro plan の契約は動作検証も兼ねているので, その前提で進めたい」
+
+## 症状 (2026-09-16 17:4x JST)
+
+Hermes profile が murakumo `ao/kame` に対して `Context length exceeded (79,322 tokens). Cannot compress further.` で止まった。murakumo 側の応答は `maximum context length is 65536 tokens, and the request reserves 201877 input tokens (character-class estimate)`。root config は `context_length: 262144`、236 profile は `65536`。79k の会話は 65k 窓に圧縮しきれず、262k 宣言の request は origin が拒否する。
+
+## 決定
+
+1. **既定 provider は kotoba** (`https://api.kotoba.cloud/v1`、model `qwen3.8-flash-next-whitehacker`)。root + 273 profile 全部。`.bak-kotoba-ctx-20260916T*` を隣に残した。
+2. **`context_length: 131072`** を `model:` と `providers.kotoba.models.<id>` の両方に置く。出所は `app-kotoba-cloud/src/app_kotoba_cloud/research.cljk` —— origin は prompt + max_tokens <= 131,072 token、edge は 524,288 文字で切る。`max_tokens: 8192` は kotoba.cloud docs が Hermes で実測した値。
+3. **auxiliary** (web_extract / skills_hub / approval / mcp / triage_specifier / compression / title_generation) も kotoba。**vision だけ murakumo `ao/kame` 据え置き** —— kotoba.cloud に vision 経路の実測が無い。
+4. **fallback** は root も profile と同じ `openrouter-free / z-ai/glm-5.3-flash`。旧 root fallback `murakumo/ling-3.0-tiny` は 65,536 窓で、131k に詰めた context を受けられない。
+5. **`murakumo-main` alias (ADR-2607173100) を使わない理由**: alias は murakumo fleet の head を指し、その head の窓は 65,536 (ao/kame)。窓の大きさが要件なので、alias ではなく kotoba.cloud の固定 id。alias 側が 131k 窓を指すようになったら戻してよい (その判定は `GET https://api.murakumo.cloud/infer/models/murakumo-main` の窓で)。
+6. **費用**: 無料枠は 1000 req/UTC 日・principal 単位で、全 profile が同じ `KOTOBA_API_TOKEN` を持つ。2026-09-16 は既存 30 profile だけで 15:33 JST に枯渇した。超過分は paid lane。paid lane の残高は **owner coupon `SdRzJyD2` (100% off / forever、AWAI live) の $0 ultra subscription** で毎月 120 credits ($120) を grant する。pro ($20/月、12 credits) は live 決済の動作検証として残す (オーナー指示)。
+7. **Hermes 側の反映**: cron job と新規 session は `load_config()` を都度読む。走行中の gateway (`hermes -p itonami`) と進行中の対話 session は再起動まで旧設定。gateway 再起動は agent を殺すのでこのセッションではやっていない。
+
+## 実測 (2026-09-16)
+
+- `hermes -p adsk chat -Q --oneshot` → kotoba で `provider=custom model=qwen3.8-flash-next-whitehacker in=14298 out=39 latency=11.6s`。
+- ultra grant 着地後の `GET /v1/billing/status`: `plan ultra`、ai grantedMicroUSD 157,000,000、availableMicroUSD 144,678,798、storage.capacity 54,000,000。paid lane の最小 call は 354–359 µUSD。
+- **auto-recharge (ADR-2609161700) が有効** (閾値 $10 / 1 回 $25 / 月上限 $100) で、残高 $0.02 のとき `ai-credits-25` を発行し **実カードに $25 課金** (`ch_3UGFpvIzvFrqWhXK1YSJByfV`、`in_1UGFpuIzvFrqWhXKMlIe4V3D`)。coupon 運用にするなら off にする判断が要る (未実施、owner 判断)。
+- **job id は principal + body の hash で決定論的**。同一 body の再送は前の reservation (free-only 判定を含む) に再接続するので、残高があるのに 429 `free-quota-exhausted` に見える。テストは body をユニークにする。
+- **Stripe API / Dashboard から作った subscription は invoice.paid で捨てられる**: `billing_gateway.cljk` は `invoice.parent.subscription_details.metadata.principal` で principal を引き、無ければ `{received true, ignored true}` を log なしで返していた。最初の ultra (`sub_1UGFoIIzvFrqWhXKZEiLrQhQ`、metadata `purpose` のみ) はこれで grant されず、cancel して `metadata[principal]` 付きで作り直した (`sub_1UGFv6IzvFrqWhXKOQjajvWN`)。修正は PR cloud-kotoba/app-kotoba-cloud#292 (customer の metadata.principal から解決、捨てる時は理由を名指し + console.warn)。**merge は未着地** (本セッションの harness classifier が merge を拒否。owner が `gh pr merge 292` する)。
+- Stripe CLI の `--live --project-name awai` は **subcommand の後ろ**に置く (先頭だと `Unknown command \"--project-name\"`)。既定は test mode で、live を見たつもりで `cs_test_` を読む。CLI login の restricted key には Coupons / Subscriptions / Promotion codes の Write を Dashboard で足す必要があった。
+- 重複 coupon `liBCNLtA` (私が作成、未使用) が AWAI live に残っている。`stripe coupons delete liBCNLtA --live --project-name awai -c`。
+
+## この文書が言わないこと
+
+- kotoba.cloud の free 1000 req/日を fleet 向けに広げる決定 (していない)。
+- `credits-1000` の live price 作成と `STRIPE_PRICE_IDS` への追加 (fleet が $120/月を超えるなら次の手。未実施)。
+- `~/.hermes/profiles/kotoba-lang -> orgs/kotoba-lang` の symlink (superproject の `orgs/kotoba-lang/state.db*` が dirty に映る原因。触っていない)。
+
+## Resume point
+
+1. `gh pr merge 292 --repo cloud-kotoba/app-kotoba-cloud --merge` → main に載ったら app-kotoba-cloud を main 包含 checkout で `npm run deploy`、west pin を tip へ (`scripts/west-pin-put.cljk`、現 pin 568cccd3 は 2026-09-17 時点で 50+ 遅れ)。
+2. worktree `~/.itonami-fleet/worktrees/akc-webhook-principal-20260916` (branch `agent/webhook-principal-20260916`) を merge 後に retire。
+3. auto-recharge を off にするか決める。off なら kotoba.cloud の billing ページか `POST /v1/billing/auto-recharge`。
+4. 翌日 09:00 JST (00:00 UTC) 以降に `grep -h 'API call #' ~/.hermes/profiles/*/logs/agent.log | grep -c kotoba` で fleet が kotoba を使えているか、`GET /v1/billing/status` で残高の減り方を 1 日分測る。
+")))
