@@ -1,0 +1,87 @@
+;; manifest/agent-task-models.edn — agent の task 分類 × 候補 model の正本（ADR-2609172000）。
+;;
+;; ここに書くのは「何を・どの床で測るか」と「測った結果の提案」だけ。
+;; routing 本体（~/.hermes/config.yaml と profile、cloud-murakumo-api の ao_organism.js の表、
+;; Claude loop の起動文字列）は **この file が書き換えない**。反映は skill `agent-task-models` の
+;; 1 反復が :apply の値に従ってやる。
+;;
+;; 測定は scripts/agent-task-models-tick.cljk（決定論、モデルを起こさない）。
+;; 結果の ledger は ~/.itonami/agent-task-models-tick.ledger.edn（append-only）。
+;; model id をここに書くのは ADR-2607173100 の例外ではない —— これは「候補の名簿」であって
+;; 呼び出し側が引く alias ではない。呼び出し側は今までどおり alias / profile を引く。
+{:version 1
+ :scope "Hermes 常駐 profile（~/.hermes/profiles/*）と Claude loop（scripts/*-loop.cljk）の task 分類ごとに、自前 host / api.kotoba.cloud の候補 model を同一 task 集合で測り、routing の提案を出す。翻訳 draft の routing（manifest/public-language-models.edn）は別物。"
+
+ ;; 候補。:auth nil は匿名で叩ける（2026-09-17 に operator Mac から実測: HTTP 200）。
+ ;; :window は catalogue（GET https://api.murakumo.cloud/infer/models）と hermes config の値。
+ :models
+ {"nex-n2.5-mini-uncensored"
+  {:provider :murakumo :base-url "https://api.murakumo.cloud/v1" :auth nil
+   :window 65536 :host "xavier" :adr "adr-2609161000"
+   :note "ao/usagi の draft member（latency-first）。非 reasoning。"}
+  "qwen3.8-27b-uncensored"
+  {:provider :murakumo :base-url "https://api.murakumo.cloud/v1" :auth nil
+   :window 8192 :host "k16" :adr "adr-2609151900"
+   :note "reasoning-first（content が空で reasoning_content だけ返る形）。K16 Vulkan 全積載で 2.5 tok/s。window 8192 は host の設定であって model の最大（262144、ADR-2609100400）ではない —— 窓超えの :error は model の欠陥ではなく host の床。"}
+  "qwen3.8-flash-next-whitehacker"
+  {:provider :kotoba :base-url "https://api.kotoba.cloud/v1"
+   :auth {:env "KOTOBA_API_TOKEN" :env-file "~/.hermes/.env"}
+   :window 131072 :adr "adr-2609171000"
+   :note "273 profile の現在の既定。無料枠 1000 req/UTC 日・principal 単位（tick の消費はこの枠から出る）。"}}
+
+ ;; task 分類。:tasks は scripts/model-eval/tasks.cljk の :id（実行して PASS/FAIL を出す。LLM-judge は使わない）。
+ ;; tick は 1 周に 1 分類だけ測る（最も古い分類から）。
+ :task-classes
+ {:code {:tasks [:lru-cache :toposort :merge-intervals :fix-binary-search :token-bucket :stack-vm :log-parse :diff-hunks :retry-backoff :semver :sql-where]
+         :why "profile の大半（amu-* / aiueos-* / kotoba-* / *-maint / *-port）が書くのはコード。"}
+  :structured-output {:tasks [:strict-json :json-paths :edn-emit]
+                      :why "Hermes は tool call と提案 EDN で駆動する。読める EDN / 厳密 JSON を書けない model は他が良くても使えない（ADR-2608272100 の probe と同じ理由）。"}
+  :refusal {:tasks [:refuse-hallucination]
+            :why "「無い」と答えられるか。捏造ゼロの床。"}
+  :long-context {:tasks [:needle-4k :needle-16k :needle-32k]
+                 :why "superproject の evidence（7-14 KB）+ prompt を 1 turn で読む profile 向け。窓超えは :error として分けて数える。"}}
+
+ ;; profile 名 → 分類。手書きの語彙（corpus から導かない）。先頭一致で最初に当たった行。
+ ;; 当たらない profile は :agent-general（= 4 分類の合算で判定）。
+ :profile-classes
+ [{:match "^(amu|aiueos|kotoba|kagami|kbb|symbol|amu-)" :class :code}
+  {:match "-(maint|port|test|bench|jit)" :class :code}
+  {:match "^(adnetwork|adsk|adska|.*-scout|.*-research)" :class :long-context}
+  {:match "-(ingest|coverage|evidence|audit)" :class :long-context}
+  {:match "^(90-docs|docs-|adr-)" :class :structured-output}]
+
+ ;; 監視する面。tick が毎周ここを読んで「今どう routing されているか」を ledger に刻む。
+ :surfaces
+ {:hermes {:root-config "~/.hermes/config.yaml"
+           :profiles "~/.hermes/profiles/*/config.yaml"
+           :routing-key "model: / default:"}
+  :claude-loops {:scripts "scripts/*-loop.cljk"
+                 :invocation "claude -p"
+                 :note "--model 指定が無ければ Claude Code の既定。候補 3 model は claude -p に載らないので、この面は測るだけで提案しない（Claude 側の model 選択は別決定）。"}
+  :murakumo-organisms {:table "orgs/network-awai/cloud-murakumo-api/src/ao_organism.js"
+                       :note "ao/<name> の member 表。この bot は読まない・書かない（ADR-2609161120）。"}}
+
+ ;; 選択規則（ADR-2609152300 の KPI）。K5 を下げる変更は改善と呼ばない。
+ :selection
+ {:order [:k5-pass-rate :k6-wall-median]
+  :min-answered-per-cell 3        ;; pass+fail（:truncated / :error は答えていない）が 3 未満の cell は順位に入れない
+  :min-ticks-per-cell 2           ;; 1 周の数字を KPI と呼ばない（同じ task 集合で 2 周以上）
+  :evidence-max-age-days 7        ;; これより古い row は集計から外す
+  :drift-min-margin 0.15          ;; 現行と勝者の pass-rate 差がこれ未満なら「差が無い」= 現行維持
+  :tie "現行維持"}
+
+ ;; 1 周の予算。
+ :budget
+ {:max-tokens-floor 2000          ;; cap = max(floor, 2 × task :budget)。reasoning が予算を食い切った出力は :truncated
+  :request-timeout-s 900
+  :parallel-models 3              ;; model 同士は並列、1 model の中は直列（murakumo の slot は 1）
+  :classes-per-tick 1}
+
+ ;; 反映。:propose = 提案を :recommendations と ADR gap に書くだけ。:auto = hermes profile の default を書き換える
+ ;; （ADR-2609171000 の owner 決定を上書きするので、:auto にするのは owner の決定）。
+ :apply {:hermes :propose
+         :claude-loops :never}
+
+ ;; 反復が着地させる提案。key は分類、値は {:model :evidence {:ticks :answered :pass-rate :wall-median} :at}。
+ ;; 空 = まだ床（:selection）を満たす測定が無い。
+ :recommendations {}}
