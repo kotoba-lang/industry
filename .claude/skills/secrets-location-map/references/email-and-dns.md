@@ -1,7 +1,18 @@
 # メール / DNS
 
 - **Resend（transactional email / smtp.kotobase.net）**:
-  - **正本 = 1Password `gftdcojp` vault / item `gftd.resend/API_KEY`**（category PASSWORD、
+  - **正本（2026-09-17 以降）= 1Password `Private` vault / item「Resend API Key」**（API_CREDENTIAL、
+    UUID `hcvozl5zqo74es4gwdjxgum66e`、欄 `credential`。オーナーが 2026-09-17 に登録し直したもの）:
+    `op read 'op://Private/hcvozl5zqo74es4gwdjxgum66e/credential'`。`GET /domains` で 11 domain が
+    返ることを確認済み。投入済み: `kotoba-research-authority` の `RESEND_API_KEY`（app-kotoba-cloud の
+    通知先、ADR-2609171500）。⚠ `op item get` は初回に 1Password の承認待ちで 60 s を超えることがある ——
+    `timeout 40` を付けて再試行する。
+  - **Resend account の domain 上限**（2026-09-17 実測）: verified 11 件（mail.shinshi.club / mail.aozora.app /
+    mail.x402.nexus / mail.murakumo.cloud / kotobase.net / mail.kotobase.net / etzhayyim.com /
+    mail.itonami.cloud / email.gftd.ai / gftd.ai / email.gftd.co.jp）で plan の上限。`POST /domains` は
+    403 "You have reached the domain limit of your plan"。**`mail.kotoba.cloud` は未登録**（DNS に残る
+    SES 形式の MX/SPF は過去の登録の名残）。新 domain を足すには plan upgrade か既存 domain の削除が要る。
+  - 旧正本 = 1Password `gftdcojp` vault / item `gftd.resend/API_KEY`（category PASSWORD、
     2026-09-17 実測。`gftd.resend` という item は無く `op read op://gftdcojp/gftd.resend/credential` は
     「isn't an item」で落ちる —— 下の旧記述はその名前で書かれていた）
     - `op read 'op://gftdcojp/enrqtwwuxdoaglpvq326ecskji/password'`（item UUID 指定。名前に `/` を含むので
