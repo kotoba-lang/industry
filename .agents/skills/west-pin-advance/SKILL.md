@@ -137,6 +137,38 @@ pin を 44 件 main に流した実事故（`90852b86`）の再発防止。
 `west-pin-verify.yml` は撤去済み**（2026-07-30、ADR-2607300900 — 16 workflow
 すべてが job 起動せず赤のままだった）。
 
+## repo の org 移転（GitHub transfer）の正手順
+
+実測 2026-09-16（app-kotoba-cloud / cloud-kotoba-dds → cloud-kotoba org）:
+
+1. transfer は `POST /repos/{owner}/{repo}/transfer` + **`new_owner`** パラメータ。
+   `/orgs/{org}/repos/{repo}/transfer` + `new_org` は 404/422。両 org の owner なら
+   招待なしで即時完了し、旧 URL は GitHub がリダイレクト維持。Issues/PR 番号も継続。
+2. local checkout を `orgs/<new-org>/<repo>/` へ mv + 各 `git remote set-url`。
+   bot worktree（~/.gftd/worktrees/*）は共有 config を読むので main の set-url で跟着。
+3. repos.edn を 4 点編集: `:remotes` に新 remote、`:group-filter` に `+<org>`、
+   `:orgs` に role、`:path-overrides` に**旧→新** path を追加 — これで
+   `:extra-projects` や docs に残る旧 path 候補は自動解決（書き換え不要）。
+   path-overrides のキーは旧 path なので、後から bulk 置換で叩くと identity 化に
+   なる。順序は「repos.edn 編集 → 生成 → 残 references swept」。
+4. checkout を**west.yml の現 pin へ checkout してから** `gen --entry` を回す
+   （--entry は working HEAD を採るため、main tip だと黙って pin 前進する）。
+   冲突解決も同様: `--theirs` 採用 → 子を向こう側の pin に checkout → `gen --entry`
+   で自 splice 再適用。
+5. fleet-db.edn: header を west.yml prefix から再構築、:remotes vector と
+   #:repo レコードだけ編集。reconcile --check の changed/added 数が編集前と
+   同一であることを確認してから commit（既存 drift へ混入しない）。
+6. 生活参照の sweep: 台帳 hermes-cron-jobs.json は**生成物** — live の
+   `~/.hermes[/profiles/*]/cron/jobs.json` と `profiles/*/SOUL.md` を token 置換
+   してから `export_cron.py` で再生成（台帳だけ直しても live が勝つ）。`.gitignore`
+   は gen-orgs-gitignore.cljk、90-docs の surface/concept は各 gen スクリプト
+   （surface は `.cljk` — datom ヘッダの `.cljs` 記述は古い）。過去 ADR・cron
+   output・日付レポートは当時の path のまま残す。
+7. ⚠ 直後の race: advance-pins/merger bot が**旧 west.yml ベース**で pin 前進を
+   push して org 情報が巻き戻る（remote: kotoba-lang 再発 + 旧 path 再生成）。
+   fetch して「新 pin adopt + splice 再生成で再適用」を素早くやり直す。相手機は
+   次回 fetch する構造なので、我々が main に乗れば以後自己回復する。
+
 ## west を動かす worktree の作り方（topdir 固定）
 
 **agent ごとの git worktree で `west update` を動かすときは、worktree を
