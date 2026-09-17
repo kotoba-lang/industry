@@ -56,7 +56,7 @@ visibility は全て保持。GitHub は旧 slug を redirect するので、west
 
 **この段が終わるまで `orgs/net-kotobase/` の path は生きている** —— 消して「無い」と結論しない。
 
-### 3. サービス面: kotobase.net の capability host を graph.kotoba.cloud 配下へ
+### 3. サービス面 —— **superseded by adr-2609171500 (2026-09-17 午後)**: capability host は graph.kotoba.cloud に寄せない。capability 本体を kotoba-lang の OSS library にし、graph.kotoba.cloud (private) と yataverse.com (public) の 2 deployment で提供する。以下は決定時点の記録
 
 正規入口は `graph.kotoba.cloud` (app-kotoba-cloud)。各 capability は app-kotoba-cloud の route + service binding で既存 Worker に委譲する (Worker 自体は動かさない): datomic → `/v1/datomic/*`、cypher → `/v1/cypher/*`、sparql/lake → `/v1/sparql/*`、s3 / pinning / ipni / status / witness は個別に契約を読んでから。旧 `*.kotobase.net` は **API client が POST するので 301 では壊れる** —— 消費者 (kotobase-client、actor 群、SDK) を新入口に移してから 410 にする。着地のたびに CLAUDE.md『live service の永続化境界は kotobase.net』の host 名リストを書き換え、adr-2608159100 の該当節を superseded にする。**この ADR の時点では 1 つも着地していない。**
 
