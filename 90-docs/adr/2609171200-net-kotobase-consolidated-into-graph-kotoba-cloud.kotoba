@@ -10,7 +10,7 @@
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/topic "net-kotobase-consolidation")
   (:source/dataset "adr")
-  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/app-kotoba-cloud" "orgs/net-kotobase/control-plane"))
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/app-kotoba-cloud" "orgs/cloud-kotoba/kotobase-control-plane"))
   (:adr/authoritative_for
 (vector "旧 net-kotobase org の 13 repo の現在の slug (2026-09-17 transfer 後) と、それぞれが cloud 面か OSS 面かの判定根拠" "west path 移動 (orgs/net-kotobase/* → orgs/cloud-kotoba/* / orgs/kotoba-lang/*) の段階手順と、各段の gate (west-orphan-audit --blocking exit 0)" "kotobase.net 配下でまだ公開されている capability host の一覧と、graph.kotoba.cloud 配下へ寄せる順序" "CLAUDE.md『ドメイン移転で改名しない。一括改名はしない』を owner が本件に限って override した事実"))
   (:adr/related
@@ -36,17 +36,19 @@
 |---|---|---|---|
 | net-kotobase/sdk | **kotoba-lang/kotobase-sdk** | OSS | public、Apache-2.0。`kotoba-lang/sdk` が既存なので family 面 `kotobase-` で命名 |
 | net-kotobase/commoncrawl-actor | **kotoba-lang/commoncrawl-actor** | OSS | public、AGPL-3.0 |
-| net-kotobase/control-plane | cloud-kotoba/control-plane | cloud | private、稼働 gateway 群 |
-| net-kotobase/authn | cloud-kotoba/authn | cloud | private |
-| net-kotobase/engine | cloud-kotoba/engine | cloud | private Worker |
-| net-kotobase/cypher | cloud-kotoba/cypher | cloud | private Worker |
-| net-kotobase/lake | cloud-kotoba/lake | cloud | private Worker |
-| net-kotobase/search-origin | cloud-kotoba/search-origin | cloud | private Worker |
-| net-kotobase/ipfs | cloud-kotoba/ipfs | cloud | private Worker |
-| net-kotobase/commoncrawler | cloud-kotoba/commoncrawler | cloud | private |
-| net-kotobase/delegation-rootkeys | cloud-kotoba/delegation-rootkeys | cloud | public だが kotobase.net の root key 配布物 = service artifact |
-| net-kotobase/docs | cloud-kotoba/docs (**archived**) | 退役 | 公開 docs は移転済み。bot 残骸は `.git/stash-archive-2026-09-17/net-kotobase-docs-bot-residue/untracked.tgz` に退避、着地しない |
-| net-kotobase/control-plane-retired | cloud-kotoba/control-plane-retired (**archived**) | 退役 | |
+| net-kotobase/control-plane | **cloud-kotoba/kotobase-control-plane** | cloud | private、稼働 gateway 群（`net-kotobase` / `kotobase-authn` = auth.kotoba.cloud / status / protocols / mail / inga-replica / cf-wasm-staging / `kotoba-cloud-database`） |
+| net-kotobase/authn | **cloud-kotoba/kotobase-authn** | cloud | private（authn.kotobase.net Worker、応答なし。live の auth は control-plane/authn） |
+| net-kotobase/engine | **cloud-kotoba/kotobase-engine-worker** | cloud | private Worker（backend.kotobase.net）。`kotobase-engine` は kotoba-lang の OSS engine が west 名として持つので `-worker` |
+| net-kotobase/cypher | **cloud-kotoba/kotobase-cypher** | cloud | private Worker（cypher.kotobase.net） |
+| net-kotobase/lake | **cloud-kotoba/kotobase-lake-worker** | cloud | private Worker（lake.kotobase.net）。`kotobase-lake` は kotoba-lang の OSS lake が west 名として持つので `-worker` |
+| net-kotobase/search-origin | **cloud-kotoba/kotobase-search-origin** | cloud | private Worker（search.kotobase.net → search.yataverse.com） |
+| net-kotobase/ipfs | **cloud-kotoba/kotobase-ipfs** | cloud | private Worker（bytes plane: yataverse.com / *.ipfs.yataverse.com、ipni-drain） |
+| net-kotobase/commoncrawler | **cloud-kotoba/kotobase-commoncrawler** | cloud | private |
+| net-kotobase/delegation-rootkeys | **cloud-kotoba/kotobase-delegation-rootkeys** | cloud | public だが kotobase.net の root key 配布物 = service artifact |
+| net-kotobase/docs | **cloud-kotoba/kotobase-docs** (**archived**) | 退役 | 公開 docs は移転済み。bot 残骸は `.git/stash-archive-2026-09-17/net-kotobase-docs-bot-residue/untracked.tgz` に退避、着地しない |
+| net-kotobase/control-plane-retired | **cloud-kotoba/kotobase-control-plane-retired** (**archived**) | 退役 | |
+
+**同日午後の owner 決定（2 度目の改名）**: cloud-kotoba org の中で bare 名（control-plane / engine / lake / ipfs …）は「graph（旧 kotobase.net）の面」か「kotoba.cloud 全体の面」か区別できない、と owner が指摘 → cloud 面の 11 本を family 面 `kotobase-` で改名（候補 `graph-` は owner が退け、`kotobase-` を選択。archived 2 本も含める）。手順: GitHub rename（archived は unarchive → rename → re-archive）→ `scripts/west-entry-rename.cljk`（11 行、server-side single-entry `a4f72baf`）→ `relocate-west-project.cljk` × 11 + `:manifest.repos/archived` の key 移動（reader → writer）→ 手書き参照（gates.edn `:name`、public-runtime-owners、human-authentication-policy、hermes-cron-jobs workdir、ipni-advertise / publish-document / verify-* の既定 path）→ `.gitignore` 再生成。west 名 = slug に揃え、`repo-path:` は消えた（`cloud-kotoba-engine` / `cloud-kotoba-docs` という org 前置の名前は無くなった）。wrangler の Worker 名（`net-kotobase` / `net-kotobase-ipfs` 等）は deploy identity なので変えていない。
 
 visibility は全て保持。GitHub は旧 slug を redirect するので、west の `remote: net-kotobase` と `git fetch` は第 2 段が終わるまでそのまま動く (実測: `git ls-remote https://github.com/net-kotobase/cypher.git` が答える、`gh api repos/net-kotobase/cypher` → `cloud-kotoba/cypher`)。**罠**: `gh api --input` の POST は 307 を追わない (skill git-cleanup-conflict)。
 

@@ -56,7 +56,7 @@
       "orgs/kotoba-lang/kagi/bin/kagi"))
 (def ipfs-cwd
   (or (aget (.-env js/process) "IPNI_IPFS_CWD")
-      "orgs/cloud-kotoba/ipfs"))
+      "orgs/cloud-kotoba/kotobase-ipfs"))
 (def bucket "kotobase-graph-database-production")
 (def context-id
   (or (aget (.-env js/process) "IPNI_CONTEXT_ID") "kotobase-appviews-v1"))

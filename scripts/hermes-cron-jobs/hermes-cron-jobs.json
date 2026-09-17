@@ -5053,7 +5053,7 @@
         "monitor_url": null,
         "name": "kb-cosientist-bench",
         "no_agent": false,
-        "prompt": "net-kotobase co-scientist cowork bot (bench/計測担当)。SOUL.md の分担に従い、15 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。LIVE SMOKE が非 200 なら測定せず記録して終了。\n- docs repo (orgs/net-kotobase/docs) の query-cosientist.md が状態正本。\n- NEXT 指定と -falsify の evidence の「要 quiet-host 測定」を探す。host load1 > 7.5 なら local 測定は拒否し「host busy (数値)」のみ evidence に残す (production HTTP 実測は load gate を避けて良い)。\n- 測定は claim contract の同一測定法のみ (30 sequential + 3 warmup 除外, nearest-rank)。secret は一切記録しない。\n- 結果は当該仮説行の evidence 欄に測定条件付きで 1 行追記。改善しなければ「not-separated」と正直に書く。\n- 報告: 実行した測定 / verdict / 数字。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
+        "prompt": "net-kotobase co-scientist cowork bot (bench/計測担当)。SOUL.md の分担に従い、15 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。LIVE SMOKE が非 200 なら測定せず記録して終了。\n- docs repo (orgs/cloud-kotoba/kotobase-docs) の query-cosientist.md が状態正本。\n- NEXT 指定と -falsify の evidence の「要 quiet-host 測定」を探す。host load1 > 7.5 なら local 測定は拒否し「host busy (数値)」のみ evidence に残す (production HTTP 実測は load gate を避けて良い)。\n- 測定は claim contract の同一測定法のみ (30 sequential + 3 warmup 除外, nearest-rank)。secret は一切記録しない。\n- 結果は当該仮説行の evidence 欄に測定条件付きで 1 行追記。改善しなければ「not-separated」と正直に書く。\n- 報告: 実行した測定 / verdict / 数字。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
         "repeat": {
           "times": null
         },
@@ -5064,7 +5064,7 @@
         },
         "script": "kb_cosientist_state.sh",
         "skills": null,
-        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/net-kotobase/docs"
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/cloud-kotoba/kotobase-docs"
       }
     ],
     "net-kotobase-cosientist": [
@@ -5081,7 +5081,7 @@
         "monitor_url": null,
         "name": "kb-cosientist-core",
         "no_agent": false,
-        "prompt": "net-kotobase co-scientist コア bot。SOUL.md の分担に従い、30 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。\n- docs repo (orgs/net-kotobase/docs) の query-cosientist.md が状態正本。git pull --ff-only で最新を取り込む。\n- sibling bot (-falsify/-bench) の evidence で qualify (分離済みの測定改善) が確認された仮説のみ実装する。evidence のない仮説は実装しない (反証が先)。\n- 実装は最小 diff、対象 repo の feature branch (bot/cosient-<ts>) から PR。main 直接 push 禁止。\n- 実装後は同一測定法で before/after を測定し evidence 欄に 1 行追記。劣化したら revert し「劣化」と正直に記録。\n- 報告: 仮説ID / 変更内容 / 測定数字 / 次の 1 hypothesis。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
+        "prompt": "net-kotobase co-scientist コア bot。SOUL.md の分担に従い、30 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。\n- docs repo (orgs/cloud-kotoba/kotobase-docs) の query-cosientist.md が状態正本。git pull --ff-only で最新を取り込む。\n- sibling bot (-falsify/-bench) の evidence で qualify (分離済みの測定改善) が確認された仮説のみ実装する。evidence のない仮説は実装しない (反証が先)。\n- 実装は最小 diff、対象 repo の feature branch (bot/cosient-<ts>) から PR。main 直接 push 禁止。\n- 実装後は同一測定法で before/after を測定し evidence 欄に 1 行追記。劣化したら revert し「劣化」と正直に記録。\n- 報告: 仮説ID / 変更内容 / 測定数字 / 次の 1 hypothesis。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
         "repeat": {
           "times": null
         },
@@ -5092,7 +5092,7 @@
         },
         "script": "kb_cosientist_state.sh",
         "skills": null,
-        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/net-kotobase/docs"
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/cloud-kotoba/kotobase-docs"
       }
     ],
     "net-kotobase-falsify": [
@@ -5109,7 +5109,7 @@
         "monitor_url": null,
         "name": "kb-cosientist-falsify",
         "no_agent": false,
-        "prompt": "net-kotobase co-scientist cowork bot (falsify 担当)。SOUL.md の分担に従い、15 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。\n- NEXT に他 bot の指定があればそれを優先。docs repo (orgs/net-kotobase/docs) の query-cosientist.md が状態正本。\n- hypothesis population から open な仮説を 1 件選ぶ。反証が先: コード変更はしない。hand-patch / local 実験で効果を予測・実測する。\n- evidence 欄への追記のみ許可 (status 書き換えは net-kotobase-rank の専門)。secret (token/cookie/credential) は一切記録しない。\n- 報告: 仮説ID / 反証実験の数字 / 次の 1 hypothesis。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
+        "prompt": "net-kotobase co-scientist cowork bot (falsify 担当)。SOUL.md の分担に従い、15 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。\n- NEXT に他 bot の指定があればそれを優先。docs repo (orgs/cloud-kotoba/kotobase-docs) の query-cosientist.md が状態正本。\n- hypothesis population から open な仮説を 1 件選ぶ。反証が先: コード変更はしない。hand-patch / local 実験で効果を予測・実測する。\n- evidence 欄への追記のみ許可 (status 書き換えは net-kotobase-rank の専門)。secret (token/cookie/credential) は一切記録しない。\n- 報告: 仮説ID / 反証実験の数字 / 次の 1 hypothesis。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
         "repeat": {
           "times": null
         },
@@ -5120,7 +5120,7 @@
         },
         "script": "kb_cosientist_state.sh",
         "skills": null,
-        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/net-kotobase/docs"
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/cloud-kotoba/kotobase-docs"
       }
     ],
     "net-kotobase-maint": [
@@ -5165,7 +5165,7 @@
         "monitor_url": null,
         "name": "kb-cosientist-rank",
         "no_agent": false,
-        "prompt": "net-kotobase co-scientist cowork bot (rank 担当)。SOUL.md の分担に従い、15 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。\n- docs repo (orgs/net-kotobase/docs) の query-cosientist.md が状態正本。git pull --ff-only で最新 evidence を取り込む。\n- population を rank し直し、status 遷移 (open/executed/landed/refuted)、新仮説 (K-Z 系列) 登録、evolve 判断を行う。evidence のない status 遷移をしない。\n- 次に -falsify / -bench が取るべき 1 仮説を「NEXT: K-xx (理由1行)」で Iteration log 末尾に残す。\n- 報告: rank 変更点 / 新仮説 / NEXT 指定。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
+        "prompt": "net-kotobase co-scientist cowork bot (rank 担当)。SOUL.md の分担に従い、15 分の 1 反復を遂行せよ。\n\nまず monitor 測定 (kb_cosientist_state.sh の出力) が、あなたが知るすべて。\n- docs repo (orgs/cloud-kotoba/kotobase-docs) の query-cosientist.md が状態正本。git pull --ff-only で最新 evidence を取り込む。\n- population を rank し直し、status 遷移 (open/executed/landed/refuted)、新仮説 (K-Z 系列) 登録、evolve 判断を行う。evidence のない status 遷移をしない。\n- 次に -falsify / -bench が取るべき 1 仮説を「NEXT: K-xx (理由1行)」で Iteration log 末尾に残す。\n- 報告: rank 変更点 / 新仮説 / NEXT 指定。誇張なし。\n\ncron runtime が拒否するコマンド形に注意: -e/-c スクリプトフラグ、heredoc でのインタプリタへのスクリプト流し込み、rm -rf は使わない。コードはファイルに書いて実行する。",
         "repeat": {
           "times": null
         },
@@ -5176,7 +5176,7 @@
         },
         "script": "kb_cosientist_state.sh",
         "skills": null,
-        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/net-kotobase/docs"
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/cloud-kotoba/kotobase-docs"
       }
     ],
     "oppai-gen": [
@@ -5821,7 +5821,7 @@
         "monitor_url": null,
         "name": "search-kotobase-index-refresh",
         "no_agent": false,
-        "prompt": "search-kotobase-maint index freshness run. SOUL.md no bundan ni shitagai, 1 run wo suikou seyo. repo ~/github/com-junkawasaki/orgs/net-kotobase/search-origin, ingest wa scripts/ingest.py, kensho wa npx shadow-cljs release worker + node smoke, midori nara npm run deploy go live kakunin.",
+        "prompt": "search-kotobase-maint index freshness run. SOUL.md no bundan ni shitagai, 1 run wo suikou seyo. repo ~/github/com-junkawasaki/orgs/cloud-kotoba/kotobase-search-origin, ingest wa scripts/ingest.py, kensho wa npx shadow-cljs release worker + node smoke, midori nara npm run deploy go live kakunin.",
         "repeat": {
           "times": null
         },

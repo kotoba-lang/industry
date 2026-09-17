@@ -2151,7 +2151,7 @@
   ;; portable `.cljc`, so this one runs on a node with no egress at all —
   ;; unlike kotobase-client above.
   ;; NOT verified on a node.
-  {:name "search-origin" :gate :nbb-test :classpath "src:test"
+  {:name "kotobase-search-origin" :gate :nbb-test :classpath "src:test"
    :entry "test/run_tests.cljk" :ship-git-deps true :cd true}
 
   ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
@@ -2198,7 +2198,7 @@
   ;;
   ;; :id を明示するのは、この repo に gate が 4 本になったため（gate-id 既定の
   ;; `:name` に頼ると "control-plane" という、どの gate か分からない識別子になる）。
-  {:name "control-plane" :id "net-kotobase-hermetic" :gate :nbb-script
+  {:name "kotobase-control-plane" :id "net-kotobase-hermetic" :gate :nbb-script
    :script "gates/net-kotobase-hermetic-check.cljk"
    :script-args ["--min-surfaces" "8" "--min-syntax" "20"] :cd true}
 
@@ -2223,7 +2223,7 @@
   ;;
   ;; tree を一切読まないので :include-ext で最小限だけ運ぶ。
   ;; :name は west project 名（上の hermetic entry の注記と同じ理由で 2026-08-17 に修正）。
-  {:name "control-plane" :id "net-kotobase-live-planes" :gate :nbb-script
+  {:name "kotobase-control-plane" :id "net-kotobase-live-planes" :gate :nbb-script
    :script "gates/net-kotobase-live-planes.cljk"
    :include-ext [".md"] :cd false}
 
@@ -2276,7 +2276,7 @@
   ;;   一致する tree → exit 0 / source を 1 行動かす → exit 1（両 digest を提示）/
   ;;   verifier 不在 → exit 90。
   ;; :name は west project 名（上の hermetic entry の注記と同じ理由で 2026-08-17 に修正）。
-  {:name "control-plane" :id "net-kotobase-bundle-freshness" :gate :nbb-script
+  {:name "kotobase-control-plane" :id "net-kotobase-bundle-freshness" :gate :nbb-script
    :script "gates/net-kotobase-bundle-freshness.cljk" :cd false}
 
   ;; protocols-worker（kotobase.net の protocol 面）の upstream lock 契約。
@@ -2315,7 +2315,7 @@
   ;;   lockFailures を `return []`     → exit 1（self-test が捕まえる。--check は緑のまま）
   ;;   upstream-lock.json を配らない   → exit **90**（= 答えられなかった。0 でも 1 でもない）
   ;;   lock も source-path も空        → exit **90**（checker は `OK (0 …)` で緑。floor が拒否）
-  {:name "control-plane" :id "protocols-upstream-lock" :gate :nbb-script
+  {:name "kotobase-control-plane" :id "protocols-upstream-lock" :gate :nbb-script
    :script "gates/protocols-upstream-lock-check.cljk"
    :script-args ["--min-repos" "20"] :cd false}
 
