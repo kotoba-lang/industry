@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>cloud.itonami.bot.agent-task-models</string>
+
+  <!-- ローカル Claude loop（superproject ADR-2609172000）。姉妹の
+       cloud.itonami.bot.rule-kaizen と同じ 2 段構え:
+         1) scripts/agent-task-models-tick.cljk が 1 分類 × 候補 model を測る（決定論）
+         2) finding（routing のずれ / 候補が答えられない）があるときだけ claude -p /agent-task-models
+
+       6 時間ごと = 4 分類を 1 日で 1 巡。測るだけの周がほとんどで、それが監視。
+
+       止め方:
+         launchctl bootout gui/$(id -u)/cloud.itonami.bot.agent-task-models
+       測らず集計と routing だけ見る:
+         kbb --backend sci scripts/agent-task-models-loop.cljk --report-only
+       finding を見るだけ（モデルを起こさない）:
+         kbb --backend sci scripts/agent-task-models-loop.cljk --dry-run
+
+       この plist の着地だけでは LaunchAgents へ bootstrap しない。 -->
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/kbb</string>
+    <string>--backend</string>
+    <string>sci</string>
+    <string>scripts/agent-task-models-loop.cljk</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/junkawasaki/github/com-junkawasaki</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>COM_JUNKAWASAKI_ROOT</key>
+    <string>/Users/junkawasaki/github/com-junkawasaki</string>
+    <key>HOME</key>
+    <string>/Users/junkawasaki</string>
+    <key>USER</key>
+    <string>junkawasaki</string>
+    <key>LOGNAME</key>
+    <string>junkawasaki</string>
+    <key>SHELL</key>
+    <string>/bin/zsh</string>
+  </dict>
+
+  <key>StartInterval</key>
+  <integer>21600</integer>
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/junkawasaki/.itonami/agent-task-models.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/junkawasaki/.itonami/agent-task-models.stdout.log</string>
+</dict>
+</plist>

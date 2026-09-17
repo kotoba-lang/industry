@@ -1,0 +1,365 @@
+#!/usr/bin/env kbb
+;; scripts/agent-task-models-tick.cljk — agent の task 分類 × 候補 model を同一 task 集合で測り、
+;; 今の routing とのずれ（finding）を出す。ここにモデル（agent）は居ない。候補 model を
+;; 「被測定物」として呼ぶだけ。正本は manifest/agent-task-models.edn（ADR-2609172000）。
+;; 姉妹は rule-kaizen-tick / adr-inventory-tick。
+;;
+;; 1 周 = 1 分類（最も古く測った分類）× 全候補 model。model 同士は並列、model 内は直列。
+;; task の定義は scripts/model-eval/tasks.cljk を借りる（--classpath scripts/model-eval）。
+;; 判定は「出力を実際に走らせて PASS/FAIL」。LLM-judge は使わない。
+;;
+;; 不変条件（ADR-2608136000 の 8 問）:
+;;   - 結果は :pass / :fail / :truncated / :error の 4 値。後 2 つは「答えていない」で、
+;;     pass-rate の分母に入れない。error 本文は捨てず :err に残す。
+;;   - 走った task が 0 なら候補 0 を報告しない（:insufficient-scan）。
+;;   - ledger は追記のみ。捏造ゼロ。この tick は git を触らない。
+;;   - exit 0 常に（監視 tick であって gate ではない）。
+;;
+;; usage:
+;;   kbb --backend sci --classpath scripts/model-eval scripts/agent-task-models-tick.cljk
+;;     [--class code|structured-output|refusal|long-context] [--only task1,task2]
+;;     [--models m1,m2] [--report-only]   ;; report-only は測らず ledger の集計と routing だけ出す
+;;   出力: 人が読む要約 + 最後に `TICK<TAB><edn>`（loop が読む）。
+
+(require '[clojure.edn :as edn]
+         '[clojure.string :as str]
+         '[promesa.core :as p]
+         '[tasks :as t])
+
+(def fs (js/require "node:fs"))
+(def os (js/require "node:os"))
+(def cp (js/require "node:child_process"))
+(def path (js/require "node:path"))
+
+(def home (.homedir os))
+(def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT") (.cwd js/process)))
+(def manifest-file (str root "/manifest/agent-task-models.edn"))
+(def ledger-file (str home "/.itonami/agent-task-models-tick.ledger.edn"))
+
+(def args (vec *command-line-args*))
+(defn- opt [flag] (when-let [i (some (fn [[i a]] (when (= a flag) i)) (map-indexed vector args))]
+                    (get args (inc i))))
+(def report-only? (boolean (some #{"--report-only"} args)))
+
+(defn- expand-home [s] (str/replace s #"^~" home))
+(defn- now [] (.toISOString (js/Date.)))
+(defn- r2 [x] (when x (/ (js/Math.round (* 100 x)) 100)))
+(defn- median [xs] (let [s (vec (sort xs)) n (count s)]
+                     (when (pos? n) (if (odd? n) (nth s (quot n 2))
+                                        (/ (+ (nth s (dec (quot n 2))) (nth s (quot n 2))) 2)))))
+
+;; ------------------------------------------------------------------ manifest / ledger
+
+(defn- read-manifest []
+  (edn/read-string (str (.readFileSync fs manifest-file "utf8"))))
+
+(defn- read-ledger []
+  (try (->> (str (.readFileSync fs ledger-file "utf8")) str/split-lines (remove str/blank?)
+            (keep #(try (edn/read-string %) (catch :default _ nil))) vec)
+       (catch :default _ [])))
+
+(defn- append-ledger! [m]
+  (.mkdirSync fs (.dirname path ledger-file) #js {:recursive true})
+  (.appendFileSync fs ledger-file (str (pr-str m) "\n")))
+
+;; ------------------------------------------------------------------ routing の実測（読むだけ）
+
+(defn- yaml-model-default
+  "hermes config.yaml の `model:` 節の `default:` を返す。YAML parser は持たない —— この 2 行だけ読む。"
+  [file]
+  (try
+    (let [lines (str/split-lines (str (.readFileSync fs file "utf8")))]
+      (loop [ls lines in? false]
+        (when-let [l (first ls)]
+          (cond
+            (re-find #"^model:\s*$" l) (recur (rest ls) true)
+            (and in? (re-find #"^\S" l)) nil
+            (and in? (re-find #"^\s+default:\s*\S" l)) (str/trim (second (str/split l #"default:" 2)))
+            :else (recur (rest ls) in?)))))
+    (catch :default _ nil)))
+
+(defn- hermes-routing [manifest]
+  (let [root-cfg (expand-home (get-in manifest [:surfaces :hermes :root-config]))
+        pdir (str home "/.hermes/profiles")
+        names (try (vec (.readdirSync fs pdir)) (catch :default _ []))
+        rows (for [n names
+                   :let [f (str pdir "/" n "/config.yaml")]
+                   :when (.existsSync fs f)]
+               [n (yaml-model-default f)])
+        classify (fn [n] (or (some (fn [{:keys [match class]}] (when (re-find (re-pattern match) n) class))
+                                   (:profile-classes manifest))
+                             :agent-general))
+        by-class (reduce (fn [m [n model]] (update-in m [(classify n) (or model "?")] (fnil inc 0))) {} rows)]
+    {:root-default (yaml-model-default root-cfg)
+     :profiles (count names)
+     :profiles-with-config (count rows)
+     :by-model (frequencies (map #(or (second %) "?") rows))
+     :by-class by-class}))
+
+(defn- claude-loop-routing []
+  (let [dir (str root "/scripts")
+        files (try (filter #(str/ends-with? % "-loop.cljk") (vec (.readdirSync fs dir))) (catch :default _ []))
+        rows (for [f files
+                   :let [s (str (.readFileSync fs (str dir "/" f) "utf8"))]
+                   :when (str/includes? s "\"claude\"")]
+               [f (some->> (re-find #"--model[\"\s]+([a-zA-Z0-9.:_-]+)" s) second)])]
+    {:loops (count rows)
+     :with-model-flag (count (filter second rows))
+     :models (frequencies (keep second rows))}))
+
+;; ------------------------------------------------------------------ 候補 model を呼ぶ
+
+(defn- auth-header [{:keys [auth]}]
+  (when-let [env (:env auth)]
+    (let [v (or (aget (.-env js/process) env)
+                (when-let [f (:env-file auth)]
+                  (try (some->> (str/split-lines (str (.readFileSync fs (expand-home f) "utf8")))
+                                (filter #(str/starts-with? % (str env "=")))
+                                first (#(subs % (inc (count env)))) str/trim
+                                (#(str/replace % #"^\"|\"$" "")))
+                       (catch :default _ nil))))]
+      (if (seq v) (str "Bearer " v) ::missing))))
+
+(defn- chat
+  "OpenAI 互換 chat/completions を curl で 1 回。返り値は {:http :wall-s :body(map|nil) :raw}。"
+  [model-id spec prompt max-tokens timeout-s]
+  (let [auth (auth-header spec)]
+    (if (= ::missing auth)
+      (p/resolved {:http nil :err (str "auth env " (get-in spec [:auth :env]) " が空") :body nil})
+      (let [bodyf (str (.tmpdir os) "/atm-" (js/Math.floor (* 1e9 (js/Math.random))) ".json")
+            body (js/JSON.stringify (clj->js {:model model-id
+                                              :messages [{:role "user" :content prompt}]
+                                              :max_tokens max-tokens
+                                              :temperature 0
+                                              :stream false}))
+            _ (.writeFileSync fs bodyf body)
+            t0 (js/Date.now)
+            argv (cond-> ["-s" "-m" (str timeout-s) "-w" "\n__HTTP__%{http_code}"
+                          "-H" "Content-Type: application/json"
+                          "-d" (str "@" bodyf)
+                          (str (:base-url spec) "/chat/completions")]
+                   auth (into ["-H" (str "Authorization: " auth)]))]
+        (p/create
+         (fn [res _]
+           (.execFile cp "curl" (clj->js argv) #js {:maxBuffer 67108864}
+                      (fn [err out _]
+                        (try (.unlinkSync fs bodyf) (catch :default _ nil))
+                        (let [out (str out)
+                              [raw http] (str/split out #"\n__HTTP__" 2)
+                              parsed (try (js->clj (js/JSON.parse raw) :keywordize-keys true)
+                                          (catch :default _ nil))]
+                          (res {:http (when (seq (str http)) (js/parseInt http))
+                                :wall-s (r2 (/ (- (js/Date.now) t0) 1000))
+                                :err (when err (str (.-message err)))
+                                :body parsed
+                                :raw (subs raw 0 (min 400 (count raw)))}))))))))))
+
+;; ------------------------------------------------------------------ 判定（bench.cljk の check と同じ規則）
+
+(defn- code-block [s]
+  (let [m (re-find #"(?s)```(?:python|py)?\s*\n(.*?)```" (or s ""))]
+    (if m (second m) (or s ""))))
+
+(defn- json-block [s]
+  (let [s (str/replace (or s "") #"(?s)```(?:json)?\s*\n?" "")
+        i (str/index-of s "{")]
+    (when i
+      (loop [j i depth 0 instr false esc false]
+        (if (>= j (count s)) nil
+            (let [c (nth s j)]
+              (cond esc (recur (inc j) depth instr false)
+                    (= c \\) (recur (inc j) depth instr true)
+                    (= c \") (recur (inc j) depth (not instr) false)
+                    instr (recur (inc j) depth instr false)
+                    (= c \{) (recur (inc j) (inc depth) instr false)
+                    (= c \}) (if (= depth 1) (subs s i (inc j)) (recur (inc j) (dec depth) instr false))
+                    :else (recur (inc j) depth instr false))))))))
+
+(defn- run-python [src stdin-str]
+  (let [f (str (.tmpdir os) "/atm-" (js/Math.floor (* 1e9 (js/Math.random))) ".py")]
+    (.writeFileSync fs f src)
+    (try
+      (let [r (.spawnSync cp "python3" #js [f]
+                          #js {:timeout 20000 :encoding "utf8" :input (or stdin-str "")
+                               :env #js {"PATH" (aget (.-env js/process) "PATH") "HOME" (.tmpdir os)}})]
+        (.unlinkSync fs f)
+        {:code (aget r "status") :out (str (aget r "stdout"))
+         :err (str/trim (subs (str (aget r "stderr")) 0 300))})
+      (catch :default e {:code -1 :out "" :err (str e)}))))
+
+(defn- check [task content]
+  (case (:kind task)
+    :python (let [r (run-python (str (code-block content) "\n\n" (:harness task)) nil)]
+              {:verdict (if (and (= 0 (:code r)) (str/includes? (:out r) "PASS")) :pass :fail)
+               :err (when (not= 0 (:code r)) (:err r))})
+    :json (if-let [j (json-block content)]
+            (let [r (run-python (:harness task) j)]
+              {:verdict (if (and (= 0 (:code r)) (str/includes? (:out r) "PASS")) :pass :fail)
+               :err (when (not= 0 (:code r)) (:err r))})
+            {:verdict :fail :err "no JSON object in output"})
+    :needle {:verdict (if (str/includes? (str/upper-case (or content "")) (:answer task)) :pass :fail)}))
+
+;; needle は tasks.cljk に prompt が無い（bench.cljk が組む）ので、ここで同じ形に組む。
+(defn- needle-task [{:keys [id tokens]}]
+  (let [words (quot tokens 13)
+        filler (fn [n] (str/join " " (map #(str "line" % " the quick brown fox jumps over the lazy dog") (range n))))
+        secret "The murakumo fleet passphrase is ORANGE-HARBOR-49."]
+    {:id id :kind :needle :budget 30 :answer "ORANGE-HARBOR-49"
+     :prompt (str "Read the document below and answer one question.\n\n<doc>\n"
+                  (filler (quot words 2)) "\n\n" secret "\n\n" (filler (quot words 2))
+                  "\n</doc>\n\nWhat is the murakumo fleet passphrase? Answer with the passphrase only.")}))
+
+(defn- all-tasks []
+  (into (vec t/tasks) (map needle-task t/needles)))
+
+;; ------------------------------------------------------------------ 1 model × 1 分類
+
+(defn- run-model [manifest model-id spec tasks]
+  (let [{:keys [max-tokens-floor request-timeout-s]} (:budget manifest)]
+    (p/loop [ts tasks acc []]
+      (if (empty? ts)
+        acc
+        (let [task (first ts)
+              cap (max max-tokens-floor (* 2 (:budget task)))]
+          (p/let [r (chat model-id spec (:prompt task) cap request-timeout-s)
+                  msg (get-in r [:body :choices 0 :message])
+                  content (or (:content msg) "")
+                  finish (get-in r [:body :choices 0 :finish_reason])
+                  usage (get-in r [:body :usage])
+                  verdict (cond
+                            (or (:err r) (nil? (:body r)) (not= 200 (:http r)) (get-in r [:body :error]))
+                            {:verdict :error
+                             :err (or (:err r) (some-> (get-in r [:body :error]) pr-str)
+                                      (str "HTTP " (:http r) " " (:raw r)))}
+                            (and (str/blank? content) (= "length" finish))
+                            {:verdict :truncated :err "予算切れ（content 空、finish_reason length）"}
+                            :else (let [v (check task content)]
+                                    (if (and (= :fail (:verdict v)) (= "length" finish))
+                                      (assoc v :verdict :truncated) v)))
+                  row {:model model-id :task (:id task) :kind (:kind task)
+                       :verdict (:verdict verdict) :err (:err verdict)
+                       :http (:http r) :finish finish :cap cap
+                       :wall-s (:wall-s r)
+                       :in-tok (:prompt_tokens usage) :out-tok (:completion_tokens usage)
+                       :reasoning-chars (count (or (:reasoning_content msg) ""))
+                       :content-chars (count content)}]
+            (println (str "  " (name (:verdict row)) "\t" model-id "\t" (name (:id task))
+                          "\twall=" (:wall-s row) "s out=" (:out-tok row)
+                          (when (:err row) (str "\t! " (first (str/split-lines (str (:err row))))))))
+            (p/recur (rest ts) (conj acc row))))))))
+
+;; ------------------------------------------------------------------ 集計
+
+(defn- fresh-rows [manifest ledger]
+  (let [max-age (get-in manifest [:selection :evidence-max-age-days])
+        cutoff (- (js/Date.now) (* max-age 86400000))]
+    (for [e ledger
+          :when (and (:rows e) (>= (.getTime (js/Date. (:at e))) cutoff))
+          r (:rows e)]
+      (assoc r :class (:class e) :tick (:at e)))))
+
+(defn- cell-stats [rows]
+  (let [f #(count (filter (fn [r] (= % (:verdict r))) rows))
+        answered (+ (f :pass) (f :fail))]
+    {:n (count rows) :pass (f :pass) :fail (f :fail) :truncated (f :truncated) :error (f :error)
+     :answered answered
+     :ticks (count (distinct (map :tick rows)))
+     :pass-rate (when (pos? answered) (r2 (/ (f :pass) answered)))
+     :wall-median (r2 (median (keep :wall-s (filter #(#{:pass :fail} (:verdict %)) rows))))}))
+
+(defn- aggregate [manifest ledger]
+  (let [rows (fresh-rows manifest ledger)]
+    (reduce (fn [m [[c mdl] rs]] (assoc-in m [c mdl] (cell-stats rs)))
+            {} (group-by (juxt :class :model) rows))))
+
+(defn- winner [manifest cells]
+  (let [{:keys [min-answered-per-cell min-ticks-per-cell]} (:selection manifest)
+        eligible (filter (fn [[_ s]] (and (>= (:answered s) min-answered-per-cell)
+                                          (>= (:ticks s) min-ticks-per-cell))) cells)]
+    (when (seq eligible)
+      (first (sort-by (fn [[_ s]] [(- (:pass-rate s)) (or (:wall-median s) 1e9)]) eligible)))))
+
+(defn- current-model-for-class [routing c]
+  ;; その分類の profile が最も多く使っている model。分類に profile が無ければ root の default。
+  (or (some->> (get-in routing [:by-class c]) (sort-by (comp - val)) first key)
+      (:root-default routing)))
+
+(defn- findings [manifest agg routing]
+  (let [margin (get-in manifest [:selection :drift-min-margin])]
+    (vec
+     (concat
+      ;; 1) routing のずれ
+      (for [[c cells] agg
+            :let [[best s] (winner manifest cells)
+                  cur (current-model-for-class routing c)
+                  cur-s (get cells cur)]
+            :when (and best (not= best cur)
+                       (or (nil? cur-s) (< (:answered cur-s) (get-in manifest [:selection :min-answered-per-cell]))
+                           (>= (- (:pass-rate s) (:pass-rate cur-s)) margin)))]
+        {:kind :routing-drift :class c :current cur :winner best
+         :evidence {:winner s :current cur-s}})
+      ;; 2) 候補が答えられない（全 task が :error）—— 順位以前の話
+      (for [[c cells] agg
+            [mdl s] cells
+            :when (and (pos? (:n s)) (= (:n s) (:error s)) (>= (:ticks s) 2))]
+        {:kind :model-unavailable :class c :model mdl :evidence s})))))
+
+;; ------------------------------------------------------------------ main
+
+(defn- pick-class [manifest ledger]
+  (let [classes (keys (:task-classes manifest))
+        last-at (into {} (for [c classes]
+                           [c (->> ledger (filter #(= c (:class %))) (map :at) sort last)]))]
+    (if-let [c (opt "--class")]
+      (keyword c)
+      (first (sort-by (fn [c] (or (last-at c) "")) classes)))))
+
+(defn -main []
+  (let [started (now)
+        manifest (read-manifest)
+        ledger (read-ledger)
+        routing {:hermes (hermes-routing manifest) :claude-loops (claude-loop-routing)}
+        cls (pick-class manifest ledger)
+        only (some->> (opt "--only") (#(str/split % #",")) (map keyword) set)
+        want-models (some->> (opt "--models") (#(str/split % #",")) set)
+        task-ids (set (get-in manifest [:task-classes cls :tasks]))
+        tasks (cond->> (filter #(task-ids (:id %)) (all-tasks)) only (filter #(only (:id %))))
+        models (cond->> (:models manifest) want-models (filter #(want-models (key %))))]
+    (println (str "agent-task-models-tick " started))
+    (println (str "  hermes: " (:profiles-with-config (:hermes routing)) " profile / root default "
+                  (:root-default (:hermes routing)) " / by-model " (pr-str (:by-model (:hermes routing)))))
+    (println (str "  claude loops: " (:loops (:claude-loops routing)) " (--model 付き "
+                  (:with-model-flag (:claude-loops routing)) ")"))
+    (p/let [results (if report-only?
+                      (p/resolved [])
+                      (do (println (str "  measuring class " (name cls) ": " (count tasks) " task × "
+                                        (count models) " model"))
+                          (p/all (map (fn [[mid spec]] (run-model manifest mid spec tasks)) models))))
+            rows (vec (apply concat results))
+            entry (cond
+                    report-only? {:at started :outcome :report-only :routing routing}
+                    (empty? rows) {:at started :outcome :insufficient-scan :class cls
+                                   :reason (if (empty? tasks) :no-tasks-for-class :no-rows) :routing routing}
+                    :else {:at started :outcome :measured :class cls :rows rows :routing routing})
+            _ (append-ledger! entry)
+            ledger' (conj ledger entry)
+            agg (aggregate manifest ledger')
+            fnd (findings manifest agg (:hermes routing))
+            summary {:at started :outcome (:outcome entry) :class cls
+                     :measured (count rows)
+                     :cells agg
+                     :finding-count (count fnd)
+                     :next (first fnd)
+                     :remaining (rest fnd)}]
+      (println "  cells (7 d):")
+      (doseq [[c cells] (sort agg) [m s] (sort cells)]
+        (println (str "    " (name c) "\t" m "\tpass " (:pass s) "/" (:answered s)
+                      " (trunc " (:truncated s) " err " (:error s) ") ticks " (:ticks s)
+                      " wall~" (:wall-median s) "s")))
+      (println (str "  findings: " (count fnd)
+                    (when-let [n (first fnd)] (str " → next " (name (:kind n)) " " (name (:class n))
+                                                   " current=" (:current n) " winner=" (or (:winner n) (:model n))))))
+      (println (str "TICK\t" (pr-str (dissoc summary :cells))))
+      (js/process.exit 0))))
+
+(-main)

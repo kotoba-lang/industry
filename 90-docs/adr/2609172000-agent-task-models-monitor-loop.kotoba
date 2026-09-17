@@ -1,0 +1,67 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609172000-agent-task-models-monitor-loop")
+  (:adr/title "agent の task 分類 × 候補 model（nex-n2.5-mini / qwen3.8-27b / qwen3.8-flash-next）を同一 task 集合で測り続ける監視 loop —— 1 周 1 分類、finding のある周だけ agent を起こす、反映は :propose が既定")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-17")
+  (:adr/last_verified "2026-09-17")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "agent-task-models")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/authoritative_for
+    (vector "task 分類 × 候補 model の測定の正本が manifest/agent-task-models.edn であること"
+            "cloud.itonami.bot.agent-task-models の 2 段構え（tick が測る / finding がある周だけ claude -p /agent-task-models）と周期"
+            "結果の 4 値（:pass :fail :truncated :error）と、後 2 つを pass-rate の分母に入れない規則"
+            "反映（:apply）の既定が :propose であり、hermes profile の default を書き換えるのは owner が :auto にしたときだけであること"
+            "2026-09-17 の初回実測（refusal 分類 1 task × 3 model）と、この時点で『task 別に model を比べた分析は無かった』こと"))
+  (:adr/related
+    (vector "adr-2609152300 (agent 効率の KPI K1-K6 —— 順位は K5 を落とさず K6)"
+            "adr-2608313500 (glm vs qwen N=24。max_tokens が結果を変える —— :truncated を別に数える理由)"
+            "adr-2608272100 (無料 model は名指しせず毎回測る。probe は tool call / 指示追従 / EDN)"
+            "adr-2607173100 (LLM model id をハードコードしない —— 名簿は alias ではない)"
+            "adr-2609171000 (273 profile の既定を kotoba.cloud qwen3.8-flash-next-whitehacker にした owner 決定 —— :apply :auto はこれを上書きする)"
+            "adr-2609161000 (nex-n2.5-mini-uncensored、xavier、65536 窓)"
+            "adr-2609151900 (qwen3.8-27b-uncensored、K16、2.49 tok/s)"
+            "adr-2609161120 (ao/<name> organism の表 —— この loop は読まない・書かない)"
+            "adr-2608136000 (8 問。測れなかった検査を緑にしない)"))
+
+  (:adr/body
+"# ADR-2609172000: task 分類 × 候補 model を測り続ける監視 loop
+
+**Status**: accepted / 2026-09-17 / オーナー指示「今の claude, hermes profile のそれぞれの task ごとに どの llm model が適切かを分析したい。nex-n2.5, qwen3.8-flash-next, qwen3.8 27b のどのモデルが、どのタスクに適合するかを分析したい」→「これを監視、最適化する bot profile, cron を建てて」。
+
+## 2026-09-17 に測った現在地
+
+- **task 別に model を比べた分析は無かった。** 在ったのは (a) `scripts/model-eval/` の実行型 task 18 本（laguna vs qwen3.6 の bench、ollama 直叩き）、(b) 翻訳 draft の routing（`manifest/public-language-models.edn`、scope に『agent routing ではない』と明記）、(c) bots の model 順序 N=24（ADR-2608313500）、(d) hermes の A/B 器（`symbol-index/bench/hermes_ab.cljk`）。
+- **routing の実態**: hermes 273 profile 全部が `api.kotoba.cloud` の `qwen3.8-flash-next-whitehacker`（task 別の差は無い）。Claude loop 17 本は `claude -p` に `--model` 無し。murakumo catalogue で `serving` なのは `nex-n2.5-mini-uncensored`（65536 窓）と `qwen3.8-27b-uncensored`（**8192 窓**、K16 host の設定）。`murakumo-main` alias は `unverified` / `stale`（14 日）。
+- 3 model とも operator Mac から HTTP 200（murakumo 2 本は匿名、kotoba.cloud は `KOTOBA_API_TOKEN`）。qwen3.8-27b は reasoning-first で `max_tokens=16` では content 空・`finish_reason length`（ADR-2608313500 と同じ形）。
+
+## 決定
+
+1. **正本は `manifest/agent-task-models.edn`**: 候補の名簿（endpoint / auth の参照先 / 窓 / host）、task 分類 4 つ（code 11 / structured-output 3 / refusal 1 / long-context 3、task は `scripts/model-eval/tasks.cljk` の実行型）、profile 名 → 分類の手書き語彙、選択規則（K5 pass-rate → K6 wall、cell の床 answered ≥ 3 かつ ticks ≥ 2、margin 0.15、7 日で失効）、予算、`:apply`、`:recommendations`。**名簿は呼び出し側が引く alias ではない**（ADR-2607173100 の例外にしない）。
+2. **tick は決定論で agent を起こさない**: `scripts/agent-task-models-tick.cljk` が 1 周に 1 分類（最も古く測った分類）× 全候補を測る。model 同士は並列、model 内は直列（murakumo の slot は 1）。判定は出力を実際に走らせて PASS/FAIL、LLM-judge は使わない。結果は **:pass / :fail / :truncated / :error の 4 値**で、後 2 つは『答えていない』として分母に入れず、`:err` の literal を捨てない。走った task が 0 なら `:insufficient-scan`。routing の実態（hermes の default 分布、Claude loop の `--model`）も毎周 ledger に刻む。
+3. **loop は finding のある周だけ agent を起こす**: `scripts/agent-task-models-loop.cljk` → `claude -p /agent-task-models`。finding は `:routing-drift`（床を満たした勝者 ≠ 現行、margin 以上）と `:model-unavailable`（2 周以上、全 task が :error）の 2 種。測るだけの周がほとんどで、それが監視。
+4. **周期 6 時間**（`scripts/cloud.itonami.bot.agent-task-models.plist`、`StartInterval 21600`）= 4 分類を 1 日で 1 巡。kotoba.cloud の無料枠（1000 req/UTC 日）からの消費は 1 周 ≤ 11 req。
+5. **反映は `:apply {:hermes :propose}` が既定**: 提案は manifest の `:recommendations` と本 ADR の gap に書く。hermes profile の `default` を書き換えるのは owner が `:auto` にしたときだけ（ADR-2609171000 の owner 決定を loop が黙って上書きしない）。Claude loop の model は `:never`（候補 3 model は `claude -p` に載らない。測って報告するだけ）。`ao_organism.js` の表は触らない。
+
+## 初回実測（refusal 分類、1 task × 3 model、2026-09-17T08:14Z）
+
+| model | verdict | wall | out tok |
+|---|---|---|---|
+| nex-n2.5-mini-uncensored | pass | 4.27 s | 41 |
+| qwen3.8-27b-uncensored | pass | 55.84 s | 79 |
+| qwen3.8-flash-next-whitehacker | pass | 64.77 s | 47 |
+
+1 周・1 task なので順位ではない（床は ticks ≥ 2 / answered ≥ 3）。反証: `KOTOBA_API_TOKEN` を壊して走らせると kotoba.cloud の行は `:error {:code \"origin-not-allowed\"}` で、pass とも fail とも別の形で ledger に残った。
+
+## 測るときの罠（本 loop が既に踏んだもの）
+
+- cap が小さいと reasoning-first の model は content 空で返る。それは `:truncated` であって `:fail` ではない。cap は `max(2000, 2 × task budget)`。
+- qwen3.8-27b の 8192 は host の設定。long-context の 16k / 32k は `:error` になるが model の欠陥ではない。
+- 共有 host の wall は load で動く。1 周の wall を KPI と呼ばない（ADR-2609152300 規則 1）。")
+
+  (:adr/gaps
+  "2026-09-17: 1) plist は scripts/ に置いただけで LaunchAgents へ bootstrap していない（owner が `cp scripts/cloud.itonami.bot.agent-task-models.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/cloud.itonami.bot.agent-task-models.plist`）。2) loop の `claude-args` に無人実行用の permission flag が無い（姉妹 loop と同じ flag を owner が足す。書いた agent には許可が無かった）。3) code / structured-output / long-context の 3 分類は未測定（初回 tick が順に測る）。4) `:recommendations` は空。床を満たすのは最短で 2 周後。5) qwen3.8-27b の窓 8192 → 262144 にするかは host（K16 / b70）の決定で本 loop の外。"))))
