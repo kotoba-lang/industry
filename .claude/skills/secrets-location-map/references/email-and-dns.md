@@ -1,15 +1,28 @@
 # メール / DNS
 
 - **Resend（transactional email / smtp.kotobase.net）**:
-  - **正本 = 1Password `gftdcojp` vault / item `gftd.resend`**
-    - `op://gftdcojp/gftd.resend/credential`（API Credential の credential 欄）
-    - フィールド: `username=API_KEY`、`hostname=https://api.resend.com`
+  - **正本 = 1Password `gftdcojp` vault / item `gftd.resend/API_KEY`**（category PASSWORD、
+    2026-09-17 実測。`gftd.resend` という item は無く `op read op://gftdcojp/gftd.resend/credential` は
+    「isn't an item」で落ちる —— 下の旧記述はその名前で書かれていた）
+    - `op read 'op://gftdcojp/enrqtwwuxdoaglpvq326ecskji/password'`（item UUID 指定。名前に `/` を含むので
+      `op://gftdcojp/gftd.resend/API_KEY/password` は path が曖昧になる）
+    - 隣の item `gftd.resend/DEFAULT_FROM`（`dioxmrpwhygofxm3t7aaxqhxlu`）は既定送信元 `well@email.gftd.ai`
+    - ⚠ **2026-09-17 実測: この item の値（`re_` 36 字、note「Imported from macOS Keychain Generic Password」）は
+      Resend に `API key is invalid` と拒否される** —— `GET /domains`（400）と `POST /emails` を
+      `delivered@resend.dev` 宛（401）の 2 経路で同じ。revoke/rotate 済み。新しい key を
+      https://resend.com/api-keys で発行してこの item の password 欄を更新すること
+      （dashboard login は人間の操作。agent は password を入力しない）。更新後の投入:
+      `op read 'op://gftdcojp/enrqtwwuxdoaglpvq326ecskji/password' | npx wrangler secret put RESEND_API_KEY --config wrangler.research.jsonc`
+      （app-kotoba-cloud の通知先、ADR-2609171500）。
+    - 旧記述（item `gftd.resend` / `credential` 欄、`username=API_KEY`、`hostname=https://api.resend.com`）は
+      2026-09-17 時点で実在しない。
     - 用途: Worker secret `RESEND_API_KEY`（`net-kotobase` / legacy mailer）、
       ローカル CLI、domain verify（`mail.kotobase.net` 等）
     - 投入スクリプト: `kbb --backend sci scripts/provision-resend-1password.cljk`
       （Keychain `gftd.resend`/`API_KEY` → op item。`--update` で上書き）
   - **Keychain ミラー**（非対話ローカル）: `service=gftd.resend` /
     `account=API_KEY` — 1Password が biometric timeout のときのフォールバック。
+    ⚠ 2026-09-17 実測: このマシンの keychain に `gftd.resend` item は無い（`security find-generic-password -s gftd.resend` が 0 件）。
     新規取得の正経路は op; keychain は mirror 扱い。
   - **関連ドメイン（Resend account 側）**: `email.gftd.ai`（受信可）、
     `mail.kotobase.net`（smtp.kotobase.net 用、domain id
