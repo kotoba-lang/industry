@@ -9,7 +9,7 @@
 ;;
 ;; archived / datalad グループは名簿に入れない。
 ;;
-;; roster size: 4824
+;; roster size: 4825
 
 [{:bot/name "aburi",
   :bot/groups ["cloud-itonami"],
@@ -19098,18 +19098,8 @@
   :bot/charter
   "repo `app-kotoba-cloud` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=app。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/cloud-kotoba/app-kotoba-cloud",
-  :bot/pin "a4ffc6335dff0f616cd3d0aeab2e25bf9c31909a",
+  :bot/pin "6f97dbdce1a77f15b81e21bfb7f02956b85d7619",
   :bot/class :app,
-  :bot/org "cloud-kotoba",
-  :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "authn",
-  :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/authn",
-  :bot/charter
-  "repo `authn` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/authn",
-  :bot/pin "5460b021667e86c921d61841ef35b51d87126154",
-  :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
  {:bot/name "cloud-kotoba-dds",
@@ -19122,82 +19112,92 @@
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "cloud-kotoba-engine",
+ {:bot/name "kotobase-authn",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/cloud-kotoba-engine",
+  :bot/id "cloud-kotoba/kotobase-authn",
   :bot/charter
-  "repo `cloud-kotoba-engine` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/engine",
-  :bot/pin "045f84ef6491d32b8171a3132334920427e16922",
+  "repo `kotobase-authn` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-authn",
+  :bot/pin "5460b021667e86c921d61841ef35b51d87126154",
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "commoncrawler",
+ {:bot/name "kotobase-commoncrawler",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/commoncrawler",
+  :bot/id "cloud-kotoba/kotobase-commoncrawler",
   :bot/charter
-  "repo `commoncrawler` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/commoncrawler",
+  "repo `kotobase-commoncrawler` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-commoncrawler",
   :bot/pin "97feff1551a011b13768681be2ba7b804783468c",
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "control-plane",
+ {:bot/name "kotobase-control-plane",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/control-plane",
+  :bot/id "cloud-kotoba/kotobase-control-plane",
   :bot/charter
-  "repo `control-plane` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/control-plane",
-  :bot/pin "57b43ce87f673feb2c3d58875f78b2d6381256ca",
+  "repo `kotobase-control-plane` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-control-plane",
+  :bot/pin "31b16ef8ad4468b0c5c3f37624271039d1266314",
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "cypher",
+ {:bot/name "kotobase-cypher",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/cypher",
+  :bot/id "cloud-kotoba/kotobase-cypher",
   :bot/charter
-  "repo `cypher` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/cypher",
-  :bot/pin "de818c5e7f66674982615a54a3c1bcfa5e4ce23a",
+  "repo `kotobase-cypher` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-cypher",
+  :bot/pin "76338fdc016ee34d77a6334b96b468410fe0e00a",
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "delegation-rootkeys",
+ {:bot/name "kotobase-delegation-rootkeys",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/delegation-rootkeys",
+  :bot/id "cloud-kotoba/kotobase-delegation-rootkeys",
   :bot/charter
-  "repo `delegation-rootkeys` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/delegation-rootkeys",
+  "repo `kotobase-delegation-rootkeys` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-delegation-rootkeys",
   :bot/pin "6cc2f27acd7ddf0f99b28203a135e618059e5222",
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "ipfs",
+ {:bot/name "kotobase-engine-worker",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/ipfs",
+  :bot/id "cloud-kotoba/kotobase-engine-worker",
   :bot/charter
-  "repo `ipfs` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/ipfs",
+  "repo `kotobase-engine-worker` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-engine-worker",
+  :bot/pin "ad9d7c14d2d93af6d476692ef952473fee6d19a9",
+  :bot/class :library,
+  :bot/org "cloud-kotoba",
+  :bot/floors [:checkout :pinned :landed :readme :test-signal]}
+ {:bot/name "kotobase-ipfs",
+  :bot/groups ["cloud-kotoba"],
+  :bot/id "cloud-kotoba/kotobase-ipfs",
+  :bot/charter
+  "repo `kotobase-ipfs` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-ipfs",
   :bot/pin "71299a517439382efc49b6d54d80a0a5aa8a96dd",
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "lake",
+ {:bot/name "kotobase-lake-worker",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/lake",
+  :bot/id "cloud-kotoba/kotobase-lake-worker",
   :bot/charter
-  "repo `lake` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/lake",
-  :bot/pin "4762960ee0ebb907b960ce25df51c97b03de9f5a",
+  "repo `kotobase-lake-worker` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-lake-worker",
+  :bot/pin "f1d139326b9b6c91bc9fb844da55cdde5c6f3215",
   :bot/class :library,
   :bot/org "cloud-kotoba",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
- {:bot/name "search-origin",
+ {:bot/name "kotobase-search-origin",
   :bot/groups ["cloud-kotoba"],
-  :bot/id "cloud-kotoba/search-origin",
+  :bot/id "cloud-kotoba/kotobase-search-origin",
   :bot/charter
-  "repo `search-origin` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
-  :bot/repo "orgs/cloud-kotoba/search-origin",
+  "repo `kotobase-search-origin` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/cloud-kotoba/kotobase-search-origin",
   :bot/pin "68910ee9ee211b9fdf7458f3716135f55c648362",
   :bot/class :library,
   :bot/org "cloud-kotoba",
@@ -21058,7 +21058,7 @@
   :bot/charter
   "repo `amu` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/amu",
-  :bot/pin "d85307b44a0620a448232a07b009b8ac32b91c4d",
+  :bot/pin "fc473a81979b441c83afc6f667b7a26f0101c7cc",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -21668,7 +21668,7 @@
   :bot/charter
   "repo `artifact` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/artifact",
-  :bot/pin "7b8ba2f4fb3d925b01028082b4dffb3607b06af2",
+  :bot/pin "f0fd1f87185d05f589b9bc1f93933ac0b3eccc13",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39428,7 +39428,7 @@
   :bot/charter
   "repo `kotobase-protocol-atproto` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-atproto",
-  :bot/pin "211d6a9dd862d42eb7e7b1fbbcbedbfcb367ff56",
+  :bot/pin "e714545810567214e150071aebdf1546bec8b975",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39438,7 +39438,7 @@
   :bot/charter
   "repo `kotobase-protocol-core` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-core",
-  :bot/pin "3a81f280e376efed2d7cc0d1ccfb11c8f44b7fcd",
+  :bot/pin "9a1e5299c5a4777d4f1f2bca535becb15f7cefd6",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39448,7 +39448,7 @@
   :bot/charter
   "repo `kotobase-protocol-git` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-git",
-  :bot/pin "a06e910df09f111651149b6dcc44df0c1f668345",
+  :bot/pin "2d0f31ab008c07d7f7432358621e88f170c791fd",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39458,7 +39458,7 @@
   :bot/charter
   "repo `kotobase-protocol-ipfs` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-ipfs",
-  :bot/pin "2590b2e3b2e8ad574754e3daa8c23204277d3079",
+  :bot/pin "0c8cc8c26f7bf9dfa91e0d04c8a4b5e2a9bd6e66",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39468,7 +39468,7 @@
   :bot/charter
   "repo `kotobase-protocol-ipq` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-ipq",
-  :bot/pin "6fdfdb1bff5f51b0a5e9fae7596aaffa69d6158b",
+  :bot/pin "c2df0f20be6bf3247d50b2f6f1d1b2070f8fad48",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39478,7 +39478,7 @@
   :bot/charter
   "repo `kotobase-protocol-issues` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-issues",
-  :bot/pin "e78b7b326e0b059343e368b1bf6d2a9df6b676b1",
+  :bot/pin "518540cf3d01df50e33598c98bc64ee25d1eb1cc",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39488,7 +39488,7 @@
   :bot/charter
   "repo `kotobase-protocol-pinning` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-pinning",
-  :bot/pin "d20f04690a015d9700049bacdb940d2beb0dec23",
+  :bot/pin "b6a6d5bd1259635da5d73f411576e3047c74c0da",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39498,7 +39498,7 @@
   :bot/charter
   "repo `kotobase-protocol-s3` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocol-s3",
-  :bot/pin "be2bc11855599480b9868fd42e0efde6f4d0526a",
+  :bot/pin "1320bfa98213748b08c93553efd73a0af64f0d4e",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39519,6 +39519,16 @@
   "repo `kotobase-protocols-worker` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-protocols-worker",
   :bot/pin "2e48c82411458b4dcdf99ed8774caec0587ea642",
+  :bot/class :library,
+  :bot/org "kotoba-lang",
+  :bot/floors [:checkout :pinned :landed :readme :test-signal]}
+ {:bot/name "kotobase-query-surfaces",
+  :bot/groups ["kotoba-lang"],
+  :bot/id "kotoba-lang/kotobase-query-surfaces",
+  :bot/charter
+  "repo `kotobase-query-surfaces` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
+  :bot/repo "orgs/kotoba-lang/kotobase-query-surfaces",
+  :bot/pin "e925da5ac0f517b49f2e8880076ee80930f6152e",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -39648,7 +39658,7 @@
   :bot/charter
   "repo `kotobase-worker-shell` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/kotobase-worker-shell",
-  :bot/pin "b1486e3e72fe825e88af02221fa371afbe22cd58",
+  :bot/pin "cb50edc2e3a96447d059e414c9fa98e12c10b604",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -41958,7 +41968,7 @@
   :bot/charter
   "repo `org-ieee-awk` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=spec-mirror。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/org-ieee-awk",
-  :bot/pin "8090cb22f1d38f87d21721147e8df604869824f1",
+  :bot/pin "f289fae1578eccfbe30fabf8d45efd741f62a3ea",
   :bot/class :spec-mirror,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -42128,7 +42138,7 @@
   :bot/charter
   "repo `org-ieee-regex` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=spec-mirror。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/org-ieee-regex",
-  :bot/pin "59e17470bb97e864935618f16ec51012485f7877",
+  :bot/pin "7fae1b2e362926c53ae8d651e9e3a4cfe0037032",
   :bot/class :spec-mirror,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -42148,7 +42158,7 @@
   :bot/charter
   "repo `org-ieee-sed` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=spec-mirror。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/org-ieee-sed",
-  :bot/pin "808f5700cc8311f199b2666e44d37be9eed29098",
+  :bot/pin "fb58c9905fc0cb03441583d73b93a9d17eb07c8b",
   :bot/class :spec-mirror,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -42918,7 +42928,7 @@
   :bot/charter
   "repo `org-iso-isobmff` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=spec-mirror。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/org-iso-isobmff",
-  :bot/pin "fd1a5aa4cfaf31cf92dd26ced4cc68a6b43dd4d2",
+  :bot/pin "e15b34d71aec653f9b8a538ec1b5e3927ebb4d73",
   :bot/class :spec-mirror,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -45068,7 +45078,7 @@
   :bot/charter
   "repo `shinkansen` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/shinkansen",
-  :bot/pin "ff132ad390054737cf60cd3c860e5dcd095bb875",
+  :bot/pin "8af00cc859513d503a3fefa6335dbd7b14f81d04",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
@@ -46288,7 +46298,7 @@
   :bot/charter
   "repo `symbol-index` の現在地を測り、床を割っているものが在れば 1 件だけ提案する。class=library。床: checkout が在る / west pin と一致 / 未着地の作業が無い / README が読める / コードが在るなら test 信号が在る。",
   :bot/repo "orgs/kotoba-lang/symbol-index",
-  :bot/pin "2fcaefc86cf08612dc11ae1dbbeab568535dd35b",
+  :bot/pin "c03a7eeea4d99b6cdd93ea1ce85a2e2f3b8fe45c",
   :bot/class :library,
   :bot/org "kotoba-lang",
   :bot/floors [:checkout :pinned :landed :readme :test-signal]}
