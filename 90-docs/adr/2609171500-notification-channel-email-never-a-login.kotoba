@@ -121,6 +121,25 @@ admin.kotoba.cloud から自分の principal に実行 → 200、receipt `op-@ko
 （503 `contact-mail-not-configured`、何も mint されない）—— fail closed の経路を live で確認。
 **principal 共有の状態は終わった**: forward は principal ごと、anonymous object は release 済み。
 
+## 着地状態と resume point（closing 2026-09-17 08:5x UTC）
+
+- **main に在るもの**: app-kotoba-cloud main `94f3ca6e`（west pin 同じ）—— 通知先 panel と `/v1/account/contact*`、
+  research authority の `contact` ops と送信、per-principal forward の修正、operator op `adopt-anonymous`、
+  sender `no-reply@mail.kotoba.cloud`、token 発行後の channel 再読込。root main `12b19f9d` —— この ADR、
+  `manifest/human-authentication-policy.edn` の `:post-auth-notification` 面、`scripts/provision-resend-dns.cljk`
+  （kotoba.cloud zone、env 優先の資格情報、MX 衝突の置換、`--update-types`）、secrets-location-map の Resend /
+  Cloudflare の実状。
+- **live**: edge `442b7ea1`、research authority `e0daa923`（どちらも main から）。`RESEND_API_KEY` は authority
+  Worker に投入済み。Resend: `mail.kotoba.cloud` 送信 + 受信 verified、残る domain は mail.shinshi.club /
+  mail.aozora.app / mail.x402.nexus / mail.murakumo.cloud / mail.itonami.cloud / mail.kotoba.cloud の 6。
+  オーナーの principal は自分の object に record（verified / scope / token）を持つ。通知先は 未登録（probe は削除済み）。
+- **検証**: `kbb -M:test` 197 tests / 0 failures、`npm run test:worker`（contact-email 152、authority-routing 60、
+  smoke）、`test:workerd` 17、`audit:uiux` ≥ 80、実ブラウザ `test/account-browser.cljk` の contact block、
+  live e2e（送信 → Resend Receiving で受信 → コード確認 → producer 通知受信）。
+- **次の最初の一手**: オーナーが console の 通知先 に自分の address を登録する（人の受信箱）。agent 側の再検証は
+  `node test/contact-email.mjs`（build 後）と、live なら console から `probe-<rand>@mail.kotoba.cloud` へ送って
+  `GET https://api.resend.com/emails/receiving?limit=10`（key は 1Password Private「Resend API Key」）で読む。
+
 ## 未測定・残る gap
 
 - **`RESEND_API_KEY` は投入済み（2026-09-17 07:3x UTC）。** 1Password の旧 item `gftd.resend/API_KEY` の値は
