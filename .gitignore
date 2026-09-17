@@ -5235,3 +5235,16 @@ hyakka-wiki-index.key
 /.tmp-line-research/
 /b300-glm53/
 .sales-catalog-build/
+
+# Hermes profile home: ~/.hermes/profiles/kotoba-lang is a symlink to orgs/kotoba-lang, so the
+# agent's runtime state (SQLite, locks, hub-bundled skills, snapshots, persona) is written into
+# this tree. Swept in by accident in 984b37a1ec6 (2026-09-05); untracked on 2026-09-17. Child
+# repos under orgs/kotoba-lang/<name>/ are unaffected (these patterns are anchored to the dir).
+/orgs/kotoba-lang/state.db
+/orgs/kotoba-lang/state.db-*
+/orgs/kotoba-lang/state.db.*
+/orgs/kotoba-lang/.backup.lock
+/orgs/kotoba-lang/SOUL.md
+/orgs/kotoba-lang/cache/
+/orgs/kotoba-lang/state-snapshots/
+/orgs/kotoba-lang/skills/
