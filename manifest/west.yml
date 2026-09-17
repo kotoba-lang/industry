@@ -14556,33 +14556,34 @@ manifest:
       path: orgs/kotoba-lang/worklaw
       groups: [kotoba-lang]
     - name: authn
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 5460b021667e86c921d61841ef35b51d87126154
-      path: orgs/net-kotobase/authn
-      groups: [net-kotobase]
-    - name: net-kotobase-docs
-      remote: net-kotobase
+      path: orgs/cloud-kotoba/authn
+      groups: [cloud-kotoba]
+    - name: cloud-kotoba-docs
+      remote: cloud-kotoba
       repo-path: docs
       revision: 3ede3dd2057a8a0ed6bc3fd943efea5b221753ed
-      path: orgs/net-kotobase/docs
-      groups: [net-kotobase]
-    - name: net-kotobase-engine
-      remote: net-kotobase
+      path: orgs/cloud-kotoba/docs
+      groups: [archived]
+      userdata:
+        archived: true
+    - name: cloud-kotoba-engine
+      remote: cloud-kotoba
       repo-path: engine
       revision: fe116835d1bc4a8e0a01eb783822c6cccb643694
-      path: orgs/net-kotobase/engine
-      groups: [net-kotobase]
-    - name: net-kotobase-sdk
-      remote: net-kotobase
-      repo-path: sdk
+      path: orgs/cloud-kotoba/engine
+      groups: [cloud-kotoba]
+    - name: kotobase-sdk
+      remote: kotoba-lang
       revision: 818c67802af5f6d9ca62af5bfc81a538bdb753c4
-      path: orgs/net-kotobase/sdk
-      groups: [net-kotobase]
+      path: orgs/kotoba-lang/kotobase-sdk
+      groups: [kotoba-lang]
     - name: search-origin
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 68910ee9ee211b9fdf7458f3716135f55c648362
-      path: orgs/net-kotobase/search-origin
-      groups: [net-kotobase]
+      path: orgs/cloud-kotoba/search-origin
+      groups: [cloud-kotoba]
     - name: app-tabi-mikake
       remote: network-awai
       revision: 53e2c14317d4e000e8aa322183a29400004dba06
@@ -17623,9 +17624,9 @@ manifest:
       userdata:
         archived: true
     - name: control-plane-retired
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 2e4d7e0384f538c731ff11ef3c697ff9a1fefca1
-      path: orgs/net-kotobase/control-plane-retired
+      path: orgs/cloud-kotoba/control-plane-retired
       groups: [archived]
       userdata:
         archived: true
@@ -17926,10 +17927,10 @@ manifest:
       path: orgs/cloud-kotoba/cypher
       groups: [cloud-kotoba]
     - name: lake
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 4762960ee0ebb907b960ce25df51c97b03de9f5a
-      path: orgs/net-kotobase/lake
-      groups: [net-kotobase]
+      path: orgs/cloud-kotoba/lake
+      groups: [cloud-kotoba]
     - name: fans-oppai
       remote: network-awai
       revision: 8e7b0a75825d398e30e0ff0ba5688bc87255bf61
@@ -28447,10 +28448,10 @@ manifest:
       userdata:
         rad-rid: rad:z4sBVBPosrMtr8avVwVAYES1aSYP
     - name: commoncrawl-actor
-      remote: net-kotobase
+      remote: kotoba-lang
       revision: 27c70c30adaee2bbf7c206a5a81e74a8b8c80eb8
-      path: orgs/net-kotobase/commoncrawl-actor
-      groups: [net-kotobase]
+      path: orgs/kotoba-lang/commoncrawl-actor
+      groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zajDfG3Xm5KUaxw4f9usKGrSVfN2
     - name: kotobase-engine
@@ -29210,10 +29211,10 @@ manifest:
       userdata:
         rad-rid: rad:z22t7Ew57BsyqWUALLzGoXhVSutwQ
     - name: commoncrawler
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 97feff1551a011b13768681be2ba7b804783468c
-      path: orgs/net-kotobase/commoncrawler
-      groups: [net-kotobase]
+      path: orgs/cloud-kotoba/commoncrawler
+      groups: [cloud-kotoba]
     - name: netcap
       remote: kotoba-lang
       revision: dfec04dc653191f7868b50c3152082189a982ec6
@@ -31583,15 +31584,15 @@ manifest:
       path: orgs/network-awai/net-isekai-gen
       groups: [network-awai]
     - name: control-plane
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 57b43ce87f673feb2c3d58875f78b2d6381256ca
-      path: orgs/net-kotobase/control-plane
-      groups: [net-kotobase]
+      path: orgs/cloud-kotoba/control-plane
+      groups: [cloud-kotoba]
     - name: ipfs
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 71299a517439382efc49b6d54d80a0a5aa8a96dd
-      path: orgs/net-kotobase/ipfs
-      groups: [net-kotobase]
+      path: orgs/cloud-kotoba/ipfs
+      groups: [cloud-kotoba]
     - name: network-isekai
       remote: network-awai
       revision: 60ac8769c5209c919a89c2fb36a19b84009ab52d
@@ -31889,10 +31890,10 @@ manifest:
       path: orgs/kotoba-lang/prng
       groups: [kotoba-lang]
     - name: delegation-rootkeys
-      remote: net-kotobase
+      remote: cloud-kotoba
       revision: 6cc2f27acd7ddf0f99b28203a135e618059e5222
-      path: orgs/net-kotobase/delegation-rootkeys
-      groups: [net-kotobase]
+      path: orgs/cloud-kotoba/delegation-rootkeys
+      groups: [cloud-kotoba]
     - name: shinkansen
       remote: kotoba-lang
       revision: ff132ad390054737cf60cd3c860e5dcd095bb875
