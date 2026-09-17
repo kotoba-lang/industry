@@ -126,9 +126,16 @@ admin.kotoba.cloud から自分の principal に実行 → 200、receipt `op-@ko
 - **`RESEND_API_KEY` は投入済み（2026-09-17 07:3x UTC）。** 1Password の旧 item `gftd.resend/API_KEY` の値は
   Resend に `API key is invalid`（`GET /domains` と `POST /emails` の 2 経路）—— オーナーが `Private` /
   「Resend API Key」に登録し直し、それを authority Worker に入れた（secrets-location-map 更新済み）。
-- **送信元は `no-reply@mail.kotobase.net`**（authority `96f676df`、main `67544ed4`）: Resend account の verified
-  11 domain に `mail.kotoba.cloud` は無く、`POST /domains` は 403 "domain limit of your plan"。plan upgrade か
-  既存 domain の削除で枠ができたら `mail.kotoba.cloud` を登録して `CONTACT_MAIL_FROM` を戻す。
+- **送信元は `no-reply@mail.kotoba.cloud`**（authority `e0daa923`、main `46a0e868`）。経緯: 最初は Resend account の
+  verified 11 domain に `mail.kotoba.cloud` が無く `POST /domains` が 403 "domain limit of your plan" だったので
+  一時的に `no-reply@mail.kotobase.net`（`96f676df`）。オーナー指示（「2」→ 除去する domain の名指し）で
+  kotobase.net / mail.kotobase.net / email.gftd.ai / gftd.ai / etzhayyim.com / email.gftd.co.jp を Resend から除去
+  （上限は 10 で、11 は超過状態だった）→ `mail.kotoba.cloud` を登録（ap-northeast-1）→
+  `scripts/provision-resend-dns.cljk --only kotoba.cloud --execute` で kotoba.cloud zone に DKIM / SPF MX / SPF TXT /
+  CNAME の 4 record（既存の `_dmarc.kotoba.cloud` p=reject は触らない）→ 1 分以内に Resend `verified` →
+  `CONTACT_MAIL_FROM` を戻して deploy → console から `delivered@resend.dev` へ送信 →「確認コードを送りました。」→
+  取り消し。⚠ `mail.kotobase.net` 送信元だった経路（smtp.kotobase.net の mail.send、mail-worker の Resend
+  Receiving）は Resend に domain が無くなったので動かない —— 使うなら再登録。
 - **送信を live で測った**: オーナーの console から Resend のテスト受信箱 `delivered@resend.dev` へ →
   「確認コードを送りました。」/ 確認待ち /「…宛に確認コードを送りました。…（残り 5 回）」/ code 欄に focus →
   取り消す →「確認を取り消しました。」/ 未登録。**人の受信箱でコードを打って確認する段はオーナーが自分の

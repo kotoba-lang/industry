@@ -17,9 +17,15 @@
 ;;         -> reject); withheld by default because overwriting a live policy is
 ;;         a deliverability decision, not reconciliation.
 ;;
-;; Credentials (targeted reads, never printed):
-;;   Resend      keychain service=gftd.resend account=API_KEY
-;;   Cloudflare  keychain service=gftd.cf     account=API_TOKEN
+;; Credentials (targeted reads, never printed). Environment first, then the
+;; keychain — measured 2026-09-17: the keychain items below were stale (the
+;; Resend key revoked, the Cloudflare token `9109 Invalid access token`), while
+;; 1Password held the new Resend key and kagi the Cloudflare global key
+;; (secrets-location-map: email-and-dns.md, cloudflare.md):
+;;   Resend      env RESEND_API_KEY | keychain service=gftd.resend account=API_KEY
+;;   Cloudflare  env CLOUDFLARE_API_TOKEN (Bearer)
+;;               | env CLOUDFLARE_EMAIL + CLOUDFLARE_GLOBAL_API_KEY (X-Auth-Email / X-Auth-Key)
+;;               | keychain service=gftd.cf account=API_TOKEN
 ;;
 ;; Exit codes: 0 = in sync / applied, 1 = error, 2 = drift found (--check only)
 
@@ -38,7 +44,12 @@
    {:zone "x402.nexus"     :resend-domain "mail.x402.nexus"}
    {:zone "kotobase.net"   :resend-domain "mail.kotobase.net"}
    {:zone "itonami.cloud"  :resend-domain "mail.itonami.cloud"}
-   {:zone "murakumo.cloud" :resend-domain "mail.murakumo.cloud"}])
+   {:zone "murakumo.cloud" :resend-domain "mail.murakumo.cloud"}
+   ;; kotoba.cloud's notification channel sender (ADR-2609171500, 2026-09-17).
+   ;; kotobase.net / mail.kotobase.net were removed from the Resend account the
+   ;; same day (owner direction; the plan's domain limit) — their rows above
+   ;; stay for the record but resolve to no Resend domain now.
+   {:zone "kotoba.cloud"   :resend-domain "mail.kotoba.cloud"}])
 
 ;; Inbound mail for these zones is Cloudflare Email Routing, not Resend, so the
 ;; Resend "Receiving MX" row is deliberately NOT created. Resend will keep
@@ -50,7 +61,9 @@
                          :mx [["route1.mx.cloudflare.net" 25]
                               ["route3.mx.cloudflare.net" 40]
                               ["route2.mx.cloudflare.net" 55]]}
-   "mail.itonami.cloud" {:zone "itonami.cloud" :mx :already-present}})
+   "mail.itonami.cloud" {:zone "itonami.cloud" :mx :already-present}
+   ;; no inbound for the notification sender: outbound only
+   "mail.kotoba.cloud"  {:zone "kotoba.cloud" :mx :already-present}})
 
 ;; DMARC aggregate reports land in one mailbox: dmarc@kotobase.net, which the
 ;; kotobase.net Email Routing catch-all already delivers to worker:kotobase-mail.
@@ -91,11 +104,21 @@
       (.then #(.json %))
       (.then ->clj)))
 
-(defn cf-req [token method path body]
+(defn env [k] (let [v (aget (.-env process) k)] (when (and (string? v) (seq (str/trim v))) (str/trim v))))
+(defn resend-key []
+  (or (env "RESEND_API_KEY") (keychain "gftd.resend" "API_KEY")))
+(defn cf-auth
+  "The Cloudflare auth headers: a Bearer token, or the global key pair."
+  []
+  (cond
+    (env "CLOUDFLARE_API_TOKEN") {"Authorization" (str "Bearer " (env "CLOUDFLARE_API_TOKEN"))}
+    (and (env "CLOUDFLARE_EMAIL") (env "CLOUDFLARE_GLOBAL_API_KEY"))
+    {"X-Auth-Email" (env "CLOUDFLARE_EMAIL") "X-Auth-Key" (env "CLOUDFLARE_GLOBAL_API_KEY")}
+    :else {"Authorization" (str "Bearer " (keychain "gftd.cf" "API_TOKEN"))}))
+(defn cf-req [auth method path body]
   (-> (js/fetch (str "https://api.cloudflare.com/client/v4" path)
                 (clj->js (cond-> {:method  method
-                                  :headers {"Authorization" (str "Bearer " token)
-                                            "Content-Type"  "application/json"}}
+                                  :headers (merge auth {"Content-Type" "application/json"})}
                            body (assoc :body (js/JSON.stringify (clj->js body))))))
       (.then #(.json %))
       (.then ->clj)))
@@ -197,8 +220,8 @@
         update-conflicts? (some #{"--update-conflicts"} argv)
         only     (when-let [i (.indexOf argv "--only")]
                    (when (>= i 0) (set (str/split (get argv (inc i) "") #","))))
-        rs-key   (keychain "gftd.resend" "API_KEY")
-        cf-key   (keychain "gftd.cf" "API_TOKEN")
+        rs-key   (resend-key)
+        cf-key   (cf-auth)
         targets  (if (seq only) (filter #(only (:zone %)) zones) zones)]
     (-> (js/Promise.resolve)
         (.then

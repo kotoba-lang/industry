@@ -7,11 +7,19 @@
     返ることを確認済み。投入済み: `kotoba-research-authority` の `RESEND_API_KEY`（app-kotoba-cloud の
     通知先、ADR-2609171500）。⚠ `op item get` は初回に 1Password の承認待ちで 60 s を超えることがある ——
     `timeout 40` を付けて再試行する。
-  - **Resend account の domain 上限**（2026-09-17 実測）: verified 11 件（mail.shinshi.club / mail.aozora.app /
-    mail.x402.nexus / mail.murakumo.cloud / kotobase.net / mail.kotobase.net / etzhayyim.com /
-    mail.itonami.cloud / email.gftd.ai / gftd.ai / email.gftd.co.jp）で plan の上限。`POST /domains` は
-    403 "You have reached the domain limit of your plan"。**`mail.kotoba.cloud` は未登録**（DNS に残る
-    SES 形式の MX/SPF は過去の登録の名残）。新 domain を足すには plan upgrade か既存 domain の削除が要る。
+  - **Resend account の domain 上限は 10**（2026-09-17 実測: 11 件在ったが上限超過状態で、1 件消しても
+    `POST /domains` は 403 "You have reached the domain limit of your plan"）。オーナー指示で
+    kotobase.net / mail.kotobase.net / email.gftd.ai / gftd.ai / etzhayyim.com / email.gftd.co.jp を除去し、
+    **`mail.kotoba.cloud` を登録・verified**（id `9974ffab-43f6-4bc0-a8fb-d12723f9878f`、ap-northeast-1）。
+    2026-09-17 時点の verified: mail.shinshi.club / mail.aozora.app / mail.x402.nexus / mail.murakumo.cloud /
+    mail.itonami.cloud / mail.kotoba.cloud（6 件）。⚠ `mail.kotobase.net` を送信元にしていた経路
+    （`smtp.kotobase.net` の mail.send、mail-worker の Resend Receiving）は Resend 側の domain が無いので
+    動かない —— 使うなら再登録が要る。
+  - **DNS の置き方は `scripts/provision-resend-dns.cljk --only <zone> [--execute]`**（Resend の live 値から
+    reconcile、dry-run 既定）。資格情報は env 優先: `RESEND_API_KEY`、Cloudflare は `CLOUDFLARE_API_TOKEN` か
+    `CLOUDFLARE_EMAIL` + `CLOUDFLARE_GLOBAL_API_KEY`（kagi `CLOUDFLARE_GLOBAL_API_KEY` の `email` /
+    `global-api-key`。2026-09-17 にこれで kotoba.cloud zone に 4 record を置いた）。keychain の
+    `gftd.resend` / `gftd.cf` は 2026-09-17 時点どちらも使えない（不在 / `9109 Invalid access token`）。
   - 旧正本 = 1Password `gftdcojp` vault / item `gftd.resend/API_KEY`（category PASSWORD、
     2026-09-17 実測。`gftd.resend` という item は無く `op read op://gftdcojp/gftd.resend/credential` は
     「isn't an item」で落ちる —— 下の旧記述はその名前で書かれていた）
