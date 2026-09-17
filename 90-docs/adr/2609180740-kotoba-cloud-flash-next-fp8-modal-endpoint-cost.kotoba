@@ -1,0 +1,109 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609180740-kotoba-cloud-flash-next-fp8-modal-endpoint-cost")
+  (:adr/title "api.kotoba.cloud が orcarouter/Qwen3.8-Flash-Next-Uncensored-FP8 (172.8 GiB) を Modal の専用 endpoint (scale-to-zero、compute 課金) で運用するときの原価 —— 2026-09-17 の単価・検証済み GPU 構成・実測アンカー $3.32/M output tok・月次シナリオ、および未測定 3 点")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-18")
+  (:adr/last_verified "2026-09-18")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-cloud-inference-cost")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/cloud-kotoba/app-kotoba-cloud"))
+  (:adr/authoritative_for
+(vector "api.kotoba.cloud で Qwen3.8-Flash-Next 系の FP8 checkpoint (172.78 GiB、51B n-gram 表が rank ごとに複製される) を Modal 専用 endpoint に載せるときの GPU 構成の可否 (B300:2 が検証済み最小、B300:1 / H200:2 / H100:2 は不可)" "Modal 単価 (2026-09-17 取得) から出る時間単価・常時稼働月額・cold start 1 回の原価" "$/M output token の実測アンカー (vLLM 公式 recipe: H100:4 + PLE CPU offload で 1,430 out tok/s @ 同時 64) と、それ以外の構成が推定であること" "散発トラフィックで cold start + scaledown 待機が仕事の 10 倍になる構造と、常時稼働への切替閾値" "この原価を現行 output 単価 $2.40/M (billing.cljk v3) と比べた判定"))
+  (:adr/related
+(vector "adr-2609171000 (Hermes fleet の既定を api.kotoba.cloud qwen3.8-flash-next-whitehacker に —— 本 ADR はその provider 側の原価)" "adr-2609160028 (kotoba-cloud paid inference)" "adr-2800005200 (Qwen3.8-Flash-Next の expert-aware NVMe streaming —— 自前 M4 fleet 経路。本 ADR は Modal 経路)" "adr-2607173100 (LLM model id をハードコードしない)" "docs/kotoba-cloud-econ-sim-2026-09-15.md (NVFP4 姉妹版の経営シミュレーション。untracked、本 ADR とは checkpoint も GPU 前提も違う)" "90-docs/business/openrouter/modal-backend-qualification-20260908.edn (Modal Shared endpoint の token 課金と契約上の未確認事項)"))
+
+  (:adr/body
+"# ADR-2609180740: Qwen3.8-Flash-Next-Uncensored-FP8 を Modal 専用 endpoint で運用する原価
+
+**Status**: accepted / 2026-09-18 / オーナー指示「modal の endpoint mode で orcarouter/Qwen3.8-Flash-Next-Uncensored-FP8 の運用コストを計算してみて」→「上記を api.kotoba.cloud の adr にきろく」。
+
+**endpoint mode の解釈**: Modal Library の Shared endpoint (token 課金) はカスタム HF checkpoint を載せられない。ここで言う endpoint は `@app.server` (vLLM OpenAI 互換) の **専用デプロイ = GPU/CPU/RAM の秒課金 + scale-to-zero**。
+
+## 前提 (2026-09-17 に実測・取得)
+
+**checkpoint** (HF API `safetensors` メタデータ、`lastModified 2026-08-29`):
+- safetensors 合計 **185,523,321,634 bytes = 185.5 GB = 172.8 GiB**、131 shard。総 180.0B params (F8_E4M3 174.5B + BF16 5.5B)。公式 `Qwen/Qwen3.8-Flash-Next-FP8` と byte 互換 (vLLM recipe の『172.78 GiB』と一致)。
+- 125B total / 6B active / 48 層 / 512 experts top-10 + shared / 262,144 ctx。**51B の n-gram (PLE) 埋め込み表は TP で分割されず rank ごとに複製される** —— これが GPU 選定を決める。
+- repo は **gated** (承認済み HF token が要る)。abliterated 版で、model card 自身が moderation 層なしで end user に出すなと書いている。
+- 推奨 image `vllm/vllm-openai:qwen38-flash-next` (CUDA 13、PyPI 不可)。FP8 は `--enable-expert-parallel` 必須 (intermediate 640 ÷ TP が block 128 で割れない)。
+
+**Modal 単価** (modal.com/pricing、秒課金): B300 $0.001972/s = $7.10/h、B200 $6.25/h、H200 $4.54/h、H100 $3.95/h。CPU $0.0000131/core-s ($0.047/core-h)、RAM $0.00000222/GiB-s ($0.008/GiB-h)、CPU/RAM は request と実使用の大きい方。Volume $0.09/GiB-月だが 1 TiB/月まで無料 → 186 GB の置き場は $0。Starter は GPU 同時 10 枚・$30/月の無料枠、Team は $250/月 + 50 枚。scaledown_window は 2 秒〜20 分、idle 中も課金。GPU memory snapshot は multi-GPU 非対応 (alpha)。Volume 読み出しは最大 2.5 GB/s。
+
+## 構成の可否 (vLLM 公式 recipe が検証した組合せ、2026-09-14 更新版)
+
+| 構成 | GPU $/h | +host $/h | 合計 $/h | 常時稼働 $/月 (730 h) | 可否 |
+|---|---|---|---|---|---|
+| **B300:2 (TP2)** | 14.20 | 0.89 | **15.09** | **11,014** | 検証済み最小 (recipe: GB300 TP2 が minimum) |
+| **H100:4 + `VLLM_PLE_CPU_OFFLOAD=1`** | 15.80 | 1.27 | **17.07** | 12,461 | 検証済み、**唯一の実測 tok/s あり**。host RAM ≥ 51 GB + headroom |
+| B200:2 (TP2) | 12.50 | 0.89 | 13.39 | 9,773 | VRAM 上は入る (rank あたり ~125 GB / 0.9×180) が recipe 未検証 |
+| B300:4 (TP4) | 28.40 | 0.89 | 29.29 | 21,378 | recipe 推奨 (MTP3 込みで検証) |
+| H200:8 (TEP8) | 36.32 | 0.89 | 37.21 | 27,160 | 検証済み。plain TP8 は不可 |
+| B300:1 | 7.10 | — | — | — | **不可**: recipe『TP1 compilation OOM on GB300: use TP2 or TP4』 |
+| H200:2 / H100:2 | — | — | — | — | **不可**: 51 GB 表の複製で rank あたり 125 GB > 0.85 × 141 |
+
+host は 8 core + 64 GiB 想定 (H100 offload 版は 112 GiB)。Modal は `gpu=H100` を同額で H200 に自動昇格することがあるが、VRAM 141 GB を前提にしてはいけない (`H100!` で固定)。
+
+## cold start (scale-to-zero の実コスト)
+
+- Volume 2.5 GB/s → 重み転送だけで ≥ 74 s。engine compile 込みで **4〜8 分と仮定 (未測定)**。multi-GPU なので memory snapshot は使えない。
+- **cold 5 分 + scaledown_window 5 分 = 1 burst あたり B300:2 $2.51 / H100:4 $2.84**。
+
+## トークン単価
+
+**実測アンカー**: recipe の H100:4 + PLE offload で **1,430 output tok/s (同時 64、random 1024in/256out)**。
+→ **$3.32 / M output tok、5.59 req/s、$0.85 / 1,000 req** (入力 5,720 tok/s は同時に処理されるので入力側は実質 $0)。
+
+| 構成 | 1,000 tok/s | 1,430 | 2,000 | 3,000 | 5,000 | 8,000 |
+|---|---|---|---|---|---|---|
+| H100:4 | 4.74 | **3.32 (実測)** | 2.37 | 1.58 | 0.95 | 0.59 |
+| B300:2 | 4.19 | 2.93 | 2.10 | 1.40 | 0.84 | 0.52 |
+| B200:2 | 3.72 | 2.60 | 1.86 | 1.24 | 0.74 | 0.46 |
+| H200:8 | 10.33 | 7.23 | 5.17 | 3.44 | 2.07 | 1.29 |
+
+($/M output tok、host 込み)。**B300:2 の tok/s は未測定** —— H100:4 の帯域 13.4 TB/s に対し 16 TB/s + offload 無しなので 1.5〜2.5× を見込めるが推定であって測定ではない。参考: SemiAnalysis InferenceX の H200×8 SGLang 実測 (2026-08-27、AgentX agentic workload、total tokens) は 16,353 tok/s/GPU @ 50 tok/s/user → Modal 単価で $0.079 / M total tok。framework も workload も違うので上限の目安。MTP speculative decoding は H100 で悪化 (受理率 ~36%、throughput -8〜36%) なので既定 off。
+
+## 月次シナリオ (B300:2 / H100:4、cold 5 + idle 5 分/burst)
+
+| シナリオ | B300:2 | H100:4 |
+|---|---|---|
+| dev: 2 h/日 × 22 日、1 burst/日 | $719 | $814 |
+| 営業時間 8 h/日 × 22 日 | $2,711 | $3,067 |
+| 散発 30 req/日 × 30 日 (各 1 分・孤立 burst) | $2,489 | $2,816 |
+| 200 req/日を 20 burst に集約 (各 3 分) | $1,961 | $2,219 |
+| 24/7 `min_containers=1` | $11,014 | $12,461 |
+
+散発 30 req/日で $2.5K = **1 req あたり $2.8**。仕事 15 h に対し cold + idle が 150 h。孤立 burst が 1 日 ~140 を超えると常時稼働の方が安い。
+
+## 判定
+
+1. **最安の検証済み構成は B300:2 = $15.09/h。** B300:1 は動かず、H200:2 も入らない。
+2. 現行 api.kotoba.cloud の output $2.40/M (`app-kotoba-cloud` billing.cljk v3、docs/kotoba-cloud-econ-sim-2026-09-15.md) に対し、実測アンカーの原価は **$3.32/M (H100:4)** —— 現行単価で常時稼働は赤字。B300:2 で 2,000 out tok/s 以上出せれば $2.1/M 以下に落ちるが未測定。
+3. コストを決めるのは GPU 単価より **稼働率と cold start 回数**。散発なら Modal Shared endpoint / 他 provider の token 課金の方が桁で安い (Shared の契約・再販条件は modal-backend-qualification-20260908 の未解決事項のまま)。
+4. この ADR は原価の記録であって、api.kotoba.cloud の単価改定や Modal への deploy を決めていない。
+
+## 未測定 (この ADR が『測った』と言っていないもの)
+
+1. B300:2 の実 output tok/s (同時数別)。
+2. Modal 上の cold start 秒数 (Volume → GPU の転送 + compile)。
+3. PLE 複製込みの rank あたり実 VRAM と、`--max-num-seqs 256` での KV 予算。
+4. Modal の host RAM 計上 (page cache が request を超えて実使用に数えられるか)。
+
+B300:2 を 1 時間だけ立てて `vllm bench serve` を回せば **約 $20** で 1〜3 が埋まる。計算は python で再現できる (前提: 上の単価、730 h/月、cold 5 分、scaledown 5 分、host 8 core + 64/112 GiB)。
+
+## 出典 (2026-09-17 取得)
+
+- https://huggingface.co/orcarouter/Qwen3.8-Flash-Next-Uncensored-FP8 (model card、gated) と `https://huggingface.co/api/models/orcarouter/Qwen3.8-Flash-Next-Uncensored-FP8?blobs=true`
+- https://huggingface.co/Qwen/Qwen3.8-Flash-Next
+- https://recipes.vllm.ai/Qwen/Qwen3.8-Flash-Next (Updated 2026-09-14)
+- https://inferencex.semianalysis.com/run/qwen-3-8-flash-next-on-h200 (run 2026-08-27)
+- https://modal.com/pricing, https://modal.com/docs/guide/gpu, /cold-start, /memory-snapshot, /volumes, /resources
+
+## Resume point
+
+1. 測るなら: Modal Starter で `gpu=B300:2`、Volume に gated checkpoint を 1 回置き (HF token は Modal Secret)、`vllm serve --tensor-parallel-size 2 --enable-expert-parallel --max-num-seqs 256` で 1 時間、`vllm bench serve` を同時 8 / 64 / 256 で。cold start は container 起動から `/health` 200 までを秒で記録。結果はこの ADR の本文を上書き (履歴は git)。
+2. 単価改定を判断するなら、上の表の B300:2 行を実測値で置き換えてから。
+")))
