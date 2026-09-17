@@ -4,6 +4,7 @@
   (:adr/title "shinkansen — 5 軸の直交（DID / CID / origin / grant / effect）、reference host、maturity gap の解消と「作らない」の決定")
   (:adr/status "accepted")
   (:adr/date "2026-09-16")
+  (:adr/updated "2026-09-17")
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/doc-type "adr")
   (:adr/source-format "kotoba")
@@ -12,14 +13,17 @@
                       "orgs/kotoba-lang/jp-go-digital-design-system"
                       "orgs/cloud-kotoba/app-kotoba-cloud"
                       "orgs/kotoba-lang/org-biscuitsec"
-                      "orgs/kotoba-lang/authority"))
+                      "orgs/kotoba-lang/authority"
+                      "orgs/net-kotobase/control-plane"))
 
   (:adr/authoritative-for
   (vector "shinkansen の dispatch は authority seam を持ち、seam が無い・答えが decision でない・否のいずれも拒否であること（binding に届いたことは authority ではない）"
    "origin / path / hostname は authorizer の入力にならないこと（origin は containment、path は参照、URL は view）"
    "shinkansen の framework 契約は reference host（shinkansen.host / serve）で駆動されること、maturity.cljc が declared と driven を区別して測ること"
    "preference cookie（locale / theme）は name-origin family を跨いでよく、credential / grant は跨がないこと"
-   "作らないもの: client soft navigation、image / font 最適化、HMR（live-reload まで）、table の virtualisation"))
+   "作らないもの: client soft navigation、image / font 最適化、HMR（live-reload まで）、table の virtualisation"
+   "identity（CID を名乗る）と retrievability（{cid}.ipfs.yataverse.com が同じ bytes を返す）は別の性質で、後者は release step（app-kotoba-cloud publish:receipts）が作り、verify:live の canonical-resolves case がそれを測ること"
+   "kotobase.net apex の zone Redirect Rule は Worker 930ce2d0 の除外（/.well-known/ /api/ /xrpc/ /pins /mcp /health /ipfs/ /ipns/、非 GET）を必ず持つこと —— 持たない rule は archive の PUT /ipfs/{cid} を黙って 308 にする"))
 
   (:adr/related
   (vector "adr-2609131808-shinkansen-content-addressed-web-framework"
@@ -38,7 +42,9 @@
    "D7: origin 分離の代価 —— preference（locale / theme）は name-origin の性質。locale cookie は :domain に registrable parent を置いてよい（app-kotoba-cloud、オーナー実測 2026-09-16）。credential / grant は Domain= で配らない（grant は header）"
    "D8: 作らない —— client soft navigation（CID を跨ぐ nav は content host では origin を跨ぐ）、image / font 最適化（:document 自己完結と衝突）、HMR（新しい document CID が在るだけ）、DADS table の virtualisation（1 page 分の行）。作る場合は accepted ADR を要する"
    "D9: jp-go-dds.behavior 0.2.0 —— popover / tooltip / select / slider / table を足し、place() で全 float が viewport に衝突しない（flip up + clamp）。12 kind。shinkansen.audit :behaviors-delivered は同じ 12 を知る"
-   "D10: shinkansen.form —— schema は data、validate は field ごとに全 rule を名指し、field-attrs が aria-invalid / aria-describedby を出す。actions は schema map を :validate として受ける"))
+   "D10: shinkansen.form —— schema は data、validate は field ごとに全 rule を名指し、field-attrs が aria-invalid / aria-describedby を出す。actions は schema map を :validate として受ける"
+   "D11: 本番の name host は identity を名乗り（ETag = raw CIDv1、Link rel=canonical ipfs://、no-cache、If-None-Match は strong / weak（CDN が圧縮で W/ にする）とも receipt だけで 304）、bytes plane は R2 kotobase-graph-database-production の ipld/{cid} を最初に読むので、retrievability は release の後に publish:receipts（HEAD で既存 skip → wrangler r2 object put → plane から読み戻して byte 比較）が作る。B2 archive / IPNI はそこで書かない（未着手であって決定ではない）"
+   "D12: kotobase.net apex の document は graph.kotoba.cloud/ へ（owner 2026-09-17）。zone Redirect Rule と control-plane の kotobaCloudApexRedirect（PR 709）は同じ target を持つ。API / DID / bytes path と非 GET は rule から除外され、archive の PUT /ipfs/{cid} は 401（届いて auth を求める）に戻った"))
 
   (:adr/body
   "2026-09-16 オーナーとの設計対話（docs. / apps. / console. の origin 分離 → DID + Biscuit → CID first、path は参照）を shinkansen に当てて測った。見直し前の framework は what（CID）と where（{cid}.ipfs.* / {name}.itonami.app）を持ち、who と may を持たず、自分が行う唯一の effect（chain append）に名前が無かった —— actions/dispatch は shape と宣言だけを見て、MCP lake_dispatch は event 以外を受け取らず、binding に届いたことが authority だった。これは capability-semantics の :plain-resource-is-not-authority と :missing-grant :deny を framework 自身が破る形。
@@ -51,10 +57,18 @@
 - cloud-kotoba/app-kotoba-cloud PR 294: locale.cljk が shinkansen.locale を require（再導出を廃止）。worker-smoke 30 assertion。deploy は同 repo の既存 4 failure が npm test gate を止めるため未実施
 - kotoba-lang/jp-go-digital-design-system PR 12 / 13: popover / tooltip / select / slider / table + place()。real browser 146 assertion（80 から）
 - shinkansen PR 13: shinkansen.form、audit の behaviour 契約 12 kind、maturity 行
+- 2026-09-17（e2e と bytes plane）: shinkansen PR 14（host document-headers / not-modified? / routes paths->tree —— Worker host 用）、15（viewport が linked stylesheet の phone band を読む :stylesheets —— 418/451 document を拒否していた gate の直し）、16 / 22（maturity: kotoba.cloud が routes / adapter / invoke / state identity / i18n の product consumer）、18（weak ETag を一致とみなす + live-identity-e2e `npm run verify:live` を本番 name host に当てる）、21（seam は api.kotoba.cloud で測る —— docs. は documents-only で /v1/invoke は 404、e2e の前提が違っていた）、23（bytes plane は yataverse.com、kotobase suffix は retired。e2e に canonical-resolves case）、25（canonical resolves 緑の実測を SPEC §1.1 / §3.3 と maturity に）
+- app-kotoba-cloud PR 322（tenants 一覧が本番で一度も読めていなかった —— authn-token が常に POST /v1/biscuit/token していた。authn-call が caller の method で /v1/tenants へ）、327（/v1/invoke の query が本番で count 0 —— ctx が index の :documents を読んでいた。make-ctx は index を受ける）、330（weak ETag で 304 —— Cloudflare 越しの browser は 304 を一度も得ていなかった）、334（scripts/publish-receipts.cljk、`npm run publish:receipts [--dry-run] [--limit N] [--wrangler-dir]`）
+- net-kotobase/control-plane PR 709（57b43ce、pin 前進）: kotobaCloudApexRedirect の target を graph.kotoba.cloud/ に。deploy はしていない —— 有効な policy は zone rule
+- kotobase.net zone（5ad3da692f2367905c257cfcb0c1057c、ruleset b40982939f9e4c11acc8da4f41b568e4）の Redirect Rule 4 本（2026-09-14 16:03 JST 作成、version 5）は host 一致だけで全 path・全 method を kotoba.cloud へ飛ばしていた（3aa20428: 全 GET → 301 kotoba.cloud{path}、cb27df0e: POST/PUT/DELETE/PATCH → 308 kotoba.cloud{path}、d92b3feb: / → 301 kotoba.cloud/docs/graph/、cef00d39: /ipld → 302 ipfs.kotobase.net）。Worker 930ce2d0 の除外は rule に無く、archive の PUT /ipfs/{cid} が 308 で死んでいた。agent の Cloudflare 書き込みは auto-mode classifier（DNS / Domain / Cert Changes）で止まる —— owner が同 patch（kagi CLOUDFLARE_GLOBAL_API_KEY）を 2026-09-17 に実行: 3aa20428 / cb27df0e に GET-HEAD と非 GET の分担 + 除外（/.well-known/ /api/ /xrpc/ /pins /mcp /health /ipfs/ /ipns/、`/` と /index.html は d92b3feb）、target は 3 本とも https://graph.kotoba.cloud/、cef00d39 は据え置き。1 回目は `action is required for action parameters` で 3 本とも失敗（PATCH body に action と enabled が要る）、足して成功。実測後: / → 301 graph.kotoba.cloud/、/health 200、/.well-known/did.json 200、PUT /ipfs/x → 401、POST /benchmarks → 308 graph
+- R2 publish（app-kotoba-cloud `npm run publish:receipts`、wrangler OAuth session、2026-09-17）: 1 回目（09:45 の build）は SCANNED 567 / PUBLISHED 509 / ALREADY 58 / FAILED 0 だったが verify:live はまだ FAILED 2 —— 回している間に別 release（favicon を全 host に、PR 336）が出て 567 個全部の CID が変わっていた。main tip e9e12f36 で `npm run render` し直すと receipt は live と 567/567 一致（render は再現可能。live の artifact = bafkreifjsdfntbcqtcwgspkfkmsacu575fnpmgij2inzmgjuprzm3244zi）。2 回目（同 build、順方向 + 逆方向の 2 process）: 順方向 SCANNED 567 / PUBLISHED 267 / ALREADY 300 / FAILED 0、逆方向 244 / 323 / 0（合わせて 511 PUT）。**測れたこと**: 1 document ≈ 6–10 s（wrangler 起動が支配的）、全 document が変わる release は CLI 経由で 1 時間級 —— 次の release までに終わらないことがある
+- 本番 e2e（shinkansen `npm run verify:live`、release 441beec4 の後 + publish 後）: release 441beec4 の直後は SCANNED 20 / FAILED 2（canonical resolves が両 host で 404）、2 回目の publish 後は SCANNED 20 / FAILED 0 / UNREACHABLE 0（canonical resolves 200、served CID = ETag）。case: apex receipts / ETag = served bytes の raw CIDv1（weak 可）/ Link canonical / no-cache / 304 strong + weak / asset は identity を名乗らない / canonical resolves（{cid}.ipfs.yataverse.com が同じ bytes）/ invoke seam（api.kotoba.cloud: grant 無し → 403 no-grant-presented、読めない → grant-unreadable）
+- 本番 allow path（owner の Chrome の passkey session、console.kotoba.cloud 同 origin、token は page の window.__e2e に置き agent には返していない）: tenant `shinkansen-e2e`（t_a357795dff7b4e3992501488）を作り data:read token を mint → POST api.kotoba.cloud/v1/invoke {:kind :query} → 200 / granted / holder = active DID / 567 document の station。tenant は owner の account に残してある（decommission は owner 判断）
 
 測ったこと（数値は再現手順として）: 消費者数は cloud-kotoba / net-kotobase / cloud-itonami-app / cloud-kotoba-dds を [shinkansen.<ns> の require 形で grep。19 namespace 中 5 に消費者、11 は 0 だった。reference host は 11 を :driven-by-host にするが :driven-by-product ではない —— maturity.cljc がその差を持つ。
 
 発見・未解決:
+- 2026-09-17 に測って残ったもの（優先順）: ① publish:receipts は deploy chain に入っていない（wrangler OAuth が要り fleet CI から打てない）—— release のたびに手で回すか drain worker に寄せるかは未決 ② B2 archive（PUT kotobase.net/ipfs/{cid}、KOTOBASE_ARCHIVE_TOKEN）と IPNI announce は publish:receipts が書かない ③ /v1/invoke に CORS が無い（同 origin の console からしか呼べない）④ data-loading / rendering-modes / dev / error-handling は reference host だけが駆動、forms / MCP は declared、charts は absent（maturity.cljc）⑤ `.claude/settings.json` の Cloudflare zone 読み取り permission rule は agent の self-modification 拒否で未適用（snippet は session 末尾の handoff）
 - lang/capability-semantics.edn の閉じた :kinds に :chain/append / :app/query / :app/assert は無い。semantics の集合をそのまま渡す production authorizer は 3 つとも :unknown-kind :deny で拒否する（方向は正しい）。登録は言語側の決定
 - org-biscuitsec の npm run test:nbb は pin の綴りのままでは走らない（kotoba.lang.text と protobuf.wire が classpath に無い）
 - （解消 2026-09-16、同日後半）kotoba.cloud が product consumer になった: app-kotoba-cloud PR 301（fc20c7a、release version 8a46e59b）。render が全 541 document を adapter/adapt（publish gate → raw CIDv1 receipt）に通し /.well-known/shinkansen/receipts.json を出す。Worker は routes/paths->tree で name を解決し ETag = CID / Link rel=canonical ipfs:// / no-cache、If-None-Match は receipt だけで 304。実測 live: kotoba.cloud/ の body の raw CIDv1 = ETag（bafkreibaelmdac6…）、docs.kotoba.cloud も同じ、css は identity を名乗らない。POST /v1/invoke は authn の Biscuit wire を pinned root 公開鍵（auth.kotoba.cloud/.well-known/biscuit-configuration rootKeys id 1）で verify し biscuit.authority/->grant + authority.chain で決める —— この Worker が presented Biscuit を verify する最初の面。本番実測: grant 無し → no-grant-presented、読めない → grant-unreadable、test root の wire token → signature-mismatch。許可経路（data:read の本物の token → receipt set を query）は passkey session が要るので unit（178 test）と workerd（14 check）でのみ実測。残り: layouts と render は app 自身、bytes は Static Assets、chain は無い（action は 422）
