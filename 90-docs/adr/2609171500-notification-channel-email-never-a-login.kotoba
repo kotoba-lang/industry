@@ -104,18 +104,26 @@ anonymous object に `/adopt/release` を頼む —— anonymous 側は **record
   「読み込めませんでした。更新してください。」を名指しで出す（旧 authority は `/contact/status` に 404）、
   PAT 発行の notify hop は 404 を握って無視。**main と west pin は修正と機能を持ち、authority Worker は持たない。**
 
-## 次の一手（オーナー判断）
+## オーナー判断（2026-09-17「1」）と実行
 
-1. anonymous record を **operator 署名の op でオーナーの現在の principal に明示的に渡す**
-   （既存の `RESEARCH_OPERATOR_SECRET` 経路の `review` op に `adopt-anonymous` を足す。名前一致に頼らない、
-   監査台帳に残る）。着地後に authority を再 deploy → admin console から 1 回実行 → オーナーの object に
-   verified / scope / token 6 本が載る。他の principal が同じ record を共有していた状態は終わる。
-2. または修正を保留し（rollback のまま）、共有 object を意図的に受け入れる —— その場合 ADR にそう書く。
-   通知先機能は authority 側の op が無いので動かない。
+operator op **`adopt-anonymous`**（`/v1/research/review`、registry operator か HMAC proof）を足した
+（app-kotoba-cloud main `35751a0f`）: target の object 上で動き、anonymous object に `force` で release を
+頼み（object 間のみ —— binding は今も `/adopt/release` を呼べない）、record の `principalId` を target に
+書き換え、`:lastReview` に `adoptedFrom` 付きで監査。拒否は名指し: `record-present`（target が空でない
+record を持つ —— 上書きしない）/ `nothing-to-adopt`（既に渡した、または無い）。`test/authority-routing.mjs`
+60 checks。
+
+**live（06:59 UTC）**: authority `d7753300` / edge `5794e4e5` を main `18309bff` から deploy。オーナーが
+admin.kotoba.cloud から自分の principal に実行 → 200、receipt `op-@kotoba-iytl8oz8ehlqr8-1789628413591`、
+`active` / eKYC `verified` / token 7 / scope 1。console はオーナー自身の object で 本人確認 確認済み /
+研究環境 利用可能 / owned·approved / 6 本が有効 / 7 本、通知先は「未登録」+ address 入力。
+`probe@example.com` へコード送信 → 「この環境ではメール送信がまだ設定されていません。」
+（503 `contact-mail-not-configured`、何も mint されない）—— fail closed の経路を live で確認。
+**principal 共有の状態は終わった**: forward は principal ごと、anonymous object は release 済み。
 
 ## 未測定・残る gap
 
-- **`RESEND_API_KEY` は authority Worker（`kotoba-research-authority`）に未投入。** 投入まで start は
+- **`RESEND_API_KEY` は authority Worker（`kotoba-research-authority`）に未投入（live で確認済み、上）。** 投入まで start は
   503 `contact-mail-not-configured` を名指しで返す（console はその文を出す）。投入:
   `op read op://gftdcojp/gftd.resend/credential | wrangler secret put RESEND_API_KEY --config wrangler.research.jsonc`
   （op が signin できないとき keychain mirror `gftd.resend`/`API_KEY` も 2026-09-17 時点で無かった）。
