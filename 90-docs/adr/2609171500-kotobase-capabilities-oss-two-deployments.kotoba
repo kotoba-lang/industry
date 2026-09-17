@@ -1,0 +1,62 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609171500-kotobase-capabilities-oss-two-deployments")
+  (:adr/title "kotobase の capability はすべて kotoba-lang の OSS library、graph.kotoba.cloud (private) と yataverse.com (public) はその 2 つの deployment —— private Worker に残っている capability 本体 (~35k 行) を切り出す順序と、adr-2609171200 §3 の superseded")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-17")
+  (:adr/last_verified "2026-09-17")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotobase-capabilities-oss-deployments")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root" "orgs/kotoba-lang/kotobase-protocol-core" "orgs/cloud-kotoba/control-plane" "orgs/cloud-kotoba/ipfs" "orgs/cloud-kotoba/cypher" "orgs/cloud-kotoba/lake" "orgs/kotoba-lang/app-kotoba-cloud"))
+  (:adr/authoritative_for
+(vector "kotoba.cloud と yataverse.com の役割分担 (何を private で運用し、何を public で運用するか) と、その線が『protocol 名』ではなく『capability 本体は OSS、deployment は 2 つ』であること" "2026-09-17 時点で capability 本体が private repo に残っている量の実測と、切り出す順序 (依存の底から)" "kotobase-protocol-core を public にする決定 (secret scan 48 blob / 0 hit、.cpcache 除去、Apache-2.0)" "adr-2609171200 §3 (kotobase.net の capability host を graph.kotoba.cloud 配下へ寄せる) を superseded にする"))
+  (:adr/related
+(vector "adr-2609171200 (§3 を本 ADR が superseded。§1 transfer と §2 west 移動は生きている)" "adr-2608051000 (1 repo = 1 capability —— 切り出しの単位はこれ)" "adr-2609108000 (privacy 面 —— private/public の線は Identity != Authority、Content addressing != Safe disclosure)" "adr-2608159100 (永続化境界は kotobase.net —— host 名の節は yataverse.com / graph.kotoba.cloud の deployment が立った時点で書き換える)"))
+
+  (:adr/body
+"# ADR-2609171500: kotobase の capability は OSS library、graph.kotoba.cloud と yataverse.com はその 2 つの deployment
+
+**Status**: accepted / 2026-09-17 / オーナー指示「capability host は yataverse.com に移行、graph.kotoba.cloud などで提供。kotoba.cloud は cybersecurity 関係だけ、graph / ontology が中心で private がメイン。多様な ipld / ipni ベースの protocol、capability、p2p ベースのものは yataverse.com に」→「あくまでも capability は OSS で公開できているよね? graph.kotoba.cloud は単に private に運用するというだけ。yataverse 側に datomic / cypher / sparql の capability ももちろん持たせたい」→「ok, do it」。
+
+## 決定
+
+1. **capability 本体は kotoba-lang の OSS library**（1 repo = 1 capability、adr-2608051000）。private に残すのは**判定と鍵**だけ: `trust_assurance` / `trust_decision` / `keyring` / billing / firewall / cybersecurity の判定。
+2. **deployment は 2 つ**、同じ library を使う:
+   - `graph.kotoba.cloud`（cloud-kotoba、private 運用）: graph / ontology + cybersecurity。datomic / cypher / sparql は `/v1/...` の path で提供。
+   - `yataverse.com`（network-awai、public 運用）: 同じ datomic / cypher / sparql に加えて IPLD / IPNI / IPFS / IPNS / s3 / pinning / atproto / git / p2p / search。
+   線は「protocol 名」ではなく「private で運用するか public で運用するか」。どちらも同じ OSS の instance。
+3. **adr-2609171200 §3 は superseded**: kotobase.net の capability host を graph.kotoba.cloud に寄せる作業はしない。旧 `*.kotobase.net` host は、yataverse.com / graph.kotoba.cloud の deployment が立ち、消費者（kotobase-client / SDK / actor 群）が新入口に移ったあとで 410 にする（API client は POST するので 301 では壊れる）。
+4. repo は面に従う: protocol Worker（ipfs、protocols-worker の分割先、commoncrawler、inga replica、search-origin）の deployment wrapper は network-awai へ、graph 系の wrapper は cloud-kotoba に残す。library は全部 kotoba-lang。
+
+## 実測 (2026-09-17): 「OSS で公開できているか」は部分的
+
+| capability | OSS (kotoba-lang public) | private に残る本体 |
+|---|---|---|
+| datom 面 / graph DB | kotobase-server (21 file)、kotobase-engine-lsm、kotobase-client、kotobase-block-codec、inga、io-ipld* | `cloud-kotoba/control-plane/kotobase-graph-database` 42 file・約 14k 行 (xrpc / store / object-store / block-store / keyring / trust_assurance / trust_decision / physical-index-journal)。kotobase-server と同じ path の file は 0 |
+| Cypher | org-opencypher-cypher (仕様・parser) | `control-plane/protocols-worker/query.cljk` 368 行 (cypher Worker は 43 行でそれを require) |
+| SPARQL / lake | kotobase-lake、org-w3-sparql-protocol、columnar、org-apache-arrow / -parquet | `lake` Worker 658 行 (一番 OSS に近い) |
+| s3 / pinning / IPNI / atproto / git | — | `protocols-worker` 5,576 行 (dep は text だけ)、`kotobase-protocol-core` 577 行 **(private だった)** |
+| IPFS / IPNS gateway | io-ipld、io-ipld-car、io-multiformats | `ipfs` Worker 4,815 行 |
+| search | kotobase-shard-index | `search-origin` 20,100 行 (yataverse で稼働中) |
+
+合計 約 35k 行が切り出し対象。
+
+## 切り出しの順序 (依存の底から)
+
+1. **kotobase-protocol-core を public に** —— 本日実施: 全履歴 secret scan 48 blob / 0 hit (陽性 control 通過)、`.cpcache` (ローカル絶対 path) を untrack (PR #1)、Apache-2.0 LICENSE を kotobase / kotobase-server と byte 同一で追加 (PR #2)、west pin 9a1e5299 へ。**visibility の PATCH は owner 操作** (`gh api -X PATCH repos/kotoba-lang/kotobase-protocol-core -f visibility=public`) —— agent の harness が『Create Public Surface』として拒否した。
+2. `protocols-worker` を capability ごとに `kotobase-protocol-{s3,pinning,ipni,atproto,git}` + `kotobase-query-cypher` に分割 (kotoba-lang、public)。Worker 側は wrapper に。
+3. `kotobase-graph-database` の store / object-store / block-store / physical-index-journal / xrpc を `kotobase-server` へ吸収。`trust_*` と `keyring` は cloud-kotoba に残す。
+4. `ipfs` Worker 本体を `kotobase-gateway-ipfs` へ。
+5. yataverse.com 用の deployment wrapper を network-awai に置き、datomic / cypher / sparql / protocol 群を public で立てる。graph.kotoba.cloud の wrapper は同じ library を private 設定で。
+6. 消費者を新入口へ → 旧 `*.kotobase.net` を 410 → adr-2608159100 の host 名の節を書き換え。
+
+各段の gate: 切り出した library に**その Worker が実際に require する**こと (索引が当たることは動く証拠ではない)、`west-orphan-audit --blocking` exit 0、Worker の smoke が切り出し前後で同じ結果。
+
+## Resume point
+
+第 2 段の最初の 1 本は `protocols-worker/query.cljk` (368 行、cypher Worker の唯一の依存) → `kotoba-lang/kotobase-query-cypher`。
+"
+)))
