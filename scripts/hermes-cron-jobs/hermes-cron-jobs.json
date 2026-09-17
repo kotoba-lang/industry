@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-16T09:06:10Z",
+  "generated_at": "2026-09-17T16:19:44+09:00",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -8305,6 +8305,34 @@
         "script": null,
         "skills": null,
         "workdir": null
+      }
+    ],
+    "akc-graph-ops": [
+      {
+        "id": "cd476c0da2aa",
+        "name": "akc-graph-ops",
+        "schedule": {
+          "kind": "cron",
+          "expr": "0 6 * * 1",
+          "display": "0 6 * * 1"
+        },
+        "script": "akc_graph_ops_evidence.py",
+        "workdir": "/Users/junkawasaki/.gftd/worktrees/akc-graph-ops",
+        "model": "qwen3.8-flash-next-whitehacker",
+        "provider": "kotoba",
+        "max_tokens": 16384,
+        "enabled_toolsets": null,
+        "prompt": "akc-graph-ops weekly iteration (agent graph lane owner).\n\nSOUL.md を読め (~/.hermes/profiles/akc-graph-ops/SOUL.md)。実行手順:\n1. evidence script 出力 (この run の冒頭) を読む。REFUSED banner なら盲状態を報告して停止。\n2. 偶数週 (週番号偶数) = 計測反復: 結果をレポートして終了 (PR 不要なら PR ゼロで正常)。\n   奇数週 = 追加反復: guard matrix の穴 (write拒否, pat拒否, gremlin subset) と\n   llms.txt の graph セクションの実在を 1 ハードニングし, 1 PR まで。\n3. 作業 branch は kotoba-lang remote の main から新規 (graph-ops/main は同期専用, push しない)。\n4. PR は cloud-kotoba/app-kotoba-cloud 宛。1 run = 最大 1 PR。approve せずコメント検査 -> gh pr merge --merge。\n5. shell コマンド行は純 ASCII (ファイル内容は日本語可)。",
+        "deliver": "local",
+        "no_agent": false,
+        "repeat": {
+          "times": null,
+          "completed": 0
+        },
+        "skills": [],
+        "context_from": null,
+        "monitor_script": null,
+        "monitor_url": null
       }
     ]
   },
