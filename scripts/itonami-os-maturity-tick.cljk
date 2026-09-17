@@ -163,21 +163,55 @@
 
 (def ^:private set-re #"#\{([^}]*)\}")
 
+(defn- read-ns-file [dir base]
+  ;; 2026-09-17 実測: cljk rename (ADR-2609111500) で phase/governor が .cljk に
+  ;; なった repo があり、旧拡張子だけ読むと読めなかった op 集合が隣の def の
+  ;; リテラルに化ける（isic-7310 の偽 drift はこれ）。両方読む。
+  (or (slurp* (str dir base ".cljc"))
+      (slurp* (str dir base ".cljk"))))
+
+(defn- literal->set [body]
+  (->> (str/split body #"\s+")
+       (map str/trim)
+       (remove str/blank?)
+       (filter #(str/starts-with? % ":"))
+       (map #(keyword (subs % 1)))
+       set))
+
 (defn- parse-op-set [src marker]
   (when src
     (when-let [i (str/index-of src marker)]
-      (when-let [m (re-find set-re (subs src i (min (count src) (+ i 600))))]
-        (->> (str/split (second m) #"\s+")
-             (map str/trim)
-             (remove str/blank?)
-             (filter #(str/starts-with? % ":"))
-             (map #(keyword (subs % 1)))
-             set)))))
+      (let [body (subs src (+ i (count marker))
+                       (min (count src) (+ i (count marker) 600)))
+            body (str/replace body #"^\s+" "")]
+        (cond
+          ;; 直呼び出しの union: `(def write-ops (set/union a b))` —— 参照先の
+          ;; def を解決する。1 段だけで足りる（実測の形はこの 1 種のみ）。
+          (str/starts-with? body "(set/union")
+          ;; 名前は union 呼び出し行の上だけ。docstring まで走らせるのは禁止
+          ;; (2026-09-17 実測: 600 字窓の語を全部拾うと直後の docstring が
+          ;; 混ざって every? が壊れ、偽 drift が出続けた)。
+          (let [line (first (str/split body #"\n"))
+                names (->> (subs line (count "(set/union"))
+                           (re-seq #"\b([a-z][a-z0-9_-]+)\b")
+                           (map second))
+                resolved (map (fn [n]
+                                (when-let [j (str/index-of src (str "(def " n))]
+                                  (when-let [m (re-find set-re
+                                                       (subs src j (min (count src) (+ j 600))))]
+                                    (literal->set (second m)))))
+                              names)]
+            ;; 1 つでも解決できない名前があれば嘘をつかない -> nil
+            (when (every? some? resolved)
+              (reduce into #{} resolved)))
+
+          (re-find set-re body) (literal->set (second (re-find set-re body)))
+          :else nil)))))
 
 (defn- actor-ops [v]
   (let [base (str root "/orgs/" (:org v) "/" (:repo v) "/src/" (:ns v))
-        gov (slurp* (str base "/governor.cljc"))
-        ph (slurp* (str base "/phase.cljc"))]
+        gov (read-ns-file base "/governor")
+        ph (read-ns-file base "/phase")]
     (or (parse-op-set gov "(def allowed-ops")
         (let [r (parse-op-set ph "(def read-ops")
               w (parse-op-set ph "(def write-ops")]
