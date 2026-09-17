@@ -134,7 +134,17 @@ admin.kotoba.cloud から自分の principal に実行 → 200、receipt `op-@ko
   `scripts/provision-resend-dns.cljk --only kotoba.cloud --execute` で kotoba.cloud zone に DKIM / SPF MX / SPF TXT /
   CNAME の 4 record（既存の `_dmarc.kotoba.cloud` p=reject は触らない）→ 1 分以内に Resend `verified` →
   `CONTACT_MAIL_FROM` を戻して deploy → console から `delivered@resend.dev` へ送信 →「確認コードを送りました。」→
-  取り消し。⚠ `mail.kotobase.net` 送信元だった経路（smtp.kotobase.net の mail.send、mail-worker の Resend
+  取り消し。
+- **送受信の輪を Resend で閉じた**（オーナー指示「送受信も resend で試して」、08:22 UTC）: `mail.kotoba.cloud` の
+  Receiving を有効化（`PATCH /domains/{id}` `capabilities.receiving`）、受信 MX を
+  `provision-resend-dns.cljk --only kotoba.cloud --execute --update-conflicts --update-types MX` で配置（古い
+  `feedback-smtp.us-east-1` MX を置換、DMARC は触らない）→ 約 40 s で Receiving verified。console から
+  `probe-hty085@mail.kotoba.cloud` へコード送信 → 5 s 後に `GET /emails/receiving` に在る（from
+  `no-reply@mail.kotoba.cloud`）→ そのコードを打つ →「通知先を確認しました。」→ producer: 接続トークン発行
+  （label `notify-e2e`、即 revoke）→ `lastDelivery {token-issued, ok true}` → 通知メールが 3 s 後に受信
+  （label あり・token 文字列なし・「認証経路ではない」文あり）→ probe address を削除。**agent が Resend
+  Receiving を受信箱として使えるので、以後この e2e は人の受信箱なしで回せる。** 副産物: token 発行後に
+  panel の「最後の通知」が再読込されなかった → `create-pat!` が channel を再読込するよう修正（main `94f3ca6e`）。⚠ `mail.kotobase.net` 送信元だった経路（smtp.kotobase.net の mail.send、mail-worker の Resend
   Receiving）は Resend に domain が無くなったので動かない —— 使うなら再登録。
 - **送信を live で測った**: オーナーの console から Resend のテスト受信箱 `delivered@resend.dev` へ →
   「確認コードを送りました。」/ 確認待ち /「…宛に確認コードを送りました。…（残り 5 回）」/ code 欄に focus →

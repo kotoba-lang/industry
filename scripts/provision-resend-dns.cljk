@@ -16,6 +16,10 @@
 ;;         this file. Needed to move the DMARC policy ramp (none -> quarantine
 ;;         -> reject); withheld by default because overwriting a live policy is
 ;;         a deliverability decision, not reconciliation.
+;;   kbb --backend sci scripts/provision-resend-dns.cljk --execute --update-conflicts --update-types MX
+;;       ^ rewrites only conflicts of the named types (2026-09-17: replace a
+;;         stale send-only MX with Resend's inbound MX and leave the zone's own
+;;         DMARC p=reject alone).
 ;;
 ;; Credentials (targeted reads, never printed). Environment first, then the
 ;; keychain — measured 2026-09-17: the keychain items below were stale (the
@@ -61,9 +65,13 @@
                          :mx [["route1.mx.cloudflare.net" 25]
                               ["route3.mx.cloudflare.net" 40]
                               ["route2.mx.cloudflare.net" 55]]}
-   "mail.itonami.cloud" {:zone "itonami.cloud" :mx :already-present}
-   ;; no inbound for the notification sender: outbound only
-   "mail.kotoba.cloud"  {:zone "kotoba.cloud" :mx :already-present}})
+   "mail.itonami.cloud" {:zone "itonami.cloud" :mx :already-present}})
+;; mail.kotoba.cloud is NOT in that map on purpose: its inbound is Resend
+;; Receiving (capabilities.receiving enabled 2026-09-17 for the notification
+;; channel's send/receive loop), so the Receiving MX row IS created. The
+;; zone also carried a stale `mail.kotoba.cloud MX 10 feedback-smtp.us-east-1`
+;; from an earlier registration — an MX at the same name with other content
+;; is reported as a conflict and replaced only under --update-conflicts.
 
 ;; DMARC aggregate reports land in one mailbox: dmarc@kotobase.net, which the
 ;; kotobase.net Email Routing catch-all already delivers to worker:kotobase-mail.
@@ -208,6 +216,12 @@
                 (str/starts-with? (norm (:content d)) "v=DMARC1")))
        (update acc :conflict conj
                (assoc d :existing (->> existing (filter #(same-slot? % d)) first)))
+       ;; an MX at an occupied name pointing elsewhere (a stale host from an
+       ;; earlier registration) = replace, not a second MX that half the
+       ;; senders would try first
+       (and (= (:type d) "MX") (some #(same-slot? % d) existing))
+       (update acc :conflict conj
+               (assoc d :existing (->> existing (filter #(same-slot? % d)) first)))
        :else (update acc :create conj d)))
    {:ok [] :create [] :conflict [] :zone zone-name}
    desired))
@@ -218,6 +232,12 @@
   (let [argv     (vec (drop 2 (js->clj (.-argv process))))
         execute? (some #{"--execute"} argv)
         update-conflicts? (some #{"--update-conflicts"} argv)
+        ;; --update-types MX[,TXT]: rewrite only conflicts of these record
+        ;; types (a zone's own DMARC policy must not ride along with an MX fix)
+        update-types (when-let [i (.indexOf argv "--update-types")]
+                       (when (>= i 0) (set (str/split (get argv (inc i) "") #","))))
+        updatable? (fn [d] (and update-conflicts?
+                                (or (empty? update-types) (contains? update-types (:type d)))))
         only     (when-let [i (.indexOf argv "--only")]
                    (when (>= i 0) (set (str/split (get argv (inc i) "") #","))))
         rs-key   (resend-key)
@@ -321,11 +341,13 @@
                                                      (str "  " (pr-str (:errors r))))))
                                      (:success r)))))
                       (when update-conflicts?
-                        (for [{:keys [zone conflict]} plans, d conflict]
+                        (for [{:keys [zone conflict]} plans, d conflict
+                              :when (updatable? d)]
                           (-> (cf-req cf-key "PATCH"
                                       (str "/zones/" (zone-ids zone) "/dns_records/"
                                            (get-in d [:existing :id]))
-                                      {:content (:content d)})
+                                      (cond-> {:content (:content d)}
+                                        (:priority d) (assoc :priority (:priority d))))
                               (.then (fn [r]
                                        (println (str (if (:success r) "  UPD  " "  FAIL ")
                                                      zone " " (:type d) " " (:name d)
@@ -343,7 +365,8 @@
                                             ;; zero once --update-conflicts ran,
                                             ;; otherwise they are still drift.
                                             " conflicts-left="
-                                            (if update-conflicts? 0 n-conf)))
+                                            (count (for [{:keys [conflict]} plans, d conflict
+                                                         :when (not (updatable? d))] d))))
                               (process/exit (if (pos? bad) 1 0))))))))))
         (.catch (fn [e] (die! (str "error: " e)))))))
 
