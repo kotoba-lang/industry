@@ -1,0 +1,49 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609181715-typed-decisions-train-teacher-and-code-decisions")
+  (:adr/title "typed-decisions 第 2 反復 —— 判断品質を上げる順番は OOD 評価 → 教師 → backbone であり、教師 qwen3.8-flash-next-whitehacker は hard label しか出さず in-domain gold で student に負ける。判断は CID への Choice として code / tool call に落とす（wire.py）")
+  (:adr/status :proposed)
+  (:adr/date "2026-09-18")
+  (:adr/deciders (vector "owner"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe" "adr-2609171000-hermes-fleet-kotoba-cloud-default-owner-coupon" "ADR-2607289500" "ADR-2607173100"))
+  (:adr/source (vector "https://github.com/kotoba-lang/typed-decisions" "https://api.kotoba.cloud/v1/models" "https://typesafe.ai/"))
+  (:adr/context
+  "owner の問い（2026-09-18）: (1) train を想定して判断・推論品質をどう上げるか、(2) kotoba.cloud の qwen3.8-flash-next-whitehacker を教師にして同程度の判断品質に至るコスト、(3) その判断を kotoba の unison 的性質（definition = content hash、symbol-index の closure hash が memo key、capability catalog の typed ability と deny-by-default admission）を使って coding に落とす —— 判断 → code / tool call。
+
+  前反復（ADR-2609181544）で測っていなかった 3 つを測った: OOD question、教師の性質と精度、code decision。実装は kotoba-lang/typed-decisions@0068bec0（data.py ood_questions / teacher.py / code_data.py / wire.py）。
+
+  教師 lane の実測: logprobs は返らない、n は 1 固定（invalid-research-request）、temperature 1.0 の 8 sample が全部同一 → 分布は取れず hard label のみ。urllib 既定 UA は Cloudflare 1010 で 403（curl 既定 UA は通る）、client 名を名乗る UA で通した。並列 8 で 0.16 req/s（p50 47 s / p95 71 s、lane が直列化）、途中 503。答えの形式ゆれ（A1: を全行に付ける・Q1.・散文）で最初の parser は 19% 落とし、行指向 parser で 4%。")
+  (:adr/decision
+  "1. 判断品質の改善順は **OOD 評価 → 教師 → backbone**。OOD split（同じ state に未見 instructions + 未見 option 列、gold は同 label からの規則）を corpus の恒久部品にし、以後の run は in-domain と OOD を並記する。OOD を出さない改善は認めない。
+
+  2. 教師 qwen3.8-flash-next-whitehacker からの蒸留は **in-domain の gold 精度を上げる手段としては採らない**（下の verification: 77 択 intent で教師 0.776 vs student 0.922）。教師の用途は **gold の無い question のラベル付け**（新 workflow・OOD）に限る。分布蒸留（KL）は lane が logprobs を出さないので不可能 —— 必要なら murakumo か Modal 上の自前 serving（llama-server / vLLM の logprobs）を教師にする。
+
+  3. コスト: 教師の壁時計が律速で GPU 費ではない。18k state ≈ 31 時間（0.16 req/s）、10⁵ state ≈ 1 週間、金額は無料枠 + owner coupon で $0。student 側は DeBERTa-v3-large 30k example × 1 ep で $0.19。
+
+  4. score（順序段階）の読み出しは **未見の段階列に転移しない**（3 model とも OOD で多数派以下）。score は Choice として扱い、期待値の読み出しは同じ option 列で訓練したときだけ使う。否定形 noul は ModernBERT-base と LLaDA が多数派を割る（元の question に答える）—— 否定を含む言い換えを訓練の一貫性 loss に入れる（次の反復）。
+
+  5. 判断 → code / tool call の形は **CID への Choice**: state = 目標 + 型文脈 + 型で刈った候補、option = definition（名前・ns・doc・hash）、答えは pointer（wire.py の :reference {:fq :hash}）。分布と confidence を必ず添え、admission は較正済み noul + 閾値（:autonomous / :escalate）。memo-key = sha256(state, question, option hash 列) で同じ入力の判断は forward を走らせない。**実行はしない**（agent は propose まで、authorize は governor）。自由文の引数はこの model の外（生成器か既存値の CID 参照）。
+
+  6. code decision の学習データは symbol-index から取る（definition → 参照する definition を Choice、参照するかを noul、namespace hash で split）。Choice と noul を同じ example に同居させない（yes-noul が答えを漏らす、実測 train loss 0.000）。
+
+  7. backbone: ModernBERT-base は 3 回目の不安定（code corpus で発散、標準 corpus の 18k × 1 ep 再走で 0.434）。製品経路の既定は DeBERTa-v3-large のまま。")
+  (:adr/consequences
+  "- 『教師に並ぶコスト』の答えは『この教師には in-domain では既に並んでいて、超えている』。蒸留の価値は gold の無い所にしか無く、そこでの教師精度は未測定（OOD split は規則 gold なので測れる —— 次の反復の 1 番目）。
+  - OOD 0.62（DeBERTa）/ 0.61（LLaDA）/ 0.49（base）は『question を読む能力』の今の天井。in-domain の 0.85 と 23 pt 差。ここが judgement quality の実体で、backbone の scale より言い換え・否定・新 option 列の訓練が先。
+  - code decision 0.638（未見 namespace、k≈5.7）は名前と近傍だけの数字。型で候補を刈る（kotoba-sema）と k が下がるので、次は型付き候補列で測る。
+  - wire.py は proposal の形だけ。governor 側の受け口（cloud-itonami の承認キュー）への接続は未着地。
+  - 未測定: 教師の OOD 精度、DeBERTa の多 epoch、言い換え一貫性 loss の効果、型で刈った候補列、複数 seed。")
+  (:adr/verification
+  "全部 kotoba-lang/typed-decisions@0068bec0 の reports/ と data/。H100 / Modal。
+
+  OOD（test 1,500 state、4,004 question。in-domain → OOD）: ModernBERT-base 2 ep 0.728 → 0.485 / DeBERTa-v3-large 1 ep 0.852 → 0.622 / LLaDA-MoE-7B-A1B LoRA 0.837 → 0.614。多数派: b77 topic 0.33 / b77 outflow 0.67 / boolq 否定 0.64 / sst5 tone 0.41。否定形 noul: base 0.397 / LLaDA 0.391 / DeBERTa 0.671。score（未見段階列）: 0.378・0.474 / 0.269・0.360 / 0.285・0.397（3 model とも多数派 0.56・0.51 未満）。sst5 推薦 noul: 0.690 / 0.905 / 0.875。
+
+  教師（data/teacher-test.jsonl、459 state、hard label、unparsed 38/1,299）: b77 intent 0.776（n 590、student 0.922）/ b77 card noul 0.877（0.968）/ sst5 level 0.555（0.585）/ sst5 polarity 0.783（0.800）/ sst5 positive 0.861（0.903）/ boolq 0.828（n 29、503 で途切れ、student 0.881）。throughput 0.16 req/s（300 state 1,864 s、prompt 197k tok）。
+
+  code decision（data-code、413k def / 31.9k ns → 68k Choice + 68k noul pair、test 1,407 ns、train 30k example × 1 ep、test 3,000 example）: DeBERTa-v3-large Choice 0.638（k≈5.7、chance 0.179）/ noul 0.809 / ECE 0.019 / train-subset 0.822 / $0.19。ModernBERT-base Choice 0.286 / noul 0.580（loss 1.5 → 6.1、発散）。漏れの実測: Choice と yes-noul を同居させた最初の build は train loss 0.0000。
+
+  wire.py: tests/test_wire.py（pointer = {:fq :hash}、閾値で :autonomous / :escalate、memo-key は option hash 1 つの変化で変わる）緑。
+
+  再現: python -m typed_decisions.data --out data（ood-test.jsonl を含む）/ python -m typed_decisions.teacher --split test --limit 300 --out data/teacher-test.jsonl / python -m typed_decisions.code_data --top <superproject> --out data-code / modal run modal_app.py::encoder --model microsoft/deberta-v3-large --lr 2e-5 --max-len 512 --max-state 160 --attn eager --limit 30000 --test-limit 3000 --data-dir /cache/data-code。")
+  (:adr/body
+  "正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification の各属性。要旨: 判断品質は OOD で測る（in-domain 0.85 → OOD 0.62）、教師 whitehacker は hard label のみで in-domain gold では student 以下（蒸留は gold の無い所だけ）、コストは GPU でなく教師の壁時計（18k state ≈ 31 h、$0）、判断 → code は CID への Choice + 較正済み admission noul + memo-key（wire.py）、code decision は未見 namespace で 0.638。")))
