@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-18T09:43:21Z",
+  "generated_at": "2026-09-18T11:32:50Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -8906,6 +8906,33 @@
         },
         "script": "pwned_dataset_ops_evidence.py",
         "skills": null,
+        "workdir": null
+      }
+    ],
+    "yabai-crypto": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "7df1672dee8d",
+        "model": "z-ai/glm-5.3-flash",
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "yabai-crypto daily iteration",
+        "no_agent": false,
+        "prompt": "yabai-crypto daily iteration. Read SOUL.md first (/Users/junkawasaki/.hermes/profiles/yabai-crypto/SOUL.md) and follow it exactly. The evidence JSON from yabai_crypto_evidence.py is at the top of this run; if it shows a REFUSED banner, report blind and stop. Step 0 resync the worktree, then pick ONE lever, at most one PR. Budget 25 API calls; all command lines pure ASCII. Never send anything external.",
+        "provider": "openrouter",
+        "repeat": {
+          "times": null,
+          "completed": 0
+        },
+        "schedule": {
+          "kind": "cron",
+          "expr": "34 6 * * *",
+          "display": "34 6 * * *"
+        },
+        "script": "yabai_crypto_evidence.py",
+        "skills": [],
         "workdir": null
       }
     ]
