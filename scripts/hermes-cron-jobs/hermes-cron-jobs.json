@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-18T11:58:07+09:00",
+ "generated_at": "2026-09-18T03:19:41Z",
  "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
  "profiles": {
   "adnetwork-scout": [
@@ -8416,6 +8416,102 @@
      "kind": "cron"
     },
     "script": null,
+    "skills": null,
+    "workdir": null
+   }
+  ],
+  "kev-dataset-ops": [
+   {
+    "context_from": null,
+    "deliver": "local",
+    "enabled_toolsets": null,
+    "id": "0bd857a96cb9",
+    "monitor_script": null,
+    "monitor_url": null,
+    "name": "kev-dataset-sync",
+    "no_agent": true,
+    "prompt": "kev sync (CISA KEV json -> R2 kev/, script-only no_agent)",
+    "repeat": {
+     "times": null
+    },
+    "schedule": {
+     "display": "15 9 * * *",
+     "expr": "15 9 * * *",
+     "kind": "cron"
+    },
+    "script": "kev_dataset_ops_evidence.py",
+    "skills": null,
+    "workdir": null
+   }
+  ],
+  "epss-dataset-ops": [
+   {
+    "context_from": null,
+    "deliver": "local",
+    "enabled_toolsets": null,
+    "id": "bc04acf4a274",
+    "monitor_script": null,
+    "monitor_url": null,
+    "name": "epss-dataset-sync",
+    "no_agent": true,
+    "prompt": "epss sync (FIRST EPSS csv -> R2 epss/, script-only no_agent)",
+    "repeat": {
+     "times": null
+    },
+    "schedule": {
+     "display": "45 9 * * *",
+     "expr": "45 9 * * *",
+     "kind": "cron"
+    },
+    "script": "epss_dataset_ops_evidence.py",
+    "skills": null,
+    "workdir": null
+   }
+  ],
+  "cwe-dataset-ops": [
+   {
+    "context_from": null,
+    "deliver": "local",
+    "enabled_toolsets": null,
+    "id": "7aca60028daa",
+    "monitor_script": null,
+    "monitor_url": null,
+    "name": "cwe-dataset-sync",
+    "no_agent": true,
+    "prompt": "cwe sync (MITRE CWE zip -> R2 cwe/, script-only no_agent)",
+    "repeat": {
+     "times": null
+    },
+    "schedule": {
+     "display": "30 10 * * 3",
+     "expr": "30 10 * * 3",
+     "kind": "cron"
+    },
+    "script": "cwe_dataset_ops_evidence.py",
+    "skills": null,
+    "workdir": null
+   }
+  ],
+  "attack-dataset-ops": [
+   {
+    "context_from": null,
+    "deliver": "local",
+    "enabled_toolsets": null,
+    "id": "91ba1f80332d",
+    "monitor_script": null,
+    "monitor_url": null,
+    "name": "attack-dataset-sync",
+    "no_agent": true,
+    "prompt": "attack sync (ATT&CK STIX -> R2 attack/, script-only no_agent)",
+    "repeat": {
+     "times": null
+    },
+    "schedule": {
+     "display": "10 10 * * 1",
+     "expr": "10 10 * * 1",
+     "kind": "cron"
+    },
+    "script": "attack_dataset_ops_evidence.py",
     "skills": null,
     "workdir": null
    }
