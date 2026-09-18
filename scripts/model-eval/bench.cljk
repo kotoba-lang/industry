@@ -14,6 +14,7 @@
   (:require ["fs" :as fs]
             ["child_process" :as cp]
             ["os" :as os]
+            ["path" :as path]
             [clojure.string :as str]
             [cljs.reader :as edn]
             [promesa.core :as p]
@@ -72,7 +73,7 @@
    のもモデルの振る舞いなので、抽出できなかったことを合格にも不合格にもしない —
    実際に走らせて判定する）。"
   [s]
-  (let [m (re-find #"(?s)```(?:python|py)?\s*\n(.*?)```" (or s ""))]
+  (let [m (re-find #"(?s)```(?:python|py|clojure|clj|cljc|cljk|edn)?\s*\n(.*?)```" (or s ""))]
     (if m (second m) (or s ""))))
 
 (defn json-block
@@ -114,6 +115,58 @@
       (catch :default e
         {:code -1 :out "" :err (str e)}))))
 
+
+;; :cljk — repo をその commit で展開し、module を差し替えて test ns を kbb sci で走らせる（kotoba-tasks.edn）。
+;; runner は clojure.test の summary 行を数える（sci では t/report の再定義が効かない、実測 2026-09-18）。
+(def ^:private cljk-runner
+  "(require '[clojure.test :as t] '[clojure.string :as str] 'TEST-NS)
+(def out (with-out-str (t/run-tests 'TEST-NS)))
+(print out)
+(let [[_ tests asserts] (re-find #\"Ran (\\d+) tests containing (\\d+) assertions\" out)
+      [_ fails errors] (re-find #\"(\\d+) failures, (\\d+) errors\" out)
+      ok (and asserts fails errors (pos? (js/parseInt asserts)) (zero? (js/parseInt fails)) (zero? (js/parseInt errors)))]
+  (println (pr-str {:tests tests :assertions asserts :failures fails :errors errors}))
+  (println (if ok \"PASS\" \"FAIL\")))
+")
+
+(defn- repo-checkout
+  "The child repo the task came from. A docs-profile worktree has manifest/ but no orgs/, so the lookup
+  honours SUPERPROJECT_ROOT, then walks up from cwd for a root that actually holds the checkout."
+  [repo-name]
+  (let [rel (str "/orgs/kotoba-lang/" repo-name)
+        env-root (aget (.-env js/process) "SUPERPROJECT_ROOT")
+        cands (concat (when env-root [env-root])
+                      (loop [d (.cwd js/process) acc []]
+                        (let [acc (conj acc d) up (.dirname path d)]
+                          (if (= up d) acc (recur up acc)))))]
+    (some (fn [r] (let [p (str r rel)] (when (.existsSync fs (str p "/.git")) p))) cands)))
+
+(defn- run-cljk [task module-src]
+  (let [repo (or (repo-checkout (:repo task)) (str "<none>/orgs/kotoba-lang/" (:repo task)))
+        d (str (.tmpdir os) "/atm-cljk-" (js/Math.floor (* 1e9 (js/Math.random))))]
+    (if-not (.existsSync fs (str repo "/.git"))
+      {:code -1 :out "" :err (str "repo checkout missing: " repo)}
+      (try
+        (.mkdirSync fs d #js {:recursive true})
+        (let [ar (.spawnSync cp "sh" #js ["-c" (str "git -C '" repo "' archive --format=tar " (:sha task) " | tar -x -C '" d "'")] #js {:encoding "utf8" :timeout 60000})]
+          (if (not= 0 (aget ar "status"))
+            {:code -1 :out "" :err (str "archive failed: " (subs (str (aget ar "stderr")) 0 200))}
+            (let [sp (str d "/" (:src-path task))]
+              (.mkdirSync fs (.dirname path sp) #js {:recursive true})
+              (.writeFileSync fs sp module-src)
+              (.writeFileSync fs (str d "/runner.cljk") (str/replace cljk-runner "TEST-NS" (:test-ns task)))
+              (let [cpx (str/join ":" (filter #(.existsSync fs %) (map #(str d "/" %) ["src" "test" "resources" "lib"])))
+                    r (.spawnSync cp "kbb" #js ["--backend" "sci" "--classpath" cpx "runner.cljk"]
+                                  #js {:cwd d :timeout 120000 :encoding "utf8"
+                                       :env #js {"PATH" (aget (.-env js/process) "PATH") "HOME" (aget (.-env js/process) "HOME")}})]
+                (.rmSync fs d #js {:recursive true :force true})
+                {:code (aget r "status") :out (str (aget r "stdout")) :err (str/trim (subs (str (aget r "stderr")) 0 300))}))))
+        (catch :default e {:code -1 :out "" :err (str e)})))))
+
+(defn- cljk-verdict [r]
+  (let [lines (str/split-lines (str/trim (:out r)))]
+    (if (and (= 0 (:code r)) (= "PASS" (last lines))) :pass :fail)))
+
 (defn check [task content]
   (case (:kind task)
     :python (let [src (str (code-block content) "\n\n" (:harness task))
@@ -125,7 +178,12 @@
               {:verdict :fail :err "no JSON object in output" :code nil :out ""}
               (let [r (run-python (:harness task) j)]
                 (assoc r :verdict (if (and (= 0 (:code r)) (str/includes? (:out r) "PASS"))
-                                    :pass :fail)))))))
+                                    :pass :fail)))))
+    :cljk (let [src (code-block content)]
+            (if (str/blank? src)
+              {:verdict :fail :err "no code block in output" :code nil :out ""}
+              (let [r (run-cljk task src)]
+                (assoc r :verdict (cljk-verdict r)))))))
 
 ;; ------------------------------------------------------------------- runners
 

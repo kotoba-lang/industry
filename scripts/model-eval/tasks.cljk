@@ -9,8 +9,42 @@
 ;;              stdout に "PASS" が出て exit 0 なら合格。
 ;;   :json    — 出力から JSON object を取り出し、:harness (python) に stdin で渡す。
 ;;   :needle  — 長文脈の retrieval。:answer の文字列が出力に含まれれば合格。
+;;   :cljk    — workspace の git 履歴から採った fix pair（kotoba-tasks.edn、typed-decisions の
+;;              mine_kotoba_tasks.py が生成。各 pair は kbb sci で before=FAIL / after=PASS を
+;;              確認済み）。モデルは壊れた module + test を見て module 全文を返す。判定は
+;;              repo をその commit で展開し、module を差し替えて test ns を kbb sci で走らせる。
 
-(ns tasks)
+(ns tasks
+  (:require [cljs.reader :as reader]
+            ["fs" :as fs]))
+
+(def kotoba-tasks-file
+  (first (filter #(.existsSync fs %) ["scripts/model-eval/kotoba-tasks.edn" "kotoba-tasks.edn" "model-eval/kotoba-tasks.edn"])))
+
+(defn- cljk-task [t]
+  (assoc t
+         :prompt (str "You are fixing a Clojure module in the `" (:repo t) "` repository (kotoba-lang). The test namespace `"
+                      (:test-ns t) "` currently FAILS against the module below. Return the COMPLETE corrected module `"
+                      (:src-path t) "` in one ```clojure code block — the whole file, same namespace, nothing else. "
+                      "Do not change the test.
+
+### " (:src-path t) " (broken)
+```clojure
+" (:src-before t)
+                      "
+```
+
+### " (:test-path t) "
+```clojure
+" (:test t) "
+```
+")
+         :chars (+ (count (:src-before t)) (count (:test t)))))
+
+(def kotoba-tasks
+  (if kotoba-tasks-file
+    (mapv cljk-task (reader/read-string (.readFileSync fs kotoba-tasks-file "utf8")))
+    []))
 
 (def tasks
   [
@@ -261,6 +295,8 @@ assert d['names'] == ['area'], d
 print('PASS')
 "}
    ])
+
+(def tasks (into tasks kotoba-tasks))
 
 (def needles
   [{:id :needle-4k  :tokens 4000}

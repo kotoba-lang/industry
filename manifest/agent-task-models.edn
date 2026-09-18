@@ -38,6 +38,8 @@
                       :why "Hermes は tool call と提案 EDN で駆動する。読める EDN / 厳密 JSON を書けない model は他が良くても使えない（ADR-2608272100 の probe と同じ理由）。"}
   :refusal {:tasks [:refuse-hallucination]
             :why "「無い」と答えられるか。捏造ゼロの床。"}
+  :kotoba {:tasks [:kotoba-amu-24516340 :kotoba-kotoba-native-13bfbebd :kotoba-app-kotoba-cloud-f6005de2 :kotoba-kotobase-peer-9b251ecc :kotoba-kotobase-peer-2ee8b10c :kotoba-kotoba-sema-1c16d4cf :kotoba-kotoba-sema-4471b336 :kotoba-kotoba-sema-ae30fa83 :kotoba-aiueos-63d0e5ca :kotoba-aiueos-15d105dd :kotoba-aiueos-d7514e98 :kotoba-aiueos-5c2642c1 :kotoba-kototama-beae237c :kotoba-kototama-de177068 :kotoba-inga-d0886a2e :kotoba-inga-8bc3583e :kotoba-kotobase-server-3400f54a :kotoba-engi-163b5dcf :kotoba-engi-3f3cf8aa :kotoba-engi-590dadf9 :kotoba-engi-227c9d54 :kotoba-slides-18cc9036 :kotoba-kuro-8d907acb :kotoba-kuro-8773addd]
+           :why "agentic coding の実体は .cljc/.cljk の修正。task は workspace の git 履歴の fix pair（scripts/model-eval/kotoba-tasks.edn、typed-decisions/mine_kotoba_tasks.py 生成、各 pair は kbb sci で before=FAIL / after=PASS を確認済み）。generic な :code 11 問は kotoba について何も言わない（2026-09-18 まで kotoba task は 0 だった）。"}
   :long-context {:tasks [:needle-4k :needle-16k :needle-32k]
                  :why "superproject の evidence（7-14 KB）+ prompt を 1 turn で読む profile 向け。窓超えは :error として分けて数える。"}}
 
