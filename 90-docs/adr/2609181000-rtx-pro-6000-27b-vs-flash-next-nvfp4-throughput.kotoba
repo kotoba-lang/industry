@@ -1,0 +1,85 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609181000-rtx-pro-6000-27b-vs-flash-next-nvfp4-throughput")
+  (:adr/title "RTX PRO 6000 x1 上で Qwen3.8-27B-whitehat と Qwen3.8-Flash-Next を同一計測器で実測 —— vLLM NVFP4、同ハード同コスト($2.75/h)なら Flash-Next が短出力・32k 長文脈の双方でスループット/レイテンシとも優位、8k warm でのみ 27B が僅差。密27Bが長文脈で27Bが勝つという事前仮説は反証された")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-18")
+  (:adr/last_verified "2026-09-18")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "rtx-pro-6000-27b-vs-flash-next-nvfp4-throughput")
+  (:source/dataset "adr")
+  (:adr/repos (vector "orgs/com-kotobalabs/qwen38-27b-whitehat" "orgs/cloud-kotoba/app-kotoba-cloud"))
+  (:adr/related
+   (vector "app-kotoba-cloud docs/adr/2609160940-hf-inference-endpoint-iq4xs.md (RTX PRO 6000 Blackwell x1 の価格 $2.75/h・provider nvidia-rtx-pro-6000・本番 vLLM NVFP4 endpoint q38-unc-nvfp4-vllm-rtx の構成の出所)"
+           "adr-2609071100-capacity-that-folds-prefill-into-throughput (スループットは decode/prefill を分けて publish する規則。本 ADR の tok/s は usage.completion_tokens 由来、E2E は wall-clock)"
+           "adr-2608136000 (検査の 8 問 —— 測れなかった値を測れた値と同じ形で publish しない。TTFT/ITL は信頼できなかったので出さず E2E を出した)"))
+  (:adr/body "## Context
+
+オーナー指示（2026-09-17〜18）: com-kotobalabs/Qwen3.8-27B-whitehat-NVFP4 を実際に RTX PRO 6000 で運用して最大 concurrency とスループットを測り公開し、次に本番運用中の Qwen3.8-Flash-Next（vLLM）とどちらが性能・コスパで優れるかを実測せよ。さらに長文脈×高並列の領域も測れ、と。
+
+計測は Hugging Face Inference Endpoints 上で行った。RTX PRO 6000 Blackwell x1（96 GB / 23 vCPU / 256 GB、AWS us-east-2、$2.75/h、分課金）。本番の red-route endpoint（q38-unc-nvfp4-vllm-rtx）には触れず、比較用に別名の endpoint を立てて計測後に削除した。両者とも vLLM・NVFP4（compressed-tensors）・maxNumSeqs 64・同一計測器（bench/benchmark.py、streaming、tok/s は usage.completion_tokens、E2E は wall-clock）。
+
+- 27B: com-kotobalabs/Qwen3.8-27B-whitehat-NVFP4（密 27B、qwen3_5、NVFP4 ~18 GB）。
+- Flash-Next: orcarouter/Qwen3.8-Flash-Next-Uncensored-NVFP4（177B MoE、512 experts 中 ~10 active、48層中 12 full-attention・36 Gated-DeltaNet 線形、~90 GB 常駐 + PLE 27 GB を CPU offload）。本番構成を丸ごと複製。
+
+## 測定1 —— 短出力（256 tok 生成、短 prompt）
+
+| conc | 27B tok/s | 27B E2E p50 | Flash-Next tok/s | FN E2E p50 |
+|---:|---:|---:|---:|---:|
+| 1 | 47 | 5.4s | 88 | 2.9s |
+| 8 | 329 | 6.0s | 505 | 4.0s |
+| 16 | 641 | 6.3s | 716 | 5.9s |
+| 32 | 897 | 6.9s | 1,225 | 5.5s |
+| 48 | 1,556 | 7.9s | 1,892 | 6.5s |
+| 64 | 1,636 | 8.3s | 2,154 | 7.6s |
+| 96 | 1,433 | 9.3s | 1,967 | 8.3s |
+| 128 | 1,908 | 17.1s | 2,537 | 12.8s |
+
+両者 128 並列まで 0 エラー。Flash-Next が全並列で tok/s・E2E とも優位。ピーク 2,537 対 1,908 tok/s（+33%）。同 $2.75/h なのでトークン単価も約 +33%（3.3M 対 2.5M tokens/$）。
+
+## 測定2 —— 長文脈×高並列（128 tok 生成、1 wave/level）
+
+| model | ctx(実測 prompt tok) | conc | tok/s | E2E p50 | ok/err |
+|---|---:|---:|---:|---:|---:|
+| 27B | ~7.9k | 32 | 102* | 40.0s* | 32/0 |
+| 27B | ~7.9k | 64 | 1,193 | 6.2s | 64/0 |
+| 27B | ~7.9k | 96 | 1,188 | 6.9s | 96/0 |
+| 27B | ~31k | 32 | 399 | 10.2s | 32/0 |
+| 27B | ~31k | 64 | 578 | 13.1s | 64/0 |
+| 27B | ~31k | 96 | 490 | 16.1s | 96/0 |
+| FN | ~7.9k | 32 | 353 | 11.5s | 32/0 |
+| FN | ~7.9k | 64 | 1,022 | 8.0s | 64/0 |
+| FN | ~7.9k | 96 | 1,056 | 9.3s | 96/0 |
+| FN | ~31k | 32 | 576 | 7.1s | 32/0 |
+| FN | ~31k | 64 | 976 | 8.3s | 64/0 |
+| FN | ~31k | 96 | 872 | 11.4s | 96/0 |
+
+*27B の 8k/conc-32 の 102 tok/s・40s は fresh endpoint の初回 wave の cold-start アーティファクト（prefix cache 空・warmup）。warm な 64/96 では 1,188-1,193 tok/s。指標として扱わない。
+
+## Finding
+
+1. **Flash-Next は短出力・32k 長文脈の双方で優位。** 32k では全並列で 27B を上回る（976 対 578 tok/s @64）。8k warm でのみ 27B が僅差で上（1,193 対 1,022 @64）。
+2. **事前仮説（密27B は重みが小さく KV 予算が大きいので長文脈×高並列で逆転する）は反証された。** 逆に Flash-Next の優位は長文脈で拡大する。理由は、Flash-Next は 48層中 36層が Gated-DeltaNet 線形 attention で、文脈長に対してほぼ線形にしかコストが増えないのに対し、密27B の full-attention は文脈長に対して重いため。MoE の疎性（~10/512 expert）で decode 自体も安い。
+3. **KV 枯渇によるエラー/崩壊は 32k×96 まで両者とも観測されず**（vLLM の paged attention はエラーを返さず、先行不能分を待たせてスループットを落とすだけ）。当初想定した「Flash-Next が先にエラーで倒れる」領域は、少なくとも 32k×96 の範囲には無い。
+4. **同一ハード・同一価格なので、コスパはスループット比に一致する。** 測定した全域で Flash-Next が同等以上 → コスパも Flash-Next が同等以上。加えて Flash-Next は 177B・エージェント・マルチモーダル・262k 文脈で能力も上。
+
+## Decision
+
+RTX PRO 6000 x1・vLLM NVFP4・測定した作業負荷（≤32k 文脈、≤128 並列、短〜中出力）の範囲では、性能もコスパも **Flash-Next が優位**と記録する。「密27B の方が高スループット・低コスト」という当初の見立ては測定により棄却する。27B の合理的な用途は、Flash-Next 級の能力が不要でメモリフットプリントが小さいことに価値がある場面（別ハードでの省リソース運用等）に限られる。運用切替の意思決定そのものは本 ADR の範囲外（能力・品質面の評価は別途）。
+
+## 未測定（この結論を越えて使わないこと）
+
+- **TTFT/ITL は信頼できる値が取れていない。** served config が --reasoning-parser qwen3 で最初のトークンが reasoning_content に流れ、streaming の逐次トークン計測が破綻した（ITL 0.028ms 等の無意味値）。よって E2E（wall-clock、256/128 tok 完了までの実時間）のみを publish した。
+- 32k を越える文脈、96 を越える並列、long-output は未測定。
+- **品質・能力は未測定。** 本 ADR はスループット/レイテンシのみ。27B が Flash-Next の代替になり得るかは task 品質評価を要する。
+- prompt cache/prefix reuse の効果は制御していない（cache_prompt 既定）。
+
+## Reproduce
+
+- 計測器: orgs/com-kotobalabs/qwen38-27b-whitehat/bench/benchmark.py（--prompt-tokens で長文脈、--concurrency でスイープ）。
+- endpoint 構成: 同 dir の bench/endpoint_deploy.py（27B）と bench/endpoint_deploy_flashnext.py（Flash-Next、本番 q38-unc-nvfp4-vllm-rtx を複製）。どちらも create/status/delete。
+- 生データ: bench/results.json（27B 短出力）、bench/flashnext_results.json（FN 短出力）、bench/lc/*.json（両者 長文脈）、まとめは bench/comparison.md。
+- endpoint はすべて計測後に削除済み（billing 停止を HTTP 200 で確認）。"))
+)
