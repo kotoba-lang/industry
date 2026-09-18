@@ -30,6 +30,16 @@ git fetch origin && git merge --ff-only origin/main
 kbb --backend sci --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljk
 ```
 
+**「候補ゼロ」は計測器の故障を疑え。** 2026-09-18 実測: not-loadable 201 本は
+全部嘘だった —— brew nbb v1.5.x が Node v26 で `--classpath` を完全無視
+（probe.cljc 1 本 + `--classpath .` が found できない）。tick は fork
+`orgs/kotoba-lang/org-babashka-nbb/cli.js` + gitlibs src 解決に切り済み
+(557b53fcbc3)。tick を触ったら standard-shape を単体で叩いて
+`{:standard? true}` になるもの 1 本で確認すること（`sed 's/^(-main)$//'` で
+lib 化 → 末尾に `(println (standard-shape {:org "cloud-itonami" :repo "..." :ns "..."}))`、
+`kbb --backend sci` で走る）。cljk rename 後は拡張子前提の箇所
+（jvm-only-files / standard-shape / read-ns-file）が黙って候補を消す。
+
 tick が出す `:candidates` が**次の 1 本の候補**（M_own 降順、標準形適合のみ）。
 
 tick は宣言を **origin/main から**読む（2026-08-08 以降）。出力 1 行目が
