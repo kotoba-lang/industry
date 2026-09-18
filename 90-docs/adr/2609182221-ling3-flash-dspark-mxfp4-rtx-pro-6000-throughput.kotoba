@@ -1,0 +1,110 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609182221-ling3-flash-dspark-mxfp4-rtx-pro-6000-throughput")
+  (:adr/title "Ling-3.0-flash (124B MoE) + Ling-3.0-flash-dspark を HF Inference Endpoints の RTX PRO 6000 x1 (96GB, $2.75/h) に MXFP4 で実配置し実測 —— NVFP4 チェックポイントは存在しない（配布は MXFP4）。DSPARK 投機的デコーディングは decode スループットを約1.56倍にするが KV 予算を最大93%削る。単一ストリーム最大233 tok/s、24並列以上で集計スループットが385 tok/sに飽和")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-18")
+  (:adr/last_verified "2026-09-18")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "ling3-flash-dspark-mxfp4-rtx-pro-6000-throughput")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki/root"))
+  (:adr/related
+   (vector "adr-2609121325-6600hs-ling30-tiny-host-bailingmoe3（同じ Ling-3.0/bailingmoe 系列だが別モデル・別ハード・別runtime。あちらは Ling-3.0-tiny 7.9B を 6600HS box に llama.cpp CPU-only で host、本 ADR は Ling-3.0-flash 124B を RTX PRO 6000 に SGLang で host）"
+           "adr-2609181000-rtx-pro-6000-27b-vs-flash-next-nvfp4-throughput（同ハード・同 $2.75/h・同 HF Inference Endpoints 経路で Qwen3.8-27B-whitehat 対 Qwen3.8-Flash-Next を vLLM NVFP4 で比較した別件 ADR。両 ADR とも計測後に endpoint を削除して billing を止める運用が共通）"
+           "adr-2608136000（検査の 8 問 —— 測れなかった値を測れた値と同じ形で publish しない。本 ADR は SSE chunk 数をトークン数と誤認する測定バグを実際に踏み、usage.completion_tokens に切り替えて訂正した経緯を Finding に残す）"))
+  (:adr/body "## Context
+
+オーナー指示（2026-09-18）: `inclusionAI/Ling-3.0-flash-dspark` を Hugging Face Inference Endpoints に deploy して速度を検証したい（当初 Intel Sapphire Rapids 4vCPU/8GB の推奨構成を見ていたが、これは draft/speculator モデル単体の HF 推奨構成であり、target model 無しでは意味のある chat 出力にならない点をまず訂正した）。続けて「RTX PRO 6000, 1台で NVFP4 なども使って高速化したい」との指示。さらに「hf endpoint inference で進めて」「最大並行、最大スループットを計測」の順で進行した。
+
+**訂正1**: `inclusionAI/Ling-3.0-flash-dspark`（1.36B, BF16, 2.73GB）は Ling-3.0-flash（124B, MoE, target model）用の speculative decoding 用 draft モデル単体であり、target 無しでは標準的な chat 出力にならない。
+**訂正2**: 指示にあった「NVFP4」は実在しない。inclusionAI が配布している 4bit チェックポイント `inclusionAI/Ling-3.0-flash-fp4` は **MXFP4**（OCP microscaling, block=32）であり、NVIDIA 独自の NVFP4（block=16, FP8+FP32 二段スケール, 要 ModelOpt 変換）ではない。SGLang 側の backend も `--moe-runner-backend flashinfer_mxfp4`。NVFP4 版チェックポイントは今回作成・使用していない。
+
+計測は Hugging Face Inference Endpoints（dedicated）上、`aws / us-east-2 / nvidia-rtx-pro-6000 x1`（96GB VRAM, 23 vCPU, 256GB RAM, $2.75/h、分課金）で行った。account の quota は実測で `maxAccelerators: 4`（x1 は quota 内）。token は `~/.hermes/.env` ではなく `/Users/junkawasaki/github/com-junkawasaki/.env` の `HF_TOKEN_KOTOBA_CLOUD`（role: write）— これで `inference.endpoints` 権限が確認できた（既定の `~/.cache/huggingface/token` には権限が無く 403）。engine は SGLang（HF Endpoints の managed engine の1つ、`model.image.sGLang.url` で任意の image URL を指定可能）、image は SGLang 公式の cookbook 検証済み `docker.io/lmsysorg/sglang:dev-Ling-3.0-flash` を明示指定（HF managed default image のバージョンは不明で DSPARK 対応が未確認だったため）。
+
+並行して別セッション（フォーク元、同一会話履歴を分岐点まで共有）が同じ `com-junkawasaki` namespace 上で同じ endpoint 名を操作しており、途中で endpoint の作成/削除が衝突した（一方が pause したものをもう一方が確認前に delete）。以降は SendMessage で「作成/削除の前に確認する」運用に切り替えて進めた。
+
+## モデル構成
+
+| repo | 役割 | 形式 | 実ダウンロードサイズ (HF API 実測) |
+|---|---|---|---|
+| inclusionAI/Ling-3.0-flash-fp4 | target, 124B MoE (bailing_hybrid/BailingMoeV3, 512 experts, top-8 + shared-1, hidden 2560, 42 layers) | MXFP4 | 70.4 GB |
+| inclusionAI/Ling-3.0-flash-int4 | target（比較用、未使用） | INT4 (compressed-tensors W4A16) | 77.0 GB |
+| inclusionAI/Ling-3.0-flash-dspark | draft (speculative decoding, DFlash/SpecForge 系, block size 8) | BF16 | 2.73 GB |
+
+起動 flags（SGLang server args, `--trust-remote-code` 必須）:
+```
+--moe-runner-backend flashinfer_mxfp4
+--mem-fraction-static 0.75
+--context-length 8192
+# DSPARK 有効時のみ追加:
+--speculative-algorithm DSPARK
+--speculative-draft-model-path inclusionAI/Ling-3.0-flash-dspark
+--enable-linear-replayssm-spec
+--linear-replayssm-cache-len 32
+```
+
+## 実測1 —— 単一ストリーム decode スループット（256 tok 生成、温度0、同一 prompt）
+
+起動ログ実測: weight load 24.36s（MXFP4のみ）/ 30.71s（DSPARK込み）、`available_gpu_mem` は 23.17GB（MXFP4のみ）→ 21.90GB（DSPARK込み、draft weight + verify buffer 分でさらに縮む）。`max_running_requests` は **8 → 3**、`max_total_num_tokens` は **455,823 → 33,785（-92.6%）** に低下（DSPARK は CUDA graph 捕捉形状 bs=[1,2,3] のみ、KV/verify window の追加予算を要するため）。
+
+| 構成 | TTFT | decode throughput（usage.completion_tokens 由来） | 256tok応答の壁時計時間 |
+|---|---:|---:|---:|
+| MXFP4 のみ（DSPARK無し） | ~0.70s | **148〜149 tok/s** | 2.42s |
+| MXFP4 + DSPARK | ~0.65s | **~230〜233 tok/s** | 1.75〜1.8s |
+
+**DSPARK は decode throughput を約1.55〜1.6倍にする**（README記載の acceptance length macro mean 5.29 より実測倍率は小さい — draft側の推論コストと verify window のオーバーヘッドが乗るため、理論値と実測の乖離としては妥当）。
+
+### 測定バグとその訂正（8問の6問目「理由の literal を pin する」に相当する実例）
+
+当初、streaming (SSE) の `delta.content` が届く chunk 数を「1 chunk = 1 token」として tok/s を計算し、DSPARK で **66 tok/s（-55%、baselineより遅い）** という結果を得た。これは誤りだった。DSPARK は verify step ごとに 1 delta を streaming し、1 step で複数（最大9、verify window 実測 nchunks=83 に対し nchars=1211〜1222、約4字/token として ~250〜300 token 相当 → 約3〜3.6 token/chunk）のトークンを1 chunkにまとめて送る。chunk 数を token 数として数えると系統的に過小評価になる（baseline は1 token/chunkなので同じ手法でも壊れない — 148 vs 149 tok/sで両者が近似したのはこのため）。**non-streaming リクエストの `usage.completion_tokens`（サーバ側トークナイザによる authoritative な値）に切り替えて訂正し**、上表の233 tok/sを得た。この訂正は、同一の endpoint を並行して観測していた別セッションとも突き合わせて確認済み。
+
+## 実測2 —— 最大並行・最大スループット（DSPARK構成、128 tok生成、non-stream、usage.completion_tokens合計 / wall time）
+
+| 並行数 | 集計スループット | 備考 |
+|---:|---:|---|
+| 1 | 109 tok/s | 単一ストリーム参照（初回27秒の外れ値はTritonカーネルのlazy compileで除外） |
+| 2 | 71 tok/s | |
+| 3 | 169 tok/s | |
+| 4 | 273 tok/s | |
+| 6 | 326 tok/s | |
+| 8 | 334 tok/s | |
+| 12 | 360 tok/s | |
+| 16 | 367 tok/s | |
+| 24 / 32 / 40 / 44 | **384〜389 tok/s** | 飽和域 — 最大集計スループット |
+| 36 | 227 tok/s | 異常値、単発 |
+| 48 | 90 tok/s（2回とも再現） | 異常値、原因未特定 |
+
+**最大集計スループット ≈ 385 tok/s**、並行数24前後から飽和に到達し44まで維持。エラー0件（全並行数で ok=n, err=0）。
+
+## Finding
+
+1. **NVFP4 ではなく MXFP4 が実在するチェックポイント形式。** 訂正済み、以後この系列のモデルで「NVFP4」と言及されたら MXFP4 の誤りを疑う。
+2. **DSPARK は単一ストリームの decode を約1.56倍高速化するが、KV/並行予算を最大93%犠牲にする。** レイテンシ最適化（低並行・対話用途）では有利、素の並行スループット最大化が目的ならこのトレードオフを踏まえて構成を選ぶ必要がある。
+3. **並行化によるスループット向上は単一ストリームの理論線形値（109×24≈2,616 tok/s）の約15%（385 tok/s）で頭打ちになる。** 単一GPU（tp=1）の物理的な演算・帯域上限に加え、512 expertのfine-grained MoEでは並行数が増えるほど1ステップで触れるexpertの和集合が広がり、weight読み込みの「割り勘」効果が早期に飽和する（未測定・推測 — expert利用率テレメトリは未取得）。DSPARK自体の追加計算、CUDA graph捕捉形状（bs=[1,2,3]のみ）、KVトークン予算（33,785）も副次的な要因候補。
+4. **並行数36・48での落ち込みは再現性の解釈が割れる。** 48は2回とも約68.1秒で（ほぼ一致）再現したが、36は初回のみ悪化し他は正常。この端末は多数の Claude セッションが同時にCPUを奪い合う環境であり、クライアント側（Python `ThreadPoolExecutor` + `urllib`、コネクションプール無し）のスケジューリング競合が疑われるが、サーバ側の確定した閾値とは断定していない。
+5. **streamingのchunk数をtoken数として扱う計測は、投機的デコーディング配下で系統的に壊れる。** non-streamingの`usage.completion_tokens`を正とする。
+
+## Decision
+
+Ling-3.0-flash + Ling-3.0-flash-dspark を RTX PRO 6000 x1（HF Inference Endpoints, MXFP4, SGLang, DSPARK有効）で運用する場合の実測値として、単一ストリーム decode 233 tok/s・最大集計スループット385 tok/sを記録する。低並行・低レイテンシ用途にはDSPARK有効が有利、高並行バッチ処理が主目的ならKV予算の93%減を踏まえてDSPARK無効（またはcontext-length/mem-fraction-staticの調整）を検討する。運用切替そのものの意思決定は本ADRの範囲外。
+
+## 未測定（この結論を越えて使わないこと）
+
+- 並行数36・48の異常値の根本原因（クライアント側競合 vs サーバ側の何らかの閾値）は未分離。
+- DSPARK無効（baseline MXFP4のみ）構成での並行スイープは未実施（DSPARK有効構成のみ計測）。
+- `--context-length 8192` 固定での計測。長文脈（32k等）での挙動は未測定。
+- NVFP4への変換（ModelOpt等での自前量子化）は未試行。
+- MoE expert利用率・GPU利用率のテレメトリは未取得（Finding 3の推測を検証していない）。
+- 品質・出力の正しさは未評価（本ADRはスループット/レイテンシのみ）。
+
+## Reproduce
+
+- endpoint作成: `POST https://api.endpoints.huggingface.cloud/v2/endpoint/com-junkawasaki`、body は上記 flags を `model.args` に、`model.image.sGLang.url = \"docker.io/lmsysorg/sglang:dev-Ling-3.0-flash\"`、`compute = {accelerator: gpu, instanceType: nvidia-rtx-pro-6000, instanceSize: x1, scaling: {minReplica:1, maxReplica:1}}`、`provider = {vendor: aws, region: us-east-2}`、`type: authenticated`。
+- token: `/Users/junkawasaki/github/com-junkawasaki/.env` の `HF_TOKEN_KOTOBA_CLOUD`（`inference.endpoints` 権限あり、role write）。
+- ベンチ: non-streaming `POST /v1/chat/completions`（`model: inclusionAI/Ling-3.0-flash-fp4`, `stream: false`, `temperature: 0`）、`usage.completion_tokens` を都度読む。並行スイープは `concurrent.futures.ThreadPoolExecutor` で束ねて発行、`sum(completion_tokens) / wall_time` を集計スループットとする。
+- endpoint はすべて計測後に `DELETE /v2/endpoint/com-junkawasaki/<name>` で削除し、続く `GET` の 404 で billing 停止を確認した（2セッション合計で2回作成・2回削除、総稼働時間 約26分、概算コスト ~$1.2）。
+- 複数セッションで同一 endpoint 名を操作する場合は、作成・削除の前に SendMessage で確認を取ること（本ADRの計測中に一度、確認前の削除による手戻りが発生した）。"))
+)
