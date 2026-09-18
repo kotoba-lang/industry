@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-18T11:12:55+09:00",
+ "generated_at": "2026-09-18T11:58:07+09:00",
  "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
  "profiles": {
   "adnetwork-scout": [
@@ -634,15 +634,15 @@
     "id": "1a0ebe81d626",
     "monitor_script": null,
     "monitor_url": null,
-    "name": "appstore-catalog-ops catalog daily iteration",
+    "name": "appstore-catalog-ops catalog monthly iteration",
     "no_agent": false,
     "prompt": "You are the appstore-catalog-ops bot. Read SOUL.md (~/.hermes/profiles/appstore-catalog-ops/SOUL.md) first and follow it. Workdir is the dedicated worktree (repo cloud-kotoba/app-kotoba-cloud, remote name kotoba-lang). Procedure: 1. Read the evidence output injected at the top of this run; a REFUSED banner means report blind and stop. 2. If sources.json is missing under assets/appstore-catalog-ops-src/, seed it with 5-10 verified public app-inventory sources (iTunes Search/Lookup, Google Play per-country storefronts, open app-metadata datasets) - each URL fetched NOW, honest layer (primary-fetched / secondary-reported) and access notes. 3. Otherwise pick exactly ONE lever in SOUL priority order (fix DEAD urls / add records / close coverage gap). 4. Fresh topic branch from kotoba-lang/main; gh pr create --repo cloud-kotoba/app-kotoba-cloud; leave the inspection record via gh pr comment; gh pr merge --merge. 5. No change -> report 'opened no PR' with the reason (valid outcome). Limits: finish within 40 API calls; no deploy; never push main; ASCII-only shell command lines; verified_at taken from the date command.",
     "repeat": {
      "times": null
     },
     "schedule": {
-     "display": "40 6 * * *",
-     "expr": "40 6 * * *",
+     "display": "40 6 3 * *",
+     "expr": "40 6 3 * *",
      "kind": "cron"
     },
     "script": "appstore_catalog_ops_evidence.py",
@@ -756,15 +756,15 @@
     "id": "cb5399205875",
     "monitor_script": null,
     "monitor_url": null,
-    "name": "chain-catalog-ops catalog daily iteration",
+    "name": "chain-catalog-ops catalog monthly iteration",
     "no_agent": false,
     "prompt": "You are the chain-catalog-ops bot. Read SOUL.md (~/.hermes/profiles/chain-catalog-ops/SOUL.md) first and follow it. Workdir is the dedicated worktree (repo cloud-kotoba/app-kotoba-cloud, remote name kotoba-lang). Procedure: 1. Read the evidence output injected at the top of this run; a REFUSED banner means report blind and stop. 2. If sources.json is missing under assets/chain-catalog-ops-src/, seed it with 5-10 verified blockchain data sources (explorer APIs, public RPC endpoints, open chain datasets) - each URL fetched NOW, honest layer (primary-fetched / secondary-reported) and access notes. 3. Otherwise pick exactly ONE lever in SOUL priority order (fix DEAD urls / add records / close coverage gap). 4. Fresh topic branch from kotoba-lang/main; gh pr create --repo cloud-kotoba/app-kotoba-cloud; leave the inspection record via gh pr comment; gh pr merge --merge. 5. No change -> report 'opened no PR' with the reason (valid outcome). Limits: finish within 40 API calls; no deploy; never push main; ASCII-only shell command lines; verified_at taken from the date command.",
     "repeat": {
      "times": null
     },
     "schedule": {
-     "display": "10 5 * * *",
-     "expr": "10 5 * * *",
+     "display": "10 5 1 * *",
+     "expr": "10 5 1 * *",
      "kind": "cron"
     },
     "script": "chain_catalog_ops_evidence.py",
@@ -2154,15 +2154,15 @@
     "id": "5b62293bd366",
     "monitor_script": null,
     "monitor_url": null,
-    "name": "ip-catalog-ops catalog daily iteration",
+    "name": "ip-catalog-ops catalog monthly iteration",
     "no_agent": false,
     "prompt": "You are the ip-catalog-ops bot. Read SOUL.md (~/.hermes/profiles/ip-catalog-ops/SOUL.md) first and follow it. Workdir is the dedicated worktree (repo cloud-kotoba/app-kotoba-cloud, remote name kotoba-lang). Procedure: 1. Read the evidence output injected at the top of this run; a REFUSED banner means report blind and stop. 2. If sources.json is missing under assets/ip-catalog-ops-src/, seed it with 5-10 verified IP/ASN/geo/RIR-WHOIS sources (RIR delegation stats files, RDAP endpoints, geofeeds, open geo datasets) - each URL fetched NOW, honest layer (primary-fetched / secondary-reported) and access notes. 3. Otherwise pick exactly ONE lever in SOUL priority order (fix DEAD urls / add records / close coverage gap). 4. Fresh topic branch from kotoba-lang/main; gh pr create --repo cloud-kotoba/app-kotoba-cloud; leave the inspection record via gh pr comment; gh pr merge --merge. 5. No change -> report 'opened no PR' with the reason (valid outcome). Limits: finish within 40 API calls; no deploy; never push main; ASCII-only shell command lines; verified_at taken from the date command.",
     "repeat": {
      "times": null
     },
     "schedule": {
-     "display": "25 6 * * *",
-     "expr": "25 6 * * *",
+     "display": "25 6 2 * *",
+     "expr": "25 6 2 * *",
      "kind": "cron"
     },
     "script": "ip_catalog_ops_evidence.py",
