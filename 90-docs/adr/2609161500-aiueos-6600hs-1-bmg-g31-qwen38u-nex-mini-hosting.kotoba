@@ -100,7 +100,7 @@ gateway 経由 (`POST https://api.murakumo.cloud/v1/chat/completions`、無認�
 ## 分かったこと (次に測る人のため)
 
 - **gateway の soft cache-affinity**: 同一 prompt の job は前回 served した worker に先に広告される (`/infer/queue?model=&did=` の did がその実装、poll_worker.cljs `queue-path`)。同一 prompt で 5 本 probe したら全部 K16 に行き、prompt を変えたら this node が取った。**probe は毎回違う prompt で**。claim は atomic 先着で速さの優先は無い。
-- **nex の routing**: `x-murakumo-route-head: xavier` —— cloud-murakumo-api は nex-n2.5-mini-uncensored を名前で xavier の Workers-VPC binding に送る (adr-2609161000)。edge queue には流れないので、this node の nex join は enroll 済み (`aiueos-6600hs-1-nex-n25-mini`) でも job 0。xavier より 2.7 倍速い this node に nex を向けるかは gateway 側の変更 (PR + deploy) で、本 ADR では**やっていない**。
+- **nex の routing**: ~~xavier 固定~~ → **2026-09-18 に this node が primary** (`x-murakumo-route-head: 6600hs1`、binding `MURAKUMO_6600HS1_PRIVATE`、xavier は到達不能時の fallback。cloud-murakumo-api PR #272、adr-2609181615)。edge queue には流れないので this node の nex join は enroll 済みでも job 0 —— これは設計。出荷形は 4 slot × 65536 (--parallel sweep は adr-2609181615)。
 - GuC firmware は 70.44.1 (推奨 70.54.0、Ubuntu linux-firmware 20240318)。コストは未測定。
 - kotoba-lang/murakumo の `kbb -M:test` は engine 側 `No matching clause: export` で走らず (Node 26)。fleet.edn / infer.edn は nbb の `clojure.edn` reader で読めることだけ確かめた。
 
@@ -112,14 +112,14 @@ gateway 経由 (`POST https://api.murakumo.cloud/v1/chat/completions`、無認�
 
 次 agent の最初の command: `ssh root@100.98.24.37 'systemctl is-active murakumo-6600hs1-nex-n25-mini-llama murakumo-6600hs1-nex-n25-mini-join; curl -s http://127.0.0.1:8090/props | head -c 300'` → `curl -s https://api.murakumo.cloud/ready | jq .inference[\"pool-available\"]` (b70 0 のままなら murakumo-main は依然 head ゼロ)。
 
-残 gap の優先順: ① murakumo-main の head 復元 (オーナー判断: 別 node か Nex を降ろす。tunnel credential 再発行 + `murakumo-b70-join`) ② nex の gateway routing を this node (3.3 倍速) に向けるか (cloud-murakumo-api の `ao/usagi` draft、PR + deploy) ③ K16 qwen38u (2.5 tok/s) の退役判断 ④ 旧 `ubuntu-server` / 旧 `aiueos-6600hs` の tailnet 登録削除 ⑤ NVMe 未割当 ~360 GB の LVM 拡張 ⑥ GuC firmware 更新の効果測定。
+残 gap の優先順: ① murakumo-main の head 復元 (オーナー判断: 別 node か Nex を降ろす。tunnel credential 再発行 + `murakumo-b70-join`) ② ~~nex の gateway routing を this node に向ける~~ 閉 2026-09-18 (adr-2609181615) ③ K16 qwen38u (2.5 tok/s) の退役判断 ④ 旧 `ubuntu-server` / 旧 `aiueos-6600hs` の tailnet 登録削除 ⑤ NVMe 未割当 ~360 GB の LVM 拡張 ⑥ GuC firmware 更新の効果測定。
 
 保全した他者 WIP: root superproject の stash@{0} と stash@{2} (observatory-collect bot の tracked 生成物 `90-docs/observatory/observatory.datoms.edn`、FF のために退避、drop していない。bot はその後自分で snapshot を commit しているので実質 superseded だが判断は bot owner)。untracked draft `90-docs/adr/2609141203-social-capital-ledger.edn` は `:adr/id` を slug 形に直しただけで本文は無変更、untracked のまま。
 
 ## やっていないこと
 
 - **murakumo-main の head 復元 (b70 role)** —— nex-only 決定後も未復元。VRAM は 9.45 GiB 空くが stock 27B (15.7 GiB) は入らないので、復元するなら Nex を降ろすか別 node。tunnel credential 再発行と `murakumo-b70-join` の復元も未着手。
-- nex の gateway routing 変更 (上記)。
+- ~~nex の gateway routing 変更~~ 閉 2026-09-18 (adr-2609181615)。
 - K16 の qwen38u (2.5 tok/s) の退役。同じ queue に居るので job の半分は今も K16 に落ちる —— オーナー判断。
 - 旧 `ubuntu-server` / 旧 `aiueos-6600hs` の tailnet 登録の削除。
 - vision (mmproj) の E2E。unit には載せてあるが image_url probe は未実施。
