@@ -6,7 +6,7 @@
   (:adr/deciders (vector "owner"))
   (:adr/supersedes (vector))
   (:adr/related (vector "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe" "adr-2609171000-hermes-fleet-kotoba-cloud-default-owner-coupon" "ADR-2607289500" "ADR-2607173100"))
-  (:adr/source (vector "https://github.com/kotoba-lang/typed-decisions" "https://github.com/kotoba-lang/typed-decisions/commit/eaf79d48b48089759ce5fce4de028d6536862270" "https://api.kotoba.cloud/v1/models" "https://typesafe.ai/"))
+  (:adr/source (vector "https://github.com/kotoba-lang/typed-decisions" "https://github.com/kotoba-lang/typed-decisions/commit/bbae190af648f6fc8a1e94d019d084f62ebb98ef" "https://api.kotoba.cloud/v1/models" "https://typesafe.ai/"))
   (:adr/context
   "owner の問い（2026-09-18）: (1) train を想定して判断・推論品質をどう上げるか、(2) kotoba.cloud の qwen3.8-flash-next-whitehacker を教師にして同程度の判断品質に至るコスト、(3) その判断を kotoba の unison 的性質（definition = content hash、symbol-index の closure hash が memo key、capability catalog の typed ability と deny-by-default admission）を使って coding に落とす —— 判断 → code / tool call。
 
@@ -20,20 +20,24 @@
 
   3. コスト: 教師の壁時計が律速で GPU 費ではない。18k state ≈ 31 時間（0.16 req/s）、10⁵ state ≈ 1 週間、金額は無料枠 + owner coupon で $0。student 側は DeBERTa-v3-large 30k example × 1 ep で $0.19。
 
-  4. 訓練は **gold を構造的に保つ augmentation**（option 順 shuffle / 言い換え / distractor drop / 段階名の同義置換 / noul の否定 = gold 反転、augment.py、p=0.7）を既定にする —— 第 3 反復で OOD +2.6 pt・否定形 noul +16 pt・OOD ECE −0.03、in-domain −0.6 pt。**consistency KL（2 表層の対称 KL）は採らない**（同等以下で費用 2 倍）。2 epoch も OOD を上げない。score（順序段階）は未見の段階列に転移しないが、教師も同じ 2 問で多数派以下なので **OOD の score 2 問（b77 urgency / sst5 intensity）の規則 gold を疑い、作り直すまで読まない**。
+  4. 訓練は **gold を構造的に保つ augmentation**（option 順 shuffle / 言い換え / distractor drop / 段階名の同義置換 / noul の否定 = gold 反転、augment.py、p=0.7）を既定にする —— 第 3 反復で OOD +2.6 pt・否定形 noul +16 pt・OOD ECE −0.03、in-domain −0.6 pt。**consistency KL（2 表層の対称 KL）は採らない**（同等以下で費用 2 倍）。2 epoch も OOD を上げない。OOD の score 2 問（b77 urgency / sst5 intensity）は 3 model + 教師が揃って多数派以下だったので gold を疑い、第 4 反復で **削除して dataset の 5 段階の単調 relabel 2 問（stars 同方向 / disappointed 逆方向）に置換**した。新 gold では 0.37〜0.42（多数派 0.255、MAE 0.7 段階）—— 未見の段階列で方向を読む能力は部分的にある。
 
-  5. 判断 → code / tool call の形は **CID への Choice**: state = 目標 + 型文脈 + 型で刈った候補、option = definition（名前・ns・doc・hash）、答えは pointer（wire.py の :reference {:fq :hash}）。分布と confidence を必ず添え、admission は較正済み noul + 閾値（:autonomous / :escalate）。memo-key = sha256(state, question, option hash 列) で同じ入力の判断は forward を走らせない。**実行はしない**（agent は propose まで、authorize は governor）。自由文の引数はこの model の外（生成器か既存値の CID 参照）。承認キューへの形は cloud-itonami の kaizen ingress（wire.py to_kaizen_issue、id = memo-key 先頭 16 桁で重複は 200 already-open）—— **POST はまだしない**（narrow key で取り消せない）。
+  5. 判断 → code / tool call の形は **CID への Choice**: state = 目標 + 型文脈 + 型で刈った候補、option = definition（名前・ns・doc・hash）、答えは pointer（wire.py の :reference {:fq :hash}）。分布と confidence を必ず添え、admission は較正済み noul + 閾値（:autonomous / :escalate）。memo-key = sha256(state, question, option hash 列) で同じ入力の判断は forward を走らせない。**実行はしない**（agent は propose まで、authorize は governor）。自由文の引数はこの model の外（生成器か既存値の CID 参照）。承認キューへの形は cloud-itonami の kaizen ingress（wire.py to_kaizen_issue、id は validate の正規表現に合わせ kaizen:typed-decisions:<memo16>:<window>、重複は 200 already-open）。第 4 反復で code model の実 proposal（正解、confidence 0.74）を POST したが **503 kaizen intake is not provisioned for this tenant** —— tenant kotoba-lang/typed-decisions の ingress key digest（KV ITONAMI_DATA、kaizen:kotoba-lang/typed-decisions:ingress-key-sha256）が無い。provisioning（random key → Keychain、sha256 → wrangler kv key put）は Keychain 書き込みが agent の権限で拒否されたので **owner の 1 回作業**（README『owner がやること』）。
 
   6. code decision の学習データは symbol-index から取る（definition → 参照する definition を Choice、参照するかを noul、namespace hash で split）。Choice と noul を同じ example に同居させない（yes-noul が答えを漏らす、実測 train loss 0.000）。
 
-  7. backbone: ModernBERT-base は 3 回目の不安定（code corpus で発散、標準 corpus の 18k × 1 ep 再走で 0.434）。製品経路の既定は DeBERTa-v3-large のまま。")
+  7. augmentation は自然文 corpus 用。code corpus（option = 識別子）に掛けると学習しない（loss 1.5 → 1.7、chance）—— code decision は augment 0 で回す。
+
+  8. backbone: ModernBERT-base は 3 回目の不安定（code corpus で発散、標準 corpus の 18k × 1 ep 再走で 0.434）。製品経路の既定は DeBERTa-v3-large のまま。")
   (:adr/consequences
   "- 『教師に並ぶコスト』の答えは『この教師には in-domain では既に並んでいて、超えている』。蒸留の価値は gold の無い所にしか無く、そこでの教師精度は未測定（OOD split は規則 gold なので測れる —— 次の反復の 1 番目）。
   - OOD 0.62（DeBERTa）/ 0.61（LLaDA）/ 0.49（base）は『question を読む能力』の今の天井。in-domain の 0.85 と 23 pt 差。ここが judgement quality の実体で、backbone の scale より言い換え・否定・新 option 列の訓練が先。
   - code decision 0.638（未見 namespace、k≈5.7）は名前と近傍だけの数字。型で候補を刈る（kotoba-sema）と k が下がるので、次は型付き候補列で測る。
   - wire.py は proposal の形だけ。governor 側の受け口（cloud-itonami の承認キュー）への接続は未着地。
   - 型で刈った候補列は **corpus が無い**: symbol-index の .kotoba 定義は 618k 中 95 行。kotoba-sema の型で candidate を刈る code decision は .kotoba の定義が増えるまで測れない（当面は同 ns 近傍 distractor）。
-  - 未測定: 複数 seed、OOD score 2 問の gold 作り直し後の値、governor 受け口への実 POST。")
+  - seed 3 本（DeBERTa-v3-large、augment 0.7）: in-domain 0.847（spread 0.011）、OOD 0.678（spread 0.025）。**OOD で 2 pt 以下の差は seed noise**。boolq support が 0.68〜0.84 と最も揺れる。
+  - 教師ラベルを student に足す実験（train state 700 件の読解系 OOD question 1,400 q、data/ood-train.jsonl）は lane の hang（同じ prompt で 180〜600 s、Say OK は 1.2 s、その後 503）で 2026-09-18 時点では未完 —— 並列 8 で timeout した request が lane の queue に残ると読める。結果は README に追記。
+  - 未測定: governor への 202 proposed（provisioning 待ち）、教師ラベル追加の効果。")
   (:adr/verification
   "全部 kotoba-lang/typed-decisions@0068bec0 の reports/ と data/。H100 / Modal。
 
@@ -44,6 +48,8 @@
   code decision（data-code、413k def / 31.9k ns → 68k Choice + 68k noul pair、test 1,407 ns、train 30k example × 1 ep、test 3,000 example）: DeBERTa-v3-large Choice 0.638（k≈5.7、chance 0.179）/ noul 0.809 / ECE 0.019 / train-subset 0.822 / $0.19。ModernBERT-base Choice 0.286 / noul 0.580（loss 1.5 → 6.1、発散）。漏れの実測: Choice と yes-noul を同居させた最初の build は train loss 0.0000。
 
   第 3 反復（reports/aug-*.json、DeBERTa-v3-large 18k state、test 1,500）: baseline in 0.852 / OOD 0.622 / OOD ECE 0.116 / boolq 否定 0.671 → augment p=0.7: 0.846 / **0.648** / 0.088 / **0.83**（$0.26）→ augment 0.7 + consistency 0.5: 0.852 / 0.635 / 0.110 / 0.83（$0.50）→ augment 0.5 + consistency 0.2 × 2 ep: 0.855 / 0.621 / 0.130 / 0.84（$0.99）。教師 OOD（data/teacher-ood-test.jsonl、280 state / 726 q、unparsed 24）: 全体 0.696、b77 topic 0.742、b77 outflow 0.859、boolq support 0.909、boolq 否定 0.854、sst5 tone 0.674、sst5 推薦 0.833、score 2 問 0.306 / 0.389（student も多数派以下 → gold を疑う）。31 分 / 300 state（p50 11 s）。
+
+  第 4 反復（reports/seed*-deb-large-aug07-*.json、新 OOD set）: seed 0/1/2 in 0.846 / 0.842 / 0.852、OOD 0.685 / 0.663 / 0.687、OOD ECE 0.049 / 0.053 / 0.028、boolq support 0.84 / 0.68 / 0.79、boolq 否定 0.84 / 0.86 / 0.85、sst5 score（stars + disappointed）0.39 / 0.37 / 0.42、MAE 0.72 / 0.78 / 0.67。code model 再走 0.629（前 0.638）、proposal 20 件中 13 正解（data/proposals-code.json）。augment 0.5 の code run: choice 0.182 / noul 0.500（reports/code-deb-large-1ep-aug05-props-*.json）。kaizen POST: 503 not provisioned（reports/kaizen-post-receipt-20260918.txt）。
 
   wire.py: tests/test_wire.py（pointer = {:fq :hash}、閾値で :autonomous / :escalate、memo-key は option hash 1 つの変化で変わる）緑。
 
