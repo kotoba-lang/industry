@@ -157,7 +157,7 @@
 ;; ------------------------------------------------------------------ 判定（bench.cljk の check と同じ規則）
 
 (defn- code-block [s]
-  (let [m (re-find #"(?s)```(?:python|py)?\s*\n(.*?)```" (or s ""))]
+  (let [m (re-find #"(?s)```(?:python|py|clojure|clj|cljc|cljk|edn)?\s*\n(.*?)```" (or s ""))]
     (if m (second m) (or s ""))))
 
 (defn- json-block [s]
@@ -187,6 +187,58 @@
          :err (str/trim (subs (str (aget r "stderr")) 0 300))})
       (catch :default e {:code -1 :out "" :err (str e)}))))
 
+
+;; :cljk — repo をその commit で展開し、module を差し替えて test ns を kbb sci で走らせる（kotoba-tasks.edn）。
+;; runner は clojure.test の summary 行を数える（sci では t/report の再定義が効かない、実測 2026-09-18）。
+(def ^:private cljk-runner
+  "(require '[clojure.test :as t] '[clojure.string :as str] 'TEST-NS)
+(def out (with-out-str (t/run-tests 'TEST-NS)))
+(print out)
+(let [[_ tests asserts] (re-find #\"Ran (\\d+) tests containing (\\d+) assertions\" out)
+      [_ fails errors] (re-find #\"(\\d+) failures, (\\d+) errors\" out)
+      ok (and asserts fails errors (pos? (js/parseInt asserts)) (zero? (js/parseInt fails)) (zero? (js/parseInt errors)))]
+  (println (pr-str {:tests tests :assertions asserts :failures fails :errors errors}))
+  (println (if ok \"PASS\" \"FAIL\")))
+")
+
+(defn- repo-checkout
+  "The child repo the task came from. A docs-profile worktree has manifest/ but no orgs/, so the lookup
+  honours SUPERPROJECT_ROOT, then walks up from cwd for a root that actually holds the checkout."
+  [repo-name]
+  (let [rel (str "/orgs/kotoba-lang/" repo-name)
+        env-root (aget (.-env js/process) "SUPERPROJECT_ROOT")
+        cands (concat (when env-root [env-root])
+                      (loop [d (.cwd js/process) acc []]
+                        (let [acc (conj acc d) up (.dirname path d)]
+                          (if (= up d) acc (recur up acc)))))]
+    (some (fn [r] (let [p (str r rel)] (when (.existsSync fs (str p "/.git")) p))) cands)))
+
+(defn- run-cljk [task module-src]
+  (let [repo (or (repo-checkout (:repo task)) (str "<none>/orgs/kotoba-lang/" (:repo task)))
+        d (str (.tmpdir os) "/atm-cljk-" (js/Math.floor (* 1e9 (js/Math.random))))]
+    (if-not (.existsSync fs (str repo "/.git"))
+      {:code -1 :out "" :err (str "repo checkout missing: " repo)}
+      (try
+        (.mkdirSync fs d #js {:recursive true})
+        (let [ar (.spawnSync cp "sh" #js ["-c" (str "git -C '" repo "' archive --format=tar " (:sha task) " | tar -x -C '" d "'")] #js {:encoding "utf8" :timeout 60000})]
+          (if (not= 0 (aget ar "status"))
+            {:code -1 :out "" :err (str "archive failed: " (subs (str (aget ar "stderr")) 0 200))}
+            (let [sp (str d "/" (:src-path task))]
+              (.mkdirSync fs (.dirname path sp) #js {:recursive true})
+              (.writeFileSync fs sp module-src)
+              (.writeFileSync fs (str d "/runner.cljk") (str/replace cljk-runner "TEST-NS" (:test-ns task)))
+              (let [cpx (str/join ":" (filter #(.existsSync fs %) (map #(str d "/" %) ["src" "test" "resources" "lib"])))
+                    r (.spawnSync cp "kbb" #js ["--backend" "sci" "--classpath" cpx "runner.cljk"]
+                                  #js {:cwd d :timeout 120000 :encoding "utf8"
+                                       :env #js {"PATH" (aget (.-env js/process) "PATH") "HOME" (aget (.-env js/process) "HOME")}})]
+                (.rmSync fs d #js {:recursive true :force true})
+                {:code (aget r "status") :out (str (aget r "stdout")) :err (str/trim (subs (str (aget r "stderr")) 0 300))}))))
+        (catch :default e {:code -1 :out "" :err (str e)})))))
+
+(defn- cljk-verdict [r]
+  (let [lines (str/split-lines (str/trim (:out r)))]
+    (if (and (= 0 (:code r)) (= "PASS" (last lines))) :pass :fail)))
+
 (defn- check [task content]
   (case (:kind task)
     :python (let [r (run-python (str (code-block content) "\n\n" (:harness task)) nil)]
@@ -197,7 +249,12 @@
               {:verdict (if (and (= 0 (:code r)) (str/includes? (:out r) "PASS")) :pass :fail)
                :err (when (not= 0 (:code r)) (:err r))})
             {:verdict :fail :err "no JSON object in output"})
-    :needle {:verdict (if (str/includes? (str/upper-case (or content "")) (:answer task)) :pass :fail)}))
+    :needle {:verdict (if (str/includes? (str/upper-case (or content "")) (:answer task)) :pass :fail)}
+    :cljk (let [src (code-block content)]
+            (if (str/blank? src)
+              {:verdict :fail :err "no code block in output"}
+              (let [r (run-cljk task src)]
+                {:verdict (cljk-verdict r) :err (when (not= :pass (cljk-verdict r)) (subs (str (:out r) " " (:err r)) 0 300))})))))
 
 ;; needle は tasks.cljk に prompt が無い（bench.cljk が組む）ので、ここで同じ形に組む。
 (defn- needle-task [{:keys [id tokens]}]
@@ -362,4 +419,22 @@
       (println (str "TICK\t" (pr-str (dissoc summary :cells))))
       (js/process.exit 0))))
 
-(-main)
+;; --self-test-cljk [N]: the harness must say PASS for the landed module and FAIL for the broken one, on the
+;; first N kotoba tasks. A harness that cannot fail measures nothing (CLAUDE.md 8 問 #5); exit 1 unless every
+;; pair flips, exit 2 if there were no tasks to test.
+(defn- self-test-cljk! []
+  (let [n (js/parseInt (or (opt "--self-test-cljk") "3"))
+        ts (take n tasks/kotoba-tasks)]
+    (if (empty? ts)
+      (do (println "SELF-TEST-CLJK\tno kotoba tasks loaded") (js/process.exit 2))
+      (let [rows (for [t ts]
+                   (let [after (:verdict (check t (str "```clojure\n" (:src-after t) "\n```")))
+                         before (:verdict (check t (str "```clojure\n" (:src-before t) "\n```")))]
+                     (println (str "  " (name (:id t)) "\tafter=" (name after) "\tbefore=" (name before)))
+                     [(:id t) after before]))
+            rows (doall rows)
+            ok (count (filter (fn [[_ a b]] (and (= :pass a) (= :fail b))) rows))]
+        (println (str "SELF-TEST-CLJK\tflipped " ok "/" (count rows)))
+        (js/process.exit (if (= ok (count rows)) 0 1))))))
+
+(if (some #{"--self-test-cljk"} args) (self-test-cljk!) (-main))
