@@ -10,7 +10,7 @@ usage: python3 agentmail_inbox_keys.py <inbox1> <inbox2> ...
 Requires the org key at kagi item AGENTMAIL_API_KEY.
 Keychain service per inbox: agentmail-inbox-key-<localpart>
 """
-import json, subprocess, sys, urllib.request
+import json, os, subprocess, sys, urllib.request
 
 INBOXES = sys.argv[1:]
 if not INBOXES:
@@ -18,6 +18,11 @@ if not INBOXES:
     sys.exit(2)
 
 def kagi_get(item):
+    # Prefer kagi; fall back to the env (~/.hermes/.env exports AGENTMAIL_API_KEY
+    # for cron context — kagi item was lost, env copy is authoritative since 2026-09-18).
+    ev = os.environ.get(item, "")
+    if ev:
+        return ev
     out = subprocess.run(
         ["orgs/kotoba-lang/kagi/bin/kagi", "get", item],
         capture_output=True, text=True,
