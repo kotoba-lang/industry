@@ -253,6 +253,7 @@ fleet-db に吸収する。**fleet-db / ledger / fleet-head.edn を手編集し�
 
 - **runtime の順序は `kotoba wasm runtime` > `clojurewasm` > `ClojureScript` > `nbb`、`JVM` と `bb` は最後の手段。** JVM / bb にしか無い経路は compat 層として隔離する。
 - **Rust を新規に書かない。`.sh` を新規に書かない。生 JS の `.mjs` / `.cjs` も新規に書かない。** 新規の運用 tooling は **kbb-first**（owner 指示 2026-09-07、ADR-2609081800。skill `nbb-to-kbb-migration` は名指しだけで未着地）。`bb.edn` / `#!/usr/bin/env bb` を新規に置かない。
+- **Deno を依存にしない（harness・bench・oracle も含む。owner 指示 2026-09-18、ADR-2609182300）。** native の計測経路は `.kotoba` → `amu compile --target <isa> --jvm-free` → `amu extract-native`（`:offset` を loader に渡す）→ `tools/kexe_loader.c` の 1 本。既存の `verify/*.js`（Deno）は legacy harness —— 新規に足さず、値を引くときは「Deno harness の値」と明記する。
 - **`.cljk` を `require` で解決できるのは kbb の engine だけ**（ADR-2609111700。engine は `kotoba-lang/org-babashka-nbb`）。script host は `bin/kbb --backend sci [--classpath <cp>] <script.cljk>`。
 - **Clojure CLI / babashka / nbb / shadow-cljs の起動文字列を書かない — 呼び方は `kbb`**（ADR-2609112000）: `kbb -M:<alias>` / `kbb --backend sci <script>` / `amu compile --target wasm32-browser`。**`kbb -M:test` が緑なことは JVM suite が緑なことではない。** 検出器 `scripts/verify-no-clojure-cli.cljk`（古い綴りを意図して引用する file は `kbb-cutover` + `: keep` を 1 行置く）。
 - **`#?(:kototama ...)` / `#?(:clojurewasm ...)` は存在しない reader-conditional**（黙って dead branch）。
