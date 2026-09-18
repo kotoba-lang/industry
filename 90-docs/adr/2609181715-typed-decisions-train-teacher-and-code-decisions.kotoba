@@ -6,7 +6,7 @@
   (:adr/deciders (vector "owner"))
   (:adr/supersedes (vector))
   (:adr/related (vector "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe" "adr-2609171000-hermes-fleet-kotoba-cloud-default-owner-coupon" "ADR-2607289500" "ADR-2607173100"))
-  (:adr/source (vector "https://github.com/kotoba-lang/typed-decisions" "https://github.com/kotoba-lang/typed-decisions/commit/bbae190af648f6fc8a1e94d019d084f62ebb98ef" "https://api.kotoba.cloud/v1/models" "https://typesafe.ai/"))
+  (:adr/source (vector "https://github.com/kotoba-lang/typed-decisions" "https://github.com/kotoba-lang/typed-decisions/commit/93d45f15c027e6c8fd5b378b87e85129b1bf596c" "https://huggingface.co/com-kotobalabs/open-jev-deberta-v3-large" "https://api.kotoba.cloud/v1/models" "https://typesafe.ai/"))
   (:adr/context
   "owner の問い（2026-09-18）: (1) train を想定して判断・推論品質をどう上げるか、(2) kotoba.cloud の qwen3.8-flash-next-whitehacker を教師にして同程度の判断品質に至るコスト、(3) その判断を kotoba の unison 的性質（definition = content hash、symbol-index の closure hash が memo key、capability catalog の typed ability と deny-by-default admission）を使って coding に落とす —— 判断 → code / tool call。
 
@@ -28,7 +28,9 @@
 
   7. augmentation は自然文 corpus 用。code corpus（option = 識別子）に掛けると学習しない（loss 1.5 → 1.7、chance）—— code decision は augment 0 で回す。
 
-  8. backbone: ModernBERT-base は 3 回目の不安定（code corpus で発散、標準 corpus の 18k × 1 ep 再走で 0.434）。製品経路の既定は DeBERTa-v3-large のまま。")
+  8. **公開**: DeBERTa-v3-large（augment 0.7、seed 2、1 ep、in-domain 0.854 / OOD 0.690）を https://huggingface.co/com-kotobalabs/open-jev-deberta-v3-large として Apache-2.0 で公開（owner 指示 2026-09-18、名前は open-jev）。bundle = HF 形式 backbone + head.safetensors + marker 付き tokenizer + open_jev_config.json + 同梱 loader（typed_decisions/open_jev.py）。Hub からの round trip を確認。TypeSafe と無関係で data / code を借りていないことと数字が比較不能であることを card に明記。ModernBERT-base 版は augmentation 下で 0.504 に崩れ（4 例目の不安定）公開しない。
+
+  9. backbone: ModernBERT-base は 3 回目の不安定（code corpus で発散、標準 corpus の 18k × 1 ep 再走で 0.434）。製品経路の既定は DeBERTa-v3-large のまま。")
   (:adr/consequences
   "- 『教師に並ぶコスト』の答えは『この教師には in-domain では既に並んでいて、超えている』。蒸留の価値は gold の無い所にしか無く、そこでの教師精度は未測定（OOD split は規則 gold なので測れる —— 次の反復の 1 番目）。
   - OOD 0.62（DeBERTa）/ 0.61（LLaDA）/ 0.49（base）は『question を読む能力』の今の天井。in-domain の 0.85 と 23 pt 差。ここが judgement quality の実体で、backbone の scale より言い換え・否定・新 option 列の訓練が先。
