@@ -1,0 +1,46 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609181847-agentic-coding-growth-path-kotoba-eval-and-decision-flywheel")
+  (:adr/title ".cljk / .kotoba の agentic coding を育てる経路 —— 生成・判断・検証を分け、検証（compile / test / gate）を label 源にする。段 0: kotoba の eval task class（git 履歴の fix pair 24 本、routing 中の model は 0/8 answered）、段 1: Hermes transcript の判断化（抽出器、実行は owner）")
+  (:adr/status :proposed)
+  (:adr/date "2026-09-18")
+  (:adr/deciders (vector "owner"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe" "adr-2609181715-typed-decisions-train-teacher-and-code-decisions" "ADR-2609152300" "adr-2609171000-hermes-fleet-kotoba-cloud-default-owner-coupon" "ADR-2609181615"))
+  (:adr/source (vector "https://github.com/kotoba-lang/typed-decisions" "scripts/model-eval/kotoba-tasks.edn" "manifest/agent-task-models.edn"))
+  (:adr/context
+  "owner の問い（2026-09-18）: 『基本は今の cljk / kotoba の agentic coding が適切にできればいい。それまで成長させるには?』
+
+  測った現在地: Hermes 281 profile は全部 qwen3.8-flash-next-whitehacker に routing（agent-task-models tick 09:20）。eval の :code は generic な 11 問（lru-cache / toposort …）で、**kotoba / cljc の task は 0**。typed-decisions（ADR-2609181544 / 2609181715）で分かったこと: 候補から選ぶ・admit する判断は 40 ms で較正できる（in-domain 0.85、未見 namespace の code decision 0.63、OOD 0.68）が生成はしない。kotoba の資産（definition = CID、closure hash = memo key、kotoba-sema の型、capability catalog）は判定を候補選択に還元できるが、.kotoba の定義は index 中 95 行で corpus が無い。fleet で serve できる architecture は kotoba-lang/inference の verify にあるもの（gemma4 / qwen4exp / Qwen3.8-Flash-Next）で DeBERTa は無い（ADR-2609181615: murakumo の推論 engine は kotodama.inference）。
+
+  段 0 の実測: 80 repo × 400 commit を歩き、1 commit が src/*.cljc|cljk を 1 本だけ触り test ns が在る pair のうち、repo をその commit で展開して module を差し替えた harness が before=FAIL / after=PASS の両方を返すものだけを採って 24 task / 12 repo。funnel: fix 系 commit の 65% は src を複数触り、残りの 3/4 に test ns が無い。harness の自己検査 4/4 flip。最初の測定（最小 8 task、実 tick）: nex-n2.5-mini-uncensored は 8/8 truncated（out=2048 で content 空、reasoning が枠を食い切る）、whitehacker は research-service-unavailable（lane 停止中）。
+
+  段 1 の実測: ~/.hermes の state.db は 282 profile、default だけで message 144,686 / tool call 70,479、amu-maint 11,698 call。terminal の結果は exit_code 付き JSON（outcome label が無料で取れる）。抽出器は書いて合成 DB で test 緑、本物への実行は agent の権限で拒否（transcript 一括読み出し = provenance）。")
+  (:adr/decision
+  "1. **生成・判断・検証を分ける。** 生成は LLM（今は whitehacker、将来 fleet の kotodama.inference）、判断は typed judge（候補 CID の Choice、admit の Noul、40 ms、較正済み、memo-key で cache）、検証は compiler / test / fleet gate / propose→govern 台帳 —— 検証の結果が label で、捏造も LLM-judge も無い。これが Jev の RLCD に相当するこの workspace の形。
+
+  2. **成長速度の唯一の指標は『1 日に貯まる検証付き (state, decision, outcome) の本数』。** 今は 0（281 profile が毎日走っているのに判断の形で残っていない）。この数を毎 tick 測り、増やさない変更は成長と呼ばない。
+
+  3. **段 0（着地）**: model-eval に :kotoba task class。task は git 履歴の fix pair、採用条件は harness の両方向（before=FAIL / after=PASS）。生成器は scripts/model-eval/kotoba-tasks.edn に typed-decisions の mine_kotoba_tasks.py、harness は tick / bench の :cljk（git archive + module 差し替え + kbb sci、summary 行を数える）、--self-test-cljk が落ちる gate。**answered 0 を fail 0 と読まない**（truncated / error は別に数える —— 今日の routing 中 model は 1 問も答えていない）。
+
+  4. **段 1（抽出器着地、実行は owner）**: Hermes transcript → typed decision（Choice『次に呼ぶ tool』、Noul『この call はエラー無く終わるか』、outcome は exit_code / error marker、secret scrub 必須、出力は gitignore）。実行と結果の記録は owner の判断（provenance）。
+
+  5. **段 2**: judge を gate に入れる —— agent の diff に『着地するか』の Noul、閾値未満は人へ。床は『着地する』予測の precision vs 実 gate。
+
+  6. **段 3**: 生成器の蒸留は gate を通った出力だけ（rejection-sampled SFT）、target は kotodama.inference が動かせる architecture。judge も同じ経路に載せ替える（DeBERTa は fleet に載らない）。律速は教師の壁時計（whitehacker 0.16 req/s、今日は停止）なので生成器を fleet に持つことが前提。
+
+  7. **段 4**: kotoba-native judge（kotoba-sema が型で刈った候補 CID）。.kotoba corpus は design system 5 repo の移行で増えるまで測れない。
+
+  8. **今日の routing に対する含意**: nex は 2048 token の出力枠で module 全文を返せない、whitehacker は lane が落ちる —— cljc の修正 task を『答えられる』model が fleet に 1 つも無いことが測れた。次の tick で k16 の qwen3.8-27b を最小 task 2 本だけ測る（1 task 30 分超）。")
+  (:adr/consequences
+  "- eval が kotoba を測るようになった。以後『model X は coding が得意』は kotoba task の pass/answered で言う。
+  - 判断の label は検証から出るので、fleet の gate と台帳がそのまま訓練データ源になる。DB に書くだけの mutation は作らない（ADR-2608039700）。
+  - transcript の判断化は provenance の判断を含むので agent が勝手に回さない。secret scrub の効きは合成 test でしか確かめていない —— 実 DB で scrub 件数と drop 件数を最初に見る。
+  - 未測定: whitehacker の kotoba pass rate（lane 復旧後）、qwen3.8-27b の同上、Hermes 抽出の triple 数、段 2 の precision。")
+  (:adr/verification
+  "- task 生成: kotoba-lang/typed-decisions@c8dcaaaf mine_kotoba_tasks.py、出力 scripts/model-eval/kotoba-tasks.edn（24 task、1.0 MB、cljs.reader で読み戻し 24 件・全 key 確認）。
+  - harness: kbb --backend sci --classpath .:scripts:scripts/model-eval:scripts/nbb_compat scripts/agent-task-models-tick.cljk --self-test-cljk 4 → SELF-TEST-CLJK flipped 4/4（after=pass / before=fail）。docs 専用 worktree では orgs/ が無く 0/1（SUPERPROJECT_ROOT を渡すと 2/2）—— checkout 不在は fail として現れる。
+  - 実 tick（--class kotoba --only <最小 8> --models nex-n2.5-mini-uncensored,qwen3.8-flash-next-whitehacker、2026-09-18 18:4x JST、ledger ~/.itonami/agent-task-models-tick.ledger.edn）: nex 8/8 truncated out=2048 content 空、whitehacker error research-service-unavailable wall 538 s。
+  - 抽出器: tests/test_hermes_data.py（scrub / outcome / 合成 DB 2 record）緑。本物の DB は未実行。
+  - 着地: 段 0 の superproject 側 commit 35633135（tasks.cljk / bench.cljk / tick.cljk / manifest / kotoba-tasks.edn）。")
+  (:adr/body
+  "正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification の各属性。要旨: 生成・判断・検証を分け、検証を label 源にする。段 0 で kotoba の eval task 24 本が着地し、routing 中の model は 0/8 answered（truncated / lane down）。段 1 の抽出器は着地、実行は owner。成長の指標は検証付き triple / 日（今 0）。")))
