@@ -1,0 +1,76 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609181200-freebuff-agent-onramp-and-mcp")
+  (:adr/title "freebuff の sponsored run から 3 製品（kotoba-lang.org / kotoba.cloud / graph.kotoba.cloud）に LLM が入れる動線を実測で直し、MCP サーバを 2 本立てて『1 コマンドで始められる』にした —— 動線の切れ目は graph 側に集中していた（apex 文書のコピー・kotobase.net → workbench HTML のループ・agent が credential を得る手段の不在）")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-18")
+  (:adr/last_verified "2026-09-18")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "freebuff-agent-onramp-and-mcp")
+  (:source/dataset "adr")
+  (:adr/repos (vector "orgs/cloud-kotoba/app-kotoba-cloud" "orgs/kotoba-lang/kotoba-lang" "orgs/cloud-kotoba/kotobase-control-plane"))
+  (:adr/related
+   (vector "adr-2608136000 (検査の 8 問。graph llms.txt を apex コピーに戻すと名指しの理由で赤、cookie を流すビルドで名指しの理由で赤、を確かめてから landed とした)"
+           "adr-2609070400 (人間認証は Web3 first。agent は sign-in しない・passkey / wallet / card を渡されない、という前提で procedure と quickstart を書いた)"
+           "adr-2608159100 (live service の永続化境界は kotobase.net / api.kotoba.cloud の datom 面。MCP は新しい store を持たず route を再入するだけ)"
+           "app-kotoba-cloud docs/freebuff-campaigns.md (suggest timing・テキスト広告・procedure 3 セットの正本)"))
+  (:adr/body "## Context
+
+オーナー指示（2026-09-17）: freebuff.com（広告で無料の coding agent）を使う開発者に、コーディング中に kotoba-lang.org / kotoba.cloud / graph.kotoba.cloud を suggest する仕組みを入れたい。onboarding prompt と suggest timing の draft が 2 本あった（Ichihara 案の graph 版を含む）。続く指示: それぞれ LLM が agentic coding を進めやすく入りやすい動線になっているか → 動線を整えて prompt を作れ → review・merge・deploy → graph.kotoba.cloud などのスタートも LLM がすぐ始められるよう setup、MCP も。
+
+## freebuff の仕組み（`CodebuffAI/freebuff` を 2026-09-17 に実測）
+
+広告は 2 形式。テキスト広告（turn 間、landing URL に `?bfcid=` 付きで着地、conversion は hosted tag か server postback）と、**sponsored run**（repo の `origin` remote 単位で proposal card → Accept → 無人 agent が worktree の branch `freebuff/<slug>-<runId>` で advertiser の procedure を一字一句そのまま実行して commit、push はしない → card に CTA + bfcid）。sponsored run の制約は `common/src/ads/sponsored-local-execution.ts` と `sdk/src/tools/sponsored-sandbox.ts` に code として在る: tool grant は read/write_workspace・agent_control・run_commands・network のみ（`ask_user` なし・subagent なし）、書込みは worktree 内のみで `.env*` / CI / `.git` は拒否、env は `PATH LANG LC_ALL TERM SSL_CERT_*` だけで `HOME` は run 専用 dir、`npm install` 等は拒否、shell の network は macOS（sandbox-exec）のみ可で Linux（bubblewrap `--unshare-all`）は不可、Windows は run 自体を拒否。procedure は hash 化して同意されるので run 時に書換え不能、`{{advertiserLink}}` だけが置換される。agentic 形式が新規 advertiser に self-serve か（公開 code は Supabase pilot）は未確認。
+
+## 動線の実測（2026-09-17、直す前）
+
+| 切れ目 | 実測 |
+|---|---|
+| graph.kotoba.cloud の llms.txt / llms-full.txt / agent-quickstart.md / .well-known/agent.json | apex（推論製品）の文書と byte 同一。graph の話が一行も無い |
+| kotoba.cloud/llms.txt・両 agent-quickstart の『Graph CLI and MCP onboarding』リンク | kotobase.net/agent-quickstart.md → 301 → graph.kotoba.cloud/（noindex の sign-in workbench HTML）→ その llms.txt は apex コピー → ループ。旧 quickstart（signup → biscuit → write → query → pin）は net-kotobase の source に残るが到達不能 |
+| draft の `api.kotoba.cloud/v1/database` | root は 404 `database-route-not-found`。実 route（`/v1/database/xrpc/ai.gftd.apps.kotobase.datomic.*`、`/v1/database/api/*`、`/v1/database/session/*`）は公開テキストのどこにも無い（llms*/quickstart/mcp.json で 0 件、docs endpoint 表で 0 行） |
+| agent が DB credential を得る手段 | Biscuit mint は browser cookie + same-origin 限定、service account（Authn `/v1/tenants/<id>/service-accounts`）の UI はどこにも無い |
+| docs.kotoba.cloud/llms.txt | 404 |
+| kotoba-lang.org の quickstart | Homebrew 前提のみ。sponsored run の sandbox では `brew install` 不可（/opt/homebrew に書けない・install 拒否） |
+| conversion | kotoba-lang.org は `trial_started`（playground）、kotoba.cloud は `signup_completed`、graph は tag を読むだけで一度も発火しない。server postback はどこにも無い |
+| kotoba.cloud/mcp.json | 『There is no MCP protocol endpoint』と明記。kotobase.net/mcp は動くが tools が `kotobase_*` 命名で createDatabase / listDatabases に届かない |
+
+## Decision
+
+1. **graph.kotoba.cloud は自分の agent 文書を持つ**（`assets/graph/{llms.txt,llms-full.txt,agent-quickstart.md,agent.json}`、worker の `graph-agent-documents` で host root に配信）。apex 3 文書と kotoba-lang.org の graph リンクは graph.kotoba.cloud/agent-quickstart.md へ。kotobase.net の 3 文書は同じ path で graph host へ 301（zone Redirect Rule 806be065 を document rule の前に追加 = 効いている policy、worker `kotobaCloudApexRedirect` も同じ mapping）。
+2. **agent の credential は tenant service account**（`kb_sa_…`）。workbench に『Create agent token』を置き、`/v1/database/session/service-accounts`（cookie session → Authn、body は `{name}` のみ、tenantId は URL）で一度だけ発行して一度だけ表示する。agent は毎回 `Authorization: Bearer $KOTOBA_DATABASE_TOKEN` + `X-Kotobase-Tenant` で呼ぶ —— kotobase の write gate（`proxy/authorize-tenant-cap-write`、origin/main）が editor service account の `data:write` を cacao 無しで admit することを code で確認した。15 分 Biscuit（`POST auth.kotoba.cloud/v1/biscuit/token`）は任意の attenuation であって手順ではない（初版 quickstart はこれを必須にしていて誤り。同日訂正）。
+3. **MCP サーバ 2 本**（`src/app_kotoba_cloud/mcp.cljk`、streamable HTTP・stateless・JSON-RPC）: `graph.kotoba.cloud/mcp`（graph_docs / graph_list_databases / graph_create_database / graph_db_stats / graph_transact / graph_query datalog|cypher|sparql|sql / graph_usage）と `kotoba.cloud/mcp`（kotoba_knowledge_search / kotoba_knowledge_context / kotoba_models は無認証、kotoba_research_status / kotoba_chat_completion は PAT）。**tool は route への薄い shim**: 接続の `authorization` と `x-kotobase-tenant` だけを synthetic request に載せて router を再入する。cookie は載せない。tool の結果は route の答えそのもの（401 は 401 のまま isError）。新しい store も credential class も持たない。`/.well-known/mcp(.json)` に transport・credential・tools・client one-liner（Claude Code / Codex / Cursor・VS Code JSON）。GET `/mcp` は `accept: text/event-stream` なら 405（stream は開かない）。
+4. **kotoba-lang.org は CLI が入口**（MCP ではない）。agent-quickstart §1b『worktree-local install』: release tarball（1 executable + LICENSE + README、~42 MB、`.sha256` 付き）を `.kotoba-toolchain/` に展開して path で呼ぶ。sponsored run と同じ env（`PATH`/`LANG`/専用 `HOME`・`TMPDIR`）で selfhost check → compile → Node で 42 を実測。
+5. **conversion**: graph の sign-in return_to に landing query を保持（bfcid が auth 往復で落ちていた）、workspace 作成で `trial_started`（eventId `<tenantId>:workspace_created`）。server postback は `FREEBUFF_ADS_API_KEY`（campaign review 後に freebuff が発行）が来るまで作らない。
+6. **prompt 3 セット**は sponsored run の制約に合わせて書く: 無人・質問不可・install 不可・credential ゼロを前提に、run は client code + README（`{{advertiserLink}}`）を commit し、人の手順（sign-in / token 発行）は CTA 着地ページ側に置く。draft の『Guide the user to sign in / brew install』は run 内で成立しない。正本は app-kotoba-cloud `docs/freebuff-campaigns.md`。
+
+## 着地（すべて default branch、2026-09-18 実測）
+
+- cloud-kotoba/app-kotoba-cloud #359（graph 文書・agent token・attribution・campaigns）→ merge 083b78cf、#377（MCP）→ merge 3df257e5。deploy version 35cb8ac2（origin/main を含む worktree から。途中、別セッションの deploy（#376 時点）と lock が競合し、待って再 deploy）。
+- kotoba-lang/kotoba-lang #698（§1b、graph リンク）→ merge 29771dd8、**admin bypass**: 必須 check `test` は 2026-09-16 以降 main の全 commit で赤（`grammar_authority_test` / `authority_claim_lowering_test` の既存失敗、site asset のみのこの変更とは無関係）。Workers Builds が自動配信、`/agent-quickstart.md` に §1b を実測。
+- cloud-kotoba/kotobase-control-plane #721（worker の redirect mapping）→ merge 9cb21523。挙動は zone rule で live、gateway worker の再配信はしていない（次の通常 release に同乗）。
+- west pin: app-kotoba-cloud → 3df257e5、kotoba-lang → 29771dd8、kotobase-control-plane → 9cb21523（single-entry commit）。
+
+## 検証
+
+- app-kotoba-cloud: `kbb -M:test` 202 tests / 0 failures、`npm run build`、worker smoke（graph 文書が host 自身のもので apex と異なる・docs host の agent 文書・service-accounts exchange の拒否が Authn の前・MCP の descriptor / lifecycle / tools が credential だけで gateway を再入・引数拒否が route の前・knowledge 無認証）、`audit:uiux` ≥ 80、workerd contract。**両方向**: graph llms.txt を apex コピーに戻すと『the graph llms.txt is not the apex copy』で赤、cookie を流すビルドで『the MCP connection's cookie never becomes a database credential』で赤。
+- net-kotobase: node harness で 3 文書が path 保持で 301、他は root、API path は非 redirect、POST は対象外。
+- live: graph.kotoba.cloud/{llms.txt, llms-full.txt, agent-quickstart.md, .well-known/agent.json, .well-known/mcp.json} 200 で graph 文書、kotobase.net/agent-quickstart.md → 301 → graph quickstart、docs.kotoba.cloud/llms.txt 200、apex 3 文書に kotobase.net/agent-quickstart.md の言及 0 件。MCP: initialize → kotoba-graph / kotoba-cloud、tools/list 7 + 5、無認証で graph_docs・kotoba_knowledge_search T1018・kotoba_models 成功、graph_query 無認証 → sign-in-required、偽 token → edge の Unauthorized (presented: bearer)。**Claude Code から `claude mcp add` → `claude mcp list` で両サーバ ✔ Connected**（probe entry は削除済み）。
+
+## 未検証・残 gap（優先順）
+
+1. **service token → 実データ書込みの end-to-end**（人の session が要る）: graph.kotoba.cloud で workspace 作成 → Create agent token → `claude mcp add …` → 『databases を list して hello を作って 1 datom 書いて読み返して』。通れば graph quickstart の手順 3–4 が実測になる。code contract（write gate の service-account 分岐）からは通るはず。
+2. freebuff 側: agentic campaign が self-serve か担当に確認。テキスト広告 + Conversion API は公開文書どおり登録可。`FREEBUFF_ADS_API_KEY` が来たら server postback（signup_completed / trial_started / installation_completed）。
+3. kotoba-lang の CI 赤（grammar-authority vendored copy 不一致・authority-claim-lowering）は別件として直す。
+4. agent token の revoke / rotate は Authn API 呼び出しのみで UI 無し（quickstart にそう明記）。
+5. kotoba-lang.org に `.well-known/agent.json` は未設置（llms.txt が代替）。
+
+## Reproduce
+
+- 動線の実測: `curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' <url>` を上の表の URL に。graph と apex の llms.txt は `cmp` で比較する。
+- MCP: `curl -sS -X POST https://graph.kotoba.cloud/mcp -H 'content-type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}'`、`claude mcp add --transport http kotoba-graph https://graph.kotoba.cloud/mcp` → `claude mcp list`。
+- worktree-local install: kotoba-lang.org/agent-quickstart.md §1b を `env -i PATH=\"$PATH\" HOME=<private> TMPDIR=<private> LANG=en_US.UTF-8` の下で。
+- sponsored run の制約: `gh api repos/CodebuffAI/freebuff/contents/common/src/ads/sponsored-local-execution.ts`。"))
+)
