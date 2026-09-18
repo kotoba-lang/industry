@@ -1,0 +1,50 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe")
+  (:adr/title "Jev 型（state + 型付き question → 較正済み確率、1 pass）を encoder（ModernBERT / DeBERTa）と dLLM（LLaDA-MoE-7B-A1B）で軽量に再現し、速度・精度・訓練費を実測で比べた —— 製品経路は encoder、ModernBERT-large は前提を外れた")
+  (:adr/status :proposed)
+  (:adr/date "2026-09-18")
+  (:adr/deciders (vector "owner"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609112640-qwen38-27b-fast-dllm-v2-block-diffusion" "ADR-2607173100" "ADR-2608136000"))
+  (:adr/source (vector "https://typesafe.ai/" "https://typesafe.ai/blog/introducing-system-one-models-and-jev" "https://dev.to/valyuai/how-to-use-jev-a-practical-guide-to-typesafes-system-one-model-g5e" "https://huggingface.co/answerdotai/ModernBERT-large" "https://huggingface.co/inclusionAI/LLaDA-MoE-7B-A1B-Instruct" "https://modal.com/pricing"))
+  (:adr/context
+  "依頼（2026-09-18）: ChatGPT が出した『Jev 再現なら ModernBERT-large が本命、dLLM なら LLaDA-MoE-7B-A1B』という案を参考に、ModernBERT-like と LLaDA-MoE の 2 backbone で Jev 型 model を軽量に再現し、速度・精度・その後の train cost を比較する。
+
+  Jev（TypeSafe AI、2026-09-15 launch、$40M）の公開情報: System One Model、RLCD（Reinforcement Learning for Calibrated Decisions）で訓練、入力は state + 複数の型付き question（Choice 最大 255 択 / Score 2〜10 順序段階 / Noul yes-no）、出力は choice と probabilities と confidence、1 parallel pass、0% structured-output error、70〜500 ms、$0.000081/task、自社 4 workflow で 67.8%（frontier model との一致率であって gold accuracy ではない）。API 仕様書は公開されていない —— 形は site と dev.to の guide からの再構成。
+
+  workspace の索引（repo-search jev typesafe modernbert llada / decision / calibration distill classifier encoder、concept-lookup decision model）に既存物は無し。近接: kotoba-lang/dllm-qwen38（Modal での GPU run の慣例と report の書き方をそのまま借りた）、kotoba-lang/torch（EDN の module graph、今回は使わない）、cloud-itonami/llm-dataset（大物の置き場）。GPU は owner 指示どおり Modal（H100 $0.001097/s、2026-09-18 に pricing を読んだ値）。")
+  (:adr/decision
+  "1. 新規 repo kotoba-lang/typed-decisions（subject 面。Jev は参照点であって仕様ではないので origin 面にしない）。Python は機構、決定はこの ADR。
+
+  2. 形を先に固定した: 3 種の question はすべて『option 列上の softmax』1 つに還元する（score は期待段階の読み出し、noul は 2 択の p(yes)）。head は 1 つ、N question は 1 forward。生成しないので structured-output error は構造的に 0。
+
+  3. label は公開 dataset の gold だけ（banking77 / sst5 / boolq から 1 state に 1〜3 question、合成答えも teacher も無し）。Jev の 67.8% とは比較しない（別の target）。
+
+  4. 2 backbone を同じ loss（CE + Brier）・同じ read-out・同じ bench で測る: A = encoder（ModernBERT-base/large、対照に DeBERTa-v3、RoBERTa）を full fine-tune、B = LLaDA-MoE-7B-A1B を LoRA r16、question ごとに [MASK] 1 slot を置き option label token に制限した logits を読む。steps>1 は LLaDA の low-confidence remasking で『追加 diffusion step の値段』も測る。
+
+  5. 測った結果、製品経路は encoder に置く。ただし ModernBERT-large ではない —— 下の verification のとおり、この pipeline では 5 つの encoder 中で最も学ばない。今の最良は DeBERTa-v3-large（0.855、e2e 42 ms、$0.26）、最安は ModernBERT-base（0.717、e2e 68 ms、$0.16、8k context）。dLLM は精度で並ぶ（0.835）が latency が 16 倍遅く訓練費が 14 倍高い。
+
+  6. 次の一手は capacity の scale ではなく evaluation の穴（OOD question、frontier teacher の蒸留、seed 複数）を塞ぐこと。ModernBERT-like 1〜2B を pretrain する案はこの結果の前では根拠が無い。")
+  (:adr/consequences
+  "- ChatGPT 案の『ModernBERT-large が最有力』は反証された。原因は architecture の質ではなく、読み出しの設計 + 学習の遅さ: 新設 marker token の hidden state を採点する head は 1 epoch 3k state では label prior から動かず（lr / head-lr / Brier 重み / autocast / attn / compile の全掃引で同じ）、option の text token 平均を読む head（span）に替えると base は即座に学ぶが large は動かない。同じ span head で DeBERTa-v3-large は 3k/1ep で 0.787。
+  - Jev の 70〜500 ms は encoder なら H100 で桁に余裕がある（forward 19〜39 ms / 10 決定）。e2e は Python の tokenise が支配する。7B dLLM は 1 step でも 0.6〜0.9 s で band の外。
+  - $0.000081/task は compute cost の約 200 倍（ModernBERT-base の 100 決定 forward 34 ms = $0.00004/pass）。価格であって原価ではない、と読める。
+  - 測っていないもの: OOD question（同じ state に未見の question）、teacher 蒸留、複数 seed、ModernBERT-large の多 epoch、Apple M1 Max の latency（別途）。
+  - repo の運用: corpus は data.py で再生成、checkpoint は Modal volume typed-decisions-cache、report.json だけ commit。")
+  (:adr/verification
+  "全部 reports/*.json（H100 80GB、Modal、2026-09-18）。test 1,500 state / 3,508 question。
+
+  head-to-head（accuracy all / Brier / ECE(T fit) / b77 intent / boolq / e2e p50 1 state×10 q / forward / train wall / USD）:
+  - ModernBERT-base 149M, 18k state × 2 ep: 0.717 / 0.359 / 0.013 / 0.833 / 0.649 / 68 ms / 19 ms / 150 s / $0.16
+  - DeBERTa-v3-large 435M, 18k × 1 ep: 0.855 / 0.204 / 0.014 / 0.922 / 0.881 / 42 ms / 39 ms / 237 s / $0.26
+  - LLaDA-MoE-7B-A1B LoRA r16, 6k × 1 ep: 0.835 / 0.231 / 0.028 / 0.890 / 0.869 / 676 ms / 846 ms / 2,083 s / $2.29（zero-shot 0.645）
+  等データ対照（6k × 1 ep）: base 0.577 / DeBERTa-large 0.819 / LLaDA 0.835。
+  LLaDA steps=2: 0.838 で 1,341 ms（2 倍）。throughput batch 8: base 435 q/s / DeBERTa 460 / LLaDA 28。
+
+  ablation（3k × 1 ep、span head）: ModernBERT-base 0.539（b77 0.550）/ ModernBERT-large 0.388〜0.399（lr 1e-5〜1e-4、2ep、no-amp、eager すべて）/ DeBERTa-v3-base 0.398 / DeBERTa-v3-large 0.787 / RoBERTa-large 0.710。marker head（opt / q-opt）: 全 13 run が 0.376〜0.438。MLM-slot 経路の ModernBERT-base 0.392。16 state の過学習検査: 50 step で loss 0.000、train16 acc 1.0（loop は正しい）。
+
+  再現: modal run modal_app.py::data → modal run modal_app.py::encoder --model microsoft/deberta-v3-large --lr 2e-5 --max-len 512 --max-state 256 --attn eager → modal run modal_app.py::dllm --limit 6000 --batch 8 --grad-accum 1 --eval-steps 1,2。tiny model の test（pytest、CPU 4 分）は objective → forward → read-out の機構だけを閉じる。
+
+  2026-09-18 途中経過: ModernBERT-base 18k × 6 ep は session 再起動で 1 回死に再走中（結果は README に追記）。")
+  (:adr/body
+  "正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification の各属性。要旨: Jev 型を 3 backbone で実測し、製品経路は encoder（DeBERTa-v3-large が最良、ModernBERT-base が最安）、ModernBERT-large は反証、dLLM は精度で並ぶが latency 16 倍・訓練費 14 倍。")))
