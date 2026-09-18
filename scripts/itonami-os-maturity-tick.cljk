@@ -72,6 +72,19 @@
       {:code (aget r "status") :out (str (aget r "stdout"))})
     (catch :default e {:code nil :out (str e)})))
 
+(defn- nbb-probe
+  "`(require 'ns)` が通るか。Node v26 では brew の nbb (v1.5.x) が
+  `--classpath` を完全に無視する（`probe.cljc` 1 本 + `--classpath .` で
+  「Could not find namespace」を返す実測 2026-09-18）—— つまり
+  not-loadable-under-nbb は計測器の嘘だった。workspace の fork
+  (org-babashka-nbb/cli.js) は絶対 classpath で正しく引くのでそちらを使い、
+  fork が無い環境だけ brew nbb に落ちる。"
+  [cp-str expr]
+  (let [fork (str root "/orgs/kotoba-lang/org-babashka-nbb/cli.js")]
+    (if (exists? fork)
+      (sh "node" [fork "--classpath" cp-str "-e" expr])
+      (sh "nbb" ["--classpath" cp-str "-e" expr]))))
+
 ;; ── 1) 宣言を読む ────────────────────────────────────────────────────────────
 
 (defn- git-out
@@ -147,7 +160,12 @@
   (let [dir (str root "/orgs/" (:org v) "/" (:repo v) "/src")]
     (if-not (exists? dir)
       {:checkout :absent :files :unknown}
-      (let [{:keys [code out]} (sh "find" [dir "(" "-name" "*.clj" "-o" "-name" "*.cljk" ")"])]
+      ;; 2026-09-18: cljk rename (ADR-2609111500) 以降、*.cljk は**移動可能側**の
+      ;; 拡張子で、JVM 専用残骸は *.clj だけ。旧実装は *.cljk も列挙していて
+      ;; （rename 直後の計測: 6310 の jvm-only=20 本）全面が候補から消えた。
+      ;; .cljk の可搬性は拡張子では分からない —— standard-shape の nbb probe が
+      ;; 実際に require して確かめるので、ここでは *.clj 残骸だけ数える。
+      (let [{:keys [code out]} (sh "find" [dir "-name" "*.clj"])]
         (if (not= 0 code)
           {:checkout :present :files :unknown}
           {:checkout :present
@@ -284,17 +302,39 @@
           why (assoc :why why)
           (seq core-clj) (assoc :jvm-only-core core-clj))))))
 
+(def gitlibs (str home "/.gitlibs/libs"))
+
+(defn- gitlibs-srcs
+  "deps.edn のテキストから `{:git/sha \"...\"}` pin を拾い、tools.deps の
+  gitlibs レイアウト (`~/.gitlibs/libs/<prefix>/<leaf>/<sha>/src`) に写す。
+  nbb probe が自 repo の `kotoba.lang.text` 等で偽 not-loadable になっていた
+  原因はこれ（実測 2026-09-18: 6310 の operation は text 込みの CP なら
+  nbb で load できるのに、tick の classpath に text が無く落ち続けていた）。"
+  [deps-edn-text]
+  ;; prefix にハイフンが入る（io.github.kotoba-lang）—— 文字クラスから
+  ;; 抜けていた実測 2026-09-18: text pin が `lang/text` に化けて exists? で
+  ;; 消え、6310/5820 が not-loadable 偽阴性のまま候補外になっていた。
+  (->> (re-seq #"([a-z0-9.-]+)/([a-z0-9._-]+)\s*\{:git/sha\s+\"([0-9a-f]+)\"" deps-edn-text)
+       (mapv (fn [[_ prefix leaf sha]] (str gitlibs "/" prefix "/" leaf "/" sha "/src")))))
+
 (defn- dep-classpath
   "この vertical を nbb で load するのに要る classpath。repo 自身と、
-  `deps.edn` の `:local/root` が指す sibling の `src` を並べる（推移依存は
-  1 段だけ —— これで足りなければ load は失敗し、それは正しい答えになる）。"
+  `deps.edn` の `:local/root` が指す sibling の `src`、および同じ表に
+  書かれた `:git/sha` pin の gitlibs checkout を並べる（推移は 1 段 ——
+  local/root sibling 自身の deps.edn まで。これで足りなければ load は
+  失敗し、それは正しい答えになる）。"
   [v]
   (let [self (str root "/orgs/" (:org v) "/" (:repo v))
         deps (or (slurp* (str self "/deps.edn")) "")
         sibs (->> (re-seq #"\"\.\./\.\./([a-z0-9-]+)/([a-z0-9.-]+)\"" deps)
-                  (map (fn [[_ o r]] (str root "/orgs/" o "/" r "/src")))
-                  distinct)]
-    (str/join ":" (cons (str self "/src") sibs))))
+                  (mapv (fn [[_ o r]] (str root "/orgs/" o "/" r "/src")))
+                  distinct)
+        sib-deps (mapv #(or (slurp* (str (subs % 0 (- (count %) 4)) "/deps.edn")) "") sibs)
+        gl (->> (concat [deps] sib-deps)
+                (mapcat gitlibs-srcs)
+                (filter exists?)
+                distinct)]
+    (str/join ":" (concat [(str self "/src")] sibs gl))))
 
 (defn- norm
   "照合用の正規化 —— 英数字だけに落とす。**branch 名は repo 名と綴りが揃わない**
@@ -423,8 +463,8 @@
                    :else
                    (let [c (first cs)
                          v {:org "cloud-itonami" :repo (:repo c) :ns (:ns c)}
-                         {:keys [code]} (sh "nbb" ["--classpath" (dep-classpath v)
-                                                   "-e" (str "(require '[" (:ns c) ".operation])")])]
+                         {:keys [code]} (nbb-probe (dep-classpath v)
+                                                   (str "(require '" (:ns c) ".operation)"))]
                      (if (= 0 code)
                        (recur (rest cs) (conj acc c) rejected)
                        (recur (rest cs) acc
@@ -471,9 +511,12 @@
 
 (defn- standard-shape [v]
   (let [base (str root "/orgs/" (:org v) "/" (:repo v) "/src/" (:ns v))
-        op (slurp* (str base "/operation.cljc"))
-        ph (slurp* (str base "/phase.cljc"))
-        st (slurp* (str base "/store.cljc"))]
+        ;; rename (ADR-2609111500) 後は .cljk 側にある repo がある —— 1 本でも
+        ;; 読めないと :source-unreadable になり、6310/5820 のように「繋げる」
+        ;; 対象が毎周 候補から黙って消える（実測 2026-09-18）。両方読む。
+        op (read-ns-file base "/operation")
+        ph (read-ns-file base "/phase")
+        st (read-ns-file base "/store")]
     (cond
       (not (and op ph st)) {:standard? :unknown :missing [:source-unreadable]}
       :else
@@ -494,8 +537,8 @@
           ;; 形だけを見ていた版はこの repo を毎周「次の 1 手」に出し続け、
           ;; ループが 1 反復まるごと使って同じ結論に達するところだった。
           ;; **実際に require してみるのが唯一の確かめ方**なので、そうする。
-          (let [{:keys [code]} (sh "nbb" ["--classpath" (str (dep-classpath v))
-                                          "-e" (str "(require '[" (:ns v) ".operation])")])]
+          (let [{:keys [code]} (nbb-probe (dep-classpath v)
+                                          (str "(require '" (:ns v) ".operation)"))]
             (if (= 0 code)
               {:standard? true :missing []}
               {:standard? false :missing [:not-loadable-under-nbb]}))))))) 
