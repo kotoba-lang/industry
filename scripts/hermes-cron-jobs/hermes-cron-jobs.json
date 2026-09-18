@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-18T07:10:29Z",
+  "generated_at": "2026-09-18T09:43:21Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-scout": [
@@ -8879,6 +8879,32 @@
           "kind": "cron"
         },
         "script": null,
+        "skills": null,
+        "workdir": null
+      }
+    ],
+    "pwned-dataset-ops": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "6d8c8d7d89bb",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "pwned-dataset-sync",
+        "no_agent": true,
+        "prompt": "pwned sync (HIBP public breach corpus -> R2 pwned/, script-only no_agent)",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "40 6 4 * *",
+          "expr": "40 6 4 * *",
+          "kind": "cron"
+        },
+        "script": "pwned_dataset_ops_evidence.py",
         "skills": null,
         "workdir": null
       }
