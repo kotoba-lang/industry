@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-18T13:42:10.702713+09:00",
+ "generated_at": "2026-09-18T13:58:22.441096+09:00",
  "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
  "profiles": {
   "adnetwork-scout": [
@@ -8540,29 +8540,29 @@
   ],
   "twin-ops": [
    {
-    "deliver": "local",
-    "prompt": "twin-ops patrol (ENTERPRISE digital twin, not a physics sim). First run scripts/twin_ops_evidence.py (bare python3, any cwd) and read its JSON. If it prints REFUSED you are blind: report and stop. Checks: (1) live - twin.kotoba.cloud landing/ontology/enterprise data must be 200 with the expected body marker, apex /twin/ must reach the twin host; (2) drift - assets/twin-catalog-src/enterprise.json (in ~/.gftd/worktrees/akc-twin-ops) vs the worktree's wrangler.jsonc: host/service/r2/DO counts must match, and twin_site.cljk must not mention the removed shibuya physics sim. On real drift: first git fetch origin in the worktree and confirm the drift is on origin/main (not a stale worktree); then update the curated catalog + landing copy in ONE PR from a fresh topic branch twin-ops/<yyyymmdd> cut from origin/main; never push main; shell command lines pure ASCII. Follow SOUL.md in the profile dir. Budget: finish within 15 API calls, report a compact status per check, then stop. 'Opened no PR' is valid when all green.",
-    "monitor_url": null,
     "script": "twin_ops_evidence.py",
     "id": "1efbb13b866f",
+    "monitor_url": null,
     "workdir": "/Users/junkawasaki/.gftd/worktrees/akc-twin-ops",
-    "monitor_script": null,
-    "no_agent": false,
+    "schedule": {
+     "kind": "cron",
+     "expr": "52 4 1 * *",
+     "display": "52 4 1 * *"
+    },
+    "prompt": "twin-ops patrol (ENTERPRISE digital twin - ontology, not physics sim). First run scripts/twin_ops_evidence.py (bare python3, any cwd) and read its JSON. If it prints REFUSED you are blind: report and stop. Checks: (1) live - twin.kotoba.cloud landing/ontology/enterprise.json/agent.md/tx.edn must be 200 with the expected body marker, apex /twin/ must reach the twin host; (2) drift - assets/twin-catalog-src/enterprise.json (in ~/.gftd/worktrees/akc-twin-ops) vs the worktree wrangler.jsonc (host/service/r2/DO counts), twin_site.cljk must not mention the shibuya sim, tx.edn and agent.md must be present; the worktree must be re-synced to origin/main BEFORE declaring drift (git fetch origin; checkout origin/main -f). On real drift: update the curated catalog, regenerate tx.edn+agent.md with scripts/twin-txs.py, land ONE PR from a fresh topic branch twin-ops/<yyyymmdd> cut from origin/main; never push main; shell command lines pure ASCII. Ingest status: without TWIN_TENANT_TOKEN in the profile .env the graph-plane ingest is pending a human-minted write-scope service account - report 'ingest pending human mint', never fake a query result. Follow SOUL.md. Budget 15 API calls; 'Opened no PR' is valid when all green.",
     "repeat": {
      "times": null,
      "completed": 2
     },
+    "monitor_script": null,
+    "no_agent": false,
     "skills": [],
     "enabled_toolsets": [
      "terminal",
      "file",
      "web"
     ],
-    "schedule": {
-     "kind": "cron",
-     "expr": "52 4 1 * *",
-     "display": "52 4 1 * *"
-    },
+    "deliver": "local",
     "context_from": null,
     "name": "twin-ops patrol (monthly 1st 04:52 JST)"
    }
