@@ -1,0 +1,75 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609182230-llada22-flash-uncensored-hf-jobs-rtx6000-int4-bench")
+  (:adr/title "LLaDA2.2-flash の uncensored fork を chat_template 注入だけで com-kotobalabs に公開し、HF Jobs rtx-pro-6000 (INT4/minnow) で推論速度・最大 concurrency・throughput を実測 —— 集約 ~1,950 tok/s で頭打ち、同時 24–48 が最適域、64 同時が上限（429+リトライ）、BF16 単一 96GB は不可（205.8GB）。HF Inference Providers はこの系統に未対応")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-18")
+  (:adr/last_verified "2026-09-18")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "llada22-flash-uncensored-hf-jobs-rtx6000-int4-bench")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-kotobalabs/LLaDA2.2-flash-uncensored"))
+  (:adr/authoritative_for
+   (vector "com-kotobalabs/LLaDA2.2-flash-uncensored の存在と実装形態（chat_template 常時注入、重みは base の Xet clone）"
+           "LLaDA2.2-flash が HF Inference Providers で serverless 提供されない理由と、RTX PRO 6000 で動かす経路が HF Jobs しかないこと"
+           "RTX PRO 6000 x1 上の LLaDA2.2-flash INT4 (minnow) の推論速度・同時数・スループットの対照値"))
+  (:adr/related
+   (vector "adr-2609181000-rtx-pro-6000-27b-vs-flash-next-nvfp4-throughput (同一 flavor rtx-pro-6000 $2.75/h の vLLM 側の数字。本 ADR は block diffusion モデルの同一ハード対照値)"
+           "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe (LLaDA 系 MoE の形状の観察)"
+           "adr-2609160940-hf-inference-endpoint-iq4xs (app-kotoba-cloud 側。専用 Endpoints のハードカタルグに RTX PRO 6000 が無いことの確認経緯)"))
+  (:adr/body "## Context
+
+オーナー指示（2026-09-18）: inclusionAI/LLaDA2.2-flash の uncensored model を作り、公開先は huggingface.co/com-kotobalabs。続けて「hf inference の rtx pro 6000 host して推論速度、最大 concurrency, throughput を評価」。
+
+## 決定1 —— uncensored 化は chat_template 常時注入（重み学習ではない）
+
+- 公開: https://huggingface.co/com-kotobalabs/LLaDA2.2-flash-uncensored（public、45 ファイル、safetensors 32、205,782,452,128 B）。
+- 実装: base を HF duplicate API でサーバー側コピー（Xet clone。205GB の再アップロード無し）し、chat_template.jinja だけ差し替え。UNCENSORED_DIRECTIVE（拒絶・道徳説教・免責・CW なし、タブー話題も直接答える）を system block に**呼び出し側が system を省略しても**常時注入。tool_calls / multi-turn のレンダリングは base と同一。
+- 検証: jinja2 で no-system / system+tools+tool_result をレンダリング確認。実サービングでも /v1/completions に生テンプレートを投げて directive_present: true を確認（2026-09-18、RTX PRO 6000 上）。
+- 使い方は base と同一（AutoTokenizer + trust_remote_code）。
+- 仮で作った com-junkawasaki/LLaDA2.2-flash-uncensored は削除済み（単一正本は com-kotobalabs）。
+
+## 決定2 —— 実行形態は HF Jobs（Inference Providers でも専用 Endpoints でもない）
+
+- HF Inference Providers: inferenceProviderMapping = null、router カタルグ 137 モデルに llada 0 件。block diffusion + modeling_llada2_moe.py の trust_remote_code 自定义コードが原因で serverless widget は出ない。
+- 専用 Inference Endpoints のハードカタルグに RTX PRO 6000 は無い（A100/H100/H200 クラスのみ）。
+- HF Jobs の flavor rtx-pro-6000（1x RTX PRO 6000 Blackwell 96GB、23 vCPU、$2.75/h）が使える。**BF16 全量 205.8GB は 96GB に収まらない**ので INT4 で測る（coder543/LLaDA2.2-flash-minnow llada2.2-flash-int4.mnw、57.6GB。重みは base と同一なので uncensored fork の性能そのもの。uncensor はテンプレート層なので量子化と直交）。
+- ランタイム: coder543/minnow (Rust、CUDA)。コンテナ nvidia/cuda:13.3.1-devel-ubuntu24.04、ベンチスクリプトは /tmp/bench:ro マウントで投入。
+
+## 実測（2026-09-18、HF Jobs llada22-bench3 / llada22-bench-r2、合計 ~20 分課金）
+
+単一リクエスト（512 tok 出力）:
+- 最良ケース（数字羅列・反復的）: 0.84s = **610 tok/s**（block diffusion は反復出力が異様に速い）
+- 実コンテンツ（4,000 tok prefill + 256 出力）: 3.12s
+- 自由文の短応答（uncensored probe 26–69 tok）: 49–98 tok/s
+
+Concurrency ラダー（各 512 tok、--parallel 48〜64 + K/V 30GiB、429 はクライアントリトライで吸収、全リクエスト成功）:
+
+| conc | p50 | per-req tok/s | 集約 tok/s |
+|---:|---:|---:|---:|
+| 4 | 2.3–20s | 235 | 885 |
+| 8 | 2.8s | 189–248 | 1,409–1,489 |
+| 16 | 4.4–4.7s | 108–115 | 1,611–1,684 |
+| 24 | 6.3s | 81 | 1,827 |
+| 32 | 7.9–8.1s | 63–64 | 1,847–1,870 |
+| 48 | 12.2–12.6s | 41–47 | 1,804–1,864 |
+| 64 | 17.7s | 30 | 1,754 |
+| 24×2048長文 | 21.4s | 84 | **1,953（ピーク）** |
+
+- **集約スループットは ~1,900 tok/s で頭打ち。同時 24–48 が最適域。**
+- **最大 concurrency は 1 GPU あたり 64 同時実走**（--parallel 64 で 64/64 成功）。--parallel 128 はロード中にクラッシュ（上限超過）。デフォルト K/V 予算では 12 本で打ち止め（429）なので K/V を明示的に積むこと。超過はキューでなく 429 なのでレートキャップ 48 + リトライが運用形。
+- VRAM 実使用 58.4GB / 96GB、GPU util ピーク 76%。
+- コスト: 飽和 ~1,900 tok/s ≒ **$0.55 / 1M 出力トークン**（$2.75/h）。BF16 完全精度なら rtx-pro-6000x4（384GB、$11/h）が最小。
+
+## 未測定（この結論を越えて使わないこと）
+
+- BF16 での品質/速度（1x では不可、x4 未実施）、32k 超文脈、minnow 以外のランタイム（SGLang llada2 は未 merge の可能性）、prompt cache の効果制御なし。
+- INT4 の品質劣化は未評価（速度のみ）。
+
+## Reproduce
+
+- 生データ 35 レコード: ローカル /tmp/llada22/results_combined.jsonl。ベンチスクリプト bench_flash.sh / bench2.sh（HF Jobs -v マウントで投入、ジョブ llada22-bench3 / llada22-bench-r2、hf jobs logs で追跡可）。
+- サービングコマンド: minnow --model llada2.2-flash-int4.mnw serve --parallel 64 --cache-max-mib 30000。"))
+)
