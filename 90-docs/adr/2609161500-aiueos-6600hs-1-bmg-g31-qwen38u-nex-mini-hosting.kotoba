@@ -112,7 +112,7 @@ gateway 経由 (`POST https://api.murakumo.cloud/v1/chat/completions`、無認�
 
 次 agent の最初の command: `ssh root@100.98.24.37 'systemctl is-active murakumo-6600hs1-nex-n25-mini-llama murakumo-6600hs1-nex-n25-mini-join; curl -s http://127.0.0.1:8090/props | head -c 300'` → `curl -s https://api.murakumo.cloud/ready | jq .inference[\"pool-available\"]` (b70 0 のままなら murakumo-main は依然 head ゼロ)。
 
-残 gap の優先順: ① murakumo-main の head 復元 (オーナー判断: 別 node か Nex を降ろす。tunnel credential 再発行 + `murakumo-b70-join`) ② ~~nex の gateway routing を this node に向ける~~ 閉 2026-09-18 (adr-2609181615) ③ K16 qwen38u (2.5 tok/s) の退役判断 ④ 旧 `ubuntu-server` / 旧 `aiueos-6600hs` の tailnet 登録削除 ⑤ NVMe 未割当 ~360 GB の LVM 拡張 ⑥ GuC firmware 更新の効果測定。
+残 gap の優先順: ① murakumo-main の head 復元 (オーナー判断: 別 node か Nex を降ろす。tunnel credential 再発行 + `murakumo-b70-join`) ② ~~nex の gateway routing を this node に向ける~~ 閉 2026-09-18 (adr-2609181615) ③ K16 qwen38u (2.5 tok/s) の退役判断 ④ 旧 `ubuntu-server` / 旧 `aiueos-6600hs` の tailnet 登録削除 ⑤ ~~NVMe 未割当 ~360 GB の LVM 拡張~~ 閉 2026-09-18 (root LV 100 → 462.71 GiB、adr-2609181615) ⑥ GuC firmware 更新の効果測定。
 
 保全した他者 WIP: root superproject の stash@{0} と stash@{2} (observatory-collect bot の tracked 生成物 `90-docs/observatory/observatory.datoms.edn`、FF のために退避、drop していない。bot はその後自分で snapshot を commit しているので実質 superseded だが判断は bot owner)。untracked draft `90-docs/adr/2609141203-social-capital-ledger.edn` は `:adr/id` を slug 形に直しただけで本文は無変更、untracked のまま。
 
