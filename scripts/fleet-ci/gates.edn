@@ -2649,7 +2649,13 @@
   ;;
   ;; :cd false —— 他と揃える。green は「その repo の suite が通った」で
   ;; あって west pin を進める根拠ではない。
-  {:name "kotoba-native" :id "kotoba-native-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  ;; 2026-09-18 (kotoba-native ADR 0086, root ADR-2609182400): the suite runs
+  ;; on the kbb engine -- `:jvm-test` had been dead since the `.cljk` rename
+  ;; (kbb has no JVM route; `clojure -M:test` sees 0 tests). run-tests.cljk is
+  ;; the whole suite, refuses unlisted test files and counts the 18 elf64
+  ;; twin-gap tests apart as known-red (exit 1 on any other red or on a
+  ;; known-red that passes). nbb.edn declares the six deps the tests reach.
+  {:name "kotoba-native" :id "kotoba-native-nbb-test" :gate :nbb-test :classpath "src:resources:test" :entry "run-tests.cljk" :cd false}
   {:name "kotoba-kir" :id "kotoba-kir-jvm-test" :gate :jvm-test :cap :jvm :cd false}
   ;; kotoba.kir is `.cljc` and claims two runtimes; until 2026-08-24 every test
   ;; in that repository was `.clj` and `:jvm-test` above was its only gate, so
