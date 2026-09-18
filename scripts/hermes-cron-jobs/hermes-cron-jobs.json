@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-18T12:49:56.875451+09:00",
+ "generated_at": "2026-09-18T13:42:10.702713+09:00",
  "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
  "profiles": {
   "adnetwork-scout": [
@@ -8541,30 +8541,30 @@
   "twin-ops": [
    {
     "deliver": "local",
-    "skills": [],
-    "context_from": null,
-    "monitor_script": null,
+    "prompt": "twin-ops patrol (ENTERPRISE digital twin, not a physics sim). First run scripts/twin_ops_evidence.py (bare python3, any cwd) and read its JSON. If it prints REFUSED you are blind: report and stop. Checks: (1) live - twin.kotoba.cloud landing/ontology/enterprise data must be 200 with the expected body marker, apex /twin/ must reach the twin host; (2) drift - assets/twin-catalog-src/enterprise.json (in ~/.gftd/worktrees/akc-twin-ops) vs the worktree's wrangler.jsonc: host/service/r2/DO counts must match, and twin_site.cljk must not mention the removed shibuya physics sim. On real drift: first git fetch origin in the worktree and confirm the drift is on origin/main (not a stale worktree); then update the curated catalog + landing copy in ONE PR from a fresh topic branch twin-ops/<yyyymmdd> cut from origin/main; never push main; shell command lines pure ASCII. Follow SOUL.md in the profile dir. Budget: finish within 15 API calls, report a compact status per check, then stop. 'Opened no PR' is valid when all green.",
+    "monitor_url": null,
     "script": "twin_ops_evidence.py",
+    "id": "1efbb13b866f",
     "workdir": "/Users/junkawasaki/.gftd/worktrees/akc-twin-ops",
-    "name": "twin-ops patrol (monthly 1st 04:52 JST)",
+    "monitor_script": null,
+    "no_agent": false,
     "repeat": {
      "times": null,
-     "completed": 1
+     "completed": 2
     },
-    "id": "1efbb13b866f",
+    "skills": [],
+    "enabled_toolsets": [
+     "terminal",
+     "file",
+     "web"
+    ],
     "schedule": {
      "kind": "cron",
      "expr": "52 4 1 * *",
      "display": "52 4 1 * *"
     },
-    "no_agent": false,
-    "prompt": "twin-ops patrol. First run scripts/twin_ops_evidence.py (bare python3, from any cwd) and read its JSON. If it prints REFUSED you are blind: report and stop. Compare: (1) live probes - landing/sim/wasm/splat must be 200 with body containing Digital Twin, apex /twin/ must 301 to the twin host; (2) drift - the worktree assets/twin mirror vs the local app-isekai pin checkout (all files in_sync expected). If the upstream app-isekai checkout is behind the remote default branch, first git fetch in that checkout (remote: origin) and compare the newest shibuya statics before declaring in-sync. On real drift or a live failure: open ONE PR from a fresh topic branch (twin-ops/<yyyymmdd>) cut from the worktree's origin/main in ~/.gftd/worktrees/akc-twin-ops; never push main; shell command lines pure ASCII. Follow SOUL.md in the profile dir. Budget: finish within 15 API calls, report a compact status per check, then stop. 'Opened no PR' is a valid outcome when all green.",
-    "monitor_url": null,
-    "enabled_toolsets": [
-     "terminal",
-     "file",
-     "web"
-    ]
+    "context_from": null,
+    "name": "twin-ops patrol (monthly 1st 04:52 JST)"
    }
   ]
  },
