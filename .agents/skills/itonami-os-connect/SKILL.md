@@ -40,8 +40,12 @@ os.edn` と出ていたら **その候補は信用できない**（共有 checko
 接続済みで、loop 自身が『次の反復も同じ罠を踏む』と ledger に書いて終わった）。
 `~/.itonami/itonami-os-maturity-tick.ledger.edn` の末尾数行も読む。
 
-**tick が `:ops-drift` を出していたら、接続より先にそれを直す。** 宣言と actor の
-op がズレている面は嘘をついているので、その上に 1 本足しても嘘が増えるだけ。
+**tick が `:ops-drift` を出していたら、接続より先にそれを直す。** ただし**直す前に
+drift が本物か確かめる** —— 2026-09-17 実測で isic-7310 の drift は偽物だった
+（actor 側は `(def write-ops (set/union placement-ops tieup-ops))` で宣言と一致；
+旧パーサが union 参照を docstring まで拾って :unknown 化していた。修正コミット
+3b394fd0549：union 名前の抽出は呼び出し行のみ、拡張子は cljk-twin 両対応）。
+actor の実物（`git show <pin>:src/<ns>/phase.cljc`）を目視して結論すること。
 
 ### 1. 1 本選ぶ
 
