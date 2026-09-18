@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-18T13:58:22.441096+09:00",
+ "generated_at": "2026-09-18T14:22:57.062035+09:00",
  "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
  "profiles": {
   "adnetwork-scout": [
@@ -8250,6 +8250,33 @@
     "script": "yabai_ops_evidence.py",
     "skills": null,
     "workdir": "/Users/junkawasaki/.gftd/worktrees/yabai-ops"
+   }
+  ],
+  "yabai-risk-ops": [
+   {
+    "context_from": null,
+    "deliver": "local",
+    "enabled_toolsets": null,
+    "id": "cbfe43b5a18c",
+    "monitor_script": null,
+    "monitor_url": null,
+    "name": "yabai-risk-ops daily scoring integrity",
+    "no_agent": false,
+    "prompt": "Read the evidence JSON above. Follow SOUL.md: pick ONE lever (scoring_gap > scoring_drift > unknown_kind > head_drift), run the rail (build/test yabai-catalog, render, shadow release, audit:uiux, test:worker), open ONE PR to cloud-kotoba/app-kotoba-cloud, merge via gh api with review comment, wrangler deploy, live head verify. Finish within 25 API calls. Shell command lines pure ASCII. opened-no-PR is a valid outcome.",
+    "script": "yabai_risk_ops_evidence.py",
+    "skills": [],
+    "workdir": "/Users/junkawasaki/.gftd/worktrees/yabai-risk-ops",
+    "repeat": {
+     "times": null
+    },
+    "schedule": {
+     "display": "50 6 * * *",
+     "expr": "50 6 * * *",
+     "kind": "cron"
+    },
+    "script": "yabai_risk_ops_evidence.py",
+    "skills": null,
+    "workdir": "/Users/junkawasaki/.gftd/worktrees/yabai-risk-ops"
    }
   ],
   "yabai-staging": [
