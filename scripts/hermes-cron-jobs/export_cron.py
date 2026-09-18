@@ -131,6 +131,18 @@ def main():
                 # not have rebuilt the job it was describing.
                 "monitor_script": j.get("monitor_script"),
                 "monitor_url": j.get("monitor_url"),
+                # The model / provider pin (`hermes cron create --model X
+                # --provider Y`, user-owned) is a definition too: measured
+                # 2026-09-18 with akc-admin-ops, a job registered WITHOUT the
+                # pin resolved the profile default to provider `custom` on the
+                # OpenRouter base URL (400 "not a valid model ID"), fell back
+                # to the blue route and timed out (504) -- the same job pinned
+                # to the sibling bots' path completed. A ledger without the
+                # pin rebuilds the failing job. `model_snapshot` /
+                # `provider_snapshot` (what a run actually used) stay out:
+                # they are state.
+                "model": j.get("model"),
+                "provider": j.get("provider"),
                 # Skills preloaded into the job's prompt (`hermes cron edit
                 # --add-skill`). Part of the definition: a job re-registered
                 # without them behaves differently (measured 2026-09-15 with
