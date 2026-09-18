@@ -300,4 +300,10 @@
   "adnetwork-scout/154d3b000fe5" 1   ;;    0.0M/day  adnetwork-scout-collect
   "DEFAULT/ec4522b248a9" 1   ;;    0.0M/day  tettai-scout
   "DEFAULT/26a8f01c618b" 1   ;;    0.0M/day  realestate-procedure-source
+  ;; admin.kotoba.cloud operator-console ops (2026-09-18, ADR-2609181500 in
+  ;; app-kotoba-cloud): a security patrol, so it is cut last. The monitor job
+  ;; runs the agent only when the stable evidence changed; the weekly review
+  ;; is one report. Both unmeasured at registration (no run yet).
+  "akc-admin-ops/db3a3cf7a52f" 1   ;;  unmeasured  admin-gate-watch (every 6h, monitor)
+  "akc-admin-ops/a12d6d44f7bf" 1   ;;  unmeasured  admin-access-review (weekly)
  }}

@@ -30,6 +30,10 @@ python3 scripts/hermes-cron-jobs/export_cron.py --check  # 差分検査 (CI/flee
 そのまま）、`--check` も自端末の profile だけを比べる。実測 2026-09-15: main の台帳 141 profile
 に対し local は 36、素朴な上書きなら 105 profile を消していた。
 
+job の model / provider pin（`hermes cron create --model X --provider Y`）も定義として焼く
+（2026-09-18 実測、akc-admin-ops: pin 無しで登録した job は profile 既定を provider `custom`
++ OpenRouter base URL に解決して 400 `not a valid model ID`、blue route へ fallback して
+504 `inference-timeout` —— 同じ job を twin-ops と同じ pin にしたら completed）。
 job に先読みさせる `skills`（`hermes cron edit <id> --add-skill <name>`）も定義の一部として
 焼く —— 無いまま再登録すると挙動が変わる（symbol-index の実測: 先読み 8/8 正解、
 置くだけ 2/8）。
