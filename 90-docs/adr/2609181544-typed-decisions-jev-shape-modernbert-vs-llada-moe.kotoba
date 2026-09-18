@@ -29,7 +29,7 @@
   "- ChatGPT 案の『ModernBERT-large が最有力』は反証された。原因は architecture の質ではなく、読み出しの設計 + 学習の遅さ: 新設 marker token の hidden state を採点する head は 1 epoch 3k state では label prior から動かず（lr / head-lr / Brier 重み / autocast / attn / compile の全掃引で同じ）、option の text token 平均を読む head（span）に替えると base は即座に学ぶが large は動かない。同じ span head で DeBERTa-v3-large は 3k/1ep で 0.787。
   - Jev の 70〜500 ms は encoder なら H100 で桁に余裕がある（forward 19〜39 ms / 10 決定）。e2e は Python の tokenise が支配する。7B dLLM は 1 step でも 0.6〜0.9 s で band の外。
   - $0.000081/task は compute cost の約 200 倍（ModernBERT-base の 100 決定 forward 34 ms = $0.00004/pass）。価格であって原価ではない、と読める。
-  - 測っていないもの: OOD question（同じ state に未見の question）、teacher 蒸留、複数 seed、ModernBERT-large の多 epoch、Apple M1 Max の latency（別途）。
+  - 測っていないもの: OOD question（同じ state に未見の question）、teacher 蒸留、複数 seed、ModernBERT-large の多 epoch、Apple M1 Max の latency（2 回試して未測定）。
   - repo の運用: corpus は data.py で再生成、checkpoint は Modal volume typed-decisions-cache、report.json だけ commit。")
   (:adr/verification
   "全部 reports/*.json（H100 80GB、Modal、2026-09-18）。test 1,500 state / 3,508 question。
@@ -45,6 +45,8 @@
 
   再現: modal run modal_app.py::data → modal run modal_app.py::encoder --model microsoft/deberta-v3-large --lr 2e-5 --max-len 512 --max-state 256 --attn eager → modal run modal_app.py::dllm --limit 6000 --batch 8 --grad-accum 1 --eval-steps 1,2。tiny model の test（pytest、CPU 4 分）は objective → forward → read-out の機構だけを閉じる。
 
-  2026-09-18 途中経過: ModernBERT-base 18k × 6 ep は session 再起動で 1 回死に再走中（結果は README に追記）。")
+  ModernBERT-base 18k × 6 ep（$0.43、session 再起動で 1 回死に再走）: 0.746 / b77 0.894 / boolq 0.631（平ら）/ sst5 level 0.429、train-subset 0.949、ECE 0.120 —— 短文 2 source を暗記し boolq の passage を読んでいない。同じ $0.26〜0.43 なら DeBERTa-v3-large 1 ep（0.855、boolq 0.881）が上。
+
+  結論（日本語、README の要約と同一）: 製品経路は encoder、最良は DeBERTa-v3-large（0.855 / 42 ms / $0.26）、最安は ModernBERT-base（0.717 / 68 ms / $0.16、8k context）。ModernBERT-large は全設定で label prior から動かず反証。dLLM は精度で並ぶ（0.835）が latency 16 倍・訓練費 14 倍。Jev の $0.000081/task は compute 原価（ModernBERT-base 100 決定 forward 34 ms = $0.00004/pass）の約 200 倍で、価格であって原価ではない。未測定: OOD question、teacher 蒸留、複数 seed、ModernBERT-large の多 epoch、M1 Max MPS latency（2 回とも session 再起動で死亡）。")
   (:adr/body
   "正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification の各属性。要旨: Jev 型を 3 backbone で実測し、製品経路は encoder（DeBERTa-v3-large が最良、ModernBERT-base が最安）、ModernBERT-large は反証、dLLM は精度で並ぶが latency 16 倍・訓練費 14 倍。")))
