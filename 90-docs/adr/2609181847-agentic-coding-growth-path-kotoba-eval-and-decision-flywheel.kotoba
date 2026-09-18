@@ -49,6 +49,12 @@
   - 止めたもの: kotoba.cloud lane の probe + 教師 OOD-train ラベラー（lane 停止のため。data/ood-train.jsonl 700 state は未ラベル）。
   - 未着地（blocker 付き）: (a) kaizen 実 POST —— tenant kotoba-lang/typed-decisions の ingress key provisioning（Keychain 書込 + wrangler kv key put、README『owner がやること』3 行）が agent の権限で拒否。(b) Hermes transcript の判断化 —— hermes_data.py は着地、実行は provenance のため owner（コマンドは README 段 1）。(c) 教師ラベル追加実験 —— lane 復旧待ち。(d) qwen3.8-27b（k16）の kotoba task 測定 —— 未実行（1 task 30 分超、--only で最小 2 本）。
   - 次 agent の最初の command: kbb --backend sci --classpath .:scripts:scripts/model-eval:scripts/nbb_compat scripts/agent-task-models-tick.cljk --report-only（kotoba cell の answered / truncated / error を読む）→ lane が生きていれば --class kotoba --only kotoba-amu-24516340,kotoba-kotobase-peer-9b251ecc --models qwen3.8-27b-uncensored。
+  closing 2（2026-09-18 20:0x JST、同日 2 回目）—— 前回の closing からの差分:
+  - kotoba class の tick は完走し ledger に載った（09:34Z、16 測定）: nex 0/8 answered（truncated 8、out=2048）、whitehacker 0/8（error 8: research-service-unavailable 1 / inference-timeout 3 / guardrail-unavailable 3 / max_tokens 8000 を reasoning で使い切り 1）。pass 0/0 = 未定義であって fail ではない。reasoning-first model に module 全文を返させる task 設計は出力枠を reasoning と分ける必要がある（次に直す点、未着手）。
+  - コミット 1（OOD 計画）を測って見積りを撤回: 16 family の幅も同 state の question 多様性も OOD 合計を動かさない（ADR-2609181715 decision 9、typed-decisions README『コミット 1』）。16 family 版は HF revision multi-16 として公開。child は 1acb81c8、west pin 同 sha（7d6158b1）、tree clean。
+  - 動いているものは無い（Modal app 0、ローカル process 0）。
+  - blocker は前回と同じ 4 件（kaizen provisioning / Hermes 抽出の実行 / 教師ラベル実験 / k16 qwen3.8-27b 測定）に、『kotoba task の出力枠設計（reasoning と本文を分ける）』が加わる。
+  - 次 agent の最初の command は前回と同じ report-only。
   - 保全した owner WIP（触っていない）: superproject 本体 checkout は branch bot/kinyu-20260918-prod-gates（origin/main から 1 ahead）で、tracked 変更（90-docs/business/metrics/*、observatory.datoms.edn、vuln-scan-log.md）と多数の untracked orgs/ がセッション開始前から在る。今回触った 5 file（tasks.cljk / bench.cljk / tick.cljk / agent-task-models.edn / kotoba-tasks.edn）は origin/main とバイト同一（branch が古いので diff に見えるだけ）。orgs/kotoba-lang/amu は tracked 変更あり（hook 報告、私のものではない）。")
   (:adr/body
   "正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification の各属性。要旨: 生成・判断・検証を分け、検証を label 源にする。段 0 で kotoba の eval task 24 本が着地し、routing 中の model は 0/8 answered（truncated / lane down）。段 1 の抽出器は着地、実行は owner。成長の指標は検証付き triple / 日（今 0）。")))
