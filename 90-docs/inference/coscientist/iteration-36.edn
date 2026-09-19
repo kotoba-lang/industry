@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-36"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-36.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 31: C-1 groundwork, prefill-ready kernels"
+  :coscientist/iteration 36
+  :coscientist/subject "deltanet_fused reads its batch row from pos[1] and every kdot takes positions-per-input-row from Meta.pad0, so a P-token prompt can run the kdots as one batch (weights read once) and the two recurrences as P steps; decode unchanged on B70 / K16 / Xavier; the generator's prefill mode is next"
+  :coscientist/engine-note "The kernel side of prefill landed first and was re-verified against decode on three boxes, so the generator step can fail on its own."
+  :coscientist/generated 3
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "the generator's prefill mode (batched layer bodies, stepbuf recurrences, MoE ids [P x 8], lm_head on the last row)"
+  :coscientist/measured "decode after the rebuild: B70 4L i8 2.58-2.59 ms/token (a 7.77 ms outlier under vLLM load), K16 12L 27.3-27.5, Xavier 12L h2 36.6; chains equal"
+  :coscientist/refuted "none"
+  :coscientist/carries-forward "prefill mode; resident 40-layer B70 run; tokenizer; HTTP; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 36 — `/loop 30min kaizen loop` tick 31（2026-09-19）\n\n対象: C-1 —— 本物の prefill（decode 速度の逐次でなく、prompt を batch で）。今 tick は kernel 側の地ならし。\n\n## Generate\n\n- H36.1 prefill の勝ち筋は「重みを P 回でなく 1 回読む」: kdot は positions 次元を既に持つ（MoE の 8 position）ので `positions = P`・`input_per_expert = 1` で batch になる。行単位の op（rmsnorm / rope / silu / softmax）も rows = P × … で batch。\n- H36.2 再帰（delta-net の S、causal attention の KV）は batch できず P step 直列 —— だが dispatch は P × 21 でなく 21 + 2P。\n- H36.3 kernel 変更は 2 箇所で済み、decode には無変化で入れられる。\n\n## Reflect / 実装・測定\n\n- `deltanet_fused`: `pos[1]` = batch 内の row（decode は posbuf の 2 語目 = 0）、`qkv / alpha / betaL / z / out` を row で offset。`conv_step` に qoff。\n- kdot 8 kernel（f32 r1/r8、x8r8、i8 x8r4/r8、h2、s4、x8）: `in_row = position / pad0`（`pad0 > 1` の時。MoE prefill は token あたり 8 position）。既定 pad0 = 0 で従来通り。\n- decode 再検証（rebuild 後）: B70 4 層 i8 2.58 ms（3/3）、K16 12 層 27.3（chain 同一）、Xavier 12 層 h2 36.6（3/3）。H36.3 **採択**。一時的に B70 が 7.77 ms を出したのは vLLM の request と重なった雑音（再走 2.58 / 2.59）。\n- 算数（40 層、P token）: decode 流し = P × ~21 dispatch、重み P pass（P = 16: 336 dispatch、21 GB 読み）。batch = ~21 + 2P dispatch、重み 1 pass（16: 53 dispatch、1.3 GB）。prefill 時間は重み 1 pass + 再帰 2P step —— B70 なら 16 token で decode 16 回の 40 ms → 5 ms 級。H36.1 / H36.2 は設計として採択、測定は次 tick。\n\n## Rank（C）\n\n1. generator の `prefill` mode: prompt P を batch: embedding `[P × 2048]`、層 body の kdot を positions=P、行 op を rows=P、delta-net / attention を stepbuf で P dispatch、MoE の router/topk/ids を P 行（ids `[P × 8]`、expert kdot positions = 8P、pad0 = 8）、weighted_sum を P 行、lm_head は最終行。oracle は decode_tokens_ref の P step と同じ値になるはず（同じ数学）。\n2. B70 40 層常駐（オーナー判断）。\n3. tokenizer（GGUF の vocab / merges を読んで `.kotoba` から使う形）→ HTTP。\n\n## Evolve（次 tick）\n\n`gen_decode_tokens_guest.cljk` に `prefill` mode を足し、K16 12 層で P = 8 の prefill を decode 8 step と比較（時間と x の一致）。\n\n## Meta\n\n- kernel を先に prefill 対応にして decode で退行なしを 3 箱で確かめてから generator に進む —— 変更を 2 段に分けたので、次 tick の失敗は generator だけを疑えばよい。\n- 「算数を先に書く」（重み 1 pass / P pass）で、prefill の価値が箱に依らず言えた。\n"}]
