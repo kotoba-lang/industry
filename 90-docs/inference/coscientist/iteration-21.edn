@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-21"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-21.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 16: A-2, the Q6_K lm_head on the half path"
+  :coscientist/iteration 21
+  :coscientist/subject "Q6_K half arm (-DQ6_HALF -> kdot_h2q6_r1.spv): lm_head 23.7 -> 26.6 GB/s; put into the shared binary it regressed the 40-layer token 88.9 -> 94.7 ms (register pressure on the other arms), as a separate binary it gives 88.9 -> 86.9 ms/token (11.5 tok/s), 12/12 oracle"
+  :coscientist/engine-note "The regression was visible only because the unchanged guest was re-run under the new binary in the same session; per-format binaries are the fix and the rule."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 1
+  :coscientist/ranked-first "intra-layer kernel fusion and expert kdot packing (the 71 ms of layers)"
+  :coscientist/measured "Xavier lm_head bench s4 17.7 ms / 23.7 GB/s -> h2q6 15.9 ms / 26.6 GB/s, max rel err 3.4e-3 random x; 40L resident: shared-binary 94.7 / 92.7 ms (s4 lm / h2 lm), tick-15 binary 88.9, separate binary 86.99 / 86.85 ms (A/B with 88.85 between); 12/12 oracle; KL(oracle||gpu) 1.07e-7 at step 11; thermal 37 C, EMC 2133 MHz, drop_caches no effect"
+  :coscientist/refuted "H21.2 one binary for all formats; 'the drift is the box' (it was the binary)"
+  :coscientist/carries-forward "layer fusion + expert kdot packing; Q6_K 210 -> 212 byte repack; gateway switch with C's HTTP"
+  :doc/body "# Inference serving co-scientist, iteration 21 — `/loop 30min kaizen loop` tick 16（2026-09-19）\n\n対象: A-2 —— Q6_K lm_head の half 経路（Xavier の token 89.5 ms のうち 18 ms）。\n\n## Generate\n\n- H21.1 Q6_K も h2 と同じ形（code を byte に、指数 trick、packed multiply）で 18 → ~10 ms。\n- H21.2 同じ `kdot_h2_r1.comp` に arm を足すだけで済む（binary は 1 つ）。\n\n## Reflect / 測定（Xavier）\n\n- bench（lm_head 417 MB）: s4 23.7 → **26.6 GB/s**（17.7 → 15.9 ms/dispatch）。H21.1 は**半分だけ**: Q6_K の 210 byte block は 2 block に 1 つ語境界をまたぎ `weight_u32_at` が 2 load、dequant を軽くしても load 側が残る。\n- H21.2 **棄却、退行を伴って**: 同じ binary に Q6 arm を入れた版で 40 層 token が **88.9 → 94.7 ms**（lm_head 自体は速いのに）。同じ guest（spv を path で参照）を同 session で再走させて 89.5 → 94.7 を見、tick 15 の binary に戻すと 88.9 に戻ったので kernel 由来と確定。uniform branch の kernel 全体の register 圧が上がり Q5_K / IQ4_XS arm の occupancy が落ちた。\n- 直し: `-DQ6_HALF` で別 binary `kdot_h2q6_r1.spv`、`:lm` 行だけがそれを使う。wide / narrow の binary は tick 15 と byte 同一（cmp）。40 層常駐 **86.9 ms/token = 11.5 tok/s**（A/B 2 往復: 86.99 / 88.85 / 86.85）、12/12 oracle、最終 step KL(oracle‖gpu) 1.07e-7。\n- fn mode の guest が最終 logits を答えに付けるようにした（parity_check が fn guest で動く）。\n- 副産物の観測: drop_caches / compact_memory では変わらず、thermal 37 °C・EMC 2133 pin 済み —— 退行は箱の状態ではなく binary だった。\n\n## Rank（A の残り）\n\n1. 層内 kernel 融合（rmsnorm+kdot、silu_mul+down、weighted_sum+add）と expert kdot の詰め: 層 ~71 ms が本体。\n2. Q6_K の load 時 repack（210 → 212 byte、語境界を消す）: lm_head 16 → ~12 ms。\n3. gateway 差し替え（C の HTTP と同時）。\n\n## Evolve（次 tick）\n\nrecurrent 層の 27 dispatch を対にして数え、`rmsnorm_kdot`（norm を shared に置いて即 kdot）から。Xavier の dispatch 費用は小さい（反復 10）ので融合の価値は barrier ではなく**中間 buffer の往復と launch の谷**にある —— 1 層で先に測る。\n\n## Meta\n\n- 「部品が速くなった」と「全体が速くなった」は別。全体を、**変更前の binary を残したまま**同条件で A/B する手順（spv を path で差し替え、guest は同じ）が退行を 1 回で捕まえた。\n- 1 つの kernel に形式ごとの arm を持たせる設計は、arm を足すたびに他の arm の費用になる。形式ごとの binary が正しい（layout 表はもともとその形）。\n"}]
