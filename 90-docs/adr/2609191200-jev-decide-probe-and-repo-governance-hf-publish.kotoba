@@ -1,0 +1,81 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609191200-jev-decide-probe-and-repo-governance-hf-publish")
+  (:adr/title "TypeSafe Jev(System One, OpenRouter typesafe/jev-1.13)を router/gate primitive として probe する scripts/jev-decide.cljk を追加。実 workspace finding 1 件を kotoba-lang/typed-decisions の新 family `repo-governance`(ungoaled, prediction≠gold)として記録し、com-kotobalabs/typed-decisions-repo-governance として HF に公開")
+  (:adr/status :accepted)
+  (:adr/date "2026-09-19")
+  (:adr/deciders (vector "owner"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe"
+                        "adr-2609181715-typed-decisions-train-teacher-and-code-decisions"
+                        "ADR-2607173100"))
+  (:adr/source (vector "https://openrouter.ai/typesafe/jev-1.13"
+                       "https://docs.typesafe.ai/concepts/system-one"
+                       "https://openrouter.ai/api/alpha/decisions"
+                       "orgs/kotoba-lang/typed-decisions"
+                       "https://huggingface.co/com-kotobalabs/typed-decisions-repo-governance"))
+  (:adr/context
+  "owner の問い(2026-09-19): TypeSafe の Jev(自然文を理解するが choice/score/noul の型付き決定しか返さず、
+  コードも自由文も書けない、と TypeSafe 自身の docs が明言する model)だけで、kotoba の unison 的性質
+  (content-addressed definition、symbol-index の候補列挙)を使った coding/refactor/tool call ができないか。
+  検討の結果、jev 単体では『有限集合からの選択』(tool 名のルーティング、既存 CID の中からの choice、
+  noul によるゲート)は担えるが、新しい式・引数文字列の自由生成は担えないという境界を実測込みで確認した。
+
+  続けて owner は、この判断ログを将来の学習用に dataset として保存し HF に公開したいと指示。索引を引いた
+  ところ、同じ着想 —— Jev 形の判断を kotoba の CID 選択に落とす —— は既に `kotoba-lang/typed-decisions`
+  (ADR-2609181544 / ADR-2609181715)で先行して測定・実装され、蒸留の学習済み model は既に
+  `com-kotobalabs/open-jev-deberta-v3-large` として公開済みだった。別ラインで新規 dataset を作ると
+  この既存の corpus 規律(gold と教師ラベルを混同しない、OOD を並記する)と分裂するため、owner に
+  『typed-decisions に合流』か『独立 dataset』かを問い、**合流**が選ばれた。合わせて、記録する実例
+  (compliance-scope-boundary の実 finding、`orgs/cloud-itonami/kaisya` の Worker が 2 ドメインを跨ぐ)を
+  そのまま公開してよいかも確認し、**そのまま含めてよい**と指示された。")
+  (:adr/decision
+  "1. `scripts/jev-decide.cljk`(この superproject root)を追加: state + questions(TypeSafe の
+  `{type, instructions, criteria}` map そのまま)を受け取り、OpenRouter `POST /api/alpha/decisions`
+  (実測で発見した実 endpoint — TypeSafe 自身の `POST https://api.typesafe.ai/v1/systemone` とは別経路。
+  この workspace には TypeSafe 直の鍵は無く、OpenRouter 鍵は既に `gftd.openrouter`/`OPENROUTER_API_KEY`
+  として Keychain にあったため後者を使う)を呼び、答えを印字するだけの薄い plumbing にする。model は
+  ADR-2607173100 の精神で alias(`typesafe/jev-latest`)を既定にしたかったが、**この alpha endpoint は
+  2026-09-19 時点でこのエイリアスを 400 で拒否する**(OpenRouter のモデルページ上では有効なのに)実装状態の
+  制約を測ったため、`typesafe/jev-1.13` に pin し、この一文をヘッダに残す。鍵は `security
+  find-generic-password` で呼び出し時にのみ読み、agent はその値を一度も出力・保持しない。exit は
+  0(answered)/1(REFUSED — key 不在・network 失敗・非 200)/2(BAD-ARGS)の 3 値で、失敗を『答えのふり』
+  にしない(verification-discipline の 8 問と同型)。
+
+  2. `--record <path>` で、成功した呼び出しを 1 行 1 JSON として追記できるようにした。書式は
+  typed-decisions の `schema.Example` を土台にしつつ、**`Question.gold` を全問 `null` にし、jev の実際の
+  答えは `gold` にではなく別 key `prediction` に置く** —— gold の無い family に教師/model の答えを gold と
+  取り違えさせない、という typed-decisions が既に確立していた規律(ADR-2609181715 の『蒸留は gold の代用に
+  しない』)をそのまま踏襲したもの。`gold_status` に `\"unresolved -- ...\"` と明記する。
+
+  3. `kotoba-lang/typed-decisions` に新 family **`repo-governance`**(`data/repo-governance.jsonl`)を
+  追加し、README に第 5 反復として記録した。1 件目は superproject の SessionStart hook が示した実際の
+  finding(`compliance-scope-boundary` / `cross-boundary:cloud-itonami-kaisya`)。捏造なし、実データ 1 件。
+  **現状は corpus ではなく種(n=1)** —— gold が埋まって(owner/governor の裁定、または将来の教師ラベル追加)
+  初めて他 family と同じ扱いになる、と README に明記し、embedding/train script からは触れない位置に置く。
+
+  4. `data/repo-governance.jsonl` を新規 HF dataset `com-kotobalabs/typed-decisions-repo-governance` として
+  Apache-2.0 で公開(owner 指示 2026-09-19)。card に ungoaled であること、`prediction` は正解ではなく
+  jev の予測であること、含まれる compliance finding は実データであることを明記する。")
+  (:adr/consequences
+  "- jev(TypeSafe)は router/gate primitive としてのみ位置づけ、coding/refactor の生成そのものを代替する
+  という前提には立たない —— 生成が要る箇所は既存の LLM(murakumo-main alias)のままで良い。
+  - `repo-governance` family は訓練にはまだ使えない(gold 無し)。次の一歩は (a) 実際にこの finding が
+  裁定されたら gold を書き戻す配線、(b) 十分件数が溜まったら教師ラベル方式を適用するか、のどちらも未着手。
+  - `jev-decide.cljk` は worktree 上のみで main へはまだ着地していない(別途 land 判断待ち、この ADR は
+  設計と HF 公開のみを accepted とする)。
+  - typesafe/jev-latest alias が OpenRouter alpha decisions endpoint で 400 になる件は TypeSafe/OpenRouter
+  側の実装状態であり、再測定して直っていれば pin を外せる。")
+  (:adr/verification
+  "実行 2026-09-19、この session: `kbb --backend sci scripts/jev-decide.cljk --state-file
+  scripts/jev-decide.example-state.txt --questions-file scripts/jev-decide.example-questions.json`
+  → exit 0、`needs_urgent_remediation` noul 0.42 / `owning_area` choice `kotobase-planes`(p=0.80,
+  confidence 0.73)/ `severity` score 1.05(confidence 0.91)、cost $0.0000275。BAD-ARGS(引数無し、exit 2)
+  と REFUSED(不正鍵、exit 1、答えを返さない)も実行して確認。`data/repo-governance.jsonl` に 1 行追記されたことを
+  ファイル内容で確認。HF push は `huggingface_hub`(token store、identity `com-junkawasaki`、org
+  `com-kotobalabs` admin — 前例 `com-junkawasaki/dllm-qwen38-ar-baseline` で書込み実証済み)で実行、
+  `https://huggingface.co/datasets/com-kotobalabs/typed-decisions-repo-governance` で round trip 確認。")
+  (:adr/body
+  "正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification の各属性。要旨: Jev は
+  choice/score/noul の型付き決定のみを返す router/gate primitive であり生成はしない。実測でこの境界を
+  確認したうえで、判断ログを既存の kotoba-lang/typed-decisions の規律(gold と予測を混同しない)に沿う
+  新 family `repo-governance` として記録し、n=1 の種として HF に公開した。")))

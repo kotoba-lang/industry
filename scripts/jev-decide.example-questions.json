@@ -1,0 +1,25 @@
+{
+  "needs_urgent_remediation": {
+    "type": "noul",
+    "instructions": "Given only the stated finding, does it describe something that needs urgent remediation rather than a tolerable, already-accepted design tradeoff?"
+  },
+  "owning_area": {
+    "type": "choice",
+    "instructions": "Which existing area of this workspace's own conventions is the right place to route this finding for a decision?",
+    "criteria": {
+      "kotobase-planes": "app/service identity, naming, and hosting-boundary conventions for kotobase-backed services",
+      "fleet-ci-gates": "CI/CD gate design and what counts as a landed, verified fix",
+      "new-project-scaffold": "how a new repo or Worker is scaffolded and registered",
+      "none-of-these": "this needs a person's judgment call, not a routing decision"
+    }
+  },
+  "severity": {
+    "type": "score",
+    "instructions": "How severe is this finding as a compliance/scope concern",
+    "criteria": [
+      "cosmetic: worth noting, no action needed",
+      "moderate: should be reviewed and either fixed or explicitly accepted",
+      "severe: blocks compliant operation until resolved"
+    ]
+  }
+}
