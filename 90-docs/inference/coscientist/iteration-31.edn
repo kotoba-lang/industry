@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-31"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-31.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 26: B-8, the dp4a kdot"
+  :coscientist/iteration 31
+  :coscientist/subject "quant_q8 + kdot_i8_r8 (dotPacked4x8EXT on byte-per-code K-quant words): correct at Q8-activation precision (rel-RMS 5e-3 on random x), B70 attn_qkv 168 -> 193 GB/s and lm_head 261 -> 289 -- +11-15%, not 2x; the remaining ANV cost is code extraction and 4-byte load granularity, so the next lever is a 16-byte-load layout"
+  :coscientist/engine-note "The second arithmetic hypothesis for ANV's gap fell; the load-width difference between the floor probe and the kernels was there from the start."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 1
+  :coscientist/ranked-first "uvec4 16-byte-load layout on top of dp4a (r8 x x16)"
+  :coscientist/measured "B70 pinned: i8r8 attn_qkv 193 GB/s (f32 r8 168), attn_gate 99 (90), expert 14 (13), lm_head 289 (261); rel-RMS vs f64 attn_qkv 6.1e-3, lm_head 4.5e-3; max-rel 0.20 / 0.31 / 0.23 / 0.20 on the 1e-2 floor; glslang 15.1 rejects GL_EXT_integer_dot_product, 16.6 accepts"
+  :coscientist/refuted "H31.1 removing the int->float conversions and FMAs brings the ANV kdot near the floor"
+  :coscientist/carries-forward "16-byte-load layout; wiring quant_q8 into the token loop; resident 40-layer run; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 31 — `/loop 30min kaizen loop` tick 26（2026-09-19）\n\n対象: B-8 —— dp4a 経路（int8 activation + `dotPacked4x8EXT`）を B70 で。\n\n## Generate\n\n- H31.1 K-quant の codes 語は byte-per-code なので、activation を int8 にすれば値 4 個 = dot 1 命令、int→float 4 回と fma 4 回が消え、ANV の kdot は床（598 GB/s）に向かって 2× 級。\n- H31.2 精度は llama.cpp の Q8 activation と同じ（rel-RMS ~5e-3 on random x、実 model の分布では 40 層 parity で判定）。\n\n## Reflect / 測定（B70 pin）\n\n- 道具: system glslang 15.1 は `GL_EXT_integer_dot_product` を拒否 → Khronos release 16.6 を `/opt/glslang-16.6` に置いた（`glslang16`）。mixed-signedness の overload を避け、codes を `int()` にして signed × signed に。\n- `quant_q8` + `kdot_i8_r8`: attn_qkv Q5_K 168 → **193 GB/s**、lm_head Q6_K 261 → **289**、attn_gate IQ4_XS 90 → 99、expert 13 → 14。H31.1 **半分棄却**: +11–15% で 2× ではない。\n- H31.2 **採択**: rel-RMS 6.1e-3（Q5_K）/ 4.5e-3（Q6_K）—— 32 block max/127 の量子化雑音そのもの（random-normal x で 0.5%/値、cancellation で増幅）。max-rel 0.2 は 1e-2 床の小さい出力行。\n- 読み: multiply-accumulate を消しても 15% しか動かない → ANV の残りは code 抽出（shift / mask、値 4 個あたり ~10 命令）と **load の粒度**（thread あたり 4 byte 語を 8 行分 = 8 load/block。床の 598 は 16 byte vec4 load）。次は `uvec4` 16 byte load（thread が 16 値）× 行 in-flight。\n\n## Rank（B）\n\n1. 16 byte load の layout（r8 × x16、dp4a の上に）: bench で 598 への距離。\n2. dp4a を token loop に配線（層あたり 6 kdot 入力への `quant_q8` 前置、6 binding pipeline）→ 4 層 → 40 層 parity → anv / radv 既定。単独でも +6% 級。\n3. 40 層常駐の実測（オーナー判断）、Xavier（オーナー判断）。\n\n## Evolve（次 tick）\n\n`kdot_i8_r8.comp` の load を `uvec4`（1 thread = 16 連続値 = block の 1/16、16 thread × 8 row … workgroup 64 thread で 4 row × 16 thread か 8 row × 8 thread の 2 形）で書き、attn_qkv / lm_head を bench。\n\n## Meta\n\n- 「床までの差 = 演算」を 2 回（h2、dp4a）で切った。残った候補（load 粒度）は probe の条件（vec4）と kernel の条件（uint）の差に最初から書いてあった。**床 probe は kernel と同じ load 幅で測るか、幅を変数にして測る。**\n- toolchain の壁（glslang 15.1）は 10 分で越えられた。「extension が無い」は driver の話か compiler の話かを分ける。\n"}]
