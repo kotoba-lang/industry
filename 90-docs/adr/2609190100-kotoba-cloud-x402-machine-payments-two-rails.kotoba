@@ -99,9 +99,20 @@ billing と同じ reconciliation で見える利点がある。ただし:
 この ADR を書き換え、`docs/billing/configuration.md` に第二レールとして x402-via-Stripe
 の統合を追記する。混同注意: nexus-x402 経由の決済は Stripe balance には乗らない —— 2つの
 レールの revenue は別の場所に記録される。")
+  (:adr/landed
+   "決定1（nexus-x402 に薄く乗せるレーン）は cloud-kotoba/app-kotoba-cloud#452 として
+着地済み（2026-09-19、merge commit d242099792629e1115ef53e7f6b2b85fe5c7edcf、
+default branch main）。test/x402-gateway.mjs（9 パターン）を含め npm test / test:worker
+green。**`X402_ENABLED` は wrangler.jsonc 上 \"false\" のまま** —— この ADR の時点で
+`/x402/v1/chat/completions` は本番で常に 404、決済は一切受け付けていない。決定2
+（Stripe 公式 x402）は未着手のまま。")
   (:adr/next
-   (vector "オーナー: Stripe Dashboard で Stablecoins and Crypto を申請（acct_1TuxvPIzvFrqWhXK）"
+   (vector "kotoba.cloud: `/.well-known/x402` discovery document を公開する（nexus-x402 の
+POST /apply が document-unreadable で拒否する前提条件、未着手）"
+           "kotoba.cloud を nexus-x402 に POST /apply で自己登録し sk_live_ key を取得、
+Worker secret として保存（本番決済を初めて有効にする操作 —— オーナー確認を経てから）"
+           "オーナー確認の上で X402_ENABLED を \"true\" に切り替え（この 1 手が「404 のまま」
+から「実際に決済を受け付ける」への唯一の切り替え点）"
+           "オーナー: Stripe Dashboard で Stablecoins and Crypto を申請（acct_1TuxvPIzvFrqWhXK）"
            "オーナー: Coinbase Developer Platform アカウント作成 + API key 発行"
-           "承認後: DEPOSIT_ADDRESS 作成 → x402-via-Stripe レールをこの ADR に追記して実装"
-           "nexus-x402 側: kotoba.cloud を POST /apply で自己登録し sk_live_ key を取得、Worker secret として保存"
-           "実装後: test/worker-smoke.mjs に /x402/v1/chat/completions の 8問チェック（未払い→402 challenge、無効payment→402、有効payment→200 かつ ledger 非経由、フラグoff→404）を追加"))))
+           "承認後: DEPOSIT_ADDRESS 作成 → x402-via-Stripe レールをこの ADR に追記して実装"))))
