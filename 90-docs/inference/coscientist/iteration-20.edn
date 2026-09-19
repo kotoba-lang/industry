@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-20"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-20.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 15: A-1, the whole model resident on Xavier"
+  :coscientist/iteration 20
+  :coscientist/subject "owner decision: stop Xavier's llama-server, pursue A -> B -> C; the 40-layer fn-mode guest (h2) runs resident on Xavier: 17.4 GB mapped in 19 s, 89.5 ms/token = 11.2 tok/s steady, 12/12 argmax = oracle, greedy ' Paris.<|im_end|>...'; llama.cpp CUDA was 18.7 tok/s"
+  :coscientist/engine-note "The 12-layer extrapolation of iteration 12 and the 40-layer measurement agree within 1%; the first full-model number was a confirmation, not a discovery."
+  :coscientist/generated 3
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "Q6_K lm_head half path (18 of the 89.5 ms)"
+  :coscientist/measured "Xavier free 2 -> 23 GB after stop; resident 40L h2: load 19.6 s, 12 tokens 89.3-89.6 ms each, mean 89.5 ms = 11.2 tok/s; 12/12 argmax = oracle (K16 40L 12-token oracle); llama.cpp CUDA 18.7 tok/s (stopped)"
+  :coscientist/refuted "iteration 19's worry that h2 changes greedy picks on the real model (12/12 equal)"
+  :coscientist/carries-forward "Q6_K lm_head half; intra-layer fusion and expert kdot packing; gateway head switch once the HTTP surface exists (C); B: B70 kernels; C: prefill / tokenizer / HTTP / batching"
+  :doc/body "# Inference serving co-scientist, iteration 20 — `/loop 30min kaizen loop` tick 15（2026-09-19）\n\n対象: A-1 —— Xavier の llama-server を止め（オーナー決定）、40 層を 1 GPU に常駐させて初めての full-model 速度を測る。\n\n## オーナー決定（2026-09-19）\n\n「xavier の serving を止めて ok」「A, B, C」。A = Xavier 置き換え（llama.cpp CUDA 18.7 tok/s 相当まで、~6 tick）、B = B70 単一ストリームを vLLM 級へ（8–12 tick）、C = serving system（15–25 tick）。この順で loop に載せる。\n\n## Generate\n\n- H20.1 llama-server（21 GB）を止めれば 17.4 GB の重み + state が Xavier の unified memory に常駐し、fn mode の guest がそのまま 40 層で走る。\n- H20.2 速度は 12 層の外挿どおり ~90 ms/token（1.8 ms/層 × 40 + lm_head 18 ms）。\n- H20.3 h2 既定でも実 model（尖った分布）の greedy chain は oracle と一致する（反復 19 の食い違いは 12 層の平坦分布の性質）。\n\n## Reflect / 測定（Xavier、clock pin 済み）\n\n- `systemctl stop murakumo-xavier-nex-n25-mini.service` → free 2 → 23 GB。unit は enabled のまま（native の HTTP 面が無いので reboot 時は llama-server に戻る形を残す）。\n- 40 層 `nvgpu`（h2）fn guest: MAP 17.4 GB 込みで 19.6 s、以後 **89.3–89.6 ms/token、mean 89.5 = 11.2 tok/s**（12 token）。H20.1 / H20.2 **採択**。\n- oracle（K16 で 40 層 12 token、~12 分）と **12/12 一致**。greedy: « The capital of France is » → « Paris.<|im_end|>\\n<think>\\n\\n</think>\\n\\n »。H20.3 **採択**（実 model では h2 の pick も同じ）。\n- 内訳: 層 ~72 ms（nvgpu kdot の命令発行天井、反復 11）+ lm_head ~18 ms（Q6_K は f32 経路）。llama.cpp CUDA の 18.7 tok/s に対して 0.6×。\n\n## Rank（A の残り）\n\n1. Q6_K lm_head の half 経路（18 → ~10 ms、−9%）。\n2. 層内 kernel 融合（rmsnorm+kdot、silu_mul+down、weighted_sum+add）と expert kdot の 8 position をまとめる形（72 → 50 ms 級）。\n3. gateway の Xavier head を native に差し替える —— HTTP 面が要るので C-3 と同時。\n\n## Evolve（次 tick）\n\n`kdot_h2_r1` の Q6_K arm を half に（210 byte block の ql/qh を 8 値ずつ f16vec2 に、scale は int8 → half）。誤差は 40 層 parity（KL）で測ってから既定に。\n\n## Meta\n\n- 外挿（反復 12）と実測（今回）が 1% で合った。12 層で天井を測り切っていたから、40 層は測定でなく確認になった。\n- 「止めてよい」の決定が出た瞬間に 1 tick で常駐が上がったのは、guest が T にも層数にも依らない形（反復 16）になっていたから。\n"}]
