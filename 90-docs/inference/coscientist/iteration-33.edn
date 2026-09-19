@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-33"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-33.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 28: B-10, the x8 lane mapping with rows in flight"
+  :coscientist/iteration 33
+  :coscientist/subject "kdot_x8r8 -DROWS: x8's contiguous-8-values lanes with R rows sharing the activation; x8r4 is the anv wide / lm kernel (attn_qkv 163 -> 199 GB/s, lm_head 261 -> 272), 4-layer token 2.97 -> 2.82 ms; experts stay on r8 (x8r8 loses at 8 positions); B70 4L token 3.63 -> 2.82 over the session, 40-layer estimate ~13 ms (~75 tok/s)"
+  :coscientist/engine-note "Coalescing was a real contributor, not the whole gap; the single-expert 2x was checked in the eight-position shape before it could mislead."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 1
+  :coscientist/ranked-first "dp4a on the x8r4 mapping (kdot_i8_x8r4), then quant_q8 wiring and parity"
+  :coscientist/measured "B70 pinned GB/s: attn_qkv r8 163 / x8r8 159 / x8r4 199; attn_gate 90 / 104; expert 14 / 29; lm_head 261 / 173 / 272; composed 4L x 3T anv 2.97 -> x8r4 2.82 -> experts x8r8 3.27 ms/token; x rel 4.4e-6"
+  :coscientist/refuted "H33.2 eight rows for the x8 mapping (four is best); H33.1's 250 GB/s (199)"
+  :coscientist/carries-forward "kdot_i8_x8r4; quant_q8 wiring; resident 40-layer run; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 33 — `/loop 30min kaizen loop` tick 28（2026-09-19）\n\n対象: B-10 —— block 内の coalescing（反復 32 に残った候補）: x8 の thread 割付 × 行 in-flight。\n\n## Generate\n\n- H33.1 lane が連続 8 値を持つ x8 割付（load 命令が block の codes を冗長なく連続で覆う）に r8 の行 in-flight を足すと、ANV の qkv が 163 → 250 級。\n- H33.2 行数は r8 と同じ 8 が良い。\n\n## Reflect / 測定（B70 pin、GB/s、全部 oracle 一致）\n\n| tensor | f32 r8 | x8 × r8 | x8 × r4 |\n|---|---|---|---|\n| attn_qkv Q5_K | 163 | 159 | **199** |\n| attn_gate IQ4_XS | 90 | 104 | — |\n| expert 1 本 | 14 | **29** | — |\n| lm_head Q6_K | 261 | 173 | **272** |\n\n- H33.1 **部分採択**: coalescing は本物の要因（qkv +22%、単 expert 2×）だが 250 級には届かず 199（床 598 の 1/3）。H33.2 **棄却**: x8 割付では 8 行が多すぎる（256 thread × acc[8] で spill 気味、lm_head は 261 → 173）、4 行が最良 —— 反復 29 の sweep（r8 形で 4–8 が飽和）と整合。\n- 合成 4 層 × 3 token（各 2 回）: wide + lm を x8r4 に **2.97 → 2.82 ms**。expert を x8r8 に **3.27**（8 position の形では r8 が勝つ —— 単 expert bench の 2× は本番の形と違う、反復 27 と同じ罠を今回は踏まずに測った）。\n- `anv` = wide x8r4 / narrow r1 / expert r8 / out r1 / lm x8r4。generator は kernel 名から行数を読む。\n- session 集計（B70 4 層 token）: 3.63 → 2.82（−22%）。40 層 ≈ 40 × 0.28 + 1.7 ≈ **13 ms、~75 tok/s**（vLLM 103 の 0.73×）。\n\n## Rank（B）\n\n1. x8r4 の上に dp4a（`kdot_i8_x8r4`）: 反復 31 の +15% と今回の +22% が重なるか（別の律速なら重なる）。効けば generator に `quant_q8` 前置 → 4 層 → 40 層 parity → 既定。\n2. 40 層常駐の実測（オーナー判断）。\n3. Xavier（オーナー判断）。\n\n## Evolve（次 tick）\n\n`kdot_x8r8.comp` の per-value を `kdot_i8_r8.comp` の dot 形に（lane の 8 値 = 2 語 → 2 dotPacked、activation は xq 2 語 + scale 1 本）。B70 pin で bench → 合成。\n\n## Meta\n\n- 天井の原因は 1 つではなかった: coalescing で 1/3 まで来て、演算（dp4a）で更に 15%、残りはまだ名前が無い。**「原因」でなく「寄与」で数える。**\n- 単 expert bench の 2× を本番に持ち込む前に 8 position で測った —— 反復 27 の学びが使えた。\n"}]
