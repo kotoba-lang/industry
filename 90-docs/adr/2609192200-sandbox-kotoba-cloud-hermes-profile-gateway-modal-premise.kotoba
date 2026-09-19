@@ -35,9 +35,39 @@
 
 **根拠**: (a) Modal が Hermes Agent の official terminal backend であり、この workspace の Hermes fleet の実エンジンと直接一致する。(b) GPU on-demand・gVisor 隔離・scale-to-zero は「profile ごとの使い捨て実行環境」という gateway/runtime の役割に直接合致する。(c) Cloudflare Containers 側にはこの Hermes 統合が存在しない（独自に実装する必要がある）。
 
+## 検証済み（2026-09-19、owner 指示「実際に進めて、local の hermes profile を sandbox で起動してみて」）
+
+実物の Hermes profile を Modal Sandbox 内で起動することを実測した。使ったのは新規に作った
+使い捨て profile `modal-smoketest`（API key 無し）—— `default` profile（本番の identity、
+`.env`・実 cron 履歴・SOUL.md を含む）は意図的に使わなかった（信頼できないサードパーティへ
+資格情報付き identity を送る判断を、確認なしに広げない）。
+
+手順: `hermes profile export <name>` → `.tar.gz` を Modal Volume（`hermes-profile-archives`）へ
+upload → `modal.Sandbox.create(...)` でその Volume をマウント → sandbox 内で
+`tar xzf /vol/<name>.tar.gz -C ~/.hermes/profiles` → `hermes -p <name> status`。
+`@app.function` 経路・`modal.Sandbox.create` 経路（= `app.py` が実際に使う経路）の両方で
+exit 0、`hermes status` が profile の config・0 API keys・gateway stopped を正しく報告。
+
+**この過程で見つけた実バグ 2 件（`app.py` に反映済み、commit `c99ed8e`）**:
+1. `pip install git+https://github.com/NousResearch/hermes-agent.git` は動かない —— wheel
+   build 自体を拒否する（\"Hermes is distributed via the shell installer, Docker image, or
+   Nix.\"）。image を公式 shell installer（`curl -fsSL
+   https://hermes-agent.nousresearch.com/install.sh | bash`）に変更。
+2. profile 選択は `-p <name>` であって `--profile <name> --headless` ではない
+   （後者のフラグは存在しない）。
+
+west pin は `c99ed8ecfa32`（旧 `7ead8425c150` から前進、`kbb --backend sci
+scripts/west-pin-put.cljk app-hermes-sandbox HEAD` で single-entry commit `06fa99dba793`）。
+
+**この検証が証明していないもの**: 実際のチャットターン（turn-by-turn の session I/O）、
+GPU 構成、gateway 経由の認証、`sandbox.kotoba.cloud` の DNS 紐付け、`default` 等の実 profile
+（実資格情報つき）での動作。`hermes -p <name> status` が通ったことは「profile がロードできる」
+の証拠であって「session が動く」の証拠ではない。
+
 ## 現在地・未決事項（この ADR が「実装済み」と言っていないもの）
 
-scaffold（`app.py` / `README.md`）のみ。**`modal deploy` は未実行**、DNS/custom domain の紐付けも未実行。
+scaffold（`app.py` / `README.md`）+ 上記の検証済み boot-check のみ。**`modal deploy`
+（gateway 自体の本番デプロイ）は未実行**、DNS/custom domain の紐付けも未実行。
 
 未決事項:
 1. sandbox.kotoba.cloud という custom domain を Modal の web endpoint にどう向けるか（Modal 側の custom domain 機能 or Cloudflare 側で CNAME → Modal、後者なら結局 Cloudflare を DNS 層だけ併用することになる）。
