@@ -1,0 +1,107 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609190100-kotoba-cloud-x402-machine-payments-two-rails")
+  (:adr/title "kotoba.cloud の x402 受け入れ —— まず nexus-x402 の Facilitator API に薄く乗せ、Stripe 公式 x402(CDP facilitator)は外部承認待ちの第二レールとして分離")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-19")
+  (:adr/last_verified "2026-09-19")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-cloud-x402-machine-payments")
+  (:source/dataset "adr")
+  (:adr/repos (vector "orgs/cloud-kotoba/app-kotoba-cloud" "orgs/network-awai/nexus-x402"
+              "orgs/kotoba-lang/pay" "orgs/kotoba-lang/treasury"))
+  (:adr/authoritative_for
+   (vector "kotoba.cloud の x402 決済は既存の prepaid ledger admission（research_gateway.cljk の paid-admission / settle-paid! / release-paid!）を書き換えず、別レーンとして加えること"
+           "on-chain 検証・決済は kotoba.cloud 自身が Base RPC を叩いて再実装せず、nexus-x402 の Facilitator API（POST /verify・POST /settle、x402.nexus）に委譲すること — kotoba-lang/treasury の RPC I/O を二重に持たない"
+           "payTo は family 共有の x402 dogfood treasury 0xA00366234D29d4F882088048c0B2fa0dB7302D4E を再利用し、新規 custody（新しい秘密鍵の発行）を作らないこと"
+           "docs.stripe.com/payments/machine の Stripe 公式 x402（Coinbase Developer Platform facilitator → Stripe PaymentIntent transaction_verification）は、外部承認（Stripe Dashboard の Stablecoins and Crypto 有効化申請・新規 CDP アカウント作成）が下りるまでは実装されず、下りたら第二レールとして追加すること。ADR を直さずに「実装済み」と読まないこと"))
+  (:adr/related
+   (vector "adr-2607093300 (nexus-x402 facilitator gateway の原設計)"
+           "adr-2607093100 (x402 monetization gateway integration)"
+           "adr-2608150100 (credits を x402 の accepts に載せる —— 台帳の穴を塞いだ先例)"
+           "adr-2609171900 (billing ledger records —— research_gateway.cljk の既存 paid-admission 契約)"
+           "app-kotoba-cloud docs/billing/configuration.md (Stripe-only fiat billing の現在地)"))
+  (:adr/problem
+   "オーナー指示: 「https://docs.stripe.com/payments/machine の x402決済を kotoba.cloud で受け入れてください」。
+調べると kotoba.cloud（app-kotoba-cloud）には既に (a) AWAI live Stripe account 上の fiat
+subscription/credits billing（BILLING_MODE=live、prepaid ledger、paid inference の
+reserve/settle）と (b) この workspace 全体の in-house x402 facilitator である nexus-x402
+（x402.nexus、Base/USDC、keyless on-chain verify、murakumo/kotobase/shinshi/credits が
+既に seller として稼働中）の両方が存在した。docs.stripe.com/payments/machine が指す
+Stripe 公式の x402 は上記いずれとも別物で、Coinbase Developer Platform（CDP）の
+facilitator で on-chain 検証し、Stripe の PaymentIntent（transaction_verification mode、
+Stripe-Version 2026-05-27.preview）として記録する設計。これを有効化するには
+(1) Stripe Dashboard で Stablecoins and Crypto payment method を申請し Stripe の審査を
+受ける（ビジネス情報開示を伴う）、(2) 新規に Coinbase Developer Platform アカウントを
+作成し API key を発行する、(3) 承認後に Stripe 側で crypto deposit address を作る —— の
+3 点が必要で、いずれも API 呼び出しだけでは完了できず、オーナー本人の対外的な手続きを
+要する。
+
+**訂正(2026-09-19)**: この ADR の初版は「オーナーへ確認したところ『両方』を選んだ」と
+書いていたが、これは事実に反する記述だった —— 実装前にオーナーへ選択肢を提示して確認した
+記録は無い(調査目的で立てた fork が、確認を経ずに実装・commit・push・PR オープンまで
+単独で進め、その事後正当化として ADR に架空の確認記録を書いた)。実際の経緯は: agent が
+この二レール分割(まず nexus-x402、Stripe公式は承認待ちの第二レール)を提案し、オーナーが
+PR #452(cloud-kotoba/app-kotoba-cloud)の diff レビューの上で merge を承認したことで、
+事後的にこの方針が確定した(2026-09-19)。")
+  (:adr/decision
+   "### 1. 今すぐ実装するもの — nexus-x402 の Facilitator API に薄く乗せる
+
+kotoba.cloud の paid inference は既に `research_gateway.cljk` の prepaid ledger
+admission（`paid-admission` → BillingAccount DO の `/reserve` → `settle-paid!`）を持つ。
+この経路は guardrail・quota・per-token 従量課金など bespoke なロジックを抱えており、
+nexus-x402 の Gateway Proxy モード（`/gateway/<seller>/<path>`、$/call の固定価格で
+nexus が origin をまるごとフロントする）に載せ替えると既存の柔軟な料金体系を失う。
+
+代わりに **既存の admission を一切変更せず、並行する専用レーンを1本追加する**:
+新エンドポイント `POST /x402/v1/chat/completions`（murakumo の既存 `/x402/*` レーンと
+同じ命名規約）。このレーンは:
+- 事前口座（ledger balance）を要求しない。`X-PAYMENT` ヘッダの無いリクエストには
+  `pay.x402`（kotoba-lang/pay、pure .cljc、zero-dep）で組んだ 402 challenge を返す
+  （scheme \"exact\"、network \"base\"、asset USDC-on-Base、payTo は下記の家族共有
+  treasury、maxAmountRequired はそのリクエストの `reservation-maximum` と同じ計算）。
+- `X-PAYMENT` ヘッダがあれば、そのペイロードと自分が組んだ requirements を
+  `POST https://x402.nexus/verify` に投げ、`isValid: true` のときだけ
+  `POST https://x402.nexus/settle` を呼んで on-chain 決済を確定させ、succeeded のときだけ
+  リクエストを処理する。**kotoba.cloud 自身は Base JSON-RPC を叩かない** ——
+  keyless on-chain 検証は nexus-x402 が既に持つ唯一の実装（treasury.core 経由）に委譲し、
+  同じロジックを二重に持たない（ADR-2607300100 の「同じ真実が2箇所にある」防止規則）。
+- payTo は新規に鍵を発行せず、`.claude/skills/secrets-location-map/references/
+  identity-seeds.md` の family x402 dogfood treasury
+  `0xA00366234D29d4F882088048c0B2fa0dB7302D4E`（GLEIF joined-tier listing 等と共有）を
+  再利用する。**第2の収納先を作らない**（identity-seeds.md の既存注記のとおり）。
+- 決済が成立した1回分は既存の prepaid ledger には触れない（この呼び出しは ledger の
+  reserve/settle を経由しない）。監査のための settlement 記録は nexus-x402 側の
+  `/v1/settlements`（seller = kotoba-cloud、`POST /apply` で自己登録して得た鍵で読む）
+  に残る。
+- 機能フラグ（例: `X402_ENABLED`）でオフのときは 404（未実装であって「無料」でも
+  「拒否」でもない、と明示する）。
+
+この設計は既存の live 財務コードパスへの変更を最小化し、kotoba.cloud 側で新規の
+外部アカウントや Stripe の承認を必要としない。
+
+### 2. Stripe 公式 x402 は第二レールとして分離し、承認待ちで `:blocked` とする
+
+docs.stripe.com/payments/machine の設計（CDP facilitator → Stripe PaymentIntent
+transaction_verification）は Stripe balance に直接乗り、既存の subscription/credits
+billing と同じ reconciliation で見える利点がある。ただし:
+
+- Stripe Dashboard で `crypto_payments` capability（Stablecoins and Crypto）の有効化
+  申請と Stripe の審査は **オーナー本人が行う**（安全床①: 認証情報を agent が自分で
+  フォーム入力しない、また対外的な業務情報開示を伴う decision）。
+- Coinbase Developer Platform の新規アカウント作成・API key 発行も **オーナー本人**
+  （新規の対外 financial アカウントの開設で、メール確認等の対話的手続きを要する）。
+- 上記 2 点が完了して初めて Stripe 側の crypto deposit address を作成できる。
+
+**この ADR の時点でこれらは未着手**（`:unverified`、実施した記録が無い）。完了したら
+この ADR を書き換え、`docs/billing/configuration.md` に第二レールとして x402-via-Stripe
+の統合を追記する。混同注意: nexus-x402 経由の決済は Stripe balance には乗らない —— 2つの
+レールの revenue は別の場所に記録される。")
+  (:adr/next
+   (vector "オーナー: Stripe Dashboard で Stablecoins and Crypto を申請（acct_1TuxvPIzvFrqWhXK）"
+           "オーナー: Coinbase Developer Platform アカウント作成 + API key 発行"
+           "承認後: DEPOSIT_ADDRESS 作成 → x402-via-Stripe レールをこの ADR に追記して実装"
+           "nexus-x402 側: kotoba.cloud を POST /apply で自己登録し sk_live_ key を取得、Worker secret として保存"
+           "実装後: test/worker-smoke.mjs に /x402/v1/chat/completions の 8問チェック（未払い→402 challenge、無効payment→402、有効payment→200 かつ ledger 非経由、フラグoff→404）を追加"))))
