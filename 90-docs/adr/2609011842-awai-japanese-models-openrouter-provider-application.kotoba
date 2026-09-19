@@ -6,8 +6,8 @@
   (:adr/doc-type "adr")
   (:adr/source-format "edn")
   (:adr/date "2026-09-01")
-  (:adr/last-verified "2026-09-11")
-  (:adr/last_verified "2026-09-11")
+  (:adr/last-verified "2026-09-19")
+  (:adr/last_verified "2026-09-19")
   (:adr/authoritative true)
   (:adr/deciders (vector "Jun Kawasaki"))
   (:adr/topic "awai-openrouter-original-japanese-models")
@@ -46,7 +46,10 @@
    "cloud-murakumo source readback 2026-09-01: /api/v1/generation job facade、MiniMax-H3 ComfyUI graph、async artifact pipeline、OpenAI /v1/videos backend adapter が既に存在"
    "2026-09-01 production: cloud-murakumo-api PR #194 は main へ merge 済み（3e91b9f507006493c71135d50be3ffcc4c52391e）。Cloudflare version a9066a0a-c55a-4ebb-a690-d9de1eda7dde を api.murakumo.cloud に deploy。awai-network/basho は backend 未準備のため /v1/models へ未掲載、live request は HTTP 503 self_model_backend_unavailable で fail-closed"
    "2026-09-01 production: cloud-murakumo PR #159 は main へ merge 済み（683cb6ed6eded3114be0b797eb259316e6f77e6b）、生成成果物 PR #160 も merge 済み（af0b6cb1d489e4babfe3a158af3e176f18c6136f）。owner 承認後に lease-free bootstrap を実行し Cloudflare version 1b398be7-53e0-4683-9d75-009394080ed6 を murakumo.cloud へ deploy。/api/v1/videos は live で token 無しを HTTP 401 にし、Hokusai は pending 表示のまま。fine-tuned backend は未配線"
-   "2026-09-01 production: network-awai-apex PR #1 は main へ merge 済み（174492d8186d62ae728c0f4f630a4af94fcf2310）。Cloudflare version 45d9a3bb-bff4-4a72-b06f-08b9aa629564 を awai.network に deployし、murakumo-main の実生成を確認。Basho/Hokusai cutover 設定は readiness 未達のため未設定"))
+   "2026-09-01 production: network-awai-apex PR #1 は main へ merge 済み（174492d8186d62ae728c0f4f630a4af94fcf2310）。Cloudflare version 45d9a3bb-bff4-4a72-b06f-08b9aa629564 を awai.network に deployし、murakumo-main の実生成を確認。Basho/Hokusai cutover 設定は readiness 未達のため未設定"
+   "2026-09-19 live re-check: POST https://api.murakumo.cloud/v1/chat/completions model=awai-network/basho は匿名呼び出しに self_model_requires_identity（\"Basho uses a metered vendor backend and requires an identified caller\"）を返す。HTTP status は最初の手動確認では未計測のまま本文だけを見て「400」と書いたが誤りで、scripts/hermes-openrouter-gates/progress_scan.cljk の -w 付き計測で HTTP 402 と確認した（訂正）。GET /v1/models 上の awai-network/hokusai は video generation ではなく無料 image エンドポイント（/v1/images/generations）のラッパーで、ADR が指す fine-tuned audiovisual model とは別物。§9 の submit gate は 2026-09-11 から不変のまま未充足（fine-tuned checkpoint 無し、model card 無し、production endpoint は fail-closed）"
+   "2026-09-19 owner override（chat 内 明示指示、AskUserQuestion で提示した3択のうち『ゲート未達のまま申請する』を選択）: §9 の submit gate 充足を待たず、openrouter.ai/providers/apply/form から2件目の provider application を submit。Company Name=AWAI Network, L.L.C.、Website=https://awai.network、Display Name=AWAI、slug=awai、Distinguishing Features=Unique Models のみ（Low Pricing/Unique Infrastructure は murakumo 側の別申請でのみ選択）。Extra Details 本文に逐語で『STATUS: IN DEVELOPMENT, not yet production-ready -- no trained checkpoint exists yet for either model as of this application』『do not route production traffic to awai-network/basho or awai-network/hokusai yet』と明記（Consequences の『未学習の時点では in development と記載する』を充足）。/models・API Base URL は暫定で murakumo.cloud の既存 endpoint を指す（Basho/Hokusai 専用の稼働 endpoint はまだ無い）。送信後 『Thanks! Your submission has been received.』を画面上で確認。これは submit gate の充足ではなく、gate 未充足を明記した上での意図的な例外申請として記録する"
+   "2026-09-19 同日、同じ owner 承認の下で murakumo.cloud を provider とする別件の provider application（slug=murakumo、Display Name=Murakumo、model 例に murakumo-main を使用）も同フォームから submit 済み。本 ADR の §2/§8 が定義する『developer=awai.network、inference provider=murakumo.cloud』の役割分離を、OpenRouter 上は2枚の別 provider application として体現した。ただし murakumo-main は draft doc（90-docs/business/openrouter/awai-murakumo-provider-application.edn）が名指しで『unsuitable』とした alias であり、その draft が要求する7日間観測・課金統合・確定 privacy/terms・外部 receipt のいずれも経ずに submit された点は事後に判明した齟齬として残す"))
   (:adr/body
   "# awai.network の日本語独自モデルを murakumo.cloud provider として OpenRouter に申請する
 
@@ -86,7 +89,7 @@ awai.network は日本語に最適化した独自モデルを開発し、murakum
 
 8. **OpenRouter onboarding.** BYOK は利用者のキーを既存 provider に渡す機能で、custom model registration ではない。murakumo.cloud は provider application を行い、Basho の streaming `/chat/completions` と usage、Hokusai の async `/videos` job lifecycle と artifact delivery、model catalog、token/second pricing、capacity、data retention/training policy、health/uptime を提示する。OpenRouter が publisher namespace と provider display/slug を承認して初めて公開 id を advertised する。
 
-9. **submit gate.** 次が揃うまで外部申請は draft のままにする。
+9. **submit gate（2026-09-19 時点で未充足のまま owner override により submit 済み）。** 本来は次が揃うまで外部申請を draft のままにする方針だった。
    - fine-tuned checkpoint の content id / revision と private artifact readback
    - upstream と dataset の商用利用・派生物配布の権利確認
    - model card と日本語 eval、安全性 eval、tool/JSON/vision compatibility matrix
@@ -96,6 +99,8 @@ awai.network は日本語に最適化した独自モデルを開発し、murakum
    - Basho の価格、context length、TTFT、tokens/s、capacity TPM、95% 以上の uptime 証跡
    - Hokusai の $/second、queue wait、generation latency、success rate、capacity、artifact retention 証跡
    - prompt logging、retention、training reuse、ZDR の明示
+
+   **2026-09-19 override:** 上記のどれも充足していない状態で、owner が chat 上で明示的に「ゲート未達のまま申請する」を選択し、Extra Details に `IN DEVELOPMENT` / `do not route production traffic` を逐語で明記した provider application（company=AWAI Network, L.L.C., slug=awai）を submit した。これは方針の撤回ではなく、この1回の申請に限った owner 判断による例外である。§9 のゲート自体は残り、次にこの名前空間を production 向けに advertise する（cutover 変数を有効化する、readiness-gates を `true` にする等）前には、なお本節の項目を満たす必要がある。同日、murakumo.cloud を provider とする別件申請（slug=murakumo）も同じ owner 判断の下で submit した。
 
 ## Consequences
 

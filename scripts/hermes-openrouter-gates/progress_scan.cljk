@@ -1,0 +1,144 @@
+#!/usr/bin/env kbb
+;; progress_scan.cljk — decision-free measurement of the two OpenRouter provider
+;; applications submitted 2026-09-19 (slug=murakumo, slug=awai) ahead of their
+;; own submission gates.
+;;
+;; Context: ADR adr-2609011842-awai-japanese-models-openrouter-provider-application
+;; and 90-docs/business/openrouter/awai-murakumo-provider-application.edn record
+;; an owner-directed exception -- both applications were submitted with the
+;; gates below still unevidenced. This script does not decide anything and does
+;; not resubmit or edit either application. It measures whether each gate item
+;; has moved since 2026-09-19, so a run does not have to rediscover state, and
+;; so nobody has to re-read the whole ADR to see what is still open.
+;;
+;; Evidence floor (CLAUDE.md 8 questions, ADR-2608136000): a check that could
+;; not run is never reported as a passed or absent gate. Any failed live check
+;; -> that gate line prints UNKNOWN (not DONE, not PENDING). If every live
+;; check fails, exit 2 ("could not answer"), not 0 or 1.
+;;
+;; Usage:
+;;   kbb --backend sci scripts/hermes-openrouter-gates/progress_scan.cljk
+
+(require '[scripts.nbb-compat :as io :refer [slurp spit]]
+         '[clojure.edn :as edn]
+         '[clojure.string :as str])
+
+(def routing-path "90-docs/deployment/awai-murakumo-basho-hokusai-routing.edn")
+(def application-path "90-docs/business/openrouter/awai-murakumo-provider-application.edn")
+
+(defn sh [& args]
+  (try (apply io/sh args)
+       (catch :default e {:exit -1 :out "" :err (str e)})))
+
+(defn read-edn-file [path]
+  (when (.existsSync (js/require "fs") path)
+    (try (edn/read-string (slurp path))
+         (catch :default _ ::unreadable))))
+
+(defn get-json [& curl-args]
+  (let [r (apply sh "curl" "-LfsS" "--max-time" "8" curl-args)]
+    (if (zero? (:exit r))
+      (try {:ok? true :json (js->clj (.parse js/JSON (:out r)) :keywordize-keys true)}
+           (catch :default e {:ok? false :err (str "unparseable body: " e)}))
+      {:ok? false :err (str "curl exit " (:exit r) ": " (str/trim (or (:err r) "")))})))
+
+(defn basho-identity-check []
+  ;; Expected today: HTTP 400 self_model_requires_identity for an anonymous
+  ;; caller. That response IS the gate being open, not a probe failure -- so
+  ;; treat any HTTP response (2xx through 4xx) as a successful measurement.
+  (let [r (sh "curl" "-sS" "--max-time" "8" "-w" "\n%{http_code}"
+              "-X" "POST" "https://api.murakumo.cloud/v1/chat/completions"
+              "-H" "content-type: application/json"
+              "-d" "{\"model\":\"awai-network/basho\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}")]
+    (if (zero? (:exit r))
+      (let [lines (str/split-lines (:out r))
+            code (last lines)
+            body (str/join "\n" (butlast lines))]
+        {:ok? true :http code :body body
+         :anonymous-blocked? (str/includes? body "self_model_requires_identity")})
+      {:ok? false :err (str "curl exit " (:exit r))})))
+
+(defn models-catalog-check []
+  (let [{:keys [ok? json err]} (get-json "https://api.murakumo.cloud/v1/models")]
+    (if ok?
+      (let [entries (:data json)
+            by-id (into {} (map (juxt :id identity)) entries)
+            hokusai (get by-id "awai-network/hokusai")
+            basho-organism (get by-id "ao/basho")]
+        {:ok? true
+         :hokusai-is-video? (= "video" (:kind hokusai))
+         :hokusai-kind (:kind hokusai)
+         :basho-organism-present? (some? basho-organism)})
+      {:ok? false :err err})))
+
+(defn gate-line [status label detail]
+  (println (str status "\t" label "\t" detail)))
+
+(defn -main [& _args]
+  (let [routing (read-edn-file routing-path)
+        application-raw (read-edn-file application-path)
+        application (when (vector? application-raw) (first application-raw))
+        basho-artifact (get-in routing [:artifacts :basho])
+        hokusai-artifact (get-in routing [:artifacts :hokusai])
+        advertise? (get routing :contract/advertise-models?)
+        identity (basho-identity-check)
+        catalog (models-catalog-check)
+        checks-ok (filterv :ok? [identity catalog])
+        checks-failed (filterv (comp not :ok?) [identity catalog])]
+
+    (println (str "SCANNED\troutes=" (if routing "1" "0")
+                  "\tapplication-doc=" (if application "1" "0")
+                  "\tlive-checks-ok=" (count checks-ok)
+                  "\tlive-checks-failed=" (count checks-failed)))
+
+    (when (nil? routing)
+      (gate-line "UNKNOWN" "routing-contract" (str routing-path " could not be read")))
+    (when (nil? application)
+      (gate-line "UNKNOWN" "application-doc" (str application-path " could not be read")))
+
+    (gate-line (if (= :not-trained (:state basho-artifact)) "PENDING" "UNKNOWN")
+               "basho-fine-tuned-checkpoint"
+               (str "routing.edn :artifacts :basho :state = " (:state basho-artifact)))
+    (gate-line (if (= :not-trained (:state hokusai-artifact)) "PENDING" "UNKNOWN")
+               "hokusai-fine-tuned-checkpoint"
+               (str "routing.edn :artifacts :hokusai :state = " (:state hokusai-artifact)))
+
+    (gate-line (cond
+                 (not (:ok? identity)) "UNKNOWN"
+                 (:anonymous-blocked? identity) "PENDING"
+                 :else "DONE")
+               "basho-public-endpoint-serves-anonymous-callers"
+               (if (:ok? identity)
+                 (str "live POST /v1/chat/completions model=awai-network/basho -> HTTP " (:http identity)
+                      (when (:anonymous-blocked? identity) " (self_model_requires_identity)"))
+                 (str "live check failed: " (:err identity))))
+
+    (gate-line (cond
+                 (not (:ok? catalog)) "UNKNOWN"
+                 (:hokusai-is-video? catalog) "DONE"
+                 :else "PENDING")
+               "hokusai-served-as-video-model-not-image-wrapper"
+               (if (:ok? catalog)
+                 (str "live GET /v1/models awai-network/hokusai :kind = " (:hokusai-kind catalog)
+                      " (need \"video\", ADR says async audiovisual, not the free image wrapper)")
+                 (str "live check failed: " (:err catalog))))
+
+    (gate-line (if (true? advertise?) "DONE" "PENDING")
+               "routing-contract-advertise-models-flag"
+               (str "routing.edn :contract/advertise-models? = " advertise?
+                    " (must flip true only after every readiness-gate below is evidenced)"))
+
+    (doseq [gate (get-in routing [:readiness-gates :advertise-in-models])]
+      (gate-line "PENDING" (str "readiness-gate/" (name gate))
+                 "listed in routing.edn :readiness-gates :advertise-in-models, no evidence tracked yet"))
+
+    (println (str "DOC-STATUS\tapplication-doc-status=" (:doc/status application)
+                  "\t(expect :submitted-ahead-of-gates until the 8 remaining-submission-gates items in that doc are each evidenced)"))
+
+    (if (empty? checks-ok)
+      (do
+        (println "REFUSED\tboth live checks failed; this run could not measure current production state")
+        (io/exit 2))
+      (io/exit 0))))
+
+(apply -main *command-line-args*)
