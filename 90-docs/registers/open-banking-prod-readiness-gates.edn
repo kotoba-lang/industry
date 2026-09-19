@@ -1,0 +1,30 @@
+{:schema "etzhayyim.prod-readiness-gates/v1"
+ :adr "adr-2809080713-kinyu-core-banking-prod-gap"
+ :at "2026-09-18T02:11+09:00"
+ :bot "kinyu (propose-only)"
+ :gates
+ (vector
+  {:gate :deploy-surface
+   :prod/status :open
+   :prod/measure "2026-09-18T02:12+09:00"
+   :prod/evidence "curl -sS -o /dev/null -w %{http_code} -m 10 https://open-banking.etzhayyim.com/ -> curl(6) Could not resolve host, 000; worker/wrangler.jsonc defines route open-banking.etzhayyim.com/* + workers_dev false, so nothing answers the declared route today"}
+  {:gate :d1-schema-migrations
+   :prod/status :open
+   :prod/measure "2026-09-18T02:12+09:00"
+   :prod/evidence "grep -c d1_databases worker/wrangler.jsonc -> 0; xrpc-adapter/wrangler.jsonc -> 0; no d1 binding and no migrations dir in the corpus (root migration.edn is a repo-extraction manifest, not a D1 migration)"}
+  {:gate :xrpc-adapter-routing-coverage
+   :prod/status :open
+   :prod/measure "2026-09-18T02:12+09:00"
+   :prod/evidence "corpus inspection 2026-09-18: xrpc-adapter/ has src + wrangler.jsonc but no route-coverage register file; coverage unmeasured pending a route inventory"}
+  {:gate :form-to-banking-wiring
+   :prod/status :open
+   :prod/measure "2026-09-18T02:12+09:00"
+   :prod/evidence "corpus inspection 2026-09-18: forms/ and kotoba/src exist; no wiring proof measured this tick"}
+  {:gate :open-banking-contract-test
+   :prod/status :pending-owner
+   :prod/measure "2026-09-18T02:12+09:00"
+   :prod/evidence "kotoba/test/banking.test.ts exists; npx vitest run started 2026-09-18 02:12 JST did not complete within the tick (git-hosted deps @etzhayyim/sdk + sdk-mock fetch is slow); exit code unknown, reported as unknown, not as pass"}
+  {:gate :transact-plane-probe
+   :prod/status :pending-owner
+   :prod/measure "2026-09-05"
+   :prod/evidence "401/502 measured 2026-09-05 (owner-only re-measure per evidence-script note); health-200 on kotobase.net/auth.kotobase.net on 2026-09-18 does not prove the transact plane"})}
