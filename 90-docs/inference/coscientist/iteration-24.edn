@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-24"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-24.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 19: B-2, the fused delta-net step"
+  :coscientist/iteration 24
+  :coscientist/subject "deltanet_fused.comp: seven dispatches / four barriers of the recurrent path in one per-head dispatch (parity-double-buffered conv ring), oracle-exact on B70 and Xavier, and measured neutral (B70 4L 3.51 -> 3.49 ms, Xavier 12L 37.3 -> 37.3): a barrier between real dispatches is worth ~1 us, not the probe's 6.6; fusion is the default for simplicity, not speed"
+  :coscientist/engine-note "The previous iteration's barrier share came from a trivial-dispatch probe; the fused kernel measured it against real work and demoted it."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 1
+  :coscientist/ranked-first "kdot bandwidth on B70 (expert kdots ~90 GB/s, qkv ~130, device >= 260)"
+  :coscientist/measured "B70 4L x 3T: nofuse 3.51 / 3.51, fused 3.49 / 3.49 ms/token; Xavier 12L x 3T: nofuse 37.27-37.44, fused 37.17-37.36; argmax chains equal, x rel 2.6e-6 (B70) / 4.2e-4..3.5e-3 (Xavier h2); dispatches per recurrent layer 27 -> 21"
+  :coscientist/refuted "H24.2 barriers are 5-10% of the B70 token (and iteration 23's '40% of a layer')"
+  :coscientist/carries-forward "expert / qkv kdot bandwidth on B70; resident 40-layer B70 run; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 24 — `/loop 30min kaizen loop` tick 19（2026-09-19）\n\n対象: B-2 —— element-wise の融合で B70 の barrier 費用（反復 23 の見立てで層の ~40%）を取る。\n\n## Generate\n\n- H24.1 recurrent 経路の 7 dispatch（gate_decay2 ×2、conv1d、l2norm ×2、deltanet、gated_rmsnorm）は head ごとに閉じているので 1 kernel に畳める（conv ring の共有 channel は parity で double-buffer）。\n- H24.2 barrier 4 本 × 6.6 µs × 30 recurrent 層 ≈ 0.8 ms/token、中間 buffer の往復込みで B70 の 40 層 token の 5–10%。\n\n## Reflect / 測定\n\n- `deltanet_fused.comp`（13 binding → amu #1032 で上限 16）。両箱で oracle 一致（B70 4 層 3/3、Xavier 12 層 3/3、x rel 同桁）。H24.1 **採択**。\n- A/B 各 2 回: **B70 4 層 × 3 token 3.51 → 3.49 ms（−0.6%）、Xavier 12 層 × 3 token 37.3 → 37.3（0）**。H24.2 **棄却**。\n- 読み: 反復 23 の「barrier = 層の 40%」は trivial dispatch の床 probe から出した値。実 dispatch の間では pipeline の drain が仕事と重なり、barrier 1 本を消す価値は ~1 µs。B70 の層 ~0.46 ms は kernel 0.35 + 小 dispatch の launch の谷。\n- 決定: 融合は既定にする（単純、dispatch 21/層、決して遅くない）。`<mode>-nofuse` で旧経路を残す。checker は fn mode の 4 field 最終 answer を受ける形に。\n- 副産物: Xavier 12 層は 39.4（反復 16）→ 37.3 —— 反復 21 の Q6 half lm_head 分。\n\n## Rank（B）\n\n1. kdot の帯域: expert kdot（512×8 / 2048×8、IQ4_XS）~90 GB/s、qkv ~130、device は ≥ 260（lm_head r8 実測）。positions=8 を 1 workgroup で 8 行分回して x を共有する r8 系 / expert 別 dispatch を 1 つに。\n2. 40 層常駐の実測（vLLM 27 GB を止める判断、または K16 分担）。\n3. Xavier: オーナー判断待ち（反復 22）。\n\n## Evolve（次 tick）\n\nB70 で kdot_f32_r8 の expert 版（positions を workgroup 内で回す）を bench し、90 → 200 GB/s 級かを見る。効けば anv 行の :narrow を差し替え。\n\n## Meta\n\n- 床 probe（trivial dispatch）の barrier 費用を実 dispatch に外挿した —— 「単位の違う 2 つの測定を同じ名前で呼ぶ」の再演（反復 10 の逆向き）。**probe の値は上限、実 workload で測ってから rank に置く。**\n- 中立な結果でも「正しく、単純」なら既定にしてよい —— 速度の表に 0 と書いた上で。\n"}]
