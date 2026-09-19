@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-32"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-32.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 27: B-9, the ANV kdot ceiling, three hypotheses"
+  :coscientist/iteration 32
+  :coscientist/subject "load width (4-byte probe 593 vs vec4 598 GB/s), occupancy (r8 K-split: qkv 162 -> 162) and load-instruction count (r8 + shared headers: 162 -> 132, lm_head 261 -> 196) all measured out as the cause of ANV's kdot ceiling; what remains is coalescing inside the K-quant block -- next kernel x8 x r8"
+  :coscientist/engine-note "Three hypotheses eliminated in one tick, the cheapest first; a shared-memory allocation slowed an arm that never touched it, a second instance of per-binary resource cost."
+  :coscientist/generated 3
+  :coscientist/rejected-by-reflection 2
+  :coscientist/ranked-first "kdot_x8r8: x8's contiguous-8-values thread mapping with r8's rows in flight"
+  :coscientist/measured "B70 pinned: mem_probe_u32 593 GB/s; r8k4 attn_qkv 162 attn_gate 111 lm_head 236 (vs 162 / 91 / 261); s4_r8 attn_qkv 132 lm_head 196; all oracle-exact"
+  :coscientist/refuted "H32.1 load granularity; H32.3 header load count (regression); H32.2 occupancy neutral for qkv"
+  :coscientist/carries-forward "kdot_x8r8 (then i8); quant_q8 wiring; resident 40-layer run; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 32 — `/loop 30min kaizen loop` tick 27（2026-09-19）\n\n対象: B-9 —— ANV の kdot（qkv 165、lm_head 261–289 GB/s）と床 598 の差の正体。\n\n## Generate\n\n- H32.1 load の粒度: probe は 16 byte vec4、kdot は 4 byte 語 → 4 byte で probe を測り直せば床が下がる。\n- H32.2 occupancy: r8 は 8192 行で 1024 workgroup × 64 thread = 65k thread しか無い → block loop を 4 分割して thread 4 倍。\n- H32.3 load 命令数: Q5_K の thread は値 4 個に ~8 load（header byte の再読み）→ header を shared に stage。\n\n## Reflect / 測定（B70 pin）\n\n| 仮説 | kernel | attn_qkv | attn_gate | lm_head |\n|---|---|---|---|---|\n| 基準 | f32 r8 | 162 | 91 | 261 |\n| H32.1 | `mem_probe_u32`（4 byte） | 593 GB/s（vec4 598） | | |\n| H32.2 | `kdot_f32_r8k4` | 162 | 111 | 236 |\n| H32.3 | `kdot_s4_r8` | **132** | | **196** |\n\n- H32.1 **棄却**（10 分の probe で kernel を書かずに済んだ）。H32.2 **中立**（gate だけ +22%、lm_head −9%）。H32.3 **棄却、退行**: Q6_K は stage 経路を通らないのに 261 → 196 —— shared 配列を足すだけで occupancy が落ちる（反復 21 の「同じ binary の別 arm」と同型: kernel の資源は arm ごとでなく binary ごと）。\n- 残る候補（全数字と整合）: **block 内の coalescing**。r8 の 1 load 命令（64 thread）は 1 行の `qs` 128 B を 50% 冗長に + `qh` 32 B = 実効 ~100 B、probe の命令は連続 256 B。`kdot_x8`（thread = 連続 8 値、冗長なし、r1 形）が B70 で r1 の最良（143）だったのは同じ理由。→ x8 の割付 × r8 の行 in-flight（`kdot_x8r8`: 256 thread、8 行、thread は 1 block の連続 8 値）。\n\n## Rank（B）\n\n1. `kdot_x8r8`（f32）を bench、効けば dp4a を載せる（i8 版）→ generator 配線 → 4 層 → 40 層 parity → 既定。\n2. 40 層常駐の実測（オーナー判断）。\n3. Xavier（オーナー判断）。\n\n## Evolve（次 tick）\n\n`kdot_x8.comp` の main を r8 化: workgroup 256 thread = 8 block-slot × 32 lane、行 8 本を loop（acc[8]）、x は thread ごと 2 vec4 を 1 回 load。\n\n## Meta\n\n- 1 tick で仮説 3 つ、実装は probe 1 つ + kernel 2 つ、全部 15 分以内に符号が出た。**天井の原因探しは、安い順に測って消す**。\n- shared 配列を足すと関係ない arm まで遅くなる —— 2 度目。**kernel の資源（register / shared）は binary 単位**、と規則に昇格。\n"}]
