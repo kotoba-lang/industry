@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-34"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-34.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 29: B-11, int8 activations on ANV as the parity-gated default"
+  :coscientist/iteration 34
+  :coscientist/subject "kdot_i8_x8r4 stacks the integer-dot and coalescing gains (B70 attn_qkv 221 GB/s, lm_head 321); quant_q8 wired into the generator; 4-layer token 2.83 -> 2.55 ms; 40-layer parity KL(oracle||gpu) 3.4e-3, KL(llama.cpp||gpu) 0.0054 (exact 0.0143) -> anv default; B70 4L token 3.63 -> 2.55 over the session, 40-layer estimate ~10 ms (~100 tok/s class)"
+  :coscientist/engine-note "Two gains from different bottlenecks stacked as predicted; the default was decided by the distribution rule set in iteration 15."
+  :coscientist/generated 3
+  :coscientist/rejected-by-reflection 1
+  :coscientist/ranked-first "a resident 40-layer B70 measurement (owner decision on vLLM's memory)"
+  :coscientist/measured "B70 pinned i8x8r4: attn_qkv 221, attn_gate 127, lm_head 321 GB/s; composed 4L x 3T anv 2.83-2.87 / anv-i8 2.55 / anv-i8e 2.58 ms; 40L streaming: 5/5 argmax, logits max|d| 0.72, KL(oracle||gpu) 3.42e-3, KL(llama||gpu) 0.0054 over top-40, mass 0.907 vs 0.916, top-10 10/10, p(Paris) 0.535, wall 43.9 s"
+  :coscientist/refuted "H34.3 int8 experts help (2.58 vs 2.55)"
+  :coscientist/carries-forward "resident 40-layer B70 run; int8 on K16 (RADV has the 4x8 dot); Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 34 — `/loop 30min kaizen loop` tick 29（2026-09-19）\n\n対象: B-11 —— dp4a（反復 31、+15%）と x8 割付（反復 33、+22%）を重ね、token loop に配線し、40 層 parity で既定を決める。\n\n## Generate\n\n- H34.1 2 つの利得は別の律速（演算 / coalescing）なので重なる: attn_qkv 199 → 230 級。\n- H34.2 int8 activation の分布ずれは llama.cpp の Q8 regime と同じで、KL(llama‖gpu) は exact kernel より小さくなる（llama.cpp に近づく）。\n- H34.3 expert kdot にも効く。\n\n## Reflect / 測定（B70）\n\n- `kdot_i8_x8r4` bench（pin）: attn_qkv **221**、attn_gate 127、lm_head **321** GB/s。H34.1 **採択**（221 vs 199、床 598 の 37%）。\n- generator: `quant_q8` を activation ごと層ごと 1 回（h、h2、actE、hN）、対 buffer `[xq xscale]`、行 key `:wide-i8` / `:lm-i8` / `:expert-i8`。合成 4 層 × 3 token: **anv 2.83 → anv-i8 2.55 ms/token（−10%）**、chain 3/3、x rel 3e-2（Q8）。expert も int8: 2.58 —— H34.3 **棄却**（expert kdot は 8 position の r8 で既に飽和）。\n- 40 層 streaming parity（B70、同 prompt、44 s）: 5/5 argmax = oracle、**KL(oracle‖gpu) 3.4e-3 nats、KL(llama‖gpu) 0.0054**（exact 0.0143）、top-10 は 10/10、p(Paris) 0.535（llama 0.474 / exact 0.549）。H34.2 **採択**。\n- 決定: `anv` = int8 wide / lm（`anv-exact` で f32 を残す）。判定は反復 15（Xavier h2）と同じ物差し（分布の KL、隠れ状態の x rel 0.42 は記録）。\n- session 集計（B70 4 層 token）: 3.63 → 3.50 → 3.45 → 3.30 → 3.06 → 2.96 → 2.82 → **2.55**（−30%）。40 層 ≈ 40 × 0.21 + 1.7 ≈ **10 ms/token、~100 tok/s 級**（vLLM 103）。\n\n## Rank（B）\n\n1. **B70 の 40 層常駐実測**: 見積もり 10 ms は vLLM 級 —— 外挿を測定に。vLLM の 27 GB を止める判断（オーナー）。\n2. K16 に同じ int8 経路（RADV も `integerDotProduct4x8BitPackedSignedAccelerated`）: K16 は帯域律速なので利得は小さい見立て、測る。\n3. Xavier（オーナー判断）。\n\n## Evolve（次 tick）\n\nオーナー判断を待つ間: K16 で `kdot_i8_x8r4` / `kdot_i8_r8` を bench → radv 行に int8 を（parity は K16 streaming で）。\n\n## Meta\n\n- 2 つの利得が「別の律速」なら重なる、という仮説をそのまま測って当たった。反復 32 の「原因でなく寄与で数える」の配当。\n- 既定化の物差しを反復 15 で 1 度決めておいたので、今回は判断でなく手続きだった。\n"}]
