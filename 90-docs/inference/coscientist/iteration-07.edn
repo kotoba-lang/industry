@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-07"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-07.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 2: Xavier"
+  :coscientist/iteration 7
+  :coscientist/subject "Xavier: GPU clock governor (podgov, 114 MHz idle) was the largest cost -- jetson_clocks gives 59.7 ms/token steady on 12 layers x 3 tokens; murakumo-xavier-performance.service enabled on the box; x8 kernel layout 10x on small K-quant tensors, slower in the composed step"
+  :coscientist/engine-note "A control probe (r1 structure with trivial dequant, 5.8 GB/s) separated structure from arithmetic before any kernel was rewritten."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "a device with room for the 40 layers (owner decision)"
+  :coscientist/measured "Xavier 12L x 3T: 89-140 -> 59.7 ms/token with pinned clocks; x8 Q5_K 14.1 GB/s (r1 1.3), IQ4_XS 10.5 (4.4); composed step x8 69 ms vs r1 60; llama-server 18.4 -> 18.7 tok/s"
+  :coscientist/refuted "'the dequant arithmetic is why nvgpu is slow' (the control probe is as slow); 'x8 everywhere' (loses on the small kdots)"
+  :coscientist/carries-forward "per-(backend, tensor) layout table in the generator; Q6_K load-time repack for the lm_head; the 40-layer run"
+  :doc/body "# Inference serving co-scientist, iteration 7 — `/loop 30min kaizen loop` tick 2（2026-09-19）\n\n対象: Xavier の kernel layout（反復 6 の rank 2）。\n\n## Generate\n\n- H7.1 nvgpu で kdot が遅いのは dequant の演算か、kernel の構造（64 thread / 4 値 / 4 本の scalar x load）か。\n- H7.2 Xavier の数字がぶれる（89–140 ms）のは kernel ではなく箱の状態か。\n\n## Reflect / 測定\n\n- H7.2 が先に当たった: `nvpmodel` は MAXN でも GPU governor は `nvhost_podgov`、待機 114 MHz からバースト毎にランプ。`jetson_clocks`（min=max=1377 MHz）で 12 層 × 3 token が **89–140 → 59.7 ms/token で定常**（1.5–2.3×）。murakumo に `murakumo-xavier-performance.service` が最初から在り、箱では **disabled** だった → enable + start（再起動後も効く）。本番 llama-server は 18.4 → 18.7 tok/s（持続 decode は元からランプ済み）。\n- H7.1: 構造。`kdot_ctrl_r1.comp`（r1 の構造で dequant を 1 load に潰した probe）が 5.8 GB/s（f32 dot_rows は 54）。`kdot_x8.comp`（256 thread、thread あたり連続 8 値、`vec4` の x load、warp 内で連続 load）で Q5_K attn_qkv 1.3 → **14.1 GB/s**、IQ4_XS gate 4.4 → **10.5**、正しさ維持（rel ≤ 1.6e-5）。ただし 12 層合成では r1 60 ms に対し x8 69 ms —— 小さい kdot（alpha/beta 32 行、expert 512 行）で 256 thread が損。lm_head Q6_K は 17–20 GB/s のまま（210 byte block の非整列 load）。\n- 混同要因: Xavier は RAM 31 GB 中 26 使用 + swap 1.2 GB（llama-server 17 GB 常駐）。\n\n## Rank\n\n1. 40 層フル実行の device（オーナー判断）。\n2. layout の per-(backend, tensor) 選択を generator に（Deno 期 KDOT_TABLE の再来）。x8 は中型 tensor、r1 は小型。\n3. Q6_K の非整列 load（lm_head 417 MB、token あたり 4–20 ms）→ load 時 repack。\n\n## Evolve（次 tick）\n\ngenerator に layout 表（backend × tensor → spv）を入れ、Xavier は attn_qkv/attn_gate/ssm_out/attn_q/attn_output に x8、他は r1。K16/B70 は既定のまま。その後 Q6_K。\n\n## Meta\n\n- 「kernel が遅い」の第一原因が kernel でなかった（governor）。箱の状態を測ってから kernel に手を入れる —— CLAUDE.md「症状が出た層で profile を止めない」の逆向きの例。\n- 既に在る unit（performance）が disabled だったのは、索引に在っても動いているとは限らない例。\n"}]
