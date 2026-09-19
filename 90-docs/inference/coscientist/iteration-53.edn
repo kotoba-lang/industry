@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-53"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-53.edn"
+  :doc/date "2026-09-20"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 48: the shell scheduler over the batch step"
+  :coscientist/iteration 53
+  :coscientist/subject "serve_http batch-rows B: rows are slots, arriving requests wait in pending and take a free row at the next tick, every tick one 2B-word message advances all occupied rows, rows leave on stop/length, streaming per row; batch mode is greedy without prefill chunks (single-row steps share row 0's state). K16 12L B=4: N=4 57.7 vs serial 38.1 seq-tokens/s (1.51x), N=8 69.0 vs 37.8 (1.83x), N=1 0.57x; Xavier 40L B=4 (head stopped for the run, restored): N=4 14.8, N=8 15.8 vs 11.5 single stream"
+  :coscientist/engine-note "C-4 is served end to end; the measurement names the policy gap (a lone request pays the B-row step) and the next mechanism (kept buffers for B in {1,2,4})."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "adaptive batch: kept buffers for B in {1, 2, 4} in one guest so the scheduler picks the step by occupancy; then prefill chunks per row"
+  :coscientist/measured "K16 serial: N=1 0.376 s 34.6, N=4 1.155 s 38.1, N=8 2.327 s 37.8 seq-tokens/s; batch B=4: N=1 0.661 s 19.7, N=4 0.762 s 57.7, N=8 1.276 s 69.0; Xavier 40L batch B=4: N=1 1.78 s 3.9 (France stops after 7 tokens), N=4 2.16 s 14.8, N=8 4.04 s 15.8; head restored, chat 'Paris' 1693 ms"
+  :coscientist/refuted ""
+  :coscientist/carries-forward "adaptive B; per-row prefill chunks and sampling in batch mode; anv int8 positions lm_head; bucket 16; gateway fallback exercise (owner); probe-xavier stale (gateway repo); B70 40L (owner: vLLM)"
+  :doc/body "# Inference serving co-scientist, iteration 53 — `/loop 30min kaizen loop` tick 48（2026-09-20）\n\n対象: batch step の上に shell の scheduler。\n\n## Generate\n\n- H53.1 `serve_http.cljk … <prefill-bucket> <batch-rows>`: B 行 = slot。到着 request は `pending` に入り次の tick で空き行を取る（reset flag 付き）; tick は 2B 語 message 1 本で占有行を全部進める（空き行は `0,1`）; 行は `<|im_end|>` / `<|endoftext|>`（stop）か `max_tokens`（length）で抜け promise を resolve、streaming は行ごとの `on-token`。batch step は greedy で行あたり 1 token/step → batch mode では prefill chunk も sampling も使わない（単一行 step は行 0 の state を batch step と共有するので混ぜられない）。`load_check.py` で N 並列。\n\n## Measure\n\nK16 12 層、`rb12lm4.bin`（B=4）、prompt 5 / 1 token + 8 生成、serial shell（`rs12s.bin`、prefill bucket 8）と比較:\n\n| N 並列 | serial | batch scheduler（B=4） | 比 |\n|---|---|---|---|\n| 1 | 0.376 s、34.6 seq-token/s | 0.661 s、19.7 | 0.57× |\n| 4 | 1.155 s、38.1 | 0.762 s、**57.7** | **1.51×** |\n| 8 | 2.327 s、37.8 | 1.276 s、**69.0** | **1.83×** |\n\nXavier 40 層、`rb40-nv.bin`（B=4）を :8090 で（head unit を測定中だけ停止、primary vLLM は稼働; 後で unit を戻し `Paris` 1.69 s を確認）: N=1 3.9 seq-token/s（France は 7 token で stop）、N=4 **14.8**、N=8 **15.8** —— serial head の単一 stream 11.5 token/s に対し 1.3–1.4×。ids は確認した全 request で greedy 単一行と一致。\n\n## Reflect\n\n- batch guest の step は常に B 行を計算するので、1 本だけの request は B 行分を払い prefill chunk も失う（N=1 で 0.57×）。serving の方針は「軽負荷は serial shell、重負荷は batch shell」か、1 guest に B ∈ {1, 2, 4} の kept buffer を持たせ scheduler が占有数で step を選ぶ adaptive —— それが次。\n\n## Evolve\n\n- 次: adaptive B（kept buffer を B ごとに）、その後 batch mode の行ごと prefill chunk と sampling。anv の int8 positions lm_head。\n"}]
