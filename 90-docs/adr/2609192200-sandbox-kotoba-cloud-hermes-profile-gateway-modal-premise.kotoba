@@ -87,6 +87,74 @@ secret は未作成）—— 複数 profile・複数 provider を正しく扱う
 本番 identity での動作、OpenRouter 以外の provider、gateway（`web` エンドポイント）経由での
 実行 —— ここまでは全て `modal run` の local entrypoint から直接 Sandbox を作って検証した。
 
+## デプロイ・インシデント（2026-09-19）
+
+`modal deploy` 直後、`web` endpoint に**認証が無い状態で数分間公開**された
+（`POST /profiles/{profile}/sessions` が誰でも叩け、付与済みの OpenRouter credit を
+無制限に消費できた）。bearer token（`hermes-sandbox-gateway-token` Modal Secret、
+owner 生成の新規ランダム値、既存 credential ではない）を追加して再 deploy したが、
+**それだけでは露出は閉じなかった** —— 既に起動済みの warm container が新コードを
+拾わず、旧・無認証コードを応答し続けた（`modal container stop` で明示的に落として
+初めて閉じた）。教訓: **`modal deploy` はコード更新を保証するが、既存 warm container
+の入替は保証しない。** 認証・セキュリティ関連の変更は deploy 後に
+`modal container list` → 該当 container を stop → 実リクエストで確認、までを 1 組にする。
+
+## 第3段: kotoba.cloud ユーザー向け・課金統合（2026-09-19、owner 指示「この modal 推論,
+bot sandbox も kotoba.cloud の課金プランに含めて, user が扱えるようにして」）
+
+**owner 判断（AskUserQuestion）**: 課金単位 = 既存 `ai` scope のクレジットをそのまま消費
+（新 scope・新 Stripe product は作らない）。profile モデル = ユーザーごとに新規 profile を
+都度生成（運営者個人の `~/.hermes` データは一切触れない）。
+
+**Modal 側（`app-hermes-sandbox`）**: `run_for_principal(principal, prompt)` —— kotoba.cloud
+の principal id を `hashlib.sha256` で `u<16進16桁>` に固定形へ変換してから初めて shell
+コマンドへ渡す（injection surface を作らない）。初回はその principal 用に空 profile を
+sandbox 内で生成、以降は volume から復元 → 実行 → 再保存、で永続化。実測
+（合成 principal で 2 回連続呼び出し）: 1 回目は生成して応答、2 回目は同じ archive を
+`modal volume ls` で確認の上で復元して応答 —— 継続していることを実データで確認。
+実バグ: `Volume.commit()` は「volume をマウントしたコンテナの内側からしか呼べない」
+（呼び出し元 = sandbox を作る側から呼ぶと `ConflictError`）。Sandbox は exit 時に
+自分の volume 書き込みを自動 commit する —— 明示 commit を呼び出し元から削除して解決。
+`POST /users/{principal}/complete?prompt=...` が同期エンドポイント（sandbox 完了まで
+block し、出力を直接返す。job polling ではない）。
+
+**kotoba.cloud 側（`app-kotoba-cloud`）**: 新規 `sandbox_gateway.cljk`
+（`POST /v1/sandbox/complete`）を追加、`worker.cljk` のルータへ登録。既存の
+`billing-binding/account` primitive（`research_gateway.cljk` が chat completions で
+使うのと同じ関数）で `\"ai\"` scope に対し reserve → Modal gateway 呼び出し → settle。
+**意図的に research-gateway の `paid-admission` より単純**（free lane 無し —— metering
+未設定 or reservation 拒否は即座に拒否、無料で通さない。replay-of-settled-job の特別
+扱いや per-token 精算も再実装していない —— 既知のギャップとして明記、隠していない）。
+settle 額は固定 $0.05（`flat-charge-micro-usd`）—— **実測コストに基づくチューニングは
+未実施のプレースホルダ**。`HERMES_SANDBOX_GATEWAY_TOKEN`（Modal 側と同じ共有 bearer
+token）は Worker secret（未 commit）、`HERMES_SANDBOX_GATEWAY_URL` は `wrangler.jsonc`
+の `vars`（非機密、deploy 済み Modal endpoint の URL のみ）。
+
+**着地**: `feat/hermes-sandbox-gateway` ブランチ（build 0 error、既存 test suite
+219 tests / 26487 assertions 全 pass）→ サーバサイド merge → `npm run deploy` 実行
+（preflight・test・build・uiux audit・test:worker・test:workerd・`wrangler deploy` を
+含むフル pipeline、全て pass）→ `api.kotoba.cloud` へ live deploy 済み（commit
+`ff49786d4603`、west pin 前進済み）。
+
+**実測（deploy 直後）**: `curl -X POST https://api.kotoba.cloud/v1/sandbox/complete
+-H \"Origin: https://kotoba.cloud\"` → `{\"error\":\"sandbox-not-configured\"}` (503)。
+**これは設計どおり** —— `HERMES_SANDBOX_GATEWAY_TOKEN` がまだ未設定（agent は
+credential を扱わない方針のため owner が設定する）ので fail-closed している。token が
+無ければ課金も推論も一切発生しない。
+
+## 未決事項（第3段時点で追加）
+
+1. **`HERMES_SANDBOX_GATEWAY_TOKEN` が未設定** —— owner が `modal secret create` /
+   `wrangler secret put` を実行するまで機能しない（agent は secret 値を扱うツールで
+   ブロックされる設計。過去2回、実 credential を扱う `modal secret create` 呼び出しは
+   安全分類器に拒否され、owner 自身の実行に切り替えた）。
+2. **settle 額 $0.05 は未チューニング。** 実 Modal + OpenRouter コストの実測が要る。
+3. **research-gateway の free lane・replay・per-token 精算を意図的に省略した。** 本番の
+   利用パターンが要求すれば追加実装が要る。
+4. **auth モデルは session viewer のみ**（PAT bearer token 未対応。billing-gateway の
+   `/status` `/holds` のような PAT 経由読み取りには対応していない）。
+5. DNS/custom domain（`sandbox.kotoba.cloud` そのもの）は依然未着手。
+
 ## 現在地・未決事項（この ADR が「実装済み」と言っていないもの）
 
 scaffold（`app.py` / `README.md`）+ 上記の検証済み boot-check のみ。**`modal deploy`
