@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-06"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-06.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving (kotodama.inference) on the native :gpu/compute path; /loop 30min kaizen loop tick 1"
+  :coscientist/iteration 6
+  :coscientist/subject "greedy decode over tokens entirely on the device (embed_iq4xs, copy_at KV append, per-position metas); 3-token chains on B70 (4 layers), K16 iGPU and Xavier (12 layers) match the stateful f64 oracle"
+  :coscientist/engine-note "Three bounds met by name and raised or routed around: 64 dispatches / 256 buffers per loader, the 1 MiB source bound applied to artifacts, and kotoba-mir's 4,095-slot spill frame (handles are now literal, sequential per kind)."
+  :coscientist/generated 3
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "a device with room for the 40 layers (owner decision: which serving process yields)"
+  :coscientist/measured "K16 iGPU 12 layers: 27.8 ms/token steady; Xavier 12 layers: 89-140 ms; B70 4 layers: 6.7-16.8 ms (vLLM resident). argmax identical to the oracle at every step on every box; x rel <= 7.5e-6."
+  :coscientist/refuted "binding every handle in one let (kotoba-mir spill frame); copies inside BEGIN..SUBMIT (silently dropped the batch, now refused)."
+  :coscientist/carries-forward "Xavier kernel layout; the 40-layer run once a device is free; prefill; sampling; llama.cpp distribution parity over a prompt."
+  :doc/body "# Inference serving co-scientist, iteration 6 — `/loop 30min kaizen loop` tick 1（2026-09-19）\n\n器は反復 5 のまま（amu-native kexe + `:gpu/compute`、Deno 無し）。反復 5 以降の着地を含めて、この tick でどこまで動いたか。\n\n## Generate\n\n- H6.1 token > 0: conv ring / delta-net S / KV cache を device buffer に持ち越し、rope の position と attention の T を token ごとの meta で与えれば、greedy chain が f64 参照と一致するか。\n- H6.2 embedding lookup を device に置き、argmax buffer から次 token の id を読めば host に id を戻さずに chain できるか。\n- H6.3 12 層 × 3 token の guest は言語・loader のどの床に当たるか。\n\n## Reflect / 測定\n\n- H6.1 / H6.2: **一致**。`embed_iq4xs.comp`（IQ4_XS の 1 行を dequant、id は `ids[slot]`）、`copy_at`（KV append）、per-position meta。B70 4 層 × 3 token: argmax 59315 → 149044 → 169222 = 参照、x rel ≤ 7e-6。K16 iGPU 12 層 × 3: 163967 → 1320 → 11278 = 参照、**27.8 ms/token 定常**。Xavier 12 層 × 3: 同 argmax、140 → 103 → 89 ms。\n- H6.3: 床 3 つ。(a) loader: command buffer あたり 64 dispatch、buffer 256 → 2048 / 4096 に（amu #1028）。(b) amu CLI: `extract-native` が 1.09 MB の artifact に source の 1 MiB 上限 → artifact は EDN の 8 MiB（同 PR）。(c) **kotoba-mir `:spill-frame-too-large`（4,095 slot）**: handle を全部 `let` に束ねると 358 束縛 + request の一時値で溢れる。4,095 は AArch64 の `ldr [sp, #imm12*8]` の届く範囲（性質寄り）。→ 束ねない: loader は handle を種類ごとに 1, 2, 3… と順に振るので generator が literal で書く。code 338 KB → 70 KB、床に近づかない。\n- ついでに見つけた: amu CI の fuzz baseline（loader sha ratchet）が #1028 の teardown 呼び出しで赤 → ratchet 前進（意図どおりの赤）。\n\n## Rank\n\n1. 40 層フル実行の場所（3 箱とも serving process が device memory を保持）—— オーナー判断待ち。\n2. Xavier の kernel layout（12 層で 89–140 ms、Mesa の 3–5 倍遅い）。\n3. prefill（prompt を 1 token ずつ流している）と sampling、llama.cpp との分布一致。\n\n## Evolve（次 tick）\n\nXavier 専用 layout の第一手（r1 で x の再読が支配 → r8 系 + 256 thread、`weight_byte` 依存 load の削減）を Xavier 単体で測る。40 層は場所が空いたら即。\n\n## Meta\n\n- 「黙って 0」が 1 回（BEGIN 中の WRITE）。loader 側で名指し拒否に変えた。以後の床は全部名乗って止まった（8 問の 2・4・6）。\n- generator が「知っていること」を literal に焼く（GGUF offset、handle 番号、position）のは、`.kotoba` 側に判断を残しつつ live 値を減らす正しい形だった。\n"}]
