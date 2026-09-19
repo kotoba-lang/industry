@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-40"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-40.edn"
+  :doc/date "2026-09-20"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 35: C-2, the tokenizer"
+  :coscientist/iteration 40
+  :coscientist/subject "gguf_tokenizer.cljk: byte-level BPE from the GGUF's own tokens / merges / pre (qwen2 regex, GPT-2 byte map, greedy merges) with decode; tokenizer_check.cljk: 12/12 corpus lines equal to llama-server /tokenize, decode round-trips"
+  :coscientist/engine-note "Defined the tokenizer as 'equal to llama.cpp on a corpus' and measured that before calling it landed."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "runtime prompt into the guest (env/cli capability + a WRITEDEC loader request), then the kbb HTTP shell"
+  :coscientist/measured "12/12 lines equal (English, Japanese, Korean/Russian, German apostrophes, Python, prices/dates, emoji, contractions, edge whitespace, URL); decode round-trip 3/3; GGUF header 10.9 MB parsed from the 64 MiB head dump"
+  :coscientist/refuted "none"
+  :coscientist/carries-forward "runtime prompt + WRITEDEC; kbb HTTP shell; chat template / special tokens; gateway switch; MoE prefill grouping; delta-net chunking; resident 40-layer B70 run; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 40 — `/loop 30min kaizen loop` tick 35（2026-09-20）\n\n対象: C-2 —— tokenizer。text → ids → text を、GGUF が持つ vocab / merges から。\n\n## Generate\n\n- H40.1 GGUF の metadata（tokens 248,320 本、merges、pre = qwen2）だけで llama.cpp と同じ tokenization ができる（byte-level BPE + qwen2 の pre-tokenizer regex + GPT-2 の byte 表）。\n- H40.2 実装は kbb（ClojureScript の `RegExp` は `\\\\p{L}` と lookahead を `u` flag で扱える）で足り、`.kotoba` 側には ids だけ渡せばよい。\n\n## Reflect / 実装・測定\n\n- `gguf_tokenizer.cljk`: header parser（欲しい 5 key だけ array を保持、他は skip）、byte→unicode 表（GPT-2 の 256 → 可視文字）、pre-tokenizer regex、greedy 最小 rank merge、decode（token 文字列 → byte 列 → utf8）。\n- `tokenizer_check.cljk` + `tokenizer_corpus.txt`（12 行: 英 / 日 / 韓 + 露 / 独 apostrophe / Python / 金額・日付 / emoji / 縮約 / 空白の縁 / URL）: llama-server `/tokenize` と **12/12 一致**、3 行の decode round-trip 一致。H40.1 / H40.2 **採択**。\n- 設計上の境界: 特殊 token（`<|im_start|>` 等）は BPE の外 —— chat template 層が splice する。`add_special` は Qwen では BOS 無し。\n\n## Rank（C）\n\n1. C-3 の入口: runtime prompt —— guest が ids を実行時に受ける（`:env/read` の文字列を `string-code-point-at` で 10 進 parse、または `:cli/args`）、tokbuf に書くには hex 整形が要る → loader に `WRITEDEC <h> <off> <u32…>`（機構、1 行）。\n2. C-3 の本体: kbb の HTTP shell（OpenAI 互換 `/v1/completions` と `/v1/chat/completions`、tokenizer、chat template、常駐 kexe への prompt 渡しと token stream の読み出し）。kotoba 側の net capability は次段。\n3. gateway の Xavier head を native shell に差し替え（A の最後）。\n\n## Evolve（次 tick）\n\nC-3-1: `WRITEDEC` を loader に、guest に `:env/read \"NEX_PROMPT\"` → parse → tokbuf、`main` を prompt 長に依らない形に（P は runtime 値 → prefill は P ≤ 16 の kernel なので decode 逐次 fallback か chunk）。K16 12 層で同じ prompt を runtime 渡しで走らせ、chain 一致。\n\n## Meta\n\n- tokenizer を「llama.cpp と同じ答えを出す」で定義し、corpus 1 本で一致を測ってから landed と呼んだ。文字クラスの罠（\\\\p{L}、lookahead）は JS の regex が吸収した —— kbb-first が効いた例。\n"}]
