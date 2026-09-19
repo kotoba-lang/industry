@@ -11,11 +11,11 @@
   {:gate :d1-schema-migrations
    :prod/status :open
    :prod/measure "2026-09-18T02:12+09:00"
-   :prod/evidence "grep -c d1_databases worker/wrangler.jsonc -> 0; xrpc-adapter/wrangler.jsonc -> 0; no d1 binding and no migrations dir in the corpus (root migration.edn is a repo-extraction manifest, not a D1 migration)"}
+   :prod/evidence "grep -c d1_databases worker/wrangler.jsonc -> 0; xrpc-adapter/wrangler.jsonc -> 0; no d1 binding and no migrations dir in the corpus (root migration.edn is a repo-extraction manifest, not a D1 migration); re-measured 0/0 on 2026-09-20"}
   {:gate :xrpc-adapter-routing-coverage
-   :prod/status :open
-   :prod/measure "2026-09-18T02:12+09:00"
-   :prod/evidence "corpus inspection 2026-09-18: xrpc-adapter/ has src + wrangler.jsonc but no route-coverage register file; coverage unmeasured pending a route inventory"}
+   :prod/status :measured-pass
+   :prod/measure "2026-09-20T02:20+09:00"
+   :prod/evidence "static route inventory measured in corpus @9024f0f (local read-only clone): xrpc-adapter/src/index.ts routes map wires exactly 5 NSIDs (createAccount POST, getAccount GET, listAccounts GET, transfer POST, listTransactions GET) matching the kotoba 5-fn reference impl = 5/5 covered, 0 uncovered; machine-readable inventory at 90-docs/registers/open-banking-xrpc-route-inventory.edn. Static source-level only - live endpoint behavior unmeasured until :deploy-surface closes"}
   {:gate :form-to-banking-wiring
    :prod/status :open
    :prod/measure "2026-09-18T02:12+09:00"
@@ -27,4 +27,4 @@
   {:gate :transact-plane-probe
    :prod/status :pending-owner
    :prod/measure "2026-09-05"
-   :prod/evidence "401/502 measured 2026-09-05 (owner-only re-measure per evidence-script note); health-200 on kotobase.net/auth.kotobase.net on 2026-09-18 does not prove the transact plane"})}
+   :prod/evidence "401/502 measured 2026-09-05 (owner-only re-measure per evidence-script note); health-200 on kotobase.net/auth.kotobase.net on 2026-09-19 does not prove the transact plane"})}
