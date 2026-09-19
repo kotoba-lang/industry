@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-18"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-18.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 13: device-side sampling"
+  :coscientist/iteration 18
+  :coscientist/subject "nex_sample_topp: temperature + top-p sampling in one workgroup (tau by bisection, index-order cumulative, u = hash(seed, pos)); 256/256 draws equal the f64 oracle on fixed logits (TV 0.052 vs exact), 6/6 tokens in the K16 12-layer loop with 3 forced + 3 sampled; costs 4.8 ms per draw"
+  :coscientist/engine-note "A dedicated fixed-logits test separated the hash, the threshold and the cumulative before the token loop was trusted."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "multi-workgroup sampler (4.8 ms -> < 1 ms)"
+  :coscientist/measured "K16 T 0.8 top-p 0.95 seed 0x01234567: set 14 tokens mass 0.9523 tau 2.96e-3; 256/256 exact, 256/256 inside, TV 0.052, 1224 ms for 256 draws (4.8 ms each); token loop 12L 3 forced + 3 sampled 6/6, 32 ms/token (was 27.5)"
+  :coscientist/refuted "none"
+  :coscientist/carries-forward "multi-workgroup sampler; resident 40-layer serving path (owner decision); Q6_K lm_head half path; B70 fusion; top-k / min-p"
+  :doc/body "# Inference serving co-scientist, iteration 18 — `/loop 30min kaizen loop` tick 13（2026-09-19）\n\n対象: device 側 sampling（反復 17 の rank 1）—— greedy の token loop を serving の形に。\n\n## Generate\n\n- H18.1 1 workgroup（256 thread）で 248,320 語彙の temperature + top-p sampling が数 ms で書ける（sort 無し: τ の二分法 + index 順の累積）。\n- H18.2 乱数を `hash(seed, pos)` にすれば oracle（numpy）が draw を 1 つずつ再現でき、確率の f32 / f64 差で食い違うのは境界の draw だけ（256 回でほぼ 0 回）。\n\n## Reflect / 測定（K16、T 0.8、top-p 0.95、seed 0x01234567）\n\n- `sample_test.kotoba`: oracle の最終 logits（40 層、« Paris » の文脈）を固定して 256 draw、`pos_incr` で counter を進める。top-p 集合 14 token（mass 0.9523、τ 2.96e-3）。**256/256 が oracle と一致**、全部集合内、経験分布 vs 厳密の TV 0.052（256 標本の期待雑音 ≈ 0.06）。H18.1 / H18.2 **採択**。\n- token loop（fn mode、`sample:T:top_p:seed`）: K16 12 層、`9707,198,220` + sampling 3: **6/6 一致**（18171 / 84249 / 236687 / 112516 / 21356 / 226585）、x rel ≤ 6.5e-6。\n- 費用: 1 workgroup が 248k 要素を ~35 回舐める → **4.8 ms/draw**（command buffer 27.5 → 32 ms/token）。二分法の 30 pass が大半。\n- 未実装: top-k、repetition penalty、min-p。llama.cpp の既定 sampler 列とは違う（比較する時は両方 top-p のみに揃える）。\n\n## Rank\n\n1. sampler を多 workgroup に（partial max / Z / mass を 61 workgroup で、二分法は max·Z の後の小さい histogram で置換）: 4.8 → <1 ms。\n2. 40 層を 1 箱に常駐させる serving 経路（オーナー判断: Xavier の llama-server 17 GB）。\n3. Q6_K lm_head の half 経路、B70 の融合、top-k / min-p。\n\n## Evolve（次 tick）\n\n`sample_topp` を 2 段に: `sample_part`（61 workgroup: 部分 max、部分 Z、確率の対数 histogram 64 bin）→ `sample_final`（1 workgroup: histogram から τ の区間を決め、区間内だけ走査）。\n\n## Meta\n\n- sampler の正しさを「token loop の chain が合う」だけで見なかった。固定 logits × 256 draw の専用 test が、hash・τ・累積の 3 つの実装差を 1 回で切り分ける形。\n- 費用は測ってから rank に置いた（4.8 ms は K16 の token の 15%。Xavier では割合が小さい）。\n"}]
