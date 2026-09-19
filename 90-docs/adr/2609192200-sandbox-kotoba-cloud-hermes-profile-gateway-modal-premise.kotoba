@@ -59,10 +59,33 @@ exit 0、`hermes status` が profile の config・0 API keys・gateway stopped �
 west pin は `c99ed8ecfa32`（旧 `7ead8425c150` から前進、`kbb --backend sci
 scripts/west-pin-put.cljk app-hermes-sandbox HEAD` で single-entry commit `06fa99dba793`）。
 
-**この検証が証明していないもの**: 実際のチャットターン（turn-by-turn の session I/O）、
-GPU 構成、gateway 経由の認証、`sandbox.kotoba.cloud` の DNS 紐付け、`default` 等の実 profile
-（実資格情報つき）での動作。`hermes -p <name> status` が通ったことは「profile がロードできる」
-の証拠であって「session が動く」の証拠ではない。
+**この検証が証明していないもの（この時点）**: 実際のチャットターン（turn-by-turn の
+session I/O）、GPU 構成、gateway 経由の認証、`sandbox.kotoba.cloud` の DNS 紐付け、`default`
+等の実 profile（実資格情報つき）での動作。`hermes -p <name> status` が通ったことは
+「profile がロードできる」の証拠であって「session が動く」の証拠ではない。
+
+## 検証済み・第2段（2026-09-19、owner 指示「next, 実際に ローカルの hermes profile を modal で動かして」）
+
+上の boot-check（`status`）だけでなく、**実際の推論**を Modal 上で通した。
+
+- credential 経路: `modal secret create hermes-openrouter-key OPENROUTER_API_KEY=$OPENROUTER_API_KEY`
+  を **owner 自身が実行**（agent は `modal secret create` の実行を安全分類器に拒否され、
+  平文キーには一切触れていない —— 拒否された時点で回避策を探さず owner に判断を委ねた）。
+- Sandbox に `secrets=[modal.Secret.from_name(\"hermes-openrouter-key\")]` を付け、
+  `hermes -p modal-smoketest -z \"Reply with exactly five words confirming you are running
+  inside a Modal Sandbox.\" --provider openrouter -m openrouter/auto` を実行。
+- 結果: exit 0、**実際のモデル応答** \"I am in Modal Sandbox.\" —— 固定文字列ではなく
+  OpenRouter 経由の本物の推論。
+
+`app.py` の `_sandbox_for_profile` は `prompt` 引数を取るようになり、無ければ `status`
+（boot-check）、あれば `-z <prompt> --provider openrouter -m openrouter/auto`（実推論）を走らせる。
+secret は今のところ全 profile に `hermes-openrouter-key` を固定で付けている（他 provider の
+secret は未作成）—— 複数 profile・複数 provider を正しく扱う設計はまだ無い。west pin は
+`312307143c34`（single-entry commit `1b47b4836aea`）。
+
+**この検証が証明していないもの（第2段時点で追加）**: 複数ターンの会話、`default` 等の
+本番 identity での動作、OpenRouter 以外の provider、gateway（`web` エンドポイント）経由での
+実行 —— ここまでは全て `modal run` の local entrypoint から直接 Sandbox を作って検証した。
 
 ## 現在地・未決事項（この ADR が「実装済み」と言っていないもの）
 
