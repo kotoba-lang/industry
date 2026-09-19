@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-17"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-17.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 12: B70 40-layer parity, the fleet table"
+  :coscientist/iteration 17
+  :coscientist/subject "B70 (ANV) runs the 40-layer streaming guest beside vLLM: 5/5 argmax = oracle, logits max|d| 1.7e-5, KL(llama||gpu) 0.0143 -- the same distribution as K16 and Xavier; the llama.cpp parity item is closed for the fleet"
+  :coscientist/engine-note "One command per box once the apparatus existed; the measurement cost was paid in iterations 14 and 15."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "device-side sampling (temperature / top-p) in the token loop"
+  :coscientist/measured "B70 5 tokens x 40 layers 44.5 s wall (disk-bound, 15 GB host RAM), lm_head buffer 6.6-8.6 ms; argmax 271 / 314 / 279 / 369 / 11751 = oracle; x rel <= 2.2e-4 step 0, <= 2.1e-5 after; logits max|d| 1.7e-5, KL(oracle||gpu) 3.6e-12; KL(llama||gpu) 0.0143 over top-40, mass 0.907 vs 0.911, top-10 10/10, p(Paris) 0.549"
+  :coscientist/refuted "none"
+  :coscientist/carries-forward "device-side sampling; a resident 40-layer serving path on one box (owner decision); Q6_K lm_head half path; B70 fusion"
+  :doc/body "# Inference serving co-scientist, iteration 17 — `/loop 30min kaizen loop` tick 12（2026-09-19）\n\n対象: B70 での 40 層 streaming parity（反復 16 の rank 1）—— fleet の 3 箱目。\n\n## Generate\n\n- H17.1 B70（ANV）は vLLM 27 GB の隣（空き ~3 GB）で 40 層 streaming が走る。\n- H17.2 B70 の分布は oracle / llama.cpp と K16・Xavier と同じ程度に一致する（同じ program、別 driver・別 ISA）。\n\n## Reflect / 測定（prompt = The capital of France is、oracle と llama.cpp 参照は K16 から複写）\n\n| 箱、40 層、exact kernel | argmax vs oracle | 最終 logits vs oracle | KL(llama‖gpu) top-40 | p(Paris) | wall（5 token） |\n|---|---|---|---|---|---|\n| K16 RADV | 5/5 | max|Δ| 1.5e-5 | 0.0143 | 0.549 | 25.8 s（page cache） |\n| Xavier nvgpu s4 | 5/5 | 6.7e-6 | 0.0167 | 0.549 | 85 s（NVMe） |\n| Xavier nvgpu h2（既定） | 5/5 | 0.32（KL 8.5e-4） | 0.0142 | 0.557 | 86 s |\n| **B70 ANV** | **5/5** | **1.7e-5** | **0.0143** | **0.549** | 44.5 s（disk、host RAM 15 GB） |\n\n- H17.1 **採択**（層 0.46 GB + lm_head 0.42 + embd 0.27 + staging で 3 GB に収まる）。\n- H17.2 **採択**: 3 architecture・3 driver・2 ISA で同じ program が同じ分布。llama.cpp 分布一致の項目（反復 12 から持ち越し）は fleet で閉じた。\n- 見送り: stream mode の fn 形への統一。層ごとの file offset は規則性が無く（tensor directory の順）、handle 計算はできても offset 計算はできない —— 層関数 40 個（各 19 の MAP literal）が offset 表そのものなので、この形が正しい。\n\n## Rank\n\n1. sampling を device 側に（temperature / top-p、counter-based の乱数を seed buffer から）—— greedy の token loop を serving に近づける最後の欠け。\n2. 40 層を 1 箱に常駐させる serving 経路（Xavier: llama-server を止めれば 17 GB 空く。オーナー判断）。\n3. Q6_K lm_head の half 経路（Xavier 18 ms/token）、B70 の融合。\n\n## Evolve（次 tick）\n\n`nex_ops.comp` に `sample_topp`（logits → softmax → 累積 → threshold、乱数 = hash(seed, pos)）を足し、`argmax_final` の代わりに tokbuf へ書く。oracle は同じ乱数列を numpy で。\n\n## Meta\n\n- 同じ質問を 3 箱に同じ装置で訊けたので、この tick の測定は 1 コマンドだった。装置（stream guest + parity_check + 参照の複写）を先に作った反復 14–15 の配当。\n"}]
