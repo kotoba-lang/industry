@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-27"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-27.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 22: B-5, the expert kdots' own layout class"
+  :coscientist/iteration 27
+  :coscientist/subject "a fourth layout class :expert; on B70 the three 8-position expert kdots on r8 take the 4-layer token 3.30 -> 3.06 ms (oracle-exact) while r8 on the narrow class loses (3.15); K16 neutral; anv = wide r8 / narrow r1 / expert r8 / lm r8; B70 40-layer estimate ~14 ms/token"
+  :coscientist/engine-note "The single-expert bench had said r8 was wrong for experts; the composed step with eight positions said the opposite -- the bench's shape was not the workload's."
+  :coscientist/generated 3
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "small-dispatch consolidation (rmsnorm prologue, weighted_sum+add+norm, gate+up in one dispatch)"
+  :coscientist/measured "B70 4L x 3T: experts r1 3.30 / 3.30, experts r8 3.07 / 3.05, narrow+experts r8 3.17 / 3.14 ms/token; K16 12L x 4T experts r1 26.9-27.7 vs r8 26.8-27.7; x rel 4.93e-6 unchanged"
+  :coscientist/refuted "'r8 is wrong for the expert kdots' (true for one expert / 64 workgroups, false at 8 positions)"
+  :coscientist/carries-forward "small-dispatch consolidation; resident 40-layer B70 run; B70 min_freq unit"
+  :doc/body "# Inference serving co-scientist, iteration 27 — `/loop 30min kaizen loop` tick 22（2026-09-19）\n\n対象: B-5 —— expert kdot 3 本（層の 13.4 MB、~90 GB/s）。\n\n## Generate\n\n- H27.1 expert kdot（512 × 8 position、2048 × 8）は position 方向に 4096 / 16384 workgroup あるので、r1 でなく r8（8 行/workgroup、x 共有、thread あたり 8 本の load）が効く —— 単 expert の bench で r8 が負けたのは 64 workgroup しか無かったから。\n- H27.2 同じ r8 は narrow class（32–2048 行 × 1 position）では飢える。\n- H27.3 K16（帯域律速）では変わらない。\n\n## Reflect / 測定（合成 4 層 × 3 token、oracle 一致、各 2 回）\n\n- B70: experts r1 **3.30** → r8 **3.06 ms/token**（−7%、層あたり −0.06 ms）。H27.1 **採択**。\n- B70: narrow も r8 → **3.15**（experts r8 の 3.06 より悪い）。H27.2 **採択** → `anv` = wide r8 / narrow r1 / **expert r8** / lm r8。\n- K16 12 層 × 4: experts r8 27.2 vs r1 27.3。H27.3 **採択**、`radv` 行は不変。\n- 実装: layout 表の 4 つ目の class `:expert`（無ければ `:narrow` に fallback）、narrow の dispatch も `wg-of` を通す形に（r8 を試せるように）。\n- B70 40 層の見積もり: 反復 26 の 16.5 → **~14 ms/token（~70 tok/s 級）**。外挿のまま —— 常駐実測には vLLM の 27 GB が要る。\n\n## Rank（B）\n\n1. 小 dispatch の統合: rmsnorm を kdot の prologue に（x を読む時に rms を workgroup ごとに再計算）、weighted_sum + add + 次層 rmsnorm を 1 kernel に、gate_exps + up_exps を 1 dispatch に（同じ ids・同じ x）。層 21 → ~15 dispatch。\n2. 40 層常駐の実測（オーナー判断: vLLM を止める / 別の箱）。\n3. B70 の `min_freq` unit（serving するなら）。\n\n## Evolve（次 tick）\n\n`nex_ops.comp` に `weighted_sum_add_norm`（ffn の和 + resid + 次層の rmsnorm を 1 dispatch、出力 xout と h）と、kdot に `rmsnorm 入力` の flag（Meta pad0 = norm weight binding あり）。B70 4 層で dispatch 数と ms を測る。\n\n## Meta\n\n- bench（単 expert、64 workgroup）が「r8 は expert に不向き」と言ったのは workgroup 数の話で、合成 step の 8 position では逆だった。**bench の形が本番の形と違う時は、本番の形で測る。**\n- class を分けたので箱ごとの表が 4 列になった。列が増えるたびに「その箱で測った」が要る —— radv は中立、nvgpu は未測（h2 kernel に r8 系が無い）。\n"}]
