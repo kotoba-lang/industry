@@ -1,0 +1,52 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609192200-sandbox-kotoba-cloud-hermes-profile-gateway-modal-premise")
+  (:adr/title "sandbox.kotoba.cloud (cloud-kotoba/app-hermes-sandbox) の Hermes profile gateway/runtime を Cloudflare Containers 前提から Modal 前提に変更する")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-19")
+  (:adr/last_verified "2026-09-19")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-cloud-hermes-sandbox")
+  (:source/dataset "adr")
+  (:adr/repos (vector "cloud-kotoba/app-hermes-sandbox" "com-junkawasaki/root"))
+  (:adr/authoritative_for
+(vector "sandbox.kotoba.cloud の compute 基盤は Modal（Hermes profile ごとの gVisor sandbox 実行）を前提とする。Cloudflare Containers は不採用" "GitHub repo description の「hosted on Cloudflare Containers」は 2026-09-18 作成時点の未実装 intent であって決定ではない（実装状態は測ってから従う、ADR-2809041200）—— 本 ADR がその上書き" "Modal 採用の根拠は Hermes Agent（NousResearch、この workspace の `~/.hermes` の実体、v0.21.3）が `official/mlops/modal` skill と `terminal.backend: modal` を公式サポートしている実測（2026-09-19、hermes-agent.nousresearch.com docs 確認）。gVisor 隔離 + H100/H200/B200 GPU on-demand + scale-to-zero が Hermes profile 実行に直接使える"))
+  (:adr/related
+(vector "adr-2609180740 (Modal endpoint での GPU 推論原価 —— 本 ADR とは別軸、gateway/runtime の compute ではなく LLM 推論の話)" "adr-2609171000 (Hermes fleet の既定 provider)" "cloud-kotoba/app-hermes-sandbox #README (scaffold 実装)"))
+
+  (:adr/body
+"# ADR-2609192200: sandbox.kotoba.cloud の Hermes profile gateway/runtime を Modal 前提にする
+
+**Status**: accepted / 2026-09-19 / オーナー指示「sandbox.kotoba.cloud は modal 前提にして」。
+
+## 経緯（この会話で実測した事実）
+
+1. **`sandbox.kotoba.cloud` は本 ADR 起票時点で稼働していない**: DNS は NXDOMAIN（`dig`/`host` とも未解決、`curl` も接続不可、2026-09-19 実測）。
+2. 実体リポジトリ `cloud-kotoba/app-hermes-sandbox` は 2026-09-18 作成、GitHub 上 `size:0`・コミットゼロ（`gh api repos/cloud-kotoba/app-hermes-sandbox/commits` は 409 \"Git Repository is empty\"）。ローカル checkout も `bin/` `docker/` `worker/` の空ディレクトリのみで、`manifest/west.yml` / `manifest/repos.edn` に未登録（orphan checkout）。
+3. GitHub repo の description（\"Hermes profile gateway/runtime hosted on Cloudflare Containers at sandbox.kotoba.cloud\"）は **repo 作成時に書かれた intent であって、何かを測って決めた結果ではない**（CLAUDE.md「規則を制約として持ち出す前に、性質か実装状態かを判定する」— 実装状態は測ってから従う）。`docker/` `worker/` という空ディレクトリ名がその intent の名残。
+4. 一方、この workspace の Hermes fleet（`~/.hermes/profiles` を profile 単位で持つ bot 群）が実際に動かしているエンジンは **NousResearch の Hermes Agent**（`~/.hermes/hermes-agent`、`hermes --version` → `Hermes Agent v0.21.3 (2026.9.14) · upstream d177b119`）。この Hermes Agent は **Modal を `official/mlops/modal` skill として公式サポート**している（`hermes skills install official/mlops/modal`、Orchestra Research メンテ、MIT license。`terminal.backend: modal` を設定すると agent のサンドボックス実行を Modal 上（gVisor コンテナ、T4〜B200 GPU、scale-to-zero、sub-second cold start）で動かせる。出典 `https://hermes-agent.nousresearch.com/docs/user-guide/skills/optional/mlops/mlops-modal`、`.../user-guide/configuration`、2026-09-19 WebFetch 実測）。Modal と Daytona が Hermes が公式文書化しているクラウド/サーバレス terminal backend の 2 択。
+5. ただしこの workspace の `~/.hermes/config.yaml` は現在 `backend: nous`（自前バックエンド）。手元にある `modal-gpu-sizing` / `modal-sglang-bench` skill は公式 Modal skill とは別物（GPU 単価調査・sglang ベンチ用のカスタム skill）。
+
+## 決定
+
+**sandbox.kotoba.cloud の compute 基盤を Modal に premise する。** Hermes profile（`~/.hermes/profiles/<name>`）ごとに Modal Sandbox を起動し、web gateway（ASGI、Modal 上で `@modal.asgi_app()`）経由で HTTP から到達できるようにする。Cloudflare Containers は採用しない。
+
+**根拠**: (a) Modal が Hermes Agent の official terminal backend であり、この workspace の Hermes fleet の実エンジンと直接一致する。(b) GPU on-demand・gVisor 隔離・scale-to-zero は「profile ごとの使い捨て実行環境」という gateway/runtime の役割に直接合致する。(c) Cloudflare Containers 側にはこの Hermes 統合が存在しない（独自に実装する必要がある）。
+
+## 現在地・未決事項（この ADR が「実装済み」と言っていないもの）
+
+scaffold（`app.py` / `README.md`）のみ。**`modal deploy` は未実行**、DNS/custom domain の紐付けも未実行。
+
+未決事項:
+1. sandbox.kotoba.cloud という custom domain を Modal の web endpoint にどう向けるか（Modal 側の custom domain 機能 or Cloudflare 側で CNAME → Modal、後者なら結局 Cloudflare を DNS 層だけ併用することになる）。
+2. gateway の認証モデル（誰が・どの profile を起動してよいか）。
+3. profile ごとの secrets（HF token 等）を Modal Secret にどう渡すか — 本 ADR は方針のみで具体的な secret 名は未定。
+4. `~/.hermes/config.yaml` の `backend: nous` をこの gateway 専用に `modal` へ切り替えるか、gateway 側だけが Modal を使い常駐の hermes CLI 自体は nous のままにするか。
+
+## Resume point
+
+1. `cloud-kotoba/app-hermes-sandbox` の `app.py` scaffold を元に、実際の profile 起動 API（POST /profiles/{name}/sessions 等）を実装。
+2. 未決事項 1〜4 をオーナーに確認してから `modal deploy` を実行し、DNS を切り替える。
+")))
