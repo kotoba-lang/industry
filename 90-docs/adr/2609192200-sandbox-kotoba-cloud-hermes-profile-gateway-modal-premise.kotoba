@@ -170,4 +170,42 @@ scaffold（`app.py` / `README.md`）+ 上記の検証済み boot-check のみ。
 
 1. `cloud-kotoba/app-hermes-sandbox` の `app.py` scaffold を元に、実際の profile 起動 API（POST /profiles/{name}/sessions 等）を実装。
 2. 未決事項 1〜4 をオーナーに確認してから `modal deploy` を実行し、DNS を切り替える。
+
+## 第4段: app.kotoba.cloud + インストール可能な kotoba app（2026-09-19、owner 指示
+「コレを app.kotoba.cloud で確認できるようにして. また dmg, exe, sh を作成して,
+インストール可能な kotoba app を作成して、公開」）
+
+**owner 判断（AskUserQuestion）**: kotoba app = sandbox チャットのネイティブクライアント
+（言語 runtime のインストーラではない）。署名証明書 = 未署名でまず公開（macOS Developer ID /
+notarization・Windows Authenticode ともこの workspace に無い。iOS App Store 証明書のみ実在、
+`.claude/skills/secrets-location-map/references/mobile-publishing.md`）。
+
+**app.kotoba.cloud**（`app-kotoba-cloud` commit `d96f69c857ce`、west pin 前進済み）: `/support/`
+と全く同じパターン（`cloud-kotoba-dds.chat`、single-page-app・locale-variant 規約）で
+`/v1/sandbox/complete` に投げるサインイン必須のチャット UI。`console.cljk` に新 surface
+`:app` を追加（nav・origins・surface-of の 3 箇所）、`console_locales.cljk` に `:nav-app` を
+追加し **`scripts/translate-console-copy.cljk` を実行して 20 locale 全部を実際に生成**
+（フォールバックで済ませなかった — このリポジトリの test 自身が「全 locale に存在すること」を
+強制するため）。`test:worker` の smoke test が実際に 2 件の見落とし（`locale.cljk` の
+`variant-roots`、`worker-smoke.mjs` 自身のホスト表）を deploy 前に検出、修正して green。
+実測: `https://app.kotoba.cloud/` 200、`id=\"sandbox-chat\"` を含む、未認証 POST は
+`sandbox-not-configured` 503（設計どおり fail-closed、token 未設定のため）。
+
+**インストール可能な launcher**（同 commit、`assets/download/` → `site.cljk` の
+copy-file パターンで `public/download/` へ）: Electron・新規 Rust・新しい browser engine は
+一切使わず、**実ブラウザを app-mode で起動するだけの薄い launcher** を 3 形式で作成。
+- macOS: `hdiutil` で作った実 `.dmg`（`Kotoba.app`、Info.plist は `plutil -lint` 済み、
+  mount して構造確認済み）。
+- Windows: `makensis`（brew で新規 install）でコンパイルした**本物の PE32 実行ファイル**
+  （`file` コマンドで確認済み。Start Menu / Desktop shortcut が `.vbs` 経由で
+  `explorer.exe <url>` を呼ぶ — 全 Windows version で確実に動く経路）。
+- Linux: `curl | sh` 前提の POSIX installer（`~/.local/bin` + `.desktop` entry）。
+
+実測（deploy 後）: `https://app.kotoba.cloud/download/{Kotoba.dmg,Kotoba-Setup.exe,
+kotoba-install.sh}` が 200・元バイナリとバイトサイズ一致・`file` で種別確認済み
+（dmg=zlib compressed data、exe=PE32 executable (GUI) Nullsoft Installer）。
+
+**この段の未決事項**: 未署名なので Gatekeeper / SmartScreen 警告が出る（ページに明記済み、
+隠していない）。将来署名するなら macOS Developer ID + notarization、Windows
+Authenticode 証明書の新規取得が要る（owner action、agent は代行しない）。
 ")))
