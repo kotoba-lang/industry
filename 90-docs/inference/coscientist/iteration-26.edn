@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-26"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-26.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 21: B-4, the delta-net step on 512 threads"
+  :coscientist/iteration 26
+  :coscientist/subject "deltanet_fused on 512 threads (key dimension split in four, shared reduce): B70 4L x 3T 3.46 -> 3.30 ms/token (-0.053 ms per recurrent layer), Xavier 12L 37.1 -> 36.4, K16 unchanged; oracle-exact on all three"
+  :coscientist/engine-note "The first B70 item whose predicted and measured gains agree; the profile-then-decompose order is paying."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "expert kdots with a shared activation (three per layer at ~90 GB/s)"
+  :coscientist/measured "B70 4L x 3T v1 3.47 / 3.46 -> v2 3.31 / 3.29 ms; Xavier 12L x 3T 37.13 -> 36.44; K16 12L 27.3 -> 27.3; x rel B70 4.93e-6, Xavier 3.10e-3 (h2)"
+  :coscientist/refuted "none"
+  :coscientist/carries-forward "expert kdot with shared x; small-dispatch consolidation; resident 40-layer B70 run"
+  :doc/body "# Inference serving co-scientist, iteration 26 — `/loop 30min kaizen loop` tick 21（2026-09-19）\n\n対象: B-4 —— delta-net step の直列 K loop（B70 の層で最大の latency 項目、反復 25 の rank 1）。\n\n## Generate\n\n- H26.1 head あたり 128 thread が K=128 段の直列 loop を 2 回歩く形を、4 thread group で key を 4 分割し shared で reduce すれば 0.065 → ~0.02 ms/層（B70）。\n- H26.2 同じ変更は Xavier にも効き、K16（wave64）にはあまり効かない。\n\n## Reflect / 測定\n\n- `deltanet_fused.comp` を `local_size 512`（j × 4 part）に。conv / l2 / gated-rmsnorm は part 0、他 part は reduce に 0 を寄与。ring 書込みは part 0 のみ（1 回）。\n- 3 箱で oracle 一致（B70 x rel 4.9e-6、Xavier 3.1e-3（h2）、K16 chain 同一）。\n- A/B（各 2 回）: **B70 4 層 × 3 token 3.46 → 3.30 ms/token**（−4.6%、recurrent 層あたり −0.053 ms → 40 層で ≈ −1.6 ms）。**Xavier 12 層 × 3 token 37.1 → 36.4**（−2%）。**K16 12 層 27.3 → 27.3**（0）。H26.1 **採択**（予測 0.065 → 0.02 に対し実測 −0.053）、H26.2 **採択**。\n- B70 の推定 40 層 token: 18 → ~16.5 ms（~60 tok/s 級、未実測 —— device が要る）。\n\n## Rank（B）\n\n1. expert kdot（3 本、13.4 MB/層、~90 GB/s）: positions=8 を 1 workgroup 内で回して x を共有する expert 専用 kernel、または gate_exps と up_exps を 1 dispatch に（同じ ids・同じ x）。\n2. 小 dispatch の統合: rmsnorm を kdot prologue に、weighted_sum + add + 次層 rmsnorm を 1 kernel に（層 21 → ~15 dispatch）。\n3. 40 層常駐の実測（vLLM の 27 GB）。\n\n## Evolve（次 tick）\n\n`kdot_f32_r1` の expert 変種: 1 workgroup = 1 行 × 8 position（x を 8 本 shared に置き、重みは 8 expert 分を順に）→ x の再読みが 1/8、weight 読みは変わらず。gate と up を同じ dispatch で（binding に 2 本目の weight と出力）。\n\n## Meta\n\n- 予測（0.065 → 0.02）と実測（−0.053）が合った初めての B70 の項目。profile → 床との差の分解 → 1 項目ずつ、の順が効いている。\n- 同じ kernel 変更の効き方が 3 箱で 3 通り（−4.6 / −2 / 0%）。箱の列で持つ表がまた要った。\n"}]
