@@ -1,7 +1,33 @@
 {
-  "generated_at": "2026-09-18T11:32:50Z",
+  "generated_at": "2026-09-19T00:22:04Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
+    "adnetwork-dataset-ops": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "30440214d92a",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "adnetwork-dataset-sync",
+        "no_agent": true,
+        "prompt": "placeholder",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "45 10 * * *",
+          "expr": "45 10 * * *",
+          "kind": "cron"
+        },
+        "script": "adnetwork_dataset_ops_evidence.py",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "adnetwork-scout": [
       {
         "context_from": null,
@@ -119,9 +145,9 @@
           "times": null
         },
         "schedule": {
-          "display": "every 360m",
-          "kind": "interval",
-          "minutes": 360
+          "display": "50 4,16 * * *",
+          "expr": "50 4,16 * * *",
+          "kind": "cron"
         },
         "script": null,
         "skills": null,
@@ -158,19 +184,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "9e2c2ae32cd2",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-blog-i18n daily blog translation",
         "no_agent": false,
         "prompt": "akc-blog-i18n daily blog translation",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "30 4 * * *",
-          "expr": "30 4 * * *",
+          "display": "34 4 * * *",
+          "expr": "34 4 * * *",
           "kind": "cron"
         },
         "script": "akc_blog_i18n_evidence.py",
@@ -190,13 +216,13 @@
           "web"
         ],
         "id": "f7c745360a8d",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-csf-fit-ops daily evidence + iteration",
         "no_agent": false,
         "prompt": "akc-csf-fit-ops daily iteration (CSF 2.0 coverage app owner)\n\nSOUL.md を読め (~/.hermes/profiles/akc-csf-fit-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. 日付 (JST) の偶奇で反復を選ぶ: 偶数日=計測反録 (PR 無しでレポートして停止、「opened no PR」は正常)、\n   奇数日=追加反復。cache/metrics.json の時系列 (first_seen, last_deltas) を使って利用分析をレポートに含める。\n3. 担当 app: 「使用中 product を選択 → NIST CSF v2 のサブカテゴリ満たし度を可視化・レポート」。\n   追加反復では証拠から lever を 1 つだけ選ぶ: /v1/security/compliance-fit (nist-csf-20) の\n   覆り数可視化、csf2 catalog (106 小カテゴリ) + compliance-catalog ontology claims をデータ源とした\n   coverage heatmap / レポート出力面、クロスページ surface 追加。compliance-fit endpoint が未 live の\n   404 状態では平行実装 agent の PR と重複しないこと — one-lever 規律で lever が in-flight PR と\n   同じなら「opened no PR」で明確に停止する。\n   workdir ~/.gftd/worktrees/akc-csf-fit-ops で topic branch を kotoba-lang/main から新規作成\n   (リモート名 kotoba-lang。origin ではない)。修正後 npm run render + 対象テストを通してから\n   gh pr create --repo cloud-kotoba/app-kotoba-cloud。PR は docs/copy/catalog-data レベルのみ。\n   自分の PR は approve できないので gh pr comment で検査記録を残し gh pr merge --merge で merge。\n   merge 後は何も前進させない (west pin advance は自分の仕事ではない)。\n4. 予算: 20 API call 以内に収め、進捗に関わらずレポートして停止。main 直 push 禁止。1 run = 最大 1 PR。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -218,19 +244,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "3dc594a6e90e",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-ctem-ops daily evidence + iteration",
         "no_agent": false,
         "prompt": "akc-ctem-ops daily iteration (security service CTEM)\n\nSOUL.md を読め (~/.hermes/profiles/akc-ctem-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. 日付 (JST) の偶奇で反復を選ぶ: 偶数日=計測反録 (PR 無しでレポートして停止、「opened no PR」は正常)、\n   奇数日=追加反復。cache/metrics.json の時系列 (first_seen, last_deltas) を使って利用分析をレポートに含める。\n3. 追加反復では証拠から lever を 1 つだけ選ぶ (capability rows / summary copy の充実、\n   header nav・docs page 等のクロスページ surface 追加、/v1 catalog field の深化、finding-schema field doc)。\n   workdir ~/.gftd/worktrees/akc-ctem-ops で topic branch を kotoba-lang/main から新規作成\n   (リモート名 kotoba-lang。origin ではない)。修正後 npm run render + 対象テストを通してから\n   gh pr create --repo cloud-kotoba/app-kotoba-cloud。PR は docs/copy/catalog-data レベルのみ。\n   自分の PR は approve できないので gh pr comment で検査記録を残し gh pr merge --merge で merge。\n   merge 後は何も前進させない (west pin advance は自分の仕事ではない)。\n4. 予算: 20 API call 以内に収め、進捗に関わらずレポートして停止。main 直 push 禁止。1 run = 最大 1 PR。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "10 2 * * *",
-          "expr": "10 2 * * *",
+          "display": "9 2 * * *",
+          "expr": "9 2 * * *",
           "kind": "cron"
         },
         "script": "akc_ctem_ops_evidence.py",
@@ -246,13 +272,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "ca57c86f6b12",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-dast-ops daily evidence + iteration",
         "no_agent": false,
         "prompt": "akc-dast-ops daily iteration (security service DAST)\n\nSOUL.md を読め (~/.hermes/profiles/akc-dast-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. 日付 (JST) の偶奇で反復を選ぶ: 偶数日=計測反録 (PR 無しでレポートして停止、「opened no PR」は正常)、\n   奇数日=追加反復。cache/metrics.json の時系列 (first_seen, last_deltas) を使って利用分析をレポートに含める。\n3. 追加反復では証拠から lever を 1 つだけ選ぶ (capability rows / summary copy の充実、\n   header nav・docs page 等のクロスページ surface 追加、/v1 catalog field の深化、finding-schema field doc)。\n   workdir ~/.gftd/worktrees/akc-dast-ops で topic branch を kotoba-lang/main から新規作成\n   (リモート名 kotoba-lang。origin ではない)。修正後 npm run render + 対象テストを通してから\n   gh pr create --repo cloud-kotoba/app-kotoba-cloud。PR は docs/copy/catalog-data レベルのみ。\n   自分の PR は approve できないので gh pr comment で検査記録を残し gh pr merge --merge で merge。\n   merge 後は何も前進させない (west pin advance は自分の仕事ではない)。\n4. 予算: 20 API call 以内に収め、進捗に関わらずレポートして停止。main 直 push 禁止。1 run = 最大 1 PR。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -274,13 +300,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "cd476c0da2aa",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-graph-ops",
         "no_agent": false,
         "prompt": "akc-graph-ops weekly iteration (agent graph lane owner).\n\nSOUL.md を読め (~/.hermes/profiles/akc-graph-ops/SOUL.md)。実行手順:\n1. evidence script 出力 (この run の冒頭) を読む。REFUSED banner なら盲状態を報告して停止。\n2. 偶数週 (週番号偶数) = 計測反復: 結果をレポートして終了 (PR 不要なら PR ゼロで正常)。\n   奇数週 = 追加反復: guard matrix の穴 (write拒否, pat拒否, gremlin subset) と\n   llms.txt の graph セクションの実在を 1 ハードニングし, 1 PR まで。\n3. 作業 branch は kotoba-lang remote の main から新規 (graph-ops/main は同期専用, push しない)。\n4. PR は cloud-kotoba/app-kotoba-cloud 宛。1 run = 最大 1 PR。approve せずコメント検査 -> gh pr merge --merge。\n5. shell コマンド行は純 ASCII (ファイル内容は日本語可)。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -300,19 +326,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "d95acbd714d7",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-sast-ops daily evidence + iteration",
         "no_agent": false,
         "prompt": "akc-sast-ops daily iteration (security service SAST)\n\nSOUL.md を読め (~/.hermes/profiles/akc-sast-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. 日付 (JST) の偶奇で反復を選ぶ: 偶数日=計測反録 (PR 無しでレポートして停止、「opened no PR」は正常)、\n   奇数日=追加反復。cache/metrics.json の時系列 (first_seen, last_deltas) を使って利用分析をレポートに含める。\n3. 追加反復では証拠から lever を 1 つだけ選ぶ (capability rows / summary copy の充実、\n   header nav・docs page 等のクロスページ surface 追加、/v1 catalog field の深化、finding-schema field doc)。\n   workdir ~/.gftd/worktrees/akc-sast-ops で topic branch を kotoba-lang/main から新規作成\n   (リモート名 kotoba-lang。origin ではない)。修正後 npm run render + 対象テストを通してから\n   gh pr create --repo cloud-kotoba/app-kotoba-cloud。PR は docs/copy/catalog-data レベルのみ。\n   自分の PR は approve できないので gh pr comment で検査記録を残し gh pr merge --merge で merge。\n   merge 後は何も前進させない (west pin advance は自分の仕事ではない)。\n4. 予算: 20 API call 以内に収め、進捗に関わらずレポートして停止。main 直 push 禁止。1 run = 最大 1 PR。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "40 2 * * *",
-          "expr": "40 2 * * *",
+          "display": "45 2 * * *",
+          "expr": "45 2 * * *",
           "kind": "cron"
         },
         "script": "akc_sast_ops_evidence.py",
@@ -332,19 +358,19 @@
           "web"
         ],
         "id": "c3d38a665cd9",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-sec-observatory daily security observatory pos",
         "no_agent": false,
         "prompt": "akc-sec-observatory daily run (kotoba.cloud security observatory blog). SOUL.md を読め (~/.hermes/profiles/akc-sec-observatory/SOUL.md)。要旨: (1) evidence script 出力に REFUSED があったら盲状態を報告して停止。 (2) web_search で過去24-48h の cybersecurity ニュース・重大インシデント・AIモデル動向からテーマを 1 つ選ぶ。 (3) assets/blog/posts.edn に ja+en 分析記事 1 本を append (slug 重複絶対禁止、出典 URL 付き、断定回避)。 (4) topic branch を kotoba-lang/main から新規作成、npm run render を通し gh pr create --repo cloud-kotoba/app-kotoba-cloud。 (5) gh pr comment で検査記録を残し gh pr merge --merge。 (6) merge 後 worktree を kotoba-lang/main に同期し npm run deploy (再試行 1 回まで)。 deploy は npm run deploy を試し、exit 0 でなければ 1 回だけ fallback: npm run render && node scripts/sync-shadow-src.mjs && npx shadow-cljs release browser app research-providers research-authority && npx wrangler deploy --env=\"\" (main の既存 test 失敗 265 は gate 外。render と audit:uiux は自分の変更分が green であること)。。 (7) curl -sI https://kotoba.cloud/blog/ で live 確認し新記事 URL をレポート。 予算 25 API call。1 run = 1 PR。良い題材が無い日は opened no PR で停止 (正常)。main 直 push / force-push 禁止。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "30 2 * * *",
-          "expr": "30 2 * * *",
+          "display": "29 2 * * *",
+          "expr": "29 2 * * *",
           "kind": "cron"
         },
         "script": "akc_sec_observatory_evidence.py",
@@ -360,13 +386,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "6b8b08f58b57",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-trail-ops daily security trail",
         "no_agent": false,
         "prompt": "akc-trail-ops daily run (security trail public data). SOUL.md を読め (/Users/junkawasaki/.hermes/profiles/akc-trail-ops/SOUL.md)。要旨: (1) evidence script 出力の JSON を読む。REFUSED banner なら盲状態を報告して停止。(2) topic branch を kotoba-lang/main (リモート名 kotoba-lang) から新規作成。(3) evidence の dns/ip/kev/nvd から assets/security-data/trail/index.json をschema {version,generatedAt,dns,ip,kev,nvd,analysis} で書く/前日分とマージ (各配列 20 件以内、新しいものが先頭)。analysis は ja/en で当日の最優先パッチ対象を 1 つ、出典 URL 付きで指摘。(4) npm run render → gh pr create --repo cloud-kotoba/app-kotoba-cloud → gh pr comment で検査記録 → gh pr merge --merge。(5) merge 後 fetch+checkout kotoba-lang/main → deploy: npm run deploy を試し exit!=0 なら 1 回だけ fallback (順序严守): npm run render && node scripts/sync-shadow-src.mjs && npx shadow-cljs release browser app research-providers research-authority && npm run audit:uiux && npm run test:worker && npx wrangler deploy --env=\"\" (audit を release より前に走らせると /js/session.js 欠落で HARD assets-resolve 落ち)。curl -s https://kotoba.cloud/security-data/trail/index.json で live 確認。予算 20 API call。1 run = 1 PR。main 直 push/force-push 禁止。evidence が全て空なら opened no PR で停止 (正常系)。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -388,13 +414,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "0ca56e8803e4",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "akc-vm-ops daily evidence + iteration",
         "no_agent": false,
         "prompt": "akc-vm-ops daily iteration (security service VM)\n\nSOUL.md を読め (~/.hermes/profiles/akc-vm-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. 日付 (JST) の偶奇で反復を選ぶ: 偶数日=計測反録 (PR 無しでレポートして停止、「opened no PR」は正常)、\n   奇数日=追加反復。cache/metrics.json の時系列 (first_seen, last_deltas) を使って利用分析をレポートに含める。\n3. 追加反復では証拠から lever を 1 つだけ選ぶ (capability rows / summary copy の充実、\n   header nav・docs page 等のクロスページ surface 追加、/v1 catalog field の深化、finding-schema field doc)。\n   workdir ~/.gftd/worktrees/akc-vm-ops で topic branch を kotoba-lang/main から新規作成\n   (リモート名 kotoba-lang。origin ではない)。修正後 npm run render + 対象テストを通してから\n   gh pr create --repo cloud-kotoba/app-kotoba-cloud。PR は docs/copy/catalog-data レベルのみ。\n   自分の PR は approve できないので gh pr comment で検査記録を残し gh pr merge --merge で merge。\n   merge 後は何も前進させない (west pin advance は自分の仕事ではない)。\n4. 予算: 20 API call 以内に収め、進捗に関わらずレポートして停止。main 直 push 禁止。1 run = 最大 1 PR。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -696,19 +722,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "1a0ebe81d626",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "appstore-catalog-ops catalog daily iteration",
         "no_agent": false,
         "prompt": "You are the appstore-catalog-ops bot. Read SOUL.md (~/.hermes/profiles/appstore-catalog-ops/SOUL.md) first and follow it. Workdir is the dedicated worktree (repo cloud-kotoba/app-kotoba-cloud, remote name kotoba-lang). Procedure: 1. Read the evidence output injected at the top of this run; a REFUSED banner means report blind and stop. 2. If sources.json is missing under assets/appstore-catalog-ops-src/, seed it with 5-10 verified public app-inventory sources (iTunes Search/Lookup, Google Play per-country storefronts, open app-metadata datasets) - each URL fetched NOW, honest layer (primary-fetched / secondary-reported) and access notes. 3. Otherwise pick exactly ONE lever in SOUL priority order (fix DEAD urls / add records / close coverage gap). 4. Fresh topic branch from kotoba-lang/main; gh pr create --repo cloud-kotoba/app-kotoba-cloud; leave the inspection record via gh pr comment; gh pr merge --merge. 5. No change -> report 'opened no PR' with the reason (valid outcome). Limits: finish within 40 API calls; no deploy; never push main; ASCII-only shell command lines; verified_at taken from the date command.",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "40 6 3 * *",
-          "expr": "40 6 3 * *",
+          "display": "44 6 * * *",
+          "expr": "44 6 * * *",
           "kind": "cron"
         },
         "script": "appstore_catalog_ops_evidence.py",
@@ -733,8 +759,8 @@
           "times": null
         },
         "schedule": {
-          "display": "10 10 * * 1",
-          "expr": "10 10 * * 1",
+          "display": "9 10 * * 1",
+          "expr": "9 10 * * 1",
           "kind": "cron"
         },
         "script": "attack_dataset_ops_evidence.py",
@@ -766,26 +792,52 @@
         "workdir": null
       }
     ],
+    "babiniku-support": [
+      {
+        "context_from": null,
+        "deliver": "bot-chat:babiniku-support",
+        "enabled_toolsets": null,
+        "id": "a9ad5d0da0d0",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "mail-inbox-poll",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 15m",
+          "kind": "interval",
+          "minutes": 15
+        },
+        "script": "mail_inbox.sh",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "branch-drain": [
       {
         "context_from": null,
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "86e1107fb102",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "branch-drain tick",
         "no_agent": false,
         "prompt": "あなたは branch-drain bot。~/.hermes/profiles/branch-drain/SOUL.md を最優先で読み、それに従え。この prompt に注入された BRANCH_QUEUE_SCAN_V1 の WORK 行が今回の worklist であり、queue を自分で探してはならない。REFUSED があれば計測不能とだけ報告して止まる。最大 5 件、安い action から、SOUL.md の手順どおりに処理し、各 item を 1 行で報告する。superproject checkout（/Users/junkawasaki/github/com-junkawasaki）では commit も checkout もしない。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "every 120m",
-          "kind": "interval",
-          "minutes": 120
+          "display": "19 3,15 * * *",
+          "expr": "19 3,15 * * *",
+          "kind": "cron"
         },
         "script": "branch_queue_scan.py",
         "skills": [
@@ -848,19 +900,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "cb5399205875",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "chain-catalog-ops catalog daily iteration",
         "no_agent": false,
         "prompt": "You are the chain-catalog-ops bot. Read SOUL.md (~/.hermes/profiles/chain-catalog-ops/SOUL.md) first and follow it. Workdir is the dedicated worktree (repo cloud-kotoba/app-kotoba-cloud, remote name kotoba-lang). Procedure: 1. Read the evidence output injected at the top of this run; a REFUSED banner means report blind and stop. 2. If sources.json is missing under assets/chain-catalog-ops-src/, seed it with 5-10 verified blockchain data sources (explorer APIs, public RPC endpoints, open chain datasets) - each URL fetched NOW, honest layer (primary-fetched / secondary-reported) and access notes. 3. Otherwise pick exactly ONE lever in SOUL priority order (fix DEAD urls / add records / close coverage gap). 4. Fresh topic branch from kotoba-lang/main; gh pr create --repo cloud-kotoba/app-kotoba-cloud; leave the inspection record via gh pr comment; gh pr merge --merge. 5. No change -> report 'opened no PR' with the reason (valid outcome). Limits: finish within 40 API calls; no deploy; never push main; ASCII-only shell command lines; verified_at taken from the date command.",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "10 5 1 * *",
-          "expr": "10 5 1 * *",
+          "display": "14 5 * * *",
+          "expr": "14 5 * * *",
           "kind": "cron"
         },
         "script": "chain_catalog_ops_evidence.py",
@@ -929,17 +981,17 @@
         "monitor_url": null,
         "name": "cloud-kotoba-admin-mktg hourly iteration (marketing surface)",
         "no_agent": false,
-        "prompt": "kotoba-cloud-mktg daily iteration (kotoba.cloud marketing surface)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/kotoba-cloud-mktg/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. cache/metrics.json の last_deltas と SOUL の surface 一覧から lever を 1 つだけ選ぶ。\n   開始時に gh pr list --repo cloud-kotoba/app-kotoba-cloud --state open を読み、in-flight PR と\n   同一領域なら「opened no PR (lever owned by in-flight PR)」と明示して停止。\n3. workdir /Users/junkawasaki/.gftd/worktrees/kotoba-cloud-mktg で topic branch を\n   kotoba-lang/main から新規作成 (リモート名 kotoba-lang。origin ではない)。\n   修正 → npm run render + 対象テスト → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   gh pr comment に検査記録 → gh pr merge --merge。push 前に git fetch kotoba-lang + rebase。\n4. 予算: 12 API call 以内。1 run = 最大 1 PR。main 直 push 禁止。進捗に関わらず予算内なら\n   レポートして停止。何もなければ「opened no PR」+理由で停止 (正常系)。",
+        "prompt": "kotoba-cloud-mktg iteration — CONVERSION PRIORITY (owner direction 2026-09-19: リソースは subscription / 有料ユーザー / credits 購入を増やす活動に集中)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/kotoba-cloud-mktg/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭、2 ブロック) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. lever 選択は CONVERSION 優先 (この順序を上回らないこと):\n   a. /billing / console.kotoba.cloud/billing の checkout・deposit・plan card の離脱要因 (CTA コピー、価格表示、free→paid の導線、自動チャージ opt-in の可視性)\n   b. landing / docs / llms.txt からの有料導線 (「無料枠枯渇後に何を買うか」が LLM にも人間にも一目で伝わるか)\n   c. credits deposit ($10–$1000 自由額, ADR-2609181200) と pack (50/100/500/1000) の訴求\n   d. funnel カウンタ (visitors/signups/signup_completed) を上げる具体的な障害の特定と修正\n   e. 上記 a–d に該当しない SEO/locale 汎用 lever は、in-flight の conversion 系 PR が無いときだけ。\n   cache/metrics.json と cache/metrics-conversion.json の last_deltas から lever を 1 つだけ選ぶ。\n   開始時に gh pr list --repo cloud-kotoba/app-kotoba-cloud --state open を読み、in-flight PR と同一領域なら「opened no PR (lever owned by in-flight PR)」と明示して停止。\n3. workdir /Users/junkawasaki/.gftd/worktrees/kotoba-cloud-mktg で topic branch を kotoba-lang/main から新規作成 (リモート名 kotoba-lang。origin ではない)。\n   修正 → npm run render + 対象テスト → gh pr create --repo cloud-kotoba/app-kotoba-cloud → gh pr comment に検査記録 → gh pr merge --merge。push 前に git fetch kotoba-lang + rebase。\n4. 予算: 12 API call 以内。1 run = 最大 1 PR。main 直 push 禁止。何もなければ「opened no PR」+理由で停止 (正常系)。",
         "provider": "kotoba",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "6 * * * *",
-          "expr": "6 * * * *",
+          "display": "10 */2 * * *",
+          "expr": "10 */2 * * *",
           "kind": "cron"
         },
-        "script": "cloud_kotoba_admin_mktg_evidence.py",
+        "script": "cloud_kotoba_admin_mktg_conversion_evidence.py",
         "skills": [
           "symbol-index"
         ],
@@ -961,14 +1013,14 @@
         "monitor_url": null,
         "name": "cloud-kotoba-admin-sales hourly iteration (catalog data)",
         "no_agent": false,
-        "prompt": "kotoba-cloud-sales daily iteration (kotoba.cloud catalog data)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/kotoba-cloud-sales/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. cache/metrics.json の last_deltas と cross-source-pairs から lever を 1 つだけ選ぶ。\n   開始時に gh pr list --repo cloud-kotoba/app-kotoba-cloud --state open を読み、in-flight PR と\n   同一領域なら「opened no PR (lever owned by in-flight PR)」と明示して停止。\n3. workdir /Users/junkawasaki/.gftd/worktrees/kotoba-cloud-sales で topic branch を\n   kotoba-lang/main から新規作成 (リモート名 kotoba-lang。origin ではない)。\n   該当 build/test (build:compliance-catalog / test:security-data / test:crypto-catalog 等) を\n   通してから gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   gh pr comment に検査記録 → gh pr merge --merge。push 前に git fetch kotoba-lang + rebase。\n4. 予算: 12 API call 以内。1 run = 最大 1 PR。main 直 push 禁止。何もなければ\n   「opened no PR」+理由で停止 (正常系)。",
+        "prompt": "kotoba-cloud-sales iteration — CONVERSION PRIORITY (owner direction 2026-09-19: subscription / 有料ユーザー / credits 購入の増加に直結する work のみ優先)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/kotoba-cloud-sales/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. lever 選択は売上直結のみ: (a) sales-catalog R2 (companies/contacts) からkotoba.cloud の有料購読・credits 購入見込みの事業者リストを抽出・強化し、/compliance /security/services ページの B2B 訴求に反映する、(b) billing/plan/pricing データの正確性 (catalog とサイトの食い違い) を直す、(c) org/team plane (Team plan $150, seats) の導線データ。一般的な catalog 深耕は in-flight の conversion 系作業が無いときだけ。\n   cache/metrics.json の last_deltas と cross-source-pairs から lever を 1 つだけ選ぶ。\n   開始時に gh pr list --repo cloud-kotoba/app-kotoba-cloud --state open を読み、in-flight PR と同一領域なら「opened no PR (lever owned by in-flight PR)」と明示して停止。\n3. workdir /Users/junkawasaki/.gftd/worktrees/kotoba-cloud-sales で topic branch を kotoba-lang/main から新規作成 (リモート名 kotoba-lang。origin ではない)。\n   該当 build/test (build:compliance-catalog / test:security-data / test:crypto-catalog 等) を通してから gh pr create --repo cloud-kotoba/app-kotoba-cloud → gh pr comment に検査記録 → gh pr merge --merge。push 前に git fetch kotoba-lang + rebase。\n4. 予算: 12 API call 以内。1 run = 最大 1 PR。main 直 push 禁止。何もなければ「opened no PR」+理由で停止 (正常系)。",
         "provider": "kotoba",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "18 * * * *",
-          "expr": "18 * * * *",
+          "display": "30 */2 * * *",
+          "expr": "30 */2 * * *",
           "kind": "cron"
         },
         "script": "cloud_kotoba_admin_sales_evidence.py",
@@ -976,6 +1028,30 @@
           "symbol-index"
         ],
         "workdir": "/Users/junkawasaki/.gftd/worktrees/cloud-kotoba-admin-sales"
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "590edb3c23f5",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "sales-catalog-r2-sync",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "40 7 * * *",
+          "expr": "40 7 * * *",
+          "kind": "cron"
+        },
+        "script": "sales-catalog-sync.sh",
+        "skills": null,
+        "workdir": null
       }
     ],
     "codinator": [
@@ -1076,19 +1152,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "4e64c5de72f7",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "crypto-catalog weekly maintenance",
         "no_agent": false,
         "prompt": "あなたは crypto-catalog-maint bot。SOUL.md (~/.hermes/profiles/crypto-catalog-maint/SOUL.md) を最優先で読み、それに従え。ワークディレクトリは ~/.gftd/worktrees/crypto-catalog-maint (repo cloud-kotoba/app-kotoba-cloud, リモート名 kotoba-lang)。\n\n今回の反復:\n1. python3 scripts/crypto_catalog_evidence.py を走らせる (REFUSED が出たら「計測不能」と報告して停止)。すべての source/website/desk URL の生死が出力される。\n2. topic branch を kotoba-lang/main から新規に切る (crypto/catalog-<date>)。\n3. SOUL.md の外科的メンテだけ実施:\n   - DEAD/ERR の URL は代替公式ページを自分で fetch して 200 確認してから置換。直せなければその URL を sources から削除 (sources が空になったレコードは削除)\n   - FSA 登録簿 xlsx の Last-Modified が 2026-08-21 以降に更新されていれば取得し、新規/取消を exchanges.json に反映\n   - 明確な規制変更が分かれば 1-2 点だけ反映\n4. node scripts/build-crypto-catalog.mjs && node test/crypto-catalog.mjs が緑であること (assets/crypto-catalog/ blocks の再生成差分も commit)。\n5. 変更があれば commit して gh pr create --repo cloud-kotoba/app-kotoba-cloud --base main --head <topic branch>。なければ \"opened no PR\" と報告して停止。\n6. 報告: PR URL、件数変化 (exchanges X→Y)、置換/削除した URL とステータス。\n\n制約: API call 上限 300。deploy しない。main 直 push 禁止。force-push 禁止。1 反復 = 1 PR。実データの捏造禁止。fetch せず確認していない URL を載せない。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "20 4 * * 1",
-          "expr": "20 4 * * 1",
+          "display": "28 4 * * *",
+          "expr": "28 4 * * *",
           "kind": "cron"
         },
         "script": "crypto_catalog_evidence.py",
@@ -1108,13 +1184,13 @@
           "web"
         ],
         "id": "5edf888a691b",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "csf2-catalog daily iteration",
         "no_agent": false,
         "prompt": "あなたは csf2-catalog bot。SOUL.md (~/.hermes/profiles/csf2-catalog/SOUL.md) を最優先で読み、それに従え。ワークディレクトリは ~/.gftd/worktrees/csf2-catalog (repo cloud-kotoba/app-kotoba-cloud, リモート名は kotoba-lang)。\n\n今回の反復:\n1. python3 scripts/csf2_evidence.py を走らせる (REFUSED が出たら「計測不能」と報告して停止)。\n2. evidence 出力で反復種別を決める: 偶数日 = 成熟度反復 (coverage 計測 + docs/research/csf2/maturity.md 追記 + 出典 URL 死活 3-5 件)、奇数日 = 拡張反復 (薄いカテゴリ THIN_CATEGORIES を優先して実在製品を 1-3 件追加、product/source 必須)。\n3. topic branch を kotoba-lang/main から新規に切る (research/csf2-<date>)。\n4. 変更したら node scripts/build-csf2-catalog.mjs でデータ再生成し、node test/csf2-catalog.mjs が green になること。\n5. 変更が 1 行でもあれば commit して gh pr create --repo cloud-kotoba/app-kotoba-cloud --base main。変更なければ \"opened no PR\" と報告して停止。\n6. 報告: PR URL、反復種別、coverage 変化 (covered/106)、テスト結果、確認した出典 URL とステータス。\n\n制約: API call 上限 300。deploy しない。main 直 push 禁止。force-push 禁止。1 反復 = 1 PR。CSF 2.0 コードは evidence 出力の subcategories にあるものだけ使える (DE.CM-05, PR.DS-03..09 などは存在しない)。実データの捏造禁止。PR は gh pr create で出す (gh pr list ではなく、leaf repo は独立)。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -1147,8 +1223,8 @@
           "times": null
         },
         "schedule": {
-          "display": "30 10 * * 3",
-          "expr": "30 10 * * 3",
+          "display": "29 10 * * 3",
+          "expr": "29 10 * * 3",
           "kind": "cron"
         },
         "script": "cwe_dataset_ops_evidence.py",
@@ -1253,145 +1329,25 @@
     "default": [
       {
         "context_from": null,
-        "deliver": "local",
+        "deliver": "bot-chat",
         "enabled_toolsets": null,
-        "id": "a35f0e176e0c",
+        "id": "8146d3e6924d",
         "model": null,
         "monitor_script": null,
         "monitor_url": null,
-        "name": "orgbrain-publish",
-        "no_agent": true,
-        "prompt": "(script-only mechanical sync — no agent turn expected)",
-        "provider": null,
-        "repeat": {
-          "times": null
-        },
-        "schedule": {
-          "display": "35 5,17 * * *",
-          "expr": "35 5,17 * * *",
-          "kind": "cron"
-        },
-        "script": "orgbrain-publish.sh",
-        "skills": null,
-        "workdir": null
-      },
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "758a68bdc279",
-        "model": null,
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "sales-catalog-r2-sync",
-        "no_agent": true,
-        "prompt": "mechanical sales catalog sync (no_agent; the script is the whole job)",
-        "provider": null,
-        "repeat": {
-          "times": null
-        },
-        "schedule": {
-          "display": "40 7 * * *",
-          "expr": "40 7 * * *",
-          "kind": "cron"
-        },
-        "script": "sales-catalog-sync.sh",
-        "skills": null,
-        "workdir": null
-      },
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "eaedfb5470ba",
-        "model": null,
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "nvd-dataset-r2-sync",
-        "no_agent": true,
-        "prompt": "mechanical NVD full-dataset sync (no_agent; the script is the whole job)",
-        "provider": null,
-        "repeat": {
-          "times": null
-        },
-        "schedule": {
-          "display": "20 8 * * *",
-          "expr": "20 8 * * *",
-          "kind": "cron"
-        },
-        "script": "nvd-dataset-sync.sh",
-        "skills": null,
-        "workdir": null
-      },
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "7eaa850af2b9",
-        "model": null,
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "nvd-coverage-finisher",
+        "name": "bots-organize",
         "no_agent": false,
-        "prompt": "Read /Users/junkawasaki/nvd-dataset/LANDING-NOTES.md and finish the NVD open-data landing end-to-end. Steps: (0) FIRST, if pgrep -f 'fetch_nvd.py|nvd-dataset-sync.sh' shows the 08:20 incr sync running, poll every 3 min until it exits (max 45 min) — never verify or write while it runs. (1) Confirm /tmp/nvd-pipeline.log's LAST publish/iceberg block ends with PUBLISH-EXIT=0 ICEBERG-EXIT=0 (there may be an older 'MASTER DONE' line plus tonight's blocks). If the full fetch hasn't even produced MASTER DONE yet, just report current status from /tmp/nvd-fetch.log / /tmp/nvd-pipeline.log and STOP (no destructive action). (2) Verify curl -sf https://data.kotoba.cloud/ returns catalog JSON with nonzero datasets.nvd.totalRows (~390k+), and Iceberg table security.nvd_cve readback count matches (~/venvs/iceberg/bin/python pyiceberg, account 4da882dc30d9ee257f319d3c33ecf0, warehouse ACCOUNT_internal-security-nvd, namespace security, table nvd_cve). (3) In a FRESH worktree off origin/main of kotoba-lang/app-kotoba-cloud (do NOT use ~/.gftd/worktrees/akc-trail-ops; create your own to avoid racing the 05:52 akc-trail-ops bot): implement the two edits described in LANDING-NOTES.md step 3 (coverage.nvd in scripts/build-security-data.mjs fetched at render time via AbortSignal.timeout, try/catch omitting coverage.nvd on failure, and the nvd-open-data entry in apps_site.cljk). node --check the mjs; npm run build; npm run audit:uiux; npm run test:worker; npm run test:workerd (site-test ~250 baseline failures are pre-existing — gate on ZERO NEW failures by name). Commit, push, open PR against main, squash-merge via gh api PUT pulls/<n>/merge, deploy from an origin/main-inclusive checkout: node scripts/sync-shadow-src.mjs && CLOUDFLARE_ACCOUNT_ID=4da882dc30d9ee257f319d3c33ecf0 npx wrangler deploy --env=\"\" (4) Live verify: kotoba.cloud/security-data/index.json coverage.nvd matches the data host total; ranged GET on /nvd/parquet/nvd_cve_2024.parquet returns 206; https://data.kotoba.cloud/ returns 200. Report exact totals and the PR number.",
+        "prompt": "Fleet organize sweep (read-only, report only). 1) Compare 'hermes profile list' with every profiles/*/cron/jobs.json: report orphan crons (profile deleted, job file remains), unexpectedly paused jobs, and new tombstones in profiles/.deleted/. 2) For each star-support mail bot, check last cron run status for repeated failures. 3) Note disk free if under 20GB. Reply max 6 short lines; if all healthy reply exactly: fleet ok. Do NOT change or delete anything - propose fixes as one-line suggestions.",
         "provider": null,
         "repeat": {
-          "times": 1
+          "times": null
         },
         "schedule": {
-          "display": "once at 2026-09-17 08:40",
-          "kind": "once",
-          "run_at": "2026-09-17T08:40:00+09:00"
+          "display": "9 6 * * *",
+          "expr": "9 6 * * *",
+          "kind": "cron"
         },
         "script": null,
-        "skills": null,
-        "workdir": null
-      },
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "b9b88d9ecda6",
-        "model": null,
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "mail-poll-agentmail",
-        "no_agent": true,
-        "prompt": "",
-        "provider": null,
-        "repeat": {
-          "times": null
-        },
-        "schedule": {
-          "display": "every 60m",
-          "kind": "interval",
-          "minutes": 60
-        },
-        "script": "mail_poll.sh",
-        "skills": null,
-        "workdir": null
-      },
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "e32a601c084e",
-        "model": null,
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "osint-catalog-sync",
-        "no_agent": true,
-        "prompt": "mechanical osint catalog collection + R2 Data Catalog publish (no_agent; the script is the whole job)",
-        "provider": null,
-        "repeat": {
-          "times": null
-        },
-        "schedule": {
-          "display": "5 4 5 * *",
-          "expr": "5 4 5 * *",
-          "kind": "cron"
-        },
-        "script": "osint-catalog-sync.sh",
         "skills": null,
         "workdir": null
       }
@@ -1429,19 +1385,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "f4db9e7069b3",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "mac disk maintenance",
         "no_agent": false,
         "prompt": "Read SOUL.md (~/.hermes/profiles/disk-maintenance/SOUL.md) and follow it. Steps: 1) python3 ~/.hermes/profiles/disk-maintenance/scripts/disk_maintenance_evidence.py — measure. 2) If free_pct < 15: python3 ~/.hermes/profiles/disk-maintenance/scripts/disk_clean_safe.py — whitelist-only cleanup script (do NOT invent your own rm commands; they will be denied). 3) Re-run the evidence script and report before/after free_gb with the cleanup report. If free_pct >= 15: report numbers and stop (valid outcome). Never touch ~/Downloads, ~/Documents, ~/Desktop, ~/github, ~/.gftd, ~/.itonami, ~/.Trash, credentials. Finish within 10 API calls and stop.",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "50 * * * *",
-          "expr": "50 * * * *",
+          "display": "49 * * * *",
+          "expr": "49 * * * *",
           "kind": "cron"
         },
         "script": "disk_maintenance_evidence.py",
@@ -1575,19 +1531,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "5832d6f1ba7c",
-        "model": null,
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "el-case-ops mail-drop watchdog (EL litigation)",
         "no_agent": false,
         "prompt": "el-case-ops mail-drop watchdog (EL litigation)",
-        "provider": null,
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "30 6 * * *",
-          "expr": "30 6 * * *",
+          "display": "29 6 * * *",
+          "expr": "29 6 * * *",
           "kind": "cron"
         },
         "script": "el_case_ops_evidence.py",
@@ -1627,13 +1583,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "e5685e2d145a",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "fake-report-maint-tick",
         "no_agent": false,
         "prompt": "fake-report-maint bot. SOUL.md wo yomi, ADR-2609141800 no genzaichi wo hakatte kara, tsugi no 1 hanketsu (saidai 1 PR) wo suikoku seyo. superproject /Users/junkawasaki/github/com-junkawasaki no 90-docs/adr/2609141800-*.kotoba ga seihon. WIP wo kowasanai. test midori + PR de chakuchi. dousa siteinai mono wo kansei to hokoku shinai.",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -1961,13 +1917,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "9d75f407c245",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "git-cleanup-ops fleet local cleanup (runbook)",
         "no_agent": false,
         "prompt": "You are git-cleanup-ops. FIRST read /Users/junkawasaki/.hermes/profiles/git-cleanup-ops/SOUL.md and obey it exactly; it is your whole charter (local-side cleanup of the com-junkawasaki west workspace per manifest/cleanup-workflow.edn). The GIT_CLEANUP_OPS_INVENTORY_V1 injected above was measured for you this run - do not re-discover the queue. Budget: finish within 25 tool calls / 30 min, then report and stop. If REFUSED-ALL: report 'measurement not possible' and stop. If REFUSED <phase>: skip that phase only. Work: at most 3 retirement items (stash/branch via git_cleanup_retire.py archive-then-drop; classification = content containment per SOUL) OR one land batch (kbb --backend sci scripts/cleanup-land.cljk --apply --names a,b,c with <=3 repos). Never fleet-wide west update. Never run git stash drop / git branch -D / rm directly (headless denies; use the retire script). The superproject dirty entries and FF-MERGE-BLOCKED are owner work: report only. routine/*, git-annex, main, worktree-in-use branches: never delete. west-orphan exit 2 = could not ask GitHub: report, do nothing. Remote PR/branch disposition belongs to pr-drain / branch-drain: do not touch. End with the SOUL report format: actions + archive paths, PR URLs, untouched WORK rows count, phases not measured, remaining stash/branch counts. 'opened no PR' is a valid outcome.",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -2465,13 +2421,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "5b62293bd366",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "ip-catalog-ops catalog daily iteration",
         "no_agent": false,
         "prompt": "You are the ip-catalog-ops bot. Read SOUL.md (~/.hermes/profiles/ip-catalog-ops/SOUL.md) first and follow it. Workdir is the dedicated worktree (repo cloud-kotoba/app-kotoba-cloud, remote name kotoba-lang). Procedure: 1. Read the evidence output injected at the top of this run; a REFUSED banner means report blind and stop. 2. If sources.json is missing under assets/ip-catalog-ops-src/, seed it with 5-10 verified IP/ASN/geo/RIR-WHOIS sources (RIR delegation stats files, RDAP endpoints, geofeeds, open geo datasets) - each URL fetched NOW, honest layer (primary-fetched / secondary-reported) and access notes. 3. Otherwise pick exactly ONE lever in SOUL priority order (fix DEAD urls / add records / close coverage gap). 4. Fresh topic branch from kotoba-lang/main; gh pr create --repo cloud-kotoba/app-kotoba-cloud; leave the inspection record via gh pr comment; gh pr merge --merge. 5. No change -> report 'opened no PR' with the reason (valid outcome). Limits: finish within 40 API calls; no deploy; never push main; ASCII-only shell command lines; verified_at taken from the date command.",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -2505,6 +2461,32 @@
           "kind": "cron"
         },
         "script": null,
+        "skills": null,
+        "workdir": null
+      }
+    ],
+    "isekai-support": [
+      {
+        "context_from": null,
+        "deliver": "bot-chat:isekai-support",
+        "enabled_toolsets": null,
+        "id": "258bec4ac375",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "mail-inbox-poll",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 15m",
+          "kind": "interval",
+          "minutes": 15
+        },
+        "script": "mail_inbox.sh",
         "skills": null,
         "workdir": null
       }
@@ -3723,6 +3705,32 @@
         "workdir": "/Users/junkawasaki/.gftd/bots/itonami"
       }
     ],
+    "itonami-support": [
+      {
+        "context_from": null,
+        "deliver": "bot-chat:itonami-support",
+        "enabled_toolsets": null,
+        "id": "5d9b283c68f3",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "mail-inbox-poll",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 15m",
+          "kind": "interval",
+          "minutes": 15
+        },
+        "script": "mail_inbox.sh",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "itonami-winfix": [
       {
         "context_from": null,
@@ -4015,19 +4023,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "aceade2482ae",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "kotoba-auth-ops daily evidence + fix iteration",
         "no_agent": false,
         "prompt": "kotoba-auth-ops daily evidence + fix iteration\n\nSOUL.md を読め (~/.hermes/profiles/kotoba-auth-ops/SOUL.md)。実行手順:\n1. まず evidence script の出力 (この run の冒頭にある) を読み、live 状態を記録する。\n2. 日付の偶奇で反復を選ぶ: 偶数日=計測反復 (PR 無しでレポートのみ)、奇数日=修正反復。\n3. 修正反復では SOUL.md の既知問題リストの上から 1 件だけに着手。\n   topic branch (origin/main から新規作成) → 修正 → shadow-cljs release + test:worker\n   検証 → 1 PR。main 直 push 禁止。\n4. 25 API call 以内に収め、進捗に関わらずレポートして停止。\n5. wrangler deploy で activate が必要な場合は `wrangler versions deploy <VID> --yes` を使う。\n   deploy 前に `npx wrangler deployments status` で他 agent の上書きがないか確認。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "50 3 * * *",
-          "expr": "50 3 * * *",
+          "display": "35 3 * * *",
+          "expr": "35 3 * * *",
           "kind": "cron"
         },
         "script": "kotoba_auth_ops_evidence.py",
@@ -4058,8 +4066,8 @@
           "times": null
         },
         "schedule": {
-          "display": "40 4 * * 2",
-          "expr": "40 4 * * 2",
+          "display": "44 4 * * 1",
+          "expr": "44 4 * * 1",
           "kind": "cron"
         },
         "script": "kotoba_docs_evidence.py",
@@ -4153,6 +4161,32 @@
         "workdir": "/Users/junkawasaki/.gftd/worktrees/kotoba-cloud-sales"
       }
     ],
+    "kotoba-cloud-support": [
+      {
+        "context_from": null,
+        "deliver": "bot-chat:kotoba-cloud-support",
+        "enabled_toolsets": null,
+        "id": "f7ce4f53dd92",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "mail-inbox-poll",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 15m",
+          "kind": "interval",
+          "minutes": 15
+        },
+        "script": "mail_inbox.sh",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "kotoba-dispatch-followup": [
       {
         "context_from": null,
@@ -4203,6 +4237,32 @@
         "script": null,
         "skills": null,
         "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/amu"
+      }
+    ],
+    "kotoba-lang-support": [
+      {
+        "context_from": null,
+        "deliver": "bot-chat:kotoba-lang-support",
+        "enabled_toolsets": null,
+        "id": "d6706dcbe0cd",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "mail-inbox-poll",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 15m",
+          "kind": "interval",
+          "minutes": 15
+        },
+        "script": "mail_inbox.sh",
+        "skills": null,
+        "workdir": null
       }
     ],
     "kotoba-maint": [
@@ -4267,19 +4327,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "da76bc763e74",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "kotoba-pep-maint weekly maintenance",
         "no_agent": false,
         "prompt": "あなたは kotoba-pep-maint bot。SOUL.md (~/.hermes/profiles/kotoba-pep-maint/SOUL.md) を最優先で読み、それに従え。ワークディレクトリは ~/.gftd/worktrees/kotoba-pep-maint (repo cloud-kotoba/app-kotoba-cloud、fetch リモート名は kotoba-lang)。\n\n今回の反復:\n1. python3 scripts/kotoba_pep_evidence.py を走らせる (REFUSED が出たら「計測不能」と報告して停止)。\n2. 日付が偶数日なら計測反復: MISMATCH 一覧を報告して終了 (PR なしでよい)。奇数日なら追加反復: MISMATCH のうち最初の 1〜2 件だけ外科的に修正。\n   - /security-data/pep/ が無い件の正しい整備形: scripts/build-security-data.mjs のパターンに従う小規模な pep builder 追加 (jp_shugiin 等の bounded な upstream dataset を names.txt/entities.ftm.json から正規化し、既存 corpus を壊さない)。OpenSanctions 全量 (925MB) を commit しない。\n   - ADR の CC BY 記述は実ライセンス CC BY-NC 4.0 に docs 側を合わせる (コードは変えない)。\n   - OpenSanctions の URL は必ず index.json の resources[].url から取得 (version suffix 変動、ハードコード禁止)。\n3. topic branch を kotoba-lang/main から新規に切る (pep/kotoba-pep-maint-<date>)。\n4. 変更があれば commit して gh pr create --repo cloud-kotoba/app-kotoba-cloud (head は topic branch)。MISMATCH ゼロなら \"opened no PR\" と報告して停止。\n5. 報告: PR URL、修正 MISMATCH、残件数。\n\n制約: API call 上限 30。deploy しない。main 直 push 禁止。force-push 禁止。1 反復 = 1 PR。実データ捏造禁止。新規/修正 URL は PR 前に curl で 200 確認。OpenSanctions は CC BY-NC 4.0 (non-commercial) であることを明記。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "30 4 * * 4",
-          "expr": "30 4 * * 4",
+          "display": "26 4 * * 1",
+          "expr": "26 4 * * 1",
           "kind": "cron"
         },
         "script": "kotoba_pep_evidence.py",
@@ -4299,13 +4359,13 @@
           "web"
         ],
         "id": "eb3873c027e3",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "kotoba-proof-ops daily iteration",
         "no_agent": false,
         "prompt": "kotoba-proof-ops daily iteration (criminal-investigation support DB + face tracker)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/kotoba-proof-ops/SOUL.md)。実行手順:\n1. evidence script 出力 (この run 冒頭) を読む。REFUSED banner なら PR が出ず盲状態を報告して停止。\n2. JST 日付の偶奇: 偶数日=計測のみレポート (opened no PR 可=正常)、奇数日=実装反復。\n   cache/metrics.json の時系列 (days, banner, gateway-submit-registered) を利用分析に含める。\n3. 実装反復では SOUL の残タスク順から次の 1 レバーだけ進める:\n   (1) research_gateway.cljk allow-list へ /v1/research/ekyc/kotoba-proof/submit 登録\n   (2) mobile NFC capture shell (ICAO chip SOD + DG1/DG5/DG11/DG12)\n   (3) CSCA/DSC master-list bundle + 週次 refresh\n   (4) Modal face/liveness service (layer-2, cloud-murakumo deploy/face-service/)\n   worktree ~/.gftd/worktrees/kotoba-proof-ops で topic branch を kotoba-lang/main から\n   新規作成 (リモート名 kotoba-lang。origin ではない)。push 前に git fetch kotoba-lang + rebase。\n   検証は nbb/sci 系なら kbb --backend sci。shadow-cljs は build/shadow-src/ コピーを読む\n   — 編集後は node scripts/sync-shadow-src.mjs で同期してから compile。\n   npm run render + 対象テスト green -> gh pr create --repo cloud-kotoba/app-kotoba-cloud ->\n   gh pr comment で検査記録 -> gh pr merge --merge。main 直 push/force-push 禁止。\n4. 予算: 20 API call 以内。進捗に関わらず最後はレポートして停止。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -4405,13 +4465,13 @@
           "web"
         ],
         "id": "a742bf9b792c",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "kotoba-vuln-eval daily vulnerability assessment",
         "no_agent": false,
         "prompt": "kotoba-vuln-eval daily vulnerability assessment\n\nSOUL.md を読め (~/.hermes/profiles/kotoba-vuln-eval/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. 計測事实から評価対象を 1 領域だけ選ぶ (優先順位: behind が大きい repo > pin 停滞 repo > live 面)。\n   現在 known: ayatori pin behind≈120, amu behind≈14, kotoba pin fresh。\n   観点: パーサ安全 (再帰/reader 上限)、deps.edn git/sha ピン停滞、live 面の 404/リダイレクト/CSP。\n3. 結果は cache/metrics.json の時系列と突き合わせてレポート。app-kotoba-cloud 面の修正のみ PR 化:\n   workdir で topic branch を kotoba-lang/main から新規作成 (リモート名 kotoba-lang、origin ではない)。\n   検証 (npx shadow-cljs compile 或いは対象テスト) を通してから gh pr create --repo cloud-kotoba/app-kotoba-cloud。\n   PR は docs/評価レポート/テスト追加レベルのみ。機能実装はしない。\n   自分の PR は approve できないので gh pr comment で検査記録を残し gh pr merge --merge で merge。\n4. 予算: 20 API call 以内。進捗に関わらずレポートして停止。main 直 push 禁止。1 run = 最大 1 PR。\n   「opened no PR」(評価のみ / 対象ゼロ) は正常系。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -4575,6 +4635,32 @@
         "workdir": null
       }
     ],
+    "kotobase-support": [
+      {
+        "context_from": null,
+        "deliver": "bot-chat:kotobase-support",
+        "enabled_toolsets": null,
+        "id": "14489fb6de37",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "mail-inbox-poll",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 15m",
+          "kind": "interval",
+          "minutes": 15
+        },
+        "script": "mail_inbox.sh",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "kotobase-webdesign": [
       {
         "context_from": null,
@@ -4729,13 +4815,13 @@
           "web"
         ],
         "id": "1bc412c12516",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "legal-catalog-ops daily iteration (legal-data cata",
         "no_agent": false,
         "prompt": "legal-catalog-ops daily iteration (legal-data catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/legal-catalog-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起点) -> build (node scripts/build-legal-catalog.mjs) -> test:legal-catalog -> render -> shadow release -> audit:uiux 検証 -> gh pr create --repo cloud-kotoba/app-kotoba-cloud -> 自己検査 comment -> gh pr merge --merge まで。not mergeable なら fetch+rebase+push して再試行。何も足すことがなければ 'opened no PR' と理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/legal-catalog-ops。リモート名は kotoba-lang。20 API call 予算。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -5151,19 +5237,19 @@
           "web"
         ],
         "id": "23bd7fe1c75d",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "mhri-research weekly maintenance",
         "no_agent": false,
         "prompt": "あなたは mhri-research bot。SOUL.md (~/.hermes/profiles/mhri-research/SOUL.md) を最優先で読み、それに従え。ワークディレクトリは ~/.gftd/worktrees/mhri-research (repo cloud-kotoba/app-kotoba-cloud)。\n\n今回の反復:\n1. python3 scripts/mhri_evidence.py を走らせる (REFUSED が出たら「計測不能」と報告して停止)。\n2. topic branch を kotoba-lang/main から新規に切る (research/mhri-<date>)。\n3. docs/research/mhri/report.md を外科的に更新するだけ:\n   - 出典 URL の生死を evidence script 出力で確認し、死んでいる URL は代替を探して置換\n   - AA Intelligence Index の version 表記 / FLI edition / METR 最新レポートへの追従を 1-2 点だけ\n   - wholesale 再生成禁止。既存の構造・重み (0.4/0.3/0.3) を勝手に変えない\n4. 変更が 1 行でもあれば commit して gh pr create --repo cloud-kotoba/app-kotoba-cloud (head は topic branch)。変更なければ \"opened no PR\" と報告して停止。\n5. 報告: PR URL、変更点、検証した出典 URL とステータス。\n\n制約: API call 上限 300。deploy しない。main 直 push 禁止。force-push 禁止。1 反復 = 1 PR。実データの捏造禁止。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "30 4 * * 2",
-          "expr": "30 4 * * 2",
+          "display": "38 4 * * 1",
+          "expr": "38 4 * * 1",
           "kind": "cron"
         },
         "script": "scripts/mhri_evidence.py",
@@ -5459,6 +5545,32 @@
         "workdir": null
       }
     ],
+    "murakumo-support": [
+      {
+        "context_from": null,
+        "deliver": "bot-chat:murakumo-support",
+        "enabled_toolsets": null,
+        "id": "ef2e97e9c58d",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "mail-inbox-poll",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 15m",
+          "kind": "interval",
+          "minutes": 15
+        },
+        "script": "mail_inbox.sh",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "murakumo-tier-routing": [
       {
         "context_from": null,
@@ -5647,6 +5759,58 @@
         "workdir": "/Users/junkawasaki/github/com-junkawasaki/orgs/cloud-kotoba/kotobase-docs"
       }
     ],
+    "nvd-dataset-ops": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "db86ac7da5f2",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "nvd-dataset-r2-sync",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "20 8 * * *",
+          "expr": "20 8 * * *",
+          "kind": "cron"
+        },
+        "script": "nvd-dataset-sync.sh",
+        "skills": null,
+        "workdir": null
+      }
+    ],
+    "openrouter-gates": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "f2b42e3d5ab8",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "gate-scan",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "every 1440m",
+          "kind": "interval",
+          "minutes": 1440
+        },
+        "script": "gate_scan.py",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "oppai-gen": [
       {
         "context_from": null,
@@ -5771,13 +5935,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "1a329082bc42",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "orgbrain-maint daily tick",
         "no_agent": false,
         "prompt": "orgbrain-maint bot. SOUL.md (~/.hermes/profiles/orgbrain-maint/SOUL.md) wo saiyuu-sen de yomi, sono tesugi ni shitagae. mazu python3 ~/.hermes/profiles/orgbrain-maint/scripts/orgbrain_evidence.py wo hasira (REFUSED deta ra 'keisoku fukano' to houkoku shite teishi). honjitsu no hanpatsu shurui wa script no 'iteration' kara kimeru (measure = keisoku / extend = kakuchou 1 process). worktree wa ~/.gftd/worktrees/orgbrain, remote wa kotoba-lang. topic branch wa kotoba-lang/main kara shinkini kiru. 1 hanpatsu = saidai 1 PR. API call jougen 250. test green dake ga chakuchi jouken. 'opened no PR' wa seijoukei. deploy shinai. main chokusetsu push kinshi. force-push kinshi.",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -5791,6 +5955,30 @@
           "symbol-index"
         ],
         "workdir": "/Users/junkawasaki/.gftd/worktrees/orgbrain"
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "2e59714ea0a8",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "orgbrain-publish",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "35 5,17 * * *",
+          "expr": "35 5,17 * * *",
+          "kind": "cron"
+        },
+        "script": "orgbrain-publish.sh",
+        "skills": null,
+        "workdir": null
       }
     ],
     "oriru": [
@@ -5835,6 +6023,32 @@
           "kind": "cron"
         },
         "script": null,
+        "skills": null,
+        "workdir": null
+      }
+    ],
+    "osint-catalog-ops": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "8aa8de406c7a",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "osint-catalog-sync",
+        "no_agent": true,
+        "prompt": "",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "5 4 5 * *",
+          "expr": "5 4 5 * *",
+          "kind": "cron"
+        },
+        "script": "osint-catalog-sync.sh",
         "skills": null,
         "workdir": null
       }
@@ -6049,26 +6263,52 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "fe323bd36793",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "pr-drain tick",
         "no_agent": false,
         "prompt": "あなたは pr-drain bot。~/.hermes/profiles/pr-drain/SOUL.md を最優先で読み、それに従え。この prompt に注入された PR_QUEUE_SCAN_V1 の WORK 行が今回の worklist であり、queue を自分で探してはならない。REFUSED があれば計測不能とだけ報告して止まる。最大 5 件、安い action から、SOUL.md の disposition 規則どおりに処理し（close は必ず comment 付き、code は test 実行数 N>0 の緑だけ merge）、各 item を 1 行で報告する。superproject checkout（/Users/junkawasaki/github/com-junkawasaki）では commit も checkout もしない。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "every 180m",
-          "kind": "interval",
-          "minutes": 180
+          "display": "0 3,11 * * *",
+          "expr": "0 3,11 * * *",
+          "kind": "cron"
         },
         "script": "pr_drain_scan.py",
         "skills": [
           "symbol-index"
         ],
         "workdir": "/Users/junkawasaki/github/com-junkawasaki"
+      }
+    ],
+    "pwned-dataset-ops": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "6d8c8d7d89bb",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "pwned-dataset-sync",
+        "no_agent": true,
+        "prompt": "pwned sync (HIBP public breach corpus -> R2 pwned/, script-only no_agent)",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "40 6 4 * *",
+          "expr": "40 6 4 * *",
+          "kind": "cron"
+        },
+        "script": "pwned_dataset_ops_evidence.py",
+        "skills": null,
+        "workdir": null
       }
     ],
     "rasen-genome": [
@@ -6171,13 +6411,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "6e581642543f",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "root-repo secops weekly maintenance",
         "no_agent": false,
         "prompt": "root-repo secops weekly maintenance\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/root-sec-maint/SOUL.md)。実行手順:\n1. 冒頭の evidence script 出力を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の lever 規則から 1 つだけ選ぶ。全 CLEAN なら PR を出さず「開いた PR なし」で正常終了してよい。\n3. topic branch を origin/main から切る (worktree: /Users/junkawasaki/.gftd/worktrees/root-sec-maint)。編集 → commit → gh pr create --repo com-junkawasaki/root → 検証結果を gh pr comment → gh pr merge --merge。push 競合は fetch + merge origin/main を 2-3 回 (rebase 禁止)。\n4. secret の値をどこにも出力しない (ファイル名・変数名・長さまで)。履歴書き換え一切禁止。ローテートが必要なら PR 本文に人間への要求として書け。\n5. API call budget ≤ 30。超過するなら途中報告して停止。1 run = 1 PR。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6603,13 +6843,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "210252f7b2cb",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "social-catalog weekly maintenance",
         "no_agent": false,
         "prompt": "social-catalog weekly maintenance\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/social-catalog-maint/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の lever 規則から 1 つだけ選び、topic branch (origin/main 起点) で編集。\n3. catalog を編集したら nbb で cljs.reader が通ることを確認してから commit・gh pr create --repo com-junkawasaki/root・検査 comment を残して gh pr merge --merge。\n4. マージ後 worktree を再同期し python3 ~/.hermes/profiles/social-catalog-maint/scripts/sync_catalog_r2.py を実行、READBACK MATCH を確認。\n5. 変化がなければ「opened no PR」で正常終了。API calls ≤ 30 を超えたら途中報告で停止。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6633,13 +6873,13 @@
           "web"
         ],
         "id": "d834dd40d54a",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "sousa-ontology",
         "no_agent": false,
         "prompt": "あなたは sousa-ontology bot。SOUL.md (~/.hermes/profiles/sousa-ontology/SOUL.md) を最優先で読み、それに従え。ワークディレクトリは ~/.gftd/worktrees/sousa-ontology (repo cloud-kotoba/app-kotoba-cloud)。\n\n今回の反復:\n1. まず SOUL.md と既存コード (src/app_kotoba_cloud/worker.cljk, chain_facts.cljk, test/ 配下, test_runner) を読んで様式を把握する。\n2. topic branch を kotoba-lang/main から新規に切る (sousa/ontology-<date>)。\n3. src/app_kotoba_cloud/sousa.cljk を新規作成: 事件/被害者/容疑者/証拠/手続き のオントロジースキーマ (entity defs, 関係, 状態遷移), 検証関数, 最小クエリ関数。実データは入れない (サンプルのみ)。\n4. 対応する test ns を追加し、test_runner にも登録。\n5. .cljk 追加後は .cljk→.cljc symlink shim を再生成 (skill kotoba-cloud-deploy 手順)。\n6. npm run test:worker を緑にする (deps.edn は一時変更のみ、commit しない)。\n7. gh pr create --repo cloud-kotoba/app-kotoba-cloud --title \"sousa: investigation-support ontology schema (sousa.cljk)\" で PR。\n8. 報告: PR URL、テスト結果、次の反復でやること。\n\n制約: API call 上限 500、反復を大きく進めてよい。deploy しない。1 PR。実データ禁止。PR が出せなければ \"opened no PR\" と報告して停止。",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6825,13 +7065,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "23e86d2ba662",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-awareness daily iteration (Trend Micro catalog",
         "no_agent": false,
         "prompt": "tm-awareness daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-awareness/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-awareness。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6857,13 +7097,13 @@
           "web"
         ],
         "id": "2b9ccf09ec7c",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-container-sec daily iteration (Trend Micro cata",
         "no_agent": false,
         "prompt": "tm-container-sec daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-container-sec/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-container-sec。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6885,13 +7125,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "943555523447",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-data-sec daily iteration (Trend Micro catalog c",
         "no_agent": false,
         "prompt": "tm-data-sec daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-data-sec/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-data-sec。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6917,13 +7157,13 @@
           "web"
         ],
         "id": "fea10fb38ab9",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-ddi-xdr daily iteration (Trend Micro catalog co",
         "no_agent": false,
         "prompt": "tm-ddi-xdr daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-ddi-xdr/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-ddi-xdr。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6949,13 +7189,13 @@
           "web"
         ],
         "id": "179008fe75e4",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-file-sec daily iteration (Trend Micro catalog c",
         "no_agent": false,
         "prompt": "tm-file-sec daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-file-sec/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-file-sec。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -6981,13 +7221,13 @@
           "web"
         ],
         "id": "48c65c885c88",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-identity-sec daily iteration (Trend Micro catal",
         "no_agent": false,
         "prompt": "tm-identity-sec daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-identity-sec/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-identity-sec。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7009,19 +7249,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "1eb73b0934cb",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-idp daily iteration (Trend Micro catalog covera",
         "no_agent": false,
         "prompt": "tm-idp daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-idp/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-idp。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "30 4 * * *",
-          "expr": "30 4 * * *",
+          "display": "29 4 * * *",
+          "expr": "29 4 * * *",
           "kind": "cron"
         },
         "script": "tm_idp_evidence.py",
@@ -7037,13 +7277,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "f1221dc75420",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-ot-sec daily iteration (Trend Micro catalog cov",
         "no_agent": false,
         "prompt": "tm-ot-sec daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-ot-sec/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-ot-sec。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7065,13 +7305,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "d827154bc341",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-pwmgr daily iteration (Trend Micro catalog cove",
         "no_agent": false,
         "prompt": "tm-pwmgr daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-pwmgr/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-pwmgr。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7093,13 +7333,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "6ecabb8c562b",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-secops daily iteration (Trend Micro catalog cov",
         "no_agent": false,
         "prompt": "tm-secops daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-secops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-secops。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7121,13 +7361,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "cbaa539f2938",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-threat-intel daily iteration (Trend Micro catal",
         "no_agent": false,
         "prompt": "tm-threat-intel daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-threat-intel/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-threat-intel。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7153,13 +7393,13 @@
           "web"
         ],
         "id": "d25438d7be67",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-tippingpoint daily iteration (Trend Micro catal",
         "no_agent": false,
         "prompt": "tm-tippingpoint daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-tippingpoint/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-tippingpoint。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7181,13 +7421,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "e1b89c2715ba",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-vb-cloud daily iteration (Trend Micro catalog c",
         "no_agent": false,
         "prompt": "tm-vb-cloud daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-vb-cloud/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-vb-cloud。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7209,13 +7449,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "9ba95cf4f67e",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-vb-mac daily iteration (Trend Micro catalog cov",
         "no_agent": false,
         "prompt": "tm-vb-mac daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-vb-mac/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-vb-mac。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7237,13 +7477,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "fdc72072da99",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-vb-mobile daily iteration (Trend Micro catalog",
         "no_agent": false,
         "prompt": "tm-vb-mobile daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-vb-mobile/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-vb-mobile。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7265,13 +7505,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "b2758180d9cb",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-vbhn daily iteration (Trend Micro catalog cover",
         "no_agent": false,
         "prompt": "tm-vbhn daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-vbhn/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-vbhn。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7293,13 +7533,13 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "69e7592db04f",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-vbts daily iteration (Trend Micro catalog cover",
         "no_agent": false,
         "prompt": "tm-vbts daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-vbts/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-vbts。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
@@ -7325,19 +7565,19 @@
           "web"
         ],
         "id": "2ec0e9094af7",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "tm-ztsa daily iteration (Trend Micro catalog cover",
         "no_agent": false,
         "prompt": "tm-ztsa daily iteration (Trend Micro catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/tm-ztsa/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起\n   点) → catalog build/render 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud →\n   自己検査 comment → gh pr merge --merge まで。何も足すことがなければ「opened no PR」と\n   理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/tm-ztsa。push 前に git fetch kotoba-lang して\n   rebase すること。8 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "42 4 * * *",
-          "expr": "42 4 * * *",
+          "display": "46 4 * * *",
+          "expr": "46 4 * * *",
           "kind": "cron"
         },
         "script": "tm_ztsa_evidence.py",
@@ -7717,19 +7957,19 @@
         "deliver": "local",
         "enabled_toolsets": null,
         "id": "450adcdeeed8",
-        "model": "qwen3.8-flash-next-whitehacker",
+        "model": "z-ai/glm-5.3-flash",
         "monitor_script": null,
         "monitor_url": null,
         "name": "vc-fund-ops daily iteration (VC fund catalog cover",
         "no_agent": false,
         "prompt": "vc-fund-ops daily iteration (VC fund catalog coverage)\n\nSOUL.md を読め (/Users/junkawasaki/.hermes/profiles/vc-fund-ops/SOUL.md)。実行手順:\n1. evidence script の出力 (この run の冒頭) を読む。REFUSED banner が出ていたら PR は出さず盲状態を報告して停止。\n2. SOUL.md の iteration 規律に従い lever を 1 つだけ選び、topic branch (kotoba-lang/main 起点) → build (node scripts/build-vc-catalog.mjs) → test:vc-catalog → render → shadow release → audit:uiux 検証 → gh pr create --repo cloud-kotoba/app-kotoba-cloud → 自己検査 comment → gh pr merge --merge まで。not mergeable なら fetch+rebase+push して再試行。何も足すことがなければ「opened no PR」と理由付きで報告して停止 (正常系)。\n3. workdir は /Users/junkawasaki/.gftd/worktrees/vc-fund-ops。push 前に git fetch kotoba-lang して rebase すること。10 API call 予算。\n",
-        "provider": "kotoba",
+        "provider": "openrouter",
         "repeat": {
           "times": null
         },
         "schedule": {
-          "display": "50 5 * * *",
-          "expr": "50 5 * * *",
+          "display": "46 5 * * *",
+          "expr": "46 5 * * *",
           "kind": "cron"
         },
         "script": "vc_fund_ops_evidence.py",
@@ -8595,6 +8835,32 @@
         "workdir": null
       }
     ],
+    "yabai-crypto": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "7df1672dee8d",
+        "model": "z-ai/glm-5.3-flash",
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "yabai-crypto daily iteration",
+        "no_agent": false,
+        "prompt": "yabai-crypto daily iteration. Read SOUL.md first (/Users/junkawasaki/.hermes/profiles/yabai-crypto/SOUL.md) and follow it exactly. The evidence JSON from yabai_crypto_evidence.py is at the top of this run; if it shows a REFUSED banner, report blind and stop. Step 0 resync the worktree, then pick ONE lever, at most one PR. Budget 25 API calls; all command lines pure ASCII. Never send anything external.",
+        "provider": "openrouter",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "34 6 * * *",
+          "expr": "34 6 * * *",
+          "kind": "cron"
+        },
+        "script": "yabai_crypto_evidence.py",
+        "skills": null,
+        "workdir": null
+      }
+    ],
     "yabai-intel": [
       {
         "context_from": null,
@@ -8658,8 +8924,8 @@
           "times": null
         },
         "schedule": {
-          "display": "30 6 * * *",
-          "expr": "30 6 * * *",
+          "display": "26 6 * * *",
+          "expr": "26 6 * * *",
           "kind": "cron"
         },
         "script": "yabai_ops_evidence.py",
@@ -8684,8 +8950,8 @@
           "times": null
         },
         "schedule": {
-          "display": "50 6 * * *",
-          "expr": "50 6 * * *",
+          "display": "54 6 * * *",
+          "expr": "54 6 * * *",
           "kind": "cron"
         },
         "script": "yabai_risk_ops_evidence.py",
@@ -8880,59 +9146,6 @@
         },
         "script": null,
         "skills": null,
-        "workdir": null
-      }
-    ],
-    "pwned-dataset-ops": [
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "6d8c8d7d89bb",
-        "model": null,
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "pwned-dataset-sync",
-        "no_agent": true,
-        "prompt": "pwned sync (HIBP public breach corpus -> R2 pwned/, script-only no_agent)",
-        "provider": null,
-        "repeat": {
-          "times": null
-        },
-        "schedule": {
-          "display": "40 6 4 * *",
-          "expr": "40 6 4 * *",
-          "kind": "cron"
-        },
-        "script": "pwned_dataset_ops_evidence.py",
-        "skills": null,
-        "workdir": null
-      }
-    ],
-    "yabai-crypto": [
-      {
-        "context_from": null,
-        "deliver": "local",
-        "enabled_toolsets": null,
-        "id": "7df1672dee8d",
-        "model": "z-ai/glm-5.3-flash",
-        "monitor_script": null,
-        "monitor_url": null,
-        "name": "yabai-crypto daily iteration",
-        "no_agent": false,
-        "prompt": "yabai-crypto daily iteration. Read SOUL.md first (/Users/junkawasaki/.hermes/profiles/yabai-crypto/SOUL.md) and follow it exactly. The evidence JSON from yabai_crypto_evidence.py is at the top of this run; if it shows a REFUSED banner, report blind and stop. Step 0 resync the worktree, then pick ONE lever, at most one PR. Budget 25 API calls; all command lines pure ASCII. Never send anything external.",
-        "provider": "openrouter",
-        "repeat": {
-          "times": null,
-          "completed": 0
-        },
-        "schedule": {
-          "kind": "cron",
-          "expr": "34 6 * * *",
-          "display": "34 6 * * *"
-        },
-        "script": "yabai_crypto_evidence.py",
-        "skills": [],
         "workdir": null
       }
     ]
