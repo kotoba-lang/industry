@@ -1,0 +1,76 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609191400-dsv41-flash-uncensored-exl3-2x-rtx-pro-6000-modal")
+  (:adr/title "DeepSeek V4.1 Flash uncensored を $5/h 目標で運用する —— dealignai FP8 から EXL3 2.0bpw に再量子化し Modal 2x RTX PRO 6000 TP2 で serve（HF Endpoints は除外）")
+  (:adr/status "superseded")
+  (:adr/superseded-by "adr-2609192140-dsv41-flash-whitehacker-canonical-origin-vllm-2x-rtx-pro-6000-hf-endpoint")
+  (:adr/date "2026-09-19")
+  (:adr/last_verified "2026-09-19")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative false)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "dsv41-flash-uncensored-infra")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki"))
+  (:adr/authoritative_for
+   (vector "DeepSeek V4.1 Flash uncensored の運用形態は Modal app `dsv41-flash`（2x RTX PRO 6000 TP2、scale-to-zero）とし、Hugging Face Endpoints は採用しないこと"
+           "uncensored pack の正本は HuggingFace `com-junkawasaki/dsv41-flash-uncensored-exl3-2.0bpw`（公開、55 files）であり、量子化の source は `dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8` + diffbot recipe（EXL3 2.0bpw、MCG）であること"
+           "`dealignai/...-EXL3-2.9bpw`（既製品）は GPU 側 197 GiB で 2x96GB に収まらないため不使用であること。2x RTX PRO 6000 で uncensored を回すなら 2.0bpw 再 pack が唯一の既知経路であること"
+           "sm_120（RTX PRO 6000 Blackwell Server Edition）では vLLM の indexer_kv_dtype='mxfp4' が sm_10x 限定と弾かれるため、--attention-config で mxfp4 を指定しないこと（diffbot serve.sh のデフォルトは sm_120 では使えない）"
+           "コスト目標『1h あたり 5 ドル以下』は常時飽和では成立せず（GPU 2 台で $6.06/h + CPU/mem で約 $6.9/h）、scale-to-zero（scaledown_window=600、idle $0）前提の実効平均で満たす運用であること"))
+  (:adr/related
+   (vector "adr-2609182330 (nex n2.5 mini nvfp4 の RTX PRO 6000 throughput 計測 —— 同一ハードの評価前提)"
+           "~/.modal-dsv41/app.py (実装正本 290 行)"
+           "~/.modal-dsv41/RUN.md (download / quantize / upload / deploy 手順)"
+           "https://huggingface.co/diffbot/DeepSeek-V4.1-Flash-EXL3-2.0bpw-2x-RTX-PRO-6000 (recipe と serve 手順の出典)"))
+  (:adr/problem
+   "【経緯 2026-09-19 同日】この ADR の Modal 前提は同日中に反転した: Modal scheduler 障害（nvidia-container-cli driver rpc timeout）で min_containers=1 が最大 10 台の RTX PRO 6000 replica を 2 回生み、HF Inference Endpoints に移した。『sm_120 で indexer_kv_dtype=mxfp4 は使えない』も誤りで、diffbot 版 sitecustomize.py + sm120_page.py + AOT cache の空化が揃えば動く（後継 ADR に 3 点を記載）。EXL3 2.0bpw 再 pack の判断と dealignai 2.9bpw 不採用の判断はそのまま後継に引き継いだ。\n\nオーナー指示: uncensored の DeepSeek V4.1 Flash を『コスパ的に 1h 5ドル以下』『pro 6000 2台ぐらい』で運用したい。\n調査で確定した制約:\n(a) base は DeepseekV41ForCausalLM / model_type deepseek_v41、FP8 dynamic attention + FP4 expert で重み約 510 GB。Transformers 5.17.0 に deepseek_v41 の実装は無く、heretic 等の一般的な abliteration 道具は使えない（uncensored 済み本体は dealignai が FP8 で公開済みなので自作不要と結論）。\n(b) Engram 表が約 190 GiB あり、GPU に載らない。diffbot recipe は pinned host RAM か disk へ退避する。\n(c) 既製の uncensored EXL3-2.9bpw は GPU 側 197 GiB で 2x96GB に収まらない。\n(d) HF Endpoints は rtx-pro-6000 x2 で $5.5/h（税別想定、目標超過）かつ標準 vLLM イメージでは EXL3 サーバ（ExLlamaV3 + sm_120 パッチ入り）が動かず、custom image の道が docs から確認できない。h200 x1 / a100 x2 は $5/h ちょうどだが FP8 510 GB と sm_120 専用カーネル前提で不適。\n(e) Modal は RTX PRO 6000 を 2 台構成で提供（probe 実測: 2x『NVIDIA RTX PRO 6000 Blackwell Server Edition』97,887 MiB、compute_cap 12.0）、料金は $0.000842/s/GPU = $3.03/GPU/h。")
+  (:adr/decision
+   "### 1. 量子化: dealignai FP8 を diffbot recipe で EXL3 2.0bpw に再 pack
+
+`dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8`（MIT、custom code なし、510 GB）を Modal の
+Volume `dsv41-models`（/models マウント）に download し、diffbot の quantize.sh 準拠手順で
+EXL3 2.0bpw（experts MCG）へ変換した。生成物 210.7 GB 級 → GPU 側は 2x96 GB に収まり
+（実測: load 成功、KV cache 用に GPU へ 8 GiB を残置）、Engram 表は host RAM/disk 経路。
+結果は公開 repo `com-junkawasaki/dsv41-flash-uncensored-exl3-2.0bpw`（55 files）に正本として
+おき、再量子化の手間を一度きりにする。
+
+### 2. 実行基盤: Modal（HF Endpoints を除外）
+
+- base image を `vllm/vllm-openai:deepseekv41-flash-0909@sha256:4f3c8bcf...564a9b` に digest 固定し、
+  exllamav3 / vllm-exl3 sm_120 ビルド、FlashInfer、engram の disk 退避パッチ、
+  fastapi/httpx を載せたカスタム image としてビルド済み。
+- serve クラス: gpu=RTX-PRO-6000:2、cpu=16、memory=128 GiB、ephemeral_disk=512 GiB、
+  timeout=86400、scaledown_window=600。memory を 240 GiB から下げたのは、その方が
+  scheduler が Pending にならない実測があるため（engram は disk 経路なので実害なし）。
+- vLLM は 127.0.0.1:8001 で起動し、フロントは `@modal.asgi_app()`（FastAPI）が 8000 を兼ねる。
+  **`@modal.web_server(8000)` は間違い** — web_server は自分でバインドする必要があり、
+  ASGI app を返すだけだと誰も 8000 を listen せず全リクエストが詰まった（実測ハマり）。
+- serve 引数の注意: `--attention-config '{\"indexer_kv_dtype\":\"mxfp4\"}'` はこの vLLM ビルドで
+  『sm_10x (B200/GB200) 限定』と worker が例外を投げて EngineCore が死ぬ。sm_120 では
+  引数を省略する（diffbot serve.sh のデフォルトは sm_120 では使えない）。max_inputs=8 も
+  現行 modal が max_inputs=1 しか支持せず禁止。
+
+### 3. コストの見積り（実測単価ベース）
+
+GPU 2 台 $6.06/h + CPU 16core 約 $0.76/h + mem 128 GiB 約 $1.02/h（フル稼働時）で
+合計 $6.9/h 前後。Modal は idle / コンテナ非起動 $0 なので、scaledown_window=600 と
+合わせれば『1h 5 ドル以下』は**実効平均**として成立しうる（稼働率 ~70% 以下なら達成）。
+24/7 飽和Traffic では目標超過になることは正直に記載する。HF Endpoints の x2 ($5.5/h) は
+機能しても EXL3 が載らないため比較対象外。
+
+### 4. 検証状態（2026-09-19 13:40 JST 時点）
+
+- Weight load（48 shards、TP2）、KV cache 確保（1,154,660 tokens、40k ctx で 28 並列相当）、
+  Application startup complete まで実測済み。エンジン起動はコールドで約 10 分。
+- chat completion の最終疎通（MODAL-TP2-OK）は**未完了**: フロントが 503『engine still loading』
+  を返すところまで確認済みだが、その後 workspace の HTTP proxy が
+  『modal-http: workspace ... is disabled』を返し始めた（prepaid クレジット切れ疑い、
+  fleet 側 503 prepaid と同じパターン）。チャージ後に 1 リクエストで完了確認できる状態。
+- 教訓として冷スタート 10 分の間フロントが 503 を返す設計なので、呼び出し側は
+  retry-with-backoff を前提とすること（503 の body に log_tail が入る）。")
+  (:adr/next
+   (vector "オーナー: Modal workspace junkawasakicom のクレジットをチャージ（modal-http disabled の解消）"
+           "チャージ後: POST /v1/chat/completions をリトライして MODAL-TP2-OK を受け、実測 tokens/s をこの ADR の :adr/last_verified に追記"
+           "トラフィック実測後: 実効 $/h を計算し、飽和寄りなら HF Endpoints x4 ($11/h) や B200 単機との比較を表にして追記"
+           "アプリ側: API_KEY 環境変数で vllm --api-key を有効化（今は無効 = 公開 endpoint のまま）"))))
