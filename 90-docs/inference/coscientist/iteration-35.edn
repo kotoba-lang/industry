@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-35"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-35.edn"
+  :doc/date "2026-09-19"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 30: the int8 path on K16"
+  :coscientist/iteration 35
+  :coscientist/subject "the dp4a x8r4 path measured on K16 (RADV): attn_qkv 21.9 vs f32 r8 25.7 GB/s, lm_head 44.2 vs 43.1 against a 46 GB/s floor -- no gain, radv stays f32; the three boxes' kdot bottlenecks are now settled: K16 bandwidth, B70 issue/coalescing (int8 x8r4 landed), Xavier instruction issue without an integer dot (h2 landed)"
+  :coscientist/engine-note "Third box, same rule: a kernel that won on one box was measured before being adopted on another, and lost."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "resident 40-layer B70 measurement (owner decision), then C-1 prefill kernel"
+  :coscientist/measured "K16 GB/s: attn_qkv f32 r8 25.7, r1 22.3, i8 x8r4 21.9, i8 r8 20.0; attn_gate i8 x8r4 17.4; lm_head f32 r1 43.1, r8 38.2, i8 x8r4 44.2, i8 r8 38.4; floor 46"
+  :coscientist/refuted "'int8 helps everywhere' (K16 no)"
+  :coscientist/carries-forward "resident 40-layer B70 run; C-1 prefill kernel; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 35 — `/loop 30min kaizen loop` tick 30（2026-09-19）\n\n対象: B70 で効いた int8 経路（dp4a × x8r4）を K16（RADV）に。\n\n## Generate\n\n- H35.1 RADV も `integerDotProduct4x8BitPackedSignedAccelerated` を返すので同じ kernel が動く。\n- H35.2 K16 は帯域律速（床 46 GB/s に対し 55–95%）なので利得は小さい —— 0 〜 +10%。\n\n## Reflect / 測定（K16、GB/s）\n\n| tensor | f32 r8 | f32 r1 | i8 x8r4 | i8 r8 |\n|---|---|---|---|---|\n| attn_qkv Q5_K | 25.7 | 22.3 | 21.9 | 20.0 |\n| attn_gate IQ4_XS | — | — | 17.4 | — |\n| lm_head Q6_K | 38.2 | 43.1 | 44.2 | 38.4 |\n\n- H35.1 **採択**（glslang 16.6 を K16 にも、kernel はそのまま動き oracle 誤差は Q8 の桁）。\n- H35.2 **採択、下側**: qkv は負け、lm_head +2%。K16 の kdot は床の 55–95% で、int8 は Q8 の数値を足すだけ。`radv` は f32 のまま（wide r8 / narrow r1 / lm r1）。\n- 3 箱の kdot の結論が揃った: **K16 = 帯域律速**（kernel に残りなし。K16 で速くするなら重みの byte を減らすしかない = 別の量子化）、**B70 = 発行 / coalescing 律速**（int8 × x8r4 で 3.63 → 2.55 ms、床の 37%）、**Xavier = integer dot 無しの命令律速**（h2、床の ~22%）。\n- kernel 側の B 項目はこれで尽きた。残る B は常駐実測（オーナー判断）。\n\n## Rank\n\n1. B70 の 40 層常駐実測（オーナー: vLLM 27 GB）。\n2. C-1: prefill kernel（decode 速度の逐次でなく、prompt 全体を 1 command buffer で —— kdot の positions 次元は既に在る）。\n3. Xavier（オーナー判断）。\n\n## Evolve（次 tick）\n\nC-1 の設計: prompt P token の embedding を [P × 2048] に、kdot を positions=P で（`input_per_expert=1` の形を流用）、delta-net / attention を P step 直列 or chunk、lm_head は最後の position だけ。K16 12 層で prefill 8 token の時間 vs decode 逐次 8 回。\n\n## Meta\n\n- 「効いた kernel を横展開する」は測ってから。3 箱目でも符号が違った（B70 +10%、K16 0/−）。箱ごとに律速の種類を確定してから kernel を選ぶ —— この session で 3 回言った規則の、最後の裏付け。\n"}]
