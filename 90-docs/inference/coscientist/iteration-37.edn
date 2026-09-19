@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-37"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-37.edn"
+  :doc/date "2026-09-20"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 32: C-1, batched prefill for the recurrent layers"
+  :coscientist/iteration 37
+  :coscientist/subject "prefill mode: the P-token prompt as one batch through the recurrent layers (kdots positions=P, row-wise ops with a row dimension, delta-net as P steps on a per-layer stepbuf, lm_head on the last row); K16 3 layers x 8 tokens: decode 118.6 ms -> prefill 40.2 ms (2.9x), all 8 rows oracle-exact; attention layers not yet batched"
+  :coscientist/engine-note "The oracle's per-step hidden states made the prefill's correctness a full-row comparison; both failures on the way were in the generator, as the two-stage split intended."
+  :coscientist/generated 3
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "attention layers in prefill (row offsets in rope / copy_at / attn_decode, P causal steps)"
+  :coscientist/measured "K16 3 recurrent layers, prompt 760,6511,314,9338,369,13,576,6722: decode 8 steps 118.6 ms (14.1-16.1 each), 8/8 argmax; prefill 113 dispatches, 40.2 / 40.1 ms, rows x rel 1.5e-6 .. 5.5e-6, argmax 261 = oracle"
+  :coscientist/refuted "H37.1's ~1/P (2.9x overall; layers 37 -> 30 ms because the delta-net's P sequential steps remain)"
+  :coscientist/carries-forward "attention-layer prefill; chunked delta-net prefill; tokenizer; HTTP; resident 40-layer B70 run; Xavier owner decision"
+  :doc/body "# Inference serving co-scientist, iteration 37 — `/loop 30min kaizen loop` tick 32（2026-09-20）\n\n対象: C-1 —— generator の prefill mode（反復 36 の kernel 地ならしの上に）。\n\n## Generate\n\n- H37.1 prompt P token を 1 batch で流すと、recurrent 層では decode P 回の 1/P 弱の時間になる（重み 1 pass）。\n- H37.2 数学は decode と同じなので、prefill の全 P 行の隠れ状態は oracle の step ごとの値と 1e-6 で一致する。\n- H37.3 kernel 側の行次元は decode の形（1 行）で無変化に入れられる。\n\n## Reflect / 実装・測定（K16、recurrent 3 層、prompt 8 token）\n\n- 実装: buffer × P、kdot meta（positions P、ipe 1、pad0 8 for experts、pad1 P−1 for lm_head）、行次元を 5 op + embedding に、`pos_incr2` と層ごとの `stepbuf`、`zerosP`、`prefill_check.py`。踏んだ穴 2 つ: `;;` の後ろに置いた def が丸ごと comment に（m-am1 未定義）、`tokbuf` が ntok で sized されていて P token の WRITE が溢れた（loader が名指しで拒否 → 直った）。\n- **decode 8 step: 118.6 ms（14.1–16.1 ms/token）、8/8 argmax。prefill: 40.2 ms、8/8 行 x rel ≤ 5e-6、argmax 261 = oracle。** H37.2 **採択**、H37.3 **採択**（decode 再検証 8/8）。\n- H37.1 **部分採択**: 全体 2.9× だが lm_head（~10 ms）を除くと層は 37 → 30 ms。recurrent 層の prefill は delta-net の P 直列 dispatch（32 wg × 512 thread、P = 8 で層あたり 8 dispatch）が支配。kdot 側は重み 1 pass になった（8 token で 8 → 1）。\n- 未: attention 層（q/k/v は positions=P で済むが、rope / copy_at に行、attn_decode は causal P step で query 行 offset）。\n\n## Rank（C）\n\n1. C-1 後半: attention 層の prefill（rope / copy_at / attn_decode に row offset、P step）→ 12 層・40 層の prefill を測る。\n2. delta-net の prefill を chunk 化（P step を並列化する数学: 状態 S の更新は逐次だが、q/k/v の conv・l2norm は batch できる → step は S の更新のみに）。\n3. tokenizer → HTTP。\n\n## Evolve（次 tick）\n\n`rope_neox` / `copy_at` / `attn_decode` に `pos[1]` の行 offset（rope: 位置 = pos[0] + row、attn: query 行と T = pos[0] + row + 1）、generator の attention 分岐を prefill 対応、K16 12 層で prefill 8 vs decode 8。\n\n## Meta\n\n- 「同じ数学」を oracle が担保するので、prefill の正しさは全 P 行の一致という強い test で 1 回で確かめられた。\n- 2 段（kernel → generator）に分けたので、今 tick の失敗 2 つは両方 generator の中で、kernel を疑わずに済んだ。\n"}]
