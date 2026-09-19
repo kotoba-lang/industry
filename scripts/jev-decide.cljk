@@ -1,0 +1,188 @@
+#!/usr/bin/env kbb
+;; scripts/jev-decide.cljk — ask TypeSafe's Jev (a "System One" model: it
+;; returns typed choice/score/noul answers, never free text or code) one or
+;; more typed questions against a state, over OpenRouter.
+;;
+;; Why this exists: Jev cannot write code or prose (TypeSafe's own docs say
+;; so explicitly). What it CAN do is pick among a finite, caller-supplied set
+;; of options with a calibrated probability. This script is the thin,
+;; reusable plumbing for that — a router/gate primitive, not a coding agent.
+;; It never auto-acts on its own answer; it only prints what Jev returned.
+;;
+;; usage:
+;;   kbb --backend sci scripts/jev-decide.cljk --state-file <path> --questions-file <path> [--model <slug>]
+;;   kbb --backend sci scripts/jev-decide.cljk --state "..." --questions-file <path>
+;;   echo '<state text>' | kbb --backend sci scripts/jev-decide.cljk --state - --questions-file <path>
+;;
+;; <questions-file> is JSON, exactly TypeSafe's `questions` map shape:
+;;   {"key": {"type": "choice"|"score"|"noul", "instructions": "...",
+;;            "criteria": {...} | [...]}}
+;;
+;; --record <path>   append this call's {state, questions, prediction} as one
+;;                    JSON line to <path>, in the shape
+;;                    kotoba-lang/typed-decisions expects for a new,
+;;                    ungoaled family (its schema.py Example needs a `gold`
+;;                    index; a live workspace decision has none yet, so every
+;;                    question here carries `gold: null` and the model's own
+;;                    answer is kept under `prediction`, never mistaken for
+;;                    gold). Only written on a real 200 answer — a REFUSED
+;;                    call records nothing. Optional --source / --meta-json
+;;                    (a JSON object string) tag the record; both default to
+;;                    minimal values.
+;;
+;; Model: intended default was the `typesafe/jev-latest` OpenRouter alias, in
+;; the spirit of ADR-2607173100 (don't hardcode a model id) even though that
+;; ADR is scoped to `murakumo-main`. MEASURED 2026-09-19: POST
+;; /api/alpha/decisions rejects "typesafe/jev-latest" with 400 "Model ... does
+;; not exist" even though the alias resolves fine on OpenRouter's own model
+;; page — this alpha endpoint does not yet accept it. Defaulting to the
+;; pinned `typesafe/jev-1.13` until re-measured; override with --model or
+;; JEV_MODEL once the alias route works.
+;;
+;; Key resolution order (never dumped, only read at call time):
+;;   env OPENROUTER_API_KEY
+;;   keychain service=gftd.openrouter account=OPENROUTER_API_KEY
+;; (per .claude/skills/secrets-location-map/references/third-party-api.md)
+;;
+;; Exit is three-valued, same discipline as the other detectors in this repo:
+;;   0  the API answered; ANSWER lines below are real model output
+;;   1  the key or the network or the response was unusable — REFUSED, and
+;;      that is never printed as though it were a noul of 0 or an empty choice
+;;   2  bad invocation (missing/unreadable arguments)
+
+(require '[clojure.string :as str])
+
+(def fs (js/require "node:fs"))
+(def path (js/require "node:path"))
+(def cp (js/require "node:child_process"))
+(def https (js/require "node:https"))
+(def process (js/require "node:process"))
+
+(def argv (js->clj (.-argv process)))
+
+(defn- flag-value [flag]
+  (let [i (.indexOf argv flag)]
+    (when (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)))))
+
+(def model (or (flag-value "--model") (.-JEV_MODEL js/process.env) "typesafe/jev-1.13"))
+
+(defn- read-key []
+  (or (let [e (.-OPENROUTER_API_KEY js/process.env)]
+        (when (and (string? e) (pos? (count e))) e))
+      (try
+        (let [out (.execFileSync cp "security"
+                                  #js ["find-generic-password" "-s" "gftd.openrouter"
+                                       "-a" "OPENROUTER_API_KEY" "-w"]
+                                  #js {:encoding "utf8" :stdio #js ["ignore" "pipe" "ignore"]})
+              k (str/trim (str out))]
+          (when (and (pos? (count k)) (not (str/includes? k "could not"))) k))
+        (catch :default _ nil))))
+
+(defn- read-state [v]
+  (cond
+    (nil? v) nil
+    (= v "-") (str/trim (.readFileSync fs 0 "utf8"))
+    :else v))
+
+(defn- read-state-file [p]
+  (when (and p (.existsSync fs p)) (.readFileSync fs p "utf8")))
+
+(defn- read-questions-file [p]
+  (when (and p (.existsSync fs p))
+    (try (js/JSON.parse (.readFileSync fs p "utf8")) (catch :default _ nil))))
+
+(defn- post-json [url body-str token]
+  (js/Promise.
+   (fn [resolve]
+     (let [u (js/URL. url)
+           payload (js/Buffer.from body-str "utf8")
+           req (.request https
+                         #js {:hostname (.-hostname u)
+                              :path (str (.-pathname u) (.-search u))
+                              :method "POST"
+                              :headers #js {"authorization" (str "Bearer " token)
+                                            "content-type" "application/json"
+                                            "content-length" (.-length payload)}
+                              :timeout 30000}
+                         (fn [res]
+                           (let [chunks #js []]
+                             (.on res "data" (fn [c] (.push chunks c)))
+                             (.on res "end"
+                                  (fn []
+                                    (resolve {:status (.-statusCode res)
+                                              :body (.toString (.concat js/Buffer chunks) "utf8")}))))))]
+       (.on req "error" (fn [e] (resolve {:status nil :error (str e)})))
+       (.on req "timeout" (fn [] (.destroy req) (resolve {:status nil :error "timeout"})))
+       (.write req payload)
+       (.end req)))))
+
+(defn- refuse [reason]
+  (println (str "REFUSED\t" reason))
+  (.exit process 1))
+
+(defn- bad-args [reason]
+  (println (str "BAD-ARGS\t" reason))
+  (.exit process 2))
+
+(defn- question->record [[qid qspec]]
+  (let [kind (:type qspec)
+        options (case kind
+                  "noul" ["no" "yes"]
+                  "choice" (vec (keys (:criteria qspec)))
+                  "score" (vec (:criteria qspec))
+                  [])]
+    {:qid (name qid) :kind kind :instructions (:instructions qspec)
+     :options options :gold nil}))
+
+(defn- append-record! [record-path state questions parsed]
+  (let [src (or (flag-value "--source") "workspace-repo-governance")
+        meta-raw (flag-value "--meta-json")
+        meta (or (when meta-raw (try (js->clj (js/JSON.parse meta-raw) :keywordize-keys true)
+                                     (catch :default _ nil)))
+                 {})
+        qs (js->clj questions :keywordize-keys true)
+        record {:state state
+                :source src
+                :collected_at (.toISOString (js/Date.))
+                :meta meta
+                :questions (mapv question->record qs)
+                :prediction {:model (:model parsed) :provider (:provider parsed)
+                            :id (:id parsed) :answers (:answers parsed) :usage (:usage parsed)}
+                :gold_status "unresolved -- live jev prediction, not training gold, until independently resolved"}]
+    (.mkdirSync fs (.dirname path record-path) #js {:recursive true})
+    (.appendFileSync fs record-path (str (js/JSON.stringify (clj->js record)) "\n") "utf8")))
+
+(defn- emit-answer [state questions parsed]
+  (println (str "MODEL\t" (:model parsed)))
+  (println (str "ID\t" (:id parsed)))
+  (doseq [[k v] (:answers parsed)]
+    (println (str "ANSWER\t" (name k) "\t" (js/JSON.stringify (clj->js v)))))
+  (println (str "USAGE\t" (js/JSON.stringify (clj->js (:usage parsed)))))
+  (when-let [record-path (flag-value "--record")]
+    (append-record! record-path state questions parsed)
+    (println (str "RECORDED\t" record-path)))
+  (.exit process 0))
+
+(defn- handle-response [state questions {:keys [status body error]}]
+  (cond
+    error (refuse (str "network:" error))
+    (not= status 200) (refuse (str "http-" status ":" (subs (or body "") 0 (min 300 (count (or body ""))))))
+    :else (try
+            (emit-answer state questions (js->clj (js/JSON.parse body) :keywordize-keys true))
+            (catch :default e (refuse (str "unparseable-response:" e))))))
+
+(defn- ask! [state questions token]
+  (let [body (js/JSON.stringify (clj->js {:model model :state state :questions questions}))]
+    (.then (post-json "https://openrouter.ai/api/alpha/decisions" body token)
+           (partial handle-response state questions))))
+
+(let [state-arg (or (flag-value "--state") (read-state-file (flag-value "--state-file")))
+      state (read-state state-arg)
+      questions (read-questions-file (flag-value "--questions-file"))]
+  (cond
+    (str/blank? (str state)) (bad-args "no --state / --state-file (or stdin via --state -) given")
+    (nil? questions) (bad-args "no readable --questions-file given")
+    :else (let [token (read-key)]
+            (if-not token
+              (refuse "openrouter-key-missing (env OPENROUTER_API_KEY / keychain gftd.openrouter)")
+              (ask! state questions token)))))

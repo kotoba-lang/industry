@@ -1,0 +1,4 @@
+Detector: compliance-scope-boundary — certification scope drawn around domains, cut through by one Worker.
+Finding (first seen within the last 12h, still standing):
+cross-boundary:cloud-itonami-kaisya — itonami.app and itonami.cloud are both served by a single Cloudflare Worker (orgs/cloud-itonami/kaisya/wrangler.jsonc). The detector's premise is that a compliance/system boundary cannot be drawn along DNS domain lines alone when one deployable artifact spans both domains.
+No further remediation, ticket, or accepted-risk note has been recorded for this finding yet.
