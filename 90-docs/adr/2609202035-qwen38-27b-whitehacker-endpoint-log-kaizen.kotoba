@@ -1,0 +1,109 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609202035-qwen38-27b-whitehacker-endpoint-log-kaizen")
+  (:adr/title "qwen38-27b-whitehacker HF endpoint の vLLM ログ 7 時間分（2026-09-20 04:24–11:21 UTC、7 pod、3,826 req）を実測 —— 実トラフィックは ~50k token コンテキスト × 760 tok 出力 × 12 req/min の agent セッションで、同時実行は最大 16。gate 64 は KV 容量（1.82M tok）を超える。設定変更 4 回で in-flight 11 件を abort、seqs 64→256→64 は観測上 no-op、cold start ~4 min は torch.compile cache miss と MM warmup が主。kaizen 8 項目を優先順で決定")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-20")
+  (:adr/last_verified "2026-09-20")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-cloud-red-routes")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki" "cloud-kotoba/app-kotoba-cloud" "com-kotobalabs/qwen38-27b-whitehacker"))
+  (:adr/related
+   (vector "adr-2609200440-qwen38-27b-whitehacker-red-route-published-deepseek-nex-pruned (この endpoint の正本。本 ADR はその consequences の retune 項目『red-max-in-flight(64) は 32k ctx での測定に基づく暫定値で実トラフィックで測り直す』への実測入力)"
+           "adr-2609181000-rtx-pro-6000-27b-vs-flash-next-nvfp4-throughput (bench 側の数値。短 prompt・300 tok 出力の合成負荷であり、本 ADR の実トラフィック profile とは別物)"
+           "adr-2609201145-dsv41-flash-throughput-scaling-rtx-pro-6000-nvlink-wall-b300-fp4-paths (DP replica で伸ばす方針の出所)"
+           "adr-2609071100-capacity-that-folds-prefill-into-throughput (throughput は prefill と decode を分けて publish する規則。本 ADR も分けている)"
+           "adr-2608136000 (検査の 8 問。測れなかった値を測れた値と同じ形で publish しない —— 本 ADR の『未測定』節)"))
+  (:adr/problem
+   "オーナー指示 2026-09-20:『qwen38-27b-whitehacker_full_log.txt を分析して、hf endpoint の kaizen ポイントを分析して』。対象は com-kotobalabs/qwen38-27b-whitehacker（1× RTX PRO 6000、vLLM 0.29.0、orcarouter/Qwen3.8-27B-Uncensored-NVFP4、FP8 KV、FlashInfer、native fp4_gemm）の HF Inference Endpoints ログ export（6,818 行 / 1.2 MB、2026-09-20T04:24:23Z〜11:21:38Z）。ADR-2609200440 の設定は合成 bench（短 prompt、300 tok）で決めており、実トラフィックの形（コンテキスト長・同時数・出力長）は未測定だった。ログは vLLM 標準の 10 秒間隔 metrics 行と access 行だけで、per-request の TTFT / TPOT / token 数は含まない。")
+  (:adr/body "## 構成（ログから読めた事実）
+
+- vLLM 0.29.0（vllm-openai:latest）、`Qwen3_5ForConditionalGeneration`、GPU sm120 94.97 GiB（RTX PRO 6000）、`quantization=compressed-tensors`、`FlashInferCutlassNvFp4LinearKernel for NVFP4 GEMM`（native fp4_gemm、[AutoTuner] Tuning fp4_gemm 22/22）、`kv_cache_dtype=fp8`、FLASHINFER attention（decode_backend=xqa）、GDN prefill Triton/FLA・decode cuda、prefix caching、chunked prefill、cudagraph FULL_AND_PIECEWISE。
+- weights 22.99 GiB（6 shard、load 3.1–3.6 s）、KV 58.75 GiB = 1,818,435〜1,848,567 tok（max-model-len 262144 で『満杯 262K を同時に』6.94〜7.05 本）。131072 の時は 1,768,015 tok / 13.49 本。
+- pod は 7 本。ridusget-vcnbp（131072）→ yu9eeyma-zcb62（131072、scale-to-zero 復帰）→ bwr6dwo6-5qpkh（262144）→ nc5ys1i9-42gsd（+chunked-prefill / max-num-batched-tokens 16384 / max-num-seqs 64）→ w2s8njtq-b4z28（seqs 256）→ ktaoopa8-4wclg（seqs 64）→ ktaoopa8-qxbzp（同 revision、11:20:23 起動、ログ終端まで 4wclg と並走）。
+- HTTP: `POST /v1/chat/completions` 200 × 3,826、404 × 3（`The model tgi does not exist`、05:04–05:05）、`GET /v1/models` × 6。クラッシュ 0（唯一の `EngineDeadError` は shutdown で engine を force kill した結果であって原因ではない）。client IP は 10.41.x の 5 個 = HF router の replica。
+
+## ワークロード実測
+
+| 指標 | 値 | 出所 |
+|---|---:|---|
+| リクエスト | 3,826 / 6.3 h（04:28〜11:21） | access 行 |
+| 到着率 | 定常 ~12 req/min、最大 27/min、完了 0 の分は無し（08:42〜11:21） | access 行を分で集計 |
+| Running | 平均 4.6、**最大 16**（分布: 0–5 が 75%、≥10 が 10%） | metrics 行 |
+| Waiting>0 | 2,101 sample 中 **9 回**（最大 4） | metrics 行 |
+| 出力 | ~760 tok/req（reasoning 込み）、合計 2.92M tok | gen tok/s × 10 s の積算 ÷ req 数 |
+| prompt（ログ値） | ~3,094 tok/req、合計 11.8M tok | prompt tok/s × 10 s の積算 |
+| Prefix cache hit | 0% → **91.6〜93.4%**（累積値、pod ごとにリセット） | metrics 行 |
+| KV 使用率 | 平均 12%、**最大 52.2%**（w2s8njtq、Running 16） | metrics 行 |
+| decode 速度（pure decode 窓、prompt=0） | N=1 61.2 tok/s、N=2 55.0/seq、N=4 41.1/seq、N=6 37.1/seq、N=8 31.0/seq、N=9 30.4/seq | metrics 行を Running で bucket |
+| aggregate（全窓） | N=1 59.5、N=4 150、N=8 233、N=12 269、N=14 305 tok/s（最大 383） | 同上 |
+| 平均滞在時間 | **~23 s/req**（Little: 4.6 ÷ 0.2 req/s）≒ 760 tok ÷ 35 tok/s | 導出 |
+
+### 実コンテキストは ~50k token/req（2 つの独立推定が一致）
+
+1. prefix hit 93% のとき、ログの prompt 3,094 tok/req が uncached 分なら全長 ≈ 3,094 ÷ (1 − 0.93) ≈ **44k**。
+2. KV 使用 tok（使用率 × 容量）÷ Running を Running=2〜16 の全窓で取ると中央値 **46k〜59k**（全体中央値 50.5k、p90 68.5k）で、Running に依らずほぼ一定。
+
+∴ この route の実トラフィックは『**~50k token の agent セッション × 760 tok 出力 × 12 req/min**』。ADR-2609181000 / 2609200440 の bench（短 prompt・300 tok・distinct）とは負荷の形が別物である。
+
+## Finding
+
+1. **設定変更 4 回で in-flight 11 件を abort している。** 旧 pod の shutdown は毎回 `stopping engine client mode=abort timeout=0s` → 即 SIGTERM。その瞬間の Running は 1 / 3 / 4 / 3。一方 FastAPI 側は `signalling HTTP server shutdown` から `Application shutdown complete` まで **~2 分**生きている（k8s grace period は存在する）のに、engine は 0 s で abort している。
+2. **gate 64 は今のコンテキスト長では KV 容量を超える。** 64 × 50k = 3.2M tok > 1.82M。KV-safe な同時数は **~36（中央値 50k）/ ~27（p90 68k）**。超過分は V1 が recompute preemption で捌く（エラーにはならないが per-request が崩れる）。今日の peak 16 では未発火。
+3. **per-request decode の落ち方が bench より急。** pure-decode 窓でも N=8 で 31 tok/s/seq（ADR-2609200440 の bench は N=16 で 739 aggregate = 46/seq）。差は長コンテキストの KV 読みが per-step に乗っているためと**推定**（KV byte/token は未算出なので仮説）。
+4. **seqs 64→256→64 の往復は観測上 no-op。** Running 最大 16 なので 64 も 256 も一度も律速していない。代わりに redeploy 2 回 = in-flight kill 7 件 + cold start 8 分。
+5. **cold start はコンテナ内 ~4 min（起動ログ → Application startup complete が 3:58〜4:21）。** 内訳（ktaoopa8-4wclg）: 起動〜engine init 40 s / weights 5 s / **torch.compile 58.7 s（Dynamo 15.9 s + graph 33.3 s。cache dir が 4 種類 = 毎回 miss、`/root/.cache` は pod 揮発）** / profiling+warmup 55.0 s / CUDA graph 13+6 s + FlashInfer autotune 13 s / API 起動 20 s（うち **multi-modal warmup 15.7 s** — text-only route なのに vision tower を profile）。scale-to-zero は 04:28:59 最終 req → **04:58:59（30 分）**に発動、次の pod が ready になったのは 05:04:32（**~5.5 min 不達**、その間の需要は 1 req 規模だったので被害は小）。
+6. **観測性の穴。** ログには TTFT / TPOT / E2E / per-request token 数が無い。滞在時間は Little's law の導出値であって測定値ではない。
+7. 小物: 05:04 の 404 × 3 は client が `model: tgi` を送った（served 名は repo id）/ `_gumbel_sample_kernel` の Triton JIT が 2 pod で初回推論時に発火（一発の latency spike、vLLM が warn）/ `generation_config.json` の T=1.0・top_k 20・top_p 0.95 がサーバ既定として採用されている / `--served-model-name` duplicate と `--model` deprecated は HF wrapper の警告で無害 / Prefix cache hit rate は累積値なので瞬時値として読まない。
+8. **11:20:23 に同 revision（ktaoopa8-qxbzp）の 2 本目 pod が立った。** 直前の 4wclg は Running 12–15・15–25 req/min。設定変更なら revision hash が変わるので、autoscale か pod 置換。ログ終端（11:21:38）まで両方生きており、どちらかは未確認。
+
+## 未測定（この結論を越えて使わないこと）
+
+- KV 使用率 = 参照中 block という読み（V1 では ref 0 の cached block は free queue に居て free 扱い、という理解）は**仮定**。独立推定 1 と一致したので採ったが、vLLM 側 code で確かめていない。
+- ログの prompt throughput が uncached token のみを数えるという読みも同じく**仮定**（推定 1 と 2 の一致が根拠）。
+- KV byte/token（層数・KV head 数）を算出していないので、Finding 3 の per-step コストモデルは立てていない。
+- graceful drain を伸ばす vLLM 0.29 側の flag 名は未確認（ログの `mode=abort timeout=0s` が設定値であることだけが事実）。
+- orcarouter NVFP4 checkpoint に MTP head が残っているか、hybrid GDN（Qwen3.5）で ngram / MTP speculative decoding が vLLM 0.29 で有効か、は未検証。
+- 11:20 の 2 本目 pod が autoscale か置換かは HF console 未確認。
+- TTFT / TPOT は取れていない。滞在 ~23 s は導出値。
+
+## Reproduce（ログ 1 本から同じ表を出す手順）
+
+```
+F=qwen38-27b-whitehacker_full_log.txt
+# pod と寿命
+awk '{print $2}' $F | sort | uniq -c
+# 設定差分
+grep 'non-default args' $F
+# access と status
+grep -oE '\"(GET|POST) [^ ]+ HTTP/1.1\" [0-9]+' $F | sort | uniq -c
+# metrics 行 → TSV（ts pod prompt_tps gen_tps running waiting kv% prefix_hit%）
+grep 'loggers.py:310' $F | sed -E 's/^([^ ]+) ([^ ]+) .*prompt throughput: ([0-9.]+) .*generation throughput: ([0-9.]+) .*Running: ([0-9]+) .*Waiting: ([0-9]+) .*KV cache usage: ([0-9.]+)%.*hit rate: ([0-9.]+)%.*/\\1\\t\\2\\t\\3\\t\\4\\t\\5\\t\\6\\t\\7\\t\\8/' > metrics.tsv
+# shutdown 時の in-flight
+grep -B2 'shutdown triggered' $F | grep 'Running:'
+# 実コンテキスト推定 2: 使用率 × 容量 ÷ Running を Running≥2 の窓で中央値
+awk -F'\\t' '$5>=2 {print ($7/100*1848567)/$5}' metrics.tsv | sort -n | awk '{a[NR]=$1} END{print a[int(NR/2)], a[int(NR*0.9)]}'
+```
+decode の bucket 表は metrics.tsv を Running でグループし、`prompt_tps==0` の窓だけを pure decode として平均する。")
+  (:adr/decision
+   "実測を正本として記録し、kaizen を次の優先順で決める（すべて 2026-09-20 時点で**未実施**。着手したら本文の該当項目を書き換える）。
+1. **in-flight を殺さない更新運用**: endpoint の設定変更はまとめて、Running=0 の時間帯（scale-to-zero 直前か深夜帯）に当てる。vLLM 側の drain timeout を HTTP 側が生きている ~2 分の範囲で伸ばせるかを確認し、伸ばせるなら container-args に入れる。
+2. **gate を KV から導く**: app-kotoba-cloud の red-max-in-flight-by-route(64) と endpoint --max-num-seqs(64) は、実コンテキスト中央値 50k・p90 68k に対して KV-safe 上限 ~36 / ~27 を超えている。gate を ~32 に下げるか、64 を維持して preemption を許容するかは owner 判断（本 ADR は決めない）。どちらでも ADR-2609200440 の『32k ctx 前提の暫定値』注記は本 ADR を参照して閉じる。**1 台超は DP replica**（gate を上げない、ADR-2609200440 と同じ）。
+3. **decode を測ってから速くする**: `/metrics`（Prometheus、port 8000）を gateway 側から scrape して TTFT / TPOT / E2E histogram を取る（Finding 6 も同時に閉じる）。その上で speculative decoding を検証: ngram（weight 不要、agent/tool 出力の反復に効く）→ MTP（checkpoint に head があれば）。hybrid GDN で有効かは vLLM 0.29 で実測してから採用。
+4. **cold start を削る**: text-only route なので `--limit-mm-per-prompt` で image/video を 0 にして vision tower の profile と MM warmup（~16 s）を外す。torch.compile cache と FlashInfer autotune cache を custom image に焼く（flash-next で custom image の実績あり）で ~60〜70 s。scale-to-zero の 30 分は当面維持（idle $0 と 5.5 min 不達のトレードオフは需要曲線を見て決める）。
+5. **変更は metrics を見てから**: Running / Waiting / KV 使用率の 10 秒 metrics で律速していない knob（max-num-seqs 等）を動かさない。動かすなら仮説と観測指標を commit message に書く。
+6. 小物は順不同で: gateway が送る model 名の確認（`tgi` 404）、generation_config 既定（T=1.0 / top_k 20 / top_p 0.95）を route 文書に明記、`_gumbel_sample_kernel` は vLLM 側 warmup の穴として upstream を見る。
+7. 11:20 の 2 本目 pod を HF console で確認する（autoscale なら $2.75/h × 2 の billing が始まっている）。")
+  (:adr/authoritative_for
+   (vector "qwen38-27b-whitehacker の実トラフィック profile（2026-09-20 04:24–11:21 UTC、HF endpoint ログ実測）: ~12 req/min 定常、Running 平均 4.6 / 最大 16、Waiting>0 は 0.4%、出力 ~760 tok/req、uncached prompt ~3.1k tok/req、prefix hit ~93%、実コンテキスト中央値 ~50k tok / p90 ~68k（2 つの独立推定が一致）、KV 使用率 最大 52%"
+           "1× RTX PRO 6000 / NVFP4 native fp4_gemm / FP8 KV / ~50k ctx の実トラフィックでの decode: N=1 61 tok/s、N=4 41/seq、N=8 31/seq（pure decode 窓）。bench（短 prompt）の N=16 46/seq より悪い —— 長コンテキストの KV 読みが原因という仮説は未検証"
+           "KV 容量 1.82M tok（262144 設定）と実コンテキスト 50k から導く KV-safe 同時数は ~36（中央値）/ ~27（p90）。gate 64 はこれを超える"
+           "HF Inference Endpoints の rolling update は旧 pod の vLLM engine を mode=abort timeout=0s で即 kill する（in-flight は 200 を返さない）。HTTP server 側は ~2 分残る"
+           "cold start の内訳（コンテナ内 ~4 min）: torch.compile ~59 s（cache miss、cache key は max-model-len / seqs / batched-tokens で変わる）、profiling+warmup ~55 s、CUDA graph + autotune ~32 s、MM warmup ~16 s、weights ~5 s。scale-to-zero は最終 req から 30 分で発動"
+           "この endpoint で 7 時間・3,826 req にクラッシュは無い。EngineDeadError は shutdown の副作用"))
+  (:adr/consequences
+   "gate / seqs の再設定は owner 判断待ち（decision 2）。それまで route は 64 のまま。着手順は decision の番号順。本 ADR の数値は 2026-09-20 の 7 時間分であり、需要が変われば profile も変わる —— 次の retune は `/metrics` scrape（decision 3）を先に入れて、Little's law の導出値ではなく測定値で行う。ログ本体（1.2 MB）は repo に置かず、Reproduce 節の手順で同じ表が出ることを正本とする。")
+  (:adr/tags (vector "red-route" "api-kotoba-cloud" "qwen3.8-27b" "nvfp4" "rtx-pro-6000" "vllm" "hf-inference-endpoints" "log-analysis" "kaizen" "concurrency" "prefix-caching" "cold-start" "rolling-update" "kv-cache" "observability"))))
