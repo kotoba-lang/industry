@@ -7,6 +7,7 @@
   (:adr/supersedes (vector))
   (:adr/related (vector "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe"
                         "adr-2609181715-typed-decisions-train-teacher-and-code-decisions"
+                        "adr-2609201400-jev-code-holes-choice-refactor-closing"
                         "ADR-2607173100"))
   (:adr/source (vector "https://openrouter.ai/typesafe/jev-1.13"
                        "https://docs.typesafe.ai/concepts/system-one"
@@ -57,14 +58,16 @@
   Apache-2.0 で公開(owner 指示 2026-09-19)。card に ungoaled であること、`prediction` は正解ではなく
   jev の予測であること、含まれる compliance finding は実データであることを明記する。")
   (:adr/consequences
-  "- jev(TypeSafe)は router/gate primitive としてのみ位置づけ、coding/refactor の生成そのものを代替する
-  という前提には立たない —— 生成が要る箇所は既存の LLM(murakumo-main alias)のままで良い。
-  - `repo-governance` family は訓練にはまだ使えない(gold 無し)。次の一歩は (a) 実際にこの finding が
-  裁定されたら gold を書き戻す配線、(b) 十分件数が溜まったら教師ラベル方式を適用するか、のどちらも未着手。
-  - `jev-decide.cljk` は worktree 上のみで main へはまだ着地していない(別途 land 判断待ち、この ADR は
-  設計と HF 公開のみを accepted とする)。
-  - typesafe/jev-latest alias が OpenRouter alpha decisions endpoint で 400 になる件は TypeSafe/OpenRouter
-  側の実装状態であり、再測定して直っていれば pin を外せる。")
+  "- 【2026-09-20 更新】『jev は router/gate primitive であって refactor の生成は代替しない』という当初の読みは
+  **測って訂正した**（adr-2609201400）: 生成とは反復された choice であり、駆動ループ・候補列挙・verifier を外から
+  与えれば、既存の名前への繋ぎ替え refactor は choice だけで通る（rename 1 本が kbb で PASS）。残る境界は
+  『repo に無い新規の名前』と『演算子・述語の意味変更』。数字は adr-2609201400 と
+  kotoba-lang/typed-decisions README 第6〜9反復。
+  - `repo-governance` family は訓練にはまだ使えない（gold 無し、n=1）。gold を埋める経路 (a) owner/governor の
+  裁定を書き戻す (b) 教師ラベル、はどちらも未着手。代わりに **gold 付きの `code-holes` family**
+  （commit が gold、`com-kotobalabs/typed-decisions-code-holes`）を作った。
+  - `jev-decide.cljk` は com-junkawasaki/root PR #3231（06dbd5c）で main に着地済み。
+  - typesafe/jev-latest alias が OpenRouter alpha decisions endpoint で 400 になる件は未再測定。")
   (:adr/verification
   "実行 2026-09-19、この session: `kbb --backend sci scripts/jev-decide.cljk --state-file
   scripts/jev-decide.example-state.txt --questions-file scripts/jev-decide.example-questions.json`
