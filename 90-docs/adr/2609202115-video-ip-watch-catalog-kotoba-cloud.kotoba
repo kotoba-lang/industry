@@ -1,0 +1,47 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609202115-video-ip-watch-catalog-kotoba-cloud")
+  (:adr/title "動画 IP ウォッチ・カタログ app (kotoba.cloud /video-ip/) — YouTube/TikTok/Instagram/Facebook 投稿収集・著作権侵害分析評価・権利者報告の設計と video-ip-watch-ops bot")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-20")
+  (:adr/last_verified "2026-09-20")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "video-ip-watch")
+  (:source/dataset "adr")
+  (:adr/repos (vector "cloud-kotoba/app-kotoba-cloud" "com-junkawasaki/root"))
+  (:adr/authoritative_for
+(vector "動画 IP (club-shinshi ORIGINAL-SERIES・dougaka-vector) の不法投稿監視・著作権侵害分析・権利者報告を公開する kotoba.cloud 面の slug は /video-ip/ (データ面 /video-ip-data/video-ip/) である。/copyright/ /ip/ /watch/ は使わない (/ip/ は過去に試作 404 実測済み)" "侵害判定の語彙: candidate / verified / ok / fair-use / suspected-reuse / infringement / unknown / reported。takedown 報告 (DMCA) は bot が自動送信せず、infringement・suspected-reuse に human-review が通ったものだけを reports.json に draft する" "収集 layer 表記は既存 catalog 慣例と同じ primary-fetched / secondary-reported。実 fetch できない platform 壁 (TikTok oembed 400 / Facebook oembed DNS-dead / Instagram media_id 403) は wall として記録し、API key 投入前の候補は fingerprint=pending のまま candidate に留める"))
+  (:adr/related
+(vector "adr-2609192200 (sandbox.kotoba.cloud Modal 前提 — 別レーン)" "vc-catalog (PR#222, 2026-09-16 — この catalog が copy した最小セットの原典)" "video-ip-watch-ops profile/cron (本 ADR の実装 bot)"))
+
+  (:adr/body
+"# ADR-2609202115: 動画 IP ウォッチ・カタログ app と video-ip-watch-ops bot
+
+**Status**: accepted / 2026-09-20 / オーナー指示「youtube, tiktok, instagram, facebook などの投稿された動画情報を収集して、不法投稿・著作権侵害を分析評価、また著作権者に報告する app を kotoba.cloud app として設計して、コレを進める bot profile, cron を立てて」。
+
+## 経緯 (この会話で実測した事実)
+
+1. **既存レーンとの重複は無い**: `ip-catalog-ops` は IP アドレス/ASN カタログ、`shinshi-catalog-video-tick.cljk` は自社動画生成で、本タスク (投稿監視・侵害判定・報告) とは別物。著作権監視系 profile (copyright / takedown / ipr / video-watch) は `~/.hermes/profiles/` に 0 件 (grep 実測)。
+2. **app 受け皿は既存の catalog パターン**: `cloud-kotoba/app-kotoba-cloud` は /vc/ /sanctions/ /law/ など「src JSON → build-*.mjs (IPLD blocks + DAG-JSON index) → cljk site view → data at /x-data/x/」の同型レーンを量産済み (vc-catalog PR#222 の最小セット skill 化済み)。法務データ catalog (/law/, legal-catalog) も著作権・知財の条文・判例を載せており、本 catalog はその sibling (自社 IP の実態面)。
+3. **収集手段の liveness 実測 (2026-09-20)**: YouTube oEmbed 200・yt-dlp flat-playlist 検索 OK (36 候補取得)。TikTok oEmbed 400、Facebook oEmbed ドメイン DNS-dead (000)、Instagram Graph media_id 403 — 無認証では YouTube のみ実用。→ Phase 1 は YouTube candidate、TikTok/IG/FB は wall として記録し API key 投入で Phase 2 拡張。
+4. **権利者はワークスペース内に実在**: `orgs/network-awai/club-shinshi` (ORIGINAL-SERIES 12、shinshi.club 200 実測、契約 edn あり) と dougaka-vector (aozora.app 200、ATProto did:key)。監視対象 IP を推測でなく実在契約からseedできる。
+
+## 決定
+
+1. **app 形状**: kotoba.cloud の新規公開面 `/video-ip/` (+ `/ja/video-ip/`) — vc-catalog と同一のビルド・emit・テスト配線 (PR cloud-kotoba/app-kotoba-cloud#497)。正本は `assets/video-ip-catalog-src/{rights-holders,videos,reports,relations}.json`、機械可読データは `/video-ip-data/video-ip/{index.json,ontology.jsonld,relations.json}` (IPLD/DAG-JSON、head CID を content-address で公開)。
+2. **分析評価の語彙とハブ**: status = candidate / verified / ok / fair-use / suspected-reuse / infringement / unknown / reported。評価は verification (fingerprint: frame-phash / audio-chromaprint pending 実測 method 付き) + assessment (score / signals / rationale) をレコードに持つ。fpcalc 未導入 (Phase 2 で `brew install fpcalc` 済ませるまで fingerprint=pending を正直に出す)。
+3. **著作権者報告の安全弁**: reports.json の各レコードは DMCA 17 U.S.C. 512(c)(3) の列挙要件 (特定・善意声明・署名・アドレス) を満たす form を source form に持つ。bot は infringement / suspected-reuse + **human-review 通過分だけを draft** し、自動送信はしない (SOUL に明文化)。state = draft → sent → acked → resolved。
+4. **bot**: profile `video-ip-watch-ops` (donor: ip-catalog-ops)、dedicated worktree `~/.gftd/worktrees/video-ip-watch-ops` (remote 名 `kotoba-lang` 明記)、evidence script `video_ip_watch_ops_evidence.py` (BLIND/DEAD 分離・curl 実測・REFUSED banner)、cron `5 7 * * *` 毎日 (衝突チェック済: 07:10 legal-catalog-ops と 5 分差以上)。1 run = 1 lever・topic branch は refs/remotes/kotoba-lang/main 起点・PR 1 本・main push 禁止・shell 行 ASCII のみ。
+5. **巡回頻度**: 侵害監視は news 性が命なので daily (ユーザーの『月次巡回』既定は成立後、推論スループットを見て判断。まず daily で hand-run 検証)。
+
+## 検証済み (2026-09-20)
+
+- build: 2 holders / 36 videos / 0 reports / 86 claims、head CID 安定 (CID は index の generatedAt を含む — 再生成で動くことを確認)。
+- test/video-ip-catalog.mjs integrity gate 全通過、uiux documents-static 登録済み。
+- kbb -M:test 226 tests / 26,622 assertions — 失敗は既存の forge ABI 未コンパイル 1 件 (本変更と無関係、build:contract 指示)。
+- npm run render 601 receipts → public/video-ip/index.html + public/video-ip-data/video-ip/* 実出力確認。
+- PR #497 open (head df5b24a2 系)。merge・deploy は bot の通常レーン (human-review 済み main からの夜間 deploy) に委ねる。")
+  (:adr/consequences
+"app-kotoba-cloud に動画 IP の公開監視面が1つ増える。SOP 的に: 新シリーズ追加 = rights-holders.json の series に追記、新規 candidate 動画 = bot が videos.json に layer 付きで追加、報告 = reports.json に human-review gate 経由でのみ入る。TikTok/IG/FB の実収集 (Phase 2) はプラットフォーム公式 API key の取得判断がオーナー側に残る (無認証 oembed は実測で壁)。fpcalc 導入と、frame phash 比較ワーカーの追加は bot の lever として自然に伸びる。")))
