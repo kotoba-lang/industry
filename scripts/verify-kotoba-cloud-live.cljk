@@ -24,7 +24,8 @@
 ;;   completion      one short text completion answers 200 with text
 ;;   tool-calls      a tool-equipped request answers native tool_calls whose id
 ;;                   is the origin's (chatcmpl-tool-…), not the authority's
-;;                   text-recovery (call_…) — the parser at the origin regressed
+;;                   text-recovery (call_xxxxxxxx-xxx, a uuid prefix; SGLang's native
+;;                   call_<24 hex> is not that) — the parser at the origin regressed
 ;;                   if the latter comes back
 ;;   stream          stream: true answers text/event-stream with [DONE]
 ;;
@@ -164,8 +165,13 @@
                                                             (when (str/includes? (str (get-in choice [:message :content])) "<tool_call>") " — XML in content")))
                        (not= "write_file" (get-in calls [0 :function :name]))
                        (finding! "error" "tool-calls" (str "called " (get-in calls [0 :function :name]) " instead of write_file"))
-                       (str/starts-with? (str id) "call_")
-                       (finding! "warn" "tool-calls" "tool_calls recovered from text by the authority (id call_…): the origin's parser is not returning native calls")))))))
+                       ;; the authority's text-recovery ids are `call_` + the first 12
+                       ;; chars of a uuid (research_authority.cljk: 8 hex, a hyphen, 3
+                       ;; hex). Native ids: vLLM `chatcmpl-tool-…`, SGLang `call_` + 24
+                       ;; hex (no hyphen — measured 2026-09-20 on the Modal B300 origin,
+                       ;; where the old `starts-with? "call_"` test warned falsely).
+                       (re-matches #"call_[0-9a-f]{8}-[0-9a-f]{3}" (str id))
+                       (finding! "warn" "tool-calls" "tool_calls recovered from text by the authority (id call_xxxxxxxx-xxx): the origin's parser is not returning native calls")))))))
 
 (defn- check-stream [tok]
   (check!)

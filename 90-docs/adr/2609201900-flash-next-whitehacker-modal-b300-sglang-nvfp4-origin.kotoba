@@ -1,0 +1,44 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609201900-flash-next-whitehacker-modal-b300-sglang-nvfp4-origin")
+  (:adr/title "qwen3.8-flash-next-whitehacker の origin を 1× B300 (Modal) の SGLang NVFP4 に移す —— SGLang cookbook の B300 NVFP4 cell を逐語で使い、refusal-removed ModelOpt NVFP4 (dealignai CYBERSECURITY) を FP4 tensor core で full-resident serve。単 B300 で N=1 285〜335 / N=64 2,265〜2,761 tok/s（FP8 同 GPU 比 +10〜30%、旧 RTX PRO 6000 PLE offload の 1,795 比 1.3〜1.5×）。orcarouter Uncensored-NVFP4 は compressed-tensors W4A16（FP4 演算なし・SGLang loader 非対応）なので B300 では不採用。cold start 17〜30 分は Modal GPU snapshot（公式 sglang_snapshot.py の形）で対処、scale-to-zero を維持")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-20")
+  (:adr/last_verified "2026-09-20")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-cloud-red-routes")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki" "cloud-kotoba/app-kotoba-cloud"))
+  (:adr/related
+   (vector "adr-2609200440-qwen38-27b-whitehacker-red-route-published-deepseek-nex-pruned (直前の red route 作業。flash-next の RTX PRO 6000 実測 1,795 tok/s と B300 spec/cost 比較はここ)"
+           "adr-2609160940 (Cutover to vLLM: flash-next を HF Inference Endpoint (RTX PRO 6000, PLE CPU offload) に置いた決定。その endpoint は pause のまま温存)"
+           "adr-260914 (最初の .modal.run 版 flash-next。runaway replica loop で放棄 —— 今回は max_containers=1 で guard)"
+           "PR cloud-kotoba/app-kotoba-cloud#504 (配線: red-route-host-suffixes / upstream id / gate 24)"
+           "https://docs.sglang.io/cookbook/autoregressive/Qwen/Qwen3.8-Flash-Next (SGLang 公式 cookbook。B300 / NVFP4 / single-node cell がこの origin の flag の正本)"
+           "https://recipes.vllm.ai/Qwen/Qwen3.8-Flash-Next (vLLM 公式 recipe。image nightly / default variant Inferact NVFP4 / TP4。今回は SGLang が動いたので未実行、vllm_nvfp4_b300.py として用意)"
+           "https://inferencex.semianalysis.com/inference/agentic/440455 (比較対象の InferenceX B300 TP1 run: image lmsysorg/sglang:qwen38flashnext, RadixArk NVFP4, c8 interactivity 163 tok/s/user @ ISL ~89K, accept 2.32)"
+           "modal-examples 06_gpu_and_ml/llm-serving/sglang_snapshot.py (GPU snapshot の公式パターン: --enable-memory-saver --enable-weights-cpu-backup, /release_memory_occupation → snapshot → /resume_memory_occupation)"))
+  (:adr/problem
+   "オーナー指示 2026-09-20: 『Qwen3.8 Flash Next 176B を B300 で Modal で単体ホストし、InferenceX の SGLang 性能が出るか評価』→『orcarouter Uncensored-NVFP4 で検証』→『B300 で ok』→『api.kotoba.cloud の flash next whitehat にこの Modal B300 を接続』→『ウェブで調べて。recipe を変に使い回さず、各 model・公式の設定を使って』→『fp4 じゃないと B300 が最大限活用できないので、vLLM or SGLang で fp4 でちゃんと推論する環境も用意して検証。fp8 も並行で』→『Modal の GPU snapshot は使えないか』。前提: HF endpoint (RTX PRO 6000 96GB) では 183.5GB の orcarouter build を PLE CPU offload でしか載せられず PCIe 律速で 1,795 tok/s、B300 (288GB) なら full-resident にできるはず、という見立て。制約: (a) orcarouter Uncensored-NVFP4 は compressed-tensors 'mixed-precision' (experts = nvfp4-pack-quantized W4、attention/shared = FP8 channel W8、**input_activations null = weight-only W4A16**。カード自身が『W4A4 は calibration が要る、要望あれば』と明記) —— つまり FP4 tensor core を使わない量子化。(b) pip SGLang 0.5.20 はその loader を持たない (`ImportError: Other method (CompressedTensorsW4A16Sparse24) is not supported now`)。(c) vLLM day-0 tag は config shim (lychee888 FP8PLE) 経由の PLE offload でしか起動できず offload=0 は CUDA assert。(d) SGLang cookbook の単 GPU cell は NVFP4 (RadixArk) だけ、FP8 の公式 cell は TP4/EP4 (4 GPU)。(e) cold start: weight 2.5 分 + flashinfer/TileLang JIT ~12 分 + autotune/graph 2 分 = 17〜30 分（host 差）。")
+  (:adr/decision
+   "1. **origin = Modal app `flashnext-whitehat-b300`**（1× B300、pip sglang 0.5.20 on nvidia/cuda:13.0.3-devel + Python 3.12 —— v0.5.20 は srt/models/qwen4_exp*.py を同梱するので cookbook の『PyPI 未収録、PR #36497 を build』注記は stale。0.5.20 が torch 2.13.0=cu130 を pin するので base も CUDA 13）。`modal.web_server` の OpenAI 互換 /v1、`--api-key`（Modal secret `flashnext-whitehat-origin` の FLASHNEXT_API_KEY）、`--served-model-name` = weights の repo id、min_containers=0 / max_containers=1 / scaledown_window=600。URL `https://junkawasakicom--flashnext-whitehat-b300-flashnext-serve.modal.run`。
+2. **weights = dealignai/Qwen3.8-Flash-Next-CYBERSECURITY-NVFP4**（126 GiB、ModelOpt 0.46.0、quant_algo NVFP4、group 16、exclude 13 modules —— RadixArk/Qwen3.8-Flash-Next-NVFP4 と同一 scheme・同一サイズ。refusal-removed、cybercrime/intrusion 100% comply を公称。オーナー選択 2026-09-20、候補 4 から）。真の W4A4 なので SGLang は `flashinfer_trtllm` MoE runner + `trtllm_fp4_block_scale_moe` を選ぶ (log で確認)。
+3. **flags = SGLang cookbook の B300 / NVFP4 (RDXA) / single node / low-latency cell を逐語**: `--tp 1 --linear-attn-prefill-backend flashinfer --linear-attn-decode-backend flashinfer --mamba-ssm-dtype bfloat16 --speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4 --reasoning-parser auto` + cookbook §2.2 の opt-in `--tool-call-parser auto`（chat template から qwen3_coder に自動解決）。`--quantization` は付けない（hf_quant_config で modelopt NVFP4 に解決）、`--trust-remote-code` も不要（native arch）。以前の InferenceX CI 流用 flag（--dp 1 --ep-size 1 --mem-fraction-static 0.90 --context-length 40960）は捨てた。
+4. **cold start = Modal GPU snapshot**（公式 sglang_snapshot.py の形: `@app.cls(enable_memory_snapshot=True, experimental_options={\"enable_gpu_snapshot\": True})`、`@modal.enter(snap=True)` で launch_server (+ `--enable-memory-saver --enable-weights-cpu-backup`) → /health → warmup 3 回 → POST /release_memory_occupation → snapshot、`@modal.enter(snap=False)` で /resume_memory_occupation。release が拒否されたら resident のまま snapshot する fallback 付き。TORCHINDUCTOR_COMPILE_THREADS=1）。snapshot は deployed app の最初の数回の cold start で生成される。JIT cache を Volume (/jitcache) に置く試みは **空のまま** (512 B) で効かなかった —— FLASHINFER_WORKSPACE_BASE / TILELANG_CACHE_DIR / SGLANG_CACHE_DIR / TRITON_CACHE_DIR を指したが artifact はそこに書かれていない。どこに書かれるかは serve 起動時の JITDIRS 診断行で採る（未解決、snapshot で代替）。
+5. **配線 (PR #504)**: `red-route-host-suffix` (1 文字列) → `red-route-host-suffixes` [.endpoints.huggingface.cloud .modal.run]（SSRF allowlist は維持。stale-host test は両 family 外の host で pin）、upstream id / catalog :upstream → dealignai id、gate `red-max-in-flight-by-route` 8 → 24、secret は MODAL_INFERENCE_URL / MODAL_INFERENCE_TOKEN のまま（名前が再び文字どおり）で値を Modal origin に回した。HF endpoint 群は pause のまま温存（オーナー指示『以前の hf のままは継続的に pause』）。
+6. **不採用**: orcarouter Uncensored-NVFP4（W4A16、FP4 演算なし、SGLang loader 非対応）。orcarouter Uncensored-FP8（動くが FP8: B300 の FP4 を使わない、公式 cell は TP4/EP4 で単 GPU は cell 外）。vLLM（day-0 tag は PLE offload 専用。公式 recipe は nightly + Inferact NVFP4 + TP4 —— `vllm_nvfp4_b300.py` に TP1 化して用意、SGLang が動いたので未実行）。lmsysorg/sglang:qwen38flashnext docker image（Modal の runtime injection が /opt/sglang venv と衝突し grpclib ModuleNotFoundError、add_python でも不可 → pip 版 Modal-native image で回避）。")
+  (:adr/consequences
+   "**実測 (1× B300 Modal、SGLang 0.5.20、cookbook cell、ISL 860 / OSL 512、NEXTN MTP、tok/s)**:
+| build | N=1 | N=4 total/user | N=8 | N=16 | N=32 | N=64 | GPU 常駐 | KV pool | cold start |
+| orcarouter Uncensored-FP8 (block-FP8、cookbook FP8 cell を TP4/EP4→TP1) | 254 | 541/146 | 981/130 | 1,476/98 | 2,276/75 | 2,345/54 | 124 GB + 4.7 MTP | 2.4M tok | 910 s |
+| RadixArk NVFP4 (cookbook 公式 cell、censored) | 263 | 529/133 | 925/121 | 1,471/96 | 2,388/77 | 2,338/50 | 75.6 GB + 7 MTP | 3.6M tok | 1,800 s |
+| dealignai CYBERSECURITY-NVFP4 run 1 | 335 | 647/168 | 1,078/143 | 1,725/112 | 2,546/85 | 2,761/62 | 同上 | 同上 | 1,050 s |
+| dealignai CYBERSECURITY-NVFP4 run 2 | 285 | 519/136 | 976/124 | 1,417/91 | 2,350/77 | 2,265/48 | 同上 | 同上 | 1,810 s |
+読み: (1) 同一 build の 2 run が ±15〜20% ずれる = Modal host 差。dealignai と RadixArk の差は同じ帯域内なので『abliterated の方が速い』とは言えない（accept length 2.2〜2.8 も両者同水準）。(2) FP4 vs FP8 は同一 GPU で N=1 +10〜30%、N=64 0〜+18%、KV pool 1.5×。MoE が A6B なので FP4 の利得は帯域側に出て、decode は spec-decode の verify と linear attention に律速される。(3) InferenceX c8 interactivity 163 (ISL ~89K) に対し N=8 124〜143（ISL 860）—— 同水準。InferenceX の『throughput/chip 39,430』は prefill 込みの値で、この output-only 表とは比較できない。(4) 旧 HF endpoint (RTX PRO 6000 PLE offload) の gate 64 で 1,795 に対し、B300 は N=64 で 2,265〜2,761 (1.3〜1.5×)、single-stream 285〜335。
+**gate**: SGLang は NEXTN 有効時 max_running_requests=48。gate 24 = 全 user が N=32 の床 85 tok/s より上（latency-first）で aggregate ~2,100。
+**cold start**: snapshot 無しで 17〜30 分（weight load 2〜2.5 分は volume からで妥当、残りは flashinfer/TileLang の nvcc JIT と autotune）。snapshot の restore 時間は deploy 後の 2 回目以降の cold start で計測して本 ADR に追記する（未計測は未計測と書く）。
+**cost**: B300 $6.25/h（Modal）。scale-to-zero + max 1 で idle 0、稼働時 $150/日 上限。
+**残り**: JIT cache の書き先特定（JITDIRS 診断）、snapshot restore の実測、live 検証の結果、west pin 前進。")
+  (:adr/tags (vector "red-route" "api-kotoba-cloud" "flash-next" "qwen3.8" "nvfp4" "fp4" "b300" "modal" "sglang" "sglang-cookbook" "modelopt" "abliterated" "gpu-snapshot" "cold-start" "scale-to-zero" "mtp" "nextn" "concurrency" "official-config"))))
