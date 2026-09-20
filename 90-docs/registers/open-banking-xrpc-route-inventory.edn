@@ -1,0 +1,23 @@
+{:schema "etzhayyim.xrpc-route-inventory/v1"
+ :gate :xrpc-adapter-routing-coverage
+ :at "2026-09-20T02:20+09:00"
+ :bot "kinyu (propose-only)"
+ :method "static inventory read from corpus sources; no deploy, no execution (propose-only rules)"
+ :corpus "orgs/cloud-itonami/open-banking @ 9024f0f21e1c (archived read-only; measured locally 2026-09-20)"
+ :declared-route-pattern "open-banking.etzhayyim.com/xrpc/* (xrpc-adapter/wrangler.jsonc routes[0], zone etzhayyim.com)"
+ :nsids
+ (vector
+  {:nsid "com.etzhayyim.apps.openBanking.createAccount" :method "POST" :handler "createAccount" :kotoba-fn "createAccount"}
+  {:nsid "com.etzhayyim.apps.openBanking.getAccount" :method "GET" :handler "getAccount" :kotoba-fn "getAccount"}
+  {:nsid "com.etzhayyim.apps.openBanking.listAccounts" :method "GET" :handler "listAccounts" :kotoba-fn "listAccounts"}
+  {:nsid "com.etzhayyim.apps.openBanking.transfer" :method "POST" :handler "transfer" :kotoba-fn "transfer" :zod-validated? true}
+  {:nsid "com.etzhayyim.apps.openBanking.listTransactions" :method "GET" :handler "listTransactions" :kotoba-fn "listTransactions"})
+ :coverage {:wired 5 :kotoba-reference-fns 5 :uncovered 0}
+ :evidence
+ (vector
+  "xrpc-adapter/src/index.ts routes map (lines 72-93) declares exactly 5 NSIDs under NSID_BASE com.etzhayyim.apps.openBanking"
+  "kotoba/src/banking.ts header (lines 4-10) lists the same 5 reference functions: createAccount/getAccount/listAccounts/transfer/listTransactions"
+  "transfer is the only Zod-validated endpoint (transferInputSchema.safeParse, index.ts lines 192-204)"
+  "mapStatus maps rejected/accountNotFound/currencyMismatch -> 400, alreadyExists/alreadyProcessed -> 200 idempotent (lines 103-108)"
+  "grep -c d1 in xrpc-adapter/wrangler.jsonc and worker/wrangler.jsonc -> 0/0 (measured 2026-09-20; no D1 binding yet)")
+ :caveat "coverage is static source-level; live endpoint behavior unmeasured until :deploy-surface gate closes (route did not resolve 2026-09-18, curl exit 6)"}
