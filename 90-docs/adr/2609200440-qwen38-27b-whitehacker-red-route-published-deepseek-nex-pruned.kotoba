@@ -1,0 +1,34 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609200440-qwen38-27b-whitehacker-red-route-published-deepseek-nex-pruned")
+  (:adr/title "api.kotoba.cloud に red route 'qwen3.8-27b-whitehacker' を公開 —— dense Qwen3.8-27B uncensored NVFP4 を 1× RTX PRO 6000 の vLLM で serve、native flashinfer fp4_gemm が自動選択され 2,963 tok/s @ N=256（0 errors）。1 枚に収まるので TP 無し = NVLink 壁を回避。deepseek-v4.1-flash / nex-n2.5-mini を catalog から prune（:served false、配線は温存）。hermes config も同期。igorls NInfer は別 runtime（.ninfer / concurrency ≤8）で multi-tenant route には不適")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-20")
+  (:adr/last_verified "2026-09-20")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "kotoba-cloud-red-routes")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki" "cloud-kotoba/app-kotoba-cloud"))
+  (:adr/related
+   (vector "adr-2609201145-dsv41-flash-throughput-scaling-rtx-pro-6000-nvlink-wall-b300-fp4-paths (なぜ 552B は RTX PRO 6000 で伸びないか＝ NVLink 壁。27B が 1 枚に載って TP を回避できるのがこの route の要点)"
+           "adr-2609192140-dsv41-flash-whitehacker-canonical-origin-vllm-2x-rtx-pro-6000-hf-endpoint (deepseek red route の正本。今回 :served false で prune)"
+           "orcarouter/Qwen3.8-27B-Uncensored-NVFP4 (served weights。base = Qwen3.8-27B、abliterated、mixed NVFP4/FP8)"
+           "igorls/Qwen3.8-27B-Uncensored-NVFP4-NInfer (同 base の .ninfer 変換 + Inco AI DFlash2。github.com/igorls/ninfer @ 91ce2f2)"
+           "PR cloud-kotoba/app-kotoba-cloud#488 (merge 269f6a24)"))
+  (:adr/problem
+   "オーナー指示 2026-09-20:『api.kotoba.cloud に red として qwen3.8 27b model を公開。hermes agent で model 選択にこの qwen38-27b を表示して。逆に deepseek, nex2.5 は prune。igorls/Qwen3.8-27B-Uncensored-NVFP4-NInfer もスループットを計測』。狙いは 27B（能力は 27B で足りるとの前提、2026-09-19）を、552B DeepSeek を縛った NVLink 壁を回避して安く高スループットに serve すること。制約: RTX PRO 6000 quota、uncensored checkpoint の access、native FP4 kernel が sm_120 で実際に選ばれるか。")
+  (:adr/decision
+   "orcarouter/Qwen3.8-27B-Uncensored-NVFP4 を 1× RTX PRO 6000 の HF Inference Endpoint（com-kotobalabs/qwen38-27b-whitehacker、vLLM latest、scale-to-zero）で serve し、api.kotoba.cloud に red route 'qwen3.8-27b-whitehacker' として :served true で公開した。upstream/secret/gate は per-route 配線（既存 red route と同じ形）。deepseek-v4.1-flash-whitehacker と nex-n2.5-mini-whitehacker は :served false で catalog から prune（upstream-models・secret・ladder・operator record はすべて温存 = 1 行で復帰可能、nex の『park, don't delete』と同じ）。hermes の ~/.hermes/config.yaml（kotoba provider）も qwen38-27b を追加して default にし、deepseek を除いた。NInfer は同 base の別 runtime だが .ninfer 専用形式・concurrency 1..8 の workstation エンジンなので multi-tenant route の origin には採らない（vLLM が 256 並列で桁違いに上）。")
+  (:adr/authoritative_for
+   (vector "native FP4 は sm_120（RTX PRO 6000）で実際に使われる: vLLM latest は compressed-tensors NVFP4 を auto-detect し、Marlin ではなく flashinfer の native fp4_gemm を選ぶ（BACKEND ログで [AutoTuner] Tuning fp4_gemm を確認、2026-09-20 実測）。--quantization を渡さない（config から自動）ことが条件 —— modelopt_fp4 を明示すると config の compressed-tensors と衝突して ValidationError"
+           "1× RTX PRO 6000、orcarouter/Qwen3.8-27B-Uncensored-NVFP4、thinking off、300-token 出力、distinct prompt、native fp4_gemm の実測 aggregate: N=1 56 tok/s、N=16 739、N=64 1,928、N=128 2,601、N=256 2,963（全て 0 errors）。native fp4_gemm(2,963) は modelopt/Marlin 経路(2,393) を上回る。27B(~14 GB NVFP4)は 1 枚に載るので TP 無し＝ NVLink all-reduce 壁が存在しない（552B が TP2/4 で ~700-800 に張り付いたのと対照的）"
+           "endpoint 設定: com-kotobalabs 名前空間、aws us-east-2、nvidia-rtx-pro-6000 x1（$2.75/h、quota 0/4）、type authenticated（Worker が bearer で到達可能）、custom-image vllm/vllm-openai:latest、engine vllm、port 8000 / health /health、scale-to-zero minReplica 0 / 30 min。container-args: --max-model-len 131072 --kv-cache-dtype fp8 --gpu-memory-utilization 0.90 --enable-prefix-caching --reasoning-parser qwen3 --tool-call-parser qwen3_coder --trust-remote-code。orcarouter repo は gated なので boot に HF_TOKEN secret が要る"
+           "upstream id は served 名 = weights の repo id: /v1/models が 'orcarouter/Qwen3.8-27B-Uncensored-NVFP4' を返す（HF 管理 vLLM が --served-model-name を repo id で上書きする既存の慣習）。gateway はこの id を model に送る。:strictAttribution true が成立。enable_thinking:false は効く（reasoning_tokens 0 の短答を確認）ので off-path で短リクエストが空 length になる事故は起きない"
+           "配線（app-kotoba-cloud、PR#488 / merge 269f6a24）: research.cljk models に 'qwen3.8-27b-whitehacker'（:team :red :served true :input-modalities [text]、reasoning ladder なし＝この vLLM build の enable_thinking on-path が未計測のため advertise しない）。research_authority.cljk に upstream-models / red-route-secret-env(QWEN27B_INFERENCE_URL) / red-route-token-secret-env(QWEN27B_INFERENCE_TOKEN) / red-max-in-flight-by-route(32、131k ctx 前提の保守値)。secret 2 本は kotoba-research-authority worker に設定済み。URL secret は full …/v1/chat/completions"
+           "deploy は 2 worker: npm run deploy（edge kotoba-cloud-control-plane、catalog を配る）と wrangler deploy --config wrangler.research.jsonc（authority、routing を配る）。両方 origin/main 包含の checkout から。live /v1/models 検証: qwen3.8-27b-whitehacker=upstream-tested-access-gated、deepseek/nex=route-not-configured"
+           "NInfer(igorls/Qwen3.8-27B-Uncensored-NVFP4-NInfer)は route origin に不適: (1) .ninfer 専用形式で vLLM/transformers/ollama/llama.cpp は load できない、専用 fork（CUDA 13.1+、sm_120a、Windows で qualification、Linux は再 qualify されていない）(2) concurrency は 1..8 FIFO なので 256 並列を捌く multi-tenant red route には桁が足りない (3) base は同じ orcarouter NVFP4 で、NInfer の付加価値は DFlash2 speculative decoding による single-stream 速度。∴ 公開 route は vLLM のまま、NInfer は単一 workstation 用途の別軸として評価する"))
+  (:adr/consequences
+   "red route は 4 本中 2 本 served（qwen3.8-flash-next-whitehacker と qwen3.8-27b-whitehacker）、deepseek/nex/glm は route-not-configured。deepseek の 2× RTX PRO 6000 origin は delist 中は cost 節約のため pause 推奨（catalog の :served false は billing を止めない）。qwen38-27b endpoint は scale-to-zero なので idle は $0、初回リクエストで cold start（~4.5 min で READY を実測）。retune 項目: red-max-in-flight(32) は 32k ctx での測定に基づく暫定値で 131k ctx 実トラフィックで測り直す。enable_thinking on-path を計測できたら reasoning ladder を開ける。")
+  (:adr/tags (vector "red-route" "api-kotoba-cloud" "qwen3.8-27b" "nvfp4" "rtx-pro-6000" "vllm" "native-fp4" "ninfer"))))
