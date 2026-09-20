@@ -1,0 +1,17 @@
+[{:db/id -1
+  :doc/id "inference-coscientist-iteration-58"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/inference/coscientist/iteration-58.edn"
+  :doc/date "2026-09-20"
+  :source/dataset "inference-coscientist"
+  :coscientist/domain "LLM inference serving on the native :gpu/compute path; /loop kaizen tick 53: int8 in the batch step on anv"
+  :coscientist/iteration 58
+  :coscientist/subject "B rows' activations quantized as one vector (quant_q8 over B*n; the int8 kernels index the per-32 scale by element), int8 lm_head with positions = B, int8/dual forms enabled for batch steps up to :batch-layout-upto. B70 12L: upto 1 -> B=2 8.95 / B=4 13.32; upto 2 -> 8.65 / 13.24 (anv default); upto 4 -> 8.66 / 15.57. seq-tokens/s 200 -> 231 (B=2) -> 302 (B=4, 1.51x). The adaptive anv guest needed 128 pipelines (amu #1039, 'pipeline table full' at 64); kexe-loader-gpu7 built on the boxes"
+  :coscientist/engine-note "tick 47's open item (an int8 positions lm_head for anv) closed as a measurement: the int8 decode form read twice beats the f32 positions form read once up to B=2, and nothing new was needed."
+  :coscientist/generated 2
+  :coscientist/rejected-by-reflection 0
+  :coscientist/ranked-first "the per-row costs that cap batch gain (MoE experts at 8B positions, delta-net state traffic): group the expert kdots by expert so rows sharing one read it once"
+  :coscientist/measured "B70 rap12-anv upto1: 5.21 / 8.95 / 13.32 ms; upto2: 5.21 / 8.65 / 13.24; upto4: 5.21 / 8.66 / 15.57 (B=1/2/4); rows oracle-exact; pipeline count ~70 on anv"
+  :coscientist/refuted ""
+  :coscientist/carries-forward "amu #1039 merge + pin + loader promotion; per-row batch costs (MoE experts, delta-net state); bucket 16; gateway fallback exercise (owner); probe-xavier stale (gateway repo); B70 40L (owner: vLLM)"
+  :doc/body "# Inference serving co-scientist, iteration 58 — `/loop 30min kaizen loop` tick 53（2026-09-20）\n\n対象: anv の batch step に int8（反復 52 で残した「anv の int8 positions lm_head」）。\n\n## Generate\n\n- H58.1 B 行の activation を 1 本の vector として量子化（`quant_q8` を `B·n` 要素で; int8 kernel は per-32 の scale を要素 index で引くので連続行は他に何も要らない）、int8 lm_head は `positions = B`、int8 / dual 形は `:batch-layout-upto` 以下の batch step で有効。\n- H58.2 adaptive anv guest は loader の `pipeline table full`（64）で起動拒否: ops 23 + batch 双子 13 + batch-prefill 双子 5 + kdot layout と int8 形 + phase ごとの positions kernel + embed / delta-net 3 種 + quantizer ≈ 70。amu #1039 で `KGPU_MAX_PIPELINES` 128、3 箱に `kexe-loader-gpu7`（PR が着地したら昇格）。K16 / Xavier は数本の余裕で旧上限内だった。\n\n## Measure\n\nB70 12 層、adaptive guest（`prefill:8 batch:1,2,4`）、GPU ms/step、全行 oracle 一致:\n\n| `:batch-layout-upto` | B=1 | B=2 | B=4 |\n|---|---|---|---|\n| 1 | 5.21 | 8.95 | 13.32 |\n| **2**（anv 既定） | 5.21 | **8.65** | **13.24** |\n| 4 | 5.21 | 8.66 | 15.57 |\n\n- seq-token/s 200（単一）→ 231（B=2）→ **302（B=4、1.51×）**。425 MB の lm_head を int8 で 2 度読む方が f32 positions kernel で 1 度読むより速い —— 反復 52 の open item は測定で閉じた（新 kernel 不要）。\n\n## Evolve\n\n- 次: batch gain を頭打ちにする行比例 cost —— MoE expert kdot（8B position、行が同じ expert を選べば 1 度で読める grouping）、delta-net の state traffic。amu #1039 の merge / pin / 昇格。\n"}]
