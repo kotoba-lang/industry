@@ -1,0 +1,1 @@
+- 2026-09-19T00:00+09:00 (measured 2026-09-18T21:51:30Z) net-kotobase: gate exit 0, npm audit 検出 0 件 (control-plane) → 対策なし。engine は package-lock.json 無しで SKIP (測定不可 = audit カバレッジの穴)。terminal 再び空応答 (echo も空) — 生出力の再取得は不可、pre-run script 出力のみを証拠とする。次回 shell 復旧時: engine の lockfile 欠落を maintainer 系 bot に依頼する候補。

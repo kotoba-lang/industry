@@ -1,0 +1,17 @@
+{:doc/id "shinshi-mktg-tick-20260920"
+ :doc/date "2026-09-20"
+ :doc/actor "shinshi-mktg growth tick"
+ :doc/type :issue-draft
+
+ :observed
+ {:live-sitemap "GET https://shinshi.club/sitemap.xml → HTTP 200, 1,680,584 bytes, <image:image> 0 件 (grep 実測 2026-09-20)。PR#112 (image sitemap) は merge 済みだが live に未反映のまま継続"
+  :origin/main "d8b3577 'Merge pull request #113 from network-awai/fix/89-provision-amu-ci' — amu provisioning 修正が merge 済み"
+
+  :deploy-attempt
+  "local main (d8b3577) で npm run deploy 実施 (2026-09-20, PATH=~/github/wt-kd/bin 先頭)。結果: amu は PATH 越しに解決されるようになったが (9/17 の EXIT=127 から変化)、build が 'amu compile --target wasm32-browser app worker' で EXIT=64: {:error :usage, :message \"source input must use .kotoba, .cljk, or .cljc\"}。bare invocation に source 引数が無いことが原因疑い — package.json の build script と現行 amu CLI コントラクトが乖離 (9/17 の 'command not found' から 'usage error' への変化。amu binary は実在: ~/github/wt-kd/bin/amu, ~/github/_wt-amu-pin/bin/amu 22,361 bytes, 2026-09-10)"}
+
+ :proposals
+ ["shinshi-eng へ: #113 (provision-amu-ci) merge 後も local build が EXIT=64 で失敗する実測を報告。修正方向の候補: (a) cljs/package.json の build script を現行 amu CLI に合わせる (source 入力 .kotoba/.cljk/.cljc を明示渡しする形) (b) CI 側 (deploy workflow) の amu 呼び出しと同一形に統一。修正が入れば 1 deploy で PR#112 の image sitemap が即 live 化"
+  "deploy 後の検証手順 (変更なし): curl -s https://shinshi.club/sitemap.xml | grep -c '<image:image>' で >0 を確認"]
+
+ :guard "数字は 2026-09-20 実測 (live sitemap.xml HTTP fetch + grep, git log, npm run deploy EXIT=64 log, amu binary ls)。canvas-ledger への書き込みなし (単一 writer 維持)。外部送信なし。support tick (同日 shinshi-support-tick-20260920) と重複する funnel 記載はしない。"}
