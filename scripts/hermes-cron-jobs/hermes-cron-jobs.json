@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-19T00:22:04Z",
+  "generated_at": "2026-09-20T09:59:56Z",
   "note": "Re-registerable definition ledger for every Hermes profile cron job. State fields are intentionally absent (terminal-local). Regenerate with export_cron.py.",
   "profiles": {
     "adnetwork-dataset-ops": [
@@ -9145,6 +9145,56 @@
           "kind": "cron"
         },
         "script": null,
+        "skills": null,
+        "workdir": null
+      }
+    ],
+    "kotoba-partner-catalog-ops": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "38852c18e6b6",
+        "model": null,
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "partner-catalog-r2-sync",
+        "no_agent": true,
+        "prompt": "partner-catalog-r2-sync: sync kotoba.cloud sales-partner/agent catalog (partners.json) into R2 Data Catalog Iceberg kotoba_sales.partners. Run the script, report its single line. Empty output means no drift - reply NO_REPLY.",
+        "provider": null,
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "55 7 * * *",
+          "expr": "55 7 * * *",
+          "kind": "cron"
+        },
+        "script": "partner-catalog-sync.sh",
+        "skills": null,
+        "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "f3e3d600ecdc",
+        "model": "qwen3.8-27b-whitehacker",
+        "monitor_script": null,
+        "monitor_url": null,
+        "name": "kotoba-partner-catalog-deepen",
+        "no_agent": false,
+        "prompt": "kotoba.cloud sales-partner catalog deepening. Read /Users/junkawasaki/.hermes/profiles/kotoba-partner-catalog-ops/SOUL.md first, then follow it. Pick exactly 1 lever from the evidence JSON at the top of this run (dead sources first, then a gap country, then reported->verified upgrade). Edit only /Users/junkawasaki/github/com-junkawasaki/scripts/hermes-partner-catalog/partners.json per the SOUL rules (no git commands, no R2 writes), validate the JSON after editing, report what changed. If no lever: report no lever this run and stop.",
+        "provider": "kotoba",
+        "repeat": {
+          "times": null
+        },
+        "schedule": {
+          "display": "17 7 1 * *",
+          "expr": "17 7 1 * *",
+          "kind": "cron"
+        },
+        "script": "kotoba_partner_catalog_ops_evidence.py",
         "skills": null,
         "workdir": null
       }
