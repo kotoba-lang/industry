@@ -1,0 +1,38 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609201145-dsv41-flash-throughput-scaling-rtx-pro-6000-nvlink-wall-b300-fp4-paths")
+  (:adr/title "DeepSeek V4.1 Flash の throughput scaling 調査 —— RTX PRO 6000 は NVLink 不在で InferenceX 級に届かない（4× FP8 実測 ~800 tok/s、台数を増やしても伸びない）。full V4.1 の native FP4 は 2× B300 が要る（1 枚は枝刈り必須）。HF quota・Modal B300 の drivability・コストと、REAP/sparse-NVFP4 の位置づけ")
+  (:adr/status "accepted")
+  (:adr/date "2026-09-20")
+  (:adr/last_verified "2026-09-20")
+  (:adr/doc_type "adr")
+  (:adr/source-format "kotoba")
+  (:adr/authoritative true)
+  (:adr/deciders (vector "Jun Kawasaki"))
+  (:adr/topic "dsv41-flash-uncensored-infra")
+  (:source/dataset "adr")
+  (:adr/repos (vector "com-junkawasaki" "cloud-kotoba/deepseek-v41-flash-satgeze-x2" "cloud-kotoba/deepseek-v41-flash-reap-nvfp4-x2"))
+  (:adr/related
+   (vector "adr-2609192140-dsv41-flash-whitehacker-canonical-origin-vllm-2x-rtx-pro-6000-hf-endpoint (現行 2× 経路の正本。~700 tok/s の kernel 律速をここで確定)"
+           "SemiAnalysis InferenceX DeepSeek V4.1 Flash 552B（B300 vLLM TP2 Conc64 = 155,834 tok/s/chip / 248M tokens per $1 TCO）"
+           "cloud-kotoba/deepseek-v41-flash-reap-nvfp4-x2 (REAP-192E + sparse-NVFP4 の recipe repo。pin c507c83、west 登録済み ac678a69)"
+           "https://github.com/Infatoshi/dsv4-flash-2x-rtxpro6000s (V4-Flash-0731-NVFP4 を 2× RTX PRO 6000 sm_120 で serve、13 patch)"
+           "https://github.com/CerebrasResearch/reap / vllm-project/llm-compressor examples/reap_expert_pruning"
+           "https://github.com/NVIDIA/TensorRT-Model-Optimizer (NVFP4 + 2:4 sparsity、vLLM Unified HF export)"))
+  (:adr/problem
+   "現行 2× RTX PRO 6000（EXL3 2bpw、~700 tok/s aggregate）を超えて InferenceX 級（B300 TP2 で 155k tok/s/chip）に近づけたい。オーナーの狙いは (1) RTX PRO 6000 を増やせば native tensor-core で伸びるか (2) full V4.1 を native FP4 で 2 枚/1 枚に載せられるか (3) B300/B200 を実測してコスト判断。制約: full V4.1-Flash = 384 experts / 552B。FP4 tensor core は 4-bit を読むので weight は 4-bit 固定 → 552B × 4bit = 276 GB が下限、192 GB (2×96) には収まらない。")
+  (:adr/decision
+   "RTX PRO 6000 は台数・量子化を変えても InferenceX 級に届かない（NVLink 不在が根本）。full 品質 V4.1 を 2 枚で回すなら現行 EXL3 2bpw が最適点のまま。native FP4 で InferenceX 級を狙うなら datacenter GPU（NVLink あり）が必須 —— full V4.1-NVFP4 は 2× B300、1 枚に収めるには expert 枝刈り（REAP-≤256E）か小型モデル（V4-Flash-0731）が要る。B300 は HF に無いので Modal（or neocloud）で実測する。REAP-192E / sparse-NVFP4 の recipe は repo 化済み（reap-nvfp4-x2）。")
+  (:adr/authoritative_for
+   (vector "RTX PRO 6000（ワークステーション版）には NVLink が無い。TP の all-reduce が PCIe 経由（+ NCCL_P2P_DISABLE=1、workstation ペアの P2P init deadlock 回避）で、GPU を足すほど通信オーバーヘッドが追加 compute を食い潰す。∴ 台数を増やしても aggregate throughput は伸びない。実測: 2×(2bpw) ~700 → 4×(FP8) ~800 tok/s（ほぼ横ばい）"
+           "full V4.1-Flash（552B）の native FP4（NVFP4）実サイズは 429-510 GB（LibertAI 429 / nvidia 510 / Solstice 527）。5-6× RTX PRO 6000、2× B300（各 275 GB usable）、または 3× B200 が要る。1× B300（275 GB usable）には Engram を host にオフロードしても収まらない（VRAM 常駐 ~321 GB > 275）"
+           "1× B300 に載るのは枝刈り/小型のみ: REAP-256E→NVFP4 ~228 GB ✓、REAP-192E(50%)→NVFP4 ~152 GB ✓、V4-Flash-0731-NVFP4 176 GB（ready）✓。full V4.1 は不可"
+           "FP4 効率を保ったまま縮める軸は 2 つだけ: expert 枝刈り（param 数を削る、REAP）と 4:8 semi-structured sparsity（Blackwell HW が 0 を飛ばす）。ビットを 4 未満にすると FP4 tensor core を使えず dequant 経路（= EXL3 2bpw = 遅い）に落ちる。4-bit 前提では REAP-50%（~152 GB）の方が sparse-NVFP4（metadata で ~210 GB）より圧縮率が高く、MoE/code では品質劣化も小さい見込み（REAP は MoE 専用 SOTA、sparse は全 weight を一律 0 + 量子化の二重損失）。ただし llm-compressor 実測で DeepSeek-V3 系（Moonlight-16B）が 50% で崩れた例があり、V4.1 の 384 experts でも code/tool で eval してから信用する"
+           "HF の GPU 提供: Inference Endpoints の nvidia-rtx-pro-6000 quota はこの account で 2（4 台要求は 409）。B200 は Endpoints にあり（$9.25/GPU）、B300 は無い。HF Jobs は rtx-pro-6000 x4/x8 と h200 x8 まで（B200/B300 は無い）。∴ B300 は HF では動かせず Modal / neocloud + 認証が要る"
+           "Modal は HGX B300（NVIDIA B300 SXM6 AC、275,040 MiB/GPU usable、~$7.10/h・per-second、gpu=\"B300:N\"）と B200（~$6.25/h）を提供。one-shot の modal run 関数（固定 GPU、終了で解放）なら 2026-09 の runaway-replica 事故（web_server + min_containers の autoscaling）を回避できる"
+           "コスト参照（2026-09）: B300 rental RunPod $6.94-7.89/GPU・市場中央値 $7.88、Modal $7.10。B200 Lambda $4.99 / HF $9.25。B300 購入 ~$53K/GPU、DGX B300 8枚 $400-500K。現行 2× RTX PRO 6000 (HF) $5.5/h。InferenceX TCO: B300 TP2 = 248M tokens/$1、現行 2× ≈ 458k tokens/$（飽和時、~540× 差）—— ただし低ボリューム red route では時間単価が支配的で現行 2× が最安"))
+  (:adr/evidence
+   "【4× RTX PRO 6000 実測、2026-09-20、HF Jobs rtx-pro-6000x4、full uncensored V4.1（distributedcognition/DeepSeek-V4.1-Flash-abliterated, FP8, 510 GB）、TP4、Engram→host（8 shards × 23.6 GiB = ~189 GB）、DSpark 無、thinking off】\nREADY ~460s。VRAM 常駐 weights ~321 GB = ~80 GB/GPU。KV 1,462,144 tokens、262K context で max concurrency 5.58×。\n| N | aggregate tok/s | per-req p50 |\n| 1 | 57 | 57.3 |\n| 8 | 292 | 36.5 |\n| 16 | 504 | 31.5 |\n| 32 | 782 | 24.5 |\nengine peak generation 812.7 tok/s @ Running=32。\n比較: 現行 2× RTX PRO 6000 EXL3 2bpw + DSpark = single 85 / aggregate peak ~700。→ GPU を 2→4 に倍増しても aggregate ~700→~800（ほぼ横ばい）、single はむしろ低下（85→57、FP8 は 2bpw の 2 倍バイト + TP4 通信 + spec 無し）。NVLink 不在で TP スケールが効かないことの直接証拠。\n\n【fit 検証（HF safetensors index の total_size = VRAM 常駐サイズ、per GPU 96 GB (RTX PRO 6000) / 275 GB (B300) / 192 GB (B200)）】\nfull V4.1-Flash: 384 experts / 552B。NVFP4 429-510 GB。FP8 552 GB（distributedcognition uncensored 510、Engram 込み）。EXL3 2bpw ~150 GB（現行、収まるが FP4 非対応）。\nREAP-272E=426B（NVFP4 234 GB）、REAP-256E=414B（NVFP4 228 GB）、REAP-192E(50%)=276B（NVFP4 152 GB、safetensors 版は無く MLX のみ）。V4-Flash-0731（旧世代・小）NVFP4 176 GB（Infatoshi 実測: 2× RTX PRO 6000 で single 202 / agg 825 @ c=8）。\n\n【Modal B300 実測（進行中、2026-09-20）】\nprobe: gpu=\"B300:1\" 確保成功、NVIDIA B300 SXM6 AC 275,040 MiB。full V4.1-NVFP4（nvidia）を 2× B300 TP2 modelopt_fp4 で serve するベンチ（modal run eval.py::bench_2x、one-shot 関数）を実行中 —— 結果はこの節に追記する（does native FP4 + NVLink deliver InferenceX-class の直接検証）。\n\n【1回目の失敗と学び】4× FP8 の 1回目は engine core init で落ち、eval script が内側 log を tail 40 行しか拾わず root cause を取り逃した（recipe README の『root cause は wrapper の上』の罠）。v2 で (a) 失敗時に vllm.log 全体を出力 (b) --quantization を config auto 検出に (c) DSpark を外す、に直して成功。")
+  (:adr/consequences
+   "+ 「RTX PRO 6000 では InferenceX 級は出ない」が実測で確定（NVLink 不在）。4 台は 2 台の ~2 倍コストで throughput ほぼ同じ → 割に合わない。\n+ full uncensored V4.1 を native tensor-core（FP8）で 4 台に載せること自体は可能（Engram→host が効く）と実証。\n+ reap-nvfp4-x2 repo に REAP-192E / sparse-NVFP4 の再現パイプラインを用意（h200x8 build → rtx-pro-6000x2 serve、pin 済み）。\n- REAP / sparse-NVFP4 は「2 台で single-stream latency を上げる（FP4 で ~2×）」用途には効くが、NVLink が無い以上 aggregate を InferenceX 級にはできない。\n- full V4.1 native FP4 は最低 2× B300（or 3× B200、or 5-6× RTX PRO 6000）。1× B300 に収めるには REAP-≤256E か V4-Flash-0731 への縮小が必須で、品質 or 世代のトレードを伴う。\n- B300 は HF に無く Modal/neocloud 依存 —— production を B300 に載せるなら HF Endpoints から出ることになる（運用面の変更）。\n- 低ボリューム red route の経済性では現行 2× RTX PRO 6000（$5.5/h、uncensored、稼働中）が依然最安・最適。B300 が効くのは持続高負荷になってから。")
+  (:adr/resume
+   "追記待ち: Modal 2× B300（full V4.1-NVFP4）ベンチの実数（single / aggregate tok/s、engine peak、$/1M tok）。出たら evidence と decision を更新。次にオーナー判断: (a) 2× B300 が InferenceX 級を出したら production を B300（Modal/neocloud）へ載せ替えるか、コスト（~$14/h 常時 vs 現行 $5.5/h）と HF 離脱の是非。(b) 1× B300 に収めたいなら REAP-256E→NVFP4 を build（reap-nvfp4-x2 の build/reap192_nvfp4.sh を 256E 版に）。(c) 現行 2× 維持で確定し FP4 実験は latency 改善用途に限定。reap-nvfp4-x2 の build 実行（h200x8、~$300-800）は VALIDATE 点（REAP が FP8 base を受けるか等、repo の build/README）を潰してから。")))
