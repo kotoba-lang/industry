@@ -1,0 +1,100 @@
+(vector (map (:db/id -1)
+  (:adr/id "adr-2609201400-jev-code-holes-choice-refactor-closing")
+  (:adr/title "choice しか返さない model(TypeSafe Jev)で kotoba の refactor は回るか —— 駆動ループ・候補列挙・verifier を外から与えて実測: 既存の名前への繋ぎ替えは通る(rename 1 本 kbb PASS、keyword 0.7 / 依存 rewire)、新規の名前(36%)と意味変更は通らない。gold 付き code-holes family を 1,232 + 1,160 件 HF に公開。closing 2026-09-20")
+  (:adr/status :accepted)
+  (:adr/date "2026-09-20")
+  (:adr/deciders (vector "owner"))
+  (:adr/supersedes (vector))
+  (:adr/related (vector "adr-2609191200-jev-decide-probe-and-repo-governance-hf-publish"
+                        "adr-2609181715-typed-decisions-train-teacher-and-code-decisions"
+                        "adr-2609181544-typed-decisions-jev-shape-modernbert-vs-llada-moe"
+                        "ADR-2608136000"))
+  (:adr/source (vector "orgs/kotoba-lang/typed-decisions"
+                       "https://github.com/kotoba-lang/typed-decisions/pull/2"
+                       "https://github.com/kotoba-lang/typed-decisions/pull/3"
+                       "https://github.com/kotoba-lang/typed-decisions/pull/4"
+                       "https://github.com/kotoba-lang/typed-decisions/pull/5"
+                       "https://github.com/kotoba-lang/typed-decisions/pull/6"
+                       "https://huggingface.co/datasets/com-kotobalabs/typed-decisions-code-holes"
+                       "https://huggingface.co/datasets/com-kotobalabs/typed-decisions-repo-governance"
+                       "90-docs/research-notes/jev-typed-decisions-2026-09-20.md"))
+  (:adr/context
+  "owner の問い(2026-09-19): jev だけで kotoba の coding / refactor / tool call ができるか。adr-2609191200 の
+  時点では『jev は 1 回の呼び出しでコードを書けない(TypeSafe 自身の docs)』を根拠に『router/gate 専用』と
+  結論していた。owner の『もう少し検討して』で読み直し、**生成とは反復された choice**であり、jev に無いのは
+  能力ではなく駆動ループだ、と訂正。kotoba が有利な理由を 3 つ挙げた —— 名前が identity でない
+  (content-addressed)、capability import が有限、型検査器・test が verifier として在る(掛け算ではなく探索)。
+  owner の『はい。検証してみて』『do it』『next』『3, 1』で 4 反復を実測した。test bed は
+  kotoba-lang/typed-decisions の段 0 corpus(`mine_kotoba_tasks.py`、FAIL→PASS 検証済み fix pair 24 本)と、
+  そこから広げた git 履歴全体。")
+  (:adr/decision
+  "1. **駆動ループ(`jev_holes.py`)**: before/after を token 差分し『1 token 削除 → 1 token 挿入、両方 code-like
+  (keyword / symbol / 空白無し文字列)』を穴とする。option は module + test(+ 第9反復から repo 全体)にある同種
+  token から置換前を除いたもの。**gold が option に無ければ落として数える、足さない**。穴ごとに jev へ choice を
+  1 回、top-1 を全穴に入れて kbb で実 test、FAIL なら confidence の低い穴から jev 自身の分布の次点へ backtrack
+  (8 run まで)。
+
+  2. **corpus の形が最初の結果**: 24 pair の変更 token は挿入 2,453 / 削除 191(93% が挿入)、履歴 80 repo では
+  1.31M / 221k(86%)。**実 bugfix の大半は choice の外**。ただし test を反転させる bugfix を掘った corpus なので
+  生成に偏る —— 繋ぎ替え refactor は test を反転させないためここに入らない、と明記。
+
+  3. **rename refactor が choice だけで通った**: `kototama-de177068`(keyword 2 + 名前文字列 2 を
+  kotoba-core-contracts の名前へ)は 4 arm すべてで greedy 1 run PASS、6/6 正解。第 6 反復で落ちていたのは
+  harness が文字列 literal を丸ごと除外していたからで、到達率でも model でもなかった。
+
+  4. **gold 付き `code-holes` family(`hole_data.py`)**: kotoba-lang の git 履歴から穴を掘り、gold = commit が置いた
+  token(`verified: commit|test`)。80 repo × 300 commit → 穴 4,042、file pool で到達 1,300、**unreachable 68%**。
+  split は repository 単位。**各 record に `changed_tokens` を持つ** —— 最初の held-out 200 穴は 167 が変更
+  token 100 超の diff 内の 1:1 alignment(誰も決めていない置換)で symbol 0.05 だった。isolated(≤100)だけを
+  評価に使う、と card にも書く。
+
+  5. **候補の整形(`hole_eval.py --reshape`)**は穴の形で条件付ける: reader 構文は常に、alias の裸 symbol は穴が
+  namespaced なときだけ、`_`/`&` は binding 位置以外だけ。無条件版は実 refactor の gold を 4 つ消した。
+  効果 +1.5 pt は jev の呼び出し間の揺れ(±1.5 pt)と同程度。
+
+  6. **候補源は repo 全体(`hole_data.py --pool repo`、blob cache)**: 到達 22% → 64%、なお 36% は sha 時点の repo に
+  無い名前 = 生成。同じ穴で pool だけ変えると keyword は落ちず symbol が 3/26 落ちる。**閾値は穴の種類と pool に
+  依存し、単一の 0.6 ではない。**
+
+  7. **公開**: `com-kotobalabs/typed-decisions-code-holes`(config default 1,232 件 / repo-pool 1,160 件、
+  Apache-2.0)。owner の『kotoba-lang は public』を **GitHub API で 65 repo 実測 → 64 public / 1 private
+  (`app-kotoba-cloud`、68 record)**、private を除いて公開。
+
+  8. 触っていないもの: student(DeBERTa)の訓練、kotoba-sema による型刈り(pair が .cljc なので不可)、
+  jev-latest alias の再測定、repo-governance の gold。")
+  (:adr/consequences
+  "- 『jev で kotoba の refactor』の答えは 3 層: (1) **既存の名前への繋ぎ替え**は候補源が repo なら到達 64%、
+  keyword 0.7 / 名前文字列 0.7 / symbol は依存 rewire(`clojure.string`→`kotoba.lang.text` の形)なら当たる、
+  較正ゲート 0.8 で精度 0.86〜0.92・適用率 0.27〜0.34 —— dependency-substitution-wave の 64 coordinate と
+  repo-bot の finding はこの形。(2) **論理の選択**(`second`→`first`、`inc`→`quot`、局所変数の命名)は top-1 0〜0.3、
+  rank 2 が多く backtracking の入口にはなるが単独では信用できない。(3) **新規の名前・新規の式**は option に無い
+  = choice の外、変更 token の 86〜93%、穴の 36%。
+  - jev の実力の数字は **keyword 0.68 / symbol 0.40**(isolated 344 穴、chance 0.013 / 0.006)。第 6・7 反復の
+  0.89 は keyword に偏った 56 穴の数字で、一般化しない。
+  - symbol は候補が増えるほど落ちる(k 148 → 242 で 0.38 → 0.27)。255 の中で役割・型で刈るか、jev の top-k を
+  型検査・test に渡す二段構成が次の設計点。
+  - jev の呼び出し間の揺れ ±1.5 pt を下回る差は結論にしない。
+  - 残 gap(優先順): ① student を code-holes で訓練し in-domain / OOD を測る(Modal、$0.2 程度、
+  `modal run modal_app.py::encoder --data-dir data-holes`) ② `.kotoba` の pair が溜まったら kotoba-sema で刈って
+  同じ表 ③ repo-governance の gold 配線 ④ jev-latest alias 再測定。
+  - 保全した他者 WIP: superproject 本体 checkout の branch `bot/kinyu-20260919-gate-register-v2` と untracked
+  (`90-docs/business/fleet-kpi/` は edn が壊れており、pre-commit hook が本体 checkout からの commit/push を
+  止める。触っていない)。typed-decisions checkout の `data-holes/` `data-holes-repo/` は私の生成物(untracked、
+  `hole_data.py` で再生成可、慣例どおり commit しない)。")
+  (:adr/verification
+  "全部 kotoba-lang/typed-decisions main(10d7834)の `reports/`: jev-holes.json / jev-holes-run2.json(第6、
+  45 穴)、jev-holes-final-{file,file-role,repo,repo-role}.json(第7、56 穴 × 4 arm、kbb 41 run/arm)、
+  hole-data-stats.json / hole-eval-jev.json(第8、200 穴 unfiltered)/ hole-eval-jev-iso100.json(344 穴)、
+  hole-eval-jev-iso100-reshape.json / hole-data-repo-stats.json / hole-eval-jev-repo-iso100.json(第9)。
+  API cost 合計 ≈ $0.55、jev 呼び出し ≈ 1,300。kbb verdict は `mine_kotoba_tasks.run_case`(sha 時点の repo に
+  module 1 本を差し替えて実 test namespace)。両方向: BAD-ARGS / REFUSED 経路、gold-dropped-by-reshape、
+  unreachable を全部数えて印字。
+
+  着地: typed-decisions #1 74bccd0 / #2 fa2661b / #3 bc5d9b5 / #4 1f0a2dc / #5 6093867 / #6 10d7834。
+  superproject #3231 06dbd5c(jev-decide.cljk + adr-2609191200)。HF round trip を raw/resolve URL で確認。
+  worktree / branch は全部 remove 済み(`git worktree list` で確認)。")
+  (:adr/body
+  "正本は :adr/context / :adr/decision / :adr/consequences / :adr/verification。要旨: adr-2609191200 の
+  『jev は router/gate 専用』を測って訂正。駆動ループ・候補列挙・verifier を外から与えれば既存の名前への
+  繋ぎ替え refactor は choice だけで通る(rename 1 本 PASS、keyword 0.68 / symbol 0.40、較正ゲート 0.8 で精度
+  0.9)。新規の名前(36%)と意味変更は通らない。gold 付き code-holes family を HF に公開。次は student 訓練。")))
