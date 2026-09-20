@@ -490,8 +490,16 @@
         (let [abs (node-path.resolve repo target-rel)
               proj (project-of-abs abs)
               dir-exists? (exists? abs)
-              in-west? (contains? west proj)]
-          (when (or (not dir-exists?) (not in-west?))
+              in-west? (contains? west proj)
+              ;; 自分自身の repo 内を指す :local/root が未存在 = build scratch
+              ;; (例 cloud-murakumo の :mirror alias ".cljk-build/deps/<lib>"、
+              ;;  gitignore 済みで mirror script が生成する)。west の登録辺では
+              ;; ないので壊れ扱いしない。実測 2026-09-20: これを blocking と誤認し
+              ;;  west-triple-sync が fetch-ff を空振りした。
+              self-scratch? (= proj (str "orgs/" (node-path.basename org) "/"
+                                         (node-path.basename repo)))]
+          (when (and (or (not dir-exists?) (not in-west?))
+                     (not (and self-scratch? (not dir-exists?))))
             (swap! hits conj
                    {:consumer (str "orgs/" (node-path.basename org) "/"
                                    (node-path.basename repo) "/deps.edn")
