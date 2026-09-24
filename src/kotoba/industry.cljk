@@ -32,7 +32,7 @@
   over nil yields `{}`, so `by-id` would answer a complete-looking index
   over no data and `get-industry` nil for every ISIC class — a caller
   passing nothing must not receive that."
-  (:require [clojure.set :as set]
+  (:require [kotoba.lang.coll :as set]
             [kotoba.industry.embedded :as embedded]
             [kotoba.industry.wave :as wave]
             [kotoba.technology :as technology]))

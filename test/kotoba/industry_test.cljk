@@ -3,7 +3,7 @@
             [kotoba.industry :as industry]
             [kotoba.industry.embedded :as embedded]
             [kotoba.technology :as technology]
-            [clojure.set]))
+            [kotoba.lang.coll]))
 
 (def ^:private unprovided-technology-ids
   "Technology ids declared by a real industry that nothing in
@@ -46,7 +46,7 @@
                             (:industries (industry/registry))
                         t (concat required-technologies optional-technologies)]
                     t))]
-    (is (= unprovided-technology-ids (clojure.set/difference declared known))
+    (is (= unprovided-technology-ids (kotoba.lang.coll/difference declared known))
         "the backlog must only shrink -- build one, or stop declaring it")))
 
 (deftest every-industry-can-be-queried
